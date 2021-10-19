@@ -1,0 +1,6 @@
+edition = "2018"
+group_imports = "StdExternalCrate"
+imports_granularity = "Crate"
+imports_layout = "HorizontalVertical"
+normalize_comments = true
+wrap_comments = true
