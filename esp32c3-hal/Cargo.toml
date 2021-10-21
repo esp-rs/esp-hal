@@ -1,0 +1,26 @@
+[package]
+name = "esp32c3-hal"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+bare-metal = "1.0"
+embedded-hal = { version = "0.2", features = ["unproven"] }
+nb = "1.0"
+riscv = "0.7"
+void = { version = "1.0", default-features = false }
+
+[dependencies.esp32c3]
+path = "../../esp-pacs/esp32c3"
+
+[dependencies.riscv-rt] 
+git = "https://github.com/MabezDev/riscv-rt"
+rev = "6b55e4aa3895924e31bcd151f2f0ab840836fa07"
+optional = true
+
+[dev-dependencies]
+panic-halt = "0.2"
+
+[features]
+default = ["rt"]
+rt = ["esp32c3/rt", "riscv-rt"]
