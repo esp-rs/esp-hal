@@ -1,0 +1,22 @@
+[package]
+name = "esp32-hal"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+bare-metal = "1.0"
+embedded-hal = { version = "0.2", features = ["unproven"] }
+nb = "1.0"
+void = { version = "1.0", default-features = false }
+xtensa-lx = { version = "0.4", features = ["lx6"] }
+xtensa-lx-rt = { version = "0.7", optional = true, features = ["lx6"] }
+
+[dependencies.esp32]
+path = "../../esp-pacs/esp32"
+
+[dev-dependencies]
+panic-halt = "0.2"
+
+[features]
+default = ["rt"]
+rt = ["esp32/rt", "xtensa-lx-rt"]

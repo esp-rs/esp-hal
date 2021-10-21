@@ -1,0 +1,12 @@
+[target.xtensa-esp32-none-elf]
+runner = "xtensa-esp32-elf-gdb -q -x xtensa.gdb"
+
+[build]
+rustflags = [
+  "-C", "link-arg=-nostartfiles",
+  "-C", "link-arg=-Wl,-Tlink.x",
+]
+target = "xtensa-esp32-none-elf"
+
+[unstable]
+build-std = ["core"]
