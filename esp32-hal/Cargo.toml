@@ -14,6 +14,10 @@ xtensa-lx-rt = { version = "0.7", optional = true, features = ["lx6"] }
 [dependencies.esp32]
 path = "../../esp-pacs/esp32"
 
+[dependencies.esp-hal-common]
+path = "../esp-hal-common"
+features = ["enable-esp32"]
+
 [dev-dependencies]
 panic-halt = "0.2"
 

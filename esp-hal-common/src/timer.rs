@@ -35,6 +35,10 @@ pub trait Instance {
 
     fn reset_counter(&mut self) {
         self.as_timg0()
+            .t0loadlo
+            .write(|w| unsafe { w.t0_load_lo().bits(0) });
+
+        self.as_timg0()
             .t0loadhi
             .write(|w| unsafe { w.t0_load_hi().bits(0) });
 

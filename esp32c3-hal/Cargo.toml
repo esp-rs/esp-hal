@@ -13,6 +13,10 @@ void = { version = "1.0", default-features = false }
 [dependencies.esp32c3]
 path = "../../esp-pacs/esp32c3"
 
+[dependencies.esp-hal-common]
+path = "../esp-hal-common"
+features = ["enable-esp32c3"]
+
 [dependencies.riscv-rt] 
 git = "https://github.com/MabezDev/riscv-rt"
 rev = "6b55e4aa3895924e31bcd151f2f0ab840836fa07"
