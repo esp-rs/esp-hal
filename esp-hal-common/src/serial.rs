@@ -1,14 +1,7 @@
-//! UART Functionality (UART)
-//!
-//! Reference: ESP32-C3 TRM v0.3 Section 20 (as TRM)
-//!
-//! The ESP32-C3 has two identical UART groups UART0 and UART1.
-//!
-//! TODO:
-//! - Interrupt support
-
 use embedded_hal::serial::{Read, Write};
 
+#[cfg(feature = "enable-esp32")]
+use crate::pac::UART2;
 use crate::pac::{uart0::RegisterBlock, UART0, UART1};
 
 const UART_FIFO_SIZE: u16 = 128;
@@ -27,6 +20,7 @@ impl<T: Instance> Serial<T> {
         let mut serial = Serial { uart };
         serial.uart.disable_rx_interrupts();
         serial.uart.disable_tx_interrupts();
+
         Ok(serial)
     }
 }
@@ -85,22 +79,32 @@ pub trait Instance {
 
     /// Get the number of occupied entries in the tx fifo buffer
     fn get_tx_fifo_count(&mut self) -> u16 {
-        self.as_uart0().status.read().txfifo_cnt().bits()
+        self.as_uart0().status.read().txfifo_cnt().bits().into()
     }
 
     /// Get the number of occupied entries in the rx fifo buffer
     fn get_rx_fifo_count(&mut self) -> u16 {
-        self.as_uart0().status.read().rxfifo_cnt().bits()
+        self.as_uart0().status.read().rxfifo_cnt().bits().into()
     }
 
     /// Check if the UART TX statemachine is is idle
     fn is_tx_idle(&mut self) -> bool {
-        self.as_uart0().fsm_status.read().st_utx_out().bits() == 0x0u8
+        #[cfg(feature = "enable-esp32")]
+        let ret = self.as_uart0().status.read().st_utx_out().bits() == 0x0u8;
+        #[cfg(not(feature = "enable-esp32"))]
+        let ret = self.as_uart0().fsm_status.read().st_utx_out().bits() == 0x0u8;
+
+        ret
     }
 
     /// Check if the UART RX statemachine is is idle
     fn is_rx_idle(&mut self) -> bool {
-        self.as_uart0().fsm_status.read().st_urx_out().bits() == 0x0u8
+        #[cfg(feature = "enable-esp32")]
+        let ret = self.as_uart0().status.read().st_urx_out().bits() == 0x0u8;
+        #[cfg(not(feature = "enable-esp32"))]
+        let ret = self.as_uart0().fsm_status.read().st_urx_out().bits() == 0x0u8;
+
+        ret
     }
 }
 
@@ -164,6 +168,15 @@ impl Instance for UART0 {
 
 /// Specific instance implementation for the UART1 peripheral
 impl Instance for UART1 {
+    #[inline(always)]
+    fn as_uart0(&self) -> &RegisterBlock {
+        self
+    }
+}
+
+#[cfg(feature = "enable-esp32")]
+/// Specific instance implementation for the UART2 peripheral
+impl Instance for UART2 {
     #[inline(always)]
     fn as_uart0(&self) -> &RegisterBlock {
         self
