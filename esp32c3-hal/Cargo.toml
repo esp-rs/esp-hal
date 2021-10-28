@@ -15,7 +15,7 @@ path = "../../esp-pacs/esp32c3"
 
 [dependencies.esp-hal-common]
 path = "../esp-hal-common"
-features = ["enable-esp32c3"]
+features = ["32c3"]
 
 [dependencies.riscv-rt] 
 git = "https://github.com/MabezDev/riscv-rt"

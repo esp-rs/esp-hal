@@ -34,17 +34,15 @@ pub trait Instance {
     fn as_timg0(&self) -> &RegisterBlock;
 
     fn reset_counter(&mut self) {
-        self.as_timg0()
+        let reg_block = self.as_timg0();
+
+        reg_block
             .t0loadlo
             .write(|w| unsafe { w.t0_load_lo().bits(0) });
-
-        self.as_timg0()
+        reg_block
             .t0loadhi
             .write(|w| unsafe { w.t0_load_hi().bits(0) });
-
-        self.as_timg0()
-            .t0load
-            .write(|w| unsafe { w.t0_load().bits(1) });
+        reg_block.t0load.write(|w| unsafe { w.t0_load().bits(1) });
     }
 
     fn set_counter_active(&mut self, state: bool) {
@@ -82,24 +80,24 @@ pub trait Instance {
         let high = (value >> 32) as u32;
         let low = (value & 0xFFFF_FFFF) as u32;
 
-        self.as_timg0()
+        let reg_block = self.as_timg0();
+
+        reg_block
             .t0alarmlo
             .write(|w| unsafe { w.t0_alarm_lo().bits(low) });
-        self.as_timg0()
+        reg_block
             .t0alarmhi
             .write(|w| unsafe { w.t0_alarm_hi().bits(high) });
     }
 
     fn set_wdt_enabled(&mut self, enabled: bool) {
-        self.as_timg0()
+        let reg_block = self.as_timg0();
+
+        reg_block
             .wdtwprotect
             .write(|w| unsafe { w.wdt_wkey().bits(0u32) });
-
-        self.as_timg0()
-            .wdtconfig0
-            .write(|w| w.wdt_en().bit(enabled));
-
-        self.as_timg0()
+        reg_block.wdtconfig0.write(|w| w.wdt_en().bit(enabled));
+        reg_block
             .wdtwprotect
             .write(|w| unsafe { w.wdt_wkey().bits(0x50D8_3AA1u32) });
     }

@@ -1,2 +1,2 @@
-INCLUDE esp32c3-memory.x
+INCLUDE memory.x
 INCLUDE link.x

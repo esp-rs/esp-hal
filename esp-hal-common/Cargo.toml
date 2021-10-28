@@ -6,13 +6,18 @@ edition = "2018"
 [dependencies]
 embedded-hal = { version = "0.2", features = ["unproven"] }
 nb = "1.0"
+xtensa-lx = { version = "0.4", optional = true }
 void = { version = "1.0", default-features = false }
-# Each supported device MUST have its PAC included below.
+# IMPORTANT:
+# Each supported device MUST have its PAC included below along with a
+# corresponding feature.
 esp32   = { path = "../../esp-pacs/esp32",   optional = true }
 esp32c3 = { path = "../../esp-pacs/esp32c3", optional = true }
 esp32s2 = { path = "../../esp-pacs/esp32s2", optional = true }
+esp32s3 = { path = "../../esp-pacs/esp32s3", optional = true }
 
 [features]
-enable-esp32 = ["esp32"]
-enable-esp32c3 = ["esp32c3"]
-enable-esp32s2 = ["esp32s2"]
+32   = ["esp32",   "xtensa-lx/lx6"]
+32c3 = ["esp32c3"]
+32s2 = ["esp32s2", "xtensa-lx/lx6"] # FIXME
+32s3 = ["esp32s3", "xtensa-lx/lx6"] # FIXME

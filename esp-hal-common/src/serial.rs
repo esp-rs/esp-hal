@@ -1,6 +1,6 @@
 use embedded_hal::serial::{Read, Write};
 
-#[cfg(feature = "enable-esp32")]
+#[cfg(any(feature = "32", feature = "32s3"))]
 use crate::pac::UART2;
 use crate::pac::{uart0::RegisterBlock, UART0, UART1};
 
@@ -89,9 +89,9 @@ pub trait Instance {
 
     /// Check if the UART TX statemachine is is idle
     fn is_tx_idle(&mut self) -> bool {
-        #[cfg(feature = "enable-esp32")]
+        #[cfg(feature = "32")]
         let ret = self.as_uart0().status.read().st_utx_out().bits() == 0x0u8;
-        #[cfg(not(feature = "enable-esp32"))]
+        #[cfg(not(feature = "32"))]
         let ret = self.as_uart0().fsm_status.read().st_utx_out().bits() == 0x0u8;
 
         ret
@@ -99,9 +99,9 @@ pub trait Instance {
 
     /// Check if the UART RX statemachine is is idle
     fn is_rx_idle(&mut self) -> bool {
-        #[cfg(feature = "enable-esp32")]
+        #[cfg(feature = "32")]
         let ret = self.as_uart0().status.read().st_urx_out().bits() == 0x0u8;
-        #[cfg(not(feature = "enable-esp32"))]
+        #[cfg(not(feature = "32"))]
         let ret = self.as_uart0().fsm_status.read().st_urx_out().bits() == 0x0u8;
 
         ret
@@ -117,10 +117,18 @@ impl<T: Instance> Write<u8> for Serial<T> {
         if self.uart.get_tx_fifo_count() >= UART_FIFO_SIZE {
             Err(nb::Error::WouldBlock)
         } else {
+            #[cfg(feature = "32")]
+            self.uart
+                .as_uart0()
+                .fifo()
+                .write(|w| unsafe { w.rxfifo_rd_byte().bits(word) });
+
+            #[cfg(not(feature = "32"))]
             self.uart
                 .as_uart0()
                 .fifo
                 .write(|w| unsafe { w.rxfifo_rd_byte().bits(word) });
+
             Ok(())
         }
     }
@@ -142,7 +150,12 @@ impl<T: Instance> Read<u8> for Serial<T> {
     /// Reads a single word from the serial interface
     fn read(&mut self) -> nb::Result<u8, Self::Error> {
         if self.uart.get_rx_fifo_count() > 0 {
-            Ok(self.uart.as_uart0().fifo.read().rxfifo_rd_byte().bits())
+            #[cfg(feature = "32")]
+            let value = self.uart.as_uart0().fifo().read().rxfifo_rd_byte().bits();
+            #[cfg(not(feature = "32"))]
+            let value = self.uart.as_uart0().fifo.read().rxfifo_rd_byte().bits();
+
+            Ok(value)
         } else {
             Err(nb::Error::WouldBlock)
         }
@@ -174,7 +187,7 @@ impl Instance for UART1 {
     }
 }
 
-#[cfg(feature = "enable-esp32")]
+#[cfg(any(feature = "32", feature = "32s3"))]
 /// Specific instance implementation for the UART2 peripheral
 impl Instance for UART2 {
     #[inline(always)]

@@ -16,7 +16,7 @@ path = "../../esp-pacs/esp32"
 
 [dependencies.esp-hal-common]
 path = "../esp-hal-common"
-features = ["enable-esp32"]
+features = ["32"]
 
 [dev-dependencies]
 panic-halt = "0.2"
