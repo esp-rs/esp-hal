@@ -11,13 +11,8 @@ pub struct Timer<T> {
 }
 
 pub enum Error {
-    /// Report that the timer is active and certain management
-    /// operations cannot be performed safely
     TimerActive,
-    /// Report that the timer is inactive and thus not
-    /// ever reaching any potentially configured alarm value
     TimerInactive,
-    /// Report that the alarm functionality is disabled
     AlarmInactive,
 }
 
@@ -31,48 +26,56 @@ where
 }
 
 pub trait Instance {
-    fn as_timg0(&self) -> &RegisterBlock;
+    fn register_block(&self) -> &RegisterBlock;
 
     fn reset_counter(&mut self) {
-        let reg_block = self.as_timg0();
+        let reg_block = self.register_block();
 
         reg_block
             .t0loadlo
             .write(|w| unsafe { w.t0_load_lo().bits(0) });
+
         reg_block
             .t0loadhi
             .write(|w| unsafe { w.t0_load_hi().bits(0) });
+
         reg_block.t0load.write(|w| unsafe { w.t0_load().bits(1) });
     }
 
     fn set_counter_active(&mut self, state: bool) {
-        self.as_timg0().t0config.modify(|_, w| w.t0_en().bit(state));
+        self.register_block()
+            .t0config
+            .modify(|_, w| w.t0_en().bit(state));
     }
 
     fn is_counter_active(&mut self) -> bool {
-        self.as_timg0().t0config.read().t0_en().bit_is_set()
+        self.register_block().t0config.read().t0_en().bit_is_set()
     }
 
     fn set_counter_decrementing(&mut self, decrementing: bool) {
-        self.as_timg0()
+        self.register_block()
             .t0config
             .modify(|_, w| w.t0_increase().bit(!decrementing));
     }
 
     fn set_auto_reload(&mut self, auto_reload: bool) {
-        self.as_timg0()
+        self.register_block()
             .t0config
             .modify(|_, w| w.t0_autoreload().bit(auto_reload));
     }
 
     fn set_alarm_active(&mut self, state: bool) {
-        self.as_timg0()
+        self.register_block()
             .t0config
             .modify(|_, w| w.t0_alarm_en().bit(state));
     }
 
     fn is_alarm_active(&mut self) -> bool {
-        self.as_timg0().t0config.read().t0_alarm_en().bit_is_set()
+        self.register_block()
+            .t0config
+            .read()
+            .t0_alarm_en()
+            .bit_is_set()
     }
 
     fn load_alarm_value(&mut self, value: u64) {
@@ -80,23 +83,26 @@ pub trait Instance {
         let high = (value >> 32) as u32;
         let low = (value & 0xFFFF_FFFF) as u32;
 
-        let reg_block = self.as_timg0();
+        let reg_block = self.register_block();
 
         reg_block
             .t0alarmlo
             .write(|w| unsafe { w.t0_alarm_lo().bits(low) });
+
         reg_block
             .t0alarmhi
             .write(|w| unsafe { w.t0_alarm_hi().bits(high) });
     }
 
     fn set_wdt_enabled(&mut self, enabled: bool) {
-        let reg_block = self.as_timg0();
+        let reg_block = self.register_block();
 
         reg_block
             .wdtwprotect
             .write(|w| unsafe { w.wdt_wkey().bits(0u32) });
+
         reg_block.wdtconfig0.write(|w| w.wdt_en().bit(enabled));
+
         reg_block
             .wdtwprotect
             .write(|w| unsafe { w.wdt_wkey().bits(0x50D8_3AA1u32) });
@@ -130,30 +136,18 @@ where
             panic!("Called wait on an inactive timer!");
         }
 
-        let int_raw_is_clear = self
-            .timg
-            .as_timg0()
-            .int_raw_timers
-            .read()
-            .t0_int_raw()
-            .bit_is_clear();
+        let reg_block = self.timg.register_block();
 
-        if int_raw_is_clear {
-            Err(nb::Error::WouldBlock)
-        } else {
-            self.timg
-                .as_timg0()
-                .int_clr_timers
-                .write(|w| w.t0_int_clr().set_bit());
-
+        if reg_block.int_raw_timers.read().t0_int_raw().bit_is_set() {
+            reg_block.int_clr_timers.write(|w| w.t0_int_clr().set_bit());
             self.timg.set_alarm_active(true);
 
             Ok(())
+        } else {
+            Err(nb::Error::WouldBlock)
         }
     }
 }
-
-impl<T> Periodic for Timer<T> where T: Instance {}
 
 impl<T> Cancel for Timer<T>
 where
@@ -174,6 +168,8 @@ where
     }
 }
 
+impl<T> Periodic for Timer<T> where T: Instance {}
+
 impl<T> WatchdogDisable for Timer<T>
 where
     T: Instance,
@@ -185,14 +181,14 @@ where
 
 impl Instance for TIMG0 {
     #[inline(always)]
-    fn as_timg0(&self) -> &RegisterBlock {
+    fn register_block(&self) -> &RegisterBlock {
         self
     }
 }
 
 impl Instance for TIMG1 {
     #[inline(always)]
-    fn as_timg0(&self) -> &RegisterBlock {
+    fn register_block(&self) -> &RegisterBlock {
         self
     }
 }

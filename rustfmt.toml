@@ -1,4 +1,5 @@
 edition = "2018"
+enum_discrim_align_threshold = 15
 group_imports = "StdExternalCrate"
 imports_granularity = "Crate"
 imports_layout = "HorizontalVertical"
