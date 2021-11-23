@@ -3,4 +3,6 @@ members = [
     "esp-hal-common",
     "esp32-hal",
     "esp32c3-hal",
+    "esp32s2-hal",
+    "esp32s3-hal",
 ]
