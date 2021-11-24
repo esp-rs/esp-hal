@@ -18,7 +18,7 @@ fn main() -> ! {
     rtc_cntl.set_wdt_enable(false);
     timer0.disable();
 
-    let mut led = io.pins.gpio2.into_push_pull_output();
+    let mut led = io.pins.gpio3.into_push_pull_output();
     led.set_high().unwrap();
 
     timer0.start(10_000_000u64);
