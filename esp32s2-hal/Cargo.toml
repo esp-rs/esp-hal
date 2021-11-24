@@ -10,12 +10,9 @@ nb = "1.0"
 void = { version = "1.0", default-features = false }
 xtensa-lx = { version = "0.4", features = ["lx6"] } # FIXME
 
-[dependencies.esp32s2]
-path = "../../esp-pacs/esp32s2"
-
 [dependencies.esp-hal-common]
 path = "../esp-hal-common"
-features = ["32s2"]
+features = ["esp32s2"]
 
 [dependencies.xtensa-lx-rt]
 git = "https://github.com/esp-rs/xtensa-lx-rt/"
@@ -28,4 +25,4 @@ panic-halt = "0.2"
 
 [features]
 default = ["rt"]
-rt = ["esp32s2/rt", "xtensa-lx-rt"]
+rt = ["xtensa-lx-rt"]

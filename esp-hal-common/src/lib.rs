@@ -1,13 +1,13 @@
 #![no_std]
 
-#[cfg(feature = "32")]
-pub use esp32 as pac;
-#[cfg(feature = "32c3")]
-pub use esp32c3 as pac;
-#[cfg(feature = "32s2")]
-pub use esp32s2 as pac;
-#[cfg(feature = "32s3")]
-pub use esp32s3 as pac;
+#[cfg(feature = "esp32")]
+pub use esp32_pac as pac;
+#[cfg(feature = "esp32c3")]
+pub use esp32c3_pac as pac;
+#[cfg(feature = "esp32s2")]
+pub use esp32s2_pac as pac;
+#[cfg(feature = "esp32s3")]
+pub use esp32s3_pac as pac;
 
 pub mod prelude;
 pub mod serial;

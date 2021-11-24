@@ -9,18 +9,20 @@ embedded-hal = { version = "0.2", features = ["unproven"] }
 nb = "1.0"
 void = { version = "1.0", default-features = false }
 xtensa-lx = { version = "0.4", features = ["lx6"] }
-xtensa-lx-rt = { version = "0.7", optional = true, features = ["lx6"] }
-
-[dependencies.esp32]
-path = "../../esp-pacs/esp32"
 
 [dependencies.esp-hal-common]
 path = "../esp-hal-common"
-features = ["32"]
+features = ["esp32"]
+
+[dependencies.xtensa-lx-rt]
+git = "https://github.com/esp-rs/xtensa-lx-rt/"
+branch = "unify-xtensa-asm"
+features = ["lx6"]
+optional = true
 
 [dev-dependencies]
 panic-halt = "0.2"
 
 [features]
 default = ["rt"]
-rt = ["esp32/rt", "xtensa-lx-rt"]
+rt = ["xtensa-lx-rt"]

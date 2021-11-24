@@ -1,23 +1,24 @@
 [package]
-name = "esp-hal-common"
+name    = "esp-hal-common"
 version = "0.1.0"
 edition = "2018"
 
 [dependencies]
 embedded-hal = { version = "0.2", features = ["unproven"] }
-nb = "1.0"
-xtensa-lx = { version = "0.4", optional = true }
-void = { version = "1.0", default-features = false }
+nb           = "1.0"
+riscv        = { version = "0.7", optional = true }
+void         = { version = "1.0", default-features = false }
+xtensa-lx    = { version = "0.4", optional = true }
 # IMPORTANT:
 # Each supported device MUST have its PAC included below along with a
 # corresponding feature.
-esp32   = { path = "../../esp-pacs/esp32",   optional = true }
-esp32c3 = { path = "../../esp-pacs/esp32c3", optional = true }
-esp32s2 = { path = "../../esp-pacs/esp32s2", optional = true }
-esp32s3 = { path = "../../esp-pacs/esp32s3", optional = true }
+esp32_pac   = { package = "esp32",   git = "https://github.com/jessebraham/esp32.git",   branch = "develop", optional = true }
+esp32c3_pac = { package = "esp32c3", git = "https://github.com/jessebraham/esp32c3.git", branch = "develop", optional = true }
+esp32s2_pac = { package = "esp32s2", git = "https://github.com/jessebraham/esp32s2.git", branch = "develop", optional = true }
+esp32s3_pac = { package = "esp32s3", git = "https://github.com/jessebraham/esp32s3.git", branch = "develop", optional = true }
 
 [features]
-32   = ["esp32",   "xtensa-lx/lx6"]
-32c3 = ["esp32c3"]
-32s2 = ["esp32s2", "xtensa-lx/lx6"] # FIXME
-32s3 = ["esp32s3", "xtensa-lx/lx6"] # FIXME
+esp32   = ["esp32_pac",   "esp32_pac/rt",   "xtensa-lx/lx6"]
+esp32c3 = ["esp32c3_pac", "esp32c3_pac/rt", "riscv"]
+esp32s2 = ["esp32s2_pac", "esp32s2_pac/rt", "xtensa-lx/lx6"] # FIXME
+esp32s3 = ["esp32s3_pac", "esp32s3_pac/rt", "xtensa-lx/lx6"] # FIXME

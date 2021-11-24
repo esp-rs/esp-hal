@@ -1,6 +1,6 @@
 use embedded_hal::serial::{Read, Write};
 
-#[cfg(any(feature = "32", feature = "32s3"))]
+#[cfg(any(feature = "esp32", feature = "esp32s3"))]
 use crate::pac::UART2;
 use crate::pac::{uart0::RegisterBlock, UART0, UART1};
 
@@ -89,18 +89,18 @@ pub trait Instance {
     }
 
     fn is_tx_idle(&mut self) -> bool {
-        #[cfg(feature = "32")]
+        #[cfg(feature = "esp32")]
         let idle = self.register_block().status.read().st_utx_out().bits() == 0x0u8;
-        #[cfg(not(feature = "32"))]
+        #[cfg(not(feature = "esp32"))]
         let idle = self.register_block().fsm_status.read().st_utx_out().bits() == 0x0u8;
 
         idle
     }
 
     fn is_rx_idle(&mut self) -> bool {
-        #[cfg(feature = "32")]
+        #[cfg(feature = "esp32")]
         let idle = self.register_block().status.read().st_urx_out().bits() == 0x0u8;
-        #[cfg(not(feature = "32"))]
+        #[cfg(not(feature = "esp32"))]
         let idle = self.register_block().fsm_status.read().st_urx_out().bits() == 0x0u8;
 
         idle
@@ -112,13 +112,13 @@ impl<T: Instance> Write<u8> for Serial<T> {
 
     fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
         if self.uart.get_tx_fifo_count() < UART_FIFO_SIZE {
-            #[cfg(feature = "32")]
+            #[cfg(feature = "esp32")]
             self.uart
                 .register_block()
                 .fifo()
                 .write(|w| unsafe { w.rxfifo_rd_byte().bits(word) });
 
-            #[cfg(not(feature = "32"))]
+            #[cfg(not(feature = "esp32"))]
             self.uart
                 .register_block()
                 .fifo
@@ -144,7 +144,7 @@ impl<T: Instance> Read<u8> for Serial<T> {
 
     fn read(&mut self) -> nb::Result<u8, Self::Error> {
         if self.uart.get_rx_fifo_count() > 0 {
-            #[cfg(feature = "32")]
+            #[cfg(feature = "esp32")]
             let value = self
                 .uart
                 .register_block()
@@ -153,7 +153,7 @@ impl<T: Instance> Read<u8> for Serial<T> {
                 .rxfifo_rd_byte()
                 .bits();
 
-            #[cfg(not(feature = "32"))]
+            #[cfg(not(feature = "esp32"))]
             let value = self
                 .uart
                 .register_block()
@@ -192,7 +192,7 @@ impl Instance for UART1 {
     }
 }
 
-#[cfg(any(feature = "32", feature = "32s3"))]
+#[cfg(any(feature = "esp32", feature = "esp32s3"))]
 impl Instance for UART2 {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
