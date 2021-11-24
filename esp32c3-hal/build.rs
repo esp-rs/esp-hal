@@ -14,6 +14,11 @@ fn main() {
         .write_all(include_bytes!("esp32c3-link.x"))
         .unwrap();
 
+    File::create(out.join("riscv-link.x"))
+        .unwrap()
+        .write_all(include_bytes!("riscv-link.x"))
+        .unwrap();        
+
     println!("cargo:rustc-link-search={}", out.display());
 
     // Only re-run the build script when memory.x is changed,
