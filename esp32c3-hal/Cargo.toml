@@ -25,3 +25,6 @@ panic-halt = "0.2"
 [features]
 default = ["rt"]
 rt = ["riscv-rt"]
+
+[package.metadata.espflash]
+format = "direct-boot"
