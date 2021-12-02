@@ -112,13 +112,6 @@ impl<T: Instance> Write<u8> for Serial<T> {
 
     fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
         if self.uart.get_tx_fifo_count() < UART_FIFO_SIZE {
-            #[cfg(feature = "esp32")]
-            self.uart
-                .register_block()
-                .fifo()
-                .write(|w| unsafe { w.rxfifo_rd_byte().bits(word) });
-
-            #[cfg(not(feature = "esp32"))]
             self.uart
                 .register_block()
                 .fifo
@@ -144,16 +137,6 @@ impl<T: Instance> Read<u8> for Serial<T> {
 
     fn read(&mut self) -> nb::Result<u8, Self::Error> {
         if self.uart.get_rx_fifo_count() > 0 {
-            #[cfg(feature = "esp32")]
-            let value = self
-                .uart
-                .register_block()
-                .fifo()
-                .read()
-                .rxfifo_rd_byte()
-                .bits();
-
-            #[cfg(not(feature = "esp32"))]
             let value = self
                 .uart
                 .register_block()

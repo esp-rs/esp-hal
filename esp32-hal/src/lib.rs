@@ -1,7 +1,9 @@
 #![no_std]
 
 pub use embedded_hal as ehal;
-pub use esp_hal_common::{pac, prelude, Serial, Timer};
+pub use esp_hal_common::{gpio as hal_gpio, pac, prelude, Serial, Timer};
+
+pub mod gpio;
 
 #[no_mangle]
 extern "C" fn DefaultHandler(_level: u32, _interrupt: pac::Interrupt) {}

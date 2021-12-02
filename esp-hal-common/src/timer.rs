@@ -99,13 +99,17 @@ pub trait Instance {
 
         reg_block
             .wdtwprotect
-            .write(|w| unsafe { w.wdt_wkey().bits(0u32) });
+            .write(|w| unsafe { w.wdt_wkey().bits(0x50D8_3AA1u32) });
 
-        reg_block.wdtconfig0.write(|w| w.wdt_en().bit(enabled));
+        if !enabled {
+            reg_block.wdtconfig0.write(|w| unsafe { w.bits(0) });
+        } else {
+            reg_block.wdtconfig0.write(|w| w.wdt_en().bit(true));
+        }
 
         reg_block
             .wdtwprotect
-            .write(|w| unsafe { w.wdt_wkey().bits(0x50D8_3AA1u32) });
+            .write(|w| unsafe { w.wdt_wkey().bits(0u32) });
     }
 }
 

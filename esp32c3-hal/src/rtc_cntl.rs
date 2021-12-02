@@ -30,9 +30,13 @@ impl RtcCntl {
     pub fn set_wdt_enable(&self, enable: bool) {
         self.set_wdt_write_protection(false);
 
-        self.rtc_cntl
-            .rtc_wdtconfig0
-            .write(|w| w.wdt_en().bit(enable));
+        if !enable {
+            self.rtc_cntl.rtc_wdtconfig0.write(|w| unsafe { w.bits(0) });
+        } else {
+            self.rtc_cntl
+                .rtc_wdtconfig0
+                .write(|w| w.wdt_en().bit(enable));
+        }
 
         self.set_wdt_write_protection(true);
     }
