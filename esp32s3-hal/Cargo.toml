@@ -1,22 +1,42 @@
 [package]
-name = "esp32s3-hal"
+name    = "esp32s3-hal"
 version = "0.1.0"
-edition = "2018"
+authors = [
+    "Jesse Braham <jesse@beta7.io>",
+    "Björn Quentin <bjoern.quentin@mobile-j.de>",
+]
+edition     = "2021"
+description = "HAL for ESP32-S3 microcontrollers"
+repository  = "https://github.com/esp-rs/esp-hal"
+license     = "MIT OR Apache-2.0"
+
+keywords = [
+    "embedded",
+    "embedded-hal",
+    "esp",
+    "esp32s3",
+    "no-std",
+]
+categories = [
+    "embedded",
+    "hardware-support",
+    "no-std",
+]
 
 [dependencies]
-bare-metal = "1.0"
+bare-metal   = "1.0"
 embedded-hal = { version = "0.2", features = ["unproven"] }
-nb = "1.0"
-void = { version = "1.0", default-features = false }
-xtensa-lx = { version = "0.4", features = ["lx6"] } # FIXME
+nb           = "1.0"
+void         = { version = "1.0", default-features = false }
+xtensa-lx    = { version = "0.4", features = ["lx6"] } # FIXME
 
 [dependencies.esp-hal-common]
-path = "../esp-hal-common"
+path     = "../esp-hal-common"
 features = ["esp32s3"]
 
-[dependencies.xtensa-lx-rt]
-git = "https://github.com/esp-rs/xtensa-lx-rt/"
-branch = "unify-xtensa-asm"
+[dependencies.xtensa-lx-rt] # FIXME
+git      = "https://github.com/esp-rs/xtensa-lx-rt/"
+branch   = "unify-xtensa-asm"
 features = ["lx6"]
 optional = true
 
@@ -25,4 +45,4 @@ panic-halt = "0.2"
 
 [features]
 default = ["rt"]
-rt = ["xtensa-lx-rt"]
+rt      = ["xtensa-lx-rt"]

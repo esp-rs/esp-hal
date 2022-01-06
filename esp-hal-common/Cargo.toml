@@ -1,19 +1,26 @@
 [package]
 name    = "esp-hal-common"
 version = "0.1.0"
-edition = "2018"
+authors = [
+    "Jesse Braham <jesse@beta7.io>",
+    "Björn Quentin <bjoern.quentin@mobile-j.de>",
+]
+edition     = "2021"
+description = "HAL implementations for peripherals common among Espressif devices; should not be used directly"
+repository  = "https://github.com/esp-rs/esp-hal"
+license     = "MIT OR Apache-2.0"
 
 [dependencies]
-paste = "1.0.6"
 embedded-hal = { version = "0.2", features = ["unproven"] }
 nb           = "1.0"
+paste        = "1.0"
 riscv        = { version = "0.7", optional = true }
 void         = { version = "1.0", default-features = false }
 xtensa-lx    = { version = "0.4", optional = true }
 # IMPORTANT:
 # Each supported device MUST have its PAC included below along with a
 # corresponding feature.
-esp32_pac   = { package = "esp32", git = "https://github.com/jessebraham/esp32.git", branch = "develop", optional = true }
+esp32_pac   = { package = "esp32",   git = "https://github.com/jessebraham/esp32.git",   branch = "develop", optional = true }
 esp32c3_pac = { package = "esp32c3", git = "https://github.com/jessebraham/esp32c3.git", branch = "develop", optional = true }
 esp32s2_pac = { package = "esp32s2", git = "https://github.com/jessebraham/esp32s2.git", branch = "develop", optional = true }
 esp32s3_pac = { package = "esp32s3", git = "https://github.com/jessebraham/esp32s3.git", branch = "develop", optional = true }
