@@ -1,4 +1,7 @@
 {
+    "rust-analyzer.cargo.features": [
+        "esp32c3"
+    ],
     "editor.formatOnSave": true,
     "rust-analyzer.checkOnSave.allTargets": false
 }
