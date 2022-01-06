@@ -1,4 +1,3 @@
-pub use crate::prelude::*;
 pub use paste::paste;
 
 #[macro_export]
@@ -7,8 +6,8 @@ macro_rules! impl_output {
         $gpio_function:ident,
         $pxi:ident:
         (
-            $pin_num:expr, $iomux_reg:expr, $bit:expr, $out_en_set:ident, $out_en_clear:ident,
-            $out_set:ident, $out_clear:ident, $out_reg:ident
+            $pin_num:expr, $iomux_reg:expr, $bit:expr, $out_en_set:ident,
+            $out_en_clear:ident, $out_set:ident, $out_clear:ident, $out_reg:ident
         )
         $( ,( $( $af_signal:ident: $af:ident ),* ))?
     ) => {
@@ -84,8 +83,6 @@ macro_rules! impl_output {
                             .clear_bit()
                     });
                 }
-
-
             }
 
             pub fn into_push_pull_output(self) -> $pxi<Output<PushPull>> {
@@ -159,8 +156,8 @@ macro_rules! impl_output {
             fn internal_pull_up_in_sleep_mode(&mut self, on: bool) -> &mut Self {
                 paste! {
                     unsafe { &*IO_MUX::ptr() }
-                    .$iomux_reg
-                    .modify(|_, w| w.mcu_wpu().bit(on));
+                        .$iomux_reg
+                        .modify(|_, w| w.mcu_wpu().bit(on));
                 }
                 self
             }
@@ -168,8 +165,8 @@ macro_rules! impl_output {
             fn internal_pull_down_in_sleep_mode(&mut self, on: bool) -> &mut Self {
                 paste!{
                     unsafe { &*IO_MUX::ptr() }
-                    .$iomux_reg
-                    .modify(|_, w| w.mcu_wpd().bit(on));
+                        .$iomux_reg
+                        .modify(|_, w| w.mcu_wpd().bit(on));
                 }
                 self
             }
@@ -177,8 +174,8 @@ macro_rules! impl_output {
             fn enable_output_in_sleep_mode(&mut self, on: bool) -> &mut Self {
                 paste! {
                     unsafe { &*IO_MUX::ptr() }
-                    .$iomux_reg
-                    .modify(|_, w| w.mcu_oe().bit(on));
+                        .$iomux_reg
+                        .modify(|_, w| w.mcu_oe().bit(on));
                 }
                 self
             }
@@ -240,11 +237,15 @@ macro_rules! impl_output {
 
 #[macro_export]
 macro_rules! impl_input {
-    ($gpio_function:ident,
+    (
+        $gpio_function:ident,
         $pxi:ident:
-        ($pin_num:expr, $iomux_reg:expr, $bit:expr, $out_en_clear:ident, $reg:ident, $reader:ident,
-            $status_w1tc:ident, $pcpu_int:ident, $pcpu_nmi:ident, $acpu_int:ident, $acpu_nmi:ident
-        ) $( ,( $( $af_signal:ident : $af:ident ),* ))?
+        (
+            $pin_num:expr, $iomux_reg:expr, $bit:expr, $out_en_clear:ident,
+            $reg:ident, $reader:ident, $status_w1tc:ident, $pcpu_int:ident,
+            $pcpu_nmi:ident, $acpu_int:ident, $acpu_nmi:ident
+        )
+        $( ,( $( $af_signal:ident : $af:ident ),* ))?
     ) => {
         impl<MODE> embedded_hal::digital::v2::InputPin for $pxi<Input<MODE>> {
             type Error = Infallible;
@@ -263,28 +264,26 @@ macro_rules! impl_input {
                 let gpio = unsafe { &*GPIO::ptr() };
                 let iomux = unsafe { &*IO_MUX::ptr() };
 
-
                 gpio.$out_en_clear
                     .write(|w| unsafe { w.bits(1 << $bit) });
 
                 gpio.func_out_sel_cfg[$pin_num]
                     .modify(|_, w| unsafe { w.out_sel().bits(OutputSignal::GPIO as OutputSignalType) });
 
-
-                    paste! {
-                        iomux.$iomux_reg.modify(|_, w| unsafe {
-                            w.mcu_sel()
-                                .bits(2)
-                                .fun_ie()
-                                .set_bit()
-                                .fun_wpd()
-                                .bit(pull_down)
-                                .fun_wpu()
-                                .bit(pull_up)
-                                .slp_sel()
-                                .clear_bit()
-                        });
-                    }
+                paste! {
+                    iomux.$iomux_reg.modify(|_, w| unsafe {
+                        w.mcu_sel()
+                            .bits(2)
+                            .fun_ie()
+                            .set_bit()
+                            .fun_wpd()
+                            .bit(pull_down)
+                            .fun_wpu()
+                            .bit(pull_up)
+                            .slp_sel()
+                            .clear_bit()
+                    });
+                }
             }
 
             pub fn into_floating_input(self) -> $pxi<Input<Floating>> {
@@ -328,11 +327,9 @@ macro_rules! impl_input {
                 force_via_gpio_mux: bool,
             ) -> &mut Self {
 
-                let af = if force_via_gpio_mux
-                {
+                let af = if force_via_gpio_mux {
                     AlternateFunction::$gpio_function
-                }
-                else {
+                } else {
                     match signal {
                         $( $(
                             InputSignal::$af_signal => AlternateFunction::$af,
@@ -430,8 +427,6 @@ macro_rules! impl_input {
             }
 
             fn enable_hold(&mut self, _on: bool) {
-
-
                 todo!();
             }
         }
@@ -439,80 +434,127 @@ macro_rules! impl_input {
 }
 
 #[macro_export]
-macro_rules! impl_pin_wrap {
-    ($gpio_function:ident, $pxi:ident, $pin_num:expr, $iomux_reg:expr, $type:ident, Bank0, SingleCore
+macro_rules! impl_input_wrap {
+    (
+        $gpio_function:ident, $pxi:ident, $pin_num:expr, $iomux_reg:expr, $type:ident, Bank0, SingleCore
         $( ,( $( $af_input_signal:ident : $af_input:ident ),* ) )?
     ) => {
-        impl_input!($gpio_function, $pxi: ($pin_num, $iomux_reg, $pin_num % 32, enable_w1tc, in_, data_next,
-            status_w1tc, pcpu_int, pcpu_nmi_int, pcpu_int, pcpu_nmi_int)
-            $( ,( $( $af_input_signal: $af_input ),* ) )? );
-    };
-    ($gpio_function:ident, $pxi:ident, $pin_num:expr, $iomux_reg:expr, $type:ident, Bank1, SingleCore
-        $( ,( $( $af_input_signal:ident : $af_input:ident ),* ) )?
-    ) => {
-        impl_input!($gpio_function, $pxi: ($pin_num, $iomux_reg, $pin_num % 32, enable1_w1tc, in1, data_next,
-            status1_w1tc, pcpu_int1, pcpu_nmi_int1, pcpu_int1, pcpu_nmi_int1)
-            $( ,( $( $af_input_signal: $af_input ),* ) )? );
+        impl_input!(
+            $gpio_function,
+            $pxi:
+            (
+                $pin_num, $iomux_reg, $pin_num % 32, enable_w1tc, in_, data_next,
+                status_w1tc, pcpu_int, pcpu_nmi_int, pcpu_int, pcpu_nmi_int
+            )
+            $( ,( $( $af_input_signal: $af_input ),* ) )?
+        );
     };
 
-    ($gpio_function:ident, $pxi:ident, $pin_num:expr, $iomux_reg:expr, $type:ident, Bank0, DualCore
+    (
+        $gpio_function:ident, $pxi:ident, $pin_num:expr, $iomux_reg:expr, $type:ident, Bank1, SingleCore
         $( ,( $( $af_input_signal:ident : $af_input:ident ),* ) )?
     ) => {
-        impl_input!($gpio_function, $pxi: ($pin_num, $iomux_reg, $pin_num % 32, enable_w1tc, in_, data_next,
-            status_w1tc, pcpu_int, pcpu_nmi_int, acpu_int, acpu_nmi_int)
-            $( ,( $( $af_input_signal: $af_input ),* ) )? );
+        impl_input!(
+            $gpio_function,
+            $pxi:
+            (
+                $pin_num, $iomux_reg, $pin_num % 32, enable1_w1tc, in1, data_next,
+                status1_w1tc, pcpu_int1, pcpu_nmi_int1, pcpu_int1, pcpu_nmi_int1
+            )
+            $( ,( $( $af_input_signal: $af_input ),* ) )?
+        );
     };
-    ($gpio_function:ident, $pxi:ident, $pin_num:expr, $iomux_reg:expr, $type:ident, Bank1, DualCore
+
+    (
+        $gpio_function:ident, $pxi:ident, $pin_num:expr, $iomux_reg:expr, $type:ident, Bank0, DualCore
         $( ,( $( $af_input_signal:ident : $af_input:ident ),* ) )?
     ) => {
-        impl_input!($gpio_function, $pxi: ($pin_num, $iomux_reg, $pin_num % 32, enable1_w1tc, in1, data_next,
-            status1_w1tc, pcpu_int1, pcpu_nmi_int1, acpu_int1, acpu_nmi_int1)
-            $( ,( $( $af_input_signal: $af_input ),* ) )? );
+        impl_input!(
+            $gpio_function,
+            $pxi:
+            (
+                $pin_num, $iomux_reg, $pin_num % 32, enable_w1tc, in_, data_next,
+                status_w1tc, pcpu_int, pcpu_nmi_int, acpu_int, acpu_nmi_int
+            )
+            $( ,( $( $af_input_signal: $af_input ),* ) )?
+        );
+    };
+
+    (
+        $gpio_function:ident, $pxi:ident, $pin_num:expr, $iomux_reg:expr, $type:ident, Bank1, DualCore
+        $( ,( $( $af_input_signal:ident : $af_input:ident ),* ) )?
+    ) => {
+        impl_input!(
+            $gpio_function,
+            $pxi:
+            (
+                $pin_num, $iomux_reg, $pin_num % 32, enable1_w1tc, in1, data_next,
+                status1_w1tc, pcpu_int1, pcpu_nmi_int1, acpu_int1, acpu_nmi_int1
+            )
+            $( ,( $( $af_input_signal: $af_input ),* ) )?
+        );
     };
 }
 
 #[macro_export]
 macro_rules! impl_output_wrap {
-    ($gpio_function:ident, $pxi:ident, $pin_num:expr, $iomux_reg:expr, IO, Bank0
+    (
+        $gpio_function:ident, $pxi:ident, $pin_num:expr, $iomux_reg:expr, IO, Bank0
         $( ,( $( $af_output_signal:ident : $af_output:ident ),* ))?
     ) => {
-        impl_output!($gpio_function, $pxi:
-            ($pin_num, $iomux_reg, $pin_num % 32, enable_w1ts, enable_w1tc, out_w1ts, out_w1tc, out)
-
-            $( ,( $( $af_output_signal: $af_output ),* ) )? );
+        impl_output!(
+            $gpio_function,
+            $pxi:
+            (
+                $pin_num, $iomux_reg, $pin_num % 32, enable_w1ts, enable_w1tc,
+                out_w1ts, out_w1tc, out
+            )
+            $( ,( $( $af_output_signal: $af_output ),* ) )?
+        );
     };
-    ($gpio_function:ident, $pxi:ident, $pin_num:expr, $iomux_reg:expr, IO, Bank1
+
+    (
+        $gpio_function:ident, $pxi:ident, $pin_num:expr, $iomux_reg:expr, IO, Bank1
         $( ,( $( $af_output_signal:ident : $af_output:ident ),* ))?
     ) => {
-        impl_output!($gpio_function, $pxi:
-            ($pin_num, $iomux_reg, $pin_num % 32, enable1_w1ts, enable1_w1tc, out1_w1ts, out1_w1tc, out1)
-
-            $( ,( $( $af_output_signal: $af_output ),* ) )? );
+        impl_output!(
+            $gpio_function,
+            $pxi:
+            (
+                $pin_num, $iomux_reg, $pin_num % 32, enable1_w1ts, enable1_w1tc,
+                out1_w1ts, out1_w1tc, out1
+            )
+            $( ,( $( $af_output_signal: $af_output ),* ) )?
+        );
     };
 
-    ($gpio_function:ident, $pxi:ident, $pin_num:expr, $iomux_reg:expr, $type:ident, $bank:ident
+    (
+        $gpio_function:ident, $pxi:ident, $pin_num:expr, $iomux_reg:expr, $type:ident, $bank:ident
         $( ,( $( $af_output_signal:ident : $af_output:ident ),* ))?
-    ) => {
-    };
+    ) => {};
 }
 
 #[macro_export]
 macro_rules! gpio {
-    (   $gpio_function:ident,
+    (
+        $gpio_function:ident,
         $cores:ident,
-        $($pxi:ident: ($pname:ident, $pin_num:literal, $iomux_reg:expr, $type:ident, $rtc:tt, $bank:ident ),
         $(
-            ( $( $af_input_signal:ident: $af_input:ident ),* ),
+            $pxi:ident:
+            (
+                $pname:ident, $pin_num:literal, $iomux_reg:expr, $type:ident,
+                $rtc:tt, $bank:ident
+            ),
             $(
-            ( $( $af_output_signal:ident: $af_output:ident ),* ),
+                ( $( $af_input_signal:ident: $af_input:ident ),* ),
+                $( ( $( $af_output_signal:ident: $af_output:ident ),* ), )?
             )?
-        )?
-        )+ ) => {
+        )+
+    ) => {
         use core::{convert::Infallible, marker::PhantomData};
         use embedded_hal::digital::v2::{OutputPin as _, StatefulOutputPin as _};
         use crate::pac::{GPIO, IO_MUX};
 
-        #[allow(dead_code)]
         pub struct IO {
             io_mux: IO_MUX,
             pub pins: Pins,
@@ -727,32 +769,32 @@ macro_rules! gpio {
             }
         }
 
-
         pub struct Pins {
             $(
-
                 pub $pname: $pxi<Unknown>,
             )+
         }
 
-
-
         $(
-
             pub struct $pxi<MODE> {
                 _mode: PhantomData<MODE>,
             }
 
-            impl_pin_wrap!($gpio_function, $pxi, $pin_num, $iomux_reg, $type, $bank, $cores
-                $( ,( $( $af_input_signal: $af_input ),* ) )? );
-            impl_output_wrap!($gpio_function, $pxi, $pin_num, $iomux_reg, $type, $bank
-                $($( ,( $( $af_output_signal: $af_output ),* ) )? )? );
+            impl_input_wrap!(
+                $gpio_function, $pxi, $pin_num, $iomux_reg, $type, $bank, $cores
+                $( ,( $( $af_input_signal: $af_input ),* ) )?
+            );
+
+            impl_output_wrap!(
+                $gpio_function, $pxi, $pin_num, $iomux_reg, $type, $bank
+                $($( ,( $( $af_output_signal: $af_output ),* ) )? )?
+            );
         )+
     };
 }
 
 pub use gpio;
 pub use impl_input;
+pub use impl_input_wrap;
 pub use impl_output;
 pub use impl_output_wrap;
-pub use impl_pin_wrap;
