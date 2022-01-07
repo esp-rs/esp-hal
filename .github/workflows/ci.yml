@@ -1,0 +1,49 @@
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+
+name: CI
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check-riscv:
+    name: Check RISC-V Examples
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        toolchain: [stable, nightly]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          target: riscv32imc-unknown-none-elf
+          toolchain: ${{ matrix.toolchain }}
+          default: true
+      - uses: Swatinem/rust-cache@v1
+      - uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --examples --package=esp32c3-hal --target=riscv32imc-unknown-none-elf
+
+  check-xtensa:
+    name: Check Xtensa Examples
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        chip: [esp32]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: esp-rs/xtensa-toolchain@afb2ca0c7eefb637832d240ae357b820a1edc2c7
+        with:
+          default: true
+          ldproxy: false
+      - uses: Swatinem/rust-cache@v1
+      - uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: -Zbuild-std --examples --package=${{ matrix.chip }}-hal --target=xtensa-${{ matrix.chip }}-none-elf
