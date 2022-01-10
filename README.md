@@ -10,7 +10,7 @@ The various packages in this repository may or may not build at any given time. 
 
 ## What is working?
 
-For the **ESP32** and **ESP32-C3**, the `GPIO`, `TIMG` and `UART` peripherals have (probably incomplete) implementations which are nonetheless functional. These packages include examples to demonstrate these peripherals.
+For the **ESP32** and **ESP32-C3**, the `GPIO`, `TIMG` and `UART` peripherals have (probably incomplete) implementations which are nonetheless functional. Both of the aforementioned chips also have implmented the `DelayUs` and `DelayMs` traits from `embedded-hal`. These packages include examples to demonstrate these peripherals.
 
 ## What is NOT working?
 

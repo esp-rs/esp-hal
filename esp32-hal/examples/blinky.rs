@@ -1,8 +1,7 @@
 #![no_std]
 #![no_main]
 
-use esp32_hal::{gpio::IO, pac::Peripherals, prelude::*, Timer};
-use nb::block;
+use esp32_hal::{gpio::IO, pac::Peripherals, prelude::*, Delay, Timer};
 use panic_halt as _;
 use xtensa_lx_rt::entry;
 
@@ -10,18 +9,23 @@ use xtensa_lx_rt::entry;
 fn main() -> ! {
     let peripherals = Peripherals::take().unwrap();
 
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-    let mut led = io.pins.gpio15.into_push_pull_output();
+    // Disable the TIMG watchdog timer.
     let mut timer0 = Timer::new(peripherals.TIMG0);
 
-    // Disable watchdog timer
     timer0.disable();
 
+    // Set GPIO15 as an output, and set its state high initially.
+    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let mut led = io.pins.gpio15.into_push_pull_output();
+
     led.set_high().unwrap();
-    timer0.start(10_000_000u64);
+
+    // Initialize the Delay peripheral, and use it to toggle the LED state in a
+    // loop.
+    let mut delay = Delay::new();
 
     loop {
         led.toggle().unwrap();
-        block!(timer0.wait()).unwrap();
+        delay.delay_ms(500u32);
     }
 }
