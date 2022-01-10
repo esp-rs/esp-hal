@@ -1,3 +1,5 @@
+//! General-purpose timers
+
 use embedded_hal::{
     timer::{Cancel, CountDown, Periodic},
     watchdog::WatchdogDisable,
@@ -6,16 +8,19 @@ use void::Void;
 
 use crate::pac::{timg0::RegisterBlock, TIMG0, TIMG1};
 
+/// General-purpose timer
 pub struct Timer<T> {
     timg: T,
 }
 
+/// Custom timer error type
 pub enum Error {
     TimerActive,
     TimerInactive,
     AlarmInactive,
 }
 
+/// Timer driver
 impl<T> Timer<T>
 where
     T: Instance,
@@ -25,6 +30,7 @@ where
     }
 }
 
+/// Timer peripheral instance
 pub trait Instance {
     fn register_block(&self) -> &RegisterBlock;
 

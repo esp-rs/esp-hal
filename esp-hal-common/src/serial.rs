@@ -1,3 +1,5 @@
+//! UART driver
+
 use embedded_hal::serial::{Read, Write};
 
 #[cfg(any(feature = "esp32", feature = "esp32s3"))]
@@ -6,9 +8,11 @@ use crate::pac::{uart0::RegisterBlock, UART0, UART1};
 
 const UART_FIFO_SIZE: u16 = 128;
 
+/// Custom serial error type
 #[derive(Debug)]
 pub enum Error {}
 
+/// UART driver
 pub struct Serial<T> {
     uart: T,
 }
@@ -23,6 +27,7 @@ impl<T: Instance> Serial<T> {
     }
 }
 
+/// UART peripheral instance
 pub trait Instance {
     fn register_block(&self) -> &RegisterBlock;
 

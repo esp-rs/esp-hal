@@ -1,3 +1,9 @@
+//! Delay driver
+//!
+//! Implement the `DelayMs` and `DelayUs` traits from [embedded-hal].
+//!
+//! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
+
 use embedded_hal::blocking::delay::{DelayMs, DelayUs};
 
 pub use self::delay::Delay;
@@ -22,8 +28,6 @@ where
     }
 }
 
-// The delay implementation for RISC-V devices (ESP32-C3) uses the `SYSTIMER`
-// peripheral, as unfortunately this device does NOT implement the `mcycle` CSR.
 #[cfg(feature = "esp32c3")]
 mod delay {
     use crate::pac::SYSTIMER;
@@ -33,15 +37,23 @@ mod delay {
     // incremented by 1/16 μs on each `CNT_CLK` cycle.
     const CLK_FREQ_HZ: u64 = 16_000_000;
 
+    /// Delay driver
+    ///
+    /// Uses the `SYSTIMER` peripheral for counting clock cycles, as
+    /// unfortunately the ESP32-C3 does NOT implement the `mcycle` CSR, which is
+    /// how we would normally do this.
     pub struct Delay {
         systimer: SYSTIMER,
     }
 
     impl Delay {
+        /// Instantiate the `Delay` driver, taking ownership of the `SYSTIMER`
+        /// peripheral struct
         pub fn new(systimer: SYSTIMER) -> Self {
             Self { systimer }
         }
 
+        /// Delay for the specified number of microseconds
         pub fn delay(&self, us: u32) {
             let t0 = self.unit0_value();
             let clocks = (us as u64 * CLK_FREQ_HZ) / 1_000_000;
@@ -71,22 +83,25 @@ mod delay {
     }
 }
 
-// The delay implementation for Xtensa devices (ESP32, ESP32-S2, ESP32-S3) uses
-// the built-in timer from the `xtensa_lx` crate.
 #[cfg(not(feature = "esp32c3"))]
 mod delay {
     // FIXME: The ESP32-S2 and ESP32-S3 have fixed crystal frequencies of 40MHz.
     //        This will not always be the case when using the ESP32.
     const CLK_FREQ_HZ: u64 = 40_000_000;
 
+    /// Delay driver
+    ///
+    /// Uses the built-in Xtensa timer from the `xtensa_lx` crate.
     #[derive(Default)]
     pub struct Delay;
 
     impl Delay {
+        /// Instantiate the `Delay` driver
         pub fn new() -> Self {
             Self
         }
 
+        /// Delay for the specified number of microseconds
         pub fn delay(&self, us: u32) {
             let clocks = (us as u64 * CLK_FREQ_HZ) / 1_000_000;
             xtensa_lx::timer::delay(clocks as u32);
