@@ -1,10 +1,9 @@
 #![no_std]
 
 pub use embedded_hal as ehal;
-pub use esp_hal_common::{gpio as hal_gpio, pac, prelude, Serial, Timer};
-
-pub mod rtc_cntl;
+pub use esp_hal_common::{pac, prelude, Serial, Timer};
 
 pub mod gpio;
+pub mod rtc_cntl;
 
-pub use rtc_cntl::RtcCntl;
+pub use self::{gpio::IO, rtc_cntl::RtcCntl};
