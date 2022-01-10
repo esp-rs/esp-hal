@@ -20,7 +20,7 @@ Everything else.
 
 At this time, there are two major issues blocking progress on the **ESP32-S2** and **ESP32-S3**:
 
-- The lack of runtime support via [riscv-rt](https://github.com/rust-embedded/riscv-rt)
+- The lack of runtime support via [xtensa-lx-rt](https://github.com/esp-rs/xtensa-lx-rt)
 - The omission of linker scripts, required for actually building the binaries
 
 Once these issues have been resolved, progress can resume on the `esp32s2-hal` and `esp32s3-hal` crates.
