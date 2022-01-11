@@ -32,6 +32,7 @@ embedded-hal = { version = "0.2", features = ["unproven"] }
 nb           = "1.0"
 riscv        = "0.7"
 void         = { version = "1.0", default-features = false }
+r0 = "1.0.0"
 
 [dependencies.esp-hal-common]
 path     = "../esp-hal-common"
@@ -48,3 +49,4 @@ panic-halt = "0.2"
 [features]
 default = ["rt"]
 rt      = ["riscv-rt"]
+normalboot = []

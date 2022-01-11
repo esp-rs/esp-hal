@@ -34,6 +34,12 @@ PROVIDE(_setup_interrupts = default_setup_interrupts);
 */
 PROVIDE(_mp_hook = default_mp_hook);
 
+/* # Start trap function override
+  By default uses the riscv crates default trap handler
+  but by providing the `_start_trap` symbol external crates can override.
+*/
+PROVIDE(_start_trap = default_start_trap);
+
 SECTIONS
 {
   .text.dummy (NOLOAD) :
@@ -44,6 +50,7 @@ SECTIONS
 
   .text _stext :
   {
+    _stext = .;
     /* Put reset handler first in .text section so it ends up as the entry */
     /* point of the program. */
     KEEP(*(.init));
@@ -56,8 +63,22 @@ SECTIONS
     _etext = .;
   } > REGION_TEXT
 
-  _text_size = _etext - _stext + 8;
-  .rodata ORIGIN(DROM) + _text_size : AT(_text_size)
+  /**
+   * This dummy section represents the .text section but in rodata.
+   * Thus, it must have its alignement and (at least) its size.
+   */
+  .text_dummy (NOLOAD):
+  {
+    /* Start at the same alignement constraint than .text */
+    . = ALIGN(ALIGNOF(.text));
+    /* Create an empty gap as big as .text section */
+    . = . + SIZEOF(.text);
+    /* Prepare the alignement of the section above. Few bytes (0x20) must be
+     * added for the mapping header. */
+    . = ALIGN(0x10000) + 0x20;
+  } > REGION_RODATA
+
+  .rodata : ALIGN(4)
   {
     _srodata = .;
     *(.srodata .srodata.*);
@@ -70,9 +91,23 @@ SECTIONS
     _erodata = .;
   } > REGION_RODATA
 
-  _rodata_size = _erodata - _srodata + 8;
-  .data ORIGIN(DRAM) : AT(_text_size + _rodata_size)
+  .iram : ALIGN(4) {
+    _iramdata = LOADADDR(.iram);
+    _siramdata = .;
+    *(.iram);
+    . = ALIGN(4);
+    _eiramdata = .;
+  } > IRAM
+
+  /* similar as text_dummy */
+  .ram_dummy (NOLOAD) : {
+    . = ALIGN(ALIGNOF(.iram));
+    . = . + SIZEOF(.iram);
+  } > REGION_DATA
+
+  .data : ALIGN(4)
   {
+    _sidata = LOADADDR(.data);
     _sdata = .;
     /* Must be called __global_pointer$ for linker relaxations to work. */
     PROVIDE(__global_pointer$ = . + 0x800);
@@ -82,7 +117,6 @@ SECTIONS
     _edata = .;
   } > REGION_DATA
 
-  _data_size = _edata - _sdata + 8;
   .bss (NOLOAD) :
   {
     _sbss = .;
@@ -90,13 +124,6 @@ SECTIONS
     . = ALIGN(4);
     _ebss = .;
   } > REGION_BSS
-
-  .iram ORIGIN(IRAM) + _data_size : AT(_text_size + _rodata_size + _data_size){
-    _siramdata = .;
-    *(.iram);
-    . = ALIGN(4);
-    _eiramdata = .;
-  } > IRAM
 
   /* fictitious region that represents the memory available for the heap */
   .heap (NOLOAD) :
@@ -127,9 +154,6 @@ SECTIONS
   .eh_frame (INFO) : { KEEP(*(.eh_frame)) }
   .eh_frame_hdr (INFO) : { *(.eh_frame_hdr) }
 }
-
-PROVIDE(_sidata = _erodata + 8);
-PROVIDE(_iramdata = /*LOADADDR(.iram) +*/ 0x3C000000 + _text_size + _rodata_size + _data_size);
 
 /* Do not exceed this mark in the error messages above                                    | */
 ASSERT(ORIGIN(REGION_TEXT) % 4 == 0, "

@@ -1,6 +1,5 @@
 [target.riscv32imc-unknown-none-elf]
 rustflags = [
-  "-C", "link-arg=-Tesp32c3-link.x",
 ]
 
 [build]
