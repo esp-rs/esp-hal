@@ -18,12 +18,18 @@ pub struct Serial<T> {
 }
 
 impl<T: Instance> Serial<T> {
+    /// Create a new UART instance
     pub fn new(uart: T) -> Result<Self, Error> {
         let mut serial = Serial { uart };
         serial.uart.disable_rx_interrupts();
         serial.uart.disable_tx_interrupts();
 
         Ok(serial)
+    }
+
+    /// Return the raw interface to the underlying UART instance
+    pub fn free(self) -> T {
+        self.uart
     }
 }
 
@@ -112,7 +118,44 @@ pub trait Instance {
     }
 }
 
-impl<T: Instance> Write<u8> for Serial<T> {
+impl Instance for UART0 {
+    #[inline(always)]
+    fn register_block(&self) -> &RegisterBlock {
+        self
+    }
+}
+
+impl Instance for UART1 {
+    #[inline(always)]
+    fn register_block(&self) -> &RegisterBlock {
+        self
+    }
+}
+
+#[cfg(any(feature = "esp32", feature = "esp32s3"))]
+impl Instance for UART2 {
+    #[inline(always)]
+    fn register_block(&self) -> &RegisterBlock {
+        self
+    }
+}
+
+impl<T> core::fmt::Write for Serial<T>
+where
+    T: Instance,
+{
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+        s.as_bytes()
+            .iter()
+            .try_for_each(|c| nb::block!(self.write(*c)))
+            .map_err(|_| core::fmt::Error)
+    }
+}
+
+impl<T> Write<u8> for Serial<T>
+where
+    T: Instance,
+{
     type Error = Error;
 
     fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
@@ -137,7 +180,10 @@ impl<T: Instance> Write<u8> for Serial<T> {
     }
 }
 
-impl<T: Instance> Read<u8> for Serial<T> {
+impl<T> Read<u8> for Serial<T>
+where
+    T: Instance,
+{
     type Error = Error;
 
     fn read(&mut self) -> nb::Result<u8, Self::Error> {
@@ -154,36 +200,5 @@ impl<T: Instance> Read<u8> for Serial<T> {
         } else {
             Err(nb::Error::WouldBlock)
         }
-    }
-}
-
-impl<T: Instance> core::fmt::Write for Serial<T> {
-    fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        s.as_bytes()
-            .iter()
-            .try_for_each(|c| nb::block!(self.write(*c)))
-            .map_err(|_| core::fmt::Error)
-    }
-}
-
-impl Instance for UART0 {
-    #[inline(always)]
-    fn register_block(&self) -> &RegisterBlock {
-        self
-    }
-}
-
-impl Instance for UART1 {
-    #[inline(always)]
-    fn register_block(&self) -> &RegisterBlock {
-        self
-    }
-}
-
-#[cfg(any(feature = "esp32", feature = "esp32s3"))]
-impl Instance for UART2 {
-    #[inline(always)]
-    fn register_block(&self) -> &RegisterBlock {
-        self
     }
 }

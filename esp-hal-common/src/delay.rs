@@ -47,10 +47,14 @@ mod delay {
     }
 
     impl Delay {
-        /// Instantiate the `Delay` driver, taking ownership of the `SYSTIMER`
-        /// peripheral struct
+        /// Create a new Delay instance
         pub fn new(systimer: SYSTIMER) -> Self {
             Self { systimer }
+        }
+
+        /// Return the raw interface to the underlying SYSTIMER instance
+        pub fn free(self) -> SYSTIMER {
+            self.systimer
         }
 
         /// Delay for the specified number of microseconds
