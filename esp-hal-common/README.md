@@ -1,8 +1,9 @@
 # esp-hal-common
 
-[![Crates.io](https://img.shields.io/crates/v/esp-hal-common.svg)](https://crates.io/crates/esp-hal-common)
-[![Docs](https://docs.rs/esp-hal-common/badge.svg)](https://docs.rs/esp-hal-common/)
-![Crates.io](https://img.shields.io/crates/l/esp-hal-common)
+[![Crates.io](https://img.shields.io/crates/v/esp-hal-common?labelColor=1C2C2E&color=C96329&logo=Rust&style=flat-square)](https://crates.io/crates/esp-hal-common)
+[![docs.rs](https://img.shields.io/docsrs/esp-hal-common?labelColor=1C2C2E&color=C96329&logo=rust&style=flat-square)](https://docs.rs/esp-hal-common)
+![Crates.io](https://img.shields.io/crates/l/esp-hal-common?labelColor=1C2C2E&style=flat-square)
+[![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&labelColor=1C2C2E&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
 
 `no_std` HAL implementations for the peripherals which are common among Espressif devices. Implements a number of the traits defined by [embedded-hal](https://github.com/rust-embedded/embedded-hal).
 

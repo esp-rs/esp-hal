@@ -1,8 +1,9 @@
 # esp32c3-hal
 
-[![Crates.io](https://img.shields.io/crates/v/esp32c3-hal.svg)](https://crates.io/crates/esp32c3-hal)
-[![Docs](https://docs.rs/esp32c3-hal/badge.svg)](https://docs.rs/esp32c3-hal/)
-![Crates.io](https://img.shields.io/crates/l/esp32c3-hal)
+[![Crates.io](https://img.shields.io/crates/v/esp32c3-hal?labelColor=1C2C2E&color=C96329&logo=Rust&style=flat-square)](https://crates.io/crates/esp32c3-hal)
+[![docs.rs](https://img.shields.io/docsrs/esp32c3-hal?labelColor=1C2C2E&color=C96329&logo=rust&style=flat-square)](https://docs.rs/esp32c3-hal)
+![Crates.io](https://img.shields.io/crates/l/esp32c3-hal?labelColor=1C2C2E&style=flat-square)
+[![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&labelColor=1C2C2E&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
 
 `no_std` HAL for the ESP32-C3 from Espressif. Implements a number of the traits defined by [embedded-hal](https://github.com/rust-embedded/embedded-hal).
 

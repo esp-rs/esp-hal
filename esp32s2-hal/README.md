@@ -1,8 +1,9 @@
 # esp32s2-hal
 
-[![Crates.io](https://img.shields.io/crates/v/esp32s2-hal.svg)](https://crates.io/crates/esp32s2-hal)
-[![Docs](https://docs.rs/esp32s2-hal/badge.svg)](https://docs.rs/esp32s2-hal/)
-![Crates.io](https://img.shields.io/crates/l/esp32s2-hal)
+[![Crates.io](https://img.shields.io/crates/v/esp32s2-hal?labelColor=1C2C2E&color=C96329&logo=Rust&style=flat-square)](https://crates.io/crates/esp32s2-hal)
+[![docs.rs](https://img.shields.io/docsrs/esp32s2-hal?labelColor=1C2C2E&color=C96329&logo=rust&style=flat-square)](https://docs.rs/esp32s2-hal)
+![Crates.io](https://img.shields.io/crates/l/esp32s2-hal?labelColor=1C2C2E&style=flat-square)
+[![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&labelColor=1C2C2E&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
 
 `no_std` HAL for the ESP32-S2 from Espressif. Implements a number of the traits defined by [embedded-hal](https://github.com/rust-embedded/embedded-hal).
 
