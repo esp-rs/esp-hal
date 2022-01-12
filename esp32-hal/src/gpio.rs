@@ -1,6 +1,4 @@
-use esp_hal_common::gpio::gpio;
-
-use crate::hal_gpio::*;
+use esp_hal_common::gpio::*;
 
 type OutputSignalType = u16;
 const OUTPUT_SIGNAL_MAX: u16 = 548;

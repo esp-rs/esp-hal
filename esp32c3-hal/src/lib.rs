@@ -1,14 +1,13 @@
 #![no_std]
 
 pub use embedded_hal as ehal;
-pub use esp_hal_common::{gpio as hal_gpio, pac, prelude, Serial, Timer};
-
-pub mod rtc_cntl;
+pub use esp_hal_common::{pac, prelude, Delay, Serial, Timer};
+use riscv_rt::pre_init;
 
 pub mod gpio;
+pub mod rtc_cntl;
 
-use riscv_rt::pre_init;
-pub use rtc_cntl::RtcCntl;
+pub use self::{gpio::IO, rtc_cntl::RtcCntl};
 
 extern "C" {
     // Boundaries of the .iram section
@@ -28,6 +27,7 @@ unsafe fn init() {
     r0::init_data(&mut _siramdata, &mut _eiramdata, &_iramdata);
 }
 
+#[allow(unreachable_code)]
 #[export_name = "_mp_hook"]
 pub extern "Rust" fn mp_hook() -> bool {
     #[cfg(not(feature = "normalboot"))]

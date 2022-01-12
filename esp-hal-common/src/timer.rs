@@ -1,3 +1,5 @@
+//! General-purpose timers
+
 use embedded_hal::{
     timer::{Cancel, CountDown, Periodic},
     watchdog::WatchdogDisable,
@@ -6,25 +8,36 @@ use void::Void;
 
 use crate::pac::{timg0::RegisterBlock, TIMG0, TIMG1};
 
-pub struct Timer<T> {
-    timg: T,
-}
-
+/// Custom timer error type
+#[derive(Debug)]
 pub enum Error {
     TimerActive,
     TimerInactive,
     AlarmInactive,
 }
 
+/// General-purpose timer
+pub struct Timer<T> {
+    timg: T,
+}
+
+/// Timer driver
 impl<T> Timer<T>
 where
     T: Instance,
 {
+    /// Create a new timer instance
     pub fn new(timg: T) -> Self {
         Self { timg }
     }
+
+    /// Return the raw interface to the underlying timer instance
+    pub fn free(self) -> T {
+        self.timg
+    }
 }
 
+/// Timer peripheral instance
 pub trait Instance {
     fn register_block(&self) -> &RegisterBlock;
 
@@ -113,6 +126,20 @@ pub trait Instance {
     }
 }
 
+impl Instance for TIMG0 {
+    #[inline(always)]
+    fn register_block(&self) -> &RegisterBlock {
+        self
+    }
+}
+
+impl Instance for TIMG1 {
+    #[inline(always)]
+    fn register_block(&self) -> &RegisterBlock {
+        self
+    }
+}
+
 impl<T> CountDown for Timer<T>
 where
     T: Instance,
@@ -137,7 +164,7 @@ where
 
     fn wait(&mut self) -> nb::Result<(), Void> {
         if !self.timg.is_counter_active() {
-            panic!("Called wait on an inactive timer!");
+            panic!("Called wait on an inactive timer!")
         }
 
         let reg_block = self.timg.register_block();
@@ -180,19 +207,5 @@ where
 {
     fn disable(&mut self) {
         self.timg.set_wdt_enabled(false);
-    }
-}
-
-impl Instance for TIMG0 {
-    #[inline(always)]
-    fn register_block(&self) -> &RegisterBlock {
-        self
-    }
-}
-
-impl Instance for TIMG1 {
-    #[inline(always)]
-    fn register_block(&self) -> &RegisterBlock {
-        self
     }
 }

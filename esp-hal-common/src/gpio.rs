@@ -1,3 +1,11 @@
+//! GPIO driver
+//!
+//! Defines a series of macros which allow for the definition of each chip's
+//! GPIO pins in a generic manner. Implements the various traits defined by
+//! [embedded-hal].
+//!
+//! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
+
 pub use paste::paste;
 
 #[macro_export]

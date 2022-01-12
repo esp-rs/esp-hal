@@ -1,7 +1,9 @@
 #![no_std]
 
 pub use embedded_hal as ehal;
-pub use esp_hal_common::{gpio as hal_gpio, pac, prelude, Serial, Timer};
+pub use esp_hal_common::{pac, prelude, Delay, Serial, Timer};
+
+pub use self::gpio::IO;
 
 pub mod gpio;
 
@@ -43,8 +45,9 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
     xtensa_lx_rt::Reset();
 }
 
-/// The esp32 has a first stage bootloader that handles loading program data into the right place
-/// therefore we skip loading it again.
+/// The ESP32 has a first stage bootloader that handles loading program data
+/// into the right place therefore we skip loading it again.
+#[doc(hidden)]
 #[no_mangle]
 #[rustfmt::skip]
 pub extern "Rust" fn __init_data() -> bool {

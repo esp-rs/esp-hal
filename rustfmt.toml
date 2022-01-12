@@ -1,7 +1,12 @@
-edition = "2018"
-enum_discrim_align_threshold = 25
-group_imports = "StdExternalCrate"
+# Comments
+format_code_in_doc_comments = true
+normalize_comments          = true
+wrap_comments               = true
+
+# Enums
+enum_discrim_align_threshold = 35
+
+# Imports
+group_imports       = "StdExternalCrate"
 imports_granularity = "Crate"
-imports_layout = "HorizontalVertical"
-normalize_comments = true
-wrap_comments = true
+imports_layout      = "HorizontalVertical"

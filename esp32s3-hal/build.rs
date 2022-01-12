@@ -8,6 +8,11 @@ fn main() {
         .write_all(include_bytes!("memory.x"))
         .unwrap();
 
+    File::create(out.join("alias.x"))
+        .unwrap()
+        .write_all(include_bytes!("rom.x"))
+        .unwrap();
+
     println!("cargo:rustc-link-search={}", out.display());
 
     // Only re-run the build script when memory.x is changed,
