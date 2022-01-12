@@ -11,10 +11,10 @@
 //! - [esp32s3-hal]
 //!
 //! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
-//! [esp32-hal]: https://github.com/jessebraham/esp-hal/tree/main/esp32-hal
-//! [esp32c3-hal]: https://github.com/jessebraham/esp-hal/tree/main/esp32c3-hal
-//! [esp32s2-hal]: https://github.com/jessebraham/esp-hal/tree/main/esp32s2-hal
-//! [esp32s3-hal]: https://github.com/jessebraham/esp-hal/tree/main/esp32s3-hal
+//! [esp32-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32-hal
+//! [esp32c3-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32c3-hal
+//! [esp32s2-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32s2-hal
+//! [esp32s3-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32s3-hal
 
 #![no_std]
 
