@@ -3,6 +3,7 @@ on:
     branches:
       - main
   push:
+  workflow_dispatch:
 
 name: CI
 
