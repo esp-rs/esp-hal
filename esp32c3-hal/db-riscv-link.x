@@ -91,12 +91,13 @@ SECTIONS
     _ebss = .;
   } > REGION_BSS
 
-  .iram ORIGIN(IRAM) + _data_size : AT(_text_size + _rodata_size + _data_size){
-    _siramdata = .;
-    *(.iram);
+  .rwtext ORIGIN(REGION_RWTEXT) + _data_size : AT(_text_size + _rodata_size + _data_size){
+    _srwtext = .;
+    *(.rwtext);
     . = ALIGN(4);
-    _eiramdata = .;
-  } > IRAM
+    _erwtext = .;
+  } > REGION_RWTEXT
+  _rwtext_size = _erwtext - _srwtext + 8;
 
   /* fictitious region that represents the memory available for the heap */
   .heap (NOLOAD) :
@@ -115,6 +116,36 @@ SECTIONS
     _sstack = .;
   } > REGION_STACK
 
+  .rtc_fast.text : AT(_text_size + _rodata_size + _data_size + _rwtext_size) {
+    _srtc_fast_text = .;
+    *(.rtc_fast.literal .rtc_fast.text .rtc_fast.literal.* .rtc_fast.text.*)
+    . = ALIGN(4);
+    _ertc_fast_text = .;
+  } > REGION_RTC_FAST
+  _fast_text_size = _ertc_fast_text - _srtc_fast_text + 8;
+
+  .rtc_fast.data : AT(_text_size + _rodata_size + _data_size + _rwtext_size + _fast_text_size) 
+  {
+    _rtc_fast_data_start = ABSOLUTE(.);
+    *(.rtc_fast.data .rtc_fast.data.*)
+    . = ALIGN(4);
+    _rtc_fast_data_end = ABSOLUTE(.);
+  } > REGION_RTC_FAST
+  _rtc_fast_data_size = _rtc_fast_data_end - _rtc_fast_data_start + 8;
+
+ .rtc_fast.bss (NOLOAD) : ALIGN(4) 
+  {
+    _rtc_fast_bss_start = ABSOLUTE(.);
+    *(.rtc_fast.bss .rtc_fast.bss.*)
+    . = ALIGN(4);
+    _rtc_fast_bss_end = ABSOLUTE(.);
+  } > REGION_RTC_FAST
+
+ .rtc_fast.noinit (NOLOAD) : ALIGN(4) 
+  {
+    *(.rtc_fast.noinit .rtc_fast.noinit.*)
+  } > REGION_RTC_FAST
+
   /* fake output .got section */
   /* Dynamic relocations are unsupported. This section is only used to detect
      relocatable code in the input files and raise an error if relocatable code
@@ -129,7 +160,9 @@ SECTIONS
 }
 
 PROVIDE(_sidata = _erodata + 8);
-PROVIDE(_iramdata = /*LOADADDR(.iram) +*/ 0x3C000000 + _text_size + _rodata_size + _data_size);
+PROVIDE(_irwtext = ORIGIN(DROM) + _text_size + _rodata_size + _data_size);
+PROVIDE(_irtc_fast_text = ORIGIN(DROM) + _text_size + _rodata_size + _data_size + _rwtext_size);
+PROVIDE(_irtc_fast_data = ORIGIN(DROM) + _text_size + _rodata_size + _data_size + _rwtext_size + _fast_text_size);
 
 /* Do not exceed this mark in the error messages above                                    | */
 ASSERT(ORIGIN(REGION_TEXT) % 4 == 0, "

@@ -91,18 +91,18 @@ SECTIONS
     _erodata = .;
   } > REGION_RODATA
 
-  .iram : ALIGN(4) {
-    _iramdata = LOADADDR(.iram);
-    _siramdata = .;
-    *(.iram);
+  .rwtext : ALIGN(4) {
+    _irwtext = LOADADDR(.rwtext);
+    _srwtext = .;
+    *(.rwtext);
     . = ALIGN(4);
-    _eiramdata = .;
-  } > IRAM
+    _erwtext = .;
+  } > REGION_RWTEXT
 
   /* similar as text_dummy */
   .ram_dummy (NOLOAD) : {
-    . = ALIGN(ALIGNOF(.iram));
-    . = . + SIZEOF(.iram);
+    . = ALIGN(ALIGNOF(.rwtext));
+    . = . + SIZEOF(.rwtext);
   } > REGION_DATA
 
   .data : ALIGN(4)
@@ -142,14 +142,28 @@ SECTIONS
     _sstack = .;
   } > REGION_STACK
 
-  /* fake output .got section */
-  /* Dynamic relocations are unsupported. This section is only used to detect
-     relocatable code in the input files and raise an error if relocatable code
-     is found */
-  .got (INFO) :
+  .rtc_fast.text : ALIGN(4) {
+    *(.rtc_fast.literal .rtc_fast.text .rtc_fast.literal.* .rtc_fast.text.*)
+  } > REGION_RTC_FAST AT > REGION_RODATA
+
+  .rtc_fast.data : ALIGN(4) 
   {
-    KEEP(*(.got .got.*));
-  }
+    _rtc_fast_data_start = ABSOLUTE(.);
+    *(.rtc_fast.data .rtc_fast.data.*)
+    _rtc_fast_data_end = ABSOLUTE(.);
+  } > REGION_RTC_FAST AT > REGION_RODATA
+
+ .rtc_fast.bss (NOLOAD) : ALIGN(4) 
+  {
+    _rtc_fast_bss_start = ABSOLUTE(.);
+    *(.rtc_fast.bss .rtc_fast.bss.*)
+    _rtc_fast_bss_end = ABSOLUTE(.);
+  } > REGION_RTC_FAST
+
+ .rtc_fast.noinit (NOLOAD) : ALIGN(4) 
+  {
+    *(.rtc_fast.noinit .rtc_fast.noinit.*)
+  } > REGION_RTC_FAST
 
   .eh_frame (INFO) : { KEEP(*(.eh_frame)) }
   .eh_frame_hdr (INFO) : { *(.eh_frame_hdr) }

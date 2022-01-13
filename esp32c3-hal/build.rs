@@ -7,18 +7,18 @@ fn main() {
 
     File::create(out.join("memory.x"))
         .unwrap()
-        .write_all(include_bytes!("esp32c3-memory.x"))
+        .write_all(include_bytes!("db-esp32c3-memory.x"))
         .unwrap();
 
     File::create(out.join("esp32c3-link.x"))
         .unwrap()
-        .write_all(include_bytes!("esp32c3-link.x"))
+        .write_all(include_bytes!("db-esp32c3-link.x"))
         .unwrap();
 
     File::create(out.join("riscv-link.x"))
         .unwrap()
-        .write_all(include_bytes!("riscv-link.x"))
-        .unwrap();        
+        .write_all(include_bytes!("db-riscv-link.x"))
+        .unwrap();
 
     println!("cargo:rustc-link-search={}", out.display());
 
@@ -37,10 +37,10 @@ fn main() {
         .write_all(include_bytes!("bl-esp32c3-memory.x"))
         .unwrap();
 
-        File::create(out.join("bl-riscv-link.x"))
+    File::create(out.join("bl-riscv-link.x"))
         .unwrap()
         .write_all(include_bytes!("bl-riscv-link.x"))
-        .unwrap(); 
+        .unwrap();
 
     println!("cargo:rustc-link-search={}", out.display());
 

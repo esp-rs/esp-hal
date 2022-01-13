@@ -3,8 +3,8 @@
 
 use core::fmt::Write;
 
-use esp32c3_hal::{
-    pac::{self, UART0},
+use esp32_hal::{
+    pac::{Peripherals, UART0},
     prelude::*,
     ram,
     Serial,
@@ -12,7 +12,7 @@ use esp32c3_hal::{
 };
 use nb::block;
 use panic_halt as _;
-use riscv_rt::entry;
+use xtensa_lx_rt::entry;
 
 #[ram(rtc_fast)]
 static mut SOME_INITED_DATA: [u8; 2] = [0xaa, 0xbb];
@@ -25,12 +25,12 @@ static mut SOME_ZEROED_DATA: [u8; 8] = [0; 8];
 
 #[entry]
 fn main() -> ! {
-    let peripherals = pac::Peripherals::take().unwrap();
+    let peripherals = Peripherals::take().unwrap();
+
     let mut timer0 = Timer::new(peripherals.TIMG0);
     let mut serial0 = Serial::new(peripherals.UART0).unwrap();
 
-    // don't disable WDTs ... we actually want it getting triggered in this example
-
+    // Disable watchdog timer
     timer0.disable();
 
     timer0.start(10_000_000u64);

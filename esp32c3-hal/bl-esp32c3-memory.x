@@ -16,6 +16,7 @@ MEMORY
     */
     /* 400K of on soc RAM, 16K reserved for cache */
     ICACHE : ORIGIN = 0x4037C000,  LENGTH = 0x4000
+    /* Instruction RAM */
     IRAM : ORIGIN = 0x4037C000 + 0x4000, LENGTH = 400K - 0x4000
     /* Data RAM */
     DRAM : ORIGIN = 0x3FC80000, LENGTH = 0x50000
@@ -25,11 +26,10 @@ MEMORY
     /* Instruction ROM */
     IROM : ORIGIN =   0x42000000 + 0x20, LENGTH = 0x400000 - 0x20
     /* Data ROM */
-    /*
-     TODO IROM + DROM share the same phys address ... need to offset DROM data with len of .text
-     DROM : ORIGIN = 0x3C000000 + 0x20 + 0xa0000, LENGTH = 0x400000 - 0x20
-    */
     DROM : ORIGIN = 0x3C000000, LENGTH = 0x400000
+
+    /* RTC fast memory (executable). Persists over deep sleep. */
+    RTC_FAST : ORIGIN = 0x50000000, LENGTH = 0x2000 /*- ESP_BOOTLOADER_RESERVE_RTC*/    
 }
 
 REGION_ALIAS("REGION_TEXT", IROM);
@@ -39,3 +39,6 @@ REGION_ALIAS("REGION_DATA", DRAM);
 REGION_ALIAS("REGION_BSS", DRAM);
 REGION_ALIAS("REGION_HEAP", DRAM);
 REGION_ALIAS("REGION_STACK", DRAM);
+
+REGION_ALIAS("REGION_RWTEXT", IRAM);
+REGION_ALIAS("REGION_RTC_FAST", RTC_FAST);
