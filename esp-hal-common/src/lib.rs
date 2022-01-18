@@ -37,3 +37,6 @@ pub use delay::Delay;
 pub use gpio::*;
 pub use serial::Serial;
 pub use timer::Timer;
+
+use procmacros;
+pub use procmacros::ram;

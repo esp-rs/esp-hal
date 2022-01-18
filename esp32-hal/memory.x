@@ -78,16 +78,16 @@ SECTIONS {
   
   .rtc_fast.data :
   {
-    _rtc_fast_data_start = ABSOLUTE(.);
     . = ALIGN(4);
+    _rtc_fast_data_start = ABSOLUTE(.);
     *(.rtc_fast.data .rtc_fast.data.*)
     _rtc_fast_data_end = ABSOLUTE(.);
   } > rtc_fast_dram_seg AT > RODATA
 
  .rtc_fast.bss (NOLOAD) :
   {
-    _rtc_fast_bss_start = ABSOLUTE(.);
     . = ALIGN(4);
+    _rtc_fast_bss_start = ABSOLUTE(.);
     *(.rtc_fast.bss .rtc_fast.bss.*)
     _rtc_fast_bss_end = ABSOLUTE(.);
   } > rtc_fast_dram_seg
@@ -106,16 +106,16 @@ SECTIONS {
 
   .rtc_slow.data :
   {
-    _rtc_slow_data_start = ABSOLUTE(.);
     . = ALIGN(4);
+    _rtc_slow_data_start = ABSOLUTE(.);
     *(.rtc_slow.data .rtc_slow.data.*)
     _rtc_slow_data_end = ABSOLUTE(.);
   } > rtc_slow_seg AT > RODATA
 
  .rtc_slow.bss (NOLOAD) :
   {
-    _rtc_slow_bss_start = ABSOLUTE(.);
     . = ALIGN(4);
+    _rtc_slow_bss_start = ABSOLUTE(.);
     *(.rtc_slow.bss .rtc_slow.bss.*)
     _rtc_slow_bss_end = ABSOLUTE(.);
   } > rtc_slow_seg

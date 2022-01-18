@@ -7,6 +7,8 @@ pub use self::gpio::IO;
 
 pub mod gpio;
 
+pub use esp_hal_common::ram;
+
 #[no_mangle]
 extern "C" fn DefaultHandler(_level: u32, _interrupt: pac::Interrupt) {}
 
