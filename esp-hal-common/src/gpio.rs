@@ -6,7 +6,111 @@
 //!
 //! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
 
+use core::marker::PhantomData;
+
 pub use paste::paste;
+
+#[derive(Copy, Clone)]
+pub enum Event {
+    RisingEdge  = 1,
+    FallingEdge = 2,
+    AnyEdge     = 3,
+    LowLevel    = 4,
+    HighLevel   = 5,
+}
+
+pub struct Unknown {}
+
+pub struct Input<MODE> {
+    _mode: PhantomData<MODE>,
+}
+
+pub struct RTCInput<MODE> {
+    _mode: PhantomData<MODE>,
+}
+
+pub struct Floating;
+
+pub struct PullDown;
+
+pub struct PullUp;
+
+pub struct Output<MODE> {
+    _mode: PhantomData<MODE>,
+}
+
+pub struct RTCOutput<MODE> {
+    _mode: PhantomData<MODE>,
+}
+
+pub struct OpenDrain;
+
+pub struct PushPull;
+
+pub struct Analog;
+
+pub struct Alternate<MODE> {
+    _mode: PhantomData<MODE>,
+}
+
+pub struct AF0;
+
+pub struct AF1;
+
+pub struct AF2;
+
+pub enum DriveStrength {
+    I5mA  = 0,
+    I10mA = 1,
+    I20mA = 2,
+    I40mA = 3,
+}
+
+#[derive(PartialEq)]
+pub enum AlternateFunction {
+    Function0 = 0,
+    Function1 = 1,
+    Function2 = 2,
+    Function3 = 3,
+    Function4 = 4,
+    Function5 = 5,
+}
+
+pub trait RTCPin {}
+
+pub trait AnalogPin {}
+
+pub trait Pin {
+    fn sleep_mode(&mut self, on: bool) -> &mut Self;
+
+    fn set_alternate_function(&mut self, alternate: AlternateFunction) -> &mut Self;
+
+    fn listen(&mut self, event: Event) {
+        self.listen_with_options(event, true, false, false)
+    }
+
+    fn listen_with_options(
+        &mut self,
+        event: Event,
+        int_enable: bool,
+        nmi_enable: bool,
+        wake_up_from_light_sleep: bool,
+    );
+
+    fn unlisten(&mut self);
+
+    fn clear_interrupt(&mut self);
+
+    fn is_pcore_interrupt_set(&mut self) -> bool;
+
+    fn is_pcore_non_maskable_interrupt_set(&mut self) -> bool;
+
+    fn is_acore_interrupt_set(&mut self) -> bool;
+
+    fn is_acore_non_maskable_interrupt_set(&mut self) -> bool;
+
+    fn enable_hold(&mut self, on: bool);
+}
 
 #[macro_export]
 macro_rules! impl_output {
@@ -583,36 +687,16 @@ macro_rules! gpio {
             fn split(self) -> Self::Parts;
         }
 
-        pub trait Pin {
-            fn sleep_mode(&mut self, on: bool) -> &mut Self;
+        impl GpioExt for GPIO {
+            type Parts = Pins;
 
-            fn set_alternate_function(&mut self, alternate: AlternateFunction) -> &mut Self;
-
-            fn listen(&mut self, event: Event) {
-                self.listen_with_options(event, true, false, false)
+            fn split(self) -> Self::Parts {
+                Pins {
+                    $(
+                        $pname: $pxi { _mode: PhantomData },
+                    )+
+                }
             }
-
-            fn listen_with_options(
-                &mut self,
-                event: Event,
-                int_enable: bool,
-                nmi_enable: bool,
-                wake_up_from_light_sleep: bool,
-            );
-
-            fn unlisten(&mut self);
-
-            fn clear_interrupt(&mut self);
-
-            fn is_pcore_interrupt_set(&mut self) -> bool;
-
-            fn is_pcore_non_maskable_interrupt_set(&mut self) -> bool;
-
-            fn is_acore_interrupt_set(&mut self) -> bool;
-
-            fn is_acore_non_maskable_interrupt_set(&mut self) -> bool;
-
-            fn enable_hold(&mut self, on: bool);
         }
 
         pub trait InputPin: Pin {
@@ -673,76 +757,6 @@ macro_rules! gpio {
             fn internal_pull_down(&mut self, on: bool) -> &mut Self;
         }
 
-        pub trait RTCPin {}
-
-        pub trait AnalogPin {}
-
-        #[derive(Copy, Clone)]
-        pub enum Event {
-            RisingEdge = 1,
-            FallingEdge = 2,
-            AnyEdge = 3,
-            LowLevel = 4,
-            HighLevel = 5,
-        }
-
-        pub struct Unknown {}
-
-        pub struct Input<MODE> {
-            _mode: PhantomData<MODE>,
-        }
-
-        pub struct RTCInput<MODE> {
-            _mode: PhantomData<MODE>,
-        }
-
-        pub struct Floating;
-
-        pub struct PullDown;
-
-        pub struct PullUp;
-
-        pub struct Output<MODE> {
-            _mode: PhantomData<MODE>,
-        }
-
-        pub struct RTCOutput<MODE> {
-            _mode: PhantomData<MODE>,
-        }
-
-        pub struct OpenDrain;
-
-        pub struct PushPull;
-
-        pub struct Analog;
-
-        pub struct Alternate<MODE> {
-            _mode: PhantomData<MODE>,
-        }
-
-        pub struct AF0;
-
-        pub struct AF1;
-
-        pub struct AF2;
-
-        pub enum DriveStrength {
-            I5mA = 0,
-            I10mA = 1,
-            I20mA = 2,
-            I40mA = 3,
-        }
-
-        #[derive(PartialEq)]
-        pub enum AlternateFunction {
-            Function0 = 0,
-            Function1 = 1,
-            Function2 = 2,
-            Function3 = 3,
-            Function4 = 4,
-            Function5 = 5,
-        }
-
         pub fn connect_low_to_peripheral(signal: InputSignal) {
             unsafe { &*GPIO::ptr() }.func_in_sel_cfg[signal as usize].modify(|_, w| unsafe {
                 w.sel()
@@ -763,18 +777,6 @@ macro_rules! gpio {
                     .in_sel()
                     .bits(0x1e)
             });
-        }
-
-        impl GpioExt for GPIO {
-            type Parts = Pins;
-
-            fn split(self) -> Self::Parts {
-                Pins {
-                    $(
-                        $pname: $pxi { _mode: PhantomData },
-                    )+
-                }
-            }
         }
 
         pub struct Pins {
