@@ -112,245 +112,73 @@ pub trait Pin {
     fn enable_hold(&mut self, on: bool);
 }
 
-#[macro_export]
-macro_rules! impl_output {
-    (
-        $gpio_function:ident,
-        $pxi:ident:
-        (
-            $pin_num:expr, $iomux_reg:expr, $bit:expr, $out_en_set:ident,
-            $out_en_clear:ident, $out_set:ident, $out_clear:ident, $out_reg:ident
-        )
-        $( ,( $( $af_signal:ident: $af:ident ),* ))?
-    ) => {
-        impl<MODE> embedded_hal::digital::v2::OutputPin for $pxi<Output<MODE>> {
-            type Error = Infallible;
+pub trait InputPin: Pin {
+    type InputSignal;
 
-            fn set_high(&mut self) -> Result<(), Self::Error> {
-                unsafe { (*GPIO::ptr()).$out_set.write(|w| w.bits(1 << $bit)) };
-                Ok(())
-            }
+    fn set_to_input(&mut self) -> &mut Self;
 
-            fn set_low(&mut self) -> Result<(), Self::Error> {
-                unsafe { (*GPIO::ptr()).$out_clear.write(|w| w.bits(1 << $bit)) };
-                Ok(())
-            }
-        }
+    fn enable_input(&mut self, on: bool) -> &mut Self;
 
-        impl<MODE> embedded_hal::digital::v2::StatefulOutputPin for $pxi<Output<MODE>> {
-            fn is_set_high(&self) -> Result<bool, Self::Error> {
-                unsafe { Ok((*GPIO::ptr()).$out_reg.read().bits() & (1 << $bit) != 0) }
-            }
+    fn enable_input_in_sleep_mode(&mut self, on: bool) -> &mut Self;
 
-            fn is_set_low(&self) -> Result<bool, Self::Error> {
-                Ok(!self.is_set_high()?)
-            }
-        }
+    fn is_input_high(&mut self) -> bool;
 
-        impl<MODE> embedded_hal::digital::v2::ToggleableOutputPin for $pxi<Output<MODE>> {
-            type Error = Infallible;
+    fn connect_input_to_peripheral(&mut self, signal: Self::InputSignal) -> &mut Self {
+        self.connect_input_to_peripheral_with_options(signal, false, false)
+    }
 
-            fn toggle(&mut self) -> Result<(), Self::Error> {
-                if self.is_set_high()? {
-                    Ok(self.set_low()?)
-                } else {
-                    Ok(self.set_high()?)
-                }
-            }
-        }
+    fn connect_input_to_peripheral_with_options(
+        &mut self,
+        signal: Self::InputSignal,
+        invert: bool,
+        force_via_gpio_mux: bool,
+    ) -> &mut Self;
+}
 
-        impl<MODE> $pxi<MODE> {
-            pub fn into_pull_up_input(self) -> $pxi<Input<PullUp>> {
-                self.init_input(false, false);
-                $pxi { _mode: PhantomData }
-            }
+pub trait OutputPin: Pin {
+    type OutputSignal;
 
-            pub fn into_pull_down_input(self) -> $pxi<Input<PullDown>> {
-                self.init_input(true, false);
-                $pxi { _mode: PhantomData }
-            }
+    fn set_to_open_drain_output(&mut self) -> &mut Self;
 
-            fn init_output(&self, alternate: AlternateFunction, open_drain: bool) {
-                let gpio = unsafe { &*GPIO::ptr() };
-                let iomux = unsafe { &*IO_MUX::ptr() };
+    fn set_to_push_pull_output(&mut self) -> &mut Self;
 
-                gpio.$out_en_set.write(|w| unsafe { w.bits(1 << $bit) });
-                gpio.pin[$pin_num].modify(|_, w| w.pin_pad_driver().bit(open_drain));
-                gpio.func_out_sel_cfg[$pin_num]
-                    .modify(|_, w| unsafe { w.out_sel().bits(OutputSignal::GPIO as OutputSignalType) });
+    fn enable_output(&mut self, on: bool) -> &mut Self;
 
-                paste! {
-                    iomux.$iomux_reg.modify(|_, w| unsafe {
-                        w.mcu_sel()
-                            .bits(alternate as u8)
-                            .fun_ie()
-                            .clear_bit()
-                            .fun_wpd()
-                            .clear_bit()
-                            .fun_wpu()
-                            .clear_bit()
-                            .fun_drv()
-                            .bits(DriveStrength::I20mA as u8)
-                            .slp_sel()
-                            .clear_bit()
-                    });
-                }
-            }
+    fn set_output_high(&mut self, on: bool) -> &mut Self;
 
-            pub fn into_push_pull_output(self) -> $pxi<Output<PushPull>> {
-                self.init_output(AlternateFunction::$gpio_function, false);
-                $pxi { _mode: PhantomData }
-            }
+    fn set_drive_strength(&mut self, strength: DriveStrength) -> &mut Self;
 
-            pub fn into_open_drain_output(self) -> $pxi<Output<OpenDrain>> {
-                self.init_output(AlternateFunction::$gpio_function, true);
-                $pxi { _mode: PhantomData }
-            }
+    fn enable_open_drain(&mut self, on: bool) -> &mut Self;
 
-            pub fn into_alternate_1(self) -> $pxi<Alternate<AF1>> {
-                self.init_output(AlternateFunction::Function1, false);
-                $pxi { _mode: PhantomData }
-            }
+    fn enable_output_in_sleep_mode(&mut self, on: bool) -> &mut Self;
 
-            pub fn into_alternate_2(self) -> $pxi<Alternate<AF2>> {
-                self.init_output(AlternateFunction::Function2, false);
-                $pxi { _mode: PhantomData }
-            }
-        }
+    fn internal_pull_up_in_sleep_mode(&mut self, on: bool) -> &mut Self;
 
-        impl<MODE> OutputPin for $pxi<MODE> {
-            fn set_to_open_drain_output(&mut self) -> &mut Self {
-                self.init_output(AlternateFunction::$gpio_function, true);
-                self
-            }
+    fn internal_pull_down_in_sleep_mode(&mut self, on: bool) -> &mut Self;
 
-            fn set_to_push_pull_output(&mut self) -> &mut Self {
-                self.init_output(AlternateFunction::$gpio_function, false);
-                self
-            }
+    fn connect_peripheral_to_output(&mut self, signal: Self::OutputSignal) -> &mut Self {
+        self.connect_peripheral_to_output_with_options(signal, false, false, false, false)
+    }
 
-            fn enable_output(&mut self, on: bool) -> &mut Self {
-                if on {
-                    unsafe { &*GPIO::ptr() }
-                        .$out_en_set
-                        .write(|w| unsafe { w.bits(1 << $bit) });
-                } else {
-                    unsafe { &*GPIO::ptr() }
-                        .$out_en_clear
-                        .write(|w| unsafe { w.bits(1 << $bit) });
-                }
-                self
-            }
+    fn connect_peripheral_to_output_with_options(
+        &mut self,
+        signal: Self::OutputSignal,
+        invert: bool,
+        invert_enable: bool,
+        enable_from_gpio: bool,
+        force_via_gpio_mux: bool,
+    ) -> &mut Self;
 
-            fn set_output_high(&mut self, high: bool) -> &mut Self {
-                if high {
-                    unsafe { (*GPIO::ptr()).$out_set.write(|w| w.bits(1 << $bit)) };
-                } else {
-                    unsafe { (*GPIO::ptr()).$out_clear.write(|w| w.bits(1 << $bit)) };
-                }
-                self
-            }
+    fn internal_pull_up(&mut self, on: bool) -> &mut Self;
 
-            fn set_drive_strength(&mut self, strength: DriveStrength) -> &mut Self {
-                paste! {
-                    unsafe { &*IO_MUX::ptr() }
-                    .$iomux_reg
-                    .modify(|_, w| unsafe { w.fun_drv().bits(strength as u8) });
-                }
-                self
-            }
-
-            fn enable_open_drain(&mut self, on: bool) -> &mut Self {
-                unsafe { &*GPIO::ptr() }.pin[$pin_num].modify(|_, w| w.pin_pad_driver().bit(on));
-                self
-            }
-
-            fn internal_pull_up_in_sleep_mode(&mut self, on: bool) -> &mut Self {
-                paste! {
-                    unsafe { &*IO_MUX::ptr() }
-                        .$iomux_reg
-                        .modify(|_, w| w.mcu_wpu().bit(on));
-                }
-                self
-            }
-
-            fn internal_pull_down_in_sleep_mode(&mut self, on: bool) -> &mut Self {
-                paste!{
-                    unsafe { &*IO_MUX::ptr() }
-                        .$iomux_reg
-                        .modify(|_, w| w.mcu_wpd().bit(on));
-                }
-                self
-            }
-
-            fn enable_output_in_sleep_mode(&mut self, on: bool) -> &mut Self {
-                paste! {
-                    unsafe { &*IO_MUX::ptr() }
-                        .$iomux_reg
-                        .modify(|_, w| w.mcu_oe().bit(on));
-                }
-                self
-            }
-
-            fn connect_peripheral_to_output_with_options(
-                &mut self,
-                signal: OutputSignal,
-                invert: bool,
-                invert_enable: bool,
-                enable_from_gpio: bool,
-                force_via_gpio_mux: bool,
-            ) -> &mut Self {
-                let af = if force_via_gpio_mux {
-                    AlternateFunction::$gpio_function
-                } else {
-                    match signal {
-                        $( $(
-                            OutputSignal::$af_signal => AlternateFunction::$af,
-                        )* )?
-                        _ => AlternateFunction::$gpio_function
-                    }
-                };
-
-                if af == AlternateFunction::$gpio_function && signal as usize > OUTPUT_SIGNAL_MAX as usize {
-                    panic!("Cannot connect this peripheral to GPIO");
-                }
-
-                self.set_alternate_function(af);
-
-                let clipped_signal = if signal as usize <= OUTPUT_SIGNAL_MAX as usize { signal as OutputSignalType } else { OUTPUT_SIGNAL_MAX };
-
-                unsafe { &*GPIO::ptr() }.func_out_sel_cfg[$pin_num].modify(|_, w| unsafe {
-                    w
-                        .out_sel().bits(clipped_signal)
-                        .inv_sel().bit(invert)
-                        .oen_sel().bit(enable_from_gpio)
-                        .oen_inv_sel().bit(invert_enable)
-                });
-
-                self
-            }
-
-            fn internal_pull_up(&mut self, on: bool) -> &mut Self {
-                paste!{
-                    unsafe { &*IO_MUX::ptr() }.$iomux_reg.modify(|_, w| w.fun_wpu().bit(on));
-                }
-                self
-            }
-
-            fn internal_pull_down(&mut self, on: bool) -> &mut Self {
-                paste! {
-                    unsafe { &*IO_MUX::ptr() }.$iomux_reg.modify(|_, w| w.fun_wpd().bit(on));
-                }
-                self
-            }
-        }
-    };
+    fn internal_pull_down(&mut self, on: bool) -> &mut Self;
 }
 
 #[macro_export]
 macro_rules! impl_input {
     (
         $gpio_function:ident,
+        $input_signal:ty,
         $pxi:ident:
         (
             $pin_num:expr, $iomux_reg:expr, $bit:expr, $out_en_clear:ident,
@@ -405,6 +233,8 @@ macro_rules! impl_input {
         }
 
         impl<MODE> InputPin for $pxi<MODE> {
+            type InputSignal = $input_signal;
+
             fn set_to_input(&mut self) -> &mut Self {
                 self.init_input(false, false);
                 self
@@ -434,17 +264,16 @@ macro_rules! impl_input {
 
             fn connect_input_to_peripheral_with_options(
                 &mut self,
-                signal: InputSignal,
+                signal: Self::InputSignal,
                 invert: bool,
                 force_via_gpio_mux: bool,
             ) -> &mut Self {
-
                 let af = if force_via_gpio_mux {
                     AlternateFunction::$gpio_function
                 } else {
                     match signal {
                         $( $(
-                            InputSignal::$af_signal => AlternateFunction::$af,
+                            Self::InputSignal::$af_signal => AlternateFunction::$af,
                         )* )?
                         _ => AlternateFunction::$gpio_function
                     }
@@ -548,11 +377,13 @@ macro_rules! impl_input {
 #[macro_export]
 macro_rules! impl_input_wrap {
     (
-        $gpio_function:ident, $pxi:ident, $pin_num:expr, $iomux_reg:expr, $type:ident, Bank0, SingleCore
+        $gpio_function:ident,
+        $pxi:ident, $pin_num:expr, $iomux_reg:expr, $type:ident, Bank0, SingleCore
         $( ,( $( $af_input_signal:ident : $af_input:ident ),* ) )?
     ) => {
         impl_input!(
             $gpio_function,
+            InputSignal,
             $pxi:
             (
                 $pin_num, $iomux_reg, $pin_num % 32, enable_w1tc, in_, data_next,
@@ -563,11 +394,13 @@ macro_rules! impl_input_wrap {
     };
 
     (
-        $gpio_function:ident, $pxi:ident, $pin_num:expr, $iomux_reg:expr, $type:ident, Bank1, SingleCore
+        $gpio_function:ident,
+        $pxi:ident, $pin_num:expr, $iomux_reg:expr, $type:ident, Bank1, SingleCore
         $( ,( $( $af_input_signal:ident : $af_input:ident ),* ) )?
     ) => {
         impl_input!(
             $gpio_function,
+            InputSignal,
             $pxi:
             (
                 $pin_num, $iomux_reg, $pin_num % 32, enable1_w1tc, in1, data_next,
@@ -578,11 +411,13 @@ macro_rules! impl_input_wrap {
     };
 
     (
-        $gpio_function:ident, $pxi:ident, $pin_num:expr, $iomux_reg:expr, $type:ident, Bank0, DualCore
+        $gpio_function:ident,
+        $pxi:ident, $pin_num:expr, $iomux_reg:expr, $type:ident, Bank0, DualCore
         $( ,( $( $af_input_signal:ident : $af_input:ident ),* ) )?
     ) => {
         impl_input!(
             $gpio_function,
+            InputSignal,
             $pxi:
             (
                 $pin_num, $iomux_reg, $pin_num % 32, enable_w1tc, in_, data_next,
@@ -593,11 +428,13 @@ macro_rules! impl_input_wrap {
     };
 
     (
-        $gpio_function:ident, $pxi:ident, $pin_num:expr, $iomux_reg:expr, $type:ident, Bank1, DualCore
+        $gpio_function:ident,
+        $pxi:ident, $pin_num:expr, $iomux_reg:expr, $type:ident, Bank1, DualCore
         $( ,( $( $af_input_signal:ident : $af_input:ident ),* ) )?
     ) => {
         impl_input!(
             $gpio_function,
+            InputSignal,
             $pxi:
             (
                 $pin_num, $iomux_reg, $pin_num % 32, enable1_w1tc, in1, data_next,
@@ -609,13 +446,254 @@ macro_rules! impl_input_wrap {
 }
 
 #[macro_export]
+macro_rules! impl_output {
+    (
+        $gpio_function:ident,
+        $output_signal:ty,
+        $pxi:ident:
+        (
+            $pin_num:expr, $iomux_reg:expr, $bit:expr, $out_en_set:ident,
+            $out_en_clear:ident, $out_set:ident, $out_clear:ident, $out_reg:ident
+        )
+        $( ,( $( $af_signal:ident: $af:ident ),* ))?
+    ) => {
+        impl<MODE> embedded_hal::digital::v2::OutputPin for $pxi<Output<MODE>> {
+            type Error = Infallible;
+
+            fn set_high(&mut self) -> Result<(), Self::Error> {
+                unsafe { (*GPIO::ptr()).$out_set.write(|w| w.bits(1 << $bit)) };
+                Ok(())
+            }
+
+            fn set_low(&mut self) -> Result<(), Self::Error> {
+                unsafe { (*GPIO::ptr()).$out_clear.write(|w| w.bits(1 << $bit)) };
+                Ok(())
+            }
+        }
+
+        impl<MODE> embedded_hal::digital::v2::StatefulOutputPin for $pxi<Output<MODE>> {
+            fn is_set_high(&self) -> Result<bool, Self::Error> {
+                unsafe { Ok((*GPIO::ptr()).$out_reg.read().bits() & (1 << $bit) != 0) }
+            }
+
+            fn is_set_low(&self) -> Result<bool, Self::Error> {
+                Ok(!self.is_set_high()?)
+            }
+        }
+
+        impl<MODE> embedded_hal::digital::v2::ToggleableOutputPin for $pxi<Output<MODE>> {
+            type Error = Infallible;
+
+            fn toggle(&mut self) -> Result<(), Self::Error> {
+                if self.is_set_high()? {
+                    Ok(self.set_low()?)
+                } else {
+                    Ok(self.set_high()?)
+                }
+            }
+        }
+
+        impl<MODE> $pxi<MODE> {
+            pub fn into_pull_up_input(self) -> $pxi<Input<PullUp>> {
+                self.init_input(false, false);
+                $pxi { _mode: PhantomData }
+            }
+
+            pub fn into_pull_down_input(self) -> $pxi<Input<PullDown>> {
+                self.init_input(true, false);
+                $pxi { _mode: PhantomData }
+            }
+
+            fn init_output(&self, alternate: AlternateFunction, open_drain: bool) {
+                let gpio = unsafe { &*GPIO::ptr() };
+                let iomux = unsafe { &*IO_MUX::ptr() };
+
+                gpio.$out_en_set.write(|w| unsafe { w.bits(1 << $bit) });
+                gpio.pin[$pin_num].modify(|_, w| w.pin_pad_driver().bit(open_drain));
+
+                gpio.func_out_sel_cfg[$pin_num]
+                    .modify(|_, w| unsafe { w.out_sel().bits(OutputSignal::GPIO as OutputSignalType) });
+
+                paste! {
+                    iomux.$iomux_reg.modify(|_, w| unsafe {
+                        w.mcu_sel()
+                            .bits(alternate as u8)
+                            .fun_ie()
+                            .clear_bit()
+                            .fun_wpd()
+                            .clear_bit()
+                            .fun_wpu()
+                            .clear_bit()
+                            .fun_drv()
+                            .bits(DriveStrength::I20mA as u8)
+                            .slp_sel()
+                            .clear_bit()
+                    });
+                }
+            }
+
+            pub fn into_push_pull_output(self) -> $pxi<Output<PushPull>> {
+                self.init_output(AlternateFunction::$gpio_function, false);
+                $pxi { _mode: PhantomData }
+            }
+
+            pub fn into_open_drain_output(self) -> $pxi<Output<OpenDrain>> {
+                self.init_output(AlternateFunction::$gpio_function, true);
+                $pxi { _mode: PhantomData }
+            }
+
+            pub fn into_alternate_1(self) -> $pxi<Alternate<AF1>> {
+                self.init_output(AlternateFunction::Function1, false);
+                $pxi { _mode: PhantomData }
+            }
+
+            pub fn into_alternate_2(self) -> $pxi<Alternate<AF2>> {
+                self.init_output(AlternateFunction::Function2, false);
+                $pxi { _mode: PhantomData }
+            }
+        }
+
+        impl<MODE> OutputPin for $pxi<MODE> {
+            type OutputSignal = $output_signal;
+
+            fn set_to_open_drain_output(&mut self) -> &mut Self {
+                self.init_output(AlternateFunction::$gpio_function, true);
+                self
+            }
+
+            fn set_to_push_pull_output(&mut self) -> &mut Self {
+                self.init_output(AlternateFunction::$gpio_function, false);
+                self
+            }
+
+            fn enable_output(&mut self, on: bool) -> &mut Self {
+                if on {
+                    unsafe { &*GPIO::ptr() }
+                        .$out_en_set
+                        .write(|w| unsafe { w.bits(1 << $bit) });
+                } else {
+                    unsafe { &*GPIO::ptr() }
+                        .$out_en_clear
+                        .write(|w| unsafe { w.bits(1 << $bit) });
+                }
+                self
+            }
+
+            fn set_output_high(&mut self, high: bool) -> &mut Self {
+                if high {
+                    unsafe { (*GPIO::ptr()).$out_set.write(|w| w.bits(1 << $bit)) };
+                } else {
+                    unsafe { (*GPIO::ptr()).$out_clear.write(|w| w.bits(1 << $bit)) };
+                }
+                self
+            }
+
+            fn set_drive_strength(&mut self, strength: DriveStrength) -> &mut Self {
+                paste! {
+                    unsafe { &*IO_MUX::ptr() }
+                    .$iomux_reg
+                    .modify(|_, w| unsafe { w.fun_drv().bits(strength as u8) });
+                }
+                self
+            }
+
+            fn enable_open_drain(&mut self, on: bool) -> &mut Self {
+                unsafe { &*GPIO::ptr() }.pin[$pin_num].modify(|_, w| w.pin_pad_driver().bit(on));
+                self
+            }
+
+            fn internal_pull_up_in_sleep_mode(&mut self, on: bool) -> &mut Self {
+                paste! {
+                    unsafe { &*IO_MUX::ptr() }
+                        .$iomux_reg
+                        .modify(|_, w| w.mcu_wpu().bit(on));
+                }
+                self
+            }
+
+            fn internal_pull_down_in_sleep_mode(&mut self, on: bool) -> &mut Self {
+                paste!{
+                    unsafe { &*IO_MUX::ptr() }
+                        .$iomux_reg
+                        .modify(|_, w| w.mcu_wpd().bit(on));
+                }
+                self
+            }
+
+            fn enable_output_in_sleep_mode(&mut self, on: bool) -> &mut Self {
+                paste! {
+                    unsafe { &*IO_MUX::ptr() }
+                        .$iomux_reg
+                        .modify(|_, w| w.mcu_oe().bit(on));
+                }
+                self
+            }
+
+            fn connect_peripheral_to_output_with_options(
+                &mut self,
+                signal: Self::OutputSignal,
+                invert: bool,
+                invert_enable: bool,
+                enable_from_gpio: bool,
+                force_via_gpio_mux: bool,
+            ) -> &mut Self {
+                let af = if force_via_gpio_mux {
+                    AlternateFunction::$gpio_function
+                } else {
+                    match signal {
+                        $( $(
+                            Self::OutputSignal::$af_signal => AlternateFunction::$af,
+                        )* )?
+                        _ => AlternateFunction::$gpio_function
+                    }
+                };
+
+                if af == AlternateFunction::$gpio_function && signal as usize > OUTPUT_SIGNAL_MAX as usize {
+                    panic!("Cannot connect this peripheral to GPIO");
+                }
+
+                self.set_alternate_function(af);
+
+                let clipped_signal = if signal as usize <= OUTPUT_SIGNAL_MAX as usize { signal as OutputSignalType } else { OUTPUT_SIGNAL_MAX };
+
+                unsafe { &*GPIO::ptr() }.func_out_sel_cfg[$pin_num].modify(|_, w| unsafe {
+                    w
+                        .out_sel().bits(clipped_signal)
+                        .inv_sel().bit(invert)
+                        .oen_sel().bit(enable_from_gpio)
+                        .oen_inv_sel().bit(invert_enable)
+                });
+
+                self
+            }
+
+            fn internal_pull_up(&mut self, on: bool) -> &mut Self {
+                paste!{
+                    unsafe { &*IO_MUX::ptr() }.$iomux_reg.modify(|_, w| w.fun_wpu().bit(on));
+                }
+                self
+            }
+
+            fn internal_pull_down(&mut self, on: bool) -> &mut Self {
+                paste! {
+                    unsafe { &*IO_MUX::ptr() }.$iomux_reg.modify(|_, w| w.fun_wpd().bit(on));
+                }
+                self
+            }
+        }
+    };
+}
+
+#[macro_export]
 macro_rules! impl_output_wrap {
     (
-        $gpio_function:ident, $pxi:ident, $pin_num:expr, $iomux_reg:expr, IO, Bank0
+        $gpio_function:ident,
+        $pxi:ident, $pin_num:expr, $iomux_reg:expr, IO, Bank0
         $( ,( $( $af_output_signal:ident : $af_output:ident ),* ))?
     ) => {
         impl_output!(
             $gpio_function,
+            OutputSignal,
             $pxi:
             (
                 $pin_num, $iomux_reg, $pin_num % 32, enable_w1ts, enable_w1tc,
@@ -626,11 +704,13 @@ macro_rules! impl_output_wrap {
     };
 
     (
-        $gpio_function:ident, $pxi:ident, $pin_num:expr, $iomux_reg:expr, IO, Bank1
+        $gpio_function:ident,
+        $pxi:ident, $pin_num:expr, $iomux_reg:expr, IO, Bank1
         $( ,( $( $af_output_signal:ident : $af_output:ident ),* ))?
     ) => {
         impl_output!(
             $gpio_function,
+            OutputSignal,
             $pxi:
             (
                 $pin_num, $iomux_reg, $pin_num % 32, enable1_w1ts, enable1_w1tc,
@@ -641,7 +721,8 @@ macro_rules! impl_output_wrap {
     };
 
     (
-        $gpio_function:ident, $pxi:ident, $pin_num:expr, $iomux_reg:expr, $type:ident, $bank:ident
+        $gpio_function:ident,
+        $pxi:ident, $pin_num:expr, $iomux_reg:expr, $type:ident, $bank:ident
         $( ,( $( $af_output_signal:ident : $af_output:ident ),* ))?
     ) => {};
 }
@@ -697,64 +778,6 @@ macro_rules! gpio {
                     )+
                 }
             }
-        }
-
-        pub trait InputPin: Pin {
-            fn set_to_input(&mut self) -> &mut Self;
-
-            fn enable_input(&mut self, on: bool) -> &mut Self;
-
-            fn enable_input_in_sleep_mode(&mut self, on: bool) -> &mut Self;
-
-            fn is_input_high(&mut self) -> bool;
-
-            fn connect_input_to_peripheral(&mut self, signal: InputSignal) -> &mut Self {
-                self.connect_input_to_peripheral_with_options(signal, false, false)
-            }
-
-            fn connect_input_to_peripheral_with_options(
-                &mut self,
-                signal: InputSignal,
-                invert: bool,
-                force_via_gpio_mux: bool,
-            ) -> &mut Self;
-        }
-
-        pub trait OutputPin: Pin {
-            fn set_to_open_drain_output(&mut self) -> &mut Self;
-
-            fn set_to_push_pull_output(&mut self) -> &mut Self;
-
-            fn enable_output(&mut self, on: bool) -> &mut Self;
-
-            fn set_output_high(&mut self, on: bool) -> &mut Self;
-
-            fn set_drive_strength(&mut self, strength: DriveStrength) -> &mut Self;
-
-            fn enable_open_drain(&mut self, on: bool) -> &mut Self;
-
-            fn enable_output_in_sleep_mode(&mut self, on: bool) -> &mut Self;
-
-            fn internal_pull_up_in_sleep_mode(&mut self, on: bool) -> &mut Self;
-
-            fn internal_pull_down_in_sleep_mode(&mut self, on: bool) -> &mut Self;
-
-            fn connect_peripheral_to_output(&mut self, signal: OutputSignal) -> &mut Self {
-                self.connect_peripheral_to_output_with_options(signal, false, false, false, false)
-            }
-
-            fn connect_peripheral_to_output_with_options(
-                &mut self,
-                signal: OutputSignal,
-                invert: bool,
-                invert_enable: bool,
-                enable_from_gpio: bool,
-                force_via_gpio_mux: bool,
-            ) -> &mut Self;
-
-            fn internal_pull_up(&mut self, on: bool) -> &mut Self;
-
-            fn internal_pull_down(&mut self, on: bool) -> &mut Self;
         }
 
         pub fn connect_low_to_peripheral(signal: InputSignal) {
