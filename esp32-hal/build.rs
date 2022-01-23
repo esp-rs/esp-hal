@@ -13,6 +13,13 @@ fn main() {
         .write_all(include_bytes!("rom.x"))
         .unwrap();
 
+    File::create(out.join("hal-defaults.x"))
+        .unwrap()
+        .write_all(include_bytes!("hal-defaults.x"))
+        .unwrap();
+
+    println!("cargo:rustc-link-arg=-Thal-defaults.x");
+
     println!("cargo:rustc-link-search={}", out.display());
 
     // Only re-run the build script when memory.x is changed,
