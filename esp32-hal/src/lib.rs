@@ -7,7 +7,7 @@ pub use self::gpio::IO;
 
 pub mod gpio;
 
-pub use esp_hal_common::ram;
+pub use esp_hal_common::{interrupt, ram, Cpu};
 
 #[no_mangle]
 extern "C" fn DefaultHandler(_level: u32, _interrupt: pac::Interrupt) {}
@@ -54,4 +54,11 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
 #[rustfmt::skip]
 pub extern "Rust" fn __init_data() -> bool {
     false
+}
+
+fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
+    int_enable as u8
+        | ((nmi_enable as u8) << 1)
+        | (int_enable as u8) << 2
+        | ((nmi_enable as u8) << 3)
 }

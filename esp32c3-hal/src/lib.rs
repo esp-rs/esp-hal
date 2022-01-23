@@ -8,7 +8,7 @@ use riscv_rt::pre_init;
 pub mod gpio;
 pub mod rtc_cntl;
 
-pub use esp_hal_common::ram;
+pub use esp_hal_common::{interrupt, ram, Cpu};
 
 pub use self::{gpio::IO, rtc_cntl::RtcCntl};
 
@@ -40,6 +40,7 @@ extern "C" {
 #[cfg(not(feature = "normalboot"))]
 #[pre_init]
 #[cfg(not(feature = "normalboot"))]
+#[doc(hidden)]
 unsafe fn init() {
     r0::init_data(&mut _srwtext, &mut _erwtext, &_irwtext);
 
@@ -54,6 +55,7 @@ unsafe fn init() {
 
 #[allow(unreachable_code)]
 #[export_name = "_mp_hook"]
+#[doc(hidden)]
 pub fn mp_hook() -> bool {
     unsafe {
         r0::zero_bss(&mut _rtc_fast_bss_start, &mut _rtc_fast_bss_end);
@@ -68,4 +70,8 @@ pub fn mp_hook() -> bool {
     }
 
     false
+}
+
+fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
+    int_enable as u8 | ((nmi_enable as u8) << 1)
 }

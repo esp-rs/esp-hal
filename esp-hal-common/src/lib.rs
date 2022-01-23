@@ -29,14 +29,26 @@ pub use esp32s3_pac as pac;
 
 pub mod delay;
 pub mod gpio;
+#[cfg_attr(feature = "esp32", path = "interrupt/xtensa.rs")]
+#[cfg_attr(feature = "esp32c3", path = "interrupt/riscv.rs")]
+pub mod interrupt;
 pub mod prelude;
 pub mod serial;
 pub mod timer;
 
 pub use delay::Delay;
 pub use gpio::*;
+pub use interrupt::*;
+use procmacros;
+pub use procmacros::ram;
 pub use serial::Serial;
 pub use timer::Timer;
 
-use procmacros;
-pub use procmacros::ram;
+/// Enumeration of CPU cores
+/// The actual number of available cores depends on the target.
+pub enum Cpu {
+    /// The fist core
+    ProCpu = 0,
+    /// The second core
+    AppCpu,
+}

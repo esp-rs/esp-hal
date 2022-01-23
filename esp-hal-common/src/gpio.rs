@@ -330,10 +330,12 @@ macro_rules! impl_input {
                         _ => {}
                     }
                 }
+
+                // a crate using this macro needs to provide gpio_intr_enable
                 unsafe {
                     (&*GPIO::ptr()).pin[$pin_num].modify(|_, w|
                         w
-                            .pin_int_ena().bits(int_enable as u8 | ((nmi_enable as u8) << 1))
+                            .pin_int_ena().bits(crate::gpio_intr_enable(int_enable, nmi_enable))
                             .pin_int_type().bits(event as u8)
                             .pin_wakeup_enable().bit(wake_up_from_light_sleep)
                     );
