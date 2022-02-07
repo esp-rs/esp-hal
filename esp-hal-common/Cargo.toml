@@ -17,7 +17,7 @@ paste        = "1.0"
 riscv        = { version = "0.7", optional = true }
 void         = { version = "1.0", default-features = false }
 xtensa-lx    = { version = "0.6.0", optional = true }
-xtensa-lx-rt = { version = "0.8.0", features = ["esp32"], optional = true }
+xtensa-lx-rt = { version = "0.9.0", optional = true }
 procmacros   = { path = "../esp-hal-procmacros", package = "esp-hal-procmacros" }
 # IMPORTANT:
 # Each supported device MUST have its PAC included below along with a
@@ -30,8 +30,8 @@ esp32s3_pac = { package = "esp32s3", git = "https://github.com/esp-rs/esp-pacs.g
 [features]
 esp32   = ["esp32_pac",   "esp32_pac/rt",   "xtensa-lx/esp32", "xtensa-lx-rt/esp32", "procmacros/rtc_slow", "dual_core"]
 esp32c3 = ["esp32c3_pac", "esp32c3_pac/rt", "riscv", "single_core"]
-esp32s2 = ["esp32s2_pac", "esp32s2_pac/rt", "xtensa-lx/esp32", "xtensa-lx-rt/esp32", "procmacros/rtc_slow", "single_core"] # FIXME
-esp32s3 = ["esp32s3_pac", "esp32s3_pac/rt", "xtensa-lx/esp32", "xtensa-lx-rt/esp32", "procmacros/rtc_slow", "dual_core"] # FIXME
+esp32s2 = ["esp32s2_pac", "esp32s2_pac/rt", "xtensa-lx/esp32", "xtensa-lx-rt/esp32s2", "procmacros/rtc_slow", "single_core"] # FIXME
+esp32s3 = ["esp32s3_pac", "esp32s3_pac/rt", "xtensa-lx/esp32", "xtensa-lx-rt/esp32s3", "procmacros/rtc_slow", "dual_core"] # FIXME
 
 single_core = []
 dual_core = []
