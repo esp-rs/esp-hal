@@ -11,7 +11,8 @@ extern "C" {
 }
 
 /// Enumeration of available CPU interrupts
-/// It's possible to create one handler per priority level. (e.g `level1_interrupt`)
+/// It's possible to create one handler per priority level. (e.g
+/// `level1_interrupt`)
 #[allow(unused)]
 pub enum CpuInterrupt {
     Interrupt0LevelPriority1 = 0,
@@ -30,7 +31,7 @@ pub enum CpuInterrupt {
     Interrupt13LevelPriority1,
     Interrupt14NmiPriority7,
     Interrupt15Timer1Priority3,
-    Interrupt16Timer2Priority3,
+    Interrupt16Timer2Priority5,
     Interrupt17LevelPriority1,
     Interrupt18LevelPriority1,
     Interrupt19LevelPriority2,
@@ -53,13 +54,12 @@ pub fn enable(core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
     unsafe {
         let interrupt_number = interrupt as isize;
         let cpu_interrupt_number = which as isize;
-        let intr = &*crate::pac::DPORT::ptr();
         let intr_map_base = match core {
-            Cpu::ProCpu => intr.pro_mac_intr_map.as_ptr(),
+            Cpu::ProCpu => (&*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
             #[cfg(feature = "dual_core")]
-            Cpu::AppCpu => intr.app_mac_intr_map.as_ptr(),
+            Cpu::AppCpu => (&*core1_interrupt_peripheral()).app_mac_intr_map.as_ptr(),
             #[cfg(feature = "single_core")]
-            Cpu::AppCpu => intr.pro_mac_intr_map.as_ptr(),
+            Cpu::AppCpu => (&*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
         };
         intr_map_base
             .offset(interrupt_number)
@@ -71,13 +71,12 @@ pub fn enable(core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
 pub fn disable(core: Cpu, interrupt: Interrupt) {
     unsafe {
         let interrupt_number = interrupt as isize;
-        let intr = &*crate::pac::DPORT::ptr();
         let intr_map_base = match core {
-            Cpu::ProCpu => intr.pro_mac_intr_map.as_ptr(),
+            Cpu::ProCpu => (&*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
             #[cfg(feature = "dual_core")]
-            Cpu::AppCpu => intr.app_mac_intr_map.as_ptr(),
+            Cpu::AppCpu => (&*core1_interrupt_peripheral()).app_mac_intr_map.as_ptr(),
             #[cfg(feature = "single_core")]
-            Cpu::AppCpu => intr.pro_mac_intr_map.as_ptr(),
+            Cpu::AppCpu => (&*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
         };
         intr_map_base.offset(interrupt_number).write_volatile(0);
     }
@@ -95,17 +94,82 @@ pub fn get_status(core: Cpu) -> u128 {
     unsafe {
         match core {
             Cpu::ProCpu => {
-                ((*crate::pac::DPORT::ptr()).pro_intr_status_0.read().bits() as u128)
-                    | ((*crate::pac::DPORT::ptr()).pro_intr_status_1.read().bits() as u128) << 32
-                    | ((*crate::pac::DPORT::ptr()).pro_intr_status_2.read().bits() as u128) << 64
+                ((&*core0_interrupt_peripheral())
+                    .pro_intr_status_0
+                    .read()
+                    .bits() as u128)
+                    | ((&*core0_interrupt_peripheral())
+                        .pro_intr_status_1
+                        .read()
+                        .bits() as u128)
+                        << 32
+                    | ((&*core0_interrupt_peripheral())
+                        .pro_intr_status_2
+                        .read()
+                        .bits() as u128)
+                        << 64
             }
+            #[cfg(feature = "dual_core")]
             Cpu::AppCpu => {
-                ((*crate::pac::DPORT::ptr()).app_intr_status_0.read().bits() as u128)
-                    | ((*crate::pac::DPORT::ptr()).app_intr_status_1.read().bits() as u128) << 32
-                    | ((*crate::pac::DPORT::ptr()).app_intr_status_2.read().bits() as u128) << 64
+                ((&*core1_interrupt_peripheral())
+                    .app_intr_status_0
+                    .read()
+                    .bits() as u128)
+                    | ((&*core1_interrupt_peripheral())
+                        .app_intr_status_1
+                        .read()
+                        .bits() as u128)
+                        << 32
+                    | ((&*core1_interrupt_peripheral())
+                        .app_intr_status_2
+                        .read()
+                        .bits() as u128)
+                        << 64
+            }
+            #[cfg(feature = "single_core")]
+            Cpu::AppCpu => {
+                ((&*core0_interrupt_peripheral())
+                    .pro_intr_status_0
+                    .read()
+                    .bits() as u128)
+                    | ((&*core0_interrupt_peripheral())
+                        .pro_intr_status_1
+                        .read()
+                        .bits() as u128)
+                        << 32
+                    | ((&*core0_interrupt_peripheral())
+                        .pro_intr_status_2
+                        .read()
+                        .bits() as u128)
+                        << 64
             }
         }
     }
+}
+
+#[cfg(feature = "esp32")]
+unsafe fn core0_interrupt_peripheral() -> *const crate::pac::dport::RegisterBlock {
+    crate::pac::DPORT::ptr()
+}
+
+#[cfg(feature = "esp32")]
+unsafe fn core1_interrupt_peripheral() -> *const crate::pac::dport::RegisterBlock {
+    crate::pac::DPORT::ptr()
+}
+
+#[cfg(feature = "esp32s2")]
+unsafe fn core0_interrupt_peripheral() -> *const crate::pac::interrupt::RegisterBlock {
+    crate::pac::INTERRUPT::ptr()
+}
+
+#[cfg(feature = "esp32s3")]
+unsafe fn core0_interrupt_peripheral() -> *const crate::pac::interrupt_core0::RegisterBlock {
+    crate::pac::INTERRUPT_CORE0::ptr()
+}
+
+#[cfg(feature = "esp32s3")]
+unsafe fn core1_interrupt_peripheral() -> *const crate::pac::interrupt_core1::RegisterBlock {
+    crate::pac::INTERRUPT_CORE1::ptr()
 }
 
 #[xtensa_lx_rt::interrupt(1)]
