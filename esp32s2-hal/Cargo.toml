@@ -28,17 +28,12 @@ bare-metal   = "1.0"
 embedded-hal = { version = "0.2", features = ["unproven"] }
 nb           = "1.0"
 void         = { version = "1.0", default-features = false }
-xtensa-lx    = { version = "0.4", features = ["lx6"] } # FIXME
+xtensa-lx    = { version = "0.6.0", features = ["esp32"] } # FIXME
+xtensa-lx-rt = { version = "0.8.0", features = ["esp32"], optional = true }
 
 [dependencies.esp-hal-common]
 path     = "../esp-hal-common"
 features = ["esp32s2"]
-
-[dependencies.xtensa-lx-rt] # FIXME
-git      = "https://github.com/esp-rs/xtensa-lx-rt/"
-branch   = "unify-xtensa-asm"
-features = ["lx6"]
-optional = true
 
 [dev-dependencies]
 panic-halt = "0.2"

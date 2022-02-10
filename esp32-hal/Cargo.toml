@@ -28,8 +28,8 @@ bare-metal   = "1.0"
 embedded-hal = { version = "0.2", features = ["unproven"] }
 nb           = "1.0"
 void         = { version = "1.0", default-features = false }
-xtensa-lx    = { version = "0.4", features = ["lx6"] }
-xtensa-lx-rt = { version = "0.7", features = ["lx6"], optional = true }
+xtensa-lx    = { version = "0.6.0", features = ["esp32"] }
+xtensa-lx-rt = { version = "0.8.0", features = ["esp32"], optional = true }
 
 [dependencies.esp-hal-common]
 path     = "../esp-hal-common"
