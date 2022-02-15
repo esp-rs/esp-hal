@@ -172,37 +172,44 @@ unsafe fn core1_interrupt_peripheral() -> *const crate::pac::interrupt_core1::Re
     crate::pac::INTERRUPT_CORE1::ptr()
 }
 
-#[xtensa_lx_rt::interrupt(1)]
-fn _level1_interrupt() {
+#[no_mangle]
+#[link_section = ".rwtext"]
+fn __level1_interrupt() {
     unsafe { level1_interrupt() };
 }
 
-#[xtensa_lx_rt::interrupt(2)]
-fn _level2_interrupt() {
+#[no_mangle]
+#[link_section = ".rwtext"]
+fn __level2_interrupt() {
     unsafe { level2_interrupt() };
 }
 
-#[xtensa_lx_rt::interrupt(3)]
-fn _level3_interrupt() {
+#[no_mangle]
+#[link_section = ".rwtext"]
+fn __level3_interrupt() {
     unsafe { level3_interrupt() };
 }
 
-#[xtensa_lx_rt::interrupt(4)]
-fn _level4_interrupt() {
+#[no_mangle]
+#[link_section = ".rwtext"]
+fn __level4_interrupt() {
     unsafe { level4_interrupt() };
 }
 
-#[xtensa_lx_rt::interrupt(5)]
-fn _level5_interrupt() {
+#[no_mangle]
+#[link_section = ".rwtext"]
+fn __level5_interrupt() {
     unsafe { level5_interrupt() };
 }
 
-#[xtensa_lx_rt::interrupt(6)]
-fn _level6_interrupt() {
+#[no_mangle]
+#[link_section = ".rwtext"]
+fn __level6_interrupt() {
     unsafe { level6_interrupt() };
 }
 
-#[xtensa_lx_rt::interrupt(7)]
-fn _level7_interrupt() {
+#[no_mangle]
+#[link_section = ".rwtext"]
+fn __level7_interrupt() {
     unsafe { level7_interrupt() };
 }

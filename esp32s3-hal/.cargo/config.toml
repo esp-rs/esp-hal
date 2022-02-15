@@ -4,7 +4,7 @@ runner = "xtensa-esp32s3-elf-gdb -q -x xtensa.gdb"
 [build]
 rustflags = [
   "-C", "link-arg=-nostartfiles",
-  "-C", "link-arg=-Wl,-Tlink.x",
+  "-C", "link-arg=-Wl,-Tesp32s3.x",
 ]
 target = "xtensa-esp32s3-none-elf"
 

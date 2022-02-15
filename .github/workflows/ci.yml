@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        chip: [esp32, esp32s2]
+        chip: [esp32, esp32s2, esp32s3]
     steps:
       - uses: actions/checkout@v2
       - uses: esp-rs/xtensa-toolchain@afb2ca0c7eefb637832d240ae357b820a1edc2c7
