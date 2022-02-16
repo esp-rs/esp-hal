@@ -28,39 +28,24 @@ For additional updates, please follow along in the [esp-rs channel] on Matrix.
 
 ## What is working?
 
-Currently, only the `esp32-hal` and `esp32c3-hal` packages contain functional examples. Please see the [Notes on the ESP32-S2 and ESP32-S3] below for more information on why this is the case.
+|Peripheral|ESP32|ESP32-C3|ESP32S2|ESP32S3|
+|---|---|---|---|---|
+|TIMG|&#x2611;|&#x2611;|&#x2611;|&#x2611;|
+|UART|&#x2611;|&#x2611;|&#x2611;|&#x2611;|
+|GPIO|&#x2611;|&#x2611;|-|-|
 
-For the **ESP32** and **ESP32-C3**, the following peripherals have some level of functionality:
-
-- `GPIO` pins can be used as digital inputs or outputs
-- `TIMG` instances can be used as general-purpose timers
-- `UART` can be used for bi-directional communication with another device
-- The `DelayMs` and `DelayUs` traits from `embedded-hal` have been implemented
+The `DelayMs` and `DelayUs` traits from `embedded-hal` have been implemented
   - Uses the `SYSTIMER` peripheral for the **ESP32-C3**, and the built in Xtensa timers for the other chips
-
-[notes on the esp32-s2 and esp32-s3]: #notes-on-the-esp32-s2-and-esp32-s3
-
 ## What is NOT working?
 
 Everything else.
 
-### Notes on the ESP32-S2 and ESP32-S3
-
-At this time, there are two major issues blocking progress on the **ESP32-S2** and **ESP32-S3**:
-
-- The lack of runtime support via [xtensa-lx-rt](https://github.com/esp-rs/xtensa-lx-rt)
-- The omission of linker scripts, required for actually building the binaries
-
-Once these issues have been resolved, progress can resume on the `esp32s2-hal` and `esp32s3-hal` crates.
-
 ## Peripheral Access Crates
 
-For the time being, the `esp-hal-common` package is using git dependencies pointing to forks of the various PACs. This is being done for two reasons:
+For the time being, the `esp-hal-common` package is using git dependencies pointing to a monorepo containing the various PACs. This is being done for two reasons:
 
 - While the existing `esp32-hal` crate exists, so must `esp32`; however, updating the `esp32` crate to the newer SVD causes breaking changes
 - To enable rapid patching and prototyping without interfering with the mainline repositories
-
-Once development has progressed further and the PACs are mostly in line with each other, the dependencies can be reverted to their traditional forms.
 
 ## License
 
