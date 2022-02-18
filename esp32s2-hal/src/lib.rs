@@ -3,6 +3,12 @@
 pub use embedded_hal as ehal;
 pub use esp_hal_common::{pac, prelude, ram, Delay, Serial, Timer};
 
+pub use self::gpio::IO;
+
+pub mod gpio;
+
+pub use esp_hal_common::{interrupt, Cpu};
+
 #[no_mangle]
 extern "C" fn DefaultHandler(_level: u32, _interrupt: pac::Interrupt) {}
 
@@ -50,7 +56,7 @@ pub extern "Rust" fn __init_data() -> bool {
     false
 }
 
-fn _gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
+fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
     int_enable as u8
         | ((nmi_enable as u8) << 1)
         | (int_enable as u8) << 2
