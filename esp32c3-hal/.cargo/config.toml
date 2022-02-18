@@ -1,5 +1,7 @@
 [target.riscv32imc-unknown-none-elf]
+runner = "espflash --format direct-boot --monitor"
 rustflags = [
+  "-C", "link-arg=-Tlinkall.x"
 ]
 
 [build]

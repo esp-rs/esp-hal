@@ -1,7 +1,7 @@
 #![no_std]
 
 pub use embedded_hal as ehal;
-pub use esp_hal_common::{pac, prelude, Delay, Serial, Timer, ram};
+pub use esp_hal_common::{pac, prelude, ram, Delay, Serial, Timer};
 
 #[no_mangle]
 extern "C" fn DefaultHandler(_level: u32, _interrupt: pac::Interrupt) {}
