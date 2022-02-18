@@ -19,7 +19,7 @@ use esp_hal_common::{
     PullDown,
 };
 use panic_halt as _;
-use xtensa_lx::mutex::{Mutex, CriticalSectionMutex};
+use xtensa_lx::mutex::{CriticalSectionMutex, Mutex};
 use xtensa_lx_rt::entry;
 
 static mut SERIAL: CriticalSectionMutex<RefCell<Option<Serial<UART0>>>> =
@@ -33,7 +33,7 @@ fn main() -> ! {
 
     // Disable the TIMG watchdog timer.
     let mut timer0 = Timer::new(peripherals.TIMG0);
-    let mut serial0 = Serial::new(peripherals.UART0).unwrap();
+    let serial0 = Serial::new(peripherals.UART0).unwrap();
 
     timer0.disable();
 
@@ -61,7 +61,9 @@ fn main() -> ! {
     let mut delay = Delay::new();
 
     unsafe {
-        xtensa_lx::interrupt::enable_mask(xtensa_lx_rt::interrupt::CpuInterruptLevel::Level2.mask());
+        xtensa_lx::interrupt::enable_mask(
+            xtensa_lx_rt::interrupt::CpuInterruptLevel::Level2.mask(),
+        );
     }
 
     loop {
