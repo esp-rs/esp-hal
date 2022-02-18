@@ -48,7 +48,8 @@ pub enum InterruptKind {
 }
 
 /// Enumeration of available CPU interrupts.
-/// It is possible to create a handler for each of the interrupts. (e.g. `interrupt3`)
+/// It is possible to create a handler for each of the interrupts. (e.g.
+/// `interrupt3`)
 pub enum CpuInterrupt {
     Interrupt1 = 1,
     Interrupt2,

@@ -5,25 +5,28 @@ fn main() {
     let out = &PathBuf::from(env::var_os("OUT_DIR").unwrap());
     File::create(out.join("memory.x"))
         .unwrap()
-        .write_all(include_bytes!("memory.x"))
+        .write_all(include_bytes!("ld/memory.x"))
         .unwrap();
 
     File::create(out.join("alias.x"))
         .unwrap()
-        .write_all(include_bytes!("rom.x"))
+        .write_all(include_bytes!("ld/rom.x"))
         .unwrap();
 
     File::create(out.join("hal-defaults.x"))
         .unwrap()
-        .write_all(include_bytes!("hal-defaults.x"))
+        .write_all(include_bytes!("ld/hal-defaults.x"))
         .unwrap();
 
     File::create(out.join("esp32s3.x"))
         .unwrap()
-        .write_all(include_bytes!("esp32s3.x"))
+        .write_all(include_bytes!("ld/esp32s3.x"))
         .unwrap();
 
-    println!("cargo:rustc-link-arg=-Thal-defaults.x");
+    File::create(out.join("linkall.x"))
+        .unwrap()
+        .write_all(include_bytes!("ld/linkall.x"))
+        .unwrap();
 
     println!("cargo:rustc-link-search={}", out.display());
 
