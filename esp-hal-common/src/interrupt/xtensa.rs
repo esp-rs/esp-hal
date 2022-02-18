@@ -174,42 +174,42 @@ unsafe fn core1_interrupt_peripheral() -> *const crate::pac::interrupt_core1::Re
 
 #[no_mangle]
 #[link_section = ".rwtext"]
-fn __level1_interrupt() {
+fn __level_1_interrupt() {
     unsafe { level1_interrupt() };
 }
 
 #[no_mangle]
 #[link_section = ".rwtext"]
-fn __level2_interrupt() {
+fn __level_2_interrupt() {
     unsafe { level2_interrupt() };
 }
 
 #[no_mangle]
 #[link_section = ".rwtext"]
-fn __level3_interrupt() {
+fn __level_3_interrupt() {
     unsafe { level3_interrupt() };
 }
 
 #[no_mangle]
 #[link_section = ".rwtext"]
-fn __level4_interrupt() {
+fn __level_4_interrupt() {
     unsafe { level4_interrupt() };
 }
 
 #[no_mangle]
 #[link_section = ".rwtext"]
-fn __level5_interrupt() {
+fn __level_5_interrupt() {
     unsafe { level5_interrupt() };
 }
 
 #[no_mangle]
 #[link_section = ".rwtext"]
-fn __level6_interrupt() {
+fn __level_6_interrupt() {
     unsafe { level6_interrupt() };
 }
 
 #[no_mangle]
 #[link_section = ".rwtext"]
-fn __level7_interrupt() {
+fn __level_7_interrupt() {
     unsafe { level7_interrupt() };
 }
