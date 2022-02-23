@@ -32,7 +32,7 @@ For additional updates, please follow along in the [esp-rs channel] on Matrix.
 |---|---|---|---|---|
 |TIMG|&#x2611;|&#x2611;|&#x2611;|&#x2611;|
 |UART|&#x2611;|&#x2611;|&#x2611;|&#x2611;|
-|GPIO|&#x2611;|&#x2611;|-|-|
+|GPIO|&#x2611;|&#x2611;|&#x2611;|&#x2611;|
 
 The `DelayMs` and `DelayUs` traits from `embedded-hal` have been implemented
   - Uses the `SYSTIMER` peripheral for the **ESP32-C3**, and the built in Xtensa timers for the other chips
