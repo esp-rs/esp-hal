@@ -1,3 +1,6 @@
+ENTRY(_start_hal)
+PROVIDE(_start_trap = _start_trap_hal);
+
 PROVIDE(_stext = ORIGIN(REGION_TEXT));
 PROVIDE(_stack_start = ORIGIN(REGION_STACK) + LENGTH(REGION_STACK));
 PROVIDE(_max_hart_id = 0);

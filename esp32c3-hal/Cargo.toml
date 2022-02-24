@@ -31,17 +31,13 @@ bare-metal   = "1.0"
 embedded-hal = { version = "0.2", features = ["unproven"] }
 nb           = "1.0"
 riscv        = "0.7"
+riscv-rt     = { version = "0.8.1", optional = true }
 void         = { version = "1.0", default-features = false }
 r0           = "1.0.0"
 
 [dependencies.esp-hal-common]
 path     = "../esp-hal-common"
 features = ["esp32c3"]
-
-[dependencies.riscv-rt] 
-git      = "https://github.com/MabezDev/riscv-rt"
-rev      = "6b55e4aa3895924e31bcd151f2f0ab840836fa07"
-optional = true
 
 [build-dependencies]
 riscv-target = "0.1.2"
