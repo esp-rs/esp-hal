@@ -4,8 +4,8 @@
 //! display (via I2C)
 //!
 //! The following wiring is assumed:
-//! - SDA => GPIO2
-//! - SCL => GPIO3
+//! - SDA => GPIO1
+//! - SCL => GPIO2
 
 #![no_std]
 #![no_main]
@@ -19,7 +19,8 @@ use embedded_graphics::{
     prelude::*,
     text::{Alignment, Text},
 };
-use esp32c3_hal::{gpio::IO, i2c, pac::Peripherals, prelude::*, RtcCntl, Timer, I2C};
+use esp32c3_hal::{gpio::IO, pac::Peripherals, prelude::*, RtcCntl, Timer};
+use esp_hal_common::i2c::I2C;
 use nb::block;
 use panic_halt as _;
 use riscv_rt::entry;
@@ -27,7 +28,7 @@ use ssd1306::{prelude::*, I2CDisplayInterface, Ssd1306};
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take().unwrap();
+    let mut peripherals = Peripherals::take().unwrap();
 
     let rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
     let mut timer0 = Timer::new(peripherals.TIMG0);
@@ -41,28 +42,16 @@ fn main() -> ! {
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    // Enable the I2C peripheral clock
-    peripherals
-        .SYSTEM
-        .perip_clk_en0
-        .modify(|_, w| w.ext0_clk_en().set_bit());
-
-    // Take the I2C peripheral out of any pre-existing reset state
-    // (shouldn't be the case after a fresh startup, but better be safe)
-    peripherals
-        .SYSTEM
-        .perip_rst_en0
-        .modify(|_, w| w.ext0_rst().clear_bit());
-
     // Create a new peripheral object with the described wiring
     // and standard I2C clock speed
     let i2c = I2C::new(
         peripherals.I2C,
-        i2c::Pins {
-            sda: io.pins.gpio2,
-            scl: io.pins.gpio3,
+        esp_hal_common::i2c::Pins {
+            sda: io.pins.gpio1,
+            scl: io.pins.gpio2,
         },
         100_000,
+        &mut peripherals.SYSTEM,
     )
     .unwrap();
 

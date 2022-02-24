@@ -3,10 +3,9 @@
 pub use embedded_hal as ehal;
 pub use esp_hal_common::{pac, prelude, Delay, RtcCntl, Serial, Timer};
 
-pub use self::{gpio::IO, i2c::I2C};
+pub use self::{gpio::IO};
 
 pub mod gpio;
-pub mod i2c;
 
 pub use esp_hal_common::{interrupt, ram, Cpu};
 

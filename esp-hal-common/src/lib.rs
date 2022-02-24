@@ -43,6 +43,7 @@ pub mod timer;
 
 pub use delay::Delay;
 pub use gpio::*;
+pub use i2c::Pins;
 pub use interrupt::*;
 use procmacros;
 pub use procmacros::ram;

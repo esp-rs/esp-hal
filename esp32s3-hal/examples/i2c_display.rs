@@ -4,8 +4,8 @@
 //! display (via I2C)
 //!
 //! The following wiring is assumed:
-//! - SDA => GPIO32
-//! - SCL => GPIO33
+//! - SDA => GPIO1
+//! - SCL => GPIO2
 
 #![no_std]
 #![no_main]
@@ -22,7 +22,7 @@ use embedded_graphics::{
     text::{Alignment, Text},
 };
 use esp_hal_common::i2c::{self, I2C};
-use esp32_hal::{gpio::IO, pac::Peripherals, prelude::*, Serial, Timer};
+use esp32s3_hal::{gpio::IO, pac::Peripherals, prelude::*, Serial, Timer};
 use nb::block;
 use panic_halt as _;
 use ssd1306::{prelude::*, I2CDisplayInterface, Ssd1306};
@@ -47,11 +47,11 @@ fn main() -> ! {
     let i2c = I2C::new(
         peripherals.I2C0,
         i2c::Pins {
-            sda: io.pins.gpio32,
-            scl: io.pins.gpio33,
+            sda: io.pins.gpio1,
+            scl: io.pins.gpio2,
         },
         100_000,
-        &mut peripherals.DPORT,
+        &mut peripherals.SYSTEM,
     )
     .unwrap();
 
@@ -65,6 +65,8 @@ fn main() -> ! {
     let mut display = Ssd1306::new(interface, DisplaySize128x64, DisplayRotation::Rotate0)
         .into_buffered_graphics_mode();
     display.init().unwrap();
+
+    writeln!(serial0, "Display initialized!").unwrap();
 
     // Specify different text styles
     let text_style = MonoTextStyleBuilder::new()
@@ -91,7 +93,7 @@ fn main() -> ! {
         .unwrap();
 
         Text::with_alignment(
-            "Chip: ESP32",
+            "Chip: ESP32S3",
             display.bounding_box().center() + Point::new(0, 14),
             text_style,
             Alignment::Center,

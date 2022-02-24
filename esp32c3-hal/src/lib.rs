@@ -6,12 +6,11 @@ pub use esp_hal_common::{pac, prelude, Delay, Serial, Timer};
 use riscv_rt::pre_init;
 
 pub mod gpio;
-pub mod i2c;
 pub mod rtc_cntl;
 
 pub use esp_hal_common::{interrupt, ram, Cpu};
 
-pub use self::{gpio::IO, i2c::I2C, rtc_cntl::RtcCntl};
+pub use self::{gpio::IO, rtc_cntl::RtcCntl};
 
 extern "C" {
     // Boundaries of the .iram section
