@@ -14,8 +14,6 @@ If you are interested in `no_std` development for ESP devices, we encourage you 
 >
 > **The `esp32-hal` package in this repository is NOT the same as the one published on [crates.io]. The published crate can be found in the [esp-rs/esp32-hal] repository. Once feature parity has been reached, the hope is for the version in this repository to supersede the old one.**
 >
-> **The various packages in this repository may or may not build at any given time.**
->
 > **Until the first releases are published, there should be no expectation of API stability.**
 
 Please make sure you understand all the points above, and use these packages at your own risk. When the packages in this repository are ready for general use this README will be updated to indicate such.
@@ -28,24 +26,12 @@ For additional updates, please follow along in the [esp-rs channel] on Matrix.
 
 ## What is working?
 
-|Peripheral|ESP32|ESP32-C3|ESP32S2|ESP32S3|
-|---|---|---|---|---|
-|TIMG|&#x2611;|&#x2611;|&#x2611;|&#x2611;|
-|UART|&#x2611;|&#x2611;|&#x2611;|&#x2611;|
-|GPIO|&#x2611;|&#x2611;|&#x2611;|&#x2611;|
+Presently the `GPIO`, `TIMG`, and `UART` peripherals have drivers implemented for all supported chips. In addition the `DelayUs` and `DelayMs` traits from [embedded-hal] have been implemented, using the `SYSTIMER` peripheral for the **ESP32-C3** and the internal Xtensa timers for the remaining chips.
 
-The `DelayMs` and `DelayUs` traits from `embedded-hal` have been implemented
-  - Uses the `SYSTIMER` peripheral for the **ESP32-C3**, and the built in Xtensa timers for the other chips
-## What is NOT working?
+For a complete list of which peripheral drivers are implemented for which chips, please refer to [this issue].
 
-Everything else.
-
-## Peripheral Access Crates
-
-For the time being, the `esp-hal-common` package is using git dependencies pointing to a monorepo containing the various PACs. This is being done for two reasons:
-
-- While the existing `esp32-hal` crate exists, so must `esp32`; however, updating the `esp32` crate to the newer SVD causes breaking changes
-- To enable rapid patching and prototyping without interfering with the mainline repositories
+[embedded-hal]: https://github.com/rust-embedded/embedded-hal
+[this issue]: https://github.com/esp-rs/esp-hal/issues/19
 
 ## License
 
