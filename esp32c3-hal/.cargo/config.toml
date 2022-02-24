@@ -4,6 +4,13 @@ rustflags = [
   "-C", "link-arg=-Tlinkall.x"
 ]
 
+# for testing: you can specify this target to see atomic emulation in action
+[target.riscv32imac-unknown-none-elf]
+runner = "espflash --format direct-boot --monitor"
+rustflags = [
+  "-C", "link-arg=-Tlinkall.x"
+]
+
 [build]
 target = "riscv32imc-unknown-none-elf"
 

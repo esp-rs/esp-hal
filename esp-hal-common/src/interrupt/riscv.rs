@@ -187,7 +187,6 @@ pub fn get_status(_core: Cpu) -> u128 {
     }
 }
 
-// TODO should this be aligned with Atomic Emulation Trap Handler in future?
 /// Registers saved in trap handler
 #[doc(hidden)]
 #[allow(missing_docs)]
@@ -235,14 +234,12 @@ pub struct TrapFrame {
 #[export_name = "_start_trap_rust_hal"]
 pub unsafe extern "C" fn start_trap_rust_hal(trap_frame: *mut TrapFrame) {
     extern "C" {
-        pub fn _start_trap_rust(trap_frame: *const TrapFrame);
-
         pub fn DefaultHandler();
     }
 
     let cause = mcause::read();
     if cause.is_exception() {
-        _start_trap_rust(trap_frame);
+        handle_exception(trap_frame);
     } else {
         let code = riscv::register::mcause::read().code();
         match code {
@@ -280,6 +277,89 @@ pub unsafe extern "C" fn start_trap_rust_hal(trap_frame: *mut TrapFrame) {
             _ => DefaultHandler(),
         };
     }
+}
+
+/// Apply atomic emulation if needed. Call the default exception handler
+/// otherwise.
+///
+/// # Safety
+///
+/// This function is called from an trap handler.
+#[doc(hidden)]
+unsafe fn handle_exception(trap_frame: *mut TrapFrame) {
+    extern "C" {
+        pub fn _start_trap_atomic_rust(trap_frame: *mut riscv_atomic_emulation_trap::TrapFrame);
+    }
+
+    let mut atomic_emulation_trap_frame = riscv_atomic_emulation_trap::TrapFrame {
+        pc: riscv::register::mepc::read(),
+        ra: (*trap_frame).ra,
+        sp: (*trap_frame).sp,
+        gp: (*trap_frame).gp,
+        tp: (*trap_frame).tp,
+        t0: (*trap_frame).t0,
+        t1: (*trap_frame).t1,
+        t2: (*trap_frame).t2,
+        fp: (*trap_frame).s0,
+        s1: (*trap_frame).s1,
+        a0: (*trap_frame).a0,
+        a1: (*trap_frame).a1,
+        a2: (*trap_frame).a2,
+        a3: (*trap_frame).a3,
+        a4: (*trap_frame).a4,
+        a5: (*trap_frame).a5,
+        a6: (*trap_frame).a6,
+        a7: (*trap_frame).a7,
+        s2: (*trap_frame).s2,
+        s3: (*trap_frame).s3,
+        s4: (*trap_frame).s4,
+        s5: (*trap_frame).s5,
+        s6: (*trap_frame).s6,
+        s7: (*trap_frame).s7,
+        s8: (*trap_frame).s8,
+        s9: (*trap_frame).s9,
+        s10: (*trap_frame).s10,
+        s11: (*trap_frame).s11,
+        t3: (*trap_frame).t3,
+        t4: (*trap_frame).t4,
+        t5: (*trap_frame).t5,
+        t6: (*trap_frame).t6,
+    };
+
+    _start_trap_atomic_rust(&mut atomic_emulation_trap_frame);
+
+    riscv::register::mepc::write(atomic_emulation_trap_frame.pc);
+    (*trap_frame).ra = atomic_emulation_trap_frame.ra;
+    (*trap_frame).sp = atomic_emulation_trap_frame.sp;
+    (*trap_frame).gp = atomic_emulation_trap_frame.gp;
+    (*trap_frame).tp = atomic_emulation_trap_frame.tp;
+    (*trap_frame).t0 = atomic_emulation_trap_frame.t0;
+    (*trap_frame).t1 = atomic_emulation_trap_frame.t1;
+    (*trap_frame).t2 = atomic_emulation_trap_frame.t2;
+    (*trap_frame).s0 = atomic_emulation_trap_frame.fp;
+    (*trap_frame).s1 = atomic_emulation_trap_frame.s1;
+    (*trap_frame).a0 = atomic_emulation_trap_frame.a0;
+    (*trap_frame).a1 = atomic_emulation_trap_frame.a1;
+    (*trap_frame).a2 = atomic_emulation_trap_frame.a2;
+    (*trap_frame).a3 = atomic_emulation_trap_frame.a3;
+    (*trap_frame).a4 = atomic_emulation_trap_frame.a4;
+    (*trap_frame).a5 = atomic_emulation_trap_frame.a5;
+    (*trap_frame).a6 = atomic_emulation_trap_frame.a6;
+    (*trap_frame).a7 = atomic_emulation_trap_frame.a7;
+    (*trap_frame).s2 = atomic_emulation_trap_frame.s2;
+    (*trap_frame).s3 = atomic_emulation_trap_frame.s3;
+    (*trap_frame).s4 = atomic_emulation_trap_frame.s4;
+    (*trap_frame).s5 = atomic_emulation_trap_frame.s5;
+    (*trap_frame).s6 = atomic_emulation_trap_frame.s6;
+    (*trap_frame).s7 = atomic_emulation_trap_frame.s7;
+    (*trap_frame).s8 = atomic_emulation_trap_frame.s8;
+    (*trap_frame).s9 = atomic_emulation_trap_frame.s9;
+    (*trap_frame).s10 = atomic_emulation_trap_frame.s10;
+    (*trap_frame).s11 = atomic_emulation_trap_frame.s11;
+    (*trap_frame).t3 = atomic_emulation_trap_frame.t3;
+    (*trap_frame).t4 = atomic_emulation_trap_frame.t4;
+    (*trap_frame).t5 = atomic_emulation_trap_frame.t5;
+    (*trap_frame).t6 = atomic_emulation_trap_frame.t6;
 }
 
 #[doc(hidden)]
