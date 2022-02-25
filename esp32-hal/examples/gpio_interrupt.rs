@@ -8,6 +8,7 @@ use esp32_hal::{
     pac::{self, Peripherals, UART0},
     prelude::*,
     Delay,
+    RtcCntl,
     Serial,
     Timer,
 };
@@ -34,8 +35,11 @@ fn main() -> ! {
     // Disable the TIMG watchdog timer.
     let mut timer0 = Timer::new(peripherals.TIMG0);
     let serial0 = Serial::new(peripherals.UART0).unwrap();
+    let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
 
+    // Disable MWDT and RWDT (Watchdog) flash boot protection
     timer0.disable();
+    rtc_cntl.set_wdt_global_enable(false);
 
     // Set GPIO15 as an output, and set its state high initially.
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
