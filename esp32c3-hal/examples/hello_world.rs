@@ -12,7 +12,7 @@ use riscv_rt::entry;
 fn main() -> ! {
     let peripherals = Peripherals::take().unwrap();
 
-    let rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
+    let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
     let mut serial0 = Serial::new(peripherals.UART0).unwrap();
     let mut timer0 = Timer::new(peripherals.TIMG0);
     let mut timer1 = Timer::new(peripherals.TIMG1);

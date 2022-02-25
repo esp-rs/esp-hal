@@ -9,7 +9,7 @@ impl RtcCntl {
         Self { rtc_cntl }
     }
 
-    pub fn set_super_wdt_enable(&self, enable: bool) {
+    pub fn set_super_wdt_enable(&mut self, enable: bool) {
         self.set_swd_write_protection(false);
 
         self.rtc_cntl
@@ -19,7 +19,7 @@ impl RtcCntl {
         self.set_swd_write_protection(true);
     }
 
-    fn set_swd_write_protection(&self, enable: bool) {
+    fn set_swd_write_protection(&mut self, enable: bool) {
         let wkey = if enable { 0u32 } else { 0x8F1D_312A };
 
         self.rtc_cntl
@@ -27,7 +27,7 @@ impl RtcCntl {
             .write(|w| unsafe { w.swd_wkey().bits(wkey) });
     }
 
-    pub fn set_wdt_enable(&self, enable: bool) {
+    pub fn set_wdt_enable(&mut self, enable: bool) {
         self.set_wdt_write_protection(false);
 
         if !enable {
@@ -41,7 +41,7 @@ impl RtcCntl {
         self.set_wdt_write_protection(true);
     }
 
-    fn set_wdt_write_protection(&self, enable: bool) {
+    fn set_wdt_write_protection(&mut self, enable: bool) {
         let wkey = if enable { 0u32 } else { 0x50D8_3AA1 };
 
         self.rtc_cntl
