@@ -7,7 +7,6 @@ use esp32_hal::{
     pac::{Peripherals, UART0},
     prelude::*,
     ram,
-    RtcCntl,
     Serial,
     Timer,
 };
@@ -30,11 +29,11 @@ fn main() -> ! {
 
     let mut timer0 = Timer::new(peripherals.TIMG0);
     let mut serial0 = Serial::new(peripherals.UART0).unwrap();
-    let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
 
-    // Disable MWDT and RWDT (Watchdog) flash boot protection
+    // Disable MWDT flash boot protection
     timer0.disable();
-    rtc_cntl.set_wdt_global_enable(false);
+    // The RWDT flash boot protection remains enabled and it being triggered is part
+    // of the example
 
     timer0.start(10_000_000u64);
 
