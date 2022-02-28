@@ -30,8 +30,10 @@ fn main() -> ! {
     let mut timer0 = Timer::new(peripherals.TIMG0);
     let mut serial0 = Serial::new(peripherals.UART0).unwrap();
 
-    // Disable watchdog timer
+    // Disable MWDT flash boot protection
     timer0.disable();
+    // The RWDT flash boot protection remains enabled and it being triggered is part
+    // of the example
 
     timer0.start(10_000_000u64);
 

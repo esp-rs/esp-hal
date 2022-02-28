@@ -35,6 +35,8 @@ pub mod gpio;
 #[cfg_attr(feature = "esp32c3", path = "interrupt/riscv.rs")]
 pub mod interrupt;
 pub mod prelude;
+#[cfg(not(feature = "esp32c3"))]
+pub mod rtc_cntl;
 pub mod serial;
 pub mod timer;
 
@@ -43,6 +45,8 @@ pub use gpio::*;
 pub use interrupt::*;
 use procmacros;
 pub use procmacros::ram;
+#[cfg(not(feature = "esp32c3"))]
+pub use rtc_cntl::RtcCntl;
 pub use serial::Serial;
 pub use timer::Timer;
 
