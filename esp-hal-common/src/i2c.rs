@@ -219,13 +219,13 @@ type System = crate::pac::DPORT;
 #[cfg(not(feature = "esp32"))]
 type System = crate::pac::SYSTEM;
 
-
 impl<T> I2C<T>
 where
     T: Instance,
 {
     /// Create a new I2C instance
-    /// This will enable the peripheral but the periphal won't get automatically disabled when this gets dropped.
+    /// This will enable the peripheral but the periphal won't get automatically
+    /// disabled when this gets dropped.
     pub fn new<
         SDA: OutputPin<OutputSignal = OutputSignal> + InputPin<InputSignal = InputSignal>,
         SCL: OutputPin<OutputSignal = OutputSignal> + InputPin<InputSignal = InputSignal>,
@@ -275,7 +275,7 @@ fn enable_peripheral<T: Instance>(i2c: &T, system: &mut System) {
             system
                 .perip_rst_en
                 .modify(|_, w| w.i2c0_ext0_rst().clear_bit());
-        },
+        }
         1 => {
             system
                 .perip_clk_en
@@ -283,7 +283,7 @@ fn enable_peripheral<T: Instance>(i2c: &T, system: &mut System) {
             system
                 .perip_rst_en
                 .modify(|_, w| w.i2c_ext1_rst().clear_bit());
-        },
+        }
         _ => panic!(), // will never happen
     }
     #[cfg(not(feature = "esp32"))]
@@ -292,20 +292,20 @@ fn enable_peripheral<T: Instance>(i2c: &T, system: &mut System) {
             system
                 .perip_clk_en0
                 .modify(|_, w| w.i2c_ext0_clk_en().set_bit());
-    
+
             // Take the I2C peripheral out of any pre-existing reset state
             // (shouldn't be the case after a fresh startup, but better be safe)
             system
                 .perip_rst_en0
                 .modify(|_, w| w.i2c_ext0_rst().clear_bit());
-        },
+        }
         1 => {
             cfg_if::cfg_if! {
                 if #[cfg(not(feature = "esp32c3"))] {
                     system
                     .perip_clk_en0
                     .modify(|_, w| w.i2c_ext1_clk_en().set_bit());
-        
+
                     // Take the I2C peripheral out of any pre-existing reset state
                     // (shouldn't be the case after a fresh startup, but better be safe)
                     system
@@ -314,9 +314,9 @@ fn enable_peripheral<T: Instance>(i2c: &T, system: &mut System) {
                 } else {
                     ()
                 }
-    
+
             }
-        },
+        }
         _ => panic!(), // will never happen
     }
 }
@@ -353,10 +353,9 @@ pub trait Instance {
         });
 
         #[cfg(feature = "esp32s2")]
-        self.register_block().ctr.modify(|_, w| 
-            w.ref_always_on()
-                .set_bit()
-        );
+        self.register_block()
+            .ctr
+            .modify(|_, w| w.ref_always_on().set_bit());
 
         // Configure filter
         self.set_filter(Some(7), Some(7));
@@ -533,10 +532,9 @@ pub trait Instance {
 
             // we already did that above but on S2 we need this to make it work
             #[cfg(feature = "esp32s2")]
-            self.register_block().scl_high_period.write(|w| {
-                w.scl_wait_high_period()
-                    .bits(scl_wait_high)
-            });
+            self.register_block()
+                .scl_high_period
+                .write(|w| w.scl_wait_high_period().bits(scl_wait_high));
 
             // sda sample
             self.register_block()
@@ -908,10 +906,8 @@ fn read_fifo(register_block: &RegisterBlock) -> u8 {
         0x6001301c
     } else {
         0x6002701c
-    })  as *mut u32;
-    unsafe {
-        (fifo_ptr.read() & 0xff) as u8
-    }
+    }) as *mut u32;
+    unsafe { (fifo_ptr.read() & 0xff) as u8 }
 }
 
 #[cfg(feature = "esp32")]

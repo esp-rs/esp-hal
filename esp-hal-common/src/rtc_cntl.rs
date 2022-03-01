@@ -18,7 +18,9 @@ impl RtcCntl {
     /// Global switch for RTC_CNTL watchdog functionality
     pub fn set_wdt_global_enable(&mut self, enable: bool) {
         self.set_wdt_write_protection(false);
-        self.rtc_cntl.wdtconfig0.modify(|_, w| w.wdt_en().bit(enable).wdt_flashboot_mod_en().clear_bit());
+        self.rtc_cntl
+            .wdtconfig0
+            .modify(|_, w| w.wdt_en().bit(enable).wdt_flashboot_mod_en().clear_bit());
         self.set_wdt_write_protection(true);
     }
 }
