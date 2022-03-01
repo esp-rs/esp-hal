@@ -22,7 +22,7 @@ use embedded_graphics::{
     text::{Alignment, Text},
 };
 use esp_hal_common::i2c::{self, I2C};
-use esp32s2_hal::{gpio::IO, pac::Peripherals, prelude::*, Serial, Timer};
+use esp32s2_hal::{gpio::IO, pac::Peripherals, prelude::*, Serial, Timer, RtcCntl};
 use nb::block;
 use panic_halt as _;
 use ssd1306::{prelude::*, I2CDisplayInterface, Ssd1306};
@@ -34,9 +34,11 @@ fn main() -> ! {
 
     let mut timer0 = Timer::new(peripherals.TIMG0);
     let mut serial0 = Serial::new(peripherals.UART0).unwrap();
+    let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
 
     // Disable watchdog timer
     timer0.disable();
+    rtc_cntl.set_wdt_global_enable(false);
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 

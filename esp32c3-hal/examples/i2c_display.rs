@@ -30,7 +30,7 @@ use ssd1306::{prelude::*, I2CDisplayInterface, Ssd1306};
 fn main() -> ! {
     let mut peripherals = Peripherals::take().unwrap();
 
-    let rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
+    let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
     let mut timer0 = Timer::new(peripherals.TIMG0);
     let mut timer1 = Timer::new(peripherals.TIMG1);
 
