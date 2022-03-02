@@ -19,8 +19,7 @@ use embedded_graphics::{
     prelude::*,
     text::{Alignment, Text},
 };
-use esp32c3_hal::{gpio::IO, pac::Peripherals, prelude::*, RtcCntl, Timer};
-use esp_hal_common::i2c::I2C;
+use esp32c3_hal::{gpio::IO, i2c::I2C, pac::Peripherals, prelude::*, RtcCntl, Timer};
 use nb::block;
 use panic_halt as _;
 use riscv_rt::entry;
@@ -46,10 +45,8 @@ fn main() -> ! {
     // and standard I2C clock speed
     let i2c = I2C::new(
         peripherals.I2C,
-        esp_hal_common::i2c::Pins {
-            sda: io.pins.gpio1,
-            scl: io.pins.gpio2,
-        },
+        io.pins.gpio1,
+        io.pins.gpio2,
         100_000,
         &mut peripherals.SYSTEM,
     )

@@ -1,7 +1,7 @@
 use esp_hal_common::gpio::{types::*, *};
 
-// ESP32S3 is a dual-core chip however pro cpu and app cpu shares the same interrupt enable bit
-// see https://github.com/espressif/esp-idf/blob/c04803e88b871a4044da152dfb3699cf47354d18/components/hal/esp32s3/include/hal/gpio_ll.h#L32
+// ESP32S3 is a dual-core chip however pro cpu and app cpu shares the same
+// interrupt enable bit see https://github.com/espressif/esp-idf/blob/c04803e88b871a4044da152dfb3699cf47354d18/components/hal/esp32s3/include/hal/gpio_ll.h#L32
 // Treating it as SingleCore in the gpio macro makes this work.
 gpio! {
     Function1,
@@ -42,7 +42,7 @@ gpio! {
     Gpio36: (gpio36, 36, gpio[36], IO,    0, Bank1), (FSPICLK: Function2), (FSPICLK: Function2, SUBSPICLK: Function3),
     Gpio37: (gpio37, 37, gpio[37], IO,    0, Bank1), (FSPIQ: Function2, SUBSPIQ: Function3, SPIDQS: Function4), (FSPIQ: Function2, SUBSPIQ: Function3, SPIDQS: Function4),
     Gpio38: (gpio38, 38, gpio[38], IO,    0, Bank1), (FSPIWP: Function2, SUBSPIWP: Function3), (FSPIWP: Function3, SUBSPIWP: Function3),
-    Gpio39: (gpio39, 39, gpio[39], IO,    0, Bank1), (), (SUBSPICS1: Function4), 
+    Gpio39: (gpio39, 39, gpio[39], IO,    0, Bank1), (), (SUBSPICS1: Function4),
     Gpio40: (gpio40, 40, gpio[40], IO,    0, Bank1),
     Gpio41: (gpio41, 41, gpio[41], IO,    0, Bank1),
     Gpio42: (gpio42, 42, gpio[42], IO,    0, Bank1),

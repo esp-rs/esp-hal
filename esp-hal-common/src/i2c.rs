@@ -52,14 +52,6 @@ pub enum SetupError {
     PeripheralDisabled,
 }
 
-/// Pins used by the I2C interface
-///
-/// Note that any two pins may be used
-pub struct Pins<SDA: OutputPin + InputPin, SCL: OutputPin + InputPin> {
-    pub sda: SDA,
-    pub scl: SCL,
-}
-
 /// A generic I2C Command
 enum Command {
     Start,
@@ -151,24 +143,20 @@ enum Ack {
     NACK,
 }
 
-#[allow(dead_code)]
 #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
 enum Opcode {
     RSTART = 6,
     WRITE  = 1,
     READ   = 3,
     STOP   = 2,
-    END    = 4,
 }
 
-#[allow(dead_code)]
 #[cfg(any(feature = "esp32", feature = "esp32s2"))]
 enum Opcode {
     RSTART = 0,
     WRITE  = 1,
     READ   = 2,
     STOP   = 3,
-    END    = 4,
 }
 
 /// I2C peripheral container (I2C)
@@ -224,14 +212,15 @@ where
     T: Instance,
 {
     /// Create a new I2C instance
-    /// This will enable the peripheral but the peripheral won't get automatically
-    /// disabled when this gets dropped.
+    /// This will enable the peripheral but the peripheral won't get
+    /// automatically disabled when this gets dropped.
     pub fn new<
         SDA: OutputPin<OutputSignal = OutputSignal> + InputPin<InputSignal = InputSignal>,
         SCL: OutputPin<OutputSignal = OutputSignal> + InputPin<InputSignal = InputSignal>,
     >(
         i2c: T,
-        mut pins: Pins<SDA, SCL>,
+        mut sda: SDA,
+        mut scl: SCL,
         frequency: u32,
         system: &mut System,
     ) -> Result<Self, SetupError> {
@@ -239,15 +228,13 @@ where
 
         let mut i2c = I2C { peripheral: i2c };
 
-        pins.sda
-            .set_to_open_drain_output()
+        sda.set_to_open_drain_output()
             .enable_input(true)
             .internal_pull_up(true)
             .connect_peripheral_to_output(OutputSignal::I2CEXT0_SDA)
             .connect_input_to_peripheral(InputSignal::I2CEXT0_SDA);
 
-        pins.scl
-            .set_to_open_drain_output()
+        scl.set_to_open_drain_output()
             .enable_input(true)
             .internal_pull_up(true)
             .connect_peripheral_to_output(OutputSignal::I2CEXT0_SCL)

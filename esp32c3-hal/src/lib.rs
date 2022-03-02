@@ -1,7 +1,7 @@
 #![no_std]
 
 pub use embedded_hal as ehal;
-pub use esp_hal_common::{pac, prelude, Delay, Serial, Timer};
+pub use esp_hal_common::{i2c, pac, prelude, Delay, Serial, Timer};
 #[cfg(not(feature = "normalboot"))]
 use riscv_rt::pre_init;
 

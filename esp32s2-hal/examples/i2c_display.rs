@@ -21,8 +21,7 @@ use embedded_graphics::{
     prelude::*,
     text::{Alignment, Text},
 };
-use esp_hal_common::i2c::{self, I2C};
-use esp32s2_hal::{gpio::IO, pac::Peripherals, prelude::*, Serial, Timer, RtcCntl};
+use esp32s2_hal::{gpio::IO, i2c::I2C, pac::Peripherals, prelude::*, RtcCntl, Serial, Timer};
 use nb::block;
 use panic_halt as _;
 use ssd1306::{prelude::*, I2CDisplayInterface, Ssd1306};
@@ -48,10 +47,8 @@ fn main() -> ! {
     // and standard I2C clock speed
     let i2c = I2C::new(
         peripherals.I2C0,
-        i2c::Pins {
-            sda: io.pins.gpio35,
-            scl: io.pins.gpio36,
-        },
+        io.pins.gpio35,
+        io.pins.gpio36,
         100_000,
         &mut peripherals.SYSTEM,
     )

@@ -1,7 +1,16 @@
 #![no_std]
 
 pub use embedded_hal as ehal;
-pub use esp_hal_common::{pac, prelude, ram, Delay, RtcCntl, Serial, Timer};
+pub use esp_hal_common::{
+    i2c::{self, I2C},
+    pac,
+    prelude,
+    ram,
+    Delay,
+    RtcCntl,
+    Serial,
+    Timer,
+};
 
 pub use self::gpio::IO;
 
