@@ -5,9 +5,6 @@ use core::convert::TryInto;
 
 use embedded_hal::blocking::i2c::*;
 
-#[cfg(feature = "esp32c3")]
-use crate::pac::i2c::{RegisterBlock, COMD};
-#[cfg(not(feature = "esp32c3"))]
 use crate::pac::i2c0::{RegisterBlock, COMD};
 use crate::{
     gpio::{InputPin, OutputPin},
@@ -915,20 +912,6 @@ fn write_fifo(register_block: &RegisterBlock, data: u8) {
     }
 }
 
-#[cfg(feature = "esp32c3")]
-impl Instance for crate::pac::I2C {
-    #[inline(always)]
-    fn register_block(&self) -> &RegisterBlock {
-        self
-    }
-
-    #[inline(always)]
-    fn i2c_number(&self) -> usize {
-        0
-    }
-}
-
-#[cfg(not(feature = "esp32c3"))]
 impl Instance for crate::pac::I2C0 {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {

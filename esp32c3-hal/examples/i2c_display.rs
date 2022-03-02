@@ -44,7 +44,7 @@ fn main() -> ! {
     // Create a new peripheral object with the described wiring
     // and standard I2C clock speed
     let i2c = I2C::new(
-        peripherals.I2C,
+        peripherals.I2C0,
         io.pins.gpio1,
         io.pins.gpio2,
         100_000,
