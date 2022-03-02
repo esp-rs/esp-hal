@@ -224,7 +224,7 @@ where
     T: Instance,
 {
     /// Create a new I2C instance
-    /// This will enable the peripheral but the periphal won't get automatically
+    /// This will enable the peripheral but the peripheral won't get automatically
     /// disabled when this gets dropped.
     pub fn new<
         SDA: OutputPin<OutputSignal = OutputSignal> + InputPin<InputSignal = InputSignal>,
@@ -317,7 +317,7 @@ fn enable_peripheral<T: Instance>(i2c: &T, system: &mut System) {
 
             }
         }
-        _ => panic!(), // will never happen
+        _ => unreachable!(), // will never happen
     }
 }
 
@@ -460,7 +460,7 @@ pub trait Instance {
         }
 
         // The different chips have highly very different timing configurations, so
-        // we're setting these up separately (this might introduce someoverhead,
+        // we're setting these up separately (this might introduce some overhead,
         // but improves readability)
         cfg_if::cfg_if! {
             if #[cfg(feature = "esp32c3")] {
