@@ -29,6 +29,7 @@ pub use esp32s3_pac as pac;
 
 pub mod delay;
 pub mod gpio;
+pub mod i2c;
 #[cfg_attr(feature = "esp32", path = "interrupt/xtensa.rs")]
 #[cfg_attr(feature = "esp32s2", path = "interrupt/xtensa.rs")]
 #[cfg_attr(feature = "esp32s3", path = "interrupt/xtensa.rs")]

@@ -37,6 +37,8 @@ features = ["esp32s2"]
 
 [dev-dependencies]
 panic-halt = "0.2"
+ssd1306 = "0.7.0"
+embedded-graphics = "0.7.1"
 
 [features]
 default = ["rt"]
