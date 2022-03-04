@@ -117,7 +117,7 @@ pub fn enable(_core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
 
         // enable interrupt
         intr.cpu_int_enable
-            .write(|w| w.bits(1 << cpu_interrupt_number));
+            .modify(|r, w| w.bits((1 << cpu_interrupt_number) | r.bits()));
     }
 }
 

@@ -35,6 +35,18 @@ where
     pub fn free(self) -> T {
         self.timg
     }
+
+    pub fn listen(&mut self) {
+        self.timg.listen();
+    }
+
+    pub fn unlisten(&mut self) {
+        self.timg.unlisten();
+    }
+
+    pub fn clear_interrupt(&mut self) {
+        self.timg.clear_interrupt();
+    }
 }
 
 /// Timer peripheral instance
@@ -123,6 +135,30 @@ pub trait Instance {
         reg_block
             .wdtwprotect
             .write(|w| unsafe { w.wdt_wkey().bits(0u32) });
+    }
+
+    fn listen(&mut self) {
+        // always use level interrupt
+        #[cfg(any(feature = "esp32", feature = "esp32s2"))]
+        self.register_block()
+            .t0config
+            .modify(|_, w| w.t0_level_int_en().set_bit());
+
+        self.register_block()
+            .int_ena_timers
+            .modify(|_, w| w.t0_int_ena().set_bit());
+    }
+
+    fn unlisten(&mut self) {
+        self.register_block()
+            .int_ena_timers
+            .modify(|_, w| w.t0_int_ena().clear_bit());
+    }
+
+    fn clear_interrupt(&mut self) {
+        self.register_block()
+            .int_clr_timers
+            .write(|w| w.t0_int_clr().set_bit());
     }
 }
 
