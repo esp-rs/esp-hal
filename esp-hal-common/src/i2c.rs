@@ -5,9 +5,9 @@ use core::convert::TryInto;
 
 use embedded_hal::blocking::i2c::*;
 
-use crate::pac::i2c0::{RegisterBlock, COMD};
 use crate::{
     gpio::{InputPin, OutputPin},
+    pac::i2c0::{RegisterBlock, COMD},
     types::{InputSignal, OutputSignal},
 };
 
