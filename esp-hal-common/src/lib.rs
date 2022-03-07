@@ -39,6 +39,7 @@ pub mod prelude;
 #[cfg(not(feature = "esp32c3"))]
 pub mod rtc_cntl;
 pub mod serial;
+pub mod spi;
 pub mod timer;
 
 pub use delay::Delay;
@@ -49,6 +50,7 @@ pub use procmacros::ram;
 #[cfg(not(feature = "esp32c3"))]
 pub use rtc_cntl::RtcCntl;
 pub use serial::Serial;
+pub use spi::Spi;
 pub use timer::Timer;
 
 /// Enumeration of CPU cores

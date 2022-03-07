@@ -6,6 +6,7 @@ pub use esp_hal_common::{
     pac,
     prelude,
     ram,
+    spi,
     Delay,
     RtcCntl,
     Serial,
