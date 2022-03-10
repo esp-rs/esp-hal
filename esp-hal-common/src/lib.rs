@@ -36,6 +36,7 @@ pub mod i2c;
 #[cfg_attr(feature = "esp32c3", path = "interrupt/riscv.rs")]
 pub mod interrupt;
 pub mod prelude;
+pub mod rng;
 #[cfg(not(feature = "esp32c3"))]
 pub mod rtc_cntl;
 pub mod serial;
@@ -47,6 +48,7 @@ pub use gpio::*;
 pub use interrupt::*;
 use procmacros;
 pub use procmacros::ram;
+pub use rng::Rng;
 #[cfg(not(feature = "esp32c3"))]
 pub use rtc_cntl::RtcCntl;
 pub use serial::Serial;

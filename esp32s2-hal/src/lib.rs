@@ -8,6 +8,7 @@ pub use esp_hal_common::{
     ram,
     spi,
     Delay,
+    Rng,
     RtcCntl,
     Serial,
     Timer,
