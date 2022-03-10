@@ -12,7 +12,7 @@
 */
 
 .section .init, "ax"
-.global _start
+.global _start_hal
 
 _start_hal:
     /* Jump to the absolute address defined by the linker script. */
