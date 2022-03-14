@@ -1,11 +1,4 @@
-use std::{
-    env,
-    fs::{self, File},
-    io::Write,
-    path::PathBuf,
-};
-
-use riscv_target::Target;
+use std::{env, fs::File, io::Write, path::PathBuf};
 
 #[cfg(not(feature = "normalboot"))]
 fn main() {
@@ -39,7 +32,6 @@ fn main() {
     println!("cargo:rerun-if-changed=memory.x");
 
     add_defaults();
-    prepare_trap();
 }
 
 #[cfg(feature = "normalboot")]
@@ -68,7 +60,6 @@ fn main() {
     println!("cargo:rerun-if-changed=memory.x");
 
     add_defaults();
-    prepare_trap();
 }
 
 fn add_defaults() {
@@ -79,26 +70,4 @@ fn add_defaults() {
         .unwrap();
 
     println!("cargo:rustc-link-search={}", out.display());
-}
-
-fn prepare_trap() {
-    let out = &PathBuf::from(env::var_os("OUT_DIR").unwrap());
-    let name = env::var("CARGO_PKG_NAME").unwrap();
-    let target = env::var("TARGET").unwrap();
-
-    if target.starts_with("riscv") {
-        let mut target = Target::from_target_str(&target);
-        target.retain_extensions("if");
-
-        let target = target.to_string();
-
-        fs::copy(
-            format!("bin/asm_{}.a", target),
-            out.join(format!("lib{}.a", name)),
-        )
-        .unwrap();
-
-        println!("cargo:rustc-link-lib=static={}", name);
-        println!("cargo:rustc-link-search={}", out.display());
-    }
 }

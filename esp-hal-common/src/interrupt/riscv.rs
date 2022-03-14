@@ -366,11 +366,11 @@ unsafe fn handle_exception(trap_frame: *mut TrapFrame) {
 #[no_mangle]
 pub fn _setup_interrupts() {
     extern "C" {
-        static _vector_table: *const u32;
+        static _vector_table_hal: *const u32;
     }
 
     unsafe {
-        let vec_table = &_vector_table as *const _ as usize;
+        let vec_table = &_vector_table_hal as *const _ as usize;
         riscv::register::mtvec::write(vec_table, riscv::register::mtvec::TrapMode::Vectored);
     };
 }
