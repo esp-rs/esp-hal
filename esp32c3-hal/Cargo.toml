@@ -40,9 +40,6 @@ riscv-atomic-emulation-trap = "0.1.0"
 path     = "../esp-hal-common"
 features = ["esp32c3"]
 
-[build-dependencies]
-riscv-target = "0.1.2"
-
 [dev-dependencies]
 panic-halt = "0.2"
 ssd1306 = "0.7.0"
