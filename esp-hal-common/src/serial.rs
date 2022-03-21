@@ -27,6 +27,11 @@ impl<T: Instance> Serial<T> {
         Ok(serial)
     }
 
+    /// Writes bytes
+    pub fn write_bytes(&mut self, data: &[u8]) -> Result<(), Error> {
+        data.iter().try_for_each(|c| nb::block!(self.write(*c)))
+    }
+
     /// Return the raw interface to the underlying UART instance
     pub fn free(self) -> T {
         self.uart
@@ -140,15 +145,32 @@ impl Instance for UART2 {
     }
 }
 
+#[cfg(feature = "ufmt")]
+impl<T> ufmt_write::uWrite for Serial<T>
+where
+    T: Instance,
+{
+    type Error = Error;
+
+    #[inline]
+    fn write_str(&mut self, s: &str) -> Result<(), Self::Error> {
+        self.write_bytes(s.as_bytes())
+    }
+
+    #[inline]
+    fn write_char(&mut self, ch: char) -> Result<(), Self::Error> {
+        let mut buffer = [0u8; 4];
+        self.write_bytes(ch.encode_utf8(&mut buffer).as_bytes())
+    }
+}
+
 impl<T> core::fmt::Write for Serial<T>
 where
     T: Instance,
 {
+    #[inline]
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        s.as_bytes()
-            .iter()
-            .try_for_each(|c| nb::block!(self.write(*c)))
-            .map_err(|_| core::fmt::Error)
+        self.write_bytes(s.as_bytes()).map_err(|_| core::fmt::Error)
     }
 }
 

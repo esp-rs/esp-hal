@@ -48,4 +48,5 @@ embedded-graphics = "0.7.1"
 [features]
 default = ["rt"]
 rt      = ["riscv-rt"]
+ufmt    = ["esp-hal-common/ufmt"]
 normalboot = []

@@ -43,3 +43,4 @@ embedded-graphics = "0.7.1"
 [features]
 default = ["rt"]
 rt      = ["xtensa-lx-rt"]
+ufmt    = ["esp-hal-common/ufmt"]

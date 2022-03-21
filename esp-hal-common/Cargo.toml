@@ -25,6 +25,9 @@ riscv-atomic-emulation-trap = { version = "0.1", optional = true }
 # Xtensa
 xtensa-lx = { version = "0.6", optional = true }
 
+# Part of `ufmt` containing only `uWrite` trait
+ufmt-write = { version = "0.1", optional = true }
+
 # IMPORTANT:
 # Each supported device MUST have its PAC included below along with a
 # corresponding feature. We rename the PAC packages because we cannot
@@ -47,3 +50,6 @@ xtensa = ["procmacros/rtc_slow", "xtensa-lx/esp32"]
 # Core Count (should not be enabled directly, but instead by a PAC's feature)
 single_core = []
 dual_core   = []
+
+# To support `ufmt`
+ufmt = ["ufmt-write"]
