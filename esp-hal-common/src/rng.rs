@@ -26,7 +26,7 @@ use crate::pac::RNG;
 /// If none of the above conditions are true, the output of the RNG should be
 /// considered pseudo-random only.
 ///
-/// For more information, please refer to the ESP-IDF documentation:  
+/// For more information, please refer to the ESP-IDF documentation:
 /// <https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/random.html>
 #[derive(Debug)]
 pub struct Rng {
@@ -37,6 +37,12 @@ impl Rng {
     /// Create a new random number generator instance
     pub fn new(rng: RNG) -> Self {
         Self { rng }
+    }
+
+    #[inline]
+    /// Reads currently available `u32` integer from `RNG`
+    pub fn random(&mut self) -> u32 {
+        self.rng.data.read().bits()
     }
 
     /// Return the raw interface to the underlying `Rng` instance
@@ -50,7 +56,7 @@ impl Read for Rng {
 
     fn read(&mut self, buffer: &mut [u8]) -> Result<(), Self::Error> {
         for chunk in buffer.chunks_mut(4) {
-            let bytes = self.rng.data.read().bits().to_le_bytes();
+            let bytes = self.random().to_le_bytes();
             chunk.copy_from_slice(&bytes[..chunk.len()]);
         }
 
