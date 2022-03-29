@@ -4,7 +4,7 @@ use core::arch::global_asm;
 
 pub use embedded_hal as ehal;
 pub use esp_hal_common::{i2c, pac, prelude, spi, Delay, Rng, Serial, Timer};
-#[cfg(not(feature = "normalboot"))]
+#[cfg(feature = "direct-boot")]
 use riscv_rt::pre_init;
 
 pub mod gpio;
@@ -247,10 +247,9 @@ abort_hal:
 "#
 );
 
-#[cfg(not(feature = "normalboot"))]
-#[pre_init]
-#[cfg(not(feature = "normalboot"))]
+#[cfg(feature = "direct-boot")]
 #[doc(hidden)]
+#[pre_init]
 unsafe fn init() {
     r0::init_data(&mut _srwtext, &mut _erwtext, &_irwtext);
 
@@ -271,7 +270,7 @@ pub fn mp_hook() -> bool {
         r0::zero_bss(&mut _rtc_fast_bss_start, &mut _rtc_fast_bss_end);
     }
 
-    #[cfg(not(feature = "normalboot"))]
+    #[cfg(feature = "direct-boot")]
     return true;
 
     // no init data when using normal boot - but we need to zero out BSS
