@@ -15,6 +15,7 @@ jobs:
     name: Check RISC-V Examples
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         toolchain: [stable, nightly]
     steps:
@@ -35,6 +36,7 @@ jobs:
     name: Check Xtensa Examples
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         chip: [esp32, esp32s2, esp32s3]
     steps:
