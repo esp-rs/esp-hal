@@ -1,13 +1,14 @@
 use crate::{pac::Interrupt, Cpu};
+use xtensa_lx_rt::exception::Context;
 
 extern "C" {
-    fn level1_interrupt();
-    fn level2_interrupt();
-    fn level3_interrupt();
-    fn level4_interrupt();
-    fn level5_interrupt();
-    fn level6_interrupt();
-    fn level7_interrupt();
+    fn level1_interrupt(save_frame: &mut Context);
+    fn level2_interrupt(save_frame: &mut Context);
+    fn level3_interrupt(save_frame: &mut Context);
+    fn level4_interrupt(save_frame: &mut Context);
+    fn level5_interrupt(save_frame: &mut Context);
+    fn level6_interrupt(save_frame: &mut Context);
+    fn level7_interrupt(save_frame: &mut Context);
 }
 
 /// Enumeration of available CPU interrupts
@@ -174,42 +175,42 @@ unsafe fn core1_interrupt_peripheral() -> *const crate::pac::interrupt_core1::Re
 
 #[no_mangle]
 #[link_section = ".rwtext"]
-fn __level_1_interrupt() {
-    unsafe { level1_interrupt() };
+fn __level_1_interrupt(_level: u32, save_frame: &mut Context) {
+    unsafe { level1_interrupt(save_frame) };
 }
 
 #[no_mangle]
 #[link_section = ".rwtext"]
-fn __level_2_interrupt() {
-    unsafe { level2_interrupt() };
+fn __level_2_interrupt(_level: u32, save_frame: &mut Context) {
+    unsafe { level2_interrupt(save_frame) };
 }
 
 #[no_mangle]
 #[link_section = ".rwtext"]
-fn __level_3_interrupt() {
-    unsafe { level3_interrupt() };
+fn __level_3_interrupt(_level: u32, save_frame: &mut Context) {
+    unsafe { level3_interrupt(save_frame) };
 }
 
 #[no_mangle]
 #[link_section = ".rwtext"]
-fn __level_4_interrupt() {
-    unsafe { level4_interrupt() };
+fn __level_4_interrupt(_level: u32, save_frame: &mut Context) {
+    unsafe { level4_interrupt(save_frame) };
 }
 
 #[no_mangle]
 #[link_section = ".rwtext"]
-fn __level_5_interrupt() {
-    unsafe { level5_interrupt() };
+fn __level_5_interrupt(_level: u32, save_frame: &mut Context) {
+    unsafe { level5_interrupt(save_frame) };
 }
 
 #[no_mangle]
 #[link_section = ".rwtext"]
-fn __level_6_interrupt() {
-    unsafe { level6_interrupt() };
+fn __level_6_interrupt(_level: u32, save_frame: &mut Context) {
+    unsafe { level6_interrupt(save_frame) };
 }
 
 #[no_mangle]
 #[link_section = ".rwtext"]
-fn __level_7_interrupt() {
-    unsafe { level7_interrupt() };
+fn __level_7_interrupt(_level: u32, save_frame: &mut Context) {
+    unsafe { level7_interrupt(save_frame) };
 }
