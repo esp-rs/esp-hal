@@ -1,6 +1,6 @@
 use std::{env, fs::File, io::Write, path::PathBuf};
 
-#[cfg(not(feature = "normalboot"))]
+#[cfg(feature = "direct-boot")]
 fn main() {
     // Put the linker script somewhere the linker can find it
     let out = &PathBuf::from(env::var_os("OUT_DIR").unwrap());
@@ -34,7 +34,7 @@ fn main() {
     add_defaults();
 }
 
-#[cfg(feature = "normalboot")]
+#[cfg(not(feature = "direct-boot"))]
 fn main() {
     // Put the linker script somewhere the linker can find it
     let out = &PathBuf::from(env::var_os("OUT_DIR").unwrap());

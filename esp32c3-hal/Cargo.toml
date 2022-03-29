@@ -23,9 +23,6 @@ categories = [
     "no-std",
 ]
 
-[package.metadata.espflash]
-format = "direct-boot"
-
 [dependencies]
 bare-metal                  = "1.0"
 embedded-hal                = { version = "0.2", features = ["unproven"] }
@@ -46,7 +43,7 @@ ssd1306 = "0.7.0"
 embedded-graphics = "0.7.1"
 
 [features]
-default = ["rt"]
-rt      = ["riscv-rt"]
-ufmt    = ["esp-hal-common/ufmt"]
-normalboot = []
+default     = ["rt"]
+direct-boot = []
+rt          = ["riscv-rt"]
+ufmt        = ["esp-hal-common/ufmt"]
