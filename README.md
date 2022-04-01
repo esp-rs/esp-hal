@@ -36,8 +36,8 @@ _\* via [atomic emulation]_
 
 The **M**inimum **S**upported **R**ust **V**ersions are:
 
-- `1.56.0` for RISC-V devices (**ESP32-C3**)
-- `stable - 1` for Xtensa devices (**ESP32**, **ESP32-S2**, **ESP32-S3**)
+- `1.59.0` for RISC-V devices (**ESP32-C3**)
+- `1.59.0` for Xtensa devices (**ESP32**, **ESP32-S2**, **ESP32-S3**)
 
 Note that targeting the Xtensa ISA requires the use of the [esp-rs/rust] compiler fork, whereas RISC-V is officially supported by the official Rust compiler.
 
