@@ -65,7 +65,9 @@ fn main() -> ! {
     let mut delay = Delay::new();
 
     unsafe {
-        xtensa_lx::interrupt::enable();
+        xtensa_lx::interrupt::enable_mask(
+            1 << 1
+        );
     }
 
     loop {

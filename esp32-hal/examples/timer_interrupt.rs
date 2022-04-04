@@ -48,7 +48,7 @@ fn main() -> ! {
     interrupt::enable(
         Cpu::ProCpu,
         pac::Interrupt::TG1_T0_LEVEL,
-        interrupt::CpuInterrupt::Interrupt24LevelPriority4,
+        interrupt::CpuInterrupt::Interrupt23LevelPriority3,
     );
     timer1.start(100_000_000u64);
     timer1.listen();
@@ -62,10 +62,10 @@ fn main() -> ! {
     unsafe {
         xtensa_lx::interrupt::disable();
         xtensa_lx::interrupt::enable_mask(
-            xtensa_lx_rt::interrupt::CpuInterruptLevel::Level2.mask(),
+            1 << 20,
         );
         xtensa_lx::interrupt::enable_mask(
-            xtensa_lx_rt::interrupt::CpuInterruptLevel::Level4.mask(),
+            1 << 23,
         );
     }
 
@@ -98,18 +98,18 @@ pub fn level2_interrupt() {
 }
 
 #[no_mangle]
-pub fn level4_interrupt() {
+pub fn level3_interrupt() {
     unsafe {
         (&SERIAL).lock(|data| {
             let mut serial = data.borrow_mut();
             let serial = serial.as_mut().unwrap();
-            writeln!(serial, "Interrupt Level 4").ok();
+            writeln!(serial, "Interrupt Level 3").ok();
         });
     }
 
     interrupt::clear(
         Cpu::ProCpu,
-        interrupt::CpuInterrupt::Interrupt24LevelPriority4,
+        interrupt::CpuInterrupt::Interrupt23LevelPriority3,
     );
 
     unsafe {
