@@ -65,7 +65,7 @@ fn main() -> ! {
 
     unsafe {
         xtensa_lx::interrupt::enable_mask(
-            xtensa_lx_rt::interrupt::CpuInterruptLevel::Level2.mask(),
+            1 << 19,
         );
     }
 
