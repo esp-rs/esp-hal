@@ -51,6 +51,7 @@ extern "C" {
                 num: u32,
                 fixed: u32,
             ) -> i32;
+            fn esp_rom_printf(format: *const u8, ...) -> i32;
 
             /* IROM metadata:
              * - Destination address (VMA) for IROM region
@@ -395,6 +396,9 @@ pub fn mp_hook() -> bool {
     #[cfg(feature = "mcuboot")]
     unsafe {
         configure_mmu();
+
+        static MESSAGE: &[u8] = b"Welcome to Rust from MCUboot!\n\0";
+        esp_rom_printf(MESSAGE.as_ptr());
     }
 
     unsafe {

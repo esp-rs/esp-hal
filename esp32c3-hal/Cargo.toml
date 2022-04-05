@@ -44,7 +44,7 @@ smart-leds        = "0.3"
 esp-println       = { version = "0.2.0", features = ["esp32c3"] }
 
 [features]
-default     = ["idfboot", "rt"]
+default     = ["mcuboot", "rt"]
 idfboot     = []
 mcuboot     = []
 direct-boot = []
