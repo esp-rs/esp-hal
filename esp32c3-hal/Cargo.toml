@@ -25,6 +25,7 @@ categories = [
 ]
 
 [dependencies]
+cfg-if           = "1.0"
 embedded-hal     = { version = "0.2.7", features = ["unproven"] }
 embedded-hal-1   = { version = "=1.0.0-alpha.9", optional = true, package = "embedded-hal" }
 embedded-hal-nb  = { version = "=1.0.0-alpha.1", optional = true }
@@ -43,6 +44,7 @@ ssd1306           = "0.7.1"
 
 [features]
 default           = ["rt", "vectored"]
+mcu-boot          = []
 direct-boot       = []
 eh1               = ["esp-hal-common/eh1", "dep:embedded-hal-1", "dep:embedded-hal-nb"]
 rt                = ["riscv-rt"]
@@ -62,3 +64,6 @@ required-features = ["eh1"]
 [[example]]
 name              = "spi_eh1_device_loopback"
 required-features = ["eh1"]
+
+[profile.dev]
+opt-level = 1
