@@ -1,6 +1,6 @@
 #![no_std]
 
-use core::arch::global_asm;
+use core::arch::{asm, global_asm};
 
 #[cfg(feature = "mcu-boot")]
 use core::mem::size_of;
@@ -237,97 +237,91 @@ _start_trap_hal:
 "#
 );
 
-global_asm!(
-    r#"
-.section .init, "ax"
-.global _start_hal
+#[cfg(feature = "mcu-boot")]
+#[link_section = ".entry_addr"]
+#[no_mangle]
+#[used]
+// Entry point address for the MCUboot image header
+static ENTRY_POINT: unsafe fn() -> ! = start_hal;
 
-_start_hal:
-    /* Jump to the absolute address defined by the linker script. */
-    lui ra, %hi(_abs_start_hal)
-    jr %lo(_abs_start_hal)(ra)
-"#
-);
+#[link_section = ".init"]
+#[export_name = "_start_hal"]
+unsafe fn start_hal() -> ! {
+    asm!(
+        r#"
+        .option norelax
 
-global_asm!(
-    r#"
-.section .init
+        // unsupported on ESP32-C3
+        // csrw mie, 0
+        // csrw mip, 0
 
-_abs_start_hal:
-    .option norelax
-    .cfi_startproc
-    .cfi_undefined ra
+        li  x1, 0
+        li  x2, 0
+        li  x3, 0
+        li  x4, 0
+        li  x5, 0
+        li  x6, 0
+        li  x7, 0
+        li  x8, 0
+        li  x9, 0
+        li  x10,0
+        li  x11,0
+        li  x12,0
+        li  x13,0
+        li  x14,0
+        li  x15,0
+        li  x16,0
+        li  x17,0
+        li  x18,0
+        li  x19,0
+        li  x20,0
+        li  x21,0
+        li  x22,0
+        li  x23,0
+        li  x24,0
+        li  x25,0
+        li  x26,0
+        li  x27,0
+        li  x28,0
+        li  x29,0
+        li  x30,0
+        li  x31,0
 
-    // unsupported on ESP32C3
-    // csrw mie, 0
-    // csrw mip, 0
+        .option push
+        .option norelax
+        la gp, __global_pointer$
+        .option pop
 
-    li  x1, 0
-    li  x2, 0
-    li  x3, 0
-    li  x4, 0
-    li  x5, 0
-    li  x6, 0
-    li  x7, 0
-    li  x8, 0
-    li  x9, 0
-    li  x10,0
-    li  x11,0
-    li  x12,0
-    li  x13,0
-    li  x14,0
-    li  x15,0
-    li  x16,0
-    li  x17,0
-    li  x18,0
-    li  x19,0
-    li  x20,0
-    li  x21,0
-    li  x22,0
-    li  x23,0
-    li  x24,0
-    li  x25,0
-    li  x26,0
-    li  x27,0
-    li  x28,0
-    li  x29,0
-    li  x30,0
-    li  x31,0
+        // Check hart id
+        csrr a2, mhartid
+        lui t0, %hi(_max_hart_id)
+        add t0, t0, %lo(_max_hart_id)
+        bgtu a2, t0, abort_hal
 
-    .option push
-    .option norelax
-    la gp, __global_pointer$
-    .option pop
+        // Allocate stacks
+        la sp, _stack_start
+        lui t0, %hi(_hart_stack_size)
+        add t0, t0, %lo(_hart_stack_size)
 
-    // Check hart id
-    csrr a2, mhartid
-    lui t0, %hi(_max_hart_id)
-    add t0, t0, %lo(_max_hart_id)
-    bgtu a2, t0, abort_hal
+        beqz a2, 2f  // Jump if single-hart
+        mv t1, a2
+        mv t2, t0
+    1:
+        add t0, t0, t2
+        addi t1, t1, -1
+        bnez t1, 1b
+    2:
+        sub sp, sp, t0
 
-    // Allocate stacks
-    la sp, _stack_start
-    lui t0, %hi(_hart_stack_size)
-    add t0, t0, %lo(_hart_stack_size)
+        // Set frame pointer
+        add s0, sp, zero
 
-    beqz a2, 2f  // Jump if single-hart
-    mv t1, a2
-    mv t2, t0
-1:
-    add t0, t0, t2
-    addi t1, t1, -1
-    bnez t1, 1b
-2:
-    sub sp, sp, t0
+        jal zero, _start_rust
+    "#
+    );
 
-    // Set frame pointer
-    add s0, sp, zero
-
-    jal zero, _start_rust
-
-    .cfi_endproc
-"#
-);
+    unreachable!()
+}
 
 global_asm!(
     r#"
