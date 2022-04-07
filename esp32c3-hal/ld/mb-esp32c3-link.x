@@ -10,7 +10,7 @@ SECTIONS
 
     /* Application entry point address */
 
-    LONG(ADDR(.rwtext))
+    KEEP(*(.entry_addr))
 
     /* IRAM metadata:
      * - Destination address (VMA) for IRAM region
