@@ -1,7 +1,7 @@
 MEMORY
 {
     /*
-        https://github.com/espressif/esptool/blob/master/esptool.py#L1919
+        https://github.com/espressif/esptool/blob/ed64d20b051d05f3f522bacc6a786098b562d4b8/esptool/targets/esp32c3.py#L78-L90
         MEMORY_MAP = [[0x00000000, 0x00010000, "PADDING"],
                   [0x3C000000, 0x3C800000, "DROM"],
                   [0x3FC80000, 0x3FCE0000, "DRAM"],
