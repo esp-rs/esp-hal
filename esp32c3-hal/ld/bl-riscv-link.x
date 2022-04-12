@@ -98,6 +98,15 @@ SECTIONS
     _irwtext = LOADADDR(.rwtext);
     _srwtext = .;
     *(.rwtext);
+
+    *(.iram1)
+    *(.iram1.*)
+
+    *(.wifi0iram .wifi0iram.*)
+    *(.wifirxiram .wifirxiram.*)
+    *(.wifislpiram .wifislpiram.*)
+    *(.wifislprxiram .wifislprxiram.*)
+
     . = ALIGN(4);
     _erwtext = .;
   } > REGION_RWTEXT
@@ -108,7 +117,7 @@ SECTIONS
     . = . + SIZEOF(.rwtext);
   } > REGION_DATA
 
-  .data : ALIGN(4)
+  .data : ALIGN(8)
   {
     _sidata = LOADADDR(.data);
     _sdata = .;
@@ -116,15 +125,31 @@ SECTIONS
     PROVIDE(__global_pointer$ = . + 0x800);
     *(.sdata .sdata.* .sdata2 .sdata2.*);
     *(.data .data.*);
-    . = ALIGN(4);
+    *(.data1)
+
+    . = ALIGN(8);
     _edata = .;
   } > REGION_DATA
 
   .bss (NOLOAD) :
   {
+    . = ALIGN(8);
     _sbss = .;
+    *(.dynsbss)
+    *(.sbss)
+    *(.sbss.*)
+    *(.gnu.linkonce.sb.*)
+    *(.scommon)
+    *(.sbss2)
+    *(.sbss2.*)
+    *(.gnu.linkonce.sb2.*)
+    *(.dynbss)
     *(.sbss .sbss.* .bss .bss.*);
-    . = ALIGN(4);
+    *(.share.mem)
+    *(.gnu.linkonce.b.*)
+    *(COMMON)
+
+    . = ALIGN(8);
     _ebss = .;
   } > REGION_BSS
 
@@ -132,6 +157,7 @@ SECTIONS
   .heap (NOLOAD) :
   {
     _sheap = .;
+    _heap_start = .;
     . += _heap_size;
     . = ALIGN(4);
     _eheap = .;
