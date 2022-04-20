@@ -23,7 +23,7 @@ riscv                       = { version = "0.7", optional = true }
 riscv-atomic-emulation-trap = { version = "0.1", optional = true }
 
 # Xtensa
-xtensa-lx = { version = "0.6", optional = true }
+xtensa-lx = { version = "0.7.0", optional = true }
 
 # Xtensa Runtime
 xtensa-lx-rt = { version = "0.11.0", optional = true }
@@ -41,14 +41,14 @@ esp32s2_pac = { package = "esp32s2", git = "https://github.com/esp-rs/esp-pacs.g
 esp32s3_pac = { package = "esp32s3", git = "https://github.com/esp-rs/esp-pacs.git", branch = "with_source", optional = true }
 
 [features]
-esp32   = [  "esp32_pac/rt", "xtensa",   "dual_core", "xtensa-lx-rt/esp32"]
+esp32   = [  "esp32_pac/rt", "xtensa",   "dual_core", "xtensa-lx-rt/esp32", "xtensa-lx/esp32"]
 esp32c3 = ["esp32c3_pac/rt", "risc_v", "single_core"]
-esp32s2 = ["esp32s2_pac/rt", "xtensa", "single_core", "xtensa-lx-rt/esp32s2"]
-esp32s3 = ["esp32s3_pac/rt", "xtensa",   "dual_core", "xtensa-lx-rt/esp32s3"]
+esp32s2 = ["esp32s2_pac/rt", "xtensa", "single_core", "xtensa-lx-rt/esp32s2", "xtensa-lx/esp32s2"]
+esp32s3 = ["esp32s3_pac/rt", "xtensa",   "dual_core", "xtensa-lx-rt/esp32s3", "xtensa-lx/esp32s3"]
 
 # Architecture (should not be enabled directly, but instead by a PAC's feature)
 risc_v = ["riscv", "riscv-atomic-emulation-trap"]
-xtensa = ["procmacros/rtc_slow", "xtensa-lx/esp32"]
+xtensa = ["procmacros/rtc_slow"]
 
 # Core Count (should not be enabled directly, but instead by a PAC's feature)
 single_core = []
