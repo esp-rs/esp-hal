@@ -27,7 +27,7 @@ categories = [
 bare-metal                  = "1.0"
 embedded-hal                = { version = "0.2", features = ["unproven"] }
 nb                          = "1.0"
-riscv                       = "0.7"
+riscv                       = "0.8.0"
 riscv-rt                    = { version = "0.8.1", optional = true }
 void                        = { version = "1.0", default-features = false }
 r0                          = "1.0.0"
