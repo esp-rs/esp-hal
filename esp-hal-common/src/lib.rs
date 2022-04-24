@@ -34,6 +34,7 @@ pub mod i2c;
 #[cfg_attr(feature = "xtensa", path = "interrupt/xtensa.rs")]
 pub mod interrupt;
 pub mod prelude;
+pub mod pulse_control;
 pub mod rng;
 #[cfg(not(feature = "esp32c3"))]
 pub mod rtc_cntl;
@@ -42,11 +43,13 @@ pub mod spi;
 pub mod timer;
 #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
 pub mod usb_serial_jtag;
+pub mod utils;
 
 pub use delay::Delay;
 pub use gpio::*;
 pub use interrupt::*;
 pub use procmacros::ram;
+pub use pulse_control::PulseControl;
 pub use rng::Rng;
 #[cfg(not(feature = "esp32c3"))]
 pub use rtc_cntl::RtcCntl;
