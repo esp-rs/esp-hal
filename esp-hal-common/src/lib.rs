@@ -40,6 +40,8 @@ pub mod rtc_cntl;
 pub mod serial;
 pub mod spi;
 pub mod timer;
+#[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+pub mod usb_serial_jtag;
 
 pub use delay::Delay;
 pub use gpio::*;
@@ -52,6 +54,8 @@ pub use rtc_cntl::RtcCntl;
 pub use serial::Serial;
 pub use spi::Spi;
 pub use timer::Timer;
+#[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+pub use usb_serial_jtag::UsbSerialJtag;
 
 /// Enumeration of CPU cores
 /// The actual number of available cores depends on the target.
