@@ -41,7 +41,7 @@ jobs:
         chip: [esp32, esp32s2, esp32s3]
     steps:
       - uses: actions/checkout@v2
-      - uses: esp-rs/xtensa-toolchain@afb2ca0c7eefb637832d240ae357b820a1edc2c7
+      - uses: esp-rs/xtensa-toolchain@v1.1
         with:
           default: true
           ldproxy: false
@@ -49,4 +49,4 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: check
-          args: -Zbuild-std --examples --package=${{ matrix.chip }}-hal --target=xtensa-${{ matrix.chip }}-none-elf
+          args: -Zbuild-std=core --examples --package=${{ matrix.chip }}-hal --target=xtensa-${{ matrix.chip }}-none-elf
