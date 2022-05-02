@@ -180,6 +180,64 @@ pub trait OutputPin: Pin {
     fn internal_pull_down(&mut self, on: bool) -> &mut Self;
 }
 
+// Only for ESP32 in order to workaround errata 3.6
+#[macro_export]
+macro_rules! impl_errata36 {
+    (None, $pull_down:expr, $pull_up:expr) => {
+        // NONE
+    };
+
+    (pad_dac1, $pull_down:expr, $pull_up:expr) => {
+        use crate::pac::RTCIO;
+        let rtcio = unsafe { &*RTCIO::ptr() };
+        rtcio.pad_dac1.modify(|r,w| unsafe {
+            w.bits( r.bits() )
+                .pdac1_rue().bit($pull_up)
+                .pdac1_rde().bit($pull_down)
+        });
+    };
+
+    (pad_dac2, $pull_down:expr, $pull_up:expr) => {
+        use crate::pac::RTCIO;
+        let rtcio = unsafe { &*RTCIO::ptr() };
+        rtcio.pad_dac2.modify(|r,w| unsafe {
+            w.bits( r.bits() )
+                .pdac2_rue().bit($pull_up)
+                .pdac2_rde().bit($pull_down)
+        });
+    };
+
+    (xtal_32k_n, $pull_down:expr, $pull_up:expr) => {
+        use crate::pac::RTCIO;
+        let rtcio = unsafe { &*RTCIO::ptr() };
+        rtcio.xtal_32k_pad.modify(|r,w| unsafe {
+            w.bits( r.bits() )
+                .x32n_rue().bit($pull_up)
+                .x32n_rde().bit($pull_down)
+        });
+    };
+
+    (xtal_32k_p, $pull_down:expr, $pull_up:expr) => {
+        use crate::pac::RTCIO;
+        let rtcio = unsafe { &*RTCIO::ptr() };
+        rtcio.xtal_32k_pad.modify(|r,w| unsafe {
+            w.bits( r.bits() )
+                .x32p_rue().bit($pull_up)
+                .x32p_rde().bit($pull_down)
+        });
+    };
+
+    ($errata36:ident, $pull_down:expr, $pull_up:expr) => {
+        use crate::pac::RTCIO;
+        let rtcio = unsafe { &*RTCIO::ptr() };
+        rtcio.$errata36.modify(|r,w| unsafe {
+            w.bits( r.bits() )
+                .rue().bit($pull_up)
+                .rde().bit($pull_down)
+        });
+    };
+}
+
 #[macro_export]
 macro_rules! impl_input {
     (
@@ -189,7 +247,7 @@ macro_rules! impl_input {
         (
             $pin_num:expr, $iomux_reg:expr, $bit:expr, $out_en_clear:ident,
             $reg:ident, $reader:ident, $status_w1tc:ident, $pcpu_int:ident,
-            $pcpu_nmi:ident, $acpu_int:ident, $acpu_nmi:ident
+            $pcpu_nmi:ident, $acpu_int:ident, $acpu_nmi:ident, $errata36:ident
         )
         $( ,( $( $af_signal:ident : $af:ident ),* ))?
     ) => {
@@ -215,6 +273,8 @@ macro_rules! impl_input {
 
                 gpio.func_out_sel_cfg[$pin_num]
                     .modify(|_, w| unsafe { w.out_sel().bits(OutputSignal::GPIO as OutputSignalType) });
+
+                impl_errata36!($errata36, pull_down, pull_up);
 
                 paste! {
                     iomux.$iomux_reg.modify(|_, w| unsafe {
@@ -386,7 +446,7 @@ macro_rules! impl_input {
 macro_rules! impl_input_wrap {
     (
         $gpio_function:ident,
-        $pxi:ident, $pin_num:expr, $iomux_reg:expr, $type:ident, Bank0, SingleCore
+        $pxi:ident, $pin_num:expr, $iomux_reg:expr, $type:ident, Bank0, SingleCore, $errata36:ident
         $( ,( $( $af_input_signal:ident : $af_input:ident ),* ) )?
     ) => {
         impl_input!(
@@ -395,7 +455,7 @@ macro_rules! impl_input_wrap {
             $pxi:
             (
                 $pin_num, $iomux_reg, $pin_num % 32, enable_w1tc, in_, data_next,
-                status_w1tc, pcpu_int, pcpu_nmi_int, pcpu_int, pcpu_nmi_int
+                status_w1tc, pcpu_int, pcpu_nmi_int, pcpu_int, pcpu_nmi_int, $errata36
             )
             $( ,( $( $af_input_signal: $af_input ),* ) )?
         );
@@ -403,7 +463,7 @@ macro_rules! impl_input_wrap {
 
     (
         $gpio_function:ident,
-        $pxi:ident, $pin_num:expr, $iomux_reg:expr, $type:ident, Bank1, SingleCore
+        $pxi:ident, $pin_num:expr, $iomux_reg:expr, $type:ident, Bank1, SingleCore, $errata36:ident
         $( ,( $( $af_input_signal:ident : $af_input:ident ),* ) )?
     ) => {
         impl_input!(
@@ -412,7 +472,7 @@ macro_rules! impl_input_wrap {
             $pxi:
             (
                 $pin_num, $iomux_reg, $pin_num % 32, enable1_w1tc, in1, data_next,
-                status1_w1tc, pcpu_int1, pcpu_nmi_int1, pcpu_int1, pcpu_nmi_int1
+                status1_w1tc, pcpu_int1, pcpu_nmi_int1, pcpu_int1, pcpu_nmi_int1, $errata36
             )
             $( ,( $( $af_input_signal: $af_input ),* ) )?
         );
@@ -420,7 +480,7 @@ macro_rules! impl_input_wrap {
 
     (
         $gpio_function:ident,
-        $pxi:ident, $pin_num:expr, $iomux_reg:expr, $type:ident, Bank0, DualCore
+        $pxi:ident, $pin_num:expr, $iomux_reg:expr, $type:ident, Bank0, DualCore, $errata36:ident
         $( ,( $( $af_input_signal:ident : $af_input:ident ),* ) )?
     ) => {
         impl_input!(
@@ -429,7 +489,7 @@ macro_rules! impl_input_wrap {
             $pxi:
             (
                 $pin_num, $iomux_reg, $pin_num % 32, enable_w1tc, in_, data_next,
-                status_w1tc, pcpu_int, pcpu_nmi_int, acpu_int, acpu_nmi_int
+                status_w1tc, pcpu_int, pcpu_nmi_int, acpu_int, acpu_nmi_int, $errata36
             )
             $( ,( $( $af_input_signal: $af_input ),* ) )?
         );
@@ -437,7 +497,7 @@ macro_rules! impl_input_wrap {
 
     (
         $gpio_function:ident,
-        $pxi:ident, $pin_num:expr, $iomux_reg:expr, $type:ident, Bank1, DualCore
+        $pxi:ident, $pin_num:expr, $iomux_reg:expr, $type:ident, Bank1, DualCore, $errata36:ident
         $( ,( $( $af_input_signal:ident : $af_input:ident ),* ) )?
     ) => {
         impl_input!(
@@ -446,7 +506,7 @@ macro_rules! impl_input_wrap {
             $pxi:
             (
                 $pin_num, $iomux_reg, $pin_num % 32, enable1_w1tc, in1, data_next,
-                status1_w1tc, pcpu_int1, pcpu_nmi_int1, acpu_int1, acpu_nmi_int1
+                status1_w1tc, pcpu_int1, pcpu_nmi_int1, acpu_int1, acpu_nmi_int1, $errata36
             )
             $( ,( $( $af_input_signal: $af_input ),* ) )?
         );
@@ -503,7 +563,7 @@ macro_rules! impl_output {
 
         impl<MODE> $pxi<MODE> {
             pub fn into_pull_up_input(self) -> $pxi<Input<PullUp>> {
-                self.init_input(false, false);
+                self.init_input(false, true);
                 $pxi { _mode: PhantomData }
             }
 
@@ -744,7 +804,7 @@ macro_rules! gpio {
             $pxi:ident:
             (
                 $pname:ident, $pin_num:literal, $iomux_reg:expr, $type:ident,
-                $rtc:tt, $bank:ident
+                $rtc:tt, $bank:ident, $errata36:ident
             ),
             $(
                 ( $( $af_input_signal:ident: $af_input:ident ),* ),
@@ -822,7 +882,7 @@ macro_rules! gpio {
             }
 
             impl_input_wrap!(
-                $gpio_function, $pxi, $pin_num, $iomux_reg, $type, $bank, $cores
+                $gpio_function, $pxi, $pin_num, $iomux_reg, $type, $bank, $cores, $errata36
                 $( ,( $( $af_input_signal: $af_input ),* ) )?
             );
 
@@ -839,3 +899,4 @@ pub use impl_input;
 pub use impl_input_wrap;
 pub use impl_output;
 pub use impl_output_wrap;
+pub use impl_errata36;
