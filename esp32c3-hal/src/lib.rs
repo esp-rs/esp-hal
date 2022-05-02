@@ -3,16 +3,27 @@
 use core::arch::global_asm;
 
 pub use embedded_hal as ehal;
-pub use esp_hal_common::{i2c, pac, prelude, spi, Delay, Rng, Serial, Timer};
+pub use esp_hal_common::{
+    i2c,
+    interrupt,
+    pac,
+    prelude,
+    ram,
+    spi,
+    Cpu,
+    Delay,
+    Rng,
+    Serial,
+    Timer,
+    UsbSerialJtag,
+};
 #[cfg(feature = "direct-boot")]
 use riscv_rt::pre_init;
 
+pub use self::{gpio::IO, rtc_cntl::RtcCntl};
+
 pub mod gpio;
 pub mod rtc_cntl;
-
-pub use esp_hal_common::{interrupt, ram, Cpu};
-
-pub use self::{gpio::IO, rtc_cntl::RtcCntl};
 
 extern "C" {
     // Boundaries of the .iram section
