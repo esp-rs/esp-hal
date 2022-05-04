@@ -239,7 +239,8 @@ pub unsafe extern "C" fn start_trap_rust_hal(trap_frame: *mut TrapFrame) {
 
     let cause = mcause::read();
     if cause.is_exception() {
-        handle_exception(trap_frame);
+        let pc = riscv::register::mepc::read();
+        handle_exception(pc, trap_frame);
     } else {
         let code = riscv::register::mcause::read().code();
         match code {
@@ -286,7 +287,23 @@ pub unsafe extern "C" fn start_trap_rust_hal(trap_frame: *mut TrapFrame) {
 ///
 /// This function is called from an trap handler.
 #[doc(hidden)]
-unsafe fn handle_exception(trap_frame: *mut TrapFrame) {
+unsafe fn handle_exception(pc: usize, trap_frame: *mut TrapFrame) {
+    let insn: usize = *(pc as *const _);
+    let needs_atomic_emulation = if (insn & 0b1111111) != 0b0101111 {
+        false
+    } else {
+        true
+    };
+
+    if !needs_atomic_emulation {
+        extern "C" {
+            fn ExceptionHandler(tf: *mut TrapFrame);
+        }
+        ExceptionHandler(trap_frame);
+
+        return;
+    }
+
     extern "C" {
         pub fn _start_trap_atomic_rust(trap_frame: *mut riscv_atomic_emulation_trap::TrapFrame);
     }
