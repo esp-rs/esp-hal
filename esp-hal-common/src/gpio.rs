@@ -107,13 +107,13 @@ pub trait Pin {
 
     fn clear_interrupt(&mut self);
 
-    fn is_pcore_interrupt_set(&mut self) -> bool;
+    fn is_pcore_interrupt_set(&self) -> bool;
 
-    fn is_pcore_non_maskable_interrupt_set(&mut self) -> bool;
+    fn is_pcore_non_maskable_interrupt_set(&self) -> bool;
 
-    fn is_acore_interrupt_set(&mut self) -> bool;
+    fn is_acore_interrupt_set(&self) -> bool;
 
-    fn is_acore_non_maskable_interrupt_set(&mut self) -> bool;
+    fn is_acore_non_maskable_interrupt_set(&self) -> bool;
 
     fn enable_hold(&mut self, on: bool);
 }
@@ -127,7 +127,7 @@ pub trait InputPin: Pin {
 
     fn enable_input_in_sleep_mode(&mut self, on: bool) -> &mut Self;
 
-    fn is_input_high(&mut self) -> bool;
+    fn is_input_high(&self) -> bool;
 
     fn connect_input_to_peripheral(&mut self, signal: Self::InputSignal) -> &mut Self {
         self.connect_input_to_peripheral_with_options(signal, false, false)
@@ -190,51 +190,57 @@ macro_rules! impl_errata36 {
     (pad_dac1, $pull_down:expr, $pull_up:expr) => {
         use crate::pac::RTCIO;
         let rtcio = unsafe { &*RTCIO::ptr() };
-        rtcio.pad_dac1.modify(|r,w| unsafe {
-            w.bits( r.bits() )
-                .pdac1_rue().bit($pull_up)
-                .pdac1_rde().bit($pull_down)
+        rtcio.pad_dac1.modify(|r, w| unsafe {
+            w.bits(r.bits())
+                .pdac1_rue()
+                .bit($pull_up)
+                .pdac1_rde()
+                .bit($pull_down)
         });
     };
 
     (pad_dac2, $pull_down:expr, $pull_up:expr) => {
         use crate::pac::RTCIO;
         let rtcio = unsafe { &*RTCIO::ptr() };
-        rtcio.pad_dac2.modify(|r,w| unsafe {
-            w.bits( r.bits() )
-                .pdac2_rue().bit($pull_up)
-                .pdac2_rde().bit($pull_down)
+        rtcio.pad_dac2.modify(|r, w| unsafe {
+            w.bits(r.bits())
+                .pdac2_rue()
+                .bit($pull_up)
+                .pdac2_rde()
+                .bit($pull_down)
         });
     };
 
     (xtal_32k_n, $pull_down:expr, $pull_up:expr) => {
         use crate::pac::RTCIO;
         let rtcio = unsafe { &*RTCIO::ptr() };
-        rtcio.xtal_32k_pad.modify(|r,w| unsafe {
-            w.bits( r.bits() )
-                .x32n_rue().bit($pull_up)
-                .x32n_rde().bit($pull_down)
+        rtcio.xtal_32k_pad.modify(|r, w| unsafe {
+            w.bits(r.bits())
+                .x32n_rue()
+                .bit($pull_up)
+                .x32n_rde()
+                .bit($pull_down)
         });
     };
 
     (xtal_32k_p, $pull_down:expr, $pull_up:expr) => {
         use crate::pac::RTCIO;
         let rtcio = unsafe { &*RTCIO::ptr() };
-        rtcio.xtal_32k_pad.modify(|r,w| unsafe {
-            w.bits( r.bits() )
-                .x32p_rue().bit($pull_up)
-                .x32p_rde().bit($pull_down)
+        rtcio.xtal_32k_pad.modify(|r, w| unsafe {
+            w.bits(r.bits())
+                .x32p_rue()
+                .bit($pull_up)
+                .x32p_rde()
+                .bit($pull_down)
         });
     };
 
     ($errata36:ident, $pull_down:expr, $pull_up:expr) => {
         use crate::pac::RTCIO;
         let rtcio = unsafe { &*RTCIO::ptr() };
-        rtcio.$errata36.modify(|r,w| unsafe {
-            w.bits( r.bits() )
-                .rue().bit($pull_up)
-                .rde().bit($pull_down)
-        });
+        rtcio
+            .$errata36
+            .modify(|r, w| unsafe { w.bits(r.bits()).rue().bit($pull_up).rde().bit($pull_down) });
     };
 }
 
@@ -324,7 +330,7 @@ macro_rules! impl_input {
                 self
             }
 
-            fn is_input_high(&mut self) -> bool {
+            fn is_input_high(&self) -> bool {
                 unsafe { &*GPIO::ptr() }.$reg.read().$reader().bits() & (1 << $bit) != 0
             }
 
@@ -419,19 +425,19 @@ macro_rules! impl_input {
                     unsafe {w.bits(1 << $bit)})
             }
 
-            fn is_pcore_interrupt_set(&mut self) -> bool {
+            fn is_pcore_interrupt_set(&self) -> bool {
                 (unsafe {&*GPIO::ptr()}.$pcpu_int.read().bits() & (1 << $bit)) !=0
             }
 
-            fn is_pcore_non_maskable_interrupt_set(&mut self) -> bool {
+            fn is_pcore_non_maskable_interrupt_set(&self) -> bool {
                 (unsafe {&*GPIO::ptr()}.$pcpu_nmi.read().bits() & (1 << $bit)) !=0
             }
 
-            fn is_acore_interrupt_set(&mut self) -> bool {
+            fn is_acore_interrupt_set(&self) -> bool {
                 (unsafe {&*GPIO::ptr()}.$acpu_int.read().bits() & (1 << $bit)) !=0
             }
 
-            fn is_acore_non_maskable_interrupt_set(&mut self) -> bool {
+            fn is_acore_non_maskable_interrupt_set(&self) -> bool {
                 (unsafe {&*GPIO::ptr()}.$acpu_nmi.read().bits() & (1 << $bit)) !=0
             }
 
@@ -895,8 +901,8 @@ macro_rules! gpio {
 }
 
 pub use gpio;
+pub use impl_errata36;
 pub use impl_input;
 pub use impl_input_wrap;
 pub use impl_output;
 pub use impl_output_wrap;
-pub use impl_errata36;

@@ -46,7 +46,6 @@ pub mod usb_serial_jtag;
 pub use delay::Delay;
 pub use gpio::*;
 pub use interrupt::*;
-use procmacros;
 pub use procmacros::ram;
 pub use rng::Rng;
 #[cfg(not(feature = "esp32c3"))]

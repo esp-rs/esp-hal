@@ -104,7 +104,7 @@ pub trait Instance {
             .into()
     }
 
-    fn is_tx_idle(&mut self) -> bool {
+    fn is_tx_idle(&self) -> bool {
         #[cfg(feature = "esp32")]
         let idle = self.register_block().status.read().st_utx_out().bits() == 0x0u8;
         #[cfg(not(feature = "esp32"))]
@@ -113,7 +113,7 @@ pub trait Instance {
         idle
     }
 
-    fn is_rx_idle(&mut self) -> bool {
+    fn is_rx_idle(&self) -> bool {
         #[cfg(feature = "esp32")]
         let idle = self.register_block().status.read().st_urx_out().bits() == 0x0u8;
         #[cfg(not(feature = "esp32"))]

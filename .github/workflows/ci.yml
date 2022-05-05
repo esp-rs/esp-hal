@@ -50,3 +50,26 @@ jobs:
         with:
           command: check
           args: -Zbuild-std=core --examples --package=${{ matrix.chip }}-hal --target=xtensa-${{ matrix.chip }}-none-elf
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        chip: [esp32, esp32c3, esp32s2, esp32s3]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          default: true
+          components: clippy
+      - uses: Swatinem/rust-cache@v1
+      - uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          # I find `clippy::too-many-arguments` to be rather rather arbitrary.
+          # As for `clippy::module-inception`... don't tell me what to do ;)
+          args: --package=${{ matrix.chip }}-hal -- --no-deps -D warnings --A clippy::too-many-arguments --A clippy::module-inception

@@ -61,12 +61,8 @@ fn main() -> ! {
 
     unsafe {
         xtensa_lx::interrupt::disable();
-        xtensa_lx::interrupt::enable_mask(
-            1 << 20,
-        );
-        xtensa_lx::interrupt::enable_mask(
-            1 << 23,
-        );
+        xtensa_lx::interrupt::enable_mask(1 << 20);
+        xtensa_lx::interrupt::enable_mask(1 << 23);
     }
 
     loop {}

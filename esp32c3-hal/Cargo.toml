@@ -24,23 +24,22 @@ categories = [
 ]
 
 [dependencies]
-bare-metal                  = "1.0"
-embedded-hal                = { version = "0.2", features = ["unproven"] }
-nb                          = "1.0"
-riscv                       = "0.8.0"
-riscv-rt                    = { version = "0.8.1", optional = true }
-void                        = { version = "1.0", default-features = false }
-r0                          = "1.0.0"
-riscv-atomic-emulation-trap = "0.1.0"
+bare-metal   = "1.0"
+embedded-hal = { version = "0.2", features = ["unproven"] }
+nb           = "1.0"
+r0           = "1.0.0"
+riscv        = "0.8.0"
+riscv-rt     = { version = "0.8", optional = true }
+void         = { version = "1.0", default-features = false }
 
 [dependencies.esp-hal-common]
 path     = "../esp-hal-common"
 features = ["esp32c3"]
 
 [dev-dependencies]
-panic-halt = "0.2"
-ssd1306 = "0.7.0"
-embedded-graphics = "0.7.1"
+embedded-graphics = "0.7"
+panic-halt        = "0.2"
+ssd1306           = "0.7"
 
 [features]
 default     = ["rt"]

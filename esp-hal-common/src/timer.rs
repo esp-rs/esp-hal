@@ -73,7 +73,7 @@ pub trait Instance {
             .modify(|_, w| w.t0_en().bit(state));
     }
 
-    fn is_counter_active(&mut self) -> bool {
+    fn is_counter_active(&self) -> bool {
         self.register_block().t0config.read().t0_en().bit_is_set()
     }
 
@@ -95,7 +95,7 @@ pub trait Instance {
             .modify(|_, w| w.t0_alarm_en().bit(state));
     }
 
-    fn is_alarm_active(&mut self) -> bool {
+    fn is_alarm_active(&self) -> bool {
         self.register_block()
             .t0config
             .read()
