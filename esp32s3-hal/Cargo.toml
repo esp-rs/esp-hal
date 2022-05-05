@@ -25,20 +25,20 @@ categories = [
 
 [dependencies]
 bare-metal   = "1.0"
-embedded-hal = { version = "0.2", features = ["unproven"] }
+embedded-hal = { version = "0.2",  features = ["unproven"] }
 nb           = "1.0"
-void         = { version = "1.0", default-features = false }
-xtensa-lx    = { version = "0.7.0", features = ["esp32s3"] }
-xtensa-lx-rt = { version = "0.11.0", features = ["esp32s3"], optional = true }
+void         = { version = "1.0",  default-features = false }
+xtensa-lx    = { version = "0.7",  features = ["esp32s3"] }
+xtensa-lx-rt = { version = "0.11", features = ["esp32s3"], optional = true }
 
 [dependencies.esp-hal-common]
 path     = "../esp-hal-common"
 features = ["esp32s3"]
 
 [dev-dependencies]
-panic-halt = "0.2"
-ssd1306 = "0.7.0"
-embedded-graphics = "0.7.1"
+embedded-graphics = "0.7"
+panic-halt        = "0.2"
+ssd1306           = "0.7"
 
 [features]
 default = ["rt"]
