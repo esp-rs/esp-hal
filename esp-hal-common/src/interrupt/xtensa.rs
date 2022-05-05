@@ -57,11 +57,11 @@ pub fn enable(core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
         let interrupt_number = interrupt as isize;
         let cpu_interrupt_number = which as isize;
         let intr_map_base = match core {
-            Cpu::ProCpu => (&*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
+            Cpu::ProCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
             #[cfg(feature = "dual_core")]
-            Cpu::AppCpu => (&*core1_interrupt_peripheral()).app_mac_intr_map.as_ptr(),
+            Cpu::AppCpu => (*core1_interrupt_peripheral()).app_mac_intr_map.as_ptr(),
             #[cfg(feature = "single_core")]
-            Cpu::AppCpu => (&*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
+            Cpu::AppCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
         };
         intr_map_base
             .offset(interrupt_number)
@@ -74,11 +74,11 @@ pub fn disable(core: Cpu, interrupt: Interrupt) {
     unsafe {
         let interrupt_number = interrupt as isize;
         let intr_map_base = match core {
-            Cpu::ProCpu => (&*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
+            Cpu::ProCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
             #[cfg(feature = "dual_core")]
-            Cpu::AppCpu => (&*core1_interrupt_peripheral()).app_mac_intr_map.as_ptr(),
+            Cpu::AppCpu => (*core1_interrupt_peripheral()).app_mac_intr_map.as_ptr(),
             #[cfg(feature = "single_core")]
-            Cpu::AppCpu => (&*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
+            Cpu::AppCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
         };
         intr_map_base.offset(interrupt_number).write_volatile(0);
     }
@@ -96,16 +96,16 @@ pub fn get_status(core: Cpu) -> u128 {
     unsafe {
         match core {
             Cpu::ProCpu => {
-                ((&*core0_interrupt_peripheral())
+                ((*core0_interrupt_peripheral())
                     .pro_intr_status_0
                     .read()
                     .bits() as u128)
-                    | ((&*core0_interrupt_peripheral())
+                    | ((*core0_interrupt_peripheral())
                         .pro_intr_status_1
                         .read()
                         .bits() as u128)
                         << 32
-                    | ((&*core0_interrupt_peripheral())
+                    | ((*core0_interrupt_peripheral())
                         .pro_intr_status_2
                         .read()
                         .bits() as u128)
@@ -113,16 +113,16 @@ pub fn get_status(core: Cpu) -> u128 {
             }
             #[cfg(feature = "dual_core")]
             Cpu::AppCpu => {
-                ((&*core1_interrupt_peripheral())
+                ((*core1_interrupt_peripheral())
                     .app_intr_status_0
                     .read()
                     .bits() as u128)
-                    | ((&*core1_interrupt_peripheral())
+                    | ((*core1_interrupt_peripheral())
                         .app_intr_status_1
                         .read()
                         .bits() as u128)
                         << 32
-                    | ((&*core1_interrupt_peripheral())
+                    | ((*core1_interrupt_peripheral())
                         .app_intr_status_2
                         .read()
                         .bits() as u128)
@@ -130,16 +130,16 @@ pub fn get_status(core: Cpu) -> u128 {
             }
             #[cfg(feature = "single_core")]
             Cpu::AppCpu => {
-                ((&*core0_interrupt_peripheral())
+                ((*core0_interrupt_peripheral())
                     .pro_intr_status_0
                     .read()
                     .bits() as u128)
-                    | ((&*core0_interrupt_peripheral())
+                    | ((*core0_interrupt_peripheral())
                         .pro_intr_status_1
                         .read()
                         .bits() as u128)
                         << 32
-                    | ((&*core0_interrupt_peripheral())
+                    | ((*core0_interrupt_peripheral())
                         .pro_intr_status_2
                         .read()
                         .bits() as u128)

@@ -289,11 +289,7 @@ pub unsafe extern "C" fn start_trap_rust_hal(trap_frame: *mut TrapFrame) {
 #[doc(hidden)]
 unsafe fn handle_exception(pc: usize, trap_frame: *mut TrapFrame) {
     let insn: usize = *(pc as *const _);
-    let needs_atomic_emulation = if (insn & 0b1111111) != 0b0101111 {
-        false
-    } else {
-        true
-    };
+    let needs_atomic_emulation = (insn & 0b1111111) == 0b0101111;
 
     if !needs_atomic_emulation {
         extern "C" {

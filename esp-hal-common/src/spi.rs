@@ -75,10 +75,8 @@ where
 
         spi.enable_peripheral(system);
 
-        let mut spi = Self { spi: spi };
-
+        let mut spi = Self { spi };
         spi.spi.setup(frequency);
-
         spi.spi.init();
         spi.spi.set_data_mode(mode);
 
@@ -207,9 +205,6 @@ pub trait Instance {
             */
 
             let mut pre: i32;
-            let n: i32;
-            let mut h: i32;
-            let l: i32;
             let mut bestn: i32 = -1;
             let mut bestpre: i32 = -1;
             let mut besterr: i32 = 0;
@@ -242,20 +237,20 @@ pub trait Instance {
                 }
             }
 
-            n = bestn;
+            let n: i32 = bestn;
             pre = bestpre as i32;
-            l = n;
+            let l: i32 = n;
 
             /* Effectively, this does:
             *   h = round((duty_cycle * n) / 256)
             */
 
-            h = (duty_cycle * n + 127) / 256;
+            let mut h: i32 = (duty_cycle * n + 127) / 256;
             if h <= 0 {
                 h = 1;
             }
 
-            reg_val = ((l as u32 - 1) << 0) |
+            reg_val = (l as u32 - 1) |
                     ((h as u32 - 1) << 6) |
                     ((n as u32 - 1) << 12) |
                     ((pre as u32 - 1) << 18);
@@ -353,7 +348,7 @@ pub trait Instance {
             let mut fifo_ptr = reg_block.w0.as_ptr();
             for chunk in chunk.chunks(4) {
                 let mut u32_as_bytes = [0u8; 4];
-                u32_as_bytes[0..(chunk.len())].clone_from_slice(&chunk);
+                u32_as_bytes[0..(chunk.len())].clone_from_slice(chunk);
                 let reg_val: u32 = u32::from_le_bytes(u32_as_bytes);
 
                 unsafe {

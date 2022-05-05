@@ -75,10 +75,10 @@ enum Command {
 impl From<Command> for u16 {
     fn from(c: Command) -> u16 {
         let opcode = match c {
-            Command::Start => Opcode::RSTART,
-            Command::Stop => Opcode::STOP,
-            Command::Write { .. } => Opcode::WRITE,
-            Command::Read { .. } => Opcode::READ,
+            Command::Start => Opcode::RStart,
+            Command::Stop => Opcode::Stop,
+            Command::Write { .. } => Opcode::Write,
+            Command::Read { .. } => Opcode::Read,
         };
 
         let length = match c {
@@ -87,7 +87,7 @@ impl From<Command> for u16 {
         };
 
         let ack_exp = match c {
-            Command::Start | Command::Stop | Command::Read { .. } => Ack::NACK,
+            Command::Start | Command::Stop | Command::Read { .. } => Ack::Nack,
             Command::Write { ack_exp: exp, .. } => exp,
         };
 
@@ -99,7 +99,7 @@ impl From<Command> for u16 {
         };
 
         let ack_value = match c {
-            Command::Start | Command::Stop | Command::Write { .. } => Ack::NACK,
+            Command::Start | Command::Stop | Command::Write { .. } => Ack::Nack,
             Command::Read { ack_value: ack, .. } => ack,
         };
 
@@ -111,13 +111,13 @@ impl From<Command> for u16 {
             cmd &= !(1 << 8);
         }
 
-        if ack_exp == Ack::NACK {
+        if ack_exp == Ack::Nack {
             cmd |= 1 << 9;
         } else {
             cmd &= !(1 << 9);
         }
 
-        if ack_value == Ack::NACK {
+        if ack_value == Ack::Nack {
             cmd |= 1 << 10;
         } else {
             cmd &= !(1 << 10);
@@ -130,30 +130,30 @@ impl From<Command> for u16 {
 }
 
 enum OperationType {
-    WRITE = 0,
-    READ  = 1,
+    Write = 0,
+    Read  = 1,
 }
 
 #[derive(Eq, PartialEq, Copy, Clone)]
 enum Ack {
-    ACK,
-    NACK,
+    Ack,
+    Nack,
 }
 
 #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
 enum Opcode {
-    RSTART = 6,
-    WRITE  = 1,
-    READ   = 3,
-    STOP   = 2,
+    RStart = 6,
+    Write  = 1,
+    Read   = 3,
+    Stop   = 2,
 }
 
 #[cfg(any(feature = "esp32", feature = "esp32s2"))]
 enum Opcode {
-    RSTART = 0,
-    WRITE  = 1,
-    READ   = 2,
-    STOP   = 3,
+    RStart = 0,
+    Write  = 1,
+    Read   = 2,
+    Stop   = 3,
 }
 
 /// I2C peripheral container (I2C)
@@ -454,29 +454,24 @@ pub trait Instance {
                 let scl_high: u16 = half_cycle - scl_wait_high as u16;
                 let sda_hold = half_cycle / 4;
                 let sda_sample = scl_high / 2;
-            }
-            else if #[cfg(feature = "esp32s3")] {
+            } else if #[cfg(feature = "esp32s3")] {
                 let scl_high = if bus_freq <= 50000 { half_cycle } else { half_cycle / 5 * 4 + 4 };
                 let scl_wait_high: u8 = (half_cycle - scl_high).try_into().map_err(|_| SetupError::InvalidClkConfig)?;
                 let sda_hold = half_cycle / 2;
                 let sda_sample = half_cycle / 2;
-            }
-            else if #[cfg(feature = "esp32s2")] {
+            } else if #[cfg(feature = "esp32s2")] {
                 let scl_high = half_cycle / 2 + 2;
                 let scl_wait_high = scl_high - (scl_high/2 +2) + 4; // NOTE the additional +4 compared to ESP-IDF
                 let sda_hold = half_cycle / 2;
                 let sda_sample = scl_high / 2 - 1;
-            }
-            else {
+            } else {
                 // ESP32 is default (as it is the simplest case and does not even have
                 // the wait_high field)
                 let scl_high = half_cycle;
                 let sda_hold = half_cycle / 2;
                 let sda_sample = scl_high / 2;
-                let tout: u16 = (half_cycle * 20)
-                    .try_into()
-                    .map_err(|_| SetupError::InvalidClkConfig)?;
-                    }
+                let tout: u16 = half_cycle * 20;
+            }
         }
 
         let scl_low = half_cycle;
@@ -654,7 +649,7 @@ pub trait Instance {
         // Load address and R/W bit into FIFO
         write_fifo(
             self.register_block(),
-            addr << 1 | OperationType::WRITE as u8,
+            addr << 1 | OperationType::Write as u8,
         );
         // Load actual data bytes
         for byte in bytes {
@@ -668,7 +663,7 @@ pub trait Instance {
         cmd_write.write(|w| unsafe {
             w.command().bits(
                 Command::Write {
-                    ack_exp: Ack::ACK,
+                    ack_exp: Ack::Ack,
                     ack_check_en: true,
                     length: 1 + bytes.len() as u8,
                 }
@@ -704,7 +699,7 @@ pub trait Instance {
             .write(|w| unsafe { w.command().bits(Command::Start.into()) });
 
         // Load address and R/W bit into FIFO
-        write_fifo(self.register_block(), addr << 1 | OperationType::READ as u8);
+        write_fifo(self.register_block(), addr << 1 | OperationType::Read as u8);
 
         // Check if we have another cmd register ready, otherwise return appropriate
         // error
@@ -714,7 +709,7 @@ pub trait Instance {
             .write(|w| unsafe {
                 w.command().bits(
                     Command::Write {
-                        ack_exp: Ack::ACK,
+                        ack_exp: Ack::Ack,
                         ack_check_en: true,
                         length: 1,
                     }
@@ -732,7 +727,7 @@ pub trait Instance {
                 .write(|w| unsafe {
                     w.command().bits(
                         Command::Read {
-                            ack_value: Ack::ACK,
+                            ack_value: Ack::Ack,
                             length: buffer.len() as u8 - 1,
                         }
                         .into(),
@@ -747,7 +742,7 @@ pub trait Instance {
             .write(|w| unsafe {
                 w.command().bits(
                     Command::Read {
-                        ack_value: Ack::NACK,
+                        ack_value: Ack::Nack,
                         length: 1,
                     }
                     .into(),
