@@ -1,5 +1,6 @@
-use crate::{pac::Interrupt, Cpu};
 use xtensa_lx_rt::exception::Context;
+
+use crate::{pac::Interrupt, Cpu};
 
 extern "C" {
     fn level1_interrupt(save_frame: &mut Context);
