@@ -15,7 +15,7 @@
 //!     mosi,
 //!     miso,
 //!     cs,
-//!     100_000,
+//!     100u32.kHz(),
 //!     embedded_hal::spi::MODE_0,
 //!     &mut peripherals.SYSTEM,
 //! );
@@ -24,6 +24,7 @@
 use core::convert::Infallible;
 
 use embedded_hal::spi::{FullDuplex, Mode};
+use fugit::{HertzU32, RateExtU32};
 
 use crate::{
     pac::spi2::RegisterBlock,
@@ -57,7 +58,7 @@ where
         mut mosi: MOSI,
         mut miso: MISO,
         mut cs: CS,
-        frequency: u32,
+        frequency: HertzU32,
         mode: Mode,
         system: &mut System,
     ) -> Self {
@@ -184,15 +185,17 @@ pub trait Instance {
     }
 
     // taken from https://github.com/apache/incubator-nuttx/blob/8267a7618629838231256edfa666e44b5313348e/arch/risc-v/src/esp32c3/esp32c3_spi.c#L496
-    fn setup(&mut self, frequency: u32) {
-        const APB_CLK_FREQ: u32 = 80_000_000; // TODO this might not be always true
+    fn setup(&mut self, frequency: HertzU32) {
+        // FIXME: this might not be always true
+        let apb_clk_freq: HertzU32 = 80u32.MHz();
+
         let reg_val: u32;
         let duty_cycle = 128;
 
         // In HW, n, h and l fields range from 1 to 64, pre ranges from 1 to 8K.
         // The value written to register is one lower than the used value.
 
-        if frequency > ((APB_CLK_FREQ / 4) * 3) {
+        if frequency > ((apb_clk_freq / 4) * 3) {
             // Using APB frequency directly will give us the best result here.
             reg_val = 1 << 31;
         } else {
@@ -219,7 +222,7 @@ pub trait Instance {
                 *   pre = round((APB_CLK_FREQ / n) / frequency)
                 */
 
-                pre = ((APB_CLK_FREQ as i32/ n) + (frequency as i32 / 2)) / frequency as i32;
+                pre = ((apb_clk_freq.raw() as i32/ n) + (frequency.raw() as i32 / 2)) / frequency.raw() as i32;
 
                 if pre <= 0 {
                     pre = 1;
@@ -229,7 +232,7 @@ pub trait Instance {
                     pre = 16;
                 }
 
-                errval = (APB_CLK_FREQ as i32 / (pre as i32 * n as i32) - frequency as i32).abs();
+                errval = (apb_clk_freq.raw() as i32 / (pre as i32 * n as i32) - frequency.raw() as i32).abs();
                 if bestn == -1 || errval <= besterr {
                     besterr = errval;
                     bestn = n as i32;

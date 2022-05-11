@@ -47,18 +47,18 @@ fn main() -> ! {
         mosi,
         miso,
         cs,
-        100_000,
+        100u32.kHz(),
         embedded_hal::spi::MODE_0,
         &mut peripherals.SYSTEM,
     );
 
-    let delay = Delay::new();
+    let mut delay = Delay::new();
 
     loop {
         let mut data = [0xde, 0xca, 0xfb, 0xad];
         spi.transfer(&mut data).unwrap();
         writeln!(serial0, "{:x?}", data).ok();
 
-        delay.delay(250_000);
+        delay.delay_ms(250u32);
     }
 }
