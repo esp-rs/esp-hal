@@ -45,3 +45,4 @@ smart-leds        = "0.3"
 default = ["rt"]
 rt      = ["xtensa-lx-rt/esp32"]
 ufmt    = ["esp-hal-common/ufmt"]
+bluetooth = []
