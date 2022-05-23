@@ -30,13 +30,14 @@ where
 
 #[cfg(feature = "esp32c3")]
 mod delay {
+    use fugit::Hertz;
+
     use crate::pac::SYSTIMER;
 
     // The counters and comparators are driven using `XTAL_CLK`. The average clock
     // frequency is fXTAL_CLK/2.5, which is 16 MHz. The timer counting is
     // incremented by 1/16 μs on each `CNT_CLK` cycle.
-    const CLK_FREQ_HZ: u64 = 16_000_000;
-
+    const CLK_FREQ_HZ: Hertz<u64> = Hertz::<u64>::MHz(16);
     /// Delay driver
     ///
     /// Uses the `SYSTIMER` peripheral for counting clock cycles, as
@@ -60,7 +61,7 @@ mod delay {
         /// Delay for the specified number of microseconds
         pub fn delay(&self, us: u32) {
             let t0 = self.unit0_value();
-            let clocks = (us as u64 * CLK_FREQ_HZ) / 1_000_000;
+            let clocks = (us as u64 * CLK_FREQ_HZ.raw()) / Hertz::<u64>::MHz(1).raw();
 
             while self.unit0_value().wrapping_sub(t0) <= clocks {}
         }
@@ -89,9 +90,12 @@ mod delay {
 
 #[cfg(not(feature = "esp32c3"))]
 mod delay {
+
+    use fugit::Hertz;
+
     // FIXME: The ESP32-S2 and ESP32-S3 have fixed crystal frequencies of 40MHz.
     //        This will not always be the case when using the ESP32.
-    const CLK_FREQ_HZ: u64 = 40_000_000;
+    const CLK_FREQ_HZ: Hertz<u64> = Hertz::<u64>::MHz(40);
 
     /// Delay driver
     ///
@@ -107,7 +111,7 @@ mod delay {
 
         /// Delay for the specified number of microseconds
         pub fn delay(&self, us: u32) {
-            let clocks = (us as u64 * CLK_FREQ_HZ) / 1_000_000;
+            let clocks = (us as u64 * CLK_FREQ_HZ.raw()) / Hertz::<u64>::MHz(1).raw();
             xtensa_lx::timer::delay(clocks as u32);
         }
     }

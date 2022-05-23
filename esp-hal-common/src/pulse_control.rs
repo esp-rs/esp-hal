@@ -80,6 +80,8 @@
 
 use core::slice::Iter;
 
+use fugit::NanosDurationU32;
+
 use crate::{
     gpio::{types::OutputSignal, OutputPin},
     pac::RMT,
@@ -169,11 +171,11 @@ pub struct PulseCode {
     /// Logical output level in the first pulse code interval
     pub level1: bool,
     /// Length of the first pulse code interval (in clock cycles)
-    pub length1: u16,
+    pub length1: NanosDurationU32,
     /// Logical output level in the second pulse code interval
     pub level2: bool,
     /// Length of the second pulse code interval (in clock cycles)
-    pub length2: u16,
+    pub length2: NanosDurationU32,
 }
 
 /// Convert a pulse code structure into a u32 value that can be written
@@ -185,7 +187,7 @@ impl From<PulseCode> for u32 {
         // little-endian
 
         // The length1 value resides in bits [14:0]
-        let mut entry: u32 = p.length1 as u32;
+        let mut entry: u32 = p.length1.ticks() as u32;
 
         // If level1 is high, set bit 15, otherwise clear it
         if p.level1 {
@@ -202,7 +204,7 @@ impl From<PulseCode> for u32 {
         }
 
         // The length2 value resides in bits [30:16]
-        entry |= (p.length2 as u32) << 16;
+        entry |= (p.length2.ticks() as u32) << 16;
 
         entry
     }
