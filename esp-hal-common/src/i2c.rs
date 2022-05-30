@@ -4,7 +4,7 @@
 use core::convert::TryInto;
 
 use embedded_hal::blocking::i2c::*;
-use fugit::Hertz;
+use fugit::HertzU32;
 
 use crate::{
     gpio::{InputPin, OutputPin},
@@ -14,13 +14,13 @@ use crate::{
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "esp32c3")] {
-        const SOURCE_CLK_FREQ: Hertz<u32> = Hertz::<u32>::MHz(40);
+        const SOURCE_CLK_FREQ: HertzU32 = HertzU32::MHz(40);
     } else if #[cfg(feature = "esp32")] {
-        const SOURCE_CLK_FREQ: Hertz<u32> = Hertz::<u32>::MHz(80);
+        const SOURCE_CLK_FREQ: HertzU32 = HertzU32::MHz(80);
     } else if #[cfg(feature = "esp32s2")] {
-        const SOURCE_CLK_FREQ: Hertz<u32> = Hertz::<u32>::MHz(80);
+        const SOURCE_CLK_FREQ: HertzU32 = HertzU32::MHz(80);
     } else {
-        const SOURCE_CLK_FREQ: Hertz<u32> = Hertz::<u32>::MHz(40);
+        const SOURCE_CLK_FREQ: HertzU32 = HertzU32::MHz(40);
     }
 }
 
@@ -219,7 +219,7 @@ where
         i2c: T,
         mut sda: SDA,
         mut scl: SCL,
-        frequency: Hertz<u32>,
+        frequency: HertzU32,
         system: &mut System,
     ) -> Result<Self, SetupError> {
         enable_peripheral(&i2c, system);
@@ -312,7 +312,7 @@ pub trait Instance {
 
     fn i2c_number(&self) -> usize;
 
-    fn setup(&mut self, frequency: Hertz<u32>) -> Result<(), SetupError> {
+    fn setup(&mut self, frequency: HertzU32) -> Result<(), SetupError> {
         // Reset entire peripheral (also resets fifo)
         self.reset();
 
@@ -426,8 +426,8 @@ pub trait Instance {
     /// associated timings
     fn set_frequency(
         &mut self,
-        source_clk: Hertz<u32>,
-        bus_freq: Hertz<u32>,
+        source_clk: HertzU32,
+        bus_freq: HertzU32,
     ) -> Result<(), SetupError> {
         cfg_if::cfg_if! {
             if #[cfg(any(feature = "esp32s3", feature = "esp32c3"))] {
