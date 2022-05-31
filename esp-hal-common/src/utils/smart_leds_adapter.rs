@@ -13,6 +13,7 @@
 
 use core::{marker::PhantomData, slice::IterMut};
 
+use fugit::NanosDuration;
 use smart_leds_trait::{SmartLedsWrite, RGB8};
 
 #[cfg(any(feature = "esp32", feature = "esp32s2"))]
@@ -42,10 +43,14 @@ const SK68XX_T0L_NS: u32 = SK68XX_CODE_PERIOD - SK68XX_T0H_NS;
 const SK68XX_T1H_NS: u32 = 640;
 const SK68XX_T1L_NS: u32 = SK68XX_CODE_PERIOD - SK68XX_T1H_NS;
 
-const SK68XX_T0H_CYCLES: u16 = ((SK68XX_T0H_NS * (SOURCE_CLK_FREQ / 1_000_000)) / 500) as u16;
-const SK68XX_T0L_CYCLES: u16 = ((SK68XX_T0L_NS * (SOURCE_CLK_FREQ / 1_000_000)) / 500) as u16;
-const SK68XX_T1H_CYCLES: u16 = ((SK68XX_T1H_NS * (SOURCE_CLK_FREQ / 1_000_000)) / 500) as u16;
-const SK68XX_T1L_CYCLES: u16 = ((SK68XX_T1L_NS * (SOURCE_CLK_FREQ / 1_000_000)) / 500) as u16;
+const SK68XX_T0H_CYCLES: NanosDuration<u32> =
+    NanosDuration::<u32>::from_ticks((SK68XX_T0H_NS * (SOURCE_CLK_FREQ / 1_000_000)) / 500);
+const SK68XX_T0L_CYCLES: NanosDuration<u32> =
+    NanosDuration::<u32>::from_ticks((SK68XX_T0L_NS * (SOURCE_CLK_FREQ / 1_000_000)) / 500);
+const SK68XX_T1H_CYCLES: NanosDuration<u32> =
+    NanosDuration::<u32>::from_ticks((SK68XX_T1H_NS * (SOURCE_CLK_FREQ / 1_000_000)) / 500);
+const SK68XX_T1L_CYCLES: NanosDuration<u32> =
+    NanosDuration::<u32>::from_ticks((SK68XX_T1L_NS * (SOURCE_CLK_FREQ / 1_000_000)) / 500);
 
 /// All types of errors that can happen during the conversion and transmission
 /// of LED commands

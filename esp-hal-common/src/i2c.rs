@@ -4,6 +4,7 @@
 use core::convert::TryInto;
 
 use embedded_hal::blocking::i2c::*;
+use fugit::HertzU32;
 
 use crate::{
     gpio::{InputPin, OutputPin},
@@ -13,13 +14,13 @@ use crate::{
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "esp32c3")] {
-        const SOURCE_CLK_FREQ: u32 = 40_000_000;
+        const SOURCE_CLK_FREQ: HertzU32 = HertzU32::MHz(40);
     } else if #[cfg(feature = "esp32")] {
-        const SOURCE_CLK_FREQ: u32 = 80_000_000;
+        const SOURCE_CLK_FREQ: HertzU32 = HertzU32::MHz(80);
     } else if #[cfg(feature = "esp32s2")] {
-        const SOURCE_CLK_FREQ: u32 = 80_000_000;
+        const SOURCE_CLK_FREQ: HertzU32 = HertzU32::MHz(80);
     } else {
-        const SOURCE_CLK_FREQ: u32 = 40_000_000;
+        const SOURCE_CLK_FREQ: HertzU32 = HertzU32::MHz(40);
     }
 }
 
@@ -218,7 +219,7 @@ where
         i2c: T,
         mut sda: SDA,
         mut scl: SCL,
-        frequency: u32,
+        frequency: HertzU32,
         system: &mut System,
     ) -> Result<Self, SetupError> {
         enable_peripheral(&i2c, system);
@@ -311,7 +312,7 @@ pub trait Instance {
 
     fn i2c_number(&self) -> usize;
 
-    fn setup(&mut self, frequency: u32) -> Result<(), SetupError> {
+    fn setup(&mut self, frequency: HertzU32) -> Result<(), SetupError> {
         // Reset entire peripheral (also resets fifo)
         self.reset();
 
@@ -423,21 +424,25 @@ pub trait Instance {
 
     /// Sets the frequency of the I2C interface by calculating and applying the
     /// associated timings
-    fn set_frequency(&mut self, source_clk: u32, bus_freq: u32) -> Result<(), SetupError> {
+    fn set_frequency(
+        &mut self,
+        source_clk: HertzU32,
+        bus_freq: HertzU32,
+    ) -> Result<(), SetupError> {
         cfg_if::cfg_if! {
             if #[cfg(any(feature = "esp32s3", feature = "esp32c3"))] {
                 // C3 and S3 have a clock devider mechanism, which we want to configure
                 // as high as possible.
-                let sclk_div: u8 = (source_clk / (bus_freq * 1024) + 1)
+                let sclk_div: u8 = (source_clk.raw() / (bus_freq.raw() * 1024) + 1)
                     .try_into()
                     .map_err(|_| SetupError::InvalidClkConfig)?;
 
-                let half_cycle: u16 = ((source_clk / sclk_div as u32 / bus_freq / 2) as u32)
+                let half_cycle: u16 = ((source_clk.raw() / sclk_div as u32 / bus_freq.raw() / 2) as u32)
                     .try_into()
                     .map_err(|_| SetupError::InvalidClkConfig)?;
             } else {
                 // For EPS32 and the S2 variant no clock divider mechanism exists.
-                let half_cycle: u16 = (source_clk / (bus_freq * 2) as u32)
+                let half_cycle: u16 = (source_clk.raw() / (bus_freq.raw() * 2) as u32)
                 .try_into()
                 .map_err(|_| SetupError::InvalidClkConfig)?;
             }
@@ -448,14 +453,14 @@ pub trait Instance {
         // but improves readability)
         cfg_if::cfg_if! {
             if #[cfg(feature = "esp32c3")] {
-                let scl_wait_high: u8 = (if bus_freq <= 50000 { 0 } else { half_cycle / 8 })
+                let scl_wait_high: u8 = (if bus_freq.raw() <= 50000 { 0 } else { half_cycle / 8 })
                     .try_into()
                     .map_err(|_| SetupError::InvalidClkConfig)?;
                 let scl_high: u16 = half_cycle - scl_wait_high as u16;
                 let sda_hold = half_cycle / 4;
                 let sda_sample = scl_high / 2;
             } else if #[cfg(feature = "esp32s3")] {
-                let scl_high = if bus_freq <= 50000 { half_cycle } else { half_cycle / 5 * 4 + 4 };
+                let scl_high = if bus_freq.raw() <= 50000 { half_cycle } else { half_cycle / 5 * 4 + 4 };
                 let scl_wait_high: u8 = (half_cycle - scl_high).try_into().map_err(|_| SetupError::InvalidClkConfig)?;
                 let sda_hold = half_cycle / 2;
                 let sda_sample = half_cycle / 2;

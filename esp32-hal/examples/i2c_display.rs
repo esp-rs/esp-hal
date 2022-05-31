@@ -49,7 +49,7 @@ fn main() -> ! {
         peripherals.I2C0,
         io.pins.gpio32,
         io.pins.gpio33,
-        100_000,
+        100u32.kHz(),
         &mut peripherals.DPORT,
     )
     .unwrap();
