@@ -30,7 +30,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: check
-          args: --examples --package=esp32c3-hal --target=riscv32imc-unknown-none-elf
+          args: --examples --manifest-path=esp32c3-hal/Cargo.toml --target=riscv32imc-unknown-none-elf
 
   check-xtensa:
     name: Check Xtensa Examples
@@ -41,15 +41,16 @@ jobs:
         chip: [esp32, esp32s2, esp32s3]
     steps:
       - uses: actions/checkout@v2
-      - uses: esp-rs/xtensa-toolchain@v1.1
+      - uses: esp-rs/xtensa-toolchain@v1.2
         with:
           default: true
           ldproxy: false
+          buildtargets: ${{ matrix.chip }}
       - uses: Swatinem/rust-cache@v1
       - uses: actions-rs/cargo@v1
         with:
           command: check
-          args: -Zbuild-std=core --examples --package=${{ matrix.chip }}-hal --target=xtensa-${{ matrix.chip }}-none-elf
+          args: -Zbuild-std=core --examples --manifest-path=${{ matrix.chip }}-hal/Cargo.toml --target=xtensa-${{ matrix.chip }}-none-elf
 
   clippy:
     name: Clippy
@@ -72,4 +73,4 @@ jobs:
           command: clippy
           # I find `clippy::too-many-arguments` to be rather rather arbitrary.
           # As for `clippy::module-inception`... don't tell me what to do ;)
-          args: --package=${{ matrix.chip }}-hal -- --no-deps -D warnings --A clippy::too-many-arguments --A clippy::module-inception
+          args: --manifest-path=${{ matrix.chip }}-hal/Cargo.toml -- --no-deps -D warnings --A clippy::too-many-arguments --A clippy::module-inception
