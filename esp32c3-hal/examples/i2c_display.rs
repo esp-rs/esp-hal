@@ -20,7 +20,6 @@ use embedded_graphics::{
     text::{Alignment, Text},
 };
 use esp32c3_hal::{gpio::IO, i2c::I2C, pac::Peripherals, prelude::*, RtcCntl, Timer};
-use fugit::HertzU32;
 use nb::block;
 use panic_halt as _;
 use riscv_rt::entry;
@@ -48,7 +47,7 @@ fn main() -> ! {
         peripherals.I2C0,
         io.pins.gpio1,
         io.pins.gpio2,
-        HertzU32::kHz(100),
+        100u32.kHz(),
         &mut peripherals.SYSTEM,
     )
     .unwrap();

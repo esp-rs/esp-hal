@@ -22,7 +22,6 @@ use embedded_graphics::{
     text::{Alignment, Text},
 };
 use esp32s3_hal::{gpio::IO, i2c::I2C, pac::Peripherals, prelude::*, RtcCntl, Serial, Timer};
-use fugit::HertzU32;
 use nb::block;
 use panic_halt as _;
 use ssd1306::{prelude::*, I2CDisplayInterface, Ssd1306};
@@ -50,7 +49,7 @@ fn main() -> ! {
         peripherals.I2C0,
         io.pins.gpio1,
         io.pins.gpio2,
-        HertzU32::kHz(100),
+        100u32.kHz(),
         &mut peripherals.SYSTEM,
     )
     .unwrap();
