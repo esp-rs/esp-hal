@@ -4,27 +4,37 @@
 //!
 //! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
 
-use embedded_hal::blocking::delay::{DelayMs, DelayUs};
+use core::convert::Infallible;
 
 pub use self::delay::Delay;
 
-impl<T> DelayMs<T> for Delay
+impl<T> embedded_hal::blocking::delay::DelayMs<T> for Delay
 where
     T: Into<u32>,
 {
     fn delay_ms(&mut self, ms: T) {
         for _ in 0..ms.into() {
-            self.delay_us(1000u32);
+            self.delay(1000u32);
         }
     }
 }
 
-impl<T> DelayUs<T> for Delay
+impl<T> embedded_hal::blocking::delay::DelayUs<T> for Delay
 where
     T: Into<u32>,
 {
     fn delay_us(&mut self, us: T) {
         self.delay(us.into());
+    }
+}
+
+impl embedded_hal_1::delay::blocking::DelayUs for Delay {
+    type Error = Infallible;
+
+    fn delay_us(&mut self, us: u32) -> Result<(), Self::Error> {
+        self.delay(us);
+
+        Ok(())
     }
 }
 
@@ -65,7 +75,6 @@ mod delay {
 
 #[cfg(not(feature = "esp32c3"))]
 mod delay {
-
     use fugit::HertzU64;
 
     use crate::clock::Clocks;

@@ -1,7 +1,5 @@
 //! UART driver
 
-use embedded_hal::serial::{Read, Write};
-
 #[cfg(any(feature = "esp32", feature = "esp32s3"))]
 use crate::pac::UART2;
 use crate::pac::{uart0::RegisterBlock, UART0, UART1};
@@ -12,12 +10,21 @@ const UART_FIFO_SIZE: u16 = 128;
 #[derive(Debug)]
 pub enum Error {}
 
+impl embedded_hal_1::serial::Error for Error {
+    fn kind(&self) -> embedded_hal_1::serial::ErrorKind {
+        embedded_hal_1::serial::ErrorKind::Other
+    }
+}
+
 /// UART driver
 pub struct Serial<T> {
     uart: T,
 }
 
-impl<T: Instance> Serial<T> {
+impl<T> Serial<T>
+where
+    T: Instance,
+{
     /// Create a new UART instance
     pub fn new(uart: T) -> Result<Self, Error> {
         let mut serial = Serial { uart };
@@ -27,14 +34,52 @@ impl<T: Instance> Serial<T> {
         Ok(serial)
     }
 
-    /// Writes bytes
-    pub fn write_bytes(&mut self, data: &[u8]) -> Result<(), Error> {
-        data.iter().try_for_each(|c| nb::block!(self.write(*c)))
-    }
-
     /// Return the raw interface to the underlying UART instance
     pub fn free(self) -> T {
         self.uart
+    }
+
+    /// Writes bytes
+    pub fn write_bytes(&mut self, data: &[u8]) -> Result<(), Error> {
+        data.iter()
+            .try_for_each(|c| nb::block!(self.write_byte(*c)))
+    }
+
+    fn write_byte(&mut self, word: u8) -> nb::Result<(), Error> {
+        if self.uart.get_tx_fifo_count() < UART_FIFO_SIZE {
+            self.uart
+                .register_block()
+                .fifo
+                .write(|w| unsafe { w.rxfifo_rd_byte().bits(word) });
+
+            Ok(())
+        } else {
+            Err(nb::Error::WouldBlock)
+        }
+    }
+
+    fn flush_tx(&self) -> nb::Result<(), Error> {
+        if self.uart.is_tx_idle() {
+            Ok(())
+        } else {
+            Err(nb::Error::WouldBlock)
+        }
+    }
+
+    fn read_byte(&mut self) -> nb::Result<u8, Error> {
+        if self.uart.get_rx_fifo_count() > 0 {
+            let value = self
+                .uart
+                .register_block()
+                .fifo
+                .read()
+                .rxfifo_rd_byte()
+                .bits();
+
+            Ok(value)
+        } else {
+            Err(nb::Error::WouldBlock)
+        }
     }
 }
 
@@ -174,53 +219,54 @@ where
     }
 }
 
-impl<T> Write<u8> for Serial<T>
+impl<T> embedded_hal::serial::Write<u8> for Serial<T>
 where
     T: Instance,
 {
     type Error = Error;
 
     fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
-        if self.uart.get_tx_fifo_count() < UART_FIFO_SIZE {
-            self.uart
-                .register_block()
-                .fifo
-                .write(|w| unsafe { w.rxfifo_rd_byte().bits(word) });
-
-            Ok(())
-        } else {
-            Err(nb::Error::WouldBlock)
-        }
+        self.write_byte(word)
     }
 
     fn flush(&mut self) -> nb::Result<(), Self::Error> {
-        if self.uart.is_tx_idle() {
-            Ok(())
-        } else {
-            Err(nb::Error::WouldBlock)
-        }
+        self.flush_tx()
     }
 }
 
-impl<T> Read<u8> for Serial<T>
+impl<T> embedded_hal::serial::Read<u8> for Serial<T>
 where
     T: Instance,
 {
     type Error = Error;
 
     fn read(&mut self) -> nb::Result<u8, Self::Error> {
-        if self.uart.get_rx_fifo_count() > 0 {
-            let value = self
-                .uart
-                .register_block()
-                .fifo
-                .read()
-                .rxfifo_rd_byte()
-                .bits();
+        self.read_byte()
+    }
+}
 
-            Ok(value)
-        } else {
-            Err(nb::Error::WouldBlock)
-        }
+impl<T> embedded_hal_1::serial::ErrorType for Serial<T> {
+    type Error = Error;
+}
+
+impl<T> embedded_hal_1::serial::nb::Read for Serial<T>
+where
+    T: Instance,
+{
+    fn read(&mut self) -> nb::Result<u8, Self::Error> {
+        self.read_byte()
+    }
+}
+
+impl<T> embedded_hal_1::serial::nb::Write for Serial<T>
+where
+    T: Instance,
+{
+    fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
+        self.write_byte(word)
+    }
+
+    fn flush(&mut self) -> nb::Result<(), Self::Error> {
+        self.flush_tx()
     }
 }
