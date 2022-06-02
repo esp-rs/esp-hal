@@ -24,14 +24,15 @@ categories = [
 ]
 
 [dependencies]
-bare-metal   = "1.0"
-embedded-hal = { version = "0.2", features = ["unproven"] }
-fugit        = "0.3"
-nb           = "1.0"
-r0           = "1.0"
-riscv        = "0.8"
-riscv-rt     = { version = "0.8", optional = true }
-void         = { version = "1.0", default-features = false }
+bare-metal     = "1.0"
+embedded-hal   = { version = "0.2", features = ["unproven"] }
+embedded-hal-1 = { package = "embedded-hal", version = "=1.0.0-alpha.8" }
+fugit          = "0.3"
+nb             = "1.0"
+r0             = "1.0"
+riscv          = "0.8"
+riscv-rt       = { version = "0.8", optional = true }
+void           = { version = "1.0", default-features = false }
 
 [dependencies.esp-hal-common]
 path     = "../esp-hal-common"

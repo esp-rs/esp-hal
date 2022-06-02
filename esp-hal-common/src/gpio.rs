@@ -523,6 +523,20 @@ macro_rules! impl_input {
             }
         }
 
+        impl<MODE> embedded_hal_1::digital::ErrorType for $pxi<Input<MODE>> {
+            type Error = Infallible;
+        }
+
+        impl<MODE> embedded_hal_1::digital::blocking::InputPin for $pxi<Input<MODE>> {
+            fn is_high(&self) -> Result<bool, Self::Error> {
+                Ok(self.read_input() & (1 << $bit) != 0)
+            }
+
+            fn is_low(&self) -> Result<bool, Self::Error> {
+                Ok(!self.is_high()?)
+            }
+        }
+
         impl<MODE> $pxi<MODE> {
             fn init_input(&self, pull_down: bool, pull_up: bool) {
                 let gpio = unsafe { &*GPIO::PTR };
@@ -740,6 +754,46 @@ macro_rules! impl_output {
             type Error = Infallible;
 
             fn toggle(&mut self) -> Result<(), Self::Error> {
+                use embedded_hal::digital::v2::{StatefulOutputPin as _, OutputPin as _};
+
+                if self.is_set_high()? {
+                    Ok(self.set_low()?)
+                } else {
+                    Ok(self.set_high()?)
+                }
+            }
+        }
+
+        impl<MODE> embedded_hal_1::digital::ErrorType for $pxi<Output<MODE>> {
+            type Error = Infallible;
+        }
+
+        impl<MODE> embedded_hal_1::digital::blocking::OutputPin for $pxi<Output<MODE>> {
+            fn set_low(&mut self) -> Result<(), Self::Error> {
+                self.write_output_clear(1 << $bit);
+                Ok(())
+            }
+
+            fn set_high(&mut self) -> Result<(), Self::Error> {
+                self.write_output_set(1 << $bit);
+                Ok(())
+            }
+        }
+
+        impl<MODE> embedded_hal_1::digital::blocking::StatefulOutputPin for $pxi<Output<MODE>> {
+            fn is_set_high(&self) -> Result<bool, Self::Error> {
+                Ok(self.read_output() & (1 << $bit) != 0)
+            }
+
+            fn is_set_low(&self) -> Result<bool, Self::Error> {
+                Ok(!self.is_set_high()?)
+            }
+        }
+
+        impl<MODE> embedded_hal_1::digital::blocking::ToggleableOutputPin for $pxi<Output<MODE>> {
+            fn toggle(&mut self) -> Result<(), Self::Error> {
+                use embedded_hal_1::digital::blocking::{StatefulOutputPin as _, OutputPin as _};
+
                 if self.is_set_high()? {
                     Ok(self.set_low()?)
                 } else {
@@ -1009,7 +1063,7 @@ macro_rules! gpio {
         )+
     ) => {
         use core::{convert::Infallible, marker::PhantomData};
-        use embedded_hal::digital::v2::{OutputPin as _, StatefulOutputPin as _};
+
         use crate::pac::{GPIO, IO_MUX};
 
         pub struct IO {

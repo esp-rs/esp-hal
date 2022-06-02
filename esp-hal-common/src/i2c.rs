@@ -1,9 +1,9 @@
 //! I2C Driver
 //!
 //! Supports multiple I2C peripheral instances
+
 use core::convert::TryInto;
 
-use embedded_hal::blocking::i2c::*;
 use fugit::HertzU32;
 
 use crate::{
@@ -31,6 +31,18 @@ pub enum Error {
     ArbitrationLost,
     ExecIncomplete,
     CommandNrExceeded,
+}
+
+impl embedded_hal_1::i2c::Error for Error {
+    fn kind(&self) -> embedded_hal_1::i2c::ErrorKind {
+        use embedded_hal_1::i2c::ErrorKind;
+
+        match self {
+            Self::ExceedingFifo => ErrorKind::Overrun,
+            Self::ArbitrationLost => ErrorKind::ArbitrationLoss,
+            _ => ErrorKind::Other,
+        }
+    }
 }
 
 /// I2C-specific setup errors
@@ -152,7 +164,7 @@ pub struct I2C<T> {
     peripheral: T,
 }
 
-impl<T> Read for I2C<T>
+impl<T> embedded_hal::blocking::i2c::Read for I2C<T>
 where
     T: Instance,
 {
@@ -163,7 +175,7 @@ where
     }
 }
 
-impl<T> Write for I2C<T>
+impl<T> embedded_hal::blocking::i2c::Write for I2C<T>
 where
     T: Instance,
 {
@@ -174,7 +186,7 @@ where
     }
 }
 
-impl<T> WriteRead for I2C<T>
+impl<T> embedded_hal::blocking::i2c::WriteRead for I2C<T>
 where
     T: Instance,
 {
@@ -187,6 +199,66 @@ where
         buffer: &mut [u8],
     ) -> Result<(), Self::Error> {
         self.peripheral.master_write_read(address, bytes, buffer)
+    }
+}
+
+impl<T> embedded_hal_1::i2c::ErrorType for I2C<T> {
+    type Error = Error;
+}
+
+impl<T> embedded_hal_1::i2c::blocking::I2c for I2C<T>
+where
+    T: Instance,
+{
+    fn read(&mut self, address: u8, buffer: &mut [u8]) -> Result<(), Self::Error> {
+        self.peripheral.master_read(address, buffer)
+    }
+
+    fn write(&mut self, address: u8, bytes: &[u8]) -> Result<(), Self::Error> {
+        self.peripheral.master_write(address, bytes)
+    }
+
+    fn write_iter<B>(&mut self, _address: u8, _bytes: B) -> Result<(), Self::Error>
+    where
+        B: IntoIterator<Item = u8>,
+    {
+        todo!()
+    }
+
+    fn write_read(
+        &mut self,
+        address: u8,
+        bytes: &[u8],
+        buffer: &mut [u8],
+    ) -> Result<(), Self::Error> {
+        self.peripheral.master_write_read(address, bytes, buffer)
+    }
+
+    fn write_iter_read<B>(
+        &mut self,
+        _address: u8,
+        _bytes: B,
+        _buffer: &mut [u8],
+    ) -> Result<(), Self::Error>
+    where
+        B: IntoIterator<Item = u8>,
+    {
+        todo!()
+    }
+
+    fn transaction<'a>(
+        &mut self,
+        _address: u8,
+        _operations: &mut [embedded_hal_1::i2c::blocking::Operation<'a>],
+    ) -> Result<(), Self::Error> {
+        todo!()
+    }
+
+    fn transaction_iter<'a, O>(&mut self, _address: u8, _operations: O) -> Result<(), Self::Error>
+    where
+        O: IntoIterator<Item = embedded_hal_1::i2c::blocking::Operation<'a>>,
+    {
+        todo!()
     }
 }
 
