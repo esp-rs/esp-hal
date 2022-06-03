@@ -93,9 +93,7 @@ mod delay {
 
     use fugit::HertzU64;
 
-    // FIXME: The ESP32-S2 and ESP32-S3 have fixed crystal frequencies of 40MHz.
-    //        This will not always be the case when using the ESP32.
-    const CLK_FREQ_HZ: HertzU64 = HertzU64::MHz(40);
+    const CLK_FREQ_HZ: HertzU64 = HertzU64::MHz(80);
 
     /// Delay driver
     ///
