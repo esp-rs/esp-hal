@@ -4,7 +4,7 @@ pub struct UsbSerialJtag;
 
 impl core::fmt::Write for UsbSerialJtag {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        let reg_block = unsafe { &*USB_DEVICE::ptr() };
+        let reg_block = unsafe { &*USB_DEVICE::PTR };
 
         // TODO: 64 byte chunks max
         for chunk in s.as_bytes().chunks(32) {

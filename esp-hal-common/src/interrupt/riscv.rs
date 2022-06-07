@@ -109,7 +109,7 @@ pub fn enable(_core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
     unsafe {
         let interrupt_number = interrupt as isize;
         let cpu_interrupt_number = which as isize;
-        let intr = &*crate::pac::INTERRUPT_CORE0::ptr();
+        let intr = &*crate::pac::INTERRUPT_CORE0::PTR;
         let intr_map_base = intr.mac_intr_map.as_ptr();
         intr_map_base
             .offset(interrupt_number)
@@ -125,7 +125,7 @@ pub fn enable(_core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
 pub fn disable(_core: Cpu, interrupt: Interrupt) {
     unsafe {
         let interrupt_number = interrupt as isize;
-        let intr = &*crate::pac::INTERRUPT_CORE0::ptr();
+        let intr = &*crate::pac::INTERRUPT_CORE0::PTR;
         let intr_map_base = intr.mac_intr_map.as_ptr();
         intr_map_base.offset(interrupt_number).write_volatile(0);
     }
@@ -134,7 +134,7 @@ pub fn disable(_core: Cpu, interrupt: Interrupt) {
 /// Set the interrupt kind (i.e. level or edge) of an CPU interrupt
 pub fn set_kind(_core: Cpu, which: CpuInterrupt, kind: InterruptKind) {
     unsafe {
-        let intr = &*crate::pac::INTERRUPT_CORE0::ptr();
+        let intr = &*crate::pac::INTERRUPT_CORE0::PTR;
         let cpu_interrupt_number = which as isize;
 
         let interrupt_type = match kind {
@@ -152,7 +152,7 @@ pub fn set_kind(_core: Cpu, which: CpuInterrupt, kind: InterruptKind) {
 /// Set the priority level of an CPU interrupt
 pub fn set_priority(_core: Cpu, which: CpuInterrupt, priority: Priority) {
     unsafe {
-        let intr = &*crate::pac::INTERRUPT_CORE0::ptr();
+        let intr = &*crate::pac::INTERRUPT_CORE0::PTR;
         let cpu_interrupt_number = which as isize;
         let intr_prio_base = intr.cpu_int_pri_0.as_ptr();
 
@@ -166,7 +166,7 @@ pub fn set_priority(_core: Cpu, which: CpuInterrupt, priority: Priority) {
 pub fn clear(_core: Cpu, which: CpuInterrupt) {
     unsafe {
         let cpu_interrupt_number = which as isize;
-        let intr = &*crate::pac::INTERRUPT_CORE0::ptr();
+        let intr = &*crate::pac::INTERRUPT_CORE0::PTR;
         intr.cpu_int_clear
             .write(|w| w.bits(1 << cpu_interrupt_number));
     }
@@ -175,11 +175,11 @@ pub fn clear(_core: Cpu, which: CpuInterrupt) {
 /// Get status of peripheral interrupts
 pub fn get_status(_core: Cpu) -> u128 {
     unsafe {
-        ((*crate::pac::INTERRUPT_CORE0::ptr())
+        ((*crate::pac::INTERRUPT_CORE0::PTR)
             .intr_status_reg_0
             .read()
             .bits() as u128)
-            | ((*crate::pac::INTERRUPT_CORE0::ptr())
+            | ((*crate::pac::INTERRUPT_CORE0::PTR)
                 .intr_status_reg_1
                 .read()
                 .bits() as u128)

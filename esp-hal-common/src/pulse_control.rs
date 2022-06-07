@@ -286,7 +286,7 @@ macro_rules! channel_instance {
                 cfg_if::cfg_if! {
                     if #[cfg(any(feature = "esp32c3", feature = "esp32s3"))] {
                         // Apply default configuration
-                        unsafe { &*RMT::ptr() }.ch_tx_conf0[$num].modify(|_, w| unsafe {
+                        unsafe { &*RMT::PTR }.ch_tx_conf0[$num].modify(|_, w| unsafe {
                             // Configure memory block size
                             w.mem_size()
                                 .bits(1)
@@ -381,7 +381,7 @@ macro_rules! output_channel {
             fn set_idle_output_level(&mut self, level: bool) -> &mut Self {
                 cfg_if::cfg_if! {
                     if #[cfg(any(feature = "esp32c3", feature = "esp32s3"))] {
-                        unsafe { &*RMT::ptr() }
+                        unsafe { &*RMT::PTR }
                             .ch_tx_conf0[$num]
                             .modify(|_, w| w.idle_out_lv().bit(level));
                     }
@@ -398,7 +398,7 @@ macro_rules! output_channel {
             fn set_idle_output(&mut self, state: bool) -> &mut Self {
                 cfg_if::cfg_if! {
                     if #[cfg(any(feature = "esp32c3", feature = "esp32s3"))] {
-                        unsafe { &*RMT::ptr() }
+                        unsafe { &*RMT::PTR }
                             .ch_tx_conf0[$num]
                             .modify(|_, w| w.idle_out_en().bit(state));
                     }
@@ -415,7 +415,7 @@ macro_rules! output_channel {
             fn set_channel_divider(&mut self, divider: u8) -> &mut Self {
                 cfg_if::cfg_if! {
                     if #[cfg(any(feature = "esp32c3", feature = "esp32s3"))] {
-                        unsafe { &*RMT::ptr() }
+                        unsafe { &*RMT::PTR }
                             .ch_tx_conf0[$num]
                             .modify(|_, w| unsafe { w.div_cnt().bits(divider) });
                     }
@@ -432,7 +432,7 @@ macro_rules! output_channel {
             fn set_carrier_modulation(&mut self, state: bool) -> &mut Self {
                 cfg_if::cfg_if! {
                     if #[cfg(any(feature = "esp32c3", feature = "esp32s3"))] {
-                        unsafe { &*RMT::ptr() }
+                        unsafe { &*RMT::PTR }
                             .ch_tx_conf0[$num]
                             .modify(|_, w| w.carrier_en().bit(state));
                     }
@@ -524,7 +524,7 @@ macro_rules! output_channel {
                     if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
                         let conf_reg = & conf1!($num);
                     } else {
-                        let conf_reg = & unsafe{ &*RMT::ptr() }.ch_tx_conf0[$num];
+                        let conf_reg = & unsafe{ &*RMT::PTR }.ch_tx_conf0[$num];
                     }
                 }
 
@@ -533,7 +533,7 @@ macro_rules! output_channel {
                 cfg_if::cfg_if! {
                     if #[cfg(feature = "esp32")] {
                         // Configure counting mode and repetitions
-                        unsafe { &*RMT::ptr() }.ch_tx_lim[$num].modify(|_, w| unsafe {
+                        unsafe { &*RMT::PTR }.ch_tx_lim[$num].modify(|_, w| unsafe {
                             // Set the interrupt threshold for sent pulse codes to
                             // half the size of the RAM in case we use wrap mode
                             w.tx_lim()
@@ -547,7 +547,7 @@ macro_rules! output_channel {
                         }
 
                         // Configure counting mode and repetitions
-                        unsafe { &*RMT::ptr() }.ch_tx_lim[$num].modify(|_, w| unsafe {
+                        unsafe { &*RMT::PTR }.ch_tx_lim[$num].modify(|_, w| unsafe {
                             // Set number of repetitions
                             w.tx_loop_num()
                                 .bits(reps)
@@ -605,7 +605,7 @@ macro_rules! output_channel {
                 // Depending on the variant, other registers have to be used here
                 cfg_if::cfg_if! {
                     if #[cfg(feature = "esp32")] {
-                        unsafe { &*RMT::ptr() }.int_clr.write(|w| unsafe {
+                        unsafe { &*RMT::PTR }.int_clr.write(|w| unsafe {
                             // The ESP32 variant does not have the loop functionality
                             w.ch_tx_end_int_clr($num)
                                 .set_bit()
@@ -615,7 +615,7 @@ macro_rules! output_channel {
                                 .set_bit()
                         });
                     } else if #[cfg(feature = "esp32s2")] {
-                        unsafe { &*RMT::ptr() }.int_clr.write(|w| unsafe {
+                        unsafe { &*RMT::PTR }.int_clr.write(|w| unsafe {
                             w.ch_tx_end_int_clr($num)
                                 .set_bit()
                                 .ch_tx_loop_int_clr($num)
@@ -626,7 +626,7 @@ macro_rules! output_channel {
                                 .set_bit()
                         });
                     } else {
-                        unsafe { &*RMT::ptr() }.int_clr.write(|w| unsafe {
+                        unsafe { &*RMT::PTR }.int_clr.write(|w| unsafe {
                             w.ch_tx_end_int_clr($num)
                                 .set_bit()
                                 .ch_tx_loop_int_clr($num)
@@ -645,7 +645,7 @@ macro_rules! output_channel {
                     if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
                         conf1!($num).modify(|_, w| w.tx_start().set_bit());
                     } else {
-                        unsafe{ &*RMT::ptr() }.ch_tx_conf0[$num].modify(|_, w| w.tx_start().set_bit());
+                        unsafe{ &*RMT::PTR }.ch_tx_conf0[$num].modify(|_, w| w.tx_start().set_bit());
                     }
                 }
 
@@ -654,7 +654,7 @@ macro_rules! output_channel {
                 if repeat_mode != RepeatMode::Forever {
                     // Wait for interrupt being raised, either completion or error
                     loop {
-                        let interrupts = unsafe { &*RMT::ptr() }.int_raw.read();
+                        let interrupts = unsafe { &*RMT::PTR }.int_raw.read();
 
                         match (
                             unsafe { interrupts.ch_tx_end_int_raw($num).bit() },
@@ -683,7 +683,7 @@ macro_rules! output_channel {
                                 self.write_sequence(&mut sequence_iter, CHANNEL_RAM_SIZE / 2);
 
                                 // Clear the threshold interrupt (write-through)
-                                unsafe { &*RMT::ptr() }.int_clr.write(|w| unsafe {
+                                unsafe { &*RMT::PTR }.int_clr.write(|w| unsafe {
                                     w.ch_tx_thr_event_int_clr($num).set_bit()
                                 });
                             }
@@ -720,7 +720,7 @@ macro_rules! output_channel {
             fn stop_transmission(&self) {
                 cfg_if::cfg_if! {
                     if #[cfg(any(feature = "esp32c3", feature = "esp32s3"))] {
-                        unsafe { &*RMT::ptr() }
+                        unsafe { &*RMT::PTR }
                             .ch_tx_conf0[$num]
                             .modify(|_, w| w.tx_stop().set_bit());
                     }
@@ -740,14 +740,14 @@ macro_rules! output_channel {
 macro_rules! conf0 {
     ($channel: literal) => {
         match $channel {
-            0 => &unsafe { &*RMT::ptr() }.ch0conf0,
-            1 => &unsafe { &*RMT::ptr() }.ch1conf0,
-            2 => &unsafe { &*RMT::ptr() }.ch2conf0,
-            3 => &unsafe { &*RMT::ptr() }.ch3conf0,
-            4 => &unsafe { &*RMT::ptr() }.ch4conf0,
-            5 => &unsafe { &*RMT::ptr() }.ch5conf0,
-            6 => &unsafe { &*RMT::ptr() }.ch6conf0,
-            7 => &unsafe { &*RMT::ptr() }.ch7conf0,
+            0 => &unsafe { &*RMT::PTR }.ch0conf0,
+            1 => &unsafe { &*RMT::PTR }.ch1conf0,
+            2 => &unsafe { &*RMT::PTR }.ch2conf0,
+            3 => &unsafe { &*RMT::PTR }.ch3conf0,
+            4 => &unsafe { &*RMT::PTR }.ch4conf0,
+            5 => &unsafe { &*RMT::PTR }.ch5conf0,
+            6 => &unsafe { &*RMT::PTR }.ch6conf0,
+            7 => &unsafe { &*RMT::PTR }.ch7conf0,
             _ => panic!("Attempted access to non-existing channel!"),
         }
     };
@@ -757,14 +757,14 @@ macro_rules! conf0 {
 macro_rules! conf1 {
     ($channel: literal) => {
         match $channel {
-            0 => &unsafe { &*RMT::ptr() }.ch0conf1,
-            1 => &unsafe { &*RMT::ptr() }.ch1conf1,
-            2 => &unsafe { &*RMT::ptr() }.ch2conf1,
-            3 => &unsafe { &*RMT::ptr() }.ch3conf1,
-            4 => &unsafe { &*RMT::ptr() }.ch4conf1,
-            5 => &unsafe { &*RMT::ptr() }.ch5conf1,
-            6 => &unsafe { &*RMT::ptr() }.ch6conf1,
-            7 => &unsafe { &*RMT::ptr() }.ch7conf1,
+            0 => &unsafe { &*RMT::PTR }.ch0conf1,
+            1 => &unsafe { &*RMT::PTR }.ch1conf1,
+            2 => &unsafe { &*RMT::PTR }.ch2conf1,
+            3 => &unsafe { &*RMT::PTR }.ch3conf1,
+            4 => &unsafe { &*RMT::PTR }.ch4conf1,
+            5 => &unsafe { &*RMT::PTR }.ch5conf1,
+            6 => &unsafe { &*RMT::PTR }.ch6conf1,
+            7 => &unsafe { &*RMT::PTR }.ch7conf1,
             _ => panic!("Attempted access to non-existing channel!"),
         }
     };
@@ -774,10 +774,10 @@ macro_rules! conf1 {
 macro_rules! conf0 {
     ($channel: literal) => {
         match $channel {
-            0 => &unsafe { &*RMT::ptr() }.ch0conf0,
-            1 => &unsafe { &*RMT::ptr() }.ch1conf0,
-            2 => &unsafe { &*RMT::ptr() }.ch2conf0,
-            3 => &unsafe { &*RMT::ptr() }.ch3conf0,
+            0 => &unsafe { &*RMT::PTR }.ch0conf0,
+            1 => &unsafe { &*RMT::PTR }.ch1conf0,
+            2 => &unsafe { &*RMT::PTR }.ch2conf0,
+            3 => &unsafe { &*RMT::PTR }.ch3conf0,
             _ => panic!("Attempted access to non-existing channel!"),
         }
     };
@@ -787,10 +787,10 @@ macro_rules! conf0 {
 macro_rules! conf1 {
     ($channel: literal) => {
         match $channel {
-            0 => &unsafe { &*RMT::ptr() }.ch0conf1,
-            1 => &unsafe { &*RMT::ptr() }.ch1conf1,
-            2 => &unsafe { &*RMT::ptr() }.ch2conf1,
-            3 => &unsafe { &*RMT::ptr() }.ch3conf1,
+            0 => &unsafe { &*RMT::PTR }.ch0conf1,
+            1 => &unsafe { &*RMT::PTR }.ch1conf1,
+            2 => &unsafe { &*RMT::PTR }.ch2conf1,
+            3 => &unsafe { &*RMT::PTR }.ch3conf1,
             _ => panic!("Attempted access to non-existing channel!"),
         }
     };

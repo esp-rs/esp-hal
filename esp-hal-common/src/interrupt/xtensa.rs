@@ -151,27 +151,27 @@ pub fn get_status(core: Cpu) -> u128 {
 
 #[cfg(feature = "esp32")]
 unsafe fn core0_interrupt_peripheral() -> *const crate::pac::dport::RegisterBlock {
-    crate::pac::DPORT::ptr()
+    crate::pac::DPORT::PTR
 }
 
 #[cfg(feature = "esp32")]
 unsafe fn core1_interrupt_peripheral() -> *const crate::pac::dport::RegisterBlock {
-    crate::pac::DPORT::ptr()
+    crate::pac::DPORT::PTR
 }
 
 #[cfg(feature = "esp32s2")]
 unsafe fn core0_interrupt_peripheral() -> *const crate::pac::interrupt::RegisterBlock {
-    crate::pac::INTERRUPT::ptr()
+    crate::pac::INTERRUPT::PTR
 }
 
 #[cfg(feature = "esp32s3")]
 unsafe fn core0_interrupt_peripheral() -> *const crate::pac::interrupt_core0::RegisterBlock {
-    crate::pac::INTERRUPT_CORE0::ptr()
+    crate::pac::INTERRUPT_CORE0::PTR
 }
 
 #[cfg(feature = "esp32s3")]
 unsafe fn core1_interrupt_peripheral() -> *const crate::pac::interrupt_core1::RegisterBlock {
-    crate::pac::INTERRUPT_CORE1::ptr()
+    crate::pac::INTERRUPT_CORE1::PTR
 }
 
 #[no_mangle]

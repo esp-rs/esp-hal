@@ -189,7 +189,7 @@ macro_rules! impl_errata36 {
 
     (pad_dac1, $pull_down:expr, $pull_up:expr) => {
         use crate::pac::RTCIO;
-        let rtcio = unsafe { &*RTCIO::ptr() };
+        let rtcio = unsafe { &*RTCIO::PTR };
         rtcio.pad_dac1.modify(|r, w| unsafe {
             w.bits(r.bits())
                 .pdac1_rue()
@@ -201,7 +201,7 @@ macro_rules! impl_errata36 {
 
     (pad_dac2, $pull_down:expr, $pull_up:expr) => {
         use crate::pac::RTCIO;
-        let rtcio = unsafe { &*RTCIO::ptr() };
+        let rtcio = unsafe { &*RTCIO::PTR };
         rtcio.pad_dac2.modify(|r, w| unsafe {
             w.bits(r.bits())
                 .pdac2_rue()
@@ -213,7 +213,7 @@ macro_rules! impl_errata36 {
 
     (xtal_32k_n, $pull_down:expr, $pull_up:expr) => {
         use crate::pac::RTCIO;
-        let rtcio = unsafe { &*RTCIO::ptr() };
+        let rtcio = unsafe { &*RTCIO::PTR };
         rtcio.xtal_32k_pad.modify(|r, w| unsafe {
             w.bits(r.bits())
                 .x32n_rue()
@@ -225,7 +225,7 @@ macro_rules! impl_errata36 {
 
     (xtal_32k_p, $pull_down:expr, $pull_up:expr) => {
         use crate::pac::RTCIO;
-        let rtcio = unsafe { &*RTCIO::ptr() };
+        let rtcio = unsafe { &*RTCIO::PTR };
         rtcio.xtal_32k_pad.modify(|r, w| unsafe {
             w.bits(r.bits())
                 .x32p_rue()
@@ -237,7 +237,7 @@ macro_rules! impl_errata36 {
 
     ($errata36:ident, $pull_down:expr, $pull_up:expr) => {
         use crate::pac::RTCIO;
-        let rtcio = unsafe { &*RTCIO::ptr() };
+        let rtcio = unsafe { &*RTCIO::PTR };
         rtcio
             .$errata36
             .modify(|r, w| unsafe { w.bits(r.bits()).rue().bit($pull_up).rde().bit($pull_down) });
@@ -261,7 +261,7 @@ macro_rules! impl_input {
             type Error = Infallible;
 
             fn is_high(&self) -> Result<bool, Self::Error> {
-                Ok(unsafe { &*GPIO::ptr() }.$reg.read().$reader().bits() & (1 << $bit) != 0)
+                Ok(unsafe { &*GPIO::PTR }.$reg.read().$reader().bits() & (1 << $bit) != 0)
             }
 
             fn is_low(&self) -> Result<bool, Self::Error> {
@@ -271,8 +271,8 @@ macro_rules! impl_input {
 
         impl<MODE> $pxi<MODE> {
             fn init_input(&self, pull_down: bool, pull_up: bool) {
-                let gpio = unsafe { &*GPIO::ptr() };
-                let iomux = unsafe { &*IO_MUX::ptr() };
+                let gpio = unsafe { &*GPIO::PTR };
+                let iomux = unsafe { &*IO_MUX::PTR };
 
                 gpio.$out_en_clear
                     .write(|w| unsafe { w.bits(1 << $bit) });
@@ -314,7 +314,7 @@ macro_rules! impl_input {
 
             fn enable_input(&mut self, on: bool) -> &mut Self {
                 paste!{
-                    unsafe { &*IO_MUX::ptr() }
+                    unsafe { &*IO_MUX::PTR }
                         .$iomux_reg
                         .modify(|_, w| w.fun_ie().bit(on));
                 }
@@ -323,7 +323,7 @@ macro_rules! impl_input {
 
             fn enable_input_in_sleep_mode(&mut self, on: bool) -> &mut Self {
                 paste! {
-                    unsafe { &*IO_MUX::ptr() }
+                    unsafe { &*IO_MUX::PTR }
                         .$iomux_reg
                         .modify(|_, w| w.mcu_ie().bit(on));
                 }
@@ -331,7 +331,7 @@ macro_rules! impl_input {
             }
 
             fn is_input_high(&self) -> bool {
-                unsafe { &*GPIO::ptr() }.$reg.read().$reader().bits() & (1 << $bit) != 0
+                unsafe { &*GPIO::PTR }.$reg.read().$reader().bits() & (1 << $bit) != 0
             }
 
             fn connect_input_to_peripheral_with_options(
@@ -358,7 +358,7 @@ macro_rules! impl_input {
                 self.set_alternate_function(af);
 
                 if (signal as usize) <= INPUT_SIGNAL_MAX as usize {
-                    unsafe { &*GPIO::ptr() }.func_in_sel_cfg[signal as usize].modify(|_, w| unsafe {
+                    unsafe { &*GPIO::PTR }.func_in_sel_cfg[signal as usize].modify(|_, w| unsafe {
                         w.sel()
                             .set_bit()
                             .in_inv_sel()
@@ -374,7 +374,7 @@ macro_rules! impl_input {
         impl<MODE> Pin for $pxi<MODE> {
             fn sleep_mode(&mut self, on: bool) -> &mut Self {
                 paste! {
-                    unsafe { &*IO_MUX::ptr() }
+                    unsafe { &*IO_MUX::PTR }
                         .$iomux_reg
                         .modify(|_, w| w.slp_sel().bit(on));
                 }
@@ -383,7 +383,7 @@ macro_rules! impl_input {
 
             fn set_alternate_function(&mut self, alternate: AlternateFunction) -> &mut Self {
                 paste! {
-                    unsafe { &*IO_MUX::ptr() }
+                    unsafe { &*IO_MUX::PTR }
                         .$iomux_reg
                         .modify(|_, w| unsafe { w.mcu_sel().bits(alternate as u8) });
                 }
@@ -405,7 +405,7 @@ macro_rules! impl_input {
 
                 // a crate using this macro needs to provide gpio_intr_enable
                 unsafe {
-                    (&*GPIO::ptr()).pin[$pin_num].modify(|_, w|
+                    (&*GPIO::PTR).pin[$pin_num].modify(|_, w|
                         w
                             .pin_int_ena().bits(crate::gpio_intr_enable(int_enable, nmi_enable))
                             .pin_int_type().bits(event as u8)
@@ -415,30 +415,30 @@ macro_rules! impl_input {
             }
 
             fn unlisten(&mut self) {
-                unsafe { (&*GPIO::ptr()).pin[$pin_num].modify(|_, w|
+                unsafe { (&*GPIO::PTR).pin[$pin_num].modify(|_, w|
                     w.pin_int_ena().bits(0).pin_int_type().bits(0).pin_int_ena().bits(0) );
                 }
             }
 
             fn clear_interrupt(&mut self) {
-                unsafe {&*GPIO::ptr()}.$status_w1tc.write(|w|
+                unsafe {&*GPIO::PTR}.$status_w1tc.write(|w|
                     unsafe {w.bits(1 << $bit)})
             }
 
             fn is_pcore_interrupt_set(&self) -> bool {
-                (unsafe {&*GPIO::ptr()}.$pcpu_int.read().bits() & (1 << $bit)) !=0
+                (unsafe {&*GPIO::PTR}.$pcpu_int.read().bits() & (1 << $bit)) !=0
             }
 
             fn is_pcore_non_maskable_interrupt_set(&self) -> bool {
-                (unsafe {&*GPIO::ptr()}.$pcpu_nmi.read().bits() & (1 << $bit)) !=0
+                (unsafe {&*GPIO::PTR}.$pcpu_nmi.read().bits() & (1 << $bit)) !=0
             }
 
             fn is_acore_interrupt_set(&self) -> bool {
-                (unsafe {&*GPIO::ptr()}.$acpu_int.read().bits() & (1 << $bit)) !=0
+                (unsafe {&*GPIO::PTR}.$acpu_int.read().bits() & (1 << $bit)) !=0
             }
 
             fn is_acore_non_maskable_interrupt_set(&self) -> bool {
-                (unsafe {&*GPIO::ptr()}.$acpu_nmi.read().bits() & (1 << $bit)) !=0
+                (unsafe {&*GPIO::PTR}.$acpu_nmi.read().bits() & (1 << $bit)) !=0
             }
 
             fn enable_hold(&mut self, _on: bool) {
@@ -535,19 +535,19 @@ macro_rules! impl_output {
             type Error = Infallible;
 
             fn set_high(&mut self) -> Result<(), Self::Error> {
-                unsafe { (*GPIO::ptr()).$out_set.write(|w| w.bits(1 << $bit)) };
+                unsafe { (*GPIO::PTR).$out_set.write(|w| w.bits(1 << $bit)) };
                 Ok(())
             }
 
             fn set_low(&mut self) -> Result<(), Self::Error> {
-                unsafe { (*GPIO::ptr()).$out_clear.write(|w| w.bits(1 << $bit)) };
+                unsafe { (*GPIO::PTR).$out_clear.write(|w| w.bits(1 << $bit)) };
                 Ok(())
             }
         }
 
         impl<MODE> embedded_hal::digital::v2::StatefulOutputPin for $pxi<Output<MODE>> {
             fn is_set_high(&self) -> Result<bool, Self::Error> {
-                unsafe { Ok((*GPIO::ptr()).$out_reg.read().bits() & (1 << $bit) != 0) }
+                unsafe { Ok((*GPIO::PTR).$out_reg.read().bits() & (1 << $bit) != 0) }
             }
 
             fn is_set_low(&self) -> Result<bool, Self::Error> {
@@ -579,8 +579,8 @@ macro_rules! impl_output {
             }
 
             fn init_output(&self, alternate: AlternateFunction, open_drain: bool) {
-                let gpio = unsafe { &*GPIO::ptr() };
-                let iomux = unsafe { &*IO_MUX::ptr() };
+                let gpio = unsafe { &*GPIO::PTR };
+                let iomux = unsafe { &*IO_MUX::PTR };
 
                 gpio.$out_en_set.write(|w| unsafe { w.bits(1 << $bit) });
                 gpio.pin[$pin_num].modify(|_, w| w.pin_pad_driver().bit(open_drain));
@@ -642,11 +642,11 @@ macro_rules! impl_output {
 
             fn enable_output(&mut self, on: bool) -> &mut Self {
                 if on {
-                    unsafe { &*GPIO::ptr() }
+                    unsafe { &*GPIO::PTR }
                         .$out_en_set
                         .write(|w| unsafe { w.bits(1 << $bit) });
                 } else {
-                    unsafe { &*GPIO::ptr() }
+                    unsafe { &*GPIO::PTR }
                         .$out_en_clear
                         .write(|w| unsafe { w.bits(1 << $bit) });
                 }
@@ -655,16 +655,16 @@ macro_rules! impl_output {
 
             fn set_output_high(&mut self, high: bool) -> &mut Self {
                 if high {
-                    unsafe { (*GPIO::ptr()).$out_set.write(|w| w.bits(1 << $bit)) };
+                    unsafe { (*GPIO::PTR).$out_set.write(|w| w.bits(1 << $bit)) };
                 } else {
-                    unsafe { (*GPIO::ptr()).$out_clear.write(|w| w.bits(1 << $bit)) };
+                    unsafe { (*GPIO::PTR).$out_clear.write(|w| w.bits(1 << $bit)) };
                 }
                 self
             }
 
             fn set_drive_strength(&mut self, strength: DriveStrength) -> &mut Self {
                 paste! {
-                    unsafe { &*IO_MUX::ptr() }
+                    unsafe { &*IO_MUX::PTR }
                     .$iomux_reg
                     .modify(|_, w| unsafe { w.fun_drv().bits(strength as u8) });
                 }
@@ -672,13 +672,13 @@ macro_rules! impl_output {
             }
 
             fn enable_open_drain(&mut self, on: bool) -> &mut Self {
-                unsafe { &*GPIO::ptr() }.pin[$pin_num].modify(|_, w| w.pin_pad_driver().bit(on));
+                unsafe { &*GPIO::PTR }.pin[$pin_num].modify(|_, w| w.pin_pad_driver().bit(on));
                 self
             }
 
             fn internal_pull_up_in_sleep_mode(&mut self, on: bool) -> &mut Self {
                 paste! {
-                    unsafe { &*IO_MUX::ptr() }
+                    unsafe { &*IO_MUX::PTR }
                         .$iomux_reg
                         .modify(|_, w| w.mcu_wpu().bit(on));
                 }
@@ -687,7 +687,7 @@ macro_rules! impl_output {
 
             fn internal_pull_down_in_sleep_mode(&mut self, on: bool) -> &mut Self {
                 paste!{
-                    unsafe { &*IO_MUX::ptr() }
+                    unsafe { &*IO_MUX::PTR }
                         .$iomux_reg
                         .modify(|_, w| w.mcu_wpd().bit(on));
                 }
@@ -696,7 +696,7 @@ macro_rules! impl_output {
 
             fn enable_output_in_sleep_mode(&mut self, on: bool) -> &mut Self {
                 paste! {
-                    unsafe { &*IO_MUX::ptr() }
+                    unsafe { &*IO_MUX::PTR }
                         .$iomux_reg
                         .modify(|_, w| w.mcu_oe().bit(on));
                 }
@@ -730,7 +730,7 @@ macro_rules! impl_output {
 
                 let clipped_signal = if signal as usize <= OUTPUT_SIGNAL_MAX as usize { signal as OutputSignalType } else { OUTPUT_SIGNAL_MAX };
 
-                unsafe { &*GPIO::ptr() }.func_out_sel_cfg[$pin_num].modify(|_, w| unsafe {
+                unsafe { &*GPIO::PTR }.func_out_sel_cfg[$pin_num].modify(|_, w| unsafe {
                     w
                         .out_sel().bits(clipped_signal)
                         .inv_sel().bit(invert)
@@ -743,14 +743,14 @@ macro_rules! impl_output {
 
             fn internal_pull_up(&mut self, on: bool) -> &mut Self {
                 paste!{
-                    unsafe { &*IO_MUX::ptr() }.$iomux_reg.modify(|_, w| w.fun_wpu().bit(on));
+                    unsafe { &*IO_MUX::PTR }.$iomux_reg.modify(|_, w| w.fun_wpu().bit(on));
                 }
                 self
             }
 
             fn internal_pull_down(&mut self, on: bool) -> &mut Self {
                 paste! {
-                    unsafe { &*IO_MUX::ptr() }.$iomux_reg.modify(|_, w| w.fun_wpd().bit(on));
+                    unsafe { &*IO_MUX::PTR }.$iomux_reg.modify(|_, w| w.fun_wpd().bit(on));
                 }
                 self
             }
@@ -855,7 +855,7 @@ macro_rules! gpio {
         }
 
         pub fn connect_low_to_peripheral(signal: InputSignal) {
-            unsafe { &*GPIO::ptr() }.func_in_sel_cfg[signal as usize].modify(|_, w| unsafe {
+            unsafe { &*GPIO::PTR }.func_in_sel_cfg[signal as usize].modify(|_, w| unsafe {
                 w.sel()
                     .set_bit()
                     .in_inv_sel()
@@ -866,7 +866,7 @@ macro_rules! gpio {
         }
 
         pub fn connect_high_to_peripheral(signal: InputSignal) {
-            unsafe { &*GPIO::ptr() }.func_in_sel_cfg[signal as usize].modify(|_, w| unsafe {
+            unsafe { &*GPIO::PTR }.func_in_sel_cfg[signal as usize].modify(|_, w| unsafe {
                 w.sel()
                     .set_bit()
                     .in_inv_sel()
