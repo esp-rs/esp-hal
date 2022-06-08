@@ -12,7 +12,8 @@
 #![no_main]
 
 use esp32s2_hal::{
-    pac,
+    clock::ClockControl,
+    pac::Peripherals,
     prelude::*,
     utils::{smartLedAdapter, SmartLedsAdapter},
     Delay,
@@ -33,7 +34,9 @@ use xtensa_lx_rt::entry;
 
 #[entry]
 fn main() -> ! {
-    let mut peripherals = pac::Peripherals::take().unwrap();
+    let peripherals = Peripherals::take().unwrap();
+    let mut system = peripherals.SYSTEM.split();
+    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
     let mut timer0 = Timer::new(peripherals.TIMG0);
@@ -44,7 +47,7 @@ fn main() -> ! {
     rtc_cntl.set_wdt_global_enable(false);
 
     // Configure RMT peripheral globally
-    let pulse = PulseControl::new(peripherals.RMT, &mut peripherals.SYSTEM).unwrap();
+    let pulse = PulseControl::new(peripherals.RMT, &mut system.peripheral_clock_control).unwrap();
 
     // We use one of the RMT channels to instantiate a `SmartLedsAdapter` which can
     // be used directly with all `smart_led` implementations
@@ -52,7 +55,7 @@ fn main() -> ! {
 
     // Initialize the Delay peripheral, and use it to toggle the LED state in a
     // loop.
-    let mut delay = Delay::new();
+    let mut delay = Delay::new(&clocks);
 
     let mut color = Hsv {
         hue: 0,

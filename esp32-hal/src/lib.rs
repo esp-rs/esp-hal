@@ -2,6 +2,7 @@
 
 pub use embedded_hal as ehal;
 pub use esp_hal_common::{
+    clock,
     i2c,
     interrupt,
     pac,

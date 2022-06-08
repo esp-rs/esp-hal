@@ -21,7 +21,16 @@ use embedded_graphics::{
     prelude::*,
     text::{Alignment, Text},
 };
-use esp32_hal::{gpio::IO, i2c::I2C, pac::Peripherals, prelude::*, RtcCntl, Serial, Timer};
+use esp32_hal::{
+    clock::ClockControl,
+    gpio::IO,
+    i2c::I2C,
+    pac::Peripherals,
+    prelude::*,
+    RtcCntl,
+    Serial,
+    Timer,
+};
 use nb::block;
 use panic_halt as _;
 use ssd1306::{prelude::*, I2CDisplayInterface, Ssd1306};
@@ -29,7 +38,9 @@ use xtensa_lx_rt::entry;
 
 #[entry]
 fn main() -> ! {
-    let mut peripherals = Peripherals::take().unwrap();
+    let peripherals = Peripherals::take().unwrap();
+    let mut system = peripherals.DPORT.split();
+    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let mut timer0 = Timer::new(peripherals.TIMG0);
     let mut serial0 = Serial::new(peripherals.UART0).unwrap();
@@ -50,7 +61,8 @@ fn main() -> ! {
         io.pins.gpio32,
         io.pins.gpio33,
         100u32.kHz(),
-        &mut peripherals.DPORT,
+        &mut system.peripheral_clock_control,
+        &clocks,
     )
     .unwrap();
 

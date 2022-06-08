@@ -19,7 +19,15 @@ use embedded_graphics::{
     prelude::*,
     text::{Alignment, Text},
 };
-use esp32c3_hal::{gpio::IO, i2c::I2C, pac::Peripherals, prelude::*, RtcCntl, Timer};
+use esp32c3_hal::{
+    clock::ClockControl,
+    gpio::IO,
+    i2c::I2C,
+    pac::Peripherals,
+    prelude::*,
+    RtcCntl,
+    Timer,
+};
 use nb::block;
 use panic_halt as _;
 use riscv_rt::entry;
@@ -27,7 +35,9 @@ use ssd1306::{prelude::*, I2CDisplayInterface, Ssd1306};
 
 #[entry]
 fn main() -> ! {
-    let mut peripherals = Peripherals::take().unwrap();
+    let peripherals = Peripherals::take().unwrap();
+    let mut system = peripherals.SYSTEM.split();
+    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
     let mut timer0 = Timer::new(peripherals.TIMG0);
@@ -48,7 +58,8 @@ fn main() -> ! {
         io.pins.gpio1,
         io.pins.gpio2,
         100u32.kHz(),
-        &mut peripherals.SYSTEM,
+        &mut system.peripheral_clock_control,
+        &clocks,
     )
     .unwrap();
 

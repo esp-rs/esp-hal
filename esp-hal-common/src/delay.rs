@@ -32,25 +32,27 @@ where
 mod delay {
     use fugit::HertzU64;
 
-    use crate::pac::SYSTIMER;
+    use crate::{clock::Clocks, pac::SYSTIMER};
 
-    // The counters and comparators are driven using `XTAL_CLK`. The average clock
-    // frequency is fXTAL_CLK/2.5, which is 16 MHz. The timer counting is
-    // incremented by 1/16 μs on each `CNT_CLK` cycle.
-    const CLK_FREQ_HZ: HertzU64 = HertzU64::MHz(16);
-    /// Delay driver
-    ///
     /// Uses the `SYSTIMER` peripheral for counting clock cycles, as
     /// unfortunately the ESP32-C3 does NOT implement the `mcycle` CSR, which is
     /// how we would normally do this.
     pub struct Delay {
         systimer: SYSTIMER,
+        freq: HertzU64,
     }
 
     impl Delay {
         /// Create a new Delay instance
-        pub fn new(systimer: SYSTIMER) -> Self {
-            Self { systimer }
+        pub fn new(systimer: SYSTIMER, clocks: &Clocks) -> Self {
+            // The counters and comparators are driven using `XTAL_CLK`. The average clock
+            // frequency is fXTAL_CLK/2.5, which is 16 MHz. The timer counting is
+            // incremented by 1/16 μs on each `CNT_CLK` cycle.
+
+            Self {
+                systimer,
+                freq: HertzU64::MHz((clocks.xtal_clock.to_MHz() * 10 / 25) as u64),
+            }
         }
 
         /// Return the raw interface to the underlying SYSTIMER instance
@@ -61,7 +63,7 @@ mod delay {
         /// Delay for the specified number of microseconds
         pub fn delay(&self, us: u32) {
             let t0 = self.unit0_value();
-            let clocks = (us as u64 * CLK_FREQ_HZ.raw()) / HertzU64::MHz(1).raw();
+            let clocks = (us as u64 * self.freq.raw()) / HertzU64::MHz(1).raw();
 
             while self.unit0_value().wrapping_sub(t0) <= clocks {}
         }
@@ -93,23 +95,26 @@ mod delay {
 
     use fugit::HertzU64;
 
-    const CLK_FREQ_HZ: HertzU64 = HertzU64::MHz(80);
+    use crate::clock::Clocks;
 
     /// Delay driver
     ///
     /// Uses the built-in Xtensa timer from the `xtensa_lx` crate.
-    #[derive(Default)]
-    pub struct Delay;
+    pub struct Delay {
+        freq: HertzU64,
+    }
 
     impl Delay {
         /// Instantiate the `Delay` driver
-        pub fn new() -> Self {
-            Self
+        pub fn new(clocks: &Clocks) -> Self {
+            Self {
+                freq: HertzU64::MHz(clocks.cpu_clock.to_MHz() as u64),
+            }
         }
 
         /// Delay for the specified number of microseconds
         pub fn delay(&self, us: u32) {
-            let clocks = (us as u64 * CLK_FREQ_HZ.raw()) / HertzU64::MHz(1).raw();
+            let clocks = (us as u64 * self.freq.raw()) / HertzU64::MHz(1).raw();
             xtensa_lx::timer::delay(clocks as u32);
         }
     }

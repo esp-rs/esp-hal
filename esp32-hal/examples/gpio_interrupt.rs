@@ -4,6 +4,7 @@
 use core::{cell::RefCell, fmt::Write};
 
 use esp32_hal::{
+    clock::ClockControl,
     gpio::{Gpio0, IO},
     pac::{self, Peripherals, UART0},
     prelude::*,
@@ -31,6 +32,8 @@ static mut BUTTON: SpinLockMutex<RefCell<Option<Gpio0<Input<PullDown>>>>> =
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take().unwrap();
+    let system = peripherals.DPORT.split();
+    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     // Disable the TIMG watchdog timer.
     let mut timer0 = Timer::new(peripherals.TIMG0);
@@ -62,7 +65,7 @@ fn main() -> ! {
 
     // Initialize the Delay peripheral, and use it to toggle the LED state in a
     // loop.
-    let mut delay = Delay::new();
+    let mut delay = Delay::new(&clocks);
 
     unsafe {
         xtensa_lx::interrupt::enable_mask(1 << 1);

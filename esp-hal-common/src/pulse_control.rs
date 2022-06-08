@@ -85,6 +85,7 @@ use fugit::NanosDurationU32;
 use crate::{
     gpio::{types::OutputSignal, OutputPin},
     pac::RMT,
+    system::PeripheralClockControl,
 };
 
 /// Errors that can occur when the peripheral is configured
@@ -209,11 +210,6 @@ impl From<PulseCode> for u32 {
         entry
     }
 }
-
-#[cfg(feature = "esp32")]
-type System = crate::pac::DPORT;
-#[cfg(not(feature = "esp32"))]
-type System = crate::pac::SYSTEM;
 
 /// Functionality that every OutputChannel must support
 pub trait OutputChannel {
@@ -819,7 +815,7 @@ macro_rules! rmt {
         #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
         pub fn new(
             instance: RMT,
-            system: &mut System,
+            peripheral_clock_control: &mut PeripheralClockControl,
             clk_source: ClockSource,
             div_abs: u8,
             div_frac_a: u8,
@@ -833,7 +829,7 @@ macro_rules! rmt {
                 )+
             };
 
-            pc.enable_peripheral(system);
+            pc.enable_peripheral(peripheral_clock_control);
             pc.config_global(clk_source, div_abs, div_frac_a, div_frac_b)?;
 
             Ok(pc)
@@ -843,7 +839,7 @@ macro_rules! rmt {
         #[cfg(any(feature = "esp32", feature = "esp32s2"))]
         pub fn new(
             instance: RMT,
-            system: &mut System,
+            peripheral_clock_control: &mut PeripheralClockControl,
         ) -> Result<Self, SetupError> {
 
             let pc = PulseControl {
@@ -853,7 +849,7 @@ macro_rules! rmt {
                 )+
             };
 
-            pc.enable_peripheral(system);
+            pc.enable_peripheral(peripheral_clock_control);
             pc.config_global()?;
 
             Ok(pc)
@@ -865,24 +861,8 @@ macro_rules! rmt {
         }
 
         // Enable the RMT peripherals clock in the system peripheral
-        fn enable_peripheral(&self, system: &mut System) {
-            cfg_if::cfg_if! {
-                if #[cfg(feature = "esp32")] {
-                    system
-                        .perip_clk_en
-                        .modify(|_, w| w.rmt_clk_en().set_bit());
-                    system
-                        .perip_rst_en
-                        .modify(|_, w| w.rmt_rst().clear_bit());
-                } else {
-                    system
-                        .perip_clk_en0
-                        .modify(|_, w| w.rmt_clk_en().set_bit());
-                    system
-                        .perip_rst_en0
-                        .modify(|_, w| w.rmt_rst().clear_bit());
-                }
-            }
+        fn enable_peripheral(&self, peripheral_clock_control: &mut PeripheralClockControl) {
+            peripheral_clock_control.enable(crate::system::Peripheral::Rmt);
         }
 
         /// Assign the global (peripheral-wide) configuration. This

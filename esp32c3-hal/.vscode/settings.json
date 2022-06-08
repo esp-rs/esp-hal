@@ -4,7 +4,6 @@
     "editor.formatOnSave": true,
     "rust-analyzer.checkOnSave.allTargets": false,
     "rust-analyzer.checkOnSave.allFeatures": false,
-    "rust-analyzer.cargo.runBuildScripts": false,
     "rust-analyzer.checkOnSave.overrideCommand": [
         "cargo",
         "check",
@@ -12,5 +11,6 @@
         "-Z",
         "build-std=core",
         "--examples"
-    ]
+    ],
+    "rust-analyzer.cargo.buildScripts.enable": false
 }
