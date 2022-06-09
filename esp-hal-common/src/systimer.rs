@@ -1,6 +1,6 @@
 use core::{intrinsics::transmute, marker::PhantomData};
 
-use esp32c3_pac::{
+use crate::pac::{
     generic::Reg,
     systimer::{
         comp0_load::COMP0_LOAD_SPEC,
@@ -8,9 +8,8 @@ use esp32c3_pac::{
         target0_hi::TARGET0_HI_SPEC,
         target0_lo::TARGET0_LO_SPEC,
     },
+    SYSTIMER,
 };
-
-use crate::pac::SYSTIMER;
 
 // TODO this only handles unit0 of the systimer
 

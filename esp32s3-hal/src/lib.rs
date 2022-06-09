@@ -10,6 +10,7 @@ pub use esp_hal_common::{
     pulse_control,
     ram,
     spi,
+    systimer,
     usb_serial_jtag,
     utils,
     Cpu,

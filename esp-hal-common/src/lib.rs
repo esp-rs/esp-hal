@@ -58,7 +58,7 @@ pub use spi::Spi;
 pub use timer::Timer;
 #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
 pub use usb_serial_jtag::UsbSerialJtag;
-#[cfg(feature = "esp32c3")]
+#[cfg(any(feature = "esp32c3", feature = "esp32s3", feature = "esp32s2"))]
 pub mod systimer;
 
 pub mod clock;
