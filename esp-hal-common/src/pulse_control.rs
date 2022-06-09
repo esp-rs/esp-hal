@@ -603,33 +603,33 @@ macro_rules! output_channel {
                     if #[cfg(feature = "esp32")] {
                         unsafe { &*RMT::PTR }.int_clr.write(|w| unsafe {
                             // The ESP32 variant does not have the loop functionality
-                            w.ch_tx_end_int_clr($num)
+                            w.ch_tx_end_int_clr::<$num>()
                                 .set_bit()
-                                .ch_err_int_clr($num)
+                                .ch_err_int_clr::<$num>()
                                 .set_bit()
-                                .ch_tx_thr_event_int_clr($num)
+                                .ch_tx_thr_event_int_clr::<$num>()
                                 .set_bit()
                         });
                     } else if #[cfg(feature = "esp32s2")] {
                         unsafe { &*RMT::PTR }.int_clr.write(|w| unsafe {
-                            w.ch_tx_end_int_clr($num)
+                            w.ch_tx_end_int_clr::<$num>()
                                 .set_bit()
-                                .ch_tx_loop_int_clr($num)
+                                .ch_tx_loop_int_clr::<$num>()
                                 .set_bit()
-                                .ch_err_int_clr($num)
+                                .ch_err_int_clr::<$num>()
                                 .set_bit()
-                                .ch_tx_thr_event_int_clr($num)
+                                .ch_tx_thr_event_int_clr::<$num>()
                                 .set_bit()
                         });
                     } else {
                         unsafe { &*RMT::PTR }.int_clr.write(|w| unsafe {
-                            w.ch_tx_end_int_clr($num)
+                            w.ch_tx_end_int_clr::<$num>()
                                 .set_bit()
-                                .ch_tx_loop_int_clr($num)
+                                .ch_tx_loop_int_clr::<$num>()
                                 .set_bit()
-                                .ch_tx_err_int_clr($num)
+                                .ch_tx_err_int_clr::<$num>()
                                 .set_bit()
-                                .ch_tx_thr_event_int_clr($num)
+                                .ch_tx_thr_event_int_clr::<$num>()
                                 .set_bit()
                         });
                     }
@@ -680,9 +680,9 @@ macro_rules! output_channel {
 
                                 // Clear the threshold interrupt (write-through)
                                 unsafe { &*RMT::PTR }.int_clr.write(|w| unsafe {
-                                    w.ch_tx_thr_event_int_clr($num).set_bit()
+                                    w.ch_tx_thr_event_int_clr::<$num>().set_bit()
                                 });
-                            }
+                        }
                             // Neither completed nor error -> continue busy waiting
                             (false, false, false, false) => (),
                             // Anything else constitutes an error state
