@@ -67,7 +67,7 @@ fn main() -> ! {
         &clocks,
     );
 
-    let mut delay = Delay::new(peripherals.SYSTIMER, &clocks);
+    let mut delay = Delay::new(&clocks);
 
     loop {
         let mut data = [0xde, 0xca, 0xfb, 0xad];

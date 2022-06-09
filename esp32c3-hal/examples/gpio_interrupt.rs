@@ -79,7 +79,7 @@ fn main() -> ! {
         riscv::interrupt::enable();
     }
 
-    let mut delay = Delay::new(peripherals.SYSTIMER, &clocks);
+    let mut delay = Delay::new(&clocks);
     loop {
         led.toggle().unwrap();
         delay.delay_ms(500u32);
