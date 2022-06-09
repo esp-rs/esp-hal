@@ -42,19 +42,19 @@ fn main() -> ! {
 
     writeln!(serial0, "SYSTIMER Demo start!").ok();
 
-    let mut syst = SystemTimer::new(peripherals.SYSTIMER);
+    let syst = SystemTimer::new(peripherals.SYSTIMER);
 
-    writeln!(serial0, "SYSTIMER Current value = {}", syst.now()).ok();
+    writeln!(serial0, "SYSTIMER Current value = {}", SystemTimer::now()).ok();
 
-    let alarm0 = syst.alarm0().unwrap();
+    let alarm0 = syst.alarm0;
     alarm0.set_target(40_000_000);
     alarm0.enable_interrupt();
 
-    let alarm1 = syst.alarm1().unwrap();
+    let alarm1 = syst.alarm1;
     alarm1.set_target(41_111_111);
     alarm1.enable_interrupt();
 
-    let alarm2 = syst.alarm2().unwrap();
+    let alarm2 = syst.alarm2;
     alarm2.set_target(42_222_222 * 2);
     alarm2.enable_interrupt();
 
@@ -123,7 +123,7 @@ pub fn interrupt1() {
     riscv::interrupt::free(|cs| unsafe {
         let mut serial = SERIAL.borrow(*cs).borrow_mut();
         let serial = serial.as_mut().unwrap();
-        writeln!(serial, "Interrupt 1").ok();
+        writeln!(serial, "Interrupt 1 = {}", SystemTimer::now()).ok();
 
         let mut alarm = ALARM0.borrow(*cs).borrow_mut();
         let alarm = alarm.as_mut().unwrap();
@@ -138,7 +138,7 @@ pub fn interrupt2() {
     riscv::interrupt::free(|cs| unsafe {
         let mut serial = SERIAL.borrow(*cs).borrow_mut();
         let serial = serial.as_mut().unwrap();
-        writeln!(serial, "Interrupt 2").ok();
+        writeln!(serial, "Interrupt 2 = {}", SystemTimer::now()).ok();
 
         let mut alarm = ALARM1.borrow(*cs).borrow_mut();
         let alarm = alarm.as_mut().unwrap();
@@ -153,7 +153,7 @@ pub fn interrupt3() {
     riscv::interrupt::free(|cs| unsafe {
         let mut serial = SERIAL.borrow(*cs).borrow_mut();
         let serial = serial.as_mut().unwrap();
-        writeln!(serial, "Interrupt 3").ok();
+        writeln!(serial, "Interrupt 3 = {}", SystemTimer::now()).ok();
 
         let mut alarm = ALARM2.borrow(*cs).borrow_mut();
         let alarm = alarm.as_mut().unwrap();

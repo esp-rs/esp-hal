@@ -16,59 +16,49 @@ use crate::pac::SYSTIMER;
 
 #[derive(Debug)]
 pub struct SystemTimer {
-    inner: SYSTIMER,
-    alrm0: Option<Alarm<Target, 0>>,
-    alrm1: Option<Alarm<Target, 1>>,
-    alrm2: Option<Alarm<Target, 2>>,
+    _inner: SYSTIMER,
+    pub alarm0: Alarm<Target, 0>,
+    pub alarm1: Alarm<Target, 1>,
+    pub alarm2: Alarm<Target, 2>,
 }
 
 impl SystemTimer {
     pub fn new(p: SYSTIMER) -> Self {
-        // TODO enable
         Self {
-            inner: p,
-            alrm0: Some(Alarm::new()),
-            alrm1: Some(Alarm::new()),
-            alrm2: Some(Alarm::new()),
+            _inner: p,
+            alarm0: Alarm::new(),
+            alarm1: Alarm::new(),
+            alarm2: Alarm::new(),
         }
     }
 
     // TODO use fugit types
-    pub fn now(&self) -> u64 {
-        self.inner
+    pub fn now() -> u64 {
+        // This should be safe to access from multiple contexts
+        // worst case scenario the second accesor ends up reading
+        // an older time stamp
+        let systimer = unsafe { &*SYSTIMER::ptr() };
+        systimer
             .unit0_op
-            .write(|w| w.timer_unit0_update().set_bit());
+            .modify(|_, w| w.timer_unit0_update().set_bit());
 
-        while !self
-            .inner
+        while !systimer
             .unit0_op
             .read()
             .timer_unit0_value_valid()
             .bit_is_set()
         {}
 
-        let value_lo = self.inner.unit0_value_lo.read().bits();
-        let value_hi = self.inner.unit0_value_hi.read().bits();
+        let value_lo = systimer.unit0_value_lo.read().bits();
+        let value_hi = systimer.unit0_value_hi.read().bits();
 
         ((value_hi as u64) << 32) | value_lo as u64
-    }
-
-    pub fn alarm0(&mut self) -> Option<Alarm<Target, 0>> {
-        self.alrm0.take()
-    }
-
-    pub fn alarm1(&mut self) -> Option<Alarm<Target, 1>> {
-        self.alrm1.take()
-    }
-
-    pub fn alarm2(&mut self) -> Option<Alarm<Target, 2>> {
-        self.alrm2.take()
     }
 }
 
 #[derive(Debug)]
 pub struct Target;
-// pub struct Periodic; // TODO
+// pub struct Periodic; // TODO, also impl e-h timer traits
 
 #[derive(Debug)]
 pub struct Alarm<MODE, const CHANNEL: u8> {
