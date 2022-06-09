@@ -65,7 +65,8 @@ pub struct Alarm<MODE, const CHANNEL: u8> {
     _pd: PhantomData<MODE>,
 }
 
-impl<const CHANNEL: u8> Alarm<Target, CHANNEL> {
+impl<T, const CHANNEL: u8> Alarm<T, CHANNEL> {
+    // private constructor
     fn new() -> Self {
         Self { _pd: PhantomData }
     }
@@ -95,7 +96,9 @@ impl<const CHANNEL: u8> Alarm<Target, CHANNEL> {
             _ => unreachable!(),
         }
     }
+}
 
+impl<const CHANNEL: u8> Alarm<Target, CHANNEL> {
     pub fn set_target(&self, timestamp: u64) {
         unsafe {
             let systimer = &*SYSTIMER::ptr();
