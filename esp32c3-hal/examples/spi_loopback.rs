@@ -18,13 +18,24 @@
 
 use core::fmt::Write;
 
-use esp32c3_hal::{gpio::IO, pac::Peripherals, prelude::*, Delay, RtcCntl, Serial, Timer};
+use esp32c3_hal::{
+    clock::ClockControl,
+    gpio::IO,
+    pac::Peripherals,
+    prelude::*,
+    Delay,
+    RtcCntl,
+    Serial,
+    Timer,
+};
 use panic_halt as _;
 use riscv_rt::entry;
 
 #[entry]
 fn main() -> ! {
-    let mut peripherals = Peripherals::take().unwrap();
+    let peripherals = Peripherals::take().unwrap();
+    let mut system = peripherals.SYSTEM.split();
+    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     // Disable the watchdog timers. For the ESP32-C3, this includes the Super WDT,
     // the RTC WDT, and the TIMG WDTs.
@@ -37,11 +48,6 @@ fn main() -> ! {
     rtc_cntl.set_wdt_enable(false);
     timer0.disable();
     timer1.disable();
-
-    peripherals
-        .SYSTEM
-        .sysclk_conf
-        .modify(|_, w| unsafe { w.soc_clk_sel().bits(1) });
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let sclk = io.pins.gpio6;
@@ -57,10 +63,11 @@ fn main() -> ! {
         cs,
         100u32.kHz(),
         embedded_hal::spi::MODE_0,
-        &mut peripherals.SYSTEM,
+        &mut system.peripheral_clock_control,
+        &clocks,
     );
 
-    let mut delay = Delay::new(peripherals.SYSTIMER);
+    let mut delay = Delay::new(peripherals.SYSTIMER, &clocks);
 
     loop {
         let mut data = [0xde, 0xca, 0xfb, 0xad];

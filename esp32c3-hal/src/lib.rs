@@ -4,6 +4,7 @@ use core::arch::global_asm;
 
 pub use embedded_hal as ehal;
 pub use esp_hal_common::{
+    clock,
     i2c,
     interrupt,
     pac,
@@ -11,6 +12,7 @@ pub use esp_hal_common::{
     pulse_control,
     ram,
     spi,
+    system,
     utils,
     Cpu,
     Delay,

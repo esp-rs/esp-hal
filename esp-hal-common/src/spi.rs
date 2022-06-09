@@ -24,19 +24,16 @@
 use core::convert::Infallible;
 
 use embedded_hal::spi::{FullDuplex, Mode};
-use fugit::{HertzU32, RateExtU32};
+use fugit::HertzU32;
 
 use crate::{
+    clock::Clocks,
     pac::spi2::RegisterBlock,
+    system::PeripheralClockControl,
     types::{InputSignal, OutputSignal},
     InputPin,
     OutputPin,
 };
-
-#[cfg(feature = "esp32")]
-type System = crate::pac::DPORT;
-#[cfg(not(feature = "esp32"))]
-type System = crate::pac::SYSTEM;
 
 pub struct Spi<T> {
     spi: T,
@@ -60,7 +57,8 @@ where
         mut cs: CS,
         frequency: HertzU32,
         mode: Mode,
-        system: &mut System,
+        peripheral_clock_control: &mut PeripheralClockControl,
+        clocks: &Clocks,
     ) -> Self {
         sck.set_to_push_pull_output()
             .connect_peripheral_to_output(spi.sclk_signal());
@@ -74,10 +72,10 @@ where
         cs.set_to_push_pull_output()
             .connect_peripheral_to_output(spi.cs_signal());
 
-        spi.enable_peripheral(system);
+        spi.enable_peripheral(peripheral_clock_control);
 
         let mut spi = Self { spi };
-        spi.spi.setup(frequency);
+        spi.spi.setup(frequency, clocks);
         spi.spi.init();
         spi.spi.set_data_mode(mode);
 
@@ -141,7 +139,7 @@ pub trait Instance {
 
     fn cs_signal(&self) -> OutputSignal;
 
-    fn enable_peripheral(&self, system: &mut System);
+    fn enable_peripheral(&self, peripheral_clock_control: &mut PeripheralClockControl);
 
     fn init(&mut self) {
         let reg_block = self.register_block();
@@ -185,9 +183,9 @@ pub trait Instance {
     }
 
     // taken from https://github.com/apache/incubator-nuttx/blob/8267a7618629838231256edfa666e44b5313348e/arch/risc-v/src/esp32c3/esp32c3_spi.c#L496
-    fn setup(&mut self, frequency: HertzU32) {
+    fn setup(&mut self, frequency: HertzU32, clocks: &Clocks) {
         // FIXME: this might not be always true
-        let apb_clk_freq: HertzU32 = 80u32.MHz();
+        let apb_clk_freq: HertzU32 = HertzU32::Hz(clocks.apb_clock.to_Hz());
 
         let reg_val: u32;
         let duty_cycle = 128;
@@ -450,15 +448,8 @@ impl Instance for crate::pac::SPI2 {
     }
 
     #[inline(always)]
-    fn enable_peripheral(&self, system: &mut System) {
-        // enable peripheral
-        system
-            .perip_clk_en0
-            .modify(|_, w| w.spi2_clk_en().set_bit());
-
-        // Take the peripheral out of any pre-existing reset state
-        // (shouldn't be the case after a fresh startup, but better be safe)
-        system.perip_rst_en0.modify(|_, w| w.spi2_rst().clear_bit());
+    fn enable_peripheral(&self, peripheral_clock_control: &mut PeripheralClockControl) {
+        peripheral_clock_control.enable(crate::system::Peripheral::Spi2);
     }
 }
 
@@ -490,9 +481,8 @@ impl Instance for crate::pac::SPI2 {
     }
 
     #[inline(always)]
-    fn enable_peripheral(&self, system: &mut System) {
-        system.perip_clk_en.modify(|_, w| w.spi2_clk_en().set_bit());
-        system.perip_rst_en.modify(|_, w| w.spi2_rst().clear_bit());
+    fn enable_peripheral(&self, peripheral_clock_control: &mut PeripheralClockControl) {
+        peripheral_clock_control.enable(crate::system::Peripheral::Spi2);
     }
 }
 
@@ -524,9 +514,8 @@ impl Instance for crate::pac::SPI3 {
     }
 
     #[inline(always)]
-    fn enable_peripheral(&self, system: &mut System) {
-        system.perip_clk_en.modify(|_, w| w.spi3_clk_en().set_bit());
-        system.perip_rst_en.modify(|_, w| w.spi3_rst().clear_bit());
+    fn enable_peripheral(&self, peripheral_clock_control: &mut PeripheralClockControl) {
+        peripheral_clock_control.enable(crate::system::Peripheral::Spi3)
     }
 }
 
@@ -558,11 +547,8 @@ impl Instance for crate::pac::SPI2 {
     }
 
     #[inline(always)]
-    fn enable_peripheral(&self, system: &mut System) {
-        system
-            .perip_clk_en0
-            .modify(|_, w| w.spi2_clk_en().set_bit());
-        system.perip_rst_en0.modify(|_, w| w.spi2_rst().clear_bit());
+    fn enable_peripheral(&self, peripheral_clock_control: &mut PeripheralClockControl) {
+        peripheral_clock_control.enable(crate::system::Peripheral::Spi2)
     }
 }
 
@@ -594,10 +580,7 @@ impl Instance for crate::pac::SPI3 {
     }
 
     #[inline(always)]
-    fn enable_peripheral(&self, system: &mut System) {
-        system
-            .perip_clk_en0
-            .modify(|_, w| w.spi3_clk_en().set_bit());
-        system.perip_rst_en0.modify(|_, w| w.spi3_rst().clear_bit());
+    fn enable_peripheral(&self, peripheral_clock_control: &mut PeripheralClockControl) {
+        peripheral_clock_control.enable(crate::system::Peripheral::Spi3)
     }
 }

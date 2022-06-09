@@ -3,15 +3,25 @@
 
 use core::fmt::Write;
 
-use esp32c3_hal::{pac::Peripherals, prelude::*, Delay, RtcCntl, Timer, UsbSerialJtag};
+use esp32c3_hal::{
+    clock::ClockControl,
+    pac::Peripherals,
+    prelude::*,
+    Delay,
+    RtcCntl,
+    Timer,
+    UsbSerialJtag,
+};
 use panic_halt as _;
 use riscv_rt::entry;
 
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take().unwrap();
+    let system = peripherals.SYSTEM.split();
+    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let mut delay = Delay::new(peripherals.SYSTIMER);
+    let mut delay = Delay::new(peripherals.SYSTIMER, &clocks);
     let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
     let mut timer0 = Timer::new(peripherals.TIMG0);
     let mut timer1 = Timer::new(peripherals.TIMG1);

@@ -5,6 +5,7 @@ use core::{cell::RefCell, fmt::Write};
 
 use bare_metal::Mutex;
 use esp32c3_hal::{
+    clock::ClockControl,
     gpio::{Gpio9, IO},
     pac::{self, Peripherals, UART0},
     prelude::*,
@@ -30,6 +31,8 @@ static mut BUTTON: Mutex<RefCell<Option<Gpio9<Input<PullDown>>>>> = Mutex::new(R
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take().unwrap();
+    let system = peripherals.SYSTEM.split();
+    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     // Disable the watchdog timers. For the ESP32-C3, this includes the Super WDT,
     // the RTC WDT, and the TIMG WDTs.
@@ -76,7 +79,7 @@ fn main() -> ! {
         riscv::interrupt::enable();
     }
 
-    let mut delay = Delay::new(peripherals.SYSTIMER);
+    let mut delay = Delay::new(peripherals.SYSTIMER, &clocks);
     loop {
         led.toggle().unwrap();
         delay.delay_ms(500u32);

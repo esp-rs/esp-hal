@@ -7,22 +7,12 @@ use embedded_hal::blocking::i2c::*;
 use fugit::HertzU32;
 
 use crate::{
+    clock::Clocks,
     gpio::{InputPin, OutputPin},
     pac::i2c0::{RegisterBlock, COMD},
+    system::PeripheralClockControl,
     types::{InputSignal, OutputSignal},
 };
-
-cfg_if::cfg_if! {
-    if #[cfg(feature = "esp32c3")] {
-        const SOURCE_CLK_FREQ: HertzU32 = HertzU32::MHz(40);
-    } else if #[cfg(feature = "esp32")] {
-        const SOURCE_CLK_FREQ: HertzU32 = HertzU32::MHz(80);
-    } else if #[cfg(feature = "esp32s2")] {
-        const SOURCE_CLK_FREQ: HertzU32 = HertzU32::MHz(80);
-    } else {
-        const SOURCE_CLK_FREQ: HertzU32 = HertzU32::MHz(40);
-    }
-}
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "esp32s2")] {
@@ -200,11 +190,6 @@ where
     }
 }
 
-#[cfg(feature = "esp32")]
-type System = crate::pac::DPORT;
-#[cfg(not(feature = "esp32"))]
-type System = crate::pac::SYSTEM;
-
 impl<T> I2C<T>
 where
     T: Instance,
@@ -220,9 +205,10 @@ where
         mut sda: SDA,
         mut scl: SCL,
         frequency: HertzU32,
-        system: &mut System,
+        peripheral_clock_control: &mut PeripheralClockControl,
+        clocks: &Clocks,
     ) -> Result<Self, SetupError> {
-        enable_peripheral(&i2c, system);
+        enable_peripheral(&i2c, peripheral_clock_control);
 
         let mut i2c = I2C { peripheral: i2c };
 
@@ -238,7 +224,7 @@ where
             .connect_peripheral_to_output(OutputSignal::I2CEXT0_SCL)
             .connect_input_to_peripheral(InputSignal::I2CEXT0_SCL);
 
-        i2c.peripheral.setup(frequency)?;
+        i2c.peripheral.setup(frequency, clocks)?;
 
         Ok(i2c)
     }
@@ -249,59 +235,12 @@ where
     }
 }
 
-fn enable_peripheral<T: Instance>(i2c: &T, system: &mut System) {
+fn enable_peripheral<T: Instance>(i2c: &T, peripheral_clock_control: &mut PeripheralClockControl) {
     // enable peripheral
-    #[cfg(feature = "esp32")]
     match i2c.i2c_number() {
-        0 => {
-            system
-                .perip_clk_en
-                .modify(|_, w| w.i2c0_ext0_clk_en().set_bit());
-            system
-                .perip_rst_en
-                .modify(|_, w| w.i2c0_ext0_rst().clear_bit());
-        }
-        1 => {
-            system
-                .perip_clk_en
-                .modify(|_, w| w.i2c_ext1_clk_en().set_bit());
-            system
-                .perip_rst_en
-                .modify(|_, w| w.i2c_ext1_rst().clear_bit());
-        }
-        _ => panic!(), // will never happen
-    }
-    #[cfg(not(feature = "esp32"))]
-    match i2c.i2c_number() {
-        0 => {
-            system
-                .perip_clk_en0
-                .modify(|_, w| w.i2c_ext0_clk_en().set_bit());
-
-            // Take the I2C peripheral out of any pre-existing reset state
-            // (shouldn't be the case after a fresh startup, but better be safe)
-            system
-                .perip_rst_en0
-                .modify(|_, w| w.i2c_ext0_rst().clear_bit());
-        }
-        1 => {
-            cfg_if::cfg_if! {
-                if #[cfg(not(feature = "esp32c3"))] {
-                    system
-                    .perip_clk_en0
-                    .modify(|_, w| w.i2c_ext1_clk_en().set_bit());
-
-                    // Take the I2C peripheral out of any pre-existing reset state
-                    // (shouldn't be the case after a fresh startup, but better be safe)
-                    system
-                        .perip_rst_en0
-                        .modify(|_, w| w.i2c_ext1_rst().clear_bit());
-                } else {
-                    ()
-                }
-
-            }
-        }
+        0 => peripheral_clock_control.enable(crate::system::Peripheral::I2cExt0),
+        #[cfg(not(feature = "esp32c3"))]
+        1 => peripheral_clock_control.enable(crate::system::Peripheral::I2cExt1),
         _ => unreachable!(), // will never happen
     }
 }
@@ -312,7 +251,7 @@ pub trait Instance {
 
     fn i2c_number(&self) -> usize;
 
-    fn setup(&mut self, frequency: HertzU32) -> Result<(), SetupError> {
+    fn setup(&mut self, frequency: HertzU32, clocks: &Clocks) -> Result<(), SetupError> {
         // Reset entire peripheral (also resets fifo)
         self.reset();
 
@@ -346,7 +285,7 @@ pub trait Instance {
         self.set_filter(Some(7), Some(7));
 
         // Configure frequency
-        self.set_frequency(SOURCE_CLK_FREQ, frequency)?;
+        self.set_frequency(clocks.i2c_clock.convert(), frequency)?;
 
         // Propagate configuration changes (only necessary with C3 and S3)
         #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]

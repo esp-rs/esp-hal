@@ -14,3 +14,5 @@ pub use embedded_hal::{
     prelude::*,
 };
 pub use fugit::{ExtU32 as _, ExtU64 as _, RateExtU32 as _, RateExtU64 as _};
+
+pub use crate::system::SystemExt;

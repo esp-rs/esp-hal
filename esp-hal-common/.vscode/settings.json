@@ -1,5 +1,7 @@
 {
-    "rust-analyzer.cargo.features": [],
+    "rust-analyzer.cargo.features": [
+        "esp32c3"
+    ],
     "rust-analyzer.cargo.allFeatures": false,
     "editor.formatOnSave": true,
     "rust-analyzer.checkOnSave.allTargets": false,
@@ -7,10 +9,15 @@
     "rust-analyzer.checkOnSave.overrideCommand": [
         "cargo",
         "check",
+        "--features",
+        "esp32c3",
         "--message-format=json",
         "-Z",
         "build-std=core",
-        "--examples"
+        "--target",
+        "riscv32imac-unknown-none-elf",
+        "--examples",
+        "--lib",
     ],
     "rust-analyzer.cargo.buildScripts.enable": false
 }
