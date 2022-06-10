@@ -13,6 +13,7 @@ pub use esp_hal_common::{
     ram,
     spi,
     system,
+    systimer,
     utils,
     Cpu,
     Delay,

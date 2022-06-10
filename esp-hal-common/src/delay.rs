@@ -32,60 +32,33 @@ where
 mod delay {
     use fugit::HertzU64;
 
-    use crate::{clock::Clocks, pac::SYSTIMER};
+    use crate::{clock::Clocks, systimer::SystemTimer};
 
     /// Uses the `SYSTIMER` peripheral for counting clock cycles, as
     /// unfortunately the ESP32-C3 does NOT implement the `mcycle` CSR, which is
     /// how we would normally do this.
     pub struct Delay {
-        systimer: SYSTIMER,
         freq: HertzU64,
     }
 
     impl Delay {
         /// Create a new Delay instance
-        pub fn new(systimer: SYSTIMER, clocks: &Clocks) -> Self {
+        pub fn new(clocks: &Clocks) -> Self {
             // The counters and comparators are driven using `XTAL_CLK`. The average clock
             // frequency is fXTAL_CLK/2.5, which is 16 MHz. The timer counting is
             // incremented by 1/16 μs on each `CNT_CLK` cycle.
 
             Self {
-                systimer,
                 freq: HertzU64::MHz((clocks.xtal_clock.to_MHz() * 10 / 25) as u64),
             }
         }
 
-        /// Return the raw interface to the underlying SYSTIMER instance
-        pub fn free(self) -> SYSTIMER {
-            self.systimer
-        }
-
         /// Delay for the specified number of microseconds
         pub fn delay(&self, us: u32) {
-            let t0 = self.unit0_value();
+            let t0 = SystemTimer::now();
             let clocks = (us as u64 * self.freq.raw()) / HertzU64::MHz(1).raw();
 
-            while self.unit0_value().wrapping_sub(t0) <= clocks {}
-        }
-
-        #[inline(always)]
-        fn unit0_value(&self) -> u64 {
-            self.systimer
-                .unit0_op
-                .write(|w| w.timer_unit0_update().set_bit());
-
-            while !self
-                .systimer
-                .unit0_op
-                .read()
-                .timer_unit0_value_valid()
-                .bit_is_set()
-            {}
-
-            let value_lo = self.systimer.unit0_value_lo.read().bits();
-            let value_hi = self.systimer.unit0_value_hi.read().bits();
-
-            ((value_hi as u64) << 32) | value_lo as u64
+            while SystemTimer::now().wrapping_sub(t0) <= clocks {}
         }
     }
 }
