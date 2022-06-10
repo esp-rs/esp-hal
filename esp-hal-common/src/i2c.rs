@@ -370,20 +370,13 @@ pub trait Instance {
     ) -> Result<(), SetupError> {
         cfg_if::cfg_if! {
             if #[cfg(any(feature = "esp32s3", feature = "esp32c3"))] {
-                // C3 and S3 have a clock devider mechanism, which we want to configure
+                // C3 and S3 have a clock divider mechanism, which we want to configure
                 // as high as possible.
-                let sclk_div: u8 = (source_clk.raw() / (bus_freq.raw() * 1024) + 1)
-                    .try_into()
-                    .map_err(|_| SetupError::InvalidClkConfig)?;
-
-                let half_cycle: u16 = ((source_clk.raw() / sclk_div as u32 / bus_freq.raw() / 2) as u32)
-                    .try_into()
-                    .map_err(|_| SetupError::InvalidClkConfig)?;
+                let sclk_div = source_clk.raw() / (bus_freq.raw() * 1024) + 1;
+                let half_cycle = source_clk.raw() / sclk_div as u32 / bus_freq.raw() / 2;
             } else {
                 // For EPS32 and the S2 variant no clock divider mechanism exists.
-                let half_cycle: u16 = (source_clk.raw() / (bus_freq.raw() * 2) as u32)
-                .try_into()
-                .map_err(|_| SetupError::InvalidClkConfig)?;
+                let half_cycle = source_clk.raw() / bus_freq.raw() / 2;
             }
         }
 
@@ -392,35 +385,62 @@ pub trait Instance {
         // but improves readability)
         cfg_if::cfg_if! {
             if #[cfg(feature = "esp32c3")] {
-                let scl_wait_high: u8 = (if bus_freq.raw() <= 50000 { 0 } else { half_cycle / 8 })
-                    .try_into()
-                    .map_err(|_| SetupError::InvalidClkConfig)?;
-                let scl_high: u16 = half_cycle - scl_wait_high as u16;
+                let scl_wait_high = if bus_freq.raw() <= 50000 { 0 } else { half_cycle / 8 };
+                let scl_high = half_cycle - scl_wait_high;
                 let sda_hold = half_cycle / 4;
                 let sda_sample = scl_high / 2;
             } else if #[cfg(feature = "esp32s3")] {
                 let scl_high = if bus_freq.raw() <= 50000 { half_cycle } else { half_cycle / 5 * 4 + 4 };
-                let scl_wait_high: u8 = (half_cycle - scl_high).try_into().map_err(|_| SetupError::InvalidClkConfig)?;
+                let scl_wait_high = half_cycle - scl_high;
                 let sda_hold = half_cycle / 2;
                 let sda_sample = half_cycle / 2;
             } else if #[cfg(feature = "esp32s2")] {
                 let scl_high = half_cycle / 2 + 2;
-                let scl_wait_high = scl_high - (scl_high/2 +2) + 4; // NOTE the additional +4 compared to ESP-IDF
+                let scl_wait_high = half_cycle - scl_high;
                 let sda_hold = half_cycle / 2;
-                let sda_sample = scl_high / 2 - 1;
+                let sda_sample = half_cycle / 2 - 1;
             } else {
                 // ESP32 is default (as it is the simplest case and does not even have
                 // the wait_high field)
                 let scl_high = half_cycle;
                 let sda_hold = half_cycle / 2;
                 let sda_sample = scl_high / 2;
-                let tout: u16 = half_cycle * 20;
+                let tout = half_cycle * 20;
             }
         }
 
         let scl_low = half_cycle;
         let setup = half_cycle;
         let hold = half_cycle;
+
+        #[cfg(not(feature = "esp32"))]
+        let scl_low = scl_low as u16 - 1;
+
+        #[cfg(feature = "esp32")]
+        let scl_low = scl_low as u16;
+
+        let scl_high = scl_high as u16;
+
+        #[cfg(any(feature = "esp32s3", feature = "esp32c3"))]
+        let scl_wait_high = scl_wait_high as u8;
+
+        #[cfg(any(feature = "esp32s2"))]
+        let scl_wait_high = scl_wait_high as u16;
+
+        let sda_hold = sda_hold
+            .try_into()
+            .map_err(|_| SetupError::InvalidClkConfig)?;
+
+        let setup = setup.try_into().map_err(|_| SetupError::InvalidClkConfig)?;
+
+        let sda_sample = sda_sample
+            .try_into()
+            .map_err(|_| SetupError::InvalidClkConfig)?;
+
+        let hold = hold.try_into().map_err(|_| SetupError::InvalidClkConfig)?;
+
+        #[cfg(any(feature = "esp32s3", feature = "esp32c3"))]
+        let sclk_div = sclk_div as u8;
 
         unsafe {
             // divider
@@ -432,7 +452,7 @@ pub trait Instance {
             // scl period
             self.register_block()
                 .scl_low_period
-                .write(|w| w.scl_low_period().bits(scl_low - 1));
+                .write(|w| w.scl_low_period().bits(scl_low));
 
             // for high/wait_high we have to differentiate between the chips
             // as the EPS32 does not have a wait_high field
@@ -448,16 +468,19 @@ pub trait Instance {
                 else {
                     self.register_block().scl_high_period.write(|w| {
                         w.scl_high_period()
-                            .bits(scl_high/2 +2)
+                            .bits(scl_high)
                     });
                 }
             }
 
             // we already did that above but on S2 we need this to make it work
             #[cfg(feature = "esp32s2")]
-            self.register_block()
-                .scl_high_period
-                .write(|w| w.scl_wait_high_period().bits(scl_wait_high));
+            self.register_block().scl_high_period.write(|w| {
+                w.scl_wait_high_period()
+                    .bits(scl_wait_high)
+                    .scl_high_period()
+                    .bits(scl_high)
+            });
 
             // sda sample
             self.register_block()
