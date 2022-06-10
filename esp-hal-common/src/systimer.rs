@@ -3,7 +3,6 @@ use core::{intrinsics::transmute, marker::PhantomData};
 use crate::pac::{
     generic::Reg,
     systimer::{
-        comp0_load::COMP0_LOAD_SPEC,
         target0_conf::TARGET0_CONF_SPEC,
         target0_hi::TARGET0_HI_SPEC,
         target0_lo::TARGET0_LO_SPEC,
@@ -101,61 +100,74 @@ impl<const CHANNEL: u8> Alarm<Target, CHANNEL> {
     pub fn set_target(&self, timestamp: u64) {
         unsafe {
             let systimer = &*SYSTIMER::ptr();
-            let (tconf, hi, lo, comp): (
+            let (tconf, hi, lo): (
                 &Reg<TARGET0_CONF_SPEC>,
                 &Reg<TARGET0_HI_SPEC>,
                 &Reg<TARGET0_LO_SPEC>,
-                &Reg<COMP0_LOAD_SPEC>,
             ) = match CHANNEL {
                 0 => (
                     &systimer.target0_conf,
                     &systimer.target0_hi,
                     &systimer.target0_lo,
-                    &systimer.comp0_load,
                 ),
                 1 => (
                     transmute(&systimer.target1_conf),
                     transmute(&systimer.target1_hi),
                     transmute(&systimer.target1_lo),
-                    transmute(&systimer.comp1_load),
                 ),
                 2 => (
                     transmute(&systimer.target2_conf),
                     transmute(&systimer.target2_hi),
                     transmute(&systimer.target2_lo),
-                    transmute(&systimer.comp2_load),
                 ),
                 _ => unreachable!(),
             };
 
-            tconf.write(|w| {
-                w.target0_timer_unit_sel()
-                    .clear_bit()
-                    .target0_period_mode()
-                    .clear_bit()
-            });
+            #[cfg(feature = "esp32s2")]
+            systimer.step.write(|w| w.timer_xtal_step().bits(0x1)); // run at XTAL freq, not 80 * XTAL freq
 
+            #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+            {
+                tconf.write(|w| w.target0_timer_unit_sel().clear_bit()); // default, use unit 0
+                systimer
+                    .conf
+                    .modify(|_, w| w.timer_unit0_core0_stall_en().clear_bit());
+            }
+
+            tconf.write(|w| w.target0_period_mode().clear_bit()); // target mode
             hi.write(|w| w.timer_target0_hi().bits((timestamp >> 32) as u32));
             lo.write(|w| w.timer_target0_lo().bits((timestamp & 0xFFFF_FFFF) as u32));
 
-            comp.write(|w| w.timer_comp0_load().set_bit());
+            #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+            {
+                match CHANNEL {
+                    0 => {
+                        systimer
+                            .comp0_load
+                            .write(|w| w.timer_comp0_load().set_bit());
+                    }
+                    1 => systimer
+                        .comp1_load
+                        .write(|w| w.timer_comp1_load().set_bit()),
+                    2 => systimer
+                        .comp2_load
+                        .write(|w| w.timer_comp2_load().set_bit()),
+                    _ => unreachable!(),
+                }
 
-            systimer.conf.modify(|_r, w| match CHANNEL {
-                0 => w
-                    .target0_work_en()
-                    .set_bit()
-                    .timer_unit0_core0_stall_en()
-                    .clear_bit(),
-                1 => w
-                    .target1_work_en()
-                    .set_bit()
-                    .timer_unit0_core0_stall_en()
-                    .clear_bit(),
-                2 => w
-                    .target2_work_en()
-                    .set_bit()
-                    .timer_unit0_core0_stall_en()
-                    .clear_bit(),
+                systimer.conf.modify(|_r, w| match CHANNEL {
+                    0 => w.target0_work_en().set_bit(),
+                    1 => w.target1_work_en().set_bit(),
+                    2 => w.target2_work_en().set_bit(),
+                    _ => unreachable!(),
+                });
+            }
+
+            #[cfg(feature = "esp32s2")]
+            tconf.modify(|_r, w| match CHANNEL {
+                0 => w.target0_work_en().set_bit(),
+                1 => w.target0_work_en().set_bit(),
+                2 => w.target0_work_en().set_bit(),
                 _ => unreachable!(),
             });
         }
