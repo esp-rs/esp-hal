@@ -10,6 +10,8 @@ use core::marker::PhantomData;
 
 pub use paste::paste;
 
+use crate::pac::GPIO;
+
 #[cfg_attr(feature = "esp32", path = "gpio/esp32.rs")]
 #[cfg_attr(feature = "esp32c3", path = "gpio/esp32c3.rs")]
 #[cfg_attr(feature = "esp32s2", path = "gpio/esp32s2.rs")]
@@ -180,6 +182,236 @@ pub trait OutputPin: Pin {
     fn internal_pull_down(&mut self, on: bool) -> &mut Self;
 }
 
+pub struct SingleCoreInteruptStatusRegisterAccess {}
+pub struct DualCoreInteruptStatusRegisterAccess {}
+
+pub trait InteruptStatusRegisterAccess {
+    fn pro_cpu_interrupt_status_read() -> u32;
+
+    fn pro_cpu_nmi_status_read() -> u32;
+
+    fn app_cpu_interrupt_status_read() -> u32;
+
+    fn app_cpu_nmi_status_read() -> u32;
+}
+
+impl InteruptStatusRegisterAccess for SingleCoreInteruptStatusRegisterAccess {
+    fn pro_cpu_interrupt_status_read() -> u32 {
+        unsafe { &*GPIO::PTR }.pcpu_int.read().bits()
+    }
+
+    fn pro_cpu_nmi_status_read() -> u32 {
+        unsafe { &*GPIO::PTR }.pcpu_nmi_int.read().bits()
+    }
+
+    fn app_cpu_interrupt_status_read() -> u32 {
+        unsafe { &*GPIO::PTR }.pcpu_int.read().bits()
+    }
+
+    fn app_cpu_nmi_status_read() -> u32 {
+        unsafe { &*GPIO::PTR }.pcpu_nmi_int.read().bits()
+    }
+}
+
+// ESP32S3 is a dual-core chip however pro cpu and app cpu shares the same
+// interrupt enable bit see
+// https://github.com/espressif/esp-idf/blob/c04803e88b871a4044da152dfb3699cf47354d18/components/hal/esp32s3/include/hal/gpio_ll.h#L32
+// Treating it as SingleCore in the gpio macro makes this work.
+#[cfg(not(any(feature = "esp32c3", feature = "esp32s2", feature = "esp32s3")))]
+impl InteruptStatusRegisterAccess for DualCoreInteruptStatusRegisterAccess {
+    fn pro_cpu_interrupt_status_read() -> u32 {
+        unsafe { &*GPIO::PTR }.pcpu_int.read().bits()
+    }
+
+    fn pro_cpu_nmi_status_read() -> u32 {
+        unsafe { &*GPIO::PTR }.pcpu_nmi_int.read().bits()
+    }
+
+    fn app_cpu_interrupt_status_read() -> u32 {
+        unsafe { &*GPIO::PTR }.acpu_int.read().bits()
+    }
+
+    fn app_cpu_nmi_status_read() -> u32 {
+        unsafe { &*GPIO::PTR }.acpu_nmi_int.read().bits()
+    }
+}
+
+pub trait InterruptStatusRegisters<RegisterAccess>
+where
+    RegisterAccess: InteruptStatusRegisterAccess,
+{
+    fn pro_cpu_interrupt_status_read(&self) -> u32 {
+        RegisterAccess::pro_cpu_interrupt_status_read()
+    }
+
+    fn pro_cpu_nmi_status_read(&self) -> u32 {
+        RegisterAccess::pro_cpu_nmi_status_read()
+    }
+
+    fn app_cpu_interrupt_status_read(&self) -> u32 {
+        RegisterAccess::app_cpu_interrupt_status_read()
+    }
+
+    fn app_cpu_nmi_status_read(&self) -> u32 {
+        RegisterAccess::app_cpu_nmi_status_read()
+    }
+}
+
+pub struct Bank0GpioRegisterAccess {}
+pub struct Bank1GpioRegisterAccess {}
+
+pub trait BankGpioRegisterAccess {
+    fn write_out_en_clear(word: u32);
+
+    fn write_out_en_set(word: u32);
+
+    fn read_input() -> u32;
+
+    fn read_output() -> u32;
+
+    fn write_interrupt_status_clear(word: u32);
+
+    fn write_output_set(word: u32);
+
+    fn write_output_clear(word: u32);
+}
+
+impl BankGpioRegisterAccess for Bank0GpioRegisterAccess {
+    fn write_out_en_clear(word: u32) {
+        unsafe { &*GPIO::PTR }
+            .enable_w1tc
+            .write(|w| unsafe { w.bits(word) });
+    }
+
+    fn write_out_en_set(word: u32) {
+        unsafe { &*GPIO::PTR }
+            .enable_w1ts
+            .write(|w| unsafe { w.bits(word) });
+    }
+
+    fn read_input() -> u32 {
+        unsafe { &*GPIO::PTR }.in_.read().bits()
+    }
+
+    fn read_output() -> u32 {
+        unsafe { &*GPIO::PTR }.out.read().bits()
+    }
+
+    fn write_interrupt_status_clear(word: u32) {
+        unsafe { &*GPIO::PTR }
+            .status_w1tc
+            .write(|w| unsafe { w.bits(word) });
+    }
+
+    fn write_output_set(word: u32) {
+        unsafe { &*GPIO::PTR }
+            .out_w1ts
+            .write(|w| unsafe { w.bits(word) });
+    }
+
+    fn write_output_clear(word: u32) {
+        unsafe { &*GPIO::PTR }
+            .out_w1tc
+            .write(|w| unsafe { w.bits(word) });
+    }
+}
+
+#[cfg(not(feature = "esp32c3"))]
+impl BankGpioRegisterAccess for Bank1GpioRegisterAccess {
+    fn write_out_en_clear(word: u32) {
+        unsafe { &*GPIO::PTR }
+            .enable1_w1tc
+            .write(|w| unsafe { w.bits(word) });
+    }
+
+    fn write_out_en_set(word: u32) {
+        unsafe { &*GPIO::PTR }
+            .enable1_w1ts
+            .write(|w| unsafe { w.bits(word) });
+    }
+
+    fn read_input() -> u32 {
+        unsafe { &*GPIO::PTR }.in1.read().bits()
+    }
+
+    fn read_output() -> u32 {
+        unsafe { &*GPIO::PTR }.out1.read().bits()
+    }
+
+    fn write_interrupt_status_clear(word: u32) {
+        unsafe { &*GPIO::PTR }
+            .status1_w1tc
+            .write(|w| unsafe { w.bits(word) });
+    }
+
+    fn write_output_set(word: u32) {
+        unsafe { &*GPIO::PTR }
+            .out1_w1ts
+            .write(|w| unsafe { w.bits(word) });
+    }
+
+    fn write_output_clear(word: u32) {
+        unsafe { &*GPIO::PTR }
+            .out1_w1tc
+            .write(|w| unsafe { w.bits(word) });
+    }
+}
+
+pub trait GpioRegisters<RegisterAccess>
+where
+    RegisterAccess: BankGpioRegisterAccess,
+{
+    fn write_out_en_clear(&self, word: u32) {
+        RegisterAccess::write_out_en_clear(word);
+    }
+
+    fn write_out_en_set(&self, word: u32) {
+        RegisterAccess::write_out_en_set(word);
+    }
+
+    fn read_input(&self) -> u32 {
+        RegisterAccess::read_input()
+    }
+
+    fn read_output(&self) -> u32 {
+        RegisterAccess::read_output()
+    }
+
+    fn write_interrupt_status_clear(&self, word: u32) {
+        RegisterAccess::write_interrupt_status_clear(word);
+    }
+
+    fn write_output_clear(&self, word: u32) {
+        RegisterAccess::write_output_clear(word)
+    }
+
+    fn write_output_set(&self, word: u32) {
+        RegisterAccess::write_output_set(word)
+    }
+}
+
+pub fn connect_low_to_peripheral(signal: InputSignal) {
+    unsafe { &*GPIO::PTR }.func_in_sel_cfg[signal as usize].modify(|_, w| unsafe {
+        w.sel()
+            .set_bit()
+            .in_inv_sel()
+            .bit(false)
+            .in_sel()
+            .bits(0x1f)
+    });
+}
+
+pub fn connect_high_to_peripheral(signal: InputSignal) {
+    unsafe { &*GPIO::PTR }.func_in_sel_cfg[signal as usize].modify(|_, w| unsafe {
+        w.sel()
+            .set_bit()
+            .in_inv_sel()
+            .bit(false)
+            .in_sel()
+            .bits(0x1e)
+    });
+}
+
 // Only for ESP32 in order to workaround errata 3.6
 #[macro_export]
 macro_rules! impl_errata36 {
@@ -251,9 +483,8 @@ macro_rules! impl_input {
         $input_signal:ty,
         $pxi:ident:
         (
-            $pin_num:expr, $iomux_reg:expr, $bit:expr, $out_en_clear:ident,
-            $reg:ident, $reader:ident, $status_w1tc:ident, $pcpu_int:ident,
-            $pcpu_nmi:ident, $acpu_int:ident, $acpu_nmi:ident, $errata36:ident
+            $pin_num:expr, $iomux_reg:expr, $bit:expr,
+            $errata36:ident
         )
         $( ,( $( $af_signal:ident : $af:ident ),* ))?
     ) => {
@@ -261,7 +492,7 @@ macro_rules! impl_input {
             type Error = Infallible;
 
             fn is_high(&self) -> Result<bool, Self::Error> {
-                Ok(unsafe { &*GPIO::PTR }.$reg.read().$reader().bits() & (1 << $bit) != 0)
+                Ok(self.read_input() & (1 << $bit) != 0)
             }
 
             fn is_low(&self) -> Result<bool, Self::Error> {
@@ -274,8 +505,7 @@ macro_rules! impl_input {
                 let gpio = unsafe { &*GPIO::PTR };
                 let iomux = unsafe { &*IO_MUX::PTR };
 
-                gpio.$out_en_clear
-                    .write(|w| unsafe { w.bits(1 << $bit) });
+                self.write_out_en_clear(1 << $bit);
 
                 gpio.func_out_sel_cfg[$pin_num]
                     .modify(|_, w| unsafe { w.out_sel().bits(OutputSignal::GPIO as OutputSignalType) });
@@ -331,7 +561,7 @@ macro_rules! impl_input {
             }
 
             fn is_input_high(&self) -> bool {
-                unsafe { &*GPIO::PTR }.$reg.read().$reader().bits() & (1 << $bit) != 0
+                self.read_input() & (1 << $bit) != 0
             }
 
             fn connect_input_to_peripheral_with_options(
@@ -421,24 +651,23 @@ macro_rules! impl_input {
             }
 
             fn clear_interrupt(&mut self) {
-                unsafe {&*GPIO::PTR}.$status_w1tc.write(|w|
-                    unsafe {w.bits(1 << $bit)})
+                self.write_interrupt_status_clear(1 << $bit);
             }
 
             fn is_pcore_interrupt_set(&self) -> bool {
-                (unsafe {&*GPIO::PTR}.$pcpu_int.read().bits() & (1 << $bit)) !=0
+                (self.pro_cpu_interrupt_status_read() & (1 << $bit)) !=0
             }
 
             fn is_pcore_non_maskable_interrupt_set(&self) -> bool {
-                (unsafe {&*GPIO::PTR}.$pcpu_nmi.read().bits() & (1 << $bit)) !=0
+                (self.pro_cpu_nmi_status_read() & (1 << $bit)) !=0
             }
 
             fn is_acore_interrupt_set(&self) -> bool {
-                (unsafe {&*GPIO::PTR}.$acpu_int.read().bits() & (1 << $bit)) !=0
+                (self.app_cpu_interrupt_status_read() & (1 << $bit)) !=0
             }
 
             fn is_acore_non_maskable_interrupt_set(&self) -> bool {
-                (unsafe {&*GPIO::PTR}.$acpu_nmi.read().bits() & (1 << $bit)) !=0
+                (self.app_cpu_nmi_status_read() & (1 << $bit)) !=0
             }
 
             fn enable_hold(&mut self, _on: bool) {
@@ -449,85 +678,13 @@ macro_rules! impl_input {
 }
 
 #[macro_export]
-macro_rules! impl_input_wrap {
-    (
-        $gpio_function:ident,
-        $pxi:ident, $pin_num:expr, $iomux_reg:expr, $type:ident, Bank0, SingleCore, $errata36:ident
-        $( ,( $( $af_input_signal:ident : $af_input:ident ),* ) )?
-    ) => {
-        impl_input!(
-            $gpio_function,
-            InputSignal,
-            $pxi:
-            (
-                $pin_num, $iomux_reg, $pin_num % 32, enable_w1tc, in_, data_next,
-                status_w1tc, pcpu_int, pcpu_nmi_int, pcpu_int, pcpu_nmi_int, $errata36
-            )
-            $( ,( $( $af_input_signal: $af_input ),* ) )?
-        );
-    };
-
-    (
-        $gpio_function:ident,
-        $pxi:ident, $pin_num:expr, $iomux_reg:expr, $type:ident, Bank1, SingleCore, $errata36:ident
-        $( ,( $( $af_input_signal:ident : $af_input:ident ),* ) )?
-    ) => {
-        impl_input!(
-            $gpio_function,
-            InputSignal,
-            $pxi:
-            (
-                $pin_num, $iomux_reg, $pin_num % 32, enable1_w1tc, in1, data_next,
-                status1_w1tc, pcpu_int1, pcpu_nmi_int1, pcpu_int1, pcpu_nmi_int1, $errata36
-            )
-            $( ,( $( $af_input_signal: $af_input ),* ) )?
-        );
-    };
-
-    (
-        $gpio_function:ident,
-        $pxi:ident, $pin_num:expr, $iomux_reg:expr, $type:ident, Bank0, DualCore, $errata36:ident
-        $( ,( $( $af_input_signal:ident : $af_input:ident ),* ) )?
-    ) => {
-        impl_input!(
-            $gpio_function,
-            InputSignal,
-            $pxi:
-            (
-                $pin_num, $iomux_reg, $pin_num % 32, enable_w1tc, in_, data_next,
-                status_w1tc, pcpu_int, pcpu_nmi_int, acpu_int, acpu_nmi_int, $errata36
-            )
-            $( ,( $( $af_input_signal: $af_input ),* ) )?
-        );
-    };
-
-    (
-        $gpio_function:ident,
-        $pxi:ident, $pin_num:expr, $iomux_reg:expr, $type:ident, Bank1, DualCore, $errata36:ident
-        $( ,( $( $af_input_signal:ident : $af_input:ident ),* ) )?
-    ) => {
-        impl_input!(
-            $gpio_function,
-            InputSignal,
-            $pxi:
-            (
-                $pin_num, $iomux_reg, $pin_num % 32, enable1_w1tc, in1, data_next,
-                status1_w1tc, pcpu_int1, pcpu_nmi_int1, acpu_int1, acpu_nmi_int1, $errata36
-            )
-            $( ,( $( $af_input_signal: $af_input ),* ) )?
-        );
-    };
-}
-
-#[macro_export]
 macro_rules! impl_output {
     (
         $gpio_function:ident,
         $output_signal:ty,
         $pxi:ident:
         (
-            $pin_num:expr, $iomux_reg:expr, $bit:expr, $out_en_set:ident,
-            $out_en_clear:ident, $out_set:ident, $out_clear:ident, $out_reg:ident
+            $pin_num:expr, $iomux_reg:expr, $bit:expr
         )
         $( ,( $( $af_signal:ident: $af:ident ),* ))?
     ) => {
@@ -535,19 +692,19 @@ macro_rules! impl_output {
             type Error = Infallible;
 
             fn set_high(&mut self) -> Result<(), Self::Error> {
-                unsafe { (*GPIO::PTR).$out_set.write(|w| w.bits(1 << $bit)) };
+                self.write_output_set(1 << $bit);
                 Ok(())
             }
 
             fn set_low(&mut self) -> Result<(), Self::Error> {
-                unsafe { (*GPIO::PTR).$out_clear.write(|w| w.bits(1 << $bit)) };
+                self.write_output_clear(1 << $bit);
                 Ok(())
             }
         }
 
         impl<MODE> embedded_hal::digital::v2::StatefulOutputPin for $pxi<Output<MODE>> {
             fn is_set_high(&self) -> Result<bool, Self::Error> {
-                unsafe { Ok((*GPIO::PTR).$out_reg.read().bits() & (1 << $bit) != 0) }
+                Ok(self.read_output() & (1 << $bit) != 0)
             }
 
             fn is_set_low(&self) -> Result<bool, Self::Error> {
@@ -582,7 +739,7 @@ macro_rules! impl_output {
                 let gpio = unsafe { &*GPIO::PTR };
                 let iomux = unsafe { &*IO_MUX::PTR };
 
-                gpio.$out_en_set.write(|w| unsafe { w.bits(1 << $bit) });
+                self.write_out_en_set(1 << $bit);
                 gpio.pin[$pin_num].modify(|_, w| w.pin_pad_driver().bit(open_drain));
 
                 gpio.func_out_sel_cfg[$pin_num]
@@ -642,22 +799,18 @@ macro_rules! impl_output {
 
             fn enable_output(&mut self, on: bool) -> &mut Self {
                 if on {
-                    unsafe { &*GPIO::PTR }
-                        .$out_en_set
-                        .write(|w| unsafe { w.bits(1 << $bit) });
+                    self.write_out_en_set(1 << $bit);
                 } else {
-                    unsafe { &*GPIO::PTR }
-                        .$out_en_clear
-                        .write(|w| unsafe { w.bits(1 << $bit) });
+                    self.write_out_en_clear(1 << $bit);
                 }
                 self
             }
 
             fn set_output_high(&mut self, high: bool) -> &mut Self {
                 if high {
-                    unsafe { (*GPIO::PTR).$out_set.write(|w| w.bits(1 << $bit)) };
+                    self.write_output_set(1 << $bit);
                 } else {
-                    unsafe { (*GPIO::PTR).$out_clear.write(|w| w.bits(1 << $bit)) };
+                    self.write_output_clear(1 << $bit);
                 }
                 self
             }
@@ -762,7 +915,7 @@ macro_rules! impl_output {
 macro_rules! impl_output_wrap {
     (
         $gpio_function:ident,
-        $pxi:ident, $pin_num:expr, $iomux_reg:expr, IO, Bank0
+        $pxi:ident, $pin_num:expr, $iomux_reg:expr, IO,
         $( ,( $( $af_output_signal:ident : $af_output:ident ),* ))?
     ) => {
         impl_output!(
@@ -770,35 +923,44 @@ macro_rules! impl_output_wrap {
             OutputSignal,
             $pxi:
             (
-                $pin_num, $iomux_reg, $pin_num % 32, enable_w1ts, enable_w1tc,
-                out_w1ts, out_w1tc, out
+                $pin_num, $iomux_reg, $pin_num % 32
             )
             $( ,( $( $af_output_signal: $af_output ),* ) )?
         );
     };
 
+    // if it's not an output enabled pin just emit no code here
     (
         $gpio_function:ident,
-        $pxi:ident, $pin_num:expr, $iomux_reg:expr, IO, Bank1
-        $( ,( $( $af_output_signal:ident : $af_output:ident ),* ))?
-    ) => {
-        impl_output!(
-            $gpio_function,
-            OutputSignal,
-            $pxi:
-            (
-                $pin_num, $iomux_reg, $pin_num % 32, enable1_w1ts, enable1_w1tc,
-                out1_w1ts, out1_w1tc, out1
-            )
-            $( ,( $( $af_output_signal: $af_output ),* ) )?
-        );
-    };
-
-    (
-        $gpio_function:ident,
-        $pxi:ident, $pin_num:expr, $iomux_reg:expr, $type:ident, $bank:ident
+        $pxi:ident, $pin_num:expr, $iomux_reg:expr, $type:ident,
         $( ,( $( $af_output_signal:ident : $af_output:ident ),* ))?
     ) => {};
+}
+
+#[macro_export]
+macro_rules! impl_gpio_register_access {
+    (Bank0, $pxi:ident) => {
+        #[doc(hidden)]
+        impl<MODE> GpioRegisters<Bank0GpioRegisterAccess> for $pxi<MODE> {}
+    };
+
+    (Bank1, $pxi:ident) => {
+        #[doc(hidden)]
+        impl<MODE> GpioRegisters<Bank1GpioRegisterAccess> for $pxi<MODE> {}
+    };
+}
+
+#[macro_export]
+macro_rules! impl_interrupt_status_register_access {
+    (SingleCore, $pxi:ident) => {
+        #[doc(hidden)]
+        impl<MODE> InterruptStatusRegisters<SingleCoreInteruptStatusRegisterAccess> for $pxi<MODE> {}
+    };
+
+    (DualCore, $pxi:ident) => {
+        #[doc(hidden)]
+        impl<MODE> InterruptStatusRegisters<DualCoreInteruptStatusRegisterAccess> for $pxi<MODE> {}
+    };
 }
 
 #[macro_export]
@@ -854,28 +1016,6 @@ macro_rules! gpio {
             }
         }
 
-        pub fn connect_low_to_peripheral(signal: InputSignal) {
-            unsafe { &*GPIO::PTR }.func_in_sel_cfg[signal as usize].modify(|_, w| unsafe {
-                w.sel()
-                    .set_bit()
-                    .in_inv_sel()
-                    .bit(false)
-                    .in_sel()
-                    .bits(0x1f)
-            });
-        }
-
-        pub fn connect_high_to_peripheral(signal: InputSignal) {
-            unsafe { &*GPIO::PTR }.func_in_sel_cfg[signal as usize].modify(|_, w| unsafe {
-                w.sel()
-                    .set_bit()
-                    .in_inv_sel()
-                    .bit(false)
-                    .in_sel()
-                    .bits(0x1e)
-            });
-        }
-
         pub struct Pins {
             $(
                 pub $pname: $pxi<Unknown>,
@@ -887,13 +1027,23 @@ macro_rules! gpio {
                 _mode: PhantomData<MODE>,
             }
 
-            impl_input_wrap!(
-                $gpio_function, $pxi, $pin_num, $iomux_reg, $type, $bank, $cores, $errata36
+            impl_gpio_register_access!($bank, $pxi);
+
+            impl_interrupt_status_register_access!($cores, $pxi);
+
+            impl_input!(
+                $gpio_function,
+                InputSignal,
+                $pxi:
+                (
+                    $pin_num, $iomux_reg, $pin_num % 32,
+                    $errata36
+                )
                 $( ,( $( $af_input_signal: $af_input ),* ) )?
             );
 
             impl_output_wrap!(
-                $gpio_function, $pxi, $pin_num, $iomux_reg, $type, $bank
+                $gpio_function, $pxi, $pin_num, $iomux_reg, $type,
                 $($( ,( $( $af_output_signal: $af_output ),* ) )? )?
             );
         )+
@@ -902,7 +1052,10 @@ macro_rules! gpio {
 
 pub use gpio;
 pub use impl_errata36;
+pub use impl_gpio_register_access;
 pub use impl_input;
-pub use impl_input_wrap;
+pub use impl_interrupt_status_register_access;
 pub use impl_output;
 pub use impl_output_wrap;
+
+use self::types::InputSignal;
