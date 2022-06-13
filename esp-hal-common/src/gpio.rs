@@ -500,6 +500,18 @@ macro_rules! impl_input {
             }
         }
 
+        impl embedded_hal::digital::v2::InputPin for $pxi<Output<OpenDrain>> {
+            type Error = Infallible;
+
+            fn is_high(&self) -> Result<bool, Self::Error> {
+                Ok(self.read_input() & (1 << $bit) != 0)
+            }
+
+            fn is_low(&self) -> Result<bool, Self::Error> {
+                Ok(!self.is_high()?)
+            }
+        }
+
         impl<MODE> $pxi<MODE> {
             fn init_input(&self, pull_down: bool, pull_up: bool) {
                 let gpio = unsafe { &*GPIO::PTR };
@@ -750,7 +762,7 @@ macro_rules! impl_output {
                         w.mcu_sel()
                             .bits(alternate as u8)
                             .fun_ie()
-                            .clear_bit()
+                            .bit(open_drain)
                             .fun_wpd()
                             .clear_bit()
                             .fun_wpu()
