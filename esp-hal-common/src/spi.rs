@@ -16,14 +16,14 @@
 //!     miso,
 //!     cs,
 //!     100u32.kHz(),
-//!     embedded_hal::spi::MODE_0,
-//!     &mut peripherals.SYSTEM,
+//!     SpiMode::Mode0,
+//!     &mut peripheral_clock_control,
+//!     &mut clocks,
 //! );
 //! ```
 
 use core::convert::Infallible;
 
-use embedded_hal::spi::{FullDuplex, Mode};
 use fugit::HertzU32;
 
 use crate::{
@@ -34,6 +34,14 @@ use crate::{
     InputPin,
     OutputPin,
 };
+
+#[derive(Debug, Clone, Copy)]
+pub enum SpiMode {
+    Mode0,
+    Mode1,
+    Mode2,
+    Mode3,
+}
 
 pub struct Spi<T> {
     spi: T,
@@ -56,7 +64,7 @@ where
         mut miso: MISO,
         mut cs: CS,
         frequency: HertzU32,
-        mode: Mode,
+        mode: SpiMode,
         peripheral_clock_control: &mut PeripheralClockControl,
         clocks: &Clocks,
     ) -> Self {
@@ -88,18 +96,18 @@ where
     }
 }
 
-impl<T> FullDuplex<u8> for Spi<T>
+impl<T> embedded_hal::spi::FullDuplex<u8> for Spi<T>
 where
     T: Instance,
 {
     type Error = Infallible;
 
     fn read(&mut self) -> nb::Result<u8, Self::Error> {
-        self.spi.read()
+        self.spi.read_byte()
     }
 
     fn send(&mut self, word: u8) -> nb::Result<(), Self::Error> {
-        self.spi.send(word)
+        self.spi.write_byte(word)
     }
 }
 
@@ -121,10 +129,24 @@ where
     type Error = Infallible;
 
     fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-        let mut words_mut = [0u8; 256];
-        words_mut[0..words.len()].clone_from_slice(&words[0..words.len()]);
-        self.spi.transfer(&mut words_mut[0..words.len()])?;
-        Ok(())
+        self.spi.write_bytes(words)
+    }
+}
+
+impl<T> embedded_hal_1::spi::ErrorType for Spi<T> {
+    type Error = Infallible;
+}
+
+impl<T> embedded_hal_1::spi::nb::FullDuplex for Spi<T>
+where
+    T: Instance,
+{
+    fn read(&mut self) -> nb::Result<u8, Self::Error> {
+        self.spi.read_byte()
+    }
+
+    fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
+        self.spi.write_byte(word)
     }
 }
 
@@ -263,23 +285,23 @@ pub trait Instance {
     }
 
     #[cfg(not(feature = "esp32"))]
-    fn set_data_mode(&mut self, data_mode: embedded_hal::spi::Mode) -> &mut Self {
+    fn set_data_mode(&mut self, data_mode: SpiMode) -> &mut Self {
         let reg_block = self.register_block();
 
         match data_mode {
-            embedded_hal::spi::MODE_0 => {
+            SpiMode::Mode0 => {
                 reg_block.misc.modify(|_, w| w.ck_idle_edge().clear_bit());
                 reg_block.user.modify(|_, w| w.ck_out_edge().clear_bit());
             }
-            embedded_hal::spi::MODE_1 => {
+            SpiMode::Mode1 => {
                 reg_block.misc.modify(|_, w| w.ck_idle_edge().clear_bit());
                 reg_block.user.modify(|_, w| w.ck_out_edge().set_bit());
             }
-            embedded_hal::spi::MODE_2 => {
+            SpiMode::Mode2 => {
                 reg_block.misc.modify(|_, w| w.ck_idle_edge().set_bit());
                 reg_block.user.modify(|_, w| w.ck_out_edge().set_bit());
             }
-            embedded_hal::spi::MODE_3 => {
+            SpiMode::Mode3 => {
                 reg_block.misc.modify(|_, w| w.ck_idle_edge().set_bit());
                 reg_block.user.modify(|_, w| w.ck_out_edge().clear_bit());
             }
@@ -288,23 +310,23 @@ pub trait Instance {
     }
 
     #[cfg(feature = "esp32")]
-    fn set_data_mode(&mut self, data_mode: embedded_hal::spi::Mode) -> &mut Self {
+    fn set_data_mode(&mut self, data_mode: SpiMode) -> &mut Self {
         let reg_block = self.register_block();
 
         match data_mode {
-            embedded_hal::spi::MODE_0 => {
+            SpiMode::Mode0 => {
                 reg_block.pin.modify(|_, w| w.ck_idle_edge().clear_bit());
                 reg_block.user.modify(|_, w| w.ck_out_edge().clear_bit());
             }
-            embedded_hal::spi::MODE_1 => {
+            SpiMode::Mode1 => {
                 reg_block.pin.modify(|_, w| w.ck_idle_edge().clear_bit());
                 reg_block.user.modify(|_, w| w.ck_out_edge().set_bit());
             }
-            embedded_hal::spi::MODE_2 => {
+            SpiMode::Mode2 => {
                 reg_block.pin.modify(|_, w| w.ck_idle_edge().set_bit());
                 reg_block.user.modify(|_, w| w.ck_out_edge().set_bit());
             }
-            embedded_hal::spi::MODE_3 => {
+            SpiMode::Mode3 => {
                 reg_block.pin.modify(|_, w| w.ck_idle_edge().set_bit());
                 reg_block.user.modify(|_, w| w.ck_out_edge().clear_bit());
             }
@@ -312,7 +334,7 @@ pub trait Instance {
         self
     }
 
-    fn read(&mut self) -> nb::Result<u8, Infallible> {
+    fn read_byte(&mut self) -> nb::Result<u8, Infallible> {
         let reg_block = self.register_block();
 
         if reg_block.cmd.read().usr().bit_is_set() {
@@ -322,7 +344,7 @@ pub trait Instance {
         Ok(u32::try_into(reg_block.w0.read().bits()).unwrap_or_default())
     }
 
-    fn send(&mut self, word: u8) -> nb::Result<(), Infallible> {
+    fn write_byte(&mut self, word: u8) -> nb::Result<(), Infallible> {
         let reg_block = self.register_block();
 
         if reg_block.cmd.read().usr().bit_is_set() {
@@ -336,6 +358,15 @@ pub trait Instance {
         self.update();
 
         reg_block.cmd.modify(|_, w| w.usr().set_bit());
+
+        Ok(())
+    }
+
+    fn write_bytes(&mut self, words: &[u8]) -> Result<(), Infallible> {
+        let mut words_mut = [0u8; 256];
+        words_mut[0..words.len()].clone_from_slice(&words[0..words.len()]);
+
+        self.transfer(&mut words_mut[0..words.len()])?;
 
         Ok(())
     }
