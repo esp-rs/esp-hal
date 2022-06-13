@@ -6,19 +6,15 @@ use core::{cell::RefCell, fmt::Write};
 use esp32_hal::{
     clock::ClockControl,
     gpio::{Gpio0, IO},
+    gpio_types::{Event, Input, Pin, PullDown},
+    interrupt,
     pac::{self, Peripherals, UART0},
     prelude::*,
+    Cpu,
     Delay,
     RtcCntl,
     Serial,
     Timer,
-};
-use esp_hal_common::{
-    gpio::{Event, Pin},
-    interrupt,
-    Cpu,
-    Input,
-    PullDown,
 };
 use panic_halt as _;
 use xtensa_lx::mutex::{Mutex, SpinLockMutex};

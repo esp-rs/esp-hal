@@ -7,20 +7,15 @@ use bare_metal::Mutex;
 use esp32c3_hal::{
     clock::ClockControl,
     gpio::{Gpio9, IO},
+    gpio_types::{Event, Input, Pin, PullDown},
+    interrupt,
     pac::{self, Peripherals, UART0},
     prelude::*,
+    Cpu,
     Delay,
     RtcCntl,
     Serial,
     Timer,
-};
-use esp_hal_common::{
-    interrupt::{self},
-    Cpu,
-    Event,
-    Input,
-    Pin,
-    PullDown,
 };
 use panic_halt as _;
 use riscv_rt::entry;
