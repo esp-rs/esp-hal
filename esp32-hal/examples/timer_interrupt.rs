@@ -4,13 +4,14 @@
 use core::{cell::RefCell, fmt::Write};
 
 use esp32_hal::{
+    interrupt,
     pac::{self, Peripherals, TIMG0, TIMG1, UART0},
     prelude::*,
+    Cpu,
     RtcCntl,
     Serial,
     Timer,
 };
-use esp_hal_common::{interrupt, Cpu};
 use panic_halt as _;
 use xtensa_lx::mutex::{Mutex, SpinLockMutex};
 use xtensa_lx_rt::entry;

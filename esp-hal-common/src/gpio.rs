@@ -1,17 +1,15 @@
-//! GPIO driver
+//! GPIO Types
 //!
-//! Defines a series of macros which allow for the definition of each chip's
-//! GPIO pins in a generic manner. Implements the various traits defined by
-//! [embedded-hal].
-//!
-//! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
+//! Various traits and enums to work with GPIO
 
 use core::marker::PhantomData;
 
+#[doc(hidden)]
 pub use paste::paste;
 
 use crate::pac::GPIO;
 
+#[doc(hidden)]
 #[cfg_attr(feature = "esp32", path = "gpio/esp32.rs")]
 #[cfg_attr(feature = "esp32c3", path = "gpio/esp32c3.rs")]
 #[cfg_attr(feature = "esp32s2", path = "gpio/esp32s2.rs")]
@@ -182,9 +180,12 @@ pub trait OutputPin: Pin {
     fn internal_pull_down(&mut self, on: bool) -> &mut Self;
 }
 
+#[doc(hidden)]
 pub struct SingleCoreInteruptStatusRegisterAccess {}
+#[doc(hidden)]
 pub struct DualCoreInteruptStatusRegisterAccess {}
 
+#[doc(hidden)]
 pub trait InteruptStatusRegisterAccess {
     fn pro_cpu_interrupt_status_read() -> u32;
 
@@ -236,6 +237,7 @@ impl InteruptStatusRegisterAccess for DualCoreInteruptStatusRegisterAccess {
     }
 }
 
+#[doc(hidden)]
 pub trait InterruptStatusRegisters<RegisterAccess>
 where
     RegisterAccess: InteruptStatusRegisterAccess,
@@ -257,9 +259,12 @@ where
     }
 }
 
+#[doc(hidden)]
 pub struct Bank0GpioRegisterAccess {}
+#[doc(hidden)]
 pub struct Bank1GpioRegisterAccess {}
 
+#[doc(hidden)]
 pub trait BankGpioRegisterAccess {
     fn write_out_en_clear(word: u32);
 
@@ -316,6 +321,7 @@ impl BankGpioRegisterAccess for Bank0GpioRegisterAccess {
     }
 }
 
+#[doc(hidden)]
 #[cfg(not(feature = "esp32c3"))]
 impl BankGpioRegisterAccess for Bank1GpioRegisterAccess {
     fn write_out_en_clear(word: u32) {
@@ -357,6 +363,7 @@ impl BankGpioRegisterAccess for Bank1GpioRegisterAccess {
     }
 }
 
+#[doc(hidden)]
 pub trait GpioRegisters<RegisterAccess>
 where
     RegisterAccess: BankGpioRegisterAccess,
@@ -390,6 +397,7 @@ where
     }
 }
 
+#[doc(hidden)]
 pub fn connect_low_to_peripheral(signal: InputSignal) {
     unsafe { &*GPIO::PTR }.func_in_sel_cfg[signal as usize].modify(|_, w| unsafe {
         w.sel()
@@ -401,6 +409,7 @@ pub fn connect_low_to_peripheral(signal: InputSignal) {
     });
 }
 
+#[doc(hidden)]
 pub fn connect_high_to_peripheral(signal: InputSignal) {
     unsafe { &*GPIO::PTR }.func_in_sel_cfg[signal as usize].modify(|_, w| unsafe {
         w.sel()
@@ -413,6 +422,7 @@ pub fn connect_high_to_peripheral(signal: InputSignal) {
 }
 
 // Only for ESP32 in order to workaround errata 3.6
+#[doc(hidden)]
 #[macro_export]
 macro_rules! impl_errata36 {
     (None, $pull_down:expr, $pull_up:expr) => {
@@ -476,6 +486,7 @@ macro_rules! impl_errata36 {
     };
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! impl_input {
     (
@@ -689,6 +700,7 @@ macro_rules! impl_input {
     };
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! impl_output {
     (
@@ -923,6 +935,7 @@ macro_rules! impl_output {
     };
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! impl_output_wrap {
     (
@@ -949,6 +962,7 @@ macro_rules! impl_output_wrap {
     ) => {};
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! impl_gpio_register_access {
     (Bank0, $pxi:ident) => {
@@ -962,6 +976,7 @@ macro_rules! impl_gpio_register_access {
     };
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! impl_interrupt_status_register_access {
     (SingleCore, $pxi:ident) => {
@@ -975,6 +990,7 @@ macro_rules! impl_interrupt_status_register_access {
     };
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! gpio {
     (

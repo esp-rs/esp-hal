@@ -1,3 +1,12 @@
+//! General Purpose I/Os
+//!
+//! To get access to the pins, you first need to convert them into a HAL
+//! designed struct from the pac struct `GPIO` and `IO_MUX` using `IO::new`.
+//!
+//! ```no_run
+//! let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+//! let mut led = io.pins.gpio5.into_push_pull_output();
+//! ```
 use esp_hal_common::gpio::{types::*, *};
 
 gpio! {

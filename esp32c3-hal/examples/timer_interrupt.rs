@@ -5,15 +5,13 @@ use core::{cell::RefCell, fmt::Write};
 
 use bare_metal::Mutex;
 use esp32c3_hal::{
+    interrupt,
     pac::{self, Peripherals, TIMG0, TIMG1, UART0},
     prelude::*,
+    Cpu,
     RtcCntl,
     Serial,
     Timer,
-};
-use esp_hal_common::{
-    interrupt::{self},
-    Cpu,
 };
 use panic_halt as _;
 use riscv_rt::entry;

@@ -5,20 +5,18 @@ use core::{cell::RefCell, fmt::Write};
 
 use esp32s2_hal::{
     clock::ClockControl,
+    interrupt,
     pac::{self, Peripherals, UART0},
     prelude::*,
+    systimer::{Alarm, SystemTimer, Target},
+    Cpu,
     Delay,
     RtcCntl,
     Serial,
     Timer,
 };
-use esp_hal_common::{
-    interrupt,
-    Cpu,
-    systimer::{SystemTimer, Alarm, Target}
-};
 use panic_halt as _;
-use xtensa_lx::mutex::{Mutex, CriticalSectionMutex};
+use xtensa_lx::mutex::{CriticalSectionMutex, Mutex};
 use xtensa_lx_rt::entry;
 
 static mut SERIAL: CriticalSectionMutex<RefCell<Option<Serial<UART0>>>> =
@@ -92,7 +90,7 @@ fn main() -> ! {
     let mut delay = Delay::new(&clocks);
 
     unsafe {
-        xtensa_lx::interrupt::enable_mask(1 << 19 | 1 << 0 | 1 << 23 );
+        xtensa_lx::interrupt::enable_mask(1 << 19 | 1 << 0 | 1 << 23);
     }
 
     loop {
@@ -115,7 +113,7 @@ pub fn level1_interrupt() {
         interrupt::CpuInterrupt::Interrupt0LevelPriority1,
     );
 
-    unsafe { 
+    unsafe {
         (&ALARM0).lock(|data| {
             let mut alarm = data.borrow_mut();
             let alarm = alarm.as_mut().unwrap();
@@ -139,7 +137,7 @@ pub fn level2_interrupt() {
         interrupt::CpuInterrupt::Interrupt19LevelPriority2,
     );
 
-    unsafe { 
+    unsafe {
         (&ALARM1).lock(|data| {
             let mut alarm = data.borrow_mut();
             let alarm = alarm.as_mut().unwrap();
@@ -163,7 +161,7 @@ pub fn level3_interrupt() {
         interrupt::CpuInterrupt::Interrupt23LevelPriority3,
     );
 
-    unsafe { 
+    unsafe {
         (&ALARM2).lock(|data| {
             let mut alarm = data.borrow_mut();
             let alarm = alarm.as_mut().unwrap();
