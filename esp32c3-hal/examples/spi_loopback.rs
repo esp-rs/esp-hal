@@ -23,6 +23,7 @@ use esp32c3_hal::{
     gpio::IO,
     pac::Peripherals,
     prelude::*,
+    spi::{Spi, SpiMode},
     Delay,
     RtcCntl,
     Serial,
@@ -55,14 +56,14 @@ fn main() -> ! {
     let mosi = io.pins.gpio7;
     let cs = io.pins.gpio10;
 
-    let mut spi = esp32c3_hal::spi::Spi::new(
+    let mut spi = Spi::new(
         peripherals.SPI2,
         sclk,
         mosi,
         miso,
         cs,
         100u32.kHz(),
-        embedded_hal::spi::MODE_0,
+        SpiMode::Mode0,
         &mut system.peripheral_clock_control,
         &clocks,
     );
