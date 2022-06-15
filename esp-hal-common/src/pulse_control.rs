@@ -81,6 +81,7 @@
 use core::slice::Iter;
 
 use fugit::NanosDurationU32;
+pub use paste::paste;
 
 use crate::{
     gpio::{types::OutputSignal, OutputPin},
@@ -601,36 +602,42 @@ macro_rules! output_channel {
                 // Depending on the variant, other registers have to be used here
                 cfg_if::cfg_if! {
                     if #[cfg(feature = "esp32")] {
-                        unsafe { &*RMT::PTR }.int_clr.write(|w| unsafe {
+                        unsafe { &*RMT::PTR }.int_clr.write(|w| {
                             // The ESP32 variant does not have the loop functionality
-                            w.ch_tx_end_int_clr::<$num>()
-                                .set_bit()
-                                .ch_err_int_clr::<$num>()
-                                .set_bit()
-                                .ch_tx_thr_event_int_clr::<$num>()
-                                .set_bit()
+                            paste!(
+                                w.[<ch $num _tx_end_int_clr>]()
+                                    .set_bit()
+                                    .[<ch $num _err_int_clr>]()
+                                    .set_bit()
+                                    .[<ch $num _tx_thr_event_int_clr>]()
+                                    .set_bit()
+                            )
                         });
                     } else if #[cfg(feature = "esp32s2")] {
-                        unsafe { &*RMT::PTR }.int_clr.write(|w| unsafe {
-                            w.ch_tx_end_int_clr::<$num>()
-                                .set_bit()
-                                .ch_tx_loop_int_clr::<$num>()
-                                .set_bit()
-                                .ch_err_int_clr::<$num>()
-                                .set_bit()
-                                .ch_tx_thr_event_int_clr::<$num>()
-                                .set_bit()
+                        unsafe { &*RMT::PTR }.int_clr.write(|w| {
+                            paste!(
+                                w.[<ch $num _tx_end_int_clr>]()
+                                    .set_bit()
+                                    .[<ch $num _tx_loop_int_clr>]()
+                                    .set_bit()
+                                    .[<ch $num _err_int_clr>]()
+                                    .set_bit()
+                                    .[<ch $num _tx_thr_event_int_clr>]()
+                                    .set_bit()
+                            )
                         });
                     } else {
-                        unsafe { &*RMT::PTR }.int_clr.write(|w| unsafe {
-                            w.ch_tx_end_int_clr::<$num>()
-                                .set_bit()
-                                .ch_tx_loop_int_clr::<$num>()
-                                .set_bit()
-                                .ch_tx_err_int_clr::<$num>()
-                                .set_bit()
-                                .ch_tx_thr_event_int_clr::<$num>()
-                                .set_bit()
+                        unsafe { &*RMT::PTR }.int_clr.write(|w| {
+                            paste!(
+                                w.[<ch $num _tx_end_int_clr>]()
+                                    .set_bit()
+                                    .[<ch $num _tx_loop_int_clr>]()
+                                    .set_bit()
+                                    .[<ch $num _tx_err_int_clr>]()
+                                    .set_bit()
+                                    .[<ch $num _tx_thr_event_int_clr>]()
+                                    .set_bit()
+                            )
                         });
                     }
                 }
@@ -679,8 +686,8 @@ macro_rules! output_channel {
                                 self.write_sequence(&mut sequence_iter, CHANNEL_RAM_SIZE / 2);
 
                                 // Clear the threshold interrupt (write-through)
-                                unsafe { &*RMT::PTR }.int_clr.write(|w| unsafe {
-                                    w.ch_tx_thr_event_int_clr::<$num>().set_bit()
+                                unsafe { &*RMT::PTR }.int_clr.write(|w| {
+                                    paste!(w.[<ch $num _tx_thr_event_int_clr>]().set_bit())
                                 });
                         }
                             // Neither completed nor error -> continue busy waiting
