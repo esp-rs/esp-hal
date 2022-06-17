@@ -28,6 +28,13 @@ pub use esp32s2_pac as pac;
 pub use esp32s3_pac as pac;
 
 pub mod delay;
+
+#[cfg_attr(feature = "esp32", path = "efuse/esp32.rs")]
+#[cfg_attr(feature = "esp32c3", path = "efuse/esp32c3.rs")]
+#[cfg_attr(feature = "esp32s2", path = "efuse/esp32s2.rs")]
+#[cfg_attr(feature = "esp32s3", path = "efuse/esp32s3.rs")]
+pub mod efuse;
+
 pub mod gpio;
 pub mod i2c;
 #[cfg_attr(feature = "risc_v", path = "interrupt/riscv.rs")]
