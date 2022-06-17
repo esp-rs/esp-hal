@@ -3,6 +3,7 @@
 pub use embedded_hal as ehal;
 pub use esp_hal_common::{
     clock,
+    efuse,
     gpio as gpio_types,
     i2c,
     interrupt,

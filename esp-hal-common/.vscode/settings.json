@@ -1,6 +1,6 @@
 {
     "rust-analyzer.cargo.features": [
-        "esp32c3"
+        "esp32"
     ],
     "rust-analyzer.cargo.allFeatures": false,
     "editor.formatOnSave": true,
@@ -10,12 +10,12 @@
         "cargo",
         "check",
         "--features",
-        "esp32c3",
+        "esp32",
         "--message-format=json",
         "-Z",
         "build-std=core",
         "--target",
-        "riscv32imac-unknown-none-elf",
+        "xtensa-esp32-none-elf",
         "--examples",
         "--lib",
     ],
