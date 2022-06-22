@@ -31,7 +31,7 @@ fugit          = "0.3"
 nb             = "1.0"
 void           = { version = "1.0",  default-features = false }
 xtensa-lx      = { version = "0.7",  features = ["esp32s3"] }
-xtensa-lx-rt   = { version = "0.11", features = ["esp32s3"], optional = true }
+xtensa-lx-rt   = { version = "0.12", features = ["esp32s3"], optional = true }
 
 [dependencies.esp-hal-common]
 path     = "../esp-hal-common"
