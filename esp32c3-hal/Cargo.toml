@@ -44,5 +44,6 @@ smart-leds        = "0.3"
 [features]
 default     = ["rt"]
 direct-boot = []
+eh1         = ["esp-hal-common/eh1"]
 rt          = ["riscv-rt"]
 ufmt        = ["esp-hal-common/ufmt"]

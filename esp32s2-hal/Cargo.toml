@@ -42,5 +42,6 @@ smart-leds        = "0.3"
 
 [features]
 default = ["rt"]
+eh1     = ["esp-hal-common/eh1"]
 rt      = ["xtensa-lx-rt/esp32s2"]
 ufmt    = ["esp-hal-common/ufmt"]
