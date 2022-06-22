@@ -55,7 +55,7 @@ pub mod utils;
 pub use delay::Delay;
 pub use gpio::*;
 pub use interrupt::*;
-pub use procmacros::ram;
+pub use procmacros as macros;
 pub use pulse_control::PulseControl;
 pub use rng::Rng;
 #[cfg(not(feature = "esp32c3"))]
@@ -86,4 +86,14 @@ pub enum Cpu {
     ProCpu = 0,
     /// The second core
     AppCpu,
+}
+
+pub fn get_core() -> Cpu {
+    #[cfg(target_arch = "xtensa")]
+    match ((xtensa_lx::get_processor_id() >> 13) & 1) != 0 {
+        false => Cpu::ProCpu,
+        true => Cpu::AppCpu,
+    }
+    #[cfg(target_arch = "riscv")] // TODO get hart_id
+    Cpu::ProCpu
 }

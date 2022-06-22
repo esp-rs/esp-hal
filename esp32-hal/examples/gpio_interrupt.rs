@@ -43,6 +43,9 @@ fn main() -> ! {
     let serial0 = Serial::new(peripherals.UART0);
     let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
 
+    writeln!(serial0, "Hello world!").ok();
+    esp_println::println!("Hello esp_println!");
+
     // Disable MWDT and RWDT (Watchdog) flash boot protection
     wdt.disable();
     rtc_cntl.set_wdt_global_enable(false);
@@ -80,22 +83,15 @@ fn main() -> ! {
     }
 }
 
-#[no_mangle]
-pub fn level1_interrupt() {
+#[interrupt]
+fn GPIO() {
     unsafe {
         (&SERIAL).lock(|data| {
             let mut serial = data.borrow_mut();
             let serial = serial.as_mut().unwrap();
             writeln!(serial, "Interrupt").ok();
         });
-    }
 
-    interrupt::clear(
-        Cpu::ProCpu,
-        interrupt::CpuInterrupt::Interrupt1LevelPriority1,
-    );
-
-    unsafe {
         (&BUTTON).lock(|data| {
             let mut button = data.borrow_mut();
             let button = button.as_mut().unwrap();
