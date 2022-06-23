@@ -1,4 +1,4 @@
-use xtensa_lx::interrupt::InterruptNumber;
+use xtensa_lx::interrupt::{self, InterruptNumber};
 use xtensa_lx_rt::exception::Context;
 
 use crate::{
@@ -172,6 +172,70 @@ unsafe fn core1_interrupt_peripheral() -> *const crate::pac::interrupt_core1::Re
 mod vectored {
     use super::*;
 
+    // TODO use CpuInterrupt::LevelX.mask() // TODO make it const
+    const CPU_INTERRUPT_LEVELS: [u32; 8] = [
+        0b_0000_0000_0000_0000_0000_0000_0000_0000, // Dummy level 0
+        0b_0000_0000_0000_0110_0011_0111_1111_1111, // Level_1
+        0b_0000_0000_0011_1000_0000_0000_0000_0000, // Level 2
+        0b_0010_1000_1100_0000_1000_1000_0000_0000, // Level 3
+        0b_0101_0011_0000_0000_0000_0000_0000_0000, // Level 4
+        0b_1000_0100_0000_0001_0000_0000_0000_0000, // Level 5
+        0b_0000_0000_0000_0000_0000_0000_0000_0000, // Level 6
+        0b_0000_0000_0000_0000_0100_0000_0000_0000, // Level 7
+    ];
+    const CPU_INTERRUPT_INTERNAL: u32 = 0b_0010_0000_0000_0001_1000_1000_1100_0000;
+    const CPU_INTERRUPT_EDGE: u32 = 0b_0111_0000_0100_0000_0000_1100_1000_0000;
+
+    fn cpu_interrupt_nr_to_handler(_number: u32) -> Option<unsafe extern "C" fn()> {
+        // TODO this needs be in a xtensa_lx with a default impl! Like arm
+        // extern "C" {
+        //     fn Timer0();
+        //     fn Timer1();
+        //     fn Timer2();
+
+        //     fn Profiling();
+
+        //     fn SoftwareLevel1();
+        //     fn SoftwareLevel3();
+
+        //     fn NMI();
+        // }
+
+        // match number {
+        //     6 => Timer0,
+        //     7 => SoftwareLevel1,
+        //     11 => Profiling,
+        //     14 => NMI,
+        //     15 => Timer1,
+        //     16 => Timer2,
+        //     29 => SoftwareLevel3,
+        //     _ => return None;
+        // }
+
+        unsafe extern "C" fn nop() {}
+
+        Some(nop)
+    }
+
+    // TODO this will be chip specific - this only handles esp32
+    const INTERRUPT_EDGE: u128 =
+    0b_0000_0000_0000_0000_0000_0000_0000_0000__0000_0000_0000_0000_0000_0000_0000_0011_1111_1100_0000_0000_0000_0000_0000_0000__0000_0000_0000_0000_0000_0000_0000_0000;
+    // TODO this will be chip specific - this only handles esp32
+    // fn interrupt_is_edge(interrupt: Interrupt) -> bool {
+    //     use pac::Interrupt::*;
+    //     [
+    //         TG0_T0_EDGE,
+    //         TG0_T1_EDGE,
+    //         TG0_WDT_EDGE,
+    //         TG0_LACT_EDGE,
+    //         TG1_T0_EDGE,
+    //         TG1_T1_EDGE,
+    //         TG1_WDT_EDGE,
+    //         TG1_LACT_EDGE,
+    //     ]
+    //     .contains(&interrupt)
+    // }
+
     #[no_mangle]
     #[link_section = ".rwtext"]
     unsafe fn __level_1_interrupt(level: u32, _save_frame: &mut Context) {
@@ -218,31 +282,58 @@ mod vectored {
     // static mut INTERRUPT_LEVELS: [u128; 8] = [0u128; 8];
 
     unsafe fn handle_interrupts(level: u32) {
-        // TODO check if its a CPU interrupt
-        // TODO check if its an edge interrupt
-        // CPU & EDGE interrupts were declared inside the pac on the old esp32
-        // crates, but I think we should define them with extern "C"
-        // inside this crate, e.g
-        //
-        // extern "C" {
-        //     fn Timer0();
-        // }
+        let cpu_interrupt_mask =
+            interrupt::get() & interrupt::get_mask() & CPU_INTERRUPT_LEVELS[level as usize];
 
-        // finally check periperal sources and fire of handlers from pac
-        let interrupt_mask = get_status(crate::get_core()); //  & INTERRUPT_LEVELS[level as usize] // TODO priority
-        let interrupt_nr = interrupt_mask.trailing_zeros();
+        if cpu_interrupt_mask & CPU_INTERRUPT_INTERNAL != 0 {
+            let cpu_interrupt_mask = cpu_interrupt_mask & CPU_INTERRUPT_INTERNAL;
+            let cpu_interrupt_nr = cpu_interrupt_mask.trailing_zeros();
 
-        // Interrupt::try_from can fail if interrupt already de-asserted:
-        // silently ignore
-        if let Ok(interrupt) = pac::Interrupt::try_from(interrupt_nr as u16) {
-            handle_interrupt(level, interrupt);
+            if (cpu_interrupt_mask & CPU_INTERRUPT_EDGE) != 0 {
+                interrupt::clear(1 << cpu_interrupt_nr);
+            }
+            if let Some(handler) = cpu_interrupt_nr_to_handler(cpu_interrupt_nr) {
+                handler();
+            }
+        } else {
+            if (cpu_interrupt_mask & CPU_INTERRUPT_EDGE) != 0 {
+                let cpu_interrupt_mask = cpu_interrupt_mask & CPU_INTERRUPT_EDGE;
+                let cpu_interrupt_nr = cpu_interrupt_mask.trailing_zeros();
+                interrupt::clear(1 << cpu_interrupt_nr);
+
+                // for edge interrupts cannot rely on the interrupt status
+                // register, therefore call all registered
+                // handlers for current level
+                // let mut interrupt_mask = INTERRUPT_LEVELS[level as usize] & INTERRUPT_EDGE;
+                // // TODO priority
+                let mut interrupt_mask = INTERRUPT_EDGE;
+                loop {
+                    let interrupt_nr = interrupt_mask.trailing_zeros();
+                    if let Ok(interrupt) = pac::Interrupt::try_from(interrupt_nr as u16) {
+                        handle_interrupt(level, interrupt)
+                    } else {
+                        break;
+                    }
+                    interrupt_mask &= !(1u128 << interrupt_nr);
+                }
+            } else {
+                // finally check periperal sources and fire of handlers from pac
+                // peripheral mapped interrupts are cleared by the peripheral
+                let interrupt_mask = get_status(crate::get_core()); //  & INTERRUPT_LEVELS[level as usize] // TODO priority
+                let interrupt_nr = interrupt_mask.trailing_zeros();
+
+                // Interrupt::try_from can fail if interrupt already de-asserted:
+                // silently ignore
+                if let Ok(interrupt) = pac::Interrupt::try_from(interrupt_nr as u16) {
+                    handle_interrupt(level, interrupt);
+                }
+            }
         }
-        // peripheral mapped interrupts are cleared by the peripheral
     }
 
     unsafe fn handle_interrupt(level: u32, interrupt: Interrupt) {
         extern "C" {
-            // defined in xtensa_lx_rt
+            // defined in each hal
             fn DefaultHandler(level: u32, interrupt: Interrupt);
         }
 
