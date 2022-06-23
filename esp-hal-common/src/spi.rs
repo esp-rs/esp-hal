@@ -13,8 +13,8 @@
 //!     peripherals.SPI2,
 //!     sclk,
 //!     mosi,
-//!     miso,
-//!     cs,
+//!     Some(miso),
+//!     Some(cs),
 //!     100u32.kHz(),
 //!     SpiMode::Mode0,
 //!     &mut peripheral_clock_control,
@@ -61,8 +61,8 @@ where
         spi: T,
         mut sck: SCK,
         mut mosi: MOSI,
-        mut miso: MISO,
-        mut cs: CS,
+        miso: Option<MISO>,
+        cs: Option<CS>,
         frequency: HertzU32,
         mode: SpiMode,
         peripheral_clock_control: &mut PeripheralClockControl,
@@ -74,11 +74,15 @@ where
         mosi.set_to_push_pull_output()
             .connect_peripheral_to_output(spi.mosi_signal());
 
-        miso.set_to_input()
-            .connect_input_to_peripheral(spi.miso_signal());
+        if let Some(mut miso) = miso {
+            miso.set_to_input()
+                .connect_input_to_peripheral(spi.miso_signal());
+        }
 
-        cs.set_to_push_pull_output()
-            .connect_peripheral_to_output(spi.cs_signal());
+        if let Some(mut cs) = cs {
+            cs.set_to_push_pull_output()
+                .connect_peripheral_to_output(spi.cs_signal());
+        }
 
         spi.enable_peripheral(peripheral_clock_control);
 
