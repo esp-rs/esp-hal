@@ -6,27 +6,26 @@
 #![no_std]
 #![no_main]
 
-use core::{cell::RefCell, fmt::Write};
+use core::cell::RefCell;
 
 use esp32_hal::{
     clock::ClockControl,
     gpio::{Gpio0, IO},
     gpio_types::{Event, Input, Pin, PullDown},
     interrupt,
-    pac::{self, Peripherals, UART0},
+    pac::{self, Peripherals},
     prelude::*,
     timer::TimerGroup,
     Cpu,
     Delay,
     RtcCntl,
     Serial,
+    Timer,
 };
 use panic_halt as _;
 use xtensa_lx::mutex::{Mutex, SpinLockMutex};
 use xtensa_lx_rt::entry;
 
-static mut SERIAL: SpinLockMutex<RefCell<Option<Serial<UART0>>>> =
-    SpinLockMutex::new(RefCell::new(None));
 static mut BUTTON: SpinLockMutex<RefCell<Option<Gpio0<Input<PullDown>>>>> =
     SpinLockMutex::new(RefCell::new(None));
 
@@ -43,7 +42,6 @@ fn main() -> ! {
     let serial0 = Serial::new(peripherals.UART0);
     let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
 
-    writeln!(serial0, "Hello world!").ok();
     esp_println::println!("Hello esp_println!");
 
     // Disable MWDT and RWDT (Watchdog) flash boot protection
@@ -57,15 +55,10 @@ fn main() -> ! {
     button.listen(Event::FallingEdge);
 
     unsafe {
-        (&SERIAL).lock(|data| (*data).replace(Some(serial0)));
         (&BUTTON).lock(|data| (*data).replace(Some(button)));
     }
 
-    interrupt::enable(
-        Cpu::ProCpu,
-        pac::Interrupt::GPIO,
-        interrupt::CpuInterrupt::Interrupt1LevelPriority1,
-    );
+    interrupt::vectored::enable_with_priority(Cpu::ProCpu, pac::Interrupt::GPIO, interrupt::vectored::Priority::Priority3).unwrap();
 
     led.set_high().unwrap();
 
@@ -78,6 +71,7 @@ fn main() -> ! {
     }
 
     loop {
+        esp_println::println!("Interrupt - INTLEVEL: {}", xtensa_lx::interrupt::get_level());
         led.toggle().unwrap();
         delay.delay_ms(500u32);
     }
@@ -86,11 +80,7 @@ fn main() -> ! {
 #[interrupt]
 fn GPIO() {
     unsafe {
-        (&SERIAL).lock(|data| {
-            let mut serial = data.borrow_mut();
-            let serial = serial.as_mut().unwrap();
-            writeln!(serial, "Interrupt").ok();
-        });
+        esp_println::println!("GPIO Interrupt");
 
         (&BUTTON).lock(|data| {
             let mut button = data.borrow_mut();
