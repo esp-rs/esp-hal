@@ -17,6 +17,7 @@
 //! [esp32s3-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32s3-hal
 
 #![no_std]
+#![cfg_attr(target_arch = "xtensa", feature(asm_experimental_arch))]
 
 #[cfg(feature = "esp32")]
 pub use esp32_pac as pac;
@@ -81,9 +82,103 @@ pub mod cpu_control;
 
 /// Enumeration of CPU cores
 /// The actual number of available cores depends on the target.
+#[derive(Copy, Clone, Debug)]
 pub enum Cpu {
     /// The first core
     ProCpu = 0,
     /// The second core
     AppCpu,
+}
+
+pub fn get_core() -> Cpu {
+    #[cfg(target_arch = "xtensa")]
+    match ((xtensa_lx::get_processor_id() >> 13) & 1) != 0 {
+        false => Cpu::ProCpu,
+        true => Cpu::AppCpu,
+    }
+    #[cfg(target_arch = "riscv32")] // TODO get hart_id
+    Cpu::ProCpu
+}
+
+// TODO for next release of cs, we need to impl for RISCV too
+#[cfg(target_arch = "xtensa")] //
+mod critical_section_impl {
+    struct CriticalSection;
+
+    critical_section::custom_impl!(CriticalSection);
+
+    /// Virtual representation of the PS (processor state) of an Xtensa chip
+    static mut VPS: u32 = 0; // TODO remove when 32bit tokens are supported in CS
+
+    unsafe impl critical_section::Impl for CriticalSection {
+        unsafe fn acquire() -> u8 {
+            core::arch::asm!("rsil {0}, 15", out(reg) VPS);
+            #[cfg(feature = "dual_core")]
+            {
+                let guard = multicore::MULTICORE_LOCK.lock();
+                core::mem::forget(guard); // forget it so drop doesn't run
+            }
+            0
+        }
+
+        unsafe fn release(_token: u8) {
+            #[cfg(feature = "dual_core")]
+            {
+                debug_assert!(multicore::MULTICORE_LOCK.is_owned_by_current_thread());
+                // safety: we logically own the mutex from acquire()
+                multicore::MULTICORE_LOCK.force_unlock();
+            }
+            core::arch::asm!("wsr.ps {0}", in(reg) VPS)
+        }
+    }
+
+    #[cfg(feature = "dual_core")]
+    mod multicore {
+        use core::sync::atomic::{AtomicBool, Ordering};
+
+        use lock_api::{GetThreadId, GuardSend, RawMutex};
+
+        use crate::get_core;
+
+        /// Reentrant Mutex
+        ///
+        /// Currently implemented using an atomic spin lock.
+        /// In the future we can optimize this raw mutex to use some hardware
+        /// features.
+        pub(crate) static MULTICORE_LOCK: lock_api::ReentrantMutex<RawSpinlock, RawThreadId, ()> =
+            lock_api::ReentrantMutex::const_new(RawSpinlock::INIT, RawThreadId::INIT, ());
+
+        pub(crate) struct RawThreadId;
+
+        unsafe impl lock_api::GetThreadId for RawThreadId {
+            const INIT: Self = RawThreadId;
+
+            fn nonzero_thread_id(&self) -> core::num::NonZeroUsize {
+                core::num::NonZeroUsize::new((get_core() as usize) + 1).unwrap()
+            }
+        }
+
+        pub(crate) struct RawSpinlock(AtomicBool);
+
+        unsafe impl lock_api::RawMutex for RawSpinlock {
+            const INIT: RawSpinlock = RawSpinlock(AtomicBool::new(false));
+
+            // A spinlock guard can be sent to another thread and unlocked there
+            type GuardMarker = GuardSend;
+
+            fn lock(&self) {
+                while !self.try_lock() {}
+            }
+
+            fn try_lock(&self) -> bool {
+                self.0
+                    .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+                    .is_ok()
+            }
+
+            unsafe fn unlock(&self) {
+                self.0.store(false, Ordering::Release);
+            }
+        }
+    }
 }
