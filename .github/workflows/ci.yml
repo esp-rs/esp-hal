@@ -52,25 +52,44 @@ jobs:
           command: check
           args: -Zbuild-std=core --examples --manifest-path=${{ matrix.chip }}-hal/Cargo.toml --target=xtensa-${{ matrix.chip }}-none-elf
 
-  clippy:
-    name: Clippy
+  clippy-riscv:
+    name: Run clippy on RISC-V builds
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        chip: [esp32, esp32c3, esp32s2, esp32s3]
+        toolchain: [stable, nightly]
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: nightly
-          default: true
+          target: riscv32imc-unknown-none-elf
+          toolchain: ${{ matrix.toolchain }}
           components: clippy
+          default: true
       - uses: Swatinem/rust-cache@v1
       - uses: actions-rs/cargo@v1
         with:
           command: clippy
-          # I find `clippy::too-many-arguments` to be rather rather arbitrary.
-          # As for `clippy::module-inception`... don't tell me what to do ;)
-          args: --manifest-path=${{ matrix.chip }}-hal/Cargo.toml -- --no-deps -D warnings --A clippy::too-many-arguments --A clippy::module-inception
+          args: --manifest-path=esp32c3-hal/Cargo.toml --target=riscv32imc-unknown-none-elf -- --no-deps -D warnings --A clippy::too-many-arguments --A clippy::module-inception
+        
+  clippy-xtensa:
+    name: Run clippy on Xtensa builds
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        chip: [esp32, esp32s2, esp32s3]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: esp-rs/xtensa-toolchain@v1.2
+        with:
+          default: true
+          ldproxy: false
+          buildtargets: ${{ matrix.chip }}
+      - uses: Swatinem/rust-cache@v1
+      - uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: -Zbuild-std=core --manifest-path=${{ matrix.chip }}-hal/Cargo.toml --target=xtensa-${{ matrix.chip }}-none-elf -- --no-deps -D warnings --A clippy::too-many-arguments --A clippy::module-inception
