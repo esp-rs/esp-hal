@@ -101,19 +101,19 @@ pub fn get_core() -> Cpu {
 }
 
 // TODO for next release of cs, we need to impl for RISCV too
-#[cfg(target_arch = "xtensa")] //
+#[cfg(target_arch = "xtensa")]
 mod critical_section_impl {
     struct CriticalSection;
 
     critical_section::custom_impl!(CriticalSection);
 
-    /// Virtual representation of the PS (processor state) of an Xtensa chip
-    static mut VPS: u32 = 0; // TODO remove when 32bit tokens are supported in CS
+    // Virtual representation of the PS (processor state) of an Xtensa chip
+    static mut VPS: u32 = 0; // TODO remove when 32bit tokens are supported in CS crate
 
     unsafe impl critical_section::Impl for CriticalSection {
         unsafe fn acquire() -> u8 {
             core::arch::asm!("rsil {0}, 15", out(reg) VPS);
-            #[cfg(feature = "dual_core")]
+            #[cfg(feature = "multicore")]
             {
                 let guard = multicore::MULTICORE_LOCK.lock();
                 core::mem::forget(guard); // forget it so drop doesn't run
@@ -122,7 +122,7 @@ mod critical_section_impl {
         }
 
         unsafe fn release(_token: u8) {
-            #[cfg(feature = "dual_core")]
+            #[cfg(feature = "multicore")]
             {
                 debug_assert!(multicore::MULTICORE_LOCK.is_owned_by_current_thread());
                 // safety: we logically own the mutex from acquire()
@@ -132,7 +132,7 @@ mod critical_section_impl {
         }
     }
 
-    #[cfg(feature = "dual_core")]
+    #[cfg(feature = "multicore")]
     mod multicore {
         use core::sync::atomic::{AtomicBool, Ordering};
 

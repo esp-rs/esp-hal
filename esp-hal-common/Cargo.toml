@@ -46,18 +46,18 @@ esp32s2_pac = { package = "esp32s2", git = "https://github.com/esp-rs/esp-pacs.g
 esp32s3_pac = { package = "esp32s3", git = "https://github.com/esp-rs/esp-pacs.git", branch = "with_source", optional = true }
 
 [features]
-esp32   = ["esp32_pac/rt", "xtensa",   "dual_core", "xtensa-lx-rt/esp32",   "xtensa-lx/esp32",   "smartled"]
-esp32c3 = ["esp32c3_pac/rt", "risc_v", "single_core", "smartled"]
-esp32s2 = ["esp32s2_pac/rt", "xtensa", "single_core", "xtensa-lx-rt/esp32s2", "xtensa-lx/esp32s2", "smartled"]
-esp32s3 = ["esp32s3_pac/rt", "xtensa",   "dual_core", "xtensa-lx-rt/esp32s3", "xtensa-lx/esp32s3", "smartled"]
+esp32   = ["esp32_pac/rt", "xtensa",   "multicore", "xtensa-lx-rt/esp32",   "xtensa-lx/esp32",   "smartled"]
+esp32c3 = ["esp32c3_pac/rt", "risc_v", "unicore", "smartled"]
+esp32s2 = ["esp32s2_pac/rt", "xtensa", "unicore", "xtensa-lx-rt/esp32s2", "xtensa-lx/esp32s2", "smartled"]
+esp32s3 = ["esp32s3_pac/rt", "xtensa",   "multicore", "xtensa-lx-rt/esp32s3", "xtensa-lx/esp32s3", "smartled"]
 
 # Architecture (should not be enabled directly, but instead by a PAC's feature)
 risc_v = ["riscv", "riscv-atomic-emulation-trap"]
 xtensa = ["procmacros/rtc_slow"]
 
 # Core Count (should not be enabled directly, but instead by a PAC's feature)
-single_core = []
-dual_core   = ["lock_api"]
+unicore = []
+multicore   = ["lock_api"]
 
 # To support `ufmt`
 ufmt = ["ufmt-write"]
