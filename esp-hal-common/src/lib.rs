@@ -38,8 +38,8 @@ pub mod efuse;
 
 pub mod gpio;
 pub mod i2c;
-#[cfg_attr(feature = "risc_v", path = "interrupt/riscv.rs")]
-#[cfg_attr(feature = "xtensa", path = "interrupt/xtensa.rs")]
+#[cfg_attr(target_arch = "riscv32", path = "interrupt/riscv.rs")]
+#[cfg_attr(target_arch = "xtensa", path = "interrupt/xtensa.rs")]
 pub mod interrupt;
 pub mod prelude;
 pub mod pulse_control;
