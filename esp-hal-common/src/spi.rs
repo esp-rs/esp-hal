@@ -137,10 +137,12 @@ where
     }
 }
 
+#[cfg(feature = "eh1")]
 impl<T> embedded_hal_1::spi::ErrorType for Spi<T> {
     type Error = Infallible;
 }
 
+#[cfg(feature = "eh1")]
 impl<T> embedded_hal_1::spi::nb::FullDuplex for Spi<T>
 where
     T: Instance,

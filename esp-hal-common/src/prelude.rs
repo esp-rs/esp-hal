@@ -23,6 +23,7 @@ pub use nb;
 pub use crate::system::SystemExt;
 
 /// All traits required for using the 1.0.0-alpha.x release of embedded-hal
+#[cfg(feature = "eh1")]
 pub mod eh1 {
     pub use embedded_hal_1::{
         delay::blocking::DelayUs as _embedded_hal_delay_blocking_DelayUs,

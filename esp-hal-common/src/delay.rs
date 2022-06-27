@@ -4,8 +4,6 @@
 //!
 //! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
 
-use core::convert::Infallible;
-
 pub use self::delay::Delay;
 
 impl<T> embedded_hal::blocking::delay::DelayMs<T> for Delay
@@ -28,8 +26,9 @@ where
     }
 }
 
+#[cfg(feature = "eh1")]
 impl embedded_hal_1::delay::blocking::DelayUs for Delay {
-    type Error = Infallible;
+    type Error = core::convert::Infallible;
 
     fn delay_us(&mut self, us: u32) -> Result<(), Self::Error> {
         self.delay(us);

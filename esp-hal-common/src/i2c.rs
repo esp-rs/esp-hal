@@ -33,6 +33,7 @@ pub enum Error {
     CommandNrExceeded,
 }
 
+#[cfg(feature = "eh1")]
 impl embedded_hal_1::i2c::Error for Error {
     fn kind(&self) -> embedded_hal_1::i2c::ErrorKind {
         use embedded_hal_1::i2c::ErrorKind;
@@ -202,10 +203,12 @@ where
     }
 }
 
+#[cfg(feature = "eh1")]
 impl<T> embedded_hal_1::i2c::ErrorType for I2C<T> {
     type Error = Error;
 }
 
+#[cfg(feature = "eh1")]
 impl<T> embedded_hal_1::i2c::blocking::I2c for I2C<T>
 where
     T: Instance,

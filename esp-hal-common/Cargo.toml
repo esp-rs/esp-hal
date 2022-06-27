@@ -13,7 +13,7 @@ license     = "MIT OR Apache-2.0"
 [dependencies]
 cfg-if         = "1.0"
 embedded-hal   = { version = "0.2", features = ["unproven"] }
-embedded-hal-1 = { package = "embedded-hal", version = "=1.0.0-alpha.8" }
+embedded-hal-1 = { package = "embedded-hal", version = "=1.0.0-alpha.8", optional = true }
 fugit          = "0.3"
 nb             = "1.0"
 paste          = "1.0"
@@ -62,3 +62,6 @@ ufmt = ["ufmt-write"]
 
 # To use the external `smart_led` crate
 smartled = ["smart-leds-trait"]
+
+# Implement the `embedded-hal==1.0.0-alpha.x` traits
+eh1 = ["embedded-hal-1"]

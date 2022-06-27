@@ -27,9 +27,6 @@ categories = [
 bare-metal     = "1.0"
 embedded-hal   = { version = "0.2",  features = ["unproven"] }
 embedded-hal-1 = { package = "embedded-hal", version = "=1.0.0-alpha.8" }
-fugit          = "0.3"
-nb             = "1.0"
-void           = { version = "1.0",  default-features = false }
 xtensa-lx      = { version = "0.7",  features = ["esp32"] }
 xtensa-lx-rt   = { version = "0.12", features = ["esp32"], optional = true }
 
@@ -46,5 +43,6 @@ smart-leds        = "0.3"
 [features]
 default   = ["rt"]
 bluetooth = []
+eh1       = ["esp-hal-common/eh1"]
 rt        = ["xtensa-lx-rt/esp32"]
 ufmt      = ["esp-hal-common/ufmt"]

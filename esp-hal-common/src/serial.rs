@@ -10,6 +10,7 @@ const UART_FIFO_SIZE: u16 = 128;
 #[derive(Debug)]
 pub enum Error {}
 
+#[cfg(feature = "eh1")]
 impl embedded_hal_1::serial::Error for Error {
     fn kind(&self) -> embedded_hal_1::serial::ErrorKind {
         embedded_hal_1::serial::ErrorKind::Other
@@ -245,10 +246,12 @@ where
     }
 }
 
+#[cfg(feature = "eh1")]
 impl<T> embedded_hal_1::serial::ErrorType for Serial<T> {
     type Error = Error;
 }
 
+#[cfg(feature = "eh1")]
 impl<T> embedded_hal_1::serial::nb::Read for Serial<T>
 where
     T: Instance,
@@ -258,6 +261,7 @@ where
     }
 }
 
+#[cfg(feature = "eh1")]
 impl<T> embedded_hal_1::serial::nb::Write for Serial<T>
 where
     T: Instance,
