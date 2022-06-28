@@ -87,6 +87,8 @@ pub trait RTCPin {}
 pub trait AnalogPin {}
 
 pub trait Pin {
+    fn number(&self) -> u8;
+
     fn sleep_mode(&mut self, on: bool) -> &mut Self;
 
     fn set_alternate_function(&mut self, alternate: AlternateFunction) -> &mut Self;
@@ -641,6 +643,10 @@ macro_rules! impl_input {
         }
 
         impl<MODE> Pin for $pxi<MODE> {
+            fn number(&self) -> u8 {
+                $pin_num
+            }
+
             fn sleep_mode(&mut self, on: bool) -> &mut Self {
                 paste! {
                     unsafe { &*IO_MUX::PTR }
