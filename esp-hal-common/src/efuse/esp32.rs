@@ -1,5 +1,4 @@
 //! Reading of eFuses
-//! 
 
 use fugit::{HertzU32, RateExtU32};
 

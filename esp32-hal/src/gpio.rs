@@ -53,3 +53,24 @@ gpio! {
     Gpio38: (gpio38, 38, gpio38, Input, 0, Bank1, None),
     Gpio39: (gpio39, 39, gpio39, Input, 0, Bank1, None),
 }
+
+analog! {[
+    Gpio36: (0,  sensor_pads,  sense1_hold, sense1_mux_sel, sense1_fun_sel, sense1_fun_ie, sense1_slp_ie, sense1_slp_sel ),
+    Gpio37: (1,  sensor_pads,  sense2_hold, sense2_mux_sel, sense2_fun_sel, sense2_fun_ie, sense2_slp_ie, sense2_slp_sel ),
+    Gpio38: (2,  sensor_pads,  sense3_hold, sense3_mux_sel, sense3_fun_sel, sense3_fun_ie, sense3_slp_ie, sense3_slp_sel ),
+    Gpio39: (3,  sensor_pads,  sense4_hold, sense4_mux_sel, sense4_fun_sel, sense4_fun_ie, sense4_slp_ie, sense4_slp_sel ),
+    Gpio34: (4,  adc_pad,      adc1_hold,   adc1_mux_sel,   adc1_fun_sel,   adc1_fun_ie,   adc1_slp_ie,   adc1_slp_sel   ),
+    Gpio35: (5,  adc_pad,      adc2_hold,   adc2_mux_sel,   adc2_fun_sel,   adc1_fun_ie,   adc1_slp_ie,   adc1_slp_sel   ),
+    Gpio25: (6,  pad_dac1,     pdac1_hold,  pdac1_mux_sel,  pdac1_fun_sel,  pdac1_fun_ie,  pdac1_slp_ie,  pdac1_slp_sel,  pdac1_rue, pdac1_rde, pdac1_drv, pdac1_slp_oe),
+    Gpio26: (7,  pad_dac2,     pdac2_hold,  pdac2_mux_sel,  pdac2_fun_sel,  pdac2_fun_ie,  pdac2_slp_ie,  pdac2_slp_sel,  pdac2_rue, pdac2_rde, pdac2_drv, pdac2_slp_oe),
+    Gpio33: (8,  xtal_32k_pad, x32n_hold,   x32n_mux_sel,   x32n_fun_sel,   x32n_fun_ie,   x32n_slp_ie,   x32n_slp_sel,   x32n_rue,  x32n_rde,  x32n_drv,  x32n_slp_oe),
+    Gpio32: (9,  xtal_32k_pad, x32p_hold,   x32p_mux_sel,   x32p_fun_sel,   x32p_fun_ie,   x32p_slp_ie,   x32p_slp_sel,   x32p_rue,  x32p_rde,  x32p_drv,  x32p_slp_oe),
+    Gpio4:  (10, touch_pad0,   hold,        mux_sel,        fun_sel,        fun_ie,        slp_ie,        slp_sel,        rue,       rde,       drv,       slp_oe),
+    Gpio0:  (11, touch_pad1,   hold,        mux_sel,        fun_sel,        fun_ie,        slp_ie,        slp_sel,        rue,       rde,       drv,       slp_oe),
+    Gpio2:  (12, touch_pad2,   hold,        mux_sel,        fun_sel,        fun_ie,        slp_ie,        slp_sel,        rue,       rde,       drv,       slp_oe),
+    Gpio15: (13, touch_pad3,   hold,        mux_sel,        fun_sel,        fun_ie,        slp_ie,        slp_sel,        rue,       rde,       drv,       slp_oe),
+    Gpio13: (14, touch_pad4,   hold,        mux_sel,        fun_sel,        fun_ie,        slp_ie,        slp_sel,        rue,       rde,       drv,       slp_oe),
+    Gpio12: (15, touch_pad5,   hold,        mux_sel,        fun_sel,        fun_ie,        slp_ie,        slp_sel,        rue,       rde,       drv,       slp_oe),
+    Gpio14: (16, touch_pad6,   hold,        mux_sel,        fun_sel,        fun_ie,        slp_ie,        slp_sel,        rue,       rde,       drv,       slp_oe),
+    Gpio27: (17, touch_pad7,   hold,        mux_sel,        fun_sel,        fun_ie,        slp_ie,        slp_sel,        rue,       rde,       drv,       slp_oe),
+]}

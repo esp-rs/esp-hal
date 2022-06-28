@@ -71,10 +71,12 @@ pub mod systimer;
 pub mod clock;
 pub mod system;
 
+pub mod analog;
+
 /// Enumeration of CPU cores
 /// The actual number of available cores depends on the target.
 pub enum Cpu {
-    /// The fist core
+    /// The first core
     ProCpu = 0,
     /// The second core
     AppCpu,

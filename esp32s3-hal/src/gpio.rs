@@ -63,3 +63,5 @@ gpio! {
     Gpio47: (gpio47, 47, gpio[47], IO,    0, Bank1, None),
     Gpio48: (gpio48, 48, gpio[48], IO,    0, Bank1, None),
 }
+
+// TODO add analog capable gpios - see https://github.com/espressif/esp-idf/blob/master/components/soc/esp32s3/rtc_io_periph.c
