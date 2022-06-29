@@ -4,6 +4,7 @@
 use core::{cell::RefCell, fmt::Write};
 
 use esp32s2_hal::{
+    clock::ClockControl,
     interrupt,
     pac::{self, Peripherals, TIMG0, TIMG1, UART0},
     prelude::*,
@@ -26,10 +27,12 @@ static mut TIMER1: CriticalSectionMutex<RefCell<Option<Timer<TIMG1>>>> =
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take().unwrap();
+    let system = peripherals.SYSTEM.split();
+    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     // Disable the TIMG watchdog timer.
-    let mut timer0 = Timer::new(peripherals.TIMG0);
-    let mut timer1 = Timer::new(peripherals.TIMG1);
+    let mut timer0 = Timer::new(peripherals.TIMG0, clocks.apb_clock);
+    let mut timer1 = Timer::new(peripherals.TIMG1, clocks.apb_clock);
     let serial0 = Serial::new(peripherals.UART0).unwrap();
     let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
 
@@ -43,7 +46,7 @@ fn main() -> ! {
         pac::Interrupt::TG0_T0_LEVEL,
         interrupt::CpuInterrupt::Interrupt20LevelPriority2,
     );
-    timer0.start(50_000_000u64);
+    timer0.start(500u64.millis());
     timer0.listen();
 
     interrupt::enable(
@@ -51,7 +54,7 @@ fn main() -> ! {
         pac::Interrupt::TG1_T0_LEVEL,
         interrupt::CpuInterrupt::Interrupt23LevelPriority3,
     );
-    timer1.start(100_000_000u64);
+    timer1.start(1u64.secs());
     timer1.listen();
 
     unsafe {
@@ -89,7 +92,7 @@ pub fn level2_interrupt() {
             let mut timer0 = data.borrow_mut();
             let timer0 = timer0.as_mut().unwrap();
             timer0.clear_interrupt();
-            timer0.start(50_000_000u64);
+            timer0.start(500u64.millis());
         });
     }
 }
@@ -114,7 +117,7 @@ pub fn level3_interrupt() {
             let mut timer1 = data.borrow_mut();
             let timer1 = timer1.as_mut().unwrap();
             timer1.clear_interrupt();
-            timer1.start(100_000_000u64);
+            timer1.start(1u64.secs());
         });
     }
 }

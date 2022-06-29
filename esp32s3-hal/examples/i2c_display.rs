@@ -42,7 +42,7 @@ fn main() -> ! {
     let mut system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let mut timer0 = Timer::new(peripherals.TIMG0);
+    let mut timer0 = Timer::new(peripherals.TIMG0, clocks.apb_clock);
     let mut serial0 = Serial::new(peripherals.UART0).unwrap();
     let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
 
@@ -67,7 +67,7 @@ fn main() -> ! {
     .unwrap();
 
     // Start timer (5 second interval)
-    timer0.start(50_000_000u64);
+    timer0.start(5u64.secs());
 
     writeln!(serial0, "Starting timer!").unwrap();
 

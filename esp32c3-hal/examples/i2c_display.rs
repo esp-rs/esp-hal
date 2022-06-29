@@ -40,8 +40,8 @@ fn main() -> ! {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
-    let mut timer0 = Timer::new(peripherals.TIMG0);
-    let mut timer1 = Timer::new(peripherals.TIMG1);
+    let mut timer0 = Timer::new(peripherals.TIMG0, clocks.apb_clock);
+    let mut timer1 = Timer::new(peripherals.TIMG1, clocks.apb_clock);
 
     // Disable watchdog timers
     rtc_cntl.set_super_wdt_enable(false);
@@ -64,7 +64,7 @@ fn main() -> ! {
     .unwrap();
 
     // Start timer (5 second interval)
-    timer0.start(50_000_000u64);
+    timer0.start(5u64.secs());
 
     // Initialize display
     let interface = I2CDisplayInterface::new(i2c);

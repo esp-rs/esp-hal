@@ -3,7 +3,7 @@
 
 use core::fmt::Write;
 
-use esp32_hal::{pac::Peripherals, prelude::*, RtcCntl, Serial, Timer};
+use esp32_hal::{clock::ClockControl, pac::Peripherals, prelude::*, RtcCntl, Serial, Timer};
 use nb::block;
 use panic_halt as _;
 use xtensa_lx_rt::entry;
@@ -11,8 +11,10 @@ use xtensa_lx_rt::entry;
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take().unwrap();
+    let system = peripherals.DPORT.split();
+    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let mut timer0 = Timer::new(peripherals.TIMG0);
+    let mut timer0 = Timer::new(peripherals.TIMG0, clocks.apb_clock);
     let mut serial0 = Serial::new(peripherals.UART0).unwrap();
     let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
 
@@ -20,7 +22,7 @@ fn main() -> ! {
     timer0.disable();
     rtc_cntl.set_wdt_global_enable(false);
 
-    timer0.start(10_000_000u64);
+    timer0.start(1u64.secs());
 
     loop {
         writeln!(serial0, "Hello world!").unwrap();

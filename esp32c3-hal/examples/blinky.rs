@@ -23,8 +23,8 @@ fn main() -> ! {
     // Disable the watchdog timers. For the ESP32-C3, this includes the Super WDT,
     // the RTC WDT, and the TIMG WDTs.
     let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
-    let mut timer0 = Timer::new(peripherals.TIMG0);
-    let mut timer1 = Timer::new(peripherals.TIMG1);
+    let mut timer0 = Timer::new(peripherals.TIMG0, clocks.apb_clock);
+    let mut timer1 = Timer::new(peripherals.TIMG1, clocks.apb_clock);
 
     rtc_cntl.set_super_wdt_enable(false);
     rtc_cntl.set_wdt_enable(false);

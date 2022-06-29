@@ -5,6 +5,7 @@ use core::{cell::RefCell, fmt::Write};
 
 use bare_metal::Mutex;
 use esp32c3_hal::{
+    clock::ClockControl,
     interrupt,
     pac::{self, Peripherals, TIMG0, TIMG1, UART0},
     prelude::*,
@@ -23,12 +24,14 @@ static mut TIMER1: Mutex<RefCell<Option<Timer<TIMG1>>>> = Mutex::new(RefCell::ne
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take().unwrap();
+    let system = peripherals.SYSTEM.split();
+    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     // Disable the watchdog timers. For the ESP32-C3, this includes the Super WDT,
     // the RTC WDT, and the TIMG WDTs.
     let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
-    let mut timer0 = Timer::new(peripherals.TIMG0);
-    let mut timer1 = Timer::new(peripherals.TIMG1);
+    let mut timer0 = Timer::new(peripherals.TIMG0, clocks.apb_clock);
+    let mut timer1 = Timer::new(peripherals.TIMG1, clocks.apb_clock);
     let serial0 = Serial::new(peripherals.UART0).unwrap();
 
     rtc_cntl.set_super_wdt_enable(false);
@@ -52,7 +55,7 @@ fn main() -> ! {
         interrupt::Priority::Priority1,
     );
 
-    timer0.start(10_000_000u64);
+    timer0.start(500u64.millis());
     timer0.listen();
 
     interrupt::enable(
@@ -71,7 +74,7 @@ fn main() -> ! {
         interrupt::Priority::Priority1,
     );
 
-    timer1.start(20_000_000u64);
+    timer1.start(1u64.secs());
     timer1.listen();
 
     riscv::interrupt::free(|_cs| unsafe {
@@ -100,7 +103,7 @@ pub fn interrupt1() {
         interrupt::clear(Cpu::ProCpu, interrupt::CpuInterrupt::Interrupt1);
         timer0.clear_interrupt();
 
-        timer0.start(10_000_000u64);
+        timer0.start(500u64.millis());
     });
 }
 
@@ -117,6 +120,6 @@ pub fn interrupt11() {
         interrupt::clear(Cpu::ProCpu, interrupt::CpuInterrupt::Interrupt11);
         timer1.clear_interrupt();
 
-        timer1.start(20_000_000u64);
+        timer1.start(1u64.secs());
     });
 }

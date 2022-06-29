@@ -34,7 +34,7 @@ fn main() -> ! {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let mut timer0 = Timer::new(peripherals.TIMG0);
+    let mut timer0 = Timer::new(peripherals.TIMG0, clocks.apb_clock);
     let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
     let serial0 = Serial::new(peripherals.UART0).unwrap();
 
