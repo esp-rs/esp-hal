@@ -4,6 +4,7 @@ use embedded_hal::{
     timer::{Cancel, CountDown, Periodic},
     watchdog::WatchdogDisable,
 };
+use fugit::{MegahertzU32, MicrosDurationU64};
 use void::Void;
 
 use crate::pac::{timg0::RegisterBlock, TIMG0, TIMG1};
@@ -19,6 +20,7 @@ pub enum Error {
 /// General-purpose timer
 pub struct Timer<T> {
     timg: T,
+    apb_clk_freq: MegahertzU32,
 }
 
 /// Timer driver
@@ -27,8 +29,10 @@ where
     T: Instance,
 {
     /// Create a new timer instance
-    pub fn new(timg: T) -> Self {
-        Self { timg }
+    pub fn new(timg: T, apb_clk_freq: MegahertzU32) -> Self {
+        // TODO: this currently assumes APB_CLK is being used, as we don't yet have a
+        //       way to select the XTAL_CLK.
+        Self { timg, apb_clk_freq }
     }
 
     /// Return the raw interface to the underlying timer instance
@@ -160,6 +164,20 @@ pub trait Instance {
             .int_clr_timers
             .write(|w| w.t0_int_clr().set_bit());
     }
+
+    fn divider(&self) -> u32 {
+        // From the ESP32 TRM, "11.2.1 16­-bit Prescaler and Clock Selection":
+        //
+        // "The prescaler can divide the APB clock by a factor from 2 to 65536.
+        // Specifically, when TIMGn_Tx_DIVIDER is either 1 or 2, the clock divisor is 2;
+        // when TIMGn_Tx_DIVIDER is 0, the clock divisor is 65536. Any other value will
+        // cause the clock to be divided by exactly that value."
+        match self.register_block().t0config.read().t0_divider().bits() {
+            0 => 65536,
+            1 | 2 => 2,
+            n => n as u32,
+        }
+    }
 }
 
 impl Instance for TIMG0 {
@@ -176,21 +194,39 @@ impl Instance for TIMG1 {
     }
 }
 
+fn timeout_to_ticks<T, F>(timeout: T, clock: F, divider: u32) -> u64
+where
+    T: Into<MicrosDurationU64>,
+    F: Into<MegahertzU32>,
+{
+    let timeout: MicrosDurationU64 = timeout.into();
+    let seconds = timeout.to_secs();
+
+    let clock: MegahertzU32 = clock.into();
+    let period = 1f64 / (clock.to_Hz() as f64 / divider as f64); // seconds
+
+    (seconds as f64 / period) as u64
+}
+
 impl<T> CountDown for Timer<T>
 where
     T: Instance,
 {
-    type Time = u64;
+    type Time = MicrosDurationU64;
 
     fn start<Time>(&mut self, timeout: Time)
     where
-        Time: Into<u64>,
+        Time: Into<Self::Time>,
     {
         self.timg.set_counter_active(false);
         self.timg.set_alarm_active(false);
 
         self.timg.reset_counter();
-        self.timg.load_alarm_value(timeout.into());
+
+        // TODO: this currently assumes APB_CLK is being used, as we don't yet have a
+        //       way to select the XTAL_CLK.
+        let ticks = timeout_to_ticks(timeout, self.apb_clk_freq, self.timg.divider());
+        self.timg.load_alarm_value(ticks);
 
         self.timg.set_counter_decrementing(false);
         self.timg.set_auto_reload(true);
