@@ -4,7 +4,8 @@
 use core::fmt::Write;
 
 use esp32c3_hal::{
-    pac::{self, UART0},
+    clock::ClockControl,
+    pac::{Peripherals, UART0},
     prelude::*,
     ram,
     Serial,
@@ -25,8 +26,11 @@ static mut SOME_ZEROED_DATA: [u8; 8] = [0; 8];
 
 #[entry]
 fn main() -> ! {
-    let peripherals = pac::Peripherals::take().unwrap();
-    let mut timer0 = Timer::new(peripherals.TIMG0);
+    let peripherals = Peripherals::take().unwrap();
+    let system = peripherals.SYSTEM.split();
+    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+
+    let mut timer0 = Timer::new(peripherals.TIMG0, clocks.apb_clock);
     let mut serial0 = Serial::new(peripherals.UART0).unwrap();
 
     // Disable MWDT flash boot protection
@@ -34,7 +38,7 @@ fn main() -> ! {
     // The RWDT flash boot protection remains enabled and it being triggered is part
     // of the example
 
-    timer0.start(10_000_000u64);
+    timer0.start(1u64.secs());
 
     writeln!(
         serial0,
