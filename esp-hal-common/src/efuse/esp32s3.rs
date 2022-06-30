@@ -1,5 +1,4 @@
 //! Reading of eFuses
-//! 
 
 use crate::pac::EFUSE;
 

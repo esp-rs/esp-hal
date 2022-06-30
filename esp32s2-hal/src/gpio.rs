@@ -58,3 +58,9 @@ gpio! {
     Gpio45: (gpio45, 45, gpio45, IO,    0, Bank1, None),
     Gpio46: (gpio46, 46, gpio46, IO,Input, Bank1, None),
 }
+
+// TODO other analog capable gpios - see https://github.com/espressif/esp-idf/blob/master/components/soc/esp32s2/rtc_io_periph.c
+analog! {[
+    Gpio17: (17,  pad_dac1,     pdac1_hold,  pdac1_mux_sel,  pdac1_fun_sel,  pdac1_fun_ie,  pdac1_slp_ie,  pdac1_slp_sel,  pdac1_rue, pdac1_rde, pdac1_drv, pdac1_slp_oe),
+    Gpio18: (18,  pad_dac2,     pdac2_hold,  pdac2_mux_sel,  pdac2_fun_sel,  pdac2_fun_ie,  pdac2_slp_ie,  pdac2_slp_sel,  pdac2_rue, pdac2_rde, pdac2_drv, pdac2_slp_oe),
+]}

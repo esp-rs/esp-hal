@@ -20,6 +20,8 @@ pub use fugit::{
 };
 pub use nb;
 
+#[cfg(any(feature = "esp32", feature = "esp32s2"))]
+pub use crate::analog::SensExt;
 pub use crate::system::SystemExt;
 
 /// All traits required for using the 1.0.0-alpha.x release of embedded-hal

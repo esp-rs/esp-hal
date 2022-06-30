@@ -25,6 +25,7 @@ pub use esp_hal_common::{
 
 pub use self::gpio::IO;
 
+pub mod dac;
 pub mod gpio;
 
 #[no_mangle]
