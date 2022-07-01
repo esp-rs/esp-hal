@@ -40,16 +40,24 @@ where
         self.timg
     }
 
+    /// Listen for interrupt
     pub fn listen(&mut self) {
         self.timg.listen();
     }
 
+    /// Stop listening for interrupt
     pub fn unlisten(&mut self) {
         self.timg.unlisten();
     }
 
+    /// Clear intterupt status
     pub fn clear_interrupt(&mut self) {
         self.timg.clear_interrupt();
+    }
+
+    /// Read current raw timer value in timer ticks
+    pub fn read_raw(&self) -> u64 {
+        self.timg.read_raw()
     }
 }
 
@@ -165,6 +173,17 @@ pub trait Instance {
             .write(|w| w.t0_int_clr().set_bit());
     }
 
+    fn read_raw(&self) -> u64 {
+        self.register_block()
+            .t0update
+            .write(|w| unsafe { w.bits(0) });
+
+        let value_lo = self.register_block().t0lo.read().bits() as u64;
+        let value_hi = (self.register_block().t0hi.read().bits() as u64) << 32;
+
+        (value_lo | value_hi) as u64
+    }
+
     fn divider(&self) -> u32 {
         // From the ESP32 TRM, "11.2.1 16­-bit Prescaler and Clock Selection":
         //
@@ -200,12 +219,14 @@ where
     F: Into<MegahertzU32>,
 {
     let timeout: MicrosDurationU64 = timeout.into();
-    let seconds = timeout.to_secs();
+    let micros = timeout.to_micros();
 
     let clock: MegahertzU32 = clock.into();
-    let period = 1f64 / (clock.to_Hz() as f64 / divider as f64); // seconds
 
-    (seconds as f64 / period) as u64
+    // TODO can we get this to not use doubles/floats
+    let period = 1_000_000f64 / (clock.to_Hz() as f64 / divider as f64); // micros
+
+    (micros as f64 / period) as u64
 }
 
 impl<T> CountDown for Timer<T>
@@ -225,6 +246,7 @@ where
 
         // TODO: this currently assumes APB_CLK is being used, as we don't yet have a
         //       way to select the XTAL_CLK.
+        // TODO: can we cache the divider (only get it on initialization)?
         let ticks = timeout_to_ticks(timeout, self.apb_clk_freq, self.timg.divider());
         self.timg.load_alarm_value(ticks);
 
