@@ -156,6 +156,26 @@ where
     }
 }
 
+#[cfg(feature = "eh1")]
+impl<T> embedded_hal_1::spi::blocking::SpiBusWrite for Spi<T>
+where
+    T: Instance,
+{
+    fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
+        self.spi.send_bytes(words)
+    }
+}
+
+#[cfg(feature = "eh1")]
+impl<T> embedded_hal_1::spi::blocking::SpiBusFlush for Spi<T>
+where
+    T: Instance,
+{
+    fn flush(&mut self) -> Result<(), Self::Error> {
+        self.spi.flush()
+    }
+}
+
 pub trait Instance {
     fn register_block(&self) -> &RegisterBlock;
 
@@ -374,6 +394,56 @@ pub trait Instance {
 
         self.transfer(&mut words_mut[0..words.len()])?;
 
+        Ok(())
+    }
+
+    fn send_bytes(&mut self, words: &[u8]) -> Result<(), Infallible> {
+        let reg_block = self.register_block();
+        let num_chuncks = words.len() / 64;
+
+        // The fifo has a total of 16 32 bit registers (64 bytes) so the data
+        // must be chunked and then transmitted
+        for (i, chunk) in words.chunks(64).enumerate() {
+            self.configure_datalen(chunk.len() as u32 * 8);
+
+            let mut fifo_ptr = reg_block.w0.as_ptr();
+            for chunk in chunk.chunks(4) {
+                let mut u32_as_bytes = [0u8; 4];
+                unsafe {
+                    let ptr = u32_as_bytes.as_mut_ptr();
+                    ptr.copy_from(chunk.as_ptr(), chunk.len());
+                }
+                let reg_val: u32 = u32::from_le_bytes(u32_as_bytes);
+
+                unsafe {
+                    *fifo_ptr = reg_val;
+                    fifo_ptr = fifo_ptr.offset(1);
+                };
+            }
+
+            self.update();
+
+            reg_block.cmd.modify(|_, w| w.usr().set_bit());
+
+            // Wait for all chunks to complete except the last one.
+            // The function is allowed to return before the bus is idle.
+            // see [embedded-hal flushing](https://docs.rs/embedded-hal/1.0.0-alpha.8/embedded_hal/spi/blocking/index.html#flushing)
+            if i < num_chuncks {
+                while reg_block.cmd.read().usr().bit_is_set() {
+                    // wait
+                }
+            }
+        }
+        Ok(())
+    }
+
+    // Check if the bus is busy and if it is wait for it to be idle
+    fn flush(&mut self) -> Result<(), Infallible> {
+        let reg_block = self.register_block();
+
+        while reg_block.cmd.read().usr().bit_is_set() {
+            // wait for bus to be clear
+        }
         Ok(())
     }
 
