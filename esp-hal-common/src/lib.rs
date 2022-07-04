@@ -73,6 +73,12 @@ pub mod system;
 
 pub mod analog;
 
+#[cfg_attr(feature = "esp32", path = "cpu_control/esp32.rs")]
+#[cfg_attr(feature = "esp32c3", path = "cpu_control/none.rs")]
+#[cfg_attr(feature = "esp32s2", path = "cpu_control/none.rs")]
+#[cfg_attr(feature = "esp32s3", path = "cpu_control/esp32s3.rs")]
+pub mod cpu_control;
+
 /// Enumeration of CPU cores
 /// The actual number of available cores depends on the target.
 pub enum Cpu {
