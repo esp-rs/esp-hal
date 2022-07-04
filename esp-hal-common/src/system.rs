@@ -75,11 +75,17 @@ pub struct SystemClockControl {
     _private: (),
 }
 
+/// Controls the configuration of the chip's clocks.
+pub struct CpuControl {
+    _private: (),
+}
+
 /// The SYSTEM/DPORT splitted into it's different logical parts.
 pub struct SystemParts {
     _private: (),
     pub peripheral_clock_control: PeripheralClockControl,
     pub clock_control: SystemClockControl,
+    pub cpu_control: CpuControl,
 }
 
 /// Extension trait to split a SYSTEM/DPORT peripheral in independent logical
@@ -99,6 +105,7 @@ impl SystemExt for SystemPeripheral {
             _private: (),
             peripheral_clock_control: PeripheralClockControl { _private: () },
             clock_control: SystemClockControl { _private: () },
+            cpu_control: CpuControl { _private: () },
         }
     }
 }

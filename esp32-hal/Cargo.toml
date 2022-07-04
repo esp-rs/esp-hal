@@ -39,6 +39,7 @@ embedded-graphics = "0.7"
 panic-halt        = "0.2"
 ssd1306           = "0.7"
 smart-leds        = "0.3"
+esp-println       = { version = "0.1.0", features = ["esp32"] }
 
 [features]
 default   = ["rt"]
