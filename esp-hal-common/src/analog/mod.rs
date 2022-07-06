@@ -1,3 +1,8 @@
+#[cfg_attr(feature = "esp32", path = "adc/esp32.rs")]
+#[cfg_attr(feature = "esp32s2", path = "adc/esp32s2.rs")]
+#[cfg_attr(feature = "esp32s3", path = "adc/esp32s3.rs")]
+#[cfg_attr(feature = "esp32c3", path = "adc/esp32c3.rs")]
+pub mod adc;
 #[cfg(not(any(feature = "esp32c3", feature = "esp32s3")))]
 pub mod dac;
 

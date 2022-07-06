@@ -2,6 +2,7 @@
 
 pub use embedded_hal as ehal;
 pub use esp_hal_common::{
+    analog::{adc::*, *},
     clock,
     cpu_control::CpuControl,
     efuse,
@@ -25,6 +26,7 @@ pub use esp_hal_common::{
 
 pub use self::gpio::IO;
 
+pub mod adc;
 pub mod dac;
 pub mod gpio;
 

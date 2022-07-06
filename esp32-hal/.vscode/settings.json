@@ -1,7 +1,7 @@
 {
     "rust-analyzer.cargo.features": [],
     "rust-analyzer.cargo.allFeatures": false,
-    "editor.formatOnSave": true,
+    "editor.formatOnSave": false,
     "rust-analyzer.checkOnSave.allTargets": false,
     "rust-analyzer.checkOnSave.allFeatures": false,
     "rust-analyzer.checkOnSave.overrideCommand": [
