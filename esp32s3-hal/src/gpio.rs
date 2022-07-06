@@ -64,4 +64,27 @@ gpio! {
     Gpio48: (gpio48, 48, gpio[48], IO,    0, Bank1, None),
 }
 
-// TODO add analog capable gpios - see https://github.com/espressif/esp-idf/blob/master/components/soc/esp32s3/rtc_io_periph.c
+analog! {
+    Gpio0:  ( 0,  touch_pad0,    touch_pad0_hold,  mux_sel,      fun_sel,      fun_ie,       slp_ie,       slp_sel,       rue,       rde,       drv,       slp_oe),
+    Gpio1:  ( 1,  touch_pad1,    touch_pad1_hold,  mux_sel,      fun_sel,      fun_ie,       slp_ie,       slp_sel,       rue,       rde,       drv,       slp_oe),
+    Gpio2:  ( 2,  touch_pad2,    touch_pad2_hold,  mux_sel,      fun_sel,      fun_ie,       slp_ie,       slp_sel,       rue,       rde,       drv,       slp_oe),
+    Gpio3:  ( 3,  touch_pad3,    touch_pad3_hold,  mux_sel,      fun_sel,      fun_ie,       slp_ie,       slp_sel,       rue,       rde,       drv,       slp_oe),
+    Gpio4:  ( 4,  touch_pad4,    touch_pad4_hold,  mux_sel,      fun_sel,      fun_ie,       slp_ie,       slp_sel,       rue,       rde,       drv,       slp_oe),
+    Gpio5:  ( 5,  touch_pad5,    touch_pad5_hold,  mux_sel,      fun_sel,      fun_ie,       slp_ie,       slp_sel,       rue,       rde,       drv,       slp_oe),
+    Gpio6:  ( 6,  touch_pad6,    touch_pad6_hold,  mux_sel,      fun_sel,      fun_ie,       slp_ie,       slp_sel,       rue,       rde,       drv,       slp_oe),
+    Gpio7:  ( 7,  touch_pad7,    touch_pad7_hold,  mux_sel,      fun_sel,      fun_ie,       slp_ie,       slp_sel,       rue,       rde,       drv,       slp_oe),
+    Gpio8:  ( 8,  touch_pad8,    touch_pad8_hold,  mux_sel,      fun_sel,      fun_ie,       slp_ie,       slp_sel,       rue,       rde,       drv,       slp_oe),
+    Gpio9:  ( 9,  touch_pad9,    touch_pad9_hold,  mux_sel,      fun_sel,      fun_ie,       slp_ie,       slp_sel,       rue,       rde,       drv,       slp_oe),
+    Gpio10: (10,  touch_pad10,   touch_pad10_hold, mux_sel,      fun_sel,      fun_ie,       slp_ie,       slp_sel,       rue,       rde,       drv,       slp_oe),
+    Gpio11: (11,  touch_pad11,   touch_pad11_hold, mux_sel,      fun_sel,      fun_ie,       slp_ie,       slp_sel,       rue,       rde,       drv,       slp_oe),
+    Gpio12: (12,  touch_pad12,   touch_pad12_hold, mux_sel,      fun_sel,      fun_ie,       slp_ie,       slp_sel,       rue,       rde,       drv,       slp_oe),
+    Gpio13: (13,  touch_pad13,   touch_pad13_hold, mux_sel,      fun_sel,      fun_ie,       slp_ie,       slp_sel,       rue,       rde,       drv,       slp_oe),
+    Gpio14: (14,  touch_pad14,   touch_pad14_hold, mux_sel,      fun_sel,      fun_ie,       slp_ie,       slp_sel,       rue,       rde,       drv,       slp_oe),
+    Gpio15: (15,  xtal_32p_pad,  x32p_hold,        x32p_mux_sel, x32p_fun_sel, x32p_fun_ie,  x32p_slp_ie,  x32p_slp_sel,  x32p_rue,  x32p_rde,  x32p_drv,  x32p_slp_oe),
+    Gpio16: (16,  xtal_32n_pad,  x32n_hold,        x32n_mux_sel, x32n_fun_sel, x32n_fun_ie,  x32n_slp_ie,  x32n_slp_sel,  x32n_rue,  x32n_rde,  x32n_drv,  x32pn_slp_oe),
+    Gpio17: (17,  pad_dac1,      pdac1_hold,       pdac1_mux_sel,pdac1_fun_sel,pdac1_fun_ie, pdac1_slp_ie, pdac1_slp_sel, pdac1_rue, pdac1_rde, pdac1_drv, pdac1_slp_oe),
+    Gpio18: (18,  pad_dac2,      pdac2_hold,       pdac2_mux_sel,pdac2_fun_sel,pdac2_fun_ie, pdac2_slp_ie, pdac2_slp_sel, pdac2_rue, pdac2_rde, pdac2_drv, pdac2_slp_oe),
+    Gpio19: (19,  rtc_pad19,     rtc_pad19_hold,   mux_sel,      fun_sel,      fun_ie,       slp_ie,       slp_sel,       rue,       rde,       drv,       slp_oe),
+    Gpio20: (20,  rtc_pad20,     rtc_pad20_hold,   mux_sel,      fun_sel,      fun_ie,       slp_ie,       slp_sel,       rue,       rde,       drv,       slp_oe),
+    Gpio21: (21,  rtc_pad21,     rtc_pad21_hold,   mux_sel,      fun_sel,      fun_ie,       slp_ie,       slp_sel,       rue,       rde,       drv,       slp_oe),
+}

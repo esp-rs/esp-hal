@@ -1159,11 +1159,11 @@ pub fn enable_iomux_clk_gate() {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! analog {
-    ([
-        $($pxi:ident: ($pin_num:expr, $pin_reg:ident, $hold: ident, $mux_sel:ident,
+    (
+        $($pxi:ident: ($pin_num:expr, $pin_reg:expr, $hold: ident, $mux_sel:ident,
             $fun_sel:ident, $fun_ie:ident, $slp_ie:ident, $slp_sel:ident
             $(, $rue:ident, $rde:ident, $drv:ident, $slp_oe:ident)?),)+
-    ]) => {
+    ) => {
         $(
             impl<MODE> $pxi<MODE> {
                 pub fn into_analog(mut self) -> $pxi<Analog> {
@@ -1174,33 +1174,36 @@ macro_rules! analog {
                         $crate::gpio::enable_iomux_clk_gate();
 
                         // disable input
-                        rtcio.$pin_reg.modify(|_,w| w.$fun_ie().bit(false));
+                        paste! {
+                            rtcio.$pin_reg.modify(|_,w| w.$fun_ie().bit(false));
+                        }
 
                         // disable output
                         rtcio.enable_w1tc.write(|w| unsafe { w.enable_w1tc().bits(1 << $pin_num) });
-                        // ESP32-S2 rtcio.rtc_gpio_enable_w1tc.write(|w| unsafe { w.reg_rtcio_reg_gpio_enable_w1tc().bits(1 << $pin_num) });
-                        //rtcio.rtc_gpio_enable_w1tc.write(|w| unsafe { w.rtc_gpio_enable_w1tc().bits(1 << $pin_num) });
 
                         // disable open drain
                         rtcio.pin[$pin_num].modify(|_,w| w.pin_pad_driver().bit(false));
-                        //rtcio.rtc_gpio_pin[$pin_num].modify(|_,w| w.gpio_pin0_pad_driver().bit(false));
 
-                        rtcio.$pin_reg.modify(|_,w| {
-                            w.$fun_ie().clear_bit();
+                        paste! {
+                            rtcio.$pin_reg.modify(|_,w| {
+                                w.$fun_ie().clear_bit();
 
-                            // Connect pin to analog / RTC module instead of standard GPIO
-                            w.$mux_sel().set_bit();
+                                // Connect pin to analog / RTC module instead of standard GPIO
+                                w.$mux_sel().set_bit();
 
-                            // Select function "RTC function 1" (GPIO) for analog use
-                            unsafe { w.$fun_sel().bits(0b00) }
-                        });
+                                // Select function "RTC function 1" (GPIO) for analog use
+                                unsafe { w.$fun_sel().bits(0b00) }
+                            });
+                        }
 
                         // Disable pull-up and pull-down resistors on the pin, if it has them
-                        rtcio.$pin_reg.modify(|_,w| {
-                            w
-                            .$rue().bit(false)
-                            .$rde().bit(false)
-                        });
+                        paste! {
+                            rtcio.$pin_reg.modify(|_,w| {
+                                w
+                                .$rue().bit(false)
+                                .$rde().bit(false)
+                            });
+                        }
                     )?
 
                     $pxi { _mode: PhantomData }

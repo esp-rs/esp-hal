@@ -54,7 +54,7 @@ gpio! {
     Gpio39: (gpio39, 39, gpio39, Input, 0, Bank1, None),
 }
 
-analog! {[
+analog! {
     Gpio36: (0,  sensor_pads,  sense1_hold, sense1_mux_sel, sense1_fun_sel, sense1_fun_ie, sense1_slp_ie, sense1_slp_sel ),
     Gpio37: (1,  sensor_pads,  sense2_hold, sense2_mux_sel, sense2_fun_sel, sense2_fun_ie, sense2_slp_ie, sense2_slp_sel ),
     Gpio38: (2,  sensor_pads,  sense3_hold, sense3_mux_sel, sense3_fun_sel, sense3_fun_ie, sense3_slp_ie, sense3_slp_sel ),
@@ -73,4 +73,4 @@ analog! {[
     Gpio12: (15, touch_pad5,   hold,        mux_sel,        fun_sel,        fun_ie,        slp_ie,        slp_sel,        rue,       rde,       drv,       slp_oe),
     Gpio14: (16, touch_pad6,   hold,        mux_sel,        fun_sel,        fun_ie,        slp_ie,        slp_sel,        rue,       rde,       drv,       slp_oe),
     Gpio27: (17, touch_pad7,   hold,        mux_sel,        fun_sel,        fun_ie,        slp_ie,        slp_sel,        rue,       rde,       drv,       slp_oe),
-]}
+}

@@ -1,6 +1,6 @@
 {
     "rust-analyzer.cargo.features": [
-        "esp32s3"
+        "esp32s2"
     ],
     "rust-analyzer.cargo.allFeatures": false,
     "editor.formatOnSave": true,
@@ -10,12 +10,12 @@
         "cargo",
         "check",
         "--features",
-        "esp32s3",
+        "esp32s2",
         "--message-format=json",
         "-Z",
         "build-std=core",
         "--target",
-        "xtensa-esp32s3-none-elf",
+        "xtensa-esp32s2-none-elf",
         "--examples",
         "--lib",
     ],
