@@ -1156,6 +1156,7 @@ pub fn enable_iomux_clk_gate() {
     }
 }
 
+#[cfg(not(feature = "esp32c3"))]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! analog {
@@ -1205,6 +1206,38 @@ macro_rules! analog {
                             });
                         }
                     )?
+
+                    $pxi { _mode: PhantomData }
+                }
+            }
+        )+
+    }
+}
+
+#[cfg(feature = "esp32c3")]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! analog {
+    (
+        $($pxi:ident => $pin_num:literal)+
+    ) => {
+        $(
+            impl<MODE> $pxi<MODE> {
+                pub fn into_analog(mut self) -> $pxi<Analog> {
+                    use crate::pac::IO_MUX;
+                    use crate::pac::GPIO;
+
+                    let io_mux = unsafe{ &*IO_MUX::PTR };
+                    let gpio = unsafe{ &*GPIO::PTR };
+
+                    io_mux.gpio[$pin_num].modify(|_,w| unsafe {
+                        w.mcu_sel().bits(1)
+                            .fun_ie().clear_bit()
+                            .fun_wpu().clear_bit()
+                            .fun_wpd().clear_bit()
+                    });
+
+                    gpio.enable_w1tc.write(|w| unsafe { w.bits(1 << $pin_num) });
 
                     $pxi { _mode: PhantomData }
                 }

@@ -19,7 +19,8 @@
 //! | 9       |                      | GPIO26        |
 
 use embedded_hal::adc::Channel;
-use esp_hal_common::analog::{adc::impl_adc_interface, ADC1, ADC2};
+use esp_hal_common::analog::adc::impl_adc_interface;
+pub use esp_hal_common::analog::{adc::*, ADC1, ADC2};
 
 use crate::{gpio::*, gpio_types::Analog};
 

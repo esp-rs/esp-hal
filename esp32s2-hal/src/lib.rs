@@ -2,7 +2,6 @@
 
 pub use embedded_hal as ehal;
 pub use esp_hal_common::{
-    analog::{adc::*, *},
     clock,
     efuse,
     gpio as gpio_types,
@@ -29,6 +28,11 @@ pub use self::gpio::IO;
 pub mod adc;
 pub mod dac;
 pub mod gpio;
+
+/// Common module for analog functions
+pub mod analog {
+    pub use esp_hal_common::analog::{AvailableAnalog, SensExt};
+}
 
 #[no_mangle]
 extern "C" fn DefaultHandler(_level: u32, _interrupt: pac::Interrupt) {}

@@ -30,8 +30,14 @@ use riscv_rt::pre_init;
 
 pub use self::{gpio::IO, rtc_cntl::RtcCntl};
 
+pub mod adc;
 pub mod gpio;
 pub mod rtc_cntl;
+
+/// Common module for analog functions
+pub mod analog {
+    pub use esp_hal_common::analog::{AvailableAnalog, SarAdcExt};
+}
 
 extern "C" {
     // Boundaries of the .iram section

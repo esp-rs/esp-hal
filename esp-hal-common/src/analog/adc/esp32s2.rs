@@ -56,6 +56,7 @@ impl<ADCI> Default for AdcConfig<ADCI> {
     }
 }
 
+#[doc(hidden)]
 pub trait RegisterAccess {
     fn set_bit_width(resolution: u8);
 
@@ -360,6 +361,7 @@ where
     }
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! impl_adc_interface {
     ($adc:ident [
