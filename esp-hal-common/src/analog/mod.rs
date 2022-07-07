@@ -34,6 +34,7 @@ cfg_if::cfg_if! {
             pub dac2: DAC2,
         }
 
+        /// Extension trait to split a SENS peripheral in independent parts
         pub trait SensExt {
             fn split(self) -> AvailableAnalog;
         }
@@ -51,6 +52,44 @@ cfg_if::cfg_if! {
                         _private: PhantomData,
                     },
                     dac2: DAC2 {
+                        _private: PhantomData,
+                    },
+                }
+            }
+        }
+    }
+}
+
+cfg_if::cfg_if! {
+    if #[cfg(feature = "esp32c3")] {
+        use core::marker::PhantomData;
+
+        use crate::pac::APB_SARADC;
+
+        pub struct ADC1 {
+            _private: PhantomData<()>,
+        }
+        pub struct ADC2 {
+            _private: PhantomData<()>,
+        }
+
+        pub struct AvailableAnalog {
+            pub adc1: ADC1,
+            pub adc2: ADC2,
+        }
+
+        /// Extension trait to split a APB_SARADC peripheral in independent parts
+        pub trait SarAdcExt {
+            fn split(self) -> AvailableAnalog;
+        }
+
+        impl SarAdcExt for APB_SARADC {
+            fn split(self) -> AvailableAnalog {
+                AvailableAnalog {
+                    adc1: ADC1 {
+                        _private: PhantomData,
+                    },
+                    adc2: ADC2 {
                         _private: PhantomData,
                     },
                 }

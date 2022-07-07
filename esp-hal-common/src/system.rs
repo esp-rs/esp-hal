@@ -21,6 +21,8 @@ pub enum Peripheral {
     #[cfg(not(feature = "esp32c3"))]
     I2cExt1,
     Rmt,
+    #[cfg(feature = "esp32c3")]
+    ApbSarAdc,
 }
 
 /// Controls the enablement of peripheral clocks.
@@ -65,6 +67,11 @@ impl PeripheralClockControl {
             Peripheral::Rmt => {
                 perip_clk_en0.modify(|_, w| w.rmt_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.rmt_rst().clear_bit());
+            }
+            #[cfg(feature = "esp32c3")]
+            Peripheral::ApbSarAdc => {
+                perip_clk_en0.modify(|_, w| w.apb_saradc_clk_en().set_bit());
+                perip_rst_en0.modify(|_, w| w.apb_saradc_rst().clear_bit());
             }
         }
     }

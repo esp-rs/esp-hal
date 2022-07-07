@@ -1,22 +1,19 @@
 //! Connect a potentiometer to PIN25 and see the read values change when
-//! rotating the shaft. If could also connect the PIN to GND or 3V3 to see the
-//! maximum and minimum raw values read.
+//! rotating the shaft. Alternatively you could also connect the PIN to GND or
+//! 3V3 to see the maximum and minimum raw values read.
 
 #![no_std]
 #![no_main]
 
 use esp32_hal::{
+    adc::{AdcConfig, Attenuation, ADC, ADC2},
     clock::ClockControl,
     gpio::IO,
     pac::Peripherals,
     prelude::*,
-    AdcConfig,
-    Attenuation,
     Delay,
     RtcCntl,
     Timer,
-    ADC,
-    ADC2,
 };
 use esp_println::println;
 use panic_halt as _;

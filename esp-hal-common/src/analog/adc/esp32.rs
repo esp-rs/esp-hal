@@ -82,6 +82,7 @@ pub trait RegisterAccess {
     fn read_data_sar() -> u16;
 }
 
+#[doc(hidden)]
 impl RegisterAccess for ADC1 {
     fn set_bit_width(resolution: u8) {
         let sensors = unsafe { &*SENS::ptr() };
@@ -375,6 +376,7 @@ where
     }
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! impl_adc_interface {
     ($adc:ident [
