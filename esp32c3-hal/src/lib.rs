@@ -39,6 +39,11 @@ pub mod analog {
     pub use esp_hal_common::analog::{AvailableAnalog, SarAdcExt};
 }
 
+/// Serial Configuration
+pub mod serial {
+    pub use esp_hal_common::serial::*;
+}
+
 extern "C" {
     // Boundaries of the .iram section
     static mut _srwtext: u32;

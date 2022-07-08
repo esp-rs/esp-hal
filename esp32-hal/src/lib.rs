@@ -34,6 +34,11 @@ pub mod analog {
     pub use esp_hal_common::analog::{AvailableAnalog, SensExt};
 }
 
+/// Serial Configuration
+pub mod serial {
+    pub use esp_hal_common::serial::*;
+}
+
 #[no_mangle]
 extern "C" fn DefaultHandler(_level: u32, _interrupt: pac::Interrupt) {}
 
