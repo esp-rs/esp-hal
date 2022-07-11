@@ -2,8 +2,6 @@
 //! You can short the TX and RX pin and see it reads what was written.
 //! Additionally you can connect a logic analzyer to TX and see how the changes
 //! of the configuration change the output signal.
-//! 
-//! THIS CURRENTLY DOESN'T WORK IN DEBUG BUILDS! THIS NEEDS TO GET FIGURED OUT!
 
 #![no_std]
 #![no_main]
