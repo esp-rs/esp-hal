@@ -109,30 +109,30 @@ pub fn get_core() -> Cpu {
 mod critical_section_impl {
     struct CriticalSection;
 
-    critical_section::custom_impl!(CriticalSection);
-
-    // Virtual representation of the PS (processor state) of an Xtensa chip
-    static mut VPS: u32 = 0; // TODO remove when 32bit tokens are supported in CS crate
+    critical_section::set_impl!(CriticalSection);
 
     unsafe impl critical_section::Impl for CriticalSection {
-        unsafe fn acquire() -> u8 {
-            core::arch::asm!("rsil {0}, 15", out(reg) VPS);
+        unsafe fn acquire() -> critical_section::RawToken {
+            let tkn: critical_section::RawToken;
+            core::arch::asm!("rsil {0}, 15", out(reg) tkn);
             #[cfg(feature = "multicore")]
             {
                 let guard = multicore::MULTICORE_LOCK.lock();
                 core::mem::forget(guard); // forget it so drop doesn't run
             }
-            0
+            tkn
         }
 
-        unsafe fn release(_token: u8) {
-            #[cfg(feature = "multicore")]
-            {
-                debug_assert!(multicore::MULTICORE_LOCK.is_owned_by_current_thread());
-                // safety: we logically own the mutex from acquire()
-                multicore::MULTICORE_LOCK.force_unlock();
+        unsafe fn release(token: critical_section::RawToken) {
+            if token != 0 {
+                #[cfg(feature = "multicore")]
+                {
+                    debug_assert!(multicore::MULTICORE_LOCK.is_owned_by_current_thread());
+                    // safety: we logically own the mutex from acquire()
+                    multicore::MULTICORE_LOCK.force_unlock();
+                }
+                core::arch::asm!("wsr.ps {0}", in(reg) token)
             }
-            core::arch::asm!("wsr.ps {0}", in(reg) VPS)
         }
     }
 

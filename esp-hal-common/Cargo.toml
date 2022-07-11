@@ -19,7 +19,7 @@ nb             = "1.0"
 paste          = "1.0"
 procmacros     = { path = "../esp-hal-procmacros", package = "esp-hal-procmacros" }
 void           = { version = "1.0", default-features = false }
-critical-section = { version = "0.2.7",features = ["custom-impl"] }
+critical-section = { git = "https://github.com/embassy-rs/critical-section", features = ["token-u32"] }
 lock_api = { version = "0.4.7", optional = true }
 
 # RISC-V
