@@ -19,7 +19,7 @@ use smart_leds_trait::{SmartLedsWrite, RGB8};
 #[cfg(any(feature = "esp32", feature = "esp32s2"))]
 use crate::pulse_control::ClockSource;
 use crate::{
-    gpio::{types::OutputSignal, OutputPin},
+    gpio::OutputPin,
     pulse_control::{OutputChannel, PulseCode, RepeatMode, TransmissionError},
 };
 
@@ -90,7 +90,7 @@ pub struct SmartLedsAdapter<CHANNEL, PIN, const BUFFER_SIZE: usize> {
 impl<CHANNEL, PIN, const BUFFER_SIZE: usize> SmartLedsAdapter<CHANNEL, PIN, BUFFER_SIZE>
 where
     CHANNEL: OutputChannel,
-    PIN: OutputPin<OutputSignal = OutputSignal>,
+    PIN: OutputPin,
 {
     /// Create a new adapter object that drives the pin using the RMT channel.
     pub fn new(mut channel: CHANNEL, pin: PIN) -> SmartLedsAdapter<CHANNEL, PIN, BUFFER_SIZE> {
@@ -166,7 +166,7 @@ impl<CHANNEL, PIN, const BUFFER_SIZE: usize> SmartLedsWrite
     for SmartLedsAdapter<CHANNEL, PIN, BUFFER_SIZE>
 where
     CHANNEL: OutputChannel,
-    PIN: OutputPin<OutputSignal = OutputSignal>,
+    PIN: OutputPin,
 {
     type Error = LedAdapterError;
     type Color = RGB8;

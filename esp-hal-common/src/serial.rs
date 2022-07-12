@@ -11,11 +11,7 @@ use crate::{
         UART1,
     },
     types::{InputSignal, OutputSignal},
-    Floating,
-    Input,
     InputPin,
-    NoPin,
-    Output,
     OutputPin,
 };
 
@@ -109,16 +105,27 @@ pub mod config {
 }
 
 /// Pins used by the UART interface
-pub struct Pins<TX: OutputPin, RX: InputPin, CTS: InputPin, RTS: OutputPin> {
+
+pub trait UartPins {
+    fn configure_pins(
+        &mut self,
+        tx_signal: OutputSignal,
+        rx_signal: InputSignal,
+        cts_signal: InputSignal,
+        rts_signal: OutputSignal,
+    );
+}
+
+pub struct AllPins<TX: OutputPin, RX: InputPin, CTS: InputPin, RTS: OutputPin> {
     pub tx: Option<TX>,
     pub rx: Option<RX>,
     pub cts: Option<CTS>,
     pub rts: Option<RTS>,
 }
 
-impl<TX: OutputPin, RX: InputPin, CTS: InputPin, RTS: OutputPin> Pins<TX, RX, CTS, RTS> {
-    pub fn new(tx: TX, rx: RX, cts: CTS, rts: RTS) -> Pins<TX, RX, CTS, RTS> {
-        Pins {
+impl<TX: OutputPin, RX: InputPin, CTS: InputPin, RTS: OutputPin> AllPins<TX, RX, CTS, RTS> {
+    pub fn new(tx: TX, rx: RX, cts: CTS, rts: RTS) -> AllPins<TX, RX, CTS, RTS> {
+        AllPins {
             tx: Some(tx),
             rx: Some(rx),
             cts: Some(cts),
@@ -127,18 +134,66 @@ impl<TX: OutputPin, RX: InputPin, CTS: InputPin, RTS: OutputPin> Pins<TX, RX, CT
     }
 }
 
-impl<TX: OutputPin, RX: InputPin> Pins<TX, RX, NoPin<Input<Floating>>, NoPin<Output<Floating>>> {
-    pub fn new_tx_rx(
-        tx: TX,
-        rx: RX,
-    ) -> Pins<TX, RX, NoPin<Input<Floating>>, NoPin<Output<Floating>>> {
-        let pins: Pins<TX, RX, NoPin<Input<Floating>>, NoPin<Output<Floating>>> = Pins {
+impl<TX: OutputPin, RX: InputPin, CTS: InputPin, RTS: OutputPin> UartPins
+    for AllPins<TX, RX, CTS, RTS>
+{
+    fn configure_pins(
+        &mut self,
+        tx_signal: OutputSignal,
+        rx_signal: InputSignal,
+        cts_signal: InputSignal,
+        rts_signal: OutputSignal,
+    ) {
+        if let Some(ref mut tx) = self.tx {
+            tx.set_to_push_pull_output()
+                .connect_peripheral_to_output(tx_signal);
+        }
+
+        if let Some(ref mut rx) = self.rx {
+            rx.set_to_input().connect_input_to_peripheral(rx_signal);
+        }
+
+        if let Some(ref mut cts) = self.cts {
+            cts.set_to_input().connect_input_to_peripheral(cts_signal);
+        }
+
+        if let Some(ref mut rts) = self.rts {
+            rts.set_to_push_pull_output()
+                .connect_peripheral_to_output(rts_signal);
+        }
+    }
+}
+
+pub struct TxRxPins<TX: OutputPin, RX: InputPin> {
+    pub tx: Option<TX>,
+    pub rx: Option<RX>,
+}
+
+impl<TX: OutputPin, RX: InputPin> TxRxPins<TX, RX> {
+    pub fn new_tx_rx(tx: TX, rx: RX) -> TxRxPins<TX, RX> {
+        TxRxPins {
             tx: Some(tx),
             rx: Some(rx),
-            cts: None,
-            rts: None,
-        };
-        pins
+        }
+    }
+}
+
+impl<TX: OutputPin, RX: InputPin> UartPins for TxRxPins<TX, RX> {
+    fn configure_pins(
+        &mut self,
+        tx_signal: OutputSignal,
+        rx_signal: InputSignal,
+        _cts_signal: InputSignal,
+        _rts_signal: OutputSignal,
+    ) {
+        if let Some(ref mut tx) = self.tx {
+            tx.set_to_push_pull_output()
+                .connect_peripheral_to_output(tx_signal);
+        }
+
+        if let Some(ref mut rx) = self.rx {
+            rx.set_to_input().connect_input_to_peripheral(rx_signal);
+        }
     }
 }
 
@@ -159,22 +214,27 @@ where
     T: Instance,
 {
     /// Create a new UART instance with defaults
-    pub fn new_with_config<
-        TX: OutputPin<OutputSignal = OutputSignal>,
-        RX: InputPin<InputSignal = InputSignal>,
-        CTS: InputPin<InputSignal = InputSignal>,
-        RTS: OutputPin<OutputSignal = OutputSignal>,
-    >(
+    pub fn new_with_config<P>(
         uart: T,
         config: Option<Config>,
-        pins: Option<Pins<TX, RX, CTS, RTS>>,
+        mut pins: Option<P>,
         clocks: &Clocks,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, Error>
+    where
+        P: UartPins,
+    {
         let mut serial = Serial { uart };
         serial.uart.disable_rx_interrupts();
         serial.uart.disable_tx_interrupts();
 
-        serial.uart.configure_pins(pins);
+        if let Some(ref mut pins) = pins {
+            pins.configure_pins(
+                serial.uart.tx_signal(),
+                serial.uart.rx_signal(),
+                serial.uart.cts_signal(),
+                serial.uart.rts_signal(),
+            );
+        }
 
         config.map(|config| {
             serial.change_data_bits(config.data_bits);
@@ -441,48 +501,6 @@ pub trait Instance {
         let idle = self.register_block().fsm_status.read().st_urx_out().bits() == 0x0u8;
 
         idle
-    }
-
-    fn configure_pins<
-        TX: OutputPin<OutputSignal = OutputSignal>,
-        RX: InputPin<InputSignal = InputSignal>,
-        CTS: InputPin<InputSignal = InputSignal>,
-        RTS: OutputPin<OutputSignal = OutputSignal>,
-    >(
-        &self,
-        pins: Option<Pins<TX, RX, CTS, RTS>>,
-    ) {
-        if pins.is_some() {
-            let pins = pins.unwrap();
-
-            if pins.tx.is_some() {
-                pins.tx
-                    .unwrap()
-                    .set_to_push_pull_output()
-                    .connect_peripheral_to_output(self.tx_signal());
-            }
-
-            if pins.rx.is_some() {
-                pins.rx
-                    .unwrap()
-                    .set_to_input()
-                    .connect_input_to_peripheral(self.rx_signal());
-            }
-
-            if pins.cts.is_some() {
-                pins.cts
-                    .unwrap()
-                    .set_to_input()
-                    .connect_input_to_peripheral(self.cts_signal());
-            }
-
-            if pins.rts.is_some() {
-                pins.rts
-                    .unwrap()
-                    .set_to_push_pull_output()
-                    .connect_peripheral_to_output(self.rts_signal());
-            }
-        }
     }
 
     fn tx_signal(&self) -> OutputSignal;

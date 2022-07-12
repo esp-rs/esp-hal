@@ -14,7 +14,7 @@ use esp32s2_hal::{
     prelude::*,
     serial::{
         config::{Config, DataBits, Parity, StopBits},
-        Pins,
+        TxRxPins,
     },
     Delay,
     RtcCntl,
@@ -46,7 +46,7 @@ fn main() -> ! {
     };
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-    let pins = Pins::new_tx_rx(
+    let pins = TxRxPins::new_tx_rx(
         io.pins.gpio1.into_push_pull_output(),
         io.pins.gpio2.into_floating_input(),
     );

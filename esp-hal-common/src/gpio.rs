@@ -121,8 +121,6 @@ pub trait Pin {
 }
 
 pub trait InputPin: Pin {
-    type InputSignal;
-
     fn set_to_input(&mut self) -> &mut Self;
 
     fn enable_input(&mut self, on: bool) -> &mut Self;
@@ -131,21 +129,19 @@ pub trait InputPin: Pin {
 
     fn is_input_high(&self) -> bool;
 
-    fn connect_input_to_peripheral(&mut self, signal: Self::InputSignal) -> &mut Self {
+    fn connect_input_to_peripheral(&mut self, signal: InputSignal) -> &mut Self {
         self.connect_input_to_peripheral_with_options(signal, false, false)
     }
 
     fn connect_input_to_peripheral_with_options(
         &mut self,
-        signal: Self::InputSignal,
+        signal: InputSignal,
         invert: bool,
         force_via_gpio_mux: bool,
     ) -> &mut Self;
 }
 
 pub trait OutputPin: Pin {
-    type OutputSignal;
-
     fn set_to_open_drain_output(&mut self) -> &mut Self;
 
     fn set_to_push_pull_output(&mut self) -> &mut Self;
@@ -164,13 +160,13 @@ pub trait OutputPin: Pin {
 
     fn internal_pull_down_in_sleep_mode(&mut self, on: bool) -> &mut Self;
 
-    fn connect_peripheral_to_output(&mut self, signal: Self::OutputSignal) -> &mut Self {
+    fn connect_peripheral_to_output(&mut self, signal: OutputSignal) -> &mut Self {
         self.connect_peripheral_to_output_with_options(signal, false, false, false, false)
     }
 
     fn connect_peripheral_to_output_with_options(
         &mut self,
-        signal: Self::OutputSignal,
+        signal: OutputSignal,
         invert: bool,
         invert_enable: bool,
         enable_from_gpio: bool,
@@ -576,8 +572,6 @@ macro_rules! impl_input {
         }
 
         impl<MODE> InputPin for $pxi<MODE> {
-            type InputSignal = $input_signal;
-
             fn set_to_input(&mut self) -> &mut Self {
                 self.init_input(false, false);
                 self
@@ -607,7 +601,7 @@ macro_rules! impl_input {
 
             fn connect_input_to_peripheral_with_options(
                 &mut self,
-                signal: Self::InputSignal,
+                signal: InputSignal,
                 invert: bool,
                 force_via_gpio_mux: bool,
             ) -> &mut Self {
@@ -616,7 +610,7 @@ macro_rules! impl_input {
                 } else {
                     match signal {
                         $( $(
-                            Self::InputSignal::$af_signal => AlternateFunction::$af,
+                            InputSignal::$af_signal => AlternateFunction::$af,
                         )* )?
                         _ => AlternateFunction::$gpio_function
                     }
@@ -875,8 +869,6 @@ macro_rules! impl_output {
         }
 
         impl<MODE> OutputPin for $pxi<MODE> {
-            type OutputSignal = $output_signal;
-
             fn set_to_open_drain_output(&mut self) -> &mut Self {
                 self.init_output(AlternateFunction::$gpio_function, true);
                 self
@@ -948,7 +940,7 @@ macro_rules! impl_output {
 
             fn connect_peripheral_to_output_with_options(
                 &mut self,
-                signal: Self::OutputSignal,
+                signal: OutputSignal,
                 invert: bool,
                 invert_enable: bool,
                 enable_from_gpio: bool,
@@ -959,7 +951,7 @@ macro_rules! impl_output {
                 } else {
                     match signal {
                         $( $(
-                            Self::OutputSignal::$af_signal => AlternateFunction::$af,
+                            OutputSignal::$af_signal => AlternateFunction::$af,
                         )* )?
                         _ => AlternateFunction::$gpio_function
                     }
@@ -1243,156 +1235,6 @@ macro_rules! analog {
                 }
             }
         )+
-    }
-}
-
-#[doc(hidden)]
-/// A "No-Pin" used internally for convenience.
-pub struct NoPin<MODE> {
-    _mode: PhantomData<MODE>,
-}
-
-impl<MODE> NoPin<Input<MODE>> {}
-
-impl<MODE> NoPin<Output<MODE>> {}
-
-impl<MODE> Pin for NoPin<MODE> {
-    fn number(&self) -> u8 {
-        unreachable!()
-    }
-
-    fn sleep_mode(&mut self, _on: bool) -> &mut Self {
-        unreachable!()
-    }
-
-    fn set_alternate_function(&mut self, _alternate: AlternateFunction) -> &mut Self {
-        unreachable!()
-    }
-
-    fn listen_with_options(
-        &mut self,
-        _event: Event,
-        _int_enable: bool,
-        _nmi_enable: bool,
-        _wake_up_from_light_sleep: bool,
-    ) {
-        unreachable!()
-    }
-
-    fn unlisten(&mut self) {
-        unreachable!()
-    }
-
-    fn clear_interrupt(&mut self) {
-        unreachable!()
-    }
-
-    fn is_pcore_interrupt_set(&self) -> bool {
-        unreachable!()
-    }
-
-    fn is_pcore_non_maskable_interrupt_set(&self) -> bool {
-        unreachable!()
-    }
-
-    fn is_acore_interrupt_set(&self) -> bool {
-        unreachable!()
-    }
-
-    fn is_acore_non_maskable_interrupt_set(&self) -> bool {
-        unreachable!()
-    }
-
-    fn enable_hold(&mut self, _on: bool) {
-        unreachable!()
-    }
-}
-
-impl<MODE> OutputPin for NoPin<MODE> {
-    type OutputSignal = OutputSignal;
-
-    fn set_to_open_drain_output(&mut self) -> &mut Self {
-        unreachable!()
-    }
-
-    fn set_to_push_pull_output(&mut self) -> &mut Self {
-        unreachable!()
-    }
-
-    fn enable_output(&mut self, _on: bool) -> &mut Self {
-        unreachable!()
-    }
-
-    fn set_output_high(&mut self, _on: bool) -> &mut Self {
-        unreachable!()
-    }
-
-    fn set_drive_strength(&mut self, _strength: DriveStrength) -> &mut Self {
-        unreachable!()
-    }
-
-    fn enable_open_drain(&mut self, _on: bool) -> &mut Self {
-        unreachable!()
-    }
-
-    fn enable_output_in_sleep_mode(&mut self, _on: bool) -> &mut Self {
-        unreachable!()
-    }
-
-    fn internal_pull_up_in_sleep_mode(&mut self, _on: bool) -> &mut Self {
-        unreachable!()
-    }
-
-    fn internal_pull_down_in_sleep_mode(&mut self, _on: bool) -> &mut Self {
-        unreachable!()
-    }
-
-    fn connect_peripheral_to_output_with_options(
-        &mut self,
-        _signal: Self::OutputSignal,
-        _invert: bool,
-        _invert_enable: bool,
-        _enable_from_gpio: bool,
-        _force_via_gpio_mux: bool,
-    ) -> &mut Self {
-        unreachable!()
-    }
-
-    fn internal_pull_up(&mut self, _on: bool) -> &mut Self {
-        unreachable!()
-    }
-
-    fn internal_pull_down(&mut self, _on: bool) -> &mut Self {
-        unreachable!()
-    }
-}
-
-impl<MODE> InputPin for NoPin<MODE> {
-    type InputSignal = InputSignal;
-
-    fn set_to_input(&mut self) -> &mut Self {
-        unreachable!()
-    }
-
-    fn enable_input(&mut self, _on: bool) -> &mut Self {
-        unreachable!()
-    }
-
-    fn enable_input_in_sleep_mode(&mut self, _on: bool) -> &mut Self {
-        unreachable!()
-    }
-
-    fn is_input_high(&self) -> bool {
-        unreachable!()
-    }
-
-    fn connect_input_to_peripheral_with_options(
-        &mut self,
-        _signal: Self::InputSignal,
-        _invert: bool,
-        _force_via_gpio_mux: bool,
-    ) -> &mut Self {
-        unreachable!()
     }
 }
 
