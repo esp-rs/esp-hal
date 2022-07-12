@@ -42,7 +42,7 @@ fn main() -> ! {
     // the RTC WDT, and the TIMG WDTs.
     let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
     let mut timer0 = Timer::new(peripherals.TIMG0, clocks.apb_clock);
-    let mut serial0 = Serial::new(peripherals.UART0).unwrap();
+    let mut serial0 = Serial::new(peripherals.UART0);
 
     timer0.disable();
     rtc_cntl.set_wdt_global_enable(false);

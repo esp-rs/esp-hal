@@ -22,7 +22,7 @@ fn main() -> ! {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
-    let mut serial0 = Serial::new(peripherals.UART0).unwrap();
+    let mut serial0 = Serial::new(peripherals.UART0);
     let mut timer0 = Timer::new(peripherals.TIMG0, clocks.apb_clock);
     let mut timer1 = Timer::new(peripherals.TIMG1, clocks.apb_clock);
 

@@ -1,8 +1,6 @@
 //! Connect a potentiometer to PIN3 and see the read values change when
 //! rotating the shaft. Alternatively you could also connect the PIN to GND or
 //! 3V3 to see the maximum and minimum raw values read.
-//!
-//! THIS CURRENTLY DOESN'T WORK IN DEBUG BUILDS! THIS NEEDS TO GET FIGURED OUT!
 
 #![no_std]
 #![no_main]

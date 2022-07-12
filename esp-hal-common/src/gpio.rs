@@ -121,8 +121,6 @@ pub trait Pin {
 }
 
 pub trait InputPin: Pin {
-    type InputSignal;
-
     fn set_to_input(&mut self) -> &mut Self;
 
     fn enable_input(&mut self, on: bool) -> &mut Self;
@@ -131,21 +129,19 @@ pub trait InputPin: Pin {
 
     fn is_input_high(&self) -> bool;
 
-    fn connect_input_to_peripheral(&mut self, signal: Self::InputSignal) -> &mut Self {
+    fn connect_input_to_peripheral(&mut self, signal: InputSignal) -> &mut Self {
         self.connect_input_to_peripheral_with_options(signal, false, false)
     }
 
     fn connect_input_to_peripheral_with_options(
         &mut self,
-        signal: Self::InputSignal,
+        signal: InputSignal,
         invert: bool,
         force_via_gpio_mux: bool,
     ) -> &mut Self;
 }
 
 pub trait OutputPin: Pin {
-    type OutputSignal;
-
     fn set_to_open_drain_output(&mut self) -> &mut Self;
 
     fn set_to_push_pull_output(&mut self) -> &mut Self;
@@ -164,13 +160,13 @@ pub trait OutputPin: Pin {
 
     fn internal_pull_down_in_sleep_mode(&mut self, on: bool) -> &mut Self;
 
-    fn connect_peripheral_to_output(&mut self, signal: Self::OutputSignal) -> &mut Self {
+    fn connect_peripheral_to_output(&mut self, signal: OutputSignal) -> &mut Self {
         self.connect_peripheral_to_output_with_options(signal, false, false, false, false)
     }
 
     fn connect_peripheral_to_output_with_options(
         &mut self,
-        signal: Self::OutputSignal,
+        signal: OutputSignal,
         invert: bool,
         invert_enable: bool,
         enable_from_gpio: bool,
@@ -576,8 +572,6 @@ macro_rules! impl_input {
         }
 
         impl<MODE> InputPin for $pxi<MODE> {
-            type InputSignal = $input_signal;
-
             fn set_to_input(&mut self) -> &mut Self {
                 self.init_input(false, false);
                 self
@@ -607,7 +601,7 @@ macro_rules! impl_input {
 
             fn connect_input_to_peripheral_with_options(
                 &mut self,
-                signal: Self::InputSignal,
+                signal: InputSignal,
                 invert: bool,
                 force_via_gpio_mux: bool,
             ) -> &mut Self {
@@ -616,7 +610,7 @@ macro_rules! impl_input {
                 } else {
                     match signal {
                         $( $(
-                            Self::InputSignal::$af_signal => AlternateFunction::$af,
+                            InputSignal::$af_signal => AlternateFunction::$af,
                         )* )?
                         _ => AlternateFunction::$gpio_function
                     }
@@ -875,8 +869,6 @@ macro_rules! impl_output {
         }
 
         impl<MODE> OutputPin for $pxi<MODE> {
-            type OutputSignal = $output_signal;
-
             fn set_to_open_drain_output(&mut self) -> &mut Self {
                 self.init_output(AlternateFunction::$gpio_function, true);
                 self
@@ -948,7 +940,7 @@ macro_rules! impl_output {
 
             fn connect_peripheral_to_output_with_options(
                 &mut self,
-                signal: Self::OutputSignal,
+                signal: OutputSignal,
                 invert: bool,
                 invert_enable: bool,
                 enable_from_gpio: bool,
@@ -959,7 +951,7 @@ macro_rules! impl_output {
                 } else {
                     match signal {
                         $( $(
-                            Self::OutputSignal::$af_signal => AlternateFunction::$af,
+                            OutputSignal::$af_signal => AlternateFunction::$af,
                         )* )?
                         _ => AlternateFunction::$gpio_function
                     }
@@ -1255,4 +1247,4 @@ pub use impl_interrupt_status_register_access;
 pub use impl_output;
 pub use impl_output_wrap;
 
-use self::types::InputSignal;
+use self::types::{InputSignal, OutputSignal};

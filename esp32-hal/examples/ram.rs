@@ -31,7 +31,7 @@ fn main() -> ! {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let mut timer0 = Timer::new(peripherals.TIMG0, clocks.apb_clock);
-    let mut serial0 = Serial::new(peripherals.UART0).unwrap();
+    let mut serial0 = Serial::new(peripherals.UART0);
 
     // Disable MWDT flash boot protection
     timer0.disable();

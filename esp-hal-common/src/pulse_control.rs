@@ -237,10 +237,7 @@ pub trait OutputChannel {
     /// (Note that we only take a reference here, so the ownership remains with
     /// the calling entity. The configured pin thus can be re-configured
     /// independently.)
-    fn assign_pin<RmtPin: OutputPin<OutputSignal = OutputSignal>>(
-        &mut self,
-        pin: RmtPin,
-    ) -> &mut Self;
+    fn assign_pin<RmtPin: OutputPin>(&mut self, pin: RmtPin) -> &mut Self;
 
     /// Send a pulse sequence in a blocking fashion
     fn send_pulse_sequence<const N: usize>(
@@ -457,7 +454,7 @@ macro_rules! output_channel {
             }
 
             /// Assign a pin that should be driven by this channel
-            fn assign_pin<RmtPin: OutputPin<OutputSignal = OutputSignal>>(
+            fn assign_pin<RmtPin: OutputPin >(
                 &mut self,
                 mut pin: RmtPin,
             ) -> &mut Self {

@@ -12,6 +12,7 @@ pub use esp_hal_common::{
     prelude,
     pulse_control,
     ram,
+    serial,
     spi,
     systimer,
     usb_serial_jtag,

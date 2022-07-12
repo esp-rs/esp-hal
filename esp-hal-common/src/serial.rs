@@ -1,14 +1,202 @@
 //! UART driver
 
+use self::config::Config;
 #[cfg(any(feature = "esp32", feature = "esp32s3"))]
 use crate::pac::UART2;
-use crate::pac::{uart0::RegisterBlock, UART0, UART1};
+use crate::{
+    clock::Clocks,
+    pac::{
+        uart0::{fifo::FIFO_SPEC, RegisterBlock},
+        UART0,
+        UART1,
+    },
+    types::{InputSignal, OutputSignal},
+    InputPin,
+    OutputPin,
+};
 
 const UART_FIFO_SIZE: u16 = 128;
 
 /// Custom serial error type
 #[derive(Debug)]
 pub enum Error {}
+
+/// UART configuration
+pub mod config {
+    /// Number of data bits
+    #[derive(PartialEq, Eq, Copy, Clone, Debug)]
+    pub enum DataBits {
+        DataBits5 = 0,
+        DataBits6 = 1,
+        DataBits7 = 2,
+        DataBits8 = 3,
+    }
+
+    /// Parity check
+    #[derive(PartialEq, Eq, Copy, Clone, Debug)]
+    pub enum Parity {
+        ParityNone,
+        ParityEven,
+        ParityOdd,
+    }
+
+    /// Number of stop bits
+    #[derive(PartialEq, Eq, Copy, Clone, Debug)]
+    pub enum StopBits {
+        /// 1 stop bit
+        STOP1   = 1,
+        /// 1.5 stop bits
+        STOP1P5 = 2,
+        /// 2 stop bits
+        STOP2   = 3,
+    }
+
+    /// UART configuration
+    #[derive(Debug, Copy, Clone)]
+    pub struct Config {
+        pub baudrate: u32,
+        pub data_bits: DataBits,
+        pub parity: Parity,
+        pub stop_bits: StopBits,
+    }
+
+    impl Config {
+        pub fn baudrate(mut self, baudrate: u32) -> Self {
+            self.baudrate = baudrate;
+            self
+        }
+
+        pub fn parity_none(mut self) -> Self {
+            self.parity = Parity::ParityNone;
+            self
+        }
+
+        pub fn parity_even(mut self) -> Self {
+            self.parity = Parity::ParityEven;
+            self
+        }
+
+        pub fn parity_odd(mut self) -> Self {
+            self.parity = Parity::ParityOdd;
+            self
+        }
+
+        pub fn data_bits(mut self, data_bits: DataBits) -> Self {
+            self.data_bits = data_bits;
+            self
+        }
+
+        pub fn stop_bits(mut self, stop_bits: StopBits) -> Self {
+            self.stop_bits = stop_bits;
+            self
+        }
+    }
+
+    impl Default for Config {
+        fn default() -> Config {
+            Config {
+                baudrate: 115_200,
+                data_bits: DataBits::DataBits8,
+                parity: Parity::ParityNone,
+                stop_bits: StopBits::STOP1,
+            }
+        }
+    }
+}
+
+/// Pins used by the UART interface
+pub trait UartPins {
+    fn configure_pins(
+        &mut self,
+        tx_signal: OutputSignal,
+        rx_signal: InputSignal,
+        cts_signal: InputSignal,
+        rts_signal: OutputSignal,
+    );
+}
+
+/// All pins offered by UART
+pub struct AllPins<TX: OutputPin, RX: InputPin, CTS: InputPin, RTS: OutputPin> {
+    pub tx: Option<TX>,
+    pub rx: Option<RX>,
+    pub cts: Option<CTS>,
+    pub rts: Option<RTS>,
+}
+
+/// Tx and Rx pins
+impl<TX: OutputPin, RX: InputPin, CTS: InputPin, RTS: OutputPin> AllPins<TX, RX, CTS, RTS> {
+    pub fn new(tx: TX, rx: RX, cts: CTS, rts: RTS) -> AllPins<TX, RX, CTS, RTS> {
+        AllPins {
+            tx: Some(tx),
+            rx: Some(rx),
+            cts: Some(cts),
+            rts: Some(rts),
+        }
+    }
+}
+
+impl<TX: OutputPin, RX: InputPin, CTS: InputPin, RTS: OutputPin> UartPins
+    for AllPins<TX, RX, CTS, RTS>
+{
+    fn configure_pins(
+        &mut self,
+        tx_signal: OutputSignal,
+        rx_signal: InputSignal,
+        cts_signal: InputSignal,
+        rts_signal: OutputSignal,
+    ) {
+        if let Some(ref mut tx) = self.tx {
+            tx.set_to_push_pull_output()
+                .connect_peripheral_to_output(tx_signal);
+        }
+
+        if let Some(ref mut rx) = self.rx {
+            rx.set_to_input().connect_input_to_peripheral(rx_signal);
+        }
+
+        if let Some(ref mut cts) = self.cts {
+            cts.set_to_input().connect_input_to_peripheral(cts_signal);
+        }
+
+        if let Some(ref mut rts) = self.rts {
+            rts.set_to_push_pull_output()
+                .connect_peripheral_to_output(rts_signal);
+        }
+    }
+}
+
+pub struct TxRxPins<TX: OutputPin, RX: InputPin> {
+    pub tx: Option<TX>,
+    pub rx: Option<RX>,
+}
+
+impl<TX: OutputPin, RX: InputPin> TxRxPins<TX, RX> {
+    pub fn new_tx_rx(tx: TX, rx: RX) -> TxRxPins<TX, RX> {
+        TxRxPins {
+            tx: Some(tx),
+            rx: Some(rx),
+        }
+    }
+}
+
+impl<TX: OutputPin, RX: InputPin> UartPins for TxRxPins<TX, RX> {
+    fn configure_pins(
+        &mut self,
+        tx_signal: OutputSignal,
+        rx_signal: InputSignal,
+        _cts_signal: InputSignal,
+        _rts_signal: OutputSignal,
+    ) {
+        if let Some(ref mut tx) = self.tx {
+            tx.set_to_push_pull_output()
+                .connect_peripheral_to_output(tx_signal);
+        }
+
+        if let Some(ref mut rx) = self.rx {
+            rx.set_to_input().connect_input_to_peripheral(rx_signal);
+        }
+    }
+}
 
 #[cfg(feature = "eh1")]
 impl embedded_hal_1::serial::Error for Error {
@@ -26,13 +214,46 @@ impl<T> Serial<T>
 where
     T: Instance,
 {
-    /// Create a new UART instance
-    pub fn new(uart: T) -> Result<Self, Error> {
+    /// Create a new UART instance with defaults
+    pub fn new_with_config<P>(
+        uart: T,
+        config: Option<Config>,
+        mut pins: Option<P>,
+        clocks: &Clocks,
+    ) -> Self
+    where
+        P: UartPins,
+    {
         let mut serial = Serial { uart };
         serial.uart.disable_rx_interrupts();
         serial.uart.disable_tx_interrupts();
 
-        Ok(serial)
+        if let Some(ref mut pins) = pins {
+            pins.configure_pins(
+                serial.uart.tx_signal(),
+                serial.uart.rx_signal(),
+                serial.uart.cts_signal(),
+                serial.uart.rts_signal(),
+            );
+        }
+
+        config.map(|config| {
+            serial.change_data_bits(config.data_bits);
+            serial.change_parity(config.parity);
+            serial.change_stop_bits(config.stop_bits);
+            serial.change_baud(config.baudrate, clocks);
+        });
+
+        serial
+    }
+
+    /// Create a new UART instance with defaults
+    pub fn new(uart: T) -> Self {
+        let mut serial = Serial { uart };
+        serial.uart.disable_rx_interrupts();
+        serial.uart.disable_tx_interrupts();
+
+        serial
     }
 
     /// Return the raw interface to the underlying UART instance
@@ -68,19 +289,134 @@ where
     }
 
     fn read_byte(&mut self) -> nb::Result<u8, Error> {
+        #[allow(unused_variables)]
+        let offset = 0;
+
+        // on ESP32-S2 we need to use PeriBus2 to read the FIFO
+        #[cfg(feature = "esp32s2")]
+        let offset = 0x20c00000;
+
         if self.uart.get_rx_fifo_count() > 0 {
-            let value = self
-                .uart
-                .register_block()
-                .fifo
-                .read()
-                .rxfifo_rd_byte()
-                .bits();
+            let value = unsafe {
+                let fifo = (self.uart.register_block().fifo.as_ptr() as *mut u8).offset(offset)
+                    as *mut crate::pac::generic::Reg<FIFO_SPEC>;
+                (*fifo).read().rxfifo_rd_byte().bits()
+            };
 
             Ok(value)
         } else {
             Err(nb::Error::WouldBlock)
         }
+    }
+
+    /// Change the number of stop bits
+    pub fn change_stop_bits(&mut self, stop_bits: config::StopBits) -> &mut Self {
+        // workaround for hardware issue, when UART stop bit set as 2-bit mode.
+        #[cfg(feature = "esp32")]
+        if stop_bits == config::StopBits::STOP2 {
+            self.uart
+                .register_block()
+                .rs485_conf
+                .modify(|_, w| w.dl1_en().bit(true));
+
+            self.uart
+                .register_block()
+                .conf0
+                .modify(|_, w| unsafe { w.stop_bit_num().bits(1) });
+        } else {
+            self.uart
+                .register_block()
+                .rs485_conf
+                .modify(|_, w| w.dl1_en().bit(false));
+
+            self.uart
+                .register_block()
+                .conf0
+                .modify(|_, w| unsafe { w.stop_bit_num().bits(stop_bits as u8) });
+        }
+
+        #[cfg(not(feature = "esp32"))]
+        self.uart
+            .register_block()
+            .conf0
+            .modify(|_, w| unsafe { w.stop_bit_num().bits(stop_bits as u8) });
+
+        self
+    }
+
+    /// Change the number of data bits
+    fn change_data_bits(&mut self, data_bits: config::DataBits) -> &mut Self {
+        self.uart
+            .register_block()
+            .conf0
+            .modify(|_, w| unsafe { w.bit_num().bits(data_bits as u8) });
+
+        self
+    }
+
+    /// Change the type of parity checking
+    fn change_parity(&mut self, parity: config::Parity) -> &mut Self {
+        self.uart
+            .register_block()
+            .conf0
+            .modify(|_, w| match parity {
+                config::Parity::ParityNone => w.parity_en().clear_bit(),
+                config::Parity::ParityEven => w.parity_en().set_bit().parity().clear_bit(),
+                config::Parity::ParityOdd => w.parity_en().set_bit().parity().set_bit(),
+            });
+
+        self
+    }
+
+    #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+    fn change_baud(&self, baudrate: u32, clocks: &Clocks) {
+        // we force the clock source to be APB and don't use the decimal part of the
+        // divider
+        let clk = clocks.apb_clock.to_Hz();
+        let max_div = 0b1111_1111_1111 - 1;
+        let clk_div = ((clk) + (max_div * baudrate) - 1) / (max_div * baudrate);
+
+        self.uart.register_block().clk_conf.write(|w| unsafe {
+            w.sclk_sel()
+                .bits(1) // APB
+                .sclk_div_a()
+                .bits(0)
+                .sclk_div_b()
+                .bits(0)
+                .sclk_div_num()
+                .bits(clk_div as u8 - 1)
+                .rx_sclk_en()
+                .bit(true)
+                .tx_sclk_en()
+                .bit(true)
+        });
+
+        let clk = clk / clk_div;
+        let divider = clk / baudrate;
+        let divider = divider as u16;
+
+        self.uart
+            .register_block()
+            .clkdiv
+            .write(|w| unsafe { w.clkdiv().bits(divider).frag().bits(0) });
+    }
+
+    #[cfg(any(feature = "esp32", feature = "esp32s2"))]
+    fn change_baud(&self, baudrate: u32, clocks: &Clocks) {
+        // we force the clock source to be APB and don't use the decimal part of the
+        // divider
+        let clk = clocks.apb_clock.to_Hz();
+
+        self.uart
+            .register_block()
+            .conf0
+            .modify(|_, w| w.tick_ref_always_on().bit(true));
+        let divider = clk / baudrate;
+
+        self.uart
+            .register_block()
+            .clkdiv
+            .write(|w| unsafe { w.clkdiv().bits(divider).frag().bits(0) });
     }
 }
 
@@ -167,12 +503,36 @@ pub trait Instance {
 
         idle
     }
+
+    fn tx_signal(&self) -> OutputSignal;
+
+    fn rx_signal(&self) -> InputSignal;
+
+    fn cts_signal(&self) -> InputSignal;
+
+    fn rts_signal(&self) -> OutputSignal;
 }
 
 impl Instance for UART0 {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
         self
+    }
+
+    fn tx_signal(&self) -> OutputSignal {
+        OutputSignal::U0TXD
+    }
+
+    fn rx_signal(&self) -> InputSignal {
+        InputSignal::U0RXD
+    }
+
+    fn cts_signal(&self) -> InputSignal {
+        InputSignal::U0CTS
+    }
+
+    fn rts_signal(&self) -> OutputSignal {
+        OutputSignal::U0RTS
     }
 }
 
@@ -181,6 +541,22 @@ impl Instance for UART1 {
     fn register_block(&self) -> &RegisterBlock {
         self
     }
+
+    fn tx_signal(&self) -> OutputSignal {
+        OutputSignal::U1TXD
+    }
+
+    fn rx_signal(&self) -> InputSignal {
+        InputSignal::U1RXD
+    }
+
+    fn cts_signal(&self) -> InputSignal {
+        InputSignal::U1CTS
+    }
+
+    fn rts_signal(&self) -> OutputSignal {
+        OutputSignal::U1RTS
+    }
 }
 
 #[cfg(any(feature = "esp32", feature = "esp32s3"))]
@@ -188,6 +564,22 @@ impl Instance for UART2 {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
         self
+    }
+
+    fn tx_signal(&self) -> OutputSignal {
+        OutputSignal::U2TXD
+    }
+
+    fn rx_signal(&self) -> InputSignal {
+        InputSignal::U2RXD
+    }
+
+    fn cts_signal(&self) -> InputSignal {
+        InputSignal::U2CTS
+    }
+
+    fn rts_signal(&self) -> OutputSignal {
+        OutputSignal::U2RTS
     }
 }
 

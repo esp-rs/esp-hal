@@ -52,12 +52,7 @@ where
     T: Instance,
 {
     /// Constructs an SPI instance in 8bit dataframe mode.
-    pub fn new<
-        SCK: OutputPin<OutputSignal = OutputSignal>,
-        MOSI: OutputPin<OutputSignal = OutputSignal>,
-        MISO: InputPin<InputSignal = InputSignal>,
-        CS: OutputPin<OutputSignal = OutputSignal>,
-    >(
+    pub fn new<SCK: OutputPin, MOSI: OutputPin, MISO: InputPin, CS: OutputPin>(
         spi: T,
         mut sck: SCK,
         mut mosi: MOSI,

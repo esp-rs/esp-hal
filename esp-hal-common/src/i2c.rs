@@ -272,10 +272,7 @@ where
     /// Create a new I2C instance
     /// This will enable the peripheral but the peripheral won't get
     /// automatically disabled when this gets dropped.
-    pub fn new<
-        SDA: OutputPin<OutputSignal = OutputSignal> + InputPin<InputSignal = InputSignal>,
-        SCL: OutputPin<OutputSignal = OutputSignal> + InputPin<InputSignal = InputSignal>,
-    >(
+    pub fn new<SDA: OutputPin + InputPin, SCL: OutputPin + InputPin>(
         i2c: T,
         mut sda: SDA,
         mut scl: SCL,
