@@ -13,6 +13,7 @@ pub use esp_hal_common::{
     prelude,
     pulse_control,
     ram,
+    serial,
     spi,
     system,
     systimer,
@@ -37,11 +38,6 @@ pub mod rtc_cntl;
 /// Common module for analog functions
 pub mod analog {
     pub use esp_hal_common::analog::{AvailableAnalog, SarAdcExt};
-}
-
-/// Serial Configuration
-pub mod serial {
-    pub use esp_hal_common::serial::*;
 }
 
 extern "C" {

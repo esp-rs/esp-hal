@@ -11,6 +11,7 @@ pub use esp_hal_common::{
     prelude,
     pulse_control,
     ram,
+    serial,
     spi,
     systimer,
     utils,
@@ -32,11 +33,6 @@ pub mod gpio;
 /// Common module for analog functions
 pub mod analog {
     pub use esp_hal_common::analog::{AvailableAnalog, SensExt};
-}
-
-/// Serial Configuration
-pub mod serial {
-    pub use esp_hal_common::serial::*;
 }
 
 #[no_mangle]

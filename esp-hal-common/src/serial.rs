@@ -105,7 +105,6 @@ pub mod config {
 }
 
 /// Pins used by the UART interface
-
 pub trait UartPins {
     fn configure_pins(
         &mut self,
@@ -116,6 +115,7 @@ pub trait UartPins {
     );
 }
 
+/// All pins offered by UART
 pub struct AllPins<TX: OutputPin, RX: InputPin, CTS: InputPin, RTS: OutputPin> {
     pub tx: Option<TX>,
     pub rx: Option<RX>,
@@ -123,6 +123,7 @@ pub struct AllPins<TX: OutputPin, RX: InputPin, CTS: InputPin, RTS: OutputPin> {
     pub rts: Option<RTS>,
 }
 
+/// Tx and Rx pins
 impl<TX: OutputPin, RX: InputPin, CTS: InputPin, RTS: OutputPin> AllPins<TX, RX, CTS, RTS> {
     pub fn new(tx: TX, rx: RX, cts: CTS, rts: RTS) -> AllPins<TX, RX, CTS, RTS> {
         AllPins {
@@ -219,7 +220,7 @@ where
         config: Option<Config>,
         mut pins: Option<P>,
         clocks: &Clocks,
-    ) -> Result<Self, Error>
+    ) -> Self
     where
         P: UartPins,
     {
@@ -243,16 +244,16 @@ where
             serial.change_baud(config.baudrate, clocks);
         });
 
-        Ok(serial)
+        serial
     }
 
     /// Create a new UART instance with defaults
-    pub fn new(uart: T) -> Result<Self, Error> {
+    pub fn new(uart: T) -> Self {
         let mut serial = Serial { uart };
         serial.uart.disable_rx_interrupts();
         serial.uart.disable_tx_interrupts();
 
-        Ok(serial)
+        serial
     }
 
     /// Return the raw interface to the underlying UART instance

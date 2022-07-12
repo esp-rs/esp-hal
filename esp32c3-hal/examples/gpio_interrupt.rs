@@ -34,7 +34,7 @@ fn main() -> ! {
     let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
     let mut timer0 = Timer::new(peripherals.TIMG0, clocks.apb_clock);
     let mut timer1 = Timer::new(peripherals.TIMG1, clocks.apb_clock);
-    let serial0 = Serial::new(peripherals.UART0).unwrap();
+    let serial0 = Serial::new(peripherals.UART0);
 
     rtc_cntl.set_super_wdt_enable(false);
     rtc_cntl.set_wdt_enable(false);
