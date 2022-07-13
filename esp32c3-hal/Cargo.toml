@@ -29,7 +29,7 @@ embedded-hal   = { version = "0.2", features = ["unproven"] }
 embedded-hal-1 = { package = "embedded-hal", version = "=1.0.0-alpha.8" }
 r0             = "1.0"
 riscv          = "0.8"
-riscv-rt       = { version = "0.8", optional = true }
+riscv-rt       = { version = "0.9", optional = true }
 
 [dependencies.esp-hal-common]
 path     = "../esp-hal-common"
