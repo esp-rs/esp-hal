@@ -202,6 +202,7 @@ where
     }
 }
 
+
 #[cfg(feature = "eh1")]
 pub use ehal1::*;
 
@@ -234,6 +235,84 @@ mod ehal1 {
     {
         fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
             self.spi.send_bytes(words)
+        }
+    }
+
+    impl<T> SpiBusRead for Spi<T>
+    where
+        T: Instance,
+    {
+        fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+            self.spi.read_bytes(words)
+        }
+    }
+
+    impl<T> SpiBus for Spi<T>
+    where
+        T: Instance,
+    {
+        /// Write out data from `write`, read response into `read`.
+        ///
+        /// `read` and `write` are allowed to have different lengths. If `write` is longer, all
+        /// other bytes received are discarded. If `read` is longer, [`EMPTY_WRITE_PAD`] is written
+        /// out as necessary until enough bytes have been read.
+        fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
+            // Optimizations
+            if read.len() == 0 {
+                SpiBusWrite::write(self, write)?;
+            } else if write.len() == 0 {
+                SpiBusRead::read(self, read)?;
+            }
+
+            let mut write_from = 0;
+            let mut read_from = 0;
+
+            loop {
+                // How many bytes we write in this chunk
+                let write_inc = core::cmp::min(FIFO_SIZE, write.len() - write_from);
+                let write_to = write_from + write_inc;
+                // How many bytes we read in this chunk
+                let read_inc = core::cmp::min(FIFO_SIZE, read.len() - read_from);
+                let read_to = read_from + read_inc;
+
+                if (write_inc == 0) && (read_inc == 0) {
+                    break;
+                }
+
+                if write_to < read_to {
+                    // Read more than we write, must pad writing part with zeros
+                    let mut empty = [EMPTY_WRITE_PAD; FIFO_SIZE];
+                    empty[0..write_inc].copy_from_slice(&write[write_from..write_to]);
+                    SpiBusWrite::write(self, &empty)?;
+                } else {
+                    SpiBusWrite::write(self, &write[write_from..write_to])?;
+                }
+
+                SpiBusFlush::flush(self)?;
+
+                if read_inc > 0 {
+                    SpiBusRead::read(self, &mut read[read_from..read_to])?;
+                }
+
+                write_from = write_to;
+                read_from = read_to;
+            }
+            Ok(())
+        }
+
+        /// Transfer data in place.
+        ///
+        /// Writes data from `words` out on the bus and stores the reply into `words`. A convenient
+        /// wrapper around [`write`](SpiBusWrite::write), [`flush`](SpiBusFlush::flush) and
+        /// [`read`](SpiBusRead::read).
+        fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+            // Since we have the traits so neatly implemented above, use them!
+            for chunk in words.chunks_mut(FIFO_SIZE) {
+                SpiBusWrite::write(self, chunk)?;
+                SpiBusFlush::flush(self)?;
+                SpiBusRead::read(self, chunk)?;
+            }
+            Ok(())
         }
     }
 
