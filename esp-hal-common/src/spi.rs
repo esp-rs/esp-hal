@@ -203,41 +203,47 @@ where
 }
 
 #[cfg(feature = "eh1")]
-impl<T> embedded_hal_1::spi::ErrorType for Spi<T> {
-    type Error = Infallible;
-}
+pub use ehal1::*;
 
 #[cfg(feature = "eh1")]
-impl<T> embedded_hal_1::spi::nb::FullDuplex for Spi<T>
-where
-    T: Instance,
-{
-    fn read(&mut self) -> nb::Result<u8, Self::Error> {
-        self.spi.read_byte()
+mod ehal1 {
+    use super::*;
+    use embedded_hal_1::spi::nb::FullDuplex;
+    use embedded_hal_1::spi::blocking::{SpiBus, SpiBusWrite, SpiBusRead, SpiBusFlush};
+
+    impl<T> embedded_hal_1::spi::ErrorType for Spi<T> {
+        type Error = Infallible;
     }
 
-    fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
-        self.spi.write_byte(word)
-    }
-}
+    impl<T> FullDuplex for Spi<T>
+    where
+        T: Instance,
+    {
+        fn read(&mut self) -> nb::Result<u8, Self::Error> {
+            self.spi.read_byte()
+        }
 
-#[cfg(feature = "eh1")]
-impl<T> embedded_hal_1::spi::blocking::SpiBusWrite for Spi<T>
-where
-    T: Instance,
-{
-    fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-        self.spi.send_bytes(words)
+        fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
+            self.spi.write_byte(word)
+        }
     }
-}
 
-#[cfg(feature = "eh1")]
-impl<T> embedded_hal_1::spi::blocking::SpiBusFlush for Spi<T>
-where
-    T: Instance,
-{
-    fn flush(&mut self) -> Result<(), Self::Error> {
-        self.spi.flush()
+    impl<T> SpiBusWrite for Spi<T>
+    where
+        T: Instance,
+    {
+        fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
+            self.spi.send_bytes(words)
+        }
+    }
+
+    impl<T> SpiBusFlush for Spi<T>
+    where
+        T: Instance,
+    {
+        fn flush(&mut self) -> Result<(), Self::Error> {
+            self.spi.flush()
+        }
     }
 }
 
