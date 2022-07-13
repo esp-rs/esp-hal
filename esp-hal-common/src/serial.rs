@@ -102,6 +102,33 @@ pub mod config {
             }
         }
     }
+
+    /// Configuration for the AT-CMD detection functionality
+    pub struct AtCmdConfig {
+        pub pre_idle_count: Option<u16>,
+        pub post_idle_count: Option<u16>,
+        pub gap_timeout: Option<u16>,
+        pub cmd_char: u8,
+        pub char_num: Option<u8>,
+    }
+
+    impl AtCmdConfig {
+        pub fn new(
+            pre_idle_count: Option<u16>,
+            post_idle_count: Option<u16>,
+            gap_timeout: Option<u16>,
+            cmd_char: u8,
+            char_num: Option<u8>,
+        ) -> AtCmdConfig {
+            Self {
+                pre_idle_count,
+                post_idle_count,
+                gap_timeout,
+                cmd_char,
+                char_num,
+            }
+        }
+    }
 }
 
 /// Pins used by the UART interface
@@ -265,6 +292,162 @@ where
     pub fn write_bytes(&mut self, data: &[u8]) -> Result<(), Error> {
         data.iter()
             .try_for_each(|c| nb::block!(self.write_byte(*c)))
+    }
+
+    /// Configures the AT-CMD detection settings.
+    pub fn set_at_cmd(&mut self, config: config::AtCmdConfig) {
+        #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
+        self.uart
+            .register_block()
+            .clk_conf
+            .modify(|_, w| w.sclk_en().clear_bit());
+
+        self.uart.register_block().at_cmd_char.write(|w| unsafe {
+            w.at_cmd_char()
+                .bits(config.cmd_char)
+                .char_num()
+                .bits(config.char_num.or(Some(1)).unwrap())
+        });
+
+        if let Some(pre_idle_count) = config.pre_idle_count {
+            self.uart
+                .register_block()
+                .at_cmd_precnt
+                .write(|w| unsafe { w.pre_idle_num().bits(pre_idle_count.into()) });
+        }
+
+        if let Some(post_idle_count) = config.post_idle_count {
+            self.uart
+                .register_block()
+                .at_cmd_postcnt
+                .write(|w| unsafe { w.post_idle_num().bits(post_idle_count.into()) });
+        }
+
+        if let Some(gap_timeout) = config.gap_timeout {
+            self.uart
+                .register_block()
+                .at_cmd_gaptout
+                .write(|w| unsafe { w.rx_gap_tout().bits(gap_timeout.into()) });
+        }
+
+        #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
+        self.uart
+            .register_block()
+            .clk_conf
+            .modify(|_, w| w.sclk_en().set_bit());
+    }
+
+    /// Configures the RX-FIFO threshold
+    pub fn set_rx_fifo_full_threshold(&mut self, threshold: u16) {
+        #[cfg(feature = "esp32")]
+        let threshold: u8 = threshold as u8;
+
+        self.uart
+            .register_block()
+            .conf1
+            .modify(|_, w| unsafe { w.rxfifo_full_thrhd().bits(threshold) });
+    }
+
+    /// Listen for AT-CMD interrupts
+    pub fn listen_at_cmd(&mut self) {
+        self.uart
+            .register_block()
+            .int_ena
+            .modify(|_, w| w.at_cmd_char_det_int_ena().set_bit());
+    }
+
+    /// Stop listening for AT-CMD interrupts
+    pub fn unlisten_at_cmd(&mut self) {
+        self.uart
+            .register_block()
+            .int_ena
+            .modify(|_, w| w.at_cmd_char_det_int_ena().set_bit());
+    }
+
+    /// Listen for TX-DONE interrupts
+    pub fn listen_tx_done(&mut self) {
+        self.uart
+            .register_block()
+            .int_ena
+            .modify(|_, w| w.tx_done_int_ena().set_bit());
+    }
+
+    /// Stop listening for TX-DONE interrupts
+    pub fn unlisten_tx_done(&mut self) {
+        self.uart
+            .register_block()
+            .int_ena
+            .modify(|_, w| w.tx_done_int_ena().set_bit());
+    }
+
+    /// Listen for RX-FIFO-FULL interrupts
+    pub fn listen_rx_fifo_full(&mut self) {
+        self.uart
+            .register_block()
+            .int_ena
+            .modify(|_, w| w.rxfifo_full_int_ena().set_bit());
+    }
+
+    /// Stop listening for RX-FIFO-FULL interrupts
+    pub fn unlisten_rx_fifo_full(&mut self) {
+        self.uart
+            .register_block()
+            .int_ena
+            .modify(|_, w| w.rxfifo_full_int_ena().set_bit());
+    }
+
+    /// Checks if AT-CMD interrupt is set
+    pub fn at_cmd_interrupt_set(&self) -> bool {
+        self.uart
+            .register_block()
+            .int_raw
+            .read()
+            .at_cmd_char_det_int_raw()
+            .bit_is_set()
+    }
+
+    /// Checks if TX-DONE interrupt is set
+    pub fn tx_done_interrupt_set(&self) -> bool {
+        self.uart
+            .register_block()
+            .int_raw
+            .read()
+            .tx_done_int_raw()
+            .bit_is_set()
+    }
+
+    /// Checks if RX-FIFO-FULL interrupt is set
+    pub fn rx_fifo_full_interrupt_set(&self) -> bool {
+        self.uart
+            .register_block()
+            .int_raw
+            .read()
+            .rxfifo_full_int_raw()
+            .bit_is_set()
+    }
+
+    /// Reset AT-CMD interrupt
+    pub fn reset_at_cmd_interrupt(&self) {
+        self.uart
+            .register_block()
+            .int_clr
+            .write(|w| w.at_cmd_char_det_int_clr().set_bit());
+    }
+
+    /// Reset TX-DONE interrupt
+    pub fn reset_tx_done_interrupt(&self) {
+        self.uart
+            .register_block()
+            .int_clr
+            .write(|w| w.tx_done_int_clr().set_bit());
+    }
+
+    /// Reset RX-FIFO-FULL interrupt
+    pub fn reset_rx_fifo_full_interrupt(&self) {
+        self.uart
+            .register_block()
+            .int_clr
+            .write(|w| w.rxfifo_full_int_clr().set_bit());
     }
 
     fn write_byte(&mut self, word: u8) -> nb::Result<(), Error> {
