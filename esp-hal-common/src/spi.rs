@@ -21,9 +21,9 @@
 //!     &mut clocks,
 //! );
 //! ```
-
 #[cfg(all(feature = "eh1", feature = "esp32c3"))]
-use core::{cell::RefCell, convert::Infallible};
+use core::cell::RefCell;
+use core::convert::Infallible;
 
 use fugit::HertzU32;
 #[cfg(all(feature = "eh1", feature = "esp32c3"))]
