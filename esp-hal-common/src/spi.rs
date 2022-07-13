@@ -527,6 +527,14 @@ pub trait Instance {
         }
         Ok(())
     }
+
+    fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Infallible> {
+        for chunk in words.chunks_mut(FIFO_SIZE) {
+            self.send_bytes(chunk)?;
+            self.flush()?;
+            self.read_bytes(chunk)?;
+        }
+
         Ok(words)
     }
 
