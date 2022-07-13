@@ -22,9 +22,12 @@
 //! );
 //! ```
 
-use core::convert::Infallible;
+#[cfg(all(feature = "eh1", feature = "esp32c3"))]
+use core::{cell::RefCell, convert::Infallible};
 
 use fugit::HertzU32;
+#[cfg(all(feature = "eh1", feature = "esp32c3"))]
+use riscv::interrupt::Mutex;
 
 use crate::{
     clock::Clocks,
@@ -41,6 +44,82 @@ pub enum SpiMode {
     Mode1,
     Mode2,
     Mode3,
+}
+
+#[cfg(feature = "eh1")]
+pub struct SpiDevice<'a, T, CS>
+where
+    T: Instance,
+    CS: OutputPin<OutputSignal = OutputSignal>,
+{
+    spi_master: &'a SpiMaster<T>,
+    cs: CS,
+}
+impl<'a, T, CS> SpiDevice<'a, T, CS>
+where
+    T: Instance,
+    CS: OutputPin<OutputSignal = OutputSignal>,
+{
+    pub fn new(spi_master: &'a SpiMaster<T>, cs: CS) -> Self {
+        Self { spi_master, cs }
+    }
+}
+
+#[cfg(feature = "eh1")]
+pub struct SpiMaster<T> {
+    spi: Mutex<RefCell<Spi<T>>>,
+}
+
+#[cfg(feature = "eh1")]
+impl<T> SpiMaster<T>
+where
+    T: Instance,
+{
+    pub fn new(spi: Spi<T>) -> Self {
+        Self {
+            spi: Mutex::new(RefCell::new(spi)),
+        }
+    }
+}
+
+#[cfg(feature = "eh1")]
+impl<'a, T, CS> embedded_hal_1::spi::ErrorType for SpiDevice<'a, T, CS>
+where
+    T: Instance,
+    CS: OutputPin<OutputSignal = OutputSignal>,
+{
+    type Error = Infallible;
+}
+
+#[cfg(all(feature = "eh1", feature = "esp32c3"))]
+impl<'a, T, CS> embedded_hal_1::spi::blocking::SpiDevice for SpiDevice<'a, T, CS>
+where
+    T: Instance,
+    CS: OutputPin<OutputSignal = OutputSignal>,
+{
+    type Bus = Spi<T>;
+
+    fn transaction<R>(
+        &mut self,
+        f: impl FnOnce(
+            &mut Self::Bus,
+        ) -> Result<R, <Self::Bus as embedded_hal_1::spi::ErrorType>::Error>,
+    ) -> Result<R, Self::Error> {
+        let critical_section = unsafe {
+            riscv::interrupt::disable();
+            riscv::interrupt::CriticalSection::new()
+        };
+        let mut spi = self.spi_master.spi.borrow(critical_section).borrow_mut();
+        self.cs.connect_peripheral_to_output(spi.spi.cs_signal());
+        let trans_result = f(&mut spi);
+        let flush_result = spi.spi.flush_bus();
+        drop(spi);
+        unsafe {
+            riscv::interrupt::enable();
+        }
+        flush_result?;
+        trans_result
+    }
 }
 
 pub struct Spi<T> {
@@ -227,6 +306,15 @@ where
         self.spi.send_bytes(words)
     }
 }
+#[cfg(feature = "eh1")]
+impl<T> embedded_hal_1::spi::blocking::SpiBusRead for Spi<T>
+where
+    T: Instance,
+{
+    fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+        unimplemented!()
+    }
+}
 
 #[cfg(feature = "eh1")]
 impl<T> embedded_hal_1::spi::blocking::SpiBusFlush for Spi<T>
@@ -234,7 +322,20 @@ where
     T: Instance,
 {
     fn flush(&mut self) -> Result<(), Self::Error> {
-        self.spi.flush()
+        self.spi.flush_bus()
+    }
+}
+
+#[cfg(feature = "eh1")]
+impl<T> embedded_hal_1::spi::blocking::SpiBus for Spi<T>
+where
+    T: Instance,
+{
+    fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
+        unimplemented!()
+    }
+    fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+        unimplemented!()
     }
 }
 
@@ -500,7 +601,7 @@ pub trait Instance {
     }
 
     // Check if the bus is busy and if it is wait for it to be idle
-    fn flush(&mut self) -> Result<(), Infallible> {
+    fn flush_bus(&mut self) -> Result<(), Infallible> {
         let reg_block = self.register_block();
 
         while reg_block.cmd.read().usr().bit_is_set() {
