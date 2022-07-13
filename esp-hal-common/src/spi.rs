@@ -496,42 +496,11 @@ pub trait Instance {
         Ok(())
     }
 
-    // Check if the bus is busy and if it is wait for it to be idle
-    fn flush(&mut self) -> Result<(), Infallible> {
+    fn read_bytes(&mut self, words: &mut [u8]) -> Result<(), Infallible> {
         let reg_block = self.register_block();
 
-        while reg_block.cmd.read().usr().bit_is_set() {
-            // wait for bus to be clear
-        }
-        Ok(())
-    }
-
-    fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Infallible> {
-        let reg_block = self.register_block();
-
-        for chunk in words.chunks_mut(64) {
-            self.configure_datalen(chunk.len() as u32 * 8);
-
-            let mut fifo_ptr = reg_block.w0.as_ptr();
-            for chunk in chunk.chunks(4) {
-                let mut u32_as_bytes = [0u8; 4];
-                u32_as_bytes[0..(chunk.len())].clone_from_slice(chunk);
-                let reg_val: u32 = u32::from_le_bytes(u32_as_bytes);
-
-                unsafe {
-                    *fifo_ptr = reg_val;
-                    fifo_ptr = fifo_ptr.offset(1);
-                };
-            }
-
-            self.update();
-
-            reg_block.cmd.modify(|_, w| w.usr().set_bit());
-
-            while reg_block.cmd.read().usr().bit_is_set() {
-                // wait
-            }
-
+        for chunk in words.chunks_mut(FIFO_SIZE) {
+            // Beginning of reception buffer
             let mut fifo_ptr = reg_block.w0.as_ptr();
             for index in (0..chunk.len()).step_by(4) {
                 let reg_val = unsafe { *fifo_ptr };
@@ -546,6 +515,18 @@ pub trait Instance {
             }
         }
 
+        Ok(())
+    }
+
+    // Check if the bus is busy and if it is wait for it to be idle
+    fn flush(&mut self) -> Result<(), Infallible> {
+        let reg_block = self.register_block();
+
+        while reg_block.cmd.read().usr().bit_is_set() {
+            // wait for bus to be clear
+        }
+        Ok(())
+    }
         Ok(words)
     }
 
