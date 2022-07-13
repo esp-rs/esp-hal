@@ -454,12 +454,7 @@ pub trait Instance {
     }
 
     fn write_bytes(&mut self, words: &[u8]) -> Result<(), Infallible> {
-        let mut words_mut = [0u8; 256];
-        words_mut[0..words.len()].clone_from_slice(&words[0..words.len()]);
-
-        self.transfer(&mut words_mut[0..words.len()])?;
-
-        Ok(())
+        self.send_bytes(words)
     }
 
     fn send_bytes(&mut self, words: &[u8]) -> Result<(), Infallible> {
