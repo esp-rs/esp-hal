@@ -35,6 +35,9 @@ use crate::{
     OutputPin,
 };
 
+/// The size of the FIFO buffer for SPI
+const FIFO_SIZE: usize = 64;
+
 #[derive(Debug, Clone, Copy)]
 pub enum SpiMode {
     Mode0,
@@ -461,11 +464,10 @@ pub trait Instance {
 
     fn send_bytes(&mut self, words: &[u8]) -> Result<(), Infallible> {
         let reg_block = self.register_block();
-        let num_chuncks = words.len() / 64;
+        let num_chuncks = words.len() / FIFO_SIZE;
 
-        // The fifo has a total of 16 32 bit registers (64 bytes) so the data
-        // must be chunked and then transmitted
-        for (i, chunk) in words.chunks(64).enumerate() {
+        // The fifo has a limited fixed size, so the data must be chunken and then transmitted
+        for (i, chunk) in words.chunks(FIFO_SIZE).enumerate() {
             self.configure_datalen(chunk.len() as u32 * 8);
 
             let mut fifo_ptr = reg_block.w0.as_ptr();
