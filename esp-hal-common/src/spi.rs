@@ -23,9 +23,7 @@
 //! ```
 
 use core::convert::Infallible;
-
 use fugit::HertzU32;
-
 use crate::{
     clock::Clocks,
     pac::spi2::RegisterBlock,
@@ -37,6 +35,7 @@ use crate::{
 
 /// The size of the FIFO buffer for SPI
 const FIFO_SIZE: usize = 64;
+const EMPTY_WRITE_PAD: u8 = 0x00u8;
 
 #[derive(Debug, Clone, Copy)]
 pub enum SpiMode {
@@ -69,8 +68,10 @@ where
         sck.set_to_push_pull_output()
             .connect_peripheral_to_output(spi.sclk_signal());
 
-        mosi.set_to_push_pull_output()
-            .connect_peripheral_to_output(spi.mosi_signal());
+        if let Some(mut mosi) = mosi {
+            mosi.set_to_push_pull_output()
+                .connect_peripheral_to_output(spi.mosi_signal());
+        }
 
         miso.set_to_input()
             .connect_input_to_peripheral(spi.miso_signal());
