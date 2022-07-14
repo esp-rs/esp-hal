@@ -66,12 +66,7 @@ fn main() -> ! {
     // loop.
     let mut delay = Delay::new(&clocks);
 
-    unsafe {
-        xtensa_lx::interrupt::enable_mask(1 << 1);
-    }
-
     loop {
-        esp_println::println!("Interrupt - INTLEVEL: {}", xtensa_lx::interrupt::get_level());
         led.toggle().unwrap();
         delay.delay_ms(500u32);
     }
@@ -80,7 +75,7 @@ fn main() -> ! {
 #[interrupt]
 fn GPIO() {
     unsafe {
-        esp_println::println!("GPIO Interrupt");
+        esp_println::println!("GPIO Interrupt with priority {}", xtensa_lx::interrupt::get_level());
 
         (&BUTTON).lock(|data| {
             let mut button = data.borrow_mut();
