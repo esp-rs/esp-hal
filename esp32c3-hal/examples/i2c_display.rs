@@ -10,6 +10,8 @@
 #![no_std]
 #![no_main]
 
+use core::fmt::Write;
+
 use embedded_graphics::{
     mono_font::{
         ascii::{FONT_6X10, FONT_9X18_BOLD},
@@ -27,6 +29,7 @@ use esp32c3_hal::{
     prelude::*,
     RtcCntl,
     Timer,
+    UsbSerialJtag,
 };
 use nb::block;
 use panic_halt as _;
@@ -70,7 +73,19 @@ fn main() -> ! {
     let interface = I2CDisplayInterface::new(i2c);
     let mut display = Ssd1306::new(interface, DisplaySize128x64, DisplayRotation::Rotate0)
         .into_buffered_graphics_mode();
-    display.init().unwrap();
+
+    loop {
+        if let Err(e) = display.init() {
+            writeln!(
+                UsbSerialJtag,
+                "Failed to initialize display. Error: {:?}",
+                e
+            )
+            .ok();
+        } else {
+            break;
+        }
+    }
 
     // Specify different text styles
     let text_style = MonoTextStyleBuilder::new()
