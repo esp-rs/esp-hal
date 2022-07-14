@@ -415,6 +415,36 @@ pub mod vectored {
             .contains(&interrupt)
         }
     }
+
+    #[cfg(feature = "esp32s2")]
+    mod chip_specific {
+        use super::*;
+        pub const INTERRUPT_EDGE: u128 =
+    0b_0000_0000_0000_0000_0000_0000_0000_0000__0000_0000_0000_0000_0000_0000_0001_1111_1110_0000_0000_0000_0000_0000_0000_0000__0000_0000_0000_0000_0000_0000_0000_0000;
+        pub fn interrupt_is_edge(interrupt: Interrupt) -> bool {
+            use pac::Interrupt::*;
+            [
+                TG0_T0_EDGE,
+                TG0_T1_EDGE,
+                TG0_WDT_EDGE,
+                TG0_LACT_EDGE,
+                TG1_T0_EDGE,
+                TG1_T1_EDGE,
+                TG1_WDT_EDGE,
+                TG1_LACT_EDGE,
+            ]
+            .contains(&interrupt)
+        }
+    }
+
+    #[cfg(feature = "esp32s3")]
+    mod chip_specific {
+        use super::*;
+        pub const INTERRUPT_EDGE: u128 = 0;
+        pub fn interrupt_is_edge(_interrupt: Interrupt) -> bool {
+            false
+        }
+    }
 }
 
 #[cfg(not(feature = "vectored"))]

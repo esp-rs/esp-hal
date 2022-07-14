@@ -35,6 +35,9 @@ r0             = { version = "1.0", optional = true }
 path     = "../esp-hal-common"
 features = ["esp32s3"]
 
+[patch.crates-io]
+xtensa-lx-rt = { git = "https://github.com/esp-rs/xtensa-lx-rt", rev = "70c56b1090d36742077283af2a83ca4bc1b4f338" }
+
 [dev-dependencies]
 embedded-graphics = "0.7"
 panic-halt        = "0.2"
