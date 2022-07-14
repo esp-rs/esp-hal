@@ -275,35 +275,18 @@ pub mod vectored {
     const CPU_INTERRUPT_INTERNAL: u32 = 0b_0010_0000_0000_0001_1000_1000_1100_0000;
     const CPU_INTERRUPT_EDGE: u32 = 0b_0111_0000_0100_0000_0000_1100_1000_0000;
 
-    fn cpu_interrupt_nr_to_cpu_interrupt_handler(_number: u32) -> Option<unsafe extern "C" fn()> {
-        // TODO this needs be in a xtensa_lx with a default impl! Like cortex-m crates
-        // extern "C" {
-        //     fn Timer0();
-        //     fn Timer1();
-        //     fn Timer2();
-
-        //     fn Profiling();
-
-        //     fn SoftwareLevel1();
-        //     fn SoftwareLevel3();
-
-        //     fn NMI();
-        // }
-
-        // match number {
-        //     6 => Timer0,
-        //     7 => SoftwareLevel1,
-        //     11 => Profiling,
-        //     14 => NMI,
-        //     15 => Timer1,
-        //     16 => Timer2,
-        //     29 => SoftwareLevel3,
-        //     _ => return None;
-        // }
-
-        unsafe extern "C" fn nop() {}
-
-        Some(nop)
+    fn cpu_interrupt_nr_to_cpu_interrupt_handler(number: u32) -> Option<unsafe extern "C" fn(u32)> {
+        use xtensa_lx_rt::*;
+        Some(match number {
+            6 => Timer0,
+            7 => Software0,
+            11 => Profiling,
+            14 => NMI,
+            15 => Timer1,
+            16 => Timer2,
+            29 => Software1,
+            _ => return None,
+        })
     }
 
     #[no_mangle]
@@ -360,7 +343,7 @@ pub mod vectored {
                 interrupt::clear(1 << cpu_interrupt_nr);
             }
             if let Some(handler) = cpu_interrupt_nr_to_cpu_interrupt_handler(cpu_interrupt_nr) {
-                handler();
+                handler(level);
             }
         } else {
             if (cpu_interrupt_mask & CPU_INTERRUPT_EDGE) != 0 {

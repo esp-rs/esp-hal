@@ -46,6 +46,9 @@ esp32c3_pac = { package = "esp32c3", git = "https://github.com/esp-rs/esp-pacs.g
 esp32s2_pac = { package = "esp32s2", git = "https://github.com/esp-rs/esp-pacs.git", rev = "148dbb843cba3c311364aa994b8f3f773d15b04f", optional = true }
 esp32s3_pac = { package = "esp32s3", git = "https://github.com/esp-rs/esp-pacs.git", rev = "148dbb843cba3c311364aa994b8f3f773d15b04f", optional = true }
 
+[patch.crates-io]
+xtensa-lx-rt = { git = "https://github.com/esp-rs/xtensa-lx-rt", rev = "70c56b1090d36742077283af2a83ca4bc1b4f338" }
+
 [features]
 esp32   = [  "esp32_pac/rt", "xtensa",   "dual_core", "xtensa-lx-rt/esp32",     "xtensa-lx/esp32"]
 esp32c3 = ["esp32c3_pac/rt", "risc_v", "single_core"]
