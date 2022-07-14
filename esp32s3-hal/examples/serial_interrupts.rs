@@ -53,11 +53,13 @@ fn main() -> ! {
     serial0.listen_at_cmd();
     serial0.listen_rx_fifo_full();
 
-    interrupt::enable(
-        Cpu::ProCpu,
-        pac::Interrupt::UART0,
-        interrupt::CpuInterrupt::Interrupt20LevelPriority2,
-    );
+    unsafe {
+        interrupt::enable(
+            Cpu::ProCpu,
+            pac::Interrupt::UART0,
+            interrupt::CpuInterrupt::Interrupt20LevelPriority2,
+        );
+    }
 
     timer0.start(1u64.secs());
 

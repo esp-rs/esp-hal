@@ -69,25 +69,25 @@ fn main() -> ! {
         (&ALARM0).lock(|data| (*data).replace(Some(alarm0)));
         (&ALARM1).lock(|data| (*data).replace(Some(alarm1)));
         (&ALARM2).lock(|data| (*data).replace(Some(alarm2)));
+
+        interrupt::enable(
+            Cpu::ProCpu,
+            pac::Interrupt::SYSTIMER_TARGET0,
+            interrupt::CpuInterrupt::Interrupt0LevelPriority1,
+        );
+
+        interrupt::enable(
+            Cpu::ProCpu,
+            pac::Interrupt::SYSTIMER_TARGET1,
+            interrupt::CpuInterrupt::Interrupt19LevelPriority2,
+        );
+
+        interrupt::enable(
+            Cpu::ProCpu,
+            pac::Interrupt::SYSTIMER_TARGET2,
+            interrupt::CpuInterrupt::Interrupt23LevelPriority3,
+        );
     }
-
-    interrupt::enable(
-        Cpu::ProCpu,
-        pac::Interrupt::SYSTIMER_TARGET0,
-        interrupt::CpuInterrupt::Interrupt0LevelPriority1,
-    );
-
-    interrupt::enable(
-        Cpu::ProCpu,
-        pac::Interrupt::SYSTIMER_TARGET1,
-        interrupt::CpuInterrupt::Interrupt19LevelPriority2,
-    );
-
-    interrupt::enable(
-        Cpu::ProCpu,
-        pac::Interrupt::SYSTIMER_TARGET2,
-        interrupt::CpuInterrupt::Interrupt23LevelPriority3,
-    );
 
     // Initialize the Delay peripheral, and use it to toggle the LED state in a
     // loop.

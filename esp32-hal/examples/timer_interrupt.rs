@@ -58,31 +58,32 @@ fn main() -> ! {
     wdt1.disable();
     rtc_cntl.set_wdt_global_enable(false);
 
-    interrupt::enable(
-        Cpu::ProCpu,
-        pac::Interrupt::TG0_T0_LEVEL,
-        interrupt::CpuInterrupt::Interrupt20LevelPriority2,
-    );
-    interrupt::enable(
-        Cpu::ProCpu,
-        pac::Interrupt::TG0_T1_LEVEL,
-        interrupt::CpuInterrupt::Interrupt20LevelPriority2,
-    );
+    unsafe {
+        interrupt::enable(
+            Cpu::ProCpu,
+            pac::Interrupt::TG0_T0_LEVEL,
+            interrupt::CpuInterrupt::Interrupt20LevelPriority2,
+        );
+        interrupt::enable(
+            Cpu::ProCpu,
+            pac::Interrupt::TG0_T1_LEVEL,
+            interrupt::CpuInterrupt::Interrupt20LevelPriority2,
+        );
+        interrupt::enable(
+            Cpu::ProCpu,
+            pac::Interrupt::TG1_T0_LEVEL,
+            interrupt::CpuInterrupt::Interrupt23LevelPriority3,
+        );
+        interrupt::enable(
+            Cpu::ProCpu,
+            pac::Interrupt::TG1_T1_LEVEL,
+            interrupt::CpuInterrupt::Interrupt23LevelPriority3,
+        );
+    }
     timer00.start(500u64.millis());
     timer00.listen();
     timer01.start(2500u64.millis());
     timer01.listen();
-
-    interrupt::enable(
-        Cpu::ProCpu,
-        pac::Interrupt::TG1_T0_LEVEL,
-        interrupt::CpuInterrupt::Interrupt23LevelPriority3,
-    );
-    interrupt::enable(
-        Cpu::ProCpu,
-        pac::Interrupt::TG1_T1_LEVEL,
-        interrupt::CpuInterrupt::Interrupt23LevelPriority3,
-    );
     timer10.start(1u64.secs());
     timer10.listen();
     timer11.start(3u64.secs());

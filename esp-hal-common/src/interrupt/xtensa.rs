@@ -47,21 +47,31 @@ pub enum CpuInterrupt {
 }
 
 /// Enable and assign a peripheral interrupt to an CPU interrupt.
-pub fn enable(core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
-    unsafe {
-        let interrupt_number = interrupt as isize;
-        let cpu_interrupt_number = which as isize;
-        let intr_map_base = match core {
-            Cpu::ProCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
-            #[cfg(feature = "dual_core")]
-            Cpu::AppCpu => (*core1_interrupt_peripheral()).app_mac_intr_map.as_ptr(),
-            #[cfg(feature = "single_core")]
-            Cpu::AppCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
-        };
-        intr_map_base
-            .offset(interrupt_number)
-            .write_volatile(cpu_interrupt_number as u32);
-    }
+///
+/// Great care **must** be taken when using with function with interrupt
+/// vectoring (enabled by default). Avoid the following CPU interrupts:
+/// - Interrupt1LevelPriority1
+/// - Interrupt19LevelPriority2
+/// - Interrupt23LevelPriority3
+/// - Interrupt10EdgePriority1
+/// - Interrupt22EdgePriority3
+/// As they are preallocated for interrupt vectoring.
+///
+/// Note: this only maps the interrupt to the CPU interrupt. The CPU interrupt
+/// still needs to be enabled afterwards
+pub unsafe fn enable(core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
+    let interrupt_number = interrupt as isize;
+    let cpu_interrupt_number = which as isize;
+    let intr_map_base = match core {
+        Cpu::ProCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
+        #[cfg(feature = "multicore")]
+        Cpu::AppCpu => (*core1_interrupt_peripheral()).app_mac_intr_map.as_ptr(),
+        #[cfg(feature = "unicore")]
+        Cpu::AppCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
+    };
+    intr_map_base
+        .offset(interrupt_number)
+        .write_volatile(cpu_interrupt_number as u32);
 }
 
 /// Disable the given peripheral interrupt.
