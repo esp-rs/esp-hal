@@ -213,10 +213,17 @@ pub mod vectored {
     ) -> Result<(), Error> {
         let cpu_interrupt =
             interrupt_level_to_cpu_interrupt(level, chip_specific::interrupt_is_edge(interrupt))?;
+        use xtensa_lx::mutex::Mutex as _;
 
-        // (&INTERRUPT_LEVELS_MUTEX).lock(|_| unsafe {
-        // TODO: CS here
-        unsafe {
+        #[cfg(any(feature = "esp32", feature = "esp32s3"))]
+        type Mutex<T> = xtensa_lx::mutex::CriticalSectionSpinLockMutex<T>;
+        #[cfg(feature = "esp32s2")]
+        type Mutex<T> = xtensa_lx::mutex::CriticalSectionMutex<T>;
+
+        // TODO: replace with critical-section CS later
+        static LEVELS_CS: Mutex<()> = Mutex::new(());
+        (&LEVELS_CS).lock(|_| unsafe {
+            // TODO reduce to 3?, as we only support up to 3 prios atm
             for i in 0..=7 {
                 INTERRUPT_LEVELS[i] &= !(1 << interrupt.number());
             }
@@ -227,9 +234,8 @@ pub mod vectored {
             xtensa_lx::interrupt::enable_mask(
                 xtensa_lx::interrupt::get_mask() | 1 << cpu_interrupt as u32,
             );
-        }
+        });
         Ok(())
-        // })
     }
 
     // TODO mention that theses interrupts are reservered in vector mode
