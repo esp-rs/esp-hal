@@ -14,6 +14,7 @@ pub use esp_hal_common::{
     ram,
     serial,
     spi,
+    timer,
     utils,
     Cpu,
     Delay,
@@ -21,7 +22,6 @@ pub use esp_hal_common::{
     Rng,
     RtcCntl,
     Serial,
-    Timer,
 };
 
 pub use self::gpio::IO;

@@ -41,10 +41,10 @@ smart-leds-trait = { version = "0.2.1", optional = true }
 #
 # Please note: for now we use git-dependencies from the `with_source` branch however we pin the dependency
 # to specific commits.
-esp32_pac   = { package = "esp32",   git = "https://github.com/esp-rs/esp-pacs.git", rev = "f5905f30f4796ed4da8fe333b6ed9700901c515b", optional = true }
-esp32c3_pac = { package = "esp32c3", git = "https://github.com/esp-rs/esp-pacs.git", rev = "f5905f30f4796ed4da8fe333b6ed9700901c515b", optional = true }
-esp32s2_pac = { package = "esp32s2", git = "https://github.com/esp-rs/esp-pacs.git", rev = "f5905f30f4796ed4da8fe333b6ed9700901c515b", optional = true }
-esp32s3_pac = { package = "esp32s3", git = "https://github.com/esp-rs/esp-pacs.git", rev = "f5905f30f4796ed4da8fe333b6ed9700901c515b", optional = true }
+esp32_pac   = { package = "esp32",   git = "https://github.com/esp-rs/esp-pacs.git", rev = "148dbb843cba3c311364aa994b8f3f773d15b04f", optional = true }
+esp32c3_pac = { package = "esp32c3", git = "https://github.com/esp-rs/esp-pacs.git", rev = "148dbb843cba3c311364aa994b8f3f773d15b04f", optional = true }
+esp32s2_pac = { package = "esp32s2", git = "https://github.com/esp-rs/esp-pacs.git", rev = "148dbb843cba3c311364aa994b8f3f773d15b04f", optional = true }
+esp32s3_pac = { package = "esp32s3", git = "https://github.com/esp-rs/esp-pacs.git", rev = "148dbb843cba3c311364aa994b8f3f773d15b04f", optional = true }
 
 [features]
 esp32   = [  "esp32_pac/rt", "xtensa",   "dual_core", "xtensa-lx-rt/esp32",   "xtensa-lx/esp32",   "smartled"]

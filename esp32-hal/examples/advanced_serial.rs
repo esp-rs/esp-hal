@@ -15,10 +15,10 @@ use esp32_hal::{
         config::{Config, DataBits, Parity, StopBits},
         TxRxPins,
     },
+    timer::TimerGroup,
     Delay,
     RtcCntl,
     Serial,
-    Timer,
 };
 use esp_println::println;
 use nb::block;
@@ -31,11 +31,12 @@ fn main() -> ! {
     let system = peripherals.DPORT.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let mut timer0 = Timer::new(peripherals.TIMG0, clocks.apb_clock);
+    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let mut wdt = timer_group0.wdt;
     let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
 
     // Disable MWDT and RWDT (Watchdog) flash boot protection
-    timer0.disable();
+    wdt.disable();
     rtc_cntl.set_wdt_global_enable(false);
 
     let config = Config {

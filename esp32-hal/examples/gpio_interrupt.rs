@@ -10,11 +10,11 @@ use esp32_hal::{
     interrupt,
     pac::{self, Peripherals, UART0},
     prelude::*,
+    timer::TimerGroup,
     Cpu,
     Delay,
     RtcCntl,
     Serial,
-    Timer,
 };
 use panic_halt as _;
 use xtensa_lx::mutex::{Mutex, SpinLockMutex};
@@ -31,13 +31,15 @@ fn main() -> ! {
     let system = peripherals.DPORT.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
+    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let mut wdt = timer_group0.wdt;
+
     // Disable the TIMG watchdog timer.
-    let mut timer0 = Timer::new(peripherals.TIMG0, clocks.apb_clock);
     let serial0 = Serial::new(peripherals.UART0);
     let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
 
     // Disable MWDT and RWDT (Watchdog) flash boot protection
-    timer0.disable();
+    wdt.disable();
     rtc_cntl.set_wdt_global_enable(false);
 
     // Set GPIO15 as an output, and set its state high initially.

@@ -24,10 +24,10 @@ use esp32_hal::{
     pac::Peripherals,
     prelude::*,
     spi::{Spi, SpiMode},
+    timer::TimerGroup,
     Delay,
     RtcCntl,
     Serial,
-    Timer,
 };
 use panic_halt as _;
 use xtensa_lx_rt::entry;
@@ -41,10 +41,11 @@ fn main() -> ! {
     // Disable the watchdog timers. For the ESP32-C3, this includes the Super WDT,
     // the RTC WDT, and the TIMG WDTs.
     let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
-    let mut timer0 = Timer::new(peripherals.TIMG0, clocks.apb_clock);
+    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let mut wdt = timer_group0.wdt;
     let mut serial0 = Serial::new(peripherals.UART0);
 
-    timer0.disable();
+    wdt.disable();
     rtc_cntl.set_wdt_global_enable(false);
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);

@@ -14,9 +14,9 @@ use esp32c3_hal::{
         config::{Config, DataBits, Parity, StopBits},
         TxRxPins,
     },
+    timer::TimerGroup,
     RtcCntl,
     Serial,
-    Timer,
     IO,
 };
 use esp_println::println;
@@ -31,14 +31,17 @@ fn main() -> ! {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
-    let mut timer0 = Timer::new(peripherals.TIMG0, clocks.apb_clock);
-    let mut timer1 = Timer::new(peripherals.TIMG1, clocks.apb_clock);
+    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let mut timer0 = timer_group0.timer0;
+    let mut wdt0 = timer_group0.wdt;
+    let timer_group1 = TimerGroup::new(peripherals.TIMG1, &clocks);
+    let mut wdt1 = timer_group1.wdt;
 
     // Disable watchdog timers
     rtc_cntl.set_super_wdt_enable(false);
     rtc_cntl.set_wdt_enable(false);
-    timer0.disable();
-    timer1.disable();
+    wdt0.disable();
+    wdt1.disable();
 
     let config = Config {
         baudrate: 115200,

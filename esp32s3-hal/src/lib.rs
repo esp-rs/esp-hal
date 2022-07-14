@@ -15,6 +15,7 @@ pub use esp_hal_common::{
     serial,
     spi,
     systimer,
+    timer,
     usb_serial_jtag,
     utils,
     Cpu,
@@ -23,7 +24,6 @@ pub use esp_hal_common::{
     Rng,
     RtcCntl,
     Serial,
-    Timer,
     UsbSerialJtag,
 };
 

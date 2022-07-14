@@ -8,8 +8,8 @@ use esp32_hal::{
     pac::{Peripherals, UART0},
     prelude::*,
     ram,
+    timer::TimerGroup,
     Serial,
-    Timer,
 };
 use nb::block;
 use panic_halt as _;
@@ -30,11 +30,13 @@ fn main() -> ! {
     let system = peripherals.DPORT.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let mut timer0 = Timer::new(peripherals.TIMG0, clocks.apb_clock);
+    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let mut timer0 = timer_group0.timer0;
+    let mut wdt = timer_group0.wdt;
     let mut serial0 = Serial::new(peripherals.UART0);
 
     // Disable MWDT flash boot protection
-    timer0.disable();
+    wdt.disable();
     // The RWDT flash boot protection remains enabled and it being triggered is part
     // of the example
 

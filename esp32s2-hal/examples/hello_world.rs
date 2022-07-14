@@ -3,7 +3,14 @@
 
 use core::fmt::Write;
 
-use esp32s2_hal::{clock::ClockControl, pac::Peripherals, prelude::*, RtcCntl, Serial, Timer};
+use esp32s2_hal::{
+    clock::ClockControl,
+    pac::Peripherals,
+    prelude::*,
+    timer::TimerGroup,
+    RtcCntl,
+    Serial,
+};
 use nb::block;
 use panic_halt as _;
 use xtensa_lx_rt::entry;
@@ -14,12 +21,14 @@ fn main() -> ! {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let mut timer0 = Timer::new(peripherals.TIMG0, clocks.apb_clock);
+    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let mut timer0 = timer_group0.timer0;
+    let mut wdt = timer_group0.wdt;
     let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
     let mut serial0 = Serial::new(peripherals.UART0);
 
     // Disable MWDT and RWDT (Watchdog) flash boot protection
-    timer0.disable();
+    wdt.disable();
     rtc_cntl.set_wdt_global_enable(false);
 
     timer0.start(1u64.secs());

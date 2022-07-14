@@ -7,10 +7,11 @@ use esp32_hal::{
     clock::ClockControl,
     pac::{Peripherals, TIMG1},
     prelude::*,
+    timer::{Timer0, TimerGroup},
     CpuControl,
     RtcCntl,
-    Timer,
 };
+use esp_hal_common::Timer;
 use esp_println::println;
 use nb::block;
 use panic_halt as _;
@@ -27,13 +28,19 @@ fn _main() -> ! {
     let system = peripherals.DPORT.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let mut timer0 = Timer::new(peripherals.TIMG0, clocks.apb_clock);
-    let mut timer1 = Timer::new(peripherals.TIMG1, clocks.apb_clock);
+    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let mut timer0 = timer_group0.timer0;
+    let mut wdt0 = timer_group0.wdt;
+
+    let timer_group1 = TimerGroup::new(peripherals.TIMG1, &clocks);
+    let mut timer1 = timer_group1.timer0;
+    let mut wdt1 = timer_group1.wdt;
+
     let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
 
     // Disable MWDT and RWDT (Watchdog) flash boot protection
-    timer0.disable();
-    timer1.disable();
+    wdt0.disable();
+    wdt1.disable();
     rtc_cntl.set_wdt_global_enable(false);
 
     timer0.start(1u64.secs());
@@ -55,7 +62,10 @@ fn _main() -> ! {
     }
 }
 
-fn cpu1_task(timer: &mut Timer<TIMG1>, counter: &xtensa_lx::mutex::SpinLockMutex<AtomicI32>) -> ! {
+fn cpu1_task(
+    timer: &mut Timer<Timer0<TIMG1>>,
+    counter: &xtensa_lx::mutex::SpinLockMutex<AtomicI32>,
+) -> ! {
     println!("Hello World - Core 1!");
     loop {
         block!(timer.wait()).unwrap();

@@ -1,9 +1,13 @@
+//! This demos the watchdog timer.
+//! Basically the same as `hello_world` but if you remove the call to
+//! `wdt.feed()` the watchdog will reset the system.#![no_std]
+
 #![no_std]
 #![no_main]
 
 use core::fmt::Write;
 
-use esp32c3_hal::{
+use esp32s2_hal::{
     clock::ClockControl,
     pac::Peripherals,
     prelude::*,
@@ -13,7 +17,7 @@ use esp32c3_hal::{
 };
 use nb::block;
 use panic_halt as _;
-use riscv_rt::entry;
+use xtensa_lx_rt::entry;
 
 #[entry]
 fn main() -> ! {
@@ -21,23 +25,19 @@ fn main() -> ! {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
-    let mut serial0 = Serial::new(peripherals.UART0);
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let mut timer0 = timer_group0.timer0;
-    let mut wdt0 = timer_group0.wdt;
-    let timer_group1 = TimerGroup::new(peripherals.TIMG1, &clocks);
-    let mut wdt1 = timer_group1.wdt;
+    let mut wdt = timer_group0.wdt;
+    let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
+    let mut serial0 = Serial::new(peripherals.UART0);
 
-    // Disable watchdog timers
-    rtc_cntl.set_super_wdt_enable(false);
-    rtc_cntl.set_wdt_enable(false);
-    wdt0.disable();
-    wdt1.disable();
+    wdt.start(2u64.secs());
+    rtc_cntl.set_wdt_global_enable(false);
 
     timer0.start(1u64.secs());
 
     loop {
+        wdt.feed();
         writeln!(serial0, "Hello world!").unwrap();
         block!(timer0.wait()).unwrap();
     }
