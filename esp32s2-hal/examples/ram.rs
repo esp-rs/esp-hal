@@ -12,9 +12,9 @@ use core::fmt::Write;
 
 use esp32s2_hal::{
     clock::ClockControl,
+    macros::ram,
     pac::{Peripherals, UART0},
     prelude::*,
-    ram,
     timer::TimerGroup,
     Serial,
 };

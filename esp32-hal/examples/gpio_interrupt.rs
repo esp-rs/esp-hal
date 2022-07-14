@@ -58,7 +58,12 @@ fn main() -> ! {
         (&BUTTON).lock(|data| (*data).replace(Some(button)));
     }
 
-    interrupt::vectored::enable_with_priority(Cpu::ProCpu, pac::Interrupt::GPIO, interrupt::vectored::Priority::Priority3).unwrap();
+    interrupt::vectored::enable_with_priority(
+        Cpu::ProCpu,
+        pac::Interrupt::GPIO,
+        interrupt::vectored::Priority::Priority3,
+    )
+    .unwrap();
 
     led.set_high().unwrap();
 
@@ -75,7 +80,10 @@ fn main() -> ! {
 #[interrupt]
 fn GPIO() {
     unsafe {
-        esp_println::println!("GPIO Interrupt with priority {}", xtensa_lx::interrupt::get_level());
+        esp_println::println!(
+            "GPIO Interrupt with priority {}",
+            xtensa_lx::interrupt::get_level()
+        );
 
         (&BUTTON).lock(|data| {
             let mut button = data.borrow_mut();
