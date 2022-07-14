@@ -13,6 +13,7 @@ use esp32s3_hal::{
     gpio::{Gpio0, IO},
     gpio_types::{Event, Input, Pin, PullDown},
     interrupt,
+    macros::ram,
     pac::{self, Peripherals},
     prelude::*,
     timer::TimerGroup,
@@ -74,6 +75,7 @@ fn main() -> ! {
     }
 }
 
+#[ram]
 #[interrupt]
 fn GPIO() {
     unsafe {

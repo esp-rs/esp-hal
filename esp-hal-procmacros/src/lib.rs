@@ -265,6 +265,7 @@ fn check_attr_whitelist(attrs: &[Attribute], caller: WhiteListCaller) -> Result<
         "forbid",
         "cold",
         "ram",
+        "inline",
     ];
 
     'o: for attr in attrs {
@@ -276,7 +277,7 @@ fn check_attr_whitelist(attrs: &[Attribute], caller: WhiteListCaller) -> Result<
 
         let err_str = match caller {
             WhiteListCaller::Interrupt => {
-                "this attribute is not allowed on an interrupt handler controlled by esp32_hal"
+                "this attribute is not allowed on an interrupt handler controlled by esp-hal"
             }
         };
 

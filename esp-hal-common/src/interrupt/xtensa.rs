@@ -171,6 +171,8 @@ unsafe fn core1_interrupt_peripheral() -> *const crate::pac::interrupt_core1::Re
 
 #[cfg(feature = "vectored")]
 pub mod vectored {
+    use procmacros::ram;
+
     use super::*;
 
     #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -331,6 +333,7 @@ pub mod vectored {
         handle_interrupts(level)
     }
 
+    #[ram]
     unsafe fn handle_interrupts(level: u32) {
         let cpu_interrupt_mask =
             interrupt::get() & interrupt::get_mask() & CPU_INTERRUPT_LEVELS[level as usize];
@@ -381,6 +384,7 @@ pub mod vectored {
         }
     }
 
+    #[ram]
     unsafe fn handle_interrupt(level: u32, interrupt: Interrupt) {
         extern "C" {
             // defined in each hal
@@ -400,6 +404,7 @@ pub mod vectored {
         use super::*;
         pub const INTERRUPT_EDGE: u128 =
     0b_0000_0000_0000_0000_0000_0000_0000_0000__0000_0000_0000_0000_0000_0000_0000_0011_1111_1100_0000_0000_0000_0000_0000_0000__0000_0000_0000_0000_0000_0000_0000_0000;
+        #[inline]
         pub fn interrupt_is_edge(interrupt: Interrupt) -> bool {
             use pac::Interrupt::*;
             [
@@ -421,6 +426,7 @@ pub mod vectored {
         use super::*;
         pub const INTERRUPT_EDGE: u128 =
     0b_0000_0000_0000_0000_0000_0000_0000_0000__0000_0000_0000_0000_0000_0000_0001_1111_1110_0000_0000_0000_0000_0000_0000_0000__0000_0000_0000_0000_0000_0000_0000_0000;
+        #[inline]
         pub fn interrupt_is_edge(interrupt: Interrupt) -> bool {
             use pac::Interrupt::*;
             [
@@ -441,6 +447,7 @@ pub mod vectored {
     mod chip_specific {
         use super::*;
         pub const INTERRUPT_EDGE: u128 = 0;
+        #[inline]
         pub fn interrupt_is_edge(_interrupt: Interrupt) -> bool {
             false
         }
