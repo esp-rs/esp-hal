@@ -34,7 +34,6 @@ use fugit::HertzU32;
 
 /// The size of the FIFO buffer for SPI
 const FIFO_SIZE: usize = 64;
-const EMPTY_WRITE_PAD: u8 = 0x00u8;
 
 #[derive(Debug, Clone, Copy)]
 pub enum SpiMode {
@@ -210,6 +209,8 @@ mod ehal1 {
     use super::*;
     use embedded_hal_1::spi::blocking::{SpiBus, SpiBusFlush, SpiBusRead, SpiBusWrite};
     use embedded_hal_1::spi::nb::FullDuplex;
+
+    const EMPTY_WRITE_PAD: u8 = 0x00u8;
 
     impl<T> embedded_hal_1::spi::ErrorType for Spi<T> {
         type Error = Infallible;
