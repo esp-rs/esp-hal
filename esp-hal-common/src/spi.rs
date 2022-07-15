@@ -22,16 +22,15 @@
 //! );
 //! ```
 
-use core::convert::Infallible;
-use fugit::HertzU32;
 use crate::{
     clock::Clocks,
     pac::spi2::RegisterBlock,
     system::PeripheralClockControl,
     types::{InputSignal, OutputSignal},
-    InputPin,
-    OutputPin,
+    InputPin, OutputPin,
 };
+use core::convert::Infallible;
+use fugit::HertzU32;
 
 /// The size of the FIFO buffer for SPI
 const FIFO_SIZE: usize = 64;
@@ -203,15 +202,14 @@ where
     }
 }
 
-
 #[cfg(feature = "eh1")]
 pub use ehal1::*;
 
 #[cfg(feature = "eh1")]
 mod ehal1 {
     use super::*;
+    use embedded_hal_1::spi::blocking::{SpiBus, SpiBusFlush, SpiBusRead, SpiBusWrite};
     use embedded_hal_1::spi::nb::FullDuplex;
-    use embedded_hal_1::spi::blocking::{SpiBus, SpiBusWrite, SpiBusRead, SpiBusFlush};
 
     impl<T> embedded_hal_1::spi::ErrorType for Spi<T> {
         type Error = Infallible;
@@ -397,12 +395,12 @@ pub trait Instance {
             reg_val = 1 << 31;
         } else {
             /* For best duty cycle resolution, we want n to be as close to 32 as
-            * possible, but we also need a pre/n combo that gets us as close as
-            * possible to the intended frequency. To do this, we bruteforce n and
-            * calculate the best pre to go along with that. If there's a choice
-            * between pre/n combos that give the same result, use the one with the
-            * higher n.
-            */
+             * possible, but we also need a pre/n combo that gets us as close as
+             * possible to the intended frequency. To do this, we bruteforce n and
+             * calculate the best pre to go along with that. If there's a choice
+             * between pre/n combos that give the same result, use the one with the
+             * higher n.
+             */
 
             let mut pre: i32;
             let mut bestn: i32 = -1;
@@ -411,15 +409,16 @@ pub trait Instance {
             let mut errval: i32;
 
             /* Start at n = 2. We need to be able to set h/l so we have at least
-            * one high and one low pulse.
-            */
+             * one high and one low pulse.
+             */
 
-            for  n in 2..64 {
+            for n in 2..64 {
                 /* Effectively, this does:
-                *   pre = round((APB_CLK_FREQ / n) / frequency)
-                */
+                 *   pre = round((APB_CLK_FREQ / n) / frequency)
+                 */
 
-                pre = ((apb_clk_freq.raw() as i32/ n) + (frequency.raw() as i32 / 2)) / frequency.raw() as i32;
+                pre = ((apb_clk_freq.raw() as i32 / n) + (frequency.raw() as i32 / 2))
+                    / frequency.raw() as i32;
 
                 if pre <= 0 {
                     pre = 1;
@@ -429,7 +428,9 @@ pub trait Instance {
                     pre = 16;
                 }
 
-                errval = (apb_clk_freq.raw() as i32 / (pre as i32 * n as i32) - frequency.raw() as i32).abs();
+                errval = (apb_clk_freq.raw() as i32 / (pre as i32 * n as i32)
+                    - frequency.raw() as i32)
+                    .abs();
                 if bestn == -1 || errval <= besterr {
                     besterr = errval;
                     bestn = n as i32;
@@ -442,18 +443,18 @@ pub trait Instance {
             let l: i32 = n;
 
             /* Effectively, this does:
-            *   h = round((duty_cycle * n) / 256)
-            */
+             *   h = round((duty_cycle * n) / 256)
+             */
 
             let mut h: i32 = (duty_cycle * n + 127) / 256;
             if h <= 0 {
                 h = 1;
             }
 
-            reg_val = (l as u32 - 1) |
-                    ((h as u32 - 1) << 6) |
-                    ((n as u32 - 1) << 12) |
-                    ((pre as u32 - 1) << 18);
+            reg_val = (l as u32 - 1)
+                | ((h as u32 - 1) << 6)
+                | ((n as u32 - 1) << 12)
+                | ((pre as u32 - 1) << 18);
         }
 
         self.register_block()
