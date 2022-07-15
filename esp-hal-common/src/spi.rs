@@ -232,6 +232,7 @@ mod ehal1 {
     where
         T: Instance,
     {
+        /// See also: [`send_bytes`].
         fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
             self.spi.send_bytes(words)
         }
@@ -241,6 +242,7 @@ mod ehal1 {
     where
         T: Instance,
     {
+        /// See also: [`read_bytes`].
         fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
             self.spi.read_bytes(words)
         }
@@ -254,7 +256,8 @@ mod ehal1 {
         ///
         /// `read` and `write` are allowed to have different lengths. If `write` is longer, all
         /// other bytes received are discarded. If `read` is longer, [`EMPTY_WRITE_PAD`] is written
-        /// out as necessary until enough bytes have been read.
+        /// out as necessary until enough bytes have been read. Reading and writing happens
+        /// simultaneously.
         fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
             // Optimizations
             if read.len() == 0 {
@@ -544,6 +547,14 @@ pub trait Instance {
         self.send_bytes(words)
     }
 
+    /// Send bytes via SPI.
+    ///
+    /// Copies the content of `words` in chunks of 64 bytes into the SPI transmission FIFO. If
+    /// `words` is longer than 64 bytes, multiple sequential transfers are performed. This function
+    /// will return before all bytes of the last chunk to transmit have been sent to the wire. If
+    /// you must ensure that the whole messages was written correctly, use
+    /// [`flush`].
+    // FIXME: See below.
     fn send_bytes(&mut self, words: &[u8]) -> Result<(), Infallible> {
         let reg_block = self.register_block();
         let num_chuncks = words.len() / FIFO_SIZE;
@@ -552,8 +563,8 @@ pub trait Instance {
         for (i, chunk) in words.chunks(FIFO_SIZE).enumerate() {
             self.configure_datalen(chunk.len() as u32 * 8);
 
-            let transfer_num_words = (chunk.len() as u32) / 4;
-            let transfer_num_bytes = (chunk.len() as u32) % 4;
+            // let transfer_num_words = (chunk.len() as u32) / 4;
+            // let transfer_num_bytes = (chunk.len() as u32) % 4;
 
             let fifo_ptr = reg_block.w0.as_ptr();
             unsafe {
@@ -602,6 +613,11 @@ pub trait Instance {
         Ok(())
     }
 
+    /// Read received bytes from SPI.
+    ///
+    /// Copies the contents of the SPI receive FIFO into `words`. This function doesn't perform
+    /// flushing. If you want to read the response to something you have written before, consider
+    /// using [`transfer`] instead.
     fn read_bytes(&mut self, words: &mut [u8]) -> Result<(), Infallible> {
         let reg_block = self.register_block();
 
