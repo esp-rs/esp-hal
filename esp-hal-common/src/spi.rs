@@ -588,18 +588,9 @@ pub trait Instance {
 
         for chunk in words.chunks_mut(FIFO_SIZE) {
             // Beginning of reception buffer
-            let mut fifo_ptr = reg_block.w0.as_ptr();
-            for index in (0..chunk.len()).step_by(4) {
-                let reg_val = unsafe { *fifo_ptr };
-                let bytes = reg_val.to_le_bytes();
-
-                let len = usize::min(chunk.len(), index + 4) - index;
-                chunk[index..(index + len)].clone_from_slice(&bytes[0..len]);
-
-                unsafe {
-                    fifo_ptr = fifo_ptr.offset(1);
-                };
-            }
+            let fifo_ptr = reg_block.w0.as_ptr() as *const u8;
+            let raw_slice = unsafe { core::slice::from_raw_parts::<u8>(fifo_ptr, chunk.len()) };
+            chunk.copy_from_slice(raw_slice);
         }
 
         Ok(())
