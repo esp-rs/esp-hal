@@ -18,9 +18,7 @@
 
 use core::fmt::Write;
 
-use embedded_hal_1::spi::blocking::{
-    SpiBus, SpiBusWrite, SpiBusRead, SpiBusFlush,
-};
+use embedded_hal_1::spi::blocking::SpiBus;
 use esp32_hal::{
     clock::ClockControl,
     gpio::IO,
@@ -72,6 +70,7 @@ fn main() -> ! {
     writeln!(serial0, "=== SPI example with embedded-hal-1 traits ===").unwrap();
 
     loop {
+        // --- Symmetric transfer (Read as much as we write) ---
         write!(serial0, "Starting symmetric transfer...").unwrap();
         let write = [0xde, 0xad, 0xbe, 0xef];
         let mut read: [u8; 4] = [0x00u8; 4];
@@ -82,7 +81,8 @@ fn main() -> ! {
         delay.delay_ms(250u32);
 
 
-        write!(serial0, "Starting assymetric transfer (read > write)...").unwrap();
+        // --- Asymmetric transfer (Read more than we write) ---
+        write!(serial0, "Starting asymetric transfer (read > write)...").unwrap();
         let mut read: [u8; 4] = [0x00; 4];
 
         SpiBus::transfer(&mut spi, &mut read[0..2], &write[..]).expect("Asymmetric transfer failed");
@@ -92,17 +92,32 @@ fn main() -> ! {
         delay.delay_ms(250u32);
 
 
+        // --- Symmetric transfer with huge buffer ---
         // Only your RAM is the limit!
         write!(serial0, "Starting huge transfer...").unwrap();
-        let mut write = [0x55u8; 256];
+        let mut write = [0x55u8; 4096];
         for byte in 0..write.len() {
             write[byte] = byte as u8;
         }
-        let mut read = [0x00u8; 256];
+        let mut read = [0x00u8; 4096];
 
         SpiBus::transfer(&mut spi, &mut read[..], &write[..]).expect("Huge transfer failed");
-        //SpiBus::transfer_in_place(&mut spi, &mut write[..]).expect("Huge transfer failed");
         assert_eq!(write, read);
+        writeln!(serial0, " SUCCESS").unwrap();
+        delay.delay_ms(250u32);
+
+
+        // --- Symmetric transfer with huge buffer in-place (No additional allocation needed) ---
+        write!(serial0, "Starting huge transfer (in-place)...").unwrap();
+        let mut write = [0x55u8; 4096];
+        for byte in 0..write.len() {
+            write[byte] = byte as u8;
+        }
+
+        SpiBus::transfer_in_place(&mut spi, &mut write[..]).expect("Huge transfer failed");
+        for byte in 0..write.len() {
+            assert_eq!(write[byte], byte as u8);
+        }
         writeln!(serial0, " SUCCESS").unwrap();
         delay.delay_ms(250u32);
     }
