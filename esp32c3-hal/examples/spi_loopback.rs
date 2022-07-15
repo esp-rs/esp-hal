@@ -59,7 +59,7 @@ fn main() -> ! {
     let mut spi = Spi::new(
         peripherals.SPI2,
         sclk,
-        mosi,
+        Some(mosi),
         Some(miso),
         Some(cs),
         100u32.kHz(),
