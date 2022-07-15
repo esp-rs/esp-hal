@@ -548,24 +548,43 @@ pub trait Instance {
         let reg_block = self.register_block();
         let num_chuncks = words.len() / FIFO_SIZE;
 
-        // The fifo has a limited fixed size, so the data must be chunken and then transmitted
+        // The fifo has a limited fixed size, so the data must be chunked and then transmitted
         for (i, chunk) in words.chunks(FIFO_SIZE).enumerate() {
             self.configure_datalen(chunk.len() as u32 * 8);
 
-            let mut fifo_ptr = reg_block.w0.as_ptr();
-            for chunk in chunk.chunks(4) {
-                let mut u32_as_bytes = [0u8; 4];
-                unsafe {
-                    let ptr = u32_as_bytes.as_mut_ptr();
-                    ptr.copy_from(chunk.as_ptr(), chunk.len());
-                }
-                let reg_val: u32 = u32::from_le_bytes(u32_as_bytes);
+            let transfer_num_words = (chunk.len() as u32) / 4;
+            let transfer_num_bytes = (chunk.len() as u32) % 4;
 
-                unsafe {
-                    *fifo_ptr = reg_val;
-                    fifo_ptr = fifo_ptr.offset(1);
-                };
+            let fifo_ptr = reg_block.w0.as_ptr();
+            unsafe {
+                // It seems that `copy_nonoverlapping` is significantly faster than regular `copy`,
+                // by about 20%... ?
+                core::ptr::copy_nonoverlapping::<u32>(
+                    chunk.as_ptr() as *const u32,
+                    fifo_ptr as *mut u32,
+                    // FIXME: Using any other transfer length **does not work**. I don't understand
+                    // why.
+                    FIFO_SIZE / 4,
+                );
+                //fifo_ptr = fifo_ptr.offset(transfer_num_words as isize);
             }
+
+            //// Transfer the remaining bytes
+            //if transfer_num_bytes > 0 {
+            //    let transfer_words_bytes = ((chunk.len() as u32) - transfer_num_bytes) as usize;
+            //    let mut u32_as_bytes = [0u8; 4];
+
+            //    unsafe {
+            //        let ptr = u32_as_bytes.as_mut_ptr();
+            //        ptr.copy_from(chunk[transfer_words_bytes..].as_ptr(), chunk.len());
+            //    }
+            //    let reg_val: u32 = u32::from_le_bytes(u32_as_bytes);
+
+            //    unsafe {
+            //        *fifo_ptr = reg_val;
+            //    };
+
+            //}
 
             self.update();
 
