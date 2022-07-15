@@ -62,13 +62,14 @@ fn main() -> ! {
         Some(mosi),
         Some(miso),
         Some(cs),
-        100u32.kHz(),
+        1000u32.kHz(),
         SpiMode::Mode0,
         &mut system.peripheral_clock_control,
         &clocks,
     );
 
     let mut delay = Delay::new(&clocks);
+    writeln!(serial0, "=== SPI example with embedded-hal-1 traits ===").unwrap();
 
     loop {
         write!(serial0, "Starting symmetric transfer...").unwrap();
@@ -90,5 +91,19 @@ fn main() -> ! {
         writeln!(serial0, " SUCCESS").unwrap();
         delay.delay_ms(250u32);
 
+
+        // Only your RAM is the limit!
+        write!(serial0, "Starting huge transfer...").unwrap();
+        let mut write = [0x55u8; 256];
+        for byte in 0..write.len() {
+            write[byte] = byte as u8;
+        }
+        let mut read = [0x00u8; 256];
+
+        SpiBus::transfer(&mut spi, &mut read[..], &write[..]).expect("Huge transfer failed");
+        //SpiBus::transfer_in_place(&mut spi, &mut write[..]).expect("Huge transfer failed");
+        assert_eq!(write, read);
+        writeln!(serial0, " SUCCESS").unwrap();
+        delay.delay_ms(250u32);
     }
 }
