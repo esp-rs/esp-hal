@@ -30,15 +30,12 @@ use esp32_hal::{
 use panic_halt as _;
 use xtensa_lx_rt::entry;
 
-#[cfg(feature = "eh1")]
 use embedded_hal_1::spi::blocking::SpiBus;
-#[cfg(feature = "eh1")]
 use esp32_hal::{
     gpio::IO,
     spi::{Spi, SpiMode},
 };
 
-#[cfg(feature = "eh1")]
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take().unwrap();
@@ -129,26 +126,3 @@ fn main() -> ! {
     }
 }
 
-#[cfg(not(feature = "eh1"))]
-#[entry]
-fn main() -> ! {
-
-    let peripherals = Peripherals::take().unwrap();
-    let system = peripherals.DPORT.split();
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-
-    // Disable the watchdog timers. For the ESP32-C3, this includes the Super WDT,
-    // the RTC WDT, and the TIMG WDTs.
-    let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
-    let mut timer0 = Timer::new(peripherals.TIMG0, clocks.apb_clock);
-    let mut serial0 = Serial::new(peripherals.UART0).unwrap();
-
-    timer0.disable();
-    rtc_cntl.set_wdt_global_enable(false);
-    let mut delay = Delay::new(&clocks);
-
-    loop {
-        writeln!(serial0, "This example requires the 'eh1' feature flag!").unwrap();
-        delay.delay_ms(1000u32);
-    }
-}
