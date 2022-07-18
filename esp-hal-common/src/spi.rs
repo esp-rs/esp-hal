@@ -337,6 +337,106 @@ mod ehal1 {
             self.spi.flush()
         }
     }
+
+    use xtensa_lx::mutex::Mutex;
+    use core::cell::RefCell;
+    use embedded_hal_1::spi;
+    use embedded_hal_1::spi::ErrorType;
+    use embedded_hal_1::spi::blocking::SpiDevice;
+    use embedded_hal_1::digital::blocking::OutputPin;
+
+    /// An SPI device on a shared SPI bus.
+    ///
+    /// This provides device specific access on a shared SPI bus. This allows you to attach
+    /// multiple SPI devices to the same bus, each with its own CS line, and then perform safe
+    /// transfers on them. This is achieved by wrapping an SPI instance that implements [`SpiBus`]
+    /// into a [`Mutex`] to grant exclusive access for the duration of the transactions.
+    ///
+    /// Note that the SPI interface must be wrapped into a [`RefCell`] for reasons of interior
+    /// mutability.
+    ///
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    /// let sclk = io.pins.gpio12;
+    /// let miso = io.pins.gpio11;
+    /// let mosi = io.pins.gpio13;
+    /// let cs = io.pins.gpio10;
+    ///
+    /// let mut spi = hal::spi::Spi::new(
+    ///     peripherals.SPI2,
+    ///     sclk,
+    ///     Some(mosi),
+    ///     Some(miso),
+    ///     None,
+    ///     100u32.kHz(),
+    ///     SpiMode::Mode0,
+    ///     &mut peripheral_clock_control,
+    ///     &mut clocks,
+    /// );
+    /// ```
+    pub struct SpiBusDevice<'a, B, M, CS>
+    where
+        B: SpiBus + ErrorType,
+        M: Mutex<Data=RefCell<B>>,
+        CS: OutputPin,
+    {
+        bus: &'a mut M,
+        cs: CS,
+    }
+
+    //impl<'a, B, M, CS> SpiBusDevice<'a, B, M, CS>
+    //where
+    //    B: SpiBus + ErrorType,
+    //    M: Mutex<Data=RefCell<B>>,
+    //    CS: OutputPin,
+    //{
+    //    pub fn new(bus: M, cs: CS) -> Self {
+    //        let cs = cs.into_push_pull_output();
+    //        SpiBusDevice {
+    //            bus,
+    //            cs,
+    //        }
+    //}
+
+    impl<'a, B, M, CS> ErrorType for SpiBusDevice<'a, B, M, CS>
+    where
+        B: SpiBus + ErrorType,
+        M: Mutex<Data=RefCell<B>>,
+        CS: OutputPin,
+    {
+        type Error = spi::ErrorKind;
+    }
+
+    impl<B, M, CS> SpiDevice for SpiBusDevice<'_, B, M, CS>
+    where
+        B: SpiBus + ErrorType,
+        M: Mutex<Data=RefCell<B>>,
+        CS: OutputPin,
+    {
+        type Bus = B;
+
+        fn transaction<R>(&mut self, f: impl FnOnce(&mut Self::Bus) -> Result<R, <Self::Bus as ErrorType>::Error>) -> Result<R, Self::Error> {
+            self.bus.lock(|bus| {
+                let mut bus = bus.borrow_mut();
+                self.cs.set_low().map_err(|_| spi::ErrorKind::ChipSelectFault)?;
+
+                // We postpone handling these errors until AFTER we raised CS again, so the bus is
+                // free (Or we die trying if CS errors).
+                let f_res = f(&mut bus);
+                let flush_res = bus.flush();
+
+                self.cs.set_high().map_err(|_| spi::ErrorKind::ChipSelectFault)?;
+
+                let f_res = f_res.map_err(|_| spi::ErrorKind::Other)?;
+                flush_res.map_err(|_| spi::ErrorKind::Other)?;
+
+                Ok(f_res)
+            })
+        }
+    }
 }
 
 pub trait Instance {
