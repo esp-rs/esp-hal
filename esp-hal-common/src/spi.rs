@@ -344,6 +344,7 @@ mod ehal1 {
     use embedded_hal_1::spi::ErrorType;
     use embedded_hal_1::spi::blocking::SpiDevice;
     use embedded_hal_1::digital::blocking::OutputPin;
+    //use esp_hal_common::gpio::OutputPin;
 
     /// An SPI device on a shared SPI bus.
     ///
@@ -387,19 +388,20 @@ mod ehal1 {
         cs: CS,
     }
 
-    //impl<'a, B, M, CS> SpiBusDevice<'a, B, M, CS>
-    //where
-    //    B: SpiBus + ErrorType,
-    //    M: Mutex<Data=RefCell<B>>,
-    //    CS: OutputPin,
-    //{
-    //    pub fn new(bus: M, cs: CS) -> Self {
-    //        let cs = cs.into_push_pull_output();
-    //        SpiBusDevice {
-    //            bus,
-    //            cs,
-    //        }
-    //}
+    impl<'a, B, M, CS> SpiBusDevice<'a, B, M, CS>
+    where
+        B: SpiBus + ErrorType,
+        M: Mutex<Data=RefCell<B>>,
+        CS: OutputPin,
+    {
+        pub fn new(bus: &'a mut M, cs: CS) -> Self {
+            //let cs = cs.set_to_push_pull_output();
+            SpiBusDevice {
+                bus,
+                cs,
+            }
+        }
+    }
 
     impl<'a, B, M, CS> ErrorType for SpiBusDevice<'a, B, M, CS>
     where
