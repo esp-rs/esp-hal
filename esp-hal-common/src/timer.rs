@@ -72,17 +72,12 @@ where
 
         let wdt = Wdt::new();
 
-        #[cfg(not(feature = "esp32c3"))]
-        let timer_group = Self {
+        Self {
             timer0,
+            #[cfg(not(feature = "esp32c3"))]
             timer1,
             wdt,
-        };
-
-        #[cfg(feature = "esp32c3")]
-        let timer_group = Self { timer0, wdt };
-
-        timer_group
+        }
     }
 }
 
@@ -119,7 +114,7 @@ where
         self.timg.unlisten();
     }
 
-    /// Clear intereupt status
+    /// Clear interrupt status
     pub fn clear_interrupt(&mut self) {
         self.timg.clear_interrupt();
     }
