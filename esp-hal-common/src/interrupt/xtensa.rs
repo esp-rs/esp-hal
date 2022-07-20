@@ -65,9 +65,9 @@ pub unsafe fn enable(core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
     let cpu_interrupt_number = which as isize;
     let intr_map_base = match core {
         Cpu::ProCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
-        #[cfg(feature = "multicore")]
+        #[cfg(feature = "multi_core")]
         Cpu::AppCpu => (*core1_interrupt_peripheral()).app_mac_intr_map.as_ptr(),
-        #[cfg(feature = "unicore")]
+        #[cfg(feature = "single_core")]
         Cpu::AppCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
     };
     intr_map_base
@@ -81,7 +81,7 @@ pub fn disable(core: Cpu, interrupt: Interrupt) {
         let interrupt_number = interrupt as isize;
         let intr_map_base = match core {
             Cpu::ProCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
-            #[cfg(feature = "dual_core")]
+            #[cfg(feature = "multi_core")]
             Cpu::AppCpu => (*core1_interrupt_peripheral()).app_mac_intr_map.as_ptr(),
             #[cfg(feature = "single_core")]
             Cpu::AppCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
@@ -117,7 +117,7 @@ pub fn get_status(core: Cpu) -> u128 {
                         .bits() as u128)
                         << 64
             }
-            #[cfg(feature = "dual_core")]
+            #[cfg(feature = "multi_core")]
             Cpu::AppCpu => {
                 ((*core1_interrupt_peripheral())
                     .app_intr_status_0
@@ -252,9 +252,9 @@ pub mod vectored {
         unsafe {
             let intr_map_base = match core {
                 Cpu::ProCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
-                #[cfg(feature = "multicore")]
+                #[cfg(feature = "multi_core")]
                 Cpu::AppCpu => (*core1_interrupt_peripheral()).app_mac_intr_map.as_ptr(),
-                #[cfg(feature = "unicore")]
+                #[cfg(feature = "single_core")]
                 Cpu::AppCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
             };
 

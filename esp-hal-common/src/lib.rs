@@ -89,15 +89,15 @@ pub enum Cpu {
 }
 
 pub fn get_core() -> Cpu {
-    #[cfg(all(target_arch = "xtensa", feature = "multicore"))]
+    #[cfg(all(target_arch = "xtensa", feature = "multi_core"))]
     match ((xtensa_lx::get_processor_id() >> 13) & 1) != 0 {
         false => Cpu::ProCpu,
         true => Cpu::AppCpu,
     }
-    // #[cfg(all(target_arch = "riscv32", feature = "multicore"))]
+    // #[cfg(all(target_arch = "riscv32", feature = "multi_core"))]
     // TODO get hart_id
 
     // single core always has ProCpu only
-    #[cfg(feature = "unicore")]
+    #[cfg(feature = "single_core")]
     Cpu::ProCpu
 }

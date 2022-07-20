@@ -58,7 +58,7 @@ esp32s3 = ["esp32s3_pac/rt", "xtensa",   "dual_core", "xtensa-lx-rt/esp32s3", "x
 
 # Core Count (should not be enabled directly, but instead by a PAC's feature)
 single_core = []
-dual_core   = []
+multi_core   = []
 
 # To support `ufmt`
 ufmt = ["ufmt-write"]
