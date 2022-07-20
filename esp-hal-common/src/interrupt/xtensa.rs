@@ -11,6 +11,7 @@ use crate::{
 /// `level1_interrupt`)
 #[allow(unused)]
 #[derive(Debug, Copy, Clone)]
+#[repr(u32)]
 pub enum CpuInterrupt {
     Interrupt0LevelPriority1 = 0,
     Interrupt1LevelPriority1,
@@ -192,30 +193,99 @@ pub mod vectored {
 
     /// Interrupt priority levels.
     #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+    #[repr(u8)]
     pub enum Priority {
         None = 0,
         Priority1,
         Priority2,
         Priority3,
-        // TODO the following priorities are 'unusable' due to the value in PS_INTLEVEL_EXCM
-        // defined in xtensa_lx_rt Xtensa programmer guide indicates we _can_ implement
-        // high level interrupts in Rust, but they recommend we dont (however their reasoning
-        // seemed to indicate interference with rtos')
-        //
-        // Another suggestion from Xtensa programmers guide:
-        // Alternatively, a level-one interrupt can also be used instead (with software
-        // prioritization if needed) but I have no idea what software prioritization would
-        // look like in this context.
-
-        // Priority4,
-        // Priority5,
-        // Priority6,
     }
 
-    /// Stores what interrupts are enabled at each interrupt level
-    static mut INTERRUPT_LEVELS: [u128; 8] = [0u128; 8];
+    impl CpuInterrupt {
+        #[inline]
+        fn level(&self) -> Priority {
+            match self {
+                CpuInterrupt::Interrupt0LevelPriority1
+                | CpuInterrupt::Interrupt1LevelPriority1
+                | CpuInterrupt::Interrupt2LevelPriority1
+                | CpuInterrupt::Interrupt3LevelPriority1
+                | CpuInterrupt::Interrupt4LevelPriority1
+                | CpuInterrupt::Interrupt5LevelPriority1
+                | CpuInterrupt::Interrupt6Timer0Priority1
+                | CpuInterrupt::Interrupt7SoftwarePriority1
+                | CpuInterrupt::Interrupt8LevelPriority1
+                | CpuInterrupt::Interrupt9LevelPriority1
+                | CpuInterrupt::Interrupt10EdgePriority1
+                | CpuInterrupt::Interrupt12LevelPriority1
+                | CpuInterrupt::Interrupt13LevelPriority1
+                | CpuInterrupt::Interrupt17LevelPriority1
+                | CpuInterrupt::Interrupt18LevelPriority1 => Priority::Priority1,
 
-    /// A priority of None, disables the interrupt
+                CpuInterrupt::Interrupt19LevelPriority2
+                | CpuInterrupt::Interrupt20LevelPriority2
+                | CpuInterrupt::Interrupt21LevelPriority2 => Priority::Priority2,
+
+                CpuInterrupt::Interrupt11ProfilingPriority3
+                | CpuInterrupt::Interrupt15Timer1Priority3
+                | CpuInterrupt::Interrupt22EdgePriority3
+                | CpuInterrupt::Interrupt27LevelPriority3
+                | CpuInterrupt::Interrupt29SoftwarePriority3
+                | CpuInterrupt::Interrupt23LevelPriority3 => Priority::Priority3,
+
+                // we direct these to None because we do not support interrupts at this level
+                // through Rust
+                CpuInterrupt::Interrupt24LevelPriority4
+                | CpuInterrupt::Interrupt25LevelPriority4
+                | CpuInterrupt::Interrupt28EdgePriority4
+                | CpuInterrupt::Interrupt30EdgePriority4
+                | CpuInterrupt::Interrupt31EdgePriority5
+                | CpuInterrupt::Interrupt16Timer2Priority5
+                | CpuInterrupt::Interrupt26LevelPriority5
+                | CpuInterrupt::Interrupt14NmiPriority7 => Priority::None,
+            }
+        }
+    }
+
+    /// Get the interrupts configured for the core
+    #[inline]
+    fn get_configured_interrupts(core: Cpu) -> [u128; 7] {
+        unsafe {
+            let intr_map_base = match core {
+                Cpu::ProCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
+                #[cfg(feature = "multicore")]
+                Cpu::AppCpu => (*core1_interrupt_peripheral()).app_mac_intr_map.as_ptr(),
+                #[cfg(feature = "unicore")]
+                Cpu::AppCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
+            };
+
+            let mut levels = [0u128; 7];
+
+            for i in 0..get_interrupt_count() {
+                let i = i as isize;
+                let cpu_interrupt = intr_map_base.offset(i).read_volatile();
+                // safety: cast is safe because of repr(u32)
+                let cpu_interrupt: CpuInterrupt = core::mem::transmute(cpu_interrupt);
+                let level = cpu_interrupt.level() as u8 as usize;
+                levels[level] |= 1 << i;
+            }
+
+            levels
+        }
+    }
+
+    #[inline]
+    fn get_interrupt_count() -> usize {
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "esp32")] {
+                68
+            } else if #[cfg(feature = "esp32s2")] {
+                94
+            } else if #[cfg(feature = "esp32s3")] {
+                98
+            }
+        }
+    }
+
     pub fn enable_with_priority(
         core: crate::Cpu,
         interrupt: Interrupt,
@@ -223,33 +293,17 @@ pub mod vectored {
     ) -> Result<(), Error> {
         let cpu_interrupt =
             interrupt_level_to_cpu_interrupt(level, chip_specific::interrupt_is_edge(interrupt))?;
-        use xtensa_lx::mutex::Mutex as _;
 
-        #[cfg(any(feature = "esp32", feature = "esp32s3"))]
-        type Mutex<T> = xtensa_lx::mutex::CriticalSectionSpinLockMutex<T>;
-        #[cfg(feature = "esp32s2")]
-        type Mutex<T> = xtensa_lx::mutex::CriticalSectionMutex<T>;
-
-        // TODO: replace with critical-section CS later
-        static LEVELS_CS: Mutex<()> = Mutex::new(());
-        (&LEVELS_CS).lock(|_| unsafe {
-            // TODO reduce to 3?, as we only support up to 3 prios atm
-            for i in 0..=7 {
-                INTERRUPT_LEVELS[i] &= !(1 << interrupt.number());
-            }
-            INTERRUPT_LEVELS[level as usize] |= 1 << interrupt.number();
-
+        unsafe {
             enable(core, interrupt, cpu_interrupt);
 
             xtensa_lx::interrupt::enable_mask(
                 xtensa_lx::interrupt::get_mask() | 1 << cpu_interrupt as u32,
             );
-        });
+        }
         Ok(())
     }
 
-    // TODO mention that theses interrupts are reservered in vector mode
-    // TODO make the normal `enable` unsafe? Would break vectoring unless careful
     fn interrupt_level_to_cpu_interrupt(
         level: Priority,
         is_edge: bool,
@@ -260,10 +314,6 @@ pub mod vectored {
                 Priority::Priority1 => CpuInterrupt::Interrupt10EdgePriority1,
                 Priority::Priority2 => return Err(Error::InvalidInterrupt),
                 Priority::Priority3 => CpuInterrupt::Interrupt22EdgePriority3,
-                // Priority::Priority4 => CpuInterrupt::Interrupt28EdgePriority4,
-                // Priority::Priority5 => CpuInterrupt::Interrupt31EdgePriority5,
-                // Priority::Priority6 => return Err(Error::InvalidInterrupt),
-                // Priority::Priority7 => CpuInterrupt::Interrupt14NmiPriority7,
             }
         } else {
             match level {
@@ -271,10 +321,6 @@ pub mod vectored {
                 Priority::Priority1 => CpuInterrupt::Interrupt1LevelPriority1,
                 Priority::Priority2 => CpuInterrupt::Interrupt19LevelPriority2,
                 Priority::Priority3 => CpuInterrupt::Interrupt23LevelPriority3,
-                // Priority::Priority4 => CpuInterrupt::Interrupt24LevelPriority4,
-                // Priority::Priority5 => CpuInterrupt::Interrupt26LevelPriority5,
-                // Priority::Priority6 => return Err(Error::InvalidInterrupt),
-                // Priority::Priority7 => CpuInterrupt::Interrupt14NmiPriority7,
             }
         })
     }
@@ -293,8 +339,10 @@ pub mod vectored {
     const CPU_INTERRUPT_INTERNAL: u32 = 0b_0010_0000_0000_0001_1000_1000_1100_0000;
     const CPU_INTERRUPT_EDGE: u32 = 0b_0111_0000_0100_0000_0000_1100_1000_0000;
 
+    #[inline]
     fn cpu_interrupt_nr_to_cpu_interrupt_handler(number: u32) -> Option<unsafe extern "C" fn(u32)> {
         use xtensa_lx_rt::*;
+        // we're fortunate that all esp variants use the same CPU interrupt layout
         Some(match number {
             6 => Timer0,
             7 => Software0,
@@ -365,6 +413,7 @@ pub mod vectored {
                 handler(level);
             }
         } else {
+            let interrupt_levels = get_configured_interrupts(crate::get_core());
             if (cpu_interrupt_mask & CPU_INTERRUPT_EDGE) != 0 {
                 let cpu_interrupt_mask = cpu_interrupt_mask & CPU_INTERRUPT_EDGE;
                 let cpu_interrupt_nr = cpu_interrupt_mask.trailing_zeros();
@@ -374,7 +423,7 @@ pub mod vectored {
                 // register, therefore call all registered
                 // handlers for current level
                 let mut interrupt_mask =
-                    INTERRUPT_LEVELS[level as usize] & chip_specific::INTERRUPT_EDGE;
+                    interrupt_levels[level as usize] & chip_specific::INTERRUPT_EDGE;
                 loop {
                     let interrupt_nr = interrupt_mask.trailing_zeros();
                     if let Ok(interrupt) = pac::Interrupt::try_from(interrupt_nr as u16) {
@@ -388,7 +437,7 @@ pub mod vectored {
                 // finally check periperal sources and fire of handlers from pac
                 // peripheral mapped interrupts are cleared by the peripheral
                 let interrupt_mask =
-                    get_status(crate::get_core()) & INTERRUPT_LEVELS[level as usize];
+                    get_status(crate::get_core()) & interrupt_levels[level as usize];
                 let interrupt_nr = interrupt_mask.trailing_zeros();
 
                 // Interrupt::try_from can fail if interrupt already de-asserted:
