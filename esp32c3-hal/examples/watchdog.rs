@@ -1,3 +1,7 @@
+//! This demos the watchdog timer.
+//! Basically the same as `hello_world` but if you remove the call to
+//! `wdt.feed()` the watchdog will reset the system.
+
 #![no_std]
 #![no_main]
 
@@ -32,12 +36,13 @@ fn main() -> ! {
     // Disable watchdog timers
     rtc_cntl.set_super_wdt_enable(false);
     rtc_cntl.set_wdt_enable(false);
-    wdt0.disable();
+    wdt0.start(2u64.secs());
     wdt1.disable();
 
     timer0.start(1u64.secs());
 
     loop {
+        wdt0.feed();
         writeln!(serial0, "Hello world!").unwrap();
         block!(timer0.wait()).unwrap();
     }

@@ -17,13 +17,13 @@ pub use esp_hal_common::{
     spi,
     system,
     systimer,
+    timer,
     utils,
     Cpu,
     Delay,
     PulseControl,
     Rng,
     Serial,
-    Timer,
     UsbSerialJtag,
 };
 #[cfg(feature = "direct-boot")]

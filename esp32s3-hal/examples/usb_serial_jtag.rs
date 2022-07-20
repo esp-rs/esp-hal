@@ -7,9 +7,9 @@ use esp32s3_hal::{
     clock::ClockControl,
     pac::Peripherals,
     prelude::*,
+    timer::TimerGroup,
     Delay,
     RtcCntl,
-    Timer,
     UsbSerialJtag,
 };
 use panic_halt as _;
@@ -23,10 +23,11 @@ fn main() -> ! {
 
     let mut delay = Delay::new(&clocks);
     let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
-    let mut timer0 = Timer::new(peripherals.TIMG0, clocks.apb_clock);
+    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let mut wdt = timer_group0.wdt;
 
     // Disable MWDT and RWDT (Watchdog) flash boot protection
-    timer0.disable();
+    wdt.disable();
     rtc_cntl.set_wdt_global_enable(false);
 
     loop {

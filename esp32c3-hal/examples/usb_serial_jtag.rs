@@ -7,9 +7,9 @@ use esp32c3_hal::{
     clock::ClockControl,
     pac::Peripherals,
     prelude::*,
+    timer::TimerGroup,
     Delay,
     RtcCntl,
-    Timer,
     UsbSerialJtag,
 };
 use panic_halt as _;
@@ -23,14 +23,16 @@ fn main() -> ! {
 
     let mut delay = Delay::new(&clocks);
     let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
-    let mut timer0 = Timer::new(peripherals.TIMG0, clocks.apb_clock);
-    let mut timer1 = Timer::new(peripherals.TIMG1, clocks.apb_clock);
+    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let mut wdt0 = timer_group0.wdt;
+    let timer_group1 = TimerGroup::new(peripherals.TIMG1, &clocks);
+    let mut wdt1 = timer_group1.wdt;
 
     // Disable watchdog timers
     rtc_cntl.set_super_wdt_enable(false);
     rtc_cntl.set_wdt_enable(false);
-    timer0.disable();
-    timer1.disable();
+    wdt0.disable();
+    wdt1.disable();
 
     loop {
         writeln!(UsbSerialJtag, "Hello world!").ok();

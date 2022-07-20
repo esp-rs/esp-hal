@@ -1,0 +1,23 @@
+{
+    "rust-analyzer.cargo.features": [
+        "esp32"
+    ],
+    "rust-analyzer.cargo.allFeatures": false,
+    "editor.formatOnSave": false,
+    "rust-analyzer.checkOnSave.allTargets": true,
+    "rust-analyzer.checkOnSave.allFeatures": false,
+    "rust-analyzer.checkOnSave.overrideCommand": [
+        "cargo",
+        "check",
+        "--features",
+        "esp32",
+        "--message-format=json",
+        "-Z",
+        "build-std=core",
+        "--target",
+        "xtensa-esp32-none-elf",
+        "--examples",
+        "--lib",
+    ],
+    "rust-analyzer.cargo.buildScripts.enable": false
+}

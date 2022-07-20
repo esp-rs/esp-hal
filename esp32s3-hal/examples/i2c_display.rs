@@ -27,9 +27,9 @@ use esp32s3_hal::{
     i2c::I2C,
     pac::Peripherals,
     prelude::*,
+    timer::TimerGroup,
     RtcCntl,
     Serial,
-    Timer,
 };
 use nb::block;
 use panic_halt as _;
@@ -42,12 +42,14 @@ fn main() -> ! {
     let mut system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let mut timer0 = Timer::new(peripherals.TIMG0, clocks.apb_clock);
+    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let mut timer0 = timer_group0.timer0;
+    let mut wdt = timer_group0.wdt;
     let mut serial0 = Serial::new(peripherals.UART0);
     let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
 
     // Disable watchdog timer
-    timer0.disable();
+    wdt.disable();
     rtc_cntl.set_wdt_global_enable(false);
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
