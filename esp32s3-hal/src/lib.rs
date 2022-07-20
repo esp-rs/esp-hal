@@ -1,6 +1,6 @@
 #![no_std]
-#![feature(naked_functions)]
-#![feature(asm_experimental_arch)]
+#![cfg_attr(feature = "direct-boot", feature(naked_functions))]
+#![cfg_attr(feature = "direct-boot", feature(asm_experimental_arch))]
 
 pub use embedded_hal as ehal;
 pub use esp_hal_common::{
