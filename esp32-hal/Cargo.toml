@@ -31,9 +31,6 @@ xtensa-lx      = { version = "0.7",  features = ["esp32"] }
 xtensa-lx-rt   = { version = "0.13", features = ["esp32"], optional = true }
 nb             = "1.0.0"
 
-[patch.crates-io]
-xtensa-lx-rt = { git = "https://github.com/esp-rs/xtensa-lx-rt", rev = "70c56b1090d36742077283af2a83ca4bc1b4f338" }
-
 [dependencies.esp-hal-common]
 path     = "../esp-hal-common"
 features = ["esp32"]

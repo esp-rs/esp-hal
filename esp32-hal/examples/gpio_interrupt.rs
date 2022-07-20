@@ -56,7 +56,7 @@ fn main() -> ! {
     interrupt::vectored::enable_with_priority(
         Cpu::ProCpu,
         pac::Interrupt::GPIO,
-        interrupt::vectored::Priority::Priority3,
+        interrupt::vectored::Priority::Priority2,
     )
     .unwrap();
 
