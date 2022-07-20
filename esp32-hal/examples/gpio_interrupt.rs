@@ -20,8 +20,6 @@ use esp32_hal::{
     Cpu,
     Delay,
     RtcCntl,
-    Serial,
-    Timer,
 };
 use panic_halt as _;
 use xtensa_lx::mutex::{Mutex, SpinLockMutex};
@@ -39,11 +37,7 @@ fn main() -> ! {
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let mut wdt = timer_group0.wdt;
 
-    // Disable the TIMG watchdog timer.
-    let serial0 = Serial::new(peripherals.UART0);
     let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
-
-    esp_println::println!("Hello esp_println!");
 
     // Disable MWDT and RWDT (Watchdog) flash boot protection
     wdt.disable();

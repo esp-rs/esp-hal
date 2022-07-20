@@ -20,8 +20,6 @@ use esp32s3_hal::{
     Cpu,
     Delay,
     RtcCntl,
-    Serial,
-    Timer,
 };
 use panic_halt as _;
 use xtensa_lx::mutex::{Mutex, SpinLockMutex};

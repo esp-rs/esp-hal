@@ -70,9 +70,9 @@ fn main() -> ! {
             interrupt::CpuInterrupt::Interrupt20LevelPriority2,
         );
         interrupt::enable(
-        Cpu::ProCpu,
-        pac::Interrupt::TG1_T0_LEVEL,
-        interrupt::CpuInterrupt::Interrupt23LevelPriority3,
+            Cpu::ProCpu,
+            pac::Interrupt::TG1_T0_LEVEL,
+            interrupt::CpuInterrupt::Interrupt23LevelPriority3,
         );
         interrupt::enable(
             Cpu::ProCpu,
