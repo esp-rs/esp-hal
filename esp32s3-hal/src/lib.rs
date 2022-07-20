@@ -1,4 +1,6 @@
 #![no_std]
+#![cfg_attr(feature = "direct-boot", feature(naked_functions))]
+#![cfg_attr(feature = "direct-boot", feature(asm_experimental_arch))]
 
 pub use embedded_hal as ehal;
 pub use esp_hal_common::{
@@ -33,6 +35,118 @@ pub mod gpio;
 
 #[no_mangle]
 extern "C" fn DefaultHandler(_level: u32, _interrupt: pac::Interrupt) {}
+
+#[cfg(all(feature = "rt", feature = "direct-boot"))]
+#[doc(hidden)]
+#[no_mangle]
+#[link_section = ".init"]
+#[naked]
+unsafe extern "C" fn init() {
+    core::arch::asm!("call0 startup_direct_boot", options(noreturn));
+}
+
+#[cfg(all(feature = "rt", feature = "direct-boot"))]
+#[doc(hidden)]
+#[no_mangle]
+pub unsafe fn startup_direct_boot() -> ! {
+    // These symbols are from `memory.x`
+    extern "C" {
+        static mut _rtc_fast_bss_start: u32;
+        static mut _rtc_fast_bss_end: u32;
+
+        static mut _rtc_slow_bss_start: u32;
+        static mut _rtc_slow_bss_end: u32;
+
+        // Boundaries of the .rtc_fast.text section
+        static mut _rtc_fast_text_start: u32;
+        static mut _rtc_fast_text_end: u32;
+        static mut _irtc_fast_text: u32;
+
+        // Boundaries of the .rtc_fast.data section
+        static mut _rtc_fast_data_start: u32;
+        static mut _rtc_fast_data_end: u32;
+        static mut _irtc_fast_data: u32;
+
+        // Boundaries of the .rtc_slow.text section
+        static mut _rtc_slow_text_start: u32;
+        static mut _rtc_slow_text_end: u32;
+        static mut _irtc_slow_text: u32;
+
+        // Boundaries of the .rtc_slow.data section
+        static mut _rtc_slow_data_start: u32;
+        static mut _rtc_slow_data_end: u32;
+        static mut _irtc_slow_data: u32;
+
+        static mut _stack_end_cpu0: u32;
+    }
+
+    // set stack pointer to end of memory: no need to retain stack up to this point
+    xtensa_lx::set_stack_pointer(&mut _stack_end_cpu0);
+
+    // copy rtc data from flash to destinations
+    r0::init_data(
+        &mut _rtc_fast_data_start,
+        &mut _rtc_fast_data_end,
+        &_irtc_fast_data,
+    );
+
+    r0::init_data(
+        &mut _rtc_fast_text_start,
+        &mut _rtc_fast_text_end,
+        &_irtc_fast_text,
+    );
+
+    r0::init_data(
+        &mut _rtc_slow_data_start,
+        &mut _rtc_slow_data_end,
+        &_irtc_slow_data,
+    );
+
+    r0::init_data(
+        &mut _rtc_slow_text_start,
+        &mut _rtc_slow_text_end,
+        &_irtc_slow_text,
+    );
+
+    // Initialize RTC RAM
+    xtensa_lx_rt::zero_bss(&mut _rtc_fast_bss_start, &mut _rtc_fast_bss_end);
+    xtensa_lx_rt::zero_bss(&mut _rtc_slow_bss_start, &mut _rtc_slow_bss_end);
+
+    // first of all copy rwtext
+    extern "C" {
+        // Boundaries of the .iram section
+        static mut _srwtext: u32;
+        static mut _erwtext: u32;
+        static mut _irwtext: u32;
+    }
+    r0::init_data(&mut _srwtext, &mut _erwtext, &_irwtext);
+
+    // do some configurations for compatability with the 2nd stage bootloader
+    // this is a workaround and ideally we should deal with these settings in other
+    // places
+    (&*crate::pac::TIMG0::PTR)
+        .int_ena_timers
+        .modify(|_, w| w.t0_int_ena().set_bit().t1_int_ena().set_bit());
+    (&*crate::pac::TIMG1::PTR)
+        .int_ena_timers
+        .modify(|_, w| w.t0_int_ena().set_bit().t1_int_ena().set_bit());
+
+    (&*crate::pac::RTC_CNTL::PTR)
+        .swd_wprotect
+        .write(|w| w.bits(0x8f1d312a));
+    (&*crate::pac::RTC_CNTL::PTR)
+        .swd_conf
+        .modify(|_, w| w.swd_disable().set_bit());
+    (&*crate::pac::RTC_CNTL::PTR)
+        .swd_wprotect
+        .write(|w| w.bits(0));
+
+    (&*crate::pac::SYSTEM::PTR)
+        .sysclk_conf
+        .modify(|_, w| w.soc_clk_sel().bits(1));
+
+    xtensa_lx_rt::Reset();
+}
 
 #[cfg(feature = "rt")]
 #[doc(hidden)]
@@ -107,7 +221,13 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
 #[no_mangle]
 #[rustfmt::skip]
 pub extern "Rust" fn __init_data() -> bool {
-    false
+    #[cfg(feature = "direct-boot")]
+    let res = true;
+
+    #[cfg(not(feature = "direct-boot"))]
+    let res = false;
+
+    res
 }
 
 fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
