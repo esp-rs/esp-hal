@@ -373,30 +373,6 @@ pub mod vectored {
         handle_interrupts(level)
     }
 
-    #[no_mangle]
-    #[link_section = ".rwtext"]
-    unsafe fn __level_4_interrupt(level: u32, _save_frame: &mut Context) {
-        handle_interrupts(level)
-    }
-
-    #[no_mangle]
-    #[link_section = ".rwtext"]
-    unsafe fn __level_5_interrupt(level: u32, _save_frame: &mut Context) {
-        handle_interrupts(level)
-    }
-
-    #[no_mangle]
-    #[link_section = ".rwtext"]
-    unsafe fn __level_6_interrupt(level: u32, _save_frame: &mut Context) {
-        handle_interrupts(level)
-    }
-
-    #[no_mangle]
-    #[link_section = ".rwtext"]
-    unsafe fn __level_7_interrupt(level: u32, _save_frame: &mut Context) {
-        handle_interrupts(level)
-    }
-
     #[ram]
     unsafe fn handle_interrupts(level: u32) {
         let cpu_interrupt_mask =
@@ -519,13 +495,15 @@ pub mod vectored {
     }
 }
 
-#[cfg(not(feature = "vectored"))]
 mod raw {
     use super::*;
 
     extern "C" {
+        #[cfg(not(feature = "vectored"))]
         fn level1_interrupt(save_frame: &mut Context);
+        #[cfg(not(feature = "vectored"))]
         fn level2_interrupt(save_frame: &mut Context);
+        #[cfg(not(feature = "vectored"))]
         fn level3_interrupt(save_frame: &mut Context);
         fn level4_interrupt(save_frame: &mut Context);
         fn level5_interrupt(save_frame: &mut Context);
@@ -535,18 +513,21 @@ mod raw {
 
     #[no_mangle]
     #[link_section = ".rwtext"]
+    #[cfg(not(feature = "vectored"))]
     unsafe fn __level_1_interrupt(_level: u32, save_frame: &mut Context) {
         level1_interrupt(save_frame)
     }
 
     #[no_mangle]
     #[link_section = ".rwtext"]
+    #[cfg(not(feature = "vectored"))]
     unsafe fn __level_2_interrupt(_level: u32, save_frame: &mut Context) {
         level2_interrupt(save_frame)
     }
 
     #[no_mangle]
     #[link_section = ".rwtext"]
+    #[cfg(not(feature = "vectored"))]
     unsafe fn __level_3_interrupt(_level: u32, save_frame: &mut Context) {
         level3_interrupt(save_frame)
     }
