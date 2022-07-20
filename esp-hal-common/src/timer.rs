@@ -22,6 +22,8 @@ pub enum Error {
     AlarmInactive,
 }
 
+// A timergroup consisting of up to 2 timers (chip dependent) and a watchdog
+// timer
 pub struct TimerGroup<T>
 where
     T: TimerGroupInstance,
@@ -162,7 +164,6 @@ pub trait Instance {
 }
 
 pub struct Timer0<TG> {
-    // timer_group: TG,
     phantom: PhantomData<TG>,
 }
 
