@@ -48,3 +48,7 @@ bluetooth = []
 eh1       = ["esp-hal-common/eh1"]
 rt        = ["xtensa-lx-rt/esp32"]
 ufmt      = ["esp-hal-common/ufmt"]
+
+[[example]]
+name = "spi_eh1_loopback"
+required-features = ["eh1"]

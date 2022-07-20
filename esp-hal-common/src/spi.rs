@@ -1,7 +1,8 @@
 //! # Serial Peripheral Interface
-//! To construct the SPI instances, use the `Spi::new` functions.
 //!
-//! ## Initialisation example
+//! There are multiple ways to use SPI, depending on your needs. Regardles of which way you choose,
+//! you must first create an SPI instance with [`Spi::new`].
+//!
 //! ```rust
 //! let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 //! let sclk = io.pins.gpio12;
@@ -12,7 +13,7 @@
 //! let mut spi = hal::spi::Spi::new(
 //!     peripherals.SPI2,
 //!     sclk,
-//!     mosi,
+//!     Some(mosi),
 //!     Some(miso),
 //!     Some(cs),
 //!     100u32.kHz(),
@@ -21,19 +22,40 @@
 //!     &mut clocks,
 //! );
 //! ```
-
-use core::convert::Infallible;
-
-use fugit::HertzU32;
+//!
+//! ## Exclusive access to the SPI bus
+//!
+//! If all you want to do is to communicate to a single device, and you initiate transactions
+//! yourself, there are a number of ways to achieve this:
+//!
+//! - Use the [`FullDuplex`](embedded_hal::spi::FullDuplex) trait to read/write single bytes at a
+//!   time,
+//! - Use the [`SpiBus`](embedded_hal_1::spi::blocking::SpiBus) trait (requires the "eh1" feature)
+//!   and its associated functions to initiate transactions with simultaneous reads and writes, or
+//! - Use the [`SpiBusWrite`](embedded_hal_1::spi::blocking::SpiBusWrite) and
+//!   [`SpiBusRead`](embedded_hal_1::spi::blocking::SpiBusRead) traits (requires the "eh1" feature)
+//!   and their associated functions to read or write mutiple bytes at a time.
+//!
+//!
+//! ## Shared SPI access
+//!
+//! If you have multiple devices on the same SPI bus that each have their own CS line, you may want
+//! to have a look at the [`SpiBusController`] and [`SpiBusDevice`] implemented here. These give
+//! exclusive access to the underlying SPI bus by means of a Mutex. This ensures that device
+//! transactions do not interfere with each other.
 
 use crate::{
     clock::Clocks,
     pac::spi2::RegisterBlock,
     system::PeripheralClockControl,
     types::{InputSignal, OutputSignal},
-    InputPin,
-    OutputPin,
+    InputPin, OutputPin,
 };
+use core::convert::Infallible;
+use fugit::HertzU32;
+
+/// The size of the FIFO buffer for SPI
+const FIFO_SIZE: usize = 64;
 
 #[derive(Debug, Clone, Copy)]
 pub enum SpiMode {
@@ -55,7 +77,7 @@ where
     pub fn new<SCK: OutputPin, MOSI: OutputPin, MISO: InputPin, CS: OutputPin>(
         spi: T,
         mut sck: SCK,
-        mut mosi: MOSI,
+        mosi: Option<MOSI>,
         miso: Option<MISO>,
         cs: Option<CS>,
         frequency: HertzU32,
@@ -66,8 +88,10 @@ where
         sck.set_to_push_pull_output()
             .connect_peripheral_to_output(spi.sclk_signal());
 
-        mosi.set_to_push_pull_output()
-            .connect_peripheral_to_output(spi.mosi_signal());
+        if let Some(mut mosi) = mosi {
+            mosi.set_to_push_pull_output()
+                .connect_peripheral_to_output(spi.mosi_signal());
+        }
 
         if let Some(mut miso) = miso {
             miso.set_to_input()
@@ -133,41 +157,227 @@ where
 }
 
 #[cfg(feature = "eh1")]
-impl<T> embedded_hal_1::spi::ErrorType for Spi<T> {
-    type Error = Infallible;
-}
+pub use ehal1::*;
 
 #[cfg(feature = "eh1")]
-impl<T> embedded_hal_1::spi::nb::FullDuplex for Spi<T>
-where
-    T: Instance,
-{
-    fn read(&mut self) -> nb::Result<u8, Self::Error> {
-        self.spi.read_byte()
+mod ehal1 {
+    use super::*;
+    use embedded_hal_1::spi::blocking::{SpiBus, SpiBusFlush, SpiBusRead, SpiBusWrite};
+    use embedded_hal_1::spi::nb::FullDuplex;
+
+    const EMPTY_WRITE_PAD: u8 = 0x00u8;
+
+    impl<T> embedded_hal_1::spi::ErrorType for Spi<T> {
+        type Error = Infallible;
     }
 
-    fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
-        self.spi.write_byte(word)
-    }
-}
+    impl<T> FullDuplex for Spi<T>
+    where
+        T: Instance,
+    {
+        fn read(&mut self) -> nb::Result<u8, Self::Error> {
+            self.spi.read_byte()
+        }
 
-#[cfg(feature = "eh1")]
-impl<T> embedded_hal_1::spi::blocking::SpiBusWrite for Spi<T>
-where
-    T: Instance,
-{
-    fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-        self.spi.send_bytes(words)
+        fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
+            self.spi.write_byte(word)
+        }
     }
-}
 
-#[cfg(feature = "eh1")]
-impl<T> embedded_hal_1::spi::blocking::SpiBusFlush for Spi<T>
-where
-    T: Instance,
-{
-    fn flush(&mut self) -> Result<(), Self::Error> {
-        self.spi.flush()
+    impl<T> SpiBusWrite for Spi<T>
+    where
+        T: Instance,
+    {
+        /// See also: [`send_bytes`].
+        fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
+            self.spi.send_bytes(words)
+        }
+    }
+
+    impl<T> SpiBusRead for Spi<T>
+    where
+        T: Instance,
+    {
+        /// See also: [`read_bytes`].
+        fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+            self.spi.read_bytes(words)
+        }
+    }
+
+    impl<T> SpiBus for Spi<T>
+    where
+        T: Instance,
+    {
+        /// Write out data from `write`, read response into `read`.
+        ///
+        /// `read` and `write` are allowed to have different lengths. If `write` is longer, all
+        /// other bytes received are discarded. If `read` is longer, [`EMPTY_WRITE_PAD`] is written
+        /// out as necessary until enough bytes have been read. Reading and writing happens
+        /// simultaneously.
+        fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
+            // Optimizations
+            if read.len() == 0 {
+                SpiBusWrite::write(self, write)?;
+            } else if write.len() == 0 {
+                SpiBusRead::read(self, read)?;
+            }
+
+            let mut write_from = 0;
+            let mut read_from = 0;
+
+            loop {
+                // How many bytes we write in this chunk
+                let write_inc = core::cmp::min(FIFO_SIZE, write.len() - write_from);
+                let write_to = write_from + write_inc;
+                // How many bytes we read in this chunk
+                let read_inc = core::cmp::min(FIFO_SIZE, read.len() - read_from);
+                let read_to = read_from + read_inc;
+
+                if (write_inc == 0) && (read_inc == 0) {
+                    break;
+                }
+
+                if write_to < read_to {
+                    // Read more than we write, must pad writing part with zeros
+                    let mut empty = [EMPTY_WRITE_PAD; FIFO_SIZE];
+                    empty[0..write_inc].copy_from_slice(&write[write_from..write_to]);
+                    SpiBusWrite::write(self, &empty)?;
+                } else {
+                    SpiBusWrite::write(self, &write[write_from..write_to])?;
+                }
+
+                SpiBusFlush::flush(self)?;
+
+                if read_inc > 0 {
+                    SpiBusRead::read(self, &mut read[read_from..read_to])?;
+                }
+
+                write_from = write_to;
+                read_from = read_to;
+            }
+            Ok(())
+        }
+
+        /// Transfer data in place.
+        ///
+        /// Writes data from `words` out on the bus and stores the reply into `words`. A convenient
+        /// wrapper around [`write`](SpiBusWrite::write), [`flush`](SpiBusFlush::flush) and
+        /// [`read`](SpiBusRead::read).
+        fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+            // Since we have the traits so neatly implemented above, use them!
+            for chunk in words.chunks_mut(FIFO_SIZE) {
+                SpiBusWrite::write(self, chunk)?;
+                SpiBusFlush::flush(self)?;
+                SpiBusRead::read(self, chunk)?;
+            }
+            Ok(())
+        }
+    }
+
+    impl<T> SpiBusFlush for Spi<T>
+    where
+        T: Instance,
+    {
+        fn flush(&mut self) -> Result<(), Self::Error> {
+            self.spi.flush()
+        }
+    }
+
+    use xtensa_lx::mutex::Mutex;
+    use xtensa_lx::mutex::SpinLockMutex;
+    use core::cell::RefCell;
+    use embedded_hal_1::spi;
+    use embedded_hal_1::spi::ErrorType;
+    use embedded_hal_1::spi::blocking::SpiDevice;
+    use embedded_hal_1::digital::blocking::OutputPin;
+
+    /// SPI bus controller.
+    ///
+    /// Has exclusive access to an SPI bus, which is managed via a `Mutex`. Used as basis for the
+    /// [`SpiBusDevice`] implementation. Note that the wrapped [`RefCell`] is used solely to
+    /// achieve interior mutability.
+    pub struct SpiBusController<B: SpiBus + ErrorType> {
+        lock: SpinLockMutex<RefCell<B>>,
+    }
+
+    impl<B: SpiBus + ErrorType> SpiBusController<B> {
+        /// Create a new controller from an SPI bus instance.
+        ///
+        /// Takes ownership of the SPI bus in the process. Afterwards, the SPI bus can only be
+        /// accessed via instances of [`SpiBusDevice`].
+        pub fn from_spi(bus: B) -> Self {
+            SpiBusController {
+                lock: SpinLockMutex::new(RefCell::new(bus)),
+            }
+        }
+    }
+
+    impl<B> ErrorType for SpiBusController<B>
+    where
+        B: SpiBus + ErrorType,
+    {
+        type Error = spi::ErrorKind;
+    }
+
+    /// An SPI device on a shared SPI bus.
+    ///
+    /// Provides device specific access on a shared SPI bus. Enables attaching multiple SPI devices
+    /// to the same bus, each with its own CS line, and performing safe transfers on them.
+    pub struct SpiBusDevice<'a, B, CS>
+    where
+        B: SpiBus + ErrorType,
+        CS: OutputPin,
+    {
+        bus: &'a SpiBusController<B>,
+        cs: CS,
+    }
+
+    impl<'a, B, CS> SpiBusDevice<'a, B, CS>
+    where
+        B: SpiBus + ErrorType,
+        CS: OutputPin,
+    {
+        pub fn new(bus: &'a SpiBusController<B>, cs: CS) -> Self {
+            SpiBusDevice {
+                bus,
+                cs,
+            }
+        }
+    }
+
+    impl<'a, B, CS> ErrorType for SpiBusDevice<'a, B, CS>
+    where
+        B: SpiBus + ErrorType,
+        CS: OutputPin,
+    {
+        type Error = spi::ErrorKind;
+    }
+
+    impl<B, CS> SpiDevice for SpiBusDevice<'_, B, CS>
+    where
+        B: SpiBus + ErrorType,
+        CS: OutputPin,
+    {
+        type Bus = B;
+
+        fn transaction<R>(&mut self, f: impl FnOnce(&mut Self::Bus) -> Result<R, <Self::Bus as ErrorType>::Error>) -> Result<R, Self::Error> {
+            (&self.bus.lock).lock(|bus| {
+                let mut bus = bus.borrow_mut();
+                self.cs.set_low().map_err(|_| spi::ErrorKind::ChipSelectFault)?;
+
+                // We postpone handling these errors until AFTER we raised CS again, so the bus is
+                // free (Or we die trying if CS errors).
+                let f_res = f(&mut bus);
+                let flush_res = bus.flush();
+
+                self.cs.set_high().map_err(|_| spi::ErrorKind::ChipSelectFault)?;
+
+                let f_res = f_res.map_err(|_| spi::ErrorKind::Other)?;
+                flush_res.map_err(|_| spi::ErrorKind::Other)?;
+
+                Ok(f_res)
+            })
+        }
     }
 }
 
@@ -241,12 +451,12 @@ pub trait Instance {
             reg_val = 1 << 31;
         } else {
             /* For best duty cycle resolution, we want n to be as close to 32 as
-            * possible, but we also need a pre/n combo that gets us as close as
-            * possible to the intended frequency. To do this, we bruteforce n and
-            * calculate the best pre to go along with that. If there's a choice
-            * between pre/n combos that give the same result, use the one with the
-            * higher n.
-            */
+             * possible, but we also need a pre/n combo that gets us as close as
+             * possible to the intended frequency. To do this, we bruteforce n and
+             * calculate the best pre to go along with that. If there's a choice
+             * between pre/n combos that give the same result, use the one with the
+             * higher n.
+             */
 
             let mut pre: i32;
             let mut bestn: i32 = -1;
@@ -255,15 +465,16 @@ pub trait Instance {
             let mut errval: i32;
 
             /* Start at n = 2. We need to be able to set h/l so we have at least
-            * one high and one low pulse.
-            */
+             * one high and one low pulse.
+             */
 
-            for  n in 2..64 {
+            for n in 2..64 {
                 /* Effectively, this does:
-                *   pre = round((APB_CLK_FREQ / n) / frequency)
-                */
+                 *   pre = round((APB_CLK_FREQ / n) / frequency)
+                 */
 
-                pre = ((apb_clk_freq.raw() as i32/ n) + (frequency.raw() as i32 / 2)) / frequency.raw() as i32;
+                pre = ((apb_clk_freq.raw() as i32 / n) + (frequency.raw() as i32 / 2))
+                    / frequency.raw() as i32;
 
                 if pre <= 0 {
                     pre = 1;
@@ -273,7 +484,9 @@ pub trait Instance {
                     pre = 16;
                 }
 
-                errval = (apb_clk_freq.raw() as i32 / (pre as i32 * n as i32) - frequency.raw() as i32).abs();
+                errval = (apb_clk_freq.raw() as i32 / (pre as i32 * n as i32)
+                    - frequency.raw() as i32)
+                    .abs();
                 if bestn == -1 || errval <= besterr {
                     besterr = errval;
                     bestn = n as i32;
@@ -286,18 +499,18 @@ pub trait Instance {
             let l: i32 = n;
 
             /* Effectively, this does:
-            *   h = round((duty_cycle * n) / 256)
-            */
+             *   h = round((duty_cycle * n) / 256)
+             */
 
             let mut h: i32 = (duty_cycle * n + 127) / 256;
             if h <= 0 {
                 h = 1;
             }
 
-            reg_val = (l as u32 - 1) |
-                    ((h as u32 - 1) << 6) |
-                    ((n as u32 - 1) << 12) |
-                    ((pre as u32 - 1) << 18);
+            reg_val = (l as u32 - 1)
+                | ((h as u32 - 1) << 6)
+                | ((n as u32 - 1) << 12)
+                | ((pre as u32 - 1) << 18);
         }
 
         self.register_block()
@@ -384,37 +597,58 @@ pub trait Instance {
     }
 
     fn write_bytes(&mut self, words: &[u8]) -> Result<(), Infallible> {
-        let mut words_mut = [0u8; 256];
-        words_mut[0..words.len()].clone_from_slice(&words[0..words.len()]);
-
-        self.transfer(&mut words_mut[0..words.len()])?;
-
-        Ok(())
+        self.send_bytes(words)
     }
 
+    /// Send bytes via SPI.
+    ///
+    /// Copies the content of `words` in chunks of 64 bytes into the SPI transmission FIFO. If
+    /// `words` is longer than 64 bytes, multiple sequential transfers are performed. This function
+    /// will return before all bytes of the last chunk to transmit have been sent to the wire. If
+    /// you must ensure that the whole messages was written correctly, use
+    /// [`flush`].
+    // FIXME: See below.
     fn send_bytes(&mut self, words: &[u8]) -> Result<(), Infallible> {
         let reg_block = self.register_block();
-        let num_chuncks = words.len() / 64;
+        let num_chuncks = words.len() / FIFO_SIZE;
 
-        // The fifo has a total of 16 32 bit registers (64 bytes) so the data
-        // must be chunked and then transmitted
-        for (i, chunk) in words.chunks(64).enumerate() {
+        // The fifo has a limited fixed size, so the data must be chunked and then transmitted
+        for (i, chunk) in words.chunks(FIFO_SIZE).enumerate() {
             self.configure_datalen(chunk.len() as u32 * 8);
 
-            let mut fifo_ptr = reg_block.w0.as_ptr();
-            for chunk in chunk.chunks(4) {
-                let mut u32_as_bytes = [0u8; 4];
-                unsafe {
-                    let ptr = u32_as_bytes.as_mut_ptr();
-                    ptr.copy_from(chunk.as_ptr(), chunk.len());
-                }
-                let reg_val: u32 = u32::from_le_bytes(u32_as_bytes);
+            // let transfer_num_words = (chunk.len() as u32) / 4;
+            // let transfer_num_bytes = (chunk.len() as u32) % 4;
 
-                unsafe {
-                    *fifo_ptr = reg_val;
-                    fifo_ptr = fifo_ptr.offset(1);
-                };
+            let fifo_ptr = reg_block.w0.as_ptr();
+            unsafe {
+                // It seems that `copy_nonoverlapping` is significantly faster than regular `copy`,
+                // by about 20%... ?
+                core::ptr::copy_nonoverlapping::<u32>(
+                    chunk.as_ptr() as *const u32,
+                    fifo_ptr as *mut u32,
+                    // FIXME: Using any other transfer length **does not work**. I don't understand
+                    // why.
+                    FIFO_SIZE / 4,
+                );
+                //fifo_ptr = fifo_ptr.offset(transfer_num_words as isize);
             }
+
+            //// Transfer the remaining bytes
+            //if transfer_num_bytes > 0 {
+            //    let transfer_words_bytes = ((chunk.len() as u32) - transfer_num_bytes) as usize;
+            //    let mut u32_as_bytes = [0u8; 4];
+
+            //    unsafe {
+            //        let ptr = u32_as_bytes.as_mut_ptr();
+            //        ptr.copy_from(chunk[transfer_words_bytes..].as_ptr(), chunk.len());
+            //    }
+            //    let reg_val: u32 = u32::from_le_bytes(u32_as_bytes);
+
+            //    unsafe {
+            //        *fifo_ptr = reg_val;
+            //    };
+
+            //}
 
             self.update();
 
@@ -432,6 +666,24 @@ pub trait Instance {
         Ok(())
     }
 
+    /// Read received bytes from SPI.
+    ///
+    /// Copies the contents of the SPI receive FIFO into `words`. This function doesn't perform
+    /// flushing. If you want to read the response to something you have written before, consider
+    /// using [`transfer`] instead.
+    fn read_bytes(&mut self, words: &mut [u8]) -> Result<(), Infallible> {
+        let reg_block = self.register_block();
+
+        for chunk in words.chunks_mut(FIFO_SIZE) {
+            // Beginning of reception buffer
+            let fifo_ptr = reg_block.w0.as_ptr() as *const u8;
+            let raw_slice = unsafe { core::slice::from_raw_parts::<u8>(fifo_ptr, chunk.len()) };
+            chunk.copy_from_slice(raw_slice);
+        }
+
+        Ok(())
+    }
+
     // Check if the bus is busy and if it is wait for it to be idle
     fn flush(&mut self) -> Result<(), Infallible> {
         let reg_block = self.register_block();
@@ -443,43 +695,10 @@ pub trait Instance {
     }
 
     fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Infallible> {
-        let reg_block = self.register_block();
-
-        for chunk in words.chunks_mut(64) {
-            self.configure_datalen(chunk.len() as u32 * 8);
-
-            let mut fifo_ptr = reg_block.w0.as_ptr();
-            for chunk in chunk.chunks(4) {
-                let mut u32_as_bytes = [0u8; 4];
-                u32_as_bytes[0..(chunk.len())].clone_from_slice(chunk);
-                let reg_val: u32 = u32::from_le_bytes(u32_as_bytes);
-
-                unsafe {
-                    *fifo_ptr = reg_val;
-                    fifo_ptr = fifo_ptr.offset(1);
-                };
-            }
-
-            self.update();
-
-            reg_block.cmd.modify(|_, w| w.usr().set_bit());
-
-            while reg_block.cmd.read().usr().bit_is_set() {
-                // wait
-            }
-
-            let mut fifo_ptr = reg_block.w0.as_ptr();
-            for index in (0..chunk.len()).step_by(4) {
-                let reg_val = unsafe { *fifo_ptr };
-                let bytes = reg_val.to_le_bytes();
-
-                let len = usize::min(chunk.len(), index + 4) - index;
-                chunk[index..(index + len)].clone_from_slice(&bytes[0..len]);
-
-                unsafe {
-                    fifo_ptr = fifo_ptr.offset(1);
-                };
-            }
+        for chunk in words.chunks_mut(FIFO_SIZE) {
+            self.send_bytes(chunk)?;
+            self.flush()?;
+            self.read_bytes(chunk)?;
         }
 
         Ok(words)
