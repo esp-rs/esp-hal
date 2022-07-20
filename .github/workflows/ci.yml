@@ -30,7 +30,8 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: check
-          args: --examples --manifest-path=esp32c3-hal/Cargo.toml --target=riscv32imc-unknown-none-elf
+          # The `hello_rgb` example requires the `smartled` feature to be enabled
+          args: --examples --manifest-path=esp32c3-hal/Cargo.toml --target=riscv32imc-unknown-none-elf --features=smartled
 
   check-xtensa:
     name: Check Xtensa Examples
@@ -50,7 +51,8 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: check
-          args: -Zbuild-std=core --examples --manifest-path=${{ matrix.chip }}-hal/Cargo.toml --target=xtensa-${{ matrix.chip }}-none-elf
+          # The `hello_rgb` example requires the `smartled` feature to be enabled
+          args: -Zbuild-std=core --examples --manifest-path=${{ matrix.chip }}-hal/Cargo.toml --target=xtensa-${{ matrix.chip }}-none-elf --features=smartled
 
   clippy:
     name: Clippy
