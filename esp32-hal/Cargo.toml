@@ -28,7 +28,7 @@ bare-metal     = "1.0"
 embedded-hal   = { version = "0.2",  features = ["unproven"] }
 embedded-hal-1 = { package = "embedded-hal", version = "=1.0.0-alpha.8" }
 xtensa-lx      = { version = "0.7",  features = ["esp32"] }
-xtensa-lx-rt   = { version = "0.12", features = ["esp32"], optional = true }
+xtensa-lx-rt   = { version = "0.13", features = ["esp32"], optional = true }
 nb             = "1.0.0"
 
 [dependencies.esp-hal-common]

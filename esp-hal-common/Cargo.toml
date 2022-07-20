@@ -26,7 +26,7 @@ riscv-atomic-emulation-trap = { version = "0.1", optional = true }
 
 # Xtensa
 xtensa-lx    = { version = "0.7",  optional = true }
-xtensa-lx-rt = { version = "0.12", optional = true }
+xtensa-lx-rt = { version = "0.13", optional = true }
 
 # Part of `ufmt` containing only `uWrite` trait
 ufmt-write = { version = "0.1", optional = true }
