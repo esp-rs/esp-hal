@@ -30,12 +30,10 @@ use esp32_hal::{
 use panic_halt as _;
 use xtensa_lx_rt::entry;
 
-use xtensa_lx::mutex::SpinLockMutex;
-use core::cell::RefCell;
-use embedded_hal_1::spi::blocking::SpiDevice;
+use embedded_hal_1::spi::blocking::{SpiBus, SpiDevice};
 use esp32_hal::{
     gpio::IO,
-    spi::{Spi, SpiMode, SpiBusDevice},
+    spi::{Spi, SpiMode, SpiBusDevice, SpiBusController},
 };
 
 #[entry]
@@ -59,20 +57,20 @@ fn main() -> ! {
     let mosi = io.pins.gpio23;
     let cs = io.pins.gpio22;
     let cs = cs.into_push_pull_output();
+    let no_cs : Option<esp32_hal::gpio::Gpio22<esp_hal_common::Output<esp_hal_common::PushPull>>> = None;
 
-    let mut spi = Spi::new(
+    let spi_controller = SpiBusController::from_spi(Spi::new(
         peripherals.SPI2,
         sclk,
         Some(mosi),
         Some(miso),
-        None,
+        no_cs,
         1000u32.kHz(),
         SpiMode::Mode0,
         &mut system.peripheral_clock_control,
         &clocks,
-    );
-    let mut mutex_spi = SpinLockMutex::new(RefCell::new(spi));
-    let spi_device = SpiBusDevice::new(&mut mutex_spi, cs);
+    ));
+    let mut spi_device = SpiBusDevice::new(&spi_controller, cs);
 
     let mut delay = Delay::new(&clocks);
     writeln!(serial0, "=== SPI example with embedded-hal-1 traits ===").unwrap();
@@ -84,7 +82,8 @@ fn main() -> ! {
         let mut read: [u8; 4] = [0x00u8; 4];
 
         spi_device.transaction(|bus| {
-            bus.transfer(&mut read[..], &write[..])
+            SpiBus::transfer(bus, &mut read[..], &write[..])
+            //bus.transfer(&mut read[..], &write[..])
         }).unwrap();
         assert_eq!(write, read);
         writeln!(serial0, " SUCCESS").unwrap();
