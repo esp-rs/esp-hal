@@ -145,8 +145,6 @@ pub unsafe fn startup_direct_boot() -> ! {
         .sysclk_conf
         .modify(|_, w| w.soc_clk_sel().bits(1));
 
-    configure_cpu_caches();
-
     xtensa_lx_rt::Reset();
 }
 

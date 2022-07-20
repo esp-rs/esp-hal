@@ -98,6 +98,7 @@ SECTIONS {
     _rodata_start = ABSOLUTE(.);
     . = ALIGN (4);
     *(.rodata .rodata.*)
+    . = ALIGN (4);
     _rodata_end = ABSOLUTE(.);
   }
 
@@ -145,6 +146,8 @@ SECTIONS {
     _init_end = ABSOLUTE(.);
 
     *(.rwtext.literal .rwtext .rwtext.literal.* .rwtext.*)
+
+    . = ALIGN (4);
     _erwtext = .;
   }
 
@@ -167,6 +170,7 @@ SECTIONS {
     _bss_start = ABSOLUTE(.);
     . = ALIGN (4);
     *(.bss .bss.* COMMON)
+    . = ALIGN (4);
     _bss_end = ABSOLUTE(.);
   } > RWDATA
 
@@ -174,6 +178,7 @@ SECTIONS {
   {
     . = ALIGN(4);
     *(.noinit .noinit.*)
+    . = ALIGN (4);
   } > RWDATA
 
   .rtc_fast.text ORIGIN(rtc_fast_iram_seg) : 
@@ -205,6 +210,7 @@ SECTIONS {
     . = ALIGN(4);
     _rtc_fast_bss_start = ABSOLUTE(.);
     *(.rtc_fast.bss .rtc_fast.bss.*)
+    . = ALIGN (4);
     _rtc_fast_bss_end = ABSOLUTE(.);
   }
 
@@ -212,6 +218,7 @@ SECTIONS {
   {
     . = ALIGN(4);
     *(.rtc_fast.noinit .rtc_fast.noinit.*)
+    . = ALIGN (4);
   }
 
  .rtc_slow.text ORIGIN(rtc_slow_seg) : 
@@ -247,6 +254,7 @@ SECTIONS {
     . = ALIGN(4);
     _rtc_slow_bss_start = ABSOLUTE(.);
     *(.rtc_slow.bss .rtc_slow.bss.*)
+    . = ALIGN (4);
     _rtc_slow_bss_end = ABSOLUTE(.);
   }
 
@@ -254,6 +262,7 @@ SECTIONS {
   {
     . = ALIGN(4);
     *(.rtc_slow.noinit .rtc_slow.noinit.*)
+    . = ALIGN (4);
   }
 
  .external.data :
@@ -261,6 +270,7 @@ SECTIONS {
     _external_data_start = ABSOLUTE(.);
     . = ALIGN(4);
     *(.external.data .external.data.*)
+    . = ALIGN (4);
     _external_data_end = ABSOLUTE(.);
   } > psram_seg AT > RODATA
 
@@ -269,6 +279,7 @@ SECTIONS {
     _external_bss_start = ABSOLUTE(.);
     . = ALIGN(4);
     *(.external.bss .external.bss.*)
+    . = ALIGN (4);
     _external_bss_end = ABSOLUTE(.);
   } > psram_seg
 
@@ -276,6 +287,7 @@ SECTIONS {
   {
     . = ALIGN(4);
     *(.external.noinit .external.noinit.*)
+    . = ALIGN (4);
   } > psram_seg
 
   /* must be last segment using psram_seg */
@@ -283,5 +295,6 @@ SECTIONS {
   {
     . = ALIGN (4);
     _external_heap_start = ABSOLUTE(.);
+    . = ALIGN (4);
   } > psram_seg 
 }
