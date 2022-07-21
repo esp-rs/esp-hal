@@ -1,5 +1,3 @@
-use procmacros::ram;
-
 const REF_CLK_FREQ: u32 = 1000000;
 
 const MHZ: u32 = 1000000;
@@ -65,7 +63,6 @@ pub(crate) enum PllFequency {
     Pll480MHz,
 }
 
-#[ram]
 pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalFrequency, pll_freq: PllFequency) {
     let efuse = unsafe { &*crate::pac::EFUSE::ptr() };
     let rtc_cntl = unsafe { &*crate::pac::RTC_CNTL::ptr() };
@@ -228,7 +225,6 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalFrequency, pll_freq: PllF
     }
 }
 
-#[ram]
 pub(crate) fn esp32_rtc_bbpll_enable() {
     let rtc_cntl = unsafe { &*crate::pac::RTC_CNTL::ptr() };
 
@@ -289,7 +285,6 @@ unsafe fn i2c_writereg_rtc(block: u32, block_hostid: u32, reg_add: u32, indata: 
     rom_i2c_writereg(block, block_hostid, reg_add, indata);
 }
 
-#[ram]
 pub(crate) fn esp32_rtc_update_to_xtal(freq: XtalFrequency, _div: u32) {
     let apb_cntl = unsafe { &*crate::pac::APB_CTRL::ptr() };
     let rtc_cntl = unsafe { &*crate::pac::RTC_CNTL::ptr() };
@@ -321,7 +316,6 @@ pub(crate) fn esp32_rtc_update_to_xtal(freq: XtalFrequency, _div: u32) {
     }
 }
 
-#[ram]
 pub(crate) fn set_cpu_freq(cpu_freq_mhz: crate::clock::CpuClock) {
     let efuse = unsafe { &*crate::pac::EFUSE::ptr() };
     let dport = unsafe { &*crate::pac::DPORT::ptr() };
@@ -376,6 +370,6 @@ fn esp32_update_cpu_freq(ticks_per_us: u32) {
     const G_TICKS_PER_US_PRO: u32 = 0x3ffe01e0;
     unsafe {
         // Update scale factors used by esp_rom_delay_us
-        *(G_TICKS_PER_US_PRO as *mut u32) = ticks_per_us;
+        (G_TICKS_PER_US_PRO as *mut u32).write_volatile(ticks_per_us);
     }
 }
