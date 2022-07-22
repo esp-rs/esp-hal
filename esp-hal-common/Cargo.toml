@@ -63,4 +63,4 @@ smartled = ["smart-leds-trait"]
 # Implement the `embedded-hal==1.0.0-alpha.x` traits
 eh1 = ["embedded-hal-1"]
 # To use vectored interrupts (calling the handlers defined in the PAC)
-vectored = []
+vectored = ["procmacros/interrupt"]

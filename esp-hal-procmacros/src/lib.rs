@@ -1,16 +1,13 @@
-use std::iter;
-
 use darling::FromMeta;
 use proc_macro::{self, Span, TokenStream};
 use proc_macro_error::{abort, proc_macro_error};
 use quote::quote;
+#[cfg(feature = "interrupt")]
 use syn::{
     parse,
-    parse_macro_input,
     spanned::Spanned,
     AttrStyle,
     Attribute,
-    AttributeArgs,
     Ident,
     ItemFn,
     Meta::Path,
@@ -18,6 +15,7 @@ use syn::{
     Type,
     Visibility,
 };
+use syn::{parse_macro_input, AttributeArgs};
 
 #[derive(Debug, Default, FromMeta)]
 #[darling(default)]
@@ -111,6 +109,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
 /// When specified between braces (`#[interrupt(example)]`) that interrupt will
 /// be used and the function can have an arbitrary name. Otherwise the name of
 /// the function must be the name of the interrupt.
+#[cfg(feature = "interrupt")]
 #[proc_macro_attribute]
 pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
     let mut f: ItemFn = syn::parse(input).expect("`#[interrupt]` must be applied to a function");
@@ -179,7 +178,7 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
         &format!("__esp_hal_internal_{}", f.sig.ident),
         proc_macro2::Span::call_site(),
     );
-    f.block.stmts.extend(iter::once(
+    f.block.stmts.extend(std::iter::once(
         syn::parse2(quote! {{
             // Check that this interrupt actually exists
             crate::pac::Interrupt::#ident_s;
@@ -227,10 +226,12 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
     .into()
 }
 
+#[cfg(feature = "interrupt")]
 enum WhiteListCaller {
     Interrupt,
 }
 
+#[cfg(feature = "interrupt")]
 fn check_attr_whitelist(attrs: &[Attribute], caller: WhiteListCaller) -> Result<(), TokenStream> {
     let whitelist = &[
         "doc",
@@ -267,10 +268,12 @@ fn check_attr_whitelist(attrs: &[Attribute], caller: WhiteListCaller) -> Result<
 }
 
 /// Returns `true` if `attr.path` matches `name`
+#[cfg(feature = "interrupt")]
 fn eq(attr: &Attribute, name: &str) -> bool {
     attr.style == AttrStyle::Outer && attr.path.is_ident(name)
 }
 
+#[cfg(feature = "interrupt")]
 fn extract_cfgs(attrs: Vec<Attribute>) -> (Vec<Attribute>, Vec<Attribute>) {
     let mut cfgs = vec![];
     let mut not_cfgs = vec![];
