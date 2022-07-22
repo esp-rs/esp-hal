@@ -1,3 +1,8 @@
+//! This shows how to output text via USB Serial/JTAG.
+//! You need to connect via the Serial/JTAG interface to see any output.
+//! Most dev-kits use a USB-UART-bridge - in that case you won't see any output.
+//! This will work with the ESP32-C3-DevKit-RUST-1
+
 #![no_std]
 #![no_main]
 

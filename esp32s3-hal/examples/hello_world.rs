@@ -1,3 +1,6 @@
+//! This shows how to write text to serial0.
+//! You can see the output with `espflash` if you provide the `--monitor` option
+
 #![no_std]
 #![no_main]
 

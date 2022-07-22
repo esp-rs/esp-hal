@@ -1,3 +1,10 @@
+//! This shows how to use RTC memory.
+//! RTC memory is retained during resets and during most sleep modes.
+//! Initialized memory is always re-initialized on startup.
+//! Uninitialzed memory isn't initialized on startup and can be used to keep
+//! data during resets. Zeroed memory is initialized to zero on startup.
+//! We can also run code from RTC memory.
+
 #![no_std]
 #![no_main]
 

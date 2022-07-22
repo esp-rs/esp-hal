@@ -1,3 +1,7 @@
+//! This shows how to spawn a task on the second core.
+//! The first core will print the value of a counter which is incremented by the
+//! second core.
+
 #![no_std]
 #![no_main]
 

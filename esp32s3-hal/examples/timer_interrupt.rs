@@ -1,3 +1,7 @@
+//! This shows how to use the TIMG peripheral interrupts.
+//! There is TIMG0 and TIMG1 each of them containing two general purpose timers
+//! and a watchdog timer.
+
 #![no_std]
 #![no_main]
 

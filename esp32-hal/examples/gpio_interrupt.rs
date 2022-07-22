@@ -1,3 +1,8 @@
+//! GPIO interrupt
+//!
+//! This prints "Interrupt" when the boot button is pressed.
+//! It also blinks an LED like the blinky example.
+
 #![no_std]
 #![no_main]
 
