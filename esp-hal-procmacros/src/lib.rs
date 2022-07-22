@@ -109,6 +109,24 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
 /// When specified between braces (`#[interrupt(example)]`) that interrupt will
 /// be used and the function can have an arbitrary name. Otherwise the name of
 /// the function must be the name of the interrupt.
+///
+/// Example usage:
+///
+/// ```rust
+/// #[interrupt]
+/// fn GPIO() {
+///     // code
+/// }
+/// ```
+///
+/// The interrupt context can also be supplied by adding a argument to the
+/// interrupt function for example, on Xtensa based chips:
+///
+/// ```rust
+/// fn GPIO(context: &mut xtensa_lx_rt::exeception::Context) {
+///     // code
+/// }
+/// ```
 #[cfg(feature = "interrupt")]
 #[proc_macro_attribute]
 pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
@@ -181,7 +199,7 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
     f.block.stmts.extend(std::iter::once(
         syn::parse2(quote! {{
             // Check that this interrupt actually exists
-            crate::pac::Interrupt::#ident_s;
+            self::pac::Interrupt::#ident_s;
         }})
         .unwrap(),
     ));

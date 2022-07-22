@@ -181,10 +181,14 @@ unsafe fn core1_interrupt_peripheral() -> *const crate::pac::interrupt_core1::Re
 }
 
 #[cfg(feature = "vectored")]
+pub use vectored::*;
+
+#[cfg(feature = "vectored")]
 pub mod vectored {
     use procmacros::ram;
 
     use super::*;
+    use crate::get_core;
 
     #[derive(Copy, Clone, Debug, PartialEq, Eq)]
     pub enum Error {
@@ -286,16 +290,12 @@ pub mod vectored {
         }
     }
 
-    pub fn enable_with_priority(
-        core: crate::Cpu,
-        interrupt: Interrupt,
-        level: Priority,
-    ) -> Result<(), Error> {
+    pub fn enable(interrupt: Interrupt, level: Priority) -> Result<(), Error> {
         let cpu_interrupt =
             interrupt_level_to_cpu_interrupt(level, chip_specific::interrupt_is_edge(interrupt))?;
 
         unsafe {
-            map(core, interrupt, cpu_interrupt);
+            map(get_core(), interrupt, cpu_interrupt);
 
             xtensa_lx::interrupt::enable_mask(
                 xtensa_lx::interrupt::get_mask() | 1 << cpu_interrupt as u32,
