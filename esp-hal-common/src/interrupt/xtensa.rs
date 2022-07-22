@@ -47,9 +47,9 @@ pub enum CpuInterrupt {
     Interrupt31EdgePriority5,
 }
 
-/// Enable and assign a peripheral interrupt to an CPU interrupt.
+/// Assign a peripheral interrupt to an CPU interrupt.
 ///
-/// Great care **must** be taken when using with function with interrupt
+/// Great care **must** be taken when using this function with interrupt
 /// vectoring (enabled by default). Avoid the following CPU interrupts:
 /// - Interrupt1LevelPriority1
 /// - Interrupt19LevelPriority2
@@ -60,7 +60,7 @@ pub enum CpuInterrupt {
 ///
 /// Note: this only maps the interrupt to the CPU interrupt. The CPU interrupt
 /// still needs to be enabled afterwards
-pub unsafe fn enable(core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
+pub unsafe fn map(core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
     let interrupt_number = interrupt as isize;
     let cpu_interrupt_number = which as isize;
     let intr_map_base = match core {
@@ -295,7 +295,7 @@ pub mod vectored {
             interrupt_level_to_cpu_interrupt(level, chip_specific::interrupt_is_edge(interrupt))?;
 
         unsafe {
-            enable(core, interrupt, cpu_interrupt);
+            map(core, interrupt, cpu_interrupt);
 
             xtensa_lx::interrupt::enable_mask(
                 xtensa_lx::interrupt::get_mask() | 1 << cpu_interrupt as u32,
