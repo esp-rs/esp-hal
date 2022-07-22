@@ -1,3 +1,6 @@
+//! This shows how to use the SYSTIMER peripheral including interrupts.
+//! It's an additional timer besides the TIMG peripherals.
+
 #![no_std]
 #![no_main]
 

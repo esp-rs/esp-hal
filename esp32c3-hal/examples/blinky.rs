@@ -1,3 +1,7 @@
+//! Blinks an LED
+//!
+//! This assumes that a LED is connected to the pin assigned to `led`. (GPIO5)
+
 #![no_std]
 #![no_main]
 

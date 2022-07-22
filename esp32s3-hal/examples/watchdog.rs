@@ -1,6 +1,6 @@
 //! This demos the watchdog timer.
 //! Basically the same as `hello_world` but if you remove the call to
-//! `wdt.feed()` the watchdog will reset the system.#![no_std]
+//! `wdt.feed()` the watchdog will reset the system.
 
 #![no_std]
 #![no_main]

@@ -1,3 +1,6 @@
+//! This shows how to read selected information from eFuses.
+//! e.g. the MAC address
+
 #![no_std]
 #![no_main]
 
