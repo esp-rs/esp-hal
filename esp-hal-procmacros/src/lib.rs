@@ -1,4 +1,4 @@
-use std::{collections::HashSet, iter};
+use std::iter;
 
 use darling::FromMeta;
 use proc_macro::{self, Span, TokenStream};
@@ -11,14 +11,10 @@ use syn::{
     AttrStyle,
     Attribute,
     AttributeArgs,
-    FnArg,
     Ident,
-    Item,
     ItemFn,
-    ItemStatic,
     Meta::Path,
     ReturnType,
-    Stmt,
     Type,
     Visibility,
 };
@@ -157,7 +153,6 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
     let valid_signature = f.sig.constness.is_none()
         && f.vis == Visibility::Inherited
         && f.sig.abi.is_none()
-        && f.sig.inputs.is_empty()
         && f.sig.generics.params.is_empty()
         && f.sig.generics.where_clause.is_none()
         && f.sig.variadic.is_none()
@@ -168,42 +163,29 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
                 Type::Never(..) => true,
                 _ => false,
             },
-        };
+        }
+        && f.sig.inputs.len() <= 1;
 
     if !valid_signature {
         return parse::Error::new(
             f.span(),
-            "`#[interrupt]` handlers must have signature `[unsafe] fn() [-> !]`",
+            "`#[interrupt]` handlers must have signature `[unsafe] fn([&mut Context]) [-> !]`",
         )
         .to_compile_error()
         .into();
     }
 
-    let (statics, stmts) = match extract_static_muts(f.block.stmts.iter().cloned()) {
-        Err(e) => return e.to_compile_error().into(),
-        Ok(x) => x,
-    };
-
     f.sig.ident = Ident::new(
-        &format!("__xtensa_lx_6_{}", f.sig.ident),
+        &format!("__esp_hal_internal_{}", f.sig.ident),
         proc_macro2::Span::call_site(),
     );
-    f.sig.inputs.extend(statics.iter().map(|statik| {
-        let ident = &statik.ident;
-        let ty = &statik.ty;
-        let attrs = &statik.attrs;
-        syn::parse::<FnArg>(quote!(#[allow(non_snake_case)] #(#attrs)* #ident: &mut #ty).into())
-            .unwrap()
-    }));
-    f.block.stmts = iter::once(
+    f.block.stmts.extend(iter::once(
         syn::parse2(quote! {{
             // Check that this interrupt actually exists
             crate::pac::Interrupt::#ident_s;
         }})
         .unwrap(),
-    )
-    .chain(stmts)
-    .collect();
+    ));
 
     let tramp_ident = Ident::new(
         &format!("{}_trampoline", f.sig.ident),
@@ -211,36 +193,31 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
     );
     let ident = &f.sig.ident;
 
-    let resource_args = statics
-        .iter()
-        .map(|statik| {
-            let (ref cfgs, ref attrs) = extract_cfgs(statik.attrs.clone());
-            let ident = &statik.ident;
-            let ty = &statik.ty;
-            let expr = &statik.expr;
-            quote! {
-                #(#cfgs)*
-                {
-                    #(#attrs)*
-                    static mut #ident: #ty = #expr;
-                    &mut #ident
-                }
-            }
-        })
-        .collect::<Vec<_>>();
-
     let (ref cfgs, ref attrs) = extract_cfgs(f.attrs.clone());
 
     let export_name = ident_s.to_string();
+
+    #[cfg(feature = "xtensa")]
+    let context = quote! {
+        xtensa_lx_rt::exception::Context
+    };
+
+    #[cfg(feature = "riscv")]
+    let context = quote! {
+        crate::interrupt::TrapFrame
+    };
+
+    let context_call =
+        (f.sig.inputs.len() == 1).then_some(Ident::new("context", proc_macro2::Span::call_site()));
 
     quote!(
         #(#cfgs)*
         #(#attrs)*
         #[doc(hidden)]
         #[export_name = #export_name]
-        pub unsafe extern "C" fn #tramp_ident() {
+        pub unsafe extern "C" fn #tramp_ident(context: &mut #context) {
             #ident(
-                #(#resource_args),*
+                #context_call
             )
         }
 
@@ -307,42 +284,4 @@ fn extract_cfgs(attrs: Vec<Attribute>) -> (Vec<Attribute>, Vec<Attribute>) {
     }
 
     (cfgs, not_cfgs)
-}
-
-/// Extracts `static mut` vars from the beginning of the given statements
-fn extract_static_muts(
-    stmts: impl IntoIterator<Item = Stmt>,
-) -> Result<(Vec<ItemStatic>, Vec<Stmt>), parse::Error> {
-    let mut istmts = stmts.into_iter();
-
-    let mut seen = HashSet::new();
-    let mut statics = vec![];
-    let mut stmts = vec![];
-    while let Some(stmt) = istmts.next() {
-        match stmt {
-            Stmt::Item(Item::Static(var)) => {
-                if var.mutability.is_some() {
-                    if seen.contains(&var.ident) {
-                        return Err(parse::Error::new(
-                            var.ident.span(),
-                            format!("the name `{}` is defined multiple times", var.ident),
-                        ));
-                    }
-
-                    seen.insert(var.ident.clone());
-                    statics.push(var);
-                } else {
-                    stmts.push(Stmt::Item(Item::Static(var)));
-                }
-            }
-            _ => {
-                stmts.push(stmt);
-                break;
-            }
-        }
-    }
-
-    stmts.extend(istmts);
-
-    Ok((statics, stmts))
 }

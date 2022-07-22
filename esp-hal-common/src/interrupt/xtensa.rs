@@ -357,24 +357,24 @@ pub mod vectored {
 
     #[no_mangle]
     #[link_section = ".rwtext"]
-    unsafe fn __level_1_interrupt(level: u32, _save_frame: &mut Context) {
-        handle_interrupts(level)
+    unsafe fn __level_1_interrupt(level: u32, save_frame: &mut Context) {
+        handle_interrupts(level, save_frame)
     }
 
     #[no_mangle]
     #[link_section = ".rwtext"]
-    unsafe fn __level_2_interrupt(level: u32, _save_frame: &mut Context) {
-        handle_interrupts(level)
+    unsafe fn __level_2_interrupt(level: u32, save_frame: &mut Context) {
+        handle_interrupts(level, save_frame)
     }
 
     #[no_mangle]
     #[link_section = ".rwtext"]
-    unsafe fn __level_3_interrupt(level: u32, _save_frame: &mut Context) {
-        handle_interrupts(level)
+    unsafe fn __level_3_interrupt(level: u32, save_frame: &mut Context) {
+        handle_interrupts(level, save_frame)
     }
 
     #[ram]
-    unsafe fn handle_interrupts(level: u32) {
+    unsafe fn handle_interrupts(level: u32, save_frame: &mut Context) {
         let cpu_interrupt_mask =
             interrupt::get() & interrupt::get_mask() & CPU_INTERRUPT_LEVELS[level as usize];
 
@@ -403,7 +403,7 @@ pub mod vectored {
                 loop {
                     let interrupt_nr = interrupt_mask.trailing_zeros();
                     if let Ok(interrupt) = pac::Interrupt::try_from(interrupt_nr as u16) {
-                        handle_interrupt(level, interrupt)
+                        handle_interrupt(level, interrupt, save_frame)
                     } else {
                         break;
                     }
@@ -419,14 +419,14 @@ pub mod vectored {
                 // Interrupt::try_from can fail if interrupt already de-asserted:
                 // silently ignore
                 if let Ok(interrupt) = pac::Interrupt::try_from(interrupt_nr as u16) {
-                    handle_interrupt(level, interrupt);
+                    handle_interrupt(level, interrupt, save_frame);
                 }
             }
         }
     }
 
     #[ram]
-    unsafe fn handle_interrupt(level: u32, interrupt: Interrupt) {
+    unsafe fn handle_interrupt(level: u32, interrupt: Interrupt, save_frame: &mut Context) {
         extern "C" {
             // defined in each hal
             fn DefaultHandler(level: u32, interrupt: Interrupt);
@@ -436,7 +436,8 @@ pub mod vectored {
         if handler as *const _ == DefaultHandler as *const unsafe extern "C" fn() {
             DefaultHandler(level, interrupt);
         } else {
-            handler();
+            let handler: fn(&mut Context) = core::mem::transmute(handler);
+            handler(save_frame);
         }
     }
 
