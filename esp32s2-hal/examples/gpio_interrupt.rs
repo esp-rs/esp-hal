@@ -17,7 +17,6 @@ use esp32s2_hal::{
     pac::{self, Peripherals},
     prelude::*,
     timer::TimerGroup,
-    Cpu,
     Delay,
     RtcCntl,
 };
@@ -36,6 +35,7 @@ fn main() -> ! {
 
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let mut wdt = timer_group0.wdt;
+
     let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
 
     // Disable MWDT and RWDT (Watchdog) flash boot protection
@@ -52,10 +52,9 @@ fn main() -> ! {
         (&BUTTON).lock(|data| (*data).replace(Some(button)));
     }
 
-    interrupt::vectored::enable_with_priority(
-        Cpu::ProCpu,
+    interrupt::enable(
         pac::Interrupt::GPIO,
-        interrupt::vectored::Priority::Priority3,
+        interrupt::vectored::Priority::Priority2,
     )
     .unwrap();
 

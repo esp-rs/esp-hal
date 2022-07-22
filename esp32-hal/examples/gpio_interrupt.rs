@@ -17,7 +17,6 @@ use esp32_hal::{
     pac::{self, Peripherals},
     prelude::*,
     timer::TimerGroup,
-    Cpu,
     Delay,
     RtcCntl,
 };
@@ -53,8 +52,7 @@ fn main() -> ! {
         (&BUTTON).lock(|data| (*data).replace(Some(button)));
     }
 
-    interrupt::vectored::enable_with_priority(
-        Cpu::ProCpu,
+    interrupt::enable(
         pac::Interrupt::GPIO,
         interrupt::vectored::Priority::Priority2,
     )
@@ -74,15 +72,11 @@ fn main() -> ! {
 
 #[ram]
 #[interrupt]
-fn GPIO(frame: &mut xtensa_lx_rt::exception::Context) {
+fn GPIO() {
     unsafe {
         esp_println::println!(
             "GPIO Interrupt with priority {}",
             xtensa_lx::interrupt::get_level()
-        );
-        esp_println::println!(
-            "{:?}",
-            frame
         );
 
         (&BUTTON).lock(|data| {

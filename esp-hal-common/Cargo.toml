@@ -45,7 +45,7 @@ esp32s3_pac = { package = "esp32s3", git = "https://github.com/esp-rs/esp-pacs.g
 
 [features]
 esp32   = ["esp32_pac/rt"  , "procmacros/xtensa", "multi_core" , "xtensa-lx-rt/esp32",   "xtensa-lx/esp32"]
-esp32c3 = ["esp32c3_pac/rt", "procmacros/riscv" , "single_core"]
+esp32c3 = ["esp32c3_pac/rt", "procmacros/riscv" , "single_core", "riscv", "riscv-atomic-emulation-trap"]
 esp32s2 = ["esp32s2_pac/rt", "procmacros/xtensa", "single_core", "xtensa-lx-rt/esp32s2", "xtensa-lx/esp32s2"]
 esp32s3 = ["esp32s3_pac/rt", "procmacros/xtensa", "multi_core" , "xtensa-lx-rt/esp32s3", "xtensa-lx/esp32s3"]
 
