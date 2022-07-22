@@ -188,6 +188,22 @@ impl ClockControl {
             },
         }
     }
+
+    /// Configure the CPU clock speed.
+    #[allow(unused)]
+    pub fn configure(clock_control: SystemClockControl, cpu_clock_speed: CpuClock) -> ClockControl {
+        clocks_ll::set_cpu_clock(cpu_clock_speed);
+
+        ClockControl {
+            _private: (),
+            desired_rates: RawClocks {
+                cpu_clock: cpu_clock_speed.frequency(),
+                apb_clock: MegahertzU32::MHz(80),
+                xtal_clock: MegahertzU32::MHz(40),
+                i2c_clock: MegahertzU32::MHz(40),
+            },
+        }
+    }
 }
 
 #[cfg(feature = "esp32s3")]
@@ -199,6 +215,22 @@ impl ClockControl {
             _private: (),
             desired_rates: RawClocks {
                 cpu_clock: MegahertzU32::MHz(80),
+                apb_clock: MegahertzU32::MHz(80),
+                xtal_clock: MegahertzU32::MHz(40),
+                i2c_clock: MegahertzU32::MHz(40),
+            },
+        }
+    }
+
+    /// Configure the CPU clock speed.
+    #[allow(unused)]
+    pub fn configure(clock_control: SystemClockControl, cpu_clock_speed: CpuClock) -> ClockControl {
+        clocks_ll::set_cpu_clock(cpu_clock_speed);
+
+        ClockControl {
+            _private: (),
+            desired_rates: RawClocks {
+                cpu_clock: cpu_clock_speed.frequency(),
                 apb_clock: MegahertzU32::MHz(80),
                 xtal_clock: MegahertzU32::MHz(40),
                 i2c_clock: MegahertzU32::MHz(40),

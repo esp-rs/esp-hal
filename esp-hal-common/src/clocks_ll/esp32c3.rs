@@ -1,13 +1,13 @@
 use crate::clock::CpuClock;
 
 pub(crate) fn set_cpu_clock(cpu_clock_speed: CpuClock) {
-    let system_control = crate::pac::SYSTEM::PTR;
+    let system_control = unsafe { &*crate::pac::SYSTEM::PTR };
 
     unsafe {
-        (&*system_control)
+        system_control
             .sysclk_conf
             .modify(|_, w| w.soc_clk_sel().bits(1));
-        (&*system_control).cpu_per_conf.modify(|_, w| {
+        system_control.cpu_per_conf.modify(|_, w| {
             w.pll_freq_sel()
                 .set_bit()
                 .cpuperiod_sel()
