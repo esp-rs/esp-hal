@@ -1,6 +1,9 @@
 use riscv::register::mcause;
 
-use crate::{pac::Interrupt, Cpu};
+use crate::{
+    pac::{self, Interrupt},
+    Cpu,
+};
 
 // User code shouldn't usually take the mutable TrapFrame or the TrapFrame in
 // general. However this makes things like preemtive multitasking easier in
@@ -50,6 +53,8 @@ pub enum InterruptKind {
 /// Enumeration of available CPU interrupts.
 /// It is possible to create a handler for each of the interrupts. (e.g.
 /// `interrupt3`)
+#[repr(u32)]
+#[derive(Debug, Copy, Clone)]
 pub enum CpuInterrupt {
     Interrupt1 = 1,
     Interrupt2,
@@ -85,6 +90,7 @@ pub enum CpuInterrupt {
 }
 
 /// Interrupt priority levels.
+#[repr(u8)]
 pub enum Priority {
     None,
     Priority1,
@@ -104,21 +110,22 @@ pub enum Priority {
     Priority15,
 }
 
-/// Enable and assign a peripheral interrupt to an CPU interrupt.
-pub fn enable(_core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
-    unsafe {
-        let interrupt_number = interrupt as isize;
-        let cpu_interrupt_number = which as isize;
-        let intr = &*crate::pac::INTERRUPT_CORE0::PTR;
-        let intr_map_base = intr.mac_intr_map.as_ptr();
-        intr_map_base
-            .offset(interrupt_number)
-            .write_volatile(cpu_interrupt_number as u32);
+/// Assign a peripheral interrupt to an CPU interrupt.
+///
+/// Great care must be taken when using the `vectored` feature (enabled by
+/// default). Avoid interrupts 1 - 15 when interrupt vectoring is enabled.
+pub unsafe fn map(_core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
+    let interrupt_number = interrupt as isize;
+    let cpu_interrupt_number = which as isize;
+    let intr = &*crate::pac::INTERRUPT_CORE0::PTR;
+    let intr_map_base = intr.mac_intr_map.as_ptr();
+    intr_map_base
+        .offset(interrupt_number)
+        .write_volatile(cpu_interrupt_number as u32);
 
-        // enable interrupt
-        intr.cpu_int_enable
-            .modify(|r, w| w.bits((1 << cpu_interrupt_number) | r.bits()));
-    }
+    // enable interrupt
+    intr.cpu_int_enable
+        .modify(|r, w| w.bits((1 << cpu_interrupt_number) | r.bits()));
 }
 
 /// Disable the given peripheral interrupt.
@@ -184,6 +191,187 @@ pub fn get_status(_core: Cpu) -> u128 {
                 .read()
                 .bits() as u128)
                 << 32
+    }
+}
+
+#[cfg(feature = "vectored")]
+pub use vectored::*;
+
+#[cfg(feature = "vectored")]
+mod vectored {
+    use super::*;
+
+    // Setup interrupts 1-15 ready for vectoring (level only)
+    #[doc(hidden)]
+    pub(crate) unsafe fn init_vectoring() {
+        let intr = &*crate::pac::INTERRUPT_CORE0::PTR;
+
+        for i in 1..=15 {
+            set_kind(
+                crate::get_core(),
+                core::mem::transmute(i),
+                InterruptKind::Level,
+            );
+            set_priority(
+                crate::get_core(),
+                core::mem::transmute(i),
+                core::mem::transmute(i as u8),
+            );
+            // enable CPU interrupt
+            intr.cpu_int_enable
+                .modify(|r, w| w.bits((1 << i) | r.bits()));
+        }
+    }
+
+    /// Get the interrupts configured for the core
+    #[inline]
+    fn get_configured_interrupts(_core: Cpu) -> [u128; 15] {
+        unsafe {
+            let intr = &*crate::pac::INTERRUPT_CORE0::PTR;
+            let intr_map_base = intr.mac_intr_map.as_ptr();
+            let intr_prio_base = intr.cpu_int_pri_0.as_ptr();
+
+            let mut prios = [0u128; 15];
+
+            for i in 0..get_interrupt_count() {
+                let i = i as isize;
+                let cpu_interrupt = intr_map_base.offset(i).read_volatile();
+                // safety: cast is safe because of repr(u32)
+                let cpu_interrupt: CpuInterrupt = core::mem::transmute(cpu_interrupt);
+                let prio = intr_prio_base
+                    .offset(cpu_interrupt as isize)
+                    .read_volatile();
+
+                prios[prio as usize] |= 1 << i;
+            }
+
+            prios
+        }
+    }
+
+    #[inline]
+    fn get_interrupt_count() -> usize {
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "esp32c3")] {
+                62
+            }
+        }
+    }
+
+    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+    pub enum Error {
+        InvalidInterruptPriority,
+    }
+
+    /// Enables a interrupt at a given priority
+    ///
+    /// Note that interrupts still need to be enabled globally for interrupts
+    /// to be serviced.
+    pub fn enable(interrupt: Interrupt, level: Priority) -> Result<(), Error> {
+        if matches!(level, Priority::None) {
+            return Err(Error::InvalidInterruptPriority);
+        }
+        // TODO how do we handle edge interrupts?
+        unsafe {
+            let cpu_interrupt = core::mem::transmute(level as u8 as u32);
+            map(crate::get_core(), interrupt, cpu_interrupt);
+        }
+        Ok(())
+    }
+
+    unsafe fn handle_interrupts(cpu_intr: CpuInterrupt, context: &mut TrapFrame) {
+        let status = get_status(crate::get_core());
+        clear(crate::get_core(), cpu_intr);
+
+        let configured_interrupts = get_configured_interrupts(crate::get_core());
+        let mut interrupt_mask = status & configured_interrupts[cpu_intr as usize];
+        while interrupt_mask != 0 {
+            let interrupt_nr = interrupt_mask.trailing_zeros();
+            // Interrupt::try_from can fail if interrupt already de-asserted:
+            // silently ignore
+            if let Ok(interrupt) = pac::Interrupt::try_from(interrupt_nr as u8) {
+                handle_interrupt(interrupt, context)
+            } else {
+                break;
+            }
+            interrupt_mask &= !(1u128 << interrupt_nr);
+        }
+    }
+
+    unsafe fn handle_interrupt(interrupt: Interrupt, save_frame: &mut TrapFrame) {
+        extern "C" {
+            // defined in riscv-rt
+            fn DefaultHandler();
+        }
+        let handler = pac::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler;
+        if handler as *const _ == DefaultHandler as *const unsafe extern "C" fn() {
+            DefaultHandler();
+        } else {
+            let handler: fn(&mut TrapFrame) = core::mem::transmute(handler);
+            handler(save_frame);
+        }
+    }
+
+    #[no_mangle]
+    pub unsafe fn interrupt1(context: &mut TrapFrame) {
+        handle_interrupts(CpuInterrupt::Interrupt1, context)
+    }
+
+    #[no_mangle]
+    pub unsafe fn interrupt2(context: &mut TrapFrame) {
+        handle_interrupts(CpuInterrupt::Interrupt2, context)
+    }
+    #[no_mangle]
+    pub unsafe fn interrupt3(context: &mut TrapFrame) {
+        handle_interrupts(CpuInterrupt::Interrupt3, context)
+    }
+    #[no_mangle]
+    pub unsafe fn interrupt4(context: &mut TrapFrame) {
+        handle_interrupts(CpuInterrupt::Interrupt4, context)
+    }
+    #[no_mangle]
+    pub unsafe fn interrupt5(context: &mut TrapFrame) {
+        handle_interrupts(CpuInterrupt::Interrupt5, context)
+    }
+    #[no_mangle]
+    pub unsafe fn interrupt6(context: &mut TrapFrame) {
+        handle_interrupts(CpuInterrupt::Interrupt6, context)
+    }
+    #[no_mangle]
+    pub unsafe fn interrupt7(context: &mut TrapFrame) {
+        handle_interrupts(CpuInterrupt::Interrupt7, context)
+    }
+    #[no_mangle]
+    pub unsafe fn interrupt8(context: &mut TrapFrame) {
+        handle_interrupts(CpuInterrupt::Interrupt8, context)
+    }
+    #[no_mangle]
+    pub unsafe fn interrupt9(context: &mut TrapFrame) {
+        handle_interrupts(CpuInterrupt::Interrupt9, context)
+    }
+    #[no_mangle]
+    pub unsafe fn interrupt10(context: &mut TrapFrame) {
+        handle_interrupts(CpuInterrupt::Interrupt10, context)
+    }
+    #[no_mangle]
+    pub unsafe fn interrupt11(context: &mut TrapFrame) {
+        handle_interrupts(CpuInterrupt::Interrupt11, context)
+    }
+    #[no_mangle]
+    pub unsafe fn interrupt12(context: &mut TrapFrame) {
+        handle_interrupts(CpuInterrupt::Interrupt12, context)
+    }
+    #[no_mangle]
+    pub unsafe fn interrupt13(context: &mut TrapFrame) {
+        handle_interrupts(CpuInterrupt::Interrupt13, context)
+    }
+    #[no_mangle]
+    pub unsafe fn interrupt14(context: &mut TrapFrame) {
+        handle_interrupts(CpuInterrupt::Interrupt14, context)
+    }
+    #[no_mangle]
+    pub unsafe fn interrupt15(context: &mut TrapFrame) {
+        handle_interrupts(CpuInterrupt::Interrupt15, context)
     }
 }
 
@@ -385,5 +573,8 @@ pub fn _setup_interrupts() {
     unsafe {
         let vec_table = &_vector_table_hal as *const _ as usize;
         riscv::register::mtvec::write(vec_table, riscv::register::mtvec::TrapMode::Vectored);
+
+        #[cfg(feature = "vectored")]
+        crate::interrupt::init_vectoring();
     };
 }

@@ -15,13 +15,13 @@
     // developing for. This will propagate to the `esp-hal-common` crate too,
     // as it is a dependency. Changing target/project requires reloading
     // Rust Analyzer.
-    "rust-analyzer.cargo.target": "xtensa-esp32-none-elf",
-    // "rust-analyzer.cargo.target": "riscv32imc-unknown-none-elf",
+    // "rust-analyzer.cargo.target": "xtensa-esp32-none-elf",
+    "rust-analyzer.cargo.target": "riscv32imc-unknown-none-elf",
     // "rust-analyzer.cargo.target": "xtensa-esp32s2-none-elf",
     // "rust-analyzer.cargo.target": "xtensa-esp32s3-none-elf",
     "rust-analyzer.linkedProjects": [
-        "esp32-hal/Cargo.toml",
-        // "esp32c3-hal/Cargo.toml",
+        // "esp32-hal/Cargo.toml",
+        "esp32c3-hal/Cargo.toml",
         // "esp32s2-hal/Cargo.toml",
         // "esp32s3-hal/Cargo.toml",
     ],

@@ -310,3 +310,6 @@ pub fn mp_hook() -> bool {
 fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
     int_enable as u8 | ((nmi_enable as u8) << 1)
 }
+
+#[no_mangle]
+extern "C" fn DefaultHandler(_interrupt: pac::Interrupt) {}
