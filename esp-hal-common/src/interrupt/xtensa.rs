@@ -1,21 +1,17 @@
+use xtensa_lx::interrupt::{self, InterruptNumber};
 use xtensa_lx_rt::exception::Context;
 
-use crate::{pac::Interrupt, Cpu};
-
-extern "C" {
-    fn level1_interrupt(save_frame: &mut Context);
-    fn level2_interrupt(save_frame: &mut Context);
-    fn level3_interrupt(save_frame: &mut Context);
-    fn level4_interrupt(save_frame: &mut Context);
-    fn level5_interrupt(save_frame: &mut Context);
-    fn level6_interrupt(save_frame: &mut Context);
-    fn level7_interrupt(save_frame: &mut Context);
-}
+use crate::{
+    pac::{self, Interrupt},
+    Cpu,
+};
 
 /// Enumeration of available CPU interrupts
 /// It's possible to create one handler per priority level. (e.g
 /// `level1_interrupt`)
 #[allow(unused)]
+#[derive(Debug, Copy, Clone)]
+#[repr(u32)]
 pub enum CpuInterrupt {
     Interrupt0LevelPriority1 = 0,
     Interrupt1LevelPriority1,
@@ -51,22 +47,32 @@ pub enum CpuInterrupt {
     Interrupt31EdgePriority5,
 }
 
-/// Enable and assign a peripheral interrupt to an CPU interrupt.
-pub fn enable(core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
-    unsafe {
-        let interrupt_number = interrupt as isize;
-        let cpu_interrupt_number = which as isize;
-        let intr_map_base = match core {
-            Cpu::ProCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
-            #[cfg(feature = "dual_core")]
-            Cpu::AppCpu => (*core1_interrupt_peripheral()).app_mac_intr_map.as_ptr(),
-            #[cfg(feature = "single_core")]
-            Cpu::AppCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
-        };
-        intr_map_base
-            .offset(interrupt_number)
-            .write_volatile(cpu_interrupt_number as u32);
-    }
+/// Assign a peripheral interrupt to an CPU interrupt.
+///
+/// Great care **must** be taken when using this function with interrupt
+/// vectoring (enabled by default). Avoid the following CPU interrupts:
+/// - Interrupt1LevelPriority1
+/// - Interrupt19LevelPriority2
+/// - Interrupt23LevelPriority3
+/// - Interrupt10EdgePriority1
+/// - Interrupt22EdgePriority3
+/// As they are preallocated for interrupt vectoring.
+///
+/// Note: this only maps the interrupt to the CPU interrupt. The CPU interrupt
+/// still needs to be enabled afterwards
+pub unsafe fn map(core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
+    let interrupt_number = interrupt as isize;
+    let cpu_interrupt_number = which as isize;
+    let intr_map_base = match core {
+        Cpu::ProCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
+        #[cfg(feature = "multi_core")]
+        Cpu::AppCpu => (*core1_interrupt_peripheral()).app_mac_intr_map.as_ptr(),
+        #[cfg(feature = "single_core")]
+        Cpu::AppCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
+    };
+    intr_map_base
+        .offset(interrupt_number)
+        .write_volatile(cpu_interrupt_number as u32);
 }
 
 /// Disable the given peripheral interrupt.
@@ -75,7 +81,7 @@ pub fn disable(core: Cpu, interrupt: Interrupt) {
         let interrupt_number = interrupt as isize;
         let intr_map_base = match core {
             Cpu::ProCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
-            #[cfg(feature = "dual_core")]
+            #[cfg(feature = "multi_core")]
             Cpu::AppCpu => (*core1_interrupt_peripheral()).app_mac_intr_map.as_ptr(),
             #[cfg(feature = "single_core")]
             Cpu::AppCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
@@ -111,7 +117,7 @@ pub fn get_status(core: Cpu) -> u128 {
                         .bits() as u128)
                         << 64
             }
-            #[cfg(feature = "dual_core")]
+            #[cfg(feature = "multi_core")]
             Cpu::AppCpu => {
                 ((*core1_interrupt_peripheral())
                     .app_intr_status_0
@@ -174,44 +180,380 @@ unsafe fn core1_interrupt_peripheral() -> *const crate::pac::interrupt_core1::Re
     crate::pac::INTERRUPT_CORE1::PTR
 }
 
-#[no_mangle]
-#[link_section = ".rwtext"]
-fn __level_1_interrupt(_level: u32, save_frame: &mut Context) {
-    unsafe { level1_interrupt(save_frame) };
+#[cfg(feature = "vectored")]
+pub use vectored::*;
+
+#[cfg(feature = "vectored")]
+pub mod vectored {
+    use procmacros::ram;
+
+    use super::*;
+    use crate::get_core;
+
+    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+    pub enum Error {
+        InvalidInterrupt,
+    }
+
+    /// Interrupt priority levels.
+    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+    #[repr(u8)]
+    pub enum Priority {
+        None = 0,
+        Priority1,
+        Priority2,
+        Priority3,
+    }
+
+    impl CpuInterrupt {
+        #[inline]
+        fn level(&self) -> Priority {
+            match self {
+                CpuInterrupt::Interrupt0LevelPriority1
+                | CpuInterrupt::Interrupt1LevelPriority1
+                | CpuInterrupt::Interrupt2LevelPriority1
+                | CpuInterrupt::Interrupt3LevelPriority1
+                | CpuInterrupt::Interrupt4LevelPriority1
+                | CpuInterrupt::Interrupt5LevelPriority1
+                | CpuInterrupt::Interrupt6Timer0Priority1
+                | CpuInterrupt::Interrupt7SoftwarePriority1
+                | CpuInterrupt::Interrupt8LevelPriority1
+                | CpuInterrupt::Interrupt9LevelPriority1
+                | CpuInterrupt::Interrupt10EdgePriority1
+                | CpuInterrupt::Interrupt12LevelPriority1
+                | CpuInterrupt::Interrupt13LevelPriority1
+                | CpuInterrupt::Interrupt17LevelPriority1
+                | CpuInterrupt::Interrupt18LevelPriority1 => Priority::Priority1,
+
+                CpuInterrupt::Interrupt19LevelPriority2
+                | CpuInterrupt::Interrupt20LevelPriority2
+                | CpuInterrupt::Interrupt21LevelPriority2 => Priority::Priority2,
+
+                CpuInterrupt::Interrupt11ProfilingPriority3
+                | CpuInterrupt::Interrupt15Timer1Priority3
+                | CpuInterrupt::Interrupt22EdgePriority3
+                | CpuInterrupt::Interrupt27LevelPriority3
+                | CpuInterrupt::Interrupt29SoftwarePriority3
+                | CpuInterrupt::Interrupt23LevelPriority3 => Priority::Priority3,
+
+                // we direct these to None because we do not support interrupts at this level
+                // through Rust
+                CpuInterrupt::Interrupt24LevelPriority4
+                | CpuInterrupt::Interrupt25LevelPriority4
+                | CpuInterrupt::Interrupt28EdgePriority4
+                | CpuInterrupt::Interrupt30EdgePriority4
+                | CpuInterrupt::Interrupt31EdgePriority5
+                | CpuInterrupt::Interrupt16Timer2Priority5
+                | CpuInterrupt::Interrupt26LevelPriority5
+                | CpuInterrupt::Interrupt14NmiPriority7 => Priority::None,
+            }
+        }
+    }
+
+    /// Get the interrupts configured for the core
+    #[inline]
+    fn get_configured_interrupts(core: Cpu) -> [u128; 7] {
+        unsafe {
+            let intr_map_base = match core {
+                Cpu::ProCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
+                #[cfg(feature = "multi_core")]
+                Cpu::AppCpu => (*core1_interrupt_peripheral()).app_mac_intr_map.as_ptr(),
+                #[cfg(feature = "single_core")]
+                Cpu::AppCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
+            };
+
+            let mut levels = [0u128; 7];
+
+            for i in 0..get_interrupt_count() {
+                let i = i as isize;
+                let cpu_interrupt = intr_map_base.offset(i).read_volatile();
+                // safety: cast is safe because of repr(u32)
+                let cpu_interrupt: CpuInterrupt = core::mem::transmute(cpu_interrupt);
+                let level = cpu_interrupt.level() as u8 as usize;
+                levels[level] |= 1 << i;
+            }
+
+            levels
+        }
+    }
+
+    #[inline]
+    fn get_interrupt_count() -> usize {
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "esp32")] {
+                68
+            } else if #[cfg(feature = "esp32s2")] {
+                94
+            } else if #[cfg(feature = "esp32s3")] {
+                98
+            }
+        }
+    }
+
+    pub fn enable(interrupt: Interrupt, level: Priority) -> Result<(), Error> {
+        let cpu_interrupt =
+            interrupt_level_to_cpu_interrupt(level, chip_specific::interrupt_is_edge(interrupt))?;
+
+        unsafe {
+            map(get_core(), interrupt, cpu_interrupt);
+
+            xtensa_lx::interrupt::enable_mask(
+                xtensa_lx::interrupt::get_mask() | 1 << cpu_interrupt as u32,
+            );
+        }
+        Ok(())
+    }
+
+    fn interrupt_level_to_cpu_interrupt(
+        level: Priority,
+        is_edge: bool,
+    ) -> Result<CpuInterrupt, Error> {
+        Ok(if is_edge {
+            match level {
+                Priority::None => return Err(Error::InvalidInterrupt),
+                Priority::Priority1 => CpuInterrupt::Interrupt10EdgePriority1,
+                Priority::Priority2 => return Err(Error::InvalidInterrupt),
+                Priority::Priority3 => CpuInterrupt::Interrupt22EdgePriority3,
+            }
+        } else {
+            match level {
+                Priority::None => return Err(Error::InvalidInterrupt),
+                Priority::Priority1 => CpuInterrupt::Interrupt1LevelPriority1,
+                Priority::Priority2 => CpuInterrupt::Interrupt19LevelPriority2,
+                Priority::Priority3 => CpuInterrupt::Interrupt23LevelPriority3,
+            }
+        })
+    }
+
+    // TODO use CpuInterrupt::LevelX.mask() // TODO make it const
+    const CPU_INTERRUPT_LEVELS: [u32; 8] = [
+        0b_0000_0000_0000_0000_0000_0000_0000_0000, // Dummy level 0
+        0b_0000_0000_0000_0110_0011_0111_1111_1111, // Level_1
+        0b_0000_0000_0011_1000_0000_0000_0000_0000, // Level 2
+        0b_0010_1000_1100_0000_1000_1000_0000_0000, // Level 3
+        0b_0101_0011_0000_0000_0000_0000_0000_0000, // Level 4
+        0b_1000_0100_0000_0001_0000_0000_0000_0000, // Level 5
+        0b_0000_0000_0000_0000_0000_0000_0000_0000, // Level 6
+        0b_0000_0000_0000_0000_0100_0000_0000_0000, // Level 7
+    ];
+    const CPU_INTERRUPT_INTERNAL: u32 = 0b_0010_0000_0000_0001_1000_1000_1100_0000;
+    const CPU_INTERRUPT_EDGE: u32 = 0b_0111_0000_0100_0000_0000_1100_1000_0000;
+
+    #[inline]
+    fn cpu_interrupt_nr_to_cpu_interrupt_handler(number: u32) -> Option<unsafe extern "C" fn(u32)> {
+        use xtensa_lx_rt::*;
+        // we're fortunate that all esp variants use the same CPU interrupt layout
+        Some(match number {
+            6 => Timer0,
+            7 => Software0,
+            11 => Profiling,
+            14 => NMI,
+            15 => Timer1,
+            16 => Timer2,
+            29 => Software1,
+            _ => return None,
+        })
+    }
+
+    #[no_mangle]
+    #[link_section = ".rwtext"]
+    unsafe fn __level_1_interrupt(level: u32, save_frame: &mut Context) {
+        handle_interrupts(level, save_frame)
+    }
+
+    #[no_mangle]
+    #[link_section = ".rwtext"]
+    unsafe fn __level_2_interrupt(level: u32, save_frame: &mut Context) {
+        handle_interrupts(level, save_frame)
+    }
+
+    #[no_mangle]
+    #[link_section = ".rwtext"]
+    unsafe fn __level_3_interrupt(level: u32, save_frame: &mut Context) {
+        handle_interrupts(level, save_frame)
+    }
+
+    #[ram]
+    unsafe fn handle_interrupts(level: u32, save_frame: &mut Context) {
+        let cpu_interrupt_mask =
+            interrupt::get() & interrupt::get_mask() & CPU_INTERRUPT_LEVELS[level as usize];
+
+        if cpu_interrupt_mask & CPU_INTERRUPT_INTERNAL != 0 {
+            let cpu_interrupt_mask = cpu_interrupt_mask & CPU_INTERRUPT_INTERNAL;
+            let cpu_interrupt_nr = cpu_interrupt_mask.trailing_zeros();
+
+            if (cpu_interrupt_mask & CPU_INTERRUPT_EDGE) != 0 {
+                interrupt::clear(1 << cpu_interrupt_nr);
+            }
+            if let Some(handler) = cpu_interrupt_nr_to_cpu_interrupt_handler(cpu_interrupt_nr) {
+                handler(level);
+            }
+        } else {
+            let interrupt_levels = get_configured_interrupts(crate::get_core());
+            if (cpu_interrupt_mask & CPU_INTERRUPT_EDGE) != 0 {
+                let cpu_interrupt_mask = cpu_interrupt_mask & CPU_INTERRUPT_EDGE;
+                let cpu_interrupt_nr = cpu_interrupt_mask.trailing_zeros();
+                interrupt::clear(1 << cpu_interrupt_nr);
+
+                // for edge interrupts cannot rely on the interrupt status
+                // register, therefore call all registered
+                // handlers for current level
+                let mut interrupt_mask =
+                    interrupt_levels[level as usize] & chip_specific::INTERRUPT_EDGE;
+                loop {
+                    let interrupt_nr = interrupt_mask.trailing_zeros();
+                    if let Ok(interrupt) = pac::Interrupt::try_from(interrupt_nr as u16) {
+                        handle_interrupt(level, interrupt, save_frame)
+                    } else {
+                        break;
+                    }
+                    interrupt_mask &= !(1u128 << interrupt_nr);
+                }
+            } else {
+                // finally check periperal sources and fire of handlers from pac
+                // peripheral mapped interrupts are cleared by the peripheral
+                let interrupt_mask =
+                    get_status(crate::get_core()) & interrupt_levels[level as usize];
+                let interrupt_nr = interrupt_mask.trailing_zeros();
+
+                // Interrupt::try_from can fail if interrupt already de-asserted:
+                // silently ignore
+                if let Ok(interrupt) = pac::Interrupt::try_from(interrupt_nr as u16) {
+                    handle_interrupt(level, interrupt, save_frame);
+                }
+            }
+        }
+    }
+
+    #[ram]
+    unsafe fn handle_interrupt(level: u32, interrupt: Interrupt, save_frame: &mut Context) {
+        extern "C" {
+            // defined in each hal
+            fn DefaultHandler(level: u32, interrupt: Interrupt);
+        }
+
+        let handler = pac::__INTERRUPTS[interrupt.number() as usize]._handler;
+        if handler as *const _ == DefaultHandler as *const unsafe extern "C" fn() {
+            DefaultHandler(level, interrupt);
+        } else {
+            let handler: fn(&mut Context) = core::mem::transmute(handler);
+            handler(save_frame);
+        }
+    }
+
+    #[cfg(feature = "esp32")]
+    mod chip_specific {
+        use super::*;
+        pub const INTERRUPT_EDGE: u128 =
+    0b_0000_0000_0000_0000_0000_0000_0000_0000__0000_0000_0000_0000_0000_0000_0000_0011_1111_1100_0000_0000_0000_0000_0000_0000__0000_0000_0000_0000_0000_0000_0000_0000;
+        #[inline]
+        pub fn interrupt_is_edge(interrupt: Interrupt) -> bool {
+            use pac::Interrupt::*;
+            [
+                TG0_T0_EDGE,
+                TG0_T1_EDGE,
+                TG0_WDT_EDGE,
+                TG0_LACT_EDGE,
+                TG1_T0_EDGE,
+                TG1_T1_EDGE,
+                TG1_WDT_EDGE,
+                TG1_LACT_EDGE,
+            ]
+            .contains(&interrupt)
+        }
+    }
+
+    #[cfg(feature = "esp32s2")]
+    mod chip_specific {
+        use super::*;
+        pub const INTERRUPT_EDGE: u128 =
+    0b_0000_0000_0000_0000_0000_0000_0000_0000__0000_0000_0000_0000_0000_0000_0001_1111_1110_0000_0000_0000_0000_0000_0000_0000__0000_0000_0000_0000_0000_0000_0000_0000;
+        #[inline]
+        pub fn interrupt_is_edge(interrupt: Interrupt) -> bool {
+            use pac::Interrupt::*;
+            [
+                TG0_T0_EDGE,
+                TG0_T1_EDGE,
+                TG0_WDT_EDGE,
+                TG0_LACT_EDGE,
+                TG1_T0_EDGE,
+                TG1_T1_EDGE,
+                TG1_WDT_EDGE,
+                TG1_LACT_EDGE,
+            ]
+            .contains(&interrupt)
+        }
+    }
+
+    #[cfg(feature = "esp32s3")]
+    mod chip_specific {
+        use super::*;
+        pub const INTERRUPT_EDGE: u128 = 0;
+        #[inline]
+        pub fn interrupt_is_edge(_interrupt: Interrupt) -> bool {
+            false
+        }
+    }
 }
 
-#[no_mangle]
-#[link_section = ".rwtext"]
-fn __level_2_interrupt(_level: u32, save_frame: &mut Context) {
-    unsafe { level2_interrupt(save_frame) };
-}
+mod raw {
+    use super::*;
 
-#[no_mangle]
-#[link_section = ".rwtext"]
-fn __level_3_interrupt(_level: u32, save_frame: &mut Context) {
-    unsafe { level3_interrupt(save_frame) };
-}
+    extern "C" {
+        #[cfg(not(feature = "vectored"))]
+        fn level1_interrupt(save_frame: &mut Context);
+        #[cfg(not(feature = "vectored"))]
+        fn level2_interrupt(save_frame: &mut Context);
+        #[cfg(not(feature = "vectored"))]
+        fn level3_interrupt(save_frame: &mut Context);
+        fn level4_interrupt(save_frame: &mut Context);
+        fn level5_interrupt(save_frame: &mut Context);
+        fn level6_interrupt(save_frame: &mut Context);
+        fn level7_interrupt(save_frame: &mut Context);
+    }
 
-#[no_mangle]
-#[link_section = ".rwtext"]
-fn __level_4_interrupt(_level: u32, save_frame: &mut Context) {
-    unsafe { level4_interrupt(save_frame) };
-}
+    #[no_mangle]
+    #[link_section = ".rwtext"]
+    #[cfg(not(feature = "vectored"))]
+    unsafe fn __level_1_interrupt(_level: u32, save_frame: &mut Context) {
+        level1_interrupt(save_frame)
+    }
 
-#[no_mangle]
-#[link_section = ".rwtext"]
-fn __level_5_interrupt(_level: u32, save_frame: &mut Context) {
-    unsafe { level5_interrupt(save_frame) };
-}
+    #[no_mangle]
+    #[link_section = ".rwtext"]
+    #[cfg(not(feature = "vectored"))]
+    unsafe fn __level_2_interrupt(_level: u32, save_frame: &mut Context) {
+        level2_interrupt(save_frame)
+    }
 
-#[no_mangle]
-#[link_section = ".rwtext"]
-fn __level_6_interrupt(_level: u32, save_frame: &mut Context) {
-    unsafe { level6_interrupt(save_frame) };
-}
+    #[no_mangle]
+    #[link_section = ".rwtext"]
+    #[cfg(not(feature = "vectored"))]
+    unsafe fn __level_3_interrupt(_level: u32, save_frame: &mut Context) {
+        level3_interrupt(save_frame)
+    }
 
-#[no_mangle]
-#[link_section = ".rwtext"]
-fn __level_7_interrupt(_level: u32, save_frame: &mut Context) {
-    unsafe { level7_interrupt(save_frame) };
+    #[no_mangle]
+    #[link_section = ".rwtext"]
+    unsafe fn __level_4_interrupt(_level: u32, save_frame: &mut Context) {
+        level4_interrupt(save_frame)
+    }
+
+    #[no_mangle]
+    #[link_section = ".rwtext"]
+    unsafe fn __level_5_interrupt(_level: u32, save_frame: &mut Context) {
+        level5_interrupt(save_frame)
+    }
+
+    #[no_mangle]
+    #[link_section = ".rwtext"]
+    unsafe fn __level_6_interrupt(_level: u32, save_frame: &mut Context) {
+        level6_interrupt(save_frame)
+    }
+
+    #[no_mangle]
+    #[link_section = ".rwtext"]
+    unsafe fn __level_7_interrupt(_level: u32, save_frame: &mut Context) {
+        level7_interrupt(save_frame)
+    }
 }

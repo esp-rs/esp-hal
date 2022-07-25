@@ -37,8 +37,8 @@ pub mod efuse;
 
 pub mod gpio;
 pub mod i2c;
-#[cfg_attr(feature = "risc_v", path = "interrupt/riscv.rs")]
-#[cfg_attr(feature = "xtensa", path = "interrupt/xtensa.rs")]
+#[cfg_attr(target_arch = "riscv32", path = "interrupt/riscv.rs")]
+#[cfg_attr(target_arch = "xtensa", path = "interrupt/xtensa.rs")]
 pub mod interrupt;
 pub mod prelude;
 pub mod pulse_control;
@@ -55,7 +55,7 @@ pub mod utils;
 pub use delay::Delay;
 pub use gpio::*;
 pub use interrupt::*;
-pub use procmacros::ram;
+pub use procmacros as macros;
 pub use pulse_control::PulseControl;
 pub use rng::Rng;
 #[cfg(not(feature = "esp32c3"))]
@@ -86,4 +86,18 @@ pub enum Cpu {
     ProCpu = 0,
     /// The second core
     AppCpu,
+}
+
+pub fn get_core() -> Cpu {
+    #[cfg(all(target_arch = "xtensa", feature = "multi_core"))]
+    match ((xtensa_lx::get_processor_id() >> 13) & 1) != 0 {
+        false => Cpu::ProCpu,
+        true => Cpu::AppCpu,
+    }
+    // #[cfg(all(target_arch = "riscv32", feature = "multi_core"))]
+    // TODO get hart_id
+
+    // single core always has ProCpu only
+    #[cfg(feature = "single_core")]
+    Cpu::ProCpu
 }

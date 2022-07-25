@@ -38,27 +38,21 @@ smart-leds-trait = { version = "0.2.1", optional = true }
 # Each supported device MUST have its PAC included below along with a
 # corresponding feature. We rename the PAC packages because we cannot
 # have dependencies and features with the same names.
-#
-# Please note: for now we use git-dependencies from the `with_source` branch however we pin the dependency
-# to specific commits.
-esp32_pac   = { package = "esp32",   git = "https://github.com/esp-rs/esp-pacs.git", rev = "148dbb843cba3c311364aa994b8f3f773d15b04f", optional = true }
-esp32c3_pac = { package = "esp32c3", git = "https://github.com/esp-rs/esp-pacs.git", rev = "148dbb843cba3c311364aa994b8f3f773d15b04f", optional = true }
-esp32s2_pac = { package = "esp32s2", git = "https://github.com/esp-rs/esp-pacs.git", rev = "148dbb843cba3c311364aa994b8f3f773d15b04f", optional = true }
-esp32s3_pac = { package = "esp32s3", git = "https://github.com/esp-rs/esp-pacs.git", rev = "148dbb843cba3c311364aa994b8f3f773d15b04f", optional = true }
+esp32_pac   = { package = "esp32",   git = "https://github.com/esp-rs/esp-pacs.git", branch = "with_source", optional = true }
+esp32c3_pac = { package = "esp32c3", git = "https://github.com/esp-rs/esp-pacs.git", branch = "with_source", optional = true }
+esp32s2_pac = { package = "esp32s2", git = "https://github.com/esp-rs/esp-pacs.git", branch = "with_source", optional = true }
+esp32s3_pac = { package = "esp32s3", git = "https://github.com/esp-rs/esp-pacs.git", branch = "with_source", optional = true }
 
 [features]
-esp32   = [  "esp32_pac/rt", "xtensa",   "dual_core", "xtensa-lx-rt/esp32",     "xtensa-lx/esp32"]
-esp32c3 = ["esp32c3_pac/rt", "risc_v", "single_core"]
-esp32s2 = ["esp32s2_pac/rt", "xtensa", "single_core", "xtensa-lx-rt/esp32s2", "xtensa-lx/esp32s2"]
-esp32s3 = ["esp32s3_pac/rt", "xtensa",   "dual_core", "xtensa-lx-rt/esp32s3", "xtensa-lx/esp32s3"]
+esp32   = ["esp32_pac/rt"  , "procmacros/xtensa", "multi_core" , "xtensa-lx-rt/esp32",   "xtensa-lx/esp32"]
+esp32c3 = ["esp32c3_pac/rt", "procmacros/riscv" , "single_core", "riscv", "riscv-atomic-emulation-trap"]
+esp32s2 = ["esp32s2_pac/rt", "procmacros/xtensa", "single_core", "xtensa-lx-rt/esp32s2", "xtensa-lx/esp32s2"]
+esp32s3 = ["esp32s3_pac/rt", "procmacros/xtensa", "multi_core" , "xtensa-lx-rt/esp32s3", "xtensa-lx/esp32s3"]
 
-# Architecture (should not be enabled directly, but instead by a PAC's feature)
-risc_v = ["riscv", "riscv-atomic-emulation-trap"]
-xtensa = ["procmacros/rtc_slow"]
 
 # Core Count (should not be enabled directly, but instead by a PAC's feature)
 single_core = []
-dual_core   = []
+multi_core   = []
 
 # To support `ufmt`
 ufmt = ["ufmt-write"]
@@ -68,3 +62,5 @@ smartled = ["smart-leds-trait"]
 
 # Implement the `embedded-hal==1.0.0-alpha.x` traits
 eh1 = ["embedded-hal-1"]
+# To use vectored interrupts (calling the handlers defined in the PAC)
+vectored = ["procmacros/interrupt"]

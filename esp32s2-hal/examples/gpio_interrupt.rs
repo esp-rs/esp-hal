@@ -6,27 +6,24 @@
 #![no_std]
 #![no_main]
 
-use core::{cell::RefCell, fmt::Write};
+use core::cell::RefCell;
 
 use esp32s2_hal::{
     clock::ClockControl,
     gpio::{Gpio0, IO},
     gpio_types::{Event, Input, Pin, PullDown},
     interrupt,
-    pac::{self, Peripherals, UART0},
+    macros::ram,
+    pac::{self, Peripherals},
     prelude::*,
     timer::TimerGroup,
-    Cpu,
     Delay,
     RtcCntl,
-    Serial,
 };
 use panic_halt as _;
 use xtensa_lx::mutex::{CriticalSectionMutex, Mutex};
 use xtensa_lx_rt::entry;
 
-static mut SERIAL: CriticalSectionMutex<RefCell<Option<Serial<UART0>>>> =
-    CriticalSectionMutex::new(RefCell::new(None));
 static mut BUTTON: CriticalSectionMutex<RefCell<Option<Gpio0<Input<PullDown>>>>> =
     CriticalSectionMutex::new(RefCell::new(None));
 
@@ -38,29 +35,28 @@ fn main() -> ! {
 
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let mut wdt = timer_group0.wdt;
+
     let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
-    let serial0 = Serial::new(peripherals.UART0);
 
     // Disable MWDT and RWDT (Watchdog) flash boot protection
     wdt.disable();
     rtc_cntl.set_wdt_global_enable(false);
 
-    // Set GPIO4 as an output, and set its state high initially.
+    // Set GPIO15 as an output, and set its state high initially.
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-    let mut led = io.pins.gpio4.into_push_pull_output();
+    let mut led = io.pins.gpio15.into_push_pull_output();
     let mut button = io.pins.gpio0.into_pull_down_input();
     button.listen(Event::FallingEdge);
 
     unsafe {
-        (&SERIAL).lock(|data| (*data).replace(Some(serial0)));
         (&BUTTON).lock(|data| (*data).replace(Some(button)));
     }
 
     interrupt::enable(
-        Cpu::ProCpu,
         pac::Interrupt::GPIO,
-        interrupt::CpuInterrupt::Interrupt19LevelPriority2,
-    );
+        interrupt::vectored::Priority::Priority2,
+    )
+    .unwrap();
 
     led.set_high().unwrap();
 
@@ -68,32 +64,21 @@ fn main() -> ! {
     // loop.
     let mut delay = Delay::new(&clocks);
 
-    unsafe {
-        xtensa_lx::interrupt::enable_mask(1 << 19);
-    }
-
     loop {
         led.toggle().unwrap();
         delay.delay_ms(500u32);
     }
 }
 
-#[no_mangle]
-pub fn level2_interrupt() {
+#[ram]
+#[interrupt]
+fn GPIO() {
     unsafe {
-        (&SERIAL).lock(|data| {
-            let mut serial = data.borrow_mut();
-            let serial = serial.as_mut().unwrap();
-            writeln!(serial, "Interrupt").ok();
-        });
-    }
+        esp_println::println!(
+            "GPIO Interrupt with priority {}",
+            xtensa_lx::interrupt::get_level()
+        );
 
-    interrupt::clear(
-        Cpu::ProCpu,
-        interrupt::CpuInterrupt::Interrupt19LevelPriority2,
-    );
-
-    unsafe {
         (&BUTTON).lock(|data| {
             let mut button = data.borrow_mut();
             let button = button.as_mut().unwrap();

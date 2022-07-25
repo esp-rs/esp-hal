@@ -2,6 +2,19 @@ use darling::FromMeta;
 use proc_macro::{self, Span, TokenStream};
 use proc_macro_error::{abort, proc_macro_error};
 use quote::quote;
+#[cfg(feature = "interrupt")]
+use syn::{
+    parse,
+    spanned::Spanned,
+    AttrStyle,
+    Attribute,
+    Ident,
+    ItemFn,
+    Meta::Path,
+    ReturnType,
+    Type,
+    Visibility,
+};
 use syn::{parse_macro_input, AttributeArgs};
 
 #[derive(Debug, Default, FromMeta)]
@@ -87,4 +100,209 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
         #item
     };
     output.into()
+}
+
+/// Marks a function as an interrupt handler
+///
+/// Used to handle on of the [interrupts](enum.Interrupt.html).
+///
+/// When specified between braces (`#[interrupt(example)]`) that interrupt will
+/// be used and the function can have an arbitrary name. Otherwise the name of
+/// the function must be the name of the interrupt.
+///
+/// Example usage:
+///
+/// ```rust
+/// #[interrupt]
+/// fn GPIO() {
+///     // code
+/// }
+/// ```
+///
+/// The interrupt context can also be supplied by adding a argument to the
+/// interrupt function for example, on Xtensa based chips:
+///
+/// ```rust
+/// fn GPIO(context: &mut xtensa_lx_rt::exeception::Context) {
+///     // code
+/// }
+/// ```
+#[cfg(feature = "interrupt")]
+#[proc_macro_attribute]
+pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
+    let mut f: ItemFn = syn::parse(input).expect("`#[interrupt]` must be applied to a function");
+
+    let attr_args = parse_macro_input!(args as AttributeArgs);
+
+    if attr_args.len() > 1 {
+        abort!(
+            Span::call_site(),
+            "This attribute accepts zero or 1 arguments"
+        )
+    }
+
+    let ident = f.sig.ident.clone();
+    let mut ident_s = &ident.clone();
+
+    if attr_args.len() == 1 {
+        match &attr_args[0] {
+            syn::NestedMeta::Meta(Path(x)) => {
+                ident_s = x.get_ident().unwrap();
+            }
+            _ => {
+                abort!(
+                    Span::call_site(),
+                    format!(
+                        "This attribute accepts a string attribute {:?}",
+                        attr_args[0]
+                    )
+                )
+            }
+        }
+    }
+
+    // XXX should we blacklist other attributes?
+
+    if let Err(error) = check_attr_whitelist(&f.attrs, WhiteListCaller::Interrupt) {
+        return error;
+    }
+
+    let valid_signature = f.sig.constness.is_none()
+        && f.vis == Visibility::Inherited
+        && f.sig.abi.is_none()
+        && f.sig.generics.params.is_empty()
+        && f.sig.generics.where_clause.is_none()
+        && f.sig.variadic.is_none()
+        && match f.sig.output {
+            ReturnType::Default => true,
+            ReturnType::Type(_, ref ty) => match **ty {
+                Type::Tuple(ref tuple) => tuple.elems.is_empty(),
+                Type::Never(..) => true,
+                _ => false,
+            },
+        }
+        && f.sig.inputs.len() <= 1;
+
+    if !valid_signature {
+        return parse::Error::new(
+            f.span(),
+            "`#[interrupt]` handlers must have signature `[unsafe] fn([&mut Context]) [-> !]`",
+        )
+        .to_compile_error()
+        .into();
+    }
+
+    f.sig.ident = Ident::new(
+        &format!("__esp_hal_internal_{}", f.sig.ident),
+        proc_macro2::Span::call_site(),
+    );
+    f.block.stmts.extend(std::iter::once(
+        syn::parse2(quote! {{
+            // Check that this interrupt actually exists
+            self::pac::Interrupt::#ident_s;
+        }})
+        .unwrap(),
+    ));
+
+    let tramp_ident = Ident::new(
+        &format!("{}_trampoline", f.sig.ident),
+        proc_macro2::Span::call_site(),
+    );
+    let ident = &f.sig.ident;
+
+    let (ref cfgs, ref attrs) = extract_cfgs(f.attrs.clone());
+
+    let export_name = ident_s.to_string();
+
+    #[cfg(feature = "xtensa")]
+    let context = quote! {
+        xtensa_lx_rt::exception::Context
+    };
+
+    #[cfg(feature = "riscv")]
+    let context = quote! {
+        crate::interrupt::TrapFrame
+    };
+
+    let context_call =
+        (f.sig.inputs.len() == 1).then_some(Ident::new("context", proc_macro2::Span::call_site()));
+
+    quote!(
+        #(#cfgs)*
+        #(#attrs)*
+        #[doc(hidden)]
+        #[export_name = #export_name]
+        pub unsafe extern "C" fn #tramp_ident(context: &mut #context) {
+            #ident(
+                #context_call
+            )
+        }
+
+        #[inline(always)]
+        #f
+    )
+    .into()
+}
+
+#[cfg(feature = "interrupt")]
+enum WhiteListCaller {
+    Interrupt,
+}
+
+#[cfg(feature = "interrupt")]
+fn check_attr_whitelist(attrs: &[Attribute], caller: WhiteListCaller) -> Result<(), TokenStream> {
+    let whitelist = &[
+        "doc",
+        "link_section",
+        "cfg",
+        "allow",
+        "warn",
+        "deny",
+        "forbid",
+        "cold",
+        "ram",
+        "inline",
+    ];
+
+    'o: for attr in attrs {
+        for val in whitelist {
+            if eq(&attr, &val) {
+                continue 'o;
+            }
+        }
+
+        let err_str = match caller {
+            WhiteListCaller::Interrupt => {
+                "this attribute is not allowed on an interrupt handler controlled by esp-hal"
+            }
+        };
+
+        return Err(parse::Error::new(attr.span(), &err_str)
+            .to_compile_error()
+            .into());
+    }
+
+    Ok(())
+}
+
+/// Returns `true` if `attr.path` matches `name`
+#[cfg(feature = "interrupt")]
+fn eq(attr: &Attribute, name: &str) -> bool {
+    attr.style == AttrStyle::Outer && attr.path.is_ident(name)
+}
+
+#[cfg(feature = "interrupt")]
+fn extract_cfgs(attrs: Vec<Attribute>) -> (Vec<Attribute>, Vec<Attribute>) {
+    let mut cfgs = vec![];
+    let mut not_cfgs = vec![];
+
+    for attr in attrs {
+        if eq(&attr, "cfg") {
+            cfgs.push(attr);
+        } else {
+            not_cfgs.push(attr);
+        }
+    }
+
+    (cfgs, not_cfgs)
 }

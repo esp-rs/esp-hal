@@ -22,3 +22,6 @@ proc-macro-error = "1.0.4"
 
 [features]
 rtc_slow = []
+xtensa = []
+riscv = []
+interrupt = []

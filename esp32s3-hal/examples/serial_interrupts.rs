@@ -14,7 +14,6 @@ use esp32s3_hal::{
     prelude::*,
     serial::config::AtCmdConfig,
     timer::TimerGroup,
-    Cpu,
     RtcCntl,
     Serial,
 };
@@ -53,21 +52,12 @@ fn main() -> ! {
     serial0.listen_at_cmd();
     serial0.listen_rx_fifo_full();
 
-    interrupt::enable(
-        Cpu::ProCpu,
-        pac::Interrupt::UART0,
-        interrupt::CpuInterrupt::Interrupt20LevelPriority2,
-    );
+    interrupt::enable(pac::Interrupt::UART0, interrupt::Priority::Priority2).unwrap();
 
     timer0.start(1u64.secs());
 
     unsafe {
         (&SERIAL).lock(|data| (*data).replace(Some(serial0)));
-    }
-
-    unsafe {
-        xtensa_lx::interrupt::disable();
-        xtensa_lx::interrupt::enable_mask(1 << 20);
     }
 
     loop {
@@ -83,8 +73,8 @@ fn main() -> ! {
     }
 }
 
-#[no_mangle]
-pub fn level2_interrupt() {
+#[interrupt]
+fn UART0() {
     unsafe {
         (&SERIAL).lock(|data| {
             let mut serial = data.borrow_mut();
@@ -106,10 +96,6 @@ pub fn level2_interrupt() {
 
             serial.reset_at_cmd_interrupt();
             serial.reset_rx_fifo_full_interrupt();
-            interrupt::clear(
-                Cpu::ProCpu,
-                interrupt::CpuInterrupt::Interrupt20LevelPriority2,
-            );
         });
     }
 }

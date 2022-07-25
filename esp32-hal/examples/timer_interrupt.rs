@@ -13,11 +13,10 @@ use esp32_hal::{
     pac::{self, Peripherals, TIMG0, TIMG1, UART0},
     prelude::*,
     timer::{Timer0, Timer1, TimerGroup},
-    Cpu,
     RtcCntl,
     Serial,
 };
-use esp_hal_common::Timer;
+use esp_hal_common::{Priority, Timer};
 use panic_halt as _;
 use xtensa_lx::mutex::{Mutex, SpinLockMutex};
 use xtensa_lx_rt::entry;
@@ -58,31 +57,14 @@ fn main() -> ! {
     wdt1.disable();
     rtc_cntl.set_wdt_global_enable(false);
 
-    interrupt::enable(
-        Cpu::ProCpu,
-        pac::Interrupt::TG0_T0_LEVEL,
-        interrupt::CpuInterrupt::Interrupt20LevelPriority2,
-    );
-    interrupt::enable(
-        Cpu::ProCpu,
-        pac::Interrupt::TG0_T1_LEVEL,
-        interrupt::CpuInterrupt::Interrupt20LevelPriority2,
-    );
+    interrupt::enable(pac::Interrupt::TG0_T0_LEVEL, Priority::Priority2).unwrap();
+    interrupt::enable(pac::Interrupt::TG0_T1_LEVEL, Priority::Priority2).unwrap();
+    interrupt::enable(pac::Interrupt::TG1_T0_LEVEL, Priority::Priority3).unwrap();
+    interrupt::enable(pac::Interrupt::TG1_T1_LEVEL, Priority::Priority3).unwrap();
     timer00.start(500u64.millis());
     timer00.listen();
     timer01.start(2500u64.millis());
     timer01.listen();
-
-    interrupt::enable(
-        Cpu::ProCpu,
-        pac::Interrupt::TG1_T0_LEVEL,
-        interrupt::CpuInterrupt::Interrupt23LevelPriority3,
-    );
-    interrupt::enable(
-        Cpu::ProCpu,
-        pac::Interrupt::TG1_T1_LEVEL,
-        interrupt::CpuInterrupt::Interrupt23LevelPriority3,
-    );
     timer10.start(1u64.secs());
     timer10.listen();
     timer11.start(3u64.secs());
@@ -96,22 +78,11 @@ fn main() -> ! {
         (&TIMER11).lock(|data| (*data).replace(Some(timer11)));
     }
 
-    unsafe {
-        xtensa_lx::interrupt::disable();
-        xtensa_lx::interrupt::enable_mask(1 << 20);
-        xtensa_lx::interrupt::enable_mask(1 << 23);
-    }
-
     loop {}
 }
 
-#[no_mangle]
-pub fn level2_interrupt() {
-    interrupt::clear(
-        Cpu::ProCpu,
-        interrupt::CpuInterrupt::Interrupt20LevelPriority2,
-    );
-
+#[interrupt]
+fn TG0_T0_LEVEL() {
     unsafe {
         (&TIMER00).lock(|data| {
             let mut timer = data.borrow_mut();
@@ -128,7 +99,12 @@ pub fn level2_interrupt() {
                 });
             }
         });
+    }
+}
 
+#[interrupt]
+fn TG0_T1_LEVEL() {
+    unsafe {
         (&TIMER01).lock(|data| {
             let mut timer = data.borrow_mut();
             let timer = timer.as_mut().unwrap();
@@ -147,13 +123,8 @@ pub fn level2_interrupt() {
     }
 }
 
-#[no_mangle]
-pub fn level3_interrupt() {
-    interrupt::clear(
-        Cpu::ProCpu,
-        interrupt::CpuInterrupt::Interrupt23LevelPriority3,
-    );
-
+#[interrupt]
+fn TG1_T0_LEVEL() {
     unsafe {
         (&TIMER10).lock(|data| {
             let mut timer = data.borrow_mut();
@@ -170,7 +141,12 @@ pub fn level3_interrupt() {
                 });
             }
         });
+    }
+}
 
+#[interrupt]
+fn TG1_T1_LEVEL() {
+    unsafe {
         (&TIMER11).lock(|data| {
             let mut timer = data.borrow_mut();
             let timer = timer.as_mut().unwrap();

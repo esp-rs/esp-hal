@@ -1,17 +1,12 @@
 {
     "editor.formatOnSave": true,
-
     "rust-analyzer.cargo.buildScripts.enable": true,
     "rust-analyzer.cargo.noDefaultFeatures": true,
-
     "rust-analyzer.checkOnSave.allTargets": false,
-
     "rust-analyzer.imports.granularity.enforce": true,
     "rust-analyzer.imports.granularity.group": "crate",
-
     "rust-analyzer.procMacro.attributes.enable": false,
     "rust-analyzer.procMacro.enable": true,
-
     // -----------------------------------------------------------------------
     // Since we have to handle multiple toolchains AND multiple targets, we
     // we need to give Rust Analyzer some directions.
@@ -20,15 +15,13 @@
     // developing for. This will propagate to the `esp-hal-common` crate too,
     // as it is a dependency. Changing target/project requires reloading
     // Rust Analyzer.
-
-    // "rust-analyzer.cargo.target": "xtensa-esp32-none-elf",
-    "rust-analyzer.cargo.target": "riscv32imc-unknown-none-elf",
+    "rust-analyzer.cargo.target": "xtensa-esp32-none-elf",
+    // "rust-analyzer.cargo.target": "riscv32imc-unknown-none-elf",
     // "rust-analyzer.cargo.target": "xtensa-esp32s2-none-elf",
     // "rust-analyzer.cargo.target": "xtensa-esp32s3-none-elf",
-
     "rust-analyzer.linkedProjects": [
-        // "esp32-hal/Cargo.toml",
-        "esp32c3-hal/Cargo.toml",
+        "esp32-hal/Cargo.toml",
+        // "esp32c3-hal/Cargo.toml",
         // "esp32s2-hal/Cargo.toml",
         // "esp32s3-hal/Cargo.toml",
     ],
