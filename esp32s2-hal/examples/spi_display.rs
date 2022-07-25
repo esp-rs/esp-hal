@@ -54,12 +54,14 @@ fn main() -> ! {
     let cs = io.pins.gpio5;
     let rst = io.pins.gpio8;
     let dc = io.pins.gpio4;
+    let sck = io.pins.gpio6;
+    let miso = io.pins.gpio12;
 
     let spi = spi::Spi::new(
         peripherals.SPI3,
-        io.pins.gpio6,
+        sck,
         mosi,
-        Some(io.pins.gpio12),
+        Some(miso),
         Some(cs),
         80u32.kHz(),
         spi::SpiMode::Mode0,
