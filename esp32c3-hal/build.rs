@@ -1,5 +1,37 @@
 use std::{env, fs::File, io::Write, path::PathBuf};
 
+// Thanks to kennytm and TheDan64 for the assert_unique_used_features macro.
+// Source:
+// https://github.com/TheDan64/inkwell/blob/36c3b106e61b1b45295a35f94023d93d9328c76f/src/lib.rs#L81-L110
+macro_rules! assert_unique_features {
+    () => {};
+    ($first:tt $(,$rest:tt)*) => {
+        $(
+            #[cfg(all(feature = $first, feature = $rest))]
+            compile_error!(concat!("Features \"", $first, "\" and \"", $rest, "\" cannot be used together"));
+        )*
+        assert_unique_features!($($rest),*);
+    }
+}
+
+// This macro ensures that at least one of the feature flags are provided and
+// prints them out if none are provided.
+macro_rules! assert_used_features {
+    ($($all:tt),*) => {
+        #[cfg(not(any($(feature = $all),*)))]
+        compile_error!(concat!("One of the feature flags must be provided: ", $($all, " "),*));
+    }
+}
+
+macro_rules! assert_unique_used_features {
+    ($($all:tt),*) => {
+        assert_unique_features!($($all),*);
+        assert_used_features!($($all),*);
+    }
+}
+
+assert_unique_used_features! {"idfboot", "mcuboot", "direct-boot"}
+
 #[cfg(feature = "direct-boot")]
 fn main() {
     // Put the linker script somewhere the linker can find it
@@ -34,7 +66,7 @@ fn main() {
     add_defaults();
 }
 
-#[cfg(not(feature = "direct-boot"))]
+#[cfg(feature = "idfboot")]
 fn main() {
     // Put the linker script somewhere the linker can find it
     let out = &PathBuf::from(env::var_os("OUT_DIR").unwrap());
@@ -62,11 +94,51 @@ fn main() {
     add_defaults();
 }
 
+#[cfg(feature = "mcuboot")]
+fn main() {
+    // Put the linker script somewhere the linker can find it
+    let out = &PathBuf::from(env::var_os("OUT_DIR").unwrap());
+
+    File::create(out.join("memory.x"))
+        .unwrap()
+        .write_all(include_bytes!("ld/mb-esp32c3-memory.x"))
+        .unwrap();
+
+    File::create(out.join("esp32c3-link.x"))
+        .unwrap()
+        .write_all(include_bytes!("ld/mb-esp32c3-link.x"))
+        .unwrap();
+
+    File::create(out.join("riscv-link.x"))
+        .unwrap()
+        .write_all(include_bytes!("ld/mb-riscv-link.x"))
+        .unwrap();
+
+    File::create(out.join("linkall.x"))
+        .unwrap()
+        .write_all(include_bytes!("ld/mb-linkall.x"))
+        .unwrap();
+
+    println!("cargo:rustc-link-search={}", out.display());
+
+    // Only re-run the build script when memory.x is changed,
+    // instead of when any part of the source code changes.
+    println!("cargo:rerun-if-changed=memory.x");
+
+    add_defaults();
+}
+
 fn add_defaults() {
     let out = &PathBuf::from(env::var_os("OUT_DIR").unwrap());
+
     File::create(out.join("hal-defaults.x"))
         .unwrap()
         .write_all(include_bytes!("ld/hal-defaults.x"))
+        .unwrap();
+
+    File::create(out.join("rom-functions.x"))
+        .unwrap()
+        .write_all(include_bytes!("ld/rom-functions.x"))
         .unwrap();
 
     println!("cargo:rustc-link-search={}", out.display());
