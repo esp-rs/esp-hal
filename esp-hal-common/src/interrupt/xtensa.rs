@@ -184,7 +184,7 @@ unsafe fn core1_interrupt_peripheral() -> *const crate::pac::interrupt_core1::Re
 pub use vectored::*;
 
 #[cfg(feature = "vectored")]
-pub mod vectored {
+mod vectored {
     use procmacros::ram;
 
     use super::*;
