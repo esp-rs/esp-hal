@@ -36,7 +36,10 @@ pub mod analog {
 }
 
 #[no_mangle]
-extern "C" fn DefaultHandler(_level: u32, _interrupt: pac::Interrupt) {}
+extern "C" fn EspDefaultHandler(_level: u32, _interrupt: pac::Interrupt) {}
+
+#[no_mangle]
+extern "C" fn DefaultHandler() {}
 
 /// Function initializes ESP32 specific memories (RTC slow and fast) and
 /// then calls original Reset function

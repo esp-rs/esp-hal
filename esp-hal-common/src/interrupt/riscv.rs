@@ -325,12 +325,12 @@ mod vectored {
     #[ram]
     unsafe fn handle_interrupt(interrupt: Interrupt, save_frame: &mut TrapFrame) {
         extern "C" {
-            // defined in riscv-rt
-            fn DefaultHandler();
+            // defined in each hal
+            fn EspDefaultHandler();
         }
         let handler = pac::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler;
-        if handler as *const _ == DefaultHandler as *const unsafe extern "C" fn() {
-            DefaultHandler();
+        if handler as *const _ == EspDefaultHandler as *const unsafe extern "C" fn() {
+            EspDefaultHandler();
         } else {
             let handler: fn(&mut TrapFrame) = core::mem::transmute(handler);
             handler(save_frame);
@@ -462,6 +462,7 @@ pub struct TrapFrame {
 #[export_name = "_start_trap_rust_hal"]
 pub unsafe extern "C" fn start_trap_rust_hal(trap_frame: *mut TrapFrame) {
     extern "C" {
+        // defined in riscv-rt
         pub fn DefaultHandler();
     }
 

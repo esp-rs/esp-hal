@@ -312,4 +312,4 @@ fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
 }
 
 #[no_mangle]
-extern "C" fn DefaultHandler(_interrupt: pac::Interrupt) {}
+extern "C" fn EspDefaultHandler(_interrupt: pac::Interrupt) {}

@@ -429,12 +429,12 @@ mod vectored {
     unsafe fn handle_interrupt(level: u32, interrupt: Interrupt, save_frame: &mut Context) {
         extern "C" {
             // defined in each hal
-            fn DefaultHandler(level: u32, interrupt: Interrupt);
+            fn EspDefaultHandler(level: u32, interrupt: Interrupt);
         }
 
         let handler = pac::__INTERRUPTS[interrupt.number() as usize]._handler;
-        if handler as *const _ == DefaultHandler as *const unsafe extern "C" fn() {
-            DefaultHandler(level, interrupt);
+        if handler as *const _ == EspDefaultHandler as *const unsafe extern "C" fn() {
+            EspDefaultHandler(level, interrupt);
         } else {
             let handler: fn(&mut Context) = core::mem::transmute(handler);
             handler(save_frame);

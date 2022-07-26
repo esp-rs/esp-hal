@@ -34,7 +34,10 @@ pub use self::gpio::IO;
 pub mod gpio;
 
 #[no_mangle]
-extern "C" fn DefaultHandler(_level: u32, _interrupt: pac::Interrupt) {}
+extern "C" fn EspDefaultHandler(_level: u32, _interrupt: pac::Interrupt) {}
+
+#[no_mangle]
+extern "C" fn DefaultHandler() {}
 
 #[cfg(all(feature = "rt", feature = "direct-boot"))]
 #[doc(hidden)]
