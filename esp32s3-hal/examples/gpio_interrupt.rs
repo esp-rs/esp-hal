@@ -54,7 +54,7 @@ fn main() -> ! {
 
     interrupt::enable(
         pac::Interrupt::GPIO,
-        interrupt::vectored::Priority::Priority2,
+        interrupt::Priority::Priority2,
     )
     .unwrap();
 

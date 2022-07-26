@@ -29,3 +29,5 @@ PROVIDE(interrupt28 = DefaultHandler);
 PROVIDE(interrupt29 = DefaultHandler);
 PROVIDE(interrupt30 = DefaultHandler);
 PROVIDE(interrupt31 = DefaultHandler);
+
+INCLUDE "device.x"

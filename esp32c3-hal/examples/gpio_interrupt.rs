@@ -6,7 +6,7 @@
 #![no_std]
 #![no_main]
 
-use core::{cell::RefCell, fmt::Write};
+use core::cell::RefCell;
 
 use bare_metal::Mutex;
 use esp32c3_hal::{
@@ -14,18 +14,15 @@ use esp32c3_hal::{
     gpio::{Gpio9, IO},
     gpio_types::{Event, Input, Pin, PullDown},
     interrupt,
-    pac::{self, Peripherals, UART0},
+    pac::{self, Peripherals},
     prelude::*,
     timer::TimerGroup,
-    Cpu,
     Delay,
     RtcCntl,
-    Serial,
 };
 use panic_halt as _;
 use riscv_rt::entry;
 
-static mut SERIAL: Mutex<RefCell<Option<Serial<UART0>>>> = Mutex::new(RefCell::new(None));
 static mut BUTTON: Mutex<RefCell<Option<Gpio9<Input<PullDown>>>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
@@ -41,7 +38,6 @@ fn main() -> ! {
     let mut wdt0 = timer_group0.wdt;
     let timer_group1 = TimerGroup::new(peripherals.TIMG1, &clocks);
     let mut wdt1 = timer_group1.wdt;
-    let serial0 = Serial::new(peripherals.UART0);
 
     rtc_cntl.set_super_wdt_enable(false);
     rtc_cntl.set_wdt_enable(false);
@@ -57,25 +53,10 @@ fn main() -> ! {
     button.listen(Event::FallingEdge);
 
     riscv::interrupt::free(|_cs| unsafe {
-        SERIAL.get_mut().replace(Some(serial0));
         BUTTON.get_mut().replace(Some(button));
     });
 
-    interrupt::enable(
-        Cpu::ProCpu,
-        pac::Interrupt::GPIO,
-        interrupt::CpuInterrupt::Interrupt3,
-    );
-    interrupt::set_kind(
-        Cpu::ProCpu,
-        interrupt::CpuInterrupt::Interrupt3,
-        interrupt::InterruptKind::Level,
-    );
-    interrupt::set_priority(
-        Cpu::ProCpu,
-        interrupt::CpuInterrupt::Interrupt3,
-        interrupt::Priority::Priority1,
-    );
+    interrupt::enable(pac::Interrupt::GPIO, interrupt::Priority::Priority3).unwrap();
 
     unsafe {
         riscv::interrupt::enable();
@@ -88,17 +69,12 @@ fn main() -> ! {
     }
 }
 
-#[no_mangle]
-pub fn interrupt3() {
+#[interrupt]
+fn GPIO() {
     riscv::interrupt::free(|cs| unsafe {
-        let mut serial = SERIAL.borrow(*cs).borrow_mut();
-        let serial = serial.as_mut().unwrap();
         let mut button = BUTTON.borrow(*cs).borrow_mut();
         let button = button.as_mut().unwrap();
-
-        writeln!(serial, "Interrupt").ok();
-
-        interrupt::clear(Cpu::ProCpu, interrupt::CpuInterrupt::Interrupt3);
+        esp_println::println!("GPIO interrupt");
         button.clear_interrupt();
     });
 }
