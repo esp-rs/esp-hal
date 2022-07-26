@@ -1,3 +1,15 @@
+//! Interrupt handling - RISCV
+//!
+//! When the `vectored` feature is enabled, CPU interrupts 1 through 15 are
+//! reserved for each of the possible interrupt priorities.
+//!
+//! ```rust
+//! interrupt1() => Priority::Priority1
+//! interrupt2() => Priority::Priority2
+//! ...
+//! interrupt15() => Priority::Priority15
+//! ```
+
 use riscv::register::mcause;
 
 use crate::{
@@ -122,8 +134,12 @@ pub unsafe fn map(_core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
     intr_map_base
         .offset(interrupt_number)
         .write_volatile(cpu_interrupt_number as u32);
+}
 
-    // enable interrupt
+/// Enable a CPU interrupt
+pub unsafe fn enable_cpu_interrupt(which: CpuInterrupt) {
+    let cpu_interrupt_number = which as isize;
+    let intr = &*crate::pac::INTERRUPT_CORE0::PTR;
     intr.cpu_int_enable
         .modify(|r, w| w.bits((1 << cpu_interrupt_number) | r.bits()));
 }
@@ -206,11 +222,9 @@ pub use vectored::*;
 mod vectored {
     use super::*;
 
-    // Setup interrupts 1-15 ready for vectoring (level only)
+    // Setup interrupts 1-15 ready for vectoring
     #[doc(hidden)]
     pub(crate) unsafe fn init_vectoring() {
-        let intr = &*crate::pac::INTERRUPT_CORE0::PTR;
-
         for i in 1..=15 {
             set_kind(
                 crate::get_core(),
@@ -222,9 +236,7 @@ mod vectored {
                 core::mem::transmute(i),
                 core::mem::transmute(i as u8),
             );
-            // enable the CPU interrupt
-            intr.cpu_int_enable
-                .modify(|r, w| w.bits((1 << i) | r.bits()));
+            enable_cpu_interrupt(core::mem::transmute(i));
         }
     }
 
@@ -263,6 +275,7 @@ mod vectored {
         }
     }
 
+    /// Interrupt Error
     #[derive(Copy, Clone, Debug, PartialEq, Eq)]
     pub enum Error {
         InvalidInterruptPriority,
@@ -279,6 +292,7 @@ mod vectored {
         unsafe {
             let cpu_interrupt = core::mem::transmute(level as u8 as u32);
             map(crate::get_core(), interrupt, cpu_interrupt);
+            enable_cpu_interrupt(cpu_interrupt);
         }
         Ok(())
     }
