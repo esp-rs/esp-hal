@@ -326,11 +326,11 @@ mod vectored {
     unsafe fn handle_interrupt(interrupt: Interrupt, save_frame: &mut TrapFrame) {
         extern "C" {
             // defined in each hal
-            fn EspDefaultHandler();
+            fn EspDefaultHandler(interrupt: Interrupt);
         }
         let handler = pac::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler;
         if handler as *const _ == EspDefaultHandler as *const unsafe extern "C" fn() {
-            EspDefaultHandler();
+            EspDefaultHandler(interrupt);
         } else {
             let handler: fn(&mut TrapFrame) = core::mem::transmute(handler);
             handler(save_frame);
