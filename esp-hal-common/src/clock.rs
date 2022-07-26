@@ -159,13 +159,20 @@ impl ClockControl {
     /// Configure the CPU clock speed.
     #[allow(unused)]
     pub fn configure(clock_control: SystemClockControl, cpu_clock_speed: CpuClock) -> ClockControl {
-        clocks_ll::set_cpu_clock(cpu_clock_speed);
+        let apb_freq = clocks_ll::ApbFrequency::ApbFreq80MHz;
+        let xtal_freq = clocks_ll::XtalFrequency::RtcXtalFreq40M;
+        let pll_freq = clocks_ll::PllFrequency::Pll480MHz;
+
+        clocks_ll::esp32c3_rtc_bbpll_enable();
+        clocks_ll::esp32c3_rtc_bbpll_configure(xtal_freq, pll_freq);
+        clocks_ll::esp32c3_rtc_freq_to_pll_mhz(cpu_clock_speed);
+        clocks_ll::esp32c3_rtc_apb_freq_update(apb_freq);
 
         ClockControl {
             _private: (),
             desired_rates: RawClocks {
                 cpu_clock: cpu_clock_speed.frequency(),
-                apb_clock: MegahertzU32::MHz(80),
+                apb_clock: MegahertzU32::MHz(apb_freq.mhz()),
                 xtal_clock: MegahertzU32::MHz(40),
                 i2c_clock: MegahertzU32::MHz(40),
             },

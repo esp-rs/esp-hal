@@ -44,6 +44,7 @@ pub mod ledc;
 pub mod prelude;
 pub mod pulse_control;
 pub mod rng;
+pub mod rom;
 pub mod rtc_cntl;
 pub mod serial;
 pub mod spi;
