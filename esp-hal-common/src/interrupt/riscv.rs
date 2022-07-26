@@ -191,6 +191,7 @@ pub unsafe fn set_priority(_core: Cpu, which: CpuInterrupt, priority: Priority) 
 }
 
 /// Clear a CPU interrupt
+#[inline]
 pub fn clear(_core: Cpu, which: CpuInterrupt) {
     unsafe {
         let cpu_interrupt_number = which as isize;
@@ -201,6 +202,7 @@ pub fn clear(_core: Cpu, which: CpuInterrupt) {
 }
 
 /// Get status of peripheral interrupts
+#[inline]
 pub fn get_status(_core: Cpu) -> u128 {
     unsafe {
         ((*crate::pac::INTERRUPT_CORE0::PTR)
@@ -220,6 +222,8 @@ pub use vectored::*;
 
 #[cfg(feature = "vectored")]
 mod vectored {
+    use procmacros::ram;
+
     use super::*;
 
     // Setup interrupts 1-15 ready for vectoring
@@ -297,6 +301,7 @@ mod vectored {
         Ok(())
     }
 
+    #[ram]
     unsafe fn handle_interrupts(cpu_intr: CpuInterrupt, context: &mut TrapFrame) {
         let status = get_status(crate::get_core());
 
@@ -317,6 +322,7 @@ mod vectored {
         }
     }
 
+    #[ram]
     unsafe fn handle_interrupt(interrupt: Interrupt, save_frame: &mut TrapFrame) {
         extern "C" {
             // defined in riscv-rt
@@ -332,63 +338,78 @@ mod vectored {
     }
 
     #[no_mangle]
+    #[ram]
     pub unsafe fn interrupt1(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt1, context)
     }
 
     #[no_mangle]
+    #[ram]
     pub unsafe fn interrupt2(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt2, context)
     }
     #[no_mangle]
+    #[ram]
     pub unsafe fn interrupt3(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt3, context)
     }
     #[no_mangle]
+    #[ram]
     pub unsafe fn interrupt4(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt4, context)
     }
     #[no_mangle]
+    #[ram]
     pub unsafe fn interrupt5(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt5, context)
     }
     #[no_mangle]
+    #[ram]
     pub unsafe fn interrupt6(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt6, context)
     }
     #[no_mangle]
+    #[ram]
     pub unsafe fn interrupt7(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt7, context)
     }
     #[no_mangle]
+    #[ram]
     pub unsafe fn interrupt8(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt8, context)
     }
     #[no_mangle]
+    #[ram]
     pub unsafe fn interrupt9(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt9, context)
     }
     #[no_mangle]
+    #[ram]
     pub unsafe fn interrupt10(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt10, context)
     }
     #[no_mangle]
+    #[ram]
     pub unsafe fn interrupt11(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt11, context)
     }
     #[no_mangle]
+    #[ram]
     pub unsafe fn interrupt12(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt12, context)
     }
     #[no_mangle]
+    #[ram]
     pub unsafe fn interrupt13(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt13, context)
     }
     #[no_mangle]
+    #[ram]
     pub unsafe fn interrupt14(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt14, context)
     }
     #[no_mangle]
+    #[ram]
     pub unsafe fn interrupt15(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt15, context)
     }
