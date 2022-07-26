@@ -139,6 +139,9 @@ pub fn disable(_core: Cpu, interrupt: Interrupt) {
 }
 
 /// Set the interrupt kind (i.e. level or edge) of an CPU interrupt
+///
+/// This is safe to call when the `vectored` feature is enabled. The vectored
+/// interrupt handler will take care of clearing edge interrupt bits.
 pub fn set_kind(_core: Cpu, which: CpuInterrupt, kind: InterruptKind) {
     unsafe {
         let intr = &*crate::pac::INTERRUPT_CORE0::PTR;
@@ -157,16 +160,18 @@ pub fn set_kind(_core: Cpu, which: CpuInterrupt, kind: InterruptKind) {
 }
 
 /// Set the priority level of an CPU interrupt
-pub fn set_priority(_core: Cpu, which: CpuInterrupt, priority: Priority) {
-    unsafe {
-        let intr = &*crate::pac::INTERRUPT_CORE0::PTR;
-        let cpu_interrupt_number = which as isize;
-        let intr_prio_base = intr.cpu_int_pri_0.as_ptr();
+///
+/// Great care must be taken when using the `vectored` feature (enabled by
+/// default). Avoid changing the priority of interrupts 1 - 15 when interrupt
+/// vectoring is enabled.
+pub unsafe fn set_priority(_core: Cpu, which: CpuInterrupt, priority: Priority) {
+    let intr = &*crate::pac::INTERRUPT_CORE0::PTR;
+    let cpu_interrupt_number = which as isize;
+    let intr_prio_base = intr.cpu_int_pri_0.as_ptr();
 
-        intr_prio_base
-            .offset(cpu_interrupt_number as isize)
-            .write_volatile(priority as u32);
-    }
+    intr_prio_base
+        .offset(cpu_interrupt_number as isize)
+        .write_volatile(priority as u32);
 }
 
 /// Clear a CPU interrupt
@@ -217,7 +222,7 @@ mod vectored {
                 core::mem::transmute(i),
                 core::mem::transmute(i as u8),
             );
-            // enable CPU interrupt
+            // enable the CPU interrupt
             intr.cpu_int_enable
                 .modify(|r, w| w.bits((1 << i) | r.bits()));
         }
@@ -271,7 +276,6 @@ mod vectored {
         if matches!(level, Priority::None) {
             return Err(Error::InvalidInterruptPriority);
         }
-        // TODO how do we handle edge interrupts?
         unsafe {
             let cpu_interrupt = core::mem::transmute(level as u8 as u32);
             map(crate::get_core(), interrupt, cpu_interrupt);
@@ -281,6 +285,9 @@ mod vectored {
 
     unsafe fn handle_interrupts(cpu_intr: CpuInterrupt, context: &mut TrapFrame) {
         let status = get_status(crate::get_core());
+
+        // this has no effect on level interrupts, but the interrupt may be an edge one
+        // so we clear it anyway
         clear(crate::get_core(), cpu_intr);
 
         let configured_interrupts = get_configured_interrupts(crate::get_core());
@@ -291,8 +298,6 @@ mod vectored {
             // silently ignore
             if let Ok(interrupt) = pac::Interrupt::try_from(interrupt_nr as u8) {
                 handle_interrupt(interrupt, context)
-            } else {
-                break;
             }
             interrupt_mask &= !(1u128 << interrupt_nr);
         }
