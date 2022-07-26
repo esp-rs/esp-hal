@@ -4,24 +4,22 @@
 #![no_std]
 #![no_main]
 
-use core::{cell::RefCell, fmt::Write};
+use core::cell::RefCell;
 
 use bare_metal::Mutex;
 use esp32c3_hal::{
     clock::ClockControl,
     interrupt,
-    pac::{self, Peripherals, UART0},
+    pac::{self, Peripherals},
     prelude::*,
     systimer::{Alarm, SystemTimer, Target},
     timer::TimerGroup,
     Cpu,
     RtcCntl,
-    Serial,
 };
 use panic_halt as _;
 use riscv_rt::entry;
 
-static mut SERIAL: Mutex<RefCell<Option<Serial<UART0>>>> = Mutex::new(RefCell::new(None));
 static mut ALARM0: Mutex<RefCell<Option<Alarm<Target, 0>>>> = Mutex::new(RefCell::new(None));
 static mut ALARM1: Mutex<RefCell<Option<Alarm<Target, 1>>>> = Mutex::new(RefCell::new(None));
 static mut ALARM2: Mutex<RefCell<Option<Alarm<Target, 2>>>> = Mutex::new(RefCell::new(None));
@@ -40,18 +38,14 @@ fn main() -> ! {
     let timer_group1 = TimerGroup::new(peripherals.TIMG1, &clocks);
     let mut wdt1 = timer_group1.wdt;
 
-    let mut serial0 = Serial::new(peripherals.UART0);
-
     rtc_cntl.set_super_wdt_enable(false);
     rtc_cntl.set_wdt_enable(false);
     wdt0.disable();
     wdt1.disable();
 
-    writeln!(serial0, "SYSTIMER Demo start!").ok();
-
     let syst = SystemTimer::new(peripherals.SYSTIMER);
 
-    writeln!(serial0, "SYSTIMER Current value = {}", SystemTimer::now()).ok();
+    esp_println::println!("SYSTIMER Current value = {}", SystemTimer::now());
 
     let alarm0 = syst.alarm0;
     alarm0.set_target(40_000_000);
@@ -66,53 +60,22 @@ fn main() -> ! {
     alarm2.enable_interrupt();
 
     interrupt::enable(
-        Cpu::ProCpu,
         pac::Interrupt::SYSTIMER_TARGET0,
-        interrupt::CpuInterrupt::Interrupt1,
-    );
+        interrupt::Priority::Priority1,
+    )
+    .unwrap();
     interrupt::enable(
-        Cpu::ProCpu,
         pac::Interrupt::SYSTIMER_TARGET1,
-        interrupt::CpuInterrupt::Interrupt2,
-    );
+        interrupt::Priority::Priority1,
+    )
+    .unwrap();
     interrupt::enable(
-        Cpu::ProCpu,
         pac::Interrupt::SYSTIMER_TARGET2,
-        interrupt::CpuInterrupt::Interrupt3,
-    );
-    interrupt::set_kind(
-        Cpu::ProCpu,
-        interrupt::CpuInterrupt::Interrupt1,
-        interrupt::InterruptKind::Level,
-    );
-    interrupt::set_kind(
-        Cpu::ProCpu,
-        interrupt::CpuInterrupt::Interrupt2,
-        interrupt::InterruptKind::Level,
-    );
-    interrupt::set_kind(
-        Cpu::ProCpu,
-        interrupt::CpuInterrupt::Interrupt3,
-        interrupt::InterruptKind::Level,
-    );
-    interrupt::set_priority(
-        Cpu::ProCpu,
-        interrupt::CpuInterrupt::Interrupt1,
         interrupt::Priority::Priority1,
-    );
-    interrupt::set_priority(
-        Cpu::ProCpu,
-        interrupt::CpuInterrupt::Interrupt2,
-        interrupt::Priority::Priority1,
-    );
-    interrupt::set_priority(
-        Cpu::ProCpu,
-        interrupt::CpuInterrupt::Interrupt3,
-        interrupt::Priority::Priority1,
-    );
+    )
+    .unwrap();
 
     riscv::interrupt::free(|_cs| unsafe {
-        SERIAL.get_mut().replace(Some(serial0));
         ALARM0.get_mut().replace(Some(alarm0));
         ALARM1.get_mut().replace(Some(alarm1));
         ALARM2.get_mut().replace(Some(alarm2));
@@ -125,12 +88,10 @@ fn main() -> ! {
     loop {}
 }
 
-#[no_mangle]
-pub fn interrupt1() {
+#[interrupt]
+fn SYSTIMER_TARGET0() {
     riscv::interrupt::free(|cs| unsafe {
-        let mut serial = SERIAL.borrow(*cs).borrow_mut();
-        let serial = serial.as_mut().unwrap();
-        writeln!(serial, "Interrupt 1 = {}", SystemTimer::now()).ok();
+        esp_println::println!("Interrupt 1 = {}", SystemTimer::now());
 
         let mut alarm = ALARM0.borrow(*cs).borrow_mut();
         let alarm = alarm.as_mut().unwrap();
@@ -140,12 +101,10 @@ pub fn interrupt1() {
     });
 }
 
-#[no_mangle]
-pub fn interrupt2() {
+#[interrupt]
+fn SYSTIMER_TARGET1() {
     riscv::interrupt::free(|cs| unsafe {
-        let mut serial = SERIAL.borrow(*cs).borrow_mut();
-        let serial = serial.as_mut().unwrap();
-        writeln!(serial, "Interrupt 2 = {}", SystemTimer::now()).ok();
+        esp_println::println!("Interrupt 2 = {}", SystemTimer::now());
 
         let mut alarm = ALARM1.borrow(*cs).borrow_mut();
         let alarm = alarm.as_mut().unwrap();
@@ -155,12 +114,10 @@ pub fn interrupt2() {
     });
 }
 
-#[no_mangle]
-pub fn interrupt3() {
+#[interrupt]
+fn SYSTIMER_TARGET2() {
     riscv::interrupt::free(|cs| unsafe {
-        let mut serial = SERIAL.borrow(*cs).borrow_mut();
-        let serial = serial.as_mut().unwrap();
-        writeln!(serial, "Interrupt 3 = {}", SystemTimer::now()).ok();
+        esp_println::println!("Interrupt 3 = {}", SystemTimer::now());
 
         let mut alarm = ALARM2.borrow(*cs).borrow_mut();
         let alarm = alarm.as_mut().unwrap();

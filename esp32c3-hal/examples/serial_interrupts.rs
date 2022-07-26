@@ -56,20 +56,11 @@ fn main() -> ! {
         SERIAL.get_mut().replace(Some(serial0));
     });
 
-    interrupt::enable(
-        Cpu::ProCpu,
-        pac::Interrupt::UART0,
-        interrupt::CpuInterrupt::Interrupt3,
-    );
+    interrupt::enable(pac::Interrupt::UART0, interrupt::Priority::Priority1).unwrap();
     interrupt::set_kind(
         Cpu::ProCpu,
-        interrupt::CpuInterrupt::Interrupt3,
+        interrupt::CpuInterrupt::Interrupt1, // Interrupt 1 handles priority one interrupts
         interrupt::InterruptKind::Edge,
-    );
-    interrupt::set_priority(
-        Cpu::ProCpu,
-        interrupt::CpuInterrupt::Interrupt3,
-        interrupt::Priority::Priority1,
     );
 
     unsafe {
@@ -88,8 +79,8 @@ fn main() -> ! {
     }
 }
 
-#[no_mangle]
-pub fn interrupt3() {
+#[interrupt]
+fn UART0() {
     riscv::interrupt::free(|cs| unsafe {
         let mut serial = SERIAL.borrow(*cs).borrow_mut();
         let serial = serial.as_mut().unwrap();
@@ -110,6 +101,5 @@ pub fn interrupt3() {
 
         serial.reset_at_cmd_interrupt();
         serial.reset_rx_fifo_full_interrupt();
-        interrupt::clear(Cpu::ProCpu, interrupt::CpuInterrupt::Interrupt3);
     });
 }
