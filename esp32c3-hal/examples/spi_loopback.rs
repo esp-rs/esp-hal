@@ -49,7 +49,7 @@ fn main() -> ! {
     let mut serial0 = Serial::new(peripherals.UART0);
 
     rtc_cntl.set_super_wdt_enable(false);
-    rtc_cntl.set_wdt_enable(false);
+    rtc_cntl.set_wdt_global_enable(false);
     wdt0.disable();
     wdt1.disable();
 
