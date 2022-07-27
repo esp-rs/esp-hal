@@ -13,8 +13,8 @@
 //!     peripherals.SPI2,
 //!     sclk,
 //!     mosi,
-//!     Some(miso),
-//!     Some(cs),
+//!     miso,
+//!     cs,
 //!     100u32.kHz(),
 //!     SpiMode::Mode0,
 //!     &mut peripheral_clock_control,
@@ -56,8 +56,8 @@ where
         spi: T,
         mut sck: SCK,
         mut mosi: MOSI,
-        miso: Option<MISO>,
-        cs: Option<CS>,
+        mut miso: MISO,
+        mut cs: CS,
         frequency: HertzU32,
         mode: SpiMode,
         peripheral_clock_control: &mut PeripheralClockControl,
@@ -69,16 +69,83 @@ where
         mosi.set_to_push_pull_output()
             .connect_peripheral_to_output(spi.mosi_signal());
 
-        if let Some(mut miso) = miso {
-            miso.set_to_input()
-                .connect_input_to_peripheral(spi.miso_signal());
-        }
+        miso.set_to_input()
+            .connect_input_to_peripheral(spi.miso_signal());
 
-        if let Some(mut cs) = cs {
-            cs.set_to_push_pull_output()
-                .connect_peripheral_to_output(spi.cs_signal());
-        }
+        cs.set_to_push_pull_output()
+            .connect_peripheral_to_output(spi.cs_signal());
 
+        Self::new_internal(spi, frequency, mode, peripheral_clock_control, clocks)
+    }
+
+    /// Constructs an SPI instance in 8bit dataframe mode without CS pin.
+    pub fn new_no_cs<SCK: OutputPin, MOSI: OutputPin, MISO: InputPin>(
+        spi: T,
+        mut sck: SCK,
+        mut mosi: MOSI,
+        mut miso: MISO,
+        frequency: HertzU32,
+        mode: SpiMode,
+        peripheral_clock_control: &mut PeripheralClockControl,
+        clocks: &Clocks,
+    ) -> Self {
+        sck.set_to_push_pull_output()
+            .connect_peripheral_to_output(spi.sclk_signal());
+
+        mosi.set_to_push_pull_output()
+            .connect_peripheral_to_output(spi.mosi_signal());
+
+        miso.set_to_input()
+            .connect_input_to_peripheral(spi.miso_signal());
+
+        Self::new_internal(spi, frequency, mode, peripheral_clock_control, clocks)
+    }
+
+    /// Constructs an SPI instance in 8bit dataframe mode without CS and MISO
+    /// pin.
+    pub fn new_no_cs_no_miso<SCK: OutputPin, MOSI: OutputPin>(
+        spi: T,
+        mut sck: SCK,
+        mut mosi: MOSI,
+        frequency: HertzU32,
+        mode: SpiMode,
+        peripheral_clock_control: &mut PeripheralClockControl,
+        clocks: &Clocks,
+    ) -> Self {
+        sck.set_to_push_pull_output()
+            .connect_peripheral_to_output(spi.sclk_signal());
+
+        mosi.set_to_push_pull_output()
+            .connect_peripheral_to_output(spi.mosi_signal());
+
+        Self::new_internal(spi, frequency, mode, peripheral_clock_control, clocks)
+    }
+
+    /// Constructs an SPI instance in 8bit dataframe mode with only MOSI
+    /// connected. This might be useful for (ab)using SPI to  implement
+    /// other protocols by bitbanging (WS2812B, onewire, generating arbitrary
+    /// waveforms…)
+    pub fn new_mosi_only<MOSI: OutputPin>(
+        spi: T,
+        mut mosi: MOSI,
+        frequency: HertzU32,
+        mode: SpiMode,
+        peripheral_clock_control: &mut PeripheralClockControl,
+        clocks: &Clocks,
+    ) -> Self {
+        mosi.set_to_push_pull_output()
+            .connect_peripheral_to_output(spi.mosi_signal());
+
+        Self::new_internal(spi, frequency, mode, peripheral_clock_control, clocks)
+    }
+
+    pub fn new_internal(
+        spi: T,
+        frequency: HertzU32,
+        mode: SpiMode,
+        peripheral_clock_control: &mut PeripheralClockControl,
+        clocks: &Clocks,
+    ) -> Self {
         spi.enable_peripheral(peripheral_clock_control);
 
         let mut spi = Self { spi };
