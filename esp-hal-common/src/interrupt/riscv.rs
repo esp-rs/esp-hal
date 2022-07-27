@@ -246,7 +246,7 @@ mod vectored {
 
     /// Get the interrupts configured for the core
     #[inline]
-    fn get_configured_interrupts(_core: Cpu) -> [u128; 15] {
+    fn get_configured_interrupts(_core: Cpu, mut status: u128) -> [u128; 15] {
         unsafe {
             let intr = &*crate::pac::INTERRUPT_CORE0::PTR;
             let intr_map_base = intr.mac_intr_map.as_ptr();
@@ -254,8 +254,9 @@ mod vectored {
 
             let mut prios = [0u128; 15];
 
-            for i in 0..get_interrupt_count() {
-                let i = i as isize;
+            while status != 0 {
+                let interrupt_nr = status.trailing_zeros();
+                let i = interrupt_nr as isize;
                 let cpu_interrupt = intr_map_base.offset(i).read_volatile();
                 // safety: cast is safe because of repr(u32)
                 let cpu_interrupt: CpuInterrupt = core::mem::transmute(cpu_interrupt);
@@ -264,18 +265,10 @@ mod vectored {
                     .read_volatile();
 
                 prios[prio as usize] |= 1 << i;
+                status &= !(1u128 << interrupt_nr);
             }
 
             prios
-        }
-    }
-
-    #[inline]
-    fn get_interrupt_count() -> usize {
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "esp32c3")] {
-                62
-            }
         }
     }
 
@@ -309,7 +302,7 @@ mod vectored {
         // so we clear it anyway
         clear(crate::get_core(), cpu_intr);
 
-        let configured_interrupts = get_configured_interrupts(crate::get_core());
+        let configured_interrupts = get_configured_interrupts(crate::get_core(), status);
         let mut interrupt_mask = status & configured_interrupts[cpu_intr as usize];
         while interrupt_mask != 0 {
             let interrupt_nr = interrupt_mask.trailing_zeros();

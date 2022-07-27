@@ -252,7 +252,7 @@ mod vectored {
 
     /// Get the interrupts configured for the core
     #[inline]
-    fn get_configured_interrupts(core: Cpu) -> [u128; 7] {
+    fn get_configured_interrupts(core: Cpu, mut status: u128) -> [u128; 7] {
         unsafe {
             let intr_map_base = match core {
                 Cpu::ProCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
@@ -264,29 +264,19 @@ mod vectored {
 
             let mut levels = [0u128; 7];
 
-            for i in 0..get_interrupt_count() {
-                let i = i as isize;
+            while status != 0 {
+                let interrupt_nr = status.trailing_zeros();
+                let i = interrupt_nr as isize;
                 let cpu_interrupt = intr_map_base.offset(i).read_volatile();
                 // safety: cast is safe because of repr(u32)
                 let cpu_interrupt: CpuInterrupt = core::mem::transmute(cpu_interrupt);
                 let level = cpu_interrupt.level() as u8 as usize;
+
                 levels[level] |= 1 << i;
+                status &= !(1u128 << interrupt_nr);
             }
 
             levels
-        }
-    }
-
-    #[inline]
-    fn get_interrupt_count() -> usize {
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "esp32")] {
-                68
-            } else if #[cfg(feature = "esp32s2")] {
-                94
-            } else if #[cfg(feature = "esp32s3")] {
-                98
-            }
         }
     }
 
@@ -389,7 +379,8 @@ mod vectored {
                 handler(level);
             }
         } else {
-            let interrupt_levels = get_configured_interrupts(crate::get_core());
+            let status = get_status(crate::get_core());
+            let interrupt_levels = get_configured_interrupts(crate::get_core(), status);
             if (cpu_interrupt_mask & CPU_INTERRUPT_EDGE) != 0 {
                 let cpu_interrupt_mask = cpu_interrupt_mask & CPU_INTERRUPT_EDGE;
                 let cpu_interrupt_nr = cpu_interrupt_mask.trailing_zeros();
@@ -412,8 +403,7 @@ mod vectored {
             } else {
                 // finally check periperal sources and fire of handlers from pac
                 // peripheral mapped interrupts are cleared by the peripheral
-                let interrupt_mask =
-                    get_status(crate::get_core()) & interrupt_levels[level as usize];
+                let interrupt_mask = status & interrupt_levels[level as usize];
                 let interrupt_nr = interrupt_mask.trailing_zeros();
 
                 // Interrupt::try_from can fail if interrupt already de-asserted:
