@@ -360,16 +360,16 @@ pub(crate) fn set_cpu_freq(cpu_freq_mhz: crate::clock::CpuClock) {
             .store5
             .modify(|_, w| w.scratch5().bits(value as u32));
 
-        esp32_update_cpu_freq(cpu_freq_mhz.frequency().to_Hz());
+        esp32_update_cpu_freq(cpu_freq_mhz.mhz());
     }
 }
 
-/// Set the real CPU ticks per us to the ets, so that ets_delay_us
+/// Pass the CPU clock in MHz so that ets_delay_us
 /// will be accurate. Call this function when CPU frequency is changed.
-fn esp32_update_cpu_freq(ticks_per_us: u32) {
+fn esp32_update_cpu_freq(mhz: u32) {
     const G_TICKS_PER_US_PRO: u32 = 0x3ffe01e0;
     unsafe {
         // Update scale factors used by esp_rom_delay_us
-        (G_TICKS_PER_US_PRO as *mut u32).write_volatile(ticks_per_us);
+        (G_TICKS_PER_US_PRO as *mut u32).write_volatile(mhz);
     }
 }
