@@ -24,7 +24,7 @@ impl RtcCntl {
         self.set_wdt_write_protection(true);
     }
 
-    #[cfg(feature = "esp32c3")]
+    #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
     pub fn set_super_wdt_enable(&mut self, enable: bool) {
         self.set_swd_write_protection(false);
 
@@ -35,7 +35,7 @@ impl RtcCntl {
         self.set_swd_write_protection(true);
     }
 
-    #[cfg(feature = "esp32c3")]
+    #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
     fn set_swd_write_protection(&mut self, enable: bool) {
         let wkey = if enable { 0u32 } else { 0x8F1D_312A };
 
