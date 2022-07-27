@@ -364,7 +364,7 @@ pub(crate) fn set_cpu_freq(cpu_freq_mhz: crate::clock::CpuClock) {
     }
 }
 
-/// Set the real CPU ticks per us to the ets, so that ets_delay_us
+/// Pass the CPU clock in MHz so that ets_delay_us
 /// will be accurate. Call this function when CPU frequency is changed.
 fn esp32_update_cpu_freq(mhz: u32) {
     const G_TICKS_PER_US_PRO: u32 = 0x3ffe01e0;
