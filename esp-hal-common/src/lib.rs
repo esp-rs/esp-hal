@@ -43,7 +43,6 @@ pub mod interrupt;
 pub mod prelude;
 pub mod pulse_control;
 pub mod rng;
-#[cfg(not(feature = "esp32c3"))]
 pub mod rtc_cntl;
 pub mod serial;
 pub mod spi;
@@ -58,7 +57,6 @@ pub use interrupt::*;
 pub use procmacros as macros;
 pub use pulse_control::PulseControl;
 pub use rng::Rng;
-#[cfg(not(feature = "esp32c3"))]
 pub use rtc_cntl::RtcCntl;
 pub use serial::Serial;
 pub use spi::Spi;

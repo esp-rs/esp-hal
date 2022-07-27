@@ -35,7 +35,7 @@ fn main() -> ! {
 
     // Disable watchdog timers
     rtc_cntl.set_super_wdt_enable(false);
-    rtc_cntl.set_wdt_enable(false);
+    rtc_cntl.set_wdt_global_enable(false);
     wdt0.start(2u64.secs());
     wdt1.disable();
 

@@ -23,4 +23,24 @@ impl RtcCntl {
             .modify(|_, w| w.wdt_en().bit(enable).wdt_flashboot_mod_en().clear_bit());
         self.set_wdt_write_protection(true);
     }
+
+    #[cfg(feature = "esp32c3")]
+    pub fn set_super_wdt_enable(&mut self, enable: bool) {
+        self.set_swd_write_protection(false);
+
+        self.rtc_cntl
+            .swd_conf
+            .write(|w| w.swd_auto_feed_en().bit(!enable));
+
+        self.set_swd_write_protection(true);
+    }
+
+    #[cfg(feature = "esp32c3")]
+    fn set_swd_write_protection(&mut self, enable: bool) {
+        let wkey = if enable { 0u32 } else { 0x8F1D_312A };
+
+        self.rtc_cntl
+            .swd_wprotect
+            .write(|w| unsafe { w.swd_wkey().bits(wkey) });
+    }
 }

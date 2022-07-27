@@ -23,17 +23,17 @@ pub use esp_hal_common::{
     Delay,
     PulseControl,
     Rng,
+    RtcCntl,
     Serial,
     UsbSerialJtag,
 };
 #[cfg(feature = "direct-boot")]
 use riscv_rt::pre_init;
 
-pub use self::{gpio::IO, rtc_cntl::RtcCntl};
+pub use self::gpio::IO;
 
 pub mod adc;
 pub mod gpio;
-pub mod rtc_cntl;
 
 /// Common module for analog functions
 pub mod analog {

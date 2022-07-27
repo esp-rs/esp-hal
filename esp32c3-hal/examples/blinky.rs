@@ -33,7 +33,7 @@ fn main() -> ! {
     let mut wdt1 = timer_group1.wdt;
 
     rtc_cntl.set_super_wdt_enable(false);
-    rtc_cntl.set_wdt_enable(false);
+    rtc_cntl.set_wdt_global_enable(false);
     wdt0.disable();
     wdt1.disable();
 
