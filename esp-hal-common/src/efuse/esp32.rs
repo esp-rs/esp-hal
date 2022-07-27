@@ -73,7 +73,7 @@ impl Efuse {
     ///
     /// Note that the actual clock may be lower, depending on the current power
     /// configuration of the chip, clock source, and other settings.
-    pub fn get_max_cpu_fequency() -> HertzU32 {
+    pub fn get_max_cpu_frequency() -> HertzU32 {
         let efuse = unsafe { &*EFUSE::ptr() };
 
         let has_rating = efuse.blk0_rdata3.read().rd_chip_cpu_freq_rated().bit();

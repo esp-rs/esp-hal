@@ -118,9 +118,9 @@ impl ClockControl {
         // we will take care then
         let xtal_freq = clocks_ll::XtalFrequency::RtcXtalFreq40M;
         let pll_freq = match cpu_clock_speed {
-            CpuClock::Clock80MHz => clocks_ll::PllFequency::Pll320MHz,
-            CpuClock::Clock160MHz => clocks_ll::PllFequency::Pll320MHz,
-            CpuClock::Clock240MHz => clocks_ll::PllFequency::Pll480MHz,
+            CpuClock::Clock80MHz => clocks_ll::PllFrequency::Pll320MHz,
+            CpuClock::Clock160MHz => clocks_ll::PllFrequency::Pll320MHz,
+            CpuClock::Clock240MHz => clocks_ll::PllFrequency::Pll480MHz,
         };
 
         clocks_ll::esp32_rtc_update_to_xtal(xtal_freq, 1);

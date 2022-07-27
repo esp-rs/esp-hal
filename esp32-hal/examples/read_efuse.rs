@@ -42,7 +42,12 @@ fn main() -> ! {
     )
     .unwrap();
     writeln!(serial0, "Chip type {:?}", Efuse::get_chip_type()).unwrap();
-    writeln!(serial0, "Max CPU clock {:?}", Efuse::get_max_cpu_fequency()).unwrap();
+    writeln!(
+        serial0,
+        "Max CPU clock {:?}",
+        Efuse::get_max_cpu_frequency()
+    )
+    .unwrap();
     writeln!(
         serial0,
         "Flash Encryption {:?}",

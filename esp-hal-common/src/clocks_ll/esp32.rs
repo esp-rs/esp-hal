@@ -58,12 +58,12 @@ impl XtalFrequency {
 
 #[allow(unused)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum PllFequency {
+pub(crate) enum PllFrequency {
     Pll320MHz,
     Pll480MHz,
 }
 
-pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalFrequency, pll_freq: PllFequency) {
+pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalFrequency, pll_freq: PllFrequency) {
     let efuse = unsafe { &*crate::pac::EFUSE::ptr() };
     let rtc_cntl = unsafe { &*crate::pac::RTC_CNTL::ptr() };
 
@@ -82,7 +82,7 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalFrequency, pll_freq: PllF
         let i2c_bbpll_div_7_0: u32;
         let i2c_bbpll_dcur: u32;
 
-        if pll_freq == PllFequency::Pll320MHz {
+        if pll_freq == PllFrequency::Pll320MHz {
             // Raise the voltage, if needed
             rtc_cntl
                 .reg
