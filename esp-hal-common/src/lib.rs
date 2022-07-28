@@ -59,7 +59,7 @@ pub use interrupt::*;
 pub use procmacros as macros;
 pub use pulse_control::PulseControl;
 pub use rng::Rng;
-pub use rtc_cntl::RtcCntl;
+pub use rtc_cntl::{Rtc, Rwdt};
 pub use serial::Serial;
 pub use spi::Spi;
 pub use timer::Timer;

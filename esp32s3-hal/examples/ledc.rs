@@ -19,7 +19,7 @@ use esp32s3_hal::{
     pac::Peripherals,
     prelude::*,
     timer::TimerGroup,
-    RtcCntl,
+    Rtc,
     Serial,
 };
 use esp_println;
@@ -36,11 +36,11 @@ fn main() -> ! {
     let _timer0 = timer_group0.timer0;
     let mut wdt = timer_group0.wdt;
     let mut _serial0 = Serial::new(peripherals.UART0);
-    let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
+    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
 
     // Disable watchdog timer
     wdt.disable();
-    rtc_cntl.set_wdt_global_enable(false);
+    rtc.rwdt.disable();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let led = io.pins.gpio4.into_push_pull_output();

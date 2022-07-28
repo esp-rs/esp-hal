@@ -1,5 +1,5 @@
 //! # Clock Control
-use fugit::MegahertzU32;
+use fugit::HertzU32;
 
 use crate::system::SystemClockControl;
 
@@ -10,7 +10,7 @@ use crate::system::SystemClockControl;
 mod clocks_ll;
 
 pub trait Clock {
-    fn frequency(&self) -> MegahertzU32;
+    fn frequency(&self) -> HertzU32;
 
     fn mhz(&self) -> u32 {
         self.frequency().to_MHz()
@@ -32,12 +32,12 @@ pub enum CpuClock {
 
 #[allow(dead_code)]
 impl Clock for CpuClock {
-    fn frequency(&self) -> MegahertzU32 {
+    fn frequency(&self) -> HertzU32 {
         match self {
-            CpuClock::Clock80MHz => MegahertzU32::MHz(80),
-            CpuClock::Clock160MHz => MegahertzU32::MHz(160),
+            CpuClock::Clock80MHz => HertzU32::MHz(80),
+            CpuClock::Clock160MHz => HertzU32::MHz(160),
             #[cfg(not(feature = "esp32c3"))]
-            CpuClock::Clock240MHz => MegahertzU32::MHz(240),
+            CpuClock::Clock240MHz => HertzU32::MHz(240),
         }
     }
 }
@@ -56,16 +56,16 @@ pub(crate) enum XtalClock {
 }
 
 impl Clock for XtalClock {
-    fn frequency(&self) -> MegahertzU32 {
+    fn frequency(&self) -> HertzU32 {
         match self {
-            XtalClock::RtcXtalFreq40M => MegahertzU32::MHz(40),
+            XtalClock::RtcXtalFreq40M => HertzU32::MHz(40),
             #[cfg(feature = "esp32")]
-            XtalClock::RtcXtalFreq26M => MegahertzU32::MHz(26),
+            XtalClock::RtcXtalFreq26M => HertzU32::MHz(26),
             #[cfg(feature = "esp32")]
-            XtalClock::RtcXtalFreq24M => MegahertzU32::MHz(24),
+            XtalClock::RtcXtalFreq24M => HertzU32::MHz(24),
             #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
-            XtalClock::RtcXtalFreq32M => MegahertzU32::MHz(32),
-            XtalClock::RtcXtalFreqOther(mhz) => MegahertzU32::MHz(*mhz),
+            XtalClock::RtcXtalFreq32M => HertzU32::MHz(32),
+            XtalClock::RtcXtalFreqOther(mhz) => HertzU32::MHz(*mhz),
         }
     }
 }
@@ -85,10 +85,10 @@ pub(crate) enum ApbClock {
 }
 
 impl Clock for ApbClock {
-    fn frequency(&self) -> MegahertzU32 {
+    fn frequency(&self) -> HertzU32 {
         match self {
-            ApbClock::ApbFreq80MHz => MegahertzU32::MHz(80),
-            ApbClock::ApbFreqOther(mhz) => MegahertzU32::MHz(*mhz),
+            ApbClock::ApbFreq80MHz => HertzU32::MHz(80),
+            ApbClock::ApbFreqOther(mhz) => HertzU32::MHz(*mhz),
         }
     }
 }
@@ -99,10 +99,10 @@ impl Clock for ApbClock {
 /// longer be changed
 pub struct Clocks {
     _private: (),
-    pub cpu_clock: MegahertzU32,
-    pub apb_clock: MegahertzU32,
-    pub xtal_clock: MegahertzU32,
-    pub i2c_clock: MegahertzU32,
+    pub cpu_clock: HertzU32,
+    pub apb_clock: HertzU32,
+    pub xtal_clock: HertzU32,
+    pub i2c_clock: HertzU32,
     // TODO chip specific additional ones as needed
 }
 
@@ -125,10 +125,10 @@ impl Clocks {
 
 #[doc(hidden)]
 pub struct RawClocks {
-    pub cpu_clock: MegahertzU32,
-    pub apb_clock: MegahertzU32,
-    pub xtal_clock: MegahertzU32,
-    pub i2c_clock: MegahertzU32,
+    pub cpu_clock: HertzU32,
+    pub apb_clock: HertzU32,
+    pub xtal_clock: HertzU32,
+    pub i2c_clock: HertzU32,
     // TODO chip specific additional ones as needed
 }
 /// Used to configure the frequencies of the clocks present in the chip.
@@ -157,10 +157,10 @@ impl ClockControl {
         ClockControl {
             _private: (),
             desired_rates: RawClocks {
-                cpu_clock: MegahertzU32::MHz(80),
-                apb_clock: MegahertzU32::MHz(80),
-                xtal_clock: MegahertzU32::MHz(40),
-                i2c_clock: MegahertzU32::MHz(80),
+                cpu_clock: HertzU32::MHz(80),
+                apb_clock: HertzU32::MHz(80),
+                xtal_clock: HertzU32::MHz(40),
+                i2c_clock: HertzU32::MHz(80),
             },
         }
     }
@@ -186,9 +186,9 @@ impl ClockControl {
             _private: (),
             desired_rates: RawClocks {
                 cpu_clock: cpu_clock_speed.frequency(),
-                apb_clock: MegahertzU32::MHz(80),
-                xtal_clock: MegahertzU32::MHz(40),
-                i2c_clock: MegahertzU32::MHz(40),
+                apb_clock: HertzU32::MHz(80),
+                xtal_clock: HertzU32::MHz(40),
+                i2c_clock: HertzU32::MHz(40),
             },
         }
     }
@@ -202,10 +202,10 @@ impl ClockControl {
         ClockControl {
             _private: (),
             desired_rates: RawClocks {
-                cpu_clock: MegahertzU32::MHz(80),
-                apb_clock: MegahertzU32::MHz(80),
-                xtal_clock: MegahertzU32::MHz(40),
-                i2c_clock: MegahertzU32::MHz(40),
+                cpu_clock: HertzU32::MHz(80),
+                apb_clock: HertzU32::MHz(80),
+                xtal_clock: HertzU32::MHz(40),
+                i2c_clock: HertzU32::MHz(40),
             },
         }
     }
@@ -235,7 +235,7 @@ impl ClockControl {
                 cpu_clock: cpu_clock_speed.frequency(),
                 apb_clock: apb_freq.frequency(),
                 xtal_clock: xtal_freq.frequency(),
-                i2c_clock: MegahertzU32::MHz(40),
+                i2c_clock: HertzU32::MHz(40),
             },
         }
     }
@@ -249,10 +249,10 @@ impl ClockControl {
         ClockControl {
             _private: (),
             desired_rates: RawClocks {
-                cpu_clock: MegahertzU32::MHz(80),
-                apb_clock: MegahertzU32::MHz(80),
-                xtal_clock: MegahertzU32::MHz(40),
-                i2c_clock: MegahertzU32::MHz(80),
+                cpu_clock: HertzU32::MHz(80),
+                apb_clock: HertzU32::MHz(80),
+                xtal_clock: HertzU32::MHz(40),
+                i2c_clock: HertzU32::MHz(80),
             },
         }
     }
@@ -266,9 +266,9 @@ impl ClockControl {
             _private: (),
             desired_rates: RawClocks {
                 cpu_clock: cpu_clock_speed.frequency(),
-                apb_clock: MegahertzU32::MHz(80),
-                xtal_clock: MegahertzU32::MHz(40),
-                i2c_clock: MegahertzU32::MHz(40),
+                apb_clock: HertzU32::MHz(80),
+                xtal_clock: HertzU32::MHz(40),
+                i2c_clock: HertzU32::MHz(40),
             },
         }
     }
@@ -282,10 +282,10 @@ impl ClockControl {
         ClockControl {
             _private: (),
             desired_rates: RawClocks {
-                cpu_clock: MegahertzU32::MHz(80),
-                apb_clock: MegahertzU32::MHz(80),
-                xtal_clock: MegahertzU32::MHz(40),
-                i2c_clock: MegahertzU32::MHz(40),
+                cpu_clock: HertzU32::MHz(80),
+                apb_clock: HertzU32::MHz(80),
+                xtal_clock: HertzU32::MHz(40),
+                i2c_clock: HertzU32::MHz(40),
             },
         }
     }
@@ -299,9 +299,9 @@ impl ClockControl {
             _private: (),
             desired_rates: RawClocks {
                 cpu_clock: cpu_clock_speed.frequency(),
-                apb_clock: MegahertzU32::MHz(80),
-                xtal_clock: MegahertzU32::MHz(40),
-                i2c_clock: MegahertzU32::MHz(40),
+                apb_clock: HertzU32::MHz(80),
+                xtal_clock: HertzU32::MHz(40),
+                i2c_clock: HertzU32::MHz(40),
             },
         }
     }

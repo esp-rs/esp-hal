@@ -14,7 +14,7 @@ use esp32_hal::{
     pac::{self, Peripherals, TIMG0, TIMG1, UART0},
     prelude::*,
     timer::{Timer, Timer0, Timer1, TimerGroup},
-    RtcCntl,
+    Rtc,
     Serial,
 };
 use panic_halt as _;
@@ -50,12 +50,12 @@ fn main() -> ! {
     let mut wdt1 = timer_group1.wdt;
 
     let serial0 = Serial::new(peripherals.UART0);
-    let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
+    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
 
     // Disable MWDT and RWDT (Watchdog) flash boot protection
     wdt0.disable();
     wdt1.disable();
-    rtc_cntl.set_wdt_global_enable(false);
+    rtc.rwdt.disable();
 
     interrupt::enable(pac::Interrupt::TG0_T0_LEVEL, Priority::Priority2).unwrap();
     interrupt::enable(pac::Interrupt::TG0_T1_LEVEL, Priority::Priority2).unwrap();

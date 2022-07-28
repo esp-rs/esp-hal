@@ -53,4 +53,10 @@ impl Efuse {
             % 2)
             != 0
     }
+
+    /// Get the multiplier for the timeout value of the RWDT STAGE 0 register.
+    pub fn get_rwdt_multiplier() -> u8 {
+        let efuse = unsafe { &*EFUSE::ptr() };
+        efuse.rd_repeat_data1.read().wdt_delay_sel().bits()
+    }
 }

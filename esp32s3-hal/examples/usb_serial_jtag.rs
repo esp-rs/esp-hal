@@ -13,7 +13,7 @@ use esp32s3_hal::{
     prelude::*,
     timer::TimerGroup,
     Delay,
-    RtcCntl,
+    Rtc,
     UsbSerialJtag,
 };
 use panic_halt as _;
@@ -26,13 +26,13 @@ fn main() -> ! {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let mut delay = Delay::new(&clocks);
-    let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
+    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let mut wdt = timer_group0.wdt;
 
     // Disable MWDT and RWDT (Watchdog) flash boot protection
     wdt.disable();
-    rtc_cntl.set_wdt_global_enable(false);
+    rtc.rwdt.disable();
 
     loop {
         writeln!(UsbSerialJtag, "Hello world!").ok();
