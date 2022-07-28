@@ -1,3 +1,9 @@
+use crate::clock::{
+    Clock,
+    XtalClock,
+    PllClock,
+};
+
 const REF_CLK_FREQ: u32 = 1000000;
 
 const MHZ: u32 = 1000000;
@@ -36,34 +42,7 @@ const I2C_BBPLL_OC_LREF: u32 = 2;
 const I2C_BBPLL_OC_DIV_7_0: u32 = 3;
 const I2C_BBPLL_OC_DCUR: u32 = 5;
 
-#[allow(unused)]
-#[derive(Debug, Clone, Copy)]
-pub(crate) enum XtalFrequency {
-    RtcXtalFreq40M,
-    RtcXtalFreq26M,
-    RtcXtalFreq24M,
-    RtcXtalFreqOther(u32),
-}
-
-impl XtalFrequency {
-    fn hz(&self) -> u32 {
-        match self {
-            XtalFrequency::RtcXtalFreq40M => 40_000_000,
-            XtalFrequency::RtcXtalFreq26M => 26_000_000,
-            XtalFrequency::RtcXtalFreq24M => 24_000_000,
-            XtalFrequency::RtcXtalFreqOther(mhz) => mhz * MHZ,
-        }
-    }
-}
-
-#[allow(unused)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum PllFrequency {
-    Pll320MHz,
-    Pll480MHz,
-}
-
-pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalFrequency, pll_freq: PllFrequency) {
+pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock) {
     let efuse = unsafe { &*crate::pac::EFUSE::ptr() };
     let rtc_cntl = unsafe { &*crate::pac::RTC_CNTL::ptr() };
 
@@ -82,7 +61,7 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalFrequency, pll_freq: PllF
         let i2c_bbpll_div_7_0: u32;
         let i2c_bbpll_dcur: u32;
 
-        if pll_freq == PllFrequency::Pll320MHz {
+        if matches!(pll_freq, PllClock::Pll320MHz) {
             // Raise the voltage, if needed
             rtc_cntl
                 .reg
@@ -90,7 +69,7 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalFrequency, pll_freq: PllF
 
             // Configure 320M PLL
             match xtal_freq {
-                XtalFrequency::RtcXtalFreq40M => {
+                XtalClock::RtcXtalFreq40M => {
                     div_ref = 0;
                     div7_0 = 32;
                     div10_8 = 0;
@@ -99,7 +78,7 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalFrequency, pll_freq: PllF
                     bw = 3;
                 }
 
-                XtalFrequency::RtcXtalFreq26M => {
+                XtalClock::RtcXtalFreq26M => {
                     div_ref = 12;
                     div7_0 = 224;
                     div10_8 = 4;
@@ -108,7 +87,7 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalFrequency, pll_freq: PllF
                     bw = 1;
                 }
 
-                XtalFrequency::RtcXtalFreq24M => {
+                XtalClock::RtcXtalFreq24M => {
                     div_ref = 11;
                     div7_0 = 224;
                     div10_8 = 4;
@@ -117,7 +96,7 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalFrequency, pll_freq: PllF
                     bw = 1;
                 }
 
-                XtalFrequency::RtcXtalFreqOther(_) => {
+                XtalClock::RtcXtalFreqOther(_) => {
                     div_ref = 12;
                     div7_0 = 224;
                     div10_8 = 4;
@@ -147,7 +126,7 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalFrequency, pll_freq: PllF
 
             // Configure 480M PLL
             match xtal_freq {
-                XtalFrequency::RtcXtalFreq40M => {
+                XtalClock::RtcXtalFreq40M => {
                     div_ref = 0;
                     div7_0 = 28;
                     div10_8 = 0;
@@ -156,7 +135,7 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalFrequency, pll_freq: PllF
                     bw = 3;
                 }
 
-                XtalFrequency::RtcXtalFreq26M => {
+                XtalClock::RtcXtalFreq26M => {
                     div_ref = 12;
                     div7_0 = 144;
                     div10_8 = 4;
@@ -165,7 +144,7 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalFrequency, pll_freq: PllF
                     bw = 1;
                 }
 
-                XtalFrequency::RtcXtalFreq24M => {
+                XtalClock::RtcXtalFreq24M => {
                     div_ref = 11;
                     div7_0 = 144;
                     div10_8 = 4;
@@ -174,7 +153,7 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalFrequency, pll_freq: PllF
                     bw = 1;
                 }
 
-                XtalFrequency::RtcXtalFreqOther(_) => {
+                XtalClock::RtcXtalFreqOther(_) => {
                     div_ref = 12;
                     div7_0 = 224;
                     div10_8 = 4;
@@ -285,7 +264,7 @@ unsafe fn i2c_writereg_rtc(block: u32, block_hostid: u32, reg_add: u32, indata: 
     rom_i2c_writereg(block, block_hostid, reg_add, indata);
 }
 
-pub(crate) fn esp32_rtc_update_to_xtal(freq: XtalFrequency, _div: u32) {
+pub(crate) fn esp32_rtc_update_to_xtal(freq: XtalClock, _div: u32) {
     let apb_cntl = unsafe { &*crate::pac::APB_CTRL::ptr() };
     let rtc_cntl = unsafe { &*crate::pac::RTC_CNTL::ptr() };
 
