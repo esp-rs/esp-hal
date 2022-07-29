@@ -9,6 +9,7 @@ pub use esp_hal_common::{
     gpio as gpio_types,
     i2c,
     interrupt,
+    ledc,
     macros,
     pac,
     prelude,
