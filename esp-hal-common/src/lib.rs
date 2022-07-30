@@ -40,6 +40,11 @@ pub mod i2c;
 #[cfg_attr(target_arch = "riscv32", path = "interrupt/riscv.rs")]
 #[cfg_attr(target_arch = "xtensa", path = "interrupt/xtensa.rs")]
 pub mod interrupt;
+#[cfg_attr(feature = "esp32", path = "ledc/esp32/mod.rs")]
+#[cfg_attr(feature = "esp32c3", path = "ledc/others/mod.rs")]
+#[cfg_attr(feature = "esp32s2", path = "ledc/others/mod.rs")]
+#[cfg_attr(feature = "esp32s3", path = "ledc/others/mod.rs")]
+pub mod ledc;
 pub mod prelude;
 pub mod pulse_control;
 pub mod rng;
