@@ -235,7 +235,7 @@ mod ehal1 {
     {
         /// See also: [`send_bytes`].
         fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-            self.spi.send_bytes(words)
+            self.spi.write_bytes(words)
         }
     }
 
@@ -544,11 +544,7 @@ pub trait Instance {
         Ok(())
     }
 
-    fn write_bytes(&mut self, words: &[u8]) -> Result<(), Infallible> {
-        self.send_bytes(words)
-    }
-
-    /// Send bytes via SPI.
+    /// Write bytes to SPI.
     ///
     /// Copies the content of `words` in chunks of 64 bytes into the SPI transmission FIFO. If
     /// `words` is longer than 64 bytes, multiple sequential transfers are performed. This function
@@ -556,16 +552,13 @@ pub trait Instance {
     /// you must ensure that the whole messages was written correctly, use
     /// [`flush`].
     // FIXME: See below.
-    fn send_bytes(&mut self, words: &[u8]) -> Result<(), Infallible> {
+    fn write_bytes(&mut self, words: &[u8]) -> Result<(), Infallible> {
         let reg_block = self.register_block();
         let num_chuncks = words.len() / FIFO_SIZE;
 
         // The fifo has a limited fixed size, so the data must be chunked and then transmitted
         for (i, chunk) in words.chunks(FIFO_SIZE).enumerate() {
             self.configure_datalen(chunk.len() as u32 * 8);
-
-            // let transfer_num_words = (chunk.len() as u32) / 4;
-            // let transfer_num_bytes = (chunk.len() as u32) % 4;
 
             let fifo_ptr = reg_block.w0.as_ptr();
             unsafe {
@@ -580,23 +573,6 @@ pub trait Instance {
                 );
                 //fifo_ptr = fifo_ptr.offset(transfer_num_words as isize);
             }
-
-            //// Transfer the remaining bytes
-            //if transfer_num_bytes > 0 {
-            //    let transfer_words_bytes = ((chunk.len() as u32) - transfer_num_bytes) as usize;
-            //    let mut u32_as_bytes = [0u8; 4];
-
-            //    unsafe {
-            //        let ptr = u32_as_bytes.as_mut_ptr();
-            //        ptr.copy_from(chunk[transfer_words_bytes..].as_ptr(), chunk.len());
-            //    }
-            //    let reg_val: u32 = u32::from_le_bytes(u32_as_bytes);
-
-            //    unsafe {
-            //        *fifo_ptr = reg_val;
-            //    };
-
-            //}
 
             self.update();
 
@@ -644,7 +620,7 @@ pub trait Instance {
 
     fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Infallible> {
         for chunk in words.chunks_mut(FIFO_SIZE) {
-            self.send_bytes(chunk)?;
+            self.write_bytes(chunk)?;
             self.flush()?;
             self.read_bytes(chunk)?;
         }
