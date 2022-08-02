@@ -15,8 +15,6 @@ pub use embedded_hal::{
 pub use fugit::{
     ExtU32 as _fugit_ExtU32,
     ExtU64 as _fugit_ExtU64,
-    HertzU32 as _fugit_HertzU32,
-    MegahertzU32 as _fugit_MegahertzU32,
     RateExtU32 as _fugit_RateExtU32,
     RateExtU64 as _fugit_RateExtU64,
 };

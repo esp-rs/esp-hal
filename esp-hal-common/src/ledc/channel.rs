@@ -1,5 +1,7 @@
 use paste::paste;
 
+#[cfg(feature = "esp32")]
+use super::HighSpeed;
 use super::{
     timer::{TimerIFace, TimerSpeed},
     LowSpeed,
@@ -8,6 +10,7 @@ use crate::{
     gpio::{types::OutputSignal, OutputPin},
     pac::ledc::RegisterBlock,
 };
+
 /// Channel errors
 #[derive(Debug)]
 pub enum Error {
@@ -116,7 +119,7 @@ where
             return Err(Error::Channel);
         }
 
-        let duty_range = 2_u32.pow(duty_exp);
+        let duty_range = 2u32.pow(duty_exp);
         let duty_value = (duty_range as f32 * duty_pct) as u32;
 
         if duty_value == 0 || duty_pct > 1.0 {
@@ -131,9 +134,39 @@ where
     }
 }
 
+#[cfg(feature = "esp32")]
 /// Macro to configure channel parameters in hw
 macro_rules! set_channel {
-    ( $self: ident, $speed: ident, $num: literal, $channel_number: ident ) => {
+    ($self: ident, $speed: ident, $num: literal, $channel_number: ident) => {
+        paste! {
+            $self.ledc.[<$speed sch $num _hpoint>]
+                .write(|w| unsafe { w.[<hpoint>]().bits(0x0) });
+            $self.ledc.[<$speed sch $num _conf0>].modify(|_, w| unsafe {
+                w.[<sig_out_en>]()
+                    .set_bit()
+                    .[<timer_sel>]()
+                    .bits($channel_number)
+            });
+            $self.ledc.[<$speed sch $num _conf1>].write(|w| unsafe {
+                w.[<duty_start>]()
+                    .set_bit()
+                    .[<duty_inc>]()
+                    .set_bit()
+                    .[<duty_num>]()
+                    .bits(0x1)
+                    .[<duty_cycle>]()
+                    .bits(0x1)
+                    .[<duty_scale>]()
+                    .bits(0x0)
+                });
+        }
+    };
+}
+
+#[cfg(not(feature = "esp32"))]
+/// Macro to configure channel parameters in hw
+macro_rules! set_channel {
+    ($self: ident, $speed: ident, $num: literal, $channel_number: ident) => {
         paste! {
             $self.ledc.[<ch $num _hpoint>]
                 .write(|w| unsafe { w.[<hpoint>]().bits(0x0) });
@@ -159,9 +192,22 @@ macro_rules! set_channel {
     };
 }
 
+#[cfg(feature = "esp32")]
 /// Macro to set duty parameters in hw
 macro_rules! set_duty {
-    ( $self: ident, $speed: ident, $num: literal, $duty: ident ) => {
+    ($self: ident, $speed: ident, $num: literal, $duty: ident) => {
+        paste! {
+            $self.ledc
+                .[<$speed sch $num _duty>]
+                .write(|w| unsafe { w.[<duty>]().bits($duty << 4) })
+        }
+    };
+}
+
+#[cfg(not(feature = "esp32"))]
+/// Macro to set duty parameters in hw
+macro_rules! set_duty {
+    ($self: ident, $speed: ident, $num: literal, $duty: ident) => {
         paste! {
             $self.ledc
                 .[<ch $num _duty>]
@@ -170,15 +216,109 @@ macro_rules! set_duty {
     };
 }
 
+#[cfg(feature = "esp32")]
 /// Macro to update channel configuration (only for LowSpeed channels)
 macro_rules! update_channel {
-    ( $self: ident, $num: literal) => {
+    ($self: ident, $num: literal) => {
+        paste! {
+            $self.ledc
+                .[<lsch $num _conf0>]
+                .modify(|_, w| w.[<para_up>]().set_bit());
+        }
+    };
+}
+
+#[cfg(not(feature = "esp32"))]
+/// Macro to update channel configuration (only for LowSpeed channels)
+macro_rules! update_channel {
+    ($self: ident, $num: literal) => {
         paste! {
             $self.ledc
                 .[<ch $num _conf0>]
                 .modify(|_, w| w.[<para_up>]().set_bit());
         }
     };
+}
+
+#[cfg(feature = "esp32")]
+/// Channel HW interface for HighSpeed channels
+impl<'a, O> ChannelHW<O> for Channel<'a, HighSpeed, O>
+where
+    O: OutputPin,
+{
+    /// Configure Channel HW except for the duty which is set via
+    /// [`Self::set_duty_hw`].
+    fn configure_hw(&mut self) -> Result<(), Error> {
+        if let Some(timer) = self.timer {
+            if !timer.is_configured() {
+                return Err(Error::Timer);
+            }
+
+            self.output_pin.set_to_push_pull_output();
+
+            let channel_number = timer.get_number() as u8;
+            match self.number {
+                Number::Channel0 => {
+                    set_channel!(self, h, 0, channel_number);
+                    self.output_pin
+                        .connect_peripheral_to_output(OutputSignal::LEDC_HS_SIG0);
+                }
+                Number::Channel1 => {
+                    set_channel!(self, h, 1, channel_number);
+                    self.output_pin
+                        .connect_peripheral_to_output(OutputSignal::LEDC_HS_SIG1);
+                }
+                Number::Channel2 => {
+                    set_channel!(self, h, 2, channel_number);
+                    self.output_pin
+                        .connect_peripheral_to_output(OutputSignal::LEDC_HS_SIG2);
+                }
+                Number::Channel3 => {
+                    set_channel!(self, h, 3, channel_number);
+                    self.output_pin
+                        .connect_peripheral_to_output(OutputSignal::LEDC_HS_SIG3);
+                }
+                Number::Channel4 => {
+                    set_channel!(self, h, 4, channel_number);
+                    self.output_pin
+                        .connect_peripheral_to_output(OutputSignal::LEDC_HS_SIG4);
+                }
+                Number::Channel5 => {
+                    set_channel!(self, h, 5, channel_number);
+                    self.output_pin
+                        .connect_peripheral_to_output(OutputSignal::LEDC_HS_SIG5);
+                }
+                Number::Channel6 => {
+                    set_channel!(self, h, 6, channel_number);
+                    self.output_pin
+                        .connect_peripheral_to_output(OutputSignal::LEDC_HS_SIG6);
+                }
+                Number::Channel7 => {
+                    set_channel!(self, h, 7, channel_number);
+                    self.output_pin
+                        .connect_peripheral_to_output(OutputSignal::LEDC_HS_SIG7);
+                }
+            }
+        } else {
+            return Err(Error::Timer);
+        }
+
+        Ok(())
+    }
+
+    /// Set duty in channel HW
+    fn set_duty_hw(&self, duty: u32) {
+        match self.number {
+            Number::Channel0 => set_duty!(self, h, 0, duty),
+            Number::Channel1 => set_duty!(self, h, 1, duty),
+            Number::Channel2 => set_duty!(self, h, 2, duty),
+            Number::Channel3 => set_duty!(self, h, 3, duty),
+            Number::Channel4 => set_duty!(self, h, 4, duty),
+            Number::Channel5 => set_duty!(self, h, 5, duty),
+            Number::Channel6 => set_duty!(self, h, 6, duty),
+            Number::Channel7 => set_duty!(self, h, 7, duty),
+        };
+    }
 }
 
 /// Channel HW interface for LowSpeed channels
