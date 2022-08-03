@@ -66,10 +66,8 @@ where
         sck.set_to_push_pull_output()
             .connect_peripheral_to_output(spi.sclk_signal());
 
-        if let Some(mut mosi) = mosi {
-            mosi.set_to_push_pull_output()
-                .connect_peripheral_to_output(spi.mosi_signal());
-        }
+        mosi.set_to_push_pull_output()
+            .connect_peripheral_to_output(spi.mosi_signal());
 
         miso.set_to_input()
             .connect_input_to_peripheral(spi.miso_signal());
