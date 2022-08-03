@@ -1,10 +1,10 @@
 //! SPI loopback test
 //!
 //! Folowing pins are used:
-//! SCLK    GPIO19
-//! MISO    GPIO25
-//! MOSI    GPIO23
-//! CS      GPIO22
+//! SCLK    GPIO12
+//! MISO    GPIO11
+//! MOSI    GPIO13
+//! CS      GPIO10
 //!
 //! Depending on your target and the board you are using you have to change the
 //! pins.
@@ -18,7 +18,7 @@
 
 use core::fmt::Write;
 
-use esp32_hal::{
+use esp32s3_hal::{
     clock::ClockControl,
     gpio::IO,
     pac::Peripherals,
@@ -37,7 +37,7 @@ use embedded_hal_1::spi::blocking::SpiBus;
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take().unwrap();
-    let mut system = peripherals.DPORT.split();
+    let mut system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     // Disable the watchdog timers. For the ESP32-C3, this includes the Super WDT,
@@ -51,10 +51,10 @@ fn main() -> ! {
     rtc_cntl.set_wdt_global_enable(false);
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-    let sclk = io.pins.gpio19;
-    let miso = io.pins.gpio25;
-    let mosi = io.pins.gpio23;
-    let cs = io.pins.gpio22;
+    let sclk = io.pins.gpio12;
+    let miso = io.pins.gpio11;
+    let mosi = io.pins.gpio13;
+    let cs = io.pins.gpio10;
 
     let mut spi = Spi::new(
         peripherals.SPI2,

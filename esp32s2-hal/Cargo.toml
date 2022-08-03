@@ -52,3 +52,7 @@ vectored = ["esp-hal-common/vectored"]
 [[example]]
 name              = "hello_rgb"
 required-features = ["smartled"]
+
+[[example]]
+name = "spi_eh1_loopback"
+required-features = ["eh1"]

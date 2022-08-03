@@ -1,10 +1,10 @@
 //! SPI loopback test
 //!
 //! Folowing pins are used:
-//! SCLK    GPIO19
-//! MISO    GPIO25
-//! MOSI    GPIO23
-//! CS      GPIO22
+//! SCLK    GPIO6
+//! MISO    GPIO2
+//! MOSI    GPIO7
+//! CS      GPIO10
 //!
 //! Depending on your target and the board you are using you have to change the
 //! pins.
@@ -18,7 +18,7 @@
 
 use core::fmt::Write;
 
-use esp32_hal::{
+use esp32c3_hal::{
     clock::ClockControl,
     gpio::IO,
     pac::Peripherals,
@@ -30,31 +30,36 @@ use esp32_hal::{
     Serial,
 };
 use panic_halt as _;
-use xtensa_lx_rt::entry;
+use riscv_rt::entry;
 
 use embedded_hal_1::spi::blocking::SpiBus;
 
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take().unwrap();
-    let mut system = peripherals.DPORT.split();
+    let mut system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     // Disable the watchdog timers. For the ESP32-C3, this includes the Super WDT,
     // the RTC WDT, and the TIMG WDTs.
     let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    let mut wdt = timer_group0.wdt;
+    let mut wdt0 = timer_group0.wdt;
+    let timer_group1 = TimerGroup::new(peripherals.TIMG1, &clocks);
+    let mut wdt1 = timer_group1.wdt;
+
     let mut serial0 = Serial::new(peripherals.UART0);
 
-    wdt.disable();
+    rtc_cntl.set_super_wdt_enable(false);
     rtc_cntl.set_wdt_global_enable(false);
+    wdt0.disable();
+    wdt1.disable();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-    let sclk = io.pins.gpio19;
-    let miso = io.pins.gpio25;
-    let mosi = io.pins.gpio23;
-    let cs = io.pins.gpio22;
+    let sclk = io.pins.gpio6;
+    let miso = io.pins.gpio2;
+    let mosi = io.pins.gpio7;
+    let cs = io.pins.gpio10;
 
     let mut spi = Spi::new(
         peripherals.SPI2,
