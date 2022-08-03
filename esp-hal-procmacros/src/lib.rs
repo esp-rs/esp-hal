@@ -225,7 +225,7 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
     };
 
     let context_call =
-        (f.sig.inputs.len() == 1).then_some(Ident::new("context", proc_macro2::Span::call_site()));
+        (f.sig.inputs.len() == 1).then(|| Ident::new("context", proc_macro2::Span::call_site()));
 
     quote!(
         #(#cfgs)*
