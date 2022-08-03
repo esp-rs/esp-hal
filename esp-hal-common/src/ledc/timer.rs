@@ -1,5 +1,10 @@
+use fugit::MegahertzU32;
+
+#[cfg(feature = "esp32")]
+use super::HighSpeed;
 use super::{LowSpeed, Speed};
-use crate::{clock::Clocks, pac::ledc, prelude::_fugit_MegahertzU32};
+use crate::{clock::Clocks, pac::ledc};
+
 /// Timer errors
 #[derive(Debug)]
 pub enum Error {
@@ -7,13 +12,12 @@ pub enum Error {
     Divisor,
 }
 
-use super::HighSpeed;
-
+#[cfg(feature = "esp32")]
 /// Clock source for HS Timers
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
 pub enum HSClockSource {
-    // TODO RefTick,
     APBClk,
+    // TODO RefTick,
 }
 
 /// Clock source for LS Timers
@@ -21,7 +25,6 @@ pub enum HSClockSource {
 pub enum LSClockSource {
     APBClk,
     // TODO SLOWClk
-    // SLOWClk,
 }
 
 /// Timer number
@@ -35,8 +38,7 @@ pub enum Number {
 
 /// Timer configuration
 pub mod config {
-
-    use crate::prelude::_fugit_HertzU32;
+    use fugit::HertzU32;
 
     /// Number of bits reserved for duty cycle adjustment
     #[derive(PartialEq, Eq, Copy, Clone, Debug)]
@@ -55,11 +57,17 @@ pub mod config {
         Duty12Bit,
         Duty13Bit,
         Duty14Bit,
+        #[cfg(feature = "esp32")]
         Duty15Bit,
+        #[cfg(feature = "esp32")]
         Duty16Bit,
+        #[cfg(feature = "esp32")]
         Duty17Bit,
+        #[cfg(feature = "esp32")]
         Duty18Bit,
+        #[cfg(feature = "esp32")]
         Duty19Bit,
+        #[cfg(feature = "esp32")]
         Duty20Bit,
     }
 
@@ -68,7 +76,7 @@ pub mod config {
     pub struct Config<CS> {
         pub duty: Duty,
         pub clock_source: CS,
-        pub frequency: _fugit_HertzU32,
+        pub frequency: HertzU32,
     }
 }
 
@@ -82,6 +90,7 @@ impl TimerSpeed for LowSpeed {
     type ClockSourceType = LSClockSource;
 }
 
+#[cfg(feature = "esp32")]
 /// Timer source type for HighSpeed timers
 impl TimerSpeed for HighSpeed {
     type ClockSourceType = HSClockSource;
@@ -90,7 +99,7 @@ impl TimerSpeed for HighSpeed {
 /// Interface for Timers
 pub trait TimerIFace<S: TimerSpeed> {
     /// Return the frequency of the timer
-    fn get_freq(&self) -> Option<_fugit_MegahertzU32>;
+    fn get_freq(&self) -> Option<MegahertzU32>;
 
     /// Configure the timer
     fn configure(&mut self, config: config::Config<S::ClockSourceType>) -> Result<(), Error>;
@@ -108,7 +117,7 @@ pub trait TimerIFace<S: TimerSpeed> {
 /// Interface for HW configuration of timer
 pub trait TimerHW<S: TimerSpeed> {
     /// Get the current source timer frequency from the HW
-    fn get_freq_hw(&self) -> Option<_fugit_MegahertzU32>;
+    fn get_freq_hw(&self) -> Option<MegahertzU32>;
 
     /// Configure the HW for the timer
     fn configure_hw(&self, divisor: u32);
@@ -132,7 +141,7 @@ where
     Timer<'a, S>: TimerHW<S>,
 {
     /// Return the frequency of the timer
-    fn get_freq(&self) -> Option<_fugit_MegahertzU32> {
+    fn get_freq(&self) -> Option<MegahertzU32> {
         self.get_freq_hw()
     }
 
@@ -141,8 +150,9 @@ where
         self.duty = Some(config.duty);
         self.clock_source = Some(config.clock_source);
 
+        // TODO: we should return some error here if `unwrap()` fails
         let src_freq: u32 = self.get_freq().unwrap().to_Hz();
-        let precision = 2_u64.pow(config.duty as u32);
+        let precision = 2u64.pow(config.duty as u32);
         let frequency: u32 = config.frequency.raw();
 
         let divisor = (((src_freq as u64) << 8) + ((frequency as u64 * precision) / 2))
@@ -192,33 +202,23 @@ impl<'a, S: TimerSpeed> Timer<'a, S> {
             clock_source: None,
         }
     }
-
-    // TODO This function will be relevant when we add other clk sources
-    // Helper function that return the current frequency of the LowSpeed global
-    // source
-    // fn get_slow_clock_freq(&self) -> _fugit_MegahertzU32 {
-    //             if self.ledc.conf.read().apb_clk_sel().bit_is_clear() {
-    //                 8u32.MHz().into()
-    //             } else {
-    //                 // 80u32.MHz().into()
-    //                 self.clock_control_config.apb_clock
-    //             }
-    // }
 }
 
 /// Timer HW implementation for LowSpeed timers
 impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
     /// Get the current source timer frequency from the HW
-    fn get_freq_hw(&self) -> Option<_fugit_MegahertzU32> {
+    fn get_freq_hw(&self) -> Option<MegahertzU32> {
         self.clock_source.map(|cs| match cs {
             LSClockSource::APBClk => self.clock_control_config.apb_clock,
         })
     }
 
+    #[cfg(feature = "esp32")]
     /// Configure the HW for the timer
     fn configure_hw(&self, divisor: u32) {
         let duty = self.duty.unwrap() as u8;
-        let sel_lstimer = self.clock_source.unwrap() == LSClockSource::APBClk;
+        let sel_lstimer = self.clock_source == Some(LSClockSource::APBClk);
+
         match self.number {
             Number::Timer0 => self.ledc.lstimer0_conf.modify(|_, w| unsafe {
                 w.tick_sel()
@@ -271,6 +271,65 @@ impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
         };
     }
 
+    #[cfg(not(feature = "esp32"))]
+    /// Configure the HW for the timer
+    fn configure_hw(&self, divisor: u32) {
+        let duty = self.duty.unwrap() as u8;
+        let sel_lstimer = self.clock_source == Some(LSClockSource::APBClk);
+
+        match self.number {
+            Number::Timer0 => self.ledc.timer0_conf.modify(|_, w| unsafe {
+                w.tick_sel()
+                    .bit(sel_lstimer)
+                    .rst()
+                    .clear_bit()
+                    .pause()
+                    .clear_bit()
+                    .clk_div()
+                    .bits(divisor)
+                    .duty_res()
+                    .bits(duty)
+            }),
+            Number::Timer1 => self.ledc.timer1_conf.modify(|_, w| unsafe {
+                w.tick_sel()
+                    .bit(sel_lstimer)
+                    .rst()
+                    .clear_bit()
+                    .pause()
+                    .clear_bit()
+                    .clk_div()
+                    .bits(divisor)
+                    .duty_res()
+                    .bits(duty)
+            }),
+            Number::Timer2 => self.ledc.timer2_conf.modify(|_, w| unsafe {
+                w.tick_sel()
+                    .bit(sel_lstimer)
+                    .rst()
+                    .clear_bit()
+                    .pause()
+                    .clear_bit()
+                    .clk_div()
+                    .bits(divisor)
+                    .duty_res()
+                    .bits(duty)
+            }),
+            Number::Timer3 => self.ledc.timer3_conf.modify(|_, w| unsafe {
+                w.tick_sel()
+                    .bit(sel_lstimer)
+                    .rst()
+                    .clear_bit()
+                    .pause()
+                    .clear_bit()
+                    .clk_div()
+                    .bits(divisor)
+                    .duty_res()
+                    .bits(duty)
+            }),
+        };
+    }
+
+    #[cfg(feature = "esp32")]
     /// Update the timer in HW
     fn update_hw(&self) {
         match self.number {
@@ -280,12 +339,24 @@ impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
             Number::Timer3 => self.ledc.lstimer3_conf.modify(|_, w| w.para_up().set_bit()),
         };
     }
+
+    #[cfg(not(feature = "esp32"))]
+    /// Update the timer in HW
+    fn update_hw(&self) {
+        match self.number {
+            Number::Timer0 => self.ledc.timer0_conf.modify(|_, w| w.para_up().set_bit()),
+            Number::Timer1 => self.ledc.timer1_conf.modify(|_, w| w.para_up().set_bit()),
+            Number::Timer2 => self.ledc.timer2_conf.modify(|_, w| w.para_up().set_bit()),
+            Number::Timer3 => self.ledc.timer3_conf.modify(|_, w| w.para_up().set_bit()),
+        };
+    }
 }
 
+#[cfg(feature = "esp32")]
 /// Timer HW implementation for HighSpeed timers
 impl<'a> TimerHW<HighSpeed> for Timer<'a, HighSpeed> {
     /// Get the current source timer frequency from the HW
-    fn get_freq_hw(&self) -> Option<_fugit_MegahertzU32> {
+    fn get_freq_hw(&self) -> Option<MegahertzU32> {
         self.clock_source.map(|cs| match cs {
             // TODO RefTick HSClockSource::RefTick => self.clock_control_config.apb_clock,
             HSClockSource::APBClk => self.clock_control_config.apb_clock,
@@ -295,7 +366,8 @@ impl<'a> TimerHW<HighSpeed> for Timer<'a, HighSpeed> {
     /// Configure the HW for the timer
     fn configure_hw(&self, divisor: u32) {
         let duty = self.duty.unwrap() as u8;
-        let sel_hstimer = self.clock_source.unwrap() == HSClockSource::APBClk;
+        let sel_hstimer = self.clock_source == Some(HSClockSource::APBClk);
+
         match self.number {
             Number::Timer0 => self.ledc.hstimer0_conf.modify(|_, w| unsafe {
                 w.tick_sel()
