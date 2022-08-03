@@ -11,6 +11,9 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # --------------------------------------------------------------------------
+  # Check Examples
+
   check-riscv:
     name: Check RISC-V Examples
     runs-on: ubuntu-latest
@@ -54,6 +57,9 @@ jobs:
           # The `hello_rgb` example requires the `smartled` feature to be enabled
           args: -Zbuild-std=core --examples --manifest-path=${{ matrix.chip }}-hal/Cargo.toml --target=xtensa-${{ matrix.chip }}-none-elf --features=smartled
 
+  # --------------------------------------------------------------------------
+  # Clippy
+
   clippy-riscv:
     name: Run clippy on RISC-V builds
     runs-on: ubuntu-latest
@@ -75,7 +81,7 @@ jobs:
         with:
           command: clippy
           args: --manifest-path=esp32c3-hal/Cargo.toml --target=riscv32imc-unknown-none-elf -- --no-deps -D warnings --A clippy::too-many-arguments --A clippy::module-inception
-        
+
   clippy-xtensa:
     name: Run clippy on Xtensa builds
     runs-on: ubuntu-latest
@@ -95,3 +101,48 @@ jobs:
         with:
           command: clippy
           args: -Zbuild-std=core --manifest-path=${{ matrix.chip }}-hal/Cargo.toml --target=xtensa-${{ matrix.chip }}-none-elf -- --no-deps -D warnings --A clippy::too-many-arguments --A clippy::module-inception
+
+  # --------------------------------------------------------------------------
+  # MSRV Check
+
+  msrv-riscv:
+    name: Check RISC-V MSRV
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        chip: [esp32c3]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          target: riscv32imc-unknown-none-elf
+          toolchain: "1.59.0"
+          default: true
+      - uses: Swatinem/rust-cache@v1
+      - uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --manifest-path=${{ matrix.chip }}-hal/Cargo.toml --target=riscv32imc-unknown-none-elf --features=eh1,smartled,ufmt
+
+  msrv-xtensa:
+    name: Check Xtensa MSRV
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        chip: [esp32, esp32s2, esp32s3]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: esp-rs/xtensa-toolchain@v1.2
+        with:
+          default: true
+          ldproxy: false
+          buildtargets: ${{ matrix.chip }}
+          version: "1.59.0"
+      - uses: Swatinem/rust-cache@v1
+      - uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: -Zbuild-std=core --manifest-path=${{ matrix.chip }}-hal/Cargo.toml --target=xtensa-${{ matrix.chip }}-none-elf --features=eh1,smartled,ufmt
