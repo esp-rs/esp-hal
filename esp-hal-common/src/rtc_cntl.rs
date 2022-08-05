@@ -101,6 +101,10 @@ impl Rtc {
             swd: Swd::new(),
         }
     }
+
+    pub fn estimate_xtal_frequency(&mut self) -> u32 {
+        RtcClock::estimate_xtal_frequency()
+    }
 }
 
 /// RTC Watchdog Timer
@@ -108,6 +112,42 @@ pub struct RtcClock;
 /// RTC Watchdog Timer driver
 impl RtcClock {
     const CAL_FRACT: u32 = 19;
+
+    /// Enable or disable 8 MHz internal oscillator
+    ///
+    /// Output from 8 MHz internal oscillator is passed into a configurable
+    /// divider, which by default divides the input clock frequency by 256.
+    /// Output of the divider may be used as RTC_SLOW_CLK source.
+    /// Output of the divider is referred to in register descriptions and code as
+    /// 8md256 or simply d256. Divider values other than 256 may be configured, but
+    /// this facility is not currently needed, so is not exposed in the code.
+    ///
+    /// When 8MHz/256 divided output is not needed, the divider should be disabled
+    /// to reduce power consumption.
+    fn enable_8m(clk_8m_en: bool, d256_en: bool) {
+        let rtc_cntl = unsafe { &*RTC_CNTL::ptr() };
+
+        if clk_8m_en {
+            rtc_cntl.clk_conf.modify(|_, w| w.enb_ck8m().clear_bit());
+            unsafe {
+                rtc_cntl.timer1.modify(|_, w| w.ck8m_wait().bits(5));
+                esp_rom_delay_us(50);
+            }
+        } else {
+            rtc_cntl.clk_conf.modify(|_, w| w.enb_ck8m().set_bit());
+            rtc_cntl
+                .timer1
+                .modify(|_, w| unsafe { w.ck8m_wait().bits(20) });
+        }
+
+        if d256_en {
+            rtc_cntl
+                .clk_conf
+                .modify(|_, w| w.enb_ck8m_div().clear_bit());
+        } else {
+            rtc_cntl.clk_conf.modify(|_, w| w.enb_ck8m_div().set_bit());
+        }
+    }
 
     /// Get main XTAL frequency
     /// This is the value stored in RTC register RTC_XTAL_FREQ_REG by the bootloader, as passed to
@@ -195,12 +235,14 @@ impl RtcClock {
         };
     }
 
+    /// Calibration of RTC_SLOW_CLK is performed using a special feature of TIMG0.
+    /// This feature counts the number of XTAL clock cycles within a given number of
+    /// RTC_SLOW_CLK cycles.
     fn calibrate_internal(cal_clk: RtcCalSel, slowclk_cycles: u32) -> u32 {
         // Except for ESP32, choosing RTC_CAL_RTC_MUX results in calibration of
         // the 150k RTC clock (90k on ESP32-S2) regardless of the currently selected SLOW_CLK.
         // On the ESP32, it uses the currently selected SLOW_CLK.
         // The following code emulates ESP32 behavior for the other chips:
-
         #[cfg(not(feature = "esp32"))]
         let cal_clk = match cal_clk {
             RtcCalSel::RtcCalRtcMux => match RtcClock::get_slow_freq() {
@@ -339,6 +381,14 @@ impl RtcClock {
         cal_val
     }
 
+    /// Measure ratio between XTAL frequency and RTC slow clock frequency
+    fn get_calibration_ratio(cal_clk: RtcCalSel, slowclk_cycles: u32) -> u32 {
+        let xtal_cycles = RtcClock::calibrate_internal(cal_clk, slowclk_cycles) as u64;
+        let ratio = (xtal_cycles << RtcClock::CAL_FRACT) / slowclk_cycles as u64;
+
+        (ratio & (u32::MAX as u64)) as u32
+    }
+
     /// Measure RTC slow clock's period, based on main XTAL frequency
     ///
     /// This function will time out and return 0 if the time for the given number
@@ -369,6 +419,28 @@ impl RtcClock {
         let period = q_to_float(period_13q19);
 
         (1000f32 / period) as u16
+    }
+
+    fn estimate_xtal_frequency() -> u32 {
+        // Number of 8M/256 clock cycles to use for XTAL frequency estimation.
+        const XTAL_FREQ_EST_CYCLES: u32 = 10;
+
+        let rtc_cntl = unsafe { &*RTC_CNTL::ptr() };
+        let clk_8m_enabled = rtc_cntl.clk_conf.read().enb_ck8m().bit_is_clear();
+        let clk_8md256_enabled = rtc_cntl.clk_conf.read().enb_ck8m_div().bit_is_clear();
+
+        if !clk_8md256_enabled {
+            RtcClock::enable_8m(true, true);
+        }
+
+        let ratio = RtcClock::get_calibration_ratio(RtcCalSel::RtcCal8mD256, XTAL_FREQ_EST_CYCLES);
+        let freq_mhz =
+            ((ratio as u64 * RtcFastClock::RtcFastClock8m.hz() as u64 / 1_000_000u64 / 256u64)
+                >> RtcClock::CAL_FRACT) as u32;
+
+        RtcClock::enable_8m(clk_8m_enabled, clk_8md256_enabled);
+
+        freq_mhz
     }
 }
 
