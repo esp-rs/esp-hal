@@ -25,12 +25,12 @@ use esp32_hal::{
     Delay,
     RtcCntl,
     Serial,
-    Timer,
+    timer::TimerGroup,
 };
 use panic_halt as _;
 use xtensa_lx_rt::entry;
 
-use embedded_hal_1::spi::blocking::{SpiBus, SpiDevice};
+use embedded_hal_1::spi::blocking::SpiDevice;
 use esp32_hal::{
     gpio::IO,
     spi::{Spi, SpiMode, SpiBusDevice, SpiBusController},
@@ -45,11 +45,12 @@ fn main() -> ! {
     // Disable the watchdog timers. For the ESP32-C3, this includes the Super WDT,
     // the RTC WDT, and the TIMG WDTs.
     let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
-    let mut timer0 = Timer::new(peripherals.TIMG0, clocks.apb_clock);
-    let mut serial0 = Serial::new(peripherals.UART0).unwrap();
-
-    timer0.disable();
+    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let mut wdt = timer_group0.wdt;
+    wdt.disable();
     rtc_cntl.set_wdt_global_enable(false);
+
+    let mut serial0 = Serial::new(peripherals.UART0);
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let sclk = io.pins.gpio19;
@@ -57,14 +58,12 @@ fn main() -> ! {
     let mosi = io.pins.gpio23;
     let cs = io.pins.gpio22;
     let cs = cs.into_push_pull_output();
-    let no_cs : Option<esp32_hal::gpio::Gpio22<esp_hal_common::Output<esp_hal_common::PushPull>>> = None;
 
-    let spi_controller = SpiBusController::from_spi(Spi::new(
+    let spi_controller = SpiBusController::from_spi(Spi::new_no_cs(
         peripherals.SPI2,
         sclk,
-        Some(mosi),
-        Some(miso),
-        no_cs,
+        mosi,
+        miso,
         1000u32.kHz(),
         SpiMode::Mode0,
         &mut system.peripheral_clock_control,
@@ -81,54 +80,51 @@ fn main() -> ! {
         let write = [0xde, 0xad, 0xbe, 0xef];
         let mut read: [u8; 4] = [0x00u8; 4];
 
-        spi_device.transaction(|bus| {
-            SpiBus::transfer(bus, &mut read[..], &write[..])
-            //bus.transfer(&mut read[..], &write[..])
-        }).unwrap();
+        spi_device.transfer(&mut read[..], &write[..]).unwrap();
         assert_eq!(write, read);
         writeln!(serial0, " SUCCESS").unwrap();
         delay.delay_ms(250u32);
 
 
-        //// --- Asymmetric transfer (Read more than we write) ---
-        //write!(serial0, "Starting asymetric transfer (read > write)...").unwrap();
-        //let mut read: [u8; 4] = [0x00; 4];
+        // --- Asymmetric transfer (Read more than we write) ---
+        write!(serial0, "Starting asymetric transfer (read > write)...").unwrap();
+        let mut read: [u8; 4] = [0x00; 4];
 
-        //SpiBus::transfer(&mut spi, &mut read[0..2], &write[..]).expect("Asymmetric transfer failed");
-        //assert_eq!(write[0], read[0]);
-        //assert_eq!(read[2], 0x00u8);
-        //writeln!(serial0, " SUCCESS").unwrap();
-        //delay.delay_ms(250u32);
-
-
-        //// --- Symmetric transfer with huge buffer ---
-        //// Only your RAM is the limit!
-        //write!(serial0, "Starting huge transfer...").unwrap();
-        //let mut write = [0x55u8; 4096];
-        //for byte in 0..write.len() {
-        //    write[byte] = byte as u8;
-        //}
-        //let mut read = [0x00u8; 4096];
-
-        //SpiBus::transfer(&mut spi, &mut read[..], &write[..]).expect("Huge transfer failed");
-        //assert_eq!(write, read);
-        //writeln!(serial0, " SUCCESS").unwrap();
-        //delay.delay_ms(250u32);
+        spi_device.transfer(&mut read[0..2], &write[..]).expect("Asymmetric transfer failed");
+        assert_eq!(write[0], read[0]);
+        assert_eq!(read[2], 0x00u8);
+        writeln!(serial0, " SUCCESS").unwrap();
+        delay.delay_ms(250u32);
 
 
-        //// --- Symmetric transfer with huge buffer in-place (No additional allocation needed) ---
-        //write!(serial0, "Starting huge transfer (in-place)...").unwrap();
-        //let mut write = [0x55u8; 4096];
-        //for byte in 0..write.len() {
-        //    write[byte] = byte as u8;
-        //}
+        // --- Symmetric transfer with huge buffer ---
+        // Only your RAM is the limit!
+        write!(serial0, "Starting huge transfer...").unwrap();
+        let mut write = [0x55u8; 4096];
+        for byte in 0..write.len() {
+            write[byte] = byte as u8;
+        }
+        let mut read = [0x00u8; 4096];
 
-        //SpiBus::transfer_in_place(&mut spi, &mut write[..]).expect("Huge transfer failed");
-        //for byte in 0..write.len() {
-        //    assert_eq!(write[byte], byte as u8);
-        //}
-        //writeln!(serial0, " SUCCESS").unwrap();
-        //delay.delay_ms(250u32);
+        spi_device.transfer(&mut read[..], &write[..]).expect("Huge transfer failed");
+        assert_eq!(write, read);
+        writeln!(serial0, " SUCCESS").unwrap();
+        delay.delay_ms(250u32);
+
+
+        // --- Symmetric transfer with huge buffer in-place (No additional allocation needed) ---
+        write!(serial0, "Starting huge transfer (in-place)...").unwrap();
+        let mut write = [0x55u8; 4096];
+        for byte in 0..write.len() {
+            write[byte] = byte as u8;
+        }
+
+        spi_device.transfer_in_place(&mut write[..]).expect("Huge transfer failed");
+        for byte in 0..write.len() {
+            assert_eq!(write[byte], byte as u8);
+        }
+        writeln!(serial0, " SUCCESS").unwrap();
+        delay.delay_ms(250u32);
     }
 }
 

@@ -59,3 +59,7 @@ required-features = ["smartled"]
 [[example]]
 name = "spi_eh1_loopback"
 required-features = ["eh1"]
+
+[[example]]
+name = "spi_eh1_device_loopback"
+required-features = ["eh1"]
