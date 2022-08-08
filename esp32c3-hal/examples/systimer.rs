@@ -21,13 +21,12 @@ use esp32c3_hal::{
 use esp_backtrace as _;
 use riscv_rt::entry;
 
-static ALARM0: Mutex<RefCell<Option<Alarm<Target, 0>>>> = Mutex::new(RefCell::new(None));
+static ALARM0: Mutex<RefCell<Option<Alarm<Periodic, 0>>>> = Mutex::new(RefCell::new(None));
 static ALARM1: Mutex<RefCell<Option<Alarm<Target, 1>>>> = Mutex::new(RefCell::new(None));
 static ALARM2: Mutex<RefCell<Option<Alarm<Target, 2>>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
-    esp_println::logger::init_logger(log::LevelFilter::Info);
     let peripherals = Peripherals::take().unwrap();
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
@@ -45,7 +44,7 @@ fn main() -> ! {
     esp_println::println!("SYSTIMER Current value = {}", SystemTimer::now());
 
     let alarm0 = syst.alarm0.into_periodic();
-    alarm0.set_period(esp32c3_hal::prelude::_fugit_RateExtU32::Hz(1)); // TODO fit this abomination
+    alarm0.set_period(1u32.Hz());
     alarm0.clear_interrupt();
     alarm0.enable_interrupt();
 

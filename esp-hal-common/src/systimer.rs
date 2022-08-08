@@ -67,7 +67,6 @@ pub struct Alarm<MODE, const CHANNEL: u8> {
 }
 
 impl<T, const CHANNEL: u8> Alarm<T, CHANNEL> {
-
     #[cfg(feature = "esp32s2")]
     pub const TICKS_PER_SECOND: u32 = 40_000_000;
     #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
@@ -103,10 +102,11 @@ impl<T, const CHANNEL: u8> Alarm<T, CHANNEL> {
             _ => unreachable!(),
         }
     }
-}
 
-impl<const CHANNEL: u8> Alarm<Target, CHANNEL> {
-    pub fn set_target(&self, timestamp: u64) {
+    fn configure(
+        &self,
+        conf: impl FnOnce(&Reg<TARGET0_CONF_SPEC>, &Reg<TARGET0_HI_SPEC>, &Reg<TARGET0_LO_SPEC>),
+    ) {
         unsafe {
             let systimer = &*SYSTIMER::ptr();
             let (tconf, hi, lo): (
@@ -143,9 +143,7 @@ impl<const CHANNEL: u8> Alarm<Target, CHANNEL> {
                     .modify(|_, w| w.timer_unit0_core0_stall_en().clear_bit());
             }
 
-            tconf.write(|w| w.target0_period_mode().clear_bit()); // target mode
-            hi.write(|w| w.timer_target0_hi().bits((timestamp >> 32) as u32));
-            lo.write(|w| w.timer_target0_lo().bits((timestamp & 0xFFFF_FFFF) as u32));
+            conf(tconf, hi, lo);
 
             #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
             {
@@ -180,6 +178,16 @@ impl<const CHANNEL: u8> Alarm<Target, CHANNEL> {
                 _ => unreachable!(),
             });
         }
+    }
+}
+
+impl<const CHANNEL: u8> Alarm<Target, CHANNEL> {
+    pub fn set_target(&self, timestamp: u64) {
+        self.configure(|tconf, hi, lo| unsafe {
+            tconf.write(|w| w.target0_period_mode().clear_bit()); // target mode
+            hi.write(|w| w.timer_target0_hi().bits((timestamp >> 32) as u32));
+            lo.write(|w| w.timer_target0_lo().bits((timestamp & 0xFFFF_FFFF) as u32));
+        })
     }
 
     pub fn into_periodic(self) -> Alarm<Periodic, CHANNEL> {
@@ -191,82 +199,16 @@ impl<const CHANNEL: u8> Alarm<Periodic, CHANNEL> {
     pub fn set_period(&self, period: fugit::HertzU32) {
         let time_period: MillisDurationU32 = period.into_duration();
         let cycles = time_period.ticks();
-        unsafe {
-            let systimer = &*SYSTIMER::ptr();
-            let (tconf, hi, lo): (
-                &Reg<TARGET0_CONF_SPEC>,
-                &Reg<TARGET0_HI_SPEC>,
-                &Reg<TARGET0_LO_SPEC>,
-            ) = match CHANNEL {
-                0 => (
-                    &systimer.target0_conf,
-                    &systimer.target0_hi,
-                    &systimer.target0_lo,
-                ),
-                1 => (
-                    transmute(&systimer.target1_conf),
-                    transmute(&systimer.target1_hi),
-                    transmute(&systimer.target1_lo),
-                ),
-                2 => (
-                    transmute(&systimer.target2_conf),
-                    transmute(&systimer.target2_hi),
-                    transmute(&systimer.target2_lo),
-                ),
-                _ => unreachable!(),
-            };
-
-            #[cfg(feature = "esp32s2")]
-            systimer.step.write(|w| w.timer_xtal_step().bits(0x1)); // run at XTAL freq, not 80 * XTAL freq
-
-            #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
-            {
-                tconf.write(|w| w.target0_timer_unit_sel().clear_bit()); // default, use unit 0
-                systimer
-                    .conf
-                    .modify(|_, w| w.timer_unit0_core0_stall_en().clear_bit());
-            }
-
+        self.configure(|tconf, hi, lo| unsafe {
             tconf.write(|w| {
-                // periodic mode, period in cycles
-                w.target0_period_mode().set_bit().target0_period().bits(cycles * (Self::TICKS_PER_SECOND / 1000))
-            }); 
+                w.target0_period_mode()
+                    .set_bit()
+                    .target0_period()
+                    .bits(cycles * (Self::TICKS_PER_SECOND / 1000))
+            });
             hi.write(|w| w.timer_target0_hi().bits(0));
             lo.write(|w| w.timer_target0_lo().bits(0));
-
-            #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
-            {
-                match CHANNEL {
-                    0 => {
-                        systimer
-                            .comp0_load
-                            .write(|w| w.timer_comp0_load().set_bit());
-                    }
-                    1 => systimer
-                        .comp1_load
-                        .write(|w| w.timer_comp1_load().set_bit()),
-                    2 => systimer
-                        .comp2_load
-                        .write(|w| w.timer_comp2_load().set_bit()),
-                    _ => unreachable!(),
-                }
-
-                systimer.conf.modify(|_r, w| match CHANNEL {
-                    0 => w.target0_work_en().set_bit(),
-                    1 => w.target1_work_en().set_bit(),
-                    2 => w.target2_work_en().set_bit(),
-                    _ => unreachable!(),
-                });
-            }
-
-            #[cfg(feature = "esp32s2")]
-            tconf.modify(|_r, w| match CHANNEL {
-                0 => w.target0_work_en().set_bit(),
-                1 => w.target0_work_en().set_bit(),
-                2 => w.target0_work_en().set_bit(),
-                _ => unreachable!(),
-            });
-        }
+        })
     }
 
     pub fn into_target(self) -> Alarm<Target, CHANNEL> {
