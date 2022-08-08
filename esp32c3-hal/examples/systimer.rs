@@ -13,7 +13,7 @@ use esp32c3_hal::{
     interrupt::Priority,
     pac::{self, Peripherals},
     prelude::*,
-    systimer::{Alarm, SystemTimer, Target},
+    systimer::{Alarm, SystemTimer, Target, Periodic},
     timer::TimerGroup,
     Delay,
     Rtc,
@@ -27,6 +27,7 @@ static ALARM2: Mutex<RefCell<Option<Alarm<Target, 2>>>> = Mutex::new(RefCell::ne
 
 #[entry]
 fn main() -> ! {
+    esp_println::logger::init_logger(log::LevelFilter::Info);
     let peripherals = Peripherals::take().unwrap();
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
@@ -41,8 +42,11 @@ fn main() -> ! {
 
     let syst = SystemTimer::new(peripherals.SYSTIMER);
 
-    let alarm0 = syst.alarm0;
-    alarm0.set_target(40_000_0000);
+    esp_println::println!("SYSTIMER Current value = {}", SystemTimer::now());
+
+    let alarm0 = syst.alarm0.into_periodic();
+    alarm0.set_period(esp32c3_hal::prelude::_fugit_RateExtU32::Hz(1)); // TODO fit this abomination
+    alarm0.clear_interrupt();
     alarm0.enable_interrupt();
 
     let alarm1 = syst.alarm1;
