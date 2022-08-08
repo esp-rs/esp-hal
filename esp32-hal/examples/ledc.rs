@@ -1,4 +1,5 @@
-//! Turns on LED with the option to change LED intensity depending on `duty` value.
+//! Turns on LED with the option to change LED intensity depending on `duty`
+//! value.
 //!
 //! This assumes that a LED is connected to the pin assigned to `led`. (GPIO4)
 
@@ -6,19 +7,21 @@
 #![no_main]
 
 use core::fmt::Write;
+
 use esp32_hal::{
+    clock::ClockControl,
     gpio::IO,
-    Serial,
+    ledc::{
+        channel::{self, ChannelIFace},
+        timer::{self, TimerIFace},
+        HighSpeed,
+        LEDC,
+    },
+    pac::Peripherals,
+    prelude::*,
     timer::TimerGroup,
     RtcCntl,
-    clock::ClockControl,
-    prelude::*,
-    pac::Peripherals,
-};
-use esp_hal_common::ledc::{
-    channel::{self, ChannelIFace},
-    timer::{self, TimerIFace},
-    HighSpeed, LEDC,
+    Serial,
 };
 use panic_halt as _;
 use xtensa_lx_rt::entry;

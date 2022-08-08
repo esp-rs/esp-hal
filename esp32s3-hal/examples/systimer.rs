@@ -9,12 +9,12 @@ use core::cell::RefCell;
 use esp32s3_hal::{
     clock::ClockControl,
     interrupt,
+    interrupt::Priority,
     pac::{self, Peripherals},
     prelude::*,
     systimer::{Alarm, SystemTimer, Target},
     timer::TimerGroup,
     Delay,
-    interrupt::Priority,
     RtcCntl,
 };
 use panic_halt as _;
@@ -62,18 +62,9 @@ fn main() -> ! {
         (&ALARM2).lock(|data| (*data).replace(Some(alarm2)));
     }
 
-    interrupt::enable(
-        pac::Interrupt::SYSTIMER_TARGET0,
-        Priority::Priority1,
-    ).unwrap();
-    interrupt::enable(
-        pac::Interrupt::SYSTIMER_TARGET1,
-        Priority::Priority2,
-    ).unwrap();
-    interrupt::enable(
-        pac::Interrupt::SYSTIMER_TARGET2,
-        Priority::Priority2,
-    ).unwrap();
+    interrupt::enable(pac::Interrupt::SYSTIMER_TARGET0, Priority::Priority1).unwrap();
+    interrupt::enable(pac::Interrupt::SYSTIMER_TARGET1, Priority::Priority2).unwrap();
+    interrupt::enable(pac::Interrupt::SYSTIMER_TARGET2, Priority::Priority2).unwrap();
 
     // Initialize the Delay peripheral, and use it to toggle the LED state in a
     // loop.

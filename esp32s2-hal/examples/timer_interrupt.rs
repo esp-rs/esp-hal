@@ -10,13 +10,13 @@ use core::{cell::RefCell, fmt::Write};
 use esp32s2_hal::{
     clock::ClockControl,
     interrupt,
+    interrupt::Priority,
     pac::{self, Peripherals, TIMG0, TIMG1, UART0},
     prelude::*,
-    timer::{Timer0, Timer1, TimerGroup},
+    timer::{Timer, Timer0, Timer1, TimerGroup},
     RtcCntl,
     Serial,
 };
-use esp_hal_common::{Priority, Timer};
 use panic_halt as _;
 use xtensa_lx::mutex::{CriticalSectionMutex, Mutex};
 use xtensa_lx_rt::entry;

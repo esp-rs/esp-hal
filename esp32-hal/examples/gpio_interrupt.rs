@@ -52,11 +52,7 @@ fn main() -> ! {
         (&BUTTON).lock(|data| (*data).replace(Some(button)));
     }
 
-    interrupt::enable(
-        pac::Interrupt::GPIO,
-        interrupt::Priority::Priority2,
-    )
-    .unwrap();
+    interrupt::enable(pac::Interrupt::GPIO, interrupt::Priority::Priority2).unwrap();
 
     led.set_high().unwrap();
 

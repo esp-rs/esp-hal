@@ -11,11 +11,10 @@ use esp32_hal::{
     clock::ClockControl,
     pac::{Peripherals, TIMG1},
     prelude::*,
-    timer::{Timer0, TimerGroup},
+    timer::{Timer, Timer0, TimerGroup},
     CpuControl,
     RtcCntl,
 };
-use esp_hal_common::Timer;
 use esp_println::println;
 use nb::block;
 use panic_halt as _;
@@ -24,10 +23,6 @@ use xtensa_lx_rt::entry;
 
 #[entry]
 fn main() -> ! {
-    _main();
-}
-
-fn _main() -> ! {
     let peripherals = Peripherals::take().unwrap();
     let system = peripherals.DPORT.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
