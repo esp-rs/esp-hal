@@ -1,4 +1,4 @@
-use fugit::MegahertzU32;
+use fugit::HertzU32;
 
 #[cfg(feature = "esp32")]
 use super::HighSpeed;
@@ -101,7 +101,7 @@ impl TimerSpeed for HighSpeed {
 /// Interface for Timers
 pub trait TimerIFace<S: TimerSpeed> {
     /// Return the frequency of the timer
-    fn get_freq(&self) -> Option<MegahertzU32>;
+    fn get_freq(&self) -> Option<HertzU32>;
 
     /// Configure the timer
     fn configure(&mut self, config: config::Config<S::ClockSourceType>) -> Result<(), Error>;
@@ -119,7 +119,7 @@ pub trait TimerIFace<S: TimerSpeed> {
 /// Interface for HW configuration of timer
 pub trait TimerHW<S: TimerSpeed> {
     /// Get the current source timer frequency from the HW
-    fn get_freq_hw(&self) -> Option<MegahertzU32>;
+    fn get_freq_hw(&self) -> Option<HertzU32>;
 
     /// Configure the HW for the timer
     fn configure_hw(&self, divisor: u32);
@@ -144,7 +144,7 @@ where
     Timer<'a, S>: TimerHW<S>,
 {
     /// Return the frequency of the timer
-    fn get_freq(&self) -> Option<MegahertzU32> {
+    fn get_freq(&self) -> Option<HertzU32> {
         self.get_freq_hw()
     }
 
@@ -216,7 +216,7 @@ impl<'a, S: TimerSpeed> Timer<'a, S> {
 /// Timer HW implementation for LowSpeed timers
 impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
     /// Get the current source timer frequency from the HW
-    fn get_freq_hw(&self) -> Option<MegahertzU32> {
+    fn get_freq_hw(&self) -> Option<fugit::HertzU32> {
         self.clock_source.map(|cs| match cs {
             LSClockSource::APBClk => self.clock_control_config.apb_clock,
         })
@@ -365,7 +365,7 @@ impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
 /// Timer HW implementation for HighSpeed timers
 impl<'a> TimerHW<HighSpeed> for Timer<'a, HighSpeed> {
     /// Get the current source timer frequency from the HW
-    fn get_freq_hw(&self) -> Option<MegahertzU32> {
+    fn get_freq_hw(&self) -> Option<HertzU32> {
         self.clock_source.map(|cs| match cs {
             // TODO RefTick HSClockSource::RefTick => self.clock_control_config.apb_clock,
             HSClockSource::APBClk => self.clock_control_config.apb_clock,

@@ -14,7 +14,7 @@ use esp32c3_hal::{
     pac::{self, Peripherals, TIMG0, TIMG1},
     prelude::*,
     timer::{Timer, Timer0, TimerGroup},
-    RtcCntl,
+    Rtc,
 };
 use panic_halt as _;
 use riscv_rt::entry;
@@ -30,7 +30,7 @@ fn main() -> ! {
 
     // Disable the watchdog timers. For the ESP32-C3, this includes the Super WDT,
     // the RTC WDT, and the TIMG WDTs.
-    let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
+    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let mut timer0 = timer_group0.timer0;
     let mut wdt0 = timer_group0.wdt;
@@ -38,8 +38,8 @@ fn main() -> ! {
     let mut timer1 = timer_group1.timer0;
     let mut wdt1 = timer_group1.wdt;
 
-    rtc_cntl.set_super_wdt_enable(false);
-    rtc_cntl.set_wdt_global_enable(false);
+    rtc.swd.disable();
+    rtc.rwdt.disable();
     wdt0.disable();
     wdt1.disable();
 

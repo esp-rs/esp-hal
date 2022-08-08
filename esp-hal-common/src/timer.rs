@@ -6,7 +6,7 @@ use embedded_hal::{
     timer::{Cancel, CountDown, Periodic},
     watchdog::{Watchdog, WatchdogDisable, WatchdogEnable},
 };
-use fugit::{MegahertzU32, MicrosDurationU64};
+use fugit::{HertzU32, MicrosDurationU64};
 use void::Void;
 
 use crate::{
@@ -86,7 +86,7 @@ where
 /// General-purpose timer
 pub struct Timer<T> {
     timg: T,
-    apb_clk_freq: MegahertzU32,
+    apb_clk_freq: HertzU32,
 }
 
 /// Timer driver
@@ -95,7 +95,7 @@ where
     T: Instance,
 {
     /// Create a new timer instance
-    pub fn new(timg: T, apb_clk_freq: MegahertzU32) -> Self {
+    pub fn new(timg: T, apb_clk_freq: HertzU32) -> Self {
         // TODO: this currently assumes APB_CLK is being used, as we don't yet have a
         //       way to select the XTAL_CLK.
         Self { timg, apb_clk_freq }
@@ -438,12 +438,12 @@ where
 fn timeout_to_ticks<T, F>(timeout: T, clock: F, divider: u32) -> u64
 where
     T: Into<MicrosDurationU64>,
-    F: Into<MegahertzU32>,
+    F: Into<HertzU32>,
 {
     let timeout: MicrosDurationU64 = timeout.into();
     let micros = timeout.to_micros();
 
-    let clock: MegahertzU32 = clock.into();
+    let clock: HertzU32 = clock.into();
 
     // TODO can we get this to not use doubles/floats
     let period = 1_000_000f64 / (clock.to_Hz() as f64 / divider as f64); // micros

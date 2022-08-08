@@ -13,7 +13,7 @@ use esp32_hal::{
     prelude::*,
     timer::{Timer, Timer0, TimerGroup},
     CpuControl,
-    RtcCntl,
+    Rtc,
 };
 use esp_println::println;
 use nb::block;
@@ -35,12 +35,12 @@ fn main() -> ! {
     let mut timer1 = timer_group1.timer0;
     let mut wdt1 = timer_group1.wdt;
 
-    let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
+    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
 
     // Disable MWDT and RWDT (Watchdog) flash boot protection
     wdt0.disable();
     wdt1.disable();
-    rtc_cntl.set_wdt_global_enable(false);
+    rtc.rwdt.disable();
 
     timer0.start(1u64.secs());
     timer1.start(500u64.millis());

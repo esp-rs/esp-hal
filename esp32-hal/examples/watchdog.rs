@@ -12,7 +12,7 @@ use esp32_hal::{
     pac::Peripherals,
     prelude::*,
     timer::TimerGroup,
-    RtcCntl,
+    Rtc,
     Serial,
 };
 use nb::block;
@@ -29,9 +29,9 @@ fn main() -> ! {
     let mut timer0 = timer_group0.timer0;
     let mut wdt = timer_group0.wdt;
     let mut serial0 = Serial::new(peripherals.UART0);
-    let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
+    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
 
-    rtc_cntl.set_wdt_global_enable(false);
+    rtc.rwdt.disable();
 
     wdt.start(2u64.secs());
     timer0.start(1u64.secs());

@@ -21,7 +21,7 @@ use esp32_hal::{
     utils::{smartLedAdapter, SmartLedsAdapter},
     Delay,
     PulseControl,
-    RtcCntl,
+    Rtc,
     IO,
 };
 #[allow(unused_imports)]
@@ -40,14 +40,14 @@ fn main() -> ! {
     let mut system = peripherals.DPORT.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
+    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let mut wdt = timer_group0.wdt;
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
     // Disable MWDT and RWDT (Watchdog) flash boot protection
     wdt.disable();
-    rtc_cntl.set_wdt_global_enable(false);
+    rtc.rwdt.disable();
 
     // Configure RMT peripheral globally
     let pulse = PulseControl::new(peripherals.RMT, &mut system.peripheral_clock_control).unwrap();

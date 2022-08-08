@@ -11,7 +11,7 @@ use esp32s3_hal::{
     pac::Peripherals,
     prelude::*,
     timer::TimerGroup,
-    RtcCntl,
+    Rtc,
     Serial,
 };
 use nb::block;
@@ -27,12 +27,12 @@ fn main() -> ! {
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let mut timer0 = timer_group0.timer0;
     let mut wdt = timer_group0.wdt;
-    let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
+    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
     let mut serial0 = Serial::new(peripherals.UART0);
 
     // Disable MWDT and RWDT (Watchdog) flash boot protection
     wdt.disable();
-    rtc_cntl.set_wdt_global_enable(false);
+    rtc.rwdt.disable();
 
     timer0.start(1u64.secs());
 

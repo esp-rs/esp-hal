@@ -15,7 +15,7 @@ use esp32s2_hal::{
     systimer::{Alarm, SystemTimer, Target},
     timer::TimerGroup,
     Delay,
-    RtcCntl,
+    Rtc,
 };
 use panic_halt as _;
 use xtensa_lx::mutex::{CriticalSectionMutex, Mutex};
@@ -36,11 +36,11 @@ fn main() -> ! {
 
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let mut wdt = timer_group0.wdt;
-    let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
+    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
 
     // Disable MWDT and RWDT (Watchdog) flash boot protection
     wdt.disable();
-    rtc_cntl.set_wdt_global_enable(false);
+    rtc.rwdt.disable();
 
     let syst = SystemTimer::new(peripherals.SYSTIMER);
 

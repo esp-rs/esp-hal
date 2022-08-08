@@ -20,7 +20,7 @@ use esp32c3_hal::{
     utils::{smartLedAdapter, SmartLedsAdapter},
     Delay,
     PulseControl,
-    RtcCntl,
+    Rtc,
     IO,
 };
 #[allow(unused_imports)]
@@ -39,14 +39,14 @@ fn main() -> ! {
     let mut system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
+    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let mut wdt0 = timer_group0.wdt;
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
     // Disable watchdogs
-    rtc_cntl.set_super_wdt_enable(false);
-    rtc_cntl.set_wdt_global_enable(false);
+    rtc.swd.disable();
+    rtc.rwdt.disable();
     wdt0.disable();
 
     // Configure RMT peripheral globally
