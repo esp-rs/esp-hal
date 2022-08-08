@@ -34,6 +34,8 @@ use fugit::HertzU32;
 
 /// The size of the FIFO buffer for SPI
 const FIFO_SIZE: usize = 64;
+/// Empty byte to write out on SPI while reading
+const EMPTY_WRITE_STUFFING: u8 = 0u8;
 
 #[derive(Debug, Clone, Copy)]
 pub enum SpiMode {
@@ -231,7 +233,7 @@ mod ehal1 {
     where
         T: Instance,
     {
-        /// See also: [`send_bytes`].
+        /// See also: [`write_bytes`].
         fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
             self.spi.write_bytes(words)
         }
@@ -292,7 +294,7 @@ mod ehal1 {
                 SpiBusFlush::flush(self)?;
 
                 if read_inc > 0 {
-                    SpiBusRead::read(self, &mut read[read_from..read_to])?;
+                    self.spi.read_bytes_from_fifo(&mut read[read_from..read_to])?;
                 }
 
                 write_from = write_to;
@@ -311,7 +313,7 @@ mod ehal1 {
             for chunk in words.chunks_mut(FIFO_SIZE) {
                 SpiBusWrite::write(self, chunk)?;
                 SpiBusFlush::flush(self)?;
-                SpiBusRead::read(self, chunk)?;
+                self.spi.read_bytes_from_fifo(chunk)?;
             }
             Ok(())
         }
@@ -588,12 +590,29 @@ pub trait Instance {
         Ok(())
     }
 
-    /// Read received bytes from SPI.
+    /// Read bytes from SPI.
+    ///
+    /// Sends out a stuffing byte for every byte to read. This function doesn't perform flushing.
+    /// If you want to read the response to something you have written before, consider using
+    /// [`transfer`] instead.
+    fn read_bytes(&mut self, words: &mut [u8]) -> Result<(), Infallible> {
+        let empty_array = [EMPTY_WRITE_STUFFING; FIFO_SIZE];
+
+        for chunk in words.chunks_mut(FIFO_SIZE) {
+            self.write_bytes(&empty_array[0..chunk.len()])?;
+            self.flush()?;
+            self.read_bytes_from_fifo(chunk)?;
+        }
+        Ok(())
+    }
+
+
+    /// Read received bytes from SPI FIFO.
     ///
     /// Copies the contents of the SPI receive FIFO into `words`. This function doesn't perform
     /// flushing. If you want to read the response to something you have written before, consider
     /// using [`transfer`] instead.
-    fn read_bytes(&mut self, words: &mut [u8]) -> Result<(), Infallible> {
+    fn read_bytes_from_fifo(&mut self, words: &mut [u8]) -> Result<(), Infallible> {
         let reg_block = self.register_block();
 
         for chunk in words.chunks_mut(FIFO_SIZE) {
@@ -620,7 +639,7 @@ pub trait Instance {
         for chunk in words.chunks_mut(FIFO_SIZE) {
             self.write_bytes(chunk)?;
             self.flush()?;
-            self.read_bytes(chunk)?;
+            self.read_bytes_from_fifo(chunk)?;
         }
 
         Ok(words)
