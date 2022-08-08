@@ -9,18 +9,18 @@
 use esp32s3_hal::{
     clock::ClockControl,
     gpio::IO,
+    ledc::{
+        channel::{self, ChannelIFace},
+        timer::{self, TimerIFace},
+        LSGlobalClkSource,
+        LowSpeed,
+        LEDC,
+    },
     pac::Peripherals,
     prelude::*,
     timer::TimerGroup,
     RtcCntl,
     Serial,
-};
-use esp_hal_common::ledc::{
-    channel::{self, ChannelIFace},
-    timer::{self, TimerIFace},
-    LSGlobalClkSource,
-    LowSpeed,
-    LEDC,
 };
 use esp_println;
 use panic_halt as _;
@@ -51,15 +51,17 @@ fn main() -> ! {
 
     ledc.set_global_slow_clock(LSGlobalClkSource::APBClk);
 
-    let mut lstimer0 = ledc.get_timer::<LowSpeed>(timer::Number::Timer2);
+    let mut lstimer0 = ledc.get_timer::<LowSpeed>(timer::Number::Timer0);
 
-    lstimer0
-        .configure(timer::config::Config {
-            duty: timer::config::Duty::Duty5Bit,
-            clock_source: timer::LSClockSource::APBClk,
-            frequency: 24u32.kHz(),
-        })
-        .unwrap();
+    let res = lstimer0.configure(timer::config::Config {
+        duty: timer::config::Duty::Duty5Bit,
+        clock_source: timer::LSClockSource::APBClk,
+        frequency: 24u32.kHz(),
+    });
+
+    if res.is_err() {
+        esp_println::println!("oh no!");
+    }
 
     let mut channel0 = ledc.get_channel(channel::Number::Channel0, led);
     channel0

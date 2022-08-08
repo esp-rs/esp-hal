@@ -13,10 +13,9 @@ use esp32c3_hal::{
     interrupt,
     pac::{self, Peripherals, TIMG0, TIMG1},
     prelude::*,
-    timer::{Timer0, TimerGroup},
+    timer::{Timer, Timer0, TimerGroup},
     RtcCntl,
 };
-use esp_hal_common::Timer;
 use panic_halt as _;
 use riscv_rt::entry;
 

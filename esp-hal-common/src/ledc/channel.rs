@@ -137,7 +137,7 @@ where
 #[cfg(feature = "esp32")]
 /// Macro to configure channel parameters in hw
 macro_rules! set_channel {
-    ($self: ident, $speed: ident, $num: literal, $channel_number: ident) => {
+    ($self: ident, $speed: ident, $num: literal, $timer_number: ident) => {
         paste! {
             $self.ledc.[<$speed sch $num _hpoint>]
                 .write(|w| unsafe { w.[<hpoint>]().bits(0x0) });
@@ -145,7 +145,7 @@ macro_rules! set_channel {
                 w.[<sig_out_en>]()
                     .set_bit()
                     .[<timer_sel>]()
-                    .bits($channel_number)
+                    .bits($timer_number)
             });
             $self.ledc.[<$speed sch $num _conf1>].write(|w| unsafe {
                 w.[<duty_start>]()
@@ -166,7 +166,7 @@ macro_rules! set_channel {
 #[cfg(not(feature = "esp32"))]
 /// Macro to configure channel parameters in hw
 macro_rules! set_channel {
-    ($self: ident, $speed: ident, $num: literal, $channel_number: ident) => {
+    ($self: ident, $speed: ident, $num: literal, $timer_number: ident) => {
         paste! {
             $self.ledc.[<ch $num _hpoint>]
                 .write(|w| unsafe { w.[<hpoint>]().bits(0x0) });
@@ -174,7 +174,7 @@ macro_rules! set_channel {
                 w.[<sig_out_en>]()
                     .set_bit()
                     .[<timer_sel>]()
-                    .bits($channel_number)
+                    .bits($timer_number)
             });
             $self.ledc.[<ch $num _conf1>].write(|w| unsafe {
                 w.[<duty_start>]()
@@ -256,45 +256,45 @@ where
 
             self.output_pin.set_to_push_pull_output();
 
-            let channel_number = timer.get_number() as u8;
+            let timer_number = timer.get_number() as u8;
             match self.number {
                 Number::Channel0 => {
-                    set_channel!(self, h, 0, channel_number);
+                    set_channel!(self, h, 0, timer_number);
                     self.output_pin
                         .connect_peripheral_to_output(OutputSignal::LEDC_HS_SIG0);
                 }
                 Number::Channel1 => {
-                    set_channel!(self, h, 1, channel_number);
+                    set_channel!(self, h, 1, timer_number);
                     self.output_pin
                         .connect_peripheral_to_output(OutputSignal::LEDC_HS_SIG1);
                 }
                 Number::Channel2 => {
-                    set_channel!(self, h, 2, channel_number);
+                    set_channel!(self, h, 2, timer_number);
                     self.output_pin
                         .connect_peripheral_to_output(OutputSignal::LEDC_HS_SIG2);
                 }
                 Number::Channel3 => {
-                    set_channel!(self, h, 3, channel_number);
+                    set_channel!(self, h, 3, timer_number);
                     self.output_pin
                         .connect_peripheral_to_output(OutputSignal::LEDC_HS_SIG3);
                 }
                 Number::Channel4 => {
-                    set_channel!(self, h, 4, channel_number);
+                    set_channel!(self, h, 4, timer_number);
                     self.output_pin
                         .connect_peripheral_to_output(OutputSignal::LEDC_HS_SIG4);
                 }
                 Number::Channel5 => {
-                    set_channel!(self, h, 5, channel_number);
+                    set_channel!(self, h, 5, timer_number);
                     self.output_pin
                         .connect_peripheral_to_output(OutputSignal::LEDC_HS_SIG5);
                 }
                 Number::Channel6 => {
-                    set_channel!(self, h, 6, channel_number);
+                    set_channel!(self, h, 6, timer_number);
                     self.output_pin
                         .connect_peripheral_to_output(OutputSignal::LEDC_HS_SIG6);
                 }
                 Number::Channel7 => {
-                    set_channel!(self, h, 7, channel_number);
+                    set_channel!(self, h, 7, timer_number);
                     self.output_pin
                         .connect_peripheral_to_output(OutputSignal::LEDC_HS_SIG7);
                 }
@@ -335,54 +335,54 @@ where
 
             self.output_pin.set_to_push_pull_output();
 
-            let channel_number = timer.get_number() as u8;
+            let timer_number = timer.get_number() as u8;
             match self.number {
                 Number::Channel0 => {
-                    set_channel!(self, l, 0, channel_number);
+                    set_channel!(self, l, 0, timer_number);
                     update_channel!(self, 0);
                     self.output_pin
                         .connect_peripheral_to_output(OutputSignal::LEDC_LS_SIG0);
                 }
                 Number::Channel1 => {
-                    set_channel!(self, l, 1, channel_number);
+                    set_channel!(self, l, 1, timer_number);
                     update_channel!(self, 1);
                     self.output_pin
                         .connect_peripheral_to_output(OutputSignal::LEDC_LS_SIG1);
                 }
                 Number::Channel2 => {
-                    set_channel!(self, l, 2, channel_number);
+                    set_channel!(self, l, 2, timer_number);
                     update_channel!(self, 2);
                     self.output_pin
                         .connect_peripheral_to_output(OutputSignal::LEDC_LS_SIG2);
                 }
                 Number::Channel3 => {
-                    set_channel!(self, l, 3, channel_number);
+                    set_channel!(self, l, 3, timer_number);
                     update_channel!(self, 3);
                     self.output_pin
                         .connect_peripheral_to_output(OutputSignal::LEDC_LS_SIG3);
                 }
                 Number::Channel4 => {
-                    set_channel!(self, l, 4, channel_number);
+                    set_channel!(self, l, 4, timer_number);
                     update_channel!(self, 4);
                     self.output_pin
                         .connect_peripheral_to_output(OutputSignal::LEDC_LS_SIG4);
                 }
                 Number::Channel5 => {
-                    set_channel!(self, l, 5, channel_number);
+                    set_channel!(self, l, 5, timer_number);
                     update_channel!(self, 5);
                     self.output_pin
                         .connect_peripheral_to_output(OutputSignal::LEDC_LS_SIG5);
                 }
                 #[cfg(not(feature = "esp32c3"))]
                 Number::Channel6 => {
-                    set_channel!(self, l, 6, channel_number);
+                    set_channel!(self, l, 6, timer_number);
                     update_channel!(self, 6);
                     self.output_pin
                         .connect_peripheral_to_output(OutputSignal::LEDC_LS_SIG6);
                 }
                 #[cfg(not(feature = "esp32c3"))]
                 Number::Channel7 => {
-                    set_channel!(self, l, 7, channel_number);
+                    set_channel!(self, l, 7, timer_number);
                     update_channel!(self, 7);
                     self.output_pin
                         .connect_peripheral_to_output(OutputSignal::LEDC_LS_SIG7);

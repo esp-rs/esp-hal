@@ -9,18 +9,18 @@
 use esp32s2_hal::{
     clock::ClockControl,
     gpio::IO,
+    ledc::{
+        channel::{self, ChannelIFace},
+        timer::{self, TimerIFace},
+        LSGlobalClkSource,
+        LowSpeed,
+        LEDC,
+    },
     pac::Peripherals,
     prelude::*,
     timer::TimerGroup,
     RtcCntl,
     Serial,
-};
-use esp_hal_common::ledc::{
-    channel::{self, ChannelIFace},
-    timer::{self, TimerIFace},
-    LSGlobalClkSource,
-    LowSpeed,
-    LEDC,
 };
 use esp_println;
 use panic_halt as _;
