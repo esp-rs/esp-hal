@@ -552,7 +552,7 @@ macro_rules! impl_input {
                 paste! {
                     iomux.$iomux_reg.modify(|_, w| unsafe {
                         w.mcu_sel()
-                            .bits(2)
+                            .bits(AlternateFunction::$gpio_function as u8)
                             .fun_ie()
                             .set_bit()
                             .fun_wpd()
