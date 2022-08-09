@@ -15,9 +15,8 @@ use esp32c3_hal::{
     interrupt,
     pac::{self, Peripherals},
     prelude::*,
-    Rtc,
+    Rtc, Rwdt,
 };
-use esp_hal_common::Rwdt;
 use panic_halt as _;
 use riscv_rt::entry;
 

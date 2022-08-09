@@ -26,6 +26,7 @@ pub use esp_hal_common::{
     PulseControl,
     Rng,
     Rtc,
+    Rwdt,
     Serial,
     UsbSerialJtag,
 };
