@@ -8,7 +8,12 @@
 use core::fmt::Write;
 
 use esp32c3_hal::{
-    clock::ClockControl, pac::Peripherals, prelude::*, timer::TimerGroup, Rtc, Serial,
+    clock::ClockControl,
+    pac::Peripherals,
+    prelude::*,
+    timer::TimerGroup,
+    Rtc,
+    Serial,
 };
 use nb::block;
 use panic_halt as _;

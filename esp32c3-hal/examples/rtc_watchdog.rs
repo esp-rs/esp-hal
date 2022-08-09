@@ -1,7 +1,7 @@
 //! This demos the RTC Watchdog Timer (RWDT).
-//! The RWDT is initially configured to trigger an interrupt after a given timeout.
-//! Then, upon expiration, the RWDT is restarted and then reconfigured to reset both the main
-//! system and the RTC.
+//! The RWDT is initially configured to trigger an interrupt after a given
+//! timeout. Then, upon expiration, the RWDT is restarted and then reconfigured
+//! to reset both the main system and the RTC.
 
 #![no_std]
 #![no_main]
@@ -9,13 +9,13 @@
 use core::cell::RefCell;
 
 use bare_metal::Mutex;
-
 use esp32c3_hal::{
     clock::ClockControl,
     interrupt,
     pac::{self, Peripherals},
     prelude::*,
-    Rtc, Rwdt,
+    Rtc,
+    Rwdt,
 };
 use panic_halt as _;
 use riscv_rt::entry;
