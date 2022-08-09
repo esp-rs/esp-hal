@@ -65,9 +65,9 @@
 //! // Create pulse sequence
 //! let mut seq = [PulseCode {
 //!     level1: true,
-//!     length1: 1,
+//!     length1: 10u32.nanos(),
 //!     level2: false,
-//!     length2: 9,
+//!     length2: 90u32.nanos(),
 //! }; 288];
 //!
 //! // Send sequence
@@ -284,13 +284,6 @@ macro_rules! channel_instance {
                             // Configure memory block size
                             w.mem_size()
                                 .bits(1)
-                                // Set config bit
-                                .conf_update()
-                                .set_bit()
-                                // Enable wrap mode (this is enabled globally for
-                                // the ESP32 and ESP32-S2)
-                                .mem_tx_wrap_en()
-                                .set_bit()
                         });
                     }
                     else {
@@ -588,7 +581,7 @@ macro_rules! output_channel {
                     self.write_sequence(&mut sequence_iter, CHANNEL_RAM_SIZE);
                 } else {
                     // Write whole sequence to FIFO RAM
-                    self.write_sequence(&mut sequence_iter, CHANNEL_RAM_SIZE - 1);
+                    self.write_sequence(&mut sequence_iter, CHANNEL_RAM_SIZE);
                 }
 
                 // Clear the relevant interrupts
@@ -639,6 +632,19 @@ macro_rules! output_channel {
                     }
                 }
 
+                // always enable tx wrap
+                #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+                unsafe { &*RMT::PTR }.ch_tx_conf0[$num].modify(|_, w| {
+                    w.mem_tx_wrap_en()
+                        .set_bit()
+                });
+
+                // apply configuration updates
+                #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+                unsafe { &*RMT::PTR }.ch_tx_conf0[$num].modify(|_, w| {
+                    w.conf_update()
+                        .set_bit()
+                });
 
                 // Depending on the variant, other registers have to be used here
                 cfg_if::cfg_if! {
@@ -929,7 +935,7 @@ macro_rules! rmt {
             self.reg.int_ena.write(|w| unsafe { w.bits(0) });
 
             // Clear all interrupts
-            self.reg.int_clr.write(|w| unsafe { w.bits(0) });
+            self.reg.int_clr.write(|w| unsafe { w.bits(0xffffffff) });
 
             Ok(())
         }

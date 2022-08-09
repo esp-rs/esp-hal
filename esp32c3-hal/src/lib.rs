@@ -4,8 +4,29 @@ use core::arch::global_asm;
 
 pub use embedded_hal as ehal;
 pub use esp_hal_common::{
-    clock, efuse, gpio as gpio_types, i2c, interrupt, ledc, macros, pac, prelude, pulse_control,
-    serial, spi, system, systimer, timer, utils, Cpu, Delay, PulseControl, Rng, Rtc, Rwdt, Serial,
+    clock,
+    efuse,
+    gpio as gpio_types,
+    i2c,
+    interrupt,
+    ledc,
+    macros,
+    pac,
+    prelude,
+    pulse_control,
+    serial,
+    spi,
+    system,
+    systimer,
+    timer,
+    utils,
+    Cpu,
+    Delay,
+    PulseControl,
+    Rng,
+    Rtc,
+    Rwdt,
+    Serial,
     UsbSerialJtag,
 };
 #[cfg(feature = "direct-boot")]
