@@ -173,6 +173,8 @@ pub trait OutputPin: Pin {
         force_via_gpio_mux: bool,
     ) -> &mut Self;
 
+    fn disconnect_peripheral_from_output(&mut self) -> &mut Self;
+
     fn internal_pull_up(&mut self, on: bool) -> &mut Self;
 
     fn internal_pull_down(&mut self, on: bool) -> &mut Self;
@@ -971,6 +973,19 @@ macro_rules! impl_output {
                         .inv_sel().bit(invert)
                         .oen_sel().bit(enable_from_gpio)
                         .oen_inv_sel().bit(invert_enable)
+                });
+
+                self
+            }
+
+            fn disconnect_peripheral_from_output(
+                &mut self,
+            ) -> &mut Self {
+                // Reset this GPIO to plain GPIO
+                self.set_alternate_function(AlternateFunction::Function2);
+
+                unsafe { &*GPIO::PTR }.func_out_sel_cfg[$pin_num].modify(|_, w| unsafe {
+                    w.out_sel().bits(OutputSignal::GPIO as OutputSignalType)
                 });
 
                 self
