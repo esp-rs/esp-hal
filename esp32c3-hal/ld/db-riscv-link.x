@@ -86,14 +86,6 @@ SECTIONS
   } > REGION_DATA
 
   _data_size = _edata - _sdata + 8;
-  .bss (NOLOAD) :
-  {
-    _sbss = .;
-    *(.sbss .sbss.* .bss .bss.*);
-    . = ALIGN(4);
-    _ebss = .;
-  } > REGION_BSS
-
   .rwtext ORIGIN(REGION_RWTEXT) + _data_size : AT(_text_size + _rodata_size + _data_size){
     _srwtext = .;
     *(.rwtext);
@@ -101,6 +93,22 @@ SECTIONS
     _erwtext = .;
   } > REGION_RWTEXT
   _rwtext_size = _erwtext - _srwtext + 8;
+
+  .rwtext.dummy (NOLOAD):
+  {
+    /* This section is required to skip .rwtext area because REGION_RWTEXT
+     * and REGION_BSS reflect the same address space on different buses.
+     */
+    . = ORIGIN(REGION_BSS) + _rwtext_size;
+  } > REGION_BSS
+
+  .bss (NOLOAD) :
+  {
+    _sbss = .;
+    *(.sbss .sbss.* .bss .bss.*);
+    . = ALIGN(4);
+    _ebss = .;
+  } > REGION_BSS
 
   /* fictitious region that represents the memory available for the heap */
   .heap (NOLOAD) :
