@@ -140,6 +140,10 @@ pub trait InputPin: Pin {
         force_via_gpio_mux: bool,
     ) -> &mut Self;
 
+    /// Remove a connected `signal` from this input pin.
+    ///
+    /// Clears the entry in the GPIO matrix / IO mux that associates this input pin with the given
+    /// [input `signal`](`InputSignal`). Any other connected signals remain intact.
     fn disconnect_input_from_peripheral(&mut self, signal: InputSignal) -> &mut Self;
 }
 
@@ -175,6 +179,11 @@ pub trait OutputPin: Pin {
         force_via_gpio_mux: bool,
     ) -> &mut Self;
 
+    /// Remove this output pin from a connected [signal](`InputSignal`).
+    ///
+    /// Clears the entry in the GPIO matrix / IO mux that associates this output pin with a
+    /// previously connected [signal](`InputSignal`). Any other outputs connected to the signal
+    /// remain intact.
     fn disconnect_peripheral_from_output(&mut self) -> &mut Self;
 
     fn internal_pull_up(&mut self, on: bool) -> &mut Self;
