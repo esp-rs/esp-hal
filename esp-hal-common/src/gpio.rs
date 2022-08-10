@@ -139,6 +139,8 @@ pub trait InputPin: Pin {
         invert: bool,
         force_via_gpio_mux: bool,
     ) -> &mut Self;
+
+    fn disconnect_input_from_peripheral(&mut self, signal: InputSignal) -> &mut Self;
 }
 
 pub trait OutputPin: Pin {
@@ -634,6 +636,17 @@ macro_rules! impl_input {
                             .bits($pin_num)
                     });
                 }
+                self
+            }
+
+            fn disconnect_input_from_peripheral(&mut self, signal: InputSignal) -> &mut Self {
+                // Reset this GPIO to plain GPIO
+                self.set_alternate_function(AlternateFunction::Function2);
+
+                unsafe { &*GPIO::PTR }.func_in_sel_cfg[signal as usize].modify(|_, w| unsafe {
+                    w.sel().clear_bit()
+                });
+
                 self
             }
         }
