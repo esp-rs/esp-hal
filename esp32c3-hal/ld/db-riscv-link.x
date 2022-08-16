@@ -52,8 +52,8 @@ SECTIONS
     KEEP(*(.init));
     KEEP(*(.init.rust));
     . = ALIGN(4);
-    (*(.trap));
-    (*(.trap.rust));
+    KEEP(*(.trap));
+    KEEP(*(.trap.rust));
 
     *(.text .text.*);
     _etext = .;
