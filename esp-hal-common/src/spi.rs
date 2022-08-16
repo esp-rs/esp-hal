@@ -556,7 +556,7 @@ pub trait Instance {
     // FIXME: See below.
     fn write_bytes(&mut self, words: &[u8]) -> Result<(), Infallible> {
         let reg_block = self.register_block();
-        let num_chuncks = words.len() / FIFO_SIZE;
+        let num_chunks = words.len() / FIFO_SIZE;
 
         // The fifo has a limited fixed size, so the data must be chunked and then transmitted
         for (i, chunk) in words.chunks(FIFO_SIZE).enumerate() {
@@ -573,7 +573,6 @@ pub trait Instance {
                     // why.
                     FIFO_SIZE / 4,
                 );
-                //fifo_ptr = fifo_ptr.offset(transfer_num_words as isize);
             }
 
             self.update();
@@ -583,7 +582,7 @@ pub trait Instance {
             // Wait for all chunks to complete except the last one.
             // The function is allowed to return before the bus is idle.
             // see [embedded-hal flushing](https://docs.rs/embedded-hal/1.0.0-alpha.8/embedded_hal/spi/blocking/index.html#flushing)
-            if i < num_chuncks {
+            if i < num_chunks {
                 while reg_block.cmd.read().usr().bit_is_set() {
                     // wait
                 }
