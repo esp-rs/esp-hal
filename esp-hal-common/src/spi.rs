@@ -33,9 +33,10 @@ use core::convert::Infallible;
 use fugit::HertzU32;
 
 /// The size of the FIFO buffer for SPI
+#[cfg(not(feature = "esp32s2"))]
 const FIFO_SIZE: usize = 64;
-/// Empty byte to write out on SPI while reading
-const EMPTY_WRITE_STUFFING: u8 = 0u8;
+#[cfg(feature = "esp32s2")]
+const FIFO_SIZE: usize = 72;
 
 #[derive(Debug, Clone, Copy)]
 pub enum SpiMode {
