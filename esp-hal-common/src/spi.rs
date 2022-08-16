@@ -614,14 +614,27 @@ pub trait Instance {
     /// Copies the contents of the SPI receive FIFO into `words`. This function doesn't perform
     /// flushing. If you want to read the response to something you have written before, consider
     /// using [`transfer`] instead.
+    // FIXME: Using something like `core::slice::from_raw_parts` and `copy_from_slice` on the
+    // receive registers works only for the esp32 and esp32c3 varaints. The reason for this is
+    // unknown.
     fn read_bytes_from_fifo(&mut self, words: &mut [u8]) -> Result<(), Infallible> {
         let reg_block = self.register_block();
 
         for chunk in words.chunks_mut(FIFO_SIZE) {
-            // Beginning of reception buffer
-            let fifo_ptr = reg_block.w0.as_ptr() as *const u8;
-            let raw_slice = unsafe { core::slice::from_raw_parts::<u8>(fifo_ptr, chunk.len()) };
-            chunk.copy_from_slice(raw_slice);
+            self.configure_datalen(chunk.len() as u32 * 8);
+
+            let mut fifo_ptr = reg_block.w0.as_ptr();
+            for index in (0..chunk.len()).step_by(4) {
+                let reg_val = unsafe { *fifo_ptr };
+                let bytes = reg_val.to_le_bytes();
+
+                let len = usize::min(chunk.len(), index + 4) - index;
+                chunk[index..(index + len)].clone_from_slice(&bytes[0..len]);
+
+                unsafe {
+                    fifo_ptr = fifo_ptr.offset(1);
+                };
+            }
         }
 
         Ok(())
