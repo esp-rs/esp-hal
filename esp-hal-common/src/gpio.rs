@@ -139,6 +139,12 @@ pub trait InputPin: Pin {
         invert: bool,
         force_via_gpio_mux: bool,
     ) -> &mut Self;
+
+    /// Remove a connected `signal` from this input pin.
+    ///
+    /// Clears the entry in the GPIO matrix / IO mux that associates this input pin with the given
+    /// [input `signal`](`InputSignal`). Any other connected signals remain intact.
+    fn disconnect_input_from_peripheral(&mut self, signal: InputSignal) -> &mut Self;
 }
 
 pub trait OutputPin: Pin {
@@ -172,6 +178,13 @@ pub trait OutputPin: Pin {
         enable_from_gpio: bool,
         force_via_gpio_mux: bool,
     ) -> &mut Self;
+
+    /// Remove this output pin from a connected [signal](`InputSignal`).
+    ///
+    /// Clears the entry in the GPIO matrix / IO mux that associates this output pin with a
+    /// previously connected [signal](`InputSignal`). Any other outputs connected to the signal
+    /// remain intact.
+    fn disconnect_peripheral_from_output(&mut self) -> &mut Self;
 
     fn internal_pull_up(&mut self, on: bool) -> &mut Self;
 
@@ -634,6 +647,17 @@ macro_rules! impl_input {
                 }
                 self
             }
+
+            fn disconnect_input_from_peripheral(&mut self, signal: InputSignal) -> &mut Self {
+                // Reset this GPIO to plain GPIO
+                self.set_alternate_function(AlternateFunction::$gpio_function);
+
+                unsafe { &*GPIO::PTR }.func_in_sel_cfg[signal as usize].modify(|_, w| unsafe {
+                    w.sel().clear_bit()
+                });
+
+                self
+            }
         }
 
         impl<MODE> Pin for $pxi<MODE> {
@@ -971,6 +995,19 @@ macro_rules! impl_output {
                         .inv_sel().bit(invert)
                         .oen_sel().bit(enable_from_gpio)
                         .oen_inv_sel().bit(invert_enable)
+                });
+
+                self
+            }
+
+            fn disconnect_peripheral_from_output(
+                &mut self,
+            ) -> &mut Self {
+                // Reset this GPIO to plain GPIO
+                self.set_alternate_function(AlternateFunction::$gpio_function);
+
+                unsafe { &*GPIO::PTR }.func_out_sel_cfg[$pin_num].modify(|_, w| unsafe {
+                    w.out_sel().bits(OutputSignal::GPIO as OutputSignalType)
                 });
 
                 self
