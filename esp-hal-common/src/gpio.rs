@@ -650,7 +650,7 @@ macro_rules! impl_input {
 
             fn disconnect_input_from_peripheral(&mut self, signal: InputSignal) -> &mut Self {
                 // Reset this GPIO to plain GPIO
-                self.set_alternate_function(AlternateFunction::Function2);
+                self.set_alternate_function(AlternateFunction::$gpio_function);
 
                 unsafe { &*GPIO::PTR }.func_in_sel_cfg[signal as usize].modify(|_, w| unsafe {
                     w.sel().clear_bit()
@@ -1004,7 +1004,7 @@ macro_rules! impl_output {
                 &mut self,
             ) -> &mut Self {
                 // Reset this GPIO to plain GPIO
-                self.set_alternate_function(AlternateFunction::Function2);
+                self.set_alternate_function(AlternateFunction::$gpio_function);
 
                 unsafe { &*GPIO::PTR }.func_out_sel_cfg[$pin_num].modify(|_, w| unsafe {
                     w.out_sel().bits(OutputSignal::GPIO as OutputSignalType)
