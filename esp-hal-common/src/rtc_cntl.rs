@@ -508,7 +508,7 @@ impl WatchdogDisable for Rwdt {
 
         self.set_write_protection(false);
 
-        rtc_cntl.wdtconfig0.modify(|_, w| w.wdt_en().clear_bit());
+        rtc_cntl.wdtconfig0.modify(|_, w| w.wdt_en().clear_bit().wdt_flashboot_mod_en().clear_bit());
 
         self.set_write_protection(true);
     }
