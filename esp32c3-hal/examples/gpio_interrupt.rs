@@ -8,7 +8,7 @@
 
 use core::cell::RefCell;
 
-use bare_metal::Mutex;
+use critical_section::Mutex;
 use esp32c3_hal::{
     clock::ClockControl,
     gpio::{Gpio9, IO},
@@ -71,10 +71,8 @@ fn main() -> ! {
 
 #[interrupt]
 fn GPIO() {
-    riscv::interrupt::free(|cs| unsafe {
-        let mut button = BUTTON.borrow(*cs).borrow_mut();
-        let button = button.as_mut().unwrap();
+    critical_section::with(|cs| unsafe {
         esp_println::println!("GPIO interrupt");
-        button.clear_interrupt();
+        BUTTON.borrow_ref_mut(cs).as_mut().unwrap().clear_interrupt();
     });
 }

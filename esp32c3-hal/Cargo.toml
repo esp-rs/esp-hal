@@ -24,7 +24,6 @@ categories = [
 ]
 
 [dependencies]
-bare-metal     = "1.0"
 embedded-hal   = { version = "0.2", features = ["unproven"] }
 embedded-hal-1 = { package = "embedded-hal", version = "=1.0.0-alpha.8" }
 r0             = "1.0"
@@ -41,6 +40,7 @@ panic-halt        = "0.2"
 ssd1306           = "0.7"
 smart-leds        = "0.3"
 esp-println       = { version = "0.2.0", features = ["esp32c3"] }
+critical-section = "1"
 
 [features]
 default     = ["rt", "vectored"]

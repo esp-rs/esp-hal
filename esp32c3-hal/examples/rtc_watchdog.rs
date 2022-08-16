@@ -8,7 +8,7 @@
 
 use core::cell::RefCell;
 
-use bare_metal::Mutex;
+use critical_section::Mutex;
 use esp32c3_hal::{
     clock::ClockControl,
     interrupt,
@@ -39,7 +39,7 @@ fn main() -> ! {
 
     interrupt::enable(pac::Interrupt::RTC_CORE, interrupt::Priority::Priority1).unwrap();
 
-    riscv::interrupt::free(|_cs| unsafe {
+    critical_section::with(|_| unsafe {
         RWDT.get_mut().replace(Some(rtc.rwdt));
     });
 
@@ -52,10 +52,10 @@ fn main() -> ! {
 
 #[interrupt]
 fn RTC_CORE() {
-    riscv::interrupt::free(|cs| unsafe {
+    critical_section::with(|cs| unsafe {
         esp_println::println!("RWDT Interrupt");
 
-        let mut rwdt = RWDT.borrow(*cs).borrow_mut();
+        let mut rwdt = RWDT.borrow_ref_mut(cs);
         let rwdt = rwdt.as_mut().unwrap();
 
         rwdt.clear_interrupt();

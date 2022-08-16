@@ -7,7 +7,7 @@
 
 use core::{cell::RefCell, fmt::Write};
 
-use bare_metal::Mutex;
+use critical_section::Mutex;
 use esp32c3_hal::{
     clock::ClockControl,
     interrupt,
@@ -68,11 +68,8 @@ fn main() -> ! {
     }
 
     loop {
-        riscv::interrupt::free(|cs| unsafe {
-            let mut serial = SERIAL.borrow(*cs).borrow_mut();
-            let serial = serial.as_mut().unwrap();
-
-            writeln!(serial, "Hello World! Send a single `#` character or send at least 30 characters and see the interrupts trigger.").ok();
+        critical_section::with(|cs| unsafe {
+            writeln!(SERIAL.borrow_ref_mut(cs).as_mut().unwrap(), "Hello World! Send a single `#` character or send at least 30 characters and see the interrupts trigger.").ok();
         });
 
         block!(timer0.wait()).unwrap();
@@ -81,8 +78,8 @@ fn main() -> ! {
 
 #[interrupt]
 fn UART0() {
-    riscv::interrupt::free(|cs| unsafe {
-        let mut serial = SERIAL.borrow(*cs).borrow_mut();
+    critical_section::with(|cs| unsafe {
+        let mut serial = SERIAL.borrow_ref_mut(cs);
         let serial = serial.as_mut().unwrap();
 
         let mut cnt = 0;

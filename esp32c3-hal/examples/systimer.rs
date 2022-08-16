@@ -6,7 +6,7 @@
 
 use core::cell::RefCell;
 
-use bare_metal::Mutex;
+use critical_section::Mutex;
 use esp32c3_hal::{
     clock::ClockControl,
     interrupt,
@@ -14,7 +14,6 @@ use esp32c3_hal::{
     prelude::*,
     systimer::{Alarm, SystemTimer, Target},
     timer::TimerGroup,
-    Cpu,
     Rtc,
 };
 use panic_halt as _;
@@ -75,7 +74,7 @@ fn main() -> ! {
     )
     .unwrap();
 
-    riscv::interrupt::free(|_cs| unsafe {
+    critical_section::with(|_| unsafe {
         ALARM0.get_mut().replace(Some(alarm0));
         ALARM1.get_mut().replace(Some(alarm1));
         ALARM2.get_mut().replace(Some(alarm2));
@@ -90,39 +89,24 @@ fn main() -> ! {
 
 #[interrupt]
 fn SYSTIMER_TARGET0() {
-    riscv::interrupt::free(|cs| unsafe {
+    critical_section::with(|cs| unsafe {
         esp_println::println!("Interrupt 1 = {}", SystemTimer::now());
-
-        let mut alarm = ALARM0.borrow(*cs).borrow_mut();
-        let alarm = alarm.as_mut().unwrap();
-
-        interrupt::clear(Cpu::ProCpu, interrupt::CpuInterrupt::Interrupt1);
-        alarm.clear_interrupt();
+        ALARM0.borrow_ref_mut(cs).as_mut().unwrap().clear_interrupt();
     });
 }
 
 #[interrupt]
 fn SYSTIMER_TARGET1() {
-    riscv::interrupt::free(|cs| unsafe {
+    critical_section::with(|cs| unsafe {
         esp_println::println!("Interrupt 2 = {}", SystemTimer::now());
-
-        let mut alarm = ALARM1.borrow(*cs).borrow_mut();
-        let alarm = alarm.as_mut().unwrap();
-
-        interrupt::clear(Cpu::ProCpu, interrupt::CpuInterrupt::Interrupt2);
-        alarm.clear_interrupt();
+        ALARM1.borrow_ref_mut(cs).as_mut().unwrap().clear_interrupt();
     });
 }
 
 #[interrupt]
 fn SYSTIMER_TARGET2() {
-    riscv::interrupt::free(|cs| unsafe {
+    critical_section::with(|cs| unsafe {
         esp_println::println!("Interrupt 3 = {}", SystemTimer::now());
-
-        let mut alarm = ALARM2.borrow(*cs).borrow_mut();
-        let alarm = alarm.as_mut().unwrap();
-
-        interrupt::clear(Cpu::ProCpu, interrupt::CpuInterrupt::Interrupt3);
-        alarm.clear_interrupt();
+        ALARM2.borrow_ref_mut(cs).as_mut().unwrap().clear_interrupt();
     });
 }
