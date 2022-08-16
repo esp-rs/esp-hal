@@ -1,7 +1,7 @@
 /* This memory map assumes the flash cache is on; 
    the blocks used are excluded from the various memory ranges 
    
-   see: https://github.com/espressif/esp-idf/blob/master/components/soc/src/esp32/soc_memory_layout.c
+   see: https://github.com/espressif/esp-idf/blob/5b1189570025ba027f2ff6c2d91f6ffff3809cc2/components/heap/port/esp32s2/memory_layout.c
    for details
    */
 
