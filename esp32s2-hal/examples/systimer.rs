@@ -6,6 +6,7 @@
 
 use core::cell::RefCell;
 
+use critical_section::Mutex;
 use esp32s2_hal::{
     clock::ClockControl,
     interrupt,
@@ -18,15 +19,14 @@ use esp32s2_hal::{
     Rtc,
 };
 use panic_halt as _;
-use xtensa_lx::mutex::{CriticalSectionMutex, Mutex};
 use xtensa_lx_rt::entry;
 
-static mut ALARM0: CriticalSectionMutex<RefCell<Option<Alarm<Target, 0>>>> =
-    CriticalSectionMutex::new(RefCell::new(None));
-static mut ALARM1: CriticalSectionMutex<RefCell<Option<Alarm<Target, 1>>>> =
-    CriticalSectionMutex::new(RefCell::new(None));
-static mut ALARM2: CriticalSectionMutex<RefCell<Option<Alarm<Target, 2>>>> =
-    CriticalSectionMutex::new(RefCell::new(None));
+static mut ALARM0: Mutex<RefCell<Option<Alarm<Target, 0>>>> =
+    Mutex::new(RefCell::new(None));
+static mut ALARM1: Mutex<RefCell<Option<Alarm<Target, 1>>>> =
+    Mutex::new(RefCell::new(None));
+static mut ALARM2: Mutex<RefCell<Option<Alarm<Target, 2>>>> =
+    Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
@@ -56,11 +56,11 @@ fn main() -> ! {
     alarm2.set_target(42_222_2220 * 2);
     alarm2.enable_interrupt();
 
-    unsafe {
-        (&ALARM0).lock(|data| (*data).replace(Some(alarm0)));
-        (&ALARM1).lock(|data| (*data).replace(Some(alarm1)));
-        (&ALARM2).lock(|data| (*data).replace(Some(alarm2)));
-    }
+    critical_section::with(|_| unsafe {
+        ALARM0.get_mut().replace(Some(alarm0));
+        ALARM1.get_mut().replace(Some(alarm1));
+        ALARM2.get_mut().replace(Some(alarm2));
+    });
 
     interrupt::enable(pac::Interrupt::SYSTIMER_TARGET0, Priority::Priority1).unwrap();
     interrupt::enable(pac::Interrupt::SYSTIMER_TARGET1, Priority::Priority2).unwrap();
@@ -78,38 +78,23 @@ fn main() -> ! {
 #[interrupt]
 fn SYSTIMER_TARGET0() {
     esp_println::println!("Interrupt lvl1 (alarm0)");
-
-    unsafe {
-        (&ALARM0).lock(|data| {
-            let mut alarm = data.borrow_mut();
-            let alarm = alarm.as_mut().unwrap();
-            alarm.clear_interrupt();
-        });
-    }
+    critical_section::with(|cs| unsafe {
+        ALARM0.borrow_ref_mut(cs).as_mut().unwrap().clear_interrupt()
+    });
 }
 
 #[interrupt]
 fn SYSTIMER_TARGET1() {
     esp_println::println!("Interrupt lvl2 (alarm1)");
-
-    unsafe {
-        (&ALARM1).lock(|data| {
-            let mut alarm = data.borrow_mut();
-            let alarm = alarm.as_mut().unwrap();
-            alarm.clear_interrupt();
-        });
-    }
+    critical_section::with(|cs| unsafe {
+        ALARM1.borrow_ref_mut(cs).as_mut().unwrap().clear_interrupt()
+    });
 }
 
 #[interrupt]
 fn SYSTIMER_TARGET2() {
     esp_println::println!("Interrupt lvl2 (alarm2)");
-
-    unsafe {
-        (&ALARM2).lock(|data| {
-            let mut alarm = data.borrow_mut();
-            let alarm = alarm.as_mut().unwrap();
-            alarm.clear_interrupt();
-        });
-    }
+    critical_section::with(|cs| unsafe {
+        ALARM2.borrow_ref_mut(cs).as_mut().unwrap().clear_interrupt()
+    });
 }
