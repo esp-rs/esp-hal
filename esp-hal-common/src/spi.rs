@@ -37,6 +37,8 @@ use fugit::HertzU32;
 const FIFO_SIZE: usize = 64;
 #[cfg(feature = "esp32s2")]
 const FIFO_SIZE: usize = 72;
+/// Padding byte for empty write transfers
+const EMPTY_WRITE_PAD: u8 = 0x00u8;
 
 #[derive(Debug, Clone, Copy)]
 pub enum SpiMode {
@@ -211,7 +213,6 @@ mod ehal1 {
     use embedded_hal_1::spi::blocking::{SpiBus, SpiBusFlush, SpiBusRead, SpiBusWrite};
     use embedded_hal_1::spi::nb::FullDuplex;
 
-    const EMPTY_WRITE_PAD: u8 = 0x00u8;
 
     impl<T> embedded_hal_1::spi::ErrorType for Spi<T> {
         type Error = Infallible;
@@ -597,7 +598,7 @@ pub trait Instance {
     /// If you want to read the response to something you have written before, consider using
     /// [`transfer`] instead.
     fn read_bytes(&mut self, words: &mut [u8]) -> Result<(), Infallible> {
-        let empty_array = [EMPTY_WRITE_STUFFING; FIFO_SIZE];
+        let empty_array = [EMPTY_WRITE_PAD; FIFO_SIZE];
 
         for chunk in words.chunks_mut(FIFO_SIZE) {
             self.write_bytes(&empty_array[0..chunk.len()])?;
