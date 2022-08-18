@@ -33,7 +33,7 @@ fn main() {
 
     // Only re-run the build script when memory.x is changed,
     // instead of when any part of the source code changes.
-    println!("cargo:rerun-if-changed=memory.x");
+    println!("cargo:rerun-if-changed=ld/memory.x");
 }
 
 #[cfg(feature = "direct-boot")]
@@ -69,5 +69,5 @@ fn main() {
 
     // Only re-run the build script when memory.x is changed,
     // instead of when any part of the source code changes.
-    println!("cargo:rerun-if-changed=memory.x");
+    println!("cargo:rerun-if-changed=ld/memory.x");
 }
