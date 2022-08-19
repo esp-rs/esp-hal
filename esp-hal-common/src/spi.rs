@@ -376,7 +376,8 @@ mod ehal1 {
             spi::{self, blocking::SpiDevice, ErrorType},
         };
         use crate::OutputPin;
-        use xtensa_lx::mutex::{Mutex, SpinLockMutex};
+        #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
+        use xtensa_lx::mutex::Mutex;
 
         /// SPI bus controller.
         ///
@@ -384,7 +385,10 @@ mod ehal1 {
         /// the [`SpiBusDevice`] implementation. Note that the wrapped [`RefCell`] is used solely
         /// to achieve interior mutability.
         pub struct SpiBusController<B: SpiBus + ErrorType> {
-            lock: SpinLockMutex<RefCell<B>>,
+            #[cfg(any(feature = "esp32", feature = "esp32s3"))]
+            lock: xtensa_lx::mutex::SpinLockMutex<RefCell<B>>,
+            #[cfg(feature = "esp32s2")]
+            lock: xtensa_lx::mutex::CriticalSectionMutex<RefCell<B>>,
         }
 
         impl<B: SpiBus + ErrorType> SpiBusController<B> {
@@ -394,7 +398,10 @@ mod ehal1 {
             /// accessed via instances of [`SpiBusDevice`].
             pub fn from_spi(bus: B) -> Self {
                 SpiBusController {
-                    lock: SpinLockMutex::new(RefCell::new(bus)),
+                    #[cfg(any(feature = "esp32", feature = "esp32s3"))]
+                    lock: xtensa_lx::mutex::SpinLockMutex::new(RefCell::new(bus)),
+                    #[cfg(feature = "esp32s2")]
+                    lock: xtensa_lx::mutex::CriticalSectionMutex::new(RefCell::new(bus)),
                 }
             }
 
@@ -452,6 +459,7 @@ mod ehal1 {
         {
             type Bus = B;
 
+            #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
             fn transaction<R>(
                 &mut self,
                 f: impl FnOnce(&mut Self::Bus) -> Result<R, <Self::Bus as ErrorType>::Error>,
