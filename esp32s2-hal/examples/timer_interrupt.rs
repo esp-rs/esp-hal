@@ -20,14 +20,10 @@ use esp32s2_hal::{
 use panic_halt as _;
 use xtensa_lx_rt::entry;
 
-static mut TIMER00: Mutex<RefCell<Option<Timer<Timer0<TIMG0>>>>> =
-    Mutex::new(RefCell::new(None));
-static mut TIMER01: Mutex<RefCell<Option<Timer<Timer1<TIMG0>>>>> =
-    Mutex::new(RefCell::new(None));
-static mut TIMER10: Mutex<RefCell<Option<Timer<Timer0<TIMG1>>>>> =
-    Mutex::new(RefCell::new(None));
-static mut TIMER11: Mutex<RefCell<Option<Timer<Timer1<TIMG1>>>>> =
-    Mutex::new(RefCell::new(None));
+static TIMER00: Mutex<RefCell<Option<Timer<Timer0<TIMG0>>>>> = Mutex::new(RefCell::new(None));
+static TIMER01: Mutex<RefCell<Option<Timer<Timer1<TIMG0>>>>> = Mutex::new(RefCell::new(None));
+static TIMER10: Mutex<RefCell<Option<Timer<Timer0<TIMG1>>>>> = Mutex::new(RefCell::new(None));
+static TIMER11: Mutex<RefCell<Option<Timer<Timer1<TIMG1>>>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
@@ -66,11 +62,11 @@ fn main() -> ! {
     timer11.start(3u64.secs());
     timer11.listen();
 
-    critical_section::with(|_| unsafe {
-        TIMER00.get_mut().replace(Some(timer00));
-        TIMER01.get_mut().replace(Some(timer01));
-        TIMER10.get_mut().replace(Some(timer10));
-        TIMER11.get_mut().replace(Some(timer11));
+    critical_section::with(|cs| {
+        TIMER00.borrow_ref_mut(cs).replace(timer00);
+        TIMER01.borrow_ref_mut(cs).replace(timer01);
+        TIMER10.borrow_ref_mut(cs).replace(timer10);
+        TIMER11.borrow_ref_mut(cs).replace(timer11);
     });
 
     loop {}
@@ -78,7 +74,7 @@ fn main() -> ! {
 
 #[interrupt]
 fn TG0_T0_LEVEL() {
-    critical_section::with(|cs| unsafe {
+    critical_section::with(|cs| {
         let mut timer = TIMER00.borrow_ref_mut(cs);
         let timer = timer.as_mut().unwrap();
 
@@ -92,7 +88,7 @@ fn TG0_T0_LEVEL() {
 
 #[interrupt]
 fn TG0_T1_LEVEL() {
-    critical_section::with(|cs| unsafe {
+    critical_section::with(|cs| {
         let mut timer = TIMER01.borrow_ref_mut(cs);
         let timer = timer.as_mut().unwrap();
 
@@ -106,7 +102,7 @@ fn TG0_T1_LEVEL() {
 
 #[interrupt]
 fn TG1_T0_LEVEL() {
-    critical_section::with(|cs| unsafe {
+    critical_section::with(|cs| {
         let mut timer = TIMER10.borrow_ref_mut(cs);
         let timer = timer.as_mut().unwrap();
 
@@ -120,7 +116,7 @@ fn TG1_T0_LEVEL() {
 
 #[interrupt]
 fn TG1_T1_LEVEL() {
-    critical_section::with(|cs| unsafe {
+    critical_section::with(|cs| {
         let mut timer = TIMER11.borrow_ref_mut(cs);
         let timer = timer.as_mut().unwrap();
 

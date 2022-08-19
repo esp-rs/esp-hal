@@ -5,8 +5,9 @@
 #![no_std]
 #![no_main]
 
-use core::sync::atomic::{AtomicI32, Ordering};
+use core::cell::RefCell;
 
+use critical_section::Mutex;
 use esp32s3_hal::{
     clock::ClockControl,
     pac::{Peripherals, TIMG1},
@@ -18,7 +19,6 @@ use esp32s3_hal::{
 use esp_println::println;
 use nb::block;
 use panic_halt as _;
-use xtensa_lx::mutex::Mutex;
 use xtensa_lx_rt::entry;
 
 #[entry]
@@ -45,7 +45,7 @@ fn main() -> ! {
     timer0.start(1u64.secs());
     timer1.start(500u64.millis());
 
-    let counter = xtensa_lx::mutex::SpinLockMutex::new(AtomicI32::new(0));
+    let counter = Mutex::new(RefCell::new(0));
 
     let mut cpu_control = CpuControl::new(system.cpu_control);
     let mut cpu1_fnctn = || {
@@ -56,24 +56,19 @@ fn main() -> ! {
     loop {
         block!(timer0.wait()).unwrap();
 
-        let count = (&counter).lock(|counter| counter.load(Ordering::Relaxed));
+        let count = critical_section::with(|cs| *counter.borrow_ref(cs));
         println!("Hello World - Core 0! Counter is {}", count);
     }
 }
 
 fn cpu1_task(
     timer: &mut Timer<Timer0<TIMG1>>,
-    counter: &xtensa_lx::mutex::SpinLockMutex<AtomicI32>,
+    counter: &critical_section::Mutex<RefCell<i32>>,
 ) -> ! {
     println!("Hello World - Core 1!");
     loop {
         block!(timer.wait()).unwrap();
 
-        (&*counter).lock(|counter| {
-            counter.store(
-                counter.load(Ordering::Relaxed).wrapping_add(1),
-                Ordering::Relaxed,
-            );
-        });
+        critical_section::with(|cs| counter.borrow_ref_mut(cs).wrapping_add(1));
     }
 }

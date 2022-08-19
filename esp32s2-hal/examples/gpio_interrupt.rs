@@ -24,8 +24,7 @@ use esp32s2_hal::{
 use panic_halt as _;
 use xtensa_lx_rt::entry;
 
-static mut BUTTON: Mutex<RefCell<Option<Gpio0<Input<PullDown>>>>> =
-    Mutex::new(RefCell::new(None));
+static mut BUTTON: Mutex<RefCell<Option<Gpio0<Input<PullDown>>>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
@@ -48,10 +47,7 @@ fn main() -> ! {
     let mut button = io.pins.gpio0.into_pull_down_input();
     button.listen(Event::FallingEdge);
 
-
-    critical_section::with(|_| unsafe {
-        BUTTON.get_mut().replace(Some(button))
-    });
+    critical_section::with(|_| unsafe { BUTTON.get_mut().replace(Some(button)) });
 
     interrupt::enable(pac::Interrupt::GPIO, interrupt::Priority::Priority2).unwrap();
 
@@ -75,6 +71,10 @@ fn GPIO() {
         xtensa_lx::interrupt::get_level()
     );
     critical_section::with(|cs| unsafe {
-        BUTTON.borrow_ref_mut(cs).as_mut().unwrap().clear_interrupt()
+        BUTTON
+            .borrow_ref_mut(cs)
+            .as_mut()
+            .unwrap()
+            .clear_interrupt()
     });
 }

@@ -6,7 +6,7 @@
 #![no_std]
 #![no_main]
 
-use core::{cell::RefCell, borrow::BorrowMut};
+use core::cell::RefCell;
 
 use critical_section::Mutex;
 use esp32s2_hal::{
@@ -20,8 +20,7 @@ use esp32s2_hal::{
 use panic_halt as _;
 use xtensa_lx_rt::entry;
 
-static mut RWDT: Mutex<RefCell<Option<Rwdt>>> =
-    Mutex::new(RefCell::new(None));
+static mut RWDT: Mutex<RefCell<Option<Rwdt>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {

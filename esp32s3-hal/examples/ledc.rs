@@ -53,7 +53,7 @@ fn main() -> ! {
 
     let mut lstimer0 = ledc.get_timer::<LowSpeed>(timer::Number::Timer0);
 
-    let res = lstimer0
+    lstimer0
         .configure(timer::config::Config {
             duty: timer::config::Duty::Duty5Bit,
             clock_source: timer::LSClockSource::APBClk,
