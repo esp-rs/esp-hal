@@ -21,8 +21,8 @@ use esp32c3_hal::{
     timer::TimerGroup,
     Rtc,
 };
-use esp_println;
 use esp_backtrace as _;
+use esp_println;
 use riscv_rt::entry;
 
 #[entry]

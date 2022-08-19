@@ -22,8 +22,8 @@ use esp32s2_hal::{
     Rtc,
     Serial,
 };
-use esp_println;
 use esp_backtrace as _;
+use esp_println;
 use xtensa_lx_rt::entry;
 
 #[entry]

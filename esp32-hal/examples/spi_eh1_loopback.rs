@@ -18,6 +18,7 @@
 
 use core::fmt::Write;
 
+use embedded_hal_1::spi::blocking::SpiBus;
 use esp32_hal::{
     clock::ClockControl,
     gpio::IO,
@@ -29,10 +30,8 @@ use esp32_hal::{
     Rtc,
     Serial,
 };
-use panic_halt as _;
+use esp_backtrace as _;
 use xtensa_lx_rt::entry;
-
-use embedded_hal_1::spi::blocking::SpiBus;
 
 #[entry]
 fn main() -> ! {
@@ -82,17 +81,16 @@ fn main() -> ! {
         writeln!(serial0, " SUCCESS").unwrap();
         delay.delay_ms(250u32);
 
-
         // --- Asymmetric transfer (Read more than we write) ---
         write!(serial0, "Starting asymetric transfer (read > write)...").unwrap();
         let mut read: [u8; 4] = [0x00; 4];
 
-        SpiBus::transfer(&mut spi, &mut read[0..2], &write[..]).expect("Asymmetric transfer failed");
+        SpiBus::transfer(&mut spi, &mut read[0..2], &write[..])
+            .expect("Asymmetric transfer failed");
         assert_eq!(write[0], read[0]);
         assert_eq!(read[2], 0x00u8);
         writeln!(serial0, " SUCCESS").unwrap();
         delay.delay_ms(250u32);
-
 
         // --- Symmetric transfer with huge buffer ---
         // Only your RAM is the limit!
@@ -108,8 +106,8 @@ fn main() -> ! {
         writeln!(serial0, " SUCCESS").unwrap();
         delay.delay_ms(250u32);
 
-
-        // --- Symmetric transfer with huge buffer in-place (No additional allocation needed) ---
+        // --- Symmetric transfer with huge buffer in-place (No additional allocation
+        // needed) ---
         write!(serial0, "Starting huge transfer (in-place)...").unwrap();
         let mut write = [0x55u8; 4096];
         for byte in 0..write.len() {
@@ -124,4 +122,3 @@ fn main() -> ! {
         delay.delay_ms(250u32);
     }
 }
-

@@ -14,8 +14,8 @@ use esp32c3_hal::{
     Rtc,
     Serial,
 };
-use nb::block;
 use esp_backtrace as _;
+use nb::block;
 use riscv_rt::entry;
 
 #[entry]

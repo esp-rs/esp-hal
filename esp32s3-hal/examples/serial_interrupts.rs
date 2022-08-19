@@ -18,8 +18,8 @@ use esp32s3_hal::{
     Rtc,
     Serial,
 };
-use nb::block;
 use esp_backtrace as _;
+use nb::block;
 use xtensa_lx_rt::entry;
 
 static SERIAL: Mutex<RefCell<Option<Serial<UART0>>>> = Mutex::new(RefCell::new(None));

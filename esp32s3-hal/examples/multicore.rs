@@ -16,9 +16,9 @@ use esp32s3_hal::{
     CpuControl,
     Rtc,
 };
+use esp_backtrace as _;
 use esp_println::println;
 use nb::block;
-use esp_backtrace as _;
 use xtensa_lx_rt::entry;
 
 #[entry]

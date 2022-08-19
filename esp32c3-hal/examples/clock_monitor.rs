@@ -1,14 +1,13 @@
-//! This demos a simple monitor for the XTAL frequency, by relying on a special feature of the
-//! TIMG0 (Timer Group 0). This feature counts the number of XTAL clock cycles within a given
-//! number of RTC_SLOW_CLK cycles.
+//! This demos a simple monitor for the XTAL frequency, by relying on a special
+//! feature of the TIMG0 (Timer Group 0). This feature counts the number of XTAL
+//! clock cycles within a given number of RTC_SLOW_CLK cycles.
 
 #![no_std]
 #![no_main]
 
 use core::cell::RefCell;
 
-use bare_metal::Mutex;
-
+use critical_section::Mutex;
 use esp32c3_hal::{
     clock::ClockControl,
     interrupt,
@@ -16,10 +15,10 @@ use esp32c3_hal::{
     prelude::*,
     Rtc,
 };
-use panic_halt as _;
+use esp_backtrace as _;
 use riscv_rt::entry;
 
-static mut RTC: Mutex<RefCell<Option<Rtc>>> = Mutex::new(RefCell::new(None));
+static RTC: Mutex<RefCell<Option<Rtc>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
@@ -44,8 +43,8 @@ fn main() -> ! {
 
     interrupt::enable(pac::Interrupt::RTC_CORE, interrupt::Priority::Priority1).unwrap();
 
-    riscv::interrupt::free(|_cs| unsafe {
-        RTC.get_mut().replace(Some(rtc));
+    critical_section::with(|cs| {
+        RTC.borrow_ref_mut(cs).replace(rtc);
     });
 
     unsafe {
@@ -57,8 +56,8 @@ fn main() -> ! {
 
 #[interrupt]
 fn RTC_CORE() {
-    riscv::interrupt::free(|cs| unsafe {
-        let mut rtc = RTC.borrow(*cs).borrow_mut();
+    critical_section::with(|cs| {
+        let mut rtc = RTC.borrow(cs).borrow_mut();
         let rtc = rtc.as_mut().unwrap();
 
         esp_println::println!(

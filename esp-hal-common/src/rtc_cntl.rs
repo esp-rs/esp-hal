@@ -118,12 +118,13 @@ impl RtcClock {
     /// Output from 8 MHz internal oscillator is passed into a configurable
     /// divider, which by default divides the input clock frequency by 256.
     /// Output of the divider may be used as RTC_SLOW_CLK source.
-    /// Output of the divider is referred to in register descriptions and code as
-    /// 8md256 or simply d256. Divider values other than 256 may be configured, but
-    /// this facility is not currently needed, so is not exposed in the code.
+    /// Output of the divider is referred to in register descriptions and code
+    /// as 8md256 or simply d256. Divider values other than 256 may be
+    /// configured, but this facility is not currently needed, so is not
+    /// exposed in the code.
     ///
-    /// When 8MHz/256 divided output is not needed, the divider should be disabled
-    /// to reduce power consumption.
+    /// When 8MHz/256 divided output is not needed, the divider should be
+    /// disabled to reduce power consumption.
     fn enable_8m(clk_8m_en: bool, d256_en: bool) {
         let rtc_cntl = unsafe { &*RTC_CNTL::ptr() };
 
@@ -235,9 +236,9 @@ impl RtcClock {
         };
     }
 
-    /// Calibration of RTC_SLOW_CLK is performed using a special feature of TIMG0.
-    /// This feature counts the number of XTAL clock cycles within a given number of
-    /// RTC_SLOW_CLK cycles.
+    /// Calibration of RTC_SLOW_CLK is performed using a special feature of
+    /// TIMG0. This feature counts the number of XTAL clock cycles within a
+    /// given number of RTC_SLOW_CLK cycles.
     fn calibrate_internal(cal_clk: RtcCalSel, slowclk_cycles: u32) -> u32 {
         // Except for ESP32, choosing RTC_CAL_RTC_MUX results in calibration of
         // the 150k RTC clock (90k on ESP32-S2) regardless of the currently selected
@@ -582,7 +583,9 @@ impl WatchdogDisable for Rwdt {
 
         self.set_write_protection(false);
 
-        rtc_cntl.wdtconfig0.modify(|_, w| w.wdt_en().clear_bit().wdt_flashboot_mod_en().clear_bit());
+        rtc_cntl
+            .wdtconfig0
+            .modify(|_, w| w.wdt_en().clear_bit().wdt_flashboot_mod_en().clear_bit());
 
         self.set_write_protection(true);
     }

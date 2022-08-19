@@ -24,7 +24,7 @@ use esp32c3_hal::{
     IO,
 };
 #[allow(unused_imports)]
-use panic_halt;
+use esp_backtrace as _;
 use riscv_rt::entry;
 use smart_leds::{
     brightness,

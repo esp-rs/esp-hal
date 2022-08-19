@@ -28,8 +28,8 @@ use esp32c3_hal::{
     timer::TimerGroup,
     Rtc,
 };
-use nb::block;
 use esp_backtrace as _;
+use nb::block;
 use riscv_rt::entry;
 use ssd1306::{prelude::*, I2CDisplayInterface, Ssd1306};
 

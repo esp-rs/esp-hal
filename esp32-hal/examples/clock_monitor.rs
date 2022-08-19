@@ -7,6 +7,7 @@
 
 use core::cell::RefCell;
 
+use critical_section::Mutex;
 use esp32_hal::{
     clock::ClockControl,
     interrupt,
@@ -14,12 +15,10 @@ use esp32_hal::{
     prelude::*,
     Rtc,
 };
-use panic_halt as _;
-use xtensa_lx::mutex::{CriticalSectionMutex, Mutex};
+use esp_backtrace as _;
 use xtensa_lx_rt::entry;
 
-static mut RTC: CriticalSectionMutex<RefCell<Option<Rtc>>> =
-    CriticalSectionMutex::new(RefCell::new(None));
+static RTC: Mutex<RefCell<Option<Rtc>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
@@ -43,27 +42,23 @@ fn main() -> ! {
 
     interrupt::enable(pac::Interrupt::RTC_CORE, interrupt::Priority::Priority1).unwrap();
 
-    unsafe {
-        (&RTC).lock(|data| (*data).replace(Some(rtc)));
-    }
+    critical_section::with(|cs| RTC.borrow_ref_mut(cs).replace(rtc));
 
     loop {}
 }
 
 #[interrupt]
 fn RTC_CORE() {
-    unsafe {
-        (&RTC).lock(|data| {
-            let mut rtc = data.borrow_mut();
-            let rtc = rtc.as_mut().unwrap();
+    critical_section::with(|cs| {
+        let mut rtc = RTC.borrow_ref_mut(cs);
+        let rtc = rtc.as_mut().unwrap();
 
-            esp_println::println!(
-                "{: <10} XTAL frequency: {} MHz",
-                "[Monitor]",
-                rtc.estimate_xtal_frequency()
-            );
+        esp_println::println!(
+            "{: <10} XTAL frequency: {} MHz",
+            "[Monitor]",
+            rtc.estimate_xtal_frequency()
+        );
 
-            rtc.rwdt.clear_interrupt();
-        });
-    }
+        rtc.rwdt.clear_interrupt();
+    });
 }

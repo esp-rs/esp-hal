@@ -15,8 +15,8 @@ use esp32_hal::{
     Delay,
     Rtc,
 };
-use esp_println::println;
 use esp_backtrace as _;
+use esp_println::println;
 use xtensa_lx_rt::entry;
 
 #[entry]
