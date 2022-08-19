@@ -1,13 +1,13 @@
-use fugit::{HertzU32, MicrosDurationU64};
-
 use embedded_hal::watchdog::{Watchdog, WatchdogDisable, WatchdogEnable};
-
-use crate::{clock::Clock, clock::XtalClock, pac::RTC_CNTL, pac::TIMG0};
+use fugit::{HertzU32, MicrosDurationU64};
 
 #[cfg(not(feature = "esp32"))]
 use crate::efuse::Efuse;
-
-use crate::rom::esp_rom_delay_us;
+use crate::{
+    clock::{Clock, XtalClock},
+    pac::{RTC_CNTL, TIMG0},
+    rom::esp_rom_delay_us,
+};
 
 #[cfg_attr(feature = "esp32", path = "rtc/esp32.rs")]
 #[cfg_attr(feature = "esp32s2", path = "rtc/esp32s2.rs")]
@@ -22,7 +22,7 @@ pub(crate) enum RtcFastClock {
     /// Main XTAL, divided by 4
     RtcFastClockXtalD4 = 0,
     /// Internal fast RC oscillator
-    RtcFastClock8m = 1,
+    RtcFastClock8m     = 1,
 }
 
 impl Clock for RtcFastClock {
@@ -42,11 +42,11 @@ impl Clock for RtcFastClock {
 /// RTC SLOW_CLK frequency values
 pub(crate) enum RtcSlowClock {
     /// Internal slow RC oscillator
-    RtcSlowClockRtc = 0,
+    RtcSlowClockRtc     = 0,
     /// External 32 KHz XTAL
     RtcSlowClock32kXtal = 1,
     /// Internal fast RC oscillator, divided by 256
-    RtcSlowClock8mD256 = 2,
+    RtcSlowClock8mD256  = 2,
 }
 
 impl Clock for RtcSlowClock {
@@ -72,11 +72,11 @@ impl Clock for RtcSlowClock {
 /// Clock source to be calibrated using rtc_clk_cal function
 pub(crate) enum RtcCalSel {
     /// Currently selected RTC SLOW_CLK
-    RtcCalRtcMux = 0,
+    RtcCalRtcMux      = 0,
     /// Internal 8 MHz RC oscillator, divided by 256
-    RtcCal8mD256 = 1,
+    RtcCal8mD256      = 1,
     /// External 32 KHz XTAL
-    RtcCal32kXtal = 2,
+    RtcCal32kXtal     = 2,
     #[cfg(not(feature = "esp32"))]
     /// Internal 150 KHz RC oscillator
     RtcCalInternalOsc = 3,
@@ -150,8 +150,8 @@ impl RtcClock {
     }
 
     /// Get main XTAL frequency
-    /// This is the value stored in RTC register RTC_XTAL_FREQ_REG by the bootloader, as passed to
-    /// rtc_clk_init function.
+    /// This is the value stored in RTC register RTC_XTAL_FREQ_REG by the
+    /// bootloader, as passed to rtc_clk_init function.
     fn get_xtal_freq() -> XtalClock {
         let rtc_cntl = unsafe { &*RTC_CNTL::ptr() };
         let xtal_freq_reg = rtc_cntl.store4.read().bits();
@@ -240,8 +240,8 @@ impl RtcClock {
     /// RTC_SLOW_CLK cycles.
     fn calibrate_internal(cal_clk: RtcCalSel, slowclk_cycles: u32) -> u32 {
         // Except for ESP32, choosing RTC_CAL_RTC_MUX results in calibration of
-        // the 150k RTC clock (90k on ESP32-S2) regardless of the currently selected SLOW_CLK.
-        // On the ESP32, it uses the currently selected SLOW_CLK.
+        // the 150k RTC clock (90k on ESP32-S2) regardless of the currently selected
+        // SLOW_CLK. On the ESP32, it uses the currently selected SLOW_CLK.
         // The following code emulates ESP32 behavior for the other chips:
         #[cfg(not(feature = "esp32"))]
         let cal_clk = match cal_clk {
@@ -281,7 +281,8 @@ impl RtcClock {
             .bit_is_set()
         {
             // Set a small timeout threshold to accelerate the generation of timeout.
-            // The internal circuit will be reset when the timeout occurs and will not affect the next calibration.
+            // The internal circuit will be reset when the timeout occurs and will not
+            // affect the next calibration.
             timg0
                 .rtccalicfg2
                 .modify(|_, w| unsafe { w.rtc_cali_timeout_thres().bits(1) });
@@ -391,10 +392,11 @@ impl RtcClock {
 
     /// Measure RTC slow clock's period, based on main XTAL frequency
     ///
-    /// This function will time out and return 0 if the time for the given number
-    /// of cycles to be counted exceeds the expected time twice. This may happen if
-    /// 32k XTAL is being calibrated, but the oscillator has not started up (due to
-    /// incorrect loading capacitance, board design issue, or lack of 32 XTAL on board).
+    /// This function will time out and return 0 if the time for the given
+    /// number of cycles to be counted exceeds the expected time twice. This
+    /// may happen if 32k XTAL is being calibrated, but the oscillator has
+    /// not started up (due to incorrect loading capacitance, board design
+    /// issue, or lack of 32 XTAL on board).
     fn calibrate(cal_clk: RtcCalSel, slowclk_cycles: u32) -> u32 {
         let xtal_freq = RtcClock::get_xtal_freq();
         let xtal_cycles = RtcClock::calibrate_internal(cal_clk, slowclk_cycles) as u64;
@@ -448,11 +450,11 @@ impl RtcClock {
 #[allow(unused)]
 #[derive(Debug, Clone, Copy)]
 enum RwdtStageAction {
-    RwdtStageActionOff = 0,
-    RwdtStageActionInterrupt = 1,
-    RwdtStageActionResetCpu = 2,
+    RwdtStageActionOff         = 0,
+    RwdtStageActionInterrupt   = 1,
+    RwdtStageActionResetCpu    = 2,
     RwdtStageActionResetSystem = 3,
-    RwdtStageActionResetRtc = 4,
+    RwdtStageActionResetRtc    = 4,
 }
 
 /// RTC Watchdog Timer

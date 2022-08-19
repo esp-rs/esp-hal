@@ -1,6 +1,8 @@
-use crate::{clock::XtalClock, pac::RTC_CNTL};
-
-use crate::rtc_cntl::{RtcCalSel, RtcClock, RtcFastClock, RtcSlowClock};
+use crate::{
+    clock::XtalClock,
+    pac::RTC_CNTL,
+    rtc_cntl::{RtcCalSel, RtcClock, RtcFastClock, RtcSlowClock},
+};
 
 pub(crate) fn init() {}
 

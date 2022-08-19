@@ -6,8 +6,9 @@
 #![no_std]
 #![no_main]
 
-use core::cell::RefCell;
+use core::{cell::RefCell, borrow::BorrowMut};
 
+use critical_section::Mutex;
 use esp32s2_hal::{
     clock::ClockControl,
     interrupt,
@@ -17,11 +18,10 @@ use esp32s2_hal::{
     Rwdt,
 };
 use panic_halt as _;
-use xtensa_lx::mutex::{CriticalSectionMutex, Mutex};
 use xtensa_lx_rt::entry;
 
-static mut RWDT: CriticalSectionMutex<RefCell<Option<Rwdt>>> =
-    CriticalSectionMutex::new(RefCell::new(None));
+static mut RWDT: Mutex<RefCell<Option<Rwdt>>> =
+    Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
@@ -40,27 +40,24 @@ fn main() -> ! {
     interrupt::enable(pac::Interrupt::RTC_CORE, interrupt::Priority::Priority1).unwrap();
 
     unsafe {
-        (&RWDT).lock(|data| (*data).replace(Some(rtc.rwdt)));
+        RWDT.get_mut().replace(Some(rtc.rwdt));
     }
 
     loop {}
 }
 
 #[interrupt]
-fn RTC_CORE() {
-    unsafe {
-        (&RWDT).lock(|data| {
-            esp_println::println!("RWDT Interrupt");
+unsafe fn RTC_CORE() {
+    critical_section::with(|cs| {
+        esp_println::println!("RWDT Interrupt");
+        let mut rwdt = RWDT.borrow_ref_mut(cs);
+        let rwdt = rwdt.as_mut().unwrap();
 
-            let mut rwdt = data.borrow_mut();
-            let rwdt = rwdt.as_mut().unwrap();
+        rwdt.clear_interrupt();
 
-            rwdt.clear_interrupt();
+        esp_println::println!("Restarting in 5 seconds...");
 
-            esp_println::println!("Restarting in 5 seconds...");
-
-            rwdt.start(5000u64.millis());
-            rwdt.unlisten();
-        });
-    }
+        rwdt.start(5000u64.millis());
+        rwdt.unlisten();
+    });
 }

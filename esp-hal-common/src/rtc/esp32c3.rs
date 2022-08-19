@@ -1,13 +1,12 @@
 use paste::paste;
 
 use crate::{
-    clock::XtalClock, pac::APB_CTRL, pac::EXTMEM, pac::RTC_CNTL, pac::SPI0, pac::SPI1, pac::SYSTEM,
+    clock::XtalClock,
+    pac::{APB_CTRL, EXTMEM, RTC_CNTL, SPI0, SPI1, SYSTEM},
+    regi2c_write_mask,
+    rom::regi2c_ctrl_write_reg_mask,
+    rtc_cntl::{RtcCalSel, RtcClock, RtcFastClock, RtcSlowClock},
 };
-
-use crate::rtc_cntl::{RtcCalSel, RtcClock, RtcFastClock, RtcSlowClock};
-
-use crate::regi2c_write_mask;
-use crate::rom::regi2c_ctrl_write_reg_mask;
 
 const I2C_DIG_REG: u32 = 0x6d;
 const I2C_DIG_REG_HOSTID: u32 = 0;
