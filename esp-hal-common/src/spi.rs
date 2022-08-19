@@ -373,9 +373,9 @@ mod ehal1 {
         use core::cell::RefCell;
 
         use embedded_hal_1::{
-            digital::blocking::OutputPin,
             spi::{self, blocking::SpiDevice, ErrorType},
         };
+        use crate::OutputPin;
         use xtensa_lx::mutex::{Mutex, SpinLockMutex};
 
         /// SPI bus controller.
@@ -448,7 +448,7 @@ mod ehal1 {
         impl<B, CS> SpiDevice for SpiBusDevice<'_, B, CS>
         where
             B: SpiBus + ErrorType,
-            CS: OutputPin,
+            CS: OutputPin + crate::gpio::OutputPin,
         {
             type Bus = B;
 
@@ -458,9 +458,10 @@ mod ehal1 {
             ) -> Result<R, Self::Error> {
                 (&self.bus.lock).lock(|bus| {
                     let mut bus = bus.borrow_mut();
+
                     self.cs
-                        .set_low()
-                        .map_err(|_| spi::ErrorKind::ChipSelectFault)?;
+                        .set_to_push_pull_output()
+                        .set_output_high(false);
 
                     // We postpone handling these errors until AFTER we raised CS again, so the bus
                     // is free (Or we die trying if CS errors).
@@ -468,8 +469,7 @@ mod ehal1 {
                     let flush_res = bus.flush();
 
                     self.cs
-                        .set_high()
-                        .map_err(|_| spi::ErrorKind::ChipSelectFault)?;
+                        .set_output_high(true);
 
                     let f_res = f_res.map_err(|_| spi::ErrorKind::Other)?;
                     flush_res.map_err(|_| spi::ErrorKind::Other)?;
