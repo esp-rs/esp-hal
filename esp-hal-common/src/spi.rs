@@ -397,6 +397,13 @@ mod ehal1 {
                     lock: SpinLockMutex::new(RefCell::new(bus)),
                 }
             }
+
+            pub fn add_device<'a, CS: OutputPin>(&'a self, cs: CS) -> SpiBusDevice<'a, B, CS> {
+                SpiBusDevice {
+                    bus: self,
+                    cs,
+                }
+            }
         }
 
         impl<B> ErrorType for SpiBusController<B>
