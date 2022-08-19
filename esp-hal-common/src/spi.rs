@@ -364,127 +364,140 @@ mod ehal1 {
         }
     }
 
-    #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
-    pub use xtensa_spi_device::*;
+    use core::cell::RefCell;
 
+    use embedded_hal_1::spi::{self, blocking::SpiDevice, ErrorType};
     #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
-    mod xtensa_spi_device {
-        use super::*;
-        use core::cell::RefCell;
+    use xtensa_lx::mutex::Mutex;
+    #[cfg(any(feature = "esp32", feature = "esp32s3"))]
+    use xtensa_lx::mutex::SpinLockMutex as MutexImpl;
+    #[cfg(feature = "esp32s2")]
+    use xtensa_lx::mutex::CriticalSectionMutex as MutexImpl;
+    #[cfg(feature = "esp32c3")]
+    use riscv::interrupt::Mutex as MutexImpl;
 
-        use embedded_hal_1::{
-            spi::{self, blocking::SpiDevice, ErrorType},
-        };
-        use crate::OutputPin;
+    use crate::OutputPin;
+
+    /// SPI bus controller.
+    ///
+    /// Has exclusive access to an SPI bus, which is managed via a `Mutex`. Used
+    /// as basis for the [`SpiBusDevice`] implementation. Note that the
+    /// wrapped [`RefCell`] is used solely to achieve interior mutability.
+    pub struct SpiBusController<B: SpiBus + ErrorType> {
+        lock: MutexImpl<RefCell<B>>,
+    }
+
+    impl<B: SpiBus + ErrorType> SpiBusController<B> {
+        /// Create a new controller from an SPI bus instance.
+        ///
+        /// Takes ownership of the SPI bus in the process. Afterwards, the SPI
+        /// bus can only be accessed via instances of [`SpiBusDevice`].
+        pub fn from_spi(bus: B) -> Self {
+            SpiBusController {
+                lock: MutexImpl::new(RefCell::new(bus)),
+            }
+        }
+
+        pub fn add_device<'a, CS: OutputPin>(&'a self, cs: CS) -> SpiBusDevice<'a, B, CS> {
+            SpiBusDevice { bus: self, cs }
+        }
+    }
+
+    impl<B> ErrorType for SpiBusController<B>
+    where
+        B: SpiBus + ErrorType,
+    {
+        type Error = spi::ErrorKind;
+    }
+
+    /// An SPI device on a shared SPI bus.
+    ///
+    /// Provides device specific access on a shared SPI bus. Enables attaching
+    /// multiple SPI devices to the same bus, each with its own CS line, and
+    /// performing safe transfers on them.
+    pub struct SpiBusDevice<'a, B, CS>
+    where
+        B: SpiBus + ErrorType,
+        CS: OutputPin,
+    {
+        bus: &'a SpiBusController<B>,
+        cs: CS,
+    }
+
+    impl<'a, B, CS> SpiBusDevice<'a, B, CS>
+    where
+        B: SpiBus + ErrorType,
+        CS: OutputPin,
+    {
+        pub fn new(bus: &'a SpiBusController<B>, cs: CS) -> Self {
+            SpiBusDevice { bus, cs }
+        }
+    }
+
+    impl<'a, B, CS> ErrorType for SpiBusDevice<'a, B, CS>
+    where
+        B: SpiBus + ErrorType,
+        CS: OutputPin,
+    {
+        type Error = spi::ErrorKind;
+    }
+
+    impl<B, CS> SpiDevice for SpiBusDevice<'_, B, CS>
+    where
+        B: SpiBus + ErrorType,
+        CS: OutputPin + crate::gpio::OutputPin,
+    {
+        type Bus = B;
+
         #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
-        use xtensa_lx::mutex::Mutex;
+        fn transaction<R>(
+            &mut self,
+            f: impl FnOnce(&mut Self::Bus) -> Result<R, <Self::Bus as ErrorType>::Error>,
+        ) -> Result<R, Self::Error> {
+            (&self.bus.lock).lock(|bus| {
+                let mut bus = bus.borrow_mut();
 
-        /// SPI bus controller.
-        ///
-        /// Has exclusive access to an SPI bus, which is managed via a `Mutex`. Used as basis for
-        /// the [`SpiBusDevice`] implementation. Note that the wrapped [`RefCell`] is used solely
-        /// to achieve interior mutability.
-        pub struct SpiBusController<B: SpiBus + ErrorType> {
-            #[cfg(any(feature = "esp32", feature = "esp32s3"))]
-            lock: xtensa_lx::mutex::SpinLockMutex<RefCell<B>>,
-            #[cfg(feature = "esp32s2")]
-            lock: xtensa_lx::mutex::CriticalSectionMutex<RefCell<B>>,
+                self.cs.set_to_push_pull_output().set_output_high(false);
+
+                // We postpone handling these errors until AFTER we raised CS again, so the bus
+                // is free (Or we die trying if CS errors).
+                let f_res = f(&mut bus);
+                let flush_res = bus.flush();
+
+                self.cs.set_output_high(true);
+
+                let f_res = f_res.map_err(|_| spi::ErrorKind::Other)?;
+                flush_res.map_err(|_| spi::ErrorKind::Other)?;
+
+                Ok(f_res)
+            })
         }
 
-        impl<B: SpiBus + ErrorType> SpiBusController<B> {
-            /// Create a new controller from an SPI bus instance.
-            ///
-            /// Takes ownership of the SPI bus in the process. Afterwards, the SPI bus can only be
-            /// accessed via instances of [`SpiBusDevice`].
-            pub fn from_spi(bus: B) -> Self {
-                SpiBusController {
-                    #[cfg(any(feature = "esp32", feature = "esp32s3"))]
-                    lock: xtensa_lx::mutex::SpinLockMutex::new(RefCell::new(bus)),
-                    #[cfg(feature = "esp32s2")]
-                    lock: xtensa_lx::mutex::CriticalSectionMutex::new(RefCell::new(bus)),
-                }
-            }
+        #[cfg(feature = "esp32c3")]
+        fn transaction<R>(
+            &mut self,
+            f: impl FnOnce(&mut Self::Bus) -> Result<R, <Self::Bus as ErrorType>::Error>,
+        ) -> Result<R, Self::Error> {
+            let critical_section = unsafe {
+                riscv::interrupt::disable();
+                riscv::interrupt::CriticalSection::new()
+            };
 
-            pub fn add_device<'a, CS: OutputPin>(&'a self, cs: CS) -> SpiBusDevice<'a, B, CS> {
-                SpiBusDevice {
-                    bus: self,
-                    cs,
-                }
-            }
-        }
+            let mut bus = self.bus.lock.borrow(critical_section).borrow_mut();
 
-        impl<B> ErrorType for SpiBusController<B>
-        where
-            B: SpiBus + ErrorType,
-        {
-            type Error = spi::ErrorKind;
-        }
+            self.cs.set_to_push_pull_output().set_output_high(false);
 
-        /// An SPI device on a shared SPI bus.
-        ///
-        /// Provides device specific access on a shared SPI bus. Enables attaching multiple SPI
-        /// devices to the same bus, each with its own CS line, and performing safe transfers on
-        /// them.
-        pub struct SpiBusDevice<'a, B, CS>
-        where
-            B: SpiBus + ErrorType,
-            CS: OutputPin,
-        {
-            bus: &'a SpiBusController<B>,
-            cs: CS,
-        }
+            // We postpone handling these errors until AFTER we raised CS again, so the bus
+            // is free (Or we die trying if CS errors).
+            let f_res = f(&mut bus);
+            let flush_res = bus.flush();
 
-        impl<'a, B, CS> SpiBusDevice<'a, B, CS>
-        where
-            B: SpiBus + ErrorType,
-            CS: OutputPin,
-        {
-            pub fn new(bus: &'a SpiBusController<B>, cs: CS) -> Self {
-                SpiBusDevice { bus, cs }
-            }
-        }
+            self.cs.set_output_high(true);
 
-        impl<'a, B, CS> ErrorType for SpiBusDevice<'a, B, CS>
-        where
-            B: SpiBus + ErrorType,
-            CS: OutputPin,
-        {
-            type Error = spi::ErrorKind;
-        }
+            let f_res = f_res.map_err(|_| spi::ErrorKind::Other)?;
+            flush_res.map_err(|_| spi::ErrorKind::Other)?;
 
-        impl<B, CS> SpiDevice for SpiBusDevice<'_, B, CS>
-        where
-            B: SpiBus + ErrorType,
-            CS: OutputPin + crate::gpio::OutputPin,
-        {
-            type Bus = B;
-
-            #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
-            fn transaction<R>(
-                &mut self,
-                f: impl FnOnce(&mut Self::Bus) -> Result<R, <Self::Bus as ErrorType>::Error>,
-            ) -> Result<R, Self::Error> {
-                (&self.bus.lock).lock(|bus| {
-                    let mut bus = bus.borrow_mut();
-
-                    self.cs
-                        .set_to_push_pull_output()
-                        .set_output_high(false);
-
-                    // We postpone handling these errors until AFTER we raised CS again, so the bus
-                    // is free (Or we die trying if CS errors).
-                    let f_res = f(&mut bus);
-                    let flush_res = bus.flush();
-
-                    self.cs
-                        .set_output_high(true);
-
-                    let f_res = f_res.map_err(|_| spi::ErrorKind::Other)?;
-                    flush_res.map_err(|_| spi::ErrorKind::Other)?;
-
-                    Ok(f_res)
-                })
-            }
+            Ok(f_res)
         }
     }
 }
