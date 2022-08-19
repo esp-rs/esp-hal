@@ -16,7 +16,7 @@ use esp32c3_hal::{
     timer::{Timer, Timer0, TimerGroup},
     Rtc,
 };
-use panic_halt as _;
+use esp_backtrace as _;
 use riscv_rt::entry;
 
 static TIMER0: Mutex<RefCell<Option<Timer<Timer0<TIMG0>>>>> = Mutex::new(RefCell::new(None));

@@ -19,7 +19,7 @@ use esp32_hal::{
     Serial,
 };
 use nb::block;
-use panic_halt as _;
+use esp_backtrace as _;
 use xtensa_lx_rt::entry;
 
 #[ram(rtc_fast)]

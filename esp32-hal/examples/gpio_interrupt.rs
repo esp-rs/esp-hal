@@ -21,7 +21,7 @@ use esp32_hal::{
     Delay,
     Rtc,
 };
-use panic_halt as _;
+use esp_backtrace as _;
 use xtensa_lx_rt::entry;
 
 static BUTTON: Mutex<RefCell<Option<Gpio0<Input<PullDown>>>>> = Mutex::new(RefCell::new(None));

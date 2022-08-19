@@ -20,7 +20,7 @@ use esp32c3_hal::{
     Delay,
     Rtc,
 };
-use panic_halt as _;
+use esp_backtrace as _;
 use riscv_rt::entry;
 
 static BUTTON: Mutex<RefCell<Option<Gpio9<Input<PullDown>>>>> = Mutex::new(RefCell::new(None));

@@ -17,7 +17,7 @@ use esp32_hal::{
     timer::{Timer, Timer0, Timer1, TimerGroup},
     Rtc,
 };
-use panic_halt as _;
+use esp_backtrace as _;
 use xtensa_lx_rt::entry;
 
 static TIMER00: Mutex<RefCell<Option<Timer<Timer0<TIMG0>>>>> = Mutex::new(RefCell::new(None));

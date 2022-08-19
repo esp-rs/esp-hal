@@ -17,7 +17,7 @@ use esp32c3_hal::{
     Rtc,
     Rwdt,
 };
-use panic_halt as _;
+use esp_backtrace as _;
 use riscv_rt::entry;
 
 static RWDT: Mutex<RefCell<Option<Rwdt>>> = Mutex::new(RefCell::new(None));

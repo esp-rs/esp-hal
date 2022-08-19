@@ -18,7 +18,7 @@ use esp32c3_hal::{
     Delay,
     Rtc,
 };
-use panic_halt as _;
+use esp_backtrace as _;
 use riscv_rt::entry;
 
 static ALARM0: Mutex<RefCell<Option<Alarm<Target, 0>>>> = Mutex::new(RefCell::new(None));

@@ -20,7 +20,7 @@ use esp32c3_hal::{
     Serial,
 };
 use nb::block;
-use panic_halt as _;
+use esp_backtrace as _;
 use riscv_rt::entry;
 
 static SERIAL: Mutex<RefCell<Option<Serial<UART0>>>> = Mutex::new(RefCell::new(None));

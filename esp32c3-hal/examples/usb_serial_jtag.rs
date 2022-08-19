@@ -17,7 +17,7 @@ use esp32c3_hal::{
     Rtc,
     UsbSerialJtag,
 };
-use panic_halt as _;
+use esp_backtrace as _;
 use riscv_rt::entry;
 
 #[entry]

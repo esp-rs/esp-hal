@@ -29,7 +29,7 @@ use esp32c3_hal::{
     Rtc,
 };
 use nb::block;
-use panic_halt as _;
+use esp_backtrace as _;
 use riscv_rt::entry;
 use ssd1306::{prelude::*, I2CDisplayInterface, Ssd1306};
 
