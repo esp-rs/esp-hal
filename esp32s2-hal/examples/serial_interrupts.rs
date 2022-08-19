@@ -22,7 +22,7 @@ use nb::block;
 use panic_halt as _;
 use xtensa_lx_rt::entry;
 
-static mut SERIAL: Mutex<RefCell<Option<Serial<UART0>>>> = Mutex::new(RefCell::new(None));
+static SERIAL: Mutex<RefCell<Option<Serial<UART0>>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
@@ -55,10 +55,10 @@ fn main() -> ! {
 
     timer0.start(1u64.secs());
 
-    critical_section::with(|_| unsafe { SERIAL.get_mut().replace(Some(serial0)) });
+    critical_section::with(|cs| SERIAL.borrow_ref_mut(cs).replace(serial0));
 
     loop {
-        critical_section::with(|cs| unsafe {
+        critical_section::with(|cs| {
             let mut serial = SERIAL.borrow_ref_mut(cs);
             let serial = serial.as_mut().unwrap();
             writeln!(serial, "Hello World! Send a single `#` character or send at least 30 characters and see the interrupts trigger.").ok();
@@ -70,7 +70,7 @@ fn main() -> ! {
 
 #[interrupt]
 fn UART0() {
-    critical_section::with(|cs| unsafe {
+    critical_section::with(|cs| {
         let mut serial = SERIAL.borrow_ref_mut(cs);
         let serial = serial.as_mut().unwrap();
 

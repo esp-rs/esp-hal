@@ -19,8 +19,8 @@ use esp32c3_hal::{
 use panic_halt as _;
 use riscv_rt::entry;
 
-static mut TIMER0: Mutex<RefCell<Option<Timer<Timer0<TIMG0>>>>> = Mutex::new(RefCell::new(None));
-static mut TIMER1: Mutex<RefCell<Option<Timer<Timer0<TIMG1>>>>> = Mutex::new(RefCell::new(None));
+static TIMER0: Mutex<RefCell<Option<Timer<Timer0<TIMG0>>>>> = Mutex::new(RefCell::new(None));
+static TIMER1: Mutex<RefCell<Option<Timer<Timer0<TIMG1>>>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
@@ -51,9 +51,9 @@ fn main() -> ! {
     timer1.start(1u64.secs());
     timer1.listen();
 
-    critical_section::with(|_| unsafe {
-        TIMER0.get_mut().replace(Some(timer0));
-        TIMER1.get_mut().replace(Some(timer1));
+    critical_section::with(|cs| {
+        TIMER0.borrow_ref_mut(cs).replace(timer0);
+        TIMER1.borrow_ref_mut(cs).replace(timer1);
     });
 
     unsafe {
@@ -65,7 +65,7 @@ fn main() -> ! {
 
 #[interrupt]
 fn TG0_T0_LEVEL() {
-    critical_section::with(|cs| unsafe {
+    critical_section::with(|cs| {
         esp_println::println!("Interrupt 1");
 
         let mut timer0 = TIMER0.borrow_ref_mut(cs);
@@ -78,7 +78,7 @@ fn TG0_T0_LEVEL() {
 
 #[interrupt]
 fn TG1_T0_LEVEL() {
-    critical_section::with(|cs| unsafe {
+    critical_section::with(|cs| {
         esp_println::println!("Interrupt 11");
 
         let mut timer1 = TIMER1.borrow_ref_mut(cs);

@@ -20,7 +20,7 @@ use esp32s2_hal::{
 use panic_halt as _;
 use xtensa_lx_rt::entry;
 
-static mut RWDT: Mutex<RefCell<Option<Rwdt>>> = Mutex::new(RefCell::new(None));
+static RWDT: Mutex<RefCell<Option<Rwdt>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
@@ -36,22 +36,18 @@ fn main() -> ! {
     rtc.rwdt.start(2000u64.millis());
     rtc.rwdt.listen();
 
-    interrupt::enable(pac::Interrupt::RTC_CORE, interrupt::Priority::Priority1).unwrap();
+    critical_section::with(|cs| RWDT.borrow_ref_mut(cs).replace(rtc.rwdt));
 
-    unsafe {
-        RWDT.get_mut().replace(Some(rtc.rwdt));
-    }
+    interrupt::enable(pac::Interrupt::RTC_CORE, interrupt::Priority::Priority1).unwrap();
 
     loop {}
 }
 
 #[interrupt]
-unsafe fn RTC_CORE() {
+fn RTC_CORE() {
     critical_section::with(|cs| {
-        esp_println::println!("RWDT Interrupt");
         let mut rwdt = RWDT.borrow_ref_mut(cs);
         let rwdt = rwdt.as_mut().unwrap();
-
         rwdt.clear_interrupt();
 
         esp_println::println!("Restarting in 5 seconds...");

@@ -20,7 +20,7 @@ use esp32c3_hal::{
 use panic_halt as _;
 use riscv_rt::entry;
 
-static mut RWDT: Mutex<RefCell<Option<Rwdt>>> = Mutex::new(RefCell::new(None));
+static RWDT: Mutex<RefCell<Option<Rwdt>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
@@ -39,9 +39,7 @@ fn main() -> ! {
 
     interrupt::enable(pac::Interrupt::RTC_CORE, interrupt::Priority::Priority1).unwrap();
 
-    critical_section::with(|_| unsafe {
-        RWDT.get_mut().replace(Some(rtc.rwdt));
-    });
+    critical_section::with(|cs| RWDT.borrow_ref_mut(cs).replace(rtc.rwdt));
 
     unsafe {
         riscv::interrupt::enable();
@@ -52,7 +50,7 @@ fn main() -> ! {
 
 #[interrupt]
 fn RTC_CORE() {
-    critical_section::with(|cs| unsafe {
+    critical_section::with(|cs| {
         esp_println::println!("RWDT Interrupt");
 
         let mut rwdt = RWDT.borrow_ref_mut(cs);
