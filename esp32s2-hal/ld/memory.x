@@ -21,11 +21,17 @@ STACK_SIZE = 8k;
 /* Specify main memory areas */
 MEMORY
 {
-  vectors_seg ( RX )     : ORIGIN = 0x40022000, len =  1k /* SRAM0 */
+  vectors_seg ( RX )     : ORIGIN = 0x40022000, len = 1k /* SRAM0 */
   iram_seg ( RX )        : ORIGIN = 0x40022400, len = 128k-0x400 /* SRAM0 */
 
-  dram_seg ( RW )        : ORIGIN = 0x3FFB0000 + RESERVE_DRAM, len = 176k - RESERVE_DRAM
-  reserved_for_boot_seg  : ORIGIN = 0x3FFDC200, len = 144k /* SRAM1; reserved for static ROM usage; can be used for heap */
+  dram_seg ( RW )        : ORIGIN = 0x3FFB0000 + RESERVE_DRAM, len = 192k - RESERVE_DRAM
+
+  /* SRAM1; reserved for static ROM usage; can be used for heap.
+     Length based on the "_dram0_rtos_reserved_start" symbol from IDF used to delimit the
+     ROM data reserved region:
+     https://github.com/espressif/esp-idf/blob/bcb34ca7aef4e8d3b97d75ad069b960fb1c17c16/components/heap/port/esp32s2/memory_layout.c#L121-L122
+  */
+  reserved_for_boot_seg  : ORIGIN = 0x3FFE0000, len = 0x1FA10
 
   /* external flash 
      The 0x20 offset is a convenience for the app binary image generation.
@@ -156,13 +162,11 @@ SECTIONS {
 _external_ram_start = ABSOLUTE(ORIGIN(psram_seg));
 _external_ram_end = ABSOLUTE(ORIGIN(psram_seg)+LENGTH(psram_seg));
 
-_heap_end = ABSOLUTE(ORIGIN(dram_seg))+LENGTH(dram_seg)+LENGTH(reserved_for_boot_seg) - 2*STACK_SIZE;
+_heap_end = ABSOLUTE(ORIGIN(dram_seg))+LENGTH(dram_seg)+LENGTH(reserved_for_boot_seg) - STACK_SIZE;
 _text_heap_end = ABSOLUTE(ORIGIN(iram_seg)+LENGTH(iram_seg));
 _external_heap_end = ABSOLUTE(ORIGIN(psram_seg)+LENGTH(psram_seg));
 
-_stack_start_cpu1 = _heap_end;
-_stack_end_cpu1 = _stack_start_cpu1 + STACK_SIZE;
-_stack_start_cpu0 = _stack_end_cpu1;
+_stack_start_cpu0 = _heap_end;
 _stack_end_cpu0 = _stack_start_cpu0 + STACK_SIZE;
 
 EXTERN(DefaultHandler);
