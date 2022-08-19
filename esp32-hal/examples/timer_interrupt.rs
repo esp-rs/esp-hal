@@ -5,32 +5,25 @@
 #![no_std]
 #![no_main]
 
-use core::{cell::RefCell, fmt::Write};
+use core::cell::RefCell;
 
+use critical_section::Mutex;
 use esp32_hal::{
     clock::ClockControl,
     interrupt,
     interrupt::Priority,
-    pac::{self, Peripherals, TIMG0, TIMG1, UART0},
+    pac::{self, Peripherals, TIMG0, TIMG1},
     prelude::*,
     timer::{Timer, Timer0, Timer1, TimerGroup},
     Rtc,
-    Serial,
 };
 use panic_halt as _;
-use xtensa_lx::mutex::{Mutex, SpinLockMutex};
 use xtensa_lx_rt::entry;
 
-static mut SERIAL: SpinLockMutex<RefCell<Option<Serial<UART0>>>> =
-    SpinLockMutex::new(RefCell::new(None));
-static mut TIMER00: SpinLockMutex<RefCell<Option<Timer<Timer0<TIMG0>>>>> =
-    SpinLockMutex::new(RefCell::new(None));
-static mut TIMER01: SpinLockMutex<RefCell<Option<Timer<Timer1<TIMG0>>>>> =
-    SpinLockMutex::new(RefCell::new(None));
-static mut TIMER10: SpinLockMutex<RefCell<Option<Timer<Timer0<TIMG1>>>>> =
-    SpinLockMutex::new(RefCell::new(None));
-static mut TIMER11: SpinLockMutex<RefCell<Option<Timer<Timer1<TIMG1>>>>> =
-    SpinLockMutex::new(RefCell::new(None));
+static TIMER00: Mutex<RefCell<Option<Timer<Timer0<TIMG0>>>>> = Mutex::new(RefCell::new(None));
+static TIMER01: Mutex<RefCell<Option<Timer<Timer1<TIMG0>>>>> = Mutex::new(RefCell::new(None));
+static TIMER10: Mutex<RefCell<Option<Timer<Timer0<TIMG1>>>>> = Mutex::new(RefCell::new(None));
+static TIMER11: Mutex<RefCell<Option<Timer<Timer1<TIMG1>>>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
@@ -49,7 +42,6 @@ fn main() -> ! {
     let mut timer11 = timer_group1.timer1;
     let mut wdt1 = timer_group1.wdt;
 
-    let serial0 = Serial::new(peripherals.UART0);
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
 
     // Disable MWDT and RWDT (Watchdog) flash boot protection
@@ -70,97 +62,72 @@ fn main() -> ! {
     timer11.start(3u64.secs());
     timer11.listen();
 
-    unsafe {
-        (&SERIAL).lock(|data| (*data).replace(Some(serial0)));
-        (&TIMER00).lock(|data| (*data).replace(Some(timer00)));
-        (&TIMER01).lock(|data| (*data).replace(Some(timer01)));
-        (&TIMER10).lock(|data| (*data).replace(Some(timer10)));
-        (&TIMER11).lock(|data| (*data).replace(Some(timer11)));
-    }
+    critical_section::with(|cs| {
+        TIMER00.borrow_ref_mut(cs).replace(timer00);
+        TIMER01.borrow_ref_mut(cs).replace(timer01);
+        TIMER10.borrow_ref_mut(cs).replace(timer10);
+        TIMER11.borrow_ref_mut(cs).replace(timer11);
+    });
 
     loop {}
 }
 
 #[interrupt]
 fn TG0_T0_LEVEL() {
-    unsafe {
-        (&TIMER00).lock(|data| {
-            let mut timer = data.borrow_mut();
-            let timer = timer.as_mut().unwrap();
+    critical_section::with(|cs| {
+        let mut timer = TIMER00.borrow_ref_mut(cs);
+        let timer = timer.as_mut().unwrap();
 
-            if timer.is_interrupt_set() {
-                timer.clear_interrupt();
-                timer.start(500u64.millis());
+        if timer.is_interrupt_set() {
+            timer.clear_interrupt();
+            timer.start(500u64.millis());
 
-                (&SERIAL).lock(|data| {
-                    let mut serial = data.borrow_mut();
-                    let serial = serial.as_mut().unwrap();
-                    writeln!(serial, "Interrupt Level 2 - Timer0").ok();
-                });
-            }
-        });
-    }
+            esp_println::println!("Interrupt Level 2 - Timer0");
+        }
+    });
 }
 
 #[interrupt]
 fn TG0_T1_LEVEL() {
-    unsafe {
-        (&TIMER01).lock(|data| {
-            let mut timer = data.borrow_mut();
-            let timer = timer.as_mut().unwrap();
+    critical_section::with(|cs| {
+        let mut timer = TIMER01.borrow_ref_mut(cs);
+        let timer = timer.as_mut().unwrap();
 
-            if timer.is_interrupt_set() {
-                timer.clear_interrupt();
-                timer.start(2500u64.millis());
+        if timer.is_interrupt_set() {
+            timer.clear_interrupt();
+            timer.start(2500u64.millis());
 
-                (&SERIAL).lock(|data| {
-                    let mut serial = data.borrow_mut();
-                    let serial = serial.as_mut().unwrap();
-                    writeln!(serial, "Interrupt Level 2 - Timer1").ok();
-                });
-            }
-        });
-    }
+            esp_println::println!("Interrupt Level 2 - Timer1");
+        }
+    });
 }
 
 #[interrupt]
 fn TG1_T0_LEVEL() {
-    unsafe {
-        (&TIMER10).lock(|data| {
-            let mut timer = data.borrow_mut();
-            let timer = timer.as_mut().unwrap();
+    critical_section::with(|cs| {
+        let mut timer = TIMER10.borrow_ref_mut(cs);
+        let timer = timer.as_mut().unwrap();
 
-            if timer.is_interrupt_set() {
-                timer.clear_interrupt();
-                timer.start(1u64.secs());
+        if timer.is_interrupt_set() {
+            timer.clear_interrupt();
+            timer.start(1u64.secs());
 
-                (&SERIAL).lock(|data| {
-                    let mut serial = data.borrow_mut();
-                    let serial = serial.as_mut().unwrap();
-                    writeln!(serial, "Interrupt Level 3 - Timer0").ok();
-                });
-            }
-        });
-    }
+            esp_println::println!("Interrupt Level 3 - Timer0");
+        }
+    });
 }
 
 #[interrupt]
 fn TG1_T1_LEVEL() {
-    unsafe {
-        (&TIMER11).lock(|data| {
-            let mut timer = data.borrow_mut();
-            let timer = timer.as_mut().unwrap();
+    critical_section::with(|cs| {
+        let mut timer = TIMER10.borrow_ref_mut(cs);
+        let timer = timer.as_mut().unwrap();
 
-            if timer.is_interrupt_set() {
-                timer.clear_interrupt();
-                timer.start(3u64.secs());
+        if timer.is_interrupt_set() {
+            timer.clear_interrupt();
+            timer.start(3u64.secs());
 
-                (&SERIAL).lock(|data| {
-                    let mut serial = data.borrow_mut();
-                    let serial = serial.as_mut().unwrap();
-                    writeln!(serial, "Interrupt Level 3 - Timer1").ok();
-                });
-            }
-        });
-    }
+            esp_println::println!("Interrupt Level 3 - Timer1");
+        }
+    });
 }

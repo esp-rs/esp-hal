@@ -41,6 +41,7 @@ panic-halt        = "0.2"
 ssd1306           = "0.7"
 smart-leds        = "0.3"
 esp-println       = { version = "0.2.0", features = ["esp32"] }
+critical-section  = "1"
 
 [features]
 default   = ["rt", "vectored"]
