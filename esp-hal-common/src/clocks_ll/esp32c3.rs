@@ -1,9 +1,11 @@
 use paste::paste;
 
-use crate::clock::{ApbClock, Clock, CpuClock, PllClock, XtalClock};
-
-use crate::rom::{ets_update_cpu_frequency, regi2c_ctrl_write_reg, regi2c_ctrl_write_reg_mask};
-use crate::{regi2c_write, regi2c_write_mask};
+use crate::{
+    clock::{ApbClock, Clock, CpuClock, PllClock, XtalClock},
+    regi2c_write,
+    regi2c_write_mask,
+    rom::{ets_update_cpu_frequency, regi2c_ctrl_write_reg, regi2c_ctrl_write_reg_mask},
+};
 
 const I2C_BBPLL: u32 = 0x66;
 const I2C_BBPLL_HOSTID: u32 = 0;
@@ -188,7 +190,8 @@ pub(crate) fn esp32c3_rtc_update_to_xtal(freq: XtalClock, _div: u32) {
 
     unsafe {
         ets_update_cpu_frequency(freq.mhz());
-        // Set divider from XTAL to APB clock. Need to set divider to 1 (reg. value 0) first.
+        // Set divider from XTAL to APB clock. Need to set divider to 1 (reg. value 0)
+        // first.
         system_control.sysclk_conf.modify(|_, w| {
             w.pre_div_cnt()
                 .bits(0)

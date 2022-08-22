@@ -31,8 +31,8 @@ use esp32s3_hal::{
     Rtc,
     Serial,
 };
+use esp_backtrace as _;
 use nb::block;
-use panic_halt as _;
 use ssd1306::{prelude::*, I2CDisplayInterface, Ssd1306};
 use xtensa_lx_rt::entry;
 

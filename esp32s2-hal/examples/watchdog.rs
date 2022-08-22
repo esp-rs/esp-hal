@@ -15,8 +15,8 @@ use esp32s2_hal::{
     Rtc,
     Serial,
 };
+use esp_backtrace as _;
 use nb::block;
-use panic_halt as _;
 use xtensa_lx_rt::entry;
 
 #[entry]

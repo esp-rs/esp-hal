@@ -7,7 +7,7 @@
 
 use core::{cell::RefCell, fmt::Write};
 
-use bare_metal::Mutex;
+use critical_section::Mutex;
 use esp32c3_hal::{
     clock::ClockControl,
     interrupt,
@@ -19,11 +19,11 @@ use esp32c3_hal::{
     Rtc,
     Serial,
 };
+use esp_backtrace as _;
 use nb::block;
-use panic_halt as _;
 use riscv_rt::entry;
 
-static mut SERIAL: Mutex<RefCell<Option<Serial<UART0>>>> = Mutex::new(RefCell::new(None));
+static SERIAL: Mutex<RefCell<Option<Serial<UART0>>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
@@ -52,9 +52,7 @@ fn main() -> ! {
 
     timer0.start(1u64.secs());
 
-    riscv::interrupt::free(|_cs| unsafe {
-        SERIAL.get_mut().replace(Some(serial0));
-    });
+    critical_section::with(|cs| SERIAL.borrow_ref_mut(cs).replace(serial0));
 
     interrupt::enable(pac::Interrupt::UART0, interrupt::Priority::Priority1).unwrap();
     interrupt::set_kind(
@@ -68,11 +66,8 @@ fn main() -> ! {
     }
 
     loop {
-        riscv::interrupt::free(|cs| unsafe {
-            let mut serial = SERIAL.borrow(*cs).borrow_mut();
-            let serial = serial.as_mut().unwrap();
-
-            writeln!(serial, "Hello World! Send a single `#` character or send at least 30 characters and see the interrupts trigger.").ok();
+        critical_section::with(|cs| {
+            writeln!(SERIAL.borrow_ref_mut(cs).as_mut().unwrap(), "Hello World! Send a single `#` character or send at least 30 characters and see the interrupts trigger.").ok();
         });
 
         block!(timer0.wait()).unwrap();
@@ -81,8 +76,8 @@ fn main() -> ! {
 
 #[interrupt]
 fn UART0() {
-    riscv::interrupt::free(|cs| unsafe {
-        let mut serial = SERIAL.borrow(*cs).borrow_mut();
+    critical_section::with(|cs| {
+        let mut serial = SERIAL.borrow_ref_mut(cs);
         let serial = serial.as_mut().unwrap();
 
         let mut cnt = 0;

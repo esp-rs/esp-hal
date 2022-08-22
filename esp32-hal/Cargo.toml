@@ -37,10 +37,11 @@ features = ["esp32"]
 
 [dev-dependencies]
 embedded-graphics = "0.7"
-panic-halt        = "0.2"
 ssd1306           = "0.7"
 smart-leds        = "0.3"
 esp-println       = { version = "0.2.0", features = ["esp32"] }
+esp-backtrace     = { version = "0.2", features = ["esp32", "panic-handler", "exception-handler", "print-uart"] }
+critical-section  = "1"
 
 [features]
 default   = ["rt", "vectored"]

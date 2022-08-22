@@ -8,7 +8,7 @@
 
 use core::cell::RefCell;
 
-use bare_metal::Mutex;
+use critical_section::Mutex;
 use esp32c3_hal::{
     clock::ClockControl,
     gpio::{Gpio9, IO},
@@ -20,10 +20,10 @@ use esp32c3_hal::{
     Delay,
     Rtc,
 };
-use panic_halt as _;
+use esp_backtrace as _;
 use riscv_rt::entry;
 
-static mut BUTTON: Mutex<RefCell<Option<Gpio9<Input<PullDown>>>>> = Mutex::new(RefCell::new(None));
+static BUTTON: Mutex<RefCell<Option<Gpio9<Input<PullDown>>>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
@@ -52,9 +52,7 @@ fn main() -> ! {
     let mut button = io.pins.gpio9.into_pull_down_input();
     button.listen(Event::FallingEdge);
 
-    riscv::interrupt::free(|_cs| unsafe {
-        BUTTON.get_mut().replace(Some(button));
-    });
+    critical_section::with(|cs| BUTTON.borrow_ref_mut(cs).replace(button));
 
     interrupt::enable(pac::Interrupt::GPIO, interrupt::Priority::Priority3).unwrap();
 
@@ -71,10 +69,12 @@ fn main() -> ! {
 
 #[interrupt]
 fn GPIO() {
-    riscv::interrupt::free(|cs| unsafe {
-        let mut button = BUTTON.borrow(*cs).borrow_mut();
-        let button = button.as_mut().unwrap();
+    critical_section::with(|cs| {
         esp_println::println!("GPIO interrupt");
-        button.clear_interrupt();
+        BUTTON
+            .borrow_ref_mut(cs)
+            .as_mut()
+            .unwrap()
+            .clear_interrupt();
     });
 }

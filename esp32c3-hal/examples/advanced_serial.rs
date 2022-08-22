@@ -19,9 +19,9 @@ use esp32c3_hal::{
     Serial,
     IO,
 };
+use esp_backtrace as _;
 use esp_println::println;
 use nb::block;
-use panic_halt as _;
 use riscv_rt::entry;
 
 #[entry]

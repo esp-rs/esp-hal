@@ -15,7 +15,7 @@ use esp32s2_hal::{
     PulseControl,
     Rtc,
 };
-use panic_halt as _;
+use esp_backtrace as _;
 use xtensa_lx_rt::entry;
 
 #[entry]

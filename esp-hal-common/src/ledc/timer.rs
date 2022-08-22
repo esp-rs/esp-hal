@@ -161,7 +161,8 @@ where
         let mut divisor = ((src_freq as u64) << 8) / frequency as u64 / precision as u64;
 
         if divisor > LEDC_TIMER_DIV_NUM_MAX {
-            // APB_CLK results in divisor which too high. Try using REF_TICK as clock source.
+            // APB_CLK results in divisor which too high. Try using REF_TICK as clock
+            // source.
             self.use_ref_tick = true;
             divisor = ((1_000_000 as u64) << 8) / frequency as u64 / precision as u64;
         }

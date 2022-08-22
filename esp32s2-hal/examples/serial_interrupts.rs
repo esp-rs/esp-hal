@@ -7,6 +7,7 @@
 
 use core::{cell::RefCell, fmt::Write};
 
+use critical_section::Mutex;
 use esp32s2_hal::{
     clock::ClockControl,
     interrupt,
@@ -17,13 +18,11 @@ use esp32s2_hal::{
     Rtc,
     Serial,
 };
+use esp_backtrace as _;
 use nb::block;
-use panic_halt as _;
-use xtensa_lx::mutex::{CriticalSectionMutex, Mutex};
 use xtensa_lx_rt::entry;
 
-static mut SERIAL: CriticalSectionMutex<RefCell<Option<Serial<UART0>>>> =
-    CriticalSectionMutex::new(RefCell::new(None));
+static SERIAL: Mutex<RefCell<Option<Serial<UART0>>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
@@ -56,18 +55,14 @@ fn main() -> ! {
 
     timer0.start(1u64.secs());
 
-    unsafe {
-        (&SERIAL).lock(|data| (*data).replace(Some(serial0)));
-    }
+    critical_section::with(|cs| SERIAL.borrow_ref_mut(cs).replace(serial0));
 
     loop {
-        unsafe {
-            (&SERIAL).lock(|data| {
-                let mut serial = data.borrow_mut();
-                let serial = serial.as_mut().unwrap();
-                writeln!(serial, "Hello World! Send a single `#` character or send at least 30 characters and see the interrupts trigger.").ok();
-            });
-        }
+        critical_section::with(|cs| {
+            let mut serial = SERIAL.borrow_ref_mut(cs);
+            let serial = serial.as_mut().unwrap();
+            writeln!(serial, "Hello World! Send a single `#` character or send at least 30 characters and see the interrupts trigger.").ok();
+        });
 
         block!(timer0.wait()).unwrap();
     }
@@ -75,27 +70,25 @@ fn main() -> ! {
 
 #[interrupt]
 fn UART0() {
-    unsafe {
-        (&SERIAL).lock(|data| {
-            let mut serial = data.borrow_mut();
-            let serial = serial.as_mut().unwrap();
+    critical_section::with(|cs| {
+        let mut serial = SERIAL.borrow_ref_mut(cs);
+        let serial = serial.as_mut().unwrap();
 
-            let mut cnt = 0;
-            while let nb::Result::Ok(_c) = serial.read() {
-                cnt += 1;
-            }
-            writeln!(serial, "Read {} bytes", cnt,).ok();
+        let mut cnt = 0;
+        while let nb::Result::Ok(_c) = serial.read() {
+            cnt += 1;
+        }
+        writeln!(serial, "Read {} bytes", cnt,).ok();
 
-            writeln!(
-                serial,
-                "Interrupt AT-CMD: {} RX-FIFO-FULL: {}",
-                serial.at_cmd_interrupt_set(),
-                serial.rx_fifo_full_interrupt_set(),
-            )
-            .ok();
+        writeln!(
+            serial,
+            "Interrupt AT-CMD: {} RX-FIFO-FULL: {}",
+            serial.at_cmd_interrupt_set(),
+            serial.rx_fifo_full_interrupt_set(),
+        )
+        .ok();
 
-            serial.reset_at_cmd_interrupt();
-            serial.reset_rx_fifo_full_interrupt();
-        });
-    }
+        serial.reset_at_cmd_interrupt();
+        serial.reset_rx_fifo_full_interrupt();
+    });
 }

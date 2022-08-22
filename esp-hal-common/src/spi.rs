@@ -22,15 +22,18 @@
 //! );
 //! ```
 
+use core::convert::Infallible;
+
+use fugit::HertzU32;
+
 use crate::{
     clock::Clocks,
     pac::spi2::RegisterBlock,
     system::PeripheralClockControl,
     types::{InputSignal, OutputSignal},
-    InputPin, OutputPin,
+    InputPin,
+    OutputPin,
 };
-use core::convert::Infallible;
-use fugit::HertzU32;
 
 /// The size of the FIFO buffer for SPI
 #[cfg(not(feature = "esp32s2"))]
@@ -209,10 +212,12 @@ pub use ehal1::*;
 
 #[cfg(feature = "eh1")]
 mod ehal1 {
-    use super::*;
-    use embedded_hal_1::spi::blocking::{SpiBus, SpiBusFlush, SpiBusRead, SpiBusWrite};
-    use embedded_hal_1::spi::nb::FullDuplex;
+    use embedded_hal_1::spi::{
+        blocking::{SpiBus, SpiBusFlush, SpiBusRead, SpiBusWrite},
+        nb::FullDuplex,
+    };
 
+    use super::*;
 
     impl<T> embedded_hal_1::spi::ErrorType for Spi<T> {
         type Error = Infallible;
@@ -257,9 +262,10 @@ mod ehal1 {
     {
         /// Write out data from `write`, read response into `read`.
         ///
-        /// `read` and `write` are allowed to have different lengths. If `write` is longer, all
-        /// other bytes received are discarded. If `read` is longer, [`EMPTY_WRITE_PAD`] is written
-        /// out as necessary until enough bytes have been read. Reading and writing happens
+        /// `read` and `write` are allowed to have different lengths. If `write`
+        /// is longer, all other bytes received are discarded. If `read`
+        /// is longer, [`EMPTY_WRITE_PAD`] is written out as necessary
+        /// until enough bytes have been read. Reading and writing happens
         /// simultaneously.
         fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
             // Optimizations
@@ -296,7 +302,8 @@ mod ehal1 {
                 SpiBusFlush::flush(self)?;
 
                 if read_inc > 0 {
-                    self.spi.read_bytes_from_fifo(&mut read[read_from..read_to])?;
+                    self.spi
+                        .read_bytes_from_fifo(&mut read[read_from..read_to])?;
                 }
 
                 write_from = write_to;
@@ -307,8 +314,9 @@ mod ehal1 {
 
         /// Transfer data in place.
         ///
-        /// Writes data from `words` out on the bus and stores the reply into `words`. A convenient
-        /// wrapper around [`write`](SpiBusWrite::write), [`flush`](SpiBusFlush::flush) and
+        /// Writes data from `words` out on the bus and stores the reply into
+        /// `words`. A convenient wrapper around
+        /// [`write`](SpiBusWrite::write), [`flush`](SpiBusFlush::flush) and
         /// [`read`](SpiBusRead::read).
         fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
             // Since we have the traits so neatly implemented above, use them!
@@ -548,9 +556,10 @@ pub trait Instance {
 
     /// Write bytes to SPI.
     ///
-    /// Copies the content of `words` in chunks of 64 bytes into the SPI transmission FIFO. If
-    /// `words` is longer than 64 bytes, multiple sequential transfers are performed. This function
-    /// will return before all bytes of the last chunk to transmit have been sent to the wire. If
+    /// Copies the content of `words` in chunks of 64 bytes into the SPI
+    /// transmission FIFO. If `words` is longer than 64 bytes, multiple
+    /// sequential transfers are performed. This function will return before
+    /// all bytes of the last chunk to transmit have been sent to the wire. If
     /// you must ensure that the whole messages was written correctly, use
     /// [`flush`].
     // FIXME: See below.
@@ -558,14 +567,15 @@ pub trait Instance {
         let reg_block = self.register_block();
         let num_chunks = words.len() / FIFO_SIZE;
 
-        // The fifo has a limited fixed size, so the data must be chunked and then transmitted
+        // The fifo has a limited fixed size, so the data must be chunked and then
+        // transmitted
         for (i, chunk) in words.chunks(FIFO_SIZE).enumerate() {
             self.configure_datalen(chunk.len() as u32 * 8);
 
             let fifo_ptr = reg_block.w0.as_ptr();
             unsafe {
-                // It seems that `copy_nonoverlapping` is significantly faster than regular `copy`,
-                // by about 20%... ?
+                // It seems that `copy_nonoverlapping` is significantly faster than regular
+                // `copy`, by about 20%... ?
                 core::ptr::copy_nonoverlapping::<u32>(
                     chunk.as_ptr() as *const u32,
                     fifo_ptr as *mut u32,
@@ -593,9 +603,9 @@ pub trait Instance {
 
     /// Read bytes from SPI.
     ///
-    /// Sends out a stuffing byte for every byte to read. This function doesn't perform flushing.
-    /// If you want to read the response to something you have written before, consider using
-    /// [`transfer`] instead.
+    /// Sends out a stuffing byte for every byte to read. This function doesn't
+    /// perform flushing. If you want to read the response to something you
+    /// have written before, consider using [`transfer`] instead.
     fn read_bytes(&mut self, words: &mut [u8]) -> Result<(), Infallible> {
         let empty_array = [EMPTY_WRITE_PAD; FIFO_SIZE];
 
@@ -607,15 +617,15 @@ pub trait Instance {
         Ok(())
     }
 
-
     /// Read received bytes from SPI FIFO.
     ///
-    /// Copies the contents of the SPI receive FIFO into `words`. This function doesn't perform
-    /// flushing. If you want to read the response to something you have written before, consider
-    /// using [`transfer`] instead.
-    // FIXME: Using something like `core::slice::from_raw_parts` and `copy_from_slice` on the
-    // receive registers works only for the esp32 and esp32c3 varaints. The reason for this is
-    // unknown.
+    /// Copies the contents of the SPI receive FIFO into `words`. This function
+    /// doesn't perform flushing. If you want to read the response to
+    /// something you have written before, consider using [`transfer`]
+    /// instead.
+    // FIXME: Using something like `core::slice::from_raw_parts` and
+    // `copy_from_slice` on the receive registers works only for the esp32 and
+    // esp32c3 varaints. The reason for this is unknown.
     fn read_bytes_from_fifo(&mut self, words: &mut [u8]) -> Result<(), Infallible> {
         let reg_block = self.register_block();
 

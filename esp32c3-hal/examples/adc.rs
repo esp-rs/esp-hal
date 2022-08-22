@@ -17,8 +17,8 @@ use esp32c3_hal::{
     Delay,
     Rtc,
 };
+use esp_backtrace as _;
 use esp_println::println;
-use panic_halt as _;
 use riscv_rt::entry;
 
 #[entry]

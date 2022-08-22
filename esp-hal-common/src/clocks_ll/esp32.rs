@@ -1,8 +1,4 @@
-use crate::clock::{
-    Clock,
-    XtalClock,
-    PllClock,
-};
+use crate::clock::{Clock, PllClock, XtalClock};
 
 const REF_CLK_FREQ: u32 = 1000000;
 

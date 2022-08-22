@@ -8,6 +8,7 @@
 
 use core::cell::RefCell;
 
+use critical_section::Mutex;
 use esp32s2_hal::{
     clock::ClockControl,
     gpio::{Gpio0, IO},
@@ -20,12 +21,10 @@ use esp32s2_hal::{
     Delay,
     Rtc,
 };
-use panic_halt as _;
-use xtensa_lx::mutex::{CriticalSectionMutex, Mutex};
+use esp_backtrace as _;
 use xtensa_lx_rt::entry;
 
-static mut BUTTON: CriticalSectionMutex<RefCell<Option<Gpio0<Input<PullDown>>>>> =
-    CriticalSectionMutex::new(RefCell::new(None));
+static BUTTON: Mutex<RefCell<Option<Gpio0<Input<PullDown>>>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
@@ -48,9 +47,7 @@ fn main() -> ! {
     let mut button = io.pins.gpio0.into_pull_down_input();
     button.listen(Event::FallingEdge);
 
-    unsafe {
-        (&BUTTON).lock(|data| (*data).replace(Some(button)));
-    }
+    critical_section::with(|cs| BUTTON.borrow_ref_mut(cs).replace(button));
 
     interrupt::enable(pac::Interrupt::GPIO, interrupt::Priority::Priority2).unwrap();
 
@@ -69,16 +66,15 @@ fn main() -> ! {
 #[ram]
 #[interrupt]
 fn GPIO() {
-    unsafe {
-        esp_println::println!(
-            "GPIO Interrupt with priority {}",
-            xtensa_lx::interrupt::get_level()
-        );
-
-        (&BUTTON).lock(|data| {
-            let mut button = data.borrow_mut();
-            let button = button.as_mut().unwrap();
-            button.clear_interrupt();
-        });
-    }
+    esp_println::println!(
+        "GPIO Interrupt with priority {}",
+        xtensa_lx::interrupt::get_level()
+    );
+    critical_section::with(|cs| {
+        BUTTON
+            .borrow_ref_mut(cs)
+            .as_mut()
+            .unwrap()
+            .clear_interrupt()
+    });
 }

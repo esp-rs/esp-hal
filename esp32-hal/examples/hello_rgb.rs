@@ -25,7 +25,7 @@ use esp32_hal::{
     IO,
 };
 #[allow(unused_imports)]
-use panic_halt as _;
+use esp_backtrace as _;
 use smart_leds::{
     brightness,
     gamma,

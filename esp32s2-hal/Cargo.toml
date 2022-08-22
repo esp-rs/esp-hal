@@ -24,7 +24,6 @@ categories = [
 ]
 
 [dependencies]
-bare-metal     = "1.0"
 embedded-hal   = { version = "0.2",  features = ["unproven"] }
 embedded-hal-1 = { package = "embedded-hal", version = "=1.0.0-alpha.8" }
 xtensa-lx      = { version = "0.7",  features = ["esp32s2"] }
@@ -40,6 +39,8 @@ panic-halt        = "0.2"
 ssd1306           = "0.7"
 smart-leds        = "0.3"
 esp-println       = { version = "0.2.0", features = ["esp32s2"] }
+esp-backtrace     = { version = "0.2", features = ["esp32s2", "panic-handler", "exception-handler", "print-uart"] }
+critical-section  = "1"
 
 [features]
 default   = ["rt", "vectored"]
