@@ -8,8 +8,10 @@
 /* override entry point */
 ENTRY(ESP32Reset)
 
-/* reserved at the start of DRAM */
-RESERVE_DRAM = 0x4000;
+/* reserved at the start of DRAM/IRAM */
+RESERVE_CACHES = 0x2000;
+
+VECTORS_SIZE = 0x400;
 
 /* reserved at the start of the RTC memories for use by the ULP processor */
 RESERVE_RTC_FAST = 0;
@@ -21,10 +23,10 @@ STACK_SIZE = 8k;
 /* Specify main memory areas */
 MEMORY
 {
-  vectors_seg ( RX )     : ORIGIN = 0x40022000, len = 1k /* SRAM0 */
-  iram_seg ( RX )        : ORIGIN = 0x40022400, len = 128k-0x400 /* SRAM0 */
+  vectors_seg ( RX )     : ORIGIN = 0x40020000 + RESERVE_CACHES, len = VECTORS_SIZE /* SRAM0 */
+  iram_seg ( RX )        : ORIGIN = 0x40020000 + RESERVE_CACHES + VECTORS_SIZE, len = 192k - RESERVE_CACHES - VECTORS_SIZE /* SRAM0 */
 
-  dram_seg ( RW )        : ORIGIN = 0x3FFB0000 + RESERVE_DRAM, len = 192k - RESERVE_DRAM
+  dram_seg ( RW )        : ORIGIN = 0x3FFB0000 + RESERVE_CACHES + VECTORS_SIZE, len = 192k - RESERVE_CACHES - VECTORS_SIZE
 
   /* SRAM1; reserved for static ROM usage; can be used for heap.
      Length based on the "_dram0_rtos_reserved_start" symbol from IDF used to delimit the
