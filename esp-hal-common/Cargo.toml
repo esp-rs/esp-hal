@@ -40,18 +40,16 @@ critical-section = "1.0.0"
 # Each supported device MUST have its PAC included below along with a
 # corresponding feature. We rename the PAC packages because we cannot
 # have dependencies and features with the same names.
-# NOTE: If we ever raise our MSRV to 1.60.0+ we can use the optional
-#       dependency syntax in the features instead of aliasing these packages.
-esp32_pac   = { package = "esp32",   version = "0.13.0", optional = true }
-esp32c3_pac = { package = "esp32c3", version = "0.5.0",  optional = true }
-esp32s2_pac = { package = "esp32s2", version = "0.3.0",  optional = true }
-esp32s3_pac = { package = "esp32s3", version = "0.3.0",  optional = true }
+esp32   = { version = "0.13.0", optional = true }
+esp32c3 = { version = "0.5.0",  optional = true }
+esp32s2 = { version = "0.3.0",  optional = true }
+esp32s3 = { version = "0.3.0",  optional = true }
 
 [features]
-esp32   = ["esp32_pac/rt"  , "procmacros/xtensa", "multi_core" , "xtensa-lx-rt/esp32",   "xtensa-lx/esp32",   "critical-section/restore-state-u32"]
-esp32c3 = ["esp32c3_pac/rt", "procmacros/riscv" , "single_core", "riscv", "riscv-atomic-emulation-trap",      "critical-section/restore-state-u8"]
-esp32s2 = ["esp32s2_pac/rt", "procmacros/xtensa", "single_core", "xtensa-lx-rt/esp32s2", "xtensa-lx/esp32s2", "critical-section/restore-state-u32"]
-esp32s3 = ["esp32s3_pac/rt", "procmacros/xtensa", "multi_core" , "xtensa-lx-rt/esp32s3", "xtensa-lx/esp32s3", "critical-section/restore-state-u32"]
+esp32   = ["esp32/rt"  , "procmacros/xtensa", "multi_core" , "xtensa-lx-rt/esp32",   "xtensa-lx/esp32",   "critical-section/restore-state-u32"]
+esp32c3 = ["esp32c3/rt", "procmacros/riscv" , "single_core", "riscv", "riscv-atomic-emulation-trap",      "critical-section/restore-state-u8"]
+esp32s2 = ["esp32s2/rt", "procmacros/xtensa", "single_core", "xtensa-lx-rt/esp32s2", "xtensa-lx/esp32s2", "critical-section/restore-state-u32"]
+esp32s3 = ["esp32s3/rt", "procmacros/xtensa", "multi_core" , "xtensa-lx-rt/esp32s3", "xtensa-lx/esp32s3", "critical-section/restore-state-u32"]
 
 # Core Count (should not be enabled directly, but instead by a PAC's feature)
 single_core = []
