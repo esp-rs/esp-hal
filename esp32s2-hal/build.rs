@@ -23,6 +23,11 @@ fn main() {
         .write_all(include_bytes!("ld/linkall.x"))
         .unwrap();
 
+    File::create(out.join("link-esp32s2.x"))
+        .unwrap()
+        .write_all(include_bytes!("ld/link-esp32s2.x"))
+        .unwrap();
+
     println!("cargo:rustc-link-search={}", out.display());
 
     // Only re-run the build script when memory.x is changed,

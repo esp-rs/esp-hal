@@ -11,6 +11,8 @@ ENTRY(ESP32Reset)
 /* reserved at the start of DRAM */
 RESERVE_DRAM = 0x4000;
 
+VECTORS_SIZE = 0x400;
+
 /* reserved at the start of the RTC memories for use by the ULP processor */
 RESERVE_RTC_FAST = 0;
 RESERVE_RTC_SLOW = 0;
@@ -21,17 +23,17 @@ STACK_SIZE = 8k;
 /* Specify main memory areas */
 MEMORY
 {
-  vectors_seg ( RX )     : ORIGIN = 0x40022000, len = 1k /* SRAM0 */
-  iram_seg ( RX )        : ORIGIN = 0x40022400, len = 128k-0x400 /* SRAM0 */
+  vectors_seg ( RX )     : ORIGIN = 0x40020000 + RESERVE_DRAM, len = VECTORS_SIZE /* SRAM0 */
+  iram_seg ( RX )        : ORIGIN = 0x40020000 + RESERVE_DRAM + VECTORS_SIZE, len = 192 - RESERVE_DRAM - VECTORS_SIZE /* SRAM0 */
 
-  dram_seg ( RW )        : ORIGIN = 0x3FFB0000 + RESERVE_DRAM, len = 192k - RESERVE_DRAM
+  dram_seg ( RW )        : ORIGIN = 0x3FFB0000 + RESERVE_DRAM + VECTORS_SIZE, len = 192k - RESERVE_DRAM - VECTORS_SIZE
 
   /* SRAM1; reserved for static ROM usage; can be used for heap.
      Length based on the "_dram0_rtos_reserved_start" symbol from IDF used to delimit the
      ROM data reserved region:
      https://github.com/espressif/esp-idf/blob/bcb34ca7aef4e8d3b97d75ad069b960fb1c17c16/components/heap/port/esp32s2/memory_layout.c#L121-L122
   */
-  reserved_for_boot_seg  : ORIGIN = 0x3FFE0000, len = 0x1FA10
+  reserved_for_boot_seg  : ORIGIN = 0x3ffffa10, len = 0x5f0
 
   /* external flash 
      The 0x20 offset is a convenience for the app binary image generation.
