@@ -56,7 +56,7 @@ SECTIONS {
     *(.noinit .noinit.*)
   } > RWDATA
 
-  .dram0_reserved_for_data (NOLOAD) : ALIGN(4)
+  .iram0_reserved_for_data (NOLOAD) : ALIGN(4)
   {
     . = ORIGIN(RWTEXT) + SIZEOF(.data) + SIZEOF(.bss) + SIZEOF(.noinit);
   } > RWTEXT
