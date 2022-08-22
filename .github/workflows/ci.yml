@@ -118,7 +118,7 @@ jobs:
         with:
           profile: minimal
           target: riscv32imc-unknown-none-elf
-          toolchain: "1.59.0"
+          toolchain: "1.60.0"
           default: true
       - uses: Swatinem/rust-cache@v1
       - uses: actions-rs/cargo@v1
@@ -140,7 +140,7 @@ jobs:
           default: true
           ldproxy: false
           buildtargets: ${{ matrix.chip }}
-          version: "1.59.0"
+          version: "1.60.0"
       - uses: Swatinem/rust-cache@v1
       - uses: actions-rs/cargo@v1
         with:
