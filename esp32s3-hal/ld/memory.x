@@ -29,7 +29,7 @@ MEMORY
 {
   vectors_seg ( RX )     : ORIGIN = 0x40370000 + RESERVE_ICACHE, len = VECTORS_SIZE
   iram_seg ( RX )        : ORIGIN = 0x40370000 + RESERVE_ICACHE + VECTORS_SIZE, len = 328k - VECTORS_SIZE - RESERVE_ICACHE
-  dram_seg ( RW )        : ORIGIN = 0x3FC88000 , len = 328k 
+  dram_seg ( RW )        : ORIGIN = 0x3FC88000 , len = 345856 
 
   reserved_for_boot_seg  : ORIGIN = 0x3FCDC700, len = 0xB000 /* reserved for static ROM usage; can be used for heap */
 
