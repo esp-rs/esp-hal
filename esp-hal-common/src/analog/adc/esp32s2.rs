@@ -1,11 +1,10 @@
 use core::marker::PhantomData;
 
 use embedded_hal::adc::{Channel, OneShot};
-use esp32s2_pac::APB_SARADC;
 
 use crate::{
     analog::{ADC1, ADC2},
-    pac::SENS,
+    pac::{APB_SARADC, SENS},
 };
 
 /// The sampling/readout resolution of the ADC
