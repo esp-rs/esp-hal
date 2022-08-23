@@ -2,7 +2,7 @@
 ENTRY(ESP32Reset)
 
 /* reserved for ICACHE */
-RESERVE_ICACHES = 0x8000;
+RESERVE_ICACHE = 0x8000;
 
 /* reserved at the start of the RTC memories for use by the ULP processor */
 RESERVE_RTC_FAST = 0;
@@ -22,16 +22,16 @@ VECTORS_SIZE = 0x400;
  memory, but can only be used after app starts.
 
  D cache use the memory from high address, so when it's configured to 16K/32K, the region
- 0x3FCF000 ~ (3FD00000 - DATA_CACHE_SIZE) should be available. This region is not used as
+ 0x3FCF0000 ~ (3FD00000 - DATA_CACHE_SIZE) should be available. This region is not used as
  static memory, leaving to the heap.
 */
 MEMORY
 {
-  vectors_seg ( RX )     : ORIGIN = 0x40370000 + RESERVE_ICACHES, len =  1k
-  iram_seg ( RX )        : ORIGIN = 0x40370000 + RESERVE_ICACHES + VECTORS_SIZE, len = 328k - VECTORS_SIZE - RESERVE_ICACHES
-  dram_seg ( RW )        : ORIGIN = 0x3FC80000 + RESERVE_ICACHES + VECTORS_SIZE, len = 328k - VECTORS_SIZE - RESERVE_ICACHES
+  vectors_seg ( RX )     : ORIGIN = 0x40370000 + RESERVE_ICACHE, len = VECTORS_SIZE
+  iram_seg ( RX )        : ORIGIN = 0x40370000 + RESERVE_ICACHE + VECTORS_SIZE, len = 328k - VECTORS_SIZE - RESERVE_ICACHE
+  dram_seg ( RW )        : ORIGIN = 0x3FC88000 , len = 328k 
 
-  reserved_for_boot_seg  : ORIGIN = 0x3FFDC200, len = 144k /* reserved for static ROM usage; can be used for heap */
+  reserved_for_boot_seg  : ORIGIN = 0x3FCDC700, len = 0xB000 /* reserved for static ROM usage; can be used for heap */
 
   /* external flash 
      The 0x20 offset is a convenience for the app binary image generation.

@@ -71,7 +71,7 @@ SECTIONS {
     /*  Create an empty gap as big as .rwtext section - 32k (SRAM0) 
      *  because SRAM1 is available on the data bus and instruction bus 
      */
-    . = MAX(SIZEOF(.rwtext), 32k) - 32k + VECTORS_SIZE + RESERVE_ICACHES;
+    . = MAX(SIZEOF(.rwtext) + RESERVE_ICACHE + VECTORS_SIZE, 32k) - 32k;
 
     /* Prepare the alignment of the section above. */
     . = ALIGN(4);
