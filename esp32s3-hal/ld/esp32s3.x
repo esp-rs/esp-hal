@@ -1,6 +1,5 @@
-
 /* before memory.x to allow override */
-ENTRY(Reset)
+ENTRY(ESP32Reset)
 
 INCLUDE memory.x
 
@@ -53,7 +52,6 @@ SECTIONS {
     _rodata_end = ABSOLUTE(.);
   } > RODATA
 
-
   .rwtext : ALIGN(4)
   {
     . = ALIGN (4);
@@ -70,15 +68,13 @@ SECTIONS {
 
     . = ALIGN(ALIGNOF(.rwtext));
 
-    /* Create an empty gap as big as .text section */
-
-    . = SIZEOF(.rwtext);
-
-    /* Prepare the alignment of the section above. Few bytes (0x20) must be
-     * added for the mapping header.
+    /*  Create an empty gap as big as .rwtext section - 32k (SRAM0) 
+     *  because SRAM1 is available on the data bus and instruction bus 
      */
+    . = MAX(SIZEOF(.rwtext) + RESERVE_ICACHE + VECTORS_SIZE, 32k) - 32k;
 
-    . = ALIGN(0x10000) + 0x20;
+    /* Prepare the alignment of the section above. */
+    . = ALIGN(4);
     _rwdata_reserved_start = .;
   } > RWDATA
 

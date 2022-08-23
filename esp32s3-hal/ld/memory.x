@@ -1,8 +1,8 @@
 /* override entry point */
 ENTRY(ESP32Reset)
 
-/* reserved at the start of DRAM */
-RESERVE_DRAM = 0x8000;
+/* reserved for ICACHE */
+RESERVE_ICACHE = 0x8000;
 
 /* reserved at the start of the RTC memories for use by the ULP processor */
 RESERVE_RTC_FAST = 0;
@@ -11,14 +11,27 @@ RESERVE_RTC_SLOW = 0;
 /* define stack size for both cores */
 STACK_SIZE = 8k;
 
-/* Specify main memory areas */
+VECTORS_SIZE = 0x400;
+
+/* Specify main memory areas
+
+ 40370000 <- IRAM/Icache -> 40378000 <- D/IRAM (I) -> 403E0000
+                            3FC88000 <- D/IRAM (D) -> 3FCF0000 <- DRAM/DCache -> 3FD00000
+
+ Startup code uses the IRAM from 0x403B9000 to 0x403E0000, which is not available for static
+ memory, but can only be used after app starts.
+
+ D cache use the memory from high address, so when it's configured to 16K/32K, the region
+ 0x3FCF0000 ~ (3FD00000 - DATA_CACHE_SIZE) should be available. This region is not used as
+ static memory, leaving to the heap.
+*/
 MEMORY
 {
-  vectors_seg ( RX )     : ORIGIN = 0x40370000 + RESERVE_DRAM, len =  1k
-  iram_seg ( RX )        : ORIGIN = 0x40370400 + RESERVE_DRAM, len = 328k - 0x400
+  vectors_seg ( RX )     : ORIGIN = 0x40370000 + RESERVE_ICACHE, len = VECTORS_SIZE
+  iram_seg ( RX )        : ORIGIN = 0x40370000 + RESERVE_ICACHE + VECTORS_SIZE, len = 328k - VECTORS_SIZE - RESERVE_ICACHE
+  dram_seg ( RW )        : ORIGIN = 0x3FC88000 , len = 345856 
 
-  dram_seg ( RW )        : ORIGIN = 0x3FC80000 + RESERVE_DRAM, len = 328k - RESERVE_DRAM
-  reserved_for_boot_seg  : ORIGIN = 0x3FFDC200, len = 144k /* ???? SRAM1; reserved for static ROM usage; can be used for heap */
+  reserved_for_boot_seg  : ORIGIN = 0x3FCDC700, len = 0xB000 /* reserved for static ROM usage; can be used for heap */
 
   /* external flash 
      The 0x20 offset is a convenience for the app binary image generation.
