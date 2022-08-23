@@ -379,8 +379,6 @@ mod vectored {
                 handler(level);
             }
         } else {
-            let status = get_status(crate::get_core());
-            let interrupt_levels = get_configured_interrupts(crate::get_core(), status);
             if (cpu_interrupt_mask & CPU_INTERRUPT_EDGE) != 0 {
                 let cpu_interrupt_mask = cpu_interrupt_mask & CPU_INTERRUPT_EDGE;
                 let cpu_interrupt_nr = cpu_interrupt_mask.trailing_zeros();
@@ -389,8 +387,10 @@ mod vectored {
                 // for edge interrupts cannot rely on the interrupt status
                 // register, therefore call all registered
                 // handlers for current level
-                let mut interrupt_mask =
-                    interrupt_levels[level as usize] & chip_specific::INTERRUPT_EDGE;
+                let interrupt_levels =
+                    get_configured_interrupts(crate::get_core(), chip_specific::INTERRUPT_EDGE);
+                let interrupt_mask = interrupt_levels[level as usize];
+                let mut interrupt_mask = interrupt_mask & chip_specific::INTERRUPT_EDGE;
                 loop {
                     let interrupt_nr = interrupt_mask.trailing_zeros();
                     if let Ok(interrupt) = pac::Interrupt::try_from(interrupt_nr as u16) {
@@ -403,6 +403,8 @@ mod vectored {
             } else {
                 // finally check periperal sources and fire of handlers from pac
                 // peripheral mapped interrupts are cleared by the peripheral
+                let status = get_status(crate::get_core());
+                let interrupt_levels = get_configured_interrupts(crate::get_core(), status);
                 let interrupt_mask = status & interrupt_levels[level as usize];
                 let interrupt_nr = interrupt_mask.trailing_zeros();
 
@@ -457,7 +459,7 @@ mod vectored {
     mod chip_specific {
         use super::*;
         pub const INTERRUPT_EDGE: u128 =
-    0b_0000_0000_0000_0000_0000_0000_0000_0000__0000_0000_0000_0000_0000_0000_0001_1111_1110_0000_0000_0000_0000_0000_0000_0000__0000_0000_0000_0000_0000_0000_0000_0000;
+    0b_0000_0000_0000_0000_0000_0000_0000_0000__0000_0000_0000_0000_0000_0011_1011_1111_1100_0000_0000_0000_0000_0000_0000_0000__0000_0000_0000_0000_0000_0000_0000_0000;
         #[inline]
         pub fn interrupt_is_edge(interrupt: Interrupt) -> bool {
             use pac::Interrupt::*;
@@ -470,6 +472,9 @@ mod vectored {
                 TG1_T1_EDGE,
                 TG1_WDT_EDGE,
                 TG1_LACT_EDGE,
+                SYSTIMER_TARGET0,
+                SYSTIMER_TARGET1,
+                SYSTIMER_TARGET2,
             ]
             .contains(&interrupt)
         }
