@@ -1,12 +1,12 @@
 //! SPI loopback test
 //!
 //! Folowing pins are used:
-//! SCLK    GPIO19
-//! MISO    GPIO25
-//! MOSI    GPIO23
-//! CS 1    GPIO12
-//! CS 2    GPIO13
-//! CS 3    GPIO14
+//! SCLK    GPIO6
+//! MISO    GPIO2
+//! MOSI    GPIO7
+//! CS 1    GPIO3
+//! CS 2    GPIO4
+//! CS 3    GPIO4
 //!
 //! Depending on your target and the board you are using you have to change the
 //! pins.
@@ -20,7 +20,7 @@
 
 use core::fmt::Write;
 
-use esp32_hal::{
+use esp32c3_hal::{
     clock::ClockControl,
     gpio::IO,
     pac::Peripherals,
@@ -46,16 +46,21 @@ fn main() -> ! {
     // the RTC WDT, and the TIMG WDTs.
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    let mut wdt = timer_group0.wdt;
+    let mut wdt0 = timer_group0.wdt;
+    let timer_group1 = TimerGroup::new(peripherals.TIMG1, &clocks);
+    let mut wdt1 = timer_group1.wdt;
+
     let mut serial0 = Serial::new(peripherals.UART0);
 
-    wdt.disable();
+    rtc.swd.disable();
     rtc.rwdt.disable();
+    wdt0.disable();
+    wdt1.disable();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-    let sclk = io.pins.gpio19;
-    let miso = io.pins.gpio25;
-    let mosi = io.pins.gpio23;
+    let sclk = io.pins.gpio6;
+    let miso = io.pins.gpio2;
+    let mosi = io.pins.gpio7;
 
     let spi_controller = SpiBusController::from_spi(Spi::new_no_cs(
         peripherals.SPI2,
@@ -67,9 +72,9 @@ fn main() -> ! {
         &mut system.peripheral_clock_control,
         &clocks,
     ));
-    let mut spi_device_1 = spi_controller.add_device(io.pins.gpio12);
-    let mut spi_device_2 = spi_controller.add_device(io.pins.gpio13);
-    let mut spi_device_3 = spi_controller.add_device(io.pins.gpio14);
+    let mut spi_device_1 = spi_controller.add_device(io.pins.gpio3);
+    let mut spi_device_2 = spi_controller.add_device(io.pins.gpio4);
+    let mut spi_device_3 = spi_controller.add_device(io.pins.gpio5);
 
     let mut delay = Delay::new(&clocks);
     writeln!(serial0, "=== SPI example with embedded-hal-1 traits ===").unwrap();

@@ -1,12 +1,12 @@
 //! SPI loopback test
 //!
 //! Folowing pins are used:
-//! SCLK    GPIO19
-//! MISO    GPIO25
-//! MOSI    GPIO23
-//! CS 1    GPIO12
-//! CS 2    GPIO13
-//! CS 3    GPIO14
+//! SCLK    GPIO36
+//! MISO    GPIO37
+//! MOSI    GPIO35
+//! CS 1    GPIO1
+//! CS 2    GPIO2
+//! CS 3    GPIO3
 //!
 //! Depending on your target and the board you are using you have to change the
 //! pins.
@@ -20,7 +20,7 @@
 
 use core::fmt::Write;
 
-use esp32_hal::{
+use esp32s2_hal::{
     clock::ClockControl,
     gpio::IO,
     pac::Peripherals,
@@ -39,7 +39,7 @@ use embedded_hal_1::spi::blocking::SpiDevice;
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take().unwrap();
-    let mut system = peripherals.DPORT.split();
+    let mut system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     // Disable the watchdog timers. For the ESP32-C3, this includes the Super WDT,
@@ -53,9 +53,9 @@ fn main() -> ! {
     rtc.rwdt.disable();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-    let sclk = io.pins.gpio19;
-    let miso = io.pins.gpio25;
-    let mosi = io.pins.gpio23;
+    let sclk = io.pins.gpio36;
+    let miso = io.pins.gpio37;
+    let mosi = io.pins.gpio35;
 
     let spi_controller = SpiBusController::from_spi(Spi::new_no_cs(
         peripherals.SPI2,
@@ -67,9 +67,9 @@ fn main() -> ! {
         &mut system.peripheral_clock_control,
         &clocks,
     ));
-    let mut spi_device_1 = spi_controller.add_device(io.pins.gpio12);
-    let mut spi_device_2 = spi_controller.add_device(io.pins.gpio13);
-    let mut spi_device_3 = spi_controller.add_device(io.pins.gpio14);
+    let mut spi_device_1 = spi_controller.add_device(io.pins.gpio1);
+    let mut spi_device_2 = spi_controller.add_device(io.pins.gpio2);
+    let mut spi_device_3 = spi_controller.add_device(io.pins.gpio3);
 
     let mut delay = Delay::new(&clocks);
     writeln!(serial0, "=== SPI example with embedded-hal-1 traits ===").unwrap();
