@@ -24,7 +24,7 @@ use esp32_hal::{
     gpio::IO,
     pac::Peripherals,
     prelude::*,
-    spi::{Spi, SpiMode},
+    spi::{SpiBuilder, SpiMode},
     timer::TimerGroup,
     Delay,
     Rtc,
@@ -55,17 +55,18 @@ fn main() -> ! {
     let mosi = io.pins.gpio23;
     let cs = io.pins.gpio22;
 
-    let mut spi = Spi::new(
+    let mut spi = SpiBuilder::new(
         peripherals.SPI2,
-        sclk,
-        mosi,
-        miso,
-        cs,
-        1000u32.kHz(),
-        SpiMode::Mode0,
         &mut system.peripheral_clock_control,
         &clocks,
-    );
+        sclk,
+    )
+    .frequency(1000u32.kHz())
+    .mode(SpiMode::Mode0)
+    .mosi(mosi)
+    .miso(miso)
+    .cs(cs)
+    .build();
 
     let mut delay = Delay::new(&clocks);
     writeln!(serial0, "=== SPI example with embedded-hal-1 traits ===").unwrap();
