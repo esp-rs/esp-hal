@@ -203,7 +203,9 @@ where
     type Error = Infallible;
 
     fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-        self.spi.write_bytes(words)
+        self.spi.write_bytes(words)?;
+        self.spi.flush()?;
+        Ok(())
     }
 }
 
@@ -592,6 +594,9 @@ pub trait Instance {
             // Wait for all chunks to complete except the last one.
             // The function is allowed to return before the bus is idle.
             // see [embedded-hal flushing](https://docs.rs/embedded-hal/1.0.0-alpha.8/embedded_hal/spi/blocking/index.html#flushing)
+            //
+            // THIS IS NOT TRUE FOR EH 0.2.X! MAKE SURE TO FLUSH IN EH 0.2.X TRAIT
+            // IMPLEMENTATIONS!
             if i < num_chunks {
                 while reg_block.cmd.read().usr().bit_is_set() {
                     // wait
