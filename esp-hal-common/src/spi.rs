@@ -24,7 +24,7 @@
 
 use core::convert::Infallible;
 
-use fugit::HertzU32;
+use fugit::{HertzU32, RateExtU32};
 
 use crate::{
     clock::Clocks,
@@ -53,6 +53,109 @@ pub enum SpiMode {
 
 pub struct Spi<T> {
     spi: T,
+}
+
+pub struct SpiBuilder<'a, T, SCK, MISO, MOSI, CS> {
+    instance: T,
+    frequency: HertzU32, // 100u32.kHz(),
+    mode: SpiMode,       // SpiMode::Mode0,
+    peripheral_clock_control: &'a mut PeripheralClockControl,
+    clocks: &'a Clocks,
+    pin_sck: SCK,
+    pin_miso: Option<MISO>,
+    pin_mosi: Option<MOSI>,
+    pin_cs: Option<CS>,
+}
+
+impl<'a, T, SCK, MISO, MOSI, CS> SpiBuilder<'a, T, SCK, MISO, MOSI, CS>
+where
+    T: Instance,
+    SCK: OutputPin,
+    MOSI: OutputPin,
+    MISO: InputPin,
+    CS: OutputPin,
+{
+    /// Create a new SPI builder instance.
+    pub fn new(
+        spi: T,
+        peripheral_clock_control: &'a mut PeripheralClockControl,
+        clocks: &'a Clocks,
+        sck: SCK,
+    ) -> Self {
+        SpiBuilder {
+            instance: spi,
+            frequency: 100u32.kHz(),
+            mode: SpiMode::Mode0,
+            peripheral_clock_control,
+            clocks,
+            pin_sck: sck,
+            pin_miso: None,
+            pin_mosi: None,
+            pin_cs: None,
+        }
+    }
+
+    /// Set SPI bus frequency. Defaults to 100 kHz.
+    pub fn frequency(mut self, frequency: HertzU32) -> Self {
+        self.frequency = frequency;
+        self
+    }
+
+    /// Set SPI bus operation mode. Defaults to Mode 0.
+    pub fn mode(mut self, mode: SpiMode) -> Self {
+        self.mode = mode;
+        self
+    }
+
+    /// (Optional) Add a chip select line.
+    ///
+    /// If you intend to use multiple devices on the same SPI bus (i.e. you share the bus),
+    /// don't add a CS line and prefer to use [`SpiBusDevice`](TODO) instead.
+    pub fn cs(mut self, cs: CS) -> Self {
+        self.pin_cs = Some(cs);
+        self
+    }
+
+    /// (Optional) Add a MISO line.
+    pub fn miso(mut self, miso: MISO) -> Self {
+        self.pin_miso = Some(miso);
+        self
+    }
+
+    /// (Optional) Add a MOSI line.
+    pub fn mosi(mut self, mosi: MOSI) -> Self {
+        self.pin_mosi = Some(mosi);
+        self
+    }
+
+    /// Build a [`Spi`] instance.
+    pub fn build(mut self) -> Spi<T> {
+        self.pin_sck.set_to_push_pull_output()
+            .connect_peripheral_to_output(self.instance.sclk_signal());
+
+        if let Some(mut mosi) = self.pin_mosi {
+            mosi.set_to_push_pull_output()
+                .connect_peripheral_to_output(self.instance.mosi_signal());
+        }
+
+        if let Some(mut miso) = self.pin_miso {
+            miso.set_to_input()
+                .connect_input_to_peripheral(self.instance.miso_signal());
+        }
+
+        if let Some(mut cs) = self.pin_cs {
+            cs.set_to_push_pull_output()
+                .connect_peripheral_to_output(self.instance.cs_signal());
+        }
+
+        Spi::new_internal(
+            self.instance,
+            self.frequency,
+            self.mode,
+            self.peripheral_clock_control,
+            self.clocks,
+        )
+    }
 }
 
 impl<T> Spi<T>
@@ -561,7 +664,7 @@ pub trait Instance {
     /// sequential transfers are performed. This function will return before
     /// all bytes of the last chunk to transmit have been sent to the wire. If
     /// you must ensure that the whole messages was written correctly, use
-    /// [`flush`].
+    /// [`flush`](Instance::flush).
     // FIXME: See below.
     fn write_bytes(&mut self, words: &[u8]) -> Result<(), Infallible> {
         let reg_block = self.register_block();
@@ -605,7 +708,8 @@ pub trait Instance {
     ///
     /// Sends out a stuffing byte for every byte to read. This function doesn't
     /// perform flushing. If you want to read the response to something you
-    /// have written before, consider using [`transfer`] instead.
+    /// have written before, consider using [`transfer`](Instance::transfer)
+    /// instead.
     fn read_bytes(&mut self, words: &mut [u8]) -> Result<(), Infallible> {
         let empty_array = [EMPTY_WRITE_PAD; FIFO_SIZE];
 
@@ -621,8 +725,8 @@ pub trait Instance {
     ///
     /// Copies the contents of the SPI receive FIFO into `words`. This function
     /// doesn't perform flushing. If you want to read the response to
-    /// something you have written before, consider using [`transfer`]
-    /// instead.
+    /// something you have written before, consider
+    /// using [`transfer`](Instance::transfer) instead.
     // FIXME: Using something like `core::slice::from_raw_parts` and
     // `copy_from_slice` on the receive registers works only for the esp32 and
     // esp32c3 varaints. The reason for this is unknown.
