@@ -12,30 +12,29 @@ repository   = "https://github.com/esp-rs/esp-hal"
 license      = "MIT OR Apache-2.0"
 
 [dependencies]
-cfg-if         = "1.0"
-embedded-hal   = { version = "0.2", features = ["unproven"] }
-embedded-hal-1 = { package = "embedded-hal", version = "=1.0.0-alpha.8", optional = true }
-fugit          = "0.3"
-nb             = "1.0"
-paste          = "1.0"
-procmacros     = { path = "../esp-hal-procmacros", package = "esp-hal-procmacros" }
-void           = { version = "1.0", default-features = false }
+cfg-if           = "1.0.0"
+critical-section = "1.0.0"
+embedded-hal     = { version = "0.2.7", features = ["unproven"] }
+embedded-hal-1   = { package = "embedded-hal", version = "=1.0.0-alpha.8", optional = true }
+fugit            = "0.3.6"
+nb               = "1.0.0"
+paste            = "1.0.8"
+procmacros       = { path = "../esp-hal-procmacros", package = "esp-hal-procmacros" }
+void             = { version = "1.0.2", default-features = false }
 
 # RISC-V
-riscv                       = { version = "0.8", optional = true }
-riscv-atomic-emulation-trap = { version = "0.1", optional = true }
+riscv                       = { version = "0.8.0", optional = true }
+riscv-atomic-emulation-trap = { version = "0.1.1", optional = true }
 
 # Xtensa
-xtensa-lx    = { version = "0.7",  optional = true }
-xtensa-lx-rt = { version = "0.13", optional = true }
-
-# Part of `ufmt` containing only `uWrite` trait
-ufmt-write = { version = "0.1", optional = true }
+xtensa-lx    = { version = "0.7.0",  optional = true }
+xtensa-lx-rt = { version = "0.13.0", optional = true }
 
 # Smart-LED (e.g., WS2812/SK68XX) support
 smart-leds-trait = { version = "0.2.1", optional = true }
 
-critical-section = "1.0.0"
+# Part of `ufmt` containing only `uWrite` trait
+ufmt-write = { version = "0.1.0", optional = true }
 
 # IMPORTANT:
 # Each supported device MUST have its PAC included below along with a
@@ -54,16 +53,16 @@ esp32s3 = ["esp32s3/rt", "procmacros/xtensa", "multi_core" , "xtensa-lx-rt/esp32
 
 # Core Count (should not be enabled directly, but instead by a PAC's feature)
 single_core = []
-multi_core   = []
+multi_core  = []
 
-# To support `ufmt`
-ufmt = ["ufmt-write"]
+# Implement the `embedded-hal==1.0.0-alpha.x` traits
+eh1 = ["embedded-hal-1"]
 
 # To use the external `smart_led` crate
 smartled = ["smart-leds-trait"]
 
-# Implement the `embedded-hal==1.0.0-alpha.x` traits
-eh1 = ["embedded-hal-1"]
+# To support `ufmt`
+ufmt = ["ufmt-write"]
 
 # To use vectored interrupts (calling the handlers defined in the PAC)
 vectored = ["procmacros/interrupt"]
