@@ -144,7 +144,7 @@ enum Ack {
     Nack,
 }
 
-#[cfg(any(esp32c3, esp32s3))]
+#[cfg(any(esp32c2, esp32c3, esp32s3))]
 enum Opcode {
     RStart = 6,
     Write  = 1,
@@ -311,7 +311,7 @@ fn enable_peripheral<T: Instance>(i2c: &T, peripheral_clock_control: &mut Periph
     // enable peripheral
     match i2c.i2c_number() {
         0 => peripheral_clock_control.enable(crate::system::Peripheral::I2cExt0),
-        #[cfg(not(esp32c3))]
+        #[cfg(not(any(esp32c2, esp32c3)))]
         1 => peripheral_clock_control.enable(crate::system::Peripheral::I2cExt1),
         _ => unreachable!(), // will never happen
     }
@@ -441,8 +441,8 @@ pub trait Instance {
         bus_freq: HertzU32,
     ) -> Result<(), SetupError> {
         cfg_if::cfg_if! {
-            if #[cfg(any(esp32s3, esp32c3))] {
-                // C3 and S3 have a clock divider mechanism, which we want to configure
+            if #[cfg(any(esp32c2, esp32c3, esp32s3))] {
+                // C2, C3, and S3 have a clock divider mechanism, which we want to configure
                 // as high as possible.
                 let sclk_div = source_clk.raw() / (bus_freq.raw() * 1024) + 1;
                 let half_cycle = source_clk.raw() / sclk_div as u32 / bus_freq.raw() / 2;
@@ -456,7 +456,7 @@ pub trait Instance {
         // we're setting these up separately (this might introduce some overhead,
         // but improves readability)
         cfg_if::cfg_if! {
-            if #[cfg(esp32c3)] {
+            if #[cfg(any(esp32c2, esp32c3))] {
                 let scl_wait_high = if bus_freq.raw() <= 50000 { 0 } else { half_cycle / 8 };
                 let scl_high = half_cycle - scl_wait_high;
                 let sda_hold = half_cycle / 4;
@@ -493,7 +493,7 @@ pub trait Instance {
 
         let scl_high = scl_high as u16;
 
-        #[cfg(any(esp32s3, esp32c3))]
+        #[cfg(any(esp32c2, esp32c3, esp32s3))]
         let scl_wait_high = scl_wait_high as u8;
 
         #[cfg(any(esp32s2))]
@@ -958,7 +958,7 @@ impl Instance for crate::pac::I2C0 {
     }
 }
 
-#[cfg(not(esp32c3))]
+#[cfg(not(any(esp32c2, esp32c3)))]
 impl Instance for crate::pac::I2C1 {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {

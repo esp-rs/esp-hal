@@ -6,12 +6,14 @@
 //! device-specific HAL crates instead:
 //!
 //! - [esp32-hal]
+//! - [esp32c2-hal]
 //! - [esp32c3-hal]
 //! - [esp32s2-hal]
 //! - [esp32s3-hal]
 //!
 //! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
 //! [esp32-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32-hal
+//! [esp32c2-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32c2-hal
 //! [esp32c3-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32c3-hal
 //! [esp32s2-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32s2-hal
 //! [esp32s3-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32s3-hal
@@ -21,6 +23,8 @@
 
 #[cfg(esp32)]
 pub use esp32 as pac;
+#[cfg(esp32c2)]
+pub use esp32c2 as pac;
 #[cfg(esp32c3)]
 pub use esp32c3 as pac;
 #[cfg(esp32s2)]
@@ -48,11 +52,17 @@ pub mod clock;
 pub mod delay;
 pub mod gpio;
 pub mod i2c;
+// FIXME: While the ESP32-C2 *does* have LEDC, it is not currently available in
+//        the SVD.
+#[cfg(not(esp32c2))]
 pub mod ledc;
 pub mod prelude;
+#[cfg(not(esp32c2))]
 pub mod pulse_control;
 pub mod rng;
 pub mod rom;
+// FIXME
+#[cfg(not(esp32c2))]
 pub mod rtc_cntl;
 pub mod serial;
 pub mod spi;
@@ -62,14 +72,16 @@ pub mod systimer;
 pub mod timer;
 #[cfg(has_usb_serial_jtag)]
 pub mod usb_serial_jtag;
+#[cfg(not(esp32c2))]
 pub mod utils;
 
 #[cfg_attr(esp32, path = "cpu_control/esp32.rs")]
-#[cfg_attr(any(esp32c3, esp32s2), path = "cpu_control/none.rs")]
+#[cfg_attr(any(esp32c2, esp32c3, esp32s2), path = "cpu_control/none.rs")]
 #[cfg_attr(esp32s3, path = "cpu_control/esp32s3.rs")]
 pub mod cpu_control;
 
 #[cfg_attr(esp32, path = "efuse/esp32.rs")]
+#[cfg_attr(esp32c2, path = "efuse/esp32c2.rs")]
 #[cfg_attr(esp32c3, path = "efuse/esp32c3.rs")]
 #[cfg_attr(esp32s2, path = "efuse/esp32s2.rs")]
 #[cfg_attr(esp32s3, path = "efuse/esp32s3.rs")]

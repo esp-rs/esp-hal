@@ -823,12 +823,12 @@ pub trait Instance {
     fn configure_datalen(&self, len: u32) {
         let reg_block = self.register_block();
 
-        #[cfg(any(esp32c3, esp32s3))]
+        #[cfg(any(esp32c2, esp32c3, esp32s3))]
         reg_block
             .ms_dlen
             .write(|w| unsafe { w.ms_data_bitlen().bits(len - 1) });
 
-        #[cfg(not(any(esp32c3, esp32s3)))]
+        #[cfg(not(any(esp32c2, esp32c3, esp32s3)))]
         {
             reg_block
                 .mosi_dlen
@@ -841,7 +841,7 @@ pub trait Instance {
     }
 }
 
-#[cfg(any(esp32c3))]
+#[cfg(any(esp32c2, esp32c3))]
 impl Instance for crate::pac::SPI2 {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
