@@ -5,10 +5,11 @@ authors = [
     "Jesse Braham <jesse@beta7.io>",
     "Björn Quentin <bjoern.quentin@mobile-j.de>",
 ]
-edition     = "2021"
-description = "HAL for ESP32-S2 microcontrollers"
-repository  = "https://github.com/esp-rs/esp-hal"
-license     = "MIT OR Apache-2.0"
+edition      = "2021"
+rust-version = "1.60.0"
+description  = "HAL for ESP32-S2 microcontrollers"
+repository   = "https://github.com/esp-rs/esp-hal"
+license      = "MIT OR Apache-2.0"
 
 keywords = [
     "embedded",

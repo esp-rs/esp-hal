@@ -5,10 +5,11 @@ authors = [
     "Jesse Braham <jesse@beta7.io>",
     "Björn Quentin <bjoern.quentin@mobile-j.de>",
 ]
-edition     = "2021"
-description = "HAL implementations for peripherals common among Espressif devices; should not be used directly"
-repository  = "https://github.com/esp-rs/esp-hal"
-license     = "MIT OR Apache-2.0"
+edition      = "2021"
+rust-version = "1.60.0"
+description  = "HAL implementations for peripherals common among Espressif devices; should not be used directly"
+repository   = "https://github.com/esp-rs/esp-hal"
+license      = "MIT OR Apache-2.0"
 
 [dependencies]
 cfg-if         = "1.0"
