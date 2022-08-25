@@ -6,9 +6,11 @@
 
 **H**ardware **A**bstraction **L**ayer crates for the **ESP32**, **ESP32-C3**, **ESP32-S2**, and **ESP32-S3** from Espressif.
 
-This project is still in the early stages of development, and as such there should be no expectation of API stability. Only a small number of peripherals currently have drivers implemented (you can see a full list [here]) and out of those most are still incomplete, albeit functional. These HALs are `no_std`; if you are looking for `std` support please use [esp-idf-hal] instead.
+These HALs are `no_std`; if you are looking for `std` support please use [esp-idf-hal] instead.
 
-If you have any questions, comments, or concerns please join us on [Matrix]. For additional information regarding any of the crates in the monorepo, please refer to the crate's README.
+This project is still in the early stages of development, and as such there should be no expectation of API stability. A significant number of peripherals currently have drivers implemented (you can see a full list [here]) but have varying levels of functionality. For most basic tasks, this should be usable already.
+
+If you have any questions, comments, or concerns please [open an issue], [start a new discussion], or join us on [Matrix]. For additional information regarding any of the crates in this repository please refer to the crate's README.
 
 |     Crate     |                               Target                                | Technical Reference Manual |
 | :-----------: | :-----------------------------------------------------------------: | :------------------------: |
@@ -21,6 +23,8 @@ _\* via [atomic emulation]_
 
 [here]: https://github.com/esp-rs/esp-hal/issues/19
 [esp-idf-hal]: https://github.com/esp-rs/esp-idf-hal
+[open an issue]: https://github.com/esp-rs/esp-hal/issues/new
+[start a new discussion]: https://github.com/esp-rs/esp-hal/discussions/new
 [matrix]: https://matrix.to/#/#esp-rs:matrix.org
 [esp32-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32-hal
 [esp32c3-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32c3-hal
@@ -39,9 +43,12 @@ The **M**inimum **S**upported **R**ust **V**ersions are:
 - `1.60.0` for RISC-V devices (**ESP32-C3**)
 - `1.60.0` for Xtensa devices (**ESP32**, **ESP32-S2**, **ESP32-S3**)
 
-Note that targeting the Xtensa ISA requires the use of the [esp-rs/rust] compiler fork, whereas RISC-V is officially supported by the official Rust compiler.
+Note that targeting the Xtensa ISA currently requires the use of the [esp-rs/rust] compiler fork. The [esp-rs/rust-build] repository has pre-compiled release artifacts for most common platforms, and provides installation scripts to aid you in the process.
+
+RISC-V is officially supported by the official Rust compiler.
 
 [esp-rs/rust]: https://github.com/esp-rs/rust
+[esp-rs/rust-build]: https://github.com/esp-rs/rust-build
 
 ## License
 
