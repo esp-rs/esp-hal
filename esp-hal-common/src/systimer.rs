@@ -1,5 +1,7 @@
 use core::{intrinsics::transmute, marker::PhantomData};
 
+use fugit::MillisDurationU32;
+
 use crate::pac::{
     generic::Reg,
     systimer::{
@@ -21,6 +23,11 @@ pub struct SystemTimer {
 }
 
 impl SystemTimer {
+    #[cfg(feature = "esp32s2")]
+    pub const TICKS_PER_SECOND: u64 = 80_000_000; // TODO this can change when we have support for changing APB frequency
+    #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+    pub const TICKS_PER_SECOND: u64 = 16_000_000;
+
     pub fn new(p: SYSTIMER) -> Self {
         Self {
             _inner: p,
@@ -56,7 +63,8 @@ impl SystemTimer {
 
 #[derive(Debug)]
 pub struct Target;
-// pub struct Periodic; // TODO, also impl e-h timer traits
+#[derive(Debug)]
+pub struct Periodic; // TODO, also impl e-h timer traits
 
 #[derive(Debug)]
 pub struct Alarm<MODE, const CHANNEL: u8> {
@@ -94,10 +102,11 @@ impl<T, const CHANNEL: u8> Alarm<T, CHANNEL> {
             _ => unreachable!(),
         }
     }
-}
 
-impl<const CHANNEL: u8> Alarm<Target, CHANNEL> {
-    pub fn set_target(&self, timestamp: u64) {
+    fn configure(
+        &self,
+        conf: impl FnOnce(&Reg<TARGET0_CONF_SPEC>, &Reg<TARGET0_HI_SPEC>, &Reg<TARGET0_LO_SPEC>),
+    ) {
         unsafe {
             let systimer = &*SYSTIMER::ptr();
             let (tconf, hi, lo): (
@@ -134,9 +143,7 @@ impl<const CHANNEL: u8> Alarm<Target, CHANNEL> {
                     .modify(|_, w| w.timer_unit0_core0_stall_en().clear_bit());
             }
 
-            tconf.write(|w| w.target0_period_mode().clear_bit()); // target mode
-            hi.write(|w| w.timer_target0_hi().bits((timestamp >> 32) as u32));
-            lo.write(|w| w.timer_target0_lo().bits((timestamp & 0xFFFF_FFFF) as u32));
+            conf(tconf, hi, lo);
 
             #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
             {
@@ -171,5 +178,40 @@ impl<const CHANNEL: u8> Alarm<Target, CHANNEL> {
                 _ => unreachable!(),
             });
         }
+    }
+}
+
+impl<const CHANNEL: u8> Alarm<Target, CHANNEL> {
+    pub fn set_target(&self, timestamp: u64) {
+        self.configure(|tconf, hi, lo| unsafe {
+            tconf.write(|w| w.target0_period_mode().clear_bit()); // target mode
+            hi.write(|w| w.timer_target0_hi().bits((timestamp >> 32) as u32));
+            lo.write(|w| w.timer_target0_lo().bits((timestamp & 0xFFFF_FFFF) as u32));
+        })
+    }
+
+    pub fn into_periodic(self) -> Alarm<Periodic, CHANNEL> {
+        Alarm { _pd: PhantomData }
+    }
+}
+
+impl<const CHANNEL: u8> Alarm<Periodic, CHANNEL> {
+    pub fn set_period(&self, period: fugit::HertzU32) {
+        let time_period: MillisDurationU32 = period.into_duration();
+        let cycles = time_period.ticks();
+        self.configure(|tconf, hi, lo| unsafe {
+            tconf.write(|w| {
+                w.target0_period_mode()
+                    .set_bit()
+                    .target0_period()
+                    .bits(cycles * (SystemTimer::TICKS_PER_SECOND as u32 / 1000))
+            });
+            hi.write(|w| w.timer_target0_hi().bits(0));
+            lo.write(|w| w.timer_target0_lo().bits(0));
+        })
+    }
+
+    pub fn into_target(self) -> Alarm<Target, CHANNEL> {
+        Alarm { _pd: PhantomData }
     }
 }

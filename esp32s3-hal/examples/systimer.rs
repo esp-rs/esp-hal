@@ -13,7 +13,7 @@ use esp32s3_hal::{
     interrupt::Priority,
     pac::{self, Peripherals},
     prelude::*,
-    systimer::{Alarm, SystemTimer, Target},
+    systimer::{Alarm, SystemTimer, Target, Periodic},
     timer::TimerGroup,
     Delay,
     Rtc,
@@ -21,7 +21,7 @@ use esp32s3_hal::{
 use esp_backtrace as _;
 use xtensa_lx_rt::entry;
 
-static ALARM0: Mutex<RefCell<Option<Alarm<Target, 0>>>> = Mutex::new(RefCell::new(None));
+static ALARM0: Mutex<RefCell<Option<Alarm<Periodic, 0>>>> = Mutex::new(RefCell::new(None));
 static ALARM1: Mutex<RefCell<Option<Alarm<Target, 1>>>> = Mutex::new(RefCell::new(None));
 static ALARM2: Mutex<RefCell<Option<Alarm<Target, 2>>>> = Mutex::new(RefCell::new(None));
 
@@ -41,16 +41,18 @@ fn main() -> ! {
 
     let syst = SystemTimer::new(peripherals.SYSTIMER);
 
-    let alarm0 = syst.alarm0;
-    alarm0.set_target(40_000_0000);
+    esp_println::println!("SYSTIMER Current value = {}", SystemTimer::now());
+
+    let alarm0 = syst.alarm0.into_periodic();
+    alarm0.set_period(1u32.Hz());
     alarm0.enable_interrupt();
 
     let alarm1 = syst.alarm1;
-    alarm1.set_target(41_111_1110);
+    alarm1.set_target(SystemTimer::now() + (SystemTimer::TICKS_PER_SECOND * 2));
     alarm1.enable_interrupt();
 
     let alarm2 = syst.alarm2;
-    alarm2.set_target(42_222_2220 * 2);
+    alarm2.set_target(SystemTimer::now() + (SystemTimer::TICKS_PER_SECOND * 3));
     alarm2.enable_interrupt();
 
     critical_section::with(|cs| {
@@ -61,7 +63,7 @@ fn main() -> ! {
 
     interrupt::enable(pac::Interrupt::SYSTIMER_TARGET0, Priority::Priority1).unwrap();
     interrupt::enable(pac::Interrupt::SYSTIMER_TARGET1, Priority::Priority2).unwrap();
-    interrupt::enable(pac::Interrupt::SYSTIMER_TARGET2, Priority::Priority2).unwrap();
+    interrupt::enable(pac::Interrupt::SYSTIMER_TARGET2, Priority::Priority3).unwrap();
 
     // Initialize the Delay peripheral, and use it to toggle the LED state in a
     // loop.
