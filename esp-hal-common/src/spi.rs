@@ -55,43 +55,35 @@ pub struct Spi<T> {
     spi: T,
 }
 
-pub struct SpiBuilder<'a, T, SCK, MISO, MOSI, CS> {
+
+pub struct SpiBuilder<'a, T> {
     instance: T,
     frequency: HertzU32, // 100u32.kHz(),
     mode: SpiMode,       // SpiMode::Mode0,
     peripheral_clock_control: &'a mut PeripheralClockControl,
     clocks: &'a Clocks,
-    pin_sck: SCK,
-    pin_miso: Option<MISO>,
-    pin_mosi: Option<MOSI>,
-    pin_cs: Option<CS>,
 }
 
-impl<'a, T, SCK, MISO, MOSI, CS> SpiBuilder<'a, T, SCK, MISO, MOSI, CS>
+impl<'a, T> SpiBuilder<'a, T>
 where
     T: Instance,
-    SCK: OutputPin,
-    MOSI: OutputPin,
-    MISO: InputPin,
-    CS: OutputPin,
 {
     /// Create a new SPI builder instance.
-    pub fn new(
+    pub fn new<SCK: OutputPin>(
         spi: T,
         peripheral_clock_control: &'a mut PeripheralClockControl,
         clocks: &'a Clocks,
-        sck: SCK,
+        mut sck: SCK,
     ) -> Self {
+        sck.set_to_push_pull_output()
+            .connect_peripheral_to_output(spi.sclk_signal());
+
         SpiBuilder {
             instance: spi,
             frequency: 100u32.kHz(),
             mode: SpiMode::Mode0,
             peripheral_clock_control,
             clocks,
-            pin_sck: sck,
-            pin_miso: None,
-            pin_mosi: None,
-            pin_cs: None,
         }
     }
 
@@ -111,43 +103,28 @@ where
     ///
     /// If you intend to use multiple devices on the same SPI bus (i.e. you share the bus),
     /// don't add a CS line and prefer to use [`SpiBusDevice`](TODO) instead.
-    pub fn cs(mut self, cs: CS) -> Self {
-        self.pin_cs = Some(cs);
+    pub fn cs<CS: OutputPin>(self, mut cs: CS) -> Self {
+        cs.set_to_push_pull_output()
+            .connect_peripheral_to_output(self.instance.cs_signal());
         self
     }
 
     /// (Optional) Add a MISO line.
-    pub fn miso(mut self, miso: MISO) -> Self {
-        self.pin_miso = Some(miso);
+    pub fn miso<MISO: InputPin>(self, mut miso: MISO) -> Self {
+        miso.set_to_input()
+            .connect_input_to_peripheral(self.instance.miso_signal());
         self
     }
 
     /// (Optional) Add a MOSI line.
-    pub fn mosi(mut self, mosi: MOSI) -> Self {
-        self.pin_mosi = Some(mosi);
+    pub fn mosi<MOSI: OutputPin>(self, mut mosi: MOSI) -> Self {
+        mosi.set_to_push_pull_output()
+            .connect_peripheral_to_output(self.instance.mosi_signal());
         self
     }
 
     /// Build a [`Spi`] instance.
-    pub fn build(mut self) -> Spi<T> {
-        self.pin_sck.set_to_push_pull_output()
-            .connect_peripheral_to_output(self.instance.sclk_signal());
-
-        if let Some(mut mosi) = self.pin_mosi {
-            mosi.set_to_push_pull_output()
-                .connect_peripheral_to_output(self.instance.mosi_signal());
-        }
-
-        if let Some(mut miso) = self.pin_miso {
-            miso.set_to_input()
-                .connect_input_to_peripheral(self.instance.miso_signal());
-        }
-
-        if let Some(mut cs) = self.pin_cs {
-            cs.set_to_push_pull_output()
-                .connect_peripheral_to_output(self.instance.cs_signal());
-        }
-
+    pub fn build(self) -> Spi<T> {
         Spi::new_internal(
             self.instance,
             self.frequency,
