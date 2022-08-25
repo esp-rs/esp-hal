@@ -23,6 +23,11 @@ pub struct SystemTimer {
 }
 
 impl SystemTimer {
+    #[cfg(feature = "esp32s2")]
+    pub const TICKS_PER_SECOND: u64 = 80_000_000; // TODO this can change when we have support for changing APB frequency
+    #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+    pub const TICKS_PER_SECOND: u64 = 16_000_000;
+
     pub fn new(p: SYSTIMER) -> Self {
         Self {
             _inner: p,
@@ -67,11 +72,6 @@ pub struct Alarm<MODE, const CHANNEL: u8> {
 }
 
 impl<T, const CHANNEL: u8> Alarm<T, CHANNEL> {
-    #[cfg(feature = "esp32s2")]
-    pub const TICKS_PER_SECOND: u32 = 40_000_000;
-    #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
-    pub const TICKS_PER_SECOND: u32 = 16_000_000;
-
     // private constructor
     fn new() -> Self {
         Self { _pd: PhantomData }
@@ -204,7 +204,7 @@ impl<const CHANNEL: u8> Alarm<Periodic, CHANNEL> {
                 w.target0_period_mode()
                     .set_bit()
                     .target0_period()
-                    .bits(cycles * (Self::TICKS_PER_SECOND / 1000))
+                    .bits(cycles * (SystemTimer::TICKS_PER_SECOND as u32 / 1000))
             });
             hi.write(|w| w.timer_target0_hi().bits(0));
             lo.write(|w| w.timer_target0_lo().bits(0));
