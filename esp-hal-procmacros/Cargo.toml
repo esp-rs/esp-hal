@@ -5,23 +5,24 @@ authors = [
     "Jesse Braham <jesse@beta7.io>",
     "Björn Quentin <bjoern.quentin@mobile-j.de>",
 ]
-edition     = "2021"
-description = "Procedural macros for ESP-HAL"
-repository  = "https://github.com/esp-rs/esp-hal"
-license     = "MIT OR Apache-2.0"
+edition      = "2021"
+rust-version = "1.60.0"
+description  = "Procedural macros for ESP-HAL"
+repository   = "https://github.com/esp-rs/esp-hal"
+license      = "MIT OR Apache-2.0"
 
 [lib]
 proc-macro = true
 
 [dependencies]
-quote = "1.0"
-proc-macro2 = "1.0"
-darling = "0.14"
-syn = {version = "1.0", features = ["extra-traits", "full"]}
+darling          = "0.14.1"
 proc-macro-error = "1.0.4"
+proc-macro2      = "1.0.43"
+quote            = "1.0.21"
+syn              = {version = "1.0.99", features = ["extra-traits", "full"]}
 
 [features]
-rtc_slow = []
-xtensa = []
-riscv = []
 interrupt = []
+riscv     = []
+rtc_slow  = []
+xtensa    = []
