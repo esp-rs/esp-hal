@@ -4,9 +4,15 @@ use fugit::HertzU32;
 use crate::system::SystemClockControl;
 
 #[cfg_attr(esp32, path = "clocks_ll/esp32.rs")]
+#[cfg_attr(esp32c2, path = "clocks_ll/esp32c2.rs")]
 #[cfg_attr(esp32c3, path = "clocks_ll/esp32c3.rs")]
 #[cfg_attr(esp32s2, path = "clocks_ll/esp32s2.rs")]
 #[cfg_attr(esp32s3, path = "clocks_ll/esp32s3.rs")]
+#[cfg_attr(feature = "esp32", path = "clocks_ll/esp32.rs")]
+#[cfg_attr(feature = "esp32c2", path = "clocks_ll/esp32c2.rs")]
+#[cfg_attr(feature = "esp32c3", path = "clocks_ll/esp32c3.rs")]
+#[cfg_attr(feature = "esp32s2", path = "clocks_ll/esp32s2.rs")]
+#[cfg_attr(feature = "esp32s3", path = "clocks_ll/esp32s3.rs")]
 mod clocks_ll;
 
 pub trait Clock {
@@ -26,7 +32,8 @@ pub trait Clock {
 pub enum CpuClock {
     Clock80MHz,
     Clock160MHz,
-    #[cfg(not(esp32c3))]
+    #[cfg(not(any(esp32c2, esp32c3)))]
+    #[cfg(not(any(feature = "esp32c2", feature = "esp32c3")))]
     Clock240MHz,
 }
 
@@ -36,7 +43,8 @@ impl Clock for CpuClock {
         match self {
             CpuClock::Clock80MHz => HertzU32::MHz(80),
             CpuClock::Clock160MHz => HertzU32::MHz(160),
-            #[cfg(not(esp32c3))]
+            #[cfg(not(any(esp32c2, esp32c3)))]
+            #[cfg(not(any(feature = "esp32c2", feature = "esp32c3")))]
             CpuClock::Clock240MHz => HertzU32::MHz(240),
         }
     }
@@ -50,7 +58,8 @@ pub(crate) enum XtalClock {
     RtcXtalFreq26M,
     #[cfg(esp32)]
     RtcXtalFreq24M,
-    #[cfg(any(esp32c3, esp32s3))]
+    #[cfg(any(esp32c2, esp32c3, esp32s3))]
+    #[cfg(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3"))]
     RtcXtalFreq32M,
     RtcXtalFreqOther(u32),
 }
@@ -63,7 +72,8 @@ impl Clock for XtalClock {
             XtalClock::RtcXtalFreq26M => HertzU32::MHz(26),
             #[cfg(esp32)]
             XtalClock::RtcXtalFreq24M => HertzU32::MHz(24),
-            #[cfg(any(esp32c3, esp32s3))]
+            #[cfg(any(esp32c2, esp32c3, esp32s3))]
+            #[cfg(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3"))]
             XtalClock::RtcXtalFreq32M => HertzU32::MHz(32),
             XtalClock::RtcXtalFreqOther(mhz) => HertzU32::MHz(*mhz),
         }
@@ -131,6 +141,7 @@ pub struct RawClocks {
     pub i2c_clock: HertzU32,
     // TODO chip specific additional ones as needed
 }
+
 /// Used to configure the frequencies of the clocks present in the chip.
 ///
 /// After setting all frequencies, call the freeze function to apply the
@@ -188,6 +199,53 @@ impl ClockControl {
                 cpu_clock: cpu_clock_speed.frequency(),
                 apb_clock: HertzU32::MHz(80),
                 xtal_clock: HertzU32::MHz(40),
+                i2c_clock: HertzU32::MHz(40),
+            },
+        }
+    }
+}
+
+#[cfg(esp32c2)]
+impl ClockControl {
+    /// Use what is considered the default settings after boot.
+    #[allow(unused)]
+    pub fn boot_defaults(clock_control: SystemClockControl) -> ClockControl {
+        ClockControl {
+            _private: (),
+            desired_rates: RawClocks {
+                cpu_clock: HertzU32::MHz(80),
+                apb_clock: HertzU32::MHz(80),
+                xtal_clock: HertzU32::MHz(40),
+                i2c_clock: HertzU32::MHz(40),
+            },
+        }
+    }
+
+    /// Configure the CPU clock speed.
+    #[allow(unused)]
+    pub fn configure(clock_control: SystemClockControl, cpu_clock_speed: CpuClock) -> ClockControl {
+        let apb_freq;
+        let xtal_freq = XtalClock::RtcXtalFreq40M;
+        let pll_freq = PllClock::Pll480MHz;
+
+        if cpu_clock_speed.mhz() <= xtal_freq.mhz() {
+            apb_freq = ApbClock::ApbFreqOther(cpu_clock_speed.mhz());
+            clocks_ll::esp32c2_rtc_update_to_xtal(xtal_freq, 1);
+            clocks_ll::esp32c2_rtc_apb_freq_update(apb_freq);
+        } else {
+            apb_freq = ApbClock::ApbFreq80MHz;
+            clocks_ll::esp32c2_rtc_bbpll_enable();
+            clocks_ll::esp32c2_rtc_bbpll_configure(xtal_freq, pll_freq);
+            clocks_ll::esp32c2_rtc_freq_to_pll_mhz(cpu_clock_speed);
+            clocks_ll::esp32c2_rtc_apb_freq_update(apb_freq);
+        }
+
+        ClockControl {
+            _private: (),
+            desired_rates: RawClocks {
+                cpu_clock: cpu_clock_speed.frequency(),
+                apb_clock: apb_freq.frequency(),
+                xtal_clock: xtal_freq.frequency(),
                 i2c_clock: HertzU32::MHz(40),
             },
         }

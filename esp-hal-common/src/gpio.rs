@@ -1207,7 +1207,7 @@ pub fn enable_iomux_clk_gate() {
     }
 }
 
-#[cfg(not(esp32c3))]
+#[cfg(not(any(esp32c2, esp32c3)))]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! analog {
@@ -1267,7 +1267,7 @@ macro_rules! analog {
     }
 }
 
-#[cfg(esp32c3)]
+#[cfg(any(esp32c2, esp32c3))]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! analog {

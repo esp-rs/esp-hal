@@ -29,3 +29,11 @@ gpio! {
     Gpio19: (gpio19, 19, gpio[19], IO,   0, Bank0, None),
     Gpio20: (gpio20, 20, gpio[20], IO,   0, Bank0, None),
 }
+
+analog! {
+    Gpio0 => 0
+    Gpio1 => 1
+    Gpio2 => 2
+    Gpio3 => 3
+    Gpio4 => 4
+}
