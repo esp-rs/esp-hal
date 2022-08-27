@@ -42,6 +42,7 @@ esp-backtrace     = { version = "0.2.0", features = ["esp32c3", "panic-handler",
 esp-println       = { version = "0.2.2", features = ["esp32c3"] }
 smart-leds        = "0.3.0"
 ssd1306           = "0.7.1"
+rotary-encoder-embedded = "0.1.1"
 
 [features]
 default     = ["rt", "vectored"]
