@@ -32,14 +32,14 @@ use esp32c3_hal::{
     Serial,
 };
 use esp_backtrace as _;
-use xtensa_lx_rt::entry;
+use riscv_rt::entry;
 
 use embedded_hal_1::spi::blocking::SpiDevice;
 
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take().unwrap();
-    let mut system = peripherals.DPORT.split();
+    let mut system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     // Disable the watchdog timers. For the ESP32-C3, this includes the Super WDT,
