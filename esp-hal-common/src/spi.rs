@@ -1,8 +1,7 @@
 //! # Serial Peripheral Interface
 //!
-//! There are multiple ways to use SPI, depending on your needs. Regardles of
-//! which way you choose, you must first create an SPI instance with
-//! [`Spi::new`].
+//! There are multiple ways to use SPI, depending on your needs. Regardless of which way you
+//! choose, you must first create an SPI instance with [`Spi::new`].
 //!
 //! ```rust
 //! let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
@@ -26,26 +25,23 @@
 //!
 //! ## Exclusive access to the SPI bus
 //!
-//! If all you want to do is to communicate to a single device, and you initiate
-//! transactions yourself, there are a number of ways to achieve this:
+//! If all you want to do is to communicate to a single device, and you initiate transactions
+//! yourself, there are a number of ways to achieve this:
 //!
-//! - Use the [`FullDuplex`](embedded_hal::spi::FullDuplex) trait to read/write
-//!   single bytes at a time,
-//! - Use the [`SpiBus`](embedded_hal_1::spi::blocking::SpiBus) trait (requires
-//!   the "eh1" feature) and its associated functions to initiate transactions
-//!   with simultaneous reads and writes, or
+//! - Use the [`FullDuplex`](embedded_hal::spi::FullDuplex) trait to read/write single bytes at a
+//!   time,
+//! - Use the [`SpiBus`](embedded_hal_1::spi::blocking::SpiBus) trait (requires the "eh1" feature)
+//!   and its associated functions to initiate transactions with simultaneous reads and writes, or
 //! - Use the [`SpiBusWrite`](embedded_hal_1::spi::blocking::SpiBusWrite) and
-//!   [`SpiBusRead`](embedded_hal_1::spi::blocking::SpiBusRead) traits (requires
-//!   the "eh1" feature) and their associated functions to read or write mutiple
-//!   bytes at a time.
+//!   [`SpiBusRead`](embedded_hal_1::spi::blocking::SpiBusRead) traits (requires the "eh1" feature)
+//!   and their associated functions to read or write mutiple bytes at a time.
 //!
 //!
 //! ## Shared SPI access
 //!
-//! If you have multiple devices on the same SPI bus that each have their own CS
-//! line, you may want to have a look at the [`SpiBusController`] and
-//! [`SpiBusDevice`] implemented here. These give exclusive access to the
-//! underlying SPI bus by means of a Mutex. This ensures that device
+//! If you have multiple devices on the same SPI bus that each have their own CS line, you may want
+//! to have a look at the [`SpiBusController`] and [`SpiBusDevice`] implemented here. These give
+//! exclusive access to the underlying SPI bus by means of a Mutex. This ensures that device
 //! transactions do not interfere with each other.
 
 use core::convert::Infallible;
