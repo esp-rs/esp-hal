@@ -1,7 +1,8 @@
 //! # Serial Peripheral Interface
 //!
-//! There are multiple ways to use SPI, depending on your needs. Regardless of which way you
-//! choose, you must first create an SPI instance with [`Spi::new`].
+//! There are multiple ways to use SPI, depending on your needs. Regardless of
+//! which way you choose, you must first create an SPI instance with
+//! [`Spi::new`].
 //!
 //! ```rust
 //! let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
@@ -25,23 +26,26 @@
 //!
 //! ## Exclusive access to the SPI bus
 //!
-//! If all you want to do is to communicate to a single device, and you initiate transactions
-//! yourself, there are a number of ways to achieve this:
+//! If all you want to do is to communicate to a single device, and you initiate
+//! transactions yourself, there are a number of ways to achieve this:
 //!
-//! - Use the [`FullDuplex`](embedded_hal::spi::FullDuplex) trait to read/write single bytes at a
-//!   time,
-//! - Use the [`SpiBus`](embedded_hal_1::spi::blocking::SpiBus) trait (requires the "eh1" feature)
-//!   and its associated functions to initiate transactions with simultaneous reads and writes, or
+//! - Use the [`FullDuplex`](embedded_hal::spi::FullDuplex) trait to read/write
+//!   single bytes at a time,
+//! - Use the [`SpiBus`](embedded_hal_1::spi::blocking::SpiBus) trait (requires
+//!   the "eh1" feature) and its associated functions to initiate transactions
+//!   with simultaneous reads and writes, or
 //! - Use the [`SpiBusWrite`](embedded_hal_1::spi::blocking::SpiBusWrite) and
-//!   [`SpiBusRead`](embedded_hal_1::spi::blocking::SpiBusRead) traits (requires the "eh1" feature)
-//!   and their associated functions to read or write mutiple bytes at a time.
+//!   [`SpiBusRead`](embedded_hal_1::spi::blocking::SpiBusRead) traits (requires
+//!   the "eh1" feature) and their associated functions to read or write mutiple
+//!   bytes at a time.
 //!
 //!
 //! ## Shared SPI access
 //!
-//! If you have multiple devices on the same SPI bus that each have their own CS line, you may want
-//! to have a look at the [`SpiBusController`] and [`SpiBusDevice`] implemented here. These give
-//! exclusive access to the underlying SPI bus by means of a Mutex. This ensures that device
+//! If you have multiple devices on the same SPI bus that each have their own CS
+//! line, you may want to have a look at the [`SpiBusController`] and
+//! [`SpiBusDevice`] implemented here. These give exclusive access to the
+//! underlying SPI bus by means of a Mutex. This ensures that device
 //! transactions do not interfere with each other.
 
 use core::convert::Infallible;
@@ -363,14 +367,6 @@ mod ehal1 {
     use core::cell::RefCell;
 
     use embedded_hal_1::spi::{self, blocking::SpiDevice, ErrorType};
-    #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
-    use xtensa_lx::mutex::Mutex;
-    #[cfg(any(feature = "esp32", feature = "esp32s3"))]
-    use xtensa_lx::mutex::SpinLockMutex as MutexImpl;
-    #[cfg(feature = "esp32s2")]
-    use xtensa_lx::mutex::CriticalSectionMutex as MutexImpl;
-    #[cfg(feature = "esp32c3")]
-    use riscv::interrupt::Mutex as MutexImpl;
 
     use crate::OutputPin;
 
@@ -380,7 +376,7 @@ mod ehal1 {
     /// as basis for the [`SpiBusDevice`] implementation. Note that the
     /// wrapped [`RefCell`] is used solely to achieve interior mutability.
     pub struct SpiBusController<B: SpiBus + ErrorType> {
-        lock: MutexImpl<RefCell<B>>,
+        lock: critical_section::Mutex<RefCell<B>>,
     }
 
     impl<B: SpiBus + ErrorType> SpiBusController<B> {
@@ -390,7 +386,7 @@ mod ehal1 {
         /// bus can only be accessed via instances of [`SpiBusDevice`].
         pub fn from_spi(bus: B) -> Self {
             SpiBusController {
-                lock: MutexImpl::new(RefCell::new(bus)),
+                lock: critical_section::Mutex::new(RefCell::new(bus)),
             }
         }
 
@@ -445,13 +441,12 @@ mod ehal1 {
     {
         type Bus = B;
 
-        #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
         fn transaction<R>(
             &mut self,
             f: impl FnOnce(&mut Self::Bus) -> Result<R, <Self::Bus as ErrorType>::Error>,
         ) -> Result<R, Self::Error> {
-            (&self.bus.lock).lock(|bus| {
-                let mut bus = bus.borrow_mut();
+            critical_section::with(|cs| {
+                let mut bus = self.bus.lock.borrow_ref_mut(cs);
 
                 self.cs.set_to_push_pull_output().set_output_high(false);
 
@@ -467,33 +462,6 @@ mod ehal1 {
 
                 Ok(f_res)
             })
-        }
-
-        #[cfg(feature = "esp32c3")]
-        fn transaction<R>(
-            &mut self,
-            f: impl FnOnce(&mut Self::Bus) -> Result<R, <Self::Bus as ErrorType>::Error>,
-        ) -> Result<R, Self::Error> {
-            let critical_section = unsafe {
-                riscv::interrupt::disable();
-                riscv::interrupt::CriticalSection::new()
-            };
-
-            let mut bus = self.bus.lock.borrow(critical_section).borrow_mut();
-
-            self.cs.set_to_push_pull_output().set_output_high(false);
-
-            // We postpone handling these errors until AFTER we raised CS again, so the bus
-            // is free (Or we die trying if CS errors).
-            let f_res = f(&mut bus);
-            let flush_res = bus.flush();
-
-            self.cs.set_output_high(true);
-
-            let f_res = f_res.map_err(|_| spi::ErrorKind::Other)?;
-            flush_res.map_err(|_| spi::ErrorKind::Other)?;
-
-            Ok(f_res)
         }
     }
 }
