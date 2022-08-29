@@ -833,6 +833,14 @@ macro_rules! impl_output {
             }
         }
 
+        impl_from!($pxi, Input<Floating>, into_floating_input);
+        impl_from!($pxi, Input<PullUp>, into_pull_up_input);
+        impl_from!($pxi, Input<PullDown>, into_pull_down_input);
+        impl_from!($pxi, Output<PushPull>, into_push_pull_output);
+        impl_from!($pxi, Output<OpenDrain>, into_open_drain_output);
+        impl_from!($pxi, Alternate<AF1>, into_alternate_1);
+        impl_from!($pxi, Alternate<AF2>, into_alternate_2);
+
         impl<MODE> $pxi<MODE> {
             pub fn into_pull_up_input(self) -> $pxi<Input<PullUp>> {
                 self.init_input(false, true);
@@ -1088,6 +1096,18 @@ macro_rules! impl_interrupt_status_register_access {
 
 #[doc(hidden)]
 #[macro_export]
+macro_rules! impl_from {
+    ($pxi:ident, $mode:ty, $function:ident) => {
+        impl From<$pxi<Unknown>> for $pxi<$mode> {
+            fn from(pin: $pxi<Unknown>) -> $pxi<$mode> {
+                pin.$function()
+            }
+        }
+    }
+}
+
+#[doc(hidden)]
+#[macro_export]
 macro_rules! gpio {
     (
         $gpio_function:ident,
@@ -1240,6 +1260,8 @@ macro_rules! analog {
                     $pxi { _mode: PhantomData }
                 }
             }
+
+            impl_from!($pxi, Analog, into_analog);
         )+
     }
 }
@@ -1272,6 +1294,8 @@ macro_rules! analog {
                     $pxi { _mode: PhantomData }
                 }
             }
+
+            impl_from!($pxi, Analog, into_analog);
         )+
     }
 }
@@ -1281,6 +1305,7 @@ pub use gpio;
 pub use impl_errata36;
 pub use impl_gpio_register_access;
 pub use impl_input;
+pub use impl_from;
 pub use impl_interrupt_status_register_access;
 pub use impl_output;
 pub use impl_output_wrap;
