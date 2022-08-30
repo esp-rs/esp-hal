@@ -1,7 +1,9 @@
 //! # Serial Peripheral Interface
-//! To construct the SPI instances, use the `Spi::new` functions.
 //!
-//! ## Initialisation example
+//! There are multiple ways to use SPI, depending on your needs. Regardless of
+//! which way you choose, you must first create an SPI instance with
+//! [`Spi::new`].
+//!
 //! ```rust
 //! let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 //! let sclk = io.pins.gpio12;
@@ -21,6 +23,30 @@
 //!     &mut clocks,
 //! );
 //! ```
+//!
+//! ## Exclusive access to the SPI bus
+//!
+//! If all you want to do is to communicate to a single device, and you initiate
+//! transactions yourself, there are a number of ways to achieve this:
+//!
+//! - Use the [`FullDuplex`](embedded_hal::spi::FullDuplex) trait to read/write
+//!   single bytes at a time,
+//! - Use the [`SpiBus`](embedded_hal_1::spi::blocking::SpiBus) trait (requires
+//!   the "eh1" feature) and its associated functions to initiate transactions
+//!   with simultaneous reads and writes, or
+//! - Use the [`SpiBusWrite`](embedded_hal_1::spi::blocking::SpiBusWrite) and
+//!   [`SpiBusRead`](embedded_hal_1::spi::blocking::SpiBusRead) traits (requires
+//!   the "eh1" feature) and their associated functions to read or write mutiple
+//!   bytes at a time.
+//!
+//!
+//! ## Shared SPI access
+//!
+//! If you have multiple devices on the same SPI bus that each have their own CS
+//! line, you may want to have a look at the [`SpiBusController`] and
+//! [`SpiBusDevice`] implemented here. These give exclusive access to the
+//! underlying SPI bus by means of a Mutex. This ensures that device
+//! transactions do not interfere with each other.
 
 use core::convert::Infallible;
 
@@ -337,6 +363,107 @@ mod ehal1 {
     {
         fn flush(&mut self) -> Result<(), Self::Error> {
             self.spi.flush()
+        }
+    }
+
+    use core::cell::RefCell;
+
+    use embedded_hal_1::spi::{self, blocking::SpiDevice, ErrorType};
+
+    use crate::OutputPin;
+
+    /// SPI bus controller.
+    ///
+    /// Has exclusive access to an SPI bus, which is managed via a `Mutex`. Used
+    /// as basis for the [`SpiBusDevice`] implementation. Note that the
+    /// wrapped [`RefCell`] is used solely to achieve interior mutability.
+    pub struct SpiBusController<B: SpiBus + ErrorType> {
+        lock: critical_section::Mutex<RefCell<B>>,
+    }
+
+    impl<B: SpiBus + ErrorType> SpiBusController<B> {
+        /// Create a new controller from an SPI bus instance.
+        ///
+        /// Takes ownership of the SPI bus in the process. Afterwards, the SPI
+        /// bus can only be accessed via instances of [`SpiBusDevice`].
+        pub fn from_spi(bus: B) -> Self {
+            SpiBusController {
+                lock: critical_section::Mutex::new(RefCell::new(bus)),
+            }
+        }
+
+        pub fn add_device<'a, CS: OutputPin>(&'a self, cs: CS) -> SpiBusDevice<'a, B, CS> {
+            SpiBusDevice { bus: self, cs }
+        }
+    }
+
+    impl<B> ErrorType for SpiBusController<B>
+    where
+        B: SpiBus + ErrorType,
+    {
+        type Error = spi::ErrorKind;
+    }
+
+    /// An SPI device on a shared SPI bus.
+    ///
+    /// Provides device specific access on a shared SPI bus. Enables attaching
+    /// multiple SPI devices to the same bus, each with its own CS line, and
+    /// performing safe transfers on them.
+    pub struct SpiBusDevice<'a, B, CS>
+    where
+        B: SpiBus + ErrorType,
+        CS: OutputPin,
+    {
+        bus: &'a SpiBusController<B>,
+        cs: CS,
+    }
+
+    impl<'a, B, CS> SpiBusDevice<'a, B, CS>
+    where
+        B: SpiBus + ErrorType,
+        CS: OutputPin,
+    {
+        pub fn new(bus: &'a SpiBusController<B>, cs: CS) -> Self {
+            SpiBusDevice { bus, cs }
+        }
+    }
+
+    impl<'a, B, CS> ErrorType for SpiBusDevice<'a, B, CS>
+    where
+        B: SpiBus + ErrorType,
+        CS: OutputPin,
+    {
+        type Error = spi::ErrorKind;
+    }
+
+    impl<B, CS> SpiDevice for SpiBusDevice<'_, B, CS>
+    where
+        B: SpiBus + ErrorType,
+        CS: OutputPin + crate::gpio::OutputPin,
+    {
+        type Bus = B;
+
+        fn transaction<R>(
+            &mut self,
+            f: impl FnOnce(&mut Self::Bus) -> Result<R, <Self::Bus as ErrorType>::Error>,
+        ) -> Result<R, Self::Error> {
+            critical_section::with(|cs| {
+                let mut bus = self.bus.lock.borrow_ref_mut(cs);
+
+                self.cs.set_to_push_pull_output().set_output_high(false);
+
+                // We postpone handling these errors until AFTER we raised CS again, so the bus
+                // is free (Or we die trying if CS errors).
+                let f_res = f(&mut bus);
+                let flush_res = bus.flush();
+
+                self.cs.set_output_high(true);
+
+                let f_res = f_res.map_err(|_| spi::ErrorKind::Other)?;
+                flush_res.map_err(|_| spi::ErrorKind::Other)?;
+
+                Ok(f_res)
+            })
         }
     }
 }
