@@ -6,7 +6,7 @@
 //! MOSI    GPIO7
 //! CS 1    GPIO3
 //! CS 2    GPIO4
-//! CS 3    GPIO4
+//! CS 3    GPIO5
 //!
 //! Depending on your target and the board you are using you have to change the
 //! pins.
