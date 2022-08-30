@@ -27,7 +27,7 @@
 //! channel0
 //!     .configure(channel::config::Config {
 //!         timer: &lstimer0,
-//!         duty: 0.1,
+//!         duty: 10,
 //!     })
 //!     .unwrap();
 //! ```
@@ -53,7 +53,7 @@
 //! channel0
 //!     .configure(channel::config::Config {
 //!         timer: &hstimer0,
-//!         duty: 0.1,
+//!         duty: 10,
 //!     })
 //!     .unwrap();
 //! ```

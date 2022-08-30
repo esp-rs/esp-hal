@@ -45,7 +45,7 @@ pub mod config {
     #[derive(Copy, Clone)]
     pub struct Config<'a, S: TimerSpeed> {
         pub timer: &'a dyn TimerIFace<S>,
-        pub duty_pct: f32,
+        pub duty_pct: u8,
     }
 }
 
@@ -58,7 +58,7 @@ where
     fn configure(&mut self, config: config::Config<'a, S>) -> Result<(), Error>;
 
     /// Set channel duty HW
-    fn set_duty(&self, duty_pct: f32) -> Result<(), Error>;
+    fn set_duty(&self, duty_pct: u8) -> Result<(), Error>;
 }
 
 /// Channel HW interface
@@ -107,7 +107,7 @@ where
     }
 
     /// Set duty % of channel
-    fn set_duty(&self, duty_pct: f32) -> Result<(), Error> {
+    fn set_duty(&self, duty_pct: u8) -> Result<(), Error> {
         let duty_exp;
         if let Some(timer) = self.timer {
             if let Some(timer_duty) = timer.get_duty() {
@@ -120,9 +120,9 @@ where
         }
 
         let duty_range = 2u32.pow(duty_exp);
-        let duty_value = (duty_range as f32 * duty_pct) as u32;
+        let duty_value = (duty_range * duty_pct as u32) as u32 / 100;
 
-        if duty_value == 0 || duty_pct > 1.0 {
+        if duty_value == 0 || duty_pct > 100u8 {
             // Not enough bits to represent the requested duty % or duty_pct greater than
             // 1.0
             return Err(Error::Duty);
