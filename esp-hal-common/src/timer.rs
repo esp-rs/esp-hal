@@ -445,10 +445,9 @@ where
 
     let clock: HertzU32 = clock.into();
 
-    // TODO can we get this to not use doubles/floats
-    let period = 1_000_000f64 / (clock.to_Hz() as f64 / divider as f64); // micros
-
-    (micros as f64 / period) as u64
+    // 1_000_000 is used to get rid of `float` calculations
+    let period: u64 = 1_000_000 * 1_000_000 / (clock.to_Hz() as u64 / divider as u64);
+    (1_000_000 * micros / period as u64) as u64
 }
 
 impl<T> CountDown for Timer<T>

@@ -1,5 +1,5 @@
 //! Turns on LED with the option to change LED intensity depending on `duty`
-//! value.
+//! value. Possible values (`u32`) are in range 0..100.
 //!
 //! This assumes that a LED is connected to the pin assigned to `led`. (GPIO4)
 
@@ -67,7 +67,7 @@ fn main() -> ! {
     channel0
         .configure(channel::config::Config {
             timer: &lstimer0,
-            duty_pct: 0.1,
+            duty_pct: 10,
         })
         .unwrap();
 

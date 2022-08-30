@@ -418,10 +418,10 @@ impl RtcClock {
             1024,
         );
 
-        let q_to_float = |val| (val as f32) / ((1 << RtcClock::CAL_FRACT) as f32);
-        let period = q_to_float(period_13q19);
+        // 100_000_000 is used to get rid of `float` calculations
+        let period = (100_000_000 * period_13q19 as u64) / (1 << RtcClock::CAL_FRACT);
 
-        (1000f32 / period) as u16
+        (100_000_000 * 1000 / period) as u16
     }
 
     fn estimate_xtal_frequency() -> u32 {
