@@ -20,6 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        chip: [esp32c3]
         toolchain: [stable, nightly]
     steps:
       - uses: actions/checkout@v2
@@ -33,7 +34,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: check
-          args: --examples --manifest-path=esp32c3-hal/Cargo.toml --target=riscv32imc-unknown-none-elf --features=eh1,smartled,ufmt
+          args: --examples --manifest-path=${{ matrix.chip }}-hal/Cargo.toml --target=riscv32imc-unknown-none-elf --features=eh1,smartled,ufmt
 
   check-xtensa:
     name: Check Xtensa Examples
@@ -64,6 +65,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        chip: [esp32c3]
         toolchain: [stable, nightly]
     steps:
       - uses: actions/checkout@v2
@@ -78,7 +80,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: --manifest-path=esp32c3-hal/Cargo.toml --target=riscv32imc-unknown-none-elf -- --no-deps -D warnings --A clippy::too-many-arguments --A clippy::module-inception
+          args: --manifest-path=${{ matrix.chip }}-hal/Cargo.toml --target=riscv32imc-unknown-none-elf -- --no-deps
 
   clippy-xtensa:
     name: Run clippy on Xtensa builds
@@ -98,7 +100,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: -Zbuild-std=core --manifest-path=${{ matrix.chip }}-hal/Cargo.toml --target=xtensa-${{ matrix.chip }}-none-elf -- --no-deps -D warnings --A clippy::too-many-arguments --A clippy::module-inception
+          args: -Zbuild-std=core --manifest-path=${{ matrix.chip }}-hal/Cargo.toml --target=xtensa-${{ matrix.chip }}-none-elf -- --no-deps
 
   # --------------------------------------------------------------------------
   # MSRV Check
