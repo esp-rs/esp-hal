@@ -110,6 +110,16 @@ SECTIONS
     _ebss = .;
   } > REGION_BSS
 
+  /* ### .uninit */
+  .uninit (NOLOAD) : ALIGN(4)
+  {
+    . = ALIGN(4);
+    __suninit = .;
+    *(.uninit .uninit.*);
+    . = ALIGN(4);
+    __euninit = .;
+  } > REGION_BSS
+
   /* fictitious region that represents the memory available for the heap */
   .heap (NOLOAD) :
   {
@@ -135,7 +145,7 @@ SECTIONS
   } > REGION_RTC_FAST
   _fast_text_size = _ertc_fast_text - _srtc_fast_text + 8;
 
-  .rtc_fast.data : AT(_text_size + _rodata_size + _data_size + _rwtext_size + _fast_text_size) 
+  .rtc_fast.data : AT(_text_size + _rodata_size + _data_size + _rwtext_size + _fast_text_size)
   {
     _rtc_fast_data_start = ABSOLUTE(.);
     *(.rtc_fast.data .rtc_fast.data.*)
@@ -144,7 +154,7 @@ SECTIONS
   } > REGION_RTC_FAST
   _rtc_fast_data_size = _rtc_fast_data_end - _rtc_fast_data_start + 8;
 
- .rtc_fast.bss (NOLOAD) : ALIGN(4) 
+ .rtc_fast.bss (NOLOAD) : ALIGN(4)
   {
     _rtc_fast_bss_start = ABSOLUTE(.);
     *(.rtc_fast.bss .rtc_fast.bss.*)
@@ -152,7 +162,7 @@ SECTIONS
     _rtc_fast_bss_end = ABSOLUTE(.);
   } > REGION_RTC_FAST
 
- .rtc_fast.noinit (NOLOAD) : ALIGN(4) 
+ .rtc_fast.noinit (NOLOAD) : ALIGN(4)
   {
     *(.rtc_fast.noinit .rtc_fast.noinit.*)
   } > REGION_RTC_FAST
