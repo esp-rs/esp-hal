@@ -11,7 +11,7 @@
 //! 10% duty using the ABPClock
 //!
 //! ```rust,ignore
-//! let mut ledc = LEDC::new(&clock_control, &mut system.peripheral_clock_control);
+//! let mut ledc = LEDC::new(peripherals.LEDC, &clock_control, &mut system.peripheral_clock_control);
 //! ledc.set_global_slow_clock(LSGlobalClkSource::APBClk);
 //!
 //! let mut lstimer0 = ledc.get_timer::<LowSpeed>(timer::Number::Timer0);
@@ -38,7 +38,7 @@
 //! 10% duty using the ABPClock
 //!
 //! ```rust,ignore
-//! let ledc = LEDC::new(&clock_control, &mut system.peripheral_clock_control);
+//! let ledc = LEDC::new(peripherals.LEDC, &clock_control, &mut system.peripheral_clock_control);
 //!
 //! let mut hstimer0 = ledc.get_timer::<HighSpeed>(timer::Number::Timer0);
 //! hstimer0
@@ -85,6 +85,7 @@ pub enum LSGlobalClkSource {
 
 /// LEDC (LED PWM Controller)
 pub struct LEDC<'a> {
+    _instance: crate::pac::LEDC,
     ledc: &'a crate::pac::ledc::RegisterBlock,
     clock_control_config: &'a Clocks,
 }
@@ -105,11 +106,12 @@ impl Speed for LowSpeed {}
 
 impl<'a> LEDC<'a> {
     /// Return a new LEDC
-    pub fn new(clock_control_config: &'a Clocks, system: &mut PeripheralClockControl) -> Self {
+    pub fn new(_instance: crate::pac::LEDC, clock_control_config: &'a Clocks, system: &mut PeripheralClockControl) -> Self {
         system.enable(Peripheral::Ledc);
 
         let ledc = unsafe { &*crate::pac::LEDC::ptr() };
         LEDC {
+            _instance,
             ledc,
             clock_control_config,
         }

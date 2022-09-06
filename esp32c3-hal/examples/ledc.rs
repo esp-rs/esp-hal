@@ -49,7 +49,7 @@ fn main() -> ! {
 
     esp_println::println!("\nESP32C3 Started\n\n");
 
-    let mut ledc = LEDC::new(&clocks, &mut system.peripheral_clock_control);
+    let mut ledc = LEDC::new(peripherals.LEDC, &clocks, &mut system.peripheral_clock_control);
 
     ledc.set_global_slow_clock(LSGlobalClkSource::APBClk);
 
