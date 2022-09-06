@@ -46,7 +46,7 @@ fn main() -> ! {
 
     writeln!(serial0, "\nESP32 Started\n\n").unwrap();
 
-    let ledc = LEDC::new(&clocks, &mut system.peripheral_clock_control);
+    let ledc = LEDC::new(peripherals.LEDC, &clocks, &mut system.peripheral_clock_control);
 
     let mut hstimer0 = ledc.get_timer::<HighSpeed>(timer::Number::Timer0);
 
