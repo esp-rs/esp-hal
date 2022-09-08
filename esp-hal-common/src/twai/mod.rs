@@ -1,21 +1,26 @@
-use core::default;
+use core::slice::from_raw_parts;
 
 use crate::{
-    clock::Clocks,
+    // clock::Clocks,
     pac::twai::RegisterBlock,
     system::PeripheralClockControl,
     types::{InputSignal, OutputSignal},
-    InputPin, OutputPin,
+    InputPin,
+    OutputPin,
 };
 
-// use alloc::{format, string::String};
-use embedded_hal::can::{self, Frame};
+use embedded_hal::can::{self, ErrorKind, Frame, StandardId};
+
+use self::filter::{Filter, FilterToRegisters};
+
+pub mod filter;
 
 /// Very basic implementation of the Frame trait.
 ///
 /// TODO: See if data and dlc can be simplified into a slice w/ lifetimes etc.
 /// TODO: See if this can be improved.
 ///
+#[derive(Debug)]
 pub struct ESPTWAIFrame {
     id: can::Id,
     dlc: usize,
@@ -221,9 +226,55 @@ where
             });
     }
 
-    /// TODO: Set up the acceptance filter on the device to accept the specified filters.
-    pub fn set_filter(&mut self) {
-        panic!("Unimplemented.");
+    /// Set up the acceptance filter on the device to accept the specified filters.
+    ///
+    /// [ESP32C3 Reference Manual](https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf#subsubsection.29.4.6)
+    pub fn set_filter(&mut self, filter: Filter) {
+        // Set or clear the rx filter mode bit depending on the filter type.
+        let filter_mode_bit = match filter {
+            Filter::Single(_) => true,
+            Filter::Dual(_) => false,
+        };
+        self.peripheral
+            .register_block()
+            .mode
+            .modify(|_, w| w.rx_filter_mode().bit(filter_mode_bit));
+
+        // Convert the filter into values for the registers and store them to the registers.
+        let registers = filter.to_registers();
+        // TODO: Use something better for copying, probably something similar to memcpy.
+        self.peripheral
+            .register_block()
+            .data_0
+            .write(|w| w.tx_byte_0().variant(registers[0]));
+        self.peripheral
+            .register_block()
+            .data_1
+            .write(|w| w.tx_byte_1().variant(registers[1]));
+        self.peripheral
+            .register_block()
+            .data_2
+            .write(|w| w.tx_byte_2().variant(registers[2]));
+        self.peripheral
+            .register_block()
+            .data_3
+            .write(|w| w.tx_byte_3().variant(registers[3]));
+        self.peripheral
+            .register_block()
+            .data_4
+            .write(|w| w.tx_byte_4().variant(registers[4]));
+        self.peripheral
+            .register_block()
+            .data_5
+            .write(|w| w.tx_byte_5().variant(registers[5]));
+        self.peripheral
+            .register_block()
+            .data_6
+            .write(|w| w.tx_byte_6().variant(registers[6]));
+        self.peripheral
+            .register_block()
+            .data_7
+            .write(|w| w.tx_byte_7().variant(registers[7]));
     }
 
     /// Set the Error warning threshold.
@@ -308,6 +359,34 @@ where
             .read()
             .tx_buf_st()
             .bit()
+    }
+
+    /// Get the number of messages that the peripheral has received.
+    ///
+    /// Note that this may not be the number of messages in the receive FIFO due to
+    /// fifo overflow/overrun.
+    pub fn num_messages(&self) -> u8 {
+        self.peripheral
+            .register_block()
+            .rx_message_cnt
+            .read()
+            .rx_message_counter()
+            .bits()
+    }
+    /// Clear the receive FIFO, discarding any valid, partial, or invalid packets.
+    ///
+    /// This is typically used to clear an overrun receive FIFO.
+    pub fn clear_receive_fifo(&self) {
+        while self.num_messages() > 0 {}
+    }
+
+    /// Release the message in the buffer. This will decrement the received message
+    /// counter and prepare the next message in the FIFO for reading.
+    pub fn release_receive_fifo(&self) {
+        self.peripheral
+            .register_block()
+            .cmd
+            .write(|w| w.release_buf().set_bit());
     }
 }
 
@@ -470,7 +549,65 @@ where
         nb::Result::Ok(None)
     }
     fn receive(&mut self) -> nb::Result<Self::Frame, Self::Error> {
-        panic!("Not implemented");
+        // Check that we actually have packets to receive.
+        if self.num_messages() == 0 {
+            return nb::Result::Err(nb::Error::WouldBlock);
+        }
+
+        // Check if the packet in the receive buffer is valid or overrun.
+        let is_overrun = self
+            .peripheral
+            .register_block()
+            .status
+            .read()
+            .miss_st()
+            .bit_is_set();
+
+        if is_overrun {
+            return nb::Result::Err(nb::Error::Other(ESPTWAIError {
+                kind: ErrorKind::Overrun,
+            }));
+        }
+
+        // TODO: Read the actual data.
+        // TODO: patch the svd files :/.
+        let data_0 =
+            unsafe { (self.peripheral.register_block().data_0.as_ptr() as *const u8).read() };
+
+        let is_standard_format = data_0 & 0b1 << 7 == 0;
+        let dlc = (data_0 & 0b1111) as usize;
+
+        let maybe_frame = if is_standard_format {
+            // Frame uses standard 11 bit id.
+            let data_1 =
+                unsafe { (self.peripheral.register_block().data_1.as_ptr() as *const u8).read() };
+            let data_2 =
+                unsafe { (self.peripheral.register_block().data_2.as_ptr() as *const u8).read() };
+
+            let id = StandardId::new((data_1 as u16) << 3 | (data_2 as u16) >> 5).unwrap();
+
+            // Copy the packet payload from the peripheral into memory.
+            // TODO: find a better way of doing this, basically a memcpy, but the
+            // destination and source have different strides.
+            let raw_payload =
+                unsafe { from_raw_parts(self.peripheral.register_block().data_3.as_ptr(), dlc) };
+
+            let mut payload: [u8; 8] = [0; 8];
+            for i in 0..dlc {
+                payload[i] = raw_payload[i] as u8;
+            }
+
+            ESPTWAIFrame::new(id, &payload[..dlc])
+        } else {
+            // Frame uses extended 29 bit id.
+            panic!("Unimplemented");
+        };
+
+        // Release the packet we read from the FIFO, allowing the peripheral to prepare
+        // the next packet.
+        self.release_receive_fifo();
+
+        nb::Result::Ok(maybe_frame.unwrap())
     }
 }
 

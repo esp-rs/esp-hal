@@ -8,12 +8,13 @@ use esp32c3_hal::{
     pac::Peripherals,
     prelude::*,
     timer::TimerGroup,
-    twai, Rtc, UsbSerialJtag,
+    twai::{self, ESPTWAIFrame},
+    Rtc, UsbSerialJtag,
 };
 
-use embedded_hal::can::{Can, Frame, Id::Standard, StandardId};
+use embedded_hal::can::{Can, Frame, StandardId};
 use esp_backtrace as _;
-use nb::{block, Error};
+use nb::block;
 use riscv_rt::entry;
 
 #[entry]
@@ -47,7 +48,7 @@ fn main() -> ! {
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let can_config = twai::TWAIConfiguration::new(
+    let mut can_config = twai::TWAIConfiguration::new(
         peripherals.TWAI,
         io.pins.gpio2,
         io.pins.gpio3,
@@ -55,39 +56,45 @@ fn main() -> ! {
         twai::BaudRate::B1000K,
     );
 
+    // Set bits in the bitmask means that we don't care about that bit.
+    let filter = twai::filter::Filter::Single(twai::filter::FilterIdFormat::Standard(
+        twai::filter::SingleStandardFilter {
+            id: twai::filter::ValueMask {
+                value: StandardId::new(0x000).unwrap(),
+                mask: StandardId::new(0x000).unwrap(),
+            },
+            rtr: twai::filter::ValueMask {
+                value: false,
+                mask: true,
+            },
+            data: twai::filter::ValueMask {
+                value: [0x00, 0x00],
+                mask: [0xff, 0xff],
+            },
+        },
+    ));
+
+    can_config.set_filter(filter);
+
     let mut can = can_config.start();
 
-    let mut packets_sent = 0u64;
-
     loop {
-        let d = packets_sent as u8;
-        let data = [d, 1, 2, 3, 4, 5, 6, 7];
+        // writeln!(UsbSerialJtag, "Waiting for packet...").unwrap();
+        let frame = block!(can.receive()).unwrap();
+        writeln!(UsbSerialJtag, "Received: {:?}", frame).unwrap();
 
-        let id = (packets_sent as u16) & 0x7FF;
+        // Increment the payload bytes by one.
+        let mut data: [u8; 8] = [0; 8];
+        data[..frame.dlc()].copy_from_slice(frame.data());
 
-        let mut frame =
-            twai::ESPTWAIFrame::new(Standard(StandardId::new(id).unwrap()), &data).unwrap();
-
-        let result = block!(can.transmit(&mut frame));
-
-        // match result {
-        //     Err(err) => match err {
-        //         Error::WouldBlock => {
-        //             writeln!(UsbSerialJtag, "TWAI would block!").unwrap();
-        //         }
-        //         Error::Other(err) => {
-        //             writeln!(UsbSerialJtag, "TWAI hit a different error: {:?}", err).unwrap();
-        //         }
-        //     },
-        //     _ => {}
-        // }
-
-        if let Err(err) = result {
-            writeln!(UsbSerialJtag, "TWAI hit a different error: {:?}", err).unwrap();
-        } else {
-            packets_sent += 1;
-            writeln!(UsbSerialJtag, "Sent. {}", packets_sent).unwrap();
+        for b in data[..frame.dlc()].iter_mut() {
+            *b += 1;
         }
+
+        let frame = ESPTWAIFrame::new(frame.id(), &data[..frame.dlc()]).unwrap();
+        // Transmit the frame back.
+        writeln!(UsbSerialJtag, "Transmitting: {:?}", frame).unwrap();
+        let _result = block!(can.transmit(&frame)).unwrap();
 
         // let status = can.status();
         // writeln!(
