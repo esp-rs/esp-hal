@@ -9,7 +9,7 @@ use crate::{
     OutputPin,
 };
 
-use embedded_hal::can::{self, ErrorKind, Frame, StandardId};
+use embedded_hal::can::{self, ErrorKind, ExtendedId, Frame, StandardId};
 
 use self::filter::{Filter, FilterToRegisters};
 
@@ -377,7 +377,9 @@ where
     ///
     /// This is typically used to clear an overrun receive FIFO.
     pub fn clear_receive_fifo(&self) {
-        while self.num_messages() > 0 {}
+        while self.num_messages() > 0 {
+            self.release_receive_fifo();
+        }
     }
 
     /// Release the message in the buffer. This will decrement the received message
@@ -391,12 +393,16 @@ where
 }
 
 #[derive(Debug)]
-pub struct ESPTWAIError {
-    kind: embedded_hal::can::ErrorKind,
+pub enum ESPTWAIError {
+    BusOff,
+    EmbeddedHAL(embedded_hal::can::ErrorKind),
 }
 impl embedded_hal::can::Error for ESPTWAIError {
     fn kind(&self) -> can::ErrorKind {
-        self.kind
+        match self {
+            Self::BusOff => can::ErrorKind::Other,
+            Self::EmbeddedHAL(kind) => *kind,
+        }
     }
 }
 
@@ -418,11 +424,15 @@ where
     /// notes 1 and 2 in the Frame Identifier section of the reference manual.
     ///
     fn transmit(&mut self, frame: &Self::Frame) -> nb::Result<Option<Self::Frame>, Self::Error> {
-        // TODO: Check that the peripheral is not already transmitting a packet,
-        // if so return WouldBlock, or figure out a way to cancel a transmission and return
-        // the attempted packet.
-        if !self.transmit_buffer_is_empty() {
+        let status = self.peripheral.register_block().status.read();
+
+        // Check that the peripheral is not already transmitting a packet.
+        if !status.tx_buf_st().bit_is_set() {
             return nb::Result::Err(nb::Error::WouldBlock);
+        }
+        // Check that the peripheral is not in a bus off state.
+        if status.bus_off_st().bit_is_set() {
+            return nb::Result::Err(nb::Error::Other(ESPTWAIError::BusOff));
         }
 
         // Assemble the frame information into the data_0 byte.
@@ -442,30 +452,43 @@ where
             can::Id::Standard(id) => {
                 let id = id.as_raw();
 
-                // Upper 8 bits go into byte_1.
                 self.peripheral
                     .register_block()
                     .data_1
                     .write(|w| w.tx_byte_1().variant((id >> 3) as u8));
 
-                // Lower 3 bits go into the upper 3 bits of byte_2.
                 self.peripheral
                     .register_block()
                     .data_2
                     .write(|w| w.tx_byte_2().variant((id << 5) as u8));
             }
             can::Id::Extended(id) => {
-                let _id = id.as_raw();
-                panic!("Unimplemented");
+                let id = id.as_raw();
+
+                self.peripheral
+                    .register_block()
+                    .data_1
+                    .write(|w| w.tx_byte_1().variant((id >> 21) as u8));
+                self.peripheral
+                    .register_block()
+                    .data_2
+                    .write(|w| w.tx_byte_2().variant((id >> 13) as u8));
+                self.peripheral
+                    .register_block()
+                    .data_3
+                    .write(|w| w.tx_byte_3().variant((id >> 5) as u8));
+                self.peripheral
+                    .register_block()
+                    .data_4
+                    .write(|w| w.tx_byte_4().variant((id << 3) as u8));
             }
         }
 
-        // Assemble the data portion of the packet.
+        // Store the data portion of the packet into the transmit buffer.
         if frame.is_data_frame() {
             match frame.id() {
                 can::Id::Standard(_) => {
                     // TODO: Copy data to the appropriate registers in a better method. Verified in --release asm that this is bad.
-
                     // Byte 0 of the payload.
                     if frame.dlc() > 0 {
                         let data_byte_1 = &frame.data()[0];
@@ -532,7 +555,71 @@ where
                     }
                 }
                 can::Id::Extended(_) => {
-                    panic!("Unimplemented");
+                    // TODO: Copy data to the appropriate registers in a better method. Verified in --release asm that this is bad.
+                    // Byte 0 of the payload.
+                    if frame.dlc() > 0 {
+                        let data_byte_1 = &frame.data()[0];
+                        self.peripheral
+                            .register_block()
+                            .data_5
+                            .write(|w| w.tx_byte_5().variant(*data_byte_1));
+                    }
+                    // Byte 1 of the payload.
+                    if frame.dlc() > 1 {
+                        let data_byte_2 = &frame.data()[1];
+                        self.peripheral
+                            .register_block()
+                            .data_6
+                            .write(|w| w.tx_byte_6().variant(*data_byte_2));
+                    }
+                    // Byte 2 of the payload.
+                    if frame.dlc() > 2 {
+                        let data_byte_3 = &frame.data()[2];
+                        self.peripheral
+                            .register_block()
+                            .data_7
+                            .write(|w| w.tx_byte_7().variant(*data_byte_3));
+                    }
+                    // Byte 3 of the payload.
+                    if frame.dlc() > 3 {
+                        let data_byte_4 = &frame.data()[3];
+                        self.peripheral
+                            .register_block()
+                            .data_8
+                            .write(|w| w.tx_byte_8().variant(*data_byte_4));
+                    }
+                    // Byte 4 of the payload.
+                    if frame.dlc() > 4 {
+                        let data_byte_5 = &frame.data()[4];
+                        self.peripheral
+                            .register_block()
+                            .data_9
+                            .write(|w| w.tx_byte_9().variant(*data_byte_5));
+                    }
+                    // Byte 5 of the payload.
+                    if frame.dlc() > 5 {
+                        let data_byte_6 = &frame.data()[5];
+                        self.peripheral
+                            .register_block()
+                            .data_10
+                            .write(|w| w.tx_byte_10().variant(*data_byte_6));
+                    }
+                    // Byte 6 of the payload.
+                    if frame.dlc() > 6 {
+                        let data_byte_7 = &frame.data()[6];
+                        self.peripheral
+                            .register_block()
+                            .data_11
+                            .write(|w| w.tx_byte_11().variant(*data_byte_7));
+                    }
+                    // Byte 7 of the payload.
+                    if frame.dlc() > 7 {
+                        let data_byte_8 = &frame.data()[7];
+                        self.peripheral
+                            .register_block()
+                            .data_12
+                            .write(|w| w.tx_byte_12().variant(*data_byte_8));
+                    }
                 }
             }
         } else {
@@ -540,7 +627,7 @@ where
         }
 
         // Set the transmit request command, this will lock the transmit buffer until the
-        // transmission is complete, aborted
+        // transmission is complete or aborted.
         self.peripheral
             .register_block()
             .cmd
@@ -549,40 +636,50 @@ where
         nb::Result::Ok(None)
     }
     fn receive(&mut self) -> nb::Result<Self::Frame, Self::Error> {
+        let status = self.peripheral.register_block().status.read();
+
         // Check that we actually have packets to receive.
-        if self.num_messages() == 0 {
+        if !status.rx_buf_st().bit_is_set() {
             return nb::Result::Err(nb::Error::WouldBlock);
         }
 
         // Check if the packet in the receive buffer is valid or overrun.
-        let is_overrun = self
-            .peripheral
-            .register_block()
-            .status
-            .read()
-            .miss_st()
-            .bit_is_set();
-
-        if is_overrun {
-            return nb::Result::Err(nb::Error::Other(ESPTWAIError {
-                kind: ErrorKind::Overrun,
-            }));
+        if status.miss_st().bit_is_set() {
+            return nb::Result::Err(nb::Error::Other(ESPTWAIError::EmbeddedHAL(
+                ErrorKind::Overrun,
+            )));
         }
 
-        // TODO: Read the actual data.
-        // TODO: patch the svd files :/.
-        let data_0 =
-            unsafe { (self.peripheral.register_block().data_0.as_ptr() as *const u8).read() };
+        // Read the frame information and extract the frame id format and dlc.
+        let data_0 = self
+            .peripheral
+            .register_block()
+            .data_0
+            .read()
+            .tx_byte_0()
+            .bits();
 
         let is_standard_format = data_0 & 0b1 << 7 == 0;
         let dlc = (data_0 & 0b1111) as usize;
 
+        // Read the payload from the packet and construct a frame.
         let maybe_frame = if is_standard_format {
             // Frame uses standard 11 bit id.
-            let data_1 =
-                unsafe { (self.peripheral.register_block().data_1.as_ptr() as *const u8).read() };
-            let data_2 =
-                unsafe { (self.peripheral.register_block().data_2.as_ptr() as *const u8).read() };
+            let data_1 = self
+                .peripheral
+                .register_block()
+                .data_1
+                .read()
+                .tx_byte_1()
+                .bits();
+
+            let data_2 = self
+                .peripheral
+                .register_block()
+                .data_1
+                .read()
+                .tx_byte_1()
+                .bits();
 
             let id = StandardId::new((data_1 as u16) << 3 | (data_2 as u16) >> 5).unwrap();
 
@@ -600,7 +697,57 @@ where
             ESPTWAIFrame::new(id, &payload[..dlc])
         } else {
             // Frame uses extended 29 bit id.
-            panic!("Unimplemented");
+            let data_1 = self
+                .peripheral
+                .register_block()
+                .data_1
+                .read()
+                .tx_byte_1()
+                .bits();
+
+            let data_2 = self
+                .peripheral
+                .register_block()
+                .data_1
+                .read()
+                .tx_byte_1()
+                .bits();
+
+            let data_3 = self
+                .peripheral
+                .register_block()
+                .data_3
+                .read()
+                .tx_byte_3()
+                .bits();
+
+            let data_4 = self
+                .peripheral
+                .register_block()
+                .data_4
+                .read()
+                .tx_byte_4()
+                .bits();
+
+            let id = ExtendedId::new(
+                (data_1 as u32) << 21
+                    | (data_2 as u32) << 13
+                    | (data_3 as u32) << 5
+                    | (data_4 as u32) >> 3,
+            )
+            .unwrap();
+
+            // Copy the packet payload from the peripheral into memory.
+            // TODO: find a better way of doing this, basically a memcpy, but the
+            // destination and source have different strides.
+            let raw_payload =
+                unsafe { from_raw_parts(self.peripheral.register_block().data_5.as_ptr(), dlc) };
+
+            let mut payload: [u8; 8] = [0; 8];
+            for i in 0..dlc {
+                payload[i] = raw_payload[i] as u8;
+            }
+            ESPTWAIFrame::new(id, &payload[..dlc])
         };
 
         // Release the packet we read from the FIFO, allowing the peripheral to prepare
