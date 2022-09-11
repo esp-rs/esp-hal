@@ -1,18 +1,19 @@
 use core::slice::from_raw_parts;
 
 use crate::{
-    // clock::Clocks,
+    clock::Clocks,
     pac::twai::RegisterBlock,
     system::PeripheralClockControl,
     types::{InputSignal, OutputSignal},
-    InputPin,
-    OutputPin,
+    InputPin, OutputPin,
 };
 
 use embedded_hal::can::{self, ErrorKind, ExtendedId, Frame, StandardId};
+use fugit::HertzU32;
 
-use self::filter::{Filter, FilterToRegisters};
+use self::filter::{Filter, FilterType};
 
+pub mod bitselector;
 pub mod filter;
 
 /// Very basic implementation of the Frame trait.
@@ -165,6 +166,7 @@ where
         mut tx_pin: TX,
         mut rx_pin: RX,
         clock_control: &mut PeripheralClockControl,
+        clocks: &Clocks,
         baud_rate: BaudRate,
     ) -> Self {
         // TODO: Probably should do a low level reset.
@@ -180,14 +182,19 @@ where
             peripheral: peripheral,
         };
 
-        cfg.set_frequency(baud_rate);
+        cfg.set_baud_rate(baud_rate, clocks);
 
         cfg
     }
 
     /// Set the bitrate of the bus.
-    fn set_frequency(&mut self, baud_rate: BaudRate) {
+    ///
+    /// Note: The timings currently assume a APB_CLK of 80MHz.
+    ///
+    fn set_baud_rate(&mut self, baud_rate: BaudRate, clocks: &Clocks) {
         // TWAI is clocked from the APB_CLK according to Table 6-4 [ESP32C3 Reference Manual](https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf)
+        // Included timings are all for 80MHz so assert that we are running at 80MHz.
+        assert!(clocks.apb_clock == HertzU32::MHz(80));
 
         // Unpack the baud rate timings and convert them to the values needed for the register.
         // Many of the registers have a minimum value of 1 which is represented by having zero
@@ -229,12 +236,9 @@ where
     /// Set up the acceptance filter on the device to accept the specified filters.
     ///
     /// [ESP32C3 Reference Manual](https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf#subsubsection.29.4.6)
-    pub fn set_filter(&mut self, filter: Filter) {
+    pub fn set_filter(&mut self, filter: impl Filter) {
         // Set or clear the rx filter mode bit depending on the filter type.
-        let filter_mode_bit = match filter {
-            Filter::Single(_) => true,
-            Filter::Dual(_) => false,
-        };
+        let filter_mode_bit = filter.filter_type() == FilterType::Single;
         self.peripheral
             .register_block()
             .mode
@@ -318,6 +322,8 @@ impl<T> TWAI<T>
 where
     T: Instance,
 {
+    /// Stop the peripheral, putting it into reset mode and enabling reconfiguration.
+    ///
     pub fn stop(self) -> TWAIConfiguration<T> {
         // Put the peripheral into reset/configuration mode by setting the reset mode bit.
         self.peripheral
@@ -329,7 +335,6 @@ where
             peripheral: self.peripheral,
         }
     }
-
     pub fn receive_error_count(&self) -> u8 {
         self.peripheral
             .register_block()
@@ -345,10 +350,6 @@ where
             .read()
             .tx_err_cnt()
             .bits()
-    }
-
-    pub fn status(&self) -> u32 {
-        self.peripheral.register_block().status.read().bits()
     }
 
     /// Test if the transmit buffer is available for writing.
@@ -663,7 +664,7 @@ where
         let dlc = (data_0 & 0b1111) as usize;
 
         // Read the payload from the packet and construct a frame.
-        let maybe_frame = if is_standard_format {
+        let frame = if is_standard_format {
             // Frame uses standard 11 bit id.
             let data_1 = self
                 .peripheral
@@ -694,7 +695,7 @@ where
                 payload[i] = raw_payload[i] as u8;
             }
 
-            ESPTWAIFrame::new(id, &payload[..dlc])
+            ESPTWAIFrame::new(id, &payload[..dlc]).unwrap()
         } else {
             // Frame uses extended 29 bit id.
             let data_1 = self
@@ -742,19 +743,19 @@ where
             // destination and source have different strides.
             let raw_payload =
                 unsafe { from_raw_parts(self.peripheral.register_block().data_5.as_ptr(), dlc) };
-
             let mut payload: [u8; 8] = [0; 8];
             for i in 0..dlc {
                 payload[i] = raw_payload[i] as u8;
             }
-            ESPTWAIFrame::new(id, &payload[..dlc])
+
+            ESPTWAIFrame::new(id, &payload[..dlc]).unwrap()
         };
 
         // Release the packet we read from the FIFO, allowing the peripheral to prepare
         // the next packet.
         self.release_receive_fifo();
 
-        nb::Result::Ok(maybe_frame.unwrap())
+        nb::Result::Ok(frame)
     }
 }
 

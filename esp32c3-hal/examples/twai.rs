@@ -3,16 +3,20 @@
 
 use core::fmt::Write;
 use esp32c3_hal::{
-    clock::{ClockControl, CpuClock},
+    clock::ClockControl,
     gpio::IO,
     pac::Peripherals,
     prelude::*,
     timer::TimerGroup,
-    twai::{self, ESPTWAIFrame},
+    twai::{
+        self,
+        bitselector::{BitSelectorNewExact, Selector},
+        ESPTWAIFrame,
+    },
     Rtc, UsbSerialJtag,
 };
 
-use embedded_hal::can::{Can, Frame, StandardId};
+use embedded_hal::can::{Can, Frame};
 use esp_backtrace as _;
 use nb::block;
 use riscv_rt::entry;
@@ -21,8 +25,7 @@ use riscv_rt::entry;
 fn main() -> ! {
     let peripherals = Peripherals::take().unwrap();
     let mut system = peripherals.SYSTEM.split();
-    // let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-    let clocks = ClockControl::configure(system.clock_control, CpuClock::Clock160MHz).freeze();
+    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
@@ -53,26 +56,50 @@ fn main() -> ! {
         io.pins.gpio2,
         io.pins.gpio3,
         &mut system.peripheral_clock_control,
+        &clocks,
         twai::BaudRate::B1000K,
     );
 
-    // Set bits in the bitmask means that we don't care about that bit.
-    let filter = twai::filter::Filter::Single(twai::filter::FilterIdFormat::Standard(
-        twai::filter::SingleStandardFilter {
-            id: twai::filter::ValueMask {
-                value: StandardId::new(0x000).unwrap(),
-                mask: StandardId::new(0x000).unwrap(),
-            },
-            rtr: twai::filter::ValueMask {
-                value: false,
-                mask: true,
-            },
-            data: twai::filter::ValueMask {
-                value: [0x00, 0x00],
-                mask: [0xff, 0xff],
-            },
+    // let filter = twai::filter::SingleStandardFilter {
+    //     id: twai::filter::BitSelector::new_exact(0b10101010101),
+    //     rtr: twai::filter::BitSelector::new_exact(0b0),
+    //     data: [
+    //         twai::filter::BitSelector::new_exact(0x24),
+    //         twai::filter::BitSelector::new_any(),
+    //     ],
+    // };
+    // TODO: even though this is a single, standard id filter, extended ids will also match this filter.
+    let filter = twai::filter::SingleStandardFilter {
+        id: twai::bitselector::BitSelector {
+            bits: [
+                Selector::Set,
+                Selector::Any,
+                Selector::Any,
+                Selector::Any,
+                Selector::Any,
+                Selector::Any,
+                Selector::Any,
+                Selector::Any,
+                Selector::Any,
+                Selector::Any,
+                Selector::Any,
+            ],
         },
-    ));
+        rtr: twai::bitselector::BitSelector::new_exact(0b0),
+        data: [
+            twai::bitselector::BitSelector::new_any(),
+            twai::bitselector::BitSelector::new_any(),
+        ],
+    };
+
+    // // Dump the generated regs.
+    // let regs = filter.to_registers();
+    // writeln!(
+    //     UsbSerialJtag,
+    //     "Filter Registers:\n\t{:08b} {:08b} {:08b} {:08b}\n\t{:08b} {:08b} {:08b} {:08b}",
+    //     regs[0], regs[1], regs[2], regs[3], regs[4], regs[5], regs[6], regs[7],
+    // )
+    // .unwrap();
 
     can_config.set_filter(filter);
 
@@ -81,7 +108,7 @@ fn main() -> ! {
     loop {
         // writeln!(UsbSerialJtag, "Waiting for packet...").unwrap();
         let frame = block!(can.receive()).unwrap();
-        writeln!(UsbSerialJtag, "Received: {:?}", frame).unwrap();
+        writeln!(UsbSerialJtag, "    Received: {:?}", frame).unwrap();
 
         // Increment the payload bytes by one.
         let mut data: [u8; 8] = [0; 8];

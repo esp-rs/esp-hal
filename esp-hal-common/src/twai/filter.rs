@@ -1,115 +1,145 @@
-use embedded_hal::can::{ExtendedId, StandardId};
+use super::bitselector::BitSelector;
 
-pub struct ValueMask<T> {
-    pub value: T,
-    pub mask: T,
-}
-pub trait FilterToRegisters {
-    fn to_registers(self) -> [u8; 8];
+#[derive(Debug, PartialEq)]
+pub enum FilterType {
+    Single,
+    Dual,
 }
 
+pub trait Filter {
+    // The type of the filter.
+    const FILTER_TYPE: FilterType;
+    fn filter_type(&self) -> FilterType {
+        Self::FILTER_TYPE
+    }
+
+    fn to_registers(&self) -> [u8; 8];
+}
+
+///
+///
+/// Warning: This is not a perfect filter. Extended ids that match the bit layout of this filter
+/// will also be accepted.
 pub struct SingleStandardFilter {
-    pub id: ValueMask<StandardId>,
-    pub rtr: ValueMask<bool>,
-    pub data: ValueMask<[u8; 2]>,
+    pub id: BitSelector<11>,
+    pub rtr: BitSelector<1>,
+    pub data: [BitSelector<8>; 2],
 }
-impl FilterToRegisters for SingleStandardFilter {
-    fn to_registers(self) -> [u8; 8] {
+
+impl Filter for SingleStandardFilter {
+    const FILTER_TYPE: FilterType = FilterType::Single;
+    fn to_registers(&self) -> [u8; 8] {
         [
             // Value.
-            (self.id.value.as_raw() >> 3) as u8,
-            ((self.id.value.as_raw() << 5) as u8
-                | if self.rtr.value { 0b1 << 4 } else { 0b0 << 4 })
-                & 0b11110000,
-            self.data.value[0],
-            self.data.value[1],
+            // TODO: Implement some sort of into for slices of bits so that we can simplify some of this code.
+            self.id.bits[10].into_value() << 7
+                | self.id.bits[9].into_value() << 6
+                | self.id.bits[8].into_value() << 5
+                | self.id.bits[7].into_value() << 4
+                | self.id.bits[6].into_value() << 3
+                | self.id.bits[5].into_value() << 2
+                | self.id.bits[4].into_value() << 1
+                | self.id.bits[3].into_value(),
+            self.id.bits[2].into_value() << 7
+                | self.id.bits[1].into_value() << 6
+                | self.id.bits[0].into_value() << 5
+                | self.rtr.bits[0].into_value() << 4,
+            self.data[0].bits[7].into_value() << 7
+                | self.data[0].bits[6].into_value() << 6
+                | self.data[0].bits[5].into_value() << 5
+                | self.data[0].bits[4].into_value() << 4
+                | self.data[0].bits[3].into_value() << 3
+                | self.data[0].bits[2].into_value() << 2
+                | self.data[0].bits[1].into_value() << 1
+                | self.data[0].bits[0].into_value() << 0,
+            self.data[1].bits[7].into_value() << 7
+                | self.data[1].bits[6].into_value() << 6
+                | self.data[1].bits[5].into_value() << 5
+                | self.data[1].bits[4].into_value() << 4
+                | self.data[1].bits[3].into_value() << 3
+                | self.data[1].bits[2].into_value() << 2
+                | self.data[1].bits[1].into_value() << 1
+                | self.data[1].bits[0].into_value() << 0,
             // Mask.
-            (self.id.mask.as_raw() >> 3) as u8,
-            ((self.id.mask.as_raw() << 5) as u8 | if self.rtr.mask { 0b1 << 4 } else { 0b0 << 4 })
-                & 0b11110000,
-            self.data.mask[0],
-            self.data.mask[1],
+            self.id.bits[10].into_mask() << 7
+                | self.id.bits[9].into_mask() << 6
+                | self.id.bits[8].into_mask() << 5
+                | self.id.bits[7].into_mask() << 4
+                | self.id.bits[6].into_mask() << 3
+                | self.id.bits[5].into_mask() << 2
+                | self.id.bits[4].into_mask() << 1
+                | self.id.bits[3].into_mask(),
+            self.id.bits[2].into_mask() << 7
+                | self.id.bits[1].into_mask() << 6
+                | self.id.bits[0].into_mask() << 5
+                | self.rtr.bits[0].into_mask() << 4,
+            self.data[0].bits[7].into_mask() << 7
+                | self.data[0].bits[6].into_mask() << 6
+                | self.data[0].bits[5].into_mask() << 5
+                | self.data[0].bits[4].into_mask() << 4
+                | self.data[0].bits[3].into_mask() << 3
+                | self.data[0].bits[2].into_mask() << 2
+                | self.data[0].bits[1].into_mask() << 1
+                | self.data[0].bits[0].into_mask() << 0,
+            self.data[1].bits[7].into_mask() << 7
+                | self.data[1].bits[6].into_mask() << 6
+                | self.data[1].bits[5].into_mask() << 5
+                | self.data[1].bits[4].into_mask() << 4
+                | self.data[1].bits[3].into_mask() << 3
+                | self.data[1].bits[2].into_mask() << 2
+                | self.data[1].bits[1].into_mask() << 1
+                | self.data[1].bits[0].into_mask() << 0,
         ]
     }
 }
-
+///
+///
+/// Warning: This is not a perfect filter. Standard ids that match the bit layout of this filter
+/// will also be accepted.
 pub struct SingleExtendedFilter {
-    pub id: ValueMask<ExtendedId>,
-    pub rtr: ValueMask<bool>,
+    pub id: BitSelector<29>,
+    pub rtr: BitSelector<1>,
 }
-impl FilterToRegisters for SingleExtendedFilter {
-    fn to_registers(self) -> [u8; 8] {
-        [
-            // Value.
-            (self.id.value.as_raw() >> 21) as u8,
-            (self.id.value.as_raw() >> 13) as u8,
-            (self.id.value.as_raw() >> 5) as u8,
-            ((self.id.value.as_raw() << 3) as u8
-                | if self.rtr.value { 0b1 << 2 } else { 0b0 << 2 })
-                & 0b11111100,
-            // Mask.
-            (self.id.mask.as_raw() >> 21) as u8,
-            (self.id.mask.as_raw() >> 13) as u8,
-            (self.id.mask.as_raw() >> 5) as u8,
-            ((self.id.mask.as_raw() << 3) as u8 | if self.rtr.mask { 0b1 << 2 } else { 0b0 << 2 })
-                & 0b11111100,
-        ]
+impl Filter for SingleExtendedFilter {
+    const FILTER_TYPE: FilterType = FilterType::Single;
+    fn to_registers(&self) -> [u8; 8] {
+        panic!("Unimplemented");
     }
 }
 
-// TODO: how do we actually want to store the two filters?
-
+///
+/// TODO: is this how we actually want to store the two filters?
+///
+/// Warning: This is not a perfect filter. Extended ids that match the bit layout of this filter
+/// will also be accepted.
 pub struct DualStandardFilter {
-    pub id: ValueMask<StandardId>,
-    pub rtr: ValueMask<bool>,
-    // TODO: only the first filter can match on the data.
-    pub data: ValueMask<[u8; 1]>,
+    pub first_id: BitSelector<11>,
+    pub first_rtr: BitSelector<1>,
+    pub first_data: BitSelector<8>,
+
+    pub second_id: BitSelector<11>,
+    pub second_rtr: BitSelector<1>,
 }
-impl FilterToRegisters for DualStandardFilter {
-    fn to_registers(self) -> [u8; 8] {
+impl Filter for DualStandardFilter {
+    const FILTER_TYPE: FilterType = FilterType::Dual;
+    fn to_registers(&self) -> [u8; 8] {
         // TODO: this.
         panic!("Unimplemented");
     }
 }
 ///
-/// NOTE: The dual extended id acceptance filter can only match "the first 16 bits of the 29-bit ID".
+/// NOTE: The dual extended id acceptance filters can only match "the first 16 bits of the 29-bit ID".
+///
+///
+/// Warning: This is not a perfect filter. Standard ids that match the bit layout of this filter
+/// will also be accepted.
 pub struct DualExtendedFilter {
-    pub id: ValueMask<u16>,
+    pub id: [BitSelector<16>; 2],
 }
-impl FilterToRegisters for DualExtendedFilter {
-    fn to_registers(self) -> [u8; 8] {
+impl Filter for DualExtendedFilter {
+    const FILTER_TYPE: FilterType = FilterType::Dual;
+    fn to_registers(&self) -> [u8; 8] {
         // TODO: this.
         panic!("Unimplemented");
-    }
-}
-
-pub enum FilterIdFormat<Std, Ext> {
-    Standard(Std),
-    Extended(Ext),
-}
-impl<Std, Ext> FilterToRegisters for FilterIdFormat<Std, Ext>
-where
-    Std: FilterToRegisters,
-    Ext: FilterToRegisters,
-{
-    fn to_registers(self) -> [u8; 8] {
-        match self {
-            FilterIdFormat::Standard(filter) => filter.to_registers(),
-            FilterIdFormat::Extended(filter) => filter.to_registers(),
-        }
-    }
-}
-
-pub enum Filter {
-    Single(FilterIdFormat<SingleStandardFilter, SingleExtendedFilter>),
-    Dual(FilterIdFormat<DualStandardFilter, DualExtendedFilter>),
-}
-
-impl FilterToRegisters for Filter {
-    fn to_registers(self) -> [u8; 8] {
-        match self {
-            Self::Single(single) => single.to_registers(),
-            Self::Dual(dual) => dual.to_registers(),
-        }
     }
 }
