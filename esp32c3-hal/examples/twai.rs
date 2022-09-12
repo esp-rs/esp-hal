@@ -115,7 +115,7 @@ fn main() -> ! {
         data[..frame.dlc()].copy_from_slice(frame.data());
 
         for b in data[..frame.dlc()].iter_mut() {
-            *b += 1;
+            (*b, _) = (*b).overflowing_add(1);
         }
 
         let frame = ESPTWAIFrame::new(frame.id(), &data[..frame.dlc()]).unwrap();

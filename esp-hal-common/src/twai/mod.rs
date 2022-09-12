@@ -1,4 +1,4 @@
-use core::slice::from_raw_parts;
+use core::slice::{from_raw_parts, from_raw_parts_mut};
 
 use crate::{
     clock::Clocks,
@@ -27,6 +27,25 @@ pub struct ESPTWAIFrame {
     dlc: usize,
     data: [u8; 8],
     is_remote: bool,
+}
+
+impl ESPTWAIFrame {
+    /// Make a new frame from an id and a slice of the TWAI_DATA_x_REG registers.
+    fn new_from_data_registers(id: impl Into<can::Id>, data: &[u32]) -> Self {
+        let mut d: [u8; 8] = [0; 8];
+
+        // Copy the data from the memory mapped peripheral into actual memory.
+        for (src, dest) in data.iter().zip(d.iter_mut()) {
+            *dest = *src as u8;
+        }
+
+        Self {
+            id: id.into(),
+            data: d,
+            dlc: data.len(),
+            is_remote: false,
+        }
+    }
 }
 
 impl embedded_hal::can::Frame for ESPTWAIFrame {
@@ -246,39 +265,11 @@ where
 
         // Convert the filter into values for the registers and store them to the registers.
         let registers = filter.to_registers();
-        // TODO: Use something better for copying, probably something similar to memcpy.
-        self.peripheral
-            .register_block()
-            .data_0
-            .write(|w| w.tx_byte_0().variant(registers[0]));
-        self.peripheral
-            .register_block()
-            .data_1
-            .write(|w| w.tx_byte_1().variant(registers[1]));
-        self.peripheral
-            .register_block()
-            .data_2
-            .write(|w| w.tx_byte_2().variant(registers[2]));
-        self.peripheral
-            .register_block()
-            .data_3
-            .write(|w| w.tx_byte_3().variant(registers[3]));
-        self.peripheral
-            .register_block()
-            .data_4
-            .write(|w| w.tx_byte_4().variant(registers[4]));
-        self.peripheral
-            .register_block()
-            .data_5
-            .write(|w| w.tx_byte_5().variant(registers[5]));
-        self.peripheral
-            .register_block()
-            .data_6
-            .write(|w| w.tx_byte_6().variant(registers[6]));
-        self.peripheral
-            .register_block()
-            .data_7
-            .write(|w| w.tx_byte_7().variant(registers[7]));
+
+        // Copy the filter to the peripheral.
+        unsafe {
+            copy_to_data_register(self.peripheral.register_block().data_0.as_ptr(), &registers);
+        }
     }
 
     /// Set the Error warning threshold.
@@ -407,6 +398,31 @@ impl embedded_hal::can::Error for ESPTWAIError {
     }
 }
 
+/// Copy data from multiple TWAI_DATA_x_REG registers, packing the source into the destination.
+///
+/// This function will step through the source memory by STEP bytes copying an individual byte
+/// into each element of the destination.
+///
+unsafe fn copy_from_data_register(dest: &mut [u8], src: *const u32) {
+    let src = from_raw_parts(src, dest.len());
+
+    for (dest, src) in dest.iter_mut().zip(src.iter()) {
+        *dest = *src as u8;
+    }
+}
+/// Copy data to multiple TWAI_DATA_x_REG registers, unpacking the source into the destination.
+///
+/// This function will step through the source memory by STEP bytes copying an individual byte
+/// into each element of the destination.
+///
+unsafe fn copy_to_data_register(dest: *mut u32, src: &[u8]) {
+    let dest = from_raw_parts_mut(dest, src.len());
+
+    for (dest, src) in dest.iter_mut().zip(src.iter()) {
+        *dest = *src as u32;
+    }
+}
+
 impl<T> embedded_hal::can::Can for TWAI<T>
 where
     T: Instance,
@@ -421,7 +437,7 @@ where
     ///
     /// [ESP32C3 Reference Manual](https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf#subsubsection.29.4.4.2)
     ///
-    /// NOTE: This may not work if using the self reception/self test functionality. See
+    /// NOTE: TODO: This may not work if using the self reception/self test functionality. See
     /// notes 1 and 2 in the Frame Identifier section of the reference manual.
     ///
     fn transmit(&mut self, frame: &Self::Frame) -> nb::Result<Option<Self::Frame>, Self::Error> {
@@ -437,8 +453,8 @@ where
         }
 
         // Assemble the frame information into the data_0 byte.
-        let frame_format: u8 = if frame.is_extended() { 0x1 } else { 0x0 };
-        let rtr_bit: u8 = if frame.is_remote_frame() { 0x1 } else { 0x0 };
+        let frame_format: u8 = frame.is_extended() as u8;
+        let rtr_bit: u8 = frame.is_remote_frame() as u8;
         let dlc_bits: u8 = frame.dlc() as u8 & 0b1111;
 
         let data_0: u8 = frame_format << 7 | rtr_bit << 6 | dlc_bits;
@@ -488,140 +504,18 @@ where
         // Store the data portion of the packet into the transmit buffer.
         if frame.is_data_frame() {
             match frame.id() {
-                can::Id::Standard(_) => {
-                    // TODO: Copy data to the appropriate registers in a better method. Verified in --release asm that this is bad.
-                    // Byte 0 of the payload.
-                    if frame.dlc() > 0 {
-                        let data_byte_1 = &frame.data()[0];
-                        self.peripheral
-                            .register_block()
-                            .data_3
-                            .write(|w| w.tx_byte_3().variant(*data_byte_1));
-                    }
-                    // Byte 1 of the payload.
-                    if frame.dlc() > 1 {
-                        let data_byte_2 = &frame.data()[1];
-                        self.peripheral
-                            .register_block()
-                            .data_4
-                            .write(|w| w.tx_byte_4().variant(*data_byte_2));
-                    }
-                    // Byte 2 of the payload.
-                    if frame.dlc() > 2 {
-                        let data_byte_3 = &frame.data()[2];
-                        self.peripheral
-                            .register_block()
-                            .data_5
-                            .write(|w| w.tx_byte_5().variant(*data_byte_3));
-                    }
-                    // Byte 3 of the payload.
-                    if frame.dlc() > 3 {
-                        let data_byte_4 = &frame.data()[3];
-                        self.peripheral
-                            .register_block()
-                            .data_6
-                            .write(|w| w.tx_byte_6().variant(*data_byte_4));
-                    }
-                    // Byte 4 of the payload.
-                    if frame.dlc() > 4 {
-                        let data_byte_5 = &frame.data()[4];
-                        self.peripheral
-                            .register_block()
-                            .data_7
-                            .write(|w| w.tx_byte_7().variant(*data_byte_5));
-                    }
-                    // Byte 5 of the payload.
-                    if frame.dlc() > 5 {
-                        let data_byte_6 = &frame.data()[5];
-                        self.peripheral
-                            .register_block()
-                            .data_8
-                            .write(|w| w.tx_byte_8().variant(*data_byte_6));
-                    }
-                    // Byte 6 of the payload.
-                    if frame.dlc() > 6 {
-                        let data_byte_7 = &frame.data()[6];
-                        self.peripheral
-                            .register_block()
-                            .data_9
-                            .write(|w| w.tx_byte_9().variant(*data_byte_7));
-                    }
-                    // Byte 7 of the payload.
-                    if frame.dlc() > 7 {
-                        let data_byte_8 = &frame.data()[7];
-                        self.peripheral
-                            .register_block()
-                            .data_10
-                            .write(|w| w.tx_byte_10().variant(*data_byte_8));
-                    }
-                }
-                can::Id::Extended(_) => {
-                    // TODO: Copy data to the appropriate registers in a better method. Verified in --release asm that this is bad.
-                    // Byte 0 of the payload.
-                    if frame.dlc() > 0 {
-                        let data_byte_1 = &frame.data()[0];
-                        self.peripheral
-                            .register_block()
-                            .data_5
-                            .write(|w| w.tx_byte_5().variant(*data_byte_1));
-                    }
-                    // Byte 1 of the payload.
-                    if frame.dlc() > 1 {
-                        let data_byte_2 = &frame.data()[1];
-                        self.peripheral
-                            .register_block()
-                            .data_6
-                            .write(|w| w.tx_byte_6().variant(*data_byte_2));
-                    }
-                    // Byte 2 of the payload.
-                    if frame.dlc() > 2 {
-                        let data_byte_3 = &frame.data()[2];
-                        self.peripheral
-                            .register_block()
-                            .data_7
-                            .write(|w| w.tx_byte_7().variant(*data_byte_3));
-                    }
-                    // Byte 3 of the payload.
-                    if frame.dlc() > 3 {
-                        let data_byte_4 = &frame.data()[3];
-                        self.peripheral
-                            .register_block()
-                            .data_8
-                            .write(|w| w.tx_byte_8().variant(*data_byte_4));
-                    }
-                    // Byte 4 of the payload.
-                    if frame.dlc() > 4 {
-                        let data_byte_5 = &frame.data()[4];
-                        self.peripheral
-                            .register_block()
-                            .data_9
-                            .write(|w| w.tx_byte_9().variant(*data_byte_5));
-                    }
-                    // Byte 5 of the payload.
-                    if frame.dlc() > 5 {
-                        let data_byte_6 = &frame.data()[5];
-                        self.peripheral
-                            .register_block()
-                            .data_10
-                            .write(|w| w.tx_byte_10().variant(*data_byte_6));
-                    }
-                    // Byte 6 of the payload.
-                    if frame.dlc() > 6 {
-                        let data_byte_7 = &frame.data()[6];
-                        self.peripheral
-                            .register_block()
-                            .data_11
-                            .write(|w| w.tx_byte_11().variant(*data_byte_7));
-                    }
-                    // Byte 7 of the payload.
-                    if frame.dlc() > 7 {
-                        let data_byte_8 = &frame.data()[7];
-                        self.peripheral
-                            .register_block()
-                            .data_12
-                            .write(|w| w.tx_byte_12().variant(*data_byte_8));
-                    }
-                }
+                can::Id::Standard(_) => unsafe {
+                    copy_to_data_register(
+                        self.peripheral.register_block().data_3.as_ptr(),
+                        frame.data(),
+                    )
+                },
+                can::Id::Extended(_) => unsafe {
+                    copy_to_data_register(
+                        self.peripheral.register_block().data_5.as_ptr(),
+                        frame.data(),
+                    )
+                },
             }
         } else {
             // Is RTR frame, so no data is included.
@@ -677,25 +571,22 @@ where
             let data_2 = self
                 .peripheral
                 .register_block()
-                .data_1
+                .data_2
                 .read()
-                .tx_byte_1()
+                .tx_byte_2()
                 .bits();
 
-            let id = StandardId::new((data_1 as u16) << 3 | (data_2 as u16) >> 5).unwrap();
+            let raw_id: u16 = ((data_1 as u16) << 3) | ((data_2 as u16) >> 5);
 
-            // Copy the packet payload from the peripheral into memory.
-            // TODO: find a better way of doing this, basically a memcpy, but the
-            // destination and source have different strides.
-            let raw_payload =
-                unsafe { from_raw_parts(self.peripheral.register_block().data_3.as_ptr(), dlc) };
+            let id = StandardId::new(raw_id).unwrap();
 
-            let mut payload: [u8; 8] = [0; 8];
-            for i in 0..dlc {
-                payload[i] = raw_payload[i] as u8;
+            // Create a new frame from the contents of the appropriate TWAI_DATA_x_REG registers.
+            unsafe {
+                ESPTWAIFrame::new_from_data_registers(
+                    id,
+                    from_raw_parts(self.peripheral.register_block().data_3.as_ptr(), dlc),
+                )
             }
-
-            ESPTWAIFrame::new(id, &payload[..dlc]).unwrap()
         } else {
             // Frame uses extended 29 bit id.
             let data_1 = self
@@ -709,9 +600,9 @@ where
             let data_2 = self
                 .peripheral
                 .register_block()
-                .data_1
+                .data_2
                 .read()
-                .tx_byte_1()
+                .tx_byte_2()
                 .bits();
 
             let data_3 = self
@@ -730,25 +621,19 @@ where
                 .tx_byte_4()
                 .bits();
 
-            let id = ExtendedId::new(
-                (data_1 as u32) << 21
-                    | (data_2 as u32) << 13
-                    | (data_3 as u32) << 5
-                    | (data_4 as u32) >> 3,
-            )
-            .unwrap();
+            let raw_id: u32 = (data_1 as u32) << 21
+                | (data_2 as u32) << 13
+                | (data_3 as u32) << 5
+                | (data_4 as u32) >> 3;
 
-            // Copy the packet payload from the peripheral into memory.
-            // TODO: find a better way of doing this, basically a memcpy, but the
-            // destination and source have different strides.
-            let raw_payload =
-                unsafe { from_raw_parts(self.peripheral.register_block().data_5.as_ptr(), dlc) };
-            let mut payload: [u8; 8] = [0; 8];
-            for i in 0..dlc {
-                payload[i] = raw_payload[i] as u8;
+            let id = ExtendedId::new(raw_id).unwrap();
+
+            unsafe {
+                ESPTWAIFrame::new_from_data_registers(
+                    id,
+                    from_raw_parts(self.peripheral.register_block().data_5.as_ptr(), dlc),
+                )
             }
-
-            ESPTWAIFrame::new(id, &payload[..dlc]).unwrap()
         };
 
         // Release the packet we read from the FIFO, allowing the peripheral to prepare
