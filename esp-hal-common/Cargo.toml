@@ -1,6 +1,6 @@
 [package]
 name    = "esp-hal-common"
-version = "0.1.0"
+version = "0.2.0"
 authors = [
     "Jesse Braham <jesse@beta7.io>",
     "Björn Quentin <bjoern.quentin@mobile-j.de>",
@@ -13,13 +13,13 @@ license      = "MIT OR Apache-2.0"
 
 [dependencies]
 cfg-if           = "1.0.0"
-critical-section = "1.0.0"
+critical-section = "1.1.0"
 embedded-hal     = { version = "0.2.7", features = ["unproven"] }
 embedded-hal-1   = { package = "embedded-hal", version = "=1.0.0-alpha.8", optional = true }
 fugit            = "0.3.6"
 nb               = "1.0.0"
 paste            = "=1.0.8"
-procmacros       = { path = "../esp-hal-procmacros", package = "esp-hal-procmacros" }
+procmacros       = { version = "0.1.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 void             = { version = "1.0.2", default-features = false }
 
 # RISC-V
