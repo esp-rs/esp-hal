@@ -17,7 +17,7 @@
 //! [esp32s3-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32s3-hal
 
 #![no_std]
-#![cfg_attr(target_arch = "xtensa", feature(asm_experimental_arch))]
+#![cfg_attr(not(feature = "esp32c3"), feature(asm_experimental_arch))]
 
 #[cfg(feature = "esp32")]
 pub use esp32 as pac;
@@ -38,8 +38,8 @@ pub mod efuse;
 
 pub mod gpio;
 pub mod i2c;
-#[cfg_attr(target_arch = "riscv32", path = "interrupt/riscv.rs")]
-#[cfg_attr(target_arch = "xtensa", path = "interrupt/xtensa.rs")]
+#[cfg_attr(feature = "esp32c3", path = "interrupt/riscv.rs")]
+#[cfg_attr(not(feature = "esp32c3"), path = "interrupt/xtensa.rs")]
 pub mod interrupt;
 pub mod ledc;
 pub mod prelude;
@@ -90,12 +90,13 @@ pub enum Cpu {
 }
 
 pub fn get_core() -> Cpu {
-    #[cfg(all(target_arch = "xtensa", feature = "multi_core"))]
+    #[cfg(all(not(feature = "esp32c3"), feature = "multi_core"))]
     match ((xtensa_lx::get_processor_id() >> 13) & 1) != 0 {
         false => Cpu::ProCpu,
         true => Cpu::AppCpu,
     }
-    // #[cfg(all(target_arch = "riscv32", feature = "multi_core"))]
+
+    // #[cfg(all(feature = "esp32c3", feature = "multi_core"))]
     // TODO get hart_id
 
     // single core always has ProCpu only
@@ -108,7 +109,7 @@ mod critical_section_impl {
 
     critical_section::set_impl!(CriticalSection);
 
-    #[cfg(target_arch = "xtensa")]
+    #[cfg(not(feature = "esp32c3"))]
     mod xtensa {
 
         unsafe impl critical_section::Impl for super::CriticalSection {
@@ -139,7 +140,7 @@ mod critical_section_impl {
         }
     }
 
-    #[cfg(target_arch = "riscv32")]
+    #[cfg(feature = "esp32c3")]
     mod riscv {
         unsafe impl critical_section::Impl for super::CriticalSection {
             unsafe fn acquire() -> critical_section::RawRestoreState {
