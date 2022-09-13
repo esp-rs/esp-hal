@@ -41,24 +41,25 @@ fn main() -> ! {
     wdt1.disable();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-    let mut pin = io.pins.gpio2.into_analog();
 
     // Create ADC instances
     let analog = peripherals.APB_SARADC.split();
 
-    let mut adc2_config = AdcConfig::new();
-    adc2_config.enable_pin(&pin, Attenuation::Attenuation11dB);
-    let mut adc2 = ADC::<ADC1>::adc(
+    let mut adc1_config = AdcConfig::new();
+
+    let mut pin = adc1_config.enable_pin(io.pins.gpio2.into_analog(), Attenuation::Attenuation11dB);
+
+    let mut adc1 = ADC::<ADC1>::adc(
         &mut system.peripheral_clock_control,
         analog.adc1,
-        adc2_config,
+        adc1_config,
     )
     .unwrap();
 
     let mut delay = Delay::new(&clocks);
 
     loop {
-        let pin_value: u16 = nb::block!(adc2.read(&mut pin)).unwrap();
+        let pin_value: u16 = nb::block!(adc1.read(&mut pin)).unwrap();
         println!("PIN ADC reading = {}", pin_value);
         delay.delay_ms(1500u32);
     }

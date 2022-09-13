@@ -34,19 +34,20 @@ fn main() -> ! {
     rtc.rwdt.disable();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-    let mut pin3 = io.pins.gpio3.into_analog();
+    //let pin3 = io.pins.gpio3.into_analog();
 
     // Create ADC instances
     let analog = peripherals.SENS.split();
 
     let mut adc1_config = AdcConfig::new();
-    adc1_config.enable_pin(&pin3, Attenuation::Attenuation11dB);
+
+    let mut pin3 = adc1_config.enable_pin(io.pins.gpio3.into_analog(), Attenuation::Attenuation11dB);
+
     let mut adc1 = ADC::<ADC1>::adc(analog.adc1, adc1_config).unwrap();
 
     let mut delay = Delay::new(&clocks);
 
     loop {
-        println!("About to read from ADC");
         let pin3_value: u16 = nb::block!(adc1.read(&mut pin3)).unwrap();
         println!("PIN3 ADC reading = {}", pin3_value);
         delay.delay_ms(1500u32);
