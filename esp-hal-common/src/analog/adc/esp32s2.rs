@@ -22,6 +22,19 @@ pub enum Attenuation {
     Attenuation11dB  = 0b11,
 }
 
+pub struct AdcPin<PIN, ADCI> {
+    pub pin: PIN,
+    _phantom: PhantomData<ADCI>,
+}
+
+impl<PIN: Channel<ADCI, ID = u8>, ADCI> Channel<ADCI> for AdcPin<PIN, ADCI> {
+    type ID = u8;
+
+    fn channel() -> Self::ID {
+        PIN::channel()
+    }
+}
+
 pub struct AdcConfig<ADCI> {
     pub resolution: Resolution,
     pub attenuations: [Option<Attenuation>; 10],
@@ -38,10 +51,15 @@ where
 
     pub fn enable_pin<PIN: Channel<ADCI, ID = u8>>(
         &mut self,
-        _pin: &PIN,
+        pin: PIN,
         attenuation: Attenuation,
-    ) {
+    ) -> AdcPin<PIN, ADCI> {
         self.attenuations[PIN::channel() as usize] = Some(attenuation);
+
+        AdcPin {
+            pin,
+            _phantom: PhantomData::default(),
+        }
     }
 }
 
@@ -314,7 +332,7 @@ where
     }
 }
 
-impl<ADCI, WORD, PIN> OneShot<ADCI, WORD, PIN> for ADC<ADCI>
+impl<ADCI, WORD, PIN> OneShot<ADCI, WORD, AdcPin<PIN, ADCI>> for ADC<ADCI>
 where
     WORD: From<u16>,
     PIN: Channel<ADCI, ID = u8>,
@@ -322,23 +340,26 @@ where
 {
     type Error = ();
 
-    fn read(&mut self, _pin: &mut PIN) -> nb::Result<WORD, Self::Error> {
-        if self.attenuations[PIN::channel() as usize] == None {
-            panic!("Channel {} is not configured reading!", PIN::channel());
+    fn read(&mut self, _pin: &mut AdcPin<PIN, ADCI>) -> nb::Result<WORD, Self::Error> {
+        if self.attenuations[AdcPin::<PIN, ADCI>::channel() as usize] == None {
+            panic!(
+                "Channel {} is not configured reading!",
+                AdcPin::<PIN, ADCI>::channel()
+            );
         }
 
         if let Some(active_channel) = self.active_channel {
             // There is conversion in progress:
             // - if it's for a different channel try again later
-            // - if it's for the given channel, go ahaid and check progress
-            if active_channel != PIN::channel() {
+            // - if it's for the given channel, go ahead and check progress
+            if active_channel != AdcPin::<PIN, ADCI>::channel() {
                 return Err(nb::Error::WouldBlock);
             }
         } else {
             // If no conversions are in progress, start a new one for given channel
-            self.active_channel = Some(PIN::channel());
+            self.active_channel = Some(AdcPin::<PIN, ADCI>::channel());
 
-            ADCI::set_en_pad(PIN::channel() as u8);
+            ADCI::set_en_pad(AdcPin::<PIN, ADCI>::channel() as u8);
 
             ADCI::clear_start_sar();
             ADCI::set_start_sar();

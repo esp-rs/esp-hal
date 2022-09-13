@@ -34,13 +34,12 @@ fn main() -> ! {
     rtc.rwdt.disable();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-    let mut pin25 = io.pins.gpio25.into_analog();
 
     // Create ADC instances
     let analog = peripherals.SENS.split();
 
     let mut adc2_config = AdcConfig::new();
-    adc2_config.enable_pin(&pin25, Attenuation::Attenuation11dB);
+    let mut pin25 = adc2_config.enable_pin(io.pins.gpio25.into_analog(), Attenuation::Attenuation11dB);
     let mut adc2 = ADC::<ADC2>::adc(analog.adc2, adc2_config).unwrap();
 
     let mut delay = Delay::new(&clocks);
