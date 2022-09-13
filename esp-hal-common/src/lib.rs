@@ -27,20 +27,27 @@ pub use esp32c3 as pac;
 pub use esp32s2 as pac;
 #[cfg(esp32s3)]
 pub use esp32s3 as pac;
+pub use procmacros as macros;
 
+#[cfg(any(esp32c3, esp32s3))]
+pub use self::usb_serial_jtag::UsbSerialJtag;
+pub use self::{
+    delay::Delay,
+    gpio::*,
+    interrupt::*,
+    pulse_control::PulseControl,
+    rng::Rng,
+    rtc_cntl::{Rtc, Rwdt},
+    serial::Serial,
+    spi::Spi,
+    timer::Timer,
+};
+
+pub mod analog;
+pub mod clock;
 pub mod delay;
-
-#[cfg_attr(esp32, path = "efuse/esp32.rs")]
-#[cfg_attr(esp32c3, path = "efuse/esp32c3.rs")]
-#[cfg_attr(esp32s2, path = "efuse/esp32s2.rs")]
-#[cfg_attr(esp32s3, path = "efuse/esp32s3.rs")]
-pub mod efuse;
-
 pub mod gpio;
 pub mod i2c;
-#[cfg_attr(riscv, path = "interrupt/riscv.rs")]
-#[cfg_attr(xtensa, path = "interrupt/xtensa.rs")]
-pub mod interrupt;
 pub mod ledc;
 pub mod prelude;
 pub mod pulse_control;
@@ -49,36 +56,28 @@ pub mod rom;
 pub mod rtc_cntl;
 pub mod serial;
 pub mod spi;
+pub mod system;
+#[cfg(any(esp32c3, esp32s3, esp32s2))]
+pub mod systimer;
 pub mod timer;
 #[cfg(any(esp32c3, esp32s3))]
 pub mod usb_serial_jtag;
 pub mod utils;
 
-pub use delay::Delay;
-pub use gpio::*;
-pub use interrupt::*;
-pub use procmacros as macros;
-pub use pulse_control::PulseControl;
-pub use rng::Rng;
-pub use rtc_cntl::{Rtc, Rwdt};
-pub use serial::Serial;
-pub use spi::Spi;
-pub use timer::Timer;
-#[cfg(any(esp32c3, esp32s3))]
-pub use usb_serial_jtag::UsbSerialJtag;
-#[cfg(any(esp32c3, esp32s3, esp32s2))]
-pub mod systimer;
-
-pub mod clock;
-pub mod system;
-
-pub mod analog;
-
 #[cfg_attr(esp32, path = "cpu_control/esp32.rs")]
-#[cfg_attr(esp32c3, path = "cpu_control/none.rs")]
-#[cfg_attr(esp32s2, path = "cpu_control/none.rs")]
+#[cfg_attr(any(esp32c3, esp32s2), path = "cpu_control/none.rs")]
 #[cfg_attr(esp32s3, path = "cpu_control/esp32s3.rs")]
 pub mod cpu_control;
+
+#[cfg_attr(esp32, path = "efuse/esp32.rs")]
+#[cfg_attr(esp32c3, path = "efuse/esp32c3.rs")]
+#[cfg_attr(esp32s2, path = "efuse/esp32s2.rs")]
+#[cfg_attr(esp32s3, path = "efuse/esp32s3.rs")]
+pub mod efuse;
+
+#[cfg_attr(riscv, path = "interrupt/riscv.rs")]
+#[cfg_attr(xtensa, path = "interrupt/xtensa.rs")]
+pub mod interrupt;
 
 /// Enumeration of CPU cores
 /// The actual number of available cores depends on the target.
