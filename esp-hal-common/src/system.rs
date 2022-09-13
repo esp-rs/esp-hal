@@ -8,9 +8,9 @@
 //! let system = peripherals.SYSTEM.split();
 //! let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 //! ```
-#[cfg(not(feature = "esp32"))]
+#[cfg(not(esp32))]
 type SystemPeripheral = crate::pac::SYSTEM;
-#[cfg(feature = "esp32")]
+#[cfg(esp32)]
 type SystemPeripheral = crate::pac::DPORT;
 
 /// Peripherals which can be enabled via [PeripheralClockControl]
@@ -18,11 +18,11 @@ pub enum Peripheral {
     Spi2,
     Spi3,
     I2cExt0,
-    #[cfg(not(feature = "esp32c3"))]
+    #[cfg(not(esp32c3))]
     I2cExt1,
     Rmt,
     Ledc,
-    #[cfg(feature = "esp32c3")]
+    #[cfg(esp32c3)]
     ApbSarAdc,
 }
 
@@ -36,9 +36,9 @@ impl PeripheralClockControl {
     pub fn enable(&mut self, peripheral: Peripheral) {
         let system = unsafe { &*SystemPeripheral::PTR };
 
-        #[cfg(not(feature = "esp32"))]
+        #[cfg(not(esp32))]
         let (perip_clk_en0, perip_rst_en0) = { (&system.perip_clk_en0, &system.perip_rst_en0) };
-        #[cfg(feature = "esp32")]
+        #[cfg(esp32)]
         let (perip_clk_en0, perip_rst_en0) = { (&system.perip_clk_en, &system.perip_rst_en) };
 
         match peripheral {
@@ -50,17 +50,17 @@ impl PeripheralClockControl {
                 perip_clk_en0.modify(|_, w| w.spi3_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.spi3_rst().clear_bit());
             }
-            #[cfg(feature = "esp32")]
+            #[cfg(esp32)]
             Peripheral::I2cExt0 => {
                 perip_clk_en0.modify(|_, w| w.i2c0_ext0_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.i2c0_ext0_rst().clear_bit());
             }
-            #[cfg(not(feature = "esp32"))]
+            #[cfg(not(esp32))]
             Peripheral::I2cExt0 => {
                 perip_clk_en0.modify(|_, w| w.i2c_ext0_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.i2c_ext0_rst().clear_bit());
             }
-            #[cfg(not(feature = "esp32c3"))]
+            #[cfg(not(esp32c3))]
             Peripheral::I2cExt1 => {
                 perip_clk_en0.modify(|_, w| w.i2c_ext1_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.i2c_ext1_rst().clear_bit());
@@ -73,7 +73,7 @@ impl PeripheralClockControl {
                 perip_clk_en0.modify(|_, w| w.ledc_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.ledc_rst().clear_bit());
             }
-            #[cfg(feature = "esp32c3")]
+            #[cfg(esp32c3)]
             Peripheral::ApbSarAdc => {
                 perip_clk_en0.modify(|_, w| w.apb_saradc_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.apb_saradc_rst().clear_bit());

@@ -3,13 +3,13 @@ pub use paste::paste;
 /// Pauses execution for us microseconds
 #[inline(always)]
 pub unsafe fn esp_rom_delay_us(us: u32) {
-    #[cfg(feature = "esp32")]
+    #[cfg(esp32)]
     const ESP_ROM_DELAY_US: u32 = 0x4000_8534;
-    #[cfg(feature = "esp32s2")]
+    #[cfg(esp32s2)]
     const ESP_ROM_DELAY_US: u32 = 0x4000_d888;
-    #[cfg(feature = "esp32s3")]
+    #[cfg(esp32s3)]
     const ESP_ROM_DELAY_US: u32 = 0x4000_0600;
-    #[cfg(feature = "esp32c3")]
+    #[cfg(esp32c3)]
     const ESP_ROM_DELAY_US: u32 = 0x4000_0050;
 
     // cast to usize is just needed because of the way we run clippy in CI
@@ -22,13 +22,13 @@ pub unsafe fn esp_rom_delay_us(us: u32) {
 /// Set the real CPU ticks per us to the ets, so that ets_delay_us
 /// will be accurate. Call this function when CPU frequency is changed.
 pub unsafe fn ets_update_cpu_frequency(ticks_per_us: u32) {
-    #[cfg(feature = "esp32")]
+    #[cfg(esp32)]
     const ETS_UPDATE_CPU_FREQUENCY: u32 = 0x4000_8550;
-    #[cfg(feature = "esp32s2")]
+    #[cfg(esp32s2)]
     const ETS_UPDATE_CPU_FREQUENCY: u32 = 0x4000_d8a4;
-    #[cfg(feature = "esp32s3")]
+    #[cfg(esp32s3)]
     const ETS_UPDATE_CPU_FREQUENCY: u32 = 0x4004_3164;
-    #[cfg(feature = "esp32c3")]
+    #[cfg(esp32c3)]
     const ETS_UPDATE_CPU_FREQUENCY: u32 = 0x4000_0588;
 
     // cast to usize is just needed because of the way we run clippy in CI
@@ -40,13 +40,13 @@ pub unsafe fn ets_update_cpu_frequency(ticks_per_us: u32) {
 
 #[inline(always)]
 pub unsafe fn regi2c_ctrl_write_reg(block: u32, block_hostid: u32, reg_add: u32, indata: u32) {
-    #[cfg(feature = "esp32")]
+    #[cfg(esp32)]
     const ROM_I2C_WRITEREG: u32 = 0x4000_41a4;
-    #[cfg(feature = "esp32s2")]
+    #[cfg(esp32s2)]
     const ROM_I2C_WRITEREG: u32 = 0x4000_a9a8;
-    #[cfg(feature = "esp32s3")]
+    #[cfg(esp32s3)]
     const ROM_I2C_WRITEREG: u32 = 0x4000_5d60;
-    #[cfg(feature = "esp32c3")]
+    #[cfg(esp32c3)]
     const ROM_I2C_WRITEREG: u32 = 0x4000_195c;
 
     // cast to usize is just needed because of the way we run clippy in CI
@@ -77,13 +77,13 @@ pub unsafe fn regi2c_ctrl_write_reg_mask(
     reg_add_lsb: u32,
     indata: u32,
 ) {
-    #[cfg(feature = "esp32")]
+    #[cfg(esp32)]
     const ROM_I2C_WRITEREG_MASK: u32 = 0x4000_41fc;
-    #[cfg(feature = "esp32s2")]
+    #[cfg(esp32s2)]
     const ROM_I2C_WRITEREG_MASK: u32 = 0x4000_aa00;
-    #[cfg(feature = "esp32s3")]
+    #[cfg(esp32s3)]
     const ROM_I2C_WRITEREG_MASK: u32 = 0x4000_5d6c;
-    #[cfg(feature = "esp32c3")]
+    #[cfg(esp32c3)]
     const ROM_I2C_WRITEREG_MASK: u32 = 0x4000_1960;
 
     // cast to usize is just needed because of the way we run clippy in CI

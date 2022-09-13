@@ -16,7 +16,7 @@ use core::{marker::PhantomData, slice::IterMut};
 use fugit::NanosDuration;
 use smart_leds_trait::{SmartLedsWrite, RGB8};
 
-#[cfg(any(feature = "esp32", feature = "esp32s2"))]
+#[cfg(any(esp32, esp32s2))]
 use crate::pulse_control::ClockSource;
 use crate::{
     gpio::OutputPin,
@@ -28,13 +28,13 @@ use crate::{
 //
 // TODO: Factor in clock configuration, this needs to be revisited once #24 and
 // #44 have been addressed.
-#[cfg(feature = "esp32c3")]
+#[cfg(esp32c3)]
 const SOURCE_CLK_FREQ: u32 = 40_000_000;
-#[cfg(feature = "esp32s2")]
+#[cfg(esp32s2)]
 const SOURCE_CLK_FREQ: u32 = 40_000_000;
-#[cfg(feature = "esp32")]
+#[cfg(esp32)]
 const SOURCE_CLK_FREQ: u32 = 40_000_000;
-#[cfg(feature = "esp32s3")]
+#[cfg(esp32s3)]
 const SOURCE_CLK_FREQ: u32 = 40_000_000;
 
 const SK68XX_CODE_PERIOD: u32 = 1200;
@@ -94,14 +94,14 @@ where
 {
     /// Create a new adapter object that drives the pin using the RMT channel.
     pub fn new(mut channel: CHANNEL, pin: PIN) -> SmartLedsAdapter<CHANNEL, PIN, BUFFER_SIZE> {
-        #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+        #[cfg(any(esp32c3, esp32s3))]
         channel
             .set_idle_output_level(false)
             .set_carrier_modulation(false)
             .set_channel_divider(1)
             .set_idle_output(true);
 
-        #[cfg(any(feature = "esp32", feature = "esp32s2"))]
+        #[cfg(any(esp32, esp32s2))]
         channel
             .set_idle_output_level(false)
             .set_carrier_modulation(false)

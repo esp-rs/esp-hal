@@ -1,7 +1,7 @@
 //! UART driver
 
 use self::config::Config;
-#[cfg(any(feature = "esp32", feature = "esp32s3"))]
+#[cfg(any(esp32, esp32s3))]
 use crate::pac::UART2;
 use crate::{
     clock::Clocks,
@@ -296,7 +296,7 @@ where
 
     /// Configures the AT-CMD detection settings.
     pub fn set_at_cmd(&mut self, config: config::AtCmdConfig) {
-        #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
+        #[cfg(not(any(esp32, esp32s2)))]
         self.uart
             .register_block()
             .clk_conf
@@ -330,7 +330,7 @@ where
                 .write(|w| unsafe { w.rx_gap_tout().bits(gap_timeout.into()) });
         }
 
-        #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
+        #[cfg(not(any(esp32, esp32s2)))]
         self.uart
             .register_block()
             .clk_conf
@@ -339,7 +339,7 @@ where
 
     /// Configures the RX-FIFO threshold
     pub fn set_rx_fifo_full_threshold(&mut self, threshold: u16) {
-        #[cfg(feature = "esp32")]
+        #[cfg(esp32)]
         let threshold: u8 = threshold as u8;
 
         self.uart
@@ -476,7 +476,7 @@ where
         let offset = 0;
 
         // on ESP32-S2 we need to use PeriBus2 to read the FIFO
-        #[cfg(feature = "esp32s2")]
+        #[cfg(esp32s2)]
         let offset = 0x20c00000;
 
         if self.uart.get_rx_fifo_count() > 0 {
@@ -495,7 +495,7 @@ where
     /// Change the number of stop bits
     pub fn change_stop_bits(&mut self, stop_bits: config::StopBits) -> &mut Self {
         // workaround for hardware issue, when UART stop bit set as 2-bit mode.
-        #[cfg(feature = "esp32")]
+        #[cfg(esp32)]
         if stop_bits == config::StopBits::STOP2 {
             self.uart
                 .register_block()
@@ -518,7 +518,7 @@ where
                 .modify(|_, w| unsafe { w.stop_bit_num().bits(stop_bits as u8) });
         }
 
-        #[cfg(not(feature = "esp32"))]
+        #[cfg(not(esp32))]
         self.uart
             .register_block()
             .conf0
@@ -551,7 +551,7 @@ where
         self
     }
 
-    #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+    #[cfg(any(esp32c3, esp32s3))]
     fn change_baud(&self, baudrate: u32, clocks: &Clocks) {
         // we force the clock source to be APB and don't use the decimal part of the
         // divider
@@ -584,7 +584,7 @@ where
             .write(|w| unsafe { w.clkdiv().bits(divider).frag().bits(0) });
     }
 
-    #[cfg(any(feature = "esp32", feature = "esp32s2"))]
+    #[cfg(any(esp32, esp32s2))]
     fn change_baud(&self, baudrate: u32, clocks: &Clocks) {
         // we force the clock source to be APB and don't use the decimal part of the
         // divider
@@ -670,18 +670,18 @@ pub trait Instance {
     }
 
     fn is_tx_idle(&self) -> bool {
-        #[cfg(feature = "esp32")]
+        #[cfg(esp32)]
         let idle = self.register_block().status.read().st_utx_out().bits() == 0x0u8;
-        #[cfg(not(feature = "esp32"))]
+        #[cfg(not(esp32))]
         let idle = self.register_block().fsm_status.read().st_utx_out().bits() == 0x0u8;
 
         idle
     }
 
     fn is_rx_idle(&self) -> bool {
-        #[cfg(feature = "esp32")]
+        #[cfg(esp32)]
         let idle = self.register_block().status.read().st_urx_out().bits() == 0x0u8;
-        #[cfg(not(feature = "esp32"))]
+        #[cfg(not(esp32))]
         let idle = self.register_block().fsm_status.read().st_urx_out().bits() == 0x0u8;
 
         idle
@@ -742,7 +742,7 @@ impl Instance for UART1 {
     }
 }
 
-#[cfg(any(feature = "esp32", feature = "esp32s3"))]
+#[cfg(any(esp32, esp32s3))]
 impl Instance for UART2 {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {

@@ -15,7 +15,7 @@ use crate::{
 };
 
 cfg_if::cfg_if! {
-    if #[cfg(feature = "esp32s2")] {
+    if #[cfg(esp32s2)] {
         const I2C_LL_INTR_MASK: u32 = 0x1ffff;
     } else {
         const I2C_LL_INTR_MASK: u32 = 0x3ffff;
@@ -144,7 +144,7 @@ enum Ack {
     Nack,
 }
 
-#[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+#[cfg(any(esp32c3, esp32s3))]
 enum Opcode {
     RStart = 6,
     Write  = 1,
@@ -152,7 +152,7 @@ enum Opcode {
     Stop   = 2,
 }
 
-#[cfg(any(feature = "esp32", feature = "esp32s2"))]
+#[cfg(any(esp32, esp32s2))]
 enum Opcode {
     RStart = 0,
     Write  = 1,
@@ -311,7 +311,7 @@ fn enable_peripheral<T: Instance>(i2c: &T, peripheral_clock_control: &mut Periph
     // enable peripheral
     match i2c.i2c_number() {
         0 => peripheral_clock_control.enable(crate::system::Peripheral::I2cExt0),
-        #[cfg(not(feature = "esp32c3"))]
+        #[cfg(not(esp32c3))]
         1 => peripheral_clock_control.enable(crate::system::Peripheral::I2cExt1),
         _ => unreachable!(), // will never happen
     }
@@ -348,7 +348,7 @@ pub trait Instance {
                 .set_bit()
         });
 
-        #[cfg(feature = "esp32s2")]
+        #[cfg(esp32s2)]
         self.register_block()
             .ctr
             .modify(|_, w| w.ref_always_on().set_bit());
@@ -360,7 +360,7 @@ pub trait Instance {
         self.set_frequency(clocks.i2c_clock.convert(), frequency)?;
 
         // Propagate configuration changes (only necessary with C3 and S3)
-        #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+        #[cfg(any(esp32c3, esp32s3))]
         self.register_block()
             .ctr
             .modify(|_, w| w.conf_upgate().set_bit());
@@ -389,7 +389,7 @@ pub trait Instance {
         // Reset the FSM
         // (the option to reset the FSM is not available
         // for the ESP32)
-        #[cfg(not(feature = "esp32"))]
+        #[cfg(not(esp32))]
         self.register_block()
             .ctr
             .modify(|_, w| w.fsm_rst().set_bit());
@@ -407,7 +407,7 @@ pub trait Instance {
     /// pulse must be present to pass the filter
     fn set_filter(&mut self, sda_threshold: Option<u8>, scl_threshold: Option<u8>) {
         cfg_if::cfg_if! {
-            if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
+            if #[cfg(any(esp32, esp32s2))] {
                 let sda_register = &self.register_block().sda_filter_cfg;
                 let scl_register = &self.register_block().scl_filter_cfg;
             } else {
@@ -441,7 +441,7 @@ pub trait Instance {
         bus_freq: HertzU32,
     ) -> Result<(), SetupError> {
         cfg_if::cfg_if! {
-            if #[cfg(any(feature = "esp32s3", feature = "esp32c3"))] {
+            if #[cfg(any(esp32s3, esp32c3))] {
                 // C3 and S3 have a clock divider mechanism, which we want to configure
                 // as high as possible.
                 let sclk_div = source_clk.raw() / (bus_freq.raw() * 1024) + 1;
@@ -456,17 +456,17 @@ pub trait Instance {
         // we're setting these up separately (this might introduce some overhead,
         // but improves readability)
         cfg_if::cfg_if! {
-            if #[cfg(feature = "esp32c3")] {
+            if #[cfg(esp32c3)] {
                 let scl_wait_high = if bus_freq.raw() <= 50000 { 0 } else { half_cycle / 8 };
                 let scl_high = half_cycle - scl_wait_high;
                 let sda_hold = half_cycle / 4;
                 let sda_sample = scl_high / 2;
-            } else if #[cfg(feature = "esp32s3")] {
+            } else if #[cfg(esp32s3)] {
                 let scl_high = if bus_freq.raw() <= 50000 { half_cycle } else { half_cycle / 5 * 4 + 4 };
                 let scl_wait_high = half_cycle - scl_high;
                 let sda_hold = half_cycle / 2;
                 let sda_sample = half_cycle / 2;
-            } else if #[cfg(feature = "esp32s2")] {
+            } else if #[cfg(esp32s2)] {
                 let scl_high = half_cycle / 2 + 2;
                 let scl_wait_high = half_cycle - scl_high;
                 let sda_hold = half_cycle / 2;
@@ -485,18 +485,18 @@ pub trait Instance {
         let setup = half_cycle;
         let hold = half_cycle;
 
-        #[cfg(not(feature = "esp32"))]
+        #[cfg(not(esp32))]
         let scl_low = scl_low as u16 - 1;
 
-        #[cfg(feature = "esp32")]
+        #[cfg(esp32)]
         let scl_low = scl_low as u16;
 
         let scl_high = scl_high as u16;
 
-        #[cfg(any(feature = "esp32s3", feature = "esp32c3"))]
+        #[cfg(any(esp32s3, esp32c3))]
         let scl_wait_high = scl_wait_high as u8;
 
-        #[cfg(any(feature = "esp32s2"))]
+        #[cfg(any(esp32s2))]
         let scl_wait_high = scl_wait_high as u16;
 
         let sda_hold = sda_hold
@@ -511,12 +511,12 @@ pub trait Instance {
 
         let hold = hold.try_into().map_err(|_| SetupError::InvalidClkConfig)?;
 
-        #[cfg(any(feature = "esp32s3", feature = "esp32c3"))]
+        #[cfg(any(esp32s3, esp32c3))]
         let sclk_div = sclk_div as u8;
 
         unsafe {
             // divider
-            #[cfg(any(feature = "esp32s3", feature = "esp32c3"))]
+            #[cfg(any(esp32s3, esp32c3))]
             self.register_block()
                 .clk_conf
                 .modify(|_, w| w.sclk_sel().clear_bit().sclk_div_num().bits(sclk_div - 1));
@@ -529,7 +529,7 @@ pub trait Instance {
             // for high/wait_high we have to differentiate between the chips
             // as the EPS32 does not have a wait_high field
             cfg_if::cfg_if! {
-                if #[cfg(not(feature = "esp32"))] {
+                if #[cfg(not(esp32))] {
                     self.register_block().scl_high_period.write(|w| {
                         w.scl_high_period()
                             .bits(scl_high)
@@ -546,7 +546,7 @@ pub trait Instance {
             }
 
             // we already did that above but on S2 we need this to make it work
-            #[cfg(feature = "esp32s2")]
+            #[cfg(esp32s2)]
             self.register_block().scl_high_period.write(|w| {
                 w.scl_wait_high_period()
                     .bits(scl_wait_high)
@@ -581,7 +581,7 @@ pub trait Instance {
             // The ESP32 variant does not have an enable flag for the
             // timeout mechanism
             cfg_if::cfg_if! {
-                if #[cfg(feature = "esp32")] {
+                if #[cfg(esp32)] {
                     // timeout
                     self.register_block()
                         .to
@@ -612,7 +612,7 @@ pub trait Instance {
 
         // Ensure that the configuration of the peripheral is correctly propagated
         // (only necessary for C3 and S3 variant)
-        #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+        #[cfg(any(esp32c3, esp32s3))]
         self.register_block()
             .ctr
             .modify(|_, w| w.conf_upgate().set_bit());
@@ -628,7 +628,7 @@ pub trait Instance {
             // The ESP32 variant has a slightly different interrupt naming
             // scheme!
             cfg_if::cfg_if! {
-                if #[cfg(feature = "esp32")] {
+                if #[cfg(esp32)] {
                     // Handle error cases
                     if interrupts.time_out_int_raw().bit_is_set() {
                         return Err(Error::TimeOut);
@@ -905,19 +905,19 @@ pub trait Instance {
     }
 }
 
-#[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
+#[cfg(not(any(esp32, esp32s2)))]
 fn read_fifo(register_block: &RegisterBlock) -> u8 {
     register_block.data.read().fifo_rdata().bits()
 }
 
-#[cfg(not(feature = "esp32"))]
+#[cfg(not(esp32))]
 fn write_fifo(register_block: &RegisterBlock, data: u8) {
     register_block
         .data
         .write(|w| unsafe { w.fifo_rdata().bits(data) });
 }
 
-#[cfg(feature = "esp32s2")]
+#[cfg(esp32s2)]
 fn read_fifo(register_block: &RegisterBlock) -> u8 {
     let base_addr = register_block.scl_low_period.as_ptr();
     let fifo_ptr = (if base_addr as u32 == 0x3f413000 {
@@ -928,12 +928,12 @@ fn read_fifo(register_block: &RegisterBlock) -> u8 {
     unsafe { (fifo_ptr.read() & 0xff) as u8 }
 }
 
-#[cfg(feature = "esp32")]
+#[cfg(esp32)]
 fn read_fifo(register_block: &RegisterBlock) -> u8 {
     register_block.data.read().fifo_rdata().bits()
 }
 
-#[cfg(feature = "esp32")]
+#[cfg(esp32)]
 fn write_fifo(register_block: &RegisterBlock, data: u8) {
     let base_addr = register_block.scl_low_period.as_ptr();
     let fifo_ptr = (if base_addr as u32 == 0x3FF53000 {
@@ -958,7 +958,7 @@ impl Instance for crate::pac::I2C0 {
     }
 }
 
-#[cfg(not(feature = "esp32c3"))]
+#[cfg(not(esp32c3))]
 impl Instance for crate::pac::I2C1 {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {

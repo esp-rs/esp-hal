@@ -17,29 +17,29 @@
 //! [esp32s3-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32s3-hal
 
 #![no_std]
-#![cfg_attr(not(feature = "esp32c3"), feature(asm_experimental_arch))]
+#![cfg_attr(not(esp32c3), feature(asm_experimental_arch))]
 
-#[cfg(feature = "esp32")]
+#[cfg(esp32)]
 pub use esp32 as pac;
-#[cfg(feature = "esp32c3")]
+#[cfg(esp32c3)]
 pub use esp32c3 as pac;
-#[cfg(feature = "esp32s2")]
+#[cfg(esp32s2)]
 pub use esp32s2 as pac;
-#[cfg(feature = "esp32s3")]
+#[cfg(esp32s3)]
 pub use esp32s3 as pac;
 
 pub mod delay;
 
-#[cfg_attr(feature = "esp32", path = "efuse/esp32.rs")]
-#[cfg_attr(feature = "esp32c3", path = "efuse/esp32c3.rs")]
-#[cfg_attr(feature = "esp32s2", path = "efuse/esp32s2.rs")]
-#[cfg_attr(feature = "esp32s3", path = "efuse/esp32s3.rs")]
+#[cfg_attr(esp32, path = "efuse/esp32.rs")]
+#[cfg_attr(esp32c3, path = "efuse/esp32c3.rs")]
+#[cfg_attr(esp32s2, path = "efuse/esp32s2.rs")]
+#[cfg_attr(esp32s3, path = "efuse/esp32s3.rs")]
 pub mod efuse;
 
 pub mod gpio;
 pub mod i2c;
-#[cfg_attr(feature = "esp32c3", path = "interrupt/riscv.rs")]
-#[cfg_attr(not(feature = "esp32c3"), path = "interrupt/xtensa.rs")]
+#[cfg_attr(esp32c3, path = "interrupt/riscv.rs")]
+#[cfg_attr(not(esp32c3), path = "interrupt/xtensa.rs")]
 pub mod interrupt;
 pub mod ledc;
 pub mod prelude;
@@ -50,7 +50,7 @@ pub mod rtc_cntl;
 pub mod serial;
 pub mod spi;
 pub mod timer;
-#[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+#[cfg(any(esp32c3, esp32s3))]
 pub mod usb_serial_jtag;
 pub mod utils;
 
@@ -64,9 +64,9 @@ pub use rtc_cntl::{Rtc, Rwdt};
 pub use serial::Serial;
 pub use spi::Spi;
 pub use timer::Timer;
-#[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+#[cfg(any(esp32c3, esp32s3))]
 pub use usb_serial_jtag::UsbSerialJtag;
-#[cfg(any(feature = "esp32c3", feature = "esp32s3", feature = "esp32s2"))]
+#[cfg(any(esp32c3, esp32s3, esp32s2))]
 pub mod systimer;
 
 pub mod clock;
@@ -74,10 +74,10 @@ pub mod system;
 
 pub mod analog;
 
-#[cfg_attr(feature = "esp32", path = "cpu_control/esp32.rs")]
-#[cfg_attr(feature = "esp32c3", path = "cpu_control/none.rs")]
-#[cfg_attr(feature = "esp32s2", path = "cpu_control/none.rs")]
-#[cfg_attr(feature = "esp32s3", path = "cpu_control/esp32s3.rs")]
+#[cfg_attr(esp32, path = "cpu_control/esp32.rs")]
+#[cfg_attr(esp32c3, path = "cpu_control/none.rs")]
+#[cfg_attr(esp32s2, path = "cpu_control/none.rs")]
+#[cfg_attr(esp32s3, path = "cpu_control/esp32s3.rs")]
 pub mod cpu_control;
 
 /// Enumeration of CPU cores
@@ -90,13 +90,13 @@ pub enum Cpu {
 }
 
 pub fn get_core() -> Cpu {
-    #[cfg(all(not(feature = "esp32c3"), feature = "multi_core"))]
+    #[cfg(all(not(esp32c3), feature = "multi_core"))]
     match ((xtensa_lx::get_processor_id() >> 13) & 1) != 0 {
         false => Cpu::ProCpu,
         true => Cpu::AppCpu,
     }
 
-    // #[cfg(all(feature = "esp32c3", feature = "multi_core"))]
+    // #[cfg(all(esp32c3, feature = "multi_core"))]
     // TODO get hart_id
 
     // single core always has ProCpu only
@@ -109,7 +109,7 @@ mod critical_section_impl {
 
     critical_section::set_impl!(CriticalSection);
 
-    #[cfg(not(feature = "esp32c3"))]
+    #[cfg(not(esp32c3))]
     mod xtensa {
 
         unsafe impl critical_section::Impl for super::CriticalSection {
@@ -140,7 +140,7 @@ mod critical_section_impl {
         }
     }
 
-    #[cfg(feature = "esp32c3")]
+    #[cfg(esp32c3)]
     mod riscv {
         unsafe impl critical_section::Impl for super::CriticalSection {
             unsafe fn acquire() -> critical_section::RawRestoreState {

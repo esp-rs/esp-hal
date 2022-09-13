@@ -29,7 +29,7 @@ where
     T: TimerGroupInstance,
 {
     pub timer0: Timer<Timer0<T>>,
-    #[cfg(not(feature = "esp32c3"))]
+    #[cfg(not(esp32c3))]
     pub timer1: Timer<Timer1<T>>,
     pub wdt: Wdt<T>,
 }
@@ -64,7 +64,7 @@ where
             clocks.apb_clock,
         );
 
-        #[cfg(not(feature = "esp32c3"))]
+        #[cfg(not(esp32c3))]
         let timer1 = Timer::new(
             Timer1 {
                 phantom: PhantomData::default(),
@@ -76,7 +76,7 @@ where
 
         Self {
             timer0,
-            #[cfg(not(feature = "esp32c3"))]
+            #[cfg(not(esp32c3))]
             timer1,
             wdt,
         }
@@ -242,7 +242,7 @@ where
         let reg_block = unsafe { &*TG::register_block() };
 
         // always use level interrupt
-        #[cfg(any(feature = "esp32", feature = "esp32s2"))]
+        #[cfg(any(esp32, esp32s2))]
         reg_block.t0config.modify(|_, w| w.level_int_en().set_bit());
 
         reg_block
@@ -298,13 +298,13 @@ where
     }
 }
 
-#[cfg(not(feature = "esp32c3"))]
+#[cfg(not(esp32c3))]
 pub struct Timer1<TG> {
     phantom: PhantomData<TG>,
 }
 
 /// Timer peripheral instance
-#[cfg(not(feature = "esp32c3"))]
+#[cfg(not(esp32c3))]
 impl<TG> Instance for Timer1<TG>
 where
     TG: TimerGroupInstance,
@@ -379,7 +379,7 @@ where
         let reg_block = unsafe { &*TG::register_block() };
 
         // always use level interrupt
-        #[cfg(any(feature = "esp32", feature = "esp32s2"))]
+        #[cfg(any(esp32, esp32s2))]
         reg_block.t1config.modify(|_, w| w.level_int_en().set_bit());
 
         reg_block
@@ -597,7 +597,7 @@ where
                 .bits(0)
         });
 
-        #[cfg(feature = "esp32c3")]
+        #[cfg(esp32c3)]
         reg_block
             .wdtconfig0
             .modify(|_, w| w.wdt_conf_update_en().set_bit());

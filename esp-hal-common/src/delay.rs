@@ -37,7 +37,7 @@ impl embedded_hal_1::delay::blocking::DelayUs for Delay {
     }
 }
 
-#[cfg(feature = "esp32c3")]
+#[cfg(esp32c3)]
 mod delay {
     use fugit::HertzU64;
 
@@ -72,7 +72,7 @@ mod delay {
     }
 }
 
-#[cfg(not(feature = "esp32c3"))]
+#[cfg(not(esp32c3))]
 mod delay {
     use fugit::HertzU64;
 

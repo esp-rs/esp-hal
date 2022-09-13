@@ -23,9 +23,9 @@ pub struct SystemTimer {
 }
 
 impl SystemTimer {
-    #[cfg(feature = "esp32s2")]
+    #[cfg(esp32s2)]
     pub const TICKS_PER_SECOND: u64 = 80_000_000; // TODO this can change when we have support for changing APB frequency
-    #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+    #[cfg(any(esp32c3, esp32s3))]
     pub const TICKS_PER_SECOND: u64 = 16_000_000;
 
     pub fn new(p: SYSTIMER) -> Self {
@@ -132,10 +132,10 @@ impl<T, const CHANNEL: u8> Alarm<T, CHANNEL> {
                 _ => unreachable!(),
             };
 
-            #[cfg(feature = "esp32s2")]
+            #[cfg(esp32s2)]
             systimer.step.write(|w| w.timer_xtal_step().bits(0x1)); // run at XTAL freq, not 80 * XTAL freq
 
-            #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+            #[cfg(any(esp32c3, esp32s3))]
             {
                 tconf.write(|w| w.target0_timer_unit_sel().clear_bit()); // default, use unit 0
                 systimer
@@ -145,7 +145,7 @@ impl<T, const CHANNEL: u8> Alarm<T, CHANNEL> {
 
             conf(tconf, hi, lo);
 
-            #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+            #[cfg(any(esp32c3, esp32s3))]
             {
                 match CHANNEL {
                     0 => {
@@ -170,7 +170,7 @@ impl<T, const CHANNEL: u8> Alarm<T, CHANNEL> {
                 });
             }
 
-            #[cfg(feature = "esp32s2")]
+            #[cfg(esp32s2)]
             tconf.modify(|_r, w| match CHANNEL {
                 0 => w.target0_work_en().set_bit(),
                 1 => w.target0_work_en().set_bit(),

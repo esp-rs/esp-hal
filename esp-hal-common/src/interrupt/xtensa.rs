@@ -155,27 +155,27 @@ pub fn get_status(core: Cpu) -> u128 {
     }
 }
 
-#[cfg(feature = "esp32")]
+#[cfg(esp32)]
 unsafe fn core0_interrupt_peripheral() -> *const crate::pac::dport::RegisterBlock {
     crate::pac::DPORT::PTR
 }
 
-#[cfg(feature = "esp32")]
+#[cfg(esp32)]
 unsafe fn core1_interrupt_peripheral() -> *const crate::pac::dport::RegisterBlock {
     crate::pac::DPORT::PTR
 }
 
-#[cfg(feature = "esp32s2")]
+#[cfg(esp32s2)]
 unsafe fn core0_interrupt_peripheral() -> *const crate::pac::interrupt::RegisterBlock {
     crate::pac::INTERRUPT::PTR
 }
 
-#[cfg(feature = "esp32s3")]
+#[cfg(esp32s3)]
 unsafe fn core0_interrupt_peripheral() -> *const crate::pac::interrupt_core0::RegisterBlock {
     crate::pac::INTERRUPT_CORE0::PTR
 }
 
-#[cfg(feature = "esp32s3")]
+#[cfg(esp32s3)]
 unsafe fn core1_interrupt_peripheral() -> *const crate::pac::interrupt_core1::RegisterBlock {
     crate::pac::INTERRUPT_CORE1::PTR
 }
@@ -433,7 +433,7 @@ mod vectored {
         }
     }
 
-    #[cfg(feature = "esp32")]
+    #[cfg(esp32)]
     mod chip_specific {
         use super::*;
         pub const INTERRUPT_EDGE: u128 =
@@ -455,7 +455,7 @@ mod vectored {
         }
     }
 
-    #[cfg(feature = "esp32s2")]
+    #[cfg(esp32s2)]
     mod chip_specific {
         use super::*;
         pub const INTERRUPT_EDGE: u128 =
@@ -480,7 +480,7 @@ mod vectored {
         }
     }
 
-    #[cfg(feature = "esp32s3")]
+    #[cfg(esp32s3)]
     mod chip_specific {
         use super::*;
         pub const INTERRUPT_EDGE: u128 = 0;
