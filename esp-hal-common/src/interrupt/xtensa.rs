@@ -65,9 +65,9 @@ pub unsafe fn map(core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
     let cpu_interrupt_number = which as isize;
     let intr_map_base = match core {
         Cpu::ProCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
-        #[cfg(feature = "multi_core")]
+        #[cfg(multi_core)]
         Cpu::AppCpu => (*core1_interrupt_peripheral()).app_mac_intr_map.as_ptr(),
-        #[cfg(feature = "single_core")]
+        #[cfg(single_core)]
         Cpu::AppCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
     };
     intr_map_base
@@ -81,9 +81,9 @@ pub fn disable(core: Cpu, interrupt: Interrupt) {
         let interrupt_number = interrupt as isize;
         let intr_map_base = match core {
             Cpu::ProCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
-            #[cfg(feature = "multi_core")]
+            #[cfg(multi_core)]
             Cpu::AppCpu => (*core1_interrupt_peripheral()).app_mac_intr_map.as_ptr(),
-            #[cfg(feature = "single_core")]
+            #[cfg(single_core)]
             Cpu::AppCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
         };
         intr_map_base.offset(interrupt_number).write_volatile(0);
@@ -117,7 +117,7 @@ pub fn get_status(core: Cpu) -> u128 {
                         .bits() as u128)
                         << 64
             }
-            #[cfg(feature = "multi_core")]
+            #[cfg(multi_core)]
             Cpu::AppCpu => {
                 ((*core1_interrupt_peripheral())
                     .app_intr_status_0
@@ -134,7 +134,7 @@ pub fn get_status(core: Cpu) -> u128 {
                         .bits() as u128)
                         << 64
             }
-            #[cfg(feature = "single_core")]
+            #[cfg(single_core)]
             Cpu::AppCpu => {
                 ((*core0_interrupt_peripheral())
                     .pro_intr_status_0
@@ -256,9 +256,9 @@ mod vectored {
         unsafe {
             let intr_map_base = match core {
                 Cpu::ProCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
-                #[cfg(feature = "multi_core")]
+                #[cfg(multi_core)]
                 Cpu::AppCpu => (*core1_interrupt_peripheral()).app_mac_intr_map.as_ptr(),
-                #[cfg(feature = "single_core")]
+                #[cfg(single_core)]
                 Cpu::AppCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
             };
 

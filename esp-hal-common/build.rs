@@ -21,4 +21,18 @@ fn main() {
     } else if esp32s3 {
         println!("cargo:rustc-cfg=esp32s3");
     }
+
+    // Inject a configuration symbol for the architecture of the enabled chip
+    if esp32c3 {
+        println!("cargo:rustc-cfg=riscv");
+    } else {
+        println!("cargo:rustc-cfg=xtensa");
+    }
+
+    // Inject a configuration symbol to state the core count of the enabled chip
+    if esp32c3 || esp32s2 {
+        println!("cargo:rustc-cfg=single_core");
+    } else {
+        println!("cargo:rustc-cfg=multi_core");
+    }
 }

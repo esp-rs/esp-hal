@@ -17,7 +17,7 @@
 //! [esp32s3-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32s3-hal
 
 #![no_std]
-#![cfg_attr(not(esp32c3), feature(asm_experimental_arch))]
+#![cfg_attr(xtensa, feature(asm_experimental_arch))]
 
 #[cfg(esp32)]
 pub use esp32 as pac;
@@ -38,8 +38,8 @@ pub mod efuse;
 
 pub mod gpio;
 pub mod i2c;
-#[cfg_attr(esp32c3, path = "interrupt/riscv.rs")]
-#[cfg_attr(not(esp32c3), path = "interrupt/xtensa.rs")]
+#[cfg_attr(riscv, path = "interrupt/riscv.rs")]
+#[cfg_attr(xtensa, path = "interrupt/xtensa.rs")]
 pub mod interrupt;
 pub mod ledc;
 pub mod prelude;
@@ -90,17 +90,17 @@ pub enum Cpu {
 }
 
 pub fn get_core() -> Cpu {
-    #[cfg(all(not(esp32c3), feature = "multi_core"))]
+    #[cfg(all(xtensa, multi_core))]
     match ((xtensa_lx::get_processor_id() >> 13) & 1) != 0 {
         false => Cpu::ProCpu,
         true => Cpu::AppCpu,
     }
 
-    // #[cfg(all(esp32c3, feature = "multi_core"))]
+    // #[cfg(all(riscv, multi_core))]
     // TODO get hart_id
 
     // single core always has ProCpu only
-    #[cfg(feature = "single_core")]
+    #[cfg(single_core)]
     Cpu::ProCpu
 }
 
@@ -109,16 +109,15 @@ mod critical_section_impl {
 
     critical_section::set_impl!(CriticalSection);
 
-    #[cfg(not(esp32c3))]
+    #[cfg(xtensa)]
     mod xtensa {
-
         unsafe impl critical_section::Impl for super::CriticalSection {
             unsafe fn acquire() -> critical_section::RawRestoreState {
                 let tkn: critical_section::RawRestoreState;
                 core::arch::asm!("rsil {0}, 15", out(reg) tkn);
-                #[cfg(feature = "multicore")]
+                #[cfg(multi_core)]
                 {
-                    let guard = multicore::MULTICORE_LOCK.lock();
+                    let guard = super::multicore::MULTICORE_LOCK.lock();
                     core::mem::forget(guard); // forget it so drop doesn't run
                 }
                 tkn
@@ -126,11 +125,11 @@ mod critical_section_impl {
 
             unsafe fn release(token: critical_section::RawRestoreState) {
                 if token != 0 {
-                    #[cfg(feature = "multicore")]
+                    #[cfg(multi_core)]
                     {
-                        debug_assert!(multicore::MULTICORE_LOCK.is_owned_by_current_thread());
+                        debug_assert!(super::multicore::MULTICORE_LOCK.is_owned_by_current_thread());
                         // safety: we logically own the mutex from acquire()
-                        multicore::MULTICORE_LOCK.force_unlock();
+                        super::multicore::MULTICORE_LOCK.force_unlock();
                     }
                     core::arch::asm!(
                         "wsr.ps {0}",
@@ -140,14 +139,14 @@ mod critical_section_impl {
         }
     }
 
-    #[cfg(esp32c3)]
+    #[cfg(riscv)]
     mod riscv {
         unsafe impl critical_section::Impl for super::CriticalSection {
             unsafe fn acquire() -> critical_section::RawRestoreState {
                 let interrupts_active = riscv::register::mstatus::read().mie();
                 riscv::interrupt::disable();
 
-                #[cfg(feature = "multicore")]
+                #[cfg(multi_core)]
                 {
                     let guard = multicore::MULTICORE_LOCK.lock();
                     core::mem::forget(guard); // forget it so drop doesn't run
@@ -158,7 +157,7 @@ mod critical_section_impl {
 
             unsafe fn release(token: critical_section::RawRestoreState) {
                 if token != 0 {
-                    #[cfg(feature = "multicore")]
+                    #[cfg(multi_core)]
                     {
                         debug_assert!(multicore::MULTICORE_LOCK.is_owned_by_current_thread());
                         // safety: we logically own the mutex from acquire()
@@ -170,7 +169,7 @@ mod critical_section_impl {
         }
     }
 
-    #[cfg(feature = "multicore")]
+    #[cfg(multi_core)]
     mod multicore {
         use core::sync::atomic::{AtomicBool, Ordering};
 
