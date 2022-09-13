@@ -343,21 +343,21 @@ where
             .bits()
     }
 
-    /// Test if the transmit buffer is available for writing.
-    pub fn transmit_buffer_is_empty(&self) -> bool {
+    /// Check if the controller is in a bus off state.
+    pub fn is_bus_off(&self) -> bool {
         self.peripheral
             .register_block()
             .status
             .read()
-            .tx_buf_st()
-            .bit()
+            .bus_off_st()
+            .bit_is_set()
     }
 
-    /// Get the number of messages that the peripheral has received.
+    /// Get the number of messages that the peripheral has available in the receive FIFO.
     ///
     /// Note that this may not be the number of messages in the receive FIFO due to
     /// fifo overflow/overrun.
-    pub fn num_messages(&self) -> u8 {
+    pub fn num_available_messages(&self) -> u8 {
         self.peripheral
             .register_block()
             .rx_message_cnt
@@ -368,15 +368,17 @@ where
     /// Clear the receive FIFO, discarding any valid, partial, or invalid packets.
     ///
     /// This is typically used to clear an overrun receive FIFO.
+    ///
+    /// TODO: Not sure if this needs to be guarded against Bus Off.
     pub fn clear_receive_fifo(&self) {
-        while self.num_messages() > 0 {
+        while self.num_available_messages() > 0 {
             self.release_receive_fifo();
         }
     }
 
     /// Release the message in the buffer. This will decrement the received message
     /// counter and prepare the next message in the FIFO for reading.
-    pub fn release_receive_fifo(&self) {
+    fn release_receive_fifo(&self) {
         self.peripheral
             .register_block()
             .cmd
@@ -399,11 +401,7 @@ impl embedded_hal::can::Error for ESPTWAIError {
 }
 
 /// Copy data from multiple TWAI_DATA_x_REG registers, packing the source into the destination.
-///
-/// This function will step through the source memory by STEP bytes copying an individual byte
-/// into each element of the destination.
-///
-unsafe fn copy_from_data_register(dest: &mut [u8], src: *const u32) {
+unsafe fn _copy_from_data_register(dest: &mut [u8], src: *const u32) {
     let src = from_raw_parts(src, dest.len());
 
     for (dest, src) in dest.iter_mut().zip(src.iter()) {
@@ -411,10 +409,6 @@ unsafe fn copy_from_data_register(dest: &mut [u8], src: *const u32) {
     }
 }
 /// Copy data to multiple TWAI_DATA_x_REG registers, unpacking the source into the destination.
-///
-/// This function will step through the source memory by STEP bytes copying an individual byte
-/// into each element of the destination.
-///
 unsafe fn copy_to_data_register(dest: *mut u32, src: &[u8]) {
     let dest = from_raw_parts_mut(dest, src.len());
 
@@ -443,13 +437,13 @@ where
     fn transmit(&mut self, frame: &Self::Frame) -> nb::Result<Option<Self::Frame>, Self::Error> {
         let status = self.peripheral.register_block().status.read();
 
-        // Check that the peripheral is not already transmitting a packet.
-        if !status.tx_buf_st().bit_is_set() {
-            return nb::Result::Err(nb::Error::WouldBlock);
-        }
         // Check that the peripheral is not in a bus off state.
         if status.bus_off_st().bit_is_set() {
             return nb::Result::Err(nb::Error::Other(ESPTWAIError::BusOff));
+        }
+        // Check that the peripheral is not already transmitting a packet.
+        if !status.tx_buf_st().bit_is_set() {
+            return nb::Result::Err(nb::Error::WouldBlock);
         }
 
         // Assemble the frame information into the data_0 byte.
@@ -532,6 +526,11 @@ where
     }
     fn receive(&mut self) -> nb::Result<Self::Frame, Self::Error> {
         let status = self.peripheral.register_block().status.read();
+
+        // Check that the peripheral is not in a bus off state.
+        if status.bus_off_st().bit_is_set() {
+            return nb::Result::Err(nb::Error::Other(ESPTWAIError::BusOff));
+        }
 
         // Check that we actually have packets to receive.
         if !status.rx_buf_st().bit_is_set() {
