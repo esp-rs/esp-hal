@@ -52,11 +52,29 @@ SECTIONS {
     _rodata_end = ABSOLUTE(.);
   } > RODATA
 
+  .rodata.wifi :
+  {
+    . = ALIGN(4);
+    *( .rodata_wlog_*.* )
+  } > RODATA AT > RODATA
+  
   .rwtext : ALIGN(4)
   {
     . = ALIGN (4);
     *(.rwtext.literal .rwtext .rwtext.literal.* .rwtext.*)
   } > RWTEXT
+
+  /* wifi data */
+  .rwtext.wifi :
+  {
+    . = ALIGN(4);
+    *( .wifi0iram  .wifi0iram.*)
+    *( .wifirxiram  .wifirxiram.*)
+    *( .wifislprxiram  .wifislprxiram.*)
+    *( .wifislpiram  .wifislpiram.*)
+    *( .phyiram  .phyiram.*)
+    *( .iram1  .iram1.*)
+  } > RWTEXT AT > RODATA
 
   .rwdata_dummy (NOLOAD) :
   {
@@ -71,7 +89,7 @@ SECTIONS {
     /*  Create an empty gap as big as .rwtext section - 32k (SRAM0) 
      *  because SRAM1 is available on the data bus and instruction bus 
      */
-    . = MAX(SIZEOF(.rwtext) + RESERVE_ICACHE + VECTORS_SIZE, 32k) - 32k;
+    . = MAX(SIZEOF(.rwtext) + SIZEOF(.rwtext.wifi) + RESERVE_ICACHE + VECTORS_SIZE, 32k) - 32k;
 
     /* Prepare the alignment of the section above. */
     . = ALIGN(4);
@@ -84,6 +102,12 @@ SECTIONS {
     . = ALIGN (4);
     *(.data .data.*)
     _data_end = ABSOLUTE(.);
+  } > RWDATA AT > RODATA
+
+  .data.wifi :
+  {
+    . = ALIGN(4);
+    *( .dram1 .dram1.*)
   } > RWDATA AT > RODATA
 
   /* LMA of .data */
@@ -101,6 +125,13 @@ SECTIONS {
   {
     . = ALIGN(4);
     *(.noinit .noinit.*)
+  } > RWDATA
+
+  /* must be last segment using RWDATA */
+  .heap_start (NOLOAD) : ALIGN(4)
+  {
+    . = ALIGN (4);
+    _heap_start = ABSOLUTE(.);
   } > RWDATA
 
 }
