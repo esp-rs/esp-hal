@@ -62,9 +62,9 @@ use crate::{
 };
 
 /// The size of the FIFO buffer for SPI
-#[cfg(not(feature = "esp32s2"))]
+#[cfg(not(esp32s2))]
 const FIFO_SIZE: usize = 64;
-#[cfg(feature = "esp32s2")]
+#[cfg(esp32s2)]
 const FIFO_SIZE: usize = 72;
 /// Padding byte for empty write transfers
 const EMPTY_WRITE_PAD: u8 = 0x00u8;
@@ -504,7 +504,7 @@ pub trait Instance {
                 .clear_bit()
         });
 
-        #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
+        #[cfg(not(any(esp32, esp32s2)))]
         reg_block.clk_gate.modify(|_, w| {
             w.clk_en()
                 .set_bit()
@@ -516,7 +516,7 @@ pub trait Instance {
 
         reg_block.ctrl.write(|w| unsafe { w.bits(0) });
 
-        #[cfg(not(feature = "esp32"))]
+        #[cfg(not(esp32))]
         reg_block.misc.write(|w| unsafe { w.bits(0) });
 
         reg_block.slave.write(|w| unsafe { w.bits(0) });
@@ -605,7 +605,7 @@ pub trait Instance {
             .write(|w| unsafe { w.bits(reg_val) });
     }
 
-    #[cfg(not(feature = "esp32"))]
+    #[cfg(not(esp32))]
     fn set_data_mode(&mut self, data_mode: SpiMode) -> &mut Self {
         let reg_block = self.register_block();
 
@@ -630,7 +630,7 @@ pub trait Instance {
         self
     }
 
-    #[cfg(feature = "esp32")]
+    #[cfg(esp32)]
     fn set_data_mode(&mut self, data_mode: SpiMode) -> &mut Self {
         let reg_block = self.register_block();
 
@@ -801,7 +801,7 @@ pub trait Instance {
         Ok(words)
     }
 
-    #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
+    #[cfg(not(any(esp32, esp32s2)))]
     fn update(&self) {
         let reg_block = self.register_block();
 
@@ -812,7 +812,7 @@ pub trait Instance {
         }
     }
 
-    #[cfg(any(feature = "esp32", feature = "esp32s2"))]
+    #[cfg(any(esp32, esp32s2))]
     fn update(&self) {
         // not need/available on ESP32/ESP32S2
     }
@@ -820,12 +820,12 @@ pub trait Instance {
     fn configure_datalen(&self, len: u32) {
         let reg_block = self.register_block();
 
-        #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+        #[cfg(any(esp32c3, esp32s3))]
         reg_block
             .ms_dlen
             .write(|w| unsafe { w.ms_data_bitlen().bits(len - 1) });
 
-        #[cfg(not(any(feature = "esp32c3", feature = "esp32s3")))]
+        #[cfg(not(any(esp32c3, esp32s3)))]
         {
             reg_block
                 .mosi_dlen
@@ -838,7 +838,7 @@ pub trait Instance {
     }
 }
 
-#[cfg(any(feature = "esp32c3"))]
+#[cfg(any(esp32c3))]
 impl Instance for crate::pac::SPI2 {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
@@ -871,7 +871,7 @@ impl Instance for crate::pac::SPI2 {
     }
 }
 
-#[cfg(any(feature = "esp32"))]
+#[cfg(any(esp32))]
 impl Instance for crate::pac::SPI2 {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
@@ -904,7 +904,7 @@ impl Instance for crate::pac::SPI2 {
     }
 }
 
-#[cfg(any(feature = "esp32"))]
+#[cfg(any(esp32))]
 impl Instance for crate::pac::SPI3 {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
@@ -937,7 +937,7 @@ impl Instance for crate::pac::SPI3 {
     }
 }
 
-#[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
+#[cfg(any(esp32s2, esp32s3))]
 impl Instance for crate::pac::SPI2 {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
@@ -970,7 +970,7 @@ impl Instance for crate::pac::SPI2 {
     }
 }
 
-#[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
+#[cfg(any(esp32s2, esp32s3))]
 impl Instance for crate::pac::SPI3 {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {

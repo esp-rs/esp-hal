@@ -10,10 +10,10 @@ pub use paste::paste;
 use crate::pac::GPIO;
 
 #[doc(hidden)]
-#[cfg_attr(feature = "esp32", path = "gpio/esp32.rs")]
-#[cfg_attr(feature = "esp32c3", path = "gpio/esp32c3.rs")]
-#[cfg_attr(feature = "esp32s2", path = "gpio/esp32s2.rs")]
-#[cfg_attr(feature = "esp32s3", path = "gpio/esp32s3.rs")]
+#[cfg_attr(esp32, path = "gpio/esp32.rs")]
+#[cfg_attr(esp32c3, path = "gpio/esp32c3.rs")]
+#[cfg_attr(esp32s2, path = "gpio/esp32s2.rs")]
+#[cfg_attr(esp32s3, path = "gpio/esp32s3.rs")]
 pub mod types;
 
 #[derive(Copy, Clone)]
@@ -230,7 +230,7 @@ impl InteruptStatusRegisterAccess for SingleCoreInteruptStatusRegisterAccess {
 // interrupt enable bit see
 // https://github.com/espressif/esp-idf/blob/c04803e88b871a4044da152dfb3699cf47354d18/components/hal/esp32s3/include/hal/gpio_ll.h#L32
 // Treating it as SingleCore in the gpio macro makes this work.
-#[cfg(not(any(feature = "esp32c3", feature = "esp32s2", feature = "esp32s3")))]
+#[cfg(not(any(esp32c3, esp32s2, esp32s3)))]
 impl InteruptStatusRegisterAccess for DualCoreInteruptStatusRegisterAccess {
     fn pro_cpu_interrupt_status_read() -> u32 {
         unsafe { &*GPIO::PTR }.pcpu_int.read().bits()
@@ -334,7 +334,7 @@ impl BankGpioRegisterAccess for Bank0GpioRegisterAccess {
 }
 
 #[doc(hidden)]
-#[cfg(not(feature = "esp32c3"))]
+#[cfg(not(esp32c3))]
 impl BankGpioRegisterAccess for Bank1GpioRegisterAccess {
     fn write_out_en_clear(word: u32) {
         unsafe { &*GPIO::PTR }
@@ -1103,7 +1103,7 @@ macro_rules! impl_from {
                 pin.$function()
             }
         }
-    }
+    };
 }
 
 #[doc(hidden)]
@@ -1196,7 +1196,7 @@ macro_rules! gpio {
 
 #[doc(hidden)]
 pub fn enable_iomux_clk_gate() {
-    #[cfg(feature = "esp32s2")]
+    #[cfg(esp32s2)]
     {
         use crate::pac::SENS;
         let sensors = unsafe { &*SENS::ptr() };
@@ -1206,7 +1206,7 @@ pub fn enable_iomux_clk_gate() {
     }
 }
 
-#[cfg(not(feature = "esp32c3"))]
+#[cfg(not(esp32c3))]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! analog {
@@ -1266,7 +1266,7 @@ macro_rules! analog {
     }
 }
 
-#[cfg(feature = "esp32c3")]
+#[cfg(esp32c3)]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! analog {
@@ -1303,9 +1303,9 @@ macro_rules! analog {
 pub use analog;
 pub use gpio;
 pub use impl_errata36;
+pub use impl_from;
 pub use impl_gpio_register_access;
 pub use impl_input;
-pub use impl_from;
 pub use impl_interrupt_status_register_access;
 pub use impl_output;
 pub use impl_output_wrap;

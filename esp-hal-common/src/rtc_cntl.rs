@@ -1,7 +1,7 @@
 use embedded_hal::watchdog::{Watchdog, WatchdogDisable, WatchdogEnable};
 use fugit::{HertzU32, MicrosDurationU64};
 
-#[cfg(not(feature = "esp32"))]
+#[cfg(not(esp32))]
 use crate::efuse::Efuse;
 use crate::{
     clock::{Clock, XtalClock},
@@ -9,10 +9,10 @@ use crate::{
     rom::esp_rom_delay_us,
 };
 
-#[cfg_attr(feature = "esp32", path = "rtc/esp32.rs")]
-#[cfg_attr(feature = "esp32s2", path = "rtc/esp32s2.rs")]
-#[cfg_attr(feature = "esp32s3", path = "rtc/esp32s3.rs")]
-#[cfg_attr(feature = "esp32c3", path = "rtc/esp32c3.rs")]
+#[cfg_attr(esp32, path = "rtc/esp32.rs")]
+#[cfg_attr(esp32s2, path = "rtc/esp32s2.rs")]
+#[cfg_attr(esp32s3, path = "rtc/esp32s3.rs")]
+#[cfg_attr(esp32c3, path = "rtc/esp32c3.rs")]
 mod rtc;
 
 #[allow(unused)]
@@ -29,9 +29,9 @@ impl Clock for RtcFastClock {
     fn frequency(&self) -> HertzU32 {
         match self {
             RtcFastClock::RtcFastClockXtalD4 => HertzU32::Hz(40_000_000 / 4),
-            #[cfg(any(feature = "esp32", feature = "esp32s2"))]
+            #[cfg(any(esp32, esp32s2))]
             RtcFastClock::RtcFastClock8m => HertzU32::Hz(8_500_000),
-            #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+            #[cfg(any(esp32c3, esp32s3))]
             RtcFastClock::RtcFastClock8m => HertzU32::Hz(17_500_000),
         }
     }
@@ -52,16 +52,16 @@ pub(crate) enum RtcSlowClock {
 impl Clock for RtcSlowClock {
     fn frequency(&self) -> HertzU32 {
         match self {
-            #[cfg(feature = "esp32")]
+            #[cfg(esp32)]
             RtcSlowClock::RtcSlowClockRtc => HertzU32::Hz(150_000),
-            #[cfg(feature = "esp32s2")]
+            #[cfg(esp32s2)]
             RtcSlowClock::RtcSlowClockRtc => HertzU32::Hz(90_000),
-            #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+            #[cfg(any(esp32c3, esp32s3))]
             RtcSlowClock::RtcSlowClockRtc => HertzU32::Hz(136_000),
             RtcSlowClock::RtcSlowClock32kXtal => HertzU32::Hz(32768),
-            #[cfg(any(feature = "esp32", feature = "esp32s2"))]
+            #[cfg(any(esp32, esp32s2))]
             RtcSlowClock::RtcSlowClock8mD256 => HertzU32::Hz(8_500_000 / 256),
-            #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+            #[cfg(any(esp32c3, esp32s3))]
             RtcSlowClock::RtcSlowClock8mD256 => HertzU32::Hz(17_500_000 / 256),
         }
     }
@@ -77,7 +77,7 @@ pub(crate) enum RtcCalSel {
     RtcCal8mD256      = 1,
     /// External 32 KHz XTAL
     RtcCal32kXtal     = 2,
-    #[cfg(not(feature = "esp32"))]
+    #[cfg(not(esp32))]
     /// Internal 150 KHz RC oscillator
     RtcCalInternalOsc = 3,
 }
@@ -85,7 +85,7 @@ pub(crate) enum RtcCalSel {
 pub struct Rtc {
     _inner: RTC_CNTL,
     pub rwdt: Rwdt,
-    #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+    #[cfg(any(esp32c3, esp32s3))]
     pub swd: Swd,
 }
 
@@ -97,7 +97,7 @@ impl Rtc {
         Self {
             _inner: rtc_cntl,
             rwdt: Rwdt::default(),
-            #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+            #[cfg(any(esp32c3, esp32s3))]
             swd: Swd::new(),
         }
     }
@@ -171,11 +171,11 @@ impl RtcClock {
 
         match reg_val_to_clk_val(xtal_freq_reg) {
             40 => XtalClock::RtcXtalFreq40M,
-            #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+            #[cfg(any(esp32c3, esp32s3))]
             32 => XtalClock::RtcXtalFreq32M,
-            #[cfg(feature = "esp32")]
+            #[cfg(esp32)]
             26 => XtalClock::RtcXtalFreq26M,
-            #[cfg(feature = "esp32")]
+            #[cfg(esp32)]
             24 => XtalClock::RtcXtalFreq24M,
             other => XtalClock::RtcXtalFreqOther(other),
         }
@@ -244,7 +244,7 @@ impl RtcClock {
         // the 150k RTC clock (90k on ESP32-S2) regardless of the currently selected
         // SLOW_CLK. On the ESP32, it uses the currently selected SLOW_CLK.
         // The following code emulates ESP32 behavior for the other chips:
-        #[cfg(not(feature = "esp32"))]
+        #[cfg(not(esp32))]
         let cal_clk = match cal_clk {
             RtcCalSel::RtcCalRtcMux => match RtcClock::get_slow_freq() {
                 RtcSlowClock::RtcSlowClock32kXtal => RtcCalSel::RtcCal32kXtal,
@@ -274,7 +274,7 @@ impl RtcClock {
 
         // There may be another calibration process already running during we
         // call this function, so we should wait the last process is done.
-        #[cfg(not(feature = "esp32"))]
+        #[cfg(not(esp32))]
         if timg0
             .rtccalicfg
             .read()
@@ -307,21 +307,21 @@ impl RtcClock {
         // Set timeout reg and expect time delay
         let expected_freq = match cal_clk {
             RtcCalSel::RtcCal32kXtal => {
-                #[cfg(not(feature = "esp32"))]
+                #[cfg(not(esp32))]
                 timg0.rtccalicfg2.modify(|_, w| unsafe {
                     w.rtc_cali_timeout_thres().bits(slowclk_cycles << 12)
                 });
                 RtcSlowClock::RtcSlowClock32kXtal
             }
             RtcCalSel::RtcCal8mD256 => {
-                #[cfg(not(feature = "esp32"))]
+                #[cfg(not(esp32))]
                 timg0.rtccalicfg2.modify(|_, w| unsafe {
                     w.rtc_cali_timeout_thres().bits(slowclk_cycles << 12)
                 });
                 RtcSlowClock::RtcSlowClock8mD256
             }
             _ => {
-                #[cfg(not(feature = "esp32"))]
+                #[cfg(not(esp32))]
                 timg0.rtccalicfg2.modify(|_, w| unsafe {
                     w.rtc_cali_timeout_thres().bits(slowclk_cycles << 10)
                 });
@@ -341,7 +341,7 @@ impl RtcClock {
             esp_rom_delay_us(us_time_estimate);
         }
 
-        #[cfg(feature = "esp32")]
+        #[cfg(esp32)]
         let mut timeout_us = us_time_estimate;
 
         let cal_val = loop {
@@ -349,13 +349,13 @@ impl RtcClock {
                 break timg0.rtccalicfg1.read().rtc_cali_value().bits();
             }
 
-            #[cfg(not(feature = "esp32"))]
+            #[cfg(not(esp32))]
             if timg0.rtccalicfg2.read().rtc_cali_timeout().bit_is_set() {
                 // Timed out waiting for calibration
                 break 0;
             }
 
-            #[cfg(feature = "esp32")]
+            #[cfg(esp32)]
             if timeout_us > 0 {
                 timeout_us -= 1;
                 unsafe {
@@ -491,15 +491,15 @@ impl Rwdt {
             .wdtconfig0
             .modify(|_, w| unsafe { w.wdt_stg0().bits(self.stg0_action as u8) });
 
-        #[cfg(feature = "esp32")]
+        #[cfg(esp32)]
         rtc_cntl.int_ena.modify(|_, w| w.wdt_int_ena().set_bit());
 
-        #[cfg(feature = "esp32s2")]
+        #[cfg(esp32s2)]
         rtc_cntl
             .int_ena_rtc
             .modify(|_, w| w.wdt_int_ena().set_bit());
 
-        #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+        #[cfg(any(esp32c3, esp32s3))]
         rtc_cntl
             .int_ena_rtc
             .modify(|_, w| w.rtc_wdt_int_ena().set_bit());
@@ -519,15 +519,15 @@ impl Rwdt {
             .wdtconfig0
             .modify(|_, w| unsafe { w.wdt_stg0().bits(self.stg0_action as u8) });
 
-        #[cfg(feature = "esp32")]
+        #[cfg(esp32)]
         rtc_cntl.int_ena.modify(|_, w| w.wdt_int_ena().clear_bit());
 
-        #[cfg(feature = "esp32s2")]
+        #[cfg(esp32s2)]
         rtc_cntl
             .int_ena_rtc
             .modify(|_, w| w.wdt_int_ena().clear_bit());
 
-        #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+        #[cfg(any(esp32c3, esp32s3))]
         rtc_cntl
             .int_ena_rtc
             .modify(|_, w| w.rtc_wdt_int_ena().clear_bit());
@@ -540,13 +540,13 @@ impl Rwdt {
 
         self.set_write_protection(false);
 
-        #[cfg(feature = "esp32")]
+        #[cfg(esp32)]
         rtc_cntl.int_clr.write(|w| w.wdt_int_clr().set_bit());
 
-        #[cfg(feature = "esp32s2")]
+        #[cfg(esp32s2)]
         rtc_cntl.int_clr_rtc.write(|w| w.wdt_int_clr().set_bit());
 
-        #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+        #[cfg(any(esp32c3, esp32s3))]
         rtc_cntl
             .int_clr_rtc
             .write(|w| w.rtc_wdt_int_clr().set_bit());
@@ -558,11 +558,11 @@ impl Rwdt {
         let rtc_cntl = unsafe { &*RTC_CNTL::ptr() };
 
         cfg_if::cfg_if! {
-            if #[cfg(feature = "esp32")] {
+            if #[cfg(esp32)] {
                 rtc_cntl.int_st.read().wdt_int_st().bit_is_set()
-            } else if #[cfg(feature = "esp32s2")] {
+            } else if #[cfg(esp32s2)] {
                 rtc_cntl.int_st_rtc.read().wdt_int_st().bit_is_set()
-            } else if #[cfg(any(feature = "esp32c3", feature = "esp32s3"))] {
+            } else if #[cfg(any(esp32c3, esp32s3))] {
                 rtc_cntl.int_st_rtc.read().rtc_wdt_int_st().bit_is_set()
             }
         }
@@ -604,12 +604,12 @@ impl WatchdogEnable for Rwdt {
         self.set_write_protection(false);
 
         unsafe {
-            #[cfg(feature = "esp32")]
+            #[cfg(esp32)]
             rtc_cntl
                 .wdtconfig1
                 .modify(|_, w| w.wdt_stg0_hold().bits(timeout_raw));
 
-            #[cfg(not(feature = "esp32"))]
+            #[cfg(not(esp32))]
             rtc_cntl.wdtconfig1.modify(|_, w| {
                 w.wdt_stg0_hold()
                     .bits(timeout_raw >> (1 + Efuse::get_rwdt_multiplier()))
@@ -649,11 +649,11 @@ impl Watchdog for Rwdt {
     }
 }
 
-#[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+#[cfg(any(esp32c3, esp32s3))]
 /// Super Watchdog
 pub struct Swd;
 
-#[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+#[cfg(any(esp32c3, esp32s3))]
 /// Super Watchdog driver
 impl Swd {
     pub fn new() -> Self {
@@ -671,7 +671,7 @@ impl Swd {
     }
 }
 
-#[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+#[cfg(any(esp32c3, esp32s3))]
 impl WatchdogDisable for Swd {
     fn disable(&mut self) {
         let rtc_cntl = unsafe { &*RTC_CNTL::ptr() };

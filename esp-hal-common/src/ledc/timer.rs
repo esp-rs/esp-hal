@@ -1,6 +1,6 @@
 use fugit::HertzU32;
 
-#[cfg(feature = "esp32")]
+#[cfg(esp32)]
 use super::HighSpeed;
 use super::{LowSpeed, Speed};
 use crate::{clock::Clocks, pac::ledc};
@@ -14,7 +14,7 @@ pub enum Error {
     Divisor,
 }
 
-#[cfg(feature = "esp32")]
+#[cfg(esp32)]
 /// Clock source for HS Timers
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
 pub enum HSClockSource {
@@ -59,17 +59,17 @@ pub mod config {
         Duty12Bit,
         Duty13Bit,
         Duty14Bit,
-        #[cfg(feature = "esp32")]
+        #[cfg(esp32)]
         Duty15Bit,
-        #[cfg(feature = "esp32")]
+        #[cfg(esp32)]
         Duty16Bit,
-        #[cfg(feature = "esp32")]
+        #[cfg(esp32)]
         Duty17Bit,
-        #[cfg(feature = "esp32")]
+        #[cfg(esp32)]
         Duty18Bit,
-        #[cfg(feature = "esp32")]
+        #[cfg(esp32)]
         Duty19Bit,
-        #[cfg(feature = "esp32")]
+        #[cfg(esp32)]
         Duty20Bit,
     }
 
@@ -92,7 +92,7 @@ impl TimerSpeed for LowSpeed {
     type ClockSourceType = LSClockSource;
 }
 
-#[cfg(feature = "esp32")]
+#[cfg(esp32)]
 /// Timer source type for HighSpeed timers
 impl TimerSpeed for HighSpeed {
     type ClockSourceType = HSClockSource;
@@ -223,7 +223,7 @@ impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
         })
     }
 
-    #[cfg(feature = "esp32")]
+    #[cfg(esp32)]
     /// Configure the HW for the timer
     fn configure_hw(&self, divisor: u32) {
         let duty = self.duty.unwrap() as u8;
@@ -281,7 +281,7 @@ impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
         };
     }
 
-    #[cfg(not(feature = "esp32"))]
+    #[cfg(not(esp32))]
     /// Configure the HW for the timer
     fn configure_hw(&self, divisor: u32) {
         let duty = self.duty.unwrap() as u8;
@@ -339,7 +339,7 @@ impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
         };
     }
 
-    #[cfg(feature = "esp32")]
+    #[cfg(esp32)]
     /// Update the timer in HW
     fn update_hw(&self) {
         match self.number {
@@ -350,7 +350,7 @@ impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
         };
     }
 
-    #[cfg(not(feature = "esp32"))]
+    #[cfg(not(esp32))]
     /// Update the timer in HW
     fn update_hw(&self) {
         match self.number {
@@ -362,7 +362,7 @@ impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
     }
 }
 
-#[cfg(feature = "esp32")]
+#[cfg(esp32)]
 /// Timer HW implementation for HighSpeed timers
 impl<'a> TimerHW<HighSpeed> for Timer<'a, HighSpeed> {
     /// Get the current source timer frequency from the HW

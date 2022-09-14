@@ -90,7 +90,7 @@ pub struct LEDC<'a> {
     clock_control_config: &'a Clocks,
 }
 
-#[cfg(feature = "esp32")]
+#[cfg(esp32)]
 /// Used to specify HighSpeed Timer/Channel
 pub struct HighSpeed {}
 
@@ -99,14 +99,18 @@ pub struct LowSpeed {}
 
 pub trait Speed {}
 
-#[cfg(feature = "esp32")]
+#[cfg(esp32)]
 impl Speed for HighSpeed {}
 
 impl Speed for LowSpeed {}
 
 impl<'a> LEDC<'a> {
     /// Return a new LEDC
-    pub fn new(_instance: crate::pac::LEDC, clock_control_config: &'a Clocks, system: &mut PeripheralClockControl) -> Self {
+    pub fn new(
+        _instance: crate::pac::LEDC,
+        clock_control_config: &'a Clocks,
+        system: &mut PeripheralClockControl,
+    ) -> Self {
         system.enable(Peripheral::Ledc);
 
         let ledc = unsafe { &*crate::pac::LEDC::ptr() };
@@ -118,13 +122,13 @@ impl<'a> LEDC<'a> {
     }
 
     /// Set global slow clock source
-    #[cfg(feature = "esp32")]
+    #[cfg(esp32)]
     pub fn set_global_slow_clock(&mut self, _clock_source: LSGlobalClkSource) {
         self.ledc.conf.write(|w| w.apb_clk_sel().set_bit());
         self.ledc.lstimer0_conf.modify(|_, w| w.para_up().set_bit());
     }
 
-    #[cfg(not(feature = "esp32"))]
+    #[cfg(not(esp32))]
     /// Set global slow clock source
     pub fn set_global_slow_clock(&mut self, clock_source: LSGlobalClkSource) {
         match clock_source {

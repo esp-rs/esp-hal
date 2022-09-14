@@ -17,6 +17,7 @@ critical-section = "1.1.0"
 embedded-hal     = { version = "0.2.7", features = ["unproven"] }
 embedded-hal-1   = { package = "embedded-hal", version = "=1.0.0-alpha.8", optional = true }
 fugit            = "0.3.6"
+lock_api         = { version = "0.4.8", optional = true }
 nb               = "1.0.0"
 paste            = "=1.0.8"
 procmacros       = { version = "0.1.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
@@ -46,14 +47,10 @@ esp32s2 = { version = "0.3.0",  optional = true }
 esp32s3 = { version = "0.3.0",  optional = true }
 
 [features]
-esp32   = ["esp32/rt"  , "procmacros/xtensa", "multi_core" , "xtensa-lx-rt/esp32",   "xtensa-lx/esp32",   "critical-section/restore-state-u32"]
-esp32c3 = ["esp32c3/rt", "procmacros/riscv" , "single_core", "riscv", "riscv-atomic-emulation-trap",      "critical-section/restore-state-u8"]
-esp32s2 = ["esp32s2/rt", "procmacros/xtensa", "single_core", "xtensa-lx-rt/esp32s2", "xtensa-lx/esp32s2", "critical-section/restore-state-u32"]
-esp32s3 = ["esp32s3/rt", "procmacros/xtensa", "multi_core" , "xtensa-lx-rt/esp32s3", "xtensa-lx/esp32s3", "critical-section/restore-state-u32"]
-
-# Core Count (should not be enabled directly, but instead by a PAC's feature)
-single_core = []
-multi_core  = []
+esp32   = ["esp32/rt"  , "procmacros/xtensa", "xtensa-lx-rt/esp32",   "xtensa-lx/esp32",   "critical-section/restore-state-u32", "lock_api"]
+esp32c3 = ["esp32c3/rt", "procmacros/riscv" , "riscv", "riscv-atomic-emulation-trap",      "critical-section/restore-state-u8"]
+esp32s2 = ["esp32s2/rt", "procmacros/xtensa", "xtensa-lx-rt/esp32s2", "xtensa-lx/esp32s2", "critical-section/restore-state-u32"]
+esp32s3 = ["esp32s3/rt", "procmacros/xtensa", "xtensa-lx-rt/esp32s3", "xtensa-lx/esp32s3", "critical-section/restore-state-u32", "lock_api"]
 
 # Implement the `embedded-hal==1.0.0-alpha.x` traits
 eh1 = ["embedded-hal-1"]

@@ -10,7 +10,7 @@ pub trait DAC1Impl {
     where
         Self: Sized,
     {
-        #[cfg(feature = "esp32s2")]
+        #[cfg(esp32s2)]
         {
             let sensors = unsafe { &*SENS::ptr() };
             sensors
@@ -48,7 +48,7 @@ pub trait DAC2Impl {
     where
         Self: Sized,
     {
-        #[cfg(feature = "esp32s2")]
+        #[cfg(esp32s2)]
         {
             let sensors = unsafe { &*SENS::ptr() };
             sensors

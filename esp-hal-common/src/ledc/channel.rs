@@ -1,6 +1,6 @@
 use paste::paste;
 
-#[cfg(feature = "esp32")]
+#[cfg(esp32)]
 use super::HighSpeed;
 use super::{
     timer::{TimerIFace, TimerSpeed},
@@ -31,9 +31,9 @@ pub enum Number {
     Channel3,
     Channel4,
     Channel5,
-    #[cfg(not(feature = "esp32c3"))]
+    #[cfg(not(esp32c3))]
     Channel6,
-    #[cfg(not(feature = "esp32c3"))]
+    #[cfg(not(esp32c3))]
     Channel7,
 }
 
@@ -134,7 +134,7 @@ where
     }
 }
 
-#[cfg(feature = "esp32")]
+#[cfg(esp32)]
 /// Macro to configure channel parameters in hw
 macro_rules! set_channel {
     ($self: ident, $speed: ident, $num: literal, $timer_number: ident) => {
@@ -163,7 +163,7 @@ macro_rules! set_channel {
     };
 }
 
-#[cfg(not(feature = "esp32"))]
+#[cfg(not(esp32))]
 /// Macro to configure channel parameters in hw
 macro_rules! set_channel {
     ($self: ident, $speed: ident, $num: literal, $timer_number: ident) => {
@@ -192,7 +192,7 @@ macro_rules! set_channel {
     };
 }
 
-#[cfg(feature = "esp32")]
+#[cfg(esp32)]
 /// Macro to set duty parameters in hw
 macro_rules! set_duty {
     ($self: ident, $speed: ident, $num: literal, $duty: ident) => {
@@ -204,7 +204,7 @@ macro_rules! set_duty {
     };
 }
 
-#[cfg(not(feature = "esp32"))]
+#[cfg(not(esp32))]
 /// Macro to set duty parameters in hw
 macro_rules! set_duty {
     ($self: ident, $speed: ident, $num: literal, $duty: ident) => {
@@ -216,7 +216,7 @@ macro_rules! set_duty {
     };
 }
 
-#[cfg(feature = "esp32")]
+#[cfg(esp32)]
 /// Macro to update channel configuration (only for LowSpeed channels)
 macro_rules! update_channel {
     ($self: ident, $num: literal) => {
@@ -228,7 +228,7 @@ macro_rules! update_channel {
     };
 }
 
-#[cfg(not(feature = "esp32"))]
+#[cfg(not(esp32))]
 /// Macro to update channel configuration (only for LowSpeed channels)
 macro_rules! update_channel {
     ($self: ident, $num: literal) => {
@@ -240,7 +240,7 @@ macro_rules! update_channel {
     };
 }
 
-#[cfg(feature = "esp32")]
+#[cfg(esp32)]
 /// Channel HW interface for HighSpeed channels
 impl<'a, O> ChannelHW<O> for Channel<'a, HighSpeed, O>
 where
@@ -373,14 +373,14 @@ where
                     self.output_pin
                         .connect_peripheral_to_output(OutputSignal::LEDC_LS_SIG5);
                 }
-                #[cfg(not(feature = "esp32c3"))]
+                #[cfg(not(esp32c3))]
                 Number::Channel6 => {
                     set_channel!(self, l, 6, timer_number);
                     update_channel!(self, 6);
                     self.output_pin
                         .connect_peripheral_to_output(OutputSignal::LEDC_LS_SIG6);
                 }
-                #[cfg(not(feature = "esp32c3"))]
+                #[cfg(not(esp32c3))]
                 Number::Channel7 => {
                     set_channel!(self, l, 7, timer_number);
                     update_channel!(self, 7);
@@ -404,9 +404,9 @@ where
             Number::Channel3 => set_duty!(self, l, 3, duty),
             Number::Channel4 => set_duty!(self, l, 4, duty),
             Number::Channel5 => set_duty!(self, l, 5, duty),
-            #[cfg(not(feature = "esp32c3"))]
+            #[cfg(not(esp32c3))]
             Number::Channel6 => set_duty!(self, l, 6, duty),
-            #[cfg(not(feature = "esp32c3"))]
+            #[cfg(not(esp32c3))]
             Number::Channel7 => set_duty!(self, l, 7, duty),
         };
     }
