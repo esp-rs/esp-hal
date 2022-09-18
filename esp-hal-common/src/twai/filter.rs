@@ -103,7 +103,7 @@ pub struct SingleExtendedFilter {
 impl Filter for SingleExtendedFilter {
     const FILTER_TYPE: FilterType = FilterType::Single;
     fn to_registers(&self) -> [u8; 8] {
-        panic!("Unimplemented");
+        todo!();
     }
 }
 
@@ -123,8 +123,7 @@ pub struct DualStandardFilter {
 impl Filter for DualStandardFilter {
     const FILTER_TYPE: FilterType = FilterType::Dual;
     fn to_registers(&self) -> [u8; 8] {
-        // TODO: this.
-        panic!("Unimplemented");
+        todo!();
     }
 }
 ///
@@ -139,7 +138,6 @@ pub struct DualExtendedFilter {
 impl Filter for DualExtendedFilter {
     const FILTER_TYPE: FilterType = FilterType::Dual;
     fn to_registers(&self) -> [u8; 8] {
-        // TODO: this.
-        panic!("Unimplemented");
+        todo!();
     }
 }

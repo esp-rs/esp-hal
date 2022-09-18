@@ -16,8 +16,7 @@ use self::filter::{Filter, FilterType};
 pub mod bitselector;
 pub mod filter;
 
-/// Very basic implementation of the Frame trait.
-///
+/// Very basic structure backing the embedded_hal::can::Frame trait.
 #[derive(Debug)]
 pub struct ESPTWAIFrame {
     id: can::Id,
@@ -53,8 +52,7 @@ impl embedded_hal::can::Frame for ESPTWAIFrame {
             return None;
         }
 
-        // TODO: See struct docs for TODO list, ideally this copy would be eliminated somehow.
-        let mut d: [u8; 8] = Default::default();
+        let mut d: [u8; 8] = [0; 8];
         let (left, _unused) = d.split_at_mut(data.len());
         left.clone_from_slice(data);
 
@@ -67,9 +65,13 @@ impl embedded_hal::can::Frame for ESPTWAIFrame {
     }
 
     fn new_remote(id: impl Into<can::Id>, dlc: usize) -> Option<Self> {
+        // CAN2.0 frames cannot have more than 8 bytes.
+        if dlc > 8 {
+            return None;
+        }
         Some(ESPTWAIFrame {
             id: id.into(),
-            data: Default::default(),
+            data: [0; 8],
             dlc: dlc,
             is_remote: true,
         })
@@ -82,22 +84,18 @@ impl embedded_hal::can::Frame for ESPTWAIFrame {
         }
     }
 
-    #[inline(always)]
     fn is_remote_frame(&self) -> bool {
         self.is_remote
     }
 
-    #[inline(always)]
     fn id(&self) -> can::Id {
         self.id
     }
 
-    #[inline(always)]
     fn dlc(&self) -> usize {
         self.dlc
     }
 
-    #[inline(always)]
     fn data(&self) -> &[u8] {
         match self.is_remote_frame() {
             true => &[],
@@ -186,8 +184,6 @@ where
         clocks: &Clocks,
         baud_rate: BaudRate,
     ) -> Self {
-        // TODO: Probably should do a low level reset.
-
         // Enable the peripheral clock for the TWAI peripheral.
         clock_control.enable(crate::system::Peripheral::TWAI);
 
@@ -207,7 +203,6 @@ where
     /// Set the bitrate of the bus.
     ///
     /// Note: The timings currently assume a APB_CLK of 80MHz.
-    ///
     fn set_baud_rate(&mut self, baud_rate: BaudRate, clocks: &Clocks) {
         // TWAI is clocked from the APB_CLK according to Table 6-4 [ESP32C3 Reference Manual](https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf)
         // Included timings are all for 80MHz so assert that we are running at 80MHz.
@@ -301,8 +296,6 @@ where
 ///
 /// According to the [ESP32C3 Reference Manual](https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf) 29.4.1.2 Operation Mode, in "Normal Mode":
 /// The TWAI controller can transmit and receive messages including error signals (such as error and overload Frames)
-///
-///
 pub struct TWAI<T> {
     peripheral: T,
 }
@@ -312,7 +305,6 @@ where
     T: Instance,
 {
     /// Stop the peripheral, putting it into reset mode and enabling reconfiguration.
-    ///
     pub fn stop(self) -> TWAIConfiguration<T> {
         // Put the peripheral into reset/configuration mode by setting the reset mode bit.
         self.peripheral
@@ -367,7 +359,7 @@ where
     ///
     /// This is typically used to clear an overrun receive FIFO.
     ///
-    /// TODO: Not sure if this needs to be guarded against Bus Off.
+    /// TODO: Not sure if this needs to be guarded against Bus Off or other error states.
     pub fn clear_receive_fifo(&self) {
         while self.num_available_messages() > 0 {
             self.release_receive_fifo();

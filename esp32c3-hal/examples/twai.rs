@@ -8,11 +8,7 @@ use esp32c3_hal::{
     pac::Peripherals,
     prelude::*,
     timer::TimerGroup,
-    twai::{
-        self,
-        bitselector::{BitSelectorNewExact, Selector},
-        ESPTWAIFrame,
-    },
+    twai::{self, ESPTWAIFrame},
     Rtc, UsbSerialJtag,
 };
 
@@ -69,23 +65,24 @@ fn main() -> ! {
     //     ],
     // };
     // TODO: even though this is a single, standard id filter, extended ids will also match this filter.
+    // A filter that matches standard ids of an even value.
     let filter = twai::filter::SingleStandardFilter {
         id: twai::bitselector::BitSelector {
             bits: [
-                Selector::Set,
-                Selector::Any,
-                Selector::Any,
-                Selector::Any,
-                Selector::Any,
-                Selector::Any,
-                Selector::Any,
-                Selector::Any,
-                Selector::Any,
-                Selector::Any,
-                Selector::Any,
+                twai::bitselector::Selector::Reset,
+                twai::bitselector::Selector::Any,
+                twai::bitselector::Selector::Any,
+                twai::bitselector::Selector::Any,
+                twai::bitselector::Selector::Any,
+                twai::bitselector::Selector::Any,
+                twai::bitselector::Selector::Any,
+                twai::bitselector::Selector::Any,
+                twai::bitselector::Selector::Any,
+                twai::bitselector::Selector::Any,
+                twai::bitselector::Selector::Any,
             ],
         },
-        rtr: twai::bitselector::BitSelector::new_exact(0b0),
+        rtr: twai::bitselector::BitSelector::new_any(),
         data: [
             twai::bitselector::BitSelector::new_any(),
             twai::bitselector::BitSelector::new_any(),
@@ -110,36 +107,23 @@ fn main() -> ! {
         let frame = block!(can.receive()).unwrap();
         writeln!(UsbSerialJtag, "    Received: {:?}", frame).unwrap();
 
-        // Increment the payload bytes by one.
-        let mut data: [u8; 8] = [0; 8];
-        data[..frame.dlc()].copy_from_slice(frame.data());
+        let frame = if frame.is_data_frame() {
+            // Increment the payload bytes by one.
+            let mut data: [u8; 8] = [0; 8];
+            data[..frame.dlc()].copy_from_slice(frame.data());
 
-        for b in data[..frame.dlc()].iter_mut() {
-            (*b, _) = (*b).overflowing_add(1);
-        }
+            for b in data[..frame.dlc()].iter_mut() {
+                (*b, _) = (*b).overflowing_add(1);
+            }
 
-        let frame = ESPTWAIFrame::new(frame.id(), &data[..frame.dlc()]).unwrap();
+            ESPTWAIFrame::new(frame.id(), &data[..frame.dlc()]).unwrap()
+        } else {
+            // Echo back the request.
+            frame
+        };
+
         // Transmit the frame back.
-        writeln!(UsbSerialJtag, "Transmitting: {:?}", frame).unwrap();
+        // writeln!(UsbSerialJtag, "Transmitting: {:?}", frame).unwrap();
         let _result = block!(can.transmit(&frame)).unwrap();
-
-        // let status = can.status();
-        // writeln!(
-        //     UsbSerialJtag,
-        //     "CAN Status: {:b}\n\t RX_BUF_ST {}\n\t OVERRUN_ST {}\n\t TX_BUF_ST {}\n\t TX_COMPLETE {}\n\t RX_ST {}\n\t TX_ST {}\n\t ERR_ST {}\n\t BUS_OFF_ST {}\n\t MISS_ST {}",
-        //     status,
-        //     (status >> 0) & 0b1 != 0,
-        //     (status >> 1) & 0b1 != 0,
-        //     (status >> 2) & 0b1 != 0,
-        //     (status >> 3) & 0b1 != 0,
-        //     (status >> 4) & 0b1 != 0,
-        //     (status >> 5) & 0b1 != 0,
-        //     (status >> 6) & 0b1 != 0,
-        //     (status >> 7) & 0b1 != 0,
-        //     (status >> 8) & 0b1 != 0,
-        // )
-        // .ok();
-
-        // block!(timer0.wait()).unwrap();
     }
 }
