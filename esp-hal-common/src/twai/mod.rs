@@ -18,12 +18,10 @@ pub mod filter;
 
 /// Very basic implementation of the Frame trait.
 ///
-/// TODO: See if data and dlc can be simplified into a slice w/ lifetimes etc.
-/// TODO: See if this can be improved.
-///
 #[derive(Debug)]
 pub struct ESPTWAIFrame {
     id: can::Id,
+    // TODO: Might be nice to have a heapless::Vec<u8, 8> for the data.
     dlc: usize,
     data: [u8; 8],
     is_remote: bool,
@@ -401,6 +399,11 @@ impl embedded_hal::can::Error for ESPTWAIError {
 }
 
 /// Copy data from multiple TWAI_DATA_x_REG registers, packing the source into the destination.
+///
+/// # Safety
+/// This function is marked unsafe because it reads arbitrarily from memory-mapped registers.
+/// Specifically, this function is used with the TWAI_DATA_x_REG registers which has different
+/// results based on the mode of the peripheral.
 unsafe fn _copy_from_data_register(dest: &mut [u8], src: *const u32) {
     let src = from_raw_parts(src, dest.len());
 
@@ -408,7 +411,13 @@ unsafe fn _copy_from_data_register(dest: &mut [u8], src: *const u32) {
         *dest = *src as u8;
     }
 }
+
 /// Copy data to multiple TWAI_DATA_x_REG registers, unpacking the source into the destination.
+///
+/// # Safety
+/// This function is marked unsafe because it writes arbitrarily to memory-mapped registers.
+/// Specifically, this function is used with the TWAI_DATA_x_REG registers which has different
+/// results based on the mode of the peripheral.
 unsafe fn copy_to_data_register(dest: *mut u32, src: &[u8]) {
     let dest = from_raw_parts_mut(dest, src.len());
 
@@ -554,6 +563,7 @@ where
             .bits();
 
         let is_standard_format = data_0 & 0b1 << 7 == 0;
+        let is_data_frame = data_0 & 0b1 << 6 == 0;
         let dlc = (data_0 & 0b1111) as usize;
 
         // Read the payload from the packet and construct a frame.
@@ -579,12 +589,14 @@ where
 
             let id = StandardId::new(raw_id).unwrap();
 
-            // Create a new frame from the contents of the appropriate TWAI_DATA_x_REG registers.
-            unsafe {
-                ESPTWAIFrame::new_from_data_registers(
-                    id,
-                    from_raw_parts(self.peripheral.register_block().data_3.as_ptr(), dlc),
-                )
+            if is_data_frame {
+                // Create a new frame from the contents of the appropriate TWAI_DATA_x_REG registers.
+                let register_data = unsafe {
+                    from_raw_parts(self.peripheral.register_block().data_3.as_ptr(), dlc)
+                };
+                ESPTWAIFrame::new_from_data_registers(id, register_data)
+            } else {
+                ESPTWAIFrame::new_remote(id, dlc).unwrap()
             }
         } else {
             // Frame uses extended 29 bit id.
@@ -627,11 +639,13 @@ where
 
             let id = ExtendedId::new(raw_id).unwrap();
 
-            unsafe {
-                ESPTWAIFrame::new_from_data_registers(
-                    id,
-                    from_raw_parts(self.peripheral.register_block().data_5.as_ptr(), dlc),
-                )
+            if is_data_frame {
+                let register_data = unsafe {
+                    from_raw_parts(self.peripheral.register_block().data_5.as_ptr(), dlc)
+                };
+                ESPTWAIFrame::new_from_data_registers(id, register_data)
+            } else {
+                ESPTWAIFrame::new_remote(id, dlc).unwrap()
             }
         };
 
