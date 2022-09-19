@@ -60,7 +60,7 @@
 //!     .set_idle_output(true);
 //!
 //! // Assign GPIO pin where pulses should be sent to
-//! rmt_channel0.assign_pin(io.pins.gpio8);
+//! let mut rmt_channel0 = rmt_channel0.assign_pin(io.pins.gpio8);
 //!
 //! // Create pulse sequence
 //! let mut seq = [PulseCode {
@@ -95,9 +95,6 @@ pub enum SetupError {
     /// The global configuration for the RMT peripheral is invalid
     /// (e.g. the fractional parameters are outOfBound)
     InvalidGlobalConfig,
-    /// A pin was already assigned to the channel, at this point in
-    /// time, only one assigned pin per channel is supported
-    PinAlreadyAssigned,
 }
 
 /// Errors that can occur during a transmission attempt
@@ -213,7 +210,7 @@ impl From<PulseCode> for u32 {
 }
 
 /// Functionality that every OutputChannel must support
-pub trait OutputChannel {
+pub trait OutputChannel<CC> {
     /// Set the logical level that the connected pin is pulled to
     /// while the channel is idle
     fn set_idle_output_level(&mut self, level: bool) -> &mut Self;
@@ -237,8 +234,11 @@ pub trait OutputChannel {
     /// (Note that we only take a reference here, so the ownership remains with
     /// the calling entity. The configured pin thus can be re-configured
     /// independently.)
-    fn assign_pin<RmtPin: OutputPin>(&mut self, pin: RmtPin) -> &mut Self;
+    fn assign_pin<RmtPin: OutputPin>(self, pin: RmtPin) -> CC;
+}
 
+/// Functionality that is allowed only on `ConfiguredChannel`
+pub trait ConfiguredChannel {
     /// Send a pulse sequence in a blocking fashion
     fn send_pulse_sequence<const N: usize>(
         &mut self,
@@ -355,123 +355,24 @@ macro_rules! channel_instance {
                 self.mem_offset = 0;
             }
         }
-    };
-}
 
-macro_rules! output_channel {
-    ($num:literal, $cxi:ident, $output_signal:path
-        ) => {
-        impl OutputChannel for $cxi {
-            /// Set the logical level that the connected pin is pulled to
-            /// while the channel is idle
-            #[inline(always)]
-            fn set_idle_output_level(&mut self, level: bool) -> &mut Self {
-                cfg_if::cfg_if! {
-                    if #[cfg(any(esp32c3, esp32s3))] {
-                        unsafe { &*RMT::PTR }
-                            .ch_tx_conf0[$num]
-                            .modify(|_, w| w.idle_out_lv().bit(level));
-                    }
-                    else {
-                        conf1!($num)
-                            .modify(|_, w| w.idle_out_lv().bit(level));
-                    }
-                };
-                self
+        paste!(
+            #[doc = "Wrapper for`" $cxi "` object."]
+            pub struct [<Configured $cxi>] {
+                channel: $cxi,
             }
 
-            /// Enable/Disable the output while the channel is idle
-            #[inline(always)]
-            fn set_idle_output(&mut self, state: bool) -> &mut Self {
-                cfg_if::cfg_if! {
-                    if #[cfg(any(esp32c3, esp32s3))] {
-                        unsafe { &*RMT::PTR }
-                            .ch_tx_conf0[$num]
-                            .modify(|_, w| w.idle_out_en().bit(state));
-                    }
-                    else {
-                        conf1!($num)
-                            .modify(|_, w| w.idle_out_en().bit(state));
-                    }
-                };
-                self
-            }
+            impl ConfiguredChannel for [<Configured $cxi>] {
+                /// Send a pulse sequence in a blocking fashion
+                fn send_pulse_sequence<const N: usize>(
+                    &mut self,
+                    repeat_mode: RepeatMode,
+                    sequence: &[PulseCode; N],
+                ) -> Result<(), TransmissionError> {
+                    let precomputed_sequence = sequence.map(|x| u32::from(x));
 
-            /// Set channel clock divider value
-            #[inline(always)]
-            fn set_channel_divider(&mut self, divider: u8) -> &mut Self {
-                cfg_if::cfg_if! {
-                    if #[cfg(any(esp32c3, esp32s3))] {
-                        unsafe { &*RMT::PTR }
-                            .ch_tx_conf0[$num]
-                            .modify(|_, w| unsafe { w.div_cnt().bits(divider) });
-                    }
-                    else {
-                        conf0!($num)
-                            .modify(|_, w| unsafe { w.div_cnt().bits(divider) });
-                    }
-                };
-                self
-            }
-
-            /// Enable/Disable carrier modulation
-            #[inline(always)]
-            fn set_carrier_modulation(&mut self, state: bool) -> &mut Self {
-                cfg_if::cfg_if! {
-                    if #[cfg(any(esp32c3, esp32s3))] {
-                        unsafe { &*RMT::PTR }
-                            .ch_tx_conf0[$num]
-                            .modify(|_, w| w.carrier_en().bit(state));
-                    }
-                    else {
-                        conf0!($num)
-                            .modify(|_, w| w.carrier_en().bit(state));
-                    }
-                };
-                self
-            }
-
-            /// Set the clock source (for the ESP32-S2 and ESP32 this can be done on a
-            /// channel level)
-            #[cfg(any(esp32s2, esp32))]
-            #[inline(always)]
-            fn set_clock_source(&mut self, source: ClockSource) -> &mut Self {
-                let bit_value = match source {
-                    ClockSource::RefTick => false,
-                    ClockSource::APB => true,
-                };
-
-                conf1!($num)
-                    .modify(|_, w| w.ref_always_on().bit(bit_value));
-                self
-            }
-
-            /// Assign a pin that should be driven by this channel
-            fn assign_pin<RmtPin: OutputPin >(
-                &mut self,
-                mut pin: RmtPin,
-            ) -> &mut Self {
-                // Configure Pin as output anc connect to signal
-                pin.set_to_push_pull_output()
-                    .connect_peripheral_to_output($output_signal);
-
-                self
-            }
-
-            /// Send a pulse sequence in a blocking fashion
-            fn send_pulse_sequence<const N: usize>(
-                &mut self,
-                repeat_mode: RepeatMode,
-                sequence: &[PulseCode; N],
-            ) -> Result<(), TransmissionError> {
-                // Create an internal object with an u32 representation of the pulses
-                // While this is a memory overhead, we need this for performance reasons (doing the
-                // conversion while already sending and replacing pulse codes in the fifo is too
-                // slow)
-                let precomputed_sequence = sequence.map(|x| u32::from(x));
-
-                self.send_pulse_sequence_raw(repeat_mode, &precomputed_sequence)
-            }
+                    self.send_pulse_sequence_raw(repeat_mode, &precomputed_sequence)
+                }
 
             /// Send a raw pulse sequence in a blocking fashion
             ///
@@ -570,7 +471,7 @@ macro_rules! output_channel {
                         .set_bit()
                 });
 
-                self.reset_fifo();
+                self.channel.reset_fifo();
                 let mut sequence_iter = sequence.iter();
 
                 // We have to differentiate here if we can fit the whole sequence
@@ -578,10 +479,10 @@ macro_rules! output_channel {
                 // the sequence into chuncks.
                 if sequence.len() >= CHANNEL_RAM_SIZE as usize {
                     // Write the first 48 entries
-                    self.write_sequence(&mut sequence_iter, CHANNEL_RAM_SIZE);
+                    self.channel.write_sequence(&mut sequence_iter, CHANNEL_RAM_SIZE);
                 } else {
                     // Write whole sequence to FIFO RAM
-                    self.write_sequence(&mut sequence_iter, CHANNEL_RAM_SIZE);
+                    self.channel.write_sequence(&mut sequence_iter, CHANNEL_RAM_SIZE);
                 }
 
                 // Clear the relevant interrupts
@@ -686,7 +587,7 @@ macro_rules! output_channel {
                             }
                             // Refill the buffer
                             (false, false, false, true) => {
-                                self.write_sequence(&mut sequence_iter, CHANNEL_RAM_SIZE / 2);
+                                self.channel.write_sequence(&mut sequence_iter, CHANNEL_RAM_SIZE / 2);
 
                                 // Clear the threshold interrupt (write-through)
                                 unsafe { &*RMT::PTR }.int_clr.write(|w| {
@@ -738,7 +639,117 @@ macro_rules! output_channel {
                     // transmission once it has been started!
                 };
             }
+            }
+
+        );
+    };
+}
+
+macro_rules! output_channel {
+    ($num:literal, $cxi:ident, $output_signal:path
+        ) => {
+            paste!(
+
+        impl OutputChannel<[<Configured $cxi>]> for $cxi {
+            /// Set the logical level that the connected pin is pulled to
+            /// while the channel is idle
+            #[inline(always)]
+            fn set_idle_output_level(&mut self, level: bool) -> &mut Self {
+                cfg_if::cfg_if! {
+                    if #[cfg(any(esp32c3, esp32s3))] {
+                        unsafe { &*RMT::PTR }
+                            .ch_tx_conf0[$num]
+                            .modify(|_, w| w.idle_out_lv().bit(level));
+                    }
+                    else {
+                        conf1!($num)
+                            .modify(|_, w| w.idle_out_lv().bit(level));
+                    }
+                };
+                self
+            }
+
+            /// Enable/Disable the output while the channel is idle
+            #[inline(always)]
+            fn set_idle_output(&mut self, state: bool) -> &mut Self {
+                cfg_if::cfg_if! {
+                    if #[cfg(any(esp32c3, esp32s3))] {
+                        unsafe { &*RMT::PTR }
+                            .ch_tx_conf0[$num]
+                            .modify(|_, w| w.idle_out_en().bit(state));
+                    }
+                    else {
+                        conf1!($num)
+                            .modify(|_, w| w.idle_out_en().bit(state));
+                    }
+                };
+                self
+            }
+
+            /// Set channel clock divider value
+            #[inline(always)]
+            fn set_channel_divider(&mut self, divider: u8) -> &mut Self {
+                cfg_if::cfg_if! {
+                    if #[cfg(any(esp32c3, esp32s3))] {
+                        unsafe { &*RMT::PTR }
+                            .ch_tx_conf0[$num]
+                            .modify(|_, w| unsafe { w.div_cnt().bits(divider) });
+                    }
+                    else {
+                        conf0!($num)
+                            .modify(|_, w| unsafe { w.div_cnt().bits(divider) });
+                    }
+                };
+                self
+            }
+
+            /// Enable/Disable carrier modulation
+            #[inline(always)]
+            fn set_carrier_modulation(&mut self, state: bool) -> &mut Self {
+                cfg_if::cfg_if! {
+                    if #[cfg(any(esp32c3, esp32s3))] {
+                        unsafe { &*RMT::PTR }
+                            .ch_tx_conf0[$num]
+                            .modify(|_, w| w.carrier_en().bit(state));
+                    }
+                    else {
+                        conf0!($num)
+                            .modify(|_, w| w.carrier_en().bit(state));
+                    }
+                };
+                self
+            }
+
+            /// Set the clock source (for the ESP32-S2 and ESP32 this can be done on a
+            /// channel level)
+            #[cfg(any(esp32s2, esp32))]
+            #[inline(always)]
+            fn set_clock_source(&mut self, source: ClockSource) -> &mut Self {
+                let bit_value = match source {
+                    ClockSource::RefTick => false,
+                    ClockSource::APB => true,
+                };
+
+                conf1!($num)
+                    .modify(|_, w| w.ref_always_on().bit(bit_value));
+                self
+            }
+
+            /// Assign a pin that should be driven by this channel
+            fn assign_pin<RmtPin: OutputPin >(
+                self,
+                mut pin: RmtPin,
+            ) -> [<Configured $cxi>] {
+                // Configure Pin as output anc connect to signal
+                pin.set_to_push_pull_output()
+                    .connect_peripheral_to_output($output_signal);
+
+                [<Configured $cxi>] {
+                    channel: self,
+                }
+            }
         }
+    );
     };
 }
 
