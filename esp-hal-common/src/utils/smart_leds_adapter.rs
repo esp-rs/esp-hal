@@ -20,7 +20,7 @@ use smart_leds_trait::{SmartLedsWrite, RGB8};
 use crate::pulse_control::ClockSource;
 use crate::{
     gpio::OutputPin,
-    pulse_control::{OutputChannel, PulseCode, RepeatMode, TransmissionError},
+    pulse_control::{ConfiguredChannel, OutputChannel, PulseCode, RepeatMode, TransmissionError},
 };
 
 // Specifies what clock frequency we're using for the RMT peripheral (if
@@ -89,11 +89,17 @@ pub struct SmartLedsAdapter<CHANNEL, PIN, const BUFFER_SIZE: usize> {
 
 impl<CHANNEL, PIN, const BUFFER_SIZE: usize> SmartLedsAdapter<CHANNEL, PIN, BUFFER_SIZE>
 where
-    CHANNEL: OutputChannel,
+    CHANNEL: ConfiguredChannel,
     PIN: OutputPin,
 {
     /// Create a new adapter object that drives the pin using the RMT channel.
-    pub fn new(mut channel: CHANNEL, pin: PIN) -> SmartLedsAdapter<CHANNEL, PIN, BUFFER_SIZE> {
+    pub fn new<UnconfiguredChannel>(
+        mut channel: UnconfiguredChannel,
+        pin: PIN,
+    ) -> SmartLedsAdapter<CHANNEL, PIN, BUFFER_SIZE>
+    where
+        UnconfiguredChannel: OutputChannel<CHANNEL>,
+    {
         #[cfg(any(esp32c3, esp32s3))]
         channel
             .set_idle_output_level(false)
@@ -109,7 +115,7 @@ where
             .set_idle_output(true)
             .set_clock_source(ClockSource::APB);
 
-        channel.assign_pin(pin);
+        let channel = channel.assign_pin(pin);
         Self {
             channel,
             rmt_buffer: [0; BUFFER_SIZE],
@@ -165,7 +171,7 @@ where
 impl<CHANNEL, PIN, const BUFFER_SIZE: usize> SmartLedsWrite
     for SmartLedsAdapter<CHANNEL, PIN, BUFFER_SIZE>
 where
-    CHANNEL: OutputChannel,
+    CHANNEL: ConfiguredChannel,
     PIN: OutputPin,
 {
     type Error = LedAdapterError;

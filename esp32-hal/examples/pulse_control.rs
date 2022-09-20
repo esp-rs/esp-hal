@@ -10,7 +10,7 @@ use esp32_hal::{
     gpio::IO,
     pac::Peripherals,
     prelude::*,
-    pulse_control::{OutputChannel, PulseCode, RepeatMode},
+    pulse_control::{ConfiguredChannel, OutputChannel, PulseCode, RepeatMode},
     timer::TimerGroup,
     PulseControl,
     Rtc,
@@ -46,7 +46,7 @@ fn main() -> ! {
         .set_idle_output(true);
 
     // Assign GPIO pin where pulses should be sent to
-    rmt_channel0.assign_pin(io.pins.gpio4);
+    let mut rmt_channel0 = rmt_channel0.assign_pin(io.pins.gpio4);
 
     // Create pulse sequence
     let mut seq = [PulseCode {
