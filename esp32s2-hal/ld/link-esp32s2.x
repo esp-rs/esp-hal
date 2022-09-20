@@ -28,8 +28,42 @@ SECTIONS {
     _rodata_start = ABSOLUTE(.);
     . = ALIGN (4);
     *(.rodata .rodata.*)
+    . = ALIGN(4);
     _rodata_end = ABSOLUTE(.);
   } > RODATA
+
+  .rodata.wifi :
+  {
+    . = ALIGN(4);
+    *( .rodata_wlog_*.* )
+    . = ALIGN(4);
+  } > RODATA
+
+
+  .rwtext : ALIGN(4)
+  {
+    . = ALIGN (4);
+    *(.rwtext.literal .rwtext .rwtext.literal.* .rwtext.*)
+    . = ALIGN (4);
+  } > RWTEXT
+
+  /* wifi data */
+  .rwtext.wifi : ALIGN(4)
+  {
+    . = ALIGN(4);
+    *( .wifi0iram  .wifi0iram.*)
+    *( .wifirxiram  .wifirxiram.*)
+    *( .wifislprxiram  .wifislprxiram.*)
+    *( .wifislpiram  .wifislpiram.*)
+    *( .phyiram  .phyiram.*)
+    *( .iram1  .iram1.*)
+    . = ALIGN(4);
+  } > RWTEXT
+
+  .iram0_reserved_for_text (NOLOAD) : ALIGN(4)
+  {
+    . = ORIGIN(RWDATA) + SIZEOF(.rwtext) + SIZEOF(.rwtext.wifi);
+  } > RWDATA
 
   .data : ALIGN(4)
   {
@@ -37,6 +71,12 @@ SECTIONS {
     . = ALIGN (4);
     *(.data .data.*)
     _data_end = ABSOLUTE(.);
+  } > RWDATA AT > RODATA
+
+  .data.wifi :
+  {
+    . = ALIGN(4);
+    *( .dram1 .dram1.*)
   } > RWDATA AT > RODATA
 
   /* LMA of .data */
@@ -55,17 +95,6 @@ SECTIONS {
     . = ALIGN(4);
     *(.noinit .noinit.*)
   } > RWDATA
-
-  .iram0_reserved_for_data (NOLOAD) : ALIGN(4)
-  {
-    . = ORIGIN(RWTEXT) + SIZEOF(.data) + SIZEOF(.bss) + SIZEOF(.noinit);
-  } > RWTEXT
-
-  .rwtext : ALIGN(4)
-  {
-    . = ALIGN (4);
-    *(.rwtext.literal .rwtext .rwtext.literal.* .rwtext.*)
-  } > RWTEXT
 
  /* must be last segment using RWTEXT */
   .text_heap_start (NOLOAD) : ALIGN(4)
