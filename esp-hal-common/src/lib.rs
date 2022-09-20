@@ -29,7 +29,7 @@ pub use esp32s2 as pac;
 pub use esp32s3 as pac;
 pub use procmacros as macros;
 
-#[cfg(any(esp32c3, esp32s3))]
+#[cfg(has_usb_serial_jtag)]
 pub use self::usb_serial_jtag::UsbSerialJtag;
 pub use self::{
     delay::Delay,
@@ -57,10 +57,10 @@ pub mod rtc_cntl;
 pub mod serial;
 pub mod spi;
 pub mod system;
-#[cfg(any(esp32c3, esp32s3, esp32s2))]
+#[cfg(has_systimer)]
 pub mod systimer;
 pub mod timer;
-#[cfg(any(esp32c3, esp32s3))]
+#[cfg(has_usb_serial_jtag)]
 pub mod usb_serial_jtag;
 pub mod utils;
 

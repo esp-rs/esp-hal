@@ -11,7 +11,7 @@ fn main() {
         n => panic!("Exactly 1 chip must be enabled via its Cargo feature, {n} provided"),
     }
 
-    // Inject a configuration symbol for the enabled chip
+    // Configuration symbol for the enabled chip
     if esp32 {
         println!("cargo:rustc-cfg=esp32");
     } else if esp32c3 {
@@ -22,17 +22,27 @@ fn main() {
         println!("cargo:rustc-cfg=esp32s3");
     }
 
-    // Inject a configuration symbol for the architecture of the enabled chip
+    // Configuration symbol for the architecture of the enabled chip
     if esp32c3 {
         println!("cargo:rustc-cfg=riscv");
     } else {
         println!("cargo:rustc-cfg=xtensa");
     }
 
-    // Inject a configuration symbol to state the core count of the enabled chip
+    // Configuration symbol for the core count of the enabled chip
     if esp32c3 || esp32s2 {
         println!("cargo:rustc-cfg=single_core");
     } else {
         println!("cargo:rustc-cfg=multi_core");
+    }
+
+    // Configuration symbol for the SYSTIMER peripheral
+    if esp32c3 || esp32s2 || esp32s3 {
+        println!("cargo:rustc-cfg=has_systimer");
+    }
+
+    // Configuration symbol for the USB_SERIAL_JTAG peripheral
+    if esp32c3 || esp32s3 {
+        println!("cargo:rustc-cfg=has_usb_serial_jtag");
     }
 }
