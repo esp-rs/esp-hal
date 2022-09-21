@@ -73,6 +73,7 @@ pub mod system;
 #[cfg(systimer)]
 pub mod systimer;
 pub mod timer;
+pub mod twai;
 pub mod uart;
 #[cfg(usb_serial_jtag)]
 pub mod usb_serial_jtag;

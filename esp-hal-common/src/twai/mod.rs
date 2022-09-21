@@ -16,17 +16,16 @@ use self::filter::{Filter, FilterType};
 pub mod bitselector;
 pub mod filter;
 
-/// Very basic structure backing the embedded_hal::can::Frame trait.
+/// Structure backing the embedded_hal::can::Frame trait.
 #[derive(Debug)]
-pub struct ESPTWAIFrame {
+pub struct EspTwaiFrame {
     id: can::Id,
-    // TODO: Might be nice to have a heapless::Vec<u8, 8> for the data.
     dlc: usize,
     data: [u8; 8],
     is_remote: bool,
 }
 
-impl ESPTWAIFrame {
+impl EspTwaiFrame {
     /// Make a new frame from an id and a slice of the TWAI_DATA_x_REG registers.
     fn new_from_data_registers(id: impl Into<can::Id>, data: &[u32]) -> Self {
         let mut d: [u8; 8] = [0; 8];
@@ -45,7 +44,7 @@ impl ESPTWAIFrame {
     }
 }
 
-impl embedded_hal::can::Frame for ESPTWAIFrame {
+impl embedded_hal::can::Frame for EspTwaiFrame {
     fn new(id: impl Into<can::Id>, data: &[u8]) -> Option<Self> {
         // CAN2.0 frames cannot contain more than 8 bytes of data.
         if data.len() > 8 {
@@ -56,7 +55,7 @@ impl embedded_hal::can::Frame for ESPTWAIFrame {
         let (left, _unused) = d.split_at_mut(data.len());
         left.clone_from_slice(data);
 
-        Some(ESPTWAIFrame {
+        Some(EspTwaiFrame {
             id: id.into(),
             data: d,
             dlc: data.len(),
@@ -69,10 +68,10 @@ impl embedded_hal::can::Frame for ESPTWAIFrame {
         if dlc > 8 {
             return None;
         }
-        Some(ESPTWAIFrame {
+        Some(EspTwaiFrame {
             id: id.into(),
             data: [0; 8],
-            dlc: dlc,
+            dlc,
             is_remote: true,
         })
     }
@@ -97,6 +96,8 @@ impl embedded_hal::can::Frame for ESPTWAIFrame {
     }
 
     fn data(&self) -> &[u8] {
+        // Remote frames do not contain data, yet have a value for the dlc so return
+        // an empty slice for remote frames.
         match self.is_remote_frame() {
             true => &[],
             false => &self.data[0..self.dlc],
@@ -168,11 +169,11 @@ impl BaudRate {
 }
 
 /// An inactive TWAI peripheral in the "Reset"/configuration state.
-pub struct TWAIConfiguration<T> {
+pub struct TwaiConfiguration<T> {
     peripheral: T,
 }
 
-impl<T> TWAIConfiguration<T>
+impl<T> TwaiConfiguration<T>
 where
     T: Instance,
 {
@@ -185,15 +186,13 @@ where
         baud_rate: BaudRate,
     ) -> Self {
         // Enable the peripheral clock for the TWAI peripheral.
-        clock_control.enable(crate::system::Peripheral::TWAI);
+        clock_control.enable(crate::system::Peripheral::Twai);
 
         // Set up the GPIO pins.
         tx_pin.connect_peripheral_to_output(OutputSignal::TWAI_TX);
         rx_pin.connect_input_to_peripheral(InputSignal::TWAI_RX);
 
-        let mut cfg = TWAIConfiguration {
-            peripheral: peripheral,
-        };
+        let mut cfg = TwaiConfiguration { peripheral };
 
         cfg.set_baud_rate(baud_rate, clocks);
 
@@ -279,14 +278,14 @@ where
 
     /// Put the peripheral into Operation Mode, allowing the transmission and reception of
     /// packets using the new object.
-    pub fn start(self) -> TWAI<T> {
+    pub fn start(self) -> Twai<T> {
         // Put the peripheral into operation mode by clearing the reset mode bit.
         self.peripheral
             .register_block()
             .mode
             .modify(|_, w| w.reset_mode().clear_bit());
 
-        TWAI {
+        Twai {
             peripheral: self.peripheral,
         }
     }
@@ -296,23 +295,23 @@ where
 ///
 /// According to the [ESP32C3 Reference Manual](https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf) 29.4.1.2 Operation Mode, in "Normal Mode":
 /// The TWAI controller can transmit and receive messages including error signals (such as error and overload Frames)
-pub struct TWAI<T> {
+pub struct Twai<T> {
     peripheral: T,
 }
 
-impl<T> TWAI<T>
+impl<T> Twai<T>
 where
     T: Instance,
 {
     /// Stop the peripheral, putting it into reset mode and enabling reconfiguration.
-    pub fn stop(self) -> TWAIConfiguration<T> {
+    pub fn stop(self) -> TwaiConfiguration<T> {
         // Put the peripheral into reset/configuration mode by setting the reset mode bit.
         self.peripheral
             .register_block()
             .mode
             .modify(|_, w| w.reset_mode().set_bit());
 
-        TWAIConfiguration {
+        TwaiConfiguration {
             peripheral: self.peripheral,
         }
     }
@@ -377,11 +376,11 @@ where
 }
 
 #[derive(Debug)]
-pub enum ESPTWAIError {
+pub enum EspTwaiError {
     BusOff,
     EmbeddedHAL(embedded_hal::can::ErrorKind),
 }
-impl embedded_hal::can::Error for ESPTWAIError {
+impl embedded_hal::can::Error for EspTwaiError {
     fn kind(&self) -> can::ErrorKind {
         match self {
             Self::BusOff => can::ErrorKind::Other,
@@ -418,12 +417,12 @@ unsafe fn copy_to_data_register(dest: *mut u32, src: &[u8]) {
     }
 }
 
-impl<T> embedded_hal::can::Can for TWAI<T>
+impl<T> embedded_hal::can::Can for Twai<T>
 where
     T: Instance,
 {
-    type Frame = ESPTWAIFrame;
-    type Error = ESPTWAIError;
+    type Frame = EspTwaiFrame;
+    type Error = EspTwaiError;
     /// Transmit a frame.
     ///
     /// Because of how the TWAI registers are set up, we have to do some assembly of bytes. Note
@@ -440,7 +439,7 @@ where
 
         // Check that the peripheral is not in a bus off state.
         if status.bus_off_st().bit_is_set() {
-            return nb::Result::Err(nb::Error::Other(ESPTWAIError::BusOff));
+            return nb::Result::Err(nb::Error::Other(EspTwaiError::BusOff));
         }
         // Check that the peripheral is not already transmitting a packet.
         if !status.tx_buf_st().bit_is_set() {
@@ -530,7 +529,7 @@ where
 
         // Check that the peripheral is not in a bus off state.
         if status.bus_off_st().bit_is_set() {
-            return nb::Result::Err(nb::Error::Other(ESPTWAIError::BusOff));
+            return nb::Result::Err(nb::Error::Other(EspTwaiError::BusOff));
         }
 
         // Check that we actually have packets to receive.
@@ -540,7 +539,7 @@ where
 
         // Check if the packet in the receive buffer is valid or overrun.
         if status.miss_st().bit_is_set() {
-            return nb::Result::Err(nb::Error::Other(ESPTWAIError::EmbeddedHAL(
+            return nb::Result::Err(nb::Error::Other(EspTwaiError::EmbeddedHAL(
                 ErrorKind::Overrun,
             )));
         }
@@ -586,9 +585,9 @@ where
                 let register_data = unsafe {
                     from_raw_parts(self.peripheral.register_block().data_3.as_ptr(), dlc)
                 };
-                ESPTWAIFrame::new_from_data_registers(id, register_data)
+                EspTwaiFrame::new_from_data_registers(id, register_data)
             } else {
-                ESPTWAIFrame::new_remote(id, dlc).unwrap()
+                EspTwaiFrame::new_remote(id, dlc).unwrap()
             }
         } else {
             // Frame uses extended 29 bit id.
@@ -635,9 +634,9 @@ where
                 let register_data = unsafe {
                     from_raw_parts(self.peripheral.register_block().data_5.as_ptr(), dlc)
                 };
-                ESPTWAIFrame::new_from_data_registers(id, register_data)
+                EspTwaiFrame::new_from_data_registers(id, register_data)
             } else {
-                ESPTWAIFrame::new_remote(id, dlc).unwrap()
+                EspTwaiFrame::new_remote(id, dlc).unwrap()
             }
         };
 

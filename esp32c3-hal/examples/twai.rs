@@ -3,16 +3,11 @@
 
 use core::fmt::Write;
 use esp32c3_hal::{
-    clock::ClockControl,
-    gpio::IO,
-    pac::Peripherals,
-    prelude::*,
-    timer::TimerGroup,
-    twai::{self, ESPTWAIFrame},
-    Rtc, UsbSerialJtag,
+    clock::ClockControl, gpio::IO, pac::Peripherals, prelude::*, timer::TimerGroup, twai, Rtc,
+    UsbSerialJtag,
 };
 
-use embedded_hal::can::{Can, Frame};
+use embedded_hal::can::{Can, Frame, Id, StandardId};
 use esp_backtrace as _;
 use nb::block;
 use riscv_rt::entry;
@@ -25,7 +20,6 @@ fn main() -> ! {
 
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    let mut timer0 = timer_group0.timer0;
     let mut wdt0 = timer_group0.wdt;
     let timer_group1 = TimerGroup::new(peripherals.TIMG1, &clocks);
     let mut wdt1 = timer_group1.wdt;
@@ -36,34 +30,30 @@ fn main() -> ! {
     wdt0.disable();
     wdt1.disable();
 
-    timer0.start(500u64.millis());
-
-    writeln!(
-        UsbSerialJtag,
-        "Clocks: apb: {} cpu: {} xtal: {}",
-        clocks.apb_clock, clocks.cpu_clock, clocks.xtal_clock
-    )
-    .unwrap();
-
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let mut can_config = twai::TWAIConfiguration::new(
+    // Use GPIO pins 2 and 3 to connect to the respective pins on the CAN transceiver.
+    let can_tx_pin = io.pins.gpio2;
+    let can_rx_pin = io.pins.gpio3;
+
+    // The speed of the CAN bus.
+    let can_baudrate = twai::BaudRate::B1000K;
+
+    // Begin configuring the TWAI peripheral. The peripheral is in a reset like state that
+    // prevents transmission but allows configuration.
+    let mut can_config = twai::TwaiConfiguration::new(
         peripherals.TWAI,
-        io.pins.gpio2,
-        io.pins.gpio3,
+        can_tx_pin,
+        can_rx_pin,
         &mut system.peripheral_clock_control,
         &clocks,
-        twai::BaudRate::B1000K,
+        can_baudrate,
     );
 
-    // let filter = twai::filter::SingleStandardFilter {
-    //     id: twai::filter::BitSelector::new_exact(0b10101010101),
-    //     rtr: twai::filter::BitSelector::new_exact(0b0),
-    //     data: [
-    //         twai::filter::BitSelector::new_exact(0x24),
-    //         twai::filter::BitSelector::new_any(),
-    //     ],
-    // };
+    // Partially filter the incoming messages to reduce overhead of receiving undesired messages.
+    // Note that due to how the hardware filters messages, standard ids and extended ids may both
+    // match a filter. Frame ids should be explicitly checked in the application instead of fully
+    // relying on these partial acceptance filters to exactly match.
     // TODO: even though this is a single, standard id filter, extended ids will also match this filter.
     // A filter that matches standard ids of an even value.
     let filter = twai::filter::SingleStandardFilter {
@@ -88,42 +78,42 @@ fn main() -> ! {
             twai::bitselector::BitSelector::new_any(),
         ],
     };
-
-    // // Dump the generated regs.
-    // let regs = filter.to_registers();
-    // writeln!(
-    //     UsbSerialJtag,
-    //     "Filter Registers:\n\t{:08b} {:08b} {:08b} {:08b}\n\t{:08b} {:08b} {:08b} {:08b}",
-    //     regs[0], regs[1], regs[2], regs[3], regs[4], regs[5], regs[6], regs[7],
-    // )
-    // .unwrap();
-
     can_config.set_filter(filter);
 
+    // Start the peripheral. This locks the configuration settings of the peripheral and puts it
+    // into operation mode, allowing packets to be sent and received.
     let mut can = can_config.start();
 
     loop {
-        // writeln!(UsbSerialJtag, "Waiting for packet...").unwrap();
+        // Wait for a frame to be received.
         let frame = block!(can.receive()).unwrap();
-        writeln!(UsbSerialJtag, "    Received: {:?}", frame).unwrap();
 
-        let frame = if frame.is_data_frame() {
-            // Increment the payload bytes by one.
-            let mut data: [u8; 8] = [0; 8];
-            data[..frame.dlc()].copy_from_slice(frame.data());
+        writeln!(UsbSerialJtag, "Received a frame:").unwrap();
 
-            for b in data[..frame.dlc()].iter_mut() {
-                (*b, _) = (*b).overflowing_add(1);
+        // Print different messages based on the frame id type.
+        match frame.id() {
+            Id::Standard(id) => {
+                writeln!(UsbSerialJtag, "\tStandard Id: {:?}", id).unwrap();
             }
+            Id::Extended(id) => {
+                writeln!(UsbSerialJtag, "\tExtended Id: {:?}", id).unwrap();
+            }
+        }
 
-            ESPTWAIFrame::new(frame.id(), &data[..frame.dlc()]).unwrap()
+        // Print out the frame data or the requested data length code for a remote
+        // transmission request frame.
+        if frame.is_data_frame() {
+            writeln!(UsbSerialJtag, "\tData: {:?}", frame.data()).unwrap();
         } else {
-            // Echo back the request.
-            frame
-        };
+            writeln!(
+                UsbSerialJtag,
+                "\tRemote Frame. Data Length Code: {}",
+                frame.dlc()
+            )
+            .unwrap();
+        }
 
         // Transmit the frame back.
-        // writeln!(UsbSerialJtag, "Transmitting: {:?}", frame).unwrap();
         let _result = block!(can.transmit(&frame)).unwrap();
     }
 }

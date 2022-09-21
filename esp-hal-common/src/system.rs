@@ -42,7 +42,7 @@ pub enum Peripheral {
     I2s1,
     #[cfg(usb_otg)]
     Usb,
-    TWAI,
+    Twai,
 }
 
 /// Controls the enablement of peripheral clocks.
@@ -150,7 +150,7 @@ impl PeripheralClockControl {
                 perip_clk_en0.modify(|_, w| w.usb_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.usb_rst().clear_bit());
             }
-            Peripheral::TWAI => {
+            Peripheral::Twai => {
                 perip_clk_en0.modify(|_, w| w.can_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.can_rst().clear_bit());
             }
