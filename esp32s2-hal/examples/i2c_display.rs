@@ -10,8 +10,6 @@
 #![no_std]
 #![no_main]
 
-use core::fmt::Write;
-
 use embedded_graphics::{
     mono_font::{
         ascii::{FONT_6X10, FONT_9X18_BOLD},
@@ -29,7 +27,6 @@ use esp32s2_hal::{
     prelude::*,
     timer::TimerGroup,
     Rtc,
-    Serial,
 };
 use esp_backtrace as _;
 use nb::block;
@@ -45,7 +42,6 @@ fn main() -> ! {
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let mut timer0 = timer_group0.timer0;
     let mut wdt = timer_group0.wdt;
-    let mut serial0 = Serial::new(peripherals.UART0);
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
 
     // Disable watchdog timer
@@ -53,8 +49,6 @@ fn main() -> ! {
     rtc.rwdt.disable();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-
-    writeln!(serial0, "Enabling peripheral!").unwrap();
 
     // Create a new peripheral object with the described wiring
     // and standard I2C clock speed
@@ -70,8 +64,6 @@ fn main() -> ! {
 
     // Start timer (5 second interval)
     timer0.start(5u64.secs());
-
-    writeln!(serial0, "Starting timer!").unwrap();
 
     // Initialize display
     let interface = I2CDisplayInterface::new(i2c);
@@ -90,8 +82,6 @@ fn main() -> ! {
         .build();
 
     loop {
-        writeln!(serial0, "In Loop!").unwrap();
-
         // Fill display bufffer with a centered text with two lines (and two text
         // styles)
         Text::with_alignment(

@@ -22,7 +22,6 @@ use esp32c3_hal::{
     Rtc,
 };
 use esp_backtrace as _;
-use esp_println;
 use riscv_rt::entry;
 
 #[entry]
@@ -33,7 +32,6 @@ fn main() -> ! {
 
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    let _timer0 = timer_group0.timer0;
     let mut wdt0 = timer_group0.wdt;
     let timer_group1 = TimerGroup::new(peripherals.TIMG1, &clocks);
     let mut wdt1 = timer_group1.wdt;
@@ -47,12 +45,12 @@ fn main() -> ! {
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let led = io.pins.gpio4.into_push_pull_output();
 
-    esp_println::println!("\nESP32C3 Started\n\n");
-
-    let mut ledc = LEDC::new(peripherals.LEDC, &clocks, &mut system.peripheral_clock_control);
-
+    let mut ledc = LEDC::new(
+        peripherals.LEDC,
+        &clocks,
+        &mut system.peripheral_clock_control,
+    );
     ledc.set_global_slow_clock(LSGlobalClkSource::APBClk);
-
     let mut lstimer0 = ledc.get_timer::<LowSpeed>(timer::Number::Timer2);
 
     lstimer0

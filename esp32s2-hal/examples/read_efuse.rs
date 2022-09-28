@@ -4,8 +4,6 @@
 #![no_std]
 #![no_main]
 
-use core::fmt::Write;
-
 use esp32s2_hal::{
     clock::ClockControl,
     efuse::Efuse,
@@ -13,9 +11,9 @@ use esp32s2_hal::{
     prelude::*,
     timer::TimerGroup,
     Rtc,
-    Serial,
 };
 use esp_backtrace as _;
+use esp_println::println;
 use xtensa_lx_rt::entry;
 
 #[entry]
@@ -26,19 +24,13 @@ fn main() -> ! {
 
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let mut wdt = timer_group0.wdt;
-    let mut serial0 = Serial::new(peripherals.UART0);
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
 
     // Disable MWDT and RWDT (Watchdog) flash boot protection
     wdt.disable();
     rtc.rwdt.disable();
-    writeln!(serial0, "MAC address {:02x?}", Efuse::get_mac_address()).unwrap();
-    writeln!(
-        serial0,
-        "Flash Encryption {:?}",
-        Efuse::get_flash_encryption()
-    )
-    .unwrap();
+    println!("MAC address {:02x?}", Efuse::get_mac_address());
+    println!("Flash Encryption {:?}", Efuse::get_flash_encryption());
 
     loop {}
 }

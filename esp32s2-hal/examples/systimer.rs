@@ -13,12 +13,13 @@ use esp32s2_hal::{
     interrupt::Priority,
     pac::{self, Peripherals},
     prelude::*,
-    systimer::{Alarm, SystemTimer, Target, Periodic},
+    systimer::{Alarm, Periodic, SystemTimer, Target},
     timer::TimerGroup,
     Delay,
     Rtc,
 };
 use esp_backtrace as _;
+use esp_println::println;
 use xtensa_lx_rt::entry;
 
 static ALARM0: Mutex<RefCell<Option<Alarm<Periodic, 0>>>> = Mutex::new(RefCell::new(None));
@@ -41,7 +42,7 @@ fn main() -> ! {
 
     let syst = SystemTimer::new(peripherals.SYSTIMER);
 
-    esp_println::println!("SYSTIMER Current value = {}", SystemTimer::now());
+    println!("SYSTIMER Current value = {}", SystemTimer::now());
 
     let alarm0 = syst.alarm0.into_periodic();
     alarm0.set_period(1u32.Hz());
@@ -76,7 +77,7 @@ fn main() -> ! {
 
 #[interrupt]
 fn SYSTIMER_TARGET0() {
-    esp_println::println!("Interrupt lvl1 (alarm0)");
+    println!("Interrupt lvl1 (alarm0)");
     critical_section::with(|cs| {
         ALARM0
             .borrow_ref_mut(cs)
@@ -88,7 +89,7 @@ fn SYSTIMER_TARGET0() {
 
 #[interrupt]
 fn SYSTIMER_TARGET1() {
-    esp_println::println!("Interrupt lvl3 (alarm1)");
+    println!("Interrupt lvl3 (alarm1)");
     critical_section::with(|cs| {
         ALARM1
             .borrow_ref_mut(cs)
@@ -100,7 +101,7 @@ fn SYSTIMER_TARGET1() {
 
 #[interrupt]
 fn SYSTIMER_TARGET2() {
-    esp_println::println!("Interrupt lvl3 (alarm2)");
+    println!("Interrupt lvl3 (alarm2)");
     critical_section::with(|cs| {
         ALARM2
             .borrow_ref_mut(cs)

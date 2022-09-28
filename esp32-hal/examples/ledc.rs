@@ -6,8 +6,6 @@
 #![no_std]
 #![no_main]
 
-use core::fmt::Write;
-
 use esp32_hal::{
     clock::ClockControl,
     gpio::IO,
@@ -21,7 +19,6 @@ use esp32_hal::{
     prelude::*,
     timer::TimerGroup,
     Rtc,
-    Serial,
 };
 use esp_backtrace as _;
 use xtensa_lx_rt::entry;
@@ -34,7 +31,6 @@ fn main() -> ! {
 
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let mut wdt = timer_group0.wdt;
-    let mut serial0 = Serial::new(peripherals.UART0);
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
 
     // Disable watchdog timer
@@ -44,10 +40,11 @@ fn main() -> ! {
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let led = io.pins.gpio4.into_push_pull_output();
 
-    writeln!(serial0, "\nESP32 Started\n\n").unwrap();
-
-    let ledc = LEDC::new(peripherals.LEDC, &clocks, &mut system.peripheral_clock_control);
-
+    let ledc = LEDC::new(
+        peripherals.LEDC,
+        &clocks,
+        &mut system.peripheral_clock_control,
+    );
     let mut hstimer0 = ledc.get_timer::<HighSpeed>(timer::Number::Timer0);
 
     hstimer0
