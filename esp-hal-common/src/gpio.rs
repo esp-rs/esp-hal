@@ -541,7 +541,7 @@ macro_rules! impl_input {
         }
 
         #[cfg(feature = "eh1")]
-        impl<MODE> embedded_hal_1::digital::blocking::InputPin for $pxi<Input<MODE>> {
+        impl<MODE> embedded_hal_1::digital::InputPin for $pxi<Input<MODE>> {
             fn is_high(&self) -> Result<bool, Self::Error> {
                 Ok(self.read_input() & (1 << $bit) != 0)
             }
@@ -797,7 +797,7 @@ macro_rules! impl_output {
         }
 
         #[cfg(feature = "eh1")]
-        impl<MODE> embedded_hal_1::digital::blocking::OutputPin for $pxi<Output<MODE>> {
+        impl<MODE> embedded_hal_1::digital::OutputPin for $pxi<Output<MODE>> {
             fn set_low(&mut self) -> Result<(), Self::Error> {
                 self.write_output_clear(1 << $bit);
                 Ok(())
@@ -810,7 +810,7 @@ macro_rules! impl_output {
         }
 
         #[cfg(feature = "eh1")]
-        impl<MODE> embedded_hal_1::digital::blocking::StatefulOutputPin for $pxi<Output<MODE>> {
+        impl<MODE> embedded_hal_1::digital::StatefulOutputPin for $pxi<Output<MODE>> {
             fn is_set_high(&self) -> Result<bool, Self::Error> {
                 Ok(self.read_output() & (1 << $bit) != 0)
             }
@@ -821,9 +821,9 @@ macro_rules! impl_output {
         }
 
         #[cfg(feature = "eh1")]
-        impl<MODE> embedded_hal_1::digital::blocking::ToggleableOutputPin for $pxi<Output<MODE>> {
+        impl<MODE> embedded_hal_1::digital::ToggleableOutputPin for $pxi<Output<MODE>> {
             fn toggle(&mut self) -> Result<(), Self::Error> {
-                use embedded_hal_1::digital::blocking::{StatefulOutputPin as _, OutputPin as _};
+                use embedded_hal_1::digital::{StatefulOutputPin as _, OutputPin as _};
 
                 if self.is_set_high()? {
                     Ok(self.set_low()?)

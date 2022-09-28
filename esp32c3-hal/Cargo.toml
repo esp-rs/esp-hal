@@ -25,12 +25,13 @@ categories = [
 ]
 
 [dependencies]
-embedded-hal   = { version = "0.2.7", features = ["unproven"] }
-embedded-hal-1 = { version = "=1.0.0-alpha.8", package = "embedded-hal" }
-esp-hal-common = { version = "0.2.0",  features = ["esp32c3"], path = "../esp-hal-common" }
-r0             = "1.0.0"
-riscv          = "0.8.0"
-riscv-rt       = { version = "0.9.0", optional = true }
+embedded-hal     = { version = "0.2.7", features = ["unproven"] }
+embedded-hal-1   = { version = "=1.0.0-alpha.9", optional = true, package = "embedded-hal" }
+embedded-hal-nb  = { version = "=1.0.0-alpha.1", optional = true }
+esp-hal-common   = { version = "0.2.0",  features = ["esp32c3"], path = "../esp-hal-common" }
+r0               = "1.0.0"
+riscv            = "0.8.0"
+riscv-rt         = { version = "0.9.0", optional = true }
 
 [dev-dependencies]
 critical-section  = "1.1.0"
@@ -43,7 +44,7 @@ ssd1306           = "0.7.1"
 [features]
 default     = ["rt", "vectored"]
 direct-boot = []
-eh1         = ["esp-hal-common/eh1"]
+eh1         = ["esp-hal-common/eh1", "dep:embedded-hal-1", "dep:embedded-hal-nb"]
 rt          = ["riscv-rt"]
 smartled    = ["esp-hal-common/smartled"]
 ufmt        = ["esp-hal-common/ufmt"]
@@ -58,5 +59,5 @@ name              = "spi_eh1_loopback"
 required-features = ["eh1"]
 
 [[example]]
-name = "spi_eh1_device_loopback"
+name              = "spi_eh1_device_loopback"
 required-features = ["eh1"]

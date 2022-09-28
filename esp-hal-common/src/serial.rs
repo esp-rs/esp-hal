@@ -827,7 +827,7 @@ impl<T> embedded_hal_1::serial::ErrorType for Serial<T> {
 }
 
 #[cfg(feature = "eh1")]
-impl<T> embedded_hal_1::serial::nb::Read for Serial<T>
+impl<T> embedded_hal_nb::serial::Read for Serial<T>
 where
     T: Instance,
 {
@@ -837,7 +837,7 @@ where
 }
 
 #[cfg(feature = "eh1")]
-impl<T> embedded_hal_1::serial::nb::Write for Serial<T>
+impl<T> embedded_hal_nb::serial::Write for Serial<T>
 where
     T: Instance,
 {
