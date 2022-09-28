@@ -6,7 +6,6 @@
 #![no_std]
 #![no_main]
 
-use embedded_hal_1::nb::block;
 use esp32s2_hal::{
     clock::ClockControl,
     gpio::IO,
@@ -23,6 +22,7 @@ use esp32s2_hal::{
 };
 use esp_backtrace as _;
 use esp_println::println;
+use nb::block;
 use xtensa_lx_rt::entry;
 
 #[entry]

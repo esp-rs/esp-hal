@@ -16,7 +16,7 @@
 #![no_std]
 #![no_main]
 
-use embedded_hal_1::spi::blocking::SpiBus;
+use embedded_hal_1::spi::SpiBus;
 use esp32s2_hal::{
     clock::ClockControl,
     gpio::IO,

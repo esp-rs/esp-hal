@@ -31,13 +31,13 @@
 //!
 //! - Use the [`FullDuplex`](embedded_hal::spi::FullDuplex) trait to read/write
 //!   single bytes at a time,
-//! - Use the [`SpiBus`](embedded_hal_1::spi::blocking::SpiBus) trait (requires
-//!   the "eh1" feature) and its associated functions to initiate transactions
-//!   with simultaneous reads and writes, or
-//! - Use the [`SpiBusWrite`](embedded_hal_1::spi::blocking::SpiBusWrite) and
-//!   [`SpiBusRead`](embedded_hal_1::spi::blocking::SpiBusRead) traits (requires
-//!   the "eh1" feature) and their associated functions to read or write mutiple
-//!   bytes at a time.
+//! - Use the [`SpiBus`](embedded_hal_1::spi::SpiBus) trait (requires the "eh1"
+//!   feature) and its associated functions to initiate transactions with
+//!   simultaneous reads and writes, or
+//! - Use the [`SpiBusWrite`](embedded_hal_1::spi::SpiBusWrite) and
+//!   [`SpiBusRead`](embedded_hal_1::spi::SpiBusRead) traits (requires the "eh1"
+//!   feature) and their associated functions to read or write mutiple bytes at
+//!   a time.
 //!
 //!
 //! ## Shared SPI access
@@ -240,12 +240,21 @@ pub use ehal1::*;
 
 #[cfg(feature = "eh1")]
 mod ehal1 {
+    use core::cell::RefCell;
+
     use embedded_hal_1::spi::{
-        blocking::{SpiBus, SpiBusFlush, SpiBusRead, SpiBusWrite},
-        nb::FullDuplex,
+        self,
+        ErrorType,
+        SpiBus,
+        SpiBusFlush,
+        SpiBusRead,
+        SpiBusWrite,
+        SpiDevice,
     };
+    use embedded_hal_nb::spi::FullDuplex;
 
     use super::*;
+    use crate::OutputPin;
 
     impl<T> embedded_hal_1::spi::ErrorType for Spi<T> {
         type Error = Infallible;
@@ -365,12 +374,6 @@ mod ehal1 {
             self.spi.flush()
         }
     }
-
-    use core::cell::RefCell;
-
-    use embedded_hal_1::spi::{self, blocking::SpiDevice, ErrorType};
-
-    use crate::OutputPin;
 
     /// SPI bus controller.
     ///

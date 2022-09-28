@@ -18,7 +18,7 @@
 #![no_std]
 #![no_main]
 
-use embedded_hal_1::spi::blocking::SpiDevice;
+use embedded_hal_1::spi::SpiDevice;
 use esp32s2_hal::{
     clock::ClockControl,
     gpio::IO,
