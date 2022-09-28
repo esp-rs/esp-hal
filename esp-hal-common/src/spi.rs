@@ -380,30 +380,27 @@ mod ehal1 {
     /// Has exclusive access to an SPI bus, which is managed via a `Mutex`. Used
     /// as basis for the [`SpiBusDevice`] implementation. Note that the
     /// wrapped [`RefCell`] is used solely to achieve interior mutability.
-    pub struct SpiBusController<B: SpiBus + ErrorType> {
-        lock: critical_section::Mutex<RefCell<B>>,
+    pub struct SpiBusController<I: Instance> {
+        lock: critical_section::Mutex<RefCell<Spi<I>>>,
     }
 
-    impl<B: SpiBus + ErrorType> SpiBusController<B> {
+    impl<I: Instance> SpiBusController<I> {
         /// Create a new controller from an SPI bus instance.
         ///
         /// Takes ownership of the SPI bus in the process. Afterwards, the SPI
         /// bus can only be accessed via instances of [`SpiBusDevice`].
-        pub fn from_spi(bus: B) -> Self {
+        pub fn from_spi(bus: Spi<I>) -> Self {
             SpiBusController {
                 lock: critical_section::Mutex::new(RefCell::new(bus)),
             }
         }
 
-        pub fn add_device<'a, CS: OutputPin>(&'a self, cs: CS) -> SpiBusDevice<'a, B, CS> {
+        pub fn add_device<'a, CS: OutputPin>(&'a self, cs: CS) -> SpiBusDevice<'a, I, CS> {
             SpiBusDevice { bus: self, cs }
         }
     }
 
-    impl<B> ErrorType for SpiBusController<B>
-    where
-        B: SpiBus + ErrorType,
-    {
+    impl<I: Instance> ErrorType for SpiBusController<I> {
         type Error = spi::ErrorKind;
     }
 
@@ -412,39 +409,40 @@ mod ehal1 {
     /// Provides device specific access on a shared SPI bus. Enables attaching
     /// multiple SPI devices to the same bus, each with its own CS line, and
     /// performing safe transfers on them.
-    pub struct SpiBusDevice<'a, B, CS>
+    pub struct SpiBusDevice<'a, I, CS>
     where
-        B: SpiBus + ErrorType,
+        I: Instance,
         CS: OutputPin,
     {
-        bus: &'a SpiBusController<B>,
+        bus: &'a SpiBusController<I>,
         cs: CS,
     }
 
-    impl<'a, B, CS> SpiBusDevice<'a, B, CS>
+    impl<'a, I, CS> SpiBusDevice<'a, I, CS>
     where
-        B: SpiBus + ErrorType,
+        I: Instance,
         CS: OutputPin,
     {
-        pub fn new(bus: &'a SpiBusController<B>, cs: CS) -> Self {
+        pub fn new(bus: &'a SpiBusController<I>, mut cs: CS) -> Self {
+            cs.set_to_push_pull_output().set_output_high(true);
             SpiBusDevice { bus, cs }
         }
     }
 
-    impl<'a, B, CS> ErrorType for SpiBusDevice<'a, B, CS>
+    impl<'a, I, CS> ErrorType for SpiBusDevice<'a, I, CS>
     where
-        B: SpiBus + ErrorType,
+        I: Instance,
         CS: OutputPin,
     {
         type Error = spi::ErrorKind;
     }
 
-    impl<B, CS> SpiDevice for SpiBusDevice<'_, B, CS>
+    impl<I, CS> SpiDevice for SpiBusDevice<'_, I, CS>
     where
-        B: SpiBus + ErrorType,
+        I: Instance,
         CS: OutputPin + crate::gpio::OutputPin,
     {
-        type Bus = B;
+        type Bus = Spi<I>;
 
         fn transaction<R>(
             &mut self,
@@ -453,14 +451,14 @@ mod ehal1 {
             critical_section::with(|cs| {
                 let mut bus = self.bus.lock.borrow_ref_mut(cs);
 
-                self.cs.set_to_push_pull_output().set_output_high(false);
+                self.cs.connect_peripheral_to_output(bus.spi.cs_signal());
 
                 // We postpone handling these errors until AFTER we raised CS again, so the bus
                 // is free (Or we die trying if CS errors).
                 let f_res = f(&mut bus);
                 let flush_res = bus.flush();
 
-                self.cs.set_output_high(true);
+                self.cs.disconnect_peripheral_from_output();
 
                 let f_res = f_res.map_err(|_| spi::ErrorKind::Other)?;
                 flush_res.map_err(|_| spi::ErrorKind::Other)?;
