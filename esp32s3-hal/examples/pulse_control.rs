@@ -10,7 +10,7 @@ use esp32s3_hal::{
     gpio::IO,
     pac::Peripherals,
     prelude::*,
-    pulse_control::{ConfiguredChannel, ClockSource, OutputChannel, PulseCode, RepeatMode},
+    pulse_control::{ClockSource, ConfiguredChannel, OutputChannel, PulseCode, RepeatMode},
     timer::TimerGroup,
     PulseControl,
     Rtc,
@@ -75,8 +75,6 @@ fn main() -> ! {
             length2: 60u32.nanos(),
         };
     }
-
-    esp_println::println!("Start");
 
     loop {
         // Send sequence

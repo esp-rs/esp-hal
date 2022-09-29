@@ -8,17 +8,15 @@
 #![no_std]
 #![no_main]
 
-use core::fmt::Write;
-
 use esp32s3_hal::{
     clock::ClockControl,
     macros::ram,
-    pac::{Peripherals, UART0},
+    pac::Peripherals,
     prelude::*,
     timer::TimerGroup,
-    Serial,
 };
 use esp_backtrace as _;
+use esp_println::println;
 use nb::block;
 use xtensa_lx_rt::entry;
 
@@ -40,7 +38,6 @@ fn main() -> ! {
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let mut timer0 = timer_group0.timer0;
     let mut wdt = timer_group0.wdt;
-    let mut serial0 = Serial::new(peripherals.UART0);
 
     // Disable MWDT flash boot protection
     wdt.disable();
@@ -49,23 +46,21 @@ fn main() -> ! {
 
     timer0.start(1u64.secs());
 
-    writeln!(
-        serial0,
+    println!(
         "IRAM function located at {:p}",
         function_in_ram as *const ()
-    )
-    .unwrap();
+    );
     unsafe {
-        writeln!(serial0, "SOME_INITED_DATA {:x?}", SOME_INITED_DATA).unwrap();
-        writeln!(serial0, "SOME_UNINITED_DATA {:x?}", SOME_UNINITED_DATA).unwrap();
-        writeln!(serial0, "SOME_ZEROED_DATA {:x?}", SOME_ZEROED_DATA).unwrap();
+        println!("SOME_INITED_DATA {:x?}", SOME_INITED_DATA);
+        println!("SOME_UNINITED_DATA {:x?}", SOME_UNINITED_DATA);
+        println!("SOME_ZEROED_DATA {:x?}", SOME_ZEROED_DATA);
 
         SOME_INITED_DATA[0] = 0xff;
         SOME_ZEROED_DATA[0] = 0xff;
 
-        writeln!(serial0, "SOME_INITED_DATA {:x?}", SOME_INITED_DATA).unwrap();
-        writeln!(serial0, "SOME_UNINITED_DATA {:x?}", SOME_UNINITED_DATA).unwrap();
-        writeln!(serial0, "SOME_ZEROED_DATA {:x?}", SOME_ZEROED_DATA).unwrap();
+        println!("SOME_INITED_DATA {:x?}", SOME_INITED_DATA);
+        println!("SOME_UNINITED_DATA {:x?}", SOME_UNINITED_DATA);
+        println!("SOME_ZEROED_DATA {:x?}", SOME_ZEROED_DATA);
 
         if SOME_UNINITED_DATA[0] != 0 {
             SOME_UNINITED_DATA[0] = 0;
@@ -76,27 +71,25 @@ fn main() -> ! {
             SOME_UNINITED_DATA[1] = 0;
         }
 
-        writeln!(serial0, "Counter {}", SOME_UNINITED_DATA[1]).unwrap();
+        println!("Counter {}", SOME_UNINITED_DATA[1]);
         SOME_UNINITED_DATA[1] += 1;
     }
 
-    writeln!(
-        serial0,
+    println!(
         "RTC_FAST function located at {:p}",
         function_in_rtc_ram as *const ()
-    )
-    .unwrap();
-    writeln!(serial0, "Result {}", function_in_rtc_ram()).unwrap();
+    );
+    println!("Result {}", function_in_rtc_ram());
 
     loop {
-        function_in_ram(&mut serial0);
+        function_in_ram();
         block!(timer0.wait()).unwrap();
     }
 }
 
 #[ram]
-fn function_in_ram(serial0: &mut Serial<UART0>) {
-    writeln!(serial0, "Hello world!").unwrap();
+fn function_in_ram() {
+    println!("Hello world!");
 }
 
 #[ram(rtc_fast)]

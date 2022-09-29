@@ -5,17 +5,9 @@
 #![no_std]
 #![no_main]
 
-use core::fmt::Write;
-
-use esp32_hal::{
-    clock::ClockControl,
-    pac::Peripherals,
-    prelude::*,
-    timer::TimerGroup,
-    Rtc,
-    Serial,
-};
+use esp32_hal::{clock::ClockControl, pac::Peripherals, prelude::*, timer::TimerGroup, Rtc};
 use esp_backtrace as _;
+use esp_println::println;
 use nb::block;
 use xtensa_lx_rt::entry;
 
@@ -28,7 +20,6 @@ fn main() -> ! {
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let mut timer0 = timer_group0.timer0;
     let mut wdt = timer_group0.wdt;
-    let mut serial0 = Serial::new(peripherals.UART0);
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
 
     rtc.rwdt.disable();
@@ -38,7 +29,7 @@ fn main() -> ! {
 
     loop {
         wdt.feed();
-        writeln!(serial0, "Hello world!").unwrap();
+        println!("Hello world!");
         block!(timer0.wait()).unwrap();
     }
 }

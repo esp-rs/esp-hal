@@ -82,8 +82,6 @@ fn main() -> ! {
         };
     }
 
-    esp_println::println!("Start");
-
     loop {
         // Send sequence
         rmt_channel0
