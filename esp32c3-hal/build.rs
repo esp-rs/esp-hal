@@ -78,7 +78,7 @@ fn add_defaults() {
 
 const OPT_LEVEL_Z_MSG: &str = r#"opt-level=z will produce broken 128-bit shifts (i.e. `1u128 << i`). The hal's interrupt handling relies on that operation, causing an 'attempt to subtract with overflow' panic if an enabled interrupt is triggered while using that opt-level.
 
-Please use `opt-level="s"` in lieu of "z", or alternatively enable `features = ["allow-opt-level-z"]` to supress this error. The latter option is only recommended if you:
+Please use `opt-level="s"` in lieu of "z", or alternatively enable `features = ["allow-opt-level-z"]` to suppress this error. The latter option is only recommended if you:
 
   * Do not use interrupts, and
   * Do not have any shifts of 128-bit integers (either u128 or i128) in your code
