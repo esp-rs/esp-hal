@@ -209,7 +209,7 @@ impl<T> embedded_hal_1::i2c::ErrorType for I2C<T> {
 }
 
 #[cfg(feature = "eh1")]
-impl<T> embedded_hal_1::i2c::blocking::I2c for I2C<T>
+impl<T> embedded_hal_1::i2c::I2c for I2C<T>
 where
     T: Instance,
 {
@@ -252,14 +252,14 @@ where
     fn transaction<'a>(
         &mut self,
         _address: u8,
-        _operations: &mut [embedded_hal_1::i2c::blocking::Operation<'a>],
+        _operations: &mut [embedded_hal_1::i2c::Operation<'a>],
     ) -> Result<(), Self::Error> {
         todo!()
     }
 
     fn transaction_iter<'a, O>(&mut self, _address: u8, _operations: O) -> Result<(), Self::Error>
     where
-        O: IntoIterator<Item = embedded_hal_1::i2c::blocking::Operation<'a>>,
+        O: IntoIterator<Item = embedded_hal_1::i2c::Operation<'a>>,
     {
         todo!()
     }

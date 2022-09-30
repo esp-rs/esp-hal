@@ -20,10 +20,8 @@ use esp32s3_hal::{
     prelude::*,
     timer::TimerGroup,
     Rtc,
-    Serial,
 };
 use esp_backtrace as _;
-use esp_println;
 use xtensa_lx_rt::entry;
 
 #[entry]
@@ -33,9 +31,7 @@ fn main() -> ! {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    let _timer0 = timer_group0.timer0;
     let mut wdt = timer_group0.wdt;
-    let mut _serial0 = Serial::new(peripherals.UART0);
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
 
     // Disable watchdog timer
@@ -45,9 +41,11 @@ fn main() -> ! {
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let led = io.pins.gpio4.into_push_pull_output();
 
-    esp_println::println!("\nESP32S3 Started\n\n");
-
-    let mut ledc = LEDC::new(peripherals.LEDC, &clocks, &mut system.peripheral_clock_control);
+    let mut ledc = LEDC::new(
+        peripherals.LEDC,
+        &clocks,
+        &mut system.peripheral_clock_control,
+    );
 
     ledc.set_global_slow_clock(LSGlobalClkSource::APBClk);
 

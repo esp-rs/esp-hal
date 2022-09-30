@@ -18,6 +18,7 @@ use esp32s3_hal::{
     Rtc,
 };
 use esp_backtrace as _;
+use esp_println::println;
 use xtensa_lx_rt::entry;
 
 static TIMER00: Mutex<RefCell<Option<Timer<Timer0<TIMG0>>>>> = Mutex::new(RefCell::new(None));
@@ -81,7 +82,7 @@ fn TG0_T0_LEVEL() {
         if timer.is_interrupt_set() {
             timer.clear_interrupt();
             timer.start(500u64.millis());
-            esp_println::println!("Interrupt Level 2 - Timer0");
+            println!("Interrupt Level 2 - Timer0");
         }
     });
 }
@@ -95,7 +96,7 @@ fn TG0_T1_LEVEL() {
         if timer.is_interrupt_set() {
             timer.clear_interrupt();
             timer.start(500u64.millis());
-            esp_println::println!("Interrupt Level 2 - Timer1");
+            println!("Interrupt Level 2 - Timer1");
         }
     });
 }
@@ -109,7 +110,7 @@ fn TG1_T0_LEVEL() {
         if timer.is_interrupt_set() {
             timer.clear_interrupt();
             timer.start(500u64.millis());
-            esp_println::println!("Interrupt Level 3 - Timer0");
+            println!("Interrupt Level 3 - Timer0");
         }
     });
 }
@@ -123,7 +124,7 @@ fn TG1_T1_LEVEL() {
         if timer.is_interrupt_set() {
             timer.clear_interrupt();
             timer.start(500u64.millis());
-            esp_println::println!("Interrupt Level 3 - Timer1");
+            println!("Interrupt Level 3 - Timer1");
         }
     });
 }

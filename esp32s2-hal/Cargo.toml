@@ -25,11 +25,12 @@ categories = [
 ]
 
 [dependencies]
-embedded-hal   = { version = "0.2.7",  features = ["unproven"] }
-embedded-hal-1 = { version = "=1.0.0-alpha.8", package = "embedded-hal" }
-esp-hal-common = { version = "0.2.0",  features = ["esp32s2"], path = "../esp-hal-common" }
-xtensa-lx      = { version = "0.7.0",  features = ["esp32s2"] }
-xtensa-lx-rt   = { version = "0.13.0", features = ["esp32s2"], optional = true }
+embedded-hal     = { version = "0.2.7",  features = ["unproven"] }
+embedded-hal-1   = { version = "=1.0.0-alpha.9", optional = true, package = "embedded-hal" }
+embedded-hal-nb  = { version = "=1.0.0-alpha.1", optional = true }
+esp-hal-common   = { version = "0.2.0",  features = ["esp32s2"], path = "../esp-hal-common" }
+xtensa-lx        = { version = "0.7.0",  features = ["esp32s2"] }
+xtensa-lx-rt     = { version = "0.13.0", features = ["esp32s2"], optional = true }
 
 [dev-dependencies]
 critical-section  = "1.1.0"
@@ -41,7 +42,7 @@ ssd1306           = "0.7.1"
 
 [features]
 default   = ["rt", "vectored"]
-eh1       = ["esp-hal-common/eh1"]
+eh1       = ["esp-hal-common/eh1", "dep:embedded-hal-1", "dep:embedded-hal-nb"]
 rt        = ["xtensa-lx-rt/esp32s2"]
 smartled  = ["esp-hal-common/smartled"]
 ufmt      = ["esp-hal-common/ufmt"]
@@ -56,5 +57,5 @@ name              = "spi_eh1_loopback"
 required-features = ["eh1"]
 
 [[example]]
-name = "spi_eh1_device_loopback"
+name              = "spi_eh1_device_loopback"
 required-features = ["eh1"]

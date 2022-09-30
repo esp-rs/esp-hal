@@ -36,6 +36,22 @@ _\* via [atomic emulation]_
 [esp32-s3]: https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf
 [atomic emulation]: https://github.com/esp-rs/riscv-atomic-emulation-trap
 
+## Ancillary Crates
+
+There are a number of other crates within the [esp-rs organization] which can be used in conjunction with `esp-hal`:
+
+|      Crate      |                                  Description                                   |
+| :-------------: | :----------------------------------------------------------------------------: |
+|   [esp-alloc]   |                        A simple `no_std` heap allocator                        |
+| [esp-backtrace] |                 Backtrace support for bare-metal applications                  |
+|  [esp-storage]  | Implementation of [embedded-storage] traits to access unencrypted flash memory |
+
+[esp-rs organization]: https://github.com/esp-rs
+[esp-alloc]: https://github.com/esp-rs/esp-alloc
+[esp-backtrace]: https://github.com/esp-rs/esp-backtrace
+[esp-storage]: https://github.com/esp-rs/esp-storage
+[embedded-storage]: https://github.com/rust-embedded-community/embedded-storage
+
 ## MSRV
 
 The **M**inimum **S**upported **R**ust **V**ersions are:

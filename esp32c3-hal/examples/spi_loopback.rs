@@ -16,8 +16,6 @@
 #![no_std]
 #![no_main]
 
-use core::fmt::Write;
-
 use esp32c3_hal::{
     clock::ClockControl,
     gpio::IO,
@@ -27,9 +25,9 @@ use esp32c3_hal::{
     timer::TimerGroup,
     Delay,
     Rtc,
-    Serial,
 };
 use esp_backtrace as _;
+use esp_println::println;
 use riscv_rt::entry;
 
 #[entry]
@@ -45,8 +43,6 @@ fn main() -> ! {
     let mut wdt0 = timer_group0.wdt;
     let timer_group1 = TimerGroup::new(peripherals.TIMG1, &clocks);
     let mut wdt1 = timer_group1.wdt;
-
-    let mut serial0 = Serial::new(peripherals.UART0);
 
     rtc.swd.disable();
     rtc.rwdt.disable();
@@ -76,7 +72,7 @@ fn main() -> ! {
     loop {
         let mut data = [0xde, 0xca, 0xfb, 0xad];
         spi.transfer(&mut data).unwrap();
-        writeln!(serial0, "{:x?}", data).ok();
+        println!("{:x?}", data);
 
         delay.delay_ms(250u32);
     }

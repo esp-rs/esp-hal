@@ -16,6 +16,7 @@ use esp32s2_hal::{
     Rtc,
 };
 use esp_backtrace as _;
+use esp_println::println;
 use xtensa_lx_rt::entry;
 
 static RTC: Mutex<RefCell<Option<Rtc>>> = Mutex::new(RefCell::new(None));
@@ -34,7 +35,7 @@ fn main() -> ! {
     rtc.rwdt.start(2000u64.millis());
     rtc.rwdt.listen();
 
-    esp_println::println!(
+    println!(
         "{: <10} XTAL frequency: {} MHz",
         "[Expected]",
         clocks.xtal_clock.to_MHz()
@@ -53,7 +54,7 @@ fn RTC_CORE() {
         let mut rtc = RTC.borrow_ref_mut(cs);
         let rtc = rtc.as_mut().unwrap();
 
-        esp_println::println!(
+        println!(
             "{: <10} XTAL frequency: {} MHz",
             "[Monitor]",
             rtc.estimate_xtal_frequency()

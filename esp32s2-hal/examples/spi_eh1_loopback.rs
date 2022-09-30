@@ -16,9 +16,7 @@
 #![no_std]
 #![no_main]
 
-use core::fmt::Write;
-
-use embedded_hal_1::spi::blocking::SpiBus;
+use embedded_hal_1::spi::SpiBus;
 use esp32s2_hal::{
     clock::ClockControl,
     gpio::IO,
@@ -28,9 +26,9 @@ use esp32s2_hal::{
     timer::TimerGroup,
     Delay,
     Rtc,
-    Serial,
 };
 use esp_backtrace as _;
+use esp_println::{print, println};
 use xtensa_lx_rt::entry;
 
 #[entry]
@@ -44,7 +42,6 @@ fn main() -> ! {
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let mut wdt = timer_group0.wdt;
-    let mut serial0 = Serial::new(peripherals.UART0);
 
     wdt.disable();
     rtc.rwdt.disable();
@@ -68,33 +65,33 @@ fn main() -> ! {
     );
 
     let mut delay = Delay::new(&clocks);
-    writeln!(serial0, "=== SPI example with embedded-hal-1 traits ===").unwrap();
+    println!("=== SPI example with embedded-hal-1 traits ===");
 
     loop {
         // --- Symmetric transfer (Read as much as we write) ---
-        write!(serial0, "Starting symmetric transfer...").unwrap();
+        print!("Starting symmetric transfer...");
         let write = [0xde, 0xad, 0xbe, 0xef];
         let mut read: [u8; 4] = [0x00u8; 4];
 
         SpiBus::transfer(&mut spi, &mut read[..], &write[..]).expect("Symmetric transfer failed");
         assert_eq!(write, read);
-        writeln!(serial0, " SUCCESS").unwrap();
+        println!(" SUCCESS");
         delay.delay_ms(250u32);
 
         // --- Asymmetric transfer (Read more than we write) ---
-        write!(serial0, "Starting asymetric transfer (read > write)...").unwrap();
+        print!("Starting asymetric transfer (read > write)...");
         let mut read: [u8; 4] = [0x00; 4];
 
         SpiBus::transfer(&mut spi, &mut read[0..2], &write[..])
             .expect("Asymmetric transfer failed");
         assert_eq!(write[0], read[0]);
         assert_eq!(read[2], 0x00u8);
-        writeln!(serial0, " SUCCESS").unwrap();
+        println!(" SUCCESS");
         delay.delay_ms(250u32);
 
         // --- Symmetric transfer with huge buffer ---
         // Only your RAM is the limit!
-        write!(serial0, "Starting huge transfer...").unwrap();
+        print!("Starting huge transfer...");
         let mut write = [0x55u8; 4096];
         for byte in 0..write.len() {
             write[byte] = byte as u8;
@@ -103,12 +100,12 @@ fn main() -> ! {
 
         SpiBus::transfer(&mut spi, &mut read[..], &write[..]).expect("Huge transfer failed");
         assert_eq!(write, read);
-        writeln!(serial0, " SUCCESS").unwrap();
+        println!(" SUCCESS");
         delay.delay_ms(250u32);
 
         // --- Symmetric transfer with huge buffer in-place (No additional allocation
         // needed) ---
-        write!(serial0, "Starting huge transfer (in-place)...").unwrap();
+        print!("Starting huge transfer (in-place)...");
         let mut write = [0x55u8; 4096];
         for byte in 0..write.len() {
             write[byte] = byte as u8;
@@ -118,7 +115,7 @@ fn main() -> ! {
         for byte in 0..write.len() {
             assert_eq!(write[byte], byte as u8);
         }
-        writeln!(serial0, " SUCCESS").unwrap();
+        println!(" SUCCESS");
         delay.delay_ms(250u32);
     }
 }
