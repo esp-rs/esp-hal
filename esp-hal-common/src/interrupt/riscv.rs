@@ -445,6 +445,10 @@ pub struct TrapFrame {
     pub gp: usize,
     pub tp: usize,
     pub sp: usize,
+    pub pc: usize,
+    pub mstatus: usize,
+    pub mcause: usize,
+    pub mtval: usize,
 }
 
 /// # Safety
@@ -527,7 +531,7 @@ unsafe fn handle_exception(pc: usize, trap_frame: *mut TrapFrame) {
     }
 
     let mut atomic_emulation_trap_frame = riscv_atomic_emulation_trap::TrapFrame {
-        pc: riscv::register::mepc::read(),
+        x0: 0,
         ra: (*trap_frame).ra,
         sp: (*trap_frame).sp,
         gp: (*trap_frame).gp,
@@ -559,11 +563,12 @@ unsafe fn handle_exception(pc: usize, trap_frame: *mut TrapFrame) {
         t4: (*trap_frame).t4,
         t5: (*trap_frame).t5,
         t6: (*trap_frame).t6,
+        pc: (*trap_frame).pc,
     };
 
     _start_trap_atomic_rust(&mut atomic_emulation_trap_frame);
 
-    riscv::register::mepc::write(atomic_emulation_trap_frame.pc);
+    (*trap_frame).pc = atomic_emulation_trap_frame.pc;
     (*trap_frame).ra = atomic_emulation_trap_frame.ra;
     (*trap_frame).sp = atomic_emulation_trap_frame.sp;
     (*trap_frame).gp = atomic_emulation_trap_frame.gp;
