@@ -36,6 +36,21 @@ _\* via [atomic emulation]_
 [esp32-s3]: https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf
 [atomic emulation]: https://github.com/esp-rs/riscv-atomic-emulation-trap
 
+## Quickstart
+
+We recommend using [cargo-generate] and [esp-template] in order to generate a new project with all the required dependencies and configuration:
+
+```bash
+$ cargo install cargo-generate
+$ cargo generate --git https://github.com/esp-rs/esp-template
+```
+
+For more information on using this template please refer to [its README].
+
+[cargo-generate]: https://github.com/cargo-generate/cargo-generate
+[esp-template]: https://github.com/esp-rs/esp-template
+[its readme]: https://github.com/esp-rs/esp-template/blob/main/README.md
+
 ## Ancillary Crates
 
 There are a number of other crates within the [esp-rs organization] which can be used in conjunction with `esp-hal`:
