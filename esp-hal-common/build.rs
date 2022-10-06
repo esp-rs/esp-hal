@@ -1,6 +1,6 @@
 fn main() {
     let esp32 = cfg!(feature = "esp32");
-    let esp32c2 = cfg!(feature = "esp32c3");
+    let esp32c2 = cfg!(feature = "esp32c2");
     let esp32c3 = cfg!(feature = "esp32c3");
     let esp32s2 = cfg!(feature = "esp32s2");
     let esp32s3 = cfg!(feature = "esp32s3");

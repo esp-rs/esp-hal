@@ -8,11 +8,6 @@ use crate::system::SystemClockControl;
 #[cfg_attr(esp32c3, path = "clocks_ll/esp32c3.rs")]
 #[cfg_attr(esp32s2, path = "clocks_ll/esp32s2.rs")]
 #[cfg_attr(esp32s3, path = "clocks_ll/esp32s3.rs")]
-#[cfg_attr(feature = "esp32", path = "clocks_ll/esp32.rs")]
-#[cfg_attr(feature = "esp32c2", path = "clocks_ll/esp32c2.rs")]
-#[cfg_attr(feature = "esp32c3", path = "clocks_ll/esp32c3.rs")]
-#[cfg_attr(feature = "esp32s2", path = "clocks_ll/esp32s2.rs")]
-#[cfg_attr(feature = "esp32s3", path = "clocks_ll/esp32s3.rs")]
 mod clocks_ll;
 
 pub trait Clock {

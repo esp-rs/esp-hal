@@ -18,7 +18,7 @@
 
 use core::fmt::Write;
 
-use embedded_hal_1::spi::blocking::SpiBus;
+use embedded_hal_1::spi::SpiBus;
 use esp32c2_hal::{
     clock::ClockControl,
     gpio::IO,

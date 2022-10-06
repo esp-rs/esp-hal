@@ -33,13 +33,14 @@ pub use esp32s2 as pac;
 pub use esp32s3 as pac;
 pub use procmacros as macros;
 
+#[cfg(not(esp32c2))]
+pub use self::pulse_control::PulseControl;
 #[cfg(has_usb_serial_jtag)]
 pub use self::usb_serial_jtag::UsbSerialJtag;
 pub use self::{
     delay::Delay,
     gpio::*,
     interrupt::*,
-    pulse_control::PulseControl,
     rng::Rng,
     rtc_cntl::{Rtc, Rwdt},
     serial::Serial,
@@ -61,8 +62,6 @@ pub mod prelude;
 pub mod pulse_control;
 pub mod rng;
 pub mod rom;
-// FIXME
-#[cfg(not(esp32c2))]
 pub mod rtc_cntl;
 pub mod serial;
 pub mod spi;

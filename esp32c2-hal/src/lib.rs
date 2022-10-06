@@ -20,6 +20,8 @@ pub use esp_hal_common::{
     Cpu,
     Delay,
     Rng,
+    Rtc,
+    Rwdt,
     Serial,
 };
 

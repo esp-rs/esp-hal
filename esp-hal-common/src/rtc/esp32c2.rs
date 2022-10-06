@@ -31,45 +31,15 @@ pub(crate) fn init() {
 
     unsafe {
         regi2c_write_mask!(I2C_DIG_REG, I2C_DIG_REG_XPD_DIG_REG, 0);
-
         regi2c_write_mask!(I2C_DIG_REG, I2C_DIG_REG_XPD_RTC_REG, 0);
     }
-
-    rtc_cntl.ana_conf.modify(|_, w| w.pvtmon_pu().clear_bit());
 
     unsafe {
         rtc_cntl
             .timer1
             .modify(|_, w| w.pll_buf_wait().bits(20u8).ck8m_wait().bits(20u8));
-        rtc_cntl.timer5.modify(|_, w| w.min_slp_val().bits(2u8));
 
-        // Set default powerup & wait time
-        rtc_cntl.timer3.modify(|_, w| {
-            w.wifi_powerup_timer()
-                .bits(1u8)
-                .wifi_wait_timer()
-                .bits(1u16)
-                .bt_powerup_timer()
-                .bits(1u8)
-                .bt_wait_timer()
-                .bits(1u16)
-        });
-        rtc_cntl.timer4.modify(|_, w| {
-            w.cpu_top_powerup_timer()
-                .bits(1u8)
-                .cpu_top_wait_timer()
-                .bits(1u16)
-                .dg_wrap_powerup_timer()
-                .bits(1u8)
-                .dg_wrap_wait_timer()
-                .bits(1u16)
-        });
-        rtc_cntl.timer6.modify(|_, w| {
-            w.dg_peri_powerup_timer()
-                .bits(1u8)
-                .dg_peri_wait_timer()
-                .bits(1u16)
-        });
+        rtc_cntl.timer5.modify(|_, w| w.min_slp_val().bits(2u8));
     }
 
     calibrate_ocode();
@@ -140,6 +110,7 @@ fn clock_control_init() {
 fn power_control_init() {
     let rtc_cntl = unsafe { &*RTC_CNTL::ptr() };
     let system = unsafe { &*SYSTEM::ptr() };
+
     rtc_cntl
         .clk_conf
         .modify(|_, w| w.ck8m_force_pu().clear_bit());
@@ -158,7 +129,7 @@ fn power_control_init() {
             .set_bit()
             // Open SAR_I2C protect function to avoid SAR_I2C
             // Reset when rtc_ldo is low.
-            .reset_por_force_pd()
+            .i2c_reset_por_force_pd()
             .clear_bit()
     });
 
@@ -171,14 +142,10 @@ fn power_control_init() {
             .bb_i2c_force_pu()
             .clear_bit()
     });
-    rtc_cntl.rtc_cntl.modify(|_, w| {
-        w.regulator_force_pu()
-            .clear_bit()
-            .dboost_force_pu()
-            .clear_bit()
-            .dboost_force_pd()
-            .set_bit()
-    });
+
+    rtc_cntl
+        .rtc_cntl
+        .modify(|_, w| w.regulator_force_pu().clear_bit());
 
     // If this mask is enabled, all soc memories cannot enter power down mode.
     // We should control soc memory power down mode from RTC,
@@ -189,30 +156,13 @@ fn power_control_init() {
 
     rtc_sleep_pu();
 
-    rtc_cntl.dig_pwc.modify(|_, w| {
-        w.dg_wrap_force_pu()
-            .clear_bit()
-            .wifi_force_pu()
-            .clear_bit()
-            .bt_force_pu()
-            .clear_bit()
-            .cpu_top_force_pu()
-            .clear_bit()
-            .dg_peri_force_pu()
-            .clear_bit()
-    });
-    rtc_cntl.dig_iso.modify(|_, w| {
-        w.dg_wrap_force_noiso()
-            .clear_bit()
-            .wifi_force_noiso()
-            .clear_bit()
-            .bt_force_noiso()
-            .clear_bit()
-            .cpu_top_force_noiso()
-            .clear_bit()
-            .dg_peri_force_noiso()
-            .clear_bit()
-    });
+    rtc_cntl
+        .dig_pwc
+        .modify(|_, w| w.dg_wrap_force_pu().clear_bit());
+
+    rtc_cntl
+        .dig_iso
+        .modify(|_, w| w.dg_wrap_force_noiso().clear_bit());
 
     // Cancel digital PADS force no iso
     system
@@ -234,12 +184,9 @@ fn rtc_sleep_pu() {
     let rtc_cntl = unsafe { &*RTC_CNTL::ptr() };
     let apb_ctrl = unsafe { &*APB_CTRL::ptr() };
 
-    rtc_cntl.dig_pwc.modify(|_, w| {
-        w.lslp_mem_force_pu()
-            .clear_bit()
-            .rtc_fastmem_force_lpu()
-            .clear_bit()
-    });
+    rtc_cntl
+        .dig_pwc
+        .modify(|_, w| w.lslp_mem_force_pu().clear_bit());
 
     apb_ctrl.front_end_mem_pd.modify(|_, w| {
         w.dc_mem_force_pu()

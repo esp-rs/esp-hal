@@ -43,15 +43,15 @@ ufmt-write = { version = "0.1.0", optional = true }
 # corresponding feature. We rename the PAC packages because we cannot
 # have dependencies and features with the same names.
 esp32   = { version = "0.13.0", optional = true }
-esp32c2 = { path = "/Users/jesse/Work/esp-pacs/esp32c2",  optional = true }
+esp32c2 = { package = "esp32c2", git = "https://github.com/esp-rs/esp-pacs", rev = "df980fb", optional = true }
 esp32c3 = { version = "0.5.0",  optional = true }
 esp32s2 = { version = "0.3.0",  optional = true }
 esp32s3 = { version = "0.3.0",  optional = true }
 
 [features]
 esp32   = ["esp32/rt"  , "procmacros/xtensa", "xtensa-lx-rt/esp32",   "xtensa-lx/esp32",   "critical-section/restore-state-u32", "lock_api"]
-esp32c2 = ["esp32c2/rt", "procmacros/riscv" , "riscv-atomic-emulation-trap",               "critical-section/restore-state-u8"]
-esp32c3 = ["esp32c3/rt", "procmacros/riscv" , "riscv-atomic-emulation-trap",               "critical-section/restore-state-u8"]
+esp32c2 = ["esp32c2/rt", "procmacros/riscv" , "riscv", "riscv-atomic-emulation-trap",      "critical-section/restore-state-u8"]
+esp32c3 = ["esp32c3/rt", "procmacros/riscv" , "riscv", "riscv-atomic-emulation-trap",      "critical-section/restore-state-u8"]
 esp32s2 = ["esp32s2/rt", "procmacros/xtensa", "xtensa-lx-rt/esp32s2", "xtensa-lx/esp32s2", "critical-section/restore-state-u32"]
 esp32s3 = ["esp32s3/rt", "procmacros/xtensa", "xtensa-lx-rt/esp32s3", "xtensa-lx/esp32s3", "critical-section/restore-state-u32", "lock_api"]
 
