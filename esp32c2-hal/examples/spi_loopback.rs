@@ -16,8 +16,6 @@
 #![no_std]
 #![no_main]
 
-use core::fmt::Write;
-
 use esp32c2_hal::{
     clock::ClockControl,
     gpio::IO,
@@ -26,10 +24,10 @@ use esp32c2_hal::{
     spi::{Spi, SpiMode},
     timer::TimerGroup,
     Delay,
-    // Rtc,
-    Serial,
+    Rtc,
 };
 use esp_backtrace as _;
+use esp_println::println;
 use riscv_rt::entry;
 
 #[entry]
@@ -39,15 +37,13 @@ fn main() -> ! {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     // Disable the watchdog timers. For the ESP32-C2, this includes the Super WDT,
-    // the RTC WDT, and the TIMG WDT.
-    // let mut rtc = Rtc::new(peripherals.RTC_CNTL);
+    // the RTC WDT, and the TIMG WDTs.
+    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let mut wdt0 = timer_group0.wdt;
 
-    let mut serial0 = Serial::new(peripherals.UART0);
-
-    // rtc.swd.disable();
-    // rtc.rwdt.disable();
+    rtc.swd.disable();
+    rtc.rwdt.disable();
     wdt0.disable();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
@@ -73,7 +69,7 @@ fn main() -> ! {
     loop {
         let mut data = [0xde, 0xca, 0xfb, 0xad];
         spi.transfer(&mut data).unwrap();
-        writeln!(serial0, "{:x?}", data).ok();
+        println!("{:x?}", data);
 
         delay.delay_ms(250u32);
     }

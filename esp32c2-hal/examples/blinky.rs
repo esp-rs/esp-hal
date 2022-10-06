@@ -13,7 +13,7 @@ use esp32c2_hal::{
     system::SystemExt,
     timer::TimerGroup,
     Delay,
-    // Rtc,
+    Rtc,
 };
 use esp_backtrace as _;
 use riscv_rt::entry;
@@ -26,12 +26,12 @@ fn main() -> ! {
 
     // Disable the watchdog timers. For the ESP32-C2, this includes the Super WDT,
     // the RTC WDT, and the TIMG WDTs.
-    // let mut rtc = Rtc::new(peripherals.RTC_CNTL);
+    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let mut wdt0 = timer_group0.wdt;
 
-    // rtc.swd.disable();
-    // rtc.rwdt.disable();
+    rtc.swd.disable();
+    rtc.rwdt.disable();
     wdt0.disable();
 
     // Set GPIO5 as an output, and set its state high initially.

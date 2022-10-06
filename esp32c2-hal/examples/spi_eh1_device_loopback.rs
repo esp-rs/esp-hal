@@ -4,7 +4,9 @@
 //! SCLK    GPIO6
 //! MISO    GPIO2
 //! MOSI    GPIO7
-//! CS      GPIO10
+//! CS 1    GPIO3
+//! CS 2    GPIO4
+//! CS 3    GPIO5
 //!
 //! Depending on your target and the board you are using you have to change the
 //! pins.
@@ -16,13 +18,13 @@
 #![no_std]
 #![no_main]
 
-use embedded_hal_1::spi::SpiBus;
+use embedded_hal_1::spi::SpiDevice;
 use esp32c2_hal::{
     clock::ClockControl,
     gpio::IO,
     pac::Peripherals,
     prelude::*,
-    spi::{Spi, SpiMode},
+    spi::{Spi, SpiBusController, SpiMode},
     timer::TimerGroup,
     Delay,
     Rtc,
@@ -51,19 +53,20 @@ fn main() -> ! {
     let sclk = io.pins.gpio6;
     let miso = io.pins.gpio2;
     let mosi = io.pins.gpio7;
-    let cs = io.pins.gpio10;
 
-    let mut spi = Spi::new(
+    let spi_controller = SpiBusController::from_spi(Spi::new_no_cs(
         peripherals.SPI2,
         sclk,
         mosi,
         miso,
-        cs,
         1000u32.kHz(),
         SpiMode::Mode0,
         &mut system.peripheral_clock_control,
         &clocks,
-    );
+    ));
+    let mut spi_device_1 = spi_controller.add_device(io.pins.gpio3);
+    let mut spi_device_2 = spi_controller.add_device(io.pins.gpio4);
+    let mut spi_device_3 = spi_controller.add_device(io.pins.gpio5);
 
     let mut delay = Delay::new(&clocks);
     println!("=== SPI example with embedded-hal-1 traits ===");
@@ -74,8 +77,10 @@ fn main() -> ! {
         let write = [0xde, 0xad, 0xbe, 0xef];
         let mut read: [u8; 4] = [0x00u8; 4];
 
-        SpiBus::transfer(&mut spi, &mut read[..], &write[..]).expect("Symmetric transfer failed");
+        spi_device_1.transfer(&mut read[..], &write[..]).unwrap();
         assert_eq!(write, read);
+        spi_device_2.transfer(&mut read[..], &write[..]).unwrap();
+        spi_device_3.transfer(&mut read[..], &write[..]).unwrap();
         println!(" SUCCESS");
         delay.delay_ms(250u32);
 
@@ -83,10 +88,17 @@ fn main() -> ! {
         print!("Starting asymetric transfer (read > write)...");
         let mut read: [u8; 4] = [0x00; 4];
 
-        SpiBus::transfer(&mut spi, &mut read[0..2], &write[..])
+        spi_device_1
+            .transfer(&mut read[0..2], &write[..])
             .expect("Asymmetric transfer failed");
         assert_eq!(write[0], read[0]);
         assert_eq!(read[2], 0x00u8);
+        spi_device_2
+            .transfer(&mut read[0..2], &write[..])
+            .expect("Asymmetric transfer failed");
+        spi_device_3
+            .transfer(&mut read[0..2], &write[..])
+            .expect("Asymmetric transfer failed");
         println!(" SUCCESS");
         delay.delay_ms(250u32);
 
@@ -99,8 +111,16 @@ fn main() -> ! {
         }
         let mut read = [0x00u8; 4096];
 
-        SpiBus::transfer(&mut spi, &mut read[..], &write[..]).expect("Huge transfer failed");
+        spi_device_1
+            .transfer(&mut read[..], &write[..])
+            .expect("Huge transfer failed");
         assert_eq!(write, read);
+        spi_device_2
+            .transfer(&mut read[..], &write[..])
+            .expect("Huge transfer failed");
+        spi_device_3
+            .transfer(&mut read[..], &write[..])
+            .expect("Huge transfer failed");
         println!(" SUCCESS");
         delay.delay_ms(250u32);
 
@@ -112,10 +132,18 @@ fn main() -> ! {
             write[byte] = byte as u8;
         }
 
-        SpiBus::transfer_in_place(&mut spi, &mut write[..]).expect("Huge transfer failed");
+        spi_device_1
+            .transfer_in_place(&mut write[..])
+            .expect("Huge transfer failed");
         for byte in 0..write.len() {
             assert_eq!(write[byte], byte as u8);
         }
+        spi_device_2
+            .transfer_in_place(&mut write[..])
+            .expect("Huge transfer failed");
+        spi_device_3
+            .transfer_in_place(&mut write[..])
+            .expect("Huge transfer failed");
         println!(" SUCCESS");
         delay.delay_ms(250u32);
     }
