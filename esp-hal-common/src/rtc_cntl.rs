@@ -172,9 +172,9 @@ impl RtcClock {
 
         match reg_val_to_clk_val(xtal_freq_reg) {
             40 => XtalClock::RtcXtalFreq40M,
-            #[cfg(any(esp32c2, esp32c3, esp32s3))]
+            #[cfg(any(esp32c3, esp32s3))]
             32 => XtalClock::RtcXtalFreq32M,
-            #[cfg(esp32)]
+            #[cfg(any(esp32, esp32c2))]
             26 => XtalClock::RtcXtalFreq26M,
             #[cfg(esp32)]
             24 => XtalClock::RtcXtalFreq24M,

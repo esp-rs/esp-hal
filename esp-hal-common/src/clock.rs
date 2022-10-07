@@ -28,7 +28,6 @@ pub enum CpuClock {
     Clock80MHz,
     Clock160MHz,
     #[cfg(not(any(esp32c2, esp32c3)))]
-    #[cfg(not(any(feature = "esp32c2", feature = "esp32c3")))]
     Clock240MHz,
 }
 
@@ -39,7 +38,6 @@ impl Clock for CpuClock {
             CpuClock::Clock80MHz => HertzU32::MHz(80),
             CpuClock::Clock160MHz => HertzU32::MHz(160),
             #[cfg(not(any(esp32c2, esp32c3)))]
-            #[cfg(not(any(feature = "esp32c2", feature = "esp32c3")))]
             CpuClock::Clock240MHz => HertzU32::MHz(240),
         }
     }
@@ -49,12 +47,11 @@ impl Clock for CpuClock {
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum XtalClock {
     RtcXtalFreq40M,
-    #[cfg(esp32)]
+    #[cfg(any(esp32, esp32c2))]
     RtcXtalFreq26M,
     #[cfg(esp32)]
     RtcXtalFreq24M,
-    #[cfg(any(esp32c2, esp32c3, esp32s3))]
-    #[cfg(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3"))]
+    #[cfg(any(esp32c3, esp32s3))]
     RtcXtalFreq32M,
     RtcXtalFreqOther(u32),
 }
@@ -63,12 +60,11 @@ impl Clock for XtalClock {
     fn frequency(&self) -> HertzU32 {
         match self {
             XtalClock::RtcXtalFreq40M => HertzU32::MHz(40),
-            #[cfg(esp32)]
+            #[cfg(any(esp32, esp32c2))]
             XtalClock::RtcXtalFreq26M => HertzU32::MHz(26),
             #[cfg(esp32)]
             XtalClock::RtcXtalFreq24M => HertzU32::MHz(24),
-            #[cfg(any(esp32c2, esp32c3, esp32s3))]
-            #[cfg(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3"))]
+            #[cfg(any(esp32c3, esp32s3))]
             XtalClock::RtcXtalFreq32M => HertzU32::MHz(32),
             XtalClock::RtcXtalFreqOther(mhz) => HertzU32::MHz(*mhz),
         }

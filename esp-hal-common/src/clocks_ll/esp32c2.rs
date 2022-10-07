@@ -42,7 +42,7 @@ const I2C_MST_ANA_CONF0_REG: u32 = 0x6000_e040;
 const I2C_MST_BBPLL_STOP_FORCE_HIGH: u32 = 1 << 3;
 const I2C_MST_BBPLL_STOP_FORCE_LOW: u32 = 1 << 2;
 
-pub(crate) fn esp32c2_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock) {
+pub(crate) fn esp32c2_rtc_bbpll_configure(xtal_freq: XtalClock, _pll_freq: PllClock) {
     let system = unsafe { &*crate::pac::SYSTEM::ptr() };
 
     unsafe {
@@ -67,87 +67,45 @@ pub(crate) fn esp32c2_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClo
         clear_reg_mask(I2C_MST_ANA_CONF0_REG, I2C_MST_BBPLL_STOP_FORCE_HIGH);
         set_reg_mask(I2C_MST_ANA_CONF0_REG, I2C_MST_BBPLL_STOP_FORCE_LOW);
 
-        if matches!(pll_freq, PllClock::Pll480MHz) {
-            // Set this register to let the digital part know 480M PLL is used
-            system
-                .cpu_per_conf
-                .modify(|_, w| w.pll_freq_sel().set_bit());
+        // Set this register to let the digital part know 480M PLL is used
+        system
+            .cpu_per_conf
+            .modify(|_, w| w.pll_freq_sel().set_bit());
 
-            // Configure 480M PLL
-            match xtal_freq {
-                XtalClock::RtcXtalFreq40M => {
-                    div_ref = 0;
-                    div7_0 = 8;
-                    dr1 = 0;
-                    dr3 = 0;
-                    dchgp = 5;
-                    dcur = 3;
-                    dbias = 2;
-                }
-
-                XtalClock::RtcXtalFreq32M => {
-                    div_ref = 1;
-                    div7_0 = 26;
-                    dr1 = 1;
-                    dr3 = 1;
-                    dchgp = 4;
-                    dcur = 0;
-                    dbias = 2;
-                }
-
-                XtalClock::RtcXtalFreqOther(_) => {
-                    div_ref = 0;
-                    div7_0 = 8;
-                    dr1 = 0;
-                    dr3 = 0;
-                    dchgp = 5;
-                    dcur = 3;
-                    dbias = 2;
-                }
+        // Configure 480M PLL
+        match xtal_freq {
+            XtalClock::RtcXtalFreq40M => {
+                div_ref = 0;
+                div7_0 = 8;
+                dr1 = 0;
+                dr3 = 0;
+                dchgp = 5;
+                dcur = 3;
+                dbias = 2;
             }
 
-            regi2c_write!(I2C_BBPLL, I2C_BBPLL_MODE_HF, 0x6b);
-        } else {
-            // Clear this register to let the digital part know 320M PLL is used
-            system
-                .cpu_per_conf
-                .modify(|_, w| w.pll_freq_sel().clear_bit());
-
-            // Configure 320M PLL
-            match xtal_freq {
-                XtalClock::RtcXtalFreq40M => {
-                    div_ref = 0;
-                    div7_0 = 4;
-                    dr1 = 0;
-                    dr3 = 0;
-                    dchgp = 5;
-                    dcur = 3;
-                    dbias = 2;
-                }
-
-                XtalClock::RtcXtalFreq32M => {
-                    div_ref = 1;
-                    div7_0 = 6;
-                    dr1 = 0;
-                    dr3 = 0;
-                    dchgp = 5;
-                    dcur = 3;
-                    dbias = 2;
-                }
-
-                XtalClock::RtcXtalFreqOther(_) => {
-                    div_ref = 0;
-                    div7_0 = 4;
-                    dr1 = 0;
-                    dr3 = 0;
-                    dchgp = 5;
-                    dcur = 3;
-                    dbias = 2;
-                }
+            XtalClock::RtcXtalFreq26M => {
+                div_ref = 12;
+                div7_0 = 236;
+                dr1 = 4;
+                dr3 = 4;
+                dchgp = 0;
+                dcur = 0;
+                dbias = 2;
             }
 
-            regi2c_write!(I2C_BBPLL, I2C_BBPLL_MODE_HF, 0x69);
+            XtalClock::RtcXtalFreqOther(_) => {
+                div_ref = 0;
+                div7_0 = 8;
+                dr1 = 0;
+                dr3 = 0;
+                dchgp = 5;
+                dcur = 3;
+                dbias = 2;
+            }
         }
+
+        regi2c_write!(I2C_BBPLL, I2C_BBPLL_MODE_HF, 0x6b);
 
         i2c_bbpll_lref = (dchgp << I2C_BBPLL_OC_DCHGP_LSB) | div_ref;
         i2c_bbpll_div_7_0 = div7_0;
