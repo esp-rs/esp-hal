@@ -48,10 +48,10 @@
 //! underlying SPI bus by means of a Mutex. This ensures that device
 //! transactions do not interfere with each other.
 
-use core::convert::Infallible;
-
 use fugit::HertzU32;
 
+#[cfg(any(esp32c3))]
+use crate::dma::gdma::{DmaError, Rx, Tx};
 use crate::{
     clock::Clocks,
     pac::spi2::RegisterBlock,
@@ -68,6 +68,31 @@ const FIFO_SIZE: usize = 64;
 const FIFO_SIZE: usize = 72;
 /// Padding byte for empty write transfers
 const EMPTY_WRITE_PAD: u8 = 0x00u8;
+
+#[allow(unused)]
+const MAX_DMA_SIZE: usize = 32736;
+
+#[derive(Debug, Clone, Copy)]
+pub enum Error {
+    #[cfg(esp32c3)]
+    DmaError(DmaError),
+    MaxDmaTransferSizeExceeded,
+    Unknown,
+}
+
+#[cfg(esp32c3)]
+impl From<DmaError> for Error {
+    fn from(value: DmaError) -> Self {
+        Error::DmaError(value)
+    }
+}
+
+#[cfg(feature = "eh1")]
+impl embedded_hal_1::spi::Error for Error {
+    fn kind(&self) -> embedded_hal_1::spi::ErrorKind {
+        embedded_hal_1::spi::ErrorKind::Other
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub enum SpiMode {
@@ -173,7 +198,7 @@ where
         Self::new_internal(spi, frequency, mode, peripheral_clock_control, clocks)
     }
 
-    pub fn new_internal(
+    pub(crate) fn new_internal(
         spi: T,
         frequency: HertzU32,
         mode: SpiMode,
@@ -200,7 +225,7 @@ impl<T> embedded_hal::spi::FullDuplex<u8> for Spi<T>
 where
     T: Instance,
 {
-    type Error = Infallible;
+    type Error = Error;
 
     fn read(&mut self) -> nb::Result<u8, Self::Error> {
         self.spi.read_byte()
@@ -215,7 +240,7 @@ impl<T> embedded_hal::blocking::spi::Transfer<u8> for Spi<T>
 where
     T: Instance,
 {
-    type Error = Infallible;
+    type Error = Error;
 
     fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Self::Error> {
         self.spi.transfer(words)
@@ -226,12 +251,364 @@ impl<T> embedded_hal::blocking::spi::Write<u8> for Spi<T>
 where
     T: Instance,
 {
-    type Error = Infallible;
+    type Error = Error;
 
     fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
         self.spi.write_bytes(words)?;
         self.spi.flush()?;
         Ok(())
+    }
+}
+
+#[cfg(any(esp32c3))]
+pub mod dma {
+    use core::mem;
+
+    use embedded_dma::{ReadBuffer, WriteBuffer};
+
+    use super::{Instance, InstanceDma, Spi, MAX_DMA_SIZE};
+    use crate::dma::gdma::{DmaTransfer, DmaTransferRxTx, Rx, Tx};
+
+    impl<T> Spi<T>
+    where
+        T: Instance,
+    {
+        /// Make this SPI instance into a DMA capable instance.
+        /// Pass the Rx and Tx half of the DMA channel.
+        pub fn with_tx_rx_dma<RX, TX>(self, tx: TX, rx: RX) -> SpiDma<T, TX, RX>
+        where
+            T: InstanceDma<TX, RX>,
+            TX: Tx,
+            RX: Rx,
+        {
+            SpiDma {
+                spi: self.spi,
+                tx,
+                rx,
+            }
+        }
+    }
+
+    /// An in-progress DMA transfer
+    pub struct SpiDmaTransferRxTx<T, TX, RX, RBUFFER, TBUFFER>
+    where
+        T: InstanceDma<TX, RX>,
+        TX: Tx,
+        RX: Rx,
+    {
+        spi_dma: SpiDma<T, TX, RX>,
+        rbuffer: RBUFFER,
+        tbuffer: TBUFFER,
+    }
+
+    impl<T, TX, RX, RXBUF, TXBUF> DmaTransferRxTx<RXBUF, TXBUF, SpiDma<T, TX, RX>>
+        for SpiDmaTransferRxTx<T, TX, RX, RXBUF, TXBUF>
+    where
+        T: InstanceDma<TX, RX>,
+        TX: Tx,
+        RX: Rx,
+    {
+        /// Wait for the DMA transfer to complete and return the buffers and the
+        /// SPI instance.
+        fn wait(mut self) -> (RXBUF, TXBUF, SpiDma<T, TX, RX>) {
+            self.spi_dma.spi.flush().ok(); // waiting for the DMA transfer is not enough
+
+            // `DmaTransfer` needs to have a `Drop` implementation, because we accept
+            // managed buffers that can free their memory on drop. Because of that
+            // we can't move out of the `DmaTransfer`'s fields, so we use `ptr::read`
+            // and `mem::forget`.
+            //
+            // NOTE(unsafe) There is no panic branch between getting the resources
+            // and forgetting `self`.
+            unsafe {
+                let rbuffer = core::ptr::read(&self.rbuffer);
+                let tbuffer = core::ptr::read(&self.tbuffer);
+                let payload = core::ptr::read(&self.spi_dma);
+                mem::forget(self);
+                (rbuffer, tbuffer, payload)
+            }
+        }
+    }
+
+    impl<T, TX, RX, RXBUF, TXBUF> Drop for SpiDmaTransferRxTx<T, TX, RX, RXBUF, TXBUF>
+    where
+        T: InstanceDma<TX, RX>,
+        TX: Tx,
+        RX: Rx,
+    {
+        fn drop(&mut self) {
+            self.spi_dma.spi.flush().ok();
+        }
+    }
+
+    /// An in-progress DMA transfer.
+    pub struct SpiDmaTransfer<T, TX, RX, BUFFER>
+    where
+        T: InstanceDma<TX, RX>,
+        TX: Tx,
+        RX: Rx,
+    {
+        spi_dma: SpiDma<T, TX, RX>,
+        buffer: BUFFER,
+    }
+
+    impl<T, TX, RX, BUFFER> DmaTransfer<BUFFER, SpiDma<T, TX, RX>> for SpiDmaTransfer<T, TX, RX, BUFFER>
+    where
+        T: InstanceDma<TX, RX>,
+        TX: Tx,
+        RX: Rx,
+    {
+        /// Wait for the DMA transfer to complete and return the buffers and the
+        /// SPI instance.
+        fn wait(mut self) -> (BUFFER, SpiDma<T, TX, RX>) {
+            self.spi_dma.spi.flush().ok(); // waiting for the DMA transfer is not enough
+
+            // `DmaTransfer` needs to have a `Drop` implementation, because we accept
+            // managed buffers that can free their memory on drop. Because of that
+            // we can't move out of the `DmaTransfer`'s fields, so we use `ptr::read`
+            // and `mem::forget`.
+            //
+            // NOTE(unsafe) There is no panic branch between getting the resources
+            // and forgetting `self`.
+            unsafe {
+                let buffer = core::ptr::read(&self.buffer);
+                let payload = core::ptr::read(&self.spi_dma);
+                mem::forget(self);
+                (buffer, payload)
+            }
+        }
+    }
+
+    impl<T, TX, RX, BUFFER> Drop for SpiDmaTransfer<T, TX, RX, BUFFER>
+    where
+        T: InstanceDma<TX, RX>,
+        TX: Tx,
+        RX: Rx,
+    {
+        fn drop(&mut self) {
+            self.spi_dma.spi.flush().ok();
+        }
+    }
+
+    /// A DMA capable SPI instance.
+    pub struct SpiDma<T, TX, RX> {
+        spi: T,
+        tx: TX,
+        rx: RX,
+    }
+
+    impl<T, TX, RX> SpiDma<T, TX, RX>
+    where
+        T: InstanceDma<TX, RX>,
+        TX: Tx,
+        RX: Rx,
+    {
+        /// Return the raw interface to the underlying peripheral instance
+        pub fn free(self) -> T {
+            self.spi
+        }
+
+        /// Perform a DMA write.
+        ///
+        /// This will return a [SpiDmaTransfer] owning the buffer(s) and the SPI
+        /// instance. The maximum amount of data to be sent is 32736
+        /// bytes.
+        pub fn dma_write<TXBUF>(
+            mut self,
+            words: TXBUF,
+        ) -> Result<SpiDmaTransfer<T, TX, RX, TXBUF>, super::Error>
+        where
+            TXBUF: ReadBuffer<Word = u8>,
+        {
+            let (ptr, len) = unsafe { words.read_buffer() };
+
+            if len > MAX_DMA_SIZE {
+                return Err(super::Error::MaxDmaTransferSizeExceeded);
+            }
+
+            self.spi.start_write_bytes_dma(ptr, len, &mut self.tx)?;
+            Ok(SpiDmaTransfer {
+                spi_dma: self,
+                buffer: words,
+            })
+        }
+
+        /// Perform a DMA read.
+        ///
+        /// This will return a [SpiDmaTransfer] owning the buffer(s) and the SPI
+        /// instance. The maximum amount of data to be received is 32736
+        /// bytes.
+        pub fn dma_read<RXBUF>(
+            mut self,
+            mut words: RXBUF,
+        ) -> Result<SpiDmaTransfer<T, TX, RX, RXBUF>, super::Error>
+        where
+            RXBUF: WriteBuffer<Word = u8>,
+        {
+            let (ptr, len) = unsafe { words.write_buffer() };
+
+            if len > MAX_DMA_SIZE {
+                return Err(super::Error::MaxDmaTransferSizeExceeded);
+            }
+
+            self.spi.start_read_bytes_dma(ptr, len, &mut self.rx)?;
+            Ok(SpiDmaTransfer {
+                spi_dma: self,
+                buffer: words,
+            })
+        }
+
+        /// Perform a DMA transfer.
+        ///
+        /// This will return a [SpiDmaTransfer] owning the buffer(s) and the SPI
+        /// instance. The maximum amount of data to be sent/received is
+        /// 32736 bytes.
+        pub fn dma_transfer<TXBUF, RXBUF>(
+            mut self,
+            words: TXBUF,
+            mut read_buffer: RXBUF,
+        ) -> Result<SpiDmaTransferRxTx<T, TX, RX, RXBUF, TXBUF>, super::Error>
+        where
+            TXBUF: ReadBuffer<Word = u8>,
+            RXBUF: WriteBuffer<Word = u8>,
+        {
+            let (write_ptr, write_len) = unsafe { words.read_buffer() };
+            let (read_ptr, read_len) = unsafe { read_buffer.write_buffer() };
+
+            if write_len > MAX_DMA_SIZE || read_len > MAX_DMA_SIZE {
+                return Err(super::Error::MaxDmaTransferSizeExceeded);
+            }
+
+            self.spi.start_transfer_dma(
+                write_ptr,
+                write_len,
+                read_ptr,
+                read_len,
+                &mut self.tx,
+                &mut self.rx,
+            )?;
+            Ok(SpiDmaTransferRxTx {
+                spi_dma: self,
+                rbuffer: read_buffer,
+                tbuffer: words,
+            })
+        }
+    }
+
+    impl<T, TX, RX> embedded_hal::blocking::spi::Transfer<u8> for SpiDma<T, TX, RX>
+    where
+        T: InstanceDma<TX, RX>,
+        TX: Tx,
+        RX: Rx,
+    {
+        type Error = super::Error;
+
+        fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Self::Error> {
+            self.spi
+                .transfer_in_place_dma(words, &mut self.tx, &mut self.rx)
+        }
+    }
+
+    impl<T, TX, RX> embedded_hal::blocking::spi::Write<u8> for SpiDma<T, TX, RX>
+    where
+        T: InstanceDma<TX, RX>,
+        TX: Tx,
+        RX: Rx,
+    {
+        type Error = super::Error;
+
+        fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
+            self.spi.write_bytes_dma(words, &mut self.tx)?;
+            self.spi.flush()?;
+            Ok(())
+        }
+    }
+
+    #[cfg(feature = "eh1")]
+    mod ehal1 {
+        use embedded_hal_1::spi::{SpiBus, SpiBusFlush, SpiBusRead, SpiBusWrite};
+
+        use super::{super::InstanceDma, SpiDma};
+        use crate::dma::gdma::{Rx, Tx};
+
+        impl<T, TX, RX> embedded_hal_1::spi::ErrorType for SpiDma<T, TX, RX>
+        where
+            T: InstanceDma<TX, RX>,
+            TX: Tx,
+            RX: Rx,
+        {
+            type Error = super::super::Error;
+        }
+
+        impl<T, TX, RX> SpiBusWrite for SpiDma<T, TX, RX>
+        where
+            T: InstanceDma<TX, RX>,
+            TX: Tx,
+            RX: Rx,
+        {
+            /// See also: [`write_bytes`].
+            fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
+                self.spi.write_bytes_dma(words, &mut self.tx)?;
+                self.flush()
+            }
+        }
+
+        impl<T, TX, RX> SpiBusRead for SpiDma<T, TX, RX>
+        where
+            T: InstanceDma<TX, RX>,
+            TX: Tx,
+            RX: Rx,
+        {
+            fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+                self.spi
+                    .transfer_dma(&[], words, &mut self.tx, &mut self.rx)?;
+                self.flush()
+            }
+        }
+
+        impl<T, TX, RX> SpiBus for SpiDma<T, TX, RX>
+        where
+            T: InstanceDma<TX, RX>,
+            TX: Tx,
+            RX: Rx,
+        {
+            /// Write out data from `write`, read response into `read`.
+            ///
+            /// `read` and `write` are allowed to have different lengths. If
+            /// `write` is longer, all other bytes received are
+            /// discarded. If `read` is longer, [`EMPTY_WRITE_PAD`]
+            /// is written out as necessary until enough bytes have
+            /// been read. Reading and writing happens
+            /// simultaneously.
+            fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
+                self.spi
+                    .transfer_dma(write, read, &mut self.tx, &mut self.rx)?;
+                self.flush()
+            }
+
+            /// Transfer data in place.
+            ///
+            /// Writes data from `words` out on the bus and stores the reply
+            /// into `words`. A convenient wrapper around
+            /// [`write`](SpiBusWrite::write), [`flush`](SpiBusFlush::flush) and
+            /// [`read`](SpiBusRead::read).
+            fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+                self.spi
+                    .transfer_in_place_dma(words, &mut self.tx, &mut self.rx)?;
+                self.flush()
+            }
+        }
+
+        impl<T, TX, RX> SpiBusFlush for SpiDma<T, TX, RX>
+        where
+            T: InstanceDma<TX, RX>,
+            TX: Tx,
+            RX: Rx,
+        {
+            fn flush(&mut self) -> Result<(), Self::Error> {
+                self.spi.flush()
+            }
+        }
     }
 }
 
@@ -257,7 +634,7 @@ mod ehal1 {
     use crate::OutputPin;
 
     impl<T> embedded_hal_1::spi::ErrorType for Spi<T> {
-        type Error = Infallible;
+        type Error = super::Error;
     }
 
     impl<T> FullDuplex for Spi<T>
@@ -469,6 +846,197 @@ mod ehal1 {
     }
 }
 
+#[cfg(any(esp32c3))]
+pub trait InstanceDma<TX, RX>: Instance
+where
+    TX: Tx,
+    RX: Rx,
+{
+    fn transfer_in_place_dma<'w>(
+        &mut self,
+        words: &'w mut [u8],
+        tx: &mut TX,
+        rx: &mut RX,
+    ) -> Result<&'w [u8], Error> {
+        for chunk in words.chunks_mut(MAX_DMA_SIZE) {
+            self.start_transfer_dma(
+                chunk.as_ptr(),
+                chunk.len(),
+                chunk.as_mut_ptr(),
+                chunk.len(),
+                tx,
+                rx,
+            )?;
+
+            while !tx.is_done() && !rx.is_done() {}
+            self.flush().unwrap();
+        }
+
+        return Ok(words);
+    }
+
+    fn transfer_dma<'w>(
+        &mut self,
+        write_buffer: &'w [u8],
+        read_buffer: &'w mut [u8],
+        tx: &mut TX,
+        rx: &mut RX,
+    ) -> Result<&'w [u8], Error> {
+        let mut idx = 0;
+        loop {
+            let write_idx = isize::min(idx, write_buffer.len() as isize);
+            let write_len = usize::min(write_buffer.len() - idx as usize, MAX_DMA_SIZE);
+
+            let read_idx = isize::min(idx, read_buffer.len() as isize);
+            let read_len = usize::min(read_buffer.len() - idx as usize, MAX_DMA_SIZE);
+
+            self.start_transfer_dma(
+                unsafe { write_buffer.as_ptr().offset(write_idx) },
+                write_len,
+                unsafe { read_buffer.as_mut_ptr().offset(read_idx) },
+                read_len,
+                tx,
+                rx,
+            )?;
+
+            while !tx.is_done() && !rx.is_done() {}
+            self.flush().unwrap();
+
+            idx += MAX_DMA_SIZE as isize;
+            if idx >= write_buffer.len() as isize && idx >= read_buffer.len() as isize {
+                break;
+            }
+        }
+
+        return Ok(read_buffer);
+    }
+
+    fn start_transfer_dma<'w>(
+        &mut self,
+        write_buffer_ptr: *const u8,
+        write_buffer_len: usize,
+        read_buffer_ptr: *mut u8,
+        read_buffer_len: usize,
+        tx: &mut TX,
+        rx: &mut RX,
+    ) -> Result<(), Error> {
+        let reg_block = self.register_block();
+        self.configure_datalen(usize::max(read_buffer_len, write_buffer_len) as u32 * 8);
+
+        tx.is_done();
+        rx.is_done();
+
+        reg_block.dma_conf.modify(|_, w| w.dma_tx_ena().set_bit());
+        reg_block.dma_conf.modify(|_, w| w.dma_rx_ena().set_bit());
+        self.update();
+
+        tx.prepare_transfer(
+            crate::dma::gdma::DmaPeripheral::Spi2,
+            write_buffer_ptr,
+            write_buffer_len,
+        )?;
+        rx.prepare_transfer(
+            crate::dma::gdma::DmaPeripheral::Spi2,
+            read_buffer_ptr,
+            read_buffer_len,
+        )?;
+
+        reg_block.dma_int_clr.write(|w| {
+            w.dma_infifo_full_err_int_clr()
+                .set_bit()
+                .dma_outfifo_empty_err_int_clr()
+                .set_bit()
+                .trans_done_int_clr()
+                .set_bit()
+                .mst_rx_afifo_wfull_err_int_clr()
+                .set_bit()
+                .mst_tx_afifo_rempty_err_int_clr()
+                .set_bit()
+        });
+
+        reg_block.cmd.modify(|_, w| w.usr().set_bit());
+
+        Ok(())
+    }
+
+    fn write_bytes_dma<'w>(&mut self, words: &'w [u8], tx: &mut TX) -> Result<&'w [u8], Error> {
+        for chunk in words.chunks(MAX_DMA_SIZE) {
+            self.start_write_bytes_dma(chunk.as_ptr(), chunk.len(), tx)?;
+
+            while !tx.is_done() {}
+            self.flush().unwrap(); // seems "is_done" doesn't work as intended?
+        }
+
+        return Ok(words);
+    }
+
+    fn start_write_bytes_dma<'w>(
+        &mut self,
+        ptr: *const u8,
+        len: usize,
+        tx: &mut TX,
+    ) -> Result<(), Error> {
+        let reg_block = self.register_block();
+        self.configure_datalen(len as u32 * 8);
+
+        reg_block.dma_conf.modify(|_, w| w.dma_tx_ena().set_bit());
+        reg_block.dma_conf.modify(|_, w| w.dma_rx_ena().set_bit());
+        self.update();
+
+        tx.prepare_transfer(crate::dma::gdma::DmaPeripheral::Spi2, ptr, len)?;
+
+        reg_block.dma_int_clr.write(|w| {
+            w.dma_infifo_full_err_int_clr()
+                .set_bit()
+                .dma_outfifo_empty_err_int_clr()
+                .set_bit()
+                .trans_done_int_clr()
+                .set_bit()
+                .mst_rx_afifo_wfull_err_int_clr()
+                .set_bit()
+                .mst_tx_afifo_rempty_err_int_clr()
+                .set_bit()
+        });
+
+        reg_block.cmd.modify(|_, w| w.usr().set_bit());
+
+        return Ok(());
+    }
+
+    fn start_read_bytes_dma<'w>(
+        &mut self,
+        ptr: *mut u8,
+        len: usize,
+        rx: &mut RX,
+    ) -> Result<(), Error> {
+        let reg_block = self.register_block();
+        self.configure_datalen(len as u32 * 8);
+
+        reg_block.dma_conf.modify(|_, w| w.dma_tx_ena().set_bit());
+        reg_block.dma_conf.modify(|_, w| w.dma_rx_ena().set_bit());
+        self.update();
+
+        rx.prepare_transfer(crate::dma::gdma::DmaPeripheral::Spi2, ptr, len)?;
+
+        reg_block.dma_int_clr.write(|w| {
+            w.dma_infifo_full_err_int_clr()
+                .set_bit()
+                .dma_outfifo_empty_err_int_clr()
+                .set_bit()
+                .trans_done_int_clr()
+                .set_bit()
+                .mst_rx_afifo_wfull_err_int_clr()
+                .set_bit()
+                .mst_tx_afifo_rempty_err_int_clr()
+                .set_bit()
+        });
+
+        reg_block.cmd.modify(|_, w| w.usr().set_bit());
+
+        return Ok(());
+    }
+}
+
 pub trait Instance {
     fn register_block(&self) -> &RegisterBlock;
 
@@ -656,7 +1224,7 @@ pub trait Instance {
         self
     }
 
-    fn read_byte(&mut self) -> nb::Result<u8, Infallible> {
+    fn read_byte(&mut self) -> nb::Result<u8, Error> {
         let reg_block = self.register_block();
 
         if reg_block.cmd.read().usr().bit_is_set() {
@@ -666,7 +1234,7 @@ pub trait Instance {
         Ok(u32::try_into(reg_block.w0.read().bits()).unwrap_or_default())
     }
 
-    fn write_byte(&mut self, word: u8) -> nb::Result<(), Infallible> {
+    fn write_byte(&mut self, word: u8) -> nb::Result<(), Error> {
         let reg_block = self.register_block();
 
         if reg_block.cmd.read().usr().bit_is_set() {
@@ -693,7 +1261,7 @@ pub trait Instance {
     /// you must ensure that the whole messages was written correctly, use
     /// [`flush`].
     // FIXME: See below.
-    fn write_bytes(&mut self, words: &[u8]) -> Result<(), Infallible> {
+    fn write_bytes(&mut self, words: &[u8]) -> Result<(), Error> {
         let reg_block = self.register_block();
         let num_chunks = words.len() / FIFO_SIZE;
 
@@ -739,7 +1307,7 @@ pub trait Instance {
     /// Sends out a stuffing byte for every byte to read. This function doesn't
     /// perform flushing. If you want to read the response to something you
     /// have written before, consider using [`transfer`] instead.
-    fn read_bytes(&mut self, words: &mut [u8]) -> Result<(), Infallible> {
+    fn read_bytes(&mut self, words: &mut [u8]) -> Result<(), Error> {
         let empty_array = [EMPTY_WRITE_PAD; FIFO_SIZE];
 
         for chunk in words.chunks_mut(FIFO_SIZE) {
@@ -759,7 +1327,7 @@ pub trait Instance {
     // FIXME: Using something like `core::slice::from_raw_parts` and
     // `copy_from_slice` on the receive registers works only for the esp32 and
     // esp32c3 varaints. The reason for this is unknown.
-    fn read_bytes_from_fifo(&mut self, words: &mut [u8]) -> Result<(), Infallible> {
+    fn read_bytes_from_fifo(&mut self, words: &mut [u8]) -> Result<(), Error> {
         let reg_block = self.register_block();
 
         for chunk in words.chunks_mut(FIFO_SIZE) {
@@ -783,7 +1351,7 @@ pub trait Instance {
     }
 
     // Check if the bus is busy and if it is wait for it to be idle
-    fn flush(&mut self) -> Result<(), Infallible> {
+    fn flush(&mut self) -> Result<(), Error> {
         let reg_block = self.register_block();
 
         while reg_block.cmd.read().usr().bit_is_set() {
@@ -792,7 +1360,7 @@ pub trait Instance {
         Ok(())
     }
 
-    fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Infallible> {
+    fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Error> {
         for chunk in words.chunks_mut(FIFO_SIZE) {
             self.write_bytes(chunk)?;
             self.flush()?;
@@ -870,6 +1438,14 @@ impl Instance for crate::pac::SPI2 {
     fn enable_peripheral(&self, peripheral_clock_control: &mut PeripheralClockControl) {
         peripheral_clock_control.enable(crate::system::Peripheral::Spi2);
     }
+}
+
+#[cfg(any(esp32c3))]
+impl<TX, RX> InstanceDma<TX, RX> for crate::pac::SPI2
+where
+    TX: Tx,
+    RX: Rx,
+{
 }
 
 #[cfg(any(esp32))]
