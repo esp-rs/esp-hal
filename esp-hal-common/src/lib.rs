@@ -90,6 +90,8 @@ pub mod efuse;
 #[cfg_attr(xtensa, path = "interrupt/xtensa.rs")]
 pub mod interrupt;
 
+pub mod dma;
+
 /// Enumeration of CPU cores
 /// The actual number of available cores depends on the target.
 pub enum Cpu {

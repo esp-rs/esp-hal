@@ -26,6 +26,8 @@ pub enum Peripheral {
     Ledc,
     #[cfg(any(esp32c2, esp32c3))]
     ApbSarAdc,
+    #[cfg(esp32c3)]
+    Gdma,
 }
 
 /// Controls the enablement of peripheral clocks.
@@ -42,6 +44,9 @@ impl PeripheralClockControl {
         let (perip_clk_en0, perip_rst_en0) = { (&system.perip_clk_en0, &system.perip_rst_en0) };
         #[cfg(esp32)]
         let (perip_clk_en0, perip_rst_en0) = { (&system.perip_clk_en, &system.perip_rst_en) };
+
+        #[cfg(esp32c3)]
+        let (perip_clk_en1, perip_rst_en1) = { (&system.perip_clk_en1, &system.perip_rst_en1) };
 
         match peripheral {
             Peripheral::Spi2 => {
@@ -81,6 +86,11 @@ impl PeripheralClockControl {
             Peripheral::ApbSarAdc => {
                 perip_clk_en0.modify(|_, w| w.apb_saradc_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.apb_saradc_rst().clear_bit());
+            }
+            #[cfg(esp32c3)]
+            Peripheral::Gdma => {
+                perip_clk_en1.modify(|_, w| w.dma_clk_en().set_bit());
+                perip_rst_en1.modify(|_, w| w.dma_rst().clear_bit());
             }
         }
     }
