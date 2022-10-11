@@ -16,12 +16,12 @@ type SystemPeripheral = crate::pac::DPORT;
 /// Peripherals which can be enabled via [PeripheralClockControl]
 pub enum Peripheral {
     Spi2,
-    #[cfg(not(feature = "esp32c2"))]
+    #[cfg(not(esp32c2))]
     Spi3,
     I2cExt0,
     #[cfg(not(any(esp32c2, esp32c3)))]
     I2cExt1,
-    #[cfg(not(feature = "esp32c2"))]
+    #[cfg(not(esp32c2))]
     Rmt,
     Ledc,
     #[cfg(any(esp32c2, esp32c3))]
@@ -48,7 +48,7 @@ impl PeripheralClockControl {
                 perip_clk_en0.modify(|_, w| w.spi2_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.spi2_rst().clear_bit());
             }
-            #[cfg(not(feature = "esp32c2"))]
+            #[cfg(not(esp32c2))]
             Peripheral::Spi3 => {
                 perip_clk_en0.modify(|_, w| w.spi3_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.spi3_rst().clear_bit());
@@ -68,7 +68,7 @@ impl PeripheralClockControl {
                 perip_clk_en0.modify(|_, w| w.i2c_ext1_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.i2c_ext1_rst().clear_bit());
             }
-            #[cfg(not(feature = "esp32c2"))]
+            #[cfg(not(esp32c2))]
             Peripheral::Rmt => {
                 perip_clk_en0.modify(|_, w| w.rmt_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.rmt_rst().clear_bit());
