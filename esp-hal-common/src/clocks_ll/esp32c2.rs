@@ -38,9 +38,9 @@ const I2C_BBPLL_OC_DLREF_SEL: u32 = 6;
 const I2C_BBPLL_OC_DLREF_SEL_MSB: u32 = 7;
 const I2C_BBPLL_OC_DLREF_SEL_LSB: u32 = 6;
 
-const I2C_MST_ANA_CONF0_REG: u32 = 0x6000_e040;
-const I2C_MST_BBPLL_STOP_FORCE_HIGH: u32 = 1 << 3;
-const I2C_MST_BBPLL_STOP_FORCE_LOW: u32 = 1 << 2;
+const I2C_MST_ANA_CONF0_REG: u32 = 0x6004_E840;
+const I2C_MST_BBPLL_STOP_FORCE_HIGH: u32 = 1 << 2;
+const I2C_MST_BBPLL_STOP_FORCE_LOW: u32 = 1 << 3;
 
 pub(crate) fn esp32c2_rtc_bbpll_configure(xtal_freq: XtalClock, _pll_freq: PllClock) {
     let system = unsafe { &*crate::pac::SYSTEM::ptr() };
@@ -110,7 +110,7 @@ pub(crate) fn esp32c2_rtc_bbpll_configure(xtal_freq: XtalClock, _pll_freq: PllCl
         i2c_bbpll_lref = (dchgp << I2C_BBPLL_OC_DCHGP_LSB) | div_ref;
         i2c_bbpll_div_7_0 = div7_0;
         i2c_bbpll_dcur =
-            (2 << I2C_BBPLL_OC_DLREF_SEL_LSB) | (1 << I2C_BBPLL_OC_DHREF_SEL_LSB) | dcur;
+            (1 << I2C_BBPLL_OC_DLREF_SEL_LSB) | (3 << I2C_BBPLL_OC_DHREF_SEL_LSB) | dcur;
 
         regi2c_write!(I2C_BBPLL, I2C_BBPLL_OC_REF_DIV, i2c_bbpll_lref);
 
@@ -123,10 +123,6 @@ pub(crate) fn esp32c2_rtc_bbpll_configure(xtal_freq: XtalClock, _pll_freq: PllCl
         regi2c_write!(I2C_BBPLL, I2C_BBPLL_OC_DCUR, i2c_bbpll_dcur);
 
         regi2c_write_mask!(I2C_BBPLL, I2C_BBPLL_OC_VCO_DBIAS, dbias);
-
-        regi2c_write_mask!(I2C_BBPLL, I2C_BBPLL_OC_DHREF_SEL, 2);
-
-        regi2c_write_mask!(I2C_BBPLL, I2C_BBPLL_OC_DLREF_SEL, 1);
     }
 }
 
@@ -185,6 +181,7 @@ pub(crate) fn esp32c2_rtc_freq_to_pll_mhz(cpu_clock_speed: CpuClock) {
 
 pub(crate) fn esp32c2_rtc_apb_freq_update(apb_freq: ApbClock) {
     let rtc_cntl = unsafe { &*crate::pac::RTC_CNTL::ptr() };
+
     let value = ((apb_freq.hz() >> 12) & u16::MAX as u32)
         | (((apb_freq.hz() >> 12) & u16::MAX as u32) << 16);
 

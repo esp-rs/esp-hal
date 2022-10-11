@@ -43,7 +43,7 @@ ufmt-write = { version = "0.1.0", optional = true }
 # corresponding feature. We rename the PAC packages because we cannot
 # have dependencies and features with the same names.
 esp32   = { version = "0.13.0", optional = true }
-esp32c2 = { package = "esp32c2", git = "https://github.com/esp-rs/esp-pacs", rev = "df980fb", optional = true }
+esp32c2 = { package = "esp32c2", git = "https://github.com/esp-rs/esp-pacs", rev = "8a01143", optional = true }
 esp32c3 = { version = "0.5.0",  optional = true }
 esp32s2 = { version = "0.3.0",  optional = true }
 esp32s3 = { version = "0.3.0",  optional = true }
