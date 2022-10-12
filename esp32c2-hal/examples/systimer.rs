@@ -34,11 +34,11 @@ fn main() -> ! {
 
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let mut wdt = timer_group0.wdt;
-    // let mut rtc = Rtc::new(peripherals.RTC_CNTL);
+    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
 
     // Disable MWDT and RWDT (Watchdog) flash boot protection
     wdt.disable();
-    // rtc.rwdt.disable();
+    rtc.rwdt.disable();
 
     let syst = SystemTimer::new(peripherals.SYSTIMER);
 

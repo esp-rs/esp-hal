@@ -1,25 +1,21 @@
 MEMORY
 {
     /*
-        NOTE: the ESP32-C2 inherits from the ESP32-C3 in esptool, and uses the same memory map
-        https://github.com/espressif/esptool/blob/ed64d20b051d05f3f522bacc6a786098b562d4b8/esptool/targets/esp32c3.py#L78-L90
+        https://github.com/espressif/esptool/blob/10828527038d143e049790d330ac4de76ce987d6/esptool/targets/esp32c2.py#L53-L62
         MEMORY_MAP = [[0x00000000, 0x00010000, "PADDING"],
-                      [0x3C000000, 0x3C800000, "DROM"],
-                      [0x3FC80000, 0x3FCE0000, "DRAM"],
+                      [0x3C000000, 0x3C400000, "DROM"],
+                      [0x3FCA0000, 0x3FCE0000, "DRAM"],
                       [0x3FC88000, 0x3FD00000, "BYTE_ACCESSIBLE"],
-                      [0x3FF00000, 0x3FF20000, "DROM_MASK"],
-                      [0x40000000, 0x40060000, "IROM_MASK"],
-                      [0x42000000, 0x42800000, "IROM"],
-                      [0x4037C000, 0x403E0000, "IRAM"],
-                      [0x50000000, 0x50002000, "RTC_IRAM"],
-                      [0x50000000, 0x50002000, "RTC_DRAM"],
-                      [0x600FE000, 0x60100000, "MEM_INTERNAL2"]]
+                      [0x3FF00000, 0x3FF50000, "DROM_MASK"],
+                      [0x40000000, 0x40090000, "IROM_MASK"],
+                      [0x42000000, 0x42400000, "IROM"],
+                      [0x4037C000, 0x403C0000, "IRAM"]]
     */
 
     /* 272K of on soc RAM, 16K reserved for cache */
-    ICACHE : ORIGIN = 0x4037C000,  LENGTH = 0x4000
+    ICACHE : ORIGIN = 0x4037C000,  LENGTH = 16K
     /* Instruction RAM */
-    IRAM : ORIGIN = 0x4037C000 + 0x4000, LENGTH = 272K - 0x4000
+    IRAM : ORIGIN = 0x4037C000 + 16K, LENGTH = 272K - 16K
     /* Data RAM */
     DRAM : ORIGIN = 0x3FCA0000, LENGTH = 0x30000
 
