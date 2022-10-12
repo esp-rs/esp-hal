@@ -6,7 +6,7 @@ pub unsafe fn esp_rom_delay_us(us: u32) {
     #[cfg(esp32)]
     const ESP_ROM_DELAY_US: u32 = 0x4000_8534;
     #[cfg(esp32c2)]
-    const ESP_ROM_DELAY_US: u32 = 0x4000_0050;
+    const ESP_ROM_DELAY_US: u32 = 0x4000_0044;
     #[cfg(esp32c3)]
     const ESP_ROM_DELAY_US: u32 = 0x4000_0050;
     #[cfg(esp32s2)]

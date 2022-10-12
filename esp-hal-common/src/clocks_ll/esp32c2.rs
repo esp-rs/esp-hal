@@ -74,16 +74,6 @@ pub(crate) fn esp32c2_rtc_bbpll_configure(xtal_freq: XtalClock, _pll_freq: PllCl
 
         // Configure 480M PLL
         match xtal_freq {
-            XtalClock::RtcXtalFreq40M => {
-                div_ref = 0;
-                div7_0 = 8;
-                dr1 = 0;
-                dr3 = 0;
-                dchgp = 5;
-                dcur = 3;
-                dbias = 2;
-            }
-
             XtalClock::RtcXtalFreq26M => {
                 div_ref = 12;
                 div7_0 = 236;
@@ -93,8 +83,7 @@ pub(crate) fn esp32c2_rtc_bbpll_configure(xtal_freq: XtalClock, _pll_freq: PllCl
                 dcur = 0;
                 dbias = 2;
             }
-
-            XtalClock::RtcXtalFreqOther(_) => {
+            XtalClock::RtcXtalFreq40M | XtalClock::RtcXtalFreqOther(_) => {
                 div_ref = 0;
                 div7_0 = 8;
                 dr1 = 0;
@@ -172,7 +161,7 @@ pub(crate) fn esp32c2_rtc_freq_to_pll_mhz(cpu_clock_speed: CpuClock) {
         system_control.cpu_per_conf.modify(|_, w| {
             w.cpuperiod_sel().bits(match cpu_clock_speed {
                 CpuClock::Clock80MHz => 0,
-                CpuClock::Clock160MHz => 1,
+                CpuClock::Clock120MHz => 1,
             })
         });
         ets_update_cpu_frequency(cpu_clock_speed.mhz());
