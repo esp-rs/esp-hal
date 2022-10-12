@@ -63,6 +63,7 @@ impl SystemTimer {
 
 #[derive(Debug)]
 pub struct Target;
+
 #[derive(Debug)]
 pub struct Periodic; // TODO, also impl e-h timer traits
 
@@ -135,7 +136,7 @@ impl<T, const CHANNEL: u8> Alarm<T, CHANNEL> {
             #[cfg(esp32s2)]
             systimer.step.write(|w| w.timer_xtal_step().bits(0x1)); // run at XTAL freq, not 80 * XTAL freq
 
-            #[cfg(any(esp32c3, esp32s3))]
+            #[cfg(any(esp32c2, esp32c3, esp32s3))]
             {
                 tconf.write(|w| w.target0_timer_unit_sel().clear_bit()); // default, use unit 0
                 systimer
@@ -145,7 +146,7 @@ impl<T, const CHANNEL: u8> Alarm<T, CHANNEL> {
 
             conf(tconf, hi, lo);
 
-            #[cfg(any(esp32c3, esp32s3))]
+            #[cfg(any(esp32c2, esp32c3, esp32s3))]
             {
                 match CHANNEL {
                     0 => {

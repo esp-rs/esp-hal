@@ -600,7 +600,7 @@ where
                 .bits(0)
         });
 
-        #[cfg(esp32c3)]
+        #[cfg(any(esp32c2, esp32c3))]
         reg_block
             .wdtconfig0
             .modify(|_, w| w.wdt_conf_update_en().set_bit());

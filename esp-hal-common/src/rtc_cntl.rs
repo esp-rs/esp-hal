@@ -110,6 +110,7 @@ impl Rtc {
 
 /// RTC Watchdog Timer
 pub struct RtcClock;
+
 /// RTC Watchdog Timer driver
 impl RtcClock {
     const CAL_FRACT: u32 = 19;
@@ -500,7 +501,7 @@ impl Rwdt {
             .int_ena_rtc
             .modify(|_, w| w.wdt_int_ena().set_bit());
 
-        #[cfg(any(esp32c3, esp32s3))]
+        #[cfg(any(esp32c2, esp32c3, esp32s3))]
         rtc_cntl
             .int_ena_rtc
             .modify(|_, w| w.rtc_wdt_int_ena().set_bit());
@@ -528,7 +529,7 @@ impl Rwdt {
             .int_ena_rtc
             .modify(|_, w| w.wdt_int_ena().clear_bit());
 
-        #[cfg(any(esp32c3, esp32s3))]
+        #[cfg(any(esp32c2, esp32c3, esp32s3))]
         rtc_cntl
             .int_ena_rtc
             .modify(|_, w| w.rtc_wdt_int_ena().clear_bit());

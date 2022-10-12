@@ -20,12 +20,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        toolchain: [stable, nightly]
         include:
           - chip: esp32c2
             features: "eh1,ufmt"
+            toolchain: stable
+          - chip: esp32c2
+            features: "eh1,ufmt"
+            toolchain: nightly
           - chip: esp32c3
             features: "eh1,smartled,ufmt"
+            toolchain: stable
+          - chip: esp32c3
+            features: "eh1,smartled,ufmt"
+            toolchain: nightly
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
