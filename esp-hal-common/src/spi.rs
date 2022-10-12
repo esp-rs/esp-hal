@@ -396,7 +396,7 @@ mod ehal1 {
         }
 
         pub fn add_device<'a, CS: OutputPin>(&'a self, cs: CS) -> SpiBusDevice<'a, I, CS> {
-            SpiBusDevice { bus: self, cs }
+            SpiBusDevice::new(self, cs)
         }
     }
 
