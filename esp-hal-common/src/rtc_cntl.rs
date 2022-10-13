@@ -10,9 +10,10 @@ use crate::{
 };
 
 #[cfg_attr(esp32, path = "rtc/esp32.rs")]
+#[cfg_attr(esp32c2, path = "rtc/esp32c2.rs")]
+#[cfg_attr(esp32c3, path = "rtc/esp32c3.rs")]
 #[cfg_attr(esp32s2, path = "rtc/esp32s2.rs")]
 #[cfg_attr(esp32s3, path = "rtc/esp32s3.rs")]
-#[cfg_attr(esp32c3, path = "rtc/esp32c3.rs")]
 mod rtc;
 
 #[allow(unused)]
@@ -31,7 +32,7 @@ impl Clock for RtcFastClock {
             RtcFastClock::RtcFastClockXtalD4 => HertzU32::Hz(40_000_000 / 4),
             #[cfg(any(esp32, esp32s2))]
             RtcFastClock::RtcFastClock8m => HertzU32::Hz(8_500_000),
-            #[cfg(any(esp32c3, esp32s3))]
+            #[cfg(any(esp32c2, esp32c3, esp32s3))]
             RtcFastClock::RtcFastClock8m => HertzU32::Hz(17_500_000),
         }
     }
@@ -56,12 +57,12 @@ impl Clock for RtcSlowClock {
             RtcSlowClock::RtcSlowClockRtc => HertzU32::Hz(150_000),
             #[cfg(esp32s2)]
             RtcSlowClock::RtcSlowClockRtc => HertzU32::Hz(90_000),
-            #[cfg(any(esp32c3, esp32s3))]
+            #[cfg(any(esp32c2, esp32c3, esp32s3))]
             RtcSlowClock::RtcSlowClockRtc => HertzU32::Hz(136_000),
             RtcSlowClock::RtcSlowClock32kXtal => HertzU32::Hz(32768),
             #[cfg(any(esp32, esp32s2))]
             RtcSlowClock::RtcSlowClock8mD256 => HertzU32::Hz(8_500_000 / 256),
-            #[cfg(any(esp32c3, esp32s3))]
+            #[cfg(any(esp32c2, esp32c3, esp32s3))]
             RtcSlowClock::RtcSlowClock8mD256 => HertzU32::Hz(17_500_000 / 256),
         }
     }
@@ -85,7 +86,7 @@ pub(crate) enum RtcCalSel {
 pub struct Rtc {
     _inner: RTC_CNTL,
     pub rwdt: Rwdt,
-    #[cfg(any(esp32c3, esp32s3))]
+    #[cfg(any(esp32c2, esp32c3, esp32s3))]
     pub swd: Swd,
 }
 
@@ -97,7 +98,7 @@ impl Rtc {
         Self {
             _inner: rtc_cntl,
             rwdt: Rwdt::default(),
-            #[cfg(any(esp32c3, esp32s3))]
+            #[cfg(any(esp32c2, esp32c3, esp32s3))]
             swd: Swd::new(),
         }
     }
@@ -109,6 +110,7 @@ impl Rtc {
 
 /// RTC Watchdog Timer
 pub struct RtcClock;
+
 /// RTC Watchdog Timer driver
 impl RtcClock {
     const CAL_FRACT: u32 = 19;
@@ -173,7 +175,7 @@ impl RtcClock {
             40 => XtalClock::RtcXtalFreq40M,
             #[cfg(any(esp32c3, esp32s3))]
             32 => XtalClock::RtcXtalFreq32M,
-            #[cfg(esp32)]
+            #[cfg(any(esp32, esp32c2))]
             26 => XtalClock::RtcXtalFreq26M,
             #[cfg(esp32)]
             24 => XtalClock::RtcXtalFreq24M,
@@ -499,7 +501,7 @@ impl Rwdt {
             .int_ena_rtc
             .modify(|_, w| w.wdt_int_ena().set_bit());
 
-        #[cfg(any(esp32c3, esp32s3))]
+        #[cfg(any(esp32c2, esp32c3, esp32s3))]
         rtc_cntl
             .int_ena_rtc
             .modify(|_, w| w.rtc_wdt_int_ena().set_bit());
@@ -527,7 +529,7 @@ impl Rwdt {
             .int_ena_rtc
             .modify(|_, w| w.wdt_int_ena().clear_bit());
 
-        #[cfg(any(esp32c3, esp32s3))]
+        #[cfg(any(esp32c2, esp32c3, esp32s3))]
         rtc_cntl
             .int_ena_rtc
             .modify(|_, w| w.rtc_wdt_int_ena().clear_bit());
@@ -546,7 +548,7 @@ impl Rwdt {
         #[cfg(esp32s2)]
         rtc_cntl.int_clr_rtc.write(|w| w.wdt_int_clr().set_bit());
 
-        #[cfg(any(esp32c3, esp32s3))]
+        #[cfg(any(esp32c2, esp32c3, esp32s3))]
         rtc_cntl
             .int_clr_rtc
             .write(|w| w.rtc_wdt_int_clr().set_bit());
@@ -562,7 +564,7 @@ impl Rwdt {
                 rtc_cntl.int_st.read().wdt_int_st().bit_is_set()
             } else if #[cfg(esp32s2)] {
                 rtc_cntl.int_st_rtc.read().wdt_int_st().bit_is_set()
-            } else if #[cfg(any(esp32c3, esp32s3))] {
+            } else if #[cfg(any(esp32c2, esp32c3, esp32s3))] {
                 rtc_cntl.int_st_rtc.read().rtc_wdt_int_st().bit_is_set()
             }
         }
@@ -649,11 +651,11 @@ impl Watchdog for Rwdt {
     }
 }
 
-#[cfg(any(esp32c3, esp32s3))]
+#[cfg(any(esp32c2, esp32c3, esp32s3))]
 /// Super Watchdog
 pub struct Swd;
 
-#[cfg(any(esp32c3, esp32s3))]
+#[cfg(any(esp32c2, esp32c3, esp32s3))]
 /// Super Watchdog driver
 impl Swd {
     pub fn new() -> Self {
@@ -671,7 +673,7 @@ impl Swd {
     }
 }
 
-#[cfg(any(esp32c3, esp32s3))]
+#[cfg(any(esp32c2, esp32c3, esp32s3))]
 impl WatchdogDisable for Swd {
     fn disable(&mut self) {
         let rtc_cntl = unsafe { &*RTC_CNTL::ptr() };

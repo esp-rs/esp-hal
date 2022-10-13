@@ -20,8 +20,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        chip: [esp32c3]
-        toolchain: [stable, nightly]
+        include:
+          - chip: esp32c2
+            features: "eh1,ufmt"
+            toolchain: stable
+          - chip: esp32c2
+            features: "eh1,ufmt"
+            toolchain: nightly
+          - chip: esp32c3
+            features: "eh1,smartled,ufmt"
+            toolchain: stable
+          - chip: esp32c3
+            features: "eh1,smartled,ufmt"
+            toolchain: nightly
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -34,7 +45,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: check
-          args: --examples --manifest-path=${{ matrix.chip }}-hal/Cargo.toml --target=riscv32imc-unknown-none-elf --features=eh1,smartled,ufmt
+          args: --examples --manifest-path=${{ matrix.chip }}-hal/Cargo.toml --target=riscv32imc-unknown-none-elf --features=${{ matrix.features }}
 
   check-xtensa:
     name: Check Xtensa Examples
@@ -65,7 +76,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        chip: [esp32c3]
+        chip: [esp32c2, esp32c3]
         toolchain: [stable, nightly]
     steps:
       - uses: actions/checkout@v2
@@ -111,7 +122,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        chip: [esp32c3]
+        include:
+          - chip: esp32c2
+            features: "eh1,ufmt"
+          - chip: esp32c3
+            features: "eh1,smartled,ufmt"
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -124,7 +139,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: check
-          args: --manifest-path=${{ matrix.chip }}-hal/Cargo.toml --target=riscv32imc-unknown-none-elf --features=eh1,smartled,ufmt
+          args: --manifest-path=${{ matrix.chip }}-hal/Cargo.toml --target=riscv32imc-unknown-none-elf --features=${{ matrix.features }}
 
   msrv-xtensa:
     name: Check Xtensa MSRV

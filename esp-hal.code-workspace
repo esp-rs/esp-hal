@@ -1,31 +1,34 @@
 {
-	"folders": [
-		{
-			"path": "esp-hal-common"
-		},
-		{
-			"path": "esp32-hal"
-		},
-		{
-			"path": "esp32c3-hal"
-		},
-		{
-			"path": "esp32s2-hal"
-		},
-		{
-			"path": "esp32s3-hal"
-		},
-		{
-			"path": "esp-hal-procmacros"
-		}
-	],
-	"settings": {
-		"editor.formatOnSave": true,
-		"rust-analyzer.checkOnSave.allTargets": false,
-		"rust-analyzer.imports.granularity.enforce": true,
-		"rust-analyzer.imports.granularity.group": "crate",
-		"rust-analyzer.cargo.buildScripts.enable": true,
-		"rust-analyzer.procMacro.attributes.enable": true,
-		"rust-analyzer.procMacro.enable": true,
-	}
+  "folders": [
+    {
+      "path": "esp-hal-common"
+    },
+    {
+      "path": "esp-hal-procmacros"
+    },
+    {
+      "path": "esp32-hal"
+    },
+    {
+      "path": "esp32c2-hal"
+    },
+    {
+      "path": "esp32c3-hal"
+    },
+    {
+      "path": "esp32s2-hal"
+    },
+    {
+      "path": "esp32s3-hal"
+    }
+  ],
+  "settings": {
+    "editor.formatOnSave": true,
+    "rust-analyzer.checkOnSave.allTargets": false,
+    "rust-analyzer.imports.granularity.enforce": true,
+    "rust-analyzer.imports.granularity.group": "crate",
+    "rust-analyzer.cargo.buildScripts.enable": true,
+    "rust-analyzer.procMacro.attributes.enable": true,
+    "rust-analyzer.procMacro.enable": true
+  }
 }

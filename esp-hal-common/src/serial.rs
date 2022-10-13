@@ -551,7 +551,7 @@ where
         self
     }
 
-    #[cfg(any(esp32c3, esp32s3))]
+    #[cfg(any(esp32c2, esp32c3, esp32s3))]
     fn change_baud(&self, baudrate: u32, clocks: &Clocks) {
         // we force the clock source to be APB and don't use the decimal part of the
         // divider

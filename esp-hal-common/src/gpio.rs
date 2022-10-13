@@ -11,6 +11,7 @@ use crate::pac::GPIO;
 
 #[doc(hidden)]
 #[cfg_attr(esp32, path = "gpio/esp32.rs")]
+#[cfg_attr(esp32c2, path = "gpio/esp32c2.rs")]
 #[cfg_attr(esp32c3, path = "gpio/esp32c3.rs")]
 #[cfg_attr(esp32s2, path = "gpio/esp32s2.rs")]
 #[cfg_attr(esp32s3, path = "gpio/esp32s3.rs")]
@@ -230,7 +231,7 @@ impl InteruptStatusRegisterAccess for SingleCoreInteruptStatusRegisterAccess {
 // interrupt enable bit see
 // https://github.com/espressif/esp-idf/blob/c04803e88b871a4044da152dfb3699cf47354d18/components/hal/esp32s3/include/hal/gpio_ll.h#L32
 // Treating it as SingleCore in the gpio macro makes this work.
-#[cfg(not(any(esp32c3, esp32s2, esp32s3)))]
+#[cfg(not(any(esp32c2, esp32c3, esp32s2, esp32s3)))]
 impl InteruptStatusRegisterAccess for DualCoreInteruptStatusRegisterAccess {
     fn pro_cpu_interrupt_status_read() -> u32 {
         unsafe { &*GPIO::PTR }.pcpu_int.read().bits()
@@ -334,7 +335,7 @@ impl BankGpioRegisterAccess for Bank0GpioRegisterAccess {
 }
 
 #[doc(hidden)]
-#[cfg(not(esp32c3))]
+#[cfg(not(any(esp32c2, esp32c3)))]
 impl BankGpioRegisterAccess for Bank1GpioRegisterAccess {
     fn write_out_en_clear(word: u32) {
         unsafe { &*GPIO::PTR }
@@ -1206,7 +1207,7 @@ pub fn enable_iomux_clk_gate() {
     }
 }
 
-#[cfg(not(esp32c3))]
+#[cfg(not(any(esp32c2, esp32c3)))]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! analog {
@@ -1266,7 +1267,7 @@ macro_rules! analog {
     }
 }
 
-#[cfg(esp32c3)]
+#[cfg(any(esp32c2, esp32c3))]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! analog {

@@ -9,9 +9,11 @@ use embedded_hal::{
 use fugit::{HertzU32, MicrosDurationU64};
 use void::Void;
 
+#[cfg(not(esp32c2))]
+use crate::pac::TIMG1;
 use crate::{
     clock::Clocks,
-    pac::{timg0::RegisterBlock, TIMG0, TIMG1},
+    pac::{timg0::RegisterBlock, TIMG0},
 };
 
 /// Custom timer error type
@@ -29,7 +31,7 @@ where
     T: TimerGroupInstance,
 {
     pub timer0: Timer<Timer0<T>>,
-    #[cfg(not(esp32c3))]
+    #[cfg(not(any(esp32c2, esp32c3)))]
     pub timer1: Timer<Timer1<T>>,
     pub wdt: Wdt<T>,
 }
@@ -45,6 +47,7 @@ impl TimerGroupInstance for TIMG0 {
     }
 }
 
+#[cfg(not(esp32c2))]
 impl TimerGroupInstance for TIMG1 {
     #[inline(always)]
     fn register_block() -> *const RegisterBlock {
@@ -64,7 +67,7 @@ where
             clocks.apb_clock,
         );
 
-        #[cfg(not(esp32c3))]
+        #[cfg(not(any(esp32c2, esp32c3)))]
         let timer1 = Timer::new(
             Timer1 {
                 phantom: PhantomData::default(),
@@ -76,7 +79,7 @@ where
 
         Self {
             timer0,
-            #[cfg(not(esp32c3))]
+            #[cfg(not(any(esp32c2, esp32c3)))]
             timer1,
             wdt,
         }
@@ -298,13 +301,13 @@ where
     }
 }
 
-#[cfg(not(esp32c3))]
+#[cfg(not(any(esp32c2, esp32c3)))]
 pub struct Timer1<TG> {
     phantom: PhantomData<TG>,
 }
 
 /// Timer peripheral instance
-#[cfg(not(esp32c3))]
+#[cfg(not(any(esp32c2, esp32c3)))]
 impl<TG> Instance for Timer1<TG>
 where
     TG: TimerGroupInstance,
@@ -597,7 +600,7 @@ where
                 .bits(0)
         });
 
-        #[cfg(esp32c3)]
+        #[cfg(any(esp32c2, esp32c3))]
         reg_block
             .wdtconfig0
             .modify(|_, w| w.wdt_conf_update_en().set_bit());

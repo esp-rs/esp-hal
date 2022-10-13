@@ -1,9 +1,10 @@
 #[cfg_attr(esp32, path = "adc/esp32.rs")]
+#[cfg_attr(esp32c2, path = "adc/esp32c2.rs")]
+#[cfg_attr(esp32c3, path = "adc/esp32c3.rs")]
 #[cfg_attr(esp32s2, path = "adc/esp32s2.rs")]
 #[cfg_attr(esp32s3, path = "adc/esp32s3.rs")]
-#[cfg_attr(esp32c3, path = "adc/esp32c3.rs")]
 pub mod adc;
-#[cfg(not(any(esp32c3, esp32s3)))]
+#[cfg(not(any(esp32c2, esp32c3, esp32s3)))]
 pub mod dac;
 
 cfg_if::cfg_if! {
@@ -90,6 +91,37 @@ cfg_if::cfg_if! {
                         _private: PhantomData,
                     },
                     adc2: ADC2 {
+                        _private: PhantomData,
+                    },
+                }
+            }
+        }
+    }
+}
+
+cfg_if::cfg_if! {
+    if #[cfg(esp32c2)] {
+        use core::marker::PhantomData;
+
+        use crate::pac::APB_SARADC;
+
+        pub struct ADC1 {
+            _private: PhantomData<()>,
+        }
+
+        pub struct AvailableAnalog {
+            pub adc1: ADC1,
+        }
+
+        /// Extension trait to split a APB_SARADC peripheral in independent parts
+        pub trait SarAdcExt {
+            fn split(self) -> AvailableAnalog;
+        }
+
+        impl SarAdcExt for APB_SARADC {
+            fn split(self) -> AvailableAnalog {
+                AvailableAnalog {
+                    adc1: ADC1 {
                         _private: PhantomData,
                     },
                 }
