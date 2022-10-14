@@ -130,8 +130,8 @@ where
     }
 
     /// Read current raw timer value in timer ticks
-    pub fn read_raw(&self) -> u64 {
-        self.timg.read_raw()
+    pub fn now(&self) -> u64 {
+        self.timg.now()
     }
 }
 
@@ -159,7 +159,7 @@ pub trait Instance {
 
     fn clear_interrupt(&mut self);
 
-    fn read_raw(&self) -> u64;
+    fn now(&self) -> u64;
 
     fn divider(&self) -> u32;
 
@@ -267,7 +267,7 @@ where
         reg_block.int_clr_timers.write(|w| w.t0_int_clr().set_bit());
     }
 
-    fn read_raw(&self) -> u64 {
+    fn now(&self) -> u64 {
         let reg_block = unsafe { &*TG::register_block() };
 
         reg_block.t0update.write(|w| unsafe { w.bits(0) });
@@ -404,7 +404,7 @@ where
         reg_block.int_clr_timers.write(|w| w.t1_int_clr().set_bit());
     }
 
-    fn read_raw(&self) -> u64 {
+    fn now(&self) -> u64 {
         let reg_block = unsafe { &*TG::register_block() };
 
         reg_block.t1update.write(|w| unsafe { w.bits(0) });

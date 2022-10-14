@@ -37,6 +37,11 @@ riscv-rt         = { version = "0.9.0", optional = true }
 [dev-dependencies]
 critical-section  = "1.1.0"
 embedded-graphics = "0.7.1"
+embassy-executor  = { package = "embassy-executor", git = "https://github.com/embassy-rs/embassy/", rev = "92ed957", features = ["nightly", "integrated-timers"] }
+embassy-sync       = { package = "embassy-sync", git = "https://github.com/embassy-rs/embassy/", rev = "92ed957"}
+embassy-time       = { package = "embassy-time", git = "https://github.com/embassy-rs/embassy/", rev = "92ed957", features = ["nightly", "tick-16mhz"] }
+embedded-hal-async = { version = "0.1.0-alpha.1"}
+static_cell        = "1.0.0"
 esp-backtrace     = { version = "0.2.0", features = ["esp32c3", "panic-handler", "exception-handler", "print-uart"] }
 esp-println       = { version = "0.3.0", features = ["esp32c3"] }
 smart-leds        = "0.3.0"
@@ -52,6 +57,9 @@ smartled          = ["esp-hal-common/smartled"]
 ufmt              = ["esp-hal-common/ufmt"]
 vectored          = ["esp-hal-common/vectored"]
 allow-opt-level-z = []
+async = ["esp-hal-common/async"]
+embassy = ["esp-hal-common/embassy"]
+embassy-time-systick = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-16mhz"]
 
 [[example]]
 name              = "hello_rgb"
