@@ -232,5 +232,5 @@ pub(crate) fn esp32c3_rtc_apb_freq_update(apb_freq: ApbClock) {
 
     rtc_cntl
         .store5
-        .modify(|_, w| unsafe { w.rtc_scratch5().bits(value) });
+        .modify(|_, w| unsafe { w.scratch5().bits(value) });
 }
