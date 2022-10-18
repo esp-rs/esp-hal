@@ -583,6 +583,7 @@ where
             .wdtconfig2
             .write(|w| unsafe { w.wdt_stg0_hold().bits(timeout_raw) });
 
+        #[cfg_attr(esp32, allow(unused_unsafe))]
         reg_block.wdtconfig0.write(|w| unsafe {
             w.wdt_en()
                 .bit(true)

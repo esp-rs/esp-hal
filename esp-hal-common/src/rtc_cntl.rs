@@ -495,16 +495,10 @@ impl Rwdt {
 
         #[cfg(esp32)]
         rtc_cntl.int_ena.modify(|_, w| w.wdt_int_ena().set_bit());
-
-        #[cfg(esp32s2)]
+        #[cfg(not(esp32))]
         rtc_cntl
             .int_ena_rtc
             .modify(|_, w| w.wdt_int_ena().set_bit());
-
-        #[cfg(any(esp32c2, esp32c3, esp32s3))]
-        rtc_cntl
-            .int_ena_rtc
-            .modify(|_, w| w.rtc_wdt_int_ena().set_bit());
 
         self.set_write_protection(true);
     }
@@ -523,16 +517,10 @@ impl Rwdt {
 
         #[cfg(esp32)]
         rtc_cntl.int_ena.modify(|_, w| w.wdt_int_ena().clear_bit());
-
-        #[cfg(esp32s2)]
+        #[cfg(not(esp32))]
         rtc_cntl
             .int_ena_rtc
             .modify(|_, w| w.wdt_int_ena().clear_bit());
-
-        #[cfg(any(esp32c2, esp32c3, esp32s3))]
-        rtc_cntl
-            .int_ena_rtc
-            .modify(|_, w| w.rtc_wdt_int_ena().clear_bit());
 
         self.set_write_protection(true);
     }
@@ -544,14 +532,8 @@ impl Rwdt {
 
         #[cfg(esp32)]
         rtc_cntl.int_clr.write(|w| w.wdt_int_clr().set_bit());
-
-        #[cfg(esp32s2)]
+        #[cfg(not(esp32))]
         rtc_cntl.int_clr_rtc.write(|w| w.wdt_int_clr().set_bit());
-
-        #[cfg(any(esp32c2, esp32c3, esp32s3))]
-        rtc_cntl
-            .int_clr_rtc
-            .write(|w| w.rtc_wdt_int_clr().set_bit());
 
         self.set_write_protection(true);
     }
@@ -562,10 +544,8 @@ impl Rwdt {
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
                 rtc_cntl.int_st.read().wdt_int_st().bit_is_set()
-            } else if #[cfg(esp32s2)] {
+            } else {
                 rtc_cntl.int_st_rtc.read().wdt_int_st().bit_is_set()
-            } else if #[cfg(any(esp32c2, esp32c3, esp32s3))] {
-                rtc_cntl.int_st_rtc.read().rtc_wdt_int_st().bit_is_set()
             }
         }
     }

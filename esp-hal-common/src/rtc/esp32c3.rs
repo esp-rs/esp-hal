@@ -237,7 +237,7 @@ fn rtc_sleep_pu() {
     rtc_cntl.dig_pwc.modify(|_, w| {
         w.lslp_mem_force_pu()
             .clear_bit()
-            .rtc_fastmem_force_lpu()
+            .fastmem_force_lpu()
             .clear_bit()
     });
 

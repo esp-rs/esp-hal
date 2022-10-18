@@ -702,16 +702,16 @@ macro_rules! impl_input {
                 unsafe {
                     (&*GPIO::PTR).pin[$pin_num].modify(|_, w|
                         w
-                            .pin_int_ena().bits(crate::gpio_intr_enable(int_enable, nmi_enable))
-                            .pin_int_type().bits(event as u8)
-                            .pin_wakeup_enable().bit(wake_up_from_light_sleep)
+                            .int_ena().bits(crate::gpio_intr_enable(int_enable, nmi_enable))
+                            .int_type().bits(event as u8)
+                            .wakeup_enable().bit(wake_up_from_light_sleep)
                     );
                 }
             }
 
             fn unlisten(&mut self) {
                 unsafe { (&*GPIO::PTR).pin[$pin_num].modify(|_, w|
-                    w.pin_int_ena().bits(0).pin_int_type().bits(0).pin_int_ena().bits(0) );
+                    w.int_ena().bits(0).int_type().bits(0).int_ena().bits(0) );
                 }
             }
 
@@ -858,7 +858,7 @@ macro_rules! impl_output {
                 let iomux = unsafe { &*IO_MUX::PTR };
 
                 self.write_out_en_set(1 << $bit);
-                gpio.pin[$pin_num].modify(|_, w| w.pin_pad_driver().bit(open_drain));
+                gpio.pin[$pin_num].modify(|_, w| w.pad_driver().bit(open_drain));
 
                 gpio.func_out_sel_cfg[$pin_num]
                     .modify(|_, w| unsafe { w.out_sel().bits(OutputSignal::GPIO as OutputSignalType) });
@@ -941,7 +941,7 @@ macro_rules! impl_output {
             }
 
             fn enable_open_drain(&mut self, on: bool) -> &mut Self {
-                unsafe { &*GPIO::PTR }.pin[$pin_num].modify(|_, w| w.pin_pad_driver().bit(on));
+                unsafe { &*GPIO::PTR }.pin[$pin_num].modify(|_, w| w.pad_driver().bit(on));
                 self
             }
 
@@ -1234,7 +1234,7 @@ macro_rules! analog {
                         rtcio.enable_w1tc.write(|w| unsafe { w.enable_w1tc().bits(1 << $pin_num) });
 
                         // disable open drain
-                        rtcio.pin[$pin_num].modify(|_,w| w.pin_pad_driver().bit(false));
+                        rtcio.pin[$pin_num].modify(|_,w| w.pad_driver().bit(false));
 
                         paste! {
                             rtcio.$pin_reg.modify(|_,w| {
