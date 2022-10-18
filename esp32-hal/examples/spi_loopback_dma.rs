@@ -1,10 +1,10 @@
 //! SPI loopback test using DMA
 //!
 //! Folowing pins are used:
-//! SCLK    GPIO6
-//! MISO    GPIO2
-//! MOSI    GPIO7
-//! CS      GPIO10
+//! SCLK    GPIO19
+//! MISO    GPIO25
+//! MOSI    GPIO23
+//! CS      GPIO22
 //!
 //! Depending on your target and the board you are using you have to change the
 //! pins.
@@ -16,12 +16,12 @@
 #![no_std]
 #![no_main]
 
-use esp32c3_hal::{
+use esp32_hal::{
     clock::ClockControl,
     dma::{DmaPriority, DmaTransferRxTx},
-    gdma::Gdma,
     gpio::IO,
     pac::Peripherals,
+    pdma::Dma,
     prelude::*,
     spi::{dma::WithDmaSpi2, Spi, SpiMode},
     timer::TimerGroup,
@@ -30,35 +30,31 @@ use esp32c3_hal::{
 };
 use esp_backtrace as _;
 use esp_println::println;
-use riscv_rt::entry;
+use xtensa_lx_rt::entry;
 
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take().unwrap();
-    let mut system = peripherals.SYSTEM.split();
+    let mut system = peripherals.DPORT.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     // Disable the watchdog timers. For the ESP32-C3, this includes the Super WDT,
     // the RTC WDT, and the TIMG WDTs.
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    let mut wdt0 = timer_group0.wdt;
-    let timer_group1 = TimerGroup::new(peripherals.TIMG1, &clocks);
-    let mut wdt1 = timer_group1.wdt;
+    let mut wdt = timer_group0.wdt;
 
-    rtc.swd.disable();
+    wdt.disable();
     rtc.rwdt.disable();
-    wdt0.disable();
-    wdt1.disable();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-    let sclk = io.pins.gpio6;
-    let miso = io.pins.gpio2;
-    let mosi = io.pins.gpio7;
-    let cs = io.pins.gpio10;
+    let sclk = io.pins.gpio19;
+    let miso = io.pins.gpio25;
+    let mosi = io.pins.gpio23;
+    let cs = io.pins.gpio22;
 
-    let dma = Gdma::new(peripherals.DMA, &mut system.peripheral_clock_control);
-    let dma_channel = dma.channel0;
+    let dma = Dma::new(system.dma, &mut system.peripheral_clock_control);
+    let dma_channel = dma.spi2channel;
 
     let mut descriptors = [0u32; 8 * 3];
     let mut rx_descriptors = [0u32; 8 * 3];
