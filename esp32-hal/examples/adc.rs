@@ -39,7 +39,8 @@ fn main() -> ! {
     let analog = peripherals.SENS.split();
 
     let mut adc2_config = AdcConfig::new();
-    let mut pin25 = adc2_config.enable_pin(io.pins.gpio25.into_analog(), Attenuation::Attenuation11dB);
+    let mut pin25 =
+        adc2_config.enable_pin(io.pins.gpio25.into_analog(), Attenuation::Attenuation11dB);
     let mut adc2 = ADC::<ADC2>::adc(analog.adc2, adc2_config).unwrap();
 
     let mut delay = Delay::new(&clocks);

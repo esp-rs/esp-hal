@@ -28,6 +28,8 @@ pub enum Peripheral {
     ApbSarAdc,
     #[cfg(esp32c3)]
     Gdma,
+    #[cfg(esp32)]
+    Dma,
 }
 
 /// Controls the enablement of peripheral clocks.
@@ -92,6 +94,11 @@ impl PeripheralClockControl {
                 perip_clk_en1.modify(|_, w| w.dma_clk_en().set_bit());
                 perip_rst_en1.modify(|_, w| w.dma_rst().clear_bit());
             }
+            #[cfg(esp32)]
+            Peripheral::Dma => {
+                perip_clk_en0.modify(|_, w| w.spi_dma_clk_en().set_bit());
+                perip_rst_en0.modify(|_, w| w.spi_dma_rst().clear_bit());
+            }
         }
     }
 }
@@ -106,12 +113,20 @@ pub struct CpuControl {
     _private: (),
 }
 
+/// Controls the configuration of the chip's clocks.
+#[cfg(esp32)]
+pub struct Dma {
+    _private: (),
+}
+
 /// The SYSTEM/DPORT splitted into it's different logical parts.
 pub struct SystemParts {
     _private: (),
     pub peripheral_clock_control: PeripheralClockControl,
     pub clock_control: SystemClockControl,
     pub cpu_control: CpuControl,
+    #[cfg(esp32)]
+    pub dma: Dma,
 }
 
 /// Extension trait to split a SYSTEM/DPORT peripheral in independent logical
@@ -132,6 +147,8 @@ impl SystemExt for SystemPeripheral {
             peripheral_clock_control: PeripheralClockControl { _private: () },
             clock_control: SystemClockControl { _private: () },
             cpu_control: CpuControl { _private: () },
+            #[cfg(esp32)]
+            dma: Dma { _private: () },
         }
     }
 }

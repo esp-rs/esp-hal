@@ -90,6 +90,7 @@ pub mod efuse;
 #[cfg_attr(xtensa, path = "interrupt/xtensa.rs")]
 pub mod interrupt;
 
+#[cfg(any(esp32c3, esp32))]
 pub mod dma;
 
 /// Enumeration of CPU cores
