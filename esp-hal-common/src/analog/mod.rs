@@ -8,7 +8,7 @@ pub mod adc;
 pub mod dac;
 
 cfg_if::cfg_if! {
-    if #[cfg(any(esp32, esp32s2))] {
+    if #[cfg(any(esp32, esp32s2, esp32s3))] {
         use core::marker::PhantomData;
 
         use crate::pac::SENS;
