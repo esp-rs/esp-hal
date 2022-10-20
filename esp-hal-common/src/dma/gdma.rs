@@ -176,7 +176,7 @@ macro_rules! ImplChannel {
                     tx_descriptors: &'a mut [u32],
                     rx_descriptors: &'a mut [u32],
                     priority: DmaPriority,
-                ) -> Channel<ChannelTx<[<Channel $num TxImpl>], [<Channel $num>]>, ChannelRx<[<Channel $num RxImpl>], [<Channel $num>]>, [<SuitablePeripheral $num>]> {
+                ) -> Channel<ChannelTx<'a, [<Channel $num TxImpl>], [<Channel $num>]>, ChannelRx<'a, [<Channel $num RxImpl>], [<Channel $num>]>, [<SuitablePeripheral $num>]> {
                     let mut tx_impl = [<Channel $num TxImpl>] {};
                     tx_impl.init(burst_mode, priority);
 
@@ -221,11 +221,11 @@ pub(crate) mod private {
 
     ImplChannel!(0);
     ImplChannel!(1);
-    ImplChannel!(2);    
+    ImplChannel!(2);
 }
 
 /// GDMA Peripheral
-/// 
+///
 /// This offers the available DMA channels.
 pub struct Gdma {
     _inner: crate::pac::DMA,

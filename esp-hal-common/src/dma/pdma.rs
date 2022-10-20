@@ -209,7 +209,7 @@ pub(crate) mod private {
 }
 
 /// DMA Peripheral
-/// 
+///
 /// This offers the available DMA channels.
 pub struct Dma {
     _inner: crate::system::Dma,
