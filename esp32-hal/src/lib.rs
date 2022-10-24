@@ -27,6 +27,7 @@ pub use esp_hal_common::{
     Rtc,
     Rwdt,
     Serial,
+    embassy,
 };
 
 pub use self::gpio::IO;

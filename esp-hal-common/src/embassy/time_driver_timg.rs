@@ -1,7 +1,6 @@
 use core::cell::RefCell;
 
 use critical_section::{CriticalSection, Mutex};
-use embedded_hal::timer::CountDown;
 use pac::TIMG0;
 
 use super::AlarmState;
@@ -9,11 +8,10 @@ use crate::{
     clock::Clocks,
     pac,
     prelude::*,
-    timer::{Instance, Timer0, TimerGroup},
-    Timer,
+    timer::{Instance, TimerGroup},
 };
 
-pub const ALARM_COUNT: usize = 3;
+pub const ALARM_COUNT: usize = 2;
 
 pub struct EmbassyTimer {
     pub alarms: Mutex<[AlarmState; ALARM_COUNT]>,
@@ -44,7 +42,8 @@ impl EmbassyTimer {
 
     fn on_interrupt(&self, id: u8) {
         critical_section::with(|cs| {
-            let tg = TG.borrow_ref_mut(cs).as_mut().unwrap();
+            let mut tg = TG.borrow_ref_mut(cs);
+            let tg = tg.as_mut().unwrap();
             match id {
                 0 => tg.timer0.clear_interrupt(),
                 1 => tg.timer1.clear_interrupt(),
@@ -57,7 +56,11 @@ impl EmbassyTimer {
     pub(crate) fn init(clocks: &Clocks) {
         use crate::{interrupt, interrupt::Priority};
 
-        let tg = TimerGroup::new(unsafe { pac::Peripherals::steal().TIMG0 }, clocks);
+        // TODO can we avoid this steal in the future...
+        let mut tg = TimerGroup::new(unsafe { pac::Peripherals::steal().TIMG0 }, clocks);
+        // set divider to get a 1mhz clock. abp (80mhz) / 80 = 1mhz... // TODO assert abp clock is the source and its at the correct speed for the divider
+        tg.timer0.set_divider(clocks.apb_clock.to_MHz() as u16);
+        tg.timer1.set_divider(clocks.apb_clock.to_MHz() as u16);
 
         critical_section::with(|cs| TG.borrow_ref_mut(cs).replace(tg));
 
@@ -86,7 +89,8 @@ impl EmbassyTimer {
             let alarm_state = unsafe { self.alarms.borrow(cs).get_unchecked(alarm.id() as usize) };
             alarm_state.timestamp.set(timestamp);
 
-            let tg = TG.borrow_ref_mut(cs).as_mut().unwrap();
+            let mut tg = TG.borrow_ref_mut(cs);
+            let tg = tg.as_mut().unwrap();
             match alarm.id() {
                 0 => {
                     tg.timer0.load_alarm_value(timestamp);

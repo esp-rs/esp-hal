@@ -5,7 +5,7 @@
 use embassy_executor::Executor;
 use embassy_time::{Duration, Timer};
 
-use esp32c3_hal::{
+use esp32s2_hal::{
     clock::ClockControl,
     prelude::*,
     timer::TimerGroup,
@@ -32,7 +32,7 @@ async fn run2() {
 
 static EXECUTOR: StaticCell<Executor> = StaticCell::new();
 
-#[riscv_rt::entry]
+#[xtensa_lx_rt::entry]
 fn main() -> ! {
     esp_println::println!("Init!");
     let peripherals = Peripherals::take().unwrap();

@@ -1,6 +1,6 @@
 //! General-purpose timers
 
-use core::marker::PhantomData;
+use core::{marker::PhantomData, ops::{Deref, DerefMut}};
 
 use embedded_hal::{
     timer::{Cancel, CountDown, Periodic},
@@ -108,32 +108,22 @@ where
     pub fn free(self) -> T {
         self.timg
     }
+}
 
-    /// Listen for interrupt
-    pub fn listen(&mut self) {
-        self.timg.listen();
-    }
-
-    /// Stop listening for interrupt
-    pub fn unlisten(&mut self) {
-        self.timg.unlisten();
-    }
-
-    /// Clear interrupt status
-    pub fn clear_interrupt(&mut self) {
-        self.timg.clear_interrupt();
-    }
-
-    /// Check if the interrupt is asserted
-    pub fn is_interrupt_set(&self) -> bool {
-        self.timg.is_interrupt_set()
-    }
-
-    /// Read current raw timer value in timer ticks
-    pub fn now(&self) -> u64 {
-        self.timg.now()
+impl<T> Deref for Timer<T> where T: Instance {
+    type Target = T;
+    
+    fn deref(&self) -> &Self::Target {
+        &self.timg
     }
 }
+
+impl<T> DerefMut for Timer<T> where T: Instance {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.timg
+    }
+}
+
 
 /// Timer peripheral instance
 pub trait Instance {
@@ -162,6 +152,8 @@ pub trait Instance {
     fn now(&self) -> u64;
 
     fn divider(&self) -> u32;
+
+    fn set_divider(&mut self, divider: u16);
 
     fn is_interrupt_set(&self) -> bool;
 }
@@ -299,6 +291,12 @@ where
 
         reg_block.int_raw_timers.read().t0_int_raw().bit_is_set()
     }
+
+    fn set_divider(&mut self, divider: u16) {
+        let reg_block = unsafe { &*TG::register_block() };
+
+        reg_block.t0config.modify(|_, w| unsafe { w.divider().bits(divider) })
+    }
 }
 
 #[cfg(not(any(esp32c2, esp32c3)))]
@@ -435,6 +433,12 @@ where
         let reg_block = unsafe { &*TG::register_block() };
 
         reg_block.int_raw_timers.read().t1_int_raw().bit_is_set()
+    }
+
+    fn set_divider(&mut self, divider: u16) {
+        let reg_block = unsafe { &*TG::register_block() };
+
+        reg_block.t1config.modify(|_, w| unsafe { w.divider().bits(divider) })
     }
 }
 

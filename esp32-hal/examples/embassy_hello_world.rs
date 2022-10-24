@@ -5,11 +5,11 @@
 use embassy_executor::Executor;
 use embassy_time::{Duration, Timer};
 
-use esp32c3_hal::{
+use esp32_hal::{
     clock::ClockControl,
     prelude::*,
     timer::TimerGroup,
-    Rtc, embassy,
+    Rtc, embassy, pac::Peripherals,
 };
 use esp_backtrace as _;
 use static_cell::StaticCell;
@@ -35,9 +35,10 @@ static EXECUTOR: StaticCell<Executor> = StaticCell::new();
 #[xtensa_lx_rt::entry]
 fn main() -> ! {
     esp_println::println!("Init!");
-    let peripherals = embassy::init();
-    let system = peripherals.SYSTEM.split();
+    let peripherals = Peripherals::take().unwrap();
+    let system = peripherals.DPORT.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    embassy::init(&clocks);
 
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
@@ -46,7 +47,6 @@ fn main() -> ! {
     let mut wdt1 = timer_group1.wdt;
 
     // Disable watchdog timers
-    rtc.swd.disable();
     rtc.rwdt.disable();
     wdt0.disable();
     wdt1.disable();
