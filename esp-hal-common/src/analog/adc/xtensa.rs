@@ -161,7 +161,11 @@ impl RegisterAccess for ADC1 {
 
     fn read_done_sar() -> bool {
         let sensors = unsafe { &*SENS::ptr() };
-        sensors.sar_meas1_ctrl2.read().meas1_done_sar().bit_is_set()
+        sensors.
+            sar_meas1_ctrl2.
+            read().
+            meas1_done_sar().
+            bit_is_set()
     }
 
     fn read_data_sar() -> u16 {
@@ -238,7 +242,11 @@ impl RegisterAccess for ADC2 {
 
     fn read_done_sar() -> bool {
         let sensors = unsafe { &*SENS::ptr() };
-        sensors.sar_meas2_ctrl2.read().meas2_done_sar().bit_is_set()
+        sensors.
+            sar_meas2_ctrl2.
+            read().
+            meas2_done_sar().
+            bit_is_set()
     }
 
     fn read_data_sar() -> u16 {
@@ -287,9 +295,15 @@ where
             .modify(|_, w| w.hall_phase_force().set_bit());
 
         // Set power to SW power on
+        #[cfg(esp32s2)]
         sensors
             .sar_meas1_ctrl1
             .modify(|_, w| w.rtc_saradc_clkgate_en().set_bit());
+
+        #[cfg(esp32s3)]
+        sensors
+            .sar_peri_clk_gate_conf
+            .modify(|_, w| w.saradc_clk_en().set_bit());
 
         sensors
             .sar_power_xpd_sar

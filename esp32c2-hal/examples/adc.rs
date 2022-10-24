@@ -57,7 +57,7 @@ fn main() -> ! {
 
     loop {
         let pin_value: u16 = nb::block!(adc1.read(&mut pin)).unwrap();
-        println!("PIN ADC reading = {}", pin_value);
+        println!("PIN2 ADC reading = {}", pin_value);
         delay.delay_ms(1500u32);
     }
 }

@@ -1,8 +1,8 @@
 #[cfg_attr(esp32, path = "adc/esp32.rs")]
-#[cfg_attr(esp32c2, path = "adc/esp32c2.rs")]
-#[cfg_attr(esp32c3, path = "adc/esp32c3.rs")]
-#[cfg_attr(esp32s2, path = "adc/esp32s2.rs")]
-#[cfg_attr(esp32s3, path = "adc/esp32s3.rs")]
+#[cfg_attr(esp32c2, path = "adc/riscv.rs")]
+#[cfg_attr(esp32c3, path = "adc/riscv.rs")]
+#[cfg_attr(esp32s2, path = "adc/xtensa.rs")]
+#[cfg_attr(esp32s3, path = "adc/xtensa.rs")]
 pub mod adc;
 #[cfg(not(any(esp32c2, esp32c3, esp32s3)))]
 pub mod dac;
