@@ -14,19 +14,41 @@ MEMORY
                   [0x50000000, 0x50002000, "RTC_DRAM"],
                   [0x600FE000, 0x60100000, "MEM_INTERNAL2"]]
     */
+
+    /* The origin values for "metadata" and "ROM" memory regions are the actual
+     * load addresses.
+     *
+     * NOTE: The memory region starting from 0x0 with 0x20 length is reserved
+     * for the MCUboot header, which will be prepended to the binary file by
+     * the "imgtool" during the signing of firmware image.
+     */
+    metadata : ORIGIN = 0x20, LENGTH = 0x20
+    ROM : ORIGIN = 0x40, LENGTH = 0x400000 - 0x40
+
     /* 400K of on soc RAM, 16K reserved for cache */
     ICACHE : ORIGIN = 0x4037C000,  LENGTH = 0x4000
     /* Instruction RAM */
     IRAM : ORIGIN = 0x4037C000 + 0x4000, LENGTH = 400K - 0x4000
     /* Data RAM */
     DRAM : ORIGIN = 0x3FC80000, LENGTH = 0x50000
-    
 
     /* External flash */
     /* Instruction ROM */
     IROM : ORIGIN =   0x42000000, LENGTH = 0x400000
     /* Data ROM */
-    DROM : ORIGIN = 0x3C000000, LENGTH = 0x400000
+    /* The DROM segment origin is offset by 0x40 for mirroring the actual ROM
+     * image layout:
+     *    0x0  - 0x1F : MCUboot header
+     *    0x20 - 0x3F : Application image metadata section
+     *    0x40 onwards: ROM code and data
+     * This is required to meet the following constraint from the external
+     * flash MMU:
+     *    VMA % 64KB == LMA % 64KB
+     * i.e. the lower 16 bits of both the virtual address (address seen by the
+     * CPU) and the load address (physical address of the external flash) must
+     * be equal.
+     */
+    DROM : ORIGIN = 0x3C000000 + 0x40, LENGTH = 0x400000 - 0x40
 
     /* RTC fast memory (executable). Persists over deep sleep. */
     RTC_FAST : ORIGIN = 0x50000000, LENGTH = 0x2000 /*- ESP_BOOTLOADER_RESERVE_RTC*/

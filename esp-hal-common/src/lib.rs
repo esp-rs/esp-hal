@@ -157,11 +157,8 @@ mod critical_section_impl {
         unsafe impl critical_section::Impl for super::CriticalSection {
             unsafe fn acquire() -> critical_section::RawRestoreState {
                 let mut mstatus = 0u32;
-                unsafe {
-                    core::arch::asm!("csrrci {0}, mstatus, 8", inout(reg) mstatus);
-                }
+                core::arch::asm!("csrrci {0}, mstatus, 8", inout(reg) mstatus);
                 let interrupts_active = (mstatus & 0b1000) != 0;
-
                 #[cfg(multi_core)]
                 {
                     let guard = multicore::MULTICORE_LOCK.lock();
