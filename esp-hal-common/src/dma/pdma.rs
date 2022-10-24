@@ -155,8 +155,8 @@ macro_rules! ImplSpiChannel {
                     rx_descriptors: &'a mut [u32],
                     priority: DmaPriority,
                 ) -> Channel<
-                    ChannelTx<[<Spi $num DmaChannelTxImpl>], [<Spi $num DmaChannel>]>,
-                    ChannelRx<[<Spi $num DmaChannelRxImpl>], [<Spi $num DmaChannel>]>,
+                    ChannelTx<'a,[<Spi $num DmaChannelTxImpl>], [<Spi $num DmaChannel>]>,
+                    ChannelRx<'a,[<Spi $num DmaChannelRxImpl>], [<Spi $num DmaChannel>]>,
                     [<Spi $num DmaSuitablePeripheral>],
                 > {
                     let mut tx_impl = [<Spi $num DmaChannelTxImpl>] {};
