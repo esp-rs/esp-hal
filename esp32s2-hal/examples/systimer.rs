@@ -20,6 +20,7 @@ use esp32s2_hal::{
 };
 use esp_backtrace as _;
 use esp_println::println;
+use xtensa_atomic_emulation_trap as _;
 use xtensa_lx_rt::entry;
 
 static ALARM0: Mutex<RefCell<Option<Alarm<Periodic, 0>>>> = Mutex::new(RefCell::new(None));

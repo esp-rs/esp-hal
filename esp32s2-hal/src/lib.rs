@@ -30,6 +30,9 @@ pub use esp_hal_common::{
     Serial,
 };
 
+#[cfg(feature = "embassy")]
+pub use esp_hal_common::embassy;
+
 pub use self::gpio::IO;
 
 pub mod adc;

@@ -19,6 +19,7 @@ use esp32s2_hal::{
 };
 use esp_backtrace as _;
 use esp_println::println;
+use xtensa_atomic_emulation_trap as _;
 use xtensa_lx_rt::entry;
 
 static TIMER00: Mutex<RefCell<Option<Timer<Timer0<TIMG0>>>>> = Mutex::new(RefCell::new(None));

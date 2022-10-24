@@ -4,7 +4,7 @@ use embassy_time::driver::{AlarmHandle, Driver};
 use crate::clock::Clocks;
 
 #[cfg_attr(all(feature = "embassy-time-systick", any(feature = "esp32c3", feature = "esp32s3", feature = "esp32s2")), path = "embassy/time_driver_systimer.rs")]
-#[cfg_attr(all(feature = "embassy-time-timg", any(feature = "esp32", feature = "esp32s3", feature = "esp32s3")), path = "embassy/time_driver_timg.rs")]
+#[cfg_attr(all(feature = "embassy-time-timg", any(feature = "esp32", feature = "esp32s3", feature = "esp32s2")), path = "embassy/time_driver_timg.rs")]
 mod time_driver;
 
 use time_driver::EmbassyTimer;

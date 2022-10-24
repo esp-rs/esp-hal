@@ -12,6 +12,7 @@ use esp32s2_hal::{
     Rtc, embassy, pac::Peripherals,
 };
 use esp_backtrace as _;
+use xtensa_atomic_emulation_trap as _;
 use static_cell::StaticCell;
 
 #[embassy_executor::task]
@@ -47,7 +48,6 @@ fn main() -> ! {
     let mut wdt1 = timer_group1.wdt;
 
     // Disable watchdog timers
-    rtc.swd.disable();
     rtc.rwdt.disable();
     wdt0.disable();
     wdt1.disable();

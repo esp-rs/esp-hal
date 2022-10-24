@@ -24,6 +24,7 @@ use esp32s2_hal::{
 };
 #[allow(unused_imports)]
 use esp_backtrace as _;
+use xtensa_atomic_emulation_trap as _;
 use smart_leds::{
     brightness,
     gamma,

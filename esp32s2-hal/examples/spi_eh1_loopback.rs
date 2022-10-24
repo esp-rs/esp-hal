@@ -29,6 +29,7 @@ use esp32s2_hal::{
 };
 use esp_backtrace as _;
 use esp_println::{print, println};
+use xtensa_atomic_emulation_trap as _;
 use xtensa_lx_rt::entry;
 
 #[entry]

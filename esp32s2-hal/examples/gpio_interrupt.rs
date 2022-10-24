@@ -22,6 +22,7 @@ use esp32s2_hal::{
     Rtc,
 };
 use esp_backtrace as _;
+use xtensa_atomic_emulation_trap as _;
 use xtensa_lx_rt::entry;
 
 static BUTTON: Mutex<RefCell<Option<Gpio0<Input<PullDown>>>>> = Mutex::new(RefCell::new(None));
