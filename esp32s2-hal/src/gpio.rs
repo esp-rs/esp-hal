@@ -83,3 +83,8 @@ analog! {
     Gpio20: (20,  rtc_pad20,     rtc_pad20_hold,   mux_sel,            fun_sel,            fun_ie,            slp_ie,             slp_sel,            rue,            rde,            drv,            slp_oe),
     Gpio21: (21,  rtc_pad21,     rtc_pad21_hold,   mux_sel,            fun_sel,            fun_ie,            slp_ie,             slp_sel,            rue,            rde,            drv,            slp_oe),
 }
+
+// implement marker traits on USB pins
+impl<T> esp_hal_common::otg_fs::UsbSel for Gpio18<T> {}
+impl<T> esp_hal_common::otg_fs::UsbDp for Gpio19<T> {}
+impl<T> esp_hal_common::otg_fs::UsbDm for Gpio20<T> {}

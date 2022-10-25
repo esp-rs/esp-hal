@@ -30,6 +30,8 @@ pub enum Peripheral {
     Gdma,
     #[cfg(any(esp32, esp32s2))]
     Dma,
+    #[cfg(any(esp32s2, esp32s3))]
+    Usb,
 }
 
 /// Controls the enablement of peripheral clocks.
@@ -105,6 +107,11 @@ impl PeripheralClockControl {
                 perip_rst_en0.modify(|_, w| w.spi2_dma_rst().clear_bit());
                 perip_clk_en0.modify(|_, w| w.spi3_dma_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.spi3_dma_rst().clear_bit());
+            }
+            #[cfg(any(esp32s2, esp32s3))]
+            Peripheral::Usb => {
+                perip_clk_en0.modify(|_, w| w.usb_clk_en().set_bit());
+                perip_rst_en0.modify(|_, w| w.usb_rst().clear_bit());
             }
         }
     }

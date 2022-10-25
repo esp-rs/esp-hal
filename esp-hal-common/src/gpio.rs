@@ -418,7 +418,7 @@ pub fn connect_low_to_peripheral(signal: InputSignal) {
             .in_inv_sel()
             .bit(false)
             .in_sel()
-            .bits(0x1f)
+            .bits(ZERO_INPUT)
     });
 }
 
@@ -430,7 +430,7 @@ pub fn connect_high_to_peripheral(signal: InputSignal) {
             .in_inv_sel()
             .bit(false)
             .in_sel()
-            .bits(0x1e)
+            .bits(ONE_INPUT)
     });
 }
 
@@ -1311,4 +1311,4 @@ pub use impl_interrupt_status_register_access;
 pub use impl_output;
 pub use impl_output_wrap;
 
-use self::types::{InputSignal, OutputSignal};
+use self::types::{InputSignal, OutputSignal, ONE_INPUT, ZERO_INPUT};
