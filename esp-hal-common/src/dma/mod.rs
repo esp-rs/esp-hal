@@ -7,7 +7,7 @@ use private::*;
 #[cfg(esp32c3)]
 pub mod gdma;
 
-#[cfg(esp32)]
+#[cfg(any(esp32, esp32s2))]
 pub mod pdma;
 
 /// DMA Errors
@@ -62,7 +62,7 @@ pub enum DmaPeripheral {
 }
 
 /// DMA capable peripherals
-#[cfg(esp32)]
+#[cfg(any(esp32, esp32s2))]
 #[derive(Clone, Copy)]
 pub enum DmaPeripheral {
     Spi2 = 0,
@@ -175,7 +175,7 @@ pub(crate) mod private {
     pub trait Spi2Peripheral: SpiPeripheral + PeripheralMarker {}
 
     /// Marks channels as useable for SPI3
-    #[cfg(esp32)]
+    #[cfg(any(esp32, esp32s2))]
     pub trait Spi3Peripheral: SpiPeripheral + PeripheralMarker {}
 
     /// DMA Rx

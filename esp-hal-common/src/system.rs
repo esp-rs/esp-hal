@@ -28,7 +28,7 @@ pub enum Peripheral {
     ApbSarAdc,
     #[cfg(esp32c3)]
     Gdma,
-    #[cfg(esp32)]
+    #[cfg(any(esp32, esp32s2))]
     Dma,
 }
 
@@ -99,6 +99,13 @@ impl PeripheralClockControl {
                 perip_clk_en0.modify(|_, w| w.spi_dma_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.spi_dma_rst().clear_bit());
             }
+            #[cfg(esp32s2)]
+            Peripheral::Dma => {
+                perip_clk_en0.modify(|_, w| w.spi2_dma_clk_en().set_bit());
+                perip_rst_en0.modify(|_, w| w.spi2_dma_rst().clear_bit());
+                perip_clk_en0.modify(|_, w| w.spi3_dma_clk_en().set_bit());
+                perip_rst_en0.modify(|_, w| w.spi3_dma_rst().clear_bit());
+            }
         }
     }
 }
@@ -113,8 +120,8 @@ pub struct CpuControl {
     _private: (),
 }
 
-/// Controls the configuration of the chip's clocks.
-#[cfg(esp32)]
+/// Dummy DMA peripheral.
+#[cfg(any(esp32, esp32s2))]
 pub struct Dma {
     _private: (),
 }
@@ -125,7 +132,7 @@ pub struct SystemParts {
     pub peripheral_clock_control: PeripheralClockControl,
     pub clock_control: SystemClockControl,
     pub cpu_control: CpuControl,
-    #[cfg(esp32)]
+    #[cfg(any(esp32, esp32s2))]
     pub dma: Dma,
 }
 
@@ -147,7 +154,7 @@ impl SystemExt for SystemPeripheral {
             peripheral_clock_control: PeripheralClockControl { _private: () },
             clock_control: SystemClockControl { _private: () },
             cpu_control: CpuControl { _private: () },
-            #[cfg(esp32)]
+            #[cfg(any(esp32, esp32s2))]
             dma: Dma { _private: () },
         }
     }

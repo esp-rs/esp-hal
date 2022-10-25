@@ -161,7 +161,11 @@ impl RegisterAccess for ADC1 {
 
     fn read_done_sar() -> bool {
         let sensors = unsafe { &*SENS::ptr() };
-        sensors.sar_meas1_ctrl2.read().sar_meas1_done_sar().bit_is_set()
+        sensors
+            .sar_meas1_ctrl2
+            .read()
+            .sar_meas1_done_sar()
+            .bit_is_set()
     }
 
     fn read_data_sar() -> u16 {
@@ -238,7 +242,11 @@ impl RegisterAccess for ADC2 {
 
     fn read_done_sar() -> bool {
         let sensors = unsafe { &*SENS::ptr() };
-        sensors.sar_meas2_ctrl2.read().sar_meas2_done_sar().bit_is_set()
+        sensors
+            .sar_meas2_ctrl2
+            .read()
+            .sar_meas2_done_sar()
+            .bit_is_set()
     }
 
     fn read_data_sar() -> u16 {
