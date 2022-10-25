@@ -13,20 +13,23 @@ macro_rules! ImplSpiChannel {
             impl RegisterAccess for [<Spi $num DmaChannel>] {
                 fn init_channel() {
                     // (only) on ESP32 we need to configure DPORT for the SPI DMA channels
-                    let dport = unsafe { &*crate::pac::DPORT::PTR };
+                    #[cfg(esp32)]
+                    {
+                        let dport = unsafe { &*crate::pac::DPORT::PTR };
 
-                    match $num {
-                        2 => {
-                            dport
-                            .spi_dma_chan_sel
-                            .modify(|_, w| w.spi2_dma_chan_sel().variant(1));
-                        },
-                        3 => {
-                            dport
-                            .spi_dma_chan_sel
-                            .modify(|_, w| w.spi3_dma_chan_sel().variant(2));
-                        },
-                        _ => panic!("Only SPI2 and SPI3 supported"),
+                        match $num {
+                            2 => {
+                                dport
+                                .spi_dma_chan_sel
+                                .modify(|_, w| w.spi2_dma_chan_sel().variant(1));
+                            },
+                            3 => {
+                                dport
+                                .spi_dma_chan_sel
+                                .modify(|_, w| w.spi3_dma_chan_sel().variant(2));
+                            },
+                            _ => panic!("Only SPI2 and SPI3 supported"),
+                        }
                     }
                 }
 

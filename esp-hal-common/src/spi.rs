@@ -50,9 +50,9 @@
 
 use fugit::HertzU32;
 
-#[cfg(any(esp32c3, esp32))]
+#[cfg(any(esp32c3, esp32, esp32s2))]
 use crate::dma::private::{Rx, Tx};
-#[cfg(any(esp32c3, esp32))]
+#[cfg(any(esp32c3, esp32, esp32s2))]
 use crate::dma::{DmaError, DmaPeripheral};
 use crate::{
     clock::Clocks,
@@ -76,13 +76,13 @@ const MAX_DMA_SIZE: usize = 32736;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Error {
-    #[cfg(any(esp32c3, esp32))]
+    #[cfg(any(esp32c3, esp32, esp32s2))]
     DmaError(DmaError),
     MaxDmaTransferSizeExceeded,
     Unknown,
 }
 
-#[cfg(any(esp32c3, esp32))]
+#[cfg(any(esp32c3, esp32, esp32s2))]
 impl From<DmaError> for Error {
     fn from(value: DmaError) -> Self {
         Error::DmaError(value)
@@ -262,16 +262,16 @@ where
     }
 }
 
-#[cfg(any(esp32c3, esp32))]
+#[cfg(any(esp32c3, esp32, esp32s2))]
 pub mod dma {
     use core::mem;
 
     use embedded_dma::{ReadBuffer, WriteBuffer};
 
-    #[cfg(esp32)]
+    #[cfg(any(esp32, esp32s2))]
     use super::Spi3Instance;
     use super::{Instance, InstanceDma, Spi, Spi2Instance, MAX_DMA_SIZE};
-    #[cfg(esp32)]
+    #[cfg(any(esp32, esp32s2))]
     use crate::dma::private::Spi3Peripheral;
     use crate::dma::{
         private::{Rx, Spi2Peripheral, SpiPeripheral, Tx},
@@ -290,7 +290,7 @@ pub mod dma {
         fn with_dma(self, channel: Channel<TX, RX, P>) -> SpiDma<T, TX, RX, P>;
     }
 
-    #[cfg(esp32)]
+    #[cfg(any(esp32, esp32s2))]
     pub trait WithDmaSpi3<T, RX, TX, P>
     where
         T: Instance + Spi3Instance,
@@ -318,7 +318,7 @@ pub mod dma {
         }
     }
 
-    #[cfg(esp32)]
+    #[cfg(any(esp32, esp32s2))]
     impl<T, RX, TX, P> WithDmaSpi3<T, RX, TX, P> for Spi<T>
     where
         T: Instance + Spi3Instance,
@@ -916,7 +916,7 @@ mod ehal1 {
     }
 }
 
-#[cfg(any(esp32c3, esp32))]
+#[cfg(any(esp32c3, esp32, esp32s2))]
 pub trait InstanceDma<TX, RX>: Instance
 where
     TX: Tx,
@@ -1065,7 +1065,7 @@ where
     fn dma_peripheral(&self) -> DmaPeripheral {
         match self.spi_num() {
             2 => DmaPeripheral::Spi2,
-            #[cfg(esp32)]
+            #[cfg(any(esp32, esp32s2))]
             3 => DmaPeripheral::Spi3,
             _ => panic!("Illegal SPI instance"),
         }
@@ -1078,7 +1078,7 @@ where
         reg_block.dma_conf.modify(|_, w| w.dma_rx_ena().set_bit());
     }
 
-    #[cfg(esp32)]
+    #[cfg(any(esp32, esp32s2))]
     fn enable_dma(&self) {
         // for non GDMA this is done in `assign_tx_device` / `assign_rx_device`
     }
@@ -1100,7 +1100,7 @@ where
         });
     }
 
-    #[cfg(esp32)]
+    #[cfg(any(esp32, esp32s2))]
     fn clear_dma_interrupts(&self) {
         let reg_block = self.register_block();
         reg_block.dma_int_clr.write(|w| {
@@ -1126,7 +1126,7 @@ where
     }
 }
 
-#[cfg(any(esp32c3, esp32))]
+#[cfg(any(esp32c3, esp32, esp32s2))]
 impl<TX, RX> InstanceDma<TX, RX> for crate::pac::SPI2
 where
     TX: Tx,
@@ -1134,7 +1134,7 @@ where
 {
 }
 
-#[cfg(any(esp32))]
+#[cfg(any(esp32, esp32s2))]
 impl<TX, RX> InstanceDma<TX, RX> for crate::pac::SPI3
 where
     TX: Tx,
@@ -1706,10 +1706,10 @@ impl Instance for crate::pac::SPI3 {
 
 pub trait Spi2Instance {}
 
-#[cfg(esp32)]
+#[cfg(any(esp32, esp32s2))]
 pub trait Spi3Instance {}
 
 impl Spi2Instance for crate::pac::SPI2 {}
 
-#[cfg(esp32)]
+#[cfg(any(esp32, esp32s2))]
 impl Spi3Instance for crate::pac::SPI3 {}
