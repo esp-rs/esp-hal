@@ -12,18 +12,20 @@ repository   = "https://github.com/esp-rs/esp-hal"
 license      = "MIT OR Apache-2.0"
 
 [dependencies]
-cfg-if           = "1.0.0"
-critical-section = "1.1.0"
-embedded-hal     = { version = "0.2.7", features = ["unproven"] }
-embedded-hal-1   = { version = "=1.0.0-alpha.9", optional = true, package = "embedded-hal" }
-embedded-hal-nb  = { version = "=1.0.0-alpha.1", optional = true }
-fugit            = "0.3.6"
-lock_api         = { version = "0.4.8", optional = true }
-nb               = "1.0.0"
-paste            = "=1.0.8"
-procmacros       = { version = "0.1.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
-void             = { version = "1.0.2", default-features = false }
-embedded-dma     = "0.2.0"
+cfg-if               = "1.0.0"
+critical-section     = "1.1.1"
+embedded-hal         = { version = "0.2.7", features = ["unproven"] }
+embedded-hal-1       = { version = "=1.0.0-alpha.9", optional = true, package = "embedded-hal" }
+embedded-hal-nb      = { version = "=1.0.0-alpha.1", optional = true }
+fugit                = "0.3.6"
+lock_api             = { version = "0.4.8", optional = true }
+nb                   = "1.0.0"
+paste                = "=1.0.8"
+procmacros           = { version = "0.1.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
+void                 = { version = "1.0.2", default-features = false }
+embedded-dma         = "0.2.0"
+esp-synopsys-usb-otg = { version = "0.3.1", optional = true, features = ["fs", "esp32sx"] }
+usb-device           = { version = "0.2.3", optional = true }
 
 # RISC-V
 riscv                       = { version = "0.9.0", optional = true }
@@ -46,15 +48,15 @@ ufmt-write = { version = "0.1.0", optional = true }
 esp32   = { version = "0.14.0", features = ["critical-section"], optional = true }
 esp32c2 = { version = "0.3.0",  features = ["critical-section"], optional = true }
 esp32c3 = { version = "0.6.0",  features = ["critical-section"], optional = true }
-esp32s2 = { version = "0.4.0",  features = ["critical-section"], optional = true }
-esp32s3 = { version = "0.4.0",  features = ["critical-section"], optional = true }
+esp32s2 = { version = "0.5.0",  features = ["critical-section"], optional = true }
+esp32s3 = { version = "0.5.0",  features = ["critical-section"], optional = true }
 
 [features]
 esp32   = ["esp32/rt"  , "procmacros/xtensa", "xtensa-lx-rt/esp32",   "xtensa-lx/esp32",   "critical-section/restore-state-u32", "lock_api"]
 esp32c2 = ["esp32c2/rt", "procmacros/riscv" , "riscv", "riscv-atomic-emulation-trap",      "critical-section/restore-state-u8"]
 esp32c3 = ["esp32c3/rt", "procmacros/riscv" , "riscv", "riscv-atomic-emulation-trap",      "critical-section/restore-state-u8"]
-esp32s2 = ["esp32s2/rt", "procmacros/xtensa", "xtensa-lx-rt/esp32s2", "xtensa-lx/esp32s2", "critical-section/restore-state-u32"]
-esp32s3 = ["esp32s3/rt", "procmacros/xtensa", "xtensa-lx-rt/esp32s3", "xtensa-lx/esp32s3", "critical-section/restore-state-u32", "lock_api"]
+esp32s2 = ["esp32s2/rt", "procmacros/xtensa", "xtensa-lx-rt/esp32s2", "xtensa-lx/esp32s2", "critical-section/restore-state-u32", "esp-synopsys-usb-otg", "usb-device"]
+esp32s3 = ["esp32s3/rt", "procmacros/xtensa", "xtensa-lx-rt/esp32s3", "xtensa-lx/esp32s3", "critical-section/restore-state-u32", "lock_api", "esp-synopsys-usb-otg", "usb-device"]
 
 # Implement the `embedded-hal==1.0.0-alpha.x` traits
 eh1 = ["embedded-hal-1", "embedded-hal-nb"]

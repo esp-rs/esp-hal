@@ -91,6 +91,9 @@ pub mod efuse;
 #[cfg_attr(xtensa, path = "interrupt/xtensa.rs")]
 pub mod interrupt;
 
+#[cfg(any(esp32s3, esp32s2))]
+pub mod otg_fs;
+
 /// Enumeration of CPU cores
 /// The actual number of available cores depends on the target.
 pub enum Cpu {

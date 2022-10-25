@@ -2,6 +2,9 @@ pub type OutputSignalType = u16;
 pub const OUTPUT_SIGNAL_MAX: u16 = 548;
 pub const INPUT_SIGNAL_MAX: u16 = 539;
 
+pub const ONE_INPUT: u8 = 0x38;
+pub const ZERO_INPUT: u8 = 0x30;
+
 /// Peripheral input signals for the GPIO mux
 #[allow(non_camel_case_types)]
 #[derive(PartialEq, Copy, Clone)]

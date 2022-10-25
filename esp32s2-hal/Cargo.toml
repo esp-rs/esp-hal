@@ -39,6 +39,8 @@ esp-backtrace     = { version = "0.2.0", features = ["esp32s2", "panic-handler",
 esp-println       = { version = "0.3.0", features = ["esp32s2"] }
 smart-leds        = "0.3.0"
 ssd1306           = "0.7.1"
+usb-device        = { version = "0.2.3" }
+usbd-serial       = "0.1.1"
 
 [features]
 default   = ["rt", "vectored"]
