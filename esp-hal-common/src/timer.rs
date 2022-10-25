@@ -1,6 +1,9 @@
 //! General-purpose timers
 
-use core::{marker::PhantomData, ops::{Deref, DerefMut}};
+use core::{
+    marker::PhantomData,
+    ops::{Deref, DerefMut},
+};
 
 use embedded_hal::{
     timer::{Cancel, CountDown, Periodic},
@@ -110,20 +113,25 @@ where
     }
 }
 
-impl<T> Deref for Timer<T> where T: Instance {
+impl<T> Deref for Timer<T>
+where
+    T: Instance,
+{
     type Target = T;
-    
+
     fn deref(&self) -> &Self::Target {
         &self.timg
     }
 }
 
-impl<T> DerefMut for Timer<T> where T: Instance {
+impl<T> DerefMut for Timer<T>
+where
+    T: Instance,
+{
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.timg
     }
 }
-
 
 /// Timer peripheral instance
 pub trait Instance {
@@ -295,7 +303,9 @@ where
     fn set_divider(&mut self, divider: u16) {
         let reg_block = unsafe { &*TG::register_block() };
 
-        reg_block.t0config.modify(|_, w| unsafe { w.divider().bits(divider) })
+        reg_block
+            .t0config
+            .modify(|_, w| unsafe { w.divider().bits(divider) })
     }
 }
 
@@ -438,7 +448,9 @@ where
     fn set_divider(&mut self, divider: u16) {
         let reg_block = unsafe { &*TG::register_block() };
 
-        reg_block.t1config.modify(|_, w| unsafe { w.divider().bits(divider) })
+        reg_block
+            .t1config
+            .modify(|_, w| unsafe { w.divider().bits(divider) })
     }
 }
 

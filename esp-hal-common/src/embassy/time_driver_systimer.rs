@@ -2,10 +2,10 @@ use critical_section::{CriticalSection, Mutex};
 
 use super::AlarmState;
 use crate::{
+    clock::Clocks,
     pac,
     systimer::{Alarm, SystemTimer, Target},
 };
-use crate::clock::Clocks;
 
 pub const ALARM_COUNT: usize = 3;
 

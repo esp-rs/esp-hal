@@ -58,7 +58,8 @@ impl EmbassyTimer {
 
         // TODO can we avoid this steal in the future...
         let mut tg = TimerGroup::new(unsafe { pac::Peripherals::steal().TIMG0 }, clocks);
-        // set divider to get a 1mhz clock. abp (80mhz) / 80 = 1mhz... // TODO assert abp clock is the source and its at the correct speed for the divider
+        // set divider to get a 1mhz clock. abp (80mhz) / 80 = 1mhz... // TODO assert
+        // abp clock is the source and its at the correct speed for the divider
         tg.timer0.set_divider(clocks.apb_clock.to_MHz() as u16);
         tg.timer1.set_divider(clocks.apb_clock.to_MHz() as u16);
 

@@ -1,18 +1,36 @@
-
 use core::{cell::Cell, ptr};
+
 use embassy_time::driver::{AlarmHandle, Driver};
+
 use crate::clock::Clocks;
 
-#[cfg_attr(all(feature = "embassy-time-systick", any(feature = "esp32c3", feature = "esp32s3", feature = "esp32s2")), path = "embassy/time_driver_systimer.rs")]
-#[cfg_attr(all(feature = "embassy-time-timg", any(feature = "esp32", feature = "esp32s3", feature = "esp32s2")), path = "embassy/time_driver_timg.rs")]
+#[cfg_attr(
+    all(
+        feature = "embassy-time-systick",
+        any(
+            feature = "esp32c3",
+            feature = "esp32s3",
+            feature = "esp32s2",
+            feature = "esp32c2"
+        )
+    ),
+    path = "embassy/time_driver_systimer.rs"
+)]
+#[cfg_attr(
+    all(
+        feature = "embassy-time-timg",
+        any(feature = "esp32", feature = "esp32s3", feature = "esp32s2")
+    ),
+    path = "embassy/time_driver_timg.rs"
+)]
 mod time_driver;
 
 use time_driver::EmbassyTimer;
 
 pub fn init(clocks: &Clocks) {
     // TODO:
-    // In the future allow taking of &mut Peripheral when we move to the PeripheralRef way of driver initialization,
-    // see: https://github.com/esp-rs/esp-idf-hal/blob/5d1aea58cdda195e20d1489fcba8a8ecb6562d9a/src/peripheral.rs#L94
+    // In the future allow taking of &mut Peripheral when we move to the
+    // PeripheralRef way of driver initialization, see: https://github.com/esp-rs/esp-idf-hal/blob/5d1aea58cdda195e20d1489fcba8a8ecb6562d9a/src/peripheral.rs#L94
 
     EmbassyTimer::init(clocks);
 }

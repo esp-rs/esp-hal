@@ -217,7 +217,6 @@ impl<const CHANNEL: u8> Alarm<Periodic, CHANNEL> {
     }
 }
 
-
 impl<T> Alarm<T, 0> {
     pub const unsafe fn conjure() -> Self {
         Self { _pd: PhantomData }
