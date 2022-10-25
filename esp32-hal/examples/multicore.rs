@@ -69,6 +69,9 @@ fn cpu1_task(
     loop {
         block!(timer.wait()).unwrap();
 
-        critical_section::with(|cs| counter.borrow_ref_mut(cs).wrapping_add(1));
+        critical_section::with(|cs| {
+            let new_val = counter.borrow_ref_mut(cs).wrapping_add(1);
+            *counter.borrow_ref_mut(cs) = new_val;
+        });
     }
 }
