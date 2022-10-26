@@ -1,0 +1,59 @@
+//! Read calibration data from BMP180 sensor
+//!
+//! This example dumps the calibration data from a BMP180 sensor
+//!
+//! The following wiring is assumed:
+//! - SDA => GPIO32
+//! - SCL => GPIO33
+
+#![no_std]
+#![no_main]
+
+use esp32_hal::{
+    clock::ClockControl,
+    gpio::IO,
+    i2c::I2C,
+    pac::Peripherals,
+    prelude::*,
+    timer::TimerGroup,
+    Rtc,
+};
+use esp_backtrace as _;
+use esp_println::println;
+use xtensa_lx_rt::entry;
+
+#[entry]
+fn main() -> ! {
+    let peripherals = Peripherals::take().unwrap();
+    let mut system = peripherals.DPORT.split();
+    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+
+    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let mut wdt = timer_group0.wdt;
+    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
+
+    // Disable watchdog timer
+    wdt.disable();
+    rtc.rwdt.disable();
+
+    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+
+    // Create a new peripheral object with the described wiring
+    // and standard I2C clock speed
+    let mut i2c = I2C::new(
+        peripherals.I2C0,
+        io.pins.gpio32,
+        io.pins.gpio33,
+        100u32.kHz(),
+        &mut system.peripheral_clock_control,
+        &clocks,
+    )
+    .unwrap();
+
+    loop {
+        let mut data = [0u8; 22];
+        i2c.write_read(0x77, &[0xaa], &mut data).ok();
+
+        println!("{:02x?}", data);
+    }
+}
