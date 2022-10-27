@@ -26,7 +26,7 @@ pub enum Peripheral {
     Ledc,
     #[cfg(any(esp32c2, esp32c3))]
     ApbSarAdc,
-    #[cfg(esp32c3)]
+    #[cfg(any(esp32c2, esp32c3))]
     Gdma,
     #[cfg(any(esp32, esp32s2))]
     Dma,
@@ -47,7 +47,7 @@ impl PeripheralClockControl {
         #[cfg(esp32)]
         let (perip_clk_en0, perip_rst_en0) = { (&system.perip_clk_en, &system.perip_rst_en) };
 
-        #[cfg(esp32c3)]
+        #[cfg(any(esp32c2, esp32c3))]
         let (perip_clk_en1, perip_rst_en1) = { (&system.perip_clk_en1, &system.perip_rst_en1) };
 
         match peripheral {
@@ -89,7 +89,7 @@ impl PeripheralClockControl {
                 perip_clk_en0.modify(|_, w| w.apb_saradc_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.apb_saradc_rst().clear_bit());
             }
-            #[cfg(esp32c3)]
+            #[cfg(any(any(esp32c2, esp32c3)))]
             Peripheral::Gdma => {
                 perip_clk_en1.modify(|_, w| w.dma_clk_en().set_bit());
                 perip_rst_en1.modify(|_, w| w.dma_rst().clear_bit());

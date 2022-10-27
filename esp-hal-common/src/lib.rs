@@ -51,6 +51,8 @@ pub use self::{
 pub mod analog;
 pub mod clock;
 pub mod delay;
+#[cfg(any(esp32, esp32c2, esp32c3, esp32s2))]
+pub mod dma;
 pub mod gpio;
 pub mod i2c;
 // FIXME: While the ESP32-C2 *does* have LEDC, it is not currently available in
@@ -89,9 +91,6 @@ pub mod efuse;
 #[cfg_attr(riscv, path = "interrupt/riscv.rs")]
 #[cfg_attr(xtensa, path = "interrupt/xtensa.rs")]
 pub mod interrupt;
-
-#[cfg(any(esp32c3, esp32, esp32s2))]
-pub mod dma;
 
 /// Enumeration of CPU cores
 /// The actual number of available cores depends on the target.

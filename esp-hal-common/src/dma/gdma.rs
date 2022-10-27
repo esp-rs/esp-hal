@@ -220,7 +220,9 @@ pub(crate) mod private {
     use crate::dma::{private::*, *};
 
     ImplChannel!(0);
+    #[cfg(not(esp32c2))]
     ImplChannel!(1);
+    #[cfg(not(esp32c2))]
     ImplChannel!(2);
 }
 
@@ -230,7 +232,9 @@ pub(crate) mod private {
 pub struct Gdma {
     _inner: crate::pac::DMA,
     pub channel0: ChannelCreator0,
+    #[cfg(not(esp32c2))]
     pub channel1: ChannelCreator1,
+    #[cfg(not(esp32c2))]
     pub channel2: ChannelCreator2,
 }
 
@@ -248,7 +252,9 @@ impl Gdma {
         Gdma {
             _inner: dma,
             channel0: ChannelCreator0 {},
+            #[cfg(not(esp32c2))]
             channel1: ChannelCreator1 {},
+            #[cfg(not(esp32c2))]
             channel2: ChannelCreator2 {},
         }
     }

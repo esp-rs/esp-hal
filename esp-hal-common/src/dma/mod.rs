@@ -4,7 +4,7 @@ use core::{marker::PhantomData, sync::atomic::compiler_fence};
 
 use private::*;
 
-#[cfg(esp32c3)]
+#[cfg(any(esp32c2, esp32c3))]
 pub mod gdma;
 
 #[cfg(any(esp32, esp32s2))]
@@ -20,7 +20,7 @@ pub enum DmaError {
 }
 
 /// DMA Priorities
-#[cfg(any(esp32c3, esp32s3))]
+#[cfg(any(esp32c2, esp32c3, esp32s3))]
 #[derive(Clone, Copy)]
 pub enum DmaPriority {
     Priority0  = 0,
@@ -42,10 +42,20 @@ pub enum DmaPriority {
 }
 
 /// DMA Priorities
+/// The values need to match the TRM
 #[cfg(any(esp32, esp32s2))]
 #[derive(Clone, Copy)]
 pub enum DmaPriority {
     Priority0 = 0,
+}
+
+/// DMA capable peripherals
+/// The values need to match the TRM
+#[cfg(esp32c2)]
+#[derive(Clone, Copy)]
+pub enum DmaPeripheral {
+    Spi2 = 0,
+    Sha  = 7,
 }
 
 /// DMA capable peripherals
@@ -62,6 +72,7 @@ pub enum DmaPeripheral {
 }
 
 /// DMA capable peripherals
+/// The values need to match the TRM
 #[cfg(any(esp32, esp32s2))]
 #[derive(Clone, Copy)]
 pub enum DmaPeripheral {
