@@ -4,7 +4,7 @@ use core::{marker::PhantomData, sync::atomic::compiler_fence};
 
 use private::*;
 
-#[cfg(any(esp32c2, esp32c3))]
+#[cfg(any(esp32c2, esp32c3, esp32s3))]
 pub mod gdma;
 
 #[cfg(any(esp32, esp32s2))]
@@ -78,6 +78,23 @@ pub enum DmaPeripheral {
 pub enum DmaPeripheral {
     Spi2 = 0,
     Spi3 = 1,
+}
+
+/// DMA capable peripherals
+/// The values need to match the TRM
+#[cfg(esp32s3)]
+#[derive(Clone, Copy)]
+pub enum DmaPeripheral {
+    Spi2   = 0,
+    Spi3   = 1,
+    Uhci0  = 2,
+    I2s0   = 3,
+    I2s1   = 4,
+    LcdCam = 5,
+    Aes    = 6,
+    Sha    = 7,
+    Adc    = 8,
+    Rmt    = 9,
 }
 
 enum Owner {
@@ -186,7 +203,7 @@ pub(crate) mod private {
     pub trait Spi2Peripheral: SpiPeripheral + PeripheralMarker {}
 
     /// Marks channels as useable for SPI3
-    #[cfg(any(esp32, esp32s2))]
+    #[cfg(any(esp32, esp32s2, esp32s3))]
     pub trait Spi3Peripheral: SpiPeripheral + PeripheralMarker {}
 
     /// DMA Rx

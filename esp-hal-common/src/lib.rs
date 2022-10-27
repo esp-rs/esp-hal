@@ -51,7 +51,6 @@ pub use self::{
 pub mod analog;
 pub mod clock;
 pub mod delay;
-#[cfg(any(esp32, esp32c2, esp32c3, esp32s2))]
 pub mod dma;
 pub mod gpio;
 pub mod i2c;
