@@ -365,11 +365,13 @@ pub trait Instance {
             .ctr
             .modify(|_, w| w.conf_upgate().set_bit());
 
+        self.reset();
+
         Ok(())
     }
 
     /// Resets the I2C controller (FIFO + FSM + command list)
-    fn reset(&mut self) {
+    fn reset(&self) {
         // Reset interrupts
         // Disable all I2C interrupts
         self.register_block()
@@ -396,7 +398,7 @@ pub trait Instance {
     }
 
     /// Resets the I2C peripheral's command registers
-    fn reset_command_list(&mut self) {
+    fn reset_command_list(&self) {
         // Confirm that all commands that were configured were actually executed
         for cmd in self.register_block().comd.iter() {
             cmd.reset();
@@ -632,7 +634,7 @@ pub trait Instance {
 
         add_cmd(cmd_iterator, Command::Stop)?;
 
-        self.upgate_config();
+        self.update_config();
 
         // Load address and R/W bit into FIFO
         write_fifo(
@@ -645,7 +647,7 @@ pub trait Instance {
         self.start_transmission();
 
         // fill FIFO with remaining bytes
-        self.write_remaining_tx_fifo(index, bytes);
+        self.write_remaining_tx_fifo(index, bytes)?;
 
         self.wait_for_completion()?;
 
@@ -704,104 +706,12 @@ pub trait Instance {
 
         add_cmd(cmd_iterator, Command::Stop)?;
 
-        self.upgate_config();
+        self.update_config();
 
         // Load address and R/W bit into FIFO
         write_fifo(self.register_block(), addr << 1 | OperationType::Read as u8);
 
         self.start_transmission();
-
-        self.read_all_from_fifo(buffer)?;
-
-        self.wait_for_completion()?;
-
-        Ok(())
-    }
-
-    #[cfg(not(debug_assertions))]
-    fn perform_write_read<'a, I>(
-        &self,
-        addr: u8,
-        bytes: &[u8],
-        buffer: &mut [u8],
-        cmd_iterator: &mut I,
-    ) -> Result<(), Error>
-    where
-        I: Iterator<Item = &'a COMD>,
-    {
-        if bytes.len() > 254 {
-            // we could support more by adding multiple write operations
-            return Err(Error::ExceedingFifo);
-        }
-
-        // Clear all I2C interrupts
-        self.clear_all_interrupts();
-
-        // RSTART command
-        add_cmd(cmd_iterator, Command::Start)?;
-
-        // WRITE command
-        add_cmd(
-            cmd_iterator,
-            Command::Write {
-                ack_exp: Ack::Ack,
-                ack_check_en: true,
-                length: 1 + bytes.len() as u8,
-            },
-        )?;
-
-        add_cmd(cmd_iterator, Command::Start)?;
-
-        add_cmd(
-            cmd_iterator,
-            Command::Write {
-                ack_exp: Ack::Ack,
-                ack_check_en: true,
-                length: 1,
-            },
-        )?;
-
-        if buffer.len() > 1 {
-            // READ command (N - 1)
-            add_cmd(
-                cmd_iterator,
-                Command::Read {
-                    ack_value: Ack::Ack,
-                    length: buffer.len() as u8 - 1,
-                },
-            )?;
-        }
-
-        // READ w/o ACK
-        add_cmd(
-            cmd_iterator,
-            Command::Read {
-                ack_value: Ack::Nack,
-                length: 1,
-            },
-        )?;
-
-        add_cmd(cmd_iterator, Command::Stop)?;
-
-        self.upgate_config();
-
-        // Load address and R/W bit into FIFO
-        write_fifo(
-            self.register_block(),
-            addr << 1 | OperationType::Write as u8,
-        );
-
-        let index = self.fill_tx_fifo(bytes);
-
-        self.start_transmission();
-
-        // fill FIFO with remaining bytes
-        self.write_remaining_tx_fifo(index, bytes);
-
-        // writing to the FIFO here is too slow in debug mode apparently and the
-        // address isn't loaded fast enough ... therefore in debug mode we do separate
-        // write and reads
-        self.write_remaining_tx_fifo(0, &[addr << 1 | OperationType::Read as u8]);
 
         self.read_all_from_fifo(buffer)?;
 
@@ -817,22 +727,11 @@ pub trait Instance {
         // requested? Or is this prevented from a protocol perspective?
         for byte in buffer.iter_mut() {
             loop {
-                #[cfg(not(esp32))]
-                {
-                    let reg = self.register_block().fifo_st.read();
+                self.check_errors()?;
 
-                    if reg.rxfifo_raddr().bits() != reg.rxfifo_waddr().bits() {
-                        break;
-                    }
-                }
-
-                #[cfg(esp32)]
-                {
-                    let reg = self.register_block().rxfifo_st.read();
-
-                    if reg.rxfifo_start_addr().bits() != reg.rxfifo_end_addr().bits() {
-                        break;
-                    }
+                let reg = self.register_block().fifo_st.read();
+                if reg.rxfifo_raddr().bits() != reg.rxfifo_waddr().bits() {
+                    break;
                 }
             }
 
@@ -877,30 +776,7 @@ pub trait Instance {
         loop {
             let interrupts = self.register_block().int_raw.read();
 
-            // The ESP32 variant has a slightly different interrupt naming
-            // scheme!
-            cfg_if::cfg_if! {
-                if #[cfg(esp32)] {
-                    // Handle error cases
-                    if interrupts.time_out_int_raw().bit_is_set() {
-                        return Err(Error::TimeOut);
-                    } else if interrupts.ack_err_int_raw().bit_is_set() {
-                        return Err(Error::AckCheckFailed);
-                    } else if interrupts.arbitration_lost_int_raw().bit_is_set() {
-                        return Err(Error::ArbitrationLost);
-                    }
-                }
-                else {
-                    // Handle error cases
-                    if interrupts.time_out_int_raw().bit_is_set() {
-                        return Err(Error::TimeOut);
-                    } else if interrupts.nack_int_raw().bit_is_set() {
-                        return Err(Error::AckCheckFailed);
-                    } else if interrupts.arbitration_lost_int_raw().bit_is_set() {
-                        return Err(Error::ArbitrationLost);
-                    }
-                }
-            }
+            self.check_errors()?;
 
             // Handle completion cases
             // A full transmission was completed
@@ -919,7 +795,43 @@ pub trait Instance {
         Ok(())
     }
 
-    fn upgate_config(&self) {
+    fn check_errors(&self) -> Result<(), Error> {
+        let interrupts = self.register_block().int_raw.read();
+
+        // The ESP32 variant has a slightly different interrupt naming
+        // scheme!
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                // Handle error cases
+                if interrupts.time_out_int_raw().bit_is_set() {
+                    self.reset();
+                    return Err(Error::TimeOut);
+                } else if interrupts.ack_err_int_raw().bit_is_set() {
+                    self.reset();
+                    return Err(Error::AckCheckFailed);
+                } else if interrupts.arbitration_lost_int_raw().bit_is_set() {
+                    self.reset();
+                    return Err(Error::ArbitrationLost);
+                }
+            }
+            else {
+                // Handle error cases
+                if interrupts.time_out_int_raw().bit_is_set() {
+                    self.reset();
+                    return Err(Error::TimeOut);
+                } else if interrupts.nack_int_raw().bit_is_set() {
+                    self.reset();
+                    return Err(Error::AckCheckFailed);
+                } else if interrupts.arbitration_lost_int_raw().bit_is_set() {
+                    return Err(Error::ArbitrationLost);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn update_config(&self) {
         // Ensure that the configuration of the peripheral is correctly propagated
         // (only necessary for C3 and S3 variant)
         #[cfg(any(esp32c2, esp32c3, esp32s3))]
@@ -965,9 +877,11 @@ pub trait Instance {
     }
 
     #[cfg(not(any(esp32, esp32s2)))]
-    fn write_remaining_tx_fifo(&self, start_index: usize, bytes: &[u8]) {
+    fn write_remaining_tx_fifo(&self, start_index: usize, bytes: &[u8]) -> Result<(), Error> {
         let mut index = start_index;
         loop {
+            self.check_errors()?;
+
             while !self
                 .register_block()
                 .int_raw
@@ -980,7 +894,7 @@ pub trait Instance {
                 .write(|w| w.txfifo_wm_int_clr().set_bit());
 
             if index >= bytes.len() {
-                break;
+                break Ok(());
             }
 
             write_fifo(self.register_block(), bytes[index]);
@@ -1006,25 +920,28 @@ pub trait Instance {
     }
 
     #[cfg(any(esp32, esp32s2))]
-    fn write_remaining_tx_fifo(&self, start_index: usize, bytes: &[u8]) {
+    fn write_remaining_tx_fifo(&self, start_index: usize, bytes: &[u8]) -> Result<(), Error> {
         // on ESP32/ESP32-S2 we currently don't support I2C transactions larger than the
         // FIFO apparently it would be possible by using non-fifo mode
         // see  https://github.com/espressif/arduino-esp32/blob/7e9afe8c5ed7b5bf29624a5cd6e07d431c027b97/cores/esp32/esp32-hal-i2c.c#L615
 
         if start_index >= bytes.len() {
-            return;
+            return Ok(());
         }
 
         // this is only possible when writing the I2C address in release mode
         // from [perform_write_read]
         for b in bytes {
             write_fifo(self.register_block(), *b);
+            self.check_errors()?;
         }
+
+        Ok(())
     }
 
     /// Resets the transmit and receive FIFO buffers
     #[cfg(not(esp32))]
-    fn reset_fifo(&mut self) {
+    fn reset_fifo(&self) {
         // First, reset the fifo buffers
         self.register_block().fifo_conf.modify(|_, w| {
             w.tx_fifo_rst()
@@ -1035,26 +952,29 @@ pub trait Instance {
                 .clear_bit()
                 .fifo_prt_en()
                 .set_bit()
-                .tx_fifo_rst()
-                .clear_bit()
-                .rx_fifo_rst()
-                .clear_bit()
                 .rxfifo_wm_thrhd()
                 .variant(1)
                 .txfifo_wm_thrhd()
                 .variant(8)
         });
+
+        self.register_block()
+            .fifo_conf
+            .modify(|_, w| w.tx_fifo_rst().clear_bit().rx_fifo_rst().clear_bit());
+
         self.register_block().int_clr.write(|w| {
             w.rxfifo_wm_int_clr()
                 .set_bit()
                 .txfifo_wm_int_clr()
                 .set_bit()
         });
+
+        self.update_config();
     }
 
     /// Resets the transmit and receive FIFO buffers
     #[cfg(esp32)]
-    fn reset_fifo(&mut self) {
+    fn reset_fifo(&self) {
         // First, reset the fifo buffers
         self.register_block().fifo_conf.modify(|_, w| {
             w.tx_fifo_rst()
@@ -1063,15 +983,16 @@ pub trait Instance {
                 .set_bit()
                 .nonfifo_en()
                 .clear_bit()
-                .tx_fifo_rst()
-                .clear_bit()
-                .rx_fifo_rst()
-                .clear_bit()
                 .nonfifo_rx_thres()
                 .variant(1)
                 .nonfifo_tx_thres()
                 .variant(32)
         });
+
+        self.register_block()
+            .fifo_conf
+            .modify(|_, w| w.tx_fifo_rst().clear_bit().rx_fifo_rst().clear_bit());
+
         self.register_block()
             .int_clr
             .write(|w| w.rxfifo_full_int_clr().set_bit());
@@ -1106,20 +1027,12 @@ pub trait Instance {
         bytes: &[u8],
         buffer: &mut [u8],
     ) -> Result<(), Error> {
-        #[cfg(not(debug_assertions))]
-        {
-            // Reset FIFO and command list
-            self.reset_fifo();
-            self.reset_command_list();
-
-            self.perform_write_read(addr, bytes, buffer, &mut self.register_block().comd.iter())?;
-        }
-
-        #[cfg(debug_assertions)]
-        {
-            self.master_write(addr, bytes)?;
-            self.master_read(addr, buffer)?;
-        }
+        // it would be possible to combine the write and read
+        // in one transaction but filling the tx fifo with
+        // the current code is somewhat slow even in release mode
+        // which can cause issues
+        self.master_write(addr, bytes)?;
+        self.master_read(addr, buffer)?;
         Ok(())
     }
 }
