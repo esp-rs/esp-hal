@@ -366,6 +366,10 @@ pub(crate) mod private {
     impl_channel!(1);
     #[cfg(not(esp32c2))]
     impl_channel!(2);
+    #[cfg(esp32s3)]
+    impl_channel!(3);
+    #[cfg(esp32s3)]
+    impl_channel!(4);
 }
 
 /// GDMA Peripheral

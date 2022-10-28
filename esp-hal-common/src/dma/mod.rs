@@ -23,22 +23,16 @@ pub enum DmaError {
 #[cfg(any(esp32c2, esp32c3, esp32s3))]
 #[derive(Clone, Copy)]
 pub enum DmaPriority {
-    Priority0  = 0,
-    Priority1  = 1,
-    Priority2  = 2,
-    Priority3  = 3,
-    Priority4  = 4,
-    Priority5  = 5,
-    Priority6  = 6,
-    Priority7  = 7,
-    Priority8  = 8,
-    Priority9  = 9,
-    Priority10 = 10,
-    Priority11 = 11,
-    Priority12 = 12,
-    Priority13 = 13,
-    Priority14 = 14,
-    Priority15 = 15,
+    Priority0 = 0,
+    Priority1 = 1,
+    Priority2 = 2,
+    Priority3 = 3,
+    Priority4 = 4,
+    Priority5 = 5,
+    Priority6 = 6,
+    Priority7 = 7,
+    Priority8 = 8,
+    Priority9 = 9,
 }
 
 /// DMA Priorities
