@@ -217,6 +217,10 @@ where
         spi
     }
 
+    pub fn change_bus_frequency(&mut self, frequency: HertzU32, clocks: &Clocks) {
+        self.spi.ch_bus_freq(frequency, clocks);
+    }
+
     /// Return the raw interface to the underlying peripheral instance
     pub fn free(self) -> T {
         self.spi
@@ -1329,6 +1333,34 @@ pub trait Instance {
             }
         }
         self
+    }
+
+    fn ch_bus_freq(&mut self, frequency: HertzU32, clocks: &Clocks) {
+
+        // Disable clock source
+        #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
+        self.register_block().clk_gate.modify(|_, w| {
+            w.clk_en()
+                .clear_bit()
+                .mst_clk_active()
+                .clear_bit()
+                .mst_clk_sel()
+                .clear_bit()
+        });
+
+        // Change clock frequency
+        self.setup(frequency, clocks);
+
+        // Enable clock source
+        #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
+        self.register_block().clk_gate.modify(|_, w| {
+            w.clk_en()
+                .set_bit()
+                .mst_clk_active()
+                .set_bit()
+                .mst_clk_sel()
+                .set_bit()
+        });
     }
 
     fn read_byte(&mut self) -> nb::Result<u8, Error> {
