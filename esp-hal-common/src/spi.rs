@@ -50,12 +50,13 @@
 
 use fugit::HertzU32;
 
-#[cfg(any(esp32c3, esp32, esp32s2))]
-use crate::dma::private::{Rx, Tx};
-#[cfg(any(esp32c3, esp32, esp32s2))]
-use crate::dma::{DmaError, DmaPeripheral};
 use crate::{
     clock::Clocks,
+    dma::{
+        private::{Rx, Tx},
+        DmaError,
+        DmaPeripheral,
+    },
     pac::spi2::RegisterBlock,
     system::PeripheralClockControl,
     types::{InputSignal, OutputSignal},
@@ -76,13 +77,11 @@ const MAX_DMA_SIZE: usize = 32736;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Error {
-    #[cfg(any(esp32c3, esp32, esp32s2))]
     DmaError(DmaError),
     MaxDmaTransferSizeExceeded,
     Unknown,
 }
 
-#[cfg(any(esp32c3, esp32, esp32s2))]
 impl From<DmaError> for Error {
     fn from(value: DmaError) -> Self {
         Error::DmaError(value)
@@ -266,7 +265,6 @@ where
     }
 }
 
-#[cfg(any(esp32c3, esp32, esp32s2))]
 pub mod dma {
     use core::mem;
 
@@ -920,7 +918,6 @@ mod ehal1 {
     }
 }
 
-#[cfg(any(esp32c3, esp32, esp32s2))]
 pub trait InstanceDma<TX, RX>: Instance
 where
     TX: Tx,
@@ -1075,7 +1072,7 @@ where
         }
     }
 
-    #[cfg(esp32c3)]
+    #[cfg(any(esp32c2, esp32c3, esp32s3))]
     fn enable_dma(&self) {
         let reg_block = self.register_block();
         reg_block.dma_conf.modify(|_, w| w.dma_tx_ena().set_bit());
@@ -1087,7 +1084,7 @@ where
         // for non GDMA this is done in `assign_tx_device` / `assign_rx_device`
     }
 
-    #[cfg(esp32c3)]
+    #[cfg(any(esp32c2, esp32c3, esp32s3))]
     fn clear_dma_interrupts(&self) {
         let reg_block = self.register_block();
         reg_block.dma_int_clr.write(|w| {
@@ -1130,7 +1127,6 @@ where
     }
 }
 
-#[cfg(any(esp32c3, esp32, esp32s2))]
 impl<TX, RX> InstanceDma<TX, RX> for crate::pac::SPI2
 where
     TX: Tx,
@@ -1138,7 +1134,7 @@ where
 {
 }
 
-#[cfg(any(esp32, esp32s2))]
+#[cfg(any(esp32, esp32s2, esp32s3))]
 impl<TX, RX> InstanceDma<TX, RX> for crate::pac::SPI3
 where
     TX: Tx,
@@ -1738,10 +1734,10 @@ impl Instance for crate::pac::SPI3 {
 
 pub trait Spi2Instance {}
 
-#[cfg(any(esp32, esp32s2))]
+#[cfg(any(esp32, esp32s2, esp32s3))]
 pub trait Spi3Instance {}
 
 impl Spi2Instance for crate::pac::SPI2 {}
 
-#[cfg(any(esp32, esp32s2))]
+#[cfg(any(esp32, esp32s2, esp32s3))]
 impl Spi3Instance for crate::pac::SPI3 {}

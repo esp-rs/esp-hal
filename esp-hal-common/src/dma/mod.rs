@@ -4,7 +4,7 @@ use core::{marker::PhantomData, sync::atomic::compiler_fence};
 
 use private::*;
 
-#[cfg(esp32c3)]
+#[cfg(any(esp32c2, esp32c3, esp32s3))]
 pub mod gdma;
 
 #[cfg(any(esp32, esp32s2))]
@@ -20,32 +20,36 @@ pub enum DmaError {
 }
 
 /// DMA Priorities
-#[cfg(any(esp32c3, esp32s3))]
+#[cfg(any(esp32c2, esp32c3, esp32s3))]
 #[derive(Clone, Copy)]
 pub enum DmaPriority {
-    Priority0  = 0,
-    Priority1  = 1,
-    Priority2  = 2,
-    Priority3  = 3,
-    Priority4  = 4,
-    Priority5  = 5,
-    Priority6  = 6,
-    Priority7  = 7,
-    Priority8  = 8,
-    Priority9  = 9,
-    Priority10 = 10,
-    Priority11 = 11,
-    Priority12 = 12,
-    Priority13 = 13,
-    Priority14 = 14,
-    Priority15 = 15,
+    Priority0 = 0,
+    Priority1 = 1,
+    Priority2 = 2,
+    Priority3 = 3,
+    Priority4 = 4,
+    Priority5 = 5,
+    Priority6 = 6,
+    Priority7 = 7,
+    Priority8 = 8,
+    Priority9 = 9,
 }
 
 /// DMA Priorities
+/// The values need to match the TRM
 #[cfg(any(esp32, esp32s2))]
 #[derive(Clone, Copy)]
 pub enum DmaPriority {
     Priority0 = 0,
+}
+
+/// DMA capable peripherals
+/// The values need to match the TRM
+#[cfg(esp32c2)]
+#[derive(Clone, Copy)]
+pub enum DmaPeripheral {
+    Spi2 = 0,
+    Sha  = 7,
 }
 
 /// DMA capable peripherals
@@ -62,11 +66,29 @@ pub enum DmaPeripheral {
 }
 
 /// DMA capable peripherals
+/// The values need to match the TRM
 #[cfg(any(esp32, esp32s2))]
 #[derive(Clone, Copy)]
 pub enum DmaPeripheral {
     Spi2 = 0,
     Spi3 = 1,
+}
+
+/// DMA capable peripherals
+/// The values need to match the TRM
+#[cfg(esp32s3)]
+#[derive(Clone, Copy)]
+pub enum DmaPeripheral {
+    Spi2   = 0,
+    Spi3   = 1,
+    Uhci0  = 2,
+    I2s0   = 3,
+    I2s1   = 4,
+    LcdCam = 5,
+    Aes    = 6,
+    Sha    = 7,
+    Adc    = 8,
+    Rmt    = 9,
 }
 
 enum Owner {
@@ -175,7 +197,7 @@ pub(crate) mod private {
     pub trait Spi2Peripheral: SpiPeripheral + PeripheralMarker {}
 
     /// Marks channels as useable for SPI3
-    #[cfg(any(esp32, esp32s2))]
+    #[cfg(any(esp32, esp32s2, esp32s3))]
     pub trait Spi3Peripheral: SpiPeripheral + PeripheralMarker {}
 
     /// DMA Rx
