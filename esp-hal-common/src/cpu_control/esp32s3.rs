@@ -122,10 +122,10 @@ impl CpuControl {
     /// The second core will start running the closure `entry`.
     ///
     /// Dropping the returned guard will park the core.
-    pub fn start_app_core<'a: 'b, 'b>(
+    pub fn start_app_core(
         &mut self,
-        entry: &'a mut (dyn FnMut() + Send + 'a),
-    ) -> Result<AppCoreGuard<'b>, Error> {
+        entry: &mut (dyn FnMut() + Send),
+    ) -> Result<AppCoreGuard, Error> {
         let system_control = crate::pac::SYSTEM::PTR;
         let system_control = unsafe { &*system_control };
 
