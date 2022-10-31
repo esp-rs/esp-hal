@@ -6,8 +6,10 @@ use xtensa_lx::set_stack_pointer;
 
 use crate::Cpu;
 
-static mut START_CORE1_FUNCTION: Option<&'static mut (dyn FnMut() -> () + 'static)> = None;
+static mut START_CORE1_FUNCTION: Option<&'static mut (dyn FnMut() + 'static)> = None;
 
+/// Will park the APP (second) core when dropped
+#[must_use]
 pub struct AppCoreGuard<'a> {
     phantom: PhantomData<&'a ()>,
 }
@@ -183,10 +185,11 @@ impl CpuControl {
     /// Start the APP (second) core
     ///
     /// The second core will start running the closure `entry`.
-    #[must_use]
+    ///
+    /// Dropping the returned guard will park the core.
     pub fn start_app_core<'a: 'b, 'b>(
         &mut self,
-        entry: &'a mut (dyn FnMut() -> () + 'a),
+        entry: &'a mut (dyn FnMut() + Send + 'a),
     ) -> Result<AppCoreGuard<'b>, Error> {
         let dport_control = crate::pac::DPORT::PTR;
         let dport_control = unsafe { &*dport_control };
@@ -205,7 +208,7 @@ impl CpuControl {
         self.enable_cache(Cpu::AppCpu);
 
         unsafe {
-            let entry_fn: &'static mut (dyn FnMut() -> () + 'static) = core::mem::transmute(entry);
+            let entry_fn: &'static mut (dyn FnMut() + 'static) = core::mem::transmute(entry);
             START_CORE1_FUNCTION = Some(entry_fn);
         }
 
