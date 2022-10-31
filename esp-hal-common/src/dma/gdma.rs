@@ -382,6 +382,10 @@ pub struct Gdma {
     pub channel1: ChannelCreator1,
     #[cfg(not(esp32c2))]
     pub channel2: ChannelCreator2,
+    #[cfg(esp32s3)]
+    pub channel3: ChannelCreator3,
+    #[cfg(esp32s3)]
+    pub channel4: ChannelCreator4,
 }
 
 impl Gdma {
@@ -402,6 +406,10 @@ impl Gdma {
             channel1: ChannelCreator1 {},
             #[cfg(not(esp32c2))]
             channel2: ChannelCreator2 {},
+            #[cfg(esp32s3)]
+            channel3: ChannelCreator3 {},
+            #[cfg(esp32s3)]
+            channel4: ChannelCreator4 {},
         }
     }
 }
