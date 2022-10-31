@@ -58,6 +58,17 @@ EXTERN(__default_exception);
 EXTERN(__default_double_exception);
 EXTERN(__default_interrupt);
 
+/* high level CPU interrupts */
+PROVIDE(Timer0 = __default_user_exception);
+PROVIDE(Timer1 = __default_user_exception);
+PROVIDE(Timer2 = __default_user_exception);
+PROVIDE(Timer3 = __default_user_exception);
+PROVIDE(Profiling = __default_user_exception);
+PROVIDE(NMI = __default_user_exception);
+PROVIDE(Software0 = __default_user_exception);
+PROVIDE(Software1 = __default_user_exception);
+
+/* low level exception/interrupt, which must be overridden using naked functions */
 EXTERN(__default_naked_exception);
 EXTERN(__default_naked_double_exception);
 EXTERN(__default_naked_level_2_interrupt);
