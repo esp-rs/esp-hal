@@ -32,7 +32,7 @@ esp-hal-common   = { version = "0.2.0",  features = ["esp32c2"], path = "../esp-
 r0               = "1.0.0"
 riscv            = "0.9.0"
 riscv-rt         = { version = "0.9.0", optional = true }
-embedded-hal-async = { version = "0.1.0-alpha.1", optional = true }
+embedded-hal-async = { version = "0.1.0-alpha.3", optional = true }
 embassy-time       = { version = "0.1.0", features = ["nightly"], optional = true }
 
 [dev-dependencies]

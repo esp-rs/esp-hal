@@ -31,7 +31,7 @@ embedded-hal-nb  = { version = "=1.0.0-alpha.1", optional = true }
 esp-hal-common   = { version = "0.2.0",  features = ["esp32s2"], path = "../esp-hal-common" }
 xtensa-lx        = { version = "0.7.0",  features = ["esp32s2"] }
 xtensa-lx-rt     = { version = "0.13.0", features = ["esp32s2"], optional = true }
-embedded-hal-async = { version = "0.1.0-alpha.1", optional = true }
+embedded-hal-async = { version = "0.1.0-alpha.3", optional = true }
 embassy-time       = { version = "0.1.0", features = ["nightly"], optional = true }
 xtensa-atomic-emulation-trap = { version = "0.2.0", features = ["esp32s2"] }
 
