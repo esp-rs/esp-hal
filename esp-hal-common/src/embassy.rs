@@ -91,7 +91,7 @@ impl Driver for EmbassyTimer {
         })
     }
 
-    fn set_alarm(&self, alarm: embassy_time::driver::AlarmHandle, timestamp: u64) {
+    fn set_alarm(&self, alarm: embassy_time::driver::AlarmHandle, timestamp: u64) -> bool {
         self.set_alarm(alarm, timestamp)
     }
 }

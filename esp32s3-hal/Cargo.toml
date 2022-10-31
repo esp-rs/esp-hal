@@ -33,8 +33,8 @@ esp-hal-common  = { version = "0.2.0",  features = ["esp32s3"], path = "../esp-h
 r0              = { version = "1.0.0",  optional = true }
 xtensa-lx       = { version = "0.7.0",  features = ["esp32s3"] }
 xtensa-lx-rt    = { version = "0.13.0", features = ["esp32s3"], optional = true }
-embassy-time       = { package = "embassy-time", git = "https://github.com/embassy-rs/embassy/", rev = "92ed957", features = ["nightly"], optional = true }
 embedded-hal-async = { version = "0.1.0-alpha.1", optional = true }
+embassy-time       = { version = "0.1.0", features = ["nightly"], optional = true }
 
 [dev-dependencies]
 critical-section  = "1.1.0"
@@ -45,7 +45,7 @@ smart-leds        = "0.3.0"
 ssd1306           = "0.7.1"
 usb-device        = { version = "0.2.3" }
 usbd-serial       = "0.1.1"
-embassy-executor  = { package = "embassy-executor", git = "https://github.com/embassy-rs/embassy/", rev = "92ed957", features = ["nightly", "integrated-timers"] }
+embassy-executor  = { package = "embassy-executor", git = "https://github.com/embassy-rs/embassy/", rev = "eed34f945ccd5c4ef2af77230042dd4954e981ac", features = ["nightly", "integrated-timers"] }
 static_cell        = "1.0.0"
 
 [features]
@@ -58,8 +58,8 @@ ufmt        = ["esp-hal-common/ufmt"]
 vectored    = ["esp-hal-common/vectored"]
 async = ["esp-hal-common/async", "embedded-hal-async"]
 embassy = ["esp-hal-common/embassy"]
-embassy-time-systick = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-16mhz"]
-embassy-time-timg = ["esp-hal-common/embassy-time-timg", "embassy-time/tick-1mhz"]
+embassy-time-systick = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-hz-16_000_000"]
+embassy-time-timg = ["esp-hal-common/embassy-time-timg", "embassy-time/tick-hz-1_000_000"]
 
 [[example]]
 name              = "hello_rgb"

@@ -74,30 +74,44 @@ impl EmbassyTimer {
         }
     }
 
-    pub(crate) fn set_alarm(&self, alarm: embassy_time::driver::AlarmHandle, timestamp: u64) {
+    pub(crate) fn set_alarm(&self, alarm: embassy_time::driver::AlarmHandle, timestamp: u64) -> bool {
         critical_section::with(|cs| {
             let now = Self::now();
-            if timestamp < now {
-                self.trigger_alarm(alarm.id() as usize, cs);
-                return;
-            }
             let alarm_state = unsafe { self.alarms.borrow(cs).get_unchecked(alarm.id() as usize) };
+            if timestamp < now {
+                // If alarm timestamp has passed the alarm will not fire.
+                // Disarm the alarm and return `false` to indicate that.
+                self.disable_interrupt(alarm.id());
+                alarm_state.timestamp.set(u64::MAX);
+                return false;
+            }
             alarm_state.timestamp.set(timestamp);
             match alarm.id() {
                 0 => {
                     self.alarm0.set_target(timestamp);
-                    self.alarm0.enable_interrupt();
+                    self.alarm0.interrupt_enable(true);
                 }
                 1 => {
                     self.alarm1.set_target(timestamp);
-                    self.alarm1.enable_interrupt();
+                    self.alarm1.interrupt_enable(true);
                 }
                 2 => {
                     self.alarm2.set_target(timestamp);
-                    self.alarm2.enable_interrupt();
+                    self.alarm2.interrupt_enable(true);
                 }
                 _ => panic!(),
             }
+
+            true
         })
+    }
+
+    fn disable_interrupt(&self, id: u8) {
+         match id {
+            0 => self.alarm0.interrupt_enable(false),
+            1 => self.alarm1.interrupt_enable(false),
+            2 => self.alarm2.interrupt_enable(false),
+            _ => unreachable!(),
+        };
     }
 }
