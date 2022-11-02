@@ -2,8 +2,10 @@ use core::marker::PhantomData;
 
 use embedded_hal::adc::{Channel, OneShot};
 
+#[cfg(esp32c3)]
+use crate::analog::ADC2;
 use crate::{
-    analog::{ADC1, ADC2},
+    analog::ADC1,
     pac::APB_SARADC,
     system::{Peripheral, PeripheralClockControl},
 };
@@ -35,6 +37,7 @@ impl<PIN: Channel<ADCI, ID = u8>, ADCI> Channel<ADCI> for AdcPin<PIN, ADCI> {
         PIN::channel()
     }
 }
+
 pub struct AdcConfig<ADCI> {
     pub resolution: Resolution,
     pub attenuations: [Option<Attenuation>; 5],
@@ -125,6 +128,7 @@ impl RegisterAccess for ADC1 {
     }
 }
 
+#[cfg(esp32c3)]
 impl RegisterAccess for ADC2 {
     fn start_onetime_sample(channel: u8, attenuation: u8) {
         let sar_adc = unsafe { &*APB_SARADC::PTR };

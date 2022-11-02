@@ -1332,7 +1332,6 @@ pub trait Instance {
     }
 
     fn ch_bus_freq(&mut self, frequency: HertzU32, clocks: &Clocks) {
-
         // Disable clock source
         #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
         self.register_block().clk_gate.modify(|_, w| {

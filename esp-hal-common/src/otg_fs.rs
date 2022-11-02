@@ -93,7 +93,7 @@ where
             {
                 let rtc = &*pac::RTC_CNTL::PTR;
                 rtc.usb_conf
-                    .modify(|_, w| w.sw_hw_usb_phy_sel().set_bit().sw_usb_phy_sel().set_bit());    
+                    .modify(|_, w| w.sw_hw_usb_phy_sel().set_bit().sw_usb_phy_sel().set_bit());
             }
 
             crate::gpio::connect_high_to_peripheral(InputSignal::USB_OTG_IDDIG); // connected connector is mini-B side
