@@ -27,10 +27,12 @@ pub use esp_hal_common::{
     Rtc,
     Rwdt,
     Serial,
-    embassy,
 };
 
 pub use self::gpio::IO;
+
+#[cfg(feature = "embassy")]
+pub use esp_hal_common::embassy;
 
 pub mod adc;
 pub mod dac;

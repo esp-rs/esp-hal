@@ -80,18 +80,23 @@ impl EmbassyTimer {
         }
     }
 
-    pub(crate) fn set_alarm(&self, alarm: embassy_time::driver::AlarmHandle, timestamp: u64) {
+    pub(crate) fn set_alarm(&self, alarm: embassy_time::driver::AlarmHandle, timestamp: u64) -> bool {
         critical_section::with(|cs| {
             let now = Self::now();
-            if timestamp < now {
-                self.trigger_alarm(alarm.id() as usize, cs);
-                return;
-            }
             let alarm_state = unsafe { self.alarms.borrow(cs).get_unchecked(alarm.id() as usize) };
-            alarm_state.timestamp.set(timestamp);
-
             let mut tg = TG.borrow_ref_mut(cs);
             let tg = tg.as_mut().unwrap();
+            if timestamp < now {
+                match alarm.id() {
+                    0 => tg.timer0.unlisten(),
+                    1 => tg.timer1.unlisten(),
+                    _ => unreachable!()
+                }
+                alarm_state.timestamp.set(u64::MAX);
+                return false;
+            }
+            alarm_state.timestamp.set(timestamp);
+
             match alarm.id() {
                 0 => {
                     tg.timer0.load_alarm_value(timestamp);
@@ -109,8 +114,10 @@ impl EmbassyTimer {
                     tg.timer1.set_counter_active(true);
                     tg.timer1.set_alarm_active(true);
                 }
-                _ => panic!(),
+                _ => unreachable!(),
             }
+
+            true
         })
     }
 }
