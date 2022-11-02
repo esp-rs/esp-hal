@@ -88,6 +88,7 @@ pub(crate) enum PllClock {
 #[allow(unused)]
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum ApbClock {
+    ApbFreq40MHz,
     ApbFreq80MHz,
     ApbFreqOther(u32),
 }
@@ -95,6 +96,7 @@ pub(crate) enum ApbClock {
 impl Clock for ApbClock {
     fn frequency(&self) -> HertzU32 {
         match self {
+            ApbClock::ApbFreq40MHz => HertzU32::MHz(40),
             ApbClock::ApbFreq80MHz => HertzU32::MHz(80),
             ApbClock::ApbFreqOther(mhz) => HertzU32::MHz(*mhz),
         }
@@ -212,7 +214,7 @@ impl ClockControl {
             _private: (),
             desired_rates: RawClocks {
                 cpu_clock: HertzU32::MHz(80),
-                apb_clock: HertzU32::MHz(80),
+                apb_clock: HertzU32::MHz(40),
                 xtal_clock: HertzU32::MHz(40),
                 i2c_clock: HertzU32::MHz(40),
             },
@@ -231,7 +233,7 @@ impl ClockControl {
             clocks_ll::esp32c2_rtc_update_to_xtal(xtal_freq, 1);
             clocks_ll::esp32c2_rtc_apb_freq_update(apb_freq);
         } else {
-            apb_freq = ApbClock::ApbFreq80MHz;
+            apb_freq = ApbClock::ApbFreq40MHz;
             clocks_ll::esp32c2_rtc_bbpll_enable();
             clocks_ll::esp32c2_rtc_bbpll_configure(xtal_freq, pll_freq);
             clocks_ll::esp32c2_rtc_freq_to_pll_mhz(cpu_clock_speed);
