@@ -38,7 +38,7 @@ xtensa-atomic-emulation-trap = { version = "0.2.0", features = ["esp32s2"] }
 [dev-dependencies]
 critical-section  = "1.1.0"
 embedded-graphics = "0.7.1"
-esp-backtrace     = { version = "0.2.0", features = ["esp32s2", "panic-handler", "exception-handler", "print-uart"] }
+esp-backtrace     = { version = "0.2.0", features = ["esp32s2", "panic-handler", "print-uart"] }
 esp-println       = { version = "0.3.0", features = ["esp32s2"] }
 smart-leds        = "0.3.0"
 ssd1306           = "0.7.1"

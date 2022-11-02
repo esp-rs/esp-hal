@@ -117,3 +117,17 @@ fn buffer2() -> &'static mut [u8; 32000] {
     static mut BUFFER: [u8; 32000] = [0u8; 32000];
     unsafe { &mut BUFFER }
 }
+
+#[xtensa_lx_rt::exception]
+fn exception(cause: xtensa_lx_rt::exception::ExceptionCause, frame: xtensa_lx_rt::exception::Context) {
+    use esp_println::*;
+
+    println!("\n\nException occured {:?} {:x?}", cause, frame);
+    
+    let backtrace = esp_backtrace::arch::backtrace();
+    for b in backtrace.iter() {
+        if let Some(addr) = b {
+            println!("0x{:x}", addr)
+        }
+    }
+}
