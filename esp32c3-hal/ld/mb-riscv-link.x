@@ -90,6 +90,15 @@ SECTIONS
     _ebss = .;
   } > REGION_BSS
 
+  .uninit (NOLOAD) : ALIGN(4)
+  {
+    . = ALIGN(4);
+    __suninit = .;
+    *(.uninit .uninit.*);
+    . = ALIGN(4);
+    __euninit = .;
+  } > REGION_BSS
+
   /* fictitious region that represents the memory available for the heap */
   .heap (NOLOAD) :
   {
