@@ -11,6 +11,7 @@ pub use esp_hal_common::{
     efuse,
     gpio as gpio_types,
     i2c,
+    i2s,
     interrupt,
     ledc,
     macros,

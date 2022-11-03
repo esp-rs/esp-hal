@@ -1,0 +1,1725 @@
+//! I2S Master
+
+use embedded_dma::{ReadBuffer, WriteBuffer};
+use private::*;
+
+#[cfg(any(esp32s3))]
+use crate::dma::private::I2s1Peripheral;
+use crate::{
+    clock::Clocks,
+    dma::{
+        private::{I2s0Peripheral, I2sPeripheral, Rx, Tx},
+        Channel,
+        DmaError,
+        DmaTransfer,
+    },
+    system::PeripheralClockControl,
+    InputPin,
+    OutputPin,
+};
+
+trait AcceptedWord {}
+impl AcceptedWord for u8 {}
+impl AcceptedWord for u16 {}
+impl AcceptedWord for u32 {}
+impl AcceptedWord for i8 {}
+impl AcceptedWord for i16 {}
+impl AcceptedWord for i32 {}
+
+#[derive(Debug, Clone, Copy)]
+pub enum Error {
+    Unknown,
+    DmaError(DmaError),
+    IllegalArgument,
+}
+
+impl From<DmaError> for Error {
+    fn from(value: DmaError) -> Self {
+        Error::DmaError(value)
+    }
+}
+
+pub enum Standard {
+    Philips,
+    // Tdm,
+    // Pdm,
+}
+
+#[cfg(not(any(esp32, esp32s2)))]
+pub enum DataFormat {
+    Data32Channel32,
+    Data32Channel24,
+    Data32Channel16,
+    Data32Channel8,
+    Data16Channel16,
+    Data16Channel8,
+    Data8Channel8,
+}
+
+#[cfg(any(esp32, esp32s2))]
+pub enum DataFormat {
+    Data32Channel32,
+    Data16Channel16,
+}
+
+#[cfg(not(any(esp32, esp32s2)))]
+impl DataFormat {
+    pub fn data_bits(&self) -> u8 {
+        match self {
+            DataFormat::Data32Channel32 => 32,
+            DataFormat::Data32Channel24 => 32,
+            DataFormat::Data32Channel16 => 32,
+            DataFormat::Data32Channel8 => 32,
+            DataFormat::Data16Channel16 => 16,
+            DataFormat::Data16Channel8 => 16,
+            DataFormat::Data8Channel8 => 8,
+        }
+    }
+
+    pub fn channel_bits(&self) -> u8 {
+        match self {
+            DataFormat::Data32Channel32 => 32,
+            DataFormat::Data32Channel24 => 24,
+            DataFormat::Data32Channel16 => 16,
+            DataFormat::Data32Channel8 => 8,
+            DataFormat::Data16Channel16 => 16,
+            DataFormat::Data16Channel8 => 8,
+            DataFormat::Data8Channel8 => 8,
+        }
+    }
+}
+
+#[cfg(any(esp32, esp32s2))]
+impl DataFormat {
+    pub fn data_bits(&self) -> u8 {
+        match self {
+            DataFormat::Data32Channel32 => 32,
+            DataFormat::Data16Channel16 => 16,
+        }
+    }
+
+    pub fn channel_bits(&self) -> u8 {
+        match self {
+            DataFormat::Data32Channel32 => 32,
+            DataFormat::Data16Channel16 => 16,
+        }
+    }
+}
+
+pub struct PinsBclkWsDout<B: OutputPin, W: OutputPin, DO: OutputPin> {
+    pub bclk: B,
+    pub ws: W,
+    pub dout: DO,
+}
+
+impl<B, W, DO> I2sTxPins for PinsBclkWsDout<B, W, DO>
+where
+    B: OutputPin,
+    W: OutputPin,
+    DO: OutputPin,
+{
+    fn configure<I>(&mut self, instance: &mut I)
+    where
+        I: RegisterAccess,
+    {
+        self.bclk
+            .set_to_push_pull_output()
+            .connect_peripheral_to_output(instance.bclk_signal());
+
+        self.ws
+            .set_to_push_pull_output()
+            .connect_peripheral_to_output(instance.ws_signal());
+
+        self.dout
+            .set_to_push_pull_output()
+            .connect_peripheral_to_output(instance.dout_signal());
+    }
+}
+
+pub struct PinsBclkWsDin<B: OutputPin, W: OutputPin, DI: InputPin> {
+    pub bclk: B,
+    pub ws: W,
+    pub din: DI,
+}
+
+impl<B, W, DI> I2sRxPins for PinsBclkWsDin<B, W, DI>
+where
+    B: OutputPin,
+    W: OutputPin,
+    DI: InputPin,
+{
+    fn configure<I>(&mut self, instance: &mut I)
+    where
+        I: RegisterAccess,
+    {
+        self.bclk
+            .set_to_push_pull_output()
+            .connect_peripheral_to_output(instance.bclk_rx_signal());
+
+        self.ws
+            .set_to_push_pull_output()
+            .connect_peripheral_to_output(instance.ws_rx_signal());
+
+        self.din
+            .set_to_input()
+            .connect_input_to_peripheral(instance.din_signal());
+    }
+}
+
+#[cfg(not(esp32))]
+pub struct MclkPin<M: OutputPin> {
+    pub mclk: M,
+}
+
+#[cfg(not(esp32))]
+impl<M> I2sMclkPin for MclkPin<M>
+where
+    M: OutputPin,
+{
+    fn configure<I>(&mut self, instance: &mut I)
+    where
+        I: RegisterAccess,
+    {
+        self.mclk
+            .set_to_push_pull_output()
+            .connect_peripheral_to_output(instance.mclk_signal());
+    }
+}
+
+pub struct NoMclk {}
+
+impl I2sMclkPin for NoMclk {
+    fn configure<I>(&mut self, _instance: &mut I)
+    where
+        I: RegisterAccess,
+    {
+        // nothing to do
+    }
+}
+
+/// An in-progress DMA write transfer.
+pub struct I2sWriteDmaTransfer<T, P, TX, BUFFER>
+where
+    T: RegisterAccess,
+    P: I2sTxPins,
+    TX: Tx,
+{
+    i2s_tx: I2sTx<T, P, TX>,
+    buffer: BUFFER,
+}
+
+impl<T, P, TX, BUFFER> I2sWriteDmaTransfer<T, P, TX, BUFFER>
+where
+    T: RegisterAccess,
+    P: I2sTxPins,
+    TX: Tx,
+{
+    /// Amount of bytes which can be pushed
+    pub fn available(&mut self) -> usize {
+        self.i2s_tx.tx_channel.available()
+    }
+
+    pub fn push(&mut self, data: &[u8]) -> Result<usize, Error> {
+        Ok(self.i2s_tx.tx_channel.push(data)?)
+    }
+}
+
+impl<T, P, TX, BUFFER> DmaTransfer<BUFFER, I2sTx<T, P, TX>>
+    for I2sWriteDmaTransfer<T, P, TX, BUFFER>
+where
+    T: RegisterAccess,
+    P: I2sTxPins,
+    TX: Tx,
+{
+    /// Wait for the DMA transfer to complete and return the buffers and the
+    /// I2sTx instance.
+    fn wait(self) -> (BUFFER, I2sTx<T, P, TX>) {
+        self.i2s_tx.wait_tx_dma_done().ok(); // waiting for the DMA transfer is not enough
+
+        // `DmaTransfer` needs to have a `Drop` implementation, because we accept
+        // managed buffers that can free their memory on drop. Because of that
+        // we can't move out of the `DmaTransfer`'s fields, so we use `ptr::read`
+        // and `mem::forget`.
+        //
+        // NOTE(unsafe) There is no panic branch between getting the resources
+        // and forgetting `self`.
+        unsafe {
+            let buffer = core::ptr::read(&self.buffer);
+            let payload = core::ptr::read(&self.i2s_tx);
+            core::mem::forget(self);
+            (buffer, payload)
+        }
+    }
+}
+
+impl<T, P, TX, BUFFER> Drop for I2sWriteDmaTransfer<T, P, TX, BUFFER>
+where
+    T: RegisterAccess,
+    P: I2sTxPins,
+    TX: Tx,
+{
+    fn drop(&mut self) {
+        self.i2s_tx.wait_tx_dma_done().ok();
+    }
+}
+
+pub trait I2sWrite<W> {
+    fn write(&mut self, words: &[W]) -> Result<(), Error>;
+}
+
+pub trait I2sWriteDma<T, P, TX, TXBUF>
+where
+    T: RegisterAccess,
+    P: I2sTxPins,
+    TX: Tx,
+{
+    fn write_dma(self, words: TXBUF) -> Result<I2sWriteDmaTransfer<T, P, TX, TXBUF>, Error>
+    where
+        T: RegisterAccess,
+        P: I2sTxPins,
+        TX: Tx,
+        TXBUF: ReadBuffer<Word = u8>;
+
+    fn write_dma_circular(
+        self,
+        words: TXBUF,
+    ) -> Result<I2sWriteDmaTransfer<T, P, TX, TXBUF>, Error>
+    where
+        T: RegisterAccess,
+        P: I2sTxPins,
+        TX: Tx,
+        TXBUF: ReadBuffer<Word = u8>;
+}
+
+/// An in-progress DMA read transfer.
+pub struct I2sReadDmaTransfer<T, P, RX, BUFFER>
+where
+    T: RegisterAccess,
+    P: I2sRxPins,
+    RX: Rx,
+{
+    i2s_rx: I2sRx<T, P, RX>,
+    buffer: BUFFER,
+}
+
+impl<T, P, RX, BUFFER> I2sReadDmaTransfer<T, P, RX, BUFFER>
+where
+    T: RegisterAccess,
+    P: I2sRxPins,
+    RX: Rx,
+{
+    /// Amount of bytes which can be poped
+    pub fn available(&mut self) -> usize {
+        self.i2s_rx.rx_channel.available()
+    }
+
+    pub fn pop(&mut self, data: &mut [u8]) -> Result<usize, Error> {
+        Ok(self.i2s_rx.rx_channel.pop(data)?)
+    }
+}
+
+impl<T, P, RX, BUFFER> DmaTransfer<BUFFER, I2sRx<T, P, RX>> for I2sReadDmaTransfer<T, P, RX, BUFFER>
+where
+    T: RegisterAccess,
+    P: I2sRxPins,
+    RX: Rx,
+{
+    /// Wait for the DMA transfer to complete and return the buffers and the
+    /// I2sTx instance.
+    fn wait(self) -> (BUFFER, I2sRx<T, P, RX>) {
+        self.i2s_rx.wait_rx_dma_done().ok(); // waiting for the DMA transfer is not enough
+
+        // `DmaTransfer` needs to have a `Drop` implementation, because we accept
+        // managed buffers that can free their memory on drop. Because of that
+        // we can't move out of the `DmaTransfer`'s fields, so we use `ptr::read`
+        // and `mem::forget`.
+        //
+        // NOTE(unsafe) There is no panic branch between getting the resources
+        // and forgetting `self`.
+        unsafe {
+            let buffer = core::ptr::read(&self.buffer);
+            let payload = core::ptr::read(&self.i2s_rx);
+            core::mem::forget(self);
+            (buffer, payload)
+        }
+    }
+}
+
+impl<T, P, RX, BUFFER> Drop for I2sReadDmaTransfer<T, P, RX, BUFFER>
+where
+    T: RegisterAccess,
+    P: I2sRxPins,
+    RX: Rx,
+{
+    fn drop(&mut self) {
+        self.i2s_rx.wait_rx_dma_done().ok();
+    }
+}
+
+pub trait I2sRead<W> {
+    fn read(&mut self, words: &mut [W]) -> Result<(), Error>;
+}
+
+pub trait I2sReadDma<T, P, RX, RXBUF>
+where
+    T: RegisterAccess,
+    P: I2sRxPins,
+    RX: Rx,
+{
+    fn read_dma(self, words: RXBUF) -> Result<I2sReadDmaTransfer<T, P, RX, RXBUF>, Error>
+    where
+        T: RegisterAccess,
+        P: I2sRxPins,
+        RX: Rx,
+        RXBUF: WriteBuffer<Word = u8>;
+
+    fn read_dma_circular(self, words: RXBUF) -> Result<I2sReadDmaTransfer<T, P, RX, RXBUF>, Error>
+    where
+        T: RegisterAccess,
+        P: I2sRxPins,
+        RX: Rx,
+        RXBUF: WriteBuffer<Word = u8>;
+}
+
+pub struct I2s<I, T, P, TX, RX>
+where
+    I: Instance<T>,
+    T: RegisterAccess + Clone,
+    P: I2sMclkPin,
+    TX: Tx,
+    RX: Rx,
+{
+    _peripheral: I,
+    _register_access: T,
+    _pins: P,
+    pub i2s_tx: TxCreator<T, TX>,
+    pub i2s_rx: RxCreator<T, RX>,
+}
+
+impl<I, T, P, TX, RX> I2s<I, T, P, TX, RX>
+where
+    I: Instance<T>,
+    T: RegisterAccess + Clone,
+    P: I2sMclkPin,
+    TX: Tx,
+    RX: Rx,
+{
+    fn new_internal<IP>(
+        i2s: I,
+        mut pins: P,
+        standard: Standard,
+        data_format: DataFormat,
+        sample_rate: impl Into<fugit::HertzU32>,
+        mut channel: Channel<TX, RX, IP>,
+        peripheral_clock_control: &mut PeripheralClockControl,
+        clocks: &Clocks,
+    ) -> Self
+    where
+        IP: I2sPeripheral,
+    {
+        // on ESP32-C3 / ESP32-S3 and later RX and TX are independent and
+        // could be configured totally independently but for now handle all
+        // the targets the same and force same configuration for both, TX and RX
+
+        let mut register_access = i2s.register_access();
+
+        channel.tx.init_channel();
+        peripheral_clock_control.enable(register_access.get_peripheral());
+        pins.configure(&mut register_access);
+        register_access.set_clock(calculate_clock(
+            sample_rate,
+            2,
+            data_format.channel_bits(),
+            clocks,
+        ));
+        register_access.configure(&standard, &data_format);
+        register_access.set_master();
+        register_access.update();
+
+        Self {
+            _peripheral: i2s,
+            _register_access: register_access.clone(),
+            _pins: pins,
+            i2s_tx: TxCreator {
+                register_access: register_access.clone(),
+                tx_channel: channel.tx,
+            },
+            i2s_rx: RxCreator {
+                register_access,
+                rx_channel: channel.rx,
+            },
+        }
+    }
+}
+
+pub trait I2s0New<I, T, P, TX, RX, IP>
+where
+    I: Instance<T>,
+    T: RegisterAccess + Clone,
+    P: I2sMclkPin,
+    TX: Tx,
+    RX: Rx,
+    IP: I2sPeripheral + I2s0Peripheral,
+    RX: Rx,
+{
+    fn new(
+        i2s: I,
+        pins: P,
+        standard: Standard,
+        data_format: DataFormat,
+        sample_rate: impl Into<fugit::HertzU32>,
+        channel: Channel<TX, RX, IP>,
+        peripheral_clock_control: &mut PeripheralClockControl,
+        clocks: &Clocks,
+    ) -> Self;
+}
+
+impl<I, T, P, TX, RX, IP> I2s0New<I, T, P, TX, RX, IP> for I2s<I, T, P, TX, RX>
+where
+    I: Instance<T> + I2s0Instance,
+    T: RegisterAccess + Clone,
+    P: I2sMclkPin,
+    TX: Tx,
+    RX: Rx,
+    IP: I2sPeripheral + I2s0Peripheral,
+{
+    fn new(
+        i2s: I,
+        pins: P,
+        standard: Standard,
+        data_format: DataFormat,
+        sample_rate: impl Into<fugit::HertzU32>,
+        channel: Channel<TX, RX, IP>,
+        peripheral_clock_control: &mut PeripheralClockControl,
+        clocks: &Clocks,
+    ) -> Self {
+        Self::new_internal(
+            i2s,
+            pins,
+            standard,
+            data_format,
+            sample_rate,
+            channel,
+            peripheral_clock_control,
+            clocks,
+        )
+    }
+}
+
+#[cfg(any(esp32s3))]
+pub trait I2s1New<I, T, P, TX, RX, IP>
+where
+    I: Instance<T>,
+    T: RegisterAccess + Clone,
+    P: I2sMclkPin,
+    TX: Tx,
+    RX: Rx,
+    IP: I2sPeripheral + I2s1Peripheral,
+    RX: Rx,
+{
+    fn new(
+        i2s: I,
+        pins: P,
+        standard: Standard,
+        data_format: DataFormat,
+        sample_rate: impl Into<fugit::HertzU32>,
+        channel: Channel<TX, RX, IP>,
+        peripheral_clock_control: &mut PeripheralClockControl,
+        clocks: &Clocks,
+    ) -> Self;
+}
+
+#[cfg(any(esp32s3))]
+impl<I, T, P, TX, RX, IP> I2s1New<I, T, P, TX, RX, IP> for I2s<I, T, P, TX, RX>
+where
+    I: Instance<T> + I2s1Instance,
+    T: RegisterAccess + Clone,
+    P: I2sMclkPin,
+    TX: Tx,
+    RX: Rx,
+    IP: I2sPeripheral + I2s1Peripheral,
+{
+    fn new(
+        i2s: I,
+        pins: P,
+        standard: Standard,
+        data_format: DataFormat,
+        sample_rate: impl Into<fugit::HertzU32>,
+        channel: Channel<TX, RX, IP>,
+        peripheral_clock_control: &mut PeripheralClockControl,
+        clocks: &Clocks,
+    ) -> Self {
+        Self::new_internal(
+            i2s,
+            pins,
+            standard,
+            data_format,
+            sample_rate,
+            channel,
+            peripheral_clock_control,
+            clocks,
+        )
+    }
+}
+
+pub struct I2sTx<T, P, TX>
+where
+    T: RegisterAccess,
+    P: I2sTxPins,
+    TX: Tx,
+{
+    register_access: T,
+    _pins: P,
+    tx_channel: TX,
+}
+
+impl<T, P, TX> I2sTx<T, P, TX>
+where
+    T: RegisterAccess,
+    P: I2sTxPins,
+    TX: Tx,
+{
+    fn new(mut register_access: T, mut pins: P, tx_channel: TX) -> Self {
+        pins.configure(&mut register_access);
+
+        Self {
+            register_access,
+            _pins: pins,
+            tx_channel,
+        }
+    }
+
+    fn write_bytes(&mut self, data: &[u8]) -> Result<(), Error> {
+        let ptr = data as *const _ as *const u8;
+
+        // Reset TX unit and TX FIFO
+        self.register_access.reset_tx();
+
+        // Enable corresponding interrupts if needed
+
+        // configure DMA outlink
+        self.tx_channel.prepare_transfer(
+            self.register_access.get_dma_peripheral(),
+            false,
+            ptr,
+            data.len(),
+        )?;
+
+        // set I2S_TX_STOP_EN if needed
+
+        // start: set I2S_TX_START
+        self.register_access.tx_start();
+
+        // wait until I2S_TX_IDLE is 1
+        self.register_access.wait_for_tx_done();
+
+        Ok(())
+    }
+
+    fn start_tx_transfer<TXBUF>(
+        mut self,
+        words: TXBUF,
+        circular: bool,
+    ) -> Result<I2sWriteDmaTransfer<T, P, TX, TXBUF>, Error>
+    where
+        TXBUF: ReadBuffer<Word = u8>,
+    {
+        let (ptr, len) = unsafe { words.read_buffer() };
+
+        // Reset TX unit and TX FIFO
+        self.register_access.reset_tx();
+
+        // Enable corresponding interrupts if needed
+
+        // configure DMA outlink
+        self.tx_channel.prepare_transfer(
+            self.register_access.get_dma_peripheral(),
+            circular,
+            ptr,
+            len,
+        )?;
+
+        // set I2S_TX_STOP_EN if needed
+
+        // start: set I2S_TX_START
+        self.register_access.tx_start();
+
+        Ok(I2sWriteDmaTransfer {
+            i2s_tx: self,
+            buffer: words,
+        })
+    }
+
+    fn wait_tx_dma_done(&self) -> Result<(), Error> {
+        // wait until I2S_TX_IDLE is 1
+        self.register_access.wait_for_tx_done();
+
+        Ok(())
+    }
+}
+
+impl<T, P, TX, W> I2sWrite<W> for I2sTx<T, P, TX>
+where
+    T: RegisterAccess,
+    P: I2sTxPins,
+    TX: Tx,
+    W: AcceptedWord,
+{
+    fn write(&mut self, words: &[W]) -> Result<(), Error> {
+        self.write_bytes(unsafe {
+            core::slice::from_raw_parts(
+                words as *const _ as *const u8,
+                words.len() * core::mem::size_of::<W>(),
+            )
+        })
+    }
+}
+
+impl<T, P, TX, TXBUF> I2sWriteDma<T, P, TX, TXBUF> for I2sTx<T, P, TX>
+where
+    T: RegisterAccess,
+    P: I2sTxPins,
+    TX: Tx,
+{
+    fn write_dma(self, words: TXBUF) -> Result<I2sWriteDmaTransfer<T, P, TX, TXBUF>, Error>
+    where
+        TXBUF: ReadBuffer<Word = u8>,
+    {
+        self.start_tx_transfer(words, false)
+    }
+
+    fn write_dma_circular(self, words: TXBUF) -> Result<I2sWriteDmaTransfer<T, P, TX, TXBUF>, Error>
+    where
+        TXBUF: ReadBuffer<Word = u8>,
+    {
+        self.start_tx_transfer(words, true)
+    }
+}
+
+pub struct I2sRx<T, P, RX>
+where
+    T: RegisterAccess,
+    P: I2sRxPins,
+    RX: Rx,
+{
+    register_access: T,
+    _pins: P,
+    rx_channel: RX,
+}
+
+impl<T, P, RX> I2sRx<T, P, RX>
+where
+    T: RegisterAccess,
+    P: I2sRxPins,
+    RX: Rx,
+{
+    fn new(mut register_access: T, mut pins: P, rx_channel: RX) -> Self {
+        pins.configure(&mut register_access);
+
+        Self {
+            register_access,
+            _pins: pins,
+            rx_channel,
+        }
+    }
+
+    fn read_bytes(&mut self, data: &mut [u8]) -> Result<(), Error> {
+        let ptr = data as *mut _ as *mut u8;
+
+        // Reset RX unit and RX FIFO
+        self.register_access.reset_rx();
+
+        // Enable corresponding interrupts if needed
+
+        // configure DMA outlink
+        self.rx_channel.prepare_transfer(
+            false,
+            self.register_access.get_dma_peripheral(),
+            ptr,
+            data.len(),
+        )?;
+
+        // set I2S_TX_STOP_EN if needed
+
+        // start: set I2S_TX_START
+        self.register_access.rx_start(data.len() - 1);
+
+        // wait until I2S_TX_IDLE is 1
+        self.register_access.wait_for_rx_done();
+
+        Ok(())
+    }
+
+    fn start_rx_transfer<RXBUF>(
+        mut self,
+        mut words: RXBUF,
+        circular: bool,
+    ) -> Result<I2sReadDmaTransfer<T, P, RX, RXBUF>, Error>
+    where
+        RXBUF: WriteBuffer<Word = u8>,
+    {
+        let (ptr, len) = unsafe { words.write_buffer() };
+
+        if len % 4 != 0 {
+            return Err(Error::IllegalArgument);
+        }
+
+        // Reset TX unit and TX FIFO
+        self.register_access.reset_rx();
+
+        // Enable corresponding interrupts if needed
+
+        // configure DMA outlink
+        self.rx_channel.prepare_transfer(
+            circular,
+            self.register_access.get_dma_peripheral(),
+            ptr,
+            len,
+        )?;
+
+        // set I2S_TX_STOP_EN if needed
+
+        // start: set I2S_RX_START
+        #[cfg(not(esp32))]
+        self.register_access.rx_start(len - 1);
+
+        #[cfg(esp32)]
+        self.register_access.rx_start(len);
+
+        Ok(I2sReadDmaTransfer {
+            i2s_rx: self,
+            buffer: words,
+        })
+    }
+
+    fn wait_rx_dma_done(&self) -> Result<(), Error> {
+        self.register_access.wait_for_rx_done();
+
+        Ok(())
+    }
+}
+
+impl<W, T, P, RX> I2sRead<W> for I2sRx<T, P, RX>
+where
+    T: RegisterAccess,
+    P: I2sRxPins,
+    RX: Rx,
+    W: AcceptedWord,
+{
+    fn read(&mut self, words: &mut [W]) -> Result<(), Error> {
+        if words.len() * core::mem::size_of::<W>() > 4096 || words.len() == 0 {
+            return Err(Error::IllegalArgument);
+        }
+
+        self.read_bytes(unsafe {
+            core::slice::from_raw_parts_mut(
+                words as *mut _ as *mut u8,
+                words.len() * core::mem::size_of::<W>(),
+            )
+        })
+    }
+}
+
+impl<T, P, RX, RXBUF> I2sReadDma<T, P, RX, RXBUF> for I2sRx<T, P, RX>
+where
+    T: RegisterAccess,
+    P: I2sRxPins,
+    RX: Rx,
+{
+    fn read_dma(self, words: RXBUF) -> Result<I2sReadDmaTransfer<T, P, RX, RXBUF>, Error>
+    where
+        RXBUF: WriteBuffer<Word = u8>,
+    {
+        self.start_rx_transfer(words, false)
+    }
+
+    fn read_dma_circular(self, words: RXBUF) -> Result<I2sReadDmaTransfer<T, P, RX, RXBUF>, Error>
+    where
+        RXBUF: WriteBuffer<Word = u8>,
+    {
+        self.start_rx_transfer(words, true)
+    }
+}
+
+mod private {
+    use fugit::HertzU32;
+
+    use super::{DataFormat, I2sRx, I2sTx, Standard};
+    #[cfg(any(esp32c3, esp32s2))]
+    use crate::pac::i2s::RegisterBlock;
+    // on ESP32-S3 I2S1 doesn't support all features - use that to avoid using those features
+    // by accident
+    #[cfg(any(esp32s3, esp32))]
+    use crate::pac::i2s1::RegisterBlock;
+    #[cfg(any(esp32c3, esp32s2))]
+    use crate::pac::I2S;
+    #[cfg(any(esp32s3, esp32))]
+    use crate::pac::I2S0 as I2S;
+    use crate::{
+        clock::Clocks,
+        dma::{
+            private::{Rx, Tx},
+            DmaPeripheral,
+        },
+        system::Peripheral,
+        types::{InputSignal, OutputSignal},
+    };
+
+    pub trait I2sTxPins {
+        fn configure<I>(&mut self, instance: &mut I)
+        where
+            I: RegisterAccess;
+    }
+
+    pub trait I2sRxPins {
+        fn configure<I>(&mut self, instance: &mut I)
+        where
+            I: RegisterAccess;
+    }
+
+    pub trait I2sMclkPin {
+        fn configure<I>(&mut self, instance: &mut I)
+        where
+            I: RegisterAccess;
+    }
+
+    pub struct TxCreator<T, TX>
+    where
+        T: RegisterAccess + Clone,
+        TX: Tx,
+    {
+        pub register_access: T,
+        pub tx_channel: TX,
+    }
+
+    impl<T, TX> TxCreator<T, TX>
+    where
+        T: RegisterAccess + Clone,
+        TX: Tx,
+    {
+        pub fn with_pins<P>(self, mut pins: P) -> I2sTx<T, P, TX>
+        where
+            P: I2sTxPins,
+        {
+            let mut register_access = self.register_access.clone();
+            pins.configure(&mut register_access);
+
+            I2sTx::new(self.register_access, pins, self.tx_channel)
+        }
+    }
+
+    pub struct RxCreator<T, RX>
+    where
+        T: RegisterAccess + Clone,
+        RX: Rx,
+    {
+        pub register_access: T,
+        pub rx_channel: RX,
+    }
+
+    impl<T, RX> RxCreator<T, RX>
+    where
+        T: RegisterAccess + Clone,
+        RX: Rx,
+    {
+        pub fn with_pins<P>(self, mut pins: P) -> I2sRx<T, P, RX>
+        where
+            P: I2sRxPins,
+        {
+            let mut register_access = self.register_access.clone();
+            pins.configure(&mut register_access);
+
+            I2sRx::new(self.register_access, pins, self.rx_channel)
+        }
+    }
+
+    pub trait I2s0Instance {}
+
+    pub trait I2s1Instance {}
+
+    pub trait Instance<R>
+    where
+        R: RegisterAccess,
+    {
+        fn register_access(&self) -> R;
+    }
+
+    impl Instance<I2sPeripheral0> for I2S {
+        fn register_access(&self) -> I2sPeripheral0 {
+            I2sPeripheral0 {}
+        }
+    }
+
+    impl I2s0Instance for I2S {}
+
+    #[cfg(esp32s3)]
+    impl Instance<I2sPeripheral1> for crate::pac::I2S1 {
+        fn register_access(&self) -> I2sPeripheral1 {
+            I2sPeripheral1 {}
+        }
+    }
+
+    #[cfg(esp32s3)]
+    impl I2s1Instance for crate::pac::I2S1 {}
+
+    pub trait Signals {
+        fn get_peripheral(&self) -> Peripheral;
+
+        fn get_dma_peripheral(&self) -> DmaPeripheral;
+
+        fn mclk_signal(&self) -> OutputSignal;
+
+        fn bclk_signal(&self) -> OutputSignal;
+
+        fn ws_signal(&self) -> OutputSignal;
+
+        fn dout_signal(&self) -> OutputSignal;
+
+        fn bclk_rx_signal(&self) -> OutputSignal;
+
+        fn ws_rx_signal(&self) -> OutputSignal;
+
+        fn din_signal(&self) -> InputSignal;
+    }
+
+    pub trait RegBlock {
+        fn register_block(&self) -> &'static RegisterBlock;
+    }
+
+    #[cfg(any(esp32, esp32s2))]
+    pub trait RegisterAccess: Signals + RegBlock {
+        fn set_clock(&self, clock_settings: I2sClockDividers) {
+            let i2s = self.register_block();
+
+            i2s.clkm_conf.modify(|r, w| unsafe {
+                w.bits(r.bits() | (2 << 21)) // select PLL_160M
+            });
+
+            #[cfg(esp32)]
+            i2s.clkm_conf.modify(|_, w| w.clka_ena().clear_bit());
+
+            i2s.clkm_conf.modify(|_, w| {
+                w.clk_en()
+                    .set_bit()
+                    .clkm_div_num()
+                    .variant(clock_settings.mclk_divider as u8)
+            });
+
+            i2s.sample_rate_conf.modify(|_, w| {
+                w.tx_bck_div_num()
+                    .variant(clock_settings.bclk_divider as u8)
+                    .rx_bck_div_num()
+                    .variant(clock_settings.bclk_divider as u8)
+            });
+
+            i2s.clkm_conf
+                .modify(|_, w| w.clkm_div_b().variant(0).clkm_div_a().variant(0));
+        }
+
+        fn configure(&self, _standard: &Standard, data_format: &DataFormat) {
+            let i2s = self.register_block();
+
+            let fifo_mod = match data_format {
+                DataFormat::Data32Channel32 => 2,
+                DataFormat::Data16Channel16 => 0,
+            };
+
+            i2s.sample_rate_conf
+                .modify(|_, w| w.tx_bits_mod().variant(data_format.channel_bits()));
+            i2s.sample_rate_conf
+                .modify(|_, w| w.rx_bits_mod().variant(data_format.channel_bits()));
+
+            i2s.conf.modify(|_, w| {
+                w.tx_slave_mod()
+                    .clear_bit()
+                    .rx_slave_mod()
+                    .clear_bit()
+                    .tx_msb_shift()
+                    .set_bit() // ?
+                    .rx_msb_shift()
+                    .set_bit() // ?
+                    .tx_short_sync()
+                    .variant(false) //??
+                    .rx_short_sync()
+                    .variant(false) //??
+                    .tx_msb_right()
+                    .clear_bit()
+                    .rx_msb_right()
+                    .clear_bit()
+                    .tx_right_first()
+                    .clear_bit()
+                    .rx_right_first()
+                    .clear_bit()
+                    .tx_mono()
+                    .clear_bit()
+                    .rx_mono()
+                    .clear_bit()
+                    .sig_loopback()
+                    .clear_bit()
+            });
+
+            i2s.fifo_conf.modify(|_, w| {
+                w.tx_fifo_mod()
+                    .variant(fifo_mod)
+                    .tx_fifo_mod_force_en()
+                    .set_bit()
+                    .dscr_en()
+                    .set_bit()
+                    .rx_fifo_mod()
+                    .variant(fifo_mod)
+                    .rx_fifo_mod_force_en()
+                    .set_bit()
+            });
+
+            i2s.conf_chan
+                .modify(|_, w| w.tx_chan_mod().variant(0).rx_chan_mod().variant(0)); // for now only stereo
+
+            i2s.conf1
+                .modify(|_, w| w.tx_pcm_bypass().set_bit().rx_pcm_bypass().set_bit());
+
+            i2s.pd_conf
+                .modify(|_, w| w.fifo_force_pu().set_bit().fifo_force_pd().clear_bit());
+
+            i2s.conf2
+                .modify(|_, w| w.camera_en().clear_bit().lcd_en().clear_bit());
+        }
+
+        fn set_master(&self) {
+            let i2s = self.register_block();
+            i2s.conf
+                .modify(|_, w| w.rx_slave_mod().clear_bit().tx_slave_mod().clear_bit());
+        }
+
+        fn update(&self) {
+            // nothing to do
+        }
+
+        fn reset_tx(&self) {
+            let i2s = self.register_block();
+            i2s.conf
+                .modify(|_, w| w.tx_reset().set_bit().tx_fifo_reset().set_bit());
+            i2s.conf
+                .modify(|_, w| w.tx_reset().clear_bit().tx_fifo_reset().clear_bit());
+
+            i2s.lc_conf.modify(|_, w| w.out_rst().set_bit());
+            i2s.lc_conf.modify(|_, w| w.out_rst().clear_bit());
+
+            i2s.int_clr.write(|w| {
+                w.out_done_int_clr()
+                    .set_bit()
+                    .out_total_eof_int_clr()
+                    .set_bit()
+            });
+        }
+
+        fn tx_start(&self) {
+            let i2s = self.register_block();
+            i2s.conf.modify(|_, w| w.tx_start().set_bit());
+        }
+
+        fn wait_for_tx_done(&self) {
+            let i2s = self.register_block();
+            while i2s.state.read().tx_idle().bit_is_clear() {
+                // wait
+            }
+
+            i2s.conf.modify(|_, w| w.tx_start().clear_bit());
+        }
+
+        fn reset_rx(&self) {
+            let i2s = self.register_block();
+            i2s.conf
+                .modify(|_, w| w.rx_reset().set_bit().rx_fifo_reset().set_bit());
+            i2s.conf
+                .modify(|_, w| w.rx_reset().clear_bit().rx_fifo_reset().clear_bit());
+
+            i2s.lc_conf.modify(|_, w| w.in_rst().set_bit());
+            i2s.lc_conf.modify(|_, w| w.in_rst().clear_bit());
+
+            i2s.int_clr
+                .write(|w| w.in_done_int_clr().set_bit().in_suc_eof_int_clr().set_bit());
+        }
+
+        fn rx_start(&self, len: usize) {
+            let i2s = self.register_block();
+
+            i2s.int_clr.write(|w| w.in_suc_eof_int_clr().set_bit());
+
+            #[cfg(not(esp32))]
+            i2s.rxeof_num
+                .modify(|_, w| w.rx_eof_num().variant(len as u32));
+
+            // On ESP32, the eof_num count in words.
+            #[cfg(esp32)]
+            i2s.rxeof_num
+                .modify(|_, w| w.rx_eof_num().variant((len / 4) as u32));
+
+            i2s.conf.modify(|_, w| w.rx_start().set_bit());
+        }
+
+        fn wait_for_rx_done(&self) {
+            let i2s = self.register_block();
+            while i2s.int_raw.read().in_suc_eof_int_raw().bit_is_clear() {
+                // wait
+            }
+
+            i2s.int_clr.write(|w| w.in_suc_eof_int_clr().set_bit());
+        }
+    }
+
+    #[cfg(any(esp32c3, esp32s3))]
+    pub trait RegisterAccess: Signals + RegBlock {
+        fn set_clock(&self, clock_settings: I2sClockDividers) {
+            let i2s = self.register_block();
+            i2s.tx_clkm_conf.modify(|_, w| {
+                w.clk_en()
+                    .set_bit()
+                    .tx_clk_active()
+                    .set_bit()
+                    .tx_clk_sel()
+                    .variant(2) // for now fixed at 160MHz
+                    .tx_clkm_div_num()
+                    .variant(clock_settings.mclk_divider as u8)
+            });
+
+            i2s.tx_conf1.modify(|_, w| {
+                w.tx_bck_div_num()
+                    .variant(clock_settings.bclk_divider as u8)
+            });
+
+            i2s.tx_clkm_div_conf.modify(|_, w| {
+                w.tx_clkm_div_x()
+                    .variant(0)
+                    .tx_clkm_div_y()
+                    .variant(1)
+                    .tx_clkm_div_yn1()
+                    .variant(false)
+                    .tx_clkm_div_z()
+                    .variant(0)
+            });
+
+            i2s.rx_clkm_conf.modify(|_, w| {
+                w.rx_clk_active()
+                    .set_bit()
+                    .rx_clk_sel()
+                    .variant(2) // for now fixed at 160MHz
+                    .rx_clkm_div_num()
+                    .variant(clock_settings.mclk_divider as u8)
+            });
+
+            i2s.rx_conf1.modify(|_, w| {
+                w.rx_bck_div_num()
+                    .variant(clock_settings.bclk_divider as u8)
+            });
+
+            i2s.rx_clkm_div_conf.modify(|_, w| {
+                w.rx_clkm_div_x()
+                    .variant(0)
+                    .rx_clkm_div_y()
+                    .variant(1)
+                    .rx_clkm_div_yn1()
+                    .variant(false)
+                    .rx_clkm_div_z()
+                    .variant(0)
+            });
+        }
+
+        fn configure(&self, _standard: &Standard, data_format: &DataFormat) {
+            let i2s = self.register_block();
+            i2s.tx_conf1.modify(|_, w| {
+                w.tx_tdm_ws_width()
+                    .variant(data_format.channel_bits() - 1)
+                    .tx_bits_mod()
+                    .variant(data_format.data_bits() - 1)
+                    .tx_tdm_chan_bits()
+                    .variant(data_format.channel_bits() - 1)
+                    .tx_half_sample_bits()
+                    .variant(data_format.channel_bits() - 1)
+                    .tx_msb_shift()
+                    .set_bit()
+            });
+
+            i2s.tx_conf.modify(|_, w| {
+                w.tx_mono()
+                    .clear_bit()
+                    .tx_mono_fst_vld()
+                    .set_bit()
+                    .tx_stop_en()
+                    .set_bit()
+                    .tx_chan_equal()
+                    .clear_bit()
+                    .tx_tdm_en()
+                    .set_bit()
+                    .tx_pdm_en()
+                    .clear_bit()
+                    .tx_pcm_bypass()
+                    .set_bit()
+                    .tx_big_endian()
+                    .clear_bit()
+                    .tx_bit_order()
+                    .clear_bit()
+                    .tx_chan_mod()
+                    .variant(0)
+            });
+
+            i2s.tx_tdm_ctrl.modify(|_, w| {
+                w.tx_tdm_tot_chan_num()
+                    .variant(1)
+                    .tx_tdm_chan0_en()
+                    .set_bit()
+                    .tx_tdm_chan1_en()
+                    .set_bit()
+                    .tx_tdm_chan2_en()
+                    .clear_bit()
+                    .tx_tdm_chan3_en()
+                    .clear_bit()
+                    .tx_tdm_chan4_en()
+                    .clear_bit()
+                    .tx_tdm_chan5_en()
+                    .clear_bit()
+                    .tx_tdm_chan6_en()
+                    .clear_bit()
+                    .tx_tdm_chan7_en()
+                    .clear_bit()
+                    .tx_tdm_chan8_en()
+                    .clear_bit()
+                    .tx_tdm_chan9_en()
+                    .clear_bit()
+                    .tx_tdm_chan10_en()
+                    .clear_bit()
+                    .tx_tdm_chan11_en()
+                    .clear_bit()
+                    .tx_tdm_chan12_en()
+                    .clear_bit()
+                    .tx_tdm_chan13_en()
+                    .clear_bit()
+                    .tx_tdm_chan14_en()
+                    .clear_bit()
+                    .tx_tdm_chan15_en()
+                    .clear_bit()
+            });
+
+            i2s.rx_conf1.modify(|_, w| {
+                w.rx_tdm_ws_width()
+                    .variant(data_format.channel_bits() - 1)
+                    .rx_bits_mod()
+                    .variant(data_format.data_bits() - 1)
+                    .rx_tdm_chan_bits()
+                    .variant(data_format.channel_bits() - 1)
+                    .rx_half_sample_bits()
+                    .variant(data_format.channel_bits() - 1)
+            });
+
+            i2s.rx_conf.modify(|_, w| {
+                w.rx_mono()
+                    .clear_bit()
+                    .rx_mono_fst_vld()
+                    .set_bit()
+                    .rx_stop_mode()
+                    .variant(2)
+                    .rx_tdm_en()
+                    .set_bit()
+                    .rx_pdm_en()
+                    .clear_bit()
+                    .rx_pcm_bypass()
+                    .set_bit()
+            });
+
+            i2s.rx_tdm_ctrl.modify(|_, w| {
+                w.rx_tdm_tot_chan_num()
+                    .variant(1)
+                    .rx_tdm_pdm_chan0_en()
+                    .set_bit()
+                    .rx_tdm_pdm_chan1_en()
+                    .set_bit()
+                    .rx_tdm_pdm_chan2_en()
+                    .clear_bit()
+                    .rx_tdm_pdm_chan3_en()
+                    .clear_bit()
+                    .rx_tdm_pdm_chan4_en()
+                    .clear_bit()
+                    .rx_tdm_pdm_chan5_en()
+                    .clear_bit()
+                    .rx_tdm_pdm_chan6_en()
+                    .clear_bit()
+                    .rx_tdm_pdm_chan7_en()
+                    .clear_bit()
+                    .rx_tdm_chan8_en()
+                    .clear_bit()
+                    .rx_tdm_chan9_en()
+                    .clear_bit()
+                    .rx_tdm_chan10_en()
+                    .clear_bit()
+                    .rx_tdm_chan11_en()
+                    .clear_bit()
+                    .rx_tdm_chan12_en()
+                    .clear_bit()
+                    .rx_tdm_chan13_en()
+                    .clear_bit()
+                    .rx_tdm_chan14_en()
+                    .clear_bit()
+                    .rx_tdm_chan15_en()
+                    .clear_bit()
+            });
+        }
+
+        fn set_master(&self) {
+            let i2s = self.register_block();
+            i2s.tx_conf.modify(|_, w| w.tx_slave_mod().clear_bit());
+            i2s.rx_conf.modify(|_, w| w.rx_slave_mod().clear_bit());
+        }
+
+        fn update(&self) {
+            let i2s = self.register_block();
+            i2s.tx_conf.modify(|_, w| w.tx_update().clear_bit());
+            i2s.tx_conf.modify(|_, w| w.tx_update().set_bit());
+
+            i2s.rx_conf.modify(|_, w| w.rx_update().clear_bit());
+            i2s.rx_conf.modify(|_, w| w.rx_update().set_bit());
+        }
+
+        fn reset_tx(&self) {
+            let i2s = self.register_block();
+            i2s.tx_conf
+                .modify(|_, w| w.tx_reset().set_bit().tx_fifo_reset().set_bit());
+            i2s.tx_conf
+                .modify(|_, w| w.tx_reset().clear_bit().tx_fifo_reset().clear_bit());
+
+            i2s.int_clr
+                .write(|w| w.tx_done_int_clr().set_bit().tx_hung_int_clr().set_bit());
+        }
+
+        fn tx_start(&self) {
+            let i2s = self.register_block();
+            i2s.tx_conf.modify(|_, w| w.tx_start().set_bit());
+        }
+
+        fn wait_for_tx_done(&self) {
+            let i2s = self.register_block();
+            while i2s.state.read().tx_idle().bit_is_clear() {
+                // wait
+            }
+
+            i2s.tx_conf.modify(|_, w| w.tx_start().clear_bit());
+        }
+
+        fn reset_rx(&self) {
+            let i2s = self.register_block();
+            i2s.rx_conf
+                .modify(|_, w| w.rx_reset().set_bit().rx_fifo_reset().set_bit());
+            i2s.rx_conf
+                .modify(|_, w| w.rx_reset().clear_bit().rx_fifo_reset().clear_bit());
+
+            i2s.int_clr
+                .write(|w| w.rx_done_int_clr().set_bit().rx_hung_int_clr().set_bit());
+        }
+
+        fn rx_start(&self, len: usize) {
+            let i2s = self.register_block();
+            i2s.rxeof_num.write(|w| w.rx_eof_num().variant(len as u16));
+            i2s.rx_conf.modify(|_, w| w.rx_start().set_bit());
+        }
+
+        fn wait_for_rx_done(&self) {
+            let i2s = self.register_block();
+            while i2s.int_raw.read().rx_done_int_raw().bit_is_clear() {
+                // wait
+            }
+
+            i2s.int_clr.write(|w| w.rx_done_int_clr().set_bit());
+        }
+    }
+
+    #[derive(Clone)]
+    pub struct I2sPeripheral0 {}
+
+    #[cfg(any(esp32s3, esp32))]
+    #[derive(Clone)]
+    pub struct I2sPeripheral1 {}
+
+    #[cfg(esp32c3)]
+    impl Signals for I2sPeripheral0 {
+        fn get_peripheral(&self) -> Peripheral {
+            Peripheral::I2s0
+        }
+
+        fn get_dma_peripheral(&self) -> DmaPeripheral {
+            DmaPeripheral::I2s0
+        }
+
+        fn mclk_signal(&self) -> OutputSignal {
+            OutputSignal::I2S_MCLK
+        }
+
+        fn bclk_signal(&self) -> OutputSignal {
+            OutputSignal::I2SO_BCK
+        }
+
+        fn ws_signal(&self) -> OutputSignal {
+            OutputSignal::I2SO_WS
+        }
+
+        fn dout_signal(&self) -> OutputSignal {
+            OutputSignal::I2SI_SD
+        }
+
+        fn bclk_rx_signal(&self) -> OutputSignal {
+            OutputSignal::I2SI_BCK
+        }
+
+        fn ws_rx_signal(&self) -> OutputSignal {
+            OutputSignal::I2SI_WS
+        }
+
+        fn din_signal(&self) -> InputSignal {
+            InputSignal::I2SI_SD
+        }
+    }
+
+    #[cfg(esp32s3)]
+    impl Signals for I2sPeripheral0 {
+        fn get_peripheral(&self) -> Peripheral {
+            Peripheral::I2s0
+        }
+
+        fn get_dma_peripheral(&self) -> DmaPeripheral {
+            DmaPeripheral::I2s0
+        }
+
+        fn mclk_signal(&self) -> OutputSignal {
+            OutputSignal::I2S0_MCLK
+        }
+
+        fn bclk_signal(&self) -> OutputSignal {
+            OutputSignal::I2S0O_BCK
+        }
+
+        fn ws_signal(&self) -> OutputSignal {
+            OutputSignal::I2S0O_WS
+        }
+
+        fn dout_signal(&self) -> OutputSignal {
+            OutputSignal::I2S0O_SD
+        }
+
+        fn bclk_rx_signal(&self) -> OutputSignal {
+            OutputSignal::I2S0I_BCK
+        }
+
+        fn ws_rx_signal(&self) -> OutputSignal {
+            OutputSignal::I2S0I_WS
+        }
+
+        fn din_signal(&self) -> InputSignal {
+            InputSignal::I2S0I_SD
+        }
+    }
+
+    #[cfg(esp32s3)]
+    impl Signals for I2sPeripheral1 {
+        fn get_peripheral(&self) -> Peripheral {
+            Peripheral::I2s1
+        }
+
+        fn get_dma_peripheral(&self) -> DmaPeripheral {
+            DmaPeripheral::I2s1
+        }
+
+        fn mclk_signal(&self) -> OutputSignal {
+            OutputSignal::I2S1_MCLK
+        }
+
+        fn bclk_signal(&self) -> OutputSignal {
+            OutputSignal::I2S1O_BCK
+        }
+
+        fn ws_signal(&self) -> OutputSignal {
+            OutputSignal::I2S1O_WS
+        }
+
+        fn dout_signal(&self) -> OutputSignal {
+            OutputSignal::I2S1O_SD
+        }
+
+        fn bclk_rx_signal(&self) -> OutputSignal {
+            OutputSignal::I2S1I_BCK
+        }
+
+        fn ws_rx_signal(&self) -> OutputSignal {
+            OutputSignal::I2S1I_WS
+        }
+
+        fn din_signal(&self) -> InputSignal {
+            InputSignal::I2S1I_SD
+        }
+    }
+
+    #[cfg(esp32)]
+    impl Signals for I2sPeripheral0 {
+        fn get_peripheral(&self) -> Peripheral {
+            Peripheral::I2s0
+        }
+
+        fn get_dma_peripheral(&self) -> DmaPeripheral {
+            DmaPeripheral::I2s0
+        }
+
+        fn mclk_signal(&self) -> OutputSignal {
+            panic!("MCLK currently not supported on ESP32");
+        }
+
+        fn bclk_signal(&self) -> OutputSignal {
+            OutputSignal::I2S0O_BCK
+        }
+
+        fn ws_signal(&self) -> OutputSignal {
+            OutputSignal::I2S0O_WS
+        }
+
+        fn dout_signal(&self) -> OutputSignal {
+            OutputSignal::I2S0O_DATA_23
+        }
+
+        fn bclk_rx_signal(&self) -> OutputSignal {
+            OutputSignal::I2S0I_BCK
+        }
+
+        fn ws_rx_signal(&self) -> OutputSignal {
+            OutputSignal::I2S0I_WS
+        }
+
+        fn din_signal(&self) -> InputSignal {
+            InputSignal::I2S0I_DATA_15
+        }
+    }
+
+    #[cfg(esp32)]
+    impl Signals for I2sPeripheral1 {
+        fn get_peripheral(&self) -> Peripheral {
+            Peripheral::I2s1
+        }
+
+        fn get_dma_peripheral(&self) -> DmaPeripheral {
+            DmaPeripheral::I2s1
+        }
+
+        fn mclk_signal(&self) -> OutputSignal {
+            panic!("MCLK currently not supported on ESP32");
+        }
+
+        fn bclk_signal(&self) -> OutputSignal {
+            OutputSignal::I2S1O_BCK
+        }
+
+        fn ws_signal(&self) -> OutputSignal {
+            OutputSignal::I2S1O_WS
+        }
+
+        fn dout_signal(&self) -> OutputSignal {
+            OutputSignal::I2S1O_DATA_23
+        }
+
+        fn bclk_rx_signal(&self) -> OutputSignal {
+            OutputSignal::I2S1I_BCK
+        }
+
+        fn ws_rx_signal(&self) -> OutputSignal {
+            OutputSignal::I2S1I_WS
+        }
+
+        fn din_signal(&self) -> InputSignal {
+            InputSignal::I2S1I_DATA_15
+        }
+    }
+
+    #[cfg(esp32s2)]
+    impl Signals for I2sPeripheral0 {
+        fn get_peripheral(&self) -> Peripheral {
+            Peripheral::I2s0
+        }
+
+        fn get_dma_peripheral(&self) -> DmaPeripheral {
+            DmaPeripheral::I2s0
+        }
+
+        fn mclk_signal(&self) -> OutputSignal {
+            OutputSignal::CLK_I2S
+        }
+
+        fn bclk_signal(&self) -> OutputSignal {
+            OutputSignal::I2S0O_BCK
+        }
+
+        fn ws_signal(&self) -> OutputSignal {
+            OutputSignal::I2S0O_WS
+        }
+
+        fn dout_signal(&self) -> OutputSignal {
+            OutputSignal::I2S0O_DATA_OUT23
+        }
+
+        fn bclk_rx_signal(&self) -> OutputSignal {
+            OutputSignal::I2S0I_BCK
+        }
+
+        fn ws_rx_signal(&self) -> OutputSignal {
+            OutputSignal::I2S0I_WS
+        }
+
+        fn din_signal(&self) -> InputSignal {
+            InputSignal::I2S0I_DATA_IN15
+        }
+    }
+
+    impl RegBlock for I2sPeripheral0 {
+        fn register_block(&self) -> &'static RegisterBlock {
+            unsafe { core::mem::transmute(I2S::PTR) }
+        }
+    }
+
+    #[cfg(any(esp32s3, esp32))]
+    impl RegBlock for I2sPeripheral1 {
+        fn register_block(&self) -> &'static RegisterBlock {
+            unsafe { core::mem::transmute(crate::pac::I2S1::PTR) }
+        }
+    }
+
+    impl RegisterAccess for I2sPeripheral0 {}
+
+    #[cfg(any(esp32s3, esp32))]
+    impl RegisterAccess for I2sPeripheral1 {}
+
+    pub struct I2sClockDividers {
+        mclk_divider: u32,
+        bclk_divider: u32,
+    }
+
+    pub fn calculate_clock(
+        sample_rate: impl Into<fugit::HertzU32>,
+        channels: u8,
+        data_bits: u8,
+        _clocks: &Clocks,
+    ) -> I2sClockDividers {
+        // in esp-idf the functions looks not only different for every chip but
+        // also for TX/RX and for different modes
+
+        let mclk_multiple = 256;
+        let sclk = 160_000_000; // for now it's fixed PLL_160M_CLK
+
+        let rate_hz: HertzU32 = sample_rate.into();
+        let rate = rate_hz.raw();
+
+        let bclk = rate * channels as u32 * data_bits as u32;
+        let mclk = rate * mclk_multiple;
+        let bclk_divider = mclk / bclk;
+        let mclk_divider = sclk / mclk;
+
+        // this way we won't exactly match the desired frequency - for that we need
+        // to calculate clkm div_z, div_y, div_x, div_yn1
+
+        I2sClockDividers {
+            mclk_divider,
+            bclk_divider,
+        }
+    }
+}

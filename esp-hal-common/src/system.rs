@@ -34,6 +34,10 @@ pub enum Peripheral {
     Gdma,
     #[cfg(pdma)]
     Dma,
+    #[cfg(not(esp32c2))]
+    I2s0,
+    #[cfg(not(any(esp32c2, esp32s2, esp32c3)))]
+    I2s1,
     #[cfg(usb_otg)]
     Usb,
 }
@@ -121,6 +125,22 @@ impl PeripheralClockControl {
                 perip_rst_en0.modify(|_, w| w.spi2_dma_rst().clear_bit());
                 perip_clk_en0.modify(|_, w| w.spi3_dma_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.spi3_dma_rst().clear_bit());
+            }
+            #[cfg(esp32c3)]
+            Peripheral::I2s0 => {
+                // on ESP32-C3 note that i2s1_clk_en / rst is really I2s0
+                perip_clk_en0.modify(|_, w| w.i2s1_clk_en().set_bit());
+                perip_rst_en0.modify(|_, w| w.i2s1_rst().clear_bit());
+            }
+            #[cfg(any(esp32s3, esp32, esp32s2))]
+            Peripheral::I2s0 => {
+                perip_clk_en0.modify(|_, w| w.i2s0_clk_en().set_bit());
+                perip_rst_en0.modify(|_, w| w.i2s0_rst().clear_bit());
+            }
+            #[cfg(any(esp32s3, esp32))]
+            Peripheral::I2s1 => {
+                perip_clk_en0.modify(|_, w| w.i2s1_clk_en().set_bit());
+                perip_rst_en0.modify(|_, w| w.i2s1_rst().clear_bit());
             }
             #[cfg(usb_otg)]
             Peripheral::Usb => {

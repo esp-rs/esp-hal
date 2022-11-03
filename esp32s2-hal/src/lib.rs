@@ -8,6 +8,7 @@ pub use esp_hal_common::{
     dma::pdma,
     efuse,
     gpio as gpio_types,
+    i2s,
     i2c::{self, I2C},
     interrupt,
     ledc,

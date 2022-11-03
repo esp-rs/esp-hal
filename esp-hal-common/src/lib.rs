@@ -56,6 +56,10 @@ pub mod dma;
 pub mod embassy;
 pub mod gpio;
 pub mod i2c;
+
+#[cfg(any(esp32c3, esp32s3, esp32, esp32s2))]
+pub mod i2s;
+
 pub mod ledc;
 #[cfg(usb_otg)]
 pub mod otg_fs;

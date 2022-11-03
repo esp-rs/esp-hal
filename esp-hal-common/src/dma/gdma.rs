@@ -119,6 +119,38 @@ macro_rules! impl_channel {
                     ret
                 }
 
+                fn last_out_dscr_address() -> usize {
+                    let dma = unsafe { &*crate::pac::DMA::PTR };
+                    dma.[<out_eof_des_addr_ch $num>].read().out_eof_des_addr().bits() as usize
+                }
+
+                fn is_out_eof_interrupt_set() -> bool {
+                    let dma = unsafe { &*crate::pac::DMA::PTR };
+
+                    #[cfg(not(esp32s3))]
+                    let ret = dma.[<int_raw_ch $num>].read().out_eof().bit();
+                    #[cfg(esp32s3)]
+                    let ret = dma.[<out_int_raw_ch $num>].read().out_eof().bit();
+
+                    ret
+                }
+
+                fn reset_out_eof_interrupt() {
+                    let dma = unsafe { &*crate::pac::DMA::PTR };
+
+                    #[cfg(not(esp32s3))]
+                    dma.[<int_clr_ch $num>].write(|w| {
+                        w.out_eof()
+                            .set_bit()
+                    });
+
+                    #[cfg(esp32s3)]
+                    dma.[<out_int_clr_ch $num>].write(|w| {
+                        w.out_eof()
+                            .set_bit()
+                    });
+                }
+
                 fn set_in_burstmode(burst_mode: bool) {
                     let dma = unsafe { &*crate::pac::DMA::PTR };
 
@@ -225,6 +257,11 @@ macro_rules! impl_channel {
 
                     ret
                 }
+
+                fn last_in_dscr_address() -> usize {
+                    let dma = unsafe { &*crate::pac::DMA::PTR };
+                    dma.[<in_dscr_bf0_ch $num>].read().inlink_dscr_bf0().bits() as usize
+                }
             }
 
             pub struct [<Channel $num TxImpl>] {}
@@ -252,6 +289,12 @@ macro_rules! impl_channel {
                         descriptors: tx_descriptors,
                         burst_mode,
                         tx_impl: tx_impl,
+                        write_offset: 0,
+                        write_descr_ptr: core::ptr::null(),
+                        available: 0,
+                        last_seen_handled_descriptor_ptr: core::ptr::null(),
+                        buffer_start: core::ptr::null(),
+                        buffer_len: 0,
                         _phantom: PhantomData::default(),
                     };
 
@@ -262,6 +305,12 @@ macro_rules! impl_channel {
                         descriptors: rx_descriptors,
                         burst_mode,
                         rx_impl: rx_impl,
+                        read_offset: 0,
+                        read_descr_ptr: core::ptr::null(),
+                        available: 0,
+                        last_seen_handled_descriptor_ptr: core::ptr::null(),
+                        buffer_start: core::ptr::null(),
+                        buffer_len: 0,
                         _phantom: PhantomData::default(),
                     };
 
@@ -279,6 +328,9 @@ macro_rules! impl_channel {
             // with GDMA every channel can be used for any peripheral
             impl SpiPeripheral for [<SuitablePeripheral $num>] {}
             impl Spi2Peripheral for [<SuitablePeripheral $num>] {}
+            impl I2sPeripheral for [<SuitablePeripheral $num>] {}
+            impl I2s0Peripheral for [<SuitablePeripheral $num>] {}
+            impl I2s1Peripheral for [<SuitablePeripheral $num>] {}
         }
     };
 }

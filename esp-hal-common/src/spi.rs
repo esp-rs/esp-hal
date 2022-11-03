@@ -1000,8 +1000,18 @@ where
         self.enable_dma();
         self.update();
 
-        tx.prepare_transfer(self.dma_peripheral(), write_buffer_ptr, write_buffer_len)?;
-        rx.prepare_transfer(self.dma_peripheral(), read_buffer_ptr, read_buffer_len)?;
+        tx.prepare_transfer(
+            self.dma_peripheral(),
+            false,
+            write_buffer_ptr,
+            write_buffer_len,
+        )?;
+        rx.prepare_transfer(
+            false,
+            self.dma_peripheral(),
+            read_buffer_ptr,
+            read_buffer_len,
+        )?;
 
         self.clear_dma_interrupts();
 
@@ -1033,7 +1043,7 @@ where
         self.enable_dma();
         self.update();
 
-        tx.prepare_transfer(self.dma_peripheral(), ptr, len)?;
+        tx.prepare_transfer(self.dma_peripheral(), false, ptr, len)?;
 
         self.clear_dma_interrupts();
 
@@ -1054,7 +1064,7 @@ where
         self.enable_dma();
         self.update();
 
-        rx.prepare_transfer(self.dma_peripheral(), ptr, len)?;
+        rx.prepare_transfer(false, self.dma_peripheral(), ptr, len)?;
 
         self.clear_dma_interrupts();
 
