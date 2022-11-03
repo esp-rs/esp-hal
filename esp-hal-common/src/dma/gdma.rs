@@ -18,30 +18,17 @@ macro_rules! impl_channel {
                 fn set_out_burstmode(burst_mode: bool) {
                     let dma = unsafe { &*crate::pac::DMA::PTR };
 
-                    #[cfg(not(esp32s3))]
                     dma.[<out_conf0_ch $num>].modify(|_,w| {
-                        w.[<out_data_burst_en_ch $num>]().bit(burst_mode)
-                            .[<outdscr_burst_en_ch $num>]().bit(burst_mode)
-                    });
-
-                    #[cfg(esp32s3)]
-                    dma.[<out_conf0_ch $num>].modify(|_,w| {
-                        w.out_data_burst_en_ch().bit(burst_mode)
-                            .outdscr_burst_en_ch().bit(burst_mode)
+                        w.out_data_burst_en().bit(burst_mode)
+                            .outdscr_burst_en().bit(burst_mode)
                     });
                 }
 
                 fn set_out_priority(priority: DmaPriority) {
                     let dma = unsafe { &*crate::pac::DMA::PTR };
 
-                    #[cfg(not(esp32s3))]
                     dma.[<out_pri_ch $num>].write(|w| {
-                        w.[<tx_pri_ch $num>]().variant(priority as u8)
-                    });
-
-                    #[cfg(esp32s3)]
-                    dma.[<out_pri_ch $num>].write(|w| {
-                        w.tx_pri_ch().variant(priority as u8)
+                        w.tx_pri().variant(priority as u8)
                     });
                 }
 
@@ -50,37 +37,37 @@ macro_rules! impl_channel {
 
                     #[cfg(not(esp32s3))]
                     dma.[<int_clr_ch $num>].write(|w| {
-                        w.[<out_eof_ch $num _int_clr>]()
+                        w.out_eof()
                             .set_bit()
-                            .[<out_dscr_err_ch $num _int_clr>]()
+                            .out_dscr_err()
                             .set_bit()
-                            .[<out_done_ch $num _int_clr>]()
+                            .out_done()
                             .set_bit()
-                            .[<out_total_eof_ch $num _int_clr>]()
+                            .out_total_eof()
                             .set_bit()
-                            .[<outfifo_ovf_ch $num _int_clr>]()
+                            .outfifo_ovf()
                             .set_bit()
-                            .[<outfifo_udf_ch $num _int_clr>]()
+                            .outfifo_udf()
                             .set_bit()
                     });
 
                     #[cfg(esp32s3)]
                     dma.[<out_int_clr_ch $num>].write(|w| {
-                        w.out_eof_ch_int_clr()
+                        w.out_eof()
                             .set_bit()
-                            .out_dscr_err_ch_int_clr()
+                            .out_dscr_err()
                             .set_bit()
-                            .out_done_ch_int_clr()
+                            .out_done()
                             .set_bit()
-                            .out_total_eof_ch_int_clr()
+                            .out_total_eof()
                             .set_bit()
-                            .outfifo_ovf_l1_ch_int_clr()
+                            .outfifo_ovf_l1()
                             .set_bit()
-                            .outfifo_ovf_l3_ch_int_clr()
+                            .outfifo_ovf_l3()
                             .set_bit()
-                            .outfifo_udf_l1_ch_int_clr()
+                            .outfifo_udf_l1()
                             .set_bit()
-                            .outfifo_udf_l3_ch_int_clr()
+                            .outfifo_udf_l3()
                             .set_bit()
                     });
                 }
@@ -88,36 +75,23 @@ macro_rules! impl_channel {
                 fn reset_out() {
                     let dma = unsafe { &*crate::pac::DMA::PTR };
 
-                    #[cfg(not(esp32s3))]
-                    dma.[<out_conf0_ch $num>].modify(|_, w| w.[<out_rst_ch $num>]().set_bit());
-                    #[cfg(not(esp32s3))]
-                    dma.[<out_conf0_ch $num>].modify(|_, w| w.[<out_rst_ch $num>]().clear_bit());
-
-                    #[cfg(esp32s3)]
-                    dma.[<out_conf0_ch $num>].modify(|_, w| w.out_rst_ch().set_bit());
-                    #[cfg(esp32s3)]
-                    dma.[<out_conf0_ch $num>].modify(|_, w| w.out_rst_ch().clear_bit());
+                    dma.[<out_conf0_ch $num>].modify(|_, w| w.out_rst().set_bit());
+                    dma.[<out_conf0_ch $num>].modify(|_, w| w.out_rst().clear_bit());
                 }
 
                 fn set_out_descriptors(address: u32) {
                     let dma = unsafe { &*crate::pac::DMA::PTR };
 
-                    #[cfg(not(esp32s3))]
-                    dma.[<out_link_ch $num>]
-                        .modify(|_, w| unsafe { w.[<outlink_addr_ch $num>]().bits(address) });
-
-                    #[cfg(esp32s3)]
-                    dma.[<out_link_ch $num>].modify(|_, w| unsafe { w.outlink_addr_ch().bits(address) });
+                    dma.[<out_link_ch $num>].modify(|_, w| unsafe { w.outlink_addr().bits(address) });
                 }
 
                 fn has_out_descriptor_error() -> bool {
                     let dma = unsafe { &*crate::pac::DMA::PTR };
 
-                    #[cfg(esp32s3)]
-                    let ret = dma.[<out_int_raw_ch $num>].read().out_dscr_err_ch_int_raw().bit();
-
                     #[cfg(not(esp32s3))]
-                    let ret = dma.[<int_raw_ch $num>].read().[<out_dscr_err_ch $num _int_raw>]().bit();
+                    let ret = dma.[<int_raw_ch $num>].read().out_dscr_err().bit();
+                    #[cfg(esp32s3)]
+                    let ret = dma.[<out_int_raw_ch $num>].read().out_dscr_err().bit();
 
                     ret
                 }
@@ -125,33 +99,22 @@ macro_rules! impl_channel {
                 fn set_out_peripheral(peripheral: u8) {
                     let dma = unsafe { &*crate::pac::DMA::PTR };
 
-                    #[cfg(not(esp32s3))]
-                    dma.[<out_peri_sel_ch $num>]
-                        .modify(|_, w| w.[<peri_out_sel_ch $num>]().variant(peripheral));
-
-                    #[cfg(esp32s3)]
-                    dma.[<out_peri_sel_ch $num>].modify(|_, w| w.peri_out_sel_ch().variant(peripheral));
+                    dma.[<out_peri_sel_ch $num>].modify(|_, w| w.peri_out_sel().variant(peripheral));
                 }
 
                 fn start_out() {
                     let dma = unsafe { &*crate::pac::DMA::PTR };
 
-                    #[cfg(not(esp32s3))]
-                    dma.[<out_link_ch $num>]
-                        .modify(|_, w| w.[<outlink_start_ch $num>]().set_bit());
-
-                    #[cfg(esp32s3)]
-                    dma.[<out_link_ch $num>].modify(|_, w| w.outlink_start_ch().set_bit());
+                    dma.[<out_link_ch $num>].modify(|_, w| w.outlink_start().set_bit());
                 }
 
                 fn is_out_done() -> bool {
                     let dma = unsafe { &*crate::pac::DMA::PTR };
 
                     #[cfg(not(esp32s3))]
-                    let ret = dma.[<int_raw_ch $num>].read().[<out_total_eof_ch $num _int_raw>]().bit();
-
+                    let ret = dma.[<int_raw_ch $num>].read().out_total_eof().bit();
                     #[cfg(esp32s3)]
-                    let ret = dma.[<out_int_raw_ch $num>].read().out_total_eof_ch_int_raw().bit();
+                    let ret = dma.[<out_int_raw_ch $num>].read().out_total_eof().bit();
 
                     ret
                 }
@@ -159,29 +122,16 @@ macro_rules! impl_channel {
                 fn set_in_burstmode(burst_mode: bool) {
                     let dma = unsafe { &*crate::pac::DMA::PTR };
 
-                    #[cfg(not(esp32s3))]
                     dma.[<in_conf0_ch $num>].modify(|_,w| {
-                        w.[<in_data_burst_en_ch $num>]().bit(burst_mode)
-                            .[<indscr_burst_en_ch $num>]().bit(burst_mode)
-                    });
-
-                    #[cfg(esp32s3)]
-                    dma.[<in_conf0_ch $num>].modify(|_,w| {
-                        w.in_data_burst_en_ch().bit(burst_mode).indscr_burst_en_ch().bit(burst_mode)
+                        w.in_data_burst_en().bit(burst_mode).indscr_burst_en().bit(burst_mode)
                     });
                 }
 
                 fn set_in_priority(priority: DmaPriority) {
                     let dma = unsafe { &*crate::pac::DMA::PTR };
 
-                    #[cfg(not(esp32s3))]
                     dma.[<in_pri_ch $num>].write(|w| {
-                        w.[<rx_pri_ch $num>]().variant(priority as u8)
-                    });
-
-                    #[cfg(esp32s3)]
-                    dma.[<in_pri_ch $num>].write(|w| {
-                        w.rx_pri_ch().variant(priority as u8)
+                        w.rx_pri().variant(priority as u8)
                     });
                 }
 
@@ -190,41 +140,41 @@ macro_rules! impl_channel {
 
                     #[cfg(not(esp32s3))]
                     dma.[<int_clr_ch $num>].write(|w| {
-                        w.[<in_suc_eof_ch $num _int_clr>]()
+                        w.in_suc_eof()
                             .set_bit()
-                            .[<in_err_eof_ch $num _int_clr>]()
+                            .in_err_eof()
                             .set_bit()
-                            .[<in_dscr_err_ch $num _int_clr>]()
+                            .in_dscr_err()
                             .set_bit()
-                            .[<in_dscr_empty_ch $num _int_clr>]()
+                            .in_dscr_empty()
                             .set_bit()
-                            .[<in_done_ch $num _int_clr>]()
+                            .in_done()
                             .set_bit()
-                            .[<infifo_ovf_ch $num _int_clr>]()
+                            .infifo_ovf()
                             .set_bit()
-                            .[<infifo_udf_ch $num _int_clr>]()
+                            .infifo_udf()
                             .set_bit()
                     });
 
                     #[cfg(esp32s3)]
                     dma.[<in_int_clr_ch $num>].write(|w| {
-                        w.in_suc_eof_ch_int_clr()
+                        w.in_suc_eof()
                             .set_bit()
-                            .in_err_eof_ch_int_clr()
+                            .in_err_eof()
                             .set_bit()
-                            .in_dscr_err_ch_int_clr()
+                            .in_dscr_err()
                             .set_bit()
-                            .in_dscr_empty_ch_int_clr()
+                            .in_dscr_empty()
                             .set_bit()
-                            .in_done_ch_int_clr()
+                            .in_done()
                             .set_bit()
-                            .infifo_ovf_l1_ch_int_clr()
+                            .infifo_ovf_l1()
                             .set_bit()
-                            .infifo_ovf_l3_ch_int_clr()
+                            .infifo_ovf_l3()
                             .set_bit()
-                            .infifo_udf_l1_ch_int_clr()
+                            .infifo_udf_l1()
                             .set_bit()
-                            .infifo_udf_l3_ch_int_clr()
+                            .infifo_udf_l3()
                             .set_bit()
                     });
                 }
@@ -232,36 +182,23 @@ macro_rules! impl_channel {
                 fn reset_in() {
                     let dma = unsafe { &*crate::pac::DMA::PTR };
 
-                    #[cfg(not(esp32s3))]
-                    dma.[<in_conf0_ch $num>].modify(|_, w| w.[<in_rst_ch $num>]().set_bit());
-                    #[cfg(not(esp32s3))]
-                    dma.[<in_conf0_ch $num>].modify(|_, w| w.[<in_rst_ch $num>]().clear_bit());
-
-                    #[cfg(esp32s3)]
-                    dma.[<in_conf0_ch $num>].modify(|_, w| w.in_rst_ch().set_bit());
-                    #[cfg(esp32s3)]
-                    dma.[<in_conf0_ch $num>].modify(|_, w| w.in_rst_ch().clear_bit());
+                    dma.[<in_conf0_ch $num>].modify(|_, w| w.in_rst().set_bit());
+                    dma.[<in_conf0_ch $num>].modify(|_, w| w.in_rst().clear_bit());
                 }
 
                 fn set_in_descriptors(address: u32) {
                     let dma = unsafe { &*crate::pac::DMA::PTR };
 
-                    #[cfg(not(esp32s3))]
-                    dma.[<in_link_ch $num>]
-                        .modify(|_, w| unsafe { w.[<inlink_addr_ch $num>]().bits(address) });
-
-                    #[cfg(esp32s3)]
-                    dma.[<in_link_ch $num>].modify(|_, w| unsafe { w.inlink_addr_ch().bits(address) });
+                    dma.[<in_link_ch $num>].modify(|_, w| unsafe { w.inlink_addr().bits(address) });
                 }
 
                 fn has_in_descriptor_error() -> bool {
                     let dma = unsafe { &*crate::pac::DMA::PTR };
 
                     #[cfg(not(esp32s3))]
-                    let ret = dma.[<int_raw_ch $num>].read().[<in_dscr_err_ch $num _int_raw>]().bit();
-
+                    let ret = dma.[<int_raw_ch $num>].read().in_dscr_err().bit();
                     #[cfg(esp32s3)]
-                    let ret = dma.[<in_int_raw_ch $num>].read().in_dscr_err_ch_int_raw().bit();
+                    let ret = dma.[<in_int_raw_ch $num>].read().in_dscr_err().bit();
 
                     ret
                 }
@@ -269,33 +206,22 @@ macro_rules! impl_channel {
                 fn set_in_peripheral(peripheral: u8) {
                     let dma = unsafe { &*crate::pac::DMA::PTR };
 
-                    #[cfg(not(esp32s3))]
-                    dma.[<in_peri_sel_ch $num>]
-                        .modify(|_, w| w.[<peri_in_sel_ch $num>]().variant(peripheral));
-
-                    #[cfg(esp32s3)]
-                    dma.[<in_peri_sel_ch $num>].modify(|_, w| w.peri_in_sel_ch().variant(peripheral));
+                    dma.[<in_peri_sel_ch $num>].modify(|_, w| w.peri_in_sel().variant(peripheral));
                 }
 
                 fn start_in() {
                     let dma = unsafe { &*crate::pac::DMA::PTR };
 
-                    #[cfg(not(esp32s3))]
-                    dma.[<in_link_ch $num>]
-                        .modify(|_, w| w.[<inlink_start_ch $num>]().set_bit());
-
-                    #[cfg(esp32s3)]
-                    dma.[<in_link_ch $num>].modify(|_, w| w.inlink_start_ch().set_bit());
+                    dma.[<in_link_ch $num>].modify(|_, w| w.inlink_start().set_bit());
                 }
 
                 fn is_in_done() -> bool {
                     let dma = unsafe { &*crate::pac::DMA::PTR };
 
                     #[cfg(not(esp32s3))]
-                    let ret = dma.[<int_raw_ch $num>].read().[<in_suc_eof_ch $num _int_raw>]().bit();
-
+                    let ret = dma.[<int_raw_ch $num>].read().in_suc_eof().bit();
                     #[cfg(esp32s3)]
-                    let ret = dma.[<in_int_raw_ch $num>].read().in_suc_eof_ch_int_raw().bit();
+                    let ret = dma.[<in_int_raw_ch $num>].read().in_suc_eof().bit();
 
                     ret
                 }

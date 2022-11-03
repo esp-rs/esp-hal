@@ -46,10 +46,10 @@ ufmt-write = { version = "0.1.0", optional = true }
 # corresponding feature. We rename the PAC packages because we cannot
 # have dependencies and features with the same names.
 esp32   = { version = "0.14.0", features = ["critical-section"], optional = true }
-esp32c2 = { version = "0.3.0",  features = ["critical-section"], optional = true }
-esp32c3 = { version = "0.6.0",  features = ["critical-section"], optional = true }
+esp32c2 = { version = "0.4.0",  features = ["critical-section"], optional = true }
+esp32c3 = { version = "0.7.0",  features = ["critical-section"], optional = true }
 esp32s2 = { version = "0.5.0",  features = ["critical-section"], optional = true }
-esp32s3 = { version = "0.6.0",  features = ["critical-section"], optional = true }
+esp32s3 = { version = "0.7.0",  features = ["critical-section"], optional = true }
 
 [features]
 esp32   = ["esp32/rt"  , "procmacros/xtensa", "xtensa-lx-rt/esp32",   "xtensa-lx/esp32",   "critical-section/restore-state-u32", "lock_api"]
