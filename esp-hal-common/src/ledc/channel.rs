@@ -31,9 +31,9 @@ pub enum Number {
     Channel3,
     Channel4,
     Channel5,
-    #[cfg(not(esp32c3))]
+    #[cfg(not(any(esp32c2, esp32c3)))]
     Channel6,
-    #[cfg(not(esp32c3))]
+    #[cfg(not(any(esp32c2, esp32c3)))]
     Channel7,
 }
 
@@ -373,14 +373,14 @@ where
                     self.output_pin
                         .connect_peripheral_to_output(OutputSignal::LEDC_LS_SIG5);
                 }
-                #[cfg(not(esp32c3))]
+                #[cfg(not(any(esp32c2, esp32c3)))]
                 Number::Channel6 => {
                     set_channel!(self, l, 6, timer_number);
                     update_channel!(self, 6);
                     self.output_pin
                         .connect_peripheral_to_output(OutputSignal::LEDC_LS_SIG6);
                 }
-                #[cfg(not(esp32c3))]
+                #[cfg(not(any(esp32c2, esp32c3)))]
                 Number::Channel7 => {
                     set_channel!(self, l, 7, timer_number);
                     update_channel!(self, 7);
@@ -404,9 +404,9 @@ where
             Number::Channel3 => set_duty!(self, l, 3, duty),
             Number::Channel4 => set_duty!(self, l, 4, duty),
             Number::Channel5 => set_duty!(self, l, 5, duty),
-            #[cfg(not(esp32c3))]
+            #[cfg(not(any(esp32c2, esp32c3)))]
             Number::Channel6 => set_duty!(self, l, 6, duty),
-            #[cfg(not(esp32c3))]
+            #[cfg(not(any(esp32c2, esp32c3)))]
             Number::Channel7 => set_duty!(self, l, 7, duty),
         };
     }

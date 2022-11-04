@@ -54,10 +54,9 @@ pub mod delay;
 pub mod dma;
 pub mod gpio;
 pub mod i2c;
-// FIXME: While the ESP32-C2 *does* have LEDC, it is not currently available in
-//        the SVD.
-#[cfg(not(esp32c2))]
 pub mod ledc;
+#[cfg(any(esp32s2, esp32s3))]
+pub mod otg_fs;
 pub mod prelude;
 #[cfg(not(esp32c2))]
 pub mod pulse_control;
@@ -90,9 +89,6 @@ pub mod efuse;
 #[cfg_attr(riscv, path = "interrupt/riscv.rs")]
 #[cfg_attr(xtensa, path = "interrupt/xtensa.rs")]
 pub mod interrupt;
-
-#[cfg(any(esp32s3, esp32s2))]
-pub mod otg_fs;
 
 /// Enumeration of CPU cores
 /// The actual number of available cores depends on the target.
