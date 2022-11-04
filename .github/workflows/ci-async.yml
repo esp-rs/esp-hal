@@ -64,7 +64,7 @@ jobs:
           ]
     steps:
       - uses: actions/checkout@v2
-      - uses: esp-rs/xtensa-toolchain@v1.2
+      - uses: esp-rs/xtensa-toolchain@v1.4
         with:
           default: true
           ldproxy: false
