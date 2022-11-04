@@ -1,0 +1,76 @@
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+  workflow_dispatch:
+
+name: CI-Async
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # --------------------------------------------------------------------------
+  # Check Examples
+
+  check-async-riscv:
+    name: Check Async RISC-V Examples
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        chip_features:
+          [
+            { chip: esp32c2, features: "embassy,embassy-time-systick" },
+            { chip: esp32c3, features: "embassy,embassy-time-systick" },
+          ]
+        toolchain: [nightly]
+        example:
+          [
+            "embassy_hello_world"
+          ]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          target: riscv32imc-unknown-none-elf
+          toolchain: ${{ matrix.toolchain }}
+          default: true
+      - uses: Swatinem/rust-cache@v1
+      - uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --example ${{ matrix.example }} --manifest-path=${{ matrix.chip_features.chip }}-hal/Cargo.toml --target=riscv32imc-unknown-none-elf --features=${{ matrix.chip_features.features }}
+
+  check-async-xtensa:
+    name: Check Async Xtensa Examples
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        chip_features:
+          [
+            { chip: esp32, features: "embassy,embassy-time-timg" },
+            { chip: esp32s2, features: "embassy,embassy-time-systick" },
+            { chip: esp32s2, features: "embassy,embassy-time-timg" },
+            { chip: esp32s3, features: "embassy,embassy-time-systick" },
+            { chip: esp32s3, features: "embassy,embassy-time-timg" },
+          ]
+        example:
+          [
+            "embassy_hello_world"
+          ]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: esp-rs/xtensa-toolchain@v1.2
+        with:
+          default: true
+          ldproxy: false
+          buildtargets: ${{ matrix.chip_features.chip }}
+      - uses: Swatinem/rust-cache@v1
+      - uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: -Zbuild-std=core --example ${{ matrix.example }} --manifest-path=${{ matrix.chip_features.chip }}-hal/Cargo.toml --target=xtensa-${{ matrix.chip_features.chip }}-none-elf --features=${{ matrix.chip_features.features }}

@@ -72,5 +72,9 @@ required-features = ["eh1"]
 name              = "spi_eh1_device_loopback"
 required-features = ["eh1"]
 
+[[example]]
+name              = "embassy_hello_world"
+required-features = ["embassy"]
+
 [profile.dev]
 opt-level = 1

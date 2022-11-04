@@ -67,3 +67,7 @@ required-features = ["eh1"]
 [[example]]
 name              = "spi_eh1_device_loopback"
 required-features = ["eh1"]
+
+[[example]]
+name              = "embassy_hello_world"
+required-features = ["embassy"]
