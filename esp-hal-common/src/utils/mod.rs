@@ -5,6 +5,10 @@
 pub mod smart_leds_adapter;
 #[cfg(feature = "smartled")]
 pub use smart_leds_adapter::SmartLedsAdapter;
+#[cfg(feature = "smartled")]
+pub mod smart_leds_adapter_rgbw;
+#[cfg(feature = "smartled")]
+pub use smart_leds_adapter_rgbw::SmartLedsAdapterRGBW;
 
 // Re-export the macro that due to the macro_export configuration was already exported
 // in the root module (i.e., `esp-hal-common`)

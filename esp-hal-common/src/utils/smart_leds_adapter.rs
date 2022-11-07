@@ -94,9 +94,24 @@ where
 {
     /// Create a new adapter object that drives the pin using the RMT channel.
     pub fn new<UnconfiguredChannel>(
-        mut channel: UnconfiguredChannel,
+        channel: UnconfiguredChannel,
         pin: PIN,
     ) -> SmartLedsAdapter<CHANNEL, PIN, BUFFER_SIZE>
+    where
+        UnconfiguredChannel: OutputChannel<CHANNEL>,
+    {
+        Self {
+            channel: SmartLedsAdapter::<CHANNEL, PIN, BUFFER_SIZE>::configure_channel(channel, pin),
+            rmt_buffer: [0; BUFFER_SIZE],
+            _pin: PhantomData,
+        }
+    }
+
+    /// prepare channel for led signals
+    pub fn configure_channel<UnconfiguredChannel>(
+        mut channel: UnconfiguredChannel,
+        pin: PIN,
+    ) -> CHANNEL
     where
         UnconfiguredChannel: OutputChannel<CHANNEL>,
     {
@@ -115,12 +130,7 @@ where
             .set_idle_output(true)
             .set_clock_source(ClockSource::APB);
 
-        let channel = channel.assign_pin(pin);
-        Self {
-            channel,
-            rmt_buffer: [0; BUFFER_SIZE],
-            _pin: PhantomData,
-        }
+        channel.assign_pin(pin)
     }
 
     fn convert_rgb_to_pulse(
@@ -139,8 +149,9 @@ where
 
         Ok(())
     }
-
-    fn convert_rgb_channel_to_pulses(
+    /// Transform individual bytes into pulse codes. Useful for custom
+    /// implementations, ie RGBW
+    pub fn convert_rgb_channel_to_pulses(
         channel_value: u8,
         mut_iter: &mut IterMut<u32>,
     ) -> Result<(), LedAdapterError> {
