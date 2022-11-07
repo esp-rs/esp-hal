@@ -24,6 +24,10 @@ pub enum Peripheral {
     #[cfg(not(esp32c2))]
     Rmt,
     Ledc,
+    #[cfg(any(esp32, esp32s3))]
+    Mcpwm0,
+    #[cfg(any(esp32, esp32s3))]
+    Mcpwm1,
     #[cfg(any(esp32c2, esp32c3))]
     ApbSarAdc,
     #[cfg(any(esp32c2, esp32c3, esp32s3))]
@@ -85,6 +89,16 @@ impl PeripheralClockControl {
             Peripheral::Ledc => {
                 perip_clk_en0.modify(|_, w| w.ledc_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.ledc_rst().clear_bit());
+            }
+            #[cfg(any(esp32, esp32s3))]
+            Peripheral::Mcpwm0 => {
+                perip_clk_en0.modify(|_, w| w.pwm0_clk_en().set_bit());
+                perip_rst_en0.modify(|_, w| w.pwm0_rst().clear_bit());
+            }
+            #[cfg(any(esp32, esp32s3))]
+            Peripheral::Mcpwm1 => {
+                perip_clk_en0.modify(|_, w| w.pwm1_clk_en().set_bit());
+                perip_rst_en0.modify(|_, w| w.pwm1_rst().clear_bit());
             }
             #[cfg(any(esp32c2, esp32c3))]
             Peripheral::ApbSarAdc => {
