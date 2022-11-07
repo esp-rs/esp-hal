@@ -69,7 +69,7 @@ pub enum InputSignal {
     PCMCLK            = 204,
 }
 
-/// Peripheral input signals for the GPIO mux
+/// Peripheral output signals for the GPIO mux
 #[allow(non_camel_case_types)]
 #[derive(PartialEq, Copy, Clone)]
 pub enum OutputSignal {

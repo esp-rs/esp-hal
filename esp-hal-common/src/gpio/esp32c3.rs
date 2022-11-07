@@ -5,6 +5,7 @@ pub const INPUT_SIGNAL_MAX: u8 = 100;
 pub const ONE_INPUT: u8 = 0x1e;
 pub const ZERO_INPUT: u8 = 0x1f;
 
+/// Peripheral input signals for the GPIO mux
 #[allow(non_camel_case_types)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum InputSignal {
@@ -52,6 +53,7 @@ pub enum InputSignal {
     SIG_FUNC_100     = 100,
 }
 
+/// Peripheral output signals for the GPIO mux
 #[allow(non_camel_case_types)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum OutputSignal {
