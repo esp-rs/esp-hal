@@ -18,7 +18,7 @@ pub enum PwmWorkingMode {
     /// This is a combination of the two modes mentioned above. The PWM timer
     /// starts increasing from zero until the period value is reached. Then,
     /// the timer decreases back to zero. This pattern is then repeated. The
-    /// PWM period is the result of (the value of the period field × 2 + 1).
+    /// PWM period is the result of the value of the period field × 2.
     UpDown   = 3,
 }
 

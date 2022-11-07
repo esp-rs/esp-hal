@@ -13,18 +13,15 @@ use crate::{
 pub mod operator;
 pub mod timer;
 
-// TODO provide a getter
-pub struct PwmClock(HertzU32);
-
+#[non_exhaustive]
 pub struct MCPWM<'a, PWM> {
+    pub pwm_clk: PwmClock<'a>,
     pub timer0: Timer<0, PWM>,
     pub timer1: Timer<1, PWM>,
     pub timer2: Timer<2, PWM>,
     pub operator0: Operator<0, PWM>,
     pub operator1: Operator<1, PWM>,
     pub operator2: Operator<2, PWM>,
-    pub pwm_clk: PwmClock,
-    phantom: PhantomData<(&'a Clocks, PWM)>,
 }
 
 impl<'a, PWM: PwmPeripheral> MCPWM<'a, PWM> {
@@ -49,30 +46,15 @@ impl<'a, PWM: PwmPeripheral> MCPWM<'a, PWM> {
         // sync comparator updates when timer counter is equal to zero.
         Self::set_comparator_update_method(block, 0b0001);
 
-        #[cfg(esp32)]
-        // TODO Docs are unclear here, need to test this
-        let pwm_clk = PwmClock(clocks.apb_clock / (prescaler as u32 + 1));
-        #[cfg(esp32s3)]
-        let pwm_clk = PwmClock(clocks.crypto_pwm_clock / (prescaler as u32 + 1));
-
         MCPWM {
+            pwm_clk: PwmClock::new(clocks, prescaler),
             timer0: Timer::new(),
             timer1: Timer::new(),
             timer2: Timer::new(),
             operator0: Operator::new(),
             operator1: Operator::new(),
             operator2: Operator::new(),
-            pwm_clk,
-            phantom: PhantomData,
         }
-    }
-
-    pub fn timer_freq(&self, mode: timer::PwmWorkingMode, prescaler: u8, period: u16) -> HertzU32 {
-        let period = match mode {
-            timer::PwmWorkingMode::Increase | timer::PwmWorkingMode::Decrease => period as u32 + 1,
-            timer::PwmWorkingMode::UpDown => period as u32 * 2,
-        };
-        self.pwm_clk.0 / (prescaler as u32 + 1) / period
     }
 
     #[cfg(esp32)]
@@ -117,6 +99,49 @@ impl<'a, PWM: PwmPeripheral> MCPWM<'a, PWM> {
                 .cmpr2_b_upmethod()
                 .variant(bits)
         });
+    }
+}
+
+pub struct PwmClock<'a> {
+    pwm_clock: HertzU32,
+    phantom: PhantomData<&'a Clocks>,
+}
+
+impl<'a> PwmClock<'a> {
+    pub fn clock_frequency(&self) -> HertzU32 {
+        self.pwm_clock
+    }
+
+    pub fn timer_frequency(
+        &self,
+        mode: timer::PwmWorkingMode,
+        prescaler: u8,
+        period: u16,
+    ) -> HertzU32 {
+        let period = match mode {
+            timer::PwmWorkingMode::Increase | timer::PwmWorkingMode::Decrease => period as u32 + 1,
+            // The reference manual seems to provide an incorrect formula for UpDown
+            timer::PwmWorkingMode::UpDown => period as u32 * 2,
+        };
+        self.pwm_clock / (prescaler as u32 + 1) / period
+    }
+
+    #[cfg(esp32)]
+    fn new(clocks: &'a Clocks, prescaler: u8) -> Self {
+        // TODO Docs are unclear here, need to test this
+
+        PwmClock {
+            pwm_clock: clocks.apb_clock / (prescaler as u32 + 1),
+            phantom: PhantomData,
+        }
+    }
+
+    #[cfg(esp32s3)]
+    fn new(clocks: &'a Clocks, prescaler: u8) -> Self {
+        PwmClock {
+            pwm_clock: clocks.crypto_pwm_clock / (prescaler as u32 + 1),
+            phantom: PhantomData,
+        }
     }
 }
 
