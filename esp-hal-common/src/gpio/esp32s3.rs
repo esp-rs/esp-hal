@@ -102,7 +102,7 @@ pub enum InputSignal {
     PCMCLK            = 189,
 }
 
-/// Peripheral input signals for the GPIO mux
+/// Peripheral output signals for the GPIO mux
 #[allow(non_camel_case_types)]
 #[derive(PartialEq, Copy, Clone)]
 pub enum OutputSignal {
@@ -200,6 +200,18 @@ pub enum OutputSignal {
     SUBSPID6        = 157,
     SUBSPID7        = 158,
     SUBSPIDQS       = 159,
+    PWM0_0A         = 160,
+    PWM0_0B         = 161,
+    PWM0_1A         = 162,
+    PWM0_1B         = 163,
+    PWM0_2A         = 164,
+    PWM0_2B         = 165,
+    PWM1_0A         = 166,
+    PWM1_0B         = 167,
+    PWM1_1A         = 168,
+    PWM1_1B         = 169,
+    PWM1_2A         = 170,
+    PWM1_2B         = 171,
     SDIO_TOHOST_INT = 177,
     PCMFSYNC        = 194,
     PCMCLK          = 195,
