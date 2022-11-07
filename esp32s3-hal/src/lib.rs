@@ -15,6 +15,7 @@ pub use esp_hal_common::{
     interrupt,
     ledc,
     macros,
+    mcpwm,
     otg_fs,
     pac,
     prelude,
