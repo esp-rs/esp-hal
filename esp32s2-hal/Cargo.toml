@@ -56,7 +56,10 @@ ufmt      = ["esp-hal-common/ufmt"]
 vectored  = ["esp-hal-common/vectored"]
 async = ["esp-hal-common/async", "embedded-hal-async"]
 embassy = ["esp-hal-common/embassy"]
-embassy-time-systick = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-hz-1_000_000"] # TODO add 80_000_000 support to embassy time
+# FIXME:
+# - add 80_000_000 support to embassy time
+# - Fix https://github.com/esp-rs/esp-hal/issues/253
+# embassy-time-systick = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-hz-1_000_000"] 
 embassy-time-timg = ["esp-hal-common/embassy-time-timg", "embassy-time/tick-hz-1_000_000"]
 
 [[example]]
