@@ -113,6 +113,8 @@ pub struct Clocks {
     pub apb_clock: HertzU32,
     pub xtal_clock: HertzU32,
     pub i2c_clock: HertzU32,
+    #[cfg(esp32)]
+    pub pwm_clock: HertzU32,
     #[cfg(esp32s3)]
     pub crypto_pwm_clock: HertzU32,
     // TODO chip specific additional ones as needed
@@ -131,6 +133,8 @@ impl Clocks {
             apb_clock: raw_clocks.apb_clock,
             xtal_clock: raw_clocks.xtal_clock,
             i2c_clock: raw_clocks.i2c_clock,
+            #[cfg(esp32)]
+            pwm_clock: raw_clocks.pwm_clock,
             #[cfg(esp32s3)]
             crypto_pwm_clock: raw_clocks.crypto_pwm_clock,
         }
@@ -143,6 +147,8 @@ pub struct RawClocks {
     pub apb_clock: HertzU32,
     pub xtal_clock: HertzU32,
     pub i2c_clock: HertzU32,
+    #[cfg(esp32)]
+    pub pwm_clock: HertzU32,
     #[cfg(esp32s3)]
     pub crypto_pwm_clock: HertzU32,
     // TODO chip specific additional ones as needed
@@ -178,6 +184,7 @@ impl ClockControl {
                 apb_clock: HertzU32::MHz(80),
                 xtal_clock: HertzU32::MHz(40),
                 i2c_clock: HertzU32::MHz(80),
+                pwm_clock: HertzU32::MHz(160),
             },
         }
     }
@@ -206,6 +213,10 @@ impl ClockControl {
                 apb_clock: HertzU32::MHz(80),
                 xtal_clock: HertzU32::MHz(40),
                 i2c_clock: HertzU32::MHz(40),
+                // The docs are unclear here. pwm_clock seems to be tied to clocks.apb_clock
+                // while simultaneously being fixed at 160 MHz.
+                // Testing showed 160 MHz to be correct for current clock configurations.
+                pwm_clock: HertzU32::MHz(160),
             },
         }
     }
@@ -350,7 +361,6 @@ impl ClockControl {
                 apb_clock: HertzU32::MHz(80),
                 xtal_clock: HertzU32::MHz(40),
                 i2c_clock: HertzU32::MHz(40),
-                #[cfg(esp32s3)]
                 crypto_pwm_clock: HertzU32::MHz(160),
             },
         }
@@ -368,7 +378,6 @@ impl ClockControl {
                 apb_clock: HertzU32::MHz(80),
                 xtal_clock: HertzU32::MHz(40),
                 i2c_clock: HertzU32::MHz(40),
-                #[cfg(esp32s3)]
                 crypto_pwm_clock: HertzU32::MHz(160),
             },
         }

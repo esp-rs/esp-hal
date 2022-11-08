@@ -38,8 +38,7 @@ fn main() -> ! {
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let pin = io.pins.gpio4;
 
-    // TODO check timing
-    // clocks.crypto_pwm_clock is 160 MHz
+    // clocks.pwm_clock is 160 MHz
     // with `prescaler = 3` pwm_clk will run at `160 MHz / (3 + 1) = 40 MHz`
     let mut mcpwm = MCPWM::new(
         peripherals.PWM0,

@@ -81,10 +81,8 @@ impl<'a> PwmClock<'a> {
 
     #[cfg(esp32)]
     fn new(clocks: &'a Clocks, prescaler: u8) -> Self {
-        // TODO Docs are unclear here, need to test this
-
         PwmClock {
-            pwm_clock: clocks.apb_clock / (prescaler as u32 + 1),
+            pwm_clock: clocks.pwm_clock / (prescaler as u32 + 1),
             phantom: PhantomData,
         }
     }
