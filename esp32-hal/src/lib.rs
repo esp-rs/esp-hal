@@ -1,6 +1,7 @@
 #![no_std]
 
 pub use embedded_hal as ehal;
+#[doc(inline)]
 pub use esp_hal_common::{
     clock,
     cpu_control::CpuControl,

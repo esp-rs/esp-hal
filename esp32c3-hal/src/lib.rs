@@ -6,6 +6,7 @@ use core::arch::{asm, global_asm};
 use core::mem::size_of;
 
 pub use embedded_hal as ehal;
+#[doc(inline)]
 pub use esp_hal_common::{
     clock,
     dma,
