@@ -1,8 +1,14 @@
 use core::marker::PhantomData;
 
-use crate::mcpwm::PwmPeripheral;
+use fugit::HertzU32;
+
+use crate::{
+    clock::Clocks,
+    mcpwm::{FrequencyError, PeripheralClockConfig, PwmPeripheral},
+};
 
 /// PWM working mode
+#[derive(Copy, Clone)]
 #[repr(u8)]
 pub enum PwmWorkingMode {
     /// In this mode, the PWM timer increments from zero until reaching the
@@ -42,22 +48,26 @@ impl<const T: u8, PWM: PwmPeripheral> Timer<T, PWM> {
     /// Note also that the hardware supports writing these settings
     /// in sync with certain timer events but this HAL does not expose these for
     /// now.
-    pub fn start(&mut self, prescaler: u8, period: u16, mode: PwmWorkingMode) {
+    pub fn start(&mut self, timer_clock: TimerClockConfig) {
         // write prescaler and period with immediate update method
         unsafe {
             self.cfg0().write(|w| {
                 w.timer0_prescale()
-                    .bits(prescaler)
+                    .bits(timer_clock.prescaler)
                     .timer0_period()
-                    .bits(period)
+                    .bits(timer_clock.period)
                     .timer0_period_upmethod()
                     .variant(0)
             });
         }
 
         // set timer to continuously run and set the timer working mode
-        self.cfg1()
-            .write(|w| w.timer0_start().variant(2).timer0_mod().variant(mode as u8));
+        self.cfg1().write(|w| {
+            w.timer0_start()
+                .variant(2)
+                .timer0_mod()
+                .variant(timer_clock.mode as u8)
+        });
     }
 
     pub fn stop(&mut self) {
@@ -129,6 +139,76 @@ impl<const T: u8, PWM: PwmPeripheral> Timer<T, PWM> {
                 unreachable!()
             }
         }
+    }
+}
+
+#[derive(Copy, Clone)]
+pub struct TimerClockConfig<'a> {
+    frequency: HertzU32,
+    period: u16,
+    prescaler: u8,
+    mode: PwmWorkingMode,
+    phantom: PhantomData<&'a Clocks>,
+}
+
+impl<'a> TimerClockConfig<'a> {
+    pub fn with_prescaler(
+        clock: &PeripheralClockConfig<'a>,
+        period: u16,
+        mode: PwmWorkingMode,
+        prescaler: u8,
+    ) -> Self {
+        let cycle_period = match mode {
+            PwmWorkingMode::Increase | PwmWorkingMode::Decrease => period as u32 + 1,
+            // The reference manual seems to provide an incorrect formula for UpDown
+            PwmWorkingMode::UpDown => period as u32 * 2,
+        };
+        let frequency = clock.frequency / (prescaler as u32 + 1) / cycle_period;
+
+        TimerClockConfig {
+            frequency,
+            prescaler,
+            period,
+            mode,
+            phantom: PhantomData,
+        }
+    }
+
+    pub fn with_frequency(
+        clock: &PeripheralClockConfig<'a>,
+        period: u16,
+        mode: PwmWorkingMode,
+        target_freq: HertzU32,
+    ) -> Result<Self, FrequencyError> {
+        let cycle_period = match mode {
+            PwmWorkingMode::Increase | PwmWorkingMode::Decrease => period as u32 + 1,
+            // The reference manual seems to provide an incorrect formula for UpDown
+            PwmWorkingMode::UpDown => period as u32 * 2,
+        };
+        let target_timer_frequency = target_freq
+            .raw()
+            .checked_mul(cycle_period)
+            .ok_or(FrequencyError)?;
+        if target_timer_frequency == 0 || target_freq > clock.frequency {
+            return Err(FrequencyError);
+        }
+        let prescaler = clock.frequency.raw() / target_timer_frequency - 1;
+        if prescaler > u8::MAX as u32 {
+            return Err(FrequencyError);
+        }
+        let frequency = clock.frequency / (prescaler + 1) / cycle_period;
+
+        Ok(TimerClockConfig {
+            frequency,
+            prescaler: prescaler as u8,
+            period,
+            mode,
+            phantom: PhantomData,
+        })
+    }
+
+    pub fn frequency(&self) -> HertzU32 {
+        self.frequency
     }
 }
 

@@ -9,7 +9,7 @@ use esp32s3_hal::{
     clock::ClockControl,
     gpio::IO,
     mcpwm::{
-        MCPWM,
+        {MCPWM, PeripheralClockConfig},
         operator::PwmPinConfig,
         timer::PwmWorkingMode,
     },
@@ -38,23 +38,24 @@ fn main() -> ! {
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let pin = io.pins.gpio4;
 
-    // clocks.crypto_pwm_clock is 160 MHz
-    // with `prescaler = 3` pwm_clk will run at `160 MHz / (3 + 1) = 40 MHz`
+    // initialize peripheral
+    let clock_cfg = PeripheralClockConfig::with_frequency(&clocks, 40u32.MHz()).unwrap();
     let mut mcpwm = MCPWM::new(
         peripherals.PWM0,
-        &clocks,
-        3,
+        clock_cfg,
         &mut system.peripheral_clock_control,
     );
 
-    // with `prescaler = 19` timer0 counter will run at `40 MHz / (19 + 1) = 2 MHz`
-    // with `period = 99` timer0 will run at `2 MHz / (99 + 1) = 20 kHz`
-    mcpwm.timer0.start(19, 99, PwmWorkingMode::Increase);
+    // connect operator0 to timer0
     mcpwm.operator0.set_timer(&mcpwm.timer0);
-
+    // connect operator0 to pin
     let mut pwm_pin = mcpwm
         .operator0
         .with_pin_a(pin, PwmPinConfig::UP_ACTIVE_HIGH);
+
+    // start timer with timestamp values in the range of 0..=99 and a frequency of 20 kHz
+    let timer_clock_cfg = clock_cfg.timer_clock_with_frequency(99, PwmWorkingMode::Increase, 20u32.kHz()).unwrap();
+    mcpwm.timer0.start(timer_clock_cfg);
 
     // pin will be high 50% of the time
     pwm_pin.set_timestamp(50);

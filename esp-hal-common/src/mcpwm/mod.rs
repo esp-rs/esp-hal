@@ -15,7 +15,7 @@ pub mod timer;
 
 #[non_exhaustive]
 pub struct MCPWM<'a, PWM> {
-    pub pwm_clk: PwmClock<'a>,
+    pub peripheral_clock: PeripheralClockConfig<'a>,
     pub timer0: Timer<0, PWM>,
     pub timer1: Timer<1, PWM>,
     pub timer2: Timer<2, PWM>,
@@ -29,8 +29,7 @@ impl<'a, PWM: PwmPeripheral> MCPWM<'a, PWM> {
     // clocks.crypto_pwm_clock normally is 160 MHz
     pub fn new(
         peripheral: PWM,
-        clocks: &'a Clocks,
-        prescaler: u8,
+        peripheral_clock: PeripheralClockConfig<'a>,
         system: &mut PeripheralClockControl,
     ) -> Self {
         let _ = peripheral;
@@ -39,12 +38,14 @@ impl<'a, PWM: PwmPeripheral> MCPWM<'a, PWM> {
 
         let block = unsafe { &*PWM::block() };
         // set prescaler
-        block.clk_cfg.write(|w| w.clk_prescale().variant(prescaler));
+        block
+            .clk_cfg
+            .write(|w| w.clk_prescale().variant(peripheral_clock.prescaler));
         // enable clock
         block.clk.write(|w| w.en().set_bit());
 
         MCPWM {
-            pwm_clk: PwmClock::new(clocks, prescaler),
+            peripheral_clock,
             timer0: Timer::new(),
             timer1: Timer::new(),
             timer2: Timer::new(),
@@ -55,46 +56,71 @@ impl<'a, PWM: PwmPeripheral> MCPWM<'a, PWM> {
     }
 }
 
-pub struct PwmClock<'a> {
-    pwm_clock: HertzU32,
+#[derive(Copy, Clone)]
+pub struct PeripheralClockConfig<'a> {
+    frequency: HertzU32,
+    prescaler: u8,
     phantom: PhantomData<&'a Clocks>,
 }
 
-impl<'a> PwmClock<'a> {
-    pub fn clock_frequency(&self) -> HertzU32 {
-        self.pwm_clock
+impl<'a> PeripheralClockConfig<'a> {
+    pub fn with_prescaler(clocks: &'a Clocks, prescaler: u8) -> Self {
+        #[cfg(esp32)]
+        let source_clock = clocks.pwm_clock;
+        #[cfg(esp32s3)]
+        let source_clock = clocks.crypto_pwm_clock;
+
+        PeripheralClockConfig {
+            frequency: source_clock / (prescaler as u32 + 1),
+            prescaler,
+            phantom: PhantomData,
+        }
     }
 
-    pub fn timer_frequency(
+    pub fn with_frequency(
+        clocks: &'a Clocks,
+        target_freq: HertzU32,
+    ) -> Result<Self, FrequencyError> {
+        #[cfg(esp32)]
+        let source_clock = clocks.pwm_clock;
+        #[cfg(esp32s3)]
+        let source_clock = clocks.crypto_pwm_clock;
+
+        if target_freq.raw() == 0 || target_freq > source_clock {
+            return Err(FrequencyError);
+        }
+        let prescaler = source_clock / target_freq - 1;
+        if prescaler > u8::MAX as u32 {
+            return Err(FrequencyError);
+        }
+        Ok(Self::with_prescaler(clocks, prescaler as u8))
+    }
+
+    pub fn frequency(&self) -> HertzU32 {
+        self.frequency
+    }
+
+    pub fn timer_clock_with_prescaler(
         &self,
+        period: u16,
         mode: timer::PwmWorkingMode,
         prescaler: u8,
+    ) -> timer::TimerClockConfig<'a> {
+        timer::TimerClockConfig::with_prescaler(self, period, mode, prescaler)
+    }
+
+    pub fn timer_clock_with_frequency(
+        &self,
         period: u16,
-    ) -> HertzU32 {
-        let period = match mode {
-            timer::PwmWorkingMode::Increase | timer::PwmWorkingMode::Decrease => period as u32 + 1,
-            // The reference manual seems to provide an incorrect formula for UpDown
-            timer::PwmWorkingMode::UpDown => period as u32 * 2,
-        };
-        self.pwm_clock / (prescaler as u32 + 1) / period
-    }
-
-    #[cfg(esp32)]
-    fn new(clocks: &'a Clocks, prescaler: u8) -> Self {
-        PwmClock {
-            pwm_clock: clocks.pwm_clock / (prescaler as u32 + 1),
-            phantom: PhantomData,
-        }
-    }
-
-    #[cfg(esp32s3)]
-    fn new(clocks: &'a Clocks, prescaler: u8) -> Self {
-        PwmClock {
-            pwm_clock: clocks.crypto_pwm_clock / (prescaler as u32 + 1),
-            phantom: PhantomData,
-        }
+        mode: timer::PwmWorkingMode,
+        target_freq: HertzU32,
+    ) -> Result<timer::TimerClockConfig<'a>, FrequencyError> {
+        timer::TimerClockConfig::with_frequency(self, period, mode, target_freq)
     }
 }
+
+#[derive(Debug)]
+pub struct FrequencyError;
 
 /// A MCPWM peripheral
 pub unsafe trait PwmPeripheral {
