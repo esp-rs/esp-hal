@@ -18,7 +18,7 @@ use static_cell::StaticCell;
 async fn run1() {
     loop {
         esp_println::println!("Hello world from embassy using esp-hal-async!");
-        Timer::after(Duration::from_millis(10_000)).await;
+        Timer::after(Duration::from_millis(1_000)).await;
     }
 }
 
@@ -26,7 +26,7 @@ async fn run1() {
 async fn run2() {
     loop {
         esp_println::println!("Bing!");
-        Timer::after(Duration::from_millis(30_000)).await;
+        Timer::after(Duration::from_millis(5_000)).await;
     }
 }
 
