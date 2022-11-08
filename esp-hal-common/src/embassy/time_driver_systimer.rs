@@ -55,10 +55,9 @@ impl EmbassyTimer {
     pub(crate) fn init(_clocks: &Clocks) {
         use crate::{interrupt, interrupt::Priority, macros::interrupt};
 
-        // TODO these priorities should probably be higher than 1...
-        interrupt::enable(pac::Interrupt::SYSTIMER_TARGET0, Priority::Priority1).unwrap();
-        interrupt::enable(pac::Interrupt::SYSTIMER_TARGET1, Priority::Priority1).unwrap();
-        interrupt::enable(pac::Interrupt::SYSTIMER_TARGET2, Priority::Priority1).unwrap();
+        interrupt::enable(pac::Interrupt::SYSTIMER_TARGET0, Priority::max()).unwrap();
+        interrupt::enable(pac::Interrupt::SYSTIMER_TARGET1, Priority::max()).unwrap();
+        interrupt::enable(pac::Interrupt::SYSTIMER_TARGET2, Priority::max()).unwrap();
 
         #[interrupt]
         fn SYSTIMER_TARGET0() {

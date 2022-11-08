@@ -65,9 +65,8 @@ impl EmbassyTimer {
 
         critical_section::with(|cs| TG.borrow_ref_mut(cs).replace(tg));
 
-        // TODO these priorities should probably be higher than 1...
-        interrupt::enable(pac::Interrupt::TG0_T0_LEVEL, Priority::Priority1).unwrap();
-        interrupt::enable(pac::Interrupt::TG0_T1_LEVEL, Priority::Priority1).unwrap();
+        interrupt::enable(pac::Interrupt::TG0_T0_LEVEL, Priority::max()).unwrap();
+        interrupt::enable(pac::Interrupt::TG0_T1_LEVEL, Priority::max()).unwrap();
 
         #[interrupt]
         fn TG0_T0_LEVEL() {

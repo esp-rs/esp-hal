@@ -6,13 +6,8 @@ use crate::clock::Clocks;
 
 #[cfg_attr(
     all(
+        has_systimer,
         feature = "embassy-time-systick",
-        any(
-            feature = "esp32c3",
-            feature = "esp32s3",
-            feature = "esp32s2",
-            feature = "esp32c2"
-        )
     ),
     path = "embassy/time_driver_systimer.rs"
 )]
@@ -64,8 +59,8 @@ impl Driver for EmbassyTimer {
     }
 
     unsafe fn allocate_alarm(&self) -> Option<AlarmHandle> {
-        return critical_section::with(|_cs| {
-            let alarms = self.alarms.borrow(_cs);
+        return critical_section::with(|cs| {
+            let alarms = self.alarms.borrow(cs);
             for i in 0..time_driver::ALARM_COUNT {
                 let c = alarms.get_unchecked(i);
                 if !c.allocated.get() {
