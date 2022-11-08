@@ -35,36 +35,49 @@ impl<const O: u8, PWM: PwmPeripheral> Operator<O, PWM> {
         });
     }
 
-    pub fn with_a_pin<Pin: OutputPin>(
+    pub fn with_pin_a<Pin: OutputPin>(
         self,
         pin: Pin,
-        actions: PwmActions<true>,
+        config: PwmPinConfig<true>,
     ) -> PwmPin<Pin, PWM, O, true> {
-        let mut pin = PwmPin::new(pin);
-        pin.set_actions(actions);
-        pin
+        PwmPin::new(pin, config)
     }
-    pub fn with_b_pin<Pin: OutputPin>(
+    pub fn with_pin_b<Pin: OutputPin>(
         self,
         pin: Pin,
-        actions: PwmActions<false>,
+        config: PwmPinConfig<false>,
     ) -> PwmPin<Pin, PWM, O, false> {
-        let mut pin = PwmPin::new(pin);
-        pin.set_actions(actions);
-        pin
+        PwmPin::new(pin, config)
     }
     pub fn with_pins<PinA: OutputPin, PinB: OutputPin>(
         self,
         pin_a: PinA,
-        actions_a: PwmActions<true>,
+        config_a: PwmPinConfig<true>,
         pin_b: PinB,
-        actions_b: PwmActions<false>,
+        config_b: PwmPinConfig<false>,
     ) -> (PwmPin<PinA, PWM, O, true>, PwmPin<PinB, PWM, O, false>) {
-        let self2 = Self::new();
-        (
-            self.with_a_pin(pin_a, actions_a),
-            self2.with_b_pin(pin_b, actions_b),
-        )
+        (PwmPin::new(pin_a, config_a), PwmPin::new(pin_b, config_b))
+    }
+}
+
+pub struct PwmPinConfig<const IS_A: bool> {
+    actions: PwmActions<IS_A>,
+    update_method: PwmUpdateMethod,
+}
+
+impl<const IS_A: bool> PwmPinConfig<IS_A> {
+    pub const UP_ACTIVE_HIGH: Self =
+        Self::new(PwmActions::UP_ACTIVE_HIGH, PwmUpdateMethod::SYNC_ON_ZERO);
+    pub const UP_DOWN_ACTIVE_HIGH: Self = Self::new(
+        PwmActions::UP_DOWN_ACTIVE_HIGH,
+        PwmUpdateMethod::SYNC_ON_ZERO,
+    );
+
+    pub const fn new(actions: PwmActions<IS_A>, update_method: PwmUpdateMethod) -> Self {
+        PwmPinConfig {
+            actions,
+            update_method,
+        }
     }
 }
 
@@ -74,14 +87,17 @@ pub struct PwmPin<Pin, PWM, const O: u8, const IS_A: bool> {
 }
 
 impl<Pin: OutputPin, PWM: PwmPeripheral, const O: u8, const IS_A: bool> PwmPin<Pin, PWM, O, IS_A> {
-    fn new(mut pin: Pin) -> Self {
+    fn new(mut pin: Pin, config: PwmPinConfig<IS_A>) -> Self {
         let output_signal = PWM::output_signal::<O, IS_A>();
         pin.enable_output(true)
             .connect_peripheral_to_output(output_signal);
-        PwmPin {
+        let mut pin = PwmPin {
             _pin: pin,
             phantom: PhantomData,
-        }
+        };
+        pin.set_actions(config.actions);
+        pin.set_update_method(config.update_method);
+        pin
     }
 
     // TODO mention that using A on B and vice versa is not supported
@@ -109,21 +125,77 @@ impl<Pin: OutputPin, PWM: PwmPeripheral, const O: u8, const IS_A: bool> PwmPin<P
     }
 
     #[cfg(esp32)]
+    pub fn set_update_method(&mut self, update_method: PwmUpdateMethod) {
+        let block = unsafe { &*PWM::block() };
+        let bits = update_method.0;
+        match (O, IS_A) {
+            (0, true) => block
+                .gen0_stmp_cfg
+                .modify(|_, w| w.gen0_a_upmethod().variant(bits)),
+            (1, true) => block
+                .gen1_stmp_cfg
+                .modify(|_, w| w.gen1_a_upmethod().variant(bits)),
+            (2, true) => block
+                .gen2_stmp_cfg
+                .modify(|_, w| w.gen2_a_upmethod().variant(bits)),
+            (0, false) => block
+                .gen0_stmp_cfg
+                .modify(|_, w| w.gen0_b_upmethod().variant(bits)),
+            (1, false) => block
+                .gen1_stmp_cfg
+                .modify(|_, w| w.gen1_b_upmethod().variant(bits)),
+            (2, false) => block
+                .gen2_stmp_cfg
+                .modify(|_, w| w.gen2_b_upmethod().variant(bits)),
+            _ => {
+                unreachable!()
+            }
+        }
+    }
+
+    #[cfg(esp32s3)]
+    pub fn set_update_method(&mut self, update_method: PwmUpdateMethod) {
+        let block = unsafe { &*PWM::block() };
+        let bits = update_method.0;
+        match (O, IS_A) {
+            (0, true) => block
+                .cmpr0_cfg
+                .modify(|_, w| w.cmpr0_a_upmethod().variant(bits)),
+            (1, true) => block
+                .cmpr1_cfg
+                .modify(|_, w| w.cmpr1_a_upmethod().variant(bits)),
+            (2, true) => block
+                .cmpr2_cfg
+                .modify(|_, w| w.cmpr2_a_upmethod().variant(bits)),
+            (0, false) => block
+                .cmpr0_cfg
+                .modify(|_, w| w.cmpr0_b_upmethod().variant(bits)),
+            (1, false) => block
+                .cmpr1_cfg
+                .modify(|_, w| w.cmpr1_b_upmethod().variant(bits)),
+            (2, false) => block
+                .cmpr2_cfg
+                .modify(|_, w| w.cmpr2_b_upmethod().variant(bits)),
+            _ => {
+                unreachable!()
+            }
+        }
+    }
+
+    #[cfg(esp32)]
     pub fn set_timestamp(&mut self, value: u16) {
         let block = unsafe { &*PWM::block() };
-        unsafe {
-            match (O, IS_A) {
-                (0, true) => &block.gen0_tstmp_a.write(|w| w.gen0_a().bits(value)),
-                (1, true) => &block.gen1_tstmp_a.write(|w| w.gen1_a().bits(value)),
-                (2, true) => &block.gen2_tstmp_a.write(|w| w.gen2_a().bits(value)),
-                (0, false) => &block.gen0_tstmp_b.write(|w| w.gen0_b().bits(value)),
-                (1, false) => &block.gen1_tstmp_b.write(|w| w.gen1_b().bits(value)),
-                (2, false) => &block.gen2_tstmp_b.write(|w| w.gen2_b().bits(value)),
-                _ => {
-                    unreachable!()
-                }
+        match (O, IS_A) {
+            (0, true) => block.gen0_tstmp_a.write(|w| w.gen0_a().variant(value)),
+            (1, true) => block.gen1_tstmp_a.write(|w| w.gen1_a().variant(value)),
+            (2, true) => block.gen2_tstmp_a.write(|w| w.gen2_a().variant(value)),
+            (0, false) => block.gen0_tstmp_b.write(|w| w.gen0_b().variant(value)),
+            (1, false) => block.gen1_tstmp_b.write(|w| w.gen1_b().variant(value)),
+            (2, false) => block.gen2_tstmp_b.write(|w| w.gen2_b().variant(value)),
+            _ => {
+                unreachable!()
             }
-        };
+        }
     }
 
     #[cfg(esp32s3)]
@@ -197,5 +269,24 @@ impl<const IS_A: bool> PwmActions<IS_A> {
         let mask = !(0b11 << offset);
         let value = (self.0 & mask) | (value << offset);
         PwmActions(value)
+    }
+}
+
+pub struct PwmUpdateMethod(u8);
+
+impl PwmUpdateMethod {
+    pub const SYNC_ON_ZERO: Self = Self::empty().sync_on_timer_equals_zero();
+    pub const SYNC_ON_PERIOD: Self = Self::empty().sync_on_timer_equals_period();
+
+    pub const fn empty() -> Self {
+        PwmUpdateMethod(0)
+    }
+    pub const fn sync_on_timer_equals_zero(mut self) -> Self {
+        self.0 |= 0b0001;
+        self
+    }
+    pub const fn sync_on_timer_equals_period(mut self) -> Self {
+        self.0 |= 0b0010;
+        self
     }
 }

@@ -10,7 +10,7 @@ use esp32_hal::{
     gpio::IO,
     mcpwm::{
         MCPWM,
-        operator::PwmActions,
+        operator::PwmPinConfig,
         timer::PwmWorkingMode,
     },
     pac::Peripherals,
@@ -55,7 +55,7 @@ fn main() -> ! {
 
     let mut pwm_pin = mcpwm
         .operator0
-        .with_a_pin(pin, PwmActions::UP_ACTIVE_HIGH);
+        .with_pin_a(pin, PwmPinConfig::UP_ACTIVE_HIGH);
 
     // pin will be high 50% of the time
     pwm_pin.set_timestamp(50);

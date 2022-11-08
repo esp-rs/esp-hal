@@ -43,9 +43,6 @@ impl<'a, PWM: PwmPeripheral> MCPWM<'a, PWM> {
         // enable clock
         block.clk.write(|w| w.en().set_bit());
 
-        // sync comparator updates when timer counter is equal to zero.
-        Self::set_comparator_update_method(block, 0b0001);
-
         MCPWM {
             pwm_clk: PwmClock::new(clocks, prescaler),
             timer0: Timer::new(),
@@ -55,50 +52,6 @@ impl<'a, PWM: PwmPeripheral> MCPWM<'a, PWM> {
             operator1: Operator::new(),
             operator2: Operator::new(),
         }
-    }
-
-    #[cfg(esp32)]
-    fn set_comparator_update_method(block: &crate::pac::pwm0::RegisterBlock, bits: u8) {
-        block.gen0_stmp_cfg.write(|w| {
-            w.gen0_a_upmethod()
-                .variant(bits)
-                .gen0_b_upmethod()
-                .variant(bits)
-        });
-        block.gen1_stmp_cfg.write(|w| {
-            w.gen1_a_upmethod()
-                .variant(bits)
-                .gen1_b_upmethod()
-                .variant(bits)
-        });
-        block.gen2_stmp_cfg.write(|w| {
-            w.gen2_a_upmethod()
-                .variant(bits)
-                .gen2_b_upmethod()
-                .variant(bits)
-        });
-    }
-
-    #[cfg(esp32s3)]
-    fn set_comparator_update_method(block: &crate::pac::pwm0::RegisterBlock, bits: u8) {
-        block.cmpr0_cfg.write(|w| {
-            w.cmpr0_a_upmethod()
-                .variant(bits)
-                .cmpr0_b_upmethod()
-                .variant(bits)
-        });
-        block.cmpr1_cfg.write(|w| {
-            w.cmpr1_a_upmethod()
-                .variant(bits)
-                .cmpr1_b_upmethod()
-                .variant(bits)
-        });
-        block.cmpr2_cfg.write(|w| {
-            w.cmpr2_a_upmethod()
-                .variant(bits)
-                .cmpr2_b_upmethod()
-                .variant(bits)
-        });
     }
 }
 
