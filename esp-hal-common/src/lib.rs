@@ -48,7 +48,6 @@ pub use self::{
     timer::Timer,
 };
 
-#[cfg(any(esp32s2, esp32s3, esp32c2, esp32c3))]
 pub mod sha;
 pub mod analog;
 pub mod clock;
