@@ -24,6 +24,7 @@ use esp32s2_hal::{
 };
 #[allow(unused_imports)]
 use esp_backtrace as _;
+use xtensa_atomic_emulation_trap as _;
 use smart_leds::{
     brightness,
     gamma,
@@ -78,6 +79,20 @@ fn main() -> ! {
             led.write(brightness(gamma(data.iter().cloned()), 10))
                 .unwrap();
             delay.delay_ms(20u8);
+        }
+    }
+}
+
+#[xtensa_lx_rt::exception]
+fn exception(cause: xtensa_lx_rt::exception::ExceptionCause, frame: xtensa_lx_rt::exception::Context) {
+    use esp_println::*;
+
+    println!("\n\nException occured {:?} {:x?}", cause, frame);
+    
+    let backtrace = esp_backtrace::arch::backtrace();
+    for b in backtrace.iter() {
+        if let Some(addr) = b {
+            println!("0x{:x}", addr)
         }
     }
 }

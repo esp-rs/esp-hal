@@ -122,6 +122,16 @@ pub enum Priority {
     Priority15,
 }
 
+impl Priority {
+    pub fn max() -> Priority {
+        Priority::Priority15
+    }
+
+    pub fn min() -> Priority {
+        Priority::Priority1
+    }
+}
+
 /// Assign a peripheral interrupt to an CPU interrupt.
 ///
 /// Great care must be taken when using the `vectored` feature (enabled by
@@ -246,13 +256,13 @@ mod vectored {
 
     /// Get the interrupts configured for the core
     #[inline]
-    fn get_configured_interrupts(_core: Cpu, mut status: u128) -> [u128; 15] {
+    fn get_configured_interrupts(_core: Cpu, mut status: u128) -> [u128; 16] {
         unsafe {
             let intr = &*crate::pac::INTERRUPT_CORE0::PTR;
             let intr_map_base = intr.mac_intr_map.as_ptr();
             let intr_prio_base = intr.cpu_int_pri_0.as_ptr();
 
-            let mut prios = [0u128; 15];
+            let mut prios = [0u128; 16];
 
             while status != 0 {
                 let interrupt_nr = status.trailing_zeros();

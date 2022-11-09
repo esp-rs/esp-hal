@@ -78,18 +78,18 @@ impl<T, const CHANNEL: u8> Alarm<T, CHANNEL> {
         Self { _pd: PhantomData }
     }
 
-    pub fn enable_interrupt(&self) {
+    pub fn interrupt_enable(&self, val: bool) {
         let systimer = unsafe { &*SYSTIMER::ptr() };
         match CHANNEL {
             0 => systimer
                 .int_ena
-                .modify(|_, w| w.target0_int_ena().set_bit()),
+                .modify(|_, w| w.target0_int_ena().bit(val)),
             1 => systimer
                 .int_ena
-                .modify(|_, w| w.target1_int_ena().set_bit()),
+                .modify(|_, w| w.target1_int_ena().bit(val)),
             2 => systimer
                 .int_ena
-                .modify(|_, w| w.target2_int_ena().set_bit()),
+                .modify(|_, w| w.target2_int_ena().bit(val)),
             _ => unreachable!(),
         }
     }
@@ -214,5 +214,23 @@ impl<const CHANNEL: u8> Alarm<Periodic, CHANNEL> {
 
     pub fn into_target(self) -> Alarm<Target, CHANNEL> {
         Alarm { _pd: PhantomData }
+    }
+}
+
+impl<T> Alarm<T, 0> {
+    pub const unsafe fn conjure() -> Self {
+        Self { _pd: PhantomData }
+    }
+}
+
+impl<T> Alarm<T, 1> {
+    pub const unsafe fn conjure() -> Self {
+        Self { _pd: PhantomData }
+    }
+}
+
+impl<T> Alarm<T, 2> {
+    pub const unsafe fn conjure() -> Self {
+        Self { _pd: PhantomData }
     }
 }

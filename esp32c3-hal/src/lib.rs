@@ -34,6 +34,10 @@ pub use esp_hal_common::{
     Serial,
     UsbSerialJtag,
 };
+
+#[cfg(feature = "embassy")]
+pub use esp_hal_common::embassy;
+
 #[cfg(feature = "direct-boot")]
 use riscv_rt::pre_init;
 

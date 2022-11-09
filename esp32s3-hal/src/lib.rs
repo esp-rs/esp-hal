@@ -34,6 +34,9 @@ pub use esp_hal_common::{
     UsbSerialJtag,
 };
 
+#[cfg(feature = "embassy")]
+pub use esp_hal_common::embassy;
+
 pub use self::gpio::IO;
 
 pub mod adc;

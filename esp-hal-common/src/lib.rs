@@ -79,6 +79,9 @@ pub mod utils;
 #[cfg_attr(esp32s3, path = "cpu_control/esp32s3.rs")]
 pub mod cpu_control;
 
+#[cfg(feature = "embassy")]
+pub mod embassy;
+
 #[cfg_attr(esp32, path = "efuse/esp32.rs")]
 #[cfg_attr(esp32c2, path = "efuse/esp32c2.rs")]
 #[cfg_attr(esp32c3, path = "efuse/esp32c3.rs")]

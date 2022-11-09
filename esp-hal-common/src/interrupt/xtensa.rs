@@ -205,6 +205,16 @@ mod vectored {
         Priority3,
     }
 
+    impl Priority {
+        pub fn max() -> Priority {
+            Priority::Priority3
+        }
+
+        pub fn min() -> Priority {
+            Priority::Priority1
+        }
+    }
+
     impl CpuInterrupt {
         #[inline]
         fn level(&self) -> Priority {
@@ -252,7 +262,7 @@ mod vectored {
 
     /// Get the interrupts configured for the core
     #[inline]
-    fn get_configured_interrupts(core: Cpu, mut status: u128) -> [u128; 7] {
+    fn get_configured_interrupts(core: Cpu, mut status: u128) -> [u128; 8] {
         unsafe {
             let intr_map_base = match core {
                 Cpu::ProCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
@@ -262,7 +272,7 @@ mod vectored {
                 Cpu::AppCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map.as_ptr(),
             };
 
-            let mut levels = [0u128; 7];
+            let mut levels = [0u128; 8];
 
             while status != 0 {
                 let interrupt_nr = status.trailing_zeros();

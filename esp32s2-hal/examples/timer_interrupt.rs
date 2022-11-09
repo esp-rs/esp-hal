@@ -19,6 +19,7 @@ use esp32s2_hal::{
 };
 use esp_backtrace as _;
 use esp_println::println;
+use xtensa_atomic_emulation_trap as _;
 use xtensa_lx_rt::entry;
 
 static TIMER00: Mutex<RefCell<Option<Timer<Timer0<TIMG0>>>>> = Mutex::new(RefCell::new(None));
@@ -127,4 +128,18 @@ fn TG1_T1_LEVEL() {
             println!("Interrupt Level 3 - Timer1");
         }
     });
+}
+
+#[xtensa_lx_rt::exception]
+fn exception(cause: xtensa_lx_rt::exception::ExceptionCause, frame: xtensa_lx_rt::exception::Context) {
+    use esp_println::*;
+
+    println!("\n\nException occured {:?} {:x?}", cause, frame);
+    
+    let backtrace = esp_backtrace::arch::backtrace();
+    for b in backtrace.iter() {
+        if let Some(addr) = b {
+            println!("0x{:x}", addr)
+        }
+    }
 }

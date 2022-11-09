@@ -17,6 +17,7 @@ use esp32s2_hal::{
 };
 use esp_backtrace as _;
 use esp_println::println;
+use xtensa_atomic_emulation_trap as _;
 use nb::block;
 use xtensa_lx_rt::entry;
 
@@ -95,4 +96,18 @@ fn function_in_ram() {
 #[ram(rtc_fast)]
 fn function_in_rtc_ram() -> u32 {
     42
+}
+
+#[xtensa_lx_rt::exception]
+fn exception(cause: xtensa_lx_rt::exception::ExceptionCause, frame: xtensa_lx_rt::exception::Context) {
+    use esp_println::*;
+
+    println!("\n\nException occured {:?} {:x?}", cause, frame);
+    
+    let backtrace = esp_backtrace::arch::backtrace();
+    for b in backtrace.iter() {
+        if let Some(addr) = b {
+            println!("0x{:x}", addr)
+        }
+    }
 }

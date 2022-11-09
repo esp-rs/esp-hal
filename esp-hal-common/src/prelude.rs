@@ -57,3 +57,5 @@ pub mod eh1 {
 
     pub use crate::system::SystemExt;
 }
+
+pub use crate::{macros::*, timer::Instance};

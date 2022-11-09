@@ -31,6 +31,9 @@ pub use esp_hal_common::{
 
 pub use self::gpio::IO;
 
+#[cfg(feature = "embassy")]
+pub use esp_hal_common::embassy;
+
 pub mod adc;
 pub mod dac;
 pub mod gpio;

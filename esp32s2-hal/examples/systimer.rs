@@ -20,6 +20,7 @@ use esp32s2_hal::{
 };
 use esp_backtrace as _;
 use esp_println::println;
+use xtensa_atomic_emulation_trap as _;
 use xtensa_lx_rt::entry;
 
 static ALARM0: Mutex<RefCell<Option<Alarm<Periodic, 0>>>> = Mutex::new(RefCell::new(None));
@@ -46,15 +47,15 @@ fn main() -> ! {
 
     let alarm0 = syst.alarm0.into_periodic();
     alarm0.set_period(1u32.Hz());
-    alarm0.enable_interrupt();
+    alarm0.interrupt_enable(true);
 
     let alarm1 = syst.alarm1;
     alarm1.set_target(SystemTimer::now() + (SystemTimer::TICKS_PER_SECOND * 2));
-    alarm1.enable_interrupt();
+    alarm1.interrupt_enable(true);
 
     let alarm2 = syst.alarm2;
     alarm2.set_target(SystemTimer::now() + (SystemTimer::TICKS_PER_SECOND * 3));
-    alarm2.enable_interrupt();
+    alarm2.interrupt_enable(true);
 
     critical_section::with(|cs| {
         ALARM0.borrow_ref_mut(cs).replace(alarm0);
@@ -109,4 +110,18 @@ fn SYSTIMER_TARGET2() {
             .unwrap()
             .clear_interrupt()
     });
+}
+
+#[xtensa_lx_rt::exception]
+fn exception(cause: xtensa_lx_rt::exception::ExceptionCause, frame: xtensa_lx_rt::exception::Context) {
+    use esp_println::*;
+
+    println!("\n\nException occured {:?} {:x?}", cause, frame);
+    
+    let backtrace = esp_backtrace::arch::backtrace();
+    for b in backtrace.iter() {
+        if let Some(addr) = b {
+            println!("0x{:x}", addr)
+        }
+    }
 }
