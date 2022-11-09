@@ -1,7 +1,6 @@
 #![no_std]
 
 use core::arch::{asm, global_asm};
-
 #[cfg(feature = "mcu-boot")]
 use core::mem::size_of;
 
@@ -35,7 +34,6 @@ pub use esp_hal_common::{
     Serial,
     UsbSerialJtag,
 };
-
 #[cfg(feature = "direct-boot")]
 use riscv_rt::pre_init;
 
@@ -362,9 +360,8 @@ unsafe fn configure_mmu() {
     let autoload = cache_suspend_icache();
     cache_invalidate_icache_all();
 
-    /* Clear the MMU entries that are already set up, so the new app only has
-     * the mappings it creates.
-     */
+    // Clear the MMU entries that are already set up, so the new app only has
+    // the mappings it creates.
 
     const FLASH_MMU_TABLE: *mut u32 = 0x600c_5000 as *mut u32;
     const ICACHE_MMU_SIZE: usize = 0x200;

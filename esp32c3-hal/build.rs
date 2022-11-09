@@ -52,7 +52,7 @@ fn main() {
     add_defaults();
 }
 
-#[cfg(not(any(feature = "mcu-boot",feature = "direct-boot")))]
+#[cfg(not(any(feature = "mcu-boot", feature = "direct-boot")))]
 fn main() {
     check_opt_level();
 

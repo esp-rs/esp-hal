@@ -365,11 +365,13 @@ pub trait Instance {
             .ctr
             .modify(|_, w| w.conf_upgate().set_bit());
 
+        self.reset();
+
         Ok(())
     }
 
     /// Resets the I2C controller (FIFO + FSM + command list)
-    fn reset(&mut self) {
+    fn reset(&self) {
         // Reset interrupts
         // Disable all I2C interrupts
         self.register_block()
@@ -396,7 +398,7 @@ pub trait Instance {
     }
 
     /// Resets the I2C peripheral's command registers
-    fn reset_command_list(&mut self) {
+    fn reset_command_list(&self) {
         // Confirm that all commands that were configured were actually executed
         for cmd in self.register_block().comd.iter() {
             cmd.reset();
@@ -482,8 +484,8 @@ pub trait Instance {
         }
 
         let scl_low = half_cycle;
-        let setup = half_cycle;
-        let hold = half_cycle;
+        let setup = half_cycle - 1;
+        let hold = half_cycle - 1;
 
         #[cfg(not(esp32))]
         let scl_low = scl_low as u16 - 1;
@@ -600,259 +602,159 @@ pub trait Instance {
         Ok(())
     }
 
-    /// Start the actual transmission on a previously configured command set
-    ///
-    /// This includes the monitoring of the execution in the peripheral and the
-    /// return of the operation outcome, including error states
-    fn execute_transmission(&mut self) -> Result<(), Error> {
-        // Clear all I2C interrupts
-        self.register_block()
-            .int_clr
-            .write(|w| unsafe { w.bits(I2C_LL_INTR_MASK) });
-
-        // Ensure that the configuration of the peripheral is correctly propagated
-        // (only necessary for C3 and S3 variant)
-        #[cfg(any(esp32c2, esp32c3, esp32s3))]
-        self.register_block()
-            .ctr
-            .modify(|_, w| w.conf_upgate().set_bit());
-
-        // Start transmission
-        self.register_block()
-            .ctr
-            .modify(|_, w| w.trans_start().set_bit());
-
-        loop {
-            let interrupts = self.register_block().int_raw.read();
-
-            // The ESP32 variant has a slightly different interrupt naming
-            // scheme!
-            cfg_if::cfg_if! {
-                if #[cfg(esp32)] {
-                    // Handle error cases
-                    if interrupts.time_out_int_raw().bit_is_set() {
-                        return Err(Error::TimeOut);
-                    } else if interrupts.ack_err_int_raw().bit_is_set() {
-                        return Err(Error::AckCheckFailed);
-                    } else if interrupts.arbitration_lost_int_raw().bit_is_set() {
-                        return Err(Error::ArbitrationLost);
-                    }
-                }
-                else {
-                    // Handle error cases
-                    if interrupts.time_out_int_raw().bit_is_set() {
-                        return Err(Error::TimeOut);
-                    } else if interrupts.nack_int_raw().bit_is_set() {
-                        return Err(Error::AckCheckFailed);
-                    } else if interrupts.arbitration_lost_int_raw().bit_is_set() {
-                        return Err(Error::ArbitrationLost);
-                    }
-                }
-            }
-
-            // Handle completion cases
-            // A full transmission was completed
-            if interrupts.trans_complete_int_raw().bit_is_set()
-                || interrupts.end_detect_int_raw().bit_is_set()
-            {
-                break;
-            }
-        }
-
-        // Confirm that all commands that were configured were actually executed
-        for cmd in self.register_block().comd.iter() {
-            if cmd.read().command().bits() != 0x0 && cmd.read().command_done().bit_is_clear() {
-                return Err(Error::ExecIncomplete);
-            }
-        }
-
-        Ok(())
-    }
-
-    fn add_write_operation<'a, I>(
+    fn perform_write<'a, I>(
         &self,
         addr: u8,
         bytes: &[u8],
         cmd_iterator: &mut I,
-        include_stop: bool,
     ) -> Result<(), Error>
     where
         I: Iterator<Item = &'a COMD>,
     {
-        // Check if we have another cmd register ready, otherwise return appropriate
-        // error
-        let cmd_start = cmd_iterator.next().ok_or(Error::CommandNrExceeded)?;
+        if bytes.len() > 254 {
+            // we could support more by adding multiple write operations
+            return Err(Error::ExceedingFifo);
+        }
+
+        // Clear all I2C interrupts
+        self.clear_all_interrupts();
+
         // RSTART command
-        cmd_start.write(|w| unsafe { w.command().bits(Command::Start.into()) });
+        add_cmd(cmd_iterator, Command::Start)?;
+
+        // WRITE command
+        add_cmd(
+            cmd_iterator,
+            Command::Write {
+                ack_exp: Ack::Ack,
+                ack_check_en: true,
+                length: 1 + bytes.len() as u8,
+            },
+        )?;
+
+        add_cmd(cmd_iterator, Command::Stop)?;
+
+        self.update_config();
 
         // Load address and R/W bit into FIFO
         write_fifo(
             self.register_block(),
             addr << 1 | OperationType::Write as u8,
         );
-        // Load actual data bytes
-        for byte in bytes {
-            write_fifo(self.register_block(), *byte);
-        }
 
-        // Check if we have another cmd register ready, otherwise return appropriate
-        // error
-        let cmd_write = cmd_iterator.next().ok_or(Error::CommandNrExceeded)?;
-        // WRITE command
-        cmd_write.write(|w| unsafe {
-            w.command().bits(
-                Command::Write {
-                    ack_exp: Ack::Ack,
-                    ack_check_en: true,
-                    length: 1 + bytes.len() as u8,
-                }
-                .into(),
-            )
-        });
+        let index = self.fill_tx_fifo(bytes);
 
-        if include_stop {
-            // Check if we have another cmd register ready, otherwise return appropriate
-            // error
-            let cmd_stop = cmd_iterator.next().ok_or(Error::CommandNrExceeded)?;
-            // STOP command
-            cmd_stop.write(|w| unsafe { w.command().bits(Command::Stop.into()) });
-        }
+        self.start_transmission();
+
+        // fill FIFO with remaining bytes
+        self.write_remaining_tx_fifo(index, bytes)?;
+
+        self.wait_for_completion()?;
 
         Ok(())
     }
 
-    fn add_read_operation<'a, I>(
+    fn perform_read<'a, I>(
         &self,
         addr: u8,
-        buffer: &[u8],
+        buffer: &mut [u8],
         cmd_iterator: &mut I,
     ) -> Result<(), Error>
     where
         I: Iterator<Item = &'a COMD>,
     {
-        // Check if we have another cmd register ready, otherwise return appropriate
-        // error
-        cmd_iterator
-            .next()
-            .ok_or(Error::CommandNrExceeded)?
-            .write(|w| unsafe { w.command().bits(Command::Start.into()) });
+        if buffer.len() > 254 {
+            // we could support more by adding multiple read operations
+            return Err(Error::ExceedingFifo);
+        }
+
+        // Clear all I2C interrupts
+        self.clear_all_interrupts();
+
+        // RSTART command
+        add_cmd(cmd_iterator, Command::Start)?;
+
+        // WRITE command
+        add_cmd(
+            cmd_iterator,
+            Command::Write {
+                ack_exp: Ack::Ack,
+                ack_check_en: true,
+                length: 1,
+            },
+        )?;
+
+        if buffer.len() > 1 {
+            // READ command (N - 1)
+            add_cmd(
+                cmd_iterator,
+                Command::Read {
+                    ack_value: Ack::Ack,
+                    length: buffer.len() as u8 - 1,
+                },
+            )?;
+        }
+
+        // READ w/o ACK
+        add_cmd(
+            cmd_iterator,
+            Command::Read {
+                ack_value: Ack::Nack,
+                length: 1,
+            },
+        )?;
+
+        add_cmd(cmd_iterator, Command::Stop)?;
+
+        self.update_config();
 
         // Load address and R/W bit into FIFO
         write_fifo(self.register_block(), addr << 1 | OperationType::Read as u8);
 
-        // Check if we have another cmd register ready, otherwise return appropriate
-        // error
-        cmd_iterator
-            .next()
-            .ok_or(Error::CommandNrExceeded)?
-            .write(|w| unsafe {
-                w.command().bits(
-                    Command::Write {
-                        ack_exp: Ack::Ack,
-                        ack_check_en: true,
-                        length: 1,
-                    }
-                    .into(),
-                )
-            });
+        self.start_transmission();
 
-        // For reading bytes prior to the last read byte we need to
-        // configure the ack
-        if buffer.len() > 1 {
-            // READ command for first n - 1 bytes
-            cmd_iterator
-                .next()
-                .ok_or(Error::CommandNrExceeded)?
-                .write(|w| unsafe {
-                    w.command().bits(
-                        Command::Read {
-                            ack_value: Ack::Ack,
-                            length: buffer.len() as u8 - 1,
-                        }
-                        .into(),
-                    )
-                });
-        }
+        self.read_all_from_fifo(buffer)?;
 
-        // READ command for (last or only) byte
-        cmd_iterator
-            .next()
-            .ok_or(Error::CommandNrExceeded)?
-            .write(|w| unsafe {
-                w.command().bits(
-                    Command::Read {
-                        ack_value: Ack::Nack,
-                        length: 1,
-                    }
-                    .into(),
-                )
-            });
-
-        // Check if we have another cmd register ready, otherwise return appropriate
-        // error
-        cmd_iterator
-            .next()
-            .ok_or(Error::CommandNrExceeded)?
-            .write(|w| unsafe { w.command().bits(Command::Stop.into()) });
+        self.wait_for_completion()?;
 
         Ok(())
     }
 
-    /// Resets the transmit and receive FIFO buffers
-    fn reset_fifo(&mut self) {
-        // First, reset the fifo buffers
-        self.register_block()
-            .fifo_conf
-            .modify(|_, w| w.tx_fifo_rst().set_bit().rx_fifo_rst().set_bit());
-        self.register_block()
-            .fifo_conf
-            .modify(|_, w| w.tx_fifo_rst().clear_bit().rx_fifo_rst().clear_bit());
-    }
+    #[cfg(not(any(esp32, esp32s2)))]
+    fn read_all_from_fifo(&self, buffer: &mut [u8]) -> Result<(), Error> {
+        // Read bytes from FIFO
+        // FIXME: Handle case where less data has been provided by the slave than
+        // requested? Or is this prevented from a protocol perspective?
+        for byte in buffer.iter_mut() {
+            loop {
+                self.check_errors()?;
 
-    /// Send data bytes from the `bytes` array to a target slave with the
-    /// address `addr`
-    fn master_write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Error> {
-        // Reset FIFO and command list
-        self.reset_fifo();
-        self.reset_command_list();
+                let reg = self.register_block().fifo_st.read();
+                if reg.rxfifo_raddr().bits() != reg.rxfifo_waddr().bits() {
+                    break;
+                }
+            }
 
-        // Split the potentially larger `bytes` array into chunks of (at most) 31
-        // entries Together with the addr/access byte at the beginning of every
-        // transmission, this is the maximum size that we can store in the
-        // (default config) TX FIFO
-        for chunk in bytes.chunks(31) {
-            // Add write operation
-            self.add_write_operation(addr, chunk, &mut self.register_block().comd.iter(), true)?;
-
-            // Start transmission
-            self.execute_transmission()?
+            *byte = read_fifo(self.register_block());
         }
 
         Ok(())
     }
 
-    /// Read bytes from a target slave with the address `addr`
-    /// The number of read bytes is deterimed by the size of the `buffer`
-    /// argument
-    fn master_read(&mut self, addr: u8, buffer: &mut [u8]) -> Result<(), Error> {
-        // If the buffer size is > 32 bytes, this signals the
-        // intent to read more than that number of bytes, which we
-        // cannot achieve at this point in time
-        // TODO: Handle the case where we transfer an amount of data that is exceeding
-        // the FIFO size (i.e. > 32 bytes?)
-        if buffer.len() > 31 {
-            return Err(Error::ExceedingFifo);
+    #[cfg(any(esp32, esp32s2))]
+    fn read_all_from_fifo(&self, buffer: &mut [u8]) -> Result<(), Error> {
+        // on ESP32/ESP32-S2 we currently don't support I2C transactions larger than the
+        // FIFO apparently it would be possible by using non-fifo mode
+        // see https://github.com/espressif/arduino-esp32/blob/7e9afe8c5ed7b5bf29624a5cd6e07d431c027b97/cores/esp32/esp32-hal-i2c.c#L615
+
+        if buffer.len() > 32 {
+            panic!("On ESP32 and ESP32-S2 the max I2C read is limited to 32 bytes");
         }
 
-        // Reset FIFO and command list
-        self.reset_fifo();
-        self.reset_command_list();
-
-        // Add write operation
-        self.add_read_operation(addr, buffer, &mut self.register_block().comd.iter())?;
-
-        // Start transmission
-        self.execute_transmission()?;
+        // wait for completion - then we can just read the data from FIFO
+        // once we change to non-fifo mode to support larger transfers that
+        // won't work anymore
+        self.wait_for_completion()?;
 
         // Read bytes from FIFO
         // FIXME: Handle case where less data has been provided by the slave than
@@ -864,6 +766,259 @@ pub trait Instance {
         Ok(())
     }
 
+    fn clear_all_interrupts(&self) {
+        self.register_block()
+            .int_clr
+            .write(|w| unsafe { w.bits(I2C_LL_INTR_MASK) });
+    }
+
+    fn wait_for_completion(&self) -> Result<(), Error> {
+        loop {
+            let interrupts = self.register_block().int_raw.read();
+
+            self.check_errors()?;
+
+            // Handle completion cases
+            // A full transmission was completed
+            if interrupts.trans_complete_int_raw().bit_is_set()
+                || interrupts.end_detect_int_raw().bit_is_set()
+            {
+                break;
+            }
+        }
+        for cmd in self.register_block().comd.iter() {
+            if cmd.read().command().bits() != 0x0 && cmd.read().command_done().bit_is_clear() {
+                return Err(Error::ExecIncomplete);
+            }
+        }
+
+        Ok(())
+    }
+
+    fn check_errors(&self) -> Result<(), Error> {
+        let interrupts = self.register_block().int_raw.read();
+
+        // The ESP32 variant has a slightly different interrupt naming
+        // scheme!
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                // Handle error cases
+                if interrupts.time_out_int_raw().bit_is_set() {
+                    self.reset();
+                    return Err(Error::TimeOut);
+                } else if interrupts.ack_err_int_raw().bit_is_set() {
+                    self.reset();
+                    return Err(Error::AckCheckFailed);
+                } else if interrupts.arbitration_lost_int_raw().bit_is_set() {
+                    self.reset();
+                    return Err(Error::ArbitrationLost);
+                }
+            }
+            else {
+                // Handle error cases
+                if interrupts.time_out_int_raw().bit_is_set() {
+                    self.reset();
+                    return Err(Error::TimeOut);
+                } else if interrupts.nack_int_raw().bit_is_set() {
+                    self.reset();
+                    return Err(Error::AckCheckFailed);
+                } else if interrupts.arbitration_lost_int_raw().bit_is_set() {
+                    return Err(Error::ArbitrationLost);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn update_config(&self) {
+        // Ensure that the configuration of the peripheral is correctly propagated
+        // (only necessary for C3 and S3 variant)
+        #[cfg(any(esp32c2, esp32c3, esp32s3))]
+        self.register_block()
+            .ctr
+            .modify(|_, w| w.conf_upgate().set_bit());
+    }
+
+    fn start_transmission(&self) {
+        // Start transmission
+        self.register_block()
+            .ctr
+            .modify(|_, w| w.trans_start().set_bit());
+    }
+
+    #[cfg(not(any(esp32, esp32s2)))]
+    fn fill_tx_fifo(&self, bytes: &[u8]) -> usize {
+        let mut index = 0;
+        while index < bytes.len()
+            && !self
+                .register_block()
+                .int_raw
+                .read()
+                .txfifo_ovf_int_raw()
+                .bit_is_set()
+        {
+            write_fifo(self.register_block(), bytes[index]);
+            index += 1;
+        }
+        if self
+            .register_block()
+            .int_raw
+            .read()
+            .txfifo_ovf_int_raw()
+            .bit_is_set()
+        {
+            index -= 1;
+            self.register_block()
+                .int_clr
+                .write(|w| w.txfifo_ovf_int_clr().set_bit());
+        }
+        index
+    }
+
+    #[cfg(not(any(esp32, esp32s2)))]
+    fn write_remaining_tx_fifo(&self, start_index: usize, bytes: &[u8]) -> Result<(), Error> {
+        let mut index = start_index;
+        loop {
+            self.check_errors()?;
+
+            while !self
+                .register_block()
+                .int_raw
+                .read()
+                .txfifo_wm_int_raw()
+                .bit_is_set()
+            {}
+            self.register_block()
+                .int_clr
+                .write(|w| w.txfifo_wm_int_clr().set_bit());
+
+            if index >= bytes.len() {
+                break Ok(());
+            }
+
+            write_fifo(self.register_block(), bytes[index]);
+            index += 1;
+        }
+    }
+
+    #[cfg(any(esp32, esp32s2))]
+    fn fill_tx_fifo(&self, bytes: &[u8]) -> usize {
+        // on ESP32/ESP32-S2 we currently don't support I2C transactions larger than the
+        // FIFO apparently it would be possible by using non-fifo mode
+        // see  https://github.com/espressif/arduino-esp32/blob/7e9afe8c5ed7b5bf29624a5cd6e07d431c027b97/cores/esp32/esp32-hal-i2c.c#L615
+
+        if bytes.len() > 31 {
+            panic!("On ESP32 and ESP32-S2 the max I2C transfer is limited to 31 bytes");
+        }
+
+        for b in bytes {
+            write_fifo(self.register_block(), *b);
+        }
+
+        bytes.len()
+    }
+
+    #[cfg(any(esp32, esp32s2))]
+    fn write_remaining_tx_fifo(&self, start_index: usize, bytes: &[u8]) -> Result<(), Error> {
+        // on ESP32/ESP32-S2 we currently don't support I2C transactions larger than the
+        // FIFO apparently it would be possible by using non-fifo mode
+        // see  https://github.com/espressif/arduino-esp32/blob/7e9afe8c5ed7b5bf29624a5cd6e07d431c027b97/cores/esp32/esp32-hal-i2c.c#L615
+
+        if start_index >= bytes.len() {
+            return Ok(());
+        }
+
+        // this is only possible when writing the I2C address in release mode
+        // from [perform_write_read]
+        for b in bytes {
+            write_fifo(self.register_block(), *b);
+            self.check_errors()?;
+        }
+
+        Ok(())
+    }
+
+    /// Resets the transmit and receive FIFO buffers
+    #[cfg(not(esp32))]
+    fn reset_fifo(&self) {
+        // First, reset the fifo buffers
+        self.register_block().fifo_conf.modify(|_, w| {
+            w.tx_fifo_rst()
+                .set_bit()
+                .rx_fifo_rst()
+                .set_bit()
+                .nonfifo_en()
+                .clear_bit()
+                .fifo_prt_en()
+                .set_bit()
+                .rxfifo_wm_thrhd()
+                .variant(1)
+                .txfifo_wm_thrhd()
+                .variant(8)
+        });
+
+        self.register_block()
+            .fifo_conf
+            .modify(|_, w| w.tx_fifo_rst().clear_bit().rx_fifo_rst().clear_bit());
+
+        self.register_block().int_clr.write(|w| {
+            w.rxfifo_wm_int_clr()
+                .set_bit()
+                .txfifo_wm_int_clr()
+                .set_bit()
+        });
+
+        self.update_config();
+    }
+
+    /// Resets the transmit and receive FIFO buffers
+    #[cfg(esp32)]
+    fn reset_fifo(&self) {
+        // First, reset the fifo buffers
+        self.register_block().fifo_conf.modify(|_, w| {
+            w.tx_fifo_rst()
+                .set_bit()
+                .rx_fifo_rst()
+                .set_bit()
+                .nonfifo_en()
+                .clear_bit()
+                .nonfifo_rx_thres()
+                .variant(1)
+                .nonfifo_tx_thres()
+                .variant(32)
+        });
+
+        self.register_block()
+            .fifo_conf
+            .modify(|_, w| w.tx_fifo_rst().clear_bit().rx_fifo_rst().clear_bit());
+
+        self.register_block()
+            .int_clr
+            .write(|w| w.rxfifo_full_int_clr().set_bit());
+    }
+
+    /// Send data bytes from the `bytes` array to a target slave with the
+    /// address `addr`
+    fn master_write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Error> {
+        // Reset FIFO and command list
+        self.reset_fifo();
+        self.reset_command_list();
+        self.perform_write(addr, bytes, &mut self.register_block().comd.iter())?;
+        Ok(())
+    }
+
+    /// Read bytes from a target slave with the address `addr`
+    /// The number of read bytes is deterimed by the size of the `buffer`
+    /// argument
+    fn master_read(&mut self, addr: u8, buffer: &mut [u8]) -> Result<(), Error> {
+        // Reset FIFO and command list
+        self.reset_fifo();
+        self.reset_command_list();
+        self.perform_read(addr, buffer, &mut self.register_block().comd.iter())?;
+        Ok(())
+    }
+
     /// Write bytes from the `bytes` array first and then read n bytes into
     /// the `buffer` array with n being the size of the array.
     fn master_write_read(
@@ -872,37 +1027,23 @@ pub trait Instance {
         bytes: &[u8],
         buffer: &mut [u8],
     ) -> Result<(), Error> {
-        // If the buffer or bytes size is > 32 bytes, this signals the
-        // intent to read/write more than that number of bytes, which we
-        // cannot achieve at this point in time
-        // TODO: Handle the case where we transfer an amount of data that is exceeding
-        // the FIFO size (i.e. > 32 bytes?)
-        if buffer.len() > 31 || bytes.len() > 31 {
-            return Err(Error::ExceedingFifo);
-        }
-
-        // Reset FIFO and command list
-        self.reset_fifo();
-        self.reset_command_list();
-
-        let mut cmd_iterator = self.register_block().comd.iter();
-
-        // Add write operation
-        self.add_write_operation(addr, bytes, &mut cmd_iterator, false)?;
-
-        // Add read operation (which appends commands to the existing command list)
-        self.add_read_operation(addr, buffer, &mut cmd_iterator)?;
-
-        // Start transmission
-        self.execute_transmission()?;
-
-        // Read bytes from FIFO
-        for byte in buffer.iter_mut() {
-            *byte = read_fifo(self.register_block());
-        }
-
+        // it would be possible to combine the write and read
+        // in one transaction but filling the tx fifo with
+        // the current code is somewhat slow even in release mode
+        // which can cause issues
+        self.master_write(addr, bytes)?;
+        self.master_read(addr, buffer)?;
         Ok(())
     }
+}
+
+fn add_cmd<'a, I>(cmd_iterator: &mut I, command: Command) -> Result<(), Error>
+where
+    I: Iterator<Item = &'a COMD>,
+{
+    let cmd = cmd_iterator.next().ok_or(Error::CommandNrExceeded)?;
+    cmd.write(|w| unsafe { w.command().bits(command.into()) });
+    Ok(())
 }
 
 #[cfg(not(any(esp32, esp32s2)))]
