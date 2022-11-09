@@ -62,7 +62,7 @@ impl Sha {
         } else {
             // SET SHA_CONTINUE_REG
             unsafe {
-                // TODO: not sure what to correct unwrapping is (? is infallible but can't convert to Result for some reason)
+                // TODO: not sure what to correct unwrapping is (? is infallible but can't convert to Result for some reason)_
                 let ptr = self.sha.continue_.as_ptr().as_mut().unwrap();
                 *ptr = 1u32;
             }
@@ -92,7 +92,7 @@ impl Sha {
 
         unsafe {
             let m_cursor_ptr = self.sha.m_mem[0].as_ptr().add(self.cursor % chunk_len);
-            core::ptr::copy_nonoverlapping(chunk.as_ptr(), m_cursor_ptr, chunk.len());
+            core::ptr::copy_nonoverlapping(chunk.as_ptr(), m_cursor_ptr as *mut u8, chunk.len());
             self.cursor = self.cursor.wrapping_add(chunk.len());
         }
 
@@ -142,7 +142,7 @@ impl Sha {
                 let pad_len = chunk_len - mod_cursor;
                 unsafe {
                     let m_cursor_ptr = self.sha.m_mem[0].as_ptr().add(mod_cursor);
-                    core::ptr::write_bytes::<u8>(m_cursor_ptr, 0, pad_len);
+                    core::ptr::write_bytes::<u8>(m_cursor_ptr as *mut u8, 0, pad_len);
                 }
                 self.process_buffer(self.cursor < chunk_len);
                 self.cursor = self.cursor.wrapping_add(pad_len);
@@ -159,7 +159,7 @@ impl Sha {
                 m_cursor_ptr.write_bytes(0, chunk_len-length.len()-mod_cursor);
                 // Write length (BE) to end
                 let m_cursor_ptr = self.sha.m_mem[0].as_ptr().add(chunk_len-length.len());
-                core::ptr::copy_nonoverlapping(length.as_ptr(), m_cursor_ptr, length.len());
+                core::ptr::copy_nonoverlapping(length.as_ptr(), m_cursor_ptr as *mut u8, length.len());
             }
             
             self.process_buffer(self.cursor < chunk_len);
