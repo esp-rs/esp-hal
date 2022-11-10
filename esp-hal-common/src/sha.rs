@@ -252,7 +252,6 @@ impl Sha {
                 chunk.len(),
             );
             self.cursor = self.cursor.wrapping_add(chunk.len());
-            println!("Buffer {:?} {:02x?}", self.sha.m_mem.as_ptr() as *const u8, slice_from_raw_parts(self.sha.m_mem.as_ptr() as *const u8, 128).as_ref());
         }
 
         // Finished writing current chunk, start accelerator
