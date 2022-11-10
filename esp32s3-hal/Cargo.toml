@@ -61,6 +61,10 @@ embassy              = ["esp-hal-common/embassy"]
 embassy-time-systick = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-hz-16_000_000"]
 embassy-time-timg    = ["esp-hal-common/embassy-time-timg", "embassy-time/tick-hz-1_000_000"]
 
+
+[profile.dev.package.xtensa-lx-rt]
+opt-level = 'z'
+
 [[example]]
 name              = "hello_rgb"
 required-features = ["smartled"]
