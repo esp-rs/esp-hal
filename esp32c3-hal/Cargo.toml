@@ -31,6 +31,7 @@ embedded-hal       = { version = "0.2.7", features = ["unproven"] }
 embedded-hal-1     = { version = "=1.0.0-alpha.9", optional = true, package = "embedded-hal" }
 embedded-hal-async = { version = "0.1.0-alpha.3", optional = true }
 embedded-hal-nb    = { version = "=1.0.0-alpha.1", optional = true }
+embedded-can       = { version = "0.4.1", optional = true }
 esp-hal-common     = { version = "0.4.0",  features = ["esp32c3"], path = "../esp-hal-common" }
 r0                 = "1.0.0"
 riscv              = "0.10.0"
@@ -51,7 +52,7 @@ static_cell       = "1.0.0"
 default              = ["rt", "vectored"]
 mcu-boot             = []
 direct-boot          = []
-eh1                  = ["esp-hal-common/eh1", "dep:embedded-hal-1", "dep:embedded-hal-nb"]
+eh1                  = ["esp-hal-common/eh1", "dep:embedded-hal-1", "dep:embedded-hal-nb", "dep:embedded-can"]
 rt                   = ["riscv-rt"]
 smartled             = ["esp-hal-common/smartled"]
 ufmt                 = ["esp-hal-common/ufmt"]
