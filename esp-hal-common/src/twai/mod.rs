@@ -8,7 +8,11 @@ use crate::{
     InputPin, OutputPin,
 };
 
-use embedded_hal::can::{self, ErrorKind, ExtendedId, Frame, StandardId};
+#[cfg(feature = "eh1")]
+use embedded_can::{nb::Can, Error, ErrorKind, ExtendedId, Frame, Id, StandardId};
+#[cfg(not(feature = "eh1"))]
+use embedded_hal::can::{Can, Error, ErrorKind, ExtendedId, Frame, Id, StandardId};
+
 use fugit::HertzU32;
 
 use self::filter::{Filter, FilterType};
@@ -19,7 +23,7 @@ pub mod filter;
 /// Structure backing the embedded_hal::can::Frame trait.
 #[derive(Debug)]
 pub struct EspTwaiFrame {
-    id: can::Id,
+    id: Id,
     dlc: usize,
     data: [u8; 8],
     is_remote: bool,
@@ -27,7 +31,7 @@ pub struct EspTwaiFrame {
 
 impl EspTwaiFrame {
     /// Make a new frame from an id and a slice of the TWAI_DATA_x_REG registers.
-    fn new_from_data_registers(id: impl Into<can::Id>, data: &[u32]) -> Self {
+    fn new_from_data_registers(id: impl Into<Id>, data: &[u32]) -> Self {
         let mut d: [u8; 8] = [0; 8];
 
         // Copy the data from the memory mapped peripheral into actual memory.
@@ -44,8 +48,8 @@ impl EspTwaiFrame {
     }
 }
 
-impl embedded_hal::can::Frame for EspTwaiFrame {
-    fn new(id: impl Into<can::Id>, data: &[u8]) -> Option<Self> {
+impl Frame for EspTwaiFrame {
+    fn new(id: impl Into<Id>, data: &[u8]) -> Option<Self> {
         // CAN2.0 frames cannot contain more than 8 bytes of data.
         if data.len() > 8 {
             return None;
@@ -63,7 +67,7 @@ impl embedded_hal::can::Frame for EspTwaiFrame {
         })
     }
 
-    fn new_remote(id: impl Into<can::Id>, dlc: usize) -> Option<Self> {
+    fn new_remote(id: impl Into<Id>, dlc: usize) -> Option<Self> {
         // CAN2.0 frames cannot have more than 8 bytes.
         if dlc > 8 {
             return None;
@@ -78,8 +82,8 @@ impl embedded_hal::can::Frame for EspTwaiFrame {
 
     fn is_extended(&self) -> bool {
         match self.id {
-            can::Id::Standard(_) => false,
-            can::Id::Extended(_) => true,
+            Id::Standard(_) => false,
+            Id::Extended(_) => true,
         }
     }
 
@@ -87,7 +91,7 @@ impl embedded_hal::can::Frame for EspTwaiFrame {
         self.is_remote
     }
 
-    fn id(&self) -> can::Id {
+    fn id(&self) -> Id {
         self.id
     }
 
@@ -378,12 +382,12 @@ where
 #[derive(Debug)]
 pub enum EspTwaiError {
     BusOff,
-    EmbeddedHAL(embedded_hal::can::ErrorKind),
+    EmbeddedHAL(ErrorKind),
 }
-impl embedded_hal::can::Error for EspTwaiError {
-    fn kind(&self) -> can::ErrorKind {
+impl Error for EspTwaiError {
+    fn kind(&self) -> ErrorKind {
         match self {
-            Self::BusOff => can::ErrorKind::Other,
+            Self::BusOff => ErrorKind::Other,
             Self::EmbeddedHAL(kind) => *kind,
         }
     }
@@ -417,7 +421,7 @@ unsafe fn copy_to_data_register(dest: *mut u32, src: &[u8]) {
     }
 }
 
-impl<T> embedded_hal::can::Can for Twai<T>
+impl<T> Can for Twai<T>
 where
     T: Instance,
 {
@@ -460,7 +464,7 @@ where
 
         // Assemble the identifier information of the packet.
         match frame.id() {
-            can::Id::Standard(id) => {
+            Id::Standard(id) => {
                 let id = id.as_raw();
 
                 self.peripheral
@@ -473,7 +477,7 @@ where
                     .data_2
                     .write(|w| w.tx_byte_2().variant((id << 5) as u8));
             }
-            can::Id::Extended(id) => {
+            Id::Extended(id) => {
                 let id = id.as_raw();
 
                 self.peripheral
@@ -498,13 +502,13 @@ where
         // Store the data portion of the packet into the transmit buffer.
         if frame.is_data_frame() {
             match frame.id() {
-                can::Id::Standard(_) => unsafe {
+                Id::Standard(_) => unsafe {
                     copy_to_data_register(
                         self.peripheral.register_block().data_3.as_ptr(),
                         frame.data(),
                     )
                 },
-                can::Id::Extended(_) => unsafe {
+                Id::Extended(_) => unsafe {
                     copy_to_data_register(
                         self.peripheral.register_block().data_5.as_ptr(),
                         frame.data(),
