@@ -16,7 +16,7 @@ use esp32s3_hal::{
         LowSpeed,
         LEDC,
     },
-    pac::Peripherals,
+    peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
     Rtc,

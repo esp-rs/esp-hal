@@ -11,7 +11,7 @@ use esp32c2_hal::{
     clock::ClockControl,
     interrupt,
     interrupt::Priority,
-    pac::{self, Peripherals},
+    peripherals::{self, Peripherals},
     prelude::*,
     systimer::{Alarm, Periodic, SystemTimer, Target},
     timer::TimerGroup,
@@ -63,9 +63,9 @@ fn main() -> ! {
         ALARM2.borrow_ref_mut(cs).replace(alarm2);
     });
 
-    interrupt::enable(pac::Interrupt::SYSTIMER_TARGET0, Priority::Priority1).unwrap();
-    interrupt::enable(pac::Interrupt::SYSTIMER_TARGET1, Priority::Priority2).unwrap();
-    interrupt::enable(pac::Interrupt::SYSTIMER_TARGET2, Priority::Priority2).unwrap();
+    interrupt::enable(peripherals::Interrupt::SYSTIMER_TARGET0, Priority::Priority1).unwrap();
+    interrupt::enable(peripherals::Interrupt::SYSTIMER_TARGET1, Priority::Priority2).unwrap();
+    interrupt::enable(peripherals::Interrupt::SYSTIMER_TARGET2, Priority::Priority2).unwrap();
 
     // Initialize the Delay peripheral, and use it to toggle the LED state in a
     // loop.

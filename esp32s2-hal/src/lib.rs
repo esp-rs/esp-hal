@@ -16,10 +16,10 @@ pub use esp_hal_common::{
     ledc,
     macros,
     otg_fs,
-    pac,
     prelude,
     pulse_control,
-    serial,
+    peripherals,
+    uart,
     spi,
     system,
     systimer,
@@ -31,8 +31,8 @@ pub use esp_hal_common::{
     Rng,
     Rtc,
     Rwdt,
-    Serial,
     sha
+    Uart,
 };
 
 #[cfg(feature = "embassy")]
@@ -46,7 +46,7 @@ pub mod analog {
 }
 
 #[no_mangle]
-extern "C" fn EspDefaultHandler(_level: u32, _interrupt: pac::Interrupt) {}
+extern "C" fn EspDefaultHandler(_level: u32, _interrupt: peripherals::Interrupt) {}
 
 #[no_mangle]
 extern "C" fn DefaultHandler() {}

@@ -19,7 +19,7 @@
 use esp32s2_hal::{
     clock::ClockControl,
     gpio::IO,
-    pac::Peripherals,
+    peripherals::Peripherals,
     prelude::*,
     spi::{Spi, SpiMode},
     timer::TimerGroup,

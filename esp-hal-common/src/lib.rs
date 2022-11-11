@@ -22,15 +22,23 @@
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
 
 #[cfg(esp32)]
-pub use esp32 as pac;
+pub(crate) use esp32 as pac;
 #[cfg(esp32c2)]
-pub use esp32c2 as pac;
+pub(crate) use esp32c2 as pac;
 #[cfg(esp32c3)]
-pub use esp32c3 as pac;
+pub(crate) use esp32c3 as pac;
 #[cfg(esp32s2)]
-pub use esp32s2 as pac;
+pub(crate) use esp32s2 as pac;
 #[cfg(esp32s3)]
-pub use esp32s3 as pac;
+pub(crate) use esp32s3 as pac;
+
+#[cfg_attr(esp32, path = "peripherals/esp32.rs")]
+#[cfg_attr(esp32c3, path = "peripherals/esp32c3.rs")]
+#[cfg_attr(esp32c2, path = "peripherals/esp32c2.rs")]
+#[cfg_attr(esp32s2, path = "peripherals/esp32s2.rs")]
+#[cfg_attr(esp32s3, path = "peripherals/esp32s3.rs")]
+pub mod peripherals;
+
 pub use procmacros as macros;
 
 #[cfg(rmt)]
@@ -43,7 +51,7 @@ pub use self::{
     interrupt::*,
     rng::Rng,
     rtc_cntl::{Rtc, Rwdt},
-    uart::Serial,
+    uart::Uart,
     spi::Spi,
     timer::Timer,
 };
@@ -237,56 +245,3 @@ mod critical_section_impl {
         }
     }
 }
-
-#[macro_export]
-#[allow(unused_macros)]
-macro_rules! into_ref {
-    ($($name:ident),*) => {
-        $(
-            let $name = $name.into_ref();
-        )*
-    }
-}
-
-#[allow(unused_macros)]
-macro_rules! impl_peripheral_trait {
-    ($type:ident) => {
-        unsafe impl Send for $type {}
-
-        impl $crate::peripheral::sealed::Sealed for $type {}
-
-        impl $crate::peripheral::Peripheral for $type {
-            type P = $type;
-
-            #[inline]
-            unsafe fn clone_unchecked(&mut self) -> Self::P {
-                $type { ..*self }
-            }
-        }
-    };
-}
-
-#[allow(unused_macros)]
-macro_rules! impl_peripheral {
-    ($type:ident) => {
-        pub struct $type(::core::marker::PhantomData<*const ()>);
-
-        impl $type {
-            /// # Safety
-            ///
-            /// Care should be taken not to instnatiate this peripheral instance, if it
-            /// is already instantiated and used elsewhere
-            #[inline(always)]
-            pub unsafe fn new() -> Self {
-                $type(::core::marker::PhantomData)
-            }
-        }
-
-        $crate::impl_peripheral_trait!($type);
-    };
-}
-
-#[allow(unused_imports)]
-pub(crate) use impl_peripheral;
-#[allow(unused_imports)]
-pub(crate) use impl_peripheral_trait;

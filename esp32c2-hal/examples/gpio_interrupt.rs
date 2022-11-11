@@ -13,7 +13,7 @@ use esp32c2_hal::{
     clock::ClockControl,
     gpio::{Gpio9, IO, Event, Input, PullDown},
     interrupt,
-    pac::{self, Peripherals},
+    peripherals::{self, Peripherals},
     prelude::*,
     timer::TimerGroup,
     Delay,
@@ -50,7 +50,7 @@ fn main() -> ! {
 
     critical_section::with(|cs| BUTTON.borrow_ref_mut(cs).replace(button));
 
-    interrupt::enable(pac::Interrupt::GPIO, interrupt::Priority::Priority3).unwrap();
+    interrupt::enable(peripherals::Interrupt::GPIO, interrupt::Priority::Priority3).unwrap();
 
     unsafe {
         riscv::interrupt::enable();

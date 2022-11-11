@@ -12,7 +12,8 @@ use critical_section::Mutex;
 use esp32c3_hal::{
     clock::ClockControl,
     interrupt,
-    pac::{self, Peripherals, USB_DEVICE},
+    pac::{self, USB_DEVICE},
+    peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
     Cpu,

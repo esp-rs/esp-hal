@@ -14,7 +14,7 @@ use esp32_hal::{
     gpio::{Gpio0, IO, Event, Input, PullDown,},
     interrupt,
     macros::ram,
-    pac::{self, Peripherals},
+    peripherals::{self, Peripherals},
     prelude::*,
     timer::TimerGroup,
     Delay,
@@ -48,7 +48,7 @@ fn main() -> ! {
 
     critical_section::with(|cs| BUTTON.borrow_ref_mut(cs).replace(button));
 
-    interrupt::enable(pac::Interrupt::GPIO, interrupt::Priority::Priority2).unwrap();
+    interrupt::enable(peripherals::Interrupt::GPIO, interrupt::Priority::Priority2).unwrap();
 
     led.set_high().unwrap();
 

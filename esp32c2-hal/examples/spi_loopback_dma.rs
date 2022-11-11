@@ -21,7 +21,7 @@ use esp32c2_hal::{
     dma::{DmaPriority},
     gdma::Gdma,
     gpio::IO,
-    pac::Peripherals,
+    peripherals::Peripherals,
     prelude::*,
     spi::{Spi, SpiMode},
     timer::TimerGroup,

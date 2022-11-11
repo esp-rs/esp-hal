@@ -15,7 +15,7 @@ use esp32_hal::{
         HighSpeed,
         LEDC,
     },
-    pac::Peripherals,
+    peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
     Rtc,

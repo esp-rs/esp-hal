@@ -9,7 +9,7 @@ use esp32s2_hal::{
     clock::ClockControl,
     dac,
     gpio::IO,
-    pac::Peripherals,
+    peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
     Delay,

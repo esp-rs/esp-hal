@@ -7,7 +7,7 @@
 use esp32_hal::{
     clock::ClockControl,
     efuse::Efuse,
-    pac::Peripherals,
+    peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
     Rtc,

@@ -10,7 +10,7 @@ use core::cell::RefCell;
 use critical_section::Mutex;
 use esp32s3_hal::{
     clock::ClockControl,
-    pac::{Peripherals, TIMG1},
+    peripherals::{Peripherals, TIMG1},
     prelude::*,
     timer::{Timer, Timer0, TimerGroup},
     CpuControl,

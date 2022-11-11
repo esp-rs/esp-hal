@@ -11,7 +11,7 @@
 use esp32_hal::{
     clock::ClockControl,
     macros::ram,
-    pac::Peripherals,
+    peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
 };

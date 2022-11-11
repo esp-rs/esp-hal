@@ -17,10 +17,10 @@ pub use esp_hal_common::{
     ledc,
     macros,
     mcpwm,
-    pac,
+    peripherals,
     prelude,
     pulse_control,
-    serial,
+    uart,
     spi,
     system,
     timer,
@@ -31,8 +31,8 @@ pub use esp_hal_common::{
     Rng,
     Rtc,
     Rwdt,
-    Serial,
     sha
+    Uart,
 };
 
 pub use self::gpio::IO;
@@ -46,7 +46,7 @@ pub mod analog {
 }
 
 #[no_mangle]
-extern "C" fn EspDefaultHandler(_level: u32, _interrupt: pac::Interrupt) {}
+extern "C" fn EspDefaultHandler(_level: u32, _interrupt: peripherals::Interrupt) {}
 
 #[no_mangle]
 extern "C" fn DefaultHandler() {}

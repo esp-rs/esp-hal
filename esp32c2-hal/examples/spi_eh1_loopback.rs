@@ -20,7 +20,7 @@ use embedded_hal_1::spi::SpiBus;
 use esp32c2_hal::{
     clock::ClockControl,
     gpio::IO,
-    pac::Peripherals,
+    peripherals::Peripherals,
     prelude::*,
     spi::{Spi, SpiMode},
     timer::TimerGroup,

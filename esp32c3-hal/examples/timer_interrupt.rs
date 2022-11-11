@@ -11,7 +11,7 @@ use critical_section::Mutex;
 use esp32c3_hal::{
     clock::ClockControl,
     interrupt,
-    pac::{self, Peripherals, TIMG0, TIMG1},
+    peripherals::{self, Peripherals, TIMG0, TIMG1},
     prelude::*,
     timer::{Timer, Timer0, TimerGroup},
     Rtc,
@@ -43,11 +43,11 @@ fn main() -> ! {
     wdt0.disable();
     wdt1.disable();
 
-    interrupt::enable(pac::Interrupt::TG0_T0_LEVEL, interrupt::Priority::Priority1).unwrap();
+    interrupt::enable(peripherals::Interrupt::TG0_T0_LEVEL, interrupt::Priority::Priority1).unwrap();
     timer0.start(500u64.millis());
     timer0.listen();
 
-    interrupt::enable(pac::Interrupt::TG1_T0_LEVEL, interrupt::Priority::Priority1).unwrap();
+    interrupt::enable(peripherals::Interrupt::TG1_T0_LEVEL, interrupt::Priority::Priority1).unwrap();
     timer1.start(1u64.secs());
     timer1.listen();
 

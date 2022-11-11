@@ -9,7 +9,7 @@ use esp32c3_hal::{
     adc::{AdcConfig, Attenuation, ADC, ADC1},
     clock::ClockControl,
     gpio::IO,
-    pac::Peripherals,
+    peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
     Delay,

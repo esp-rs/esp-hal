@@ -36,7 +36,7 @@ use xtensa_lx_rt::entry;
 
 #[entry]
 fn main() -> ! {
-    let peripherals = pac::Peripherals::take().unwrap();
+    let peripherals = peripherals::Peripherals::take().unwrap();
     let mut system = peripherals.DPORT.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 

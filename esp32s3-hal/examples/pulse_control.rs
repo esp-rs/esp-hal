@@ -8,7 +8,7 @@
 use esp32s3_hal::{
     clock::ClockControl,
     gpio::IO,
-    pac::Peripherals,
+    peripherals::Peripherals,
     prelude::*,
     pulse_control::{ClockSource, ConfiguredChannel, OutputChannel, PulseCode, RepeatMode},
     timer::TimerGroup,

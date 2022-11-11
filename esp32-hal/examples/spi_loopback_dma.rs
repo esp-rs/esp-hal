@@ -20,7 +20,7 @@ use esp32_hal::{
     clock::ClockControl,
     dma::{DmaPriority},
     gpio::IO,
-    pac::Peripherals,
+    peripherals::Peripherals,
     pdma::Dma,
     prelude::*,
     spi::{Spi, SpiMode},

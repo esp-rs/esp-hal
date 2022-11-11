@@ -18,14 +18,14 @@ pub use esp_hal_common::{
     interrupt,
     ledc,
     macros,
-    pac,
+    peripherals,
     prelude,
     pulse_control,
-    serial,
     spi,
     system,
     systimer,
     timer,
+    uart,
     utils,
     Cpu,
     Delay,
@@ -33,7 +33,7 @@ pub use esp_hal_common::{
     Rng,
     Rtc,
     Rwdt,
-    Serial,
+    Uart,
     UsbSerialJtag,
     sha
 };
@@ -444,4 +444,4 @@ pub fn mp_hook() -> bool {
 }
 
 #[no_mangle]
-extern "C" fn EspDefaultHandler(_interrupt: pac::Interrupt) {}
+extern "C" fn EspDefaultHandler(_interrupt: peripherals::Interrupt) {}

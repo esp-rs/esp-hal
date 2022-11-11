@@ -23,7 +23,7 @@ use esp32s2_hal::{
     clock::ClockControl,
     gpio::IO,
     i2c::I2C,
-    pac::Peripherals,
+    peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
     Rtc,

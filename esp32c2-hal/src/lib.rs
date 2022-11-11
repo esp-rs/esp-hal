@@ -16,9 +16,9 @@ pub use esp_hal_common::{
     interrupt,
     ledc,
     macros,
-    pac,
+    peripherals,
     prelude,
-    serial,
+    uart,
     spi,
     system,
     systimer,
@@ -28,8 +28,8 @@ pub use esp_hal_common::{
     Rng,
     Rtc,
     Rwdt,
-    Serial,
     sha,
+    Uart,
 };
 
 pub use self::gpio::IO;
@@ -295,4 +295,4 @@ pub fn mp_hook() -> bool {
 }
 
 #[no_mangle]
-extern "C" fn EspDefaultHandler(_interrupt: pac::Interrupt) {}
+extern "C" fn EspDefaultHandler(_interrupt: peripherals::Interrupt) {}

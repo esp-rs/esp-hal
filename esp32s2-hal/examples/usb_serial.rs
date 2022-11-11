@@ -8,7 +8,7 @@
 use esp32s2_hal::{
     clock::{ClockControl, CpuClock},
     otg_fs::{UsbBus, USB},
-    pac::Peripherals,
+    peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
     Rtc,

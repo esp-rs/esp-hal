@@ -199,7 +199,7 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
     f.block.stmts.extend(std::iter::once(
         syn::parse2(quote! {{
             // Check that this interrupt actually exists
-            self::pac::Interrupt::#ident_s;
+            crate::peripherals::Interrupt::#ident_s;
         }})
         .unwrap(),
     ));

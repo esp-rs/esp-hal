@@ -18,22 +18,22 @@ pub use esp_hal_common::{
     macros,
     mcpwm,
     otg_fs,
-    pac,
     prelude,
     pulse_control,
-    serial,
+    uart,
     spi,
     system,
     systimer,
     timer,
     utils,
+    peripherals,
     Cpu,
     Delay,
     PulseControl,
     Rng,
     Rtc,
     Rwdt,
-    Serial,
+    Uart,
     UsbSerialJtag,
     sha
 };
@@ -49,7 +49,7 @@ pub mod analog {
 }
 
 #[no_mangle]
-extern "C" fn EspDefaultHandler(_level: u32, _interrupt: pac::Interrupt) {}
+extern "C" fn EspDefaultHandler(_level: u32, _interrupt: peripherals::Interrupt) {}
 
 #[no_mangle]
 extern "C" fn DefaultHandler() {}

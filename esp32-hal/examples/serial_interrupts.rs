@@ -11,18 +11,18 @@ use critical_section::Mutex;
 use esp32_hal::{
     clock::ClockControl,
     interrupt,
-    pac::{self, Peripherals, UART0},
+    peripherals::{self, Peripherals, UART0},
     prelude::*,
-    serial::config::AtCmdConfig,
+    uart::config::AtCmdConfig,
     timer::TimerGroup,
     Rtc,
-    Serial,
+    Uart,
 };
 use esp_backtrace as _;
 use nb::block;
 use xtensa_lx_rt::entry;
 
-static SERIAL: Mutex<RefCell<Option<Serial<UART0>>>> = Mutex::new(RefCell::new(None));
+static SERIAL: Mutex<RefCell<Option<Uart<UART0>>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
@@ -38,7 +38,7 @@ fn main() -> ! {
     let timer_group1 = TimerGroup::new(peripherals.TIMG1, &clocks);
     let mut wdt1 = timer_group1.wdt;
 
-    let mut serial0 = Serial::new(peripherals.UART0);
+    let mut serial0 = Uart::new(peripherals.UART0);
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
 
     // Disable MWDT and RWDT (Watchdog) flash boot protection
@@ -51,7 +51,7 @@ fn main() -> ! {
     serial0.listen_at_cmd();
     serial0.listen_rx_fifo_full();
 
-    interrupt::enable(pac::Interrupt::UART0, interrupt::Priority::Priority2).unwrap();
+    interrupt::enable(peripherals::Interrupt::UART0, interrupt::Priority::Priority2).unwrap();
 
     timer0.start(1u64.secs());
 

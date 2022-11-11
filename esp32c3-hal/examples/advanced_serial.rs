@@ -8,15 +8,15 @@
 
 use esp32c3_hal::{
     clock::ClockControl,
-    pac::Peripherals,
+    peripherals::Peripherals,
     prelude::*,
-    serial::{
+    uart::{
         config::{Config, DataBits, Parity, StopBits},
         TxRxPins,
     },
     timer::TimerGroup,
     Rtc,
-    Serial,
+    Uart,
     IO,
 };
 use esp_backtrace as _;
@@ -56,7 +56,7 @@ fn main() -> ! {
         io.pins.gpio2.into_floating_input(),
     );
 
-    let mut serial1 = Serial::new_with_config(peripherals.UART1, Some(config), Some(pins), &clocks);
+    let mut serial1 = Uart::new_with_config(peripherals.UART1, Some(config), Some(pins), &clocks);
 
     timer0.start(250u64.millis());
 

@@ -12,7 +12,7 @@ use critical_section::Mutex;
 use esp32c3_hal::{
     clock::ClockControl,
     interrupt,
-    pac::{self, Peripherals},
+    peripherals::{self, Peripherals},
     prelude::*,
     Rtc,
     Rwdt,
@@ -37,7 +37,7 @@ fn main() -> ! {
     rtc.rwdt.start(2000u64.millis());
     rtc.rwdt.listen();
 
-    interrupt::enable(pac::Interrupt::RTC_CORE, interrupt::Priority::Priority1).unwrap();
+    interrupt::enable(peripherals::Interrupt::RTC_CORE, interrupt::Priority::Priority1).unwrap();
 
     critical_section::with(|cs| RWDT.borrow_ref_mut(cs).replace(rtc.rwdt));
 

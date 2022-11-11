@@ -169,18 +169,152 @@ pub trait Peripheral: Sized + sealed::Sealed {
 
 impl<T: DerefMut> sealed::Sealed for T {}
 
-impl<T: DerefMut> Peripheral for T
-where
-    T::Target: Peripheral,
-{
-    type P = <T::Target as Peripheral>::P;
-
-    #[inline]
-    unsafe fn clone_unchecked(&mut self) -> Self::P {
-        self.deref_mut().clone_unchecked()
-    }
-}
-
 pub(crate) mod sealed {
     pub trait Sealed {}
+}
+
+mod peripheral_macros {
+    #[macro_export]
+    macro_rules! peripherals {
+        ($($(#[$cfg:meta])? $name:ident),*$(,)?) => {
+            #[allow(non_snake_case)]
+            pub struct Peripherals {
+                $(
+                    $(#[$cfg])?
+                    pub $name: peripherals::$name,
+                )*
+            }
+
+            impl Peripherals {
+                // /// Returns all the peripherals *once*
+                // #[inline]
+                // pub fn take() -> Self {
+
+                //     #[no_mangle]
+                //     static mut _ESP_HAL_DEVICE_PERIPHERALS: bool = false;
+
+                //     critical_section::with(|_| unsafe {
+                //         if _ESP_HAL_DEVICE_PERIPHERALS {
+                //             panic!("init called more than once!")
+                //         }
+                //         _ESP_HAL_DEVICE_PERIPHERALS = true;
+                //         Self::steal()
+                //     })
+                // }
+
+                pub fn take() -> Option<Self> {
+                    #[no_mangle]
+                    static mut _ESP_HAL_DEVICE_PERIPHERALS: bool = false;
+                    critical_section::with(|_| unsafe {
+                        if _ESP_HAL_DEVICE_PERIPHERALS {
+                            return None;
+                        }
+                        _ESP_HAL_DEVICE_PERIPHERALS = true;
+                        Some(Peripherals::steal())
+                    })
+                }
+            }
+
+            impl Peripherals {
+                /// Unsafely create an instance of this peripheral out of thin air.
+                ///
+                /// # Safety
+                ///
+                /// You must ensure that you're only using one instance of this type at a time.
+                #[inline]
+                pub unsafe fn steal() -> Self {
+                    Self {
+                        $(
+                            $(#[$cfg])?
+                            // $name: peripherals::$name::steal(), // FIXME add this back once we have removed pac::Peripherals completely
+                            $name: unsafe { core::mem::zeroed() }, // this is well defined for zero sized types: https://github.com/rust-lang/unsafe-code-guidelines/issues/250
+                        )*
+                    }
+                }
+            }
+
+            // expose the new structs
+            $(
+                pub use peripherals::$name;
+            )*
+        }
+    }
+
+    #[macro_export]
+    macro_rules! create_peripherals {
+        ($($(#[$cfg:meta])? $name:ident),*$(,)?) => {
+            $(
+                $(#[$cfg])?
+                #[derive(Debug)]
+                #[allow(non_camel_case_types)]
+                pub struct $name { _inner: () }
+
+                $(#[$cfg])?
+                impl $name {
+                    /// Unsafely create an instance of this peripheral out of thin air.
+                    ///
+                    /// # Safety
+                    ///
+                    /// You must ensure that you're only using one instance of this type at a time.
+                    #[inline]
+                    pub unsafe fn steal() -> Self {
+                        Self { _inner: () }
+                    }
+
+                    #[doc = r"Pointer to the register block"]
+                    pub const PTR: *const <super::pac::$name as core::ops::Deref>::Target = super::pac::$name::PTR;
+
+                    #[doc = r"Return the pointer to the register block"]
+                    #[inline(always)]
+                    pub const fn ptr() -> *const <super::pac::$name as core::ops::Deref>::Target {
+                        super::pac::$name::PTR
+                    }
+                }
+
+                impl core::ops::Deref for $name {
+                    type Target = <super::pac::$name as core::ops::Deref>::Target;
+
+                    fn deref(&self) -> &Self::Target {
+                        unsafe { &*Self::PTR }
+                    }
+                }
+
+                impl core::ops::DerefMut for $name {
+
+                    fn deref_mut(&mut self) -> &mut Self::Target {
+                        unsafe { &mut *(Self::PTR as *mut _)  }
+                    }
+                }
+
+                impl crate::peripheral::Peripheral for $name {
+                    type P = $name;
+
+                    #[inline]
+                    unsafe fn clone_unchecked(&mut self) -> Self::P {
+                        Self::steal()
+                    }
+                }
+
+                impl crate::peripheral::Peripheral for &mut $name {
+                    type P = $name;
+
+                    #[inline]
+                    unsafe fn clone_unchecked(&mut self) -> Self::P {
+                        $name::steal()
+                    }
+                }
+
+
+            )*
+        }
+    }
+
+    #[macro_export]
+    macro_rules! into_ref {
+    ($($name:ident),*) => {
+        $(
+            let $name = $name.into_ref();
+        )*
+    }
+}
 }
