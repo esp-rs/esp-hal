@@ -5,6 +5,16 @@ use crate::{
     OutputPin,
 };
 
+/// A MCPWM operator
+///
+/// The PWM Operator submodule has the following functions:
+/// * Generates a PWM signal pair, based on timing references obtained from the
+///   corresponding PWM timer.
+/// * Each signal out of the PWM signal pair includes a specific pattern of dead
+///   time. (Not yet implemented)
+/// * Superimposes a carrier on the PWM signal, if configured to do so. (Not yet
+///   implemented)
+/// * Handles response under fault conditions. (Not yet implemented)
 pub struct Operator<const O: u8, PWM> {
     phantom: PhantomData<PWM>,
 }
@@ -18,7 +28,7 @@ impl<const O: u8, PWM: PwmPeripheral> Operator<O, PWM> {
         }
     }
 
-    /// Select which [`Timer`] is the timing reference for this operator
+    /// Select a [`Timer`] to be the timing reference for this operator
     ///
     /// ### Note:
     /// By default TIMER0 is used
@@ -35,6 +45,7 @@ impl<const O: u8, PWM: PwmPeripheral> Operator<O, PWM> {
         });
     }
 
+    /// Use the A output with the given pin and configuration
     pub fn with_pin_a<Pin: OutputPin>(
         self,
         pin: Pin,
@@ -42,6 +53,8 @@ impl<const O: u8, PWM: PwmPeripheral> Operator<O, PWM> {
     ) -> PwmPin<Pin, PWM, O, true> {
         PwmPin::new(pin, config)
     }
+
+    /// Use the B output with the given pin and configuration
     pub fn with_pin_b<Pin: OutputPin>(
         self,
         pin: Pin,
@@ -49,6 +62,8 @@ impl<const O: u8, PWM: PwmPeripheral> Operator<O, PWM> {
     ) -> PwmPin<Pin, PWM, O, false> {
         PwmPin::new(pin, config)
     }
+
+    /// Use both the A and the B output with the given pins and configurations
     pub fn with_pins<PinA: OutputPin, PinB: OutputPin>(
         self,
         pin_a: PinA,
@@ -60,19 +75,26 @@ impl<const O: u8, PWM: PwmPeripheral> Operator<O, PWM> {
     }
 }
 
+/// Configuration describing how the operator generates a signal on a connected
+/// pin
 pub struct PwmPinConfig<const IS_A: bool> {
     actions: PwmActions<IS_A>,
     update_method: PwmUpdateMethod,
 }
 
 impl<const IS_A: bool> PwmPinConfig<IS_A> {
+    /// A configuration using [`PwmActions::UP_ACTIVE_HIGH`] and
+    /// [`PwmUpdateMethod::SYNC_ON_ZERO`]
     pub const UP_ACTIVE_HIGH: Self =
         Self::new(PwmActions::UP_ACTIVE_HIGH, PwmUpdateMethod::SYNC_ON_ZERO);
+    /// A configuration using [`PwmActions::UP_DOWN_ACTIVE_HIGH`] and
+    /// [`PwmUpdateMethod::SYNC_ON_ZERO`]
     pub const UP_DOWN_ACTIVE_HIGH: Self = Self::new(
         PwmActions::UP_DOWN_ACTIVE_HIGH,
         PwmUpdateMethod::SYNC_ON_ZERO,
     );
 
+    /// Get a configuration using the given `PwmActions` and `PwmUpdateMethod`
     pub const fn new(actions: PwmActions<IS_A>, update_method: PwmUpdateMethod) -> Self {
         PwmPinConfig {
             actions,
@@ -81,6 +103,7 @@ impl<const IS_A: bool> PwmPinConfig<IS_A> {
     }
 }
 
+/// A pin driven by an MCPWM operator
 pub struct PwmPin<Pin, PWM, const O: u8, const IS_A: bool> {
     _pin: Pin,
     phantom: PhantomData<PWM>,
@@ -100,8 +123,7 @@ impl<Pin: OutputPin, PWM: PwmPeripheral, const O: u8, const IS_A: bool> PwmPin<P
         pin
     }
 
-    // TODO mention that using A on B and vice versa is not supported
-    // TODO should this be public?
+    /// Configure what actions should be taken on timing events
     pub fn set_actions(&mut self, value: PwmActions<IS_A>) {
         // SAFETY:
         // We only grant access to our GENx_x register with the lifetime of &mut self
@@ -124,6 +146,7 @@ impl<Pin: OutputPin, PWM: PwmPeripheral, const O: u8, const IS_A: bool> PwmPin<P
         }
     }
 
+    /// Set how a new timestamp syncs with the timer
     #[cfg(esp32)]
     pub fn set_update_method(&mut self, update_method: PwmUpdateMethod) {
         let block = unsafe { &*PWM::block() };
@@ -153,6 +176,7 @@ impl<Pin: OutputPin, PWM: PwmPeripheral, const O: u8, const IS_A: bool> PwmPin<P
         }
     }
 
+    /// Set how a new timestamp syncs with the timer
     #[cfg(esp32s3)]
     pub fn set_update_method(&mut self, update_method: PwmUpdateMethod) {
         let block = unsafe { &*PWM::block() };
@@ -182,6 +206,9 @@ impl<Pin: OutputPin, PWM: PwmPeripheral, const O: u8, const IS_A: bool> PwmPin<P
         }
     }
 
+    /// Set how a new timestamp syncs with the timer.
+    /// The written value will take effect according to the set
+    /// [`PwmUpdateMethod`].
     #[cfg(esp32)]
     pub fn set_timestamp(&mut self, value: u16) {
         let block = unsafe { &*PWM::block() };
@@ -198,53 +225,80 @@ impl<Pin: OutputPin, PWM: PwmPeripheral, const O: u8, const IS_A: bool> PwmPin<P
         }
     }
 
+    /// Write a new timestamp.
+    /// The written value will take effect according to the set
+    /// [`PwmUpdateMethod`].
     #[cfg(esp32s3)]
     pub fn set_timestamp(&mut self, value: u16) {
         let block = unsafe { &*PWM::block() };
-        unsafe {
-            match (O, IS_A) {
-                (0, true) => &block.cmpr0_value0.write(|w| w.cmpr0_a().bits(value)),
-                (1, true) => &block.cmpr1_value0.write(|w| w.cmpr1_a().bits(value)),
-                (2, true) => &block.cmpr2_value0.write(|w| w.cmpr2_a().bits(value)),
-                (0, false) => &block.cmpr0_value1.write(|w| w.cmpr0_b().bits(value)),
-                (1, false) => &block.cmpr1_value1.write(|w| w.cmpr1_b().bits(value)),
-                (2, false) => &block.cmpr2_value1.write(|w| w.cmpr2_b().bits(value)),
-                _ => {
-                    unreachable!()
-                }
+        match (O, IS_A) {
+            (0, true) => block.cmpr0_value0.write(|w| w.cmpr0_a().variant(value)),
+            (1, true) => block.cmpr1_value0.write(|w| w.cmpr1_a().variant(value)),
+            (2, true) => block.cmpr2_value0.write(|w| w.cmpr2_a().variant(value)),
+            (0, false) => block.cmpr0_value1.write(|w| w.cmpr0_b().variant(value)),
+            (1, false) => block.cmpr1_value1.write(|w| w.cmpr1_b().variant(value)),
+            (2, false) => block.cmpr2_value1.write(|w| w.cmpr2_b().variant(value)),
+            _ => {
+                unreachable!()
             }
-        };
+        }
     }
 }
 
+/// An action the operator applies to an output
+#[non_exhaustive]
 #[repr(u32)]
 pub enum UpdateAction {
-    None    = 0,
+    /// Clear the output by setting it to a low level.
     SetLow  = 1,
+    /// Set the to a high level.
     SetHigh = 2,
+    /// Change the current output level to the opposite value.
+    /// If it is currently pulled high, pull it low, or vice versa.
     Toggle  = 3,
 }
 
+/// Settings for what actions should be taken on timing events
+///
+/// ### Note:
+/// The hardware supports using a timestamp A event to trigger an action on
+/// output B or vice versa. For clearer ownership semantics this HAL does not
+/// support such configurations.
 pub struct PwmActions<const IS_A: bool>(u32);
 
 impl<const IS_A: bool> PwmActions<IS_A> {
+    /// Using this setting together with a timer configured with
+    /// [`PwmWorkingMode::Increase`](super::timer::PwmWorkingMode::Increase)
+    /// will set the output high for a duration proportional to the set
+    /// timestamp.
     pub const UP_ACTIVE_HIGH: Self = Self::empty()
         .on_up_counting_timer_equals_zero(UpdateAction::SetHigh)
         .on_up_counting_timer_equals_timestamp(UpdateAction::SetLow);
 
+    /// Using this setting together with a timer configured with
+    /// [`PwmWorkingMode::UpDown`](super::timer::PwmWorkingMode::UpDown) will
+    /// set the output high for a duration proportional to the set
+    /// timestamp.
     pub const UP_DOWN_ACTIVE_HIGH: Self = Self::empty()
         .on_down_counting_timer_equals_timestamp(UpdateAction::SetHigh)
         .on_up_counting_timer_equals_timestamp(UpdateAction::SetLow);
 
+    /// `PwmActions` with no `UpdateAction`s set
     pub const fn empty() -> Self {
         PwmActions(0)
     }
+
+    /// Choose an `UpdateAction` for an `UTEZ` event
     pub const fn on_up_counting_timer_equals_zero(self, action: UpdateAction) -> Self {
         self.with_value_at_offset(action as u32, 0)
     }
+
+    /// Choose an `UpdateAction` for an `UTEP` event
     pub const fn on_up_counting_timer_equals_period(self, action: UpdateAction) -> Self {
         self.with_value_at_offset(action as u32, 2)
     }
+
+    /// Choose an `UpdateAction` for an `UTEA`/`UTEB` event
     pub const fn on_up_counting_timer_equals_timestamp(self, action: UpdateAction) -> Self {
         match IS_A {
             true => self.with_value_at_offset(action as u32, 4),
@@ -252,12 +306,17 @@ impl<const IS_A: bool> PwmActions<IS_A> {
         }
     }
 
+    /// Choose an `UpdateAction` for an `DTEZ` event
     pub const fn on_down_counting_timer_equals_zero(self, action: UpdateAction) -> Self {
         self.with_value_at_offset(action as u32, 12)
     }
+
+    /// Choose an `UpdateAction` for an `DTEP` event
     pub const fn on_down_counting_timer_equals_period(self, action: UpdateAction) -> Self {
         self.with_value_at_offset(action as u32, 14)
     }
+
+    /// Choose an `UpdateAction` for an `DTEA`/`DTEB` event
     pub const fn on_down_counting_timer_equals_timestamp(self, action: UpdateAction) -> Self {
         match IS_A {
             true => self.with_value_at_offset(action as u32, 16),
@@ -272,19 +331,32 @@ impl<const IS_A: bool> PwmActions<IS_A> {
     }
 }
 
+/// Settings for when [`PwmPin::set_timestamp`] takes effect
+///
+/// Multiple syncing triggers can be set.
 pub struct PwmUpdateMethod(u8);
 
 impl PwmUpdateMethod {
+    /// New timestamp will be applied immediately
+    pub const SYNC_IMMEDIATLY: Self = Self::empty();
+    /// New timestamp will be applied when timer is equal to zero
     pub const SYNC_ON_ZERO: Self = Self::empty().sync_on_timer_equals_zero();
+    /// New timestamp will be applied when timer is equal to period
     pub const SYNC_ON_PERIOD: Self = Self::empty().sync_on_timer_equals_period();
 
+    /// `PwmUpdateMethod` with no sync triggers.
+    /// Corresponds to syncing immediately
     pub const fn empty() -> Self {
         PwmUpdateMethod(0)
     }
+
+    /// Enable syncing new timestamp values when timer is equal to zero
     pub const fn sync_on_timer_equals_zero(mut self) -> Self {
         self.0 |= 0b0001;
         self
     }
+
+    /// Enable syncing new timestamp values when timer is equal to period
     pub const fn sync_on_timer_equals_period(mut self) -> Self {
         self.0 |= 0b0010;
         self

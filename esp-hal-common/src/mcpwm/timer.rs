@@ -7,27 +7,11 @@ use crate::{
     mcpwm::{FrequencyError, PeripheralClockConfig, PwmPeripheral},
 };
 
-/// PWM working mode
-#[derive(Copy, Clone)]
-#[repr(u8)]
-pub enum PwmWorkingMode {
-    /// In this mode, the PWM timer increments from zero until reaching the
-    /// value configured in the period field. Once done, the PWM timer
-    /// returns to zero and starts increasing again. PWM period is equal to the
-    /// value of the period field + 1.
-    Increase = 1,
-    /// The PWM timer decrements to zero, starting from the value configured in
-    /// the period field. After reaching zero, it is set back to the period
-    /// value. Then it starts to decrement again. In this case, the PWM period
-    /// is also equal to the value of period field + 1.
-    Decrease = 2,
-    /// This is a combination of the two modes mentioned above. The PWM timer
-    /// starts increasing from zero until the period value is reached. Then,
-    /// the timer decreases back to zero. This pattern is then repeated. The
-    /// PWM period is the result of the value of the period field × 2.
-    UpDown   = 3,
-}
-
+/// A MCPWM timer
+///
+/// Every timer of a particular [`MCPWM`](super::MCPWM) peripheral can be used
+/// as a timing reference for every
+/// [`Operator`](super::operator::Operator) of that peripheral
 pub struct Timer<const T: u8, PWM> {
     pub(super) phantom: PhantomData<PWM>,
 }
@@ -39,42 +23,48 @@ impl<const T: u8, PWM: PwmPeripheral> Timer<T, PWM> {
         }
     }
 
-    /// Set the prescaler, period and then the mode
+    /// Apply the given timer configuration.
     ///
     /// ### Note:
-    /// `prescaler` and `period` will be applied immediately.
-    /// If the timer is already running you might want to call [`stop`] first.
+    /// The configuration will be applied immediately.
+    /// If the timer is already running you might want to call [`Timer::stop`]
+    /// and [`Timer::reset_counter`] first.
     ///
-    /// Note also that the hardware supports writing these settings
-    /// in sync with certain timer events but this HAL does not expose these for
-    /// now.
-    pub fn start(&mut self, timer_clock: TimerClockConfig) {
+    /// The hardware supports writing these settings in sync with certain timer
+    /// events but this HAL does not expose these for now.
+    pub fn start(&mut self, timer_config: TimerClockConfig) {
         // write prescaler and period with immediate update method
-        unsafe {
-            self.cfg0().write(|w| {
-                w.timer0_prescale()
-                    .bits(timer_clock.prescaler)
-                    .timer0_period()
-                    .bits(timer_clock.period)
-                    .timer0_period_upmethod()
-                    .variant(0)
-            });
-        }
+
+        self.cfg0().write(|w| {
+            w.timer0_prescale()
+                .variant(timer_config.prescaler)
+                .timer0_period()
+                .variant(timer_config.period)
+                .timer0_period_upmethod()
+                .variant(0)
+        });
 
         // set timer to continuously run and set the timer working mode
         self.cfg1().write(|w| {
             w.timer0_start()
                 .variant(2)
                 .timer0_mod()
-                .variant(timer_clock.mode as u8)
+                .variant(timer_config.mode as u8)
         });
     }
 
+    /// Stop the timer in its current state
     pub fn stop(&mut self) {
         // freeze the timer
         self.cfg1().write(|w| w.timer0_mod().variant(0));
     }
 
+    /// Set the timer counter to 0
+    pub fn reset_counter(&mut self) {
+        todo!()
+    }
+
+    /// Read the counter value and counter direction of the timer
     pub fn status(&self) -> (u16, CounterDirection) {
         let block = unsafe { &*PWM::block() };
 
@@ -142,6 +132,10 @@ impl<const T: u8, PWM: PwmPeripheral> Timer<T, PWM> {
     }
 }
 
+/// Clock configuration of a MCPWM timer
+///
+/// Use [`PeripheralClockConfig::timer_clock_with_prescaler`](super::PeripheralClockConfig::timer_clock_with_prescaler) or
+/// [`PeripheralClockConfig::timer_clock_with_frequency`](super::PeripheralClockConfig::timer_clock_with_frequency) to it.
 #[derive(Copy, Clone)]
 pub struct TimerClockConfig<'a> {
     frequency: HertzU32,
@@ -152,7 +146,7 @@ pub struct TimerClockConfig<'a> {
 }
 
 impl<'a> TimerClockConfig<'a> {
-    pub fn with_prescaler(
+    pub(super) fn with_prescaler(
         clock: &PeripheralClockConfig<'a>,
         period: u16,
         mode: PwmWorkingMode,
@@ -174,7 +168,7 @@ impl<'a> TimerClockConfig<'a> {
         }
     }
 
-    pub fn with_frequency(
+    pub(super) fn with_frequency(
         clock: &PeripheralClockConfig<'a>,
         period: u16,
         mode: PwmWorkingMode,
@@ -207,14 +201,42 @@ impl<'a> TimerClockConfig<'a> {
         })
     }
 
+    /// Get the timer clock frequency.
+    ///
+    /// ### Note:
+    /// The actual value is rounded down to the nearest `u32` value
     pub fn frequency(&self) -> HertzU32 {
         self.frequency
     }
 }
 
+/// PWM working mode
+#[derive(Copy, Clone)]
+#[repr(u8)]
+pub enum PwmWorkingMode {
+    /// In this mode, the PWM timer increments from zero until reaching the
+    /// value configured in the period field. Once done, the PWM timer
+    /// returns to zero and starts increasing again. PWM period is equal to the
+    /// value of the period field + 1.
+    Increase = 1,
+    /// The PWM timer decrements to zero, starting from the value configured in
+    /// the period field. After reaching zero, it is set back to the period
+    /// value. Then it starts to decrement again. In this case, the PWM period
+    /// is also equal to the value of period field + 1.
+    Decrease = 2,
+    /// This is a combination of the two modes mentioned above. The PWM timer
+    /// starts increasing from zero until the period value is reached. Then,
+    /// the timer decreases back to zero. This pattern is then repeated. The
+    /// PWM period is the result of the value of the period field × 2.
+    UpDown   = 3,
+}
+
+/// The direction the timer counter is changing
 #[derive(Debug)]
 pub enum CounterDirection {
+    /// The timer counter is increasing
     Increasing,
+    /// The timer counter is decreasing
     Decreasing,
 }
 
