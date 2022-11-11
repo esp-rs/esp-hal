@@ -19,6 +19,7 @@
 //! [esp32s3-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32s3-hal
 
 #![no_std]
+#![feature(core_intrinsics)]
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
 
 #[cfg(esp32)]

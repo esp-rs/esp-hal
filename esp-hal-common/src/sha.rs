@@ -1,4 +1,4 @@
-use core::{convert::Infallible, ptr::slice_from_raw_parts};
+use core::{convert::Infallible, ptr::slice_from_raw_parts, ops::Mul};
 
 use esp_println::println;
 
@@ -22,6 +22,7 @@ use crate::pac::SHA;
 pub struct Sha {
     sha: SHA,
     mode: ShaMode,
+    write_buf: [u8; 4],
     cursor: usize,
     first_run: bool,
     finished: bool,
@@ -169,14 +170,27 @@ fn mode_as_bits(mode: ShaMode) -> u8 {
     }
 }
 
-// TODO: this is different for the esp32-hal (sha.text instead of m_mem &
-// seperate start/continue/busy (also has sha.load=finish reg) regs per algo)
+// TODO: Fix esp32 impl to also have u32 alignment (extract alignment code into seperate thing)
+// TODO: Allow/Implemenet SHA512_(u16)
+
+// A few notes on this implementation with regards to 'memcpy',
+// - It seems that ptr::write_bytes already acts as volatile, while ptr::copy_* does not (in this case)
+// - The registers are *not* cleared after processing, so padding needs to be written out
+// - This component uses core::intrinsics::volatile_* which is unstable, but is the only way to
+// efficiently copy memory with volatile
+// - For this particular registers (and probably others), a full u32 needs to be written partial
+// register writes (i.e. in u8 mode) does not work
+//   - This means that we need to buffer bytes coming in up to 4 u8's in order to create a full u32
+//     - The implementation for this is messy atm (the entire write_data function is for this purpose), it would be good to create a uniform interface
+//     for writing into aligned registers 
+
+// This only supports inputs up to u32::MAX in byte size, to increase please see ::finish()
+// length/self.cursor usage
 #[cfg(any(esp32s2, esp32s3, em_memsp32c2, esp32c3))]
 impl Sha {
     pub fn new(sha: SHA, mode: ShaMode) -> Self {
         // Setup SHA Mode
         sha.mode.write(|w| unsafe {
-            // TODO: Allow/Implemenet SHA512_(u16)
             w.mode().bits(mode_as_bits(mode))
         });
         Self {
@@ -185,6 +199,7 @@ impl Sha {
             cursor: 0,
             first_run: true,
             finished: false,
+            write_buf: [0u8; 4]
         }
     }
 
@@ -202,19 +217,15 @@ impl Sha {
         if self.first_run {
             // Set SHA_START_REG
             unsafe {
-                // TODO: not sure what to correct unwrapping is (? is infallible but can't
-                // convert to Result for some reason)
-                let ptr = self.sha.start.as_ptr().as_mut().unwrap();
-                *ptr = 1u32;
+                println!("[SHA] Starting engine as first run");
+                self.sha.start.as_ptr().write_volatile(1u32);
             }
             self.first_run = false;
         } else {
             // SET SHA_CONTINUE_REG
             unsafe {
-                // TODO: not sure what to correct unwrapping is (? is infallible but can't
-                // convert to Result for some reason)_
-                let ptr = self.sha.continue_.as_ptr().as_mut().unwrap();
-                *ptr = 1u32;
+                println!("[SHA] Starting engine as continue");
+                self.sha.continue_.as_ptr().write_volatile(1u32);
             }
         }
     }
@@ -226,6 +237,152 @@ impl Sha {
         };
     }
 
+    pub fn digest_length(&self) -> usize {
+        return match self.mode {
+            ShaMode::SHA1 => 20,
+            ShaMode::SHA224 => 28,
+            ShaMode::SHA256 => 32, 
+            ShaMode::SHA384 => 48,
+            ShaMode::SHA512 => 64,
+            #[cfg(any(esp32s2, esp32s3))]
+            ShaMode::SHA512_224 => 28,
+            #[cfg(any(esp32s2, esp32s3))]
+            ShaMode::SHA512_256 => 32, 
+        }
+    }
+
+    fn flush_data(&mut self) -> nb::Result<(), Infallible> {
+        if self.sha.busy.read().bits() != 0 {
+            return Err(nb::Error::WouldBlock);
+        }
+        
+        let write_buf_fill = self.cursor % 4;
+        println!("Flushing {} bytes from buffer", write_buf_fill);
+        if write_buf_fill == 0 {
+            return Ok(())
+        }
+
+        let chunk_len = self.chunk_length();
+        for i in write_buf_fill..self.write_buf.len() {
+            self.write_buf[i] = 0u8;
+        }
+
+        let write_buf_cursor = (self.cursor - write_buf_fill) % chunk_len;
+        unsafe {
+            let ptr = (self.sha.m_mem.as_ptr() as *mut u32).add(write_buf_cursor/4);
+            println!("[Flsuh]: Writing {:02x?} to {:?}", self.write_buf, ptr);
+            core::ptr::write_volatile(ptr, u32::from_ne_bytes(self.write_buf));
+        }
+        self.cursor = self.cursor.wrapping_add(4-write_buf_fill);
+        block!(self.check_flush())?;
+        Ok(())
+    }
+
+    // This function ensures that incoming data is aligned to u32 (due to issues with cpy_mem<u8>)
+    // The first return value will be written into the current cursor if exists
+    // If the second return value (always multiple of size<u32>) can be written to the rest of
+    // the buffer
+    // The final return value is the remaining data that cannot be used
+    fn write_data<'a>(&mut self, incoming: &'a [u8]) -> nb::Result<&'a [u8], Infallible>
+    {
+        let chunk_len = self.chunk_length();
+        let mod_cursor = self.cursor % chunk_len;
+        //  (Option<u32>, &'a [u8], &'a [u8])
+        if mod_cursor % 4 == 0 {
+            // No data in write_buf, just write as much as we can from incoming
+            let split_pt = core::cmp::min(chunk_len-mod_cursor, incoming.len());
+            let (mut chunk, remaining) = incoming.split_at(split_pt);
+            
+            // Add full chunk to cursor for next call
+            self.cursor = self.cursor.wrapping_add(chunk.len());
+            // Incoming data is not aligned, store left over in write_buf
+            if chunk.len() % 4 != 0 {
+                let (nchunk, to_store) = chunk.split_at(chunk.len() - (chunk.len() % 4));
+                chunk = nchunk;
+                to_store.iter().enumerate().for_each(|(i, v)| {
+                    if let Some(sv) = self.write_buf.get_mut(i) {
+                        *sv = *v;
+                    }
+                });
+            }
+
+            if chunk.len() == 0{
+                return Ok(remaining)
+            }
+            unsafe {
+                // Volatile write to output
+                let ptr = (self.sha.m_mem[0].as_ptr() as *mut u32).add(mod_cursor/4);
+                println!("[Update]: Writing {:02x?} ({}) to {:?}", chunk, chunk.len(), ptr);
+                core::intrinsics::volatile_copy_nonoverlapping_memory::<u32>(ptr, chunk.as_ptr() as *mut u32, chunk.len()/4);
+            }
+
+            Ok(remaining) 
+        } else {
+            // Current cursor not aligned, first load as much into write_buf as possible
+            let write_buf_fill = mod_cursor % 4;
+            let write_buf_cursor = (self.cursor - write_buf_fill) % chunk_len;
+            for i in 0..(self.write_buf.len() - write_buf_fill) {
+                match incoming.get(i) {
+                    Some(v) => {
+                        self.write_buf[write_buf_fill+i] = *v;
+                        self.cursor = self.cursor.wrapping_add(1);
+                    },
+                    None => { return Ok(&[]) }
+                }
+            }
+            // Not returned, so write_buf_fill is now 4
+            unsafe {
+                let ptr = (self.sha.m_mem.as_ptr() as *mut u32).add(write_buf_cursor/4);
+                println!("[Update]: Writing {:02x?} to {:?}", self.write_buf, ptr);
+                core::ptr::write_volatile(ptr, u32::from_ne_bytes(self.write_buf));
+            }
+            
+
+            let mod_cursor = self.cursor % chunk_len;
+            // Skip over previously written bytes
+            let (_, incoming) = incoming.split_at(core::cmp::min(incoming.len(), 4-write_buf_fill));
+            let (mut chunk, remaining) = incoming.split_at(core::cmp::min(incoming.len(), chunk_len-mod_cursor));
+
+            // Add full chunk to cursor for next call
+            self.cursor = self.cursor.wrapping_add(chunk.len());
+
+             // Remaining data is also not aligned, store left over in write_buf
+            if chunk.len() % 4 != 0 {
+                let (nchunk, to_store) = chunk.split_at(chunk.len() - (chunk.len() % 4));
+                chunk = nchunk;
+                to_store.iter().enumerate().for_each(|(i, v)| {
+                    if let Some(sv) = self.write_buf.get_mut(i) {
+                        *sv = *v;
+                    }
+                });
+            }
+            
+            if chunk.len() == 0{
+                return Ok(remaining)
+            }
+            unsafe {
+                // Volatile write to output 
+                let ptr = (self.sha.m_mem[0].as_ptr() as *mut u32).add(mod_cursor/4);
+                println!("[Update]: Writing {:02x?} ({}) to {:?}", chunk, chunk.len(), ptr);
+                core::intrinsics::volatile_copy_nonoverlapping_memory::<u32>(ptr, chunk.as_ptr() as *mut u32, chunk.len()/4);
+            }
+             
+            Ok(remaining)
+        }
+    }
+    
+    fn check_flush(&mut self) -> nb::Result<(), Infallible> {
+        if self.sha.busy.read().bits() != 0 {
+            return Err(nb::Error::WouldBlock);
+        }
+
+        // Finished writing current chunk, start accelerator
+        if self.cursor % self.chunk_length() == 0 {
+            self.process_buffer();
+        }
+        Ok(())
+    }
+
     pub fn update<'a>(&mut self, buffer: &'a [u8]) -> nb::Result<&'a [u8], Infallible> {
         if self.sha.busy.read().bits() != 0 {
             return Err(nb::Error::WouldBlock);
@@ -233,39 +390,14 @@ impl Sha {
 
         // NOTE: m_mem is 64,u8; but datasheet (esp32s2/esp32s3@>=SHA384) says 128, u8
         // Load data into M_n_REG
-        let chunk_len = self.chunk_length();
+        let remaining = self.write_data(buffer)?;
+        block!(self.check_flush())?;
 
-        // Read only enough to fill m_mem
-        let to_go = chunk_len - (self.cursor % chunk_len);
-        let to_read = if buffer.len() > to_go {
-            to_go
-        } else {
-            buffer.len()
-        };
-        let (chunk, buffer) = buffer.split_at(to_read);
-
-        unsafe {
-            let m_cursor_ptr = self.sha.m_mem[0].as_ptr() as *mut u8;
-            core::ptr::copy_nonoverlapping(
-                chunk.as_ptr(),
-                m_cursor_ptr.add(self.cursor % chunk_len),
-                chunk.len(),
-            );
-            self.cursor = self.cursor.wrapping_add(chunk.len());
-        }
-
-        // Finished writing current chunk, start accelerator
-        if self.cursor % chunk_len == 0 {
-            self.process_buffer();
-        }
-
-        Ok(buffer)
+        Ok(remaining)
     }
 
     pub fn finish(&mut self, output: &mut [u8]) -> nb::Result<(), Infallible> {
         // TODO: should we enforce full hash readout in output?
-        // TODO: `finished` latch could also be done by freeing self, although only a
-        // single read-out would be allowed :thinking:
 
         // Pad messagee:
         // Append "1" bit
@@ -289,9 +421,12 @@ impl Sha {
 
         if !self.finished {
             // Bit-length of original message + "1" bit
-            let length = (self.cursor * 8 + 1).to_be_bytes();
+            println!("Message len: {}", self.cursor);
+            let length = (self.cursor * 8).to_be_bytes();
             block!(self.update(&[0x80]))?; // Append "1" bit
-            let mut mod_cursor = self.cursor % chunk_len;
+            block!(self.flush_data())?; // Flush partial data, ensures aligned cursor 
+
+            let mod_cursor = self.cursor % chunk_len;
 
             // TODO: verify this works (should be 8 or 15 bytes free for this not to
             // trigger)
@@ -301,42 +436,51 @@ impl Sha {
             );
             if chunk_len - mod_cursor < chunk_len / 8 {
                 println!("[SHA] Adding padding!");
+                // TODO: I think the default is zero after proc_buffer, so might not need most of
+                // this
+
                 // Zero out remaining data if buffer is almost full (>=448/896), and process
                 // buffer
                 let pad_len = chunk_len - mod_cursor;
                 unsafe {
-                    let m_cursor_ptr = self.sha.m_mem[0].as_ptr() as *mut u8;
-                    core::ptr::write_bytes::<u8>(m_cursor_ptr.add(mod_cursor), 0, pad_len);
+                    let m_cursor_ptr = (self.sha.m_mem[0].as_ptr() as *mut u32).add(mod_cursor/4);
+                    println!("[Finish]: Writing [{:02x?},...] ({}) to {:?}", 0, pad_len, m_cursor_ptr);
+                    //core::ptr::write_bytes::<u32>(m_cursor_ptr, 0, pad_len/4);
+                    core::intrinsics::volatile_set_memory(m_cursor_ptr, 0, pad_len/4);
                 }
                 self.process_buffer();
                 self.cursor = self.cursor.wrapping_add(pad_len);
-                mod_cursor = self.cursor % chunk_len; // Should be zero if branched above
 
                 // Spin-wait for finish 
                 while self.sha.busy.read().bits() != 0 {}
             }
 
+            let mod_cursor = self.cursor % chunk_len; // Should be zero if branched above
             unsafe {
-                let m_cursor_ptr = self.sha.m_mem[0].as_ptr() as *mut u8;
-                // Pad zeros
-                core::ptr::write_bytes::<u8>(
-                    m_cursor_ptr.add(mod_cursor),
-                    0,
-                    chunk_len - length.len() - mod_cursor,
-                );
+                let m_cursor_ptr = self.sha.m_mem[0].as_ptr() as *mut u32;
+                // Pad zeros 
+                let pad_ptr = m_cursor_ptr.add(mod_cursor/4);
+                let pad_len = (chunk_len - mod_cursor) - 4; 
+
+                println!("[Finish]: Writing [{:02x?},...] ({}) to {:?}", 0, pad_len, pad_ptr);
+                //core::intrinsics::volatile_set_memory(pad_ptr, 0, pad_len/4);
+                core::ptr::write_bytes(pad_ptr, 0, pad_len/4);
+
                 // Write length (BE) to end
-                // FIXME: length does nothing for some reason
                 println!(
                     "{:02x?}, {}, {:?}, cursor={}, {:?} {:?}",
                     length,
                     chunk_len - length.len(),
                     length.as_ptr(),
-                    mod_cursor,
+                    self.cursor,
                     m_cursor_ptr,
-                    (self.sha.m_mem.as_ptr() as *mut u8).add(1),
+                    self.sha.m_mem.as_ptr().add(1),
                 );
-
-                core::ptr::copy_nonoverlapping::<u8>(length.as_ptr(), (self.sha.m_mem[0].as_ptr() as *mut u8).add(chunk_len - length.len()), length.len());
+               
+                let len_mem_ptr = (self.sha.m_mem.as_ptr() as *mut u32).add((chunk_len/4) -1);
+                println!("[Finish]: Writing {:02x?} to {:?}", length, len_mem_ptr);
+                // Needs volatile writes
+                core::intrinsics::volatile_copy_memory::<u32>(len_mem_ptr, length.as_ptr() as *mut u32, length.len()/4);
             }
 
             self.process_buffer();
@@ -349,10 +493,10 @@ impl Sha {
 
         unsafe {
             // TODO: limit read len to digest size
-            core::ptr::copy_nonoverlapping(
-                self.sha.h_mem.as_ptr() as *const u8,
-                output.as_mut_ptr(),
-                output.len(),
+            core::intrinsics::volatile_copy_nonoverlapping_memory::<u32>(
+                output.as_mut_ptr() as *mut u32,
+                self.sha.h_mem.as_ptr() as *const u32,
+                core::cmp::min(self.digest_length(), output.len())/4,
             );
         }
         Ok(())
