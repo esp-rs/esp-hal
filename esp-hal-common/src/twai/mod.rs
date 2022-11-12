@@ -17,7 +17,6 @@ use fugit::HertzU32;
 
 use self::filter::{Filter, FilterType};
 
-pub mod bitselector;
 pub mod filter;
 
 /// Structure backing the embedded_hal::can::Frame trait.

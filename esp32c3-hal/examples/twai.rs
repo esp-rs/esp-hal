@@ -66,28 +66,8 @@ fn main() -> ! {
     // relying on these partial acceptance filters to exactly match.
     // TODO: even though this is a single, standard id filter, extended ids will also match this filter.
     // A filter that matches standard ids of an even value.
-    let filter = twai::filter::SingleStandardFilter {
-        id: twai::bitselector::BitSelector {
-            bits: [
-                twai::bitselector::Selector::Reset,
-                twai::bitselector::Selector::Any,
-                twai::bitselector::Selector::Any,
-                twai::bitselector::Selector::Any,
-                twai::bitselector::Selector::Any,
-                twai::bitselector::Selector::Any,
-                twai::bitselector::Selector::Any,
-                twai::bitselector::Selector::Any,
-                twai::bitselector::Selector::Any,
-                twai::bitselector::Selector::Any,
-                twai::bitselector::Selector::Any,
-            ],
-        },
-        rtr: twai::bitselector::BitSelector::new_any(),
-        data: [
-            twai::bitselector::BitSelector::new_any(),
-            twai::bitselector::BitSelector::new_any(),
-        ],
-    };
+    let filter =
+        twai::filter::SingleStandardFilter::new(b"xxxxxxxxxx0", b"x", [b"xxxxxxxx", b"xxxxxxxx"]);
     can_config.set_filter(filter);
 
     // Start the peripheral. This locks the configuration settings of the peripheral and puts it
