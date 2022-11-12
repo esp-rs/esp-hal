@@ -1,4 +1,4 @@
-use core::{convert::Infallible, ptr::slice_from_raw_parts, ops::Mul};
+use core::{convert::Infallible, ptr::slice_from_raw_parts, intrinsics::size_of};
 
 use esp_println::println;
 
@@ -17,6 +17,75 @@ use crate::pac::SHA;
 // Two working modes
 // – Typical SHA
 // – DMA-SHA (not implemented yet)
+
+// The alignment helper helps you write to registers that only excepts u32 using u8 (bytes)
+// It keeps a write buffer of 4 u8 (could in theory be 3 but less convient)
+// And if the incoming data is not convertable to u32 (i.e. not a multiple of 4 in length) it will
+// store the remainder in the buffer until the next call
+//
+// It assumes incoming `dst` are aligned to desired layout (in future ptr.is_aligned can be used)
+struct AlignmentHelper {
+    buf: [u8; size_of::<u32>()],
+    buf_fill: usize
+}
+
+impl AlignmentHelper {
+    fn flush(&mut self) -> &[u8]
+    {
+        let (data, _) = self.buf.split_at(self.buf_fill);
+        data
+    }
+
+    pub fn flush_to(&mut self, dst: *mut u32) {
+        if self.buf_fill != 0 {
+            for i in self.buf_fill..size_of::<u32>() {
+                self.buf[i] = 0;
+            }
+
+            unsafe { dst.write_volatile(u32::from_ne_bytes(self.buf)) };
+        }
+    }
+
+    pub fn aligned_volatile_copy<'a>(&mut self, dst: *mut u32, src: &'a [u8], dst_bound: usize) -> &'a [u8] {
+        assert!(dst_bound > 0);
+
+        let mut cursor = 0;
+        if self.buf_fill != 0 {
+            // First prepend existing data
+            for i in 0..(size_of::<u32>() - self.buf_fill) {
+                match src.get(i) {
+                    Some(v) => { 
+                        self.buf[self.buf_fill+i] = *v ;
+                        self.buf_fill += 1;
+                    },
+                    None => { return &[] } // Used up entire buffer before filling buff_fil
+                }
+            }
+
+            unsafe {
+                core::intrinsics::volatile_copy_nonoverlapping_memory(dst, self.buf.as_ptr() as *const u32, 1);
+                cursor += 1; 
+            };
+            self.buf_fill = 0;
+        }
+
+        let (to_write, remaining) = src.split_at(core::cmp::min(dst_bound-cursor, src.len()/size_of::<u32>())*size_of::<u32>());
+        unsafe {
+            core::intrinsics::volatile_copy_nonoverlapping_memory(dst.add(cursor), to_write.as_ptr() as *const u32, to_write.len()/size_of::<u32>());
+        }
+
+        // If it's data we can't store we don't need to try and align it, just wait for next write
+        // Generally this applies when (src/4*4) != src
+        if remaining.len() < 4 {
+            self.buf.copy_from_slice(remaining);
+            self.buf_fill = remaining.len();
+            return &[];
+        }
+
+        return remaining;
+    }
+}
+
 
 #[derive(Debug)]
 pub struct Sha {
