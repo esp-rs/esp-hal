@@ -96,7 +96,7 @@ impl AlignmentHelper {
                 }
             }
 
-            dst.write_volatile(u32::from_ne_bytes(self.buf).to_be());
+            dst.write_volatile(u32::from_ne_bytes(self.buf));
             println!("Writing partial to {:02x?} to {:?}", self.buf, dst);
             cursor += 1; 
             self.buf_fill = 0;
@@ -114,7 +114,7 @@ impl AlignmentHelper {
         if to_write.len() > 0 {
             println!("Writing full to {:02x?} ({}) to {:?} {}", to_write, to_write.len(), dst.add(cursor), to_write.len()/ALIGN_SIZE);
        
-            // Raw v_c_n_m also works but only when src.len() >= 4, otherwise it be broken
+            // Raw v_c_n_m also works but only when src.len() >= 4 * ALIGN_SIZE, otherwise it be broken
             // core::intrinsics::volatile_copy_nonoverlapping_memory::<u32>(dst.add(cursor), to_write.as_ptr() as *const u32, to_write.len()/alignment);
             for (i, v) in to_write.chunks_exact(ALIGN_SIZE).enumerate() {
                 dst.add(i).write_volatile(u32::from_ne_bytes(v.try_into().unwrap()).to_be());
@@ -336,14 +336,12 @@ impl Sha {
         if self.first_run {
             // Set SHA_START_REG
             unsafe {
-                println!("[SHA] Starting engine as first run");
                 self.sha.start.as_ptr().write_volatile(1u32);
             }
             self.first_run = false;
         } else {
             // SET SHA_CONTINUE_REG
             unsafe {
-                println!("[SHA] Starting engine as continue");
                 self.sha.continue_.as_ptr().write_volatile(1u32);
             }
         }
@@ -389,14 +387,11 @@ impl Sha {
     }
 
     // This function ensures that incoming data is aligned to u32 (due to issues with cpy_mem<u8>)
-    // The first return value will be written into the current cursor if exists
-    // If the second return value (always multiple of size<u32>) can be written to the rest of
-    // the buffer
-    // The final return value is the remaining data that cannot be used
     fn write_data<'a>(&mut self, incoming: &'a [u8]) -> nb::Result<&'a [u8], Infallible>
     {
         let mod_cursor = self.cursor % self.chunk_length();
         unsafe {
+            // NOTE: m_mem is 64,u8; but datasheet (esp32s2/esp32s3@>=SHA384) says 128, u8
             let ptr = (self.sha.m_mem[0].as_ptr() as *mut u32).add(mod_cursor / ALIGN_SIZE);
             let (remaining, bound_reached) = self.alignment_helper.aligned_volatile_copy(ptr, 
                                                                          incoming, 
@@ -405,8 +400,6 @@ impl Sha {
             if bound_reached {
                 self.process_buffer();
             }
-            println!("Attempted to write {:?} ({}) to {:?}", incoming, incoming.len(), ptr);
-            println!("- Got {:?} back moved cursor {}", remaining, incoming.len() - remaining.len());
             Ok(remaining)
         }
     }
@@ -416,10 +409,7 @@ impl Sha {
             return Err(nb::Error::WouldBlock);
         }
 
-        // NOTE: m_mem is 64,u8; but datasheet (esp32s2/esp32s3@>=SHA384) says 128, u8
-        // Load data into M_n_REG
         let remaining = self.write_data(buffer)?;
-
         Ok(remaining)
     }
 
@@ -436,7 +426,6 @@ impl Sha {
         let chunk_len = self.chunk_length();
 
         if !self.finished {
-            println!("Message len: {}", self.cursor);
             // Store message length for padding 
             let length = self.cursor * 8;
             block!(self.update(&[0x80]))?; // Append "1" bit
@@ -445,13 +434,11 @@ impl Sha {
 
             let mod_cursor = self.cursor % chunk_len;
 
-            println!("[SHA] adding padding?: chunkl={}, cursor={}", chunk_len, mod_cursor);
             if chunk_len - mod_cursor < chunk_len / 8 {
                 // Zero out remaining data if buffer is almost full (>=448/896), and process buffer
                 let pad_len = chunk_len - mod_cursor;
                 unsafe {
                     let m_cursor_ptr = (self.sha.m_mem[0].as_ptr() as *mut u32).add(mod_cursor/ALIGN_SIZE);
-                    println!("[Finish]: (additional block) Writing [{:02x?},...] ({}) to {:?}", 0, pad_len, m_cursor_ptr);
                     self.alignment_helper.volatile_write_bytes(m_cursor_ptr, 0, pad_len/ALIGN_SIZE);
                     //core::intrinsics::volatile_set_memory(m_cursor_ptr, 0, pad_len/4);
                 }
@@ -469,18 +456,8 @@ impl Sha {
                 let pad_ptr = m_cursor_ptr.add(mod_cursor/ALIGN_SIZE);
                 let pad_len = (chunk_len - mod_cursor) - ALIGN_SIZE; 
 
-                println!("[Finish]: Writing [{:02x?},...] ({}) to {:?}", 0, pad_len, pad_ptr);
                 self.alignment_helper.volatile_write_bytes(pad_ptr, 0, pad_len/ALIGN_SIZE);
 
-                /*println!(
-                    "{:02x?}, {}, cursor={}, {:?}, {:?} ",
-                    length,
-                    chunk_len - alignment, 
-                    self.cursor,
-                    m_cursor_ptr,
-                    self.sha.m_mem.as_ptr().add(1),
-                );*/
-            
                 // Write length (BE) to end
                 // NOTE: aligned_volatile_copy does not work here
                 // The decompiler suggest volatile_copy_memory/write_volatile is optimized to a simple *v = *pv;
@@ -490,7 +467,6 @@ impl Sha {
                 end_ptr.write_volatile(length.to_be() as u32);
                 //let len_buf = length.to_be_bytes();
                 //core::intrinsics::volatile_copy_nonoverlapping_memory::<u32>(end_ptr, len_buf.as_ptr() as *const u32, len_buf.len()/alignment);
-                println!("[Finish]: Writing {:02x?} to {:?}", length, m_cursor_ptr.add((chunk_len/ALIGN_SIZE) - 1));
             }
 
             self.process_buffer();
