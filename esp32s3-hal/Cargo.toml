@@ -42,11 +42,13 @@ embassy-executor  = { package = "embassy-executor", git = "https://github.com/em
 embedded-graphics = "0.7.1"
 esp-backtrace     = { version = "0.3.0", features = ["esp32s3", "panic-handler", "exception-handler", "print-uart"] }
 esp-println       = { version = "0.3.1", features = ["esp32s3"] }
+sha2              = { version = "0.10.6", default-features = false}
 smart-leds        = "0.3.0"
 ssd1306           = "0.7.1"
 usb-device        = { version = "0.2.9" }
 usbd-serial       = "0.1.1"
 static_cell       = "1.0.0"
+
 
 [features]
 default              = ["rt", "vectored"]
@@ -60,10 +62,6 @@ async                = ["esp-hal-common/async", "embedded-hal-async"]
 embassy              = ["esp-hal-common/embassy"]
 embassy-time-systick = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-hz-16_000_000"]
 embassy-time-timg    = ["esp-hal-common/embassy-time-timg", "embassy-time/tick-hz-1_000_000"]
-
-
-[profile.dev.package.xtensa-lx-rt]
-opt-level = 'z'
 
 [[example]]
 name              = "hello_rgb"

@@ -1,7 +1,5 @@
 use core::convert::Infallible;
 
-use esp_println::println;
-
 use nb::block;
 use crate::pac::SHA;
 
@@ -18,15 +16,15 @@ use crate::pac::SHA;
 // – Typical SHA
 // – DMA-SHA (not implemented yet)
 
-// The alignment helper helps you write to registers that only excepts u32 using u8 (bytes)
+const ALIGN_SIZE: usize = 4; // size_of::<u32>
+
+// The alignment helper helps you write to registers that only accepts u32 using regular u8s (bytes)
 // It keeps a write buffer of 4 u8 (could in theory be 3 but less convient)
 // And if the incoming data is not convertable to u32 (i.e. not a multiple of 4 in length) it will
 // store the remainder in the buffer until the next call
 //
 // It assumes incoming `dst` are aligned to desired layout (in future ptr.is_aligned can be used)
 // It also assumes that writes are done in FIFO order
-
-const ALIGN_SIZE: usize = 4; // size_of::<u32>
 #[derive(Debug)]
 struct AlignmentHelper {
     buf: [u8; ALIGN_SIZE],
@@ -35,7 +33,7 @@ struct AlignmentHelper {
 
 impl AlignmentHelper {
     pub fn default() -> AlignmentHelper {
-        AlignmentHelper { buf: [0u8; 4], buf_fill: 0 }
+        AlignmentHelper { buf: [0u8; ALIGN_SIZE], buf_fill: 0 }
     }
 
     // This function will write any remaining buffer to dst and return the amount of *bytes*
@@ -46,7 +44,7 @@ impl AlignmentHelper {
                 self.buf[i] = 0;
             }
 
-            println!("Flushing {:02x?} to {:?}", self.buf, dst);
+            //println!("Flushing {:02x?} to {:?}", self.buf, dst);
             dst.write_volatile(u32::from_ne_bytes(self.buf));
         }
         let flushed = self.buf_fill;
@@ -62,7 +60,7 @@ impl AlignmentHelper {
             for i in self.buf_fill..ALIGN_SIZE {
                 self.buf[i] = val;
             }
-            println!("Flushing due to write bytes {:02x?} to {:?}", self.buf, dst);
+            //println!("Flushing due to write bytes {:02x?} to {:?}", self.buf, dst);
             dst.write_volatile(u32::from_ne_bytes(self.buf));
             cursor = 1;
             self.buf_fill = 0;
@@ -97,7 +95,7 @@ impl AlignmentHelper {
             }
 
             dst.write_volatile(u32::from_ne_bytes(self.buf));
-            println!("Writing partial to {:02x?} to {:?}", self.buf, dst);
+            //println!("Writing partial to {:02x?} to {:?}", self.buf, dst);
             cursor += 1; 
             self.buf_fill = 0;
         }
@@ -112,7 +110,7 @@ impl AlignmentHelper {
                 ));
 
         if to_write.len() > 0 {
-            println!("Writing full to {:02x?} ({}) to {:?} {}", to_write, to_write.len(), dst.add(cursor), to_write.len()/ALIGN_SIZE);
+            //println!("Writing full to {:02x?} ({}) to {:?} {}", to_write, to_write.len(), dst.add(cursor), to_write.len()/ALIGN_SIZE);
        
             // Raw v_c_n_m also works but only when src.len() >= 4 * ALIGN_SIZE, otherwise it be broken
             // core::intrinsics::volatile_copy_nonoverlapping_memory::<u32>(dst.add(cursor), to_write.as_ptr() as *const u32, to_write.len()/alignment);
@@ -125,7 +123,7 @@ impl AlignmentHelper {
         // Generally this applies when (src/4*4) != src
         let was_bounded = dst_bound - to_write.len() == 0;
         if remaining.len() > 0 && remaining.len() < 4 {
-            println!("Storing partial write {:02x?}", remaining);
+            //println!("Storing partial write {:02x?}", remaining);
             for i in 0..remaining.len() {
                 self.buf[i] = remaining[i];
             }
