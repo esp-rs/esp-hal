@@ -11,7 +11,6 @@ use esp32s3_hal::{
     timer::TimerGroup,
     Rtc,
     sha::{Sha, ShaMode},
-    Delay
 };
 use nb::block;
 use esp_backtrace as _;
@@ -33,14 +32,8 @@ fn main() -> ! {
     wdt.disable();
     rtc.rwdt.disable();
 
-    let mut delay = Delay::new(&clocks);
     
-    // $ echo "Test data" | sha1sum                                                                                                                                                                                                           (base) 
-    // 094a36de27ee800c2c7d98544caa9b64e76f5d3c
-
-    // pySHA512(128 * 'a') -> b73d1929aa615934e61a871596b3f3b33359f42b8175602e89f7e06e5f658a243667807ed300314b95cacdd579f3e33abdfbe351909519a846d465c59582f321
-    // SHA512SUM(128 * 'a') -> b73d1929aa615934e61a871596b3f3b33359f42b8175602e89f7e06e5f658a243667807ed300314b95cacdd579f3e33abdfbe351909519a846d465c59582f321
-    let source_data = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".as_bytes(); // Doesn't work with <16 chars (4 * u32)
+    let source_data = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".as_bytes();
     let mut remaining = source_data.clone();
     let mut hasher = Sha::new(peripherals.SHA, ShaMode::SHA512);
     let mut output = [0u8; 64];
@@ -56,7 +49,7 @@ fn main() -> ! {
             break;
         }
     }
-    
+
     block!(hasher.finish(output.as_mut_slice())).unwrap();
     let post_calc = xtensa_lx::timer::get_cycle_count();
     let hw_time = post_calc - pre_calc;
