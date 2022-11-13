@@ -253,6 +253,16 @@ impl Sha {
         Ok(())
     }
 
+
+    pub fn digest_length(&self) -> usize {
+        return match self.mode {
+            ShaMode::SHA1 => 20,
+            ShaMode::SHA256 => 32, 
+            ShaMode::SHA384 => 48,
+            ShaMode::SHA512 => 64,
+        }
+    }
+
     pub fn finish(&mut self, output: &mut [u8]) -> nb::Result<(), Infallible> {
         if !self.finished {
             block!(self.flush_data())?; // Flush partial data, ensures aligned cursor 
@@ -276,7 +286,7 @@ impl Sha {
             core::ptr::copy_nonoverlapping::<u32>(
                 self.sha.text_.as_ptr() as *const u32,
                 output.as_mut_ptr() as *mut u32,
-                output.len() / ALIGN_SIZE,
+                core::cmp::min(self.digest_length(), output.len())/ALIGN_SIZE,
             );
         }
         Ok(())
