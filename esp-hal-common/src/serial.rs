@@ -361,7 +361,7 @@ where
         self.uart
             .register_block()
             .int_ena
-            .modify(|_, w| w.at_cmd_char_det_int_ena().set_bit());
+            .modify(|_, w| w.at_cmd_char_det_int_ena().clear_bit());
     }
 
     /// Listen for TX-DONE interrupts
@@ -377,7 +377,7 @@ where
         self.uart
             .register_block()
             .int_ena
-            .modify(|_, w| w.tx_done_int_ena().set_bit());
+            .modify(|_, w| w.tx_done_int_ena().clear_bit());
     }
 
     /// Listen for RX-FIFO-FULL interrupts
@@ -393,7 +393,7 @@ where
         self.uart
             .register_block()
             .int_ena
-            .modify(|_, w| w.rxfifo_full_int_ena().set_bit());
+            .modify(|_, w| w.rxfifo_full_int_ena().clear_bit());
     }
 
     /// Checks if AT-CMD interrupt is set
