@@ -1,3 +1,8 @@
+#[cfg(feature = "eh1")]
+use embedded_can::{ExtendedId, StandardId};
+#[cfg(not(feature = "eh1"))]
+use embedded_hal::can::{ExtendedId, StandardId};
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum FilterType {
     Single,
@@ -16,6 +21,41 @@ pub trait Filter {
 
 pub type BitFilter<const N: usize> = [u8; N];
 
+macro_rules! set_bit_from_byte {
+    ($code:expr, $mask:expr, $byte:expr, $shift:expr) => {
+        match $byte {
+            b'0' => {
+                // Code bit is already zero, no need to set it.
+                $mask |= 1 << $shift;
+            }
+            b'1' => {
+                $code |= 1 << $shift;
+                $mask |= 1 << $shift;
+            }
+            b'x' => {}
+            _ => panic!("BitFilter bits must be either '1', '0' or 'x'."),
+        }
+    };
+}
+
+/// Convert a code and mask to the byte array needed at a register level.
+///
+/// On the input mask, set bits (1) mean we care about the exact value of the
+/// corresponding bit in the code, reset bits (0) mean the bit could be any value.
+const fn code_mask_to_register_array(code: u32, mask: u32) -> [u8; 8] {
+    // Convert the filter code and mask into the full byte array needed for the registers.
+    let [code_3, code_2, code_1, code_0] = code.to_be_bytes();
+
+    // At a register level, set bits in the mask mean we don't care about the value of
+    // that bit. Therefore, we invert the mask.
+    // https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf#subsubsection.29.4.6
+    let [mask_3, mask_2, mask_1, mask_0] = (!mask).to_be_bytes();
+
+    [
+        code_3, code_2, code_1, code_0, mask_3, mask_2, mask_1, mask_0,
+    ]
+}
+
 /// A filter that matches against a single 11 bit id, the rtr bit, and the first two bytes of the
 /// payload.
 ///
@@ -27,7 +67,8 @@ pub struct SingleStandardFilter {
 }
 
 impl SingleStandardFilter {
-    /// Create a new filter that matches against the id, rtr and first two bytes of the payload.
+    /// Create a new filter that matches against a single 11-bit standard id.
+    /// The filter can match against the packet's id, rtr bit, and first two bytes of the payload.
     ///
     /// Example matching only even ids, allowing any rtr value and any payload data:
     /// ```
@@ -47,38 +88,14 @@ impl SingleStandardFilter {
             let mut idx = 0;
             while idx < 11 {
                 let shift = 31 - idx;
-
-                match id[idx] {
-                    b'0' => {
-                        // Code bit is already zero, no need to set it.
-                        acceptance_mask |= 1 << shift;
-                    }
-                    b'1' => {
-                        acceptance_code |= 1 << shift;
-                        acceptance_mask |= 1 << shift;
-                    }
-                    b'x' => {}
-                    _ => panic!("BitFilter bits must be either '1', '0' or 'x'."),
-                }
-
+                set_bit_from_byte!(acceptance_code, acceptance_mask, id[idx], shift);
                 idx += 1;
             }
         }
         // Convert the rtr bit filter into the code and mask bits.
         {
             let shift = 20;
-            match rtr[0] {
-                b'0' => {
-                    // Code bit is already zero, no need to set it.
-                    acceptance_mask |= 1 << shift;
-                }
-                b'1' => {
-                    acceptance_code |= 1 << shift;
-                    acceptance_mask |= 1 << shift;
-                }
-                b'x' => {}
-                _ => panic!("BitFilter bits must be either '1', '0' or 'x'."),
-            }
+            set_bit_from_byte!(acceptance_code, acceptance_mask, rtr[0], shift);
         }
         // Convert the payload byte filter into the code and mask bits.
         {
@@ -87,38 +104,71 @@ impl SingleStandardFilter {
                 let mut idx = 0;
                 while idx < 8 {
                     let shift = 15 - (8 * payload_index) - idx;
-
-                    match payload[payload_index][idx] {
-                        b'0' => {
-                            // Code bit is already zero, no need to set it.
-                            acceptance_mask |= 1 << shift;
-                        }
-                        b'1' => {
-                            acceptance_code |= 1 << shift;
-                            acceptance_mask |= 1 << shift;
-                        }
-                        b'x' => {}
-                        _ => panic!("BitFilter bits must be either '1', '0' or 'x'."),
-                    }
-
+                    set_bit_from_byte!(
+                        acceptance_code,
+                        acceptance_mask,
+                        payload[payload_index][idx],
+                        shift
+                    );
                     idx += 1;
                 }
-
                 payload_index += 1;
             }
         }
 
-        // Convert the filter code and mask into the full byte array needed for the registers.
-        let [code_3, code_2, code_1, code_0] = acceptance_code.to_be_bytes();
+        Self {
+            raw: code_mask_to_register_array(acceptance_code, acceptance_mask),
+        }
+    }
 
-        // At a register level, set bits in the mask mean we don't care about the value of that bit. Therefore, we invert the mask.
-        // https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf#subsubsection.29.4.6
-        let [mask_3, mask_2, mask_1, mask_0] = (!acceptance_mask).to_be_bytes();
+    ///
+    /// The masks indicate which bits of the code the filter should match against. Set bits
+    /// in the mask indicate that the corresponding bit in the code should match.
+    ///
+    ///
+    /// # Examples
+    ///
+    /// A filter that matches every standard id that is even, is not an rtr frame, with
+    /// any bytes for the first two payload bytes.
+    /// ```
+    /// let filter = twai::filter::SingleStandardFilter::new_from_code_mask(
+    ///     StandardId::new(0x000).unwrap(),
+    ///     StandardId::new(0x001).unwrap(),
+    ///     false,
+    ///     true,
+    ///     [0x00, 0x00],
+    ///     [0x00, 0x00],
+    /// );
+    /// ```
+    pub fn new_from_code_mask(
+        id_code: StandardId,
+        id_mask: StandardId,
+        rtr_code: bool,
+        rtr_mask: bool,
+        payload_code: [u8; 2],
+        payload_mask: [u8; 2],
+    ) -> Self {
+        // The bit values we desire to match against. This determines whether we want a set
+        // bit (1) or a reset bit (0).
+        let mut acceptance_code: u32 = 0;
+        // The acceptance mask, set bits (1) mean we care about the exact value of the
+        // corresponding bit in the code, reset bits (0) mean the bit could be any value.
+        let mut acceptance_mask: u32 = 0;
+
+        // Pack the id into the full layout.
+        acceptance_code |= (id_code.as_raw() as u32) << 21;
+        acceptance_mask |= (id_mask.as_raw() as u32) << 21;
+
+        // Pack the rtr bit into the full layout.
+        acceptance_code |= (rtr_code as u32) << 20;
+        acceptance_mask |= (rtr_mask as u32) << 20;
+
+        // Pack the payload bytes into the full layout.
+        acceptance_code |= (payload_code[0] as u32) << 8 | (payload_code[1] as u32);
+        acceptance_mask |= (payload_mask[0] as u32) << 8 | (payload_mask[1] as u32);
 
         Self {
-            raw: [
-                code_3, code_2, code_1, code_0, mask_3, mask_2, mask_1, mask_0,
-            ],
+            raw: code_mask_to_register_array(acceptance_code, acceptance_mask),
         }
     }
 }
@@ -134,13 +184,73 @@ impl Filter for SingleStandardFilter {
 /// Warning: This is not a perfect filter. Standard ids that match the bit layout of this filter
 /// will also be accepted.
 pub struct SingleExtendedFilter {
-    // pub id: BitSelector<false, 29>,
-    // pub rtr: BitSelector<false, 1>,
+    raw: [u8; 8],
 }
+impl SingleExtendedFilter {
+    /// Create a filter that matches against a single 29-bit extended id.
+    ///
+    /// The filter can match against the packet's id and the rtr bit.
+    pub const fn new(id: BitFilter<29>, rtr: BitFilter<1>) -> Self {
+        // The bit values we desire to match against. This determines whether we want a set
+        // bit (1) or a reset bit (0).
+        let mut acceptance_code: u32 = 0;
+        // The acceptance mask, set bits (1) mean we care about the exact value of the
+        // corresponding bit in the code, reset bits (0) mean the bit could be any value.
+        let mut acceptance_mask: u32 = 0;
+
+        // Convert the id filter into the code and mask bits.
+        {
+            let mut idx = 0;
+            while idx < 29 {
+                let shift = 31 - idx;
+                set_bit_from_byte!(acceptance_code, acceptance_mask, id[idx], shift);
+                idx += 1;
+            }
+        }
+        // Convert the rtr bit filter into the code and mask bits.
+        {
+            let shift = 2;
+            set_bit_from_byte!(acceptance_code, acceptance_mask, rtr[0], shift);
+        }
+
+        Self {
+            raw: code_mask_to_register_array(acceptance_code, acceptance_mask),
+        }
+    }
+    ///
+    /// The masks indicate which bits of the code the filter should match against. Set bits
+    /// in the mask indicate that the corresponding bit in the code should match.
+    pub fn new_from_code_mask(
+        id_code: ExtendedId,
+        id_mask: ExtendedId,
+        rtr_code: bool,
+        rtr_mask: bool,
+    ) -> Self {
+        // The bit values we desire to match against. This determines whether we want a set
+        // bit (1) or a reset bit (0).
+        let mut acceptance_code: u32 = 0;
+        // The acceptance mask, set bits (1) mean we care about the exact value of the
+        // corresponding bit in the code, reset bits (0) mean the bit could be any value.
+        let mut acceptance_mask: u32 = 0;
+
+        // Pack the id into the full layout.
+        acceptance_code |= (id_code.as_raw() as u32) << 3;
+        acceptance_mask |= (id_mask.as_raw() as u32) << 3;
+
+        // Pack the rtr bit into the full layout.
+        acceptance_code |= (rtr_code as u32) << 2;
+        acceptance_mask |= (rtr_mask as u32) << 2;
+
+        Self {
+            raw: code_mask_to_register_array(acceptance_code, acceptance_mask),
+        }
+    }
+}
+
 impl Filter for SingleExtendedFilter {
     const FILTER_TYPE: FilterType = FilterType::Single;
     fn to_registers(&self) -> [u8; 8] {
-        todo!();
+        self.raw
     }
 }
 
@@ -150,17 +260,128 @@ impl Filter for SingleExtendedFilter {
 /// Warning: This is not a perfect filter. Extended ids that match the bit layout of this filter
 /// will also be accepted.
 pub struct DualStandardFilter {
-    // pub first_id: BitSelector<false, 11>,
-    // pub first_rtr: BitSelector<false, 1>,
-    // pub first_data: BitSelector<false, 8>,
-
-    // pub second_id: BitSelector<false, 11>,
-    // pub second_rtr: BitSelector<false, 1>,
+    raw: [u8; 8],
 }
+impl DualStandardFilter {
+    /// Create a filter that matches against two standard 11-bit standard ids.
+    ///
+    /// The first filter part can match a packet's id, rtr bit, and the first byte of the payload.
+    /// The second filter part can match a packet's id and rtr bit.
+    pub const fn new(
+        first_id: BitFilter<11>,
+        first_rtr: BitFilter<1>,
+        first_payload: BitFilter<8>,
+        second_id: BitFilter<11>,
+        second_rtr: BitFilter<1>,
+    ) -> Self {
+        // The bit values we desire to match against. This determines whether we want a set
+        // bit (1) or a reset bit (0).
+        let mut acceptance_code: u32 = 0;
+        // The acceptance mask, set bits (1) mean we care about the exact value of the
+        // corresponding bit in the code, reset bits (0) mean the bit could be any value.
+        let mut acceptance_mask: u32 = 0;
+
+        // Convert the first id filter into the code and mask bits.
+        {
+            let mut idx = 0;
+            while idx < 11 {
+                let shift = 31 - idx;
+                set_bit_from_byte!(acceptance_code, acceptance_mask, first_id[idx], shift);
+                idx += 1;
+            }
+        }
+        // Convert the first rtr bit filter into the code and mask bits.
+        {
+            let shift = 20;
+            set_bit_from_byte!(acceptance_code, acceptance_mask, first_rtr[0], shift);
+        }
+        // Convert the first payload byte filter into the code and mask bits.
+        {
+            let mut idx = 0;
+            while idx < 4 {
+                let shift = 19 - idx;
+                set_bit_from_byte!(acceptance_code, acceptance_mask, first_payload[idx], shift);
+                idx += 1;
+            }
+            while idx < 8 {
+                let shift = 3 + 4 - idx;
+                set_bit_from_byte!(acceptance_code, acceptance_mask, first_payload[idx], shift);
+                idx += 1;
+            }
+        }
+        // Convert the second id filter into the code and mask bits.
+        {
+            let mut idx = 0;
+            while idx < 11 {
+                let shift = 15 - idx;
+                set_bit_from_byte!(acceptance_code, acceptance_mask, second_id[idx], shift);
+                idx += 1;
+            }
+        }
+        // Convert the second rtr bit filter into the code and mask bits.
+        {
+            let shift = 4;
+            set_bit_from_byte!(acceptance_code, acceptance_mask, second_rtr[0], shift);
+        }
+
+        Self {
+            raw: code_mask_to_register_array(acceptance_code, acceptance_mask),
+        }
+    }
+    ///
+    /// The masks indicate which bits of the code the filter should match against. Set bits
+    /// in the mask indicate that the corresponding bit in the code should match.
+    pub fn new_from_code_mask(
+        first_id_code: StandardId,
+        first_id_mask: StandardId,
+        first_rtr_code: bool,
+        first_rtr_mask: bool,
+        first_payload_code: u8,
+        first_payload_mask: u8,
+        second_id_code: StandardId,
+        second_id_mask: StandardId,
+        second_rtr_code: bool,
+        second_rtr_mask: bool,
+    ) -> Self {
+        // The bit values we desire to match against. This determines whether we want a set
+        // bit (1) or a reset bit (0).
+        let mut acceptance_code: u32 = 0;
+        // The acceptance mask, set bits (1) mean we care about the exact value of the
+        // corresponding bit in the code, reset bits (0) mean the bit could be any value.
+        let mut acceptance_mask: u32 = 0;
+
+        // Pack the first id into the full layout.
+        acceptance_code |= (first_id_code.as_raw() as u32) << 21;
+        acceptance_mask |= (first_id_mask.as_raw() as u32) << 21;
+
+        // Pack the rtr bit into the full layout.
+        acceptance_code |= (first_rtr_code as u32) << 20;
+        acceptance_mask |= (first_rtr_mask as u32) << 20;
+
+        // Pack the first payload into the full layout.
+        acceptance_code |= ((first_payload_code & 0xF0) as u32) << 12;
+        acceptance_mask |= ((first_payload_mask & 0xF0) as u32) << 12;
+        acceptance_code |= (first_payload_code & 0x0F) as u32;
+        acceptance_mask |= (first_payload_mask & 0x0F) as u32;
+
+        // Pack the second id into the full layout.
+        acceptance_code |= (second_id_code.as_raw() as u32) << 5;
+        acceptance_mask |= (second_id_mask.as_raw() as u32) << 5;
+
+        // Pack the second rtr bit into the full layout.
+        acceptance_code |= (second_rtr_code as u32) << 4;
+        acceptance_mask |= (second_rtr_mask as u32) << 4;
+
+        Self {
+            raw: code_mask_to_register_array(acceptance_code, acceptance_mask),
+        }
+    }
+}
+
 impl Filter for DualStandardFilter {
     const FILTER_TYPE: FilterType = FilterType::Dual;
     fn to_registers(&self) -> [u8; 8] {
-        todo!();
+        self.raw
     }
 }
 ///
@@ -170,11 +391,68 @@ impl Filter for DualStandardFilter {
 /// Warning: This is not a perfect filter. Standard ids that match the bit layout of this filter
 /// will also be accepted.
 pub struct DualExtendedFilter {
-    // pub id: [BitSelector<false, 16>; 2],
+    raw: [u8; 8],
+}
+impl DualExtendedFilter {
+    /// Create a filter that matches the first 16 bits of two 29-bit extended ids.
+    pub const fn new(ids: [BitFilter<16>; 2]) -> Self {
+        // The bit values we desire to match against. This determines whether we want a set
+        // bit (1) or a reset bit (0).
+        let mut acceptance_code: u32 = 0;
+        // The acceptance mask, set bits (1) mean we care about the exact value of the
+        // corresponding bit in the code, reset bits (0) mean the bit could be any value.
+        let mut acceptance_mask: u32 = 0;
+
+        // Convert the id filters into the code and mask bits.
+        {
+            let mut filter_idx = 0;
+            while filter_idx < 2 {
+                let mut idx = 0;
+                while idx < 16 {
+                    let shift = 31 - (filter_idx * 16) - idx;
+                    set_bit_from_byte!(
+                        acceptance_code,
+                        acceptance_mask,
+                        ids[filter_idx][idx],
+                        shift
+                    );
+                    idx += 1;
+                }
+                filter_idx += 1;
+            }
+        }
+
+        Self {
+            raw: code_mask_to_register_array(acceptance_code, acceptance_mask),
+        }
+    }
+    ///
+    /// The masks indicate which bits of the code the filter should match against. Set bits
+    /// in the mask indicate that the corresponding bit in the code should match.
+    pub fn new_from_code_mask(ids_code: [u16; 2], ids_mask: [u16; 2]) -> Self {
+        // The bit values we desire to match against. This determines whether we want a set
+        // bit (1) or a reset bit (0).
+        let mut acceptance_code: u32 = 0;
+        // The acceptance mask, set bits (1) mean we care about the exact value of the
+        // corresponding bit in the code, reset bits (0) mean the bit could be any value.
+        let mut acceptance_mask: u32 = 0;
+
+        // Pack the first partial id into the full layout.
+        acceptance_code |= (ids_code[0] as u32) << 16;
+        acceptance_mask |= (ids_mask[0] as u32) << 16;
+
+        // Pack the second partial id into the full layout.
+        acceptance_code |= ids_code[1] as u32;
+        acceptance_mask |= ids_mask[1] as u32;
+
+        Self {
+            raw: code_mask_to_register_array(acceptance_code, acceptance_mask),
+        }
+    }
 }
 impl Filter for DualExtendedFilter {
     const FILTER_TYPE: FilterType = FilterType::Dual;
     fn to_registers(&self) -> [u8; 8] {
-        todo!();
+        self.raw
     }
 }
