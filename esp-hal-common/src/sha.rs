@@ -173,9 +173,10 @@ impl Sha {
         Self {
             sha,
             mode,
-            first_run: true,
             cursor: 0,
+            first_run: true,
             finished: false,
+            alignment_helper: AlignmentHelper::default() 
         }
     }
 
@@ -220,34 +221,41 @@ impl Sha {
             return Err(nb::Error::WouldBlock);
         }
 
-        let chunk_len = self.chunk_length();
-        let to_go = chunk_len - (self.cursor % chunk_len);
-        let to_read = if buffer.len() > to_go {
-            to_go
-        } else {
-            buffer.len()
-        };
-        let (chunk, buffer) = buffer.split_at(to_read);
-
+        let mod_cursor = self.cursor % self.chunk_length();
         unsafe {
-            let m_cursor_ptr = self.sha.text_[0].as_ptr().add(self.cursor % chunk_len);
-            core::ptr::copy_nonoverlapping(chunk.as_ptr(), m_cursor_ptr as *mut u8, chunk.len());
-            self.cursor = self.cursor.wrapping_add(chunk.len());
+            let ptr = (self.sha.text_[0].as_ptr() as *mut u32).add(mod_cursor / ALIGN_SIZE);
+            let (remaining, bound_reached) = self.alignment_helper.aligned_volatile_copy(ptr, 
+                                                                         buffer, 
+                                                                         self.chunk_length()-mod_cursor);
+            self.cursor = self.cursor.wrapping_add(buffer.len() - remaining.len());
+            if bound_reached {
+                self.process_buffer();
+            }
+            Ok(remaining)
         }
+    }
 
-        // Finished writing current chunk, start accelerator
-        if self.cursor % chunk_len == 0 {
-            self.process_buffer();
+    fn flush_data(&mut self) -> nb::Result<(), Infallible> {
+        if self.is_busy() {
+            return Err(nb::Error::WouldBlock);
         }
-
-        Ok(buffer)
+        unsafe {
+            let dst_ptr = (self.sha.text_.as_ptr() as *mut u32).add((self.cursor % self.chunk_length()) / ALIGN_SIZE);
+            let flushed =  self.alignment_helper.flush_to(dst_ptr);
+            if flushed != 0 {
+                self.cursor = self.cursor.wrapping_add(ALIGN_SIZE - flushed);
+                if self.cursor % self.chunk_length() == 0 {
+                    self.process_buffer();
+                }
+            }
+        }
+        
+        Ok(())
     }
 
     pub fn finish(&mut self, output: &mut [u8]) -> nb::Result<(), Infallible> {
         if !self.finished {
-            if self.cursor % self.chunk_length() != 0 {
-                self.process_buffer();
-            }
+            block!(self.flush_data())?; // Flush partial data, ensures aligned cursor 
 
             match self.mode {
                 // FIXME: These are marked WO, while being RO, also inconsistent func/reg
@@ -265,16 +273,18 @@ impl Sha {
         unsafe {
             // Read SHA1=Text[0:4] | SHA256=Text[0:8] | SHA384=Text[0:11] |
             // SHA512=Text[0:15] TODO: limit read len to digest size
-            core::ptr::copy_nonoverlapping(
-                self.sha.text_.as_ptr() as *const u8,
-                output.as_mut_ptr(),
-                output.len(),
+            core::ptr::copy_nonoverlapping::<u32>(
+                self.sha.text_.as_ptr() as *const u32,
+                output.as_mut_ptr() as *mut u32,
+                output.len() / ALIGN_SIZE,
             );
         }
         Ok(())
     }
 }
 
+
+#[cfg(not(esp32))]
 fn mode_as_bits(mode: ShaMode) -> u8 {
     match mode {
         ShaMode::SHA1 => 0,
@@ -282,13 +292,14 @@ fn mode_as_bits(mode: ShaMode) -> u8 {
         ShaMode::SHA256 => 2,
         ShaMode::SHA384 => 3,
         ShaMode::SHA512 => 4,
+        #[cfg(any(esp32s2, esp32s3))]
         ShaMode::SHA512_224 => 5,
+        #[cfg(any(esp32s2, esp32s3))]
         ShaMode::SHA512_256 => 6,
         // _ => 0 // TODO: SHA512/t
     }
 }
 
-// TODO: Fix esp32 impl to also have u32 alignment (extract alignment code into seperate thing)
 // TODO: Allow/Implemenet SHA512_(u16)
 
 // A few notes on this implementation with regards to 'memcpy',
