@@ -1,6 +1,5 @@
 use core::convert::Infallible;
 
-use nb::block;
 use crate::pac::SHA;
 
 // All the hash algorithms introduced in FIPS PUB 180-4 Spec.
@@ -267,7 +266,7 @@ impl Sha {
 
     pub fn finish(&mut self, output: &mut [u8]) -> nb::Result<(), Infallible> {
         if !self.finished {
-            block!(self.flush_data())?; // Flush partial data, ensures aligned cursor 
+            nb::block!(self.flush_data())?; // Flush partial data, ensures aligned cursor 
 
             match self.mode {
                 // FIXME: These are marked WO, while being RO, also inconsistent func/reg
@@ -329,7 +328,7 @@ fn mode_as_bits(mode: ShaMode) -> u8 {
 
 // This only supports inputs up to u32::MAX in byte size, to increase please see ::finish()
 // length/self.cursor usage
-#[cfg(any(esp32s2, esp32s3, em_memsp32c2, esp32c3))]
+#[cfg(any(esp32s2, esp32s3, esp32c2, esp32c3))]
 impl Sha {
     pub fn new(sha: SHA, mode: ShaMode) -> Self {
         // Setup SHA Mode
@@ -453,8 +452,8 @@ impl Sha {
         if !self.finished {
             // Store message length for padding 
             let length = self.cursor * 8;
-            block!(self.update(&[0x80]))?; // Append "1" bit
-            block!(self.flush_data())?;    // Flush partial data, ensures aligned cursor 
+            nb::block!(self.update(&[0x80]))?; // Append "1" bit
+            nb::block!(self.flush_data())?;    // Flush partial data, ensures aligned cursor 
             //assert!(self.cursor % 4 == 0);
 
             let mod_cursor = self.cursor % chunk_len;
