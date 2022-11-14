@@ -151,7 +151,9 @@ pub enum ShaMode {
     SHA1,
     #[cfg(not(esp32))]
     SHA224,
+    #[cfg(any(esp32s2, esp32s3))]
     SHA256,
+    #[cfg(any(esp32s2, esp32s3))]
     SHA384,
     #[cfg(any(esp32s2, esp32s3, esp32))]
     SHA512,
@@ -300,7 +302,9 @@ fn mode_as_bits(mode: ShaMode) -> u8 {
         ShaMode::SHA1 => 0,
         ShaMode::SHA224 => 1,
         ShaMode::SHA256 => 2,
+        #[cfg(any(esp32s2, esp32s3))]
         ShaMode::SHA384 => 3,
+        #[cfg(any(esp32s2, esp32s3))]
         ShaMode::SHA512 => 4,
         #[cfg(any(esp32s2, esp32s3))]
         ShaMode::SHA512_224 => 5,
@@ -378,7 +382,9 @@ impl Sha {
             ShaMode::SHA1 => 20,
             ShaMode::SHA224 => 28,
             ShaMode::SHA256 => 32, 
+            #[cfg(any(esp32s2, esp32s3))]
             ShaMode::SHA384 => 48,
+            #[cfg(any(esp32s2, esp32s3))]
             ShaMode::SHA512 => 64,
             #[cfg(any(esp32s2, esp32s3))]
             ShaMode::SHA512_224 => 28,
