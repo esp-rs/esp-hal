@@ -16,7 +16,7 @@ use crate::pac::SHA;
 // – Typical SHA
 // – DMA-SHA (not implemented yet)
 
-const ALIGN_SIZE: usize = 4; // size_of::<u32>
+const ALIGN_SIZE: usize = core::mem::size_of::<u32>();
 
 // The alignment helper helps you write to registers that only accepts u32 using regular u8s (bytes)
 // It keeps a write buffer of 4 u8 (could in theory be 3 but less convient)
