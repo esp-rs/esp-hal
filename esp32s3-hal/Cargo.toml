@@ -49,7 +49,6 @@ usb-device        = { version = "0.2.9" }
 usbd-serial       = "0.1.1"
 static_cell       = "1.0.0"
 
-
 [features]
 default              = ["rt", "vectored"]
 direct-boot          = ["r0"]
