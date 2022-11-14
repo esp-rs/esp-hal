@@ -151,7 +151,7 @@ pub enum ShaMode {
     #[cfg(not(esp32))]
     SHA224,
     SHA256,
-    #[cfg(any(esp32s2, esp32s3))]
+    #[cfg(any(esp32s2, esp32s3, esp32))]
     SHA384,
     #[cfg(any(esp32s2, esp32s3, esp32))]
     SHA512,
