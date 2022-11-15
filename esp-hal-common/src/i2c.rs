@@ -2,8 +2,6 @@
 //!
 //! Supports multiple I2C peripheral instances
 
-use core::convert::TryInto;
-
 use fugit::HertzU32;
 
 use crate::{
@@ -284,17 +282,18 @@ where
 
         let mut i2c = I2C { peripheral: i2c };
 
-        sda.set_to_open_drain_output()
-            .enable_input(true)
-            .internal_pull_up(true)
-            .connect_peripheral_to_output(OutputSignal::I2CEXT0_SDA)
-            .connect_input_to_peripheral(InputSignal::I2CEXT0_SDA);
-
+        // initialize SCL first to not confuse some devices like MPU6050
         scl.set_to_open_drain_output()
             .enable_input(true)
             .internal_pull_up(true)
             .connect_peripheral_to_output(OutputSignal::I2CEXT0_SCL)
             .connect_input_to_peripheral(InputSignal::I2CEXT0_SCL);
+
+        sda.set_to_open_drain_output()
+            .enable_input(true)
+            .internal_pull_up(true)
+            .connect_peripheral_to_output(OutputSignal::I2CEXT0_SDA)
+            .connect_input_to_peripheral(InputSignal::I2CEXT0_SDA);
 
         i2c.peripheral.setup(frequency, clocks)?;
 
@@ -324,9 +323,6 @@ pub trait Instance {
     fn i2c_number(&self) -> usize;
 
     fn setup(&mut self, frequency: HertzU32, clocks: &Clocks) -> Result<(), SetupError> {
-        // Reset entire peripheral (also resets fifo)
-        self.reset();
-
         self.register_block().ctr.modify(|_, w| unsafe {
             // Clear register
             w.bits(0)
@@ -365,8 +361,9 @@ pub trait Instance {
             .ctr
             .modify(|_, w| w.conf_upgate().set_bit());
 
+        // Reset entire peripheral (also resets fifo)
         self.reset();
-
+        
         Ok(())
     }
 
@@ -435,98 +432,251 @@ pub trait Instance {
         }
     }
 
+    #[cfg(esp32)]
     /// Sets the frequency of the I2C interface by calculating and applying the
-    /// associated timings
+    /// associated timings - corresponds to i2c_ll_cal_bus_clk and
+    /// i2c_ll_set_bus_timing in ESP-IDF
     fn set_frequency(
         &mut self,
         source_clk: HertzU32,
         bus_freq: HertzU32,
     ) -> Result<(), SetupError> {
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32c2, esp32c3, esp32s3))] {
-                // C2, C3, and S3 have a clock divider mechanism, which we want to configure
-                // as high as possible.
-                let sclk_div = source_clk.raw() / (bus_freq.raw() * 1024) + 1;
-                let half_cycle = source_clk.raw() / sclk_div as u32 / bus_freq.raw() / 2;
-            } else {
-                // For EPS32 and the S2 variant no clock divider mechanism exists.
-                let half_cycle = source_clk.raw() / bus_freq.raw() / 2;
-            }
-        }
+        let source_clk = source_clk.raw();
+        let bus_freq = bus_freq.raw();
 
-        // The different chips have highly very different timing configurations, so
-        // we're setting these up separately (this might introduce some overhead,
-        // but improves readability)
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32c2, esp32c3))] {
-                let scl_wait_high = if bus_freq.raw() <= 50000 { 0 } else { half_cycle / 8 };
-                let scl_high = half_cycle - scl_wait_high;
-                let sda_hold = half_cycle / 4;
-                let sda_sample = scl_high / 2;
-            } else if #[cfg(esp32s3)] {
-                let scl_high = if bus_freq.raw() <= 50000 { half_cycle } else { half_cycle / 5 * 4 + 4 };
-                let scl_wait_high = half_cycle - scl_high;
-                let sda_hold = half_cycle / 2;
-                let sda_sample = half_cycle / 2;
-            } else if #[cfg(esp32s2)] {
-                let scl_high = half_cycle / 2 + 2;
-                let scl_wait_high = half_cycle - scl_high;
-                let sda_hold = half_cycle / 2;
-                let sda_sample = half_cycle / 2 - 1;
-            } else {
-                // ESP32 is default (as it is the simplest case and does not even have
-                // the wait_high field)
-                let scl_high = half_cycle;
-                let sda_hold = half_cycle / 2;
-                let sda_sample = scl_high / 2;
-                let tout = half_cycle * 20;
-            }
-        }
-
+        let half_cycle: u32 = source_clk / bus_freq / 2;
         let scl_low = half_cycle;
-        let setup = half_cycle - 1;
-        let hold = half_cycle - 1;
+        let scl_high = half_cycle;
+        let sda_hold = half_cycle / 2;
+        let sda_sample = scl_high / 2;
+        let setup = half_cycle;
+        let hold = half_cycle;
+        let tout = half_cycle * 20; // default we set the timeout value to 10 bus cycles.
 
-        #[cfg(not(esp32))]
-        let scl_low = scl_low as u16 - 1;
+        // SCL period. According to the TRM, we should always subtract 1 to SCL low
+        // period
+        let scl_low = scl_low - 1;
+        // Still according to the TRM, if filter is not enbled, we have to subtract 7,
+        // if SCL filter is enabled, we have to subtract:
+        //   8 if SCL filter is between 0 and 2 (included)
+        //   6 + SCL threshold if SCL filter is between 3 and 7 (included)
+        // to SCL high period
+        let mut scl_high = scl_high;
+        // In the "worst" case, we will subtract 13, make sure the result will still be
+        // correct
 
-        #[cfg(esp32)]
-        let scl_low = scl_low as u16;
+        // NOTE since we always set the filter threshold to 7 we don't need conditional code here
+        // once that changes we need the conditional code here
+        scl_high -= 7 + 6;
 
-        let scl_high = scl_high as u16;
+        // if (filter_cfg_en) {
+        //     if (thres <= 2) {
+        //         scl_high -= 8;
+        //     } else {
+        //         assert(hw->scl_filter_cfg.thres <= 7);
+        //         scl_high -= thres + 6;
+        //     }
+        // } else {
+        //    scl_high -= 7;
+        //}
 
-        #[cfg(any(esp32c2, esp32c3, esp32s3))]
-        let scl_wait_high = scl_wait_high as u8;
+        let scl_high_period = scl_high;
+        let scl_low_period = scl_low;
+        // sda sample
+        let sda_hold_time = sda_hold;
+        let sda_sample_time = sda_sample;
+        // setup
+        let scl_rstart_setup_time = setup;
+        let scl_stop_setup_time = setup;
+        // hold
+        let scl_start_hold_time = hold;
+        let scl_stop_hold_time = hold;
+        let time_out_value = tout;
 
-        #[cfg(any(esp32s2))]
-        let scl_wait_high = scl_wait_high as u16;
+        self.configure_clock(
+            0,
+            scl_low_period,
+            scl_high_period,
+            0,
+            sda_hold_time,
+            sda_sample_time,
+            scl_rstart_setup_time,
+            scl_stop_setup_time,
+            scl_start_hold_time,
+            scl_stop_hold_time,
+            time_out_value,
+            true,
+        );
 
-        let sda_hold = sda_hold
-            .try_into()
-            .map_err(|_| SetupError::InvalidClkConfig)?;
+        Ok(())
+    }
 
-        let setup = setup.try_into().map_err(|_| SetupError::InvalidClkConfig)?;
+    #[cfg(esp32s2)]
+    /// Sets the frequency of the I2C interface by calculating and applying the
+    /// associated timings - corresponds to i2c_ll_cal_bus_clk and
+    /// i2c_ll_set_bus_timing in ESP-IDF
+    fn set_frequency(
+        &mut self,
+        source_clk: HertzU32,
+        bus_freq: HertzU32,
+    ) -> Result<(), SetupError> {
+        let source_clk = source_clk.raw();
+        let bus_freq = bus_freq.raw();
 
-        let sda_sample = sda_sample
-            .try_into()
-            .map_err(|_| SetupError::InvalidClkConfig)?;
+        let half_cycle: u32 = source_clk / bus_freq / 2;
+        // SCL
+        let scl_low = half_cycle;
+        // default, scl_wait_high < scl_high
+        let scl_high = half_cycle / 2 + 2;
+        let scl_wait_high = half_cycle - scl_high;
+        let sda_hold = half_cycle / 2;
+        // scl_wait_high < sda_sample <= scl_high
+        let sda_sample = half_cycle / 2 - 1;
+        let setup = half_cycle;
+        let hold = half_cycle;
+        // default we set the timeout value to 10 bus cycles
+        let tout = half_cycle * 20;
 
-        let hold = hold.try_into().map_err(|_| SetupError::InvalidClkConfig)?;
+        // scl period
+        let scl_low_period = scl_low - 1;
+        let scl_high_period = scl_high;
+        let scl_wait_high_period = scl_wait_high;
+        // sda sample
+        let sda_hold_time = sda_hold;
+        let sda_sample_time = sda_sample;
+        // setup
+        let scl_rstart_setup_time = setup;
+        let scl_stop_setup_time = setup;
+        // hold
+        let scl_start_hold_time = hold - 1;
+        let scl_stop_hold_time = hold;
+        let time_out_value = tout;
+        let time_out_en = true;
 
-        #[cfg(any(esp32c2, esp32c3, esp32s3))]
-        let sclk_div = sclk_div as u8;
+        self.configure_clock(
+            0,
+            scl_low_period,
+            scl_high_period,
+            scl_wait_high_period,
+            sda_hold_time,
+            sda_sample_time,
+            scl_rstart_setup_time,
+            scl_stop_setup_time,
+            scl_start_hold_time,
+            scl_stop_hold_time,
+            time_out_value,
+            time_out_en,
+        );
 
+        Ok(())
+    }
+
+    #[cfg(any(esp32c2, esp32c3, esp32s3))]
+    /// Sets the frequency of the I2C interface by calculating and applying the
+    /// associated timings - corresponds to i2c_ll_cal_bus_clk and
+    /// i2c_ll_set_bus_timing in ESP-IDF
+    fn set_frequency(
+        &mut self,
+        source_clk: HertzU32,
+        bus_freq: HertzU32,
+    ) -> Result<(), SetupError> {
+        let source_clk = source_clk.raw();
+        let bus_freq = bus_freq.raw();
+
+        let clkm_div: u32 = source_clk / (bus_freq * 1024) + 1;
+        let sclk_freq: u32 = source_clk / clkm_div;
+        let half_cycle: u32 = sclk_freq / bus_freq / 2;
+        // SCL
+        let clkm_div = clkm_div;
+        let scl_low = half_cycle;
+        // default, scl_wait_high < scl_high
+        // Make 80KHz as a boundary here, because when working at lower frequency, too
+        // much scl_wait_high will faster the frequency according to some
+        // hardware behaviors.
+        let scl_wait_high = if bus_freq >= 80 * 1000 {
+            half_cycle / 2 - 2
+        } else {
+            half_cycle / 4
+        };
+        let scl_high = half_cycle - scl_wait_high;
+        let sda_hold = half_cycle / 4;
+        let sda_sample = half_cycle / 2 + scl_wait_high;
+        let setup = half_cycle;
+        let hold = half_cycle;
+        // default we set the timeout value to about 10 bus cycles
+        // log(20*half_cycle)/log(2) = log(half_cycle)/log(2) +  log(20)/log(2)
+        let tout = (4 * 8 - (5 * half_cycle).leading_zeros()) + 2;
+
+        // According to the Technical Reference Manual, the following timings must be
+        // subtracted by 1. However, according to the practical measurement and
+        // some hardware behaviour, if wait_high_period and scl_high minus one.
+        // The SCL frequency would be a little higher than expected. Therefore, the
+        // solution here is not to minus scl_high as well as scl_wait high, and
+        // the frequency will be absolutely accurate to all frequency
+        // to some extent.
+        let scl_low_period = scl_low - 1;
+        let scl_high_period = scl_high;
+        let scl_wait_high_period = scl_wait_high;
+        // sda sample
+        let sda_hold_time = sda_hold - 1;
+        let sda_sample_time = sda_sample - 1;
+        // setup
+        let scl_rstart_setup_time = setup - 1;
+        let scl_stop_setup_time = setup - 1;
+        // hold
+        let scl_start_hold_time = hold - 1;
+        let scl_stop_hold_time = hold - 1;
+        let time_out_value = tout;
+        let time_out_en = true;
+
+        self.configure_clock(
+            clkm_div,
+            scl_low_period,
+            scl_high_period,
+            scl_wait_high_period,
+            sda_hold_time,
+            sda_sample_time,
+            scl_rstart_setup_time,
+            scl_stop_setup_time,
+            scl_start_hold_time,
+            scl_stop_hold_time,
+            time_out_value,
+            time_out_en,
+        );
+
+        Ok(())
+    }
+
+    #[allow(unused)]
+    fn configure_clock(
+        &mut self,
+        sclk_div: u32,
+        scl_low_period: u32,
+        scl_high_period: u32,
+        scl_wait_high_period: u32,
+        sda_hold_time: u32,
+        sda_sample_time: u32,
+        scl_rstart_setup_time: u32,
+        scl_stop_setup_time: u32,
+        scl_start_hold_time: u32,
+        scl_stop_hold_time: u32,
+        time_out_value: u32,
+        time_out_en: bool,
+    ) {
         unsafe {
             // divider
             #[cfg(any(esp32c2, esp32c3, esp32s3))]
-            self.register_block()
-                .clk_conf
-                .modify(|_, w| w.sclk_sel().clear_bit().sclk_div_num().bits(sclk_div - 1));
+            self.register_block().clk_conf.modify(|_, w| {
+                w.sclk_sel()
+                    .clear_bit()
+                    .sclk_div_num()
+                    .bits((sclk_div - 1) as u8)
+            });
 
             // scl period
             self.register_block()
                 .scl_low_period
-                .write(|w| w.scl_low_period().bits(scl_low));
+                .write(|w| w.scl_low_period().bits(scl_low_period as u16));
 
             // for high/wait_high we have to differentiate between the chips
             // as the EPS32 does not have a wait_high field
@@ -534,15 +684,15 @@ pub trait Instance {
                 if #[cfg(not(esp32))] {
                     self.register_block().scl_high_period.write(|w| {
                         w.scl_high_period()
-                            .bits(scl_high)
+                            .bits(scl_high_period as u16)
                             .scl_wait_high_period()
-                            .bits(scl_wait_high)
+                            .bits(scl_wait_high_period.try_into().unwrap())
                     });
                 }
                 else {
                     self.register_block().scl_high_period.write(|w| {
                         w.scl_high_period()
-                            .bits(scl_high)
+                            .bits(scl_high_period as u16)
                     });
                 }
             }
@@ -551,34 +701,34 @@ pub trait Instance {
             #[cfg(esp32s2)]
             self.register_block().scl_high_period.write(|w| {
                 w.scl_wait_high_period()
-                    .bits(scl_wait_high)
+                    .bits(scl_wait_high_period as u16)
                     .scl_high_period()
-                    .bits(scl_high)
+                    .bits(scl_high_period as u16)
             });
 
             // sda sample
             self.register_block()
                 .sda_hold
-                .write(|w| w.time().bits(sda_hold));
+                .write(|w| w.time().bits(sda_hold_time as u16));
             self.register_block()
                 .sda_sample
-                .write(|w| w.time().bits(sda_sample));
+                .write(|w| w.time().bits(sda_sample_time as u16));
 
             // setup
             self.register_block()
                 .scl_rstart_setup
-                .write(|w| w.time().bits(setup));
+                .write(|w| w.time().bits(scl_rstart_setup_time as u16));
             self.register_block()
                 .scl_stop_setup
-                .write(|w| w.time().bits(setup));
+                .write(|w| w.time().bits(scl_stop_setup_time as u16));
 
             // hold
             self.register_block()
                 .scl_start_hold
-                .write(|w| w.time().bits(hold));
+                .write(|w| w.time().bits(scl_start_hold_time as u16));
             self.register_block()
                 .scl_stop_hold
-                .write(|w| w.time().bits(hold));
+                .write(|w| w.time().bits(scl_stop_hold_time as u16));
 
             // The ESP32 variant does not have an enable flag for the
             // timeout mechanism
@@ -587,19 +737,20 @@ pub trait Instance {
                     // timeout
                     self.register_block()
                         .to
-                        .write(|w| w.time_out().bits(tout.into()));
+                        .write(|w| w.time_out().bits(time_out_value));
                 }
                 else {
                     // timeout
                     // FIXME: Enable timout for other chips!
                     self.register_block()
                         .to
-                        .write(|w| w.time_out_en().clear_bit());
+                        .write(|w| w.time_out_en().bit(time_out_en)
+                        .time_out_value()
+                        .variant(time_out_value.try_into().unwrap())
+                    );
                 }
             }
         }
-
-        Ok(())
     }
 
     fn perform_write<'a, I>(
@@ -823,6 +974,7 @@ pub trait Instance {
                     self.reset();
                     return Err(Error::AckCheckFailed);
                 } else if interrupts.arbitration_lost_int_raw().bit_is_set() {
+                    self.reset();
                     return Err(Error::ArbitrationLost);
                 }
             }
@@ -889,9 +1041,18 @@ pub trait Instance {
                 .txfifo_wm_int_raw()
                 .bit_is_set()
             {}
+            
             self.register_block()
                 .int_clr
                 .write(|w| w.txfifo_wm_int_clr().set_bit());
+            
+            while !self
+                .register_block()
+                .int_raw
+                .read()
+                .txfifo_wm_int_raw()
+                .bit_is_set()
+            {}
 
             if index >= bytes.len() {
                 break Ok(());
