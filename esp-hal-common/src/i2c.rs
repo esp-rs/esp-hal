@@ -350,6 +350,7 @@ pub trait Instance {
             .modify(|_, w| w.ref_always_on().set_bit());
 
         // Configure filter
+        // FIXME if we ever change this we need to adapt `set_frequency` for ESP32
         self.set_filter(Some(7), Some(7));
 
         // Configure frequency
@@ -465,7 +466,7 @@ pub trait Instance {
         // In the "worst" case, we will subtract 13, make sure the result will still be
         // correct
 
-        // NOTE since we always set the filter threshold to 7 we don't need conditional code here
+        // FIXME since we always set the filter threshold to 7 we don't need conditional code here
         // once that changes we need the conditional code here
         scl_high -= 7 + 6;
 
