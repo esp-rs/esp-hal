@@ -286,6 +286,10 @@ impl Sha {
         }
         Ok(())
     }
+
+    pub fn free(self) -> SHA {
+        return self.sha
+    }
 }
 
 
