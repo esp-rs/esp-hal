@@ -1,7 +1,7 @@
 //! UART driver
 
 use self::config::Config;
-#[cfg(any(esp32, esp32s3))]
+#[cfg(uart2)]
 use crate::pac::UART2;
 use crate::{
     clock::Clocks,
@@ -742,7 +742,7 @@ impl Instance for UART1 {
     }
 }
 
-#[cfg(any(esp32, esp32s3))]
+#[cfg(uart2)]
 impl Instance for UART2 {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {

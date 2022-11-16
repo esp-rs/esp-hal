@@ -310,7 +310,7 @@ fn enable_peripheral<T: Instance>(i2c: &T, peripheral_clock_control: &mut Periph
     // enable peripheral
     match i2c.i2c_number() {
         0 => peripheral_clock_control.enable(crate::system::Peripheral::I2cExt0),
-        #[cfg(not(any(esp32c2, esp32c3)))]
+        #[cfg(i2c1)]
         1 => peripheral_clock_control.enable(crate::system::Peripheral::I2cExt1),
         _ => unreachable!(), // will never happen
     }
@@ -364,7 +364,7 @@ pub trait Instance {
 
         // Reset entire peripheral (also resets fifo)
         self.reset();
-        
+
         Ok(())
     }
 
@@ -466,8 +466,8 @@ pub trait Instance {
         // In the "worst" case, we will subtract 13, make sure the result will still be
         // correct
 
-        // FIXME since we always set the filter threshold to 7 we don't need conditional code here
-        // once that changes we need the conditional code here
+        // FIXME since we always set the filter threshold to 7 we don't need conditional
+        // code here once that changes we need the conditional code here
         scl_high -= 7 + 6;
 
         // if (filter_cfg_en) {
@@ -1042,11 +1042,11 @@ pub trait Instance {
                 .txfifo_wm_int_raw()
                 .bit_is_set()
             {}
-            
+
             self.register_block()
                 .int_clr
                 .write(|w| w.txfifo_wm_int_clr().set_bit());
-            
+
             while !self
                 .register_block()
                 .int_raw
@@ -1261,7 +1261,7 @@ impl Instance for crate::pac::I2C0 {
     }
 }
 
-#[cfg(not(any(esp32c2, esp32c3)))]
+#[cfg(i2c1)]
 impl Instance for crate::pac::I2C1 {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {

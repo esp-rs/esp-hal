@@ -12,7 +12,7 @@ use embedded_hal::{
 use fugit::{HertzU32, MicrosDurationU64};
 use void::Void;
 
-#[cfg(not(esp32c2))]
+#[cfg(timg1)]
 use crate::pac::TIMG1;
 use crate::{
     clock::Clocks,
@@ -50,7 +50,7 @@ impl TimerGroupInstance for TIMG0 {
     }
 }
 
-#[cfg(not(esp32c2))]
+#[cfg(timg1)]
 impl TimerGroupInstance for TIMG1 {
     #[inline(always)]
     fn register_block() -> *const RegisterBlock {
