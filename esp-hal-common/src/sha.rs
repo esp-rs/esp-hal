@@ -1,5 +1,4 @@
 use core::convert::Infallible;
-
 use crate::pac::SHA;
 
 // All the hash algorithms introduced in FIPS PUB 180-4 Spec.
@@ -10,7 +9,7 @@ use crate::pac::SHA;
 // – SHA-512
 // – SHA-512/224
 // – SHA-512/256
-// – SHA-512/t
+// – SHA-512/t (not implemented yet)
 // Two working modes
 // – Typical SHA
 // – DMA-SHA (not implemented yet)
@@ -43,7 +42,6 @@ impl AlignmentHelper {
                 self.buf[i] = 0;
             }
 
-            //println!("Flushing {:02x?} to {:?}", self.buf, dst);
             dst.write_volatile(u32::from_ne_bytes(self.buf));
         }
         let flushed = self.buf_fill;
@@ -59,7 +57,6 @@ impl AlignmentHelper {
             for i in self.buf_fill..ALIGN_SIZE {
                 self.buf[i] = val;
             }
-            //println!("Flushing due to write bytes {:02x?} to {:?}", self.buf, dst);
             dst.write_volatile(u32::from_ne_bytes(self.buf));
             cursor = 1;
             self.buf_fill = 0;
@@ -94,7 +91,6 @@ impl AlignmentHelper {
             }
 
             dst.write_volatile(u32::from_ne_bytes(self.buf));
-            //println!("Writing partial to {:02x?} to {:?}", self.buf, dst);
             cursor += 1; 
             self.buf_fill = 0;
         }
@@ -109,7 +105,6 @@ impl AlignmentHelper {
                 ));
 
         if to_write.len() > 0 {
-            //println!("Writing full to {:02x?} ({}) to {:?} {}", to_write, to_write.len(), dst.add(cursor), to_write.len()/ALIGN_SIZE);
        
             // Raw v_c_n_m also works but only when src.len() >= 4 * ALIGN_SIZE, otherwise it be broken
             // core::intrinsics::volatile_copy_nonoverlapping_memory::<u32>(dst.add(cursor), to_write.as_ptr() as *const u32, to_write.len()/alignment);
@@ -122,7 +117,6 @@ impl AlignmentHelper {
         // Generally this applies when (src/4*4) != src
         let was_bounded = dst_bound - to_write.len() == 0;
         if remaining.len() > 0 && remaining.len() < 4 {
-            //println!("Storing partial write {:02x?}", remaining);
             for i in 0..remaining.len() {
                 self.buf[i] = remaining[i];
             }
@@ -322,10 +316,8 @@ fn mode_as_bits(mode: ShaMode) -> u8 {
 // - For this particular registers (and probably others), a full u32 needs to be written partial
 // register writes (i.e. in u8 mode) does not work
 //   - This means that we need to buffer bytes coming in up to 4 u8's in order to create a full u32
-//     - The implementation for this is messy atm (the entire write_data function is for this purpose), it would be good to create a uniform interface
-//     for writing into aligned registers 
 
-// This only supports inputs up to u32::MAX in byte size, to increase please see ::finish()
+// This implementation might fail after u32::MAX/8 bytes, to increase please see ::finish()
 // length/self.cursor usage
 #[cfg(any(esp32s2, esp32s3, esp32c2, esp32c3))]
 impl Sha {
@@ -436,6 +428,10 @@ impl Sha {
         Ok(remaining)
     }
 
+    // Finish of the calculation (if not alreaedy) and copy result to output
+    //
+    // Typically output is expected to be the size of digest_length(), but smaller inputs can be
+    // given to get a "short hash"
     pub fn finish(&mut self, output: &mut [u8]) -> nb::Result<(), Infallible> {
         // The main purpose of this function is to dynamically generate padding for the input.
         // Padding: Append "1" bit, Pad zeros until 512/1024 filled
@@ -488,8 +484,6 @@ impl Sha {
                 // difference when memcpy does works in other places, I don't know
                 let end_ptr = m_cursor_ptr.add((chunk_len/ALIGN_SIZE) -1);
                 end_ptr.write_volatile(length.to_be() as u32);
-                //let len_buf = length.to_be_bytes();
-                //core::intrinsics::volatile_copy_nonoverlapping_memory::<u32>(end_ptr, len_buf.as_ptr() as *const u32, len_buf.len()/alignment);
             }
 
             self.process_buffer();
