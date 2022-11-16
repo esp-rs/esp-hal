@@ -4,10 +4,9 @@ use core::{marker::PhantomData, sync::atomic::compiler_fence};
 
 use private::*;
 
-#[cfg(any(esp32c2, esp32c3, esp32s3))]
+#[cfg(gdma)]
 pub mod gdma;
-
-#[cfg(any(esp32, esp32s2))]
+#[cfg(pdma)]
 pub mod pdma;
 
 /// DMA Errors
@@ -20,7 +19,7 @@ pub enum DmaError {
 }
 
 /// DMA Priorities
-#[cfg(any(esp32c2, esp32c3, esp32s3))]
+#[cfg(gdma)]
 #[derive(Clone, Copy)]
 pub enum DmaPriority {
     Priority0 = 0,
@@ -37,7 +36,7 @@ pub enum DmaPriority {
 
 /// DMA Priorities
 /// The values need to match the TRM
-#[cfg(any(esp32, esp32s2))]
+#[cfg(pdma)]
 #[derive(Clone, Copy)]
 pub enum DmaPriority {
     Priority0 = 0,
@@ -45,49 +44,26 @@ pub enum DmaPriority {
 
 /// DMA capable peripherals
 /// The values need to match the TRM
-#[cfg(esp32c2)]
-#[derive(Clone, Copy)]
-pub enum DmaPeripheral {
-    Spi2 = 0,
-    Sha  = 7,
-}
-
-/// DMA capable peripherals
-/// The values need to match the TRM
-#[cfg(esp32c3)]
-#[derive(Clone, Copy)]
-pub enum DmaPeripheral {
-    Spi2  = 0,
-    Uhci0 = 2,
-    I2s   = 3,
-    Aes   = 6,
-    Sha   = 7,
-    Adc   = 8,
-}
-
-/// DMA capable peripherals
-/// The values need to match the TRM
-#[cfg(any(esp32, esp32s2))]
-#[derive(Clone, Copy)]
-pub enum DmaPeripheral {
-    Spi2 = 0,
-    Spi3 = 1,
-}
-
-/// DMA capable peripherals
-/// The values need to match the TRM
-#[cfg(esp32s3)]
 #[derive(Clone, Copy)]
 pub enum DmaPeripheral {
     Spi2   = 0,
+    #[cfg(any(pdma, esp32s3))]
     Spi3   = 1,
+    #[cfg(any(esp32c3, esp32s3))]
     Uhci0  = 2,
+    #[cfg(any(esp32c3, esp32s3))]
     I2s0   = 3,
+    #[cfg(esp32s3)]
     I2s1   = 4,
+    #[cfg(esp32s3)]
     LcdCam = 5,
+    #[cfg(any(esp32c3, esp32s3))]
     Aes    = 6,
+    #[cfg(gdma)]
     Sha    = 7,
+    #[cfg(any(esp32c3, esp32s3))]
     Adc    = 8,
+    #[cfg(esp32s3)]
     Rmt    = 9,
 }
 

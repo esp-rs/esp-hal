@@ -4,7 +4,7 @@
 #[cfg_attr(esp32s2, path = "adc/xtensa.rs")]
 #[cfg_attr(esp32s3, path = "adc/xtensa.rs")]
 pub mod adc;
-#[cfg(not(any(esp32c2, esp32c3, esp32s3)))]
+#[cfg(dac)]
 pub mod dac;
 
 cfg_if::cfg_if! {

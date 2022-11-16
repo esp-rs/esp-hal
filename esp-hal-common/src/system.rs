@@ -16,12 +16,12 @@ type SystemPeripheral = crate::pac::DPORT;
 /// Peripherals which can be enabled via [PeripheralClockControl]
 pub enum Peripheral {
     Spi2,
-    #[cfg(not(esp32c2))]
+    #[cfg(spi3)]
     Spi3,
     I2cExt0,
-    #[cfg(not(any(esp32c2, esp32c3)))]
+    #[cfg(i2c1)]
     I2cExt1,
-    #[cfg(not(esp32c2))]
+    #[cfg(rmt)]
     Rmt,
     Ledc,
     #[cfg(any(esp32, esp32s3))]
@@ -30,11 +30,11 @@ pub enum Peripheral {
     Mcpwm1,
     #[cfg(any(esp32c2, esp32c3))]
     ApbSarAdc,
-    #[cfg(any(esp32c2, esp32c3, esp32s3))]
+    #[cfg(gdma)]
     Gdma,
-    #[cfg(any(esp32, esp32s2))]
+    #[cfg(pdma)]
     Dma,
-    #[cfg(any(esp32s2, esp32s3))]
+    #[cfg(usb_otg)]
     Usb,
 }
 
@@ -61,7 +61,7 @@ impl PeripheralClockControl {
                 perip_clk_en0.modify(|_, w| w.spi2_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.spi2_rst().clear_bit());
             }
-            #[cfg(not(esp32c2))]
+            #[cfg(spi3)]
             Peripheral::Spi3 => {
                 perip_clk_en0.modify(|_, w| w.spi3_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.spi3_rst().clear_bit());
@@ -76,12 +76,12 @@ impl PeripheralClockControl {
                 perip_clk_en0.modify(|_, w| w.i2c_ext0_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.i2c_ext0_rst().clear_bit());
             }
-            #[cfg(not(any(esp32c2, esp32c3)))]
+            #[cfg(i2c1)]
             Peripheral::I2cExt1 => {
                 perip_clk_en0.modify(|_, w| w.i2c_ext1_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.i2c_ext1_rst().clear_bit());
             }
-            #[cfg(not(esp32c2))]
+            #[cfg(rmt)]
             Peripheral::Rmt => {
                 perip_clk_en0.modify(|_, w| w.rmt_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.rmt_rst().clear_bit());
@@ -105,7 +105,7 @@ impl PeripheralClockControl {
                 perip_clk_en0.modify(|_, w| w.apb_saradc_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.apb_saradc_rst().clear_bit());
             }
-            #[cfg(any(any(esp32c2, esp32c3, esp32s3)))]
+            #[cfg(gdma)]
             Peripheral::Gdma => {
                 perip_clk_en1.modify(|_, w| w.dma_clk_en().set_bit());
                 perip_rst_en1.modify(|_, w| w.dma_rst().clear_bit());
@@ -122,7 +122,7 @@ impl PeripheralClockControl {
                 perip_clk_en0.modify(|_, w| w.spi3_dma_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.spi3_dma_rst().clear_bit());
             }
-            #[cfg(any(esp32s2, esp32s3))]
+            #[cfg(usb_otg)]
             Peripheral::Usb => {
                 perip_clk_en0.modify(|_, w| w.usb_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.usb_rst().clear_bit());
@@ -142,7 +142,7 @@ pub struct CpuControl {
 }
 
 /// Dummy DMA peripheral.
-#[cfg(any(esp32, esp32s2))]
+#[cfg(pdma)]
 pub struct Dma {
     _private: (),
 }
@@ -153,7 +153,7 @@ pub struct SystemParts {
     pub peripheral_clock_control: PeripheralClockControl,
     pub clock_control: SystemClockControl,
     pub cpu_control: CpuControl,
-    #[cfg(any(esp32, esp32s2))]
+    #[cfg(pdma)]
     pub dma: Dma,
 }
 
@@ -175,7 +175,7 @@ impl SystemExt for SystemPeripheral {
             peripheral_clock_control: PeripheralClockControl { _private: () },
             clock_control: SystemClockControl { _private: () },
             cpu_control: CpuControl { _private: () },
-            #[cfg(any(esp32, esp32s2))]
+            #[cfg(pdma)]
             dma: Dma { _private: () },
         }
     }

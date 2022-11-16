@@ -33,9 +33,9 @@ pub use esp32s2 as pac;
 pub use esp32s3 as pac;
 pub use procmacros as macros;
 
-#[cfg(not(esp32c2))]
+#[cfg(rmt)]
 pub use self::pulse_control::PulseControl;
-#[cfg(has_usb_serial_jtag)]
+#[cfg(usb_serial_jtag)]
 pub use self::usb_serial_jtag::UsbSerialJtag;
 pub use self::{
     delay::Delay,
@@ -52,13 +52,15 @@ pub mod analog;
 pub mod clock;
 pub mod delay;
 pub mod dma;
+#[cfg(feature = "embassy")]
+pub mod embassy;
 pub mod gpio;
 pub mod i2c;
 pub mod ledc;
-#[cfg(any(esp32s2, esp32s3))]
+#[cfg(usb_otg)]
 pub mod otg_fs;
 pub mod prelude;
-#[cfg(not(esp32c2))]
+#[cfg(rmt)]
 pub mod pulse_control;
 pub mod rng;
 pub mod rom;
@@ -66,21 +68,18 @@ pub mod rtc_cntl;
 pub mod serial;
 pub mod spi;
 pub mod system;
-#[cfg(has_systimer)]
+#[cfg(systimer)]
 pub mod systimer;
 pub mod timer;
-#[cfg(has_usb_serial_jtag)]
+#[cfg(usb_serial_jtag)]
 pub mod usb_serial_jtag;
-#[cfg(not(esp32c2))]
+#[cfg(rmt)]
 pub mod utils;
 
 #[cfg_attr(esp32, path = "cpu_control/esp32.rs")]
 #[cfg_attr(any(esp32c2, esp32c3, esp32s2), path = "cpu_control/none.rs")]
 #[cfg_attr(esp32s3, path = "cpu_control/esp32s3.rs")]
 pub mod cpu_control;
-
-#[cfg(feature = "embassy")]
-pub mod embassy;
 
 #[cfg_attr(esp32, path = "efuse/esp32.rs")]
 #[cfg_attr(esp32c2, path = "efuse/esp32c2.rs")]
