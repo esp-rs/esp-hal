@@ -1,5 +1,5 @@
-//! This shows how to read selected information from eFuses.
-//! e.g. the MAC address
+//! Demonstrates the use of the SHA peripheral and compares the speed of hardware-accelerated and pure software hashing.
+//! 
 
 #![no_std]
 #![no_main]
@@ -16,7 +16,7 @@ use nb::block;
 use esp_backtrace as _;
 use esp_println::println;
 use xtensa_lx_rt::entry;
-use sha2::{Sha256, Sha512, Digest};
+use sha2::{Sha512, Digest};
 
 #[entry]
 fn main() -> ! {
@@ -36,20 +36,26 @@ fn main() -> ! {
     let source_data = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".as_bytes();
     let mut remaining = source_data.clone();
     let mut hasher = Sha::new(peripherals.SHA, ShaMode::SHA512);
+
+    // Short hashes can be created by decreasing the output buffer to the desired length
     let mut output = [0u8; 64];
 
     let pre_calc = xtensa_lx::timer::get_cycle_count();
-    loop {
-        //println!("Remaining len: {}", remaining.len());
-        match block!(hasher.update(remaining)) {
-            Ok(data) => remaining = data,
-            _ => unreachable!()
-        }
-        if remaining.len() == 0 {
-            break;
-        }
+    // The hardware implementation takes a subslice of the input, and returns the unprocessed parts
+    // The unprocessed parts can be input in the next iteration, you can always add more data until
+    // finish() is called. After finish() is called update()'s will contribute to a new hash which
+    // can be extracted again with finish().
+    
+    while remaining.len() > 0 {
+        // Can add println to view progress, however println takes a few orders of magnitude longer than
+        // the Sha function itself so not useful for comparing processing time
+        // println!("Remaining len: {}", remaining.len());
+
+        // All the HW Sha functions are infallible so unwrap is fine to use if you use block!
+        remaining = block!(hasher.update(remaining)).unwrap();
     }
 
+    // Finish can be called as many times as desired to get mutliple copies of the output.
     block!(hasher.finish(output.as_mut_slice())).unwrap();
     let post_calc = xtensa_lx::timer::get_cycle_count();
     let hw_time = post_calc - pre_calc;

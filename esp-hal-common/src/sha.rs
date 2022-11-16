@@ -215,6 +215,7 @@ impl Sha {
             return Err(nb::Error::WouldBlock);
         }
 
+        self.finished = false;
         let mod_cursor = self.cursor % self.chunk_length();
         unsafe {
             let ptr = (self.sha.text_[0].as_ptr() as *mut u32).add(mod_cursor / ALIGN_SIZE);
@@ -424,11 +425,15 @@ impl Sha {
             return Err(nb::Error::WouldBlock);
         }
 
+        self.finished = false;
+
         let remaining = self.write_data(buffer)?;
         Ok(remaining)
     }
 
     // Finish of the calculation (if not alreaedy) and copy result to output
+    // After `finish()` is called `update()`s will contribute to a new hash which
+    // can be calculated again with `finish()`.
     //
     // Typically output is expected to be the size of digest_length(), but smaller inputs can be
     // given to get a "short hash"
@@ -449,7 +454,7 @@ impl Sha {
             let length = self.cursor * 8;
             nb::block!(self.update(&[0x80]))?; // Append "1" bit
             nb::block!(self.flush_data())?;    // Flush partial data, ensures aligned cursor 
-            //assert!(self.cursor % 4 == 0);
+            debug_assert!(self.cursor % 4 == 0);
 
             let mod_cursor = self.cursor % chunk_len;
 
