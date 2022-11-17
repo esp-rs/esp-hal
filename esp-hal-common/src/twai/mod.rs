@@ -1,3 +1,8 @@
+//! # Two-wire Automotive Interface (TWAI)
+//!
+//! This driver manages the ISO 11898-1 (CAN Specification 2.0) compatible TWAI controllers. It
+//! supports Standard Frame Format (11-bit) and Extended Frame Format (29-bit) frame identifiers.
+
 use core::slice::{from_raw_parts, from_raw_parts_mut};
 
 use crate::{
@@ -19,7 +24,7 @@ use self::filter::{Filter, FilterType};
 
 pub mod filter;
 
-/// Structure backing the embedded_hal::can::Frame trait.
+/// Structure backing the embedded_hal::can::Frame/embedded_can::Frame trait.
 #[derive(Debug)]
 pub struct EspTwaiFrame {
     id: Id,
@@ -118,6 +123,7 @@ pub struct TimingConfig {
 }
 
 /// A selection of pre-determined baudrates for the TWAI driver.
+/// Currently these timings are sourced from the ESP IDF C driver which assumes an APB clock of 80MHz.
 pub enum BaudRate {
     B125K,
     B250K,
@@ -136,7 +142,7 @@ impl BaudRate {
     // #define TWAI_TIMING_CONFIG_500KBITS()   {.brp = 8, .tseg_1 = 15, .tseg_2 = 4, .sjw = 3, .triple_sampling = false}
     // #define TWAI_TIMING_CONFIG_800KBITS()   {.brp = 4, .tseg_1 = 16, .tseg_2 = 8, .sjw = 3, .triple_sampling = false}
     // #define TWAI_TIMING_CONFIG_1MBITS()     {.brp = 4, .tseg_1 = 15, .tseg_2 = 4, .sjw = 3, .triple_sampling = false}
-    fn timing(self) -> TimingConfig {
+    const fn timing(self) -> TimingConfig {
         match self {
             Self::B125K => TimingConfig {
                 baud_rate_prescaler: 32,
@@ -247,7 +253,11 @@ where
             });
     }
 
-    /// Set up the acceptance filter on the device to accept the specified filters.
+    /// Set up the acceptance filter on the device.
+    ///
+    /// NOTE: On a bus with mixed 11-bit and 29-bit packet id's, you may experience an
+    /// 11-bit filter match against a 29-bit frame and vice versa. Your application should check
+    /// the id again once a frame has been received to make sure it is the expected value.
     ///
     /// [ESP32C3 Reference Manual](https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf#subsubsection.29.4.6)
     pub fn set_filter(&mut self, filter: impl Filter) {
@@ -267,11 +277,11 @@ where
         }
     }
 
-    /// Set the Error warning threshold.
+    /// Set the error warning threshold.
     ///
-    /// In the case when any of an error counter value exceeds
-    /// the threshold, or all the error counter values are below the threshold, an error warning
-    /// interrupt will be triggered (given the enable signal is valid).
+    /// In the case when any of an error counter value exceeds the threshold, or all the
+    /// error counter values are below the threshold, an error warning interrupt will be
+    /// triggered (given the enable signal is valid).
     pub fn set_error_warning_limit(&mut self, limit: u8) {
         self.peripheral
             .register_block()
@@ -296,8 +306,8 @@ where
 
 /// An active TWAI peripheral in Normal Mode.
 ///
-/// According to the [ESP32C3 Reference Manual](https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf) 29.4.1.2 Operation Mode, in "Normal Mode":
-/// The TWAI controller can transmit and receive messages including error signals (such as error and overload Frames)
+/// In this mode, the TWAI controller can transmit and receive messages including error
+/// signals (such as error and overload frames).
 pub struct Twai<T> {
     peripheral: T,
 }
@@ -347,7 +357,7 @@ where
 
     /// Get the number of messages that the peripheral has available in the receive FIFO.
     ///
-    /// Note that this may not be the number of messages in the receive FIFO due to
+    /// Note that this may not be the number of valid messages in the receive FIFO due to
     /// fifo overflow/overrun.
     pub fn num_available_messages(&self) -> u8 {
         self.peripheral
@@ -435,7 +445,7 @@ where
     /// [ESP32C3 Reference Manual](https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf#subsubsection.29.4.4.2)
     ///
     /// NOTE: TODO: This may not work if using the self reception/self test functionality. See
-    /// notes 1 and 2 in the Frame Identifier section of the reference manual.
+    /// notes 1 and 2 in the "Frame Identifier" section of the reference manual.
     ///
     fn transmit(&mut self, frame: &Self::Frame) -> nb::Result<Option<Self::Frame>, Self::Error> {
         let status = self.peripheral.register_block().status.read();
@@ -525,8 +535,11 @@ where
             .cmd
             .write(|w| w.tx_req().set_bit());
 
+        // Success in readying packet for transmit. No packets can be replaced in the transmit
+        // buffer so return None in accordance with the embedded-can/embedded-hal trait.
         nb::Result::Ok(None)
     }
+    /// Return a received frame if there are any available.
     fn receive(&mut self) -> nb::Result<Self::Frame, Self::Error> {
         let status = self.peripheral.register_block().status.read();
 
@@ -655,6 +668,7 @@ pub trait Instance {
     fn register_block(&self) -> &RegisterBlock;
 }
 
+#[cfg(any(esp32c3))]
 impl Instance for crate::pac::TWAI {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {

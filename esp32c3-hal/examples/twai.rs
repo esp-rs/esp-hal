@@ -47,7 +47,7 @@ fn main() -> ! {
     let can_rx_pin = io.pins.gpio3;
 
     // The speed of the CAN bus.
-    let can_baudrate = twai::BaudRate::B1000K;
+    const CAN_BAUDRATE: twai::BaudRate = twai::BaudRate::B1000K;
 
     // Begin configuring the TWAI peripheral. The peripheral is in a reset like state that
     // prevents transmission but allows configuration.
@@ -57,18 +57,17 @@ fn main() -> ! {
         can_rx_pin,
         &mut system.peripheral_clock_control,
         &clocks,
-        can_baudrate,
+        CAN_BAUDRATE,
     );
 
     // Partially filter the incoming messages to reduce overhead of receiving undesired messages.
     // Note that due to how the hardware filters messages, standard ids and extended ids may both
     // match a filter. Frame ids should be explicitly checked in the application instead of fully
     // relying on these partial acceptance filters to exactly match.
-    // TODO: even though this is a single, standard id filter, extended ids will also match this filter.
     // A filter that matches standard ids of an even value.
-    let filter =
+    const FILTER: twai::filter::SingleStandardFilter =
         twai::filter::SingleStandardFilter::new(b"xxxxxxxxxx0", b"x", [b"xxxxxxxx", b"xxxxxxxx"]);
-    can_config.set_filter(filter);
+    can_config.set_filter(FILTER);
 
     // Start the peripheral. This locks the configuration settings of the peripheral and puts it
     // into operation mode, allowing packets to be sent and received.

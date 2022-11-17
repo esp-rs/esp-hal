@@ -1,3 +1,7 @@
+//! # Two-wire Automotive Interface (TWAI) Filters
+//!
+//! These are acceptance filters that limit which packets are received by the TWAI peripheral.
+
 #[cfg(feature = "eh1")]
 use embedded_can::{ExtendedId, StandardId};
 #[cfg(not(feature = "eh1"))]
@@ -10,17 +14,19 @@ pub enum FilterType {
 }
 
 pub trait Filter {
-    // The type of the filter.
+    /// The type of the filter.
     const FILTER_TYPE: FilterType;
     fn filter_type(&self) -> FilterType {
         Self::FILTER_TYPE
     }
 
+    /// Get the register level representation of the filter.
     fn to_registers(&self) -> [u8; 8];
 }
 
 pub type BitFilter<const N: usize> = [u8; N];
 
+/// Internal macro used to convert a byte from a bytestring into a bit inside a given code and mask.
 macro_rules! set_bit_from_byte {
     ($code:expr, $mask:expr, $byte:expr, $shift:expr) => {
         match $byte {
@@ -254,8 +260,10 @@ impl Filter for SingleExtendedFilter {
     }
 }
 
+/// A filter that matches against two standard 11-bit standard ids.
 ///
-/// TODO: is this how we actually want to store the two filters?
+/// The first filter part can match a packet's id, rtr bit, and the first byte of the payload.
+/// The second filter part can match a packet's id and rtr bit.
 ///
 /// Warning: This is not a perfect filter. Extended ids that match the bit layout of this filter
 /// will also be accepted.
@@ -426,6 +434,7 @@ impl DualExtendedFilter {
             raw: code_mask_to_register_array(acceptance_code, acceptance_mask),
         }
     }
+    /// Create a new filter matching the first 16 bits of two 29-bit ids.
     ///
     /// The masks indicate which bits of the code the filter should match against. Set bits
     /// in the mask indicate that the corresponding bit in the code should match.
