@@ -25,27 +25,27 @@ categories = [
 ]
 
 [dependencies]
-embedded-hal     = { version = "0.2.7",  features = ["unproven"] }
-embedded-hal-1   = { version = "=1.0.0-alpha.9", optional = true, package = "embedded-hal" }
-embedded-hal-nb  = { version = "=1.0.0-alpha.1", optional = true }
-esp-hal-common   = { version = "0.2.0",  features = ["esp32s2"], path = "../esp-hal-common" }
-xtensa-lx        = { version = "0.7.0",  features = ["esp32s2"] }
-xtensa-lx-rt     = { version = "0.13.0", features = ["esp32s2"], optional = true }
-embedded-hal-async = { version = "0.1.0-alpha.3", optional = true }
 embassy-time       = { version = "0.1.0", features = ["nightly"], optional = true }
+embedded-hal       = { version = "0.2.7",  features = ["unproven"] }
+embedded-hal-1     = { version = "=1.0.0-alpha.9", optional = true, package = "embedded-hal" }
+embedded-hal-async = { version = "0.1.0-alpha.3", optional = true }
+embedded-hal-nb    = { version = "=1.0.0-alpha.1", optional = true }
+esp-hal-common     = { version = "0.2.0",  features = ["esp32s2"], path = "../esp-hal-common" }
+xtensa-lx          = { version = "0.7.0",  features = ["esp32s2"] }
+xtensa-lx-rt       = { version = "0.13.0", features = ["esp32s2"], optional = true }
 xtensa-atomic-emulation-trap = { version = "0.2.0", features = ["esp32s2"] }
 
 [dev-dependencies]
-critical-section  = "1.1.0"
+critical-section  = "1.1.1"
+embassy-executor  = { package = "embassy-executor", git = "https://github.com/embassy-rs/embassy/", rev = "eed34f9", features = ["nightly", "integrated-timers"] }
 embedded-graphics = "0.7.1"
-esp-backtrace     = { version = "0.2.0", features = ["esp32s2", "panic-handler", "print-uart"] }
-esp-println       = { version = "0.3.0", features = ["esp32s2"] }
+esp-backtrace     = { version = "0.3.0", features = ["esp32s2", "panic-handler", "print-uart"] }
+esp-println       = { version = "0.3.1", features = ["esp32s2"] }
 smart-leds        = "0.3.0"
 ssd1306           = "0.7.1"
-usb-device        = { version = "0.2.3" }
+usb-device        = { version = "0.2.9" }
 usbd-serial       = "0.1.1"
-embassy-executor  = { package = "embassy-executor", git = "https://github.com/embassy-rs/embassy/", rev = "eed34f945ccd5c4ef2af77230042dd4954e981ac", features = ["nightly", "integrated-timers"] }
-static_cell        = "1.0.0"
+static_cell       = "1.0.0"
 
 [features]
 default   = ["rt", "vectored"]
@@ -54,8 +54,8 @@ rt        = ["xtensa-lx-rt/esp32s2"]
 smartled  = ["esp-hal-common/smartled"]
 ufmt      = ["esp-hal-common/ufmt"]
 vectored  = ["esp-hal-common/vectored"]
-async = ["esp-hal-common/async", "embedded-hal-async"]
-embassy = ["esp-hal-common/embassy"]
+async     = ["esp-hal-common/async", "embedded-hal-async"]
+embassy   = ["esp-hal-common/embassy"]
 # FIXME:
 # - add 80_000_000 support to embassy time
 # - Fix https://github.com/esp-rs/esp-hal/issues/253
