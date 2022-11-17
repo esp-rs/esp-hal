@@ -38,7 +38,7 @@ fn main() -> ! {
     let mut hasher = Sha::new(peripherals.SHA, ShaMode::SHA256);
 
     // Short hashes can be created by decreasing the output buffer to the desired length
-    let mut output = [0u8; 64];
+    let mut output = [0u8; 32];
 
     //let pre_calc = xtensa_lx::timer::get_cycle_count();
     // The hardware implementation takes a subslice of the input, and returns the unprocessed parts
@@ -60,7 +60,7 @@ fn main() -> ! {
     //let post_calc = xtensa_lx::timer::get_cycle_count();
     //let hw_time = post_calc - pre_calc;
     //println!("Took {} cycles", hw_time);
-    println!("SHA512 Hash output {:02x?}", output);
+    println!("SHA256 Hash output {:02x?}", output);
     let _usha = hasher.free();
 
 
@@ -71,7 +71,7 @@ fn main() -> ! {
     //let post_calc = xtensa_lx::timer::get_cycle_count();
     //let soft_time = post_calc - pre_calc;
     //println!("Took {} cycles", soft_time);
-    println!("SHA512 Hash output {:02x?}", soft_result);
+    println!("SHA256 Hash output {:02x?}", soft_result);
 
     //println!("HW SHA is {}x faster", soft_time/hw_time);
 
