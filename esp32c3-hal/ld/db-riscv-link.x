@@ -51,6 +51,7 @@ SECTIONS
     /* point of the program. */
     KEEP(*(.init));
     KEEP(*(.init.rust));
+    KEEP(*(.text.abort));
     . = ALIGN(4);
     KEEP(*(.trap));
     KEEP(*(.trap.rust));
