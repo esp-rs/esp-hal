@@ -196,7 +196,14 @@ impl SingleExtendedFilter {
     /// Create a filter that matches against a single 29-bit extended id.
     ///
     /// The filter can match against the packet's id and the rtr bit.
-    pub const fn new(id: BitFilter<29>, rtr: BitFilter<1>) -> Self {
+    ///
+    /// # Examples
+    /// A filter matching any odd extended ids, with any rtr value.
+    /// ```
+    /// const FILTER: twai::filter::SingleExtendedFilter =
+    ///     twai::filter::SingleExtendedFilter::new(b"xxxxxxxxxxxxxxxxxxxxxxxxxxxx1", b"x");
+    /// ```
+    pub const fn new(id: &BitFilter<29>, rtr: &BitFilter<1>) -> Self {
         // The bit values we desire to match against. This determines whether we want a set
         // bit (1) or a reset bit (0).
         let mut acceptance_code: u32 = 0;
@@ -275,12 +282,25 @@ impl DualStandardFilter {
     ///
     /// The first filter part can match a packet's id, rtr bit, and the first byte of the payload.
     /// The second filter part can match a packet's id and rtr bit.
+    ///
+    /// # Examples
+    /// A filter that matches any standard id that ends with a 00 or a 11, with any rtr, and with any
+    /// payload on the first filter.
+    /// ```
+    ///     const FILTER: twai::filter::DualStandardFilter = twai::filter::DualStandardFilter::new(
+    ///     b"xxxxxxxxx00",
+    ///     b"x",
+    ///     b"xxxxxxxx",
+    ///     b"xxxxxxxxx11",
+    ///     b"x",
+    /// );
+    /// ```
     pub const fn new(
-        first_id: BitFilter<11>,
-        first_rtr: BitFilter<1>,
-        first_payload: BitFilter<8>,
-        second_id: BitFilter<11>,
-        second_rtr: BitFilter<1>,
+        first_id: &BitFilter<11>,
+        first_rtr: &BitFilter<1>,
+        first_payload: &BitFilter<8>,
+        second_id: &BitFilter<11>,
+        second_rtr: &BitFilter<1>,
     ) -> Self {
         // The bit values we desire to match against. This determines whether we want a set
         // bit (1) or a reset bit (0).
@@ -403,7 +423,17 @@ pub struct DualExtendedFilter {
 }
 impl DualExtendedFilter {
     /// Create a filter that matches the first 16 bits of two 29-bit extended ids.
-    pub const fn new(ids: [BitFilter<16>; 2]) -> Self {
+    ///
+    /// # Examples
+    /// A filter that matches ids with 4 bits either set or reset in the higher part of the id. For example this id matches:
+    /// 0x000f000f, 0x000f000a, 0x0000000a, 0x0000000b.
+    /// But it does not match:
+    /// 0x000a000a
+    /// ```
+    /// const FILTER: twai::filter::DualExtendedFilter =
+    /// twai::filter::DualExtendedFilter::new([b"xxxxxxxxx0000xxx", b"xxxxxxxxx1111xxx"]);
+    /// ```
+    pub const fn new(ids: [&BitFilter<16>; 2]) -> Self {
         // The bit values we desire to match against. This determines whether we want a set
         // bit (1) or a reset bit (0).
         let mut acceptance_code: u32 = 0;
