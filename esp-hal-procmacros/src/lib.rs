@@ -123,7 +123,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
 /// interrupt function for example, on Xtensa based chips:
 ///
 /// ```rust
-/// fn GPIO(context: &mut xtensa_lx_rt::exeception::Context) {
+/// fn GPIO(context: &mut xtensa_lx_rt::exception::Context) {
 ///     // code
 /// }
 /// ```
