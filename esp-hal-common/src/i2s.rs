@@ -18,6 +18,14 @@ use crate::{
     OutputPin,
 };
 
+#[cfg(any(esp32, esp32s2, esp32s3))]
+const I2S_LL_MCLK_DIVIDER_BIT_WIDTH: usize = 6;
+
+#[cfg(any(esp32c3))]
+const I2S_LL_MCLK_DIVIDER_BIT_WIDTH: usize = 9;
+
+const I2S_LL_MCLK_DIVIDER_MAX: usize = (1 << I2S_LL_MCLK_DIVIDER_BIT_WIDTH) - 1;
+
 trait AcceptedWord {}
 impl AcceptedWord for u8 {}
 impl AcceptedWord for u16 {}
@@ -26,6 +34,7 @@ impl AcceptedWord for i8 {}
 impl AcceptedWord for i16 {}
 impl AcceptedWord for i32 {}
 
+/// I2S Error
 #[derive(Debug, Clone, Copy)]
 pub enum Error {
     Unknown,
@@ -39,12 +48,14 @@ impl From<DmaError> for Error {
     }
 }
 
+/// Supported standards.
 pub enum Standard {
     Philips,
     // Tdm,
     // Pdm,
 }
 
+/// Supported data formats
 #[cfg(not(any(esp32, esp32s2)))]
 pub enum DataFormat {
     Data32Channel32,
@@ -56,6 +67,7 @@ pub enum DataFormat {
     Data8Channel8,
 }
 
+/// Supported data formats
 #[cfg(any(esp32, esp32s2))]
 pub enum DataFormat {
     Data32Channel32,
@@ -106,6 +118,7 @@ impl DataFormat {
     }
 }
 
+/// Pins to use for I2S tx
 pub struct PinsBclkWsDout<B: OutputPin, W: OutputPin, DO: OutputPin> {
     pub bclk: B,
     pub ws: W,
@@ -136,6 +149,7 @@ where
     }
 }
 
+/// Pins to use for I2S rx
 pub struct PinsBclkWsDin<B: OutputPin, W: OutputPin, DI: InputPin> {
     pub bclk: B,
     pub ws: W,
@@ -166,6 +180,7 @@ where
     }
 }
 
+/// MCLK pin to use
 #[cfg(not(esp32))]
 pub struct MclkPin<M: OutputPin> {
     pub mclk: M,
@@ -186,6 +201,7 @@ where
     }
 }
 
+/// No MCLK pin
 pub struct NoMclk {}
 
 impl I2sMclkPin for NoMclk {
@@ -214,11 +230,14 @@ where
     P: I2sTxPins,
     TX: Tx,
 {
-    /// Amount of bytes which can be pushed
+    /// Amount of bytes which can be pushed.
+    /// Only useful for circular DMA transfers
     pub fn available(&mut self) -> usize {
         self.i2s_tx.tx_channel.available()
     }
 
+    /// Push bytes into the DMA buffer.
+    /// Only useful for circular DMA transfers
     pub fn push(&mut self, data: &[u8]) -> Result<usize, Error> {
         Ok(self.i2s_tx.tx_channel.push(data)?)
     }
@@ -263,16 +282,21 @@ where
     }
 }
 
+/// Blocking I2s Write
 pub trait I2sWrite<W> {
     fn write(&mut self, words: &[W]) -> Result<(), Error>;
 }
 
+/// Initiate a DMA tx transfer
 pub trait I2sWriteDma<T, P, TX, TXBUF>
 where
     T: RegisterAccess,
     P: I2sTxPins,
     TX: Tx,
 {
+    /// Write I2S.
+    /// Returns [I2sWriteDmaTransfer] which represents the in-ptrogress DMA
+    /// transfer
     fn write_dma(self, words: TXBUF) -> Result<I2sWriteDmaTransfer<T, P, TX, TXBUF>, Error>
     where
         T: RegisterAccess,
@@ -280,6 +304,8 @@ where
         TX: Tx,
         TXBUF: ReadBuffer<Word = u8>;
 
+    /// Continously write to I2S. Returns [I2sWriteDmaTransfer] which represents
+    /// the in-ptrogress DMA transfer
     fn write_dma_circular(
         self,
         words: TXBUF,
@@ -315,6 +341,30 @@ where
 
     pub fn pop(&mut self, data: &mut [u8]) -> Result<usize, Error> {
         Ok(self.i2s_rx.rx_channel.pop(data)?)
+    }
+
+    /// Wait for the DMA transfer to complete and return the buffers and the
+    /// I2sTx instance after copying the read data to the given buffer.
+    /// Length of the received data is returned at the third element of the
+    /// tuple.
+    pub fn wait_receive(mut self, dst: &mut [u8]) -> (BUFFER, I2sRx<T, P, RX>, usize) {
+        self.i2s_rx.wait_rx_dma_done().ok(); // waiting for the DMA transfer is not enough
+
+        let len = self.i2s_rx.rx_channel.drain_buffer(dst).unwrap();
+
+        // `DmaTransfer` needs to have a `Drop` implementation, because we accept
+        // managed buffers that can free their memory on drop. Because of that
+        // we can't move out of the `DmaTransfer`'s fields, so we use `ptr::read`
+        // and `mem::forget`.
+        //
+        // NOTE(unsafe) There is no panic branch between getting the resources
+        // and forgetting `self`.
+        unsafe {
+            let buffer = core::ptr::read(&self.buffer);
+            let payload = core::ptr::read(&self.i2s_rx);
+            core::mem::forget(self);
+            (buffer, payload, len)
+        }
     }
 }
 
@@ -356,16 +406,21 @@ where
     }
 }
 
+/// Blocking I2S Read
 pub trait I2sRead<W> {
     fn read(&mut self, words: &mut [W]) -> Result<(), Error>;
 }
 
+/// Initate a DMA rx transfer
 pub trait I2sReadDma<T, P, RX, RXBUF>
 where
     T: RegisterAccess,
     P: I2sRxPins,
     RX: Rx,
 {
+    /// Read I2S.
+    /// Returns [I2sReadDmaTransfer] which represents the in-ptrogress DMA
+    /// transfer
     fn read_dma(self, words: RXBUF) -> Result<I2sReadDmaTransfer<T, P, RX, RXBUF>, Error>
     where
         T: RegisterAccess,
@@ -373,6 +428,9 @@ where
         RX: Rx,
         RXBUF: WriteBuffer<Word = u8>;
 
+    /// Continously read from I2S.
+    /// Returns [I2sReadDmaTransfer] which represents the in-ptrogress DMA
+    /// transfer
     fn read_dma_circular(self, words: RXBUF) -> Result<I2sReadDmaTransfer<T, P, RX, RXBUF>, Error>
     where
         T: RegisterAccess,
@@ -381,6 +439,7 @@ where
         RXBUF: WriteBuffer<Word = u8>;
 }
 
+/// Instance of the I2S peripheral driver
 pub struct I2s<I, T, P, TX, RX>
 where
     I: Instance<T>,
@@ -452,6 +511,7 @@ where
     }
 }
 
+/// Construct a new I2S peripheral driver instance for the first I2S peripheral
 pub trait I2s0New<I, T, P, TX, RX, IP>
 where
     I: Instance<T>,
@@ -506,6 +566,7 @@ where
     }
 }
 
+/// Construct a new I2S peripheral driver instance for the second I2S peripheral
 #[cfg(any(esp32s3))]
 pub trait I2s1New<I, T, P, TX, RX, IP>
 where
@@ -562,6 +623,7 @@ where
     }
 }
 
+/// I2S TX channel
 pub struct I2sTx<T, P, TX>
 where
     T: RegisterAccess,
@@ -696,6 +758,7 @@ where
     }
 }
 
+/// I2S RX channel
 pub struct I2sRx<T, P, RX>
 where
     T: RegisterAccess,
@@ -844,7 +907,7 @@ where
 mod private {
     use fugit::HertzU32;
 
-    use super::{DataFormat, I2sRx, I2sTx, Standard};
+    use super::{DataFormat, I2sRx, I2sTx, Standard, I2S_LL_MCLK_DIVIDER_MAX};
     #[cfg(any(esp32c3, esp32s2))]
     use crate::pac::i2s::RegisterBlock;
     // on ESP32-S3 I2S1 doesn't support all features - use that to avoid using those features
@@ -1005,15 +1068,19 @@ mod private {
                     .variant(clock_settings.mclk_divider as u8)
             });
 
+            i2s.clkm_conf.modify(|_, w| {
+                w.clkm_div_a()
+                    .variant(clock_settings.denominator as u8)
+                    .clkm_div_b()
+                    .variant(clock_settings.numerator as u8)
+            });
+
             i2s.sample_rate_conf.modify(|_, w| {
                 w.tx_bck_div_num()
                     .variant(clock_settings.bclk_divider as u8)
                     .rx_bck_div_num()
                     .variant(clock_settings.bclk_divider as u8)
             });
-
-            i2s.clkm_conf
-                .modify(|_, w| w.clkm_div_b().variant(0).clkm_div_a().variant(0));
         }
 
         fn configure(&self, _standard: &Standard, data_format: &DataFormat) {
@@ -1171,6 +1238,59 @@ mod private {
     pub trait RegisterAccess: Signals + RegBlock {
         fn set_clock(&self, clock_settings: I2sClockDividers) {
             let i2s = self.register_block();
+
+            let clkm_div_x: u32;
+            let clkm_div_y: u32;
+            let clkm_div_z: u32;
+            let clkm_div_yn1: u32;
+
+            if clock_settings.denominator == 0 || clock_settings.numerator == 0 {
+                clkm_div_x = 0;
+                clkm_div_y = 0;
+                clkm_div_z = 0;
+                clkm_div_yn1 = 1;
+            } else {
+                if clock_settings.numerator > clock_settings.denominator / 2 {
+                    clkm_div_x = clock_settings
+                        .denominator
+                        .overflowing_div(
+                            clock_settings
+                                .denominator
+                                .overflowing_sub(clock_settings.numerator)
+                                .0,
+                        )
+                        .0
+                        .overflowing_sub(1)
+                        .0;
+                    clkm_div_y = clock_settings.denominator
+                        % (clock_settings
+                            .denominator
+                            .overflowing_sub(clock_settings.numerator)
+                            .0);
+                    clkm_div_z = clock_settings
+                        .denominator
+                        .overflowing_sub(clock_settings.numerator)
+                        .0;
+                    clkm_div_yn1 = 1;
+                } else {
+                    clkm_div_x = clock_settings.denominator / clock_settings.numerator - 1;
+                    clkm_div_y = clock_settings.denominator % clock_settings.numerator;
+                    clkm_div_z = clock_settings.numerator;
+                    clkm_div_yn1 = 0;
+                }
+            }
+
+            i2s.tx_clkm_div_conf.modify(|_, w| {
+                w.tx_clkm_div_x()
+                    .variant(clkm_div_x as u16)
+                    .tx_clkm_div_y()
+                    .variant(clkm_div_y as u16)
+                    .tx_clkm_div_yn1()
+                    .variant(if clkm_div_yn1 != 0 { true } else { false })
+                    .tx_clkm_div_z()
+                    .variant(clkm_div_z as u16)
+            });
+
             i2s.tx_clkm_conf.modify(|_, w| {
                 w.clk_en()
                     .set_bit()
@@ -1184,18 +1304,18 @@ mod private {
 
             i2s.tx_conf1.modify(|_, w| {
                 w.tx_bck_div_num()
-                    .variant(clock_settings.bclk_divider as u8)
+                    .variant((clock_settings.bclk_divider - 1) as u8)
             });
 
-            i2s.tx_clkm_div_conf.modify(|_, w| {
-                w.tx_clkm_div_x()
-                    .variant(0)
-                    .tx_clkm_div_y()
-                    .variant(1)
-                    .tx_clkm_div_yn1()
-                    .variant(false)
-                    .tx_clkm_div_z()
-                    .variant(0)
+            i2s.rx_clkm_div_conf.modify(|_, w| {
+                w.rx_clkm_div_x()
+                    .variant(clkm_div_x as u16)
+                    .rx_clkm_div_y()
+                    .variant(clkm_div_y as u16)
+                    .rx_clkm_div_yn1()
+                    .variant(if clkm_div_yn1 != 0 { true } else { false })
+                    .rx_clkm_div_z()
+                    .variant(clkm_div_z as u16)
             });
 
             i2s.rx_clkm_conf.modify(|_, w| {
@@ -1205,22 +1325,13 @@ mod private {
                     .variant(2) // for now fixed at 160MHz
                     .rx_clkm_div_num()
                     .variant(clock_settings.mclk_divider as u8)
+                    .mclk_sel()
+                    .variant(true)
             });
 
             i2s.rx_conf1.modify(|_, w| {
                 w.rx_bck_div_num()
-                    .variant(clock_settings.bclk_divider as u8)
-            });
-
-            i2s.rx_clkm_div_conf.modify(|_, w| {
-                w.rx_clkm_div_x()
-                    .variant(0)
-                    .rx_clkm_div_y()
-                    .variant(1)
-                    .rx_clkm_div_yn1()
-                    .variant(false)
-                    .rx_clkm_div_z()
-                    .variant(0)
+                    .variant((clock_settings.bclk_divider - 1) as u8)
             });
         }
 
@@ -1308,6 +1419,8 @@ mod private {
                     .variant(data_format.channel_bits() - 1)
                     .rx_half_sample_bits()
                     .variant(data_format.channel_bits() - 1)
+                    .rx_msb_shift()
+                    .set_bit()
             });
 
             i2s.rx_conf.modify(|_, w| {
@@ -1323,6 +1436,10 @@ mod private {
                     .clear_bit()
                     .rx_pcm_bypass()
                     .set_bit()
+                    .rx_big_endian()
+                    .clear_bit()
+                    .rx_bit_order()
+                    .clear_bit()
             });
 
             i2s.rx_tdm_ctrl.modify(|_, w| {
@@ -1692,6 +1809,8 @@ mod private {
     pub struct I2sClockDividers {
         mclk_divider: u32,
         bclk_divider: u32,
+        denominator: u32,
+        numerator: u32,
     }
 
     pub fn calculate_clock(
@@ -1700,8 +1819,10 @@ mod private {
         data_bits: u8,
         _clocks: &Clocks,
     ) -> I2sClockDividers {
-        // in esp-idf the functions looks not only different for every chip but
-        // also for TX/RX and for different modes
+        // this loosely corresponds to `i2s_std_calculate_clock` and
+        // `i2s_ll_tx_set_mclk` in esp-idf
+        //
+        // main difference is we are using fixed-point arithmetic here
 
         let mclk_multiple = 256;
         let sclk = 160_000_000; // for now it's fixed PLL_160M_CLK
@@ -1712,14 +1833,50 @@ mod private {
         let bclk = rate * channels as u32 * data_bits as u32;
         let mclk = rate * mclk_multiple;
         let bclk_divider = mclk / bclk;
-        let mclk_divider = sclk / mclk;
+        let mut mclk_divider = sclk / mclk;
 
-        // this way we won't exactly match the desired frequency - for that we need
-        // to calculate clkm div_z, div_y, div_x, div_yn1
+        let mut ma: u32;
+        let mut mb: u32;
+        let mut denominator: u32 = 0;
+        let mut numerator: u32 = 0;
+
+        let freq_diff = sclk.abs_diff(mclk * mclk_divider);
+
+        if freq_diff != 0 {
+            let decimal = freq_diff as u64 * 10000 / mclk as u64;
+
+            // Carry bit if the decimal is greater than 1.0 - 1.0 / (63.0 * 2) = 125.0 /
+            // 126.0
+            if decimal > 1250000 / 126 {
+                mclk_divider += 1;
+            } else {
+                let mut min: u32 = !0;
+
+                for a in 2..=I2S_LL_MCLK_DIVIDER_MAX {
+                    let b = (a as u64) * (freq_diff as u64 * 10000u64 / mclk as u64) + 5000;
+                    ma = ((freq_diff as u64 * 10000u64 * a as u64) / 10000) as u32;
+                    mb = (mclk as u64 * (b / 10000)) as u32;
+
+                    if ma == mb {
+                        denominator = a as u32;
+                        numerator = (b / 10000) as u32;
+                        break;
+                    }
+
+                    if mb.abs_diff(ma) < min {
+                        denominator = a as u32;
+                        numerator = b as u32;
+                        min = mb.abs_diff(ma);
+                    }
+                }
+            }
+        }
 
         I2sClockDividers {
             mclk_divider,
             bclk_divider,
+            denominator,
+            numerator,
         }
     }
 }

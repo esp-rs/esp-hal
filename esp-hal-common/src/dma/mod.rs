@@ -72,6 +72,7 @@ pub enum DmaPeripheral {
     Rmt    = 9,
 }
 
+#[derive(PartialEq, PartialOrd)]
 enum Owner {
     Cpu = 0,
     Dma = 1,
@@ -210,6 +211,8 @@ pub(crate) mod private {
         fn available(&mut self) -> usize;
 
         fn pop(&mut self, data: &mut [u8]) -> Result<usize, DmaError>;
+
+        fn drain_buffer(&mut self, dst: &mut [u8]) -> Result<usize, DmaError>;
     }
 
     pub trait RxChannel<R>
@@ -245,7 +248,7 @@ pub(crate) mod private {
 
                 let mut dw0 = &mut descriptors[descr];
 
-                dw0.set_suc_eof(true);
+                dw0.set_suc_eof(false);
                 dw0.set_owner(Owner::Dma);
                 dw0.set_size(chunk_size as u16); // align to 32 bits?
                 dw0.set_length(0); // actual size of the data!?
@@ -299,12 +302,10 @@ pub(crate) mod private {
         pub descriptors: &'a mut [u32],
         pub burst_mode: bool,
         pub rx_impl: T,
-        pub read_offset: usize,
         pub read_descr_ptr: *const u32,
         pub available: usize,
         pub last_seen_handled_descriptor_ptr: *const u32,
-        pub buffer_start: *const u8,
-        pub buffer_len: usize,
+        pub read_buffer_start: *const u8,
         pub _phantom: PhantomData<R>,
     }
 
@@ -340,12 +341,10 @@ pub(crate) mod private {
                 return Err(DmaError::BufferTooSmall);
             }
 
-            self.read_offset = 0;
             self.available = 0;
             self.read_descr_ptr = self.descriptors.as_ptr() as *const u32;
             self.last_seen_handled_descriptor_ptr = core::ptr::null();
-            self.buffer_start = data;
-            self.buffer_len = len;
+            self.read_buffer_start = data;
 
             self.rx_impl
                 .prepare_transfer(self.descriptors, circular, peri, data, len)?;
@@ -361,65 +360,47 @@ pub(crate) mod private {
         }
 
         fn available(&mut self) -> usize {
-            let last_dscr = self.rx_impl.last_in_dscr_address() as *const u32;
-            if !last_dscr.is_null()
-                && !self.last_seen_handled_descriptor_ptr.is_null()
-                && self.last_seen_handled_descriptor_ptr != last_dscr
-            {
-                let descr_address = last_dscr;
+            if self.last_seen_handled_descriptor_ptr.is_null() {
+                self.last_seen_handled_descriptor_ptr = self.descriptors.as_mut_ptr();
+                return 0;
+            }
 
-                if descr_address >= self.last_seen_handled_descriptor_ptr {
-                    let mut ptr = self.last_seen_handled_descriptor_ptr as *const u32;
+            if self.available != 0 {
+                return self.available;
+            }
 
-                    unsafe {
-                        while ptr < descr_address as *const u32 {
-                            let mut dw0 = &mut ptr.read_volatile();
-                            self.available += dw0.get_length() as usize;
-                            ptr = ptr.offset(3);
-                        }
-                    }
+            let descr_address = self.last_seen_handled_descriptor_ptr as *mut u32;
+            let mut dw0 = unsafe { &mut descr_address.read_volatile() };
+
+            if dw0.get_owner() == Owner::Cpu && dw0.get_length() != 0 {
+                let descriptor_buffer =
+                    unsafe { descr_address.offset(1).read_volatile() } as *const u8;
+                let next_descriptor =
+                    unsafe { descr_address.offset(2).read_volatile() } as *const u32;
+
+                self.read_buffer_start = descriptor_buffer;
+                self.available = dw0.get_length() as usize;
+
+                dw0.set_owner(Owner::Dma);
+                dw0.set_length(0);
+                dw0.set_suc_eof(false);
+
+                unsafe {
+                    descr_address.write_volatile(*dw0);
+                }
+
+                if !next_descriptor.is_null() {
+                    self.last_seen_handled_descriptor_ptr = next_descriptor;
                 } else {
-                    let mut ptr = self.last_seen_handled_descriptor_ptr as *const u32;
-
-                    unsafe {
-                        loop {
-                            if ptr.offset(2).read_volatile() == 0 {
-                                break;
-                            }
-
-                            let mut dw0 = &mut ptr.read_volatile();
-                            self.available += dw0.get_length() as usize;
-                            ptr = ptr.offset(3);
-                        }
-                    }
+                    self.last_seen_handled_descriptor_ptr = self.descriptors.as_ptr();
                 }
-
-                if self.available >= self.buffer_len {
-                    unsafe {
-                        let segment_len =
-                            (&mut self.read_descr_ptr.read_volatile()).get_length() as usize;
-                        self.available -= segment_len;
-                        self.read_offset = (self.read_offset + segment_len) % self.buffer_len;
-                        let next_descriptor =
-                            self.read_descr_ptr.offset(2).read_volatile() as *const u32;
-                        self.read_descr_ptr = if next_descriptor.is_null() {
-                            self.descriptors.as_ptr() as *const u32
-                        } else {
-                            next_descriptor
-                        }
-                    }
-                }
-
-                self.last_seen_handled_descriptor_ptr = descr_address;
-            } else {
-                self.last_seen_handled_descriptor_ptr = last_dscr;
             }
 
             self.available
         }
 
         fn pop(&mut self, data: &mut [u8]) -> Result<usize, super::DmaError> {
-            let avail = self.available();
+            let avail = self.available;
 
             if avail < data.len() {
                 return Err(super::DmaError::Exhausted);
@@ -427,49 +408,41 @@ pub(crate) mod private {
 
             unsafe {
                 let dst = data.as_mut_ptr();
-                let src = self.buffer_start.offset(self.read_offset as isize) as *const u8;
-                let count = usize::min(data.len(), self.buffer_len - self.read_offset);
+                let src = self.read_buffer_start;
+                let count = self.available;
                 core::ptr::copy_nonoverlapping(src, dst, count);
             }
 
-            if self.read_offset + data.len() >= self.buffer_len {
-                let remainder = (self.read_offset + data.len()) % self.buffer_len;
-                let src = self.buffer_start as *const u8;
-                unsafe {
-                    let dst = data.as_mut_ptr().offset((data.len() - remainder) as isize);
-                    core::ptr::copy_nonoverlapping(src, dst, remainder);
-                }
-            }
-
-            let mut forward = data.len();
-            loop {
-                unsafe {
-                    let next_descriptor =
-                        self.read_descr_ptr.offset(2).read_volatile() as *const u32;
-                    let segment_len =
-                        (&mut self.read_descr_ptr.read_volatile()).get_length() as usize;
-                    self.read_descr_ptr = if next_descriptor.is_null() {
-                        self.descriptors.as_ptr() as *const u32
-                    } else {
-                        next_descriptor
-                    };
-
-                    if forward <= segment_len {
-                        break;
-                    }
-
-                    forward -= segment_len;
-
-                    if forward == 0 {
-                        break;
-                    }
-                }
-            }
-
-            self.read_offset = (self.read_offset + data.len()) % self.buffer_len;
-            self.available -= data.len();
-
+            self.available = 0;
             Ok(data.len())
+        }
+
+        fn drain_buffer(&mut self, dst: &mut [u8]) -> Result<usize, DmaError> {
+            let mut len: usize = 0;
+            let mut dscr = self.descriptors.as_ptr() as *mut u32;
+            loop {
+                let mut dw0 = unsafe { &mut dscr.read_volatile() };
+                let buffer_ptr = unsafe { dscr.offset(1).read_volatile() } as *const u8;
+                let next_dscr = unsafe { dscr.offset(2).read_volatile() } as *const u8;
+                let chunk_len = dw0.get_length() as usize;
+                unsafe {
+                    core::ptr::copy_nonoverlapping(
+                        buffer_ptr,
+                        dst.as_mut_ptr().offset(len as isize),
+                        chunk_len,
+                    )
+                };
+
+                len += chunk_len;
+
+                if next_dscr.is_null() {
+                    break;
+                }
+
+                dscr = unsafe { dscr.offset(3) };
+            }
+
+            Ok(len)
         }
     }
 
