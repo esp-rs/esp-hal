@@ -2,12 +2,12 @@ use crate::pac::USB_DEVICE;
 
 pub struct UsbSerialJtag;
 
-impl core::fmt::Write for UsbSerialJtag {
-    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+impl UsbSerialJtag {
+    pub fn write_bytes(&mut self, bytes: &[u8]) {
         let reg_block = unsafe { &*USB_DEVICE::PTR };
 
         // TODO: 64 byte chunks max
-        for chunk in s.as_bytes().chunks(32) {
+        for chunk in bytes.chunks(32) {
             unsafe {
                 for &b in chunk {
                     reg_block.ep1.write(|w| w.bits(b.into()))
@@ -19,7 +19,12 @@ impl core::fmt::Write for UsbSerialJtag {
                 }
             }
         }
+    }
+}
 
-        core::fmt::Result::Ok(())
+impl core::fmt::Write for UsbSerialJtag {
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+        self.write_bytes(s.as_bytes());
+        Ok(())
     }
 }
