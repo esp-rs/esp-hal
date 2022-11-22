@@ -208,12 +208,10 @@ macro_rules! ImplSpiChannel {
                         descriptors: rx_descriptors,
                         burst_mode,
                         rx_impl: rx_impl,
-                        read_offset: 0,
                         read_descr_ptr: core::ptr::null(),
                         available: 0,
                         last_seen_handled_descriptor_ptr: core::ptr::null(),
-                        buffer_start: core::ptr::null(),
-                        buffer_len: 0,
+                        read_buffer_start: core::ptr::null(),
                         _phantom: PhantomData::default(),
                     };
 
@@ -413,12 +411,10 @@ macro_rules! ImplI2sChannel {
                         descriptors: rx_descriptors,
                         burst_mode,
                         rx_impl: rx_impl,
-                        read_offset: 0,
                         read_descr_ptr: core::ptr::null(),
                         available: 0,
                         last_seen_handled_descriptor_ptr: core::ptr::null(),
-                        buffer_start: core::ptr::null(),
-                        buffer_len: 0,
+                        read_buffer_start: core::ptr::null(),
                         _phantom: PhantomData::default(),
                     };
 
