@@ -277,7 +277,7 @@ impl Sha {
 
         unsafe {
             // Read SHA1=Text[0:4] | SHA256=Text[0:8] | SHA384=Text[0:11] |
-            // SHA512=Text[0:15] TODO: limit read len to digest size
+            // SHA512=Text[0:15]
             core::ptr::copy_nonoverlapping::<u32>(
                 self.sha.text_.as_ptr() as *const u32,
                 output.as_mut_ptr() as *mut u32,
