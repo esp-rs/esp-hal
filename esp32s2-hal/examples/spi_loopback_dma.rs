@@ -18,12 +18,12 @@
 
 use esp32s2_hal::{
     clock::ClockControl,
-    dma::{DmaPriority, DmaTransferRxTx},
+    dma::{DmaPriority},
     gpio::IO,
     pac::Peripherals,
     pdma::Dma,
     prelude::*,
-    spi::{dma::WithDmaSpi2, Spi, SpiMode},
+    spi::{Spi, SpiMode},
     timer::TimerGroup,
     Delay,
     Rtc,

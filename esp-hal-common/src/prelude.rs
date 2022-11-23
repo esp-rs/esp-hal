@@ -20,9 +20,52 @@ pub use fugit::{
 };
 pub use nb;
 
+#[cfg(any(esp32c2, esp32c3))]
+pub use crate::analog::SarAdcExt as _esp_hal_analog_SarAdcExt;
+#[cfg(any(esp32, esp32s2, esp32s3))]
+pub use crate::analog::SensExt as _esp_hal_analog_SensExt;
+#[cfg(rmt)]
+pub use crate::pulse_control::{
+    ConfiguredChannel as _esp_hal_pulse_control_ConfiguredChannel,
+    OutputChannel as _esp_hal_pulse_control_OutputChannel,
+};
 #[cfg(any(esp32, esp32s2))]
-pub use crate::analog::SensExt;
-pub use crate::{macros::*, system::SystemExt};
+pub use crate::spi::dma::WithDmaSpi3 as _esp_hal_spi_dma_WithDmaSpi3;
+pub use crate::{
+    clock::Clock as _esp_hal_clock_Clock,
+    dma::{
+        DmaTransfer as _esp_hal_dma_DmaTransfer,
+        DmaTransferRxTx as _esp_hal_dma_DmaTransferRxTx,
+    },
+    gpio::{
+        InputPin as _esp_hal_gpio_InputPin,
+        OutputPin as _esp_hal_gpio_OutputPin,
+        Pin as _esp_hal_gpio_Pin,
+    },
+    i2c::Instance as _esp_hal_i2c_Instance,
+    ledc::{
+        channel::{
+            ChannelHW as _esp_hal_ledc_channel_ChannelHW,
+            ChannelIFace as _esp_hal_ledc_channel_ChannelIFace,
+        },
+        timer::{
+            TimerHW as _esp_hal_ledc_timer_TimerHW,
+            TimerIFace as _esp_hal_ledc_timer_TimerIFace,
+        },
+    },
+    macros::*,
+    serial::{Instance as _esp_hal_serial_Instance, UartPins as _esp_hal_serial_UartPins},
+    spi::{
+        dma::WithDmaSpi2 as _esp_hal_spi_dma_WithDmaSpi2,
+        Instance as _esp_hal_spi_Instance,
+        InstanceDma as _esp_hal_spi_InstanceDma,
+    },
+    system::SystemExt as _esp_hal_system_SystemExt,
+    timer::{
+        Instance as _esp_hal_timer_Instance,
+        TimerGroupInstance as _esp_hal_timer_TimerGroupInstance,
+    },
+};
 
 /// All traits required for using the 1.0.0-alpha.x release of embedded-hal
 #[cfg(feature = "eh1")]
@@ -55,7 +98,50 @@ pub mod eh1 {
     };
     pub use nb;
 
-    pub use crate::system::SystemExt;
+    #[cfg(any(esp32c2, esp32c3))]
+    pub use crate::analog::SarAdcExt as _esp_hal_analog_SarAdcExt;
+    #[cfg(any(esp32, esp32s2, esp32s3))]
+    pub use crate::analog::SensExt as _esp_hal_analog_SensExt;
+    #[cfg(rmt)]
+    pub use crate::pulse_control::{
+        ConfiguredChannel as _esp_hal_pulse_control_ConfiguredChannel,
+        OutputChannel as _esp_hal_pulse_control_OutputChannel,
+    };
+    #[cfg(any(esp32, esp32s2))]
+    pub use crate::spi::dma::WithDmaSpi3 as _esp_hal_spi_dma_WithDmaSpi3;
+    pub use crate::{
+        clock::Clock as _esp_hal_clock_Clock,
+        dma::{
+            DmaTransfer as _esp_hal_dma_DmaTransfer,
+            DmaTransferRxTx as _esp_hal_dma_DmaTransferRxTx,
+        },
+        gpio::{
+            InputPin as _esp_hal_gpio_InputPin,
+            OutputPin as _esp_hal_gpio_OutputPin,
+            Pin as _esp_hal_gpio_Pin,
+        },
+        i2c::Instance as _esp_hal_i2c_Instance,
+        ledc::{
+            channel::{
+                ChannelHW as _esp_hal_ledc_channel_ChannelHW,
+                ChannelIFace as _esp_hal_ledc_channel_ChannelIFace,
+            },
+            timer::{
+                TimerHW as _esp_hal_ledc_timer_TimerHW,
+                TimerIFace as _esp_hal_ledc_timer_TimerIFace,
+            },
+        },
+        macros::*,
+        serial::{Instance as _esp_hal_serial_Instance, UartPins as _esp_hal_serial_UartPins},
+        spi::{
+            dma::WithDmaSpi2 as _esp_hal_spi_dma_WithDmaSpi2,
+            Instance as _esp_hal_spi_Instance,
+            InstanceDma as _esp_hal_spi_InstanceDma,
+        },
+        system::SystemExt as _esp_hal_system_SystemExt,
+        timer::{
+            Instance as _esp_hal_timer_Instance,
+            TimerGroupInstance as _esp_hal_timer_TimerGroupInstance,
+        },
+    };
 }
-
-pub use crate::{macros::*, timer::Instance};

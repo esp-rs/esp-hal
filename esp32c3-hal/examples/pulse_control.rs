@@ -11,7 +11,6 @@ use esp32c3_hal::{
     pac::Peripherals,
     prelude::*,
     pulse_control::{ClockSource, ConfiguredChannel, OutputChannel, PulseCode, RepeatMode},
-    system::SystemExt,
     timer::TimerGroup,
     PulseControl,
     Rtc,
