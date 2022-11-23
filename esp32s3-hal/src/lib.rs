@@ -23,7 +23,6 @@ pub use esp_hal_common::{
     spi,
     systimer,
     timer,
-    usb_serial_jtag,
     utils,
     Cpu,
     Delay,
