@@ -10,7 +10,6 @@ use esp32c2_hal::{
     gpio::IO,
     pac::Peripherals,
     prelude::*,
-    system::SystemExt,
     timer::TimerGroup,
     Delay,
     Rtc,

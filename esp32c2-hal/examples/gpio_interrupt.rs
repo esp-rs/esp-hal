@@ -12,7 +12,7 @@ use critical_section::Mutex;
 use esp32c2_hal::{
     clock::ClockControl,
     gpio::{Gpio9, IO},
-    gpio_types::{Event, Input, Pin, PullDown},
+    gpio_types::{Event, Input, PullDown},
     interrupt,
     pac::{self, Peripherals},
     prelude::*,

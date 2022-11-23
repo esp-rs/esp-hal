@@ -7,12 +7,10 @@
 
 use esp32c3_hal::{
     adc::{AdcConfig, Attenuation, ADC, ADC1},
-    analog::SarAdcExt,
     clock::ClockControl,
     gpio::IO,
     pac::Peripherals,
     prelude::*,
-    system::SystemExt,
     timer::TimerGroup,
     Delay,
     Rtc,

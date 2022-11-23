@@ -7,7 +7,6 @@
 
 use esp32s3_hal::{
     adc::{AdcConfig, Attenuation, ADC, ADC1},
-    analog::SensExt,
     clock::ClockControl,
     gpio::IO,
     pac::Peripherals,

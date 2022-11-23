@@ -19,6 +19,7 @@ pub use esp_hal_common::{
     pulse_control,
     serial,
     spi,
+    system,
     timer,
     utils,
     Cpu,
