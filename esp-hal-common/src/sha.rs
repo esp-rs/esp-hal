@@ -196,10 +196,10 @@ impl Sha {
     fn is_busy(&mut self) -> bool {
         match self.mode {
             // FIXME: These are marked WO, while being RO
-            ShaMode::SHA1 => unsafe { self.sha.sha1_busy.as_ptr().read() == 0 },
-            ShaMode::SHA256 => unsafe { self.sha.sha256_busy.as_ptr().read() == 0 },
-            ShaMode::SHA384 => unsafe { self.sha.sha384_busy.as_ptr().read() == 0 },
-            ShaMode::SHA512 => unsafe { self.sha.sha512_busy.as_ptr().read() == 0 },
+            ShaMode::SHA1 => unsafe { self.sha.sha1_busy.as_ptr().read() != 0 },
+            ShaMode::SHA256 => unsafe { self.sha.sha256_busy.as_ptr().read() != 0 },
+            ShaMode::SHA384 => unsafe { self.sha.sha384_busy.as_ptr().read() != 0 },
+            ShaMode::SHA512 => unsafe { self.sha.sha512_busy.as_ptr().read() != 0 },
         }
     }
 
