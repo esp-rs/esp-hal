@@ -26,15 +26,15 @@ impl<const T: u8, PWM: PwmPeripheral> Timer<T, PWM> {
     /// Apply the given timer configuration.
     ///
     /// ### Note:
-    /// The configuration will be applied immediately.
+    /// The prescalar and period configuration will be applied immediately and
+    /// before setting the [`PwmWorkingMode`].
     /// If the timer is already running you might want to call [`Timer::stop`]
-    /// and [`Timer::reset_counter`] first.
+    /// and/or [`Timer::set_counter`] first.
     ///
     /// The hardware supports writing these settings in sync with certain timer
     /// events but this HAL does not expose these for now.
     pub fn start(&mut self, timer_config: TimerClockConfig) {
         // write prescaler and period with immediate update method
-
         self.cfg0().write(|w| {
             w.timer0_prescale()
                 .variant(timer_config.prescaler)
@@ -59,9 +59,33 @@ impl<const T: u8, PWM: PwmPeripheral> Timer<T, PWM> {
         self.cfg1().write(|w| w.timer0_mod().variant(0));
     }
 
-    /// Set the timer counter to 0
-    pub fn reset_counter(&mut self) {
-        todo!()
+    /// Set the timer counter to the provided value
+    pub fn set_counter(&mut self, phase: u16) {
+        // FIXME add phase_direction to SVD, then add CounterDirection as a parameter
+        let block = unsafe { &*PWM::block() };
+        match T {
+            0 => block.timer0_sync.modify(|r, w| {
+                w.timer0_phase()
+                    .variant(phase as u32)
+                    .sw()
+                    .variant(!r.sw().bit_is_set())
+            }),
+            1 => block.timer1_sync.modify(|r, w| {
+                w.timer1_phase()
+                    .variant(phase as u32)
+                    .sw()
+                    .variant(!r.sw().bit_is_set())
+            }),
+            2 => block.timer2_sync.modify(|r, w| {
+                w.timer2_phase()
+                    .variant(phase as u32)
+                    .sw()
+                    .variant(!r.sw().bit_is_set())
+            }),
+            _ => {
+                unreachable!()
+            }
+        }
     }
 
     /// Read the counter value and counter direction of the timer
@@ -233,11 +257,12 @@ pub enum PwmWorkingMode {
 
 /// The direction the timer counter is changing
 #[derive(Debug)]
+#[repr(u8)]
 pub enum CounterDirection {
     /// The timer counter is increasing
-    Increasing,
+    Increasing = 0,
     /// The timer counter is decreasing
-    Decreasing,
+    Decreasing = 1,
 }
 
 impl From<bool> for CounterDirection {
