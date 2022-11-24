@@ -17,22 +17,15 @@ This device uses the Xtensa ISA, which is not officially supported by the Rust c
 
 ### Installing the Rust Compiler
 
-Pre-built compilers are available for most common operating systems and architectures via the [esp-rs/rust-build](https://github.com/esp-rs/rust-build) repository. This repository additionally provides scripts to simplify the installation process.
-
-For _Linux_ or _macOS_:
-
-```shell
-$ curl -LO https://raw.githubusercontent.com/esp-rs/rust-build/main/install-rust-toolchain.sh
-$ chmod +x install-rust-toolchain.sh
-$ ./install-rust-toolchain.sh
+```sh
+cargo install espup
+espup install
+# Unix
+. $HOME/export-esp.sh
+# Windows
+%USERPROFILE%\export-esp.ps1
 ```
-
-For _Windows_:
-
-```shell
-PS> Invoke-WebRequest https://raw.githubusercontent.com/esp-rs/rust-build/main/Install-RustToolchain.ps1 -OutFile Install-RustToolchain.ps1
-PS> .\Install-RustToolchain.ps1
-```
+See the [Installation chapter of The Rust on ESP Book](https://esp-rs.github.io/book/installation/installation.html#installing-rust-for-espressif-socs) for more details.
 
 ## License
 
