@@ -241,7 +241,7 @@ pub unsafe trait PwmPeripheral {
     /// Get a pointer to the peripheral RegisterBlock
     fn block() -> *const crate::pac::pwm0::RegisterBlock;
     /// Get operator GPIO mux output signal
-    fn output_signal<const O: u8, const IS_A: bool>() -> OutputSignal;
+    fn output_signal<const OP: u8, const IS_A: bool>() -> OutputSignal;
 }
 
 unsafe impl PwmPeripheral for crate::pac::PWM0 {
@@ -253,8 +253,8 @@ unsafe impl PwmPeripheral for crate::pac::PWM0 {
         Self::ptr()
     }
 
-    fn output_signal<const O: u8, const IS_A: bool>() -> OutputSignal {
-        match (O, IS_A) {
+    fn output_signal<const OP: u8, const IS_A: bool>() -> OutputSignal {
+        match (OP, IS_A) {
             (0, true) => OutputSignal::PWM0_0A,
             (1, true) => OutputSignal::PWM0_1A,
             (2, true) => OutputSignal::PWM0_1A,
@@ -275,8 +275,8 @@ unsafe impl PwmPeripheral for crate::pac::PWM1 {
         Self::ptr()
     }
 
-    fn output_signal<const O: u8, const IS_A: bool>() -> OutputSignal {
-        match (O, IS_A) {
+    fn output_signal<const OP: u8, const IS_A: bool>() -> OutputSignal {
+        match (OP, IS_A) {
             (0, true) => OutputSignal::PWM1_0A,
             (1, true) => OutputSignal::PWM1_1A,
             (2, true) => OutputSignal::PWM1_1A,

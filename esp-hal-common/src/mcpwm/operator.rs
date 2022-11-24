@@ -15,11 +15,11 @@ use crate::{
 /// * Superimposes a carrier on the PWM signal, if configured to do so. (Not yet
 ///   implemented)
 /// * Handles response under fault conditions. (Not yet implemented)
-pub struct Operator<const O: u8, PWM> {
+pub struct Operator<const OP: u8, PWM> {
     phantom: PhantomData<PWM>,
 }
 
-impl<const O: u8, PWM: PwmPeripheral> Operator<O, PWM> {
+impl<const OP: u8, PWM: PwmPeripheral> Operator<OP, PWM> {
     pub(super) fn new() -> Self {
         // TODO maybe set timersel to 3 to disable?
 
@@ -32,13 +32,13 @@ impl<const O: u8, PWM: PwmPeripheral> Operator<O, PWM> {
     ///
     /// ### Note:
     /// By default TIMER0 is used
-    pub fn set_timer<const T: u8>(&mut self, timer: &Timer<T, PWM>) {
+    pub fn set_timer<const TIM: u8>(&mut self, timer: &Timer<TIM, PWM>) {
         let _ = timer;
         let block = unsafe { &*PWM::block() };
-        block.operator_timersel.modify(|_, w| match O {
-            0 => w.operator0_timersel().variant(T),
-            1 => w.operator1_timersel().variant(T),
-            2 => w.operator2_timersel().variant(T),
+        block.operator_timersel.modify(|_, w| match OP {
+            0 => w.operator0_timersel().variant(TIM),
+            1 => w.operator1_timersel().variant(TIM),
+            2 => w.operator2_timersel().variant(TIM),
             _ => {
                 unreachable!()
             }
@@ -50,7 +50,7 @@ impl<const O: u8, PWM: PwmPeripheral> Operator<O, PWM> {
         self,
         pin: Pin,
         config: PwmPinConfig<true>,
-    ) -> PwmPin<Pin, PWM, O, true> {
+    ) -> PwmPin<Pin, PWM, OP, true> {
         PwmPin::new(pin, config)
     }
 
@@ -59,7 +59,7 @@ impl<const O: u8, PWM: PwmPeripheral> Operator<O, PWM> {
         self,
         pin: Pin,
         config: PwmPinConfig<false>,
-    ) -> PwmPin<Pin, PWM, O, false> {
+    ) -> PwmPin<Pin, PWM, OP, false> {
         PwmPin::new(pin, config)
     }
 
@@ -70,7 +70,7 @@ impl<const O: u8, PWM: PwmPeripheral> Operator<O, PWM> {
         config_a: PwmPinConfig<true>,
         pin_b: PinB,
         config_b: PwmPinConfig<false>,
-    ) -> (PwmPin<PinA, PWM, O, true>, PwmPin<PinB, PWM, O, false>) {
+    ) -> (PwmPin<PinA, PWM, OP, true>, PwmPin<PinB, PWM, OP, false>) {
         (PwmPin::new(pin_a, config_a), PwmPin::new(pin_b, config_b))
     }
 }
@@ -104,14 +104,14 @@ impl<const IS_A: bool> PwmPinConfig<IS_A> {
 }
 
 /// A pin driven by an MCPWM operator
-pub struct PwmPin<Pin, PWM, const O: u8, const IS_A: bool> {
+pub struct PwmPin<Pin, PWM, const OP: u8, const IS_A: bool> {
     _pin: Pin,
     phantom: PhantomData<PWM>,
 }
 
-impl<Pin: OutputPin, PWM: PwmPeripheral, const O: u8, const IS_A: bool> PwmPin<Pin, PWM, O, IS_A> {
+impl<Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<Pin, PWM, OP, IS_A> {
     fn new(mut pin: Pin, config: PwmPinConfig<IS_A>) -> Self {
-        let output_signal = PWM::output_signal::<O, IS_A>();
+        let output_signal = PWM::output_signal::<OP, IS_A>();
         pin.enable_output(true)
             .connect_peripheral_to_output(output_signal);
         let mut pin = PwmPin {
@@ -134,7 +134,7 @@ impl<Pin: OutputPin, PWM: PwmPeripheral, const O: u8, const IS_A: bool> PwmPin<P
         // SAFETY:
         // `bits` is a valid bit pattern
         unsafe {
-            match (O, IS_A) {
+            match (OP, IS_A) {
                 (0, true) => block.gen0_a.write(|w| w.bits(bits)),
                 (1, true) => block.gen1_a.write(|w| w.bits(bits)),
                 (2, true) => block.gen2_a.write(|w| w.bits(bits)),
@@ -151,7 +151,7 @@ impl<Pin: OutputPin, PWM: PwmPeripheral, const O: u8, const IS_A: bool> PwmPin<P
     pub fn set_update_method(&mut self, update_method: PwmUpdateMethod) {
         let block = unsafe { &*PWM::block() };
         let bits = update_method.0;
-        match (O, IS_A) {
+        match (OP, IS_A) {
             (0, true) => block
                 .gen0_stmp_cfg
                 .modify(|_, w| w.gen0_a_upmethod().variant(bits)),
@@ -181,7 +181,7 @@ impl<Pin: OutputPin, PWM: PwmPeripheral, const O: u8, const IS_A: bool> PwmPin<P
     pub fn set_update_method(&mut self, update_method: PwmUpdateMethod) {
         let block = unsafe { &*PWM::block() };
         let bits = update_method.0;
-        match (O, IS_A) {
+        match (OP, IS_A) {
             (0, true) => block
                 .cmpr0_cfg
                 .modify(|_, w| w.cmpr0_a_upmethod().variant(bits)),
@@ -212,7 +212,7 @@ impl<Pin: OutputPin, PWM: PwmPeripheral, const O: u8, const IS_A: bool> PwmPin<P
     #[cfg(esp32)]
     pub fn set_timestamp(&mut self, value: u16) {
         let block = unsafe { &*PWM::block() };
-        match (O, IS_A) {
+        match (OP, IS_A) {
             (0, true) => block.gen0_tstmp_a.write(|w| w.gen0_a().variant(value)),
             (1, true) => block.gen1_tstmp_a.write(|w| w.gen1_a().variant(value)),
             (2, true) => block.gen2_tstmp_a.write(|w| w.gen2_a().variant(value)),
@@ -231,7 +231,7 @@ impl<Pin: OutputPin, PWM: PwmPeripheral, const O: u8, const IS_A: bool> PwmPin<P
     #[cfg(esp32s3)]
     pub fn set_timestamp(&mut self, value: u16) {
         let block = unsafe { &*PWM::block() };
-        match (O, IS_A) {
+        match (OP, IS_A) {
             (0, true) => block.cmpr0_value0.write(|w| w.cmpr0_a().variant(value)),
             (1, true) => block.cmpr1_value0.write(|w| w.cmpr1_a().variant(value)),
             (2, true) => block.cmpr2_value0.write(|w| w.cmpr2_a().variant(value)),

@@ -12,11 +12,11 @@ use crate::{
 /// Every timer of a particular [`MCPWM`](super::MCPWM) peripheral can be used
 /// as a timing reference for every
 /// [`Operator`](super::operator::Operator) of that peripheral
-pub struct Timer<const T: u8, PWM> {
+pub struct Timer<const TIM: u8, PWM> {
     pub(super) phantom: PhantomData<PWM>,
 }
 
-impl<const T: u8, PWM: PwmPeripheral> Timer<T, PWM> {
+impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
     pub(super) fn new() -> Self {
         Timer {
             phantom: PhantomData,
@@ -63,7 +63,7 @@ impl<const T: u8, PWM: PwmPeripheral> Timer<T, PWM> {
     pub fn set_counter(&mut self, phase: u16) {
         // FIXME add phase_direction to SVD, then add CounterDirection as a parameter
         let block = unsafe { &*PWM::block() };
-        match T {
+        match TIM {
             0 => block.timer0_sync.modify(|r, w| {
                 w.timer0_phase()
                     .variant(phase as u32)
@@ -92,7 +92,7 @@ impl<const T: u8, PWM: PwmPeripheral> Timer<T, PWM> {
     pub fn status(&self) -> (u16, CounterDirection) {
         let block = unsafe { &*PWM::block() };
 
-        match T {
+        match TIM {
             0 => {
                 let reg = block.timer0_status.read();
                 (
@@ -128,7 +128,7 @@ impl<const T: u8, PWM: PwmPeripheral> Timer<T, PWM> {
         // SAFETY:
         // The CFG0 registers are identical for all timers so we can pretend they're
         // TIMER0_CFG0
-        match T {
+        match TIM {
             0 => &block.timer0_cfg0,
             1 => unsafe { &*(&block.timer1_cfg0 as *const _ as *const _) },
             2 => unsafe { &*(&block.timer2_cfg0 as *const _ as *const _) },
@@ -145,7 +145,7 @@ impl<const T: u8, PWM: PwmPeripheral> Timer<T, PWM> {
         // SAFETY:
         // The CFG1 registers are identical for all timers so we can pretend they're
         // TIMER0_CFG1
-        match T {
+        match TIM {
             0 => &block.timer0_cfg1,
             1 => unsafe { &*(&block.timer1_cfg1 as *const _ as *const _) },
             2 => unsafe { &*(&block.timer2_cfg1 as *const _ as *const _) },
