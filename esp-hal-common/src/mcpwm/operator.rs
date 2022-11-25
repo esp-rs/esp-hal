@@ -21,8 +21,12 @@ pub struct Operator<const OP: u8, PWM> {
 
 impl<const OP: u8, PWM: PwmPeripheral> Operator<OP, PWM> {
     pub(super) fn new() -> Self {
-        // TODO maybe set timersel to 3 to disable?
-
+        // Side note:
+        // It would have been nice to deselect any timer reference on peripheral
+        // initialization.
+        // However experimentation (ESP32-S3) showed that writing `3` to timersel
+        // will not disable the timer reference but instead act as though `2` was
+        // written.
         Operator {
             phantom: PhantomData,
         }
