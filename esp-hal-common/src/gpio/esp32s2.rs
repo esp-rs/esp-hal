@@ -1,9 +1,81 @@
+use paste::paste;
+
+use crate::{
+    gpio::PhantomData,
+    pac::GPIO,
+    AlternateFunction,
+    Bank0GpioRegisterAccess,
+    Bank1GpioRegisterAccess,
+    GpioPin,
+    InputOutputAnalogPinType,
+    InputOutputPinType,
+    Unknown,
+};
+
 pub type OutputSignalType = u16;
 pub const OUTPUT_SIGNAL_MAX: u16 = 256;
 pub const INPUT_SIGNAL_MAX: u16 = 204;
 
 pub const ONE_INPUT: u8 = 0x38;
 pub const ZERO_INPUT: u8 = 0x3c;
+
+pub(crate) const GPIO_FUNCTION: AlternateFunction = AlternateFunction::Function1;
+
+pub(crate) const fn get_io_mux_reg(gpio_num: u8) -> &'static crate::pac::io_mux::GPIO0 {
+    unsafe {
+        let iomux = &*crate::pac::IO_MUX::PTR;
+
+        match gpio_num {
+            0 => core::mem::transmute(&(iomux.gpio0)),
+            1 => core::mem::transmute(&(iomux.gpio1)),
+            2 => core::mem::transmute(&(iomux.gpio2)),
+            3 => core::mem::transmute(&(iomux.gpio3)),
+            4 => core::mem::transmute(&(iomux.gpio4)),
+            5 => core::mem::transmute(&(iomux.gpio5)),
+            6 => core::mem::transmute(&(iomux.gpio6)),
+            7 => core::mem::transmute(&(iomux.gpio7)),
+            8 => core::mem::transmute(&(iomux.gpio8)),
+            9 => core::mem::transmute(&(iomux.gpio9)),
+            10 => core::mem::transmute(&(iomux.gpio10)),
+            11 => core::mem::transmute(&(iomux.gpio11)),
+            12 => core::mem::transmute(&(iomux.gpio12)),
+            13 => core::mem::transmute(&(iomux.gpio13)),
+            14 => core::mem::transmute(&(iomux.gpio14)),
+            15 => core::mem::transmute(&(iomux.gpio15)),
+            16 => core::mem::transmute(&(iomux.gpio16)),
+            17 => core::mem::transmute(&(iomux.gpio17)),
+            18 => core::mem::transmute(&(iomux.gpio18)),
+            19 => core::mem::transmute(&(iomux.gpio19)),
+            20 => core::mem::transmute(&(iomux.gpio20)),
+            21 => core::mem::transmute(&(iomux.gpio21)),
+            26 => core::mem::transmute(&(iomux.gpio26)),
+            27 => core::mem::transmute(&(iomux.gpio27)),
+            32 => core::mem::transmute(&(iomux.gpio32)),
+            33 => core::mem::transmute(&(iomux.gpio33)),
+            34 => core::mem::transmute(&(iomux.gpio34)),
+            35 => core::mem::transmute(&(iomux.gpio35)),
+            36 => core::mem::transmute(&(iomux.gpio36)),
+            37 => core::mem::transmute(&(iomux.gpio37)),
+            38 => core::mem::transmute(&(iomux.gpio38)),
+            39 => core::mem::transmute(&(iomux.gpio39)),
+            40 => core::mem::transmute(&(iomux.gpio40)),
+            41 => core::mem::transmute(&(iomux.gpio41)),
+            42 => core::mem::transmute(&(iomux.gpio42)),
+            43 => core::mem::transmute(&(iomux.gpio43)),
+            44 => core::mem::transmute(&(iomux.gpio44)),
+            45 => core::mem::transmute(&(iomux.gpio45)),
+            46 => core::mem::transmute(&(iomux.gpio46)),
+            _ => panic!(),
+        }
+    }
+}
+
+pub(crate) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
+    int_enable as u8
+        | ((nmi_enable as u8) << 1)
+        | (int_enable as u8) << 2
+        | ((nmi_enable as u8) << 3)
+}
 
 /// Peripheral input signals for the GPIO mux
 #[allow(non_camel_case_types)]
@@ -168,3 +240,129 @@ pub enum OutputSignal {
     CLK_I2S          = 251,
     GPIO             = 256,
 }
+
+crate::gpio::gpio! {
+    (0, 0, InputOutputAnalog)
+    (1, 0, InputOutputAnalog)
+    (2, 0, InputOutputAnalog)
+    (3, 0, InputOutputAnalog)
+    (4, 0, InputOutputAnalog)
+    (5, 0, InputOutputAnalog)
+    (6, 0, InputOutputAnalog)
+    (7, 0, InputOutputAnalog)
+    (8, 0, InputOutputAnalog)
+    (9, 0, InputOutputAnalog)
+    (10, 0, InputOutputAnalog)
+    (11, 0, InputOutputAnalog)
+    (12, 0, InputOutputAnalog)
+    (13, 0, InputOutputAnalog)
+    (14, 0, InputOutputAnalog)
+    (15, 0, InputOutputAnalog)
+    (16, 0, InputOutputAnalog)
+    (17, 0, InputOutputAnalog)
+    (18, 0, InputOutputAnalog)
+    (19, 0, InputOutputAnalog)
+    (20, 0, InputOutputAnalog)
+    (21, 0, InputOutputAnalog)
+
+    (26, 0, InputOutput)
+    (27, 0, InputOutput)
+    (28, 0, InputOutput)
+    (29, 0, InputOutput)
+    (30, 0, InputOutput)
+    (31, 0, InputOutput)
+    (32, 1, InputOutput)
+    (33, 1, InputOutput)
+    (34, 1, InputOutput)
+    (35, 1, InputOutput)
+    (36, 1, InputOutput)
+    (37, 1, InputOutput)
+    (38, 1, InputOutput)
+    (39, 1, InputOutput)
+    (40, 1, InputOutput)
+    (41, 1, InputOutput)
+    (42, 1, InputOutput)
+    (43, 1, InputOutput)
+    (44, 1, InputOutput)
+    (45, 1, InputOutput)
+    (46, 1, InputOutput)
+}
+
+// on ESP32-S2 the touch_pad registers are indexed and the fields are weirdly
+// named
+macro_rules! impl_get_rtc_pad {
+    ($pad_name:ident) => {
+        paste!{
+            pub(crate) fn [<esp32s2_get_rtc_pad_ $pad_name >]() -> &'static crate::pac::rtcio::[< $pad_name:upper >] {
+                use crate::pac::RTCIO;
+                let rtcio = unsafe{ &*RTCIO::ptr() };
+                &rtcio.$pad_name
+            }
+        }
+    };
+}
+
+macro_rules! impl_get_rtc_pad_indexed {
+    ($pad_name:ident, $idx:literal) => {
+        paste!{
+            pub(crate) fn [<esp32s2_get_rtc_pad_ $pad_name $idx>]() -> &'static crate::pac::rtcio::[< $pad_name:upper >] {
+                use crate::pac::RTCIO;
+                let rtcio = unsafe{ &*RTCIO::ptr() };
+                &rtcio.$pad_name[$idx]
+            }
+        }
+    };
+}
+
+impl_get_rtc_pad_indexed!(touch_pad, 0);
+impl_get_rtc_pad_indexed!(touch_pad, 1);
+impl_get_rtc_pad_indexed!(touch_pad, 2);
+impl_get_rtc_pad_indexed!(touch_pad, 3);
+impl_get_rtc_pad_indexed!(touch_pad, 4);
+impl_get_rtc_pad_indexed!(touch_pad, 5);
+impl_get_rtc_pad_indexed!(touch_pad, 6);
+impl_get_rtc_pad_indexed!(touch_pad, 7);
+impl_get_rtc_pad_indexed!(touch_pad, 8);
+impl_get_rtc_pad_indexed!(touch_pad, 9);
+impl_get_rtc_pad_indexed!(touch_pad, 10);
+impl_get_rtc_pad_indexed!(touch_pad, 11);
+impl_get_rtc_pad_indexed!(touch_pad, 12);
+impl_get_rtc_pad_indexed!(touch_pad, 13);
+impl_get_rtc_pad_indexed!(touch_pad, 14);
+impl_get_rtc_pad!(xtal_32p_pad);
+impl_get_rtc_pad!(xtal_32n_pad);
+impl_get_rtc_pad!(pad_dac1);
+impl_get_rtc_pad!(pad_dac2);
+impl_get_rtc_pad!(rtc_pad19);
+impl_get_rtc_pad!(rtc_pad20);
+impl_get_rtc_pad!(rtc_pad21);
+
+crate::gpio::analog! {
+    ( 0,  0,  touch_pad0,     touch_pad0_mux_sel,  touch_pad0_fun_sel,  touch_pad0_fun_ie,  touch_pad0_rue,  touch_pad0_rde)
+    ( 1,  1,  touch_pad1,     touch_pad0_mux_sel,  touch_pad0_fun_sel,  touch_pad0_fun_ie,  touch_pad0_rue,  touch_pad0_rde)
+    ( 2,  2,  touch_pad2,     touch_pad0_mux_sel,  touch_pad0_fun_sel,  touch_pad0_fun_ie,  touch_pad0_rue,  touch_pad0_rde)
+    ( 3,  3,  touch_pad3,     touch_pad0_mux_sel,  touch_pad0_fun_sel,  touch_pad0_fun_ie,  touch_pad0_rue,  touch_pad0_rde)
+    ( 4,  4,  touch_pad4,     touch_pad0_mux_sel,  touch_pad0_fun_sel,  touch_pad0_fun_ie,  touch_pad0_rue,  touch_pad0_rde)
+    ( 5,  5,  touch_pad5,     touch_pad0_mux_sel,  touch_pad0_fun_sel,  touch_pad0_fun_ie,  touch_pad0_rue,  touch_pad0_rde)
+    ( 6,  6,  touch_pad6,     touch_pad0_mux_sel,  touch_pad0_fun_sel,  touch_pad0_fun_ie,  touch_pad0_rue,  touch_pad0_rde)
+    ( 7,  7,  touch_pad7,     touch_pad0_mux_sel,  touch_pad0_fun_sel,  touch_pad0_fun_ie,  touch_pad0_rue,  touch_pad0_rde)
+    ( 8,  8,  touch_pad8,     touch_pad0_mux_sel,  touch_pad0_fun_sel,  touch_pad0_fun_ie,  touch_pad0_rue,  touch_pad0_rde)
+    ( 9,  9,  touch_pad9,     touch_pad0_mux_sel,  touch_pad0_fun_sel,  touch_pad0_fun_ie,  touch_pad0_rue,  touch_pad0_rde)
+    (10, 10,  touch_pad10,    touch_pad0_mux_sel,  touch_pad0_fun_sel,  touch_pad0_fun_ie,  touch_pad0_rue,  touch_pad0_rde)
+    (11, 11,  touch_pad11,    touch_pad0_mux_sel,  touch_pad0_fun_sel,  touch_pad0_fun_ie,  touch_pad0_rue,  touch_pad0_rde)
+    (12, 12,  touch_pad12,    touch_pad0_mux_sel,  touch_pad0_fun_sel,  touch_pad0_fun_ie,  touch_pad0_rue,  touch_pad0_rde)
+    (13, 13,  touch_pad13,    touch_pad0_mux_sel,  touch_pad0_fun_sel,  touch_pad0_fun_ie,  touch_pad0_rue,  touch_pad0_rde)
+    (14, 14,  touch_pad14,    touch_pad0_mux_sel,  touch_pad0_fun_sel,  touch_pad0_fun_ie,  touch_pad0_rue,  touch_pad0_rde)
+    (15, 15,  xtal_32p_pad,   x32p_mux_sel,        x32p_fun_sel,        x32p_fun_ie,        x32p_rue,        x32p_rde)
+    (16, 16,  xtal_32n_pad,   x32n_mux_sel,        x32n_fun_sel,        x32n_fun_ie,        x32n_rue,        x32n_rde)
+    (17, 17,  pad_dac1,       pdac1_mux_sel,       pdac1_fun_sel,       pdac1_fun_ie,       pdac1_rue,       pdac1_rde)
+    (18, 18,  pad_dac2,       pdac2_mux_sel,       pdac2_fun_sel,       pdac2_fun_ie,       pdac2_rue,       pdac2_rde)
+    (19, 19,  rtc_pad19,      mux_sel,             fun_sel,             fun_ie,             rue,             rde)
+    (20, 20,  rtc_pad20,      mux_sel,             fun_sel,             fun_ie,             rue,             rde)
+    (21, 21,  rtc_pad21,      mux_sel,             fun_sel,             fun_ie,             rue,             rde)
+}
+
+// implement marker traits on USB pins
+impl<T> crate::otg_fs::UsbSel for Gpio18<T> {}
+impl<T> crate::otg_fs::UsbDp for Gpio19<T> {}
+impl<T> crate::otg_fs::UsbDm for Gpio20<T> {}

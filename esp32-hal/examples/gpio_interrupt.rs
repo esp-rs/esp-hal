@@ -11,8 +11,7 @@ use core::{borrow::BorrowMut, cell::RefCell};
 use critical_section::Mutex;
 use esp32_hal::{
     clock::ClockControl,
-    gpio::{Gpio0, IO},
-    gpio_types::{Event, Input, PullDown},
+    gpio::{Gpio0, IO, Event, Input, PullDown,},
     interrupt,
     macros::ram,
     pac::{self, Peripherals},

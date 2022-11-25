@@ -11,8 +11,7 @@ use core::cell::RefCell;
 use critical_section::Mutex;
 use esp32c2_hal::{
     clock::ClockControl,
-    gpio::{Gpio9, IO},
-    gpio_types::{Event, Input, PullDown},
+    gpio::{Gpio9, IO, Event, Input, PullDown},
     interrupt,
     pac::{self, Peripherals},
     prelude::*,

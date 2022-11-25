@@ -7,10 +7,11 @@ pub use embedded_hal as ehal;
 pub use esp_hal_common::embassy;
 #[doc(inline)]
 pub use esp_hal_common::{
+    analog::adc::implementation as adc,
     clock,
     dma::{self, gdma},
     efuse,
-    gpio as gpio_types,
+    gpio,
     i2c,
     interrupt,
     ledc,
@@ -32,9 +33,6 @@ pub use esp_hal_common::{
 };
 
 pub use self::gpio::IO;
-
-pub mod adc;
-pub mod gpio;
 
 /// Common module for analog functions
 pub mod analog {
@@ -280,10 +278,6 @@ pub fn mp_hook() -> bool {
 
         false
     }
-}
-
-fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
-    int_enable as u8 | ((nmi_enable as u8) << 1)
 }
 
 #[no_mangle]
