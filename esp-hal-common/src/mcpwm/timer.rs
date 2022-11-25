@@ -29,7 +29,9 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
     /// The prescalar and period configuration will be applied immediately and
     /// before setting the [`PwmWorkingMode`].
     /// If the timer is already running you might want to call [`Timer::stop`]
-    /// and/or [`Timer::set_counter`] first.
+    /// and/or [`Timer::set_counter`] first
+    /// (if the new period is larger than the current counter value this will
+    /// cause weird behavior).
     ///
     /// The hardware supports writing these settings in sync with certain timer
     /// events but this HAL does not expose these for now.
@@ -60,28 +62,26 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
     }
 
     /// Set the timer counter to the provided value
-    pub fn set_counter(&mut self, phase: u16) {
-        // FIXME add phase_direction to SVD, then add CounterDirection as a parameter
+    pub fn set_counter(&mut self, phase: u16, direction: CounterDirection) {
         let block = unsafe { &*PWM::block() };
+
+        // FIXME replace with safe API after https://github.com/esp-rs/esp-pacs/issues/57
         match TIM {
-            0 => block.timer0_sync.modify(|r, w| {
-                w.timer0_phase()
-                    .variant(phase as u32)
-                    .sw()
-                    .variant(!r.sw().bit_is_set())
-            }),
-            1 => block.timer1_sync.modify(|r, w| {
-                w.timer1_phase()
-                    .variant(phase as u32)
-                    .sw()
-                    .variant(!r.sw().bit_is_set())
-            }),
-            2 => block.timer2_sync.modify(|r, w| {
-                w.timer2_phase()
-                    .variant(phase as u32)
-                    .sw()
-                    .variant(!r.sw().bit_is_set())
-            }),
+            0 => {
+                let sw = block.timer0_sync.read().sw().bit_is_set();
+                let bits = ((direction as u32) << 20) + ((phase as u32) << 4) + ((!sw as u32) << 1);
+                unsafe { block.timer0_sync.write(|w| w.bits(bits)) }
+            }
+            1 => {
+                let sw = block.timer1_sync.read().sw().bit_is_set();
+                let bits = ((direction as u32) << 20) + ((phase as u32) << 4) + ((!sw as u32) << 1);
+                unsafe { block.timer1_sync.write(|w| w.bits(bits)) }
+            }
+            2 => {
+                let sw = block.timer2_sync.read().sw().bit_is_set();
+                let bits = ((direction as u32) << 20) + ((phase as u32) << 4) + ((!sw as u32) << 1);
+                unsafe { block.timer2_sync.write(|w| w.bits(bits)) }
+            }
             _ => {
                 unreachable!()
             }
