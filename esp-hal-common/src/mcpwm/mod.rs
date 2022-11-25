@@ -57,7 +57,7 @@
 
 #![deny(missing_docs)]
 
-use core::marker::PhantomData;
+use core::{marker::PhantomData, ops::Deref};
 
 use fugit::HertzU32;
 use operator::Operator;
@@ -103,13 +103,12 @@ impl<PWM: PwmPeripheral> MCPWM<PWM> {
 
         PWM::enable(system);
 
-        let block = unsafe { &*PWM::block() };
         // set prescaler
-        block
+        peripheral
             .clk_cfg
             .write(|w| w.clk_prescale().variant(peripheral_clock.prescaler));
         // enable clock
-        block.clk.write(|w| w.en().set_bit());
+        peripheral.clk.write(|w| w.en().set_bit());
 
         MCPWM {
             timer0: Timer::new(),
@@ -235,7 +234,7 @@ impl<'a> PeripheralClockConfig<'a> {
 pub struct FrequencyError;
 
 /// A MCPWM peripheral
-pub unsafe trait PwmPeripheral {
+pub unsafe trait PwmPeripheral: Deref<Target = crate::pac::pwm0::RegisterBlock> {
     /// Enable peripheral
     fn enable(system: &mut PeripheralClockControl);
     /// Get a pointer to the peripheral RegisterBlock

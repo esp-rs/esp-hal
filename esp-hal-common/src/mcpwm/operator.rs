@@ -34,6 +34,8 @@ impl<const OP: u8, PWM: PwmPeripheral> Operator<OP, PWM> {
     /// By default TIMER0 is used
     pub fn set_timer<const TIM: u8>(&mut self, timer: &Timer<TIM, PWM>) {
         let _ = timer;
+        // SAFETY:
+        // We only write to our OPERATORx_TIMERSEL register
         let block = unsafe { &*PWM::block() };
         block.operator_timersel.modify(|_, w| match OP {
             0 => w.operator0_timersel().variant(TIM),
@@ -109,7 +111,9 @@ pub struct PwmPin<Pin, PWM, const OP: u8, const IS_A: bool> {
     phantom: PhantomData<PWM>,
 }
 
-impl<Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<Pin, PWM, OP, IS_A> {
+impl<Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
+    PwmPin<Pin, PWM, OP, IS_A>
+{
     fn new(mut pin: Pin, config: PwmPinConfig<IS_A>) -> Self {
         let output_signal = PWM::output_signal::<OP, IS_A>();
         pin.enable_output(true)
@@ -126,7 +130,7 @@ impl<Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<
     /// Configure what actions should be taken on timing events
     pub fn set_actions(&mut self, value: PwmActions<IS_A>) {
         // SAFETY:
-        // We only grant access to our GENx_x register with the lifetime of &mut self
+        // We only write to our GENx_x register
         let block = unsafe { &*PWM::block() };
 
         let bits = value.0;
@@ -149,6 +153,8 @@ impl<Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<
     /// Set how a new timestamp syncs with the timer
     #[cfg(esp32)]
     pub fn set_update_method(&mut self, update_method: PwmUpdateMethod) {
+        // SAFETY:
+        // We only write to our GENx_x_UPMETHOD register
         let block = unsafe { &*PWM::block() };
         let bits = update_method.0;
         match (OP, IS_A) {
@@ -179,6 +185,8 @@ impl<Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<
     /// Set how a new timestamp syncs with the timer
     #[cfg(esp32s3)]
     pub fn set_update_method(&mut self, update_method: PwmUpdateMethod) {
+        // SAFETY:
+        // We only write to our GENx_x_UPMETHOD register
         let block = unsafe { &*PWM::block() };
         let bits = update_method.0;
         match (OP, IS_A) {
@@ -211,6 +219,8 @@ impl<Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<
     /// [`PwmUpdateMethod`].
     #[cfg(esp32)]
     pub fn set_timestamp(&mut self, value: u16) {
+        // SAFETY:
+        // We only write to our GENx_TSTMP_x register
         let block = unsafe { &*PWM::block() };
         match (OP, IS_A) {
             (0, true) => block.gen0_tstmp_a.write(|w| w.gen0_a().variant(value)),
@@ -230,6 +240,8 @@ impl<Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<
     /// [`PwmUpdateMethod`].
     #[cfg(esp32s3)]
     pub fn set_timestamp(&mut self, value: u16) {
+        // SAFETY:
+        // We only write to our GENx_TSTMP_x register
         let block = unsafe { &*PWM::block() };
         match (OP, IS_A) {
             (0, true) => block.cmpr0_value0.write(|w| w.cmpr0_a().variant(value)),

@@ -63,6 +63,8 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
 
     /// Set the timer counter to the provided value
     pub fn set_counter(&mut self, phase: u16, direction: CounterDirection) {
+        // SAFETY:
+        // We only write to our TIMERx_SYNC register
         let block = unsafe { &*PWM::block() };
 
         // FIXME replace with safe API after https://github.com/esp-rs/esp-pacs/issues/57
@@ -90,6 +92,8 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
 
     /// Read the counter value and counter direction of the timer
     pub fn status(&self) -> (u16, CounterDirection) {
+        // SAFETY:
+        // We only read from our TIMERx_STATUS register
         let block = unsafe { &*PWM::block() };
 
         match TIM {
