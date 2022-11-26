@@ -1311,4 +1311,5 @@ pub use impl_interrupt_status_register_access;
 pub use impl_output;
 pub use impl_output_wrap;
 
-use self::types::{InputSignal, OutputSignal, ONE_INPUT, ZERO_INPUT};
+pub use self::types::{InputSignal, OutputSignal};
+use self::types::{ONE_INPUT, ZERO_INPUT};
