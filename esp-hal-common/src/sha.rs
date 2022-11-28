@@ -17,6 +17,13 @@ use crate::pac::SHA;
 
 const ALIGN_SIZE: usize = core::mem::size_of::<u32>();
 
+// ESP32 does reversed order 
+#[cfg(esp32)]
+const U32_FROM_BYTES: fn([u8; 4]) -> u32 = u32::from_be_bytes;
+
+#[cfg(not(esp32))]
+const U32_FROM_BYTES: fn([u8; 4]) -> u32 = u32::from_ne_bytes; 
+
 // The alignment helper helps you write to registers that only accepts u32 using
 // regular u8s (bytes) It keeps a write buffer of 4 u8 (could in theory be 3 but
 // less convient) And if the incoming data is not convertable to u32 (i.e. not a
@@ -48,7 +55,7 @@ impl AlignmentHelper {
                 self.buf[i] = 0;
             }
 
-            dst.write_volatile(u32::from_ne_bytes(self.buf));
+            dst.write_volatile(U32_FROM_BYTES(self.buf));
         }
 
         let flushed = self.buf_fill;
@@ -67,7 +74,7 @@ impl AlignmentHelper {
                 self.buf[i] = val;
             }
 
-            dst.write_volatile(u32::from_ne_bytes(self.buf));
+            dst.write_volatile(U32_FROM_BYTES(self.buf));
             cursor = 1;
 
             self.buf_fill = 0;
@@ -107,7 +114,7 @@ impl AlignmentHelper {
                 }
             }
 
-            dst.write_volatile(u32::from_ne_bytes(self.buf));
+            dst.write_volatile(U32_FROM_BYTES(self.buf));
             cursor += 1;
 
             self.buf_fill = 0;
@@ -129,7 +136,7 @@ impl AlignmentHelper {
             // to_write.as_ptr() as *const u32, to_write.len()/alignment);
             for (i, v) in to_write.chunks_exact(ALIGN_SIZE).enumerate() {
                 dst.add(i)
-                    .write_volatile(u32::from_ne_bytes(v.try_into().unwrap()).to_be());
+                    .write_volatile(U32_FROM_BYTES(v.try_into().unwrap()).to_be());
             }
         }
 
@@ -458,7 +465,10 @@ impl Sha {
                 // actual call to memcpy, why this makes a difference when
                 // memcpy does works in other places, I don't know
                 let end_ptr = m_cursor_ptr.add((chunk_len / ALIGN_SIZE) - 1);
+                #[cfg(not(esp32))]
                 end_ptr.write_volatile(length.to_be() as u32);
+                #[cfg(esp32)]
+                end_ptr.write_volatile(length.to_le() as u32);
             }
 
             self.process_buffer();
@@ -483,12 +493,19 @@ impl Sha {
         }
 
         unsafe {
-            core::ptr::copy_nonoverlapping::<u32>(
-                self.output_ptr(),
-                output.as_mut_ptr() as *mut u32,
-                core::cmp::min(self.digest_length(), output.len()) / ALIGN_SIZE,
-            );
+
+            let digest_ptr = self.output_ptr();
+            let out_ptr = output.as_mut_ptr() as *mut u32;
+            let digest_out = core::cmp::min(self.digest_length(), output.len()) / ALIGN_SIZE;
+            for i in 0..digest_out {
+                #[cfg(not(esp32))]
+                out_ptr.add(i).write(*digest_ptr.add(i));
+                // ESP32 does reversed order 
+                #[cfg(esp32)]
+                out_ptr.add(i).write((*digest_ptr.add(i)).to_be());
+            } 
         }
+
 
         Ok(())
     }
