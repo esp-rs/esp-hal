@@ -33,6 +33,7 @@ pub use esp_hal_common::{
     Rwdt,
     Serial,
     UsbSerialJtag,
+    sha
 };
 
 #[cfg(feature = "embassy")]

@@ -48,6 +48,7 @@ pub use self::{
     timer::Timer,
 };
 
+pub mod sha;
 pub mod analog;
 pub mod clock;
 pub mod delay;
