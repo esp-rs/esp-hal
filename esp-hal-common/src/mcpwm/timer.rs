@@ -67,22 +67,39 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
         // We only write to our TIMERx_SYNC register
         let block = unsafe { &*PWM::block() };
 
-        // FIXME replace with safe API after https://github.com/esp-rs/esp-pacs/issues/57
         match TIM {
             0 => {
                 let sw = block.timer0_sync.read().sw().bit_is_set();
-                let bits = ((direction as u32) << 20) + ((phase as u32) << 4) + ((!sw as u32) << 1);
-                unsafe { block.timer0_sync.write(|w| w.bits(bits)) }
+                block.timer0_sync.write(|w| {
+                    w.timer0_phase_direction()
+                        .variant(direction as u8 != 0)
+                        .timer0_phase()
+                        .variant(phase)
+                        .sw()
+                        .variant(!sw)
+                });
             }
             1 => {
                 let sw = block.timer1_sync.read().sw().bit_is_set();
-                let bits = ((direction as u32) << 20) + ((phase as u32) << 4) + ((!sw as u32) << 1);
-                unsafe { block.timer1_sync.write(|w| w.bits(bits)) }
+                block.timer1_sync.write(|w| {
+                    w.timer1_phase_direction()
+                        .variant(direction as u8 != 0)
+                        .timer1_phase()
+                        .variant(phase)
+                        .sw()
+                        .variant(!sw)
+                });
             }
             2 => {
                 let sw = block.timer2_sync.read().sw().bit_is_set();
-                let bits = ((direction as u32) << 20) + ((phase as u32) << 4) + ((!sw as u32) << 1);
-                unsafe { block.timer2_sync.write(|w| w.bits(bits)) }
+                block.timer2_sync.write(|w| {
+                    w.timer2_phase_direction()
+                        .variant(direction as u8 != 0)
+                        .timer2_phase()
+                        .variant(phase)
+                        .sw()
+                        .variant(!sw)
+                });
             }
             _ => {
                 unreachable!()
