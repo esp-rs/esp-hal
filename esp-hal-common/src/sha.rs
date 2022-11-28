@@ -181,142 +181,6 @@ pub enum ShaMode {
 // compiler optimizations? (Requires complex const generics which isn't stable
 // yet)
 
-#[cfg(esp32)]
-impl Sha {
-    pub fn new(sha: SHA, mode: ShaMode) -> Self {
-        // Setup SHA Mode
-        Self {
-            sha,
-            mode,
-            cursor: 0,
-            first_run: true,
-            finished: false,
-            alignment_helper: AlignmentHelper::default(),
-        }
-    }
-
-    fn process_buffer(&mut self) {
-        if self.first_run {
-            match self.mode {
-                ShaMode::SHA1 => self.sha.sha1_start.write(|w| unsafe { w.bits(1) }),
-                ShaMode::SHA256 => self.sha.sha256_start.write(|w| unsafe { w.bits(1) }),
-                ShaMode::SHA384 => self.sha.sha384_start.write(|w| unsafe { w.bits(1) }),
-                ShaMode::SHA512 => self.sha.sha512_start.write(|w| unsafe { w.bits(1) }),
-            }
-            self.first_run = false;
-        } else {
-            match self.mode {
-                ShaMode::SHA1 => self.sha.sha1_continue.write(|w| unsafe { w.bits(1) }),
-                ShaMode::SHA256 => self.sha.sha256_continue.write(|w| unsafe { w.bits(1) }),
-                ShaMode::SHA384 => self.sha.sha384_continue.write(|w| unsafe { w.bits(1) }),
-                ShaMode::SHA512 => self.sha.sha512_continue.write(|w| unsafe { w.bits(1) }),
-            }
-        }
-    }
-
-    fn is_busy(&mut self) -> bool {
-        match self.mode {
-            ShaMode::SHA1 => self.sha.sha1_busy.read().sha1_busy().bit_is_set(),
-            ShaMode::SHA256 => self.sha.sha256_busy.read().sha256_busy().bit_is_set(),
-            ShaMode::SHA384 => self.sha.sha384_busy.read().sha384_busy().bit_is_set(),
-            ShaMode::SHA512 => self.sha.sha512_busy.read().sha512_busy().bit_is_set(),
-        }
-    }
-
-    fn chunk_length(&self) -> usize {
-        match self.mode {
-            ShaMode::SHA1 | ShaMode::SHA256 => 64,
-            ShaMode::SHA384 | ShaMode::SHA512 => 128,
-        }
-    }
-
-    pub fn update<'a>(&mut self, buffer: &'a [u8]) -> nb::Result<&'a [u8], Infallible> {
-        if self.is_busy() {
-            return Err(nb::Error::WouldBlock);
-        }
-
-        self.finished = false;
-
-        let mod_cursor = self.cursor % self.chunk_length();
-        unsafe {
-            let ptr = (self.sha.text[0].as_ptr() as *mut u32).add(mod_cursor / ALIGN_SIZE);
-            let (remaining, bound_reached) = self.alignment_helper.aligned_volatile_copy(
-                ptr,
-                buffer,
-                self.chunk_length() - mod_cursor,
-            );
-            self.cursor = self.cursor.wrapping_add(buffer.len() - remaining.len());
-            if bound_reached {
-                self.process_buffer();
-            }
-
-            Ok(remaining)
-        }
-    }
-
-    fn flush_data(&mut self) -> nb::Result<(), Infallible> {
-        if self.is_busy() {
-            return Err(nb::Error::WouldBlock);
-        }
-
-        unsafe {
-            let dst_ptr = (self.sha.text.as_ptr() as *mut u32)
-                .add((self.cursor % self.chunk_length()) / ALIGN_SIZE);
-            let flushed = self.alignment_helper.flush_to(dst_ptr);
-            if flushed != 0 {
-                self.cursor = self.cursor.wrapping_add(ALIGN_SIZE - flushed);
-                if self.cursor % self.chunk_length() == 0 {
-                    self.process_buffer();
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    pub fn digest_length(&self) -> usize {
-        match self.mode {
-            ShaMode::SHA1 => 20,
-            ShaMode::SHA256 => 32,
-            ShaMode::SHA384 => 48,
-            ShaMode::SHA512 => 64,
-        }
-    }
-
-    pub fn finish(&mut self, output: &mut [u8]) -> nb::Result<(), Infallible> {
-        if !self.finished {
-            nb::block!(self.flush_data())?; // Flush partial data, ensures aligned cursor
-
-            match self.mode {
-                ShaMode::SHA1 => unsafe { self.sha.sha1_load.write(|w| w.bits(1)) },
-                ShaMode::SHA256 => unsafe { self.sha.sha256_load.write(|w| w.bits(1)) },
-                ShaMode::SHA384 => unsafe { self.sha.sha384_load.write(|w| w.bits(1)) },
-                ShaMode::SHA512 => unsafe { self.sha.sha512_load.write(|w| w.bits(1)) },
-            }
-
-            // Spin wait for result, 8-20 clock cycles according to manual
-            while self.is_busy() {}
-            self.finished = true;
-        }
-
-        unsafe {
-            // Read SHA1=Text[0:4] | SHA256=Text[0:8] | SHA384=Text[0:11] |
-            // SHA512=Text[0:15]
-            core::ptr::copy_nonoverlapping::<u32>(
-                self.sha.text[0].as_ptr() as *const u32,
-                output.as_mut_ptr() as *mut u32,
-                core::cmp::min(self.digest_length(), output.len()) / ALIGN_SIZE,
-            );
-        }
-
-        Ok(())
-    }
-
-    pub fn free(self) -> SHA {
-        self.sha
-    }
-}
-
 #[cfg(not(esp32))]
 fn mode_as_bits(mode: ShaMode) -> u8 {
     match mode {
@@ -353,10 +217,10 @@ fn mode_as_bits(mode: ShaMode) -> u8 {
 
 // This implementation might fail after u32::MAX/8 bytes, to increase please see
 // ::finish() length/self.cursor usage
-#[cfg(any(esp32c2, esp32c3, esp32s2, esp32s3))]
 impl Sha {
     pub fn new(sha: SHA, mode: ShaMode) -> Self {
         // Setup SHA Mode
+        #[cfg(not(esp32))]
         sha.mode
             .write(|w| unsafe { w.mode().bits(mode_as_bits(mode)) });
 
@@ -378,6 +242,7 @@ impl Sha {
         self.finished
     }
 
+    #[cfg(not(esp32))]
     fn process_buffer(&mut self) {
         // FIXME: SHA_START_REG & SHA_CONTINUE_REG are wrongly marked as RO (they are
         // WO)
@@ -395,21 +260,59 @@ impl Sha {
         }
     }
 
+    #[cfg(esp32)]
+    fn process_buffer(&mut self) {
+        if self.first_run {
+            match self.mode {
+                ShaMode::SHA1 => self.sha.sha1_start.write(|w| unsafe { w.bits(1) }),
+                ShaMode::SHA256 => self.sha.sha256_start.write(|w| unsafe { w.bits(1) }),
+                ShaMode::SHA384 => self.sha.sha384_start.write(|w| unsafe { w.bits(1) }),
+                ShaMode::SHA512 => self.sha.sha512_start.write(|w| unsafe { w.bits(1) }),
+            }
+            self.first_run = false;
+        } else {
+            match self.mode {
+                ShaMode::SHA1 => self.sha.sha1_continue.write(|w| unsafe { w.bits(1) }),
+                ShaMode::SHA256 => self.sha.sha256_continue.write(|w| unsafe { w.bits(1) }),
+                ShaMode::SHA384 => self.sha.sha384_continue.write(|w| unsafe { w.bits(1) }),
+                ShaMode::SHA512 => self.sha.sha512_continue.write(|w| unsafe { w.bits(1) }),
+            }
+        }
+    }
+
     fn chunk_length(&self) -> usize {
         return match self.mode {
-            ShaMode::SHA1 | ShaMode::SHA224 | ShaMode::SHA256 => 64,
+            ShaMode::SHA1 | ShaMode::SHA256 => 64,
+            #[cfg(not(esp32))]
+            ShaMode::SHA224 => 64,
             _ => 128,
         };
+    }
+
+    #[cfg(esp32)]
+    fn is_busy(&self) -> bool {
+        match self.mode {
+            ShaMode::SHA1 => self.sha.sha1_busy.read().sha1_busy().bit_is_set(),
+            ShaMode::SHA256 => self.sha.sha256_busy.read().sha256_busy().bit_is_set(),
+            ShaMode::SHA384 => self.sha.sha384_busy.read().sha384_busy().bit_is_set(),
+            ShaMode::SHA512 => self.sha.sha512_busy.read().sha512_busy().bit_is_set(),
+        }
+    }
+
+    #[cfg(not(esp32))]
+    fn is_busy(&self) -> bool {
+        self.sha.busy.read().bits() != 0
     }
 
     pub fn digest_length(&self) -> usize {
         match self.mode {
             ShaMode::SHA1 => 20,
+            #[cfg(not(esp32))]
             ShaMode::SHA224 => 28,
             ShaMode::SHA256 => 32,
-            #[cfg(any(esp32s2, esp32s3))]
+            #[cfg(any(esp32, esp32s2, esp32s3))]
             ShaMode::SHA384 => 48,
-            #[cfg(any(esp32s2, esp32s3))]
+            #[cfg(any(esp32, esp32s2, esp32s3))]
             ShaMode::SHA512 => 64,
             #[cfg(any(esp32s2, esp32s3))]
             ShaMode::SHA512_224 => 28,
@@ -418,13 +321,34 @@ impl Sha {
         }
     }
 
+    #[cfg(not(esp32))]
+    fn input_ptr(&self) -> *mut u32 {
+        return self.sha.m_mem[0].as_ptr() as *mut u32;
+    }
+
+    #[cfg(esp32)]
+    fn input_ptr(&self) -> *mut u32 {
+        return self.sha.text[0].as_ptr() as *mut u32;
+    }
+
+    #[cfg(not(esp32))]
+    fn output_ptr(&self) -> *const u32 {
+        return self.sha.h_mem[0].as_ptr() as *const u32;
+    }
+
+    #[cfg(esp32)]
+    fn output_ptr(&self) -> *const u32 {
+        return self.sha.text[0].as_ptr() as *const u32;
+    }
+
     fn flush_data(&mut self) -> nb::Result<(), Infallible> {
-        if self.sha.busy.read().bits() != 0 {
+        if self.is_busy() {
             return Err(nb::Error::WouldBlock);
         }
 
         unsafe {
-            let dst_ptr = (self.sha.m_mem.as_ptr() as *mut u32)
+            let dst_ptr = self
+                .input_ptr()
                 .add((self.cursor % self.chunk_length()) / ALIGN_SIZE);
             let flushed = self.alignment_helper.flush_to(dst_ptr);
             if flushed != 0 {
@@ -445,7 +369,7 @@ impl Sha {
 
         unsafe {
             // NOTE: m_mem is 64,u8; but datasheet (esp32s2/esp32s3@>=SHA384) says 128, u8
-            let ptr = (self.sha.m_mem[0].as_ptr() as *mut u32).add(mod_cursor / ALIGN_SIZE);
+            let ptr = self.input_ptr().add(mod_cursor / ALIGN_SIZE);
             let (remaining, bound_reached) = self.alignment_helper.aligned_volatile_copy(
                 ptr,
                 incoming,
@@ -461,7 +385,7 @@ impl Sha {
     }
 
     pub fn update<'a>(&mut self, buffer: &'a [u8]) -> nb::Result<&'a [u8], Infallible> {
-        if self.sha.busy.read().bits() != 0 {
+        if self.is_busy() {
             return Err(nb::Error::WouldBlock);
         }
 
@@ -485,7 +409,7 @@ impl Sha {
         // If not enough free space for length+1, add length at end of a new zero'd
         // block
 
-        if self.sha.busy.read().bits() != 0 {
+        if self.is_busy() {
             return Err(nb::Error::WouldBlock);
         }
 
@@ -499,14 +423,12 @@ impl Sha {
             debug_assert!(self.cursor % 4 == 0);
 
             let mod_cursor = self.cursor % chunk_len;
-
             if chunk_len - mod_cursor < chunk_len / 8 {
                 // Zero out remaining data if buffer is almost full (>=448/896), and process
                 // buffer
                 let pad_len = chunk_len - mod_cursor;
                 unsafe {
-                    let m_cursor_ptr =
-                        (self.sha.m_mem[0].as_ptr() as *mut u32).add(mod_cursor / ALIGN_SIZE);
+                    let m_cursor_ptr = self.input_ptr().add(mod_cursor / ALIGN_SIZE);
                     self.alignment_helper.volatile_write_bytes(
                         m_cursor_ptr,
                         0,
@@ -519,12 +441,12 @@ impl Sha {
                 self.cursor = self.cursor.wrapping_add(pad_len);
 
                 // Spin-wait for finish
-                while self.sha.busy.read().bits() != 0 {}
+                while self.is_busy() {}
             }
 
             let mod_cursor = self.cursor % chunk_len; // Should be zero if branched above
             unsafe {
-                let m_cursor_ptr = self.sha.m_mem[0].as_ptr() as *mut u32;
+                let m_cursor_ptr = self.input_ptr();
                 // Pad zeros
                 let pad_ptr = m_cursor_ptr.add(mod_cursor / ALIGN_SIZE);
                 let pad_len = (chunk_len - mod_cursor) - ALIGN_SIZE;
@@ -544,13 +466,28 @@ impl Sha {
 
             self.process_buffer();
             // Spin-wait for final buffer to be processed
-            while self.sha.busy.read().bits() != 0 {}
+            while self.is_busy() {}
             self.finished = true;
+
+            // ESP32 requires additional load to retrieve output
+            #[cfg(esp32)]
+            {
+                match self.mode {
+                    ShaMode::SHA1 => unsafe { self.sha.sha1_load.write(|w| w.bits(1)) },
+                    ShaMode::SHA256 => unsafe { self.sha.sha256_load.write(|w| w.bits(1)) },
+                    ShaMode::SHA384 => unsafe { self.sha.sha384_load.write(|w| w.bits(1)) },
+                    ShaMode::SHA512 => unsafe { self.sha.sha512_load.write(|w| w.bits(1)) },
+                }
+
+                // Spin wait for result, 8-20 clock cycles according to manual
+                while self.is_busy() {}
+            }
+
         }
 
         unsafe {
             core::ptr::copy_nonoverlapping::<u32>(
-                self.sha.h_mem.as_ptr() as *const u32,
+                self.output_ptr(),
                 output.as_mut_ptr() as *mut u32,
                 core::cmp::min(self.digest_length(), output.len()) / ALIGN_SIZE,
             );
