@@ -368,7 +368,6 @@ impl Sha {
         let mod_cursor = self.cursor % self.chunk_length();
 
         unsafe {
-            // NOTE: m_mem is 64,u8; but datasheet (esp32s2/esp32s3@>=SHA384) says 128, u8
             let ptr = self.input_ptr().add(mod_cursor / ALIGN_SIZE);
             let (remaining, bound_reached) = self.alignment_helper.aligned_volatile_copy(
                 ptr,
@@ -434,8 +433,6 @@ impl Sha {
                         0,
                         pad_len / ALIGN_SIZE,
                     );
-                    // core::intrinsics::volatile_set_memory(m_cursor_ptr, 0,
-                    // pad_len/4);
                 }
                 self.process_buffer();
                 self.cursor = self.cursor.wrapping_add(pad_len);
@@ -467,7 +464,6 @@ impl Sha {
             self.process_buffer();
             // Spin-wait for final buffer to be processed
             while self.is_busy() {}
-            self.finished = true;
 
             // ESP32 requires additional load to retrieve output
             #[cfg(esp32)]
@@ -483,6 +479,7 @@ impl Sha {
                 while self.is_busy() {}
             }
 
+            self.finished = true;
         }
 
         unsafe {

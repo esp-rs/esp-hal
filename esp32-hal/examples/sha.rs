@@ -35,7 +35,13 @@ fn main() -> ! {
     
     let source_data = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".as_bytes();
     let mut remaining = source_data.clone();
+    println!("sha if: {:?} {:?} {:?} {:?}", peripherals.SHA.sha512_load.as_ptr(), 
+                                  peripherals.SHA.sha512_continue.as_ptr(),
+                                  peripherals.SHA.sha512_start.as_ptr(),
+                                  peripherals.SHA.sha512_busy.as_ptr());
+    let internal_mem = unsafe { core::slice::from_raw_parts(peripherals.SHA.text[0].as_ptr() as *const u8, 128) };
     let mut hasher = Sha::new(peripherals.SHA, ShaMode::SHA512);
+    println!("{:?} {} {:02x?}", hasher, source_data.len(), internal_mem);
 
     // Short hashes can be created by decreasing the output buffer to the desired length
     let mut output = [0u8; 64];
@@ -49,14 +55,17 @@ fn main() -> ! {
     while remaining.len() > 0 {
         // Can add println to view progress, however println takes a few orders of magnitude longer than
         // the Sha function itself so not useful for comparing processing time
-        // println!("Remaining len: {}", remaining.len());
+        println!("Remaining len: {} {:02x?}", remaining.len(), internal_mem);
 
         // All the HW Sha functions are infallible so unwrap is fine to use if you use block!
         remaining = block!(hasher.update(remaining)).unwrap();
     }
 
+    println!("Pre-finish: {:02x?}", internal_mem);
     // Finish can be called as many times as desired to get mutliple copies of the output.
     block!(hasher.finish(output.as_mut_slice())).unwrap();
+    println!("Post-finish: {:02x?}", internal_mem);
+
     let post_calc = xtensa_lx::timer::get_cycle_count();
     let hw_time = post_calc - pre_calc;
     println!("Took {} cycles", hw_time);
