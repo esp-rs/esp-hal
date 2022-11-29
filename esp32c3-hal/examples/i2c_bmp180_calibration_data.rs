@@ -51,8 +51,7 @@ fn main() -> ! {
         100u32.kHz(),
         &mut system.peripheral_clock_control,
         &clocks,
-    )
-    .unwrap();
+    );
 
     loop {
         let mut data = [0u8; 22];

@@ -44,13 +44,6 @@ impl embedded_hal_1::i2c::Error for Error {
     }
 }
 
-/// I2C-specific setup errors
-#[derive(Debug)]
-pub enum SetupError {
-    InvalidClkConfig,
-    PeripheralDisabled,
-}
-
 /// A generic I2C Command
 enum Command {
     Start,
@@ -277,7 +270,7 @@ where
         frequency: HertzU32,
         peripheral_clock_control: &mut PeripheralClockControl,
         clocks: &Clocks,
-    ) -> Result<Self, SetupError> {
+    ) -> Self {
         enable_peripheral(&i2c, peripheral_clock_control);
 
         let mut i2c = I2C { peripheral: i2c };
@@ -295,9 +288,9 @@ where
             .connect_peripheral_to_output(OutputSignal::I2CEXT0_SDA)
             .connect_input_to_peripheral(InputSignal::I2CEXT0_SDA);
 
-        i2c.peripheral.setup(frequency, clocks)?;
+        i2c.peripheral.setup(frequency, clocks);
 
-        Ok(i2c)
+        i2c
     }
 
     /// Return the raw interface to the underlying peripheral
@@ -322,7 +315,7 @@ pub trait Instance {
 
     fn i2c_number(&self) -> usize;
 
-    fn setup(&mut self, frequency: HertzU32, clocks: &Clocks) -> Result<(), SetupError> {
+    fn setup(&mut self, frequency: HertzU32, clocks: &Clocks) {
         self.register_block().ctr.modify(|_, w| unsafe {
             // Clear register
             w.bits(0)
@@ -354,7 +347,7 @@ pub trait Instance {
         self.set_filter(Some(7), Some(7));
 
         // Configure frequency
-        self.set_frequency(clocks.i2c_clock.convert(), frequency)?;
+        self.set_frequency(clocks.i2c_clock.convert(), frequency);
 
         // Propagate configuration changes (only necessary with C2, C3, and S3)
         #[cfg(any(esp32c2, esp32c3, esp32s3))]
@@ -364,8 +357,6 @@ pub trait Instance {
 
         // Reset entire peripheral (also resets fifo)
         self.reset();
-
-        Ok(())
     }
 
     /// Resets the I2C controller (FIFO + FSM + command list)
@@ -437,11 +428,7 @@ pub trait Instance {
     /// Sets the frequency of the I2C interface by calculating and applying the
     /// associated timings - corresponds to i2c_ll_cal_bus_clk and
     /// i2c_ll_set_bus_timing in ESP-IDF
-    fn set_frequency(
-        &mut self,
-        source_clk: HertzU32,
-        bus_freq: HertzU32,
-    ) -> Result<(), SetupError> {
+    fn set_frequency(&mut self, source_clk: HertzU32, bus_freq: HertzU32) {
         let source_clk = source_clk.raw();
         let bus_freq = bus_freq.raw();
 
@@ -508,19 +495,13 @@ pub trait Instance {
             time_out_value,
             true,
         );
-
-        Ok(())
     }
 
     #[cfg(esp32s2)]
     /// Sets the frequency of the I2C interface by calculating and applying the
     /// associated timings - corresponds to i2c_ll_cal_bus_clk and
     /// i2c_ll_set_bus_timing in ESP-IDF
-    fn set_frequency(
-        &mut self,
-        source_clk: HertzU32,
-        bus_freq: HertzU32,
-    ) -> Result<(), SetupError> {
+    fn set_frequency(&mut self, source_clk: HertzU32, bus_freq: HertzU32) {
         let source_clk = source_clk.raw();
         let bus_freq = bus_freq.raw();
 
@@ -568,19 +549,13 @@ pub trait Instance {
             time_out_value,
             time_out_en,
         );
-
-        Ok(())
     }
 
     #[cfg(any(esp32c2, esp32c3, esp32s3))]
     /// Sets the frequency of the I2C interface by calculating and applying the
     /// associated timings - corresponds to i2c_ll_cal_bus_clk and
     /// i2c_ll_set_bus_timing in ESP-IDF
-    fn set_frequency(
-        &mut self,
-        source_clk: HertzU32,
-        bus_freq: HertzU32,
-    ) -> Result<(), SetupError> {
+    fn set_frequency(&mut self, source_clk: HertzU32, bus_freq: HertzU32) {
         let source_clk = source_clk.raw();
         let bus_freq = bus_freq.raw();
 
@@ -644,8 +619,6 @@ pub trait Instance {
             time_out_value,
             time_out_en,
         );
-
-        Ok(())
     }
 
     #[allow(unused)]

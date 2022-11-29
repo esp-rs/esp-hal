@@ -10,13 +10,7 @@
 #![no_main]
 
 use esp32s3_hal::{
-    clock::ClockControl,
-    gpio::IO,
-    i2c::I2C,
-    pac::Peripherals,
-    prelude::*,
-    timer::TimerGroup,
-    Rtc,
+    clock::ClockControl, gpio::IO, i2c::I2C, pac::Peripherals, prelude::*, timer::TimerGroup, Rtc,
 };
 use esp_backtrace as _;
 use esp_println::println;
@@ -47,8 +41,7 @@ fn main() -> ! {
         100u32.kHz(),
         &mut system.peripheral_clock_control,
         &clocks,
-    )
-    .unwrap();
+    );
 
     loop {
         let mut data = [0u8; 22];
