@@ -59,8 +59,7 @@ fn main() -> ! {
         100u32.kHz(),
         &mut system.peripheral_clock_control,
         &clocks,
-    )
-    .unwrap();
+    );
 
     // Start timer (5 second interval)
     timer0.start(5u64.secs());
