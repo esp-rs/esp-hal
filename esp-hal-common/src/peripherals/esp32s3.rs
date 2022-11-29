@@ -89,6 +89,7 @@ mod peripherals {
         RTC_CNTL,
         TIMG0,
         TIMG1,
+        TWAI,
         APB_SARADC,
         SENS,
     }

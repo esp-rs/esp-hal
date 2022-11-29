@@ -705,7 +705,7 @@ pub trait Instance {
     fn register_block(&self) -> &RegisterBlock;
 }
 
-#[cfg(any(esp32c3))]
+#[cfg(any(esp32s3, esp32c3))]
 impl Instance for crate::peripherals::TWAI {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
