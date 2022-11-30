@@ -17,12 +17,12 @@ use crate::pac::SHA;
 
 const ALIGN_SIZE: usize = core::mem::size_of::<u32>();
 
-// ESP32 does reversed order 
+// ESP32 does reversed order
 #[cfg(esp32)]
 const U32_FROM_BYTES: fn([u8; 4]) -> u32 = u32::from_be_bytes;
 
 #[cfg(not(esp32))]
-const U32_FROM_BYTES: fn([u8; 4]) -> u32 = u32::from_ne_bytes; 
+const U32_FROM_BYTES: fn([u8; 4]) -> u32 = u32::from_ne_bytes;
 
 // The alignment helper helps you write to registers that only accepts u32 using
 // regular u8s (bytes) It keeps a write buffer of 4 u8 (could in theory be 3 but
@@ -292,6 +292,7 @@ impl Sha {
             ShaMode::SHA1 | ShaMode::SHA256 => 64,
             #[cfg(not(esp32))]
             ShaMode::SHA224 => 64,
+            #[cfg(not(any(esp32c2, esp32c3)))]
             _ => 128,
         };
     }
@@ -493,19 +494,17 @@ impl Sha {
         }
 
         unsafe {
-
             let digest_ptr = self.output_ptr();
             let out_ptr = output.as_mut_ptr() as *mut u32;
             let digest_out = core::cmp::min(self.digest_length(), output.len()) / ALIGN_SIZE;
             for i in 0..digest_out {
                 #[cfg(not(esp32))]
                 out_ptr.add(i).write(*digest_ptr.add(i));
-                // ESP32 does reversed order 
+                // ESP32 does reversed order
                 #[cfg(esp32)]
                 out_ptr.add(i).write((*digest_ptr.add(i)).to_be());
-            } 
+            }
         }
-
 
         Ok(())
     }

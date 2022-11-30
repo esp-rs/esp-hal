@@ -62,11 +62,13 @@ There are a number of other crates within the [esp-rs organization] which can be
 | :-------------: | :----------------------------------------------------------------------------: |
 |   [esp-alloc]   |                        A simple `no_std` heap allocator                        |
 | [esp-backtrace] |                 Backtrace support for bare-metal applications                  |
+|  [esp-println]  |                Provides `print!` and `println!` implementations                |
 |  [esp-storage]  | Implementation of [embedded-storage] traits to access unencrypted flash memory |
 
 [esp-rs organization]: https://github.com/esp-rs
 [esp-alloc]: https://github.com/esp-rs/esp-alloc
 [esp-backtrace]: https://github.com/esp-rs/esp-backtrace
+[esp-println]: https://github.com/esp-rs/esp-println
 [esp-storage]: https://github.com/esp-rs/esp-storage
 [embedded-storage]: https://github.com/rust-embedded-community/embedded-storage
 

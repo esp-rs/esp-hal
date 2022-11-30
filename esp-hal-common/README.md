@@ -10,6 +10,7 @@
 This crate should not be used directly; you should use one of the device-specific HAL crates instead:
 
 - [esp32-hal](../esp32-hal/README.md)
+- [esp32c2-hal](../esp32c2-hal/README.md)
 - [esp32c3-hal](../esp32c3-hal/README.md)
 - [esp32s2-hal](../esp32s2-hal/README.md)
 - [esp32s3-hal](../esp32s3-hal/README.md)

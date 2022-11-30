@@ -153,21 +153,18 @@ fn check_opt_level() {
         return;
     }
 
-    match env::var_os("OPT_LEVEL") {
-        Some(ref opt_level) => {
-            if opt_level == "z" {
-                println!(
-                    "{}",
-                    OPT_LEVEL_Z_MSG
-                        .lines()
-                        .into_iter()
-                        .map(|l| format!("cargo:warning={l}"))
-                        .collect::<Vec<String>>()
-                        .join("\n")
-                );
-                exit(1);
-            }
+    if let Some(ref opt_level) = env::var_os("OPT_LEVEL") {
+        if opt_level == "z" {
+            println!(
+                "{}",
+                OPT_LEVEL_Z_MSG
+                    .lines()
+                    .into_iter()
+                    .map(|l| format!("cargo:warning={l}"))
+                    .collect::<Vec<String>>()
+                    .join("\n")
+            );
+            exit(1);
         }
-        _ => {}
     }
 }
