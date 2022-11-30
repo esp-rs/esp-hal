@@ -88,8 +88,8 @@ macro_rules! impl_dac {
         use crate::gpio;
 
         $(
-            paste! {
-                pub use esp_hal_common::analog::dac::[<DAC $number Impl>];
+            paste::paste! {
+                pub use $crate::analog::dac::[<DAC $number Impl>];
 
                 /// DAC channel
                 pub struct [<DAC $number>] {
@@ -101,8 +101,8 @@ macro_rules! impl_dac {
                 impl [<DAC $number>] {
                     /// Constructs a new DAC instance
                     pub fn dac(
-                        _dac: esp_hal_common::analog::[<DAC $number>],
-                        _pin: gpio::$gpio<esp_hal_common::Analog>,
+                        _dac: $crate::analog::[<DAC $number>],
+                        _pin: gpio::$gpio<$crate::Analog>,
                     ) -> Result<Self, ()> {
                         let dac = Self {
                             _private: PhantomData,
@@ -125,3 +125,33 @@ macro_rules! impl_dac {
 }
 
 pub use impl_dac;
+
+#[cfg(esp32)]
+pub mod implementation {
+    //! Digital to analog (DAC) conversion.
+    //!
+    //! This module provides functions for controling two digital to
+    //! analog converters, available on ESP32: `DAC1` and `DAC2`.
+    //!
+    //! The DAC1 is available on the GPIO pin 25, and DAC2 on pin 26.
+
+    pub use super::*;
+    use crate::impl_dac;
+
+    impl_dac!(1 => Gpio25, 2 => Gpio26,);
+}
+
+#[cfg(esp32s2)]
+pub mod implementation {
+    //! Digital to analog (DAC) conversion.
+    //!
+    //! This module provides functions for controling two digital to
+    //! analog converters, available on ESP32: `DAC1` and `DAC2`.
+    //!
+    //! The DAC1 is available on the GPIO pin 17, and DAC2 on pin 18.
+
+    pub use super::*;
+    use crate::impl_dac;
+
+    impl_dac!(1 => Gpio17, 2 => Gpio18,);
+}

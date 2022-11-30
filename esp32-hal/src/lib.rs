@@ -3,12 +3,14 @@
 pub use embedded_hal as ehal;
 #[doc(inline)]
 pub use esp_hal_common::{
+    analog::adc::implementation as adc,
+    analog::dac::implementation as dac,
     clock,
     cpu_control::CpuControl,
     dma,
     dma::pdma,
     efuse,
-    gpio as gpio_types,
+    gpio,
     i2c,
     i2s,
     interrupt,
@@ -36,10 +38,6 @@ pub use self::gpio::IO;
 
 #[cfg(feature = "embassy")]
 pub use esp_hal_common::embassy;
-
-pub mod adc;
-pub mod dac;
-pub mod gpio;
 
 /// Common module for analog functions
 pub mod analog {
@@ -94,11 +92,4 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
 #[rustfmt::skip]
 pub extern "Rust" fn __init_data() -> bool {
     false
-}
-
-fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
-    int_enable as u8
-        | ((nmi_enable as u8) << 1)
-        | (int_enable as u8) << 2
-        | ((nmi_enable as u8) << 3)
 }

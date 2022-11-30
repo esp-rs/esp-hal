@@ -1,9 +1,79 @@
+use paste::paste;
+
+use crate::{
+    gpio::PhantomData,
+    pac::GPIO,
+    AlternateFunction,
+    Bank0GpioRegisterAccess,
+    Bank1GpioRegisterAccess,
+    GpioPin,
+    InputOnlyAnalogPinType,
+    InputOutputAnalogPinType,
+    InputOutputPinType,
+    Unknown,
+};
+
 pub type OutputSignalType = u16;
 pub const OUTPUT_SIGNAL_MAX: u16 = 548;
 pub const INPUT_SIGNAL_MAX: u16 = 539;
 
 pub const ONE_INPUT: u8 = 0x38;
 pub const ZERO_INPUT: u8 = 0x30;
+
+pub(crate) const GPIO_FUNCTION: AlternateFunction = AlternateFunction::Function2;
+
+pub(crate) fn get_io_mux_reg(gpio_num: u8) -> &'static crate::pac::io_mux::GPIO0 {
+    unsafe {
+        let iomux = &*crate::pac::IO_MUX::PTR;
+
+        match gpio_num {
+            0 => core::mem::transmute(&(iomux.gpio0)),
+            1 => core::mem::transmute(&(iomux.gpio1)),
+            2 => core::mem::transmute(&(iomux.gpio2)),
+            3 => core::mem::transmute(&(iomux.gpio3)),
+            4 => core::mem::transmute(&(iomux.gpio4)),
+            5 => core::mem::transmute(&(iomux.gpio5)),
+            6 => core::mem::transmute(&(iomux.gpio6)),
+            7 => core::mem::transmute(&(iomux.gpio7)),
+            8 => core::mem::transmute(&(iomux.gpio8)),
+            9 => core::mem::transmute(&(iomux.gpio9)),
+            10 => core::mem::transmute(&(iomux.gpio10)),
+            11 => core::mem::transmute(&(iomux.gpio11)),
+            12 => core::mem::transmute(&(iomux.gpio12)),
+            13 => core::mem::transmute(&(iomux.gpio13)),
+            14 => core::mem::transmute(&(iomux.gpio14)),
+            15 => core::mem::transmute(&(iomux.gpio15)),
+            16 => core::mem::transmute(&(iomux.gpio16)),
+            17 => core::mem::transmute(&(iomux.gpio17)),
+            18 => core::mem::transmute(&(iomux.gpio18)),
+            19 => core::mem::transmute(&(iomux.gpio19)),
+            20 => core::mem::transmute(&(iomux.gpio20)),
+            21 => core::mem::transmute(&(iomux.gpio21)),
+            22 => core::mem::transmute(&(iomux.gpio22)),
+            23 => core::mem::transmute(&(iomux.gpio23)),
+            24 => core::mem::transmute(&(iomux.gpio24)),
+            25 => core::mem::transmute(&(iomux.gpio25)),
+            26 => core::mem::transmute(&(iomux.gpio26)),
+            27 => core::mem::transmute(&(iomux.gpio27)),
+            32 => core::mem::transmute(&(iomux.gpio32)),
+            33 => core::mem::transmute(&(iomux.gpio33)),
+            34 => core::mem::transmute(&(iomux.gpio34)),
+            35 => core::mem::transmute(&(iomux.gpio35)),
+            36 => core::mem::transmute(&(iomux.gpio36)),
+            37 => core::mem::transmute(&(iomux.gpio37)),
+            38 => core::mem::transmute(&(iomux.gpio38)),
+            39 => core::mem::transmute(&(iomux.gpio39)),
+            _ => panic!(),
+        }
+    }
+}
+
+pub(crate) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
+    int_enable as u8
+        | ((nmi_enable as u8) << 1)
+        | (int_enable as u8) << 2
+        | ((nmi_enable as u8) << 3)
+}
 
 /// Peripheral input signals for the GPIO mux
 #[allow(non_camel_case_types)]
@@ -496,4 +566,149 @@ pub enum OutputSignal {
     EMAC_TXD1,
 
     MTDO,
+}
+
+pub(crate) fn errata36(pin_num: u8, pull_up: bool, pull_down: bool) {
+    use crate::pac::RTCIO;
+    let rtcio = unsafe { &*RTCIO::PTR };
+
+    match pin_num {
+        0 => {
+            rtcio
+                .touch_pad1
+                .modify(|r, w| unsafe { w.bits(r.bits()).rue().bit(pull_up).rde().bit(pull_down) });
+        }
+        2 => {
+            rtcio
+                .touch_pad2
+                .modify(|r, w| unsafe { w.bits(r.bits()).rue().bit(pull_up).rde().bit(pull_down) });
+        }
+        4 => {
+            rtcio
+                .touch_pad0
+                .modify(|r, w| unsafe { w.bits(r.bits()).rue().bit(pull_up).rde().bit(pull_down) });
+        }
+        12 => {
+            rtcio
+                .touch_pad5
+                .modify(|r, w| unsafe { w.bits(r.bits()).rue().bit(pull_up).rde().bit(pull_down) });
+        }
+        13 => {
+            rtcio
+                .touch_pad4
+                .modify(|r, w| unsafe { w.bits(r.bits()).rue().bit(pull_up).rde().bit(pull_down) });
+        }
+        14 => {
+            rtcio
+                .touch_pad6
+                .modify(|r, w| unsafe { w.bits(r.bits()).rue().bit(pull_up).rde().bit(pull_down) });
+        }
+        15 => {
+            rtcio
+                .touch_pad3
+                .modify(|r, w| unsafe { w.bits(r.bits()).rue().bit(pull_up).rde().bit(pull_down) });
+        }
+        25 => {
+            rtcio.pad_dac1.modify(|r, w| unsafe {
+                w.bits(r.bits())
+                    .pdac1_rue()
+                    .bit(pull_up)
+                    .pdac1_rde()
+                    .bit(pull_down)
+            });
+        }
+        26 => {
+            rtcio.pad_dac2.modify(|r, w| unsafe {
+                w.bits(r.bits())
+                    .pdac2_rue()
+                    .bit(pull_up)
+                    .pdac2_rde()
+                    .bit(pull_down)
+            });
+        }
+        27 => {
+            rtcio
+                .touch_pad7
+                .modify(|r, w| unsafe { w.bits(r.bits()).rue().bit(pull_up).rde().bit(pull_down) });
+        }
+        32 => {
+            rtcio.xtal_32k_pad.modify(|r, w| unsafe {
+                w.bits(r.bits())
+                    .x32n_rue()
+                    .bit(pull_up)
+                    .x32n_rde()
+                    .bit(pull_down)
+            });
+        }
+        33 => {
+            rtcio.xtal_32k_pad.modify(|r, w| unsafe {
+                w.bits(r.bits())
+                    .x32p_rue()
+                    .bit(pull_up)
+                    .x32p_rde()
+                    .bit(pull_down)
+            });
+        }
+        _ => (),
+    }
+}
+
+crate::gpio::gpio! {
+    (0, 0, InputOutputAnalog (5 => EMAC_TX_CLK) (1 => CLK_OUT1))
+    (1, 0, InputOutput (5 => EMAC_RXD2) (0 => U0TXD 1 => CLK_OUT3))
+    (2, 0, InputOutputAnalog (1 => HSPIWP 3 => HS2_DATA0 4 => SD_DATA0) (3 => HS2_DATA0 4 => SD_DATA0))
+    (3, 0, InputOutput (0 => U0RXD) (1 => CLK_OUT2))
+    (4, 0, InputOutput (1 => HSPIHD 3 => HS2_DATA1 4 => SD_DATA1 5 => EMAC_TX_ER) (3 => HS2_DATA1 4 => SD_DATA1))
+    (5, 0, InputOutput (1 => VSPICS0 3 => HS1_DATA6 5 => EMAC_RX_CLK) (3 => HS1_DATA6))
+    (6, 0, InputOutput (4 => U1CTS) (0 => SD_CLK 1 => SPICLK 3 => HS1_CLK))
+    (7, 0, InputOutput (0 => SD_DATA0 1 => SPIQ 3 => HS1_DATA0) (0 => SD_DATA0 1 => SPIQ 3 => HS1_DATA0 4 => U2RTS))
+    (8, 0, InputOutput (0 => SD_DATA1 1 => SPID 3 => HS1_DATA1 4 => U2CTS) (0 => SD_DATA1 1 => SPID 3 => HS1_DATA1))
+    (9, 0, InputOutput (0 => SD_DATA2 1 => SPIHD 3 => HS1_DATA2 4 => U1RXD) (0 => SD_DATA2 1 => SPIHD 3 => HS1_DATA2))
+    (10, 0, InputOutput ( 0 => SD_DATA3 1 => SPIWP 3 => HS1_DATA3) (0 => SD_DATA3 1 => SPIWP 3 => HS1_DATA3 4 => U1TXD))
+    (11, 0, InputOutput ( 1 => SPICS0) (0 => SD_CMD 1 => SPICS0 3 => HS1_CMD 4 => U1RTS))
+    (12, 0, InputOutputAnalog (0 => MTDI 1 => HSPIQ 3 => HS2_DATA2 4 => SD_DATA2) (1 => HSPIQ 3 => HS2_DATA2 4 => SD_DATA2 5 => EMAC_TXD3))
+    (13, 0, InputOutputAnalog (0 => MTCK 1 => HSPID 3 => HS2_DATA3 4 => SD_DATA3) (1 => HSPID 3 => HS2_DATA3 4 => SD_DATA3 5 => EMAC_RX_ER))
+    (14, 0, InputOutputAnalog (0 => MTMS 1 => HSPICLK) (1 => HSPICLK 3 => HS2_CLK 4 => SD_CLK 5 => EMAC_TXD2))
+    (15, 0, InputOutputAnalog (1 => HSPICS0 5 => EMAC_RXD3) (0 => MTDO 1 => HSPICS0 3 => HS2_CMD 4 => SD_CMD))
+    (16, 0, InputOutput (3 => HS1_DATA4 4 => U2RXD) (3 => HS1_DATA4 5 => EMAC_CLK_OUT))
+    (17, 0, InputOutput (3 => HS1_DATA5) (3 => HS1_DATA5 4 => U2TXD 5 => EMAC_CLK_180))
+    (18, 0, InputOutput (1 => VSPICLK 3 => HS1_DATA7) (1 => VSPICLK 3 => HS1_DATA7))
+    (19, 0, InputOutput (1 => VSPIQ 3 => U0CTS) (1 => VSPIQ 5 => EMAC_TXD0))
+    (20, 0, InputOutput)
+    (21, 0, InputOutput (1 => VSPIHD) (1 => VSPIHD 5 => EMAC_TX_EN))
+    (22, 0, InputOutput (1 => VSPIWP) (1 => VSPIWP 3 => U0RTS 5 => EMAC_TXD1))
+    (23, 0, InputOutput  (1 => VSPID) (1 => VSPID 3 => HS1_STROBE))
+    (24, 0, InputOutput)
+    (25, 0, InputOutputAnalog (5 => EMAC_RXD0) ())
+    (26, 0, InputOutputAnalog (5 => EMAC_RXD1) ())
+    (27, 0, InputOutputAnalog (5 => EMAC_RX_DV) ())
+    (32, 1, InputOutputAnalog)
+    (33, 1, InputOutputAnalog)
+    (34, 1, InputOnlyAnalog)
+    (35, 1, InputOnlyAnalog)
+    (36, 1, InputOnlyAnalog)
+    (37, 1, InputOnlyAnalog)
+    (38, 1, InputOnlyAnalog)
+    (39, 1, InputOnlyAnalog)
+}
+
+crate::gpio::analog! {
+     (36, 0,  sensor_pads,   sense1_mux_sel, sense1_fun_sel, sense1_fun_ie)
+     (37, 1,  sensor_pads,   sense2_mux_sel, sense2_fun_sel, sense2_fun_ie)
+     (38, 2,  sensor_pads,   sense3_mux_sel, sense3_fun_sel, sense3_fun_ie)
+     (39, 3,  sensor_pads,   sense4_mux_sel, sense4_fun_sel, sense4_fun_ie)
+     (34, 4,  adc_pad,         adc1_mux_sel,   adc1_fun_sel,   adc1_fun_ie)
+     (35, 5,  adc_pad,         adc2_mux_sel,   adc2_fun_sel,   adc1_fun_ie)
+     (25, 6,  pad_dac1,       pdac1_mux_sel,  pdac1_fun_sel,  pdac1_fun_ie, pdac1_rue, pdac1_rde)
+     (26, 7,  pad_dac2,       pdac2_mux_sel,  pdac2_fun_sel,  pdac2_fun_ie, pdac2_rue, pdac2_rde)
+     (33, 8,  xtal_32k_pad,    x32n_mux_sel,   x32n_fun_sel,   x32n_fun_ie, x32n_rue,  x32n_rde )
+     (32, 9,  xtal_32k_pad,    x32p_mux_sel,   x32p_fun_sel,   x32p_fun_ie, x32p_rue,  x32p_rde )
+     (4,  10, touch_pad0,           mux_sel,        fun_sel,        fun_ie, rue,       rde      )
+     (0,  11, touch_pad1,           mux_sel,        fun_sel,        fun_ie, rue,       rde      )
+     (2,  12, touch_pad2,           mux_sel,        fun_sel,        fun_ie, rue,       rde      )
+     (15, 13, touch_pad3,           mux_sel,        fun_sel,        fun_ie, rue,       rde      )
+     (13, 14, touch_pad4,           mux_sel,        fun_sel,        fun_ie, rue,       rde      )
+     (12, 15, touch_pad5,           mux_sel,        fun_sel,        fun_ie, rue,       rde      )
+     (14, 16, touch_pad6,           mux_sel,        fun_sel,        fun_ie, rue,       rde      )
+     (27, 17, touch_pad7,           mux_sel,        fun_sel,        fun_ie, rue,       rde      )
 }

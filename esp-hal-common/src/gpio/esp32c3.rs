@@ -1,9 +1,32 @@
+use paste::paste;
+
+use crate::{
+    gpio::PhantomData,
+    pac::GPIO,
+    AlternateFunction,
+    Bank0GpioRegisterAccess,
+    GpioPin,
+    InputOutputAnalogPinType,
+    InputOutputPinType,
+    Unknown,
+};
+
 pub type OutputSignalType = u8;
 pub const OUTPUT_SIGNAL_MAX: u8 = 128;
 pub const INPUT_SIGNAL_MAX: u8 = 100;
 
 pub const ONE_INPUT: u8 = 0x1e;
 pub const ZERO_INPUT: u8 = 0x1f;
+
+pub(crate) const GPIO_FUNCTION: AlternateFunction = AlternateFunction::Function1;
+
+pub(crate) const fn get_io_mux_reg(gpio_num: u8) -> &'static crate::pac::io_mux::GPIO {
+    unsafe { &(&*crate::pac::IO_MUX::PTR).gpio[gpio_num as usize] }
+}
+
+pub(crate) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
+    int_enable as u8 | ((nmi_enable as u8) << 1)
+}
 
 /// Peripheral input signals for the GPIO mux
 #[allow(non_camel_case_types)]
@@ -136,4 +159,38 @@ pub enum OutputSignal {
     SPICS1           = 126,
     USB_JTAG_TRST    = 127,
     GPIO             = 128,
+}
+
+crate::gpio::gpio! {
+    (0, 0, InputOutputAnalog)
+    (1, 0, InputOutputAnalog)
+    (2, 0, InputOutputAnalog (2 => FSPIQ) (2 => FSPIQ))
+    (3, 0, InputOutputAnalog)
+    (4, 0, InputOutputAnalog (2 => FSPIHD) (0 => USB_JTAG_TMS 2 => FSPIHD))
+    (5, 0, InputOutputAnalog (2 => FSPIWP) (0 => USB_JTAG_TDI 2 => FSPIWP))
+    (6, 0, InputOutput (2 => FSPICLK) (0 => USB_JTAG_TCK 2 => FSPICLK_MUX))
+    (7, 0, InputOutput (2 => FSPID) (0 => USB_JTAG_TDO 2 => FSPID))
+    (8, 0, InputOutput)
+    (9, 0, InputOutput)
+    (10, 0, InputOutput (2 => FSPICS0) (2 => FSPICS0))
+    (11, 0, InputOutput)
+    (12, 0, InputOutput (0 => SPIHD) (0 => SPIHD))
+    (13, 0, InputOutput (0 => SPIWP) (0 => SPIWP))
+    (14, 0, InputOutput () (0 => SPICS0))
+    (15, 0, InputOutput () (0 => SPICLK_MUX))
+    (16, 0, InputOutput (0 => SPID) (0 => SPID))
+    (17, 0, InputOutput (0 => SPIQ) (0 => SPIQ))
+    (18, 0, InputOutput)
+    (19, 0, InputOutput)
+    (20, 0, InputOutput (0 => U0RXD) ())
+    (21, 0, InputOutput () (0 => U0TXD))
+}
+
+crate::gpio::analog! {
+    0
+    1
+    2
+    3
+    4
+    5
 }
