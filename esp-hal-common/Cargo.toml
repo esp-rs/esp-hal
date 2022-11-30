@@ -57,11 +57,11 @@ esp32s2 = { version = "0.6.0",  features = ["critical-section"], optional = true
 esp32s3 = { version = "0.9.0",  features = ["critical-section"], optional = true }
 
 [features]
-esp32   = ["esp32/rt"  , "procmacros/xtensa", "xtensa-lx-rt/esp32",   "xtensa-lx/esp32",   "critical-section/restore-state-u32", "lock_api"]
-esp32c2 = ["esp32c2/rt", "procmacros/riscv" , "riscv", "riscv-atomic-emulation-trap",      "critical-section/restore-state-u8"]
-esp32c3 = ["esp32c3/rt", "procmacros/riscv" , "riscv", "riscv-atomic-emulation-trap",      "critical-section/restore-state-u8"]
-esp32s2 = ["esp32s2/rt", "procmacros/xtensa", "xtensa-lx-rt/esp32s2", "xtensa-lx/esp32s2", "critical-section/restore-state-u32", "esp-synopsys-usb-otg", "usb-device"]
-esp32s3 = ["esp32s3/rt", "procmacros/xtensa", "xtensa-lx-rt/esp32s3", "xtensa-lx/esp32s3", "critical-section/restore-state-u32", "lock_api", "esp-synopsys-usb-otg", "usb-device"]
+esp32   = ["esp32/rt"  , "xtensa", "xtensa-lx/esp32",   "xtensa-lx-rt/esp32",   "lock_api"]
+esp32c2 = ["esp32c2/rt", "riscv"]
+esp32c3 = ["esp32c3/rt", "riscv"]
+esp32s2 = ["esp32s2/rt", "xtensa", "xtensa-lx/esp32s2", "xtensa-lx-rt/esp32s2",             "esp-synopsys-usb-otg", "usb-device"]
+esp32s3 = ["esp32s3/rt", "xtensa", "xtensa-lx/esp32s3", "xtensa-lx-rt/esp32s3", "lock_api", "esp-synopsys-usb-otg", "usb-device"]
 
 # Implement the `embedded-hal==1.0.0-alpha.x` traits
 eh1 = ["embedded-hal-1", "embedded-hal-nb"]
@@ -76,8 +76,12 @@ ufmt = ["ufmt-write"]
 vectored = ["procmacros/interrupt"]
 
 # Implement the `embedded-hal-async==1.0.0-alpha.x` traits
-async = ["embedded-hal-async", "eh1", "embassy-sync"]
+async   = ["embedded-hal-async", "eh1", "embassy-sync"]
 embassy = ["embassy-time"]
 
 embassy-time-systick = []
-embassy-time-timg = []
+embassy-time-timg    = []
+
+# Architecture-specific features (intended for internal use)
+riscv  = ["dep:riscv", "critical-section/restore-state-u8",  "procmacros/riscv", "riscv-atomic-emulation-trap"]
+xtensa = [             "critical-section/restore-state-u32", "procmacros/xtensa"]
