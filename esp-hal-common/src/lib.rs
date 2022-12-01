@@ -62,6 +62,8 @@ pub mod i2c;
 pub mod i2s;
 
 pub mod ledc;
+#[cfg(any(esp32, esp32s3))]
+pub mod mcpwm;
 #[cfg(usb_otg)]
 pub mod otg_fs;
 pub mod prelude;

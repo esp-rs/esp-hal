@@ -54,7 +54,7 @@ esp32   = { version = "0.16.0", features = ["critical-section"], optional = true
 esp32c2 = { version = "0.5.1",  features = ["critical-section"], optional = true }
 esp32c3 = { version = "0.8.1",  features = ["critical-section"], optional = true }
 esp32s2 = { version = "0.6.0",  features = ["critical-section"], optional = true }
-esp32s3 = { version = "0.9.0",  features = ["critical-section"], optional = true }
+esp32s3 = { version = "0.10.0",  features = ["critical-section"], optional = true }
 
 [features]
 esp32   = ["esp32/rt"  , "xtensa", "xtensa-lx/esp32",   "xtensa-lx-rt/esp32",   "lock_api"]
