@@ -340,7 +340,7 @@ mod vectored {
     const CPU_INTERRUPT_EDGE: u32 = 0b_0111_0000_0100_0000_0000_1100_1000_0000;
 
     #[inline]
-    fn cpu_interrupt_nr_to_cpu_interrupt_handler(number: u32) -> Option<unsafe extern "C" fn(u32)> {
+    fn cpu_interrupt_nr_to_cpu_interrupt_handler(number: u32) -> Option<unsafe extern "C" fn(u32, save_frame: &mut Context)> {
         use xtensa_lx_rt::*;
         // we're fortunate that all esp variants use the same CPU interrupt layout
         Some(match number {
@@ -386,7 +386,7 @@ mod vectored {
                 interrupt::clear(1 << cpu_interrupt_nr);
             }
             if let Some(handler) = cpu_interrupt_nr_to_cpu_interrupt_handler(cpu_interrupt_nr) {
-                handler(level);
+                handler(level, save_frame);
             }
         } else {
             if (cpu_interrupt_mask & CPU_INTERRUPT_EDGE) != 0 {
