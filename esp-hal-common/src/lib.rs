@@ -48,7 +48,6 @@ pub use self::{
     timer::Timer,
 };
 
-pub mod sha;
 pub mod analog;
 pub mod clock;
 pub mod delay;
@@ -57,12 +56,10 @@ pub mod dma;
 pub mod embassy;
 pub mod gpio;
 pub mod i2c;
-
-#[cfg(any(esp32c3, esp32s3, esp32, esp32s2))]
+#[cfg(i2s)]
 pub mod i2s;
-
 pub mod ledc;
-#[cfg(any(esp32, esp32s3))]
+#[cfg(mcpwm)]
 pub mod mcpwm;
 #[cfg(usb_otg)]
 pub mod otg_fs;
@@ -73,6 +70,7 @@ pub mod rng;
 pub mod rom;
 pub mod rtc_cntl;
 pub mod serial;
+pub mod sha;
 pub mod spi;
 pub mod system;
 #[cfg(systimer)]

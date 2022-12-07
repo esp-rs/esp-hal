@@ -24,6 +24,8 @@ fn main() {
     //   - 'dac'
     //   - 'gdma'
     //   - 'i2c1'
+    //   - 'i2s'
+    //   - 'mcpwm'
     //   - 'pdma'
     //   - 'rmt'
     //   - 'spi3'
@@ -39,9 +41,11 @@ fn main() {
         vec![
             "esp32",
             "xtensa",
+            "mcpwm",
             "multi_core",
             "dac",
             "i2c1",
+            "i2s",
             "pdma",
             "rmt",
             "spi3",
@@ -56,6 +60,7 @@ fn main() {
             "riscv",
             "single_core",
             "gdma",
+            "i2s",
             "rmt",
             "spi3",
             "systimer",
@@ -69,6 +74,7 @@ fn main() {
             "single_core",
             "dac",
             "i2c1",
+            "i2s",
             "pdma",
             "rmt",
             "spi3",
@@ -83,6 +89,8 @@ fn main() {
             "multi_core",
             "gdma",
             "i2c1",
+            "i2s",
+            "mcpwm",
             "rmt",
             "spi3",
             "systimer",
