@@ -1530,3 +1530,125 @@ pub(crate) use gpio;
 
 pub use self::types::{InputSignal, OutputSignal};
 use self::types::{ONE_INPUT, ZERO_INPUT};
+
+
+#[cfg(feature = "async")]
+mod asynch {
+    use core::task::{Context, Poll};
+    use super::*;
+
+    use embassy_sync::waitqueue::AtomicWaker;
+    use embedded_hal_async::digital::Wait;
+
+    use crate::{pac, prelude::*};
+
+    #[allow(clippy::declare_interior_mutable_const)]
+    const NEW_AW: AtomicWaker = AtomicWaker::new();
+    #[cfg(feature = "esp32c3")]
+    const PIN_COUNT: usize = 26; // TODO cfg for each chip
+    static PIN_WAKERS: [AtomicWaker; PIN_COUNT] = [NEW_AW; PIN_COUNT];
+
+
+    impl<MODE, RA, PINTYPE, const GPIONUM: u8> Wait for GpioPin<Input<MODE>, RA, PINTYPE, GPIONUM>
+    where
+        RA: BankGpioRegisterAccess,
+        PINTYPE: IsOutputPin,
+    {
+        type WaitForHighFuture<'a> = PinFuture<'a, GpioPin<Input<MODE>, RA, PINTYPE, GPIONUM>>
+            where PINTYPE: 'a,
+                  RA: 'a,
+                  MODE: 'a;
+
+        fn wait_for_high(&mut self) -> Self::WaitForHighFuture<'_> {
+            self.listen(Event::HighLevel);
+            PinFuture::new(self)
+        }
+
+        type WaitForLowFuture<'a> = PinFuture<'a, GpioPin<Input<MODE>, RA, PINTYPE, GPIONUM>>
+            where PINTYPE: 'a,
+                  RA: 'a,
+                  MODE: 'a;
+
+        fn wait_for_low(&mut self) -> Self::WaitForLowFuture<'_> {
+            self.listen(Event::LowLevel);
+            PinFuture::new(self)
+        }
+
+        type WaitForRisingEdgeFuture<'a> = PinFuture<'a, GpioPin<Input<MODE>, RA, PINTYPE, GPIONUM>>
+            where PINTYPE: 'a,
+                  RA: 'a,
+                  MODE: 'a;
+
+        fn wait_for_rising_edge(&mut self) -> Self::WaitForRisingEdgeFuture<'_> {
+            self.listen(Event::RisingEdge);
+            PinFuture::new(self)
+        }
+
+        type WaitForFallingEdgeFuture<'a> = PinFuture<'a, GpioPin<Input<MODE>, RA, PINTYPE, GPIONUM>>
+            where PINTYPE: 'a,
+                  RA: 'a,
+                  MODE: 'a;
+
+        fn wait_for_falling_edge(&mut self) -> Self::WaitForFallingEdgeFuture<'_> {
+            self.listen(Event::FallingEdge);
+            PinFuture::new(self)
+        }
+
+        type WaitForAnyEdgeFuture<'a> = PinFuture<'a, GpioPin<Input<MODE>, RA, PINTYPE, GPIONUM>>
+            where PINTYPE: 'a,
+                  RA: 'a,
+                  MODE: 'a;
+
+        fn wait_for_any_edge(&mut self) -> Self::WaitForAnyEdgeFuture<'_> {
+            self.listen(Event::AnyEdge);
+            PinFuture::new(self)
+        }
+    }
+
+    pub struct PinFuture<'a, P> {
+        pin: &'a P,
+    }
+
+    impl<'a, P> PinFuture<'a, P>
+    where
+        P: crate::gpio::Pin + embedded_hal_1::digital::ErrorType,
+    {
+        pub fn new(pin: &'a P) -> Self {
+            Self { pin }
+        }
+    }
+
+    impl<'a, P> core::future::Future for PinFuture<'a, P>
+    where
+        P: crate::gpio::Pin + embedded_hal_1::digital::ErrorType,
+    {
+        type Output = Result<(), P::Error>;
+
+        fn poll(self: core::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+            PIN_WAKERS[self.pin.number() as usize].register(cx.waker());
+
+            // if pin is no longer listening its been triggered
+            // therefore the future has resolved
+            if !self.pin.is_listening() {
+                Poll::Ready(Ok(()))
+            } else {
+                Poll::Pending
+            }
+        }
+    }
+
+    #[interrupt]
+    unsafe fn GPIO() {
+        let gpio = crate::pac::GPIO::PTR;
+        let mut intrs = (*gpio).pcpu_int.read().bits();
+        (*gpio).status_w1tc.write(|w| w.bits(intrs)); // clear interrupts
+
+        while intrs != 0 {
+            let pin_nr = intrs.trailing_zeros();
+            // TODO in the future we could conjure a pin and reuse code in esp-hal
+            (*gpio).pin[pin_nr as usize].modify(|_, w| w.int_ena().bits(0)); // stop listening, this is the signal that the future is ready
+            PIN_WAKERS[pin_nr as usize].wake(); // wake task
+            intrs &= !(1u32 << pin_nr);
+        }
+    }
+}
