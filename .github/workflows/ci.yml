@@ -44,6 +44,8 @@ jobs:
         run: cd esp32-hal/ && cargo check --examples --features=eh1,smartled,ufmt
       - name: check esp32-hal (async)
         run: cd esp32-hal/ && cargo check --example=embassy_hello_world --features=embassy,embassy-time-timg0
+      - name: check esp32-hal (async, gpio)
+        run: cd esp32-hal/ && cargo check --example=embassy_wait --features=embassy,embassy-time-timg0,async
 
   esp32c2-hal:
     runs-on: ubuntu-latest
@@ -75,6 +77,8 @@ jobs:
         run: cd esp32c2-hal/ && cargo check --example=embassy_hello_world --features=embassy,embassy-time-systick
       - name: check esp32c2-hal (async, timg0)
         run: cd esp32c2-hal/ && cargo check --example=embassy_hello_world --features=embassy,embassy-time-timg0
+      - name: check esp32c2-hal (async, gpio)
+        run: cd esp32c2-hal/ && cargo check --example=embassy_wait --features=embassy,embassy-time-systick,async
 
   esp32c3-hal:
     runs-on: ubuntu-latest
@@ -109,6 +113,8 @@ jobs:
         run: cargo check --manifest-path=esp32c3-hal/Cargo.toml --target=riscv32imc-unknown-none-elf --example=embassy_hello_world --features=embassy,embassy-time-systick
       - name: check esp32c3-hal (async, timg0)
         run: cargo check --manifest-path=esp32c3-hal/Cargo.toml --target=riscv32imc-unknown-none-elf --example=embassy_hello_world --features=embassy,embassy-time-timg0
+      - name: check esp32c3-hal (async, gpio)
+        run: cd esp32c3-hal/ && cargo check --example=embassy_wait --features=embassy,embassy-time-systick,async
 
   esp32s2-hal:
     runs-on: ubuntu-latest
@@ -135,6 +141,8 @@ jobs:
       #   run: cd esp32s2-hal/ && cargo check --example=embassy_hello_world --features=embassy,embassy-time-systick
       - name: check esp32s2-hal (async, timg0)
         run: cd esp32s2-hal/ && cargo check --example=embassy_hello_world --features=embassy,embassy-time-timg0
+      - name: check esp32s2-hal (async, gpio)
+        run: cd esp32s2-hal/ && cargo check --example=embassy_wait --features=embassy,embassy-time-timg0,async
 
   esp32s3-hal:
     runs-on: ubuntu-latest
@@ -164,7 +172,8 @@ jobs:
         run: cd esp32s3-hal/ && cargo check --example=embassy_hello_world --features=embassy,embassy-time-systick
       - name: check esp32s3-hal (async, timg0)
         run: cd esp32s3-hal/ && cargo check --example=embassy_hello_world --features=embassy,embassy-time-timg0
-
+      - name: check esp32s3-hal (async, gpio)
+        run: cd esp32s3-hal/ && cargo check --example=embassy_wait --features=embassy,embassy-time-timg0,async
   # --------------------------------------------------------------------------
   # MSRV
 

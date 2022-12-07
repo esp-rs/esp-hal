@@ -80,5 +80,9 @@ required-features = ["eh1"]
 name              = "embassy_hello_world"
 required-features = ["embassy"]
 
+[[example]]
+name              = "embassy_wait"
+required-features = ["embassy", "async"]
+
 [profile.dev]
 opt-level = 1
