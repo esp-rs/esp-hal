@@ -30,7 +30,7 @@ void                 = { version = "1.0.2", default-features = false }
 usb-device           = { version = "0.2.9", optional = true }
 
 # async
-embedded-hal-async = { version = "0.1.0-alpha.3", optional = true }
+embedded-hal-async = { version = "0.2.0-alpha.0", optional = true }
 embassy-sync       = { version = "0.1.0", optional = true }
 embassy-time       = { version = "0.1.0", features = ["nightly"], optional = true }
 
