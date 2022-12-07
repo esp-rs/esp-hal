@@ -117,6 +117,8 @@ pub trait Pin {
         self.listen_with_options(event, true, false, false)
     }
 
+    fn is_listening(&self) -> bool;
+
     fn listen_with_options(
         &mut self,
         event: Event,
@@ -765,6 +767,11 @@ where
                     .bit(wake_up_from_light_sleep)
             });
         }
+    }
+
+    fn is_listening(&self) -> bool {
+        let bits = unsafe { &*GPIO::PTR }.pin[GPIONUM as usize].read().int_ena().bits();
+        bits != 0
     }
 
     fn unlisten(&mut self) {
