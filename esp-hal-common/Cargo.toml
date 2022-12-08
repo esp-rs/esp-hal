@@ -80,7 +80,7 @@ async   = ["embedded-hal-async", "eh1", "embassy-sync"]
 embassy = ["embassy-time"]
 
 embassy-time-systick = []
-embassy-time-timg    = []
+embassy-time-timg0    = []
 
 # Architecture-specific features (intended for internal use)
 riscv  = ["dep:riscv", "critical-section/restore-state-u8",  "procmacros/riscv", "riscv-atomic-emulation-trap"]

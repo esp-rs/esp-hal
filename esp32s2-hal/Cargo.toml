@@ -61,7 +61,7 @@ embassy   = ["esp-hal-common/embassy"]
 # - add 80_000_000 support to embassy time
 # - Fix https://github.com/esp-rs/esp-hal/issues/253
 # embassy-time-systick = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-hz-1_000_000"] 
-embassy-time-timg = ["esp-hal-common/embassy-time-timg", "embassy-time/tick-hz-1_000_000"]
+embassy-time-timg0 = ["esp-hal-common/embassy-time-timg0", "embassy-time/tick-hz-1_000_000"]
 
 [[example]]
 name              = "hello_rgb"

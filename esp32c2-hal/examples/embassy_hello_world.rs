@@ -39,7 +39,6 @@ fn main() -> ! {
     let peripherals = Peripherals::take().unwrap();
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-    embassy::init(&clocks);
 
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
@@ -49,6 +48,12 @@ fn main() -> ! {
     rtc.swd.disable();
     rtc.rwdt.disable();
     wdt0.disable();
+
+    #[cfg(feature = "embassy-time-systick")]
+    embassy::init(&clocks, esp32c2_hal::systimer::SystemTimer::new(peripherals.SYSTIMER));
+
+    #[cfg(feature = "embassy-time-timg0")]
+    embassy::init(&clocks, timer_group0.timer0);
 
     let executor = EXECUTOR.init(Executor::new());
     executor.run(|spawner| {

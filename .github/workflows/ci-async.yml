@@ -23,7 +23,9 @@ jobs:
         chip_features:
           [
             { chip: esp32c2, features: "embassy,embassy-time-systick" },
+            { chip: esp32c2, features: "embassy,embassy-time-timg0" },
             { chip: esp32c3, features: "embassy,embassy-time-systick" },
+            { chip: esp32c3, features: "embassy,embassy-time-timg0" },
           ]
         toolchain: [nightly]
         example:
@@ -52,11 +54,11 @@ jobs:
       matrix:
         chip_features:
           [
-            { chip: esp32, features: "embassy,embassy-time-timg" },
+            { chip: esp32, features: "embassy,embassy-time-timg0" },
             # { chip: esp32s2, features: "embassy,embassy-time-systick" }, # Removed for now, see esp32s2-hal/Cargo.toml
-            { chip: esp32s2, features: "embassy,embassy-time-timg" },
+            { chip: esp32s2, features: "embassy,embassy-time-timg0" },
             { chip: esp32s3, features: "embassy,embassy-time-systick" },
-            { chip: esp32s3, features: "embassy,embassy-time-timg" },
+            { chip: esp32s3, features: "embassy,embassy-time-timg0" },
           ]
         example:
           [
