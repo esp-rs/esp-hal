@@ -80,7 +80,7 @@ global_asm!(
 .align 6
 
 _start_trap_hal:
-    addi sp, sp, -32*4
+    addi sp, sp, -40*4
 
     sw ra, 0*4(sp)
     sw t0, 1*4(sp)
@@ -112,12 +112,26 @@ _start_trap_hal:
     sw s11, 27*4(sp)
     sw gp, 28*4(sp)
     sw tp, 29*4(sp)
+    csrrs t1, mepc, x0
+    sw t1, 31*4(sp)
+    csrrs t1, mstatus, x0
+    sw t1, 32*4(sp)
+    csrrs t1, mcause, x0
+    sw t1, 33*4(sp)
+    csrrs t1, mtval, x0
+    sw t1, 34*4(sp)
 
-    addi s0, sp, 32*4
+    addi s0, sp, 40*4
     sw s0, 30*4(sp)
 
     add a0, sp, zero
     jal ra, _start_trap_rust_hal
+
+    lw t1, 31*4(sp)
+    csrrw x0, mepc, t1
+
+    lw t1, 32*4(sp)
+    csrrw x0, mstatus, t1
 
     lw ra, 0*4(sp)
     lw t0, 1*4(sp)
