@@ -1,0 +1,78 @@
+{
+    "version": 1,
+    "author": "Sergio Gasquez Arcos",
+    "editor": "wokwi",
+    "parts": [
+        {
+            "type": "board-esp32-c3-devkitm-1",
+            "id": "esp",
+            "top": 0,
+            "left": 0.67,
+            "attrs": {
+                "builder": "rust-std-esp32c3"
+            }
+        },
+        {
+            "type": "wokwi-pushbutton",
+            "id": "btn1",
+            "top": 107.93,
+            "left": 168.4,
+            "attrs": {
+                "color": "green"
+            }
+        }
+    ],
+    "connections": [
+        [
+            "esp:TX",
+            "$serialMonitor:RX",
+            "",
+            []
+        ],
+        [
+            "esp:RX",
+            "$serialMonitor:TX",
+            "",
+            []
+        ],
+        [
+            "esp:5",
+            "btn1:2.l",
+            "green",
+            [
+                "h47.06",
+                "v34.63"
+            ]
+        ],
+        [
+            "esp:3V3.1",
+            "btn1:1.l",
+            "green",
+            [
+                "h-14.19",
+                "v-38.4",
+                "h164.8",
+                "v128.69"
+            ]
+        ],
+        [
+            "esp:3V3.1",
+            "esp:3V3.2",
+            "green",
+            [
+                "h0"
+            ]
+        ],
+        [
+            "esp:3V3.2",
+            "esp:5V.2",
+            "green",
+            [
+                "h0"
+            ]
+        ]
+    ],
+    "serialMonitor": {
+        "display": "terminal"
+    }
+}
