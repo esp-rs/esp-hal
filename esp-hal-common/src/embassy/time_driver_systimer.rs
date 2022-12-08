@@ -9,11 +9,13 @@ use crate::{
 
 pub const ALARM_COUNT: usize = 3;
 
+pub type TimerType = SystemTimer;
+
 pub struct EmbassyTimer {
-    pub alarms: Mutex<[AlarmState; ALARM_COUNT]>,
-    pub alarm0: Alarm<Target, 0>,
-    pub alarm1: Alarm<Target, 1>,
-    pub alarm2: Alarm<Target, 2>,
+    pub(crate) alarms: Mutex<[AlarmState; ALARM_COUNT]>,
+    pub(crate) alarm0: Alarm<Target, 0>,
+    pub(crate) alarm1: Alarm<Target, 1>,
+    pub(crate) alarm2: Alarm<Target, 2>,
 }
 
 const ALARM_STATE_NONE: AlarmState = AlarmState::new();
@@ -52,7 +54,7 @@ impl EmbassyTimer {
         })
     }
 
-    pub(crate) fn init(_clocks: &Clocks) {
+    pub fn init(_clocks: &Clocks, _systimer: TimerType) {
         use crate::{interrupt, interrupt::Priority, macros::interrupt};
 
         interrupt::enable(pac::Interrupt::SYSTIMER_TARGET0, Priority::max()).unwrap();

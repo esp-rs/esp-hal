@@ -8,26 +8,28 @@ use crate::{
     clock::Clocks,
     pac,
     prelude::*,
-    timer::{Instance, TimerGroup},
+    timer::{Timer, Timer0},
 };
 
-pub const ALARM_COUNT: usize = 2;
+pub const ALARM_COUNT: usize = 1;
+
+pub type TimerType = Timer<Timer0<TIMG0>>;
 
 pub struct EmbassyTimer {
-    pub alarms: Mutex<[AlarmState; ALARM_COUNT]>,
+    pub(crate) alarms: Mutex<[AlarmState; ALARM_COUNT]>,
+    pub(crate) timer: Mutex<RefCell<Option<TimerType>>>,
 }
 
 const ALARM_STATE_NONE: AlarmState = AlarmState::new();
 
-static TG: Mutex<RefCell<Option<TimerGroup<TIMG0>>>> = Mutex::new(RefCell::new(None));
-
 embassy_time::time_driver_impl!(static DRIVER: EmbassyTimer = EmbassyTimer {
     alarms: Mutex::new([ALARM_STATE_NONE; ALARM_COUNT]),
+    timer: Mutex::new(RefCell::new(None)),
 });
 
 impl EmbassyTimer {
     pub(crate) fn now() -> u64 {
-        critical_section::with(|cs| TG.borrow_ref(cs).as_ref().unwrap().timer0.now())
+        critical_section::with(|cs| DRIVER.timer.borrow_ref(cs).as_ref().unwrap().now())
     }
 
     pub(crate) fn trigger_alarm(&self, n: usize, cs: CriticalSection) {
@@ -42,40 +44,27 @@ impl EmbassyTimer {
 
     fn on_interrupt(&self, id: u8) {
         critical_section::with(|cs| {
-            let mut tg = TG.borrow_ref_mut(cs);
+            let mut tg = self.timer.borrow_ref_mut(cs);
             let tg = tg.as_mut().unwrap();
-            match id {
-                0 => tg.timer0.clear_interrupt(),
-                1 => tg.timer1.clear_interrupt(),
-                _ => unreachable!(),
-            };
+            tg.clear_interrupt();
             self.trigger_alarm(id as usize, cs);
         });
     }
 
-    pub(crate) fn init(clocks: &Clocks) {
+    pub fn init(clocks: &Clocks, mut timer: TimerType) {
         use crate::{interrupt, interrupt::Priority};
 
-        // TODO can we avoid this steal in the future...
-        let mut tg = TimerGroup::new(unsafe { pac::Peripherals::steal().TIMG0 }, clocks);
         // set divider to get a 1mhz clock. abp (80mhz) / 80 = 1mhz... // TODO assert
         // abp clock is the source and its at the correct speed for the divider
-        tg.timer0.set_divider(clocks.apb_clock.to_MHz() as u16);
-        tg.timer1.set_divider(clocks.apb_clock.to_MHz() as u16);
+        timer.set_divider(clocks.apb_clock.to_MHz() as u16);
 
-        critical_section::with(|cs| TG.borrow_ref_mut(cs).replace(tg));
+        critical_section::with(|cs| DRIVER.timer.borrow_ref_mut(cs).replace(timer));
 
         interrupt::enable(pac::Interrupt::TG0_T0_LEVEL, Priority::max()).unwrap();
-        interrupt::enable(pac::Interrupt::TG0_T1_LEVEL, Priority::max()).unwrap();
 
         #[interrupt]
         fn TG0_T0_LEVEL() {
             DRIVER.on_interrupt(0);
-        }
-
-        #[interrupt]
-        fn TG0_T1_LEVEL() {
-            DRIVER.on_interrupt(1);
         }
     }
 
@@ -83,39 +72,22 @@ impl EmbassyTimer {
         critical_section::with(|cs| {
             let now = Self::now();
             let alarm_state = unsafe { self.alarms.borrow(cs).get_unchecked(alarm.id() as usize) };
-            let mut tg = TG.borrow_ref_mut(cs);
+            let mut tg = self.timer.borrow_ref_mut(cs);
             let tg = tg.as_mut().unwrap();
             if timestamp < now {
-                match alarm.id() {
-                    0 => tg.timer0.unlisten(),
-                    1 => tg.timer1.unlisten(),
-                    _ => unreachable!()
-                }
+                tg.unlisten();
                 alarm_state.timestamp.set(u64::MAX);
                 return false;
             }
             alarm_state.timestamp.set(timestamp);
 
-            match alarm.id() {
-                0 => {
-                    tg.timer0.load_alarm_value(timestamp);
-                    tg.timer0.listen();
-                    tg.timer0.set_counter_decrementing(false);
-                    tg.timer0.set_auto_reload(false);
-                    tg.timer0.set_counter_active(true);
-                    tg.timer0.set_alarm_active(true);
-                }
-                1 => {
-                    tg.timer1.load_alarm_value(timestamp);
-                    tg.timer1.listen();
-                    tg.timer1.set_counter_decrementing(false);
-                    tg.timer1.set_auto_reload(false);
-                    tg.timer1.set_counter_active(true);
-                    tg.timer1.set_alarm_active(true);
-                }
-                _ => unreachable!(),
-            }
-
+            tg.load_alarm_value(timestamp);
+            tg.listen();
+            tg.set_counter_decrementing(false);
+            tg.set_auto_reload(false);
+            tg.set_counter_active(true);
+            tg.set_alarm_active(true);
+                    
             true
         })
     }

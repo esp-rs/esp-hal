@@ -30,6 +30,7 @@ fn main() {
     //   - 'rmt'
     //   - 'spi3'
     //   - 'systimer'
+    //   - 'timg0'
     //   - 'timg1'
     //   - 'uart2'
     //   - 'usb_otg'
@@ -49,11 +50,12 @@ fn main() {
             "pdma",
             "rmt",
             "spi3",
+            "timg0",
             "timg1",
             "uart2",
         ]
     } else if esp32c2 {
-        vec!["esp32c2", "riscv", "single_core", "gdma", "systimer"]
+        vec!["esp32c2", "riscv", "single_core", "gdma", "systimer", "timg0"]
     } else if esp32c3 {
         vec![
             "esp32c3",
@@ -64,6 +66,7 @@ fn main() {
             "rmt",
             "spi3",
             "systimer",
+            "timg0",
             "timg1",
             "usb_serial_jtag",
         ]
@@ -79,6 +82,7 @@ fn main() {
             "rmt",
             "spi3",
             "systimer",
+            "timg0",
             "timg1",
             "usb_otg",
         ]
@@ -94,6 +98,7 @@ fn main() {
             "rmt",
             "spi3",
             "systimer",
+            "timg0",
             "timg1",
             "uart2",
             "usb_otg",
