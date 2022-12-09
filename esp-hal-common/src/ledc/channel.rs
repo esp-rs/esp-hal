@@ -122,9 +122,8 @@ where
         let duty_range = 2u32.pow(duty_exp);
         let duty_value = (duty_range * duty_pct as u32) as u32 / 100;
 
-        if duty_value == 0 || duty_pct > 100u8 {
-            // Not enough bits to represent the requested duty % or duty_pct greater than
-            // 1.0
+        if duty_pct > 100u8 {
+            // duty_pct greater than 100%
             return Err(Error::Duty);
         }
 
