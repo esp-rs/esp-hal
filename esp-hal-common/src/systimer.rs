@@ -24,6 +24,11 @@ pub struct SystemTimer {
 
 impl SystemTimer {
     #[cfg(esp32s2)]
+    pub const BIT_MASK: u64 = u64::MAX;
+    #[cfg(any(esp32c2, esp32c3, esp32s3))]
+    pub const BIT_MASK: u64 = 0xFFFFFFFFFFFFF;
+
+    #[cfg(esp32s2)]
     pub const TICKS_PER_SECOND: u64 = 80_000_000; // TODO this can change when we have support for changing APB frequency
     #[cfg(any(esp32c2, esp32c3, esp32s3))]
     pub const TICKS_PER_SECOND: u64 = 16_000_000;
