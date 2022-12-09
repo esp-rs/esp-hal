@@ -67,7 +67,7 @@ mod delay {
             let t0 = SystemTimer::now();
             let clocks = (us as u64 * self.freq.raw()) / HertzU64::MHz(1).raw();
 
-            while SystemTimer::now().wrapping_sub(t0) <= clocks {}
+            while SystemTimer::now().wrapping_sub(t0) & SystemTimer::BIT_MASK <= clocks {}
         }
     }
 }
