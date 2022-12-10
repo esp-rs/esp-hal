@@ -235,7 +235,7 @@ macro_rules! set_duty {
                 .write(|w| unsafe { w.[<duty>]().bits($duty << 4) });
         }
         start_duty_without_fading!($self, $num);
-        update_channel!($self, $num);
+        update_channel!($self, $speed, $num);
     }};
 }
 
@@ -255,7 +255,7 @@ macro_rules! update_channel {
 #[cfg(not(esp32))]
 /// Macro to update channel configuration (only for LowSpeed channels)
 macro_rules! update_channel {
-    ($self: ident, $num: literal) => {
+    ($self: ident, l, $num: literal) => {
         paste! {
             $self.ledc
                 .[<ch $num _conf0>]
