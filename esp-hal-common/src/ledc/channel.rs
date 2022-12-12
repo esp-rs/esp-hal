@@ -122,9 +122,8 @@ where
         let duty_range = 2u32.pow(duty_exp);
         let duty_value = (duty_range * duty_pct as u32) as u32 / 100;
 
-        if duty_value == 0 || duty_pct > 100u8 {
-            // Not enough bits to represent the requested duty % or duty_pct greater than
-            // 1.0
+        if duty_pct > 100u8 {
+            // duty_pct greater than 100%
             return Err(Error::Duty);
         }
 
@@ -137,7 +136,7 @@ where
 #[cfg(esp32)]
 /// Macro to configure channel parameters in hw
 macro_rules! set_channel {
-    ($self: ident, $speed: ident, $num: literal, $timer_number: ident) => {
+    ($self: ident, $speed: ident, $num: literal, $timer_number: ident) => {{
         paste! {
             $self.ledc.[<$speed sch $num _hpoint>]
                 .write(|w| unsafe { w.[<hpoint>]().bits(0x0) });
@@ -147,6 +146,34 @@ macro_rules! set_channel {
                     .[<timer_sel>]()
                     .bits($timer_number)
             });
+        }
+        start_duty_without_fading!($self, $speed, $num);
+    }};
+}
+
+#[cfg(not(esp32))]
+/// Macro to configure channel parameters in hw
+macro_rules! set_channel {
+    ($self: ident, $speed: ident, $num: literal, $timer_number: ident) => {{
+        paste! {
+            $self.ledc.[<ch $num _hpoint>]
+                .write(|w| unsafe { w.[<hpoint>]().bits(0x0) });
+            $self.ledc.[<ch $num _conf0>].modify(|_, w| unsafe {
+                w.[<sig_out_en>]()
+                    .set_bit()
+                    .[<timer_sel>]()
+                    .bits($timer_number)
+            });
+        }
+        start_duty_without_fading!($self, $num);
+    }};
+}
+
+#[cfg(esp32)]
+/// Macro to start duty cycle, without fading
+macro_rules! start_duty_without_fading {
+    ($self: ident, $speed: ident, $num: literal) => {
+        paste! {
             $self.ledc.[<$speed sch $num _conf1>].write(|w| unsafe {
                 w.[<duty_start>]()
                     .set_bit()
@@ -164,18 +191,10 @@ macro_rules! set_channel {
 }
 
 #[cfg(not(esp32))]
-/// Macro to configure channel parameters in hw
-macro_rules! set_channel {
-    ($self: ident, $speed: ident, $num: literal, $timer_number: ident) => {
+/// Macro to start duty cycle, without fading
+macro_rules! start_duty_without_fading {
+    ($self: ident, $num: literal) => {
         paste! {
-            $self.ledc.[<ch $num _hpoint>]
-                .write(|w| unsafe { w.[<hpoint>]().bits(0x0) });
-            $self.ledc.[<ch $num _conf0>].modify(|_, w| unsafe {
-                w.[<sig_out_en>]()
-                    .set_bit()
-                    .[<timer_sel>]()
-                    .bits($timer_number)
-            });
             $self.ledc.[<ch $num _conf1>].write(|w| unsafe {
                 w.[<duty_start>]()
                     .set_bit()
@@ -195,43 +214,48 @@ macro_rules! set_channel {
 #[cfg(esp32)]
 /// Macro to set duty parameters in hw
 macro_rules! set_duty {
-    ($self: ident, $speed: ident, $num: literal, $duty: ident) => {
+    ($self: ident, $speed: ident, $num: literal, $duty: ident) => {{
         paste! {
             $self.ledc
                 .[<$speed sch $num _duty>]
-                .write(|w| unsafe { w.[<duty>]().bits($duty << 4) })
+                .write(|w| unsafe { w.[<duty>]().bits($duty << 4) });
         }
-    };
+        start_duty_without_fading!($self, $speed, $num);
+        update_channel!($self, $speed, $num);
+    }};
 }
 
 #[cfg(not(esp32))]
 /// Macro to set duty parameters in hw
 macro_rules! set_duty {
-    ($self: ident, $speed: ident, $num: literal, $duty: ident) => {
+    ($self: ident, $speed: ident, $num: literal, $duty: ident) => {{
         paste! {
             $self.ledc
                 .[<ch $num _duty>]
-                .write(|w| unsafe { w.[<duty>]().bits($duty << 4) })
+                .write(|w| unsafe { w.[<duty>]().bits($duty << 4) });
         }
-    };
+        start_duty_without_fading!($self, $num);
+        update_channel!($self, $speed, $num);
+    }};
 }
 
 #[cfg(esp32)]
 /// Macro to update channel configuration (only for LowSpeed channels)
 macro_rules! update_channel {
-    ($self: ident, $num: literal) => {
+    ($self: ident, l, $num: literal) => {
         paste! {
             $self.ledc
                 .[<lsch $num _conf0>]
                 .modify(|_, w| w.[<para_up>]().set_bit());
         }
     };
+    ($self: ident, h, $num: literal) => {};
 }
 
 #[cfg(not(esp32))]
 /// Macro to update channel configuration (only for LowSpeed channels)
 macro_rules! update_channel {
-    ($self: ident, $num: literal) => {
+    ($self: ident, l, $num: literal) => {
         paste! {
             $self.ledc
                 .[<ch $num _conf0>]
@@ -339,51 +363,51 @@ where
             match self.number {
                 Number::Channel0 => {
                     set_channel!(self, l, 0, timer_number);
-                    update_channel!(self, 0);
+                    update_channel!(self, l, 0);
                     self.output_pin
                         .connect_peripheral_to_output(OutputSignal::LEDC_LS_SIG0);
                 }
                 Number::Channel1 => {
                     set_channel!(self, l, 1, timer_number);
-                    update_channel!(self, 1);
+                    update_channel!(self, l, 1);
                     self.output_pin
                         .connect_peripheral_to_output(OutputSignal::LEDC_LS_SIG1);
                 }
                 Number::Channel2 => {
                     set_channel!(self, l, 2, timer_number);
-                    update_channel!(self, 2);
+                    update_channel!(self, l, 2);
                     self.output_pin
                         .connect_peripheral_to_output(OutputSignal::LEDC_LS_SIG2);
                 }
                 Number::Channel3 => {
                     set_channel!(self, l, 3, timer_number);
-                    update_channel!(self, 3);
+                    update_channel!(self, l, 3);
                     self.output_pin
                         .connect_peripheral_to_output(OutputSignal::LEDC_LS_SIG3);
                 }
                 Number::Channel4 => {
                     set_channel!(self, l, 4, timer_number);
-                    update_channel!(self, 4);
+                    update_channel!(self, l, 4);
                     self.output_pin
                         .connect_peripheral_to_output(OutputSignal::LEDC_LS_SIG4);
                 }
                 Number::Channel5 => {
                     set_channel!(self, l, 5, timer_number);
-                    update_channel!(self, 5);
+                    update_channel!(self, l, 5);
                     self.output_pin
                         .connect_peripheral_to_output(OutputSignal::LEDC_LS_SIG5);
                 }
                 #[cfg(not(any(esp32c2, esp32c3)))]
                 Number::Channel6 => {
                     set_channel!(self, l, 6, timer_number);
-                    update_channel!(self, 6);
+                    update_channel!(self, l, 6);
                     self.output_pin
                         .connect_peripheral_to_output(OutputSignal::LEDC_LS_SIG6);
                 }
                 #[cfg(not(any(esp32c2, esp32c3)))]
                 Number::Channel7 => {
                     set_channel!(self, l, 7, timer_number);
-                    update_channel!(self, 7);
+                    update_channel!(self, l, 7);
                     self.output_pin
                         .connect_peripheral_to_output(OutputSignal::LEDC_LS_SIG7);
                 }
