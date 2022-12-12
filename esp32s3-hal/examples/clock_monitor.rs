@@ -23,7 +23,7 @@ static RTC: Mutex<RefCell<Option<Rtc>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take().unwrap();
+    let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 

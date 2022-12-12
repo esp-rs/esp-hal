@@ -24,7 +24,7 @@ static RWDT: Mutex<RefCell<Option<Rwdt>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take().unwrap();
+    let peripherals = Peripherals::take();
     let system = peripherals.DPORT.split();
     let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 

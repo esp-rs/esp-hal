@@ -29,7 +29,7 @@ static TIMER11: Mutex<RefCell<Option<Timer<Timer1<TIMG1>>>>> = Mutex::new(RefCel
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take().unwrap();
+    let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 

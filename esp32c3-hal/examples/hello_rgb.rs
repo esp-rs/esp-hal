@@ -35,7 +35,7 @@ use smart_leds::{
 
 #[entry]
 fn main() -> ! {
-    let peripherals = peripherals::Peripherals::take().unwrap();
+    let peripherals = peripherals::Peripherals::take();
     let mut system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 

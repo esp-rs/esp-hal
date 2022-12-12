@@ -32,7 +32,7 @@ static mut SOME_ZEROED_DATA: [u8; 8] = [0; 8];
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take().unwrap();
+    let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 

@@ -186,31 +186,19 @@ mod peripheral_macros {
             }
 
             impl Peripherals {
-                // /// Returns all the peripherals *once*
-                // #[inline]
-                // pub fn take() -> Self {
+                /// Returns all the peripherals *once*
+                #[inline]
+                pub fn take() -> Self {
 
-                //     #[no_mangle]
-                //     static mut _ESP_HAL_DEVICE_PERIPHERALS: bool = false;
-
-                //     critical_section::with(|_| unsafe {
-                //         if _ESP_HAL_DEVICE_PERIPHERALS {
-                //             panic!("init called more than once!")
-                //         }
-                //         _ESP_HAL_DEVICE_PERIPHERALS = true;
-                //         Self::steal()
-                //     })
-                // }
-
-                pub fn take() -> Option<Self> {
                     #[no_mangle]
                     static mut _ESP_HAL_DEVICE_PERIPHERALS: bool = false;
+
                     critical_section::with(|_| unsafe {
                         if _ESP_HAL_DEVICE_PERIPHERALS {
-                            return None;
+                            panic!("init called more than once!")
                         }
                         _ESP_HAL_DEVICE_PERIPHERALS = true;
-                        Some(Peripherals::steal())
+                        Self::steal()
                     })
                 }
             }

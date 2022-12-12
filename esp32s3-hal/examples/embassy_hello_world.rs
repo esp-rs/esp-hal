@@ -35,7 +35,7 @@ static EXECUTOR: StaticCell<Executor> = StaticCell::new();
 #[xtensa_lx_rt::entry]
 fn main() -> ! {
     esp_println::println!("Init!");
-    let peripherals = Peripherals::take().unwrap();
+    let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
