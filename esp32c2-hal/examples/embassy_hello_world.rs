@@ -50,7 +50,10 @@ fn main() -> ! {
     wdt0.disable();
 
     #[cfg(feature = "embassy-time-systick")]
-    embassy::init(&clocks, esp32c2_hal::systimer::SystemTimer::new(peripherals.SYSTIMER));
+    embassy::init(
+        &clocks,
+        esp32c2_hal::systimer::SystemTimer::new(peripherals.SYSTIMER),
+    );
 
     #[cfg(feature = "embassy-time-timg0")]
     embassy::init(&clocks, timer_group0.timer0);

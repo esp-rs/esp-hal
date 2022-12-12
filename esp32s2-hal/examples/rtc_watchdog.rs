@@ -39,7 +39,11 @@ fn main() -> ! {
 
     critical_section::with(|cs| RWDT.borrow_ref_mut(cs).replace(rtc.rwdt));
 
-    interrupt::enable(peripherals::Interrupt::RTC_CORE, interrupt::Priority::Priority1).unwrap();
+    interrupt::enable(
+        peripherals::Interrupt::RTC_CORE,
+        interrupt::Priority::Priority1,
+    )
+    .unwrap();
 
     loop {}
 }
@@ -59,11 +63,14 @@ fn RTC_CORE() {
 }
 
 #[xtensa_lx_rt::exception]
-fn exception(cause: xtensa_lx_rt::exception::ExceptionCause, frame: xtensa_lx_rt::exception::Context) {
+fn exception(
+    cause: xtensa_lx_rt::exception::ExceptionCause,
+    frame: xtensa_lx_rt::exception::Context,
+) {
     use esp_println::*;
 
     println!("\n\nException occured {:?} {:x?}", cause, frame);
-    
+
     let backtrace = esp_backtrace::arch::backtrace();
     for b in backtrace.iter() {
         if let Some(addr) = b {

@@ -5,6 +5,8 @@ use core::arch::{asm, global_asm};
 use core::mem::size_of;
 
 pub use embedded_hal as ehal;
+#[cfg(feature = "embassy")]
+pub use esp_hal_common::embassy;
 #[doc(inline)]
 pub use esp_hal_common::{
     analog::adc::implementation as adc,
@@ -21,6 +23,7 @@ pub use esp_hal_common::{
     peripherals,
     prelude,
     pulse_control,
+    sha,
     spi,
     system,
     systimer,
@@ -35,12 +38,7 @@ pub use esp_hal_common::{
     Rwdt,
     Uart,
     UsbSerialJtag,
-    sha
 };
-
-#[cfg(feature = "embassy")]
-pub use esp_hal_common::embassy;
-
 #[cfg(feature = "direct-boot")]
 use riscv_rt::pre_init;
 

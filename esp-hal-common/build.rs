@@ -55,7 +55,14 @@ fn main() {
             "uart2",
         ]
     } else if esp32c2 {
-        vec!["esp32c2", "riscv", "single_core", "gdma", "systimer", "timg0"]
+        vec![
+            "esp32c2",
+            "riscv",
+            "single_core",
+            "gdma",
+            "systimer",
+            "timg0",
+        ]
     } else if esp32c3 {
         vec![
             "esp32c3",

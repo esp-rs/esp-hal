@@ -4,12 +4,13 @@
 
 use embassy_executor::Executor;
 use embassy_time::{Duration, Timer};
-
 use esp32_hal::{
     clock::ClockControl,
+    embassy,
+    peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
-    Rtc, embassy, peripherals::Peripherals,
+    Rtc,
 };
 use esp_backtrace as _;
 use static_cell::StaticCell;
@@ -52,7 +53,6 @@ fn main() -> ! {
 
     #[cfg(feature = "embassy-time-timg0")]
     embassy::init(&clocks, timer_group0.timer0);
-
 
     let executor = EXECUTOR.init(Executor::new());
     executor.run(|spawner| {

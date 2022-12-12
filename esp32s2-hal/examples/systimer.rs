@@ -63,9 +63,21 @@ fn main() -> ! {
         ALARM2.borrow_ref_mut(cs).replace(alarm2);
     });
 
-    interrupt::enable(peripherals::Interrupt::SYSTIMER_TARGET0, Priority::Priority1).unwrap();
-    interrupt::enable(peripherals::Interrupt::SYSTIMER_TARGET1, Priority::Priority3).unwrap();
-    interrupt::enable(peripherals::Interrupt::SYSTIMER_TARGET2, Priority::Priority3).unwrap();
+    interrupt::enable(
+        peripherals::Interrupt::SYSTIMER_TARGET0,
+        Priority::Priority1,
+    )
+    .unwrap();
+    interrupt::enable(
+        peripherals::Interrupt::SYSTIMER_TARGET1,
+        Priority::Priority3,
+    )
+    .unwrap();
+    interrupt::enable(
+        peripherals::Interrupt::SYSTIMER_TARGET2,
+        Priority::Priority3,
+    )
+    .unwrap();
 
     // Initialize the Delay peripheral, and use it to toggle the LED state in a
     // loop.
@@ -113,11 +125,14 @@ fn SYSTIMER_TARGET2() {
 }
 
 #[xtensa_lx_rt::exception]
-fn exception(cause: xtensa_lx_rt::exception::ExceptionCause, frame: xtensa_lx_rt::exception::Context) {
+fn exception(
+    cause: xtensa_lx_rt::exception::ExceptionCause,
+    frame: xtensa_lx_rt::exception::Context,
+) {
     use esp_println::*;
 
     println!("\n\nException occured {:?} {:x?}", cause, frame);
-    
+
     let backtrace = esp_backtrace::arch::backtrace();
     for b in backtrace.iter() {
         if let Some(addr) = b {

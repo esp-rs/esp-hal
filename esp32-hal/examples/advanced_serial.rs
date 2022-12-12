@@ -11,11 +11,11 @@ use esp32_hal::{
     gpio::IO,
     peripherals::Peripherals,
     prelude::*,
+    timer::TimerGroup,
     uart::{
         config::{Config, DataBits, Parity, StopBits},
         TxRxPins,
     },
-    timer::TimerGroup,
     Delay,
     Rtc,
     Uart,

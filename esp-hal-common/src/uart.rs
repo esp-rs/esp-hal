@@ -5,14 +5,12 @@ use self::config::Config;
 use crate::pac::UART2;
 use crate::{
     clock::Clocks,
-    peripherals::{
-        UART0,
-        UART1,
-    },
     pac::uart0::{fifo::FIFO_SPEC, RegisterBlock},
+    peripheral::{Peripheral, PeripheralRef},
+    peripherals::{UART0, UART1},
     types::{InputSignal, OutputSignal},
     InputPin,
-    OutputPin, peripheral::{Peripheral, PeripheralRef},
+    OutputPin,
 };
 
 const UART_FIFO_SIZE: u16 = 128;

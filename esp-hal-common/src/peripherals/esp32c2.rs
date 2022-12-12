@@ -1,7 +1,6 @@
+pub use pac::Interrupt;
 
-use crate::pac;
-
-pub use pac::Interrupt; // We need to export this for users to use
+use crate::pac; // We need to export this for users to use
 
 crate::peripherals! {
     APB_CTRL,

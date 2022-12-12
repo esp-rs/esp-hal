@@ -32,8 +32,8 @@
 use esp32_hal::{
     clock::ClockControl,
     dma::DmaPriority,
+    i2s::{DataFormat, I2s, I2s0New, I2sWriteDma, NoMclk, PinsBclkWsDout, Standard},
     pdma::Dma,
-    i2s::{DataFormat, I2s, I2sWriteDma, NoMclk, PinsBclkWsDout, Standard, I2s0New},
     peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,

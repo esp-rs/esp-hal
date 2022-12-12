@@ -37,7 +37,11 @@ fn main() -> ! {
     rtc.rwdt.disable();
     wdt0.disable();
 
-    interrupt::enable(peripherals::Interrupt::TG0_T0_LEVEL, interrupt::Priority::Priority1).unwrap();
+    interrupt::enable(
+        peripherals::Interrupt::TG0_T0_LEVEL,
+        interrupt::Priority::Priority1,
+    )
+    .unwrap();
     timer0.start(500u64.millis());
     timer0.listen();
 

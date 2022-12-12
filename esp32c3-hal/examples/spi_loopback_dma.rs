@@ -18,7 +18,7 @@
 
 use esp32c3_hal::{
     clock::ClockControl,
-    dma::{DmaPriority},
+    dma::DmaPriority,
     gdma::Gdma,
     gpio::IO,
     peripherals::Peripherals,

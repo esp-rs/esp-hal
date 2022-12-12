@@ -51,9 +51,9 @@ pub use self::{
     interrupt::*,
     rng::Rng,
     rtc_cntl::{Rtc, Rwdt},
-    uart::Uart,
     spi::Spi,
     timer::Timer,
+    uart::Uart,
 };
 
 pub mod analog;
@@ -79,12 +79,12 @@ pub mod rng;
 pub mod rom;
 pub mod rtc_cntl;
 pub mod sha;
-pub mod uart;
 pub mod spi;
 pub mod system;
 #[cfg(systimer)]
 pub mod systimer;
 pub mod timer;
+pub mod uart;
 #[cfg(usb_serial_jtag)]
 pub mod usb_serial_jtag;
 #[cfg(rmt)]

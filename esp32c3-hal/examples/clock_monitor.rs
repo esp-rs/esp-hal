@@ -41,7 +41,11 @@ fn main() -> ! {
         clocks.xtal_clock.to_MHz()
     );
 
-    interrupt::enable(peripherals::Interrupt::RTC_CORE, interrupt::Priority::Priority1).unwrap();
+    interrupt::enable(
+        peripherals::Interrupt::RTC_CORE,
+        interrupt::Priority::Priority1,
+    )
+    .unwrap();
 
     critical_section::with(|cs| {
         RTC.borrow_ref_mut(cs).replace(rtc);

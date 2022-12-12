@@ -18,10 +18,10 @@
 
 use esp32_hal::{
     clock::ClockControl,
-    dma::{DmaPriority},
+    dma::DmaPriority,
     gpio::IO,
-    peripherals::Peripherals,
     pdma::Dma,
+    peripherals::Peripherals,
     prelude::*,
     spi::{Spi, SpiMode},
     timer::TimerGroup,

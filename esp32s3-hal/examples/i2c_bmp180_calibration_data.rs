@@ -10,7 +10,13 @@
 #![no_main]
 
 use esp32s3_hal::{
-    clock::ClockControl, gpio::IO, i2c::I2C, peripherals::Peripherals, prelude::*, timer::TimerGroup, Rtc,
+    clock::ClockControl,
+    gpio::IO,
+    i2c::I2C,
+    peripherals::Peripherals,
+    prelude::*,
+    timer::TimerGroup,
+    Rtc,
 };
 use esp_backtrace as _;
 use esp_println::println;

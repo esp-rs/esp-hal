@@ -13,8 +13,8 @@ use esp32_hal::{
     interrupt,
     peripherals::{self, Peripherals, UART0},
     prelude::*,
-    uart::config::AtCmdConfig,
     timer::TimerGroup,
+    uart::config::AtCmdConfig,
     Rtc,
     Uart,
 };
@@ -51,7 +51,11 @@ fn main() -> ! {
     serial0.listen_at_cmd();
     serial0.listen_rx_fifo_full();
 
-    interrupt::enable(peripherals::Interrupt::UART0, interrupt::Priority::Priority2).unwrap();
+    interrupt::enable(
+        peripherals::Interrupt::UART0,
+        interrupt::Priority::Priority2,
+    )
+    .unwrap();
 
     timer0.start(1u64.secs());
 

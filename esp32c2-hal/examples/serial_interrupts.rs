@@ -13,8 +13,8 @@ use esp32c2_hal::{
     interrupt,
     peripherals::{self, Peripherals, UART0},
     prelude::*,
-    uart::config::AtCmdConfig,
     timer::TimerGroup,
+    uart::config::AtCmdConfig,
     Cpu,
     Rtc,
     Uart,
@@ -51,7 +51,11 @@ fn main() -> ! {
 
     critical_section::with(|cs| SERIAL.borrow_ref_mut(cs).replace(serial0));
 
-    interrupt::enable(peripherals::Interrupt::UART0, interrupt::Priority::Priority1).unwrap();
+    interrupt::enable(
+        peripherals::Interrupt::UART0,
+        interrupt::Priority::Priority1,
+    )
+    .unwrap();
     interrupt::set_kind(
         Cpu::ProCpu,
         interrupt::CpuInterrupt::Interrupt1, // Interrupt 1 handles priority one interrupts

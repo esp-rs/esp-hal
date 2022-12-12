@@ -10,11 +10,11 @@ use esp32c2_hal::{
     clock::ClockControl,
     peripherals::Peripherals,
     prelude::*,
+    timer::TimerGroup,
     uart::{
         config::{Config, DataBits, Parity, StopBits},
         TxRxPins,
     },
-    timer::TimerGroup,
     Rtc,
     Uart,
     IO,

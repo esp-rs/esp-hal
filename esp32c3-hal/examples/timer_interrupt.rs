@@ -43,11 +43,19 @@ fn main() -> ! {
     wdt0.disable();
     wdt1.disable();
 
-    interrupt::enable(peripherals::Interrupt::TG0_T0_LEVEL, interrupt::Priority::Priority1).unwrap();
+    interrupt::enable(
+        peripherals::Interrupt::TG0_T0_LEVEL,
+        interrupt::Priority::Priority1,
+    )
+    .unwrap();
     timer0.start(500u64.millis());
     timer0.listen();
 
-    interrupt::enable(peripherals::Interrupt::TG1_T0_LEVEL, interrupt::Priority::Priority1).unwrap();
+    interrupt::enable(
+        peripherals::Interrupt::TG1_T0_LEVEL,
+        interrupt::Priority::Priority1,
+    )
+    .unwrap();
     timer1.start(1u64.secs());
     timer1.listen();
 

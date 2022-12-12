@@ -3,6 +3,8 @@
 #![cfg_attr(feature = "direct-boot", feature(asm_experimental_arch))]
 
 pub use embedded_hal as ehal;
+#[cfg(feature = "embassy")]
+pub use esp_hal_common::embassy;
 #[doc(inline)]
 pub use esp_hal_common::{
     analog::adc::implementation as adc,
@@ -18,15 +20,16 @@ pub use esp_hal_common::{
     macros,
     mcpwm,
     otg_fs,
+    peripherals,
     prelude,
     pulse_control,
-    uart,
+    sha,
     spi,
     system,
     systimer,
     timer,
+    uart,
     utils,
-    peripherals,
     Cpu,
     Delay,
     PulseControl,
@@ -35,11 +38,7 @@ pub use esp_hal_common::{
     Rwdt,
     Uart,
     UsbSerialJtag,
-    sha
 };
-
-#[cfg(feature = "embassy")]
-pub use esp_hal_common::embassy;
 
 pub use self::gpio::IO;
 

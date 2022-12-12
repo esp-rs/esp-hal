@@ -13,14 +13,14 @@ use esp32s2_hal::{
     interrupt,
     peripherals::{self, Peripherals, UART0},
     prelude::*,
-    uart::config::AtCmdConfig,
     timer::TimerGroup,
+    uart::config::AtCmdConfig,
     Rtc,
     Uart,
 };
 use esp_backtrace as _;
-use xtensa_atomic_emulation_trap as _;
 use nb::block;
+use xtensa_atomic_emulation_trap as _;
 use xtensa_lx_rt::entry;
 
 static SERIAL: Mutex<RefCell<Option<Uart<UART0>>>> = Mutex::new(RefCell::new(None));
@@ -52,7 +52,11 @@ fn main() -> ! {
     serial0.listen_at_cmd();
     serial0.listen_rx_fifo_full();
 
-    interrupt::enable(peripherals::Interrupt::UART0, interrupt::Priority::Priority2).unwrap();
+    interrupt::enable(
+        peripherals::Interrupt::UART0,
+        interrupt::Priority::Priority2,
+    )
+    .unwrap();
 
     timer0.start(1u64.secs());
 
@@ -95,11 +99,14 @@ fn UART0() {
 }
 
 #[xtensa_lx_rt::exception]
-fn exception(cause: xtensa_lx_rt::exception::ExceptionCause, frame: xtensa_lx_rt::exception::Context) {
+fn exception(
+    cause: xtensa_lx_rt::exception::ExceptionCause,
+    frame: xtensa_lx_rt::exception::Context,
+) {
     use esp_println::*;
 
     println!("\n\nException occured {:?} {:x?}", cause, frame);
-    
+
     let backtrace = esp_backtrace::arch::backtrace();
     for b in backtrace.iter() {
         if let Some(addr) = b {

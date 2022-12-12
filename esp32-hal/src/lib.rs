@@ -1,6 +1,8 @@
 #![no_std]
 
 pub use embedded_hal as ehal;
+#[cfg(feature = "embassy")]
+pub use esp_hal_common::embassy;
 #[doc(inline)]
 pub use esp_hal_common::{
     analog::adc::implementation as adc,
@@ -20,10 +22,11 @@ pub use esp_hal_common::{
     peripherals,
     prelude,
     pulse_control,
-    uart,
+    sha,
     spi,
     system,
     timer,
+    uart,
     utils,
     Cpu,
     Delay,
@@ -31,14 +34,10 @@ pub use esp_hal_common::{
     Rng,
     Rtc,
     Rwdt,
-    sha,
     Uart,
 };
 
 pub use self::gpio::IO;
-
-#[cfg(feature = "embassy")]
-pub use esp_hal_common::embassy;
 
 /// Common module for analog functions
 pub mod analog {

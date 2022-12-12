@@ -1,5 +1,5 @@
 //! This shows how to continously receive data via I2S
-//! 
+//!
 //! Pins used
 //! BCLK    GPIO1
 //! WS      GPIO2
@@ -7,7 +7,7 @@
 //!
 //! Without an additional I2S source device you can connect 3V3 or GND to DIN to
 //! read 0 or 0xFF or connect DIN to WS to read two different values
-//! 
+//!
 //! You can also inspect the MCLK, BCLK and WS with a logic analyzer
 
 #![no_std]
@@ -15,9 +15,9 @@
 
 use esp32s2_hal::{
     clock::ClockControl,
-    dma::{DmaPriority},
+    dma::DmaPriority,
+    i2s::{DataFormat, I2s, I2s0New, I2sReadDma, NoMclk, PinsBclkWsDin, Standard},
     pdma::Dma,
-    i2s::{DataFormat, I2s, NoMclk, Standard, I2s0New, PinsBclkWsDin, I2sReadDma},
     peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
