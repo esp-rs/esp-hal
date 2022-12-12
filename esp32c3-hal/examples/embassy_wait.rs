@@ -35,7 +35,6 @@ fn main() -> ! {
     let peripherals = Peripherals::take().unwrap();
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-    embassy::init(&clocks);
 
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
@@ -48,6 +47,12 @@ fn main() -> ! {
     rtc.rwdt.disable();
     wdt0.disable();
     wdt1.disable();
+
+    #[cfg(feature = "embassy-time-systick")]
+    embassy::init(&clocks, esp32c3_hal::systimer::SystemTimer::new(peripherals.SYSTIMER));
+
+    #[cfg(feature = "embassy-time-timg0")]
+    embassy::init(&clocks, timer_group0.timer0);
 
      // Set GPIO5 as an output, and set its state high initially.
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
