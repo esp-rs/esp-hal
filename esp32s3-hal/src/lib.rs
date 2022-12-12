@@ -142,24 +142,24 @@ pub unsafe fn startup_direct_boot() -> ! {
     // do some configurations for compatability with the 2nd stage bootloader
     // this is a workaround and ideally we should deal with these settings in other
     // places
-    (&*crate::pac::TIMG0::PTR)
+    (&*crate::peripherals::TIMG0::PTR)
         .int_ena_timers
         .modify(|_, w| w.t0_int_ena().set_bit().t1_int_ena().set_bit());
-    (&*crate::pac::TIMG1::PTR)
+    (&*crate::peripherals::TIMG1::PTR)
         .int_ena_timers
         .modify(|_, w| w.t0_int_ena().set_bit().t1_int_ena().set_bit());
 
-    (&*crate::pac::RTC_CNTL::PTR)
+    (&*crate::peripherals::RTC_CNTL::PTR)
         .swd_wprotect
         .write(|w| w.bits(0x8f1d312a));
-    (&*crate::pac::RTC_CNTL::PTR)
+    (&*crate::peripherals::RTC_CNTL::PTR)
         .swd_conf
         .modify(|_, w| w.swd_disable().set_bit());
-    (&*crate::pac::RTC_CNTL::PTR)
+    (&*crate::peripherals::RTC_CNTL::PTR)
         .swd_wprotect
         .write(|w| w.bits(0));
 
-    (&*crate::pac::SYSTEM::PTR)
+    (&*crate::peripherals::SYSTEM::PTR)
         .sysclk_conf
         .modify(|_, w| w.soc_clk_sel().bits(1));
 

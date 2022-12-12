@@ -6,7 +6,7 @@
 
 use esp32s3_hal::{
     clock::ClockControl,
-    pac::Peripherals,
+    peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
     Rtc,

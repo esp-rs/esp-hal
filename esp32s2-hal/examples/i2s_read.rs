@@ -18,7 +18,7 @@ use esp32s2_hal::{
     dma::{DmaPriority},
     pdma::Dma,
     i2s::{DataFormat, I2s, NoMclk, Standard, I2s0New, PinsBclkWsDin, I2sReadDma},
-    pac::Peripherals,
+    peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
     Rtc,

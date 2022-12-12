@@ -36,7 +36,7 @@
 //!
 //! ### Example (for ESP32-C3)
 //! ```
-//! let mut peripherals = pac::Peripherals::take().unwrap();
+//! let mut peripherals = peripherals::Peripherals::take().unwrap();
 //!
 //! // Configure RMT peripheral globally
 //! let pulse = PulseControl::new(

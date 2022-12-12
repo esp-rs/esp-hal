@@ -54,7 +54,7 @@ pub use crate::{
         },
     },
     macros::*,
-    serial::{Instance as _esp_hal_serial_Instance, UartPins as _esp_hal_serial_UartPins},
+    uart::{Instance as _esp_hal_uart_Instance, UartPins as _esp_hal_uart_UartPins},
     spi::{
         dma::WithDmaSpi2 as _esp_hal_spi_dma_WithDmaSpi2,
         Instance as _esp_hal_spi_Instance,
@@ -132,7 +132,7 @@ pub mod eh1 {
             },
         },
         macros::*,
-        serial::{Instance as _esp_hal_serial_Instance, UartPins as _esp_hal_serial_UartPins},
+        uart::{Instance as _esp_hal_serial_Instance, UartPins as _esp_hal_serial_UartPins},
         spi::{
             dma::WithDmaSpi2 as _esp_hal_spi_dma_WithDmaSpi2,
             Instance as _esp_hal_spi_Instance,

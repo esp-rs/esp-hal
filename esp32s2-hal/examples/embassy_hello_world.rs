@@ -9,7 +9,7 @@ use esp32s2_hal::{
     clock::ClockControl,
     prelude::*,
     timer::TimerGroup,
-    Rtc, embassy, pac::Peripherals,
+    Rtc, embassy, peripherals::Peripherals,
 };
 use esp_backtrace as _;
 use xtensa_atomic_emulation_trap as _;

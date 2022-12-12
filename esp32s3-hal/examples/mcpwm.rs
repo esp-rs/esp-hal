@@ -13,7 +13,7 @@ use esp32s3_hal::{
         operator::PwmPinConfig,
         timer::PwmWorkingMode,
     },
-    pac::Peripherals,
+    peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
     Rtc,

@@ -7,7 +7,7 @@ use embassy_time::{Duration, Timer};
 use esp32c2_hal::{
     clock::ClockControl,
     embassy,
-    pac::Peripherals,
+    peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
     Rtc,

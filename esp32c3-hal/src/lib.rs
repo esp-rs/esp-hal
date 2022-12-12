@@ -407,7 +407,7 @@ unsafe fn configure_mmu() {
         0,
     );
 
-    let peripherals = pac::Peripherals::steal();
+    let peripherals = peripherals::Peripherals::steal();
     peripherals.EXTMEM.icache_ctrl1.modify(|_, w| {
         w.icache_shut_ibus()
             .clear_bit()

@@ -9,7 +9,7 @@ use esp32c3_hal::{
     clock::ClockControl,
     prelude::*,
     timer::TimerGroup,
-    Rtc, embassy, pac::Peripherals,
+    Rtc, embassy, peripherals::Peripherals,
 };
 use esp_backtrace as _;
 use static_cell::StaticCell;

@@ -31,7 +31,7 @@ pub use esp_hal_common::{
     Rng,
     Rtc,
     Rwdt,
-    sha
+    sha,
     Uart,
 };
 

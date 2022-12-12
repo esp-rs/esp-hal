@@ -35,7 +35,7 @@ use esp32c3_hal::{
     dma::DmaPriority,
     gdma::Gdma,
     i2s::{DataFormat, I2s, I2sWriteDma, MclkPin, PinsBclkWsDout, Standard, I2s0New},
-    pac::Peripherals,
+    peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
     Rtc,

@@ -15,7 +15,7 @@
 
 use esp32_hal::{
     clock::ClockControl,
-    pac,
+    peripherals,
     prelude::*,
     timer::TimerGroup,
     utils::{smartLedAdapter, SmartLedsAdapter},

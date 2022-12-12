@@ -13,7 +13,7 @@
 
 use esp32c3_hal::{
     clock::ClockControl,
-    pac,
+    peripherals,
     prelude::*,
     pulse_control::ClockSource,
     timer::TimerGroup,
