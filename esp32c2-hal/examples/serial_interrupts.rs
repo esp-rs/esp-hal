@@ -11,28 +11,28 @@ use critical_section::Mutex;
 use esp32c2_hal::{
     clock::ClockControl,
     interrupt,
-    pac::{self, Peripherals, UART0},
+    peripherals::{self, Peripherals, UART0},
     prelude::*,
-    serial::config::AtCmdConfig,
     timer::TimerGroup,
+    uart::config::AtCmdConfig,
     Cpu,
     Rtc,
-    Serial,
+    Uart,
 };
 use esp_backtrace as _;
 use nb::block;
 use riscv_rt::entry;
 
-static SERIAL: Mutex<RefCell<Option<Serial<UART0>>>> = Mutex::new(RefCell::new(None));
+static SERIAL: Mutex<RefCell<Option<Uart<UART0>>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take().unwrap();
+    let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-    let mut serial0 = Serial::new(peripherals.UART0);
+    let mut serial0 = Uart::new(peripherals.UART0);
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let mut timer0 = timer_group0.timer0;
     let mut wdt0 = timer_group0.wdt;
@@ -51,7 +51,11 @@ fn main() -> ! {
 
     critical_section::with(|cs| SERIAL.borrow_ref_mut(cs).replace(serial0));
 
-    interrupt::enable(pac::Interrupt::UART0, interrupt::Priority::Priority1).unwrap();
+    interrupt::enable(
+        peripherals::Interrupt::UART0,
+        interrupt::Priority::Priority1,
+    )
+    .unwrap();
     interrupt::set_kind(
         Cpu::ProCpu,
         interrupt::CpuInterrupt::Interrupt1, // Interrupt 1 handles priority one interrupts

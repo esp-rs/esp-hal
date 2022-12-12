@@ -10,7 +10,7 @@ use core::cell::RefCell;
 use critical_section::Mutex;
 use esp32_hal::{
     clock::ClockControl,
-    pac::{Peripherals, TIMG1},
+    peripherals::{Peripherals, TIMG1},
     prelude::*,
     timer::{Timer, Timer0, TimerGroup},
     CpuControl,
@@ -23,7 +23,7 @@ use xtensa_lx_rt::entry;
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take().unwrap();
+    let peripherals = Peripherals::take();
     let system = peripherals.DPORT.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 

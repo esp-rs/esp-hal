@@ -5,7 +5,13 @@
 #![no_std]
 #![no_main]
 
-use esp32c2_hal::{clock::ClockControl, pac::Peripherals, prelude::*, timer::TimerGroup, Rtc};
+use esp32c2_hal::{
+    clock::ClockControl,
+    peripherals::Peripherals,
+    prelude::*,
+    timer::TimerGroup,
+    Rtc,
+};
 use esp_backtrace as _;
 use esp_println::println;
 use nb::block;
@@ -13,7 +19,7 @@ use riscv_rt::entry;
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take().unwrap();
+    let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 

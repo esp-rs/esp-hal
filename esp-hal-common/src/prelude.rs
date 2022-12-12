@@ -54,7 +54,6 @@ pub use crate::{
         },
     },
     macros::*,
-    serial::{Instance as _esp_hal_serial_Instance, UartPins as _esp_hal_serial_UartPins},
     spi::{
         dma::WithDmaSpi2 as _esp_hal_spi_dma_WithDmaSpi2,
         Instance as _esp_hal_spi_Instance,
@@ -65,6 +64,7 @@ pub use crate::{
         Instance as _esp_hal_timer_Instance,
         TimerGroupInstance as _esp_hal_timer_TimerGroupInstance,
     },
+    uart::{Instance as _esp_hal_uart_Instance, UartPins as _esp_hal_uart_UartPins},
 };
 
 /// All traits required for using the 1.0.0-alpha.x release of embedded-hal
@@ -132,7 +132,6 @@ pub mod eh1 {
             },
         },
         macros::*,
-        serial::{Instance as _esp_hal_serial_Instance, UartPins as _esp_hal_serial_UartPins},
         spi::{
             dma::WithDmaSpi2 as _esp_hal_spi_dma_WithDmaSpi2,
             Instance as _esp_hal_spi_Instance,
@@ -143,5 +142,6 @@ pub mod eh1 {
             Instance as _esp_hal_timer_Instance,
             TimerGroupInstance as _esp_hal_timer_TimerGroupInstance,
         },
+        uart::{Instance as _esp_hal_serial_Instance, UartPins as _esp_hal_serial_UartPins},
     };
 }

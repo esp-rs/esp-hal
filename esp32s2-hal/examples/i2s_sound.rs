@@ -33,9 +33,9 @@
 use esp32s2_hal::{
     clock::ClockControl,
     dma::DmaPriority,
+    i2s::{DataFormat, I2s, I2s0New, I2sWriteDma, MclkPin, PinsBclkWsDout, Standard},
     pdma::Dma,
-    i2s::{DataFormat, I2s, I2sWriteDma, MclkPin, PinsBclkWsDout, Standard, I2s0New},
-    pac::Peripherals,
+    peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
     Rtc,
@@ -54,7 +54,7 @@ const SINE: [i16; 64] = [
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take().unwrap();
+    let peripherals = Peripherals::take();
     let mut system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 

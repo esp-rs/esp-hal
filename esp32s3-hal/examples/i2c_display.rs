@@ -20,7 +20,13 @@ use embedded_graphics::{
     text::{Alignment, Text},
 };
 use esp32s3_hal::{
-    clock::ClockControl, gpio::IO, i2c::I2C, pac::Peripherals, prelude::*, timer::TimerGroup, Rtc,
+    clock::ClockControl,
+    gpio::IO,
+    i2c::I2C,
+    peripherals::Peripherals,
+    prelude::*,
+    timer::TimerGroup,
+    Rtc,
 };
 use esp_backtrace as _;
 use nb::block;
@@ -29,7 +35,7 @@ use xtensa_lx_rt::entry;
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take().unwrap();
+    let peripherals = Peripherals::take();
     let mut system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 

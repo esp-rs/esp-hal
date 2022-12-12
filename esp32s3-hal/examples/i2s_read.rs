@@ -18,8 +18,8 @@ use esp32s3_hal::{
     clock::ClockControl,
     dma::DmaPriority,
     gdma::Gdma,
-    i2s::{DataFormat, I2s, I2sReadDma, MclkPin, PinsBclkWsDin, Standard, I2s0New},
-    pac::Peripherals,
+    i2s::{DataFormat, I2s, I2s0New, I2sReadDma, MclkPin, PinsBclkWsDin, Standard},
+    peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
     Rtc,
@@ -31,7 +31,7 @@ use xtensa_lx_rt::entry;
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take().unwrap();
+    let peripherals = Peripherals::take();
     let mut system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 

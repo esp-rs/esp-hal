@@ -86,15 +86,9 @@ impl<T, const CHANNEL: u8> Alarm<T, CHANNEL> {
     pub fn interrupt_enable(&self, val: bool) {
         let systimer = unsafe { &*SYSTIMER::ptr() };
         match CHANNEL {
-            0 => systimer
-                .int_ena
-                .modify(|_, w| w.target0_int_ena().bit(val)),
-            1 => systimer
-                .int_ena
-                .modify(|_, w| w.target1_int_ena().bit(val)),
-            2 => systimer
-                .int_ena
-                .modify(|_, w| w.target2_int_ena().bit(val)),
+            0 => systimer.int_ena.modify(|_, w| w.target0_int_ena().bit(val)),
+            1 => systimer.int_ena.modify(|_, w| w.target1_int_ena().bit(val)),
+            2 => systimer.int_ena.modify(|_, w| w.target2_int_ena().bit(val)),
             _ => unreachable!(),
         }
     }

@@ -8,15 +8,15 @@
 
 use esp32c2_hal::{
     clock::ClockControl,
-    pac::Peripherals,
+    peripherals::Peripherals,
     prelude::*,
-    serial::{
+    timer::TimerGroup,
+    uart::{
         config::{Config, DataBits, Parity, StopBits},
         TxRxPins,
     },
-    timer::TimerGroup,
     Rtc,
-    Serial,
+    Uart,
     IO,
 };
 use esp_backtrace as _;
@@ -26,7 +26,7 @@ use riscv_rt::entry;
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take().unwrap();
+    let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
@@ -53,7 +53,7 @@ fn main() -> ! {
         io.pins.gpio2.into_floating_input(),
     );
 
-    let mut serial1 = Serial::new_with_config(peripherals.UART1, Some(config), Some(pins), &clocks);
+    let mut serial1 = Uart::new_with_config(peripherals.UART1, Some(config), Some(pins), &clocks);
 
     timer0.start(250u64.millis());
 

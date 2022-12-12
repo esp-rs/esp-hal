@@ -4,12 +4,13 @@
 
 use embassy_executor::Executor;
 use embassy_time::{Duration, Timer};
-
 use esp32_hal::{
     clock::ClockControl,
+    embassy,
+    peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
-    Rtc, embassy, pac::Peripherals,
+    Rtc,
 };
 use esp_backtrace as _;
 use static_cell::StaticCell;
@@ -35,7 +36,7 @@ static EXECUTOR: StaticCell<Executor> = StaticCell::new();
 #[xtensa_lx_rt::entry]
 fn main() -> ! {
     esp_println::println!("Init!");
-    let peripherals = Peripherals::take().unwrap();
+    let peripherals = Peripherals::take();
     let system = peripherals.DPORT.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
@@ -52,7 +53,6 @@ fn main() -> ! {
 
     #[cfg(feature = "embassy-time-timg0")]
     embassy::init(&clocks, timer_group0.timer0);
-
 
     let executor = EXECUTOR.init(Executor::new());
     executor.run(|spawner| {

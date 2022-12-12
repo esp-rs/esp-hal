@@ -1,6 +1,8 @@
 #![no_std]
 
 pub use embedded_hal as ehal;
+#[cfg(feature = "embassy")]
+pub use esp_hal_common::embassy;
 #[doc(inline)]
 pub use esp_hal_common::{
     analog::adc::implementation as adc,
@@ -10,20 +12,21 @@ pub use esp_hal_common::{
     dma::pdma,
     efuse,
     gpio,
-    i2s,
     i2c::{self, I2C},
+    i2s,
     interrupt,
     ledc,
     macros,
     otg_fs,
-    pac,
+    peripherals,
     prelude,
     pulse_control,
-    serial,
+    sha,
     spi,
     system,
     systimer,
     timer,
+    uart,
     utils,
     Cpu,
     Delay,
@@ -31,12 +34,8 @@ pub use esp_hal_common::{
     Rng,
     Rtc,
     Rwdt,
-    Serial,
-    sha
+    Uart,
 };
-
-#[cfg(feature = "embassy")]
-pub use esp_hal_common::embassy;
 
 pub use self::gpio::IO;
 
@@ -46,7 +45,7 @@ pub mod analog {
 }
 
 #[no_mangle]
-extern "C" fn EspDefaultHandler(_level: u32, _interrupt: pac::Interrupt) {}
+extern "C" fn EspDefaultHandler(_level: u32, _interrupt: peripherals::Interrupt) {}
 
 #[no_mangle]
 extern "C" fn DefaultHandler() {}

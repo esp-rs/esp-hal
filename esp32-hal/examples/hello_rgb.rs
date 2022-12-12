@@ -15,7 +15,7 @@
 
 use esp32_hal::{
     clock::ClockControl,
-    pac,
+    peripherals,
     prelude::*,
     timer::TimerGroup,
     utils::{smartLedAdapter, SmartLedsAdapter},
@@ -36,7 +36,7 @@ use xtensa_lx_rt::entry;
 
 #[entry]
 fn main() -> ! {
-    let peripherals = pac::Peripherals::take().unwrap();
+    let peripherals = peripherals::Peripherals::take();
     let mut system = peripherals.DPORT.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 

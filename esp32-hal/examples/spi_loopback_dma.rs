@@ -18,10 +18,10 @@
 
 use esp32_hal::{
     clock::ClockControl,
-    dma::{DmaPriority},
+    dma::DmaPriority,
     gpio::IO,
-    pac::Peripherals,
     pdma::Dma,
+    peripherals::Peripherals,
     prelude::*,
     spi::{Spi, SpiMode},
     timer::TimerGroup,
@@ -34,7 +34,7 @@ use xtensa_lx_rt::entry;
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take().unwrap();
+    let peripherals = Peripherals::take();
     let mut system = peripherals.DPORT.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 

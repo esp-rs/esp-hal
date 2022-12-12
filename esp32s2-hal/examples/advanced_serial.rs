@@ -9,26 +9,26 @@
 use esp32s2_hal::{
     clock::ClockControl,
     gpio::IO,
-    pac::Peripherals,
+    peripherals::Peripherals,
     prelude::*,
-    serial::{
+    timer::TimerGroup,
+    uart::{
         config::{Config, DataBits, Parity, StopBits},
         TxRxPins,
     },
-    timer::TimerGroup,
     Delay,
     Rtc,
-    Serial,
+    Uart,
 };
 use esp_backtrace as _;
-use xtensa_atomic_emulation_trap as _;
 use esp_println::println;
 use nb::block;
+use xtensa_atomic_emulation_trap as _;
 use xtensa_lx_rt::entry;
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take().unwrap();
+    let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
@@ -53,7 +53,7 @@ fn main() -> ! {
         io.pins.gpio2.into_floating_input(),
     );
 
-    let mut serial1 = Serial::new_with_config(peripherals.UART1, Some(config), Some(pins), &clocks);
+    let mut serial1 = Uart::new_with_config(peripherals.UART1, Some(config), Some(pins), &clocks);
 
     let mut delay = Delay::new(&clocks);
 
@@ -72,11 +72,14 @@ fn main() -> ! {
 }
 
 #[xtensa_lx_rt::exception]
-fn exception(cause: xtensa_lx_rt::exception::ExceptionCause, frame: xtensa_lx_rt::exception::Context) {
+fn exception(
+    cause: xtensa_lx_rt::exception::ExceptionCause,
+    frame: xtensa_lx_rt::exception::Context,
+) {
     use esp_println::*;
 
     println!("\n\nException occured {:?} {:x?}", cause, frame);
-    
+
     let backtrace = esp_backtrace::arch::backtrace();
     for b in backtrace.iter() {
         if let Some(addr) = b {

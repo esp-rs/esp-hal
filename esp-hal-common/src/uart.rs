@@ -5,11 +5,9 @@ use self::config::Config;
 use crate::pac::UART2;
 use crate::{
     clock::Clocks,
-    pac::{
-        uart0::{fifo::FIFO_SPEC, RegisterBlock},
-        UART0,
-        UART1,
-    },
+    pac::uart0::{fifo::FIFO_SPEC, RegisterBlock},
+    peripheral::{Peripheral, PeripheralRef},
+    peripherals::{UART0, UART1},
     types::{InputSignal, OutputSignal},
     InputPin,
     OutputPin,
@@ -233,17 +231,17 @@ impl embedded_hal_1::serial::Error for Error {
 }
 
 /// UART driver
-pub struct Serial<T> {
-    uart: T,
+pub struct Uart<'d, T> {
+    uart: PeripheralRef<'d, T>,
 }
 
-impl<T> Serial<T>
+impl<'d, T> Uart<'d, T>
 where
     T: Instance,
 {
     /// Create a new UART instance with defaults
     pub fn new_with_config<P>(
-        uart: T,
+        uart: impl Peripheral<P = T> + 'd,
         config: Option<Config>,
         mut pins: Option<P>,
         clocks: &Clocks,
@@ -251,7 +249,8 @@ where
     where
         P: UartPins,
     {
-        let mut serial = Serial { uart };
+        crate::into_ref!(uart);
+        let mut serial = Uart { uart };
         serial.uart.disable_rx_interrupts();
         serial.uart.disable_tx_interrupts();
 
@@ -275,17 +274,13 @@ where
     }
 
     /// Create a new UART instance with defaults
-    pub fn new(uart: T) -> Self {
-        let mut serial = Serial { uart };
+    pub fn new(uart: impl Peripheral<P = T> + 'd) -> Self {
+        crate::into_ref!(uart);
+        let mut serial = Uart { uart };
         serial.uart.disable_rx_interrupts();
         serial.uart.disable_tx_interrupts();
 
         serial
-    }
-
-    /// Return the raw interface to the underlying UART instance
-    pub fn free(self) -> T {
-        self.uart
     }
 
     /// Writes bytes
@@ -767,7 +762,7 @@ impl Instance for UART2 {
 }
 
 #[cfg(feature = "ufmt")]
-impl<T> ufmt_write::uWrite for Serial<T>
+impl<T> ufmt_write::uWrite for Uart<'_, T>
 where
     T: Instance,
 {
@@ -785,7 +780,7 @@ where
     }
 }
 
-impl<T> core::fmt::Write for Serial<T>
+impl<T> core::fmt::Write for Uart<'_, T>
 where
     T: Instance,
 {
@@ -795,7 +790,7 @@ where
     }
 }
 
-impl<T> embedded_hal::serial::Write<u8> for Serial<T>
+impl<T> embedded_hal::serial::Write<u8> for Uart<'_, T>
 where
     T: Instance,
 {
@@ -810,7 +805,7 @@ where
     }
 }
 
-impl<T> embedded_hal::serial::Read<u8> for Serial<T>
+impl<T> embedded_hal::serial::Read<u8> for Uart<'_, T>
 where
     T: Instance,
 {
@@ -822,12 +817,12 @@ where
 }
 
 #[cfg(feature = "eh1")]
-impl<T> embedded_hal_1::serial::ErrorType for Serial<T> {
+impl<T> embedded_hal_1::serial::ErrorType for Uart<'_, T> {
     type Error = Error;
 }
 
 #[cfg(feature = "eh1")]
-impl<T> embedded_hal_nb::serial::Read for Serial<T>
+impl<T> embedded_hal_nb::serial::Read for Uart<'_, T>
 where
     T: Instance,
 {
@@ -837,7 +832,7 @@ where
 }
 
 #[cfg(feature = "eh1")]
-impl<T> embedded_hal_nb::serial::Write for Serial<T>
+impl<T> embedded_hal_nb::serial::Write for Uart<'_, T>
 where
     T: Instance,
 {

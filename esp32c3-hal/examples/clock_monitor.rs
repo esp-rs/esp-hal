@@ -11,7 +11,7 @@ use critical_section::Mutex;
 use esp32c3_hal::{
     clock::ClockControl,
     interrupt,
-    pac::{self, Peripherals},
+    peripherals::{self, Peripherals},
     prelude::*,
     Rtc,
 };
@@ -22,7 +22,7 @@ static RTC: Mutex<RefCell<Option<Rtc>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take().unwrap();
+    let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
@@ -41,7 +41,11 @@ fn main() -> ! {
         clocks.xtal_clock.to_MHz()
     );
 
-    interrupt::enable(pac::Interrupt::RTC_CORE, interrupt::Priority::Priority1).unwrap();
+    interrupt::enable(
+        peripherals::Interrupt::RTC_CORE,
+        interrupt::Priority::Priority1,
+    )
+    .unwrap();
 
     critical_section::with(|cs| {
         RTC.borrow_ref_mut(cs).replace(rtc);

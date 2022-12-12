@@ -9,16 +9,16 @@
 use esp32s3_hal::{
     clock::ClockControl,
     gpio::IO,
-    pac::Peripherals,
+    peripherals::Peripherals,
     prelude::*,
-    serial::{
+    timer::TimerGroup,
+    uart::{
         config::{Config, DataBits, Parity, StopBits},
         TxRxPins,
     },
-    timer::TimerGroup,
     Delay,
     Rtc,
-    Serial,
+    Uart,
 };
 use esp_backtrace as _;
 use esp_println::println;
@@ -27,7 +27,7 @@ use xtensa_lx_rt::entry;
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take().unwrap();
+    let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
@@ -52,7 +52,7 @@ fn main() -> ! {
         io.pins.gpio2.into_floating_input(),
     );
 
-    let mut serial1 = Serial::new_with_config(peripherals.UART1, Some(config), Some(pins), &clocks);
+    let mut serial1 = Uart::new_with_config(peripherals.UART1, Some(config), Some(pins), &clocks);
 
     let mut delay = Delay::new(&clocks);
 

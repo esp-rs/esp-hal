@@ -3,6 +3,8 @@
 #![cfg_attr(feature = "direct-boot", feature(asm_experimental_arch))]
 
 pub use embedded_hal as ehal;
+#[cfg(feature = "embassy")]
+pub use esp_hal_common::embassy;
 #[doc(inline)]
 pub use esp_hal_common::{
     analog::adc::implementation as adc,
@@ -18,14 +20,15 @@ pub use esp_hal_common::{
     macros,
     mcpwm,
     otg_fs,
-    pac,
+    peripherals,
     prelude,
     pulse_control,
-    serial,
+    sha,
     spi,
     system,
     systimer,
     timer,
+    uart,
     utils,
     Cpu,
     Delay,
@@ -33,13 +36,9 @@ pub use esp_hal_common::{
     Rng,
     Rtc,
     Rwdt,
-    Serial,
+    Uart,
     UsbSerialJtag,
-    sha
 };
-
-#[cfg(feature = "embassy")]
-pub use esp_hal_common::embassy;
 
 pub use self::gpio::IO;
 
@@ -49,7 +48,7 @@ pub mod analog {
 }
 
 #[no_mangle]
-extern "C" fn EspDefaultHandler(_level: u32, _interrupt: pac::Interrupt) {}
+extern "C" fn EspDefaultHandler(_level: u32, _interrupt: peripherals::Interrupt) {}
 
 #[no_mangle]
 extern "C" fn DefaultHandler() {}
@@ -142,24 +141,24 @@ pub unsafe fn startup_direct_boot() -> ! {
     // do some configurations for compatability with the 2nd stage bootloader
     // this is a workaround and ideally we should deal with these settings in other
     // places
-    (&*crate::pac::TIMG0::PTR)
+    (&*crate::peripherals::TIMG0::PTR)
         .int_ena_timers
         .modify(|_, w| w.t0_int_ena().set_bit().t1_int_ena().set_bit());
-    (&*crate::pac::TIMG1::PTR)
+    (&*crate::peripherals::TIMG1::PTR)
         .int_ena_timers
         .modify(|_, w| w.t0_int_ena().set_bit().t1_int_ena().set_bit());
 
-    (&*crate::pac::RTC_CNTL::PTR)
+    (&*crate::peripherals::RTC_CNTL::PTR)
         .swd_wprotect
         .write(|w| w.bits(0x8f1d312a));
-    (&*crate::pac::RTC_CNTL::PTR)
+    (&*crate::peripherals::RTC_CNTL::PTR)
         .swd_conf
         .modify(|_, w| w.swd_disable().set_bit());
-    (&*crate::pac::RTC_CNTL::PTR)
+    (&*crate::peripherals::RTC_CNTL::PTR)
         .swd_wprotect
         .write(|w| w.bits(0));
 
-    (&*crate::pac::SYSTEM::PTR)
+    (&*crate::peripherals::SYSTEM::PTR)
         .sysclk_conf
         .modify(|_, w| w.soc_clk_sel().bits(1));
 

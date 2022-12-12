@@ -13,7 +13,7 @@
 
 use esp32c3_hal::{
     clock::ClockControl,
-    pac,
+    peripherals,
     prelude::*,
     pulse_control::ClockSource,
     timer::TimerGroup,
@@ -35,7 +35,7 @@ use smart_leds::{
 
 #[entry]
 fn main() -> ! {
-    let peripherals = pac::Peripherals::take().unwrap();
+    let peripherals = peripherals::Peripherals::take();
     let mut system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 

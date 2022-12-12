@@ -12,7 +12,7 @@ use critical_section::Mutex;
 use esp32c3_hal::{
     clock::ClockControl,
     interrupt,
-    pac::{self, Peripherals, USB_DEVICE},
+    peripherals::{self, Peripherals, USB_DEVICE},
     prelude::*,
     timer::TimerGroup,
     Cpu,
@@ -28,7 +28,7 @@ static USB_SERIAL: Mutex<RefCell<Option<UsbSerialJtag<USB_DEVICE>>>> =
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take().unwrap();
+    let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
@@ -54,7 +54,7 @@ fn main() -> ! {
     critical_section::with(|cs| USB_SERIAL.borrow_ref_mut(cs).replace(usb_serial));
 
     interrupt::enable(
-        pac::Interrupt::USB_SERIAL_JTAG,
+        peripherals::Interrupt::USB_SERIAL_JTAG,
         interrupt::Priority::Priority1,
     )
     .unwrap();

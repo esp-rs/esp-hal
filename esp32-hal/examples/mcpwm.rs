@@ -1,4 +1,5 @@
-//! Uses timer0 and operator0 of the MCPWM0 peripheral to output a 50% duty signal at 20 kHz.
+//! Uses timer0 and operator0 of the MCPWM0 peripheral to output a 50% duty
+//! signal at 20 kHz.
 //!
 //! The signal will be output to the pin assigned to `pin`. (GPIO4)
 
@@ -8,12 +9,8 @@
 use esp32_hal::{
     clock::ClockControl,
     gpio::IO,
-    mcpwm::{
-        {MCPWM, PeripheralClockConfig},
-        operator::PwmPinConfig,
-        timer::PwmWorkingMode,
-    },
-    pac::Peripherals,
+    mcpwm::{operator::PwmPinConfig, timer::PwmWorkingMode, PeripheralClockConfig, MCPWM},
+    peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
     Rtc,
@@ -23,7 +20,7 @@ use xtensa_lx_rt::entry;
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take().unwrap();
+    let peripherals = Peripherals::take();
     let mut system = peripherals.DPORT.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
@@ -53,8 +50,11 @@ fn main() -> ! {
         .operator0
         .with_pin_a(pin, PwmPinConfig::UP_ACTIVE_HIGH);
 
-    // start timer with timestamp values in the range of 0..=99 and a frequency of 20 kHz
-    let timer_clock_cfg = clock_cfg.timer_clock_with_frequency(99, PwmWorkingMode::Increase, 20u32.kHz()).unwrap();
+    // start timer with timestamp values in the range of 0..=99 and a frequency of
+    // 20 kHz
+    let timer_clock_cfg = clock_cfg
+        .timer_clock_with_frequency(99, PwmWorkingMode::Increase, 20u32.kHz())
+        .unwrap();
     mcpwm.timer0.start(timer_clock_cfg);
 
     // pin will be high 50% of the time

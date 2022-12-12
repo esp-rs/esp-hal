@@ -22,15 +22,23 @@
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
 
 #[cfg(esp32)]
-pub use esp32 as pac;
+pub(crate) use esp32 as pac;
 #[cfg(esp32c2)]
-pub use esp32c2 as pac;
+pub(crate) use esp32c2 as pac;
 #[cfg(esp32c3)]
-pub use esp32c3 as pac;
+pub(crate) use esp32c3 as pac;
 #[cfg(esp32s2)]
-pub use esp32s2 as pac;
+pub(crate) use esp32s2 as pac;
 #[cfg(esp32s3)]
-pub use esp32s3 as pac;
+pub(crate) use esp32s3 as pac;
+
+#[cfg_attr(esp32, path = "peripherals/esp32.rs")]
+#[cfg_attr(esp32c3, path = "peripherals/esp32c3.rs")]
+#[cfg_attr(esp32c2, path = "peripherals/esp32c2.rs")]
+#[cfg_attr(esp32s2, path = "peripherals/esp32s2.rs")]
+#[cfg_attr(esp32s3, path = "peripherals/esp32s3.rs")]
+pub mod peripherals;
+
 pub use procmacros as macros;
 
 #[cfg(rmt)]
@@ -43,9 +51,9 @@ pub use self::{
     interrupt::*,
     rng::Rng,
     rtc_cntl::{Rtc, Rwdt},
-    serial::Serial,
     spi::Spi,
     timer::Timer,
+    uart::Uart,
 };
 
 pub mod analog;
@@ -63,19 +71,20 @@ pub mod ledc;
 pub mod mcpwm;
 #[cfg(usb_otg)]
 pub mod otg_fs;
+pub mod peripheral;
 pub mod prelude;
 #[cfg(rmt)]
 pub mod pulse_control;
 pub mod rng;
 pub mod rom;
 pub mod rtc_cntl;
-pub mod serial;
 pub mod sha;
 pub mod spi;
 pub mod system;
 #[cfg(systimer)]
 pub mod systimer;
 pub mod timer;
+pub mod uart;
 #[cfg(usb_serial_jtag)]
 pub mod usb_serial_jtag;
 #[cfg(rmt)]

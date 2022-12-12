@@ -68,7 +68,11 @@ impl EmbassyTimer {
         }
     }
 
-    pub(crate) fn set_alarm(&self, alarm: embassy_time::driver::AlarmHandle, timestamp: u64) -> bool {
+    pub(crate) fn set_alarm(
+        &self,
+        alarm: embassy_time::driver::AlarmHandle,
+        timestamp: u64,
+    ) -> bool {
         critical_section::with(|cs| {
             let now = Self::now();
             let alarm_state = unsafe { self.alarms.borrow(cs).get_unchecked(alarm.id() as usize) };
@@ -87,7 +91,7 @@ impl EmbassyTimer {
             tg.set_auto_reload(false);
             tg.set_counter_active(true);
             tg.set_alarm_active(true);
-                    
+
             true
         })
     }

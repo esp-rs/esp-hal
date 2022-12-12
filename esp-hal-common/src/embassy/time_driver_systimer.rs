@@ -75,7 +75,11 @@ impl EmbassyTimer {
         }
     }
 
-    pub(crate) fn set_alarm(&self, alarm: embassy_time::driver::AlarmHandle, timestamp: u64) -> bool {
+    pub(crate) fn set_alarm(
+        &self,
+        alarm: embassy_time::driver::AlarmHandle,
+        timestamp: u64,
+    ) -> bool {
         critical_section::with(|cs| {
             let now = Self::now();
             let alarm_state = unsafe { self.alarms.borrow(cs).get_unchecked(alarm.id() as usize) };
@@ -108,7 +112,7 @@ impl EmbassyTimer {
     }
 
     fn disable_interrupt(&self, id: u8) {
-         match id {
+        match id {
             0 => self.alarm0.interrupt_enable(false),
             1 => self.alarm1.interrupt_enable(false),
             2 => self.alarm2.interrupt_enable(false),

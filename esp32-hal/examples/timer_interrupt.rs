@@ -12,7 +12,7 @@ use esp32_hal::{
     clock::ClockControl,
     interrupt,
     interrupt::Priority,
-    pac::{self, Peripherals, TIMG0, TIMG1},
+    peripherals::{self, Peripherals, TIMG0, TIMG1},
     prelude::*,
     timer::{Timer, Timer0, Timer1, TimerGroup},
     Rtc,
@@ -27,7 +27,7 @@ static TIMER11: Mutex<RefCell<Option<Timer<Timer1<TIMG1>>>>> = Mutex::new(RefCel
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take().unwrap();
+    let peripherals = Peripherals::take();
     let system = peripherals.DPORT.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
@@ -49,10 +49,10 @@ fn main() -> ! {
     wdt1.disable();
     rtc.rwdt.disable();
 
-    interrupt::enable(pac::Interrupt::TG0_T0_LEVEL, Priority::Priority2).unwrap();
-    interrupt::enable(pac::Interrupt::TG0_T1_LEVEL, Priority::Priority2).unwrap();
-    interrupt::enable(pac::Interrupt::TG1_T0_LEVEL, Priority::Priority3).unwrap();
-    interrupt::enable(pac::Interrupt::TG1_T1_LEVEL, Priority::Priority3).unwrap();
+    interrupt::enable(peripherals::Interrupt::TG0_T0_LEVEL, Priority::Priority2).unwrap();
+    interrupt::enable(peripherals::Interrupt::TG0_T1_LEVEL, Priority::Priority2).unwrap();
+    interrupt::enable(peripherals::Interrupt::TG1_T0_LEVEL, Priority::Priority3).unwrap();
+    interrupt::enable(peripherals::Interrupt::TG1_T1_LEVEL, Priority::Priority3).unwrap();
     timer00.start(500u64.millis());
     timer00.listen();
     timer01.start(2500u64.millis());

@@ -5,6 +5,8 @@ use core::arch::{asm, global_asm};
 use core::mem::size_of;
 
 pub use embedded_hal as ehal;
+#[cfg(feature = "embassy")]
+pub use esp_hal_common::embassy;
 #[doc(inline)]
 pub use esp_hal_common::{
     analog::adc::implementation as adc,
@@ -18,14 +20,15 @@ pub use esp_hal_common::{
     interrupt,
     ledc,
     macros,
-    pac,
+    peripherals,
     prelude,
     pulse_control,
-    serial,
+    sha,
     spi,
     system,
     systimer,
     timer,
+    uart,
     utils,
     Cpu,
     Delay,
@@ -33,14 +36,9 @@ pub use esp_hal_common::{
     Rng,
     Rtc,
     Rwdt,
-    Serial,
+    Uart,
     UsbSerialJtag,
-    sha
 };
-
-#[cfg(feature = "embassy")]
-pub use esp_hal_common::embassy;
-
 #[cfg(feature = "direct-boot")]
 use riscv_rt::pre_init;
 
@@ -407,7 +405,7 @@ unsafe fn configure_mmu() {
         0,
     );
 
-    let peripherals = pac::Peripherals::steal();
+    let peripherals = peripherals::Peripherals::steal();
     peripherals.EXTMEM.icache_ctrl1.modify(|_, w| {
         w.icache_shut_ibus()
             .clear_bit()
@@ -444,4 +442,4 @@ pub fn mp_hook() -> bool {
 }
 
 #[no_mangle]
-extern "C" fn EspDefaultHandler(_interrupt: pac::Interrupt) {}
+extern "C" fn EspDefaultHandler(_interrupt: peripherals::Interrupt) {}

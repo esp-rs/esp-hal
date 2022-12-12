@@ -11,9 +11,9 @@ use core::cell::RefCell;
 use critical_section::Mutex;
 use esp32c3_hal::{
     clock::ClockControl,
-    gpio::{Gpio9, IO, Event, Input, PullDown},
+    gpio::{Event, Gpio9, Input, PullDown, IO},
     interrupt,
-    pac::{self, Peripherals},
+    peripherals::{self, Peripherals},
     prelude::*,
     timer::TimerGroup,
     Delay,
@@ -26,7 +26,7 @@ static BUTTON: Mutex<RefCell<Option<Gpio9<Input<PullDown>>>>> = Mutex::new(RefCe
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take().unwrap();
+    let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
@@ -53,7 +53,7 @@ fn main() -> ! {
 
     critical_section::with(|cs| BUTTON.borrow_ref_mut(cs).replace(button));
 
-    interrupt::enable(pac::Interrupt::GPIO, interrupt::Priority::Priority3).unwrap();
+    interrupt::enable(peripherals::Interrupt::GPIO, interrupt::Priority::Priority3).unwrap();
 
     unsafe {
         riscv::interrupt::enable();
