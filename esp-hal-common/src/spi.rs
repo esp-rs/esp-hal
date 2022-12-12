@@ -58,6 +58,7 @@ use crate::{
         DmaPeripheral,
     },
     pac::spi2::RegisterBlock,
+    peripheral::{Peripheral, PeripheralRef},
     system::PeripheralClockControl,
     types::{InputSignal, OutputSignal},
     InputPin,
@@ -103,17 +104,17 @@ pub enum SpiMode {
     Mode3,
 }
 
-pub struct Spi<T> {
-    spi: T,
+pub struct Spi<'d, T> {
+    spi: PeripheralRef<'d, T>,
 }
 
-impl<T> Spi<T>
+impl<'d, T> Spi<'d, T>
 where
     T: Instance,
 {
     /// Constructs an SPI instance in 8bit dataframe mode.
     pub fn new<SCK: OutputPin, MOSI: OutputPin, MISO: InputPin, CS: OutputPin>(
-        spi: T,
+        spi: impl Peripheral<P = T> + 'd,
         mut sck: SCK,
         mut mosi: MOSI,
         mut miso: MISO,
@@ -123,6 +124,7 @@ where
         peripheral_clock_control: &mut PeripheralClockControl,
         clocks: &Clocks,
     ) -> Self {
+        crate::into_ref!(spi);
         sck.set_to_push_pull_output()
             .connect_peripheral_to_output(spi.sclk_signal());
 
@@ -140,7 +142,7 @@ where
 
     /// Constructs an SPI instance in 8bit dataframe mode without CS pin.
     pub fn new_no_cs<SCK: OutputPin, MOSI: OutputPin, MISO: InputPin>(
-        spi: T,
+        spi: impl Peripheral<P = T> + 'd,
         mut sck: SCK,
         mut mosi: MOSI,
         mut miso: MISO,
@@ -149,6 +151,7 @@ where
         peripheral_clock_control: &mut PeripheralClockControl,
         clocks: &Clocks,
     ) -> Self {
+        crate::into_ref!(spi);
         sck.set_to_push_pull_output()
             .connect_peripheral_to_output(spi.sclk_signal());
 
@@ -164,7 +167,7 @@ where
     /// Constructs an SPI instance in 8bit dataframe mode without CS and MISO
     /// pin.
     pub fn new_no_cs_no_miso<SCK: OutputPin, MOSI: OutputPin>(
-        spi: T,
+        spi: impl Peripheral<P = T> + 'd,
         mut sck: SCK,
         mut mosi: MOSI,
         frequency: HertzU32,
@@ -172,6 +175,7 @@ where
         peripheral_clock_control: &mut PeripheralClockControl,
         clocks: &Clocks,
     ) -> Self {
+        crate::into_ref!(spi);
         sck.set_to_push_pull_output()
             .connect_peripheral_to_output(spi.sclk_signal());
 
@@ -186,13 +190,14 @@ where
     /// other protocols by bitbanging (WS2812B, onewire, generating arbitrary
     /// waveforms…)
     pub fn new_mosi_only<MOSI: OutputPin>(
-        spi: T,
+        spi: impl Peripheral<P = T> + 'd,
         mut mosi: MOSI,
         frequency: HertzU32,
         mode: SpiMode,
         peripheral_clock_control: &mut PeripheralClockControl,
         clocks: &Clocks,
     ) -> Self {
+        crate::into_ref!(spi);
         mosi.set_to_push_pull_output()
             .connect_peripheral_to_output(spi.mosi_signal());
 
@@ -200,7 +205,7 @@ where
     }
 
     pub(crate) fn new_internal(
-        spi: T,
+        spi: PeripheralRef<'d, T>,
         frequency: HertzU32,
         mode: SpiMode,
         peripheral_clock_control: &mut PeripheralClockControl,
@@ -219,14 +224,9 @@ where
     pub fn change_bus_frequency(&mut self, frequency: HertzU32, clocks: &Clocks) {
         self.spi.ch_bus_freq(frequency, clocks);
     }
-
-    /// Return the raw interface to the underlying peripheral instance
-    pub fn free(self) -> T {
-        self.spi
-    }
 }
 
-impl<T> embedded_hal::spi::FullDuplex<u8> for Spi<T>
+impl<T> embedded_hal::spi::FullDuplex<u8> for Spi<'_, T>
 where
     T: Instance,
 {
@@ -241,7 +241,7 @@ where
     }
 }
 
-impl<T> embedded_hal::blocking::spi::Transfer<u8> for Spi<T>
+impl<T> embedded_hal::blocking::spi::Transfer<u8> for Spi<'_, T>
 where
     T: Instance,
 {
@@ -252,7 +252,7 @@ where
     }
 }
 
-impl<T> embedded_hal::blocking::spi::Write<u8> for Spi<T>
+impl<T> embedded_hal::blocking::spi::Write<u8> for Spi<'_, T>
 where
     T: Instance,
 {
@@ -275,42 +275,45 @@ pub mod dma {
     use super::{Instance, InstanceDma, Spi, Spi2Instance, MAX_DMA_SIZE};
     #[cfg(any(esp32, esp32s2))]
     use crate::dma::private::Spi3Peripheral;
-    use crate::dma::{
-        private::{Rx, Spi2Peripheral, SpiPeripheral, Tx},
-        Channel,
-        DmaTransfer,
-        DmaTransferRxTx,
+    use crate::{
+        dma::{
+            private::{Rx, Spi2Peripheral, SpiPeripheral, Tx},
+            Channel,
+            DmaTransfer,
+            DmaTransferRxTx,
+        },
+        peripheral::PeripheralRef,
     };
 
-    pub trait WithDmaSpi2<T, RX, TX, P>
+    pub trait WithDmaSpi2<'d, T, RX, TX, P>
     where
         T: Instance + Spi2Instance,
         TX: Tx,
         RX: Rx,
         P: SpiPeripheral,
     {
-        fn with_dma(self, channel: Channel<TX, RX, P>) -> SpiDma<T, TX, RX, P>;
+        fn with_dma(self, channel: Channel<TX, RX, P>) -> SpiDma<'d, T, TX, RX, P>;
     }
 
     #[cfg(any(esp32, esp32s2))]
-    pub trait WithDmaSpi3<T, RX, TX, P>
+    pub trait WithDmaSpi3<'d, T, RX, TX, P>
     where
         T: Instance + Spi3Instance,
         TX: Tx,
         RX: Rx,
         P: SpiPeripheral,
     {
-        fn with_dma(self, channel: Channel<TX, RX, P>) -> SpiDma<T, TX, RX, P>;
+        fn with_dma(self, channel: Channel<TX, RX, P>) -> SpiDma<'d, T, TX, RX, P>;
     }
 
-    impl<T, RX, TX, P> WithDmaSpi2<T, RX, TX, P> for Spi<T>
+    impl<'d, T, RX, TX, P> WithDmaSpi2<'d, T, RX, TX, P> for Spi<'d, T>
     where
         T: Instance + Spi2Instance,
         TX: Tx,
         RX: Rx,
         P: SpiPeripheral + Spi2Peripheral,
     {
-        fn with_dma(self, mut channel: Channel<TX, RX, P>) -> SpiDma<T, TX, RX, P> {
+        fn with_dma(self, mut channel: Channel<TX, RX, P>) -> SpiDma<'d, T, TX, RX, P> {
             channel.tx.init_channel(); // no need to call this for both, TX and RX
 
             SpiDma {
@@ -321,14 +324,14 @@ pub mod dma {
     }
 
     #[cfg(any(esp32, esp32s2))]
-    impl<T, RX, TX, P> WithDmaSpi3<T, RX, TX, P> for Spi<T>
+    impl<'d, T, RX, TX, P> WithDmaSpi3<'d, T, RX, TX, P> for Spi<'d, T>
     where
         T: Instance + Spi3Instance,
         TX: Tx,
         RX: Rx,
         P: SpiPeripheral + Spi3Peripheral,
     {
-        fn with_dma(self, mut channel: Channel<TX, RX, P>) -> SpiDma<T, TX, RX, P> {
+        fn with_dma(self, mut channel: Channel<TX, RX, P>) -> SpiDma<'d, T, TX, RX, P> {
             channel.tx.init_channel(); // no need to call this for both, TX and RX
 
             SpiDma {
@@ -338,20 +341,20 @@ pub mod dma {
         }
     }
     /// An in-progress DMA transfer
-    pub struct SpiDmaTransferRxTx<T, TX, RX, P, RBUFFER, TBUFFER>
+    pub struct SpiDmaTransferRxTx<'d, T, TX, RX, P, RBUFFER, TBUFFER>
     where
         T: InstanceDma<TX, RX>,
         TX: Tx,
         RX: Rx,
         P: SpiPeripheral,
     {
-        spi_dma: SpiDma<T, TX, RX, P>,
+        spi_dma: SpiDma<'d, T, TX, RX, P>,
         rbuffer: RBUFFER,
         tbuffer: TBUFFER,
     }
 
-    impl<T, TX, RX, P, RXBUF, TXBUF> DmaTransferRxTx<RXBUF, TXBUF, SpiDma<T, TX, RX, P>>
-        for SpiDmaTransferRxTx<T, TX, RX, P, RXBUF, TXBUF>
+    impl<'d, T, TX, RX, P, RXBUF, TXBUF> DmaTransferRxTx<RXBUF, TXBUF, SpiDma<'d, T, TX, RX, P>>
+        for SpiDmaTransferRxTx<'d, T, TX, RX, P, RXBUF, TXBUF>
     where
         T: InstanceDma<TX, RX>,
         TX: Tx,
@@ -360,7 +363,7 @@ pub mod dma {
     {
         /// Wait for the DMA transfer to complete and return the buffers and the
         /// SPI instance.
-        fn wait(mut self) -> (RXBUF, TXBUF, SpiDma<T, TX, RX, P>) {
+        fn wait(mut self) -> (RXBUF, TXBUF, SpiDma<'d, T, TX, RX, P>) {
             self.spi_dma.spi.flush().ok(); // waiting for the DMA transfer is not enough
 
             // `DmaTransfer` needs to have a `Drop` implementation, because we accept
@@ -380,7 +383,7 @@ pub mod dma {
         }
     }
 
-    impl<T, TX, RX, P, RXBUF, TXBUF> Drop for SpiDmaTransferRxTx<T, TX, RX, P, RXBUF, TXBUF>
+    impl<'d, T, TX, RX, P, RXBUF, TXBUF> Drop for SpiDmaTransferRxTx<'d, T, TX, RX, P, RXBUF, TXBUF>
     where
         T: InstanceDma<TX, RX>,
         TX: Tx,
@@ -393,19 +396,19 @@ pub mod dma {
     }
 
     /// An in-progress DMA transfer.
-    pub struct SpiDmaTransfer<T, TX, RX, P, BUFFER>
+    pub struct SpiDmaTransfer<'d, T, TX, RX, P, BUFFER>
     where
         T: InstanceDma<TX, RX>,
         TX: Tx,
         RX: Rx,
         P: SpiPeripheral,
     {
-        spi_dma: SpiDma<T, TX, RX, P>,
+        spi_dma: SpiDma<'d, T, TX, RX, P>,
         buffer: BUFFER,
     }
 
-    impl<T, TX, RX, P, BUFFER> DmaTransfer<BUFFER, SpiDma<T, TX, RX, P>>
-        for SpiDmaTransfer<T, TX, RX, P, BUFFER>
+    impl<'d, T, TX, RX, P, BUFFER> DmaTransfer<BUFFER, SpiDma<'d, T, TX, RX, P>>
+        for SpiDmaTransfer<'d, T, TX, RX, P, BUFFER>
     where
         T: InstanceDma<TX, RX>,
         TX: Tx,
@@ -414,7 +417,7 @@ pub mod dma {
     {
         /// Wait for the DMA transfer to complete and return the buffers and the
         /// SPI instance.
-        fn wait(mut self) -> (BUFFER, SpiDma<T, TX, RX, P>) {
+        fn wait(mut self) -> (BUFFER, SpiDma<'d, T, TX, RX, P>) {
             self.spi_dma.spi.flush().ok(); // waiting for the DMA transfer is not enough
 
             // `DmaTransfer` needs to have a `Drop` implementation, because we accept
@@ -433,7 +436,7 @@ pub mod dma {
         }
     }
 
-    impl<T, TX, RX, P, BUFFER> Drop for SpiDmaTransfer<T, TX, RX, P, BUFFER>
+    impl<'d, T, TX, RX, P, BUFFER> Drop for SpiDmaTransfer<'d, T, TX, RX, P, BUFFER>
     where
         T: InstanceDma<TX, RX>,
         TX: Tx,
@@ -446,28 +449,23 @@ pub mod dma {
     }
 
     /// A DMA capable SPI instance.
-    pub struct SpiDma<T, TX, RX, P>
+    pub struct SpiDma<'d, T, TX, RX, P>
     where
         TX: Tx,
         RX: Rx,
         P: SpiPeripheral,
     {
-        pub(crate) spi: T,
+        pub(crate) spi: PeripheralRef<'d, T>,
         pub(crate) channel: Channel<TX, RX, P>,
     }
 
-    impl<T, TX, RX, P> SpiDma<T, TX, RX, P>
+    impl<'d, T, TX, RX, P> SpiDma<'d, T, TX, RX, P>
     where
         T: InstanceDma<TX, RX>,
         TX: Tx,
         RX: Rx,
         P: SpiPeripheral,
     {
-        /// Return the raw interface to the underlying peripheral instance
-        pub fn free(self) -> T {
-            self.spi
-        }
-
         /// Perform a DMA write.
         ///
         /// This will return a [SpiDmaTransfer] owning the buffer(s) and the SPI
@@ -476,7 +474,7 @@ pub mod dma {
         pub fn dma_write<TXBUF>(
             mut self,
             words: TXBUF,
-        ) -> Result<SpiDmaTransfer<T, TX, RX, P, TXBUF>, super::Error>
+        ) -> Result<SpiDmaTransfer<'d, T, TX, RX, P, TXBUF>, super::Error>
         where
             TXBUF: ReadBuffer<Word = u8>,
         {
@@ -502,7 +500,7 @@ pub mod dma {
         pub fn dma_read<RXBUF>(
             mut self,
             mut words: RXBUF,
-        ) -> Result<SpiDmaTransfer<T, TX, RX, P, RXBUF>, super::Error>
+        ) -> Result<SpiDmaTransfer<'d, T, TX, RX, P, RXBUF>, super::Error>
         where
             RXBUF: WriteBuffer<Word = u8>,
         {
@@ -529,7 +527,7 @@ pub mod dma {
             mut self,
             words: TXBUF,
             mut read_buffer: RXBUF,
-        ) -> Result<SpiDmaTransferRxTx<T, TX, RX, P, RXBUF, TXBUF>, super::Error>
+        ) -> Result<SpiDmaTransferRxTx<'d, T, TX, RX, P, RXBUF, TXBUF>, super::Error>
         where
             TXBUF: ReadBuffer<Word = u8>,
             RXBUF: WriteBuffer<Word = u8>,
@@ -557,7 +555,7 @@ pub mod dma {
         }
     }
 
-    impl<T, TX, RX, P> embedded_hal::blocking::spi::Transfer<u8> for SpiDma<T, TX, RX, P>
+    impl<'d, T, TX, RX, P> embedded_hal::blocking::spi::Transfer<u8> for SpiDma<'d, T, TX, RX, P>
     where
         T: InstanceDma<TX, RX>,
         TX: Tx,
@@ -572,7 +570,7 @@ pub mod dma {
         }
     }
 
-    impl<T, TX, RX, P> embedded_hal::blocking::spi::Write<u8> for SpiDma<T, TX, RX, P>
+    impl<'d, T, TX, RX, P> embedded_hal::blocking::spi::Write<u8> for SpiDma<'d, T, TX, RX, P>
     where
         T: InstanceDma<TX, RX>,
         TX: Tx,
@@ -595,7 +593,7 @@ pub mod dma {
         use super::{super::InstanceDma, SpiDma, SpiPeripheral};
         use crate::dma::private::{Rx, Tx};
 
-        impl<T, TX, RX, P> embedded_hal_1::spi::ErrorType for SpiDma<T, TX, RX, P>
+        impl<'d, T, TX, RX, P> embedded_hal_1::spi::ErrorType for SpiDma<'d, T, TX, RX, P>
         where
             T: InstanceDma<TX, RX>,
             TX: Tx,
@@ -605,7 +603,7 @@ pub mod dma {
             type Error = super::super::Error;
         }
 
-        impl<T, TX, RX, P> SpiBusWrite for SpiDma<T, TX, RX, P>
+        impl<'d, T, TX, RX, P> SpiBusWrite for SpiDma<'d, T, TX, RX, P>
         where
             T: InstanceDma<TX, RX>,
             TX: Tx,
@@ -619,7 +617,7 @@ pub mod dma {
             }
         }
 
-        impl<T, TX, RX, P> SpiBusRead for SpiDma<T, TX, RX, P>
+        impl<'d, T, TX, RX, P> SpiBusRead for SpiDma<'d, T, TX, RX, P>
         where
             T: InstanceDma<TX, RX>,
             TX: Tx,
@@ -633,7 +631,7 @@ pub mod dma {
             }
         }
 
-        impl<T, TX, RX, P> SpiBus for SpiDma<T, TX, RX, P>
+        impl<'d, T, TX, RX, P> SpiBus for SpiDma<'d, T, TX, RX, P>
         where
             T: InstanceDma<TX, RX>,
             TX: Tx,
@@ -670,7 +668,7 @@ pub mod dma {
             }
         }
 
-        impl<T, TX, RX, P> SpiBusFlush for SpiDma<T, TX, RX, P>
+        impl<'d, T, TX, RX, P> SpiBusFlush for SpiDma<'d, T, TX, RX, P>
         where
             T: InstanceDma<TX, RX>,
             TX: Tx,
@@ -705,11 +703,11 @@ mod ehal1 {
     use super::*;
     use crate::OutputPin;
 
-    impl<T> embedded_hal_1::spi::ErrorType for Spi<T> {
+    impl<T> embedded_hal_1::spi::ErrorType for Spi<'_, T> {
         type Error = super::Error;
     }
 
-    impl<T> FullDuplex for Spi<T>
+    impl<T> FullDuplex for Spi<'_, T>
     where
         T: Instance,
     {
@@ -722,7 +720,7 @@ mod ehal1 {
         }
     }
 
-    impl<T> SpiBusWrite for Spi<T>
+    impl<T> SpiBusWrite for Spi<'_, T>
     where
         T: Instance,
     {
@@ -732,7 +730,7 @@ mod ehal1 {
         }
     }
 
-    impl<T> SpiBusRead for Spi<T>
+    impl<T> SpiBusRead for Spi<'_, T>
     where
         T: Instance,
     {
@@ -742,7 +740,7 @@ mod ehal1 {
         }
     }
 
-    impl<T> SpiBus for Spi<T>
+    impl<T> SpiBus for Spi<'_, T>
     where
         T: Instance,
     {
@@ -815,7 +813,7 @@ mod ehal1 {
         }
     }
 
-    impl<T> SpiBusFlush for Spi<T>
+    impl<T> SpiBusFlush for Spi<'_, T>
     where
         T: Instance,
     {
@@ -829,27 +827,27 @@ mod ehal1 {
     /// Has exclusive access to an SPI bus, which is managed via a `Mutex`. Used
     /// as basis for the [`SpiBusDevice`] implementation. Note that the
     /// wrapped [`RefCell`] is used solely to achieve interior mutability.
-    pub struct SpiBusController<I: Instance> {
-        lock: critical_section::Mutex<RefCell<Spi<I>>>,
+    pub struct SpiBusController<'d, I: Instance> {
+        lock: critical_section::Mutex<RefCell<Spi<'d, I>>>,
     }
 
-    impl<I: Instance> SpiBusController<I> {
+    impl<'d, I: Instance> SpiBusController<'d, I> {
         /// Create a new controller from an SPI bus instance.
         ///
         /// Takes ownership of the SPI bus in the process. Afterwards, the SPI
         /// bus can only be accessed via instances of [`SpiBusDevice`].
-        pub fn from_spi(bus: Spi<I>) -> Self {
+        pub fn from_spi(bus: Spi<'d, I>) -> Self {
             SpiBusController {
                 lock: critical_section::Mutex::new(RefCell::new(bus)),
             }
         }
 
-        pub fn add_device<'a, CS: OutputPin>(&'a self, cs: CS) -> SpiBusDevice<'a, I, CS> {
+        pub fn add_device<'a, CS: OutputPin>(&'a self, cs: CS) -> SpiBusDevice<'a, 'd, I, CS> {
             SpiBusDevice::new(self, cs)
         }
     }
 
-    impl<I: Instance> ErrorType for SpiBusController<I> {
+    impl<'d, I: Instance> ErrorType for SpiBusController<'d, I> {
         type Error = spi::ErrorKind;
     }
 
@@ -858,27 +856,27 @@ mod ehal1 {
     /// Provides device specific access on a shared SPI bus. Enables attaching
     /// multiple SPI devices to the same bus, each with its own CS line, and
     /// performing safe transfers on them.
-    pub struct SpiBusDevice<'a, I, CS>
+    pub struct SpiBusDevice<'a, 'd, I, CS>
     where
         I: Instance,
         CS: OutputPin,
     {
-        bus: &'a SpiBusController<I>,
+        bus: &'a SpiBusController<'d, I>,
         cs: CS,
     }
 
-    impl<'a, I, CS> SpiBusDevice<'a, I, CS>
+    impl<'a, 'd, I, CS> SpiBusDevice<'a, 'd, I, CS>
     where
         I: Instance,
         CS: OutputPin,
     {
-        pub fn new(bus: &'a SpiBusController<I>, mut cs: CS) -> Self {
+        pub fn new(bus: &'a SpiBusController<'d, I>, mut cs: CS) -> Self {
             cs.set_to_push_pull_output().set_output_high(true);
             SpiBusDevice { bus, cs }
         }
     }
 
-    impl<'a, I, CS> ErrorType for SpiBusDevice<'a, I, CS>
+    impl<'a, 'd, I, CS> ErrorType for SpiBusDevice<'a, 'd, I, CS>
     where
         I: Instance,
         CS: OutputPin,
@@ -886,12 +884,12 @@ mod ehal1 {
         type Error = spi::ErrorKind;
     }
 
-    impl<I, CS> SpiDevice for SpiBusDevice<'_, I, CS>
+    impl<'a, 'd, I, CS> SpiDevice for SpiBusDevice<'a, 'd, I, CS>
     where
         I: Instance,
         CS: OutputPin + crate::gpio::OutputPin,
     {
-        type Bus = Spi<I>;
+        type Bus = Spi<'d, I>;
 
         fn transaction<R>(
             &mut self,
@@ -1137,7 +1135,7 @@ where
     }
 }
 
-impl<TX, RX> InstanceDma<TX, RX> for crate::pac::SPI2
+impl<TX, RX> InstanceDma<TX, RX> for crate::peripherals::SPI2
 where
     TX: Tx,
     RX: Rx,
@@ -1145,7 +1143,7 @@ where
 }
 
 #[cfg(any(esp32, esp32s2, esp32s3))]
-impl<TX, RX> InstanceDma<TX, RX> for crate::pac::SPI3
+impl<TX, RX> InstanceDma<TX, RX> for crate::peripherals::SPI3
 where
     TX: Tx,
     RX: Rx,
@@ -1552,7 +1550,7 @@ pub trait Instance {
 }
 
 #[cfg(any(esp32c2, esp32c3))]
-impl Instance for crate::pac::SPI2 {
+impl Instance for crate::peripherals::SPI2 {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
         self
@@ -1590,7 +1588,7 @@ impl Instance for crate::pac::SPI2 {
 }
 
 #[cfg(any(esp32))]
-impl Instance for crate::pac::SPI2 {
+impl Instance for crate::peripherals::SPI2 {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
         self
@@ -1628,7 +1626,7 @@ impl Instance for crate::pac::SPI2 {
 }
 
 #[cfg(any(esp32))]
-impl Instance for crate::pac::SPI3 {
+impl Instance for crate::peripherals::SPI3 {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
         self
@@ -1666,7 +1664,7 @@ impl Instance for crate::pac::SPI3 {
 }
 
 #[cfg(any(esp32s2, esp32s3))]
-impl Instance for crate::pac::SPI2 {
+impl Instance for crate::peripherals::SPI2 {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
         self
@@ -1704,7 +1702,7 @@ impl Instance for crate::pac::SPI2 {
 }
 
 #[cfg(any(esp32s2, esp32s3))]
-impl Instance for crate::pac::SPI3 {
+impl Instance for crate::peripherals::SPI3 {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
         self
@@ -1746,7 +1744,7 @@ pub trait Spi2Instance {}
 #[cfg(any(esp32, esp32s2, esp32s3))]
 pub trait Spi3Instance {}
 
-impl Spi2Instance for crate::pac::SPI2 {}
+impl Spi2Instance for crate::peripherals::SPI2 {}
 
 #[cfg(any(esp32, esp32s2, esp32s3))]
-impl Spi3Instance for crate::pac::SPI3 {}
+impl Spi3Instance for crate::peripherals::SPI3 {}

@@ -137,7 +137,7 @@ impl CpuControl {
     }
 
     fn enable_cache(&mut self, core: Cpu) {
-        let spi0 = unsafe { &(*crate::pac::SPI0::ptr()) };
+        let spi0 = unsafe { &(*crate::peripherals::SPI0::ptr()) };
 
         let dport_control = crate::pac::DPORT::PTR;
         let dport_control = unsafe { &*dport_control };
