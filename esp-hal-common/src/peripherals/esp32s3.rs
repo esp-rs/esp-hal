@@ -64,5 +64,9 @@ mod peripherals {
         UART0,
         UART1,
         UART2,
+        SPI0,
+        SPI1,
+        SPI2,
+        SPI3,
     }
 }
