@@ -2,27 +2,29 @@ use core::{intrinsics::transmute, marker::PhantomData};
 
 use fugit::MillisDurationU32;
 
-use crate::pac::{
-    generic::Reg,
-    systimer::{
-        target0_conf::TARGET0_CONF_SPEC,
-        target0_hi::TARGET0_HI_SPEC,
-        target0_lo::TARGET0_LO_SPEC,
+use crate::{
+    pac::{
+        generic::Reg,
+        systimer::{
+            target0_conf::TARGET0_CONF_SPEC,
+            target0_hi::TARGET0_HI_SPEC,
+            target0_lo::TARGET0_LO_SPEC,
+        },
     },
-    SYSTIMER,
+    peripheral::{Peripheral, PeripheralRef},
+    peripherals::SYSTIMER,
 };
 
 // TODO this only handles unit0 of the systimer
 
-#[derive(Debug)]
-pub struct SystemTimer {
-    _inner: SYSTIMER,
+pub struct SystemTimer<'d> {
+    _inner: PeripheralRef<'d, SYSTIMER>,
     pub alarm0: Alarm<Target, 0>,
     pub alarm1: Alarm<Target, 1>,
     pub alarm2: Alarm<Target, 2>,
 }
 
-impl SystemTimer {
+impl<'d> SystemTimer<'d> {
     #[cfg(esp32s2)]
     pub const BIT_MASK: u64 = u64::MAX;
     #[cfg(any(esp32c2, esp32c3, esp32s3))]
@@ -33,7 +35,8 @@ impl SystemTimer {
     #[cfg(any(esp32c2, esp32c3, esp32s3))]
     pub const TICKS_PER_SECOND: u64 = 16_000_000;
 
-    pub fn new(p: SYSTIMER) -> Self {
+    pub fn new(p: impl Peripheral<P = SYSTIMER> + 'd) -> Self {
+        crate::into_ref!(p);
         Self {
             _inner: p,
             alarm0: Alarm::new(),
