@@ -1,30 +1,29 @@
 use core::convert::Infallible;
 
-use crate::pac::{usb_device::RegisterBlock, USB_DEVICE};
+use crate::{
+    pac::{usb_device::RegisterBlock, USB_DEVICE},
+    peripheral::{Peripheral, PeripheralRef},
+};
 
-pub struct UsbSerialJtag<T> {
-    usb_serial: T,
+pub struct UsbSerialJtag<'d, T> {
+    usb_serial: PeripheralRef<'d, T>,
 }
 
 /// Custom USB serial error type
 type Error = Infallible;
 
-impl<T> UsbSerialJtag<T>
+impl<'d, T> UsbSerialJtag<'d, T>
 where
     T: Instance,
 {
     /// Create a new USB serial/JTAG instance with defaults
-    pub fn new(usb_serial: T) -> Self {
+    pub fn new(usb_serial: impl Peripheral<P = T> + 'd) -> Self {
+        crate::into_ref!(usb_serial);
         let mut dev = Self { usb_serial };
         dev.usb_serial.disable_rx_interrupts();
         dev.usb_serial.disable_tx_interrupts();
 
         dev
-    }
-
-    /// Return the raw interface to the underlying USB serial/JTAG instance
-    pub fn free(self) -> T {
-        self.usb_serial
     }
 
     /// Write data to the serial output in chunks of up to 64 bytes
@@ -186,14 +185,14 @@ pub trait Instance {
     }
 }
 
-impl Instance for USB_DEVICE {
+impl Instance for crate::peripherals::USB_DEVICE {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
         self
     }
 }
 
-impl<T> core::fmt::Write for UsbSerialJtag<T>
+impl<T> core::fmt::Write for UsbSerialJtag<'_, T>
 where
     T: Instance,
 {
@@ -202,7 +201,7 @@ where
     }
 }
 
-impl<T> embedded_hal::serial::Read<u8> for UsbSerialJtag<T>
+impl<T> embedded_hal::serial::Read<u8> for UsbSerialJtag<'_, T>
 where
     T: Instance,
 {
@@ -213,7 +212,7 @@ where
     }
 }
 
-impl<T> embedded_hal::serial::Write<u8> for UsbSerialJtag<T>
+impl<T> embedded_hal::serial::Write<u8> for UsbSerialJtag<'_, T>
 where
     T: Instance,
 {
