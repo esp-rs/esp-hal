@@ -60,5 +60,7 @@ mod peripherals {
         SYSTIMER,
         UART0,
         UART1,
+        USB0,
+        USB_WRAP,
     }
 }
