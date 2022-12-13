@@ -227,7 +227,8 @@ impl ClockControl {
     /// Use what is considered the default settings after boot.
     #[allow(unused)]
     pub fn boot_defaults(clock_control: SystemClockControl) -> ClockControl {
-        ClockControl {
+        #[cfg(feature = "esp32c2_40mhz")]
+        return ClockControl {
             _private: (),
             desired_rates: RawClocks {
                 cpu_clock: HertzU32::MHz(80),
@@ -235,14 +236,28 @@ impl ClockControl {
                 xtal_clock: HertzU32::MHz(40),
                 i2c_clock: HertzU32::MHz(40),
             },
-        }
+        };
+
+        #[cfg(feature = "esp32c2_26mhz")]
+        return ClockControl {
+            _private: (),
+            desired_rates: RawClocks {
+                cpu_clock: HertzU32::MHz(80),
+                apb_clock: HertzU32::MHz(40),
+                xtal_clock: HertzU32::MHz(26),
+                i2c_clock: HertzU32::MHz(26),
+            },
+        };
     }
 
     /// Configure the CPU clock speed.
     #[allow(unused)]
     pub fn configure(clock_control: SystemClockControl, cpu_clock_speed: CpuClock) -> ClockControl {
         let apb_freq;
+        #[cfg(feature = "esp32c2_40mhz")]
         let xtal_freq = XtalClock::RtcXtalFreq40M;
+        #[cfg(feature = "esp32c2_26mhz")]
+        let xtal_freq = XtalClock::RtcXtalFreq26M;
         let pll_freq = PllClock::Pll480MHz;
 
         if cpu_clock_speed.mhz() <= xtal_freq.mhz() {

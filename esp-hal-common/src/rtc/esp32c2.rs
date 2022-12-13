@@ -59,10 +59,16 @@ pub(crate) fn init() {
 }
 
 pub(crate) fn configure_clock() {
+    #[cfg(feature = "esp32c2_40mhz")]
     assert!(matches!(
         RtcClock::get_xtal_freq(),
         XtalClock::RtcXtalFreq40M
     ));
+    #[cfg(feature = "esp32c2_26mhz")]
+    assert!(
+        matches!(RtcClock::get_xtal_freq(), XtalClock::RtcXtalFreq26M),
+        "Did you flash the right bootloader configured for 26MHz xtal?"
+    );
 
     RtcClock::set_fast_freq(RtcFastClock::RtcFastClock8m);
 

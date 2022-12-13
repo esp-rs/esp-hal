@@ -12,6 +12,13 @@ fn main() {
         n => panic!("Exactly 1 chip must be enabled via its Cargo feature, {n} provided"),
     }
 
+    if cfg!(feature = "esp32c2")
+        && cfg!(feature = "esp32c2_40mhz")
+        && cfg!(feature = "esp32c2_26mhz")
+    {
+        panic!("Only one xtal speed feature can be selected");
+    }
+
     // Define all required configuration symbols for the enabled chip.
     //
     // When adding a new device, at the bare minimum the following symbols MUST be

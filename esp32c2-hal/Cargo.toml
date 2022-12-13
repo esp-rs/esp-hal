@@ -46,7 +46,7 @@ ssd1306           = "0.7.1"
 static_cell       = "1.0.0"
 
 [features]
-default              = ["rt", "vectored"]
+default              = ["rt", "vectored", "xtal40mhz"]
 direct-boot          = []
 eh1                  = ["esp-hal-common/eh1", "dep:embedded-hal-1", "dep:embedded-hal-nb"]
 rt                   = ["riscv-rt"]
@@ -55,7 +55,9 @@ vectored             = ["esp-hal-common/vectored"]
 async                = ["esp-hal-common/async", "embedded-hal-async"]
 embassy              = ["esp-hal-common/embassy"]
 embassy-time-systick = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-hz-16_000_000"]
-embassy-time-timg0 = ["esp-hal-common/embassy-time-timg0", "embassy-time/tick-hz-1_000_000"]
+embassy-time-timg0   = ["esp-hal-common/embassy-time-timg0", "embassy-time/tick-hz-1_000_000"]
+xtal40mhz            = ["esp-hal-common/esp32c2_40mhz"] 
+xtal26mhz            = ["esp-hal-common/esp32c2_26mhz"]
 
 [[example]]
 name              = "spi_eh1_loopback"
