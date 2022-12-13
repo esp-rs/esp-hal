@@ -34,11 +34,12 @@ mod peripherals {
     pub use super::pac::*;
 
     crate::create_peripherals! {
-        UART0,
-        UART1,
+        I2C0,
         SPI0,
         SPI1,
         SPI2,
         SYSTIMER,
+        UART0,
+        UART1,
     }
 }
