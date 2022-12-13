@@ -50,5 +50,6 @@ mod peripherals {
         SPI0,
         SPI1,
         SPI2,
+        SYSTIMER,
     }
 }

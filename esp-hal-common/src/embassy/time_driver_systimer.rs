@@ -9,7 +9,7 @@ use crate::{
 
 pub const ALARM_COUNT: usize = 3;
 
-pub type TimerType = SystemTimer;
+pub type TimerType = SystemTimer<'static>;
 
 pub struct EmbassyTimer {
     pub(crate) alarms: Mutex<[AlarmState; ALARM_COUNT]>,
