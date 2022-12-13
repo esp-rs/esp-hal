@@ -8,6 +8,7 @@ use crate::{
     clock::Clocks,
     gpio::{InputPin, OutputPin},
     pac::i2c0::{RegisterBlock, COMD},
+    peripheral::{Peripheral, PeripheralRef},
     system::PeripheralClockControl,
     types::{InputSignal, OutputSignal},
 };
@@ -152,11 +153,11 @@ enum Opcode {
 }
 
 /// I2C peripheral container (I2C)
-pub struct I2C<T> {
-    peripheral: T,
+pub struct I2C<'d, T> {
+    peripheral: PeripheralRef<'d, T>,
 }
 
-impl<T> embedded_hal::blocking::i2c::Read for I2C<T>
+impl<T> embedded_hal::blocking::i2c::Read for I2C<'_, T>
 where
     T: Instance,
 {
@@ -167,7 +168,7 @@ where
     }
 }
 
-impl<T> embedded_hal::blocking::i2c::Write for I2C<T>
+impl<T> embedded_hal::blocking::i2c::Write for I2C<'_, T>
 where
     T: Instance,
 {
@@ -178,7 +179,7 @@ where
     }
 }
 
-impl<T> embedded_hal::blocking::i2c::WriteRead for I2C<T>
+impl<T> embedded_hal::blocking::i2c::WriteRead for I2C<'_, T>
 where
     T: Instance,
 {
@@ -195,12 +196,12 @@ where
 }
 
 #[cfg(feature = "eh1")]
-impl<T> embedded_hal_1::i2c::ErrorType for I2C<T> {
+impl<T> embedded_hal_1::i2c::ErrorType for I2C<'_, T> {
     type Error = Error;
 }
 
 #[cfg(feature = "eh1")]
-impl<T> embedded_hal_1::i2c::I2c for I2C<T>
+impl<T> embedded_hal_1::i2c::I2c for I2C<'_, T>
 where
     T: Instance,
 {
@@ -256,7 +257,7 @@ where
     }
 }
 
-impl<T> I2C<T>
+impl<'d, T> I2C<'d, T>
 where
     T: Instance,
 {
@@ -264,13 +265,14 @@ where
     /// This will enable the peripheral but the peripheral won't get
     /// automatically disabled when this gets dropped.
     pub fn new<SDA: OutputPin + InputPin, SCL: OutputPin + InputPin>(
-        i2c: T,
+        i2c: impl Peripheral<P = T> + 'd,
         mut sda: SDA,
         mut scl: SCL,
         frequency: HertzU32,
         peripheral_clock_control: &mut PeripheralClockControl,
         clocks: &Clocks,
     ) -> Self {
+        crate::into_ref!(i2c);
         enable_peripheral(&i2c, peripheral_clock_control);
 
         let mut i2c = I2C { peripheral: i2c };
@@ -292,14 +294,14 @@ where
 
         i2c
     }
-
-    /// Return the raw interface to the underlying peripheral
-    pub fn free(self) -> T {
-        self.peripheral
-    }
 }
 
-fn enable_peripheral<T: Instance>(i2c: &T, peripheral_clock_control: &mut PeripheralClockControl) {
+fn enable_peripheral<'d, T>(
+    i2c: &PeripheralRef<'d, T>,
+    peripheral_clock_control: &mut PeripheralClockControl,
+) where
+    T: Instance,
+{
     // enable peripheral
     match i2c.i2c_number() {
         0 => peripheral_clock_control.enable(crate::system::Peripheral::I2cExt0),
@@ -1222,7 +1224,7 @@ fn write_fifo(register_block: &RegisterBlock, data: u8) {
     }
 }
 
-impl Instance for crate::pac::I2C0 {
+impl Instance for crate::peripherals::I2C0 {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
         self
@@ -1235,7 +1237,7 @@ impl Instance for crate::pac::I2C0 {
 }
 
 #[cfg(i2c1)]
-impl Instance for crate::pac::I2C1 {
+impl Instance for crate::peripherals::I2C1 {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
         self
