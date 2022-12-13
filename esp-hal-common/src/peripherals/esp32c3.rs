@@ -47,5 +47,8 @@ mod peripherals {
     crate::create_peripherals! {
         UART0,
         UART1,
+        SPI0,
+        SPI1,
+        SPI2,
     }
 }
