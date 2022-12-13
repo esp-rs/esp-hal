@@ -2,6 +2,8 @@ use std::{env, fs::File, io::Write, path::PathBuf};
 
 #[cfg(feature = "direct-boot")]
 fn main() {
+    check_features();
+
     // Put the linker script somewhere the linker can find it
     let out = &PathBuf::from(env::var_os("OUT_DIR").unwrap());
 
@@ -36,6 +38,8 @@ fn main() {
 
 #[cfg(not(feature = "direct-boot"))]
 fn main() {
+    check_features();
+
     // Put the linker script somewhere the linker can find it
     let out = &PathBuf::from(env::var_os("OUT_DIR").unwrap());
     File::create(out.join("memory.x"))
@@ -60,6 +64,12 @@ fn main() {
     println!("cargo:rerun-if-changed=ld/memory.x");
 
     add_defaults();
+}
+
+fn check_features() {
+    if cfg!(feature = "xtal40mhz") && cfg!(feature = "xtal26mhz") {
+        panic!("Only one xtal speed feature can be selected");
+    }
 }
 
 fn add_defaults() {
