@@ -202,3 +202,32 @@ impl<'d, T: crate::peripheral::Peripheral<P = SystemPeripheral> + 'd> SystemExt<
         }
     }
 }
+
+impl core::ops::Deref for SystemClockControl {
+    type Target = SystemClockControl;
+
+    fn deref(&self) -> &Self::Target {
+        self
+    }
+}
+
+impl core::ops::DerefMut for SystemClockControl {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self
+    }
+}
+
+impl crate::peripheral::Peripheral for SystemClockControl {
+    type P = SystemClockControl;
+    #[inline]
+    unsafe fn clone_unchecked(&mut self) -> Self::P {
+        SystemClockControl { _private: () }
+    }
+}
+impl crate::peripheral::Peripheral for &mut SystemClockControl {
+    type P = SystemClockControl;
+    #[inline]
+    unsafe fn clone_unchecked(&mut self) -> Self::P {
+        SystemClockControl { _private: () }
+    }
+}

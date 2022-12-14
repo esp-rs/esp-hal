@@ -126,7 +126,7 @@ impl<PWM: PwmPeripheral> MCPWM<PWM> {
 pub struct PeripheralClockConfig<'a> {
     frequency: HertzU32,
     prescaler: u8,
-    phantom: PhantomData<&'a Clocks>,
+    phantom: PhantomData<&'a Clocks<'a>>,
 }
 
 impl<'a> PeripheralClockConfig<'a> {
