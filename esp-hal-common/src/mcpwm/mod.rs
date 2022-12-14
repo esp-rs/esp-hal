@@ -65,7 +65,8 @@ use timer::Timer;
 
 use crate::{
     clock::Clocks,
-    system::{Peripheral, PeripheralClockControl},
+    peripheral::{Peripheral, PeripheralRef},
+    system::{Peripheral as PeripheralEnable, PeripheralClockControl},
     types::OutputSignal,
 };
 
@@ -76,7 +77,8 @@ pub mod timer;
 
 /// The MCPWM peripheral
 #[non_exhaustive]
-pub struct MCPWM<PWM> {
+pub struct MCPWM<'d, PWM> {
+    _inner: PeripheralRef<'d, PWM>,
     /// Timer0
     pub timer0: Timer<0, PWM>,
     /// Timer1
@@ -91,15 +93,15 @@ pub struct MCPWM<PWM> {
     pub operator2: Operator<2, PWM>,
 }
 
-impl<PWM: PwmPeripheral> MCPWM<PWM> {
+impl<'d, PWM: PwmPeripheral> MCPWM<'d, PWM> {
     /// `pwm_clk = clocks.crypto_pwm_clock / (prescaler + 1)`
     // clocks.crypto_pwm_clock normally is 160 MHz
     pub fn new(
-        peripheral: PWM,
+        peripheral: impl Peripheral<P = PWM> + 'd,
         peripheral_clock: PeripheralClockConfig,
         system: &mut PeripheralClockControl,
     ) -> Self {
-        let _ = peripheral;
+        crate::into_ref!(peripheral);
 
         PWM::enable(system);
 
@@ -111,6 +113,7 @@ impl<PWM: PwmPeripheral> MCPWM<PWM> {
         peripheral.clk.write(|w| w.en().set_bit());
 
         MCPWM {
+            _inner: peripheral,
             timer0: Timer::new(),
             timer1: Timer::new(),
             timer2: Timer::new(),
@@ -247,7 +250,7 @@ pub unsafe trait PwmPeripheral:
 
 unsafe impl PwmPeripheral for crate::peripherals::PWM0 {
     fn enable(system: &mut PeripheralClockControl) {
-        system.enable(Peripheral::Mcpwm0)
+        system.enable(PeripheralEnable::Mcpwm0)
     }
 
     fn block() -> *const crate::peripherals::pwm0::RegisterBlock {
@@ -269,7 +272,7 @@ unsafe impl PwmPeripheral for crate::peripherals::PWM0 {
 
 unsafe impl PwmPeripheral for crate::peripherals::PWM1 {
     fn enable(system: &mut PeripheralClockControl) {
-        system.enable(Peripheral::Mcpwm1)
+        system.enable(PeripheralEnable::Mcpwm1)
     }
 
     fn block() -> *const crate::peripherals::pwm0::RegisterBlock {

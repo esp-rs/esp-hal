@@ -82,5 +82,7 @@ mod peripherals {
         RMT,
         I2S0,
         I2S1,
+        PWM0,
+        PWM1,
     }
 }
