@@ -80,5 +80,7 @@ mod peripherals {
         SYSTEM,
         LEDC,
         RMT,
+        I2S0,
+        I2S1,
     }
 }
