@@ -64,5 +64,6 @@ mod peripherals {
         UART2,
         DPORT,
         LEDC,
+        RMT,
     }
 }
