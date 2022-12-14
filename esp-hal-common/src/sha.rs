@@ -1,6 +1,9 @@
 use core::convert::Infallible;
 
-use crate::pac::SHA;
+use crate::{
+    peripheral::{Peripheral, PeripheralRef},
+    peripherals::SHA,
+};
 
 // All the hash algorithms introduced in FIPS PUB 180-4 Spec.
 // – SHA-1
@@ -157,9 +160,8 @@ impl AlignmentHelper {
     }
 }
 
-#[derive(Debug)]
-pub struct Sha {
-    sha: SHA,
+pub struct Sha<'d> {
+    sha: PeripheralRef<'d, SHA>,
     mode: ShaMode,
     alignment_helper: AlignmentHelper,
     cursor: usize,
@@ -224,8 +226,10 @@ fn mode_as_bits(mode: ShaMode) -> u8 {
 
 // This implementation might fail after u32::MAX/8 bytes, to increase please see
 // ::finish() length/self.cursor usage
-impl Sha {
-    pub fn new(sha: SHA, mode: ShaMode) -> Self {
+impl<'d> Sha<'d> {
+    pub fn new(sha: impl Peripheral<P = SHA> + 'd, mode: ShaMode) -> Self {
+        crate::into_ref!(sha);
+
         // Setup SHA Mode
         #[cfg(not(esp32))]
         sha.mode
@@ -507,9 +511,5 @@ impl Sha {
         }
 
         Ok(())
-    }
-
-    pub fn free(self) -> SHA {
-        self.sha
     }
 }
