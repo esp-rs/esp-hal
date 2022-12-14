@@ -1,7 +1,7 @@
 use crate::clock::CpuClock;
 
 pub(crate) fn set_cpu_clock(cpu_clock_speed: CpuClock) {
-    let system_control = unsafe { &*crate::pac::SYSTEM::PTR };
+    let system_control = unsafe { &*crate::peripherals::SYSTEM::PTR };
 
     unsafe {
         system_control

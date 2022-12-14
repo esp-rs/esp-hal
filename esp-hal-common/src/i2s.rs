@@ -909,15 +909,15 @@ mod private {
 
     use super::{DataFormat, I2sRx, I2sTx, Standard, I2S_LL_MCLK_DIVIDER_MAX};
     #[cfg(any(esp32c3, esp32s2))]
-    use crate::pac::i2s::RegisterBlock;
+    use crate::peripherals::i2s::RegisterBlock;
     // on ESP32-S3 I2S1 doesn't support all features - use that to avoid using those features
     // by accident
     #[cfg(any(esp32s3, esp32))]
-    use crate::pac::i2s1::RegisterBlock;
+    use crate::peripherals::i2s1::RegisterBlock;
     #[cfg(any(esp32c3, esp32s2))]
-    use crate::pac::I2S;
+    use crate::peripherals::I2S;
     #[cfg(any(esp32s3, esp32))]
-    use crate::pac::I2S0 as I2S;
+    use crate::peripherals::I2S0 as I2S;
     use crate::{
         clock::Clocks,
         dma::{
@@ -1016,14 +1016,14 @@ mod private {
     impl I2s0Instance for I2S {}
 
     #[cfg(esp32s3)]
-    impl Instance<I2sPeripheral1> for crate::pac::I2S1 {
+    impl Instance<I2sPeripheral1> for crate::peripherals::I2S1 {
         fn register_access(&self) -> I2sPeripheral1 {
             I2sPeripheral1 {}
         }
     }
 
     #[cfg(esp32s3)]
-    impl I2s1Instance for crate::pac::I2S1 {}
+    impl I2s1Instance for crate::peripherals::I2S1 {}
 
     pub trait Signals {
         fn get_peripheral(&self) -> Peripheral;
@@ -1797,7 +1797,7 @@ mod private {
     #[cfg(any(esp32s3, esp32))]
     impl RegBlock for I2sPeripheral1 {
         fn register_block(&self) -> &'static RegisterBlock {
-            unsafe { core::mem::transmute(crate::pac::I2S1::PTR) }
+            unsafe { core::mem::transmute(crate::peripherals::I2S1::PTR) }
         }
     }
 

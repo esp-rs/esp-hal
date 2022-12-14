@@ -5,7 +5,7 @@ use fugit::{HertzU32, MicrosDurationU64};
 use crate::efuse::Efuse;
 use crate::{
     clock::{Clock, XtalClock},
-    pac::{RTC_CNTL, TIMG0},
+    peripherals::{RTC_CNTL, TIMG0},
     rom::esp_rom_delay_us,
 };
 

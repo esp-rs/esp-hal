@@ -11,7 +11,7 @@ cfg_if::cfg_if! {
     if #[cfg(any(esp32, esp32s2, esp32s3))] {
         use core::marker::PhantomData;
 
-        use crate::pac::SENS;
+        use crate::peripherals::SENS;
 
         pub struct ADC1 {
             _private: PhantomData<()>,
@@ -65,7 +65,7 @@ cfg_if::cfg_if! {
     if #[cfg(esp32c3)] {
         use core::marker::PhantomData;
 
-        use crate::pac::APB_SARADC;
+        use crate::peripherals::APB_SARADC;
 
         pub struct ADC1 {
             _private: PhantomData<()>,
@@ -103,7 +103,7 @@ cfg_if::cfg_if! {
     if #[cfg(esp32c2)] {
         use core::marker::PhantomData;
 
-        use crate::pac::APB_SARADC;
+        use crate::peripherals::APB_SARADC;
 
         pub struct ADC1 {
             _private: PhantomData<()>,

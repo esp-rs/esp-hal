@@ -2,7 +2,7 @@ use paste::paste;
 
 use crate::{
     gpio::PhantomData,
-    pac::GPIO,
+    peripherals::GPIO,
     AlternateFunction,
     Bank0GpioRegisterAccess,
     Bank1GpioRegisterAccess,
@@ -22,9 +22,9 @@ pub const ZERO_INPUT: u8 = 0x30;
 
 pub(crate) const GPIO_FUNCTION: AlternateFunction = AlternateFunction::Function2;
 
-pub(crate) fn get_io_mux_reg(gpio_num: u8) -> &'static crate::pac::io_mux::GPIO0 {
+pub(crate) fn get_io_mux_reg(gpio_num: u8) -> &'static crate::peripherals::io_mux::GPIO0 {
     unsafe {
-        let iomux = &*crate::pac::IO_MUX::PTR;
+        let iomux = &*crate::peripherals::IO_MUX::PTR;
 
         match gpio_num {
             0 => core::mem::transmute(&(iomux.gpio0)),
@@ -569,7 +569,7 @@ pub enum OutputSignal {
 }
 
 pub(crate) fn errata36(pin_num: u8, pull_up: bool, pull_down: bool) {
-    use crate::pac::RTCIO;
+    use crate::peripherals::RTCIO;
     let rtcio = unsafe { &*RTCIO::PTR };
 
     match pin_num {

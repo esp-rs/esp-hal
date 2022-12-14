@@ -1,6 +1,6 @@
 use crate::{
     clock::XtalClock,
-    pac::RTC_CNTL,
+    peripherals::RTC_CNTL,
     rtc_cntl::{RtcCalSel, RtcClock, RtcFastClock, RtcSlowClock},
 };
 

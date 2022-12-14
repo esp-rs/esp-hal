@@ -2,12 +2,15 @@
 
 use self::config::Config;
 #[cfg(uart2)]
-use crate::pac::UART2;
+use crate::peripherals::UART2;
 use crate::{
     clock::Clocks,
-    pac::uart0::{fifo::FIFO_SPEC, RegisterBlock},
     peripheral::{Peripheral, PeripheralRef},
-    peripherals::{UART0, UART1},
+    peripherals::{
+        uart0::{fifo::FIFO_SPEC, RegisterBlock},
+        UART0,
+        UART1,
+    },
     types::{InputSignal, OutputSignal},
     InputPin,
     OutputPin,
@@ -477,7 +480,7 @@ where
         if self.uart.get_rx_fifo_count() > 0 {
             let value = unsafe {
                 let fifo = (self.uart.register_block().fifo.as_ptr() as *mut u8).offset(offset)
-                    as *mut crate::pac::generic::Reg<FIFO_SPEC>;
+                    as *mut crate::peripherals::generic::Reg<FIFO_SPEC>;
                 (*fifo).read().rxfifo_rd_byte().bits()
             };
 

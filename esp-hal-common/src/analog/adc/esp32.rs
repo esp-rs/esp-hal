@@ -4,7 +4,7 @@ use embedded_hal::adc::{Channel, OneShot};
 
 use crate::{
     analog::{ADC1, ADC2},
-    pac::{RTCIO, SENS},
+    peripherals::{RTCIO, SENS},
 };
 
 /// The sampling/readout resolution of the ADC

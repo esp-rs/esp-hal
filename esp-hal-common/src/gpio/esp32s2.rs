@@ -2,7 +2,7 @@ use paste::paste;
 
 use crate::{
     gpio::PhantomData,
-    pac::GPIO,
+    peripherals::GPIO,
     AlternateFunction,
     Bank0GpioRegisterAccess,
     Bank1GpioRegisterAccess,
@@ -21,9 +21,9 @@ pub const ZERO_INPUT: u8 = 0x3c;
 
 pub(crate) const GPIO_FUNCTION: AlternateFunction = AlternateFunction::Function1;
 
-pub(crate) const fn get_io_mux_reg(gpio_num: u8) -> &'static crate::pac::io_mux::GPIO0 {
+pub(crate) const fn get_io_mux_reg(gpio_num: u8) -> &'static crate::peripherals::io_mux::GPIO0 {
     unsafe {
-        let iomux = &*crate::pac::IO_MUX::PTR;
+        let iomux = &*crate::peripherals::IO_MUX::PTR;
 
         match gpio_num {
             0 => core::mem::transmute(&(iomux.gpio0)),
@@ -293,8 +293,8 @@ crate::gpio::gpio! {
 macro_rules! impl_get_rtc_pad {
     ($pad_name:ident) => {
         paste!{
-            pub(crate) fn [<esp32s2_get_rtc_pad_ $pad_name >]() -> &'static crate::pac::rtcio::[< $pad_name:upper >] {
-                use crate::pac::RTCIO;
+            pub(crate) fn [<esp32s2_get_rtc_pad_ $pad_name >]() -> &'static crate::peripherals::rtcio::[< $pad_name:upper >] {
+                use crate::peripherals::RTCIO;
                 let rtcio = unsafe{ &*RTCIO::ptr() };
                 &rtcio.$pad_name
             }
@@ -305,8 +305,8 @@ macro_rules! impl_get_rtc_pad {
 macro_rules! impl_get_rtc_pad_indexed {
     ($pad_name:ident, $idx:literal) => {
         paste!{
-            pub(crate) fn [<esp32s2_get_rtc_pad_ $pad_name $idx>]() -> &'static crate::pac::rtcio::[< $pad_name:upper >] {
-                use crate::pac::RTCIO;
+            pub(crate) fn [<esp32s2_get_rtc_pad_ $pad_name $idx>]() -> &'static crate::peripherals::rtcio::[< $pad_name:upper >] {
+                use crate::peripherals::RTCIO;
                 let rtcio = unsafe{ &*RTCIO::ptr() };
                 &rtcio.$pad_name[$idx]
             }

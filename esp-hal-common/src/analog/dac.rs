@@ -1,4 +1,4 @@
-use crate::pac::{RTCIO, SENS};
+use crate::peripherals::{RTCIO, SENS};
 
 pub trait DAC {
     fn write(&mut self, value: u8);

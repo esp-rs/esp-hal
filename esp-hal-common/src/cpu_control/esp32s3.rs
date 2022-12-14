@@ -33,7 +33,7 @@ pub struct CpuControl {
 }
 
 unsafe fn internal_park_core(core: Cpu) {
-    let rtc_control = crate::pac::RTC_CNTL::PTR;
+    let rtc_control = crate::peripherals::RTC_CNTL::PTR;
     let rtc_control = &*rtc_control;
 
     match core {
@@ -70,7 +70,7 @@ impl CpuControl {
 
     /// Unpark the given core
     pub fn unpark_core(&mut self, core: Cpu) {
-        let rtc_control = crate::pac::RTC_CNTL::PTR;
+        let rtc_control = crate::peripherals::RTC_CNTL::PTR;
         let rtc_control = unsafe { &*rtc_control };
 
         match core {
@@ -126,7 +126,7 @@ impl CpuControl {
         &mut self,
         entry: &mut (dyn FnMut() + Send),
     ) -> Result<AppCoreGuard, Error> {
-        let system_control = crate::pac::SYSTEM::PTR;
+        let system_control = crate::peripherals::SYSTEM::PTR;
         let system_control = unsafe { &*system_control };
 
         if !xtensa_lx::is_debugger_attached()

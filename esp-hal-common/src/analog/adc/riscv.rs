@@ -6,7 +6,7 @@ use embedded_hal::adc::{Channel, OneShot};
 use crate::analog::ADC2;
 use crate::{
     analog::ADC1,
-    pac::APB_SARADC,
+    peripherals::APB_SARADC,
     system::{Peripheral, PeripheralClockControl},
 };
 

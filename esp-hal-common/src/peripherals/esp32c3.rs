@@ -1,6 +1,9 @@
+use esp32c3 as pac;
+// We need to export this for users to use
 pub use pac::Interrupt;
 
-use crate::pac; // We need to export this for users to use
+// We need to export this in the hal for the drivers to use
+pub(crate) use self::peripherals::*;
 
 crate::peripherals! {
     AES,
@@ -47,6 +50,7 @@ mod peripherals {
     crate::create_peripherals! {
         I2C0,
         RNG,
+        SHA,
         SPI0,
         SPI1,
         SPI2,

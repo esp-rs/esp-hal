@@ -33,7 +33,7 @@ pub struct CpuControl {
 }
 
 unsafe fn internal_park_core(core: Cpu) {
-    let rtc_control = crate::pac::RTC_CNTL::PTR;
+    let rtc_control = crate::peripherals::RTC_CNTL::PTR;
     let rtc_control = &*rtc_control;
 
     match core {
@@ -70,7 +70,7 @@ impl CpuControl {
 
     /// Unpark the given core
     pub fn unpark_core(&mut self, core: Cpu) {
-        let rtc_control = crate::pac::RTC_CNTL::PTR;
+        let rtc_control = crate::peripherals::RTC_CNTL::PTR;
         let rtc_control = unsafe { &*rtc_control };
 
         match core {
@@ -94,7 +94,7 @@ impl CpuControl {
     }
 
     fn flush_cache(&mut self, core: Cpu) {
-        let dport_control = crate::pac::DPORT::PTR;
+        let dport_control = crate::peripherals::DPORT::PTR;
         let dport_control = unsafe { &*dport_control };
 
         match core {
@@ -139,7 +139,7 @@ impl CpuControl {
     fn enable_cache(&mut self, core: Cpu) {
         let spi0 = unsafe { &(*crate::peripherals::SPI0::ptr()) };
 
-        let dport_control = crate::pac::DPORT::PTR;
+        let dport_control = crate::peripherals::DPORT::PTR;
         let dport_control = unsafe { &*dport_control };
 
         match core {
@@ -191,7 +191,7 @@ impl CpuControl {
         &mut self,
         entry: &mut (dyn FnMut() + Send),
     ) -> Result<AppCoreGuard, Error> {
-        let dport_control = crate::pac::DPORT::PTR;
+        let dport_control = crate::peripherals::DPORT::PTR;
         let dport_control = unsafe { &*dport_control };
 
         if !xtensa_lx::is_debugger_attached()

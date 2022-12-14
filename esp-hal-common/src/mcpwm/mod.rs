@@ -234,21 +234,23 @@ impl<'a> PeripheralClockConfig<'a> {
 pub struct FrequencyError;
 
 /// A MCPWM peripheral
-pub unsafe trait PwmPeripheral: Deref<Target = crate::pac::pwm0::RegisterBlock> {
+pub unsafe trait PwmPeripheral:
+    Deref<Target = crate::peripherals::pwm0::RegisterBlock>
+{
     /// Enable peripheral
     fn enable(system: &mut PeripheralClockControl);
     /// Get a pointer to the peripheral RegisterBlock
-    fn block() -> *const crate::pac::pwm0::RegisterBlock;
+    fn block() -> *const crate::peripherals::pwm0::RegisterBlock;
     /// Get operator GPIO mux output signal
     fn output_signal<const OP: u8, const IS_A: bool>() -> OutputSignal;
 }
 
-unsafe impl PwmPeripheral for crate::pac::PWM0 {
+unsafe impl PwmPeripheral for crate::peripherals::PWM0 {
     fn enable(system: &mut PeripheralClockControl) {
         system.enable(Peripheral::Mcpwm0)
     }
 
-    fn block() -> *const crate::pac::pwm0::RegisterBlock {
+    fn block() -> *const crate::peripherals::pwm0::RegisterBlock {
         Self::ptr()
     }
 
@@ -265,12 +267,12 @@ unsafe impl PwmPeripheral for crate::pac::PWM0 {
     }
 }
 
-unsafe impl PwmPeripheral for crate::pac::PWM1 {
+unsafe impl PwmPeripheral for crate::peripherals::PWM1 {
     fn enable(system: &mut PeripheralClockControl) {
         system.enable(Peripheral::Mcpwm1)
     }
 
-    fn block() -> *const crate::pac::pwm0::RegisterBlock {
+    fn block() -> *const crate::peripherals::pwm0::RegisterBlock {
         Self::ptr()
     }
 

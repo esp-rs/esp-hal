@@ -8,7 +8,7 @@ use super::{
 };
 use crate::{
     gpio::{types::OutputSignal, OutputPin},
-    pac::ledc::RegisterBlock,
+    peripherals::ledc::RegisterBlock,
 };
 
 /// Channel errors
@@ -82,7 +82,7 @@ pub struct Channel<'a, S: TimerSpeed, O: OutputPin> {
 impl<'a, S: TimerSpeed, O: OutputPin> Channel<'a, S, O> {
     /// Return a new channel
     pub fn new(number: Number, output_pin: O) -> Self {
-        let ledc = unsafe { &*crate::pac::LEDC::ptr() };
+        let ledc = unsafe { &*crate::peripherals::LEDC::ptr() };
         Channel {
             ledc,
             timer: None,

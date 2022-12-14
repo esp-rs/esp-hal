@@ -13,10 +13,10 @@ use fugit::{HertzU32, MicrosDurationU64};
 use void::Void;
 
 #[cfg(timg1)]
-use crate::pac::TIMG1;
+use crate::peripherals::TIMG1;
 use crate::{
     clock::Clocks,
-    pac::{timg0::RegisterBlock, TIMG0},
+    peripherals::{timg0::RegisterBlock, TIMG0},
 };
 
 /// Custom timer error type
@@ -46,7 +46,7 @@ pub trait TimerGroupInstance {
 impl TimerGroupInstance for TIMG0 {
     #[inline(always)]
     fn register_block() -> *const RegisterBlock {
-        crate::pac::TIMG0::PTR
+        crate::peripherals::TIMG0::PTR
     }
 }
 
@@ -54,7 +54,7 @@ impl TimerGroupInstance for TIMG0 {
 impl TimerGroupInstance for TIMG1 {
     #[inline(always)]
     fn register_block() -> *const RegisterBlock {
-        crate::pac::TIMG1::PTR
+        crate::peripherals::TIMG1::PTR
     }
 }
 
