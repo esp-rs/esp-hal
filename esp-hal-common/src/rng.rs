@@ -4,7 +4,10 @@ use core::convert::Infallible;
 
 use embedded_hal::blocking::rng::Read;
 
-use crate::pac::RNG;
+use crate::{
+    peripheral::{Peripheral, PeripheralRef},
+    peripherals::RNG,
+};
 
 /// Random Number Generator
 ///
@@ -28,14 +31,15 @@ use crate::pac::RNG;
 ///
 /// For more information, please refer to the ESP-IDF documentation:
 /// <https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/random.html>
-#[derive(Debug)]
-pub struct Rng {
-    rng: RNG,
+pub struct Rng<'d> {
+    rng: PeripheralRef<'d, RNG>,
 }
 
-impl Rng {
+impl<'d> Rng<'d> {
     /// Create a new random number generator instance
-    pub fn new(rng: RNG) -> Self {
+    pub fn new(rng: impl Peripheral<P = RNG> + 'd) -> Self {
+        crate::into_ref!(rng);
+
         Self { rng }
     }
 
@@ -44,14 +48,9 @@ impl Rng {
     pub fn random(&mut self) -> u32 {
         self.rng.data.read().bits()
     }
-
-    /// Return the raw interface to the underlying `Rng` instance
-    pub fn free(self) -> RNG {
-        self.rng
-    }
 }
 
-impl Read for Rng {
+impl Read for Rng<'_> {
     type Error = Infallible;
 
     fn read(&mut self, buffer: &mut [u8]) -> Result<(), Self::Error> {

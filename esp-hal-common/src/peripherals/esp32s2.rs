@@ -52,6 +52,7 @@ mod peripherals {
     crate::create_peripherals! {
         I2C0,
         I2C1,
+        RNG,
         SPI0,
         SPI1,
         SPI2,
