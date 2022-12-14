@@ -53,6 +53,7 @@ mod peripherals {
         I2C0,
         I2C1,
         RNG,
+        SHA,
         SPI0,
         SPI1,
         SPI2,

@@ -65,7 +65,6 @@ fn main() -> ! {
     let hw_time = post_calc - pre_calc;
     println!("Took {} cycles", hw_time);
     println!("SHA512 Hash output {:02x?}", output);
-    let _usha = hasher.free();
 
     let pre_calc = xtensa_lx::timer::get_cycle_count();
     let mut hasher = Sha512::new();
