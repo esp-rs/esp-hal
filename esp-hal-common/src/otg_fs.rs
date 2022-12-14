@@ -4,7 +4,7 @@ pub use esp_synopsys_usb_otg::UsbBus;
 use esp_synopsys_usb_otg::UsbPeripheral;
 
 use crate::{
-    pac,
+    peripherals,
     system::{Peripheral, PeripheralClockControl},
     types::InputSignal,
 };
@@ -24,7 +24,7 @@ where
     P: UsbDp + Send + Sync,
     M: UsbDm + Send + Sync,
 {
-    _usb0: pac::USB0,
+    _usb0: peripherals::USB0,
     _usb_sel: S,
     _usb_dp: P,
     _usb_dm: M,
@@ -37,7 +37,7 @@ where
     M: UsbDm + Send + Sync,
 {
     pub fn new(
-        usb0: pac::USB0,
+        usb0: peripherals::USB0,
         usb_sel: S,
         usb_dp: P,
         usb_dm: M,
@@ -67,7 +67,7 @@ where
     P: UsbDp + Send + Sync,
     M: UsbDm + Send + Sync,
 {
-    const REGISTERS: *const () = pac::USB0::ptr() as *const ();
+    const REGISTERS: *const () = peripherals::USB0::ptr() as *const ();
 
     const HIGH_SPEED: bool = false;
     const FIFO_DEPTH_WORDS: usize = 256;
@@ -75,7 +75,7 @@ where
 
     fn enable() {
         unsafe {
-            let usb_wrap = &*pac::USB_WRAP::PTR;
+            let usb_wrap = &*peripherals::USB_WRAP::PTR;
             usb_wrap.otg_conf.modify(|_, w| {
                 w.usb_pad_enable()
                     .set_bit()
@@ -91,7 +91,7 @@ where
 
             #[cfg(esp32s3)]
             {
-                let rtc = &*pac::RTC_CNTL::PTR;
+                let rtc = &*peripherals::RTC_CNTL::PTR;
                 rtc.usb_conf
                     .modify(|_, w| w.sw_hw_usb_phy_sel().set_bit().sw_usb_phy_sel().set_bit());
             }

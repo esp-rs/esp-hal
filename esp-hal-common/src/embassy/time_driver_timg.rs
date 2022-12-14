@@ -1,12 +1,12 @@
 use core::cell::RefCell;
 
 use critical_section::{CriticalSection, Mutex};
-use pac::TIMG0;
+use peripherals::TIMG0;
 
 use super::AlarmState;
 use crate::{
     clock::Clocks,
-    pac,
+    peripherals,
     prelude::*,
     timer::{Timer, Timer0},
 };
@@ -60,7 +60,7 @@ impl EmbassyTimer {
 
         critical_section::with(|cs| DRIVER.timer.borrow_ref_mut(cs).replace(timer));
 
-        interrupt::enable(pac::Interrupt::TG0_T0_LEVEL, Priority::max()).unwrap();
+        interrupt::enable(peripherals::Interrupt::TG0_T0_LEVEL, Priority::max()).unwrap();
 
         #[interrupt]
         fn TG0_T0_LEVEL() {

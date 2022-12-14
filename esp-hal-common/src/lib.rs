@@ -21,17 +21,6 @@
 #![no_std]
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
 
-#[cfg(esp32)]
-pub(crate) use esp32 as pac;
-#[cfg(esp32c2)]
-pub(crate) use esp32c2 as pac;
-#[cfg(esp32c3)]
-pub(crate) use esp32c3 as pac;
-#[cfg(esp32s2)]
-pub(crate) use esp32s2 as pac;
-#[cfg(esp32s3)]
-pub(crate) use esp32s3 as pac;
-
 #[cfg_attr(esp32, path = "peripherals/esp32.rs")]
 #[cfg_attr(esp32c3, path = "peripherals/esp32c3.rs")]
 #[cfg_attr(esp32c2, path = "peripherals/esp32c2.rs")]

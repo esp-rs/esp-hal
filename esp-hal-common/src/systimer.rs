@@ -3,16 +3,16 @@ use core::{intrinsics::transmute, marker::PhantomData};
 use fugit::MillisDurationU32;
 
 use crate::{
-    pac::{
+    peripheral::{Peripheral, PeripheralRef},
+    peripherals::{
         generic::Reg,
         systimer::{
             target0_conf::TARGET0_CONF_SPEC,
             target0_hi::TARGET0_HI_SPEC,
             target0_lo::TARGET0_LO_SPEC,
         },
+        SYSTIMER,
     },
-    peripheral::{Peripheral, PeripheralRef},
-    peripherals::SYSTIMER,
 };
 
 // TODO this only handles unit0 of the systimer

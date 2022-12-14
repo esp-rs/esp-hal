@@ -3,7 +3,7 @@ use critical_section::{CriticalSection, Mutex};
 use super::AlarmState;
 use crate::{
     clock::Clocks,
-    pac,
+    peripherals,
     systimer::{Alarm, SystemTimer, Target},
 };
 
@@ -57,9 +57,9 @@ impl EmbassyTimer {
     pub fn init(_clocks: &Clocks, _systimer: TimerType) {
         use crate::{interrupt, interrupt::Priority, macros::interrupt};
 
-        interrupt::enable(pac::Interrupt::SYSTIMER_TARGET0, Priority::max()).unwrap();
-        interrupt::enable(pac::Interrupt::SYSTIMER_TARGET1, Priority::max()).unwrap();
-        interrupt::enable(pac::Interrupt::SYSTIMER_TARGET2, Priority::max()).unwrap();
+        interrupt::enable(peripherals::Interrupt::SYSTIMER_TARGET0, Priority::max()).unwrap();
+        interrupt::enable(peripherals::Interrupt::SYSTIMER_TARGET1, Priority::max()).unwrap();
+        interrupt::enable(peripherals::Interrupt::SYSTIMER_TARGET2, Priority::max()).unwrap();
 
         #[interrupt]
         fn SYSTIMER_TARGET0() {

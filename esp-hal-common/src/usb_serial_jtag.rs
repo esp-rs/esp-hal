@@ -1,8 +1,8 @@
 use core::convert::Infallible;
 
 use crate::{
-    pac::{usb_device::RegisterBlock, USB_DEVICE},
     peripheral::{Peripheral, PeripheralRef},
+    peripherals::{usb_device::RegisterBlock, USB_DEVICE},
 };
 
 pub struct UsbSerialJtag<'d, T> {

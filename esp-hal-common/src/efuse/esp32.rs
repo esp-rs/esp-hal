@@ -2,7 +2,7 @@
 
 use fugit::{HertzU32, RateExtU32};
 
-use crate::pac::EFUSE;
+use crate::peripherals::EFUSE;
 
 pub struct Efuse;
 

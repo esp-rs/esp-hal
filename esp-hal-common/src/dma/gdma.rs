@@ -16,7 +16,7 @@ macro_rules! impl_channel {
                 }
 
                 fn set_out_burstmode(burst_mode: bool) {
-                    let dma = unsafe { &*crate::pac::DMA::PTR };
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
 
                     dma.[<out_conf0_ch $num>].modify(|_,w| {
                         w.out_data_burst_en().bit(burst_mode)
@@ -25,7 +25,7 @@ macro_rules! impl_channel {
                 }
 
                 fn set_out_priority(priority: DmaPriority) {
-                    let dma = unsafe { &*crate::pac::DMA::PTR };
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
 
                     dma.[<out_pri_ch $num>].write(|w| {
                         w.tx_pri().variant(priority as u8)
@@ -33,7 +33,7 @@ macro_rules! impl_channel {
                 }
 
                 fn clear_out_interrupts() {
-                    let dma = unsafe { &*crate::pac::DMA::PTR };
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
 
                     #[cfg(not(esp32s3))]
                     dma.[<int_clr_ch $num>].write(|w| {
@@ -73,20 +73,20 @@ macro_rules! impl_channel {
                 }
 
                 fn reset_out() {
-                    let dma = unsafe { &*crate::pac::DMA::PTR };
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
 
                     dma.[<out_conf0_ch $num>].modify(|_, w| w.out_rst().set_bit());
                     dma.[<out_conf0_ch $num>].modify(|_, w| w.out_rst().clear_bit());
                 }
 
                 fn set_out_descriptors(address: u32) {
-                    let dma = unsafe { &*crate::pac::DMA::PTR };
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
 
                     dma.[<out_link_ch $num>].modify(|_, w| unsafe { w.outlink_addr().bits(address) });
                 }
 
                 fn has_out_descriptor_error() -> bool {
-                    let dma = unsafe { &*crate::pac::DMA::PTR };
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
 
                     #[cfg(not(esp32s3))]
                     let ret = dma.[<int_raw_ch $num>].read().out_dscr_err().bit();
@@ -97,19 +97,19 @@ macro_rules! impl_channel {
                 }
 
                 fn set_out_peripheral(peripheral: u8) {
-                    let dma = unsafe { &*crate::pac::DMA::PTR };
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
 
                     dma.[<out_peri_sel_ch $num>].modify(|_, w| w.peri_out_sel().variant(peripheral));
                 }
 
                 fn start_out() {
-                    let dma = unsafe { &*crate::pac::DMA::PTR };
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
 
                     dma.[<out_link_ch $num>].modify(|_, w| w.outlink_start().set_bit());
                 }
 
                 fn is_out_done() -> bool {
-                    let dma = unsafe { &*crate::pac::DMA::PTR };
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
 
                     #[cfg(not(esp32s3))]
                     let ret = dma.[<int_raw_ch $num>].read().out_total_eof().bit();
@@ -120,12 +120,12 @@ macro_rules! impl_channel {
                 }
 
                 fn last_out_dscr_address() -> usize {
-                    let dma = unsafe { &*crate::pac::DMA::PTR };
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
                     dma.[<out_eof_des_addr_ch $num>].read().out_eof_des_addr().bits() as usize
                 }
 
                 fn is_out_eof_interrupt_set() -> bool {
-                    let dma = unsafe { &*crate::pac::DMA::PTR };
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
 
                     #[cfg(not(esp32s3))]
                     let ret = dma.[<int_raw_ch $num>].read().out_eof().bit();
@@ -136,7 +136,7 @@ macro_rules! impl_channel {
                 }
 
                 fn reset_out_eof_interrupt() {
-                    let dma = unsafe { &*crate::pac::DMA::PTR };
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
 
                     #[cfg(not(esp32s3))]
                     dma.[<int_clr_ch $num>].write(|w| {
@@ -152,7 +152,7 @@ macro_rules! impl_channel {
                 }
 
                 fn set_in_burstmode(burst_mode: bool) {
-                    let dma = unsafe { &*crate::pac::DMA::PTR };
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
 
                     dma.[<in_conf0_ch $num>].modify(|_,w| {
                         w.in_data_burst_en().bit(burst_mode).indscr_burst_en().bit(burst_mode)
@@ -160,7 +160,7 @@ macro_rules! impl_channel {
                 }
 
                 fn set_in_priority(priority: DmaPriority) {
-                    let dma = unsafe { &*crate::pac::DMA::PTR };
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
 
                     dma.[<in_pri_ch $num>].write(|w| {
                         w.rx_pri().variant(priority as u8)
@@ -168,7 +168,7 @@ macro_rules! impl_channel {
                 }
 
                 fn clear_in_interrupts() {
-                    let dma = unsafe { &*crate::pac::DMA::PTR };
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
 
                     #[cfg(not(esp32s3))]
                     dma.[<int_clr_ch $num>].write(|w| {
@@ -212,20 +212,20 @@ macro_rules! impl_channel {
                 }
 
                 fn reset_in() {
-                    let dma = unsafe { &*crate::pac::DMA::PTR };
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
 
                     dma.[<in_conf0_ch $num>].modify(|_, w| w.in_rst().set_bit());
                     dma.[<in_conf0_ch $num>].modify(|_, w| w.in_rst().clear_bit());
                 }
 
                 fn set_in_descriptors(address: u32) {
-                    let dma = unsafe { &*crate::pac::DMA::PTR };
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
 
                     dma.[<in_link_ch $num>].modify(|_, w| unsafe { w.inlink_addr().bits(address) });
                 }
 
                 fn has_in_descriptor_error() -> bool {
-                    let dma = unsafe { &*crate::pac::DMA::PTR };
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
 
                     #[cfg(not(esp32s3))]
                     let ret = dma.[<int_raw_ch $num>].read().in_dscr_err().bit();
@@ -236,19 +236,19 @@ macro_rules! impl_channel {
                 }
 
                 fn set_in_peripheral(peripheral: u8) {
-                    let dma = unsafe { &*crate::pac::DMA::PTR };
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
 
                     dma.[<in_peri_sel_ch $num>].modify(|_, w| w.peri_in_sel().variant(peripheral));
                 }
 
                 fn start_in() {
-                    let dma = unsafe { &*crate::pac::DMA::PTR };
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
 
                     dma.[<in_link_ch $num>].modify(|_, w| w.inlink_start().set_bit());
                 }
 
                 fn is_in_done() -> bool {
-                    let dma = unsafe { &*crate::pac::DMA::PTR };
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
 
                     #[cfg(not(esp32s3))]
                     let ret = dma.[<int_raw_ch $num>].read().in_suc_eof().bit();
@@ -259,7 +259,7 @@ macro_rules! impl_channel {
                 }
 
                 fn last_in_dscr_address() -> usize {
-                    let dma = unsafe { &*crate::pac::DMA::PTR };
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
                     dma.[<in_dscr_bf0_ch $num>].read().inlink_dscr_bf0().bits() as usize
                 }
             }
@@ -352,7 +352,7 @@ pub(crate) mod private {
 ///
 /// This offers the available DMA channels.
 pub struct Gdma {
-    _inner: crate::pac::DMA,
+    _inner: crate::peripherals::DMA,
     pub channel0: ChannelCreator0,
     #[cfg(not(esp32c2))]
     pub channel1: ChannelCreator1,
@@ -367,7 +367,7 @@ pub struct Gdma {
 impl Gdma {
     /// Create a DMA instance.
     pub fn new(
-        dma: crate::pac::DMA,
+        dma: crate::peripherals::DMA,
         peripheral_clock_control: &mut PeripheralClockControl,
     ) -> Gdma {
         peripheral_clock_control.enable(Peripheral::Gdma);

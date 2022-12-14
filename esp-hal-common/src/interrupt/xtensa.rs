@@ -2,7 +2,7 @@ use xtensa_lx::interrupt::{self, InterruptNumber};
 use xtensa_lx_rt::exception::Context;
 
 use crate::{
-    pac::{self, Interrupt},
+    peripherals::{self, Interrupt},
     Cpu,
 };
 
@@ -156,28 +156,30 @@ pub fn get_status(core: Cpu) -> u128 {
 }
 
 #[cfg(esp32)]
-unsafe fn core0_interrupt_peripheral() -> *const crate::pac::dport::RegisterBlock {
-    crate::pac::DPORT::PTR
+unsafe fn core0_interrupt_peripheral() -> *const crate::peripherals::dport::RegisterBlock {
+    crate::peripherals::DPORT::PTR
 }
 
 #[cfg(esp32)]
-unsafe fn core1_interrupt_peripheral() -> *const crate::pac::dport::RegisterBlock {
-    crate::pac::DPORT::PTR
+unsafe fn core1_interrupt_peripheral() -> *const crate::peripherals::dport::RegisterBlock {
+    crate::peripherals::DPORT::PTR
 }
 
 #[cfg(esp32s2)]
-unsafe fn core0_interrupt_peripheral() -> *const crate::pac::interrupt::RegisterBlock {
-    crate::pac::INTERRUPT::PTR
+unsafe fn core0_interrupt_peripheral() -> *const crate::peripherals::interrupt::RegisterBlock {
+    crate::peripherals::INTERRUPT::PTR
 }
 
 #[cfg(esp32s3)]
-unsafe fn core0_interrupt_peripheral() -> *const crate::pac::interrupt_core0::RegisterBlock {
-    crate::pac::INTERRUPT_CORE0::PTR
+unsafe fn core0_interrupt_peripheral() -> *const crate::peripherals::interrupt_core0::RegisterBlock
+{
+    crate::peripherals::INTERRUPT_CORE0::PTR
 }
 
 #[cfg(esp32s3)]
-unsafe fn core1_interrupt_peripheral() -> *const crate::pac::interrupt_core1::RegisterBlock {
-    crate::pac::INTERRUPT_CORE1::PTR
+unsafe fn core1_interrupt_peripheral() -> *const crate::peripherals::interrupt_core1::RegisterBlock
+{
+    crate::peripherals::INTERRUPT_CORE1::PTR
 }
 
 #[cfg(feature = "vectored")]
@@ -405,7 +407,7 @@ mod vectored {
                 let mut interrupt_mask = interrupt_mask & chip_specific::INTERRUPT_EDGE;
                 loop {
                     let interrupt_nr = interrupt_mask.trailing_zeros();
-                    if let Ok(interrupt) = pac::Interrupt::try_from(interrupt_nr as u16) {
+                    if let Ok(interrupt) = peripherals::Interrupt::try_from(interrupt_nr as u16) {
                         handle_interrupt(level, interrupt, save_frame)
                     } else {
                         break;
@@ -422,7 +424,7 @@ mod vectored {
 
                 // Interrupt::try_from can fail if interrupt already de-asserted:
                 // silently ignore
-                if let Ok(interrupt) = pac::Interrupt::try_from(interrupt_nr as u16) {
+                if let Ok(interrupt) = peripherals::Interrupt::try_from(interrupt_nr as u16) {
                     handle_interrupt(level, interrupt, save_frame);
                 }
             }
@@ -436,7 +438,7 @@ mod vectored {
             fn EspDefaultHandler(level: u32, interrupt: Interrupt);
         }
 
-        let handler = pac::__INTERRUPTS[interrupt.number() as usize]._handler;
+        let handler = peripherals::__INTERRUPTS[interrupt.number() as usize]._handler;
         if handler as *const _ == EspDefaultHandler as *const unsafe extern "C" fn() {
             EspDefaultHandler(level, interrupt);
         } else {
@@ -452,7 +454,7 @@ mod vectored {
     0b_0000_0000_0000_0000_0000_0000_0000_0000__0000_0000_0000_0000_0000_0000_0000_0011_1111_1100_0000_0000_0000_0000_0000_0000__0000_0000_0000_0000_0000_0000_0000_0000;
         #[inline]
         pub fn interrupt_is_edge(interrupt: Interrupt) -> bool {
-            use pac::Interrupt::*;
+            use peripherals::Interrupt::*;
             [
                 TG0_T0_EDGE,
                 TG0_T1_EDGE,
@@ -474,7 +476,7 @@ mod vectored {
     0b_0000_0000_0000_0000_0000_0000_0000_0000__0000_0000_0000_0000_0000_0011_1011_1111_1100_0000_0000_0000_0000_0000_0000_0000__0000_0000_0000_0000_0000_0000_0000_0000;
         #[inline]
         pub fn interrupt_is_edge(interrupt: Interrupt) -> bool {
-            use pac::Interrupt::*;
+            use peripherals::Interrupt::*;
             [
                 TG0_T0_EDGE,
                 TG0_T1_EDGE,

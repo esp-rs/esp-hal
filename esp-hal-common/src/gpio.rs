@@ -22,7 +22,7 @@ use core::convert::Infallible;
 
 pub use crate::types::*;
 use crate::{
-    pac::{GPIO, IO_MUX},
+    peripherals::{GPIO, IO_MUX},
     types::{
         get_io_mux_reg,
         gpio_intr_enable,
@@ -314,13 +314,13 @@ pub trait BankGpioRegisterAccess {
     fn write_output_clear(&self, word: u32);
 
     fn set_output_signal(&self, gpio_num: u8, signal: u32) {
-        let gpio = unsafe { &*crate::pac::GPIO::PTR };
+        let gpio = unsafe { &*crate::peripherals::GPIO::PTR };
         gpio.func_out_sel_cfg[gpio_num as usize]
             .modify(|_, w| unsafe { w.out_sel().bits(signal as OutputSignalType) });
     }
 
     fn configure_out_sel(&self, gpio_num: u8, signal: u32, invert: bool, oen: bool, oen_inv: bool) {
-        let gpio = unsafe { &*crate::pac::GPIO::PTR };
+        let gpio = unsafe { &*crate::peripherals::GPIO::PTR };
         gpio.func_out_sel_cfg[gpio_num as usize].modify(|_, w| unsafe {
             w.out_sel()
                 .bits(signal as OutputSignalType)
@@ -334,7 +334,7 @@ pub trait BankGpioRegisterAccess {
     }
 
     fn set_signal_to_level(&self, signal: u32, high: bool) {
-        let gpio = unsafe { &*crate::pac::GPIO::PTR };
+        let gpio = unsafe { &*crate::peripherals::GPIO::PTR };
         gpio.func_in_sel_cfg[signal as usize].modify(|_, w| unsafe {
             w.sel()
                 .set_bit()
@@ -346,7 +346,7 @@ pub trait BankGpioRegisterAccess {
     }
 
     fn clear_func_in_sel(&self, signal: u32) {
-        let gpio = unsafe { &*crate::pac::GPIO::PTR };
+        let gpio = unsafe { &*crate::peripherals::GPIO::PTR };
         gpio.func_in_sel_cfg[signal as usize].modify(|_, w| w.sel().clear_bit());
     }
 
@@ -357,7 +357,7 @@ pub trait BankGpioRegisterAccess {
         int_type: u8,
         wake_up_from_light_sleep: bool,
     ) {
-        let gpio = unsafe { &*crate::pac::GPIO::PTR };
+        let gpio = unsafe { &*crate::peripherals::GPIO::PTR };
         gpio.pin[gpio_num as usize].modify(|_, w| unsafe {
             w.int_ena()
                 .bits(int_ena as u8)
@@ -369,7 +369,7 @@ pub trait BankGpioRegisterAccess {
     }
 
     fn set_open_drain(&self, gpio_num: u8, open_drain: bool) {
-        let gpio = unsafe { &*crate::pac::GPIO::PTR };
+        let gpio = unsafe { &*crate::peripherals::GPIO::PTR };
         gpio.pin[gpio_num as usize].modify(|_, w| w.pad_driver().bit(open_drain));
     }
 }
@@ -1358,7 +1358,7 @@ macro_rules! gpio {
 pub fn enable_iomux_clk_gate() {
     #[cfg(esp32s2)]
     {
-        use crate::pac::SENS;
+        use crate::peripherals::SENS;
         let sensors = unsafe { &*SENS::ptr() };
         sensors
             .sar_io_mux_conf
@@ -1379,7 +1379,7 @@ macro_rules! analog {
         )+
     ) => {
         pub(crate) fn internal_into_analog(pin: u8) {
-            use crate::pac::RTCIO;
+            use crate::peripherals::RTCIO;
             let rtcio = unsafe{ &*RTCIO::ptr() };
             $crate::gpio::enable_iomux_clk_gate();
 
@@ -1436,7 +1436,7 @@ macro_rules! analog {
         )+
     ) => {
         pub(crate) fn internal_into_analog(pin: u8) {
-            use crate::pac::RTCIO;
+            use crate::peripherals::RTCIO;
             let rtcio = unsafe{ &*RTCIO::ptr() };
             $crate::gpio::enable_iomux_clk_gate();
 
@@ -1492,8 +1492,8 @@ macro_rules! analog {
         $($pin_num:literal)+
     ) => {
         pub(crate) fn internal_into_analog(pin: u8) {
-            use crate::pac::IO_MUX;
-            use crate::pac::GPIO;
+            use crate::peripherals::IO_MUX;
+            use crate::peripherals::GPIO;
 
             let io_mux = unsafe{ &*IO_MUX::PTR };
             let gpio = unsafe{ &*GPIO::PTR };

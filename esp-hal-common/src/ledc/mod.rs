@@ -87,7 +87,7 @@ pub enum LSGlobalClkSource {
 /// LEDC (LED PWM Controller)
 pub struct LEDC<'d> {
     _instance: PeripheralRef<'d, crate::peripherals::LEDC>,
-    ledc: &'d crate::pac::ledc::RegisterBlock,
+    ledc: &'d crate::peripherals::ledc::RegisterBlock,
     clock_control_config: &'d Clocks,
 }
 
@@ -115,7 +115,7 @@ impl<'d> LEDC<'d> {
         crate::into_ref!(_instance);
         system.enable(PeripheralEnable::Ledc);
 
-        let ledc = unsafe { &*crate::pac::LEDC::ptr() };
+        let ledc = unsafe { &*crate::peripherals::LEDC::ptr() };
         LEDC {
             _instance,
             ledc,

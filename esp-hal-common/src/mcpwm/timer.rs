@@ -141,7 +141,7 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
         }
     }
 
-    fn cfg0(&mut self) -> &crate::pac::pwm0::TIMER0_CFG0 {
+    fn cfg0(&mut self) -> &crate::peripherals::pwm0::TIMER0_CFG0 {
         // SAFETY:
         // We only grant access to our CFG0 register with the lifetime of &mut self
         let block = unsafe { &*PWM::block() };
@@ -158,7 +158,7 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
             }
         }
     }
-    fn cfg1(&mut self) -> &crate::pac::pwm0::TIMER0_CFG1 {
+    fn cfg1(&mut self) -> &crate::peripherals::pwm0::TIMER0_CFG1 {
         // SAFETY:
         // We only grant access to our CFG1 register with the lifetime of &mut self
         let block = unsafe { &*PWM::block() };

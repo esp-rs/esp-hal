@@ -13,7 +13,7 @@
 use riscv::register::mcause;
 
 use crate::{
-    pac::{self, Interrupt},
+    peripherals::{self, Interrupt},
     Cpu,
 };
 
@@ -139,7 +139,7 @@ impl Priority {
 pub unsafe fn map(_core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
     let interrupt_number = interrupt as isize;
     let cpu_interrupt_number = which as isize;
-    let intr = &*crate::pac::INTERRUPT_CORE0::PTR;
+    let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
     let intr_map_base = intr.mac_intr_map.as_ptr();
     intr_map_base
         .offset(interrupt_number)
@@ -149,7 +149,7 @@ pub unsafe fn map(_core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
 /// Enable a CPU interrupt
 pub unsafe fn enable_cpu_interrupt(which: CpuInterrupt) {
     let cpu_interrupt_number = which as isize;
-    let intr = &*crate::pac::INTERRUPT_CORE0::PTR;
+    let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
     intr.cpu_int_enable
         .modify(|r, w| w.bits((1 << cpu_interrupt_number) | r.bits()));
 }
@@ -158,7 +158,7 @@ pub unsafe fn enable_cpu_interrupt(which: CpuInterrupt) {
 pub fn disable(_core: Cpu, interrupt: Interrupt) {
     unsafe {
         let interrupt_number = interrupt as isize;
-        let intr = &*crate::pac::INTERRUPT_CORE0::PTR;
+        let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
         let intr_map_base = intr.mac_intr_map.as_ptr();
         intr_map_base.offset(interrupt_number).write_volatile(0);
     }
@@ -170,7 +170,7 @@ pub fn disable(_core: Cpu, interrupt: Interrupt) {
 /// interrupt handler will take care of clearing edge interrupt bits.
 pub fn set_kind(_core: Cpu, which: CpuInterrupt, kind: InterruptKind) {
     unsafe {
-        let intr = &*crate::pac::INTERRUPT_CORE0::PTR;
+        let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
         let cpu_interrupt_number = which as isize;
 
         let interrupt_type = match kind {
@@ -191,7 +191,7 @@ pub fn set_kind(_core: Cpu, which: CpuInterrupt, kind: InterruptKind) {
 /// default). Avoid changing the priority of interrupts 1 - 15 when interrupt
 /// vectoring is enabled.
 pub unsafe fn set_priority(_core: Cpu, which: CpuInterrupt, priority: Priority) {
-    let intr = &*crate::pac::INTERRUPT_CORE0::PTR;
+    let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
     let cpu_interrupt_number = which as isize;
     let intr_prio_base = intr.cpu_int_pri_0.as_ptr();
 
@@ -205,7 +205,7 @@ pub unsafe fn set_priority(_core: Cpu, which: CpuInterrupt, priority: Priority) 
 pub fn clear(_core: Cpu, which: CpuInterrupt) {
     unsafe {
         let cpu_interrupt_number = which as isize;
-        let intr = &*crate::pac::INTERRUPT_CORE0::PTR;
+        let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
         intr.cpu_int_clear
             .write(|w| w.bits(1 << cpu_interrupt_number));
     }
@@ -215,11 +215,11 @@ pub fn clear(_core: Cpu, which: CpuInterrupt) {
 #[inline]
 pub fn get_status(_core: Cpu) -> u128 {
     unsafe {
-        ((*crate::pac::INTERRUPT_CORE0::PTR)
+        ((*crate::peripherals::INTERRUPT_CORE0::PTR)
             .intr_status_reg_0
             .read()
             .bits() as u128)
-            | ((*crate::pac::INTERRUPT_CORE0::PTR)
+            | ((*crate::peripherals::INTERRUPT_CORE0::PTR)
                 .intr_status_reg_1
                 .read()
                 .bits() as u128)
@@ -258,7 +258,7 @@ mod vectored {
     #[inline]
     fn get_configured_interrupts(_core: Cpu, mut status: u128) -> [u128; 16] {
         unsafe {
-            let intr = &*crate::pac::INTERRUPT_CORE0::PTR;
+            let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
             let intr_map_base = intr.mac_intr_map.as_ptr();
             let intr_prio_base = intr.cpu_int_pri_0.as_ptr();
 
@@ -318,7 +318,7 @@ mod vectored {
             let interrupt_nr = interrupt_mask.trailing_zeros();
             // Interrupt::try_from can fail if interrupt already de-asserted:
             // silently ignore
-            if let Ok(interrupt) = pac::Interrupt::try_from(interrupt_nr as u8) {
+            if let Ok(interrupt) = peripherals::Interrupt::try_from(interrupt_nr as u8) {
                 handle_interrupt(interrupt, context)
             }
             interrupt_mask &= !(1u128 << interrupt_nr);
@@ -331,7 +331,7 @@ mod vectored {
             // defined in each hal
             fn EspDefaultHandler(interrupt: Interrupt);
         }
-        let handler = pac::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler;
+        let handler = peripherals::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler;
         if handler as *const _ == EspDefaultHandler as *const unsafe extern "C" fn() {
             EspDefaultHandler(interrupt);
         } else {

@@ -7,8 +7,8 @@ use fugit::HertzU32;
 use crate::{
     clock::Clocks,
     gpio::{InputPin, OutputPin},
-    pac::i2c0::{RegisterBlock, COMD},
     peripheral::{Peripheral, PeripheralRef},
+    peripherals::i2c0::{RegisterBlock, COMD},
     system::PeripheralClockControl,
     types::{InputSignal, OutputSignal},
 };
