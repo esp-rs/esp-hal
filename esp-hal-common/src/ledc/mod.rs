@@ -88,7 +88,7 @@ pub enum LSGlobalClkSource {
 pub struct LEDC<'d> {
     _instance: PeripheralRef<'d, crate::peripherals::LEDC>,
     ledc: &'d crate::peripherals::ledc::RegisterBlock,
-    clock_control_config: &'d Clocks,
+    clock_control_config: &'d Clocks<'d>,
 }
 
 #[cfg(esp32)]

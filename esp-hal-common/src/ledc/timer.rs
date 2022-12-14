@@ -131,7 +131,7 @@ pub trait TimerHW<S: TimerSpeed> {
 /// Timer struct
 pub struct Timer<'a, S: TimerSpeed> {
     ledc: &'a crate::peripherals::ledc::RegisterBlock,
-    clock_control_config: &'a Clocks,
+    clock_control_config: &'a Clocks<'a>,
     number: Number,
     duty: Option<config::Duty>,
     configured: bool,

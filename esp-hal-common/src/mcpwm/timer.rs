@@ -187,7 +187,7 @@ pub struct TimerClockConfig<'a> {
     period: u16,
     prescaler: u8,
     mode: PwmWorkingMode,
-    phantom: PhantomData<&'a Clocks>,
+    phantom: PhantomData<&'a Clocks<'a>>,
 }
 
 impl<'a> TimerClockConfig<'a> {

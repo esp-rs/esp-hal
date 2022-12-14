@@ -1,7 +1,10 @@
 //! # Clock Control
 use fugit::HertzU32;
 
-use crate::system::SystemClockControl;
+use crate::{
+    peripheral::{Peripheral, PeripheralRef},
+    system::SystemClockControl,
+};
 
 #[cfg_attr(esp32, path = "clocks_ll/esp32.rs")]
 #[cfg_attr(esp32c2, path = "clocks_ll/esp32c2.rs")]
@@ -107,8 +110,8 @@ impl Clock for ApbClock {
 ///
 /// The existence of this value indicates that the clock configuration can no
 /// longer be changed
-pub struct Clocks {
-    _private: (),
+pub struct Clocks<'d> {
+    _private: PeripheralRef<'d, SystemClockControl>,
     pub cpu_clock: HertzU32,
     pub apb_clock: HertzU32,
     pub xtal_clock: HertzU32,
@@ -121,14 +124,17 @@ pub struct Clocks {
 }
 
 #[doc(hidden)]
-impl Clocks {
+impl<'d> Clocks<'d> {
     /// This should not be used in user code.
     /// The whole point this exists is make it possible to have other crates
     /// (i.e. esp-wifi) create `Clocks`
     #[doc(hidden)]
-    pub fn from_raw_clocks(raw_clocks: RawClocks) -> Clocks {
+    pub fn from_raw_clocks(
+        system_clock_control: PeripheralRef<'d, SystemClockControl>,
+        raw_clocks: RawClocks,
+    ) -> Clocks<'d> {
         Self {
-            _private: (),
+            _private: system_clock_control,
             cpu_clock: raw_clocks.cpu_clock,
             apb_clock: raw_clocks.apb_clock,
             xtal_clock: raw_clocks.xtal_clock,
@@ -158,27 +164,29 @@ pub struct RawClocks {
 ///
 /// After setting all frequencies, call the freeze function to apply the
 /// configuration.
-pub struct ClockControl {
-    _private: (),
+pub struct ClockControl<'d> {
+    _private: PeripheralRef<'d, SystemClockControl>,
     desired_rates: RawClocks,
 }
 
-impl ClockControl {
+impl<'d> ClockControl<'d> {
     /// Applies the clock configuration and returns a Clocks struct that
     /// signifies that the clocks are frozen, and contains the frequencies
     /// used. After this function is called, the clocks can not change
-    pub fn freeze(self) -> Clocks {
-        Clocks::from_raw_clocks(self.desired_rates)
+    pub fn freeze(self) -> Clocks<'d> {
+        Clocks::from_raw_clocks(self._private, self.desired_rates)
     }
 }
 
 #[cfg(esp32)]
-impl ClockControl {
+impl<'d> ClockControl<'d> {
     /// Use what is considered the default settings after boot.
     #[allow(unused)]
-    pub fn boot_defaults(clock_control: SystemClockControl) -> ClockControl {
+    pub fn boot_defaults(
+        clock_control: impl Peripheral<P = SystemClockControl> + 'd,
+    ) -> ClockControl<'d> {
         ClockControl {
-            _private: (),
+            _private: clock_control.into_ref(),
             desired_rates: RawClocks {
                 cpu_clock: HertzU32::MHz(80),
                 apb_clock: HertzU32::MHz(80),
@@ -191,7 +199,10 @@ impl ClockControl {
 
     /// Configure the CPU clock speed.
     #[allow(unused)]
-    pub fn configure(clock_control: SystemClockControl, cpu_clock_speed: CpuClock) -> ClockControl {
+    pub fn configure(
+        clock_control: impl Peripheral<P = SystemClockControl> + 'd,
+        cpu_clock_speed: CpuClock,
+    ) -> ClockControl<'d> {
         // like NuttX use 40M hardcoded - if it turns out to be a problem
         // we will take care then
         let xtal_freq = XtalClock::RtcXtalFreq40M;
@@ -207,7 +218,7 @@ impl ClockControl {
         clocks_ll::set_cpu_freq(cpu_clock_speed);
 
         ClockControl {
-            _private: (),
+            _private: clock_control.into_ref(),
             desired_rates: RawClocks {
                 cpu_clock: cpu_clock_speed.frequency(),
                 apb_clock: HertzU32::MHz(80),
@@ -223,13 +234,15 @@ impl ClockControl {
 }
 
 #[cfg(esp32c2)]
-impl ClockControl {
+impl<'d> ClockControl<'d> {
     /// Use what is considered the default settings after boot.
     #[allow(unused)]
-    pub fn boot_defaults(clock_control: SystemClockControl) -> ClockControl {
+    pub fn boot_defaults(
+        clock_control: impl Peripheral<P = SystemClockControl> + 'd,
+    ) -> ClockControl<'d> {
         #[cfg(feature = "esp32c2_40mhz")]
         return ClockControl {
-            _private: (),
+            _private: clock_control.into_ref(),
             desired_rates: RawClocks {
                 cpu_clock: HertzU32::MHz(80),
                 apb_clock: HertzU32::MHz(40),
@@ -240,7 +253,7 @@ impl ClockControl {
 
         #[cfg(feature = "esp32c2_26mhz")]
         return ClockControl {
-            _private: (),
+            _private: clock_control.into_ref(),
             desired_rates: RawClocks {
                 cpu_clock: HertzU32::MHz(80),
                 apb_clock: HertzU32::MHz(40),
@@ -252,7 +265,10 @@ impl ClockControl {
 
     /// Configure the CPU clock speed.
     #[allow(unused)]
-    pub fn configure(clock_control: SystemClockControl, cpu_clock_speed: CpuClock) -> ClockControl {
+    pub fn configure(
+        clock_control: impl Peripheral<P = SystemClockControl> + 'd,
+        cpu_clock_speed: CpuClock,
+    ) -> ClockControl<'d> {
         let apb_freq;
         #[cfg(feature = "esp32c2_40mhz")]
         let xtal_freq = XtalClock::RtcXtalFreq40M;
@@ -273,7 +289,7 @@ impl ClockControl {
         }
 
         ClockControl {
-            _private: (),
+            _private: clock_control.into_ref(),
             desired_rates: RawClocks {
                 cpu_clock: cpu_clock_speed.frequency(),
                 apb_clock: apb_freq.frequency(),
@@ -285,12 +301,14 @@ impl ClockControl {
 }
 
 #[cfg(esp32c3)]
-impl ClockControl {
+impl<'d> ClockControl<'d> {
     /// Use what is considered the default settings after boot.
     #[allow(unused)]
-    pub fn boot_defaults(clock_control: SystemClockControl) -> ClockControl {
+    pub fn boot_defaults(
+        clock_control: impl Peripheral<P = SystemClockControl> + 'd,
+    ) -> ClockControl<'d> {
         ClockControl {
-            _private: (),
+            _private: clock_control.into_ref(),
             desired_rates: RawClocks {
                 cpu_clock: HertzU32::MHz(80),
                 apb_clock: HertzU32::MHz(80),
@@ -302,7 +320,10 @@ impl ClockControl {
 
     /// Configure the CPU clock speed.
     #[allow(unused)]
-    pub fn configure(clock_control: SystemClockControl, cpu_clock_speed: CpuClock) -> ClockControl {
+    pub fn configure(
+        clock_control: impl Peripheral<P = SystemClockControl> + 'd,
+        cpu_clock_speed: CpuClock,
+    ) -> ClockControl<'d> {
         let apb_freq;
         let xtal_freq = XtalClock::RtcXtalFreq40M;
         let pll_freq = PllClock::Pll480MHz;
@@ -320,7 +341,7 @@ impl ClockControl {
         }
 
         ClockControl {
-            _private: (),
+            _private: clock_control.into_ref(),
             desired_rates: RawClocks {
                 cpu_clock: cpu_clock_speed.frequency(),
                 apb_clock: apb_freq.frequency(),
@@ -332,12 +353,14 @@ impl ClockControl {
 }
 
 #[cfg(esp32s2)]
-impl ClockControl {
+impl<'d> ClockControl<'d> {
     /// Use what is considered the default settings after boot.
     #[allow(unused)]
-    pub fn boot_defaults(clock_control: SystemClockControl) -> ClockControl {
+    pub fn boot_defaults(
+        clock_control: impl Peripheral<P = SystemClockControl> + 'd,
+    ) -> ClockControl<'d> {
         ClockControl {
-            _private: (),
+            _private: clock_control.into_ref(),
             desired_rates: RawClocks {
                 cpu_clock: HertzU32::MHz(80),
                 apb_clock: HertzU32::MHz(80),
@@ -349,11 +372,14 @@ impl ClockControl {
 
     /// Configure the CPU clock speed.
     #[allow(unused)]
-    pub fn configure(clock_control: SystemClockControl, cpu_clock_speed: CpuClock) -> ClockControl {
+    pub fn configure(
+        clock_control: impl Peripheral<P = SystemClockControl> + 'd,
+        cpu_clock_speed: CpuClock,
+    ) -> ClockControl<'d> {
         clocks_ll::set_cpu_clock(cpu_clock_speed);
 
         ClockControl {
-            _private: (),
+            _private: clock_control.into_ref(),
             desired_rates: RawClocks {
                 cpu_clock: cpu_clock_speed.frequency(),
                 apb_clock: HertzU32::MHz(80),
@@ -365,12 +391,14 @@ impl ClockControl {
 }
 
 #[cfg(esp32s3)]
-impl ClockControl {
+impl<'d> ClockControl<'d> {
     /// Use what is considered the default settings after boot.
     #[allow(unused)]
-    pub fn boot_defaults(clock_control: SystemClockControl) -> ClockControl {
+    pub fn boot_defaults(
+        clock_control: impl Peripheral<P = SystemClockControl> + 'd,
+    ) -> ClockControl<'d> {
         ClockControl {
-            _private: (),
+            _private: clock_control.into_ref(),
             desired_rates: RawClocks {
                 cpu_clock: HertzU32::MHz(80),
                 apb_clock: HertzU32::MHz(80),
@@ -383,11 +411,14 @@ impl ClockControl {
 
     /// Configure the CPU clock speed.
     #[allow(unused)]
-    pub fn configure(clock_control: SystemClockControl, cpu_clock_speed: CpuClock) -> ClockControl {
+    pub fn configure(
+        clock_control: impl Peripheral<P = SystemClockControl> + 'd,
+        cpu_clock_speed: CpuClock,
+    ) -> ClockControl<'d> {
         clocks_ll::set_cpu_clock(cpu_clock_speed);
 
         ClockControl {
-            _private: (),
+            _private: clock_control.into_ref(),
             desired_rates: RawClocks {
                 cpu_clock: cpu_clock_speed.frequency(),
                 apb_clock: HertzU32::MHz(80),
