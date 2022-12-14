@@ -2,6 +2,7 @@
 
 use crate::{
     dma::gdma::private::*,
+    peripheral::PeripheralRef,
     system::{Peripheral, PeripheralClockControl},
 };
 
@@ -351,8 +352,8 @@ pub(crate) mod private {
 /// GDMA Peripheral
 ///
 /// This offers the available DMA channels.
-pub struct Gdma {
-    _inner: crate::peripherals::DMA,
+pub struct Gdma<'d> {
+    _inner: PeripheralRef<'d, crate::peripherals::DMA>,
     pub channel0: ChannelCreator0,
     #[cfg(not(esp32c2))]
     pub channel1: ChannelCreator1,
@@ -364,12 +365,14 @@ pub struct Gdma {
     pub channel4: ChannelCreator4,
 }
 
-impl Gdma {
+impl<'d> Gdma<'d> {
     /// Create a DMA instance.
     pub fn new(
-        dma: crate::peripherals::DMA,
+        dma: impl crate::peripheral::Peripheral<P = crate::peripherals::DMA> + 'd,
         peripheral_clock_control: &mut PeripheralClockControl,
-    ) -> Gdma {
+    ) -> Gdma<'d> {
+        crate::into_ref!(dma);
+
         peripheral_clock_control.enable(Peripheral::Gdma);
         dma.misc_conf.modify(|_, w| w.ahbm_rst_inter().set_bit());
         dma.misc_conf.modify(|_, w| w.ahbm_rst_inter().clear_bit());

@@ -231,3 +231,37 @@ impl crate::peripheral::Peripheral for &mut SystemClockControl {
         SystemClockControl { _private: () }
     }
 }
+
+#[cfg(pdma)]
+mod dma_peripheral {
+    use super::Dma;
+
+    impl core::ops::Deref for Dma {
+        type Target = Dma;
+
+        fn deref(&self) -> &Self::Target {
+            self
+        }
+    }
+
+    impl core::ops::DerefMut for Dma {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            self
+        }
+    }
+
+    impl crate::peripheral::Peripheral for Dma {
+        type P = Dma;
+        #[inline]
+        unsafe fn clone_unchecked(&mut self) -> Self::P {
+            Dma { _private: () }
+        }
+    }
+    impl crate::peripheral::Peripheral for &mut Dma {
+        type P = Dma;
+        #[inline]
+        unsafe fn clone_unchecked(&mut self) -> Self::P {
+            Dma { _private: () }
+        }
+    }
+}
