@@ -3,7 +3,7 @@ use critical_section::{CriticalSection, Mutex};
 use super::AlarmState;
 use crate::{
     clock::Clocks,
-    pac,
+    peripherals,
     systimer::{Alarm, SystemTimer, Target},
 };
 

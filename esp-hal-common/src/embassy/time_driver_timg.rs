@@ -6,7 +6,7 @@ use peripherals::TIMG0;
 use super::AlarmState;
 use crate::{
     clock::Clocks,
-    pac,
+    peripherals,
     prelude::*,
     timer::{Timer, Timer0},
 };
