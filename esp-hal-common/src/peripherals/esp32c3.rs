@@ -53,5 +53,6 @@ mod peripherals {
         UART0,
         UART1,
         USB_DEVICE,
+        SYSTEM,
     }
 }

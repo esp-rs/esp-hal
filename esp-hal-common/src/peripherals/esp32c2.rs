@@ -41,5 +41,6 @@ mod peripherals {
         SYSTIMER,
         UART0,
         UART1,
+        SYSTEM,
     }
 }

@@ -8,10 +8,12 @@
 //! let system = peripherals.SYSTEM.split();
 //! let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 //! ```
+
+use crate::peripheral::PeripheralRef;
 #[cfg(not(esp32))]
-type SystemPeripheral = crate::pac::SYSTEM;
+type SystemPeripheral = crate::peripherals::SYSTEM;
 #[cfg(esp32)]
-type SystemPeripheral = crate::pac::DPORT;
+type SystemPeripheral = crate::peripherals::DPORT;
 
 /// Peripherals which can be enabled via [PeripheralClockControl]
 pub enum Peripheral {
@@ -168,8 +170,8 @@ pub struct Dma {
 }
 
 /// The SYSTEM/DPORT splitted into it's different logical parts.
-pub struct SystemParts {
-    _private: (),
+pub struct SystemParts<'d> {
+    _private: PeripheralRef<'d, SystemPeripheral>,
     pub peripheral_clock_control: PeripheralClockControl,
     pub clock_control: SystemClockControl,
     pub cpu_control: CpuControl,
@@ -179,19 +181,19 @@ pub struct SystemParts {
 
 /// Extension trait to split a SYSTEM/DPORT peripheral in independent logical
 /// parts
-pub trait SystemExt {
+pub trait SystemExt<'d> {
     type Parts;
 
     /// Splits the SYSTEM/DPORT peripheral into it's parts.
     fn split(self) -> Self::Parts;
 }
 
-impl SystemExt for SystemPeripheral {
-    type Parts = SystemParts;
+impl<'d, T: crate::peripheral::Peripheral<P = SystemPeripheral> + 'd> SystemExt<'d> for T {
+    type Parts = SystemParts<'d>;
 
     fn split(self) -> Self::Parts {
         Self::Parts {
-            _private: (),
+            _private: self.into_ref(),
             peripheral_clock_control: PeripheralClockControl { _private: () },
             clock_control: SystemClockControl { _private: () },
             cpu_control: CpuControl { _private: () },
