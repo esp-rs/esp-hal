@@ -63,5 +63,6 @@ mod peripherals {
         UART1,
         UART2,
         DPORT,
+        LEDC,
     }
 }

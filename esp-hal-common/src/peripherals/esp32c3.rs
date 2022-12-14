@@ -55,5 +55,6 @@ mod peripherals {
         UART1,
         USB_DEVICE,
         SYSTEM,
+        LEDC,
     }
 }
