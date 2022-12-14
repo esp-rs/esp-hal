@@ -1,4 +1,4 @@
-use esp32c3 as pac;
+use esp32s3 as pac;
 // We need to export this for users to use
 pub use pac::Interrupt;
 
