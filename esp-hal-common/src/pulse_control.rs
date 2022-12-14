@@ -85,7 +85,8 @@ pub use paste::paste;
 
 use crate::{
     gpio::{types::OutputSignal, OutputPin},
-    pac::RMT,
+    peripheral::{Peripheral, PeripheralRef},
+    peripherals::RMT,
     system::PeripheralClockControl,
 };
 
@@ -822,20 +823,20 @@ macro_rules! rmt {
     )
  => {
     /// RMT peripheral (RMT)
-    pub struct PulseControl {
+    pub struct PulseControl<'d> {
         /// The underlying register block
-        reg: RMT,
+        reg: PeripheralRef<'d, RMT>,
         $(
             /// RMT channel $cxi
             pub $obj_name: $cxi,
         )+
     }
 
-    impl PulseControl {
+    impl<'d> PulseControl<'d> {
         /// Create a new pulse controller instance
         #[cfg(any(esp32c3, esp32s3))]
         pub fn new(
-            instance: RMT,
+            instance: impl Peripheral<P = RMT> + 'd,
             peripheral_clock_control: &mut PeripheralClockControl,
             clk_source: ClockSource,
             div_abs: u8,
@@ -843,6 +844,7 @@ macro_rules! rmt {
             div_frac_b: u8,
         ) -> Result<Self, SetupError> {
 
+            crate::into_ref!(instance);
             let pc = PulseControl {
                 reg: instance,
                 $(
@@ -859,10 +861,11 @@ macro_rules! rmt {
         /// Create a new pulse controller instance
         #[cfg(any(esp32, esp32s2))]
         pub fn new(
-            instance: RMT,
+            instance: impl Peripheral<P = RMT> + 'd,
             peripheral_clock_control: &mut PeripheralClockControl,
         ) -> Result<Self, SetupError> {
 
+            crate::into_ref!(instance);
             let pc = PulseControl {
                 reg: instance,
                 $(
@@ -874,11 +877,6 @@ macro_rules! rmt {
             pc.config_global()?;
 
             Ok(pc)
-        }
-
-        /// Return the raw interface to the underlying RMT peripheral
-        pub fn free(self) -> RMT {
-            self.reg
         }
 
         // Enable the RMT peripherals clock in the system peripheral

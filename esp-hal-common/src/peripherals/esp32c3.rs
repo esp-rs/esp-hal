@@ -56,5 +56,6 @@ mod peripherals {
         USB_DEVICE,
         SYSTEM,
         LEDC,
+        RMT,
     }
 }
