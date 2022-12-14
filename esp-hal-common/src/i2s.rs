@@ -13,6 +13,7 @@ use crate::{
         DmaError,
         DmaTransfer,
     },
+    peripheral::{Peripheral, PeripheralRef},
     system::PeripheralClockControl,
     InputPin,
     OutputPin,
@@ -440,7 +441,7 @@ where
 }
 
 /// Instance of the I2S peripheral driver
-pub struct I2s<I, T, P, TX, RX>
+pub struct I2s<'d, I, T, P, TX, RX>
 where
     I: Instance<T>,
     T: RegisterAccess + Clone,
@@ -448,14 +449,14 @@ where
     TX: Tx,
     RX: Rx,
 {
-    _peripheral: I,
+    _peripheral: PeripheralRef<'d, I>,
     _register_access: T,
     _pins: P,
     pub i2s_tx: TxCreator<T, TX>,
     pub i2s_rx: RxCreator<T, RX>,
 }
 
-impl<I, T, P, TX, RX> I2s<I, T, P, TX, RX>
+impl<'d, I, T, P, TX, RX> I2s<'d, I, T, P, TX, RX>
 where
     I: Instance<T>,
     T: RegisterAccess + Clone,
@@ -464,7 +465,7 @@ where
     RX: Rx,
 {
     fn new_internal<IP>(
-        i2s: I,
+        i2s: impl Peripheral<P = I> + 'd,
         mut pins: P,
         standard: Standard,
         data_format: DataFormat,
@@ -480,6 +481,7 @@ where
         // could be configured totally independently but for now handle all
         // the targets the same and force same configuration for both, TX and RX
 
+        crate::into_ref!(i2s);
         let mut register_access = i2s.register_access();
 
         channel.tx.init_channel();
@@ -512,7 +514,7 @@ where
 }
 
 /// Construct a new I2S peripheral driver instance for the first I2S peripheral
-pub trait I2s0New<I, T, P, TX, RX, IP>
+pub trait I2s0New<'d, I, T, P, TX, RX, IP>
 where
     I: Instance<T>,
     T: RegisterAccess + Clone,
@@ -523,7 +525,7 @@ where
     RX: Rx,
 {
     fn new(
-        i2s: I,
+        i2s: impl Peripheral<P = I> + 'd,
         pins: P,
         standard: Standard,
         data_format: DataFormat,
@@ -534,7 +536,7 @@ where
     ) -> Self;
 }
 
-impl<I, T, P, TX, RX, IP> I2s0New<I, T, P, TX, RX, IP> for I2s<I, T, P, TX, RX>
+impl<'d, I, T, P, TX, RX, IP> I2s0New<'d, I, T, P, TX, RX, IP> for I2s<'d, I, T, P, TX, RX>
 where
     I: Instance<T> + I2s0Instance,
     T: RegisterAccess + Clone,
@@ -544,7 +546,7 @@ where
     IP: I2sPeripheral + I2s0Peripheral,
 {
     fn new(
-        i2s: I,
+        i2s: impl Peripheral<P = I> + 'd,
         pins: P,
         standard: Standard,
         data_format: DataFormat,
@@ -568,7 +570,7 @@ where
 
 /// Construct a new I2S peripheral driver instance for the second I2S peripheral
 #[cfg(any(esp32s3))]
-pub trait I2s1New<I, T, P, TX, RX, IP>
+pub trait I2s1New<'d, I, T, P, TX, RX, IP>
 where
     I: Instance<T>,
     T: RegisterAccess + Clone,
@@ -579,7 +581,7 @@ where
     RX: Rx,
 {
     fn new(
-        i2s: I,
+        i2s: impl Peripheral<P = I> + 'd,
         pins: P,
         standard: Standard,
         data_format: DataFormat,
@@ -591,7 +593,7 @@ where
 }
 
 #[cfg(any(esp32s3))]
-impl<I, T, P, TX, RX, IP> I2s1New<I, T, P, TX, RX, IP> for I2s<I, T, P, TX, RX>
+impl<'d, I, T, P, TX, RX, IP> I2s1New<'d, I, T, P, TX, RX, IP> for I2s<'d, I, T, P, TX, RX>
 where
     I: Instance<T> + I2s1Instance,
     T: RegisterAccess + Clone,
@@ -601,7 +603,7 @@ where
     IP: I2sPeripheral + I2s1Peripheral,
 {
     fn new(
-        i2s: I,
+        i2s: impl Peripheral<P = I> + 'd,
         pins: P,
         standard: Standard,
         data_format: DataFormat,

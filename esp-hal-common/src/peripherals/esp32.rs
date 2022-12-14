@@ -69,5 +69,7 @@ mod peripherals {
         DPORT,
         LEDC,
         RMT,
+        I2S0,
+        I2S1,
     }
 }
