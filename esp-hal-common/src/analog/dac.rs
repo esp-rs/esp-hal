@@ -1,5 +1,7 @@
-use crate::peripherals::{RTCIO, SENS};
-
+use crate::{
+    peripheral::{Peripheral, PeripheralRef},
+    peripherals::{RTCIO, SENS},
+};
 pub trait DAC {
     fn write(&mut self, value: u8);
 }
@@ -92,19 +94,21 @@ macro_rules! impl_dac {
                 pub use $crate::analog::dac::[<DAC $number Impl>];
 
                 /// DAC channel
-                pub struct [<DAC $number>] {
+                pub struct [<DAC $number>]<'d, DAC> {
+                    _dac: PeripheralRef<'d, DAC>,
                     _private: PhantomData<()>,
                 }
 
-                impl [<DAC $number Impl>] for [<DAC $number>] {}
+                impl<'d, DAC> [<DAC $number Impl>] for [<DAC $number>]<'d, DAC> {}
 
-                impl [<DAC $number>] {
+                impl<'d, DAC> [<DAC $number>]<'d, DAC> {
                     /// Constructs a new DAC instance
                     pub fn dac(
-                        _dac: $crate::analog::[<DAC $number>],
+                        dac: impl $crate::peripheral::Peripheral<P = DAC> +'d,
                         _pin: gpio::$gpio<$crate::Analog>,
                     ) -> Result<Self, ()> {
                         let dac = Self {
+                            _dac: dac.into_ref(),
                             _private: PhantomData,
                         }
                         .set_power();

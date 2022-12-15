@@ -82,6 +82,65 @@ impl crate::peripheral::Peripheral for &mut ADC2 {
     }
 }
 
+impl core::ops::Deref for DAC1 {
+    type Target = DAC1;
+
+    fn deref(&self) -> &Self::Target {
+        self
+    }
+}
+
+impl core::ops::DerefMut for DAC1 {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self
+    }
+}
+
+impl crate::peripheral::Peripheral for DAC1 {
+    type P = DAC1;
+    #[inline]
+    unsafe fn clone_unchecked(&mut self) -> Self::P {
+        DAC1 { _private: () }
+    }
+}
+
+impl crate::peripheral::Peripheral for &mut DAC1 {
+    type P = DAC1;
+    #[inline]
+    unsafe fn clone_unchecked(&mut self) -> Self::P {
+        DAC1 { _private: () }
+    }
+}
+
+impl core::ops::Deref for DAC2 {
+    type Target = DAC2;
+
+    fn deref(&self) -> &Self::Target {
+        self
+    }
+}
+
+impl core::ops::DerefMut for DAC2 {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self
+    }
+}
+
+impl crate::peripheral::Peripheral for DAC2 {
+    type P = DAC2;
+    #[inline]
+    unsafe fn clone_unchecked(&mut self) -> Self::P {
+        DAC2 { _private: () }
+    }
+}
+
+impl crate::peripheral::Peripheral for &mut DAC2 {
+    type P = DAC2;
+    #[inline]
+    unsafe fn clone_unchecked(&mut self) -> Self::P {
+        DAC2 { _private: () }
+    }
+}
 
 cfg_if::cfg_if! {
     if #[cfg(any(esp32, esp32s2, esp32s3))] {
