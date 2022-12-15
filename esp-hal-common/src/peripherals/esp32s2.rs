@@ -69,5 +69,6 @@ mod peripherals {
         LEDC,
         RMT,
         I2S,
+        USB0,
     }
 }
