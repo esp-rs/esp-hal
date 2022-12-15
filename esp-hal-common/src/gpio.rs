@@ -907,6 +907,40 @@ where
     }
 }
 
+impl<MODE, RA, PINTYPE, const GPIONUM: u8> crate::peripheral::Peripheral
+    for GpioPin<MODE, RA, PINTYPE, GPIONUM>
+where
+    RA: BankGpioRegisterAccess,
+    PINTYPE: PinType,
+{
+    type P = GpioPin<MODE, RA, PINTYPE, GPIONUM>;
+
+    unsafe fn clone_unchecked(&mut self) -> Self::P {
+        core::ptr::read(self as *const _)
+    }
+}
+
+impl<MODE, RA, PINTYPE, const GPIONUM: u8> crate::peripheral::Peripheral
+    for &mut GpioPin<MODE, RA, PINTYPE, GPIONUM>
+where
+    RA: BankGpioRegisterAccess,
+    PINTYPE: PinType,
+{
+    type P = GpioPin<MODE, RA, PINTYPE, GPIONUM>;
+
+    unsafe fn clone_unchecked(&mut self) -> Self::P {
+        core::ptr::read(*self as *const _)
+    }
+}
+
+impl<MODE, RA, PINTYPE, const GPIONUM: u8> crate::peripheral::sealed::Sealed
+    for GpioPin<MODE, RA, PINTYPE, GPIONUM>
+where
+    RA: BankGpioRegisterAccess,
+    PINTYPE: PinType,
+{
+}
+
 impl<RA, PINTYPE, const GPIONUM: u8> From<GpioPin<Unknown, RA, PINTYPE, GPIONUM>>
     for GpioPin<Input<Floating>, RA, PINTYPE, GPIONUM>
 where
