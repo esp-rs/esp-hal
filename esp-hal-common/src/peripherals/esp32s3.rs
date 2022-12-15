@@ -86,5 +86,6 @@ mod peripherals {
         PWM0,
         PWM1,
         USB0,
+        RTC_CNTL,
     }
 }

@@ -73,5 +73,6 @@ mod peripherals {
         I2S1,
         PWM0,
         PWM1,
+        RTC_CNTL,
     }
 }
