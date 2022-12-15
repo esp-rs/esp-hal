@@ -6,6 +6,7 @@ use embedded_hal::adc::{Channel, OneShot};
 use crate::analog::ADC2;
 use crate::{
     analog::ADC1,
+    peripheral::PeripheralRef,
     peripherals::APB_SARADC,
     system::{Peripheral, PeripheralClockControl},
 };
@@ -170,19 +171,19 @@ impl RegisterAccess for ADC2 {
     }
 }
 
-pub struct ADC<ADC> {
-    adc: PhantomData<ADC>,
+pub struct ADC<'d, ADCI> {
+    _adc: PeripheralRef<'d, ADCI>,
     attenuations: [Option<Attenuation>; 5],
     active_channel: Option<u8>,
 }
 
-impl<ADCI> ADC<ADCI>
+impl<'d, ADCI> ADC<'d, ADCI>
 where
     ADCI: RegisterAccess,
 {
     pub fn adc(
         peripheral_clock_controller: &mut PeripheralClockControl,
-        _adc_instance: ADCI,
+        adc_instance: impl crate::peripheral::Peripheral<P = ADCI> + 'd,
         config: AdcConfig<ADCI>,
     ) -> Result<Self, ()> {
         peripheral_clock_controller.enable(Peripheral::ApbSarAdc);
@@ -199,7 +200,7 @@ where
                 .bits(0b11)
         });
         let adc = ADC {
-            adc: PhantomData,
+            _adc: adc_instance.into_ref(),
             attenuations: config.attenuations,
             active_channel: None,
         };
@@ -208,7 +209,7 @@ where
     }
 }
 
-impl<ADCI, WORD, PIN> OneShot<ADCI, WORD, AdcPin<PIN, ADCI>> for ADC<ADCI>
+impl<'d, ADCI, WORD, PIN> OneShot<ADCI, WORD, AdcPin<PIN, ADCI>> for ADC<'d, ADCI>
 where
     WORD: From<u16>,
     PIN: Channel<ADCI, ID = u8>,

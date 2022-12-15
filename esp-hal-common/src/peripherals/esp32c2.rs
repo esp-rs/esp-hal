@@ -51,5 +51,6 @@ mod peripherals {
         DMA,
         RTC_CNTL,
         TIMG0,
+        APB_SARADC,
     }
 }

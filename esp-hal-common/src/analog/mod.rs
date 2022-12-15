@@ -7,26 +7,145 @@ pub mod adc;
 #[cfg(dac)]
 pub mod dac;
 
+pub struct ADC1 {
+    _private: (),
+}
+pub struct ADC2 {
+    _private: (),
+}
+
+pub struct DAC1 {
+    _private: (),
+}
+
+pub struct DAC2 {
+    _private: (),
+}
+
+impl core::ops::Deref for ADC1 {
+    type Target = ADC1;
+
+    fn deref(&self) -> &Self::Target {
+        self
+    }
+}
+
+impl core::ops::DerefMut for ADC1 {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self
+    }
+}
+
+impl crate::peripheral::Peripheral for ADC1 {
+    type P = ADC1;
+    #[inline]
+    unsafe fn clone_unchecked(&mut self) -> Self::P {
+        ADC1 { _private: () }
+    }
+}
+
+impl crate::peripheral::Peripheral for &mut ADC1 {
+    type P = ADC1;
+    #[inline]
+    unsafe fn clone_unchecked(&mut self) -> Self::P {
+        ADC1 { _private: () }
+    }
+}
+
+impl core::ops::Deref for ADC2 {
+    type Target = ADC2;
+
+    fn deref(&self) -> &Self::Target {
+        self
+    }
+}
+
+impl core::ops::DerefMut for ADC2 {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self
+    }
+}
+
+impl crate::peripheral::Peripheral for ADC2 {
+    type P = ADC2;
+    #[inline]
+    unsafe fn clone_unchecked(&mut self) -> Self::P {
+        ADC2 { _private: () }
+    }
+}
+
+impl crate::peripheral::Peripheral for &mut ADC2 {
+    type P = ADC2;
+    #[inline]
+    unsafe fn clone_unchecked(&mut self) -> Self::P {
+        ADC2 { _private: () }
+    }
+}
+
+impl core::ops::Deref for DAC1 {
+    type Target = DAC1;
+
+    fn deref(&self) -> &Self::Target {
+        self
+    }
+}
+
+impl core::ops::DerefMut for DAC1 {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self
+    }
+}
+
+impl crate::peripheral::Peripheral for DAC1 {
+    type P = DAC1;
+    #[inline]
+    unsafe fn clone_unchecked(&mut self) -> Self::P {
+        DAC1 { _private: () }
+    }
+}
+
+impl crate::peripheral::Peripheral for &mut DAC1 {
+    type P = DAC1;
+    #[inline]
+    unsafe fn clone_unchecked(&mut self) -> Self::P {
+        DAC1 { _private: () }
+    }
+}
+
+impl core::ops::Deref for DAC2 {
+    type Target = DAC2;
+
+    fn deref(&self) -> &Self::Target {
+        self
+    }
+}
+
+impl core::ops::DerefMut for DAC2 {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self
+    }
+}
+
+impl crate::peripheral::Peripheral for DAC2 {
+    type P = DAC2;
+    #[inline]
+    unsafe fn clone_unchecked(&mut self) -> Self::P {
+        DAC2 { _private: () }
+    }
+}
+
+impl crate::peripheral::Peripheral for &mut DAC2 {
+    type P = DAC2;
+    #[inline]
+    unsafe fn clone_unchecked(&mut self) -> Self::P {
+        DAC2 { _private: () }
+    }
+}
+
 cfg_if::cfg_if! {
     if #[cfg(any(esp32, esp32s2, esp32s3))] {
-        use core::marker::PhantomData;
 
         use crate::peripherals::SENS;
-
-        pub struct ADC1 {
-            _private: PhantomData<()>,
-        }
-        pub struct ADC2 {
-            _private: PhantomData<()>,
-        }
-
-        pub struct DAC1 {
-            _private: PhantomData<()>,
-        }
-
-        pub struct DAC2 {
-            _private: PhantomData<()>,
-        }
 
         pub struct AvailableAnalog {
             pub adc1: ADC1,
@@ -44,16 +163,16 @@ cfg_if::cfg_if! {
             fn split(self) -> AvailableAnalog {
                 AvailableAnalog {
                     adc1: ADC1 {
-                        _private: PhantomData,
+                        _private: (),
                     },
                     adc2: ADC2 {
-                        _private: PhantomData,
+                        _private: (),
                     },
                     dac1: DAC1 {
-                        _private: PhantomData,
+                        _private: (),
                     },
                     dac2: DAC2 {
-                        _private: PhantomData,
+                        _private: (),
                     },
                 }
             }
@@ -63,16 +182,8 @@ cfg_if::cfg_if! {
 
 cfg_if::cfg_if! {
     if #[cfg(esp32c3)] {
-        use core::marker::PhantomData;
 
         use crate::peripherals::APB_SARADC;
-
-        pub struct ADC1 {
-            _private: PhantomData<()>,
-        }
-        pub struct ADC2 {
-            _private: PhantomData<()>,
-        }
 
         pub struct AvailableAnalog {
             pub adc1: ADC1,
@@ -84,14 +195,14 @@ cfg_if::cfg_if! {
             fn split(self) -> AvailableAnalog;
         }
 
-        impl SarAdcExt for APB_SARADC {
+        impl<'d, T: crate::peripheral::Peripheral<P = APB_SARADC> + 'd> SarAdcExt for T {
             fn split(self) -> AvailableAnalog {
                 AvailableAnalog {
                     adc1: ADC1 {
-                        _private: PhantomData,
+                        _private: (),
                     },
                     adc2: ADC2 {
-                        _private: PhantomData,
+                        _private: (),
                     },
                 }
             }
@@ -101,13 +212,8 @@ cfg_if::cfg_if! {
 
 cfg_if::cfg_if! {
     if #[cfg(esp32c2)] {
-        use core::marker::PhantomData;
 
         use crate::peripherals::APB_SARADC;
-
-        pub struct ADC1 {
-            _private: PhantomData<()>,
-        }
 
         pub struct AvailableAnalog {
             pub adc1: ADC1,
@@ -118,11 +224,11 @@ cfg_if::cfg_if! {
             fn split(self) -> AvailableAnalog;
         }
 
-        impl SarAdcExt for APB_SARADC {
+        impl<'d, T: crate::peripheral::Peripheral<P = APB_SARADC> + 'd> SarAdcExt for T {
             fn split(self) -> AvailableAnalog {
                 AvailableAnalog {
                     adc1: ADC1 {
-                        _private: PhantomData,
+                        _private: (),
                     },
                 }
             }
