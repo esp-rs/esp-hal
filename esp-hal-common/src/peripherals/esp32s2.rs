@@ -70,5 +70,6 @@ mod peripherals {
         RMT,
         I2S,
         USB0,
+        RTC_CNTL,
     }
 }

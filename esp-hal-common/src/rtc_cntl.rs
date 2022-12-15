@@ -5,6 +5,7 @@ use fugit::{HertzU32, MicrosDurationU64};
 use crate::efuse::Efuse;
 use crate::{
     clock::{Clock, XtalClock},
+    peripheral::{Peripheral, PeripheralRef},
     peripherals::{RTC_CNTL, TIMG0},
     rom::esp_rom_delay_us,
 };
@@ -83,20 +84,20 @@ pub(crate) enum RtcCalSel {
     RtcCalInternalOsc = 3,
 }
 
-pub struct Rtc {
-    _inner: RTC_CNTL,
+pub struct Rtc<'d> {
+    _inner: PeripheralRef<'d, RTC_CNTL>,
     pub rwdt: Rwdt,
     #[cfg(any(esp32c2, esp32c3, esp32s3))]
     pub swd: Swd,
 }
 
-impl Rtc {
-    pub fn new(rtc_cntl: RTC_CNTL) -> Self {
+impl<'d> Rtc<'d> {
+    pub fn new(rtc_cntl: impl Peripheral<P = RTC_CNTL> + 'd) -> Self {
         rtc::init();
         rtc::configure_clock();
 
         Self {
-            _inner: rtc_cntl,
+            _inner: rtc_cntl.into_ref(),
             rwdt: Rwdt::default(),
             #[cfg(any(esp32c2, esp32c3, esp32s3))]
             swd: Swd::new(),

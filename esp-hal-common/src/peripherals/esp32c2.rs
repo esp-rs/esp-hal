@@ -49,5 +49,6 @@ mod peripherals {
         SYSTEM,
         LEDC,
         DMA,
+        RTC_CNTL,
     }
 }
