@@ -74,5 +74,7 @@ mod peripherals {
         PWM0,
         PWM1,
         RTC_CNTL,
+        TIMG0,
+        TIMG1,
     }
 }

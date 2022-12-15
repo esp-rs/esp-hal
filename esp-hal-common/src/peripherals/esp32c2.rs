@@ -50,5 +50,6 @@ mod peripherals {
         LEDC,
         DMA,
         RTC_CNTL,
+        TIMG0,
     }
 }
