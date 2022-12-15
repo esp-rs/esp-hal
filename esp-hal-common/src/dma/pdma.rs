@@ -2,6 +2,7 @@
 
 use crate::{
     dma::pdma::private::*,
+    peripheral::PeripheralRef,
     system::{Peripheral, PeripheralClockControl},
 };
 
@@ -469,8 +470,8 @@ pub(crate) mod private {
 /// DMA Peripheral
 ///
 /// This offers the available DMA channels.
-pub struct Dma {
-    _inner: crate::system::Dma,
+pub struct Dma<'d> {
+    _inner: PeripheralRef<'d, crate::system::Dma>,
     pub spi2channel: Spi2DmaChannelCreator,
     pub spi3channel: Spi3DmaChannelCreator,
     pub i2s0channel: I2s0DmaChannelCreator,
@@ -478,16 +479,16 @@ pub struct Dma {
     pub i2s1channel: I2s1DmaChannelCreator,
 }
 
-impl Dma {
+impl<'d> Dma<'d> {
     /// Create a DMA instance.
     pub fn new(
-        dma: crate::system::Dma,
+        dma: impl crate::peripheral::Peripheral<P = crate::system::Dma> + 'd,
         peripheral_clock_control: &mut PeripheralClockControl,
-    ) -> Dma {
+    ) -> Dma<'d> {
         peripheral_clock_control.enable(Peripheral::Dma);
 
         Dma {
-            _inner: dma,
+            _inner: dma.into_ref(),
             spi2channel: Spi2DmaChannelCreator {},
             spi3channel: Spi3DmaChannelCreator {},
             i2s0channel: I2s0DmaChannelCreator {},

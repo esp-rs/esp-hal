@@ -48,5 +48,6 @@ mod peripherals {
         UART1,
         SYSTEM,
         LEDC,
+        DMA,
     }
 }
