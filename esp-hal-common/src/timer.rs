@@ -16,6 +16,7 @@ use void::Void;
 use crate::peripherals::TIMG1;
 use crate::{
     clock::Clocks,
+    peripheral::{Peripheral, PeripheralRef},
     peripherals::{timg0::RegisterBlock, TIMG0},
 };
 
@@ -29,10 +30,11 @@ pub enum Error {
 
 // A timergroup consisting of up to 2 timers (chip dependent) and a watchdog
 // timer
-pub struct TimerGroup<T>
+pub struct TimerGroup<'d, T>
 where
     T: TimerGroupInstance,
 {
+    _timer_group: PeripheralRef<'d, T>,
     pub timer0: Timer<Timer0<T>>,
     #[cfg(not(any(esp32c2, esp32c3)))]
     pub timer1: Timer<Timer1<T>>,
@@ -58,11 +60,13 @@ impl TimerGroupInstance for TIMG1 {
     }
 }
 
-impl<T> TimerGroup<T>
+impl<'d, T> TimerGroup<'d, T>
 where
     T: TimerGroupInstance,
 {
-    pub fn new(_timer_group: T, clocks: &Clocks) -> Self {
+    pub fn new(timer_group: impl Peripheral<P = T> + 'd, clocks: &Clocks) -> Self {
+        crate::into_ref!(timer_group);
+
         let timer0 = Timer::new(
             Timer0 {
                 phantom: PhantomData::default(),
@@ -81,6 +85,7 @@ where
         let wdt = Wdt::new();
 
         Self {
+            _timer_group: timer_group,
             timer0,
             #[cfg(not(any(esp32c2, esp32c3)))]
             timer1,
