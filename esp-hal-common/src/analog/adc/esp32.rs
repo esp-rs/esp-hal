@@ -4,6 +4,7 @@ use embedded_hal::adc::{Channel, OneShot};
 
 use crate::{
     analog::{ADC1, ADC2},
+    peripheral::PeripheralRef,
     peripherals::{RTCIO, SENS},
 };
 
@@ -48,6 +49,7 @@ where
     ADCI: RegisterAccess,
 {
     pub fn new() -> AdcConfig<ADCI> {
+        crate::into_ref!();
         Self::default()
     }
 
@@ -256,17 +258,20 @@ impl RegisterAccess for ADC2 {
     }
 }
 
-pub struct ADC<ADC> {
-    adc: PhantomData<ADC>,
+pub struct ADC<'d, ADC> {
+    _adc: PeripheralRef<'d, ADC>,
     attenuations: [Option<Attenuation>; 10],
     active_channel: Option<u8>,
 }
 
-impl<ADCI> ADC<ADCI>
+impl<'d, ADCI> ADC<'d, ADCI>
 where
     ADCI: RegisterAccess,
 {
-    pub fn adc(_adc_instance: ADCI, config: AdcConfig<ADCI>) -> Result<Self, ()> {
+    pub fn adc(
+        adc_instance: impl crate::peripheral::Peripheral<P = ADCI> + 'd,
+        config: AdcConfig<ADCI>,
+    ) -> Result<Self, ()> {
         let sensors = unsafe { &*SENS::ptr() };
 
         // Set reading and sampling resolution
@@ -324,7 +329,7 @@ where
             .modify(|_, w| unsafe { w.sar_amp_wait3().bits(1) });
 
         let adc = ADC {
-            adc: PhantomData,
+            _adc: adc_instance.into_ref(),
             attenuations: config.attenuations,
             active_channel: None,
         };
@@ -333,7 +338,7 @@ where
     }
 }
 
-impl<ADC1> ADC<ADC1> {
+impl<'d, ADC1> ADC<'d, ADC1> {
     pub fn enable_hall_sensor() {
         // Connect hall sensor
         let rtcio = unsafe { &*RTCIO::ptr() };
@@ -347,7 +352,7 @@ impl<ADC1> ADC<ADC1> {
     }
 }
 
-impl<ADCI, WORD, PIN> OneShot<ADCI, WORD, AdcPin<PIN, ADCI>> for ADC<ADCI>
+impl<'d, ADCI, WORD, PIN> OneShot<ADCI, WORD, AdcPin<PIN, ADCI>> for ADC<'d, ADCI>
 where
     WORD: From<u16>,
     PIN: Channel<ADCI, ID = u8>,
