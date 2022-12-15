@@ -85,5 +85,6 @@ mod peripherals {
         DMA,
         PWM0,
         PWM1,
+        USB0,
     }
 }

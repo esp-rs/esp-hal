@@ -4,6 +4,7 @@ pub use esp_synopsys_usb_otg::UsbBus;
 use esp_synopsys_usb_otg::UsbPeripheral;
 
 use crate::{
+    peripheral::PeripheralRef,
     peripherals,
     system::{Peripheral, PeripheralClockControl},
     types::InputSignal,
@@ -18,26 +19,26 @@ pub trait UsbDp {}
 #[doc(hidden)]
 pub trait UsbDm {}
 
-pub struct USB<S, P, M>
+pub struct USB<'d, S, P, M>
 where
     S: UsbSel + Send + Sync,
     P: UsbDp + Send + Sync,
     M: UsbDm + Send + Sync,
 {
-    _usb0: peripherals::USB0,
+    _usb0: PeripheralRef<'d, peripherals::USB0>,
     _usb_sel: S,
     _usb_dp: P,
     _usb_dm: M,
 }
 
-impl<S, P, M> USB<S, P, M>
+impl<'d, S, P, M> USB<'d, S, P, M>
 where
     S: UsbSel + Send + Sync,
     P: UsbDp + Send + Sync,
     M: UsbDm + Send + Sync,
 {
     pub fn new(
-        usb0: peripherals::USB0,
+        usb0: impl crate::peripheral::Peripheral<P = peripherals::USB0> + 'd,
         usb_sel: S,
         usb_dp: P,
         usb_dm: M,
@@ -45,7 +46,7 @@ where
     ) -> Self {
         peripheral_clock_control.enable(Peripheral::Usb);
         Self {
-            _usb0: usb0,
+            _usb0: usb0.into_ref(),
             _usb_sel: usb_sel,
             _usb_dp: usb_dp,
             _usb_dm: usb_dm,
@@ -53,7 +54,7 @@ where
     }
 }
 
-unsafe impl<S, P, M> Sync for USB<S, P, M>
+unsafe impl<'d, S, P, M> Sync for USB<'d, S, P, M>
 where
     S: UsbSel + Send + Sync,
     P: UsbDp + Send + Sync,
@@ -61,7 +62,7 @@ where
 {
 }
 
-unsafe impl<S, P, M> UsbPeripheral for USB<S, P, M>
+unsafe impl<'d, S, P, M> UsbPeripheral for USB<'d, S, P, M>
 where
     S: UsbSel + Send + Sync,
     P: UsbDp + Send + Sync,
