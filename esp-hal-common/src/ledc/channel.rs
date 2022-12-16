@@ -8,7 +8,8 @@ use super::{
 };
 use crate::{
     gpio::{types::OutputSignal, OutputPin},
-    peripherals::ledc::RegisterBlock, peripheral::{PeripheralRef, Peripheral},
+    peripheral::{Peripheral, PeripheralRef},
+    peripherals::ledc::RegisterBlock,
 };
 
 /// Channel errors

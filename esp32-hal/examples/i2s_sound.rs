@@ -89,7 +89,10 @@ fn main() -> ! {
         &clocks,
     );
 
-    let i2s_tx = i2s.i2s_tx.with_pins(PinsBclkWsDout::new(io.pins.gpio12,io.pins.gpio13,io.pins.gpio14,
+    let i2s_tx = i2s.i2s_tx.with_pins(PinsBclkWsDout::new(
+        io.pins.gpio12,
+        io.pins.gpio13,
+        io.pins.gpio14,
     ));
 
     let data =
