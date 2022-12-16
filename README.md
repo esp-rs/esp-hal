@@ -76,8 +76,8 @@ There are a number of other crates within the [esp-rs organization] which can be
 
 The **M**inimum **S**upported **R**ust **V**ersions are:
 
-- `1.60.0` for RISC-V devices (**ESP32-C2**, **ESP32-C3**)
-- `1.60.0` for Xtensa devices (**ESP32**, **ESP32-S2**, **ESP32-S3**)
+- `1.65.0` for RISC-V devices (**ESP32-C2**, **ESP32-C3**)
+- `1.65.0` for Xtensa devices (**ESP32**, **ESP32-S2**, **ESP32-S3**)
 
 Note that targeting the Xtensa ISA currently requires the use of the [esp-rs/rust] compiler fork. The [esp-rs/rust-build] repository has pre-compiled release artifacts for most common platforms, and provides installation scripts to aid you in the process.
 
