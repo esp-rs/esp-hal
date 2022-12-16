@@ -115,16 +115,16 @@ where
     /// Constructs an SPI instance in 8bit dataframe mode.
     pub fn new<SCK: OutputPin, MOSI: OutputPin, MISO: InputPin, CS: OutputPin>(
         spi: impl Peripheral<P = T> + 'd,
-        mut sck: SCK,
-        mut mosi: MOSI,
-        mut miso: MISO,
-        mut cs: CS,
+        sck: impl Peripheral<P = SCK> + 'd,
+        mosi: impl Peripheral<P = MOSI> + 'd,
+        miso: impl Peripheral<P = MISO> + 'd,
+        cs: impl Peripheral<P = CS> + 'd,
         frequency: HertzU32,
         mode: SpiMode,
         peripheral_clock_control: &mut PeripheralClockControl,
         clocks: &Clocks,
     ) -> Self {
-        crate::into_ref!(spi);
+        crate::into_ref!(spi, sck, mosi, miso, cs);
         sck.set_to_push_pull_output()
             .connect_peripheral_to_output(spi.sclk_signal());
 
@@ -143,15 +143,15 @@ where
     /// Constructs an SPI instance in 8bit dataframe mode without CS pin.
     pub fn new_no_cs<SCK: OutputPin, MOSI: OutputPin, MISO: InputPin>(
         spi: impl Peripheral<P = T> + 'd,
-        mut sck: SCK,
-        mut mosi: MOSI,
-        mut miso: MISO,
+        sck: impl Peripheral<P = SCK> + 'd,
+        mosi: impl Peripheral<P = MOSI> + 'd,
+        miso: impl Peripheral<P = MISO> + 'd,
         frequency: HertzU32,
         mode: SpiMode,
         peripheral_clock_control: &mut PeripheralClockControl,
         clocks: &Clocks,
     ) -> Self {
-        crate::into_ref!(spi);
+        crate::into_ref!(spi, sck, mosi, miso);
         sck.set_to_push_pull_output()
             .connect_peripheral_to_output(spi.sclk_signal());
 
@@ -168,14 +168,14 @@ where
     /// pin.
     pub fn new_no_cs_no_miso<SCK: OutputPin, MOSI: OutputPin>(
         spi: impl Peripheral<P = T> + 'd,
-        mut sck: SCK,
-        mut mosi: MOSI,
+        sck: impl Peripheral<P = SCK> + 'd,
+        mosi: impl Peripheral<P = MOSI> + 'd,
         frequency: HertzU32,
         mode: SpiMode,
         peripheral_clock_control: &mut PeripheralClockControl,
         clocks: &Clocks,
     ) -> Self {
-        crate::into_ref!(spi);
+        crate::into_ref!(spi, sck, mosi);
         sck.set_to_push_pull_output()
             .connect_peripheral_to_output(spi.sclk_signal());
 
@@ -191,13 +191,13 @@ where
     /// waveforms…)
     pub fn new_mosi_only<MOSI: OutputPin>(
         spi: impl Peripheral<P = T> + 'd,
-        mut mosi: MOSI,
+        mosi: impl Peripheral<P = MOSI> + 'd,
         frequency: HertzU32,
         mode: SpiMode,
         peripheral_clock_control: &mut PeripheralClockControl,
         clocks: &Clocks,
     ) -> Self {
-        crate::into_ref!(spi);
+        crate::into_ref!(spi, mosi);
         mosi.set_to_push_pull_output()
             .connect_peripheral_to_output(spi.mosi_signal());
 

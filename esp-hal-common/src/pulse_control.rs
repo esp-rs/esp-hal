@@ -212,10 +212,10 @@ impl From<PulseCode> for u32 {
 
 /// Functionality that every OutputChannel must support
 pub trait OutputChannel {
-
     /// Output channel type
     type ConfiguredChannel<'d, P>
-        where P: OutputPin + 'd;
+    where
+        P: OutputPin + 'd;
 
     /// Set the logical level that the connected pin is pulled to
     /// while the channel is idle
@@ -236,7 +236,10 @@ pub trait OutputChannel {
     fn set_clock_source(&mut self, source: ClockSource) -> &mut Self;
 
     /// Assign a pin that should be driven by this channel
-    fn assign_pin<'d, P: OutputPin>(self, pin: impl Peripheral<P = P> + 'd) -> Self::ConfiguredChannel<'d, P>;
+    fn assign_pin<'d, P: OutputPin>(
+        self,
+        pin: impl Peripheral<P = P> + 'd,
+    ) -> Self::ConfiguredChannel<'d, P>;
 }
 
 /// Functionality that is allowed only on `ConfiguredChannel`
@@ -657,7 +660,7 @@ macro_rules! output_channel {
 
             type ConfiguredChannel<'d, P> = [<Configured $cxi>]<'d, P>
                 where P: OutputPin + 'd;
-            
+
             /// Set the logical level that the connected pin is pulled to
             /// while the channel is idle
             #[inline(always)]

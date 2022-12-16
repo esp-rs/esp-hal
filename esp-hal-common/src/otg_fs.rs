@@ -4,7 +4,7 @@ pub use esp_synopsys_usb_otg::UsbBus;
 use esp_synopsys_usb_otg::UsbPeripheral;
 
 use crate::{
-    peripheral::{PeripheralRef, Peripheral},
+    peripheral::{Peripheral, PeripheralRef},
     peripherals,
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
     types::InputSignal,
