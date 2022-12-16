@@ -211,7 +211,12 @@ impl From<PulseCode> for u32 {
 }
 
 /// Functionality that every OutputChannel must support
-pub trait OutputChannel<CC> {
+pub trait OutputChannel {
+
+    /// Output channel type
+    type ConfiguredChannel<'d, P>
+        where P: OutputPin + 'd;
+
     /// Set the logical level that the connected pin is pulled to
     /// while the channel is idle
     fn set_idle_output_level(&mut self, level: bool) -> &mut Self;
@@ -231,11 +236,7 @@ pub trait OutputChannel<CC> {
     fn set_clock_source(&mut self, source: ClockSource) -> &mut Self;
 
     /// Assign a pin that should be driven by this channel
-    ///
-    /// (Note that we only take a reference here, so the ownership remains with
-    /// the calling entity. The configured pin thus can be re-configured
-    /// independently.)
-    fn assign_pin<RmtPin: OutputPin>(self, pin: RmtPin) -> CC;
+    fn assign_pin<'d, P: OutputPin>(self, pin: impl Peripheral<P = P> + 'd) -> Self::ConfiguredChannel<'d, P>;
 }
 
 /// Functionality that is allowed only on `ConfiguredChannel`
@@ -359,11 +360,12 @@ macro_rules! channel_instance {
 
         paste!(
             #[doc = "Wrapper for`" $cxi "` object."]
-            pub struct [<Configured $cxi>] {
+            pub struct [<Configured $cxi>]<'d, P> {
                 channel: $cxi,
+                _pin: PeripheralRef<'d, P>
             }
 
-            impl ConfiguredChannel for [<Configured $cxi>] {
+            impl<'d, P: OutputPin> ConfiguredChannel for [<Configured $cxi>]<'d, P> {
                 /// Send a pulse sequence in a blocking fashion
                 fn send_pulse_sequence<const N: usize>(
                     &mut self,
@@ -651,7 +653,11 @@ macro_rules! output_channel {
         ) => {
             paste!(
 
-        impl OutputChannel<[<Configured $cxi>]> for $cxi {
+        impl OutputChannel for $cxi {
+
+            type ConfiguredChannel<'d, P> = [<Configured $cxi>]<'d, P>
+                where P: OutputPin + 'd;
+            
             /// Set the logical level that the connected pin is pulled to
             /// while the channel is idle
             #[inline(always)]
@@ -737,16 +743,18 @@ macro_rules! output_channel {
             }
 
             /// Assign a pin that should be driven by this channel
-            fn assign_pin<RmtPin: OutputPin >(
+            fn assign_pin<'d, RmtPin: OutputPin >(
                 self,
-                mut pin: RmtPin,
-            ) -> [<Configured $cxi>] {
+                pin: impl Peripheral<P = RmtPin> + 'd
+            ) -> [<Configured $cxi>]<'d, RmtPin> {
+                crate::into_ref!(pin);
                 // Configure Pin as output anc connect to signal
                 pin.set_to_push_pull_output()
                     .connect_peripheral_to_output($output_signal);
 
                 [<Configured $cxi>] {
                     channel: self,
+                    _pin: pin
                 }
             }
         }
