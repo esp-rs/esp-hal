@@ -76,9 +76,7 @@ fn main() -> ! {
 
     let i2s = I2s::new(
         peripherals.I2S,
-        MclkPin {
-            mclk: io.pins.gpio4,
-        },
+        MclkPin::new(io.pins.gpio4),
         Standard::Philips,
         DataFormat::Data16Channel16,
         44100u32.Hz(),
@@ -92,11 +90,7 @@ fn main() -> ! {
         &clocks,
     );
 
-    let i2s_tx = i2s.i2s_tx.with_pins(PinsBclkWsDout {
-        bclk: io.pins.gpio1,
-        ws: io.pins.gpio2,
-        dout: io.pins.gpio3,
-    });
+    let i2s_tx = i2s.i2s_tx.with_pins(PinsBclkWsDout::new(io.pins.gpio1,io.pins.gpio2,io.pins.gpio3));
 
     let data =
         unsafe { core::slice::from_raw_parts(&SINE as *const _ as *const u8, SINE.len() * 2) };

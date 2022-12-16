@@ -57,9 +57,7 @@ fn main() -> ! {
 
     let i2s = I2s::new(
         peripherals.I2S0,
-        MclkPin {
-            mclk: io.pins.gpio4,
-        },
+        MclkPin::new(io.pins.gpio4),
         Standard::Philips,
         DataFormat::Data16Channel16,
         44100u32.Hz(),
@@ -73,11 +71,11 @@ fn main() -> ! {
         &clocks,
     );
 
-    let i2s_rx = i2s.i2s_rx.with_pins(PinsBclkWsDin {
-        bclk: io.pins.gpio1,
-        ws: io.pins.gpio2,
-        din: io.pins.gpio5,
-    });
+    let i2s_rx = i2s.i2s_rx.with_pins(PinsBclkWsDin::new(
+        io.pins.gpio1,
+        io.pins.gpio2,
+        io.pins.gpio5,
+    ));
 
     let buffer = dma_buffer();
 
