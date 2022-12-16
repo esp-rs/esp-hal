@@ -90,7 +90,11 @@ fn main() -> ! {
         &clocks,
     );
 
-    let i2s_tx = i2s.i2s_tx.with_pins(PinsBclkWsDout::new(io.pins.gpio1,io.pins.gpio2,io.pins.gpio3));
+    let i2s_tx = i2s.i2s_tx.with_pins(PinsBclkWsDout::new(
+        io.pins.gpio1,
+        io.pins.gpio2,
+        io.pins.gpio3,
+    ));
 
     let data =
         unsafe { core::slice::from_raw_parts(&SINE as *const _ as *const u8, SINE.len() * 2) };

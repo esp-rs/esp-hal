@@ -11,7 +11,7 @@
 //! in a sequence in a single RMT send operation) might be required!_
 #![deny(missing_docs)]
 
-use core::{marker::PhantomData, slice::IterMut};
+use core::slice::IterMut;
 
 use fugit::NanosDuration;
 use smart_leds_trait::{SmartLedsWrite, RGB8};
@@ -20,6 +20,7 @@ use smart_leds_trait::{SmartLedsWrite, RGB8};
 use crate::pulse_control::ClockSource;
 use crate::{
     gpio::OutputPin,
+    peripheral::Peripheral,
     pulse_control::{ConfiguredChannel, OutputChannel, PulseCode, RepeatMode, TransmissionError},
 };
 
@@ -75,30 +76,28 @@ macro_rules! smartLedAdapter {
         //   * channels (r,g,b -> 3)
         //   * pulses per channel 8)
         //  ) + 1 additional pulse for the end delimiter
-        SmartLedsAdapter::<_, _, { $buffer_size * 24 + 1 }>
+        SmartLedsAdapter::<_, { $buffer_size * 24 + 1 }>
     };
 }
 
 /// Adapter taking an RMT channel and a specific pin and providing RGB LED
 /// interaction functionality using the `smart-leds` crate
-pub struct SmartLedsAdapter<CHANNEL, PIN, const BUFFER_SIZE: usize> {
+pub struct SmartLedsAdapter<CHANNEL, const BUFFER_SIZE: usize> {
     channel: CHANNEL,
     rmt_buffer: [u32; BUFFER_SIZE],
-    _pin: PhantomData<PIN>,
 }
 
-impl<CHANNEL, PIN, const BUFFER_SIZE: usize> SmartLedsAdapter<CHANNEL, PIN, BUFFER_SIZE>
+impl<'d, CHANNEL, const BUFFER_SIZE: usize> SmartLedsAdapter<CHANNEL, BUFFER_SIZE>
 where
     CHANNEL: ConfiguredChannel,
-    PIN: OutputPin,
 {
     /// Create a new adapter object that drives the pin using the RMT channel.
-    pub fn new<UnconfiguredChannel>(
+    pub fn new<UnconfiguredChannel, O: OutputPin + 'd>(
         mut channel: UnconfiguredChannel,
-        pin: PIN,
-    ) -> SmartLedsAdapter<CHANNEL, PIN, BUFFER_SIZE>
+        pin: impl Peripheral<P = O> + 'd,
+    ) -> SmartLedsAdapter<CHANNEL, BUFFER_SIZE>
     where
-        UnconfiguredChannel: OutputChannel<CHANNEL>,
+        UnconfiguredChannel: OutputChannel<ConfiguredChannel<'d, O> = CHANNEL>,
     {
         #[cfg(any(esp32c3, esp32s3))]
         channel
@@ -119,7 +118,6 @@ where
         Self {
             channel,
             rmt_buffer: [0; BUFFER_SIZE],
-            _pin: PhantomData,
         }
     }
 
@@ -127,15 +125,9 @@ where
         value: RGB8,
         mut_iter: &mut IterMut<u32>,
     ) -> Result<(), LedAdapterError> {
-        SmartLedsAdapter::<CHANNEL, PIN, BUFFER_SIZE>::convert_rgb_channel_to_pulses(
-            value.g, mut_iter,
-        )?;
-        SmartLedsAdapter::<CHANNEL, PIN, BUFFER_SIZE>::convert_rgb_channel_to_pulses(
-            value.r, mut_iter,
-        )?;
-        SmartLedsAdapter::<CHANNEL, PIN, BUFFER_SIZE>::convert_rgb_channel_to_pulses(
-            value.b, mut_iter,
-        )?;
+        SmartLedsAdapter::<CHANNEL, BUFFER_SIZE>::convert_rgb_channel_to_pulses(value.g, mut_iter)?;
+        SmartLedsAdapter::<CHANNEL, BUFFER_SIZE>::convert_rgb_channel_to_pulses(value.r, mut_iter)?;
+        SmartLedsAdapter::<CHANNEL, BUFFER_SIZE>::convert_rgb_channel_to_pulses(value.b, mut_iter)?;
 
         Ok(())
     }
@@ -168,11 +160,9 @@ where
     }
 }
 
-impl<CHANNEL, PIN, const BUFFER_SIZE: usize> SmartLedsWrite
-    for SmartLedsAdapter<CHANNEL, PIN, BUFFER_SIZE>
+impl<CHANNEL, const BUFFER_SIZE: usize> SmartLedsWrite for SmartLedsAdapter<CHANNEL, BUFFER_SIZE>
 where
     CHANNEL: ConfiguredChannel,
-    PIN: OutputPin,
 {
     type Error = LedAdapterError;
     type Color = RGB8;
@@ -192,7 +182,7 @@ where
         // This will result in an `BufferSizeExceeded` error in case
         // the iterator provides more elements than the buffer can take.
         for item in iterator {
-            SmartLedsAdapter::<CHANNEL, PIN, BUFFER_SIZE>::convert_rgb_to_pulse(
+            SmartLedsAdapter::<CHANNEL, BUFFER_SIZE>::convert_rgb_to_pulse(
                 item.into(),
                 &mut seq_iter,
             )?;

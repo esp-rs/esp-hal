@@ -66,7 +66,10 @@ fn main() -> ! {
         &clocks,
     );
 
-    let i2s_rx = i2s.i2s_rx.with_pins(PinsBclkWsDin::new(io.pins.gpio1, io.pins.gpio2,io.pins.gpio5,
+    let i2s_rx = i2s.i2s_rx.with_pins(PinsBclkWsDin::new(
+        io.pins.gpio1,
+        io.pins.gpio2,
+        io.pins.gpio5,
     ));
 
     let buffer = dma_buffer();
