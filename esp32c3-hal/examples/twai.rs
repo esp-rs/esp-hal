@@ -1,24 +1,26 @@
 #![no_std]
 #![no_main]
 
-use esp32c3_hal::{
-    clock::ClockControl, gpio::IO, peripherals::Peripherals, prelude::*, timer::TimerGroup, twai,
-    Rtc,
-};
-use esp_println::println;
-
 // Run this example with the eh1 feature enabled to use embedded-can instead of
-// embedded-hal-0.2.7. embedded-can was split off from embedded-hal before it's upgrade to 1.0.0.
-// cargo run --example twai --features eh1 --release
+// embedded-hal-0.2.7. embedded-can was split off from embedded-hal before it's
+// upgrade to 1.0.0. cargo run --example twai --features eh1 --release
 #[cfg(feature = "eh1")]
 use embedded_can::{nb::Can, Frame, Id};
-
 // Run this example without the eh1 flag to use the embedded-hal 0.2.7 CAN traits.
 // cargo run --example twai --release
 #[cfg(not(feature = "eh1"))]
 use embedded_hal::can::{Can, Frame, Id};
-
+use esp32c3_hal::{
+    clock::ClockControl,
+    gpio::IO,
+    peripherals::Peripherals,
+    prelude::*,
+    timer::TimerGroup,
+    twai,
+    Rtc,
+};
 use esp_backtrace as _;
+use esp_println::println;
 use nb::block;
 use riscv_rt::entry;
 
@@ -42,15 +44,16 @@ fn main() -> ! {
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    // Use GPIO pins 2 and 3 to connect to the respective pins on the CAN transceiver.
+    // Use GPIO pins 2 and 3 to connect to the respective pins on the CAN
+    // transceiver.
     let can_tx_pin = io.pins.gpio2;
     let can_rx_pin = io.pins.gpio3;
 
     // The speed of the CAN bus.
     const CAN_BAUDRATE: twai::BaudRate = twai::BaudRate::B1000K;
 
-    // Begin configuring the TWAI peripheral. The peripheral is in a reset like state that
-    // prevents transmission but allows configuration.
+    // Begin configuring the TWAI peripheral. The peripheral is in a reset like
+    // state that prevents transmission but allows configuration.
     let mut can_config = twai::TwaiConfiguration::new(
         peripherals.TWAI,
         can_tx_pin,
@@ -60,17 +63,19 @@ fn main() -> ! {
         CAN_BAUDRATE,
     );
 
-    // Partially filter the incoming messages to reduce overhead of receiving undesired messages.
-    // Note that due to how the hardware filters messages, standard ids and extended ids may both
-    // match a filter. Frame ids should be explicitly checked in the application instead of fully
-    // relying on these partial acceptance filters to exactly match.
-    // A filter that matches standard ids of an even value.
+    // Partially filter the incoming messages to reduce overhead of receiving
+    // undesired messages. Note that due to how the hardware filters messages,
+    // standard ids and extended ids may both match a filter. Frame ids should
+    // be explicitly checked in the application instead of fully relying on
+    // these partial acceptance filters to exactly match. A filter that matches
+    // standard ids of an even value.
     const FILTER: twai::filter::SingleStandardFilter =
         twai::filter::SingleStandardFilter::new(b"xxxxxxxxxx0", b"x", [b"xxxxxxxx", b"xxxxxxxx"]);
     can_config.set_filter(FILTER);
 
-    // Start the peripheral. This locks the configuration settings of the peripheral and puts it
-    // into operation mode, allowing packets to be sent and received.
+    // Start the peripheral. This locks the configuration settings of the peripheral
+    // and puts it into operation mode, allowing packets to be sent and
+    // received.
     let mut can = can_config.start();
 
     loop {

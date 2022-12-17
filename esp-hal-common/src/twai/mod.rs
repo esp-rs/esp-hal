@@ -1,27 +1,27 @@
 //! # Two-wire Automotive Interface (TWAI)
 //!
-//! This driver manages the ISO 11898-1 (CAN Specification 2.0) compatible TWAI controllers. It
-//! supports Standard Frame Format (11-bit) and Extended Frame Format (29-bit) frame identifiers.
+//! This driver manages the ISO 11898-1 (CAN Specification 2.0) compatible TWAI
+//! controllers. It supports Standard Frame Format (11-bit) and Extended Frame
+//! Format (29-bit) frame identifiers.
 
 use core::slice::{from_raw_parts, from_raw_parts_mut};
 
+#[cfg(feature = "eh1")]
+use embedded_can::{nb::Can, Error, ErrorKind, ExtendedId, Frame, Id, StandardId};
+#[cfg(not(feature = "eh1"))]
+use embedded_hal::can::{Can, Error, ErrorKind, ExtendedId, Frame, Id, StandardId};
+use fugit::HertzU32;
+
+use self::filter::{Filter, FilterType};
 use crate::{
     clock::Clocks,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::twai::RegisterBlock,
     system::PeripheralClockControl,
     types::{InputSignal, OutputSignal},
-    InputPin, OutputPin,
+    InputPin,
+    OutputPin,
 };
-
-#[cfg(feature = "eh1")]
-use embedded_can::{nb::Can, Error, ErrorKind, ExtendedId, Frame, Id, StandardId};
-#[cfg(not(feature = "eh1"))]
-use embedded_hal::can::{Can, Error, ErrorKind, ExtendedId, Frame, Id, StandardId};
-
-use fugit::HertzU32;
-
-use self::filter::{Filter, FilterType};
 
 pub mod filter;
 
@@ -35,7 +35,8 @@ pub struct EspTwaiFrame {
 }
 
 impl EspTwaiFrame {
-    /// Make a new frame from an id and a slice of the TWAI_DATA_x_REG registers.
+    /// Make a new frame from an id and a slice of the TWAI_DATA_x_REG
+    /// registers.
     fn new_from_data_registers(id: impl Into<Id>, data: &[u32]) -> Self {
         let mut d: [u8; 8] = [0; 8];
 
@@ -124,7 +125,8 @@ pub struct TimingConfig {
 }
 
 /// A selection of pre-determined baudrates for the TWAI driver.
-/// Currently these timings are sourced from the ESP IDF C driver which assumes an APB clock of 80MHz.
+/// Currently these timings are sourced from the ESP IDF C driver which assumes
+/// an APB clock of 80MHz.
 pub enum BaudRate {
     B125K,
     B250K,
@@ -135,14 +137,21 @@ pub enum BaudRate {
 impl BaudRate {
     /// Convert the BaudRate into the timings that the peripheral needs.
     // These timings are copied from the ESP IDF C driver.
-    // #define TWAI_TIMING_CONFIG_25KBITS()    {.brp = 128, .tseg_1 = 16, .tseg_2 = 8, .sjw = 3, .triple_sampling = false}
-    // #define TWAI_TIMING_CONFIG_50KBITS()    {.brp = 80, .tseg_1 = 15, .tseg_2 = 4, .sjw = 3, .triple_sampling = false}
-    // #define TWAI_TIMING_CONFIG_100KBITS()   {.brp = 40, .tseg_1 = 15, .tseg_2 = 4, .sjw = 3, .triple_sampling = false}
-    // #define TWAI_TIMING_CONFIG_125KBITS()   {.brp = 32, .tseg_1 = 15, .tseg_2 = 4, .sjw = 3, .triple_sampling = false}
-    // #define TWAI_TIMING_CONFIG_250KBITS()   {.brp = 16, .tseg_1 = 15, .tseg_2 = 4, .sjw = 3, .triple_sampling = false}
-    // #define TWAI_TIMING_CONFIG_500KBITS()   {.brp = 8, .tseg_1 = 15, .tseg_2 = 4, .sjw = 3, .triple_sampling = false}
-    // #define TWAI_TIMING_CONFIG_800KBITS()   {.brp = 4, .tseg_1 = 16, .tseg_2 = 8, .sjw = 3, .triple_sampling = false}
-    // #define TWAI_TIMING_CONFIG_1MBITS()     {.brp = 4, .tseg_1 = 15, .tseg_2 = 4, .sjw = 3, .triple_sampling = false}
+    // #define TWAI_TIMING_CONFIG_25KBITS()    {.brp = 128, .tseg_1 = 16, .tseg_2 =
+    // 8, .sjw = 3, .triple_sampling = false}
+    // #define TWAI_TIMING_CONFIG_50KBITS()    {.brp = 80, .tseg_1 = 15, .tseg_2 =
+    // 4, .sjw = 3, .triple_sampling = false}
+    // #define TWAI_TIMING_CONFIG_100KBITS()   {.brp = 40, .tseg_1 = 15, .tseg_2 =
+    // 4, .sjw = 3, .triple_sampling = false}
+    // #define TWAI_TIMING_CONFIG_125KBITS()   {.brp = 32, .tseg_1 = 15, .tseg_2 =
+    // 4, .sjw = 3, .triple_sampling = false}
+    // #define TWAI_TIMING_CONFIG_250KBITS()   {.brp = 16, .tseg_1 = 15, .tseg_2 =
+    // 4, .sjw = 3, .triple_sampling = false}
+    // #define TWAI_TIMING_CONFIG_500KBITS()   {.brp = 8, .tseg_1 = 15, .tseg_2 = 4,
+    // .sjw = 3, .triple_sampling = false} #define TWAI_TIMING_CONFIG_800KBITS()
+    // {.brp = 4, .tseg_1 = 16, .tseg_2 = 8, .sjw = 3, .triple_sampling = false}
+    // #define TWAI_TIMING_CONFIG_1MBITS()     {.brp = 4, .tseg_1 = 15, .tseg_2 = 4,
+    // .sjw = 3, .triple_sampling = false}
     const fn timing(self) -> TimingConfig {
         match self {
             Self::B125K => TimingConfig {
@@ -218,10 +227,10 @@ where
         // Included timings are all for 80MHz so assert that we are running at 80MHz.
         assert!(clocks.apb_clock == HertzU32::MHz(80));
 
-        // Unpack the baud rate timings and convert them to the values needed for the register.
-        // Many of the registers have a minimum value of 1 which is represented by having zero
-        // bits set, therefore many values need to have 1 subtracted from them before being
-        // stored into the register.
+        // Unpack the baud rate timings and convert them to the values needed for the
+        // register. Many of the registers have a minimum value of 1 which is
+        // represented by having zero bits set, therefore many values need to
+        // have 1 subtracted from them before being stored into the register.
         let timing = baud_rate.timing();
 
         let prescale = (timing.baud_rate_prescaler / 2) - 1;
@@ -257,9 +266,10 @@ where
 
     /// Set up the acceptance filter on the device.
     ///
-    /// NOTE: On a bus with mixed 11-bit and 29-bit packet id's, you may experience an
-    /// 11-bit filter match against a 29-bit frame and vice versa. Your application should check
-    /// the id again once a frame has been received to make sure it is the expected value.
+    /// NOTE: On a bus with mixed 11-bit and 29-bit packet id's, you may
+    /// experience an 11-bit filter match against a 29-bit frame and vice
+    /// versa. Your application should check the id again once a frame has
+    /// been received to make sure it is the expected value.
     ///
     /// [ESP32C3 Reference Manual](https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf#subsubsection.29.4.6)
     pub fn set_filter(&mut self, filter: impl Filter) {
@@ -270,7 +280,8 @@ where
             .mode
             .modify(|_, w| w.rx_filter_mode().bit(filter_mode_bit));
 
-        // Convert the filter into values for the registers and store them to the registers.
+        // Convert the filter into values for the registers and store them to the
+        // registers.
         let registers = filter.to_registers();
 
         // Copy the filter to the peripheral.
@@ -281,9 +292,10 @@ where
 
     /// Set the error warning threshold.
     ///
-    /// In the case when any of an error counter value exceeds the threshold, or all the
-    /// error counter values are below the threshold, an error warning interrupt will be
-    /// triggered (given the enable signal is valid).
+    /// In the case when any of an error counter value exceeds the threshold, or
+    /// all the error counter values are below the threshold, an error
+    /// warning interrupt will be triggered (given the enable signal is
+    /// valid).
     pub fn set_error_warning_limit(&mut self, limit: u8) {
         self.peripheral
             .register_block()
@@ -291,8 +303,8 @@ where
             .write(|w| w.err_warning_limit().variant(limit));
     }
 
-    /// Put the peripheral into Operation Mode, allowing the transmission and reception of
-    /// packets using the new object.
+    /// Put the peripheral into Operation Mode, allowing the transmission and
+    /// reception of packets using the new object.
     pub fn start(self) -> Twai<'d, T> {
         // Put the peripheral into operation mode by clearing the reset mode bit.
         self.peripheral
@@ -308,8 +320,8 @@ where
 
 /// An active TWAI peripheral in Normal Mode.
 ///
-/// In this mode, the TWAI controller can transmit and receive messages including error
-/// signals (such as error and overload frames).
+/// In this mode, the TWAI controller can transmit and receive messages
+/// including error signals (such as error and overload frames).
 pub struct Twai<'d, T> {
     peripheral: PeripheralRef<'d, T>,
 }
@@ -318,9 +330,11 @@ impl<'d, T> Twai<'d, T>
 where
     T: Instance,
 {
-    /// Stop the peripheral, putting it into reset mode and enabling reconfiguration.
+    /// Stop the peripheral, putting it into reset mode and enabling
+    /// reconfiguration.
     pub fn stop(self) -> TwaiConfiguration<'d, T> {
-        // Put the peripheral into reset/configuration mode by setting the reset mode bit.
+        // Put the peripheral into reset/configuration mode by setting the reset mode
+        // bit.
         self.peripheral
             .register_block()
             .mode
@@ -357,10 +371,11 @@ where
             .bit_is_set()
     }
 
-    /// Get the number of messages that the peripheral has available in the receive FIFO.
+    /// Get the number of messages that the peripheral has available in the
+    /// receive FIFO.
     ///
-    /// Note that this may not be the number of valid messages in the receive FIFO due to
-    /// fifo overflow/overrun.
+    /// Note that this may not be the number of valid messages in the receive
+    /// FIFO due to fifo overflow/overrun.
     pub fn num_available_messages(&self) -> u8 {
         self.peripheral
             .register_block()
@@ -369,19 +384,22 @@ where
             .rx_message_counter()
             .bits()
     }
-    /// Clear the receive FIFO, discarding any valid, partial, or invalid packets.
+    /// Clear the receive FIFO, discarding any valid, partial, or invalid
+    /// packets.
     ///
     /// This is typically used to clear an overrun receive FIFO.
     ///
-    /// TODO: Not sure if this needs to be guarded against Bus Off or other error states.
+    /// TODO: Not sure if this needs to be guarded against Bus Off or other
+    /// error states.
     pub fn clear_receive_fifo(&self) {
         while self.num_available_messages() > 0 {
             self.release_receive_fifo();
         }
     }
 
-    /// Release the message in the buffer. This will decrement the received message
-    /// counter and prepare the next message in the FIFO for reading.
+    /// Release the message in the buffer. This will decrement the received
+    /// message counter and prepare the next message in the FIFO for
+    /// reading.
     fn release_receive_fifo(&self) {
         self.peripheral
             .register_block()
@@ -404,12 +422,14 @@ impl Error for EspTwaiError {
     }
 }
 
-/// Copy data from multiple TWAI_DATA_x_REG registers, packing the source into the destination.
+/// Copy data from multiple TWAI_DATA_x_REG registers, packing the source into
+/// the destination.
 ///
 /// # Safety
-/// This function is marked unsafe because it reads arbitrarily from memory-mapped registers.
-/// Specifically, this function is used with the TWAI_DATA_x_REG registers which has different
-/// results based on the mode of the peripheral.
+/// This function is marked unsafe because it reads arbitrarily from
+/// memory-mapped registers. Specifically, this function is used with the
+/// TWAI_DATA_x_REG registers which has different results based on the mode of
+/// the peripheral.
 unsafe fn _copy_from_data_register(dest: &mut [u8], src: *const u32) {
     let src = from_raw_parts(src, dest.len());
 
@@ -418,12 +438,14 @@ unsafe fn _copy_from_data_register(dest: &mut [u8], src: *const u32) {
     }
 }
 
-/// Copy data to multiple TWAI_DATA_x_REG registers, unpacking the source into the destination.
+/// Copy data to multiple TWAI_DATA_x_REG registers, unpacking the source into
+/// the destination.
 ///
 /// # Safety
-/// This function is marked unsafe because it writes arbitrarily to memory-mapped registers.
-/// Specifically, this function is used with the TWAI_DATA_x_REG registers which has different
-/// results based on the mode of the peripheral.
+/// This function is marked unsafe because it writes arbitrarily to
+/// memory-mapped registers. Specifically, this function is used with the
+/// TWAI_DATA_x_REG registers which has different results based on the mode of
+/// the peripheral.
 unsafe fn copy_to_data_register(dest: *mut u32, src: &[u8]) {
     let dest = from_raw_parts_mut(dest, src.len());
 
@@ -440,15 +462,16 @@ where
     type Error = EspTwaiError;
     /// Transmit a frame.
     ///
-    /// Because of how the TWAI registers are set up, we have to do some assembly of bytes. Note
-    /// that these registers serve a filter configuration role when the device is in
-    /// configuration mode so patching the svd files to improve this may be non-trivial.
+    /// Because of how the TWAI registers are set up, we have to do some
+    /// assembly of bytes. Note that these registers serve a filter
+    /// configuration role when the device is in configuration mode so
+    /// patching the svd files to improve this may be non-trivial.
     ///
     /// [ESP32C3 Reference Manual](https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf#subsubsection.29.4.4.2)
     ///
-    /// NOTE: TODO: This may not work if using the self reception/self test functionality. See
-    /// notes 1 and 2 in the "Frame Identifier" section of the reference manual.
-    ///
+    /// NOTE: TODO: This may not work if using the self reception/self test
+    /// functionality. See notes 1 and 2 in the "Frame Identifier" section
+    /// of the reference manual.
     fn transmit(&mut self, frame: &Self::Frame) -> nb::Result<Option<Self::Frame>, Self::Error> {
         let status = self.peripheral.register_block().status.read();
 
@@ -530,15 +553,16 @@ where
             // Is RTR frame, so no data is included.
         }
 
-        // Set the transmit request command, this will lock the transmit buffer until the
-        // transmission is complete or aborted.
+        // Set the transmit request command, this will lock the transmit buffer until
+        // the transmission is complete or aborted.
         self.peripheral
             .register_block()
             .cmd
             .write(|w| w.tx_req().set_bit());
 
-        // Success in readying packet for transmit. No packets can be replaced in the transmit
-        // buffer so return None in accordance with the embedded-can/embedded-hal trait.
+        // Success in readying packet for transmit. No packets can be replaced in the
+        // transmit buffer so return None in accordance with the
+        // embedded-can/embedded-hal trait.
         nb::Result::Ok(None)
     }
     /// Return a received frame if there are any available.
@@ -599,7 +623,8 @@ where
             let id = StandardId::new(raw_id).unwrap();
 
             if is_data_frame {
-                // Create a new frame from the contents of the appropriate TWAI_DATA_x_REG registers.
+                // Create a new frame from the contents of the appropriate TWAI_DATA_x_REG
+                // registers.
                 let register_data = unsafe {
                     from_raw_parts(self.peripheral.register_block().data_3.as_ptr(), dlc)
                 };
