@@ -7,7 +7,7 @@ use core::slice::{from_raw_parts, from_raw_parts_mut};
 
 use crate::{
     clock::Clocks,
-    pac::twai::RegisterBlock,
+    peripherals::twai::RegisterBlock,
     system::PeripheralClockControl,
     types::{InputSignal, OutputSignal},
     InputPin, OutputPin,
@@ -669,7 +669,7 @@ pub trait Instance {
 }
 
 #[cfg(any(esp32c3))]
-impl Instance for crate::pac::TWAI {
+impl Instance for crate::peripherals::TWAI {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
         self

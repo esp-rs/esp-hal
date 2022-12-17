@@ -1,11 +1,11 @@
 #![no_std]
 #![no_main]
 
-use core::fmt::Write;
 use esp32c3_hal::{
-    clock::ClockControl, gpio::IO, pac::Peripherals, prelude::*, timer::TimerGroup, twai, Rtc,
-    UsbSerialJtag,
+    clock::ClockControl, gpio::IO, peripherals::Peripherals, prelude::*, timer::TimerGroup, twai,
+    Rtc,
 };
+use esp_println::println;
 
 // Run this example with the eh1 feature enabled to use embedded-can instead of
 // embedded-hal-0.2.7. embedded-can was split off from embedded-hal before it's upgrade to 1.0.0.
@@ -24,7 +24,7 @@ use riscv_rt::entry;
 
 #[entry]
 fn main() -> ! {
-    let peripherals = Peripherals::take().unwrap();
+    let peripherals = Peripherals::take();
     let mut system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
@@ -77,29 +77,24 @@ fn main() -> ! {
         // Wait for a frame to be received.
         let frame = block!(can.receive()).unwrap();
 
-        writeln!(UsbSerialJtag, "Received a frame:").unwrap();
+        println!("Received a frame:");
 
         // Print different messages based on the frame id type.
         match frame.id() {
             Id::Standard(id) => {
-                writeln!(UsbSerialJtag, "\tStandard Id: {:?}", id).unwrap();
+                println!("\tStandard Id: {:?}", id);
             }
             Id::Extended(id) => {
-                writeln!(UsbSerialJtag, "\tExtended Id: {:?}", id).unwrap();
+                println!("\tExtended Id: {:?}", id);
             }
         }
 
         // Print out the frame data or the requested data length code for a remote
         // transmission request frame.
         if frame.is_data_frame() {
-            writeln!(UsbSerialJtag, "\tData: {:?}", frame.data()).unwrap();
+            println!("\tData: {:?}", frame.data());
         } else {
-            writeln!(
-                UsbSerialJtag,
-                "\tRemote Frame. Data Length Code: {}",
-                frame.dlc()
-            )
-            .unwrap();
+            println!("\tRemote Frame. Data Length Code: {}", frame.dlc());
         }
 
         // Transmit the frame back.
