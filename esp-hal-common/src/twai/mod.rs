@@ -7,6 +7,7 @@ use core::slice::{from_raw_parts, from_raw_parts_mut};
 
 use crate::{
     clock::Clocks,
+    peripheral::{Peripheral, PeripheralRef},
     peripherals::twai::RegisterBlock,
     system::PeripheralClockControl,
     types::{InputSignal, OutputSignal},
@@ -178,16 +179,16 @@ impl BaudRate {
 }
 
 /// An inactive TWAI peripheral in the "Reset"/configuration state.
-pub struct TwaiConfiguration<T> {
-    peripheral: T,
+pub struct TwaiConfiguration<'d, T> {
+    peripheral: PeripheralRef<'d, T>,
 }
 
-impl<T> TwaiConfiguration<T>
+impl<'d, T> TwaiConfiguration<'d, T>
 where
     T: Instance,
 {
     pub fn new<TX: OutputPin, RX: InputPin>(
-        peripheral: T,
+        peripheral: impl Peripheral<P = T> + 'd,
         mut tx_pin: TX,
         mut rx_pin: RX,
         clock_control: &mut PeripheralClockControl,
@@ -201,6 +202,7 @@ where
         tx_pin.connect_peripheral_to_output(OutputSignal::TWAI_TX);
         rx_pin.connect_input_to_peripheral(InputSignal::TWAI_RX);
 
+        crate::into_ref!(peripheral);
         let mut cfg = TwaiConfiguration { peripheral };
 
         cfg.set_baud_rate(baud_rate, clocks);
@@ -291,7 +293,7 @@ where
 
     /// Put the peripheral into Operation Mode, allowing the transmission and reception of
     /// packets using the new object.
-    pub fn start(self) -> Twai<T> {
+    pub fn start(self) -> Twai<'d, T> {
         // Put the peripheral into operation mode by clearing the reset mode bit.
         self.peripheral
             .register_block()
@@ -308,16 +310,16 @@ where
 ///
 /// In this mode, the TWAI controller can transmit and receive messages including error
 /// signals (such as error and overload frames).
-pub struct Twai<T> {
-    peripheral: T,
+pub struct Twai<'d, T> {
+    peripheral: PeripheralRef<'d, T>,
 }
 
-impl<T> Twai<T>
+impl<'d, T> Twai<'d, T>
 where
     T: Instance,
 {
     /// Stop the peripheral, putting it into reset mode and enabling reconfiguration.
-    pub fn stop(self) -> TwaiConfiguration<T> {
+    pub fn stop(self) -> TwaiConfiguration<'d, T> {
         // Put the peripheral into reset/configuration mode by setting the reset mode bit.
         self.peripheral
             .register_block()
@@ -430,7 +432,7 @@ unsafe fn copy_to_data_register(dest: *mut u32, src: &[u8]) {
     }
 }
 
-impl<T> Can for Twai<T>
+impl<T> Can for Twai<'_, T>
 where
     T: Instance,
 {
