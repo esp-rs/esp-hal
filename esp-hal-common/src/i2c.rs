@@ -266,13 +266,13 @@ where
     /// automatically disabled when this gets dropped.
     pub fn new<SDA: OutputPin + InputPin, SCL: OutputPin + InputPin>(
         i2c: impl Peripheral<P = T> + 'd,
-        mut sda: SDA,
-        mut scl: SCL,
+        sda: impl Peripheral<P = SDA> + 'd,
+        scl: impl Peripheral<P = SCL> + 'd,
         frequency: HertzU32,
         peripheral_clock_control: &mut PeripheralClockControl,
         clocks: &Clocks,
     ) -> Self {
-        crate::into_ref!(i2c);
+        crate::into_ref!(i2c, sda, scl);
         enable_peripheral(&i2c, peripheral_clock_control);
 
         let mut i2c = I2C { peripheral: i2c };

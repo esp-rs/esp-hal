@@ -144,16 +144,22 @@ pub trait UartPins {
 }
 
 /// All pins offered by UART
-pub struct AllPins<TX: OutputPin, RX: InputPin, CTS: InputPin, RTS: OutputPin> {
-    pub tx: Option<TX>,
-    pub rx: Option<RX>,
-    pub cts: Option<CTS>,
-    pub rts: Option<RTS>,
+pub struct AllPins<'d, TX: OutputPin, RX: InputPin, CTS: InputPin, RTS: OutputPin> {
+    pub(crate) tx: Option<PeripheralRef<'d, TX>>,
+    pub(crate) rx: Option<PeripheralRef<'d, RX>>,
+    pub(crate) cts: Option<PeripheralRef<'d, CTS>>,
+    pub(crate) rts: Option<PeripheralRef<'d, RTS>>,
 }
 
 /// Tx and Rx pins
-impl<TX: OutputPin, RX: InputPin, CTS: InputPin, RTS: OutputPin> AllPins<TX, RX, CTS, RTS> {
-    pub fn new(tx: TX, rx: RX, cts: CTS, rts: RTS) -> AllPins<TX, RX, CTS, RTS> {
+impl<'d, TX: OutputPin, RX: InputPin, CTS: InputPin, RTS: OutputPin> AllPins<'d, TX, RX, CTS, RTS> {
+    pub fn new(
+        tx: impl Peripheral<P = TX> + 'd,
+        rx: impl Peripheral<P = RX> + 'd,
+        cts: impl Peripheral<P = CTS> + 'd,
+        rts: impl Peripheral<P = RTS> + 'd,
+    ) -> AllPins<'d, TX, RX, CTS, RTS> {
+        crate::into_ref!(tx, rx, cts, rts);
         AllPins {
             tx: Some(tx),
             rx: Some(rx),
@@ -164,7 +170,7 @@ impl<TX: OutputPin, RX: InputPin, CTS: InputPin, RTS: OutputPin> AllPins<TX, RX,
 }
 
 impl<TX: OutputPin, RX: InputPin, CTS: InputPin, RTS: OutputPin> UartPins
-    for AllPins<TX, RX, CTS, RTS>
+    for AllPins<'_, TX, RX, CTS, RTS>
 {
     fn configure_pins(
         &mut self,
@@ -193,13 +199,17 @@ impl<TX: OutputPin, RX: InputPin, CTS: InputPin, RTS: OutputPin> UartPins
     }
 }
 
-pub struct TxRxPins<TX: OutputPin, RX: InputPin> {
-    pub tx: Option<TX>,
-    pub rx: Option<RX>,
+pub struct TxRxPins<'d, TX: OutputPin, RX: InputPin> {
+    pub tx: Option<PeripheralRef<'d, TX>>,
+    pub rx: Option<PeripheralRef<'d, RX>>,
 }
 
-impl<TX: OutputPin, RX: InputPin> TxRxPins<TX, RX> {
-    pub fn new_tx_rx(tx: TX, rx: RX) -> TxRxPins<TX, RX> {
+impl<'d, TX: OutputPin, RX: InputPin> TxRxPins<'d, TX, RX> {
+    pub fn new_tx_rx(
+        tx: impl Peripheral<P = TX> + 'd,
+        rx: impl Peripheral<P = RX> + 'd,
+    ) -> TxRxPins<'d, TX, RX> {
+        crate::into_ref!(tx, rx);
         TxRxPins {
             tx: Some(tx),
             rx: Some(rx),
@@ -207,7 +217,7 @@ impl<TX: OutputPin, RX: InputPin> TxRxPins<TX, RX> {
     }
 }
 
-impl<TX: OutputPin, RX: InputPin> UartPins for TxRxPins<TX, RX> {
+impl<TX: OutputPin, RX: InputPin> UartPins for TxRxPins<'_, TX, RX> {
     fn configure_pins(
         &mut self,
         tx_signal: OutputSignal,

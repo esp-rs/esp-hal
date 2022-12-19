@@ -6,7 +6,7 @@ authors = [
     "Björn Quentin <bjoern.quentin@mobile-j.de>",
 ]
 edition      = "2021"
-rust-version = "1.60.0"
+rust-version = "1.65.0"
 description  = "HAL for ESP32-C3 microcontrollers"
 repository   = "https://github.com/esp-rs/esp-hal"
 license      = "MIT OR Apache-2.0"

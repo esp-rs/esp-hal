@@ -2,6 +2,7 @@ use core::marker::PhantomData;
 
 use crate::{
     mcpwm::{timer::Timer, PwmPeripheral},
+    peripheral::{Peripheral, PeripheralRef},
     OutputPin,
 };
 
@@ -52,31 +53,34 @@ impl<const OP: u8, PWM: PwmPeripheral> Operator<OP, PWM> {
     }
 
     /// Use the A output with the given pin and configuration
-    pub fn with_pin_a<Pin: OutputPin>(
+    pub fn with_pin_a<'d, Pin: OutputPin>(
         self,
-        pin: Pin,
+        pin: impl Peripheral<P = Pin> + 'd,
         config: PwmPinConfig<true>,
-    ) -> PwmPin<Pin, PWM, OP, true> {
+    ) -> PwmPin<'d, Pin, PWM, OP, true> {
         PwmPin::new(pin, config)
     }
 
     /// Use the B output with the given pin and configuration
-    pub fn with_pin_b<Pin: OutputPin>(
+    pub fn with_pin_b<'d, Pin: OutputPin>(
         self,
-        pin: Pin,
+        pin: impl Peripheral<P = Pin> + 'd,
         config: PwmPinConfig<false>,
-    ) -> PwmPin<Pin, PWM, OP, false> {
+    ) -> PwmPin<'d, Pin, PWM, OP, false> {
         PwmPin::new(pin, config)
     }
 
     /// Use both the A and the B output with the given pins and configurations
-    pub fn with_pins<PinA: OutputPin, PinB: OutputPin>(
+    pub fn with_pins<'d, PinA: OutputPin, PinB: OutputPin>(
         self,
-        pin_a: PinA,
+        pin_a: impl Peripheral<P = PinA> + 'd,
         config_a: PwmPinConfig<true>,
-        pin_b: PinB,
+        pin_b: impl Peripheral<P = PinB> + 'd,
         config_b: PwmPinConfig<false>,
-    ) -> (PwmPin<PinA, PWM, OP, true>, PwmPin<PinB, PWM, OP, false>) {
+    ) -> (
+        PwmPin<'d, PinA, PWM, OP, true>,
+        PwmPin<'d, PinB, PWM, OP, false>,
+    ) {
         (PwmPin::new(pin_a, config_a), PwmPin::new(pin_b, config_b))
     }
 }
@@ -110,15 +114,16 @@ impl<const IS_A: bool> PwmPinConfig<IS_A> {
 }
 
 /// A pin driven by an MCPWM operator
-pub struct PwmPin<Pin, PWM, const OP: u8, const IS_A: bool> {
-    _pin: Pin,
+pub struct PwmPin<'d, Pin, PWM, const OP: u8, const IS_A: bool> {
+    _pin: PeripheralRef<'d, Pin>,
     phantom: PhantomData<PWM>,
 }
 
-impl<Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
-    PwmPin<Pin, PWM, OP, IS_A>
+impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
+    PwmPin<'d, Pin, PWM, OP, IS_A>
 {
-    fn new(mut pin: Pin, config: PwmPinConfig<IS_A>) -> Self {
+    fn new(pin: impl Peripheral<P = Pin> + 'd, config: PwmPinConfig<IS_A>) -> Self {
+        crate::into_ref!(pin);
         let output_signal = PWM::output_signal::<OP, IS_A>();
         pin.enable_output(true)
             .connect_peripheral_to_output(output_signal);

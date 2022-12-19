@@ -8,6 +8,7 @@ use super::{
 };
 use crate::{
     gpio::{types::OutputSignal, OutputPin},
+    peripheral::{Peripheral, PeripheralRef},
     peripherals::ledc::RegisterBlock,
 };
 
@@ -50,7 +51,7 @@ pub mod config {
 }
 
 /// Channel interface
-pub trait ChannelIFace<'a, S: TimerSpeed + 'a, O: OutputPin>
+pub trait ChannelIFace<'a, S: TimerSpeed + 'a, O: OutputPin + 'a>
 where
     Channel<'a, S, O>: ChannelHW<O>,
 {
@@ -76,12 +77,13 @@ pub struct Channel<'a, S: TimerSpeed, O: OutputPin> {
     ledc: &'a RegisterBlock,
     timer: Option<&'a dyn TimerIFace<S>>,
     number: Number,
-    output_pin: O,
+    output_pin: PeripheralRef<'a, O>,
 }
 
 impl<'a, S: TimerSpeed, O: OutputPin> Channel<'a, S, O> {
     /// Return a new channel
-    pub fn new(number: Number, output_pin: O) -> Self {
+    pub fn new(number: Number, output_pin: impl Peripheral<P = O> + 'a) -> Self {
+        crate::into_ref!(output_pin);
         let ledc = unsafe { &*crate::peripherals::LEDC::ptr() };
         Channel {
             ledc,

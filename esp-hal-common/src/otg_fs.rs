@@ -4,9 +4,9 @@ pub use esp_synopsys_usb_otg::UsbBus;
 use esp_synopsys_usb_otg::UsbPeripheral;
 
 use crate::{
-    peripheral::PeripheralRef,
+    peripheral::{Peripheral, PeripheralRef},
     peripherals,
-    system::{Peripheral, PeripheralClockControl},
+    system::{Peripheral as PeripheralEnable, PeripheralClockControl},
     types::InputSignal,
 };
 
@@ -26,9 +26,9 @@ where
     M: UsbDm + Send + Sync,
 {
     _usb0: PeripheralRef<'d, peripherals::USB0>,
-    _usb_sel: S,
-    _usb_dp: P,
-    _usb_dm: M,
+    _usb_sel: PeripheralRef<'d, S>,
+    _usb_dp: PeripheralRef<'d, P>,
+    _usb_dm: PeripheralRef<'d, M>,
 }
 
 impl<'d, S, P, M> USB<'d, S, P, M>
@@ -38,13 +38,14 @@ where
     M: UsbDm + Send + Sync,
 {
     pub fn new(
-        usb0: impl crate::peripheral::Peripheral<P = peripherals::USB0> + 'd,
-        usb_sel: S,
-        usb_dp: P,
-        usb_dm: M,
+        usb0: impl Peripheral<P = peripherals::USB0> + 'd,
+        usb_sel: impl Peripheral<P = S> + 'd,
+        usb_dp: impl Peripheral<P = P> + 'd,
+        usb_dm: impl Peripheral<P = M> + 'd,
         peripheral_clock_control: &mut PeripheralClockControl,
     ) -> Self {
-        peripheral_clock_control.enable(Peripheral::Usb);
+        crate::into_ref!(usb_sel, usb_dp, usb_dm);
+        peripheral_clock_control.enable(PeripheralEnable::Usb);
         Self {
             _usb0: usb0.into_ref(),
             _usb_sel: usb_sel,

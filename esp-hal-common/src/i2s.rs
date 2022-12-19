@@ -120,13 +120,29 @@ impl DataFormat {
 }
 
 /// Pins to use for I2S tx
-pub struct PinsBclkWsDout<B: OutputPin, W: OutputPin, DO: OutputPin> {
-    pub bclk: B,
-    pub ws: W,
-    pub dout: DO,
+pub struct PinsBclkWsDout<'d, B, W, DO> {
+    bclk: PeripheralRef<'d, B>,
+    ws: PeripheralRef<'d, W>,
+    dout: PeripheralRef<'d, DO>,
 }
 
-impl<B, W, DO> I2sTxPins for PinsBclkWsDout<B, W, DO>
+impl<'d, B, W, DO> PinsBclkWsDout<'d, B, W, DO>
+where
+    B: OutputPin,
+    W: OutputPin,
+    DO: OutputPin,
+{
+    pub fn new(
+        bclk: impl Peripheral<P = B> + 'd,
+        ws: impl Peripheral<P = W> + 'd,
+        dout: impl Peripheral<P = DO> + 'd,
+    ) -> Self {
+        crate::into_ref!(bclk, ws, dout);
+        Self { bclk, ws, dout }
+    }
+}
+
+impl<'d, B, W, DO> I2sTxPins for PinsBclkWsDout<'d, B, W, DO>
 where
     B: OutputPin,
     W: OutputPin,
@@ -151,13 +167,29 @@ where
 }
 
 /// Pins to use for I2S rx
-pub struct PinsBclkWsDin<B: OutputPin, W: OutputPin, DI: InputPin> {
-    pub bclk: B,
-    pub ws: W,
-    pub din: DI,
+pub struct PinsBclkWsDin<'d, B, W, DI> {
+    bclk: PeripheralRef<'d, B>,
+    ws: PeripheralRef<'d, W>,
+    din: PeripheralRef<'d, DI>,
 }
 
-impl<B, W, DI> I2sRxPins for PinsBclkWsDin<B, W, DI>
+impl<'d, B, W, DI> PinsBclkWsDin<'d, B, W, DI>
+where
+    B: OutputPin,
+    W: OutputPin,
+    DI: InputPin,
+{
+    pub fn new(
+        bclk: impl Peripheral<P = B> + 'd,
+        ws: impl Peripheral<P = W> + 'd,
+        din: impl Peripheral<P = DI> + 'd,
+    ) -> Self {
+        crate::into_ref!(bclk, ws, din);
+        Self { bclk, ws, din }
+    }
+}
+
+impl<'d, B, W, DI> I2sRxPins for PinsBclkWsDin<'d, B, W, DI>
 where
     B: OutputPin,
     W: OutputPin,
@@ -183,12 +215,21 @@ where
 
 /// MCLK pin to use
 #[cfg(not(esp32))]
-pub struct MclkPin<M: OutputPin> {
-    pub mclk: M,
+pub struct MclkPin<'d, M: OutputPin> {
+    mclk: PeripheralRef<'d, M>,
 }
 
 #[cfg(not(esp32))]
-impl<M> I2sMclkPin for MclkPin<M>
+impl<'d, M: OutputPin> MclkPin<'d, M> {
+    pub fn new(pin: impl Peripheral<P = M> + 'd) -> Self {
+        Self {
+            mclk: pin.into_ref(),
+        }
+    }
+}
+
+#[cfg(not(esp32))]
+impl<'d, M> I2sMclkPin for MclkPin<'d, M>
 where
     M: OutputPin,
 {
@@ -225,7 +266,7 @@ where
     buffer: BUFFER,
 }
 
-impl<T, P, TX, BUFFER> I2sWriteDmaTransfer<T, P, TX, BUFFER>
+impl<'d, T, P, TX, BUFFER> I2sWriteDmaTransfer<T, P, TX, BUFFER>
 where
     T: RegisterAccess,
     P: I2sTxPins,
@@ -244,7 +285,7 @@ where
     }
 }
 
-impl<T, P, TX, BUFFER> DmaTransfer<BUFFER, I2sTx<T, P, TX>>
+impl<'d, T, P, TX, BUFFER> DmaTransfer<BUFFER, I2sTx<T, P, TX>>
     for I2sWriteDmaTransfer<T, P, TX, BUFFER>
 where
     T: RegisterAccess,
@@ -272,7 +313,7 @@ where
     }
 }
 
-impl<T, P, TX, BUFFER> Drop for I2sWriteDmaTransfer<T, P, TX, BUFFER>
+impl<'d, T, P, TX, BUFFER> Drop for I2sWriteDmaTransfer<T, P, TX, BUFFER>
 where
     T: RegisterAccess,
     P: I2sTxPins,
@@ -289,7 +330,7 @@ pub trait I2sWrite<W> {
 }
 
 /// Initiate a DMA tx transfer
-pub trait I2sWriteDma<T, P, TX, TXBUF>
+pub trait I2sWriteDma<'d, T, P, TX, TXBUF>
 where
     T: RegisterAccess,
     P: I2sTxPins,
@@ -329,7 +370,7 @@ where
     buffer: BUFFER,
 }
 
-impl<T, P, RX, BUFFER> I2sReadDmaTransfer<T, P, RX, BUFFER>
+impl<'d, T, P, RX, BUFFER> I2sReadDmaTransfer<T, P, RX, BUFFER>
 where
     T: RegisterAccess,
     P: I2sRxPins,
@@ -369,7 +410,8 @@ where
     }
 }
 
-impl<T, P, RX, BUFFER> DmaTransfer<BUFFER, I2sRx<T, P, RX>> for I2sReadDmaTransfer<T, P, RX, BUFFER>
+impl<'d, T, P, RX, BUFFER> DmaTransfer<BUFFER, I2sRx<T, P, RX>>
+    for I2sReadDmaTransfer<T, P, RX, BUFFER>
 where
     T: RegisterAccess,
     P: I2sRxPins,
@@ -413,7 +455,7 @@ pub trait I2sRead<W> {
 }
 
 /// Initate a DMA rx transfer
-pub trait I2sReadDma<T, P, RX, RXBUF>
+pub trait I2sReadDma<'d, T, P, RX, RXBUF>
 where
     T: RegisterAccess,
     P: I2sRxPins,
@@ -739,7 +781,7 @@ where
     }
 }
 
-impl<T, P, TX, TXBUF> I2sWriteDma<T, P, TX, TXBUF> for I2sTx<T, P, TX>
+impl<'d, T, P, TX, TXBUF> I2sWriteDma<'d, T, P, TX, TXBUF> for I2sTx<T, P, TX>
 where
     T: RegisterAccess,
     P: I2sTxPins,
@@ -772,7 +814,7 @@ where
     rx_channel: RX,
 }
 
-impl<T, P, RX> I2sRx<T, P, RX>
+impl<'d, T, P, RX> I2sRx<T, P, RX>
 where
     T: RegisterAccess,
     P: I2sRxPins,
@@ -885,7 +927,7 @@ where
     }
 }
 
-impl<T, P, RX, RXBUF> I2sReadDma<T, P, RX, RXBUF> for I2sRx<T, P, RX>
+impl<'d, T, P, RX, RXBUF> I2sReadDma<'d, T, P, RX, RXBUF> for I2sRx<T, P, RX>
 where
     T: RegisterAccess,
     P: I2sRxPins,
@@ -962,13 +1004,10 @@ mod private {
         T: RegisterAccess + Clone,
         TX: Tx,
     {
-        pub fn with_pins<P>(self, mut pins: P) -> I2sTx<T, P, TX>
+        pub fn with_pins<P>(self, pins: P) -> I2sTx<T, P, TX>
         where
             P: I2sTxPins,
         {
-            let mut register_access = self.register_access.clone();
-            pins.configure(&mut register_access);
-
             I2sTx::new(self.register_access, pins, self.tx_channel)
         }
     }
@@ -987,13 +1026,10 @@ mod private {
         T: RegisterAccess + Clone,
         RX: Rx,
     {
-        pub fn with_pins<P>(self, mut pins: P) -> I2sRx<T, P, RX>
+        pub fn with_pins<P>(self, pins: P) -> I2sRx<T, P, RX>
         where
             P: I2sRxPins,
         {
-            let mut register_access = self.register_access.clone();
-            pins.configure(&mut register_access);
-
             I2sRx::new(self.register_access, pins, self.rx_channel)
         }
     }

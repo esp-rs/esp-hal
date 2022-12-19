@@ -301,7 +301,8 @@ mod peripheral_macros {
     macro_rules! into_ref {
     ($($name:ident),*) => {
         $(
-            let $name = $name.into_ref();
+            #[allow(unused_mut)]
+            let mut $name = $name.into_ref();
         )*
     }
 }
