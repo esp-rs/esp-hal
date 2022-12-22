@@ -4,8 +4,6 @@
 //! controllers. It supports Standard Frame Format (11-bit) and Extended Frame
 //! Format (29-bit) frame identifiers.
 
-use core::slice::{from_raw_parts, from_raw_parts_mut};
-
 #[cfg(feature = "eh1")]
 use embedded_can::{nb::Can, Error, ErrorKind, ExtendedId, Frame, Id, StandardId};
 #[cfg(not(feature = "eh1"))]
@@ -35,20 +33,25 @@ pub struct EspTwaiFrame {
 }
 
 impl EspTwaiFrame {
-    /// Make a new frame from an id and a slice of the TWAI_DATA_x_REG
-    /// registers.
-    fn new_from_data_registers(id: impl Into<Id>, data: &[u32]) -> Self {
-        let mut d: [u8; 8] = [0; 8];
+    /// Make a new frame from an id, pointer to the TWAI_DATA_x_REG registers,
+    /// and the length of the data payload (dlc).
+    ///
+    /// # Safety
+    /// This is unsafe because it directly accesses peripheral registers.
+    unsafe fn new_from_data_registers(
+        id: impl Into<Id>,
+        registers: *const u32,
+        dlc: usize,
+    ) -> Self {
+        let mut data: [u8; 8] = [0; 8];
 
         // Copy the data from the memory mapped peripheral into actual memory.
-        for (src, dest) in data.iter().zip(d.iter_mut()) {
-            *dest = *src as u8;
-        }
+        copy_from_data_register(&mut data[..dlc], registers);
 
         Self {
             id: id.into(),
-            data: d,
-            dlc: data.len(),
+            data,
+            dlc: dlc,
             is_remote: false,
         }
     }
@@ -198,8 +201,8 @@ where
 {
     pub fn new<TX: OutputPin, RX: InputPin>(
         peripheral: impl Peripheral<P = T> + 'd,
-        mut tx_pin: TX,
-        mut rx_pin: RX,
+        tx_pin: impl Peripheral<P = TX> + 'd,
+        rx_pin: impl Peripheral<P = RX> + 'd,
         clock_control: &mut PeripheralClockControl,
         clocks: &Clocks,
         baud_rate: BaudRate,
@@ -208,6 +211,7 @@ where
         clock_control.enable(crate::system::Peripheral::Twai);
 
         // Set up the GPIO pins.
+        crate::into_ref!(tx_pin, rx_pin);
         tx_pin.connect_peripheral_to_output(OutputSignal::TWAI_TX);
         rx_pin.connect_input_to_peripheral(InputSignal::TWAI_RX);
 
@@ -430,11 +434,11 @@ impl Error for EspTwaiError {
 /// memory-mapped registers. Specifically, this function is used with the
 /// TWAI_DATA_x_REG registers which has different results based on the mode of
 /// the peripheral.
-unsafe fn _copy_from_data_register(dest: &mut [u8], src: *const u32) {
-    let src = from_raw_parts(src, dest.len());
-
-    for (dest, src) in dest.iter_mut().zip(src.iter()) {
-        *dest = *src as u8;
+#[inline(always)]
+unsafe fn copy_from_data_register(dest: &mut [u8], src: *const u32) {
+    for (i, dest) in dest.iter_mut().enumerate() {
+        // Perform a volatile read to avoid compiler optimizations.
+        *dest = src.add(i).read_volatile() as u8;
     }
 }
 
@@ -446,11 +450,11 @@ unsafe fn _copy_from_data_register(dest: &mut [u8], src: *const u32) {
 /// memory-mapped registers. Specifically, this function is used with the
 /// TWAI_DATA_x_REG registers which has different results based on the mode of
 /// the peripheral.
+#[inline(always)]
 unsafe fn copy_to_data_register(dest: *mut u32, src: &[u8]) {
-    let dest = from_raw_parts_mut(dest, src.len());
-
-    for (dest, src) in dest.iter_mut().zip(src.iter()) {
-        *dest = *src as u32;
+    for (i, src) in src.iter().enumerate() {
+        // Perform a volatile write to avoid compiler optimizations.
+        dest.add(i).write_volatile(*src as u32);
     }
 }
 
@@ -625,10 +629,13 @@ where
             if is_data_frame {
                 // Create a new frame from the contents of the appropriate TWAI_DATA_x_REG
                 // registers.
-                let register_data = unsafe {
-                    from_raw_parts(self.peripheral.register_block().data_3.as_ptr(), dlc)
-                };
-                EspTwaiFrame::new_from_data_registers(id, register_data)
+                unsafe {
+                    EspTwaiFrame::new_from_data_registers(
+                        id,
+                        self.peripheral.register_block().data_3.as_ptr(),
+                        dlc,
+                    )
+                }
             } else {
                 EspTwaiFrame::new_remote(id, dlc).unwrap()
             }
@@ -674,10 +681,13 @@ where
             let id = ExtendedId::new(raw_id).unwrap();
 
             if is_data_frame {
-                let register_data = unsafe {
-                    from_raw_parts(self.peripheral.register_block().data_5.as_ptr(), dlc)
-                };
-                EspTwaiFrame::new_from_data_registers(id, register_data)
+                unsafe {
+                    EspTwaiFrame::new_from_data_registers(
+                        id,
+                        self.peripheral.register_block().data_5.as_ptr(),
+                        dlc,
+                    )
+                }
             } else {
                 EspTwaiFrame::new_remote(id, dlc).unwrap()
             }
