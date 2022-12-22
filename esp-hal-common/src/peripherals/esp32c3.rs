@@ -67,5 +67,6 @@ mod peripherals {
         TIMG0,
         TIMG1,
         APB_SARADC,
+        TWAI,
     }
 }
