@@ -1,7 +1,7 @@
 use crate::{
     gpio::{types::InputSignal, InputPin},
     peripheral::{PeripheralRef, Peripheral},
-    peripherals::{GPIO, pcnt::RegisterBlock},
+    peripherals::GPIO,
 };
 
 use super::unit;
@@ -79,20 +79,18 @@ impl<'a, P: InputPin> From<PcntPin<'a, P>> for u8 {
     }
 }
 
-pub struct Channel<'a> {
-    pcnt: &'a RegisterBlock,
+pub struct Channel {
     unit: unit::Number,
     channel: Number,
 }
-impl<'a> Channel<'a> {
+
+impl Channel {
     /// return a new Unit
     pub fn new(
         unit: unit::Number,
         channel: Number,
     ) -> Self {
-        let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
         Self {
-            pcnt,
             unit,
             channel,
         }
@@ -104,20 +102,20 @@ impl<'a> Channel<'a> {
         sig_pin: PcntPin<'b, EP>,
         config: Config
     ) {
-
+        let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
         let conf0 = match self.unit {
-            unit::Number::Unit0 => &self.pcnt.u0_conf0,
-            unit::Number::Unit1 => &self.pcnt.u1_conf0,
-            unit::Number::Unit2 => &self.pcnt.u2_conf0,
-            unit::Number::Unit3 => &self.pcnt.u3_conf0,
-            #[cfg(not(esp32s3))]
-            unit::Number::Unit4 => &self.pcnt.u4_conf0,
-            #[cfg(not(esp32s3))]
-            unit::Number::Unit5 => &self.pcnt.u5_conf0,
-            #[cfg(not(esp32s3))]
-            unit::Number::Unit6 => &self.pcnt.u6_conf0,
-            #[cfg(not(esp32s3))]
-            unit::Number::Unit7 => &self.pcnt.u7_conf0,
+            unit::Number::Unit0 => &pcnt.u0_conf0,
+            unit::Number::Unit1 => &pcnt.u1_conf0,
+            unit::Number::Unit2 => &pcnt.u2_conf0,
+            unit::Number::Unit3 => &pcnt.u3_conf0,
+            #[cfg(esp32)]
+            unit::Number::Unit4 => &pcnt.u4_conf0,
+            #[cfg(esp32)]
+            unit::Number::Unit5 => &pcnt.u5_conf0,
+            #[cfg(esp32)]
+            unit::Number::Unit6 => &pcnt.u6_conf0,
+            #[cfg(esp32)]
+            unit::Number::Unit7 => &pcnt.u7_conf0,
         };
         match self.channel {
             Number::Channel0 => {
@@ -163,22 +161,22 @@ impl<'a> Channel<'a> {
                 Number::Channel0 => InputSignal::PCNT3_CTRL_CH0,
                 Number::Channel1 => InputSignal::PCNT3_CTRL_CH1,
             },
-            #[cfg(not(esp32s3))]
+            #[cfg(esp32)]
             unit::Number::Unit4 => match self.channel {
                 Number::Channel0 => InputSignal::PCNT4_CTRL_CH0,
                 Number::Channel1 => InputSignal::PCNT4_CTRL_CH1,
             },
-            #[cfg(not(esp32s3))]
+            #[cfg(esp32)]
             unit::Number::Unit5 => match self.channel {
                 Number::Channel0 => InputSignal::PCNT5_CTRL_CH0,
                 Number::Channel1 => InputSignal::PCNT5_CTRL_CH1,
             },
-            #[cfg(not(esp32s3))]
+            #[cfg(esp32)]
             unit::Number::Unit6 => match self.channel {
                 Number::Channel0 => InputSignal::PCNT6_CTRL_CH0,
                 Number::Channel1 => InputSignal::PCNT6_CTRL_CH1,
             },
-            #[cfg(not(esp32s3))]
+            #[cfg(esp32)]
             unit::Number::Unit7 => match self.channel {
                 Number::Channel0 => InputSignal::PCNT7_CTRL_CH0,
                 Number::Channel1 => InputSignal::PCNT7_CTRL_CH1,
@@ -221,22 +219,22 @@ impl<'a> Channel<'a> {
                 Number::Channel0 => InputSignal::PCNT3_SIG_CH0,
                 Number::Channel1 => InputSignal::PCNT3_SIG_CH1,
             },
-            #[cfg(not(esp32s3))]
+            #[cfg(esp32)]
             unit::Number::Unit4 => match self.channel {
                 Number::Channel0 => InputSignal::PCNT4_SIG_CH0,
                 Number::Channel1 => InputSignal::PCNT4_SIG_CH1,
             },
-            #[cfg(not(esp32s3))]
+            #[cfg(esp32)]
             unit::Number::Unit5 => match self.channel {
                 Number::Channel0 => InputSignal::PCNT5_SIG_CH0,
                 Number::Channel1 => InputSignal::PCNT5_SIG_CH1,
             },
-            #[cfg(not(esp32s3))]
+            #[cfg(esp32)]
             unit::Number::Unit6 => match self.channel {
                 Number::Channel0 => InputSignal::PCNT6_SIG_CH0,
                 Number::Channel1 => InputSignal::PCNT6_SIG_CH1,
             },
-            #[cfg(not(esp32s3))]
+            #[cfg(esp32)]
             unit::Number::Unit7 => match self.channel {
                 Number::Channel0 => InputSignal::PCNT7_SIG_CH0,
                 Number::Channel1 => InputSignal::PCNT7_SIG_CH1,

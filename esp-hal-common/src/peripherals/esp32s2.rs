@@ -67,6 +67,7 @@ mod peripherals {
         UART1,
         SYSTEM,
         LEDC,
+        PCNT,
         RMT,
         I2S,
         USB0,
