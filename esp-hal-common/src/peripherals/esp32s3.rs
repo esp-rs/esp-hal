@@ -79,6 +79,7 @@ mod peripherals {
         USB_DEVICE,
         SYSTEM,
         LEDC,
+        PCNT,
         RMT,
         I2S0,
         I2S1,

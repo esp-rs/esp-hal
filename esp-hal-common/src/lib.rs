@@ -60,6 +60,7 @@ pub mod ledc;
 pub mod mcpwm;
 #[cfg(usb_otg)]
 pub mod otg_fs;
+pub mod pcnt;
 pub mod peripheral;
 pub mod prelude;
 #[cfg(rmt)]
