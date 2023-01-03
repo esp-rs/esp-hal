@@ -42,7 +42,7 @@ pub enum Peripheral {
     I2s1,
     #[cfg(usb_otg)]
     Usb,
-    #[cfg(any(esp32s3, esp32c3))]
+    #[cfg(twai)]
     Twai,
 }
 
@@ -151,7 +151,7 @@ impl PeripheralClockControl {
                 perip_clk_en0.modify(|_, w| w.usb_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.usb_rst().clear_bit());
             }
-            #[cfg(any(esp32s3, esp32c3))]
+            #[cfg(twai)]
             Peripheral::Twai => {
                 perip_clk_en0.modify(|_, w| w.twai_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.twai_rst().clear_bit());

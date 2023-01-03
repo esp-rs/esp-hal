@@ -39,6 +39,7 @@ fn main() {
     //   - 'systimer'
     //   - 'timg0'
     //   - 'timg1'
+    //   - 'twai'
     //   - 'uart2'
     //   - 'usb_otg'
     //   - 'usb_serial_jtag'
@@ -82,6 +83,7 @@ fn main() {
             "systimer",
             "timg0",
             "timg1",
+            "twai",
             "usb_serial_jtag",
         ]
     } else if esp32s2 {
@@ -114,6 +116,7 @@ fn main() {
             "systimer",
             "timg0",
             "timg1",
+            "twai",
             "uart2",
             "usb_otg",
             "usb_serial_jtag",
