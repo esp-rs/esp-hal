@@ -120,18 +120,18 @@ impl Channel {
         match self.channel {
             Number::Channel0 => {
                 conf0.modify(|_, w| unsafe {
-                    w.ch0_hctrl_mode_u().bits(config.hctrl_mode as u8)
-                    .ch0_lctrl_mode_u().bits(config.lctrl_mode as u8)
-                    .ch0_neg_mode_u().bits(config.neg_edge as u8)
-                    .ch0_pos_mode_u().bits(config.pos_edge as u8)
+                    w.ch0_hctrl_mode().bits(config.hctrl_mode as u8)
+                    .ch0_lctrl_mode().bits(config.lctrl_mode as u8)
+                    .ch0_neg_mode().bits(config.neg_edge as u8)
+                    .ch0_pos_mode().bits(config.pos_edge as u8)
                 });
             },
             Number::Channel1 => {
                 conf0.modify(|_, w| unsafe {
-                    w.ch1_hctrl_mode_u().bits(config.hctrl_mode as u8)
-                    .ch1_lctrl_mode_u().bits(config.lctrl_mode as u8)
-                    .ch1_neg_mode_u().bits(config.neg_edge as u8)
-                    .ch1_pos_mode_u().bits(config.pos_edge as u8)
+                    w.ch1_hctrl_mode().bits(config.hctrl_mode as u8)
+                    .ch1_lctrl_mode().bits(config.lctrl_mode as u8)
+                    .ch1_neg_mode().bits(config.neg_edge as u8)
+                    .ch1_pos_mode().bits(config.pos_edge as u8)
                 });
             },
         }
