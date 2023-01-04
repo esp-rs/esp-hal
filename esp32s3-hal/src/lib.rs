@@ -29,6 +29,7 @@ pub use esp_hal_common::{
     system,
     systimer,
     timer,
+    twai,
     uart,
     utils,
     Cpu,
