@@ -101,6 +101,7 @@ fn main() {
             "systimer",
             "timg0",
             "timg1",
+            "twai",
             "usb_otg",
         ]
     } else if esp32s3 {
