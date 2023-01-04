@@ -153,8 +153,8 @@ impl PeripheralClockControl {
             }
             #[cfg(any(esp32s3, esp32c3))]
             Peripheral::Twai => {
-                perip_clk_en0.modify(|_, w| w.can_clk_en().set_bit());
-                perip_rst_en0.modify(|_, w| w.can_rst().clear_bit());
+                perip_clk_en0.modify(|_, w| w.twai_clk_en().set_bit());
+                perip_rst_en0.modify(|_, w| w.twai_rst().clear_bit());
             }
         }
     }
