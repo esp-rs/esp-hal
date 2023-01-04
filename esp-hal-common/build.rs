@@ -60,6 +60,7 @@ fn main() {
             "spi3",
             "timg0",
             "timg1",
+            "twai",
             "uart2",
         ]
     } else if esp32c2 {

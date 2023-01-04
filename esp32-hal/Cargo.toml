@@ -26,6 +26,7 @@ categories = [
 
 [dependencies]
 embassy-time       = { version = "0.1.0", features = ["nightly"], optional = true }
+embedded-can       = { version = "0.4.1", optional = true }
 embedded-hal       = { version = "0.2.7",  features = ["unproven"] }
 embedded-hal-1     = { version = "=1.0.0-alpha.9", optional = true, package = "embedded-hal" }
 embedded-hal-async = { version = "0.1.0-alpha.3", optional = true }
@@ -48,7 +49,7 @@ static_cell       = "1.0.0"
 [features]
 default           = ["rt", "vectored"]
 bluetooth         = []
-eh1               = ["esp-hal-common/eh1", "dep:embedded-hal-1", "dep:embedded-hal-nb"]
+eh1               = ["dep:embedded-can", "esp-hal-common/eh1", "dep:embedded-hal-1", "dep:embedded-hal-nb"]
 rt                = ["xtensa-lx-rt/esp32"]
 smartled          = ["esp-hal-common/smartled"]
 ufmt              = ["esp-hal-common/ufmt"]
