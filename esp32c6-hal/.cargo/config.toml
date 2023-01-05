@@ -1,0 +1,20 @@
+[target.riscv32imc-unknown-none-elf]
+runner = "espflash --monitor"
+rustflags = [
+  "-C", "link-arg=-Tlinkall.x",
+  "-C", "force-frame-pointers",
+]
+
+# for testing: you can specify this target to see atomic emulation in action
+[target.riscv32imac-unknown-none-elf]
+runner = "espflash --monitor"
+rustflags = [
+  "-C", "link-arg=-Tlinkall.x",
+  "-C", "force-frame-pointers",
+]
+
+[build]
+target = "riscv32imc-unknown-none-elf"
+
+[unstable]
+build-std = [ "core" ]

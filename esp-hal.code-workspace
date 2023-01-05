@@ -16,6 +16,9 @@
       "path": "esp32c3-hal"
     },
     {
+      "path": "esp32c6-hal"
+    },
+    {
       "path": "esp32s2-hal"
     },
     {
