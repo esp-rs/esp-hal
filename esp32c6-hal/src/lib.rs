@@ -3,9 +3,9 @@
 use core::arch::{asm, global_asm};
 
 pub use embedded_hal as ehal;
-pub use esp_hal_common::{macros, peripherals};
+pub use esp_hal_common::{macros, peripherals, clock, gpio, prelude, uart, Uart, timer, Cpu, Delay, interrupt};
 
-// pub use self::gpio::IO;
+pub use self::gpio::IO;
 
 // /// Common module for analog functions
 // pub mod analog {

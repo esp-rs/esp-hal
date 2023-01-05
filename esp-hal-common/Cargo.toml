@@ -60,6 +60,9 @@ esp32c6 = { path = "C:/Users/JurajSadel/esp-pacs/esp32c6",  features = ["critica
 esp32s2 = { version = "0.12.0", features = ["critical-section"], optional = true }
 esp32s3 = { version = "0.15.0", features = ["critical-section"], optional = true }
 
+# REMOVE BEFOFE MERGE
+esp-println       = { git = "https://github.com/esp-rs/esp-println", features = ["esp32c6"] }
+
 [features]
 esp32   = ["esp32/rt"  , "xtensa", "xtensa-lx/esp32",   "xtensa-lx-rt/esp32",   "lock_api", "procmacros/esp32"]
 esp32c2 = ["esp32c2/rt", "riscv", "procmacros/esp32c2"]

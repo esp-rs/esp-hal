@@ -1,0 +1,285 @@
+use paste::paste;
+
+use crate::{
+    gpio::PhantomData,
+    peripherals::GPIO,
+    AlternateFunction,
+    Bank0GpioRegisterAccess,
+    GpioPin,
+    InputOutputAnalogPinType,
+    InputOutputPinType,
+    Unknown,
+};
+
+pub type OutputSignalType = u8;
+pub const OUTPUT_SIGNAL_MAX: u8 = 128;
+pub const INPUT_SIGNAL_MAX: u8 = 124;
+
+pub const ONE_INPUT: u8 = 0x1e;
+pub const ZERO_INPUT: u8 = 0x1f;
+
+pub(crate) const GPIO_FUNCTION: AlternateFunction = AlternateFunction::Function1;
+
+pub(crate) const fn get_io_mux_reg(gpio_num: u8) -> &'static crate::peripherals::io_mux::GPIO {
+    unsafe { &(&*crate::peripherals::IO_MUX::PTR).gpio[gpio_num as usize] }
+}
+
+pub(crate) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
+    int_enable as u8 | ((nmi_enable as u8) << 1)
+}
+
+/// Peripheral input signals for the GPIO mux
+#[allow(non_camel_case_types)]
+#[derive(PartialEq, Copy, Clone)]
+pub enum InputSignal {
+    EXT_ADC_START       = 0,
+    U0RXD               = 6,
+    U0CTS               = 7,
+    U0DSR               = 8,
+    U1RXD               = 9,
+    U1CTS               = 10,
+    U1DSR               = 11,
+    I2S_MCLK            = 12,
+    I2SO_BCK            = 13,
+    I2SO_WS             = 14,
+    I2SI_SD             = 15,
+    I2SI_BCK            = 16,
+    I2SI_WS             = 17,
+    USB_JTAG_TDO_BRIDGE = 19,
+    CPU_TESTBUS0        = 20, //TODO: verify
+    CPU_GPIO_IN0        = 28,
+    CPU_GPIO_IN1        = 29,
+    CPU_GPIO_IN2        = 30,
+    CPU_GPIO_IN3        = 31,
+    CPU_GPIO_IN4        = 32,
+    CPU_GPIO_IN5        = 33,
+    CPU_GPIO_IN6        = 34,
+    CPU_GPIO_IN7        = 35,
+    USB_JTAG_TMS        = 37,
+    USB_EXTPHY_OEN      = 40,
+    USB_EXTPHY_VM       = 41,
+    USB_EXTPHY_VPO      = 42,
+    I2CEXT0_SCL         = 45,
+    I2CEXT0_SDA         = 46,
+    PARL_RX_DATA0       = 47,
+    PARL_RX_DATA1       = 48,
+    PARL_RX_DATA2       = 49,
+    PARL_RX_DATA3       = 50,
+    PARL_RX_DATA4       = 51,
+    PARL_RX_DATA5       = 52,
+    PARL_RX_DATA6       = 53,
+    PARL_RX_DATA7       = 54,
+    PARL_RX_DATA8       = 55,
+    PARL_RX_DATA9       = 56,
+    PARL_RX_DATA10      = 57,
+    PARL_RX_DATA11      = 58,
+    PARL_RX_DATA12      = 59,
+    PARL_RX_DATA13      = 60,
+    PARL_RX_DATA14      = 61,
+    PARL_RX_DATA15      = 62,
+    FSPICLK             = 63,
+    FSPIQ               = 64,
+    FSPID               = 65,
+    FSPIHD              = 66,
+    FSPIWP              = 67,
+    FSPICS0             = 68,
+    PARL_RX_CLK         = 69,
+    PARL_TX_CLK         = 70,
+    RMT_SIG_IN0         = 71,
+    MODEM_DIAG1         = 72,
+    TWAI0_RX            = 73,
+    TWAI1_RX            = 77,
+    PWM0_SYNC0          = 87,
+    PWM0_SYNC1          = 88,
+    PWM0_SYNC2          = 89,
+    PWM0_F0             = 90,
+    PWM0_F1             = 91,
+    PWM0_F2             = 92,
+    PWM0_CAP0           = 93,
+    PWM0_CAP1           = 94,
+    PWM0_CAP2           = 95,
+    SIG_IN_FUNC97       = 97,
+    SIG_IN_FUNC98       = 98,
+    SIG_IN_FUNC99       = 99,
+    SIG_IN_FUNC100      = 100,
+    PCNT_SIG_CH0_IN0    = 101,
+    PCNT_SIG_CH1_IN0    = 102,
+    PCNT_CTRL_CH0_IN0   = 103,
+    PCNT_CTRL_CH1_IN0   = 104,
+    PCNT_SIG_CH0_IN1    = 105,
+    PCNT_SIG_CH1_IN1    = 106,
+    PCNT_CTRL_CH0_IN1   = 107,
+    PCNT_CTRL_CH1_IN1   = 108,
+    PCNT_SIG_CH0_IN2    = 109,
+    PCNT_SIG_CH1_IN2    = 110,
+    PCNT_CTRL_CH0_IN2   = 111,
+    PCNT_CTRL_CH1_IN2   = 112,
+    PCNT_SIG_CH0_IN3    = 113,
+    PCNT_SIG_CH1_IN3    = 114,
+    PCNT_CTRL_CH0_IN3   = 115,
+    PCNT_CTRL_CH1_IN3   = 116,
+    SPIQ                = 121,
+    SPID                = 122,
+    SPIHD               = 123,
+    SPIWP               = 124,
+}
+
+/// Peripheral input signals for the GPIO mux
+#[allow(non_camel_case_types)]
+#[derive(PartialEq, Copy, Clone)]
+pub enum OutputSignal {
+    LEDC_LS_SIG_OUT0        = 0,
+    LEDC_LS_SIG_OUT1        = 1,
+    LEDC_LS_SIG_OUT2        = 2,
+    LEDC_LS_SIG_OUT3        = 3,
+    LEDC_LS_SIG_OUT4        = 4,
+    LEDC_LS_SIG_OUT5        = 5,
+    U0TXD                   = 6,
+    U0RTS                   = 7,
+    U0DTR                   = 8,
+    U1TXD                   = 9,
+    U1RTS                   = 10,
+    U1DTR                   = 11,
+    I2S_MCLK                = 12,
+    I2SO_BCK                = 13,
+    I2SO_WS                 = 14,
+    I2SO_SD                 = 15,
+    I2SI_BCK                = 16,
+    I2SI_WS                 = 17,
+    I2SO_SD1                = 18,
+    USB_JTAG_TRST           = 19, // TODO: Verify
+    CPU_GPIO_OUT0           = 28,
+    CPU_GPIO_OUT1           = 29,
+    CPU_GPIO_OUT2           = 30,
+    CPU_GPIO_OUT3           = 31,
+    CPU_GPIO_OUT4           = 32,
+    CPU_GPIO_OUT5           = 33,
+    CPU_GPIO_OUT6           = 34,
+    CPU_GPIO_OUT7           = 35,
+    USB_JTAG_TCK            = 36,
+    USB_JTAG_TMS            = 37,
+    USB_JTAG_TDI            = 38,
+    USB_JTAG_TDO            = 39,
+    I2CEXT0_SCL             = 45,
+    I2CEXT0_SDA             = 46,
+    PARL_TX_DATA0           = 47,
+    PARL_TX_DATA1           = 48,
+    PARL_TX_DATA2           = 49,
+    PARL_TX_DATA3           = 50,
+    PARL_TX_DATA4           = 51,
+    PARL_TX_DATA5           = 52,
+    PARL_TX_DATA6           = 53,
+    PARL_TX_DATA7           = 54,
+    PARL_TX_DATA8           = 55,
+    PARL_TX_DATA9           = 56,
+    PARL_TX_DATA10          = 57,
+    PARL_TX_DATA11          = 58,
+    PARL_TX_DATA12          = 59,
+    PARL_TX_DATA13          = 60,
+    PARL_TX_DATA14          = 61,
+    PARL_TX_DATA15          = 62,
+    FSPICLK_MUX             = 63,
+    FSPIQ                   = 64,
+    FSPID                   = 65,
+    FSPIHD                  = 66,
+    FSPIWP                  = 67,
+    FSPICS0                 = 68,
+    SDIO_TOHOST_INT         = 69,
+    PARL_TX_CLK             = 70,
+    RMT_SIG_OUT0            = 71,
+    RMT_SIG_OUT1            = 72,
+    TWAI0_TX                = 73,
+    TWAI0_BUS_OFF_ON        = 74,
+    TWAI0_CLKOUT            = 75,
+    TWAI0_STANDBY           = 76,
+    TWAI1_TX                = 77,
+    TWAI1_BUS_OFF_ON        = 78,
+    TWAI1_CLKOUT            = 79,
+    TWAI1_STANDBY           = 80,
+    GPIO_SD0                = 83,
+    GPIO_SD1                = 84,
+    GPIO_SD2                = 85,
+    GPIO_SD3                = 86,
+    PWM0_OUT0A              = 87,
+    PWM0_OUT0B              = 88,
+    PWM0_OUT1A              = 89,
+    PWM0_OUT1B              = 90,
+    PWM0_OUT2A              = 91,
+    PWM0_OUT2B              = 92,
+    SIG_IN_FUNC97           = 97,
+    SIG_IN_FUNC98           = 98,
+    SIG_IN_FUNC99           = 99,
+    SIG_IN_FUNC100          = 100,
+    FSPICS1                 = 101,
+    FSPICS2                 = 102,
+    FSPICS3                 = 103,
+    FSPICS4                 = 104,
+    FSPICS5                 = 105,
+    SPICLK_MUX              = 114,
+    SPICS0                  = 115,
+    SPICS1                  = 116,
+    GPIO_TASK_MATRIX_OUT0   = 117, // TODO: verify rhis group - not in TRM but in ESP_IDF
+    GPIO_TASK_MATRIX_OUT1   = 118,
+    GPIO_TASK_MATRIX_OUT2   = 119,
+    GPIO_TASK_MATRIX_OUT3   = 120,
+    SPIQ                    = 121,
+    SPID                    = 122,
+    SPIHD                   = 123,
+    SPIWP                   = 124,
+    CLK_OUT_OUT1            = 125,
+    CLK_OUT_OUT2            = 126,
+    CLK_OUT_OUT3            = 127,
+    GPIO                    = 128,
+}
+
+crate::gpio::gpio! {
+    Single,
+    (0, 0, InputOutputAnalog)
+    (1, 0, InputOutputAnalog)
+    (2, 0, InputOutputAnalog (2 => FSPIQ) (2 => FSPIQ))
+    (3, 0, InputOutputAnalog)
+    (4, 0, InputOutputAnalog (2 => FSPIHD) (0 => USB_JTAG_TMS 2 => FSPIHD))
+    (5, 0, InputOutputAnalog (2 => FSPIWP) (0 => USB_JTAG_TDI 2 => FSPIWP))
+    (6, 0, InputOutputAnalog (2 => FSPICLK) (0 => USB_JTAG_TCK 2 => FSPICLK_MUX))
+    (7, 0, InputOutputAnalog (2 => FSPID) (0 => USB_JTAG_TDO 2 => FSPID))
+    (8, 0, InputOutput)
+    (9, 0, InputOutput)
+    (10, 0, InputOutput)
+    (11, 0, InputOutput)
+    (12, 0, InputOutput)
+    (13, 0, InputOutput)
+    (14, 0, InputOutput)
+    (15, 0, InputOutput)
+    (16, 0, InputOutput (0 => U0RXD) (2 => FSPICS0))
+    (17, 0, InputOutput () (0 => U0TXD 2 => FSPICS1))
+    (18, 0, InputOutput () (2 => FSPICS2)) // TODO 0 => SDIO_CMD
+    (19, 0, InputOutput () (2 => FSPICS3)) // TODO 0 => SDIO_CLK
+    (20, 0, InputOutput () (2 => FSPICS4)) //TODO 0 => SDIO_DATA0
+    (21, 0, InputOutput () (2 => FSPICS5)) // TODO 0 => SDIO_DATA1
+    (22, 0, InputOutput () ()) // TODO 0 => SDIO_DATA2
+    (23, 0, InputOutput () ()) // TODO 0 => SDIO_DATA3
+    (24, 0, InputOutput () (0 => SPICS0))
+    (25, 0, InputOutput (0 => SPIQ) (0 => SPIQ))
+    (26, 0, InputOutput (0 => SPIWP) (0 => SPIWP))
+    (27, 0, InputOutput)
+    (28, 0, InputOutput (0 => SPIHD) (0 => SPIHD))
+    (29, 0, InputOutput () (0 => SPICLK_MUX))
+    (30, 0, InputOutput (0 => SPID) (0 => SPID))
+}
+
+crate::gpio::analog! {
+    0
+    1
+    2
+    3
+    4
+    5
+    6
+    7
+}
+
+// TODO USB pins
+// implement marker traits on USB pins
+// impl<T> crate::otg_fs::UsbSel for Gpio??<T> {}
+// impl<T> crate::otg_fs::UsbDp for Gpio12<T> {}
+// impl<T> crate::otg_fs::UsbDm for Gpio13<T> {}

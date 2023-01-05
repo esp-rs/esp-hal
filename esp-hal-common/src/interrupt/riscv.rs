@@ -24,7 +24,9 @@ use crate::{
 extern "C" {
     fn interrupt1(frame: &mut TrapFrame);
     fn interrupt2(frame: &mut TrapFrame);
+    #[cfg(not(feature = "esp32c6"))]
     fn interrupt3(frame: &mut TrapFrame);
+    #[cfg(not(feature = "esp32c6"))]
     fn interrupt4(frame: &mut TrapFrame);
     fn interrupt5(frame: &mut TrapFrame);
     fn interrupt6(frame: &mut TrapFrame);
@@ -69,6 +71,8 @@ pub enum InterruptKind {
 #[repr(u32)]
 #[derive(Debug, Copy, Clone)]
 pub enum CpuInterrupt {
+    #[cfg(feature = "esp32c6")]
+    // Interrupt0 = 0,
     Interrupt1 = 1,
     Interrupt2,
     Interrupt3,
@@ -141,7 +145,10 @@ pub unsafe fn map(_core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
     let interrupt_number = interrupt as isize;
     let cpu_interrupt_number = which as isize;
     let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
+    #[cfg(not(feature = "esp32c6"))]
     let intr_map_base = intr.mac_intr_map.as_ptr();
+    #[cfg(feature = "esp32c6")]
+    let intr_map_base = intr.wifi_mac_intr_map.as_ptr();
     intr_map_base
         .offset(interrupt_number)
         .write_volatile(cpu_interrupt_number as u32);
@@ -150,7 +157,10 @@ pub unsafe fn map(_core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
 /// Enable a CPU interrupt
 pub unsafe fn enable_cpu_interrupt(which: CpuInterrupt) {
     let cpu_interrupt_number = which as isize;
+    #[cfg(not(feature = "esp32c6"))]
     let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
+    #[cfg(feature = "esp32c6")]
+    let intr = &*crate::peripherals::INTPRI::PTR;
     intr.cpu_int_enable
         .modify(|r, w| w.bits((1 << cpu_interrupt_number) | r.bits()));
 }
@@ -160,7 +170,10 @@ pub fn disable(_core: Cpu, interrupt: Interrupt) {
     unsafe {
         let interrupt_number = interrupt as isize;
         let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
+        #[cfg(not(feature = "esp32c6"))]
         let intr_map_base = intr.mac_intr_map.as_ptr();
+        #[cfg(feature = "esp32c6")]
+        let intr_map_base = intr.wifi_mac_intr_map.as_ptr();
         intr_map_base.offset(interrupt_number).write_volatile(0);
     }
 }
@@ -171,7 +184,10 @@ pub fn disable(_core: Cpu, interrupt: Interrupt) {
 /// interrupt handler will take care of clearing edge interrupt bits.
 pub fn set_kind(_core: Cpu, which: CpuInterrupt, kind: InterruptKind) {
     unsafe {
+        #[cfg(not(feature = "esp32c6"))]
         let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
+        #[cfg(feature = "esp32c6")]
+        let intr = &*crate::peripherals::INTPRI::PTR;
         let cpu_interrupt_number = which as isize;
 
         let interrupt_type = match kind {
@@ -192,7 +208,10 @@ pub fn set_kind(_core: Cpu, which: CpuInterrupt, kind: InterruptKind) {
 /// default). Avoid changing the priority of interrupts 1 - 15 when interrupt
 /// vectoring is enabled.
 pub unsafe fn set_priority(_core: Cpu, which: CpuInterrupt, priority: Priority) {
+    #[cfg(not(feature = "esp32c6"))]
     let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
+    #[cfg(feature = "esp32c6")]
+    let intr = &*crate::peripherals::INTPRI::PTR;
     let cpu_interrupt_number = which as isize;
     let intr_prio_base = intr.cpu_int_pri_0.as_ptr();
 
@@ -206,7 +225,10 @@ pub unsafe fn set_priority(_core: Cpu, which: CpuInterrupt, priority: Priority) 
 pub fn clear(_core: Cpu, which: CpuInterrupt) {
     unsafe {
         let cpu_interrupt_number = which as isize;
+        #[cfg(not(feature = "esp32c6"))]
         let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
+        #[cfg(feature = "esp32c6")]
+        let intr = &*crate::peripherals::INTPRI::PTR;
         intr.cpu_int_clear
             .write(|w| w.bits(1 << cpu_interrupt_number));
     }
@@ -260,7 +282,13 @@ mod vectored {
     fn get_configured_interrupts(_core: Cpu, mut status: u128) -> [u128; 16] {
         unsafe {
             let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
+            #[cfg(not(feature = "esp32c6"))]
             let intr_map_base = intr.mac_intr_map.as_ptr();
+            #[cfg(feature = "esp32c6")]
+            let intr_map_base = intr.wifi_mac_intr_map.as_ptr();
+
+            #[cfg(feature = "esp32c6")]
+            let intr = &*crate::peripherals::INTPRI::PTR;
             let intr_prio_base = intr.cpu_int_pri_0.as_ptr();
 
             let mut prios = [0u128; 16];

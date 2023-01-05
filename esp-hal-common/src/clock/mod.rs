@@ -34,7 +34,7 @@ pub enum CpuClock {
     Clock120MHz,
     #[cfg(not(esp32c2))]
     Clock160MHz,
-    #[cfg(not(any(esp32c2, esp32c3)))]
+    #[cfg(not(any(esp32c2, esp32c3, esp32c6)))]
     Clock240MHz,
 }
 
@@ -47,7 +47,7 @@ impl Clock for CpuClock {
             CpuClock::Clock120MHz => HertzU32::MHz(120),
             #[cfg(not(esp32c2))]
             CpuClock::Clock160MHz => HertzU32::MHz(160),
-            #[cfg(not(any(esp32c2, esp32c3)))]
+            #[cfg(not(any(esp32c2, esp32c3, esp32c6)))]
             CpuClock::Clock240MHz => HertzU32::MHz(240),
         }
     }
@@ -355,6 +355,58 @@ impl<'d> ClockControl<'d> {
             clocks_ll::esp32c3_rtc_bbpll_configure(xtal_freq, pll_freq);
             clocks_ll::esp32c3_rtc_freq_to_pll_mhz(cpu_clock_speed);
             clocks_ll::esp32c3_rtc_apb_freq_update(apb_freq);
+        }
+
+        ClockControl {
+            _private: clock_control.into_ref(),
+            desired_rates: RawClocks {
+                cpu_clock: cpu_clock_speed.frequency(),
+                apb_clock: apb_freq.frequency(),
+                xtal_clock: xtal_freq.frequency(),
+                i2c_clock: HertzU32::MHz(40),
+            },
+        }
+    }
+}
+
+#[cfg(esp32c6)]
+impl<'d> ClockControl<'d> {
+    /// Use what is considered the default settings after boot.
+    #[allow(unused)]
+    pub fn boot_defaults(
+        clock_control: impl Peripheral<P = SystemClockControl> + 'd,
+    ) -> ClockControl<'d> {
+        ClockControl {
+            _private: clock_control.into_ref(),
+            desired_rates: RawClocks {
+                cpu_clock: HertzU32::MHz(80),
+                apb_clock: HertzU32::MHz(80),
+                xtal_clock: HertzU32::MHz(40),
+                i2c_clock: HertzU32::MHz(40),
+            },
+        }
+    }
+
+    /// Configure the CPU clock speed.
+    #[allow(unused)]
+    pub fn configure(
+        clock_control: impl Peripheral<P = SystemClockControl> + 'd,
+        cpu_clock_speed: CpuClock,
+    ) -> ClockControl<'d> {
+        let apb_freq;
+        let xtal_freq = XtalClock::RtcXtalFreq40M;
+        let pll_freq = PllClock::Pll480MHz;
+
+        if cpu_clock_speed.mhz() <= xtal_freq.mhz() {
+            apb_freq = ApbClock::ApbFreqOther(cpu_clock_speed.mhz());
+            clocks_ll::esp32c6_rtc_update_to_xtal(xtal_freq, 1);
+            clocks_ll::esp32c6_rtc_apb_freq_update(apb_freq);
+        } else {
+            apb_freq = ApbClock::ApbFreq80MHz;
+            clocks_ll::esp32c6_rtc_bbpll_enable();
+            clocks_ll::esp32c6_rtc_bbpll_configure(xtal_freq, pll_freq);
+            // clocks_ll::esp32c6_rtc_freq_to_pll_mhz(cpu_clock_speed);
+            clocks_ll::esp32c6_rtc_apb_freq_update(apb_freq);
         }
 
         ClockControl {

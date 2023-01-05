@@ -45,14 +45,10 @@ PROVIDE(_start_trap = default_start_trap);
 
 SECTIONS
 {
-  .text.dummy (NOLOAD) :
-  {
-    /* This section is intended to make _stext address work */
-    . = ABSOLUTE(_stext);
-  } > REGION_TEXT
 
   .text _stext :
   {
+    . = ALIGN(4);
     _stext = .;
     /* Put reset handler first in .text section so it ends up as the entry */
     /* point of the program. */
@@ -67,20 +63,6 @@ SECTIONS
     _etext = .;
   } > REGION_TEXT
 
-  /**
-   * This dummy section represents the .text section but in rodata.
-   * Thus, it must have its alignement and (at least) its size.
-   */
-  .text_dummy (NOLOAD):
-  {
-    /* Start at the same alignement constraint than .text */
-    . = ALIGN(ALIGNOF(.text));
-    /* Create an empty gap as big as .text section */
-    . = . + SIZEOF(.text);
-    /* Prepare the alignement of the section above. Few bytes (0x20) must be
-     * added for the mapping header. */
-    . = ALIGN(0x10000) + 0x20;
-  } > REGION_RODATA
 
   .rodata : ALIGN(4)
   {
@@ -111,12 +93,6 @@ SECTIONS
     . = ALIGN(4);
     _erwtext = .;
   } > REGION_RWTEXT
-
-  /* similar as text_dummy */
-  .ram_dummy (NOLOAD) : {
-    . = ALIGN(ALIGNOF(.rwtext));
-    . = . + SIZEOF(.rwtext);
-  } > REGION_DATA
 
   .data : ALIGN(8)
   {
