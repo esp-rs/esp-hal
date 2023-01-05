@@ -167,21 +167,21 @@ SECTIONS
     *(.rtc_fast.literal .rtc_fast.text .rtc_fast.literal.* .rtc_fast.text.*)
   } > REGION_RTC_FAST AT > REGION_RODATA
 
-  .rtc_fast.data : ALIGN(4) 
+  .rtc_fast.data : ALIGN(4)
   {
     _rtc_fast_data_start = ABSOLUTE(.);
     *(.rtc_fast.data .rtc_fast.data.*)
     _rtc_fast_data_end = ABSOLUTE(.);
   } > REGION_RTC_FAST AT > REGION_RODATA
 
- .rtc_fast.bss (NOLOAD) : ALIGN(4) 
+ .rtc_fast.bss (NOLOAD) : ALIGN(4)
   {
     _rtc_fast_bss_start = ABSOLUTE(.);
     *(.rtc_fast.bss .rtc_fast.bss.*)
     _rtc_fast_bss_end = ABSOLUTE(.);
   } > REGION_RTC_FAST
 
- .rtc_fast.noinit (NOLOAD) : ALIGN(4) 
+ .rtc_fast.noinit (NOLOAD) : ALIGN(4)
   {
     *(.rtc_fast.noinit .rtc_fast.noinit.*)
   } > REGION_RTC_FAST
