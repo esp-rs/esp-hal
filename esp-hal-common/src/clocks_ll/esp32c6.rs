@@ -206,7 +206,6 @@ pub(crate) fn esp32c6_rtc_bbpll_enable() {
 }
 
 pub(crate) fn esp32c6_rtc_update_to_xtal(freq: XtalClock, _div: u8) {
-    // TODO
     let pcr =  unsafe { &*crate::peripherals::PCR::PTR };
     unsafe {
         ets_update_cpu_frequency(freq.mhz());
@@ -227,7 +226,6 @@ pub(crate) fn esp32c6_rtc_update_to_xtal(freq: XtalClock, _div: u8) {
 }
 
 pub(crate) fn esp32c6_rtc_apb_freq_update(apb_freq: ApbClock) {
-    // TODO
     let lp_aon = unsafe { &*crate::peripherals::LP_AON::ptr() };
     let value = ((apb_freq.hz() >> 12) & u16::MAX as u32)
         | (((apb_freq.hz() >> 12) & u16::MAX as u32) << 16);

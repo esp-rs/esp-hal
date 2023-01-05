@@ -125,9 +125,9 @@ pub mod cpu_control;
 #[cfg_attr(esp32s3, path = "efuse/esp32s3.rs")]
 pub mod efuse;
 
-// #[cfg_attr(riscv, path = "interrupt/riscv.rs")]
-// #[cfg_attr(xtensa, path = "interrupt/xtensa.rs")]
-// pub mod interrupt;
+#[cfg_attr(riscv, path = "interrupt/riscv.rs")]
+#[cfg_attr(xtensa, path = "interrupt/xtensa.rs")]
+pub mod interrupt;
 
 /// Enumeration of CPU cores
 /// The actual number of available cores depends on the target.
