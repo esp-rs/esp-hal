@@ -109,6 +109,20 @@ fn main() {
             "timg1",
             "usb_serial_jtag",
         ]
+    } else if esp32c6 {
+        vec![
+            "esp32c6",
+            "riscv",
+            "single_core",
+            "dac",
+            "gdma",
+            "i2s",
+            "mcpwm",
+            "rmt",
+            "systimer",
+            "timg1",
+            "usb_serial_jtag",
+        ]
     } else if esp32s2 {
         vec![
             "esp32s2",
