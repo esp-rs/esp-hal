@@ -1,11 +1,12 @@
+use super::unit;
 use crate::{
-    gpio::{types::InputSignal, InputPin},
-    peripheral::{PeripheralRef, Peripheral},
+    gpio::{
+        types::{InputSignal, ONE_INPUT, ZERO_INPUT},
+        InputPin,
+    },
+    peripheral::{Peripheral, PeripheralRef},
     peripherals::GPIO,
 };
-
-use super::unit;
-
 
 /// Channel number
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
@@ -18,7 +19,7 @@ pub enum Number {
 #[derive(Debug, Copy, Clone, Default)]
 pub enum EdgeMode {
     /// Hold current count value
-    Hold = 0,
+    Hold      = 0,
     /// Increase count value
     #[default]
     Increment = 1,
@@ -30,7 +31,7 @@ pub enum EdgeMode {
 #[derive(Debug, Copy, Clone, Default)]
 pub enum CtrlMode {
     /// Keep current count mode
-    Keep = 0,
+    Keep    = 0,
     /// Invert current count mode (increase -> decrease, decrease -> increase)
     #[default]
     Reverse = 1,
@@ -50,7 +51,7 @@ pub struct Config {
     /// PCNT signal negative edge count mode
     pub neg_edge: EdgeMode,
     pub invert_ctrl: bool,
-    pub invert_sig: bool
+    pub invert_sig: bool,
 }
 
 /// PcntPin can be always high, always low, or an actual pin
@@ -70,11 +71,9 @@ impl<'a, P: InputPin> PcntPin<'a, P> {
 impl<'a, P: InputPin> From<PcntPin<'a, P>> for u8 {
     fn from(pin: PcntPin<'a, P>) -> Self {
         match pin {
-            PcntPin::Pin(pin) => {
-                pin.number()
-            }
-            PcntPin::High => 0x38u8,
-            PcntPin::Low => 0x3cu8,
+            PcntPin::Pin(pin) => pin.number(),
+            PcntPin::High => ONE_INPUT,
+            PcntPin::Low => ZERO_INPUT,
         }
     }
 }
@@ -85,22 +84,17 @@ pub struct Channel {
 }
 
 impl Channel {
-    /// return a new Unit
-    pub fn new(
-        unit: unit::Number,
-        channel: Number,
-    ) -> Self {
-        Self {
-            unit,
-            channel,
-        }
+    /// return a new Channel
+    pub fn new(unit: unit::Number, channel: Number) -> Self {
+        Self { unit, channel }
     }
 
+    /// Configure the channel
     pub fn configure<'b, CP: InputPin, EP: InputPin>(
         &mut self,
         ctrl_pin: PcntPin<'b, CP>,
         sig_pin: PcntPin<'b, EP>,
-        config: Config
+        config: Config,
     ) {
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
         let conf0 = match self.unit {
@@ -120,31 +114,36 @@ impl Channel {
         match self.channel {
             Number::Channel0 => {
                 conf0.modify(|_, w| unsafe {
-                    w.ch0_hctrl_mode().bits(config.hctrl_mode as u8)
-                    .ch0_lctrl_mode().bits(config.lctrl_mode as u8)
-                    .ch0_neg_mode().bits(config.neg_edge as u8)
-                    .ch0_pos_mode().bits(config.pos_edge as u8)
+                    w.ch0_hctrl_mode()
+                        .bits(config.hctrl_mode as u8)
+                        .ch0_lctrl_mode()
+                        .bits(config.lctrl_mode as u8)
+                        .ch0_neg_mode()
+                        .bits(config.neg_edge as u8)
+                        .ch0_pos_mode()
+                        .bits(config.pos_edge as u8)
                 });
-            },
+            }
             Number::Channel1 => {
                 conf0.modify(|_, w| unsafe {
-                    w.ch1_hctrl_mode().bits(config.hctrl_mode as u8)
-                    .ch1_lctrl_mode().bits(config.lctrl_mode as u8)
-                    .ch1_neg_mode().bits(config.neg_edge as u8)
-                    .ch1_pos_mode().bits(config.pos_edge as u8)
+                    w.ch1_hctrl_mode()
+                        .bits(config.hctrl_mode as u8)
+                        .ch1_lctrl_mode()
+                        .bits(config.lctrl_mode as u8)
+                        .ch1_neg_mode()
+                        .bits(config.neg_edge as u8)
+                        .ch1_pos_mode()
+                        .bits(config.pos_edge as u8)
                 });
-            },
+            }
         }
         self.set_ctrl_pin(ctrl_pin, config.invert_ctrl);
         self.set_sig_pin(sig_pin, config.invert_sig);
     }
 
-    pub fn set_ctrl_pin<'b, P: InputPin>(
-        &self,
-        pin: PcntPin<'b, P>,
-        invert: bool,
-    ) -> &Self {
-        let signal =         match self.unit {
+    /// Set the control pin for this channel
+    pub fn set_ctrl_pin<'b, P: InputPin>(&self, pin: PcntPin<'b, P>, invert: bool) -> &Self {
+        let signal = match self.unit {
             unit::Number::Unit0 => match self.channel {
                 Number::Channel0 => InputSignal::PCNT0_CTRL_CH0,
                 Number::Channel1 => InputSignal::PCNT0_CTRL_CH1,
@@ -197,12 +196,8 @@ impl Channel {
         self
     }
 
-    pub fn set_sig_pin<'b, P: InputPin>(
-        &self,
-        pin: PcntPin<'b, P>,
-        invert: bool,
-    ) -> &Self {
-        let signal =         match self.unit {
+    pub fn set_sig_pin<'b, P: InputPin>(&self, pin: PcntPin<'b, P>, invert: bool) -> &Self {
+        let signal = match self.unit {
             unit::Number::Unit0 => match self.channel {
                 Number::Channel0 => InputSignal::PCNT0_SIG_CH0,
                 Number::Channel1 => InputSignal::PCNT0_SIG_CH1,
@@ -254,6 +249,4 @@ impl Channel {
         }
         self
     }
-
-
 }

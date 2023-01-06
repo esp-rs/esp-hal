@@ -1,8 +1,11 @@
 use self::unit::Unit;
-use crate::{peripheral::{PeripheralRef, Peripheral}, system::PeripheralClockControl};
+use crate::{
+    peripheral::{Peripheral, PeripheralRef},
+    system::PeripheralClockControl,
+};
 
-pub mod unit;
 pub mod channel;
+pub mod unit;
 
 pub struct PCNT<'d> {
     _instance: PeripheralRef<'d, crate::peripherals::PCNT>,
@@ -17,9 +20,7 @@ impl<'d> PCNT<'d> {
         crate::into_ref!(_instance);
         // Enable the PCNT peripherals clock in the system peripheral
         peripheral_clock_control.enable(crate::system::Peripheral::Pcnt);
-        PCNT {
-            _instance,
-        }
+        PCNT { _instance }
     }
 
     /// Return a unit
