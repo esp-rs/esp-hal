@@ -345,27 +345,27 @@ pub struct Bank1GpioRegisterAccess;
 
 #[doc(hidden)]
 pub trait BankGpioRegisterAccess {
-    fn write_out_en_clear(&self, word: u32);
+    fn write_out_en_clear(word: u32);
 
-    fn write_out_en_set(&self, word: u32);
+    fn write_out_en_set(word: u32);
 
-    fn read_input(&self) -> u32;
+    fn read_input() -> u32;
 
-    fn read_output(&self) -> u32;
+    fn read_output() -> u32;
 
-    fn write_interrupt_status_clear(&self, word: u32);
+    fn write_interrupt_status_clear(word: u32);
 
-    fn write_output_set(&self, word: u32);
+    fn write_output_set(word: u32);
 
-    fn write_output_clear(&self, word: u32);
+    fn write_output_clear(word: u32);
 
-    fn set_output_signal(&self, gpio_num: u8, signal: u32) {
+    fn set_output_signal(gpio_num: u8, signal: u32) {
         let gpio = unsafe { &*crate::peripherals::GPIO::PTR };
         gpio.func_out_sel_cfg[gpio_num as usize]
             .modify(|_, w| unsafe { w.out_sel().bits(signal as OutputSignalType) });
     }
 
-    fn configure_out_sel(&self, gpio_num: u8, signal: u32, invert: bool, oen: bool, oen_inv: bool) {
+    fn configure_out_sel(gpio_num: u8, signal: u32, invert: bool, oen: bool, oen_inv: bool) {
         let gpio = unsafe { &*crate::peripherals::GPIO::PTR };
         gpio.func_out_sel_cfg[gpio_num as usize].modify(|_, w| unsafe {
             w.out_sel()
@@ -379,7 +379,7 @@ pub trait BankGpioRegisterAccess {
         });
     }
 
-    fn set_signal_to_level(&self, signal: u32, high: bool) {
+    fn set_signal_to_level(signal: u32, high: bool) {
         let gpio = unsafe { &*crate::peripherals::GPIO::PTR };
         gpio.func_in_sel_cfg[signal as usize].modify(|_, w| unsafe {
             w.sel()
@@ -391,7 +391,7 @@ pub trait BankGpioRegisterAccess {
         });
     }
 
-    fn clear_func_in_sel(&self, signal: u32) {
+    fn clear_func_in_sel(signal: u32) {
         let gpio = unsafe { &*crate::peripherals::GPIO::PTR };
         gpio.func_in_sel_cfg[signal as usize].modify(|_, w| w.sel().clear_bit());
     }
@@ -421,39 +421,39 @@ pub trait BankGpioRegisterAccess {
 }
 
 impl BankGpioRegisterAccess for Bank0GpioRegisterAccess {
-    fn write_out_en_clear(&self, word: u32) {
+    fn write_out_en_clear(word: u32) {
         unsafe { &*GPIO::PTR }
             .enable_w1tc
             .write(|w| unsafe { w.bits(word) });
     }
 
-    fn write_out_en_set(&self, word: u32) {
+    fn write_out_en_set(word: u32) {
         unsafe { &*GPIO::PTR }
             .enable_w1ts
             .write(|w| unsafe { w.bits(word) });
     }
 
-    fn read_input(&self) -> u32 {
+    fn read_input() -> u32 {
         unsafe { &*GPIO::PTR }.in_.read().bits()
     }
 
-    fn read_output(&self) -> u32 {
+    fn read_output() -> u32 {
         unsafe { &*GPIO::PTR }.out.read().bits()
     }
 
-    fn write_interrupt_status_clear(&self, word: u32) {
+    fn write_interrupt_status_clear(word: u32) {
         unsafe { &*GPIO::PTR }
             .status_w1tc
             .write(|w| unsafe { w.bits(word) });
     }
 
-    fn write_output_set(&self, word: u32) {
+    fn write_output_set(word: u32) {
         unsafe { &*GPIO::PTR }
             .out_w1ts
             .write(|w| unsafe { w.bits(word) });
     }
 
-    fn write_output_clear(&self, word: u32) {
+    fn write_output_clear(word: u32) {
         unsafe { &*GPIO::PTR }
             .out_w1tc
             .write(|w| unsafe { w.bits(word) });
@@ -462,39 +462,39 @@ impl BankGpioRegisterAccess for Bank0GpioRegisterAccess {
 
 #[cfg(not(any(esp32c2, esp32c3)))]
 impl BankGpioRegisterAccess for Bank1GpioRegisterAccess {
-    fn write_out_en_clear(&self, word: u32) {
+    fn write_out_en_clear(word: u32) {
         unsafe { &*GPIO::PTR }
             .enable1_w1tc
             .write(|w| unsafe { w.bits(word) });
     }
 
-    fn write_out_en_set(&self, word: u32) {
+    fn write_out_en_set(word: u32) {
         unsafe { &*GPIO::PTR }
             .enable1_w1ts
             .write(|w| unsafe { w.bits(word) });
     }
 
-    fn read_input(&self) -> u32 {
+    fn read_input() -> u32 {
         unsafe { &*GPIO::PTR }.in1.read().bits()
     }
 
-    fn read_output(&self) -> u32 {
+    fn read_output() -> u32 {
         unsafe { &*GPIO::PTR }.out1.read().bits()
     }
 
-    fn write_interrupt_status_clear(&self, word: u32) {
+    fn write_interrupt_status_clear(word: u32) {
         unsafe { &*GPIO::PTR }
             .status1_w1tc
             .write(|w| unsafe { w.bits(word) });
     }
 
-    fn write_output_set(&self, word: u32) {
+    fn write_output_set(word: u32) {
         unsafe { &*GPIO::PTR }
             .out1_w1ts
             .write(|w| unsafe { w.bits(word) });
     }
 
-    fn write_output_clear(&self, word: u32) {
+    fn write_output_clear(word: u32) {
         unsafe { &*GPIO::PTR }
             .out1_w1tc
             .write(|w| unsafe { w.bits(word) });
@@ -571,8 +571,8 @@ where
 {
     _mode: PhantomData<MODE>,
     _pintype: PhantomData<PINTYPE>,
-    reg_access: RA,
-    ira: IRA,
+    _reg_access: PhantomData<RA>,
+    _ira: PhantomData<IRA>,
     af_input_signals: [Option<InputSignal>; 6],
     af_output_signals: [Option<OutputSignal>; 6],
 }
@@ -586,7 +586,7 @@ where
 {
     type Error = Infallible;
     fn is_high(&self) -> Result<bool, Self::Error> {
-        Ok(self.reg_access.read_input() & (1 << (GPIONUM % 32)) != 0)
+        Ok(RA::read_input() & (1 << (GPIONUM % 32)) != 0)
     }
     fn is_low(&self) -> Result<bool, Self::Error> {
         Ok(!self.is_high()?)
@@ -602,7 +602,7 @@ where
 {
     type Error = Infallible;
     fn is_high(&self) -> Result<bool, Self::Error> {
-        Ok(self.reg_access.read_input() & (1 << (GPIONUM % 32)) != 0)
+        Ok(RA::read_input() & (1 << (GPIONUM % 32)) != 0)
     }
     fn is_low(&self) -> Result<bool, Self::Error> {
         Ok(!self.is_high()?)
@@ -629,7 +629,7 @@ where
     PINTYPE: PinType,
 {
     fn is_high(&self) -> Result<bool, Self::Error> {
-        Ok(self.reg_access.read_input() & (1 << (GPIONUM % 32)) != 0)
+        Ok(RA::read_input() & (1 << (GPIONUM % 32)) != 0)
     }
     fn is_low(&self) -> Result<bool, Self::Error> {
         Ok(!self.is_high()?)
@@ -645,7 +645,7 @@ where
     fn init_input(&self, pull_down: bool, pull_up: bool) {
         let gpio = unsafe { &*GPIO::PTR };
 
-        self.reg_access.write_out_en_clear(1 << (GPIONUM % 32));
+        RA::write_out_en_clear(1 << (GPIONUM % 32));
         gpio.func_out_sel_cfg[GPIONUM as usize]
             .modify(|_, w| unsafe { w.out_sel().bits(OutputSignal::GPIO as OutputSignalType) });
 
@@ -671,8 +671,8 @@ where
         GpioPin {
             _mode: PhantomData,
             _pintype: PhantomData,
-            reg_access: self.reg_access,
-            ira: self.ira,
+            _reg_access: PhantomData,
+            _ira: PhantomData,
             af_input_signals: self.af_input_signals,
             af_output_signals: self.af_output_signals,
         }
@@ -683,8 +683,8 @@ where
         GpioPin {
             _mode: PhantomData,
             _pintype: PhantomData,
-            reg_access: self.reg_access,
-            ira: self.ira,
+            _reg_access: PhantomData,
+            _ira: PhantomData,
             af_input_signals: self.af_input_signals,
             af_output_signals: self.af_output_signals,
         }
@@ -695,8 +695,8 @@ where
         GpioPin {
             _mode: PhantomData,
             _pintype: PhantomData,
-            reg_access: self.reg_access,
-            ira: self.ira,
+            _reg_access: PhantomData,
+            _ira: PhantomData,
             af_input_signals: self.af_input_signals,
             af_output_signals: self.af_output_signals,
         }
@@ -723,7 +723,7 @@ where
         self
     }
     fn is_input_high(&self) -> bool {
-        self.reg_access.read_input() & (1 << (GPIONUM % 32)) != 0
+        RA::read_input() & (1 << (GPIONUM % 32)) != 0
     }
     fn connect_input_to_peripheral_with_options(
         &mut self,
@@ -834,8 +834,7 @@ where
     }
 
     fn clear_interrupt(&mut self) {
-        self.reg_access
-            .write_interrupt_status_clear(1 << (GPIONUM % 32));
+        RA::write_interrupt_status_clear(1 << (GPIONUM % 32));
     }
 
     fn is_pcore_interrupt_set(&self) -> bool {
@@ -868,11 +867,11 @@ where
 {
     type Error = Infallible;
     fn set_high(&mut self) -> Result<(), Self::Error> {
-        self.reg_access.write_output_set(1 << (GPIONUM % 32));
+        RA::write_output_set(1 << (GPIONUM % 32));
         Ok(())
     }
     fn set_low(&mut self) -> Result<(), Self::Error> {
-        self.reg_access.write_output_clear(1 << (GPIONUM % 32));
+        RA::write_output_clear(1 << (GPIONUM % 32));
         Ok(())
     }
 }
@@ -885,7 +884,7 @@ where
     PINTYPE: IsOutputPin,
 {
     fn is_set_high(&self) -> Result<bool, Self::Error> {
-        Ok(self.reg_access.read_output() & (1 << (GPIONUM % 32)) != 0)
+        Ok(RA::read_output() & (1 << (GPIONUM % 32)) != 0)
     }
     fn is_set_low(&self) -> Result<bool, Self::Error> {
         Ok(!self.is_set_high()?)
@@ -930,11 +929,11 @@ where
     PINTYPE: IsOutputPin,
 {
     fn set_low(&mut self) -> Result<(), Self::Error> {
-        self.reg_access.write_output_clear(1 << (GPIONUM % 32));
+        RA::write_output_clear(1 << (GPIONUM % 32));
         Ok(())
     }
     fn set_high(&mut self) -> Result<(), Self::Error> {
-        self.reg_access.write_output_set(1 << (GPIONUM % 32));
+        RA::write_output_set(1 << (GPIONUM % 32));
         Ok(())
     }
 }
@@ -948,7 +947,7 @@ where
     PINTYPE: IsOutputPin,
 {
     fn is_set_high(&self) -> Result<bool, Self::Error> {
-        Ok(self.reg_access.read_output() & (1 << (GPIONUM % 32)) != 0)
+        Ok(RA::read_output() & (1 << (GPIONUM % 32)) != 0)
     }
     fn is_set_low(&self) -> Result<bool, Self::Error> {
         Ok(!self.is_set_high()?)
@@ -1117,7 +1116,7 @@ where
     fn init_output(&self, alternate: AlternateFunction, open_drain: bool) {
         let gpio = unsafe { &*GPIO::PTR };
 
-        self.reg_access.write_out_en_set(1 << (GPIONUM % 32));
+        RA::write_out_en_set(1 << (GPIONUM % 32));
         gpio.pin[GPIONUM as usize].modify(|_, w| w.pad_driver().bit(open_drain));
 
         gpio.func_out_sel_cfg[GPIONUM as usize]
@@ -1144,8 +1143,8 @@ where
         GpioPin {
             _mode: PhantomData,
             _pintype: PhantomData,
-            reg_access: self.reg_access,
-            ira: self.ira,
+            _reg_access: PhantomData,
+            _ira: PhantomData,
             af_input_signals: self.af_input_signals,
             af_output_signals: self.af_output_signals,
         }
@@ -1156,8 +1155,8 @@ where
         GpioPin {
             _mode: PhantomData,
             _pintype: PhantomData,
-            reg_access: self.reg_access,
-            ira: self.ira,
+            _reg_access: PhantomData,
+            _ira: PhantomData,
             af_input_signals: self.af_input_signals,
             af_output_signals: self.af_output_signals,
         }
@@ -1168,8 +1167,8 @@ where
         GpioPin {
             _mode: PhantomData,
             _pintype: PhantomData,
-            reg_access: self.reg_access,
-            ira: self.ira,
+            _reg_access: PhantomData,
+            _ira: PhantomData,
             af_input_signals: self.af_input_signals,
             af_output_signals: self.af_output_signals,
         }
@@ -1180,8 +1179,8 @@ where
         GpioPin {
             _mode: PhantomData,
             _pintype: PhantomData,
-            reg_access: self.reg_access,
-            ira: self.ira,
+            _reg_access: PhantomData,
+            _ira: PhantomData,
             af_input_signals: self.af_input_signals,
             af_output_signals: self.af_output_signals,
         }
@@ -1207,18 +1206,18 @@ where
 
     fn enable_output(&mut self, on: bool) -> &mut Self {
         if on {
-            self.reg_access.write_out_en_set(1 << (GPIONUM % 32));
+            RA::write_out_en_set(1 << (GPIONUM % 32));
         } else {
-            self.reg_access.write_out_en_clear(1 << (GPIONUM % 32));
+            RA::write_out_en_clear(1 << (GPIONUM % 32));
         }
         self
     }
 
     fn set_output_high(&mut self, high: bool) -> &mut Self {
         if high {
-            self.reg_access.write_output_set(1 << (GPIONUM % 32));
+            RA::write_output_set(1 << (GPIONUM % 32));
         } else {
-            self.reg_access.write_output_clear(1 << (GPIONUM % 32));
+            RA::write_output_clear(1 << (GPIONUM % 32));
         }
         self
     }
@@ -1328,8 +1327,8 @@ where
         GpioPin {
             _mode: PhantomData,
             _pintype: PhantomData,
-            reg_access: self.reg_access,
-            ira: self.ira,
+            _reg_access: PhantomData,
+            _ira: PhantomData,
             af_input_signals: self.af_input_signals,
             af_output_signals: self.af_output_signals,
         }
@@ -1397,8 +1396,8 @@ macro_rules! gpio {
                                  GpioPin {
                                     _mode: PhantomData,
                                     _pintype: PhantomData,
-                                    reg_access: [< Bank $bank GpioRegisterAccess >],
-                                    ira: $crate::gpio::[< $cores CoreInteruptStatusRegisterAccessBank $bank >],
+                                    _reg_access: PhantomData,
+                                    _ira: PhantomData,
                                     af_input_signals: input_signals,
                                     af_output_signals: output_signals,
                                 }
