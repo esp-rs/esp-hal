@@ -32,25 +32,3 @@ crate::peripherals! {
     UART1,
     XTS_AES,
 }
-
-mod peripherals {
-    pub use super::pac::*;
-
-    crate::create_peripherals! {
-        I2C0,
-        RNG,
-        SHA,
-        SPI0,
-        SPI1,
-        SPI2,
-        SYSTIMER,
-        UART0,
-        UART1,
-        SYSTEM,
-        LEDC,
-        DMA,
-        RTC_CNTL,
-        TIMG0,
-        APB_SARADC,
-    }
-}
