@@ -8,6 +8,7 @@
 //! - [esp32-hal]
 //! - [esp32c2-hal]
 //! - [esp32c3-hal]
+//! - [esp32c6-hal]
 //! - [esp32s2-hal]
 //! - [esp32s3-hal]
 //!
@@ -15,6 +16,7 @@
 //! [esp32-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32-hal
 //! [esp32c2-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32c2-hal
 //! [esp32c3-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32c3-hal
+//! [esp32c6-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32c6-hal
 //! [esp32s2-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32s2-hal
 //! [esp32s3-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32s3-hal
 
@@ -27,6 +29,7 @@
 #[cfg_attr(esp32, path = "peripherals/esp32.rs")]
 #[cfg_attr(esp32c3, path = "peripherals/esp32c3.rs")]
 #[cfg_attr(esp32c2, path = "peripherals/esp32c2.rs")]
+#[cfg_attr(esp32c6, path = "peripherals/esp32c6.rs")]
 #[cfg_attr(esp32s2, path = "peripherals/esp32s2.rs")]
 #[cfg_attr(esp32s3, path = "peripherals/esp32s3.rs")]
 pub mod peripherals;
