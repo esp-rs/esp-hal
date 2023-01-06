@@ -59,38 +59,3 @@ crate::peripherals! {
     WCL,
     XTS_AES,
 }
-
-mod peripherals {
-    pub use super::pac::*;
-
-    crate::create_peripherals! {
-        I2C0,
-        I2C1,
-        RNG,
-        SHA,
-        SPI0,
-        SPI1,
-        SPI2,
-        SPI3,
-        SYSTIMER,
-        UART0,
-        UART1,
-        UART2,
-        USB_DEVICE,
-        SYSTEM,
-        LEDC,
-        RMT,
-        I2S0,
-        I2S1,
-        DMA,
-        PWM0,
-        PWM1,
-        USB0,
-        RTC_CNTL,
-        TIMG0,
-        TIMG1,
-        TWAI,
-        APB_SARADC,
-        SENS,
-    }
-}
