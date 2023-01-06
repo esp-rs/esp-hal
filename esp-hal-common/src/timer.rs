@@ -36,7 +36,7 @@ where
 {
     _timer_group: PeripheralRef<'d, T>,
     pub timer0: Timer<Timer0<T>>,
-    #[cfg(not(any(esp32c2, esp32c3)))]
+    #[cfg(not(any(esp32c2, esp32c3, esp32c6)))]
     pub timer1: Timer<Timer1<T>>,
     pub wdt: Wdt<T>,
 }
@@ -74,7 +74,7 @@ where
             clocks.apb_clock,
         );
 
-        #[cfg(not(any(esp32c2, esp32c3)))]
+        #[cfg(not(any(esp32c2, esp32c3, esp32c6)))]
         let timer1 = Timer::new(
             Timer1 {
                 phantom: PhantomData::default(),
@@ -87,7 +87,7 @@ where
         Self {
             _timer_group: timer_group,
             timer0,
-            #[cfg(not(any(esp32c2, esp32c3)))]
+            #[cfg(not(any(esp32c2, esp32c3, esp32c6)))]
             timer1,
             wdt,
         }
@@ -314,13 +314,13 @@ where
     }
 }
 
-#[cfg(not(any(esp32c2, esp32c3)))]
+#[cfg(not(any(esp32c2, esp32c3, esp32c6)))]
 pub struct Timer1<TG> {
     phantom: PhantomData<TG>,
 }
 
 /// Timer peripheral instance
-#[cfg(not(any(esp32c2, esp32c3)))]
+#[cfg(not(any(esp32c2, esp32c3, esp32c6)))]
 impl<TG> Instance for Timer1<TG>
 where
     TG: TimerGroupInstance,

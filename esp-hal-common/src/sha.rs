@@ -296,7 +296,7 @@ impl<'d> Sha<'d> {
             ShaMode::SHA1 | ShaMode::SHA256 => 64,
             #[cfg(not(esp32))]
             ShaMode::SHA224 => 64,
-            #[cfg(not(any(esp32c2, esp32c3)))]
+            #[cfg(not(any(esp32c2, esp32c3, esp32c6)))]
             _ => 128,
         };
     }

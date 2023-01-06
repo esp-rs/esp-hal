@@ -56,78 +56,76 @@ pub mod trapframe {
     pub use xtensa_lx_rt::exception::Context as TrapFrame;
 }
 
-#[cfg(rmt)]
-pub use self::pulse_control::PulseControl;
-#[cfg(usb_serial_jtag)]
-pub use self::usb_serial_jtag::UsbSerialJtag;
-pub use self::{
-    delay::Delay,
-    gpio::*,
-    interrupt::*,
-    rng::Rng,
-    rtc_cntl::{Rtc, Rwdt},
-    spi::Spi,
-    timer::Timer,
-    uart::Uart,
-};
+// #[cfg(rmt)]
+// pub use self::pulse_control::PulseControl;
+// #[cfg(usb_serial_jtag)]
+// pub use self::usb_serial_jtag::UsbSerialJtag;
+// pub use self::{
+//     delay::Delay,
+//     gpio::*,
+//     interrupt::*,
+//     rng::Rng,
+//     rtc_cntl::{Rtc, Rwdt},
+//     spi::Spi,
+//     timer::Timer,
+//     uart::Uart,
+// };
 
-#[cfg(aes)]
-pub mod aes;
-pub mod analog;
+// pub mod analog;
 pub mod clock;
 pub mod delay;
-pub mod dma;
+// pub mod dma;
 #[cfg(feature = "embassy")]
 pub mod embassy;
-pub mod gpio;
-pub mod i2c;
-#[cfg(i2s)]
-pub mod i2s;
-pub mod ledc;
-#[cfg(mcpwm)]
-pub mod mcpwm;
+// pub mod gpio;
+// pub mod i2c;
+// #[cfg(i2s)]
+// pub mod i2s;
+// pub mod ledc;
+// #[cfg(mcpwm)]
+// pub mod mcpwm;
 #[cfg(usb_otg)]
 pub mod otg_fs;
 #[cfg(any(esp32, esp32s2, esp32s3))]
 pub mod pcnt;
 pub mod peripheral;
-pub mod prelude;
-#[cfg(rmt)]
-pub mod pulse_control;
+// pub mod prelude;
+// #[cfg(rmt)]
+// pub mod pulse_control;
 #[cfg(radio)]
 pub mod radio;
 pub mod rng;
 pub mod rom;
+#[cfg(not(esp32c6))]
 pub mod rtc_cntl;
 pub mod sha;
-pub mod spi;
+// pub mod spi;
 pub mod system;
 #[cfg(systimer)]
 pub mod systimer;
 pub mod timer;
-#[cfg(any(esp32s3, esp32c3))]
-pub mod twai;
-pub mod uart;
+// pub mod uart;
 #[cfg(usb_serial_jtag)]
 pub mod usb_serial_jtag;
-#[cfg(rmt)]
-pub mod utils;
+// #[cfg(rmt)]
+// pub mod utils;
 
 #[cfg_attr(esp32, path = "cpu_control/esp32.rs")]
-#[cfg_attr(any(esp32c2, esp32c3, esp32s2), path = "cpu_control/none.rs")]
 #[cfg_attr(esp32s3, path = "cpu_control/esp32s3.rs")]
+#[cfg_attr(not(any(esp32, esp32s3)), path = "cpu_control/none.rs")]
 pub mod cpu_control;
 
 #[cfg_attr(esp32, path = "efuse/esp32.rs")]
 #[cfg_attr(esp32c2, path = "efuse/esp32c2.rs")]
 #[cfg_attr(esp32c3, path = "efuse/esp32c3.rs")]
+#[cfg_attr(esp32c6, path = "efuse/esp32c6.rs")]
 #[cfg_attr(esp32s2, path = "efuse/esp32s2.rs")]
 #[cfg_attr(esp32s3, path = "efuse/esp32s3.rs")]
 pub mod efuse;
 
-#[cfg_attr(riscv, path = "interrupt/riscv.rs")]
-#[cfg_attr(xtensa, path = "interrupt/xtensa.rs")]
-pub mod interrupt;
+// #[cfg_attr(riscv, path = "interrupt/riscv.rs")]
+// #[cfg_attr(xtensa, path = "interrupt/xtensa.rs")]
+// pub mod interrupt;
 
 /// Enumeration of CPU cores
 /// The actual number of available cores depends on the target.
