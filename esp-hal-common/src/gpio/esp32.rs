@@ -654,6 +654,7 @@ pub(crate) fn errata36(pin_num: u8, pull_up: bool, pull_down: bool) {
 }
 
 crate::gpio::gpio! {
+    Dual,
     (0, 0, InputOutputAnalog (5 => EMAC_TX_CLK) (1 => CLK_OUT1))
     (1, 0, InputOutput (5 => EMAC_RXD2) (0 => U0TXD 1 => CLK_OUT3))
     (2, 0, InputOutputAnalog (1 => HSPIWP 3 => HS2_DATA0 4 => SD_DATA0) (3 => HS2_DATA0 4 => SD_DATA0))

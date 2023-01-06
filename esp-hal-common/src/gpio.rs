@@ -213,9 +213,13 @@ pub trait OutputPin: Pin {
 }
 
 #[doc(hidden)]
-pub struct SingleCoreInteruptStatusRegisterAccess {}
+pub struct SingleCoreInteruptStatusRegisterAccessBank0;
 #[doc(hidden)]
-pub struct DualCoreInteruptStatusRegisterAccess {}
+pub struct DualCoreInteruptStatusRegisterAccessBank0;
+#[doc(hidden)]
+pub struct SingleCoreInteruptStatusRegisterAccessBank1;
+#[doc(hidden)]
+pub struct DualCoreInteruptStatusRegisterAccessBank1;
 
 #[doc(hidden)]
 pub trait InteruptStatusRegisterAccess {
@@ -228,7 +232,7 @@ pub trait InteruptStatusRegisterAccess {
     fn app_cpu_nmi_status_read() -> u32;
 }
 
-impl InteruptStatusRegisterAccess for SingleCoreInteruptStatusRegisterAccess {
+impl InteruptStatusRegisterAccess for SingleCoreInteruptStatusRegisterAccessBank0 {
     fn pro_cpu_interrupt_status_read() -> u32 {
         unsafe { &*GPIO::PTR }.pcpu_int.read().bits()
     }
@@ -246,12 +250,31 @@ impl InteruptStatusRegisterAccess for SingleCoreInteruptStatusRegisterAccess {
     }
 }
 
+#[cfg(any(esp32, esp32s2, esp32s3))]
+impl InteruptStatusRegisterAccess for SingleCoreInteruptStatusRegisterAccessBank1 {
+    fn pro_cpu_interrupt_status_read() -> u32 {
+        unsafe { &*GPIO::PTR }.pcpu_int1.read().bits()
+    }
+
+    fn pro_cpu_nmi_status_read() -> u32 {
+        unsafe { &*GPIO::PTR }.pcpu_nmi_int1.read().bits()
+    }
+
+    fn app_cpu_interrupt_status_read() -> u32 {
+        unsafe { &*GPIO::PTR }.pcpu_int1.read().bits()
+    }
+
+    fn app_cpu_nmi_status_read() -> u32 {
+        unsafe { &*GPIO::PTR }.pcpu_nmi_int1.read().bits()
+    }
+}
+
 // ESP32S3 is a dual-core chip however pro cpu and app cpu shares the same
 // interrupt enable bit see
 // https://github.com/espressif/esp-idf/blob/c04803e88b871a4044da152dfb3699cf47354d18/components/hal/esp32s3/include/hal/gpio_ll.h#L32
 // Treating it as SingleCore in the gpio macro makes this work.
 #[cfg(not(any(esp32c2, esp32c3, esp32s2, esp32s3)))]
-impl InteruptStatusRegisterAccess for DualCoreInteruptStatusRegisterAccess {
+impl InteruptStatusRegisterAccess for DualCoreInteruptStatusRegisterAccessBank0 {
     fn pro_cpu_interrupt_status_read() -> u32 {
         unsafe { &*GPIO::PTR }.pcpu_int.read().bits()
     }
@@ -266,6 +289,29 @@ impl InteruptStatusRegisterAccess for DualCoreInteruptStatusRegisterAccess {
 
     fn app_cpu_nmi_status_read() -> u32 {
         unsafe { &*GPIO::PTR }.acpu_nmi_int.read().bits()
+    }
+}
+
+// ESP32S3 is a dual-core chip however pro cpu and app cpu shares the same
+// interrupt enable bit see
+// https://github.com/espressif/esp-idf/blob/c04803e88b871a4044da152dfb3699cf47354d18/components/hal/esp32s3/include/hal/gpio_ll.h#L32
+// Treating it as SingleCore in the gpio macro makes this work.
+#[cfg(not(any(esp32c2, esp32c3, esp32s2, esp32s3)))]
+impl InteruptStatusRegisterAccess for DualCoreInteruptStatusRegisterAccessBank1 {
+    fn pro_cpu_interrupt_status_read() -> u32 {
+        unsafe { &*GPIO::PTR }.pcpu_int1.read().bits()
+    }
+
+    fn pro_cpu_nmi_status_read() -> u32 {
+        unsafe { &*GPIO::PTR }.pcpu_nmi_int1.read().bits()
+    }
+
+    fn app_cpu_interrupt_status_read() -> u32 {
+        unsafe { &*GPIO::PTR }.acpu_int1.read().bits()
+    }
+
+    fn app_cpu_nmi_status_read() -> u32 {
+        unsafe { &*GPIO::PTR }.acpu_nmi_int1.read().bits()
     }
 }
 
@@ -517,22 +563,25 @@ impl PinType for InputOnlyAnalogPinType {}
 impl IsInputPin for InputOnlyAnalogPinType {}
 impl IsAnalogPin for InputOnlyAnalogPinType {}
 
-pub struct GpioPin<MODE, RA, PINTYPE, const GPIONUM: u8>
+pub struct GpioPin<MODE, RA, IRA, PINTYPE, const GPIONUM: u8>
 where
     RA: BankGpioRegisterAccess,
+    IRA: InteruptStatusRegisterAccess,
     PINTYPE: PinType,
 {
     _mode: PhantomData<MODE>,
     _pintype: PhantomData<PINTYPE>,
     reg_access: RA,
+    ira: IRA,
     af_input_signals: [Option<InputSignal>; 6],
     af_output_signals: [Option<OutputSignal>; 6],
 }
 
-impl<MODE, RA, PINTYPE, const GPIONUM: u8> embedded_hal::digital::v2::InputPin
-    for GpioPin<Input<MODE>, RA, PINTYPE, GPIONUM>
+impl<MODE, RA, IRA, PINTYPE, const GPIONUM: u8> embedded_hal::digital::v2::InputPin
+    for GpioPin<Input<MODE>, RA, IRA, PINTYPE, GPIONUM>
 where
     RA: BankGpioRegisterAccess,
+    IRA: InteruptStatusRegisterAccess,
     PINTYPE: PinType,
 {
     type Error = Infallible;
@@ -544,10 +593,11 @@ where
     }
 }
 
-impl<RA, PINTYPE, const GPIONUM: u8> embedded_hal::digital::v2::InputPin
-    for GpioPin<Output<OpenDrain>, RA, PINTYPE, GPIONUM>
+impl<RA, IRA, PINTYPE, const GPIONUM: u8> embedded_hal::digital::v2::InputPin
+    for GpioPin<Output<OpenDrain>, RA, IRA, PINTYPE, GPIONUM>
 where
     RA: BankGpioRegisterAccess,
+    IRA: InteruptStatusRegisterAccess,
     PINTYPE: PinType,
 {
     type Error = Infallible;
@@ -560,20 +610,22 @@ where
 }
 
 #[cfg(feature = "eh1")]
-impl<MODE, RA, PINTYPE, const GPIONUM: u8> embedded_hal_1::digital::ErrorType
-    for GpioPin<Input<MODE>, RA, PINTYPE, GPIONUM>
+impl<MODE, RA, IRA, PINTYPE, const GPIONUM: u8> embedded_hal_1::digital::ErrorType
+    for GpioPin<Input<MODE>, RA, IRA, PINTYPE, GPIONUM>
 where
     RA: BankGpioRegisterAccess,
+    IRA: InteruptStatusRegisterAccess,
     PINTYPE: PinType,
 {
     type Error = Infallible;
 }
 
 #[cfg(feature = "eh1")]
-impl<MODE, RA, PINTYPE, const GPIONUM: u8> embedded_hal_1::digital::InputPin
-    for GpioPin<Input<MODE>, RA, PINTYPE, GPIONUM>
+impl<MODE, RA, IRA, PINTYPE, const GPIONUM: u8> embedded_hal_1::digital::InputPin
+    for GpioPin<Input<MODE>, RA, IRA, PINTYPE, GPIONUM>
 where
     RA: BankGpioRegisterAccess,
+    IRA: InteruptStatusRegisterAccess,
     PINTYPE: PinType,
 {
     fn is_high(&self) -> Result<bool, Self::Error> {
@@ -584,9 +636,10 @@ where
     }
 }
 
-impl<MODE, RA, PINTYPE, const GPIONUM: u8> GpioPin<MODE, RA, PINTYPE, GPIONUM>
+impl<MODE, RA, IRA, PINTYPE, const GPIONUM: u8> GpioPin<MODE, RA, IRA, PINTYPE, GPIONUM>
 where
     RA: BankGpioRegisterAccess,
+    IRA: InteruptStatusRegisterAccess,
     PINTYPE: PinType,
 {
     fn init_input(&self, pull_down: bool, pull_up: bool) {
@@ -613,43 +666,48 @@ where
         });
     }
 
-    pub fn into_floating_input(self) -> GpioPin<Input<Floating>, RA, PINTYPE, GPIONUM> {
+    pub fn into_floating_input(self) -> GpioPin<Input<Floating>, RA, IRA, PINTYPE, GPIONUM> {
         self.init_input(false, false);
         GpioPin {
             _mode: PhantomData,
             _pintype: PhantomData,
             reg_access: self.reg_access,
+            ira: self.ira,
             af_input_signals: self.af_input_signals,
             af_output_signals: self.af_output_signals,
         }
     }
 
-    pub fn into_pull_up_input(self) -> GpioPin<Input<PullUp>, RA, PINTYPE, GPIONUM> {
+    pub fn into_pull_up_input(self) -> GpioPin<Input<PullUp>, RA, IRA, PINTYPE, GPIONUM> {
         self.init_input(false, true);
         GpioPin {
             _mode: PhantomData,
             _pintype: PhantomData,
             reg_access: self.reg_access,
+            ira: self.ira,
             af_input_signals: self.af_input_signals,
             af_output_signals: self.af_output_signals,
         }
     }
 
-    pub fn into_pull_down_input(self) -> GpioPin<Input<PullDown>, RA, PINTYPE, GPIONUM> {
+    pub fn into_pull_down_input(self) -> GpioPin<Input<PullDown>, RA, IRA, PINTYPE, GPIONUM> {
         self.init_input(true, false);
         GpioPin {
             _mode: PhantomData,
             _pintype: PhantomData,
             reg_access: self.reg_access,
+            ira: self.ira,
             af_input_signals: self.af_input_signals,
             af_output_signals: self.af_output_signals,
         }
     }
 }
 
-impl<MODE, RA, PINTYPE, const GPIONUM: u8> InputPin for GpioPin<MODE, RA, PINTYPE, GPIONUM>
+impl<MODE, RA, IRA, PINTYPE, const GPIONUM: u8> InputPin
+    for GpioPin<MODE, RA, IRA, PINTYPE, GPIONUM>
 where
     RA: BankGpioRegisterAccess,
+    IRA: InteruptStatusRegisterAccess,
     PINTYPE: PinType,
 {
     fn set_to_input(&mut self) -> &mut Self {
@@ -720,9 +778,10 @@ where
     }
 }
 
-impl<MODE, RA, PINTYPE, const GPIONUM: u8> Pin for GpioPin<MODE, RA, PINTYPE, GPIONUM>
+impl<MODE, RA, IRA, PINTYPE, const GPIONUM: u8> Pin for GpioPin<MODE, RA, IRA, PINTYPE, GPIONUM>
 where
     RA: BankGpioRegisterAccess,
+    IRA: InteruptStatusRegisterAccess,
     PINTYPE: PinType,
 {
     fn number(&self) -> u8 {
@@ -780,19 +839,19 @@ where
     }
 
     fn is_pcore_interrupt_set(&self) -> bool {
-        (self.pro_cpu_interrupt_status_read() & (1 << (GPIONUM % 32))) != 0
+        (IRA::pro_cpu_interrupt_status_read() & (1 << (GPIONUM % 32))) != 0
     }
 
     fn is_pcore_non_maskable_interrupt_set(&self) -> bool {
-        (self.pro_cpu_nmi_status_read() & (1 << (GPIONUM % 32))) != 0
+        (IRA::pro_cpu_nmi_status_read() & (1 << (GPIONUM % 32))) != 0
     }
 
     fn is_acore_interrupt_set(&self) -> bool {
-        (self.app_cpu_interrupt_status_read() & (1 << (GPIONUM % 32))) != 0
+        (IRA::app_cpu_interrupt_status_read() & (1 << (GPIONUM % 32))) != 0
     }
 
     fn is_acore_non_maskable_interrupt_set(&self) -> bool {
-        (self.app_cpu_nmi_status_read() & (1 << (GPIONUM % 32))) != 0
+        (IRA::app_cpu_nmi_status_read() & (1 << (GPIONUM % 32))) != 0
     }
 
     fn enable_hold(&mut self, _on: bool) {
@@ -800,10 +859,11 @@ where
     }
 }
 
-impl<MODE, RA, PINTYPE, const GPIONUM: u8> embedded_hal::digital::v2::OutputPin
-    for GpioPin<Output<MODE>, RA, PINTYPE, GPIONUM>
+impl<MODE, RA, IRA, PINTYPE, const GPIONUM: u8> embedded_hal::digital::v2::OutputPin
+    for GpioPin<Output<MODE>, RA, IRA, PINTYPE, GPIONUM>
 where
     RA: BankGpioRegisterAccess,
+    IRA: InteruptStatusRegisterAccess,
     PINTYPE: IsOutputPin,
 {
     type Error = Infallible;
@@ -817,10 +877,11 @@ where
     }
 }
 
-impl<MODE, RA, PINTYPE, const GPIONUM: u8> embedded_hal::digital::v2::StatefulOutputPin
-    for GpioPin<Output<MODE>, RA, PINTYPE, GPIONUM>
+impl<MODE, RA, IRA, PINTYPE, const GPIONUM: u8> embedded_hal::digital::v2::StatefulOutputPin
+    for GpioPin<Output<MODE>, RA, IRA, PINTYPE, GPIONUM>
 where
     RA: BankGpioRegisterAccess,
+    IRA: InteruptStatusRegisterAccess,
     PINTYPE: IsOutputPin,
 {
     fn is_set_high(&self) -> Result<bool, Self::Error> {
@@ -831,10 +892,11 @@ where
     }
 }
 
-impl<MODE, RA, PINTYPE, const GPIONUM: u8> embedded_hal::digital::v2::ToggleableOutputPin
-    for GpioPin<Output<MODE>, RA, PINTYPE, GPIONUM>
+impl<MODE, RA, IRA, PINTYPE, const GPIONUM: u8> embedded_hal::digital::v2::ToggleableOutputPin
+    for GpioPin<Output<MODE>, RA, IRA, PINTYPE, GPIONUM>
 where
     RA: BankGpioRegisterAccess,
+    IRA: InteruptStatusRegisterAccess,
     PINTYPE: IsOutputPin,
 {
     type Error = Infallible;
@@ -849,20 +911,22 @@ where
 }
 
 #[cfg(feature = "eh1")]
-impl<MODE, RA, PINTYPE, const GPIONUM: u8> embedded_hal_1::digital::ErrorType
-    for GpioPin<Output<MODE>, RA, PINTYPE, GPIONUM>
+impl<MODE, RA, IRA, PINTYPE, const GPIONUM: u8> embedded_hal_1::digital::ErrorType
+    for GpioPin<Output<MODE>, RA, IRA, PINTYPE, GPIONUM>
 where
     RA: BankGpioRegisterAccess,
+    IRA: InteruptStatusRegisterAccess,
     PINTYPE: IsOutputPin,
 {
     type Error = Infallible;
 }
 
 #[cfg(feature = "eh1")]
-impl<MODE, RA, PINTYPE, const GPIONUM: u8> embedded_hal_1::digital::OutputPin
-    for GpioPin<Output<MODE>, RA, PINTYPE, GPIONUM>
+impl<MODE, RA, IRA, PINTYPE, const GPIONUM: u8> embedded_hal_1::digital::OutputPin
+    for GpioPin<Output<MODE>, RA, IRA, PINTYPE, GPIONUM>
 where
     RA: BankGpioRegisterAccess,
+    IRA: InteruptStatusRegisterAccess,
     PINTYPE: IsOutputPin,
 {
     fn set_low(&mut self) -> Result<(), Self::Error> {
@@ -876,10 +940,11 @@ where
 }
 
 #[cfg(feature = "eh1")]
-impl<MODE, RA, PINTYPE, const GPIONUM: u8> embedded_hal_1::digital::StatefulOutputPin
-    for GpioPin<Output<MODE>, RA, PINTYPE, GPIONUM>
+impl<MODE, RA, IRA, PINTYPE, const GPIONUM: u8> embedded_hal_1::digital::StatefulOutputPin
+    for GpioPin<Output<MODE>, RA, IRA, PINTYPE, GPIONUM>
 where
     RA: BankGpioRegisterAccess,
+    IRA: InteruptStatusRegisterAccess,
     PINTYPE: IsOutputPin,
 {
     fn is_set_high(&self) -> Result<bool, Self::Error> {
@@ -891,10 +956,11 @@ where
 }
 
 #[cfg(feature = "eh1")]
-impl<MODE, RA, PINTYPE, const GPIONUM: u8> embedded_hal_1::digital::ToggleableOutputPin
-    for GpioPin<Output<MODE>, RA, PINTYPE, GPIONUM>
+impl<MODE, RA, IRA, PINTYPE, const GPIONUM: u8> embedded_hal_1::digital::ToggleableOutputPin
+    for GpioPin<Output<MODE>, RA, IRA, PINTYPE, GPIONUM>
 where
     RA: BankGpioRegisterAccess,
+    IRA: InteruptStatusRegisterAccess,
     PINTYPE: IsOutputPin,
 {
     fn toggle(&mut self) -> Result<(), Self::Error> {
@@ -907,134 +973,145 @@ where
     }
 }
 
-impl<MODE, RA, PINTYPE, const GPIONUM: u8> crate::peripheral::Peripheral
-    for GpioPin<MODE, RA, PINTYPE, GPIONUM>
+impl<MODE, RA, IRA, PINTYPE, const GPIONUM: u8> crate::peripheral::Peripheral
+    for GpioPin<MODE, RA, IRA, PINTYPE, GPIONUM>
 where
     RA: BankGpioRegisterAccess,
+    IRA: InteruptStatusRegisterAccess,
     PINTYPE: PinType,
 {
-    type P = GpioPin<MODE, RA, PINTYPE, GPIONUM>;
+    type P = GpioPin<MODE, RA, IRA, PINTYPE, GPIONUM>;
 
     unsafe fn clone_unchecked(&mut self) -> Self::P {
         core::ptr::read(self as *const _)
     }
 }
 
-impl<MODE, RA, PINTYPE, const GPIONUM: u8> crate::peripheral::Peripheral
-    for &mut GpioPin<MODE, RA, PINTYPE, GPIONUM>
+impl<MODE, RA, IRA, PINTYPE, const GPIONUM: u8> crate::peripheral::Peripheral
+    for &mut GpioPin<MODE, RA, IRA, PINTYPE, GPIONUM>
 where
     RA: BankGpioRegisterAccess,
+    IRA: InteruptStatusRegisterAccess,
     PINTYPE: PinType,
 {
-    type P = GpioPin<MODE, RA, PINTYPE, GPIONUM>;
+    type P = GpioPin<MODE, RA, IRA, PINTYPE, GPIONUM>;
 
     unsafe fn clone_unchecked(&mut self) -> Self::P {
         core::ptr::read(*self as *const _)
     }
 }
 
-impl<MODE, RA, PINTYPE, const GPIONUM: u8> crate::peripheral::sealed::Sealed
-    for GpioPin<MODE, RA, PINTYPE, GPIONUM>
+impl<MODE, RA, IRA, PINTYPE, const GPIONUM: u8> crate::peripheral::sealed::Sealed
+    for GpioPin<MODE, RA, IRA, PINTYPE, GPIONUM>
 where
     RA: BankGpioRegisterAccess,
+    IRA: InteruptStatusRegisterAccess,
     PINTYPE: PinType,
 {
 }
 
-impl<RA, PINTYPE, const GPIONUM: u8> From<GpioPin<Unknown, RA, PINTYPE, GPIONUM>>
-    for GpioPin<Input<Floating>, RA, PINTYPE, GPIONUM>
+impl<RA, IRA, PINTYPE, const GPIONUM: u8> From<GpioPin<Unknown, RA, IRA, PINTYPE, GPIONUM>>
+    for GpioPin<Input<Floating>, RA, IRA, PINTYPE, GPIONUM>
 where
     RA: BankGpioRegisterAccess,
+    IRA: InteruptStatusRegisterAccess,
     PINTYPE: IsOutputPin,
 {
     fn from(
-        pin: GpioPin<Unknown, RA, PINTYPE, GPIONUM>,
-    ) -> GpioPin<Input<Floating>, RA, PINTYPE, GPIONUM> {
+        pin: GpioPin<Unknown, RA, IRA, PINTYPE, GPIONUM>,
+    ) -> GpioPin<Input<Floating>, RA, IRA, PINTYPE, GPIONUM> {
         pin.into_floating_input()
     }
 }
 
-impl<RA, PINTYPE, const GPIONUM: u8> From<GpioPin<Unknown, RA, PINTYPE, GPIONUM>>
-    for GpioPin<Input<PullUp>, RA, PINTYPE, GPIONUM>
+impl<RA, IRA, PINTYPE, const GPIONUM: u8> From<GpioPin<Unknown, RA, IRA, PINTYPE, GPIONUM>>
+    for GpioPin<Input<PullUp>, RA, IRA, PINTYPE, GPIONUM>
 where
     RA: BankGpioRegisterAccess,
+    IRA: InteruptStatusRegisterAccess,
     PINTYPE: IsOutputPin,
 {
     fn from(
-        pin: GpioPin<Unknown, RA, PINTYPE, GPIONUM>,
-    ) -> GpioPin<Input<PullUp>, RA, PINTYPE, GPIONUM> {
+        pin: GpioPin<Unknown, RA, IRA, PINTYPE, GPIONUM>,
+    ) -> GpioPin<Input<PullUp>, RA, IRA, PINTYPE, GPIONUM> {
         pin.into_pull_up_input()
     }
 }
 
-impl<RA, PINTYPE, const GPIONUM: u8> From<GpioPin<Unknown, RA, PINTYPE, GPIONUM>>
-    for GpioPin<Input<PullDown>, RA, PINTYPE, GPIONUM>
+impl<RA, IRA, PINTYPE, const GPIONUM: u8> From<GpioPin<Unknown, RA, IRA, PINTYPE, GPIONUM>>
+    for GpioPin<Input<PullDown>, RA, IRA, PINTYPE, GPIONUM>
 where
     RA: BankGpioRegisterAccess,
+    IRA: InteruptStatusRegisterAccess,
     PINTYPE: IsInputPin,
 {
     fn from(
-        pin: GpioPin<Unknown, RA, PINTYPE, GPIONUM>,
-    ) -> GpioPin<Input<PullDown>, RA, PINTYPE, GPIONUM> {
+        pin: GpioPin<Unknown, RA, IRA, PINTYPE, GPIONUM>,
+    ) -> GpioPin<Input<PullDown>, RA, IRA, PINTYPE, GPIONUM> {
         pin.into_pull_down_input()
     }
 }
 
-impl<RA, PINTYPE, const GPIONUM: u8> From<GpioPin<Unknown, RA, PINTYPE, GPIONUM>>
-    for GpioPin<Output<PushPull>, RA, PINTYPE, GPIONUM>
+impl<RA, IRA, PINTYPE, const GPIONUM: u8> From<GpioPin<Unknown, RA, IRA, PINTYPE, GPIONUM>>
+    for GpioPin<Output<PushPull>, RA, IRA, PINTYPE, GPIONUM>
 where
     RA: BankGpioRegisterAccess,
+    IRA: InteruptStatusRegisterAccess,
     PINTYPE: IsOutputPin,
 {
     fn from(
-        pin: GpioPin<Unknown, RA, PINTYPE, GPIONUM>,
-    ) -> GpioPin<Output<PushPull>, RA, PINTYPE, GPIONUM> {
+        pin: GpioPin<Unknown, RA, IRA, PINTYPE, GPIONUM>,
+    ) -> GpioPin<Output<PushPull>, RA, IRA, PINTYPE, GPIONUM> {
         pin.into_push_pull_output()
     }
 }
 
-impl<RA, PINTYPE, const GPIONUM: u8> From<GpioPin<Unknown, RA, PINTYPE, GPIONUM>>
-    for GpioPin<Output<OpenDrain>, RA, PINTYPE, GPIONUM>
+impl<RA, IRA, PINTYPE, const GPIONUM: u8> From<GpioPin<Unknown, RA, IRA, PINTYPE, GPIONUM>>
+    for GpioPin<Output<OpenDrain>, RA, IRA, PINTYPE, GPIONUM>
 where
     RA: BankGpioRegisterAccess,
+    IRA: InteruptStatusRegisterAccess,
     PINTYPE: IsOutputPin,
 {
     fn from(
-        pin: GpioPin<Unknown, RA, PINTYPE, GPIONUM>,
-    ) -> GpioPin<Output<OpenDrain>, RA, PINTYPE, GPIONUM> {
+        pin: GpioPin<Unknown, RA, IRA, PINTYPE, GPIONUM>,
+    ) -> GpioPin<Output<OpenDrain>, RA, IRA, PINTYPE, GPIONUM> {
         pin.into_open_drain_output()
     }
 }
 
-impl<RA, PINTYPE, const GPIONUM: u8> From<GpioPin<Unknown, RA, PINTYPE, GPIONUM>>
-    for GpioPin<Alternate<AF1>, RA, PINTYPE, GPIONUM>
+impl<RA, IRA, PINTYPE, const GPIONUM: u8> From<GpioPin<Unknown, RA, IRA, PINTYPE, GPIONUM>>
+    for GpioPin<Alternate<AF1>, RA, IRA, PINTYPE, GPIONUM>
 where
     RA: BankGpioRegisterAccess,
+    IRA: InteruptStatusRegisterAccess,
     PINTYPE: IsOutputPin,
 {
     fn from(
-        pin: GpioPin<Unknown, RA, PINTYPE, GPIONUM>,
-    ) -> GpioPin<Alternate<AF1>, RA, PINTYPE, GPIONUM> {
+        pin: GpioPin<Unknown, RA, IRA, PINTYPE, GPIONUM>,
+    ) -> GpioPin<Alternate<AF1>, RA, IRA, PINTYPE, GPIONUM> {
         pin.into_alternate_1()
     }
 }
 
-impl<RA, PINTYPE, const GPIONUM: u8> From<GpioPin<Unknown, RA, PINTYPE, GPIONUM>>
-    for GpioPin<Alternate<AF2>, RA, PINTYPE, GPIONUM>
+impl<RA, IRA, PINTYPE, const GPIONUM: u8> From<GpioPin<Unknown, RA, IRA, PINTYPE, GPIONUM>>
+    for GpioPin<Alternate<AF2>, RA, IRA, PINTYPE, GPIONUM>
 where
     RA: BankGpioRegisterAccess,
+    IRA: InteruptStatusRegisterAccess,
     PINTYPE: IsOutputPin,
 {
     fn from(
-        pin: GpioPin<Unknown, RA, PINTYPE, GPIONUM>,
-    ) -> GpioPin<Alternate<AF2>, RA, PINTYPE, GPIONUM> {
+        pin: GpioPin<Unknown, RA, IRA, PINTYPE, GPIONUM>,
+    ) -> GpioPin<Alternate<AF2>, RA, IRA, PINTYPE, GPIONUM> {
         pin.into_alternate_2()
     }
 }
 
-impl<MODE, RA, PINTYPE, const GPIONUM: u8> GpioPin<MODE, RA, PINTYPE, GPIONUM>
+impl<MODE, RA, IRA, PINTYPE, const GPIONUM: u8> GpioPin<MODE, RA, IRA, PINTYPE, GPIONUM>
 where
     RA: BankGpioRegisterAccess,
+    IRA: InteruptStatusRegisterAccess,
     PINTYPE: IsOutputPin,
 {
     fn init_output(&self, alternate: AlternateFunction, open_drain: bool) {
@@ -1062,54 +1139,60 @@ where
         });
     }
 
-    pub fn into_push_pull_output(self) -> GpioPin<Output<PushPull>, RA, PINTYPE, GPIONUM> {
+    pub fn into_push_pull_output(self) -> GpioPin<Output<PushPull>, RA, IRA, PINTYPE, GPIONUM> {
         self.init_output(GPIO_FUNCTION, false);
         GpioPin {
             _mode: PhantomData,
             _pintype: PhantomData,
             reg_access: self.reg_access,
+            ira: self.ira,
             af_input_signals: self.af_input_signals,
             af_output_signals: self.af_output_signals,
         }
     }
 
-    pub fn into_open_drain_output(self) -> GpioPin<Output<OpenDrain>, RA, PINTYPE, GPIONUM> {
+    pub fn into_open_drain_output(self) -> GpioPin<Output<OpenDrain>, RA, IRA, PINTYPE, GPIONUM> {
         self.init_output(GPIO_FUNCTION, true);
         GpioPin {
             _mode: PhantomData,
             _pintype: PhantomData,
             reg_access: self.reg_access,
+            ira: self.ira,
             af_input_signals: self.af_input_signals,
             af_output_signals: self.af_output_signals,
         }
     }
 
-    pub fn into_alternate_1(self) -> GpioPin<Alternate<AF1>, RA, PINTYPE, GPIONUM> {
+    pub fn into_alternate_1(self) -> GpioPin<Alternate<AF1>, RA, IRA, PINTYPE, GPIONUM> {
         self.init_output(AlternateFunction::Function1, false);
         GpioPin {
             _mode: PhantomData,
             _pintype: PhantomData,
             reg_access: self.reg_access,
+            ira: self.ira,
             af_input_signals: self.af_input_signals,
             af_output_signals: self.af_output_signals,
         }
     }
 
-    pub fn into_alternate_2(self) -> GpioPin<Alternate<AF2>, RA, PINTYPE, GPIONUM> {
+    pub fn into_alternate_2(self) -> GpioPin<Alternate<AF2>, RA, IRA, PINTYPE, GPIONUM> {
         self.init_output(AlternateFunction::Function2, false);
         GpioPin {
             _mode: PhantomData,
             _pintype: PhantomData,
             reg_access: self.reg_access,
+            ira: self.ira,
             af_input_signals: self.af_input_signals,
             af_output_signals: self.af_output_signals,
         }
     }
 }
 
-impl<MODE, RA, PINTYPE, const GPIONUM: u8> OutputPin for GpioPin<MODE, RA, PINTYPE, GPIONUM>
+impl<MODE, RA, IRA, PINTYPE, const GPIONUM: u8> OutputPin
+    for GpioPin<MODE, RA, IRA, PINTYPE, GPIONUM>
 where
     RA: BankGpioRegisterAccess,
+    IRA: InteruptStatusRegisterAccess,
     PINTYPE: IsOutputPin,
 {
     fn set_to_open_drain_output(&mut self) -> &mut Self {
@@ -1233,18 +1316,20 @@ where
     }
 }
 
-impl<MODE, RA, PINTYPE, const GPIONUM: u8> GpioPin<MODE, RA, PINTYPE, GPIONUM>
+impl<MODE, RA, IRA, PINTYPE, const GPIONUM: u8> GpioPin<MODE, RA, IRA, PINTYPE, GPIONUM>
 where
     RA: BankGpioRegisterAccess,
+    IRA: InteruptStatusRegisterAccess,
     PINTYPE: IsOutputPin,
 {
-    pub fn into_analog(self) -> GpioPin<Analog, RA, PINTYPE, GPIONUM> {
+    pub fn into_analog(self) -> GpioPin<Analog, RA, IRA, PINTYPE, GPIONUM> {
         types::internal_into_analog(GPIONUM);
 
         GpioPin {
             _mode: PhantomData,
             _pintype: PhantomData,
             reg_access: self.reg_access,
+            ira: self.ira,
             af_input_signals: self.af_input_signals,
             af_output_signals: self.af_output_signals,
         }
@@ -1266,62 +1351,11 @@ impl IO {
     }
 }
 
-// while ESP32-S3 is multicore it is more like single core in terms of GPIO
-// interrupts
-#[cfg(esp32s3)]
-impl<MODE, RA, PINTYPE, const GPIONUM: u8>
-    InterruptStatusRegisters<SingleCoreInteruptStatusRegisterAccess>
-    for GpioPin<MODE, RA, PINTYPE, GPIONUM>
-where
-    RA: BankGpioRegisterAccess,
-    PINTYPE: PinType,
-{
-}
-
-#[cfg(esp32)]
-impl<MODE, RA, PINTYPE, const GPIONUM: u8>
-    InterruptStatusRegisters<DualCoreInteruptStatusRegisterAccess>
-    for GpioPin<MODE, RA, PINTYPE, GPIONUM>
-where
-    RA: BankGpioRegisterAccess,
-    PINTYPE: PinType,
-{
-}
-
-#[cfg(esp32c3)]
-impl<MODE, RA, PINTYPE, const GPIONUM: u8>
-    InterruptStatusRegisters<SingleCoreInteruptStatusRegisterAccess>
-    for GpioPin<MODE, RA, PINTYPE, GPIONUM>
-where
-    RA: BankGpioRegisterAccess,
-    PINTYPE: PinType,
-{
-}
-
-#[cfg(esp32s2)]
-impl<MODE, RA, PINTYPE, const GPIONUM: u8>
-    InterruptStatusRegisters<SingleCoreInteruptStatusRegisterAccess>
-    for GpioPin<MODE, RA, PINTYPE, GPIONUM>
-where
-    RA: BankGpioRegisterAccess,
-    PINTYPE: PinType,
-{
-}
-
-#[cfg(esp32c2)]
-impl<MODE, RA, PINTYPE, const GPIONUM: u8>
-    InterruptStatusRegisters<SingleCoreInteruptStatusRegisterAccess>
-    for GpioPin<MODE, RA, PINTYPE, GPIONUM>
-where
-    RA: BankGpioRegisterAccess,
-    PINTYPE: PinType,
-{
-}
-
 #[doc(hidden)]
 #[macro_export]
 macro_rules! gpio {
     (
+        $cores:ident,
         $(
             ($gpionum:literal, $bank:literal, $type:ident
                 $(
@@ -1363,7 +1397,8 @@ macro_rules! gpio {
                                  GpioPin {
                                     _mode: PhantomData,
                                     _pintype: PhantomData,
-                                    reg_access: [< Bank $bank GpioRegisterAccess >] {},
+                                    reg_access: [< Bank $bank GpioRegisterAccess >],
+                                    ira: $crate::gpio::[< $cores CoreInteruptStatusRegisterAccessBank $bank >],
                                     af_input_signals: input_signals,
                                     af_output_signals: output_signals,
                                 }
@@ -1375,12 +1410,12 @@ macro_rules! gpio {
 
             pub struct Pins {
                 $(
-                    pub [< gpio $gpionum >] : GpioPin<Unknown, [< Bank $bank GpioRegisterAccess >], [< $type PinType >], $gpionum>,
+                    pub [< gpio $gpionum >] : GpioPin<Unknown, [< Bank $bank GpioRegisterAccess >], $crate::gpio::[< $cores CoreInteruptStatusRegisterAccessBank $bank >], [< $type PinType >], $gpionum>,
                 )+
             }
 
             $(
-                pub type [<Gpio $gpionum >]<MODE> = GpioPin<MODE, [< Bank $bank GpioRegisterAccess >], [< $type PinType >], $gpionum>;
+                pub type [<Gpio $gpionum >]<MODE> = GpioPin<MODE, [< Bank $bank GpioRegisterAccess >], $crate::gpio::[< $cores CoreInteruptStatusRegisterAccessBank $bank >], [< $type PinType >], $gpionum>;
             )+
         }
     };
