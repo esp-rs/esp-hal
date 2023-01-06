@@ -50,33 +50,3 @@ crate::peripherals! {
     UHCI0,
     UHCI1,
 }
-
-mod peripherals {
-    pub use super::pac::*;
-
-    crate::create_peripherals! {
-        I2C0,
-        I2C1,
-        RNG,
-        SHA,
-        SPI0,
-        SPI1,
-        SPI2,
-        SPI3,
-        UART0,
-        UART1,
-        UART2,
-        DPORT,
-        LEDC,
-        PCNT,
-        RMT,
-        I2S0,
-        I2S1,
-        PWM0,
-        PWM1,
-        RTC_CNTL,
-        TIMG0,
-        TIMG1,
-        SENS,
-    }
-}

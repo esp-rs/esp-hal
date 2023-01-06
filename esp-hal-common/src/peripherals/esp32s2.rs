@@ -48,33 +48,3 @@ crate::peripherals! {
     USB_WRAP,
     XTS_AES,
 }
-
-mod peripherals {
-    pub use super::pac::*;
-
-    crate::create_peripherals! {
-        I2C0,
-        I2C1,
-        RNG,
-        SHA,
-        SPI0,
-        SPI1,
-        SPI2,
-        SPI3,
-        SPI4,
-        SYSTIMER,
-        UART0,
-        UART1,
-        SYSTEM,
-        LEDC,
-        PCNT,
-        RMT,
-        I2S,
-        USB0,
-        RTC_CNTL,
-        TIMG0,
-        TIMG1,
-        APB_SARADC,
-        SENS,
-    }
-}

@@ -258,6 +258,7 @@ pub enum OutputSignal {
 }
 
 crate::gpio::gpio! {
+    Single,
     (0, 0, InputOutputAnalog)
     (1, 0, InputOutputAnalog)
     (2, 0, InputOutputAnalog)
