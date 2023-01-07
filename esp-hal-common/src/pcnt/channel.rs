@@ -85,7 +85,7 @@ pub struct Channel {
 
 impl Channel {
     /// return a new Channel
-    pub fn new(unit: unit::Number, channel: Number) -> Self {
+    pub(super) fn new(unit: unit::Number, channel: Number) -> Self {
         Self { unit, channel }
     }
 
