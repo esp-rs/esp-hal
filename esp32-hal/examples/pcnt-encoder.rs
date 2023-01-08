@@ -1,34 +1,37 @@
 //! PCNT Encoder Demo
 //!
 //! This example decodes a quadrature encoder
-//! 
+//!
 //! Since the PCNT units reset to zero when they reach their limits
 //! we use enable an interrupt on the upper and lower limits and
 //! track the overflow in an AtomicI32
 
 #![no_std]
 #![no_main]
-use core::{cmp::min, cell::RefCell, sync::atomic::{AtomicI32, Ordering}};
+use core::{
+    cell::RefCell,
+    cmp::min,
+    sync::atomic::{AtomicI32, Ordering},
+};
+
 use critical_section::Mutex;
-
 use esp32_hal as esp_hal;
-
+use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    peripherals::{Peripherals, self},
+    interrupt,
+    pcnt::{channel, channel::PcntSignal, unit, PCNT},
+    peripherals::{self, Peripherals},
     prelude::*,
     timer::TimerGroup,
     Rtc,
     IO,
-    pcnt::{PCNT, unit, channel, channel::PcntPin},
-    interrupt,
 };
-use esp_backtrace as _;
 use esp_println::println;
 use xtensa_lx_rt::entry;
 
 static UNIT0: Mutex<RefCell<Option<unit::Unit>>> = Mutex::new(RefCell::new(None));
-static VALUE: AtomicI32 =  AtomicI32::new(0);
+static VALUE: AtomicI32 = AtomicI32::new(0);
 
 #[entry]
 fn main() -> ! {
@@ -63,25 +66,33 @@ fn main() -> ! {
     let mut pin_a = io.pins.gpio22.into_pull_up_input();
     let mut pin_b = io.pins.gpio23.into_pull_up_input();
 
-    ch0.configure(PcntPin::from_pin(&mut pin_a), PcntPin::from_pin(&mut pin_b), channel::Config {
-        lctrl_mode: channel::CtrlMode::Reverse,
-        hctrl_mode: channel::CtrlMode::Keep,
-        pos_edge: channel::EdgeMode::Decrement,
-        neg_edge: channel::EdgeMode::Increment,
-        invert_ctrl: false,
-        invert_sig: false,
-    });
+    ch0.configure(
+        PcntSignal::from_pin(&mut pin_a),
+        PcntSignal::from_pin(&mut pin_b),
+        channel::Config {
+            lctrl_mode: channel::CtrlMode::Reverse,
+            hctrl_mode: channel::CtrlMode::Keep,
+            pos_edge: channel::EdgeMode::Decrement,
+            neg_edge: channel::EdgeMode::Increment,
+            invert_ctrl: false,
+            invert_sig: false,
+        },
+    );
 
     println!("setup channel 1");
     let mut ch1 = u0.get_channel(channel::Number::Channel1);
-    ch1.configure(PcntPin::from_pin(&mut pin_b), PcntPin::from_pin(&mut pin_a), channel::Config {
-        lctrl_mode: channel::CtrlMode::Reverse,
-        hctrl_mode: channel::CtrlMode::Keep,
-        pos_edge: channel::EdgeMode::Increment,
-        neg_edge: channel::EdgeMode::Decrement,
-        invert_ctrl: false,
-        invert_sig: false,
-    });
+    ch1.configure(
+        PcntSignal::from_pin(&mut pin_b),
+        PcntSignal::from_pin(&mut pin_a),
+        channel::Config {
+            lctrl_mode: channel::CtrlMode::Reverse,
+            hctrl_mode: channel::CtrlMode::Keep,
+            pos_edge: channel::EdgeMode::Increment,
+            neg_edge: channel::EdgeMode::Decrement,
+            invert_ctrl: false,
+            invert_sig: false,
+        },
+    );
     println!("subscribing to events");
     u0.events(unit::Events {
         low_limit: true,
@@ -98,18 +109,14 @@ fn main() -> ! {
 
     critical_section::with(|cs| UNIT0.borrow_ref_mut(cs).replace(u0));
 
-    interrupt::enable(
-        peripherals::Interrupt::PCNT,
-        interrupt::Priority::Priority2,
-    )
-    .unwrap();
+    interrupt::enable(peripherals::Interrupt::PCNT, interrupt::Priority::Priority2).unwrap();
 
     let mut last_value: i32 = 0;
     loop {
         critical_section::with(|cs| {
             let mut u0 = UNIT0.borrow_ref_mut(cs);
             let u0 = u0.as_mut().unwrap();
-            let value: i32 = u0.get_value()as i32 + VALUE.load(Ordering::SeqCst);
+            let value: i32 = u0.get_value() as i32 + VALUE.load(Ordering::SeqCst);
             if value != last_value {
                 println!("value: {value}");
                 last_value = value;

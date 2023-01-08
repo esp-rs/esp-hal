@@ -55,25 +55,25 @@ pub struct Config {
 }
 
 /// PcntPin can be always high, always low, or an actual pin
-pub enum PcntPin<'a, P: InputPin> {
+pub enum PcntSignal<'a, P: InputPin> {
     Pin(PeripheralRef<'a, P>),
     High,
     Low,
 }
 
-impl<'a, P: InputPin> PcntPin<'a, P> {
+impl<'a, P: InputPin> PcntSignal<'a, P> {
     pub fn from_pin(pin: impl Peripheral<P = P> + 'a) -> Self {
         crate::into_ref!(pin);
-        PcntPin::Pin(pin)
+        PcntSignal::Pin(pin)
     }
 }
 
-impl<'a, P: InputPin> From<PcntPin<'a, P>> for u8 {
-    fn from(pin: PcntPin<'a, P>) -> Self {
+impl<'a, P: InputPin> From<PcntSignal<'a, P>> for u8 {
+    fn from(pin: PcntSignal<'a, P>) -> Self {
         match pin {
-            PcntPin::Pin(pin) => pin.number(),
-            PcntPin::High => ONE_INPUT,
-            PcntPin::Low => ZERO_INPUT,
+            PcntSignal::Pin(pin) => pin.number(),
+            PcntSignal::High => ONE_INPUT,
+            PcntSignal::Low => ZERO_INPUT,
         }
     }
 }
@@ -92,8 +92,8 @@ impl Channel {
     /// Configure the channel
     pub fn configure<'b, CP: InputPin, EP: InputPin>(
         &mut self,
-        ctrl_pin: PcntPin<'b, CP>,
-        sig_pin: PcntPin<'b, EP>,
+        ctrl_signal: PcntSignal<'b, CP>,
+        edge_signal: PcntSignal<'b, EP>,
         config: Config,
     ) {
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
@@ -137,12 +137,12 @@ impl Channel {
                 });
             }
         }
-        self.set_ctrl_pin(ctrl_pin, config.invert_ctrl);
-        self.set_sig_pin(sig_pin, config.invert_sig);
+        self.set_ctrl_signal(ctrl_signal, config.invert_ctrl);
+        self.set_edge_signal(edge_signal, config.invert_sig);
     }
 
-    /// Set the control pin for this channel
-    pub fn set_ctrl_pin<'b, P: InputPin>(&self, pin: PcntPin<'b, P>, invert: bool) -> &Self {
+    /// Set the control signal (pin/high/low) for this channel
+    pub fn set_ctrl_signal<'b, P: InputPin>(&self, source: PcntSignal<'b, P>, invert: bool) -> &Self {
         let signal = match self.unit {
             unit::Number::Unit0 => match self.channel {
                 Number::Channel0 => InputSignal::PCNT0_CTRL_CH0,
@@ -181,7 +181,7 @@ impl Channel {
                 Number::Channel1 => InputSignal::PCNT7_CTRL_CH1,
             },
         };
-        let pin_num: u8 = pin.into();
+        let pin_num: u8 = source.into();
 
         if (signal as usize) <= crate::types::INPUT_SIGNAL_MAX as usize {
             unsafe { &*GPIO::PTR }.func_in_sel_cfg[signal as usize].modify(|_, w| unsafe {
@@ -196,7 +196,8 @@ impl Channel {
         self
     }
 
-    pub fn set_sig_pin<'b, P: InputPin>(&self, pin: PcntPin<'b, P>, invert: bool) -> &Self {
+    /// Set the edge signal (pin/high/low) for this channel
+    pub fn set_edge_signal<'b, P: InputPin>(&self, source: PcntSignal<'b, P>, invert: bool) -> &Self {
         let signal = match self.unit {
             unit::Number::Unit0 => match self.channel {
                 Number::Channel0 => InputSignal::PCNT0_SIG_CH0,
@@ -235,7 +236,7 @@ impl Channel {
                 Number::Channel1 => InputSignal::PCNT7_SIG_CH1,
             },
         };
-        let pin_num: u8 = pin.into();
+        let pin_num: u8 = source.into();
 
         if (signal as usize) <= crate::types::INPUT_SIGNAL_MAX as usize {
             unsafe { &*GPIO::PTR }.func_in_sel_cfg[signal as usize].modify(|_, w| unsafe {

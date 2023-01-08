@@ -17,6 +17,17 @@ pub enum Number {
     Unit7,
 }
 
+/// Unit errors
+#[derive(Debug)]
+pub enum Error {
+    /// Invalid filter threshold value
+    InvalidFilterThresh,
+    /// Invalid low limit - must be < 0
+    InvalidLowLimit,
+    /// Invalid high limit - must be > 0
+    InvalidHighLimit,
+}
+
 /// the current status of the counter.
 #[derive(Copy, Clone, Debug, Default)]
 pub enum ZeroMode {
@@ -70,10 +81,58 @@ pub struct Unit {
 impl Unit {
     /// return a new Unit
     pub(super) fn new(number: Number) -> Self {
+        let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
+        let conf0 = match number {
+            Number::Unit0 => &pcnt.u0_conf0,
+            Number::Unit1 => &pcnt.u1_conf0,
+            Number::Unit2 => &pcnt.u2_conf0,
+            Number::Unit3 => &pcnt.u3_conf0,
+            #[cfg(esp32)]
+            Number::Unit4 => &pcnt.u4_conf0,
+            #[cfg(esp32)]
+            Number::Unit5 => &pcnt.u5_conf0,
+            #[cfg(esp32)]
+            Number::Unit6 => &pcnt.u6_conf0,
+            #[cfg(esp32)]
+            Number::Unit7 => &pcnt.u7_conf0,
+        };
+        // disable filter and all events
+        conf0.modify(|_, w| unsafe {
+            w.filter_en().clear_bit()
+                .filter_thres().bits(0)
+                .thr_l_lim_en()
+                .clear_bit()
+                .thr_h_lim_en()
+                .clear_bit()
+                .thr_thres0_en()
+                .clear_bit()
+                .thr_thres1_en()
+                .clear_bit()
+                .thr_zero_en()
+                .clear_bit()
+        } );
         Self { number }
     }
 
-    pub fn configure(&mut self, config: Config) {
+    pub fn configure(&mut self, config: Config) -> Result<(), Error> {
+        // low limit must be >= or the limit is -32768 and when thats 
+        // hit the event status claims it was the high limit.
+        // tested on an esp32s3
+        if config.low_limit >= 0 {
+            return Err(Error::InvalidLowLimit);
+        }
+        if config.high_limit <= 0 {
+            return Err(Error::InvalidHighLimit);
+        }
+        let (filter_en, filter) = match config.filter {
+            Some(filter) => (true, filter),
+            None => (false, 0)
+        };
+        // filter must be less than 1024
+        if filter > 1023 {
+            return Err(Error::InvalidFilterThresh)
+        }
+
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
         let (conf0, conf1, conf2) = match self.number {
             Number::Unit0 => (&pcnt.u0_conf0, &pcnt.u0_conf1, &pcnt.u0_conf2),
@@ -89,7 +148,6 @@ impl Unit {
             #[cfg(esp32)]
             Number::Unit7 => (&pcnt.u7_conf0, &pcnt.u7_conf1, &pcnt.u7_conf2),
         };
-        // TODO: needs range checking low must be < 0 and high > 0!
         conf2.write(|w| unsafe {
             w.cnt_l_lim()
                 .bits(config.low_limit as u16)
@@ -102,14 +160,10 @@ impl Unit {
                 .cnt_thres1()
                 .bits(config.thresh1 as u16)
         });
-        if let Some(filter) = config.filter {
-            // TODO: needs range checking max is 1023!
-            conf0.modify(|_, w| unsafe { w.filter_thres().bits(filter).filter_en().set_bit() });
-        } else {
-            conf0.modify(|_, w| w.filter_en().clear_bit());
-        }
+        conf0.modify(|_, w| unsafe { w.filter_thres().bits(filter).filter_en().bit(filter_en) });
         self.pause();
         self.clear();
+        Ok(())
     }
 
     pub fn get_channel(&self, number: channel::Number) -> super::channel::Channel {
