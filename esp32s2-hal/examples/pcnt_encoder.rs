@@ -59,7 +59,7 @@ fn main() -> ! {
         high_limit: 100,
         filter: Some(min(10u16 * 80, 1023u16)),
         ..Default::default()
-    });
+    }).unwrap();
 
     println!("setup channel 0");
     let mut ch0 = u0.get_channel(channel::Number::Channel0);
