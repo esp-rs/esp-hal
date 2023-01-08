@@ -55,25 +55,25 @@ pub struct Config {
 }
 
 /// PcntPin can be always high, always low, or an actual pin
-pub enum PcntSignal<'a, P: InputPin> {
+pub enum PcntSource<'a, P: InputPin> {
     Pin(PeripheralRef<'a, P>),
     High,
     Low,
 }
 
-impl<'a, P: InputPin> PcntSignal<'a, P> {
+impl<'a, P: InputPin> PcntSource<'a, P> {
     pub fn from_pin(pin: impl Peripheral<P = P> + 'a) -> Self {
         crate::into_ref!(pin);
-        PcntSignal::Pin(pin)
+        PcntSource::Pin(pin)
     }
 }
 
-impl<'a, P: InputPin> From<PcntSignal<'a, P>> for u8 {
-    fn from(pin: PcntSignal<'a, P>) -> Self {
+impl<'a, P: InputPin> From<PcntSource<'a, P>> for u8 {
+    fn from(pin: PcntSource<'a, P>) -> Self {
         match pin {
-            PcntSignal::Pin(pin) => pin.number(),
-            PcntSignal::High => ONE_INPUT,
-            PcntSignal::Low => ZERO_INPUT,
+            PcntSource::Pin(pin) => pin.number(),
+            PcntSource::High => ONE_INPUT,
+            PcntSource::Low => ZERO_INPUT,
         }
     }
 }
@@ -92,8 +92,8 @@ impl Channel {
     /// Configure the channel
     pub fn configure<'b, CP: InputPin, EP: InputPin>(
         &mut self,
-        ctrl_signal: PcntSignal<'b, CP>,
-        edge_signal: PcntSignal<'b, EP>,
+        ctrl_signal: PcntSource<'b, CP>,
+        edge_signal: PcntSource<'b, EP>,
         config: Config,
     ) {
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
@@ -142,7 +142,11 @@ impl Channel {
     }
 
     /// Set the control signal (pin/high/low) for this channel
-    pub fn set_ctrl_signal<'b, P: InputPin>(&self, source: PcntSignal<'b, P>, invert: bool) -> &Self {
+    pub fn set_ctrl_signal<'b, P: InputPin>(
+        &self,
+        source: PcntSource<'b, P>,
+        invert: bool,
+    ) -> &Self {
         let signal = match self.unit {
             unit::Number::Unit0 => match self.channel {
                 Number::Channel0 => InputSignal::PCNT0_CTRL_CH0,
@@ -197,7 +201,11 @@ impl Channel {
     }
 
     /// Set the edge signal (pin/high/low) for this channel
-    pub fn set_edge_signal<'b, P: InputPin>(&self, source: PcntSignal<'b, P>, invert: bool) -> &Self {
+    pub fn set_edge_signal<'b, P: InputPin>(
+        &self,
+        source: PcntSource<'b, P>,
+        invert: bool,
+    ) -> &Self {
         let signal = match self.unit {
             unit::Number::Unit0 => match self.channel {
                 Number::Channel0 => InputSignal::PCNT0_SIG_CH0,

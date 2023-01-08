@@ -20,7 +20,7 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     interrupt,
-    pcnt::{channel, channel::PcntSignal, unit, PCNT},
+    pcnt::{channel, channel::PcntSource, unit, PCNT},
     peripherals::{self, Peripherals},
     prelude::*,
     timer::TimerGroup,
@@ -67,8 +67,8 @@ fn main() -> ! {
     let mut pin_b = io.pins.gpio6.into_pull_up_input();
 
     ch0.configure(
-        PcntSignal::from_pin(&mut pin_a),
-        PcntSignal::from_pin(&mut pin_b),
+        PcntSource::from_pin(&mut pin_a),
+        PcntSource::from_pin(&mut pin_b),
         channel::Config {
             lctrl_mode: channel::CtrlMode::Reverse,
             hctrl_mode: channel::CtrlMode::Keep,
@@ -82,8 +82,8 @@ fn main() -> ! {
     println!("setup channel 1");
     let mut ch1 = u0.get_channel(channel::Number::Channel1);
     ch1.configure(
-        PcntSignal::from_pin(&mut pin_b),
-        PcntSignal::from_pin(&mut pin_a),
+        PcntSource::from_pin(&mut pin_b),
+        PcntSource::from_pin(&mut pin_a),
         channel::Config {
             lctrl_mode: channel::CtrlMode::Reverse,
             hctrl_mode: channel::CtrlMode::Keep,
