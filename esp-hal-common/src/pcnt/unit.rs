@@ -98,8 +98,10 @@ impl Unit {
         };
         // disable filter and all events
         conf0.modify(|_, w| unsafe {
-            w.filter_en().clear_bit()
-                .filter_thres().bits(0)
+            w.filter_en()
+                .clear_bit()
+                .filter_thres()
+                .bits(0)
                 .thr_l_lim_en()
                 .clear_bit()
                 .thr_h_lim_en()
@@ -110,12 +112,12 @@ impl Unit {
                 .clear_bit()
                 .thr_zero_en()
                 .clear_bit()
-        } );
+        });
         Self { number }
     }
 
     pub fn configure(&mut self, config: Config) -> Result<(), Error> {
-        // low limit must be >= or the limit is -32768 and when thats 
+        // low limit must be >= or the limit is -32768 and when thats
         // hit the event status claims it was the high limit.
         // tested on an esp32s3
         if config.low_limit >= 0 {
@@ -126,11 +128,11 @@ impl Unit {
         }
         let (filter_en, filter) = match config.filter {
             Some(filter) => (true, filter),
-            None => (false, 0)
+            None => (false, 0),
         };
         // filter must be less than 1024
         if filter > 1023 {
-            return Err(Error::InvalidFilterThresh)
+            return Err(Error::InvalidFilterThresh);
         }
 
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
@@ -289,7 +291,11 @@ impl Unit {
     /// Get the mode of the last zero crossing
     pub fn get_zero_mode(&self) -> ZeroMode {
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
-        pcnt.u_status[self.number as usize].read().zero_mode().bits().into()
+        pcnt.u_status[self.number as usize]
+            .read()
+            .zero_mode()
+            .bits()
+            .into()
     }
 
     /// Enable interrupts for this unit.
