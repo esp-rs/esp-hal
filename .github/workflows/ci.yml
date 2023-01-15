@@ -1,3 +1,5 @@
+name: CI
+
 on:
   pull_request:
     branches:
@@ -5,162 +7,173 @@ on:
   push:
   workflow_dispatch:
 
-name: CI
-
 env:
   CARGO_TERM_COLOR: always
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+# Cancel any currently running workflows from the same PR, branch, or
+# tag when a new workflow is triggered.
+#
+# https://stackoverflow.com/a/66336834
+concurrency:
+  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
 
 jobs:
   # --------------------------------------------------------------------------
-  # Check Examples
+  # Check
 
-  check-riscv:
-    name: Check RISC-V Examples
+  esp32-hal:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        chip_features:
-          [
-            { chip: esp32c2, features: "eh1,ufmt" },
-            { chip: esp32c2, features: "direct-boot,eh1,ufmt" },
-            { chip: esp32c3, features: "eh1,smartled,ufmt" },
-            { chip: esp32c3, features: "direct-boot,eh1,smartled,ufmt" },
-          ]
-        toolchain: [stable, nightly]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: esp-rs/xtensa-toolchain@v1.5
+        with:
+          default: true
+          buildtargets: esp32
+          ldproxy: false
+      - uses: Swatinem/rust-cache@v1
+
+      # Perform a full build initially to verify that the examples not only
+      # build, but also link successfully.
+      - name: build esp32-hal (no features)
+        run: cd esp32-hal/ && cargo build --examples
+      # Subsequent steps can just check the examples instead, as we're already
+      # confident that they link.
+      - name: check esp32-hal (common features)
+        run: cd esp32-hal/ && cargo check --examples --features=eh1,smartled,ufmt
+      - name: check esp32-hal (async)
+        run: cd esp32-hal/ && cargo check --example=embassy_hello_world --features=embassy,embassy-time-timg0
+
+  esp32c2-hal:
+    runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           target: riscv32imc-unknown-none-elf
-          toolchain: ${{ matrix.toolchain }}
+          toolchain: nightly
           default: true
+          components: rust-src
       - uses: Swatinem/rust-cache@v1
-      - uses: actions-rs/cargo@v1
-        with:
-          command: check
-          args: --examples --manifest-path=${{ matrix.chip_features.chip }}-hal/Cargo.toml --target=riscv32imc-unknown-none-elf --features=${{ matrix.chip_features.features }}
 
-  check-xtensa:
-    name: Check Xtensa Examples
+      # Perform a full build initially to verify that the examples not only
+      # build, but also link successfully.
+      # We also use this as an opportunity to verify that the examples link
+      # for each supported image format.
+      - name: build esp32c2-hal (no features)
+        run: cd esp32c2-hal/ && cargo build --examples
+      - name: build esp32c2-hal (direct-boot)
+        run: cd esp32c2-hal/ && cargo build --examples --features=direct-boot
+      # Subsequent steps can just check the examples instead, as we're already
+      # confident that they link.
+      - name: check esp32c2-hal (common features)
+        run: cd esp32c2-hal/ && cargo check --examples --features=eh1,ufmt
+      - name: check esp32c2-hal (async, systick)
+        run: cd esp32c2-hal/ && cargo check --example=embassy_hello_world --features=embassy,embassy-time-systick
+      - name: check esp32c2-hal (async, timg0)
+        run: cd esp32c2-hal/ && cargo check --example=embassy_hello_world --features=embassy,embassy-time-timg0
+
+  esp32c3-hal:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        chip_features:
-          [
-            { chip: esp32, features: "eh1,smartled,ufmt" },
-            { chip: esp32s2, features: "eh1,smartled,ufmt" },
-            { chip: esp32s3, features: "eh1,smartled,ufmt" },
-            { chip: esp32s3, features: "direct-boot,eh1,smartled,ufmt" },
-          ]
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          target: riscv32imc-unknown-none-elf
+          toolchain: nightly
+          default: true
+          components: rust-src
+      - uses: Swatinem/rust-cache@v1
+
+      # Perform a full build initially to verify that the examples not only
+      # build, but also link successfully.
+      # We also use this as an opportunity to verify that the examples link
+      # for each supported image format.
+      - name: build esp32c3-hal (no features)
+        run: cd esp32c3-hal/ && cargo build --examples
+      - name: build esp32c3-hal (direct-boot)
+        run: cd esp32c3-hal/ && cargo build --examples --features=direct-boot
+      # FIXME: Building using the mcu-boot format currently results in an error.
+      # - name: build esp32c3-hal (mcu-boot)
+      #   run: cd esp32c3-hal/ && cargo build --examples --features=mcu-boot
+      # Subsequent steps can just check the examples instead, as we're already
+      # confident that they link.
+      - name: check esp32c3-hal (common features)
+        run: cargo check --manifest-path=esp32c3-hal/Cargo.toml --target=riscv32imc-unknown-none-elf --examples --features=eh1,smartled,ufmt
+      - name: check esp32c3-hal (async, systick)
+        run: cargo check --manifest-path=esp32c3-hal/Cargo.toml --target=riscv32imc-unknown-none-elf --example=embassy_hello_world --features=embassy,embassy-time-systick
+      - name: check esp32c3-hal (async, timg0)
+        run: cargo check --manifest-path=esp32c3-hal/Cargo.toml --target=riscv32imc-unknown-none-elf --example=embassy_hello_world --features=embassy,embassy-time-timg0
+
+  esp32s2-hal:
+    runs-on: ubuntu-latest
+
     env:
       RUSTFLAGS: '--cfg target_has_atomic="8" --cfg target_has_atomic="16" --cfg target_has_atomic="32" --cfg target_has_atomic="ptr"'
+
     steps:
       - uses: actions/checkout@v2
-      - uses: esp-rs/xtensa-toolchain@v1.4
+      - uses: esp-rs/xtensa-toolchain@v1.5
         with:
           default: true
+          buildtargets: esp32s2
           ldproxy: false
-          buildtargets: ${{ matrix.chip_features.chip }}
       - uses: Swatinem/rust-cache@v1
-      - uses: actions-rs/cargo@v1
+
+      # Perform a full build initially to verify that the examples not only
+      # build, but also link successfully.
+      - name: check esp32s2-hal (no features)
+        run: cd esp32s2-hal/ && cargo build --examples
+      # Subsequent steps can just check the examples instead, as we're already
+      # confident that they link.
+      - name: check esp32s2-hal (common features)
+        run: cd esp32s2-hal/ && cargo check --examples --features=eh1,smartled,ufmt
+      # FIXME: `time-systick` feature disabled for now, see 'esp32s2-hal/Cargo.toml'.
+      # - name: check esp32s2-hal (async, systick)
+      #   run: cd esp32s2-hal/ && cargo check --example=embassy_hello_world --features=embassy,embassy-time-systick
+      - name: check esp32s2-hal (async, timg0)
+        run: cd esp32s2-hal/ && cargo check --example=embassy_hello_world --features=embassy,embassy-time-timg0
+
+  esp32s3-hal:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: esp-rs/xtensa-toolchain@v1.5
         with:
-          command: check
-          args: -Zbuild-std=core --examples --manifest-path=${{ matrix.chip_features.chip }}-hal/Cargo.toml --target=xtensa-${{ matrix.chip_features.chip }}-none-elf --features=${{ matrix.chip_features.features }}
+          default: true
+          buildtargets: esp32s3
+          ldproxy: false
+      - uses: Swatinem/rust-cache@v1
+
+      # Perform a full build initially to verify that the examples not only
+      # build, but also link successfully.
+      # We also use this as an opportunity to verify that the examples link
+      # for each supported image format.
+      - name: build esp32s3-hal (no features)
+        run: cd esp32s3-hal/ && cargo build --examples
+      - name: build esp32s3-hal (direct-boot)
+        run: cd esp32s3-hal/ && cargo build --examples --features=direct-boot
+      # Subsequent steps can just check the examples instead, as we're already
+      # confident that they link.
+      - name: check esp32s3-hal (common features)
+        run: cd esp32s3-hal/ && cargo check --examples --features=eh1,smartled,ufmt
+      - name: check esp32s3-hal (async, systick)
+        run: cd esp32s3-hal/ && cargo check --example=embassy_hello_world --features=embassy,embassy-time-systick
+      - name: check esp32s3-hal (async, timg0)
+        run: cd esp32s3-hal/ && cargo check --example=embassy_hello_world --features=embassy,embassy-time-timg0
 
   # --------------------------------------------------------------------------
-  # Formatting & Clippy
-
-  rustfmt:
-    name: Check formatting
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        package:
-          [
-            esp-hal-common,
-            esp32-hal,
-            esp32c2-hal,
-            esp32c3-hal,
-            esp32s2-hal,
-            esp32s3-hal,
-          ]
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly
-          override: true
-          components: rustfmt
-      - uses: Swatinem/rust-cache@v1
-      - uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all --manifest-path=${{ matrix.package }}/Cargo.toml -- --check
-
-  clippy-riscv:
-    name: Run clippy on RISC-V builds
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        chip: [esp32c2, esp32c3]
-        toolchain: [stable, nightly]
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          target: riscv32imc-unknown-none-elf
-          toolchain: ${{ matrix.toolchain }}
-          components: clippy
-          default: true
-      - uses: Swatinem/rust-cache@v1
-      - uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --manifest-path=${{ matrix.chip }}-hal/Cargo.toml --target=riscv32imc-unknown-none-elf -- --no-deps
-
-  clippy-xtensa:
-    name: Run clippy on Xtensa builds
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        chip: [esp32, esp32s2, esp32s3]
-    steps:
-      - uses: actions/checkout@v2
-      - uses: esp-rs/xtensa-toolchain@v1.4
-        with:
-          default: true
-          ldproxy: false
-          buildtargets: ${{ matrix.chip }}
-      - uses: Swatinem/rust-cache@v1
-      - uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: -Zbuild-std=core --manifest-path=${{ matrix.chip }}-hal/Cargo.toml --target=xtensa-${{ matrix.chip }}-none-elf -- --no-deps
-
-  # --------------------------------------------------------------------------
-  # MSRV Check
+  # MSRV
 
   msrv-riscv:
-    name: Check RISC-V MSRV
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        chip_features:
-          [
-            { chip: esp32c2, features: "eh1,ufmt" },
-            { chip: esp32c2, features: "direct-boot,eh1,ufmt" },
-            { chip: esp32c3, features: "eh1,smartled,ufmt" },
-            { chip: esp32c3, features: "direct-boot,eh1,smartled,ufmt" },
-          ]
+
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -170,34 +183,104 @@ jobs:
           toolchain: "1.65.0"
           default: true
       - uses: Swatinem/rust-cache@v1
-      - uses: actions-rs/cargo@v1
-        with:
-          command: check
-          args: --manifest-path=${{ matrix.chip_features.chip }}-hal/Cargo.toml --target=riscv32imc-unknown-none-elf --features=${{ matrix.chip_features.features }}
+
+      # Verify the MSRV for all RISC-V chips.
+      - name: msrv (esp32c2-hal)
+        run: cd esp32c2-hal/ && cargo check --features=eh1,ufmt
+      - name: msrv (esp32c3-hal)
+        run: cd esp32c3-hal/ && cargo check --features=eh1,ufmt,smartled
 
   msrv-xtensa:
-    name: Check Xtensa MSRV
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        chip_features:
-          [
-            { chip: esp32, features: "eh1,smartled,ufmt" },
-            { chip: esp32s2, features: "eh1,smartled,ufmt" },
-            { chip: esp32s3, features: "eh1,smartled,ufmt" },
-            { chip: esp32s3, features: "direct-boot,eh1,smartled,ufmt" },
-          ]
+
     steps:
       - uses: actions/checkout@v2
-      - uses: esp-rs/xtensa-toolchain@v1.4
+      - uses: esp-rs/xtensa-toolchain@v1.5
         with:
-          default: true
           ldproxy: false
-          buildtargets: ${{ matrix.chip_features.chip }}
           version: "1.65.0"
       - uses: Swatinem/rust-cache@v1
-      - uses: actions-rs/cargo@v1
+
+      # Verify the MSRV for all Xtensa chips.
+      - name: msrv (esp32-hal)
+        run: cd esp32-hal/ && cargo check --features=eh1,ufmt,smartled
+      - name: msrv (esp32s2-hal)
+        run: cd esp32s2-hal/ && cargo check --features=eh1,ufmt,smartled
+      - name: msrv (esp32s3-hal)
+        run: cd esp32s3-hal/ && cargo check --features=eh1,ufmt,smartled
+
+  # --------------------------------------------------------------------------
+  # Lint
+
+  clippy-riscv:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
         with:
-          command: check
-          args: -Zbuild-std=core --manifest-path=${{ matrix.chip_features.chip }}-hal/Cargo.toml --target=xtensa-${{ matrix.chip_features.chip }}-none-elf --features=${{ matrix.chip_features.features }}
+          profile: minimal
+          toolchain: stable
+          components: clippy
+      - uses: Swatinem/rust-cache@v1
+
+      # Run clippy on all packages targeting RISC-V.
+      - name: clippy (esp32c2-hal)
+        run: cargo +stable clippy --manifest-path=esp32c2-hal/Cargo.toml -- --no-deps
+      - name: clippy (esp32c3-hal)
+        run: cargo +stable clippy --manifest-path=esp32c3-hal/Cargo.toml -- --no-deps
+
+  clippy-xtensa:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: esp-rs/xtensa-toolchain@v1.5
+        with:
+          ldproxy: false
+      - uses: Swatinem/rust-cache@v1
+
+      # Run clippy on all packages targeting Xtensa.
+      #
+      # The ESP32-S2 requires some additional information in order for the
+      # atomic emulation crate to build.
+      - name: clippy (esp32-hal)
+        run: cargo +esp clippy --manifest-path=esp32-hal/Cargo.toml -- --no-deps
+      - name: clippy (esp32s2-hal)
+        run: cargo +esp clippy --manifest-path=esp32s2-hal/Cargo.toml --target=xtensa-esp32s2-none-elf -Zbuild-std=core -- --no-deps
+      - name: clippy (esp32s3-hal)
+        run: cargo +esp clippy --manifest-path=esp32s3-hal/Cargo.toml -- --no-deps
+
+  rustfmt:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      # Some of the items in 'rustfmt.toml' require the nightly release
+      # channel, so we must use this channel for the formatting checks
+      # to succeed.
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          components: rustfmt
+          default: true
+
+      - uses: Swatinem/rust-cache@v1
+
+      # Check the formatting of all packages.
+      - name: rustfmt (esp-hal-common)
+        run: cargo fmt --all --manifest-path=esp-hal-common/Cargo.toml -- --check
+      - name: rustfmt (esp-hal-procmacros)
+        run: cargo fmt --all --manifest-path=esp-hal-procmacros/Cargo.toml -- --check
+      - name: rustfmt (esp32-hal)
+        run: cargo fmt --all --manifest-path=esp32-hal/Cargo.toml -- --check
+      - name: rustfmt (esp32c2-hal)
+        run: cargo fmt --all --manifest-path=esp32c2-hal/Cargo.toml -- --check
+      - name: rustfmt (esp32c3-hal)
+        run: cargo fmt --all --manifest-path=esp32c3-hal/Cargo.toml -- --check
+      - name: rustfmt (esp32s2-hal)
+        run: cargo fmt --all --manifest-path=esp32s2-hal/Cargo.toml -- --check
+      - name: rustfmt (esp32s3-hal)
+        run: cargo fmt --all --manifest-path=esp32s3-hal/Cargo.toml -- --check
