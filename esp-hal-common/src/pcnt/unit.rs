@@ -1,3 +1,5 @@
+use critical_section::CriticalSection;
+
 use super::channel;
 
 /// Unit number
@@ -174,73 +176,79 @@ impl Unit {
 
     pub fn clear(&self) {
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
-        match self.number {
-            Number::Unit0 => pcnt.ctrl.modify(|_, w| w.cnt_rst_u0().set_bit()),
-            Number::Unit1 => pcnt.ctrl.modify(|_, w| w.cnt_rst_u1().set_bit()),
-            Number::Unit2 => pcnt.ctrl.modify(|_, w| w.cnt_rst_u2().set_bit()),
-            Number::Unit3 => pcnt.ctrl.modify(|_, w| w.cnt_rst_u3().set_bit()),
-            #[cfg(esp32)]
-            Number::Unit4 => pcnt.ctrl.modify(|_, w| w.cnt_rst_u4().set_bit()),
-            #[cfg(esp32)]
-            Number::Unit5 => pcnt.ctrl.modify(|_, w| w.cnt_rst_u5().set_bit()),
-            #[cfg(esp32)]
-            Number::Unit6 => pcnt.ctrl.modify(|_, w| w.cnt_rst_u6().set_bit()),
-            #[cfg(esp32)]
-            Number::Unit7 => pcnt.ctrl.modify(|_, w| w.cnt_rst_u7().set_bit()),
-        }
-        // TODO: does this need a delay? (liebman / Jan 2 2023)
-        match self.number {
-            Number::Unit0 => pcnt.ctrl.modify(|_, w| w.cnt_rst_u0().clear_bit()),
-            Number::Unit1 => pcnt.ctrl.modify(|_, w| w.cnt_rst_u1().clear_bit()),
-            Number::Unit2 => pcnt.ctrl.modify(|_, w| w.cnt_rst_u2().clear_bit()),
-            Number::Unit3 => pcnt.ctrl.modify(|_, w| w.cnt_rst_u3().clear_bit()),
-            #[cfg(esp32)]
-            Number::Unit4 => pcnt.ctrl.modify(|_, w| w.cnt_rst_u4().clear_bit()),
-            #[cfg(esp32)]
-            Number::Unit5 => pcnt.ctrl.modify(|_, w| w.cnt_rst_u5().clear_bit()),
-            #[cfg(esp32)]
-            Number::Unit6 => pcnt.ctrl.modify(|_, w| w.cnt_rst_u6().clear_bit()),
-            #[cfg(esp32)]
-            Number::Unit7 => pcnt.ctrl.modify(|_, w| w.cnt_rst_u7().clear_bit()),
-        }
+        critical_section::with(|_cs| {
+            match self.number {
+                Number::Unit0 => pcnt.ctrl.modify(|_, w| w.cnt_rst_u0().set_bit()),
+                Number::Unit1 => pcnt.ctrl.modify(|_, w| w.cnt_rst_u1().set_bit()),
+                Number::Unit2 => pcnt.ctrl.modify(|_, w| w.cnt_rst_u2().set_bit()),
+                Number::Unit3 => pcnt.ctrl.modify(|_, w| w.cnt_rst_u3().set_bit()),
+                #[cfg(esp32)]
+                Number::Unit4 => pcnt.ctrl.modify(|_, w| w.cnt_rst_u4().set_bit()),
+                #[cfg(esp32)]
+                Number::Unit5 => pcnt.ctrl.modify(|_, w| w.cnt_rst_u5().set_bit()),
+                #[cfg(esp32)]
+                Number::Unit6 => pcnt.ctrl.modify(|_, w| w.cnt_rst_u6().set_bit()),
+                #[cfg(esp32)]
+                Number::Unit7 => pcnt.ctrl.modify(|_, w| w.cnt_rst_u7().set_bit()),
+            }
+            // TODO: does this need a delay? (liebman / Jan 2 2023)
+            match self.number {
+                Number::Unit0 => pcnt.ctrl.modify(|_, w| w.cnt_rst_u0().clear_bit()),
+                Number::Unit1 => pcnt.ctrl.modify(|_, w| w.cnt_rst_u1().clear_bit()),
+                Number::Unit2 => pcnt.ctrl.modify(|_, w| w.cnt_rst_u2().clear_bit()),
+                Number::Unit3 => pcnt.ctrl.modify(|_, w| w.cnt_rst_u3().clear_bit()),
+                #[cfg(esp32)]
+                Number::Unit4 => pcnt.ctrl.modify(|_, w| w.cnt_rst_u4().clear_bit()),
+                #[cfg(esp32)]
+                Number::Unit5 => pcnt.ctrl.modify(|_, w| w.cnt_rst_u5().clear_bit()),
+                #[cfg(esp32)]
+                Number::Unit6 => pcnt.ctrl.modify(|_, w| w.cnt_rst_u6().clear_bit()),
+                #[cfg(esp32)]
+                Number::Unit7 => pcnt.ctrl.modify(|_, w| w.cnt_rst_u7().clear_bit()),
+            }
+        });
     }
 
     /// Pause the counter
     pub fn pause(&self) {
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
-        match self.number {
-            Number::Unit0 => pcnt.ctrl.modify(|_, w| w.cnt_pause_u0().set_bit()),
-            Number::Unit1 => pcnt.ctrl.modify(|_, w| w.cnt_pause_u1().set_bit()),
-            Number::Unit2 => pcnt.ctrl.modify(|_, w| w.cnt_pause_u2().set_bit()),
-            Number::Unit3 => pcnt.ctrl.modify(|_, w| w.cnt_pause_u3().set_bit()),
-            #[cfg(esp32)]
-            Number::Unit4 => pcnt.ctrl.modify(|_, w| w.cnt_pause_u4().set_bit()),
-            #[cfg(esp32)]
-            Number::Unit5 => pcnt.ctrl.modify(|_, w| w.cnt_pause_u5().set_bit()),
-            #[cfg(esp32)]
-            Number::Unit6 => pcnt.ctrl.modify(|_, w| w.cnt_pause_u6().set_bit()),
-            #[cfg(esp32)]
-            Number::Unit7 => pcnt.ctrl.modify(|_, w| w.cnt_pause_u7().set_bit()),
-        }
+        critical_section::with(|_cs|
+            match self.number {
+                Number::Unit0 => pcnt.ctrl.modify(|_, w| w.cnt_pause_u0().set_bit()),
+                Number::Unit1 => pcnt.ctrl.modify(|_, w| w.cnt_pause_u1().set_bit()),
+                Number::Unit2 => pcnt.ctrl.modify(|_, w| w.cnt_pause_u2().set_bit()),
+                Number::Unit3 => pcnt.ctrl.modify(|_, w| w.cnt_pause_u3().set_bit()),
+                #[cfg(esp32)]
+                Number::Unit4 => pcnt.ctrl.modify(|_, w| w.cnt_pause_u4().set_bit()),
+                #[cfg(esp32)]
+                Number::Unit5 => pcnt.ctrl.modify(|_, w| w.cnt_pause_u5().set_bit()),
+                #[cfg(esp32)]
+                Number::Unit6 => pcnt.ctrl.modify(|_, w| w.cnt_pause_u6().set_bit()),
+                #[cfg(esp32)]
+                Number::Unit7 => pcnt.ctrl.modify(|_, w| w.cnt_pause_u7().set_bit()),
+            }
+        );
     }
 
     /// Resume the counter
     pub fn resume(&self) {
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
-        match self.number {
-            Number::Unit0 => pcnt.ctrl.modify(|_, w| w.cnt_pause_u0().clear_bit()),
-            Number::Unit1 => pcnt.ctrl.modify(|_, w| w.cnt_pause_u1().clear_bit()),
-            Number::Unit2 => pcnt.ctrl.modify(|_, w| w.cnt_pause_u2().clear_bit()),
-            Number::Unit3 => pcnt.ctrl.modify(|_, w| w.cnt_pause_u3().clear_bit()),
-            #[cfg(esp32)]
-            Number::Unit4 => pcnt.ctrl.modify(|_, w| w.cnt_pause_u4().clear_bit()),
-            #[cfg(esp32)]
-            Number::Unit5 => pcnt.ctrl.modify(|_, w| w.cnt_pause_u5().clear_bit()),
-            #[cfg(esp32)]
-            Number::Unit6 => pcnt.ctrl.modify(|_, w| w.cnt_pause_u6().clear_bit()),
-            #[cfg(esp32)]
-            Number::Unit7 => pcnt.ctrl.modify(|_, w| w.cnt_pause_u7().clear_bit()),
-        }
+        critical_section::with(|_cs|
+            match self.number {
+                Number::Unit0 => pcnt.ctrl.modify(|_, w| w.cnt_pause_u0().clear_bit()),
+                Number::Unit1 => pcnt.ctrl.modify(|_, w| w.cnt_pause_u1().clear_bit()),
+                Number::Unit2 => pcnt.ctrl.modify(|_, w| w.cnt_pause_u2().clear_bit()),
+                Number::Unit3 => pcnt.ctrl.modify(|_, w| w.cnt_pause_u3().clear_bit()),
+                #[cfg(esp32)]
+                Number::Unit4 => pcnt.ctrl.modify(|_, w| w.cnt_pause_u4().clear_bit()),
+                #[cfg(esp32)]
+                Number::Unit5 => pcnt.ctrl.modify(|_, w| w.cnt_pause_u5().clear_bit()),
+                #[cfg(esp32)]
+                Number::Unit6 => pcnt.ctrl.modify(|_, w| w.cnt_pause_u6().clear_bit()),
+                #[cfg(esp32)]
+                Number::Unit7 => pcnt.ctrl.modify(|_, w| w.cnt_pause_u7().clear_bit()),
+            }
+        );
     }
 
     /// Enable which events generate interrupts on this unit.
@@ -301,39 +309,43 @@ impl Unit {
     /// Enable interrupts for this unit.
     pub fn listen(&self) {
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
-        pcnt.int_ena.modify(|_, w| match self.number {
-            Number::Unit0 => w.cnt_thr_event_u0().set_bit(),
-            Number::Unit1 => w.cnt_thr_event_u1().set_bit(),
-            Number::Unit2 => w.cnt_thr_event_u2().set_bit(),
-            Number::Unit3 => w.cnt_thr_event_u3().set_bit(),
-            #[cfg(esp32)]
-            Number::Unit4 => w.cnt_thr_event_u4().set_bit(),
-            #[cfg(esp32)]
-            Number::Unit5 => w.cnt_thr_event_u5().set_bit(),
-            #[cfg(esp32)]
-            Number::Unit6 => w.cnt_thr_event_u6().set_bit(),
-            #[cfg(esp32)]
-            Number::Unit7 => w.cnt_thr_event_u7().set_bit(),
-        });
+        critical_section::with(|_cs|
+            pcnt.int_ena.modify(|_, w| match self.number {
+                Number::Unit0 => w.cnt_thr_event_u0().set_bit(),
+                Number::Unit1 => w.cnt_thr_event_u1().set_bit(),
+                Number::Unit2 => w.cnt_thr_event_u2().set_bit(),
+                Number::Unit3 => w.cnt_thr_event_u3().set_bit(),
+                #[cfg(esp32)]
+                Number::Unit4 => w.cnt_thr_event_u4().set_bit(),
+                #[cfg(esp32)]
+                Number::Unit5 => w.cnt_thr_event_u5().set_bit(),
+                #[cfg(esp32)]
+                Number::Unit6 => w.cnt_thr_event_u6().set_bit(),
+                #[cfg(esp32)]
+                Number::Unit7 => w.cnt_thr_event_u7().set_bit(),
+            })
+        );
     }
 
     /// Disable interrupts for this unit.
-    pub fn unlisten(&self) {
+    pub fn unlisten(&self, _cs: CriticalSection) {
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
-        pcnt.int_ena.write(|w| match self.number {
-            Number::Unit0 => w.cnt_thr_event_u0().clear_bit(),
-            Number::Unit1 => w.cnt_thr_event_u1().clear_bit(),
-            Number::Unit2 => w.cnt_thr_event_u2().clear_bit(),
-            Number::Unit3 => w.cnt_thr_event_u3().clear_bit(),
-            #[cfg(esp32)]
-            Number::Unit4 => w.cnt_thr_event_u4().clear_bit(),
-            #[cfg(esp32)]
-            Number::Unit5 => w.cnt_thr_event_u5().clear_bit(),
-            #[cfg(esp32)]
-            Number::Unit6 => w.cnt_thr_event_u6().clear_bit(),
-            #[cfg(esp32)]
-            Number::Unit7 => w.cnt_thr_event_u7().clear_bit(),
-        });
+        critical_section::with(|_cs|
+            pcnt.int_ena.write(|w| match self.number {
+                Number::Unit0 => w.cnt_thr_event_u0().clear_bit(),
+                Number::Unit1 => w.cnt_thr_event_u1().clear_bit(),
+                Number::Unit2 => w.cnt_thr_event_u2().clear_bit(),
+                Number::Unit3 => w.cnt_thr_event_u3().clear_bit(),
+                #[cfg(esp32)]
+                Number::Unit4 => w.cnt_thr_event_u4().clear_bit(),
+                #[cfg(esp32)]
+                Number::Unit5 => w.cnt_thr_event_u5().clear_bit(),
+                #[cfg(esp32)]
+                Number::Unit6 => w.cnt_thr_event_u6().clear_bit(),
+                #[cfg(esp32)]
+                Number::Unit7 => w.cnt_thr_event_u7().clear_bit(),
+            })
+        );
     }
 
     /// Returns true if an interrupt is active for this unit.
@@ -358,20 +370,22 @@ impl Unit {
     /// Clear the interrupt bit for this unit.
     pub fn reset_interrupt(&self) {
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
-        pcnt.int_clr.write(|w| match self.number {
-            Number::Unit0 => w.cnt_thr_event_u0().set_bit(),
-            Number::Unit1 => w.cnt_thr_event_u1().set_bit(),
-            Number::Unit2 => w.cnt_thr_event_u2().set_bit(),
-            Number::Unit3 => w.cnt_thr_event_u3().set_bit(),
-            #[cfg(esp32)]
-            Number::Unit4 => w.cnt_thr_event_u4().set_bit(),
-            #[cfg(esp32)]
-            Number::Unit5 => w.cnt_thr_event_u5().set_bit(),
-            #[cfg(esp32)]
-            Number::Unit6 => w.cnt_thr_event_u6().set_bit(),
-            #[cfg(esp32)]
-            Number::Unit7 => w.cnt_thr_event_u7().set_bit(),
-        });
+        critical_section::with(|_cs|
+            pcnt.int_clr.write(|w| match self.number {
+                Number::Unit0 => w.cnt_thr_event_u0().set_bit(),
+                Number::Unit1 => w.cnt_thr_event_u1().set_bit(),
+                Number::Unit2 => w.cnt_thr_event_u2().set_bit(),
+                Number::Unit3 => w.cnt_thr_event_u3().set_bit(),
+                #[cfg(esp32)]
+                Number::Unit4 => w.cnt_thr_event_u4().set_bit(),
+                #[cfg(esp32)]
+                Number::Unit5 => w.cnt_thr_event_u5().set_bit(),
+                #[cfg(esp32)]
+                Number::Unit6 => w.cnt_thr_event_u6().set_bit(),
+                #[cfg(esp32)]
+                Number::Unit7 => w.cnt_thr_event_u7().set_bit(),
+            })
+        );
     }
 
     /// Get the current counter value.

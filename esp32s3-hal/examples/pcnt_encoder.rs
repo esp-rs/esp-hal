@@ -3,7 +3,7 @@
 //! This example decodes a quadrature encoder
 //!
 //! Since the PCNT units reset to zero when they reach their limits
-//! we use enable an interrupt on the upper and lower limits and
+//! we enable an interrupt on the upper and lower limits and
 //! track the overflow in an AtomicI32
 
 #![no_std]
