@@ -6,11 +6,11 @@
 
 **H**ardware **A**bstraction **L**ayer crates for the **ESP32**, **ESP32-C2**, **ESP32-C3**, **ESP32-S2**, and **ESP32-S3** from Espressif.
 
-These HALs are `no_std`; if you are looking for `std` support please use [esp-idf-hal] instead.
+These HALs are `no_std`; if you are looking for `std` support, please use [esp-idf-hal] instead.
 
 This project is still in the early stages of development, and as such there should be no expectation of API stability. A significant number of peripherals currently have drivers implemented (you can see a full list [here]) but have varying levels of functionality. For most basic tasks, this should be usable already.
 
-If you have any questions, comments, or concerns please [open an issue], [start a new discussion], or join us on [Matrix]. For additional information regarding any of the crates in this repository please refer to the crate's README.
+If you have any questions, comments, or concerns, please [open an issue], [start a new discussion], or join us on [Matrix]. For additional information regarding any of the crates in this repository, please refer to the crate's README.
 
 |     Crate     |                               Target                                | Technical Reference Manual |
 | :-----------: | :-----------------------------------------------------------------: | :------------------------: |
@@ -48,7 +48,7 @@ $ cargo install cargo-generate
 $ cargo generate --git https://github.com/esp-rs/esp-template
 ```
 
-For more information on using this template please refer to [its README].
+For more information on using this template, please refer to [its README].
 
 [cargo-generate]: https://github.com/cargo-generate/cargo-generate
 [esp-template]: https://github.com/esp-rs/esp-template
@@ -85,6 +85,16 @@ RISC-V is officially supported by the official Rust compiler.
 
 [esp-rs/rust]: https://github.com/esp-rs/rust
 [esp-rs/rust-build]: https://github.com/esp-rs/rust-build
+
+## Git Hooks
+
+We provide a simple `pre-commit` hook to verify the formatting of each package prior to committing changes. This can be enabled by placing it in the `.git/hooks/` directory:
+
+```bash
+$ cp pre-commit .git/hooks/pre-commit
+```
+
+When using this hook, you can choose to ignore its failure on a per-commit basis by committing with the `--no-verify` flag; however, you will need to be sure that all packages are formatted when submitting a pull request.
 
 ## License
 
