@@ -55,7 +55,7 @@ pub struct Config {
 }
 
 /// PcntPin can be always high, always low, or an actual pin
-#[derive(Clone,Copy)]
+#[derive(Clone, Copy)]
 pub struct PcntSource {
     source: u8,
 }
@@ -63,7 +63,9 @@ pub struct PcntSource {
 impl PcntSource {
     pub fn from_pin<'a, P: InputPin>(pin: impl Peripheral<P = P> + 'a) -> Self {
         crate::into_ref!(pin);
-        Self { source: pin.number() }
+        Self {
+            source: pin.number(),
+        }
     }
     pub fn always_high() -> Self {
         Self { source: ONE_INPUT }
@@ -85,12 +87,7 @@ impl Channel {
     }
 
     /// Configure the channel
-    pub fn configure(
-        &mut self,
-        ctrl_signal: PcntSource,
-        edge_signal: PcntSource,
-        config: Config,
-    ) {
+    pub fn configure(&mut self, ctrl_signal: PcntSource, edge_signal: PcntSource, config: Config) {
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
         let conf0 = match self.unit {
             unit::Number::Unit0 => &pcnt.u0_conf0,
@@ -137,11 +134,7 @@ impl Channel {
     }
 
     /// Set the control signal (pin/high/low) for this channel
-    pub fn set_ctrl_signal(
-        &self,
-        source: PcntSource,
-        invert: bool,
-    ) -> &Self {
+    pub fn set_ctrl_signal(&self, source: PcntSource, invert: bool) -> &Self {
         let signal = match self.unit {
             unit::Number::Unit0 => match self.channel {
                 Number::Channel0 => InputSignal::PCNT0_CTRL_CH0,
@@ -195,11 +188,7 @@ impl Channel {
     }
 
     /// Set the edge signal (pin/high/low) for this channel
-    pub fn set_edge_signal(
-        &self,
-        source: PcntSource,
-        invert: bool,
-    ) -> &Self {
+    pub fn set_edge_signal(&self, source: PcntSource, invert: bool) -> &Self {
         let signal = match self.unit {
             unit::Number::Unit0 => match self.channel {
                 Number::Channel0 => InputSignal::PCNT0_SIG_CH0,
