@@ -20,6 +20,7 @@ pub use esp_hal_common::{
     macros,
     mcpwm,
     otg_fs,
+    pcnt,
     peripherals,
     prelude,
     pulse_control,

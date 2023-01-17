@@ -18,6 +18,7 @@ pub use esp_hal_common::{
     ledc,
     macros,
     otg_fs,
+    pcnt,
     peripherals,
     prelude,
     pulse_control,

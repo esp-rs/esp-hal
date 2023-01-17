@@ -30,6 +30,8 @@ pub enum Peripheral {
     Mcpwm0,
     #[cfg(any(esp32, esp32s3))]
     Mcpwm1,
+    #[cfg(any(esp32, esp32s2, esp32s3))]
+    Pcnt,
     #[cfg(any(esp32c2, esp32c3))]
     ApbSarAdc,
     #[cfg(gdma)]
@@ -107,6 +109,11 @@ impl PeripheralClockControl {
             Peripheral::Mcpwm1 => {
                 perip_clk_en0.modify(|_, w| w.pwm1_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.pwm1_rst().clear_bit());
+            }
+            #[cfg(any(esp32, esp32s2, esp32s3))]
+            Peripheral::Pcnt => {
+                perip_clk_en0.modify(|_, w| w.pcnt_clk_en().set_bit());
+                perip_rst_en0.modify(|_, w| w.pcnt_rst().clear_bit());
             }
             #[cfg(any(esp32c2, esp32c3))]
             Peripheral::ApbSarAdc => {
