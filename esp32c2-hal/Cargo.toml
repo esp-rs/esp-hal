@@ -32,8 +32,8 @@ embedded-hal-async = { version = "0.1.0-alpha.3", optional = true }
 embedded-hal-nb    = { version = "=1.0.0-alpha.1", optional = true }
 esp-hal-common     = { version = "0.4.0",  features = ["esp32c2"], path = "../esp-hal-common" }
 r0                 = "1.0.0"
-riscv              = "0.10.0"
-riscv-rt           = { version = "0.10.0", optional = true }
+riscv              = "0.10.1"
+riscv-rt           = { version = "0.11.0", optional = true }
 
 [dev-dependencies]
 critical-section  = "1.1.1"
@@ -55,9 +55,9 @@ vectored             = ["esp-hal-common/vectored"]
 async                = ["esp-hal-common/async", "embedded-hal-async"]
 embassy              = ["esp-hal-common/embassy"]
 embassy-time-systick = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-hz-16_000_000"]
-embassy-time-timg0   = ["esp-hal-common/embassy-time-timg0", "embassy-time/tick-hz-1_000_000"]
-xtal40mhz            = ["esp-hal-common/esp32c2_40mhz"] 
+embassy-time-timg0   = ["esp-hal-common/embassy-time-timg0",   "embassy-time/tick-hz-1_000_000"]
 xtal26mhz            = ["esp-hal-common/esp32c2_26mhz"]
+xtal40mhz            = ["esp-hal-common/esp32c2_40mhz"] 
 
 [[example]]
 name              = "spi_eh1_loopback"
