@@ -1,4 +1,5 @@
 use paste::paste;
+use strum::FromRepr;
 
 use crate::{
     clock::XtalClock,
@@ -205,4 +206,44 @@ fn rtc_sleep_pu() {
     apb_ctrl
         .mem_power_up
         .modify(|_, w| unsafe { w.sram_power_up().bits(0u8).rom_power_up().bits(0u8) });
+}
+
+// Terminology:
+//
+// CPU Reset:    Reset CPU core only, once reset done, CPU will execute from
+//               reset vector
+// Core Reset:   Reset the whole digital system except RTC sub-system
+// System Reset: Reset the whole digital system, including RTC sub-system
+// Chip Reset:   Reset the whole chip, including the analog part
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, FromRepr)]
+pub enum SocResetReason {
+    /// Power on reset
+    ChipPowerOn   = 0x01,
+    /// Software resets the digital core by RTC_CNTL_SW_SYS_RST
+    CoreSw        = 0x03,
+    /// Deep sleep reset the digital core
+    CoreDeepSleep = 0x05,
+    /// Main watch dog 0 resets digital core
+    CoreMwdt0     = 0x07,
+    /// RTC watch dog resets digital core
+    CoreRtcWdt    = 0x09,
+    /// Main watch dog 0 resets CPU 0
+    Cpu0Mwdt0     = 0x0B,
+    /// Software resets CPU 0 by RTC_CNTL_SW_PROCPU_RST
+    Cpu0Sw        = 0x0C,
+    /// RTC watch dog resets CPU 0
+    Cpu0RtcWdt    = 0x0D,
+    /// VDD voltage is not stable and resets the digital core
+    SysBrownOut   = 0x0F,
+    /// RTC watch dog resets digital core and rtc module
+    SysRtcWdt     = 0x10,
+    /// Super watch dog resets the digital core and rtc module
+    SysSuperWdt   = 0x12,
+    /// Glitch on clock resets the digital core and rtc module
+    SysClkGlitch  = 0x13,
+    /// eFuse CRC error resets the digital core
+    CoreEfuseCrc  = 0x14,
+    /// JTAG resets the CPU 0
+    Cpu0Jtag      = 0x18,
 }

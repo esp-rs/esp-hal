@@ -1,6 +1,7 @@
 use embedded_hal::watchdog::{Watchdog, WatchdogDisable, WatchdogEnable};
 use fugit::{HertzU32, MicrosDurationU64};
 
+use self::rtc::SocResetReason;
 #[cfg(not(esp32))]
 use crate::efuse::Efuse;
 use crate::{
@@ -8,6 +9,7 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{RTC_CNTL, TIMG0},
     rom::esp_rom_delay_us,
+    Cpu,
 };
 
 #[cfg_attr(esp32, path = "rtc/esp32.rs")]
@@ -665,4 +667,11 @@ impl WatchdogDisable for Swd {
 
         self.set_write_protection(true);
     }
+}
+
+pub fn get_reset_reason(cpu: Cpu) -> Option<SocResetReason> {
+    let reason = unsafe { crate::rom::rtc_get_reset_reason(cpu as u32) };
+    let reason = SocResetReason::from_repr(reason as usize);
+
+    reason
 }
