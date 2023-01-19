@@ -127,3 +127,21 @@ macro_rules! regi2c_write_mask {
         }
     };
 }
+
+/// Determine the reason that the specified CPU reset
+pub unsafe fn rtc_get_reset_reason(cpu_num: u32) -> u32 {
+    #[cfg(esp32)]
+    const RTC_GET_RESET_REASON: u32 = 0x4000_81d4;
+    #[cfg(esp32c2)]
+    const RTC_GET_RESET_REASON: u32 = 0x4000_0018;
+    #[cfg(esp32c3)]
+    const RTC_GET_RESET_REASON: u32 = 0x4000_0018;
+    #[cfg(esp32s2)]
+    const RTC_GET_RESET_REASON: u32 = 0x4000_ff58;
+    #[cfg(esp32s3)]
+    const RTC_GET_RESET_REASON: u32 = 0x4000_057c;
+
+    let get_reason: fn(u32) -> u32 = core::mem::transmute(RTC_GET_RESET_REASON as usize);
+
+    get_reason(cpu_num)
+}
