@@ -1,147 +1,43 @@
 pub use paste::paste;
 
-/// Pauses execution for us microseconds
-#[inline(always)]
-pub unsafe fn esp_rom_delay_us(us: u32) {
-    #[cfg(esp32)]
-    const ESP_ROM_DELAY_US: u32 = 0x4000_8534;
-    #[cfg(esp32c2)]
-    const ESP_ROM_DELAY_US: u32 = 0x4000_0044;
-    #[cfg(esp32c3)]
-    const ESP_ROM_DELAY_US: u32 = 0x4000_0050;
-    #[cfg(esp32s2)]
-    const ESP_ROM_DELAY_US: u32 = 0x4000_d888;
-    #[cfg(esp32s3)]
-    const ESP_ROM_DELAY_US: u32 = 0x4000_0600;
+#[allow(unused)]
+extern "C" {
+    pub(crate) fn rom_i2c_writeReg(block: u32, block_hostid: u32, reg_add: u32, indata: u32);
 
-    // cast to usize is just needed because of the way we run clippy in CI
-    let fn_esp_rom_delay_us: fn(us: u32) = core::mem::transmute(ESP_ROM_DELAY_US as usize);
-
-    fn_esp_rom_delay_us(us);
-}
-
-#[inline(always)]
-/// Set the real CPU ticks per us to the ets, so that ets_delay_us
-/// will be accurate. Call this function when CPU frequency is changed.
-pub unsafe fn ets_update_cpu_frequency(ticks_per_us: u32) {
-    #[cfg(esp32)]
-    const ETS_UPDATE_CPU_FREQUENCY: u32 = 0x4000_8550;
-    #[cfg(esp32c2)]
-    const ETS_UPDATE_CPU_FREQUENCY: u32 = 0x4000_0774;
-    #[cfg(esp32c3)]
-    const ETS_UPDATE_CPU_FREQUENCY: u32 = 0x4000_0588;
-    #[cfg(esp32s2)]
-    const ETS_UPDATE_CPU_FREQUENCY: u32 = 0x4000_d8a4;
-    #[cfg(esp32s3)]
-    const ETS_UPDATE_CPU_FREQUENCY: u32 = 0x4004_3164;
-
-    // cast to usize is just needed because of the way we run clippy in CI
-    let rom_ets_update_cpu_frequency: fn(ticks_per_us: u32) =
-        core::mem::transmute(ETS_UPDATE_CPU_FREQUENCY as usize);
-
-    rom_ets_update_cpu_frequency(ticks_per_us);
-}
-
-#[inline(always)]
-pub unsafe fn regi2c_ctrl_write_reg(block: u32, block_hostid: u32, reg_add: u32, indata: u32) {
-    #[cfg(esp32)]
-    const ROM_I2C_WRITEREG: u32 = 0x4000_41a4;
-    #[cfg(esp32c2)]
-    const ROM_I2C_WRITEREG: u32 = 0x4000_22f4;
-    #[cfg(esp32c3)]
-    const ROM_I2C_WRITEREG: u32 = 0x4000_195c;
-    #[cfg(esp32s2)]
-    const ROM_I2C_WRITEREG: u32 = 0x4000_a9a8;
-    #[cfg(esp32s3)]
-    const ROM_I2C_WRITEREG: u32 = 0x4000_5d60;
-
-    // cast to usize is just needed because of the way we run clippy in CI
-    let i2c_write_reg_raw: fn(block: u32, block_hostid: u32, reg_add: u32, indata: u32) -> i32 =
-        core::mem::transmute(ROM_I2C_WRITEREG as usize);
-
-    i2c_write_reg_raw(block, block_hostid, reg_add, indata);
-}
-
-#[macro_export]
-macro_rules! regi2c_write {
-    ( $block: ident, $reg_add: ident, $indata: expr ) => {
-        paste! {
-            regi2c_ctrl_write_reg($block,
-                [<$block _HOSTID>],
-                $reg_add,
-                $indata);
-        }
-    };
-}
-
-#[inline(always)]
-pub unsafe fn regi2c_ctrl_write_reg_mask(
-    block: u32,
-    block_hostid: u32,
-    reg_add: u32,
-    reg_add_msb: u32,
-    reg_add_lsb: u32,
-    indata: u32,
-) {
-    #[cfg(esp32)]
-    const ROM_I2C_WRITEREG_MASK: u32 = 0x4000_41fc;
-    #[cfg(esp32c2)]
-    const ROM_I2C_WRITEREG_MASK: u32 = 0x4000_22fc;
-    #[cfg(esp32c3)]
-    const ROM_I2C_WRITEREG_MASK: u32 = 0x4000_1960;
-    #[cfg(esp32s2)]
-    const ROM_I2C_WRITEREG_MASK: u32 = 0x4000_aa00;
-    #[cfg(esp32s3)]
-    const ROM_I2C_WRITEREG_MASK: u32 = 0x4000_5d6c;
-
-    // cast to usize is just needed because of the way we run clippy in CI
-    let i2c_write_reg_mask_raw: fn(
+    pub(crate) fn rom_i2c_writeReg_Mask(
         block: u32,
         block_hostid: u32,
         reg_add: u32,
         reg_add_msb: u32,
         reg_add_lsb: u32,
         indata: u32,
-    ) -> i32 = core::mem::transmute(ROM_I2C_WRITEREG_MASK as usize);
-
-    i2c_write_reg_mask_raw(
-        block,
-        block_hostid,
-        reg_add,
-        reg_add_msb,
-        reg_add_lsb,
-        indata,
     );
+}
+
+#[macro_export]
+macro_rules! regi2c_write {
+    ( $block: ident, $reg_add: ident, $indata: expr ) => {
+        paste! {
+            rom_i2c_writeReg($block,
+                [<$block _HOSTID>],
+                $reg_add,
+                $indata
+            );
+        }
+    };
 }
 
 #[macro_export]
 macro_rules! regi2c_write_mask {
     ( $block: ident, $reg_add: ident, $indata: expr ) => {
         paste! {
-            regi2c_ctrl_write_reg_mask($block,
+            rom_i2c_writeReg_Mask($block,
                 [<$block _HOSTID>],
                 $reg_add,
                 [<$reg_add _MSB>],
                 [<$reg_add _LSB>],
-                $indata);
+                $indata
+            );
         }
     };
-}
-
-/// Determine the reason that the specified CPU reset
-pub unsafe fn rtc_get_reset_reason(cpu_num: u32) -> u32 {
-    #[cfg(esp32)]
-    const RTC_GET_RESET_REASON: u32 = 0x4000_81d4;
-    #[cfg(esp32c2)]
-    const RTC_GET_RESET_REASON: u32 = 0x4000_0018;
-    #[cfg(esp32c3)]
-    const RTC_GET_RESET_REASON: u32 = 0x4000_0018;
-    #[cfg(esp32s2)]
-    const RTC_GET_RESET_REASON: u32 = 0x4000_ff58;
-    #[cfg(esp32s3)]
-    const RTC_GET_RESET_REASON: u32 = 0x4000_057c;
-
-    let get_reason: fn(u32) -> u32 = core::mem::transmute(RTC_GET_RESET_REASON as usize);
-
-    get_reason(cpu_num)
 }

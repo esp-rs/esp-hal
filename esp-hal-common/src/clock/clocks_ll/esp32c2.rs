@@ -4,8 +4,12 @@ use crate::{
     clock::{ApbClock, Clock, CpuClock, PllClock, XtalClock},
     regi2c_write,
     regi2c_write_mask,
-    rom::{ets_update_cpu_frequency, regi2c_ctrl_write_reg, regi2c_ctrl_write_reg_mask},
+    rom::{rom_i2c_writeReg, rom_i2c_writeReg_Mask},
 };
+
+extern "C" {
+    fn ets_update_cpu_frequency(ticks_per_us: u32);
+}
 
 const I2C_BBPLL: u32 = 0x66;
 const I2C_BBPLL_HOSTID: u32 = 0;
