@@ -47,7 +47,6 @@ SECTIONS
 {
   .text _stext :
   {
-    . = ALIGN(4);
     _stext = .;
     /* Put reset handler first in .text section so it ends up as the entry */
     /* point of the program. */
