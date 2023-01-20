@@ -74,7 +74,7 @@ pub enum InterruptKind {
 #[derive(Debug, Copy, Clone)]
 pub enum CpuInterrupt {
     #[cfg(feature = "esp32c6")]
-    Interrupt0 = 0,
+    // Interrupt0 = 0,
     Interrupt1 = 1,
     Interrupt2,
     Interrupt3,
