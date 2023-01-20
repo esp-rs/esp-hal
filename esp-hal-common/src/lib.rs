@@ -71,19 +71,19 @@ pub mod trapframe {
 //     uart::Uart,
 // };
 
-pub use self::{gpio::*, uart::Uart, timer::Timer, delay::Delay, interrupt::*, };
+pub use self::{gpio::*, uart::Uart, timer::Timer, delay::Delay, interrupt::*, spi::Spi,};
 
 // pub mod analog;
 pub mod clock;
 pub mod delay;
-// pub mod dma;
+pub mod dma;
 #[cfg(feature = "embassy")]
 pub mod embassy;
 pub mod gpio;
-// pub mod i2c;
+pub mod i2c;
 // #[cfg(i2s)]
 // pub mod i2s;
-// pub mod ledc;
+pub mod ledc;
 // #[cfg(mcpwm)]
 // pub mod mcpwm;
 #[cfg(usb_otg)]
@@ -101,7 +101,7 @@ pub mod rom;
 #[cfg(not(esp32c6))]
 pub mod rtc_cntl;
 pub mod sha;
-// pub mod spi;
+pub mod spi;
 pub mod system;
 #[cfg(systimer)]
 pub mod systimer;

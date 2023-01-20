@@ -128,12 +128,12 @@ pub enum InputSignal {
 #[allow(non_camel_case_types)]
 #[derive(PartialEq, Copy, Clone)]
 pub enum OutputSignal {
-    LEDC_LS_SIG_OUT0        = 0,
-    LEDC_LS_SIG_OUT1        = 1,
-    LEDC_LS_SIG_OUT2        = 2,
-    LEDC_LS_SIG_OUT3        = 3,
-    LEDC_LS_SIG_OUT4        = 4,
-    LEDC_LS_SIG_OUT5        = 5,
+    LEDC_LS_SIG0            = 0,
+    LEDC_LS_SIG1            = 1,
+    LEDC_LS_SIG2            = 2,
+    LEDC_LS_SIG3            = 3,
+    LEDC_LS_SIG4            = 4,
+    LEDC_LS_SIG5            = 5,
     U0TXD                   = 6,
     U0RTS                   = 7,
     U0DTR                   = 8,

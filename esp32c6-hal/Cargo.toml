@@ -1,6 +1,6 @@
 [package]
 name    = "esp32c6-hal"
-version = "0.3.0"
+version = "0.1.0"
 authors = [
     "Jesse Braham <jesse@beta7.io>",
     "Björn Quentin <bjoern.quentin@mobile-j.de>",

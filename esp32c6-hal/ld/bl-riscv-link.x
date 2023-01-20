@@ -2,7 +2,7 @@ ENTRY(_start_hal)
 PROVIDE(_start_trap = _start_trap_hal);
 
 PROVIDE(_stext = ORIGIN(REGION_TEXT));
-PROVIDE(_stack_start = ORIGIN(REGION_STACK) + LENGTH(REGION_STACK));
+PROVIDE(_stack_start = ORIGIN(RAM) + LENGTH(RAM));
 PROVIDE(_max_hart_id = 0);
 PROVIDE(_hart_stack_size = 2K);
 PROVIDE(_heap_size = 0);
@@ -45,10 +45,8 @@ PROVIDE(_start_trap = default_start_trap);
 
 SECTIONS
 {
-
   .text _stext :
   {
-    . = ALIGN(4);
     _stext = .;
     /* Put reset handler first in .text section so it ends up as the entry */
     /* point of the program. */
@@ -61,8 +59,16 @@ SECTIONS
 
     *(.text .text.*);
     _etext = .;
-  } > REGION_TEXT
+  } > ROM
 
+  /**
+   * Bootloader really wants to have separate segments for ROTEXT and RODATA
+   * Thus, we need to force a gap here.
+   */
+  .text_gap (NOLOAD): {
+    . = . + 4;
+    . = ALIGN(4) + 0x20;
+  } > ROM
 
   .rodata : ALIGN(4)
   {
@@ -75,7 +81,7 @@ SECTIONS
        section will have the correct alignment. */
     . = ALIGN(4);
     _erodata = .;
-  } > REGION_RODATA
+  } > ROM
 
   .rwtext : ALIGN(4) {
     _irwtext = LOADADDR(.rwtext);
@@ -92,7 +98,7 @@ SECTIONS
 
     . = ALIGN(4);
     _erwtext = .;
-  } > REGION_RWTEXT
+  } > RAM
 
   .data : ALIGN(8)
   {
@@ -106,7 +112,7 @@ SECTIONS
 
     . = ALIGN(8);
     _edata = .;
-  } > REGION_DATA
+  } > RAM
 
   .bss (NOLOAD) :
   {
@@ -128,7 +134,7 @@ SECTIONS
 
     . = ALIGN(8);
     _ebss = .;
-  } > REGION_BSS
+  } > RAM
 
   .uninit (NOLOAD) : ALIGN(4)
   {
@@ -137,7 +143,7 @@ SECTIONS
     *(.uninit .uninit.*);
     . = ALIGN(4);
     __euninit = .;
-  } > REGION_BSS
+  } > RAM
 
   /* fictitious region that represents the memory available for the heap */
   .heap (NOLOAD) :
@@ -147,7 +153,7 @@ SECTIONS
     . += _heap_size;
     . = ALIGN(4);
     _eheap = .;
-  } > REGION_HEAP
+  } > RAM
 
   /* fictitious region that represents the memory available for the stack */
   .stack (NOLOAD) :
@@ -155,7 +161,7 @@ SECTIONS
     _estack = .;
     . = ABSOLUTE(_stack_start);
     _sstack = .;
-  } > REGION_STACK
+  } > RAM
 
   .rtc_fast.text : ALIGN(4) {
     *(.rtc_fast.literal .rtc_fast.text .rtc_fast.literal.* .rtc_fast.text.*)
@@ -191,16 +197,16 @@ ERROR(riscv-rt): the start of the REGION_TEXT must be 4-byte aligned");
 ASSERT(ORIGIN(REGION_RODATA) % 4 == 0, "
 ERROR(riscv-rt): the start of the REGION_RODATA must be 4-byte aligned");
 
-ASSERT(ORIGIN(REGION_DATA) % 4 == 0, "
-ERROR(riscv-rt): the start of the REGION_DATA must be 4-byte aligned");
+ASSERT(ORIGIN(RAM) % 4 == 0, "
+ERROR(riscv-rt): the start of the RAM must be 4-byte aligned");
 
-ASSERT(ORIGIN(REGION_HEAP) % 4 == 0, "
+ASSERT(_sheap % 4 == 0, "
 ERROR(riscv-rt): the start of the REGION_HEAP must be 4-byte aligned");
 
 ASSERT(ORIGIN(REGION_TEXT) % 4 == 0, "
 ERROR(riscv-rt): the start of the REGION_TEXT must be 4-byte aligned");
 
-ASSERT(ORIGIN(REGION_STACK) % 4 == 0, "
+ASSERT(_sstack % 4 == 0, "
 ERROR(riscv-rt): the start of the REGION_STACK must be 4-byte aligned");
 
 ASSERT(_stext % 4 == 0, "

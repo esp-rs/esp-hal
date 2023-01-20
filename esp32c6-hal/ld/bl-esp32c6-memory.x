@@ -16,11 +16,11 @@ MEMORY
 
     /* 512K of on soc RAM, 32K reserved for cache */
     ICACHE : ORIGIN = 0x40800000,  LENGTH = 32K
-    /* Instruction RAM */
-    RAM : ORIGIN = 0x40800000 + 32K, LENGTH = 512K
+    /* Instruction and Data RAM */
+    RAM : ORIGIN = 0x40800000 + 32K, LENGTH = 512K - 32K
 
     /* External flash */
-    /* Instruction ROM */
+    /* Instruction and Data ROM */
     ROM : ORIGIN =   0x42000000 + 0x20, LENGTH = 0x400000 - 0x20
 
     /* RTC fast memory (executable). Persists over deep sleep. */
@@ -30,10 +30,4 @@ MEMORY
 REGION_ALIAS("REGION_TEXT", ROM);
 REGION_ALIAS("REGION_RODATA", ROM);
 
-REGION_ALIAS("REGION_DATA", RAM);
-REGION_ALIAS("REGION_BSS", RAM);
-REGION_ALIAS("REGION_HEAP", RAM);
-REGION_ALIAS("REGION_STACK", RAM);
-
-REGION_ALIAS("REGION_RWTEXT", RAM);
 REGION_ALIAS("REGION_RTC_FAST", RTC_FAST);

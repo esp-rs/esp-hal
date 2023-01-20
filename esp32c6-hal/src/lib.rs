@@ -3,7 +3,8 @@
 use core::arch::{asm, global_asm};
 
 pub use embedded_hal as ehal;
-pub use esp_hal_common::{macros, peripherals, clock, gpio, prelude, uart, Uart, timer, Cpu, Delay, interrupt};
+pub use esp_hal_common::{macros, peripherals, clock, gpio, prelude, uart, Uart, timer, Cpu, Delay, interrupt, i2c, ledc,
+systimer, dma, dma::gdma, spi };
 
 pub use self::gpio::IO;
 

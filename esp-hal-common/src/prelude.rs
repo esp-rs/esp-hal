@@ -35,10 +35,10 @@ pub use crate::radio::RadioExt as _esp_hal_RadioExt;
 pub use crate::spi::dma::WithDmaSpi3 as _esp_hal_spi_dma_WithDmaSpi3;
 pub use crate::{
     clock::Clock as _esp_hal_clock_Clock,
-    //dma::{
-    //    DmaTransfer as _esp_hal_dma_DmaTransfer,
-    //    DmaTransferRxTx as _esp_hal_dma_DmaTransferRxTx,
-    //},
+    dma::{
+       DmaTransfer as _esp_hal_dma_DmaTransfer,
+       DmaTransferRxTx as _esp_hal_dma_DmaTransferRxTx,
+    },
     entry,
     gpio::{
         InputPin as _esp_hal_gpio_InputPin,
@@ -57,11 +57,11 @@ pub use crate::{
     //     },
     // },
     macros::*,
-    // spi::{
-    //    dma::WithDmaSpi2 as _esp_hal_spi_dma_WithDmaSpi2,
-    //     Instance as _esp_hal_spi_Instance,
-    //     InstanceDma as _esp_hal_spi_InstanceDma,
-    // },
+    spi::{
+       dma::WithDmaSpi2 as _esp_hal_spi_dma_WithDmaSpi2,
+        Instance as _esp_hal_spi_Instance,
+        InstanceDma as _esp_hal_spi_InstanceDma,
+    },
     system::SystemExt as _esp_hal_system_SystemExt,
     timer::{
         Instance as _esp_hal_timer_Instance,
