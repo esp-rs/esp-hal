@@ -175,6 +175,9 @@ macro_rules! ImplSpiChannel {
             pub struct [<Spi $num DmaChannelCreator>] {}
 
             impl [<Spi $num DmaChannelCreator>] {
+                /// Configure the channel for use
+                ///
+                /// Descriptors should be sized as (BUFFERSIZE / 4092) * 3
                 pub fn configure<'a>(
                     self,
                     burst_mode: bool,
@@ -378,6 +381,9 @@ macro_rules! ImplI2sChannel {
             pub struct [<I2s $num DmaChannelCreator>] {}
 
             impl [<I2s $num DmaChannelCreator>] {
+                /// Configure the channel for use
+                ///
+                /// Descriptors should be sized as (BUFFERSIZE / 4092) * 3
                 pub fn configure<'a>(
                     self,
                     burst_mode: bool,

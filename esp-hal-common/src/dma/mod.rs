@@ -1,8 +1,10 @@
 //! Direct Memory Access Commons
+//!
+//! Descriptors should be sized as (BUFFERSIZE / 4092) * 3
 
 use core::{marker::PhantomData, sync::atomic::compiler_fence};
 
-use private::*;
+use self::private::PeripheralMarker;
 
 #[cfg(gdma)]
 pub mod gdma;
@@ -164,36 +166,40 @@ impl DmaLinkedListDw0 for &mut u32 {
     }
 }
 
+/// Marks channels as useable for SPI
+pub trait SpiPeripheral: PeripheralMarker {}
+
+/// Marks channels as useable for SPI2
+pub trait Spi2Peripheral: SpiPeripheral + PeripheralMarker {}
+
+/// Marks channels as useable for SPI3
+#[cfg(any(esp32, esp32s2, esp32s3))]
+pub trait Spi3Peripheral: SpiPeripheral + PeripheralMarker {}
+
+/// Marks channels as useable for I2S
+pub trait I2sPeripheral: PeripheralMarker {}
+
+/// Marks channels as useable for I2S0
+pub trait I2s0Peripheral: I2sPeripheral + PeripheralMarker {}
+
+/// Marks channels as useable for I2S1
+pub trait I2s1Peripheral: I2sPeripheral + PeripheralMarker {}
+
+/// DMA Rx
+pub trait Rx: private::RxPrivate {}
+
+/// DMA Tx
+pub trait Tx: private::TxPrivate {}
+
 /// Crate private implementatin details
 pub(crate) mod private {
     use super::*;
 
+    /// Marker trait
     pub trait PeripheralMarker {}
 
-    /// Marks channels as useable for SPI
-    pub trait SpiPeripheral: PeripheralMarker {}
-
-    /// Marks channels as useable for SPI2
-    pub trait Spi2Peripheral: SpiPeripheral + PeripheralMarker {}
-
-    /// Marks channels as useable for SPI3
-    #[cfg(any(esp32, esp32s2, esp32s3))]
-    pub trait Spi3Peripheral: SpiPeripheral + PeripheralMarker {}
-
-    /// Marks channels as useable for I2S
-    pub trait I2sPeripheral: PeripheralMarker {}
-
-    /// Marks channels as useable for I2S0
-    pub trait I2s0Peripheral: I2sPeripheral + PeripheralMarker {}
-
-    /// Marks channels as useable for I2S1
-    pub trait I2s1Peripheral: I2sPeripheral + PeripheralMarker {}
-
-    /// DMA Rx
-    ///
-    /// The functions here are not meant to be used outside the HAL and will be
-    /// hidden/inaccessible in future.
-    pub trait Rx {
+    /// The functions here are not meant to be used outside the HAL
+    pub trait RxPrivate {
         fn init(&mut self, burst_mode: bool, priority: DmaPriority);
 
         fn init_channel(&mut self);
@@ -310,6 +316,13 @@ pub(crate) mod private {
     }
 
     impl<'a, T, R> Rx for ChannelRx<'a, T, R>
+    where
+        T: RxChannel<R>,
+        R: RegisterAccess,
+    {
+    }
+
+    impl<'a, T, R> RxPrivate for ChannelRx<'a, T, R>
     where
         T: RxChannel<R>,
         R: RegisterAccess,
@@ -446,11 +459,8 @@ pub(crate) mod private {
         }
     }
 
-    /// DMA Tx
-    ///
-    /// The functions here are not meant to be used outside the HAL and will be
-    /// hidden/inaccessible in future.
-    pub trait Tx {
+    /// The functions here are not meant to be used outside the HAL
+    pub trait TxPrivate {
         fn init(&mut self, burst_mode: bool, priority: DmaPriority);
 
         fn init_channel(&mut self);
@@ -467,7 +477,7 @@ pub(crate) mod private {
 
         fn available(&mut self) -> usize;
 
-        fn push(&mut self, data: &[u8]) -> Result<usize, super::DmaError>;
+        fn push(&mut self, data: &[u8]) -> Result<usize, DmaError>;
     }
 
     pub trait TxChannel<R>
@@ -576,6 +586,13 @@ pub(crate) mod private {
     }
 
     impl<'a, T, R> Tx for ChannelTx<'a, T, R>
+    where
+        T: TxChannel<R>,
+        R: RegisterAccess,
+    {
+    }
+
+    impl<'a, T, R> TxPrivate for ChannelTx<'a, T, R>
     where
         T: TxChannel<R>,
         R: RegisterAccess,

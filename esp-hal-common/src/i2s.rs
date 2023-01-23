@@ -4,15 +4,10 @@ use embedded_dma::{ReadBuffer, WriteBuffer};
 use private::*;
 
 #[cfg(any(esp32s3))]
-use crate::dma::private::I2s1Peripheral;
+use crate::dma::I2s1Peripheral;
 use crate::{
     clock::Clocks,
-    dma::{
-        private::{I2s0Peripheral, I2sPeripheral, Rx, Tx},
-        Channel,
-        DmaError,
-        DmaTransfer,
-    },
+    dma::{Channel, DmaError, DmaTransfer, I2s0Peripheral, I2sPeripheral, Rx, Tx},
     peripheral::{Peripheral, PeripheralRef},
     system::PeripheralClockControl,
     InputPin,
@@ -126,6 +121,14 @@ pub struct PinsBclkWsDout<'d, B, W, DO> {
     dout: PeripheralRef<'d, DO>,
 }
 
+impl<'d, B, W, DO> I2sPins for PinsBclkWsDout<'d, B, W, DO>
+where
+    B: OutputPin,
+    W: OutputPin,
+    DO: OutputPin,
+{
+}
+
 impl<'d, B, W, DO> PinsBclkWsDout<'d, B, W, DO>
 where
     B: OutputPin,
@@ -189,6 +192,14 @@ where
     }
 }
 
+impl<'d, B, W, DI> I2sPins for PinsBclkWsDin<'d, B, W, DI>
+where
+    B: OutputPin,
+    W: OutputPin,
+    DI: InputPin,
+{
+}
+
 impl<'d, B, W, DI> I2sRxPins for PinsBclkWsDin<'d, B, W, DI>
 where
     B: OutputPin,
@@ -220,6 +231,9 @@ pub struct MclkPin<'d, M: OutputPin> {
 }
 
 #[cfg(not(esp32))]
+impl<'d, M> I2sPins for MclkPin<'d, M> where M: OutputPin {}
+
+#[cfg(not(esp32))]
 impl<'d, M: OutputPin> MclkPin<'d, M> {
     pub fn new(pin: impl Peripheral<P = M> + 'd) -> Self {
         Self {
@@ -245,6 +259,8 @@ where
 
 /// No MCLK pin
 pub struct NoMclk {}
+
+impl I2sPins for NoMclk {}
 
 impl I2sMclkPin for NoMclk {
     fn configure<I>(&mut self, _instance: &mut I)
@@ -948,10 +964,30 @@ where
     }
 }
 
+pub trait RegisterAccess: RegisterAccessPrivate {}
+
+pub trait I2sTxPins: I2sPins {
+    fn configure<I>(&mut self, instance: &mut I)
+    where
+        I: RegisterAccess;
+}
+
+pub trait I2sRxPins: I2sPins {
+    fn configure<I>(&mut self, instance: &mut I)
+    where
+        I: RegisterAccess;
+}
+
+pub trait I2sMclkPin: I2sPins {
+    fn configure<I>(&mut self, instance: &mut I)
+    where
+        I: RegisterAccess;
+}
+
 mod private {
     use fugit::HertzU32;
 
-    use super::{DataFormat, I2sRx, I2sTx, Standard, I2S_LL_MCLK_DIVIDER_MAX};
+    use super::{DataFormat, I2sRx, I2sTx, RegisterAccess, Standard, I2S_LL_MCLK_DIVIDER_MAX};
     #[cfg(any(esp32c3, esp32s2))]
     use crate::peripherals::i2s::RegisterBlock;
     // on ESP32-S3 I2S1 doesn't support all features - use that to avoid using those features
@@ -964,31 +1000,12 @@ mod private {
     use crate::peripherals::I2S0 as I2S;
     use crate::{
         clock::Clocks,
-        dma::{
-            private::{Rx, Tx},
-            DmaPeripheral,
-        },
+        dma::{DmaPeripheral, Rx, Tx},
         system::Peripheral,
         types::{InputSignal, OutputSignal},
     };
 
-    pub trait I2sTxPins {
-        fn configure<I>(&mut self, instance: &mut I)
-        where
-            I: RegisterAccess;
-    }
-
-    pub trait I2sRxPins {
-        fn configure<I>(&mut self, instance: &mut I)
-        where
-            I: RegisterAccess;
-    }
-
-    pub trait I2sMclkPin {
-        fn configure<I>(&mut self, instance: &mut I)
-        where
-            I: RegisterAccess;
-    }
+    pub trait I2sPins {}
 
     pub struct TxCreator<T, TX>
     where
@@ -1006,7 +1023,7 @@ mod private {
     {
         pub fn with_pins<P>(self, pins: P) -> I2sTx<T, P, TX>
         where
-            P: I2sTxPins,
+            P: super::I2sTxPins,
         {
             I2sTx::new(self.register_access, pins, self.tx_channel)
         }
@@ -1028,7 +1045,7 @@ mod private {
     {
         pub fn with_pins<P>(self, pins: P) -> I2sRx<T, P, RX>
         where
-            P: I2sRxPins,
+            P: super::I2sRxPins,
         {
             I2sRx::new(self.register_access, pins, self.rx_channel)
         }
@@ -1088,7 +1105,7 @@ mod private {
     }
 
     #[cfg(any(esp32, esp32s2))]
-    pub trait RegisterAccess: Signals + RegBlock {
+    pub trait RegisterAccessPrivate: Signals + RegBlock {
         fn set_clock(&self, clock_settings: I2sClockDividers) {
             let i2s = self.register_block();
 
@@ -1273,7 +1290,7 @@ mod private {
     }
 
     #[cfg(any(esp32c3, esp32s3))]
-    pub trait RegisterAccess: Signals + RegBlock {
+    pub trait RegisterAccessPrivate: Signals + RegBlock {
         fn set_clock(&self, clock_settings: I2sClockDividers) {
             let i2s = self.register_block();
 
@@ -1839,10 +1856,13 @@ mod private {
         }
     }
 
-    impl RegisterAccess for I2sPeripheral0 {}
+    impl RegisterAccessPrivate for I2sPeripheral0 {}
+    impl super::RegisterAccess for I2sPeripheral0 {}
 
     #[cfg(any(esp32s3, esp32))]
-    impl RegisterAccess for I2sPeripheral1 {}
+    impl RegisterAccessPrivate for I2sPeripheral1 {}
+    #[cfg(any(esp32s3, esp32))]
+    impl super::RegisterAccess for I2sPeripheral1 {}
 
     pub struct I2sClockDividers {
         mclk_divider: u32,

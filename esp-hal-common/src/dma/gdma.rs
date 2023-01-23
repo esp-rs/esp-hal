@@ -276,6 +276,9 @@ macro_rules! impl_channel {
             pub struct [<ChannelCreator $num>] {}
 
             impl [<ChannelCreator $num>] {
+                /// Configure the channel for use
+                ///
+                /// Descriptors should be sized as (BUFFERSIZE / 4092) * 3
                 pub fn configure<'a>(
                     self,
                     burst_mode: bool,
