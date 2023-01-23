@@ -48,6 +48,9 @@ usb-device        = { version = "0.2.9" }
 usbd-serial       = "0.1.1"
 static_cell       = "1.0.0"
 
+[patch.crates-io]
+xtensa-lx-rt = { version = "0.14.0", features = ["esp32s2"], git = "https://github.com/esp-rs/xtensa-lx-rt" }
+
 [features]
 default   = ["rt", "vectored"]
 eh1       = ["esp-hal-common/eh1", "dep:embedded-hal-1", "dep:embedded-hal-nb"]

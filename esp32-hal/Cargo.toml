@@ -45,6 +45,9 @@ smart-leds        = "0.3.0"
 ssd1306           = "0.7.1"
 static_cell       = "1.0.0"
 
+[patch.crates-io]
+xtensa-lx-rt = { version = "0.14.0", features = ["esp32"], git = "https://github.com/esp-rs/xtensa-lx-rt" }
+
 [features]
 default           = ["rt", "vectored"]
 bluetooth         = []
