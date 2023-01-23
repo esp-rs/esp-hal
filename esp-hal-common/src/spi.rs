@@ -582,7 +582,7 @@ pub mod dma {
         use embedded_hal_1::spi::{SpiBus, SpiBusFlush, SpiBusRead, SpiBusWrite};
 
         use super::{super::InstanceDma, SpiDma, SpiPeripheral};
-        use crate::dma::private::{Rx, Tx};
+        use crate::dma::{Rx, Tx};
 
         impl<'d, T, TX, RX, P> embedded_hal_1::spi::ErrorType for SpiDma<'d, T, TX, RX, P>
         where
