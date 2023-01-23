@@ -4,8 +4,12 @@ use crate::{
     clock::{ApbClock, Clock, CpuClock, PllClock, XtalClock},
     regi2c_write,
     regi2c_write_mask,
-    rom::{ets_update_cpu_frequency, regi2c_ctrl_write_reg, regi2c_ctrl_write_reg_mask},
+    rom::{rom_i2c_writeReg, rom_i2c_writeReg_Mask},
 };
+
+extern "C" {
+    fn ets_update_cpu_frequency(ticks_per_us: u32);
+}
 
 const I2C_BBPLL: u32 = 0x66;
 const I2C_BBPLL_HOSTID: u32 = 0;
@@ -30,15 +34,19 @@ const I2C_BBPLL_OC_VCO_DBIAS: u32 = 9;
 const I2C_BBPLL_OC_VCO_DBIAS_MSB: u32 = 1;
 const I2C_BBPLL_OC_VCO_DBIAS_LSB: u32 = 0;
 
+const I2C_BBPLL_OC_DHREF_SEL: u32 = 6;
+const I2C_BBPLL_OC_DHREF_SEL_MSB: u32 = 5;
 const I2C_BBPLL_OC_DHREF_SEL_LSB: u32 = 4;
 
+const I2C_BBPLL_OC_DLREF_SEL: u32 = 6;
+const I2C_BBPLL_OC_DLREF_SEL_MSB: u32 = 7;
 const I2C_BBPLL_OC_DLREF_SEL_LSB: u32 = 6;
 
-const I2C_MST_ANA_CONF0_REG: u32 = 0x6004_E840;
-const I2C_MST_BBPLL_STOP_FORCE_HIGH: u32 = 1 << 2;
-const I2C_MST_BBPLL_STOP_FORCE_LOW: u32 = 1 << 3;
+const I2C_MST_ANA_CONF0_REG: u32 = 0x6000_e040;
+const I2C_MST_BBPLL_STOP_FORCE_HIGH: u32 = 1 << 3;
+const I2C_MST_BBPLL_STOP_FORCE_LOW: u32 = 1 << 2;
 
-pub(crate) fn esp32c2_rtc_bbpll_configure(xtal_freq: XtalClock, _pll_freq: PllClock) {
+pub(crate) fn esp32c3_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock) {
     let system = unsafe { &*crate::peripherals::SYSTEM::ptr() };
 
     unsafe {
@@ -63,39 +71,92 @@ pub(crate) fn esp32c2_rtc_bbpll_configure(xtal_freq: XtalClock, _pll_freq: PllCl
         clear_reg_mask(I2C_MST_ANA_CONF0_REG, I2C_MST_BBPLL_STOP_FORCE_HIGH);
         set_reg_mask(I2C_MST_ANA_CONF0_REG, I2C_MST_BBPLL_STOP_FORCE_LOW);
 
-        // Set this register to let the digital part know 480M PLL is used
-        system
-            .cpu_per_conf
-            .modify(|_, w| w.pll_freq_sel().set_bit());
+        if matches!(pll_freq, PllClock::Pll480MHz) {
+            // Set this register to let the digital part know 480M PLL is used
+            system
+                .cpu_per_conf
+                .modify(|_, w| w.pll_freq_sel().set_bit());
 
-        // Configure 480M PLL
-        match xtal_freq {
-            XtalClock::RtcXtalFreq26M => {
-                div_ref = 12;
-                div7_0 = 236;
-                dr1 = 4;
-                dr3 = 4;
-                dchgp = 0;
-                dcur = 0;
-                dbias = 2;
+            // Configure 480M PLL
+            match xtal_freq {
+                XtalClock::RtcXtalFreq40M => {
+                    div_ref = 0;
+                    div7_0 = 8;
+                    dr1 = 0;
+                    dr3 = 0;
+                    dchgp = 5;
+                    dcur = 3;
+                    dbias = 2;
+                }
+
+                XtalClock::RtcXtalFreq32M => {
+                    div_ref = 1;
+                    div7_0 = 26;
+                    dr1 = 1;
+                    dr3 = 1;
+                    dchgp = 4;
+                    dcur = 0;
+                    dbias = 2;
+                }
+
+                XtalClock::RtcXtalFreqOther(_) => {
+                    div_ref = 0;
+                    div7_0 = 8;
+                    dr1 = 0;
+                    dr3 = 0;
+                    dchgp = 5;
+                    dcur = 3;
+                    dbias = 2;
+                }
             }
-            XtalClock::RtcXtalFreq40M | XtalClock::RtcXtalFreqOther(_) => {
-                div_ref = 0;
-                div7_0 = 8;
-                dr1 = 0;
-                dr3 = 0;
-                dchgp = 5;
-                dcur = 3;
-                dbias = 2;
+
+            regi2c_write!(I2C_BBPLL, I2C_BBPLL_MODE_HF, 0x6b);
+        } else {
+            // Clear this register to let the digital part know 320M PLL is used
+            system
+                .cpu_per_conf
+                .modify(|_, w| w.pll_freq_sel().clear_bit());
+
+            // Configure 320M PLL
+            match xtal_freq {
+                XtalClock::RtcXtalFreq40M => {
+                    div_ref = 0;
+                    div7_0 = 4;
+                    dr1 = 0;
+                    dr3 = 0;
+                    dchgp = 5;
+                    dcur = 3;
+                    dbias = 2;
+                }
+
+                XtalClock::RtcXtalFreq32M => {
+                    div_ref = 1;
+                    div7_0 = 6;
+                    dr1 = 0;
+                    dr3 = 0;
+                    dchgp = 5;
+                    dcur = 3;
+                    dbias = 2;
+                }
+
+                XtalClock::RtcXtalFreqOther(_) => {
+                    div_ref = 0;
+                    div7_0 = 4;
+                    dr1 = 0;
+                    dr3 = 0;
+                    dchgp = 5;
+                    dcur = 3;
+                    dbias = 2;
+                }
             }
+
+            regi2c_write!(I2C_BBPLL, I2C_BBPLL_MODE_HF, 0x69);
         }
-
-        regi2c_write!(I2C_BBPLL, I2C_BBPLL_MODE_HF, 0x6b);
 
         i2c_bbpll_lref = (dchgp << I2C_BBPLL_OC_DCHGP_LSB) | div_ref;
         i2c_bbpll_div_7_0 = div7_0;
         i2c_bbpll_dcur =
-            (1 << I2C_BBPLL_OC_DLREF_SEL_LSB) | (3 << I2C_BBPLL_OC_DHREF_SEL_LSB) | dcur;
+            (2 << I2C_BBPLL_OC_DLREF_SEL_LSB) | (1 << I2C_BBPLL_OC_DHREF_SEL_LSB) | dcur;
 
         regi2c_write!(I2C_BBPLL, I2C_BBPLL_OC_REF_DIV, i2c_bbpll_lref);
 
@@ -108,10 +169,14 @@ pub(crate) fn esp32c2_rtc_bbpll_configure(xtal_freq: XtalClock, _pll_freq: PllCl
         regi2c_write!(I2C_BBPLL, I2C_BBPLL_OC_DCUR, i2c_bbpll_dcur);
 
         regi2c_write_mask!(I2C_BBPLL, I2C_BBPLL_OC_VCO_DBIAS, dbias);
+
+        regi2c_write_mask!(I2C_BBPLL, I2C_BBPLL_OC_DHREF_SEL, 2);
+
+        regi2c_write_mask!(I2C_BBPLL, I2C_BBPLL_OC_DLREF_SEL, 1);
     }
 }
 
-pub(crate) fn esp32c2_rtc_bbpll_enable() {
+pub(crate) fn esp32c3_rtc_bbpll_enable() {
     let rtc_cntl = unsafe { &*crate::peripherals::RTC_CNTL::ptr() };
 
     rtc_cntl.options0.modify(|_, w| {
@@ -124,7 +189,7 @@ pub(crate) fn esp32c2_rtc_bbpll_enable() {
     });
 }
 
-pub(crate) fn esp32c2_rtc_update_to_xtal(freq: XtalClock, _div: u32) {
+pub(crate) fn esp32c3_rtc_update_to_xtal(freq: XtalClock, _div: u32) {
     let system_control = unsafe { &*crate::peripherals::SYSTEM::ptr() };
 
     unsafe {
@@ -147,7 +212,7 @@ pub(crate) fn esp32c2_rtc_update_to_xtal(freq: XtalClock, _div: u32) {
     }
 }
 
-pub(crate) fn esp32c2_rtc_freq_to_pll_mhz(cpu_clock_speed: CpuClock) {
+pub(crate) fn esp32c3_rtc_freq_to_pll_mhz(cpu_clock_speed: CpuClock) {
     let system_control = unsafe { &*crate::peripherals::SYSTEM::ptr() };
 
     unsafe {
@@ -157,16 +222,15 @@ pub(crate) fn esp32c2_rtc_freq_to_pll_mhz(cpu_clock_speed: CpuClock) {
         system_control.cpu_per_conf.modify(|_, w| {
             w.cpuperiod_sel().bits(match cpu_clock_speed {
                 CpuClock::Clock80MHz => 0,
-                CpuClock::Clock120MHz => 1,
+                CpuClock::Clock160MHz => 1,
             })
         });
         ets_update_cpu_frequency(cpu_clock_speed.mhz());
     }
 }
 
-pub(crate) fn esp32c2_rtc_apb_freq_update(apb_freq: ApbClock) {
+pub(crate) fn esp32c3_rtc_apb_freq_update(apb_freq: ApbClock) {
     let rtc_cntl = unsafe { &*crate::peripherals::RTC_CNTL::ptr() };
-
     let value = ((apb_freq.hz() >> 12) & u16::MAX as u32)
         | (((apb_freq.hz() >> 12) & u16::MAX as u32) << 16);
 

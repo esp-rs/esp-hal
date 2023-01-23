@@ -5,7 +5,7 @@ use crate::{
     clock::XtalClock,
     peripherals::{APB_CTRL, EXTMEM, RTC_CNTL, SPI0, SPI1, SYSTEM},
     regi2c_write_mask,
-    rom::regi2c_ctrl_write_reg_mask,
+    rom::rom_i2c_writeReg_Mask,
     rtc_cntl::{RtcCalSel, RtcClock, RtcFastClock, RtcSlowClock},
 };
 

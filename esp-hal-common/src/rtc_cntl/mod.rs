@@ -8,7 +8,6 @@ use crate::{
     clock::{Clock, XtalClock},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{RTC_CNTL, TIMG0},
-    rom::esp_rom_delay_us,
     Cpu,
 };
 
@@ -18,6 +17,12 @@ use crate::{
 #[cfg_attr(esp32s2, path = "rtc/esp32s2.rs")]
 #[cfg_attr(esp32s3, path = "rtc/esp32s3.rs")]
 mod rtc;
+
+extern "C" {
+    fn ets_delay_us(us: u32);
+
+    fn rtc_get_reset_reason(cpu_num: u32) -> u32;
+}
 
 #[allow(unused)]
 #[derive(Debug, Clone, Copy)]
@@ -137,7 +142,7 @@ impl RtcClock {
             rtc_cntl.clk_conf.modify(|_, w| w.enb_ck8m().clear_bit());
             unsafe {
                 rtc_cntl.timer1.modify(|_, w| w.ck8m_wait().bits(5));
-                esp_rom_delay_us(50);
+                ets_delay_us(50);
             }
         } else {
             rtc_cntl.clk_conf.modify(|_, w| w.enb_ck8m().set_bit());
@@ -222,7 +227,7 @@ impl RtcClock {
                     })
             });
 
-            esp_rom_delay_us(300u32);
+            ets_delay_us(300u32);
         };
     }
 
@@ -237,7 +242,7 @@ impl RtcClock {
                 })
             });
 
-            esp_rom_delay_us(3u32);
+            ets_delay_us(3u32);
         };
     }
 
@@ -343,7 +348,7 @@ impl RtcClock {
 
         // Wait for calibration to finish up to another us_time_estimate
         unsafe {
-            esp_rom_delay_us(us_time_estimate);
+            ets_delay_us(us_time_estimate);
         }
 
         #[cfg(esp32)]
@@ -364,7 +369,7 @@ impl RtcClock {
             if timeout_us > 0 {
                 timeout_us -= 1;
                 unsafe {
-                    esp_rom_delay_us(1);
+                    ets_delay_us(1);
                 }
             } else {
                 // Timed out waiting for calibration
@@ -670,7 +675,7 @@ impl WatchdogDisable for Swd {
 }
 
 pub fn get_reset_reason(cpu: Cpu) -> Option<SocResetReason> {
-    let reason = unsafe { crate::rom::rtc_get_reset_reason(cpu as u32) };
+    let reason = unsafe { rtc_get_reset_reason(cpu as u32) };
     let reason = SocResetReason::from_repr(reason as usize);
 
     reason
