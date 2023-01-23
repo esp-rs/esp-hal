@@ -52,11 +52,7 @@ use fugit::HertzU32;
 
 use crate::{
     clock::Clocks,
-    dma::{
-        private::{Rx, Tx},
-        DmaError,
-        DmaPeripheral,
-    },
+    dma::{DmaError, DmaPeripheral, Rx, Tx},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::spi2::RegisterBlock,
     system::PeripheralClockControl,
@@ -274,14 +270,9 @@ pub mod dma {
     use super::Spi3Instance;
     use super::{Instance, InstanceDma, Spi, Spi2Instance, MAX_DMA_SIZE};
     #[cfg(any(esp32, esp32s2))]
-    use crate::dma::private::Spi3Peripheral;
+    use crate::dma::Spi3Peripheral;
     use crate::{
-        dma::{
-            private::{Rx, Spi2Peripheral, SpiPeripheral, Tx},
-            Channel,
-            DmaTransfer,
-            DmaTransferRxTx,
-        },
+        dma::{Channel, DmaTransfer, DmaTransferRxTx, Rx, Spi2Peripheral, SpiPeripheral, Tx},
         peripheral::PeripheralRef,
     };
 

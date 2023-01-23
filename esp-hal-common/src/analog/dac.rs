@@ -1,5 +1,5 @@
 use crate::{
-    peripheral::{Peripheral, PeripheralRef},
+    peripheral::PeripheralRef,
     peripherals::{RTCIO, SENS},
 };
 pub trait DAC {
