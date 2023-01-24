@@ -47,6 +47,7 @@ ssd1306           = "0.7.1"
 usb-device        = { version = "0.2.9" }
 usbd-serial       = "0.1.1"
 static_cell       = "1.0.0"
+aes = "0.8.2"
 
 [features]
 default   = ["rt", "vectored"]

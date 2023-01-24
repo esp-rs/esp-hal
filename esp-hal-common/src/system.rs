@@ -46,6 +46,8 @@ pub enum Peripheral {
     Usb,
     #[cfg(any(esp32s3, esp32c3))]
     Twai,
+    #[cfg(aes)]
+    Aes,
 }
 
 /// Controls the enablement of peripheral clocks.
@@ -61,9 +63,16 @@ impl PeripheralClockControl {
         #[cfg(not(esp32))]
         let (perip_clk_en0, perip_rst_en0) = { (&system.perip_clk_en0, &system.perip_rst_en0) };
         #[cfg(esp32)]
-        let (perip_clk_en0, perip_rst_en0) = { (&system.perip_clk_en, &system.perip_rst_en) };
+        let (perip_clk_en0, perip_rst_en0, peri_clk_en, peri_rst_en) = {
+            (
+                &system.perip_clk_en,
+                &system.perip_rst_en,
+                &system.peri_clk_en,
+                &system.peri_rst_en,
+            )
+        };
 
-        #[cfg(any(esp32c2, esp32c3, esp32s3))]
+        #[cfg(any(esp32c2, esp32c3, esp32s2, esp32s3))]
         let (perip_clk_en1, perip_rst_en1) = { (&system.perip_clk_en1, &system.perip_rst_en1) };
 
         match peripheral {
@@ -162,6 +171,16 @@ impl PeripheralClockControl {
             Peripheral::Twai => {
                 perip_clk_en0.modify(|_, w| w.twai_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.twai_rst().clear_bit());
+            }
+            #[cfg(esp32)]
+            Peripheral::Aes => {
+                peri_clk_en.modify(|r, w| unsafe { w.bits(r.bits() | 1) });
+                peri_rst_en.modify(|r, w| unsafe { w.bits(r.bits() & (!1)) });
+            }
+            #[cfg(any(esp32c3, esp32s2, esp32s3))]
+            Peripheral::Aes => {
+                perip_clk_en1.modify(|_, w| w.crypto_aes_clk_en().set_bit());
+                perip_rst_en1.modify(|_, w| w.crypto_aes_rst().clear_bit());
             }
         }
     }
