@@ -513,7 +513,7 @@ pub(crate) mod private {
 
                 let mut dw0 = &mut descriptors[descr];
 
-                dw0.set_suc_eof(true);
+                dw0.set_suc_eof(last);
                 dw0.set_owner(Owner::Dma);
                 dw0.set_size(chunk_size as u16); // align to 32 bits?
                 dw0.set_length(chunk_size as u16); // actual size of the data!?
