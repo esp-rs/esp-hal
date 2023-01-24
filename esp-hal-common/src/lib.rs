@@ -135,7 +135,7 @@ mod critical_section_impl {
         unsafe impl critical_section::Impl for super::CriticalSection {
             unsafe fn acquire() -> critical_section::RawRestoreState {
                 let tkn: critical_section::RawRestoreState;
-                core::arch::asm!("rsil {0}, 15", out(reg) tkn);
+                core::arch::asm!("rsil {0}, 5", out(reg) tkn);
                 #[cfg(multi_core)]
                 {
                     let guard = super::multicore::MULTICORE_LOCK.lock();
