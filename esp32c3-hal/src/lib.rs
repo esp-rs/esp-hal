@@ -9,6 +9,7 @@ pub use embedded_hal as ehal;
 pub use esp_hal_common::embassy;
 #[doc(inline)]
 pub use esp_hal_common::{
+    aes,
     analog::adc::implementation as adc,
     clock,
     dma,

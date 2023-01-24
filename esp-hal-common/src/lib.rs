@@ -45,6 +45,8 @@ pub use self::{
     uart::Uart,
 };
 
+#[cfg(aes)]
+pub mod aes;
 pub mod analog;
 pub mod clock;
 pub mod delay;
