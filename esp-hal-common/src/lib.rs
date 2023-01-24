@@ -76,7 +76,7 @@ pub use self::{gpio::*, uart::Uart, timer::Timer, delay::Delay, interrupt::*, sp
 // pub mod analog;
 pub mod clock;
 pub mod delay;
-// pub mod dma;
+pub mod dma;
 #[cfg(feature = "embassy")]
 pub mod embassy;
 pub mod gpio;
@@ -101,7 +101,7 @@ pub mod rom;
 #[cfg(not(esp32c6))]
 pub mod rtc_cntl;
 pub mod sha;
-// pub mod spi;
+pub mod spi;
 pub mod system;
 #[cfg(systimer)]
 pub mod systimer;
