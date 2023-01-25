@@ -17,7 +17,7 @@ use crate::{
 #[cfg(any(esp32, esp32s2, esp32s3))]
 const I2S_LL_MCLK_DIVIDER_BIT_WIDTH: usize = 6;
 
-#[cfg(any(esp32c3))]
+#[cfg(any(esp32c3, esp32c6))]
 const I2S_LL_MCLK_DIVIDER_BIT_WIDTH: usize = 9;
 
 const I2S_LL_MCLK_DIVIDER_MAX: usize = (1 << I2S_LL_MCLK_DIVIDER_BIT_WIDTH) - 1;
@@ -988,13 +988,13 @@ mod private {
     use fugit::HertzU32;
 
     use super::{DataFormat, I2sRx, I2sTx, RegisterAccess, Standard, I2S_LL_MCLK_DIVIDER_MAX};
-    #[cfg(any(esp32c3, esp32s2))]
+    #[cfg(any(esp32c3, esp32c6, esp32s2))]
     use crate::peripherals::i2s::RegisterBlock;
     // on ESP32-S3 I2S1 doesn't support all features - use that to avoid using those features
     // by accident
     #[cfg(any(esp32s3, esp32))]
     use crate::peripherals::i2s1::RegisterBlock;
-    #[cfg(any(esp32c3, esp32s2))]
+    #[cfg(any(esp32c3, esp32c6, esp32s2))]
     use crate::peripherals::I2S;
     #[cfg(any(esp32s3, esp32))]
     use crate::peripherals::I2S0 as I2S;
@@ -1289,7 +1289,7 @@ mod private {
         }
     }
 
-    #[cfg(any(esp32c3, esp32s3))]
+    #[cfg(any(esp32c3, esp32c6, esp32s3))]
     pub trait RegisterAccessPrivate: Signals + RegBlock {
         fn set_clock(&self, clock_settings: I2sClockDividers) {
             let i2s = self.register_block();
@@ -1609,7 +1609,7 @@ mod private {
     #[derive(Clone)]
     pub struct I2sPeripheral1 {}
 
-    #[cfg(esp32c3)]
+    #[cfg(any(esp32c3, esp32c6))]
     impl Signals for I2sPeripheral0 {
         fn get_peripheral(&self) -> Peripheral {
             Peripheral::I2s0
@@ -1632,7 +1632,7 @@ mod private {
         }
 
         fn dout_signal(&self) -> OutputSignal {
-            OutputSignal::I2SI_SD
+            OutputSignal::I2SO_SD
         }
 
         fn bclk_rx_signal(&self) -> OutputSignal {
