@@ -73,8 +73,6 @@ pub enum InterruptKind {
 #[repr(u32)]
 #[derive(Debug, Copy, Clone)]
 pub enum CpuInterrupt {
-    #[cfg(feature = "esp32c6")]
-    Interrupt0 = 0,
     Interrupt1 = 1,
     Interrupt2,
     Interrupt3,
@@ -157,7 +155,13 @@ pub unsafe fn map(_core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
 }
 
 /// Enable a CPU interrupt
+#[cfg(not(any(esp32c6)))]
 pub unsafe fn enable_cpu_interrupt(which: CpuInterrupt) {
+    let cpu_interrupt_number = which as isize;
+    let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
+    intr.cpu_int_enable
+        .modify(|r, w| w.bits((1 << cpu_interrupt_number) | r.bits()));
+
     let cpu_interrupt_number = which as isize;
     #[cfg(not(feature = "esp32c6"))]
     let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
@@ -165,6 +169,18 @@ pub unsafe fn enable_cpu_interrupt(which: CpuInterrupt) {
     let intr = &*crate::peripherals::INTPRI::PTR;
     intr.cpu_int_enable
         .modify(|r, w| w.bits((1 << cpu_interrupt_number) | r.bits()));
+}
+
+/// Enable a CPU interrupt
+#[cfg(esp32c6)]
+pub unsafe fn enable_cpu_interrupt(which: CpuInterrupt) {
+    let cpu_interrupt_number = which as isize;
+    const DR_REG_PLIC_MX_BASE: u32 = 0x20001000;
+    const PLIC_MXINT_ENABLE_REG: u32 = DR_REG_PLIC_MX_BASE + 0x0;
+    let mxint_enable = PLIC_MXINT_ENABLE_REG as *mut u32;
+    unsafe {
+        mxint_enable.write_volatile(mxint_enable.read_volatile() | 1 << cpu_interrupt_number);
+    }
 }
 
 /// Disable the given peripheral interrupt.
@@ -261,10 +277,18 @@ mod vectored {
 
     use super::*;
 
+    #[cfg(not(any(esp32c6)))]
+    const PRIORITY_TO_INTERRUPT: [usize; 15] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+
+    // don't use interrupts reserved for CLIC (0,3,5,7)
+    #[cfg(any(esp32c6))]
+    const PRIORITY_TO_INTERRUPT: [usize; 15] =
+        [1, 2, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
+
     // Setup interrupts 1-15 ready for vectoring
     #[doc(hidden)]
     pub(crate) unsafe fn init_vectoring() {
-        for i in 1..=15 {
+        for i in PRIORITY_TO_INTERRUPT {
             set_kind(
                 crate::get_core(),
                 core::mem::transmute(i),
@@ -284,13 +308,15 @@ mod vectored {
     fn get_configured_interrupts(_core: Cpu, mut status: u128) -> [u128; 16] {
         unsafe {
             let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
-            #[cfg(not(feature = "esp32c6"))]
+
+            #[cfg(not(esp32c6))]
             let intr_map_base = intr.mac_intr_map.as_ptr();
-            #[cfg(feature = "esp32c6")]
+            #[cfg(esp32c6)]
             let intr_map_base = intr.wifi_mac_intr_map.as_ptr();
 
-            #[cfg(feature = "esp32c6")]
+            #[cfg(esp32c6)]
             let intr = &*crate::peripherals::INTPRI::PTR;
+
             let intr_prio_base = intr.cpu_int_pri_0.as_ptr();
 
             let mut prios = [0u128; 16];
@@ -328,7 +354,8 @@ mod vectored {
             return Err(Error::InvalidInterruptPriority);
         }
         unsafe {
-            let cpu_interrupt = core::mem::transmute(level as u8 as u32);
+            let cpu_interrupt =
+                core::mem::transmute(PRIORITY_TO_INTERRUPT[(level as usize) - 1] as u32);
             map(crate::get_core(), interrupt, cpu_interrupt);
             enable_cpu_interrupt(cpu_interrupt);
         }
@@ -611,4 +638,14 @@ pub fn _setup_interrupts() {
         #[cfg(feature = "vectored")]
         crate::interrupt::init_vectoring();
     };
+
+    #[cfg(esp32c6)]
+    write_mie(u32::MAX);
+}
+
+#[cfg(esp32c6)]
+fn write_mie(val: u32) {
+    unsafe {
+        core::arch::asm!("csrw mie, {0}", in(reg) val);
+    }
 }
