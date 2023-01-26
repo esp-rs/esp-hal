@@ -4,18 +4,19 @@
 
 use embassy_executor::Executor;
 use embassy_time::{Duration, Timer};
-
+use embedded_hal_async::digital::Wait;
 use esp32c3_hal::{
     clock::ClockControl,
+    embassy,
+    peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
-    Rtc, embassy, peripherals::Peripherals, IO,
+    Rtc,
+    IO,
 };
 use esp_backtrace as _;
-use esp_hal_common::{PullDown, Input, Gpio9};
+use esp_hal_common::{Gpio9, Input, PullDown};
 use static_cell::StaticCell;
-
-use embedded_hal_async::digital::Wait;
 
 #[embassy_executor::task]
 async fn ping(mut pin: Gpio9<Input<PullDown>>) {
@@ -49,7 +50,10 @@ fn main() -> ! {
     wdt1.disable();
 
     #[cfg(feature = "embassy-time-systick")]
-    embassy::init(&clocks, esp32c3_hal::systimer::SystemTimer::new(peripherals.SYSTIMER));
+    embassy::init(
+        &clocks,
+        esp32c3_hal::systimer::SystemTimer::new(peripherals.SYSTIMER),
+    );
 
     #[cfg(feature = "embassy-time-timg0")]
     embassy::init(&clocks, timer_group0.timer0);
