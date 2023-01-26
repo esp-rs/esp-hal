@@ -47,6 +47,7 @@ fn main() {
     //   - 'usb_otg'
     //   - 'usb_serial_jtag'
     //   - 'aes'
+    //   - 'plic'
     //   - 'radio'
     //
     // New symbols can be added as needed, but please be sure to update both this
@@ -108,20 +109,7 @@ fn main() {
             "systimer",
             "timg1",
             "usb_serial_jtag",
-        ]
-    } else if esp32c6 {
-        vec![
-            "esp32c6",
-            "riscv",
-            "single_core",
-            "dac",
-            "gdma",
-            "i2s",
-            "mcpwm",
-            "rmt",
-            "systimer",
-            "timg1",
-            "usb_serial_jtag",
+            "plic",
         ]
     } else if esp32s2 {
         vec![
