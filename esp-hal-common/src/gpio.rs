@@ -1751,7 +1751,7 @@ mod asynch {
                     if pin_nr < 32 {
                         Bank0GpioRegisterAccess::set_int_enable(pin_nr as u8, 0, 0, false);
                     } else {
-                        Bank0GpioRegisterAccess::set_int_enable(pin_nr as u8, 0, 0, false);
+                        Bank1GpioRegisterAccess::set_int_enable(pin_nr as u8, 0, 0, false);
                     }
                 } else {
                     Bank0GpioRegisterAccess::set_int_enable(pin_nr as u8, 0, 0, false);
