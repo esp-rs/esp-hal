@@ -1,6 +1,6 @@
 [package]
 name    = "esp-hal-procmacros"
-version = "0.1.0"
+version = "0.2.0"
 authors = [
     "Jesse Braham <jesse@beta7.io>",
     "Björn Quentin <bjoern.quentin@mobile-j.de>",
@@ -15,11 +15,11 @@ license      = "MIT OR Apache-2.0"
 proc-macro = true
 
 [dependencies]
-darling          = "0.14.1"
+darling          = "0.14.2"
 proc-macro-error = "1.0.4"
-proc-macro2      = "1.0.43"
-quote            = "1.0.21"
-syn              = {version = "1.0.99", features = ["extra-traits", "full"]}
+proc-macro2      = "1.0.50"
+quote            = "1.0.23"
+syn              = {version = "1.0.107", features = ["extra-traits", "full"]}
 
 [features]
 interrupt = []
