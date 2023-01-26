@@ -79,3 +79,7 @@ required-features = ["eh1"]
 [[example]]
 name              = "embassy_hello_world"
 required-features = ["embassy"]
+
+[[example]]
+name              = "embassy_wait"
+required-features = ["embassy", "async"]
