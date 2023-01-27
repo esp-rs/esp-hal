@@ -18,7 +18,7 @@ crate::peripherals! {
     I2C0,
     I2C1,
     I2S,
-    INTERRUPT,
+    INTERRUPT_CORE0,
     IO_MUX,
     LEDC,
     PCNT,
