@@ -16,7 +16,7 @@ use esp32c3_hal::{
     Rtc,
 };
 use esp_backtrace as _;
-use riscv_rt::entry;
+use esp_riscv_rt::{entry, riscv};
 
 static RTC: Mutex<RefCell<Option<Rtc>>> = Mutex::new(RefCell::new(None));
 

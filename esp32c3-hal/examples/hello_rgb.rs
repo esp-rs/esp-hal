@@ -25,7 +25,7 @@ use esp32c3_hal::{
 };
 #[allow(unused_imports)]
 use esp_backtrace as _;
-use riscv_rt::entry;
+use esp_riscv_rt::entry;
 use smart_leds::{
     brightness,
     gamma,

@@ -22,7 +22,7 @@ use esp32c2_hal::{
     Rtc,
 };
 use esp_backtrace as _;
-use riscv_rt::entry;
+use esp_riscv_rt::entry;
 
 #[entry]
 fn main() -> ! {

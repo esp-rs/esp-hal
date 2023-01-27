@@ -1,5 +1,4 @@
-ENTRY(_start_hal)
-PROVIDE(_start_trap = _start_trap_hal);
+ENTRY(_start)
 
 PROVIDE(_stext = ORIGIN(REGION_TEXT));
 PROVIDE(_stack_start = ORIGIN(REGION_STACK) + LENGTH(REGION_STACK));

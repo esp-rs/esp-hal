@@ -10,7 +10,8 @@
 //! interrupt15() => Priority::Priority15
 //! ```
 
-use riscv::register::mcause;
+use esp_riscv_rt::riscv::register::{mcause, mepc, mtvec};
+pub use esp_riscv_rt::TrapFrame;
 
 use crate::{
     peripherals::{self, Interrupt},
@@ -418,49 +419,6 @@ mod vectored {
     }
 }
 
-/// Registers saved in trap handler
-#[doc(hidden)]
-#[allow(missing_docs)]
-#[derive(Debug, Default, Clone, Copy)]
-#[repr(C)]
-pub struct TrapFrame {
-    pub ra: usize,
-    pub t0: usize,
-    pub t1: usize,
-    pub t2: usize,
-    pub t3: usize,
-    pub t4: usize,
-    pub t5: usize,
-    pub t6: usize,
-    pub a0: usize,
-    pub a1: usize,
-    pub a2: usize,
-    pub a3: usize,
-    pub a4: usize,
-    pub a5: usize,
-    pub a6: usize,
-    pub a7: usize,
-    pub s0: usize,
-    pub s1: usize,
-    pub s2: usize,
-    pub s3: usize,
-    pub s4: usize,
-    pub s5: usize,
-    pub s6: usize,
-    pub s7: usize,
-    pub s8: usize,
-    pub s9: usize,
-    pub s10: usize,
-    pub s11: usize,
-    pub gp: usize,
-    pub tp: usize,
-    pub sp: usize,
-    pub pc: usize,
-    pub mstatus: usize,
-    pub mcause: usize,
-    pub mtval: usize,
-}
-
 /// # Safety
 ///
 /// This function is called from an assembly trap handler.
@@ -475,10 +433,10 @@ pub unsafe extern "C" fn start_trap_rust_hal(trap_frame: *mut TrapFrame) {
 
     let cause = mcause::read();
     if cause.is_exception() {
-        let pc = riscv::register::mepc::read();
+        let pc = mepc::read();
         handle_exception(pc, trap_frame);
     } else {
-        let code = riscv::register::mcause::read().code();
+        let code = mcause::read().code();
         match code {
             1 => interrupt1(trap_frame.as_mut().unwrap()),
             2 => interrupt2(trap_frame.as_mut().unwrap()),
@@ -536,92 +494,87 @@ unsafe fn handle_exception(pc: usize, trap_frame: *mut TrapFrame) {
         return;
     }
 
-    extern "C" {
-        pub fn _start_trap_atomic_rust(trap_frame: *mut riscv_atomic_emulation_trap::TrapFrame);
-    }
+    let mut frame = [
+        0,
+        (*trap_frame).ra,
+        (*trap_frame).sp,
+        (*trap_frame).gp,
+        (*trap_frame).tp,
+        (*trap_frame).t0,
+        (*trap_frame).t1,
+        (*trap_frame).t2,
+        (*trap_frame).s0,
+        (*trap_frame).s1,
+        (*trap_frame).a0,
+        (*trap_frame).a1,
+        (*trap_frame).a2,
+        (*trap_frame).a3,
+        (*trap_frame).a4,
+        (*trap_frame).a5,
+        (*trap_frame).a6,
+        (*trap_frame).a7,
+        (*trap_frame).s2,
+        (*trap_frame).s3,
+        (*trap_frame).s4,
+        (*trap_frame).s5,
+        (*trap_frame).s6,
+        (*trap_frame).s7,
+        (*trap_frame).s8,
+        (*trap_frame).s9,
+        (*trap_frame).s10,
+        (*trap_frame).s11,
+        (*trap_frame).t3,
+        (*trap_frame).t4,
+        (*trap_frame).t5,
+        (*trap_frame).t6,
+    ];
 
-    let mut atomic_emulation_trap_frame = riscv_atomic_emulation_trap::TrapFrame {
-        x0: 0,
-        ra: (*trap_frame).ra,
-        sp: (*trap_frame).sp,
-        gp: (*trap_frame).gp,
-        tp: (*trap_frame).tp,
-        t0: (*trap_frame).t0,
-        t1: (*trap_frame).t1,
-        t2: (*trap_frame).t2,
-        fp: (*trap_frame).s0,
-        s1: (*trap_frame).s1,
-        a0: (*trap_frame).a0,
-        a1: (*trap_frame).a1,
-        a2: (*trap_frame).a2,
-        a3: (*trap_frame).a3,
-        a4: (*trap_frame).a4,
-        a5: (*trap_frame).a5,
-        a6: (*trap_frame).a6,
-        a7: (*trap_frame).a7,
-        s2: (*trap_frame).s2,
-        s3: (*trap_frame).s3,
-        s4: (*trap_frame).s4,
-        s5: (*trap_frame).s5,
-        s6: (*trap_frame).s6,
-        s7: (*trap_frame).s7,
-        s8: (*trap_frame).s8,
-        s9: (*trap_frame).s9,
-        s10: (*trap_frame).s10,
-        s11: (*trap_frame).s11,
-        t3: (*trap_frame).t3,
-        t4: (*trap_frame).t4,
-        t5: (*trap_frame).t5,
-        t6: (*trap_frame).t6,
-        pc: (*trap_frame).pc,
-    };
+    riscv_atomic_emulation_trap::atomic_emulation((*trap_frame).pc, &mut frame);
 
-    _start_trap_atomic_rust(&mut atomic_emulation_trap_frame);
-
-    (*trap_frame).pc = atomic_emulation_trap_frame.pc;
-    (*trap_frame).ra = atomic_emulation_trap_frame.ra;
-    (*trap_frame).sp = atomic_emulation_trap_frame.sp;
-    (*trap_frame).gp = atomic_emulation_trap_frame.gp;
-    (*trap_frame).tp = atomic_emulation_trap_frame.tp;
-    (*trap_frame).t0 = atomic_emulation_trap_frame.t0;
-    (*trap_frame).t1 = atomic_emulation_trap_frame.t1;
-    (*trap_frame).t2 = atomic_emulation_trap_frame.t2;
-    (*trap_frame).s0 = atomic_emulation_trap_frame.fp;
-    (*trap_frame).s1 = atomic_emulation_trap_frame.s1;
-    (*trap_frame).a0 = atomic_emulation_trap_frame.a0;
-    (*trap_frame).a1 = atomic_emulation_trap_frame.a1;
-    (*trap_frame).a2 = atomic_emulation_trap_frame.a2;
-    (*trap_frame).a3 = atomic_emulation_trap_frame.a3;
-    (*trap_frame).a4 = atomic_emulation_trap_frame.a4;
-    (*trap_frame).a5 = atomic_emulation_trap_frame.a5;
-    (*trap_frame).a6 = atomic_emulation_trap_frame.a6;
-    (*trap_frame).a7 = atomic_emulation_trap_frame.a7;
-    (*trap_frame).s2 = atomic_emulation_trap_frame.s2;
-    (*trap_frame).s3 = atomic_emulation_trap_frame.s3;
-    (*trap_frame).s4 = atomic_emulation_trap_frame.s4;
-    (*trap_frame).s5 = atomic_emulation_trap_frame.s5;
-    (*trap_frame).s6 = atomic_emulation_trap_frame.s6;
-    (*trap_frame).s7 = atomic_emulation_trap_frame.s7;
-    (*trap_frame).s8 = atomic_emulation_trap_frame.s8;
-    (*trap_frame).s9 = atomic_emulation_trap_frame.s9;
-    (*trap_frame).s10 = atomic_emulation_trap_frame.s10;
-    (*trap_frame).s11 = atomic_emulation_trap_frame.s11;
-    (*trap_frame).t3 = atomic_emulation_trap_frame.t3;
-    (*trap_frame).t4 = atomic_emulation_trap_frame.t4;
-    (*trap_frame).t5 = atomic_emulation_trap_frame.t5;
-    (*trap_frame).t6 = atomic_emulation_trap_frame.t6;
+    (*trap_frame).ra = frame[1];
+    (*trap_frame).sp = frame[2];
+    (*trap_frame).gp = frame[3];
+    (*trap_frame).tp = frame[4];
+    (*trap_frame).t0 = frame[5];
+    (*trap_frame).t1 = frame[6];
+    (*trap_frame).t2 = frame[7];
+    (*trap_frame).s0 = frame[8];
+    (*trap_frame).s1 = frame[9];
+    (*trap_frame).a0 = frame[10];
+    (*trap_frame).a1 = frame[11];
+    (*trap_frame).a2 = frame[12];
+    (*trap_frame).a3 = frame[13];
+    (*trap_frame).a4 = frame[14];
+    (*trap_frame).a5 = frame[15];
+    (*trap_frame).a6 = frame[16];
+    (*trap_frame).a7 = frame[17];
+    (*trap_frame).s2 = frame[18];
+    (*trap_frame).s3 = frame[19];
+    (*trap_frame).s4 = frame[20];
+    (*trap_frame).s5 = frame[21];
+    (*trap_frame).s6 = frame[22];
+    (*trap_frame).s7 = frame[23];
+    (*trap_frame).s8 = frame[24];
+    (*trap_frame).s9 = frame[25];
+    (*trap_frame).s10 = frame[26];
+    (*trap_frame).s11 = frame[27];
+    (*trap_frame).t3 = frame[28];
+    (*trap_frame).t4 = frame[29];
+    (*trap_frame).t5 = frame[30];
+    (*trap_frame).t6 = frame[31];
+    (*trap_frame).pc = pc + 4;
 }
 
 #[doc(hidden)]
 #[no_mangle]
 pub fn _setup_interrupts() {
     extern "C" {
-        static _vector_table_hal: *const u32;
+        static _vector_table: *const u32;
     }
 
     unsafe {
-        let vec_table = &_vector_table_hal as *const _ as usize;
-        riscv::register::mtvec::write(vec_table, riscv::register::mtvec::TrapMode::Vectored);
+        let vec_table = &_vector_table as *const _ as usize;
+        mtvec::write(vec_table, mtvec::TrapMode::Vectored);
 
         #[cfg(feature = "vectored")]
         crate::interrupt::init_vectoring();

@@ -164,6 +164,8 @@ mod critical_section_impl {
 
     #[cfg(riscv)]
     mod riscv {
+        use esp_riscv_rt::riscv;
+
         unsafe impl critical_section::Impl for super::CriticalSection {
             unsafe fn acquire() -> critical_section::RawRestoreState {
                 let mut mstatus = 0u32;

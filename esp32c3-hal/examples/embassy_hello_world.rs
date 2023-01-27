@@ -38,7 +38,7 @@ async fn run2() {
 
 static EXECUTOR: StaticCell<Executor> = StaticCell::new();
 
-#[riscv_rt::entry]
+#[esp_riscv_rt::entry]
 fn main() -> ! {
     esp_println::println!("Init!");
     let peripherals = Peripherals::take();
