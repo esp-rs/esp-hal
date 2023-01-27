@@ -20,8 +20,8 @@ use esp32c3_hal::{
     UsbSerialJtag,
 };
 use esp_backtrace as _;
+use esp_riscv_rt::{entry, riscv};
 use nb::block;
-use riscv_rt::entry;
 
 static USB_SERIAL: Mutex<RefCell<Option<UsbSerialJtag<USB_DEVICE>>>> =
     Mutex::new(RefCell::new(None));

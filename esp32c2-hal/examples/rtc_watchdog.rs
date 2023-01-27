@@ -18,7 +18,7 @@ use esp32c2_hal::{
     Rwdt,
 };
 use esp_backtrace as _;
-use riscv_rt::entry;
+use esp_riscv_rt::{entry, riscv};
 
 static RWDT: Mutex<RefCell<Option<Rwdt>>> = Mutex::new(RefCell::new(None));
 

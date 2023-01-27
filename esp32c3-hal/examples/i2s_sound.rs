@@ -42,7 +42,7 @@ use esp32c3_hal::{
     IO,
 };
 use esp_backtrace as _;
-use riscv_rt::entry;
+use esp_riscv_rt::entry;
 
 const SINE: [i16; 64] = [
     0, 3211, 6392, 9511, 12539, 15446, 18204, 20787, 23169, 25329, 27244, 28897, 30272, 31356,
