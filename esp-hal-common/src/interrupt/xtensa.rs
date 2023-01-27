@@ -165,12 +165,7 @@ unsafe fn core1_interrupt_peripheral() -> *const crate::peripherals::dport::Regi
     crate::peripherals::DPORT::PTR
 }
 
-#[cfg(esp32s2)]
-unsafe fn core0_interrupt_peripheral() -> *const crate::peripherals::interrupt::RegisterBlock {
-    crate::peripherals::INTERRUPT::PTR
-}
-
-#[cfg(esp32s3)]
+#[cfg(any(esp32s2, esp32s3))]
 unsafe fn core0_interrupt_peripheral() -> *const crate::peripherals::interrupt_core0::RegisterBlock
 {
     crate::peripherals::INTERRUPT_CORE0::PTR
