@@ -405,7 +405,7 @@ impl<'d> ClockControl<'d> {
             apb_freq = ApbClock::ApbFreq80MHz;
             clocks_ll::esp32c6_rtc_bbpll_enable();
             clocks_ll::esp32c6_rtc_bbpll_configure(xtal_freq, pll_freq);
-            // clocks_ll::esp32c6_rtc_freq_to_pll_mhz(cpu_clock_speed);
+            clocks_ll::esp32c6_rtc_freq_to_pll_mhz(cpu_clock_speed);
             clocks_ll::esp32c6_rtc_apb_freq_update(apb_freq);
         }
 
