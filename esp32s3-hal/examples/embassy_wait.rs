@@ -1,3 +1,7 @@
+//! embassy wait
+//!
+//! This is an example of asynchronously `Wait`ing for a pin state to change.
+
 #![no_std]
 #![no_main]
 #![feature(type_alias_impl_trait)]
