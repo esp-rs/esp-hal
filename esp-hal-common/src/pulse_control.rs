@@ -21,6 +21,9 @@
 //! * The **ESP32-C3** has 4 channels, `Channel0` and `Channel1` hardcoded for
 //!   transmitting signals and `Channel2` and `Channel3` hardcoded for receiving
 //!   signals.
+//! * The **ESP32-C6** has 4 channels, `Channel0` and `Channel1` hardcoded for
+//!   transmitting signals and `Channel2` and `Channel3` hardcoded for receiving
+//!   signals.
 //! * The **ESP32-S2** has 4 channels, each of them can be either receiver or
 //!   transmitter.
 //! * The **ESP32-S3** has 8 channels, `Channel0`-`Channel3` hardcdoded for
@@ -124,7 +127,7 @@ pub enum RepeatMode {
 }
 
 /// Specify the clock source for the RMT peripheral
-#[cfg(any(esp32c3, esp32s3))]
+#[cfg(any(esp32c3, esp32c6, esp32s3))]
 #[derive(Debug, Copy, Clone)]
 pub enum ClockSource {
     /// Application-level clock
@@ -150,7 +153,7 @@ pub enum ClockSource {
 // to the RMT channel
 #[cfg(any(esp32s2, esp32))]
 const CHANNEL_RAM_SIZE: u8 = 64;
-#[cfg(any(esp32c3, esp32s3))]
+#[cfg(any(esp32c3, esp32c6, esp32s3))]
 const CHANNEL_RAM_SIZE: u8 = 48;
 
 // Specifies where the RMT RAM section starts for the particular ESP32 variant
@@ -158,6 +161,8 @@ const CHANNEL_RAM_SIZE: u8 = 48;
 const RMT_RAM_START: usize = 0x3f416400;
 #[cfg(esp32c3)]
 const RMT_RAM_START: usize = 0x60016400;
+#[cfg(esp32c6)]
+const RMT_RAM_START: usize = 0x60006400;
 #[cfg(esp32)]
 const RMT_RAM_START: usize = 0x3ff56800;
 #[cfg(esp32s3)]
@@ -283,7 +288,7 @@ macro_rules! channel_instance {
                 let mut channel = $cxi { mem_offset: 0 };
 
                 cfg_if::cfg_if! {
-                    if #[cfg(any(esp32c3, esp32s3))] {
+                    if #[cfg(any(esp32c3, esp32c6, esp32s3))] {
                         // Apply default configuration
                         unsafe { &*RMT::PTR }.ch_tx_conf0[$num].modify(|_, w| unsafe {
                             // Configure memory block size
@@ -459,7 +464,7 @@ macro_rules! channel_instance {
                     }
                 }
 
-                #[cfg(any(esp32c3, esp32s3))]
+                #[cfg(any(esp32c3, esp32c6, esp32s3))]
                 conf_reg.modify(|_, w| {
                     // Set config update bit
                     w.conf_update().set_bit()
@@ -540,14 +545,14 @@ macro_rules! channel_instance {
                 }
 
                 // always enable tx wrap
-                #[cfg(any(esp32c3, esp32s3))]
+                #[cfg(any(esp32c3, esp32c6, esp32s3))]
                 unsafe { &*RMT::PTR }.ch_tx_conf0[$num].modify(|_, w| {
                     w.mem_tx_wrap_en()
                         .set_bit()
                 });
 
                 // apply configuration updates
-                #[cfg(any(esp32c3, esp32s3))]
+                #[cfg(any(esp32c3, esp32c6, esp32s3))]
                 unsafe { &*RMT::PTR }.ch_tx_conf0[$num].modify(|_, w| {
                     w.conf_update()
                         .set_bit()
@@ -577,9 +582,9 @@ macro_rules! channel_instance {
                             #[cfg(esp32)]
                             false,
                             // The C3/S3 have a slightly different interrupt naming scheme
-                            #[cfg(any(esp32, feature= "esp32s2"))]
+                            #[cfg(any(esp32, esp32s2))]
                             unsafe { interrupts.ch_err_int_raw($num).bit() },
-                            #[cfg(any(esp32c3, feature= "esp32s3"))]
+                            #[cfg(any(esp32c3, esp32c6, esp32s3))]
                             unsafe { interrupts.ch_tx_err_int_raw($num).bit() },
                             unsafe { interrupts.ch_tx_thr_event_int_raw($num).bit() },
                         ) {
@@ -612,9 +617,9 @@ macro_rules! channel_instance {
                                     #[cfg(esp32)]
                                     false,
                                     // The C3/S3 have a slightly different interrupt naming scheme
-                                    #[cfg(any(esp32, feature= "esp32s2"))]
+                                    #[cfg(any(esp32, esp32s2))]
                                     unsafe { interrupts.ch_err_int_raw($num).bit() },
-                                    #[cfg(any(esp32c3, feature= "esp32s3"))]
+                                    #[cfg(any(esp32c3, esp32c6, esp32s3))]
                                     unsafe { interrupts.ch_tx_err_int_raw($num).bit() },
                                     unsafe { interrupts.ch_tx_thr_event_int_raw($num).bit() },
                                 ))
@@ -632,7 +637,7 @@ macro_rules! channel_instance {
             /// previously a sequence was sent with `RepeatMode::Forever`.
             fn stop_transmission(&self) {
                 cfg_if::cfg_if! {
-                    if #[cfg(any(esp32c3, esp32s3))] {
+                    if #[cfg(any(esp32c3, esp32c6, esp32s3))] {
                         unsafe { &*RMT::PTR }
                             .ch_tx_conf0[$num]
                             .modify(|_, w| w.tx_stop().set_bit());
@@ -666,7 +671,7 @@ macro_rules! output_channel {
             #[inline(always)]
             fn set_idle_output_level(&mut self, level: bool) -> &mut Self {
                 cfg_if::cfg_if! {
-                    if #[cfg(any(esp32c3, esp32s3))] {
+                    if #[cfg(any(esp32c3, esp32c6, esp32s3))] {
                         unsafe { &*RMT::PTR }
                             .ch_tx_conf0[$num]
                             .modify(|_, w| w.idle_out_lv().bit(level));
@@ -683,7 +688,7 @@ macro_rules! output_channel {
             #[inline(always)]
             fn set_idle_output(&mut self, state: bool) -> &mut Self {
                 cfg_if::cfg_if! {
-                    if #[cfg(any(esp32c3, esp32s3))] {
+                    if #[cfg(any(esp32c3, esp32c6, esp32s3))] {
                         unsafe { &*RMT::PTR }
                             .ch_tx_conf0[$num]
                             .modify(|_, w| w.idle_out_en().bit(state));
@@ -700,7 +705,7 @@ macro_rules! output_channel {
             #[inline(always)]
             fn set_channel_divider(&mut self, divider: u8) -> &mut Self {
                 cfg_if::cfg_if! {
-                    if #[cfg(any(esp32c3, esp32s3))] {
+                    if #[cfg(any(esp32c3, esp32c6, esp32s3))] {
                         unsafe { &*RMT::PTR }
                             .ch_tx_conf0[$num]
                             .modify(|_, w| unsafe { w.div_cnt().bits(divider) });
@@ -717,7 +722,7 @@ macro_rules! output_channel {
             #[inline(always)]
             fn set_carrier_modulation(&mut self, state: bool) -> &mut Self {
                 cfg_if::cfg_if! {
-                    if #[cfg(any(esp32c3, esp32s3))] {
+                    if #[cfg(any(esp32c3, esp32c6, esp32s3))] {
                         unsafe { &*RMT::PTR }
                             .ch_tx_conf0[$num]
                             .modify(|_, w| w.carrier_en().bit(state));
@@ -845,7 +850,7 @@ macro_rules! rmt {
 
     impl<'d> PulseControl<'d> {
         /// Create a new pulse controller instance
-        #[cfg(any(esp32c3, esp32s3))]
+        #[cfg(any(esp32c3, esp32c6, esp32s3))]
         pub fn new(
             instance: impl Peripheral<P = RMT> + 'd,
             peripheral_clock_control: &mut PeripheralClockControl,
@@ -902,7 +907,7 @@ macro_rules! rmt {
         /// clock is calculated as follows:
         ///
         /// divider = absolute_part + 1 + (fractional_part_a / fractional_part_b)
-        #[cfg(any(esp32c3, esp32s3))]
+        #[cfg(any(esp32c3, esp32c6, esp32s3))]
         fn config_global(
             &self,
             clk_source: ClockSource,
@@ -1018,7 +1023,7 @@ macro_rules! rmt {
  };
 }
 
-#[cfg(esp32c3)]
+#[cfg(any(esp32c3, esp32c6))]
 rmt!(
     sys_conf,
     (0, Channel0, channel0, OutputSignal::RMT_SIG_0),

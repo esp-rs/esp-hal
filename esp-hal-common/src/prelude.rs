@@ -20,15 +20,15 @@ pub use fugit::{
 };
 pub use nb;
 
-#[cfg(any(esp32c2, esp32c3))]
-pub use crate::analog::SarAdcExt as _esp_hal_analog_SarAdcExt;
-#[cfg(any(esp32, esp32s2, esp32s3))]
-pub use crate::analog::SensExt as _esp_hal_analog_SensExt;
-//#[cfg(rmt)]
-//pub use crate::pulse_control::{
-//    ConfiguredChannel as _esp_hal_pulse_control_ConfiguredChannel,
-//    OutputChannel as _esp_hal_pulse_control_OutputChannel,
-//};
+// #[cfg(any(esp32c2, esp32c3))]
+// pub use crate::analog::SarAdcExt as _esp_hal_analog_SarAdcExt;
+// #[cfg(any(esp32, esp32s2, esp32s3))]
+// pub use crate::analog::SensExt as _esp_hal_analog_SensExt;
+// #[cfg(rmt)]
+// pub use crate::pulse_control::{
+//     ConfiguredChannel as _esp_hal_pulse_control_ConfiguredChannel,
+//     OutputChannel as _esp_hal_pulse_control_OutputChannel,
+// };
 #[cfg(radio)]
 pub use crate::radio::RadioExt as _esp_hal_RadioExt;
 #[cfg(any(esp32, esp32s2))]
@@ -36,8 +36,8 @@ pub use crate::spi::dma::WithDmaSpi3 as _esp_hal_spi_dma_WithDmaSpi3;
 pub use crate::{
     clock::Clock as _esp_hal_clock_Clock,
     dma::{
-       DmaTransfer as _esp_hal_dma_DmaTransfer,
-       DmaTransferRxTx as _esp_hal_dma_DmaTransferRxTx,
+        DmaTransfer as _esp_hal_dma_DmaTransfer,
+        DmaTransferRxTx as _esp_hal_dma_DmaTransferRxTx,
     },
     entry,
     gpio::{
@@ -45,20 +45,20 @@ pub use crate::{
         OutputPin as _esp_hal_gpio_OutputPin,
         Pin as _esp_hal_gpio_Pin,
     },
-    // i2c::Instance as _esp_hal_i2c_Instance,
-    // ledc::{
-    //     channel::{
-    //         ChannelHW as _esp_hal_ledc_channel_ChannelHW,
-    //         ChannelIFace as _esp_hal_ledc_channel_ChannelIFace,
-    //     },
-    //     timer::{
-    //         TimerHW as _esp_hal_ledc_timer_TimerHW,
-    //         TimerIFace as _esp_hal_ledc_timer_TimerIFace,
-    //     },
-    // },
+    i2c::Instance as _esp_hal_i2c_Instance,
+    ledc::{
+        channel::{
+            ChannelHW as _esp_hal_ledc_channel_ChannelHW,
+            ChannelIFace as _esp_hal_ledc_channel_ChannelIFace,
+        },
+        timer::{
+            TimerHW as _esp_hal_ledc_timer_TimerHW,
+            TimerIFace as _esp_hal_ledc_timer_TimerIFace,
+        },
+    },
     macros::*,
     spi::{
-       dma::WithDmaSpi2 as _esp_hal_spi_dma_WithDmaSpi2,
+        dma::WithDmaSpi2 as _esp_hal_spi_dma_WithDmaSpi2,
         Instance as _esp_hal_spi_Instance,
         InstanceDma as _esp_hal_spi_InstanceDma,
     },
