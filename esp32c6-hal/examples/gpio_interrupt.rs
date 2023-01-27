@@ -11,7 +11,7 @@ use core::{arch::asm, cell::RefCell};
 use critical_section::Mutex;
 use esp32c6_hal::{
     clock::ClockControl,
-    gpio::{Event, Gpio9, Input, PullDown, IO},
+    gpio::{Event, Gpio7, Input, PullDown, IO},
     interrupt,
     peripherals::{self, Peripherals},
     prelude::*,
@@ -24,7 +24,7 @@ use esp_backtrace as _;
 use esp_println::println;
 use riscv_rt::entry;
 
-static BUTTON: Mutex<RefCell<Option<Gpio9<Input<PullDown>>>>> = Mutex::new(RefCell::new(None));
+static BUTTON: Mutex<RefCell<Option<Gpio7<Input<PullDown>>>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
@@ -50,7 +50,7 @@ fn main() -> ! {
     let mut led = io.pins.gpio5.into_push_pull_output();
 
     // Set GPIO9 as an input
-    let mut button = io.pins.gpio9.into_pull_down_input();
+    let mut button = io.pins.gpio7.into_pull_down_input();
     button.listen(Event::FallingEdge);
 
     critical_section::with(|cs| BUTTON.borrow_ref_mut(cs).replace(button));

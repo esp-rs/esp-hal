@@ -14,12 +14,15 @@ pub use esp_hal_common::{
     macros,
     peripherals,
     prelude,
+    pulse_control,
     spi,
     systimer,
     timer,
     uart,
     Cpu,
     Delay,
+    PulseControl,
+    utils,
     Uart,
 };
 

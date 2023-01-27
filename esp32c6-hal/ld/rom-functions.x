@@ -1,4 +1,5 @@
 ets_printf = 0x40000028;
+ets_update_cpu_frequency = ets_update_cpu_frequency_rom;
 PROVIDE(esp_rom_printf = ets_printf);
 PROVIDE(cache_invalidate_icache_all = 0x4000064c);
 PROVIDE(cache_suspend_icache = 0x40000698);

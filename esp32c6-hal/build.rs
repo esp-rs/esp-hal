@@ -70,5 +70,10 @@ fn add_defaults() {
         .write_all(include_bytes!("ld/hal-defaults.x"))
         .unwrap();
 
+    File::create(out.join("rom-functions.x"))
+        .unwrap()
+        .write_all(include_bytes!("ld/rom-functions.x"))
+        .unwrap();
+
     println!("cargo:rustc-link-search={}", out.display());
 }

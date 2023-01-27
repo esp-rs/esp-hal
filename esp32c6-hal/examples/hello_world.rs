@@ -39,7 +39,7 @@ fn main() -> ! {
     // let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
     let clocks = ClockControl::configure(
         system.clock_control,
-        CpuClock::Clock80MHz,
+        CpuClock::Clock160MHz,
     )
     .freeze();
 
