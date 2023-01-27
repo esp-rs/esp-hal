@@ -34,7 +34,7 @@ async fn ping(mut pin: Gpio9<Input<PullDown>>) {
 
 static EXECUTOR: StaticCell<Executor> = StaticCell::new();
 
-#[riscv_rt::entry]
+#[esp_riscv_rt::entry]
 fn main() -> ! {
     esp_println::println!("Init!");
     let peripherals = Peripherals::take();
