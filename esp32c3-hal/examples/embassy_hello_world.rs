@@ -1,3 +1,8 @@
+//! embassy hello world
+//!
+//! This is an example of running the embassy executor with multiple tasks
+//! concurrently.
+
 #![no_std]
 #![no_main]
 #![feature(type_alias_impl_trait)]

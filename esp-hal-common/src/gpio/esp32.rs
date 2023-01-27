@@ -13,6 +13,8 @@ use crate::{
     Unknown,
 };
 
+pub const NUM_PINS: usize = 39;
+
 pub type OutputSignalType = u16;
 pub const OUTPUT_SIGNAL_MAX: u16 = 548;
 pub const INPUT_SIGNAL_MAX: u16 = 539;
