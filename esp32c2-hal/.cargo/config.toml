@@ -1,14 +1,23 @@
 [target.riscv32imc-unknown-none-elf]
 runner = "espflash flash --monitor"
 rustflags = [
-  "-C", "link-arg=-Tlinkall.x"
-]
+  "-C", "link-arg=-Tlinkall.x",
 
-# for testing: you can specify this target to see atomic emulation in action
-[target.riscv32imac-unknown-none-elf]
-runner = "espflash flash --monitor"
-rustflags = [
-  "-C", "link-arg=-Tlinkall.x"
+  # comment the cfgs below if you do _not_ wish to emulate atomics.
+  # enable the atomic codegen option for RISCV
+  "-C", "target-feature=+a",
+  # tell the core library have atomics even though it's not specified in the target definition
+  "--cfg", "target_has_atomic_load_store",
+  "--cfg", 'target_has_atomic_load_store="8"',
+  "--cfg", 'target_has_atomic_load_store="16"',
+  "--cfg", 'target_has_atomic_load_store="32"',
+  "--cfg", 'target_has_atomic_load_store="ptr"',
+  # enable cas
+  "--cfg", "target_has_atomic",
+  "--cfg", 'target_has_atomic="8"',
+  "--cfg", 'target_has_atomic="16"',
+  "--cfg", 'target_has_atomic="32"',
+  "--cfg", 'target_has_atomic="ptr"',
 ]
 
 [build]
