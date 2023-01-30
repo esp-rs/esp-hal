@@ -15,12 +15,10 @@ If you have any questions, comments, or concerns, please [open an issue], [start
 |     Crate     |                               Target                                | Technical Reference Manual |
 | :-----------: | :-----------------------------------------------------------------: | :------------------------: |
 |  [esp32-hal]  |                       `xtensa-esp32-none-elf`                       |          [ESP32]           |
-| [esp32c2-hal] | `riscv32imc-unknown-none-elf`<br />`riscv32imac-unknown-none-elf`\* |         [ESP32-C2]         |
-| [esp32c3-hal] | `riscv32imc-unknown-none-elf`<br />`riscv32imac-unknown-none-elf`\* |         [ESP32-C3]         |
+| [esp32c2-hal] |                    `riscv32imc-unknown-none-elf`                    |         [ESP32-C2]         |
+| [esp32c3-hal] |                    `riscv32imc-unknown-none-elf`                    |         [ESP32-C3]         |
 | [esp32s2-hal] |                      `xtensa-esp32s2-none-elf`                      |         [ESP32-S2]         |
 | [esp32s3-hal] |                      `xtensa-esp32s3-none-elf`                      |         [ESP32-S3]         |
-
-_\* via [atomic emulation]_
 
 [here]: https://github.com/esp-rs/esp-hal/issues/19
 [esp-idf-hal]: https://github.com/esp-rs/esp-idf-hal
