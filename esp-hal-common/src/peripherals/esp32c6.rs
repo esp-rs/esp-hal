@@ -22,7 +22,7 @@ crate::peripherals! {
     HP_APM,
     HP_SYS,
     I2C0,
-    I2S,
+    I2S0,
     INTERRUPT_CORE0,
     INTPRI,
     IO_MUX,

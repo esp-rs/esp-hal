@@ -336,7 +336,7 @@ fn clk_ll_mspi_fast_set_hs_divider(divider: u32) {
     let pcr = unsafe { &*crate::peripherals::PCR::PTR };
 
     unsafe {
-        match (divider) {
+        match divider {
             4 => pcr
                 .mspi_clk_conf
                 .modify(|_, w| w.mspi_fast_hs_div_num().bits(3)),

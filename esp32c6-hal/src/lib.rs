@@ -9,6 +9,7 @@ pub use esp_hal_common::{
     dma::gdma,
     gpio,
     i2c,
+    i2s,
     interrupt,
     ledc,
     macros,

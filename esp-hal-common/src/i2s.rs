@@ -988,15 +988,17 @@ mod private {
     use fugit::HertzU32;
 
     use super::{DataFormat, I2sRx, I2sTx, RegisterAccess, Standard, I2S_LL_MCLK_DIVIDER_MAX};
-    #[cfg(any(esp32c3, esp32c6, esp32s2))]
+    #[cfg(any(esp32c3, esp32s2))]
     use crate::peripherals::i2s::RegisterBlock;
+    #[cfg(esp32c6)]
+    use crate::peripherals::i2s0::RegisterBlock;
     // on ESP32-S3 I2S1 doesn't support all features - use that to avoid using those features
     // by accident
     #[cfg(any(esp32s3, esp32))]
     use crate::peripherals::i2s1::RegisterBlock;
-    #[cfg(any(esp32c3, esp32c6, esp32s2))]
+    #[cfg(any(esp32c3, esp32s2))]
     use crate::peripherals::I2S;
-    #[cfg(any(esp32s3, esp32))]
+    #[cfg(any(esp32s3, esp32, esp32c6))]
     use crate::peripherals::I2S0 as I2S;
     use crate::{
         clock::Clocks,
