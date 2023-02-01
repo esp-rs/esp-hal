@@ -6,9 +6,9 @@ SECTIONS
   {
     LONG(0xaedb041d)
     LONG(0xaedb041d)
-  } > IROM
+  } > ROM
 }
 
-_stext = ORIGIN(IROM) + 8;
+_stext = ORIGIN(ROM) + 8;
 
 INCLUDE riscv-link.x

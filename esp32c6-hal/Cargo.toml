@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = [
     "Jesse Braham <jesse@beta7.io>",
     "Björn Quentin <bjoern.quentin@mobile-j.de>",
+    "Juraj Sadel <jurajsadel@gmail.com>",
 ]
 edition      = "2021"
 rust-version = "1.60.0"
@@ -29,15 +30,15 @@ cfg-if             = "1.0.0"
 embassy-time       = { version = "0.1.0", features = ["nightly"], optional = true }
 embedded-hal       = { version = "0.2.7", features = ["unproven"] }
 embedded-hal-1     = { version = "=1.0.0-alpha.9", optional = true, package = "embedded-hal" }
-embedded-hal-async = { version = "0.1.0-alpha.3", optional = true }
+embedded-hal-async = { version = "0.2.0-alpha.0", optional = true }
 embedded-hal-nb    = { version = "=1.0.0-alpha.1", optional = true }
 embedded-can       = { version = "0.4.1", optional = true }
-esp-hal-common     = { features = ["esp32c6"], path = "../esp-hal-common" }
+esp-hal-common     = { version = "0.5.0",  features = ["esp32c6"], path = "../esp-hal-common" }
+esp-riscv-rt       = { version = "0.1.0", optional = true }
 r0                 = "1.0.0"
-riscv              = "0.10.1"
-riscv-rt           = { version = "0.11.0", optional = true }
 
 [dev-dependencies]
+aes               = "0.8.2"
 critical-section  = "1.1.1"
 embassy-executor  = { package = "embassy-executor", git = "https://github.com/embassy-rs/embassy/", rev = "cd9a65b", features = ["nightly", "integrated-timers"] }
 embedded-graphics = "0.7.1"
@@ -53,7 +54,7 @@ default              = ["rt", "vectored"]
 mcu-boot             = []
 direct-boot          = []
 eh1                  = ["esp-hal-common/eh1", "dep:embedded-hal-1", "dep:embedded-hal-nb", "dep:embedded-can"]
-rt                   = ["riscv-rt"]
+rt                   = ["esp-riscv-rt"]
 smartled             = ["esp-hal-common/smartled"]
 ufmt                 = ["esp-hal-common/ufmt"]
 vectored             = ["esp-hal-common/vectored"]
@@ -78,3 +79,6 @@ embassy-time-timg0 = ["esp-hal-common/embassy-time-timg0", "embassy-time/tick-hz
 # [[example]]
 # name              = "embassy_hello_world"
 # required-features = ["embassy"]
+
+[profile.dev]
+opt-level = 1

@@ -70,7 +70,7 @@ pub use self::pulse_control::PulseControl;
 //     timer::Timer,
 //     uart::Uart,
 // };
-pub use self::{delay::Delay, gpio::*, interrupt::*, spi::Spi, timer::Timer, uart::Uart};
+pub use self::{delay::Delay, gpio::*, interrupt::*, spi::Spi, timer::Timer, uart::Uart, /*rtc_cntl::{Rtc, Rwdt},*/};
 
 // pub mod analog;
 pub mod clock;
@@ -97,8 +97,8 @@ pub mod pulse_control;
 pub mod radio;
 pub mod rng;
 pub mod rom;
-#[cfg(not(esp32c6))]
-pub mod rtc_cntl;
+// #[cfg(not(esp32c6))]
+// pub mod rtc_cntl;
 pub mod sha;
 pub mod spi;
 pub mod system;

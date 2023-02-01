@@ -6,7 +6,7 @@
 #![no_std]
 #![no_main]
 
-use core::{arch::asm, cell::RefCell};
+use core::cell::RefCell;
 
 use critical_section::Mutex;
 use esp32c6_hal::{
@@ -15,14 +15,13 @@ use esp32c6_hal::{
     interrupt,
     peripherals::{self, Peripherals},
     prelude::*,
-    systimer::SystemTimer,
-    // Rtc,
     timer::TimerGroup,
     Delay,
+    // Rtc,
 };
 use esp_backtrace as _;
+use esp_riscv_rt::{entry, riscv};
 use esp_println::println;
-use riscv_rt::entry;
 
 static BUTTON: Mutex<RefCell<Option<Gpio7<Input<PullDown>>>>> = Mutex::new(RefCell::new(None));
 

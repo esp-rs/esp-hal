@@ -61,7 +61,7 @@ SECTIONS
   } > REGION_TEXT
 
   _text_size = _etext - _stext + 8;
-  .rodata ORIGIN(DROM) + _text_size : AT(_text_size)
+  .rodata ORIGIN(ROM) + _text_size : AT(_text_size)
   {
     _srodata = .;
     *(.srodata .srodata.*);
@@ -75,7 +75,7 @@ SECTIONS
   } > REGION_RODATA
 
   _rodata_size = _erodata - _srodata + 8;
-  .data ORIGIN(DRAM) : AT(_text_size + _rodata_size)
+  .data ORIGIN(RAM) : AT(_text_size + _rodata_size)
   {
     _sdata = .;
     /* Must be called __global_pointer$ for linker relaxations to work. */
@@ -182,9 +182,9 @@ SECTIONS
 }
 
 PROVIDE(_sidata = _erodata + 8);
-PROVIDE(_irwtext = ORIGIN(DROM) + _text_size + _rodata_size + _data_size);
-PROVIDE(_irtc_fast_text = ORIGIN(DROM) + _text_size + _rodata_size + _data_size + _rwtext_size);
-PROVIDE(_irtc_fast_data = ORIGIN(DROM) + _text_size + _rodata_size + _data_size + _rwtext_size + _fast_text_size);
+PROVIDE(_irwtext = ORIGIN(ROM) + _text_size + _rodata_size + _data_size);
+PROVIDE(_irtc_fast_text = ORIGIN(ROM) + _text_size + _rodata_size + _data_size + _rwtext_size);
+PROVIDE(_irtc_fast_data = ORIGIN(ROM) + _text_size + _rodata_size + _data_size + _rwtext_size + _fast_text_size);
 
 /* Do not exceed this mark in the error messages above                                    | */
 ASSERT(ORIGIN(REGION_TEXT) % 4 == 0, "

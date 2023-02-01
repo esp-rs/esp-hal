@@ -80,11 +80,7 @@ impl PeripheralClockControl {
             )
         };
 
-<<<<<<< HEAD
         #[cfg(any(esp32c2, esp32c3, esp32c6, esp32s2, esp32s3))]
-=======
-        #[cfg(any(esp32c2, esp32c3, esp32c6, esp32s3))]
->>>>>>> b278bca (Get a number of peripheral drivers building for the ESP32-C6)
         let (perip_clk_en1, perip_rst_en1) = { (&system.perip_clk_en1, &system.perip_rst_en1) };
 
         match peripheral {
@@ -193,61 +189,6 @@ impl PeripheralClockControl {
             Peripheral::Aes => {
                 perip_clk_en1.modify(|_, w| w.crypto_aes_clk_en().set_bit());
                 perip_rst_en1.modify(|_, w| w.crypto_aes_rst().clear_bit());
-            }
-        }
-    }
-}
-
-#[cfg(esp32c6)]
-impl PeripheralClockControl {
-    /// Enables and resets the given peripheral
-    pub fn enable(&mut self, peripheral: Peripheral) {
-        let system = unsafe { &*SystemPeripheral::PTR };
-
-        match peripheral {
-            Peripheral::Spi2 => {
-                system.spi2_conf.modify(|_, w| w.spi2_clk_en().set_bit());
-                system.spi2_conf.modify(|_, w| w.spi2_rst_en().clear_bit());
-            }
-            Peripheral::I2cExt0 => {
-                // FIXME
-                // perip_clk_en0.modify(|_, w| w.i2c_ext0_clk_en().set_bit());
-                // perip_rst_en0.modify(|_, w| w.i2c_ext0_rst().clear_bit());
-            }
-            Peripheral::Rmt => {
-                system.rmt_conf.modify(|_, w| w.rmt_clk_en().set_bit());
-                system.rmt_conf.modify(|_, w| w.rmt_rst_en().clear_bit());
-            }
-            Peripheral::Ledc => {
-                system.ledc_conf.modify(|_, w| w.ledc_clk_en().set_bit());
-                system.ledc_conf.modify(|_, w| w.ledc_rst_en().clear_bit());
-            }
-            Peripheral::Mcpwm0 | Peripheral::Mcpwm1 => {
-                system.pwm_conf.modify(|_, w| w.pwm_clk_en().set_bit());
-                system.pwm_conf.modify(|_, w| w.pwm_rst_en().clear_bit());
-            }
-            Peripheral::ApbSarAdc => {
-                // TODO
-            }
-            Peripheral::Gdma => {
-                system.gdma_conf.modify(|_, w| w.gdma_clk_en().set_bit());
-                system.gdma_conf.modify(|_, w| w.gdma_rst_en().clear_bit());
-            }
-            Peripheral::I2s0 => {
-                system.i2s_conf.modify(|_, w| w.i2s_clk_en().set_bit());
-                system.i2s_conf.modify(|_, w| w.i2s_rst_en().clear_bit());
-            }
-            Peripheral::Twai0 => {
-                system.twai0_conf.modify(|_, w| w.twai0_clk_en().set_bit());
-                system
-                    .twai0_conf
-                    .modify(|_, w| w.twai0_rst_en().clear_bit());
-            }
-            Peripheral::Twai1 => {
-                system.twai1_conf.modify(|_, w| w.twai1_clk_en().set_bit());
-                system
-                    .twai1_conf
-                    .modify(|_, w| w.twai1_rst_en().clear_bit());
             }
         }
     }

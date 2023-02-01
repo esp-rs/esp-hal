@@ -21,17 +21,16 @@ use esp32c6_hal::{
     //Cpu,
 };
 
-use nb::block;
 
 use esp_hal_common::system::SystemExt;
 
 use esp_backtrace as _;
-
-// static SERIAL: Mutex<RefCell<Option<Uart<UART0>>>> = Mutex::new(RefCell::new(None));
-
 use esp_println::println;
+use esp_riscv_rt::entry;
+use nb::block;
 
-#[riscv_rt::entry]
+
+#[entry]
 fn main() -> ! {
     esp_println::println!("fffff");
     let peripherals = Peripherals::take();
