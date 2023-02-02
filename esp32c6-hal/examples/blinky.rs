@@ -12,10 +12,10 @@ use esp32c6_hal::{
     prelude::*,
     timer::TimerGroup,
     Delay,
+    Rtc,
 };
 use esp_backtrace as _;
 use esp_riscv_rt::entry;
-
 
 #[entry]
 fn main() -> ! {
@@ -28,6 +28,10 @@ fn main() -> ! {
     let timer_group1 = TimerGroup::new(peripherals.TIMG1, &clocks);
     let mut wdt1 = timer_group1.wdt;
 
+    let mut rtc = Rtc::new(peripherals.LP_CLKRST);
+    rtc.rwdt.disable();
+    rtc.swd.disable();
+
     // Set GPIO5 as an output, and set its state high initially.
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let mut led = io.pins.gpio5.into_push_pull_output();
@@ -38,7 +42,12 @@ fn main() -> ! {
     // loop.
     let mut delay = Delay::new(&clocks);
 
+    // just for testing ... remove this
+    let rst_reason = unsafe { (0x600b0410 as *mut u32).read_volatile() & 0b11111 };
+    esp_println::println!("raw rst reason {} 0x{:x}", rst_reason, rst_reason);
+
     loop {
+        esp_println::println!("blinky");
         led.toggle().unwrap();
         delay.delay_ms(2000u32);
     }

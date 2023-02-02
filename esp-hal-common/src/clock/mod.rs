@@ -12,7 +12,7 @@ use crate::{
 #[cfg_attr(esp32c6, path = "clocks_ll/esp32c6.rs")]
 #[cfg_attr(esp32s2, path = "clocks_ll/esp32s2.rs")]
 #[cfg_attr(esp32s3, path = "clocks_ll/esp32s3.rs")]
-mod clocks_ll;
+pub(crate) mod clocks_ll;
 
 pub trait Clock {
     fn frequency(&self) -> HertzU32;

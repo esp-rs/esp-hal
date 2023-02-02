@@ -25,6 +25,7 @@ pub use esp_hal_common::{
     PulseControl,
     utils,
     Uart,
+    Rtc,
 };
 
 pub use self::gpio::IO;

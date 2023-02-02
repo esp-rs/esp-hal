@@ -14,7 +14,13 @@ use crate::{
 #[cfg(not(esp32c6))]
 use crate::peripherals::RTC_CNTL;
 #[cfg(esp32c6)]
-use crate::peripherals::{LP_CLKRST, LP_AON, PCR, PMU};
+use crate::peripherals::{LP_CLKRST, LP_AON, PCR, PMU, LP_WDT};
+
+#[cfg(not(esp32c6))]
+type RTC_PERIPHERAL = RTC_CNTL;
+
+#[cfg(esp32c6)]
+type RTC_PERIPHERAL = LP_CLKRST;
 
 #[cfg_attr(esp32, path = "rtc/esp32.rs")]
 #[cfg_attr(esp32c2, path = "rtc/esp32c2.rs")]
@@ -46,7 +52,7 @@ impl Clock for RtcFastClock {
             RtcFastClock::RtcFastClockXtalD4 => HertzU32::Hz(40_000_000 / 4),
             #[cfg(any(esp32, esp32s2))]
             RtcFastClock::RtcFastClock8m => HertzU32::Hz(8_500_000),
-            #[cfg(any(esp32c2, esp32c3, esp32s3))]
+            #[cfg(any(esp32c2, esp32c3, esp32s3, esp32c6))]
             RtcFastClock::RtcFastClock8m => HertzU32::Hz(17_500_000),
         }
     }
@@ -97,7 +103,10 @@ impl Clock for RtcSlowClock {
             RtcSlowClock::RtcSlowClock8mD256 => HertzU32::Hz(17_500_000 / 256),
             #[cfg(esp32c6)]
             RtcSlowClock::RtcCalRcFast => HertzU32::Hz(17_500_00),
-
+            #[cfg(esp32c6)]
+            RtcSlowClock::RtcSlowClock32kRc => HertzU32::Hz(17_500_00), // ??
+            #[cfg(esp32c6)]
+            RtcSlowClock::RtcCalInternalOsc => HertzU32::Hz(17_500_00), // ??
         }
     }
 }
@@ -145,25 +154,26 @@ pub(crate) enum RtcCaliClkSel {
 }
 
 pub struct Rtc<'d> {
-    _inner: PeripheralRef<'d, RTC_CNTL>,
+    _inner: PeripheralRef<'d, RTC_PERIPHERAL>,
     pub rwdt: Rwdt,
-    #[cfg(any(esp32c2, esp32c3, esp32s3))]
+    #[cfg(any(esp32c2, esp32c3, esp32s3, esp32c6))]
     pub swd: Swd,
 }
 
 impl<'d> Rtc<'d> {
-    pub fn new(rtc_cntl: impl Peripheral<P = RTC_CNTL> + 'd) -> Self {
+    pub fn new(rtc_cntl: impl Peripheral<P = RTC_PERIPHERAL> + 'd) -> Self {
         rtc::init();
         rtc::configure_clock();
 
         Self {
             _inner: rtc_cntl.into_ref(),
             rwdt: Rwdt::default(),
-            #[cfg(any(esp32c2, esp32c3, esp32s3))]
+            #[cfg(any(esp32c2, esp32c3, esp32s3, esp32c6))]
             swd: Swd::new(),
         }
     }
 
+    #[cfg(not(esp32c6))]
     pub fn estimate_xtal_frequency(&mut self) -> u32 {
         RtcClock::estimate_xtal_frequency()
     }
@@ -281,8 +291,8 @@ impl RtcClock {
     /// Get the RTC_SLOW_CLK source
     #[cfg(esp32c6)]
     fn get_slow_freq() -> RtcSlowClock {
-        let lp_clrst = &*LP_CLKRST::ptr();
-        let pcr = &*PCR::ptr();
+        let lp_clrst = unsafe { &*LP_CLKRST::ptr() };
+        let pcr = unsafe { &*PCR::ptr() };
 
         let slow_freq = lp_clrst.lp_clk_conf.read().slow_clk_sel().bits();
         match slow_freq {
@@ -294,7 +304,13 @@ impl RtcClock {
         }
     }
 
+    #[cfg(esp32c6)]
+    fn set_slow_freq(slow_freq: RtcSlowClock) {
+        todo!()
+    }
+
     /// Select source for RTC_SLOW_CLK
+    #[cfg(not(esp32c6))]
     fn set_slow_freq(slow_freq: RtcSlowClock) {
         unsafe {
             let rtc_cntl = &*RTC_CNTL::ptr();
@@ -847,6 +863,7 @@ impl Default for Rwdt {
     }
 }
 
+#[cfg(not(esp32c6))]
 /// RTC Watchdog Timer driver
 impl Rwdt {
     pub fn listen(&mut self) {
@@ -927,6 +944,7 @@ impl Rwdt {
     }
 }
 
+#[cfg(not(esp32c6))]
 impl WatchdogDisable for Rwdt {
     fn disable(&mut self) {
         let rtc_cntl = unsafe { &*RTC_CNTL::ptr() };
@@ -941,6 +959,7 @@ impl WatchdogDisable for Rwdt {
     }
 }
 
+#[cfg(not(esp32c6))]
 impl WatchdogEnable for Rwdt {
     type Time = MicrosDurationU64;
 
@@ -987,6 +1006,7 @@ impl WatchdogEnable for Rwdt {
     }
 }
 
+#[cfg(not(esp32c6))]
 impl Watchdog for Rwdt {
     fn feed(&mut self) {
         let rtc_cntl = unsafe { &*RTC_CNTL::ptr() };
@@ -999,7 +1019,88 @@ impl Watchdog for Rwdt {
     }
 }
 
-#[cfg(any(esp32c2, esp32c3, esp32s3))]
+
+#[cfg(any(esp32c6))]
+/// RTC Watchdog Timer driver
+impl Rwdt {
+    pub fn listen(&mut self) {
+        let rtc_cntl = unsafe { &*LP_WDT::ptr() };
+
+        self.stg0_action = RwdtStageAction::RwdtStageActionInterrupt;
+
+        self.set_write_protection(false);
+
+        // Configure STAGE0 to trigger an interrupt upon expiration
+        rtc_cntl
+            .config0
+            .modify(|_, w| unsafe { w.wdt_stg0().bits(self.stg0_action as u8) });
+
+        rtc_cntl
+            .int_ena
+            .modify(|_, w| w.lp_wdt_int_ena().set_bit());
+
+        self.set_write_protection(true);
+    }
+
+    pub fn unlisten(&mut self) {
+        let rtc_cntl = unsafe { &*LP_WDT::ptr() };
+
+        self.stg0_action = RwdtStageAction::RwdtStageActionResetRtc;
+
+        self.set_write_protection(false);
+
+        // Configure STAGE0 to reset the main system and the RTC upon expiration.
+        rtc_cntl
+            .config0
+            .modify(|_, w| unsafe { w.wdt_stg0().bits(self.stg0_action as u8) });
+
+        rtc_cntl
+            .int_ena
+            .modify(|_, w| w.lp_wdt_int_ena().clear_bit());
+
+        self.set_write_protection(true);
+    }
+
+    pub fn clear_interrupt(&mut self) {
+        let rtc_cntl = unsafe { &*LP_WDT::ptr() };
+
+        self.set_write_protection(false);
+
+        rtc_cntl.int_clr.write(|w| w.lp_wdt_int_clr().set_bit());
+
+        self.set_write_protection(true);
+    }
+
+    pub fn is_interrupt_set(&self) -> bool {
+        let rtc_cntl = unsafe { &*LP_WDT::ptr() };
+        rtc_cntl.int_st.read().lp_wdt_int_st().bit_is_set()
+    }
+
+    /// Enable/disable write protection for WDT registers
+    fn set_write_protection(&mut self, enable: bool) {
+        let rtc_cntl = unsafe { &*LP_WDT::ptr() };
+        let wkey = if enable { 0u32 } else { 0x50D8_3AA1 };
+
+        rtc_cntl.wprotect.write(|w| unsafe { w.bits(wkey) });
+    }
+}
+
+#[cfg(esp32c6)]
+impl WatchdogDisable for Rwdt {
+    fn disable(&mut self) {
+        let rtc_cntl = unsafe { &*LP_WDT::ptr() };
+
+        self.set_write_protection(false);
+
+        rtc_cntl
+            .config0
+            .modify(|_, w| w.wdt_en().clear_bit().wdt_flashboot_mod_en().clear_bit());
+
+        self.set_write_protection(true);
+    }
+}
+
+#[cfg(any(esp32c2, esp32c3, esp32s3, esp32c6))]
 /// Super Watchdog
 pub struct Swd;
 
@@ -1029,6 +1130,37 @@ impl WatchdogDisable for Swd {
         self.set_write_protection(false);
 
         rtc_cntl.swd_conf.write(|w| w.swd_auto_feed_en().set_bit());
+
+        self.set_write_protection(true);
+    }
+}
+
+#[cfg(esp32c6)]
+impl Swd {
+    pub fn new() -> Self {
+        Self
+    }
+
+    /// Enable/disable write protection for WDT registers
+    fn set_write_protection(&mut self, enable: bool) {
+        let rtc_cntl = unsafe { &*LP_WDT::ptr() };
+        let wkey = if enable { 0u32 } else { 0x8F1D_312A };
+        let wkey = if enable { 0u32 } else { 0x50D8_3AA1 };
+
+        rtc_cntl
+            .swd_wprotect
+            .write(|w| unsafe { w.swd_wkey().bits(wkey) });
+    }
+}
+
+#[cfg(any(esp32c6))]
+impl WatchdogDisable for Swd {
+    fn disable(&mut self) {
+        let rtc_cntl = unsafe { &*LP_WDT::ptr() };
+
+        self.set_write_protection(false);
+
+        rtc_cntl.swd_config.write(|w| w.swd_auto_feed_en().set_bit());
 
         self.set_write_protection(true);
     }

@@ -4,36 +4,36 @@ use strum::FromRepr;
 use crate::{
     clock::XtalClock,
     peripherals::{EXTMEM, SPI0, SPI1, PCR, LP_AON, PMU},
-    regi2c_write_mask,
-    rom::rom_i2c_writeReg_Mask,
     rtc_cntl::{RtcCalSel, RtcClock, RtcFastClock, RtcSlowClock},
+    clock::clocks_ll::regi2c_write,
+    clock::clocks_ll::regi2c_write_mask,
 };
 
-const I2C_DIG_REG: u32 = 0x6d;
-const I2C_DIG_REG_HOSTID: u32 = 0;
+const I2C_DIG_REG: u8 = 0x6d;
+const I2C_DIG_REG_HOSTID: u8 = 0;
 
-const I2C_ULP: u32 = 0x61;
-const I2C_ULP_HOSTID: u32 = 0;
+const I2C_ULP: u8 = 0x61;
+const I2C_ULP_HOSTID: u8 = 0;
 
-const I2C_DIG_REG_XPD_RTC_REG: u32 = 13;
-const I2C_DIG_REG_XPD_RTC_REG_MSB: u32 = 2;
-const I2C_DIG_REG_XPD_RTC_REG_LSB: u32 = 2;
+const I2C_DIG_REG_XPD_RTC_REG: u8 = 13;
+const I2C_DIG_REG_XPD_RTC_REG_MSB: u8 = 2;
+const I2C_DIG_REG_XPD_RTC_REG_LSB: u8 = 2;
 
-const I2C_DIG_REG_XPD_DIG_REG: u32 = 13;
-const I2C_DIG_REG_XPD_DIG_REG_MSB: u32 = 3;
-const I2C_DIG_REG_XPD_DIG_REG_LSB: u32 = 3;
+const I2C_DIG_REG_XPD_DIG_REG: u8 = 13;
+const I2C_DIG_REG_XPD_DIG_REG_MSB: u8 = 3;
+const I2C_DIG_REG_XPD_DIG_REG_LSB: u8 = 3;
 
-const I2C_ULP_IR_FORCE_XPD_CK: u32 = 0;
-const I2C_ULP_IR_FORCE_XPD_CK_MSB: u32 = 2;
-const I2C_ULP_IR_FORCE_XPD_CK_LSB: u32 = 2;
+const I2C_ULP_IR_FORCE_XPD_CK: u8 = 0;
+const I2C_ULP_IR_FORCE_XPD_CK_MSB: u8 = 2;
+const I2C_ULP_IR_FORCE_XPD_CK_LSB: u8 = 2;
 
-const I2C_DIG_REG_ENIF_RTC_DREG: u32 =   5;
-const I2C_DIG_REG_ENIF_RTC_DREG_MSB: u32 =    7;
-const I2C_DIG_REG_ENIF_RTC_DREG_LSB: u32 =    7;
+const I2C_DIG_REG_ENIF_RTC_DREG: u8 =   5;
+const I2C_DIG_REG_ENIF_RTC_DREG_MSB: u8 =    7;
+const I2C_DIG_REG_ENIF_RTC_DREG_LSB: u8 =    7;
 
-const I2C_DIG_REG_ENIF_DIG_DREG:u32 =    7;
-const I2C_DIG_REG_ENIF_DIG_DREG_MSB:u32 =    7;
-const I2C_DIG_REG_ENIF_DIG_DREG_LSB:u32 =    7;
+const I2C_DIG_REG_ENIF_DIG_DREG:u8 =    7;
+const I2C_DIG_REG_ENIF_DIG_DREG_MSB:u8 =    7;
+const I2C_DIG_REG_ENIF_DIG_DREG_LSB:u8 =    7;
 
 pub(crate) fn init() {
     let pmu = unsafe { &*PMU::ptr() };
@@ -56,11 +56,11 @@ pub(crate) fn init() {
 
     unsafe {
         // crate::clock::clocks_ll::regi2c_write_mask(I2C_DIG_REG, I2C_DIG_REG_ENIF_RTC_DREG, 1); use i2c macro from C6 clock
-        regi2c_write_mask!(I2C_DIG_REG, I2C_DIG_REG_ENIF_RTC_DREG, 1);
-        regi2c_write_mask!(I2C_DIG_REG, I2C_DIG_REG_ENIF_DIG_DREG, 1);
+        regi2c_write_mask(I2C_DIG_REG, I2C_DIG_REG_HOSTID, I2C_DIG_REG_ENIF_RTC_DREG, I2C_DIG_REG_ENIF_RTC_DREG_MSB, I2C_DIG_REG_ENIF_RTC_DREG_LSB, 1);
+        regi2c_write_mask(I2C_DIG_REG, I2C_DIG_REG_HOSTID, I2C_DIG_REG_ENIF_DIG_DREG, I2C_DIG_REG_ENIF_DIG_DREG_MSB, I2C_DIG_REG_ENIF_DIG_DREG_LSB, 1);
 
-        regi2c_write_mask!(I2C_DIG_REG, I2C_DIG_REG_XPD_RTC_REG, 0);
-        regi2c_write_mask!(I2C_DIG_REG, I2C_DIG_REG_XPD_DIG_REG, 0);
+        regi2c_write_mask(I2C_DIG_REG, I2C_DIG_REG_HOSTID, I2C_DIG_REG_XPD_RTC_REG, I2C_DIG_REG_XPD_RTC_REG_MSB, I2C_DIG_REG_XPD_RTC_REG_LSB, 0);
+        regi2c_write_mask(I2C_DIG_REG, I2C_DIG_REG_HOSTID, I2C_DIG_REG_XPD_DIG_REG, I2C_DIG_REG_XPD_DIG_REG_MSB, I2C_DIG_REG_XPD_DIG_REG_LSB, 0);
 
         pmu.hp_active_hp_regulator0.modify(|_, w|
             w.hp_active_hp_regulator_dbias().bits(25));
@@ -76,21 +76,21 @@ pub(crate) fn configure_clock() {
         XtalClock::RtcXtalFreq40M
     ));
 
-    RtcClock::set_fast_freq(RtcFastClock::RtcFastClock8m);
+    // RtcClock::set_fast_freq(RtcFastClock::RtcFastClock8m);
 
-    let cal_val = loop {
-        RtcClock::set_slow_freq(RtcSlowClock::RtcSlowClockRtc);
+    // let cal_val = loop {
+    //     RtcClock::set_slow_freq(RtcSlowClock::RtcSlowClockRtc);
 
-        let res = RtcClock::calibrate(RtcCalSel::RtcCalRtcMux, 1024);
-        if res != 0 {
-            break res;
-        }
-    };
+    //     let res = RtcClock::calibrate(RtcCalSel::RtcCalRtcMux, 1024);
+    //     if res != 0 {
+    //         break res;
+    //     }
+    // };
 
-    unsafe {
-        let lp_aon = &*LP_AON::ptr();
-        lp_aon.store1.write(|w| w.bits(cal_val));
-    }
+    // unsafe {
+    //     let lp_aon = &*LP_AON::ptr();
+    //     lp_aon.store1.write(|w| w.bits(cal_val));
+    // }
 }
 
 fn calibrate_ocode() {}

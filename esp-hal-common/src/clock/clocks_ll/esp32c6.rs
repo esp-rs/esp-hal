@@ -457,7 +457,7 @@ fn regi2c_disable_block(block: u8) {
     }
 }
 
-fn regi2c_write(block: u8, host_id: u8, reg_add: u8, data: u8) {
+pub(crate) fn regi2c_write(block: u8, host_id: u8, reg_add: u8, data: u8) {
     regi2c_enable_block(block);
 
     let temp: u32 = ((block as u32 & REGI2C_RTC_SLAVE_ID_V as u32) << REGI2C_RTC_SLAVE_ID_S as u32)
@@ -470,7 +470,7 @@ fn regi2c_write(block: u8, host_id: u8, reg_add: u8, data: u8) {
     regi2c_disable_block(block);
 }
 
-fn regi2c_write_mask(block: u8, host_id: u8, reg_add: u8, msb: u8, lsb: u8, data: u8) {
+pub(crate) fn regi2c_write_mask(block: u8, host_id: u8, reg_add: u8, msb: u8, lsb: u8, data: u8) {
     assert!(msb - lsb < 8);
     regi2c_enable_block(block);
 
