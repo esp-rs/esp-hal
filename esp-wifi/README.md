@@ -113,10 +113,6 @@ On ESP32-C3 / ESP32-S3 when using Serial-JTAG you have to activate the feature `
 
 Don't use this feature if your are _not_ using Serial-JTAG since it might reduce WiFi performance.
 
-## Running examples on ESP32-C2
-
-To run the examples on ESP32-C2 you need to modify Cargo-toml, section `target.riscv32imc-unknown-none-elf.dev-dependencies`
-
 ## What works?
 
 - scanning for WiFi access points

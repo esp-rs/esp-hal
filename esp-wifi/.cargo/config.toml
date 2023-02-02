@@ -3,7 +3,7 @@ runner = "espflash flash --monitor"
 
 rustflags = [
     "-C", "link-arg=-Tlinkall.x",
-    "-C", "link-arg=-Tesp32c3_rom_functions.x",
+    "-C", "link-arg=-Trom_functions.x",
 
     "-C", "force-frame-pointers",
 ]
@@ -15,7 +15,7 @@ rustflags = [
     #"-C", "linker=rust-lld",    
 
     "-C", "link-arg=-Tlinkall.x",
-    "-C", "link-arg=-Tesp32_rom_functions.x",
+    "-C", "link-arg=-Trom_functions.x",
 ]
 
 [target.xtensa-esp32s3-none-elf]
@@ -25,7 +25,7 @@ rustflags = [
     #"-C", "linker=rust-lld",    
 
     "-C", "link-arg=-Tlinkall.x",
-    "-C", "link-arg=-Tesp32s3_rom_functions.x",
+    "-C", "link-arg=-Trom_functions.x",
 ]
 
 [target.xtensa-esp32s2-none-elf]
@@ -35,7 +35,7 @@ rustflags = [
     #"-C", "linker=rust-lld",    
     
     "-C", "link-arg=-Tlinkall.x",
-    "-C", "link-arg=-Tesp32s2_rom_functions.x",
+    "-C", "link-arg=-Trom_functions.x",
 
     # Enable the atomic codegen option for Xtensa
     "-C", "target-feature=+s32c1i",
