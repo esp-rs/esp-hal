@@ -263,6 +263,68 @@ macro_rules! impl_channel {
                     let dma = unsafe { &*crate::peripherals::DMA::PTR };
                     dma.[<in_dscr_bf0_ch $num>].read().inlink_dscr_bf0().bits() as usize
                 }
+
+                fn is_listening_in_eof() -> bool {
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
+                    cfg_if::cfg_if! {
+                        if #[cfg(esp32s3)] {
+                            dma.[<in_int_ena_ch $num>].read().in_suc_eof().bit_is_set()
+                        } else {
+                            dma.[<int_ena_ch $num>].read().in_suc_eof().bit_is_set()
+                        }
+                    }
+                }
+                fn is_listening_out_eof() -> bool {
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
+                    cfg_if::cfg_if! {
+                        if #[cfg(esp32s3)] {
+                            dma.[<out_int_ena_ch $num>].read().out_total_eof().bit_is_set()
+                        } else {
+                            dma.[<int_ena_ch $num>].read().out_total_eof().bit_is_set()
+                        }
+                    }
+                }
+
+                fn listen_in_eof() {
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
+                    cfg_if::cfg_if! {
+                        if #[cfg(esp32s3)] {
+                            dma.[<in_int_ena_ch $num>].modify(|_, w| w.in_suc_eof().set_bit())
+                        } else {
+                            dma.[<int_ena_ch $num>].modify(|_, w| w.in_suc_eof().set_bit())
+                        }
+                    }
+                }
+                fn listen_out_eof() {
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
+                    cfg_if::cfg_if! {
+                        if #[cfg(esp32s3)] {
+                            dma.[<out_int_ena_ch $num>].modify(|_, w| w.out_total_eof().set_bit())
+                        } else {
+                            dma.[<int_ena_ch $num>].modify(|_, w| w.out_total_eof().set_bit())
+                        }
+                    }
+                }
+                fn unlisten_in_eof() {
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
+                    cfg_if::cfg_if! {
+                        if #[cfg(esp32s3)] {
+                            dma.[<in_int_ena_ch $num>].modify(|_, w| w.in_suc_eof().clear_bit())
+                        } else {
+                            dma.[<int_ena_ch $num>].modify(|_, w| w.in_suc_eof().clear_bit())
+                        }
+                    }
+                }
+                fn unlisten_out_eof() {
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
+                    cfg_if::cfg_if! {
+                        if #[cfg(esp32s3)] {
+                            dma.[<out_int_ena_ch $num>].modify(|_, w| w.out_total_eof().clear_bit())
+                        } else {
+                            dma.[<int_ena_ch $num>].modify(|_, w| w.out_total_eof().clear_bit())
+                        }
+                    }
+                }
             }
 
             pub struct [<Channel $num TxImpl>] {}
@@ -299,6 +361,8 @@ macro_rules! impl_channel {
                         last_seen_handled_descriptor_ptr: core::ptr::null(),
                         buffer_start: core::ptr::null(),
                         buffer_len: 0,
+                        #[cfg(feature = "async")]
+                        channel_index: $num,
                         _phantom: PhantomData::default(),
                     };
 
@@ -313,12 +377,16 @@ macro_rules! impl_channel {
                         available: 0,
                         last_seen_handled_descriptor_ptr: core::ptr::null(),
                         read_buffer_start: core::ptr::null(),
+                        #[cfg(feature = "async")]
+                        channel_index: $num,
                         _phantom: PhantomData::default(),
                     };
 
                     Channel {
                         tx: tx_channel,
                         rx: rx_channel,
+                        #[cfg(feature = "async")]
+                        channel_index: $num,
                         _phantom: PhantomData::default(),
                     }
                 }

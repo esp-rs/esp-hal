@@ -212,7 +212,13 @@ pub(crate) mod private {
             len: usize,
         ) -> Result<(), DmaError>;
 
-        fn is_done(&mut self) -> bool;
+        fn is_done(&self) -> bool;
+
+        fn is_listening_eof(&self) -> bool;
+
+        fn listen_eof(&self);
+
+        fn unlisten_eof(&self);
 
         fn available(&mut self) -> usize;
 
@@ -291,7 +297,7 @@ pub(crate) mod private {
             Ok(())
         }
 
-        fn is_done(&mut self) -> bool {
+        fn is_done(&self) -> bool {
             R::is_in_done()
         }
 
@@ -312,6 +318,8 @@ pub(crate) mod private {
         pub available: usize,
         pub last_seen_handled_descriptor_ptr: *const u32,
         pub read_buffer_start: *const u8,
+        #[cfg(feature = "async")]
+        pub(crate) channel_index: usize,
         pub _phantom: PhantomData<R>,
     }
 
@@ -364,7 +372,7 @@ pub(crate) mod private {
             Ok(())
         }
 
-        fn is_done(&mut self) -> bool {
+        fn is_done(&self) -> bool {
             self.rx_impl.is_done()
         }
 
@@ -457,6 +465,18 @@ pub(crate) mod private {
 
             Ok(len)
         }
+
+        fn is_listening_eof(&self) -> bool {
+            R::is_listening_in_eof()
+        }
+
+        fn listen_eof(&self) {
+            R::listen_in_eof()
+        }
+
+        fn unlisten_eof(&self) {
+            R::unlisten_in_eof()
+        }
     }
 
     /// The functions here are not meant to be used outside the HAL
@@ -473,7 +493,13 @@ pub(crate) mod private {
             len: usize,
         ) -> Result<(), DmaError>;
 
-        fn is_done(&mut self) -> bool;
+        fn is_done(&self) -> bool;
+
+        fn is_listening_eof(&self) -> bool;
+
+        fn listen_eof(&self);
+
+        fn unlisten_eof(&self);
 
         fn available(&mut self) -> usize;
 
@@ -550,7 +576,7 @@ pub(crate) mod private {
             Ok(())
         }
 
-        fn is_done(&mut self) -> bool {
+        fn is_done(&self) -> bool {
             R::is_out_done()
         }
 
@@ -582,6 +608,8 @@ pub(crate) mod private {
         pub last_seen_handled_descriptor_ptr: *const u32,
         pub buffer_start: *const u8,
         pub buffer_len: usize,
+        #[cfg(feature = "async")]
+        pub(crate) channel_index: usize,
         pub _phantom: PhantomData<R>,
     }
 
@@ -637,7 +665,7 @@ pub(crate) mod private {
             Ok(())
         }
 
-        fn is_done(&mut self) -> bool {
+        fn is_done(&self) -> bool {
             self.tx_impl.is_done()
         }
 
@@ -747,6 +775,18 @@ pub(crate) mod private {
 
             Ok(data.len())
         }
+
+        fn is_listening_eof(&self) -> bool {
+            R::is_listening_out_eof()
+        }
+
+        fn listen_eof(&self) {
+            R::listen_out_eof()
+        }
+
+        fn unlisten_eof(&self) {
+            R::unlisten_out_eof()
+        }
     }
 
     pub trait RegisterAccess {
@@ -774,6 +814,14 @@ pub(crate) mod private {
         fn start_in();
         fn is_in_done() -> bool;
         fn last_in_dscr_address() -> usize;
+
+        fn is_listening_in_eof() -> bool;
+        fn is_listening_out_eof() -> bool;
+
+        fn listen_in_eof();
+        fn listen_out_eof();
+        fn unlisten_in_eof();
+        fn unlisten_out_eof();
     }
 }
 
@@ -786,6 +834,8 @@ where
 {
     pub(crate) tx: TX,
     pub(crate) rx: RX,
+    #[cfg(feature = "async")]
+    pub(crate) channel_index: usize,
     _phantom: PhantomData<P>,
 }
 
