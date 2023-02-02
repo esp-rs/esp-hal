@@ -52,12 +52,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@v1
         with:
-          profile: minimal
           target: riscv32imc-unknown-none-elf
           toolchain: nightly
-          default: true
           components: rust-src
       - uses: Swatinem/rust-cache@v1
 
@@ -85,12 +83,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@v1
         with:
-          profile: minimal
           target: riscv32imc-unknown-none-elf
           toolchain: nightly
-          default: true
           components: rust-src
       - uses: Swatinem/rust-cache@v1
 
@@ -182,12 +178,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@v1
         with:
-          profile: minimal
           target: riscv32imc-unknown-none-elf
           toolchain: "1.65.0"
-          default: true
       - uses: Swatinem/rust-cache@v1
 
       # Verify the MSRV for all RISC-V chips.
@@ -223,9 +217,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@v1
         with:
-          profile: minimal
           toolchain: stable
           components: clippy
       - uses: Swatinem/rust-cache@v1
@@ -266,13 +259,10 @@ jobs:
       # Some of the items in 'rustfmt.toml' require the nightly release
       # channel, so we must use this channel for the formatting checks
       # to succeed.
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@v1
         with:
-          profile: minimal
           toolchain: nightly
           components: rustfmt
-          default: true
-
       - uses: Swatinem/rust-cache@v1
 
       # Check the formatting of all packages.
