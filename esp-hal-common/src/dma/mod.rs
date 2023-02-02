@@ -225,6 +225,8 @@ pub(crate) mod private {
         fn pop(&mut self, data: &mut [u8]) -> Result<usize, DmaError>;
 
         fn drain_buffer(&mut self, dst: &mut [u8]) -> Result<usize, DmaError>;
+
+        fn channel_index(&self) -> usize;
     }
 
     pub trait RxChannel<R>
@@ -477,6 +479,10 @@ pub(crate) mod private {
         fn unlisten_eof(&self) {
             R::unlisten_in_eof()
         }
+
+        fn channel_index(&self) -> usize {
+            self.channel_index
+        }
     }
 
     /// The functions here are not meant to be used outside the HAL
@@ -504,6 +510,8 @@ pub(crate) mod private {
         fn available(&mut self) -> usize;
 
         fn push(&mut self, data: &[u8]) -> Result<usize, DmaError>;
+
+        fn channel_index(&self) -> usize;
     }
 
     pub trait TxChannel<R>
@@ -787,6 +795,10 @@ pub(crate) mod private {
         fn unlisten_eof(&self) {
             R::unlisten_out_eof()
         }
+
+        fn channel_index(&self) -> usize {
+            self.channel_index
+        }
     }
 
     pub trait RegisterAccess {
@@ -851,4 +863,153 @@ pub trait DmaTransfer<B, T>: Drop {
 pub trait DmaTransferRxTx<BR, BT, T>: Drop {
     /// Wait for the transfer to finish.
     fn wait(self) -> (BR, BT, T);
+}
+
+
+#[cfg(feature = "async")]
+pub(crate) mod asynch {
+    use core::task::Poll;
+    use crate::dma::private::*;
+    use embassy_sync::waitqueue::AtomicWaker;
+
+    use super::*;
+    use crate::macros::interrupt;
+
+    #[cfg(any(esp32c3, esp32c2))]
+    pub const NUM_CHANNELS: usize = 3;
+
+    #[allow(clippy::declare_interior_mutable_const)]
+    const NEW_AW: AtomicWaker = AtomicWaker::new();
+    static CHANNEL_IN_WAKERS: [AtomicWaker; NUM_CHANNELS] = [NEW_AW; NUM_CHANNELS];
+    static CHANNEL_OUT_WAKERS: [AtomicWaker; NUM_CHANNELS] = [NEW_AW; NUM_CHANNELS];
+
+    pub struct DmaTxFuture<'a, TX> {
+        pub(crate) tx: &'a mut TX,
+        _a: ()
+    }
+
+    impl<'a, TX> DmaTxFuture<'a, TX>
+    where
+        TX: Tx,
+    {
+        pub fn new(tx: &'a mut TX) -> Self {
+            tx.listen_eof();
+            Self {
+                tx,
+                _a: ()
+            }
+        }
+    }
+
+    impl<'a, TX> core::future::Future for DmaTxFuture<'a, TX>
+    where
+        TX: Tx,
+    {
+        type Output = (); // TODO handle DMA errors
+
+        fn poll(
+            self: core::pin::Pin<&mut Self>,
+            cx: &mut core::task::Context<'_>,
+        ) -> Poll<Self::Output> {
+            CHANNEL_OUT_WAKERS[self.tx.channel_index()].register(cx.waker());
+            if self.tx.is_listening_eof() {
+                Poll::Pending
+            } else {
+                Poll::Ready(())
+            }
+        }
+    }
+
+    pub struct DmaRxFuture<'a, RX> {
+        pub(crate) rx: &'a mut RX,
+        _a: (),
+    }
+    
+    impl<'a, RX> DmaRxFuture<'a, RX>
+    where
+        RX: Rx,
+    {
+        pub fn new(rx: &'a mut RX) -> Self {
+            rx.listen_eof();
+            Self {
+                rx,
+                _a: ()
+            }
+        }
+    }
+
+    impl<'a, RX> core::future::Future for DmaRxFuture<'a, RX>
+    where
+        RX: Rx,
+    {
+        type Output = (); // TODO handle DMA errors
+
+        fn poll(
+            self: core::pin::Pin<&mut Self>,
+            cx: &mut core::task::Context<'_>,
+        ) -> Poll<Self::Output> {
+            CHANNEL_IN_WAKERS[self.rx.channel_index()].register(cx.waker());
+            if self.rx.is_listening_eof() {
+                Poll::Pending
+            } else {
+                Poll::Ready(())
+            }
+        }
+    }
+
+    #[cfg(any(esp32c3, esp32c2))]
+    mod interrupt {
+        use super::*;
+
+        #[interrupt]
+        fn DMA_CH0() {
+            type Channel = crate::dma::gdma::private::Channel0;
+
+            if Channel::is_in_done() {
+                Channel::clear_in_interrupts();
+                Channel::unlisten_out_eof();
+                CHANNEL_IN_WAKERS[0].wake()
+            }
+
+            if Channel::is_out_done() {
+                Channel::clear_out_interrupts();
+                Channel::unlisten_in_eof();
+                CHANNEL_OUT_WAKERS[0].wake()
+            }
+        }
+
+        #[interrupt]
+        fn DMA_CH1() {
+            type Channel = crate::dma::gdma::private::Channel1;
+
+            if Channel::is_in_done() {
+                Channel::clear_in_interrupts();
+                Channel::unlisten_out_eof();
+                CHANNEL_IN_WAKERS[1].wake()
+            }
+
+            if Channel::is_out_done() {
+                Channel::clear_out_interrupts();
+                Channel::unlisten_in_eof();
+                CHANNEL_OUT_WAKERS[1].wake()
+            }
+        }
+
+        #[interrupt]
+        fn DMA_CH2() {
+            type Channel = crate::dma::gdma::private::Channel2;
+
+            if Channel::is_in_done() {
+                Channel::clear_in_interrupts();
+                Channel::unlisten_out_eof();
+                CHANNEL_IN_WAKERS[2].wake()
+            }
+
+            if Channel::is_out_done() {
+                Channel::clear_out_interrupts();
+                Channel::unlisten_in_eof();
+                CHANNEL_OUT_WAKERS[2].wake()
+            }
+        }
+    }
 }
