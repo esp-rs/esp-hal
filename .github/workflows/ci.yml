@@ -32,7 +32,7 @@ jobs:
           default: true
           buildtargets: esp32
           ldproxy: false
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
 
       # Perform a full build initially to verify that the examples not only
       # build, but also link successfully.
@@ -57,7 +57,7 @@ jobs:
           target: riscv32imc-unknown-none-elf
           toolchain: nightly
           components: rust-src
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
 
       # Perform a full build initially to verify that the examples not only
       # build, but also link successfully.
@@ -88,7 +88,7 @@ jobs:
           target: riscv32imc-unknown-none-elf
           toolchain: nightly
           components: rust-src
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
 
       # Perform a full build initially to verify that the examples not only
       # build, but also link successfully.
@@ -122,7 +122,7 @@ jobs:
           default: true
           buildtargets: esp32s2
           ldproxy: false
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
 
       # Perform a full build initially to verify that the examples not only
       # build, but also link successfully.
@@ -150,7 +150,7 @@ jobs:
           default: true
           buildtargets: esp32s3
           ldproxy: false
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
 
       # Perform a full build initially to verify that the examples not only
       # build, but also link successfully.
@@ -182,7 +182,7 @@ jobs:
         with:
           target: riscv32imc-unknown-none-elf
           toolchain: "1.65.0"
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
 
       # Verify the MSRV for all RISC-V chips.
       - name: msrv (esp32c2-hal)
@@ -199,7 +199,7 @@ jobs:
         with:
           ldproxy: false
           version: "1.65.0"
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
 
       # Verify the MSRV for all Xtensa chips.
       - name: msrv (esp32-hal)
@@ -221,7 +221,7 @@ jobs:
         with:
           toolchain: stable
           components: clippy
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
 
       # Run clippy on all packages targeting RISC-V.
       - name: clippy (esp32c2-hal)
@@ -237,7 +237,7 @@ jobs:
       - uses: esp-rs/xtensa-toolchain@v1.5
         with:
           ldproxy: false
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
 
       # Run clippy on all packages targeting Xtensa.
       #
@@ -263,7 +263,7 @@ jobs:
         with:
           toolchain: nightly
           components: rustfmt
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
 
       # Check the formatting of all packages.
       - name: rustfmt (esp-hal-common)
