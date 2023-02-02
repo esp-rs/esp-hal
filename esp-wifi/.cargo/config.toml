@@ -1,0 +1,55 @@
+[target.riscv32imc-unknown-none-elf]
+runner = "espflash flash --monitor"
+
+rustflags = [
+    "-C", "link-arg=-Tlinkall.x",
+    "-C", "link-arg=-Tesp32c3_rom_functions.x",
+
+    "-C", "force-frame-pointers",
+]
+ 
+[target.xtensa-esp32-none-elf]
+runner = "espflash flash --monitor"
+
+rustflags = [
+    #"-C", "linker=rust-lld",    
+
+    "-C", "link-arg=-Tlinkall.x",
+    "-C", "link-arg=-Tesp32_rom_functions.x",
+]
+
+[target.xtensa-esp32s3-none-elf]
+runner = "espflash flash --monitor"
+
+rustflags = [
+    #"-C", "linker=rust-lld",    
+
+    "-C", "link-arg=-Tlinkall.x",
+    "-C", "link-arg=-Tesp32s3_rom_functions.x",
+]
+
+[target.xtensa-esp32s2-none-elf]
+runner = "espflash flash --monitor"
+
+rustflags = [
+    #"-C", "linker=rust-lld",    
+    
+    "-C", "link-arg=-Tlinkall.x",
+    "-C", "link-arg=-Tesp32s2_rom_functions.x",
+
+    # Enable the atomic codegen option for Xtensa
+    "-C", "target-feature=+s32c1i",
+
+    # Tell the `core` library that we have atomics, even though it's not
+    # specified in the target definition
+    "--cfg", 'target_has_atomic="8"',
+    "--cfg", 'target_has_atomic="16"',
+    "--cfg", 'target_has_atomic="32"',
+    "--cfg", 'target_has_atomic="ptr"',
+]
+
+[build]
+target = "riscv32imc-unknown-none-elf"
+ 
+[unstable]
+build-std = [ "core" ]

@@ -1,0 +1,76 @@
+[package]
+name = "esp-wifi"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+embedded-hal = "0.2.3"
+nb = "1.0.0"
+void = { version = "1.0.2", default-features = false }
+esp32c3-hal = { version = "0.5.0", optional = true }
+esp32c2-hal = { version = "0.3.0", optional = true }
+esp32-hal = { version = "0.8.0", optional = true, features = [ "rt" ] }
+esp32s3-hal = { version = "0.5.0", optional = true, features = [ "rt" ] }
+esp32s2-hal = { version = "0.5.0", optional = true, features = [ "rt" ] }
+esp32c3 = { version = "0.9.1",  features = ["critical-section"], optional = true }
+esp32c2 = { version = "0.6.1",  features = ["critical-section"], optional = true }
+riscv-rt = { version = "0.11.0", optional = true }
+riscv = { version = "0.10.1", optional = true }
+xtensa-lx-rt = { version = "0.14.0", optional = true }
+xtensa-lx = { version = "0.7.0", optional = true }
+smoltcp = { version = "0.8.2", default-features=false, features = ["proto-igmp", "proto-ipv4", "socket-tcp", "socket-icmp", "socket-udp", "medium-ethernet", "proto-dhcpv4", "socket-raw", "socket-dhcpv4"] }
+critical-section = "1.1.1"
+atomic-polyfill = "1.0.1"
+log = "0.4.17"
+embedded-svc = { version = "0.23.1", default-features = false, features = [], optional = true }
+enumset = { version = "1", default-features = false, optional = true }
+linked_list_allocator = { version = "0.10.3", default-features = false, features = ["const_mut_refs"] }
+embedded-io = "0.3.1"
+fugit = "0.3.6"
+heapless = { version = "0.7.14", default-features = false }
+num-derive = { version = "0.3", features = ["full-syntax"] }
+num-traits = { version = "0.2", default-features = false }
+esp-wifi-sys = { version = "0.1.0", path = "../esp-wifi-sys" }
+
+[build-dependencies]
+riscv-target = { version = "0.1.2", optional = true }
+
+[dev-dependencies]
+bleps = { git = "https://github.com/bjoernQ/bleps", package = "bleps", rev = "5ce5ca139fe85c0120e9c2f9607d165d1c32d725" }
+bleps-macros = { git = "https://github.com/bjoernQ/bleps", package = "bleps-macros", rev = "5ce5ca139fe85c0120e9c2f9607d165d1c32d725" }
+
+[target.xtensa-esp32-none-elf.dev-dependencies]
+esp-println = { version = "0.3.1", features = [ "esp32", "log" ] }
+esp-backtrace = { version = "0.4.0", features = [ "esp32", "panic-handler", "exception-handler", "print-uart" ] }
+
+# change this for ESP32C3 / ESP32C2
+[target.riscv32imc-unknown-none-elf.dev-dependencies]
+esp-println = { version = "0.3.1", features = [ "esp32c3", "log" ] }
+esp-backtrace = { version = "0.4.0", features = [ "esp32c3", "panic-handler", "exception-handler", "print-uart" ] }
+
+[target.xtensa-esp32s3-none-elf.dev-dependencies]
+esp-println = { version = "0.3.1", features = [ "esp32s3", "log" ] }
+esp-backtrace = { version = "0.4.0", features = [ "esp32s3", "panic-handler", "exception-handler", "print-uart" ] }
+
+[target.xtensa-esp32s2-none-elf.dev-dependencies]
+esp-println = { version = "0.3.1", features = [ "esp32s2", "log", "critical-section" ] }
+esp-backtrace = { version = "0.4.0", features = [ "esp32s2", "panic-handler", "exception-handler", "print-uart" ] }
+xtensa-atomic-emulation-trap = "0.3.0"
+
+[features]
+default = [ "utils" ]
+esp32c3 = [ "riscv-target", "riscv", "riscv-rt", "esp32c3-hal", "dep:esp32c3", "esp-wifi-sys/esp32c3" ]
+esp32c2 = [ "riscv-target", "riscv", "riscv-rt", "esp32c2-hal", "dep:esp32c2", "esp-wifi-sys/esp32c2" ]
+esp32 = [ "esp32-hal", "xtensa-lx-rt/esp32", "xtensa-lx/esp32", "esp-wifi-sys/esp32" ]
+esp32s3 = [ "esp32s3-hal", "xtensa-lx-rt/esp32s3", "xtensa-lx/esp32s3", "esp-wifi-sys/esp32s3" ]
+esp32s2 = [ "esp32s2-hal", "xtensa-lx-rt/esp32s2", "xtensa-lx/esp32s2", "esp-wifi-sys/esp32s2" ]
+wifi_logs = []
+dump_packets = []
+utils = []
+enumset = []
+embedded-svc = [ "dep:enumset", "dep:embedded-svc", "utils" ]
+wifi = []
+ble = [ "esp32-hal?/bluetooth" ]
+phy_enable_usb = []
+ps_min_modem = []
