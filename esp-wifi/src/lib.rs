@@ -60,6 +60,9 @@ pub mod wifi;
 #[cfg(feature = "ble")]
 pub mod ble;
 
+#[cfg(feature = "esp_now")]
+pub mod esp_now;
+
 pub(crate) mod common_adapter;
 
 #[doc(hidden)]

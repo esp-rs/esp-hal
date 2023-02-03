@@ -907,9 +907,12 @@ pub unsafe extern "C" fn event_post(
         wifi_event_t_WIFI_EVENT_STA_DISCONNECTED => true,
         _ => {
             use num_traits::FromPrimitive;
-            log::info!("Unhandled event: {:?}", crate::wifi::WifiEvent::from_i32(event_id));
+            log::info!(
+                "Unhandled event: {:?}",
+                crate::wifi::WifiEvent::from_i32(event_id)
+            );
             false
-        },
+        }
     };
 
     if take_state {
@@ -1506,6 +1509,7 @@ pub unsafe extern "C" fn log_write(
  *   None
  *
  ****************************************************************************/
+#[allow(improper_ctypes_definitions)]
 pub unsafe extern "C" fn log_writev(
     _level: u32,
     _tag: *const crate::binary::c_types::c_char,
@@ -1515,14 +1519,14 @@ pub unsafe extern "C" fn log_writev(
     #[cfg(not(feature = "wifi_logs"))]
     return;
 
-    #[cfg(feature = "esp32")]
+    #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
     #[allow(unreachable_code)]
     {
         let s = StrBuf::from(_format);
         log::info!("{}", s.as_str_ref());
     }
 
-    #[cfg(feature = "esp32c3")]
+    #[cfg(any(feature = "esp32c3", features = "esp32c2"))]
     #[allow(unreachable_code)]
     {
         let _args = core::mem::transmute(_args);
