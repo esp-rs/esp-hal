@@ -427,9 +427,6 @@ static g_wifi_osi_funcs: wifi_osi_funcs_t = wifi_osi_funcs_t {
 
 const CONFIG_FEATURE_WPA3_SAE_BIT: u64 = 1 << 0;
 
-// unsafe impl Sync for wifi_init_config_t {}
-// unsafe impl Sync for wifi_osi_funcs_t {}
-
 #[no_mangle]
 static mut g_wifi_feature_caps: u64 = CONFIG_FEATURE_WPA3_SAE_BIT;
 

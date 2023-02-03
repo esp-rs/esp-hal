@@ -4,8 +4,6 @@ This is experimental and a work-in-progress! You are welcome to experiment with 
 
 Wi-Fi/BTLE coexistence is implemented but currently only works (to some extent) on ESP32-C3 and ESP32-S3. In general COEX shouldn't be used currently.
 
-On ESP32-S3 you currently need to use `opt-level = "1"`.
-
 Minimum supported Rust compiler version: 1.65.0.0
 
 This uses the WiFi drivers from https://github.com/esp-rs/esp-wireless-drivers-3rdparty
