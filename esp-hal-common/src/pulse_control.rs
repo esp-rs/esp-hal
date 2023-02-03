@@ -93,6 +93,9 @@ use crate::{
     system::PeripheralClockControl,
 };
 
+#[cfg(esp32c6)]
+use crate::peripherals::PCR;
+
 /// Errors that can occur when the peripheral is configured
 #[derive(Debug)]
 pub enum SetupError {
@@ -927,6 +930,14 @@ macro_rules! rmt {
             // addressed!
 
             // Configure peripheral
+
+            #[cfg(esp32c6)]
+            let pcr = unsafe { &*PCR::ptr() };
+
+            #[cfg(esp32c6)]
+            pcr.rmt_sclk_conf.write(|w| w.sclk_en().set_bit());
+
+
             self.reg.sys_conf.modify(|_, w| unsafe {
                 // Enable clock
                 w.clk_en()
@@ -942,9 +953,23 @@ macro_rules! rmt {
                     .clear_bit()
                     // Disable FIFO mode
                     .apb_fifo_mask()
-                    .set_bit()
+                    .set_bit() });
                     // Select clock source
-                    .sclk_sel()
+                #[cfg(not(esp32c6))]
+                self.reg.sys_conf.modify(|_, w| unsafe {
+                    w.sclk_sel()
+                    .bits(clk_source as u8)
+                    // Set absolute part of divider
+                    .sclk_div_num()
+                    .bits(div_abs)
+                    // Set fractional parts of divider to 0
+                    .sclk_div_a()
+                    .bits(div_frac_a)
+                    .sclk_div_b()
+                    .bits(div_frac_b) });
+                #[cfg(esp32c6)]
+                pcr.rmt_sclk_conf.modify(|_,w| unsafe {
+                    w.sclk_sel()
                     .bits(clk_source as u8)
                     // Set absolute part of divider
                     .sclk_div_num()
