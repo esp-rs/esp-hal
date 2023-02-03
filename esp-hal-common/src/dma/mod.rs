@@ -846,8 +846,6 @@ where
 {
     pub(crate) tx: TX,
     pub(crate) rx: RX,
-    #[cfg(feature = "async")]
-    pub(crate) channel_index: usize,
     _phantom: PhantomData<P>,
 }
 

@@ -385,8 +385,6 @@ macro_rules! impl_channel {
                     Channel {
                         tx: tx_channel,
                         rx: rx_channel,
-                        #[cfg(feature = "async")]
-                        channel_index: $num,
                         _phantom: PhantomData::default(),
                     }
                 }
