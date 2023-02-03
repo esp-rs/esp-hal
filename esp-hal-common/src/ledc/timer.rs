@@ -171,7 +171,6 @@ where
             return Err(Error::Divisor);
         }
 
-        esp_println::println!("{src_freq}, {frequency}, {divisor}");
         self.configure_hw(divisor as u32);
         self.update_hw();
 
