@@ -220,6 +220,7 @@ pub trait RxPrivate {
 
     fn drain_buffer(&mut self, dst: &mut [u8]) -> Result<usize, DmaError>;
 
+    #[cfg(feature = "async")]
     fn channel_index(&self) -> usize;
 }
 
@@ -474,6 +475,7 @@ where
         R::unlisten_in_eof()
     }
 
+    #[cfg(feature = "async")]
     fn channel_index(&self) -> usize {
         self.channel_index
     }
@@ -505,6 +507,7 @@ pub trait TxPrivate {
 
     fn push(&mut self, data: &[u8]) -> Result<usize, DmaError>;
 
+    #[cfg(feature = "async")]
     fn channel_index(&self) -> usize;
 }
 
@@ -790,6 +793,7 @@ where
         R::unlisten_out_eof()
     }
 
+    #[cfg(feature = "async")]
     fn channel_index(&self) -> usize {
         self.channel_index
     }
@@ -956,13 +960,13 @@ pub(crate) mod asynch {
 
             if Channel::is_in_done() {
                 Channel::clear_in_interrupts();
-                Channel::unlisten_out_eof();
+                Channel::unlisten_in_eof();
                 CHANNEL_IN_WAKERS[0].wake()
             }
-
+            
             if Channel::is_out_done() {
                 Channel::clear_out_interrupts();
-                Channel::unlisten_in_eof();
+                Channel::unlisten_out_eof();
                 CHANNEL_OUT_WAKERS[0].wake()
             }
         }
@@ -973,13 +977,13 @@ pub(crate) mod asynch {
 
             if Channel::is_in_done() {
                 Channel::clear_in_interrupts();
-                Channel::unlisten_out_eof();
+                Channel::unlisten_in_eof();
                 CHANNEL_IN_WAKERS[1].wake()
             }
-
+            
             if Channel::is_out_done() {
                 Channel::clear_out_interrupts();
-                Channel::unlisten_in_eof();
+                Channel::unlisten_out_eof();
                 CHANNEL_OUT_WAKERS[1].wake()
             }
         }
@@ -990,13 +994,13 @@ pub(crate) mod asynch {
 
             if Channel::is_in_done() {
                 Channel::clear_in_interrupts();
-                Channel::unlisten_out_eof();
+                Channel::unlisten_in_eof();
                 CHANNEL_IN_WAKERS[2].wake()
             }
-
+            
             if Channel::is_out_done() {
                 Channel::clear_out_interrupts();
-                Channel::unlisten_in_eof();
+                Channel::unlisten_out_eof();
                 CHANNEL_OUT_WAKERS[2].wake()
             }
         }
