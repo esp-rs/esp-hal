@@ -1,7 +1,7 @@
 //! Direct Memory Access
 
 use crate::{
-    dma::gdma::private::*,
+    dma::*,
     peripheral::PeripheralRef,
     system::{Peripheral, PeripheralClockControl},
 };
@@ -403,20 +403,15 @@ macro_rules! impl_channel {
     };
 }
 
-/// Crate private implementatin details
-pub(crate) mod private {
-    use crate::dma::{private::*, *};
-
-    impl_channel!(0);
-    #[cfg(not(esp32c2))]
-    impl_channel!(1);
-    #[cfg(not(esp32c2))]
-    impl_channel!(2);
-    #[cfg(esp32s3)]
-    impl_channel!(3);
-    #[cfg(esp32s3)]
-    impl_channel!(4);
-}
+impl_channel!(0);
+#[cfg(not(esp32c2))]
+impl_channel!(1);
+#[cfg(not(esp32c2))]
+impl_channel!(2);
+#[cfg(esp32s3)]
+impl_channel!(3);
+#[cfg(esp32s3)]
+impl_channel!(4);
 
 /// GDMA Peripheral
 ///
