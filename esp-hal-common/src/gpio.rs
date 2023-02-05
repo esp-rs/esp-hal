@@ -1376,6 +1376,140 @@ where
     }
 }
 
+impl<MODE> embedded_hal::digital::v2::InputPin for AnyPin<crate::Input<MODE>> {
+    type Error = core::convert::Infallible;
+
+    fn is_high(&self) -> Result<bool, Self::Error> {
+        let inner = &self.inner;
+        handle_gpio_input!(inner, target, { target.is_high() })
+    }
+
+    fn is_low(&self) -> Result<bool, Self::Error> {
+        let inner = &self.inner;
+        handle_gpio_input!(inner, target, { target.is_low() })
+    }
+}
+
+#[cfg(feature = "eh1")]
+impl<MODE> embedded_hal_1::digital::ErrorType for AnyPin<Input<MODE>> {
+    type Error = Infallible;
+}
+
+#[cfg(feature = "eh1")]
+impl<MODE> embedded_hal_1::digital::InputPin for AnyPin<Input<MODE>> {
+    fn is_high(&self) -> Result<bool, Self::Error> {
+        let inner = &self.inner;
+        handle_gpio_input!(inner, target, { target.is_high() })
+    }
+
+    fn is_low(&self) -> Result<bool, Self::Error> {
+        let inner = &self.inner;
+        handle_gpio_input!(inner, target, { target.is_low() })
+    }
+}
+
+impl<MODE> embedded_hal::digital::v2::OutputPin for AnyPin<Output<MODE>> {
+    type Error = Infallible;
+
+    fn set_low(&mut self) -> Result<(), Self::Error> {
+        let inner = &mut self.inner;
+        handle_gpio_output!(inner, target, { target.set_low() })
+    }
+
+    fn set_high(&mut self) -> Result<(), Self::Error> {
+        let inner = &mut self.inner;
+        handle_gpio_output!(inner, target, { target.set_high() })
+    }
+}
+
+impl<MODE> embedded_hal::digital::v2::StatefulOutputPin for AnyPin<Output<MODE>> {
+    fn is_set_high(&self) -> Result<bool, Self::Error> {
+        let inner = &self.inner;
+        handle_gpio_output!(inner, target, { target.is_set_high() })
+    }
+
+    fn is_set_low(&self) -> Result<bool, Self::Error> {
+        let inner = &self.inner;
+        handle_gpio_output!(inner, target, { target.is_set_low() })
+    }
+}
+
+impl<MODE> embedded_hal::digital::v2::ToggleableOutputPin for AnyPin<Output<MODE>> {
+    type Error = Infallible;
+
+    fn toggle(&mut self) -> Result<(), Self::Error> {
+        let inner = &mut self.inner;
+        handle_gpio_output!(inner, target, { target.toggle() })
+    }
+}
+
+#[cfg(feature = "eh1")]
+impl<MODE> embedded_hal_1::digital::ErrorType for AnyPin<Output<MODE>> {
+    type Error = Infallible;
+}
+
+#[cfg(feature = "eh1")]
+impl<MODE> embedded_hal_1::digital::OutputPin for AnyPin<Output<MODE>> {
+    fn set_low(&mut self) -> Result<(), Self::Error> {
+        let inner = &mut self.inner;
+        handle_gpio_output!(inner, target, { target.set_low() })
+    }
+
+    fn set_high(&mut self) -> Result<(), Self::Error> {
+        let inner = &mut self.inner;
+        handle_gpio_output!(inner, target, { target.set_high() })
+    }
+}
+
+#[cfg(feature = "eh1")]
+impl<MODE> embedded_hal_1::digital::StatefulOutputPin for AnyPin<Output<MODE>> {
+    fn is_set_high(&self) -> Result<bool, Self::Error> {
+        let inner = &self.inner;
+        handle_gpio_output!(inner, target, { target.is_set_high() })
+    }
+
+    fn is_set_low(&self) -> Result<bool, Self::Error> {
+        let inner = &self.inner;
+        handle_gpio_output!(inner, target, { target.is_set_low() })
+    }
+}
+
+#[cfg(feature = "eh1")]
+impl<MODE> embedded_hal_1::digital::ToggleableOutputPin for AnyPin<Output<MODE>> {
+    fn toggle(&mut self) -> Result<(), Self::Error> {
+        let inner = &mut self.inner;
+        handle_gpio_output!(inner, target, { target.toggle() })
+    }
+}
+
+#[cfg(feature = "async")]
+impl<MODE> embedded_hal_async::digital::Wait for AnyPin<Input<MODE>> {
+    async fn wait_for_high(&mut self) -> Result<(), Self::Error> {
+        let inner = &mut self.inner;
+        handle_gpio_input!(inner, target, { target.wait_for_high().await })
+    }
+
+    async fn wait_for_low(&mut self) -> Result<(), Self::Error> {
+        let inner = &mut self.inner;
+        handle_gpio_input!(inner, target, { target.wait_for_low().await })
+    }
+
+    async fn wait_for_rising_edge(&mut self) -> Result<(), Self::Error> {
+        let inner = &mut self.inner;
+        handle_gpio_input!(inner, target, { target.wait_for_rising_edge().await })
+    }
+
+    async fn wait_for_falling_edge(&mut self) -> Result<(), Self::Error> {
+        let inner = &mut self.inner;
+        handle_gpio_input!(inner, target, { target.wait_for_falling_edge().await })
+    }
+
+    async fn wait_for_any_edge(&mut self) -> Result<(), Self::Error> {
+        let inner = &mut self.inner;
+        handle_gpio_input!(inner, target, { target.wait_for_any_edge().await })
+    }
+}
+
 pub struct IO {
     _io_mux: IO_MUX,
     pub pins: types::Pins,
@@ -1471,6 +1605,65 @@ macro_rules! gpio {
             $(
                 pub type [<Gpio $gpionum >]<MODE> = GpioPin<MODE, [< Bank $bank GpioRegisterAccess >], $crate::gpio::[< $cores CoreInteruptStatusRegisterAccessBank $bank >], [< $type PinType >], [<Gpio $gpionum Signals>], $gpionum>;
             )+
+
+            pub(crate) enum ErasedPin<MODE> {
+                $(
+                    [<Gpio $gpionum >]([<Gpio $gpionum >]<MODE>),
+                )+
+            }
+
+            pub struct AnyPin<MODE> {
+                pub(crate) inner: ErasedPin<MODE>
+            }
+
+            $(
+            impl<MODE> From< [<Gpio $gpionum >]<MODE> > for AnyPin<MODE> {
+                fn from(value: [<Gpio $gpionum >]<MODE>) -> Self {
+                    AnyPin {
+                        inner: ErasedPin::[<Gpio $gpionum >](value)
+                    }
+                }
+            }
+
+            impl<MODE> [<Gpio $gpionum >]<MODE> {
+                pub fn degrade(self) -> AnyPin<MODE> {
+                    AnyPin {
+                        inner: ErasedPin::[<Gpio $gpionum >](self)
+                    }
+                }
+            }
+
+            impl<MODE> TryInto<[<Gpio $gpionum >]<MODE>> for AnyPin<MODE> {
+                type Error = ();
+
+                fn try_into(self) -> Result<[<Gpio $gpionum >]<MODE>, Self::Error> {
+                    match self.inner {
+                        ErasedPin::[<Gpio $gpionum >](gpio) => Ok(gpio),
+                        _ => Err(()),
+                    }
+                }
+            }
+            )+
+
+            procmacros::make_gpio_enum_dispatch_macro!(
+                handle_gpio_output
+                { InputOutputAnalog, InputOutput, }
+                {
+                    $(
+                        $type,$gpionum
+                    )+
+                }
+            );
+
+            procmacros::make_gpio_enum_dispatch_macro!(
+                handle_gpio_input
+                { InputOutputAnalog, InputOutput, InputOnlyAnalog }
+                {
+                    $(
+                        $type,$gpionum
+                    )+
+                }
+            );
         }
     };
 }
@@ -1665,7 +1858,7 @@ mod asynch {
         for GpioPin<Input<MODE>, RA, IRA, PINTYPE, SIG, GPIONUM>
     where
         RA: BankGpioRegisterAccess,
-        PINTYPE: IsOutputPin,
+        PINTYPE: IsInputPin,
         IRA: InteruptStatusRegisterAccess,
         SIG: GpioSignal,
     {
