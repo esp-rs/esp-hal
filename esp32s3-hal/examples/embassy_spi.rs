@@ -11,16 +11,15 @@ use embassy_executor::Executor;
 use embassy_time::{Duration, Timer};
 use esp32s3_hal::{
     clock::ClockControl,
+    dma::{DmaPriority, *},
     embassy,
+    gdma::*,
     peripherals::Peripherals,
     prelude::*,
+    spi::{dma::SpiDma, Spi, SpiMode},
     timer::TimerGroup,
     Rtc,
-    gdma::*,
-    dma::*,
-    spi::{Spi, SpiMode, dma::SpiDma},
     IO,
-    dma::DmaPriority,
 };
 use esp_backtrace as _;
 use static_cell::StaticCell;
@@ -34,7 +33,13 @@ macro_rules! singleton {
     }};
 }
 
-pub type SpiType<'d> = SpiDma<'d, esp32s3_hal::peripherals::SPI2, ChannelTx<'d, Channel0TxImpl, esp32s3_hal::gdma::Channel0>, ChannelRx<'d, Channel0RxImpl, esp32s3_hal::gdma::Channel0>, SuitablePeripheral0>;
+pub type SpiType<'d> = SpiDma<
+    'd,
+    esp32s3_hal::peripherals::SPI2,
+    ChannelTx<'d, Channel0TxImpl, esp32s3_hal::gdma::Channel0>,
+    ChannelRx<'d, Channel0RxImpl, esp32s3_hal::gdma::Channel0>,
+    SuitablePeripheral0,
+>;
 
 #[embassy_executor::task]
 async fn spi_task(spi: &'static mut SpiType<'static>) {
@@ -44,7 +49,9 @@ async fn spi_task(spi: &'static mut SpiType<'static>) {
         // TODO is send/recv buffer is < 8 bytes it also hangs
         let mut buffer = [0; 8];
         esp_println::println!("Sending bytes");
-        embedded_hal_async::spi::SpiBus::transfer(spi, &mut buffer, &send_buffer).await.unwrap();
+        embedded_hal_async::spi::SpiBus::transfer(spi, &mut buffer, &send_buffer)
+            .await
+            .unwrap();
         esp_println::println!("Bytes recieved: {:?}", buffer);
         Timer::after(Duration::from_millis(5_000)).await;
     }
@@ -80,8 +87,16 @@ fn main() -> ! {
     #[cfg(feature = "embassy-time-timg0")]
     embassy::init(&clocks, timer_group0.timer0);
 
-    esp32s3_hal::interrupt::enable(esp32s3_hal::peripherals::Interrupt::DMA_IN_CH0, esp32s3_hal::interrupt::Priority::Priority1).unwrap();
-    esp32s3_hal::interrupt::enable(esp32s3_hal::peripherals::Interrupt::DMA_OUT_CH0, esp32s3_hal::interrupt::Priority::Priority1).unwrap();
+    esp32s3_hal::interrupt::enable(
+        esp32s3_hal::peripherals::Interrupt::DMA_IN_CH0,
+        esp32s3_hal::interrupt::Priority::Priority1,
+    )
+    .unwrap();
+    esp32s3_hal::interrupt::enable(
+        esp32s3_hal::peripherals::Interrupt::DMA_OUT_CH0,
+        esp32s3_hal::interrupt::Priority::Priority1,
+    )
+    .unwrap();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let sclk = io.pins.gpio6;

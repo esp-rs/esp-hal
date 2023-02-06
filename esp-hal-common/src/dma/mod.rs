@@ -263,8 +263,7 @@ where
             dw0.set_length(0); // actual size of the data!?
 
             if !last {
-                descriptors[descr + 2] =
-                    (&descriptors[descr + 3]) as *const _ as *const () as u32;
+                descriptors[descr + 2] = (&descriptors[descr + 3]) as *const _ as *const () as u32;
             } else {
                 descriptors[descr + 2] = if circular {
                     descriptors.as_ptr() as *const () as u32
@@ -392,10 +391,8 @@ where
         let mut dw0 = unsafe { &mut descr_address.read_volatile() };
 
         if dw0.get_owner() == Owner::Cpu && dw0.get_length() != 0 {
-            let descriptor_buffer =
-                unsafe { descr_address.offset(1).read_volatile() } as *const u8;
-            let next_descriptor =
-                unsafe { descr_address.offset(2).read_volatile() } as *const u32;
+            let descriptor_buffer = unsafe { descr_address.offset(1).read_volatile() } as *const u8;
+            let next_descriptor = unsafe { descr_address.offset(2).read_volatile() } as *const u32;
 
             self.read_buffer_start = descriptor_buffer;
             self.available = dw0.get_length() as usize;
@@ -551,8 +548,7 @@ where
             dw0.set_length(chunk_size as u16); // actual size of the data!?
 
             if !last {
-                descriptors[descr + 2] =
-                    (&descriptors[descr + 3]) as *const _ as *const () as u32;
+                descriptors[descr + 2] = (&descriptors[descr + 3]) as *const _ as *const () as u32;
             } else {
                 if !circular {
                     descriptors[descr + 2] = 0;
@@ -755,10 +751,8 @@ where
         let mut forward = data.len();
         loop {
             unsafe {
-                let next_descriptor =
-                    self.write_descr_ptr.offset(2).read_volatile() as *const u32;
-                let segment_len =
-                    (&mut self.write_descr_ptr.read_volatile()).get_length() as usize;
+                let next_descriptor = self.write_descr_ptr.offset(2).read_volatile() as *const u32;
+                let segment_len = (&mut self.write_descr_ptr.read_volatile()).get_length() as usize;
                 self.write_descr_ptr = if next_descriptor.is_null() {
                     self.descriptors.as_ptr() as *const u32
                 } else {
@@ -861,7 +855,6 @@ pub trait DmaTransferRxTx<BR, BT, T>: Drop {
     fn wait(self) -> (BR, BT, T);
 }
 
-
 #[cfg(feature = "async")]
 pub(crate) mod asynch {
     use core::task::Poll;
@@ -871,7 +864,7 @@ pub(crate) mod asynch {
 
     pub struct DmaTxFuture<'a, TX> {
         pub(crate) tx: &'a mut TX,
-        _a: ()
+        _a: (),
     }
 
     impl<'a, TX> DmaTxFuture<'a, TX>
@@ -880,10 +873,7 @@ pub(crate) mod asynch {
     {
         pub fn new(tx: &'a mut TX) -> Self {
             tx.listen_eof();
-            Self {
-                tx,
-                _a: ()
-            }
+            Self { tx, _a: () }
         }
     }
 
@@ -910,17 +900,14 @@ pub(crate) mod asynch {
         pub(crate) rx: &'a mut RX,
         _a: (),
     }
-    
+
     impl<'a, RX> DmaRxFuture<'a, RX>
     where
         RX: Rx,
     {
         pub fn new(rx: &'a mut RX) -> Self {
             rx.listen_eof();
-            Self {
-                rx,
-                _a: ()
-            }
+            Self { rx, _a: () }
         }
     }
 
@@ -949,14 +936,18 @@ pub(crate) mod asynch {
 
         #[interrupt]
         fn DMA_CH0() {
-            use crate::dma::gdma::{Channel0 as Channel, Channel0TxImpl as ChannelTxImpl, Channel0RxImpl as ChannelRxImpl};
+            use crate::dma::gdma::{
+                Channel0 as Channel,
+                Channel0RxImpl as ChannelRxImpl,
+                Channel0TxImpl as ChannelTxImpl,
+            };
 
             if Channel::is_in_done() {
                 Channel::clear_in_interrupts();
                 Channel::unlisten_in_eof();
                 ChannelRxImpl::waker().wake()
             }
-            
+
             if Channel::is_out_done() {
                 Channel::clear_out_interrupts();
                 Channel::unlisten_out_eof();
@@ -966,14 +957,18 @@ pub(crate) mod asynch {
 
         #[interrupt]
         fn DMA_CH1() {
-            use crate::dma::gdma::{Channel1 as Channel, Channel1TxImpl as ChannelTxImpl, Channel1RxImpl as ChannelRxImpl};
+            use crate::dma::gdma::{
+                Channel1 as Channel,
+                Channel1RxImpl as ChannelRxImpl,
+                Channel1TxImpl as ChannelTxImpl,
+            };
 
             if Channel::is_in_done() {
                 Channel::clear_in_interrupts();
                 Channel::unlisten_in_eof();
                 ChannelRxImpl::waker().wake()
             }
-            
+
             if Channel::is_out_done() {
                 Channel::clear_out_interrupts();
                 Channel::unlisten_out_eof();
@@ -983,14 +978,18 @@ pub(crate) mod asynch {
 
         #[interrupt]
         fn DMA_CH2() {
-            use crate::dma::gdma::{Channel2 as Channel, Channel2TxImpl as ChannelTxImpl, Channel2RxImpl as ChannelRxImpl};
+            use crate::dma::gdma::{
+                Channel2 as Channel,
+                Channel2RxImpl as ChannelRxImpl,
+                Channel2TxImpl as ChannelTxImpl,
+            };
 
             if Channel::is_in_done() {
                 Channel::clear_in_interrupts();
                 Channel::unlisten_in_eof();
                 ChannelRxImpl::waker().wake()
             }
-            
+
             if Channel::is_out_done() {
                 Channel::clear_out_interrupts();
                 Channel::unlisten_out_eof();
@@ -1098,14 +1097,18 @@ pub(crate) mod asynch {
 
         #[interrupt]
         fn SPI2_DMA() {
-            use crate::dma::pdma::{Spi2DmaChannel as Channel, Spi2DmaChannelTxImpl as ChannelTxImpl, Spi2DmaChannelRxImpl as ChannelRxImpl};
+            use crate::dma::pdma::{
+                Spi2DmaChannel as Channel,
+                Spi2DmaChannelRxImpl as ChannelRxImpl,
+                Spi2DmaChannelTxImpl as ChannelTxImpl,
+            };
 
             if Channel::is_in_done() {
                 Channel::clear_in_interrupts();
                 Channel::unlisten_in_eof();
                 ChannelRxImpl::waker().wake()
             }
-            
+
             if Channel::is_out_done() {
                 Channel::clear_out_interrupts();
                 Channel::unlisten_out_eof();
@@ -1115,14 +1118,18 @@ pub(crate) mod asynch {
 
         #[interrupt]
         fn SPI3_DMA() {
-            use crate::dma::pdma::{Spi3DmaChannel as Channel, Spi3DmaChannelTxImpl as ChannelTxImpl, Spi3DmaChannelRxImpl as ChannelRxImpl};
+            use crate::dma::pdma::{
+                Spi3DmaChannel as Channel,
+                Spi3DmaChannelRxImpl as ChannelRxImpl,
+                Spi3DmaChannelTxImpl as ChannelTxImpl,
+            };
 
             if Channel::is_in_done() {
                 Channel::clear_in_interrupts();
                 Channel::unlisten_in_eof();
                 ChannelRxImpl::waker().wake()
             }
-            
+
             if Channel::is_out_done() {
                 Channel::clear_out_interrupts();
                 Channel::unlisten_out_eof();

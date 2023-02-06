@@ -1,8 +1,9 @@
 //! Direct Memory Access
 
 use crate::{
+    dma::*,
     peripheral::PeripheralRef,
-    system::{Peripheral, PeripheralClockControl}, dma::*,
+    system::{Peripheral, PeripheralClockControl},
 };
 
 macro_rules! ImplSpiChannel {
