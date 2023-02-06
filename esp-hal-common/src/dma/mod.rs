@@ -998,4 +998,43 @@ pub(crate) mod asynch {
             }
         }
     }
+
+    #[cfg(any(esp32s2, esp32))]
+    mod interrupt {
+        use super::*;
+
+        #[interrupt]
+        fn SPI2_DMA() {
+            use crate::dma::pdma::{Spi2DmaChannel as Channel, Spi2DmaChannelTxImpl as ChannelTxImpl, Spi2DmaChannelRxImpl as ChannelRxImpl};
+
+            if Channel::is_in_done() {
+                Channel::clear_in_interrupts();
+                Channel::unlisten_in_eof();
+                ChannelRxImpl::waker().wake()
+            }
+            
+            if Channel::is_out_done() {
+                Channel::clear_out_interrupts();
+                Channel::unlisten_out_eof();
+                ChannelTxImpl::waker().wake()
+            }
+        }
+
+        #[interrupt]
+        fn SPI3_DMA() {
+            use crate::dma::pdma::{Spi3DmaChannel as Channel, Spi3DmaChannelTxImpl as ChannelTxImpl, Spi3DmaChannelRxImpl as ChannelRxImpl};
+
+            if Channel::is_in_done() {
+                Channel::clear_in_interrupts();
+                Channel::unlisten_in_eof();
+                ChannelRxImpl::waker().wake()
+            }
+            
+            if Channel::is_out_done() {
+                Channel::clear_out_interrupts();
+                Channel::unlisten_out_eof();
+                ChannelTxImpl::waker().wake()
+            }
+        }
+    }
 }

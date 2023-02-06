@@ -1,9 +1,8 @@
 //! Direct Memory Access
 
 use crate::{
-    dma::pdma::private::*,
     peripheral::PeripheralRef,
-    system::{Peripheral, PeripheralClockControl},
+    system::{Peripheral, PeripheralClockControl}, dma::*,
 };
 
 macro_rules! ImplSpiChannel {
@@ -84,7 +83,8 @@ macro_rules! ImplSpiChannel {
 
                 fn is_out_done() -> bool {
                     let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
-                    spi.dma_int_raw.read().out_done_int_raw().bit()
+                    // FIXME this should be out_total_eof_int_raw? but on esp32 this interrupt doesn't seem to fire
+                    spi.dma_int_raw.read().out_eof_int_raw().bit()
                 }
 
                 fn last_out_dscr_address() -> usize {
@@ -162,15 +162,57 @@ macro_rules! ImplSpiChannel {
                     let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
                     spi.inlink_dscr_bf0.read().dma_inlink_dscr_bf0().bits() as usize
                 }
+
+                fn is_listening_in_eof() -> bool {
+                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
+                    spi.dma_int_ena.read().in_suc_eof_int_ena().bit_is_set()
+                }
+
+                fn is_listening_out_eof() -> bool {
+                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
+                    spi.dma_int_ena.read().out_total_eof_int_ena().bit_is_set()
+                }
+
+                fn listen_in_eof() {
+                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
+                    spi.dma_int_ena.modify(|_, w| w.in_suc_eof_int_ena().set_bit());
+                }
+
+                fn listen_out_eof() {
+                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
+                    spi.dma_int_ena.modify(|_, w| w.out_total_eof_int_ena().set_bit());
+                }
+
+                fn unlisten_in_eof() {
+                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
+                    spi.dma_int_ena.modify(|_, w| w.in_suc_eof_int_ena().clear_bit());
+                }
+
+                fn unlisten_out_eof() {
+                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
+                    spi.dma_int_ena.modify(|_, w| w.out_total_eof_int_ena().clear_bit());
+                }
             }
 
             pub struct [<Spi $num DmaChannelTxImpl>] {}
 
-            impl<'a> TxChannel<[<Spi $num DmaChannel>]> for [<Spi $num DmaChannelTxImpl>] {}
+            impl<'a> TxChannel<[<Spi $num DmaChannel>]> for [<Spi $num DmaChannelTxImpl>] {
+                #[cfg(feature = "async")]
+                fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
+                    static WAKER: embassy_sync::waitqueue::AtomicWaker = embassy_sync::waitqueue::AtomicWaker::new();
+                    &WAKER
+                }
+            }
 
             pub struct [<Spi $num DmaChannelRxImpl>] {}
 
-            impl<'a> RxChannel<[<Spi $num DmaChannel>]> for [<Spi $num DmaChannelRxImpl>] {}
+            impl<'a> RxChannel<[<Spi $num DmaChannel>]> for [<Spi $num DmaChannelRxImpl>] {
+                #[cfg(feature = "async")]
+                fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
+                    static WAKER: embassy_sync::waitqueue::AtomicWaker = embassy_sync::waitqueue::AtomicWaker::new();
+                    &WAKER
+                }
+            }
 
             pub struct [<Spi $num DmaChannelCreator>] {}
 
@@ -368,15 +410,47 @@ macro_rules! ImplI2sChannel {
                     let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
                     reg_block.inlink_dscr_bf0.read().inlink_dscr_bf0().bits() as usize
                 }
+
+                fn is_listening_in_eof() -> bool {
+                    todo!()
+                }
+                fn is_listening_out_eof() -> bool {
+                    todo!()
+                }
+
+                fn listen_in_eof() {
+                    todo!()
+                }
+                fn listen_out_eof() {
+                    todo!()
+                }
+                fn unlisten_in_eof() {
+                    todo!()
+                }
+                fn unlisten_out_eof() {
+                    todo!()
+                }
             }
 
             pub struct [<I2s $num DmaChannelTxImpl>] {}
 
-            impl<'a> TxChannel<[<I2s $num DmaChannel>]> for [<I2s $num DmaChannelTxImpl>] {}
+            impl<'a> TxChannel<[<I2s $num DmaChannel>]> for [<I2s $num DmaChannelTxImpl>] {
+                #[cfg(feature = "async")]
+                fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
+                    static WAKER: embassy_sync::waitqueue::AtomicWaker = embassy_sync::waitqueue::AtomicWaker::new();
+                    &WAKER
+                }
+            }
 
             pub struct [<I2s $num DmaChannelRxImpl>] {}
 
-            impl<'a> RxChannel<[<I2s $num DmaChannel>]> for [<I2s $num DmaChannelRxImpl>] {}
+            impl<'a> RxChannel<[<I2s $num DmaChannel>]> for [<I2s $num DmaChannelRxImpl>] {
+                #[cfg(feature = "async")]
+                fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
+                    static WAKER: embassy_sync::waitqueue::AtomicWaker = embassy_sync::waitqueue::AtomicWaker::new();
+                    &WAKER
+                }
+            }
 
             pub struct [<I2s $num DmaChannelCreator>] {}
 
@@ -436,42 +510,37 @@ macro_rules! ImplI2sChannel {
     };
 }
 
-/// Crate private implementation details
-pub(crate) mod private {
-    use crate::dma::{private::*, *};
+pub struct Spi2DmaSuitablePeripheral {}
+impl PeripheralMarker for Spi2DmaSuitablePeripheral {}
+impl SpiPeripheral for Spi2DmaSuitablePeripheral {}
+impl Spi2Peripheral for Spi2DmaSuitablePeripheral {}
 
-    pub struct Spi2DmaSuitablePeripheral {}
-    impl PeripheralMarker for Spi2DmaSuitablePeripheral {}
-    impl SpiPeripheral for Spi2DmaSuitablePeripheral {}
-    impl Spi2Peripheral for Spi2DmaSuitablePeripheral {}
+pub struct Spi3DmaSuitablePeripheral {}
+impl PeripheralMarker for Spi3DmaSuitablePeripheral {}
+impl SpiPeripheral for Spi3DmaSuitablePeripheral {}
+impl Spi3Peripheral for Spi3DmaSuitablePeripheral {}
 
-    pub struct Spi3DmaSuitablePeripheral {}
-    impl PeripheralMarker for Spi3DmaSuitablePeripheral {}
-    impl SpiPeripheral for Spi3DmaSuitablePeripheral {}
-    impl Spi3Peripheral for Spi3DmaSuitablePeripheral {}
+ImplSpiChannel!(2);
+ImplSpiChannel!(3);
 
-    ImplSpiChannel!(2);
-    ImplSpiChannel!(3);
+pub struct I2s0DmaSuitablePeripheral {}
+impl PeripheralMarker for I2s0DmaSuitablePeripheral {}
+impl I2sPeripheral for I2s0DmaSuitablePeripheral {}
+impl I2s0Peripheral for I2s0DmaSuitablePeripheral {}
 
-    pub struct I2s0DmaSuitablePeripheral {}
-    impl PeripheralMarker for I2s0DmaSuitablePeripheral {}
-    impl I2sPeripheral for I2s0DmaSuitablePeripheral {}
-    impl I2s0Peripheral for I2s0DmaSuitablePeripheral {}
+#[cfg(esp32)]
+ImplI2sChannel!(0, "I2S0");
 
-    #[cfg(esp32)]
-    ImplI2sChannel!(0, "I2S0");
+#[cfg(esp32s2)]
+ImplI2sChannel!(0, "I2S");
 
-    #[cfg(esp32s2)]
-    ImplI2sChannel!(0, "I2S");
+pub struct I2s1DmaSuitablePeripheral {}
+impl PeripheralMarker for I2s1DmaSuitablePeripheral {}
+impl I2sPeripheral for I2s1DmaSuitablePeripheral {}
+impl I2s1Peripheral for I2s1DmaSuitablePeripheral {}
 
-    pub struct I2s1DmaSuitablePeripheral {}
-    impl PeripheralMarker for I2s1DmaSuitablePeripheral {}
-    impl I2sPeripheral for I2s1DmaSuitablePeripheral {}
-    impl I2s1Peripheral for I2s1DmaSuitablePeripheral {}
-
-    #[cfg(esp32)]
-    ImplI2sChannel!(1, "I2S1");
-}
+#[cfg(esp32)]
+ImplI2sChannel!(1, "I2S1");
 
 /// DMA Peripheral
 ///
