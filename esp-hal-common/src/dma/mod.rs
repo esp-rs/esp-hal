@@ -930,7 +930,33 @@ pub(crate) mod asynch {
         }
     }
 
-    #[cfg(any(esp32c3, esp32c2))]
+    #[cfg(esp32c2)]
+    mod interrupt {
+        use super::*;
+
+        #[interrupt]
+        fn DMA_CH0() {
+            use crate::dma::gdma::{
+                Channel0 as Channel,
+                Channel0RxImpl as ChannelRxImpl,
+                Channel0TxImpl as ChannelTxImpl,
+            };
+
+            if Channel::is_in_done() {
+                Channel::clear_in_interrupts();
+                Channel::unlisten_in_eof();
+                ChannelRxImpl::waker().wake()
+            }
+
+            if Channel::is_out_done() {
+                Channel::clear_out_interrupts();
+                Channel::unlisten_out_eof();
+                ChannelTxImpl::waker().wake()
+            }
+        }
+    }
+
+    #[cfg(esp32c3)]
     mod interrupt {
         use super::*;
 

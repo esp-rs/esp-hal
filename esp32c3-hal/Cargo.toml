@@ -85,3 +85,7 @@ required-features = ["embassy", "async"]
 
 [profile.dev]
 opt-level = 1
+
+[[example]]
+name              = "embassy_spi"
+required-features = ["embassy", "async"]
