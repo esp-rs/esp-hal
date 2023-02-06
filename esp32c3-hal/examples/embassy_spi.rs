@@ -45,8 +45,6 @@ pub type SpiType<'d> = SpiDma<
 async fn spi_task(spi: &'static mut SpiType<'static>) {
     let send_buffer = [0, 1, 2, 3, 4, 5, 6, 7];
     loop {
-        // TODO is recv buffer is < send buffer it hangs?
-        // TODO is send/recv buffer is < 8 bytes it also hangs
         let mut buffer = [0; 8];
         esp_println::println!("Sending bytes");
         embedded_hal_async::spi::SpiBus::transfer(spi, &mut buffer, &send_buffer)
