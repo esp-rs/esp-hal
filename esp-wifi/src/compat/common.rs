@@ -106,14 +106,14 @@ impl Write for StrBuf {
 }
 
 pub unsafe extern "C" fn syslog(_priority: u32, format: *const u8, mut args: VaListImpl) {
-    #[cfg(all(feature = "wifi_logs", target_arch = "riscv32"))]
+    #[cfg(all(feature = "wifi-logs", target_arch = "riscv32"))]
     {
         let mut buf = [0u8; 512];
         vsnprintf(&mut buf as *mut u8, 511, format, args);
         let res_str = StrBuf::from(&buf as *const u8);
         info!("{}", res_str.as_str_ref());
     }
-    #[cfg(all(feature = "wifi_logs", not(target_arch = "riscv32")))]
+    #[cfg(all(feature = "wifi-logs", not(target_arch = "riscv32")))]
     {
         let res_str = StrBuf::from(format);
         info!("{}", res_str.as_str_ref());

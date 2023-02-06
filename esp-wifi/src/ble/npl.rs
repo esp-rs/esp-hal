@@ -1032,7 +1032,7 @@ pub(crate) fn ble_init() {
         *(HCI_OUT_COLLECTOR.as_mut_ptr()) = HciOutCollector::new();
 
         // turn on logging
-        #[cfg(feature = "wifi_logs")]
+        #[cfg(feature = "wifi-logs")]
         {
             extern "C" {
                 static mut g_ble_plf_log_level: u32;

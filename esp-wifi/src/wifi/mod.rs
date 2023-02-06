@@ -54,9 +54,9 @@ use crate::{
 };
 use log::{debug, info};
 
-#[cfg(feature = "dump_packets")]
+#[cfg(feature = "dump-packets")]
 static DUMP_PACKETS: bool = true;
-#[cfg(not(feature = "dump_packets"))]
+#[cfg(not(feature = "dump-packets"))]
 static DUMP_PACKETS: bool = false;
 
 #[derive(Debug, Clone, Copy)]
@@ -587,10 +587,10 @@ pub fn wifi_start() -> Result<(), WifiError> {
     unsafe {
         esp_wifi_result!(esp_wifi_start())?;
 
-        #[cfg(any(coex, feature = "ps_min_modem"))]
+        #[cfg(any(coex, feature = "ps-min-modem"))]
         esp_wifi_result!(esp_wifi_set_ps(crate::binary::include::wifi_ps_type_t_WIFI_PS_MIN_MODEM))?;
 
-        #[cfg(not(any(coex, feature = "ps_min_modem")))]
+        #[cfg(not(any(coex, feature = "ps-min-modem")))]
         esp_wifi_result!(esp_wifi_set_ps(crate::binary::include::wifi_ps_type_t_WIFI_PS_NONE))?;
 
         let cntry_code = [b'C', b'N', 0];

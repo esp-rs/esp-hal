@@ -1486,7 +1486,7 @@ pub unsafe extern "C" fn log_write(
     _format: *const crate::binary::c_types::c_char,
     _args: ...
 ) {
-    #[cfg(not(feature = "wifi_logs"))]
+    #[cfg(not(feature = "wifi-logs"))]
     return;
 
     #[cfg(feature = "esp32c3")]
@@ -1516,7 +1516,7 @@ pub unsafe extern "C" fn log_writev(
     _format: *const crate::binary::c_types::c_char,
     _args: va_list,
 ) {
-    #[cfg(not(feature = "wifi_logs"))]
+    #[cfg(not(feature = "wifi-logs"))]
     return;
 
     #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
