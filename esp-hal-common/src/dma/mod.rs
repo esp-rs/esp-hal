@@ -999,6 +999,99 @@ pub(crate) mod asynch {
         }
     }
 
+    #[cfg(esp32s3)]
+    mod interrupt {
+        use super::*;
+
+        #[interrupt]
+        fn DMA_IN_CH0() {
+            use crate::dma::gdma::{Channel0 as Channel, Channel0RxImpl as ChannelRxImpl};
+
+            if Channel::is_in_done() {
+                Channel::clear_in_interrupts();
+                Channel::unlisten_in_eof();
+                ChannelRxImpl::waker().wake()
+            }
+        }
+
+        #[interrupt]
+        fn DMA_OUT_CH0() {
+            use crate::dma::gdma::{Channel0 as Channel, Channel0TxImpl as ChannelTxImpl};
+
+            if Channel::is_out_done() {
+                Channel::clear_out_interrupts();
+                Channel::unlisten_out_eof();
+                ChannelTxImpl::waker().wake()
+            }
+        }
+
+        #[interrupt]
+        fn DMA_IN_CH1() {
+            use crate::dma::gdma::{Channel1 as Channel, Channel1RxImpl as ChannelRxImpl};
+
+            if Channel::is_in_done() {
+                Channel::clear_in_interrupts();
+                Channel::unlisten_in_eof();
+                ChannelRxImpl::waker().wake()
+            }
+        }
+
+        #[interrupt]
+        fn DMA_OUT_CH1() {
+            use crate::dma::gdma::{Channel1 as Channel, Channel1TxImpl as ChannelTxImpl};
+
+            if Channel::is_out_done() {
+                Channel::clear_out_interrupts();
+                Channel::unlisten_out_eof();
+                ChannelTxImpl::waker().wake()
+            }
+        }
+
+        #[interrupt]
+        fn DMA_IN_CH3() {
+            use crate::dma::gdma::{Channel3 as Channel, Channel3RxImpl as ChannelRxImpl};
+
+            if Channel::is_in_done() {
+                Channel::clear_in_interrupts();
+                Channel::unlisten_in_eof();
+                ChannelRxImpl::waker().wake()
+            }
+        }
+
+        #[interrupt]
+        fn DMA_OUT_CH3() {
+            use crate::dma::gdma::{Channel3 as Channel, Channel3TxImpl as ChannelTxImpl};
+
+            if Channel::is_out_done() {
+                Channel::clear_out_interrupts();
+                Channel::unlisten_out_eof();
+                ChannelTxImpl::waker().wake()
+            }
+        }
+
+        #[interrupt]
+        fn DMA_IN_CH4() {
+            use crate::dma::gdma::{Channel4 as Channel, Channel4RxImpl as ChannelRxImpl};
+
+            if Channel::is_in_done() {
+                Channel::clear_in_interrupts();
+                Channel::unlisten_in_eof();
+                ChannelRxImpl::waker().wake()
+            }
+        }
+
+        #[interrupt]
+        fn DMA_OUT_CH4() {
+            use crate::dma::gdma::{Channel4 as Channel, Channel4TxImpl as ChannelTxImpl};
+
+            if Channel::is_out_done() {
+                Channel::clear_out_interrupts();
+                Channel::unlisten_out_eof();
+                ChannelTxImpl::waker().wake()
+            }
+        }
+    }
+
     #[cfg(any(esp32s2, esp32))]
     mod interrupt {
         use super::*;
