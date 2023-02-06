@@ -329,11 +329,23 @@ macro_rules! impl_channel {
 
             pub struct [<Channel $num TxImpl>] {}
 
-            impl<'a> TxChannel<[<Channel $num>]> for [<Channel $num TxImpl>] {}
+            impl<'a> TxChannel<[<Channel $num>]> for [<Channel $num TxImpl>] {
+                #[cfg(feature = "async")]
+                fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
+                    static WAKER: embassy_sync::waitqueue::AtomicWaker = embassy_sync::waitqueue::AtomicWaker::new();
+                    &WAKER
+                }
+            }
 
             pub struct [<Channel $num RxImpl>] {}
 
-            impl<'a> RxChannel<[<Channel $num>]> for [<Channel $num RxImpl>] {}
+            impl<'a> RxChannel<[<Channel $num>]> for [<Channel $num RxImpl>] {
+                #[cfg(feature = "async")]
+                fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
+                    static WAKER: embassy_sync::waitqueue::AtomicWaker = embassy_sync::waitqueue::AtomicWaker::new();
+                    &WAKER
+                }
+            }
 
             pub struct [<ChannelCreator $num>] {}
 
@@ -361,8 +373,6 @@ macro_rules! impl_channel {
                         last_seen_handled_descriptor_ptr: core::ptr::null(),
                         buffer_start: core::ptr::null(),
                         buffer_len: 0,
-                        #[cfg(feature = "async")]
-                        channel_index: $num,
                         _phantom: PhantomData::default(),
                     };
 
@@ -377,8 +387,6 @@ macro_rules! impl_channel {
                         available: 0,
                         last_seen_handled_descriptor_ptr: core::ptr::null(),
                         read_buffer_start: core::ptr::null(),
-                        #[cfg(feature = "async")]
-                        channel_index: $num,
                         _phantom: PhantomData::default(),
                     };
 
