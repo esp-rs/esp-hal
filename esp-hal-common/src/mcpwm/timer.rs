@@ -45,7 +45,7 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
                 .timer0_period_upmethod()
                 .variant(0)
         });
-
+        esp_println::println!("QQ: {} {}", timer_config.prescaler, timer_config.period);
         // set timer to continuously run and set the timer working mode
         self.cfg1().write(|w| {
             w.timer0_start()
@@ -141,6 +141,7 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
         }
     }
 
+    #[cfg(not(esp32c6))]
     fn cfg0(&mut self) -> &crate::peripherals::pwm0::TIMER0_CFG0 {
         // SAFETY:
         // We only grant access to our CFG0 register with the lifetime of &mut self
@@ -158,7 +159,47 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
             }
         }
     }
+
+    #[cfg(not(esp32c6))]
     fn cfg1(&mut self) -> &crate::peripherals::pwm0::TIMER0_CFG1 {
+        // SAFETY:
+        // We only grant access to our CFG1 register with the lifetime of &mut self
+        let block = unsafe { &*PWM::block() };
+
+        // SAFETY:
+        // The CFG1 registers are identical for all timers so we can pretend they're
+        // TIMER0_CFG1
+        match TIM {
+            0 => &block.timer0_cfg1,
+            1 => unsafe { &*(&block.timer1_cfg1 as *const _ as *const _) },
+            2 => unsafe { &*(&block.timer2_cfg1 as *const _ as *const _) },
+            _ => {
+                unreachable!()
+            }
+        }
+    }
+
+    #[cfg(esp32c6)]
+    fn cfg0(&mut self) -> &crate::peripherals::mcpwm::TIMER0_CFG0 {
+        // SAFETY:
+        // We only grant access to our CFG0 register with the lifetime of &mut self
+        let block = unsafe { &*PWM::block() };
+
+        // SAFETY:
+        // The CFG0 registers are identical for all timers so we can pretend they're
+        // TIMER0_CFG0
+        match TIM {
+            0 => &block.timer0_cfg0,
+            1 => unsafe { &*(&block.timer1_cfg0 as *const _ as *const _) },
+            2 => unsafe { &*(&block.timer2_cfg0 as *const _ as *const _) },
+            _ => {
+                unreachable!()
+            }
+        }
+    }
+
+    #[cfg(esp32c6)]
+    fn cfg1(&mut self) -> &crate::peripherals::mcpwm::TIMER0_CFG1 {
         // SAFETY:
         // We only grant access to our CFG1 register with the lifetime of &mut self
         let block = unsafe { &*PWM::block() };
@@ -237,6 +278,7 @@ impl<'a> TimerClockConfig<'a> {
         }
         let frequency = clock.frequency / (prescaler + 1) / cycle_period;
 
+        esp_println::println!("{target_timer_frequency} {target_freq} {prescaler}");
         Ok(TimerClockConfig {
             frequency,
             prescaler: prescaler as u8,
