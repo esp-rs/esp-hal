@@ -1,11 +1,9 @@
-//! This shows how to write text to uart0.
-//! You can see the output with `espflash` if you provide the `--monitor` option
+//! This demos the watchdog timer.
+//! Basically the same as `hello_world` but if you remove the call to
+//! `wdt.feed()` the watchdog will reset the system.
 
-#![feature(stmt_expr_attributes)]
 #![no_std]
 #![no_main]
-
-use core::fmt::Write;
 
 use esp32c6_hal::{
     clock::ClockControl,
@@ -13,9 +11,9 @@ use esp32c6_hal::{
     prelude::*,
     timer::TimerGroup,
     Rtc,
-    Uart,
 };
 use esp_backtrace as _;
+use esp_println::println;
 use esp_riscv_rt::entry;
 use nb::block;
 
@@ -25,19 +23,23 @@ fn main() -> ! {
     let system = peripherals.PCR.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let mut uart0 = Uart::new(peripherals.UART0);
+    let mut rtc = Rtc::new(peripherals.LP_CLKRST);
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let mut timer0 = timer_group0.timer0;
-    let _wdt0 = timer_group0.wdt;
+    let mut wdt0 = timer_group0.wdt;
     let timer_group1 = TimerGroup::new(peripherals.TIMG1, &clocks);
     let _wdt1 = timer_group1.wdt;
 
-    let _rtc = Rtc::new(peripherals.LP_CLKRST);
+    // Disable watchdog timers
+    rtc.swd.disable();
+    rtc.rwdt.disable();
+    wdt0.start(2u64.secs());
 
     timer0.start(1u64.secs());
 
     loop {
-        writeln!(uart0, "Hello world!").unwrap();
+        wdt0.feed();
+        println!("Hello world!");
         block!(timer0.wait()).unwrap();
     }
 }

@@ -17,11 +17,10 @@ use esp32c6_hal::{
     prelude::*,
     timer::TimerGroup,
     Delay,
-    // Rtc,
+    Rtc,
 };
 use esp_backtrace as _;
 use esp_riscv_rt::{entry, riscv};
-use esp_println::println;
 
 static BUTTON: Mutex<RefCell<Option<Gpio7<Input<PullDown>>>>> = Mutex::new(RefCell::new(None));
 
@@ -31,18 +30,18 @@ fn main() -> ! {
     let system = peripherals.PCR.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    // Disable the watchdog timers. For the ESP32-C3, this includes the Super WDT,
-    // the RTC WDT, and the TIMG WDTs.
-    //   let mut rtc = Rtc::new(peripherals.RTC_CNTL);
+    // Disable the watchdog timers. For the ESP32-C6, this includes the Super WDT,
+    // and the TIMG WDTs.
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    let mut wdt0 = timer_group0.wdt;
+    let _wdt0 = timer_group0.wdt;
     let timer_group1 = TimerGroup::new(peripherals.TIMG1, &clocks);
-    let mut wdt1 = timer_group1.wdt;
+    let _wdt1 = timer_group1.wdt;
 
-    //  rtc.swd.disable();
-    //  rtc.rwdt.disable();
-    wdt0.disable();
-    wdt1.disable();
+    let mut rtc = Rtc::new(peripherals.LP_CLKRST);
+
+    // Disable MWDT and RWDT (Watchdog) flash boot protection
+    rtc.rwdt.disable();
+    rtc.swd.disable();
 
     // Set GPIO5 as an output
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);

@@ -4,28 +4,34 @@ use core::arch::{asm, global_asm};
 
 pub use embedded_hal as ehal;
 pub use esp_hal_common::{
+    aes,
     clock,
     dma,
     dma::gdma,
+    efuse,
     gpio,
     i2c,
     i2s,
     interrupt,
     ledc,
     macros,
+    mcpwm,
+    pcnt,
     peripherals,
     prelude,
     pulse_control,
+    sha,
     spi,
     systimer,
     timer,
     uart,
+    utils,
     Cpu,
     Delay,
     PulseControl,
-    utils,
-    Uart,
     Rtc,
+    Uart,
+    UsbSerialJtag,
 };
 
 pub use self::gpio::IO;
