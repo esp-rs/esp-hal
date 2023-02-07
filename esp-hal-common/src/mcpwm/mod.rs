@@ -115,26 +115,33 @@ impl<'d, PWM: PwmPeripheral> MCPWM<'d, PWM> {
 
         PWM::enable(system);
 
-        // set prescaler
         #[cfg(not(esp32c6))]
-        peripheral
-            .clk_cfg
-            .write(|w| w.clk_prescale().variant(peripheral_clock.prescaler));
-        // enable clock
-        #[cfg(not(esp32c6))]
-        peripheral.clk.write(|w| w.en().set_bit());
+        {
+            // set prescaler
+            peripheral
+                .clk_cfg
+                .write(|w| w.clk_prescale().variant(peripheral_clock.prescaler));
+
+            // enable clock
+            peripheral.clk.write(|w| w.en().set_bit());
+        }
 
         #[cfg(esp32c6)]
-        let pcr = unsafe { &*crate::peripherals::PCR::ptr() };
-        #[cfg(esp32c6)]
-        pcr.pwm_clk_conf
-            .write(|w| w.pwm_div_num().variant(peripheral_clock.prescaler));
-        #[cfg(esp32c6)]
-        pcr.pwm_clk_conf.write(|w| w.pwm_clkm_en().set_bit());
-        // TODO: Add other clock sources
-        #[cfg(esp32c6)]
-        pcr.pwm_clk_conf
-            .write(|w| unsafe { w.pwm_clkm_sel().bits(1) });
+        {
+            unsafe { &*crate::peripherals::PCR::PTR }
+                .pwm_clk_conf
+                .modify(|_, w| unsafe {
+                    w.pwm_div_num()
+                        .variant(peripheral_clock.prescaler)
+                        .pwm_clkm_en()
+                        .set_bit()
+                        .pwm_clkm_sel()
+                        .bits(1)
+                });
+
+            // TODO: Add other clock sources
+        }
+
         MCPWM {
             _inner: peripheral,
             timer0: Timer::new(),
@@ -166,10 +173,10 @@ impl<'a> PeripheralClockConfig<'a> {
     pub fn with_prescaler(clocks: &'a Clocks, prescaler: u8) -> Self {
         #[cfg(esp32)]
         let source_clock = clocks.pwm_clock;
-        #[cfg(esp32s3)]
-        let source_clock = clocks.crypto_pwm_clock;
         #[cfg(esp32c6)]
         let source_clock = clocks.crypto_clock;
+        #[cfg(esp32s3)]
+        let source_clock = clocks.crypto_pwm_clock;
 
         PeripheralClockConfig {
             frequency: source_clock / (prescaler as u32 + 1),
@@ -198,19 +205,20 @@ impl<'a> PeripheralClockConfig<'a> {
     ) -> Result<Self, FrequencyError> {
         #[cfg(esp32)]
         let source_clock = clocks.pwm_clock;
-        #[cfg(esp32s3)]
-        let source_clock = clocks.crypto_pwm_clock;
         #[cfg(esp32c6)]
         let source_clock = clocks.crypto_clock;
+        #[cfg(esp32s3)]
+        let source_clock = clocks.crypto_pwm_clock;
 
         if target_freq.raw() == 0 || target_freq > source_clock {
             return Err(FrequencyError);
         }
+
         let prescaler = source_clock / target_freq - 1;
         if prescaler > u8::MAX as u32 {
             return Err(FrequencyError);
         }
-        esp_println::println!("{source_clock}, {target_freq}, {prescaler}");
+
         Ok(Self::with_prescaler(clocks, prescaler as u8))
     }
 
@@ -280,7 +288,7 @@ unsafe impl PwmPeripheral for PWM {
     }
 
     fn block() -> *const RegisterBlock {
-        Self::ptr()
+        Self::PTR
     }
 
     fn output_signal<const OP: u8, const IS_A: bool>() -> OutputSignal {
@@ -303,7 +311,7 @@ unsafe impl PwmPeripheral for crate::peripherals::PWM1 {
     }
 
     fn block() -> *const RegisterBlock {
-        Self::ptr()
+        Self::PTR
     }
 
     fn output_signal<const OP: u8, const IS_A: bool>() -> OutputSignal {
