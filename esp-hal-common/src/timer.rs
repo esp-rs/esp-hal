@@ -109,12 +109,28 @@ where
     pub fn new(timg: T, apb_clk_freq: HertzU32) -> Self {
         // TODO: this currently assumes APB_CLK is being used, as we don't yet have a
         //       way to select the XTAL_CLK.
+        #[cfg(esp32c6)]
+        Self::enable_clock();
         Self { timg, apb_clk_freq }
     }
 
     /// Return the raw interface to the underlying timer instance
     pub fn free(self) -> T {
         self.timg
+    }
+
+    #[cfg(esp32c6)]
+    fn enable_clock() {
+        let pcr = unsafe { &*crate::peripherals::PCR::ptr() };
+        pcr.timergroup0_timer_clk_conf
+            .write(|w| w.tg0_timer_clk_en().set_bit());
+        pcr.timergroup0_timer_clk_conf
+            .write(|w| unsafe { w.tg0_timer_clk_sel().bits(1) });
+
+        pcr.timergroup1_timer_clk_conf
+            .write(|w| w.tg1_timer_clk_en().set_bit());
+        pcr.timergroup1_timer_clk_conf
+            .write(|w| unsafe { w.tg1_timer_clk_sel().bits(1) });
     }
 }
 

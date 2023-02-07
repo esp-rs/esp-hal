@@ -86,15 +86,14 @@ use core::slice::Iter;
 use fugit::NanosDurationU32;
 pub use paste::paste;
 
+#[cfg(esp32c6)]
+use crate::peripherals::PCR;
 use crate::{
     gpio::{types::OutputSignal, OutputPin},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::RMT,
     system::PeripheralClockControl,
 };
-
-#[cfg(esp32c6)]
-use crate::peripherals::PCR;
 
 /// Errors that can occur when the peripheral is configured
 #[derive(Debug)]

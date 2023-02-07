@@ -539,7 +539,6 @@ mod vectored {
     }
 }
 
-
 /// # Safety
 ///
 /// This function is called from an assembly trap handler.

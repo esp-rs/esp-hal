@@ -58,20 +58,20 @@ pub mod trapframe {
 
 #[cfg(rmt)]
 pub use self::pulse_control::PulseControl;
-// #[cfg(usb_serial_jtag)]
-// pub use self::usb_serial_jtag::UsbSerialJtag;
-// pub use self::{
-//     delay::Delay,
-//     gpio::*,
-//     interrupt::*,
-//     rng::Rng,
-//     rtc_cntl::{Rtc, Rwdt},
-//     spi::Spi,
-//     timer::Timer,
-//     uart::Uart,
-// };
-pub use self::{delay::Delay, gpio::*, interrupt::*, spi::Spi, timer::Timer, uart::Uart, rtc_cntl::{Rtc, Rwdt},};
+#[cfg(usb_serial_jtag)]
+pub use self::usb_serial_jtag::UsbSerialJtag;
+pub use self::{
+    delay::Delay,
+    gpio::*,
+    interrupt::*,
+    rtc_cntl::{Rtc, Rwdt},
+    spi::Spi,
+    timer::Timer,
+    uart::Uart,
+};
 
+#[cfg(aes)]
+pub mod aes;
 // pub mod analog;
 pub mod clock;
 pub mod delay;
@@ -83,11 +83,11 @@ pub mod i2c;
 #[cfg(i2s)]
 pub mod i2s;
 pub mod ledc;
-// #[cfg(mcpwm)]
-// pub mod mcpwm;
+#[cfg(mcpwm)]
+pub mod mcpwm;
 #[cfg(usb_otg)]
 pub mod otg_fs;
-#[cfg(any(esp32, esp32s2, esp32s3))]
+#[cfg(any(esp32, esp32s2, esp32s3, esp32c6))]
 pub mod pcnt;
 pub mod peripheral;
 pub mod prelude;
@@ -104,6 +104,8 @@ pub mod system;
 #[cfg(systimer)]
 pub mod systimer;
 pub mod timer;
+// #[cfg(any(esp32s3, esp32c3, esp32c6))]
+// pub mod twai;
 pub mod uart;
 #[cfg(usb_serial_jtag)]
 pub mod usb_serial_jtag;

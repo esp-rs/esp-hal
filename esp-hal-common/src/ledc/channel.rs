@@ -215,7 +215,6 @@ macro_rules! start_duty_without_fading {
     };
 }
 
-
 #[cfg(not(any(esp32, esp32c6)))]
 /// Macro to start duty cycle, without fading
 macro_rules! start_duty_without_fading {

@@ -33,7 +33,7 @@ pub enum Peripheral {
     Mcpwm0,
     #[cfg(mcpwm)]
     Mcpwm1,
-    #[cfg(any(esp32, esp32s2, esp32s3))]
+    #[cfg(any(esp32, esp32s2, esp32s3, esp32c6))]
     Pcnt,
     #[cfg(any(esp32c2, esp32c3, esp32c6))]
     ApbSarAdc,
@@ -244,6 +244,14 @@ impl PeripheralClockControl {
                 system
                     .twai1_conf
                     .modify(|_, w| w.twai1_rst_en().clear_bit());
+            }
+            Peripheral::Aes => {
+                system.aes_conf.modify(|_, w| w.aes_clk_en().set_bit());
+                system.aes_conf.modify(|_, w| w.aes_rst_en().clear_bit());
+            }
+            Peripheral::Pcnt => {
+                system.pcnt_conf.modify(|_, w| w.pcnt_clk_en().set_bit());
+                system.pcnt_conf.modify(|_, w| w.pcnt_rst_en().clear_bit());
             }
         }
     }

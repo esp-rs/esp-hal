@@ -110,6 +110,7 @@ fn main() {
             "timg1",
             "usb_serial_jtag",
             "plic",
+            "aes",
         ]
     } else if esp32s2 {
         vec![
