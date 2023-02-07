@@ -27,7 +27,6 @@ static USB_SERIAL: Mutex<RefCell<Option<UsbSerialJtag<USB_DEVICE>>>> =
 
 #[entry]
 fn main() -> ! {
-    // TODO: test this
     let peripherals = Peripherals::take();
     let system = peripherals.PCR.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
@@ -51,11 +50,7 @@ fn main() -> ! {
 
     critical_section::with(|cs| USB_SERIAL.borrow_ref_mut(cs).replace(usb_serial));
 
-    interrupt::enable(
-        peripherals::Interrupt::USB_SERIAL_JTAG,
-        interrupt::Priority::Priority1,
-    )
-    .unwrap();
+    interrupt::enable(peripherals::Interrupt::USB, interrupt::Priority::Priority1).unwrap();
 
     interrupt::set_kind(
         Cpu::ProCpu,
@@ -81,7 +76,7 @@ fn main() -> ! {
 }
 
 #[interrupt]
-fn USB_SERIAL_JTAG() {
+fn USB() {
     critical_section::with(|cs| {
         let mut usb_serial = USB_SERIAL.borrow_ref_mut(cs);
         let usb_serial = usb_serial.as_mut().unwrap();

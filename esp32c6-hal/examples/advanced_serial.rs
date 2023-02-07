@@ -3,7 +3,6 @@
 //! Additionally you can connect a logic analzyer to TX and see how the changes
 //! of the configuration change the output signal.
 
-#![feature(stmt_expr_attributes)]
 #![no_std]
 #![no_main]
 

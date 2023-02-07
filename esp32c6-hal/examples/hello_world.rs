@@ -1,7 +1,6 @@
 //! This shows how to write text to uart0.
 //! You can see the output with `espflash` if you provide the `--monitor` option
 
-#![feature(stmt_expr_attributes)]
 #![no_std]
 #![no_main]
 

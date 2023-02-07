@@ -20,7 +20,6 @@ use sha2::{Digest, Sha256};
 
 #[entry]
 fn main() -> ! {
-    // TODO: need to debug
     let peripherals = Peripherals::take();
     let system = peripherals.PCR.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();

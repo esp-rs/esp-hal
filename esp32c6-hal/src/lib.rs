@@ -1,6 +1,8 @@
 #![no_std]
 
 pub use embedded_hal as ehal;
+#[cfg(feature = "embassy")]
+pub use esp_hal_common::embassy;
 pub use esp_hal_common::{
     aes,
     clock,
@@ -67,13 +69,7 @@ extern "C" {
 #[allow(unreachable_code)]
 #[export_name = "_mp_hook"]
 #[doc(hidden)]
-#[cfg_attr(feature = "mcu-boot", link_section = ".rwtext")]
 pub fn mp_hook() -> bool {
-    #[cfg(feature = "mcu-boot")]
-    unsafe {
-        configure_mmu();
-    }
-
     unsafe {
         r0::zero_bss(&mut _rtc_fast_bss_start, &mut _rtc_fast_bss_end);
     }
