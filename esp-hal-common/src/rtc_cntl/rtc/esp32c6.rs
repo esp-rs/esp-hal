@@ -2,11 +2,12 @@ use paste::paste;
 use strum::FromRepr;
 
 use crate::{
-    clock::XtalClock,
-    peripherals::{EXTMEM, SPI0, SPI1, PCR, LP_AON, PMU},
+    clock::{
+        clocks_ll::{regi2c_write, regi2c_write_mask},
+        XtalClock,
+    },
+    peripherals::{EXTMEM, LP_AON, PCR, PMU, SPI0, SPI1},
     rtc_cntl::{RtcCalSel, RtcClock, RtcFastClock, RtcSlowClock},
-    clock::clocks_ll::regi2c_write,
-    clock::clocks_ll::regi2c_write_mask,
 };
 
 const I2C_DIG_REG: u8 = 0x6d;
@@ -27,46 +28,73 @@ const I2C_ULP_IR_FORCE_XPD_CK: u8 = 0;
 const I2C_ULP_IR_FORCE_XPD_CK_MSB: u8 = 2;
 const I2C_ULP_IR_FORCE_XPD_CK_LSB: u8 = 2;
 
-const I2C_DIG_REG_ENIF_RTC_DREG: u8 =   5;
-const I2C_DIG_REG_ENIF_RTC_DREG_MSB: u8 =    7;
-const I2C_DIG_REG_ENIF_RTC_DREG_LSB: u8 =    7;
+const I2C_DIG_REG_ENIF_RTC_DREG: u8 = 5;
+const I2C_DIG_REG_ENIF_RTC_DREG_MSB: u8 = 7;
+const I2C_DIG_REG_ENIF_RTC_DREG_LSB: u8 = 7;
 
-const I2C_DIG_REG_ENIF_DIG_DREG:u8 =    7;
-const I2C_DIG_REG_ENIF_DIG_DREG_MSB:u8 =    7;
-const I2C_DIG_REG_ENIF_DIG_DREG_LSB:u8 =    7;
+const I2C_DIG_REG_ENIF_DIG_DREG: u8 = 7;
+const I2C_DIG_REG_ENIF_DIG_DREG_MSB: u8 = 7;
+const I2C_DIG_REG_ENIF_DIG_DREG_LSB: u8 = 7;
 
 pub(crate) fn init() {
     let pmu = unsafe { &*PMU::ptr() };
 
-    /*
-    SET_PERI_REG_MASK(PMU_RF_PWC_REG, PMU_PERIF_I2C_RSTB);
-    SET_PERI_REG_MASK(PMU_RF_PWC_REG, PMU_XPD_PERIF_I2C);
+    // SET_PERI_REG_MASK(PMU_RF_PWC_REG, PMU_PERIF_I2C_RSTB);
+    // SET_PERI_REG_MASK(PMU_RF_PWC_REG, PMU_XPD_PERIF_I2C);
+    //
+    // REGI2C_WRITE_MASK(I2C_DIG_REG, I2C_DIG_REG_ENIF_RTC_DREG, 1);
+    // REGI2C_WRITE_MASK(I2C_DIG_REG, I2C_DIG_REG_ENIF_DIG_DREG, 1);
+    // REGI2C_WRITE_MASK(I2C_DIG_REG, I2C_DIG_REG_XPD_RTC_REG, 0);
+    // REGI2C_WRITE_MASK(I2C_DIG_REG, I2C_DIG_REG_XPD_DIG_REG, 0);
+    // REG_SET_FIELD(PMU_HP_ACTIVE_HP_REGULATOR0_REG,
+    // PMU_HP_ACTIVE_HP_REGULATOR_DBIAS, 25);
+    // REG_SET_FIELD(PMU_HP_SLEEP_LP_REGULATOR0_REG,
+    // PMU_HP_SLEEP_LP_REGULATOR_DBIAS, 26);
 
-    REGI2C_WRITE_MASK(I2C_DIG_REG, I2C_DIG_REG_ENIF_RTC_DREG, 1);
-    REGI2C_WRITE_MASK(I2C_DIG_REG, I2C_DIG_REG_ENIF_DIG_DREG, 1);
-    REGI2C_WRITE_MASK(I2C_DIG_REG, I2C_DIG_REG_XPD_RTC_REG, 0);
-    REGI2C_WRITE_MASK(I2C_DIG_REG, I2C_DIG_REG_XPD_DIG_REG, 0);
-    REG_SET_FIELD(PMU_HP_ACTIVE_HP_REGULATOR0_REG, PMU_HP_ACTIVE_HP_REGULATOR_DBIAS, 25);
-    REG_SET_FIELD(PMU_HP_SLEEP_LP_REGULATOR0_REG, PMU_HP_SLEEP_LP_REGULATOR_DBIAS, 26);
-     */
-
-    pmu.rf_pwc.modify(|_, w|
-        w.perif_i2c_rstb().set_bit().
-          xpd_perif_i2c().set_bit());
+    pmu.rf_pwc
+        .modify(|_, w| w.perif_i2c_rstb().set_bit().xpd_perif_i2c().set_bit());
 
     unsafe {
-        // crate::clock::clocks_ll::regi2c_write_mask(I2C_DIG_REG, I2C_DIG_REG_ENIF_RTC_DREG, 1); use i2c macro from C6 clock
-        regi2c_write_mask(I2C_DIG_REG, I2C_DIG_REG_HOSTID, I2C_DIG_REG_ENIF_RTC_DREG, I2C_DIG_REG_ENIF_RTC_DREG_MSB, I2C_DIG_REG_ENIF_RTC_DREG_LSB, 1);
-        regi2c_write_mask(I2C_DIG_REG, I2C_DIG_REG_HOSTID, I2C_DIG_REG_ENIF_DIG_DREG, I2C_DIG_REG_ENIF_DIG_DREG_MSB, I2C_DIG_REG_ENIF_DIG_DREG_LSB, 1);
+        // crate::clock::clocks_ll::regi2c_write_mask(I2C_DIG_REG,
+        // I2C_DIG_REG_ENIF_RTC_DREG, 1); use i2c macro from C6 clock
+        regi2c_write_mask(
+            I2C_DIG_REG,
+            I2C_DIG_REG_HOSTID,
+            I2C_DIG_REG_ENIF_RTC_DREG,
+            I2C_DIG_REG_ENIF_RTC_DREG_MSB,
+            I2C_DIG_REG_ENIF_RTC_DREG_LSB,
+            1,
+        );
+        regi2c_write_mask(
+            I2C_DIG_REG,
+            I2C_DIG_REG_HOSTID,
+            I2C_DIG_REG_ENIF_DIG_DREG,
+            I2C_DIG_REG_ENIF_DIG_DREG_MSB,
+            I2C_DIG_REG_ENIF_DIG_DREG_LSB,
+            1,
+        );
 
-        regi2c_write_mask(I2C_DIG_REG, I2C_DIG_REG_HOSTID, I2C_DIG_REG_XPD_RTC_REG, I2C_DIG_REG_XPD_RTC_REG_MSB, I2C_DIG_REG_XPD_RTC_REG_LSB, 0);
-        regi2c_write_mask(I2C_DIG_REG, I2C_DIG_REG_HOSTID, I2C_DIG_REG_XPD_DIG_REG, I2C_DIG_REG_XPD_DIG_REG_MSB, I2C_DIG_REG_XPD_DIG_REG_LSB, 0);
+        regi2c_write_mask(
+            I2C_DIG_REG,
+            I2C_DIG_REG_HOSTID,
+            I2C_DIG_REG_XPD_RTC_REG,
+            I2C_DIG_REG_XPD_RTC_REG_MSB,
+            I2C_DIG_REG_XPD_RTC_REG_LSB,
+            0,
+        );
+        regi2c_write_mask(
+            I2C_DIG_REG,
+            I2C_DIG_REG_HOSTID,
+            I2C_DIG_REG_XPD_DIG_REG,
+            I2C_DIG_REG_XPD_DIG_REG_MSB,
+            I2C_DIG_REG_XPD_DIG_REG_LSB,
+            0,
+        );
 
-        pmu.hp_active_hp_regulator0.modify(|_, w|
-            w.hp_active_hp_regulator_dbias().bits(25));
-        pmu.hp_sleep_lp_regulator0.modify(|_, w|
-            w.hp_sleep_lp_regulator_dbias().bits(26));
-
+        pmu.hp_active_hp_regulator0
+            .modify(|_, w| w.hp_active_hp_regulator_dbias().bits(25));
+        pmu.hp_sleep_lp_regulator0
+            .modify(|_, w| w.hp_sleep_lp_regulator_dbias().bits(26));
     }
 }
 
@@ -285,5 +313,5 @@ pub enum SocResetReason {
     /// USB JTAG resets the digital core
     CoreUsbJtag   = 0x16,
     /// JTAG resets CPU
-    Cpu0JtagCpu = 0x18,
+    Cpu0JtagCpu   = 0x18,
 }
