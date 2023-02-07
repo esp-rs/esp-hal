@@ -287,6 +287,30 @@ macro_rules! impl_adc_interface {
 
 pub use impl_adc_interface;
 
+#[cfg(esp32c2)]
+pub mod implementation {
+    //! Analog to digital (ADC) conversion support.
+    //!
+    //! This module provides functions for reading analog values from the
+    //! analog to digital converter available on the ESP32-C2: `ADC1`.
+
+    use embedded_hal::adc::Channel;
+
+    use super::impl_adc_interface;
+    pub use crate::analog::{adc::*, ADC1};
+    use crate::gpio::*;
+
+    impl_adc_interface! {
+        ADC1 [
+            (Gpio0, 0),
+            (Gpio1, 1),
+            (Gpio2, 2),
+            (Gpio3, 3),
+            (Gpio4, 4),
+        ]
+    }
+}
+
 #[cfg(esp32c3)]
 pub mod implementation {
     //! Analog to digital (ADC) conversion support.
@@ -318,12 +342,12 @@ pub mod implementation {
     }
 }
 
-#[cfg(esp32c2)]
+#[cfg(esp32c6)]
 pub mod implementation {
     //! Analog to digital (ADC) conversion support.
     //!
-    //! This module provides functions for reading analog values from the
-    //! analog to digital converter available on the ESP32-C2: `ADC1`.
+    //! This module provides functions for reading analog values from one
+    //! analog to digital converter available on the ESP32-C6: `ADC1`.
 
     use embedded_hal::adc::Channel;
 
@@ -338,6 +362,8 @@ pub mod implementation {
             (Gpio2, 2),
             (Gpio3, 3),
             (Gpio4, 4),
+            (Gpio5, 5),
+            (Gpio6, 6),
         ]
     }
 }

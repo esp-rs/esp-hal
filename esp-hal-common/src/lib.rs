@@ -72,7 +72,7 @@ pub use self::{
 
 #[cfg(aes)]
 pub mod aes;
-// pub mod analog;
+pub mod analog;
 pub mod clock;
 pub mod delay;
 pub mod dma;
