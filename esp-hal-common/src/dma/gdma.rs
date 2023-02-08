@@ -1,7 +1,7 @@
 //! Direct Memory Access
 
 use crate::{
-    dma::gdma::private::*,
+    dma::*,
     peripheral::PeripheralRef,
     system::{Peripheral, PeripheralClockControl},
 };
@@ -263,15 +263,89 @@ macro_rules! impl_channel {
                     let dma = unsafe { &*crate::peripherals::DMA::PTR };
                     dma.[<in_dscr_bf0_ch $num>].read().inlink_dscr_bf0().bits() as usize
                 }
+
+                fn is_listening_in_eof() -> bool {
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
+                    cfg_if::cfg_if! {
+                        if #[cfg(esp32s3)] {
+                            dma.[<in_int_ena_ch $num>].read().in_suc_eof().bit_is_set()
+                        } else {
+                            dma.[<int_ena_ch $num>].read().in_suc_eof().bit_is_set()
+                        }
+                    }
+                }
+                fn is_listening_out_eof() -> bool {
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
+                    cfg_if::cfg_if! {
+                        if #[cfg(esp32s3)] {
+                            dma.[<out_int_ena_ch $num>].read().out_total_eof().bit_is_set()
+                        } else {
+                            dma.[<int_ena_ch $num>].read().out_total_eof().bit_is_set()
+                        }
+                    }
+                }
+
+                fn listen_in_eof() {
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
+                    cfg_if::cfg_if! {
+                        if #[cfg(esp32s3)] {
+                            dma.[<in_int_ena_ch $num>].modify(|_, w| w.in_suc_eof().set_bit())
+                        } else {
+                            dma.[<int_ena_ch $num>].modify(|_, w| w.in_suc_eof().set_bit())
+                        }
+                    }
+                }
+                fn listen_out_eof() {
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
+                    cfg_if::cfg_if! {
+                        if #[cfg(esp32s3)] {
+                            dma.[<out_int_ena_ch $num>].modify(|_, w| w.out_total_eof().set_bit())
+                        } else {
+                            dma.[<int_ena_ch $num>].modify(|_, w| w.out_total_eof().set_bit())
+                        }
+                    }
+                }
+                fn unlisten_in_eof() {
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
+                    cfg_if::cfg_if! {
+                        if #[cfg(esp32s3)] {
+                            dma.[<in_int_ena_ch $num>].modify(|_, w| w.in_suc_eof().clear_bit())
+                        } else {
+                            dma.[<int_ena_ch $num>].modify(|_, w| w.in_suc_eof().clear_bit())
+                        }
+                    }
+                }
+                fn unlisten_out_eof() {
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
+                    cfg_if::cfg_if! {
+                        if #[cfg(esp32s3)] {
+                            dma.[<out_int_ena_ch $num>].modify(|_, w| w.out_total_eof().clear_bit())
+                        } else {
+                            dma.[<int_ena_ch $num>].modify(|_, w| w.out_total_eof().clear_bit())
+                        }
+                    }
+                }
             }
 
             pub struct [<Channel $num TxImpl>] {}
 
-            impl<'a> TxChannel<[<Channel $num>]> for [<Channel $num TxImpl>] {}
+            impl<'a> TxChannel<[<Channel $num>]> for [<Channel $num TxImpl>] {
+                #[cfg(feature = "async")]
+                fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
+                    static WAKER: embassy_sync::waitqueue::AtomicWaker = embassy_sync::waitqueue::AtomicWaker::new();
+                    &WAKER
+                }
+            }
 
             pub struct [<Channel $num RxImpl>] {}
 
-            impl<'a> RxChannel<[<Channel $num>]> for [<Channel $num RxImpl>] {}
+            impl<'a> RxChannel<[<Channel $num>]> for [<Channel $num RxImpl>] {
+                #[cfg(feature = "async")]
+                fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
+                    static WAKER: embassy_sync::waitqueue::AtomicWaker = embassy_sync::waitqueue::AtomicWaker::new();
+                    &WAKER
+                }
+            }
 
             pub struct [<ChannelCreator $num>] {}
 
@@ -337,20 +411,15 @@ macro_rules! impl_channel {
     };
 }
 
-/// Crate private implementatin details
-pub(crate) mod private {
-    use crate::dma::{private::*, *};
-
-    impl_channel!(0);
-    #[cfg(not(esp32c2))]
-    impl_channel!(1);
-    #[cfg(not(esp32c2))]
-    impl_channel!(2);
-    #[cfg(esp32s3)]
-    impl_channel!(3);
-    #[cfg(esp32s3)]
-    impl_channel!(4);
-}
+impl_channel!(0);
+#[cfg(not(esp32c2))]
+impl_channel!(1);
+#[cfg(not(esp32c2))]
+impl_channel!(2);
+#[cfg(esp32s3)]
+impl_channel!(3);
+#[cfg(esp32s3)]
+impl_channel!(4);
 
 /// GDMA Peripheral
 ///

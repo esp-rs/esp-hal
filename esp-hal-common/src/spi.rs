@@ -577,6 +577,147 @@ pub mod dma {
         }
     }
 
+    #[cfg(feature = "async")]
+    mod asynch {
+        use super::*;
+
+        impl<'d, T, TX, RX, P> embedded_hal_async::spi::SpiBusWrite for SpiDma<'d, T, TX, RX, P>
+        where
+            T: InstanceDma<TX, RX>,
+            TX: Tx,
+            RX: Rx,
+            P: SpiPeripheral,
+        {
+            async fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
+                for chunk in words.chunks(MAX_DMA_SIZE) {
+                    self.spi.start_write_bytes_dma(
+                        chunk.as_ptr(),
+                        chunk.len(),
+                        &mut self.channel.tx,
+                    )?;
+
+                    crate::dma::asynch::DmaTxFuture::new(&mut self.channel.tx).await;
+
+                    // FIXME: in the future we should use the peripheral DMA status registers to
+                    // await on both the dma transfer _and_ the peripherals status
+                    self.spi.flush()?;
+                }
+
+                Ok(())
+            }
+        }
+
+        impl<'d, T, TX, RX, P> embedded_hal_async::spi::SpiBusFlush for SpiDma<'d, T, TX, RX, P>
+        where
+            T: InstanceDma<TX, RX>,
+            TX: Tx,
+            RX: Rx,
+            P: SpiPeripheral,
+        {
+            async fn flush(&mut self) -> Result<(), Self::Error> {
+                // TODO use async flush in the future
+                self.spi.flush()
+            }
+        }
+
+        impl<'d, T, TX, RX, P> embedded_hal_async::spi::SpiBusRead for SpiDma<'d, T, TX, RX, P>
+        where
+            T: InstanceDma<TX, RX>,
+            TX: Tx,
+            RX: Rx,
+            P: SpiPeripheral,
+        {
+            async fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+                self.spi.start_read_bytes_dma(
+                    words.as_mut_ptr(),
+                    words.len(),
+                    &mut self.channel.rx,
+                )?;
+
+                crate::dma::asynch::DmaRxFuture::new(&mut self.channel.rx).await;
+
+                Ok(())
+            }
+        }
+
+        impl<'d, T, TX, RX, P> embedded_hal_async::spi::SpiBus for SpiDma<'d, T, TX, RX, P>
+        where
+            T: InstanceDma<TX, RX>,
+            TX: Tx,
+            RX: Rx,
+            P: SpiPeripheral,
+        {
+            async fn transfer<'a>(
+                &'a mut self,
+                read: &'a mut [u8],
+                write: &'a [u8],
+            ) -> Result<(), Self::Error> {
+                let mut idx = 0;
+                loop {
+                    let write_idx = isize::min(idx, write.len() as isize);
+                    let write_len = usize::min(write.len() - idx as usize, MAX_DMA_SIZE);
+
+                    let read_idx = isize::min(idx, read.len() as isize);
+                    let read_len = usize::min(read.len() - idx as usize, MAX_DMA_SIZE);
+
+                    self.spi.start_transfer_dma(
+                        unsafe { write.as_ptr().offset(write_idx) },
+                        write_len,
+                        unsafe { read.as_mut_ptr().offset(read_idx) },
+                        read_len,
+                        &mut self.channel.tx,
+                        &mut self.channel.rx,
+                    )?;
+
+                    embassy_futures::join::join(
+                        crate::dma::asynch::DmaTxFuture::new(&mut self.channel.tx),
+                        crate::dma::asynch::DmaRxFuture::new(&mut self.channel.rx),
+                    )
+                    .await;
+
+                    // FIXME: in the future we should use the peripheral DMA status registers to
+                    // await on both the dma transfer _and_ the peripherals status
+                    self.spi.flush()?;
+
+                    idx += MAX_DMA_SIZE as isize;
+                    if idx >= write.len() as isize && idx >= read.len() as isize {
+                        break;
+                    }
+                }
+
+                Ok(())
+            }
+
+            async fn transfer_in_place<'a>(
+                &'a mut self,
+                words: &'a mut [u8],
+            ) -> Result<(), Self::Error> {
+                for chunk in words.chunks_mut(MAX_DMA_SIZE) {
+                    self.spi.start_transfer_dma(
+                        chunk.as_ptr(),
+                        chunk.len(),
+                        chunk.as_mut_ptr(),
+                        chunk.len(),
+                        &mut self.channel.tx,
+                        &mut self.channel.rx,
+                    )?;
+
+                    embassy_futures::join::join(
+                        crate::dma::asynch::DmaTxFuture::new(&mut self.channel.tx),
+                        crate::dma::asynch::DmaRxFuture::new(&mut self.channel.rx),
+                    )
+                    .await;
+
+                    // FIXME: in the future we should use the peripheral DMA status registers to
+                    // await on both the dma transfer _and_ the peripherals status
+                    self.spi.flush()?;
+                }
+
+                Ok(())
+            }
+        }
+    }
+
     #[cfg(feature = "eh1")]
     mod ehal1 {
         use embedded_hal_1::spi::{SpiBus, SpiBusFlush, SpiBusRead, SpiBusWrite};
