@@ -11,11 +11,14 @@ use embedded_hal::can::{Can, Error, ErrorKind, ExtendedId, Frame, Id, StandardId
 use fugit::HertzU32;
 
 use self::filter::{Filter, FilterType};
+#[cfg(not(esp32c6))]
+use crate::peripherals::twai::RegisterBlock;
+#[cfg(esp32c6)]
+use crate::peripherals::twai0::RegisterBlock;
 use crate::{
     clock::Clocks,
     peripheral::{Peripheral, PeripheralRef},
-    peripherals::twai::RegisterBlock,
-    system::PeripheralClockControl,
+    system::{self, PeripheralClockControl},
     types::{InputSignal, OutputSignal},
     InputPin,
     OutputPin,
@@ -137,6 +140,7 @@ pub enum BaudRate {
     B1000K,
     Custom(TimingConfig),
 }
+
 impl BaudRate {
     /// Convert the BaudRate into the timings that the peripheral needs.
     // These timings are copied from the ESP IDF C driver.
@@ -208,12 +212,12 @@ where
         baud_rate: BaudRate,
     ) -> Self {
         // Enable the peripheral clock for the TWAI peripheral.
-        clock_control.enable(crate::system::Peripheral::Twai);
+        clock_control.enable(T::SYSTEM_PERIPHERAL);
 
         // Set up the GPIO pins.
         crate::into_ref!(tx_pin, rx_pin);
-        tx_pin.connect_peripheral_to_output(OutputSignal::TWAI_TX);
-        rx_pin.connect_input_to_peripheral(InputSignal::TWAI_RX);
+        tx_pin.connect_peripheral_to_output(T::OUTPUT_SIGNAL);
+        rx_pin.connect_input_to_peripheral(T::INPUT_SIGNAL);
 
         crate::into_ref!(peripheral);
         let mut cfg = TwaiConfiguration { peripheral };
@@ -348,6 +352,7 @@ where
             peripheral: self.peripheral,
         }
     }
+
     pub fn receive_error_count(&self) -> u8 {
         self.peripheral
             .register_block()
@@ -356,6 +361,7 @@ where
             .rx_err_cnt()
             .bits()
     }
+
     pub fn transmit_error_count(&self) -> u8 {
         self.peripheral
             .register_block()
@@ -388,6 +394,7 @@ where
             .rx_message_counter()
             .bits()
     }
+
     /// Clear the receive FIFO, discarding any valid, partial, or invalid
     /// packets.
     ///
@@ -417,6 +424,7 @@ pub enum EspTwaiError {
     BusOff,
     EmbeddedHAL(ErrorKind),
 }
+
 impl Error for EspTwaiError {
     fn kind(&self) -> ErrorKind {
         match self {
@@ -569,6 +577,7 @@ where
         // embedded-can/embedded-hal trait.
         nb::Result::Ok(None)
     }
+
     /// Return a received frame if there are any available.
     fn receive(&mut self) -> nb::Result<Self::Frame, Self::Error> {
         let status = self.peripheral.register_block().status.read();
@@ -702,11 +711,47 @@ where
 }
 
 pub trait Instance {
+    const SYSTEM_PERIPHERAL: system::Peripheral;
+
+    const INPUT_SIGNAL: InputSignal;
+    const OUTPUT_SIGNAL: OutputSignal;
+
     fn register_block(&self) -> &RegisterBlock;
 }
 
-#[cfg(any(esp32s3, esp32c3))]
+#[cfg(any(esp32c3, esp32s3))]
 impl Instance for crate::peripherals::TWAI {
+    const SYSTEM_PERIPHERAL: system::Peripheral = system::Peripheral::Twai;
+
+    const INPUT_SIGNAL: InputSignal = InputSignal::TWAI_RX;
+    const OUTPUT_SIGNAL: OutputSignal = OutputSignal::TWAI_TX;
+
+    #[inline(always)]
+    fn register_block(&self) -> &RegisterBlock {
+        self
+    }
+}
+
+#[cfg(esp32c6)]
+impl Instance for crate::peripherals::TWAI0 {
+    const SYSTEM_PERIPHERAL: system::Peripheral = system::Peripheral::Twai0;
+
+    const INPUT_SIGNAL: InputSignal = InputSignal::TWAI0_RX;
+    const OUTPUT_SIGNAL: OutputSignal = OutputSignal::TWAI0_TX;
+
+    #[inline(always)]
+    fn register_block(&self) -> &RegisterBlock {
+        self
+    }
+}
+
+#[cfg(esp32c6)]
+impl Instance for crate::peripherals::TWAI1 {
+    const SYSTEM_PERIPHERAL: system::Peripheral = system::Peripheral::Twai1;
+
+    const INPUT_SIGNAL: InputSignal = InputSignal::TWAI1_RX;
+    const OUTPUT_SIGNAL: OutputSignal = OutputSignal::TWAI1_TX;
+
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
         self

@@ -301,17 +301,18 @@ macro_rules! impl_channel {
                 fn is_listening_in_eof() -> bool {
                     let dma = unsafe { &*crate::peripherals::DMA::PTR };
                     cfg_if::cfg_if! {
-                        if #[cfg(esp32s3)] {
+                        if #[cfg(any(esp32c6, esp32s3))] {
                             dma.[<in_int_ena_ch $num>].read().in_suc_eof().bit_is_set()
                         } else {
                             dma.[<int_ena_ch $num>].read().in_suc_eof().bit_is_set()
                         }
                     }
                 }
+
                 fn is_listening_out_eof() -> bool {
                     let dma = unsafe { &*crate::peripherals::DMA::PTR };
                     cfg_if::cfg_if! {
-                        if #[cfg(esp32s3)] {
+                        if #[cfg(any(esp32c6, esp32s3))] {
                             dma.[<out_int_ena_ch $num>].read().out_total_eof().bit_is_set()
                         } else {
                             dma.[<int_ena_ch $num>].read().out_total_eof().bit_is_set()
@@ -322,37 +323,40 @@ macro_rules! impl_channel {
                 fn listen_in_eof() {
                     let dma = unsafe { &*crate::peripherals::DMA::PTR };
                     cfg_if::cfg_if! {
-                        if #[cfg(esp32s3)] {
+                        if #[cfg(any(esp32c6, esp32s3))] {
                             dma.[<in_int_ena_ch $num>].modify(|_, w| w.in_suc_eof().set_bit())
                         } else {
                             dma.[<int_ena_ch $num>].modify(|_, w| w.in_suc_eof().set_bit())
                         }
                     }
                 }
+
                 fn listen_out_eof() {
                     let dma = unsafe { &*crate::peripherals::DMA::PTR };
                     cfg_if::cfg_if! {
-                        if #[cfg(esp32s3)] {
+                        if #[cfg(any(esp32c6, esp32s3))] {
                             dma.[<out_int_ena_ch $num>].modify(|_, w| w.out_total_eof().set_bit())
                         } else {
                             dma.[<int_ena_ch $num>].modify(|_, w| w.out_total_eof().set_bit())
                         }
                     }
                 }
+
                 fn unlisten_in_eof() {
                     let dma = unsafe { &*crate::peripherals::DMA::PTR };
                     cfg_if::cfg_if! {
-                        if #[cfg(esp32s3)] {
+                        if #[cfg(any(esp32c6, esp32s3))] {
                             dma.[<in_int_ena_ch $num>].modify(|_, w| w.in_suc_eof().clear_bit())
                         } else {
                             dma.[<int_ena_ch $num>].modify(|_, w| w.in_suc_eof().clear_bit())
                         }
                     }
                 }
+
                 fn unlisten_out_eof() {
                     let dma = unsafe { &*crate::peripherals::DMA::PTR };
                     cfg_if::cfg_if! {
-                        if #[cfg(esp32s3)] {
+                        if #[cfg(any(esp32c6, esp32s3))] {
                             dma.[<out_int_ena_ch $num>].modify(|_, w| w.out_total_eof().clear_bit())
                         } else {
                             dma.[<int_ena_ch $num>].modify(|_, w| w.out_total_eof().clear_bit())

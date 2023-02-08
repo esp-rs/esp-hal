@@ -104,8 +104,8 @@ pub mod system;
 #[cfg(systimer)]
 pub mod systimer;
 pub mod timer;
-// #[cfg(any(esp32s3, esp32c3, esp32c6))]
-// pub mod twai;
+#[cfg(any(esp32c3, esp32c6, esp32s3))]
+pub mod twai;
 pub mod uart;
 #[cfg(usb_serial_jtag)]
 pub mod usb_serial_jtag;
