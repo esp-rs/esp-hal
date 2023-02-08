@@ -64,6 +64,7 @@ pub use self::{
     delay::Delay,
     gpio::*,
     interrupt::*,
+    rng::Rng,
     rtc_cntl::{Rtc, Rwdt},
     spi::Spi,
     timer::Timer,
