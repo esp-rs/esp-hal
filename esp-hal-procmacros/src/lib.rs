@@ -15,7 +15,11 @@ use syn::{
     Type,
     Visibility,
 };
-use syn::{parse_macro_input, AttributeArgs};
+use syn::{
+    parse::{Parse, ParseStream},
+    parse_macro_input,
+    AttributeArgs,
+};
 
 #[derive(Debug, Default, FromMeta)]
 #[darling(default)]
@@ -305,4 +309,100 @@ fn extract_cfgs(attrs: Vec<Attribute>) -> (Vec<Attribute>, Vec<Attribute>) {
     }
 
     (cfgs, not_cfgs)
+}
+
+#[derive(Debug)]
+struct MakeGpioEnumDispatchMacro {
+    name: String,
+    filter: Vec<String>,
+    elements: Vec<(String, usize)>,
+}
+
+impl Parse for MakeGpioEnumDispatchMacro {
+    fn parse(input: ParseStream) -> syn::parse::Result<Self> {
+        let name = input.parse::<syn::Ident>()?.to_string();
+        let filter = input
+            .parse::<proc_macro2::Group>()?
+            .stream()
+            .into_iter()
+            .map(|v| match v {
+                proc_macro2::TokenTree::Group(_) => String::new(),
+                proc_macro2::TokenTree::Ident(ident) => ident.to_string(),
+                proc_macro2::TokenTree::Punct(_) => String::new(),
+                proc_macro2::TokenTree::Literal(_) => String::new(),
+            })
+            .filter(|p| !p.is_empty())
+            .collect();
+
+        let mut stream = input.parse::<proc_macro2::Group>()?.stream().into_iter();
+
+        let mut elements = vec![];
+
+        let mut element_name = String::new();
+        loop {
+            match stream.next() {
+                Some(v) => match v {
+                    proc_macro2::TokenTree::Ident(ident) => {
+                        element_name = ident.to_string();
+                    }
+                    proc_macro2::TokenTree::Literal(lit) => {
+                        let index = lit.to_string().parse().unwrap();
+                        elements.push((element_name.clone(), index));
+                    }
+                    _ => (),
+                },
+                None => break,
+            }
+        }
+
+        Ok(MakeGpioEnumDispatchMacro {
+            name,
+            filter,
+            elements,
+        })
+    }
+}
+
+#[proc_macro]
+pub fn make_gpio_enum_dispatch_macro(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as MakeGpioEnumDispatchMacro);
+
+    let mut arms = Vec::new();
+
+    for (gpio_type, num) in input.elements {
+        let enum_name = quote::format_ident!("ErasedPin");
+        let variant_name = quote::format_ident!("Gpio{}", num);
+
+        if input.filter.contains(&gpio_type) {
+            let arm = {
+                quote! { #enum_name::#variant_name($target) => $body }
+            };
+            arms.push(arm);
+        } else {
+            let arm = {
+                quote! {
+                    #[allow(unused)]
+                    #enum_name::#variant_name($target) => { panic!("Unsupported") }
+                }
+            };
+            arms.push(arm);
+        }
+    }
+
+    let macro_name = quote::format_ident!("{}", input.name);
+
+    quote! {
+        #[doc(hidden)]
+        #[macro_export]
+        macro_rules! #macro_name {
+            ($m:ident, $target:ident, $body:block) => {
+                match $m {
+                    #(#arms)*
+                }
+            }
+        }
+
+        pub(crate) use #macro_name;
+    }
+    .into()
 }
