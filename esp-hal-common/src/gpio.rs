@@ -1360,7 +1360,7 @@ impl<MODE, RA, IRA, PINTYPE, SIG, const GPIONUM: u8> GpioPin<MODE, RA, IRA, PINT
 where
     RA: BankGpioRegisterAccess,
     IRA: InteruptStatusRegisterAccess,
-    PINTYPE: IsOutputPin,
+    PINTYPE: IsAnalogPin,
     SIG: GpioSignal,
 {
     pub fn into_analog(self) -> GpioPin<Analog, RA, IRA, PINTYPE, SIG, GPIONUM> {
