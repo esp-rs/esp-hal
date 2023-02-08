@@ -74,6 +74,14 @@ required-features = ["eh1"]
 name              = "spi_eh1_device_loopback"
 required-features = ["eh1"]
 
+[[example]]
+name              = "embassy_hello_world"
+required-features = ["async", "embassy"]
+
+[[example]]
+name              = "embassy_wait"
+required-features = ["async", "embassy"]
+
 # [[example]]
-# name              = "embassy_hello_world"
-# required-features = ["embassy"]
+# name              = "embassy_spi"
+# required-features = ["async", "embassy"]
