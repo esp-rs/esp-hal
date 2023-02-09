@@ -43,7 +43,7 @@ critical-section  = "1.1.1"
 embassy-executor  = { package = "embassy-executor", git = "https://github.com/embassy-rs/embassy/", rev = "cd9a65b", features = ["nightly", "integrated-timers"] }
 embedded-graphics = "0.7.1"
 esp-backtrace     = { git = "https://github.com/jessebraham/esp-backtrace", branch = "feature/chip-support", features = ["esp32c6", "panic-handler", "exception-handler", "print-uart"] }
-esp-println       = { git = "https://github.com/esp-rs/esp-println", rev = "fc4e9cf", features = ["esp32c6"] }
+esp-println       = { git = "https://github.com/esp-rs/esp-println", rev = "316b5b9", features = ["esp32c6"] }
 sha2              = { version = "0.10.6", default-features = false}
 smart-leds        = "0.3.0"
 ssd1306           = "0.7.1"
@@ -60,7 +60,7 @@ vectored             = ["esp-hal-common/vectored"]
 async                = ["esp-hal-common/async", "embedded-hal-async"]
 embassy              = ["esp-hal-common/embassy"]
 embassy-time-systick = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-hz-16_000_000"]
-embassy-time-timg0 = ["esp-hal-common/embassy-time-timg0", "embassy-time/tick-hz-1_000_000"]
+embassy-time-timg0   = ["esp-hal-common/embassy-time-timg0",   "embassy-time/tick-hz-1_000_000"]
 
 [[example]]
 name              = "hello_rgb"
