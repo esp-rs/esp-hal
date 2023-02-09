@@ -721,7 +721,6 @@ impl WatchdogDisable for Rwdt {
     }
 }
 
-#[cfg(not(esp32c6))]
 impl WatchdogEnable for Rwdt {
     type Time = MicrosDurationU64;
 
@@ -733,6 +732,7 @@ impl WatchdogEnable for Rwdt {
         let rtc_cntl = unsafe { &*RTC_CNTL::PTR };
         #[cfg(esp32c6)]
         let rtc_cntl = unsafe { &*LP_WDT::PTR };
+
         let timeout_raw = (period.into().to_millis() * (RtcClock::cycles_to_1ms() as u64)) as u32;
         self.set_write_protection(false);
 
@@ -742,7 +742,12 @@ impl WatchdogEnable for Rwdt {
                 .wdtconfig1
                 .modify(|_, w| w.wdt_stg0_hold().bits(timeout_raw));
 
-            #[cfg(not(esp32))]
+            #[cfg(esp32c6)]
+            (&*LP_WDT::PTR)
+                .config1
+                .modify(|_, w| w.wdt_stg0_hold().bits(timeout_raw));
+
+            #[cfg(not(any(esp32, esp32c6)))]
             rtc_cntl.wdtconfig1.modify(|_, w| {
                 w.wdt_stg0_hold()
                     .bits(timeout_raw >> (1 + Efuse::get_rwdt_multiplier()))

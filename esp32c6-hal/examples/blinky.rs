@@ -46,13 +46,8 @@ fn main() -> ! {
     // loop.
     let mut delay = Delay::new(&clocks);
 
-    // just for testing ... remove this
-    let rst_reason = unsafe { (0x600b0410 as *mut u32).read_volatile() & 0b11111 };
-    esp_println::println!("raw rst reason {} 0x{:x}", rst_reason, rst_reason);
-
     loop {
-        esp_println::println!("blinky");
         led.toggle().unwrap();
-        delay.delay_ms(2000u32);
+        delay.delay_ms(500u32);
     }
 }
