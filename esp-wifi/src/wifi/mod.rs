@@ -567,6 +567,10 @@ unsafe extern "C" fn recv_cb(
             let packet = DataFrame::from_bytes(src);
             queue.enqueue(packet).unwrap();
             esp_wifi_internal_free_rx_buffer(eb);
+
+            #[cfg(feature = "embassy-net")]
+            embassy::RECEIVE_WAKER.wake();
+
             0
         } else {
             1
@@ -805,6 +809,9 @@ pub fn send_data_if_needed() {
                 log::trace!("esp_wifi_internal_tx {}", _res);
             }
         }
+
+        #[cfg(feature = "embassy-net")]
+        embassy::TRANSMIT_WAKER.wake();
     });
 }
 
@@ -1058,4 +1065,112 @@ macro_rules! esp_wifi_result {
             core::result::Result::<(), WifiError>::Ok(())
         }
     };
+}
+
+#[cfg(feature = "embassy-net")]
+pub(crate) mod embassy {
+    use super::*;
+    use embassy_net_driver::{Capabilities, Driver, RxToken, TxToken};
+    use embassy_sync::waitqueue::AtomicWaker;
+
+    pub(crate) static TRANSMIT_WAKER: AtomicWaker = AtomicWaker::new();
+    pub(crate) static RECEIVE_WAKER: AtomicWaker = AtomicWaker::new();
+
+    impl RxToken for WifiRxToken {
+        fn consume<R, F>(self, f: F) -> R
+        where
+            F: FnOnce(&mut [u8]) -> R,
+        {
+            critical_section::with(|cs| {
+                let mut queue = DATA_QUEUE_RX.borrow_ref_mut(cs);
+
+                let mut data = queue.dequeue().expect(
+                    "unreachable: transmit()/receive() ensures there is a packet to process",
+                );
+                let buffer =
+                    unsafe { core::slice::from_raw_parts(&data.data as *const u8, data.len) };
+                dump_packet_info(&buffer);
+                f(&mut data.data[..])
+            })
+        }
+    }
+
+    impl TxToken for WifiTxToken {
+        fn consume<R, F>(self, len: usize, f: F) -> R
+        where
+            F: FnOnce(&mut [u8]) -> R,
+        {
+            let res = critical_section::with(|cs| {
+                let mut queue = DATA_QUEUE_TX.borrow_ref_mut(cs);
+
+                let mut packet = DataFrame::new();
+                packet.len = len;
+                let res = f(&mut packet.data[..len]);
+                queue
+                    .enqueue(packet)
+                    .expect("unreachable: transmit()/receive() ensures there is a buffer free");
+                res
+            });
+
+            send_data_if_needed();
+            res
+        }
+    }
+
+    impl Driver for WifiDevice {
+        type RxToken<'a> = WifiRxToken
+    where
+        Self: 'a;
+
+        type TxToken<'a> = WifiTxToken
+    where
+        Self: 'a;
+
+        fn receive(
+            &mut self,
+            cx: &mut core::task::Context,
+        ) -> Option<(Self::RxToken<'_>, Self::TxToken<'_>)> {
+            RECEIVE_WAKER.register(cx.waker());
+            critical_section::with(|cs| {
+                let rx = DATA_QUEUE_RX.borrow_ref_mut(cs);
+                let tx = DATA_QUEUE_TX.borrow_ref_mut(cs);
+                if !rx.is_empty() && !tx.is_full() {
+                    Some((WifiRxToken::default(), WifiTxToken::default()))
+                } else {
+                    None
+                }
+            })
+        }
+
+        fn transmit(&mut self, cx: &mut core::task::Context) -> Option<Self::TxToken<'_>> {
+            TRANSMIT_WAKER.register(cx.waker());
+            critical_section::with(|cs| {
+                let tx = DATA_QUEUE_TX.borrow_ref_mut(cs);
+                if !tx.is_full() {
+                    Some(WifiTxToken::default())
+                } else {
+                    None
+                }
+            })
+        }
+
+        fn link_state(&mut self, _cx: &mut core::task::Context) -> embassy_net_driver::LinkState {
+            // TODO once we have an async way of connecting to wifi, use here
+            // for now just assume the link is up
+            embassy_net_driver::LinkState::Up
+        }
+
+        fn capabilities(&self) -> Capabilities {
+            let mut caps = Capabilities::default();
+            caps.max_transmission_unit = 1514;
+            caps.max_burst_size = Some(1);
+            caps
+        }
+
+        fn ethernet_address(&self) -> [u8; 6] {
+            let mut mac = [0; 6];
+            get_sta_mac(&mut mac);
+            mac
+        }
+    }
 }
