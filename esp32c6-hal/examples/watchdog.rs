@@ -28,12 +28,13 @@ fn main() -> ! {
     let mut timer0 = timer_group0.timer0;
     let mut wdt0 = timer_group0.wdt;
     let timer_group1 = TimerGroup::new(peripherals.TIMG1, &clocks);
-    let _wdt1 = timer_group1.wdt;
+    let mut wdt1 = timer_group1.wdt;
 
     // Disable watchdog timers
     rtc.swd.disable();
     rtc.rwdt.disable();
     wdt0.start(2u64.secs());
+    wdt1.disable();
 
     timer0.start(1u64.secs());
 

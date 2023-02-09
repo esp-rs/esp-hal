@@ -30,16 +30,19 @@ fn main() -> ! {
     let system = peripherals.PCR.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
+    // Disable the watchdog timers. For the ESP32-C6, this includes the Super WDT,
+    // and the TIMG WDTs.
     let mut rtc = Rtc::new(peripherals.LP_CLKRST);
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let mut timer0 = timer_group0.timer0;
-    let _wdt0 = timer_group0.wdt;
+    let mut wdt0 = timer_group0.wdt;
     let timer_group1 = TimerGroup::new(peripherals.TIMG1, &clocks);
-    let _wdt1 = timer_group1.wdt;
+    let mut wdt1 = timer_group1.wdt;
 
-    // Disable watchdog timers
     rtc.swd.disable();
     rtc.rwdt.disable();
+    wdt0.disable();
+    wdt1.disable();
 
     let config = Config {
         baudrate: 115200,

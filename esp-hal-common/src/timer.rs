@@ -566,9 +566,25 @@ where
 {
     /// Create a new watchdog timer instance
     pub fn new() -> Self {
+        #[cfg(esp32c6)]
+        Self::enable_clock();
         Self {
             phantom: PhantomData::default(),
         }
+    }
+
+    #[cfg(esp32c6)]
+    fn enable_clock() {
+        let pcr = unsafe { &*crate::peripherals::PCR::ptr() };
+        pcr.timergroup0_wdt_clk_conf
+            .write(|w| w.tg0_wdt_clk_en().set_bit());
+        pcr.timergroup0_wdt_clk_conf
+            .write(|w| unsafe { w.tg0_wdt_clk_sel().bits(1) });
+
+        pcr.timergroup1_timer_clk_conf
+            .write(|w| w.tg1_timer_clk_en().set_bit());
+        pcr.timergroup1_timer_clk_conf
+            .write(|w| unsafe { w.tg1_timer_clk_sel().bits(1) });
     }
 
     fn set_wdt_enabled(&mut self, enabled: bool) {

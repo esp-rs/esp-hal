@@ -30,18 +30,19 @@ fn main() -> ! {
 
     // Disable the watchdog timers. For the ESP32-C6, this includes the Super WDT,
     // and the TIMG WDTs.
+    let mut rtc = Rtc::new(peripherals.LP_CLKRST);
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let mut timer0 = timer_group0.timer0;
-    let _wdt0 = timer_group0.wdt;
+    let mut wdt0 = timer_group0.wdt;
     let timer_group1 = TimerGroup::new(peripherals.TIMG1, &clocks);
     let mut timer1 = timer_group1.timer0;
-    let _wdt1 = timer_group1.wdt;
+    let mut wdt1 = timer_group1.wdt;
 
-    let mut rtc = Rtc::new(peripherals.LP_CLKRST);
-
-    // Disable MWDT and RWDT (Watchdog) flash boot protection
-    rtc.rwdt.disable();
+    // Disable watchdog timers
     rtc.swd.disable();
+    rtc.rwdt.disable();
+    wdt0.disable();
+    wdt1.disable();
 
     interrupt::enable(
         peripherals::Interrupt::TG0_T0_LEVEL,
@@ -83,7 +84,7 @@ fn TG0_T0_LEVEL() {
         let timer0 = timer0.as_mut().unwrap();
 
         timer0.clear_interrupt();
-        timer0.start(10000u64.millis());
+        timer0.start(500u64.millis());
     });
 }
 
@@ -96,6 +97,6 @@ fn TG1_T0_LEVEL() {
         let timer1 = timer1.as_mut().unwrap();
 
         timer1.clear_interrupt();
-        timer1.start(19500u64.millis());
+        timer1.start(1u64.secs());
     });
 }

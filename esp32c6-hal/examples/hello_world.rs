@@ -25,13 +25,18 @@ fn main() -> ! {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let mut uart0 = Uart::new(peripherals.UART0);
+    let mut rtc = Rtc::new(peripherals.LP_CLKRST);
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let mut timer0 = timer_group0.timer0;
-    let _wdt0 = timer_group0.wdt;
+    let mut wdt0 = timer_group0.wdt;
     let timer_group1 = TimerGroup::new(peripherals.TIMG1, &clocks);
-    let _wdt1 = timer_group1.wdt;
+    let mut wdt1 = timer_group1.wdt;
 
-    let _rtc = Rtc::new(peripherals.LP_CLKRST);
+    // Disable watchdog timers
+    rtc.swd.disable();
+    rtc.rwdt.disable();
+    wdt0.disable();
+    wdt1.disable();
 
     timer0.start(1u64.secs());
 

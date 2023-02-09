@@ -41,12 +41,15 @@ fn main() -> ! {
     // the RTC WDT, and the TIMG WDTs.
     let mut rtc = Rtc::new(peripherals.LP_CLKRST);
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    let _wdt0 = timer_group0.wdt;
+    let mut wdt0 = timer_group0.wdt;
     let timer_group1 = TimerGroup::new(peripherals.TIMG1, &clocks);
-    let _wdt1 = timer_group1.wdt;
+    let mut wdt1 = timer_group1.wdt;
 
+    // Disable watchdog timers
     rtc.swd.disable();
     rtc.rwdt.disable();
+    wdt0.disable();
+    wdt1.disable();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let sclk = io.pins.gpio6;

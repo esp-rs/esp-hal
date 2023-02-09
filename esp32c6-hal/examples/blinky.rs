@@ -23,14 +23,18 @@ fn main() -> ! {
     let system = peripherals.PCR.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    let _wdt0 = timer_group0.wdt;
-    let timer_group1 = TimerGroup::new(peripherals.TIMG1, &clocks);
-    let _wdt1 = timer_group1.wdt;
-
+    // Disable the watchdog timers. For the ESP32-C6, this includes the Super WDT,
+    // and the TIMG WDTs.
     let mut rtc = Rtc::new(peripherals.LP_CLKRST);
-    rtc.rwdt.disable();
+    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let mut wdt0 = timer_group0.wdt;
+    let timer_group1 = TimerGroup::new(peripherals.TIMG1, &clocks);
+    let mut wdt1 = timer_group1.wdt;
+
     rtc.swd.disable();
+    rtc.rwdt.disable();
+    wdt0.disable();
+    wdt1.disable();
 
     // Set GPIO5 as an output, and set its state high initially.
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
