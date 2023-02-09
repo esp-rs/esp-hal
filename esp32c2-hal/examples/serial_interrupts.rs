@@ -13,6 +13,7 @@ use esp32c2_hal::{
     interrupt,
     peripherals::{self, Peripherals, UART0},
     prelude::*,
+    riscv,
     timer::TimerGroup,
     uart::config::AtCmdConfig,
     Cpu,
@@ -20,7 +21,6 @@ use esp32c2_hal::{
     Uart,
 };
 use esp_backtrace as _;
-use esp_riscv_rt::{entry, riscv};
 use nb::block;
 
 static SERIAL: Mutex<RefCell<Option<Uart<UART0>>>> = Mutex::new(RefCell::new(None));

@@ -34,8 +34,6 @@ embedded-hal-nb    = { version = "=1.0.0-alpha.1", optional = true }
 embedded-can       = { version = "0.4.1", optional = true }
 esp-hal-common     = { version = "0.5.0",  features = ["esp32s3"], path = "../esp-hal-common" }
 r0                 = { version = "1.0.0",  optional = true }
-xtensa-lx          = { version = "0.7.0",  features = ["esp32s3"] }
-xtensa-lx-rt       = { version = "0.14.0", features = ["esp32s3"], optional = true }
 
 [dev-dependencies]
 critical-section  = "1.1.1"
@@ -55,14 +53,14 @@ aes = "0.8.2"
 default              = ["rt", "vectored"]
 direct-boot          = ["r0"]
 eh1                  = ["esp-hal-common/eh1", "dep:embedded-hal-1", "dep:embedded-hal-nb", "dep:embedded-can"]
-rt                   = ["xtensa-lx-rt/esp32s3"]
+rt                   = []
 smartled             = ["esp-hal-common/smartled"]
 ufmt                 = ["esp-hal-common/ufmt"]
 vectored             = ["esp-hal-common/vectored"]
 async                = ["esp-hal-common/async", "embedded-hal-async"]
 embassy              = ["esp-hal-common/embassy"]
 embassy-time-systick = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-hz-16_000_000"]
-embassy-time-timg0    = ["esp-hal-common/embassy-time-timg0", "embassy-time/tick-hz-1_000_000"]
+embassy-time-timg0   = ["esp-hal-common/embassy-time-timg0", "embassy-time/tick-hz-1_000_000"]
 
 [[example]]
 name              = "hello_rgb"

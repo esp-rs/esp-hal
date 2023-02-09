@@ -34,7 +34,7 @@ async fn ping(mut pin: Gpio0<Input<PullDown>>) {
 
 static EXECUTOR: StaticCell<Executor> = StaticCell::new();
 
-#[xtensa_lx_rt::entry]
+#[entry]
 fn main() -> ! {
     esp_println::println!("Init!");
     let peripherals = Peripherals::take();

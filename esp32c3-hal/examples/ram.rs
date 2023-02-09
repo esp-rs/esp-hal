@@ -17,7 +17,6 @@ use esp32c3_hal::{
 };
 use esp_backtrace as _;
 use esp_println::println;
-use esp_riscv_rt::entry;
 use nb::block;
 
 #[ram(rtc_fast)]

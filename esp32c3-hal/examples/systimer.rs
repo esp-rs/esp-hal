@@ -20,7 +20,6 @@ use esp32c3_hal::{
 };
 use esp_backtrace as _;
 use esp_println::println;
-use esp_riscv_rt::entry;
 
 static ALARM0: Mutex<RefCell<Option<Alarm<Periodic, 0>>>> = Mutex::new(RefCell::new(None));
 static ALARM1: Mutex<RefCell<Option<Alarm<Target, 1>>>> = Mutex::new(RefCell::new(None));

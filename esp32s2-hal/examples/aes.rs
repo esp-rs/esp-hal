@@ -10,12 +10,13 @@ use esp32s2_hal::{
     peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
+    xtensa_lx,
     Rtc,
 };
 use esp_backtrace as _;
 use esp_println::println;
 
-#[xtensa_lx_rt::entry]
+#[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
     let mut system = peripherals.SYSTEM.split();

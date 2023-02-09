@@ -18,7 +18,6 @@ use esp32_hal::{
     Rtc,
 };
 use esp_backtrace as _;
-use xtensa_lx_rt::entry;
 
 static TIMER00: Mutex<RefCell<Option<Timer<Timer0<TIMG0>>>>> = Mutex::new(RefCell::new(None));
 static TIMER01: Mutex<RefCell<Option<Timer<Timer1<TIMG0>>>>> = Mutex::new(RefCell::new(None));

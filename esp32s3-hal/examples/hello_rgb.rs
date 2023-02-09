@@ -31,7 +31,6 @@ use smart_leds::{
     hsv::{hsv2rgb, Hsv},
     SmartLedsWrite,
 };
-use xtensa_lx_rt::entry;
 
 #[entry]
 fn main() -> ! {

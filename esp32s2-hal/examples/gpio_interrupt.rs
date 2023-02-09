@@ -5,6 +5,7 @@
 
 #![no_std]
 #![no_main]
+#![feature(asm_experimental_arch)]
 
 use core::cell::RefCell;
 
@@ -17,12 +18,11 @@ use esp32s2_hal::{
     peripherals::{self, Peripherals},
     prelude::*,
     timer::TimerGroup,
+    xtensa_lx,
     Delay,
     Rtc,
 };
 use esp_backtrace as _;
-use xtensa_atomic_emulation_trap as _;
-use xtensa_lx_rt::entry;
 
 static BUTTON: Mutex<RefCell<Option<Gpio0<Input<PullDown>>>>> = Mutex::new(RefCell::new(None));
 
@@ -77,21 +77,4 @@ fn GPIO() {
             .unwrap()
             .clear_interrupt()
     });
-}
-
-#[xtensa_lx_rt::exception]
-fn exception(
-    cause: xtensa_lx_rt::exception::ExceptionCause,
-    frame: xtensa_lx_rt::exception::Context,
-) {
-    use esp_println::*;
-
-    println!("\n\nException occured {:?} {:x?}", cause, frame);
-
-    let backtrace = esp_backtrace::arch::backtrace();
-    for b in backtrace.iter() {
-        if let Some(addr) = b {
-            println!("0x{:x}", addr)
-        }
-    }
 }

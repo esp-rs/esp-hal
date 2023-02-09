@@ -21,7 +21,6 @@ use esp32s3_hal::{
 };
 use esp_backtrace as _;
 use nb::block;
-use xtensa_lx_rt::entry;
 
 static USB_SERIAL: Mutex<RefCell<Option<UsbSerialJtag<USB_DEVICE>>>> =
     Mutex::new(RefCell::new(None));

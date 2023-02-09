@@ -39,7 +39,7 @@ async fn run2() {
 
 static EXECUTOR: StaticCell<Executor> = StaticCell::new();
 
-#[xtensa_lx_rt::entry]
+#[entry]
 fn main() -> ! {
     esp_println::println!("Init!");
     let peripherals = Peripherals::take();
@@ -65,21 +65,4 @@ fn main() -> ! {
         spawner.spawn(run1()).ok();
         spawner.spawn(run2()).ok();
     });
-}
-
-#[xtensa_lx_rt::exception]
-fn exception(
-    cause: xtensa_lx_rt::exception::ExceptionCause,
-    frame: xtensa_lx_rt::exception::Context,
-) {
-    use esp_println::*;
-
-    println!("\n\nException occured {:?} {:x?}", cause, frame);
-
-    let backtrace = esp_backtrace::arch::backtrace();
-    for b in backtrace.iter() {
-        if let Some(addr) = b {
-            println!("0x{:x}", addr)
-        }
-    }
 }

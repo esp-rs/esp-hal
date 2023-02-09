@@ -16,7 +16,6 @@ use esp32s2_hal::{
 };
 use esp_backtrace as _;
 use usb_device::prelude::{UsbDeviceBuilder, UsbVidPid};
-use xtensa_lx_rt::entry;
 
 static mut EP_MEMORY: [u32; 1024] = [0; 1024];
 

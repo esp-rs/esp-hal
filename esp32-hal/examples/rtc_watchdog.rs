@@ -18,7 +18,6 @@ use esp32_hal::{
     Rwdt,
 };
 use esp_backtrace as _;
-use xtensa_lx_rt::entry;
 
 static RWDT: Mutex<RefCell<Option<Rwdt>>> = Mutex::new(RefCell::new(None));
 

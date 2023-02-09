@@ -9,6 +9,7 @@ pub use esp_hal_common::{
     clock,
     dma::{self, gdma},
     efuse,
+    entry,
     gpio,
     i2c,
     interrupt,
@@ -16,11 +17,13 @@ pub use esp_hal_common::{
     macros,
     peripherals,
     prelude,
+    riscv,
     sha,
     spi,
     system,
     systimer,
     timer,
+    trapframe,
     uart,
     Cpu,
     Delay,
@@ -50,7 +53,7 @@ extern "C" {
 
 #[cfg(feature = "direct-boot")]
 #[doc(hidden)]
-#[esp_riscv_rt::pre_init]
+#[esp_hal_common::esp_riscv_rt::pre_init]
 unsafe fn init() {
     r0::init_data(&mut _srwtext, &mut _erwtext, &_irwtext);
 }

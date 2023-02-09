@@ -17,8 +17,6 @@ use esp32s2_hal::{
 };
 use esp_backtrace as _;
 use esp_println::println;
-use xtensa_atomic_emulation_trap as _;
-use xtensa_lx_rt::entry;
 
 #[entry]
 fn main() -> ! {
@@ -53,22 +51,5 @@ fn main() -> ! {
         let pin3_value: u16 = nb::block!(adc1.read(&mut pin3)).unwrap();
         println!("PIN3 ADC reading = {}", pin3_value);
         delay.delay_ms(1500u32);
-    }
-}
-
-#[xtensa_lx_rt::exception]
-fn exception(
-    cause: xtensa_lx_rt::exception::ExceptionCause,
-    frame: xtensa_lx_rt::exception::Context,
-) {
-    use esp_println::*;
-
-    println!("\n\nException occured {:?} {:x?}", cause, frame);
-
-    let backtrace = esp_backtrace::arch::backtrace();
-    for b in backtrace.iter() {
-        if let Some(addr) = b {
-            println!("0x{:x}", addr)
-        }
     }
 }

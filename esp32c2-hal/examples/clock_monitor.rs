@@ -13,10 +13,10 @@ use esp32c2_hal::{
     interrupt,
     peripherals::{self, Peripherals},
     prelude::*,
+    riscv,
     Rtc,
 };
 use esp_backtrace as _;
-use esp_riscv_rt::{entry, riscv};
 
 static RTC: Mutex<RefCell<Option<Rtc>>> = Mutex::new(RefCell::new(None));
 

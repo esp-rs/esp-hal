@@ -134,6 +134,8 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
 #[cfg(feature = "interrupt")]
 #[proc_macro_attribute]
 pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
+    use proc_macro_crate::{crate_name, FoundCrate};
+
     let mut f: ItemFn = syn::parse(input).expect("`#[interrupt]` must be applied to a function");
 
     let attr_args = parse_macro_input!(args as AttributeArgs);
@@ -200,10 +202,46 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
         &format!("__esp_hal_internal_{}", f.sig.ident),
         proc_macro2::Span::call_site(),
     );
+
+    #[cfg(feature = "esp32")]
+    let hal_crate = crate_name("esp32-hal");
+    #[cfg(feature = "esp32s2")]
+    let hal_crate = crate_name("esp32s2-hal");
+    #[cfg(feature = "esp32s3")]
+    let hal_crate = crate_name("esp32s3-hal");
+    #[cfg(feature = "esp32c2")]
+    let hal_crate = crate_name("esp32c2-hal");
+    #[cfg(feature = "esp32c3")]
+    let hal_crate = crate_name("esp32c3-hal");
+
+    #[cfg(feature = "esp32")]
+    let hal_crate_name = Ident::new("esp32_hal", Span::call_site().into());
+    #[cfg(feature = "esp32s2")]
+    let hal_crate_name = Ident::new("esp32s2_hal", Span::call_site().into());
+    #[cfg(feature = "esp32s3")]
+    let hal_crate_name = Ident::new("esp32s3_hal", Span::call_site().into());
+    #[cfg(feature = "esp32c2")]
+    let hal_crate_name = Ident::new("esp32c2_hal", Span::call_site().into());
+    #[cfg(feature = "esp32c3")]
+    let hal_crate_name = Ident::new("esp32c3_hal", Span::call_site().into());
+
+    let interrupt_in_hal_crate = match hal_crate {
+        Ok(FoundCrate::Itself) => {
+            quote!( #hal_crate_name::peripherals::Interrupt::#ident_s )
+        }
+        Ok(FoundCrate::Name(ref name)) => {
+            let ident = Ident::new(&name, Span::call_site().into());
+            quote!( #ident::peripherals::Interrupt::#ident_s )
+        }
+        Err(_) => {
+            quote!( crate::peripherals::Interrupt::#ident_s )
+        }
+    };
+
     f.block.stmts.extend(std::iter::once(
         syn::parse2(quote! {{
             // Check that this interrupt actually exists
-            crate::peripherals::Interrupt::#ident_s;
+            #interrupt_in_hal_crate;
         }})
         .unwrap(),
     ));
@@ -218,25 +256,34 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
 
     let export_name = ident_s.to_string();
 
-    #[cfg(feature = "xtensa")]
-    let context = quote! {
-        xtensa_lx_rt::exception::Context
-    };
-
-    #[cfg(feature = "riscv")]
-    let context = quote! {
-        crate::interrupt::TrapFrame
+    let trap_frame_in_hal_crate = match hal_crate {
+        Ok(FoundCrate::Itself) => {
+            quote!(#hal_crate_name::trapframe::TrapFrame)
+        }
+        Ok(FoundCrate::Name(ref name)) => {
+            let ident = Ident::new(&name, Span::call_site().into());
+            quote!( #ident::trapframe::TrapFrame )
+        }
+        Err(_) => {
+            quote!(crate::trapframe::TrapFrame)
+        }
     };
 
     let context_call =
         (f.sig.inputs.len() == 1).then(|| Ident::new("context", proc_macro2::Span::call_site()));
 
     quote!(
+        macro_rules! foo {
+            () => {
+            };
+        }
+        foo!();
+
         #(#cfgs)*
         #(#attrs)*
         #[doc(hidden)]
         #[export_name = #export_name]
-        pub unsafe extern "C" fn #tramp_ident(context: &mut #context) {
+        pub unsafe extern "C" fn #tramp_ident(context: &mut #trap_frame_in_hal_crate) {
             #ident(
                 #context_call
             )

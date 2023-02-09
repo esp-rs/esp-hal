@@ -31,7 +31,6 @@ use esp32s3_hal::{
 use esp_backtrace as _;
 use nb::block;
 use ssd1306::{prelude::*, I2CDisplayInterface, Ssd1306};
-use xtensa_lx_rt::entry;
 
 #[entry]
 fn main() -> ! {
