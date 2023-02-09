@@ -5,12 +5,12 @@ use core::{cell::RefCell, marker::PhantomData};
 
 use crate::common_adapter::*;
 
+use crate::esp_wifi_result;
 use critical_section::Mutex;
 use embedded_svc::wifi::{AccessPointInfo, AuthMethod, SecondaryChannel};
 use enumset::EnumSet;
-use num_derive::FromPrimitive;    
+use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
-use crate::esp_wifi_result;
 
 #[doc(hidden)]
 pub use os_adapter::*;
@@ -100,78 +100,76 @@ pub enum WifiError {
     Disconnected,
 }
 #[repr(i32)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[derive(FromPrimitive)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, FromPrimitive)]
 pub enum WifiEvent {
-    WifiEventWifiReady = 0,           
-    WifiEventScanDone,                
-    WifiEventStaStart,                
-    WifiEventStaStop,                 
-    WifiEventStaConnected,            
-    WifiEventStaDisconnected,         
-    WifiEventStaAuthmodeChange,      
-    WifiEventStaWpsErSuccess,       
-    WifiEventStaWpsErFailed,        
-    WifiEventStaWpsErTimeout,       
-    WifiEventStaWpsErPin,           
-    WifiEventStaWpsErPbcOverlap,   
-    WifiEventApStart,                 
-    WifiEventApStop,                  
-    WifiEventApStaconnected,          
-    WifiEventApStadisconnected,       
-    WifiEventApProbereqrecved,        
-    WifiEventFtmReport,               
-    WifiEventStaBssRssiLow,         
-    WifiEventActionTxStatus,         
-    WifiEventRocDone,                 
-    WifiEventStaBeaconTimeout,       
-    WifiEventMax,                      
+    WifiEventWifiReady = 0,
+    WifiEventScanDone,
+    WifiEventStaStart,
+    WifiEventStaStop,
+    WifiEventStaConnected,
+    WifiEventStaDisconnected,
+    WifiEventStaAuthmodeChange,
+    WifiEventStaWpsErSuccess,
+    WifiEventStaWpsErFailed,
+    WifiEventStaWpsErTimeout,
+    WifiEventStaWpsErPin,
+    WifiEventStaWpsErPbcOverlap,
+    WifiEventApStart,
+    WifiEventApStop,
+    WifiEventApStaconnected,
+    WifiEventApStadisconnected,
+    WifiEventApProbereqrecved,
+    WifiEventFtmReport,
+    WifiEventStaBssRssiLow,
+    WifiEventActionTxStatus,
+    WifiEventRocDone,
+    WifiEventStaBeaconTimeout,
+    WifiEventMax,
 }
 
 #[repr(i32)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[derive(FromPrimitive)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, FromPrimitive)]
 pub enum InternalWifiError {
     ///WiFi driver was not installed by esp_wifi_init */
-    EspErrWifiNotInit    = 0x3001,  
-    ///WiFi driver was not started by esp_wifi_start */ 
-    EspErrWifiNotStarted = 0x3002,   
+    EspErrWifiNotInit = 0x3001,
+    ///WiFi driver was not started by esp_wifi_start */
+    EspErrWifiNotStarted = 0x3002,
     ///WiFi driver was not stopped by esp_wifi_stop */
     EspErrWifiNotStopped = 0x3003,
     ///WiFi interface error */   
-    EspErrWifiIf          = 0x3004,   
+    EspErrWifiIf = 0x3004,
     ///WiFi mode error */
-    EspErrWifiMode        = 0x3005, 
+    EspErrWifiMode = 0x3005,
     ///WiFi internal state error */  
-    EspErrWifiState       = 0x3006, 
+    EspErrWifiState = 0x3006,
     ///WiFi internal control block of station or soft-AP error */  
-    EspErrWifiConn        = 0x3007,
+    EspErrWifiConn = 0x3007,
     ///WiFi internal NVS module error */  
-    EspErrWifiNvs         = 0x3008, 
+    EspErrWifiNvs = 0x3008,
     ///MAC address is invalid */  
-    EspErrWifiMac         = 0x3009,  
-    ///SSID is invalid */ 
-    EspErrWifiSsid        = 0x300A,  
-    ///Password is invalid */ 
-    EspErrWifiPassword    = 0x300B, 
-    ///Timeout error */ 
-    EspErrWifiTimeout     = 0x300C, 
-    ///WiFi is in sleep state(RF closed) and wakeup fail */ 
-    EspErrWifiWakeFail   = 0x300D,  
-     ///The caller would block */
+    EspErrWifiMac = 0x3009,
+    ///SSID is invalid */
+    EspErrWifiSsid = 0x300A,
+    ///Password is invalid */
+    EspErrWifiPassword = 0x300B,
+    ///Timeout error */
+    EspErrWifiTimeout = 0x300C,
+    ///WiFi is in sleep state(RF closed) and wakeup fail */
+    EspErrWifiWakeFail = 0x300D,
+    ///The caller would block */
     EspErrWifiWouldBlock = 0x300E,
     ///Station still in disconnect status */
-    EspErrWifiNotConnect = 0x300F, 
-     ///Failed to post the event to WiFi task */
-    EspErrWifiPost        = 0x3012, 
+    EspErrWifiNotConnect = 0x300F,
+    ///Failed to post the event to WiFi task */
+    EspErrWifiPost = 0x3012,
     ///Invalid WiFi state when init/deinit is called */
-    EspErrWifiInitState  = 0x3013,  
+    EspErrWifiInitState = 0x3013,
     ///Returned when WiFi is stopping */
-    EspErrWifiStopState  = 0x3014, 
-    ///The WiFi connection is not associated */ 
-    EspErrWifiNotAssoc   = 0x3015,  
+    EspErrWifiStopState = 0x3014,
+    ///The WiFi connection is not associated */
+    EspErrWifiNotAssoc = 0x3015,
     ///The WiFi TX is disallowed */
-    EspErrWifiTxDisallow = 0x3016,  
+    EspErrWifiTxDisallow = 0x3016,
 }
 
 #[cfg(all(feature = "esp32c3", coex))]
@@ -541,7 +539,10 @@ pub fn wifi_init() -> Result<(), WifiError> {
 
         esp_wifi_result!(esp_wifi_set_tx_done_cb(Some(esp_wifi_tx_done_cb)))?;
 
-        esp_wifi_result!(esp_wifi_internal_reg_rxcb(esp_interface_t_ESP_IF_WIFI_STA, Some(recv_cb)))?;
+        esp_wifi_result!(esp_wifi_internal_reg_rxcb(
+            esp_interface_t_ESP_IF_WIFI_STA,
+            Some(recv_cb)
+        ))?;
 
         #[cfg(any(feature = "esp32", feature = "esp32s3"))]
         {
@@ -564,7 +565,7 @@ unsafe extern "C" fn recv_cb(
         if !queue.is_full() {
             let src = core::slice::from_raw_parts_mut(buffer as *mut u8, len as usize);
             let packet = DataFrame::from_bytes(src);
-            queue.enqueue(packet);
+            queue.enqueue(packet).unwrap();
             esp_wifi_internal_free_rx_buffer(eb);
             0
         } else {
@@ -588,10 +589,14 @@ pub fn wifi_start() -> Result<(), WifiError> {
         esp_wifi_result!(esp_wifi_start())?;
 
         #[cfg(any(coex, feature = "ps-min-modem"))]
-        esp_wifi_result!(esp_wifi_set_ps(crate::binary::include::wifi_ps_type_t_WIFI_PS_MIN_MODEM))?;
+        esp_wifi_result!(esp_wifi_set_ps(
+            crate::binary::include::wifi_ps_type_t_WIFI_PS_MIN_MODEM
+        ))?;
 
         #[cfg(not(any(coex, feature = "ps-min-modem")))]
-        esp_wifi_result!(esp_wifi_set_ps(crate::binary::include::wifi_ps_type_t_WIFI_PS_NONE))?;
+        esp_wifi_result!(esp_wifi_set_ps(
+            crate::binary::include::wifi_ps_type_t_WIFI_PS_NONE
+        ))?;
 
         let cntry_code = [b'C', b'N', 0];
         let country = wifi_country_t {
@@ -669,7 +674,7 @@ pub fn wifi_connect(ssid: &str, password: &str) -> Result<(), WifiError> {
         cfg.sta.password[0..(password.len())].copy_from_slice(password.as_bytes());
 
         esp_wifi_result!(esp_wifi_set_config(wifi_interface_t_WIFI_IF_STA, &mut cfg))?;
-    
+
         esp_wifi_result!(esp_wifi_connect())
     }
 }
@@ -690,22 +695,24 @@ impl WifiDevice {
 
     pub fn new() -> WifiDevice {
         Self {
-            config: Default::default()
+            config: Default::default(),
         }
     }
 }
 
 // see https://docs.rs/smoltcp/0.7.1/smoltcp/phy/index.html
-impl<'a> Device<'a> for WifiDevice {
-    type RxToken = WifiRxToken;
+impl Device for WifiDevice {
+    type RxToken<'a> = WifiRxToken;
+    type TxToken<'a> = WifiTxToken;
 
-    type TxToken = WifiTxToken;
-
-    fn receive(&'a mut self) -> Option<(Self::RxToken, Self::TxToken)> {
+    fn receive(
+        &mut self,
+        _instant: smoltcp::time::Instant,
+    ) -> Option<(Self::RxToken<'_>, Self::TxToken<'_>)> {
         critical_section::with(|cs| {
-            let queue = DATA_QUEUE_RX.borrow_ref_mut(cs);
-
-            if !queue.is_empty() {
+            let rx = DATA_QUEUE_RX.borrow_ref_mut(cs);
+            let tx = DATA_QUEUE_TX.borrow_ref_mut(cs);
+            if !rx.is_empty() && !tx.is_full() {
                 Some((WifiRxToken::default(), WifiTxToken::default()))
             } else {
                 None
@@ -713,8 +720,15 @@ impl<'a> Device<'a> for WifiDevice {
         })
     }
 
-    fn transmit(&'a mut self) -> Option<Self::TxToken> {
-        Some(WifiTxToken::default())
+    fn transmit(&mut self, _instant: smoltcp::time::Instant) -> Option<Self::TxToken<'_>> {
+        critical_section::with(|cs| {
+            let tx = DATA_QUEUE_TX.borrow_ref_mut(cs);
+            if !tx.is_full() {
+                Some(WifiTxToken::default())
+            } else {
+                None
+            }
+        })
     }
 
     fn capabilities(&self) -> smoltcp::phy::DeviceCapabilities {
@@ -729,21 +743,19 @@ impl<'a> Device<'a> for WifiDevice {
 pub struct WifiRxToken {}
 
 impl RxToken for WifiRxToken {
-    fn consume<R, F>(self, _timestamp: smoltcp::time::Instant, f: F) -> smoltcp::Result<R>
+    fn consume<R, F>(self, f: F) -> R
     where
-        F: FnOnce(&mut [u8]) -> smoltcp::Result<R>,
+        F: FnOnce(&mut [u8]) -> R,
     {
         critical_section::with(|cs| {
             let mut queue = DATA_QUEUE_RX.borrow_ref_mut(cs);
 
-            if let Some(mut data) = queue.dequeue() {
-                let buffer =
-                    unsafe { core::slice::from_raw_parts(&data.data as *const u8, data.len) };
-                dump_packet_info(&buffer);
-                f(&mut data.data[..])
-            } else {
-                Err(smoltcp::Error::Exhausted)
-            }
+            let mut data = queue
+                .dequeue()
+                .expect("unreachable: transmit()/receive() ensures there is a packet to process");
+            let buffer = unsafe { core::slice::from_raw_parts(&data.data as *const u8, data.len) };
+            dump_packet_info(&buffer);
+            f(&mut data.data[..])
         })
     }
 }
@@ -752,27 +764,20 @@ impl RxToken for WifiRxToken {
 pub struct WifiTxToken {}
 
 impl TxToken for WifiTxToken {
-    fn consume<R, F>(
-        self,
-        _timestamp: smoltcp::time::Instant,
-        len: usize,
-        f: F,
-    ) -> smoltcp::Result<R>
+    fn consume<R, F>(self, len: usize, f: F) -> R
     where
-        F: FnOnce(&mut [u8]) -> smoltcp::Result<R>,
+        F: FnOnce(&mut [u8]) -> R,
     {
         let res = critical_section::with(|cs| {
             let mut queue = DATA_QUEUE_TX.borrow_ref_mut(cs);
 
-            if queue.is_full() {
-                Err(smoltcp::Error::Exhausted)
-            } else {
-                let mut packet = DataFrame::new();
-                packet.len = len;
-                let res = f(&mut packet.data[..len]);
-                queue.enqueue(packet);
-                res
-            }
+            let mut packet = DataFrame::new();
+            packet.len = len;
+            let res = f(&mut packet.data[..len]);
+            queue
+                .enqueue(packet)
+                .expect("unreachable: transmit()/receive() ensures there is a buffer free");
+            res
         });
 
         send_data_if_needed();
@@ -824,7 +829,9 @@ impl embedded_svc::wifi::Wifi for WifiDevice {
         let mut bss_total: u16 = N as u16;
 
         unsafe {
-            esp_wifi_result!(crate::binary::include::esp_wifi_scan_get_ap_num(&mut bss_total))?;
+            esp_wifi_result!(crate::binary::include::esp_wifi_scan_get_ap_num(
+                &mut bss_total
+            ))?;
             if bss_total as usize > N {
                 bss_total = N as u16;
             }
@@ -1003,10 +1010,10 @@ fn dump_packet_info(buffer: &[u8]) {
                 "src={:?} dst={:?} proto={:x?}",
                 ip.src_addr(),
                 ip.dst_addr(),
-                ip.protocol()
+                ip.next_header()
             );
 
-            match ip.protocol() {
+            match ip.next_header() {
                 smoltcp::wire::IpProtocol::HopByHop => {}
                 smoltcp::wire::IpProtocol::Icmp => {}
                 smoltcp::wire::IpProtocol::Igmp => {}
@@ -1044,9 +1051,11 @@ fn dump_packet_info(buffer: &[u8]) {
 macro_rules! esp_wifi_result {
     ($value:expr) => {
         if $value != crate::binary::include::ESP_OK as i32 {
-            Err(WifiError::InternalError(FromPrimitive::from_i32($value).unwrap()))
+            Err(WifiError::InternalError(
+                FromPrimitive::from_i32($value).unwrap(),
+            ))
         } else {
             core::result::Result::<(), WifiError>::Ok(())
         }
-    }
+    };
 }

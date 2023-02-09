@@ -315,9 +315,7 @@ impl EspNow {
             encrypt: false,
             priv_: core::ptr::null_mut(),
         };
-        check_error!({
-            esp_now_get_peer(peer_address.as_ptr(), &mut raw_peer as *mut _)
-        });
+        check_error!({ esp_now_get_peer(peer_address.as_ptr(), &mut raw_peer as *mut _) });
 
         Ok(PeerInfo {
             peer_address: raw_peer.peer_addr,
@@ -403,12 +401,7 @@ impl EspNow {
 
     /// Config ESPNOW rate
     pub fn set_rate(&mut self, rate: WifiPhyRate) -> Result<(), EspNowError> {
-        check_error!({
-            esp_wifi_config_espnow_rate(
-                wifi_interface_t_WIFI_IF_STA,
-                rate as u32,
-            )
-        });
+        check_error!({ esp_wifi_config_espnow_rate(wifi_interface_t_WIFI_IF_STA, rate as u32,) });
 
         Ok(())
     }
@@ -494,11 +487,13 @@ unsafe extern "C" fn rcv_cb(
             queue.dequeue();
         }
 
-        queue.enqueue(ReceivedData {
-            len: slice.len() as u8,
-            data: data,
-            info,
-        });
+        queue
+            .enqueue(ReceivedData {
+                len: slice.len() as u8,
+                data: data,
+                info,
+            })
+            .unwrap();
 
         #[cfg(feature = "async")]
         asynch::ESP_NOW_WAKER.wake();

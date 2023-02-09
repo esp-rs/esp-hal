@@ -5,14 +5,10 @@
 
 use bleps::{
     ad_structure::{
-        create_advertising_data,
-        AdStructure,
-        BR_EDR_NOT_SUPPORTED,
-        LE_GENERAL_DISCOVERABLE,
+        create_advertising_data, AdStructure, BR_EDR_NOT_SUPPORTED, LE_GENERAL_DISCOVERABLE,
     },
     attribute_server::{AttributeServer, NotificationData, WorkResult},
-    Ble,
-    HciConnector,
+    Ble, HciConnector,
 };
 use bleps_macros::gatt;
 #[cfg(feature = "esp32")]
@@ -32,9 +28,7 @@ use hal::{
     clock::{ClockControl, CpuClock},
     peripherals::*,
     prelude::*,
-    Rng,
-    Rtc,
-    IO,
+    Rng, Rtc, IO,
 };
 #[cfg(any(feature = "esp32c3", feature = "esp32c2"))]
 use riscv_rt::entry;

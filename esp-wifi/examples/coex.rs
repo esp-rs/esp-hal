@@ -18,7 +18,7 @@ use bleps::{
     Ble, HciConnector,
 };
 
-use esp_wifi::{ble::controller::BleConnector, current_millis, wifi_interface::Network};
+use esp_wifi::{ble::controller::BleConnector, current_millis, wifi_interface::WifiStack};
 
 use embedded_io::blocking::*;
 use embedded_svc::ipv4::Interface;
@@ -27,14 +27,13 @@ use embedded_svc::wifi::{AccessPointInfo, ClientConfiguration, Configuration, Wi
 use esp_backtrace as _;
 use esp_println::{logger::init_logger, print, println};
 use esp_wifi::initialize;
-use esp_wifi::wifi::{WifiError, utils::create_network_interface};
-use esp_wifi::{create_network_stack_storage, network_stack_storage};
+use esp_wifi::wifi::{utils::create_network_interface, WifiError};
 use hal::{
     clock::{ClockControl, CpuClock},
     Rng,
 };
 use hal::{peripherals::Peripherals, prelude::*, Rtc};
-use smoltcp::wire::Ipv4Address;
+use smoltcp::{iface::SocketStorage, wire::Ipv4Address};
 
 #[cfg(feature = "esp32c3")]
 use hal::system::SystemExt;
@@ -72,9 +71,9 @@ fn main() -> ! {
 
     rtc.rwdt.disable();
 
-    let mut storage = create_network_stack_storage!(3, 8, 1, 1);
-    let ethernet = create_network_interface(network_stack_storage!(storage));
-    let mut wifi_interface = esp_wifi::wifi_interface::Wifi::new(ethernet);
+    let mut socket_set_entries: [SocketStorage; 3] = Default::default();
+    let (iface, device, sockets) = create_network_interface(&mut socket_set_entries);
+    let mut wifi_stack = WifiStack::new(iface, device, sockets, current_millis);
 
     #[cfg(feature = "esp32c3")]
     {
@@ -89,11 +88,10 @@ fn main() -> ! {
         initialize(timg1.timer0, Rng::new(peripherals.RNG), &clocks).unwrap();
     }
 
-    println!("is wifi started: {:?}", wifi_interface.is_started());
+    println!("is wifi started: {:?}", wifi_stack.is_started());
 
     println!("Start Wifi Scan");
-    let res: Result<(heapless::Vec<AccessPointInfo, 10>, usize), WifiError> =
-        wifi_interface.scan_n();
+    let res: Result<(heapless::Vec<AccessPointInfo, 10>, usize), WifiError> = wifi_stack.scan_n();
     if let Ok((res, _count)) = res {
         for ap in res {
             println!("{:?}", ap);
@@ -106,16 +104,16 @@ fn main() -> ! {
         password: PASSWORD.into(),
         ..Default::default()
     });
-    let res = wifi_interface.set_configuration(&client_config);
+    let res = wifi_stack.set_configuration(&client_config);
     println!("wifi_connect returned {:?}", res);
 
-    println!("{:?}", wifi_interface.get_capabilities());
-    println!("wifi_connect {:?}", wifi_interface.connect());
+    println!("{:?}", wifi_stack.get_capabilities());
+    println!("wifi_connect {:?}", wifi_stack.connect());
 
     // wait to get connected
     println!("Wait to get connected");
     loop {
-        let res = wifi_interface.is_connected();
+        let res = wifi_stack.is_connected();
         match res {
             Ok(connected) => {
                 if connected {
@@ -128,18 +126,15 @@ fn main() -> ! {
             }
         }
     }
-    println!("{:?}", wifi_interface.is_connected());
+    println!("{:?}", wifi_stack.is_connected());
 
     // wait for getting an ip address
     println!("Wait to get an ip address");
-    let network = Network::new(wifi_interface, current_millis);
     loop {
-        network.poll_dhcp().unwrap();
+        wifi_stack.work();
 
-        network.work();
-
-        if network.is_iface_up() {
-            println!("got ip {:?}", network.get_ip_info());
+        if wifi_stack.is_iface_up() {
+            println!("got ip {:?}", wifi_stack.get_ip_info());
             break;
         }
     }
@@ -171,7 +166,7 @@ fn main() -> ! {
 
     let mut rx_buffer = [0u8; 1536];
     let mut tx_buffer = [0u8; 1536];
-    let mut socket = network.get_socket(&mut rx_buffer, &mut tx_buffer);
+    let mut socket = wifi_stack.get_socket(&mut rx_buffer, &mut tx_buffer);
 
     loop {
         println!("Making HTTP request");

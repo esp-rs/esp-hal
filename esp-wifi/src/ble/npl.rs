@@ -1226,10 +1226,12 @@ unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, arg: *const c_void) {
         data[2] = len as u8;
         data[3..][..len].copy_from_slice(payload);
 
-        queue.enqueue(ReceivedPacket {
-            len: (len + 3) as u8,
-            data,
-        });
+        queue
+            .enqueue(ReceivedPacket {
+                len: (len + 3) as u8,
+                data,
+            })
+            .unwrap();
     });
 }
 
@@ -1247,10 +1249,12 @@ unsafe extern "C" fn ble_hs_rx_data(om: *const OsMbuf, arg: *const c_void) {
         data[0] = 0x02; // ACL
         data[1..][..data_slice.len()].copy_from_slice(data_slice);
 
-        queue.enqueue(ReceivedPacket {
-            len: (len + 1) as u8,
-            data,
-        });
+        queue
+            .enqueue(ReceivedPacket {
+                len: (len + 1) as u8,
+                data,
+            })
+            .unwrap();
     });
 }
 

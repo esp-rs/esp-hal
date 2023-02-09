@@ -54,7 +54,7 @@ pub extern "C" fn worker_task2() {
                             debug!("timer is due.... {:p}", old.ptimer);
                             let fnctn: fn(*mut crate::binary::c_types::c_void) =
                                 core::mem::transmute(old.timer_ptr);
-                            to_run.enqueue((fnctn, old.arg_ptr));
+                            to_run.enqueue((fnctn, old.arg_ptr)).unwrap();
 
                             TIMERS[i] = Some(Timer {
                                 expire: if old.period != 0 {
