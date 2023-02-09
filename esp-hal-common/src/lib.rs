@@ -26,14 +26,6 @@
 #![cfg_attr(feature = "async", feature(async_fn_in_trait))]
 #![cfg_attr(feature = "async", feature(impl_trait_projections))]
 
-#[cfg_attr(esp32, path = "peripherals/esp32.rs")]
-#[cfg_attr(esp32c3, path = "peripherals/esp32c3.rs")]
-#[cfg_attr(esp32c2, path = "peripherals/esp32c2.rs")]
-#[cfg_attr(esp32c6, path = "peripherals/esp32c6.rs")]
-#[cfg_attr(esp32s2, path = "peripherals/esp32s2.rs")]
-#[cfg_attr(esp32s3, path = "peripherals/esp32s3.rs")]
-pub mod peripherals;
-
 #[cfg(riscv)]
 pub use esp_riscv_rt;
 #[cfg(riscv)]
@@ -129,6 +121,14 @@ pub mod efuse;
 #[cfg_attr(riscv, path = "interrupt/riscv.rs")]
 #[cfg_attr(xtensa, path = "interrupt/xtensa.rs")]
 pub mod interrupt;
+
+#[cfg_attr(esp32, path = "peripherals/esp32.rs")]
+#[cfg_attr(esp32c3, path = "peripherals/esp32c3.rs")]
+#[cfg_attr(esp32c2, path = "peripherals/esp32c2.rs")]
+#[cfg_attr(esp32c6, path = "peripherals/esp32c6.rs")]
+#[cfg_attr(esp32s2, path = "peripherals/esp32s2.rs")]
+#[cfg_attr(esp32s3, path = "peripherals/esp32s3.rs")]
+pub mod peripherals;
 
 /// Enumeration of CPU cores
 /// The actual number of available cores depends on the target.

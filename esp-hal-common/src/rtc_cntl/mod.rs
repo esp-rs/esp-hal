@@ -612,7 +612,6 @@ impl Default for Rwdt {
 /// RTC Watchdog Timer driver
 impl Rwdt {
     pub fn listen(&mut self) {
-
         #[cfg(not(esp32c6))]
         let rtc_cntl = unsafe { &*RTC_CNTL::PTR };
         #[cfg(esp32c6)]
@@ -638,7 +637,6 @@ impl Rwdt {
     }
 
     pub fn unlisten(&mut self) {
-
         #[cfg(not(esp32c6))]
         let rtc_cntl = unsafe { &*RTC_CNTL::PTR };
         #[cfg(esp32c6)]
@@ -664,7 +662,6 @@ impl Rwdt {
     }
 
     pub fn clear_interrupt(&mut self) {
-
         #[cfg(not(esp32c6))]
         let rtc_cntl = unsafe { &*RTC_CNTL::PTR };
         #[cfg(esp32c6)]
@@ -681,7 +678,6 @@ impl Rwdt {
     }
 
     pub fn is_interrupt_set(&self) -> bool {
-
         #[cfg(not(esp32c6))]
         let rtc_cntl = unsafe { &*RTC_CNTL::PTR };
         #[cfg(esp32c6)]
@@ -698,7 +694,6 @@ impl Rwdt {
 
     /// Enable/disable write protection for WDT registers
     fn set_write_protection(&mut self, enable: bool) {
-
         #[cfg(not(esp32c6))]
         let rtc_cntl = unsafe { &*RTC_CNTL::PTR };
         #[cfg(esp32c6)]
@@ -711,7 +706,6 @@ impl Rwdt {
 
 impl WatchdogDisable for Rwdt {
     fn disable(&mut self) {
-
         #[cfg(not(esp32c6))]
         let rtc_cntl = unsafe { &*RTC_CNTL::PTR };
         #[cfg(esp32c6)]
@@ -778,7 +772,6 @@ impl WatchdogEnable for Rwdt {
 
 impl Watchdog for Rwdt {
     fn feed(&mut self) {
-
         #[cfg(not(esp32c6))]
         let rtc_cntl = unsafe { &*RTC_CNTL::PTR };
         #[cfg(esp32c6)]
@@ -803,7 +796,6 @@ impl Swd {
 
     /// Enable/disable write protection for WDT registers
     fn set_write_protection(&mut self, enable: bool) {
-
         #[cfg(not(esp32c6))]
         let rtc_cntl = unsafe { &*RTC_CNTL::PTR };
         #[cfg(esp32c6)]
@@ -819,7 +811,6 @@ impl Swd {
 #[cfg(any(esp32c2, esp32c3, esp32c6, esp32s3))]
 impl WatchdogDisable for Swd {
     fn disable(&mut self) {
-
         #[cfg(not(esp32c6))]
         let rtc_cntl = unsafe { &*RTC_CNTL::PTR };
         #[cfg(esp32c6)]
