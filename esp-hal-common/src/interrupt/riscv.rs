@@ -259,6 +259,7 @@ pub fn clear(_core: Cpu, which: CpuInterrupt) {
 }
 
 /// Get status of peripheral interrupts
+#[cfg(not(esp32c6))]
 #[inline]
 pub fn get_status(_core: Cpu) -> u128 {
     unsafe {
@@ -271,6 +272,28 @@ pub fn get_status(_core: Cpu) -> u128 {
                 .read()
                 .bits() as u128)
                 << 32
+    }
+}
+
+/// Get status of peripheral interrupts
+#[cfg(esp32c6)]
+#[inline]
+pub fn get_status(_core: Cpu) -> u128 {
+    unsafe {
+        ((*crate::peripherals::INTERRUPT_CORE0::PTR)
+            .intr_status_reg_0
+            .read()
+            .bits() as u128)
+            | ((*crate::peripherals::INTERRUPT_CORE0::PTR)
+                .intr_status_reg_1
+                .read()
+                .bits() as u128)
+                << 32
+            | ((*crate::peripherals::INTERRUPT_CORE0::PTR)
+                .int_status_reg_2
+                .read()
+                .bits() as u128)
+                << 64
     }
 }
 

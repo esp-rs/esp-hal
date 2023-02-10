@@ -81,6 +81,6 @@ required-features = ["async", "embassy"]
 name              = "embassy_wait"
 required-features = ["async", "embassy"]
 
-# [[example]]
-# name              = "embassy_spi"
-# required-features = ["async", "embassy"]
+[[example]]
+name              = "embassy_spi"
+required-features = ["async", "embassy"]
