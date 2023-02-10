@@ -14,11 +14,9 @@ use esp32c6_hal::{
     peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
-    Rtc,
 };
 use esp_backtrace as _;
 use esp_println::println;
-use esp_riscv_rt::entry;
 use nb::block;
 
 #[ram(rtc_fast)]
@@ -38,7 +36,6 @@ fn main() -> ! {
 
     // Disable the watchdog timers. For the ESP32-C6, this includes the Super WDT,
     // and the TIMG WDTs.
-    let mut rtc = Rtc::new(peripherals.LP_CLKRST);
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let mut timer0 = timer_group0.timer0;
     let mut wdt0 = timer_group0.wdt;

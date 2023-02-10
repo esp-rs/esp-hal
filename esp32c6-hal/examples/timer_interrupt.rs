@@ -13,11 +13,11 @@ use esp32c6_hal::{
     interrupt,
     peripherals::{self, Peripherals, TIMG0, TIMG1},
     prelude::*,
+    riscv,
     timer::{Timer, Timer0, TimerGroup},
     Rtc,
 };
 use esp_backtrace as _;
-use esp_riscv_rt::{entry, riscv};
 
 static TIMER0: Mutex<RefCell<Option<Timer<Timer0<TIMG0>>>>> = Mutex::new(RefCell::new(None));
 static TIMER1: Mutex<RefCell<Option<Timer<Timer0<TIMG1>>>>> = Mutex::new(RefCell::new(None));

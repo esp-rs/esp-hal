@@ -14,7 +14,6 @@ use esp32c6_hal::{
 };
 use esp_backtrace as _;
 use esp_println::println;
-use esp_riscv_rt::entry;
 
 #[entry]
 fn main() -> ! {

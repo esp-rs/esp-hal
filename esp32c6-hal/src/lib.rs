@@ -10,6 +10,7 @@ pub use esp_hal_common::{
     dma,
     dma::gdma,
     efuse,
+    entry,
     gpio,
     i2c,
     i2s,
@@ -21,10 +22,13 @@ pub use esp_hal_common::{
     peripherals,
     prelude,
     pulse_control,
+    riscv,
     sha,
     spi,
     systimer,
     timer,
+    trapframe,
+    twai,
     uart,
     utils,
     Cpu,
@@ -65,6 +69,13 @@ extern "C" {
     static mut _rtc_fast_data_start: u32;
     static mut _rtc_fast_data_end: u32;
     static mut _irtc_fast_data: u32;
+}
+
+#[cfg(feature = "direct-boot")]
+#[doc(hidden)]
+#[esp_hal_common::esp_riscv_rt::pre_init]
+unsafe fn init() {
+    r0::init_data(&mut _srwtext, &mut _erwtext, &_irwtext);
 }
 
 #[allow(unreachable_code)]

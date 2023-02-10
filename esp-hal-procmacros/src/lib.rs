@@ -213,6 +213,8 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
     let hal_crate = crate_name("esp32c2-hal");
     #[cfg(feature = "esp32c3")]
     let hal_crate = crate_name("esp32c3-hal");
+    #[cfg(feature = "esp32c6")]
+    let hal_crate = crate_name("esp32c6-hal");
 
     #[cfg(feature = "esp32")]
     let hal_crate_name = Ident::new("esp32_hal", Span::call_site().into());
@@ -224,6 +226,8 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
     let hal_crate_name = Ident::new("esp32c2_hal", Span::call_site().into());
     #[cfg(feature = "esp32c3")]
     let hal_crate_name = Ident::new("esp32c3_hal", Span::call_site().into());
+    #[cfg(feature = "esp32c6")]
+    let hal_crate_name = Ident::new("esp32c6_hal", Span::call_site().into());
 
     let interrupt_in_hal_crate = match hal_crate {
         Ok(FoundCrate::Itself) => {
