@@ -20,8 +20,6 @@ use esp32s2_hal::{
 };
 use esp_backtrace as _;
 use nb::block;
-use xtensa_atomic_emulation_trap as _;
-use xtensa_lx_rt::entry;
 
 static SERIAL: Mutex<RefCell<Option<Uart<UART0>>>> = Mutex::new(RefCell::new(None));
 
@@ -96,21 +94,4 @@ fn UART0() {
         serial.reset_at_cmd_interrupt();
         serial.reset_rx_fifo_full_interrupt();
     });
-}
-
-#[xtensa_lx_rt::exception]
-fn exception(
-    cause: xtensa_lx_rt::exception::ExceptionCause,
-    frame: xtensa_lx_rt::exception::Context,
-) {
-    use esp_println::*;
-
-    println!("\n\nException occured {:?} {:x?}", cause, frame);
-
-    let backtrace = esp_backtrace::arch::backtrace();
-    for b in backtrace.iter() {
-        if let Some(addr) = b {
-            println!("0x{:x}", addr)
-        }
-    }
 }

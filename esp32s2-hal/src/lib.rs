@@ -1,8 +1,10 @@
 #![no_std]
 
+// always enable atomic emulation on ESP32-S2
 pub use embedded_hal as ehal;
 #[cfg(feature = "embassy")]
 pub use esp_hal_common::embassy;
+use esp_hal_common::xtensa_lx_rt::exception::ExceptionCause;
 #[doc(inline)]
 pub use esp_hal_common::{
     aes,
@@ -12,6 +14,7 @@ pub use esp_hal_common::{
     dma,
     dma::pdma,
     efuse,
+    entry,
     gpio,
     i2c::{self, I2C},
     i2s,
@@ -28,8 +31,10 @@ pub use esp_hal_common::{
     system,
     systimer,
     timer,
+    trapframe,
     uart,
     utils,
+    xtensa_lx,
     Cpu,
     Delay,
     PulseControl,
@@ -38,6 +43,11 @@ pub use esp_hal_common::{
     Rwdt,
     Uart,
 };
+use xtensa_atomic_emulation_trap as _;
+
+pub mod rt {
+    pub use esp_hal_common::xtensa_lx_rt::exception::ExceptionCause;
+}
 
 pub use self::gpio::IO;
 
@@ -74,17 +84,17 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
     }
 
     // set stack pointer to end of memory: no need to retain stack up to this point
-    xtensa_lx::set_stack_pointer(&mut _stack_end_cpu0);
+    esp_hal_common::xtensa_lx::set_stack_pointer(&mut _stack_end_cpu0);
 
     // copying data from flash to various data segments is done by the bootloader
     // initialization to zero needs to be done by the application
 
     // Initialize RTC RAM
-    xtensa_lx_rt::zero_bss(&mut _rtc_fast_bss_start, &mut _rtc_fast_bss_end);
-    xtensa_lx_rt::zero_bss(&mut _rtc_slow_bss_start, &mut _rtc_slow_bss_end);
+    esp_hal_common::xtensa_lx_rt::zero_bss(&mut _rtc_fast_bss_start, &mut _rtc_fast_bss_end);
+    esp_hal_common::xtensa_lx_rt::zero_bss(&mut _rtc_slow_bss_start, &mut _rtc_slow_bss_end);
 
     // continue with default reset handler
-    xtensa_lx_rt::Reset();
+    esp_hal_common::xtensa_lx_rt::Reset();
 }
 
 /// The ESP32 has a first stage bootloader that handles loading program data
@@ -94,4 +104,64 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
 #[rustfmt::skip]
 pub extern "Rust" fn __init_data() -> bool {
     false
+}
+
+/// Atomic Emulation is always enabled on ESP32-S2
+#[doc(hidden)]
+#[no_mangle]
+#[export_name = "__exception"] // this overrides the exception handler in xtensa_lx_rt
+#[link_section = ".rwtext"]
+unsafe fn exception(cause: ExceptionCause, save_frame: &mut trapframe::TrapFrame) {
+    match cause {
+        ExceptionCause::Illegal => {
+            let mut regs = [
+                save_frame.A0,
+                save_frame.A1,
+                save_frame.A2,
+                save_frame.A3,
+                save_frame.A4,
+                save_frame.A5,
+                save_frame.A6,
+                save_frame.A7,
+                save_frame.A8,
+                save_frame.A9,
+                save_frame.A10,
+                save_frame.A11,
+                save_frame.A12,
+                save_frame.A13,
+                save_frame.A14,
+                save_frame.A15,
+            ];
+
+            if xtensa_atomic_emulation_trap::atomic_emulation(save_frame.PC, &mut regs) {
+                save_frame.PC += 3; // 24bit instruction
+
+                save_frame.A0 = regs[0];
+                save_frame.A1 = regs[1];
+                save_frame.A2 = regs[2];
+                save_frame.A3 = regs[3];
+                save_frame.A4 = regs[4];
+                save_frame.A5 = regs[5];
+                save_frame.A6 = regs[6];
+                save_frame.A7 = regs[7];
+                save_frame.A8 = regs[8];
+                save_frame.A9 = regs[9];
+                save_frame.A10 = regs[10];
+                save_frame.A11 = regs[11];
+                save_frame.A12 = regs[12];
+                save_frame.A13 = regs[13];
+                save_frame.A14 = regs[14];
+                save_frame.A15 = regs[15];
+
+                return;
+            }
+        }
+        _ => (),
+    }
+
+    extern "C" {
+        fn __user_exception(cause: ExceptionCause, save_frame: &mut trapframe::TrapFrame);
+    }
+
+    __user_exception(cause, save_frame);
 }

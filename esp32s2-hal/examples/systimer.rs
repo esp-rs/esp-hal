@@ -20,8 +20,6 @@ use esp32s2_hal::{
 };
 use esp_backtrace as _;
 use esp_println::println;
-use xtensa_atomic_emulation_trap as _;
-use xtensa_lx_rt::entry;
 
 static ALARM0: Mutex<RefCell<Option<Alarm<Periodic, 0>>>> = Mutex::new(RefCell::new(None));
 static ALARM1: Mutex<RefCell<Option<Alarm<Target, 1>>>> = Mutex::new(RefCell::new(None));
@@ -122,21 +120,4 @@ fn SYSTIMER_TARGET2() {
             .unwrap()
             .clear_interrupt()
     });
-}
-
-#[xtensa_lx_rt::exception]
-fn exception(
-    cause: xtensa_lx_rt::exception::ExceptionCause,
-    frame: xtensa_lx_rt::exception::Context,
-) {
-    use esp_println::*;
-
-    println!("\n\nException occured {:?} {:x?}", cause, frame);
-
-    let backtrace = esp_backtrace::arch::backtrace();
-    for b in backtrace.iter() {
-        if let Some(addr) = b {
-            println!("0x{:x}", addr)
-        }
-    }
 }

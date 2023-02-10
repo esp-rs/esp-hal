@@ -37,6 +37,7 @@ pub use crate::{
         DmaTransfer as _esp_hal_dma_DmaTransfer,
         DmaTransferRxTx as _esp_hal_dma_DmaTransferRxTx,
     },
+    entry,
     gpio::{
         InputPin as _esp_hal_gpio_InputPin,
         OutputPin as _esp_hal_gpio_OutputPin,

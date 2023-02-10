@@ -14,6 +14,7 @@ pub use esp_hal_common::{
     dma,
     dma::gdma,
     efuse,
+    entry,
     gpio,
     i2c,
     i2s,
@@ -23,11 +24,13 @@ pub use esp_hal_common::{
     peripherals,
     prelude,
     pulse_control,
+    riscv,
     sha,
     spi,
     system,
     systimer,
     timer,
+    trapframe,
     twai,
     uart,
     utils,
@@ -125,7 +128,7 @@ static ENTRY_POINT: unsafe fn() -> ! = start_hal;
 
 #[cfg(feature = "direct-boot")]
 #[doc(hidden)]
-#[esp_riscv_rt::pre_init]
+#[esp_hal_common::esp_riscv_rt::pre_init]
 unsafe fn init() {
     r0::init_data(&mut _srwtext, &mut _erwtext, &_irwtext);
 

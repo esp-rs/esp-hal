@@ -15,7 +15,6 @@ use esp32c3_hal::{
     Uart,
 };
 use esp_backtrace as _;
-use esp_riscv_rt::entry;
 use nb::block;
 
 #[entry]

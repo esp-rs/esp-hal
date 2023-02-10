@@ -17,11 +17,11 @@ use esp32s3_hal::{
     peripherals::{self, Peripherals},
     prelude::*,
     timer::TimerGroup,
+    xtensa_lx,
     Delay,
     Rtc,
 };
 use esp_backtrace as _;
-use xtensa_lx_rt::entry;
 
 static BUTTON: Mutex<RefCell<Option<Gpio0<Input<PullDown>>>>> = Mutex::new(RefCell::new(None));
 

@@ -38,7 +38,7 @@ async fn run2() {
 
 static EXECUTOR: StaticCell<Executor> = StaticCell::new();
 
-#[xtensa_lx_rt::entry]
+#[entry]
 fn main() -> ! {
     esp_println::println!("Init!");
     let peripherals = Peripherals::take();

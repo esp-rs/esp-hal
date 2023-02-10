@@ -10,13 +10,13 @@ use esp32s2_hal::{
     prelude::*,
     sha::{Sha, ShaMode},
     timer::TimerGroup,
+    xtensa_lx,
     Rtc,
 };
 use esp_backtrace as _;
 use esp_println::println;
 use nb::block;
 use sha2::{Digest, Sha512};
-use xtensa_lx_rt::entry;
 
 #[entry]
 fn main() -> ! {

@@ -31,7 +31,27 @@
 #[cfg_attr(esp32s3, path = "peripherals/esp32s3.rs")]
 pub mod peripherals;
 
+#[cfg(riscv)]
+pub use esp_riscv_rt;
+#[cfg(riscv)]
+pub use esp_riscv_rt::entry;
+#[cfg(riscv)]
+pub use esp_riscv_rt::riscv;
 pub use procmacros as macros;
+#[cfg(xtensa)]
+pub use xtensa_lx;
+#[cfg(xtensa)]
+pub use xtensa_lx_rt;
+#[cfg(xtensa)]
+pub use xtensa_lx_rt::entry;
+
+/// State of the CPU saved when entering exception or interrupt
+pub mod trapframe {
+    #[cfg(riscv)]
+    pub use esp_riscv_rt::TrapFrame;
+    #[cfg(xtensa)]
+    pub use xtensa_lx_rt::exception::Context as TrapFrame;
+}
 
 #[cfg(rmt)]
 pub use self::pulse_control::PulseControl;

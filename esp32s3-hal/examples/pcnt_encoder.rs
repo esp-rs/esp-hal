@@ -28,7 +28,6 @@ use esp_hal::{
     IO,
 };
 use esp_println::println;
-use xtensa_lx_rt::entry;
 
 static UNIT0: Mutex<RefCell<Option<unit::Unit>>> = Mutex::new(RefCell::new(None));
 static VALUE: AtomicI32 = AtomicI32::new(0);

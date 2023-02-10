@@ -18,7 +18,6 @@ use esp32_hal::{
 use esp_backtrace as _;
 use esp_println::println;
 use nb::block;
-use xtensa_lx_rt::entry;
 
 #[ram(rtc_fast)]
 static mut SOME_INITED_DATA: [u8; 2] = [0xaa, 0xbb];

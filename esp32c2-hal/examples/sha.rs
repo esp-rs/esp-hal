@@ -14,7 +14,6 @@ use esp32c2_hal::{
 };
 use esp_backtrace as _;
 use esp_println::println;
-use esp_riscv_rt::entry;
 use nb::block;
 use sha2::{Digest, Sha256};
 

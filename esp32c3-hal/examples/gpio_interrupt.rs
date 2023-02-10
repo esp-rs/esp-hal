@@ -15,12 +15,12 @@ use esp32c3_hal::{
     interrupt,
     peripherals::{self, Peripherals},
     prelude::*,
+    riscv,
     timer::TimerGroup,
     Delay,
     Rtc,
 };
 use esp_backtrace as _;
-use esp_riscv_rt::{entry, riscv};
 
 static BUTTON: Mutex<RefCell<Option<Gpio9<Input<PullDown>>>>> = Mutex::new(RefCell::new(None));
 
