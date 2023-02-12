@@ -573,6 +573,7 @@ unsafe extern "C" fn recv_cb(
 
             0
         } else {
+            esp_wifi_internal_free_rx_buffer(eb);
             1
         }
     })
