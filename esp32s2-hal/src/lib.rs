@@ -35,6 +35,7 @@ pub use esp_hal_common::{
     uart,
     utils,
     xtensa_lx,
+    xtensa_lx_rt,
     Cpu,
     Delay,
     PulseControl,
