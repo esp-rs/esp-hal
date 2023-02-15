@@ -4,8 +4,6 @@ use embedded_io::blocking::{Read, Write};
 use embedded_io::Io;
 
 use embedded_svc::ipv4;
-use embedded_svc::wifi::AccessPointInfo;
-use enumset::EnumSet;
 use smoltcp::iface::{Interface, SocketHandle, SocketSet};
 use smoltcp::socket::{dhcpv4::Socket as Dhcpv4Socket, tcp::Socket as TcpSocket};
 use smoltcp::storage::PacketMetadata;
@@ -226,55 +224,6 @@ pub enum WifiStackError {
 impl Display for WifiStackError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{:?}", self)
-    }
-}
-
-impl embedded_svc::wifi::Wifi for WifiStack<'_> {
-    type Error = crate::wifi::WifiError;
-
-    fn get_capabilities(&self) -> Result<EnumSet<embedded_svc::wifi::Capability>, Self::Error> {
-        self.device.borrow_mut().get_capabilities()
-    }
-
-    fn get_configuration(&self) -> Result<embedded_svc::wifi::Configuration, Self::Error> {
-        self.device.borrow_mut().get_configuration()
-    }
-
-    fn set_configuration(
-        &mut self,
-        conf: &embedded_svc::wifi::Configuration,
-    ) -> Result<(), Self::Error> {
-        self.device.borrow_mut().set_configuration(conf)
-    }
-
-    fn start(&mut self) -> Result<(), Self::Error> {
-        self.device.borrow_mut().start()
-    }
-
-    fn stop(&mut self) -> Result<(), Self::Error> {
-        self.device.borrow_mut().stop()
-    }
-
-    fn connect(&mut self) -> Result<(), Self::Error> {
-        self.device.borrow_mut().connect()
-    }
-
-    fn disconnect(&mut self) -> Result<(), Self::Error> {
-        self.device.borrow_mut().disconnect()
-    }
-
-    fn is_started(&self) -> Result<bool, Self::Error> {
-        self.device.borrow_mut().is_started()
-    }
-
-    fn is_connected(&self) -> Result<bool, Self::Error> {
-        self.device.borrow_mut().is_connected()
-    }
-
-    fn scan_n<const N: usize>(
-        &mut self,
-    ) -> Result<(heapless::Vec<AccessPointInfo, N>, usize), Self::Error> {
-        self.device.borrow_mut().scan_n::<N>()
     }
 }
 

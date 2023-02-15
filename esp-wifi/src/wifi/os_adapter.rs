@@ -5,6 +5,10 @@
 #[cfg_attr(feature = "esp32s2", path = "os_adapter_esp32s2.rs")]
 pub(crate) mod os_adapter_chip_specific;
 
+use core::cell::RefCell;
+
+use critical_section::Mutex;
+use enumset::EnumSet;
 use log::{debug, trace};
 
 use crate::{
@@ -24,7 +28,13 @@ use crate::{
 #[cfg(feature = "esp32c3")]
 use crate::compat::common::syslog;
 
-pub static mut WIFI_STATE: i32 = -1;
+use super::WifiEvent;
+
+pub(crate) static mut WIFI_STATE: i32 = -1;
+
+// useful for waiting for events - clear and wait for the event bit to be set again
+pub(crate) static WIFI_EVENTS: Mutex<RefCell<EnumSet<WifiEvent>>> =
+    Mutex::new(RefCell::new(enumset::enum_set!()));
 
 pub fn is_connected() -> bool {
     unsafe { WIFI_STATE == wifi_event_t_WIFI_EVENT_STA_CONNECTED as i32 }
@@ -896,27 +906,35 @@ pub unsafe extern "C" fn event_post(
         event_data_size,
         ticks_to_wait
     );
+    use num_traits::FromPrimitive;
 
-    // probably also need to look at event_base
-    #[allow(non_upper_case_globals)]
-    let take_state = match event_id as u32 {
-        wifi_event_t_WIFI_EVENT_WIFI_READY => true,
-        wifi_event_t_WIFI_EVENT_STA_START => true,
-        wifi_event_t_WIFI_EVENT_STA_STOP => true,
-        wifi_event_t_WIFI_EVENT_STA_CONNECTED => true,
-        wifi_event_t_WIFI_EVENT_STA_DISCONNECTED => true,
-        _ => {
-            use num_traits::FromPrimitive;
-            log::info!(
-                "Unhandled event: {:?}",
-                crate::wifi::WifiEvent::from_i32(event_id)
-            );
+    let event = WifiEvent::from_i32(event_id).unwrap();
+    log::trace!("EVENT: {:?}", event);
+    critical_section::with(|cs| WIFI_EVENTS.borrow_ref_mut(cs).insert(event));
+
+    let take_state = match event {
+        WifiEvent::StaConnected
+        | WifiEvent::StaDisconnected
+        | WifiEvent::StaStart
+        | WifiEvent::StaStop
+        | WifiEvent::WifiReady
+        | WifiEvent::ScanDone => true,
+        other => {
+            log::info!("Unhandled event: {:?}", other);
             false
         }
     };
 
     if take_state {
         WIFI_STATE = event_id;
+    }
+
+    #[cfg(feature = "async")]
+    event.waker().wake();
+
+    #[cfg(feature = "embassy-net")]
+    if matches!(event, WifiEvent::StaConnected | WifiEvent::StaDisconnected) {
+        crate::wifi::embassy::LINK_STATE.wake();
     }
 
     memory_fence();

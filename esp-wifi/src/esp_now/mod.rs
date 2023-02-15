@@ -221,6 +221,8 @@ impl EspNowCreator {
     /// After this the broadcast address is already added as a peer.
     pub fn initialize(self) -> Result<EspNow, EspNowError> {
         let mut esp_now = EspNow { _private: () };
+        check_error!({ esp_wifi_set_mode(wifi_mode_t_WIFI_MODE_STA) });
+        check_error!({ esp_wifi_start() });
         check_error!({ esp_now_init() });
         check_error!({ esp_now_register_recv_cb(Some(rcv_cb)) });
 

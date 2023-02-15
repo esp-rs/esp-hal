@@ -71,7 +71,8 @@ fn main() -> ! {
     rtc.rwdt.disable();
 
     let mut socket_set_entries: [SocketStorage; 3] = Default::default();
-    let (iface, device, sockets) = create_network_interface(&mut socket_set_entries);
+    let (iface, device, mut controller, sockets) =
+        create_network_interface(&mut socket_set_entries);
     let mut wifi_stack = WifiStack::new(iface, device, sockets, current_millis);
 
     #[cfg(any(feature = "esp32c3", feature = "esp32c2"))]
@@ -87,32 +88,32 @@ fn main() -> ! {
         initialize(timg1.timer0, Rng::new(peripherals.RNG), &clocks).unwrap();
     }
 
-    println!("is wifi started: {:?}", wifi_stack.is_started());
+    let client_config = Configuration::Client(ClientConfiguration {
+        ssid: SSID.into(),
+        password: PASSWORD.into(),
+        ..Default::default()
+    });
+    let res = controller.set_configuration(&client_config);
+    println!("wifi_set_configuration returned {:?}", res);
+
+    controller.start().unwrap();
+    println!("is wifi started: {:?}", controller.is_started());
 
     println!("Start Wifi Scan");
-    let res: Result<(heapless::Vec<AccessPointInfo, 10>, usize), WifiError> = wifi_stack.scan_n();
+    let res: Result<(heapless::Vec<AccessPointInfo, 10>, usize), WifiError> = controller.scan_n();
     if let Ok((res, _count)) = res {
         for ap in res {
             println!("{:?}", ap);
         }
     }
 
-    println!("Call wifi_connect");
-    let client_config = Configuration::Client(ClientConfiguration {
-        ssid: SSID.into(),
-        password: PASSWORD.into(),
-        ..Default::default()
-    });
-    let res = wifi_stack.set_configuration(&client_config);
-    println!("wifi_set_configuration returned {:?}", res);
-
-    println!("{:?}", wifi_stack.get_capabilities());
-    println!("wifi_connect {:?}", wifi_stack.connect());
+    println!("{:?}", controller.get_capabilities());
+    println!("wifi_connect {:?}", controller.connect());
 
     // wait to get connected
     println!("Wait to get connected");
     loop {
-        let res = wifi_stack.is_connected();
+        let res = controller.is_connected();
         match res {
             Ok(connected) => {
                 if connected {
@@ -125,7 +126,7 @@ fn main() -> ! {
             }
         }
     }
-    println!("{:?}", wifi_stack.is_connected());
+    println!("{:?}", controller.is_connected());
 
     println!("Setting static IP {}", STATIC_IP);
 
