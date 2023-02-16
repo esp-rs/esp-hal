@@ -9,10 +9,16 @@ use crate::{
 pub(crate) fn init() {}
 
 pub(crate) fn configure_clock() {
+    #[cfg(feature = "esp32_40mhz")]
     assert!(matches!(
         RtcClock::get_xtal_freq(),
         XtalClock::RtcXtalFreq40M
     ));
+    #[cfg(feature = "esp32_26mhz")]
+    assert!(
+        matches!(RtcClock::get_xtal_freq(), XtalClock::RtcXtalFreq26M),
+        "Did you flash the right bootloader configured for 26Mhz xtal?"
+    );
 
     RtcClock::set_fast_freq(RtcFastClock::RtcFastClock8m);
 
