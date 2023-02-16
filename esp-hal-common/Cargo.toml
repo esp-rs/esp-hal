@@ -66,6 +66,9 @@ esp32c3 = ["esp32c3/rt", "riscv", "procmacros/esp32c3"]
 esp32s2 = ["esp32s2/rt", "xtensa", "xtensa-lx/esp32s2", "xtensa-lx-rt/esp32s2",             "esp-synopsys-usb-otg", "usb-device", "procmacros/esp32s2"]
 esp32s3 = ["esp32s3/rt", "xtensa", "xtensa-lx/esp32s3", "xtensa-lx-rt/esp32s3", "lock_api", "esp-synopsys-usb-otg", "usb-device", "procmacros/esp32s3"]
 
+esp32_40mhz = []
+esp32_26mhz = []
+
 esp32c2_40mhz = []
 esp32c2_26mhz = []
 

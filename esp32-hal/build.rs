@@ -1,6 +1,7 @@
 use std::{env, fs::File, io::Write, path::PathBuf};
 
 fn main() {
+    check_features();
     // Put the linker script somewhere the linker can find it
     let out = &PathBuf::from(env::var_os("OUT_DIR").unwrap());
     File::create(out.join("memory.x"))
@@ -67,4 +68,10 @@ fn generate_memory_extras() -> Vec<u8> {
     )
     .as_bytes()
     .to_vec()
+}
+
+fn check_features() {
+    if cfg!(feature = "esp32_40mhz") && cfg!(feature = "esp32_26mhz") {
+        panic!("Only one xtal speed feature can be selected");
+    }
 }

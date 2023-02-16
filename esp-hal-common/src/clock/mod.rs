@@ -185,7 +185,8 @@ impl<'d> ClockControl<'d> {
     pub fn boot_defaults(
         clock_control: impl Peripheral<P = SystemClockControl> + 'd,
     ) -> ClockControl<'d> {
-        ClockControl {
+        #[cfg(feature = "esp32_40mhz")]
+        return ClockControl {
             _private: clock_control.into_ref(),
             desired_rates: RawClocks {
                 cpu_clock: HertzU32::MHz(80),
@@ -194,7 +195,19 @@ impl<'d> ClockControl<'d> {
                 i2c_clock: HertzU32::MHz(80),
                 pwm_clock: HertzU32::MHz(160),
             },
-        }
+        };
+
+        #[cfg(feature = "esp32_26mhz")]
+        return ClockControl {
+            _private: clock_control.into_ref(),
+            desired_rates: RawClocks {
+                cpu_clock: HertzU32::MHz(80),
+                apb_clock: HertzU32::MHz(80),
+                xtal_clock: HertzU32::MHz(26),
+                i2c_clock: HertzU32::MHz(80),
+                pwm_clock: HertzU32::MHz(160),
+            },
+        };
     }
 
     /// Configure the CPU clock speed.
@@ -205,7 +218,10 @@ impl<'d> ClockControl<'d> {
     ) -> ClockControl<'d> {
         // like NuttX use 40M hardcoded - if it turns out to be a problem
         // we will take care then
+        #[cfg(feature = "esp32_40mhz")]
         let xtal_freq = XtalClock::RtcXtalFreq40M;
+        #[cfg(feature = "esp32_26mhz")]
+        let xtal_freq = XtalClock::RtcXtalFreq26M;
         let pll_freq = match cpu_clock_speed {
             CpuClock::Clock80MHz => PllClock::Pll320MHz,
             CpuClock::Clock160MHz => PllClock::Pll320MHz,
