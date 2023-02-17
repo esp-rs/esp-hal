@@ -1545,16 +1545,28 @@ pub trait Instance {
             self.configure_datalen(chunk.len() as u32 * 8);
 
             let fifo_ptr = reg_block.w0.as_ptr();
-            unsafe {
-                // It seems that `copy_nonoverlapping` is significantly faster than regular
-                // `copy`, by about 20%... ?
-                core::ptr::copy_nonoverlapping::<u32>(
-                    chunk.as_ptr() as *const u32,
-                    fifo_ptr as *mut u32,
-                    // FIXME: Using any other transfer length **does not work**. I don't understand
-                    // why.
-                    FIFO_SIZE / 4,
-                );
+            for i in (0..chunk.len()).step_by(4) {
+                let word = match (chunk.len() - i) % 4 {
+                    0 => {
+                        (chunk[i] as u32)
+                            | (chunk[i + 1] as u32) << 8
+                            | (chunk[i + 2] as u32) << 16
+                            | (chunk[i + 3] as u32) << 24
+                    }
+
+                    3 => {
+                        (chunk[i] as u32) | (chunk[i + 1] as u32) << 8 | (chunk[i + 2] as u32) << 16
+                    }
+
+                    2 => (chunk[i] as u32) | (chunk[i + 1] as u32) << 8,
+
+                    1 => chunk[i] as u32,
+
+                    _ => panic!(),
+                };
+                unsafe {
+                    fifo_ptr.add(i / 4).write_volatile(word);
+                }
             }
 
             self.update();
