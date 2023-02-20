@@ -49,4 +49,5 @@ crate::peripherals! {
     UART2 => true,
     UHCI0 => true,
     UHCI1 => true,
+    RADIO => false
 }

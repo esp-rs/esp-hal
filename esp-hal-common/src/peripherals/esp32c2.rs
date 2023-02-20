@@ -31,4 +31,5 @@ crate::peripherals! {
     UART0 => true,
     UART1 => true,
     XTS_AES => true,
+    RADIO => false
 }

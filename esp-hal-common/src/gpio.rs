@@ -1034,6 +1034,16 @@ where
 {
 }
 
+impl<MODE, RA, IRA, PINTYPE, SIG, const GPIONUM: u8> crate::peripheral::sealed::Sealed
+    for &mut  GpioPin<MODE, RA, IRA, PINTYPE, SIG, GPIONUM>
+where
+    RA: BankGpioRegisterAccess,
+    IRA: InteruptStatusRegisterAccess,
+    PINTYPE: PinType,
+    SIG: GpioSignal,
+{
+}
+
 impl<RA, IRA, PINTYPE, SIG, const GPIONUM: u8>
     From<GpioPin<Unknown, RA, IRA, PINTYPE, SIG, GPIONUM>>
     for GpioPin<Input<Floating>, RA, IRA, PINTYPE, SIG, GPIONUM>

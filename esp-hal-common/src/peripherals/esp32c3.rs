@@ -42,4 +42,5 @@ crate::peripherals! {
     UHCI1 => true,
     USB_DEVICE => true,
     XTS_AES => true,
+    RADIO => false
 }

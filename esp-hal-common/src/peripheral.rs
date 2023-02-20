@@ -167,8 +167,6 @@ pub trait Peripheral: Sized + sealed::Sealed {
     }
 }
 
-impl<T: DerefMut> sealed::Sealed for T {}
-
 pub(crate) mod sealed {
     pub trait Sealed {}
 }
@@ -308,6 +306,9 @@ mod peripheral_macros {
                     $name::steal()
                 }
             }
+
+            impl crate::peripheral::sealed::Sealed for $name {}
+            impl crate::peripheral::sealed::Sealed for &mut $name {}
         };
         ($(#[$cfg:meta])? $name:ident => false) => {
             $(#[$cfg])?
@@ -345,6 +346,9 @@ mod peripheral_macros {
                     $name::steal()
                 }
             }
+
+            impl crate::peripheral::sealed::Sealed for $name {}
+            impl crate::peripheral::sealed::Sealed for &mut $name {}
         }
     }
 }
