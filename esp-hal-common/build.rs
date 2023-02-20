@@ -46,6 +46,7 @@ fn main() {
     //   - 'usb_otg'
     //   - 'usb_serial_jtag'
     //   - 'aes'
+    //   - 'radio'
     //
     // New symbols can be added as needed, but please be sure to update both this
     // comment and the required vectors below.
@@ -65,6 +66,7 @@ fn main() {
             "timg1",
             "uart2",
             "aes",
+            "radio",
         ]
     } else if esp32c2 {
         vec![
@@ -74,6 +76,7 @@ fn main() {
             "gdma",
             "systimer",
             "timg0",
+            "radio",
         ]
     } else if esp32c3 {
         vec![
@@ -89,6 +92,7 @@ fn main() {
             "timg1",
             "usb_serial_jtag",
             "aes",
+            "radio",
         ]
     } else if esp32s2 {
         vec![
@@ -106,6 +110,7 @@ fn main() {
             "timg1",
             "usb_otg",
             "aes",
+            "radio",
         ]
     } else if esp32s3 {
         vec![
@@ -125,6 +130,7 @@ fn main() {
             "usb_otg",
             "usb_serial_jtag",
             "aes",
+            "radio",
         ]
     } else {
         unreachable!(); // We've already confirmed exactly one chip was selected

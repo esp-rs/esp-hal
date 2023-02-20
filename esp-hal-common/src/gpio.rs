@@ -1035,7 +1035,7 @@ where
 }
 
 impl<MODE, RA, IRA, PINTYPE, SIG, const GPIONUM: u8> crate::peripheral::sealed::Sealed
-    for &mut  GpioPin<MODE, RA, IRA, PINTYPE, SIG, GPIONUM>
+    for &mut GpioPin<MODE, RA, IRA, PINTYPE, SIG, GPIONUM>
 where
     RA: BankGpioRegisterAccess,
     IRA: InteruptStatusRegisterAccess,
