@@ -23,6 +23,7 @@ use esp_println::logger::init_logger;
 use esp_println::{print, println};
 use esp_wifi::current_millis;
 use esp_wifi::initialize;
+use esp_wifi::wifi::WifiMode;
 use esp_wifi::wifi::{utils::create_network_interface, WifiError};
 use esp_wifi::wifi_interface::WifiStack;
 use hal::clock::{ClockControl, CpuClock};
@@ -72,7 +73,7 @@ fn main() -> ! {
 
     let mut socket_set_entries: [SocketStorage; 3] = Default::default();
     let (iface, device, mut controller, sockets) =
-        create_network_interface(&mut socket_set_entries);
+        create_network_interface(WifiMode::Sta, &mut socket_set_entries);
     let mut wifi_stack = WifiStack::new(iface, device, sockets, current_millis);
 
     #[cfg(any(feature = "esp32c3", feature = "esp32c2"))]

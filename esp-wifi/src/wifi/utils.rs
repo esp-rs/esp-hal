@@ -5,22 +5,27 @@ use smoltcp::{
     wire::EthernetAddress,
 };
 
+use crate::wifi::get_ap_mac;
 use crate::wifi::get_sta_mac;
 
-use super::{WifiController, WifiDevice};
+use super::{WifiController, WifiDevice, WifiMode};
 
 /// Convenient way to create an `smoltcp` ethernet interface
 /// You can use the provided macros to create and pass a suitable backing storage.
 pub fn create_network_interface<'a>(
+    mode: WifiMode,
     storage: &'a mut [SocketStorage<'a>],
 ) -> (Interface, WifiDevice, WifiController, SocketSet<'a>) {
     let socket_set_entries = storage;
 
     let mut mac = [0u8; 6];
-    get_sta_mac(&mut mac);
+    match mode.is_ap() {
+        true => get_ap_mac(&mut mac),
+        false => get_sta_mac(&mut mac),
+    }
     let hw_address = EthernetAddress::from_bytes(&mac);
 
-    let (mut device, controller) = crate::wifi::new();
+    let (mut device, controller) = crate::wifi::new(mode);
 
     let mut config = Config::new();
 

@@ -18,7 +18,9 @@ use bleps::{
     Ble, HciConnector,
 };
 
-use esp_wifi::{ble::controller::BleConnector, current_millis, wifi_interface::WifiStack};
+use esp_wifi::{
+    ble::controller::BleConnector, current_millis, wifi::WifiMode, wifi_interface::WifiStack,
+};
 
 use embedded_io::blocking::*;
 use embedded_svc::ipv4::Interface;
@@ -73,7 +75,7 @@ fn main() -> ! {
 
     let mut socket_set_entries: [SocketStorage; 3] = Default::default();
     let (iface, device, mut controller, sockets) =
-        create_network_interface(&mut socket_set_entries);
+        create_network_interface(WifiMode::Sta, &mut socket_set_entries);
     let wifi_stack = WifiStack::new(iface, device, sockets, current_millis);
 
     #[cfg(feature = "esp32c3")]

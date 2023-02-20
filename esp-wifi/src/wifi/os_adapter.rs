@@ -47,6 +47,10 @@ pub enum WifiState {
     StaStop,
     StaConnected,
     StaDisconnected,
+    ApStart,
+    ApStop,
+    ApStaConnected,
+    ApStaDisconnected,
     Invalid,
 }
 
@@ -58,6 +62,10 @@ pub fn get_wifi_state() -> WifiState {
         wifi_event_t_WIFI_EVENT_STA_STOP => WifiState::StaStop,
         wifi_event_t_WIFI_EVENT_STA_CONNECTED => WifiState::StaConnected,
         wifi_event_t_WIFI_EVENT_STA_DISCONNECTED => WifiState::StaDisconnected,
+        wifi_event_t_WIFI_EVENT_AP_START => WifiState::ApStart,
+        wifi_event_t_WIFI_EVENT_AP_STOP => WifiState::ApStop,
+        wifi_event_t_WIFI_EVENT_AP_STACONNECTED => WifiState::ApStaConnected,
+        wifi_event_t_WIFI_EVENT_AP_STADISCONNECTED => WifiState::ApStaDisconnected,
         _ => WifiState::Invalid,
     }
 }
@@ -918,7 +926,11 @@ pub unsafe extern "C" fn event_post(
         | WifiEvent::StaStart
         | WifiEvent::StaStop
         | WifiEvent::WifiReady
-        | WifiEvent::ScanDone => true,
+        | WifiEvent::ScanDone
+        | WifiEvent::ApStart
+        | WifiEvent::ApStop
+        | WifiEvent::ApStaconnected
+        | WifiEvent::ApStadisconnected => true,
         other => {
             log::info!("Unhandled event: {:?}", other);
             false
@@ -933,7 +945,13 @@ pub unsafe extern "C" fn event_post(
     event.waker().wake();
 
     #[cfg(feature = "embassy-net")]
-    if matches!(event, WifiEvent::StaConnected | WifiEvent::StaDisconnected) {
+    if matches!(
+        event,
+        WifiEvent::StaConnected
+            | WifiEvent::StaDisconnected
+            | WifiEvent::ApStart
+            | WifiEvent::ApStop
+    ) {
         crate::wifi::embassy::LINK_STATE.wake();
     }
 

@@ -6,7 +6,9 @@
 
 use embassy_executor::_export::StaticCell;
 use embassy_net::tcp::TcpSocket;
-use embassy_net::{Config, Ipv4Address, Stack, StackResources};
+use embassy_net::{
+    Config, IpListenEndpoint, Ipv4Address, Ipv4Cidr, Stack, StackResources, StaticConfig,
+};
 #[cfg(feature = "esp32")]
 use esp32_hal as hal;
 #[cfg(feature = "esp32c2")]
@@ -20,10 +22,10 @@ use esp32s3_hal as hal;
 
 use embassy_executor::Executor;
 use embassy_time::{Duration, Timer};
-use embedded_svc::wifi::{ClientConfiguration, Configuration, Wifi};
+use embedded_svc::wifi::{AccessPointConfiguration, Configuration, Wifi};
 use esp_backtrace as _;
 use esp_println::logger::init_logger;
-use esp_println::println;
+use esp_println::{print, println};
 use esp_wifi::initialize;
 use esp_wifi::wifi::{WifiController, WifiDevice, WifiEvent, WifiMode, WifiState};
 use hal::clock::{ClockControl, CpuClock};
@@ -37,9 +39,6 @@ use hal::system::SystemExt;
 use riscv_rt::entry;
 #[cfg(any(feature = "esp32", feature = "esp32s3", feature = "esp32s2"))]
 use xtensa_lx_rt::entry;
-
-const SSID: &str = env!("SSID");
-const PASSWORD: &str = env!("PASSWORD");
 
 macro_rules! singleton {
     ($val:expr) => {{
@@ -92,12 +91,16 @@ fn main() -> ! {
         initialize(timg1.timer0, Rng::new(peripherals.RNG), &clocks).unwrap();
     }
 
-    let (wifi_interface, controller) = esp_wifi::wifi::new(WifiMode::Sta);
+    let (wifi_interface, controller) = esp_wifi::wifi::new(WifiMode::Ap);
 
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     embassy::init(&clocks, timer_group0.timer0);
 
-    let config = Config::Dhcp(Default::default());
+    let config = Config::Static(StaticConfig {
+        address: Ipv4Cidr::new(Ipv4Address::new(192, 168, 2, 1), 24),
+        gateway: Some(Ipv4Address::from_bytes(&[192, 168, 2, 1])),
+        dns_servers: Default::default(),
+    });
 
     let seed = 1234; // very random, very secure seed
 
@@ -123,32 +126,22 @@ async fn connection(mut controller: WifiController) {
     println!("Device capabilities: {:?}", controller.get_capabilities());
     loop {
         match esp_wifi::wifi::get_wifi_state() {
-            WifiState::StaConnected => {
+            WifiState::ApStart => {
                 // wait until we're no longer connected
-                controller.wait_for_event(WifiEvent::StaDisconnected).await;
+                controller.wait_for_event(WifiEvent::ApStop).await;
                 Timer::after(Duration::from_millis(5000)).await
             }
             _ => {}
         }
         if !matches!(controller.is_started(), Ok(true)) {
-            let client_config = Configuration::Client(ClientConfiguration {
-                ssid: SSID.into(),
-                password: PASSWORD.into(),
+            let client_config = Configuration::AccessPoint(AccessPointConfiguration {
+                ssid: "esp-wifi".into(),
                 ..Default::default()
             });
             controller.set_configuration(&client_config).unwrap();
             println!("Starting wifi");
             controller.start().await.unwrap();
             println!("Wifi started!");
-        }
-        println!("About to connect...");
-
-        match controller.connect().await {
-            Ok(_) => println!("Wifi connected!"),
-            Err(e) => {
-                println!("Failed to connect to wifi: {e:?}");
-                Timer::after(Duration::from_millis(5000)).await
-            }
         }
     }
 }
@@ -169,54 +162,79 @@ async fn task(stack: &'static Stack<WifiDevice>) {
         }
         Timer::after(Duration::from_millis(500)).await;
     }
+    println!("Connect to the AP `esp-wifi` and point your browser to http://192.168.2.1:8080/");
+    println!("Use a static IP in the range 192.168.2.2 .. 192.168.2.255, use gateway 192.168.2.1");
 
-    println!("Waiting to get IP address...");
+    let mut socket = TcpSocket::new(&stack, &mut rx_buffer, &mut tx_buffer);
+    socket.set_timeout(Some(embassy_net::SmolDuration::from_secs(10)));
     loop {
-        if let Some(config) = stack.config() {
-            println!("Got IP: {}", config.address);
-            break;
-        }
-        Timer::after(Duration::from_millis(500)).await;
-    }
+        println!("Wait for connection...");
+        let r = socket
+            .accept(IpListenEndpoint {
+                addr: None,
+                port: 8080,
+            })
+            .await;
+        println!("Connected...");
 
-    loop {
-        Timer::after(Duration::from_millis(1_000)).await;
-
-        let mut socket = TcpSocket::new(&stack, &mut rx_buffer, &mut tx_buffer);
-
-        socket.set_timeout(Some(embassy_net::SmolDuration::from_secs(10)));
-
-        let remote_endpoint = (Ipv4Address::new(142, 250, 185, 115), 80);
-        println!("connecting...");
-        let r = socket.connect(remote_endpoint).await;
         if let Err(e) = r {
             println!("connect error: {:?}", e);
             continue;
         }
-        println!("connected!");
-        let mut buf = [0; 1024];
+
+        use embedded_io::asynch::Write;
+
+        let mut buffer = [0u8; 1024];
+        let mut pos = 0;
         loop {
-            use embedded_io::asynch::Write;
-            let r = socket
-                .write_all(b"GET / HTTP/1.0\r\nHost: www.mobile-j.de\r\n\r\n")
-                .await;
-            if let Err(e) = r {
-                println!("write error: {:?}", e);
-                break;
-            }
-            let n = match socket.read(&mut buf).await {
+            match socket.read(&mut buffer).await {
                 Ok(0) => {
                     println!("read EOF");
                     break;
                 }
-                Ok(n) => n,
+                Ok(len) => {
+                    let to_print =
+                        unsafe { core::str::from_utf8_unchecked(&buffer[..(pos + len)]) };
+
+                    if to_print.contains("\r\n\r\n") {
+                        print!("{}", to_print);
+                        println!();
+                        break;
+                    }
+
+                    pos += len;
+                }
                 Err(e) => {
                     println!("read error: {:?}", e);
                     break;
                 }
             };
-            println!("{}", core::str::from_utf8(&buf[..n]).unwrap());
         }
-        Timer::after(Duration::from_millis(3000)).await;
+
+        let r = socket
+            .write_all(
+                b"HTTP/1.0 200 OK\r\n\r\n\
+            <html>\
+                <body>\
+                    <h1>Hello Rust! Hello esp-wifi!</h1>\
+                </body>\
+            </html>\r\n\
+            ",
+            )
+            .await;
+        if let Err(e) = r {
+            println!("write error: {:?}", e);
+        }
+
+        let r = socket.flush().await;
+        if let Err(e) = r {
+            println!("flush error: {:?}", e);
+        }
+        Timer::after(Duration::from_millis(1000)).await;
+
+        socket.close();
+        Timer::after(Duration::from_millis(1000)).await;
+
+        socket.abort();
     }
 }
