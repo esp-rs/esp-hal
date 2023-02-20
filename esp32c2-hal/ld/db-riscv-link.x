@@ -105,8 +105,8 @@ SECTIONS
     /* This section is required to skip .rwtext area because REGION_RWTEXT
      * and REGION_BSS reflect the same address space on different buses.
      */
-    . = ORIGIN(REGION_BSS) + _rwtext_size;
-  } > REGION_BSS
+    . = ORIGIN(REGION_DATA) + _rwtext_size + 8 + SIZEOF(.data);
+  } > REGION_DATA
 
   .bss (NOLOAD) :
   {
