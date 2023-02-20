@@ -1,7 +1,6 @@
 #![no_std]
 #![cfg_attr(target_arch = "xtensa", feature(asm_experimental_arch))]
 #![feature(c_variadic)]
-#![feature(layout_for_ptr)]
 
 use core::cell::RefCell;
 use core::mem::MaybeUninit;

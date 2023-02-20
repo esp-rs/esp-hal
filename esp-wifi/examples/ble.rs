@@ -1,7 +1,5 @@
 #![no_std]
 #![no_main]
-#![feature(c_variadic)]
-#![feature(const_mut_refs)]
 
 use bleps::{
     ad_structure::{

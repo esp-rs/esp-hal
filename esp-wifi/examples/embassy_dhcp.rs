@@ -1,7 +1,5 @@
 #![no_std]
 #![no_main]
-#![feature(c_variadic)]
-#![feature(const_mut_refs)]
 #![feature(type_alias_impl_trait)]
 
 use embassy_executor::_export::StaticCell;

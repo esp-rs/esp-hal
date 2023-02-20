@@ -1,7 +1,5 @@
 #![no_std]
 #![no_main]
-#![feature(c_variadic)]
-#![feature(const_mut_refs)]
 
 #[cfg(feature = "esp32")]
 use esp32_hal as hal;
