@@ -1,6 +1,6 @@
 [package]
 name    = "esp32s3-hal"
-version = "0.6.0"
+version = "0.7.0"
 authors = [
     "Jesse Braham <jesse@beta7.io>",
     "Björn Quentin <bjoern.quentin@mobile-j.de>",
@@ -32,7 +32,7 @@ embedded-hal-1     = { version = "=1.0.0-alpha.9", optional = true, package = "e
 embedded-hal-async = { version = "0.2.0-alpha.0", optional = true }
 embedded-hal-nb    = { version = "=1.0.0-alpha.1", optional = true }
 embedded-can       = { version = "0.4.1", optional = true }
-esp-hal-common     = { version = "0.6.0",  features = ["esp32s3"], path = "../esp-hal-common" }
+esp-hal-common     = { version = "0.7.0",  features = ["esp32s3"], path = "../esp-hal-common" }
 r0                 = { version = "1.0.0",  optional = true }
 
 [dev-dependencies]
