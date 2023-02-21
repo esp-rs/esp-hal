@@ -1546,7 +1546,12 @@ pub trait Instance {
 
             let fifo_ptr = reg_block.w0.as_ptr();
             for i in (0..chunk.len()).step_by(4) {
-                let word = match (chunk.len() - i) % 4 {
+                let state = if chunk.len() - i < 4 {
+                    chunk.len() % 4
+                } else {
+                    0
+                };
+                let word = match state {
                     0 => {
                         (chunk[i] as u32)
                             | (chunk[i + 1] as u32) << 8
