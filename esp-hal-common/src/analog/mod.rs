@@ -52,19 +52,8 @@ impl crate::peripheral::Peripheral for &mut ADC1 {
     }
 }
 
-impl core::ops::Deref for ADC2 {
-    type Target = ADC2;
-
-    fn deref(&self) -> &Self::Target {
-        self
-    }
-}
-
-impl core::ops::DerefMut for ADC2 {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self
-    }
-}
+impl crate::peripheral::sealed::Sealed for &mut ADC1 {}
+impl crate::peripheral::sealed::Sealed for ADC1 {}
 
 impl crate::peripheral::Peripheral for ADC2 {
     type P = ADC2;
@@ -82,19 +71,8 @@ impl crate::peripheral::Peripheral for &mut ADC2 {
     }
 }
 
-impl core::ops::Deref for DAC1 {
-    type Target = DAC1;
-
-    fn deref(&self) -> &Self::Target {
-        self
-    }
-}
-
-impl core::ops::DerefMut for DAC1 {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self
-    }
-}
+impl crate::peripheral::sealed::Sealed for &mut ADC2 {}
+impl crate::peripheral::sealed::Sealed for ADC2 {}
 
 impl crate::peripheral::Peripheral for DAC1 {
     type P = DAC1;
@@ -112,19 +90,8 @@ impl crate::peripheral::Peripheral for &mut DAC1 {
     }
 }
 
-impl core::ops::Deref for DAC2 {
-    type Target = DAC2;
-
-    fn deref(&self) -> &Self::Target {
-        self
-    }
-}
-
-impl core::ops::DerefMut for DAC2 {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self
-    }
-}
+impl crate::peripheral::sealed::Sealed for &mut DAC1 {}
+impl crate::peripheral::sealed::Sealed for DAC1 {}
 
 impl crate::peripheral::Peripheral for DAC2 {
     type P = DAC2;
@@ -141,6 +108,9 @@ impl crate::peripheral::Peripheral for &mut DAC2 {
         DAC2 { _private: () }
     }
 }
+
+impl crate::peripheral::sealed::Sealed for &mut DAC2 {}
+impl crate::peripheral::sealed::Sealed for DAC2 {}
 
 cfg_if::cfg_if! {
     if #[cfg(any(esp32, esp32s2, esp32s3))] {

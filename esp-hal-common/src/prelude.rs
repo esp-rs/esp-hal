@@ -29,6 +29,8 @@ pub use crate::pulse_control::{
     ConfiguredChannel as _esp_hal_pulse_control_ConfiguredChannel,
     OutputChannel as _esp_hal_pulse_control_OutputChannel,
 };
+#[cfg(radio)]
+pub use crate::radio::RadioExt as _esp_hal_RadioExt;
 #[cfg(any(esp32, esp32s2))]
 pub use crate::spi::dma::WithDmaSpi3 as _esp_hal_spi_dma_WithDmaSpi3;
 pub use crate::{

@@ -236,20 +236,6 @@ impl<'d, T: crate::peripheral::Peripheral<P = SystemPeripheral> + 'd> SystemExt<
     }
 }
 
-impl core::ops::Deref for SystemClockControl {
-    type Target = SystemClockControl;
-
-    fn deref(&self) -> &Self::Target {
-        self
-    }
-}
-
-impl core::ops::DerefMut for SystemClockControl {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self
-    }
-}
-
 impl crate::peripheral::Peripheral for SystemClockControl {
     type P = SystemClockControl;
     #[inline]
@@ -265,23 +251,12 @@ impl crate::peripheral::Peripheral for &mut SystemClockControl {
     }
 }
 
+impl crate::peripheral::sealed::Sealed for SystemClockControl {}
+impl crate::peripheral::sealed::Sealed for &mut SystemClockControl {}
+
 #[cfg(pdma)]
 mod dma_peripheral {
     use super::Dma;
-
-    impl core::ops::Deref for Dma {
-        type Target = Dma;
-
-        fn deref(&self) -> &Self::Target {
-            self
-        }
-    }
-
-    impl core::ops::DerefMut for Dma {
-        fn deref_mut(&mut self) -> &mut Self::Target {
-            self
-        }
-    }
 
     impl crate::peripheral::Peripheral for Dma {
         type P = Dma;
@@ -297,4 +272,7 @@ mod dma_peripheral {
             Dma { _private: () }
         }
     }
+
+    impl crate::peripheral::sealed::Sealed for Dma {}
+    impl crate::peripheral::sealed::Sealed for &mut Dma {}
 }

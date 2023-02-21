@@ -91,6 +91,8 @@ pub mod peripheral;
 pub mod prelude;
 #[cfg(rmt)]
 pub mod pulse_control;
+#[cfg(radio)]
+pub mod radio;
 pub mod rng;
 pub mod rom;
 pub mod rtc_cntl;
