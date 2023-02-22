@@ -76,6 +76,14 @@ extern "C" {
 #[esp_hal_common::esp_riscv_rt::pre_init]
 unsafe fn init() {
     r0::init_data(&mut _srwtext, &mut _erwtext, &_irwtext);
+
+    r0::init_data(
+        &mut _rtc_fast_data_start,
+        &mut _rtc_fast_data_end,
+        &_irtc_fast_data,
+    );
+
+    r0::init_data(&mut _srtc_fast_text, &mut _ertc_fast_text, &_irtc_fast_text);
 }
 
 #[allow(unreachable_code)]

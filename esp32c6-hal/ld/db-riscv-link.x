@@ -79,7 +79,7 @@ SECTIONS
     _erodata = .;
   } > REGION_RODATA
 
-  _rodata_size = _erodata - _srodata + 8;
+  _rodata_size = _erodata - _srodata;
   .data ORIGIN(RAM) : AT(_text_size + _rodata_size)
   {
     _sdata = .;
@@ -91,22 +91,44 @@ SECTIONS
     _edata = .;
   } > REGION_DATA
 
-  _data_size = _edata - _sdata + 8;
+  _data_size = _edata - _sdata;
   .rwtext ORIGIN(REGION_RWTEXT) + _data_size : AT(_text_size + _rodata_size + _data_size){
     _srwtext = .;
     *(.rwtext);
     . = ALIGN(4);
     _erwtext = .;
   } > REGION_RWTEXT
-  _rwtext_size = _erwtext - _srwtext + 8;
+  _rwtext_size = _erwtext - _srwtext;
 
-  .rwtext.dummy (NOLOAD):
+  .rtc_fast.text : AT(_text_size + _rodata_size + _data_size + _rwtext_size) {
+    _srtc_fast_text = .;
+    *(.rtc_fast.literal .rtc_fast.text .rtc_fast.literal.* .rtc_fast.text.*)
+    . = ALIGN(4);
+    _ertc_fast_text = .;
+  } > REGION_RTC_FAST
+  _fast_text_size = _ertc_fast_text - _srtc_fast_text;
+
+  .rtc_fast.data : AT(_text_size + _rodata_size + _data_size + _rwtext_size + _fast_text_size)
   {
-    /* This section is required to skip .rwtext area because REGION_RWTEXT
-     * and REGION_BSS reflect the same address space on different buses.
-     */
-    . = ORIGIN(REGION_BSS) + _rwtext_size;
-  } > REGION_BSS
+    _rtc_fast_data_start = ABSOLUTE(.);
+    *(.rtc_fast.data .rtc_fast.data.*)
+    . = ALIGN(4);
+    _rtc_fast_data_end = ABSOLUTE(.);
+  } > REGION_RTC_FAST
+  _rtc_fast_data_size = _rtc_fast_data_end - _rtc_fast_data_start;
+
+  .rtc_fast.bss (NOLOAD) : ALIGN(4)
+  {
+    _rtc_fast_bss_start = ABSOLUTE(.);
+    *(.rtc_fast.bss .rtc_fast.bss.*)
+    . = ALIGN(4);
+    _rtc_fast_bss_end = ABSOLUTE(.);
+  } > REGION_RTC_FAST
+
+  .rtc_fast.noinit (NOLOAD) : ALIGN(4)
+  {
+    *(.rtc_fast.noinit .rtc_fast.noinit.*)
+  } > REGION_RTC_FAST
 
   .bss (NOLOAD) :
   {
@@ -142,36 +164,6 @@ SECTIONS
     . = ABSOLUTE(_stack_start);
     _sstack = .;
   } > REGION_STACK
-
-  .rtc_fast.text : AT(_text_size + _rodata_size + _data_size + _rwtext_size) {
-    _srtc_fast_text = .;
-    *(.rtc_fast.literal .rtc_fast.text .rtc_fast.literal.* .rtc_fast.text.*)
-    . = ALIGN(4);
-    _ertc_fast_text = .;
-  } > REGION_RTC_FAST
-  _fast_text_size = _ertc_fast_text - _srtc_fast_text + 8;
-
-  .rtc_fast.data : AT(_text_size + _rodata_size + _data_size + _rwtext_size + _fast_text_size)
-  {
-    _rtc_fast_data_start = ABSOLUTE(.);
-    *(.rtc_fast.data .rtc_fast.data.*)
-    . = ALIGN(4);
-    _rtc_fast_data_end = ABSOLUTE(.);
-  } > REGION_RTC_FAST
-  _rtc_fast_data_size = _rtc_fast_data_end - _rtc_fast_data_start + 8;
-
- .rtc_fast.bss (NOLOAD) : ALIGN(4)
-  {
-    _rtc_fast_bss_start = ABSOLUTE(.);
-    *(.rtc_fast.bss .rtc_fast.bss.*)
-    . = ALIGN(4);
-    _rtc_fast_bss_end = ABSOLUTE(.);
-  } > REGION_RTC_FAST
-
- .rtc_fast.noinit (NOLOAD) : ALIGN(4)
-  {
-    *(.rtc_fast.noinit .rtc_fast.noinit.*)
-  } > REGION_RTC_FAST
 
   /* fake output .got section */
   /* Dynamic relocations are unsupported. This section is only used to detect
