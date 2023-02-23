@@ -35,6 +35,7 @@ pub use esp_hal_common::{
     Delay,
     PulseControl,
     Rtc,
+    Rwdt,
     Uart,
     UsbSerialJtag,
 };

@@ -79,7 +79,7 @@ SECTIONS
     _erodata = .;
   } > REGION_RODATA
 
-  _rodata_size = _erodata - _srodata;
+  _rodata_size = _erodata - _srodata + 8;
   .data ORIGIN(RAM) : AT(_text_size + _rodata_size)
   {
     _sdata = .;
@@ -91,14 +91,14 @@ SECTIONS
     _edata = .;
   } > REGION_DATA
 
-  _data_size = _edata - _sdata;
+  _data_size = _edata - _sdata + 8;
   .rwtext ORIGIN(REGION_RWTEXT) + _data_size : AT(_text_size + _rodata_size + _data_size){
     _srwtext = .;
     *(.rwtext);
     . = ALIGN(4);
     _erwtext = .;
   } > REGION_RWTEXT
-  _rwtext_size = _erwtext - _srwtext;
+  _rwtext_size = _erwtext - _srwtext + 8;
 
   .rtc_fast.text : AT(_text_size + _rodata_size + _data_size + _rwtext_size) {
     _srtc_fast_text = .;
@@ -106,7 +106,7 @@ SECTIONS
     . = ALIGN(4);
     _ertc_fast_text = .;
   } > REGION_RTC_FAST
-  _fast_text_size = _ertc_fast_text - _srtc_fast_text;
+  _fast_text_size = _ertc_fast_text - _srtc_fast_text + 8;
 
   .rtc_fast.data : AT(_text_size + _rodata_size + _data_size + _rwtext_size + _fast_text_size)
   {
@@ -115,7 +115,7 @@ SECTIONS
     . = ALIGN(4);
     _rtc_fast_data_end = ABSOLUTE(.);
   } > REGION_RTC_FAST
-  _rtc_fast_data_size = _rtc_fast_data_end - _rtc_fast_data_start;
+  _rtc_fast_data_size = _rtc_fast_data_end - _rtc_fast_data_start + 8;
 
   .rtc_fast.bss (NOLOAD) : ALIGN(4)
   {

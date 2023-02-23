@@ -937,7 +937,7 @@ macro_rules! rmt {
             pcr.rmt_sclk_conf.write(|w| w.sclk_en().set_bit());
 
 
-            self.reg.sys_conf.modify(|_, w| unsafe {
+            self.reg.sys_conf.modify(|_, w|
                 // Enable clock
                 w.clk_en()
                     .set_bit()
@@ -952,7 +952,7 @@ macro_rules! rmt {
                     .clear_bit()
                     // Disable FIFO mode
                     .apb_fifo_mask()
-                    .set_bit() });
+                    .set_bit());
                     // Select clock source
                 #[cfg(not(esp32c6))]
                 self.reg.sys_conf.modify(|_, w| unsafe {

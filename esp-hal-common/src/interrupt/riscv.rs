@@ -330,15 +330,15 @@ mod vectored {
         for (prio, num) in PRIORITY_TO_INTERRUPT.iter().enumerate() {
             set_kind(
                 crate::get_core(),
-                core::mem::transmute(*num),
+                core::mem::transmute(*num as u32),
                 InterruptKind::Level,
             );
             set_priority(
                 crate::get_core(),
-                core::mem::transmute(*num),
+                core::mem::transmute(*num as u32),
                 core::mem::transmute((prio as u8) + 1),
             );
-            enable_cpu_interrupt(core::mem::transmute(*num));
+            enable_cpu_interrupt(core::mem::transmute(*num as u32));
         }
     }
 

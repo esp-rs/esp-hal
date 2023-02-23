@@ -41,7 +41,7 @@ const MODEM_LPCON_CLK_I2C_MST_FO: u32 = 1 << 2;
 const MODEM_LPCON_I2C_MST_CLK_CONF_REG: u32 = DR_REG_MODEM_LPCON_BASE + 0x10;
 const MODEM_LPCON_CLK_I2C_MST_SEL_160M: u32 = 1 << 0;
 
-pub(crate) fn esp32c6_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock) {
+pub(crate) fn esp32c6_rtc_bbpll_configure(_xtal_freq: XtalClock, _pll_freq: PllClock) {
     unsafe {
         // enable i2c mst clk by force on temporarily
         (MODEM_LPCON_CLK_CONF_FORCE_ON_REG as *mut u32).write_volatile(
@@ -278,6 +278,8 @@ const LP_I2C_ANA_MST_I2C0_DATA_REG: u32 = DR_REG_LP_I2C_ANA_MST_BASE + 0x8;
 const LP_I2C_ANA_MST_I2C0_RDATA_V: u32 = 0x000000FF;
 const LP_I2C_ANA_MST_I2C0_RDATA_S: u32 = 0;
 
+const REGI2C_BBPLL: u8 = 0x66;
+
 fn regi2c_enable_block(block: u8) {
     reg_set_bit(MODEM_LPCON_CLK_CONF_REG, MODEM_LPCON_CLK_I2C_MST_EN);
     reg_set_bit(LP_I2C_ANA_MST_DATE_REG, LP_I2C_ANA_MST_I2C_MAT_CLK_EN);
@@ -324,7 +326,7 @@ fn regi2c_disable_block(block: u8) {
     }
 }
 
-pub(crate) fn regi2c_write(block: u8, host_id: u8, reg_add: u8, data: u8) {
+pub(crate) fn regi2c_write(block: u8, _host_id: u8, reg_add: u8, data: u8) {
     regi2c_enable_block(block);
 
     let temp: u32 = ((block as u32 & REGI2C_RTC_SLAVE_ID_V as u32) << REGI2C_RTC_SLAVE_ID_S as u32)
@@ -337,7 +339,7 @@ pub(crate) fn regi2c_write(block: u8, host_id: u8, reg_add: u8, data: u8) {
     regi2c_disable_block(block);
 }
 
-pub(crate) fn regi2c_write_mask(block: u8, host_id: u8, reg_add: u8, msb: u8, lsb: u8, data: u8) {
+pub(crate) fn regi2c_write_mask(block: u8, _host_id: u8, reg_add: u8, msb: u8, lsb: u8, data: u8) {
     assert!(msb - lsb < 8);
     regi2c_enable_block(block);
 

@@ -1,15 +1,18 @@
 use embedded_hal::watchdog::{Watchdog, WatchdogDisable, WatchdogEnable};
-use fugit::{HertzU32, MicrosDurationU64};
+#[cfg(not(esp32c6))]
+use fugit::HertzU32;
+use fugit::MicrosDurationU64;
 
 use self::rtc::SocResetReason;
-#[cfg(not(any(esp32)))]
+#[cfg(not(esp32c6))]
+use crate::clock::{Clock, XtalClock};
+#[cfg(not(any(esp32, esp32c6)))]
 use crate::efuse::Efuse;
 #[cfg(esp32c6)]
-use crate::peripherals::{LP_AON, LP_CLKRST, LP_WDT, PMU};
+use crate::peripherals::LP_WDT;
 #[cfg(not(esp32c6))]
 use crate::peripherals::{RTC_CNTL, TIMG0};
 use crate::{
-    clock::{Clock, XtalClock},
     peripheral::{Peripheral, PeripheralRef},
     Cpu,
 };
@@ -27,11 +30,16 @@ type RtcCntl = crate::peripherals::RTC_CNTL;
 #[cfg_attr(esp32s3, path = "rtc/esp32s3.rs")]
 mod rtc;
 
+#[cfg(esp32c6)]
+pub use rtc::RtcClock;
+
 extern "C" {
+    #[allow(dead_code)]
     fn ets_delay_us(us: u32);
     fn rtc_get_reset_reason(cpu_num: u32) -> u32;
 }
 
+#[cfg(not(esp32c6))]
 #[allow(unused)]
 #[derive(Debug, Clone, Copy)]
 /// RTC SLOW_CLK frequency values
@@ -42,6 +50,7 @@ pub(crate) enum RtcFastClock {
     RtcFastClock8m     = 1,
 }
 
+#[cfg(not(esp32c6))]
 impl Clock for RtcFastClock {
     fn frequency(&self) -> HertzU32 {
         match self {
@@ -55,6 +64,7 @@ impl Clock for RtcFastClock {
 }
 
 #[cfg(not(esp32c6))]
+#[allow(unused)]
 #[derive(Debug, Clone, Copy)]
 /// RTC SLOW_CLK frequency values
 pub(crate) enum RtcSlowClock {
@@ -66,21 +76,7 @@ pub(crate) enum RtcSlowClock {
     RtcSlowClock8mD256  = 2,
 }
 
-#[cfg(esp32c6)]
-#[derive(Debug, Clone, Copy, PartialEq)]
-/// RTC SLOW_CLK frequency values
-pub(crate) enum RtcSlowClock {
-    /// Internal slow RC oscillator
-    RtcSlowClockRtc     = 0,
-    /// External 32 KHz XTAL
-    RtcSlowClock32kXtal = 1,
-    /// TODO
-    RtcSlowClock32kRc   = 2,
-    /// Internal 150 KHz RC oscillator
-    RtcCalInternalOsc   = 3,
-    RtcCalRcFast,
-}
-
+#[cfg(not(esp32c6))]
 impl Clock for RtcSlowClock {
     fn frequency(&self) -> HertzU32 {
         match self {
@@ -120,35 +116,10 @@ pub(crate) enum RtcCalSel {
     RtcCalInternalOsc = 3,
 }
 
-#[cfg(esp32c6)]
-#[derive(Debug, Clone, Copy, PartialEq)]
-/// Clock source to be calibrated using rtc_clk_cal function
-pub(crate) enum RtcCalSel {
-    /// Currently selected RTC SLOW_CLK
-    RtcCalRtcMux      = -1,
-    /// Currently selected RTC SLOW_CLK
-    RtcCalRcSlow      = 0,
-    /// External 32 KHz XTAL
-    RtcCal32kXtal     = 1,
-    /// TODO
-    RtcCal32kRc       = 2,
-    #[cfg(not(esp32))]
-    /// Internal 150 KHz RC oscillator TODO
-    RtcCalInternalOsc = 3,
-    RtcCalRcFast,
-}
-
-#[cfg(esp32c6)]
-pub(crate) enum RtcCaliClkSel {
-    CaliClkRcSlow = 0,
-    CaliClkRcFast = 1,
-    CaliClk32k    = 2,
-}
-
 pub struct Rtc<'d> {
     _inner: PeripheralRef<'d, RtcCntl>,
     pub rwdt: Rwdt,
-    #[cfg(any(esp32c2, esp32c3, esp32c6, esp32s3))]
+    #[cfg(any(esp32c2, esp32c3, esp32s3, esp32c6))]
     pub swd: Swd,
 }
 
@@ -160,7 +131,7 @@ impl<'d> Rtc<'d> {
         Self {
             _inner: rtc_cntl.into_ref(),
             rwdt: Rwdt::default(),
-            #[cfg(any(esp32c2, esp32c3, esp32c6, esp32s3))]
+            #[cfg(any(esp32c2, esp32c3, esp32s3, esp32c6))]
             swd: Swd::new(),
         }
     }
@@ -170,9 +141,11 @@ impl<'d> Rtc<'d> {
     }
 }
 
+#[cfg(not(esp32c6))]
 /// RTC Watchdog Timer
 pub struct RtcClock;
 
+#[cfg(not(esp32c6))]
 /// RTC Watchdog Timer driver
 impl RtcClock {
     const CAL_FRACT: u32 = 19;

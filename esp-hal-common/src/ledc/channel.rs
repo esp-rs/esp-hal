@@ -197,10 +197,10 @@ macro_rules! start_duty_without_fading {
 macro_rules! start_duty_without_fading {
     ($self: ident, $num: literal) => {
         paste! {
-            $self.ledc.[<ch $num _conf1>].write(|w| unsafe {
+            $self.ledc.[<ch $num _conf1>].write(|w|
                 w.[<duty_start>]()
                     .set_bit()
-            });
+            );
             $self.ledc.[<ch $num _gamma_wr>].write(|w| unsafe {
                 w.[<ch_gamma_duty_inc>]()
                     .set_bit()

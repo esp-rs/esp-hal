@@ -70,6 +70,5 @@ fn main() -> ! {
         })
         .unwrap();
 
-    esp_println::println!("Dd");
     loop {}
 }
