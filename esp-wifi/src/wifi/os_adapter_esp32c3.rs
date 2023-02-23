@@ -1,3 +1,4 @@
+use esp32c3_hal::riscv;
 use log::trace;
 
 pub(crate) fn chip_ints_on(mask: u32) {

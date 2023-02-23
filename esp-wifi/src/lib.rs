@@ -21,8 +21,6 @@ use esp32s2_hal as hal;
 #[cfg(feature = "esp32s3")]
 use esp32s3_hal as hal;
 
-use hal::*;
-
 use fugit::MegahertzU32;
 use hal::clock::Clocks;
 use linked_list_allocator::Heap;
@@ -74,12 +72,6 @@ use timer::{get_systimer_count, TICKS_PER_SECOND};
 
 #[cfg(all(feature = "embedded-svc", feature = "wifi"))]
 pub mod wifi_interface;
-
-#[cfg(feature = "esp32c3")]
-use esp32c3_hal::interrupt;
-
-#[cfg(feature = "esp32c2")]
-use esp32c2_hal::interrupt;
 
 pub fn current_millis() -> u64 {
     get_systimer_count() / (TICKS_PER_SECOND / 1000)

@@ -28,10 +28,6 @@ use hal::{
     prelude::*,
     Rng, Rtc, IO,
 };
-#[cfg(any(feature = "esp32c3", feature = "esp32c2"))]
-use riscv_rt::entry;
-#[cfg(any(feature = "esp32", feature = "esp32s3"))]
-use xtensa_lx_rt::entry;
 
 #[entry]
 fn main() -> ! {

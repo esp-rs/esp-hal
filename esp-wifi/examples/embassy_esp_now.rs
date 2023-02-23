@@ -30,11 +30,6 @@ use hal::{embassy, peripherals::Peripherals, prelude::*, timer::TimerGroup, Rtc}
 #[cfg(any(feature = "esp32c3", feature = "esp32c2"))]
 use hal::system::SystemExt;
 
-#[cfg(any(feature = "esp32c3", feature = "esp32c2"))]
-use riscv_rt::entry;
-#[cfg(any(feature = "esp32", feature = "esp32s3", feature = "esp32s2"))]
-use xtensa_lx_rt::entry;
-
 #[embassy_executor::task]
 async fn run(mut esp_now: EspNow) {
     let mut ticker = Ticker::every(Duration::from_secs(5));

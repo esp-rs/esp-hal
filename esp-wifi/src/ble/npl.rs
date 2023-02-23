@@ -906,7 +906,7 @@ unsafe extern "C" fn ble_npl_eventq_put(queue: *const ble_npl_eventq, event: *co
             .as_mut()
             .unwrap()
             .queued = true;
-        EVENT_QUEUE.enqueue((*event).dummy as usize);
+        EVENT_QUEUE.enqueue((*event).dummy as usize).unwrap();
     });
 }
 

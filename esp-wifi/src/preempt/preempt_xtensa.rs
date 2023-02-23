@@ -1,13 +1,13 @@
 use super::*;
-use xtensa_lx_rt::exception::Context;
+use crate::hal::trapframe::TrapFrame;
 
 #[derive(Debug, Clone, Copy)]
 pub struct TaskContext {
-    trap_frame: Context,
+    trap_frame: TrapFrame,
 }
 
 static mut CTX_TASKS: [TaskContext; MAX_TASK] = [TaskContext {
-    trap_frame: Context {
+    trap_frame: TrapFrame {
         PC: 0,
         PS: 0,
         A0: 0,
@@ -96,7 +96,7 @@ pub fn task_create(task: extern "C" fn()) -> usize {
     }
 }
 
-pub fn task_to_trap_frame(id: usize, trap_frame: &mut Context) {
+pub fn task_to_trap_frame(id: usize, trap_frame: &mut TrapFrame) {
     unsafe {
         trap_frame.PC = CTX_TASKS[id].trap_frame.PC;
         trap_frame.PS = CTX_TASKS[id].trap_frame.PS;
@@ -155,7 +155,7 @@ pub fn task_to_trap_frame(id: usize, trap_frame: &mut Context) {
     }
 }
 
-pub fn trap_frame_to_task(id: usize, trap_frame: &Context) {
+pub fn trap_frame_to_task(id: usize, trap_frame: &TrapFrame) {
     unsafe {
         CTX_TASKS[id].trap_frame.PC = trap_frame.PC;
         CTX_TASKS[id].trap_frame.PS = trap_frame.PS;
@@ -220,7 +220,7 @@ pub fn next_task() {
     }
 }
 
-pub fn task_switch(trap_frame: &mut Context) {
+pub fn task_switch(trap_frame: &mut TrapFrame) {
     unsafe {
         if FIRST_SWITCH.load(Ordering::Relaxed) {
             FIRST_SWITCH.store(false, Ordering::Relaxed);

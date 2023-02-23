@@ -6,7 +6,7 @@ use log::trace;
 pub(crate) fn chip_ints_on(mask: u32) {
     trace!("chip_ints_on esp32");
     unsafe {
-        xtensa_lx::interrupt::enable_mask(1 << 0);
+        esp32s2_hal::xtensa_lx::interrupt::enable_mask(1 << 0);
     }
 }
 

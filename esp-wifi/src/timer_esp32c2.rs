@@ -52,11 +52,14 @@ pub fn setup_timer_isr(systimer: Alarm<Target, 0>) {
             .unwrap();
     }
 
-    esp32c2_hal::interrupt::enable(Interrupt::SW_INTR_3, hal::interrupt::Priority::Priority1)
-        .unwrap();
+    esp32c2_hal::interrupt::enable(
+        Interrupt::ETS_FROM_CPU_INTR3,
+        hal::interrupt::Priority::Priority1,
+    )
+    .unwrap();
 
     unsafe {
-        riscv::interrupt::enable();
+        esp32c2_hal::riscv::interrupt::enable();
     }
 
     while unsafe { crate::preempt::FIRST_SWITCH.load(core::sync::atomic::Ordering::Relaxed) } {}
@@ -155,9 +158,9 @@ fn SYSTIMER_TARGET0(trap_frame: &mut TrapFrame) {
 }
 
 #[interrupt]
-fn SW_INTR_3(trap_frame: &mut TrapFrame) {
+fn ETS_FROM_CPU_INTR3(trap_frame: &mut TrapFrame) {
     unsafe {
-        // clear SW_INTR_3
+        // clear ETS_FROM_CPU_INTR3
         (&*pac::SYSTEM::PTR)
             .cpu_intr_from_cpu_3
             .modify(|_, w| w.cpu_intr_from_cpu_3().clear_bit());

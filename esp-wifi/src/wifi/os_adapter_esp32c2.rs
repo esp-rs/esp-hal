@@ -18,12 +18,12 @@ pub(crate) fn chip_ints_on(mask: u32) {
 pub(crate) unsafe extern "C" fn wifi_int_disable(
     wifi_int_mux: *mut crate::binary::c_types::c_void,
 ) -> u32 {
-    let res = if riscv::register::mstatus::read().mie() {
+    let res = if esp32c2_hal::riscv::register::mstatus::read().mie() {
         1
     } else {
         0
     };
-    riscv::interrupt::disable();
+    esp32c2_hal::riscv::interrupt::disable();
 
     trace!(
         "wifi_int_disable wifi_int_mux {:p} - return {}",
@@ -45,7 +45,7 @@ pub(crate) unsafe extern "C" fn wifi_int_restore(
     );
 
     if tmp == 1 {
-        riscv::interrupt::enable();
+        esp32c2_hal::riscv::interrupt::enable();
     }
 }
 

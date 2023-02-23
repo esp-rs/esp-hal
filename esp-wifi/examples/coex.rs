@@ -38,11 +38,6 @@ use smoltcp::{iface::SocketStorage, wire::Ipv4Address};
 #[cfg(feature = "esp32c3")]
 use hal::system::SystemExt;
 
-#[cfg(feature = "esp32c3")]
-use riscv_rt::entry;
-#[cfg(any(feature = "esp32", feature = "esp32s3"))]
-use xtensa_lx_rt::entry;
-
 const SSID: &str = env!("SSID");
 const PASSWORD: &str = env!("PASSWORD");
 

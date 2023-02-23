@@ -31,11 +31,7 @@ use hal::{peripherals::Peripherals, prelude::*, Rtc};
 #[cfg(any(feature = "esp32c3", feature = "esp32c2"))]
 use hal::system::SystemExt;
 
-#[cfg(any(feature = "esp32c3", feature = "esp32c2"))]
-use riscv_rt::entry;
 use smoltcp::iface::SocketStorage;
-#[cfg(any(feature = "esp32", feature = "esp32s3", feature = "esp32s2"))]
-use xtensa_lx_rt::entry;
 
 const SSID: &str = env!("SSID");
 const PASSWORD: &str = env!("PASSWORD");

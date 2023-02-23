@@ -2,6 +2,9 @@ use core::cell::RefCell;
 
 use atomic_polyfill::{AtomicU64, Ordering};
 use critical_section::Mutex;
+use esp32_hal::xtensa_lx;
+use esp32_hal::xtensa_lx_rt;
+use esp32_hal::xtensa_lx_rt::exception::Context;
 use esp32_hal::{
     interrupt,
     peripherals::{self, TIMG1},
@@ -9,7 +12,6 @@ use esp32_hal::{
     timer::{Timer, Timer0},
 };
 use log::trace;
-use xtensa_lx_rt::exception::Context;
 
 use crate::preempt::preempt::task_switch;
 use esp32_hal::macros::interrupt;

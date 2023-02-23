@@ -13,7 +13,7 @@ const DPORT_WIFI_CLK_WIFI_EN_M: u32 = (DPORT_WIFI_CLK_WIFI_EN_V) << (DPORT_WIFI_
 pub(crate) fn chip_ints_on(mask: u32) {
     trace!("chip_ints_on esp32");
     unsafe {
-        xtensa_lx::interrupt::enable_mask(1 << 0);
+        esp32_hal::xtensa_lx::interrupt::enable_mask(1 << 0);
     }
 }
 
