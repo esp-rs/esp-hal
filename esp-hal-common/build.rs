@@ -111,6 +111,7 @@ fn main() {
             "usb_serial_jtag",
             "plic",
             "aes",
+            "radio",
         ]
     } else if esp32s2 {
         vec![

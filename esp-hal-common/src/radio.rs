@@ -38,13 +38,23 @@ impl LowRate {
 }
 
 cfg_if::cfg_if! {
-    if #[cfg(any(esp32, esp32s3, esp32c2, esp32c3))] {
+    if #[cfg(any(esp32, esp32c2, esp32c3, esp32s3))] {
         impl RadioExt for crate::peripherals::RADIO {
             type Components = (Wifi, Bluetooth);
 
             fn split(self) -> Self::Components {
                 unsafe {
                     (Wifi::steal(), Bluetooth::steal())
+                }
+            }
+        }
+    } else if #[cfg(esp32c6)] {
+        impl RadioExt for crate::peripherals::RADIO {
+            type Components = (Wifi, Bluetooth, LowRate);
+
+            fn split(self) -> Self::Components {
+                unsafe {
+                    (Wifi::steal(), Bluetooth::steal(), LowRate::steal())
                 }
             }
         }
