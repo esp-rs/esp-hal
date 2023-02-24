@@ -255,7 +255,7 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
         }
     }
 
-    /// Set how a new timestamp syncs with the timer.
+    /// Write a new timestamp.
     /// The written value will take effect according to the set
     /// [`PwmUpdateMethod`].
     #[cfg(esp32)]
@@ -282,7 +282,7 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
     #[cfg(esp32s3)]
     pub fn set_timestamp(&mut self, value: u16) {
         // SAFETY:
-        // We only write to our GENx_TSTMP_x register
+        // We only write to our CMPRx_VALUEx register
         let block = unsafe { &*PWM::block() };
         match (OP, IS_A) {
             (0, true) => block.cmpr0_value0.write(|w| w.cmpr0_a().variant(value)),
