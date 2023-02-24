@@ -119,7 +119,7 @@ pub(crate) enum RtcCalSel {
 pub struct Rtc<'d> {
     _inner: PeripheralRef<'d, RtcCntl>,
     pub rwdt: Rwdt,
-    #[cfg(any(esp32c2, esp32c3, esp32s3, esp32c6))]
+    #[cfg(any(esp32c2, esp32c3, esp32c6, esp32s3))]
     pub swd: Swd,
 }
 
@@ -131,7 +131,7 @@ impl<'d> Rtc<'d> {
         Self {
             _inner: rtc_cntl.into_ref(),
             rwdt: Rwdt::default(),
-            #[cfg(any(esp32c2, esp32c3, esp32s3, esp32c6))]
+            #[cfg(any(esp32c2, esp32c3, esp32c6, esp32s3))]
             swd: Swd::new(),
         }
     }
@@ -778,7 +778,11 @@ impl Swd {
         let rtc_cntl = unsafe { &*RTC_CNTL::PTR };
         #[cfg(esp32c6)]
         let rtc_cntl = unsafe { &*LP_WDT::PTR };
+
+        #[cfg(not(esp32c6))]
         let wkey = if enable { 0u32 } else { 0x8F1D_312A };
+        #[cfg(esp32c6)]
+        let wkey = if enable { 0u32 } else { 0x50D8_3AA1 };
 
         rtc_cntl
             .swd_wprotect

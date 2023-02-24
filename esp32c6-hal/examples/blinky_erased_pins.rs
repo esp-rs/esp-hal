@@ -41,7 +41,7 @@ fn main() -> ! {
     let led2 = io.pins.gpio4.into_push_pull_output();
     let led3 = io.pins.gpio5.into_push_pull_output();
 
-    let button = io.pins.gpio0.into_pull_down_input().degrade();
+    let button = io.pins.gpio9.into_pull_down_input().degrade();
 
     // you can use `into` or `degrade`
     let mut pins = [led1.into(), led2.into(), led3.degrade()];

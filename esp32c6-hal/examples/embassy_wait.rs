@@ -19,11 +19,11 @@ use esp32c6_hal::{
     IO,
 };
 use esp_backtrace as _;
-use esp_hal_common::{Gpio0, Input, PullDown};
+use esp_hal_common::{Gpio9, Input, PullDown};
 use static_cell::StaticCell;
 
 #[embassy_executor::task]
-async fn ping(mut pin: Gpio0<Input<PullDown>>) {
+async fn ping(mut pin: Gpio9<Input<PullDown>>) {
     loop {
         esp_println::println!("Waiting...");
         pin.wait_for_rising_edge().await.unwrap();
@@ -63,8 +63,8 @@ fn main() -> ! {
     embassy::init(&clocks, timer_group0.timer0);
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-    // GPIO 0 as input
-    let input = io.pins.gpio0.into_pull_down_input();
+    // GPIO 9 as input
+    let input = io.pins.gpio9.into_pull_down_input();
 
     // Async requires the GPIO interrupt to wake futures
     esp32c6_hal::interrupt::enable(
