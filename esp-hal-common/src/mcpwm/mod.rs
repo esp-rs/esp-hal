@@ -295,10 +295,10 @@ unsafe impl PwmPeripheral for PWM {
         match (OP, IS_A) {
             (0, true) => OutputSignal::PWM0_0A,
             (1, true) => OutputSignal::PWM0_1A,
-            (2, true) => OutputSignal::PWM0_1A,
+            (2, true) => OutputSignal::PWM0_2A,
             (0, false) => OutputSignal::PWM0_0B,
             (1, false) => OutputSignal::PWM0_1B,
-            (2, false) => OutputSignal::PWM0_1B,
+            (2, false) => OutputSignal::PWM0_2B,
             _ => unreachable!(),
         }
     }
@@ -318,10 +318,10 @@ unsafe impl PwmPeripheral for crate::peripherals::PWM1 {
         match (OP, IS_A) {
             (0, true) => OutputSignal::PWM1_0A,
             (1, true) => OutputSignal::PWM1_1A,
-            (2, true) => OutputSignal::PWM1_1A,
+            (2, true) => OutputSignal::PWM1_2A,
             (0, false) => OutputSignal::PWM1_0B,
             (1, false) => OutputSignal::PWM1_1B,
-            (2, false) => OutputSignal::PWM1_1B,
+            (2, false) => OutputSignal::PWM1_2B,
             _ => unreachable!(),
         }
     }
