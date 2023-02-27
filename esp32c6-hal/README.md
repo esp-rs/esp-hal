@@ -52,9 +52,9 @@ cargo espflash --release --format direct-boot --features direct-boot --example h
 The ROM Bootloader will identify the firmware image built with Direct Boot support and load it appropriately from the External Flash:
 
 ```shell
-ESP-ROM:esp32c6-api1-20210207
-Build:Feb  7 2021
-rst:0x1 (POWERON),boot:0xc (SPI_FAST_FLASH_BOOT)
+ESP-ROM:esp32c6-20220919
+Build:Sep 19 2022
+rst:0x1 (POWERON),boot:0x6e (SPI_FAST_FLASH_BOOT)
 Hello world!
 Hello world!
 Hello world!

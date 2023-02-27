@@ -65,7 +65,7 @@ There are a number of other crates within the [esp-rs organization] which can be
 | [esp-backtrace] |                 Backtrace support for bare-metal applications                  |
 |  [esp-println]  |                Provides `print!` and `println!` implementations                |
 |  [esp-storage]  | Implementation of [embedded-storage] traits to access unencrypted flash memory |
-|   [esp-wifi]    |                Experimental `no_std` Wi-Fi/Bluetooth LE support                |
+|   [esp-wifi]    |                      `no_std` Wi-Fi/Bluetooth LE support                       |
 
 [esp-rs organization]: https://github.com/esp-rs
 [esp-alloc]: https://github.com/esp-rs/esp-alloc
@@ -79,7 +79,7 @@ There are a number of other crates within the [esp-rs organization] which can be
 
 The **M**inimum **S**upported **R**ust **V**ersions are:
 
-- `1.65.0` for RISC-V devices (**ESP32-C2**, **ESP32-C3**)
+- `1.65.0` for RISC-V devices (**ESP32-C2**, **ESP32-C3**, **ESP32-C6**)
 - `1.65.0` for Xtensa devices (**ESP32**, **ESP32-S2**, **ESP32-S3**)
 - `1.67.0` for all `async` examples (`embassy_hello_world`, `embassy_wait`, etc.)
 

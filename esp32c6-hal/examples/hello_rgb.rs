@@ -22,7 +22,6 @@ use esp32c6_hal::{
     Rtc,
     IO,
 };
-#[allow(unused_imports)]
 use esp_backtrace as _;
 use smart_leds::{
     brightness,
