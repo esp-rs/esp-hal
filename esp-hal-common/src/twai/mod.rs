@@ -17,11 +17,9 @@ use crate::peripherals::twai::RegisterBlock;
 use crate::peripherals::twai0::RegisterBlock;
 use crate::{
     clock::Clocks,
+    gpio::{InputPin, InputSignal, OutputPin, OutputSignal},
     peripheral::{Peripheral, PeripheralRef},
     system::{self, PeripheralClockControl},
-    types::{InputSignal, OutputSignal},
-    InputPin,
-    OutputPin,
 };
 
 pub mod filter;

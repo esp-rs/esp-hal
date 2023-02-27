@@ -65,9 +65,9 @@ use timer::Timer;
 
 use crate::{
     clock::Clocks,
+    gpio::OutputSignal,
     peripheral::{Peripheral, PeripheralRef},
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
-    types::OutputSignal,
 };
 
 /// MCPWM operators

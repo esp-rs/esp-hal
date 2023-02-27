@@ -56,7 +56,6 @@ pub use self::soc::cpu_control;
 pub use self::usb_serial_jtag::UsbSerialJtag;
 pub use self::{
     delay::Delay,
-    gpio::*,
     interrupt::*,
     rng::Rng,
     rtc_cntl::{Rtc, Rwdt},

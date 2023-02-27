@@ -8,10 +8,9 @@ use crate::dma::I2s1Peripheral;
 use crate::{
     clock::Clocks,
     dma::{Channel, DmaError, DmaTransfer, I2s0Peripheral, I2sPeripheral, Rx, Tx},
+    gpio::{InputPin, OutputPin},
     peripheral::{Peripheral, PeripheralRef},
     system::PeripheralClockControl,
-    InputPin,
-    OutputPin,
 };
 
 #[cfg(any(esp32, esp32s2, esp32s3))]
@@ -1003,8 +1002,8 @@ mod private {
     use crate::{
         clock::Clocks,
         dma::{DmaPeripheral, Rx, Tx},
+        gpio::{InputSignal, OutputSignal},
         system::Peripheral,
-        types::{InputSignal, OutputSignal},
     };
 
     pub trait I2sPins {}

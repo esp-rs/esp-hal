@@ -8,31 +8,11 @@
 //! let mut led = io.pins.gpio5.into_push_pull_output();
 //! ```
 
-use core::marker::PhantomData;
+use core::{convert::Infallible, marker::PhantomData};
 
-#[doc(hidden)]
-#[cfg_attr(esp32, path = "gpio/esp32.rs")]
-#[cfg_attr(esp32c2, path = "gpio/esp32c2.rs")]
-#[cfg_attr(esp32c3, path = "gpio/esp32c3.rs")]
-#[cfg_attr(esp32c6, path = "gpio/esp32c6.rs")]
-#[cfg_attr(esp32s2, path = "gpio/esp32s2.rs")]
-#[cfg_attr(esp32s3, path = "gpio/esp32s3.rs")]
-pub mod types;
-
-use core::convert::Infallible;
-
-pub use crate::types::*;
-use crate::{
-    peripherals::{GPIO, IO_MUX},
-    types::{
-        get_io_mux_reg,
-        gpio_intr_enable,
-        OutputSignalType,
-        GPIO_FUNCTION,
-        INPUT_SIGNAL_MAX,
-        OUTPUT_SIGNAL_MAX,
-    },
-};
+use crate::peripherals::{GPIO, IO_MUX};
+pub use crate::soc::gpio::*;
+pub(crate) use crate::{analog, gpio};
 
 #[derive(Copy, Clone)]
 pub enum Event {
@@ -650,6 +630,16 @@ where
     PINTYPE: PinType,
     SIG: GpioSignal,
 {
+    pub fn new() -> Self {
+        Self {
+            _mode: PhantomData,
+            _pintype: PhantomData,
+            _reg_access: PhantomData,
+            _ira: PhantomData,
+            _signals: PhantomData,
+        }
+    }
+
     fn init_input(&self, pull_down: bool, pull_up: bool) {
         let gpio = unsafe { &*GPIO::PTR };
 
@@ -658,7 +648,7 @@ where
             .modify(|_, w| unsafe { w.out_sel().bits(OutputSignal::GPIO as OutputSignalType) });
 
         #[cfg(esp32)]
-        types::errata36(GPIONUM, pull_up, pull_down);
+        crate::soc::gpio::errata36(GPIONUM, pull_up, pull_down);
 
         get_io_mux_reg(GPIONUM).modify(|_, w| unsafe {
             w.mcu_sel()
@@ -1375,7 +1365,7 @@ where
     SIG: GpioSignal,
 {
     pub fn into_analog(self) -> GpioPin<Analog, RA, IRA, PINTYPE, SIG, GPIONUM> {
-        types::internal_into_analog(GPIONUM);
+        crate::soc::gpio::internal_into_analog(GPIONUM);
 
         GpioPin {
             _mode: PhantomData,
@@ -1387,7 +1377,7 @@ where
     }
 }
 
-impl<MODE> embedded_hal::digital::v2::InputPin for AnyPin<crate::Input<MODE>> {
+impl<MODE> embedded_hal::digital::v2::InputPin for AnyPin<Input<MODE>> {
     type Error = core::convert::Infallible;
 
     fn is_high(&self) -> Result<bool, Self::Error> {
@@ -1523,8 +1513,9 @@ impl<MODE> embedded_hal_async::digital::Wait for AnyPin<Input<MODE>> {
 
 pub struct IO {
     _io_mux: IO_MUX,
-    pub pins: types::Pins,
+    pub pins: Pins,
 }
+
 impl IO {
     pub fn new(gpio: GPIO, io_mux: IO_MUX) -> Self {
         let pins = gpio.split();
@@ -1563,13 +1554,7 @@ macro_rules! gpio {
                     Pins {
                         $(
                             [< gpio $gpionum >]: {
-                                 GpioPin {
-                                    _mode: PhantomData,
-                                    _pintype: PhantomData,
-                                    _reg_access: PhantomData,
-                                    _ira: PhantomData,
-                                    _signals: PhantomData
-                                }
+                                 GpioPin::new()
                             },
                         )+
                     }
@@ -1579,7 +1564,7 @@ macro_rules! gpio {
             $(
                 pub struct [<Gpio $gpionum Signals>] {}
 
-                impl super::GpioSignal for [<Gpio $gpionum Signals>] {
+                impl crate::gpio::GpioSignal for [<Gpio $gpionum Signals>] {
                     fn output_signals() -> [Option<OutputSignal>; 6]{
                         #[allow(unused_mut)]
                         let mut output_signals = [None,None,None,None,None,None];
@@ -1772,7 +1757,7 @@ macro_rules! analog {
                     $pin_num => {
 
                         paste!{
-                            use $crate::gpio::types::[< esp32s2_get_rtc_pad_ $pin_reg>];
+                            use $crate::gpio::[< esp32s2_get_rtc_pad_ $pin_reg>];
                             let rtc_pad = [< esp32s2_get_rtc_pad_ $pin_reg>]();
                         }
 
@@ -1844,12 +1829,6 @@ macro_rules! analog {
         }
     }
 }
-
-pub(crate) use analog;
-pub(crate) use gpio;
-
-pub use self::types::{InputSignal, OutputSignal};
-use self::types::{ONE_INPUT, ZERO_INPUT};
 
 #[cfg(feature = "async")]
 mod asynch {

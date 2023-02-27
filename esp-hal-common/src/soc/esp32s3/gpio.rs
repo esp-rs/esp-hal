@@ -1,15 +1,16 @@
 use paste::paste;
 
 use crate::{
-    gpio::PhantomData,
+    gpio::{
+        AlternateFunction,
+        Bank0GpioRegisterAccess,
+        Bank1GpioRegisterAccess,
+        GpioPin,
+        InputOutputAnalogPinType,
+        InputOutputPinType,
+        Unknown,
+    },
     peripherals::GPIO,
-    AlternateFunction,
-    Bank0GpioRegisterAccess,
-    Bank1GpioRegisterAccess,
-    GpioPin,
-    InputOutputAnalogPinType,
-    InputOutputPinType,
-    Unknown,
 };
 
 pub const NUM_PINS: usize = 48;

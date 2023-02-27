@@ -1,9 +1,9 @@
 use core::marker::PhantomData;
 
 use crate::{
+    gpio::OutputPin,
     mcpwm::{timer::Timer, PwmPeripheral},
     peripheral::{Peripheral, PeripheralRef},
-    OutputPin,
 };
 
 /// A MCPWM operator
