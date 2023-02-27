@@ -222,7 +222,12 @@ impl PeripheralClockControl {
                 system.pwm_conf.modify(|_, w| w.pwm_rst_en().clear_bit());
             }
             Peripheral::ApbSarAdc => {
-                // TODO
+                system
+                    .saradc_conf
+                    .modify(|_, w| w.saradc_reg_clk_en().set_bit());
+                system
+                    .saradc_conf
+                    .modify(|_, w| w.saradc_reg_rst_en().clear_bit());
             }
             Peripheral::Gdma => {
                 system.gdma_conf.modify(|_, w| w.gdma_clk_en().set_bit());
