@@ -10,10 +10,13 @@
 //! ```
 
 use crate::peripheral::PeripheralRef;
-#[cfg(not(esp32))]
-type SystemPeripheral = crate::peripherals::SYSTEM;
+
 #[cfg(esp32)]
 type SystemPeripheral = crate::peripherals::DPORT;
+#[cfg(esp32c6)]
+type SystemPeripheral = crate::peripherals::PCR;
+#[cfg(not(any(esp32, esp32c6)))]
+type SystemPeripheral = crate::peripherals::SYSTEM;
 
 /// Peripherals which can be enabled via [PeripheralClockControl]
 pub enum Peripheral {
@@ -26,13 +29,13 @@ pub enum Peripheral {
     #[cfg(rmt)]
     Rmt,
     Ledc,
-    #[cfg(any(esp32, esp32s3))]
+    #[cfg(mcpwm)]
     Mcpwm0,
-    #[cfg(any(esp32, esp32s3))]
+    #[cfg(mcpwm)]
     Mcpwm1,
-    #[cfg(any(esp32, esp32s2, esp32s3))]
+    #[cfg(any(esp32, esp32s2, esp32s3, esp32c6))]
     Pcnt,
-    #[cfg(any(esp32c2, esp32c3))]
+    #[cfg(any(esp32c2, esp32c3, esp32c6))]
     ApbSarAdc,
     #[cfg(gdma)]
     Gdma,
@@ -40,7 +43,7 @@ pub enum Peripheral {
     Dma,
     #[cfg(not(esp32c2))]
     I2s0,
-    #[cfg(not(any(esp32c2, esp32s2, esp32c3)))]
+    #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32s2)))]
     I2s1,
     #[cfg(usb_otg)]
     Usb,
@@ -48,6 +51,10 @@ pub enum Peripheral {
     Twai,
     #[cfg(aes)]
     Aes,
+    #[cfg(esp32c6)]
+    Twai0,
+    #[cfg(esp32c6)]
+    Twai1,
 }
 
 /// Controls the enablement of peripheral clocks.
@@ -55,6 +62,7 @@ pub struct PeripheralClockControl {
     _private: (),
 }
 
+#[cfg(not(esp32c6))]
 impl PeripheralClockControl {
     /// Enables and resets the given peripheral
     pub fn enable(&mut self, peripheral: Peripheral) {
@@ -109,12 +117,12 @@ impl PeripheralClockControl {
                 perip_clk_en0.modify(|_, w| w.ledc_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.ledc_rst().clear_bit());
             }
-            #[cfg(any(esp32, esp32s3))]
+            #[cfg(mcpwm)]
             Peripheral::Mcpwm0 => {
                 perip_clk_en0.modify(|_, w| w.pwm0_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.pwm0_rst().clear_bit());
             }
-            #[cfg(any(esp32, esp32s3))]
+            #[cfg(mcpwm)]
             Peripheral::Mcpwm1 => {
                 perip_clk_en0.modify(|_, w| w.pwm1_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.pwm1_rst().clear_bit());
@@ -186,6 +194,73 @@ impl PeripheralClockControl {
     }
 }
 
+#[cfg(esp32c6)]
+impl PeripheralClockControl {
+    /// Enables and resets the given peripheral
+    pub fn enable(&mut self, peripheral: Peripheral) {
+        let system = unsafe { &*SystemPeripheral::PTR };
+
+        match peripheral {
+            Peripheral::Spi2 => {
+                system.spi2_conf.modify(|_, w| w.spi2_clk_en().set_bit());
+                system.spi2_conf.modify(|_, w| w.spi2_rst_en().clear_bit());
+            }
+            Peripheral::I2cExt0 => {
+                system.i2c_conf.modify(|_, w| w.i2c_clk_en().set_bit());
+                system.i2c_conf.modify(|_, w| w.i2c_rst_en().clear_bit());
+            }
+            Peripheral::Rmt => {
+                system.rmt_conf.modify(|_, w| w.rmt_clk_en().set_bit());
+                system.rmt_conf.modify(|_, w| w.rmt_rst_en().clear_bit());
+            }
+            Peripheral::Ledc => {
+                system.ledc_conf.modify(|_, w| w.ledc_clk_en().set_bit());
+                system.ledc_conf.modify(|_, w| w.ledc_rst_en().clear_bit());
+            }
+            Peripheral::Mcpwm0 | Peripheral::Mcpwm1 => {
+                system.pwm_conf.modify(|_, w| w.pwm_clk_en().set_bit());
+                system.pwm_conf.modify(|_, w| w.pwm_rst_en().clear_bit());
+            }
+            Peripheral::ApbSarAdc => {
+                system
+                    .saradc_conf
+                    .modify(|_, w| w.saradc_reg_clk_en().set_bit());
+                system
+                    .saradc_conf
+                    .modify(|_, w| w.saradc_reg_rst_en().clear_bit());
+            }
+            Peripheral::Gdma => {
+                system.gdma_conf.modify(|_, w| w.gdma_clk_en().set_bit());
+                system.gdma_conf.modify(|_, w| w.gdma_rst_en().clear_bit());
+            }
+            Peripheral::I2s0 => {
+                system.i2s_conf.modify(|_, w| w.i2s_clk_en().set_bit());
+                system.i2s_conf.modify(|_, w| w.i2s_rst_en().clear_bit());
+            }
+            Peripheral::Twai0 => {
+                system.twai0_conf.modify(|_, w| w.twai0_clk_en().set_bit());
+                system
+                    .twai0_conf
+                    .modify(|_, w| w.twai0_rst_en().clear_bit());
+            }
+            Peripheral::Twai1 => {
+                system.twai1_conf.modify(|_, w| w.twai1_clk_en().set_bit());
+                system
+                    .twai1_conf
+                    .modify(|_, w| w.twai1_rst_en().clear_bit());
+            }
+            Peripheral::Aes => {
+                system.aes_conf.modify(|_, w| w.aes_clk_en().set_bit());
+                system.aes_conf.modify(|_, w| w.aes_rst_en().clear_bit());
+            }
+            Peripheral::Pcnt => {
+                system.pcnt_conf.modify(|_, w| w.pcnt_clk_en().set_bit());
+                system.pcnt_conf.modify(|_, w| w.pcnt_rst_en().clear_bit());
+            }
+        }
+    }
+}
+
 /// Controls the configuration of the chip's clocks.
 pub struct SystemClockControl {
     _private: (),
@@ -238,13 +313,16 @@ impl<'d, T: crate::peripheral::Peripheral<P = SystemPeripheral> + 'd> SystemExt<
 
 impl crate::peripheral::Peripheral for SystemClockControl {
     type P = SystemClockControl;
+
     #[inline]
     unsafe fn clone_unchecked(&mut self) -> Self::P {
         SystemClockControl { _private: () }
     }
 }
+
 impl crate::peripheral::Peripheral for &mut SystemClockControl {
     type P = SystemClockControl;
+
     #[inline]
     unsafe fn clone_unchecked(&mut self) -> Self::P {
         SystemClockControl { _private: () }

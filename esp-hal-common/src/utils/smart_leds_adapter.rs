@@ -31,6 +31,8 @@ use crate::{
 // #44 have been addressed.
 #[cfg(esp32c3)]
 const SOURCE_CLK_FREQ: u32 = 40_000_000;
+#[cfg(esp32c6)]
+const SOURCE_CLK_FREQ: u32 = 40_000_000;
 #[cfg(esp32s2)]
 const SOURCE_CLK_FREQ: u32 = 40_000_000;
 #[cfg(esp32)]
@@ -99,7 +101,7 @@ where
     where
         UnconfiguredChannel: OutputChannel<ConfiguredChannel<'d, O> = CHANNEL>,
     {
-        #[cfg(any(esp32c3, esp32s3))]
+        #[cfg(any(esp32c3, esp32c6, esp32s3))]
         channel
             .set_idle_output_level(false)
             .set_carrier_modulation(false)

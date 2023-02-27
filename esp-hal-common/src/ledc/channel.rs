@@ -32,9 +32,9 @@ pub enum Number {
     Channel3,
     Channel4,
     Channel5,
-    #[cfg(not(any(esp32c2, esp32c3)))]
+    #[cfg(not(any(esp32c2, esp32c3, esp32c6)))]
     Channel6,
-    #[cfg(not(any(esp32c2, esp32c3)))]
+    #[cfg(not(any(esp32c2, esp32c3, esp32c6)))]
     Channel7,
 }
 
@@ -192,7 +192,30 @@ macro_rules! start_duty_without_fading {
     };
 }
 
-#[cfg(not(esp32))]
+#[cfg(esp32c6)]
+/// Macro to start duty cycle, without fading
+macro_rules! start_duty_without_fading {
+    ($self: ident, $num: literal) => {
+        paste! {
+            $self.ledc.[<ch $num _conf1>].write(|w|
+                w.[<duty_start>]()
+                    .set_bit()
+            );
+            $self.ledc.[<ch $num _gamma_wr>].write(|w| unsafe {
+                w.[<ch_gamma_duty_inc>]()
+                    .set_bit()
+                    .[<ch_gamma_duty_num>]()
+                    .bits(0x1)
+                    .[<ch_gamma_duty_cycle>]()
+                    .bits(0x1)
+                    .[<ch_gamma_scale>]()
+                    .bits(0x0)
+                });
+        }
+    };
+}
+
+#[cfg(not(any(esp32, esp32c6)))]
 /// Macro to start duty cycle, without fading
 macro_rules! start_duty_without_fading {
     ($self: ident, $num: literal) => {
@@ -399,14 +422,14 @@ where
                     self.output_pin
                         .connect_peripheral_to_output(OutputSignal::LEDC_LS_SIG5);
                 }
-                #[cfg(not(any(esp32c2, esp32c3)))]
+                #[cfg(not(any(esp32c2, esp32c3, esp32c6)))]
                 Number::Channel6 => {
                     set_channel!(self, l, 6, timer_number);
                     update_channel!(self, l, 6);
                     self.output_pin
                         .connect_peripheral_to_output(OutputSignal::LEDC_LS_SIG6);
                 }
-                #[cfg(not(any(esp32c2, esp32c3)))]
+                #[cfg(not(any(esp32c2, esp32c3, esp32c6)))]
                 Number::Channel7 => {
                     set_channel!(self, l, 7, timer_number);
                     update_channel!(self, l, 7);
@@ -430,9 +453,9 @@ where
             Number::Channel3 => set_duty!(self, l, 3, duty),
             Number::Channel4 => set_duty!(self, l, 4, duty),
             Number::Channel5 => set_duty!(self, l, 5, duty),
-            #[cfg(not(any(esp32c2, esp32c3)))]
+            #[cfg(not(any(esp32c2, esp32c3, esp32c6)))]
             Number::Channel6 => set_duty!(self, l, 6, duty),
-            #[cfg(not(any(esp32c2, esp32c3)))]
+            #[cfg(not(any(esp32c2, esp32c3, esp32c6)))]
             Number::Channel7 => set_duty!(self, l, 7, duty),
         };
     }

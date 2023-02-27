@@ -4,7 +4,7 @@
 ![MIT/Apache-2.0 licensed](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue?style=flat-square)
 [![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
 
-**H**ardware **A**bstraction **L**ayer crates for the **ESP32**, **ESP32-C2**, **ESP32-C3**, **ESP32-S2**, and **ESP32-S3** from Espressif.
+**H**ardware **A**bstraction **L**ayer crates for the **ESP32**, **ESP32-C2/C3/C6**, and **ESP32-S2/S3** from Espressif.
 
 These HALs are `no_std`; if you are looking for `std` support, please use [esp-idf-hal] instead.
 
@@ -12,13 +12,14 @@ This project is still in the early stages of development, and as such there shou
 
 If you have any questions, comments, or concerns, please [open an issue], [start a new discussion], or join us on [Matrix]. For additional information regarding any of the crates in this repository, please refer to the crate's README.
 
-|     Crate     |                               Target                                | Technical Reference Manual |
-| :-----------: | :-----------------------------------------------------------------: | :------------------------: |
-|  [esp32-hal]  |                       `xtensa-esp32-none-elf`                       |          [ESP32]           |
-| [esp32c2-hal] |                    `riscv32imc-unknown-none-elf`                    |         [ESP32-C2]         |
-| [esp32c3-hal] |                    `riscv32imc-unknown-none-elf`                    |         [ESP32-C3]         |
-| [esp32s2-hal] |                      `xtensa-esp32s2-none-elf`                      |         [ESP32-S2]         |
-| [esp32s3-hal] |                      `xtensa-esp32s3-none-elf`                      |         [ESP32-S3]         |
+|     Crate     |             Target             | Technical Reference Manual |
+| :-----------: | :----------------------------: | :------------------------: |
+|  [esp32-hal]  |    `xtensa-esp32-none-elf`     |          [ESP32]           |
+| [esp32c2-hal] | `riscv32imc-unknown-none-elf`  |         [ESP32-C2]         |
+| [esp32c3-hal] | `riscv32imc-unknown-none-elf`  |         [ESP32-C3]         |
+| [esp32c6-hal] | `riscv32imac-unknown-none-elf` |         [ESP32-C6]         |
+| [esp32s2-hal] |   `xtensa-esp32s2-none-elf`    |         [ESP32-S2]         |
+| [esp32s3-hal] |   `xtensa-esp32s3-none-elf`    |         [ESP32-S3]         |
 
 [here]: https://github.com/esp-rs/esp-hal/issues/19
 [esp-idf-hal]: https://github.com/esp-rs/esp-idf-hal
@@ -28,11 +29,13 @@ If you have any questions, comments, or concerns, please [open an issue], [start
 [esp32-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32-hal
 [esp32c2-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32c2-hal
 [esp32c3-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32c3-hal
+[esp32c6-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32c6-hal
 [esp32s2-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32s2-hal
 [esp32s3-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32s3-hal
 [esp32]: https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf
 [esp32-c2]: https://www.espressif.com/sites/default/files/documentation/esp8684_technical_reference_manual_en.pdf
 [esp32-c3]: https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf
+[esp32-c6]: https://www.espressif.com/sites/default/files/documentation/esp32-c6_technical_reference_manual_en.pdf
 [esp32-s2]: https://www.espressif.com/sites/default/files/documentation/esp32-s2_technical_reference_manual_en.pdf
 [esp32-s3]: https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf
 [atomic emulation]: https://github.com/esp-rs/riscv-atomic-emulation-trap
@@ -62,6 +65,7 @@ There are a number of other crates within the [esp-rs organization] which can be
 | [esp-backtrace] |                 Backtrace support for bare-metal applications                  |
 |  [esp-println]  |                Provides `print!` and `println!` implementations                |
 |  [esp-storage]  | Implementation of [embedded-storage] traits to access unencrypted flash memory |
+|   [esp-wifi]    |                      `no_std` Wi-Fi/Bluetooth LE support                       |
 
 [esp-rs organization]: https://github.com/esp-rs
 [esp-alloc]: https://github.com/esp-rs/esp-alloc
@@ -69,12 +73,13 @@ There are a number of other crates within the [esp-rs organization] which can be
 [esp-println]: https://github.com/esp-rs/esp-println
 [esp-storage]: https://github.com/esp-rs/esp-storage
 [embedded-storage]: https://github.com/rust-embedded-community/embedded-storage
+[esp-wifi]: https://github.com/esp-rs/esp-wifi
 
 ## MSRV
 
 The **M**inimum **S**upported **R**ust **V**ersions are:
 
-- `1.65.0` for RISC-V devices (**ESP32-C2**, **ESP32-C3**)
+- `1.65.0` for RISC-V devices (**ESP32-C2**, **ESP32-C3**, **ESP32-C6**)
 - `1.65.0` for Xtensa devices (**ESP32**, **ESP32-S2**, **ESP32-S3**)
 - `1.67.0` for all `async` examples (`embassy_hello_world`, `embassy_wait`, etc.)
 

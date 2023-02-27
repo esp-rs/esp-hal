@@ -223,6 +223,38 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
         }
     }
 
+    /// Set how a new timestamp syncs with the timer
+    #[cfg(esp32c6)]
+    pub fn set_update_method(&mut self, update_method: PwmUpdateMethod) {
+        // SAFETY:
+        // We only write to our GENx_x_UPMETHOD register
+        let block = unsafe { &*PWM::block() };
+        let bits = update_method.0;
+        match (OP, IS_A) {
+            (0, true) => block
+                .gen0_stmp_cfg
+                .modify(|_, w| w.cmpr0_a_upmethod().variant(bits)),
+            (1, true) => block
+                .gen1_stmp_cfg
+                .modify(|_, w| w.cmpr1_a_upmethod().variant(bits)),
+            (2, true) => block
+                .gen2_stmp_cfg
+                .modify(|_, w| w.cmpr2_a_upmethod().variant(bits)),
+            (0, false) => block
+                .gen0_stmp_cfg
+                .modify(|_, w| w.cmpr0_b_upmethod().variant(bits)),
+            (1, false) => block
+                .gen1_stmp_cfg
+                .modify(|_, w| w.cmpr1_b_upmethod().variant(bits)),
+            (2, false) => block
+                .gen2_stmp_cfg
+                .modify(|_, w| w.cmpr2_b_upmethod().variant(bits)),
+            _ => {
+                unreachable!()
+            }
+        }
+    }
+
     /// Set how a new timestamp syncs with the timer.
     /// The written value will take effect according to the set
     /// [`PwmUpdateMethod`].
@@ -259,6 +291,27 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
             (0, false) => block.cmpr0_value1.write(|w| w.cmpr0_b().variant(value)),
             (1, false) => block.cmpr1_value1.write(|w| w.cmpr1_b().variant(value)),
             (2, false) => block.cmpr2_value1.write(|w| w.cmpr2_b().variant(value)),
+            _ => {
+                unreachable!()
+            }
+        }
+    }
+
+    /// Write a new timestamp.
+    /// The written value will take effect according to the set
+    /// [`PwmUpdateMethod`].
+    #[cfg(esp32c6)]
+    pub fn set_timestamp(&mut self, value: u16) {
+        // SAFETY:
+        // We only write to our GENx_TSTMP_x register
+        let block = unsafe { &*PWM::block() };
+        match (OP, IS_A) {
+            (0, true) => block.gen0_tstmp_a.write(|w| w.cmpr0_a().variant(value)),
+            (1, true) => block.gen1_tstmp_a.write(|w| w.cmpr1_a().variant(value)),
+            (2, true) => block.gen2_tstmp_a.write(|w| w.cmpr2_a().variant(value)),
+            (0, false) => block.gen0_tstmp_b.write(|w| w.cmpr0_b().variant(value)),
+            (1, false) => block.gen1_tstmp_b.write(|w| w.cmpr1_b().variant(value)),
+            (2, false) => block.gen2_tstmp_b.write(|w| w.cmpr2_b().variant(value)),
             _ => {
                 unreachable!()
             }

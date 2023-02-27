@@ -133,9 +133,19 @@ impl<'d> LEDC<'d> {
     #[cfg(not(esp32))]
     /// Set global slow clock source
     pub fn set_global_slow_clock(&mut self, clock_source: LSGlobalClkSource) {
+        #[cfg(esp32c6)]
+        let pcr = unsafe { &*crate::peripherals::PCR::ptr() };
+
+        #[cfg(esp32c6)]
+        pcr.ledc_sclk_conf.write(|w| w.ledc_sclk_en().set_bit());
+
         match clock_source {
             LSGlobalClkSource::APBClk => {
-                self.ledc.conf.write(|w| unsafe { w.apb_clk_sel().bits(1) })
+                #[cfg(not(esp32c6))]
+                self.ledc.conf.write(|w| unsafe { w.apb_clk_sel().bits(1) });
+                #[cfg(esp32c6)]
+                pcr.ledc_sclk_conf
+                    .write(|w| unsafe { w.ledc_sclk_sel().bits(1) });
             }
         }
         self.ledc.timer0_conf.modify(|_, w| w.para_up().set_bit());

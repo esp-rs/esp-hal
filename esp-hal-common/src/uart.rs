@@ -343,11 +343,13 @@ where
             .register_block()
             .clk_conf
             .modify(|_, w| w.sclk_en().set_bit());
+
+        self.sync_regs();
     }
 
     /// Configures the RX-FIFO threshold
     pub fn set_rx_fifo_full_threshold(&mut self, threshold: u16) {
-        #[cfg(esp32)]
+        #[cfg(any(esp32, esp32c6))]
         let threshold: u8 = threshold as u8;
 
         self.uart
@@ -592,6 +594,65 @@ where
             .write(|w| unsafe { w.clkdiv().bits(divider).frag().bits(0) });
     }
 
+    #[cfg(esp32c6)]
+    fn change_baud(&self, baudrate: u32, clocks: &Clocks) {
+        // we force the clock source to be APB and don't use the decimal part of the
+        // divider
+        let clk = clocks.apb_clock.to_Hz();
+        let max_div = 0b1111_1111_1111 - 1;
+        let clk_div = ((clk) + (max_div * baudrate) - 1) / (max_div * baudrate);
+
+        // UART clocks are configured via PCR
+        let pcr = unsafe { &*esp32c6::PCR::PTR };
+
+        match self.uart.uart_number() {
+            0 => {
+                pcr.uart0_conf
+                    .modify(|_, w| w.uart0_rst_en().clear_bit().uart0_clk_en().set_bit());
+
+                pcr.uart0_sclk_conf.modify(|_, w| unsafe {
+                    w.uart0_sclk_div_a()
+                        .bits(0)
+                        .uart0_sclk_div_b()
+                        .bits(0)
+                        .uart0_sclk_div_num()
+                        .bits(clk_div as u8 - 1)
+                        .uart0_sclk_sel()
+                        .bits(0x1) // TODO: this probably shouldn't be hard-coded
+                        .uart0_sclk_en()
+                        .set_bit()
+                });
+            }
+            1 => {
+                pcr.uart1_conf
+                    .modify(|_, w| w.uart1_rst_en().clear_bit().uart1_clk_en().set_bit());
+
+                pcr.uart1_sclk_conf.modify(|_, w| unsafe {
+                    w.uart1_sclk_div_a()
+                        .bits(0)
+                        .uart1_sclk_div_b()
+                        .bits(0)
+                        .uart1_sclk_div_num()
+                        .bits(clk_div as u8 - 1)
+                        .uart1_sclk_sel()
+                        .bits(0x1) // TODO: this probably shouldn't be hard-coded
+                        .uart1_sclk_en()
+                        .set_bit()
+                });
+            }
+            _ => unreachable!(), // ESP32-C6 only has 2 UART instances
+        }
+
+        let clk = clk / clk_div;
+        let divider = clk / baudrate;
+        let divider = divider as u16;
+
+        self.uart
+            .register_block()
+            .clkdiv
+            .write(|w| unsafe { w.clkdiv().bits(divider).frag().bits(0) });
+    }
+
     #[cfg(any(esp32, esp32s2))]
     fn change_baud(&self, baudrate: u32, clocks: &Clocks) {
         // we force the clock source to be APB and don't use the decimal part of the
@@ -609,11 +670,37 @@ where
             .clkdiv
             .write(|w| unsafe { w.clkdiv().bits(divider).frag().bits(0) });
     }
+
+    #[cfg(esp32c6)] // TODO introduce a cfg symbol for this
+    #[inline(always)]
+    fn sync_regs(&mut self) {
+        self.uart
+            .register_block()
+            .reg_update
+            .modify(|_, w| w.reg_update().set_bit());
+
+        while self
+            .uart
+            .register_block()
+            .reg_update
+            .read()
+            .reg_update()
+            .bit_is_set()
+        {
+            // wait
+        }
+    }
+
+    #[cfg(not(esp32c6))]
+    #[inline(always)]
+    fn sync_regs(&mut self) {}
 }
 
 /// UART peripheral instance
 pub trait Instance {
     fn register_block(&self) -> &RegisterBlock;
+
+    fn uart_number(&self) -> usize;
 
     fn disable_tx_interrupts(&mut self) {
         self.register_block().int_clr.write(|w| {
@@ -710,6 +797,11 @@ impl Instance for UART0 {
         self
     }
 
+    #[inline(always)]
+    fn uart_number(&self) -> usize {
+        0
+    }
+
     fn tx_signal(&self) -> OutputSignal {
         OutputSignal::U0TXD
     }
@@ -731,6 +823,11 @@ impl Instance for UART1 {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
         self
+    }
+
+    #[inline(always)]
+    fn uart_number(&self) -> usize {
+        1
     }
 
     fn tx_signal(&self) -> OutputSignal {
@@ -755,6 +852,11 @@ impl Instance for UART2 {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
         self
+    }
+
+    #[inline(always)]
+    fn uart_number(&self) -> usize {
+        2
     }
 
     fn tx_signal(&self) -> OutputSignal {

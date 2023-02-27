@@ -75,6 +75,16 @@ pub mod operator;
 /// MCPWM timers
 pub mod timer;
 
+#[cfg(not(esp32c6))]
+type RegisterBlock = crate::peripherals::pwm0::RegisterBlock;
+#[cfg(esp32c6)]
+type RegisterBlock = crate::peripherals::mcpwm::RegisterBlock;
+
+#[cfg(not(esp32c6))]
+type PWM = crate::peripherals::PWM0;
+#[cfg(esp32c6)]
+type PWM = crate::peripherals::MCPWM;
+
 /// The MCPWM peripheral
 #[non_exhaustive]
 pub struct MCPWM<'d, PWM> {
@@ -105,12 +115,32 @@ impl<'d, PWM: PwmPeripheral> MCPWM<'d, PWM> {
 
         PWM::enable(system);
 
-        // set prescaler
-        peripheral
-            .clk_cfg
-            .write(|w| w.clk_prescale().variant(peripheral_clock.prescaler));
-        // enable clock
-        peripheral.clk.write(|w| w.en().set_bit());
+        #[cfg(not(esp32c6))]
+        {
+            // set prescaler
+            peripheral
+                .clk_cfg
+                .write(|w| w.clk_prescale().variant(peripheral_clock.prescaler));
+
+            // enable clock
+            peripheral.clk.write(|w| w.en().set_bit());
+        }
+
+        #[cfg(esp32c6)]
+        {
+            unsafe { &*crate::peripherals::PCR::PTR }
+                .pwm_clk_conf
+                .modify(|_, w| unsafe {
+                    w.pwm_div_num()
+                        .variant(peripheral_clock.prescaler)
+                        .pwm_clkm_en()
+                        .set_bit()
+                        .pwm_clkm_sel()
+                        .bits(1)
+                });
+
+            // TODO: Add other clock sources
+        }
 
         MCPWM {
             _inner: peripheral,
@@ -143,6 +173,8 @@ impl<'a> PeripheralClockConfig<'a> {
     pub fn with_prescaler(clocks: &'a Clocks, prescaler: u8) -> Self {
         #[cfg(esp32)]
         let source_clock = clocks.pwm_clock;
+        #[cfg(esp32c6)]
+        let source_clock = clocks.crypto_clock;
         #[cfg(esp32s3)]
         let source_clock = clocks.crypto_pwm_clock;
 
@@ -173,16 +205,20 @@ impl<'a> PeripheralClockConfig<'a> {
     ) -> Result<Self, FrequencyError> {
         #[cfg(esp32)]
         let source_clock = clocks.pwm_clock;
+        #[cfg(esp32c6)]
+        let source_clock = clocks.crypto_clock;
         #[cfg(esp32s3)]
         let source_clock = clocks.crypto_pwm_clock;
 
         if target_freq.raw() == 0 || target_freq > source_clock {
             return Err(FrequencyError);
         }
+
         let prescaler = source_clock / target_freq - 1;
         if prescaler > u8::MAX as u32 {
             return Err(FrequencyError);
         }
+
         Ok(Self::with_prescaler(clocks, prescaler as u8))
     }
 
@@ -237,24 +273,22 @@ impl<'a> PeripheralClockConfig<'a> {
 pub struct FrequencyError;
 
 /// A MCPWM peripheral
-pub unsafe trait PwmPeripheral:
-    Deref<Target = crate::peripherals::pwm0::RegisterBlock>
-{
+pub unsafe trait PwmPeripheral: Deref<Target = RegisterBlock> {
     /// Enable peripheral
     fn enable(system: &mut PeripheralClockControl);
     /// Get a pointer to the peripheral RegisterBlock
-    fn block() -> *const crate::peripherals::pwm0::RegisterBlock;
+    fn block() -> *const RegisterBlock;
     /// Get operator GPIO mux output signal
     fn output_signal<const OP: u8, const IS_A: bool>() -> OutputSignal;
 }
 
-unsafe impl PwmPeripheral for crate::peripherals::PWM0 {
+unsafe impl PwmPeripheral for PWM {
     fn enable(system: &mut PeripheralClockControl) {
         system.enable(PeripheralEnable::Mcpwm0)
     }
 
-    fn block() -> *const crate::peripherals::pwm0::RegisterBlock {
-        Self::ptr()
+    fn block() -> *const RegisterBlock {
+        Self::PTR
     }
 
     fn output_signal<const OP: u8, const IS_A: bool>() -> OutputSignal {
@@ -270,13 +304,14 @@ unsafe impl PwmPeripheral for crate::peripherals::PWM0 {
     }
 }
 
+#[cfg(not(esp32c6))]
 unsafe impl PwmPeripheral for crate::peripherals::PWM1 {
     fn enable(system: &mut PeripheralClockControl) {
         system.enable(PeripheralEnable::Mcpwm1)
     }
 
-    fn block() -> *const crate::peripherals::pwm0::RegisterBlock {
-        Self::ptr()
+    fn block() -> *const RegisterBlock {
+        Self::PTR
     }
 
     fn output_signal<const OP: u8, const IS_A: bool>() -> OutputSignal {

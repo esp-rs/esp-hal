@@ -2,6 +2,10 @@ use core::marker::PhantomData;
 
 use fugit::HertzU32;
 
+#[cfg(esp32c6)]
+use crate::peripherals::mcpwm::{TIMER0_CFG0, TIMER0_CFG1};
+#[cfg(not(esp32c6))]
+use crate::peripherals::pwm0::{TIMER0_CFG0, TIMER0_CFG1};
 use crate::{
     clock::Clocks,
     mcpwm::{FrequencyError, PeripheralClockConfig, PwmPeripheral},
@@ -101,9 +105,7 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
                         .variant(!sw)
                 });
             }
-            _ => {
-                unreachable!()
-            }
+            _ => unreachable!(),
         }
     }
 
@@ -135,13 +137,11 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
                     reg.timer2_direction().bit_is_set().into(),
                 )
             }
-            _ => {
-                unreachable!()
-            }
+            _ => unreachable!(),
         }
     }
 
-    fn cfg0(&mut self) -> &crate::peripherals::pwm0::TIMER0_CFG0 {
+    fn cfg0(&mut self) -> &TIMER0_CFG0 {
         // SAFETY:
         // We only grant access to our CFG0 register with the lifetime of &mut self
         let block = unsafe { &*PWM::block() };
@@ -153,12 +153,11 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
             0 => &block.timer0_cfg0,
             1 => unsafe { &*(&block.timer1_cfg0 as *const _ as *const _) },
             2 => unsafe { &*(&block.timer2_cfg0 as *const _ as *const _) },
-            _ => {
-                unreachable!()
-            }
+            _ => unreachable!(),
         }
     }
-    fn cfg1(&mut self) -> &crate::peripherals::pwm0::TIMER0_CFG1 {
+
+    fn cfg1(&mut self) -> &TIMER0_CFG1 {
         // SAFETY:
         // We only grant access to our CFG1 register with the lifetime of &mut self
         let block = unsafe { &*PWM::block() };
@@ -170,9 +169,7 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
             0 => &block.timer0_cfg1,
             1 => unsafe { &*(&block.timer1_cfg1 as *const _ as *const _) },
             2 => unsafe { &*(&block.timer2_cfg1 as *const _ as *const _) },
-            _ => {
-                unreachable!()
-            }
+            _ => unreachable!(),
         }
     }
 }

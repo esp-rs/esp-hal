@@ -9,9 +9,10 @@ use crate::{
 #[cfg_attr(esp32, path = "clocks_ll/esp32.rs")]
 #[cfg_attr(esp32c2, path = "clocks_ll/esp32c2.rs")]
 #[cfg_attr(esp32c3, path = "clocks_ll/esp32c3.rs")]
+#[cfg_attr(esp32c6, path = "clocks_ll/esp32c6.rs")]
 #[cfg_attr(esp32s2, path = "clocks_ll/esp32s2.rs")]
 #[cfg_attr(esp32s3, path = "clocks_ll/esp32s3.rs")]
-mod clocks_ll;
+pub(crate) mod clocks_ll;
 
 pub trait Clock {
     fn frequency(&self) -> HertzU32;
@@ -33,7 +34,7 @@ pub enum CpuClock {
     Clock120MHz,
     #[cfg(not(esp32c2))]
     Clock160MHz,
-    #[cfg(not(any(esp32c2, esp32c3)))]
+    #[cfg(not(any(esp32c2, esp32c3, esp32c6)))]
     Clock240MHz,
 }
 
@@ -46,7 +47,7 @@ impl Clock for CpuClock {
             CpuClock::Clock120MHz => HertzU32::MHz(120),
             #[cfg(not(esp32c2))]
             CpuClock::Clock160MHz => HertzU32::MHz(160),
-            #[cfg(not(any(esp32c2, esp32c3)))]
+            #[cfg(not(any(esp32c2, esp32c3, esp32c6)))]
             CpuClock::Clock240MHz => HertzU32::MHz(240),
         }
     }
@@ -83,7 +84,7 @@ impl Clock for XtalClock {
 #[allow(unused)]
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum PllClock {
-    #[cfg(not(esp32c2))]
+    #[cfg(not(any(esp32c2, esp32c6)))]
     Pll320MHz,
     Pll480MHz,
 }
@@ -120,6 +121,8 @@ pub struct Clocks<'d> {
     pub pwm_clock: HertzU32,
     #[cfg(esp32s3)]
     pub crypto_pwm_clock: HertzU32,
+    #[cfg(esp32c6)]
+    pub crypto_clock: HertzU32,
     // TODO chip specific additional ones as needed
 }
 
@@ -143,6 +146,8 @@ impl<'d> Clocks<'d> {
             pwm_clock: raw_clocks.pwm_clock,
             #[cfg(esp32s3)]
             crypto_pwm_clock: raw_clocks.crypto_pwm_clock,
+            #[cfg(esp32c6)]
+            crypto_clock: raw_clocks.crypto_clock,
         }
     }
 }
@@ -157,6 +162,8 @@ pub struct RawClocks {
     pub pwm_clock: HertzU32,
     #[cfg(esp32s3)]
     pub crypto_pwm_clock: HertzU32,
+    #[cfg(esp32c6)]
+    pub crypto_clock: HertzU32,
     // TODO chip specific additional ones as needed
 }
 
@@ -363,6 +370,60 @@ impl<'d> ClockControl<'d> {
                 apb_clock: apb_freq.frequency(),
                 xtal_clock: xtal_freq.frequency(),
                 i2c_clock: HertzU32::MHz(40),
+            },
+        }
+    }
+}
+
+#[cfg(esp32c6)]
+impl<'d> ClockControl<'d> {
+    /// Use what is considered the default settings after boot.
+    #[allow(unused)]
+    pub fn boot_defaults(
+        clock_control: impl Peripheral<P = SystemClockControl> + 'd,
+    ) -> ClockControl<'d> {
+        ClockControl {
+            _private: clock_control.into_ref(),
+            desired_rates: RawClocks {
+                cpu_clock: HertzU32::MHz(80),
+                apb_clock: HertzU32::MHz(80),
+                xtal_clock: HertzU32::MHz(40),
+                i2c_clock: HertzU32::MHz(40),
+                crypto_clock: HertzU32::MHz(160),
+            },
+        }
+    }
+
+    /// Configure the CPU clock speed.
+    #[allow(unused)]
+    pub fn configure(
+        clock_control: impl Peripheral<P = SystemClockControl> + 'd,
+        cpu_clock_speed: CpuClock,
+    ) -> ClockControl<'d> {
+        let apb_freq;
+        let xtal_freq = XtalClock::RtcXtalFreq40M;
+        let pll_freq = PllClock::Pll480MHz;
+
+        if cpu_clock_speed.mhz() <= xtal_freq.mhz() {
+            apb_freq = ApbClock::ApbFreqOther(cpu_clock_speed.mhz());
+            clocks_ll::esp32c6_rtc_update_to_xtal(xtal_freq, 1);
+            clocks_ll::esp32c6_rtc_apb_freq_update(apb_freq);
+        } else {
+            apb_freq = ApbClock::ApbFreq80MHz;
+            clocks_ll::esp32c6_rtc_bbpll_enable();
+            clocks_ll::esp32c6_rtc_bbpll_configure(xtal_freq, pll_freq);
+            clocks_ll::esp32c6_rtc_freq_to_pll_mhz(cpu_clock_speed);
+            clocks_ll::esp32c6_rtc_apb_freq_update(apb_freq);
+        }
+
+        ClockControl {
+            _private: clock_control.into_ref(),
+            desired_rates: RawClocks {
+                cpu_clock: cpu_clock_speed.frequency(),
+                apb_clock: apb_freq.frequency(),
+                xtal_clock: xtal_freq.frequency(),
+                i2c_clock: HertzU32::MHz(40),
+                crypto_clock: HertzU32::MHz(160),
             },
         }
     }

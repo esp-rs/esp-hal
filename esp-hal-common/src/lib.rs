@@ -8,6 +8,7 @@
 //! - [esp32-hal]
 //! - [esp32c2-hal]
 //! - [esp32c3-hal]
+//! - [esp32c6-hal]
 //! - [esp32s2-hal]
 //! - [esp32s3-hal]
 //!
@@ -15,6 +16,7 @@
 //! [esp32-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32-hal
 //! [esp32c2-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32c2-hal
 //! [esp32c3-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32c3-hal
+//! [esp32c6-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32c6-hal
 //! [esp32s2-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32s2-hal
 //! [esp32s3-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32s3-hal
 
@@ -23,13 +25,6 @@
 #![cfg_attr(feature = "async", allow(incomplete_features))]
 #![cfg_attr(feature = "async", feature(async_fn_in_trait))]
 #![cfg_attr(feature = "async", feature(impl_trait_projections))]
-
-#[cfg_attr(esp32, path = "peripherals/esp32.rs")]
-#[cfg_attr(esp32c3, path = "peripherals/esp32c3.rs")]
-#[cfg_attr(esp32c2, path = "peripherals/esp32c2.rs")]
-#[cfg_attr(esp32s2, path = "peripherals/esp32s2.rs")]
-#[cfg_attr(esp32s3, path = "peripherals/esp32s3.rs")]
-pub mod peripherals;
 
 #[cfg(riscv)]
 pub use esp_riscv_rt;
@@ -85,7 +80,7 @@ pub mod ledc;
 pub mod mcpwm;
 #[cfg(usb_otg)]
 pub mod otg_fs;
-#[cfg(any(esp32, esp32s2, esp32s3))]
+#[cfg(any(esp32, esp32s2, esp32s3, esp32c6))]
 pub mod pcnt;
 pub mod peripheral;
 pub mod prelude;
@@ -102,7 +97,7 @@ pub mod system;
 #[cfg(systimer)]
 pub mod systimer;
 pub mod timer;
-#[cfg(any(esp32s3, esp32c3))]
+#[cfg(any(esp32c3, esp32c6, esp32s3))]
 pub mod twai;
 pub mod uart;
 #[cfg(usb_serial_jtag)]
@@ -111,13 +106,14 @@ pub mod usb_serial_jtag;
 pub mod utils;
 
 #[cfg_attr(esp32, path = "cpu_control/esp32.rs")]
-#[cfg_attr(any(esp32c2, esp32c3, esp32s2), path = "cpu_control/none.rs")]
 #[cfg_attr(esp32s3, path = "cpu_control/esp32s3.rs")]
+#[cfg_attr(not(any(esp32, esp32s3)), path = "cpu_control/none.rs")]
 pub mod cpu_control;
 
 #[cfg_attr(esp32, path = "efuse/esp32.rs")]
 #[cfg_attr(esp32c2, path = "efuse/esp32c2.rs")]
 #[cfg_attr(esp32c3, path = "efuse/esp32c3.rs")]
+#[cfg_attr(esp32c6, path = "efuse/esp32c6.rs")]
 #[cfg_attr(esp32s2, path = "efuse/esp32s2.rs")]
 #[cfg_attr(esp32s3, path = "efuse/esp32s3.rs")]
 pub mod efuse;
@@ -125,6 +121,23 @@ pub mod efuse;
 #[cfg_attr(riscv, path = "interrupt/riscv.rs")]
 #[cfg_attr(xtensa, path = "interrupt/xtensa.rs")]
 pub mod interrupt;
+
+#[cfg_attr(esp32, path = "peripherals/esp32.rs")]
+#[cfg_attr(esp32c3, path = "peripherals/esp32c3.rs")]
+#[cfg_attr(esp32c2, path = "peripherals/esp32c2.rs")]
+#[cfg_attr(esp32c6, path = "peripherals/esp32c6.rs")]
+#[cfg_attr(esp32s2, path = "peripherals/esp32s2.rs")]
+#[cfg_attr(esp32s3, path = "peripherals/esp32s3.rs")]
+pub mod peripherals;
+
+#[cfg(esp32c6)]
+pub fn disable_apm_filter() {
+    unsafe {
+        (&*esp32c6::LP_APM::PTR).func_ctrl.write(|w| w.bits(0));
+        (&*esp32c6::LP_APM0::PTR).func_ctrl.write(|w| w.bits(0));
+        (&*esp32c6::HP_APM::PTR).func_ctrl.write(|w| w.bits(0));
+    }
+}
 
 /// Enumeration of CPU cores
 /// The actual number of available cores depends on the target.

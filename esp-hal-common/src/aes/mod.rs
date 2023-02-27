@@ -30,7 +30,8 @@ use crate::{
 #[cfg_attr(esp32, path = "esp32.rs")]
 #[cfg_attr(esp32s3, path = "esp32s3.rs")]
 #[cfg_attr(esp32s2, path = "esp32s2.rs")]
-#[cfg_attr(esp32c3, path = "esp32c3.rs")]
+#[cfg_attr(esp32c3, path = "esp32cX.rs")]
+#[cfg_attr(esp32c6, path = "esp32cX.rs")]
 mod aes_spec_impl;
 
 const ALIGN_SIZE: usize = core::mem::size_of::<u32>();

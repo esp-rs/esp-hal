@@ -27,12 +27,12 @@ pub struct SystemTimer<'d> {
 impl<'d> SystemTimer<'d> {
     #[cfg(esp32s2)]
     pub const BIT_MASK: u64 = u64::MAX;
-    #[cfg(any(esp32c2, esp32c3, esp32s3))]
+    #[cfg(not(esp32s2))]
     pub const BIT_MASK: u64 = 0xFFFFFFFFFFFFF;
 
     #[cfg(esp32s2)]
     pub const TICKS_PER_SECOND: u64 = 80_000_000; // TODO this can change when we have support for changing APB frequency
-    #[cfg(any(esp32c2, esp32c3, esp32s3))]
+    #[cfg(not(esp32s2))]
     pub const TICKS_PER_SECOND: u64 = 16_000_000;
 
     pub fn new(p: impl Peripheral<P = SYSTIMER> + 'd) -> Self {
@@ -138,7 +138,7 @@ impl<T, const CHANNEL: u8> Alarm<T, CHANNEL> {
             #[cfg(esp32s2)]
             systimer.step.write(|w| w.timer_xtal_step().bits(0x1)); // run at XTAL freq, not 80 * XTAL freq
 
-            #[cfg(any(esp32c2, esp32c3, esp32s3))]
+            #[cfg(any(esp32c2, esp32c3, esp32c6, esp32s3))]
             {
                 tconf.write(|w| w.target0_timer_unit_sel().clear_bit()); // default, use unit 0
                 systimer
@@ -148,7 +148,7 @@ impl<T, const CHANNEL: u8> Alarm<T, CHANNEL> {
 
             conf(tconf, hi, lo);
 
-            #[cfg(any(esp32c2, esp32c3, esp32s3))]
+            #[cfg(any(esp32c2, esp32c3, esp32c6, esp32s3))]
             {
                 match CHANNEL {
                     0 => {

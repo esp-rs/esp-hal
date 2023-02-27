@@ -97,7 +97,7 @@ pub enum OutputSignal {
     I2S_MCLK         = 12,
     I2SO_BCK         = 13,
     I2SO_WS          = 14,
-    I2SI_SD          = 15,
+    I2SO_SD          = 15,
     I2SI_BCK         = 16,
     I2SI_WS          = 17,
     GPIO_WLAN_PRIO   = 18,
