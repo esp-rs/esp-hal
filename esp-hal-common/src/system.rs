@@ -80,7 +80,7 @@ impl PeripheralClockControl {
             )
         };
 
-        #[cfg(any(esp32c2, esp32c3, esp32c6, esp32s2, esp32s3))]
+        #[cfg(any(esp32c2, esp32c3, esp32s2, esp32s3))]
         let (perip_clk_en1, perip_rst_en1) = { (&system.perip_clk_en1, &system.perip_rst_en1) };
 
         match peripheral {

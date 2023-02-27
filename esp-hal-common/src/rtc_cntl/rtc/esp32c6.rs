@@ -669,29 +669,4 @@ impl RtcClock {
 
         (100_000_000 * 1000 / period) as u16
     }
-
-    pub(crate) fn estimate_xtal_frequency() -> u32 {
-        const XTAL_FREQ_EST_CYCLES: u32 = 1024;
-
-        let pmu = unsafe { &*PMU::PTR };
-        let clk_8m_enabled = pmu
-            .hp_sleep_lp_ck_power
-            .read()
-            .hp_sleep_pd_osc_clk()
-            .bit_is_set();
-
-        let clk_d256_enabled = false;
-
-        if !clk_d256_enabled {
-            RtcClock::enable_8m(true, true);
-        }
-
-        let cal_val = RtcClock::get_calibration_value(RtcCalSel::RtcCal32kRc, XTAL_FREQ_EST_CYCLES);
-        let freq_hz = 1_000_000u64 * (1 << RtcClock::CAL_FRACT as u64) / cal_val as u64;
-        let freq_mhz = (freq_hz / 1_000_000) as u32;
-
-        RtcClock::enable_8m(clk_8m_enabled, false);
-
-        freq_mhz
-    }
 }

@@ -136,6 +136,8 @@ impl<'d> Rtc<'d> {
         }
     }
 
+    // TODO: implement for ESP32-C6
+    #[cfg(not(esp32c6))]
     pub fn estimate_xtal_frequency(&mut self) -> u32 {
         RtcClock::estimate_xtal_frequency()
     }
@@ -523,6 +525,7 @@ impl RtcClock {
         (100_000_000 * 1000 / period) as u16
     }
 
+    // TODO: implement for ESP32-C6
     #[cfg(not(esp32c6))]
     fn estimate_xtal_frequency() -> u32 {
         // Number of 8M/256 clock cycles to use for XTAL frequency estimation.
@@ -544,11 +547,6 @@ impl RtcClock {
         RtcClock::enable_8m(clk_8m_enabled, clk_8md256_enabled);
 
         freq_mhz
-    }
-
-    #[cfg(esp32c6)]
-    fn estimate_xtal_frequency() -> u32 {
-        todo!()
     }
 }
 

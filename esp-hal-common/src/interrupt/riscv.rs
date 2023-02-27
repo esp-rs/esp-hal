@@ -724,12 +724,7 @@ pub fn _setup_interrupts() {
     };
 
     #[cfg(esp32c6)]
-    write_mie(u32::MAX);
-}
-
-#[cfg(esp32c6)]
-fn write_mie(val: u32) {
     unsafe {
-        core::arch::asm!("csrw mie, {0}", in(reg) val);
+        core::arch::asm!("csrw mie, {0}", in(reg) u32::MAX);
     }
 }
