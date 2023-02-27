@@ -206,9 +206,8 @@ impl PeripheralClockControl {
                 system.spi2_conf.modify(|_, w| w.spi2_rst_en().clear_bit());
             }
             Peripheral::I2cExt0 => {
-                // FIXME
-                // perip_clk_en0.modify(|_, w| w.i2c_ext0_clk_en().set_bit());
-                // perip_rst_en0.modify(|_, w| w.i2c_ext0_rst().clear_bit());
+                system.i2c_conf.modify(|_, w| w.i2c_clk_en().set_bit());
+                system.i2c_conf.modify(|_, w| w.i2c_rst_en().clear_bit());
             }
             Peripheral::Rmt => {
                 system.rmt_conf.modify(|_, w| w.rmt_clk_en().set_bit());
