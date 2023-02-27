@@ -1130,6 +1130,7 @@ where
         self.enable_dma();
         self.update();
 
+        reset_dma_before_load_dma_dscr(reg_block);
         tx.prepare_transfer(
             self.dma_peripheral(),
             false,
@@ -1144,6 +1145,7 @@ where
         )?;
 
         self.clear_dma_interrupts();
+        reset_dma_before_usr_cmd(reg_block);
 
         reg_block.cmd.modify(|_, w| w.usr().set_bit());
 
@@ -1170,12 +1172,16 @@ where
         let reg_block = self.register_block();
         self.configure_datalen(len as u32 * 8);
 
+        tx.is_done();
+
         self.enable_dma();
         self.update();
 
+        reset_dma_before_load_dma_dscr(reg_block);
         tx.prepare_transfer(self.dma_peripheral(), false, ptr, len)?;
 
         self.clear_dma_interrupts();
+        reset_dma_before_usr_cmd(reg_block);
 
         reg_block.cmd.modify(|_, w| w.usr().set_bit());
 
@@ -1191,12 +1197,16 @@ where
         let reg_block = self.register_block();
         self.configure_datalen(len as u32 * 8);
 
+        rx.is_done();
+
         self.enable_dma();
         self.update();
 
+        reset_dma_before_load_dma_dscr(reg_block);
         rx.prepare_transfer(false, self.dma_peripheral(), ptr, len)?;
 
         self.clear_dma_interrupts();
+        reset_dma_before_usr_cmd(reg_block);
 
         reg_block.cmd.modify(|_, w| w.usr().set_bit());
 
@@ -1265,6 +1275,49 @@ where
                 .set_bit()
         });
     }
+}
+
+#[cfg(not(any(esp32, esp32s2)))]
+fn reset_dma_before_usr_cmd(reg_block: &RegisterBlock) {
+    reg_block.dma_conf.modify(|_, w| {
+        w.rx_afifo_rst()
+            .set_bit()
+            .buf_afifo_rst()
+            .set_bit()
+            .dma_afifo_rst()
+            .set_bit()
+    });
+}
+
+#[cfg(any(esp32, esp32s2))]
+fn reset_dma_before_usr_cmd(_reg_block: &RegisterBlock) {}
+
+#[cfg(not(any(esp32, esp32s2)))]
+fn reset_dma_before_load_dma_dscr(_reg_block: &RegisterBlock) {}
+
+#[cfg(any(esp32, esp32s2))]
+fn reset_dma_before_load_dma_dscr(reg_block: &RegisterBlock) {
+    reg_block.dma_conf.modify(|_, w| {
+        w.out_rst()
+            .set_bit()
+            .in_rst()
+            .set_bit()
+            .ahbm_fifo_rst()
+            .set_bit()
+            .ahbm_rst()
+            .set_bit()
+    });
+
+    reg_block.dma_conf.modify(|_, w| {
+        w.out_rst()
+            .clear_bit()
+            .in_rst()
+            .clear_bit()
+            .ahbm_fifo_rst()
+            .clear_bit()
+            .ahbm_rst()
+            .clear_bit()
+    });
 }
 
 impl<TX, RX> InstanceDma<TX, RX> for crate::peripherals::SPI2
