@@ -60,7 +60,7 @@ pub use self::{
     interrupt::*,
     rng::Rng,
     rtc_cntl::{Rtc, Rwdt},
-    soc::peripherals,
+    soc::{efuse, peripherals},
     spi::Spi,
     timer::Timer,
     uart::Uart,
@@ -108,14 +108,6 @@ pub mod uart;
 pub mod usb_serial_jtag;
 #[cfg(rmt)]
 pub mod utils;
-
-#[cfg_attr(esp32, path = "efuse/esp32.rs")]
-#[cfg_attr(esp32c2, path = "efuse/esp32c2.rs")]
-#[cfg_attr(esp32c3, path = "efuse/esp32c3.rs")]
-#[cfg_attr(esp32c6, path = "efuse/esp32c6.rs")]
-#[cfg_attr(esp32s2, path = "efuse/esp32s2.rs")]
-#[cfg_attr(esp32s3, path = "efuse/esp32s3.rs")]
-pub mod efuse;
 
 #[cfg_attr(riscv, path = "interrupt/riscv.rs")]
 #[cfg_attr(xtensa, path = "interrupt/xtensa.rs")]

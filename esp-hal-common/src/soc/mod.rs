@@ -1,6 +1,6 @@
 #[cfg(any(esp32, esp32s3))]
 pub use self::soc::cpu_control;
-pub use self::soc::peripherals;
+pub use self::soc::{efuse, peripherals};
 
 #[cfg_attr(esp32, path = "esp32/mod.rs")]
 #[cfg_attr(esp32c2, path = "esp32c2/mod.rs")]
