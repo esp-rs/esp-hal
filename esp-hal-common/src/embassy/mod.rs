@@ -4,11 +4,11 @@ use embassy_time::driver::{AlarmHandle, Driver};
 
 #[cfg_attr(
     all(systimer, feature = "embassy-time-systick",),
-    path = "embassy/time_driver_systimer.rs"
+    path = "time_driver_systimer.rs"
 )]
 #[cfg_attr(
     all(timg0, feature = "embassy-time-timg0"),
-    path = "embassy/time_driver_timg.rs"
+    path = "time_driver_timg.rs"
 )]
 mod time_driver;
 
