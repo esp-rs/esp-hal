@@ -6,7 +6,7 @@ use fugit::MicrosDurationU64;
 use self::rtc::SocResetReason;
 #[cfg(not(esp32c6))]
 use crate::clock::{Clock, XtalClock};
-#[cfg(not(any(esp32, esp32c6)))]
+#[cfg(not(esp32))]
 use crate::efuse::Efuse;
 #[cfg(esp32c6)]
 use crate::peripherals::LP_WDT;
@@ -692,6 +692,7 @@ impl WatchdogDisable for Rwdt {
     }
 }
 
+// TODO: this can be refactored
 impl WatchdogEnable for Rwdt {
     type Time = MicrosDurationU64;
 
@@ -714,9 +715,10 @@ impl WatchdogEnable for Rwdt {
                 .modify(|_, w| w.wdt_stg0_hold().bits(timeout_raw));
 
             #[cfg(esp32c6)]
-            (&*LP_WDT::PTR)
-                .config1
-                .modify(|_, w| w.wdt_stg0_hold().bits(timeout_raw));
+            (&*LP_WDT::PTR).config1.modify(|_, w| {
+                w.wdt_stg0_hold()
+                    .bits(timeout_raw >> (1 + Efuse::get_rwdt_multiplier()))
+            });
 
             #[cfg(not(any(esp32, esp32c6)))]
             rtc_cntl.wdtconfig1.modify(|_, w| {

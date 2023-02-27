@@ -15,6 +15,7 @@ use esp32c6_hal::{
     peripherals::{self, Peripherals},
     prelude::*,
     riscv,
+    timer::TimerGroup,
     Rtc,
     Rwdt,
 };
@@ -26,8 +27,15 @@ static RWDT: Mutex<RefCell<Option<Rwdt>>> = Mutex::new(RefCell::new(None));
 fn main() -> ! {
     let peripherals = Peripherals::take();
     let system = peripherals.PCR.split();
-    let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
+    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let mut wdt0 = timer_group0.wdt;
+    let timer_group1 = TimerGroup::new(peripherals.TIMG1, &clocks);
+    let mut wdt1 = timer_group1.wdt;
+
+    wdt0.disable();
+    wdt1.disable();
     let mut rtc = Rtc::new(peripherals.LP_CLKRST);
 
     // Disable watchdog timers
