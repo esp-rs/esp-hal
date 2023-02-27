@@ -1,3 +1,5 @@
+#[cfg(any(esp32, esp32s3))]
+pub use self::soc::cpu_control;
 pub use self::soc::peripherals;
 
 #[cfg_attr(esp32, path = "esp32/mod.rs")]

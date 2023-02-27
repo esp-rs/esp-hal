@@ -50,6 +50,8 @@ pub mod trapframe {
 
 #[cfg(rmt)]
 pub use self::pulse_control::PulseControl;
+#[cfg(any(esp32, esp32s3))]
+pub use self::soc::cpu_control;
 #[cfg(usb_serial_jtag)]
 pub use self::usb_serial_jtag::UsbSerialJtag;
 pub use self::{
@@ -106,11 +108,6 @@ pub mod uart;
 pub mod usb_serial_jtag;
 #[cfg(rmt)]
 pub mod utils;
-
-#[cfg_attr(esp32, path = "cpu_control/esp32.rs")]
-#[cfg_attr(esp32s3, path = "cpu_control/esp32s3.rs")]
-#[cfg_attr(not(any(esp32, esp32s3)), path = "cpu_control/none.rs")]
-pub mod cpu_control;
 
 #[cfg_attr(esp32, path = "efuse/esp32.rs")]
 #[cfg_attr(esp32c2, path = "efuse/esp32c2.rs")]
