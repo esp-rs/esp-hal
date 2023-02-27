@@ -85,6 +85,8 @@ unsafe fn init() {
     );
 
     r0::init_data(&mut _srtc_fast_text, &mut _ertc_fast_text, &_irtc_fast_text);
+
+    esp_hal_common::disable_apm_filter();
 }
 
 #[allow(unreachable_code)]

@@ -130,6 +130,15 @@ pub mod interrupt;
 #[cfg_attr(esp32s3, path = "peripherals/esp32s3.rs")]
 pub mod peripherals;
 
+#[cfg(esp32c6)]
+pub fn disable_apm_filter() {
+    unsafe {
+        (&*esp32c6::LP_APM::PTR).func_ctrl.write(|w| w.bits(0));
+        (&*esp32c6::LP_APM0::PTR).func_ctrl.write(|w| w.bits(0));
+        (&*esp32c6::HP_APM::PTR).func_ctrl.write(|w| w.bits(0));
+    }
+}
+
 /// Enumeration of CPU cores
 /// The actual number of available cores depends on the target.
 pub enum Cpu {
