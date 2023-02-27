@@ -58,6 +58,7 @@ pub use self::{
     interrupt::*,
     rng::Rng,
     rtc_cntl::{Rtc, Rwdt},
+    soc::peripherals,
     spi::Spi,
     timer::Timer,
     uart::Uart,
@@ -92,6 +93,7 @@ pub mod rng;
 pub mod rom;
 pub mod rtc_cntl;
 pub mod sha;
+pub mod soc;
 pub mod spi;
 pub mod system;
 #[cfg(systimer)]
@@ -121,14 +123,6 @@ pub mod efuse;
 #[cfg_attr(riscv, path = "interrupt/riscv.rs")]
 #[cfg_attr(xtensa, path = "interrupt/xtensa.rs")]
 pub mod interrupt;
-
-#[cfg_attr(esp32, path = "peripherals/esp32.rs")]
-#[cfg_attr(esp32c3, path = "peripherals/esp32c3.rs")]
-#[cfg_attr(esp32c2, path = "peripherals/esp32c2.rs")]
-#[cfg_attr(esp32c6, path = "peripherals/esp32c6.rs")]
-#[cfg_attr(esp32s2, path = "peripherals/esp32s2.rs")]
-#[cfg_attr(esp32s3, path = "peripherals/esp32s3.rs")]
-pub mod peripherals;
 
 #[cfg(esp32c6)]
 pub fn disable_apm_filter() {
