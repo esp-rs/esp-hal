@@ -343,6 +343,8 @@ where
             .register_block()
             .clk_conf
             .modify(|_, w| w.sclk_en().set_bit());
+
+        self.sync_regs();
     }
 
     /// Configures the RX-FIFO threshold
@@ -668,6 +670,30 @@ where
             .clkdiv
             .write(|w| unsafe { w.clkdiv().bits(divider).frag().bits(0) });
     }
+
+    #[cfg(esp32c6)] // TODO introduce a cfg symbol for this
+    #[inline(always)]
+    fn sync_regs(&mut self) {
+        self.uart
+            .register_block()
+            .reg_update
+            .modify(|_, w| w.reg_update().set_bit());
+
+        while self
+            .uart
+            .register_block()
+            .reg_update
+            .read()
+            .reg_update()
+            .bit_is_set()
+        {
+            // wait
+        }
+    }
+
+    #[cfg(not(esp32c6))]
+    #[inline(always)]
+    fn sync_regs(&mut self) {}
 }
 
 /// UART peripheral instance
