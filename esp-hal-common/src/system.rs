@@ -320,17 +320,7 @@ impl crate::peripheral::Peripheral for SystemClockControl {
     }
 }
 
-impl crate::peripheral::Peripheral for &mut SystemClockControl {
-    type P = SystemClockControl;
-
-    #[inline]
-    unsafe fn clone_unchecked(&mut self) -> Self::P {
-        SystemClockControl { _private: () }
-    }
-}
-
 impl crate::peripheral::sealed::Sealed for SystemClockControl {}
-impl crate::peripheral::sealed::Sealed for &mut SystemClockControl {}
 
 #[cfg(pdma)]
 mod dma_peripheral {
@@ -343,14 +333,6 @@ mod dma_peripheral {
             Dma { _private: () }
         }
     }
-    impl crate::peripheral::Peripheral for &mut Dma {
-        type P = Dma;
-        #[inline]
-        unsafe fn clone_unchecked(&mut self) -> Self::P {
-            Dma { _private: () }
-        }
-    }
 
     impl crate::peripheral::sealed::Sealed for Dma {}
-    impl crate::peripheral::sealed::Sealed for &mut Dma {}
 }

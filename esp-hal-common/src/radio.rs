@@ -25,17 +25,47 @@ impl Wifi {
     }
 }
 
+impl crate::peripheral::Peripheral for Wifi {
+    type P = Self;
+
+    unsafe fn clone_unchecked(&mut self) -> Self::P {
+        Self::steal()
+    }
+}
+
+impl crate::peripheral::sealed::Sealed for Wifi {}
+
 impl Bluetooth {
     pub const unsafe fn steal() -> Self {
         Self { _private: () }
     }
 }
 
+impl crate::peripheral::Peripheral for Bluetooth {
+    type P = Self;
+
+    unsafe fn clone_unchecked(&mut self) -> Self::P {
+        Self::steal()
+    }
+}
+
+impl crate::peripheral::sealed::Sealed for Bluetooth {}
+
 impl LowRate {
     pub const unsafe fn steal() -> Self {
         Self { _private: () }
     }
 }
+
+impl crate::peripheral::Peripheral for LowRate {
+    type P = Self;
+
+    unsafe fn clone_unchecked(&mut self) -> Self::P {
+        Self::steal()
+    }
+}
+
+impl crate::peripheral::sealed::Sealed for LowRate {}
 
 cfg_if::cfg_if! {
     if #[cfg(any(esp32, esp32c2, esp32c3, esp32s3))] {
