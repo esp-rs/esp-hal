@@ -167,6 +167,19 @@ pub trait Peripheral: Sized + sealed::Sealed {
     }
 }
 
+impl<T> Peripheral for &mut T
+where
+    T: Peripheral,
+{
+    type P = T;
+
+    unsafe fn clone_unchecked(&mut self) -> Self::P {
+        self.clone_unchecked()
+    }
+}
+
+impl<T> sealed::Sealed for &mut T where T: sealed::Sealed {}
+
 pub(crate) mod sealed {
     pub trait Sealed {}
 }
@@ -298,17 +311,7 @@ mod peripheral_macros {
                 }
             }
 
-            impl crate::peripheral::Peripheral for &mut $name {
-                type P = $name;
-
-                #[inline]
-                unsafe fn clone_unchecked(&mut self) -> Self::P {
-                    $name::steal()
-                }
-            }
-
             impl crate::peripheral::sealed::Sealed for $name {}
-            impl crate::peripheral::sealed::Sealed for &mut $name {}
         };
         ($(#[$cfg:meta])? $name:ident => false) => {
             $(#[$cfg])?
@@ -338,17 +341,7 @@ mod peripheral_macros {
                 }
             }
 
-            impl crate::peripheral::Peripheral for &mut $name {
-                type P = $name;
-
-                #[inline]
-                unsafe fn clone_unchecked(&mut self) -> Self::P {
-                    $name::steal()
-                }
-            }
-
             impl crate::peripheral::sealed::Sealed for $name {}
-            impl crate::peripheral::sealed::Sealed for &mut $name {}
         }
     }
 }

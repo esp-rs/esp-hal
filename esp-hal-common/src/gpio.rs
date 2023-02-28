@@ -1000,33 +1000,8 @@ where
     }
 }
 
-impl<MODE, RA, IRA, PINTYPE, SIG, const GPIONUM: u8> crate::peripheral::Peripheral
-    for &mut GpioPin<MODE, RA, IRA, PINTYPE, SIG, GPIONUM>
-where
-    RA: BankGpioRegisterAccess,
-    IRA: InteruptStatusRegisterAccess,
-    PINTYPE: PinType,
-    SIG: GpioSignal,
-{
-    type P = GpioPin<MODE, RA, IRA, PINTYPE, SIG, GPIONUM>;
-
-    unsafe fn clone_unchecked(&mut self) -> Self::P {
-        core::ptr::read(*self as *const _)
-    }
-}
-
 impl<MODE, RA, IRA, PINTYPE, SIG, const GPIONUM: u8> crate::peripheral::sealed::Sealed
     for GpioPin<MODE, RA, IRA, PINTYPE, SIG, GPIONUM>
-where
-    RA: BankGpioRegisterAccess,
-    IRA: InteruptStatusRegisterAccess,
-    PINTYPE: PinType,
-    SIG: GpioSignal,
-{
-}
-
-impl<MODE, RA, IRA, PINTYPE, SIG, const GPIONUM: u8> crate::peripheral::sealed::Sealed
-    for &mut GpioPin<MODE, RA, IRA, PINTYPE, SIG, GPIONUM>
 where
     RA: BankGpioRegisterAccess,
     IRA: InteruptStatusRegisterAccess,
