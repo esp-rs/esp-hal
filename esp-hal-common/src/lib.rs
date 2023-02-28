@@ -50,14 +50,16 @@ pub mod trapframe {
 
 #[cfg(rmt)]
 pub use self::pulse_control::PulseControl;
+#[cfg(any(esp32, esp32s3))]
+pub use self::soc::cpu_control;
 #[cfg(usb_serial_jtag)]
 pub use self::usb_serial_jtag::UsbSerialJtag;
 pub use self::{
     delay::Delay,
-    gpio::*,
     interrupt::*,
     rng::Rng,
     rtc_cntl::{Rtc, Rwdt},
+    soc::{efuse, peripherals},
     spi::Spi,
     timer::Timer,
     uart::Uart,
@@ -92,6 +94,7 @@ pub mod rng;
 pub mod rom;
 pub mod rtc_cntl;
 pub mod sha;
+pub mod soc;
 pub mod spi;
 pub mod system;
 #[cfg(systimer)]
@@ -105,30 +108,9 @@ pub mod usb_serial_jtag;
 #[cfg(rmt)]
 pub mod utils;
 
-#[cfg_attr(esp32, path = "cpu_control/esp32.rs")]
-#[cfg_attr(esp32s3, path = "cpu_control/esp32s3.rs")]
-#[cfg_attr(not(any(esp32, esp32s3)), path = "cpu_control/none.rs")]
-pub mod cpu_control;
-
-#[cfg_attr(esp32, path = "efuse/esp32.rs")]
-#[cfg_attr(esp32c2, path = "efuse/esp32c2.rs")]
-#[cfg_attr(esp32c3, path = "efuse/esp32c3.rs")]
-#[cfg_attr(esp32c6, path = "efuse/esp32c6.rs")]
-#[cfg_attr(esp32s2, path = "efuse/esp32s2.rs")]
-#[cfg_attr(esp32s3, path = "efuse/esp32s3.rs")]
-pub mod efuse;
-
 #[cfg_attr(riscv, path = "interrupt/riscv.rs")]
 #[cfg_attr(xtensa, path = "interrupt/xtensa.rs")]
 pub mod interrupt;
-
-#[cfg_attr(esp32, path = "peripherals/esp32.rs")]
-#[cfg_attr(esp32c3, path = "peripherals/esp32c3.rs")]
-#[cfg_attr(esp32c2, path = "peripherals/esp32c2.rs")]
-#[cfg_attr(esp32c6, path = "peripherals/esp32c6.rs")]
-#[cfg_attr(esp32s2, path = "peripherals/esp32s2.rs")]
-#[cfg_attr(esp32s3, path = "peripherals/esp32s3.rs")]
-pub mod peripherals;
 
 #[cfg(esp32c6)]
 pub fn disable_apm_filter() {

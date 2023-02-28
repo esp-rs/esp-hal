@@ -5,15 +5,13 @@ use self::config::Config;
 use crate::peripherals::UART2;
 use crate::{
     clock::Clocks,
+    gpio::{InputPin, InputSignal, OutputPin, OutputSignal},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{
         uart0::{fifo::FIFO_SPEC, RegisterBlock},
         UART0,
         UART1,
     },
-    types::{InputSignal, OutputSignal},
-    InputPin,
-    OutputPin,
 };
 
 const UART_FIFO_SIZE: u16 = 128;

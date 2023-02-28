@@ -1,9 +1,6 @@
 use super::unit;
 use crate::{
-    gpio::{
-        types::{InputSignal, ONE_INPUT, ZERO_INPUT},
-        InputPin,
-    },
+    gpio::{InputPin, InputSignal, ONE_INPUT, ZERO_INPUT},
     peripheral::Peripheral,
     peripherals::GPIO,
 };
@@ -174,7 +171,7 @@ impl Channel {
             },
         };
 
-        if (signal as usize) <= crate::types::INPUT_SIGNAL_MAX as usize {
+        if (signal as usize) <= crate::gpio::INPUT_SIGNAL_MAX as usize {
             unsafe { &*GPIO::PTR }.func_in_sel_cfg[signal as usize].modify(|_, w| unsafe {
                 w.sel()
                     .set_bit()
@@ -228,7 +225,7 @@ impl Channel {
             },
         };
 
-        if (signal as usize) <= crate::types::INPUT_SIGNAL_MAX as usize {
+        if (signal as usize) <= crate::gpio::INPUT_SIGNAL_MAX as usize {
             unsafe { &*GPIO::PTR }.func_in_sel_cfg[signal as usize].modify(|_, w| unsafe {
                 w.sel()
                     .set_bit()

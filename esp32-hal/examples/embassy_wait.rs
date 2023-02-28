@@ -12,6 +12,7 @@ use embedded_hal_async::digital::Wait;
 use esp32_hal::{
     clock::ClockControl,
     embassy,
+    gpio::{Gpio0, Input, PullDown},
     peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
@@ -19,7 +20,6 @@ use esp32_hal::{
     IO,
 };
 use esp_backtrace as _;
-use esp_hal_common::{Gpio0, Input, PullDown};
 use static_cell::StaticCell;
 
 #[embassy_executor::task]
