@@ -630,7 +630,7 @@ where
     PINTYPE: PinType,
     SIG: GpioSignal,
 {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             _mode: PhantomData,
             _pintype: PhantomData,
