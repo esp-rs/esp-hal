@@ -37,7 +37,7 @@ r0                 = "1.0.0"
 critical-section  = "1.1.1"
 embassy-executor  = { package = "embassy-executor", git = "https://github.com/embassy-rs/embassy/", rev = "cd9a65b", features = ["nightly", "integrated-timers"] }
 embedded-graphics = "0.7.1"
-esp-backtrace     = { version = "0.5.0", features = ["esp32c2", "panic-handler", "exception-handler", "print-uart"] }
+esp-backtrace     = { version = "0.6.0", features = ["esp32c2", "panic-handler", "exception-handler", "print-uart"] }
 esp-println       = { version = "0.3.1", features = ["esp32c2"] }
 sha2              = { version = "0.10.6", default-features = false}
 ssd1306           = "0.7.1"
