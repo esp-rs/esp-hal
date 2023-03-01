@@ -104,6 +104,19 @@ SECTIONS
     __euninit = .;
   } > REGION_BSS
 
+  .data :
+  {
+    _sdata = .;
+    /* Must be called __global_pointer$ for linker relaxations to work. */
+    PROVIDE(__global_pointer$ = . + 0x800);
+    *(.sdata .sdata.* .sdata2 .sdata2.*);
+    *(.data .data.*);
+    *libriscv-*.rlib:riscv.*(.rodata .rodata.*);
+    *libesp_riscv_rt-*.rlib:esp-riscv-rt.*(.rodata .rodata.*);
+    . = ALIGN(4);
+    _edata = .;
+  } > REGION_DATA AT>ROM
+
   /* fictitious region that represents the memory available for the heap */
   .heap (NOLOAD) :
   {
@@ -120,19 +133,6 @@ SECTIONS
     . = ABSOLUTE(_stack_start);
     _sstack = .;
   } > REGION_STACK
-
-  .data :
-  {
-    _sdata = .;
-    /* Must be called __global_pointer$ for linker relaxations to work. */
-    PROVIDE(__global_pointer$ = . + 0x800);
-    *(.sdata .sdata.* .sdata2 .sdata2.*);
-    *(.data .data.*);
-    *libriscv-*.rlib:riscv.*(.rodata .rodata.*);
-    *libesp_riscv_rt-*.rlib:esp-riscv-rt.*(.rodata .rodata.*);
-    . = ALIGN(4);
-    _edata = .;
-  } > REGION_DATA AT>ROM
 
   .rtc_fast.text :
   {
