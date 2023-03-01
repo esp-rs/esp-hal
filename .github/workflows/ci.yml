@@ -102,9 +102,8 @@ jobs:
         run: cd esp32c3-hal/ && cargo build --examples
       - name: build esp32c3-hal (direct-boot)
         run: cd esp32c3-hal/ && cargo build --examples --features=direct-boot
-      # FIXME: Building using the mcu-boot format currently results in an error.
-      # - name: build esp32c3-hal (mcu-boot)
-      #   run: cd esp32c3-hal/ && cargo build --examples --features=mcu-boot
+      - name: build esp32c3-hal (mcu-boot)
+        run: cd esp32c3-hal/ && cargo build --examples --features=mcu-boot
       # Subsequent steps can just check the examples instead, as we're already
       # confident that they link.
       - name: check esp32c3-hal (common features)

@@ -54,6 +54,9 @@ pub mod analog {
 extern "C" {
     cfg_if::cfg_if! {
         if #[cfg(feature = "mcu-boot")] {
+            // Required for retrieving the entry point address
+            fn _start();
+
             // Functions from internal ROM
             fn cache_suspend_icache() -> u32;
             fn cache_resume_icache(val: u32);
@@ -124,7 +127,7 @@ extern "C" {
 #[no_mangle]
 #[used]
 // Entry point address for the MCUboot image header
-static ENTRY_POINT: unsafe fn() -> ! = start_hal;
+static ENTRY_POINT: unsafe extern "C" fn() = _start;
 
 #[cfg(feature = "direct-boot")]
 #[doc(hidden)]
@@ -198,8 +201,8 @@ unsafe fn configure_mmu() {
         0,
     );
 
-    let peripherals = peripherals::Peripherals::steal();
-    peripherals.EXTMEM.icache_ctrl1.modify(|_, w| {
+    let extmem = unsafe { &*peripherals::EXTMEM::ptr() };
+    extmem.icache_ctrl1.modify(|_, w| {
         w.icache_shut_ibus()
             .clear_bit()
             .icache_shut_dbus()
