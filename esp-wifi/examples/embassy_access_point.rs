@@ -15,6 +15,8 @@ use esp32_hal as hal;
 use esp32c2_hal as hal;
 #[cfg(feature = "esp32c3")]
 use esp32c3_hal as hal;
+#[cfg(feature = "esp32c6")]
+use esp32c6_hal as hal;
 #[cfg(feature = "esp32s2")]
 use esp32s2_hal as hal;
 #[cfg(feature = "esp32s3")]
@@ -32,7 +34,7 @@ use hal::clock::{ClockControl, CpuClock};
 use hal::Rng;
 use hal::{embassy, peripherals::Peripherals, prelude::*, timer::TimerGroup, Rtc};
 
-#[cfg(any(feature = "esp32c3", feature = "esp32c2"))]
+#[cfg(any(feature = "esp32c3", feature = "esp32c2", feature = "esp32c6"))]
 use hal::system::SystemExt;
 
 macro_rules! singleton {
@@ -53,19 +55,27 @@ fn main() -> ! {
 
     let peripherals = Peripherals::take();
 
-    #[cfg(not(feature = "esp32"))]
+    #[cfg(not(any(feature = "esp32", feature = "esp32c6")))]
     let system = peripherals.SYSTEM.split();
     #[cfg(feature = "esp32")]
     let system = peripherals.DPORT.split();
+    #[cfg(any(feature = "esp32c6"))]
+    let system = peripherals.PCR.split();
 
     #[cfg(feature = "esp32c3")]
     let clocks = ClockControl::configure(system.clock_control, CpuClock::Clock160MHz).freeze();
     #[cfg(feature = "esp32c2")]
     let clocks = ClockControl::configure(system.clock_control, CpuClock::Clock120MHz).freeze();
+    #[cfg(feature = "esp32c6")]
+    let clocks = ClockControl::configure(system.clock_control, CpuClock::Clock160MHz).freeze();
     #[cfg(any(feature = "esp32", feature = "esp32s3", feature = "esp32s2"))]
     let clocks = ClockControl::configure(system.clock_control, CpuClock::Clock240MHz).freeze();
 
+    #[cfg(not(any(feature = "esp32c6")))]
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
+
+    #[cfg(any(feature = "esp32c6"))]
+    let mut rtc = Rtc::new(peripherals.LP_CLKRST);
 
     // Disable watchdog timers
     #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
@@ -73,7 +83,7 @@ fn main() -> ! {
 
     rtc.rwdt.disable();
 
-    #[cfg(any(feature = "esp32c3", feature = "esp32c2"))]
+    #[cfg(any(feature = "esp32c3", feature = "esp32c2", feature = "esp32c6"))]
     {
         use hal::systimer::SystemTimer;
         let syst = SystemTimer::new(peripherals.SYSTIMER);

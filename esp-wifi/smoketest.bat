@@ -77,3 +77,16 @@ cargo "+nightly" run --example esp_now --release --target riscv32imc-unknown-non
 cargo "+nightly" run --example embassy_esp_now --release --target riscv32imc-unknown-none-elf --features "esp32c2,esp32c2-async,esp-now"
 cargo "+nightly" run --example access_point --release --target riscv32imc-unknown-none-elf --features "esp32c2,embedded-svc,wifi"
 cargo "+nightly" run --example embassy_access_point --release --target riscv32imc-unknown-none-elf --features "esp32c2,esp32c2-async,embedded-svc,wifi,embassy-net"
+
+set CARGO_PROFILE_RELEASE_OPT_LEVEL=3
+set CARGO_PROFILE_RELEASE_LTO=off
+echo.
+echo Connect ESP32-C3
+pause
+cargo "+nightly" run --example dhcp --release --target riscv32imac-unknown-none-elf --features "esp32c6,embedded-svc,wifi"
+cargo "+nightly" run --example static_ip --release --target riscv32imac-unknown-none-elf --features "esp32c6,embedded-svc,wifi"
+cargo "+nightly" run --example embassy_dhcp --release --target riscv32imac-unknown-none-elf --features "esp32c6,esp32c6-async,embedded-svc,wifi,embassy-net"
+cargo "+nightly" run --example esp_now --release --target riscv32imac-unknown-none-elf --features "esp32c6,esp-now"
+cargo "+nightly" run --example embassy_esp_now --release --target riscv32imac-unknown-none-elf --features "esp32c6,esp32c6-async,esp-now"
+cargo "+nightly" run --example access_point --release --target riscv32imac-unknown-none-elf --features "esp32c6,embedded-svc,wifi"
+cargo "+nightly" run --example embassy_access_point --release --target riscv32imac-unknown-none-elf --features "esp32c6,esp32c6-async,embedded-svc,wifi,embassy-net"

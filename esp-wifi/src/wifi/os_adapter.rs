@@ -1,5 +1,6 @@
 #[cfg_attr(feature = "esp32c3", path = "os_adapter_esp32c3.rs")]
 #[cfg_attr(feature = "esp32c2", path = "os_adapter_esp32c2.rs")]
+#[cfg_attr(feature = "esp32c6", path = "os_adapter_esp32c6.rs")]
 #[cfg_attr(feature = "esp32", path = "os_adapter_esp32.rs")]
 #[cfg_attr(feature = "esp32s3", path = "os_adapter_esp32s3.rs")]
 #[cfg_attr(feature = "esp32s2", path = "os_adapter_esp32s2.rs")]
@@ -25,7 +26,7 @@ use crate::{
     timer::yield_task,
 };
 
-#[cfg(feature = "esp32c3")]
+#[cfg(target_arch = "riscv32")]
 use crate::compat::common::syslog;
 
 use super::WifiEvent;
@@ -991,7 +992,7 @@ pub unsafe extern "C" fn get_free_heap_size() -> u32 {
  *
  ****************************************************************************/
 pub unsafe extern "C" fn rand() -> u32 {
-    todo!("rand")
+    crate::common_adapter::random()
 }
 
 /****************************************************************************
@@ -1525,7 +1526,7 @@ pub unsafe extern "C" fn log_write(
     #[cfg(not(feature = "wifi-logs"))]
     return;
 
-    #[cfg(feature = "esp32c3")]
+    #[cfg(target_arch = "riscv32")]
     syslog(_level, _format, _args);
 }
 
@@ -1555,14 +1556,14 @@ pub unsafe extern "C" fn log_writev(
     #[cfg(not(feature = "wifi-logs"))]
     return;
 
-    #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
+    #[cfg(target_arch = "xtensa")]
     #[allow(unreachable_code)]
     {
         let s = StrBuf::from(_format);
         log::info!("{}", s.as_str_ref());
     }
 
-    #[cfg(any(feature = "esp32c3", features = "esp32c2"))]
+    #[cfg(target_arch = "riscv32")]
     #[allow(unreachable_code)]
     {
         let _args = core::mem::transmute(_args);
@@ -1944,7 +1945,12 @@ pub unsafe extern "C" fn coex_event_duration_get(
  *   Don't support
  *
  ****************************************************************************/
-#[cfg(any(feature = "esp32c3", feature = "esp32c2", feature = "esp32s3"))]
+#[cfg(any(
+    feature = "esp32c3",
+    feature = "esp32c2",
+    feature = "esp32c6",
+    feature = "esp32s3"
+))]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn coex_pti_get(event: u32, pti: *mut u8) -> crate::binary::c_types::c_int {
     log::debug!("coex_pti_get");
@@ -2124,6 +2130,9 @@ pub unsafe extern "C" fn slowclk_cal_get() -> u32 {
 
     #[cfg(feature = "esp32c2")]
     return 28639;
+
+    #[cfg(feature = "esp32c6")]
+    return 0;
 
     #[cfg(feature = "esp32")]
     return 28639;

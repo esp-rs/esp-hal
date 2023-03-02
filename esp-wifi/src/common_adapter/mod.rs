@@ -13,6 +13,8 @@ use esp32_hal as hal;
 use esp32c2_hal as hal;
 #[cfg(feature = "esp32c3")]
 use esp32c3_hal as hal;
+#[cfg(feature = "esp32c6")]
+use esp32c6_hal as hal;
 #[cfg(feature = "esp32s2")]
 use esp32s2_hal as hal;
 #[cfg(feature = "esp32s3")]
@@ -24,6 +26,7 @@ use hal::macros::ram;
 
 #[cfg_attr(feature = "esp32c3", path = "common_adapter_esp32c3.rs")]
 #[cfg_attr(feature = "esp32c2", path = "common_adapter_esp32c2.rs")]
+#[cfg_attr(feature = "esp32c6", path = "common_adapter_esp32c6.rs")]
 #[cfg_attr(feature = "esp32", path = "common_adapter_esp32.rs")]
 #[cfg_attr(feature = "esp32s3", path = "common_adapter_esp32s3.rs")]
 #[cfg_attr(feature = "esp32s2", path = "common_adapter_esp32s2.rs")]
@@ -31,6 +34,7 @@ pub(crate) mod chip_specific;
 
 #[cfg_attr(feature = "esp32c3", path = "phy_init_data_esp32c3.rs")]
 #[cfg_attr(feature = "esp32c2", path = "phy_init_data_esp32c2.rs")]
+#[cfg_attr(feature = "esp32c6", path = "phy_init_data_esp32c6.rs")]
 #[cfg_attr(feature = "esp32", path = "phy_init_data_esp32.rs")]
 #[cfg_attr(feature = "esp32s3", path = "phy_init_data_esp32s3.rs")]
 #[cfg_attr(feature = "esp32s2", path = "phy_init_data_esp32s2.rs")]
@@ -395,4 +399,9 @@ pub unsafe extern "C" fn esp_timer_create(
 #[no_mangle]
 pub unsafe extern "C" fn strrchr(_s: *const (), _c: u32) -> *const u8 {
     todo!("strrchr");
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn floor(_v: f64) -> f64 {
+    todo!("floor")
 }

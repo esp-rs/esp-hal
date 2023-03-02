@@ -158,6 +158,7 @@ pub struct PeerInfo {
     // we always use STA for now
 }
 
+#[cfg(not(any(feature = "esp32c6")))]
 #[derive(Debug, Clone, Copy)]
 pub struct RxControlInfo {
     pub rssi: i32,
@@ -179,6 +180,31 @@ pub struct RxControlInfo {
     pub ant: u32,
     pub sig_len: u32,
     pub rx_state: u32,
+}
+
+#[cfg(any(feature = "esp32c6"))]
+#[derive(Debug, Clone, Copy)]
+pub struct RxControlInfo {
+    pub rssi: i32,
+    pub rate: u32,
+    pub sig_len: u32,
+    pub rx_state: u32,
+    pub dump_len: u32,
+    pub he_sigb_len: u32,
+    pub cur_single_mpdu: u32,
+    pub cur_bb_format: u32,
+    pub rx_channel_estimate_info_vld: u32,
+    pub rx_channel_estimate_len: u32,
+    pub second: u32,
+    pub channel: u32,
+    pub data_rssi: i32,
+    pub noise_floor: u32,
+    pub is_group: u32,
+    pub rxend_state: u32,
+    pub rxmatch3: u32,
+    pub rxmatch2: u32,
+    pub rxmatch1: u32,
+    pub rxmatch0: u32,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -452,6 +478,7 @@ unsafe extern "C" fn rcv_cb(
     ];
 
     let rx_cntl = (*esp_now_info).rx_ctrl;
+    #[cfg(not(any(feature = "esp32c6")))]
     let rx_control = RxControlInfo {
         rssi: (*rx_cntl).rssi(),
         rate: (*rx_cntl).rate(),
@@ -472,6 +499,30 @@ unsafe extern "C" fn rcv_cb(
         ant: (*rx_cntl).ant(),
         sig_len: (*rx_cntl).sig_len(),
         rx_state: (*rx_cntl).rx_state(),
+    };
+
+    #[cfg(any(feature = "esp32c6"))]
+    let rx_control = RxControlInfo {
+        rssi: (*rx_cntl).rssi(),
+        rate: (*rx_cntl).rate(),
+        sig_len: (*rx_cntl).sig_len(),
+        rx_state: (*rx_cntl).rx_state(),
+        dump_len: (*rx_cntl).dump_len(),
+        he_sigb_len: (*rx_cntl).he_sigb_len(),
+        cur_single_mpdu: (*rx_cntl).cur_single_mpdu(),
+        cur_bb_format: (*rx_cntl).cur_bb_format(),
+        rx_channel_estimate_info_vld: (*rx_cntl).rx_channel_estimate_info_vld(),
+        rx_channel_estimate_len: (*rx_cntl).rx_channel_estimate_len(),
+        second: (*rx_cntl).second(),
+        channel: (*rx_cntl).channel(),
+        data_rssi: (*rx_cntl).data_rssi(),
+        noise_floor: (*rx_cntl).noise_floor(),
+        is_group: (*rx_cntl).is_group(),
+        rxend_state: (*rx_cntl).rxend_state(),
+        rxmatch3: (*rx_cntl).rxmatch3(),
+        rxmatch2: (*rx_cntl).rxmatch2(),
+        rxmatch1: (*rx_cntl).rxmatch1(),
+        rxmatch0: (*rx_cntl).rxmatch0(),
     };
 
     let info = ReceiveInfo {

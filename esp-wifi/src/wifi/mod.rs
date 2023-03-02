@@ -40,6 +40,8 @@ use esp32_hal as hal;
 use esp32c2_hal as hal;
 #[cfg(feature = "esp32c3")]
 use esp32c3_hal as hal;
+#[cfg(feature = "esp32c6")]
+use esp32c6_hal as hal;
 #[cfg(feature = "esp32s2")]
 use esp32s2_hal as hal;
 #[cfg(feature = "esp32s3")]
@@ -441,8 +443,9 @@ static g_wifi_osi_funcs: wifi_osi_funcs_t = wifi_osi_funcs_t {
     #[cfg(any(
         feature = "esp32c3",
         feature = "esp32c2",
+        feature = "esp32c6",
         feature = "esp32s3",
-        feature = "esp32s2"
+        feature = "esp32s2",
     ))]
     _slowclk_cal_get: Some(slowclk_cal_get),
     #[cfg(any(feature = "esp32", feature = "esp32s2"))]
@@ -454,6 +457,24 @@ static g_wifi_osi_funcs: wifi_osi_funcs_t = wifi_osi_funcs_t {
         crate::wifi::os_adapter::os_adapter_chip_specific::phy_common_clock_enable,
     ),
     _coex_register_start_cb: Some(coex_register_start_cb),
+
+    #[cfg(any(feature = "esp32c6"))]
+    _regdma_link_set_write_wait_content: Some(
+        os_adapter_chip_specific::regdma_link_set_write_wait_content_dummy,
+    ),
+    #[cfg(any(feature = "esp32c6"))]
+    _sleep_retention_find_link_by_id: Some(
+        os_adapter_chip_specific::sleep_retention_find_link_by_id_dummy,
+    ),
+    #[cfg(any(feature = "esp32c6"))]
+    _sleep_retention_entries_create: Some(
+        os_adapter_chip_specific::sleep_retention_entries_create_dummy,
+    ),
+    #[cfg(any(feature = "esp32c6"))]
+    _sleep_retention_entries_destroy: Some(
+        os_adapter_chip_specific::sleep_retention_entries_destroy_dummy,
+    ),
+
     _magic: ESP_WIFI_OS_ADAPTER_MAGIC as i32,
 };
 

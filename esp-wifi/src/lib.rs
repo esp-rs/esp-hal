@@ -16,6 +16,10 @@ use esp32c2_hal::systimer::{Alarm, Target};
 use esp32c3_hal as hal;
 #[cfg(feature = "esp32c3")]
 use esp32c3_hal::systimer::{Alarm, Target};
+#[cfg(feature = "esp32c6")]
+use esp32c6_hal as hal;
+#[cfg(feature = "esp32c6")]
+use esp32c6_hal::systimer::{Alarm, Target};
 #[cfg(feature = "esp32s2")]
 use esp32s2_hal as hal;
 #[cfg(feature = "esp32s3")]
@@ -47,6 +51,7 @@ pub mod preempt;
 #[cfg_attr(feature = "esp32", path = "timer_esp32.rs")]
 #[cfg_attr(feature = "esp32c3", path = "timer_esp32c3.rs")]
 #[cfg_attr(feature = "esp32c2", path = "timer_esp32c2.rs")]
+#[cfg_attr(feature = "esp32c6", path = "timer_esp32c6.rs")]
 #[cfg_attr(feature = "esp32s3", path = "timer_esp32s3.rs")]
 #[cfg_attr(feature = "esp32s2", path = "timer_esp32s2.rs")]
 pub mod timer;
@@ -95,7 +100,7 @@ pub fn init_heap() {
     });
 }
 
-#[cfg(any(feature = "esp32c3", feature = "esp32c2"))]
+#[cfg(any(feature = "esp32c3", feature = "esp32c2", feature = "esp32c6"))]
 /// Initialize for using WiFi / BLE
 /// This will initialize internals and also initialize WiFi and BLE
 pub fn initialize(
@@ -103,6 +108,11 @@ pub fn initialize(
     rng: hal::Rng,
     clocks: &Clocks,
 ) -> Result<(), InitializationError> {
+    #[cfg(feature = "esp32c6")]
+    if clocks.cpu_clock != MegahertzU32::MHz(160) {
+        return Err(InitializationError::WrongClockConfig);
+    }
+
     #[cfg(feature = "esp32c3")]
     if clocks.cpu_clock != MegahertzU32::MHz(160) {
         return Err(InitializationError::WrongClockConfig);
@@ -112,6 +122,9 @@ pub fn initialize(
     if clocks.cpu_clock != MegahertzU32::MHz(120) {
         return Err(InitializationError::WrongClockConfig);
     }
+
+    #[cfg(feature = "esp32c6")]
+    wifi::os_adapter_chip_specific::setup();
 
     phy_mem_init();
     init_rng(rng);
@@ -144,6 +157,9 @@ pub fn initialize(
         log::debug!("ble init");
         crate::ble::ble_init();
     }
+
+    #[cfg(feature = "esp32c6")]
+    wifi::os_adapter_chip_specific::run_after_initialze_hack();
 
     Ok(())
 }

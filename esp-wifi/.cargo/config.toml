@@ -7,7 +7,17 @@ rustflags = [
 
     "-C", "force-frame-pointers",
 ]
- 
+
+[target.riscv32imac-unknown-none-elf]
+runner = "espflash flash --monitor"
+
+rustflags = [
+    "-C", "link-arg=-Tlinkall.x",
+    "-C", "link-arg=-Trom_functions.x",
+
+    "-C", "force-frame-pointers",
+]
+
 [target.xtensa-esp32-none-elf]
 runner = "espflash flash --monitor"
 
