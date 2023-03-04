@@ -26,6 +26,7 @@ pub use esp_hal_common::{
     peripherals,
     prelude,
     pulse_control,
+    reset,
     sha,
     spi,
     system,

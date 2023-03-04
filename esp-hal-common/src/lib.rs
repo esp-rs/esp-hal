@@ -88,6 +88,7 @@ pub mod prelude;
 pub mod pulse_control;
 #[cfg(radio)]
 pub mod radio;
+pub mod reset;
 pub mod rng;
 pub mod rom;
 pub mod rtc_cntl;

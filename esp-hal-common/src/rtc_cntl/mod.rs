@@ -3,7 +3,7 @@ use embedded_hal::watchdog::{Watchdog, WatchdogDisable, WatchdogEnable};
 use fugit::HertzU32;
 use fugit::MicrosDurationU64;
 
-use self::rtc::SocResetReason;
+pub use self::rtc::SocResetReason;
 #[cfg(not(esp32c6))]
 use crate::clock::{Clock, XtalClock};
 #[cfg(not(esp32))]
@@ -37,6 +37,9 @@ extern "C" {
     #[allow(dead_code)]
     fn ets_delay_us(us: u32);
     fn rtc_get_reset_reason(cpu_num: u32) -> u32;
+    fn rtc_get_wakeup_cause() -> u32;
+    pub fn software_reset_cpu();
+    pub fn software_reset();
 }
 
 #[cfg(not(esp32c6))]
@@ -809,4 +812,9 @@ pub fn get_reset_reason(cpu: Cpu) -> Option<SocResetReason> {
     let reason = SocResetReason::from_repr(reason as usize);
 
     reason
+}
+
+pub fn get_wakeup_cause() -> u32 {
+    let cause = unsafe { rtc_get_wakeup_cause() };
+    cause
 }

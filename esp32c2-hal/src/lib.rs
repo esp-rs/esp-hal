@@ -17,6 +17,7 @@ pub use esp_hal_common::{
     macros,
     peripherals,
     prelude,
+    reset,
     riscv,
     sha,
     spi,
