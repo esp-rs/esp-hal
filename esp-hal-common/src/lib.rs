@@ -101,6 +101,7 @@ pub mod pulse_control;
 pub mod radio;
 #[cfg(rng)]
 pub mod rng;
+pub mod reset;
 pub mod rom;
 #[cfg(any(lp_clkrst, rtc_cntl))]
 pub mod rtc_cntl;
