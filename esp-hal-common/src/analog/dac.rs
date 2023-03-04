@@ -105,7 +105,7 @@ macro_rules! impl_dac {
                     /// Constructs a new DAC instance
                     pub fn dac(
                         dac: impl $crate::peripheral::Peripheral<P = DAC> +'d,
-                        _pin: gpio::$gpio<$crate::Analog>,
+                        _pin: gpio::$gpio<$crate::gpio::Analog>,
                     ) -> Result<Self, ()> {
                         let dac = Self {
                             _dac: dac.into_ref(),

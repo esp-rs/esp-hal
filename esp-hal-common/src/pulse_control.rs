@@ -89,7 +89,7 @@ pub use paste::paste;
 #[cfg(esp32c6)]
 use crate::peripherals::PCR;
 use crate::{
-    gpio::{types::OutputSignal, OutputPin},
+    gpio::{OutputPin, OutputSignal},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::RMT,
     system::PeripheralClockControl,

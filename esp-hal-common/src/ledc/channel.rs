@@ -7,7 +7,7 @@ use super::{
     LowSpeed,
 };
 use crate::{
-    gpio::{types::OutputSignal, OutputPin},
+    gpio::{OutputPin, OutputSignal},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::ledc::RegisterBlock,
 };

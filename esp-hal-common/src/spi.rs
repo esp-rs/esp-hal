@@ -53,12 +53,10 @@ use fugit::HertzU32;
 use crate::{
     clock::Clocks,
     dma::{DmaError, DmaPeripheral, Rx, Tx},
+    gpio::{InputPin, InputSignal, OutputPin, OutputSignal},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::spi2::RegisterBlock,
     system::PeripheralClockControl,
-    types::{InputSignal, OutputSignal},
-    InputPin,
-    OutputPin,
 };
 
 /// The size of the FIFO buffer for SPI
@@ -833,7 +831,7 @@ mod ehal1 {
     use embedded_hal_nb::spi::FullDuplex;
 
     use super::*;
-    use crate::OutputPin;
+    use crate::gpio::OutputPin;
 
     impl<T> embedded_hal_1::spi::ErrorType for Spi<'_, T> {
         type Error = super::Error;

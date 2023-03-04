@@ -46,12 +46,11 @@ SECTIONS
   .rodata :
   {
     _srodata = .;
+    *(.srodata .srodata.*);
     *(EXCLUDE_FILE (*libriscv-*.rlib:riscv.*) .rodata);
     *(EXCLUDE_FILE (*libriscv-*.rlib:riscv.*) .rodata.*);
-    *(EXCLUDE_FILE (*libriscv_rt-*.rlib:riscv-rt.*) .rodata);
-    *(EXCLUDE_FILE (*libriscv_rt-*.rlib:riscv-rt.*) .rodata.*);
-    *(.srodata .srodata.*);
-    *(.rodata .rodata.*);
+    *(EXCLUDE_FILE (*libesp_riscv_rt-*.rlib:esp-riscv-rt.*) .rodata);
+    *(EXCLUDE_FILE (*libesp_riscv_rt-*.rlib:esp-riscv-rt.*) .rodata.*);
 
     /* 4-byte align the end (VMA) of this section.
        This is required by LLD to ensure the LMA of the following .data
@@ -67,12 +66,13 @@ SECTIONS
     /* point of the program. */
     KEEP(*(.init));
     KEEP(*(.init.rust));
+    KEEP(*(.text.abort));
     . = ALIGN(4);
     KEEP(*(.trap));
     KEEP(*(.trap.rust));
 
     *libriscv-*.rlib:riscv.*(.literal .text .literal.* .text.*);
-    *libriscv_rt-*.rlib:riscv-rt.*(.literal .text .literal.* .text.*);
+    *libesp_riscv_rt-*.rlib:esp-riscv-rt.*(.literal .text .literal.* .text.*);
     *(.rwtext);
     . = ALIGN(4);
     _erwtext = .;
@@ -104,6 +104,19 @@ SECTIONS
     __euninit = .;
   } > REGION_BSS
 
+  .data :
+  {
+    _sdata = .;
+    /* Must be called __global_pointer$ for linker relaxations to work. */
+    PROVIDE(__global_pointer$ = . + 0x800);
+    *(.sdata .sdata.* .sdata2 .sdata2.*);
+    *(.data .data.*);
+    *libriscv-*.rlib:riscv.*(.rodata .rodata.*);
+    *libesp_riscv_rt-*.rlib:esp-riscv-rt.*(.rodata .rodata.*);
+    . = ALIGN(4);
+    _edata = .;
+  } > REGION_DATA AT>ROM
+
   /* fictitious region that represents the memory available for the heap */
   .heap (NOLOAD) :
   {
@@ -120,19 +133,6 @@ SECTIONS
     . = ABSOLUTE(_stack_start);
     _sstack = .;
   } > REGION_STACK
-
-  .data :
-  {
-    _sdata = .;
-    /* Must be called __global_pointer$ for linker relaxations to work. */
-    PROVIDE(__global_pointer$ = . + 0x800);
-    *(.sdata .sdata.* .sdata2 .sdata2.*);
-    *(.data .data.*);
-    *libriscv-*.rlib:riscv.*(.rodata .rodata.*);
-    *libriscv_rt-*.rlib:riscv-rt.*(.rodata .rodata.*);
-    . = ALIGN(4);
-    _edata = .;
-  } > REGION_DATA AT>ROM
 
   .rtc_fast.text :
   {
@@ -188,9 +188,8 @@ SECTIONS
     _stext = .;
     *(EXCLUDE_FILE (*libriscv-*.rlib:riscv.*) .text)
     *(EXCLUDE_FILE (*libriscv-*.rlib:riscv.*) .text.*)
-    *(EXCLUDE_FILE (*libriscv_rt-*.rlib:riscv-rt.*) .text)
-    *(EXCLUDE_FILE (*libriscv_rt-*.rlib:riscv-rt.*) .text.*)
-    *(.text .text.*);
+    *(EXCLUDE_FILE (*libesp_riscv_rt-*.rlib:esp-riscv-rt.*) .text)
+    *(EXCLUDE_FILE (*libesp_riscv_rt-*.rlib:esp-riscv-rt.*) .text.*)
     _etext = .;
   } > REGION_TEXT AT>ROM
 
