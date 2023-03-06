@@ -19,6 +19,7 @@ pub use esp_hal_common::{
     macros,
     mcpwm,
     pcnt,
+    peripheral::Peripheral,
     peripherals,
     prelude,
     pulse_control,
