@@ -21,6 +21,7 @@ pub use esp_hal_common::{
     interrupt,
     ledc,
     macros,
+    peripheral::Peripheral,
     peripherals,
     prelude,
     pulse_control,

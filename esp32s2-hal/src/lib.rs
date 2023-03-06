@@ -23,6 +23,7 @@ pub use esp_hal_common::{
     macros,
     otg_fs,
     pcnt,
+    peripheral::Peripheral,
     peripherals,
     prelude,
     pulse_control,

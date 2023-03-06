@@ -23,6 +23,7 @@ pub use esp_hal_common::{
     mcpwm,
     otg_fs,
     pcnt,
+    peripheral::Peripheral,
     peripherals,
     prelude,
     pulse_control,
