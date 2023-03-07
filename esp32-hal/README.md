@@ -7,7 +7,7 @@
 
 `no_std` HAL for the ESP32 from Espressif. Implements a number of the traits defined by [embedded-hal](https://github.com/rust-embedded/embedded-hal).
 
-This device uses the Xtensa ISA, which is not officially supported by the Rust compiler. In order to develop for this device you must use the Rust compiler fork with Xtensa support found at [esp-rs/rust](https://github.com/esp-rs/rust). Refer to the [Getting Started](#getting-started) section below for more information.
+This device uses the Xtensa ISA, which is not officially supported by the Rust compiler. In order to develop for this device, you must use the Rust compiler fork with Xtensa support found at [esp-rs/rust](https://github.com/esp-rs/rust). Refer to the [Getting Started](#getting-started) section below for more information.
 
 ## [Documentation]
 
