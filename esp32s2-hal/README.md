@@ -7,7 +7,7 @@
 
 `no_std` HAL for the ESP32-S2 from Espressif. Implements a number of the traits defined by [embedded-hal](https://github.com/rust-embedded/embedded-hal).
 
-This device uses the Xtensa ISA, which is not officially supported by the Rust compiler. In order to develop for this device you must use the Rust compiler fork with Xtensa support found at [esp-rs/rust](https://github.com/esp-rs/rust). Refer to the [Getting Stared](#getting-started) section below for more information.
+This device uses the Xtensa ISA, which is not officially supported by the Rust compiler. In order to develop for this device, you must use the Rust compiler fork with Xtensa support found at [esp-rs/rust](https://github.com/esp-rs/rust). Refer to the [Getting Started](#getting-started) section below for more information.
 
 ## [Documentation]
 
@@ -22,9 +22,9 @@ cargo install espup
 espup install
 # Unix
 . $HOME/export-esp.sh
-# Windows
-%USERPROFILE%\export-esp.ps1
+# Windows does not require sourcing any file
 ```
+
 See the [Installation chapter of The Rust on ESP Book](https://esp-rs.github.io/book/installation/installation.html#installing-rust-for-espressif-socs) for more details.
 
 ## License

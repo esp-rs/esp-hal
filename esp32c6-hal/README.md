@@ -7,7 +7,7 @@
 
 `no_std` HAL for the ESP32-C6 from Espressif. Implements a number of the traits defined by [embedded-hal](https://github.com/rust-embedded/embedded-hal).
 
-This device uses the RISC-V ISA, which is officially supported by the Rust compiler via the `riscv32imac-unknown-none-elf` target. Refer to the [Getting Stared](#getting-started) section below for more information.
+This device uses the RISC-V ISA, which is officially supported by the Rust compiler via the `riscv32imac-unknown-none-elf` target. Refer to the [Getting Started](#getting-started) section below for more information.
 
 ## [Documentation]
 
