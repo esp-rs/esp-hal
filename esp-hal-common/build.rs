@@ -1,3 +1,5 @@
+use std::{env, fs, path::PathBuf};
+
 fn main() {
     let esp32 = cfg!(feature = "esp32");
     let esp32c2 = cfg!(feature = "esp32c2");
@@ -157,5 +159,17 @@ fn main() {
 
     for symbol in symbols {
         println!("cargo:rustc-cfg={symbol}");
+    }
+
+    // Place all linker scripts in `OUT_DIR`, and instruct Cargo how to find these
+    // files:
+    let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
+    println!("cargo:rustc-link-search={}", out.display());
+
+    if esp32 || esp32s2 || esp32s3 {
+        fs::copy("ld/xtensa/hal-defaults.x", out.join("hal-defaults.x")).unwrap();
+        fs::copy("ld/xtensa/rom.x", out.join("alias.x")).unwrap();
+    } else {
+        fs::copy("ld/riscv/hal-defaults.x", out.join("hal-defaults.x")).unwrap();
     }
 }

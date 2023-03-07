@@ -19,6 +19,11 @@ PROVIDE(MachineExternal = DefaultHandler);
 PROVIDE(DefaultHandler = DefaultInterruptHandler);
 PROVIDE(ExceptionHandler = DefaultExceptionHandler);
 
+/* The ESP32-C2 and ESP32-C3 have interrupt IDs 1-31, while the ESP32-C6 has
+   IDs 0-31, so we much define the handler for the one additional interrupt
+   ID: */
+PROVIDE(interrupt0 = DefaultHandler);
+
 /* # Pre-initialization function */
 /* If the user overrides this using the `#[pre_init]` attribute or by creating a `__pre_init` function,
    then the function this points to will be called before the RAM is initialized. */
