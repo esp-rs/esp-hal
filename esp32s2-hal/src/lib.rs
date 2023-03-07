@@ -1,50 +1,12 @@
 #![no_std]
 
-// always enable atomic emulation on ESP32-S2
 pub use embedded_hal as ehal;
 #[cfg(feature = "embassy")]
 pub use esp_hal_common::embassy;
 use esp_hal_common::xtensa_lx_rt::exception::ExceptionCause;
 #[doc(inline)]
-pub use esp_hal_common::{
-    aes,
-    analog::adc::implementation as adc,
-    analog::dac::implementation as dac,
-    clock,
-    dma,
-    dma::pdma,
-    efuse,
-    entry,
-    gpio,
-    i2c::{self, I2C},
-    i2s,
-    interrupt,
-    ledc,
-    macros,
-    otg_fs,
-    pcnt,
-    peripheral::Peripheral,
-    peripherals,
-    prelude,
-    pulse_control,
-    sha,
-    spi,
-    system,
-    systimer,
-    timer,
-    trapframe,
-    uart,
-    utils,
-    xtensa_lx,
-    xtensa_lx_rt,
-    Cpu,
-    Delay,
-    PulseControl,
-    Rng,
-    Rtc,
-    Rwdt,
-    Uart,
-};
+pub use esp_hal_common::*;
+// Always enable atomic emulation on ESP32-S2
 use xtensa_atomic_emulation_trap as _;
 
 pub mod rt {

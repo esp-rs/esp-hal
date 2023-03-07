@@ -7,43 +7,7 @@ pub use embedded_hal as ehal;
 #[cfg(feature = "embassy")]
 pub use esp_hal_common::embassy;
 #[doc(inline)]
-pub use esp_hal_common::{
-    aes,
-    analog::adc::implementation as adc,
-    clock,
-    dma,
-    dma::gdma,
-    efuse,
-    entry,
-    gpio,
-    i2c,
-    i2s,
-    interrupt,
-    ledc,
-    macros,
-    peripheral::Peripheral,
-    peripherals,
-    prelude,
-    pulse_control,
-    riscv,
-    sha,
-    spi,
-    system,
-    systimer,
-    timer,
-    trapframe,
-    twai,
-    uart,
-    utils,
-    Cpu,
-    Delay,
-    PulseControl,
-    Rng,
-    Rtc,
-    Rwdt,
-    Uart,
-    UsbSerialJtag,
-};
+pub use esp_hal_common::*;
 
 pub use self::gpio::IO;
 
