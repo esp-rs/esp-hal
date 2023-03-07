@@ -164,7 +164,7 @@ SECTIONS {
 _external_ram_start = ABSOLUTE(ORIGIN(psram_seg));
 _external_ram_end = ABSOLUTE(ORIGIN(psram_seg)+LENGTH(psram_seg));
 
-_heap_end = ABSOLUTE(ORIGIN(dram_seg))+LENGTH(dram_seg)+LENGTH(reserved_for_boot_seg) - STACK_SIZE;
+_heap_end = ABSOLUTE(ORIGIN(dram_seg))+LENGTH(dram_seg)-LENGTH(reserved_for_boot_seg) - STACK_SIZE;
 _text_heap_end = ABSOLUTE(ORIGIN(iram_seg)+LENGTH(iram_seg));
 _external_heap_end = ABSOLUTE(ORIGIN(psram_seg)+LENGTH(psram_seg));
 
