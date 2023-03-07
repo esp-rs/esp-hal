@@ -22,9 +22,9 @@ cargo install espup
 espup install
 # Unix
 . $HOME/export-esp.sh
-# Windows
-%USERPROFILE%\export-esp.ps1
+# Windows does not require sourcing any file
 ```
+
 See the [Installation chapter of The Rust on ESP Book](https://esp-rs.github.io/book/installation/installation.html#installing-rust-for-espressif-socs) for more details.
 
 ## License
