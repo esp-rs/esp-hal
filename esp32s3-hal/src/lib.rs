@@ -55,12 +55,6 @@ pub mod analog {
     pub use esp_hal_common::analog::{AvailableAnalog, SensExt};
 }
 
-#[no_mangle]
-extern "C" fn EspDefaultHandler(_level: u32, _interrupt: peripherals::Interrupt) {}
-
-#[no_mangle]
-extern "C" fn DefaultHandler() {}
-
 #[cfg(all(feature = "rt", feature = "direct-boot"))]
 #[doc(hidden)]
 #[no_mangle]

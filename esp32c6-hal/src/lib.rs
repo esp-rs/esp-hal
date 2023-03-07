@@ -110,6 +110,3 @@ pub fn mp_hook() -> bool {
 
     false
 }
-
-#[no_mangle]
-extern "C" fn EspDefaultHandler(_interrupt: peripherals::Interrupt) {}

@@ -112,6 +112,13 @@ pub mod utils;
 #[cfg_attr(xtensa, path = "interrupt/xtensa.rs")]
 pub mod interrupt;
 
+#[no_mangle]
+extern "C" fn EspDefaultHandler(_level: u32, _interrupt: peripherals::Interrupt) {}
+
+#[cfg(xtensa)]
+#[no_mangle]
+extern "C" fn DefaultHandler() {}
+
 #[cfg(esp32c6)]
 pub fn disable_apm_filter() {
     unsafe {
