@@ -339,7 +339,6 @@ pub struct Dma {
     _private: (),
 }
 
-
 /// The SYSTEM/DPORT splitted into it's different logical parts.
 pub struct SystemParts<'d> {
     _private: PeripheralRef<'d, SystemPeripheral>,
