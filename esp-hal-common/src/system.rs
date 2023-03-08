@@ -326,7 +326,7 @@ pub struct CpuControl {
 pub struct Dma {
     _private: (),
 }
-#[cfg(esp32c3)]
+#[cfg(not(any(esp32c6,esp32)))]
 
 /// The SYSTEM/DPORT splitted into it's different logical parts.
 pub struct SystemParts<'d> {
@@ -338,7 +338,7 @@ pub struct SystemParts<'d> {
     #[cfg(pdma)]
     pub dma: Dma,
 }
-#[cfg(not(esp32c3))]
+#[cfg(any(esp32c6,esp32))]
 
 pub struct SystemParts<'d> {
     _private: PeripheralRef<'d, SystemPeripheral>,
@@ -357,7 +357,7 @@ pub trait SystemExt<'d> {
     /// Splits the SYSTEM/DPORT peripheral into it's parts.
     fn split(self) -> Self::Parts;
 }
-#[cfg(not(esp32c3))]
+#[cfg(any(esp32c6,esp32))]
 impl<'d, T: crate::peripheral::Peripheral<P = SystemPeripheral> + 'd> SystemExt<'d> for T {
     type Parts = SystemParts<'d>;
 
@@ -372,7 +372,7 @@ impl<'d, T: crate::peripheral::Peripheral<P = SystemPeripheral> + 'd> SystemExt<
         }
     }
 }
-#[cfg(esp32c3)]
+#[cfg(not(any(esp32c6,esp32)))]
 impl<'d, T: crate::peripheral::Peripheral<P = SystemPeripheral> + 'd> SystemExt<'d> for T {
     type Parts = SystemParts<'d>;
 
