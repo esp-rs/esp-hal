@@ -21,6 +21,8 @@ type SystemPeripheral = crate::peripherals::SYSTEM;
 pub enum SoftwareInterrupt{
     SoftwareInterrupt0,
     SoftwareInterrupt1,
+    SoftwareInterrupt2,
+    SoftwareInterrupt3,
 }
 
 /// Peripherals which can be enabled via [PeripheralClockControl]
@@ -78,6 +80,15 @@ impl SoftwareInterruptControl{
                 let interrupt = &system.cpu_intr_from_cpu_1;
                 interrupt.write(|w|w.cpu_intr_from_cpu_1().bit(true));
             }
+            SoftwareInterrupt::SoftwareInterrupt2 => {
+                let interrupt = &system.cpu_intr_from_cpu_2;
+                interrupt.write(|w|w.cpu_intr_from_cpu_2().bit(true));
+            }
+            SoftwareInterrupt::SoftwareInterrupt3 => {
+                let interrupt = &system.cpu_intr_from_cpu_3;
+                interrupt.write(|w|w.cpu_intr_from_cpu_3().bit(true));
+            }
+
         }
         
     }
