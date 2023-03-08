@@ -103,6 +103,14 @@ impl SoftwareInterruptControl{
                 let interrupt = &system.cpu_intr_from_cpu_1;
                 interrupt.write(|w|w.cpu_intr_from_cpu_1().bit(false));
             }
+            SoftwareInterrupt::SoftwareInterrupt2 => {
+                let interrupt = &system.cpu_intr_from_cpu_1;
+                interrupt.write(|w|w.cpu_intr_from_cpu_2().bit(false));
+            }
+            SoftwareInterrupt::SoftwareInterrupt3 => {
+                let interrupt = &system.cpu_intr_from_cpu_1;
+                interrupt.write(|w|w.cpu_intr_from_cpu_3().bit(false));
+            }
         }
         
     }
