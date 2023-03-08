@@ -4,45 +4,7 @@ pub use embedded_hal as ehal;
 #[cfg(feature = "embassy")]
 pub use esp_hal_common::embassy;
 #[doc(inline)]
-pub use esp_hal_common::{
-    aes,
-    analog::adc::implementation as adc,
-    analog::dac::implementation as dac,
-    clock,
-    cpu_control::CpuControl,
-    dma,
-    dma::pdma,
-    efuse,
-    entry,
-    gpio,
-    i2c,
-    i2s,
-    interrupt,
-    ledc,
-    macros,
-    mcpwm,
-    pcnt,
-    peripheral::Peripheral,
-    peripherals,
-    prelude,
-    pulse_control,
-    sha,
-    spi,
-    system,
-    timer,
-    trapframe,
-    uart,
-    utils,
-    xtensa_lx,
-    xtensa_lx_rt,
-    Cpu,
-    Delay,
-    PulseControl,
-    Rng,
-    Rtc,
-    Rwdt,
-    Uart,
-};
+pub use esp_hal_common::*;
 
 pub use self::gpio::IO;
 
@@ -50,12 +12,6 @@ pub use self::gpio::IO;
 pub mod analog {
     pub use esp_hal_common::analog::{AvailableAnalog, SensExt};
 }
-
-#[no_mangle]
-extern "C" fn EspDefaultHandler(_level: u32, _interrupt: peripherals::Interrupt) {}
-
-#[no_mangle]
-extern "C" fn DefaultHandler() {}
 
 /// Function initializes ESP32 specific memories (RTC slow and fast) and
 /// then calls original Reset function

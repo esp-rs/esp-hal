@@ -10,10 +10,10 @@ use core::cell::RefCell;
 use critical_section::Mutex;
 use esp32_hal::{
     clock::ClockControl,
+    cpu_control::CpuControl,
     peripherals::{Peripherals, TIMG1},
     prelude::*,
     timer::{Timer, Timer0, TimerGroup},
-    CpuControl,
     Rtc,
 };
 use esp_backtrace as _;

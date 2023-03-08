@@ -8,16 +8,6 @@ fn main() {
         .write_all(include_bytes!("ld/memory.x"))
         .unwrap();
 
-    File::create(out.join("alias.x"))
-        .unwrap()
-        .write_all(include_bytes!("ld/rom.x"))
-        .unwrap();
-
-    File::create(out.join("hal-defaults.x"))
-        .unwrap()
-        .write_all(include_bytes!("ld/hal-defaults.x"))
-        .unwrap();
-
     File::create(out.join("rom-functions.x"))
         .unwrap()
         .write_all(include_bytes!("ld/rom-functions.x"))
