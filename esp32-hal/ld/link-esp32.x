@@ -11,74 +11,25 @@ PROVIDE(__init_data = default_mem_hook);
 
 INCLUDE exception.x
 
-SECTIONS {
-  .text : ALIGN(4)
-  {
-    _stext = .;
-    . = ALIGN (4);
-    _text_start = ABSOLUTE(.);
-    . = ALIGN (4);
-    *(.literal .text .literal.* .text.*)
-    _text_end = ABSOLUTE(.);
-    _etext = .;
-  } > ROTEXT
+/* map generic regions to output sections */
+INCLUDE "alias.x"
 
-  .rodata : ALIGN(4)
-  {
-    _rodata_start = ABSOLUTE(.);
-    . = ALIGN (4);
-    *(.rodata .rodata.*)
-    _rodata_end = ABSOLUTE(.);
-  } > RODATA
+INCLUDE "text.x"
+INCLUDE "rodata.x"
+INCLUDE "rwdata.x"
+INCLUDE "rwtext.x"
+INCLUDE "rtc_fast.x"
+INCLUDE "rtc_slow.x"
 
-  .rodata.wifi :
-  {
-    . = ALIGN(4);
-    *( .rodata_wlog_*.* )
-  } > RODATA AT > RODATA
+_heap_end = ABSOLUTE(ORIGIN(dram_seg))+LENGTH(dram_seg)-LENGTH(reserved_for_boot_seg) - 2*STACK_SIZE;
 
-  .data : ALIGN(4)
-  {
-    _data_start = ABSOLUTE(.);
-    . = ALIGN (4);
-    *(.data .data.*)
-    _data_end = ABSOLUTE(.);
-  } > RWDATA AT > RODATA
+_stack_start_cpu1 = _heap_end;
+_stack_end_cpu1 = _stack_start_cpu1 + STACK_SIZE;
+_stack_start_cpu0 = _stack_end_cpu1;
+_stack_end_cpu0 = _stack_start_cpu0 + STACK_SIZE;
 
-  /* LMA of .data */
-  _sidata = LOADADDR(.data);
+EXTERN(DefaultHandler);
 
-  .bss (NOLOAD) : ALIGN(4)
-  {
-    _bss_start = ABSOLUTE(.);
-    . = ALIGN (4);
-    *(.bss .bss.* COMMON)
-    _bss_end = ABSOLUTE(.);
-  } > RWDATA
+EXTERN(WIFI_EVENT); /* Force inclusion of WiFi libraries */
 
-  .noinit (NOLOAD) : ALIGN(4)
-  {
-    . = ALIGN(4);
-    *(.noinit .noinit.*)
-  } > RWDATA
-
-  .rwtext : ALIGN(4)
-  {
-    . = ALIGN (4);
-    *(.rwtext.literal .rwtext .rwtext.literal.* .rwtext.*)
-  } > RWTEXT
-
- /* must be last segment using RWTEXT */
-  .text_heap_start (NOLOAD) : ALIGN(4)
-  {
-    . = ALIGN (4);
-    _text_heap_start = ABSOLUTE(.);
-  } > RWTEXT
-
- /* must be last segment using RWDATA */
-  .heap_start (NOLOAD) : ALIGN(4)
-  {
-    . = ALIGN (4);
-    _heap_start = ABSOLUTE(.);
-  } > RWDATA
-}
+INCLUDE "device.x"

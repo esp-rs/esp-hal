@@ -1,4 +1,4 @@
-use std::{env, fs::File, io::Write, path::PathBuf};
+use std::{env, fs::{File, self}, io::Write, path::PathBuf};
 
 fn main() {
     check_features();
@@ -29,6 +29,8 @@ fn main() {
         .unwrap()
         .write_all(include_bytes!("ld/link-esp32.x"))
         .unwrap();
+
+    copy_dir_all("../ld/sections", out).unwrap();
 
     println!("cargo:rustc-link-search={}", out.display());
 
@@ -64,4 +66,18 @@ fn check_features() {
     if cfg!(feature = "esp32_40mhz") && cfg!(feature = "esp32_26mhz") {
         panic!("Only one xtal speed feature can be selected");
     }
+}
+
+fn copy_dir_all(src: impl AsRef<std::path::Path>, dst: impl AsRef<std::path::Path>) -> std::io::Result<()> {
+    fs::create_dir_all(&dst)?;
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        if ty.is_dir() {
+            copy_dir_all(entry.path(), dst.as_ref().join(entry.file_name()))?;
+        } else {
+            fs::copy(entry.path(), dst.as_ref().join(entry.file_name()))?;
+        }
+    }
+    Ok(())
 }
