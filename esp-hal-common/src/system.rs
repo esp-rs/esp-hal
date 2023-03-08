@@ -17,7 +17,7 @@ type SystemPeripheral = crate::peripherals::DPORT;
 type SystemPeripheral = crate::peripherals::PCR;
 #[cfg(not(any(esp32, esp32c6)))]
 type SystemPeripheral = crate::peripherals::SYSTEM;
-#[cfg(esp32c3)]
+#[cfg(not(any(esp32, esp32c6)))]
 pub enum SoftwareInterrupt{
     SoftwareInterrupt0,
     SoftwareInterrupt1,
@@ -63,53 +63,45 @@ pub enum Peripheral {
     #[cfg(esp32c6)]
     Twai1,
 }
-#[cfg(esp32c3)]
+#[cfg(not(any(esp32, esp32c6)))]
 pub struct SoftwareInterruptControl{
     _private:(),
 }
-#[cfg(any(esp32c3))]
+#[cfg(not(any(esp32, esp32c6)))]
 impl SoftwareInterruptControl{
-    pub fn set(&mut self, interrupt:SoftwareInterrupt){
+    pub fn raise(&mut self, interrupt:SoftwareInterrupt){
         let system = unsafe {&*SystemPeripheral::PTR };
         match interrupt {
             SoftwareInterrupt::SoftwareInterrupt0 => {
-                let interrupt = &system.cpu_intr_from_cpu_0;
-                interrupt.write(|w|w.cpu_intr_from_cpu_0().bit(true));
+                system.cpu_intr_from_cpu_0.write(|w|w.cpu_intr_from_cpu_0().bit(true));
             }
             SoftwareInterrupt::SoftwareInterrupt1 => {
-                let interrupt = &system.cpu_intr_from_cpu_1;
-                interrupt.write(|w|w.cpu_intr_from_cpu_1().bit(true));
+                system.cpu_intr_from_cpu_1.write(|w|w.cpu_intr_from_cpu_1().bit(true));
             }
             SoftwareInterrupt::SoftwareInterrupt2 => {
-                let interrupt = &system.cpu_intr_from_cpu_2;
-                interrupt.write(|w|w.cpu_intr_from_cpu_2().bit(true));
+                system.cpu_intr_from_cpu_2.write(|w|w.cpu_intr_from_cpu_2().bit(true));
             }
             SoftwareInterrupt::SoftwareInterrupt3 => {
-                let interrupt = &system.cpu_intr_from_cpu_3;
-                interrupt.write(|w|w.cpu_intr_from_cpu_3().bit(true));
+                system.cpu_intr_from_cpu_3.write(|w|w.cpu_intr_from_cpu_3().bit(true));
             }
 
         }
         
     }
-    pub fn clear(&mut self, interrupt:SoftwareInterrupt){
+    pub fn reset(&mut self, interrupt:SoftwareInterrupt){
         let system = unsafe {&*SystemPeripheral::PTR };
         match interrupt {
             SoftwareInterrupt::SoftwareInterrupt0 => {
-                let interrupt = &system.cpu_intr_from_cpu_0;
-                interrupt.write(|w|w.cpu_intr_from_cpu_0().bit(false));
+                system.cpu_intr_from_cpu_0.write(|w|w.cpu_intr_from_cpu_0().bit(false));
             }
             SoftwareInterrupt::SoftwareInterrupt1 => {
-                let interrupt = &system.cpu_intr_from_cpu_1;
-                interrupt.write(|w|w.cpu_intr_from_cpu_1().bit(false));
+                system.cpu_intr_from_cpu_1.write(|w|w.cpu_intr_from_cpu_1().bit(false));
             }
             SoftwareInterrupt::SoftwareInterrupt2 => {
-                let interrupt = &system.cpu_intr_from_cpu_2;
-                interrupt.write(|w|w.cpu_intr_from_cpu_2().bit(false));
+                system.cpu_intr_from_cpu_2.write(|w|w.cpu_intr_from_cpu_2().bit(false));
             }
             SoftwareInterrupt::SoftwareInterrupt3 => {
-                let interrupt = &system.cpu_intr_from_cpu_3;
-                interrupt.write(|w|w.cpu_intr_from_cpu_3().bit(false));
+                system.cpu_intr_from_cpu_3.write(|w|w.cpu_intr_from_cpu_3().bit(false));
             }
         }
         
