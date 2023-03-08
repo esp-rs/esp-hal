@@ -338,22 +338,13 @@ pub struct CpuControl {
 pub struct Dma {
     _private: (),
 }
-#[cfg(not(any(esp32c6, esp32)))]
+
 
 /// The SYSTEM/DPORT splitted into it's different logical parts.
 pub struct SystemParts<'d> {
     _private: PeripheralRef<'d, SystemPeripheral>,
+    #[cfg(not(any(esp32c6, esp32)))]
     pub software_interrupt_control: SoftwareInterruptControl,
-    pub peripheral_clock_control: PeripheralClockControl,
-    pub clock_control: SystemClockControl,
-    pub cpu_control: CpuControl,
-    #[cfg(pdma)]
-    pub dma: Dma,
-}
-#[cfg(any(esp32c6, esp32))]
-
-pub struct SystemParts<'d> {
-    _private: PeripheralRef<'d, SystemPeripheral>,
     pub peripheral_clock_control: PeripheralClockControl,
     pub clock_control: SystemClockControl,
     pub cpu_control: CpuControl,
