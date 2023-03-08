@@ -22,32 +22,27 @@
 
 #![no_std]
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
-#![cfg_attr(feature = "async", allow(incomplete_features))]
-#![cfg_attr(feature = "async", feature(async_fn_in_trait))]
-#![cfg_attr(feature = "async", feature(impl_trait_projections))]
+#![cfg_attr(
+    feature = "async",
+    allow(incomplete_features),
+    feature(async_fn_in_trait),
+    feature(impl_trait_projections)
+)]
 
 #[cfg(riscv)]
-pub use esp_riscv_rt;
-#[cfg(riscv)]
-pub use esp_riscv_rt::entry;
-#[cfg(riscv)]
-pub use esp_riscv_rt::riscv;
+pub use esp_riscv_rt::{self, entry, riscv};
 pub use procmacros as macros;
 #[cfg(xtensa)]
 pub use xtensa_lx;
 #[cfg(xtensa)]
-pub use xtensa_lx_rt;
-#[cfg(xtensa)]
-pub use xtensa_lx_rt::entry;
+pub use xtensa_lx_rt::{self, entry};
 
-/// State of the CPU saved when entering exception or interrupt
-pub mod trapframe {
-    #[cfg(riscv)]
-    pub use esp_riscv_rt::TrapFrame;
-    #[cfg(xtensa)]
-    pub use xtensa_lx_rt::exception::Context as TrapFrame;
-}
-
+#[cfg(dac)]
+pub use self::analog::dac::implementation as dac;
+#[cfg(gdma)]
+pub use self::dma::gdma;
+#[cfg(pdma)]
+pub use self::dma::pdma;
 #[cfg(rmt)]
 pub use self::pulse_control::PulseControl;
 #[cfg(any(esp32, esp32s3))]
@@ -55,6 +50,7 @@ pub use self::soc::cpu_control;
 #[cfg(usb_serial_jtag)]
 pub use self::usb_serial_jtag::UsbSerialJtag;
 pub use self::{
+    analog::adc::implementation as adc,
     delay::Delay,
     interrupt::*,
     rng::Rng,
@@ -77,12 +73,13 @@ pub mod gpio;
 pub mod i2c;
 #[cfg(i2s)]
 pub mod i2s;
+pub mod interrupt;
 pub mod ledc;
 #[cfg(mcpwm)]
 pub mod mcpwm;
 #[cfg(usb_otg)]
 pub mod otg_fs;
-#[cfg(any(esp32, esp32s2, esp32s3, esp32c6))]
+#[cfg(pcnt)]
 pub mod pcnt;
 pub mod peripheral;
 pub mod prelude;
@@ -100,7 +97,7 @@ pub mod system;
 #[cfg(systimer)]
 pub mod systimer;
 pub mod timer;
-#[cfg(any(esp32c3, esp32c6, esp32s3))]
+#[cfg(any(twai))]
 pub mod twai;
 pub mod uart;
 #[cfg(usb_serial_jtag)]
@@ -108,9 +105,20 @@ pub mod usb_serial_jtag;
 #[cfg(rmt)]
 pub mod utils;
 
-#[cfg_attr(riscv, path = "interrupt/riscv.rs")]
-#[cfg_attr(xtensa, path = "interrupt/xtensa.rs")]
-pub mod interrupt;
+/// State of the CPU saved when entering exception or interrupt
+pub mod trapframe {
+    #[cfg(riscv)]
+    pub use esp_riscv_rt::TrapFrame;
+    #[cfg(xtensa)]
+    pub use xtensa_lx_rt::exception::Context as TrapFrame;
+}
+
+#[no_mangle]
+extern "C" fn EspDefaultHandler(_level: u32, _interrupt: peripherals::Interrupt) {}
+
+#[cfg(xtensa)]
+#[no_mangle]
+extern "C" fn DefaultHandler() {}
 
 #[cfg(esp32c6)]
 pub fn disable_apm_filter() {

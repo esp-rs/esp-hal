@@ -121,11 +121,6 @@ fn main() {
 fn add_defaults() {
     let out = &PathBuf::from(env::var_os("OUT_DIR").unwrap());
 
-    File::create(out.join("hal-defaults.x"))
-        .unwrap()
-        .write_all(include_bytes!("ld/hal-defaults.x"))
-        .unwrap();
-
     File::create(out.join("rom-functions.x"))
         .unwrap()
         .write_all(include_bytes!("ld/rom-functions.x"))
