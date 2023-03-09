@@ -1,0 +1,5 @@
+[wokwi]
+version = 1
+elf = "esp32s2-hal/target/xtensa-esp32s2-none-elf/release/examples/ram"
+firmware = "esp32s2-hal/target/xtensa-esp32s2-none-elf/release/examples/ram"
+gdbServerPort=3333

@@ -1,0 +1,33 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug",
+            "type": "gdb",
+            "request": "attach",
+            "remote": true,
+            "target": ":3333",
+            "executable": "esp32s2-hal/target/xtensa-esp32s2-none-elf/release/examples/ram",
+            "gdbpath": "rust-gdb",
+            "cwd": "${workspaceRoot}",
+            "stopAtConnect": true,
+            "valuesFormatting": "parseText",
+            "env": {
+                "RUST_GDB": "/home/mabez/programs/xtensa-esp32s2-elf/bin/xtensa-esp32s2-elf-gdb"
+            }
+        },
+        {
+            "name": "Wokwi GDB",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "esp32s2-hal/target/xtensa-esp32s2-none-elf/debug/examples/ram",
+            "cwd": "${workspaceFolder}",
+            "MIMode": "gdb",
+            "miDebuggerPath": "/home/mabez/programs/xtensa-esp32s2-elf/bin/xtensa-esp32s2-elf-gdb",
+            "miDebuggerServerAddress": "localhost:3333"
+        }
+    ]
+}

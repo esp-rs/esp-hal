@@ -13,5 +13,5 @@ SECTIONS {
   {
     . = ALIGN(4);
     *( .rodata_wlog_*.* )
-  } > RODATA AT > RODATA
+  } > RODATA
 }

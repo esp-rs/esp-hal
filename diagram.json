@@ -1,0 +1,73 @@
+{
+    "version": 1,
+    "author": "Sergio Gasquez Arcos",
+    "editor": "wokwi",
+    "parts": [
+        {
+            "type": "board-esp32-s2-devkitm-1",
+            "id": "esp",
+            "top": 0,
+            "left": 0,
+            "attrs": {
+                "builder": "rust-std-esp32s2"
+            }
+        },
+        {
+            "type": "wokwi-led",
+            "id": "led1",
+            "top": 26.79,
+            "left": -127.33,
+            "attrs": {
+                "color": "red"
+            }
+        },
+        {
+            "type": "wokwi-resistor",
+            "id": "r1",
+            "top": 65.46,
+            "left": -76.67,
+            "attrs": {
+                "value": "1000"
+            }
+        }
+    ],
+    "connections": [
+        [
+            "esp:TX",
+            "$serialMonitor:RX",
+            "",
+            []
+        ],
+        [
+            "esp:RX",
+            "$serialMonitor:TX",
+            "",
+            []
+        ],
+        [
+            "esp:4",
+            "r1:2",
+            "green",
+            [
+                "h0"
+            ]
+        ],
+        [
+            "r1:1",
+            "led1:A",
+            "green",
+            [
+                "v0.08",
+                "h-28"
+            ]
+        ],
+        [
+            "led1:C",
+            "esp:GND.1",
+            "black",
+            [
+                "v0"
+            ]
+        ]
+    ]
+}

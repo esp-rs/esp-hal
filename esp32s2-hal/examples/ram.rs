@@ -88,7 +88,8 @@ fn main() -> ! {
 
 #[ram]
 fn function_in_ram() {
-    println!("Hello world!");
+    const message: &str = "Hello world!";
+    println!("{}", message);
 }
 
 #[ram(rtc_fast)]
