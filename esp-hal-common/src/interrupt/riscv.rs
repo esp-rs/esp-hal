@@ -589,7 +589,7 @@ pub unsafe fn map(_core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
 
 /// Get cpu interrupt assigned to peripheral interrupt
 #[inline]
-pub(super) unsafe fn get_assigned_cpu_interrupt(interrupt: Interrupt) -> CpuInterrupt {
+unsafe fn get_assigned_cpu_interrupt(interrupt: Interrupt) -> CpuInterrupt {
     let interrupt_number = interrupt as isize;
     let intr_map_base = crate::soc::registers::INTERRUPT_MAP_BASE as *mut u32;
 
