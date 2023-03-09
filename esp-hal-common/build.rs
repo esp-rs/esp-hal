@@ -39,6 +39,7 @@ fn main() {
     //   - 'gdma'
     //   - 'i2c1'
     //   - 'i2s'
+    //   - 'large_intr_status'
     //   - 'mcpwm'
     //   - 'pcnt'
     //   - 'pdma'
@@ -110,6 +111,7 @@ fn main() {
             "aes",
             "gdma",
             "i2s",
+            "large_intr_status",
             "mcpwm",
             "pcnt",
             "plic",
