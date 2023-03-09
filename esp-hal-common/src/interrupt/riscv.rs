@@ -504,6 +504,8 @@ pub fn _setup_interrupts() {
 
     unsafe {
         // disable all known interrupts
+        // at least after the 2nd stage bootloader there are some interrupts enabled
+        // (e.g. UART)
         for peripheral_interrupt in 0..255 {
             crate::soc::peripherals::Interrupt::try_from(peripheral_interrupt)
                 .map(|intr| {
@@ -532,12 +534,7 @@ pub fn disable(_core: Cpu, interrupt: Interrupt) {
         let interrupt_number = interrupt as isize;
         let intr_map_base = crate::soc::registers::INTERRUPT_MAP_BASE as *mut u32;
 
-        // 0 doesn't disable the pripheral interrupt apparently but will raise a level 1
-        // interrupt - we use CPU interrupt 31 which is disabled after reset by default
-        #[cfg(plic)]
-        intr_map_base.offset(interrupt_number).write_volatile(31);
-
-        #[cfg(not(plic))]
+        // set to 0 to disable the peripheral interrupt
         intr_map_base.offset(interrupt_number).write_volatile(0);
     }
 }
