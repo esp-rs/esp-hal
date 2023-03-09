@@ -135,6 +135,7 @@ pub enum Cpu {
     /// The first core
     ProCpu = 0,
     /// The second core
+    #[cfg(multi_core)]
     AppCpu,
 }
 

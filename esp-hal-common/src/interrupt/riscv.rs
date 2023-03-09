@@ -509,6 +509,7 @@ pub fn _setup_interrupts() {
         for peripheral_interrupt in 0..255 {
             crate::soc::peripherals::Interrupt::try_from(peripheral_interrupt)
                 .map(|intr| {
+                    #[cfg(multi_core)]
                     disable(Cpu::AppCpu, intr);
                     disable(Cpu::ProCpu, intr);
                 })
