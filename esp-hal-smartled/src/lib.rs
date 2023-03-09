@@ -1,7 +1,7 @@
 //! # Smart-LEDs RMT Adapter
 //!
 //! This adapter allows for the use of an RMT output channel to easily interact
-//! with RGB LEDs and use the convenience functions of the external
+//! with RGB LEDs and use the convenience functions of the
 //! [`smart-leds`](https://crates.io/crates/smart-leds) crate.
 //!
 //! _This is a simple implementation where every LED is adressed in an
@@ -9,35 +9,36 @@
 //! but in case this is used in combination with interrupts that might disturb
 //! the sequential sending, an alternative implementation (addressing the LEDs
 //! in a sequence in a single RMT send operation) might be required!_
+
+#![no_std]
 #![deny(missing_docs)]
 
 use core::slice::IterMut;
 
-use fugit::NanosDuration;
-use smart_leds_trait::{SmartLedsWrite, RGB8};
-
-#[cfg(any(esp32, esp32s2))]
-use crate::pulse_control::ClockSource;
-use crate::{
+#[cfg(any(feature = "esp32", feature = "esp32s2"))]
+use esp_hal_common::pulse_control::ClockSource;
+use esp_hal_common::{
     gpio::OutputPin,
     peripheral::Peripheral,
     pulse_control::{ConfiguredChannel, OutputChannel, PulseCode, RepeatMode, TransmissionError},
 };
+use fugit::NanosDuration;
+use smart_leds_trait::{SmartLedsWrite, RGB8};
 
 // Specifies what clock frequency we're using for the RMT peripheral (if
 // properly configured)
 //
 // TODO: Factor in clock configuration, this needs to be revisited once #24 and
 // #44 have been addressed.
-#[cfg(esp32c3)]
+#[cfg(feature = "esp32")]
 const SOURCE_CLK_FREQ: u32 = 40_000_000;
-#[cfg(esp32c6)]
+#[cfg(feature = "esp32c3")]
 const SOURCE_CLK_FREQ: u32 = 40_000_000;
-#[cfg(esp32s2)]
+#[cfg(feature = "esp32c6")]
 const SOURCE_CLK_FREQ: u32 = 40_000_000;
-#[cfg(esp32)]
+#[cfg(feature = "esp32s2")]
 const SOURCE_CLK_FREQ: u32 = 40_000_000;
-#[cfg(esp32s3)]
+#[cfg(feature = "esp32s3")]
 const SOURCE_CLK_FREQ: u32 = 40_000_000;
 
 const SK68XX_CODE_PERIOD: u32 = 1200;
@@ -101,14 +102,14 @@ where
     where
         UnconfiguredChannel: OutputChannel<ConfiguredChannel<'d, O> = CHANNEL>,
     {
-        #[cfg(any(esp32c3, esp32c6, esp32s3))]
+        #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
         channel
             .set_idle_output_level(false)
             .set_carrier_modulation(false)
             .set_channel_divider(1)
             .set_idle_output(true);
 
-        #[cfg(any(esp32, esp32s2))]
+        #[cfg(any(feature = "esp32", feature = "esp32s2"))]
         channel
             .set_idle_output_level(false)
             .set_carrier_modulation(false)

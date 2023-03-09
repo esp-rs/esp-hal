@@ -16,13 +16,13 @@ use esp32c6_hal::{
     prelude::*,
     pulse_control::ClockSource,
     timer::TimerGroup,
-    utils::{smartLedAdapter, SmartLedsAdapter},
     Delay,
     PulseControl,
     Rtc,
     IO,
 };
 use esp_backtrace as _;
+use esp_hal_smartled::{smartLedAdapter, SmartLedsAdapter};
 use smart_leds::{
     brightness,
     gamma,
