@@ -54,7 +54,7 @@ fn main() -> ! {
     // Begin configuring the TWAI peripheral. The peripheral is in a reset like
     // state that prevents transmission but allows configuration.
     let mut can_config = twai::TwaiConfiguration::new(
-        peripherals.TWAI,
+        peripherals.TWAI0,
         can_tx_pin,
         can_rx_pin,
         &mut system.peripheral_clock_control,

@@ -2,13 +2,10 @@ use core::marker::PhantomData;
 
 use fugit::HertzU32;
 
-#[cfg(esp32c6)]
-use crate::peripherals::mcpwm::{TIMER0_CFG0, TIMER0_CFG1};
-#[cfg(not(esp32c6))]
-use crate::peripherals::pwm0::{TIMER0_CFG0, TIMER0_CFG1};
 use crate::{
     clock::Clocks,
     mcpwm::{FrequencyError, PeripheralClockConfig, PwmPeripheral},
+    peripherals::mcpwm0::{TIMER0_CFG0, TIMER0_CFG1},
 };
 
 /// A MCPWM timer
