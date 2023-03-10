@@ -23,8 +23,38 @@ jobs:
   # --------------------------------------------------------------------------
   # Check
 
+  esp-hal-smartled:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          target: riscv32imc-unknown-none-elf
+          toolchain: nightly
+          components: rust-src
+      - uses: esp-rs/xtensa-toolchain@v1.5
+        with:
+          ldproxy: false
+          override: false
+      - uses: Swatinem/rust-cache@v2
+
+      # Check all RISC-V targets:
+      - name: check (esp32c3)
+        run: cd esp-hal-smartled/ && cargo +nightly check --features=esp32c3
+      - name: check (esp32c6)
+        run: cd esp-hal-smartled/ && cargo +nightly check --features=esp32c6
+      # Check all Xtensa targets:
+      - name: check (esp32)
+        run: cd esp-hal-smartled/ && cargo +esp check --features=esp32,esp32_40mhz
+      - name: check (esp32s2)
+        run: cd esp-hal-smartled/ && cargo +esp check --features=esp32s2
+      - name: check (esp32s3)
+        run: cd esp-hal-smartled/ && cargo +esp check --features=esp32s3
+
   esp32-hal:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v3
       - uses: esp-rs/xtensa-toolchain@v1.5
@@ -212,6 +242,7 @@ jobs:
         run: cd esp32s3-hal/ && cargo check --example=embassy_wait --features=embassy,embassy-time-timg0,async
       - name: check esp32s3-hal (async, spi)
         run: cd esp32s3-hal/ && cargo check --example=embassy_spi --features=embassy,embassy-time-timg0,async
+
   # --------------------------------------------------------------------------
   # MSRV
 
@@ -316,6 +347,8 @@ jobs:
         run: cargo fmt --all --manifest-path=esp-hal-common/Cargo.toml -- --check
       - name: rustfmt (esp-hal-procmacros)
         run: cargo fmt --all --manifest-path=esp-hal-procmacros/Cargo.toml -- --check
+      - name: rustfmt (esp-hal-smartled)
+        run: cargo fmt --all --manifest-path=esp-hal-smartled/Cargo.toml -- --check
       - name: rustfmt (esp32-hal)
         run: cargo fmt --all --manifest-path=esp32-hal/Cargo.toml -- --check
       - name: rustfmt (esp32c2-hal)
