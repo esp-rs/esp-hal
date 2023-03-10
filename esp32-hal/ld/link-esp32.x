@@ -14,13 +14,15 @@ INCLUDE exception.x
 /* map generic regions to output sections */
 INCLUDE "alias.x"
 
-/* Include shared sections - ordering matters */
+/* Shared sections - ordering matters */
 INCLUDE "text.x"
 INCLUDE "rodata.x"
 INCLUDE "rwtext.x"
 INCLUDE "rwdata.x"
 INCLUDE "rtc_fast.x"
 INCLUDE "rtc_slow.x"
+INCLUDE "external.x"
+/* End of Shared sections */
 
 _heap_end = ABSOLUTE(ORIGIN(dram_seg))+LENGTH(dram_seg)-LENGTH(reserved_for_boot_seg) - 2*STACK_SIZE;
 

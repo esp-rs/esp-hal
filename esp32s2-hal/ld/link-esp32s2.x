@@ -24,13 +24,15 @@ SECTIONS {
 INSERT BEFORE .data;
 /* End of fixups for esp32s2 */
 
-/* Include shared sections - ordering matters */
+/* Shared sections - ordering matters */
 INCLUDE "text.x"
 INCLUDE "rodata.x"
 INCLUDE "rwtext.x"
 INCLUDE "rwdata.x"
 INCLUDE "rtc_fast.x"
 INCLUDE "rtc_slow.x"
+INCLUDE "external.x"
+/* End of Shared sections */
 
 _heap_end = ABSOLUTE(ORIGIN(dram_seg))+LENGTH(dram_seg)-LENGTH(reserved_for_boot_seg) - STACK_SIZE;
 
