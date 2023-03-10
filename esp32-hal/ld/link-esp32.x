@@ -14,10 +14,11 @@ INCLUDE exception.x
 /* map generic regions to output sections */
 INCLUDE "alias.x"
 
+/* Include shared sections - ordering matters */
 INCLUDE "text.x"
 INCLUDE "rodata.x"
-INCLUDE "rwdata.x"
 INCLUDE "rwtext.x"
+INCLUDE "rwdata.x"
 INCLUDE "rtc_fast.x"
 INCLUDE "rtc_slow.x"
 

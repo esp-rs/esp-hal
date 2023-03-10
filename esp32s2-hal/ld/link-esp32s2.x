@@ -14,10 +14,21 @@ INCLUDE exception.x
 /* map generic regions to output sections */
 INCLUDE "alias.x"
 
+/* Fixups for esp32s2 */
+SECTIONS {
+  .iram0_reserved_for_text (NOLOAD) : ALIGN(4)
+  {
+    . = ORIGIN(RWDATA) + SIZEOF(.rwtext) + SIZEOF(.rwtext.wifi);
+  } > RWDATA
+}
+INSERT BEFORE .data;
+/* End of fixups for esp32s2 */
+
+/* Include shared sections - ordering matters */
 INCLUDE "text.x"
 INCLUDE "rodata.x"
-INCLUDE "rwdata.x"
 INCLUDE "rwtext.x"
+INCLUDE "rwdata.x"
 INCLUDE "rtc_fast.x"
 INCLUDE "rtc_slow.x"
 
