@@ -1,4 +1,4 @@
-use std::{env, fs::File, io::Write, path::PathBuf};
+use std::{env, fs::{File, self}, io::Write, path::PathBuf};
 
 #[cfg(not(feature = "direct-boot"))]
 fn main() {
@@ -9,15 +9,17 @@ fn main() {
         .write_all(include_bytes!("ld/memory.x"))
         .unwrap();
 
-    File::create(out.join("esp32s3.x"))
+    File::create(out.join("link-esp32s3.x"))
         .unwrap()
-        .write_all(include_bytes!("ld/esp32s3.x"))
+        .write_all(include_bytes!("ld/link-esp32s3.x"))
         .unwrap();
 
     File::create(out.join("linkall.x"))
         .unwrap()
         .write_all(include_bytes!("ld/linkall.x"))
         .unwrap();
+
+    copy_dir_all("../ld/sections", out).unwrap();
 
     println!("cargo:rustc-link-search={}", out.display());
 
@@ -65,4 +67,18 @@ fn add_defaults() {
         .unwrap();
 
     println!("cargo:rustc-link-search={}", out.display());
+}
+
+fn copy_dir_all(src: impl AsRef<std::path::Path>, dst: impl AsRef<std::path::Path>) -> std::io::Result<()> {
+    fs::create_dir_all(&dst)?;
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        if ty.is_dir() {
+            copy_dir_all(entry.path(), dst.as_ref().join(entry.file_name()))?;
+        } else {
+            fs::copy(entry.path(), dst.as_ref().join(entry.file_name()))?;
+        }
+    }
+    Ok(())
 }
