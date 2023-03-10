@@ -5,18 +5,31 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "type": "probe-rs-debug",
+            "request": "attach",
+            "name": "probe-rs Test",
+            "cwd": "${workspaceRoot}",
+            "chip": "esp32c3",
+            "coreConfigs": [
+                {
+                    "coreIndex": 0,
+                    "programBinary": "esp32c3-hal/target/riscv32imc-unknown-none-elf/debug/examples/hello_world"
+                }
+            ]
+        },
+        {
             "name": "Debug",
             "type": "gdb",
             "request": "attach",
             "remote": true,
             "target": ":3333",
-            "executable": "esp32s2-hal/target/xtensa-esp32s2-none-elf/release/examples/ram",
+            "executable": "esp32c3-hal/target/riscv32imc-unknown-none-elf/debug/examples/hello_world",
             "gdbpath": "rust-gdb",
             "cwd": "${workspaceRoot}",
             "stopAtConnect": true,
             "valuesFormatting": "parseText",
             "env": {
-                "RUST_GDB": "/home/mabez/programs/xtensa-esp32s2-elf/bin/xtensa-esp32s2-elf-gdb"
+                "RUST_GDB": "/home/mabez/programs/riscv32-esp-elf/bin/riscv32-esp-elf-gdb"
             }
         },
         {

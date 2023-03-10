@@ -1,5 +1,5 @@
 [wokwi]
 version = 1
-elf = "esp32s2-hal/target/xtensa-esp32s2-none-elf/release/examples/ram"
-firmware = "esp32s2-hal/target/xtensa-esp32s2-none-elf/release/examples/ram"
+elf = "esp32c3-hal/target/riscv32imc-unknown-none-elf/debug/examples/hello_world"
+firmware = "esp32c3-hal/target/riscv32imc-unknown-none-elf/debug/examples/hello_world"
 gdbServerPort=3333

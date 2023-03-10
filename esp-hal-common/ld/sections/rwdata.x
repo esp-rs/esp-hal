@@ -5,7 +5,9 @@ SECTIONS {
   {
     _data_start = ABSOLUTE(.);
     . = ALIGN (4);
-    *(.data .data.*)
+    *(.sdata .sdata.* .sdata2 .sdata2.*);
+    *(.data .data.*);
+    *(.data1)
     _data_end = ABSOLUTE(.);
   } > RWDATA AT > RODATA
 
@@ -16,7 +18,19 @@ SECTIONS {
   {
     _bss_start = ABSOLUTE(.);
     . = ALIGN (4);
-    *(.bss .bss.* COMMON)
+    *(.dynsbss)
+    *(.sbss)
+    *(.sbss.*)
+    *(.gnu.linkonce.sb.*)
+    *(.scommon)
+    *(.sbss2)
+    *(.sbss2.*)
+    *(.gnu.linkonce.sb2.*)
+    *(.dynbss)
+    *(.sbss .sbss.* .bss .bss.*);
+    *(.share.mem)
+    *(.gnu.linkonce.b.*)
+    *(COMMON)
     _bss_end = ABSOLUTE(.);
   } > RWDATA
 

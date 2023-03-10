@@ -148,10 +148,12 @@ fn main() {
     if cfg!(feature = "esp32") || cfg!(feature = "esp32s2") || cfg!(feature = "esp32s3") {
         fs::copy("ld/xtensa/hal-defaults.x", out.join("hal-defaults.x")).unwrap();
         fs::copy("ld/xtensa/rom.x", out.join("alias.x")).unwrap();
-        copy_dir_all("ld/sections", out).unwrap(); // TODO once supported on riscv move outside of if
     } else {
         fs::copy("ld/riscv/hal-defaults.x", out.join("hal-defaults.x")).unwrap();
+        fs::copy("ld/riscv/asserts.x", out.join("asserts.x")).unwrap();
+        fs::copy("ld/riscv/debug.x", out.join("debug.x")).unwrap();
     }
+    copy_dir_all("ld/sections", out).unwrap(); // TODO once supported on riscv move outside of if
 }
 
 fn copy_dir_all(src: impl AsRef<std::path::Path>, dst: impl AsRef<std::path::Path>) -> std::io::Result<()> {
