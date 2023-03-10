@@ -5,7 +5,7 @@ use embedded_hal::adc::{Channel, OneShot};
 use crate::{
     analog::{ADC1, ADC2},
     peripheral::PeripheralRef,
-    peripherals::{RTCIO, SENS},
+    peripherals::{RTC_IO, SENS},
 };
 
 /// The sampling/readout resolution of the ADC
@@ -341,13 +341,13 @@ where
 impl<'d, ADC1> ADC<'d, ADC1> {
     pub fn enable_hall_sensor() {
         // Connect hall sensor
-        let rtcio = unsafe { &*RTCIO::ptr() };
+        let rtcio = unsafe { &*RTC_IO::ptr() };
         rtcio.hall_sens.modify(|_, w| w.xpd_hall().set_bit());
     }
 
     pub fn disable_hall_sensor() {
         // Disconnect hall sensor
-        let rtcio = unsafe { &*RTCIO::ptr() };
+        let rtcio = unsafe { &*RTC_IO::ptr() };
         rtcio.hall_sens.modify(|_, w| w.xpd_hall().clear_bit());
     }
 }

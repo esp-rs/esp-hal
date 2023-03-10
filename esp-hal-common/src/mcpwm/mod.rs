@@ -75,15 +75,9 @@ pub mod operator;
 /// MCPWM timers
 pub mod timer;
 
-#[cfg(not(esp32c6))]
-type RegisterBlock = crate::peripherals::pwm0::RegisterBlock;
-#[cfg(esp32c6)]
-type RegisterBlock = crate::peripherals::mcpwm::RegisterBlock;
+type RegisterBlock = crate::peripherals::mcpwm0::RegisterBlock;
 
-#[cfg(not(esp32c6))]
-type PWM = crate::peripherals::PWM0;
-#[cfg(esp32c6)]
-type PWM = crate::peripherals::MCPWM;
+type PWM = crate::peripherals::MCPWM0;
 
 /// The MCPWM peripheral
 #[non_exhaustive]
@@ -305,7 +299,7 @@ unsafe impl PwmPeripheral for PWM {
 }
 
 #[cfg(not(esp32c6))]
-unsafe impl PwmPeripheral for crate::peripherals::PWM1 {
+unsafe impl PwmPeripheral for crate::peripherals::MCPWM1 {
     fn enable(system: &mut PeripheralClockControl) {
         system.enable(PeripheralEnable::Mcpwm1)
     }

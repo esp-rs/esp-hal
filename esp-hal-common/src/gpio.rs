@@ -1666,8 +1666,8 @@ macro_rules! analog {
         )+
     ) => {
         pub(crate) fn internal_into_analog(pin: u8) {
-            use crate::peripherals::RTCIO;
-            let rtcio = unsafe{ &*RTCIO::ptr() };
+            use crate::peripherals::RTC_IO;
+            let rtcio = unsafe{ &*RTC_IO::ptr() };
             $crate::gpio::enable_iomux_clk_gate();
 
             match pin {
@@ -1723,8 +1723,8 @@ macro_rules! analog {
         )+
     ) => {
         pub(crate) fn internal_into_analog(pin: u8) {
-            use crate::peripherals::RTCIO;
-            let rtcio = unsafe{ &*RTCIO::ptr() };
+            use crate::peripherals::RTC_IO;
+            let rtcio = unsafe{ &*RTC_IO::ptr() };
             $crate::gpio::enable_iomux_clk_gate();
 
             match pin {

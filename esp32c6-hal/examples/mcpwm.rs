@@ -43,7 +43,7 @@ fn main() -> ! {
     // initialize peripheral
     let clock_cfg = PeripheralClockConfig::with_frequency(&clocks, 40u32.MHz()).unwrap();
     let mut mcpwm = MCPWM::new(
-        peripherals.MCPWM,
+        peripherals.MCPWM0,
         clock_cfg,
         &mut system.peripheral_clock_control,
     );

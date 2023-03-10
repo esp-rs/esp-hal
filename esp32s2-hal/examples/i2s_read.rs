@@ -50,7 +50,7 @@ fn main() -> ! {
     let mut rx_descriptors = [0u32; 8 * 3];
 
     let i2s = I2s::new(
-        peripherals.I2S,
+        peripherals.I2S0,
         NoMclk {},
         Standard::Philips,
         DataFormat::Data16Channel16,
