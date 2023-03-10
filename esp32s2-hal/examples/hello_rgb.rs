@@ -16,7 +16,6 @@ use esp32s2_hal::{
     peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
-    utils::{smartLedAdapter, SmartLedsAdapter},
     Delay,
     PulseControl,
     Rtc,
@@ -24,6 +23,7 @@ use esp32s2_hal::{
 };
 #[allow(unused_imports)]
 use esp_backtrace as _;
+use esp_hal_smartled::{smartLedAdapter, SmartLedsAdapter};
 use smart_leds::{
     brightness,
     gamma,
