@@ -1,4 +1,4 @@
-use std::{env, fs::{File, self}, io::Write, path::PathBuf};
+use std::{env, fs::File, io::Write, path::PathBuf};
 
 fn main() {
     check_features();
@@ -29,8 +29,6 @@ fn main() {
         .unwrap()
         .write_all(include_bytes!("ld/link-esp32.x"))
         .unwrap();
-
-    copy_dir_all("../ld/sections", out).unwrap();
 
     println!("cargo:rustc-link-search={}", out.display());
 
