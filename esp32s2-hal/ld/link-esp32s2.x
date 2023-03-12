@@ -16,7 +16,7 @@ INCLUDE "alias.x"
 
 /* Fixups for esp32s2 */
 SECTIONS {
-  .iram0_reserved_for_text (NOLOAD) : ALIGN(4)
+  .rwdata_dummy (NOLOAD) : ALIGN(4)
   {
     . = ORIGIN(RWDATA) + SIZEOF(.rwtext) + SIZEOF(.rwtext.wifi);
   } > RWDATA

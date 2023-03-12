@@ -153,7 +153,7 @@ fn main() {
         fs::copy("ld/riscv/asserts.x", out.join("asserts.x")).unwrap();
         fs::copy("ld/riscv/debug.x", out.join("debug.x")).unwrap();
     }
-    copy_dir_all("ld/sections", out).unwrap(); // TODO once supported on riscv move outside of if
+    copy_dir_all("ld/sections", out).unwrap();
 }
 
 fn copy_dir_all(src: impl AsRef<std::path::Path>, dst: impl AsRef<std::path::Path>) -> std::io::Result<()> {

@@ -50,6 +50,7 @@ SECTIONS {
 INSERT BEFORE .text_init;
 
 SECTIONS {
+  /* These symbols/functions need to be near eachother, group them together at the start of text */
   .text_init _stext : ALIGN(4) 
   {
     KEEP(*(.init));
@@ -81,7 +82,7 @@ INSERT BEFORE .rodata;
 
 SECTIONS {
   /* similar as text_dummy */
-  .ram_dummy (NOLOAD) : {
+  .rwdata_dummy (NOLOAD) : {
     . = ALIGN(ALIGNOF(.rwtext));
     . = . + SIZEOF(.rwtext);
   } > RWDATA
