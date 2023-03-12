@@ -14,6 +14,10 @@ INCLUDE exception.x
 /* map generic regions to output sections */
 INCLUDE "alias.x"
 
+/* ESP32 fixups */
+INCLUDE "fixups/rtc_fast_rwdata_dummy.x"
+/* END ESP32 fixups */
+
 /* Shared sections - ordering matters */
 INCLUDE "text.x"
 INCLUDE "rodata.x"

@@ -22,6 +22,8 @@ SECTIONS {
   } > RWDATA
 }
 INSERT BEFORE .data;
+
+INCLUDE "fixups/rtc_fast_rwdata_dummy.x"
 /* End of fixups for esp32s2 */
 
 /* Shared sections - ordering matters */

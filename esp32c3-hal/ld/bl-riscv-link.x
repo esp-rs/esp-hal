@@ -97,6 +97,7 @@ INCLUDE "text.x"
 INCLUDE "rodata.x"
 INCLUDE "rwtext.x"
 INCLUDE "rwdata.x"
+INCLUDE "rtc_fast.x"
 /* End of Shared sections */
 
 INCLUDE "debug.x"
