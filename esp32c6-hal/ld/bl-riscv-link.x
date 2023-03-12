@@ -1,7 +1,7 @@
 ENTRY(_start)
 
-PROVIDE(_stext = ORIGIN(REGION_TEXT));
-PROVIDE(_stack_start = ORIGIN(RAM) + LENGTH(RAM));
+PROVIDE(_stext = ORIGIN(ROTEXT));
+PROVIDE(_stack_start = ORIGIN(RWDATA) + LENGTH(RWDATA));
 PROVIDE(_max_hart_id = 0);
 PROVIDE(_hart_stack_size = 2K);
 PROVIDE(_heap_size = 0);
@@ -44,24 +44,29 @@ PROVIDE(_mp_hook = default_mp_hook);
 */
 PROVIDE(_start_trap = default_start_trap);
 
-SECTIONS
-{
-  .text _stext :
+/* esp32c6 fixups */
+/* The ESP32-C2 and ESP32-C3 have interrupt IDs 1-31, while the ESP32-C6 has
+   IDs 0-31, so we much define the handler for the one additional interrupt
+   ID: */
+PROVIDE(interrupt0 = DefaultHandler);
+
+/* Must be called __global_pointer$ for linker relaxations to work. */
+PROVIDE(__global_pointer$ = _data_start + 0x800);
+
+SECTIONS {
+  /* These symbols/functions need to be near eachother, group them together at the start of text */
+  .text_init _stext : ALIGN(4)
   {
-    _stext = .;
-    /* Put reset handler first in .text section so it ends up as the entry */
-    /* point of the program. */
     KEEP(*(.init));
     KEEP(*(.init.rust));
     KEEP(*(.text.abort));
-    . = ALIGN(4);
     KEEP(*(.trap));
     KEEP(*(.trap.rust));
+  } > ROTEXT
+}
+INSERT BEFORE .text;
 
-    *(.text .text.*);
-    _etext = .;
-  } > ROM
-
+SECTIONS {
   /**
    * Bootloader really wants to have separate segments for ROTEXT and RODATA
    * Thus, we need to force a gap here.
@@ -70,174 +75,16 @@ SECTIONS
     . = . + 4;
     . = ALIGN(4) + 0x20;
   } > ROM
-
-  .rodata : ALIGN(4)
-  {
-    _srodata = .;
-    *(.srodata .srodata.*);
-    *(.rodata .rodata.*);
-
-    /* 4-byte align the end (VMA) of this section.
-       This is required by LLD to ensure the LMA of the following .data
-       section will have the correct alignment. */
-    . = ALIGN(4);
-    _erodata = .;
-  } > ROM
-
-  .rwtext : ALIGN(4) {
-    _irwtext = LOADADDR(.rwtext);
-    _srwtext = .;
-    *(.rwtext);
-
-    *(.iram1)
-    *(.iram1.*)
-
-    *(.wifi0iram .wifi0iram.*)
-    *(.wifirxiram .wifirxiram.*)
-    *(.wifislpiram .wifislpiram.*)
-    *(.wifislprxiram .wifislprxiram.*)
-
-    . = ALIGN(4);
-    _erwtext = .;
-  } > RAM
-
-  .data : ALIGN(8)
-  {
-    _sidata = LOADADDR(.data);
-    _sdata = .;
-    /* Must be called __global_pointer$ for linker relaxations to work. */
-    PROVIDE(__global_pointer$ = . + 0x800);
-    *(.sdata .sdata.* .sdata2 .sdata2.*);
-    *(.data .data.*);
-    *(.data1)
-
-    . = ALIGN(8);
-    _edata = .;
-  } > RAM
-
-  .bss (NOLOAD) :
-  {
-    . = ALIGN(8);
-    _sbss = .;
-    *(.dynsbss)
-    *(.sbss)
-    *(.sbss.*)
-    *(.gnu.linkonce.sb.*)
-    *(.scommon)
-    *(.sbss2)
-    *(.sbss2.*)
-    *(.gnu.linkonce.sb2.*)
-    *(.dynbss)
-    *(.sbss .sbss.* .bss .bss.*);
-    *(.share.mem)
-    *(.gnu.linkonce.b.*)
-    *(COMMON)
-
-    . = ALIGN(8);
-    _ebss = .;
-  } > RAM
-
-  .uninit (NOLOAD) : ALIGN(4)
-  {
-    . = ALIGN(4);
-    __suninit = .;
-    *(.uninit .uninit.*);
-    . = ALIGN(4);
-    __euninit = .;
-  } > RAM
-
-  /* fictitious region that represents the memory available for the heap */
-  .heap (NOLOAD) :
-  {
-    _sheap = .;
-    _heap_start = .;
-    . += _heap_size;
-    . = ALIGN(4);
-    _eheap = .;
-  } > RAM
-
-  /* fictitious region that represents the memory available for the stack */
-  .stack (NOLOAD) :
-  {
-    _estack = .;
-    . = ABSOLUTE(_stack_start);
-    _sstack = .;
-  } > RAM
-
-  .rtc_fast.text : ALIGN(4) {
-    *(.rtc_fast.literal .rtc_fast.text .rtc_fast.literal.* .rtc_fast.text.*)
-  } > REGION_RTC_FAST AT > REGION_RODATA
-
-  .rtc_fast.data : ALIGN(4)
-  {
-    _rtc_fast_data_start = ABSOLUTE(.);
-    *(.rtc_fast.data .rtc_fast.data.*)
-    _rtc_fast_data_end = ABSOLUTE(.);
-  } > REGION_RTC_FAST AT > REGION_RODATA
-
- .rtc_fast.bss (NOLOAD) : ALIGN(4)
-  {
-    _rtc_fast_bss_start = ABSOLUTE(.);
-    *(.rtc_fast.bss .rtc_fast.bss.*)
-    _rtc_fast_bss_end = ABSOLUTE(.);
-  } > REGION_RTC_FAST
-
- .rtc_fast.noinit (NOLOAD) : ALIGN(4)
-  {
-    *(.rtc_fast.noinit .rtc_fast.noinit.*)
-  } > REGION_RTC_FAST
-
-  .eh_frame (INFO) : { KEEP(*(.eh_frame)) }
-  .eh_frame_hdr (INFO) : { *(.eh_frame_hdr) }
 }
+INSERT BEFORE .rodata;
+/* end of esp32c6 fixups */
 
-/* Do not exceed this mark in the error messages above                                    | */
-ASSERT(ORIGIN(REGION_TEXT) % 4 == 0, "
-ERROR(riscv-rt): the start of the REGION_TEXT must be 4-byte aligned");
+/* Shared sections - ordering matters */
+INCLUDE "text.x"
+INCLUDE "rodata.x"
+INCLUDE "rwtext.x"
+INCLUDE "rwdata.x"
+INCLUDE "rtc_fast.x"
+/* End of Shared sections */
 
-ASSERT(ORIGIN(REGION_RODATA) % 4 == 0, "
-ERROR(riscv-rt): the start of the REGION_RODATA must be 4-byte aligned");
-
-ASSERT(ORIGIN(RAM) % 4 == 0, "
-ERROR(riscv-rt): the start of the RAM must be 4-byte aligned");
-
-ASSERT(_sheap % 4 == 0, "
-ERROR(riscv-rt): the start of the REGION_HEAP must be 4-byte aligned");
-
-ASSERT(ORIGIN(REGION_TEXT) % 4 == 0, "
-ERROR(riscv-rt): the start of the REGION_TEXT must be 4-byte aligned");
-
-ASSERT(_sstack % 4 == 0, "
-ERROR(riscv-rt): the start of the REGION_STACK must be 4-byte aligned");
-
-ASSERT(_stext % 4 == 0, "
-ERROR(riscv-rt): `_stext` must be 4-byte aligned");
-
-ASSERT(_sdata % 4 == 0 && _edata % 4 == 0, "
-BUG(riscv-rt): .data is not 4-byte aligned");
-
-ASSERT(_sidata % 4 == 0, "
-BUG(riscv-rt): the LMA of .data is not 4-byte aligned");
-
-ASSERT(_sbss % 4 == 0 && _ebss % 4 == 0, "
-BUG(riscv-rt): .bss is not 4-byte aligned");
-
-ASSERT(_sheap % 4 == 0, "
-BUG(riscv-rt): start of .heap is not 4-byte aligned");
-
-ASSERT(_stext + SIZEOF(.text) < ORIGIN(REGION_TEXT) + LENGTH(REGION_TEXT), "
-ERROR(riscv-rt): The .text section must be placed inside the REGION_TEXT region.
-Set _stext to an address smaller than 'ORIGIN(REGION_TEXT) + LENGTH(REGION_TEXT)'");
-
-ASSERT(SIZEOF(.stack) > (_max_hart_id + 1) * _hart_stack_size, "
-ERROR(riscv-rt): .stack section is too small for allocating stacks for all the harts.
-Consider changing `_max_hart_id` or `_hart_stack_size`.");
-
-ASSERT(SIZEOF(.got) == 0, "
-.got section detected in the input files. Dynamic relocations are not
-supported. If you are linking to C code compiled using the `gcc` crate
-then modify your build script to compile the C code _without_ the
--fPIC flag. See the documentation of the `gcc::Config.fpic` method for
-details.");
-
-/* Do not exceed this mark in the error messages above                                    | */
+INCLUDE "debug.x"
