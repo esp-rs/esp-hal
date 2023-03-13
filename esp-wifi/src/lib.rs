@@ -123,9 +123,6 @@ pub fn initialize(
         return Err(InitializationError::WrongClockConfig);
     }
 
-    #[cfg(feature = "esp32c6")]
-    wifi::os_adapter_chip_specific::setup();
-
     phy_mem_init();
     init_rng(rng);
     init_tasks();
@@ -157,9 +154,6 @@ pub fn initialize(
         log::debug!("ble init");
         crate::ble::ble_init();
     }
-
-    #[cfg(feature = "esp32c6")]
-    wifi::os_adapter_chip_specific::run_after_initialze_hack();
 
     Ok(())
 }

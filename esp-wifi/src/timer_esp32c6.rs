@@ -44,9 +44,12 @@ pub fn setup_timer_isr(systimer: Alarm<Target, 0>) {
     esp32c6_hal::interrupt::enable(Interrupt::WIFI_PWR, hal::interrupt::Priority::Priority1)
         .unwrap();
 
-    #[cfg(feature = "wifi")]
-    esp32c6_hal::interrupt::enable(Interrupt::WIFI_BB, hal::interrupt::Priority::Priority1)
-        .unwrap();
+    // make sure to disable WIFI_BB by mapping it to CPU interrupt 31 which is masked by default
+    // for some reason for this interrupt, mapping it to 0 doesn't deactivate it
+    let interrupt_core0 = unsafe { &*esp32c6::INTERRUPT_CORE0::PTR };
+    interrupt_core0
+        .wifi_bb_intr_map
+        .write(|w| w.wifi_bb_intr_map().variant(31));
 
     #[cfg(feature = "ble")]
     {
@@ -103,12 +106,6 @@ fn WIFI_PWR() {
 
         trace!("interrupt 1 done");
     };
-}
-
-#[cfg(feature = "wifi")]
-#[interrupt]
-fn WIFI_BB() {
-    // just do nothing at all - we only want to make sure to not run into the default handler
 }
 
 #[cfg(feature = "ble")]

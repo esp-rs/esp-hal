@@ -211,29 +211,74 @@ pub(crate) unsafe extern "C" fn read_mac(
 
 pub(crate) fn init_clocks() {
     unsafe {
-        // PERIP_CLK_EN0
-        ((0x600c0000 + 0x10) as *mut u32).write_volatile(0xffffffff);
-        // PERIP_CLK_EN1
-        ((0x600c0000 + 0x14) as *mut u32).write_volatile(0xffffffff);
-    }
+        let pmu = &*esp32c6::PMU::PTR;
 
-    // APB_CTRL_WIFI_CLK_EN_REG
-    unsafe {
-        ((0x60026000 + 0x14) as *mut u32).write_volatile(0xffffffff);
+        pmu.hp_sleep_icg_modem
+            .modify(|_, w| w.hp_sleep_dig_icg_modem_code().variant(0));
+        pmu.hp_modem_icg_modem
+            .modify(|_, w| w.hp_modem_dig_icg_modem_code().variant(1));
+        pmu.hp_active_icg_modem
+            .modify(|_, w| w.hp_active_dig_icg_modem_code().variant(2));
+        pmu.imm_modem_icg
+            .as_ptr()
+            .write_volatile(pmu.imm_modem_icg.as_ptr().read_volatile() | 1 << 31);
+        pmu.imm_sleep_sysclk
+            .as_ptr()
+            .write_volatile(pmu.imm_sleep_sysclk.as_ptr().read_volatile() | 1 << 28);
+
+        let syscon_clk_conf_power_st = (0x600A9800 + 12) as *mut u32;
+        syscon_clk_conf_power_st.write_volatile(syscon_clk_conf_power_st.read_volatile() | 6 << 28);
+        syscon_clk_conf_power_st.write_volatile(syscon_clk_conf_power_st.read_volatile() | 4 << 24);
+        syscon_clk_conf_power_st.write_volatile(syscon_clk_conf_power_st.read_volatile() | 6 << 20);
+        syscon_clk_conf_power_st.write_volatile(syscon_clk_conf_power_st.read_volatile() | 6 << 16);
+        syscon_clk_conf_power_st.write_volatile(syscon_clk_conf_power_st.read_volatile() | 6 << 12);
+        syscon_clk_conf_power_st.write_volatile(syscon_clk_conf_power_st.read_volatile() | 6 << 8);
+
+        let lp_clk_conf_power_st = (MODEM_LPCON + 8 * 4) as *mut u32;
+        lp_clk_conf_power_st.write_volatile(lp_clk_conf_power_st.read_volatile() | 6 << 28);
+        lp_clk_conf_power_st.write_volatile(lp_clk_conf_power_st.read_volatile() | 6 << 24);
+        lp_clk_conf_power_st.write_volatile(lp_clk_conf_power_st.read_volatile() | 6 << 20);
+        lp_clk_conf_power_st.write_volatile(lp_clk_conf_power_st.read_volatile() | 6 << 16);
+
+        const MODEM_LPCON: u32 = 0x600AF000;
+        let wifi_lp_clk_con = (MODEM_LPCON + 4 * 3) as *mut u32;
+        const CLK_WIFIPWR_LP_SEL_OSC_SLOW: u32 = 0;
+        const CLK_WIFIPWR_LP_SEL_OSC_FAST: u32 = 1;
+        const CLK_WIFIPWR_LP_SEL_XTAL32K: u32 = 3;
+        const CLK_WIFIPWR_LP_SEL_XTAL: u32 = 2;
+        const CLK_WIFIPWR_LP_DIV_NUM_SHIFT: u32 = 4;
+        const CLK_WIFIPWR_LP_DIV_NUM_MASK: u32 = 0b1111_1111_1111;
+        const CLK_WIFIPWR_EN: u32 = 0;
+
+        // modem_clock_hal_deselect_all_wifi_lpclk_source
+        wifi_lp_clk_con.write_volatile(
+            wifi_lp_clk_con.read_volatile()
+                & !(1 << CLK_WIFIPWR_LP_SEL_OSC_SLOW
+                    | 1 << CLK_WIFIPWR_LP_SEL_OSC_FAST
+                    | 1 << CLK_WIFIPWR_LP_SEL_XTAL32K
+                    | 1 << CLK_WIFIPWR_LP_SEL_XTAL),
+        );
+
+        // modem_clock_hal_select_wifi_lpclk_source
+        wifi_lp_clk_con
+            .write_volatile(wifi_lp_clk_con.read_volatile() | 1 << CLK_WIFIPWR_LP_SEL_OSC_SLOW);
+
+        // modem_lpcon_ll_set_wifi_lpclk_divisor_value
+        wifi_lp_clk_con.write_volatile(
+            wifi_lp_clk_con.read_volatile()
+                & !(CLK_WIFIPWR_LP_DIV_NUM_MASK << CLK_WIFIPWR_LP_DIV_NUM_SHIFT)
+                | 0 << CLK_WIFIPWR_LP_DIV_NUM_SHIFT,
+        );
+
+        // modem_lpcon_ll_enable_wifipwr_clock
+        let clk_conf = (MODEM_LPCON + 6 * 3) as *mut u32;
+        clk_conf.write_volatile(clk_conf.read_volatile() | 1 << CLK_WIFIPWR_EN);
     }
 }
 
 #[allow(unused)]
 pub(crate) fn wifi_reset_mac() {
-    const SYSCON_WIFI_RST_EN_REG: *mut u32 = (0x60026000 + 0x18) as *mut u32;
-    const SYSTEM_MAC_RST: u32 = 1 << 2;
-
-    unsafe {
-        SYSCON_WIFI_RST_EN_REG
-            .write_volatile(SYSCON_WIFI_RST_EN_REG.read_volatile() | SYSTEM_MAC_RST);
-        SYSCON_WIFI_RST_EN_REG
-            .write_volatile(SYSCON_WIFI_RST_EN_REG.read_volatile() & !SYSTEM_MAC_RST);
-    }
+    // empty
 }
 
 #[no_mangle]
