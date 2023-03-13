@@ -1,175 +1,143 @@
 use std::{env, fs, path::PathBuf};
 
+use serde::Deserialize;
+
+// Macros taken from:
+// https://github.com/TheDan64/inkwell/blob/36c3b10/src/lib.rs#L81-L110
+
+macro_rules! assert_unique_features {
+    () => {};
+
+    ( $first:tt $(,$rest:tt)* ) => {
+        $(
+            #[cfg(all(feature = $first, feature = $rest))]
+            compile_error!(concat!("Features \"", $first, "\" and \"", $rest, "\" cannot be used together"));
+        )*
+        assert_unique_features!($($rest),*);
+    };
+}
+
+macro_rules! assert_used_features {
+    ( $($all:tt),* ) => {
+        #[cfg(not(any($(feature = $all),*)))]
+        compile_error!(concat!("One of the feature flags must be provided: ", $($all, ", "),*));
+    }
+}
+
+macro_rules! assert_unique_used_features {
+    ( $($all:tt),* ) => {
+        assert_unique_features!($($all),*);
+        assert_used_features!($($all),*);
+    }
+}
+
+#[derive(Debug, Deserialize)]
+enum Arch {
+    #[serde(rename = "riscv")]
+    RiscV,
+    #[serde(rename = "xtensa")]
+    Xtensa,
+}
+
+impl core::fmt::Display for Arch {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Arch::RiscV => "riscv",
+                Arch::Xtensa => "xtensa",
+            }
+        )
+    }
+}
+
+#[derive(Debug, Deserialize)]
+enum CoreCount {
+    #[serde(rename = "single_core")]
+    Single,
+    #[serde(rename = "multi_core")]
+    Multi,
+}
+
+impl core::fmt::Display for CoreCount {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                CoreCount::Single => "single_core",
+                CoreCount::Multi => "multi_core",
+            }
+        )
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct Device {
+    pub arch: Arch,
+    pub cores: CoreCount,
+    pub peripherals: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct Config {
+    pub device: Device,
+}
+
 fn main() {
-    let esp32 = cfg!(feature = "esp32");
-    let esp32c2 = cfg!(feature = "esp32c2");
-    let esp32c3 = cfg!(feature = "esp32c3");
-    let esp32c6 = cfg!(feature = "esp32c6");
-    let esp32s2 = cfg!(feature = "esp32s2");
-    let esp32s3 = cfg!(feature = "esp32s3");
+    // NOTE: update when adding new device support!
+    // Ensure that exactly one chip has been specified:
+    assert_unique_used_features!("esp32", "esp32c2", "esp32c3", "esp32c6", "esp32s2", "esp32s3");
 
-    // Ensure that exactly one chip has been specified
-    let chip_features = [esp32, esp32c2, esp32c3, esp32c6, esp32s2, esp32s3];
-    match chip_features.iter().filter(|&&f| f).count() {
-        1 => {}
-        n => panic!("Exactly 1 chip must be enabled via its Cargo feature, {n} provided"),
-    }
-
-    if cfg!(feature = "esp32") && cfg!(feature = "esp32_40mhz") && cfg!(feature = "esp32_26mhz") {
-        panic!("Only one xtal speed feature can be selected");
-    }
-    if cfg!(feature = "esp32c2")
-        && cfg!(feature = "esp32c2_40mhz")
-        && cfg!(feature = "esp32c2_26mhz")
+    // Handle the features for the ESP32's different crystal frequencies:
+    #[cfg(feature = "esp32")]
     {
-        panic!("Only one xtal speed feature can be selected");
+        assert_unique_used_features!("esp32_26mhz", "esp32_40mhz");
     }
 
-    // Define all required configuration symbols for the enabled chip.
-    //
-    // When adding a new device, at the bare minimum the following symbols MUST be
-    // defined:
-    //   - the name of the device
-    //   - the architecture ('riscv' or 'xtensa')
-    //   - the core count ('single_core' or 'multi_core')
-    //
-    // Additionally, the following symbols MAY be defined if present:
-    //   - 'aes'
-    //   - 'dac'
-    //   - 'gdma'
-    //   - 'i2c1'
-    //   - 'i2s'
-    //   - 'large_intr_status'
-    //   - 'mcpwm'
-    //   - 'pcnt'
-    //   - 'pdma'
-    //   - 'plic'
-    //   - 'radio'
-    //   - 'rmt'
-    //   - 'spi3'
-    //   - 'systimer'
-    //   - 'timg0'
-    //   - 'timg1'
-    //   - 'twai'
-    //   - 'uart2'
-    //   - 'usb_otg'
-    //   - 'usb_serial_jtag'
-    //
-    // New symbols can be added as needed, but please be sure to update both this
-    // comment and the required vectors below.
-    let symbols = if esp32 {
-        vec![
-            "esp32",
-            "xtensa",
-            "multi_core",
-            "aes",
-            "dac",
-            "i2c1",
-            "i2s",
-            "mcpwm",
-            "pcnt",
-            "pdma",
-            "radio",
-            "rmt",
-            "spi3",
-            "timg0",
-            "timg1",
-            "uart2",
-        ]
-    } else if esp32c2 {
-        vec![
-            "esp32c2",
-            "riscv",
-            "single_core",
-            "gdma",
-            "radio",
-            "systimer",
-            "timg0",
-        ]
-    } else if esp32c3 {
-        vec![
-            "esp32c3",
-            "riscv",
-            "single_core",
-            "aes",
-            "gdma",
-            "i2s",
-            "radio",
-            "rmt",
-            "spi3",
-            "systimer",
-            "timg0",
-            "timg1",
-            "twai",
-            "usb_serial_jtag",
-        ]
-    } else if esp32c6 {
-        vec![
-            "esp32c6",
-            "riscv",
-            "single_core",
-            "aes",
-            "gdma",
-            "i2s",
-            "large_intr_status",
-            "mcpwm",
-            "pcnt",
-            "plic",
-            "radio",
-            "rmt",
-            "systimer",
-            "timg0",
-            "timg1",
-            "twai",
-            "usb_serial_jtag",
-        ]
-    } else if esp32s2 {
-        vec![
-            "esp32s2",
-            "xtensa",
-            "single_core",
-            "aes",
-            "dac",
-            "i2c1",
-            "i2s",
-            "pcnt",
-            "pdma",
-            "radio",
-            "rmt",
-            "spi3",
-            "systimer",
-            "timg0",
-            "timg1",
-            "usb_otg",
-        ]
-    } else if esp32s3 {
-        vec![
-            "esp32s3",
-            "xtensa",
-            "multi_core",
-            "aes",
-            "gdma",
-            "i2c1",
-            "i2s",
-            "mcpwm",
-            "pcnt",
-            "radio",
-            "rmt",
-            "spi3",
-            "systimer",
-            "timg0",
-            "timg1",
-            "twai",
-            "uart2",
-            "usb_otg",
-            "usb_serial_jtag",
-        ]
+    // Handle the features for the ESP32-C2's different crystal frequencies:
+    #[cfg(feature = "esp32c2")]
+    {
+        assert_unique_used_features!("esp32c2_26mhz", "esp32c2_40mhz");
+    }
+
+    // NOTE: update when adding new device support!
+    // Determine the name of the configured device:
+    let device_name = if cfg!(feature = "esp32") {
+        "esp32"
+    } else if cfg!(feature = "esp32c2") {
+        "esp32c2"
+    } else if cfg!(feature = "esp32c3") {
+        "esp32c3"
+    } else if cfg!(feature = "esp32c6") {
+        "esp32c6"
+    } else if cfg!(feature = "esp32s2") {
+        "esp32s2"
+    } else if cfg!(feature = "esp32s3") {
+        "esp32s3"
     } else {
-        unreachable!(); // We've already confirmed exactly one chip was selected
+        unreachable!() // We've confirmed exactly one known device was selected
     };
 
-    for symbol in symbols {
-        println!("cargo:rustc-cfg={symbol}");
+    // Load the configuration file for the configured device:
+    let chip_toml_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("devices")
+        .join(format!("{}.toml", device_name))
+        .canonicalize()
+        .unwrap();
+
+    let config = fs::read_to_string(chip_toml_path).unwrap();
+    let config: Config = basic_toml::from_str(&config).unwrap();
+    let device = config.device;
+
+    // Define all necessary configuration symbols for the configured device:
+    println!("cargo:rustc-cfg={}", device_name);
+    println!("cargo:rustc-cfg={}", device.arch);
+    println!("cargo:rustc-cfg={}", device.cores);
+
+    for peripheral in device.peripherals {
+        println!("cargo:rustc-cfg={peripheral}");
     }
 
     // Place all linker scripts in `OUT_DIR`, and instruct Cargo how to find these
@@ -177,7 +145,7 @@ fn main() {
     let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
     println!("cargo:rustc-link-search={}", out.display());
 
-    if esp32 || esp32s2 || esp32s3 {
+    if cfg!(feature = "esp32") || cfg!(feature = "esp32s2") || cfg!(feature = "esp32s3") {
         fs::copy("ld/xtensa/hal-defaults.x", out.join("hal-defaults.x")).unwrap();
         fs::copy("ld/xtensa/rom.x", out.join("alias.x")).unwrap();
     } else {
