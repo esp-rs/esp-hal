@@ -77,8 +77,6 @@ pub mod timer;
 
 type RegisterBlock = crate::peripherals::mcpwm0::RegisterBlock;
 
-type PWM = crate::peripherals::MCPWM0;
-
 /// The MCPWM peripheral
 #[non_exhaustive]
 pub struct MCPWM<'d, PWM> {
@@ -136,7 +134,7 @@ impl<'d, PWM: PwmPeripheral> MCPWM<'d, PWM> {
             // TODO: Add other clock sources
         }
 
-        MCPWM {
+        Self {
             _inner: peripheral,
             timer0: Timer::new(),
             timer1: Timer::new(),
@@ -172,7 +170,7 @@ impl<'a> PeripheralClockConfig<'a> {
         #[cfg(esp32s3)]
         let source_clock = clocks.crypto_pwm_clock;
 
-        PeripheralClockConfig {
+        Self {
             frequency: source_clock / (prescaler as u32 + 1),
             prescaler,
             phantom: PhantomData,
@@ -276,7 +274,8 @@ pub unsafe trait PwmPeripheral: Deref<Target = RegisterBlock> {
     fn output_signal<const OP: u8, const IS_A: bool>() -> OutputSignal;
 }
 
-unsafe impl PwmPeripheral for PWM {
+#[cfg(mcpwm0)]
+unsafe impl PwmPeripheral for crate::peripherals::MCPWM0 {
     fn enable(system: &mut PeripheralClockControl) {
         system.enable(PeripheralEnable::Mcpwm0)
     }
@@ -298,7 +297,7 @@ unsafe impl PwmPeripheral for PWM {
     }
 }
 
-#[cfg(not(esp32c6))]
+#[cfg(mcpwm1)]
 unsafe impl PwmPeripheral for crate::peripherals::MCPWM1 {
     fn enable(system: &mut PeripheralClockControl) {
         system.enable(PeripheralEnable::Mcpwm1)
