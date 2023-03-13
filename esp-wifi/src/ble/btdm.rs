@@ -405,7 +405,7 @@ unsafe extern "C" fn coex_schm_status_bit_clear(_typ: i32, status: i32) {
 
 #[ram]
 unsafe extern "C" fn read_efuse_mac(mac: *const ()) -> i32 {
-    crate::common_adapter::chip_specific::read_mac(mac as *mut _, 2)
+    crate::common_adapter::read_mac(mac as *mut _, 2)
 }
 
 #[cfg(feature = "esp32")]

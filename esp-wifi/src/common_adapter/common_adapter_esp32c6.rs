@@ -159,56 +159,6 @@ pub(crate) unsafe fn phy_disable_clock() {
     trace!("phy_enable_clock done!");
 }
 
-pub(crate) unsafe extern "C" fn read_mac(
-    mac: *mut u8,
-    type_: u32,
-) -> crate::binary::c_types::c_int {
-    trace!("read_mac {:p} {}", mac, type_);
-
-    let mut regval = [0u32; 2];
-    let data = &regval as *const _ as *const u8;
-    regval[0] = ((0x600b0800 + 0x44) as *const u32).read_volatile();
-    regval[1] = ((0x600b0800 + 0x48) as *const u32).read_volatile();
-
-    for i in 0..6 {
-        mac.offset(i)
-            .write_volatile(data.offset(5 - i).read_volatile());
-    }
-
-    /* ESP_MAC_WIFI_SOFTAP */
-    if type_ == 1 {
-        let tmp = mac.offset(0).read_volatile();
-        for i in 0..64 {
-            mac.offset(0).write_volatile(tmp | 0x02);
-            mac.offset(0)
-                .write_volatile(mac.offset(0).read_volatile() ^ (i << 2));
-
-            if mac.offset(0).read_volatile() != tmp {
-                break;
-            }
-        }
-    }
-
-    // ESP_MAC_BT
-    if type_ == 2 {
-        let tmp = mac.offset(0).read_volatile();
-        for i in 0..64 {
-            mac.offset(0).write_volatile(tmp | 0x02);
-            mac.offset(0)
-                .write_volatile(mac.offset(0).read_volatile() ^ (i << 2));
-
-            if mac.offset(0).read_volatile() != tmp {
-                break;
-            }
-        }
-
-        mac.offset(5)
-            .write_volatile(mac.offset(5).read_volatile() + 1);
-    }
-
-    0
-}
-
 pub(crate) fn init_clocks() {
     unsafe {
         let pmu = &*esp32c6::PMU::PTR;

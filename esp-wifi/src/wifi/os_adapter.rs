@@ -1092,26 +1092,6 @@ pub unsafe extern "C" fn phy_update_country_info(
 }
 
 /****************************************************************************
- * Name: esp_wifi_read_mac
- *
- * Description:
- *   Read MAC address from efuse
- *
- * Input Parameters:
- *   mac  - MAC address buffer pointer
- *   type - MAC address type
- *
- * Returned Value:
- *   0 if success or -1 if fail
- *
- ****************************************************************************/
-pub unsafe extern "C" fn read_mac(mac: *mut u8, type_: u32) -> crate::binary::c_types::c_int {
-    trace!("read_mac {:p} {}", mac, type_);
-
-    crate::common_adapter::chip_specific::read_mac(mac, type_)
-}
-
-/****************************************************************************
  * Name: wifi_reset_mac
  *
  * Description:

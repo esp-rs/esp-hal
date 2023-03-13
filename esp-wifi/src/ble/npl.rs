@@ -1111,9 +1111,8 @@ pub(crate) fn ble_init() {
         #[cfg(coex)]
         crate::binary::include::coex_enable();
 
-        // let mac: [u8; 6] = [0x6a, 0x9b, 0x4d, 0x6f, 0x64, 0x80]; // TODO better not hardcode :)
         let mut mac = [0u8; 6];
-        crate::common_adapter::chip_specific::read_mac(mac.as_mut_ptr(), 2);
+        crate::common_adapter::read_mac(mac.as_mut_ptr(), 2);
         mac.reverse();
 
         esp_ble_ll_set_public_addr(&mac as *const u8);
