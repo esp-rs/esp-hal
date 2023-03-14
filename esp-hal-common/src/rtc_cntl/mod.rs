@@ -84,23 +84,18 @@ impl Clock for RtcSlowClock {
             RtcSlowClock::RtcSlowClockRtc => HertzU32::Hz(150_000),
             #[cfg(esp32s2)]
             RtcSlowClock::RtcSlowClockRtc => HertzU32::Hz(90_000),
-            #[cfg(any(esp32c2, esp32c3, esp32c6, esp32s3))]
+            #[cfg(any(esp32c2, esp32c3, esp32s3))]
             RtcSlowClock::RtcSlowClockRtc => HertzU32::Hz(136_000),
             RtcSlowClock::RtcSlowClock32kXtal => HertzU32::Hz(32_768),
             #[cfg(any(esp32, esp32s2))]
             RtcSlowClock::RtcSlowClock8mD256 => HertzU32::Hz(8_500_000 / 256),
             #[cfg(any(esp32c2, esp32c3, esp32s3))]
             RtcSlowClock::RtcSlowClock8mD256 => HertzU32::Hz(17_500_000 / 256),
-            #[cfg(esp32c6)]
-            RtcSlowClock::RtcSlowClock32kRc => HertzU32::Hz(32_768),
-            #[cfg(esp32c6)]
-            RtcSlowClock::RtcCalInternalOsc => HertzU32::Hz(32_768),
-            #[cfg(esp32c6)]
-            RtcSlowClock::RtcCalRcFast => HertzU32::Hz(150_000),
         }
     }
 }
 
+#[allow(unused)]
 #[cfg(not(esp32c6))]
 #[derive(Debug, Clone, Copy)]
 /// Clock source to be calibrated using rtc_clk_cal function
@@ -190,28 +185,10 @@ impl RtcClock {
         }
     }
 
-    #[cfg(esp32c6)]
-    fn enable_8m(clk_8m_en: bool, _d256_en: bool) {
-        let pmu = unsafe { &*PMU::PTR };
-
-        if clk_8m_en {
-            pmu.hp_sleep_lp_ck_power
-                .modify(|_, w| w.hp_sleep_xpd_fosc_clk().set_bit());
-
-            unsafe { ets_delay_us(50) };
-        } else {
-            pmu.hp_sleep_lp_ck_power
-                .modify(|_, w| w.hp_sleep_xpd_fosc_clk().clear_bit());
-        }
-    }
-
     /// Get main XTAL frequency
     /// This is the value stored in RTC register RTC_XTAL_FREQ_REG by the
     /// bootloader, as passed to rtc_clk_init function.
     fn get_xtal_freq() -> XtalClock {
-        #[cfg(esp32c6)]
-        let xtal_freq_reg = unsafe { &*LP_AON::PTR }.store4.read().bits();
-        #[cfg(not(esp32c6))]
         let xtal_freq_reg = unsafe { &*RTC_CNTL::PTR }.store4.read().bits();
 
         // Values of RTC_XTAL_FREQ_REG and RTC_APB_FREQ_REG are stored as two copies in
@@ -251,21 +228,6 @@ impl RtcClock {
         }
     }
 
-    /// Get the RTC_SLOW_CLK source
-    #[cfg(esp32c6)]
-    fn get_slow_freq() -> RtcSlowClock {
-        let lp_clrst = unsafe { &*LP_CLKRST::ptr() };
-
-        let slow_freq = lp_clrst.lp_clk_conf.read().slow_clk_sel().bits();
-        match slow_freq {
-            0 => RtcSlowClock::RtcSlowClockRtc,
-            1 => RtcSlowClock::RtcSlowClock32kXtal,
-            2 => RtcSlowClock::RtcSlowClock32kRc,
-            3 => RtcSlowClock::RtcCalInternalOsc,
-            _ => unreachable!(),
-        }
-    }
-
     /// Select source for RTC_SLOW_CLK
     #[cfg(not(esp32c6))]
     fn set_slow_freq(slow_freq: RtcSlowClock) {
@@ -295,11 +257,6 @@ impl RtcClock {
         };
     }
 
-    #[cfg(esp32c6)]
-    fn set_slow_freq(slow_freq: RtcSlowClock) {
-        todo!()
-    }
-
     /// Select source for RTC_FAST_CLK
     #[cfg(not(esp32c6))]
     fn set_fast_freq(fast_freq: RtcFastClock) {
@@ -314,11 +271,6 @@ impl RtcClock {
 
             ets_delay_us(3u32);
         };
-    }
-
-    #[cfg(esp32c6)]
-    fn set_fast_freq(fast_freq: RtcFastClock) {
-        todo!()
     }
 
     /// Calibration of RTC_SLOW_CLK is performed using a special feature of
@@ -469,14 +421,6 @@ impl RtcClock {
         cal_val
     }
 
-    /// Calibration of RTC_SLOW_CLK is performed using a special feature of
-    /// TIMG0. This feature counts the number of XTAL clock cycles within a
-    /// given number of RTC_SLOW_CLK cycles.
-    #[cfg(esp32c6)]
-    fn calibrate_internal(cal_clk: RtcCalSel, slowclk_cycles: u32) -> u32 {
-        todo!()
-    }
-
     /// Measure ratio between XTAL frequency and RTC slow clock frequency
     fn get_calibration_ratio(cal_clk: RtcCalSel, slowclk_cycles: u32) -> u32 {
         let xtal_cycles = RtcClock::calibrate_internal(cal_clk, slowclk_cycles) as u64;
@@ -509,12 +453,6 @@ impl RtcClock {
                 RtcSlowClock::RtcSlowClock32kXtal => RtcCalSel::RtcCal32kXtal,
                 #[cfg(not(esp32c6))]
                 RtcSlowClock::RtcSlowClock8mD256 => RtcCalSel::RtcCal8mD256,
-                #[cfg(esp32c6)]
-                RtcSlowClock::RtcSlowClock32kRc => RtcCalSel::RtcCal32kRc,
-                #[cfg(esp32c6)]
-                RtcSlowClock::RtcCalInternalOsc => RtcCalSel::RtcCalInternalOsc,
-                #[cfg(esp32c6)]
-                RtcSlowClock::RtcCalRcFast => RtcCalSel::RtcCalRcFast,
             },
             1024,
         );

@@ -275,21 +275,6 @@ pub struct RtcClock;
 impl RtcClock {
     const CAL_FRACT: u32 = 19;
 
-    /// Enable or disable 8 MHz internal oscillator
-    fn enable_8m(clk_8m_en: bool, _d256_en: bool) {
-        let pmu = unsafe { &*PMU::PTR };
-
-        if clk_8m_en {
-            pmu.hp_sleep_lp_ck_power
-                .modify(|_, w| w.hp_sleep_xpd_fosc_clk().set_bit());
-
-            unsafe { ets_delay_us(50) };
-        } else {
-            pmu.hp_sleep_lp_ck_power
-                .modify(|_, w| w.hp_sleep_xpd_fosc_clk().clear_bit());
-        }
-    }
-
     /// Get main XTAL frequency
     /// This is the value stored in RTC register RTC_XTAL_FREQ_REG by the
     /// bootloader, as passed to rtc_clk_init function.
@@ -623,16 +608,6 @@ impl RtcClock {
         }
 
         cal_val
-    }
-
-    /// Measure ratio between XTAL frequency and RTC slow clock frequency
-    fn get_calibration_value(cal_clk: RtcCalSel, slowclk_cycles: u32) -> u32 {
-        let xtal_freq = RtcClock::get_xtal_freq();
-        let xtal_cycles = RtcClock::calibrate_internal(cal_clk, slowclk_cycles) as u64;
-        let divider = xtal_freq.mhz() as u64 * slowclk_cycles as u64;
-        let period_64 = ((xtal_cycles << RtcClock::CAL_FRACT) + divider / 2u64 - 1u64) / divider;
-
-        (period_64 & u32::MAX as u64) as u32
     }
 
     /// Measure RTC slow clock's period, based on main XTAL frequency
