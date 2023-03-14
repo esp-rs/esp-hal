@@ -19,10 +19,7 @@ PROVIDE(MachineExternal = DefaultHandler);
 PROVIDE(DefaultHandler = DefaultInterruptHandler);
 PROVIDE(ExceptionHandler = DefaultExceptionHandler);
 
-/* # Pre-initialization function */
-/* If the user overrides this using the `#[pre_init]` attribute or by creating a `__pre_init` function,
-   then the function this points to will be called before the RAM is initialized. */
-PROVIDE(__pre_init = default_pre_init);
+PROVIDE(__post_init = default_post_init);
 
 /* A PAC/HAL defined routine that should initialize custom interrupt controller if needed. */
 PROVIDE(_setup_interrupts = default_setup_interrupts);
