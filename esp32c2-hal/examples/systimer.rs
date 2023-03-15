@@ -37,6 +37,7 @@ fn main() -> ! {
 
     // Disable MWDT and RWDT (Watchdog) flash boot protection
     wdt.disable();
+    rtc.swd.disable();
     rtc.rwdt.disable();
 
     let syst = SystemTimer::new(peripherals.SYSTIMER);
