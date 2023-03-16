@@ -5,75 +5,41 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-embedded-hal = "0.2.3"
-nb = "1.0.0"
-void = { version = "1.0.2", default-features = false }
-esp32c3-hal = { version = "0.7.0", optional = true }
-esp32c2-hal = { version = "0.5.1", optional = true }
-esp32c6-hal = { git = "https://github.com/esp-rs/esp-hal", package = "esp32c6-hal", rev = "7cf7d8eeac9172b24f0fba7ae659ec39925ce04f",  optional = true }
-esp32-hal = { version = "0.10.0", optional = true, features = [ "rt" ] }
-esp32s3-hal = { version = "0.7.0", optional = true, features = [ "rt" ] }
-esp32s2-hal = { version = "0.7.0", optional = true, features = [ "rt" ] }
-esp32c3 = { version = "0.11.0",  features = ["critical-section"], optional = true }
-esp32c2 = { version = "0.8.0",  features = ["critical-section"], optional = true }
-esp32c6 = { version = "0.1.0",  features = ["critical-section"], optional = true }
-smoltcp = { version = "0.9.1", default-features=false, features = ["proto-igmp", "proto-ipv4", "socket-tcp", "socket-icmp", "socket-udp", "medium-ethernet", "proto-dhcpv4", "socket-raw", "socket-dhcpv4"] }
-critical-section = "1.1.1"
-atomic-polyfill = "1.0.1"
-log = "0.4.17"
-embedded-svc = { version = "0.23.1", default-features = false, features = [], optional = true }
-enumset = { version = "1", default-features = false, optional = true }
-linked_list_allocator = { version = "0.10.3", default-features = false, features = ["const_mut_refs"] }
-embedded-io = "0.4.0"
-fugit = "0.3.6"
-heapless = { version = "0.7.14", default-features = false }
-num-derive = { version = "0.3", features = ["full-syntax"] }
-num-traits = { version = "0.2", default-features = false }
+embedded-hal.workspace = true
+esp32c3-hal = { workspace = true, optional = true }
+esp32c2-hal = { workspace = true, optional = true }
+esp32c6-hal = { workspace = true, optional = true }
+esp32-hal = { workspace = true, optional = true }
+esp32s3-hal = {workspace = true, optional = true }
+esp32s2-hal = { workspace = true, optional = true }
+esp32c3 = { workspace = true, optional = true }
+esp32c2 = { workspace = true, optional = true }
+esp32c6 = { workspace = true, optional = true }
+smoltcp = { workspace = true, optional = true }
+critical-section.workspace = true
+atomic-polyfill.workspace = true
+log.workspace = true
+embedded-svc = { workspace = true, optional = true }
+enumset = {workspace = true, optional = true }
+linked_list_allocator = { workspace = true }
+embedded-io.workspace = true
+fugit.workspace = true
+heapless = { workspace = true, default-features = false }
+num-derive = { workspace = true, features = ["full-syntax"] }
+num-traits = { workspace = true, default-features = false }
 esp-wifi-sys = { version = "0.1.0", path = "../esp-wifi-sys" }
-embassy-sync = { version = "0.1.0", optional = true }
-embassy-futures = { version = "0.1.0", optional = true }
-embassy-net = { git = "https://github.com/embassy-rs/embassy", rev = "26474ce6eb759e5add1c137f3417845e0797df3a", features = ["nightly", "tcp", "udp", "dhcpv4", "medium-ethernet"], optional = true }
-embassy-net-driver = { git = "https://github.com/embassy-rs/embassy", rev = "26474ce6eb759e5add1c137f3417845e0797df3a", optional = true }
-
-[build-dependencies]
-riscv-target = { version = "0.1.2", optional = true }
-
-[dev-dependencies]
-bleps = { git = "https://github.com/bjoernQ/bleps", package = "bleps", rev = "33fde67257bfbc6c0aebf7649fd302c82ed94c64" }
-bleps-macros = { git = "https://github.com/bjoernQ/bleps", package = "bleps-macros", rev = "33fde67257bfbc6c0aebf7649fd302c82ed94c64" }
-embassy-executor  = { package = "embassy-executor", git = "https://github.com/embassy-rs/embassy/", rev = "cd9a65b", features = ["nightly", "integrated-timers"] }
-embassy-time = { version = "0.1.0", features = ["nightly"] }
-embassy-futures = "0.1.0"
-futures-util = { version = "0.3.17", default-features = false }
-
-[target.xtensa-esp32-none-elf.dev-dependencies]
-esp-println = { version = "0.4.0", features = [ "esp32", "log" ] }
-esp-backtrace = { version = "0.6.0", features = ["esp32", "panic-handler", "exception-handler", "print-uart"] }
-
-# change this for ESP32C3 / ESP32C2
-[target.riscv32imc-unknown-none-elf.dev-dependencies]
-esp-println = { version = "0.4.0", features = [ "esp32c3", "log" ] }
-esp-backtrace = { version = "0.6.0", features = ["esp32c3", "panic-handler", "exception-handler", "print-uart"] }
-
-[target.riscv32imac-unknown-none-elf.dev-dependencies]
-esp-println = { version = "0.4.0", features = [ "esp32c6", "log" ] }
-esp-backtrace = { version = "0.6.0", features = ["esp32c6", "panic-handler", "exception-handler", "print-uart"] }
-
-[target.xtensa-esp32s3-none-elf.dev-dependencies]
-esp-println = { version = "0.4.0", features = [ "esp32s3", "log" ] }
-esp-backtrace = { version = "0.6.0", features = ["esp32s3", "panic-handler", "exception-handler", "print-uart"] }
-
-[target.xtensa-esp32s2-none-elf.dev-dependencies]
-esp-println = { version = "0.4.0", features = [ "esp32s2", "log", "critical-section" ] }
-esp-backtrace = { version = "0.6.0", features = ["esp32s2", "panic-handler", "exception-handler", "print-uart"] }
+embassy-sync = { workspace = true, optional = true }
+embassy-futures = { workspace = true, optional = true }
+embassy-net = { workspace = true, optional = true }
+embassy-net-driver = { workspace = true, optional = true }
 
 [features]
 default = [ "utils" ]
 
 # chip features
-esp32c3 = [ "riscv-target", "esp32c3-hal", "dep:esp32c3", "esp-wifi-sys/esp32c3" ]
-esp32c2 = [ "riscv-target", "esp32c2-hal", "dep:esp32c2", "esp-wifi-sys/esp32c2" ]
-esp32c6 = [ "riscv-target", "esp32c6-hal", "dep:esp32c6", "esp-wifi-sys/esp32c6" ]
+esp32c3 = [ "esp32c3-hal", "dep:esp32c3", "esp-wifi-sys/esp32c3" ]
+esp32c2 = [ "esp32c2-hal", "dep:esp32c2", "esp-wifi-sys/esp32c2" ]
+esp32c6 = [ "esp32c6-hal", "dep:esp32c6", "esp-wifi-sys/esp32c6" ]
 esp32 = [ "esp32-hal",  "esp-wifi-sys/esp32" ]
 esp32s3 = [ "esp32s3-hal", "esp-wifi-sys/esp32s3" ]
 esp32s2 = [ "esp32s2-hal", "esp-wifi-sys/esp32s2" ]
@@ -91,10 +57,10 @@ embassy-net = ["dep:embassy-net", "dep:embassy-net-driver", "async"]
 # misc features
 wifi-logs = []
 dump-packets = []
-utils = []
+utils = [ "dep:smoltcp" ]
 enumset = []
 embedded-svc = [ "dep:enumset", "dep:embedded-svc", "utils" ]
-wifi = []
+wifi = [ ]
 ble = [ "esp32-hal?/bluetooth" ]
 phy-enable-usb = []
 ps-min-modem = []
