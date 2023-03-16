@@ -56,6 +56,10 @@ esp32c6 = { version = "0.2.0",  features = ["critical-section"], optional = true
 esp32s2 = { version = "0.13.0", features = ["critical-section"], optional = true }
 esp32s3 = { version = "0.16.0", features = ["critical-section"], optional = true }
 
+[build-dependencies]
+basic-toml = "0.1.1"
+serde      = { version = "1.0.152", features = ["derive"] }
+
 [features]
 esp32   = ["esp32/rt"  , "xtensa", "xtensa-lx/esp32",   "xtensa-lx-rt/esp32",   "lock_api", "procmacros/esp32"]
 esp32c2 = ["esp32c2/rt", "riscv",  "procmacros/esp32c2"]

@@ -716,7 +716,7 @@ pub trait Instance {
 
 #[cfg(any(esp32c3, esp32s3))]
 impl Instance for crate::peripherals::TWAI0 {
-    const SYSTEM_PERIPHERAL: system::Peripheral = system::Peripheral::Twai;
+    const SYSTEM_PERIPHERAL: system::Peripheral = system::Peripheral::Twai0;
 
     const INPUT_SIGNAL: InputSignal = InputSignal::TWAI_RX;
     const OUTPUT_SIGNAL: OutputSignal = OutputSignal::TWAI_TX;
