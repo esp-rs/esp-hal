@@ -45,26 +45,27 @@ pub use self::analog::dac::implementation as dac;
 pub use self::dma::gdma;
 #[cfg(pdma)]
 pub use self::dma::pdma;
+#[cfg(any(dport, interrupt_core0, interrupt_core1))]
+pub use self::interrupt::*;
 #[cfg(rmt)]
 pub use self::pulse_control::PulseControl;
 #[cfg(rng)]
 pub use self::rng::Rng;
+#[cfg(any(lp_clkrst, rtc_cntl))]
+pub use self::rtc_cntl::{Rtc, Rwdt};
 #[cfg(any(esp32, esp32s3))]
 pub use self::soc::cpu_control;
 #[cfg(efuse)]
 pub use self::soc::efuse;
+#[cfg(any(spi0, spi1, spi2, spi3))]
+pub use self::spi::Spi;
+#[cfg(any(timg0, timg1))]
+pub use self::timer::Timer;
 #[cfg(any(uart0, uart1, uart2))]
 pub use self::uart::Uart;
 #[cfg(usb_device)]
 pub use self::usb_serial_jtag::UsbSerialJtag;
-pub use self::{
-    delay::Delay,
-    interrupt::*,
-    rtc_cntl::{Rtc, Rwdt},
-    soc::peripherals,
-    spi::Spi,
-    timer::Timer,
-};
+pub use self::{delay::Delay, soc::peripherals};
 
 #[cfg(aes)]
 pub mod aes;
@@ -82,6 +83,7 @@ pub mod gpio;
 pub mod i2c;
 #[cfg(any(i2s0, i2s1))]
 pub mod i2s;
+#[cfg(any(dport, interrupt_core0, interrupt_core1))]
 pub mod interrupt;
 #[cfg(ledc)]
 pub mod ledc;
@@ -100,12 +102,14 @@ pub mod radio;
 #[cfg(rng)]
 pub mod rng;
 pub mod rom;
+#[cfg(any(lp_clkrst, rtc_cntl))]
 pub mod rtc_cntl;
 #[cfg(sha)]
 pub mod sha;
 pub mod soc;
 #[cfg(any(spi0, spi1, spi2, spi3))]
 pub mod spi;
+#[cfg(any(dport, pcr, system))]
 pub mod system;
 #[cfg(systimer)]
 pub mod systimer;
