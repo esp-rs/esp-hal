@@ -14,6 +14,12 @@ use crate::peripherals::{GPIO, IO_MUX};
 pub use crate::soc::gpio::*;
 pub(crate) use crate::{analog, gpio};
 
+/// Convenience type-alias for a no-pin / don't care - pin
+pub type NoPinType = Gpio0<Unknown>;
+
+/// Convenience constant for `Option::None` pin
+pub const NO_PIN: Option<NoPinType> = None;
+
 #[derive(Copy, Clone)]
 pub enum Event {
     RisingEdge  = 1,

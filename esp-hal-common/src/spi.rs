@@ -48,6 +48,8 @@
 //! underlying SPI bus by means of a Mutex. This ensures that device
 //! transactions do not interfere with each other.
 
+use core::marker::PhantomData;
+
 use fugit::HertzU32;
 
 use crate::{
@@ -74,6 +76,8 @@ const MAX_DMA_SIZE: usize = 32736;
 pub enum Error {
     DmaError(DmaError),
     MaxDmaTransferSizeExceeded,
+    FifoSizeExeeded,
+    Unsupported,
     Unknown,
 }
 
@@ -98,11 +102,321 @@ pub enum SpiMode {
     Mode3,
 }
 
-pub struct Spi<'d, T> {
-    spi: PeripheralRef<'d, T>,
+pub trait DuplexMode {}
+pub trait IsFullDuplex: DuplexMode {}
+pub trait IsHalfDuplex: DuplexMode {}
+
+/// SPI data mode
+///
+/// Single = 1 bit, 2 wires
+/// Dual = 2 bit, 2 wires
+/// Quad = 4 bit, 4 wires
+#[derive(Debug, Clone, Copy)]
+pub enum SpiDataMode {
+    Single,
+    Dual,
+    Quad,
 }
 
-impl<'d, T> Spi<'d, T>
+pub struct FullDuplexMode {}
+impl DuplexMode for FullDuplexMode {}
+impl IsFullDuplex for FullDuplexMode {}
+
+pub struct HalfDuplexMode {}
+impl DuplexMode for HalfDuplexMode {}
+impl IsHalfDuplex for HalfDuplexMode {}
+
+/// SPI command, 1 to 16 bits.
+///
+/// Can be [Command::None] if command phase should be suppressed.
+pub enum Command {
+    None,
+    Command1(u16, SpiDataMode),
+    Command2(u16, SpiDataMode),
+    Command3(u16, SpiDataMode),
+    Command4(u16, SpiDataMode),
+    Command5(u16, SpiDataMode),
+    Command6(u16, SpiDataMode),
+    Command7(u16, SpiDataMode),
+    Command8(u16, SpiDataMode),
+    Command9(u16, SpiDataMode),
+    Command10(u16, SpiDataMode),
+    Command11(u16, SpiDataMode),
+    Command12(u16, SpiDataMode),
+    Command13(u16, SpiDataMode),
+    Command14(u16, SpiDataMode),
+    Command15(u16, SpiDataMode),
+    Command16(u16, SpiDataMode),
+}
+
+impl Command {
+    fn width(&self) -> usize {
+        match self {
+            Command::None => 0,
+            Command::Command1(_, _) => 1,
+            Command::Command2(_, _) => 2,
+            Command::Command3(_, _) => 3,
+            Command::Command4(_, _) => 4,
+            Command::Command5(_, _) => 5,
+            Command::Command6(_, _) => 6,
+            Command::Command7(_, _) => 7,
+            Command::Command8(_, _) => 8,
+            Command::Command9(_, _) => 9,
+            Command::Command10(_, _) => 10,
+            Command::Command11(_, _) => 11,
+            Command::Command12(_, _) => 12,
+            Command::Command13(_, _) => 13,
+            Command::Command14(_, _) => 14,
+            Command::Command15(_, _) => 15,
+            Command::Command16(_, _) => 16,
+        }
+    }
+
+    fn value(&self) -> u16 {
+        match self {
+            Command::None => 0,
+            Command::Command1(value, _)
+            | Command::Command2(value, _)
+            | Command::Command3(value, _)
+            | Command::Command4(value, _)
+            | Command::Command5(value, _)
+            | Command::Command6(value, _)
+            | Command::Command7(value, _)
+            | Command::Command8(value, _)
+            | Command::Command9(value, _)
+            | Command::Command10(value, _)
+            | Command::Command11(value, _)
+            | Command::Command12(value, _)
+            | Command::Command13(value, _)
+            | Command::Command14(value, _)
+            | Command::Command15(value, _)
+            | Command::Command16(value, _) => *value,
+        }
+    }
+
+    fn mode(&self) -> SpiDataMode {
+        match self {
+            Command::None => SpiDataMode::Single,
+            Command::Command1(_, mode)
+            | Command::Command2(_, mode)
+            | Command::Command3(_, mode)
+            | Command::Command4(_, mode)
+            | Command::Command5(_, mode)
+            | Command::Command6(_, mode)
+            | Command::Command7(_, mode)
+            | Command::Command8(_, mode)
+            | Command::Command9(_, mode)
+            | Command::Command10(_, mode)
+            | Command::Command11(_, mode)
+            | Command::Command12(_, mode)
+            | Command::Command13(_, mode)
+            | Command::Command14(_, mode)
+            | Command::Command15(_, mode)
+            | Command::Command16(_, mode) => *mode,
+        }
+    }
+
+    fn is_none(&self) -> bool {
+        match self {
+            Command::None => true,
+            _ => false,
+        }
+    }
+}
+
+/// SPI address, 1 to 32 bits.
+///
+/// Can be [Address::None] if address phase should be suppressed.
+pub enum Address {
+    None,
+    Address1(u32, SpiDataMode),
+    Address2(u32, SpiDataMode),
+    Address3(u32, SpiDataMode),
+    Address4(u32, SpiDataMode),
+    Address5(u32, SpiDataMode),
+    Address6(u32, SpiDataMode),
+    Address7(u32, SpiDataMode),
+    Address8(u32, SpiDataMode),
+    Address9(u32, SpiDataMode),
+    Address10(u32, SpiDataMode),
+    Address11(u32, SpiDataMode),
+    Address12(u32, SpiDataMode),
+    Address13(u32, SpiDataMode),
+    Address14(u32, SpiDataMode),
+    Address15(u32, SpiDataMode),
+    Address16(u32, SpiDataMode),
+    Address17(u32, SpiDataMode),
+    Address18(u32, SpiDataMode),
+    Address19(u32, SpiDataMode),
+    Address20(u32, SpiDataMode),
+    Address21(u32, SpiDataMode),
+    Address22(u32, SpiDataMode),
+    Address23(u32, SpiDataMode),
+    Address24(u32, SpiDataMode),
+    Address25(u32, SpiDataMode),
+    Address26(u32, SpiDataMode),
+    Address27(u32, SpiDataMode),
+    Address28(u32, SpiDataMode),
+    Address29(u32, SpiDataMode),
+    Address30(u32, SpiDataMode),
+    Address31(u32, SpiDataMode),
+    Address32(u32, SpiDataMode),
+}
+
+impl Address {
+    fn width(&self) -> usize {
+        match self {
+            Address::None => 0,
+            Address::Address1(_, _) => 1,
+            Address::Address2(_, _) => 2,
+            Address::Address3(_, _) => 3,
+            Address::Address4(_, _) => 4,
+            Address::Address5(_, _) => 5,
+            Address::Address6(_, _) => 6,
+            Address::Address7(_, _) => 7,
+            Address::Address8(_, _) => 8,
+            Address::Address9(_, _) => 9,
+            Address::Address10(_, _) => 10,
+            Address::Address11(_, _) => 11,
+            Address::Address12(_, _) => 12,
+            Address::Address13(_, _) => 13,
+            Address::Address14(_, _) => 14,
+            Address::Address15(_, _) => 15,
+            Address::Address16(_, _) => 16,
+            Address::Address17(_, _) => 17,
+            Address::Address18(_, _) => 18,
+            Address::Address19(_, _) => 19,
+            Address::Address20(_, _) => 20,
+            Address::Address21(_, _) => 21,
+            Address::Address22(_, _) => 22,
+            Address::Address23(_, _) => 23,
+            Address::Address24(_, _) => 24,
+            Address::Address25(_, _) => 25,
+            Address::Address26(_, _) => 26,
+            Address::Address27(_, _) => 27,
+            Address::Address28(_, _) => 28,
+            Address::Address29(_, _) => 29,
+            Address::Address30(_, _) => 30,
+            Address::Address31(_, _) => 31,
+            Address::Address32(_, _) => 32,
+        }
+    }
+
+    fn value(&self) -> u32 {
+        match self {
+            Address::None => 0,
+            Address::Address1(value, _)
+            | Address::Address2(value, _)
+            | Address::Address3(value, _)
+            | Address::Address4(value, _)
+            | Address::Address5(value, _)
+            | Address::Address6(value, _)
+            | Address::Address7(value, _)
+            | Address::Address8(value, _)
+            | Address::Address9(value, _)
+            | Address::Address10(value, _)
+            | Address::Address11(value, _)
+            | Address::Address12(value, _)
+            | Address::Address13(value, _)
+            | Address::Address14(value, _)
+            | Address::Address15(value, _)
+            | Address::Address16(value, _)
+            | Address::Address17(value, _)
+            | Address::Address18(value, _)
+            | Address::Address19(value, _)
+            | Address::Address20(value, _)
+            | Address::Address21(value, _)
+            | Address::Address22(value, _)
+            | Address::Address23(value, _)
+            | Address::Address24(value, _)
+            | Address::Address25(value, _)
+            | Address::Address26(value, _)
+            | Address::Address27(value, _)
+            | Address::Address28(value, _)
+            | Address::Address29(value, _)
+            | Address::Address30(value, _)
+            | Address::Address31(value, _)
+            | Address::Address32(value, _) => *value,
+        }
+    }
+
+    fn is_none(&self) -> bool {
+        match self {
+            Address::None => true,
+            _ => false,
+        }
+    }
+
+    fn mode(&self) -> SpiDataMode {
+        match self {
+            Address::None => SpiDataMode::Single,
+            Address::Address1(_, mode)
+            | Address::Address2(_, mode)
+            | Address::Address3(_, mode)
+            | Address::Address4(_, mode)
+            | Address::Address5(_, mode)
+            | Address::Address6(_, mode)
+            | Address::Address7(_, mode)
+            | Address::Address8(_, mode)
+            | Address::Address9(_, mode)
+            | Address::Address10(_, mode)
+            | Address::Address11(_, mode)
+            | Address::Address12(_, mode)
+            | Address::Address13(_, mode)
+            | Address::Address14(_, mode)
+            | Address::Address15(_, mode)
+            | Address::Address16(_, mode)
+            | Address::Address17(_, mode)
+            | Address::Address18(_, mode)
+            | Address::Address19(_, mode)
+            | Address::Address20(_, mode)
+            | Address::Address21(_, mode)
+            | Address::Address22(_, mode)
+            | Address::Address23(_, mode)
+            | Address::Address24(_, mode)
+            | Address::Address25(_, mode)
+            | Address::Address26(_, mode)
+            | Address::Address27(_, mode)
+            | Address::Address28(_, mode)
+            | Address::Address29(_, mode)
+            | Address::Address30(_, mode)
+            | Address::Address31(_, mode)
+            | Address::Address32(_, mode) => *mode,
+        }
+    }
+}
+
+/// Read and Write in half duplex mode.
+pub trait HalfDuplexReadWrite {
+    type Error;
+
+    /// Half-duplex read.
+    fn read(
+        &mut self,
+        data_mode: SpiDataMode,
+        cmd: Command,
+        address: Address,
+        dummy: u8,
+        buffer: &mut [u8],
+    ) -> Result<(), Self::Error>;
+
+    /// Half-duplex write.
+    fn write(
+        &mut self,
+        data_mode: SpiDataMode,
+        cmd: Command,
+        address: Address,
+        dummy: u8,
+        buffer: &[u8],
+    ) -> Result<(), Self::Error>;
+}
+
+pub struct Spi<'d, T, M> {
+    spi: PeripheralRef<'d, T>,
+    _mode: PhantomData<M>,
+}
+
+impl<'d, T> Spi<'d, T, FullDuplexMode>
 where
     T: Instance,
 {
@@ -117,7 +431,7 @@ where
         mode: SpiMode,
         peripheral_clock_control: &mut PeripheralClockControl,
         clocks: &Clocks,
-    ) -> Self {
+    ) -> Spi<'d, T, FullDuplexMode> {
         crate::into_ref!(spi, sck, mosi, miso, cs);
         sck.set_to_push_pull_output()
             .connect_peripheral_to_output(spi.sclk_signal());
@@ -144,7 +458,7 @@ where
         mode: SpiMode,
         peripheral_clock_control: &mut PeripheralClockControl,
         clocks: &Clocks,
-    ) -> Self {
+    ) -> Spi<'d, T, FullDuplexMode> {
         crate::into_ref!(spi, sck, mosi, miso);
         sck.set_to_push_pull_output()
             .connect_peripheral_to_output(spi.sclk_signal());
@@ -168,7 +482,7 @@ where
         mode: SpiMode,
         peripheral_clock_control: &mut PeripheralClockControl,
         clocks: &Clocks,
-    ) -> Self {
+    ) -> Spi<'d, T, FullDuplexMode> {
         crate::into_ref!(spi, sck, mosi);
         sck.set_to_push_pull_output()
             .connect_peripheral_to_output(spi.sclk_signal());
@@ -190,7 +504,7 @@ where
         mode: SpiMode,
         peripheral_clock_control: &mut PeripheralClockControl,
         clocks: &Clocks,
-    ) -> Self {
+    ) -> Spi<'d, T, FullDuplexMode> {
         crate::into_ref!(spi, mosi);
         mosi.set_to_push_pull_output()
             .connect_peripheral_to_output(spi.mosi_signal());
@@ -204,10 +518,13 @@ where
         mode: SpiMode,
         peripheral_clock_control: &mut PeripheralClockControl,
         clocks: &Clocks,
-    ) -> Self {
+    ) -> Spi<'d, T, FullDuplexMode> {
         spi.enable_peripheral(peripheral_clock_control);
 
-        let mut spi = Self { spi };
+        let mut spi = Spi {
+            spi,
+            _mode: PhantomData::default(),
+        };
         spi.spi.setup(frequency, clocks);
         spi.spi.init();
         spi.spi.set_data_mode(mode);
@@ -220,9 +537,158 @@ where
     }
 }
 
-impl<T> embedded_hal::spi::FullDuplex<u8> for Spi<'_, T>
+impl<'d, T> Spi<'d, T, HalfDuplexMode>
+where
+    T: ExtendedInstance,
+{
+    /// Constructs an SPI instance in half-duplex mode.
+    ///
+    /// All pins are optional. Pass [crate::gpio::NO_PIN] if you don't need the
+    /// given pin.
+    pub fn new_half_duplex<
+        SCK: OutputPin,
+        MOSI: OutputPin + InputPin,
+        MISO: OutputPin + InputPin,
+        SIO2: OutputPin + InputPin,
+        SIO3: OutputPin + InputPin,
+        CS: OutputPin,
+    >(
+        spi: impl Peripheral<P = T> + 'd,
+        sck: Option<impl Peripheral<P = SCK> + 'd>,
+        mosi: Option<impl Peripheral<P = MOSI> + 'd>,
+        miso: Option<impl Peripheral<P = MISO> + 'd>,
+        sio2: Option<impl Peripheral<P = SIO2> + 'd>,
+        sio3: Option<impl Peripheral<P = SIO3> + 'd>,
+        cs: Option<impl Peripheral<P = CS> + 'd>,
+        frequency: HertzU32,
+        mode: SpiMode,
+        peripheral_clock_control: &mut PeripheralClockControl,
+        clocks: &Clocks,
+    ) -> Spi<'d, T, HalfDuplexMode> {
+        crate::into_ref!(spi);
+        if let Some(sck) = sck {
+            crate::into_ref!(sck);
+            sck.set_to_push_pull_output()
+                .connect_peripheral_to_output(spi.sclk_signal());
+        }
+
+        if let Some(mosi) = mosi {
+            crate::into_ref!(mosi);
+            mosi.enable_output(true);
+            mosi.connect_peripheral_to_output(spi.mosi_signal());
+            mosi.enable_input(true);
+            mosi.connect_input_to_peripheral(spi.sio0_input_signal());
+        }
+
+        if let Some(miso) = miso {
+            crate::into_ref!(miso);
+            miso.enable_output(true);
+            miso.connect_peripheral_to_output(spi.sio1_output_signal());
+            miso.enable_input(true);
+            miso.connect_input_to_peripheral(spi.miso_signal());
+        }
+
+        if let Some(sio2) = sio2 {
+            crate::into_ref!(sio2);
+            sio2.enable_output(true);
+            sio2.connect_peripheral_to_output(spi.sio2_output_signal());
+            sio2.enable_input(true);
+            sio2.connect_input_to_peripheral(spi.sio2_input_signal());
+        }
+
+        if let Some(sio3) = sio3 {
+            crate::into_ref!(sio3);
+            sio3.enable_output(true);
+            sio3.connect_peripheral_to_output(spi.sio3_output_signal());
+            sio3.enable_input(true);
+            sio3.connect_input_to_peripheral(spi.sio3_input_signal());
+        }
+
+        if let Some(cs) = cs {
+            crate::into_ref!(cs);
+            cs.set_to_push_pull_output()
+                .connect_peripheral_to_output(spi.cs_signal());
+        }
+
+        Self::new_internal(spi, frequency, mode, peripheral_clock_control, clocks)
+    }
+
+    pub(crate) fn new_internal(
+        spi: PeripheralRef<'d, T>,
+        frequency: HertzU32,
+        mode: SpiMode,
+        peripheral_clock_control: &mut PeripheralClockControl,
+        clocks: &Clocks,
+    ) -> Spi<'d, T, HalfDuplexMode> {
+        spi.enable_peripheral(peripheral_clock_control);
+
+        let mut spi = Spi {
+            spi,
+            _mode: PhantomData::default(),
+        };
+        spi.spi.setup(frequency, clocks);
+        spi.spi.init();
+        spi.spi.set_data_mode(mode);
+
+        spi
+    }
+
+    pub fn change_bus_frequency(&mut self, frequency: HertzU32, clocks: &Clocks) {
+        self.spi.ch_bus_freq(frequency, clocks);
+    }
+}
+
+impl<T, M> HalfDuplexReadWrite for Spi<'_, T, M>
 where
     T: Instance,
+    M: IsHalfDuplex,
+{
+    type Error = Error;
+
+    fn read(
+        &mut self,
+        data_mode: SpiDataMode,
+        cmd: Command,
+        address: Address,
+        dummy: u8,
+        buffer: &mut [u8],
+    ) -> Result<(), Self::Error> {
+        if buffer.len() > FIFO_SIZE {
+            return Err(Error::FifoSizeExeeded);
+        }
+
+        if buffer.len() == 0 {
+            return Err(Error::Unsupported);
+        }
+
+        self.spi
+            .init_spi_data_mode(cmd.mode(), address.mode(), data_mode);
+        self.spi.read_bytes_half_duplex(cmd, address, dummy, buffer)
+    }
+
+    fn write(
+        &mut self,
+        data_mode: SpiDataMode,
+        cmd: Command,
+        address: Address,
+        dummy: u8,
+        buffer: &[u8],
+    ) -> Result<(), Self::Error> {
+        if buffer.len() > FIFO_SIZE {
+            return Err(Error::FifoSizeExeeded);
+        }
+
+        self.spi
+            .init_spi_data_mode(cmd.mode(), address.mode(), data_mode);
+        self.spi
+            .write_bytes_half_duplex(cmd, address, dummy, buffer)
+    }
+}
+
+impl<T, M> embedded_hal::spi::FullDuplex<u8> for Spi<'_, T, M>
+where
+    T: Instance,
+    M: IsFullDuplex,
 {
     type Error = Error;
 
@@ -235,9 +701,10 @@ where
     }
 }
 
-impl<T> embedded_hal::blocking::spi::Transfer<u8> for Spi<'_, T>
+impl<T, M> embedded_hal::blocking::spi::Transfer<u8> for Spi<'_, T, M>
 where
     T: Instance,
+    M: IsFullDuplex,
 {
     type Error = Error;
 
@@ -246,9 +713,10 @@ where
     }
 }
 
-impl<T> embedded_hal::blocking::spi::Write<u8> for Spi<'_, T>
+impl<T, M> embedded_hal::blocking::spi::Write<u8> for Spi<'_, T, M>
 where
     T: Instance,
+    M: IsFullDuplex,
 {
     type Error = Error;
 
@@ -260,13 +728,25 @@ where
 }
 
 pub mod dma {
-    use core::mem;
+    use core::{marker::PhantomData, mem};
 
     use embedded_dma::{ReadBuffer, WriteBuffer};
 
     #[cfg(any(esp32, esp32s2))]
     use super::Spi3Instance;
-    use super::{Instance, InstanceDma, Spi, Spi2Instance, MAX_DMA_SIZE};
+    use super::{
+        Address,
+        Command,
+        DuplexMode,
+        Instance,
+        InstanceDma,
+        IsFullDuplex,
+        IsHalfDuplex,
+        Spi,
+        Spi2Instance,
+        SpiDataMode,
+        MAX_DMA_SIZE,
+    };
     #[cfg(any(esp32, esp32s2))]
     use crate::dma::Spi3Peripheral;
     use crate::{
@@ -274,85 +754,94 @@ pub mod dma {
         peripheral::PeripheralRef,
     };
 
-    pub trait WithDmaSpi2<'d, T, RX, TX, P>
+    pub trait WithDmaSpi2<'d, T, RX, TX, P, M>
     where
         T: Instance + Spi2Instance,
         TX: Tx,
         RX: Rx,
         P: SpiPeripheral,
+        M: DuplexMode,
     {
-        fn with_dma(self, channel: Channel<TX, RX, P>) -> SpiDma<'d, T, TX, RX, P>;
+        fn with_dma(self, channel: Channel<TX, RX, P>) -> SpiDma<'d, T, TX, RX, P, M>;
     }
 
     #[cfg(any(esp32, esp32s2))]
-    pub trait WithDmaSpi3<'d, T, RX, TX, P>
+    pub trait WithDmaSpi3<'d, T, RX, TX, P, M>
     where
         T: Instance + Spi3Instance,
         TX: Tx,
         RX: Rx,
         P: SpiPeripheral,
+        M: DuplexMode,
     {
-        fn with_dma(self, channel: Channel<TX, RX, P>) -> SpiDma<'d, T, TX, RX, P>;
+        fn with_dma(self, channel: Channel<TX, RX, P>) -> SpiDma<'d, T, TX, RX, P, M>;
     }
 
-    impl<'d, T, RX, TX, P> WithDmaSpi2<'d, T, RX, TX, P> for Spi<'d, T>
+    impl<'d, T, RX, TX, P, M> WithDmaSpi2<'d, T, RX, TX, P, M> for Spi<'d, T, M>
     where
         T: Instance + Spi2Instance,
         TX: Tx,
         RX: Rx,
         P: SpiPeripheral + Spi2Peripheral,
+        M: DuplexMode,
     {
-        fn with_dma(self, mut channel: Channel<TX, RX, P>) -> SpiDma<'d, T, TX, RX, P> {
+        fn with_dma(self, mut channel: Channel<TX, RX, P>) -> SpiDma<'d, T, TX, RX, P, M> {
             channel.tx.init_channel(); // no need to call this for both, TX and RX
 
             SpiDma {
                 spi: self.spi,
                 channel,
+                _mode: PhantomData::default(),
             }
         }
     }
 
     #[cfg(any(esp32, esp32s2))]
-    impl<'d, T, RX, TX, P> WithDmaSpi3<'d, T, RX, TX, P> for Spi<'d, T>
+    impl<'d, T, RX, TX, P, M> WithDmaSpi3<'d, T, RX, TX, P, M> for Spi<'d, T, M>
     where
         T: Instance + Spi3Instance,
         TX: Tx,
         RX: Rx,
         P: SpiPeripheral + Spi3Peripheral,
+        M: DuplexMode,
     {
-        fn with_dma(self, mut channel: Channel<TX, RX, P>) -> SpiDma<'d, T, TX, RX, P> {
+        fn with_dma(self, mut channel: Channel<TX, RX, P>) -> SpiDma<'d, T, TX, RX, P, M> {
             channel.tx.init_channel(); // no need to call this for both, TX and RX
 
             SpiDma {
                 spi: self.spi,
                 channel,
+                _mode: PhantomData::default(),
             }
         }
     }
     /// An in-progress DMA transfer
-    pub struct SpiDmaTransferRxTx<'d, T, TX, RX, P, RBUFFER, TBUFFER>
+    pub struct SpiDmaTransferRxTx<'d, T, TX, RX, P, RBUFFER, TBUFFER, M>
     where
         T: InstanceDma<TX, RX>,
         TX: Tx,
         RX: Rx,
         P: SpiPeripheral,
+        M: DuplexMode,
     {
-        spi_dma: SpiDma<'d, T, TX, RX, P>,
+        spi_dma: SpiDma<'d, T, TX, RX, P, M>,
         rbuffer: RBUFFER,
         tbuffer: TBUFFER,
     }
 
-    impl<'d, T, TX, RX, P, RXBUF, TXBUF> DmaTransferRxTx<RXBUF, TXBUF, SpiDma<'d, T, TX, RX, P>>
-        for SpiDmaTransferRxTx<'d, T, TX, RX, P, RXBUF, TXBUF>
+    impl<'d, T, TX, RX, P, RXBUF, TXBUF, M>
+        DmaTransferRxTx<RXBUF, TXBUF, SpiDma<'d, T, TX, RX, P, M>>
+        for SpiDmaTransferRxTx<'d, T, TX, RX, P, RXBUF, TXBUF, M>
     where
         T: InstanceDma<TX, RX>,
         TX: Tx,
         RX: Rx,
         P: SpiPeripheral,
+        M: DuplexMode,
     {
         /// Wait for the DMA transfer to complete and return the buffers and the
         /// SPI instance.
-        fn wait(mut self) -> (RXBUF, TXBUF, SpiDma<'d, T, TX, RX, P>) {
+        fn wait(mut self) -> (RXBUF, TXBUF, SpiDma<'d, T, TX, RX, P, M>) {
             self.spi_dma.spi.flush().ok(); // waiting for the DMA transfer is not enough
 
             // `DmaTransfer` needs to have a `Drop` implementation, because we accept
@@ -372,12 +861,14 @@ pub mod dma {
         }
     }
 
-    impl<'d, T, TX, RX, P, RXBUF, TXBUF> Drop for SpiDmaTransferRxTx<'d, T, TX, RX, P, RXBUF, TXBUF>
+    impl<'d, T, TX, RX, P, RXBUF, TXBUF, M> Drop
+        for SpiDmaTransferRxTx<'d, T, TX, RX, P, RXBUF, TXBUF, M>
     where
         T: InstanceDma<TX, RX>,
         TX: Tx,
         RX: Rx,
         P: SpiPeripheral,
+        M: DuplexMode,
     {
         fn drop(&mut self) {
             self.spi_dma.spi.flush().ok();
@@ -385,28 +876,30 @@ pub mod dma {
     }
 
     /// An in-progress DMA transfer.
-    pub struct SpiDmaTransfer<'d, T, TX, RX, P, BUFFER>
+    pub struct SpiDmaTransfer<'d, T, TX, RX, P, BUFFER, M>
     where
         T: InstanceDma<TX, RX>,
         TX: Tx,
         RX: Rx,
         P: SpiPeripheral,
+        M: DuplexMode,
     {
-        spi_dma: SpiDma<'d, T, TX, RX, P>,
+        spi_dma: SpiDma<'d, T, TX, RX, P, M>,
         buffer: BUFFER,
     }
 
-    impl<'d, T, TX, RX, P, BUFFER> DmaTransfer<BUFFER, SpiDma<'d, T, TX, RX, P>>
-        for SpiDmaTransfer<'d, T, TX, RX, P, BUFFER>
+    impl<'d, T, TX, RX, P, BUFFER, M> DmaTransfer<BUFFER, SpiDma<'d, T, TX, RX, P, M>>
+        for SpiDmaTransfer<'d, T, TX, RX, P, BUFFER, M>
     where
         T: InstanceDma<TX, RX>,
         TX: Tx,
         RX: Rx,
         P: SpiPeripheral,
+        M: DuplexMode,
     {
         /// Wait for the DMA transfer to complete and return the buffers and the
         /// SPI instance.
-        fn wait(mut self) -> (BUFFER, SpiDma<'d, T, TX, RX, P>) {
+        fn wait(mut self) -> (BUFFER, SpiDma<'d, T, TX, RX, P, M>) {
             self.spi_dma.spi.flush().ok(); // waiting for the DMA transfer is not enough
 
             // `DmaTransfer` needs to have a `Drop` implementation, because we accept
@@ -425,12 +918,13 @@ pub mod dma {
         }
     }
 
-    impl<'d, T, TX, RX, P, BUFFER> Drop for SpiDmaTransfer<'d, T, TX, RX, P, BUFFER>
+    impl<'d, T, TX, RX, P, BUFFER, M> Drop for SpiDmaTransfer<'d, T, TX, RX, P, BUFFER, M>
     where
         T: InstanceDma<TX, RX>,
         TX: Tx,
         RX: Rx,
         P: SpiPeripheral,
+        M: DuplexMode,
     {
         fn drop(&mut self) {
             self.spi_dma.spi.flush().ok();
@@ -438,22 +932,25 @@ pub mod dma {
     }
 
     /// A DMA capable SPI instance.
-    pub struct SpiDma<'d, T, TX, RX, P>
+    pub struct SpiDma<'d, T, TX, RX, P, M>
     where
         TX: Tx,
         RX: Rx,
         P: SpiPeripheral,
+        M: DuplexMode,
     {
         pub(crate) spi: PeripheralRef<'d, T>,
         pub(crate) channel: Channel<TX, RX, P>,
+        _mode: PhantomData<M>,
     }
 
-    impl<'d, T, TX, RX, P> SpiDma<'d, T, TX, RX, P>
+    impl<'d, T, TX, RX, P, M> SpiDma<'d, T, TX, RX, P, M>
     where
         T: InstanceDma<TX, RX>,
         TX: Tx,
         RX: Rx,
         P: SpiPeripheral,
+        M: IsFullDuplex,
     {
         /// Perform a DMA write.
         ///
@@ -463,7 +960,7 @@ pub mod dma {
         pub fn dma_write<TXBUF>(
             mut self,
             words: TXBUF,
-        ) -> Result<SpiDmaTransfer<'d, T, TX, RX, P, TXBUF>, super::Error>
+        ) -> Result<SpiDmaTransfer<'d, T, TX, RX, P, TXBUF, M>, super::Error>
         where
             TXBUF: ReadBuffer<Word = u8>,
         {
@@ -489,7 +986,7 @@ pub mod dma {
         pub fn dma_read<RXBUF>(
             mut self,
             mut words: RXBUF,
-        ) -> Result<SpiDmaTransfer<'d, T, TX, RX, P, RXBUF>, super::Error>
+        ) -> Result<SpiDmaTransfer<'d, T, TX, RX, P, RXBUF, M>, super::Error>
         where
             RXBUF: WriteBuffer<Word = u8>,
         {
@@ -516,7 +1013,7 @@ pub mod dma {
             mut self,
             words: TXBUF,
             mut read_buffer: RXBUF,
-        ) -> Result<SpiDmaTransferRxTx<'d, T, TX, RX, P, RXBUF, TXBUF>, super::Error>
+        ) -> Result<SpiDmaTransferRxTx<'d, T, TX, RX, P, RXBUF, TXBUF, M>, super::Error>
         where
             TXBUF: ReadBuffer<Word = u8>,
             RXBUF: WriteBuffer<Word = u8>,
@@ -544,12 +1041,168 @@ pub mod dma {
         }
     }
 
-    impl<'d, T, TX, RX, P> embedded_hal::blocking::spi::Transfer<u8> for SpiDma<'d, T, TX, RX, P>
+    impl<'d, T, TX, RX, P, M> SpiDma<'d, T, TX, RX, P, M>
     where
         T: InstanceDma<TX, RX>,
         TX: Tx,
         RX: Rx,
         P: SpiPeripheral,
+        M: IsHalfDuplex,
+    {
+        pub fn read<RXBUF>(
+            mut self,
+            data_mode: SpiDataMode,
+            cmd: Command,
+            address: Address,
+            dummy: u8,
+            mut buffer: RXBUF,
+        ) -> Result<SpiDmaTransfer<'d, T, TX, RX, P, RXBUF, M>, super::Error>
+        where
+            RXBUF: WriteBuffer<Word = u8>,
+        {
+            let (ptr, len) = unsafe { buffer.write_buffer() };
+
+            if len > MAX_DMA_SIZE {
+                return Err(super::Error::MaxDmaTransferSizeExceeded);
+            }
+
+            self.spi.init_half_duplex(
+                false,
+                !cmd.is_none(),
+                !address.is_none(),
+                false,
+                dummy != 0,
+                len == 0,
+            );
+            self.spi
+                .init_spi_data_mode(cmd.mode(), address.mode(), data_mode);
+
+            // set cmd, address, dummy cycles
+            let reg_block = self.spi.register_block();
+            if !cmd.is_none() {
+                reg_block.user2.modify(|_, w| {
+                    w.usr_command_bitlen()
+                        .variant((cmd.width() - 1) as u8)
+                        .usr_command_value()
+                        .variant(cmd.value())
+                });
+            }
+
+            #[cfg(not(esp32))]
+            if !address.is_none() {
+                reg_block
+                    .user1
+                    .modify(|_, w| w.usr_addr_bitlen().variant((address.width() - 1) as u8));
+
+                let addr = address.value() << (32 - address.width());
+                reg_block.addr.write(|w| w.usr_addr_value().variant(addr));
+            }
+
+            #[cfg(esp32)]
+            if !address.is_none() {
+                reg_block.user1.modify(|r, w| unsafe {
+                    w.bits(r.bits() & !(0x3f << 26) | (((address.width() - 1) as u32) & 0x3f) << 26)
+                });
+
+                let addr = address.value() << (32 - address.width());
+                reg_block.addr.write(|w| unsafe { w.bits(addr) });
+            }
+
+            if dummy > 0 {
+                reg_block
+                    .user1
+                    .modify(|_, w| w.usr_dummy_cyclelen().variant(dummy - 1));
+            }
+
+            self.spi
+                .start_read_bytes_dma(ptr, len, &mut self.channel.rx)?;
+            Ok(SpiDmaTransfer {
+                spi_dma: self,
+                buffer: buffer,
+            })
+        }
+
+        pub fn write<TXBUF>(
+            mut self,
+            data_mode: SpiDataMode,
+            cmd: Command,
+            address: Address,
+            dummy: u8,
+            buffer: TXBUF,
+        ) -> Result<SpiDmaTransfer<'d, T, TX, RX, P, TXBUF, M>, super::Error>
+        where
+            TXBUF: ReadBuffer<Word = u8>,
+        {
+            let (ptr, len) = unsafe { buffer.read_buffer() };
+
+            if len > MAX_DMA_SIZE {
+                return Err(super::Error::MaxDmaTransferSizeExceeded);
+            }
+
+            self.spi.init_half_duplex(
+                true,
+                !cmd.is_none(),
+                !address.is_none(),
+                false,
+                dummy != 0,
+                len == 0,
+            );
+            self.spi
+                .init_spi_data_mode(cmd.mode(), address.mode(), data_mode);
+
+            // set cmd, address, dummy cycles
+            let reg_block = self.spi.register_block();
+            if !cmd.is_none() {
+                reg_block.user2.modify(|_, w| {
+                    w.usr_command_bitlen()
+                        .variant((cmd.width() - 1) as u8)
+                        .usr_command_value()
+                        .variant(cmd.value())
+                });
+            }
+
+            #[cfg(not(esp32))]
+            if !address.is_none() {
+                reg_block
+                    .user1
+                    .modify(|_, w| w.usr_addr_bitlen().variant((address.width() - 1) as u8));
+
+                let addr = address.value() << (32 - address.width());
+                reg_block.addr.write(|w| w.usr_addr_value().variant(addr));
+            }
+
+            #[cfg(esp32)]
+            if !address.is_none() {
+                reg_block.user1.modify(|r, w| unsafe {
+                    w.bits(r.bits() & !(0x3f << 26) | (((address.width() - 1) as u32) & 0x3f) << 26)
+                });
+
+                let addr = address.value() << (32 - address.width());
+                reg_block.addr.write(|w| unsafe { w.bits(addr) });
+            }
+
+            if dummy > 0 {
+                reg_block
+                    .user1
+                    .modify(|_, w| w.usr_dummy_cyclelen().variant(dummy - 1));
+            }
+
+            self.spi
+                .start_write_bytes_dma(ptr, len, &mut self.channel.tx)?;
+            Ok(SpiDmaTransfer {
+                spi_dma: self,
+                buffer: buffer,
+            })
+        }
+    }
+
+    impl<'d, T, TX, RX, P, M> embedded_hal::blocking::spi::Transfer<u8> for SpiDma<'d, T, TX, RX, P, M>
+    where
+        T: InstanceDma<TX, RX>,
+        TX: Tx,
+        RX: Rx,
+        P: SpiPeripheral,
+        M: IsFullDuplex,
     {
         type Error = super::Error;
 
@@ -559,12 +1212,13 @@ pub mod dma {
         }
     }
 
-    impl<'d, T, TX, RX, P> embedded_hal::blocking::spi::Write<u8> for SpiDma<'d, T, TX, RX, P>
+    impl<'d, T, TX, RX, P, M> embedded_hal::blocking::spi::Write<u8> for SpiDma<'d, T, TX, RX, P, M>
     where
         T: InstanceDma<TX, RX>,
         TX: Tx,
         RX: Rx,
         P: SpiPeripheral,
+        M: IsFullDuplex,
     {
         type Error = super::Error;
 
@@ -579,12 +1233,13 @@ pub mod dma {
     mod asynch {
         use super::*;
 
-        impl<'d, T, TX, RX, P> embedded_hal_async::spi::SpiBusWrite for SpiDma<'d, T, TX, RX, P>
+        impl<'d, T, TX, RX, P, M> embedded_hal_async::spi::SpiBusWrite for SpiDma<'d, T, TX, RX, P, M>
         where
             T: InstanceDma<TX, RX>,
             TX: Tx,
             RX: Rx,
             P: SpiPeripheral,
+            M: IsFullDuplex,
         {
             async fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
                 for chunk in words.chunks(MAX_DMA_SIZE) {
@@ -605,12 +1260,13 @@ pub mod dma {
             }
         }
 
-        impl<'d, T, TX, RX, P> embedded_hal_async::spi::SpiBusFlush for SpiDma<'d, T, TX, RX, P>
+        impl<'d, T, TX, RX, P, M> embedded_hal_async::spi::SpiBusFlush for SpiDma<'d, T, TX, RX, P, M>
         where
             T: InstanceDma<TX, RX>,
             TX: Tx,
             RX: Rx,
             P: SpiPeripheral,
+            M: IsFullDuplex,
         {
             async fn flush(&mut self) -> Result<(), Self::Error> {
                 // TODO use async flush in the future
@@ -618,12 +1274,13 @@ pub mod dma {
             }
         }
 
-        impl<'d, T, TX, RX, P> embedded_hal_async::spi::SpiBusRead for SpiDma<'d, T, TX, RX, P>
+        impl<'d, T, TX, RX, P, M> embedded_hal_async::spi::SpiBusRead for SpiDma<'d, T, TX, RX, P, M>
         where
             T: InstanceDma<TX, RX>,
             TX: Tx,
             RX: Rx,
             P: SpiPeripheral,
+            M: IsFullDuplex,
         {
             async fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
                 self.spi.start_read_bytes_dma(
@@ -638,12 +1295,13 @@ pub mod dma {
             }
         }
 
-        impl<'d, T, TX, RX, P> embedded_hal_async::spi::SpiBus for SpiDma<'d, T, TX, RX, P>
+        impl<'d, T, TX, RX, P, M> embedded_hal_async::spi::SpiBus for SpiDma<'d, T, TX, RX, P, M>
         where
             T: InstanceDma<TX, RX>,
             TX: Tx,
             RX: Rx,
             P: SpiPeripheral,
+            M: IsFullDuplex,
         {
             async fn transfer<'a>(
                 &'a mut self,
@@ -721,24 +1379,29 @@ pub mod dma {
         use embedded_hal_1::spi::{SpiBus, SpiBusFlush, SpiBusRead, SpiBusWrite};
 
         use super::{super::InstanceDma, SpiDma, SpiPeripheral};
-        use crate::dma::{Rx, Tx};
+        use crate::{
+            dma::{Rx, Tx},
+            spi::IsFullDuplex,
+        };
 
-        impl<'d, T, TX, RX, P> embedded_hal_1::spi::ErrorType for SpiDma<'d, T, TX, RX, P>
+        impl<'d, T, TX, RX, P, M> embedded_hal_1::spi::ErrorType for SpiDma<'d, T, TX, RX, P, M>
         where
             T: InstanceDma<TX, RX>,
             TX: Tx,
             RX: Rx,
             P: SpiPeripheral,
+            M: IsFullDuplex,
         {
             type Error = super::super::Error;
         }
 
-        impl<'d, T, TX, RX, P> SpiBusWrite for SpiDma<'d, T, TX, RX, P>
+        impl<'d, T, TX, RX, P, M> SpiBusWrite for SpiDma<'d, T, TX, RX, P, M>
         where
             T: InstanceDma<TX, RX>,
             TX: Tx,
             RX: Rx,
             P: SpiPeripheral,
+            M: IsFullDuplex,
         {
             /// See also: [`write_bytes`].
             fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
@@ -747,12 +1410,13 @@ pub mod dma {
             }
         }
 
-        impl<'d, T, TX, RX, P> SpiBusRead for SpiDma<'d, T, TX, RX, P>
+        impl<'d, T, TX, RX, P, M> SpiBusRead for SpiDma<'d, T, TX, RX, P, M>
         where
             T: InstanceDma<TX, RX>,
             TX: Tx,
             RX: Rx,
             P: SpiPeripheral,
+            M: IsFullDuplex,
         {
             fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
                 self.spi
@@ -761,12 +1425,13 @@ pub mod dma {
             }
         }
 
-        impl<'d, T, TX, RX, P> SpiBus for SpiDma<'d, T, TX, RX, P>
+        impl<'d, T, TX, RX, P, M> SpiBus for SpiDma<'d, T, TX, RX, P, M>
         where
             T: InstanceDma<TX, RX>,
             TX: Tx,
             RX: Rx,
             P: SpiPeripheral,
+            M: IsFullDuplex,
         {
             /// Write out data from `write`, read response into `read`.
             ///
@@ -798,12 +1463,13 @@ pub mod dma {
             }
         }
 
-        impl<'d, T, TX, RX, P> SpiBusFlush for SpiDma<'d, T, TX, RX, P>
+        impl<'d, T, TX, RX, P, M> SpiBusFlush for SpiDma<'d, T, TX, RX, P, M>
         where
             T: InstanceDma<TX, RX>,
             TX: Tx,
             RX: Rx,
             P: SpiPeripheral,
+            M: IsFullDuplex,
         {
             fn flush(&mut self) -> Result<(), Self::Error> {
                 self.spi.flush()
@@ -833,13 +1499,14 @@ mod ehal1 {
     use super::*;
     use crate::gpio::OutputPin;
 
-    impl<T> embedded_hal_1::spi::ErrorType for Spi<'_, T> {
+    impl<T, M> embedded_hal_1::spi::ErrorType for Spi<'_, T, M> {
         type Error = super::Error;
     }
 
-    impl<T> FullDuplex for Spi<'_, T>
+    impl<T, M> FullDuplex for Spi<'_, T, M>
     where
         T: Instance,
+        M: IsFullDuplex,
     {
         fn read(&mut self) -> nb::Result<u8, Self::Error> {
             self.spi.read_byte()
@@ -850,9 +1517,10 @@ mod ehal1 {
         }
     }
 
-    impl<T> SpiBusWrite for Spi<'_, T>
+    impl<T, M> SpiBusWrite for Spi<'_, T, M>
     where
         T: Instance,
+        M: IsFullDuplex,
     {
         /// See also: [`write_bytes`].
         fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
@@ -860,9 +1528,10 @@ mod ehal1 {
         }
     }
 
-    impl<T> SpiBusRead for Spi<'_, T>
+    impl<T, M> SpiBusRead for Spi<'_, T, M>
     where
         T: Instance,
+        M: IsFullDuplex,
     {
         /// See also: [`read_bytes`].
         fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
@@ -870,9 +1539,10 @@ mod ehal1 {
         }
     }
 
-    impl<T> SpiBus for Spi<'_, T>
+    impl<T, M> SpiBus for Spi<'_, T, M>
     where
         T: Instance,
+        M: IsFullDuplex,
     {
         /// Write out data from `write`, read response into `read`.
         ///
@@ -943,9 +1613,10 @@ mod ehal1 {
         }
     }
 
-    impl<T> SpiBusFlush for Spi<'_, T>
+    impl<T, M> SpiBusFlush for Spi<'_, T, M>
     where
         T: Instance,
+        M: IsFullDuplex,
     {
         fn flush(&mut self) -> Result<(), Self::Error> {
             self.spi.flush()
@@ -957,27 +1628,27 @@ mod ehal1 {
     /// Has exclusive access to an SPI bus, which is managed via a `Mutex`. Used
     /// as basis for the [`SpiBusDevice`] implementation. Note that the
     /// wrapped [`RefCell`] is used solely to achieve interior mutability.
-    pub struct SpiBusController<'d, I: Instance> {
-        lock: critical_section::Mutex<RefCell<Spi<'d, I>>>,
+    pub struct SpiBusController<'d, I: Instance, M: IsFullDuplex> {
+        lock: critical_section::Mutex<RefCell<Spi<'d, I, M>>>,
     }
 
-    impl<'d, I: Instance> SpiBusController<'d, I> {
+    impl<'d, I: Instance, M: IsFullDuplex> SpiBusController<'d, I, M> {
         /// Create a new controller from an SPI bus instance.
         ///
         /// Takes ownership of the SPI bus in the process. Afterwards, the SPI
         /// bus can only be accessed via instances of [`SpiBusDevice`].
-        pub fn from_spi(bus: Spi<'d, I>) -> Self {
+        pub fn from_spi(bus: Spi<'d, I, M>) -> Self {
             SpiBusController {
                 lock: critical_section::Mutex::new(RefCell::new(bus)),
             }
         }
 
-        pub fn add_device<'a, CS: OutputPin>(&'a self, cs: CS) -> SpiBusDevice<'a, 'd, I, CS> {
+        pub fn add_device<'a, CS: OutputPin>(&'a self, cs: CS) -> SpiBusDevice<'a, 'd, I, CS, M> {
             SpiBusDevice::new(self, cs)
         }
     }
 
-    impl<'d, I: Instance> ErrorType for SpiBusController<'d, I> {
+    impl<'d, I: Instance, M: IsFullDuplex> ErrorType for SpiBusController<'d, I, M> {
         type Error = spi::ErrorKind;
     }
 
@@ -986,40 +1657,44 @@ mod ehal1 {
     /// Provides device specific access on a shared SPI bus. Enables attaching
     /// multiple SPI devices to the same bus, each with its own CS line, and
     /// performing safe transfers on them.
-    pub struct SpiBusDevice<'a, 'd, I, CS>
+    pub struct SpiBusDevice<'a, 'd, I, CS, M>
     where
         I: Instance,
         CS: OutputPin,
+        M: IsFullDuplex,
     {
-        bus: &'a SpiBusController<'d, I>,
+        bus: &'a SpiBusController<'d, I, M>,
         cs: CS,
     }
 
-    impl<'a, 'd, I, CS> SpiBusDevice<'a, 'd, I, CS>
+    impl<'a, 'd, I, CS, M> SpiBusDevice<'a, 'd, I, CS, M>
     where
         I: Instance,
         CS: OutputPin,
+        M: IsFullDuplex,
     {
-        pub fn new(bus: &'a SpiBusController<'d, I>, mut cs: CS) -> Self {
+        pub fn new(bus: &'a SpiBusController<'d, I, M>, mut cs: CS) -> Self {
             cs.set_to_push_pull_output().set_output_high(true);
             SpiBusDevice { bus, cs }
         }
     }
 
-    impl<'a, 'd, I, CS> ErrorType for SpiBusDevice<'a, 'd, I, CS>
+    impl<'a, 'd, I, CS, M> ErrorType for SpiBusDevice<'a, 'd, I, CS, M>
     where
         I: Instance,
         CS: OutputPin,
+        M: IsFullDuplex,
     {
         type Error = spi::ErrorKind;
     }
 
-    impl<'a, 'd, I, CS> SpiDevice for SpiBusDevice<'a, 'd, I, CS>
+    impl<'a, 'd, I, CS, M> SpiDevice for SpiBusDevice<'a, 'd, I, CS, M>
     where
         I: Instance,
         CS: OutputPin + crate::gpio::OutputPin,
+        M: IsFullDuplex,
     {
-        type Bus = Spi<'d, I>;
+        type Bus = Spi<'d, I, M>;
 
         fn transaction<R>(
             &mut self,
@@ -1333,6 +2008,20 @@ where
 {
 }
 
+pub trait ExtendedInstance: Instance {
+    fn sio0_input_signal(&self) -> InputSignal;
+
+    fn sio1_output_signal(&self) -> OutputSignal;
+
+    fn sio2_output_signal(&self) -> OutputSignal;
+
+    fn sio2_input_signal(&self) -> InputSignal;
+
+    fn sio3_output_signal(&self) -> OutputSignal;
+
+    fn sio3_input_signal(&self) -> InputSignal;
+}
+
 pub trait Instance {
     fn register_block(&self) -> &RegisterBlock;
 
@@ -1348,6 +2037,7 @@ pub trait Instance {
 
     fn spi_num(&self) -> u8;
 
+    /// Initialize for full-duplex 1 bit mode
     fn init(&mut self) {
         let reg_block = self.register_block();
         reg_block.user.modify(|_, w| {
@@ -1389,12 +2079,232 @@ pub trait Instance {
             pcr.spi2_clkm_conf.modify(|_, w| w.spi2_clkm_sel().bits(1));
         }
 
-        reg_block.ctrl.write(|w| unsafe { w.bits(0) });
+        #[cfg(not(any(esp32, esp32s2)))]
+        reg_block.ctrl.modify(|_, w| {
+            w.q_pol()
+                .clear_bit()
+                .d_pol()
+                .clear_bit()
+                .hold_pol()
+                .clear_bit()
+        });
+
+        #[cfg(esp32s2)]
+        reg_block
+            .ctrl
+            .modify(|_, w| w.q_pol().clear_bit().d_pol().clear_bit().wp().clear_bit());
+
+        #[cfg(esp32)]
+        reg_block.ctrl.modify(|_, w| w.wp().clear_bit());
 
         #[cfg(not(esp32))]
         reg_block.misc.write(|w| unsafe { w.bits(0) });
 
         reg_block.slave.write(|w| unsafe { w.bits(0) });
+    }
+
+    #[cfg(not(esp32))]
+    fn init_spi_data_mode(
+        &mut self,
+        cmd_mode: SpiDataMode,
+        address_mode: SpiDataMode,
+        data_mode: SpiDataMode,
+    ) {
+        let reg_block = self.register_block();
+        match cmd_mode {
+            SpiDataMode::Single => reg_block
+                .ctrl
+                .modify(|_, w| w.fcmd_dual().clear_bit().fcmd_quad().clear_bit()),
+            SpiDataMode::Dual => reg_block
+                .ctrl
+                .modify(|_, w| w.fcmd_dual().set_bit().fcmd_quad().clear_bit()),
+            SpiDataMode::Quad => reg_block
+                .ctrl
+                .modify(|_, w| w.fcmd_dual().clear_bit().fcmd_quad().set_bit()),
+        }
+
+        match address_mode {
+            SpiDataMode::Single => reg_block
+                .ctrl
+                .modify(|_, w| w.faddr_dual().clear_bit().faddr_quad().clear_bit()),
+            SpiDataMode::Dual => reg_block
+                .ctrl
+                .modify(|_, w| w.faddr_dual().set_bit().faddr_quad().clear_bit()),
+            SpiDataMode::Quad => reg_block
+                .ctrl
+                .modify(|_, w| w.faddr_dual().clear_bit().faddr_quad().set_bit()),
+        }
+
+        match data_mode {
+            SpiDataMode::Single => {
+                reg_block
+                    .ctrl
+                    .modify(|_, w| w.fread_dual().clear_bit().fread_quad().clear_bit());
+                reg_block
+                    .user
+                    .modify(|_, w| w.fwrite_dual().clear_bit().fwrite_quad().clear_bit());
+            }
+            SpiDataMode::Dual => {
+                reg_block
+                    .ctrl
+                    .modify(|_, w| w.fread_dual().set_bit().fread_quad().clear_bit());
+                reg_block
+                    .user
+                    .modify(|_, w| w.fwrite_dual().set_bit().fwrite_quad().clear_bit());
+            }
+            SpiDataMode::Quad => {
+                reg_block
+                    .ctrl
+                    .modify(|_, w| w.fread_quad().set_bit().fread_dual().clear_bit());
+                reg_block
+                    .user
+                    .modify(|_, w| w.fwrite_quad().set_bit().fwrite_dual().clear_bit());
+            }
+        }
+    }
+
+    #[cfg(esp32)]
+    fn init_spi_data_mode(
+        &mut self,
+        cmd_mode: SpiDataMode,
+        address_mode: SpiDataMode,
+        data_mode: SpiDataMode,
+    ) {
+        let reg_block = self.register_block();
+        match cmd_mode {
+            SpiDataMode::Single => (),
+            _ => panic!("Only 1-bit command supported"),
+        }
+
+        match (address_mode, data_mode) {
+            (SpiDataMode::Single, SpiDataMode::Single) => {
+                reg_block.ctrl.modify(|_, w| {
+                    w.fread_dio()
+                        .clear_bit()
+                        .fread_qio()
+                        .clear_bit()
+                        .fread_dual()
+                        .clear_bit()
+                        .fread_quad()
+                        .clear_bit()
+                });
+
+                reg_block.user.modify(|_, w| {
+                    w.fwrite_dio()
+                        .clear_bit()
+                        .fwrite_qio()
+                        .clear_bit()
+                        .fwrite_dual()
+                        .clear_bit()
+                        .fwrite_quad()
+                        .clear_bit()
+                });
+            }
+            (SpiDataMode::Single, SpiDataMode::Dual) => {
+                reg_block.ctrl.modify(|_, w| {
+                    w.fread_dio()
+                        .clear_bit()
+                        .fread_qio()
+                        .clear_bit()
+                        .fread_dual()
+                        .set_bit()
+                        .fread_quad()
+                        .clear_bit()
+                });
+
+                reg_block.user.modify(|_, w| {
+                    w.fwrite_dio()
+                        .clear_bit()
+                        .fwrite_qio()
+                        .clear_bit()
+                        .fwrite_dual()
+                        .set_bit()
+                        .fwrite_quad()
+                        .clear_bit()
+                });
+            }
+            (SpiDataMode::Single, SpiDataMode::Quad) => {
+                reg_block.ctrl.modify(|_, w| {
+                    w.fread_dio()
+                        .clear_bit()
+                        .fread_qio()
+                        .clear_bit()
+                        .fread_dual()
+                        .clear_bit()
+                        .fread_quad()
+                        .set_bit()
+                });
+
+                reg_block.user.modify(|_, w| {
+                    w.fwrite_dio()
+                        .clear_bit()
+                        .fwrite_qio()
+                        .clear_bit()
+                        .fwrite_dual()
+                        .clear_bit()
+                        .fwrite_quad()
+                        .set_bit()
+                });
+            }
+            (SpiDataMode::Dual, SpiDataMode::Single) => {
+                panic!("Unsupported combination of data-modes")
+            }
+            (SpiDataMode::Dual, SpiDataMode::Dual) => {
+                reg_block.ctrl.modify(|_, w| {
+                    w.fread_dio()
+                        .set_bit()
+                        .fread_qio()
+                        .clear_bit()
+                        .fread_dual()
+                        .clear_bit()
+                        .fread_quad()
+                        .clear_bit()
+                });
+
+                reg_block.user.modify(|_, w| {
+                    w.fwrite_dio()
+                        .set_bit()
+                        .fwrite_qio()
+                        .clear_bit()
+                        .fwrite_dual()
+                        .clear_bit()
+                        .fwrite_quad()
+                        .clear_bit()
+                });
+            }
+            (SpiDataMode::Dual, SpiDataMode::Quad) => {
+                panic!("Unsupported combination of data-modes")
+            }
+            (SpiDataMode::Quad, SpiDataMode::Single) => {
+                panic!("Unsupported combination of data-modes")
+            }
+            (SpiDataMode::Quad, SpiDataMode::Dual) => {
+                panic!("Unsupported combination of data-modes")
+            }
+            (SpiDataMode::Quad, SpiDataMode::Quad) => {
+                reg_block.ctrl.modify(|_, w| {
+                    w.fread_dio()
+                        .clear_bit()
+                        .fread_qio()
+                        .set_bit()
+                        .fread_dual()
+                        .clear_bit()
+                        .fread_quad()
+                        .clear_bit()
+                });
+
+                reg_block.user.modify(|_, w| {
+                    w.fwrite_dio()
+                        .clear_bit()
+                        .fwrite_qio()
+                        .set_bit()
+                        .fwrite_dual()
+                        .clear_bit()
+                        .fwrite_quad()
+                        .clear_bit()
+                });
+            }
+        }
     }
 
     // taken from https://github.com/apache/incubator-nuttx/blob/8267a7618629838231256edfa666e44b5313348e/arch/risc-v/src/esp32c3/esp32c3_spi.c#L496
@@ -1720,6 +2630,191 @@ pub trait Instance {
         Ok(words)
     }
 
+    fn start_operation(&self) {
+        let reg_block = self.register_block();
+        self.update();
+        reg_block.cmd.modify(|_, w| w.usr().set_bit());
+    }
+
+    fn init_half_duplex(
+        &mut self,
+        is_write: bool,
+        command_state: bool,
+        address_state: bool,
+        dummy_idle: bool,
+        dummy_state: bool,
+        no_mosi_miso: bool,
+    ) {
+        let reg_block = self.register_block();
+        reg_block.user.modify(|_, w| {
+            w.usr_miso_highpart()
+                .clear_bit()
+                .usr_miso_highpart()
+                .clear_bit()
+                .doutdin()
+                .clear_bit()
+                .usr_miso()
+                .bit(!is_write && !no_mosi_miso)
+                .usr_mosi()
+                .bit(is_write && !no_mosi_miso)
+                .cs_hold()
+                .set_bit()
+                .usr_dummy_idle()
+                .bit(dummy_idle)
+                .usr_dummy()
+                .bit(dummy_state)
+                .usr_addr()
+                .bit(address_state)
+                .usr_command()
+                .bit(command_state)
+        });
+
+        #[cfg(not(any(esp32, esp32s2)))]
+        reg_block.clk_gate.modify(|_, w| {
+            w.clk_en()
+                .set_bit()
+                .mst_clk_active()
+                .set_bit()
+                .mst_clk_sel()
+                .set_bit()
+        });
+
+        #[cfg(esp32c6)]
+        unsafe {
+            let pcr = &*esp32c6::PCR::PTR;
+
+            // use default clock source PLL_F80M_CLK
+            pcr.spi2_clkm_conf.modify(|_, w| w.spi2_clkm_sel().bits(1));
+        }
+
+        #[cfg(not(esp32))]
+        reg_block.misc.write(|w| unsafe { w.bits(0) });
+
+        reg_block.slave.write(|w| unsafe { w.bits(0) });
+
+        self.update();
+    }
+
+    fn write_bytes_half_duplex(
+        &mut self,
+        cmd: crate::spi::Command,
+        address: crate::spi::Address,
+        dummy: u8,
+        buffer: &[u8],
+    ) -> Result<(), Error> {
+        self.init_half_duplex(
+            true,
+            !cmd.is_none(),
+            !address.is_none(),
+            false,
+            dummy != 0,
+            buffer.len() == 0,
+        );
+
+        // set cmd, address, dummy cycles
+        let reg_block = self.register_block();
+        if !cmd.is_none() {
+            reg_block.user2.modify(|_, w| {
+                w.usr_command_bitlen()
+                    .variant((cmd.width() - 1) as u8)
+                    .usr_command_value()
+                    .variant(cmd.value())
+            });
+        }
+
+        #[cfg(not(esp32))]
+        if !address.is_none() {
+            reg_block
+                .user1
+                .modify(|_, w| w.usr_addr_bitlen().variant((address.width() - 1) as u8));
+
+            let addr = address.value() << (32 - address.width());
+            reg_block.addr.write(|w| w.usr_addr_value().variant(addr));
+        }
+
+        #[cfg(esp32)]
+        if !address.is_none() {
+            reg_block.user1.modify(|r, w| unsafe {
+                w.bits(r.bits() & !(0x3f << 26) | (((address.width() - 1) as u32) & 0x3f) << 26)
+            });
+
+            let addr = address.value() << (32 - address.width());
+            reg_block.addr.write(|w| unsafe { w.bits(addr) });
+        }
+
+        if dummy > 0 {
+            reg_block
+                .user1
+                .modify(|_, w| w.usr_dummy_cyclelen().variant(dummy - 1));
+        }
+
+        if buffer.len() > 0 {
+            // re-using the full-duplex write here
+            self.write_bytes(buffer)?;
+        } else {
+            self.start_operation();
+        }
+
+        self.flush()
+    }
+
+    fn read_bytes_half_duplex(
+        &mut self,
+        cmd: crate::spi::Command,
+        address: crate::spi::Address,
+        dummy: u8,
+        buffer: &mut [u8],
+    ) -> Result<(), Error> {
+        self.init_half_duplex(
+            false,
+            !cmd.is_none(),
+            !address.is_none(),
+            false,
+            dummy != 0,
+            buffer.len() == 0,
+        );
+
+        // set cmd, address, dummy cycles
+        let reg_block = self.register_block();
+        if !cmd.is_none() {
+            reg_block.user2.modify(|_, w| {
+                w.usr_command_bitlen()
+                    .variant((cmd.width() - 1) as u8)
+                    .usr_command_value()
+                    .variant(cmd.value())
+            });
+        }
+
+        #[cfg(not(esp32))]
+        if !address.is_none() {
+            reg_block
+                .user1
+                .modify(|_, w| w.usr_addr_bitlen().variant((address.width() - 1) as u8));
+
+            let addr = address.value() << (32 - address.width());
+            reg_block.addr.write(|w| w.usr_addr_value().variant(addr));
+        }
+
+        #[cfg(esp32)]
+        if !address.is_none() {
+            reg_block.user1.modify(|r, w| unsafe {
+                w.bits(r.bits() & !(0x3f << 26) | (((address.width() - 1) as u32) & 0x3f) << 26)
+            });
+
+            let addr = address.value() << (32 - address.width());
+            reg_block.addr.write(|w| unsafe { w.bits(addr) });
+        }
+
+        if dummy > 0 {
+            reg_block
+                .user1
+                .modify(|_, w| w.usr_dummy_cyclelen().variant(dummy - 1));
+        }
+
+        // re-using the full-duplex read which does dummy writes which is okay
+        self.read_bytes(buffer)
+    }
+
     #[cfg(not(any(esp32, esp32s2)))]
     fn update(&self) {
         let reg_block = self.register_block();
@@ -1738,21 +2833,22 @@ pub trait Instance {
 
     fn configure_datalen(&self, len: u32) {
         let reg_block = self.register_block();
+        let len = if len > 0 { len - 1 } else { 0 };
 
         #[cfg(any(esp32c2, esp32c3, esp32c6, esp32s3))]
         reg_block
             .ms_dlen
-            .write(|w| unsafe { w.ms_data_bitlen().bits(len - 1) });
+            .write(|w| unsafe { w.ms_data_bitlen().bits(len) });
 
         #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32s3)))]
         {
             reg_block
                 .mosi_dlen
-                .write(|w| unsafe { w.usr_mosi_dbitlen().bits(len - 1) });
+                .write(|w| unsafe { w.usr_mosi_dbitlen().bits(len) });
 
             reg_block
                 .miso_dlen
-                .write(|w| unsafe { w.usr_miso_dbitlen().bits(len - 1) });
+                .write(|w| unsafe { w.usr_miso_dbitlen().bits(len) });
         }
     }
 }
@@ -1795,6 +2891,39 @@ impl Instance for crate::peripherals::SPI2 {
     }
 }
 
+#[cfg(any(esp32c2, esp32c3, esp32c6))]
+impl ExtendedInstance for crate::peripherals::SPI2 {
+    #[inline(always)]
+    fn sio0_input_signal(&self) -> InputSignal {
+        InputSignal::FSPID
+    }
+
+    #[inline(always)]
+    fn sio1_output_signal(&self) -> OutputSignal {
+        OutputSignal::FSPIQ
+    }
+
+    #[inline(always)]
+    fn sio2_output_signal(&self) -> OutputSignal {
+        OutputSignal::FSPIWP
+    }
+
+    #[inline(always)]
+    fn sio2_input_signal(&self) -> InputSignal {
+        InputSignal::FSPIWP
+    }
+
+    #[inline(always)]
+    fn sio3_output_signal(&self) -> OutputSignal {
+        OutputSignal::FSPIHD
+    }
+
+    #[inline(always)]
+    fn sio3_input_signal(&self) -> InputSignal {
+        InputSignal::FSPIHD
+    }
+}
+
 #[cfg(any(esp32))]
 impl Instance for crate::peripherals::SPI2 {
     #[inline(always)]
@@ -1830,6 +2959,33 @@ impl Instance for crate::peripherals::SPI2 {
     #[inline(always)]
     fn spi_num(&self) -> u8 {
         2
+    }
+}
+
+#[cfg(any(esp32))]
+impl ExtendedInstance for crate::peripherals::SPI2 {
+    fn sio0_input_signal(&self) -> InputSignal {
+        InputSignal::HSPID
+    }
+
+    fn sio1_output_signal(&self) -> OutputSignal {
+        OutputSignal::HSPIQ
+    }
+
+    fn sio2_output_signal(&self) -> OutputSignal {
+        OutputSignal::HSPIWP
+    }
+
+    fn sio2_input_signal(&self) -> InputSignal {
+        InputSignal::HSPIWP
+    }
+
+    fn sio3_output_signal(&self) -> OutputSignal {
+        OutputSignal::HSPIHD
+    }
+
+    fn sio3_input_signal(&self) -> InputSignal {
+        InputSignal::HSPIHD
     }
 }
 
@@ -1910,6 +3066,39 @@ impl Instance for crate::peripherals::SPI2 {
 }
 
 #[cfg(any(esp32s2, esp32s3))]
+impl ExtendedInstance for crate::peripherals::SPI2 {
+    #[inline(always)]
+    fn sio0_input_signal(&self) -> InputSignal {
+        InputSignal::FSPID
+    }
+
+    #[inline(always)]
+    fn sio1_output_signal(&self) -> OutputSignal {
+        OutputSignal::FSPIQ
+    }
+
+    #[inline(always)]
+    fn sio2_output_signal(&self) -> OutputSignal {
+        OutputSignal::FSPIWP
+    }
+
+    #[inline(always)]
+    fn sio2_input_signal(&self) -> InputSignal {
+        InputSignal::FSPIWP
+    }
+
+    #[inline(always)]
+    fn sio3_output_signal(&self) -> OutputSignal {
+        OutputSignal::FSPIHD
+    }
+
+    #[inline(always)]
+    fn sio3_input_signal(&self) -> InputSignal {
+        InputSignal::FSPIHD
+    }
+}
+
+#[cfg(any(esp32s2, esp32s3))]
 impl Instance for crate::peripherals::SPI3 {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
@@ -1944,6 +3133,39 @@ impl Instance for crate::peripherals::SPI3 {
     #[inline(always)]
     fn spi_num(&self) -> u8 {
         3
+    }
+}
+
+#[cfg(esp32s3)]
+impl ExtendedInstance for crate::peripherals::SPI3 {
+    #[inline(always)]
+    fn sio0_input_signal(&self) -> InputSignal {
+        InputSignal::SPI3_D
+    }
+
+    #[inline(always)]
+    fn sio1_output_signal(&self) -> OutputSignal {
+        OutputSignal::SPI3_Q
+    }
+
+    #[inline(always)]
+    fn sio2_output_signal(&self) -> OutputSignal {
+        OutputSignal::SPI3_WP
+    }
+
+    #[inline(always)]
+    fn sio2_input_signal(&self) -> InputSignal {
+        InputSignal::SPI3_WP
+    }
+
+    #[inline(always)]
+    fn sio3_output_signal(&self) -> OutputSignal {
+        OutputSignal::SPI3_HD
+    }
+
+    #[inline(always)]
+    fn sio3_input_signal(&self) -> InputSignal {
+        InputSignal::SPI3_HD
     }
 }
 
