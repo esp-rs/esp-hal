@@ -22,13 +22,13 @@ ERROR(riscv-rt): the start of the REGION_STACK must be 4-byte aligned");
 ASSERT(_stext % 4 == 0, "
 ERROR(riscv-rt): `_stext` must be 4-byte aligned");
 
-ASSERT(_sdata % 4 == 0 && _edata % 4 == 0, "
+ASSERT(_data_start % 4 == 0 && _data_end % 4 == 0, "
 BUG(riscv-rt): .data is not 4-byte aligned");
 
 ASSERT(_sidata % 4 == 0, "
 BUG(riscv-rt): the LMA of .data is not 4-byte aligned");
 
-ASSERT(_sbss % 4 == 0 && _ebss % 4 == 0, "
+ASSERT(_bss_start % 4 == 0 && _bss_end % 4 == 0, "
 BUG(riscv-rt): .bss is not 4-byte aligned");
 
 ASSERT(_sheap % 4 == 0, "
