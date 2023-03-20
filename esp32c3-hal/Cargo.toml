@@ -83,3 +83,7 @@ opt-level = 1
 [[example]]
 name              = "embassy_spi"
 required-features = ["embassy", "async"]
+
+
+[profile.release]
+debug = true

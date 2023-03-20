@@ -84,16 +84,16 @@ SECTIONS
   _rodata_size = _erodata - _srodata + 8;
   .data ORIGIN(RAM) : AT(_text_size + _rodata_size)
   {
-    _sdata = .;
+    _data_start = .;
     /* Must be called __global_pointer$ for linker relaxations to work. */
     PROVIDE(__global_pointer$ = . + 0x800);
     *(.sdata .sdata.* .sdata2 .sdata2.*);
     *(.data .data.*);
     . = ALIGN(4);
-    _edata = .;
+    _data_end = .;
   } > REGION_DATA
 
-  _data_size = _edata - _sdata + 8;
+  _data_size = _data_end - _data_start + 8;
   .rwtext ORIGIN(REGION_RWTEXT) + _data_size : AT(_text_size + _rodata_size + _data_size){
     _srwtext = .;
     *(.rwtext);
@@ -134,10 +134,10 @@ SECTIONS
 
   .bss (NOLOAD) :
   {
-    _sbss = .;
+    _bss_start = .;
     *(.sbss .sbss.* .bss .bss.*);
     . = ALIGN(4);
-    _ebss = .;
+    _bss_end = .;
   } > REGION_BSS
 
   /* ### .uninit */
@@ -207,13 +207,13 @@ ERROR(riscv-rt): the start of the REGION_STACK must be 4-byte aligned");
 ASSERT(_stext % 4 == 0, "
 ERROR(riscv-rt): `_stext` must be 4-byte aligned");
 
-ASSERT(_sdata % 4 == 0 && _edata % 4 == 0, "
+ASSERT(_data_start % 4 == 0 && _data_end % 4 == 0, "
 BUG(riscv-rt): .data is not 4-byte aligned");
 
 ASSERT(_sidata % 4 == 0, "
 BUG(riscv-rt): the LMA of .data is not 4-byte aligned");
 
-ASSERT(_sbss % 4 == 0 && _ebss % 4 == 0, "
+ASSERT(_bss_start % 4 == 0 && _bss_end % 4 == 0, "
 BUG(riscv-rt): .bss is not 4-byte aligned");
 
 ASSERT(_sheap % 4 == 0, "
