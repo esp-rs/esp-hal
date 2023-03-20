@@ -37,7 +37,7 @@ fn main() {
         .write_all(include_bytes!("ld/db-memory.x"))
         .unwrap();
 
-    File::create(out.join("esp32s3.x"))
+    File::create(out.join("link-esp32s3.x"))
         .unwrap()
         .write_all(include_bytes!("ld/db-esp32s3.x"))
         .unwrap();
