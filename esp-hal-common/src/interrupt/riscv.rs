@@ -14,6 +14,7 @@
 
 use esp_riscv_rt::riscv::register::{mcause, mepc, mtvec};
 pub use esp_riscv_rt::TrapFrame;
+use crate::riscv;
 
 use crate::{
     peripherals::{self, Interrupt},
@@ -565,6 +566,36 @@ mod vectored {
 /// # Safety
 ///
 /// This function is called from an assembly trap handler.
+/// # Safety
+///
+/// This function is called from an assembly trap handler.
+#[cfg(not(esp32c6))]
+#[doc(hidden)]
+#[export_name = "set_prio"]
+unsafe fn handle_priority()->u32{
+    let interrupt_id:usize = mcause::read().bits() & 0x0FFFFFFF; //MSB is whether its exception or interrupt.
+    let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
+    let interrupt_priority =  intr.cpu_int_pri_0.as_ptr().offset(interrupt_id as isize).read_volatile();
+    let prev_interrupt_priority = intr.cpu_int_thresh.read().bits();
+    intr.cpu_int_thresh.write(|w| w.bits(interrupt_priority + 1)); //set the prio threshold to 1 more than current interrupt prio
+    unsafe{
+        riscv::interrupt::enable();
+    }
+    prev_interrupt_priority
+    //panic!();
+        
+
+}
+#[cfg(not(esp32c6))]
+#[doc(hidden)]
+#[export_name = "restore_prio"]
+unsafe fn restore_priority(stored_prio:u32){
+    let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
+    intr.cpu_int_thresh.write(|w| w.bits(stored_prio)); //set the prio threshold to 1 more than current interrupt prio
+    //panic!();
+        
+
+}
 #[doc(hidden)]
 #[link_section = ".trap.rust"]
 #[export_name = "_start_trap_rust_hal"]
