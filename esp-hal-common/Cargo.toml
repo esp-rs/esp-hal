@@ -95,3 +95,6 @@ embassy-time-timg0   = []
 # Architecture-specific features (intended for internal use)
 riscv  = ["critical-section/restore-state-u8",  "procmacros/riscv", "esp-riscv-rt", "riscv-atomic-emulation-trap"]
 xtensa = ["critical-section/restore-state-u32", "procmacros/xtensa"]
+
+[patch.crates-io]
+esp-riscv-rt = {git = 'https://github.com/onsdagens/esp-riscv-rt', branch='scaled_back'}
