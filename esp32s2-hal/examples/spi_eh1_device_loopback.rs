@@ -24,10 +24,8 @@ use esp32s2_hal::{
     gpio::IO,
     peripherals::Peripherals,
     prelude::*,
-    rt,
     spi::{Spi, SpiBusController, SpiMode},
     timer::TimerGroup,
-    trapframe,
     Delay,
     Rtc,
 };
