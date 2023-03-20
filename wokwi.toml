@@ -1,5 +1,0 @@
-[wokwi]
-version = 1
-elf = "esp32c3-hal/target/riscv32imc-unknown-none-elf/debug/examples/hello_world"
-firmware = "esp32c3-hal/target/riscv32imc-unknown-none-elf/debug/examples/hello_world"
-gdbServerPort=3333
