@@ -16,7 +16,7 @@ use esp32s2_hal::{
     pdma::*,
     peripherals::Peripherals,
     prelude::*,
-    spi::{dma::SpiDma, Spi, SpiMode},
+    spi::{dma::SpiDma, FullDuplexMode, Spi, SpiMode},
     timer::TimerGroup,
     Rtc,
     IO,
@@ -39,6 +39,7 @@ pub type SpiType<'d> = SpiDma<
     ChannelTx<'d, Spi2DmaChannelTxImpl, Spi2DmaChannel>,
     ChannelRx<'d, Spi2DmaChannelRxImpl, Spi2DmaChannel>,
     Spi2DmaSuitablePeripheral,
+    FullDuplexMode,
 >;
 
 #[embassy_executor::task]

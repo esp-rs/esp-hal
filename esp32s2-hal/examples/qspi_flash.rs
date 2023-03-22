@@ -21,12 +21,13 @@ use esp32s2_hal::{
     clock::ClockControl,
     dma::DmaPriority,
     gpio::IO,
+    pdma::Dma,
     peripherals::Peripherals,
     prelude::*,
     spi::{Address, Command, Spi, SpiDataMode, SpiMode},
     timer::TimerGroup,
     Delay,
-    Rtc, pdma::Dma,
+    Rtc,
 };
 use esp_backtrace as _;
 use esp_println::{print, println};
