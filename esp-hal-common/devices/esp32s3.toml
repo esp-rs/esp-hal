@@ -61,4 +61,11 @@ peripherals = [
     "adc",
     "gdma",
     "radio",
+
+    # Wakeup SOC based on ESP-IDF:
+    "SOC_PM_SUPPORT_EXT_WAKEUP",
+    "SOC_PM_SUPPORT_TOUCH_SENSOR_WAKEUP",
+    "SOC_PM_SUPPORT_WIFI_WAKEUP",
+    "SOC_PM_SUPPORT_BT_WAKEUP",
+    "SOC_RISCV_COPROC_SUPPORTED",
 ]
