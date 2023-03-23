@@ -85,6 +85,7 @@ SECTIONS {
   .rwdata_dummy (NOLOAD) : {
     . = ALIGN(ALIGNOF(.rwtext));
     . = . + SIZEOF(.rwtext);
+    . = . + SIZEOF(.rwtext.wifi);
   } > RWDATA
 }
 INSERT BEFORE .data;
