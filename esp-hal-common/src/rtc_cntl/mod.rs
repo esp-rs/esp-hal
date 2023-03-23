@@ -14,6 +14,7 @@ use crate::peripherals::LP_WDT;
 use crate::peripherals::{RTC_CNTL, TIMG0};
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
+    reset::{SleepSource, WakeupReason},
     Cpu,
 };
 
@@ -752,7 +753,77 @@ pub fn get_reset_reason(cpu: Cpu) -> Option<SocResetReason> {
     reason
 }
 
-pub fn get_wakeup_cause() -> u32 {
-    let cause = unsafe { rtc_get_wakeup_cause() };
-    cause
+pub fn get_wakeup_cause() -> SleepSource {
+
+    // FIXME: check s_light_sleep_wakeup
+    // https://github.com/espressif/esp-idf/blob/afbdb0f3ef195ab51690a64e22bfb8a5cd487914/components/esp_hw_support/sleep_modes.c#L1394
+    if get_reset_reason(Cpu::ProCpu).unwrap() != SocResetReason::CoreDeepSleep {
+        return SleepSource::WakeupUndefined;
+    }
+
+    #[cfg(esp32c6)]
+    let wakeup_cause = unsafe {
+        (&*crate::peripherals::PMU::PTR)
+            .slp_wakeup_status0
+            .read()
+            .wakeup_cause()
+            .bits()
+    };
+    #[cfg(not(any(esp32, esp32c6)))]
+    let wakeup_cause = unsafe {
+        (&*RTC_CNTL::PTR)
+            .slp_wakeup_cause
+            .read()
+            .wakeup_cause()
+            .bits()
+    };
+    #[cfg(esp32)]
+    let wakeup_cause =
+        unsafe { (&*RTC_CNTL::PTR).wakeup_state.read().wakeup_cause().bits() as u32 };
+
+    if (wakeup_cause & WakeupReason::TimerTrigEn as u32) == 0 {
+        return SleepSource::WakeupTimer;
+    }
+    if (wakeup_cause & WakeupReason::GpioTrigEn as u32) == 0 {
+        return SleepSource::WakeupGpio;
+    }
+    if (wakeup_cause & (WakeupReason::Uart0TrigEn as u32 | WakeupReason::Uart1TrigEn as u32)) == 0 {
+        return SleepSource::WakeupUart;
+    }
+
+    #[cfg(all(SOC_PM_SUPPORT_EXT_WAKEUP, not(any(esp32c2, esp32c3))))]
+    if (wakeup_cause & WakeupReason::ExtEvent0Trig as u32) == 0 {
+        return SleepSource::WakeupExt0;
+    } else if (wakeup_cause & WakeupReason::ExtEvent1Trig as u32) == 0 {
+        return SleepSource::WakeupExt1;
+    }
+
+    #[cfg(all(SOC_PM_SUPPORT_TOUCH_SENSOR_WAKEUP, not(any(esp32c2, esp32c3))))]
+    if (wakeup_cause & WakeupReason::TouchTrigEn as u32) == 0 {
+        return SleepSource::WakeupTouchPad;
+    }
+
+    #[cfg(all(SOC_PM_SUPPORT_TOUCH_SENSOR_WAKEUP, not(any(esp32c2, esp32c3))))]
+    if (wakeup_cause & WakeupReason::UlpTrigEn as u32) == 0 {
+        return SleepSource::WakeupUlp;
+    }
+
+    #[cfg(SOC_PM_SUPPORT_WIFI_WAKEUP)]
+    if (wakeup_cause & WakeupReason::WifiTrigEn as u32) == 0 {
+        return SleepSource::WakeupWifi;
+    }
+
+    #[cfg(SOC_PM_SUPPORT_BT_WAKEUP)]
+    if (wakeup_cause & WakeupReason::BtTrigEn as u32) == 0 {
+        return SleepSource::WakeupBT;
+    }
+
+    #[cfg(all(SOC_RISCV_COPROC_SUPPORTED, esp32s2))]
+    if (wakeup_cause & WakeupReason::CocpuTrigEn as u32) == 0 {
+        return SleepSource::WakeupUlp;
+    } else if (wakeup_cause & WakeupReason::CocpuTrapTrigEn as u32) == 0 {
+        return SleepSource::WakeupCocpuTrapTrig;
+    }
+
+    return SleepSource::WakeupUndefined;
 }

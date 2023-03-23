@@ -99,9 +99,9 @@ pub mod prelude;
 pub mod pulse_control;
 #[cfg(radio)]
 pub mod radio;
+pub mod reset;
 #[cfg(rng)]
 pub mod rng;
-pub mod reset;
 pub mod rom;
 #[cfg(any(lp_clkrst, rtc_cntl))]
 pub mod rtc_cntl;
