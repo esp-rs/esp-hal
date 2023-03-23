@@ -30,9 +30,10 @@ pub enum SleepSource {
     WakeupBT,
 }
 
+#[allow(unused)]
 pub(crate) enum WakeupReason {
     NoSleep           = 0,
-    #[cfg(not(any(esp32c2, esp32c3)))]
+    #[cfg(not(any(esp32c2, esp32c3, esp32c6)))]
     /// EXT0 GPIO wakeup
     ExtEvent0Trig     = 1 << 0,
     #[cfg(not(any(esp32c2, esp32c3)))]
@@ -59,15 +60,14 @@ pub(crate) enum WakeupReason {
     UlpTrigEn         = 1 << 9,
     /// BT wakeup (light sleep only)
     BtTrigEn          = 1 << 10,
-    #[cfg(esp32s2)]
+    #[cfg(any(esp32s2, esp32s3))]
     CocpuTrigEn       = 1 << 11,
     #[cfg(not(esp32))]
     Xtal32kDeadTrigEn = 1 << 12,
-    #[cfg(esp32s2)]
+    #[cfg(any(esp32s2, esp32s3))]
     CocpuTrapTrigEn   = 1 << 13,
     #[cfg(not(esp32))]
     UsbTrigEn         = 1 << 14,
-    // #[cfg(not(any(esp32, esp32s2, esp32s3)))]
     #[cfg(esp32c3)]
     BrownoutDetTrigEn = 1 << 16,
 }

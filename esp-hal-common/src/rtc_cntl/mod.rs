@@ -754,7 +754,6 @@ pub fn get_reset_reason(cpu: Cpu) -> Option<SocResetReason> {
 }
 
 pub fn get_wakeup_cause() -> SleepSource {
-
     // FIXME: check s_light_sleep_wakeup
     // https://github.com/espressif/esp-idf/blob/afbdb0f3ef195ab51690a64e22bfb8a5cd487914/components/esp_hw_support/sleep_modes.c#L1394
     if get_reset_reason(Cpu::ProCpu).unwrap() != SocResetReason::CoreDeepSleep {
@@ -791,19 +790,19 @@ pub fn get_wakeup_cause() -> SleepSource {
         return SleepSource::WakeupUart;
     }
 
-    #[cfg(all(SOC_PM_SUPPORT_EXT_WAKEUP, not(any(esp32c2, esp32c3))))]
+    #[cfg(SOC_PM_SUPPORT_EXT_WAKEUP)]
     if (wakeup_cause & WakeupReason::ExtEvent0Trig as u32) == 0 {
         return SleepSource::WakeupExt0;
     } else if (wakeup_cause & WakeupReason::ExtEvent1Trig as u32) == 0 {
         return SleepSource::WakeupExt1;
     }
 
-    #[cfg(all(SOC_PM_SUPPORT_TOUCH_SENSOR_WAKEUP, not(any(esp32c2, esp32c3))))]
+    #[cfg(SOC_PM_SUPPORT_TOUCH_SENSOR_WAKEUP)]
     if (wakeup_cause & WakeupReason::TouchTrigEn as u32) == 0 {
         return SleepSource::WakeupTouchPad;
     }
 
-    #[cfg(all(SOC_PM_SUPPORT_TOUCH_SENSOR_WAKEUP, not(any(esp32c2, esp32c3))))]
+    #[cfg(SOC_ULP_SUPPORTED)]
     if (wakeup_cause & WakeupReason::UlpTrigEn as u32) == 0 {
         return SleepSource::WakeupUlp;
     }
@@ -818,7 +817,7 @@ pub fn get_wakeup_cause() -> SleepSource {
         return SleepSource::WakeupBT;
     }
 
-    #[cfg(all(SOC_RISCV_COPROC_SUPPORTED, esp32s2))]
+    #[cfg(SOC_RISCV_COPROC_SUPPORTED)]
     if (wakeup_cause & WakeupReason::CocpuTrigEn as u32) == 0 {
         return SleepSource::WakeupUlp;
     } else if (wakeup_cause & WakeupReason::CocpuTrapTrigEn as u32) == 0 {
