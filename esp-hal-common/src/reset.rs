@@ -33,43 +33,36 @@ pub enum SleepSource {
 #[allow(unused)]
 pub(crate) enum WakeupReason {
     NoSleep           = 0,
-    #[cfg(not(any(esp32c2, esp32c3, esp32c6)))]
+    #[cfg(pm_support_ext0_wakeup)]
     /// EXT0 GPIO wakeup
     ExtEvent0Trig     = 1 << 0,
-    #[cfg(not(any(esp32c2, esp32c3)))]
+    #[cfg(pm_support_ext1_wakeup)]
     /// EXT1 GPIO wakeup
     ExtEvent1Trig     = 1 << 1,
     /// GPIO wakeup (light sleep only)
     GpioTrigEn        = 1 << 2,
     /// Timer wakeup
     TimerTrigEn       = 1 << 3,
-    #[cfg(not(any(esp32c2, esp32c3)))]
-    /// SDIO wakeup (light sleep only)
-    SdioTrigEn        = 1 << 4,
+    #[cfg(pm_support_wifi_wakeup)]
     /// MAC wakeup (light sleep only)
     WifiTrigEn        = 1 << 5,
     /// UART0 wakeup (light sleep only)
     Uart0TrigEn       = 1 << 6,
     /// UART1 wakeup (light sleep only)
     Uart1TrigEn       = 1 << 7,
-    #[cfg(not(any(esp32c2, esp32c3)))]
+    #[cfg(pm_support_touch_sensor_wakeup)]
     /// Touch wakeup
     TouchTrigEn       = 1 << 8,
-    #[cfg(not(any(esp32c2, esp32c3)))]
+    #[cfg(ulp_supported)]
     /// ULP wakeup
     UlpTrigEn         = 1 << 9,
+    #[cfg(pm_support_bt_wakeup)]
     /// BT wakeup (light sleep only)
     BtTrigEn          = 1 << 10,
-    #[cfg(any(esp32s2, esp32s3))]
+    #[cfg(riscv_coproc_supported)]
     CocpuTrigEn       = 1 << 11,
-    #[cfg(not(esp32))]
-    Xtal32kDeadTrigEn = 1 << 12,
-    #[cfg(any(esp32s2, esp32s3))]
+    #[cfg(riscv_coproc_supported)]
     CocpuTrapTrigEn   = 1 << 13,
-    #[cfg(not(esp32))]
-    UsbTrigEn         = 1 << 14,
-    #[cfg(esp32c3)]
-    BrownoutDetTrigEn = 1 << 16,
 }
 
 pub fn software_reset() {
