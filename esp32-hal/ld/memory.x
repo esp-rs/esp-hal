@@ -19,7 +19,16 @@ MEMORY
 
   reserved_for_rom_seg   : ORIGIN = 0x3FFAE000, len = 8k /* SRAM2; reserved for usage by the ROM */
   dram_seg ( RW )        : ORIGIN = 0x3FFB0000 + RESERVE_DRAM, len = 176k - RESERVE_DRAM /* SRAM2+1; first 64kB used by BT if enable */
-  reserved_for_boot_seg  : ORIGIN = 0x3FFDC200, len = 144k /* SRAM1; reserved for static ROM usage; can be used for heap */
+  
+  /* 
+  * The following values come from the heap allocator in esp-idf: https://github.com/espressif/esp-idf/blob/ab63aaa4a24a05904da2862d627f3987ecbeafd0/components/heap/port/esp32/memory_layout.c#L137-L157
+  * The segment dram2_seg after the rom data space is not mentioned in the esp32 linker scripts in esp-idf, instead the space after is used as heap space.
+  * It seems not all rom data space is reserved, but only "core"/"important" ROM functions that may be called after booting from ROM.
+  */
+  reserved_rom_data_pro  : ORIGIN = 0X3FFE0000, len = 1088
+  reserved_rom_data_app  : ORIGIN = 0X3FFE3F20, len = 1072
+
+  dram2_seg              : ORIGIN = 0x3FFE4350, len = 111k /* the rest of DRAM after the rom data segments in the middle */
 
   /* external flash 
      The 0x20 offset is a convenience for the app binary image generation.
