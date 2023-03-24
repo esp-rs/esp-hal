@@ -3,7 +3,7 @@ use embedded_hal::watchdog::{Watchdog, WatchdogDisable, WatchdogEnable};
 use fugit::HertzU32;
 use fugit::MicrosDurationU64;
 
-use self::rtc::SocResetReason;
+pub use self::rtc::SocResetReason;
 #[cfg(not(esp32c6))]
 use crate::clock::{Clock, XtalClock};
 #[cfg(not(esp32))]
@@ -14,6 +14,7 @@ use crate::peripherals::LP_WDT;
 use crate::peripherals::{RTC_CNTL, TIMG0};
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
+    reset::{SleepSource, WakeupReason},
     Cpu,
 };
 
@@ -37,6 +38,9 @@ extern "C" {
     #[allow(dead_code)]
     fn ets_delay_us(us: u32);
     fn rtc_get_reset_reason(cpu_num: u32) -> u32;
+    fn rtc_get_wakeup_cause() -> u32;
+    pub fn software_reset_cpu();
+    pub fn software_reset();
 }
 
 #[cfg(not(esp32c6))]
@@ -747,4 +751,80 @@ pub fn get_reset_reason(cpu: Cpu) -> Option<SocResetReason> {
     let reason = SocResetReason::from_repr(reason as usize);
 
     reason
+}
+
+pub fn get_wakeup_cause() -> SleepSource {
+    // FIXME: check s_light_sleep_wakeup
+    // https://github.com/espressif/esp-idf/blob/afbdb0f3ef195ab51690a64e22bfb8a5cd487914/components/esp_hw_support/sleep_modes.c#L1394
+    if get_reset_reason(Cpu::ProCpu).unwrap() != SocResetReason::CoreDeepSleep {
+        return SleepSource::Undefined;
+    }
+
+    #[cfg(esp32c6)]
+    let wakeup_cause = unsafe {
+        (&*crate::peripherals::PMU::PTR)
+            .slp_wakeup_status0
+            .read()
+            .wakeup_cause()
+            .bits()
+    };
+    #[cfg(not(any(esp32, esp32c6)))]
+    let wakeup_cause = unsafe {
+        (&*RTC_CNTL::PTR)
+            .slp_wakeup_cause
+            .read()
+            .wakeup_cause()
+            .bits()
+    };
+    #[cfg(esp32)]
+    let wakeup_cause =
+        unsafe { (&*RTC_CNTL::PTR).wakeup_state.read().wakeup_cause().bits() as u32 };
+
+    if (wakeup_cause & WakeupReason::TimerTrigEn as u32) == 0 {
+        return SleepSource::Timer;
+    }
+    if (wakeup_cause & WakeupReason::GpioTrigEn as u32) == 0 {
+        return SleepSource::Gpio;
+    }
+    if (wakeup_cause & (WakeupReason::Uart0TrigEn as u32 | WakeupReason::Uart1TrigEn as u32)) == 0 {
+        return SleepSource::Uart;
+    }
+
+    #[cfg(pm_support_ext0_wakeup)]
+    if (wakeup_cause & WakeupReason::ExtEvent0Trig as u32) == 0 {
+        return SleepSource::Ext0;
+    }
+    #[cfg(pm_support_ext1_wakeup)]
+    if (wakeup_cause & WakeupReason::ExtEvent1Trig as u32) == 0 {
+        return SleepSource::Ext1;
+    }
+
+    #[cfg(pm_support_touch_sensor_wakeup)]
+    if (wakeup_cause & WakeupReason::TouchTrigEn as u32) == 0 {
+        return SleepSource::TouchPad;
+    }
+
+    #[cfg(ulp_supported)]
+    if (wakeup_cause & WakeupReason::UlpTrigEn as u32) == 0 {
+        return SleepSource::Ulp;
+    }
+
+    #[cfg(pm_support_wifi_wakeup)]
+    if (wakeup_cause & WakeupReason::WifiTrigEn as u32) == 0 {
+        return SleepSource::Wifi;
+    }
+
+    #[cfg(pm_support_bt_wakeup)]
+    if (wakeup_cause & WakeupReason::BtTrigEn as u32) == 0 {
+        return SleepSource::BT;
+    }
+
+    #[cfg(riscv_coproc_supported)]
+    if (wakeup_cause & WakeupReason::CocpuTrigEn as u32) == 0 {
+        return SleepSource::Ulp;
+    } else if (wakeup_cause & WakeupReason::CocpuTrapTrigEn as u32) == 0 {
+        return SleepSource::CocpuTrapTrig;
+    }
+
+    return SleepSource::Undefined;
 }

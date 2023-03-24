@@ -73,4 +73,12 @@ peripherals = [
     "large_intr_status",
     "plic",
     "radio",
+
+    # Wakeup SOC based on ESP-IDF:
+    "pm_support_wifi_wakeup",
+    "pm_support_beacon_wakeup",
+    "pm_support_bt_wakeup",
+    "gpio_support_deepsleep_wakeup",
+    "uart_support_wakeup_int",
+    "pm_support_ext1_wakeup",
 ]

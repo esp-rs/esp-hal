@@ -99,6 +99,7 @@ pub mod prelude;
 pub mod pulse_control;
 #[cfg(radio)]
 pub mod radio;
+pub mod reset;
 #[cfg(rng)]
 pub mod rng;
 pub mod rom;
