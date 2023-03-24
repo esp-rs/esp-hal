@@ -293,6 +293,41 @@ pub struct Dma {
     _private: (),
 }
 
+pub enum RadioPeripherals {
+    #[cfg(phy)]
+    Phy,
+    #[cfg(bt)]
+    Bt,
+    #[cfg(wifi)]
+    Wifi,
+    #[cfg(ieee802154)]
+    Ieee802154,
+}
+
+pub struct RadioClockControl {
+    _private: (),
+}
+
+/// Control the radio peripheral clocks
+pub trait RadioClockContoller {
+    /// Enable the peripheral
+    fn enable(&mut self, peripheral: RadioPeripherals);
+
+    /// Disable the peripheral
+    fn disable(&mut self, peripheral: RadioPeripherals);
+
+    /// Reset the MAC
+    fn reset_mac(&mut self);
+
+    /// Do any common initial initialization needed
+    fn init_clocks(&mut self);
+
+    /// Initialize BLE RTC clocks
+    fn ble_rtc_clk_init(&mut self);
+
+    fn reset_rpa(&mut self);
+}
+
 /// The SYSTEM/DPORT splitted into it's different logical parts.
 pub struct SystemParts<'d> {
     _private: PeripheralRef<'d, SystemPeripheral>,
@@ -301,6 +336,7 @@ pub struct SystemParts<'d> {
     pub cpu_control: CpuControl,
     #[cfg(pdma)]
     pub dma: Dma,
+    pub radio_clock_control: RadioClockControl,
 }
 
 /// Extension trait to split a SYSTEM/DPORT peripheral in independent logical
@@ -323,6 +359,7 @@ impl<'d, T: crate::peripheral::Peripheral<P = SystemPeripheral> + 'd> SystemExt<
             cpu_control: CpuControl { _private: () },
             #[cfg(pdma)]
             dma: Dma { _private: () },
+            radio_clock_control: RadioClockControl { _private: () },
         }
     }
 }
