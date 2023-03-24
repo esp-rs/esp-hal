@@ -46,7 +46,7 @@ We recommend using [cargo-generate] and [esp-template] in order to generate a ne
 
 ```bash
 $ cargo install cargo-generate
-$ cargo generate --git https://github.com/esp-rs/esp-template
+$ cargo generate -a esp-rs/esp-template
 ```
 
 For more information on using this template, please refer to [its README].
