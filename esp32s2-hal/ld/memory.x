@@ -28,13 +28,6 @@ MEMORY
 
   dram_seg ( RW )        : ORIGIN = 0x3FFB0000 + RESERVE_CACHES + VECTORS_SIZE, len = 192k - RESERVE_CACHES - VECTORS_SIZE
 
-  /* SRAM1; reserved for static ROM usage; can be used for heap.
-     Length based on the "_dram0_rtos_reserved_start" symbol from IDF used to delimit the
-     ROM data reserved region:
-     https://github.com/espressif/esp-idf/blob/bcb34ca7aef4e8d3b97d75ad069b960fb1c17c16/components/heap/port/esp32s2/memory_layout.c#L121-L122
-  */
-  reserved_for_boot_seg  : ORIGIN = 0x3FFE0000, len = 0x1FA10
-
   /* external flash 
      The 0x20 offset is a convenience for the app binary image generation.
      Flash cache has 64KB pages. The .bin file which is flashed to the chip
