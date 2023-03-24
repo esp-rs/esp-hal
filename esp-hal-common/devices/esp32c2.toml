@@ -36,8 +36,8 @@ peripherals = [
     "radio",
 
     # Wakeup SOC based on ESP-IDF:
-    "SOC_PM_SUPPORT_WIFI_WAKEUP",
-    "SOC_PM_SUPPORT_BT_WAKEUP",
-    "SOC_GPIO_SUPPORT_DEEPSLEEP_WAKEUP",
-    "SOC_UART_SUPPORT_WAKEUP_INT",
+    "pm_support_wifi_wakeup",
+    "pm_support_bt_wakeup",
+    "uart_support_wakeup_int",
+    "gpio_support_deepsleep_wakeup",
 ]

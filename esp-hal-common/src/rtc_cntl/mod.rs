@@ -757,7 +757,7 @@ pub fn get_wakeup_cause() -> SleepSource {
     // FIXME: check s_light_sleep_wakeup
     // https://github.com/espressif/esp-idf/blob/afbdb0f3ef195ab51690a64e22bfb8a5cd487914/components/esp_hw_support/sleep_modes.c#L1394
     if get_reset_reason(Cpu::ProCpu).unwrap() != SocResetReason::CoreDeepSleep {
-        return SleepSource::WakeupUndefined;
+        return SleepSource::Undefined;
     }
 
     #[cfg(esp32c6)]
@@ -781,48 +781,50 @@ pub fn get_wakeup_cause() -> SleepSource {
         unsafe { (&*RTC_CNTL::PTR).wakeup_state.read().wakeup_cause().bits() as u32 };
 
     if (wakeup_cause & WakeupReason::TimerTrigEn as u32) == 0 {
-        return SleepSource::WakeupTimer;
+        return SleepSource::Timer;
     }
     if (wakeup_cause & WakeupReason::GpioTrigEn as u32) == 0 {
-        return SleepSource::WakeupGpio;
+        return SleepSource::Gpio;
     }
     if (wakeup_cause & (WakeupReason::Uart0TrigEn as u32 | WakeupReason::Uart1TrigEn as u32)) == 0 {
-        return SleepSource::WakeupUart;
+        return SleepSource::Uart;
     }
 
-    #[cfg(SOC_PM_SUPPORT_EXT_WAKEUP)]
+    #[cfg(pm_support_ext0_wakeup)]
     if (wakeup_cause & WakeupReason::ExtEvent0Trig as u32) == 0 {
-        return SleepSource::WakeupExt0;
-    } else if (wakeup_cause & WakeupReason::ExtEvent1Trig as u32) == 0 {
-        return SleepSource::WakeupExt1;
+        return SleepSource::Ext0;
+    }
+    #[cfg(pm_support_ext1_wakeup)]
+    if (wakeup_cause & WakeupReason::ExtEvent1Trig as u32) == 0 {
+        return SleepSource::Ext1;
     }
 
-    #[cfg(SOC_PM_SUPPORT_TOUCH_SENSOR_WAKEUP)]
+    #[cfg(pm_support_touch_sensor_wakeup)]
     if (wakeup_cause & WakeupReason::TouchTrigEn as u32) == 0 {
-        return SleepSource::WakeupTouchPad;
+        return SleepSource::TouchPad;
     }
 
-    #[cfg(SOC_ULP_SUPPORTED)]
+    #[cfg(ulp_supported)]
     if (wakeup_cause & WakeupReason::UlpTrigEn as u32) == 0 {
-        return SleepSource::WakeupUlp;
+        return SleepSource::Ulp;
     }
 
-    #[cfg(SOC_PM_SUPPORT_WIFI_WAKEUP)]
+    #[cfg(pm_support_wifi_wakeup)]
     if (wakeup_cause & WakeupReason::WifiTrigEn as u32) == 0 {
-        return SleepSource::WakeupWifi;
+        return SleepSource::Wifi;
     }
 
-    #[cfg(SOC_PM_SUPPORT_BT_WAKEUP)]
+    #[cfg(pm_support_bt_wakeup)]
     if (wakeup_cause & WakeupReason::BtTrigEn as u32) == 0 {
-        return SleepSource::WakeupBT;
+        return SleepSource::BT;
     }
 
-    #[cfg(SOC_RISCV_COPROC_SUPPORTED)]
+    #[cfg(riscv_coproc_supported)]
     if (wakeup_cause & WakeupReason::CocpuTrigEn as u32) == 0 {
-        return SleepSource::WakeupUlp;
+        return SleepSource::Ulp;
     } else if (wakeup_cause & WakeupReason::CocpuTrapTrigEn as u32) == 0 {
-        return SleepSource::WakeupCocpuTrapTrig;
+        return SleepSource::CocpuTrapTrig;
     }
 
-    return SleepSource::WakeupUndefined;
+    return SleepSource::Undefined;
 }

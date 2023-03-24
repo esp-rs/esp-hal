@@ -2,32 +2,32 @@ use crate::rtc_cntl::SocResetReason;
 
 pub enum SleepSource {
     /// In case of deep sleep, reset was not caused by exit from deep sleep
-    WakeupUndefined = 0,
+    Undefined = 0,
     /// Not a wakeup cause, used to disable all wakeup sources with
     /// esp_sleep_disable_wakeup_source
-    WakeupAll,
+    All,
     /// Wakeup caused by external signal using RTC_IO
-    WakeupExt0,
+    Ext0,
     /// Wakeup caused by external signal using RTC_CNTL
-    WakeupExt1,
+    Ext1,
     /// Wakeup caused by timer
-    WakeupTimer,
+    Timer,
     /// Wakeup caused by touchpad
-    WakeupTouchPad,
+    TouchPad,
     /// Wakeup caused by ULP program
-    WakeupUlp,
+    Ulp,
     /// Wakeup caused by GPIO (light sleep only on ESP32, S2 and S3)
-    WakeupGpio,
+    Gpio,
     /// Wakeup caused by UART (light sleep only)
-    WakeupUart,
+    Uart,
     /// Wakeup caused by WIFI (light sleep only)
-    WakeupWifi,
+    Wifi,
     /// Wakeup caused by COCPU int
-    WakeupCocpu,
+    Cocpu,
     /// Wakeup caused by COCPU crash
-    WakeupCocpuTrapTrig,
+    CocpuTrapTrig,
     /// Wakeup caused by BT (light sleep only)
-    WakeupBT,
+    BT,
 }
 
 #[allow(unused)]
