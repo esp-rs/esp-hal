@@ -36,7 +36,7 @@ INCLUDE "rtc_slow.x"
 INCLUDE "external.x"
 /* End of Shared sections */
 
-_heap_end = ABSOLUTE(ORIGIN(dram_seg))+LENGTH(dram_seg)-LENGTH(reserved_for_boot_seg) - STACK_SIZE;
+_heap_end = ABSOLUTE(ORIGIN(dram_seg))+LENGTH(dram_seg) - STACK_SIZE;
 
 _stack_start_cpu0 = _heap_end;
 _stack_end_cpu0 = _stack_start_cpu0 + STACK_SIZE;
