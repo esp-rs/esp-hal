@@ -1,4 +1,4 @@
-use crate::system::{RadioClockContoller, RadioClockControl, RadioPeripherals};
+use crate::system::{RadioClockControl, RadioClockController, RadioPeripherals};
 
 // Mask for clock bits used by both WIFI and Bluetooth, 0, 1, 2, 3, 7, 8, 9, 10,
 // 19, 20, 21, 22, 23
@@ -7,7 +7,7 @@ const SYSTEM_WIFI_CLK_WIFI_BT_COMMON_M: u32 = 0x78078F;
 // from experiments `0x00FB9FCF` is not enough for esp-wifi to work
 const SYSTEM_WIFI_CLK_EN: u32 = 0xFFFFFFFF;
 
-impl RadioClockContoller for RadioClockControl {
+impl RadioClockController for RadioClockControl {
     fn enable(&mut self, peripheral: RadioPeripherals) {
         match peripheral {
             RadioPeripherals::Phy => enable_phy(),

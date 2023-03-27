@@ -1,6 +1,6 @@
-use crate::system::{RadioClockContoller, RadioClockControl, RadioPeripherals};
+use crate::system::{RadioClockControl, RadioClockController, RadioPeripherals};
 
-impl RadioClockContoller for RadioClockControl {
+impl RadioClockController for RadioClockControl {
     fn enable(&mut self, peripheral: RadioPeripherals) {
         match peripheral {
             RadioPeripherals::Phy => enable_phy(),

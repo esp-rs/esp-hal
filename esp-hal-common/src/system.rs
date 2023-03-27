@@ -309,7 +309,7 @@ pub struct RadioClockControl {
 }
 
 /// Control the radio peripheral clocks
-pub trait RadioClockContoller {
+pub trait RadioClockController {
     /// Enable the peripheral
     fn enable(&mut self, peripheral: RadioPeripherals);
 
