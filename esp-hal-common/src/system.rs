@@ -54,6 +54,12 @@ pub enum Peripheral {
     Twai0,
     #[cfg(twai1)]
     Twai1,
+    #[cfg(timg0)]
+    Timg0,
+    #[cfg(timg1)]
+    Timg1,
+    // #[cfg(lp_wdt)]
+    // Wdt,
 }
 
 /// Controls the enablement of peripheral clocks.
@@ -190,6 +196,26 @@ impl PeripheralClockControl {
                 perip_clk_en1.modify(|_, w| w.crypto_aes_clk_en().set_bit());
                 perip_rst_en1.modify(|_, w| w.crypto_aes_rst().clear_bit());
             }
+            #[cfg(timg0)]
+            Peripheral::Timg0 => {
+                #[cfg(any(esp32c3, esp32s2, esp32s3))]
+                perip_clk_en0.modify(|_, w| w.timers_clk_en().set_bit());
+                perip_clk_en0.modify(|_, w| w.timergroup_clk_en().set_bit());
+
+                #[cfg(any(esp32c3, esp32s2, esp32s3))]
+                perip_rst_en0.modify(|_, w| w.timers_rst().clear_bit());
+                perip_rst_en0.modify(|_, w| w.timergroup_rst().clear_bit());
+            }
+            #[cfg(timg1)]
+            Peripheral::Timg1 => {
+                #[cfg(any(esp32c3, esp32s2, esp32s3))]
+                perip_clk_en0.modify(|_, w| w.timers_clk_en().set_bit());
+                perip_clk_en0.modify(|_, w| w.timergroup1_clk_en().set_bit());
+
+                #[cfg(any(esp32c3, esp32s2, esp32s3))]
+                perip_rst_en0.modify(|_, w| w.timers_rst().clear_bit());
+                perip_rst_en0.modify(|_, w| w.timergroup1_rst().clear_bit());
+            }
         }
     }
 }
@@ -272,6 +298,20 @@ impl PeripheralClockControl {
             Peripheral::Pcnt => {
                 system.pcnt_conf.modify(|_, w| w.pcnt_clk_en().set_bit());
                 system.pcnt_conf.modify(|_, w| w.pcnt_rst_en().clear_bit());
+            }
+            #[cfg(timg0)]
+            Peripheral::Timg0 => {
+                system.timergroup0_timer_clk_conf
+                .write(|w| w.tg0_timer_clk_en().set_bit());
+                system.timergroup0_timer_clk_conf
+                .write(|w| unsafe { w.tg0_timer_clk_sel().bits(1) });
+            }
+            #[cfg(timg1)]
+            Peripheral::Timg1 => {
+                system.timergroup1_timer_clk_conf
+                .write(|w| w.tg1_timer_clk_en().set_bit());
+                system.timergroup1_timer_clk_conf
+                .write(|w| unsafe { w.tg1_timer_clk_sel().bits(1) });
             }
         }
     }

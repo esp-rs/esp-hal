@@ -18,6 +18,7 @@ use crate::{
     clock::Clocks,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{timg0::RegisterBlock, TIMG0},
+    system::PeripheralClockControl,
 };
 
 /// Custom timer error type
@@ -64,7 +65,7 @@ impl<'d, T> TimerGroup<'d, T>
 where
     T: TimerGroupInstance,
 {
-    pub fn new(timer_group: impl Peripheral<P = T> + 'd, clocks: &Clocks) -> Self {
+    pub fn new(timer_group: impl Peripheral<P = T> + 'd, clocks: &Clocks, peripheral_clock_control: &mut PeripheralClockControl) -> Self {
         crate::into_ref!(timer_group);
 
         let timer0 = Timer::new(
@@ -72,6 +73,7 @@ where
                 phantom: PhantomData::default(),
             },
             clocks.apb_clock,
+            peripheral_clock_control
         );
 
         #[cfg(not(any(esp32c2, esp32c3, esp32c6)))]
@@ -80,6 +82,7 @@ where
                 phantom: PhantomData::default(),
             },
             clocks.apb_clock,
+            peripheral_clock_control
         );
 
         let wdt = Wdt::new();
@@ -106,31 +109,16 @@ where
     T: Instance,
 {
     /// Create a new timer instance
-    pub fn new(timg: T, apb_clk_freq: HertzU32) -> Self {
+    pub fn new(timg: T, apb_clk_freq: HertzU32, peripheral_clock_control: &mut PeripheralClockControl) -> Self {
         // TODO: this currently assumes APB_CLK is being used, as we don't yet have a
         //       way to select the XTAL_CLK.
-        #[cfg(esp32c6)]
-        Self::enable_clock();
+        timg.enable_peripheral(peripheral_clock_control);
         Self { timg, apb_clk_freq }
     }
 
     /// Return the raw interface to the underlying timer instance
     pub fn free(self) -> T {
         self.timg
-    }
-
-    #[cfg(esp32c6)]
-    fn enable_clock() {
-        let pcr = unsafe { &*crate::peripherals::PCR::ptr() };
-        pcr.timergroup0_timer_clk_conf
-            .write(|w| w.tg0_timer_clk_en().set_bit());
-        pcr.timergroup0_timer_clk_conf
-            .write(|w| unsafe { w.tg0_timer_clk_sel().bits(1) });
-
-        pcr.timergroup1_timer_clk_conf
-            .write(|w| w.tg1_timer_clk_en().set_bit());
-        pcr.timergroup1_timer_clk_conf
-            .write(|w| unsafe { w.tg1_timer_clk_sel().bits(1) });
     }
 }
 
@@ -185,6 +173,8 @@ pub trait Instance {
     fn set_divider(&mut self, divider: u16);
 
     fn is_interrupt_set(&self) -> bool;
+
+    fn enable_peripheral(&self, peripheral_clock_control: &mut PeripheralClockControl);
 }
 
 pub struct Timer0<TG> {
@@ -327,6 +317,10 @@ where
         reg_block
             .t0config
             .modify(|_, w| unsafe { w.divider().bits(divider) })
+    }
+
+    fn enable_peripheral(&self, peripheral_clock_control: &mut PeripheralClockControl) {
+        peripheral_clock_control.enable(crate::system::Peripheral::Timg0);
     }
 }
 
@@ -473,6 +467,10 @@ where
             .t1config
             .modify(|_, w| unsafe { w.divider().bits(divider) })
     }
+
+    fn enable_peripheral(&self, peripheral_clock_control: &mut PeripheralClockControl) {
+        peripheral_clock_control.enable(crate::system::Peripheral::Timg1);
+    }
 }
 
 fn timeout_to_ticks<T, F>(timeout: T, clock: F, divider: u32) -> u64
@@ -573,6 +571,10 @@ where
         }
     }
 
+/*
+pcr.timergroup0_timer_clk_conf
+    //         .write(|w| w.tg0_timer_clk_en().set_bit());
+ */
     #[cfg(esp32c6)]
     fn enable_clock() {
         let pcr = unsafe { &*crate::peripherals::PCR::ptr() };

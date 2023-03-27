@@ -23,7 +23,7 @@ fn main() -> ! {
     let system = peripherals.DPORT.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks, &mut system.peripheral_clock_control);
     let mut timer0 = timer_group0.timer0;
     let mut wdt = timer_group0.wdt;
     let mut serial0 = Uart::new(peripherals.UART0);
