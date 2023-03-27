@@ -10,6 +10,7 @@ use crate::{
 #[cfg_attr(esp32c2, path = "clocks_ll/esp32c2.rs")]
 #[cfg_attr(esp32c3, path = "clocks_ll/esp32c3.rs")]
 #[cfg_attr(esp32c6, path = "clocks_ll/esp32c6.rs")]
+#[cfg_attr(esp32h2, path = "clocks_ll/esp32h2.rs")]
 #[cfg_attr(esp32s2, path = "clocks_ll/esp32s2.rs")]
 #[cfg_attr(esp32s3, path = "clocks_ll/esp32s3.rs")]
 pub(crate) mod clocks_ll;
@@ -426,6 +427,26 @@ impl<'d> ClockControl<'d> {
                 crypto_clock: HertzU32::MHz(160),
             },
         }
+    }
+}
+
+#[cfg(esp32h2)]
+impl<'d> ClockControl<'d> {
+    /// Use what is considered the default settings after boot.
+    #[allow(unused)]
+    pub fn boot_defaults(
+        clock_control: impl Peripheral<P = SystemClockControl> + 'd,
+    ) -> ClockControl<'d> {
+        todo!()
+    }
+
+    /// Configure the CPU clock speed.
+    #[allow(unused)]
+    pub fn configure(
+        clock_control: impl Peripheral<P = SystemClockControl> + 'd,
+        cpu_clock_speed: CpuClock,
+    ) -> ClockControl<'d> {
+        todo!()
     }
 }
 

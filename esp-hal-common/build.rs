@@ -88,7 +88,9 @@ struct Config {
 fn main() {
     // NOTE: update when adding new device support!
     // Ensure that exactly one chip has been specified:
-    assert_unique_used_features!("esp32", "esp32c2", "esp32c3", "esp32c6", "esp32s2", "esp32s3");
+    assert_unique_used_features!(
+        "esp32", "esp32c2", "esp32c3", "esp32c6", "esp32h2", "esp32s2", "esp32s3"
+    );
 
     // Handle the features for the ESP32's different crystal frequencies:
     #[cfg(feature = "esp32")]
@@ -112,6 +114,8 @@ fn main() {
         "esp32c3"
     } else if cfg!(feature = "esp32c6") {
         "esp32c6"
+    } else if cfg!(feature = "esp32h2") {
+        "esp32h2"
     } else if cfg!(feature = "esp32s2") {
         "esp32s2"
     } else if cfg!(feature = "esp32s3") {

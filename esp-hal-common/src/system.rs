@@ -13,9 +13,9 @@ use crate::peripheral::PeripheralRef;
 
 #[cfg(esp32)]
 type SystemPeripheral = crate::peripherals::DPORT;
-#[cfg(esp32c6)]
+#[cfg(any(esp32c6, esp32h2))]
 type SystemPeripheral = crate::peripherals::PCR;
-#[cfg(not(any(esp32, esp32c6)))]
+#[cfg(not(any(esp32, esp32c6, esp32h2)))]
 type SystemPeripheral = crate::peripherals::SYSTEM;
 
 /// Peripherals which can be enabled via [PeripheralClockControl]
@@ -74,7 +74,7 @@ pub struct PeripheralClockControl {
     _private: (),
 }
 
-#[cfg(not(esp32c6))]
+#[cfg(not(any(esp32c6, esp32h2)))]
 impl PeripheralClockControl {
     /// Enables and resets the given peripheral
     pub fn enable(&mut self, peripheral: Peripheral) {
@@ -399,6 +399,16 @@ impl PeripheralClockControl {
                     .modify(|_, w| w.uart1_rst_en().clear_bit());
             }
         }
+    }
+}
+
+#[cfg(esp32h2)]
+impl PeripheralClockControl {
+    /// Enables and resets the given peripheral
+    pub fn enable(&mut self, peripheral: Peripheral) {
+        let system = unsafe { &*SystemPeripheral::PTR };
+
+        todo!()
     }
 }
 
