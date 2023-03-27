@@ -9,9 +9,8 @@ SECTIONS {
     _rodata_end = ABSOLUTE(.);
   } > RODATA
 
-  .rodata.wifi :
+  .rodata.wifi : ALIGN(4)
   {
-    . = ALIGN(4);
     *( .rodata_wlog_*.* )
   } > RODATA
 }
