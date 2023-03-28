@@ -72,27 +72,3 @@ pub(crate) unsafe extern "C" fn set_intr(
     // configured in `setup_timer_isr` and messing with the interrupts will
     // get us into trouble
 }
-
-pub(crate) unsafe extern "C" fn wifi_clock_enable() {
-    trace!("wifi_clock_enable");
-
-    const SYSCON_WIFI_CLK_EN_REG: *mut u32 = (0x60026000 + 0x14) as *mut u32;
-    const SYSTEM_WIFI_CLK_WIFI_EN_M: u32 = 0;
-    const SYSTEM_CORE_RST_EN_REG: *mut u32 = (0x60026000 + 0x18) as *mut u32;
-
-    SYSCON_WIFI_CLK_EN_REG
-        .write_volatile(SYSCON_WIFI_CLK_EN_REG.read_volatile() | SYSTEM_WIFI_CLK_WIFI_EN_M);
-    SYSTEM_CORE_RST_EN_REG.write_volatile(SYSTEM_CORE_RST_EN_REG.read_volatile() & !0);
-}
-
-pub(crate) unsafe extern "C" fn wifi_clock_disable() {
-    trace!("wifi_clock_disable");
-
-    const SYSCON_WIFI_CLK_EN_REG: *mut u32 = (0x60026000 + 0x14) as *mut u32;
-    const SYSTEM_WIFI_CLK_WIFI_EN_M: u32 = 0;
-    const SYSTEM_CORE_RST_EN_REG: *mut u32 = (0x60026000 + 0x18) as *mut u32;
-
-    SYSCON_WIFI_CLK_EN_REG
-        .write_volatile(SYSCON_WIFI_CLK_EN_REG.read_volatile() & !SYSTEM_WIFI_CLK_WIFI_EN_M);
-    SYSTEM_CORE_RST_EN_REG.write_volatile(SYSTEM_CORE_RST_EN_REG.read_volatile() | 0);
-}

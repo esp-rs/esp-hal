@@ -1,4 +1,6 @@
 use crate::binary::include::esp_bt_controller_config_t;
+use crate::common_adapter::RADIO_CLOCKS;
+use crate::hal::system::RadioClockController;
 
 pub(crate) static mut ISR_INTERRUPT_4: (
     *mut crate::binary::c_types::c_void,
@@ -96,115 +98,14 @@ pub(super) unsafe extern "C" fn esp_intr_alloc(
 }
 
 pub(super) fn ble_rtc_clk_init() {
-    /*
-    // modem_clkrst_reg
-    // LP_TIMER_SEL_XTAL32K -> 0
-    // LP_TIMER_SEL_XTAL -> 1
-    // LP_TIMER_SEL_8M -> 0
-    // LP_TIMER_SEL_RTC_SLOW -> 0
-    SET_PERI_REG_BITS(MODEM_CLKRST_MODEM_LP_TIMER_CONF_REG, 1, 0, MODEM_CLKRST_LP_TIMER_SEL_XTAL32K_S);
-    SET_PERI_REG_BITS(MODEM_CLKRST_MODEM_LP_TIMER_CONF_REG, 1, 1, MODEM_CLKRST_LP_TIMER_SEL_XTAL_S);
-    SET_PERI_REG_BITS(MODEM_CLKRST_MODEM_LP_TIMER_CONF_REG, 1, 0, MODEM_CLKRST_LP_TIMER_SEL_8M_S);
-    SET_PERI_REG_BITS(MODEM_CLKRST_MODEM_LP_TIMER_CONF_REG, 1, 0, MODEM_CLKRST_LP_TIMER_SEL_RTC_SLOW_S);
-
-    #ifdef CONFIG_XTAL_FREQ_26
-        // LP_TIMER_CLK_DIV_NUM -> 130
-        SET_PERI_REG_BITS(MODEM_CLKRST_MODEM_LP_TIMER_CONF_REG, MODEM_CLKRST_LP_TIMER_CLK_DIV_NUM, 129, MODEM_CLKRST_LP_TIMER_CLK_DIV_NUM_S);
-    #else
-        // LP_TIMER_CLK_DIV_NUM -> 250
-        SET_PERI_REG_BITS(MODEM_CLKRST_MODEM_LP_TIMER_CONF_REG, MODEM_CLKRST_LP_TIMER_CLK_DIV_NUM, 249, MODEM_CLKRST_LP_TIMER_CLK_DIV_NUM_S);
-    #endif // CONFIG_XTAL_FREQ_26
-
-    // MODEM_CLKRST_ETM_CLK_ACTIVE -> 1
-    // MODEM_CLKRST_ETM_CLK_SEL -> 0
-    SET_PERI_REG_BITS(MODEM_CLKRST_ETM_CLK_CONF_REG, 1, 1, MODEM_CLKRST_ETM_CLK_ACTIVE_S);
-    SET_PERI_REG_BITS(MODEM_CLKRST_ETM_CLK_CONF_REG, 1, 0, MODEM_CLKRST_ETM_CLK_SEL_S);
-    */
-
-    const MODEM_CLKRST_MODEM_LP_TIMER_CONF_REG: u32 = DR_REG_MODEM_CLKRST_BASE + 0x4;
-    const DR_REG_MODEM_CLKRST_BASE: u32 = 0x6004d800;
-    const MODEM_CLKRST_LP_TIMER_SEL_XTAL32K_S: u32 = 3;
-    const MODEM_CLKRST_LP_TIMER_SEL_XTAL_S: u32 = 2;
-    const MODEM_CLKRST_LP_TIMER_SEL_8M_S: u32 = 1;
-    const MODEM_CLKRST_LP_TIMER_SEL_RTC_SLOW_S: u32 = 0;
-    const MODEM_CLKRST_LP_TIMER_CLK_DIV_NUM: u32 = 0x000000FF;
-    const MODEM_CLKRST_LP_TIMER_CLK_DIV_NUM_S: u32 = 4;
-    const MODEM_CLKRST_ETM_CLK_CONF_REG: u32 = DR_REG_MODEM_CLKRST_BASE + 0x10;
-    const MODEM_CLKRST_ETM_CLK_ACTIVE_S: u32 = 1;
-    const MODEM_CLKRST_ETM_CLK_SEL_S: u32 = 0;
-
-    #[inline(always)]
-    fn set_peri_reg_bits(reg: u32, bit_map: u32, value: u32, shift: u32) {
-        let ptr = reg as *mut u32;
-        unsafe {
-            ptr.write_volatile(
-                ptr.read_volatile() & (!((bit_map) << (shift)))
-                    | (((value) & (bit_map)) << (shift)),
-            );
-        }
+    unsafe {
+        RADIO_CLOCKS.as_mut().unwrap().ble_rtc_clk_init();
     }
-
-    set_peri_reg_bits(
-        MODEM_CLKRST_MODEM_LP_TIMER_CONF_REG,
-        1,
-        0,
-        MODEM_CLKRST_LP_TIMER_SEL_XTAL32K_S,
-    );
-    set_peri_reg_bits(
-        MODEM_CLKRST_MODEM_LP_TIMER_CONF_REG,
-        1,
-        1,
-        MODEM_CLKRST_LP_TIMER_SEL_XTAL_S,
-    );
-    set_peri_reg_bits(
-        MODEM_CLKRST_MODEM_LP_TIMER_CONF_REG,
-        1,
-        0,
-        MODEM_CLKRST_LP_TIMER_SEL_8M_S,
-    );
-    set_peri_reg_bits(
-        MODEM_CLKRST_MODEM_LP_TIMER_CONF_REG,
-        1,
-        0,
-        MODEM_CLKRST_LP_TIMER_SEL_RTC_SLOW_S,
-    );
-
-    // assume 40MHz xtal
-    set_peri_reg_bits(
-        MODEM_CLKRST_MODEM_LP_TIMER_CONF_REG,
-        MODEM_CLKRST_LP_TIMER_CLK_DIV_NUM,
-        249,
-        MODEM_CLKRST_LP_TIMER_CLK_DIV_NUM_S,
-    );
-
-    set_peri_reg_bits(
-        MODEM_CLKRST_ETM_CLK_CONF_REG,
-        1,
-        1,
-        MODEM_CLKRST_ETM_CLK_ACTIVE_S,
-    );
-    set_peri_reg_bits(
-        MODEM_CLKRST_ETM_CLK_CONF_REG,
-        1,
-        0,
-        MODEM_CLKRST_ETM_CLK_SEL_S,
-    );
 }
 
 pub(super) unsafe extern "C" fn esp_reset_rpa_moudle() {
     log::trace!("esp_reset_rpa_moudle");
-
-    /*
-        DPORT_SET_PERI_REG_MASK(SYSTEM_CORE_RST_EN_REG, BLE_RPA_REST_BIT);
-        DPORT_CLEAR_PERI_REG_MASK(SYSTEM_CORE_RST_EN_REG, BLE_RPA_REST_BIT);
-    */
-    const DR_REG_SYSCON_BASE: u32 = 0x60026000;
-    const SYSCON_WIFI_RST_EN_REG: u32 = DR_REG_SYSCON_BASE + 0x18;
-    const SYSTEM_WIFI_RST_EN_REG: u32 = SYSCON_WIFI_RST_EN_REG;
-    const SYSTEM_CORE_RST_EN_REG: u32 = SYSTEM_WIFI_RST_EN_REG;
-    const BLE_RPA_REST_BIT: u32 = 1 << 27;
-
-    let ptr = SYSTEM_CORE_RST_EN_REG as *mut u32;
-    ptr.write_volatile(ptr.read_volatile() | BLE_RPA_REST_BIT);
-    ptr.write_volatile(ptr.read_volatile() & !BLE_RPA_REST_BIT);
+    unsafe {
+        RADIO_CLOCKS.as_mut().unwrap().reset_rpa();
+    }
 }

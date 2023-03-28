@@ -44,12 +44,15 @@ pub fn setup_timer_isr(systimer: Alarm<Target, 0>) {
     esp32c6_hal::interrupt::enable(Interrupt::WIFI_PWR, hal::interrupt::Priority::Priority1)
         .unwrap();
 
-    // make sure to disable WIFI_BB by mapping it to CPU interrupt 31 which is masked by default
+    // make sure to disable WIFI_BB/MODEM_PERI_TIMEOUT by mapping it to CPU interrupt 31 which is masked by default
     // for some reason for this interrupt, mapping it to 0 doesn't deactivate it
     let interrupt_core0 = unsafe { &*esp32c6::INTERRUPT_CORE0::PTR };
     interrupt_core0
         .wifi_bb_intr_map
         .write(|w| w.wifi_bb_intr_map().variant(31));
+    interrupt_core0
+        .modem_peri_timeout_intr_map
+        .write(|w| w.modem_peri_timeout_intr_map().variant(31));
 
     #[cfg(feature = "ble")]
     {
@@ -62,7 +65,7 @@ pub fn setup_timer_isr(systimer: Alarm<Target, 0>) {
     }
 
     esp32c6_hal::interrupt::enable(
-        Interrupt::CPU_FROM_CPU_3,
+        Interrupt::FROM_CPU_INTR3,
         hal::interrupt::Priority::Priority1,
     )
     .unwrap();
@@ -183,7 +186,7 @@ fn SYSTIMER_TARGET0(trap_frame: &mut TrapFrame) {
 }
 
 #[interrupt]
-fn CPU_FROM_CPU_3(trap_frame: &mut TrapFrame) {
+fn FROM_CPU_INTR3(trap_frame: &mut TrapFrame) {
     unsafe {
         // clear FROM_CPU_INTR3
         (&*pac::INTPRI::PTR)

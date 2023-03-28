@@ -1,6 +1,9 @@
 use super::phy_init_data::PHY_INIT_DATA_DEFAULT;
 use crate::binary::include::*;
+use crate::common_adapter::RADIO_CLOCKS;
 use crate::compat::common::StrBuf;
+use crate::hal::system::RadioClockController;
+use crate::hal::system::RadioPeripherals;
 use atomic_polyfill::AtomicU32;
 use log::trace;
 
@@ -110,125 +113,18 @@ fn phy_digital_regs_store() {
 
 pub(crate) unsafe fn phy_enable_clock() {
     trace!("phy_enable_clock");
-    const MODEM_LPCON: u32 = 0x600AF000;
-    const CLK_CONF: u32 = MODEM_LPCON + 6 * 4;
-    const I2C_MST_CLK_CONF: u32 = MODEM_LPCON + 4 * 4;
-
-    unsafe {
-        let clk_conf = CLK_CONF as *mut u32;
-        clk_conf.write_volatile(
-            clk_conf.read_volatile() | 1 << 2, // clk_i2c_mst_en
-        );
-
-        let i2c_mst_clk_conf = I2C_MST_CLK_CONF as *mut u32;
-        i2c_mst_clk_conf.write_volatile(
-            i2c_mst_clk_conf.read_volatile() | 1 << 0, // clk_i2c_mst_sel_160m
-        );
-    }
-
+    RADIO_CLOCKS.as_mut().unwrap().enable(RadioPeripherals::Phy);
     trace!("phy_enable_clock done!");
 }
 
 #[allow(unused)]
 pub(crate) unsafe fn phy_disable_clock() {
     trace!("phy_disable_clock");
-    const MODEM_LPCON: u32 = 0x600AF000;
-    const CLK_CONF: u32 = MODEM_LPCON + 6 * 4;
-    const I2C_MST_CLK_CONF: u32 = MODEM_LPCON + 4 * 4;
-
-    unsafe {
-        let clk_conf = CLK_CONF as *mut u32;
-        clk_conf.write_volatile(
-            clk_conf.read_volatile()
-                & !(
-                    1 << 2
-                    // clk_i2c_mst_en
-                ),
-        );
-
-        let i2c_mst_clk_conf = I2C_MST_CLK_CONF as *mut u32;
-        i2c_mst_clk_conf.write_volatile(
-            i2c_mst_clk_conf.read_volatile()
-                & !(
-                    1 << 0
-                    // clk_i2c_mst_sel_160m
-                ),
-        );
-    }
-
-    trace!("phy_enable_clock done!");
-}
-
-pub(crate) fn init_clocks() {
-    unsafe {
-        let pmu = &*esp32c6::PMU::PTR;
-
-        pmu.hp_sleep_icg_modem
-            .modify(|_, w| w.hp_sleep_dig_icg_modem_code().variant(0));
-        pmu.hp_modem_icg_modem
-            .modify(|_, w| w.hp_modem_dig_icg_modem_code().variant(1));
-        pmu.hp_active_icg_modem
-            .modify(|_, w| w.hp_active_dig_icg_modem_code().variant(2));
-        pmu.imm_modem_icg
-            .as_ptr()
-            .write_volatile(pmu.imm_modem_icg.as_ptr().read_volatile() | 1 << 31);
-        pmu.imm_sleep_sysclk
-            .as_ptr()
-            .write_volatile(pmu.imm_sleep_sysclk.as_ptr().read_volatile() | 1 << 28);
-
-        let syscon_clk_conf_power_st = (0x600A9800 + 12) as *mut u32;
-        syscon_clk_conf_power_st.write_volatile(syscon_clk_conf_power_st.read_volatile() | 6 << 28);
-        syscon_clk_conf_power_st.write_volatile(syscon_clk_conf_power_st.read_volatile() | 4 << 24);
-        syscon_clk_conf_power_st.write_volatile(syscon_clk_conf_power_st.read_volatile() | 6 << 20);
-        syscon_clk_conf_power_st.write_volatile(syscon_clk_conf_power_st.read_volatile() | 6 << 16);
-        syscon_clk_conf_power_st.write_volatile(syscon_clk_conf_power_st.read_volatile() | 6 << 12);
-        syscon_clk_conf_power_st.write_volatile(syscon_clk_conf_power_st.read_volatile() | 6 << 8);
-
-        let lp_clk_conf_power_st = (MODEM_LPCON + 8 * 4) as *mut u32;
-        lp_clk_conf_power_st.write_volatile(lp_clk_conf_power_st.read_volatile() | 6 << 28);
-        lp_clk_conf_power_st.write_volatile(lp_clk_conf_power_st.read_volatile() | 6 << 24);
-        lp_clk_conf_power_st.write_volatile(lp_clk_conf_power_st.read_volatile() | 6 << 20);
-        lp_clk_conf_power_st.write_volatile(lp_clk_conf_power_st.read_volatile() | 6 << 16);
-
-        const MODEM_LPCON: u32 = 0x600AF000;
-        let wifi_lp_clk_con = (MODEM_LPCON + 4 * 3) as *mut u32;
-        const CLK_WIFIPWR_LP_SEL_OSC_SLOW: u32 = 0;
-        const CLK_WIFIPWR_LP_SEL_OSC_FAST: u32 = 1;
-        const CLK_WIFIPWR_LP_SEL_XTAL32K: u32 = 3;
-        const CLK_WIFIPWR_LP_SEL_XTAL: u32 = 2;
-        const CLK_WIFIPWR_LP_DIV_NUM_SHIFT: u32 = 4;
-        const CLK_WIFIPWR_LP_DIV_NUM_MASK: u32 = 0b1111_1111_1111;
-        const CLK_WIFIPWR_EN: u32 = 0;
-
-        // modem_clock_hal_deselect_all_wifi_lpclk_source
-        wifi_lp_clk_con.write_volatile(
-            wifi_lp_clk_con.read_volatile()
-                & !(1 << CLK_WIFIPWR_LP_SEL_OSC_SLOW
-                    | 1 << CLK_WIFIPWR_LP_SEL_OSC_FAST
-                    | 1 << CLK_WIFIPWR_LP_SEL_XTAL32K
-                    | 1 << CLK_WIFIPWR_LP_SEL_XTAL),
-        );
-
-        // modem_clock_hal_select_wifi_lpclk_source
-        wifi_lp_clk_con
-            .write_volatile(wifi_lp_clk_con.read_volatile() | 1 << CLK_WIFIPWR_LP_SEL_OSC_SLOW);
-
-        // modem_lpcon_ll_set_wifi_lpclk_divisor_value
-        wifi_lp_clk_con.write_volatile(
-            wifi_lp_clk_con.read_volatile()
-                & !(CLK_WIFIPWR_LP_DIV_NUM_MASK << CLK_WIFIPWR_LP_DIV_NUM_SHIFT)
-                | 0 << CLK_WIFIPWR_LP_DIV_NUM_SHIFT,
-        );
-
-        // modem_lpcon_ll_enable_wifipwr_clock
-        let clk_conf = (MODEM_LPCON + 6 * 3) as *mut u32;
-        clk_conf.write_volatile(clk_conf.read_volatile() | 1 << CLK_WIFIPWR_EN);
-    }
-}
-
-#[allow(unused)]
-pub(crate) fn wifi_reset_mac() {
-    // empty
+    RADIO_CLOCKS
+        .as_mut()
+        .unwrap()
+        .disable(RadioPeripherals::Phy);
+    trace!("phy_disable_clock done!");
 }
 
 #[no_mangle]

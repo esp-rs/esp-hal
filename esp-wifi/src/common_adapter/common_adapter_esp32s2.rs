@@ -1,12 +1,11 @@
 use super::phy_init_data::PHY_INIT_DATA_DEFAULT;
 use crate::binary::include::*;
+use crate::common_adapter::RADIO_CLOCKS;
+use crate::hal::system::RadioClockController;
+use crate::hal::system::RadioPeripherals;
 use atomic_polyfill::AtomicU32;
 use esp32s2_hal::prelude::ram;
 use log::trace;
-
-const SYSTEM_WIFI_CLK_EN_REG: u32 = 0x3f426000 + 0x090;
-// Mask for clock bits used by both WIFI and Bluetooth
-const SYSTEM_WIFI_CLK_WIFI_BT_COMMON_M: u32 = 0x000003c9;
 
 const SOC_PHY_DIG_REGS_MEM_SIZE: usize = 21 * 4;
 
@@ -95,13 +94,10 @@ fn phy_digital_regs_store() {
 }
 
 pub(crate) unsafe fn phy_enable_clock() {
-    let ptr = SYSTEM_WIFI_CLK_EN_REG as *mut u32;
-
     let count = PHY_CLOCK_ENABLE_REF.fetch_add(1, atomic_polyfill::Ordering::SeqCst);
     if count == 0 {
         critical_section::with(|_| {
-            let old = ptr.read_volatile();
-            ptr.write_volatile(old | SYSTEM_WIFI_CLK_WIFI_BT_COMMON_M); // doesn't work with SYSTEM_WIFI_CLK_WIFI_BT_COMMON_M
+            RADIO_CLOCKS.as_mut().unwrap().enable(RadioPeripherals::Phy);
         });
 
         trace!("phy_enable_clock done!");
@@ -110,62 +106,17 @@ pub(crate) unsafe fn phy_enable_clock() {
 
 #[allow(unused)]
 pub(crate) unsafe fn phy_disable_clock() {
-    let ptr = SYSTEM_WIFI_CLK_EN_REG as *mut u32;
-
     let count = PHY_CLOCK_ENABLE_REF.fetch_sub(1, atomic_polyfill::Ordering::SeqCst);
     if count == 1 {
         critical_section::with(|_| {
-            let old = ptr.read_volatile();
-            ptr.write_volatile(old & !SYSTEM_WIFI_CLK_WIFI_BT_COMMON_M);
+            RADIO_CLOCKS
+                .as_mut()
+                .unwrap()
+                .disable(RadioPeripherals::Phy);
         });
 
-        trace!("phy_enable_clock done!");
+        trace!("phy_disable_clock done!");
     }
-}
-
-#[allow(unused)]
-pub(crate) fn wifi_reset_mac() {
-    const SYSCON_WIFI_RST_EN_REG: *mut u32 = (0x3f426000 + 0x94) as *mut u32;
-    const SYSTEM_MAC_RST: u32 = 1 << 2;
-
-    unsafe {
-        SYSCON_WIFI_RST_EN_REG
-            .write_volatile(SYSCON_WIFI_RST_EN_REG.read_volatile() | SYSTEM_MAC_RST);
-        SYSCON_WIFI_RST_EN_REG
-            .write_volatile(SYSCON_WIFI_RST_EN_REG.read_volatile() & !SYSTEM_MAC_RST);
-    }
-}
-
-pub(crate) fn init_clocks() {
-    log::trace!("init clocks");
-
-    const RTC_CNTL_DIG_PWC_REG: u32 = DR_REG_RTCCNTL_BASE + 0x008C;
-    const DR_REG_RTCCNTL_BASE: u32 = 0x3f408000;
-    const RTC_CNTL_DIG_ISO_REG: u32 = DR_REG_RTCCNTL_BASE + 0x0090;
-
-    const RTC_CNTL_WIFI_FORCE_PD: u32 = 1 << 17;
-    const RTC_CNTL_WIFI_FORCE_ISO: u32 = 1 << 28;
-    unsafe {
-        (RTC_CNTL_DIG_PWC_REG as *mut u32).write_volatile(
-            (RTC_CNTL_DIG_PWC_REG as *mut u32).read_volatile() & !RTC_CNTL_WIFI_FORCE_PD,
-        );
-
-        (RTC_CNTL_DIG_ISO_REG as *mut u32).write_volatile(
-            (RTC_CNTL_DIG_ISO_REG as *mut u32).read_volatile() & !RTC_CNTL_WIFI_FORCE_ISO,
-        );
-    }
-
-    // unsafe {
-    //     // PERIP_CLK_EN0
-    //     ((0x3f426000 + 0x8c) as *mut u32).write_volatile(0xffffffff);
-    //     // PERIP_CLK_EN1
-    //     ((0x3f426000 + 0x90) as *mut u32).write_volatile(0xffffffff);
-    // }
-
-    // // APB_CTRL_WIFI_CLK_EN_REG
-    // unsafe {
-    //     ((0x3f426000 + 0x90) as *mut u32).write_volatile(0xffffffff);
-    // }
 }
 
 /****************************************************************************

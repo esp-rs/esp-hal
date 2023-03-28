@@ -311,23 +311,7 @@ pub(crate) fn btdm_controller_mem_init() {
 }
 
 pub(crate) fn bt_periph_module_enable() {
-    unsafe {
-        const DR_REG_DPORT_BASE: u32 = 0x3ff00000;
-        const DPORT_WIFI_CLK_EN_REG: u32 = DR_REG_DPORT_BASE + 0x0CC;
-        const DPORT_CORE_RST_EN_REG: u32 = DR_REG_DPORT_BASE + 0x0D0;
-        const DPORT_WIFI_CLK_BT_EN: u32 = 0x30800;
-
-        let ptr = DPORT_WIFI_CLK_EN_REG as *mut u32;
-        let old = ptr.read_volatile();
-        ptr.write_volatile(old | DPORT_WIFI_CLK_BT_EN);
-
-        let ptr = DPORT_CORE_RST_EN_REG as *mut u32;
-        let old = ptr.read_volatile();
-        ptr.write_volatile(old | 0);
-    }
-    // bt_periph_module_enable(PERIPH_BT_MODULE);
-    // modifyreg32(get_clk_en_reg(periph), 0, get_clk_en_mask(periph));
-    // modifyreg32(get_rst_en_reg(periph), get_rst_en_mask(periph, true), 0);
+    // nothing
 }
 
 pub(crate) fn disable_sleep_mode() {

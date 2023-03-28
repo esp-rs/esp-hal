@@ -5,6 +5,7 @@
 use core::cell::RefCell;
 use core::mem::MaybeUninit;
 
+use common_adapter::RADIO_CLOCKS;
 use critical_section::Mutex;
 #[cfg(feature = "esp32")]
 use esp32_hal as hal;
@@ -24,6 +25,9 @@ use esp32c6_hal::systimer::{Alarm, Target};
 use esp32s2_hal as hal;
 #[cfg(feature = "esp32s3")]
 use esp32s3_hal as hal;
+
+use crate::hal::system::RadioClockController;
+use common_adapter::init_radio_clock_control;
 
 use fugit::MegahertzU32;
 use hal::clock::Clocks;
@@ -106,6 +110,7 @@ pub fn init_heap() {
 pub fn initialize(
     systimer: Alarm<Target, 0>,
     rng: hal::Rng,
+    radio_clocks: hal::system::RadioClockControl,
     clocks: &Clocks,
 ) -> Result<(), InitializationError> {
     #[cfg(feature = "esp32c6")]
@@ -124,6 +129,7 @@ pub fn initialize(
     }
 
     phy_mem_init();
+    init_radio_clock_control(radio_clocks);
     init_rng(rng);
     init_tasks();
     setup_timer_isr(systimer);
@@ -179,6 +185,7 @@ impl From<WifiError> for InitializationError {
 pub fn initialize(
     timg1_timer0: hal::timer::Timer<hal::timer::Timer0<hal::peripherals::TIMG1>>,
     rng: hal::Rng,
+    radio_clocks: hal::system::RadioClockControl,
     clocks: &Clocks,
 ) -> Result<(), InitializationError> {
     if clocks.cpu_clock != MegahertzU32::MHz(240) {
@@ -198,6 +205,7 @@ pub fn initialize(
     }
 
     phy_mem_init();
+    init_radio_clock_control(radio_clocks);
     init_rng(rng);
     init_tasks();
     setup_timer_isr(timg1_timer0);
@@ -246,5 +254,7 @@ pub fn init_buffer() {
 }
 
 pub fn init_clocks() {
-    crate::common_adapter::chip_specific::init_clocks();
+    unsafe {
+        RADIO_CLOCKS.as_mut().unwrap().init_clocks();
+    }
 }

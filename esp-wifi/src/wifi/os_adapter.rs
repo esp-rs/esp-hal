@@ -14,6 +14,7 @@ use log::{debug, trace};
 
 use crate::{
     binary::include::*,
+    common_adapter::RADIO_CLOCKS,
     compat::{
         common::{
             create_recursive_mutex, create_wifi_queue, lock_mutex, receive_queued, send_queued,
@@ -22,6 +23,8 @@ use crate::{
         malloc::calloc,
         work_queue::queue_work,
     },
+    hal::system::RadioClockController,
+    hal::system::RadioPeripherals,
     memory_fence::memory_fence,
     timer::yield_task,
 };
@@ -1106,7 +1109,7 @@ pub unsafe extern "C" fn phy_update_country_info(
  ****************************************************************************/
 pub unsafe extern "C" fn wifi_reset_mac() {
     trace!("wifi_reset_mac");
-    crate::common_adapter::chip_specific::wifi_reset_mac();
+    RADIO_CLOCKS.as_mut().unwrap().reset_mac();
 }
 
 /****************************************************************************
@@ -1124,7 +1127,10 @@ pub unsafe extern "C" fn wifi_reset_mac() {
  ****************************************************************************/
 pub unsafe extern "C" fn wifi_clock_enable() {
     trace!("wifi_clock_enable");
-    crate::wifi::os_adapter::os_adapter_chip_specific::wifi_clock_enable();
+    RADIO_CLOCKS
+        .as_mut()
+        .unwrap()
+        .enable(RadioPeripherals::Wifi);
 }
 
 /****************************************************************************
@@ -1142,7 +1148,10 @@ pub unsafe extern "C" fn wifi_clock_enable() {
  ****************************************************************************/
 pub unsafe extern "C" fn wifi_clock_disable() {
     trace!("wifi_clock_disable");
-    crate::wifi::os_adapter::os_adapter_chip_specific::wifi_clock_disable();
+    RADIO_CLOCKS
+        .as_mut()
+        .unwrap()
+        .disable(RadioPeripherals::Wifi);
 }
 
 /****************************************************************************

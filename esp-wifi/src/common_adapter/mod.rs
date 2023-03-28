@@ -20,6 +20,7 @@ use esp32s2_hal as hal;
 #[cfg(feature = "esp32s3")]
 use esp32s3_hal as hal;
 
+use hal::system::RadioClockControl;
 use hal::Rng;
 
 use hal::macros::ram;
@@ -42,9 +43,17 @@ pub(crate) mod phy_init_data;
 
 pub(crate) static mut RANDOM_GENERATOR: Option<Rng> = None;
 
-pub fn init_rng(rng: hal::Rng) {
+pub(crate) static mut RADIO_CLOCKS: Option<RadioClockControl> = None;
+
+pub fn init_rng(rng: Rng) {
     unsafe {
         crate::common_adapter::RANDOM_GENERATOR = Some(core::mem::transmute(rng));
+    }
+}
+
+pub fn init_radio_clock_control(rcc: RadioClockControl) {
+    unsafe {
+        crate::common_adapter::RADIO_CLOCKS = Some(core::mem::transmute(rcc));
     }
 }
 

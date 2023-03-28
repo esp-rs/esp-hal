@@ -53,7 +53,7 @@ pub fn setup_timer_isr(systimer: Alarm<Target, 0>) {
     }
 
     esp32c2_hal::interrupt::enable(
-        Interrupt::ETS_FROM_CPU_INTR3,
+        Interrupt::FROM_CPU_INTR3,
         hal::interrupt::Priority::Priority1,
     )
     .unwrap();
@@ -158,7 +158,7 @@ fn SYSTIMER_TARGET0(trap_frame: &mut TrapFrame) {
 }
 
 #[interrupt]
-fn ETS_FROM_CPU_INTR3(trap_frame: &mut TrapFrame) {
+fn FROM_CPU_INTR3(trap_frame: &mut TrapFrame) {
     unsafe {
         // clear ETS_FROM_CPU_INTR3
         (&*pac::SYSTEM::PTR)
