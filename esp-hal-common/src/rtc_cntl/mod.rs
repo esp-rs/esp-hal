@@ -38,7 +38,6 @@ extern "C" {
     #[allow(dead_code)]
     fn ets_delay_us(us: u32);
     fn rtc_get_reset_reason(cpu_num: u32) -> u32;
-    fn rtc_get_wakeup_cause() -> u32;
     pub fn software_reset_cpu();
     pub fn software_reset();
 }

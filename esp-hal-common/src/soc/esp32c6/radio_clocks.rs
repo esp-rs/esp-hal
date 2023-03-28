@@ -142,18 +142,94 @@ fn wifi_clock_disable() {
 
 fn ieee802154_clock_enable() {
     let modem_syscon = unsafe { &*esp32c6::MODEM_SYSCON::PTR };
+    let modem_lpcon = unsafe { &*esp32c6::MODEM_LPCON::PTR };
+
     modem_syscon
         .clk_conf
         .modify(|_, w| w.clk_zb_apb_en().set_bit().clk_zb_mac_en().set_bit());
-    wifi_clock_enable();
+
+    modem_syscon.clk_conf1.modify(|_, w| {
+        w.clk_fe_apb_en()
+            .set_bit()
+            .clk_fe_cal_160m_en()
+            .set_bit()
+            .clk_fe_160m_en()
+            .set_bit()
+            .clk_fe_80m_en()
+            .set_bit()
+            .clk_bt_apb_en()
+            .set_bit()
+            .clk_bt_en()
+            .set_bit()
+            .clk_wifibb_160x1_en()
+            .set_bit()
+            .clk_wifibb_80x1_en()
+            .set_bit()
+            .clk_wifibb_40x1_en()
+            .set_bit()
+            .clk_wifibb_80x_en()
+            .set_bit()
+            .clk_wifibb_40x_en()
+            .set_bit()
+            .clk_wifibb_80m_en()
+            .set_bit()
+            .clk_wifibb_44m_en()
+            .set_bit()
+            .clk_wifibb_40m_en()
+            .set_bit()
+            .clk_wifibb_22m_en()
+            .set_bit()
+    });
+
+    modem_lpcon
+        .clk_conf
+        .modify(|_, w| w.clk_coex_en().set_bit());
 }
 
 fn ieee802154_clock_disable() {
     let modem_syscon = unsafe { &*esp32c6::MODEM_SYSCON::PTR };
+    let modem_lpcon = unsafe { &*esp32c6::MODEM_LPCON::PTR };
+
     modem_syscon
         .clk_conf
         .modify(|_, w| w.clk_zb_apb_en().clear_bit().clk_zb_mac_en().clear_bit());
-    wifi_clock_disable();
+
+    modem_syscon.clk_conf1.modify(|_, w| {
+        w.clk_fe_apb_en()
+            .clear_bit()
+            .clk_fe_cal_160m_en()
+            .clear_bit()
+            .clk_fe_160m_en()
+            .clear_bit()
+            .clk_fe_80m_en()
+            .clear_bit()
+            .clk_bt_apb_en()
+            .clear_bit()
+            .clk_bt_en()
+            .clear_bit()
+            .clk_wifibb_160x1_en()
+            .clear_bit()
+            .clk_wifibb_80x1_en()
+            .clear_bit()
+            .clk_wifibb_40x1_en()
+            .clear_bit()
+            .clk_wifibb_80x_en()
+            .clear_bit()
+            .clk_wifibb_40x_en()
+            .clear_bit()
+            .clk_wifibb_80m_en()
+            .clear_bit()
+            .clk_wifibb_44m_en()
+            .clear_bit()
+            .clk_wifibb_40m_en()
+            .clear_bit()
+            .clk_wifibb_22m_en()
+            .clear_bit()
+    });
+
+    modem_lpcon
+        .clk_conf
+        .modify(|_, w| w.clk_coex_en().clear_bit());
 }
 
 fn reset_mac() {
