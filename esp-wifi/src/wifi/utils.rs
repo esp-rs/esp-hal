@@ -12,10 +12,11 @@ use super::{WifiController, WifiDevice, WifiMode};
 
 /// Convenient way to create an `smoltcp` ethernet interface
 /// You can use the provided macros to create and pass a suitable backing storage.
-pub fn create_network_interface<'a>(
+pub fn create_network_interface<'a, 'd>(
+    device: impl esp_hal_common::peripheral::Peripheral<P = esp_hal_common::radio::Wifi> + 'd,
     mode: WifiMode,
     storage: &'a mut [SocketStorage<'a>],
-) -> (Interface, WifiDevice, WifiController, SocketSet<'a>) {
+) -> (Interface, WifiDevice<'d>, WifiController<'d>, SocketSet<'a>) {
     let socket_set_entries = storage;
 
     let mut mac = [0u8; 6];
@@ -25,7 +26,7 @@ pub fn create_network_interface<'a>(
     }
     let hw_address = EthernetAddress::from_bytes(&mac);
 
-    let (mut device, controller) = crate::wifi::new(mode);
+    let (mut device, controller) = crate::wifi::new_with_mode(device, mode);
 
     let mut config = Config::new();
 

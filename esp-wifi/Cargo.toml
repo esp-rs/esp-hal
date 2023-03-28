@@ -16,6 +16,7 @@ esp32c3 = { workspace = true, optional = true }
 esp32c2 = { workspace = true, optional = true }
 esp32c6 = { workspace = true, optional = true }
 smoltcp = { workspace = true, optional = true }
+esp-hal-common = { workspace = true, optional = true }
 critical-section.workspace = true
 atomic-polyfill.workspace = true
 log.workspace = true
@@ -37,12 +38,12 @@ embassy-net-driver = { workspace = true, optional = true }
 default = [ "utils" ]
 
 # chip features
-esp32c3 = [ "esp32c3-hal", "dep:esp32c3", "esp-wifi-sys/esp32c3" ]
-esp32c2 = [ "esp32c2-hal", "dep:esp32c2", "esp-wifi-sys/esp32c2" ]
-esp32c6 = [ "esp32c6-hal", "dep:esp32c6", "esp-wifi-sys/esp32c6" ]
-esp32 = [ "esp32-hal",  "esp-wifi-sys/esp32" ]
-esp32s3 = [ "esp32s3-hal", "esp-wifi-sys/esp32s3" ]
-esp32s2 = [ "esp32s2-hal", "esp-wifi-sys/esp32s2" ]
+esp32c3 = [ "esp32c3-hal", "dep:esp32c3", "esp-wifi-sys/esp32c3", "esp-hal-common/esp32c3" ]
+esp32c2 = [ "esp32c2-hal", "dep:esp32c2", "esp-wifi-sys/esp32c2", "esp-hal-common/esp32c2" ]
+esp32c6 = [ "esp32c6-hal", "dep:esp32c6", "esp-wifi-sys/esp32c6", "esp-hal-common/esp32c6" ]
+esp32 = [ "esp32-hal",  "esp-wifi-sys/esp32", "esp-hal-common/esp32" ]
+esp32s3 = [ "esp32s3-hal", "esp-wifi-sys/esp32s3", "esp-hal-common/esp32s3" ]
+esp32s2 = [ "esp32s2-hal", "esp-wifi-sys/esp32s2", "esp-hal-common/esp32s2" ]
 
 # async features
 esp32c3-async = [ "esp32c3-hal/embassy", "esp32c3-hal/embassy-time-timg0", "async" ]

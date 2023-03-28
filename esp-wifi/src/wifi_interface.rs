@@ -16,7 +16,7 @@ use crate::wifi::WifiDevice;
 use core::borrow::BorrowMut;
 
 pub struct WifiStack<'a> {
-    device: RefCell<WifiDevice>,
+    device: RefCell<WifiDevice<'static>>, // TODO allow non static lifetime
     network_interface: RefCell<Interface>,
     sockets: RefCell<SocketSet<'a>>,
     current_millis_fn: fn() -> u64,
@@ -29,7 +29,7 @@ pub struct WifiStack<'a> {
 impl<'a> WifiStack<'a> {
     pub fn new(
         network_interface: Interface,
-        device: WifiDevice,
+        device: WifiDevice<'static>, // TODO relax this lifetime requirement
         mut sockets: SocketSet<'a>,
         current_millis_fn: fn() -> u64,
     ) -> WifiStack<'a> {

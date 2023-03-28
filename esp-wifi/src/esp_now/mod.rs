@@ -9,6 +9,7 @@
 use core::{cell::RefCell, fmt::Debug};
 
 use critical_section::Mutex;
+use esp_hal_common::peripheral::{Peripheral, PeripheralRef};
 
 use crate::compat::queue::SimpleQueue;
 
@@ -19,10 +20,6 @@ pub const ESP_NOW_MAX_DATA_LEN: usize = 250;
 
 /// Broadcast address
 pub const BROADCAST_ADDRESS: [u8; 6] = [0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8];
-
-static ESP_NOW: Mutex<RefCell<EspNowHolder>> = Mutex::new(RefCell::new(EspNowHolder {
-    esp_now: Some(EspNowCreator { _private: () }),
-}));
 
 static RECEIVE_QUEUE: Mutex<RefCell<SimpleQueue<ReceivedData, 10>>> =
     Mutex::new(RefCell::new(SimpleQueue::new()));
@@ -236,17 +233,17 @@ impl Debug for ReceivedData {
     }
 }
 
-pub struct EspNowCreator {
-    _private: (),
+pub struct EspNow<'d> {
+    _device: PeripheralRef<'d, esp_hal_common::radio::Wifi>,
 }
 
-impl EspNowCreator {
-    /// Initialize esp-now
-    ///
-    /// Must be called after initializing esp-wifi.
-    /// After this the broadcast address is already added as a peer.
-    pub fn initialize(self) -> Result<EspNow, EspNowError> {
-        let mut esp_now = EspNow { _private: () };
+impl<'d> EspNow<'d> {
+    pub fn new(
+        device: impl Peripheral<P = esp_hal_common::radio::Wifi> + 'd,
+    ) -> Result<EspNow<'d>, EspNowError> {
+        let mut esp_now = EspNow {
+            _device: device.into_ref(),
+        };
         check_error!({ esp_wifi_set_mode(wifi_mode_t_WIFI_MODE_STA) });
         check_error!({ esp_wifi_start() });
         check_error!({ esp_now_init() });
@@ -260,34 +257,6 @@ impl EspNowCreator {
         })?;
 
         Ok(esp_now)
-    }
-}
-
-struct EspNowHolder {
-    esp_now: Option<EspNowCreator>,
-}
-
-pub fn esp_now() -> EspNowCreator {
-    critical_section::with(|cs| ESP_NOW.borrow_ref_mut(cs).esp_now.take().unwrap())
-}
-
-pub struct EspNow {
-    _private: (),
-}
-
-impl EspNow {
-    /// Deinit
-    pub fn free(self) {
-        unsafe {
-            esp_now_unregister_recv_cb();
-            esp_now_deinit();
-            critical_section::with(|cs| {
-                ESP_NOW
-                    .borrow_ref_mut(cs)
-                    .esp_now
-                    .replace(EspNowCreator { _private: () });
-            })
-        }
     }
 
     /// Get the version of ESPNOW
@@ -454,6 +423,15 @@ impl EspNow {
     }
 }
 
+impl Drop for EspNow<'_> {
+    fn drop(&mut self) {
+        unsafe {
+            esp_now_unregister_recv_cb();
+            esp_now_deinit();
+        }
+    }
+}
+
 unsafe extern "C" fn rcv_cb(
     esp_now_info: *const esp_now_recv_info_t,
     data: *const u8,
@@ -555,36 +533,30 @@ unsafe extern "C" fn rcv_cb(
 
 #[cfg(feature = "async")]
 mod asynch {
+    use super::*;
     use core::task::{Context, Poll};
     use embassy_sync::waitqueue::AtomicWaker;
 
-    use super::{EspNow, ReceivedData};
-
     pub(super) static ESP_NOW_WAKER: AtomicWaker = AtomicWaker::new();
 
-    impl EspNow {
+    impl<'d> EspNow<'d> {
         pub async fn receive_async(&mut self) -> ReceivedData {
-            ReceiveFuture::new(self).await
+            ReceiveFuture.await
         }
     }
 
-    struct ReceiveFuture<'a> {
-        esp_now: &'a mut EspNow,
-    }
+    struct ReceiveFuture;
 
-    impl<'a> ReceiveFuture<'a> {
-        fn new(esp_now: &'a mut EspNow) -> Self {
-            Self { esp_now }
-        }
-    }
-
-    impl<'a> core::future::Future for ReceiveFuture<'a> {
+    impl core::future::Future for ReceiveFuture {
         type Output = ReceivedData;
 
         fn poll(self: core::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
             ESP_NOW_WAKER.register(cx.waker());
 
-            if let Some(data) = self.esp_now.receive() {
+            if let Some(data) = critical_section::with(|cs| {
+                let mut queue = RECEIVE_QUEUE.borrow_ref_mut(cs);
+                queue.dequeue()
+            }) {
                 Poll::Ready(data)
             } else {
                 Poll::Pending

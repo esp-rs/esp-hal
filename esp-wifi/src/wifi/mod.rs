@@ -10,6 +10,8 @@ use critical_section::Mutex;
 use embedded_svc::wifi::{AccessPointInfo, AuthMethod, SecondaryChannel};
 use enumset::EnumSet;
 use enumset::EnumSetType;
+use esp_hal_common::peripheral::Peripheral;
+use esp_hal_common::peripheral::PeripheralRef;
 use esp_wifi_sys::include::esp_interface_t_ESP_IF_WIFI_AP;
 use esp_wifi_sys::include::esp_wifi_disconnect;
 use esp_wifi_sys::include::esp_wifi_get_mode;
@@ -682,7 +684,11 @@ pub fn wifi_start_scan(block: bool) -> i32 {
     unsafe { esp_wifi_scan_start(&scan_config, block) }
 }
 
-pub fn new_with_config(config: embedded_svc::wifi::Configuration) -> (WifiDevice, WifiController) {
+pub fn new_with_config<'d>(
+    device: impl Peripheral<P = esp_hal_common::radio::Wifi> + 'd,
+    config: embedded_svc::wifi::Configuration,
+) -> (WifiDevice<'d>, WifiController<'d>) {
+    esp_hal_common::into_ref!(device);
     let mode = match config {
         embedded_svc::wifi::Configuration::None => panic!(),
         embedded_svc::wifi::Configuration::Client(_) => WifiMode::Sta,
@@ -690,44 +696,60 @@ pub fn new_with_config(config: embedded_svc::wifi::Configuration) -> (WifiDevice
         embedded_svc::wifi::Configuration::Mixed(_, _) => panic!(),
     };
     (
-        WifiDevice::new(mode),
-        WifiController::new_with_config(config),
+        WifiDevice::new(unsafe { device.clone_unchecked() }, mode),
+        WifiController::new_with_config(device, config),
     )
 }
 
-pub fn new(mode: WifiMode) -> (WifiDevice, WifiController) {
-    (WifiDevice::new(mode), WifiController::new())
+pub fn new_with_mode<'d>(
+    device: impl Peripheral<P = esp_hal_common::radio::Wifi> + 'd,
+    mode: WifiMode,
+) -> (WifiDevice<'d>, WifiController<'d>) {
+    new_with_config(
+        device,
+        match mode {
+            WifiMode::Sta => embedded_svc::wifi::Configuration::Client(Default::default()),
+            WifiMode::Ap => embedded_svc::wifi::Configuration::AccessPoint(Default::default()),
+        },
+    )
+}
+
+pub fn new<'d>(
+    device: impl Peripheral<P = esp_hal_common::radio::Wifi> + 'd,
+) -> (WifiDevice<'d>, WifiController<'d>) {
+    new_with_config(device, Default::default())
 }
 
 /// A wifi device implementing smoltcp's Device trait.
-pub struct WifiDevice {
-    _private: (),
+pub struct WifiDevice<'d> {
+    _device: PeripheralRef<'d, esp_hal_common::radio::Wifi>,
 
     // only used by embassy-net
     #[allow(unused)]
     mode: WifiMode,
 }
 
-impl WifiDevice {
-    pub(crate) fn new(mode: WifiMode) -> WifiDevice {
-        Self { _private: (), mode }
+impl<'d> WifiDevice<'d> {
+    pub(crate) fn new(
+        _device: PeripheralRef<'d, esp_hal_common::radio::Wifi>,
+        mode: WifiMode,
+    ) -> WifiDevice {
+        Self { _device, mode }
     }
 }
 
 /// A wifi controller implementing embedded_svc::Wifi traits
-pub struct WifiController {
+pub struct WifiController<'d> {
+    _device: PeripheralRef<'d, esp_hal_common::radio::Wifi>,
     config: embedded_svc::wifi::Configuration,
 }
 
-impl WifiController {
-    pub(crate) fn new_with_config(config: embedded_svc::wifi::Configuration) -> Self {
-        Self { config }
-    }
-
-    pub(crate) fn new() -> Self {
-        Self {
-            config: Default::default(),
-        }
+impl<'d> WifiController<'d> {
+    pub(crate) fn new_with_config(
+        _device: PeripheralRef<'d, esp_hal_common::radio::Wifi>,
+        config: embedded_svc::wifi::Configuration,
+    ) -> Self {
+        Self { _device, config }
     }
 
     fn is_sta_enabled(&self) -> Result<bool, WifiError> {
@@ -864,9 +886,9 @@ impl WifiController {
 }
 
 // see https://docs.rs/smoltcp/0.7.1/smoltcp/phy/index.html
-impl Device for WifiDevice {
-    type RxToken<'a> = WifiRxToken;
-    type TxToken<'a> = WifiTxToken;
+impl<'d> Device for WifiDevice<'d> {
+    type RxToken<'a> = WifiRxToken where Self: 'a;
+    type TxToken<'a> = WifiTxToken where Self: 'a;
 
     fn receive(
         &mut self,
@@ -989,7 +1011,7 @@ pub fn send_data_if_needed() {
     });
 }
 
-impl embedded_svc::wifi::Wifi for WifiController {
+impl embedded_svc::wifi::Wifi for WifiController<'_> {
     type Error = WifiError;
 
     /// This currently only supports the `Client` and `AccessPoint` capability.
@@ -1290,7 +1312,7 @@ pub(crate) mod embassy {
         }
     }
 
-    impl Driver for WifiDevice {
+    impl Driver for WifiDevice<'_> {
         type RxToken<'a> = WifiRxToken
     where
         Self: 'a;
@@ -1381,7 +1403,7 @@ mod asynch {
     use super::*;
 
     // TODO assumes STA mode only
-    impl WifiController {
+    impl<'d> WifiController<'d> {
         /// Async version of [`embedded_svc::wifi::Wifi`]'s `scan_n` method
         pub async fn scan_n<const N: usize>(
             &mut self,
