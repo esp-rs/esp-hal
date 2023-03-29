@@ -656,6 +656,15 @@ where
         #[cfg(esp32)]
         crate::soc::gpio::errata36(GPIONUM, pull_up, pull_down);
 
+        // NOTE: Workaround to make GPIO18 and GPIO19 work on the ESP32-C3, which by
+        //       default are assigned to the `USB_SERIAL_JTAG` peripheral.
+        #[cfg(esp32c3)]
+        if GPIONUM == 18 || GPIONUM == 19 {
+            unsafe { &*crate::peripherals::USB_DEVICE::PTR }
+                .conf0
+                .modify(|_, w| w.usb_pad_enable().clear_bit());
+        }
+
         get_io_mux_reg(GPIONUM).modify(|_, w| unsafe {
             w.mcu_sel()
                 .bits(GPIO_FUNCTION as u8)
@@ -1143,6 +1152,15 @@ where
 
         gpio.func_out_sel_cfg[GPIONUM as usize]
             .modify(|_, w| unsafe { w.out_sel().bits(OutputSignal::GPIO as OutputSignalType) });
+
+        // NOTE: Workaround to make GPIO18 and GPIO19 work on the ESP32-C3, which by
+        //       default are assigned to the `USB_SERIAL_JTAG` peripheral.
+        #[cfg(esp32c3)]
+        if GPIONUM == 18 || GPIONUM == 19 {
+            unsafe { &*crate::peripherals::USB_DEVICE::PTR }
+                .conf0
+                .modify(|_, w| w.usb_pad_enable().clear_bit());
+        }
 
         get_io_mux_reg(GPIONUM).modify(|_, w| unsafe {
             w.mcu_sel()
