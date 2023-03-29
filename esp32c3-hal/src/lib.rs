@@ -1,4 +1,5 @@
 #![no_std]
+#![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 
 #[cfg(feature = "mcu-boot")]
 use core::mem::size_of;

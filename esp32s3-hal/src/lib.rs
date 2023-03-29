@@ -4,6 +4,7 @@
     feature(asm_experimental_arch),
     feature(naked_functions)
 )]
+#![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 
 pub use embedded_hal as ehal;
 #[cfg(feature = "embassy")]
