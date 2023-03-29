@@ -1,5 +1,3 @@
-//! # Smart-LEDs RMT Adapter
-//!
 //! This adapter allows for the use of an RMT output channel to easily interact
 //! with RGB LEDs and use the convenience functions of the
 //! [`smart-leds`](https://crates.io/crates/smart-leds) crate.
@@ -9,9 +7,27 @@
 //! but in case this is used in combination with interrupts that might disturb
 //! the sequential sending, an alternative implementation (addressing the LEDs
 //! in a sequence in a single RMT send operation) might be required!_
+//!
+//! ## Example
+//!
+//! ```rust,ignore
+//! let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+//! let pulse = PulseControl::new(
+//!     peripherals.RMT,
+//!     &mut system.peripheral_clock_control,
+//!     ClockSource::APB,
+//!     0,
+//!     0,
+//!     0,
+//! )
+//! .unwrap();
+//!
+//! let led = <smartLedAdapter!(1)>::new(pulse.channel0, io.pins.gpio0);
+//! ```
 
 #![no_std]
 #![deny(missing_docs)]
+#![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 
 use core::slice::IterMut;
 
@@ -67,12 +83,13 @@ pub enum LedAdapterError {
 }
 
 /// Macro to generate adapters with an arbitrary buffer size fitting for a
-/// specific number of `$buffer_size` LEDs to be addressed. Attempting to use
-/// more LEDs that the buffer is configured for will result in an
-/// `LedAdapterError:BufferSizeExceeded` error.
+/// specific number of `$buffer_size` LEDs to be addressed.
+///
+/// Attempting to use more LEDs that the buffer is configured for will result in
+/// an `LedAdapterError:BufferSizeExceeded` error.
 #[macro_export]
 macro_rules! smartLedAdapter {
-    ($buffer_size: literal ) => {
+    ( $buffer_size: literal ) => {
         // The size we're assigning here is calculated as following
         //  (
         //   Nr. of LEDs
@@ -118,6 +135,7 @@ where
             .set_clock_source(ClockSource::APB);
 
         let channel = channel.assign_pin(pin);
+
         Self {
             channel,
             rmt_buffer: [0; BUFFER_SIZE],
@@ -171,7 +189,7 @@ where
     type Color = RGB8;
 
     /// Convert all RGB8 items of the iterator to the RMT format and
-    /// add them to internal buffer. Then start a singular RMT operation
+    /// add them to internal buffer, then start a singular RMT operation
     /// based on that buffer.
     fn write<T, I>(&mut self, iterator: T) -> Result<(), Self::Error>
     where

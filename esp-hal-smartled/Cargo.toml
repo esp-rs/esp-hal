@@ -6,6 +6,9 @@ description = "RMT adapter for smartleds"
 repository  = "https://github.com/esp-rs/esp-hal"
 license     = "MIT OR Apache-2.0"
 
+[package.metadata.docs.rs]
+features = ["esp32c3"]
+
 [dependencies]
 esp-hal-common   = { version = "0.8.0", path = "../esp-hal-common" }
 fugit            = "0.3.6"
