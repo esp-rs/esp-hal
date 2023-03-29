@@ -403,6 +403,42 @@ where
         }
     }
 
+    /// Use in combination with `interrupt::enable`.
+    /// The interrupt is cleared when all pending messages are received.
+    #[cfg(any(esp32c3, esp32s3))]
+    pub fn enable_rx_interrupt(&mut self) {
+        self.peripheral
+            .register_block()
+            .int_ena
+            .modify(|_, w| w.rx_int_ena().set_bit());
+    }
+
+    /// Use in combination with `interrupt::enable`.
+    /// The interrupt is cleared when all pending messages are received.
+    #[cfg(esp32c6)]
+    pub fn enable_rx_interrupt(&mut self) {
+        self.peripheral
+            .register_block()
+            .interrupt_enable
+            .modify(|_, w| w.ext_receive_int_ena().set_bit());
+    }
+
+    #[cfg(any(esp32c3, esp32s3))]
+    pub fn disable_rx_interrupt(&mut self) {
+        self.peripheral
+            .register_block()
+            .int_ena
+            .modify(|_, w| w.rx_int_ena().clear_bit());
+    }
+
+    #[cfg(esp32c6)]
+    pub fn disable_rx_interrupt(&mut self) {
+        self.peripheral
+            .register_block()
+            .interrupt_enable
+            .modify(|_, w| w.ext_receive_int_ena().clear_bit());
+    }
+
     /// Release the message in the buffer. This will decrement the received
     /// message counter and prepare the next message in the FIFO for
     /// reading.
