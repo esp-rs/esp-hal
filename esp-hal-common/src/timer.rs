@@ -85,7 +85,7 @@ where
             peripheral_clock_control
         );
 
-        let wdt = Wdt::new();
+        let wdt = Wdt::new(peripheral_clock_control);
 
         Self {
             _timer_group: timer_group,
@@ -563,30 +563,12 @@ where
     TG: TimerGroupInstance,
 {
     /// Create a new watchdog timer instance
-    pub fn new() -> Self {
-        #[cfg(esp32c6)]
-        Self::enable_clock();
+    pub fn new(_peripheral_clock_control: &mut PeripheralClockControl) -> Self {
+        #[cfg(lp_wdt)]
+        _peripheral_clock_control.enable(crate::system::Peripheral::Wdt);
         Self {
             phantom: PhantomData::default(),
         }
-    }
-
-/*
-pcr.timergroup0_timer_clk_conf
-    //         .write(|w| w.tg0_timer_clk_en().set_bit());
- */
-    #[cfg(esp32c6)]
-    fn enable_clock() {
-        let pcr = unsafe { &*crate::peripherals::PCR::ptr() };
-        pcr.timergroup0_wdt_clk_conf
-            .write(|w| w.tg0_wdt_clk_en().set_bit());
-        pcr.timergroup0_wdt_clk_conf
-            .write(|w| unsafe { w.tg0_wdt_clk_sel().bits(1) });
-
-        pcr.timergroup1_timer_clk_conf
-            .write(|w| w.tg1_timer_clk_en().set_bit());
-        pcr.timergroup1_timer_clk_conf
-            .write(|w| unsafe { w.tg1_timer_clk_sel().bits(1) });
     }
 
     fn set_wdt_enabled(&mut self, enabled: bool) {
