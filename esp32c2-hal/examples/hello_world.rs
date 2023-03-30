@@ -25,7 +25,11 @@ fn main() -> ! {
 
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
     let mut serial0 = Uart::new(peripherals.UART0, &mut system.peripheral_clock_control);
-    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks, &mut system.peripheral_clock_control);
+    let timer_group0 = TimerGroup::new(
+        peripherals.TIMG0,
+        &clocks,
+        &mut system.peripheral_clock_control,
+    );
     let mut timer0 = timer_group0.timer0;
     let mut wdt0 = timer_group0.wdt;
 

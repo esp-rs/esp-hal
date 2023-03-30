@@ -18,7 +18,10 @@ where
     T: Instance,
 {
     /// Create a new USB serial/JTAG instance with defaults
-    pub fn new(usb_serial: impl Peripheral<P = T> + 'd, peripheral_clock_control: &mut PeripheralClockControl) -> Self {
+    pub fn new(
+        usb_serial: impl Peripheral<P = T> + 'd,
+        peripheral_clock_control: &mut PeripheralClockControl,
+    ) -> Self {
         crate::into_ref!(usb_serial);
         // #[cfg(usb_device)]
         peripheral_clock_control.enable(crate::system::Peripheral::Sha);

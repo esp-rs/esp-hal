@@ -32,7 +32,11 @@ fn main() -> ! {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks, &mut system.peripheral_clock_control);
+    let timer_group0 = TimerGroup::new(
+        peripherals.TIMG0,
+        &clocks,
+        &mut system.peripheral_clock_control,
+    );
     let mut timer0 = timer_group0.timer0;
     let mut wdt = timer_group0.wdt;
 
@@ -40,7 +44,8 @@ fn main() -> ! {
     wdt.disable();
     rtc.rwdt.disable();
 
-    let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE, &mut system.peripheral_clock_control);
+    let mut usb_serial =
+        UsbSerialJtag::new(peripherals.USB_DEVICE, &mut system.peripheral_clock_control);
 
     usb_serial.listen_rx_packet_recv_interrupt();
 

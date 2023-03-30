@@ -30,7 +30,11 @@ fn main() -> ! {
     let mut system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks, &mut system.peripheral_clock_control);
+    let timer_group0 = TimerGroup::new(
+        peripherals.TIMG0,
+        &clocks,
+        &mut system.peripheral_clock_control,
+    );
     let mut wdt = timer_group0.wdt;
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
 
@@ -51,7 +55,13 @@ fn main() -> ! {
         io.pins.gpio2.into_floating_input(),
     );
 
-    let mut serial1 = Uart::new_with_config(peripherals.UART1, Some(config), Some(pins), &clocks, &mut system.peripheral_clock_control);
+    let mut serial1 = Uart::new_with_config(
+        peripherals.UART1,
+        Some(config),
+        Some(pins),
+        &clocks,
+        &mut system.peripheral_clock_control,
+    );
 
     let mut delay = Delay::new(&clocks);
 

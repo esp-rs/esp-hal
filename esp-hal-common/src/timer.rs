@@ -65,7 +65,11 @@ impl<'d, T> TimerGroup<'d, T>
 where
     T: TimerGroupInstance,
 {
-    pub fn new(timer_group: impl Peripheral<P = T> + 'd, clocks: &Clocks, peripheral_clock_control: &mut PeripheralClockControl) -> Self {
+    pub fn new(
+        timer_group: impl Peripheral<P = T> + 'd,
+        clocks: &Clocks,
+        peripheral_clock_control: &mut PeripheralClockControl,
+    ) -> Self {
         crate::into_ref!(timer_group);
 
         let timer0 = Timer::new(
@@ -73,7 +77,7 @@ where
                 phantom: PhantomData::default(),
             },
             clocks.apb_clock,
-            peripheral_clock_control
+            peripheral_clock_control,
         );
 
         #[cfg(not(any(esp32c2, esp32c3, esp32c6)))]
@@ -82,7 +86,7 @@ where
                 phantom: PhantomData::default(),
             },
             clocks.apb_clock,
-            peripheral_clock_control
+            peripheral_clock_control,
         );
 
         let wdt = Wdt::new(peripheral_clock_control);
@@ -109,7 +113,11 @@ where
     T: Instance,
 {
     /// Create a new timer instance
-    pub fn new(timg: T, apb_clk_freq: HertzU32, peripheral_clock_control: &mut PeripheralClockControl) -> Self {
+    pub fn new(
+        timg: T,
+        apb_clk_freq: HertzU32,
+        peripheral_clock_control: &mut PeripheralClockControl,
+    ) -> Self {
         // TODO: this currently assumes APB_CLK is being used, as we don't yet have a
         //       way to select the XTAL_CLK.
         timg.enable_peripheral(peripheral_clock_control);

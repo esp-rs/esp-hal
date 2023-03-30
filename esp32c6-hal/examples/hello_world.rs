@@ -25,10 +25,18 @@ fn main() -> ! {
 
     let mut uart0 = Uart::new(peripherals.UART0, &mut system.peripheral_clock_control);
     let mut rtc = Rtc::new(peripherals.LP_CLKRST);
-    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks, &mut system.peripheral_clock_control);
+    let timer_group0 = TimerGroup::new(
+        peripherals.TIMG0,
+        &clocks,
+        &mut system.peripheral_clock_control,
+    );
     let mut timer0 = timer_group0.timer0;
     let mut wdt0 = timer_group0.wdt;
-    let timer_group1 = TimerGroup::new(peripherals.TIMG1, &clocks, &mut system.peripheral_clock_control);
+    let timer_group1 = TimerGroup::new(
+        peripherals.TIMG1,
+        &clocks,
+        &mut system.peripheral_clock_control,
+    );
     let mut wdt1 = timer_group1.wdt;
 
     // Disable watchdog timers

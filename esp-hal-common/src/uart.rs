@@ -288,7 +288,10 @@ where
     }
 
     /// Create a new UART instance with defaults
-    pub fn new(uart: impl Peripheral<P = T> + 'd, peripheral_clock_control: &mut PeripheralClockControl) -> Self {
+    pub fn new(
+        uart: impl Peripheral<P = T> + 'd,
+        peripheral_clock_control: &mut PeripheralClockControl,
+    ) -> Self {
         crate::into_ref!(uart);
         uart.enable_peripheral(peripheral_clock_control);
         let mut serial = Uart { uart };
