@@ -1,3 +1,8 @@
+//! Procedural macros for placing statics and functions into RAM, and for
+//! marking interrupt handlers.
+
+#![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
+
 use darling::FromMeta;
 use proc_macro::{self, Span, TokenStream};
 use proc_macro_error::{abort, proc_macro_error};
@@ -39,7 +44,6 @@ struct RamArgs {
 /// (e.g. to persist it across resets or deep sleep mode for the RTC RAM)
 ///
 /// Not all targets support RTC slow ram.
-
 #[proc_macro_attribute]
 #[proc_macro_error]
 pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
@@ -414,6 +418,7 @@ impl Parse for MakeGpioEnumDispatchMacro {
     }
 }
 
+/// Create an enum for erased GPIO pins, using the enum-dispatch pattern
 #[proc_macro]
 pub fn make_gpio_enum_dispatch_macro(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as MakeGpioEnumDispatchMacro);

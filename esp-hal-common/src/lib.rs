@@ -28,6 +28,7 @@
     feature(async_fn_in_trait),
     feature(impl_trait_projections)
 )]
+#![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 
 #[cfg(riscv)]
 pub use esp_riscv_rt::{self, entry, riscv};
