@@ -15,3 +15,10 @@ Cargo.lock
 
 # Other
 **/settings.json
+
+# wokwi related files
+diagram.json
+wokwi.toml
+
+# vscode
+.vscode
