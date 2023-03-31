@@ -54,6 +54,19 @@ pub enum Peripheral {
     Twai0,
     #[cfg(twai1)]
     Twai1,
+    #[cfg(timg0)]
+    Timg0,
+    #[cfg(timg1)]
+    Timg1,
+    #[cfg(lp_wdt)]
+    Wdt,
+    Sha,
+    #[cfg(usb_device)]
+    UsbDevice,
+    Uart0,
+    Uart1,
+    #[cfg(uart2)]
+    Uart2,
 }
 
 /// Controls the enablement of peripheral clocks.
@@ -190,6 +203,60 @@ impl PeripheralClockControl {
                 perip_clk_en1.modify(|_, w| w.crypto_aes_clk_en().set_bit());
                 perip_rst_en1.modify(|_, w| w.crypto_aes_rst().clear_bit());
             }
+            #[cfg(timg0)]
+            Peripheral::Timg0 => {
+                #[cfg(any(esp32c3, esp32s2, esp32s3))]
+                perip_clk_en0.modify(|_, w| w.timers_clk_en().set_bit());
+                perip_clk_en0.modify(|_, w| w.timergroup_clk_en().set_bit());
+
+                #[cfg(any(esp32c3, esp32s2, esp32s3))]
+                perip_rst_en0.modify(|_, w| w.timers_rst().clear_bit());
+                perip_rst_en0.modify(|_, w| w.timergroup_rst().clear_bit());
+            }
+            #[cfg(timg1)]
+            Peripheral::Timg1 => {
+                #[cfg(any(esp32c3, esp32s2, esp32s3))]
+                perip_clk_en0.modify(|_, w| w.timers_clk_en().set_bit());
+                perip_clk_en0.modify(|_, w| w.timergroup1_clk_en().set_bit());
+
+                #[cfg(any(esp32c3, esp32s2, esp32s3))]
+                perip_rst_en0.modify(|_, w| w.timers_rst().clear_bit());
+                perip_rst_en0.modify(|_, w| w.timergroup1_rst().clear_bit());
+            }
+            Peripheral::Sha => {
+                #[cfg(not(esp32))]
+                perip_clk_en1.modify(|_, w| w.crypto_sha_clk_en().set_bit());
+                #[cfg(not(esp32))]
+                perip_rst_en1.modify(|_, w| w.crypto_sha_rst().clear_bit());
+            }
+            #[cfg(esp32c3)]
+            Peripheral::UsbDevice => {
+                perip_clk_en0.modify(|_, w| w.usb_device_clk_en().set_bit());
+                perip_rst_en0.modify(|_, w| w.usb_device_rst().clear_bit());
+            }
+            #[cfg(esp32s3)]
+            Peripheral::UsbDevice => {
+                perip_clk_en1.modify(|_, w| w.usb_device_clk_en().set_bit());
+                perip_rst_en1.modify(|_, w| w.usb_device_rst().clear_bit());
+            }
+            Peripheral::Uart0 => {
+                perip_clk_en0.modify(|_, w| w.uart_clk_en().set_bit());
+                perip_rst_en0.modify(|_, w| w.uart_rst().clear_bit());
+            }
+            Peripheral::Uart1 => {
+                perip_clk_en0.modify(|_, w| w.uart1_clk_en().set_bit());
+                perip_rst_en0.modify(|_, w| w.uart1_rst().clear_bit());
+            }
+            #[cfg(all(uart2, esp32s3))]
+            Peripheral::Uart2 => {
+                perip_clk_en1.modify(|_, w| w.uart2_clk_en().set_bit());
+                perip_rst_en1.modify(|_, w| w.uart2_rst().clear_bit());
+            }
+            #[cfg(all(uart2, esp32))]
+            Peripheral::Uart2 => {
+                perip_clk_en0.modify(|_, w| w.uart2_clk_en().set_bit());
+                perip_rst_en0.modify(|_, w| w.uart2_rst().clear_bit());
+            }
         }
     }
 }
@@ -272,6 +339,64 @@ impl PeripheralClockControl {
             Peripheral::Pcnt => {
                 system.pcnt_conf.modify(|_, w| w.pcnt_clk_en().set_bit());
                 system.pcnt_conf.modify(|_, w| w.pcnt_rst_en().clear_bit());
+            }
+            #[cfg(timg0)]
+            Peripheral::Timg0 => {
+                system
+                    .timergroup0_timer_clk_conf
+                    .write(|w| w.tg0_timer_clk_en().set_bit());
+                system
+                    .timergroup0_timer_clk_conf
+                    .write(|w| unsafe { w.tg0_timer_clk_sel().bits(1) });
+            }
+            #[cfg(timg1)]
+            Peripheral::Timg1 => {
+                system
+                    .timergroup1_timer_clk_conf
+                    .write(|w| w.tg1_timer_clk_en().set_bit());
+                system
+                    .timergroup1_timer_clk_conf
+                    .write(|w| unsafe { w.tg1_timer_clk_sel().bits(1) });
+            }
+            #[cfg(lp_wdt)]
+            Peripheral::Wdt => {
+                system
+                    .timergroup0_wdt_clk_conf
+                    .write(|w| w.tg0_wdt_clk_en().set_bit());
+                system
+                    .timergroup0_wdt_clk_conf
+                    .write(|w| unsafe { w.tg0_wdt_clk_sel().bits(1) });
+
+                system
+                    .timergroup1_timer_clk_conf
+                    .write(|w| w.tg1_timer_clk_en().set_bit());
+                system
+                    .timergroup1_timer_clk_conf
+                    .write(|w| unsafe { w.tg1_timer_clk_sel().bits(1) });
+            }
+            Peripheral::Sha => {
+                system.sha_conf.modify(|_, w| w.sha_clk_en().set_bit());
+                system.sha_conf.modify(|_, w| w.sha_rst_en().clear_bit());
+            }
+            Peripheral::UsbDevice => {
+                system
+                    .usb_device_conf
+                    .modify(|_, w| w.usb_device_clk_en().set_bit());
+                system
+                    .usb_device_conf
+                    .modify(|_, w| w.usb_device_rst_en().clear_bit());
+            }
+            Peripheral::Uart0 => {
+                system.uart0_conf.modify(|_, w| w.uart0_clk_en().set_bit());
+                system
+                    .uart0_conf
+                    .modify(|_, w| w.uart0_rst_en().clear_bit());
+            }
+            Peripheral::Uart1 => {
+                system.uart1_conf.modify(|_, w| w.uart1_clk_en().set_bit());
+                system
+                    .uart1_conf
+                    .modify(|_, w| w.uart1_rst_en().clear_bit());
             }
         }
     }

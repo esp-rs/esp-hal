@@ -3,6 +3,7 @@ use core::convert::Infallible;
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::SHA,
+    system::PeripheralClockControl,
 };
 
 // All the hash algorithms introduced in FIPS PUB 180-4 Spec.
@@ -227,8 +228,13 @@ fn mode_as_bits(mode: ShaMode) -> u8 {
 // This implementation might fail after u32::MAX/8 bytes, to increase please see
 // ::finish() length/self.cursor usage
 impl<'d> Sha<'d> {
-    pub fn new(sha: impl Peripheral<P = SHA> + 'd, mode: ShaMode) -> Self {
+    pub fn new(
+        sha: impl Peripheral<P = SHA> + 'd,
+        mode: ShaMode,
+        peripheral_clock_control: &mut PeripheralClockControl,
+    ) -> Self {
         crate::into_ref!(sha);
+        peripheral_clock_control.enable(crate::system::Peripheral::Sha);
 
         // Setup SHA Mode
         #[cfg(not(esp32))]

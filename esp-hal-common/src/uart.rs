@@ -12,6 +12,7 @@ use crate::{
         UART0,
         UART1,
     },
+    system::PeripheralClockControl,
 };
 
 const UART_FIFO_SIZE: u16 = 128;
@@ -256,11 +257,13 @@ where
         config: Option<Config>,
         mut pins: Option<P>,
         clocks: &Clocks,
+        peripheral_clock_control: &mut PeripheralClockControl,
     ) -> Self
     where
         P: UartPins,
     {
         crate::into_ref!(uart);
+        uart.enable_peripheral(peripheral_clock_control);
         let mut serial = Uart { uart };
         serial.uart.disable_rx_interrupts();
         serial.uart.disable_tx_interrupts();
@@ -285,8 +288,12 @@ where
     }
 
     /// Create a new UART instance with defaults
-    pub fn new(uart: impl Peripheral<P = T> + 'd) -> Self {
+    pub fn new(
+        uart: impl Peripheral<P = T> + 'd,
+        peripheral_clock_control: &mut PeripheralClockControl,
+    ) -> Self {
         crate::into_ref!(uart);
+        uart.enable_peripheral(peripheral_clock_control);
         let mut serial = Uart { uart };
         serial.uart.disable_rx_interrupts();
         serial.uart.disable_tx_interrupts();
@@ -787,6 +794,8 @@ pub trait Instance {
     fn cts_signal(&self) -> InputSignal;
 
     fn rts_signal(&self) -> OutputSignal;
+
+    fn enable_peripheral(&self, peripheral_clock_control: &mut PeripheralClockControl);
 }
 
 impl Instance for UART0 {
@@ -814,6 +823,10 @@ impl Instance for UART0 {
 
     fn rts_signal(&self) -> OutputSignal {
         OutputSignal::U0RTS
+    }
+
+    fn enable_peripheral(&self, peripheral_clock_control: &mut PeripheralClockControl) {
+        peripheral_clock_control.enable(crate::system::Peripheral::Uart0);
     }
 }
 
@@ -843,6 +856,10 @@ impl Instance for UART1 {
     fn rts_signal(&self) -> OutputSignal {
         OutputSignal::U1RTS
     }
+
+    fn enable_peripheral(&self, peripheral_clock_control: &mut PeripheralClockControl) {
+        peripheral_clock_control.enable(crate::system::Peripheral::Uart1);
+    }
 }
 
 #[cfg(uart2)]
@@ -871,6 +888,10 @@ impl Instance for UART2 {
 
     fn rts_signal(&self) -> OutputSignal {
         OutputSignal::U2RTS
+    }
+
+    fn enable_peripheral(&self, peripheral_clock_control: &mut PeripheralClockControl) {
+        peripheral_clock_control.enable(crate::system::Peripheral::Uart2);
     }
 }
 
