@@ -50,6 +50,8 @@ pub enum Peripheral {
     Usb,
     #[cfg(aes)]
     Aes,
+    #[cfg(hmac)]
+    Hmac,
     #[cfg(twai0)]
     Twai0,
     #[cfg(twai1)]
@@ -202,6 +204,11 @@ impl PeripheralClockControl {
             Peripheral::Aes => {
                 perip_clk_en1.modify(|_, w| w.crypto_aes_clk_en().set_bit());
                 perip_rst_en1.modify(|_, w| w.crypto_aes_rst().clear_bit());
+            }
+            #[cfg(any(esp32s2, esp32s3, esp32c3, esp32c6))]
+            Peripheral::Hmac => {
+                perip_clk_en1.modify(|_, w| w.crypto_hmac_clk_en().set_bit());
+                perip_rst_en1.modify(|_, w| w.crypto_hmac_rst().clear_bit());
             }
             #[cfg(timg0)]
             Peripheral::Timg0 => {

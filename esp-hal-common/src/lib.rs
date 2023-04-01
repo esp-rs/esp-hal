@@ -80,6 +80,8 @@ pub mod dma;
 pub mod embassy;
 #[cfg(gpio)]
 pub mod gpio;
+#[cfg(hmac)]
+pub mod hmac;
 #[cfg(any(i2c0, i2c1))]
 pub mod i2c;
 #[cfg(any(i2s0, i2s1))]
@@ -123,6 +125,7 @@ pub mod twai;
 pub mod uart;
 #[cfg(usb_device)]
 pub mod usb_serial_jtag;
+pub mod utils;
 
 /// State of the CPU saved when entering exception or interrupt
 pub mod trapframe {

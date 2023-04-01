@@ -1,5 +1,5 @@
 [target.riscv32imc-unknown-none-elf]
-runner = "espflash flash --monitor"
+runner = "espflash --monitor"
 rustflags = [
   "-C", "link-arg=-Tlinkall.x",
 
