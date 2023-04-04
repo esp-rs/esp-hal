@@ -102,6 +102,8 @@ pub mod prelude;
 pub mod pulse_control;
 #[cfg(radio)]
 pub mod radio;
+#[cfg(any(hmac, sha))]
+pub mod reg_access;
 pub mod reset;
 #[cfg(rng)]
 pub mod rng;
@@ -125,7 +127,6 @@ pub mod twai;
 pub mod uart;
 #[cfg(usb_device)]
 pub mod usb_serial_jtag;
-pub mod utils;
 
 /// State of the CPU saved when entering exception or interrupt
 pub mod trapframe {

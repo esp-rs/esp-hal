@@ -2,8 +2,10 @@ use core::convert::Infallible;
 
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
+    // peripherals::generic::{Readable, Reg, RegisterSpec, Resettable, Writable},
     peripherals::SHA,
-    system::PeripheralClockControl,
+    reg_access::AlignmentHelper,
+    system::{Peripheral as PeripheralEnable, PeripheralClockControl},
 };
 
 // All the hash algorithms introduced in FIPS PUB 180-4 Spec.
@@ -19,194 +21,29 @@ use crate::{
 // – Typical SHA
 // – DMA-SHA (not implemented yet)
 
-const ALIGN_SIZE: usize = core::mem::size_of::<u32>();
-
-// ESP32 does reversed order
-#[cfg(esp32)]
-const U32_FROM_BYTES: fn([u8; 4]) -> u32 = u32::from_be_bytes;
-
-#[cfg(not(esp32))]
-const U32_FROM_BYTES: fn([u8; 4]) -> u32 = u32::from_ne_bytes;
-
-// The alignment helper helps you write to registers that only accepts u32 using
-// regular u8s (bytes) It keeps a write buffer of 4 u8 (could in theory be 3 but
-// less convient) And if the incoming data is not convertable to u32 (i.e. not a
-// multiple of 4 in length) it will store the remainder in the buffer until the
-// next call
-//
-// It assumes incoming `dst` are aligned to desired layout (in future
-// ptr.is_aligned can be used) It also assumes that writes are done in FIFO
-// order
-#[derive(Debug)]
-struct AlignmentHelper {
-    buf: [u8; ALIGN_SIZE],
-    buf_fill: usize,
-}
-
-impl AlignmentHelper {
-    pub fn default() -> AlignmentHelper {
-        AlignmentHelper {
-            buf: [0u8; ALIGN_SIZE],
-            buf_fill: 0,
-        }
-    }
-
-    // This function will write any remaining buffer to dst and return the amount of
-    // *bytes* written (0 means no write)
-    pub unsafe fn flush_to(&mut self, dst: *mut u32) -> usize {
-        if self.buf_fill != 0 {
-            for i in self.buf_fill..ALIGN_SIZE {
-                self.buf[i] = 0;
-            }
-
-            dst.write_volatile(U32_FROM_BYTES(self.buf));
-        }
-
-        let flushed = self.buf_fill;
-        self.buf_fill = 0;
-
-        return flushed;
-    }
-
-    // This function is similar to `volatile_set_memory` but will prepend data that
-    // was previously ingested and ensure aligned (u32) writes
-    #[allow(unused)]
-    pub unsafe fn volatile_write_bytes(&mut self, dst: *mut u32, val: u8, count: usize) {
-        let mut cursor = 0;
-        if self.buf_fill != 0 {
-            for i in self.buf_fill..ALIGN_SIZE {
-                self.buf[i] = val;
-            }
-
-            dst.write_volatile(U32_FROM_BYTES(self.buf));
-            cursor = 1;
-
-            self.buf_fill = 0;
-        }
-
-        core::ptr::write_bytes(dst.add(cursor), val, count);
-    }
-
-    // This function is similar to `volatile_copy_nonoverlapping_memory`, however it
-    // buffers up to a u32 in order to always write to registers in an aligned
-    // way. Additionally it will keep stop writing when the end of the register
-    // (defined by `dst_bound` relative to `dst`) and returns the remaining data
-    // (if not possible to write everything), and if it wrote till dst_bound or
-    // exited early (due to lack of data).
-    pub unsafe fn aligned_volatile_copy<'a>(
-        &mut self,
-        dst: *mut u32,
-        src: &'a [u8],
-        dst_bound: usize,
-    ) -> (&'a [u8], bool) {
-        assert!(dst_bound > 0);
-
-        let mut nsrc = src;
-        let mut cursor = 0;
-        if self.buf_fill != 0 {
-            // First prepend existing data
-            let max_fill = ALIGN_SIZE - self.buf_fill;
-            let (nbuf, src) = src.split_at(core::cmp::min(src.len(), max_fill));
-            nsrc = src;
-            for i in 0..max_fill {
-                match nbuf.get(i) {
-                    Some(v) => {
-                        self.buf[self.buf_fill + i] = *v;
-                        self.buf_fill += 1;
-                    }
-                    None => return (&[], false), // Used up entire buffer before filling buff_fil
-                }
-            }
-
-            dst.write_volatile(U32_FROM_BYTES(self.buf));
-            cursor += 1;
-
-            self.buf_fill = 0;
-        }
-
-        if dst_bound <= cursor * ALIGN_SIZE {
-            return (nsrc, true);
-        }
-
-        let (to_write, remaining) = nsrc.split_at(core::cmp::min(
-            dst_bound - cursor * ALIGN_SIZE,
-            (nsrc.len() / ALIGN_SIZE) * ALIGN_SIZE, // TODO: unstable div_floor for clarity?
-        ));
-
-        if to_write.len() > 0 {
-            // Raw v_c_n_m also works but only when src.len() >= 4 * ALIGN_SIZE, otherwise
-            // it be broken
-            // core::intrinsics::volatile_copy_nonoverlapping_memory::<u32>(dst.add(cursor),
-            // to_write.as_ptr() as *const u32, to_write.len()/alignment);
-            for (i, v) in to_write.chunks_exact(ALIGN_SIZE).enumerate() {
-                dst.add(i)
-                    .write_volatile(U32_FROM_BYTES(v.try_into().unwrap()).to_be());
-            }
-        }
-
-        // If it's data we can't store we don't need to try and align it, just wait for
-        // next write Generally this applies when (src/4*4) != src
-        let was_bounded = dst_bound - to_write.len() == 0;
-        if remaining.len() > 0 && remaining.len() < 4 {
-            for i in 0..remaining.len() {
-                self.buf[i] = remaining[i];
-            }
-
-            self.buf_fill = remaining.len();
-
-            return (&[], was_bounded);
-        }
-
-        return (remaining, was_bounded);
-    }
-}
-
 pub struct Sha<'d> {
     sha: PeripheralRef<'d, SHA>,
     mode: ShaMode,
     alignment_helper: AlignmentHelper,
     cursor: usize,
     first_run: bool,
-    finished: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub enum ShaMode {
-    SHA1,
+    SHA1 = 0,
     #[cfg(not(esp32))]
-    SHA224,
-    SHA256,
+    SHA224 = 1,
+    SHA256 = 2,
     #[cfg(any(esp32s2, esp32s3, esp32))]
-    SHA384,
+    SHA384 = 3,
     #[cfg(any(esp32s2, esp32s3, esp32))]
-    SHA512,
+    SHA512 = 4,
     #[cfg(any(esp32s2, esp32s3))]
-    SHA512_224,
+    SHA512_224 = 5,
     #[cfg(any(esp32s2, esp32s3))]
-    SHA512_256,
+    SHA512_256 = 6,
     // SHA512_(u16) // Max 511
-}
-
-// TODO: Maybe make Sha Generic (Sha<Mode>) in order to allow for better
-// compiler optimizations? (Requires complex const generics which isn't stable
-// yet)
-
-#[cfg(not(esp32))]
-fn mode_as_bits(mode: ShaMode) -> u8 {
-    match mode {
-        ShaMode::SHA1 => 0,
-        ShaMode::SHA224 => 1,
-        ShaMode::SHA256 => 2,
-        #[cfg(any(esp32s2, esp32s3))]
-        ShaMode::SHA384 => 3,
-        #[cfg(any(esp32s2, esp32s3))]
-        ShaMode::SHA512 => 4,
-        #[cfg(any(esp32s2, esp32s3))]
-        ShaMode::SHA512_224 => 5,
-        #[cfg(any(esp32s2, esp32s3))]
-        ShaMode::SHA512_256 => 6,
-        // _ => 0 // TODO: SHA512/t
-    }
 }
 
 // TODO: Allow/Implemenet SHA512_(u16)
@@ -217,13 +54,11 @@ fn mode_as_bits(mode: ShaMode) -> u8 {
 // - The registers are *not* cleared after processing, so padding needs to be
 //   written out
 // - This component uses core::intrinsics::volatile_* which is unstable, but is
-//   the only way to
-// efficiently copy memory with volatile
+//   the only way to efficiently copy memory with volatile
 // - For this particular registers (and probably others), a full u32 needs to be
-//   written partial
-// register writes (i.e. in u8 mode) does not work
-//   - This means that we need to buffer bytes coming in up to 4 u8's in order
-//     to create a full u32
+//   written. Partial register writes (i.e. in u8 mode) does not work
+// - This means that we need to buffer bytes coming in up to 4 u8's in order
+//   to create a full u32
 
 // This implementation might fail after u32::MAX/8 bytes, to increase please see
 // ::finish() length/self.cursor usage
@@ -234,43 +69,45 @@ impl<'d> Sha<'d> {
         peripheral_clock_control: &mut PeripheralClockControl,
     ) -> Self {
         crate::into_ref!(sha);
-        peripheral_clock_control.enable(crate::system::Peripheral::Sha);
+
+        peripheral_clock_control.enable(PeripheralEnable::Sha);
 
         // Setup SHA Mode
         #[cfg(not(esp32))]
-        sha.mode
-            .write(|w| unsafe { w.mode().bits(mode_as_bits(mode)) });
+        sha.mode.write(|w| unsafe { w.mode().bits(mode as u8) });
 
         Self {
             sha,
             mode,
             cursor: 0,
             first_run: true,
-            finished: false,
             alignment_helper: AlignmentHelper::default(),
         }
     }
 
-    pub fn first_run(&self) -> bool {
-        self.first_run
-    }
-
-    pub fn finished(&self) -> bool {
-        self.finished
+    pub fn setmode(&mut self, mode: ShaMode) {
+        // Setup SHA Mode
+        #[cfg(not(esp32))]
+        self.sha
+            .mode
+            .write(|w| unsafe { w.mode().bits(mode as u8) });
     }
 
     #[cfg(not(esp32))]
+    #[inline]
     fn process_buffer(&mut self) {
         // FIXME: SHA_START_REG & SHA_CONTINUE_REG are wrongly marked as RO (they are
         // WO)
         if self.first_run {
             // Set SHA_START_REG
+            // self.sha.start.write(|w| w.start().set_bit());
             unsafe {
                 self.sha.start.as_ptr().write_volatile(1u32);
             }
             self.first_run = false;
         } else {
             // SET SHA_CONTINUE_REG
+            // self.sha.continue_.write(|w| w.continue_op().set_bit());
             unsafe {
                 self.sha.continue_.as_ptr().write_volatile(1u32);
             }
@@ -278,6 +115,7 @@ impl<'d> Sha<'d> {
     }
 
     #[cfg(esp32)]
+    #[inline]
     fn process_buffer(&mut self) {
         if self.first_run {
             match self.mode {
@@ -297,17 +135,19 @@ impl<'d> Sha<'d> {
         }
     }
 
+    #[inline]
     fn chunk_length(&self) -> usize {
         return match self.mode {
             ShaMode::SHA1 | ShaMode::SHA256 => 64,
             #[cfg(not(esp32))]
             ShaMode::SHA224 => 64,
-            #[cfg(not(any(esp32c2, esp32c3, esp32c6)))]
+            #[cfg(not(any(esp32c2, esp32c3)))]
             _ => 128,
         };
     }
 
     #[cfg(esp32)]
+    #[inline]
     fn is_busy(&self) -> bool {
         match self.mode {
             ShaMode::SHA1 => self.sha.sha1_busy.read().sha1_busy().bit_is_set(),
@@ -318,6 +158,7 @@ impl<'d> Sha<'d> {
     }
 
     #[cfg(not(esp32))]
+    #[inline]
     fn is_busy(&self) -> bool {
         self.sha.busy.read().bits() != 0
     }
@@ -339,42 +180,26 @@ impl<'d> Sha<'d> {
         }
     }
 
-    #[cfg(not(esp32))]
-    fn input_ptr(&self) -> *mut u32 {
-        return self.sha.m_mem[0].as_ptr() as *mut u32;
-    }
-
-    #[cfg(esp32)]
-    fn input_ptr(&self) -> *mut u32 {
-        return self.sha.text[0].as_ptr() as *mut u32;
-    }
-
-    #[cfg(not(esp32))]
-    fn output_ptr(&self) -> *const u32 {
-        return self.sha.h_mem[0].as_ptr() as *const u32;
-    }
-
-    #[cfg(esp32)]
-    fn output_ptr(&self) -> *const u32 {
-        return self.sha.text[0].as_ptr() as *const u32;
-    }
-
+    #[inline]
     fn flush_data(&mut self) -> nb::Result<(), Infallible> {
         if self.is_busy() {
             return Err(nb::Error::WouldBlock);
         }
 
-        unsafe {
-            let dst_ptr = self
-                .input_ptr()
-                .add((self.cursor % self.chunk_length()) / ALIGN_SIZE);
-            let flushed = self.alignment_helper.flush_to(dst_ptr);
-            if flushed != 0 {
-                self.cursor = self.cursor.wrapping_add(ALIGN_SIZE - flushed);
-                if self.cursor % self.chunk_length() == 0 {
-                    self.process_buffer();
-                }
-            }
+        let chunk_len = self.chunk_length();
+
+        let flushed = self.alignment_helper.flush_to(
+            #[cfg(esp32)]
+            &mut self.sha.text,
+            #[cfg(not(esp32))]
+            &mut self.sha.m_mem,
+            (self.cursor % chunk_len) / self.alignment_helper.align_size(),
+        );
+
+        self.cursor = self.cursor.wrapping_add(flushed);
+        if flushed > 0 && self.cursor % chunk_len == 0 {
+            self.process_buffer();
+            while self.is_busy() {}
         }
 
         Ok(())
@@ -382,31 +207,71 @@ impl<'d> Sha<'d> {
 
     // This function ensures that incoming data is aligned to u32 (due to issues
     // with cpy_mem<u8>)
+    #[inline]
     fn write_data<'a>(&mut self, incoming: &'a [u8]) -> nb::Result<&'a [u8], Infallible> {
         let mod_cursor = self.cursor % self.chunk_length();
 
-        unsafe {
-            let ptr = self.input_ptr().add(mod_cursor / ALIGN_SIZE);
-            let (remaining, bound_reached) = self.alignment_helper.aligned_volatile_copy(
-                ptr,
-                incoming,
-                self.chunk_length() - mod_cursor,
-            );
-            self.cursor = self.cursor.wrapping_add(incoming.len() - remaining.len());
-            if bound_reached {
-                self.process_buffer();
-            }
+        let chunk_len = self.chunk_length();
 
-            Ok(remaining)
+        let (remaining, bound_reached) = self.alignment_helper.aligned_volatile_copy(
+            #[cfg(esp32)]
+            &mut self.sha.text,
+            #[cfg(not(esp32))]
+            &mut self.sha.m_mem,
+            incoming,
+            chunk_len / self.alignment_helper.align_size(),
+            mod_cursor / self.alignment_helper.align_size(),
+        );
+
+        self.cursor = self.cursor.wrapping_add(incoming.len() - remaining.len());
+
+        if bound_reached {
+            self.process_buffer();
         }
+
+        Ok(remaining)
     }
+
+    /*#[cfg(esp32)]
+    #[inline]
+    fn input_ptr(&mut self) -> &mut [Reg<impl RegisterSpec<Ux = u32> + Resettable + Writable>] {
+        &mut self.sha.text
+    }
+
+    #[cfg(any(esp32s3, esp32c3, esp32c6))]
+    #[inline]
+    fn input_ptr(&mut self) -> &mut [Reg<impl RegisterSpec<Ux = u8> + Resettable + Writable>] {
+        &mut self.sha.m_mem
+    }
+
+    #[cfg(esp32s2)]
+    #[inline]
+    fn input_ptr(&mut self) -> &mut [Reg<impl RegisterSpec<Ux = u32> + Resettable + Writable>] {
+        &mut self.sha.m_mem
+    }
+
+    #[cfg(esp32)]
+    #[inline]
+    fn output_ptr(&mut self) -> &[Reg<impl RegisterSpec<Ux = u32> + Readable>] {
+        &self.sha.text
+    }
+
+    #[cfg(any(esp32s3, esp32c3, esp32c6))]
+    #[inline]
+    fn output_ptr(&mut self) -> &[Reg<impl RegisterSpec<Ux = u8> + Readable>] {
+        &mut self.sha.h_mem
+    }
+
+    #[cfg(esp32s2)]
+    #[inline]
+    fn output_ptr(&mut self) -> &[Reg<impl RegisterSpec<Ux = u32> + Readable>] {
+        &mut self.sha.h_mem
+    }*/
 
     pub fn update<'a>(&mut self, buffer: &'a [u8]) -> nb::Result<&'a [u8], Infallible> {
         if self.is_busy() {
             return Err(nb::Error::WouldBlock);
         }
-
-        self.finished = false;
 
         let remaining = self.write_data(buffer)?;
 
@@ -432,89 +297,88 @@ impl<'d> Sha<'d> {
 
         let chunk_len = self.chunk_length();
 
-        if !self.finished {
-            // Store message length for padding
-            let length = self.cursor * 8;
-            nb::block!(self.update(&[0x80]))?; // Append "1" bit
-            nb::block!(self.flush_data())?; // Flush partial data, ensures aligned cursor
-            debug_assert!(self.cursor % 4 == 0);
+        // Store message length for padding
+        let length = (self.cursor as u64 * 8).to_be_bytes();
+        nb::block!(self.update(&[0x80]))?; // Append "1" bit
+        nb::block!(self.flush_data())?; // Flush partial data, ensures aligned cursor
+        debug_assert!(self.cursor % 4 == 0);
 
-            let mod_cursor = self.cursor % chunk_len;
-            if chunk_len - mod_cursor < chunk_len / 8 {
-                // Zero out remaining data if buffer is almost full (>=448/896), and process
-                // buffer
-                let pad_len = chunk_len - mod_cursor;
-                unsafe {
-                    let m_cursor_ptr = self.input_ptr().add(mod_cursor / ALIGN_SIZE);
-                    self.alignment_helper.volatile_write_bytes(
-                        m_cursor_ptr,
-                        0,
-                        pad_len / ALIGN_SIZE,
-                    );
-                }
-                self.process_buffer();
-                self.cursor = self.cursor.wrapping_add(pad_len);
-
-                // Spin-wait for finish
-                while self.is_busy() {}
-            }
-
-            let mod_cursor = self.cursor % chunk_len; // Should be zero if branched above
-            unsafe {
-                let m_cursor_ptr = self.input_ptr();
-                // Pad zeros
-                let pad_ptr = m_cursor_ptr.add(mod_cursor / ALIGN_SIZE);
-                let pad_len = (chunk_len - mod_cursor) - ALIGN_SIZE;
-
-                self.alignment_helper
-                    .volatile_write_bytes(pad_ptr, 0, pad_len / ALIGN_SIZE);
-
-                // Write length (BE) to end
-                // NOTE: aligned_volatile_copy does not work here
-                // The decompiler suggest volatile_copy_memory/write_volatile is optimized to a
-                // simple *v = *pv; While the aligned_volatile_copy makes an
-                // actual call to memcpy, why this makes a difference when
-                // memcpy does works in other places, I don't know
-                let end_ptr = m_cursor_ptr.add((chunk_len / ALIGN_SIZE) - 1);
-                #[cfg(not(esp32))]
-                end_ptr.write_volatile(length.to_be() as u32);
+        let mod_cursor = self.cursor % chunk_len;
+        if (chunk_len - mod_cursor) < core::mem::size_of::<u64>() {
+            // Zero out remaining data if buffer is almost full (>=448/896), and process
+            // buffer
+            let pad_len = chunk_len - mod_cursor;
+            self.alignment_helper.volatile_write_bytes(
                 #[cfg(esp32)]
-                end_ptr.write_volatile(length.to_le() as u32);
-            }
-
+                &mut self.sha.text,
+                #[cfg(not(esp32))]
+                &mut self.sha.m_mem,
+                0_u8,
+                pad_len / self.alignment_helper.align_size(),
+                mod_cursor / self.alignment_helper.align_size(),
+            );
             self.process_buffer();
-            // Spin-wait for final buffer to be processed
+            self.cursor = self.cursor.wrapping_add(pad_len);
+
+            debug_assert_eq!(self.cursor % chunk_len, 0);
+
+            // Spin-wait for finish
             while self.is_busy() {}
+        }
 
-            // ESP32 requires additional load to retrieve output
+        let mod_cursor = self.cursor % chunk_len; // Should be zero if branched above
+        let pad_len = chunk_len - mod_cursor - core::mem::size_of::<u64>();
+
+        self.alignment_helper.volatile_write_bytes(
             #[cfg(esp32)]
-            {
-                match self.mode {
-                    ShaMode::SHA1 => unsafe { self.sha.sha1_load.write(|w| w.bits(1)) },
-                    ShaMode::SHA256 => unsafe { self.sha.sha256_load.write(|w| w.bits(1)) },
-                    ShaMode::SHA384 => unsafe { self.sha.sha384_load.write(|w| w.bits(1)) },
-                    ShaMode::SHA512 => unsafe { self.sha.sha512_load.write(|w| w.bits(1)) },
-                }
+            &mut self.sha.text,
+            #[cfg(not(esp32))]
+            &mut self.sha.m_mem,
+            0_u8,
+            pad_len / self.alignment_helper.align_size(),
+            mod_cursor / self.alignment_helper.align_size(),
+        );
 
-                // Spin wait for result, 8-20 clock cycles according to manual
-                while self.is_busy() {}
+        self.alignment_helper.aligned_volatile_copy(
+            #[cfg(esp32)]
+            &mut self.sha.text,
+            #[cfg(not(esp32))]
+            &mut self.sha.m_mem,
+            &length,
+            chunk_len / self.alignment_helper.align_size(),
+            (chunk_len - core::mem::size_of::<u64>()) / self.alignment_helper.align_size(),
+        );
+
+        self.process_buffer();
+        // Spin-wait for final buffer to be processed
+        while self.is_busy() {}
+
+        // ESP32 requires additional load to retrieve output
+        #[cfg(esp32)]
+        {
+            match self.mode {
+                ShaMode::SHA1 => unsafe { self.sha.sha1_load.write(|w| w.bits(1)) },
+                ShaMode::SHA256 => unsafe { self.sha.sha256_load.write(|w| w.bits(1)) },
+                ShaMode::SHA384 => unsafe { self.sha.sha384_load.write(|w| w.bits(1)) },
+                ShaMode::SHA512 => unsafe { self.sha.sha512_load.write(|w| w.bits(1)) },
             }
 
-            self.finished = true;
+            // Spin wait for result, 8-20 clock cycles according to manual
+            while self.is_busy() {}
         }
 
-        unsafe {
-            let digest_ptr = self.output_ptr();
-            let out_ptr = output.as_mut_ptr() as *mut u32;
-            let digest_out = core::cmp::min(self.digest_length(), output.len()) / ALIGN_SIZE;
-            for i in 0..digest_out {
-                #[cfg(not(esp32))]
-                out_ptr.add(i).write(*digest_ptr.add(i));
-                // ESP32 does reversed order
-                #[cfg(esp32)]
-                out_ptr.add(i).write((*digest_ptr.add(i)).to_be());
-            }
-        }
+        self.alignment_helper.volatile_read_regset(
+            #[cfg(esp32)]
+            &self.sha.text[0],
+            #[cfg(not(esp32))]
+            &self.sha.h_mem[0],
+            output,
+            core::cmp::min(output.len(), 32) / self.alignment_helper.align_size(),
+        );
+
+        self.first_run = true;
+        self.cursor = 0;
+        self.alignment_helper.reset();
 
         Ok(())
     }

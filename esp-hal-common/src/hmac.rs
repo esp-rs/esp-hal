@@ -27,55 +27,18 @@
 //!
 //! # HMAC padding
 //!
-//! If the input message is not a multiple of 512 bits, the user must apply a
-//! SHA-256 padding algorithm in software. The SHA-256 padding algorithm is
-//! the same as described in Section Padding the Message of FIPS PUB 180-4. In
+//! The HMAC padding is handled by the driver. In
 //! downstream mode, users do not need to input any message or apply padding.
 //! The HMAC module uses a default 32-byte pattern of 0x00 for re-enabling JTAG
 //! and a 32-byte pattern of 0xff for deriving the AES key for the DS module.
-//!
-//! # Usage
-//!
-//! Initialization (`enable` and `configure` functions) must be done before
-//! providing a message to be processed.
-//!
-//! ## Case 1 : the length of the message is not a multiple of 64 bytes.
-//!
-//! First, the user is required to apply SHA padding to the message.
-//!
-//! ### Subcase 1 : the length of the message is one block in total including
-//! all padding bits.
-//!
-//! The block must be provided to the `finalize_one_message_block` function.
-//! Then, the user can read the hash results in upstream mode.
-//!
-//! ### Subcase 2 : the length of the message is more than one block in total
-//! including all padding bits.
-//!
-//! All blocks except the last one must be provided to the `update_block`
-//! function. Then, the last block must be provided to the `sw_finalize`
-//! function.
-//!
-//! ## Case 2 : the length of the message is a multiple of 64 bytes.
-//!
-//! ### Subcase 1 : SHA padding has been already applied by users.
-//!
-//! All blocks except the last one must be provided to the `update_block`
-//! function. Then, the last block must be provided to the `sw_finalize`
-//! function.
-//!
-//! ### Subcase 2 : users expects to apply SHA padding in hardware.
-//!
-//! All blocks except the last one must be provided to the `update_block`
-//! function. Then, the last block must be provided to the `hw_finalize`
-//! function.
 
 use core::convert::Infallible;
 
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::HMAC,
-    utils::AlignmentHelper,
+    reg_access::AlignmentHelper,
+    system::{Peripheral as PeripheralEnable, PeripheralClockControl},
 };
 
 pub struct Hmac<'d> {
@@ -124,8 +87,14 @@ enum NextCommand {
 }
 
 impl<'d> Hmac<'d> {
-    pub fn new(hmac: impl Peripheral<P = HMAC> + 'd) -> Self {
+    pub fn new(
+        hmac: impl Peripheral<P = HMAC> + 'd,
+        peripheral_clock_control: &mut PeripheralClockControl,
+    ) -> Self {
         crate::into_ref!(hmac);
+
+        peripheral_clock_control.enable(PeripheralEnable::Sha);
+        peripheral_clock_control.enable(PeripheralEnable::Hmac);
 
         Self {
             hmac,

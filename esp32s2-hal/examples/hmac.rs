@@ -4,14 +4,16 @@
 #![no_std]
 #![no_main]
 
-use esp32c3_hal::{
+use esp32s2_hal::{
     clock::ClockControl,
     hmac::{Hmac, HmacPurpose, KeyId},
     peripherals::Peripherals,
     prelude::*,
     systimer::SystemTimer,
     timer::TimerGroup,
-    Rng, Rtc,
+    xtensa_lx,
+    Rng,
+    Rtc,
 };
 use esp_backtrace as _;
 use esp_println::{print, println};
@@ -34,20 +36,13 @@ fn main() -> ! {
         &clocks,
         &mut system.peripheral_clock_control,
     );
-    let mut wdt0 = timer_group0.wdt;
-    let timer_group1 = TimerGroup::new(
-        peripherals.TIMG1,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
-    let mut wdt1 = timer_group1.wdt;
+    let mut wdt = timer_group0.wdt;
 
     let mut rng = Rng::new(peripherals.RNG);
 
     // Disable MWDT and RWDT (Watchdog) flash boot protection
     rtc.rwdt.disable();
-    wdt0.disable();
-    wdt1.disable();
+    wdt.disable();
 
     // Set sw key
     let key = [0_u8; 32].as_ref();

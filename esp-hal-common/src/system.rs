@@ -205,7 +205,7 @@ impl PeripheralClockControl {
                 perip_clk_en1.modify(|_, w| w.crypto_aes_clk_en().set_bit());
                 perip_rst_en1.modify(|_, w| w.crypto_aes_rst().clear_bit());
             }
-            #[cfg(any(esp32s2, esp32s3, esp32c3))]
+            #[cfg(hmac)]
             Peripheral::Hmac => {
                 perip_clk_en1.modify(|_, w| w.crypto_hmac_clk_en().set_bit());
                 perip_rst_en1.modify(|_, w| w.crypto_hmac_rst().clear_bit());
@@ -345,7 +345,7 @@ impl PeripheralClockControl {
             #[cfg(hmac)]
             Peripheral::Hmac => {
                 system.hmac_conf.modify(|_, w| w.hmac_clk_en().set_bit());
-                system.hmac_conf.modify(|_, w| w.hmac_rst().clear_bit());
+                system.hmac_conf.modify(|_, w| w.hmac_rst_en().clear_bit());
             }
             #[cfg(pcnt)]
             Peripheral::Pcnt => {

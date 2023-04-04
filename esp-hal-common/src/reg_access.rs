@@ -1,10 +1,10 @@
 //! Utils
-//! 
+//!
 //! # Overview
-//! 
+//!
 //! Collection of struct which helps you write to registers.
 
-use crate::peripherals::generic::{Reg, RegisterSpec, Resettable, Writable, Readable};
+use crate::peripherals::generic::{Readable, Reg, RegisterSpec, Resettable, Writable};
 
 const U32_ALIGN_SIZE: usize = core::mem::size_of::<u32>();
 
@@ -55,9 +55,7 @@ impl AlignmentHelper {
                 self.buf[i] = 0;
             }
 
-            let dst_ptr = unsafe {
-                (dst[0].as_ptr() as *mut u32).add(offset)
-            };
+            let dst_ptr = unsafe { (dst[0].as_ptr() as *mut u32).add(offset) };
             unsafe {
                 dst_ptr.write_volatile(U32_FROM_BYTES(self.buf));
             }
@@ -72,13 +70,16 @@ impl AlignmentHelper {
 
     // This function is similar to `volatile_set_memory` but will prepend data that
     // was previously ingested and ensure aligned (u32) writes.
-    pub fn volatile_write_bytes<T, Ux>(&mut self, dst: &mut [Reg<T>], val: u8, count: usize, offset: usize) 
-    where
+    pub fn volatile_write_bytes<T, Ux>(
+        &mut self,
+        dst: &mut [Reg<T>],
+        val: u8,
+        count: usize,
+        offset: usize,
+    ) where
         T: RegisterSpec<Ux = Ux> + Resettable + Writable,
     {
-        let dst_ptr = unsafe {
-            (dst[0].as_ptr() as *mut u32).add(offset)
-        };
+        let dst_ptr = unsafe { (dst[0].as_ptr() as *mut u32).add(offset) };
 
         let mut cursor = if self.buf_fill != 0 {
             for i in self.buf_fill..U32_ALIGN_SIZE {
@@ -94,10 +95,12 @@ impl AlignmentHelper {
         } else {
             0
         };
-        
+
         while cursor < count {
             unsafe {
-                dst_ptr.add(cursor).write_volatile(U32_FROM_BYTES([0_u8; 4]));
+                dst_ptr
+                    .add(cursor)
+                    .write_volatile(U32_FROM_BYTES([0_u8; 4]));
             }
             cursor += 1;
         }
@@ -115,15 +118,13 @@ impl AlignmentHelper {
         src: &'a [u8],
         dst_bound: usize,
         offset: usize,
-    ) -> (&'a [u8], bool) 
+    ) -> (&'a [u8], bool)
     where
         T: RegisterSpec<Ux = Ux> + Resettable + Writable,
     {
         assert!(dst_bound > 0);
 
-        let dst_ptr = unsafe {
-            (dst[0].as_ptr() as *mut u32).add(offset)
-        };
+        let dst_ptr = unsafe { (dst[0].as_ptr() as *mut u32).add(offset) };
 
         let mut nsrc = src;
         let mut cursor = 0;
@@ -162,15 +163,16 @@ impl AlignmentHelper {
         if to_write.len() > 0 {
             for (i, v) in to_write.chunks_exact(U32_ALIGN_SIZE).enumerate() {
                 unsafe {
-                    dst_ptr.add(i + cursor)
-                           .write_volatile(U32_FROM_BYTES(v.try_into().unwrap()));
+                    dst_ptr
+                        .add(i + cursor)
+                        .write_volatile(U32_FROM_BYTES(v.try_into().unwrap()));
                 }
             }
         }
 
         // If it's data we can't store we don't need to try and align it, just wait for
         // next write Generally this applies when (src/4*4) != src
-        let was_bounded = (offset + cursor + to_write.len()/U32_ALIGN_SIZE) == dst_bound;
+        let was_bounded = (offset + cursor + to_write.len() / U32_ALIGN_SIZE) == dst_bound;
 
         if remaining.len() > 0 && remaining.len() < 4 {
             for i in 0..remaining.len() {
@@ -185,12 +187,7 @@ impl AlignmentHelper {
         return (remaining, was_bounded);
     }
 
-    pub fn volatile_write_regset<T, Ux>(
-        &mut self,
-        dst: &mut Reg<T>,
-        src: &[u8],
-        dst_bound: usize,
-    )
+    pub fn volatile_write_regset<T, Ux>(&mut self, dst: &mut Reg<T>, src: &[u8], dst_bound: usize)
     where
         T: RegisterSpec<Ux = Ux> + Resettable + Writable,
     {
@@ -202,18 +199,15 @@ impl AlignmentHelper {
         if src.len() > 0 {
             for (i, v) in src.chunks_exact(U32_ALIGN_SIZE).enumerate() {
                 unsafe {
-                    dst_ptr.add(i).write_volatile(U32_FROM_BYTES(v.try_into().unwrap()));
+                    dst_ptr
+                        .add(i)
+                        .write_volatile(U32_FROM_BYTES(v.try_into().unwrap()));
                 }
             }
         }
     }
 
-    pub fn volatile_read_regset<T, Ux>(
-        &self,
-        src: &Reg<T>,
-        dst: &mut [u8],
-        dst_bound: usize,
-    )
+    pub fn volatile_read_regset<T, Ux>(&self, src: &Reg<T>, dst: &mut [u8], dst_bound: usize)
     where
         T: RegisterSpec<Ux = Ux> + Readable,
     {
@@ -223,9 +217,8 @@ impl AlignmentHelper {
 
         let chunks = dst.chunks_exact_mut(U32_ALIGN_SIZE);
         for (i, chunk) in chunks.enumerate() {
-            let read_val: [u8; U32_ALIGN_SIZE] = unsafe {
-                U32_TO_BYTES(src_ptr.add(i).read_volatile())
-            };
+            let read_val: [u8; U32_ALIGN_SIZE] =
+                unsafe { U32_TO_BYTES(src_ptr.add(i).read_volatile()) };
             chunk.copy_from_slice(&read_val);
         }
     }
