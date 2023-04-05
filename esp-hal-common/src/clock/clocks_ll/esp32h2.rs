@@ -207,6 +207,8 @@ pub(crate) fn esp32h2_rtc_update_to_xtal(freq: XtalClock, _div: u8) {
 
         // Switch clock source
         pcr.sysclk_conf.modify(|_, w| w.soc_clk_sel().bits(0));
+
+        clk_ll_bus_update();
     }
 }
 
