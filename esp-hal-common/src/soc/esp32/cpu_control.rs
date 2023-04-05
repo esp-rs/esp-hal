@@ -187,10 +187,10 @@ impl CpuControl {
     /// The second core will start running the closure `entry`.
     ///
     /// Dropping the returned guard will park the core.
-    pub fn start_app_core(
+    pub fn start_app_core<'a>(
         &mut self,
-        entry: &mut (dyn FnMut() + Send),
-    ) -> Result<AppCoreGuard, Error> {
+        entry: &'a mut (dyn FnMut() + Send),
+    ) -> Result<AppCoreGuard<'a>, Error> {
         let dport_control = crate::peripherals::DPORT::PTR;
         let dport_control = unsafe { &*dport_control };
 
