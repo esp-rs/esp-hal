@@ -31,14 +31,14 @@ pub struct Sha<'d> {
 
 #[derive(Debug, Clone, Copy)]
 pub enum ShaMode {
-    SHA1 = 0,
+    SHA1       = 0,
     #[cfg(not(esp32))]
-    SHA224 = 1,
-    SHA256 = 2,
+    SHA224     = 1,
+    SHA256     = 2,
     #[cfg(any(esp32s2, esp32s3, esp32))]
-    SHA384 = 3,
+    SHA384     = 3,
     #[cfg(any(esp32s2, esp32s3, esp32))]
-    SHA512 = 4,
+    SHA512     = 4,
     #[cfg(any(esp32s2, esp32s3))]
     SHA512_224 = 5,
     #[cfg(any(esp32s2, esp32s3))]
@@ -57,8 +57,8 @@ pub enum ShaMode {
 //   the only way to efficiently copy memory with volatile
 // - For this particular registers (and probably others), a full u32 needs to be
 //   written. Partial register writes (i.e. in u8 mode) does not work
-// - This means that we need to buffer bytes coming in up to 4 u8's in order
-//   to create a full u32
+// - This means that we need to buffer bytes coming in up to 4 u8's in order to
+//   create a full u32
 
 // This implementation might fail after u32::MAX/8 bytes, to increase please see
 // ::finish() length/self.cursor usage
@@ -232,41 +232,41 @@ impl<'d> Sha<'d> {
         Ok(remaining)
     }
 
-    /*#[cfg(esp32)]
-    #[inline]
-    fn input_ptr(&mut self) -> &mut [Reg<impl RegisterSpec<Ux = u32> + Resettable + Writable>] {
-        &mut self.sha.text
-    }
-
-    #[cfg(any(esp32s3, esp32c3, esp32c6))]
-    #[inline]
-    fn input_ptr(&mut self) -> &mut [Reg<impl RegisterSpec<Ux = u8> + Resettable + Writable>] {
-        &mut self.sha.m_mem
-    }
-
-    #[cfg(esp32s2)]
-    #[inline]
-    fn input_ptr(&mut self) -> &mut [Reg<impl RegisterSpec<Ux = u32> + Resettable + Writable>] {
-        &mut self.sha.m_mem
-    }
-
-    #[cfg(esp32)]
-    #[inline]
-    fn output_ptr(&mut self) -> &[Reg<impl RegisterSpec<Ux = u32> + Readable>] {
-        &self.sha.text
-    }
-
-    #[cfg(any(esp32s3, esp32c3, esp32c6))]
-    #[inline]
-    fn output_ptr(&mut self) -> &[Reg<impl RegisterSpec<Ux = u8> + Readable>] {
-        &mut self.sha.h_mem
-    }
-
-    #[cfg(esp32s2)]
-    #[inline]
-    fn output_ptr(&mut self) -> &[Reg<impl RegisterSpec<Ux = u32> + Readable>] {
-        &mut self.sha.h_mem
-    }*/
+    // #[cfg(esp32)]
+    // #[inline]
+    // fn input_ptr(&mut self) -> &mut [Reg<impl RegisterSpec<Ux = u32> + Resettable
+    // + Writable>] { &mut self.sha.text
+    // }
+    //
+    // #[cfg(any(esp32s3, esp32c3, esp32c6))]
+    // #[inline]
+    // fn input_ptr(&mut self) -> &mut [Reg<impl RegisterSpec<Ux = u8> + Resettable
+    // + Writable>] { &mut self.sha.m_mem
+    // }
+    //
+    // #[cfg(esp32s2)]
+    // #[inline]
+    // fn input_ptr(&mut self) -> &mut [Reg<impl RegisterSpec<Ux = u32> + Resettable
+    // + Writable>] { &mut self.sha.m_mem
+    // }
+    //
+    // #[cfg(esp32)]
+    // #[inline]
+    // fn output_ptr(&mut self) -> &[Reg<impl RegisterSpec<Ux = u32> + Readable>] {
+    // &self.sha.text
+    // }
+    //
+    // #[cfg(any(esp32s3, esp32c3, esp32c6))]
+    // #[inline]
+    // fn output_ptr(&mut self) -> &[Reg<impl RegisterSpec<Ux = u8> + Readable>] {
+    // &mut self.sha.h_mem
+    // }
+    //
+    // #[cfg(esp32s2)]
+    // #[inline]
+    // fn output_ptr(&mut self) -> &[Reg<impl RegisterSpec<Ux = u32> + Readable>] {
+    // &mut self.sha.h_mem
+    // }
 
     pub fn update<'a>(&mut self, buffer: &'a [u8]) -> nb::Result<&'a [u8], Infallible> {
         if self.is_busy() {

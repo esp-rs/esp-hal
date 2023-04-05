@@ -16,9 +16,11 @@
 //! # Main features
 //!
 //! - Standard HMAC-SHA-256 algorithm.
-//! - Hash result only accessible by configurable hardware peripheral (in downstream mode).
+//! - Hash result only accessible by configurable hardware peripheral (in
+//!   downstream mode).
 //! - Compatible to challenge-response authentication algorithm.
-//! - Generates required keys for the Digital Signature (DS) peripheral (in downstream mode).
+//! - Generates required keys for the Digital Signature (DS) peripheral (in
+//!   downstream mode).
 //! - Re-enables soft-disabled JTAG (in downstream mode).
 //!
 //! # Availability on ESP32 family
@@ -56,16 +58,17 @@ pub enum Error {
     KeyPurposeMismatch,
 }
 
-/// The peripheral can be configured to deliver its output directrly to the user.
-/// It can also deliver to other periperals.
+/// The peripheral can be configured to deliver its output directrly to the
+/// user. It can also deliver to other periperals.
 #[derive(Clone, Copy, Debug)]
 pub enum HmacPurpose {
     /// HMAC is used to re-enable JTAG after soft-disabling it.
-    ToJtag = 6,
-    /// HMAC is provided to the digital signature peripheral to decrypt the private key.
-    ToDs = 7,
+    ToJtag     = 6,
+    /// HMAC is provided to the digital signature peripheral to decrypt the
+    /// private key.
+    ToDs       = 7,
     /// Let the user provide a message and read the result.
-    ToUser = 8,
+    ToUser     = 8,
     /// HMAC is used for both the digital signature or JTAG.
     ToDsOrJtag = 5,
 }
