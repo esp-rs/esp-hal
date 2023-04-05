@@ -11,7 +11,8 @@ use esp32c3_hal::{
     sha::{Sha, ShaMode},
     systimer::SystemTimer,
     timer::TimerGroup,
-    Rng, Rtc,
+    Rng,
+    Rtc,
 };
 use esp_backtrace as _;
 use esp_println::{print, println};
