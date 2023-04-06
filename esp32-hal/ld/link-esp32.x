@@ -28,7 +28,7 @@ INCLUDE "rtc_slow.x"
 INCLUDE "external.x"
 /* End of Shared sections */
 
-// an uninitialized section for use as the wifi-heap in esp-wifi
+/* an uninitialized section for use as the wifi-heap in esp-wifi */
 SECTIONS {
     .dram2_uninit (NOLOAD) : ALIGN(4) {
         *(.dram2_uninit)
