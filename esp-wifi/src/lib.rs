@@ -86,17 +86,24 @@ pub fn current_millis() -> u64 {
     get_systimer_count() / (TICKS_PER_SECOND / 1000)
 }
 
-#[cfg(not(coex))]
+#[cfg(all(not(coex), not(feature = "big-heap")))]
 const HEAP_SIZE: usize = 64 * 1024;
 
-#[cfg(coex)]
+#[cfg(all(coex, not(feature = "big-heap")))]
 const HEAP_SIZE: usize = 64 * 1024;
 
+#[cfg(all(not(coex), feature = "big-heap"))]
+const HEAP_SIZE: usize = 100 * 1024;
+
+#[cfg(all(coex, feature = "big-heap"))]
+const HEAP_SIZE: usize = 100 * 1024;
+
+#[cfg_attr(feature = "esp32", link_section = ".dram2_uninit")]
 static mut HEAP_DATA: [MaybeUninit<u8>; HEAP_SIZE] = [MaybeUninit::uninit(); HEAP_SIZE];
 
 pub(crate) static HEAP: Mutex<RefCell<Heap>> = Mutex::new(RefCell::new(Heap::empty()));
 
-pub fn init_heap() {
+fn init_heap() {
     critical_section::with(|cs| {
         HEAP.borrow(cs)
             .borrow_mut()
@@ -113,6 +120,8 @@ pub fn initialize(
     radio_clocks: hal::system::RadioClockControl,
     clocks: &Clocks,
 ) -> Result<(), InitializationError> {
+    init_heap();
+
     #[cfg(feature = "esp32c6")]
     if clocks.cpu_clock != MegahertzU32::MHz(160) {
         return Err(InitializationError::WrongClockConfig);
@@ -188,6 +197,8 @@ pub fn initialize(
     radio_clocks: hal::system::RadioClockControl,
     clocks: &Clocks,
 ) -> Result<(), InitializationError> {
+    init_heap();
+
     if clocks.cpu_clock != MegahertzU32::MHz(240) {
         return Err(InitializationError::WrongClockConfig);
     }

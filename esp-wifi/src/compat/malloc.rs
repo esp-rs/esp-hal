@@ -17,7 +17,7 @@ pub unsafe extern "C" fn malloc(size: u32) -> *const u8 {
     });
 
     if ptr.is_null() {
-        log::debug!("out of memory");
+        log::warn!("Unable to allocate {} bytes", size);
         return ptr;
     }
 
@@ -47,6 +47,14 @@ pub unsafe extern "C" fn free(ptr: *const u8) {
 pub unsafe extern "C" fn calloc(number: u32, size: u32) -> *const u8 {
     log::trace!("calloc {} {}", number, size);
 
-    let total_size = number * size + 4;
-    malloc(total_size)
+    let total_size = number * size;
+    let ptr = malloc(total_size) as *mut u8;
+
+    if !ptr.is_null() {
+        for i in 0..total_size as isize {
+            ptr.offset(i).write_volatile(0);
+        }
+    }
+
+    ptr
 }

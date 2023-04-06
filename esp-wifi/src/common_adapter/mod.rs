@@ -141,6 +141,7 @@ pub unsafe extern "C" fn semphr_give(semphr: *mut crate::binary::c_types::c_void
  ****************************************************************************/
 #[allow(unused)]
 #[ram]
+#[no_mangle]
 pub unsafe extern "C" fn random() -> crate::binary::c_types::c_ulong {
     trace!("random");
 
