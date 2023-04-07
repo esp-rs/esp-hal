@@ -785,49 +785,49 @@ pub fn get_wakeup_cause() -> SleepSource {
     let wakeup_cause =
         unsafe { (&*RTC_CNTL::PTR).wakeup_state.read().wakeup_cause().bits() as u32 };
 
-    if (wakeup_cause & WakeupReason::TimerTrigEn as u32) == 0 {
+    if (wakeup_cause & WakeupReason::TimerTrigEn as u32) != 0 {
         return SleepSource::Timer;
     }
-    if (wakeup_cause & WakeupReason::GpioTrigEn as u32) == 0 {
+    if (wakeup_cause & WakeupReason::GpioTrigEn as u32) != 0 {
         return SleepSource::Gpio;
     }
-    if (wakeup_cause & (WakeupReason::Uart0TrigEn as u32 | WakeupReason::Uart1TrigEn as u32)) == 0 {
+    if (wakeup_cause & (WakeupReason::Uart0TrigEn as u32 | WakeupReason::Uart1TrigEn as u32)) != 0 {
         return SleepSource::Uart;
     }
 
     #[cfg(pm_support_ext0_wakeup)]
-    if (wakeup_cause & WakeupReason::ExtEvent0Trig as u32) == 0 {
+    if (wakeup_cause & WakeupReason::ExtEvent0Trig as u32) != 0 {
         return SleepSource::Ext0;
     }
     #[cfg(pm_support_ext1_wakeup)]
-    if (wakeup_cause & WakeupReason::ExtEvent1Trig as u32) == 0 {
+    if (wakeup_cause & WakeupReason::ExtEvent1Trig as u32) != 0 {
         return SleepSource::Ext1;
     }
 
     #[cfg(pm_support_touch_sensor_wakeup)]
-    if (wakeup_cause & WakeupReason::TouchTrigEn as u32) == 0 {
+    if (wakeup_cause & WakeupReason::TouchTrigEn as u32) != 0 {
         return SleepSource::TouchPad;
     }
 
     #[cfg(ulp_supported)]
-    if (wakeup_cause & WakeupReason::UlpTrigEn as u32) == 0 {
+    if (wakeup_cause & WakeupReason::UlpTrigEn as u32) != 0 {
         return SleepSource::Ulp;
     }
 
     #[cfg(pm_support_wifi_wakeup)]
-    if (wakeup_cause & WakeupReason::WifiTrigEn as u32) == 0 {
+    if (wakeup_cause & WakeupReason::WifiTrigEn as u32) != 0 {
         return SleepSource::Wifi;
     }
 
     #[cfg(pm_support_bt_wakeup)]
-    if (wakeup_cause & WakeupReason::BtTrigEn as u32) == 0 {
+    if (wakeup_cause & WakeupReason::BtTrigEn as u32) != 0 {
         return SleepSource::BT;
     }
 
     #[cfg(riscv_coproc_supported)]
-    if (wakeup_cause & WakeupReason::CocpuTrigEn as u32) == 0 {
+    if (wakeup_cause & WakeupReason::CocpuTrigEn as u32) != 0 {
         return SleepSource::Ulp;
-    } else if (wakeup_cause & WakeupReason::CocpuTrapTrigEn as u32) == 0 {
+    } else if (wakeup_cause & WakeupReason::CocpuTrapTrigEn as u32) != 0 {
         return SleepSource::CocpuTrapTrig;
     }
 
