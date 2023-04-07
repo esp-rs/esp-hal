@@ -544,6 +544,18 @@ impl<const IS_A: bool> PwmActions<IS_A> {
         }
     }
 
+    /// Choose an `UpdateAction` for an `UTEA`/`UTEB` event where you can
+    /// specify which of the A/B to use
+    pub const fn on_up_counting_timer_equals_ch_timestamp<const CH_A: bool>(
+        self,
+        action: UpdateAction,
+    ) -> Self {
+        match CH_A {
+            true => self.with_value_at_offset(action as u32, 4),
+            false => self.with_value_at_offset(action as u32, 6),
+        }
+    }
+
     /// Choose an `UpdateAction` for an `DTEZ` event
     pub const fn on_down_counting_timer_equals_zero(self, action: UpdateAction) -> Self {
         self.with_value_at_offset(action as u32, 12)
@@ -557,6 +569,18 @@ impl<const IS_A: bool> PwmActions<IS_A> {
     /// Choose an `UpdateAction` for an `DTEA`/`DTEB` event
     pub const fn on_down_counting_timer_equals_timestamp(self, action: UpdateAction) -> Self {
         match IS_A {
+            true => self.with_value_at_offset(action as u32, 16),
+            false => self.with_value_at_offset(action as u32, 18),
+        }
+    }
+
+    /// Choose an `UpdateAction` for an `DTEA`/`DTEB` event where you can
+    /// specify which of the A/B to use
+    pub const fn on_down_counting_timer_equals_ch_timestamp<const CH_A: bool>(
+        self,
+        action: UpdateAction,
+    ) -> Self {
+        match CH_A {
             true => self.with_value_at_offset(action as u32, 16),
             false => self.with_value_at_offset(action as u32, 18),
         }
