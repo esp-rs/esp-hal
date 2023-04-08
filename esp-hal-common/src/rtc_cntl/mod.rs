@@ -760,24 +760,24 @@ pub fn get_wakeup_cause() -> SleepSource {
     }
 
     #[cfg(esp32c6)]
-    let wakeup_cause = unsafe {
+    let wakeup_cause = WakeupReason::from_bits_retain(unsafe {
         (&*crate::peripherals::PMU::PTR)
             .slp_wakeup_status0
             .read()
             .wakeup_cause()
             .bits()
-    };
+    });
     #[cfg(not(any(esp32, esp32c6)))]
-    let wakeup_cause = unsafe {
+    let wakeup_cause = WakeupReason::from_bits_retain(unsafe {
         (&*RTC_CNTL::PTR)
             .slp_wakeup_cause
             .read()
             .wakeup_cause()
             .bits()
-    };
+    });
     #[cfg(esp32)]
     let wakeup_cause = WakeupReason::from_bits_retain(unsafe {
-        (&*RTC_CNTL::PTR).wakeup_state.read().wakeup_cause().bits()
+        (&*RTC_CNTL::PTR).wakeup_state.read().wakeup_cause().bits() as u32
     });
 
     if wakeup_cause.contains(WakeupReason::TimerTrigEn) {

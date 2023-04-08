@@ -32,7 +32,7 @@ pub enum SleepSource {
 
 bitflags::bitflags! {
     #[allow(unused)]
-    pub(crate) struct WakeupReason: u16 {
+    pub(crate) struct WakeupReason: u32 {
         const NoSleep         = 0;
         #[cfg(pm_support_ext0_wakeup)]
         /// EXT0 GPIO wakeup
