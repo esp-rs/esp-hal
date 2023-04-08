@@ -1978,7 +1978,9 @@ mod private {
         //
         // main difference is we are using fixed-point arithmetic here
 
-        let mclk_multiple = 256;
+        // If data_bits is a power of two, use 256 as the mclk_multiple
+        // If data_bits is 24, use 192 (24 * 8) as the mclk_multiple
+        let mclk_multiple = if data_bits == 24 { 192 } else { 256 };
         let sclk = 160_000_000; // for now it's fixed PLL_160M_CLK
 
         let rate_hz: HertzU32 = sample_rate.into();
