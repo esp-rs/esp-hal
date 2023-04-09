@@ -114,6 +114,9 @@ pub trait TimerIFace<S: TimerSpeed> {
 
     /// Return the timer number
     fn get_number(&self) -> Number;
+
+    /// Return the timer frequency, or 0 if not configured
+    fn get_frequency(&self) -> u32;
 }
 
 /// Interface for HW configuration of timer
@@ -134,6 +137,7 @@ pub struct Timer<'a, S: TimerSpeed> {
     clock_control_config: &'a Clocks<'a>,
     number: Number,
     duty: Option<config::Duty>,
+    frequency: u32,
     configured: bool,
     use_ref_tick: bool,
     clock_source: Option<S::ClockSourceType>,
@@ -157,6 +161,7 @@ where
         let src_freq: u32 = self.get_freq().unwrap().to_Hz();
         let precision = 1 << config.duty as u32;
         let frequency: u32 = config.frequency.raw();
+        self.frequency = frequency;
 
         let mut divisor = ((src_freq as u64) << 8) / frequency as u64 / precision as u64;
 
@@ -193,6 +198,11 @@ where
     fn get_number(&self) -> Number {
         self.number
     }
+
+    /// Return the timer frequency
+    fn get_frequency(&self) -> u32 {
+        self.frequency
+    }
 }
 
 impl<'a, S: TimerSpeed> Timer<'a, S> {
@@ -207,6 +217,7 @@ impl<'a, S: TimerSpeed> Timer<'a, S> {
             clock_control_config,
             number,
             duty: None,
+            frequency: 0u32,
             configured: false,
             use_ref_tick: false,
             clock_source: None,

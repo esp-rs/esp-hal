@@ -1,9 +1,8 @@
 //! LEDC (LED PWM Controller) peripheral control
 //!
-//! Currently only supports fixed-frequency output. Hardware fade support and
-//! interrupts are not currently implemented. High Speed channels are availble
-//! for the ESP32 only, while Low Speed channels are available for all supported
-//! chips.
+//! Currently only supports fixed-frequency output. Interrupts are not currently
+//! implemented. High Speed channels are available for the ESP32 only, while Low
+//! Speed channels are available for all supported chips.
 //!
 //! # LowSpeed Example:
 //!
@@ -61,7 +60,6 @@
 //! # TODO
 //!
 //! - Source clock selection
-//! - Hardware fade support
 //! - Interrupts
 
 use self::{
