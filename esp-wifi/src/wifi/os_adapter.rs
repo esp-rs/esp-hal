@@ -698,7 +698,7 @@ pub unsafe extern "C" fn task_create_pinned_to_core(
 ) -> i32 {
     trace!("task_create_pinned_to_core task_func {:p} name {} stack_depth {} param {:p} prio {}, task_handle {:p} core_id {}",
         task_func,
-        StrBuf::from(name).as_str_ref(),
+        StrBuf::from(name as *const u8).as_str_ref(),
         stack_depth,
         param,
         prio,
@@ -1090,7 +1090,7 @@ pub unsafe extern "C" fn phy_update_country_info(
     country: *const crate::binary::c_types::c_char,
 ) -> crate::binary::c_types::c_int {
     // not implemented in original code
-    trace!("phy_update_country_info {}", *country as char);
+    trace!("phy_update_country_info {}", *country as u8 as char);
     -1
 }
 
@@ -1516,7 +1516,7 @@ pub unsafe extern "C" fn log_write(
     return;
 
     #[cfg(target_arch = "riscv32")]
-    syslog(_level, _format, _args);
+    syslog(_level, _format as *const u8, _args);
 }
 
 /****************************************************************************
@@ -1548,7 +1548,7 @@ pub unsafe extern "C" fn log_writev(
     #[cfg(target_arch = "xtensa")]
     #[allow(unreachable_code)]
     {
-        let s = StrBuf::from(_format);
+        let s = StrBuf::from(_format as *const u8);
         log::info!("{}", s.as_str_ref());
     }
 
@@ -1556,7 +1556,7 @@ pub unsafe extern "C" fn log_writev(
     #[allow(unreachable_code)]
     {
         let _args = core::mem::transmute(_args);
-        syslog(_level, _format, _args);
+        syslog(_level, _format as *const u8, _args);
     }
 }
 

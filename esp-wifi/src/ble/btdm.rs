@@ -296,7 +296,15 @@ unsafe extern "C" fn task_create(
 
     *(handle as *mut usize) = 0; // we will run it in task 0
 
-    queue_work(func, name, stack_depth, param, prio, handle, core_id);
+    queue_work(
+        func,
+        name as *const i8,
+        stack_depth,
+        param,
+        prio,
+        handle,
+        core_id,
+    );
     1
 }
 

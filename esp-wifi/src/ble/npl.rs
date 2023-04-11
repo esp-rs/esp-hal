@@ -361,7 +361,7 @@ unsafe extern "C" fn task_create(
     task_handle: *const crate::binary::c_types::c_void,
     core_id: u32,
 ) -> i32 {
-    let name_str = StrBuf::from(name);
+    let name_str = StrBuf::from(name as *const u8);
     log::trace!(
         "task_create {:p} {} {} {:p} {} {:p} {}",
         task_func,

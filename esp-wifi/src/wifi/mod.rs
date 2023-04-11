@@ -644,7 +644,7 @@ pub fn wifi_start() -> Result<(), WifiError> {
 
         let cntry_code = [b'C', b'N', 0];
         let country = wifi_country_t {
-            cc: cntry_code,
+            cc: core::mem::transmute(cntry_code),
             schan: 1,
             nchan: 13,
             max_tx_power: 20,

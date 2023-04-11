@@ -382,7 +382,7 @@ pub unsafe extern "C" fn pp_printf(s: *const u8, args: ...) {
 }
 
 // #define ESP_EVENT_DEFINE_BASE(id) esp_event_base_t id = #id
-static mut EVT: u8 = 0;
+static mut EVT: i8 = 0;
 #[no_mangle]
 static mut WIFI_EVENT: esp_event_base_t = unsafe { &EVT };
 
