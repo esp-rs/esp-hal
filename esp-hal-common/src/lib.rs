@@ -109,6 +109,8 @@ pub mod reset;
 #[cfg(rng)]
 pub mod rng;
 pub mod rom;
+#[cfg(rsa)]
+pub mod rsa;
 #[cfg(any(lp_clkrst, rtc_cntl))]
 pub mod rtc_cntl;
 #[cfg(sha)]
