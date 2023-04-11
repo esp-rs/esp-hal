@@ -766,68 +766,69 @@ pub fn get_wakeup_cause() -> SleepSource {
     // }
 
     #[cfg(any(esp32c6, esp32h2))]
-    let wakeup_cause = unsafe {
+    let wakeup_cause = WakeupReason::from_bits_retain(unsafe {
         (&*crate::peripherals::PMU::PTR)
             .slp_wakeup_status0
             .read()
             .wakeup_cause()
             .bits()
-    };
+    });
     #[cfg(not(any(esp32, esp32c6, esp32h2)))]
-    let wakeup_cause = unsafe {
+    let wakeup_cause = WakeupReason::from_bits_retain(unsafe {
         (&*RTC_CNTL::PTR)
             .slp_wakeup_cause
             .read()
             .wakeup_cause()
             .bits()
-    };
+    });
     #[cfg(esp32)]
-    let wakeup_cause =
-        unsafe { (&*RTC_CNTL::PTR).wakeup_state.read().wakeup_cause().bits() as u32 };
+    let wakeup_cause = WakeupReason::from_bits_retain(unsafe {
+        (&*RTC_CNTL::PTR).wakeup_state.read().wakeup_cause().bits() as u32
+    });
 
-    if (wakeup_cause & WakeupReason::TimerTrigEn as u32) != 0 {
+    if wakeup_cause.contains(WakeupReason::TimerTrigEn) {
         return SleepSource::Timer;
     }
-    if (wakeup_cause & WakeupReason::GpioTrigEn as u32) != 0 {
+    if wakeup_cause.contains(WakeupReason::GpioTrigEn) {
         return SleepSource::Gpio;
     }
-    if (wakeup_cause & (WakeupReason::Uart0TrigEn as u32 | WakeupReason::Uart1TrigEn as u32)) != 0 {
+    if wakeup_cause.intersects(WakeupReason::Uart0TrigEn | WakeupReason::Uart1TrigEn) {
         return SleepSource::Uart;
     }
 
     #[cfg(pm_support_ext0_wakeup)]
-    if (wakeup_cause & WakeupReason::ExtEvent0Trig as u32) != 0 {
+    if wakeup_cause.contains(WakeupReason::ExtEvent0Trig) {
         return SleepSource::Ext0;
     }
     #[cfg(pm_support_ext1_wakeup)]
-    if (wakeup_cause & WakeupReason::ExtEvent1Trig as u32) != 0 {
+    if wakeup_cause.contains(WakeupReason::ExtEvent1Trig) {
         return SleepSource::Ext1;
     }
 
     #[cfg(pm_support_touch_sensor_wakeup)]
-    if (wakeup_cause & WakeupReason::TouchTrigEn as u32) != 0 {
+    if wakeup_cause.contains(WakeupReason::TouchTrigEn) {
         return SleepSource::TouchPad;
     }
 
     #[cfg(ulp_supported)]
-    if (wakeup_cause & WakeupReason::UlpTrigEn as u32) != 0 {
+    if wakeup_cause.contains(WakeupReason::UlpTrigEn) {
         return SleepSource::Ulp;
     }
 
     #[cfg(pm_support_wifi_wakeup)]
-    if (wakeup_cause & WakeupReason::WifiTrigEn as u32) != 0 {
+    if wakeup_cause.contains(WakeupReason::WifiTrigEn) {
         return SleepSource::Wifi;
     }
 
     #[cfg(pm_support_bt_wakeup)]
-    if (wakeup_cause & WakeupReason::BtTrigEn as u32) != 0 {
+    if wakeup_cause.contains(WakeupReason::BtTrigEn) {
         return SleepSource::BT;
     }
 
     #[cfg(riscv_coproc_supported)]
-    if (wakeup_cause & WakeupReason::CocpuTrigEn as u32) != 0 {
+    if wakeup_cause.contains(WakeupReason::CocpuTrigEn) {
         return SleepSource::Ulp;
-    } else if (wakeup_cause & WakeupReason::CocpuTrapTrigEn as u32) != 0 {
+    } else if wakeup_cause.contains(WakeupReason::CocpuTrapTrigEn) {
         return SleepSource::CocpuTrapTrig;
     }
 
