@@ -4,5 +4,5 @@ pub mod peripherals;
 pub mod radio_clocks;
 
 pub(crate) mod registers {
-    pub const INTERRUPT_MAP_BASE: u32 = 0x0; // FIXME
+    pub const INTERRUPT_MAP_BASE: u32 = 0x60010000; // FIXME
 }
