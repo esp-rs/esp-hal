@@ -62,7 +62,7 @@ SECTIONS {
     KEEP(*(.init.rust));
     KEEP(*(.text.abort));
     KEEP(*(.trap));
-    KEEP(*(..trap.rust));
+    KEEP(*(.trap.rust));
   } > ROTEXT
 }
 INSERT BEFORE .text;
