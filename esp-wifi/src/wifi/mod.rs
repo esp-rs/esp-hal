@@ -7,7 +7,7 @@ use crate::common_adapter::*;
 
 use crate::esp_wifi_result;
 use critical_section::Mutex;
-use embedded_svc::wifi::{AccessPointInfo, AuthMethod, SecondaryChannel};
+use embedded_svc::wifi::{AccessPointInfo, AuthMethod, Protocol, SecondaryChannel};
 use enumset::EnumSet;
 use enumset::EnumSetType;
 use esp_hal_common::peripheral::Peripheral;
@@ -29,6 +29,7 @@ use esp_wifi_sys::include::wifi_interface_t_WIFI_IF_AP;
 use esp_wifi_sys::include::wifi_mode_t_WIFI_MODE_AP;
 use esp_wifi_sys::include::wifi_mode_t_WIFI_MODE_APSTA;
 use esp_wifi_sys::include::wifi_mode_t_WIFI_MODE_NULL;
+use esp_wifi_sys::include::esp_wifi_set_protocol;
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 
@@ -750,6 +751,25 @@ impl<'d> WifiController<'d> {
         config: embedded_svc::wifi::Configuration,
     ) -> Self {
         Self { _device, config }
+    }
+
+    /// Set the wifi mode.
+    /// This will set the wifi protocol to the desired protocol, the default for this is:
+    /// `WIFI_PROTOCOL_11B|WIFI_PROTOCOL_11G|WIFI_PROTOCOL_11N`
+    /// # Arguments:
+    /// * `protocol` - The desired protocol
+    /// # Example:
+    /// ```
+    /// use embedded_svc::wifi::Protocol;
+    /// use esp_wifi::wifi::WifiController;
+    /// let mut wifi = WifiController::new();
+    /// wifi.set_mode(Protocol::P802D11BGNLR);
+    /// ```
+    pub fn set_mode(&mut self, protocol: Protocol) -> Result<(), WifiError> {
+        let mut mode = wifi_mode_t_WIFI_MODE_NULL;
+        esp_wifi_result!(unsafe { esp_wifi_get_mode(&mut mode) })?;
+        esp_wifi_result!(unsafe { esp_wifi_set_protocol(mode, protocol as u8) })?;
+        Ok(())
     }
 
     fn is_sta_enabled(&self) -> Result<bool, WifiError> {

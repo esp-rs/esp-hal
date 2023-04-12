@@ -18,8 +18,6 @@ fn main() -> Result<(), String> {
                 .to_string();
                 println!("cargo:warning={}", message);
             }
-
-            ()
         }
         Err(_err) => (),
     }
