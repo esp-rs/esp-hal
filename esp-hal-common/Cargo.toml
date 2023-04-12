@@ -12,6 +12,7 @@ repository   = "https://github.com/esp-rs/esp-hal"
 license      = "MIT OR Apache-2.0"
 
 [dependencies]
+rtt-target           = { version = "0.4.0" }
 cfg-if               = "1.0.0"
 critical-section     = "1.1.1"
 embedded-can         = { version = "0.4.1", optional = true }
@@ -97,4 +98,5 @@ riscv  = ["critical-section/restore-state-u8",  "procmacros/riscv", "esp-riscv-r
 xtensa = ["critical-section/restore-state-u32", "procmacros/xtensa"]
 
 [patch.crates-io]
+rtt-target = { git = 'https://github.com/perlindgren/rtt-target', branch='panic-rtt-target-riscv' }
 esp-riscv-rt = {git = 'https://github.com/onsdagens/esp-riscv-rt', branch='scaled_back'}
