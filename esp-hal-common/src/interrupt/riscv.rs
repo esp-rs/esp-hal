@@ -717,8 +717,8 @@ unsafe fn handle_exception(pc: usize, trap_frame: *mut TrapFrame) {
         (*trap_frame).t5,
         (*trap_frame).t6,
     ];
-
-    riscv_atomic_emulation_trap::atomic_emulation((*trap_frame).pc, &mut frame);
+    //try into usize, which is 32 or 64 bit, so this will never panic
+    riscv_atomic_emulation_trap::atomic_emulation(insn.try_into().unwrap(), &mut frame);
 
     (*trap_frame).ra = frame[1];
     (*trap_frame).sp = frame[2];

@@ -97,4 +97,5 @@ riscv  = ["critical-section/restore-state-u8",  "procmacros/riscv", "esp-riscv-r
 xtensa = ["critical-section/restore-state-u32", "procmacros/xtensa"]
 
 [patch.crates-io]
+riscv-atomic-emulation-trap = {git = 'https://github.com/onsdagens/riscv_atomic_emulation_trap'}
 esp-riscv-rt = {git = 'https://github.com/onsdagens/esp-riscv-rt', branch='scaled_back'}
