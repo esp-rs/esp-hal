@@ -18,8 +18,8 @@ peripherals = [
     # "i2c0",
     # "i2c1",
     # "i2s0",
-    # "interrupt_core0",
-    # "intpri",
+    "interrupt_core0",
+    "intpri",
     # "io_mux",
     # "ledc",
     # "lp_ana",
@@ -58,4 +58,8 @@ peripherals = [
     # "uart1",
     # "uhci0",
     # "usb_device",
+
+
+    # Additional peripherals defined by us (the developers):
+    "plic",
 ]
