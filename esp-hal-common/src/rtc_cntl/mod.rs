@@ -4,16 +4,16 @@ use fugit::HertzU32;
 use fugit::MicrosDurationU64;
 
 pub use self::rtc::SocResetReason;
-use crate::clock::Clock;
 #[cfg(not(esp32c6))]
 use crate::clock::XtalClock;
 #[cfg(not(esp32))]
 use crate::efuse::Efuse;
 #[cfg(esp32c6)]
-use crate::peripherals::{LP_WDT, LP_TIMER};
+use crate::peripherals::{LP_TIMER, LP_WDT};
 #[cfg(not(esp32c6))]
 use crate::peripherals::{RTC_CNTL, TIMG0};
 use crate::{
+    clock::Clock,
     peripheral::{Peripheral, PeripheralRef},
     reset::{SleepSource, WakeupReason},
     Cpu,
@@ -143,7 +143,6 @@ impl<'d> Rtc<'d> {
 
     /// read the current value of the rtc time registers.
     pub fn get_time_raw(&self) -> u64 {
-        
         #[cfg(not(esp32c6))]
         let rtc_cntl = unsafe { &*RTC_CNTL::ptr() };
         #[cfg(esp32c6)]
