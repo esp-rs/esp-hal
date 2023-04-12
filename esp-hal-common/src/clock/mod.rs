@@ -437,7 +437,15 @@ impl<'d> ClockControl<'d> {
     pub fn boot_defaults(
         clock_control: impl Peripheral<P = SystemClockControl> + 'd,
     ) -> ClockControl<'d> {
-        todo!()
+        ClockControl {
+            _private: clock_control.into_ref(),
+            desired_rates: RawClocks {
+                cpu_clock: HertzU32::MHz(96), //
+                apb_clock: HertzU32::MHz(32), //
+                xtal_clock: HertzU32::MHz(32), //
+                i2c_clock: HertzU32::MHz(32), //
+            },
+        }
     }
 
     /// Configure the CPU clock speed.
@@ -446,7 +454,31 @@ impl<'d> ClockControl<'d> {
         clock_control: impl Peripheral<P = SystemClockControl> + 'd,
         cpu_clock_speed: CpuClock,
     ) -> ClockControl<'d> {
-        todo!()
+        let apb_freq;
+        let xtal_freq = XtalClock::RtcXtalFreqOther(32);
+        let pll_freq = PllClock::Pll320MHz;
+
+        if cpu_clock_speed.mhz() <= xtal_freq.mhz() {
+            apb_freq = ApbClock::ApbFreqOther(cpu_clock_speed.mhz());
+            clocks_ll::esp32h2_rtc_update_to_xtal(xtal_freq, 1);
+            clocks_ll::esp32h2_rtc_apb_freq_update(apb_freq);
+        } else {
+            apb_freq = ApbClock::ApbFreqOther(32);
+            clocks_ll::esp32h2_rtc_bbpll_enable();
+            clocks_ll::esp32h2_rtc_bbpll_configure(xtal_freq, pll_freq);
+            clocks_ll::esp32h2_rtc_freq_to_pll_mhz(cpu_clock_speed);
+            clocks_ll::esp32h2_rtc_apb_freq_update(apb_freq);
+        }
+
+        ClockControl {
+            _private: clock_control.into_ref(),
+            desired_rates: RawClocks {
+                cpu_clock: cpu_clock_speed.frequency(),
+                apb_clock: apb_freq.frequency(),
+                xtal_clock: xtal_freq.frequency(),
+                i2c_clock: HertzU32::MHz(32),
+            },
+        }
     }
 }
 
