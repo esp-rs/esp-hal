@@ -43,7 +43,6 @@ PROVIDE(_mp_hook = default_mp_hook);
   but by providing the `_start_trap` symbol external crates can override.
 */
 PROVIDE(_start_trap = default_start_trap);
-/*PROVIDE(_start_trap_rust_hal = DefaultHandler);*/
 
 /* esp32c6 fixups */
 /* The ESP32-C2 and ESP32-C3 have interrupt IDs 1-31, while the ESP32-C6 has
