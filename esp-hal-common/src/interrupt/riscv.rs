@@ -21,8 +21,6 @@ use crate::{
     Cpu,
 };
 
-use rtt_target::{rprintln};
-
 // User code shouldn't usually take the mutable TrapFrame or the TrapFrame in
 // general. However this makes things like preemtive multitasking easier in
 // future
@@ -608,7 +606,6 @@ pub unsafe extern "C" fn start_trap_rust_hal(trap_frame: *mut TrapFrame) {
     }
 
     let cause = mcause::read();
-    rprintln!("{:?}", cause);
     if cause.is_exception() {
         let pc = mepc::read();
         handle_exception(pc, trap_frame);
@@ -660,11 +657,11 @@ pub unsafe extern "C" fn start_trap_rust_hal(trap_frame: *mut TrapFrame) {
 #[doc(hidden)]
 unsafe fn handle_exception(pc: usize, trap_frame: *mut TrapFrame) {
     let insn = if pc % 4 != 0 {
-        let prev_aligned = pc & !0x3; //program counter and 0x00 makes sense
-        let offset = (pc - prev_aligned) as usize; //this is misalign offset (should always be 2 bytes anyways)
+        let prev_aligned = pc & !0x3;
+        let offset = (pc - prev_aligned) as usize; 
 
         let buffer = (*((prev_aligned + 4) as *const u32) as u64) << 32
-            | (*(prev_aligned as *const u32) as u64); // read two words
+            | (*(prev_aligned as *const u32) as u64);
         let buffer_bytes = buffer.to_le_bytes();
 
         u32::from_le_bytes([
@@ -676,20 +673,7 @@ unsafe fn handle_exception(pc: usize, trap_frame: *mut TrapFrame) {
     } else {
         *(pc as *const u32)
     };
-   // let insn: usize = *(pc as *const _);
-    let needs_atomic_emulation = (insn & 0b1111111) == 0b0101111; //what does this do?
-    //looks at last 7 bits (???) of INSTRUCTION AT pc and checks if its 0b 010 1111 = 1+2+4+8+32 = 47 = 0x2F
-    //which is atomic opcode
-    //ok so the fkn thing is:
-    //1. if the exception is about illegal instruction,
-    //2. we check if the instruction is one of the atomics
-    //3. if it is then we handle exception by emulating atomic
-    //   instead of going to default exception handler
-    //4. BUT i guess if the instruction is misaligned cuz of compression (maybe)
-    //   rust complains about misaligned pointer
-    //SO the pointer should be checked for alignment, if it's not we load instructions at PC-2 and PC+2
-    //then bitbang them together
-    rprintln!("{:?}", pc);
+    let needs_atomic_emulation = (insn & 0b1111111) == 0b0101111;
     if !needs_atomic_emulation {
         extern "C" {
             fn ExceptionHandler(tf: *mut TrapFrame);
