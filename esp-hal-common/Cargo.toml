@@ -36,8 +36,8 @@ embassy-time       = { version = "0.1.0", features = ["nightly"], optional = tru
 embassy-futures    = { version = "0.1.0", optional = true }
 
 # RISC-V
-esp-riscv-rt                = { version = "0.1.0", optional = true }
-riscv-atomic-emulation-trap = { version = "0.4.0", optional = true }
+esp-riscv-rt                = { git = 'https://github.com/onsdagens/esp-riscv-rt', branch='scaled_back', optional = true }
+riscv-atomic-emulation-trap = { path = '/home/pawel/riscv-atomic-emulation-trap', optional = true }
 
 # Xtensa
 xtensa-lx    = { version = "0.8.0",  optional = true }
@@ -95,7 +95,3 @@ embassy-time-timg0   = []
 # Architecture-specific features (intended for internal use)
 riscv  = ["critical-section/restore-state-u8",  "procmacros/riscv", "esp-riscv-rt", "riscv-atomic-emulation-trap"]
 xtensa = ["critical-section/restore-state-u32", "procmacros/xtensa"]
-
-[patch.crates-io]
-riscv-atomic-emulation-trap = {git = 'https://github.com/onsdagens/riscv_atomic_emulation_trap'}
-esp-riscv-rt = {git = 'https://github.com/onsdagens/esp-riscv-rt', branch='scaled_back'}
