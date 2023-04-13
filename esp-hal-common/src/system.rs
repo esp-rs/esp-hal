@@ -69,6 +69,8 @@ pub enum Peripheral {
     Uart1,
     #[cfg(uart2)]
     Uart2,
+    #[cfg(rsa)]
+    Rsa,
 }
 
 /// Controls the enablement of peripheral clocks.
@@ -264,6 +266,17 @@ impl PeripheralClockControl {
                 perip_clk_en0.modify(|_, w| w.uart2_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.uart2_rst().clear_bit());
             }
+            #[cfg(esp32)]
+            Peripheral::Rsa => {
+                peri_clk_en.modify(|r, w| unsafe { w.bits(r.bits() | 1 << 2) });
+                peri_rst_en.modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 2)) });
+            }
+            #[cfg(any(esp32c3, esp32s2, esp32s3))]
+            Peripheral::Rsa => {
+                perip_clk_en1.modify(|_, w| w.crypto_rsa_clk_en().set_bit());
+                perip_rst_en1.modify(|_, w| w.crypto_rsa_rst().clear_bit());
+                system.rsa_pd_ctrl.modify(|_, w| w.rsa_mem_pd().clear_bit());
+            }
         }
     }
 }
@@ -409,6 +422,11 @@ impl PeripheralClockControl {
                 system
                     .uart1_conf
                     .modify(|_, w| w.uart1_rst_en().clear_bit());
+            }
+            Peripheral::Rsa => {
+                system.rsa_conf.modify(|_, w| w.rsa_clk_en().set_bit());
+                system.rsa_conf.modify(|_, w| w.rsa_rst_en().clear_bit());
+                system.rsa_pd_ctrl.modify(|_, w| w.rsa_mem_pd().clear_bit());
             }
         }
     }
