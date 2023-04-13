@@ -36,7 +36,7 @@ embassy-time       = { version = "0.1.0", features = ["nightly"], optional = tru
 embassy-futures    = { version = "0.1.0", optional = true }
 
 # RISC-V
-esp-riscv-rt                = { git = 'https://github.com/onsdagens/esp-riscv-rt', branch='scaled_back', optional = true }
+#esp-riscv-rt                = { git = 'https://github.com/onsdagens/esp-riscv-rt', branch='scaled_back', optional = true }
 riscv-atomic-emulation-trap = { git = 'https://github.com/onsdagens/riscv-atomic-emulation-trap', optional = true }
 
 # Xtensa
