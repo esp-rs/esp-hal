@@ -19,7 +19,7 @@ PROVIDE(MachineExternal = DefaultHandler);
 PROVIDE(DefaultHandler = DefaultInterruptHandler);
 PROVIDE(ExceptionHandler = DefaultExceptionHandler);
 
-/* The ESP32-C2 and ESP32-C3 have interrupt IDs 1-31, while the ESP32-H2 has
+/* The ESP32-C2 and ESP32-C3 have interrupt IDs 1-31, while the ESP32-C6 and ESP32-H2 has
    IDs 0-31, so we much define the handler for the one additional interrupt
    ID: */
 PROVIDE(interrupt0 = DefaultHandler);
@@ -43,12 +43,6 @@ PROVIDE(_mp_hook = default_mp_hook);
   but by providing the `_start_trap` symbol external crates can override.
 */
 PROVIDE(_start_trap = default_start_trap);
-
-/* esp32c6 fixups */
-/* The ESP32-C2 and ESP32-C3 have interrupt IDs 1-31, while the ESP32-C6 has
-   IDs 0-31, so we much define the handler for the one additional interrupt
-   ID: */
-PROVIDE(interrupt0 = DefaultHandler);
 
 /* Must be called __global_pointer$ for linker relaxations to work. */
 PROVIDE(__global_pointer$ = _data_start + 0x800);
@@ -77,7 +71,6 @@ SECTIONS {
   } > ROM
 }
 INSERT BEFORE .rodata;
-/* end of esp32c6 fixups */
 
 /* Shared sections - ordering matters */
 INCLUDE "text.x"
