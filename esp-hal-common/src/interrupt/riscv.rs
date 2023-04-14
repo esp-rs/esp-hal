@@ -658,7 +658,7 @@ pub unsafe extern "C" fn start_trap_rust_hal(trap_frame: *mut TrapFrame) {
 unsafe fn handle_exception(pc: usize, trap_frame: *mut TrapFrame) {
     let insn = if pc % 4 != 0 {
         let prev_aligned = pc & !0x3;
-        let offset = (pc - prev_aligned) as usize; 
+        let offset = 2 as usize; //misalignment occurs due to 2-byte instructions
 
         let buffer = (*((prev_aligned + 4) as *const u32) as u64) << 32
             | (*(prev_aligned as *const u32) as u64);
@@ -668,7 +668,7 @@ unsafe fn handle_exception(pc: usize, trap_frame: *mut TrapFrame) {
             buffer_bytes[offset],
             buffer_bytes[offset + 1],
             buffer_bytes[offset + 2],
-            0,
+            buffer_bytes[offset + 3],
         ])
     } else {
         *(pc as *const u32)
