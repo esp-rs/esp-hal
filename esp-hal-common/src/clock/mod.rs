@@ -31,6 +31,8 @@ pub trait Clock {
 #[derive(Debug, Clone, Copy)]
 pub enum CpuClock {
     Clock80MHz,
+    #[cfg(esp32h2)]
+    Clock96MHz,
     #[cfg(esp32c2)]
     Clock120MHz,
     #[cfg(not(esp32c2))]
@@ -44,6 +46,8 @@ impl Clock for CpuClock {
     fn frequency(&self) -> HertzU32 {
         match self {
             CpuClock::Clock80MHz => HertzU32::MHz(80),
+            #[cfg(esp32h2)]
+            CpuClock::Clock96MHz => HertzU32::MHz(96),
             #[cfg(esp32c2)]
             CpuClock::Clock120MHz => HertzU32::MHz(120),
             #[cfg(not(esp32c2))]
@@ -476,7 +480,7 @@ impl<'d> ClockControl<'d> {
                 cpu_clock: cpu_clock_speed.frequency(),
                 apb_clock: apb_freq.frequency(),
                 xtal_clock: xtal_freq.frequency(),
-                i2c_clock: HertzU32::MHz(32),
+                i2c_clock: HertzU32::MHz(96),
             },
         }
     }
