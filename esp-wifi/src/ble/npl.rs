@@ -1232,6 +1232,9 @@ unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, arg: *const c_void) {
             })
             .unwrap();
     });
+            
+    #[cfg(feature = "async")]
+    crate::ble::controller::asynch::hci_read_data_available();
 }
 
 unsafe extern "C" fn ble_hs_rx_data(om: *const OsMbuf, arg: *const c_void) {
@@ -1255,11 +1258,22 @@ unsafe extern "C" fn ble_hs_rx_data(om: *const OsMbuf, arg: *const c_void) {
             })
             .unwrap();
     });
+            
+    #[cfg(feature = "async")]
+    crate::ble::controller::asynch::hci_read_data_available();
 }
 
 static mut BLE_HCI_READ_DATA: [u8; 256] = [0u8; 256];
 static mut BLE_HCI_READ_DATA_INDEX: usize = 0;
 static mut BLE_HCI_READ_DATA_LEN: usize = 0;
+
+#[cfg(feature = "async")]
+pub fn have_hci_read_data() -> bool {
+    critical_section::with(|cs| {
+        let queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
+        !queue.is_empty() || unsafe { BLE_HCI_READ_DATA_LEN > 0 && (BLE_HCI_READ_DATA_LEN >= BLE_HCI_READ_DATA_INDEX) }
+    })
+}
 
 pub fn read_hci(data: &mut [u8]) -> usize {
     unsafe {
@@ -1274,7 +1288,6 @@ pub fn read_hci(data: &mut [u8]) -> usize {
                     BLE_HCI_READ_DATA_INDEX = 0;
                 }
             });
-            return 0;
         }
 
         if BLE_HCI_READ_DATA_LEN > 0 {

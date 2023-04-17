@@ -93,6 +93,9 @@ extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
             let mut queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
             queue.enqueue(packet).unwrap();
         });
+        
+        #[cfg(feature = "async")]
+        crate::ble::controller::asynch::hci_read_data_available();
     }
 
     0
@@ -522,6 +525,14 @@ static mut BLE_HCI_READ_DATA: [u8; 256] = [0u8; 256];
 static mut BLE_HCI_READ_DATA_INDEX: usize = 0;
 static mut BLE_HCI_READ_DATA_LEN: usize = 0;
 
+#[cfg(feature = "async")]
+pub fn have_hci_read_data() -> bool {
+    critical_section::with(|cs| {
+        let queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
+        !queue.is_empty() || unsafe { BLE_HCI_READ_DATA_LEN > 0 && (BLE_HCI_READ_DATA_LEN >= BLE_HCI_READ_DATA_INDEX) }
+    })
+}
+
 pub fn read_hci(data: &mut [u8]) -> usize {
     unsafe {
         if BLE_HCI_READ_DATA_LEN == 0 {
@@ -529,11 +540,9 @@ pub fn read_hci(data: &mut [u8]) -> usize {
                 let mut queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
 
                 if let Some(packet) = queue.dequeue() {
-                    for i in 0..(packet.len as usize + 0/*1*/) {
-                        BLE_HCI_READ_DATA[i] = packet.data[i];
-                    }
-
-                    BLE_HCI_READ_DATA_LEN = packet.len as usize + 0 /*1*/;
+                    BLE_HCI_READ_DATA[..packet.len as usize]
+                        .copy_from_slice(&packet.data[..packet.len as usize]);
+                    BLE_HCI_READ_DATA_LEN = packet.len as usize;
                     BLE_HCI_READ_DATA_INDEX = 0;
                 }
             });

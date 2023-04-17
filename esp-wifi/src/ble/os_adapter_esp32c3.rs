@@ -160,7 +160,7 @@ pub(crate) fn create_ble_config() -> esp_bt_controller_config_t {
         hci_tl_funcs: core::ptr::null_mut(),
         txant_dft: 0,
         rxant_dft: 0,
-        txpwr_dft: 7,
+        txpwr_dft: 9,
         cfg_mask: 1,
         scan_duplicate_mode: 0,
         scan_duplicate_type: 0,
@@ -179,9 +179,7 @@ pub(crate) fn create_ble_config() -> esp_bt_controller_config_t {
 pub(crate) unsafe extern "C" fn interrupt_on(intr_num: i32) {
     trace!("interrupt_on {}", intr_num);
 
-    (*esp32c3::INTERRUPT_CORE0::PTR)
-        .cpu_int_enable
-        .modify(|r, w| w.bits(r.bits() | 1 << intr_num));
+    // NO-OP
 }
 
 pub(crate) unsafe extern "C" fn interrupt_off(_intr_num: i32) {
@@ -218,13 +216,10 @@ pub(crate) unsafe extern "C" fn interrupt_set(
         interrupt_prio
     );
 
-    ((0x600c2000 + 0x114 + interrupt_no * 4) as *mut u32).write_volatile(interrupt_prio as u32);
-
     /* Set the interrupt type (Edge or Level). */
-    // ----
-
     /* Map the CPU interrupt ID to the peripheral. */
-    ((0x600c2000 + intr_source * 4) as *mut u32).write_volatile(interrupt_no as u32);
+
+    // NO-OP
 }
 
 pub(crate) unsafe extern "C" fn interrupt_clear(_interrupt_source: i32, _interrupt_no: i32) {
