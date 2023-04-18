@@ -71,22 +71,18 @@ const I2C_MST_I2C0_CTRL_REG: u32 = DR_REG_I2C_ANA_MST_BASE + 0x0;
 const I2C_ANA_MST_I2C0_BUSY: u32 = 1 << 25;
 const REGI2C_RTC_BUSY: u32 = 1 << 25;
 
-// const LP_I2C_ANA_MST_I2C0_DATA_REG: u32 = DR_REG_LP_I2C_ANA_MST_BASE + 0x8;
-// const LP_I2C_ANA_MST_I2C0_RDATA_V: u32 = 0x000000FF;
-// const LP_I2C_ANA_MST_I2C0_RDATA_S: u32 = 0;
-
 pub(crate) fn esp32h2_rtc_bbpll_configure(_xtal_freq: XtalClock, _pll_freq: PllClock) {
     unsafe {
 
-    //     (MODEM_LPCON_CLK_CONF_FORCE_ON_REG as *mut u32).write_volatile(
-    //         (MODEM_LPCON_CLK_CONF_FORCE_ON_REG as *mut u32).read_volatile() | MODEM_LPCON_CLK_I2C_MST_FO,
-    //     );
+        // Enable I2C master clock
+        (MODEM_LPCON_CLK_CONF_FORCE_ON_REG as *mut u32).write_volatile(
+            (MODEM_LPCON_CLK_CONF_FORCE_ON_REG as *mut u32).read_volatile() | MODEM_LPCON_CLK_I2C_MST_FO,
+        );
 
-    //    // Set I2C clock to 96MHz
-    //     (MODEM_LPCON_I2C_CLK_CONF_REG as *mut u32).write_volatile(
-    //         (MODEM_LPCON_I2C_CLK_CONF_REG as *mut u32).read_volatile() | MODEM_LPCON_CLK_I2C_SEL_96M,
-    //     );
-
+       // Set I2C clock to 96MHz
+        (MODEM_LPCON_I2C_CLK_CONF_REG as *mut u32).write_volatile(
+            (MODEM_LPCON_I2C_CLK_CONF_REG as *mut u32).read_volatile() | MODEM_LPCON_CLK_I2C_SEL_96M,
+        );
 
 
         let i2c_mst_ana_conf0_reg_ptr = I2C_MST_ANA_CONF0_REG as *mut u32;
@@ -98,9 +94,6 @@ pub(crate) fn esp32h2_rtc_bbpll_configure(_xtal_freq: XtalClock, _pll_freq: PllC
         i2c_mst_ana_conf0_reg_ptr.write_volatile(
             i2c_mst_ana_conf0_reg_ptr.read_volatile() | I2C_MST_BBPLL_STOP_FORCE_LOW,
         );
-
-        // HAL_ASSERT(xtal_freq_mhz == RTC_XTAL_FREQ_32M);
-        //HAL_ASSERT(pll_freq_mhz == CLK_LL_PLL_96M_FREQ_MHZ);
 
         let oc_ref_div = 0u32;
         let oc_div = 1u32;
@@ -192,11 +185,10 @@ pub(crate) fn esp32h2_rtc_update_to_xtal(freq: XtalClock, _div: u8) {
 
         pcr.cpu_freq_conf
             .modify(|_, w| w.cpu_div_num().bits(_div - 1));
-
         // Switch clock source
         pcr.sysclk_conf.modify(|_, w| w.soc_clk_sel().bits(0));
 
-//        clk_ll_bus_update();
+        clk_ll_bus_update();
 
     }
 }
@@ -227,7 +219,7 @@ pub(crate) fn esp32h2_rtc_freq_to_pll_mhz(cpu_clock_speed: CpuClock) {
 
 }
 
-pub(crate) fn esp32h2_rtc_apb_freq_update(apb_freq: ApbClock) { // CHECKME
+pub(crate) fn esp32h2_rtc_apb_freq_update(apb_freq: ApbClock) {
     let lp_aon = unsafe {&*crate::peripherals::LP_AON::ptr()};
     let value = ((apb_freq.hz() >> 12) & u16::MAX as u32)
         | (((apb_freq.hz() >> 12) & u16::MAX as u32) << 16);
