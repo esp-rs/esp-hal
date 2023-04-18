@@ -1,7 +1,8 @@
 //! Software Interrupts
 //!
 //! An example of how software interrupts can be raised and reset
-//! Should rotate through all of the available interrupts printing their number when raised.
+//! Should rotate through all of the available interrupts printing their number
+//! when raised.
 #![no_std]
 #![no_main]
 
