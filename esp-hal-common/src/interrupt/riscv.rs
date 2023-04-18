@@ -366,6 +366,8 @@ pub unsafe extern "C" fn start_trap_rust_hal(trap_frame: *mut TrapFrame) {
         let pc = mepc::read();
         handle_exception(pc, trap_frame);
     } else {
+        #[cfg(feature = "interrupt-preemption")]
+        let interrupt_priority = handle_priority();
         let code = mcause::read().code();
         match code {
             1 => interrupt1(trap_frame.as_mut().unwrap()),
@@ -401,6 +403,8 @@ pub unsafe extern "C" fn start_trap_rust_hal(trap_frame: *mut TrapFrame) {
             31 => interrupt31(trap_frame.as_mut().unwrap()),
             _ => DefaultHandler(),
         };
+        #[cfg(feature = "interrupt-preemption")]
+        restore_priority(interrupt_priority);
     }
 }
 
@@ -677,6 +681,23 @@ mod classic {
             .offset(cpu_interrupt as isize)
             .read_volatile();
         core::mem::transmute(prio as u8)
+    }
+    #[cfg(feature = "interrupt-preemption")]
+    unsafe fn handle_priority()->u32{
+        let interrupt_id:usize = mcause::read().bits() & 0x0FFFFFFF; //MSB is whether its exception or interrupt.
+        let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
+        let interrupt_priority =  intr.cpu_int_pri_0.as_ptr().offset(interrupt_id as isize).read_volatile();
+        let prev_interrupt_priority = intr.cpu_int_thresh.read().bits();
+        intr.cpu_int_thresh.write(|w| w.bits(interrupt_priority + 1)); //set the prio threshold to 1 more than current interrupt prio
+        unsafe{
+            riscv::interrupt::enable();
+        }
+        prev_interrupt_priority
+    }
+    #[cfg(feature = "interrupt-preemption")]
+    unsafe fn restore_priority(stored_prio:u32){
+        let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
+        intr.cpu_int_thresh.write(|w| w.bits(stored_prio)); //set the prio threshold to 1 more than current interrupt prio
     }
 }
 
