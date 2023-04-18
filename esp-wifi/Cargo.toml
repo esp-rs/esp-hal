@@ -35,7 +35,7 @@ embassy-net = { workspace = true, optional = true }
 embassy-net-driver = { workspace = true, optional = true }
 
 [features]
-default = [ "utils" ]
+default = [ "utils", "mtu-1492" ]
 
 # chip features
 esp32c3 = [ "esp32c3-hal", "dep:esp32c3", "esp-wifi-sys/esp32c3", "esp-hal-common/esp32c3" ]
@@ -67,3 +67,7 @@ phy-enable-usb = []
 ps-min-modem = []
 esp-now = [ "wifi", "embedded-svc" ]
 big-heap = []
+mtu-1514 = []
+mtu-1500 = []
+mtu-1492 = []
+mtu-746 = []

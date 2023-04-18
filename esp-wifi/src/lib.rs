@@ -95,13 +95,13 @@ const HEAP_SIZE: usize = 64 * 1024;
 const HEAP_SIZE: usize = 64 * 1024;
 
 #[cfg(all(not(coex), not(feature = "esp32s2"), feature = "big-heap"))]
-const HEAP_SIZE: usize = 92 * 1024;
+const HEAP_SIZE: usize = 110 * 1024;
 
 #[cfg(all(not(coex), feature = "esp32s2", feature = "big-heap"))]
 const HEAP_SIZE: usize = 72 * 1024;
 
 #[cfg(all(coex, feature = "big-heap"))]
-const HEAP_SIZE: usize = 100 * 1024;
+const HEAP_SIZE: usize = 110 * 1024;
 
 #[cfg_attr(feature = "esp32", link_section = ".dram2_uninit")]
 static mut HEAP_DATA: [MaybeUninit<u8>; HEAP_SIZE] = [MaybeUninit::uninit(); HEAP_SIZE];

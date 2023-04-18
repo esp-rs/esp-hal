@@ -15,6 +15,7 @@ use esp_hal_common::peripheral::PeripheralRef;
 use esp_wifi_sys::include::esp_interface_t_ESP_IF_WIFI_AP;
 use esp_wifi_sys::include::esp_wifi_disconnect;
 use esp_wifi_sys::include::esp_wifi_get_mode;
+use esp_wifi_sys::include::esp_wifi_set_protocol;
 use esp_wifi_sys::include::wifi_ap_config_t;
 use esp_wifi_sys::include::wifi_auth_mode_t_WIFI_AUTH_WAPI_PSK;
 use esp_wifi_sys::include::wifi_auth_mode_t_WIFI_AUTH_WEP;
@@ -29,13 +30,21 @@ use esp_wifi_sys::include::wifi_interface_t_WIFI_IF_AP;
 use esp_wifi_sys::include::wifi_mode_t_WIFI_MODE_AP;
 use esp_wifi_sys::include::wifi_mode_t_WIFI_MODE_APSTA;
 use esp_wifi_sys::include::wifi_mode_t_WIFI_MODE_NULL;
-use esp_wifi_sys::include::esp_wifi_set_protocol;
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 
 #[doc(hidden)]
 pub use os_adapter::*;
 use smoltcp::phy::{Device, DeviceCapabilities, RxToken, TxToken};
+
+#[cfg(feature = "mtu-1514")]
+const MTU: usize = 1514;
+#[cfg(feature = "mtu-1500")]
+const MTU: usize = 1500;
+#[cfg(feature = "mtu-1492")]
+const MTU: usize = 1492;
+#[cfg(feature = "mtu-746")]
+const MTU: usize = 746;
 
 #[cfg(feature = "esp32")]
 use esp32_hal as hal;
@@ -938,7 +947,7 @@ impl<'d> Device for WifiDevice<'d> {
 
     fn capabilities(&self) -> smoltcp::phy::DeviceCapabilities {
         let mut caps = DeviceCapabilities::default();
-        caps.max_transmission_unit = 1514;
+        caps.max_transmission_unit = MTU;
         caps.max_burst_size = Some(1);
         caps
     }
@@ -1397,7 +1406,7 @@ pub(crate) mod embassy {
 
         fn capabilities(&self) -> Capabilities {
             let mut caps = Capabilities::default();
-            caps.max_transmission_unit = 1514;
+            caps.max_transmission_unit = MTU;
             caps.max_burst_size = Some(1);
             caps
         }
