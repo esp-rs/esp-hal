@@ -114,13 +114,13 @@ impl SoftwareInterruptControl {
             }
         }
     }
-
+    
     pub fn reset(&mut self, interrupt: SoftwareInterrupt) {
         #[cfg(not(any(esp32c6, esp32h2)))]
         let system = unsafe { &*SystemPeripheral::PTR };
         #[cfg(any(esp32c6, esp32h2))]
         let system = unsafe { &*IntPri::PTR };
-
+        
         match interrupt {
             SoftwareInterrupt::SoftwareInterrupt0 => {
                 system
