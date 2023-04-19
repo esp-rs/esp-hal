@@ -113,7 +113,7 @@ jobs:
         run: cd esp32c2-hal/ && cargo +nightly-2023-03-09 check --example=embassy_wait --features=embassy,embassy-time-systick,async
       - name: check esp32c2-hal (async, spi)
         run: cd esp32c2-hal/ && cargo +nightly-2023-03-09 check --example=embassy_spi --features=embassy,embassy-time-systick,async
-        
+
   esp32c3-hal:
     runs-on: ubuntu-latest
 
@@ -182,7 +182,7 @@ jobs:
       - name: check esp32c6-hal (async, spi)
         run: cd esp32c6-hal/ && cargo +nightly-2023-03-09 check --example=embassy_spi --features=embassy,embassy-time-systick,async
 
-   esp32h2-hal:
+  esp32h2-hal:
     runs-on: ubuntu-latest
 
     steps:
