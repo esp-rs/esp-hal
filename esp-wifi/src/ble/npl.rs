@@ -1231,8 +1231,10 @@ unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, arg: *const c_void) {
                 data,
             })
             .unwrap();
+
+        dump_packet_info(&data[..(len + 3) as usize]);
     });
-            
+
     #[cfg(feature = "async")]
     crate::ble::controller::asynch::hci_read_data_available();
 }
@@ -1257,8 +1259,10 @@ unsafe extern "C" fn ble_hs_rx_data(om: *const OsMbuf, arg: *const c_void) {
                 data,
             })
             .unwrap();
+
+        dump_packet_info(&data[..(len + 1) as usize]);
     });
-            
+
     #[cfg(feature = "async")]
     crate::ble::controller::asynch::hci_read_data_available();
 }
@@ -1271,7 +1275,10 @@ static mut BLE_HCI_READ_DATA_LEN: usize = 0;
 pub fn have_hci_read_data() -> bool {
     critical_section::with(|cs| {
         let queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
-        !queue.is_empty() || unsafe { BLE_HCI_READ_DATA_LEN > 0 && (BLE_HCI_READ_DATA_LEN >= BLE_HCI_READ_DATA_INDEX) }
+        !queue.is_empty()
+            || unsafe {
+                BLE_HCI_READ_DATA_LEN > 0 && (BLE_HCI_READ_DATA_LEN >= BLE_HCI_READ_DATA_INDEX)
+            }
     })
 }
 
@@ -1316,6 +1323,8 @@ pub fn send_hci(data: &[u8]) {
             loop {
                 const DATA_TYPE_COMMAND: u8 = 1;
                 const DATA_TYPE_ACL: u8 = 2;
+
+                dump_packet_info(&packet);
 
                 if packet[0] == DATA_TYPE_COMMAND {
                     let res = (ble_hci_trans_funcs_ptr.ble_hci_trans_hs_cmd_tx.unwrap())(
@@ -1399,4 +1408,14 @@ fn is_free(mempool: &OsMempool, mbuf: *const OsMbuf) -> bool {
 
         next = unsafe { (*next).next };
     }
+}
+
+#[allow(unreachable_code, unused_variables)]
+fn dump_packet_info(buffer: &[u8]) {
+    #[cfg(not(feature = "dump-packets"))]
+    return;
+
+    critical_section::with(|cs| {
+        log::info!("@HCIFRAME {:02x?}", buffer);
+    });
 }

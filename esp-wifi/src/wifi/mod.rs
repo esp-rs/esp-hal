@@ -84,7 +84,7 @@ use crate::{
     },
     compat::queue::SimpleQueue,
 };
-use log::{debug, info};
+use log::debug;
 
 #[derive(Debug, Clone, Copy)]
 pub enum WifiMode {
@@ -100,11 +100,6 @@ impl WifiMode {
         }
     }
 }
-
-#[cfg(feature = "dump-packets")]
-static DUMP_PACKETS: bool = true;
-#[cfg(not(feature = "dump-packets"))]
-static DUMP_PACKETS: bool = false;
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct DataFrame<'a> {
@@ -1221,60 +1216,12 @@ impl embedded_svc::wifi::Wifi for WifiController<'_> {
     }
 }
 
+#[allow(unreachable_code, unused_variables)]
 fn dump_packet_info(buffer: &[u8]) {
-    if !DUMP_PACKETS {
-        return;
-    }
+    #[cfg(not(feature = "dump-packets"))]
+    return;
 
-    let ef = smoltcp::wire::EthernetFrame::new_unchecked(buffer);
-    info!(
-        "src={:x?} dst={:x?} type={:x?}",
-        ef.src_addr(),
-        ef.dst_addr(),
-        ef.ethertype()
-    );
-    match ef.ethertype() {
-        smoltcp::wire::EthernetProtocol::Ipv4 => {
-            let ip = smoltcp::wire::Ipv4Packet::new_unchecked(ef.payload());
-            info!(
-                "src={:?} dst={:?} proto={:x?}",
-                ip.src_addr(),
-                ip.dst_addr(),
-                ip.next_header()
-            );
-
-            match ip.next_header() {
-                smoltcp::wire::IpProtocol::HopByHop => {}
-                smoltcp::wire::IpProtocol::Icmp => {}
-                smoltcp::wire::IpProtocol::Igmp => {}
-                smoltcp::wire::IpProtocol::Tcp => {
-                    let tp = smoltcp::wire::TcpPacket::new_unchecked(ip.payload());
-                    info!("src={:?} dst={:?}", tp.src_port(), tp.dst_port());
-                }
-                smoltcp::wire::IpProtocol::Udp => {
-                    let up = smoltcp::wire::UdpPacket::new_unchecked(ip.payload());
-                    info!("src={:?} dst={:?}", up.src_port(), up.dst_port());
-                }
-                smoltcp::wire::IpProtocol::Ipv6Route => {}
-                smoltcp::wire::IpProtocol::Ipv6Frag => {}
-                smoltcp::wire::IpProtocol::Icmpv6 => {}
-                smoltcp::wire::IpProtocol::Ipv6NoNxt => {}
-                smoltcp::wire::IpProtocol::Ipv6Opts => {}
-                smoltcp::wire::IpProtocol::Unknown(_) => {}
-            }
-        }
-        smoltcp::wire::EthernetProtocol::Arp => {
-            let ap = smoltcp::wire::ArpPacket::new_unchecked(ef.payload());
-            info!(
-                "src={:x?} dst={:x?} src proto addr={:x?}",
-                ap.source_hardware_addr(),
-                ap.target_hardware_addr(),
-                ap.source_protocol_addr()
-            );
-        }
-        smoltcp::wire::EthernetProtocol::Ipv6 => {}
-        smoltcp::wire::EthernetProtocol::Unknown(_) => {}
-    }
+    log::info!("@WIFIFRAME {:02x?}", buffer);
 }
 
 #[macro_export]

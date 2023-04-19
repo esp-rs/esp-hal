@@ -93,7 +93,12 @@ extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
             let mut queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
             queue.enqueue(packet).unwrap();
         });
-        
+
+        dump_packet_info(&core::slice::from_raw_parts(
+            data as *const u8,
+            len as usize,
+        ));
+
         #[cfg(feature = "async")]
         crate::ble::controller::asynch::hci_read_data_available();
     }
@@ -529,7 +534,10 @@ static mut BLE_HCI_READ_DATA_LEN: usize = 0;
 pub fn have_hci_read_data() -> bool {
     critical_section::with(|cs| {
         let queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
-        !queue.is_empty() || unsafe { BLE_HCI_READ_DATA_LEN > 0 && (BLE_HCI_READ_DATA_LEN >= BLE_HCI_READ_DATA_INDEX) }
+        !queue.is_empty()
+            || unsafe {
+                BLE_HCI_READ_DATA_LEN > 0 && (BLE_HCI_READ_DATA_LEN >= BLE_HCI_READ_DATA_INDEX)
+            }
     })
 }
 
@@ -582,10 +590,22 @@ pub fn send_hci(data: &[u8]) {
                 API_vhci_host_send_packet(packet.as_ptr() as *const u8, packet.len() as u16);
                 log::trace!("sent vhci host packet");
 
+                dump_packet_info(packet);
+
                 break;
             }
         }
 
         hci_out.reset();
     }
+}
+
+#[allow(unreachable_code, unused_variables)]
+fn dump_packet_info(buffer: &[u8]) {
+    #[cfg(not(feature = "dump-packets"))]
+    return;
+
+    critical_section::with(|cs| {
+        log::info!("@HCIFRAME {:02x?}", buffer);
+    });
 }
