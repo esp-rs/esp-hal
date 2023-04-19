@@ -15,8 +15,17 @@ use crate::peripheral::PeripheralRef;
 type SystemPeripheral = crate::peripherals::DPORT;
 #[cfg(esp32c6)]
 type SystemPeripheral = crate::peripherals::PCR;
+#[cfg(esp32c6)]
+type IntPri = crate::peripherals::INTPRI;
 #[cfg(not(any(esp32, esp32c6)))]
 type SystemPeripheral = crate::peripherals::SYSTEM;
+
+pub enum SoftwareInterrupt {
+    SoftwareInterrupt0,
+    SoftwareInterrupt1,
+    SoftwareInterrupt2,
+    SoftwareInterrupt3,
+}
 
 /// Peripherals which can be enabled via [PeripheralClockControl]
 pub enum Peripheral {
@@ -71,6 +80,67 @@ pub enum Peripheral {
     Uart2,
     #[cfg(rsa)]
     Rsa,
+}
+pub struct SoftwareInterruptControl {
+    _private: (),
+}
+impl SoftwareInterruptControl {
+    pub fn raise(&mut self, interrupt: SoftwareInterrupt) {
+        #[cfg(not(esp32c6))]
+        let system = unsafe { &*SystemPeripheral::PTR };
+        #[cfg(esp32c6)]
+        let system = unsafe { &*IntPri::PTR };
+        match interrupt {
+            SoftwareInterrupt::SoftwareInterrupt0 => {
+                system
+                    .cpu_intr_from_cpu_0
+                    .write(|w| w.cpu_intr_from_cpu_0().bit(true));
+            }
+            SoftwareInterrupt::SoftwareInterrupt1 => {
+                system
+                    .cpu_intr_from_cpu_1
+                    .write(|w| w.cpu_intr_from_cpu_1().bit(true));
+            }
+            SoftwareInterrupt::SoftwareInterrupt2 => {
+                system
+                    .cpu_intr_from_cpu_2
+                    .write(|w| w.cpu_intr_from_cpu_2().bit(true));
+            }
+            SoftwareInterrupt::SoftwareInterrupt3 => {
+                system
+                    .cpu_intr_from_cpu_3
+                    .write(|w| w.cpu_intr_from_cpu_3().bit(true));
+            }
+        }
+    }
+    pub fn reset(&mut self, interrupt: SoftwareInterrupt) {
+        #[cfg(not(esp32c6))]
+        let system = unsafe { &*SystemPeripheral::PTR };
+        #[cfg(esp32c6)]
+        let system = unsafe { &*IntPri::PTR };
+        match interrupt {
+            SoftwareInterrupt::SoftwareInterrupt0 => {
+                system
+                    .cpu_intr_from_cpu_0
+                    .write(|w| w.cpu_intr_from_cpu_0().bit(false));
+            }
+            SoftwareInterrupt::SoftwareInterrupt1 => {
+                system
+                    .cpu_intr_from_cpu_1
+                    .write(|w| w.cpu_intr_from_cpu_1().bit(false));
+            }
+            SoftwareInterrupt::SoftwareInterrupt2 => {
+                system
+                    .cpu_intr_from_cpu_2
+                    .write(|w| w.cpu_intr_from_cpu_2().bit(false));
+            }
+            SoftwareInterrupt::SoftwareInterrupt3 => {
+                system
+                    .cpu_intr_from_cpu_3
+                    .write(|w| w.cpu_intr_from_cpu_3().bit(false));
+            }
+        }
+    }
 }
 
 /// Controls the enablement of peripheral clocks.
@@ -492,6 +562,7 @@ pub struct SystemParts<'d> {
     #[cfg(pdma)]
     pub dma: Dma,
     pub radio_clock_control: RadioClockControl,
+    pub software_interrupt_control: SoftwareInterruptControl,
 }
 
 /// Extension trait to split a SYSTEM/DPORT peripheral in independent logical
@@ -515,6 +586,7 @@ impl<'d, T: crate::peripheral::Peripheral<P = SystemPeripheral> + 'd> SystemExt<
             #[cfg(pdma)]
             dma: Dma { _private: () },
             radio_clock_control: RadioClockControl { _private: () },
+            software_interrupt_control: SoftwareInterruptControl { _private: () },
         }
     }
 }
