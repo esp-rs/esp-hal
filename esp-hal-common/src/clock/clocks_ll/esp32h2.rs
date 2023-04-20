@@ -66,7 +66,6 @@ const REGI2C_RTC_DATA_V: u8 = 0xFF;
 const REGI2C_RTC_DATA_S: u8 = 16;
 
 const I2C_MST_I2C0_CTRL_REG: u32 = DR_REG_I2C_ANA_MST_BASE + 0x0;
-const I2C_ANA_MST_I2C0_BUSY: u32 = 1 << 25;
 const REGI2C_RTC_BUSY: u32 = 1 << 25;
 
 pub(crate) fn esp32h2_rtc_bbpll_configure(_xtal_freq: XtalClock, _pll_freq: PllClock) {
