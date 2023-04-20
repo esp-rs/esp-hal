@@ -13,11 +13,11 @@ use crate::peripheral::PeripheralRef;
 
 #[cfg(esp32)]
 type SystemPeripheral = crate::peripherals::DPORT;
-#[cfg(esp32c6)]
+#[cfg(any(esp32c6, esp32h2))]
 type SystemPeripheral = crate::peripherals::PCR;
-#[cfg(esp32c6)]
+#[cfg(any(esp32c6, esp32h2))]
 type IntPri = crate::peripherals::INTPRI;
-#[cfg(not(any(esp32, esp32c6)))]
+#[cfg(not(any(esp32, esp32c6, esp32h2)))]
 type SystemPeripheral = crate::peripherals::SYSTEM;
 
 pub enum SoftwareInterrupt {
@@ -79,15 +79,18 @@ pub enum Peripheral {
     #[cfg(rsa)]
     Rsa,
 }
+
 pub struct SoftwareInterruptControl {
     _private: (),
 }
+
 impl SoftwareInterruptControl {
     pub fn raise(&mut self, interrupt: SoftwareInterrupt) {
-        #[cfg(not(esp32c6))]
+        #[cfg(not(any(esp32c6, esp32h2)))]
         let system = unsafe { &*SystemPeripheral::PTR };
-        #[cfg(esp32c6)]
+        #[cfg(any(esp32c6, esp32h2))]
         let system = unsafe { &*IntPri::PTR };
+
         match interrupt {
             SoftwareInterrupt::SoftwareInterrupt0 => {
                 system
@@ -111,11 +114,13 @@ impl SoftwareInterruptControl {
             }
         }
     }
+
     pub fn reset(&mut self, interrupt: SoftwareInterrupt) {
-        #[cfg(not(esp32c6))]
+        #[cfg(not(any(esp32c6, esp32h2)))]
         let system = unsafe { &*SystemPeripheral::PTR };
-        #[cfg(esp32c6)]
+        #[cfg(any(esp32c6, esp32h2))]
         let system = unsafe { &*IntPri::PTR };
+
         match interrupt {
             SoftwareInterrupt::SoftwareInterrupt0 => {
                 system
@@ -146,7 +151,7 @@ pub struct PeripheralClockControl {
     _private: (),
 }
 
-#[cfg(not(esp32c6))]
+#[cfg(not(any(esp32c6, esp32h2)))]
 impl PeripheralClockControl {
     /// Enables and resets the given peripheral
     pub fn enable(&mut self, peripheral: Peripheral) {
@@ -487,6 +492,16 @@ impl PeripheralClockControl {
                 system.rsa_pd_ctrl.modify(|_, w| w.rsa_mem_pd().clear_bit());
             }
         }
+    }
+}
+
+#[cfg(esp32h2)]
+impl PeripheralClockControl {
+    /// Enables and resets the given peripheral
+    pub fn enable(&mut self, peripheral: Peripheral) {
+        let system = unsafe { &*SystemPeripheral::PTR };
+
+        todo!()
     }
 }
 
