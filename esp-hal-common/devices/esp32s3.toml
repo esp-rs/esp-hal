@@ -56,6 +56,7 @@ peripherals = [
     "usb_wrap",
     "wcl",
     "xts_aes",
+    "assist_debug_region_monitor",
 
     # Additional peripherals defined by us (the developers):
     "adc",
