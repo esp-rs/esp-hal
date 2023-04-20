@@ -29,6 +29,7 @@ peripherals = [
     "uart0",
     "uart1",
     "xts_aes",
+    "assist_debug_sp_monitor",
 
     # Additional peripherals defined by us (the developers):
     "adc",

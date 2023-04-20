@@ -72,6 +72,8 @@ pub use self::{delay::Delay, soc::peripherals};
 pub mod aes;
 #[cfg(any(adc, dac))]
 pub mod analog;
+#[cfg(assist_debug)]
+pub mod assist_debug;
 pub mod clock;
 pub mod delay;
 #[cfg(any(gdma, pdma))]
