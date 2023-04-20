@@ -42,8 +42,6 @@ sha1              = { version = "0.10", default-features = false}
 sha2              = { version = "0.10.6", default-features = false}
 ssd1306           = "0.7.1"
 static_cell       = "1.0.0"
-hex-literal       = "0.4"
-p256              = { version = "0.13", default-features = false }
 
 [features]
 default              = ["rt", "vectored", "xtal40mhz"]
