@@ -187,6 +187,7 @@ impl AlignmentHelper {
         return (remaining, was_bounded);
     }
 
+    #[allow(dead_code)]
     pub fn volatile_write_regset<T, Ux>(&mut self, dst: &mut Reg<T>, src: &[u8], dst_bound: usize)
     where
         T: RegisterSpec<Ux = Ux> + Resettable + Writable,
