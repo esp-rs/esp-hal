@@ -614,10 +614,7 @@ impl Rwdt {
 
         let wkey = if enable { 0u32 } else { 0x50D8_3AA1 };
 
-        // FIXME: register missing for H2
-        // rtc_cntl.wdtwprotect.write(|w| unsafe { w.bits(wkey) });
-
-        todo!()
+        rtc_cntl.wdtwprotect.write(|w| unsafe { w.bits(wkey) });
     }
 }
 
