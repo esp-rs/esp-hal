@@ -125,6 +125,8 @@ pub mod twai;
 pub mod uart;
 #[cfg(usb_device)]
 pub mod usb_serial_jtag;
+#[cfg(assist_debug)]
+pub mod assist_debug;
 
 /// State of the CPU saved when entering exception or interrupt
 pub mod trapframe {

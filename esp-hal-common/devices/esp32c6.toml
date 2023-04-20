@@ -66,6 +66,8 @@ peripherals = [
     "uart1",
     "uhci0",
     "usb_device",
+    "assist_debug_sp_monitor",
+    "assist_debug_region_monitor",
 
     # Additional peripherals defined by us (the developers):
     "adc",
