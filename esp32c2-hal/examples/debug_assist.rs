@@ -1,5 +1,4 @@
 //! This shows debug-assist
-//!
 
 #![no_std]
 #![no_main]
