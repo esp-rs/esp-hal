@@ -42,11 +42,18 @@ pub enum Number {
 pub mod config {
     use crate::ledc::timer::{TimerIFace, TimerSpeed};
 
+    #[derive(Copy, Clone)]
+    pub enum PinConfig {
+        PushPull,
+        OpenDrain,
+    }
+
     /// Channel configuration
     #[derive(Copy, Clone)]
     pub struct Config<'a, S: TimerSpeed> {
         pub timer: &'a dyn TimerIFace<S>,
         pub duty_pct: u8,
+        pub pin_config: PinConfig,
     }
 }
 
@@ -67,6 +74,7 @@ pub trait ChannelHW<O: OutputPin> {
     /// Configure Channel HW except for the duty which is set via
     /// [`Self::set_duty_hw`].
     fn configure_hw(&mut self) -> Result<(), Error>;
+    fn configure_hw_with_pin_config(&mut self, cfg: config::PinConfig) -> Result<(), Error>;
 
     /// Set channel duty HW
     fn set_duty_hw(&self, duty: u32);
@@ -103,7 +111,7 @@ where
         self.timer = Some(config.timer);
 
         self.set_duty(config.duty_pct)?;
-        self.configure_hw()?;
+        self.configure_hw_with_pin_config(config.pin_config)?;
 
         Ok(())
     }
@@ -298,12 +306,18 @@ where
     /// Configure Channel HW except for the duty which is set via
     /// [`Self::set_duty_hw`].
     fn configure_hw(&mut self) -> Result<(), Error> {
+        self.configure_hw_with_pin_config(config::PinConfig::PushPull)
+    }
+    fn configure_hw_with_pin_config(&mut self, cfg: config::PinConfig) -> Result<(), Error> {
         if let Some(timer) = self.timer {
             if !timer.is_configured() {
                 return Err(Error::Timer);
             }
 
-            self.output_pin.set_to_push_pull_output();
+            match cfg {
+                config::PinConfig::PushPull => self.output_pin.set_to_push_pull_output(),
+                config::PinConfig::OpenDrain => self.output_pin.set_to_open_drain_output(),
+            };
 
             let timer_number = timer.get_number() as u8;
             match self.number {
@@ -377,12 +391,22 @@ where
 {
     /// Configure Channel HW
     fn configure_hw(&mut self) -> Result<(), Error> {
+        self.configure_hw_with_pin_config(config::PinConfig::PushPull)
+    }
+    fn configure_hw_with_pin_config(&mut self, cfg: config::PinConfig) -> Result<(), Error> {
         if let Some(timer) = self.timer {
             if !timer.is_configured() {
                 return Err(Error::Timer);
             }
 
-            self.output_pin.set_to_push_pull_output();
+            match cfg {
+                config::PinConfig::PushPull => {
+                    self.output_pin.set_to_push_pull_output();
+                }
+                config::PinConfig::OpenDrain => {
+                    self.output_pin.set_to_open_drain_output();
+                }
+            }
 
             let timer_number = timer.get_number() as u8;
             match self.number {

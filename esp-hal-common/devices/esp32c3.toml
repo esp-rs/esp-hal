@@ -40,6 +40,8 @@ peripherals = [
     "uhci1",
     "usb_device",
     "xts_aes",
+    "assist_debug_sp_monitor",
+    "assist_debug_region_monitor",
 
     # Additional peripherals defined by us (the developers):
     "adc",
