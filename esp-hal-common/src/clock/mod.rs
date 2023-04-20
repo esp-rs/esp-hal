@@ -444,10 +444,10 @@ impl<'d> ClockControl<'d> {
         ClockControl {
             _private: clock_control.into_ref(),
             desired_rates: RawClocks {
-                cpu_clock: HertzU32::MHz(96),  //
-                apb_clock: HertzU32::MHz(32),  //
-                xtal_clock: HertzU32::MHz(32), //
-                i2c_clock: HertzU32::MHz(32),  //
+                cpu_clock: HertzU32::MHz(96),
+                apb_clock: HertzU32::MHz(32),
+                xtal_clock: HertzU32::MHz(32),
+                i2c_clock: HertzU32::MHz(32),
             },
         }
     }
@@ -480,7 +480,7 @@ impl<'d> ClockControl<'d> {
                 cpu_clock: cpu_clock_speed.frequency(),
                 apb_clock: apb_freq.frequency(),
                 xtal_clock: xtal_freq.frequency(),
-                i2c_clock: HertzU32::MHz(96),
+                i2c_clock: HertzU32::MHz(32),
             },
         }
     }
