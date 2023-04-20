@@ -758,12 +758,9 @@ pub fn get_reset_reason(cpu: Cpu) -> Option<SocResetReason> {
 }
 
 pub fn get_wakeup_cause() -> SleepSource {
-    // FIXME: check s_light_sleep_wakeup
-    // https://github.com/espressif/esp-idf/blob/afbdb0f/components/esp_hw_support/sleep_modes.c#L1394
-    // FIXME: un-comment block when H2's `SocResetReason` enum is populated
-    // if get_reset_reason(Cpu::ProCpu).unwrap() != SocResetReason::CoreDeepSleep {
-    //     return SleepSource::Undefined;
-    // }
+    if get_reset_reason(Cpu::ProCpu).unwrap() != SocResetReason::CoreDeepSleep {
+        return SleepSource::Undefined;
+    }
 
     #[cfg(any(esp32c6, esp32h2))]
     let wakeup_cause = WakeupReason::from_bits_retain(unsafe {
