@@ -72,6 +72,8 @@ pub use self::{delay::Delay, soc::peripherals};
 pub mod aes;
 #[cfg(any(adc, dac))]
 pub mod analog;
+#[cfg(assist_debug)]
+pub mod assist_debug;
 pub mod clock;
 pub mod delay;
 #[cfg(any(gdma, pdma))]
@@ -125,8 +127,6 @@ pub mod twai;
 pub mod uart;
 #[cfg(usb_device)]
 pub mod usb_serial_jtag;
-#[cfg(assist_debug)]
-pub mod assist_debug;
 
 /// State of the CPU saved when entering exception or interrupt
 pub mod trapframe {
