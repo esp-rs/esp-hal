@@ -11,6 +11,12 @@ use crate::{
     system::{Peripheral, PeripheralClockControl},
 };
 
+use paste::paste;
+#[cfg(esp32c6)]
+use crate::clock::clocks_ll::regi2c_write_mask;
+#[cfg(not(esp32c6))]
+use crate::rom::rom_i2c_writeReg_Mask;
+
 /// The sampling/readout resolution of the ADC
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum Resolution {
@@ -24,6 +30,13 @@ pub enum Attenuation {
     Attenuation2p5dB = 0b01,
     Attenuation6dB   = 0b10,
     Attenuation11dB  = 0b11,
+}
+#[derive(PartialEq)]
+pub enum AdcUnit {
+    /// SAR ADC 1
+    AdcUnit1,
+    /// SAR ADC 2
+    AdcUnit2,
 }
 
 pub struct AdcPin<PIN, ADCI> {
@@ -389,5 +402,238 @@ pub mod implementation {
             (Gpio4, 3),
             (Gpio5, 4),
         ]
+    }
+}
+
+// constants taken from https://github.com/espressif/esp-idf/blob/045163a2ec99eb3cb7cc69e2763afd145156c4cf/components/soc/esp32s3/include/soc/regi2c_saradc.h
+const I2C_SAR_ADC: u32 = 0x69;
+#[cfg(esp32c6)]
+const I2C_SAR_ADC_HOSTID: u32 = 0;
+#[cfg(not(esp32c6))]
+const I2C_SAR_ADC_HOSTID: u32 = 1;
+
+const ADC_SAR1_ENCAL_GND_ADDR: u32 = 0x7;
+const ADC_SAR1_ENCAL_GND_ADDR_MSB: u32 = 5;
+const ADC_SAR1_ENCAL_GND_ADDR_LSB: u32 = 5;
+
+const ADC_SAR2_ENCAL_GND_ADDR: u32 = 0x7;
+const ADC_SAR2_ENCAL_GND_ADDR_MSB: u32 = 7;
+const ADC_SAR2_ENCAL_GND_ADDR_LSB: u32 = 7;
+
+const ADC_SAR1_INITIAL_CODE_HIGH_ADDR: u32 = 0x1;
+const ADC_SAR1_INITIAL_CODE_HIGH_ADDR_MSB: u32 = 0x3;
+const ADC_SAR1_INITIAL_CODE_HIGH_ADDR_LSB: u32 = 0x0;
+
+const ADC_SAR1_INITIAL_CODE_LOW_ADDR: u32 = 0x0;
+const ADC_SAR1_INITIAL_CODE_LOW_ADDR_MSB: u32 = 0x7;
+const ADC_SAR1_INITIAL_CODE_LOW_ADDR_LSB: u32 = 0x0;
+
+const ADC_SAR2_INITIAL_CODE_HIGH_ADDR: u32 = 0x4;
+const ADC_SAR2_INITIAL_CODE_HIGH_ADDR_MSB: u32 = 0x3;
+const ADC_SAR2_INITIAL_CODE_HIGH_ADDR_LSB: u32 = 0x0;
+
+const ADC_SAR2_INITIAL_CODE_LOW_ADDR: u32 = 0x3;
+const ADC_SAR2_INITIAL_CODE_LOW_ADDR_MSB: u32 = 0x7;
+const ADC_SAR2_INITIAL_CODE_LOW_ADDR_LSB: u32 = 0x0;
+
+const ADC_SAR1_DREF_ADDR: u32 = 0x2;
+const ADC_SAR1_DREF_ADDR_MSB: u32 = 0x6;
+const ADC_SAR1_DREF_ADDR_LSB: u32 = 0x4;
+
+const ADC_SAR2_DREF_ADDR: u32 = 0x5;
+const ADC_SAR2_DREF_ADDR_MSB: u32 = 0x6;
+const ADC_SAR2_DREF_ADDR_LSB: u32 = 0x4;
+
+const _ADC_SAR1_SAMPLE_CYCLE_ADDR: u32 = 0x2;
+const _ADC_SAR1_SAMPLE_CYCLE_ADDR_MSB: u32 = 0x2;
+const _ADC_SAR1_SAMPLE_CYCLE_ADDR_LSB: u32 = 0x0;
+
+const _ADC_SARADC_DTEST_RTC_ADDR: u32 = 0x7;
+const _ADC_SARADC_DTEST_RTC_ADDR_MSB: u32 = 1;
+const _ADC_SARADC_DTEST_RTC_ADDR_LSB: u32 = 0;
+
+const _ADC_SARADC_ENT_TSENS_ADDR: u32 = 0x7;
+const _ADC_SARADC_ENT_TSENS_ADDR_MSB: u32 = 2;
+const _ADC_SARADC_ENT_TSENS_ADDR_LSB: u32 = 2;
+
+const _ADC_SARADC_ENT_RTC_ADDR: u32 = 0x7;
+const _ADC_SARADC_ENT_RTC_ADDR_MSB: u32 = 3;
+const _ADC_SARADC_ENT_RTC_ADDR_LSB: u32 = 3;
+
+const _ADC_SARADC_ENCAL_REF_ADDR: u32 = 0x7;
+const _ADC_SARADC_ENCAL_REF_ADDR_MSB: u32 = 4;
+const _ADC_SARADC_ENCAL_REF_ADDR_LSB: u32 = 4;
+
+const ADC_SARADC2_ENCAL_REF_ADDR:u32 = 0x7;
+const ADC_SARADC2_ENCAL_REF_ADDR_MSB:u32 = 6;
+const ADC_SARADC2_ENCAL_REF_ADDR_LSB:u32 = 6;
+
+const _I2C_SARADC_TSENS_DAC: u32 = 0x6;
+const _I2C_SARADC_TSENS_DAC_MSB: u32 = 3;
+const _I2C_SARADC_TSENS_DAC_LSB: u32 = 0;
+
+
+
+#[cfg(esp32c3)]
+#[inline(always)]
+/// Set common calibration configuration
+pub fn calibration_init(adc_unit: AdcUnit) {
+    match adc_unit {
+        AdcUnit::AdcUnit1 => {
+            unsafe {
+                crate::regi2c_write_mask!(
+                    I2C_SAR_ADC,
+                    ADC_SAR1_DREF_ADDR,
+                    1
+                );
+            }
+        }
+        AdcUnit::AdcUnit2 => {
+            unsafe {
+                crate::regi2c_write_mask!(
+                    I2C_SAR_ADC,
+                    ADC_SAR2_DREF_ADDR,
+                    1
+                );
+            }
+        }
+        _ => unreachable!()
+    }
+}
+
+#[cfg(esp32c3)]
+#[inline(always)]
+/// Configure the registers for ADC calibration.
+/// You need to call the `calibration_finish` interface to resume after calibration
+pub fn calibration_prepare(adc_unit: AdcUnit, internal_gnd: bool) {
+    match adc_unit {
+        AdcUnit::AdcUnit1 => {
+            unsafe {
+                crate::regi2c_write_mask!(
+                    I2C_SAR_ADC,
+                    ADC_SAR1_ENCAL_GND_ADDR,
+                    internal_gnd as u32
+                );
+            }
+        }
+        AdcUnit::AdcUnit2 => {
+            unsafe {
+                crate::regi2c_write_mask!(
+                    I2C_SAR_ADC,
+                    ADC_SAR2_ENCAL_GND_ADDR,
+                    internal_gnd as u32
+                );
+            }
+        }
+        _ => unreachable!()
+    }
+}
+
+/// Resume register status after calibration
+#[cfg(esp32c3)]
+#[inline(always)]
+pub fn calibration_finish(adc_unit: AdcUnit) {
+    match adc_unit {
+        AdcUnit::AdcUnit1 => {
+            unsafe {
+                crate::regi2c_write_mask!(
+                    I2C_SAR_ADC,
+                    ADC_SAR1_ENCAL_GND_ADDR,
+                    0
+                );
+            }
+        }
+        AdcUnit::AdcUnit2 => {
+            unsafe {
+                crate::regi2c_write_mask!(
+                    I2C_SAR_ADC,
+                    ADC_SAR2_ENCAL_GND_ADDR,
+                    0
+                );
+            }
+        }
+        _ => unreachable!()
+    }
+}
+
+#[cfg(esp32c3)]
+#[inline(always)]
+/// Set calibration parameter to ADC hardware
+pub fn set_calibration_param(adc_unit: AdcUnit, data: u16) {
+    let [msb, lsb] = data.to_be_bytes();
+
+    match adc_unit {
+        AdcUnit::AdcUnit1 => {
+            unsafe {
+                crate::regi2c_write_mask!(
+                    I2C_SAR_ADC,
+                    ADC_SAR1_INITIAL_CODE_HIGH_ADDR,
+                    msb as u32
+                );
+                crate::regi2c_write_mask!(
+                    I2C_SAR_ADC,
+                    ADC_SAR1_INITIAL_CODE_LOW_ADDR,
+                    lsb as u32
+                );
+            }
+        }
+        AdcUnit::AdcUnit2 => {
+            unsafe {
+                crate::regi2c_write_mask!(
+                    I2C_SAR_ADC,
+                    ADC_SAR2_INITIAL_CODE_HIGH_ADDR,
+                    msb as u32
+                );
+                crate::regi2c_write_mask!(
+                    I2C_SAR_ADC,
+                    ADC_SAR2_INITIAL_CODE_LOW_ADDR,
+                    lsb as u32
+                );
+            }
+        }
+        _ => unreachable!()
+    }
+}
+
+#[cfg(esp32c3)]
+pub fn calibrate() {
+    let cali_val: u16;
+    let adc: u16;
+    let adc_max: u16 = 0;
+    let adc_min: u16 = u16::MAX;
+    let adc_sum: u16 = 0;
+    let regval: u16 = 0;
+
+    // regval = read_efuse();
+
+    if regval == 1 {
+        //regval = read_efuse(ADC_CAL_BASE_REG, ADC_CAL_DATA_OFF, ADC_CAL_DATA_LEN);
+        cali_val = regval + 1000; //ADC_CAL_DATA_COMP = 1000
+    } else {
+        // Enable Vdef
+        unsafe {
+            crate::regi2c_write_mask!(
+                I2C_SAR_ADC,
+                ADC_SAR1_DREF_ADDR,
+                1
+            );
+        }
+
+        // Start sampling
+        // adc_samplecfg(ADC_CAL_CHANNEL);
+
+        // Enable internal connect GND (for calibration)
+        unsafe {
+            crate::regi2c_write_mask!(
+                I2C_SAR_ADC,
+                ADC_SAR1_ENCAL_GND_ADDR,
+                1
+            );
+        }
+
+        for _ in 0..32 {
+            set_calibration_param(AdcUnit::AdcUnit1, 0);
+        }
+
     }
 }
