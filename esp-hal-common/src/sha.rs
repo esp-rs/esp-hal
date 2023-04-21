@@ -86,9 +86,7 @@ impl<'d> Sha<'d> {
     }
 
     #[cfg(esp32)]
-    pub fn setmode(&mut self, _mode: ShaMode) {
-        
-    }
+    pub fn setmode(&mut self, _mode: ShaMode) {}
 
     #[cfg(not(esp32))]
     pub fn setmode(&mut self, mode: ShaMode) {
