@@ -212,13 +212,6 @@ where
         self.peripheral.master_write(address, bytes)
     }
 
-    fn write_iter<B>(&mut self, _address: u8, _bytes: B) -> Result<(), Self::Error>
-    where
-        B: IntoIterator<Item = u8>,
-    {
-        todo!()
-    }
-
     fn write_read(
         &mut self,
         address: u8,
@@ -228,30 +221,11 @@ where
         self.peripheral.master_write_read(address, bytes, buffer)
     }
 
-    fn write_iter_read<B>(
-        &mut self,
-        _address: u8,
-        _bytes: B,
-        _buffer: &mut [u8],
-    ) -> Result<(), Self::Error>
-    where
-        B: IntoIterator<Item = u8>,
-    {
-        todo!()
-    }
-
     fn transaction<'a>(
         &mut self,
         _address: u8,
         _operations: &mut [embedded_hal_1::i2c::Operation<'a>],
     ) -> Result<(), Self::Error> {
-        todo!()
-    }
-
-    fn transaction_iter<'a, O>(&mut self, _address: u8, _operations: O) -> Result<(), Self::Error>
-    where
-        O: IntoIterator<Item = embedded_hal_1::i2c::Operation<'a>>,
-    {
         todo!()
     }
 }
