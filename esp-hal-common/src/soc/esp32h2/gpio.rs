@@ -1,6 +1,6 @@
 use paste::paste;
 
-// https://github.com/espressif/esp-idf/blob/master/components/soc/esp32h2/gpio_periph.c#L42
+// https://github.com/espressif/esp-idf/blob/df9310a/components/soc/esp32h2/gpio_periph.c#L42
 pub const NUM_PINS: usize = 27;
 
 pub type OutputSignalType = u8;
