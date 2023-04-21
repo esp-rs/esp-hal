@@ -39,7 +39,6 @@ esp-hal-common     = { version = "0.8.0",  features = ["esp32c6"], path = "../es
 aes               = "0.8.2"
 critical-section  = "1.1.1"
 crypto-bigint     = {version = "0.5.1",default-features = false}
-embassy-executor  = { package = "embassy-executor", git = "https://github.com/embassy-rs/embassy/", rev = "cd9a65b", features = ["nightly", "integrated-timers"] }
 embedded-graphics = "0.7.1"
 esp-backtrace     = { version = "0.7.0", features = ["esp32c6", "panic-handler", "exception-handler", "print-uart"] }
 esp-hal-smartled  = { version = "0.1.0", features = ["esp32c6"], path = "../esp-hal-smartled" }
@@ -48,6 +47,12 @@ sha2              = { version = "0.10.6", default-features = false}
 smart-leds        = "0.3.0"
 ssd1306           = "0.7.1"
 static_cell       = "1.0.0"
+
+[dev-dependencies.embassy-executor]
+package  = "embassy-executor"
+git      = "https://github.com/embassy-rs/embassy/"
+rev      = "fb27594"
+features = ["nightly", "integrated-timers", "arch-riscv32", "executor-thread"]
 
 [features]
 default              = ["rt", "vectored", "esp-hal-common/rv-zero-rtc-bss"]
