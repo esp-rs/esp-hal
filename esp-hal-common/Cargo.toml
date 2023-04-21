@@ -31,9 +31,9 @@ void                 = { version = "1.0.2", default-features = false }
 usb-device           = { version = "0.2.9", optional = true }
 
 # async
-embedded-hal-async = { version = "0.2.0-alpha.0", optional = true }
-embassy-sync       = { version = "0.1.0", optional = true }
-embassy-time       = { version = "0.1.0", features = ["nightly"], optional = true }
+embedded-hal-async = { version = "0.2.0-alpha.1", optional = true }
+embassy-sync       = { version = "0.2.0", optional = true }
+embassy-time       = { version = "0.1.1", features = ["nightly"], optional = true }
 embassy-futures    = { version = "0.1.0", optional = true }
 
 # RISC-V
@@ -59,7 +59,7 @@ esp32s3 = { version = "0.18.0", features = ["critical-section"], optional = true
 
 [build-dependencies]
 basic-toml = "0.1.2"
-serde      = { version = "1.0.158", features = ["derive"] }
+serde      = { version = "1.0.160", features = ["derive"] }
 
 [features]
 esp32   = ["esp32/rt"  , "xtensa", "xtensa-lx/esp32",   "xtensa-lx-rt/esp32",   "lock_api", "procmacros/esp32"]
