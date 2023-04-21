@@ -85,9 +85,14 @@ impl<'d> Sha<'d> {
         }
     }
 
+    #[cfg(esp32)]
+    pub fn setmode(&mut self, _mode: ShaMode) {
+        
+    }
+
+    #[cfg(not(esp32))]
     pub fn setmode(&mut self, mode: ShaMode) {
         // Setup SHA Mode
-        #[cfg(not(esp32))]
         self.sha
             .mode
             .write(|w| unsafe { w.mode().bits(mode as u8) });
@@ -141,7 +146,7 @@ impl<'d> Sha<'d> {
             ShaMode::SHA1 | ShaMode::SHA256 => 64,
             #[cfg(not(esp32))]
             ShaMode::SHA224 => 64,
-            #[cfg(not(any(esp32c2, esp32c3)))]
+            #[cfg(not(any(esp32c2, esp32c3, esp32c6)))]
             _ => 128,
         };
     }

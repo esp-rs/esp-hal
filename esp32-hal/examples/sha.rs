@@ -10,7 +10,6 @@ use esp32_hal::{
     prelude::*,
     sha::{Sha, ShaMode},
     timer::TimerGroup,
-    xtensa_lx,
     Rng,
     Rtc,
 };

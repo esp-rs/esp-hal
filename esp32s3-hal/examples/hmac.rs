@@ -11,7 +11,6 @@ use esp32s3_hal::{
     prelude::*,
     systimer::SystemTimer,
     timer::TimerGroup,
-    xtensa_lx,
     Rng,
     Rtc,
 };
