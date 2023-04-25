@@ -53,7 +53,7 @@ package      = "embassy-executor"
 git      = "https://github.com/embassy-rs/embassy/"
 rev      = "fb27594"
 features = ["nightly", "integrated-timers", "arch-xtensa", "executor-thread"]
-esp-alloc         = "0.2.1"
+esp-alloc         = "0.3.0"
 
 [features]
 default   = ["rt", "vectored"]
