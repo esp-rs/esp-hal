@@ -22,8 +22,7 @@ use esp32c6_hal::{
 use esp_backtrace as _;
 use nb::block;
 
-static USB_SERIAL: Mutex<RefCell<Option<UsbSerialJtag<USB_DEVICE>>>> =
-    Mutex::new(RefCell::new(None));
+static USB_SERIAL: Mutex<RefCell<Option<UsbSerialJtag>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
