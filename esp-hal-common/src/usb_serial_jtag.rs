@@ -6,24 +6,21 @@ use crate::{
     system::PeripheralClockControl,
 };
 
-pub struct UsbSerialJtag<'d, T> {
-    usb_serial: PeripheralRef<'d, T>,
+pub struct UsbSerialJtag<'d> {
+    usb_serial: PeripheralRef<'d, USB_DEVICE>,
 }
 
 /// Custom USB serial error type
 type Error = Infallible;
 
-impl<'d, T> UsbSerialJtag<'d, T>
-where
-    T: Instance,
-{
+impl<'d> UsbSerialJtag<'d> {
     /// Create a new USB serial/JTAG instance with defaults
     pub fn new(
-        usb_serial: impl Peripheral<P = T> + 'd,
+        usb_serial: impl Peripheral<P = USB_DEVICE> + 'd,
         peripheral_clock_control: &mut PeripheralClockControl,
     ) -> Self {
         crate::into_ref!(usb_serial);
-        // #[cfg(usb_device)]
+
         peripheral_clock_control.enable(crate::system::Peripheral::Sha);
         let mut dev = Self { usb_serial };
         dev.usb_serial.disable_rx_interrupts();
@@ -198,19 +195,13 @@ impl Instance for crate::peripherals::USB_DEVICE {
     }
 }
 
-impl<T> core::fmt::Write for UsbSerialJtag<'_, T>
-where
-    T: Instance,
-{
+impl core::fmt::Write for UsbSerialJtag<'_> {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
         self.write_bytes(s.as_bytes()).map_err(|_| core::fmt::Error)
     }
 }
 
-impl<T> embedded_hal::serial::Read<u8> for UsbSerialJtag<'_, T>
-where
-    T: Instance,
-{
+impl embedded_hal::serial::Read<u8> for UsbSerialJtag<'_> {
     type Error = Error;
 
     fn read(&mut self) -> nb::Result<u8, Self::Error> {
@@ -218,10 +209,7 @@ where
     }
 }
 
-impl<T> embedded_hal::serial::Write<u8> for UsbSerialJtag<'_, T>
-where
-    T: Instance,
-{
+impl embedded_hal::serial::Write<u8> for UsbSerialJtag<'_> {
     type Error = Error;
 
     fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
