@@ -5,13 +5,13 @@ cores = "single_core"
 peripherals = [
     # Peripherals available in the PAC:
     # "aes",
-    # "apb_saradc",
+    "apb_saradc",
     # "assist_debug",
     # "ds",
     # "ecc",
     "efuse",
     # "gdma",
-    # "gpio",
+    "gpio",
     # "hmac",
     # "hp_apm",
     # "hp_sys",
@@ -20,7 +20,7 @@ peripherals = [
     # "i2s0",
     "interrupt_core0",
     "intpri",
-    # "io_mux",
+    "io_mux",
     # "ledc",
     # "lp_ana",
     # "lp_aon",
@@ -39,7 +39,6 @@ peripherals = [
     # "pcnt",
     "pcr",
     # "pmu",
-    # "peripherals",
     # "rmt",
     # "rng",
     # "rsa",
@@ -48,7 +47,7 @@ peripherals = [
     # "spi0",
     # "spi1",
     # "spi2",
-    # "systimer",
+    "systimer",
     # "tee",
     # "timg0",
     # "timg1",
@@ -59,7 +58,7 @@ peripherals = [
     # "uhci0",
     # "usb_device",
 
-
     # Additional peripherals defined by us (the developers):
+    "adc",
     "plic",
 ]

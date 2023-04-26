@@ -367,3 +367,27 @@ pub mod implementation {
         ]
     }
 }
+
+#[cfg(esp32h2)]
+pub mod implementation {
+    //! Analog to digital (ADC) conversion support.
+    //!
+    //! This module provides functions for reading analog values from one
+    //! analog to digital converter available on the ESP32-H2: `ADC1`.
+
+    use embedded_hal::adc::Channel;
+
+    use super::impl_adc_interface;
+    pub use crate::analog::{adc::*, ADC1};
+    use crate::gpio::*;
+
+    impl_adc_interface! {
+        ADC1 [
+            (Gpio1, 0),
+            (Gpio2, 1),
+            (Gpio3, 2),
+            (Gpio4, 3),
+            (Gpio5, 4),
+        ]
+    }
+}
