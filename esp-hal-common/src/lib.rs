@@ -156,6 +156,12 @@ pub fn disable_apm_filter() {
     }
 }
 
+#[doc(hidden)]
+pub fn common_init() {
+    #[cfg(psram)]
+    soc::psram::init_psram();
+}
+
 /// Enumeration of CPU cores
 /// The actual number of available cores depends on the target.
 pub enum Cpu {

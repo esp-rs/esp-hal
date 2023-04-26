@@ -75,6 +75,10 @@ esp32_26mhz = []
 esp32c2_40mhz = []
 esp32c2_26mhz = []
 
+psram_2m = []
+psram_4m = []
+psram_8m = []
+
 # Implement the `embedded-hal==1.0.0-alpha.x` traits
 eh1 = ["embedded-hal-1", "embedded-hal-nb", "embedded-can"]
 

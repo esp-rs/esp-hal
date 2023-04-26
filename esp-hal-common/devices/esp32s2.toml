@@ -53,6 +53,7 @@ peripherals = [
     "radio",
     "phy",
     "wifi",
+    "psram",
 
     # Wakeup SOC based on ESP-IDF:
     "pm_support_ext0_wakeup",
