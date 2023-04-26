@@ -9,6 +9,7 @@
 //! - [esp32c2-hal]
 //! - [esp32c3-hal]
 //! - [esp32c6-hal]
+//! - [esp32h2-hal]
 //! - [esp32s2-hal]
 //! - [esp32s3-hal]
 //!
@@ -17,6 +18,7 @@
 //! [esp32c2-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32c2-hal
 //! [esp32c3-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32c3-hal
 //! [esp32c6-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32c6-hal
+//! [esp32h2-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32h2-hal
 //! [esp32s2-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32s2-hal
 //! [esp32s3-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32s3-hal
 
@@ -42,6 +44,8 @@ pub use xtensa_lx_rt::{self, entry};
 pub use self::analog::adc::implementation as adc;
 #[cfg(dac)]
 pub use self::analog::dac::implementation as dac;
+#[cfg(any(xtensa, all(riscv, systimer)))]
+pub use self::delay::Delay;
 #[cfg(gdma)]
 pub use self::dma::gdma;
 #[cfg(pdma)]
@@ -58,6 +62,7 @@ pub use self::rtc_cntl::{Rtc, Rwdt};
 pub use self::soc::cpu_control;
 #[cfg(efuse)]
 pub use self::soc::efuse;
+pub use self::soc::peripherals;
 #[cfg(any(spi0, spi1, spi2, spi3))]
 pub use self::spi::Spi;
 #[cfg(any(timg0, timg1))]
@@ -66,7 +71,6 @@ pub use self::timer::Timer;
 pub use self::uart::Uart;
 #[cfg(usb_device)]
 pub use self::usb_serial_jtag::UsbSerialJtag;
-pub use self::{delay::Delay, soc::peripherals};
 
 #[cfg(aes)]
 pub mod aes;
@@ -75,6 +79,7 @@ pub mod analog;
 #[cfg(assist_debug)]
 pub mod assist_debug;
 pub mod clock;
+#[cfg(any(xtensa, all(riscv, systimer)))]
 pub mod delay;
 #[cfg(any(gdma, pdma))]
 pub mod dma;
