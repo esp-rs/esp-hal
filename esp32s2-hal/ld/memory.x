@@ -8,8 +8,7 @@
 /* override entry point */
 ENTRY(ESP32Reset)
 
-/* reserved at the start of DRAM/IRAM */
-RESERVE_CACHES = 0x2000;
+INCLUDE "memory_extras.x"
 
 VECTORS_SIZE = 0x400;
 
