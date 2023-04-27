@@ -262,7 +262,7 @@ impl InteruptStatusRegisterAccess for SingleCoreInteruptStatusRegisterAccessBank
 // interrupt enable bit see
 // https://github.com/espressif/esp-idf/blob/c04803e88b871a4044da152dfb3699cf47354d18/components/hal/esp32s3/include/hal/gpio_ll.h#L32
 // Treating it as SingleCore in the gpio macro makes this work.
-#[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32s2, esp32s3)))]
+#[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s2, esp32s3)))]
 impl InteruptStatusRegisterAccess for DualCoreInteruptStatusRegisterAccessBank0 {
     fn pro_cpu_interrupt_status_read() -> u32 {
         unsafe { &*GPIO::PTR }.pcpu_int.read().bits()
@@ -285,7 +285,7 @@ impl InteruptStatusRegisterAccess for DualCoreInteruptStatusRegisterAccessBank0 
 // interrupt enable bit see
 // https://github.com/espressif/esp-idf/blob/c04803e88b871a4044da152dfb3699cf47354d18/components/hal/esp32s3/include/hal/gpio_ll.h#L32
 // Treating it as SingleCore in the gpio macro makes this work.
-#[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32s2, esp32s3)))]
+#[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s2, esp32s3)))]
 impl InteruptStatusRegisterAccess for DualCoreInteruptStatusRegisterAccessBank1 {
     fn pro_cpu_interrupt_status_read() -> u32 {
         unsafe { &*GPIO::PTR }.pcpu_int1.read().bits()
@@ -449,7 +449,7 @@ impl BankGpioRegisterAccess for Bank0GpioRegisterAccess {
     }
 }
 
-#[cfg(not(any(esp32c2, esp32c3, esp32c6)))]
+#[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
 impl BankGpioRegisterAccess for Bank1GpioRegisterAccess {
     fn write_out_en_clear(word: u32) {
         unsafe { &*GPIO::PTR }
@@ -1677,7 +1677,7 @@ pub fn enable_iomux_clk_gate() {
     }
 }
 
-#[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32s2)))]
+#[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s2)))]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! analog {
@@ -1795,7 +1795,7 @@ macro_rules! analog {
     }
 }
 
-#[cfg(any(esp32c2, esp32c3, esp32c6))]
+#[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! analog {

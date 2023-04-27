@@ -1,5 +1,5 @@
 #[cfg_attr(esp32, path = "adc/esp32.rs")]
-#[cfg_attr(any(esp32c2, esp32c3, esp32c6), path = "adc/riscv.rs")]
+#[cfg_attr(riscv, path = "adc/riscv.rs")]
 #[cfg_attr(any(esp32s2, esp32s3), path = "adc/xtensa.rs")]
 pub mod adc;
 #[cfg(dac)]
@@ -77,7 +77,7 @@ impl crate::peripheral::Peripheral for DAC2 {
 impl crate::peripheral::sealed::Sealed for DAC2 {}
 
 cfg_if::cfg_if! {
-    if #[cfg(any(esp32, esp32s2, esp32s3))] {
+    if #[cfg(xtensa)] {
         use crate::peripherals::SENS;
 
         pub struct AvailableAnalog {
@@ -114,7 +114,7 @@ cfg_if::cfg_if! {
 }
 
 cfg_if::cfg_if! {
-    if #[cfg(any(esp32c2, esp32c3, esp32c6))] {
+    if #[cfg(riscv)] {
         use crate::peripherals::APB_SARADC;
 
         pub struct AvailableAnalog {
