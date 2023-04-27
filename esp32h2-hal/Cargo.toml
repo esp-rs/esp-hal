@@ -2,7 +2,8 @@
 name    = "esp32h2-hal"
 version = "0.1.0"
 authors = [
-    "Kirill Mikhailov <playfulfence@gmail.com>"
+    "Kirill Mikhailov <playfulfence@gmail.com>",
+    "Jesse Braham <jesse@beta7.io>",
 ]
 edition      = "2021"
 rust-version = "1.60.0"
@@ -57,4 +58,3 @@ async                = ["esp-hal-common/async", "embedded-hal-async"]
 embassy              = ["esp-hal-common/embassy"]
 embassy-time-systick = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-hz-16_000_000"]
 embassy-time-timg0   = ["esp-hal-common/embassy-time-timg0",   "embassy-time/tick-hz-1_000_000"]
-
