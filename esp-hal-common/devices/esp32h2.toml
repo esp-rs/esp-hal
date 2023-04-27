@@ -53,8 +53,8 @@ peripherals = [
     # "timg1",
     # "trace",
     # "twai0",
-    # "uart0",
-    # "uart1",
+    "uart0",
+    "uart1",
     # "uhci0",
     # "usb_device",
 
