@@ -127,6 +127,8 @@ pub unsafe fn startup_direct_boot() -> ! {
         .sysclk_conf
         .modify(|_, w| w.soc_clk_sel().bits(1));
 
+    esp_hal_common::common_init();
+
     esp_hal_common::xtensa_lx_rt::Reset();
 }
 
@@ -192,6 +194,8 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
     // Initialize RTC RAM
     esp_hal_common::xtensa_lx_rt::zero_bss(&mut _rtc_fast_bss_start, &mut _rtc_fast_bss_end);
     esp_hal_common::xtensa_lx_rt::zero_bss(&mut _rtc_slow_bss_start, &mut _rtc_slow_bss_end);
+
+    esp_hal_common::common_init();
 
     // continue with default reset handler
     esp_hal_common::xtensa_lx_rt::Reset();

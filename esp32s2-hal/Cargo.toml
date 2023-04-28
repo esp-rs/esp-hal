@@ -49,9 +49,10 @@ ssd1306           = "0.7.1"
 static_cell       = "1.0.0"
 usb-device        = { version = "0.2.9" }
 usbd-serial       = "0.1.1"
+esp-alloc         = "0.3.0"
 
 [dev-dependencies.embassy-executor]
-package  = "embassy-executor"
+package      = "embassy-executor"
 git      = "https://github.com/embassy-rs/embassy/"
 rev      = "fb27594"
 features = ["nightly", "integrated-timers", "arch-xtensa", "executor-thread"]
@@ -69,6 +70,11 @@ embassy   = ["esp-hal-common/embassy"]
 # - Fix https://github.com/esp-rs/esp-hal/issues/253
 # embassy-time-systick = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-hz-1_000_000"] 
 embassy-time-timg0 = ["esp-hal-common/embassy-time-timg0", "embassy-time/tick-hz-1_000_000"]
+
+psram     = []
+psram_2m  = ["esp-hal-common/psram_2m", "psram"]
+psram_4m  = ["esp-hal-common/psram_4m", "psram"]
+psram_8m  = ["esp-hal-common/psram_8m", "psram"]
 
 [[example]]
 name              = "spi_eh1_loopback"
@@ -90,6 +96,9 @@ required-features = ["embassy", "async"]
 name              = "embassy_spi"
 required-features = ["embassy", "async"]
 
+[[example]]
+name              = "psram"
+required-features = ["psram_2m"]
 
 [profile.release]
 debug = true

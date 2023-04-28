@@ -25,4 +25,4 @@ rustflags = [
 target = "xtensa-esp32s2-none-elf"
 
 [unstable]
-build-std = ["core"]
+build-std = ["core", "alloc"]

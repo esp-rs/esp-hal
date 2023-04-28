@@ -136,8 +136,15 @@ fn main() {
     println!("cargo:rustc-cfg={}", device.arch);
     println!("cargo:rustc-cfg={}", device.cores);
 
-    for peripheral in device.peripherals {
+    for peripheral in &device.peripherals {
         println!("cargo:rustc-cfg={peripheral}");
+    }
+
+    // check PSRAM features are only given if the target supports PSRAM
+    if !&device.peripherals.contains(&String::from("psram"))
+        && (cfg!(feature = "psram_2m") || cfg!(feature = "psram_4m") || cfg!(feature = "psram_8m"))
+    {
+        panic!("The target does not support PSRAM");
     }
 
     // Place all linker scripts in `OUT_DIR`, and instruct Cargo how to find these
