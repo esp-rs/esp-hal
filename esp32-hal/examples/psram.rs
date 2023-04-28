@@ -1,11 +1,11 @@
 //! This shows how to use PSRAM as heap-memory via esp-alloc
 //!
-//! You need an ESP32-S2 with at least 2 MB of PSRAM memory.
+//! You need an ESP32 with at least 2 MB of PSRAM memory.
 
 #![no_std]
 #![no_main]
 
-use esp32s2_hal::{
+use esp32_hal::{
     clock::ClockControl,
     peripherals::Peripherals,
     prelude::*,
@@ -28,11 +28,16 @@ fn init_psram_heap() {
 
 #[entry]
 fn main() -> ! {
+    #[cfg(debug_assertions)]
+    panic!("PSRAM on ESP32 needs to be built in release mode");
+
+    esp_println::logger::init_logger_from_env();
+
     let peripherals = Peripherals::take();
     soc::psram::init_psram(peripherals.PSRAM);
     init_psram_heap();
 
-    let mut system = peripherals.SYSTEM.split();
+    let mut system = peripherals.DPORT.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let timer_group0 = TimerGroup::new(
@@ -57,6 +62,7 @@ fn main() -> ! {
 
     println!("vec size = {} bytes", large_vec.len() * 4);
     println!("vec address = {:p}", large_vec.as_ptr());
+    println!("{:?}", &large_vec[..100]);
 
     let string = alloc::string::String::from("A string allocated in PSRAM");
     println!("'{}' allocated at {:p}", &string, string.as_ptr());

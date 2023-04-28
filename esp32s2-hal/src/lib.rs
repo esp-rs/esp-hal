@@ -54,8 +54,6 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
     esp_hal_common::xtensa_lx_rt::zero_bss(&mut _rtc_fast_bss_start, &mut _rtc_fast_bss_end);
     esp_hal_common::xtensa_lx_rt::zero_bss(&mut _rtc_slow_bss_start, &mut _rtc_slow_bss_end);
 
-    esp_hal_common::common_init();
-
     // continue with default reset handler
     esp_hal_common::xtensa_lx_rt::Reset();
 }
