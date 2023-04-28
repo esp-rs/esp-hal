@@ -41,6 +41,11 @@ sha1              = { version = "0.10", default-features = false}
 sha2              = { version = "0.10.6", default-features = false}
 ssd1306           = "0.7.1"
 static_cell       = "1.0.0"
+hex-literal       = "0"
+crypto-bigint     = {version = "0.5.1", default-features = false }
+elliptic-curve    = {version = "0.13.4", default-features = false, features = ["sec1"] }
+p192              = {version = "0.13.0", default-features = false, features = ["arithmetic"] }
+p256              = {version = "0.13.2", default-features = false, features = ["arithmetic"] }
 
 [dev-dependencies.embassy-executor]
 package  = "embassy-executor"
@@ -81,3 +86,7 @@ required-features = ["embassy", "async"]
 [[example]]
 name              = "embassy_spi"
 required-features = ["embassy", "async"]
+
+# Need it for ECC example
+[profile.dev]
+opt-level = 1

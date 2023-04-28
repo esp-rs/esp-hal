@@ -78,6 +78,8 @@ pub mod clock;
 pub mod delay;
 #[cfg(any(gdma, pdma))]
 pub mod dma;
+#[cfg(ecc)]
+pub mod ecc;
 #[cfg(feature = "embassy")]
 pub mod embassy;
 #[cfg(gpio)]
