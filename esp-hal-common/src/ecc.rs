@@ -20,9 +20,9 @@
 //! # Availability on ESP32 family
 //!
 //! The accelerator is available on ESP32-C2 and ESP32-C6.
-//! 
+//!
 //! # Data representation
-//! 
+//!
 //! Inputs of the ECC hardware accelerator must be provided in big-endian representation.
 //! The driver handles the inner representation of the blocks.
 
@@ -91,9 +91,9 @@ impl<'d> Ecc<'d> {
     ///
     /// Base Point Multiplication can be represented as:
     /// (Q_x, Q_y) = k * (P_x, P_y)
-    /// 
+    ///
     /// # Error
-    /// 
+    ///
     /// This function will return an error if any bitlength value is different
     /// from the bitlength of the prime fields of the curve.
     pub fn affine_point_multiplication(
@@ -156,9 +156,9 @@ impl<'d> Ecc<'d> {
     ///
     /// Finite Field Division can be represented as:
     /// Result = P_y * k^{−1} mod p
-    /// 
+    ///
     /// # Error
-    /// 
+    ///
     /// This function will return an error if any bitlength value is different
     /// from the bitlength of the prime fields of the curve.
     pub fn finite_field_division(
@@ -213,12 +213,12 @@ impl<'d> Ecc<'d> {
     ///
     /// Base Point Verification can be used to verify if a point (Px, Py) is
     /// on a selected elliptic curve.
-    /// 
+    ///
     /// # Error
-    /// 
+    ///
     /// This function will return an error if any bitlength value is different
     /// from the bitlength of the prime fields of the curve.
-    /// 
+    ///
     /// This function will return an error if the point is not on the selected
     /// elliptic curve.
     pub fn affine_point_verification(
@@ -275,12 +275,12 @@ impl<'d> Ecc<'d> {
     /// In this working mode, ECC first verifies if Point (P_x, P_y) is on the
     /// selected elliptic curve or not. If yes, then perform the multiplication:
     /// (Q_x, Q_y) = k * (P_x, P_y)
-    /// 
+    ///
     /// # Error
-    /// 
+    ///
     /// This function will return an error if any bitlength value is different
     /// from the bitlength of the prime fields of the curve.
-    /// 
+    ///
     /// This function will return an error if the point is not on the selected
     /// elliptic curve.
     pub fn affine_point_verification_multiplication(
@@ -347,9 +347,9 @@ impl<'d> Ecc<'d> {
     ///
     /// Jacobian Point Multiplication can be represented as:
     /// (Q_x, Q_y, Q_z) = k * (P_x, P_y, 1)
-    /// 
+    ///
     /// # Error
-    /// 
+    ///
     /// This function will return an error if any bitlength value is different
     /// from the bitlength of the prime fields of the curve.
     pub fn jacobian_point_multication(
@@ -414,12 +414,12 @@ impl<'d> Ecc<'d> {
     ///
     /// Jacobian Point Verification can be used to verify if a point (Q_x, Q_y,
     /// Q_z) is on a selected elliptic curve.
-    /// 
+    ///
     /// # Error
-    /// 
+    ///
     /// This function will return an error if any bitlength value is different
     /// from the bitlength of the prime fields of the curve.
-    /// 
+    ///
     /// This function will return an error if the point is not on the selected
     /// elliptic curve.
     pub fn jacobian_point_verification(
@@ -480,12 +480,12 @@ impl<'d> Ecc<'d> {
     /// In this working mode, ECC first verifies if Point (Px, Py) is on the
     /// selected elliptic curve or not. If yes, then perform the multiplication:
     /// (Q_x, Q_y, Q_z) = k * (P_x, P_y, 1)
-    /// 
+    ///
     /// # Error
-    /// 
+    ///
     /// This function will return an error if any bitlength value is different
     /// from the bitlength of the prime fields of the curve.
-    /// 
+    ///
     /// This function will return an error if the point is not on the selected
     /// elliptic curve.
     pub fn affine_point_verification_jacobian_multiplication(
