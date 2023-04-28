@@ -13,7 +13,8 @@
 //! # Main features
 //!
 //! ECC Accelerator supports:
-//! - Two different elliptic curves, namely P-192 and P-256 defined in FIPS 186-3.
+//! - Two different elliptic curves, namely P-192 and P-256 defined in FIPS
+//!   186-3.
 //! - Seven working modes.
 //! - Interrupt upon completion of calculation.
 //!
@@ -23,8 +24,8 @@
 //!
 //! # Data representation
 //!
-//! Inputs of the ECC hardware accelerator must be provided in big-endian representation.
-//! The driver handles the inner representation of the blocks.
+//! Inputs of the ECC hardware accelerator must be provided in big-endian
+//! representation. The driver handles the inner representation of the blocks.
 
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
@@ -54,13 +55,13 @@ pub enum EllipticCurve {
 }
 
 enum WorkMode {
-    PointMultiMode = 0,
+    PointMultiMode          = 0,
     #[cfg(esp32c2)]
-    DivisionMode = 1,
-    PointVerif = 2,
-    PointVerifMulti = 3,
-    JacobianPointMulti = 4,
-    JacobianPointVerif = 6,
+    DivisionMode            = 1,
+    PointVerif              = 2,
+    PointVerifMulti         = 3,
+    JacobianPointMulti      = 4,
+    JacobianPointVerif      = 6,
     PointVerifJacobianMulti = 7,
 }
 

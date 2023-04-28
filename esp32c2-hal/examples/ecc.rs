@@ -5,9 +5,12 @@
 #![no_main]
 
 use core::ops::Mul;
+
 use crypto_bigint::{
     modular::runtime_mod::{DynResidue, DynResidueParams},
-    Encoding, U192, U256,
+    Encoding,
+    U192,
+    U256,
 };
 use elliptic_curve::sec1::ToEncodedPoint;
 use esp32c2_hal::{
@@ -17,7 +20,8 @@ use esp32c2_hal::{
     prelude::*,
     systimer::SystemTimer,
     timer::TimerGroup,
-    Rng, Rtc,
+    Rng,
+    Rtc,
 };
 use esp_backtrace as _;
 use esp_println::{print, println};

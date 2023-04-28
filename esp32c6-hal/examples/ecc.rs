@@ -5,9 +5,12 @@
 #![no_main]
 
 use core::ops::Mul;
+
 use crypto_bigint::{
     modular::runtime_mod::{DynResidue, DynResidueParams},
-    Encoding, U192, U256,
+    Encoding,
+    U192,
+    U256,
 };
 use elliptic_curve::sec1::ToEncodedPoint;
 use esp32c6_hal::{
@@ -17,7 +20,8 @@ use esp32c6_hal::{
     prelude::*,
     systimer::SystemTimer,
     timer::TimerGroup,
-    Rng, Rtc,
+    Rng,
+    Rtc,
 };
 use esp_backtrace as _;
 use esp_println::{print, println};
@@ -66,7 +70,7 @@ fn main() -> ! {
 
     println!("Beginning stress tests...");
     test_affine_point_multiplication(&mut hw_ecc, &mut rng);
-    //test_finite_field_division(&mut hw_ecc, &mut rng);
+    // test_finite_field_division(&mut hw_ecc, &mut rng);
     test_affine_point_verification(&mut hw_ecc, &mut rng);
     test_afine_point_verification_multiplication(&mut hw_ecc, &mut rng);
     test_jacobian_point_multiplication(&mut hw_ecc, &mut rng);
@@ -190,79 +194,79 @@ fn test_affine_point_multiplication(ecc: &mut Ecc, rng: &mut Rng) {
     }
 }
 
-/*fn test_finite_field_division(ecc: &mut Ecc, rng: &mut Rng) {
-    for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
-        print!("Beginning finite field division tests over ");
-        match prime_field.len() {
-            24 => print!("P-192..."),
-            32 => print!("P-256..."),
-            _ => unimplemented!(),
-        };
-        let t1 = &mut [0_u8; 64];
-        let (k, y) = t1.split_at_mut(prime_field.len());
-        let (y, _) = y.split_at_mut(prime_field.len());
-        let mut delta_time = 0;
-        for _ in 0..TEST_PARAMS_VECTOR.nb_loop_inv {
-            loop {
-                rng.read(k).unwrap();
-                rng.read(y).unwrap();
-                let is_zero = k.iter().all(|&elt| elt == 0) || y.iter().all(|&elt| elt == 0);
-                let is_modulus = k.iter().zip(prime_field).all(|(&a, &b)| a == b) || y.iter().zip(prime_field).all(|(&a, &b)| a == b);
-                if is_zero == false && is_modulus == false {
-                    break;
-                }
-            }
-            let t2 = &mut [0_u8; 96];
-            let (sw_y, sw_k) = t2.split_at_mut(prime_field.len());
-            let (sw_k, sw_res) = sw_k.split_at_mut(prime_field.len());
-            let (sw_res, _) = sw_res.split_at_mut(prime_field.len());
-            sw_y.copy_from_slice(y);
-            sw_k.copy_from_slice(k);
-            let curve = match prime_field.len() {
-                24 => &EllipticCurve::P192,
-                32 => &EllipticCurve::P256,
-                _ => unimplemented!(),
-            };
-
-            let begin_time = SystemTimer::now();
-            ecc
-                .finite_field_division(curve, k, y)
-                .expect("Inputs data doesn't match the key length selected.");
-            let end_time = SystemTimer::now();
-            delta_time += end_time - begin_time;
-
-            match prime_field.len() {
-                24 => {
-                    let modulus = DynResidueParams::new(&U192::from_be_slice(prime_field));
-                    let sw_y = DynResidue::new(&U192::from_be_slice(sw_y), modulus);
-                    let sw_k = DynResidue::new(&U192::from_be_slice(sw_k), modulus);
-                    let sw_inv_k = sw_k.invert().0;
-                    sw_res.copy_from_slice(sw_y.mul(&sw_inv_k).retrieve().to_be_bytes().as_slice());
-                },
-                32 => {
-                    let modulus = DynResidueParams::new(&U256::from_be_slice(prime_field));
-                    let sw_y = DynResidue::new(&U256::from_be_slice(sw_y), modulus);
-                    let sw_k = DynResidue::new(&U256::from_be_slice(sw_k), modulus);
-                    let sw_inv_k = sw_k.invert().0;
-                    sw_res.copy_from_slice(sw_y.mul(&sw_inv_k).retrieve().to_be_bytes().as_slice());
-                },
-                _ => unimplemented!(),
-            };
-
-            for (a, b) in y.iter().zip(sw_res) {
-                assert_eq!(
-                    a, b,
-                    "ECC failed during finite field division with \np_y = {:02X?}\nk= {:02X?}",
-                    sw_y, sw_k,
-                );
-            }
-        }
-        println!(
-            "ok (it took {} cycles in average)",
-            delta_time / (TEST_PARAMS_VECTOR.nb_loop_inv as u64)
-        );
-    }
-}*/
+// fn test_finite_field_division(ecc: &mut Ecc, rng: &mut Rng) {
+// for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
+// print!("Beginning finite field division tests over ");
+// match prime_field.len() {
+// 24 => print!("P-192..."),
+// 32 => print!("P-256..."),
+// _ => unimplemented!(),
+// };
+// let t1 = &mut [0_u8; 64];
+// let (k, y) = t1.split_at_mut(prime_field.len());
+// let (y, _) = y.split_at_mut(prime_field.len());
+// let mut delta_time = 0;
+// for _ in 0..TEST_PARAMS_VECTOR.nb_loop_inv {
+// loop {
+// rng.read(k).unwrap();
+// rng.read(y).unwrap();
+// let is_zero = k.iter().all(|&elt| elt == 0) || y.iter().all(|&elt| elt == 0);
+// let is_modulus = k.iter().zip(prime_field).all(|(&a, &b)| a == b) ||
+// y.iter().zip(prime_field).all(|(&a, &b)| a == b); if is_zero == false &&
+// is_modulus == false { break;
+// }
+// }
+// let t2 = &mut [0_u8; 96];
+// let (sw_y, sw_k) = t2.split_at_mut(prime_field.len());
+// let (sw_k, sw_res) = sw_k.split_at_mut(prime_field.len());
+// let (sw_res, _) = sw_res.split_at_mut(prime_field.len());
+// sw_y.copy_from_slice(y);
+// sw_k.copy_from_slice(k);
+// let curve = match prime_field.len() {
+// 24 => &EllipticCurve::P192,
+// 32 => &EllipticCurve::P256,
+// _ => unimplemented!(),
+// };
+//
+// let begin_time = SystemTimer::now();
+// ecc
+// .finite_field_division(curve, k, y)
+// .expect("Inputs data doesn't match the key length selected.");
+// let end_time = SystemTimer::now();
+// delta_time += end_time - begin_time;
+//
+// match prime_field.len() {
+// 24 => {
+// let modulus = DynResidueParams::new(&U192::from_be_slice(prime_field));
+// let sw_y = DynResidue::new(&U192::from_be_slice(sw_y), modulus);
+// let sw_k = DynResidue::new(&U192::from_be_slice(sw_k), modulus);
+// let sw_inv_k = sw_k.invert().0;
+// sw_res.copy_from_slice(sw_y.mul(&sw_inv_k).retrieve().to_be_bytes().
+// as_slice()); },
+// 32 => {
+// let modulus = DynResidueParams::new(&U256::from_be_slice(prime_field));
+// let sw_y = DynResidue::new(&U256::from_be_slice(sw_y), modulus);
+// let sw_k = DynResidue::new(&U256::from_be_slice(sw_k), modulus);
+// let sw_inv_k = sw_k.invert().0;
+// sw_res.copy_from_slice(sw_y.mul(&sw_inv_k).retrieve().to_be_bytes().
+// as_slice()); },
+// _ => unimplemented!(),
+// };
+//
+// for (a, b) in y.iter().zip(sw_res) {
+// assert_eq!(
+// a, b,
+// "ECC failed during finite field division with \np_y = {:02X?}\nk= {:02X?}",
+// sw_y, sw_k,
+// );
+// }
+// }
+// println!(
+// "ok (it took {} cycles in average)",
+// delta_time / (TEST_PARAMS_VECTOR.nb_loop_inv as u64)
+// );
+// }
+// }
 
 fn test_affine_point_verification(ecc: &mut Ecc, rng: &mut Rng) {
     for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
