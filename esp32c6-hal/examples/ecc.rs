@@ -26,7 +26,7 @@ use hex_literal::hex;
 struct TestParams<'a> {
     prime_fields: &'a [&'a [u8]],
     nb_loop_mul: usize,
-    nb_loop_inv: usize,
+    // nb_loop_inv: usize,
 }
 
 const TEST_PARAMS_VECTOR: TestParams = TestParams {
@@ -35,7 +35,7 @@ const TEST_PARAMS_VECTOR: TestParams = TestParams {
         &hex!("ffffffff00000001000000000000000000000000ffffffffffffffffffffffff"),
     ],
     nb_loop_mul: 10,
-    nb_loop_inv: 20,
+    // nb_loop_inv: 20,
 };
 
 #[entry]
