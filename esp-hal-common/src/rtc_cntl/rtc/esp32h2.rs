@@ -3,8 +3,135 @@ use strum::FromRepr;
 
 use crate::clock::Clock;
 
+use crate::{
+    clock::{clocks_ll::regi2c_write_mask, Clock, XtalClock},
+    peripherals::{LP_AON, LP_CLKRST, PCR, PMU, TIMG0},
+};
+
+const I2C_PMU: u8 = 0x6d;
+const I2C_PMU_HOSTID: u8 = 0;
+
+const I2C_PMU_EN_I2C_RTC_DREG: u8 = 8;
+const I2C_PMU_EN_I2C_RTC_DREG_MSB: u8 = 0;
+const I2C_PMU_EN_I2C_RTC_DREG_LSB: u8 = 0;
+
+const I2C_PMU_EN_I2C_DIG_DREG: u8 = 8;
+const I2C_PMU_EN_I2C_DIG_DREG_MSB: u8 = 1;
+const I2C_PMU_EN_I2C_DIG_DREG_LSB: u8 = 1;
+
+const I2C_PMU_EN_I2C_RTC_DREG_SLP: u8 = 8;
+const I2C_PMU_EN_I2C_RTC_DREG_SLP_MSB: u8 = 2;
+const I2C_PMU_EN_I2C_RTC_DREG_SLP_LSB: u8 = 2;
+
+const I2C_PMU_EN_I2C_DIG_DREG_SLP: u8 = 8;
+const I2C_PMU_EN_I2C_DIG_DREG_SLP_MSB: u8 = 3;
+const I2C_PMU_EN_I2C_DIG_DREG_SLP_LSB: u8 = 3;
+
+const I2C_PMU_OR_XPD_RTC_REG: u8 = 8;
+const I2C_PMU_OR_XPD_RTC_REG_MSB: u8 = 4;
+const I2C_PMU_OR_XPD_RTC_REG_LSB: u8 = 4;
+
+const I2C_PMU_OR_XPD_DIG_REG: u8 = 8;
+const I2C_PMU_OR_XPD_DIG_REG_MSB: u8 = 5;
+const I2C_PMU_OR_XPD_DIG_REG_LSB: u8 = 5;
+
+const I2C_PMU_OR_XPD_TRX: u8 = 15;
+const I2C_PMU_OR_XPD_TRX_MSB: u8 = 2;
+const I2C_PMU_OR_XPD_TRX_LSB: u8 = 2;
+
+const DR_REG_PMU_BASE: u32 = 0x600B0000;
+
+const PMU_POWER_PD_TOP_CNTL_REG: u32 = DR_REG_PMU_BASE + 0xf4;
+const PMU_POWER_PD_HPAON_CNTL_REG: u32 = DR_REG_PMU_BASE + 0xf8;
+const PMU_POWER_PD_HPCPU_CNTL_REG: u32 = DR_REG_PMU_BASE + 0xfc;
+const PMU_POWER_PD_HPPERI_RESERVE_REG: u32 = DR_REG_PMU_BASE + 0x100;
+const PMU_POWER_PD_HPWIFI_CNTL_REG: u32 = DR_REG_PMU_BASE + 0x104;
+const PMU_POWER_PD_LPPERI_CNTL_REG: u32 = DR_REG_PMU_BASE + 0x108;
+
+const PMU_SLP_WAKEUP_CNTL5_REG: u32 = DR_REG_PMU_BASE + 0x134;
+const PMU_SLP_WAKEUP_CNTL7_REG: u32 = DR_REG_PMU_BASE + 0x13c;
+
+
 pub(crate) fn init() {
-    todo!()
+    // * No peripheral reg i2c power up required on the target */
+
+    unsafe {
+        regi2c_write_mask(
+            I2C_PMU,
+            I2C_PMU_HOSTID,
+            I2C_PMU_EN_I2C_RTC_DREG,
+            I2C_PMU_EN_I2C_RTC_DREG_MSB,
+            I2C_PMU_EN_I2C_RTC_DREG_LSB,
+            0,
+        );
+        regi2c_write_mask(
+            I2C_PMU,
+            I2C_PMU_HOSTID,
+            I2C_PMU_EN_I2C_DIG_DREG,
+            I2C_PMU_EN_I2C_DIG_DREG_MSB,
+            I2C_PMU_EN_I2C_DIG_DREG_LSB,
+            0,
+        );
+        regi2c_write_mask(
+            I2C_PMU,
+            I2C_PMU_HOSTID,
+            I2C_PMU_EN_I2C_RTC_DREG_SLP,
+            I2C_PMU_EN_I2C_RTC_DREG_SLP_MSB,
+            I2C_PMU_EN_I2C_RTC_DREG_SLP_LSB,
+            0,
+        );
+        regi2c_write_mask(
+            I2C_PMU,
+            I2C_PMU_HOSTID,
+            I2C_PMU_EN_I2C_DIG_DREG_SLP,
+            I2C_PMU_EN_I2C_DIG_DREG_SLP_MSB,
+            I2C_PMU_EN_I2C_DIG_DREG_SLP_LSB,
+            0,
+        );
+        regi2c_write_mask(
+            I2C_PMU,
+            I2C_PMU_HOSTID,
+            I2C_PMU_OR_XPD_RTC_REG,
+            I2C_PMU_OR_XPD_RTC_REG_MSB,
+            I2C_PMU_OR_XPD_RTC_REG_LSB,
+            0,
+        );
+        regi2c_write_mask(
+            I2C_PMU,
+            I2C_PMU_HOSTID,
+            I2C_PMU_OR_XPD_DIG_REG,
+            I2C_PMU_OR_XPD_DIG_REG_MSB,
+            I2C_PMU_OR_XPD_DIG_REG_LSB,
+            0,
+        );
+        regi2c_write_mask(
+            I2C_PMU,
+            I2C_PMU_HOSTID,
+            I2C_PMU_OR_XPD_TRX,
+            I2C_PMU_OR_XPD_TRX_MSB,
+            I2C_PMU_OR_XPD_TRX_LSB,
+            0,
+        );
+
+        (PMU_POWER_PD_TOP_CNTL_REG as *mut u32).write_volatile(0);
+        (PMU_POWER_PD_HPAON_CNTL_REG as *mut u32).write_volatile(0);
+        (PMU_POWER_PD_HPCPU_CNTL_REG as *mut u32).write_volatile(0);
+        (PMU_POWER_PD_HPPERI_RESERVE_REG as *mut u32).write_volatile(0);
+        (PMU_POWER_PD_HPWIFI_CNTL_REG as *mut u32).write_volatile(0);
+        (PMU_POWER_PD_LPPERI_CNTL_REG as *mut u32).write_volatile(0);
+
+        let pmu = &*PMU::ptr();
+
+        pmu.hp_active_hp_regulator0
+        .modify(|_, w| w.hp_active_hp_regulator_dbias().bits(25));
+        pmu.hp_sleep_lp_regulator0
+        .modify(|_, w| w.hp_sleep_lp_regulator_dbias().bits(26));
+
+        pmu.slp_wakeup_cntl5
+        .modify(|_, w| w.lp_ana_wait_target().bits(15));
+        pmu.slp_wakeup_cntl7
+        .modify(|_, w| w.ana_wait_target().bits(1700));
+    }
 }
 
 pub(crate) fn configure_clock() {
