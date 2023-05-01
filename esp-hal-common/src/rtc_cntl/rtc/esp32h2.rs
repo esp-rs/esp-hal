@@ -135,7 +135,28 @@ pub(crate) fn init() {
 }
 
 pub(crate) fn configure_clock() {
-    todo!()
+    assert!(matches!(
+        RtcClock::get_xtal_freq(),
+        XtalClock::RtcXtalFreq40M
+    ));
+
+    RtcClock::set_fast_freq(RtcFastClock::RtcFastClockRcFast);
+
+    let cal_val = loop {
+        RtcClock::set_slow_freq(RtcSlowClock::RtcSlowClockRcSlow);
+
+        let res = RtcClock::calibrate(RtcCalSel::RtcCalRtcMux, 1024);
+        if res != 0 {
+            break res;
+        }
+    };
+
+    unsafe {
+        let lp_aon = &*LP_AON::ptr();
+        lp_aon.store1.modify(|_, w| w.bits(cal_val));
+    }
+
+    modem_clk_domain_active_state_icg_map_preinit();
 }
 
 // Terminology:
@@ -192,21 +213,49 @@ pub enum SocResetReason {
 
 /// RTC SLOW_CLK frequency values
 #[derive(Debug, Clone, Copy)]
-pub(crate) enum RtcFastClock {}
+pub(crate) enum RtcFastClock {
+    /// Select RC_FAST_CLK as RTC_FAST_CLK source
+    RtcFastClockRcFast = 0,
+    /// Select XTAL_D2_CLK as RTC_FAST_CLK source
+    RtcFastClockXtalD2 = 1,
+    /// Select LP_PLL_CLK as RTC_FAST_CLK source
+    //RtcFastClockLpPll  = 2, // TODO : Check if it's used
+}
 
 impl Clock for RtcFastClock {
     fn frequency(&self) -> HertzU32 {
-        todo!()
+        match self {
+            RtcFastClock::RtcFastClockXtalD2 => HertzU32::Hz(16_000_000),
+            RtcFastClock::RtcFastClockRcFast => HertzU32::Hz(8_000_000),
+        }
     }
+}
+
+extern "C" {
+    fn ets_delay_us(us: u32);
 }
 
 /// RTC SLOW_CLK frequency values
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub(crate) enum RtcSlowClock {}
+pub(crate) enum RtcSlowClock {
+        /// Select RC_SLOW_CLK as RTC_SLOW_CLK source
+        RtcSlowClockRcSlow  = 0,
+        /// Select XTAL32K_CLK as RTC_SLOW_CLK source
+        RtcSlowClock32kXtal = 1,
+        /// Select RC32K_CLK as RTC_SLOW_CLK source
+        RtcSlowClock32kRc   = 2,
+        /// Select OSC_SLOW_CLK (external slow clock) as RTC_SLOW_CLK source
+        RtcSlowOscSlow      = 3,
+}
 
 impl Clock for RtcSlowClock {
     fn frequency(&self) -> HertzU32 {
-        todo!()
+        match self {
+            RtcSlowClock::RtcSlowClockRcSlow => HertzU32::Hz(150_000),
+            RtcSlowClock::RtcSlowClock32kXtal => HertzU32::Hz(32_768),
+            RtcSlowClock::RtcSlowClock32kRc => HertzU32::Hz(32_768),
+            RtcSlowClock::RtcSlowOscSlow => HertzU32::Hz(32_768),
+        }
     }
 }
 
@@ -218,5 +267,20 @@ impl RtcClock {
     /// Calculate the necessary RTC_SLOW_CLK cycles to complete 1 millisecond.
     pub(crate) fn cycles_to_1ms() -> u16 {
         todo!()
+    }
+}
+
+
+fn set_fast_freq(fast_freq: RtcFastClock) {
+    // components/hal/esp32s2/include/hal/clk_tree_ll.h
+    unsafe {
+        let lp_clkrst = &*LP_CLKRST::PTR;
+        lp_clkrst.lp_clk_conf.modify(|_, w| {
+            w.fast_clk_sel().bit(match fast_freq {
+                RtcFastClock::RtcFastClockRcFast => false,
+                RtcFastClock::RtcFastClockXtalD2 => true,
+            })
+        });
+        ets_delay_us(3);
     }
 }
