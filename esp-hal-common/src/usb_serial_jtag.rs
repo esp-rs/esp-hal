@@ -22,6 +22,7 @@ impl<'d> UsbSerialJtag<'d> {
         crate::into_ref!(usb_serial);
 
         peripheral_clock_control.enable(crate::system::Peripheral::Sha);
+
         let mut dev = Self { usb_serial };
         dev.usb_serial.disable_rx_interrupts();
         dev.usb_serial.disable_tx_interrupts();
@@ -61,10 +62,10 @@ impl<'d> UsbSerialJtag<'d> {
             .bit_is_set()
         {
             // the FIFO is not full
-
             unsafe {
                 reg_block.ep1.write(|w| w.rdwr_byte().bits(word.into()));
             }
+
             Ok(())
         } else {
             Err(nb::Error::WouldBlock)
@@ -177,6 +178,7 @@ pub trait Instance {
         let ep0_state = self.register_block().in_ep0_st.read();
         let wr_addr = ep0_state.in_ep0_wr_addr().bits();
         let rd_addr = ep0_state.in_ep0_rd_addr().bits();
+
         (wr_addr - rd_addr).into()
     }
 
@@ -184,11 +186,12 @@ pub trait Instance {
         let ep1_state = self.register_block().in_ep1_st.read();
         let wr_addr = ep1_state.in_ep1_wr_addr().bits();
         let rd_addr = ep1_state.in_ep1_rd_addr().bits();
+
         (wr_addr - rd_addr).into()
     }
 }
 
-impl Instance for crate::peripherals::USB_DEVICE {
+impl Instance for USB_DEVICE {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
         self
@@ -212,6 +215,29 @@ impl embedded_hal::serial::Read<u8> for UsbSerialJtag<'_> {
 impl embedded_hal::serial::Write<u8> for UsbSerialJtag<'_> {
     type Error = Error;
 
+    fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
+        self.write_byte_nb(word)
+    }
+
+    fn flush(&mut self) -> nb::Result<(), Self::Error> {
+        self.flush_tx_nb()
+    }
+}
+
+#[cfg(feature = "eh1")]
+impl embedded_hal_1::serial::ErrorType for UsbSerialJtag<'_> {
+    type Error = Error;
+}
+
+#[cfg(feature = "eh1")]
+impl embedded_hal_nb::serial::Read for UsbSerialJtag<'_> {
+    fn read(&mut self) -> nb::Result<u8, Self::Error> {
+        self.read_byte()
+    }
+}
+
+#[cfg(feature = "eh1")]
+impl embedded_hal_nb::serial::Write for UsbSerialJtag<'_> {
     fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
         self.write_byte_nb(word)
     }
