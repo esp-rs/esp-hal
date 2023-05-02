@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2023-05-02
+
 ### Added
 
 - Add bare-bones PSRAM support for ESP32-S2 (#493)
@@ -16,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add RSA peripheral support (#467)
 - Add PeripheralClockControl argument to `timg`, `wdt`, `sha`, `usb-serial-jtag` and `uart` constructors (#463)
 - Added API to raise and reset software interrupts (#426)
+- Implement `embedded_hal_nb::serial::*` traits for `UsbSerialJtag` (#498)
 
 ### Fixed
 
@@ -56,7 +59,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2022-08-05
 
-[unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.8.0...HEAD
+[unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/esp-rs/esp-hal/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/esp-rs/esp-hal/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/esp-rs/esp-hal/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/esp-rs/esp-hal/compare/v0.5.0...v0.7.0
@@ -64,4 +68,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.4.0]: https://github.com/esp-rs/esp-hal/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/esp-rs/esp-hal/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/esp-rs/esp-hal/compare/v0.1.0...v0.2.0
-[0.0.1]: https://github.com/esp-rs/esp-hal/releases/tag/v0.1.0
+[0.1.0]: https://github.com/esp-rs/esp-hal/releases/tag/v0.1.0
