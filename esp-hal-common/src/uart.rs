@@ -354,7 +354,7 @@ where
 
     /// Configures the RX-FIFO threshold
     pub fn set_rx_fifo_full_threshold(&mut self, threshold: u16) {
-        #[cfg(any(esp32, esp32c6))]
+        #[cfg(any(esp32, esp32c6, esp32h2))]
         let threshold: u8 = threshold as u8;
 
         self.uart
@@ -599,7 +599,7 @@ where
             .write(|w| unsafe { w.clkdiv().bits(divider).frag().bits(0) });
     }
 
-    #[cfg(esp32c6)]
+    #[cfg(any(esp32c6, esp32h2))]
     fn change_baud(&self, baudrate: u32, clocks: &Clocks) {
         // we force the clock source to be APB and don't use the decimal part of the
         // divider
@@ -608,7 +608,7 @@ where
         let clk_div = ((clk) + (max_div * baudrate) - 1) / (max_div * baudrate);
 
         // UART clocks are configured via PCR
-        let pcr = unsafe { &*esp32c6::PCR::PTR };
+        let pcr = unsafe { &*crate::peripherals::PCR::PTR };
 
         match self.uart.uart_number() {
             0 => {
@@ -676,7 +676,7 @@ where
             .write(|w| unsafe { w.clkdiv().bits(divider).frag().bits(0) });
     }
 
-    #[cfg(esp32c6)] // TODO introduce a cfg symbol for this
+    #[cfg(any(esp32c6, esp32h2))] // TODO introduce a cfg symbol for this
     #[inline(always)]
     fn sync_regs(&mut self) {
         self.uart
@@ -696,7 +696,7 @@ where
         }
     }
 
-    #[cfg(not(esp32c6))]
+    #[cfg(not(any(esp32c6, esp32h2)))]
     #[inline(always)]
     fn sync_regs(&mut self) {}
 }
