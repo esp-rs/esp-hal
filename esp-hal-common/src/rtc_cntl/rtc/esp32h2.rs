@@ -156,7 +156,6 @@ pub(crate) fn configure_clock() {
         lp_aon.store1.modify(|_, w| w.bits(cal_val));
     }
 
-    modem_clk_domain_active_state_icg_map_preinit();
 }
 
 // Terminology:
@@ -259,6 +258,31 @@ impl Clock for RtcSlowClock {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+/// Clock source to be calibrated using rtc_clk_cal function
+pub(crate) enum RtcCalSel {
+    /// Currently selected RTC SLOW_CLK
+    RtcCalRtcMux     = -1,
+    /// Internal 150kHz RC oscillator
+    RtcCalRcSlow     = 0,
+    /// External 32kHz XTAL, as one type of 32k clock
+    RtcCal32kXtal    = 1,
+    /// Internal 32kHz RC oscillator, as one type of 32k clock
+    RtcCal32kRc      = 2,
+    /// External slow clock signal input by lp_pad_gpio0, as one type of 32k
+    /// clock
+    RtcCal32kOscSlow = 3,
+    /// Internal 20MHz RC oscillator
+    RtcCalRcFast,
+}
+
+#[derive(Clone)]
+pub(crate) enum RtcCaliClkSel {
+    CaliClkRcSlow = 0,
+    CaliClkRcFast = 1,
+    CaliClk32k    = 2,
+}
+
 /// RTC Watchdog Timer
 pub struct RtcClock;
 
@@ -268,19 +292,344 @@ impl RtcClock {
     pub(crate) fn cycles_to_1ms() -> u16 {
         todo!()
     }
-}
 
 
-fn set_fast_freq(fast_freq: RtcFastClock) {
-    // components/hal/esp32s2/include/hal/clk_tree_ll.h
-    unsafe {
-        let lp_clkrst = &*LP_CLKRST::PTR;
-        lp_clkrst.lp_clk_conf.modify(|_, w| {
-            w.fast_clk_sel().bit(match fast_freq {
-                RtcFastClock::RtcFastClockRcFast => false,
-                RtcFastClock::RtcFastClockXtalD2 => true,
-            })
-        });
-        ets_delay_us(3);
+    fn get_xtal_freq() -> XtalClock {
+        let xtal_freq_reg = unsafe { &*LP_AON::PTR }.store4.read().bits();
+
+        // Values of RTC_XTAL_FREQ_REG and RTC_APB_FREQ_REG are stored as two copies in
+        // lower and upper 16-bit halves. These are the routines to work with such a
+        // representation.
+        let clk_val_is_valid = |val| {
+            (val & 0xffffu32) == ((val >> 16u32) & 0xffffu32) && val != 0u32 && val != u32::MAX
+        };
+        let reg_val_to_clk_val = |val| val & u16::MAX as u32;
+
+        if !clk_val_is_valid(xtal_freq_reg) {
+            return XtalClock::RtcXtalFreq40M;
+        }
+
+        match reg_val_to_clk_val(xtal_freq_reg) {
+            40 => XtalClock::RtcXtalFreq40M,
+            other => XtalClock::RtcXtalFreqOther(other),
+        }
+    }
+
+    fn set_fast_freq(fast_freq: RtcFastClock) {
+        // components/hal/esp32s2/include/hal/clk_tree_ll.h
+        unsafe {
+            let lp_clkrst = &*LP_CLKRST::PTR;
+            lp_clkrst.lp_clk_conf.modify(|_, w| {
+                w.fast_clk_sel().bit(match fast_freq {
+                    RtcFastClock::RtcFastClockRcFast => false,
+                    RtcFastClock::RtcFastClockXtalD2 => true,
+                })
+            });
+            ets_delay_us(3);
+        }
+    }
+
+    fn set_slow_freq(slow_freq: RtcSlowClock) {
+        unsafe {
+            let lp_clkrst = &*LP_CLKRST::PTR;
+
+            lp_clkrst
+                .lp_clk_conf
+                .modify(|_, w| w.slow_clk_sel().bits(slow_freq as u8));
+            lp_clkrst.clk_to_hp.modify(|_, w| {
+                w.icg_hp_xtal32k()
+                    .bit(match slow_freq {
+                        RtcSlowClock::RtcSlowClock32kXtal => true,
+                        _ => false,
+                    })
+                    .icg_hp_xtal32k()
+                    .bit(match slow_freq {
+                        RtcSlowClock::RtcSlowClock32kXtal => true,
+                        _ => false,
+                    })
+            });
+        }
+    }
+
+    /// Get the RTC_SLOW_CLK source
+    fn get_slow_freq() -> RtcSlowClock {
+        let lp_clrst = unsafe { &*LP_CLKRST::ptr() };
+
+        let slow_freq = lp_clrst.lp_clk_conf.read().slow_clk_sel().bits();
+        match slow_freq {
+            0 => RtcSlowClock::RtcSlowClockRcSlow,
+            1 => RtcSlowClock::RtcSlowClock32kXtal,
+            2 => RtcSlowClock::RtcSlowClock32kRc,
+            3 => RtcSlowClock::RtcSlowOscSlow,
+            _ => unreachable!(),
+        }
+    }
+
+        /// Calibration of RTC_SLOW_CLK is performed using a special feature of
+        /// TIMG0. This feature counts the number of XTAL clock cycles within a
+        /// given number of RTC_SLOW_CLK cycles.
+        fn calibrate_internal(mut cal_clk: RtcCalSel, slowclk_cycles: u32) -> u32 { // FIXME
+            const SOC_CLK_RC_FAST_FREQ_APPROX: u32 = 17_500_000;
+            const SOC_CLK_RC_SLOW_FREQ_APPROX: u32 = 136_000;
+            const SOC_CLK_XTAL32K_FREQ_APPROX: u32 = 32768;
+
+            if cal_clk == RtcCalSel::RtcCalRtcMux {
+                cal_clk = match cal_clk {
+                    RtcCalSel::RtcCalRtcMux => match RtcClock::get_slow_freq() {
+                        RtcSlowClock::RtcSlowClock32kXtal => RtcCalSel::RtcCal32kXtal,
+                        RtcSlowClock::RtcSlowClock32kRc => RtcCalSel::RtcCal32kRc,
+                        _ => cal_clk,
+                    },
+                    RtcCalSel::RtcCal32kOscSlow => RtcCalSel::RtcCalRtcMux,
+                    _ => cal_clk,
+                };
+            }
+
+            let lp_clkrst = unsafe { &*LP_CLKRST::ptr() };
+            let pcr = unsafe { &*PCR::ptr() };
+            let pmu = unsafe { &*PMU::ptr() };
+
+            let clk_src = RtcClock::get_slow_freq();
+
+            if cal_clk == RtcCalSel::RtcCalRtcMux {
+                cal_clk = match clk_src {
+                    RtcSlowClock::RtcSlowClockRcSlow => RtcCalSel::RtcCalRcSlow,
+                    RtcSlowClock::RtcSlowClock32kXtal => RtcCalSel::RtcCal32kXtal,
+                    RtcSlowClock::RtcSlowClock32kRc => RtcCalSel::RtcCal32kRc,
+                    RtcSlowClock::RtcSlowOscSlow => RtcCalSel::RtcCal32kOscSlow,
+                };
+            }
+
+            let cali_clk_sel;
+            if cal_clk == RtcCalSel::RtcCalRtcMux {
+                cal_clk = match clk_src {
+                    RtcSlowClock::RtcSlowClockRcSlow => RtcCalSel::RtcCalRcSlow,
+                    RtcSlowClock::RtcSlowClock32kXtal => RtcCalSel::RtcCal32kXtal,
+                    RtcSlowClock::RtcSlowClock32kRc => RtcCalSel::RtcCal32kRc,
+                    RtcSlowClock::RtcSlowOscSlow => RtcCalSel::RtcCalRcSlow,
+                }
+            }
+
+            if cal_clk == RtcCalSel::RtcCalRcFast {
+                cali_clk_sel = RtcCaliClkSel::CaliClkRcFast;
+            } else if cal_clk == RtcCalSel::RtcCalRcSlow {
+                cali_clk_sel = RtcCaliClkSel::CaliClkRcSlow;
+            } else {
+                cali_clk_sel = RtcCaliClkSel::CaliClk32k;
+                match cal_clk {
+                    RtcCalSel::RtcCalRtcMux | RtcCalSel::RtcCalRcSlow | RtcCalSel::RtcCalRcFast => (),
+                    RtcCalSel::RtcCal32kRc => pcr
+                        .ctrl_32k_conf
+                        .modify(|_, w| unsafe { w.clk_32k_sel().bits(0) }),
+                    RtcCalSel::RtcCal32kXtal => pcr
+                        .ctrl_32k_conf
+                        .modify(|_, w| unsafe { w.clk_32k_sel().bits(1) }),
+                    RtcCalSel::RtcCal32kOscSlow => pcr
+                        .ctrl_32k_conf
+                        .modify(|_, w| unsafe { w.clk_32k_sel().bits(2) }),
+                }
+            }
+
+            // Enable requested clock (150k is always on)
+            // Some delay is required before the time is stable
+            // Only enable if originaly was disabled
+            // If clock is already on, do nothing
+
+            let dig_32k_xtal_enabled = lp_clkrst.clk_to_hp.read().icg_hp_xtal32k().bit_is_set();
+
+            if cal_clk == RtcCalSel::RtcCal32kXtal && !dig_32k_xtal_enabled {
+                lp_clkrst
+                    .clk_to_hp
+                    .modify(|_, w| w.icg_hp_xtal32k().set_bit());
+            }
+
+            // TODO: very hacky
+            // in ESP-IDF these are not called in this function but the fields are set
+            lp_clkrst
+                .clk_to_hp
+                .modify(|_, w| w.icg_hp_xtal32k().set_bit());
+            pmu.hp_sleep_lp_ck_power
+                .modify(|_, w| w.hp_sleep_xpd_xtal32k().set_bit());
+
+            pmu.hp_sleep_lp_ck_power
+                .modify(|_, w| w.hp_sleep_xpd_rc32k().set_bit());
+
+            let rc_fast_enabled = pmu
+                .hp_sleep_lp_ck_power
+                .read()
+                .hp_sleep_xpd_fosc_clk()
+                .bit_is_set();
+            let dig_rc_fast_enabled = lp_clkrst.clk_to_hp.read().icg_hp_fosc().bit_is_set();
+
+            if cal_clk == RtcCalSel::RtcCalRcFast {
+                if !rc_fast_enabled {
+                    pmu.hp_sleep_lp_ck_power
+                        .modify(|_, w| w.hp_sleep_xpd_fosc_clk().set_bit());
+                    unsafe {
+                        ets_delay_us(50);
+                    }
+                }
+
+                if !dig_rc_fast_enabled {
+                    lp_clkrst.clk_to_hp.modify(|_, w| w.icg_hp_fosc().set_bit());
+                    unsafe {
+                        ets_delay_us(5);
+                    }
+                }
+            }
+
+            let rc32k_enabled = pmu
+                .hp_sleep_lp_ck_power
+                .read()
+                .hp_sleep_xpd_rc32k()
+                .bit_is_set();
+            let dig_rc32k_enabled = lp_clkrst.clk_to_hp.read().icg_hp_osc32k().bit_is_set();
+
+            if cal_clk == RtcCalSel::RtcCal32kRc {
+                if !rc32k_enabled {
+                    pmu.hp_sleep_lp_ck_power
+                        .modify(|_, w| w.hp_sleep_xpd_rc32k().set_bit());
+                    unsafe {
+                        ets_delay_us(300);
+                    }
+                }
+
+                if !dig_rc32k_enabled {
+                    lp_clkrst
+                        .clk_to_hp
+                        .modify(|_, w| w.icg_hp_osc32k().set_bit());
+                }
+            }
+
+            // Check if there is already running calibration process
+            // TODO: &mut TIMG0 for calibration
+            let timg0 = unsafe { &*TIMG0::ptr() };
+
+            if timg0
+                .rtccalicfg
+                .read()
+                .rtc_cali_start_cycling()
+                .bit_is_set()
+            {
+                timg0
+                    .rtccalicfg2
+                    .modify(|_, w| unsafe { w.rtc_cali_timeout_thres().bits(1) });
+
+                // Set small timeout threshold to accelerate the generation of timeot
+                // Internal circuit will be reset when timeout occurs and will not affect the
+                // next calibration
+                while !timg0.rtccalicfg.read().rtc_cali_rdy().bit_is_set()
+                    && !timg0.rtccalicfg2.read().rtc_cali_timeout().bit_is_set()
+                {}
+            }
+
+            // Prepare calibration
+            timg0
+                .rtccalicfg
+                .modify(|_, w| unsafe { w.rtc_cali_clk_sel().bits(cali_clk_sel.clone() as u8) });
+            timg0
+                .rtccalicfg
+                .modify(|_, w| w.rtc_cali_start_cycling().clear_bit());
+            timg0
+                .rtccalicfg
+                .modify(|_, w| unsafe { w.rtc_cali_max().bits(slowclk_cycles as u16) });
+
+            let expected_freq = match cali_clk_sel {
+                RtcCaliClkSel::CaliClk32k => {
+                    timg0.rtccalicfg2.modify(|_, w| unsafe {
+                        w.rtc_cali_timeout_thres().bits(slowclk_cycles << 12)
+                    });
+                    SOC_CLK_XTAL32K_FREQ_APPROX
+                }
+                RtcCaliClkSel::CaliClkRcFast => {
+                    timg0
+                        .rtccalicfg2
+                        .modify(|_, w| unsafe { w.rtc_cali_timeout_thres().bits(0x01FFFFFF) });
+                    SOC_CLK_RC_FAST_FREQ_APPROX
+                }
+                _ => {
+                    timg0.rtccalicfg2.modify(|_, w| unsafe {
+                        w.rtc_cali_timeout_thres().bits(slowclk_cycles << 10)
+                    });
+                    SOC_CLK_RC_SLOW_FREQ_APPROX
+                }
+            };
+
+            let us_time_estimate = (HertzU32::MHz(slowclk_cycles) / expected_freq).to_Hz();
+
+            // Start calibration
+            timg0
+                .rtccalicfg
+                .modify(|_, w| w.rtc_cali_start().clear_bit());
+            timg0.rtccalicfg.modify(|_, w| w.rtc_cali_start().set_bit());
+
+            // Wait for calibration to finish up to another us_time_estimate
+            unsafe {
+                ets_delay_us(us_time_estimate);
+            }
+
+            let cal_val = loop {
+                if timg0.rtccalicfg.read().rtc_cali_rdy().bit_is_set() {
+                    break timg0.rtccalicfg1.read().rtc_cali_value().bits();
+                }
+
+                if timg0.rtccalicfg2.read().rtc_cali_timeout().bit_is_set() {
+                    // Timed out waiting for calibration
+                    break 0;
+                }
+            };
+
+            timg0
+                .rtccalicfg
+                .modify(|_, w| w.rtc_cali_start().clear_bit());
+
+            if cal_clk == RtcCalSel::RtcCal32kXtal && !dig_32k_xtal_enabled {
+                lp_clkrst
+                    .clk_to_hp
+                    .modify(|_, w| w.icg_hp_xtal32k().clear_bit());
+            }
+
+            if cal_clk == RtcCalSel::RtcCalRcFast {
+                if rc_fast_enabled {
+                    pmu.hp_sleep_lp_ck_power
+                        .modify(|_, w| w.hp_sleep_xpd_fosc_clk().set_bit());
+                    unsafe {
+                        ets_delay_us(50);
+                    }
+                }
+
+                if dig_rc_fast_enabled {
+                    lp_clkrst.clk_to_hp.modify(|_, w| w.icg_hp_fosc().set_bit());
+                    unsafe {
+                        ets_delay_us(5);
+                    }
+                }
+            }
+
+            if cal_clk == RtcCalSel::RtcCal32kRc {
+                if rc32k_enabled {
+                    pmu.hp_sleep_lp_ck_power
+                        .modify(|_, w| w.hp_sleep_xpd_rc32k().set_bit());
+                    unsafe {
+                        ets_delay_us(300);
+                    }
+                }
+                if dig_rc32k_enabled {
+                    lp_clkrst
+                        .clk_to_hp
+                        .modify(|_, w| w.icg_hp_osc32k().set_bit());
+                }
+            }
+
+            cal_val
+        }
+
+    fn calibrate(cal_clk: RtcCalSel, slowclk_cycles: u32) -> u32 { // FIXME
+        let xtal_freq = RtcClock::get_xtal_freq();
+        let xtal_cycles = RtcClock::calibrate_internal(cal_clk, slowclk_cycles) as u64;
+        let divider = xtal_freq.mhz() as u64 * slowclk_cycles as u64;
+        let period_64 = ((xtal_cycles << RtcClock::CAL_FRACT) + divider / 2u64 - 1u64) / divider;
+
+        (period_64 & u32::MAX as u64) as u32
     }
 }
