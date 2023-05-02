@@ -472,7 +472,7 @@ const _I2C_SARADC_TSENS_DAC: u32 = 0x6;
 const _I2C_SARADC_TSENS_DAC_MSB: u32 = 3;
 const _I2C_SARADC_TSENS_DAC_LSB: u32 = 0;
 
-
+static mut G_CAL_DIGIT: u16 = 0;
 
 #[cfg(esp32c3)]
 #[inline(always)]
@@ -559,8 +559,10 @@ pub fn calibration_finish(adc_unit: AdcUnit) {
 #[cfg(esp32c3)]
 #[inline(always)]
 /// Set calibration parameter to ADC hardware
-pub fn set_calibration_param(adc_unit: AdcUnit, data: u16) {
-    let [msb, lsb] = data.to_be_bytes();
+pub fn adc_set_calibration(adc_unit: AdcUnit, data: u16) {
+    // let [msb, lsb] = data.to_be_bytes();
+    let msb = data >> 8;
+    let lsb = data & 0xff;
 
     match adc_unit {
         AdcUnit::AdcUnit1 => {
@@ -596,19 +598,118 @@ pub fn set_calibration_param(adc_unit: AdcUnit, data: u16) {
 }
 
 #[cfg(esp32c3)]
+pub fn read_efuse(address: u32, offset: u32, size: u32) -> u32 {
+    let mut shift = 32 - size;
+    let mask = u32::MAX >> shift;
+    let res = offset % 32;
+    let regaddr = address + (offset / 32 * 4);
+
+    let mut regval = unsafe { (regaddr as *const u32).read_volatile() };
+    let mut data = regval >> res;
+    if res <= shift {
+        data &= mask;
+      } else {
+        shift = 32 - res;
+
+        regval = unsafe { (regaddr as *const u32).offset(1).read_volatile() };
+        data |= (regval & (mask >> shift)) << shift;
+      }
+
+    data
+}
+
+#[cfg(esp32c3)]
+pub fn adc_read() -> u32 {
+  let mut regval;
+
+  let apb_saradc = unsafe { &*APB_SARADC::PTR };
+  /* Trigger ADC sampling */
+
+  /*
+  (0x60008068 as *mut u32).write_volatile( (0x60008068 as *mut u32).read_volatile() | (2 << 13))
+   */
+
+  // 0x60040000 + 0x020
+  // BIT(29)
+  apb_saradc.onetime_sample.modify(|_, w| w.saradc_onetime_start().set_bit());
+
+  /* Wait until ADC1 sampling is done */
+  loop {
+    regval = apb_saradc.int_st.read().bits();
+
+    if regval & (1 << 31) != 0 {
+        break;
+    }
+  }
+
+//   adc = unsafe { ((0x60040000 + 0x02) as *const u32).read_volatile() };
+// adc = getreg32(APB_SARADC_1_DATA_STATUS_REG) & ADC_VAL_MASK;
+let adc = apb_saradc.sar1data_status.read().bits() & 0xfff;
+
+  /* Disable ADC sampling */
+
+apb_saradc.onetime_sample.modify(|_, w| w.saradc_onetime_start().clear_bit());
+
+//   resetbits(APB_SARADC_ONETIME_START, APB_SARADC_ONETIME_SAMPLE_REG);
+
+  /* Clear ADC1 sampling done interrupt bit */
+
+  apb_saradc.int_clr.write(|w| w.apb_saradc1_done_int_clr().set_bit());
+//   setbits(APB_SARADC_ADC1_DONE_INT_CLR, APB_SARADC_INT_CLR_REG);
+
+  adc
+}
+
+#[cfg(esp32c3)]
+pub fn adc_samplecfg(channel: u32, atten: Attenuation) {
+    let apb_saradc = unsafe { &*APB_SARADC::PTR };
+
+    let mut regval = apb_saradc.onetime_sample.read().bits();
+    // TODO remove magic constants
+    regval &= !(1 << 31 | 1 << 30 | 1 << 25 | 1 << 23);
+
+    // FIXME: 3 depends on the ATTENT_DB (0 - 3)
+    regval |= (channel << 25) | ((atten as u32) << 23) | 1 << 31;
+
+    apb_saradc.onetime_sample.write(|w| unsafe { w.bits(regval) });
+}
+
+
+macro_rules! MAX {
+    ($a:expr, $b:expr) => {{
+        if $a > $b {
+            $a
+        } else {
+            $b
+        }
+    }};
+}
+
+macro_rules! MIN {
+    ($a:expr, $b:expr) => {{
+        if $a < $b {
+            $a
+        } else {
+            $b
+        }
+    }};
+}
+
+#[cfg(esp32c3)]
 pub fn calibrate() {
     let cali_val: u16;
-    let adc: u16;
-    let adc_max: u16 = 0;
-    let adc_min: u16 = u16::MAX;
-    let adc_sum: u16 = 0;
-    let regval: u16 = 0;
+    let mut adc: u16;
+    let mut adc_max: u16 = 0;
+    let mut adc_min: u16 = u16::MAX;
+    let mut adc_sum: u32 = 0;
 
-    // regval = read_efuse();
+//  regval = read_efuse(ADC_CAL_BASE_REG, ADC_CAL_VER_OFF, ADC_CAL_VER_LEN);
+    let mut regval = read_efuse(0x60008800 + 0x5c, 128, 3);
 
     if regval == 1 {
         //regval = read_efuse(ADC_CAL_BASE_REG, ADC_CAL_DATA_OFF, ADC_CAL_DATA_LEN);
-        cali_val = regval + 1000; //ADC_CAL_DATA_COMP = 1000
+        regval = read_efuse(0x60008800 + 0x5c, 178, 10);
+        cali_val = (regval + 1000) as u16; //ADC_CAL_DATA_COMP = 1000
     } else {
         // Enable Vdef
         unsafe {
@@ -620,7 +721,8 @@ pub fn calibrate() {
         }
 
         // Start sampling
-        // adc_samplecfg(ADC_CAL_CHANNEL);
+        // FIXME: hardcoded Attent
+        adc_samplecfg(0xf, Attenuation::Attenuation0dB);
 
         // Enable internal connect GND (for calibration)
         unsafe {
@@ -632,8 +734,35 @@ pub fn calibrate() {
         }
 
         for _ in 0..32 {
-            set_calibration_param(AdcUnit::AdcUnit1, 0);
+            adc_set_calibration(AdcUnit::AdcUnit1, 0);
+            adc = adc_read() as u16;
+            adc_sum += adc as u32;
+            adc_max  = MAX!(adc, adc_max);
+            adc_min  = MIN!(adc, adc_min);
         }
 
+        cali_val = (adc_sum - adc_max as u32 - adc_min as u32) as u16 / (32 - 2); // ADC_CAL_CNT_MAX = 32
+
+        unsafe {
+            crate::regi2c_write_mask!(
+                I2C_SAR_ADC,
+                ADC_SAR1_ENCAL_GND_ADDR,
+                0
+            );
+        }
     }
+
+        // Set final calibration parameters
+        adc_set_calibration(AdcUnit::AdcUnit1, cali_val);
+
+
+        // Set calibration digital parameters
+        // FIXME: change offset - not is for attent 0
+        regval = read_efuse(0x60008800 + 0x5c, 188, 10);
+
+        if regval & (1 << (10 - 1)) == 0 {
+            unsafe { G_CAL_DIGIT = 2000 - (regval & !(1 << (10 - 1))) as u16 };
+        } else {
+            unsafe { G_CAL_DIGIT = 2000 + regval as u16 };
+        }
 }

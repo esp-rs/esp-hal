@@ -59,6 +59,9 @@ esp32h2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "ff70333", package
 esp32s2 = { version = "0.14.0", features = ["critical-section"], optional = true }
 esp32s3 = { version = "0.18.0", features = ["critical-section"], optional = true }
 
+# remove me
+esp-println       = { version = "0.4.0", features = ["esp32c3"] }
+
 [build-dependencies]
 basic-toml = "0.1.2"
 serde      = { version = "1.0.160", features = ["derive"] }

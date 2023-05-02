@@ -1,7 +1,11 @@
 //! Reading of eFuses
 
-use crate::peripherals::EFUSE;
+use core::ptr::{null, null_mut};
 
+use esp_println::println;
+
+use crate::peripherals::EFUSE;
+use crate::analog::adc::Attenuation;
 pub struct Efuse;
 
 impl Efuse {
@@ -129,7 +133,7 @@ fn efuse_utility_get_number_of_items(bits: u32, size_of_base: u32) -> u32 {
     bits / size_of_base + (bits % size_of_base > 0) as u32
 }
 
-pub fn efuse_field_size(field: &[&EFuseAddress]) -> u32  {
+pub fn get_field_size(field: &[&EFuseAddress]) -> u32  {
     let mut bits_counter: u32 = 0;
     for i in 0..field.len() {
         if let Some(desc) = field.get(i) {
@@ -203,9 +207,15 @@ pub fn efuse_fill_buff(blk: EFuseBlock, num_reg: u32, bit_offset: u32, mut bit_c
     let blob = arr_out;
     let efuse_block = bit_offset as u32/ MAX_BLK_LEN;
     let bit_start = bit_offset as u32 % MAX_BLK_LEN;
+    // BUGFIX: address is way off, ESP-IDF reference 1610647644
+    esp_println::println!("Address {}", unsafe { *blk.address() });
+    // let reg = unsafe {
+    //     ((*blk.address() + num_reg * 4) as *const u32).read_volatile()
+    // };
     let reg = unsafe {
-        ((*blk.address() + num_reg * 4) as *const u32).read_volatile()
+        ((1610647644 + 4 * 4) as *const u32).read_volatile()
     };
+    esp_println::println!("Value: {reg}");
     let reg_of_aligned_bits = (reg >> bit_start) & efuse_get_mask(bit_count, 0);
     let mut sum_shift = 0;
     let mut shift_bit = (*bits_counter) % 8;
@@ -238,7 +248,7 @@ pub fn efuse_utility_process(
     let mut bits_counter = 0;
 
     // Get and check size.
-    let field_len = efuse_field_size(field);
+    let field_len = get_field_size(field);
     let req_size = if ptr_size_bits == 0 {
         field_len
     } else {
@@ -304,9 +314,12 @@ pub fn efuse_read_field(field: &EFuseAddress, dst: *mut core::ffi::c_void, dst_s
     if dst.is_null() || dst_size_bits == 0 {
         return EfuseErr::BadArgs;
     } else {
+        esp_println::println!("qwer");
         let dst_len = efuse_utility_get_number_of_items(dst_size_bits, 8);
-        unsafe { core::ptr::write_bytes(dst, 0, dst_len as usize) };
+        esp_println::println!("qwertyu");
+        // unsafe { core::ptr::write_bytes(dst, 0, dst_len as usize) };
         err = efuse_utility_process(&[&field], dst, dst_size_bits, efuse_fill_buff_wrapper);
+        esp_println::println!("qwertyuuiop");
     }
     err
 
@@ -325,8 +338,65 @@ pub fn calib_get_version() {
 
 }
 
-pub fn calib_get_init_code() {
+pub fn adc1_get_init_code(atten: Attenuation) -> u32 {
+    // logic taken from https://github.com/espressif/esp-idf/blob/7052a14d61d98dd387c4d99f435c42370b282fa6/components/efuse/esp32s3/esp_efuse_rtc_calib.c#L28-L61
+    // assert!(EFuseAddress::BLK_VERSION_MAJOR.read() == 1);
 
+    esp_println::println!(" version {}", EFuseAddress::BLK_VERSION_MAJOR.read());
+
+    let diffs = [
+        EFuseAddress::ADC1_INIT_CODE_ATTEN0.read(),
+        EFuseAddress::ADC1_INIT_CODE_ATTEN1.read(),
+        EFuseAddress::ADC1_INIT_CODE_ATTEN2.read(),
+        EFuseAddress::ADC1_INIT_CODE_ATTEN3.read(),
+    ];
+
+    let mut init_codes = [0, 0, 0, 0];
+    init_codes[0] = diffs[0] + 1850;
+    init_codes[1] = init_codes[0] + diffs[1] + 90;
+    init_codes[2] = init_codes[1] + diffs[2];
+    init_codes[3] = init_codes[2] + diffs[3] + 70;
+
+    // let init_code_efuse = EFuseAddress::ADC1_CAL_VOL_ATTEN0;
+    let init_code_efuse = &[&EFuseAddress::ADC1_INIT_CODE_ATTEN0];
+    let init_code_size = get_field_size(init_code_efuse);
+    esp_println::println!("Length {init_code_size}");
+
+    let mut init_code = [0u32; 10];
+    let err = efuse_read_field(init_code_efuse[0], init_code.as_mut_ptr() as *mut core::ffi::c_void, init_code_size);
+    esp_println::println!("Init_code {:?}", err);
+    esp_println::println!("Init_code {:?}", init_code);
+    match atten {
+        Attenuation::Attenuation0dB => init_codes[0],
+        Attenuation::Attenuation2p5dB => init_codes[1],
+        Attenuation::Attenuation6dB => init_codes[2],
+        Attenuation::Attenuation11dB => init_codes[3],
+    }
+}
+
+pub fn adc1_get_cal_voltage(atten: Attenuation) -> (u32, u32) {
+    // logic taken from https://github.com/espressif/esp-idf/blob/7052a14d61d98dd387c4d99f435c42370b282fa6/components/efuse/esp32s3/esp_efuse_rtc_calib.c#L63-L93
+    assert!(EFuseAddress::BLK_VERSION_MAJOR.read() == 1);
+
+    let diffs = [
+        EFuseAddress::ADC1_CAL_VOL_ATTEN0.read(),
+        EFuseAddress::ADC1_CAL_VOL_ATTEN1.read(),
+        EFuseAddress::ADC1_CAL_VOL_ATTEN2.read(),
+        EFuseAddress::ADC1_CAL_VOL_ATTEN3.read(),
+    ];
+
+    let mut voltages = [0, 0, 0, 0];
+    voltages[3] = diffs[3] + 900;
+    voltages[2] = voltages[3] + diffs[2] + 800;
+    voltages[1] = voltages[2] + diffs[1] + 700;
+    voltages[0] = voltages[1] + diffs[0] + 800;
+
+    match atten {
+        Attenuation::Attenuation0dB => (voltages[0], 850),
+        Attenuation::Attenuation2p5dB => (voltages[1], 850),
+        Attenuation::Attenuation6dB => (voltages[2], 850),
+        Attenuation::Attenuation11dB => (voltages[3], 850),
+    }
 }
 
 #[allow(unused)]
