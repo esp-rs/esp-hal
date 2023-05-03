@@ -4,9 +4,11 @@
 pub use embedded_hal as ehal;
 #[cfg(feature = "embassy")]
 pub use esp_hal_common::embassy;
-use esp_hal_common::xtensa_lx_rt::exception::ExceptionCause;
-#[doc(inline)]
 pub use esp_hal_common::*;
+
+#[rustfmt::skip]
+use esp_hal_common::xtensa_lx_rt::exception::ExceptionCause;
+
 // Always enable atomic emulation on ESP32-S2
 use xtensa_atomic_emulation_trap as _;
 
@@ -51,6 +53,8 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
     // Initialize RTC RAM
     esp_hal_common::xtensa_lx_rt::zero_bss(&mut _rtc_fast_bss_start, &mut _rtc_fast_bss_end);
     esp_hal_common::xtensa_lx_rt::zero_bss(&mut _rtc_slow_bss_start, &mut _rtc_slow_bss_end);
+
+    esp_hal_common::common_init();
 
     // continue with default reset handler
     esp_hal_common::xtensa_lx_rt::Reset();

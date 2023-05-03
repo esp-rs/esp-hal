@@ -1488,11 +1488,14 @@ mod ehal1 {
     use embedded_hal_1::spi::{
         self,
         ErrorType,
+        Operation,
         SpiBus,
         SpiBusFlush,
         SpiBusRead,
         SpiBusWrite,
         SpiDevice,
+        SpiDeviceRead,
+        SpiDeviceWrite,
     };
     use embedded_hal_nb::spi::FullDuplex;
 
@@ -1688,34 +1691,86 @@ mod ehal1 {
         type Error = spi::ErrorKind;
     }
 
-    impl<'a, 'd, I, CS, M> SpiDevice for SpiBusDevice<'a, 'd, I, CS, M>
+    impl<'a, 'd, I, CS, M> SpiDeviceRead<u8> for SpiBusDevice<'a, 'd, I, CS, M>
     where
         I: Instance,
-        CS: OutputPin + crate::gpio::OutputPin,
+        CS: OutputPin,
         M: IsFullDuplex,
     {
-        type Bus = Spi<'d, I, M>;
-
-        fn transaction<R>(
-            &mut self,
-            f: impl FnOnce(&mut Self::Bus) -> Result<R, <Self::Bus as ErrorType>::Error>,
-        ) -> Result<R, Self::Error> {
+        fn read_transaction(&mut self, operations: &mut [&mut [u8]]) -> Result<(), Self::Error> {
             critical_section::with(|cs| {
                 let mut bus = self.bus.lock.borrow_ref_mut(cs);
-
                 self.cs.connect_peripheral_to_output(bus.spi.cs_signal());
 
-                // We postpone handling these errors until AFTER we raised CS again, so the bus
-                // is free (Or we die trying if CS errors).
-                let f_res = f(&mut bus);
-                let flush_res = bus.flush();
+                let op_res = operations
+                    .iter_mut()
+                    .try_for_each(|buf| SpiBusRead::read(&mut (*bus), buf));
 
+                // On failure, it's important to still flush and de-assert CS.
+                let flush_res = bus.flush();
                 self.cs.disconnect_peripheral_from_output();
 
-                let f_res = f_res.map_err(|_| spi::ErrorKind::Other)?;
+                op_res.map_err(|_| spi::ErrorKind::Other)?;
                 flush_res.map_err(|_| spi::ErrorKind::Other)?;
 
-                Ok(f_res)
+                Ok(())
+            })
+        }
+    }
+
+    impl<'a, 'd, I, CS, M> SpiDeviceWrite<u8> for SpiBusDevice<'a, 'd, I, CS, M>
+    where
+        I: Instance,
+        CS: OutputPin,
+        M: IsFullDuplex,
+    {
+        fn write_transaction(&mut self, operations: &[&[u8]]) -> Result<(), Self::Error> {
+            critical_section::with(|cs| {
+                let mut bus = self.bus.lock.borrow_ref_mut(cs);
+                self.cs.connect_peripheral_to_output(bus.spi.cs_signal());
+
+                let op_res = operations
+                    .iter()
+                    .try_for_each(|buf| SpiBusWrite::write(&mut (*bus), buf));
+
+                // On failure, it's important to still flush and de-assert CS.
+                let flush_res = bus.flush();
+                self.cs.disconnect_peripheral_from_output();
+
+                op_res.map_err(|_| spi::ErrorKind::Other)?;
+                flush_res.map_err(|_| spi::ErrorKind::Other)?;
+
+                Ok(())
+            })
+        }
+    }
+
+    impl<'a, 'd, I, CS, M> SpiDevice<u8> for SpiBusDevice<'a, 'd, I, CS, M>
+    where
+        I: Instance,
+        CS: OutputPin,
+        M: IsFullDuplex,
+    {
+        fn transaction(&mut self, operations: &mut [Operation<'_, u8>]) -> Result<(), Self::Error> {
+            critical_section::with(|cs| {
+                let mut bus = self.bus.lock.borrow_ref_mut(cs);
+                self.cs.connect_peripheral_to_output(bus.spi.cs_signal());
+
+                let op_res = operations.iter_mut().try_for_each(|op| match op {
+                    Operation::Read(buf) => SpiBusRead::read(&mut (*bus), buf),
+                    Operation::Write(buf) => SpiBusWrite::write(&mut (*bus), buf),
+                    Operation::Transfer(read, write) => bus.transfer(read, write),
+                    Operation::TransferInPlace(buf) => bus.transfer_in_place(buf),
+                });
+
+                // On failure, it's important to still flush and de-assert CS.
+                let flush_res = bus.flush();
+                self.cs.disconnect_peripheral_from_output();
+
+                op_res.map_err(|_| spi::ErrorKind::Other)?;
+                flush_res.map_err(|_| spi::ErrorKind::Other)?;
+
+                Ok(())
             })
         }
     }

@@ -12,7 +12,7 @@ use critical_section::Mutex;
 use esp32c3_hal::{
     clock::ClockControl,
     interrupt,
-    peripherals::{self, Peripherals, USB_DEVICE},
+    peripherals::{self, Peripherals},
     prelude::*,
     riscv,
     timer::TimerGroup,
@@ -23,8 +23,7 @@ use esp32c3_hal::{
 use esp_backtrace as _;
 use nb::block;
 
-static USB_SERIAL: Mutex<RefCell<Option<UsbSerialJtag<USB_DEVICE>>>> =
-    Mutex::new(RefCell::new(None));
+static USB_SERIAL: Mutex<RefCell<Option<UsbSerialJtag>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {

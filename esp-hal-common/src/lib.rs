@@ -72,6 +72,8 @@ pub use self::{delay::Delay, soc::peripherals};
 pub mod aes;
 #[cfg(any(adc, dac))]
 pub mod analog;
+#[cfg(assist_debug)]
+pub mod assist_debug;
 pub mod clock;
 pub mod delay;
 #[cfg(any(gdma, pdma))]
@@ -148,6 +150,12 @@ pub fn disable_apm_filter() {
         (&*esp32c6::LP_APM0::PTR).func_ctrl.write(|w| w.bits(0));
         (&*esp32c6::HP_APM::PTR).func_ctrl.write(|w| w.bits(0));
     }
+}
+
+#[doc(hidden)]
+pub fn common_init() {
+    #[cfg(psram)]
+    soc::psram::init_psram();
 }
 
 /// Enumeration of CPU cores

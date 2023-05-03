@@ -6,25 +6,23 @@ use crate::{
     system::PeripheralClockControl,
 };
 
-pub struct UsbSerialJtag<'d, T> {
-    usb_serial: PeripheralRef<'d, T>,
+pub struct UsbSerialJtag<'d> {
+    usb_serial: PeripheralRef<'d, USB_DEVICE>,
 }
 
 /// Custom USB serial error type
 type Error = Infallible;
 
-impl<'d, T> UsbSerialJtag<'d, T>
-where
-    T: Instance,
-{
+impl<'d> UsbSerialJtag<'d> {
     /// Create a new USB serial/JTAG instance with defaults
     pub fn new(
-        usb_serial: impl Peripheral<P = T> + 'd,
+        usb_serial: impl Peripheral<P = USB_DEVICE> + 'd,
         peripheral_clock_control: &mut PeripheralClockControl,
     ) -> Self {
         crate::into_ref!(usb_serial);
-        // #[cfg(usb_device)]
+
         peripheral_clock_control.enable(crate::system::Peripheral::Sha);
+
         let mut dev = Self { usb_serial };
         dev.usb_serial.disable_rx_interrupts();
         dev.usb_serial.disable_tx_interrupts();
@@ -64,10 +62,10 @@ where
             .bit_is_set()
         {
             // the FIFO is not full
-
             unsafe {
                 reg_block.ep1.write(|w| w.rdwr_byte().bits(word.into()));
             }
+
             Ok(())
         } else {
             Err(nb::Error::WouldBlock)
@@ -180,6 +178,7 @@ pub trait Instance {
         let ep0_state = self.register_block().in_ep0_st.read();
         let wr_addr = ep0_state.in_ep0_wr_addr().bits();
         let rd_addr = ep0_state.in_ep0_rd_addr().bits();
+
         (wr_addr - rd_addr).into()
     }
 
@@ -187,30 +186,25 @@ pub trait Instance {
         let ep1_state = self.register_block().in_ep1_st.read();
         let wr_addr = ep1_state.in_ep1_wr_addr().bits();
         let rd_addr = ep1_state.in_ep1_rd_addr().bits();
+
         (wr_addr - rd_addr).into()
     }
 }
 
-impl Instance for crate::peripherals::USB_DEVICE {
+impl Instance for USB_DEVICE {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
         self
     }
 }
 
-impl<T> core::fmt::Write for UsbSerialJtag<'_, T>
-where
-    T: Instance,
-{
+impl core::fmt::Write for UsbSerialJtag<'_> {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
         self.write_bytes(s.as_bytes()).map_err(|_| core::fmt::Error)
     }
 }
 
-impl<T> embedded_hal::serial::Read<u8> for UsbSerialJtag<'_, T>
-where
-    T: Instance,
-{
+impl embedded_hal::serial::Read<u8> for UsbSerialJtag<'_> {
     type Error = Error;
 
     fn read(&mut self) -> nb::Result<u8, Self::Error> {
@@ -218,12 +212,32 @@ where
     }
 }
 
-impl<T> embedded_hal::serial::Write<u8> for UsbSerialJtag<'_, T>
-where
-    T: Instance,
-{
+impl embedded_hal::serial::Write<u8> for UsbSerialJtag<'_> {
     type Error = Error;
 
+    fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
+        self.write_byte_nb(word)
+    }
+
+    fn flush(&mut self) -> nb::Result<(), Self::Error> {
+        self.flush_tx_nb()
+    }
+}
+
+#[cfg(feature = "eh1")]
+impl embedded_hal_1::serial::ErrorType for UsbSerialJtag<'_> {
+    type Error = Error;
+}
+
+#[cfg(feature = "eh1")]
+impl embedded_hal_nb::serial::Read for UsbSerialJtag<'_> {
+    fn read(&mut self) -> nb::Result<u8, Self::Error> {
+        self.read_byte()
+    }
+}
+
+#[cfg(feature = "eh1")]
+impl embedded_hal_nb::serial::Write for UsbSerialJtag<'_> {
     fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
         self.write_byte_nb(word)
     }

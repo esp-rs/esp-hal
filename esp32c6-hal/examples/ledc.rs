@@ -75,6 +75,7 @@ fn main() -> ! {
         .configure(channel::config::Config {
             timer: &lstimer0,
             duty_pct: 10,
+            pin_config: channel::config::PinConfig::PushPull,
         })
         .unwrap();
 

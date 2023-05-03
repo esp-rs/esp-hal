@@ -28,12 +28,8 @@ where
 
 #[cfg(feature = "eh1")]
 impl embedded_hal_1::delay::DelayUs for Delay {
-    type Error = core::convert::Infallible;
-
-    fn delay_us(&mut self, us: u32) -> Result<(), Self::Error> {
+    fn delay_us(&mut self, us: u32) {
         self.delay(us);
-
-        Ok(())
     }
 }
 
