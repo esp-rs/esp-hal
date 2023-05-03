@@ -380,6 +380,9 @@ unsafe fn handle_priority()->u32{
 unsafe fn restore_priority(stored_prio:u32){
     let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
     intr.cpu_int_thresh.write(|w| w.bits(stored_prio)); //set the prio threshold to 1 more than current interrupt prio
+    unsafe{
+        riscv::interrupt::disable();
+    }
 }
 #[doc(hidden)]
 #[link_section = ".trap.rust"]
