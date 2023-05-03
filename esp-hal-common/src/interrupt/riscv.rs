@@ -647,10 +647,7 @@ unsafe fn restore_priority(stored_prio: u32) {
     let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
     #[cfg(esp32c6)]
     let intr = &*crate::peripherals::INTPRI::PTR;
-    intr.cpu_int_thresh.write(|w| w.bits(stored_prio)); // set the prio
-                                                        // threshold to 1 more
-                                                        // than current
-                                                        // interrupt prio
+    intr.cpu_int_thresh.write(|w| w.bits(stored_prio));
     unsafe {
         riscv::interrupt::disable();
     }
