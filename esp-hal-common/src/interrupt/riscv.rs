@@ -350,6 +350,9 @@ mod vectored {
     }
 }
 
+/// # Safety
+///
+/// This function is called from an assembly trap handler.
 #[doc(hidden)]
 #[link_section = ".trap.rust"]
 #[export_name = "_start_trap_rust_hal"]
