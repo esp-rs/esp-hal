@@ -1,8 +1,6 @@
 use fugit::HertzU32;
 use strum::FromRepr;
 
-use crate::clock::Clock;
-
 use crate::{
     clock::{clocks_ll::regi2c_write_mask, Clock, XtalClock},
     peripherals::{LP_AON, LP_CLKRST, PCR, PMU, TIMG0},
@@ -137,7 +135,7 @@ pub(crate) fn init() {
 pub(crate) fn configure_clock() {
     assert!(matches!(
         RtcClock::get_xtal_freq(),
-        XtalClock::RtcXtalFreq40M
+        XtalClock::RtcXtalFreq32M
     ));
 
     RtcClock::set_fast_freq(RtcFastClock::RtcFastClockRcFast);
@@ -217,8 +215,6 @@ pub(crate) enum RtcFastClock {
     RtcFastClockRcFast = 0,
     /// Select XTAL_D2_CLK as RTC_FAST_CLK source
     RtcFastClockXtalD2 = 1,
-    /// Select LP_PLL_CLK as RTC_FAST_CLK source
-    //RtcFastClockLpPll  = 2, // TODO : Check if it's used
 }
 
 impl Clock for RtcFastClock {
@@ -288,12 +284,9 @@ pub struct RtcClock;
 
 /// RTC Watchdog Timer driver
 impl RtcClock {
+    const CAL_FRACT: u32 = 19;
+
     /// Calculate the necessary RTC_SLOW_CLK cycles to complete 1 millisecond.
-    pub(crate) fn cycles_to_1ms() -> u16 {
-        todo!()
-    }
-
-
     fn get_xtal_freq() -> XtalClock {
         let xtal_freq_reg = unsafe { &*LP_AON::PTR }.store4.read().bits();
 
@@ -306,11 +299,11 @@ impl RtcClock {
         let reg_val_to_clk_val = |val| val & u16::MAX as u32;
 
         if !clk_val_is_valid(xtal_freq_reg) {
-            return XtalClock::RtcXtalFreq40M;
+            return XtalClock::RtcXtalFreq32M;
         }
 
         match reg_val_to_clk_val(xtal_freq_reg) {
-            40 => XtalClock::RtcXtalFreq40M,
+            32 => XtalClock::RtcXtalFreq32M,
             other => XtalClock::RtcXtalFreqOther(other),
         }
     }
@@ -320,9 +313,9 @@ impl RtcClock {
         unsafe {
             let lp_clkrst = &*LP_CLKRST::PTR;
             lp_clkrst.lp_clk_conf.modify(|_, w| {
-                w.fast_clk_sel().bit(match fast_freq {
-                    RtcFastClock::RtcFastClockRcFast => false,
-                    RtcFastClock::RtcFastClockXtalD2 => true,
+                w.fast_clk_sel().bits(match fast_freq {
+                    RtcFastClock::RtcFastClockRcFast => 0b00,
+                    RtcFastClock::RtcFastClockXtalD2 => 0b01,
                 })
             });
             ets_delay_us(3);
@@ -364,9 +357,18 @@ impl RtcClock {
             _ => unreachable!(),
         }
     }
+    
+    fn calibrate(cal_clk: RtcCalSel, slowclk_cycles: u32) -> u32 {
+        let xtal_freq = RtcClock::get_xtal_freq();
+        let xtal_cycles = RtcClock::calibrate_internal(cal_clk, slowclk_cycles) as u64;
+        let divider = xtal_freq.mhz() as u64 * slowclk_cycles as u64;
+        let period_64 = ((xtal_cycles << RtcClock::CAL_FRACT) + divider / 2u64 - 1u64) / divider;
 
-        /// Calibration of RTC_SLOW_CLK is performed using a special feature of
-        /// TIMG0. This feature counts the number of XTAL clock cycles within a
+        (period_64 & u32::MAX as u64) as u32
+    }
+    
+    /// Calibration of RTC_SLOW_CLK is performed using a special feature of
+    /// TIMG0. This feature counts the number of XTAL clock cycles within a
         /// given number of RTC_SLOW_CLK cycles.
         fn calibrate_internal(mut cal_clk: RtcCalSel, slowclk_cycles: u32) -> u32 { // FIXME
             const SOC_CLK_RC_FAST_FREQ_APPROX: u32 = 17_500_000;
@@ -624,12 +626,22 @@ impl RtcClock {
             cal_val
         }
 
-    fn calibrate(cal_clk: RtcCalSel, slowclk_cycles: u32) -> u32 { // FIXME
-        let xtal_freq = RtcClock::get_xtal_freq();
-        let xtal_cycles = RtcClock::calibrate_internal(cal_clk, slowclk_cycles) as u64;
-        let divider = xtal_freq.mhz() as u64 * slowclk_cycles as u64;
-        let period_64 = ((xtal_cycles << RtcClock::CAL_FRACT) + divider / 2u64 - 1u64) / divider;
 
-        (period_64 & u32::MAX as u64) as u32
+    pub(crate) fn cycles_to_1ms() -> u16 {
+        let period_13q19 = RtcClock::calibrate(
+            match RtcClock::get_slow_freq() {
+                RtcSlowClock::RtcSlowClockRcSlow => RtcCalSel::RtcCalRtcMux,
+                RtcSlowClock::RtcSlowClock32kXtal => RtcCalSel::RtcCal32kXtal,
+                RtcSlowClock::RtcSlowClock32kRc => RtcCalSel::RtcCal32kRc,
+                RtcSlowClock::RtcSlowOscSlow => RtcCalSel::RtcCal32kOscSlow,
+                // RtcSlowClock::RtcCalRcFast => RtcCalSel::RtcCalRcFast,
+            },
+            1024,
+        );
+
+        // 100_000_000 is used to get rid of `float` calculations
+        let period = (100_000_000 * period_13q19 as u64) / (1 << RtcClock::CAL_FRACT);
+
+        (100_000_000 * 1000 / period) as u16
     }
 }
