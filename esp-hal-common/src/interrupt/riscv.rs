@@ -12,8 +12,6 @@
 //! interrupt15() => Priority::Priority15
 //! ```
 
-#[cfg(feature = "interrupt-preemption")]
-use esp_riscv_rt::riscv::interrupt;
 use esp_riscv_rt::riscv::register::{mcause, mepc, mtvec};
 pub use esp_riscv_rt::TrapFrame;
 
@@ -352,46 +350,6 @@ mod vectored {
     }
 }
 
-/// # Safety
-///
-/// This function is called from an assembly trap handler.
-/// # Safety
-///
-/// This function is called from an assembly trap handler.
-#[cfg(not(esp32c6))]
-#[doc(hidden)]
-#[inline(always)]
-#[export_name = "set_prio"]
-unsafe fn handle_priority() -> u32 {
-    let interrupt_id: usize = mcause::read().bits() & 0x0FFFFFFF; // MSB is whether its exception or interrupt.
-    let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
-    let interrupt_priority = intr
-        .cpu_int_pri_0
-        .as_ptr()
-        .offset(interrupt_id as isize)
-        .read_volatile();
-    let prev_interrupt_priority = intr.cpu_int_thresh.read().bits();
-    if interrupt_priority < 15 {
-        // leave interrupts disabled if interrupt is of max priority.
-        intr.cpu_int_thresh
-            .write(|w| w.bits(interrupt_priority + 1)); // set the prio threshold to 1 more than current interrupt prio
-        unsafe {
-            riscv::interrupt::enable();
-        }
-    }
-    prev_interrupt_priority
-}
-#[cfg(not(esp32c6))]
-#[doc(hidden)]
-#[inline(always)]
-#[export_name = "restore_prio"]
-unsafe fn restore_priority(stored_prio: u32) {
-    let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
-    intr.cpu_int_thresh.write(|w| w.bits(stored_prio)); // set the prio threshold to 1 more than current interrupt prio
-    unsafe {
-        riscv::interrupt::disable();
-    }
-}
 #[doc(hidden)]
 #[link_section = ".trap.rust"]
 #[export_name = "_start_trap_rust_hal"]
@@ -658,8 +616,8 @@ unsafe fn get_assigned_cpu_interrupt(interrupt: Interrupt) -> CpuInterrupt {
 
     core::mem::transmute(cpu_intr)
 }
-
 #[cfg(feature = "interrupt-preemption")]
+#[inline(always)]
 unsafe fn handle_priority() -> u32 {
     let interrupt_id: usize = mcause::read().code(); // MSB is whether its exception or interrupt.
     let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
@@ -669,21 +627,27 @@ unsafe fn handle_priority() -> u32 {
         .offset(interrupt_id as isize)
         .read_volatile();
     let prev_interrupt_priority = intr.cpu_int_thresh.read().bits();
-    intr.cpu_int_thresh
-        .write(|w| w.bits(interrupt_priority + 1)); // set the prio threshold to 1 more than the prio of interrupt currently being
-                                                    // handled
-    unsafe {
-        interrupt::enable(); // prio filtering is set up, now enable interrupts
+    if interrupt_priority < 15 {
+        // leave interrupts disabled if interrupt is of max priority.
+        intr.cpu_int_thresh
+            .write(|w| w.bits(interrupt_priority + 1)); // set the prio threshold to 1 more than current interrupt prio
+        unsafe {
+            riscv::interrupt::enable();
+        }
     }
     prev_interrupt_priority
 }
 #[cfg(feature = "interrupt-preemption")]
+#[inline(always)]
 unsafe fn restore_priority(stored_prio: u32) {
     let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
     intr.cpu_int_thresh.write(|w| w.bits(stored_prio)); // set the prio
                                                         // threshold to 1 more
                                                         // than current
                                                         // interrupt prio
+    unsafe {
+        riscv::interrupt::disable();
+    }
 }
 
 #[cfg(not(plic))]
