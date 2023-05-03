@@ -1,8 +1,7 @@
-//! Software Interrupts
+//! Interrupt Preemption
 //!
-//! An example of how software interrupts can be raised and reset
-//! Should rotate through all of the available interrupts printing their number
-//! when raised.
+//! An example of how an interrupt can be preempted by another with higher priority.
+//! Should show higher-numbered software interrupts happening during the handling of lower-numbered ones.
 
 #![no_std]
 #![no_main]
