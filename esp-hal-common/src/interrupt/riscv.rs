@@ -16,7 +16,6 @@
 use esp_riscv_rt::riscv::interrupt;
 use esp_riscv_rt::riscv::register::{mcause, mepc, mtvec};
 pub use esp_riscv_rt::TrapFrame;
-use crate::riscv;
 
 #[cfg(not(plic))]
 pub use self::classic::*;
@@ -24,6 +23,7 @@ pub use self::classic::*;
 pub use self::plic::*;
 use crate::{
     peripherals::{self, Interrupt},
+    riscv,
     Cpu,
 };
 
@@ -362,14 +362,22 @@ mod vectored {
 #[doc(hidden)]
 #[inline(always)]
 #[export_name = "set_prio"]
-unsafe fn handle_priority()->u32{
-    let interrupt_id:usize = mcause::read().bits() & 0x0FFFFFFF; //MSB is whether its exception or interrupt.
+unsafe fn handle_priority() -> u32 {
+    let interrupt_id: usize = mcause::read().bits() & 0x0FFFFFFF; // MSB is whether its exception or interrupt.
     let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
-    let interrupt_priority =  intr.cpu_int_pri_0.as_ptr().offset(interrupt_id as isize).read_volatile();
+    let interrupt_priority = intr
+        .cpu_int_pri_0
+        .as_ptr()
+        .offset(interrupt_id as isize)
+        .read_volatile();
     let prev_interrupt_priority = intr.cpu_int_thresh.read().bits();
-    intr.cpu_int_thresh.write(|w| w.bits(interrupt_priority + 1)); //set the prio threshold to 1 more than current interrupt prio
-    unsafe{
-        riscv::interrupt::enable();
+    if interrupt_priority < 15 {
+        // leave interrupts disabled if interrupt is of max priority.
+        intr.cpu_int_thresh
+            .write(|w| w.bits(interrupt_priority + 1)); // set the prio threshold to 1 more than current interrupt prio
+        unsafe {
+            riscv::interrupt::enable();
+        }
     }
     prev_interrupt_priority
 }
@@ -377,10 +385,10 @@ unsafe fn handle_priority()->u32{
 #[doc(hidden)]
 #[inline(always)]
 #[export_name = "restore_prio"]
-unsafe fn restore_priority(stored_prio:u32){
+unsafe fn restore_priority(stored_prio: u32) {
     let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
-    intr.cpu_int_thresh.write(|w| w.bits(stored_prio)); //set the prio threshold to 1 more than current interrupt prio
-    unsafe{
+    intr.cpu_int_thresh.write(|w| w.bits(stored_prio)); // set the prio threshold to 1 more than current interrupt prio
+    unsafe {
         riscv::interrupt::disable();
     }
 }
@@ -450,7 +458,7 @@ pub unsafe extern "C" fn start_trap_rust_hal(trap_frame: *mut TrapFrame) {
 unsafe fn handle_exception(pc: usize, trap_frame: *mut TrapFrame) {
     let insn = if pc % 4 != 0 {
         let prev_aligned = pc & !0x3;
-        let offset = 2 as usize; //misalignment occurs due to 2-byte instructions
+        let offset = 2 as usize; // misalignment occurs due to 2-byte instructions
 
         let buffer = (*((prev_aligned + 4) as *const u32) as u64) << 32
             | (*(prev_aligned as *const u32) as u64);
