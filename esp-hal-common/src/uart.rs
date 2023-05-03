@@ -699,6 +699,16 @@ where
     #[cfg(not(esp32c6))]
     #[inline(always)]
     fn sync_regs(&mut self) {}
+
+    #[cfg(feature = "async")]
+    pub(crate) fn inner(&self) -> &T {
+        &self.uart
+    }
+
+    #[cfg(feature = "async")]
+    pub(crate) fn inner_mut(&mut self) -> &mut T {
+        &mut self.uart
+    }
 }
 
 /// UART peripheral instance
@@ -976,5 +986,128 @@ where
 
     fn flush(&mut self) -> nb::Result<(), Self::Error> {
         self.flush_tx()
+    }
+}
+
+#[cfg(feature = "async")]
+mod asynch {
+    use core::task::Poll;
+
+    use embassy_sync::waitqueue::AtomicWaker;
+    use procmacros::interrupt;
+
+    use super::{Error, Instance};
+    use crate::{uart::UART_FIFO_SIZE, Uart};
+
+    static WAKERS: [AtomicWaker; 3] = [AtomicWaker::new(), AtomicWaker::new(), AtomicWaker::new()];
+
+    pub(crate) enum Event {
+        TxDone,
+        TxFiFoEmpty,
+    }
+
+    pub(crate) struct UartFuture<'a, T: Instance> {
+        event: Event,
+        instance: &'a T,
+    }
+
+    impl<'a, T: Instance> UartFuture<'a, T> {
+        pub fn new(event: Event, instance: &'a T) -> Self {
+            match event {
+                Event::TxDone => instance
+                    .register_block()
+                    .int_ena
+                    .modify(|_, w| w.tx_done_int_ena().set_bit()),
+                Event::TxFiFoEmpty => instance
+                    .register_block()
+                    .int_ena
+                    .modify(|_, w| w.txfifo_empty_int_ena().set_bit()),
+            }
+
+            Self { event, instance }
+        }
+
+        fn event_bit_is_clear(&self) -> bool {
+            match self.event {
+                Event::TxDone => self
+                    .instance
+                    .register_block()
+                    .int_ena
+                    .read()
+                    .tx_done_int_ena()
+                    .bit_is_clear(),
+                Event::TxFiFoEmpty => self
+                    .instance
+                    .register_block()
+                    .int_ena
+                    .read()
+                    .txfifo_empty_int_ena()
+                    .bit_is_clear(),
+            }
+        }
+    }
+
+    impl<'a, T: Instance> core::future::Future for UartFuture<'a, T> {
+        type Output = ();
+
+        fn poll(
+            self: core::pin::Pin<&mut Self>,
+            cx: &mut core::task::Context<'_>,
+        ) -> core::task::Poll<Self::Output> {
+            WAKERS[self.instance.uart_number()].register(cx.waker());
+            if self.event_bit_is_clear() {
+                Poll::Ready(())
+            } else {
+                Poll::Pending
+            }
+        }
+    }
+
+    impl<T> Uart<'_, T>
+    where
+        T: Instance,
+    {
+        async fn write(&mut self, words: &[u8]) -> Result<(), Error> {
+            for chunk in words.chunks(UART_FIFO_SIZE as usize) {
+                for &byte in chunk {
+                    self.write_byte(byte).unwrap() // should never fail
+                }
+                UartFuture::new(Event::TxFiFoEmpty, self.inner()).await;
+            }
+            Ok(())
+        }
+
+        async fn flush(&mut self) -> Result<(), Error> {
+            let count = self.inner_mut().get_tx_fifo_count();
+            if count > 0 {
+                UartFuture::new(Event::TxDone, self.inner()).await;
+            }
+            Ok(())
+        }
+    }
+
+    impl<T> embedded_hal_async::serial::Write for Uart<'_, T>
+    where
+        T: Instance,
+    {
+        async fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
+            self.write(words).await
+        }
+
+        async fn flush(&mut self) -> Result<(), Self::Error> {
+            self.flush().await
+        }
+    }
+
+    #[interrupt]
+    fn UART0() {
+        let uart0 = unsafe { &*crate::peripherals::UART0::ptr() };
+        uart0.int_ena.modify(|_, w| {
+            w.txfifo_empty_int_ena()
+                .clear_bit()
+                .tx_done_int_ena()
+                .clear_bit()
+        });
+        WAKERS[0].wake();
     }
 }
