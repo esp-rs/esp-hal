@@ -11,7 +11,7 @@ use esp32h2_hal::{
     peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
-    // Rtc,
+    Rtc,
     Uart,
 };
 use esp_backtrace as _;
@@ -25,25 +25,25 @@ fn main() -> ! {
 
     // Disable the watchdog timers. For the ESP32-H2, this includes the Super WDT,
     // and the TIMG WDTs.
-    // let mut rtc = Rtc::new(peripherals.LP_CLKRST);
+    let mut rtc = Rtc::new(peripherals.LP_CLKRST);
     let timer_group0 = TimerGroup::new(
         peripherals.TIMG0,
         &clocks,
         &mut system.peripheral_clock_control,
     );
     let mut timer0 = timer_group0.timer0;
-    // let mut wdt0 = timer_group0.wdt;
+    let mut wdt0 = timer_group0.wdt;
     let timer_group1 = TimerGroup::new(
         peripherals.TIMG1,
         &clocks,
         &mut system.peripheral_clock_control,
     );
-    // let mut wdt1 = timer_group1.wdt;
+    let mut wdt1 = timer_group1.wdt;
 
-    // rtc.swd.disable();
-    // rtc.rwdt.disable();
-    // wdt0.disable();
-    // wdt1.disable();
+    rtc.swd.disable();
+    rtc.rwdt.disable();
+    wdt0.disable();
+    wdt1.disable();
 
     let mut uart0 = Uart::new(peripherals.UART0, &mut system.peripheral_clock_control);
     timer0.start(1u64.secs());
