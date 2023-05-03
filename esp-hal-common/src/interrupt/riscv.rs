@@ -360,6 +360,7 @@ mod vectored {
 /// This function is called from an assembly trap handler.
 #[cfg(not(esp32c6))]
 #[doc(hidden)]
+#[inline(always)]
 #[export_name = "set_prio"]
 unsafe fn handle_priority()->u32{
     let interrupt_id:usize = mcause::read().bits() & 0x0FFFFFFF; //MSB is whether its exception or interrupt.
@@ -371,19 +372,14 @@ unsafe fn handle_priority()->u32{
         riscv::interrupt::enable();
     }
     prev_interrupt_priority
-    //panic!();
-        
-
 }
 #[cfg(not(esp32c6))]
 #[doc(hidden)]
+#[inline(always)]
 #[export_name = "restore_prio"]
 unsafe fn restore_priority(stored_prio:u32){
     let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
     intr.cpu_int_thresh.write(|w| w.bits(stored_prio)); //set the prio threshold to 1 more than current interrupt prio
-    //panic!();
-        
-
 }
 #[doc(hidden)]
 #[link_section = ".trap.rust"]
