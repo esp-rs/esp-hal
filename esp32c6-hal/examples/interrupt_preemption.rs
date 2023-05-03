@@ -1,7 +1,8 @@
 //! Interrupt Preemption
 //!
-//! An example of how an interrupt can be preempted by another with higher priority.
-//! Should show higher-numbered software interrupts happening during the handling of lower-numbered ones.
+//! An example of how an interrupt can be preempted by another with higher
+//! priority. Should show higher-numbered software interrupts happening during
+//! the handling of lower-numbered ones.
 
 #![no_std]
 #![no_main]
@@ -71,7 +72,7 @@ fn main() -> ! {
     .unwrap();
     interrupt::enable(
         peripherals::Interrupt::FROM_CPU_INTR3,
-        interrupt::Priority::Priority4,
+        interrupt::Priority::Priority15,
     )
     .unwrap();
     unsafe { riscv::interrupt::enable() }

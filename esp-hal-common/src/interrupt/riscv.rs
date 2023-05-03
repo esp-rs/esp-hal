@@ -417,23 +417,7 @@ pub unsafe extern "C" fn start_trap_rust_hal(trap_frame: *mut TrapFrame) {
 /// This function is called from an trap handler.
 #[doc(hidden)]
 unsafe fn handle_exception(pc: usize, trap_frame: *mut TrapFrame) {
-    let insn = if pc % 4 != 0 {
-        let prev_aligned = pc & !0x3;
-        let offset = 2 as usize; // misalignment occurs due to 2-byte instructions
-
-        let buffer = (*((prev_aligned + 4) as *const u32) as u64) << 32
-            | (*(prev_aligned as *const u32) as u64);
-        let buffer_bytes = buffer.to_le_bytes();
-
-        u32::from_le_bytes([
-            buffer_bytes[offset],
-            buffer_bytes[offset + 1],
-            buffer_bytes[offset + 2],
-            buffer_bytes[offset + 3],
-        ])
-    } else {
-        *(pc as *const u32)
-    };
+    let insn = *(pc as *const u32);
     let needs_atomic_emulation = (insn & 0b1111111) == 0b0101111;
     if !needs_atomic_emulation {
         extern "C" {
