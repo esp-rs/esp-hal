@@ -323,7 +323,7 @@ jobs:
       - name: clippy (esp32-hal)
         run: cargo +esp clippy --manifest-path=esp32-hal/Cargo.toml -- --no-deps
       - name: clippy (esp32s2-hal)
-        run: cargo +esp clippy --manifest-path=esp32s2-hal/Cargo.toml --target=xtensa-esp32s2-none-elf -Zbuild-std=core -- --no-deps
+        run: cargo +esp clippy --manifest-path=esp32s2-hal/Cargo.toml -- --no-deps
       - name: clippy (esp32s3-hal)
         run: cargo +esp clippy --manifest-path=esp32s3-hal/Cargo.toml -- --no-deps
 

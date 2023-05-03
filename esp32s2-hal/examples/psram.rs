@@ -9,8 +9,9 @@ use esp32s2_hal::{
     clock::ClockControl,
     peripherals::Peripherals,
     prelude::*,
+    soc,
     timer::TimerGroup,
-    Rtc, soc,
+    Rtc,
 };
 use esp_backtrace as _;
 use esp_println::println;
@@ -22,7 +23,10 @@ static ALLOCATOR: esp_alloc::EspHeap = esp_alloc::EspHeap::empty();
 
 fn init_psram_heap() {
     unsafe {
-        ALLOCATOR.init(soc::psram::PSRAM_VADDR_START as *mut u8, soc::psram::PSRAM_BYTES);
+        ALLOCATOR.init(
+            soc::psram::PSRAM_VADDR_START as *mut u8,
+            soc::psram::PSRAM_BYTES,
+        );
     }
 }
 
