@@ -16,6 +16,7 @@
 use esp_riscv_rt::riscv::interrupt;
 use esp_riscv_rt::riscv::register::{mcause, mepc, mtvec};
 pub use esp_riscv_rt::TrapFrame;
+use crate::riscv;
 
 #[cfg(not(plic))]
 pub use self::classic::*;
@@ -354,6 +355,36 @@ mod vectored {
 /// # Safety
 ///
 /// This function is called from an assembly trap handler.
+/// # Safety
+///
+/// This function is called from an assembly trap handler.
+#[cfg(not(esp32c6))]
+#[doc(hidden)]
+#[export_name = "set_prio"]
+unsafe fn handle_priority()->u32{
+    let interrupt_id:usize = mcause::read().bits() & 0x0FFFFFFF; //MSB is whether its exception or interrupt.
+    let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
+    let interrupt_priority =  intr.cpu_int_pri_0.as_ptr().offset(interrupt_id as isize).read_volatile();
+    let prev_interrupt_priority = intr.cpu_int_thresh.read().bits();
+    intr.cpu_int_thresh.write(|w| w.bits(interrupt_priority + 1)); //set the prio threshold to 1 more than current interrupt prio
+    unsafe{
+        riscv::interrupt::enable();
+    }
+    prev_interrupt_priority
+    //panic!();
+        
+
+}
+#[cfg(not(esp32c6))]
+#[doc(hidden)]
+#[export_name = "restore_prio"]
+unsafe fn restore_priority(stored_prio:u32){
+    let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
+    intr.cpu_int_thresh.write(|w| w.bits(stored_prio)); //set the prio threshold to 1 more than current interrupt prio
+    //panic!();
+        
+
+}
 #[doc(hidden)]
 #[link_section = ".trap.rust"]
 #[export_name = "_start_trap_rust_hal"]
@@ -418,9 +449,24 @@ pub unsafe extern "C" fn start_trap_rust_hal(trap_frame: *mut TrapFrame) {
 /// This function is called from an trap handler.
 #[doc(hidden)]
 unsafe fn handle_exception(pc: usize, trap_frame: *mut TrapFrame) {
-    let insn: usize = *(pc as *const _);
-    let needs_atomic_emulation = (insn & 0b1111111) == 0b0101111;
+    let insn = if pc % 4 != 0 {
+        let prev_aligned = pc & !0x3;
+        let offset = 2 as usize; //misalignment occurs due to 2-byte instructions
 
+        let buffer = (*((prev_aligned + 4) as *const u32) as u64) << 32
+            | (*(prev_aligned as *const u32) as u64);
+        let buffer_bytes = buffer.to_le_bytes();
+
+        u32::from_le_bytes([
+            buffer_bytes[offset],
+            buffer_bytes[offset + 1],
+            buffer_bytes[offset + 2],
+            buffer_bytes[offset + 3],
+        ])
+    } else {
+        *(pc as *const u32)
+    };
+    let needs_atomic_emulation = (insn & 0b1111111) == 0b0101111;
     if !needs_atomic_emulation {
         extern "C" {
             fn ExceptionHandler(tf: *mut TrapFrame);
@@ -464,7 +510,6 @@ unsafe fn handle_exception(pc: usize, trap_frame: *mut TrapFrame) {
         (*trap_frame).t5,
         (*trap_frame).t6,
     ];
-
     riscv_atomic_emulation_trap::atomic_emulation((*trap_frame).pc, &mut frame);
 
     (*trap_frame).ra = frame[1];
