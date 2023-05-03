@@ -28,6 +28,7 @@
     feature(async_fn_in_trait),
     feature(impl_trait_projections)
 )]
+#![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 
 #[cfg(riscv)]
 pub use esp_riscv_rt::{self, entry, riscv};
@@ -37,47 +38,59 @@ pub use xtensa_lx;
 #[cfg(xtensa)]
 pub use xtensa_lx_rt::{self, entry};
 
+#[cfg(adc)]
+pub use self::analog::adc::implementation as adc;
 #[cfg(dac)]
 pub use self::analog::dac::implementation as dac;
 #[cfg(gdma)]
 pub use self::dma::gdma;
 #[cfg(pdma)]
 pub use self::dma::pdma;
+#[cfg(any(dport, interrupt_core0, interrupt_core1))]
+pub use self::interrupt::*;
 #[cfg(rmt)]
 pub use self::pulse_control::PulseControl;
+#[cfg(rng)]
+pub use self::rng::Rng;
+#[cfg(any(lp_clkrst, rtc_cntl))]
+pub use self::rtc_cntl::{Rtc, Rwdt};
 #[cfg(any(esp32, esp32s3))]
 pub use self::soc::cpu_control;
-#[cfg(usb_serial_jtag)]
+#[cfg(efuse)]
+pub use self::soc::efuse;
+#[cfg(any(spi0, spi1, spi2, spi3))]
+pub use self::spi::Spi;
+#[cfg(any(timg0, timg1))]
+pub use self::timer::Timer;
+#[cfg(any(uart0, uart1, uart2))]
+pub use self::uart::Uart;
+#[cfg(usb_device)]
 pub use self::usb_serial_jtag::UsbSerialJtag;
-pub use self::{
-    analog::adc::implementation as adc,
-    delay::Delay,
-    interrupt::*,
-    rng::Rng,
-    rtc_cntl::{Rtc, Rwdt},
-    soc::{efuse, peripherals},
-    spi::Spi,
-    timer::Timer,
-    uart::Uart,
-};
+pub use self::{delay::Delay, soc::peripherals};
 
 #[cfg(aes)]
 pub mod aes;
+#[cfg(any(adc, dac))]
 pub mod analog;
 pub mod clock;
 pub mod delay;
+#[cfg(any(gdma, pdma))]
 pub mod dma;
 #[cfg(feature = "embassy")]
 pub mod embassy;
+#[cfg(gpio)]
 pub mod gpio;
+#[cfg(any(i2c0, i2c1))]
 pub mod i2c;
-#[cfg(i2s)]
+#[cfg(any(i2s0, i2s1))]
 pub mod i2s;
+#[cfg(any(dport, interrupt_core0, interrupt_core1))]
 pub mod interrupt;
+#[cfg(ledc)]
 pub mod ledc;
-#[cfg(mcpwm)]
+#[cfg(any(mcpwm0, mcpwm1))]
 pub mod mcpwm;
-#[cfg(usb_otg)]
+#[cfg(usb0)]
 pub mod otg_fs;
 #[cfg(pcnt)]
 pub mod pcnt;
@@ -87,23 +100,31 @@ pub mod prelude;
 pub mod pulse_control;
 #[cfg(radio)]
 pub mod radio;
+pub mod reset;
+#[cfg(rng)]
 pub mod rng;
 pub mod rom;
+#[cfg(rsa)]
+pub mod rsa;
+#[cfg(any(lp_clkrst, rtc_cntl))]
 pub mod rtc_cntl;
+#[cfg(sha)]
 pub mod sha;
 pub mod soc;
+#[cfg(any(spi0, spi1, spi2, spi3))]
 pub mod spi;
+#[cfg(any(dport, pcr, system))]
 pub mod system;
 #[cfg(systimer)]
 pub mod systimer;
+#[cfg(any(timg0, timg1))]
 pub mod timer;
-#[cfg(any(twai))]
+#[cfg(any(twai0, twai1))]
 pub mod twai;
+#[cfg(any(uart0, uart1, uart2))]
 pub mod uart;
-#[cfg(usb_serial_jtag)]
+#[cfg(usb_device)]
 pub mod usb_serial_jtag;
-#[cfg(rmt)]
-pub mod utils;
 
 /// State of the CPU saved when entering exception or interrupt
 pub mod trapframe {
@@ -135,6 +156,7 @@ pub enum Cpu {
     /// The first core
     ProCpu = 0,
     /// The second core
+    #[cfg(multi_core)]
     AppCpu,
 }
 

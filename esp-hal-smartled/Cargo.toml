@@ -1,0 +1,25 @@
+[package]
+name        = "esp-hal-smartled"
+version     = "0.1.0"
+edition     = "2021"
+description = "RMT adapter for smartleds"
+repository  = "https://github.com/esp-rs/esp-hal"
+license     = "MIT OR Apache-2.0"
+
+[package.metadata.docs.rs]
+features = ["esp32c3"]
+
+[dependencies]
+esp-hal-common   = { version = "0.8.0", path = "../esp-hal-common" }
+fugit            = "0.3.6"
+smart-leds-trait = "0.2.1"
+
+[features]
+esp32   = ["esp-hal-common/esp32"]
+esp32c3 = ["esp-hal-common/esp32c3"]
+esp32c6 = ["esp-hal-common/esp32c6"]
+esp32s2 = ["esp-hal-common/esp32s2"]
+esp32s3 = ["esp-hal-common/esp32s3"]
+
+esp32_26mhz = ["esp-hal-common/esp32_26mhz"]
+esp32_40mhz = ["esp-hal-common/esp32_40mhz"]

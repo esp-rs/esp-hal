@@ -14,6 +14,12 @@ use crate::peripherals::{GPIO, IO_MUX};
 pub use crate::soc::gpio::*;
 pub(crate) use crate::{analog, gpio};
 
+/// Convenience type-alias for a no-pin / don't care - pin
+pub type NoPinType = Gpio0<Unknown>;
+
+/// Convenience constant for `Option::None` pin
+pub const NO_PIN: Option<NoPinType> = None;
+
 #[derive(Copy, Clone)]
 pub enum Event {
     RisingEdge  = 1,
@@ -650,6 +656,15 @@ where
         #[cfg(esp32)]
         crate::soc::gpio::errata36(GPIONUM, pull_up, pull_down);
 
+        // NOTE: Workaround to make GPIO18 and GPIO19 work on the ESP32-C3, which by
+        //       default are assigned to the `USB_SERIAL_JTAG` peripheral.
+        #[cfg(esp32c3)]
+        if GPIONUM == 18 || GPIONUM == 19 {
+            unsafe { &*crate::peripherals::USB_DEVICE::PTR }
+                .conf0
+                .modify(|_, w| w.usb_pad_enable().clear_bit());
+        }
+
         get_io_mux_reg(GPIONUM).modify(|_, w| unsafe {
             w.mcu_sel()
                 .bits(GPIO_FUNCTION as u8)
@@ -1137,6 +1152,15 @@ where
 
         gpio.func_out_sel_cfg[GPIONUM as usize]
             .modify(|_, w| unsafe { w.out_sel().bits(OutputSignal::GPIO as OutputSignalType) });
+
+        // NOTE: Workaround to make GPIO18 and GPIO19 work on the ESP32-C3, which by
+        //       default are assigned to the `USB_SERIAL_JTAG` peripheral.
+        #[cfg(esp32c3)]
+        if GPIONUM == 18 || GPIONUM == 19 {
+            unsafe { &*crate::peripherals::USB_DEVICE::PTR }
+                .conf0
+                .modify(|_, w| w.usb_pad_enable().clear_bit());
+        }
 
         get_io_mux_reg(GPIONUM).modify(|_, w| unsafe {
             w.mcu_sel()
@@ -1666,8 +1690,8 @@ macro_rules! analog {
         )+
     ) => {
         pub(crate) fn internal_into_analog(pin: u8) {
-            use crate::peripherals::RTCIO;
-            let rtcio = unsafe{ &*RTCIO::ptr() };
+            use crate::peripherals::RTC_IO;
+            let rtcio = unsafe{ &*RTC_IO::ptr() };
             $crate::gpio::enable_iomux_clk_gate();
 
             match pin {
@@ -1723,8 +1747,8 @@ macro_rules! analog {
         )+
     ) => {
         pub(crate) fn internal_into_analog(pin: u8) {
-            use crate::peripherals::RTCIO;
-            let rtcio = unsafe{ &*RTCIO::ptr() };
+            use crate::peripherals::RTC_IO;
+            let rtcio = unsafe{ &*RTC_IO::ptr() };
             $crate::gpio::enable_iomux_clk_gate();
 
             match pin {

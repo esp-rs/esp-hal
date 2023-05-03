@@ -24,10 +24,8 @@ use esp32s2_hal::{
     gpio::IO,
     peripherals::Peripherals,
     prelude::*,
-    rt,
     spi::{Spi, SpiBusController, SpiMode},
     timer::TimerGroup,
-    trapframe,
     Delay,
     Rtc,
 };
@@ -43,7 +41,11 @@ fn main() -> ! {
     // Disable the watchdog timers. For the ESP32-C3, this includes the Super WDT,
     // the RTC WDT, and the TIMG WDTs.
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let timer_group0 = TimerGroup::new(
+        peripherals.TIMG0,
+        &clocks,
+        &mut system.peripheral_clock_control,
+    );
     let mut wdt = timer_group0.wdt;
 
     wdt.disable();

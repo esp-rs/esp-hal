@@ -23,8 +23,38 @@ jobs:
   # --------------------------------------------------------------------------
   # Check
 
+  esp-hal-smartled:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          target: riscv32imc-unknown-none-elf
+          toolchain: nightly-2023-03-09
+          components: rust-src
+      - uses: esp-rs/xtensa-toolchain@v1.5
+        with:
+          ldproxy: false
+          override: false
+      - uses: Swatinem/rust-cache@v2
+
+      # Check all RISC-V targets:
+      - name: check (esp32c3)
+        run: cd esp-hal-smartled/ && cargo +nightly-2023-03-09 check --features=esp32c3
+      - name: check (esp32c6)
+        run: cd esp-hal-smartled/ && cargo +nightly-2023-03-09 check --features=esp32c6
+      # Check all Xtensa targets:
+      - name: check (esp32)
+        run: cd esp-hal-smartled/ && cargo +esp check --features=esp32,esp32_40mhz
+      - name: check (esp32s2)
+        run: cd esp-hal-smartled/ && cargo +esp check --features=esp32s2
+      - name: check (esp32s3)
+        run: cd esp-hal-smartled/ && cargo +esp check --features=esp32s3
+
   esp32-hal:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v3
       - uses: esp-rs/xtensa-toolchain@v1.5
@@ -41,7 +71,7 @@ jobs:
       # Subsequent steps can just check the examples instead, as we're already
       # confident that they link.
       - name: check esp32-hal (common features)
-        run: cd esp32-hal/ && cargo check --examples --features=eh1,smartled,ufmt
+        run: cd esp32-hal/ && cargo check --examples --features=eh1,ufmt
       - name: check esp32-hal (async)
         run: cd esp32-hal/ && cargo check --example=embassy_hello_world --features=embassy,embassy-time-timg0
       - name: check esp32-hal (async, gpio)
@@ -57,7 +87,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@v1
         with:
           target: riscv32imc-unknown-none-elf
-          toolchain: nightly
+          toolchain: nightly-2023-03-09
           components: rust-src
       - uses: Swatinem/rust-cache@v2
 
@@ -72,15 +102,15 @@ jobs:
       # Subsequent steps can just check the examples instead, as we're already
       # confident that they link.
       - name: check esp32c2-hal (common features)
-        run: cd esp32c2-hal/ && cargo check --examples --features=eh1,ufmt
+        run: cd esp32c2-hal/ && cargo +nightly-2023-03-09 check --examples --features=eh1,ufmt
       - name: check esp32c2-hal (async, systick)
-        run: cd esp32c2-hal/ && cargo check --example=embassy_hello_world --features=embassy,embassy-time-systick
+        run: cd esp32c2-hal/ && cargo +nightly-2023-03-09 check --example=embassy_hello_world --features=embassy,embassy-time-systick
       - name: check esp32c2-hal (async, timg0)
-        run: cd esp32c2-hal/ && cargo check --example=embassy_hello_world --features=embassy,embassy-time-timg0
+        run: cd esp32c2-hal/ && cargo +nightly-2023-03-09 check --example=embassy_hello_world --features=embassy,embassy-time-timg0
       - name: check esp32c2-hal (async, gpio)
-        run: cd esp32c2-hal/ && cargo check --example=embassy_wait --features=embassy,embassy-time-systick,async
+        run: cd esp32c2-hal/ && cargo +nightly-2023-03-09 check --example=embassy_wait --features=embassy,embassy-time-systick,async
       - name: check esp32c2-hal (async, spi)
-        run: cd esp32c2-hal/ && cargo check --example=embassy_spi --features=embassy,embassy-time-systick,async
+        run: cd esp32c2-hal/ && cargo +nightly-2023-03-09 check --example=embassy_spi --features=embassy,embassy-time-systick,async
 
   esp32c3-hal:
     runs-on: ubuntu-latest
@@ -90,7 +120,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@v1
         with:
           target: riscv32imc-unknown-none-elf
-          toolchain: nightly
+          toolchain: nightly-2023-03-09
           components: rust-src
       - uses: Swatinem/rust-cache@v2
 
@@ -99,23 +129,23 @@ jobs:
       # We also use this as an opportunity to verify that the examples link
       # for each supported image format.
       - name: build esp32c3-hal (no features)
-        run: cd esp32c3-hal/ && cargo build --examples
+        run: cd esp32c3-hal/ && cargo +nightly-2023-03-09 build --examples
       - name: build esp32c3-hal (direct-boot)
-        run: cd esp32c3-hal/ && cargo build --examples --features=direct-boot
+        run: cd esp32c3-hal/ && cargo +nightly-2023-03-09 build --examples --features=direct-boot
       - name: build esp32c3-hal (mcu-boot)
-        run: cd esp32c3-hal/ && cargo build --examples --features=mcu-boot
+        run: cd esp32c3-hal/ && cargo +nightly-2023-03-09 build --examples --features=mcu-boot
       # Subsequent steps can just check the examples instead, as we're already
       # confident that they link.
       - name: check esp32c3-hal (common features)
-        run: cd esp32c3-hal/ && cargo check --examples --features=eh1,smartled,ufmt
+        run: cd esp32c3-hal/ && cargo +nightly-2023-03-09 check --examples --features=eh1,ufmt
       - name: check esp32c3-hal (async, systick)
-        run: cd esp32c3-hal/ && cargo check --example=embassy_hello_world --features=embassy,embassy-time-systick
+        run: cd esp32c3-hal/ && cargo +nightly-2023-03-09 check --example=embassy_hello_world --features=embassy,embassy-time-systick
       - name: check esp32c3-hal (async, timg0)
-        run: cd esp32c3-hal/ && cargo check --example=embassy_hello_world --features=embassy,embassy-time-timg0
+        run: cd esp32c3-hal/ && cargo +nightly-2023-03-09 check --example=embassy_hello_world --features=embassy,embassy-time-timg0
       - name: check esp32c3-hal (async, gpio)
-        run: cd esp32c3-hal/ && cargo check --example=embassy_wait --features=embassy,embassy-time-systick,async
+        run: cd esp32c3-hal/ && cargo +nightly-2023-03-09 check --example=embassy_wait --features=embassy,embassy-time-systick,async
       - name: check esp32c3-hal (async, spi)
-        run: cd esp32c3-hal/ && cargo check --example=embassy_spi --features=embassy,embassy-time-systick,async
+        run: cd esp32c3-hal/ && cargo +nightly-2023-03-09 check --example=embassy_spi --features=embassy,embassy-time-systick,async
 
   esp32c6-hal:
     runs-on: ubuntu-latest
@@ -125,7 +155,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@v1
         with:
           target: riscv32imac-unknown-none-elf
-          toolchain: nightly
+          toolchain: nightly-2023-03-09
           components: rust-src
       - uses: Swatinem/rust-cache@v2
 
@@ -134,21 +164,21 @@ jobs:
       # We also use this as an opportunity to verify that the examples link
       # for each supported image format.
       - name: build esp32c6-hal (no features)
-        run: cd esp32c6-hal/ && cargo build --examples
+        run: cd esp32c6-hal/ && cargo +nightly-2023-03-09 build --examples
       - name: build esp32c6-hal (direct-boot)
-        run: cd esp32c6-hal/ && cargo build --examples --features=direct-boot
+        run: cd esp32c6-hal/ && cargo +nightly-2023-03-09 build --examples --features=direct-boot
       # Subsequent steps can just check the examples instead, as we're already
       # confident that they link.
       - name: check esp32c6-hal (common features)
-        run: cd esp32c6-hal/ && cargo check --examples --features=eh1,smartled,ufmt
+        run: cd esp32c6-hal/ && cargo +nightly-2023-03-09 check --examples --features=eh1,ufmt
       - name: check esp32c6-hal (async, systick)
-        run: cd esp32c6-hal/ && cargo check --example=embassy_hello_world --features=embassy,embassy-time-systick
+        run: cd esp32c6-hal/ && cargo +nightly-2023-03-09 check --example=embassy_hello_world --features=embassy,embassy-time-systick
       - name: check esp32c6-hal (async, timg0)
-        run: cd esp32c6-hal/ && cargo check --example=embassy_hello_world --features=embassy,embassy-time-timg0
+        run: cd esp32c6-hal/ && cargo +nightly-2023-03-09 check --example=embassy_hello_world --features=embassy,embassy-time-timg0
       - name: check esp32c6-hal (async, gpio)
-        run: cd esp32c6-hal/ && cargo check --example=embassy_wait --features=embassy,embassy-time-systick,async
+        run: cd esp32c6-hal/ && cargo +nightly-2023-03-09 check --example=embassy_wait --features=embassy,embassy-time-systick,async
       - name: check esp32c6-hal (async, spi)
-        run: cd esp32c6-hal/ && cargo check --example=embassy_spi --features=embassy,embassy-time-systick,async
+        run: cd esp32c6-hal/ && cargo +nightly-2023-03-09 check --example=embassy_spi --features=embassy,embassy-time-systick,async
 
   esp32s2-hal:
     runs-on: ubuntu-latest
@@ -169,7 +199,7 @@ jobs:
       # Subsequent steps can just check the examples instead, as we're already
       # confident that they link.
       - name: check esp32s2-hal (common features)
-        run: cd esp32s2-hal/ && cargo check --examples --features=eh1,smartled,ufmt
+        run: cd esp32s2-hal/ && cargo check --examples --features=eh1,ufmt
       # FIXME: `time-systick` feature disabled for now, see 'esp32s2-hal/Cargo.toml'.
       # - name: check esp32s2-hal (async, systick)
       #   run: cd esp32s2-hal/ && cargo check --example=embassy_hello_world --features=embassy,embassy-time-systick
@@ -203,7 +233,7 @@ jobs:
       # Subsequent steps can just check the examples instead, as we're already
       # confident that they link.
       - name: check esp32s3-hal (common features)
-        run: cd esp32s3-hal/ && cargo check --examples --features=eh1,smartled,ufmt
+        run: cd esp32s3-hal/ && cargo check --examples --features=eh1,ufmt
       - name: check esp32s3-hal (async, systick)
         run: cd esp32s3-hal/ && cargo check --example=embassy_hello_world --features=embassy,embassy-time-systick
       - name: check esp32s3-hal (async, timg0)
@@ -212,6 +242,7 @@ jobs:
         run: cd esp32s3-hal/ && cargo check --example=embassy_wait --features=embassy,embassy-time-timg0,async
       - name: check esp32s3-hal (async, spi)
         run: cd esp32s3-hal/ && cargo check --example=embassy_spi --features=embassy,embassy-time-timg0,async
+
   # --------------------------------------------------------------------------
   # MSRV
 
@@ -230,9 +261,9 @@ jobs:
       - name: msrv (esp32c2-hal)
         run: cd esp32c2-hal/ && cargo check --features=eh1,ufmt
       - name: msrv (esp32c3-hal)
-        run: cd esp32c3-hal/ && cargo check --features=eh1,ufmt,smartled
+        run: cd esp32c3-hal/ && cargo check --features=eh1,ufmt
       - name: msrv (esp32c6-hal)
-        run: cd esp32c6-hal/ && cargo check --features=eh1,ufmt,smartled
+        run: cd esp32c6-hal/ && cargo check --features=eh1,ufmt
 
   msrv-xtensa:
     runs-on: ubuntu-latest
@@ -247,11 +278,11 @@ jobs:
 
       # Verify the MSRV for all Xtensa chips.
       - name: msrv (esp32-hal)
-        run: cd esp32-hal/ && cargo check --features=eh1,ufmt,smartled
+        run: cd esp32-hal/ && cargo check --features=eh1,ufmt
       - name: msrv (esp32s2-hal)
-        run: cd esp32s2-hal/ && cargo check --features=eh1,ufmt,smartled
+        run: cd esp32s2-hal/ && cargo check --features=eh1,ufmt
       - name: msrv (esp32s3-hal)
-        run: cd esp32s3-hal/ && cargo check --features=eh1,ufmt,smartled
+        run: cd esp32s3-hal/ && cargo check --features=eh1,ufmt
 
   # --------------------------------------------------------------------------
   # Lint
@@ -316,6 +347,8 @@ jobs:
         run: cargo fmt --all --manifest-path=esp-hal-common/Cargo.toml -- --check
       - name: rustfmt (esp-hal-procmacros)
         run: cargo fmt --all --manifest-path=esp-hal-procmacros/Cargo.toml -- --check
+      - name: rustfmt (esp-hal-smartled)
+        run: cargo fmt --all --manifest-path=esp-hal-smartled/Cargo.toml -- --check
       - name: rustfmt (esp32-hal)
         run: cargo fmt --all --manifest-path=esp32-hal/Cargo.toml -- --check
       - name: rustfmt (esp32c2-hal)

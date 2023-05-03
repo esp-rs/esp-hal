@@ -3,7 +3,7 @@ use embedded_hal::watchdog::{Watchdog, WatchdogDisable, WatchdogEnable};
 use fugit::HertzU32;
 use fugit::MicrosDurationU64;
 
-use self::rtc::SocResetReason;
+pub use self::rtc::SocResetReason;
 #[cfg(not(esp32c6))]
 use crate::clock::{Clock, XtalClock};
 #[cfg(not(esp32))]
@@ -14,6 +14,7 @@ use crate::peripherals::LP_WDT;
 use crate::peripherals::{RTC_CNTL, TIMG0};
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
+    reset::{SleepSource, WakeupReason},
     Cpu,
 };
 
@@ -37,6 +38,8 @@ extern "C" {
     #[allow(dead_code)]
     fn ets_delay_us(us: u32);
     fn rtc_get_reset_reason(cpu_num: u32) -> u32;
+    pub fn software_reset_cpu();
+    pub fn software_reset();
 }
 
 #[cfg(not(esp32c6))]
@@ -84,23 +87,18 @@ impl Clock for RtcSlowClock {
             RtcSlowClock::RtcSlowClockRtc => HertzU32::Hz(150_000),
             #[cfg(esp32s2)]
             RtcSlowClock::RtcSlowClockRtc => HertzU32::Hz(90_000),
-            #[cfg(any(esp32c2, esp32c3, esp32c6, esp32s3))]
+            #[cfg(any(esp32c2, esp32c3, esp32s3))]
             RtcSlowClock::RtcSlowClockRtc => HertzU32::Hz(136_000),
             RtcSlowClock::RtcSlowClock32kXtal => HertzU32::Hz(32_768),
             #[cfg(any(esp32, esp32s2))]
             RtcSlowClock::RtcSlowClock8mD256 => HertzU32::Hz(8_500_000 / 256),
             #[cfg(any(esp32c2, esp32c3, esp32s3))]
             RtcSlowClock::RtcSlowClock8mD256 => HertzU32::Hz(17_500_000 / 256),
-            #[cfg(esp32c6)]
-            RtcSlowClock::RtcSlowClock32kRc => HertzU32::Hz(32_768),
-            #[cfg(esp32c6)]
-            RtcSlowClock::RtcCalInternalOsc => HertzU32::Hz(32_768),
-            #[cfg(esp32c6)]
-            RtcSlowClock::RtcCalRcFast => HertzU32::Hz(150_000),
         }
     }
 }
 
+#[allow(unused)]
 #[cfg(not(esp32c6))]
 #[derive(Debug, Clone, Copy)]
 /// Clock source to be calibrated using rtc_clk_cal function
@@ -190,28 +188,10 @@ impl RtcClock {
         }
     }
 
-    #[cfg(esp32c6)]
-    fn enable_8m(clk_8m_en: bool, _d256_en: bool) {
-        let pmu = unsafe { &*PMU::PTR };
-
-        if clk_8m_en {
-            pmu.hp_sleep_lp_ck_power
-                .modify(|_, w| w.hp_sleep_xpd_fosc_clk().set_bit());
-
-            unsafe { ets_delay_us(50) };
-        } else {
-            pmu.hp_sleep_lp_ck_power
-                .modify(|_, w| w.hp_sleep_xpd_fosc_clk().clear_bit());
-        }
-    }
-
     /// Get main XTAL frequency
     /// This is the value stored in RTC register RTC_XTAL_FREQ_REG by the
     /// bootloader, as passed to rtc_clk_init function.
     fn get_xtal_freq() -> XtalClock {
-        #[cfg(esp32c6)]
-        let xtal_freq_reg = unsafe { &*LP_AON::PTR }.store4.read().bits();
-        #[cfg(not(esp32c6))]
         let xtal_freq_reg = unsafe { &*RTC_CNTL::PTR }.store4.read().bits();
 
         // Values of RTC_XTAL_FREQ_REG and RTC_APB_FREQ_REG are stored as two copies in
@@ -251,21 +231,6 @@ impl RtcClock {
         }
     }
 
-    /// Get the RTC_SLOW_CLK source
-    #[cfg(esp32c6)]
-    fn get_slow_freq() -> RtcSlowClock {
-        let lp_clrst = unsafe { &*LP_CLKRST::ptr() };
-
-        let slow_freq = lp_clrst.lp_clk_conf.read().slow_clk_sel().bits();
-        match slow_freq {
-            0 => RtcSlowClock::RtcSlowClockRtc,
-            1 => RtcSlowClock::RtcSlowClock32kXtal,
-            2 => RtcSlowClock::RtcSlowClock32kRc,
-            3 => RtcSlowClock::RtcCalInternalOsc,
-            _ => unreachable!(),
-        }
-    }
-
     /// Select source for RTC_SLOW_CLK
     #[cfg(not(esp32c6))]
     fn set_slow_freq(slow_freq: RtcSlowClock) {
@@ -295,11 +260,6 @@ impl RtcClock {
         };
     }
 
-    #[cfg(esp32c6)]
-    fn set_slow_freq(slow_freq: RtcSlowClock) {
-        todo!()
-    }
-
     /// Select source for RTC_FAST_CLK
     #[cfg(not(esp32c6))]
     fn set_fast_freq(fast_freq: RtcFastClock) {
@@ -314,11 +274,6 @@ impl RtcClock {
 
             ets_delay_us(3u32);
         };
-    }
-
-    #[cfg(esp32c6)]
-    fn set_fast_freq(fast_freq: RtcFastClock) {
-        todo!()
     }
 
     /// Calibration of RTC_SLOW_CLK is performed using a special feature of
@@ -469,14 +424,6 @@ impl RtcClock {
         cal_val
     }
 
-    /// Calibration of RTC_SLOW_CLK is performed using a special feature of
-    /// TIMG0. This feature counts the number of XTAL clock cycles within a
-    /// given number of RTC_SLOW_CLK cycles.
-    #[cfg(esp32c6)]
-    fn calibrate_internal(cal_clk: RtcCalSel, slowclk_cycles: u32) -> u32 {
-        todo!()
-    }
-
     /// Measure ratio between XTAL frequency and RTC slow clock frequency
     fn get_calibration_ratio(cal_clk: RtcCalSel, slowclk_cycles: u32) -> u32 {
         let xtal_cycles = RtcClock::calibrate_internal(cal_clk, slowclk_cycles) as u64;
@@ -509,12 +456,6 @@ impl RtcClock {
                 RtcSlowClock::RtcSlowClock32kXtal => RtcCalSel::RtcCal32kXtal,
                 #[cfg(not(esp32c6))]
                 RtcSlowClock::RtcSlowClock8mD256 => RtcCalSel::RtcCal8mD256,
-                #[cfg(esp32c6)]
-                RtcSlowClock::RtcSlowClock32kRc => RtcCalSel::RtcCal32kRc,
-                #[cfg(esp32c6)]
-                RtcSlowClock::RtcCalInternalOsc => RtcCalSel::RtcCalInternalOsc,
-                #[cfg(esp32c6)]
-                RtcSlowClock::RtcCalRcFast => RtcCalSel::RtcCalRcFast,
             },
             1024,
         );
@@ -809,4 +750,81 @@ pub fn get_reset_reason(cpu: Cpu) -> Option<SocResetReason> {
     let reason = SocResetReason::from_repr(reason as usize);
 
     reason
+}
+
+pub fn get_wakeup_cause() -> SleepSource {
+    // FIXME: check s_light_sleep_wakeup
+    // https://github.com/espressif/esp-idf/blob/afbdb0f3ef195ab51690a64e22bfb8a5cd487914/components/esp_hw_support/sleep_modes.c#L1394
+    if get_reset_reason(Cpu::ProCpu).unwrap() != SocResetReason::CoreDeepSleep {
+        return SleepSource::Undefined;
+    }
+
+    #[cfg(esp32c6)]
+    let wakeup_cause = WakeupReason::from_bits_retain(unsafe {
+        (&*crate::peripherals::PMU::PTR)
+            .slp_wakeup_status0
+            .read()
+            .wakeup_cause()
+            .bits()
+    });
+    #[cfg(not(any(esp32, esp32c6)))]
+    let wakeup_cause = WakeupReason::from_bits_retain(unsafe {
+        (&*RTC_CNTL::PTR)
+            .slp_wakeup_cause
+            .read()
+            .wakeup_cause()
+            .bits()
+    });
+    #[cfg(esp32)]
+    let wakeup_cause = WakeupReason::from_bits_retain(unsafe {
+        (&*RTC_CNTL::PTR).wakeup_state.read().wakeup_cause().bits() as u32
+    });
+
+    if wakeup_cause.contains(WakeupReason::TimerTrigEn) {
+        return SleepSource::Timer;
+    }
+    if wakeup_cause.contains(WakeupReason::GpioTrigEn) {
+        return SleepSource::Gpio;
+    }
+    if wakeup_cause.intersects(WakeupReason::Uart0TrigEn | WakeupReason::Uart1TrigEn) {
+        return SleepSource::Uart;
+    }
+
+    #[cfg(pm_support_ext0_wakeup)]
+    if wakeup_cause.contains(WakeupReason::ExtEvent0Trig) {
+        return SleepSource::Ext0;
+    }
+    #[cfg(pm_support_ext1_wakeup)]
+    if wakeup_cause.contains(WakeupReason::ExtEvent1Trig) {
+        return SleepSource::Ext1;
+    }
+
+    #[cfg(pm_support_touch_sensor_wakeup)]
+    if wakeup_cause.contains(WakeupReason::TouchTrigEn) {
+        return SleepSource::TouchPad;
+    }
+
+    #[cfg(ulp_supported)]
+    if wakeup_cause.contains(WakeupReason::UlpTrigEn) {
+        return SleepSource::Ulp;
+    }
+
+    #[cfg(pm_support_wifi_wakeup)]
+    if wakeup_cause.contains(WakeupReason::WifiTrigEn) {
+        return SleepSource::Wifi;
+    }
+
+    #[cfg(pm_support_bt_wakeup)]
+    if wakeup_cause.contains(WakeupReason::BtTrigEn) {
+        return SleepSource::BT;
+    }
+
+    #[cfg(riscv_coproc_supported)]
+    if wakeup_cause.contains(WakeupReason::CocpuTrigEn) {
+        return SleepSource::Ulp;
+    } else if wakeup_cause.contains(WakeupReason::CocpuTrapTrigEn) {
+        return SleepSource::CocpuTrapTrig;
+    }
+
+    return SleepSource::Undefined;
 }

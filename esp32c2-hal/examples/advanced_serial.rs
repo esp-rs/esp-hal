@@ -26,11 +26,15 @@ use nb::block;
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
+    let mut system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let timer_group0 = TimerGroup::new(
+        peripherals.TIMG0,
+        &clocks,
+        &mut system.peripheral_clock_control,
+    );
     let mut timer0 = timer_group0.timer0;
     let mut wdt0 = timer_group0.wdt;
 
@@ -52,7 +56,13 @@ fn main() -> ! {
         io.pins.gpio2.into_floating_input(),
     );
 
-    let mut serial1 = Uart::new_with_config(peripherals.UART1, Some(config), Some(pins), &clocks);
+    let mut serial1 = Uart::new_with_config(
+        peripherals.UART1,
+        Some(config),
+        Some(pins),
+        &clocks,
+        &mut system.peripheral_clock_control,
+    );
 
     timer0.start(250u64.millis());
 

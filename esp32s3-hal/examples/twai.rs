@@ -44,7 +44,11 @@ fn main() -> ! {
     let mut system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let timer_group0 = TimerGroup::new(
+        peripherals.TIMG0,
+        &clocks,
+        &mut system.peripheral_clock_control,
+    );
     let mut wdt = timer_group0.wdt;
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
 
@@ -64,7 +68,7 @@ fn main() -> ! {
     // Begin configuring the TWAI peripheral. The peripheral is in a reset like
     // state that prevents transmission but allows configuration.
     let mut can_config = twai::TwaiConfiguration::new(
-        peripherals.TWAI,
+        peripherals.TWAI0,
         can_tx_pin,
         can_rx_pin,
         &mut system.peripheral_clock_control,

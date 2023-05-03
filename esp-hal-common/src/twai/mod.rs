@@ -11,14 +11,11 @@ use embedded_hal::can::{Can, Error, ErrorKind, ExtendedId, Frame, Id, StandardId
 use fugit::HertzU32;
 
 use self::filter::{Filter, FilterType};
-#[cfg(not(esp32c6))]
-use crate::peripherals::twai::RegisterBlock;
-#[cfg(esp32c6)]
-use crate::peripherals::twai0::RegisterBlock;
 use crate::{
     clock::Clocks,
     gpio::{InputPin, InputSignal, OutputPin, OutputSignal},
     peripheral::{Peripheral, PeripheralRef},
+    peripherals::twai0::RegisterBlock,
     system::{self, PeripheralClockControl},
 };
 
@@ -718,8 +715,8 @@ pub trait Instance {
 }
 
 #[cfg(any(esp32c3, esp32s3))]
-impl Instance for crate::peripherals::TWAI {
-    const SYSTEM_PERIPHERAL: system::Peripheral = system::Peripheral::Twai;
+impl Instance for crate::peripherals::TWAI0 {
+    const SYSTEM_PERIPHERAL: system::Peripheral = system::Peripheral::Twai0;
 
     const INPUT_SIGNAL: InputSignal = InputSignal::TWAI_RX;
     const OUTPUT_SIGNAL: OutputSignal = OutputSignal::TWAI_TX;

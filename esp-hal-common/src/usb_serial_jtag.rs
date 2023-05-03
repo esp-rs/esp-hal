@@ -3,6 +3,7 @@ use core::convert::Infallible;
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{usb_device::RegisterBlock, USB_DEVICE},
+    system::PeripheralClockControl,
 };
 
 pub struct UsbSerialJtag<'d, T> {
@@ -17,8 +18,13 @@ where
     T: Instance,
 {
     /// Create a new USB serial/JTAG instance with defaults
-    pub fn new(usb_serial: impl Peripheral<P = T> + 'd) -> Self {
+    pub fn new(
+        usb_serial: impl Peripheral<P = T> + 'd,
+        peripheral_clock_control: &mut PeripheralClockControl,
+    ) -> Self {
         crate::into_ref!(usb_serial);
+        // #[cfg(usb_device)]
+        peripheral_clock_control.enable(crate::system::Peripheral::Sha);
         let mut dev = Self { usb_serial };
         dev.usb_serial.disable_rx_interrupts();
         dev.usb_serial.disable_tx_interrupts();

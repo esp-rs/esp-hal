@@ -1,0 +1,57 @@
+[device]
+arch  = "riscv"
+cores = "single_core"
+
+peripherals = [
+    # Peripherals available in the PAC:
+    "aes",
+    "apb_ctrl",
+    "apb_saradc",
+    "assist_debug",
+    "dma",
+    "ds",
+    "efuse",
+    "extmem",
+    "gpio",
+    "gpio_sd",
+    "hmac",
+    "i2c0",
+    "i2s0",
+    "interrupt_core0",
+    "io_mux",
+    "ledc",
+    "rmt",
+    "rng",
+    "rsa",
+    "rtc_cntl",
+    "sensitive",
+    "sha",
+    "spi0",
+    "spi1",
+    "spi2",
+    "system",
+    "systimer",
+    "timg0",
+    "timg1",
+    "twai0",
+    "uart0",
+    "uart1",
+    "uhci0",
+    "uhci1",
+    "usb_device",
+    "xts_aes",
+
+    # Additional peripherals defined by us (the developers):
+    "adc",
+    "gdma",
+    "radio",
+    "phy",
+    "bt",
+    "wifi",
+
+    # Wakeup SOC based on ESP-IDF:
+    "pm_support_wifi_wakeup",
+    "pm_support_bt_wakeup",
+    "uart_support_wakeup_int",
+    "gpio_support_deepsleep_wakeup",
+]

@@ -1,6 +1,6 @@
 use crate::{
     peripheral::PeripheralRef,
-    peripherals::{RTCIO, SENS},
+    peripherals::{RTC_IO, SENS},
 };
 pub trait DAC {
     fn write(&mut self, value: u8);
@@ -20,7 +20,7 @@ pub trait DAC1Impl {
                 .modify(|_, w| w.dac_clkgate_en().set_bit());
         }
 
-        let rtcio = unsafe { &*RTCIO::ptr() };
+        let rtcio = unsafe { &*RTC_IO::ptr() };
 
         rtcio.pad_dac1.modify(|_, w| {
             w.pdac1_dac_xpd_force().set_bit();
@@ -31,7 +31,7 @@ pub trait DAC1Impl {
     }
 
     fn write(&mut self, value: u8) {
-        let rtcio = unsafe { &*RTCIO::ptr() };
+        let rtcio = unsafe { &*RTC_IO::ptr() };
 
         let sensors = unsafe { &*SENS::ptr() };
         sensors
@@ -58,7 +58,7 @@ pub trait DAC2Impl {
                 .modify(|_, w| w.dac_clkgate_en().set_bit());
         }
 
-        let rtcio = unsafe { &*RTCIO::ptr() };
+        let rtcio = unsafe { &*RTC_IO::ptr() };
 
         rtcio.pad_dac2.modify(|_, w| {
             w.pdac2_dac_xpd_force().set_bit();
@@ -69,7 +69,7 @@ pub trait DAC2Impl {
     }
 
     fn write(&mut self, value: u8) {
-        let rtcio = unsafe { &*RTCIO::ptr() };
+        let rtcio = unsafe { &*RTC_IO::ptr() };
 
         let sensors = unsafe { &*SENS::ptr() };
         sensors

@@ -16,7 +16,7 @@ use esp32s2_hal::{
     pdma::*,
     peripherals::Peripherals,
     prelude::*,
-    spi::{dma::SpiDma, Spi, SpiMode},
+    spi::{dma::SpiDma, FullDuplexMode, Spi, SpiMode},
     timer::TimerGroup,
     Rtc,
     IO,
@@ -39,6 +39,7 @@ pub type SpiType<'d> = SpiDma<
     ChannelTx<'d, Spi2DmaChannelTxImpl, Spi2DmaChannel>,
     ChannelRx<'d, Spi2DmaChannelRxImpl, Spi2DmaChannel>,
     Spi2DmaSuitablePeripheral,
+    FullDuplexMode,
 >;
 
 #[embassy_executor::task]
@@ -65,9 +66,17 @@ fn main() -> ! {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let timer_group0 = TimerGroup::new(
+        peripherals.TIMG0,
+        &clocks,
+        &mut system.peripheral_clock_control,
+    );
     let mut wdt0 = timer_group0.wdt;
-    let timer_group1 = TimerGroup::new(peripherals.TIMG1, &clocks);
+    let timer_group1 = TimerGroup::new(
+        peripherals.TIMG1,
+        &clocks,
+        &mut system.peripheral_clock_control,
+    );
     let mut wdt1 = timer_group1.wdt;
 
     // Disable watchdog timers

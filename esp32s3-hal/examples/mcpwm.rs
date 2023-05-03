@@ -23,7 +23,11 @@ fn main() -> ! {
     let mut system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let timer_group0 = TimerGroup::new(
+        peripherals.TIMG0,
+        &clocks,
+        &mut system.peripheral_clock_control,
+    );
     let mut wdt = timer_group0.wdt;
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
 
@@ -37,7 +41,7 @@ fn main() -> ! {
     // initialize peripheral
     let clock_cfg = PeripheralClockConfig::with_frequency(&clocks, 40u32.MHz()).unwrap();
     let mut mcpwm = MCPWM::new(
-        peripherals.PWM0,
+        peripherals.MCPWM0,
         clock_cfg,
         &mut system.peripheral_clock_control,
     );

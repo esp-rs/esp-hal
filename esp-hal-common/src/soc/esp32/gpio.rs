@@ -572,8 +572,8 @@ pub enum OutputSignal {
 }
 
 pub(crate) fn errata36(pin_num: u8, pull_up: bool, pull_down: bool) {
-    use crate::peripherals::RTCIO;
-    let rtcio = unsafe { &*RTCIO::PTR };
+    use crate::peripherals::RTC_IO;
+    let rtcio = unsafe { &*RTC_IO::PTR };
 
     match pin_num {
         0 => {

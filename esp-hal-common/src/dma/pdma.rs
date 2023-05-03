@@ -529,11 +529,7 @@ impl PeripheralMarker for I2s0DmaSuitablePeripheral {}
 impl I2sPeripheral for I2s0DmaSuitablePeripheral {}
 impl I2s0Peripheral for I2s0DmaSuitablePeripheral {}
 
-#[cfg(esp32)]
 ImplI2sChannel!(0, "I2S0");
-
-#[cfg(esp32s2)]
-ImplI2sChannel!(0, "I2S");
 
 pub struct I2s1DmaSuitablePeripheral {}
 impl PeripheralMarker for I2s1DmaSuitablePeripheral {}

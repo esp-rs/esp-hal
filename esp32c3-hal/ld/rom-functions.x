@@ -10,3 +10,5 @@ PROVIDE(ets_update_cpu_frequency_rom = 0x40000588);
 PROVIDE(rom_i2c_writeReg = 0x4000195c);
 PROVIDE(rom_i2c_writeReg_Mask = 0x40001960);
 PROVIDE(rtc_get_reset_reason = 0x40000018);
+PROVIDE(software_reset = 0x40000090);
+PROVIDE(software_reset_cpu = 0x40000094);

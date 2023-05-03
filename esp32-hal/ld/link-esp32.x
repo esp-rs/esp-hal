@@ -11,74 +11,39 @@ PROVIDE(__init_data = default_mem_hook);
 
 INCLUDE exception.x
 
+/* map generic regions to output sections */
+INCLUDE "alias.x"
+
+/* ESP32 fixups */
+INCLUDE "fixups/rtc_fast_rwdata_dummy.x"
+/* END ESP32 fixups */
+
+/* Shared sections - ordering matters */
+INCLUDE "text.x"
+INCLUDE "rodata.x"
+INCLUDE "rwtext.x"
+INCLUDE "rwdata.x"
+INCLUDE "rtc_fast.x"
+INCLUDE "rtc_slow.x"
+INCLUDE "external.x"
+/* End of Shared sections */
+
+/* an uninitialized section for use as the wifi-heap in esp-wifi */
 SECTIONS {
-  .text : ALIGN(4)
-  {
-    _stext = .;
-    . = ALIGN (4);
-    _text_start = ABSOLUTE(.);
-    . = ALIGN (4);
-    *(.literal .text .literal.* .text.*)
-    _text_end = ABSOLUTE(.);
-    _etext = .;
-  } > ROTEXT
-
-  .rodata : ALIGN(4)
-  {
-    _rodata_start = ABSOLUTE(.);
-    . = ALIGN (4);
-    *(.rodata .rodata.*)
-    _rodata_end = ABSOLUTE(.);
-  } > RODATA
-
-  .rodata.wifi :
-  {
-    . = ALIGN(4);
-    *( .rodata_wlog_*.* )
-  } > RODATA AT > RODATA
-
-  .data : ALIGN(4)
-  {
-    _data_start = ABSOLUTE(.);
-    . = ALIGN (4);
-    *(.data .data.*)
-    _data_end = ABSOLUTE(.);
-  } > RWDATA AT > RODATA
-
-  /* LMA of .data */
-  _sidata = LOADADDR(.data);
-
-  .bss (NOLOAD) : ALIGN(4)
-  {
-    _bss_start = ABSOLUTE(.);
-    . = ALIGN (4);
-    *(.bss .bss.* COMMON)
-    _bss_end = ABSOLUTE(.);
-  } > RWDATA
-
-  .noinit (NOLOAD) : ALIGN(4)
-  {
-    . = ALIGN(4);
-    *(.noinit .noinit.*)
-  } > RWDATA
-
-  .rwtext : ALIGN(4)
-  {
-    . = ALIGN (4);
-    *(.rwtext.literal .rwtext .rwtext.literal.* .rwtext.*)
-  } > RWTEXT
-
- /* must be last segment using RWTEXT */
-  .text_heap_start (NOLOAD) : ALIGN(4)
-  {
-    . = ALIGN (4);
-    _text_heap_start = ABSOLUTE(.);
-  } > RWTEXT
-
- /* must be last segment using RWDATA */
-  .heap_start (NOLOAD) : ALIGN(4)
-  {
-    . = ALIGN (4);
-    _heap_start = ABSOLUTE(.);
-  } > RWDATA
+    .dram2_uninit (NOLOAD) : ALIGN(4) {
+        *(.dram2_uninit)
+    } > dram2_seg
 }
+
+_heap_end = ABSOLUTE(ORIGIN(dram_seg))+LENGTH(dram_seg) - 2*STACK_SIZE;
+
+_stack_start_cpu1 = _heap_end;
+_stack_end_cpu1 = _stack_start_cpu1 + STACK_SIZE;
+_stack_start_cpu0 = _stack_end_cpu1;
+_stack_end_cpu0 = _stack_start_cpu0 + STACK_SIZE;
+
+EXTERN(DefaultHandler);
+
+EXTERN(WIFI_EVENT); /* Force inclusion of WiFi libraries */
+
+INCLUDE "device.x"

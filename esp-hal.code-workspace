@@ -7,6 +7,9 @@
       "path": "esp-hal-procmacros"
     },
     {
+      "path": "esp-hal-smartled"
+    },
+    {
       "path": "esp32-hal"
     },
     {

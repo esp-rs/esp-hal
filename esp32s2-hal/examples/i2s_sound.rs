@@ -57,7 +57,11 @@ fn main() -> ! {
     let mut system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let timer_group0 = TimerGroup::new(
+        peripherals.TIMG0,
+        &clocks,
+        &mut system.peripheral_clock_control,
+    );
     let mut wdt = timer_group0.wdt;
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
 
@@ -74,7 +78,7 @@ fn main() -> ! {
     let mut rx_descriptors = [0u32; 8 * 3];
 
     let i2s = I2s::new(
-        peripherals.I2S,
+        peripherals.I2S0,
         MclkPin::new(io.pins.gpio4),
         Standard::Philips,
         DataFormat::Data16Channel16,
