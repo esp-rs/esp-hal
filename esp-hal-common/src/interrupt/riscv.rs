@@ -620,7 +620,10 @@ unsafe fn get_assigned_cpu_interrupt(interrupt: Interrupt) -> CpuInterrupt {
 #[inline(always)]
 unsafe fn handle_priority() -> u32 {
     let interrupt_id: usize = mcause::read().code(); // MSB is whether its exception or interrupt.
+    #[cfg(not(esp32c6))]
     let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
+    #[cfg(esp32c6)]
+    let intr = &*crate::peripherals::INTPRI::PTR;
     let interrupt_priority = intr
         .cpu_int_pri_0
         .as_ptr()
@@ -640,7 +643,10 @@ unsafe fn handle_priority() -> u32 {
 #[cfg(feature = "interrupt-preemption")]
 #[inline(always)]
 unsafe fn restore_priority(stored_prio: u32) {
+    #[cfg(not(esp32c6))]
     let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
+    #[cfg(esp32c6)]
+    let intr = &*crate::peripherals::INTPRI::PTR;
     intr.cpu_int_thresh.write(|w| w.bits(stored_prio)); // set the prio
                                                         // threshold to 1 more
                                                         // than current
