@@ -527,8 +527,6 @@ pub fn _setup_interrupts() {
     unsafe {
         core::arch::asm!("csrw mie, {0}", in(reg) u32::MAX);
     }
-
-    crate::common_init();
 }
 
 /// Disable the given peripheral interrupt.

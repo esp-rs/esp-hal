@@ -1,10 +1,23 @@
-#[cfg(not(any(feature = "psram_2m", feature = "psram_4m", feature = "psram_8m")))]
-pub(crate) fn init_psram() {
-    // nothing to do
+const PSRAM_VADDR: u32 = 0x3f500000;
+
+cfg_if::cfg_if! {
+    if #[cfg(feature = "psram_2m")] {
+        const PSRAM_SIZE: u32 = 2;
+    } else if #[cfg(feature = "psram_4m")] {
+        const PSRAM_SIZE: u32 = 4;
+    } else if #[cfg(feature = "psram_8m")] {
+        const PSRAM_SIZE: u32 = 8;
+    } else {
+        const PSRAM_SIZE: u32 = 0;
+    }
 }
 
+pub const PSRAM_BYTES: usize = PSRAM_SIZE as usize * 1024 * 1024;
+
+pub const PSRAM_VADDR_START: usize = PSRAM_VADDR as usize;
+
 #[cfg(any(feature = "psram_2m", feature = "psram_4m", feature = "psram_8m"))]
-pub(crate) fn init_psram() {
+pub fn init_psram(_peripheral: impl crate::peripheral::Peripheral<P = crate::peripherals::PSRAM>) {
     #[allow(unused)]
     enum CacheLayout {
         CacheMemoryInvalid    = 0,
@@ -79,24 +92,6 @@ pub(crate) fn init_psram() {
         Cache_Invalidate_DCache_All();
 
         const START_PAGE: u32 = 0;
-
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "psram_2m")] {
-                const PSRAM_SIZE: u32 = 2;
-            } else if #[cfg(feature = "psram_4m")] {
-                const PSRAM_SIZE: u32 = 4;
-            } else if #[cfg(feature = "psram_8m")] {
-                const PSRAM_SIZE: u32 = 8;
-            } else {
-                const PSRAM_SIZE: u32 = 0;
-            }
-        };
-
-        #[no_mangle]
-        static PSRAM_BYTES: usize = PSRAM_SIZE as usize * 1024 * 1024;
-
-        #[no_mangle]
-        static PSRAM_VADDR_START: usize = PSRAM_VADDR as usize;
 
         if cache_dbus_mmu_set(
             MMU_ACCESS_SPIRAM,
