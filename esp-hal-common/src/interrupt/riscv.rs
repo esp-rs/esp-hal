@@ -602,22 +602,20 @@ unsafe fn get_assigned_cpu_interrupt(interrupt: Interrupt) -> CpuInterrupt {
 
     core::mem::transmute(cpu_intr)
 }
-#[cfg(feature = "interrupt-preemption")]
+#[cfg(all(feature = "interrupt-preemption", not(esp32c6)))]
 use procmacros::ram;
-#[cfg(feature = "interrupt-preemption")]
+#[cfg(all(feature = "interrupt-preemption", not(esp32c6)))]
 #[ram]
 unsafe fn handle_priority() -> u32 {
     use crate::riscv;
     let interrupt_id: usize = mcause::read().code(); // MSB is whether its exception or interrupt.
-    #[cfg(not(esp32c6))]
     let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
-    #[cfg(esp32c6)]
-    let intr = &*crate::peripherals::INTPRI::PTR;
     let interrupt_priority = intr
         .cpu_int_pri_0
         .as_ptr()
         .offset(interrupt_id as isize)
         .read_volatile();
+
     let prev_interrupt_priority = intr.cpu_int_thresh.read().bits();
     if interrupt_priority < 15 {
         // leave interrupts disabled if interrupt is of max priority.
@@ -629,17 +627,14 @@ unsafe fn handle_priority() -> u32 {
     }
     prev_interrupt_priority
 }
-#[cfg(feature = "interrupt-preemption")]
+#[cfg(all(feature = "interrupt-preemption", not(esp32c6)))]
 #[ram]
 unsafe fn restore_priority(stored_prio: u32) {
     use crate::riscv;
     unsafe {
         riscv::interrupt::disable();
     }
-    #[cfg(not(esp32c6))]
     let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
-    #[cfg(esp32c6)]
-    let intr = &*crate::peripherals::INTPRI::PTR;
     intr.cpu_int_thresh.write(|w| w.bits(stored_prio));
 }
 
@@ -745,6 +740,10 @@ mod plic {
     const PLIC_MXINT_CLEAR_REG: u32 = DR_REG_PLIC_MX_BASE + 0x8;
     const PLIC_MXINT0_PRI_REG: u32 = DR_REG_PLIC_MX_BASE + 0x10;
 
+    #[cfg(feature = "interrupt-preemption")]
+    const DR_REG_PLIC_UX_BASE: u32 = 0x20001400; // https://github.com/espressif/esp-idf/blob/56123c52aaa08f1b53350c7af30c91320b352ef4/components/soc/esp32c6/include/soc/reg_base.h#L8
+    #[cfg(feature = "interrupt-preemption")]
+    const PLIC_UXINT_THRESH_REG: u32 = DR_REG_PLIC_UX_BASE + 0x90; // https://github.com/espressif/esp-idf/blob/56123c52aaa08f1b53350c7af30c91320b352ef4/components/soc/esp32c6/include/soc/plic_reg.h#LL613C9-L613C30
     /// Enable a CPU interrupt
     pub unsafe fn enable_cpu_interrupt(which: CpuInterrupt) {
         let cpu_interrupt_number = which as isize;
@@ -809,5 +808,39 @@ mod plic {
             .offset(cpu_interrupt_number)
             .read_volatile();
         core::mem::transmute(prio as u8)
+    }
+    #[cfg(all(feature = "interrupt-preemption", esp32c6))]
+    use procmacros::ram;
+    #[cfg(all(feature = "interrupt-preemption", esp32c6))]
+    #[ram]
+    pub(super) unsafe fn handle_priority() -> u32 {
+        use super::mcause;
+        use crate::riscv;
+        let plic_mxint_pri_ptr = PLIC_MXINT0_PRI_REG as *mut u32;
+        let interrupt_id: isize = mcause::read().code().try_into().unwrap(); // MSB is whether its exception or interrupt.
+        let interrupt_priority = plic_mxint_pri_ptr.offset(interrupt_id).read_volatile();
+
+        let thresh_reg = PLIC_UXINT_THRESH_REG as *mut u32;
+        let prev_interrupt_priority = thresh_reg.read_volatile() & 0x000000FF;
+        // this is a u8 according to esp-idf, so mask everything else.
+        if interrupt_priority < 15 {
+            // leave interrupts disabled if interrupt is of max priority.
+            thresh_reg.write_volatile(interrupt_priority); // according to PLIC spec, interrupts at threshold prio are masked as well, so +
+                                                           // 1 is not needed.
+            unsafe {
+                riscv::interrupt::enable();
+            }
+        }
+        prev_interrupt_priority
+    }
+    #[cfg(all(feature = "interrupt-preemption", esp32c6))]
+    #[ram]
+    pub(super) unsafe fn restore_priority(stored_prio: u32) {
+        use crate::riscv;
+        unsafe {
+            riscv::interrupt::disable();
+        }
+        let thresh_reg = PLIC_UXINT_THRESH_REG as *mut u32;
+        thresh_reg.write_volatile(stored_prio);
     }
 }
