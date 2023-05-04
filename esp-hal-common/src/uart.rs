@@ -1099,15 +1099,42 @@ mod asynch {
         }
     }
 
+    #[cfg(uart0)]
     #[interrupt]
     fn UART0() {
-        let uart0 = unsafe { &*crate::peripherals::UART0::ptr() };
-        uart0.int_ena.modify(|_, w| {
+        let uart = unsafe { &*crate::peripherals::UART0::ptr() };
+        uart.int_ena.modify(|_, w| {
             w.txfifo_empty_int_ena()
                 .clear_bit()
                 .tx_done_int_ena()
                 .clear_bit()
         });
         WAKERS[0].wake();
+    }
+
+    #[cfg(uart1)]
+    #[interrupt]
+    fn UART1() {
+        let uart = unsafe { &*crate::peripherals::UART1::ptr() };
+        uart.int_ena.modify(|_, w| {
+            w.txfifo_empty_int_ena()
+                .clear_bit()
+                .tx_done_int_ena()
+                .clear_bit()
+        });
+        WAKERS[1].wake();
+    }
+
+    #[cfg(uart2)]
+    #[interrupt]
+    fn UART2() {
+        let uart = unsafe { &*crate::peripherals::UART2::ptr() };
+        uart.int_ena.modify(|_, w| {
+            w.txfifo_empty_int_ena()
+                .clear_bit()
+                .tx_done_int_ena()
+                .clear_bit()
+        });
+        WAKERS[2].wake();
     }
 }
