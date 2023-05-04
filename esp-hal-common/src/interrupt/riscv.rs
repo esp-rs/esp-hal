@@ -21,7 +21,6 @@ pub use self::classic::*;
 pub use self::plic::*;
 use crate::{
     peripherals::{self, Interrupt},
-    riscv,
     Cpu,
 };
 
@@ -604,8 +603,11 @@ unsafe fn get_assigned_cpu_interrupt(interrupt: Interrupt) -> CpuInterrupt {
     core::mem::transmute(cpu_intr)
 }
 #[cfg(feature = "interrupt-preemption")]
+use procmacros::ram;
+#[cfg(feature = "interrupt-preemption")]
 #[ram]
 unsafe fn handle_priority() -> u32 {
+    use crate::riscv;
     let interrupt_id: usize = mcause::read().code(); // MSB is whether its exception or interrupt.
     #[cfg(not(esp32c6))]
     let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
@@ -630,14 +632,15 @@ unsafe fn handle_priority() -> u32 {
 #[cfg(feature = "interrupt-preemption")]
 #[ram]
 unsafe fn restore_priority(stored_prio: u32) {
+    use crate::riscv;
+    unsafe {
+        riscv::interrupt::disable();
+    }
     #[cfg(not(esp32c6))]
     let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
     #[cfg(esp32c6)]
     let intr = &*crate::peripherals::INTPRI::PTR;
     intr.cpu_int_thresh.write(|w| w.bits(stored_prio));
-    unsafe {
-        riscv::interrupt::disable();
-    }
 }
 
 #[cfg(not(plic))]
