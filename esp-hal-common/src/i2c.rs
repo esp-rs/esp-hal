@@ -254,14 +254,14 @@ where
         scl.set_to_open_drain_output()
             .enable_input(true)
             .internal_pull_up(true)
-            .connect_peripheral_to_output(OutputSignal::I2CEXT0_SCL)
-            .connect_input_to_peripheral(InputSignal::I2CEXT0_SCL);
+            .connect_peripheral_to_output(i2c.peripheral.scl_output_signal())
+            .connect_input_to_peripheral(i2c.peripheral.scl_input_signal());
 
         sda.set_to_open_drain_output()
             .enable_input(true)
             .internal_pull_up(true)
-            .connect_peripheral_to_output(OutputSignal::I2CEXT0_SDA)
-            .connect_input_to_peripheral(InputSignal::I2CEXT0_SDA);
+            .connect_peripheral_to_output(i2c.peripheral.sda_output_signal())
+            .connect_input_to_peripheral(i2c.peripheral.sda_input_signal());
 
         i2c.peripheral.setup(frequency, clocks);
 
@@ -286,6 +286,11 @@ fn enable_peripheral<'d, T>(
 
 /// I2C Peripheral Instance
 pub trait Instance {
+    fn scl_output_signal(&self) -> OutputSignal;
+    fn scl_input_signal(&self) -> InputSignal;
+    fn sda_output_signal(&self) -> OutputSignal;
+    fn sda_input_signal(&self) -> InputSignal;
+
     fn register_block(&self) -> &RegisterBlock;
 
     fn i2c_number(&self) -> usize;
@@ -1199,6 +1204,25 @@ fn write_fifo(register_block: &RegisterBlock, data: u8) {
 
 impl Instance for crate::peripherals::I2C0 {
     #[inline(always)]
+    fn scl_output_signal(&self) -> OutputSignal {
+        OutputSignal::I2CEXT0_SCL
+    }
+
+    #[inline(always)]
+    fn scl_input_signal(&self) -> InputSignal {
+        InputSignal::I2CEXT0_SCL
+    }
+
+    #[inline(always)]
+    fn sda_output_signal(&self) -> OutputSignal {
+        OutputSignal::I2CEXT0_SDA
+    }
+
+    fn sda_input_signal(&self) -> InputSignal {
+        InputSignal::I2CEXT0_SDA
+    }
+
+    #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
         self
     }
@@ -1211,6 +1235,25 @@ impl Instance for crate::peripherals::I2C0 {
 
 #[cfg(i2c1)]
 impl Instance for crate::peripherals::I2C1 {
+    #[inline(always)]
+    fn scl_output_signal(&self) -> OutputSignal {
+        OutputSignal::I2CEXT1_SCL
+    }
+
+    #[inline(always)]
+    fn scl_input_signal(&self) -> InputSignal {
+        InputSignal::I2CEXT1_SCL
+    }
+
+    #[inline(always)]
+    fn sda_output_signal(&self) -> OutputSignal {
+        OutputSignal::I2CEXT1_SDA
+    }
+
+    fn sda_input_signal(&self) -> InputSignal {
+        InputSignal::I2CEXT1_SDA
+    }
+
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
         self
