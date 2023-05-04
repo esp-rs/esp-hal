@@ -604,7 +604,7 @@ unsafe fn get_assigned_cpu_interrupt(interrupt: Interrupt) -> CpuInterrupt {
     core::mem::transmute(cpu_intr)
 }
 #[cfg(feature = "interrupt-preemption")]
-#[inline(always)]
+#[ram]
 unsafe fn handle_priority() -> u32 {
     let interrupt_id: usize = mcause::read().code(); // MSB is whether its exception or interrupt.
     #[cfg(not(esp32c6))]
