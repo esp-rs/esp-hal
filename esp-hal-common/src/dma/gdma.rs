@@ -442,6 +442,8 @@ macro_rules! impl_channel {
             // with GDMA every channel can be used for any peripheral
             impl SpiPeripheral for [<SuitablePeripheral $num>] {}
             impl Spi2Peripheral for [<SuitablePeripheral $num>] {}
+            #[cfg(esp32s3)]
+            impl Spi3Peripheral for [<SuitablePeripheral $num>] {}
             impl I2sPeripheral for [<SuitablePeripheral $num>] {}
             impl I2s0Peripheral for [<SuitablePeripheral $num>] {}
             impl I2s1Peripheral for [<SuitablePeripheral $num>] {}

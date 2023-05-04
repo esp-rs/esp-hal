@@ -732,7 +732,7 @@ pub mod dma {
 
     use embedded_dma::{ReadBuffer, WriteBuffer};
 
-    #[cfg(any(esp32, esp32s2))]
+    #[cfg(any(esp32, esp32s2, esp32s3))]
     use super::Spi3Instance;
     use super::{
         Address,
@@ -747,7 +747,7 @@ pub mod dma {
         SpiDataMode,
         MAX_DMA_SIZE,
     };
-    #[cfg(any(esp32, esp32s2))]
+    #[cfg(any(esp32, esp32s2, esp32s3))]
     use crate::dma::Spi3Peripheral;
     use crate::{
         dma::{Channel, DmaTransfer, DmaTransferRxTx, Rx, Spi2Peripheral, SpiPeripheral, Tx},
@@ -765,7 +765,7 @@ pub mod dma {
         fn with_dma(self, channel: Channel<TX, RX, P>) -> SpiDma<'d, T, TX, RX, P, M>;
     }
 
-    #[cfg(any(esp32, esp32s2))]
+    #[cfg(any(esp32, esp32s2, esp32s3))]
     pub trait WithDmaSpi3<'d, T, RX, TX, P, M>
     where
         T: Instance + Spi3Instance,
@@ -796,7 +796,7 @@ pub mod dma {
         }
     }
 
-    #[cfg(any(esp32, esp32s2))]
+    #[cfg(any(esp32, esp32s2, esp32s3))]
     impl<'d, T, RX, TX, P, M> WithDmaSpi3<'d, T, RX, TX, P, M> for Spi<'d, T, M>
     where
         T: Instance + Spi3Instance,
@@ -1944,7 +1944,7 @@ where
     fn dma_peripheral(&self) -> DmaPeripheral {
         match self.spi_num() {
             2 => DmaPeripheral::Spi2,
-            #[cfg(any(esp32, esp32s2))]
+            #[cfg(any(esp32, esp32s2, esp32s3))]
             3 => DmaPeripheral::Spi3,
             _ => panic!("Illegal SPI instance"),
         }

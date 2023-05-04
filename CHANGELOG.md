@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- DMA is supported for SPI3 on ESP32-S3 (#507)
+
 ## [0.9.0] - 2023-05-02
 
 ### Added
