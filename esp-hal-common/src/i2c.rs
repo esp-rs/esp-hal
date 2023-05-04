@@ -290,7 +290,7 @@ pub trait Instance {
     fn scl_input_signal(&self) -> InputSignal;
     fn sda_output_signal(&self) -> OutputSignal;
     fn sda_input_signal(&self) -> InputSignal;
-    
+
     fn register_block(&self) -> &RegisterBlock;
 
     fn i2c_number(&self) -> usize;
@@ -1217,7 +1217,7 @@ impl Instance for crate::peripherals::I2C0 {
     fn sda_output_signal(&self) -> OutputSignal {
         OutputSignal::I2CEXT0_SDA
     }
-    
+
     fn sda_input_signal(&self) -> InputSignal {
         InputSignal::I2CEXT0_SDA
     }
@@ -1249,11 +1249,11 @@ impl Instance for crate::peripherals::I2C1 {
     fn sda_output_signal(&self) -> OutputSignal {
         OutputSignal::I2CEXT1_SDA
     }
-    
+
     fn sda_input_signal(&self) -> InputSignal {
         InputSignal::I2CEXT1_SDA
     }
-    
+
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
         self
