@@ -9,7 +9,7 @@
 
 use embassy_executor::Executor;
 use embassy_time::{Duration, Timer};
-use esp32c3_hal::{
+use esp32s2_hal::{
     clock::ClockControl,
     embassy,
     peripherals::{Interrupt, Peripherals, UART0},
@@ -58,23 +58,16 @@ fn main() -> ! {
     let mut wdt1 = timer_group1.wdt;
 
     // Disable watchdog timers
-    rtc.swd.disable();
     rtc.rwdt.disable();
     wdt0.disable();
     wdt1.disable();
-
-    #[cfg(feature = "embassy-time-systick")]
-    embassy::init(
-        &clocks,
-        esp32c3_hal::systimer::SystemTimer::new(peripherals.SYSTIMER),
-    );
 
     #[cfg(feature = "embassy-time-timg0")]
     embassy::init(&clocks, timer_group0.timer0);
 
     let uart0 = Uart::new(peripherals.UART0, &mut system.peripheral_clock_control);
 
-    esp32c3_hal::interrupt::enable(Interrupt::UART0, esp32c3_hal::Priority::Priority1).unwrap();
+    esp32s2_hal::interrupt::enable(Interrupt::UART0, esp32s2_hal::Priority::Priority1).unwrap();
 
     let executor = EXECUTOR.init(Executor::new());
     executor.run(|spawner| {

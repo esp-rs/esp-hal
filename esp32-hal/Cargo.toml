@@ -88,3 +88,7 @@ required-features = ["embassy", "async"]
 [[example]]
 name              = "psram"
 required-features = ["psram_2m"]
+
+[[example]]
+name              = "embassy_serial"
+required-features = ["embassy", "async"]

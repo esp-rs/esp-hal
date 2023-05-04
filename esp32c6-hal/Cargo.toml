@@ -85,3 +85,7 @@ required-features = ["embassy", "async"]
 [[example]]
 name = "interrupt_preemption"
 required-features = ["interrupt-preemption"]
+
+[[example]]
+name              = "embassy_serial"
+required-features = ["embassy", "async"]

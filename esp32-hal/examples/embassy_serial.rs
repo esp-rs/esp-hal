@@ -9,7 +9,7 @@
 
 use embassy_executor::Executor;
 use embassy_time::{Duration, Timer};
-use esp32c3_hal::{
+use esp32_hal::{
     clock::ClockControl,
     embassy,
     peripherals::{Interrupt, Peripherals, UART0},
@@ -40,7 +40,7 @@ static EXECUTOR: StaticCell<Executor> = StaticCell::new();
 fn main() -> ! {
     esp_println::println!("Init!");
     let peripherals = Peripherals::take();
-    let mut system = peripherals.SYSTEM.split();
+    let mut system = peripherals.DPORT.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
@@ -58,23 +58,16 @@ fn main() -> ! {
     let mut wdt1 = timer_group1.wdt;
 
     // Disable watchdog timers
-    rtc.swd.disable();
     rtc.rwdt.disable();
     wdt0.disable();
     wdt1.disable();
-
-    #[cfg(feature = "embassy-time-systick")]
-    embassy::init(
-        &clocks,
-        esp32c3_hal::systimer::SystemTimer::new(peripherals.SYSTIMER),
-    );
 
     #[cfg(feature = "embassy-time-timg0")]
     embassy::init(&clocks, timer_group0.timer0);
 
     let uart0 = Uart::new(peripherals.UART0, &mut system.peripheral_clock_control);
 
-    esp32c3_hal::interrupt::enable(Interrupt::UART0, esp32c3_hal::Priority::Priority1).unwrap();
+    esp32_hal::interrupt::enable(Interrupt::UART0, esp32_hal::Priority::Priority1).unwrap();
 
     let executor = EXECUTOR.init(Executor::new());
     executor.run(|spawner| {
