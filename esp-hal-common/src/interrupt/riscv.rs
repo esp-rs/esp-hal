@@ -628,7 +628,7 @@ unsafe fn handle_priority() -> u32 {
     prev_interrupt_priority
 }
 #[cfg(feature = "interrupt-preemption")]
-#[inline(always)]
+#[ram]
 unsafe fn restore_priority(stored_prio: u32) {
     #[cfg(not(esp32c6))]
     let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
