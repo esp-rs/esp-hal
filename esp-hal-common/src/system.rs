@@ -448,29 +448,20 @@ impl PeripheralClockControl {
                 system
                     .timergroup0_timer_clk_conf
                     .write(|w| w.tg0_timer_clk_en().set_bit());
-                #[cfg(esp32c6)]
+                let bits = if cfg!(esp32c6) { 1 } else { 2 };
                 system
                     .timergroup0_timer_clk_conf
-                    .write(|w| unsafe { w.tg0_timer_clk_sel().bits(1) });
-                #[cfg(esp32h2)]
-                system
-                    .timergroup0_timer_clk_conf
-                    .write(|w| unsafe { w.tg0_timer_clk_sel().bits(2) });
-                
+                    .write(|w| unsafe { w.tg0_timer_clk_sel().bits(bits) });
             }
             #[cfg(timg1)]
             Peripheral::Timg1 => {
                 system
                     .timergroup1_timer_clk_conf
                     .write(|w| w.tg1_timer_clk_en().set_bit());
-                #[cfg(esp32c6)]
+                let bits = if cfg!(esp32c6) { 1 } else { 2 };
                 system
                     .timergroup1_timer_clk_conf
-                    .write(|w| unsafe { w.tg1_timer_clk_sel().bits(1) });
-                #[cfg(esp32h2)]
-                system
-                    .timergroup1_timer_clk_conf
-                    .write(|w| unsafe { w.tg1_timer_clk_sel().bits(2) });
+                    .write(|w| unsafe { w.tg1_timer_clk_sel().bits(bits) });
             }
             #[cfg(lp_wdt)]
             Peripheral::Wdt => {

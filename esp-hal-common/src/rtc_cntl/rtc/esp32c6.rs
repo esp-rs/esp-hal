@@ -559,11 +559,6 @@ impl RtcClock {
                 break timg0.rtccalicfg1.read().rtc_cali_value().bits();
             }
 
-            /* TOOD: The Fosc CLK of calibration circuit is divided by 32 for ECO1.
-              So we need to multiply the frequency of the Fosc for ECO1 and above chips by 32 times.
-              And ensure that this modification will not affect ECO0.
-             -- support c6 eco1 fosc calibration by hongshuqing : https://github.com/espressif/esp-idf/commit/e3148369f32fdc6de62c35a67f7adb6f4faef4e3 */
-
             if timg0.rtccalicfg2.read().rtc_cali_timeout().bit_is_set() {
                 // Timed out waiting for calibration
                 break 0;
