@@ -93,5 +93,9 @@ required-features = ["embassy", "async"]
 name              = "psram"
 required-features = ["psram_2m"]
 
+[[example]]
+name              = "embassy_serial"
+required-features = ["embassy", "async"]
+
 [profile.release]
 debug = true

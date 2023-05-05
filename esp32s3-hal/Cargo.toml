@@ -82,3 +82,7 @@ required-features = ["embassy", "async"]
 [[example]]
 name              = "embassy_spi"
 required-features = ["embassy", "async"]
+
+[[example]]
+name              = "embassy_serial"
+required-features = ["embassy", "async"]
