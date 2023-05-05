@@ -96,6 +96,8 @@ embassy = ["embassy-time"]
 embassy-time-systick = []
 embassy-time-timg0   = []
 
+interrupt-preemption = []
+
 # Architecture-specific features (intended for internal use)
 riscv  = ["critical-section/restore-state-u8",  "procmacros/riscv", "esp-riscv-rt", "riscv-atomic-emulation-trap", "esp-riscv-rt/zero-bss"]
 xtensa = ["critical-section/restore-state-u32", "procmacros/xtensa"]

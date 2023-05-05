@@ -366,6 +366,8 @@ pub unsafe extern "C" fn start_trap_rust_hal(trap_frame: *mut TrapFrame) {
         let pc = mepc::read();
         handle_exception(pc, trap_frame);
     } else {
+        #[cfg(feature = "interrupt-preemption")]
+        let interrupt_priority = handle_priority();
         let code = mcause::read().code();
         match code {
             1 => interrupt1(trap_frame.as_mut().unwrap()),
@@ -401,6 +403,8 @@ pub unsafe extern "C" fn start_trap_rust_hal(trap_frame: *mut TrapFrame) {
             31 => interrupt31(trap_frame.as_mut().unwrap()),
             _ => DefaultHandler(),
         };
+        #[cfg(feature = "interrupt-preemption")]
+        restore_priority(interrupt_priority);
     }
 }
 
@@ -414,7 +418,6 @@ pub unsafe extern "C" fn start_trap_rust_hal(trap_frame: *mut TrapFrame) {
 unsafe fn handle_exception(pc: usize, trap_frame: *mut TrapFrame) {
     let insn: usize = *(pc as *const _);
     let needs_atomic_emulation = (insn & 0b1111111) == 0b0101111;
-
     if !needs_atomic_emulation {
         extern "C" {
             fn ExceptionHandler(tf: *mut TrapFrame);
@@ -458,7 +461,6 @@ unsafe fn handle_exception(pc: usize, trap_frame: *mut TrapFrame) {
         (*trap_frame).t5,
         (*trap_frame).t6,
     ];
-
     riscv_atomic_emulation_trap::atomic_emulation((*trap_frame).pc, &mut frame);
 
     (*trap_frame).ra = frame[1];
@@ -678,6 +680,42 @@ mod classic {
             .read_volatile();
         core::mem::transmute(prio as u8)
     }
+    #[cfg(all(feature = "interrupt-preemption"))]
+    use procmacros::ram;
+    #[cfg(all(feature = "interrupt-preemption"))]
+    #[ram]
+    pub(super) unsafe fn handle_priority() -> u32 {
+        use super::mcause;
+        use crate::riscv;
+        let interrupt_id: usize = mcause::read().code(); // MSB is whether its exception or interrupt.
+        let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
+        let interrupt_priority = intr
+            .cpu_int_pri_0
+            .as_ptr()
+            .offset(interrupt_id as isize)
+            .read_volatile();
+
+        let prev_interrupt_priority = intr.cpu_int_thresh.read().bits();
+        if interrupt_priority < 15 {
+            // leave interrupts disabled if interrupt is of max priority.
+            intr.cpu_int_thresh
+                .write(|w| w.bits(interrupt_priority + 1)); // set the prio threshold to 1 more than current interrupt prio
+            unsafe {
+                riscv::interrupt::enable();
+            }
+        }
+        prev_interrupt_priority
+    }
+    #[cfg(all(feature = "interrupt-preemption"))]
+    #[ram]
+    pub(super) unsafe fn restore_priority(stored_prio: u32) {
+        use crate::riscv;
+        unsafe {
+            riscv::interrupt::disable();
+        }
+        let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
+        intr.cpu_int_thresh.write(|w| w.bits(stored_prio));
+    }
 }
 
 #[cfg(plic)]
@@ -700,7 +738,8 @@ mod plic {
     const PLIC_MXINT_TYPE_REG: u32 = DR_REG_PLIC_MX_BASE + 0x4;
     const PLIC_MXINT_CLEAR_REG: u32 = DR_REG_PLIC_MX_BASE + 0x8;
     const PLIC_MXINT0_PRI_REG: u32 = DR_REG_PLIC_MX_BASE + 0x10;
-
+    #[cfg(feature = "interrupt-preemption")]
+    const PLIC_MXINT_THRESH_REG: u32 = DR_REG_PLIC_MX_BASE + 0x90;
     /// Enable a CPU interrupt
     pub unsafe fn enable_cpu_interrupt(which: CpuInterrupt) {
         let cpu_interrupt_number = which as isize;
@@ -765,5 +804,38 @@ mod plic {
             .offset(cpu_interrupt_number)
             .read_volatile();
         core::mem::transmute(prio as u8)
+    }
+    #[cfg(all(feature = "interrupt-preemption"))]
+    use procmacros::ram;
+    #[cfg(all(feature = "interrupt-preemption"))]
+    #[ram]
+    pub(super) unsafe fn handle_priority() -> u32 {
+        use super::mcause;
+        use crate::riscv;
+        let plic_mxint_pri_ptr = PLIC_MXINT0_PRI_REG as *mut u32;
+        let interrupt_id: isize = mcause::read().code().try_into().unwrap(); // MSB is whether its exception or interrupt.
+        let interrupt_priority = plic_mxint_pri_ptr.offset(interrupt_id).read_volatile();
+
+        let thresh_reg = PLIC_MXINT_THRESH_REG as *mut u32;
+        let prev_interrupt_priority = thresh_reg.read_volatile() & 0x000000FF;
+        // this is a u8 according to esp-idf, so mask everything else.
+        if interrupt_priority < 15 {
+            // leave interrupts disabled if interrupt is of max priority.
+            thresh_reg.write_volatile(interrupt_priority + 1);
+            unsafe {
+                riscv::interrupt::enable();
+            }
+        }
+        prev_interrupt_priority
+    }
+    #[cfg(all(feature = "interrupt-preemption"))]
+    #[ram]
+    pub(super) unsafe fn restore_priority(stored_prio: u32) {
+        use crate::riscv;
+        unsafe {
+            riscv::interrupt::disable();
+        }
+        let thresh_reg = PLIC_MXINT_THRESH_REG as *mut u32;
+        thresh_reg.write_volatile(stored_prio);
     }
 }

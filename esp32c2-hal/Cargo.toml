@@ -55,6 +55,7 @@ embassy-time-systick = ["esp-hal-common/embassy-time-systick", "embassy-time/tic
 embassy-time-timg0   = ["esp-hal-common/embassy-time-timg0",   "embassy-time/tick-hz-1_000_000"]
 xtal26mhz            = ["esp-hal-common/esp32c2_26mhz"]
 xtal40mhz            = ["esp-hal-common/esp32c2_40mhz"] 
+interrupt-preemption = ["esp-hal-common/interrupt-preemption"]
 
 [[example]]
 name              = "spi_eh1_loopback"
@@ -75,3 +76,7 @@ required-features = ["embassy", "async"]
 [[example]]
 name              = "embassy_spi"
 required-features = ["embassy", "async"]
+
+[[example]]
+name = "interrupt_preemption"
+required-features = ["interrupt-preemption"]
