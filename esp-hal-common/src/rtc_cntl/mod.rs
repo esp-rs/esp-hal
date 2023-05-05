@@ -151,7 +151,12 @@ impl<'d> Rtc<'d> {
         #[cfg(esp32)]
         let (l, h) = {
             rtc_cntl.time_update.write(|w| w.time_update().set_bit());
-            while rtc_cntl.time_update.read().time_valid().bit_is_clear() {}
+            while rtc_cntl.time_update.read().time_valid().bit_is_clear() {
+                unsafe {
+                    // might take 1 RTC slowclk period, don't flood RTC bus
+                    ets_delay_us(1);
+                }
+            }
             let h = rtc_cntl.time1.read().time_hi().bits();
             let l = rtc_cntl.time0.read().time_lo().bits();
             (l, h)
