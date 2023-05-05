@@ -602,41 +602,6 @@ unsafe fn get_assigned_cpu_interrupt(interrupt: Interrupt) -> CpuInterrupt {
 
     core::mem::transmute(cpu_intr)
 }
-#[cfg(all(feature = "interrupt-preemption", not(esp32c6)))]
-use procmacros::ram;
-#[cfg(all(feature = "interrupt-preemption", not(esp32c6)))]
-#[ram]
-unsafe fn handle_priority() -> u32 {
-    use crate::riscv;
-    let interrupt_id: usize = mcause::read().code(); // MSB is whether its exception or interrupt.
-    let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
-    let interrupt_priority = intr
-        .cpu_int_pri_0
-        .as_ptr()
-        .offset(interrupt_id as isize)
-        .read_volatile();
-
-    let prev_interrupt_priority = intr.cpu_int_thresh.read().bits();
-    if interrupt_priority < 15 {
-        // leave interrupts disabled if interrupt is of max priority.
-        intr.cpu_int_thresh
-            .write(|w| w.bits(interrupt_priority + 1)); // set the prio threshold to 1 more than current interrupt prio
-        unsafe {
-            riscv::interrupt::enable();
-        }
-    }
-    prev_interrupt_priority
-}
-#[cfg(all(feature = "interrupt-preemption", not(esp32c6)))]
-#[ram]
-unsafe fn restore_priority(stored_prio: u32) {
-    use crate::riscv;
-    unsafe {
-        riscv::interrupt::disable();
-    }
-    let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
-    intr.cpu_int_thresh.write(|w| w.bits(stored_prio));
-}
 
 #[cfg(not(plic))]
 mod classic {
@@ -717,6 +682,42 @@ mod classic {
             .read_volatile();
         core::mem::transmute(prio as u8)
     }
+    #[cfg(all(feature = "interrupt-preemption"))]
+    use procmacros::ram;
+    #[cfg(all(feature = "interrupt-preemption"))]
+    #[ram]
+    pub(super) unsafe fn handle_priority() -> u32 {
+        use super::mcause;
+        use crate::riscv;
+        let interrupt_id: usize = mcause::read().code(); // MSB is whether its exception or interrupt.
+        let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
+        let interrupt_priority = intr
+            .cpu_int_pri_0
+            .as_ptr()
+            .offset(interrupt_id as isize)
+            .read_volatile();
+
+        let prev_interrupt_priority = intr.cpu_int_thresh.read().bits();
+        if interrupt_priority < 15 {
+            // leave interrupts disabled if interrupt is of max priority.
+            intr.cpu_int_thresh
+                .write(|w| w.bits(interrupt_priority + 1)); // set the prio threshold to 1 more than current interrupt prio
+            unsafe {
+                riscv::interrupt::enable();
+            }
+        }
+        prev_interrupt_priority
+    }
+    #[cfg(all(feature = "interrupt-preemption"))]
+    #[ram]
+    pub(super) unsafe fn restore_priority(stored_prio: u32) {
+        use crate::riscv;
+        unsafe {
+            riscv::interrupt::disable();
+        }
+        let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
+        intr.cpu_int_thresh.write(|w| w.bits(stored_prio));
+    }
 }
 
 #[cfg(plic)]
@@ -739,11 +740,8 @@ mod plic {
     const PLIC_MXINT_TYPE_REG: u32 = DR_REG_PLIC_MX_BASE + 0x4;
     const PLIC_MXINT_CLEAR_REG: u32 = DR_REG_PLIC_MX_BASE + 0x8;
     const PLIC_MXINT0_PRI_REG: u32 = DR_REG_PLIC_MX_BASE + 0x10;
-
     #[cfg(feature = "interrupt-preemption")]
-    const DR_REG_PLIC_UX_BASE: u32 = 0x20001400; // https://github.com/espressif/esp-idf/blob/56123c52aaa08f1b53350c7af30c91320b352ef4/components/soc/esp32c6/include/soc/reg_base.h#L8
-    #[cfg(feature = "interrupt-preemption")]
-    const PLIC_UXINT_THRESH_REG: u32 = DR_REG_PLIC_UX_BASE + 0x90; // https://github.com/espressif/esp-idf/blob/56123c52aaa08f1b53350c7af30c91320b352ef4/components/soc/esp32c6/include/soc/plic_reg.h#LL613C9-L613C30
+    const PLIC_MXINT_THRESH_REG: u32 = DR_REG_PLIC_MX_BASE + 0x90;
     /// Enable a CPU interrupt
     pub unsafe fn enable_cpu_interrupt(which: CpuInterrupt) {
         let cpu_interrupt_number = which as isize;
@@ -809,9 +807,9 @@ mod plic {
             .read_volatile();
         core::mem::transmute(prio as u8)
     }
-    #[cfg(all(feature = "interrupt-preemption", esp32c6))]
+    #[cfg(all(feature = "interrupt-preemption"))]
     use procmacros::ram;
-    #[cfg(all(feature = "interrupt-preemption", esp32c6))]
+    #[cfg(all(feature = "interrupt-preemption"))]
     #[ram]
     pub(super) unsafe fn handle_priority() -> u32 {
         use super::mcause;
@@ -833,7 +831,7 @@ mod plic {
         }
         prev_interrupt_priority
     }
-    #[cfg(all(feature = "interrupt-preemption", esp32c6))]
+    #[cfg(all(feature = "interrupt-preemption"))]
     #[ram]
     pub(super) unsafe fn restore_priority(stored_prio: u32) {
         use crate::riscv;
