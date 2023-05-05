@@ -993,13 +993,25 @@ where
 mod asynch {
     use core::task::Poll;
 
+    use cfg_if::cfg_if;
     use embassy_sync::waitqueue::AtomicWaker;
     use procmacros::interrupt;
 
     use super::{Error, Instance};
     use crate::{uart::UART_FIFO_SIZE, Uart};
 
-    static WAKERS: [AtomicWaker; 3] = [AtomicWaker::new(), AtomicWaker::new(), AtomicWaker::new()];
+    cfg_if! {
+        if #[cfg(all(uart0, uart1, uart2))] {
+            const NUM_UART: usize = 3;
+        } else if #[cfg(all(uart0, uart1))] {
+            const NUM_UART: usize = 2;
+        } else if #[cfg(uart0)] {
+            const NUM_UART: usize = 1;
+        }
+    }
+
+    const INIT: AtomicWaker = AtomicWaker::new();
+    static WAKERS: [AtomicWaker; NUM_UART] = [INIT; NUM_UART];
 
     pub(crate) enum Event {
         TxDone,
