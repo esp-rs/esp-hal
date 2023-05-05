@@ -65,7 +65,7 @@ pub(crate) enum XtalClock {
     RtcXtalFreq24M,
     #[cfg(any(esp32, esp32c2))]
     RtcXtalFreq26M,
-    #[cfg(any(esp32c3, esp32s3))]
+    #[cfg(any(esp32c3, esp32s3, esp32h2))]
     RtcXtalFreq32M,
     RtcXtalFreq40M,
     RtcXtalFreqOther(u32),
@@ -78,7 +78,7 @@ impl Clock for XtalClock {
             XtalClock::RtcXtalFreq24M => HertzU32::MHz(24),
             #[cfg(any(esp32, esp32c2))]
             XtalClock::RtcXtalFreq26M => HertzU32::MHz(26),
-            #[cfg(any(esp32c3, esp32s3))]
+            #[cfg(any(esp32c3, esp32s3, esp32h2))]
             XtalClock::RtcXtalFreq32M => HertzU32::MHz(32),
             XtalClock::RtcXtalFreq40M => HertzU32::MHz(40),
             XtalClock::RtcXtalFreqOther(mhz) => HertzU32::MHz(*mhz),
