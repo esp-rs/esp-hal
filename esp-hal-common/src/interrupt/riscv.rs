@@ -818,13 +818,12 @@ mod plic {
         let interrupt_id: isize = mcause::read().code().try_into().unwrap(); // MSB is whether its exception or interrupt.
         let interrupt_priority = plic_mxint_pri_ptr.offset(interrupt_id).read_volatile();
 
-        let thresh_reg = PLIC_UXINT_THRESH_REG as *mut u32;
+        let thresh_reg = PLIC_MXINT_THRESH_REG as *mut u32;
         let prev_interrupt_priority = thresh_reg.read_volatile() & 0x000000FF;
         // this is a u8 according to esp-idf, so mask everything else.
         if interrupt_priority < 15 {
             // leave interrupts disabled if interrupt is of max priority.
-            thresh_reg.write_volatile(interrupt_priority); // according to PLIC spec, interrupts at threshold prio are masked as well, so +
-                                                           // 1 is not needed.
+            thresh_reg.write_volatile(interrupt_priority + 1);
             unsafe {
                 riscv::interrupt::enable();
             }
@@ -838,7 +837,7 @@ mod plic {
         unsafe {
             riscv::interrupt::disable();
         }
-        let thresh_reg = PLIC_UXINT_THRESH_REG as *mut u32;
+        let thresh_reg = PLIC_MXINT_THRESH_REG as *mut u32;
         thresh_reg.write_volatile(stored_prio);
     }
 }
