@@ -31,3 +31,5 @@ PROVIDE(interrupt30 = DefaultHandler);
 PROVIDE(interrupt31 = DefaultHandler);
 
 INCLUDE "device.x"
+
+PROVIDE(_vector_table = default_vector_table);

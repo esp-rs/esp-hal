@@ -1,7 +1,9 @@
 [target.riscv32imc-unknown-none-elf]
-runner = "espflash flash --monitor"
+runner = "espflash flash --monitor --format direct-boot"
 rustflags = [
   "-C", "link-arg=-Tlinkall.x",
+
+  "-C", "force-frame-pointers",
 
   # comment the cfgs below if you do _not_ wish to emulate atomics.
   # enable the atomic codegen option for RISCV

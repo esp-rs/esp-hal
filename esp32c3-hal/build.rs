@@ -127,6 +127,10 @@ fn add_defaults() {
         .unwrap();
 
     println!("cargo:rustc-link-search={}", out.display());
+
+    if env::var("HULK_SMASH").is_ok() {
+        println!("cargo:rustc-cfg=hulk_smash");
+    }
 }
 
 const OPT_LEVEL_Z_MSG: &str = r#"opt-level=z will produce broken 128-bit shifts (i.e. `1u128 << i`). The hal's interrupt handling relies on that operation, causing an 'attempt to subtract with overflow' panic if an enabled interrupt is triggered while using that opt-level.
@@ -137,7 +141,7 @@ Please use `opt-level="s"` in lieu of "z", or alternatively enable `features = [
   * Do not have any shifts of 128-bit integers (either u128 or i128) in your code
 
 See also: https://github.com/esp-rs/esp-hal/issues/196
-     and: https://github.com/llvm/llvm-project/issues/57988         
+     and: https://github.com/llvm/llvm-project/issues/57988
 "#;
 
 // Once a rust nightly has a fix for https://github.com/llvm/llvm-project/issues/57988 , consider:

@@ -38,7 +38,7 @@ esp-hal-common     = { version = "0.9.0",  features = ["esp32c3"], path = "../es
 aes               = "0.8.2"
 critical-section  = "1.1.1"
 crypto-bigint     = { version = "0.5.2", default-features = false}
-embassy-executor  = { version = "0.2.0", features = ["nightly", "integrated-timers", "arch-riscv32", "executor-thread"] }
+# embassy-executor  = { version = "0.2.0", features = ["nightly", "integrated-timers", "arch-riscv32", "executor-thread"] }
 embedded-graphics = "0.7.1"
 esp-backtrace     = { version = "0.7.0", features = ["esp32c3", "panic-handler", "exception-handler", "print-uart"] }
 esp-hal-smartled  = { version = "0.2.0", features = ["esp32c3"], path = "../esp-hal-smartled" }
@@ -88,3 +88,7 @@ required-features = ["embassy", "async"]
 
 [profile.release]
 debug = true
+
+[patch.crates-io]
+esp-riscv-rt  = { git = "https://github.com/rustbox/esp-riscv-rt.git", rev = "45adaf0" }
+esp-backtrace = { git = "https://github.com/rustbox/esp-backtrace.git", rev = "f835673" }
