@@ -58,5 +58,6 @@ crate::peripherals! {
     USB_WRAP => true,
     WCL => true,
     XTS_AES => true,
-    RADIO => false
+    RADIO => false,
+    PSRAM => false,
 }

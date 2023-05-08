@@ -41,9 +41,10 @@ critical-section  = "1.1.1"
 crypto-bigint     = { version = "0.5.2", default-features = false}
 embassy-executor  = { version = "0.2.0", features = ["nightly", "integrated-timers", "arch-xtensa", "executor-thread"] }
 embedded-graphics = "0.7.1"
+esp-alloc         = "0.3.0"
 esp-backtrace     = { version = "0.7.0", features = ["esp32s3", "panic-handler", "exception-handler", "print-uart"] }
 esp-hal-smartled  = { version = "0.2.0", features = ["esp32s3"], path = "../esp-hal-smartled" }
-esp-println       = { version = "0.5.0", features = ["esp32s3"] }
+esp-println       = { version = "0.5.0", features = ["esp32s3", "log"] }
 sha2              = { version = "0.10.6", default-features = false}
 smart-leds        = "0.3.0"
 ssd1306           = "0.7.1"
@@ -62,6 +63,11 @@ async                = ["esp-hal-common/async", "embedded-hal-async"]
 embassy              = ["esp-hal-common/embassy"]
 embassy-time-systick = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-hz-16_000_000"]
 embassy-time-timg0   = ["esp-hal-common/embassy-time-timg0", "embassy-time/tick-hz-1_000_000"]
+
+psram     = []
+psram_2m  = ["esp-hal-common/psram_2m", "psram"]
+psram_4m  = ["esp-hal-common/psram_4m", "psram"]
+psram_8m  = ["esp-hal-common/psram_8m", "psram"]
 
 [[example]]
 name              = "spi_eh1_loopback"
@@ -82,6 +88,10 @@ required-features = ["embassy", "async"]
 [[example]]
 name              = "embassy_spi"
 required-features = ["embassy", "async"]
+
+[[example]]
+name              = "psram"
+required-features = ["psram_2m"]
 
 [[example]]
 name              = "embassy_serial"
