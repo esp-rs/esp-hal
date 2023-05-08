@@ -5,11 +5,11 @@ use fugit::MicrosDurationU64;
 
 pub use self::rtc::SocResetReason;
 #[cfg(not(any(esp32c6, esp32h2)))]
-use crate::clock::{Clock, XtalClock};
+use crate::clock::XtalClock;
 #[cfg(not(esp32))]
 use crate::efuse::Efuse;
 #[cfg(any(esp32c6, esp32h2))]
-use crate::peripherals::LP_WDT;
+use crate::peripherals::{LP_TIMER, LP_WDT};
 #[cfg(not(any(esp32c6, esp32h2)))]
 use crate::peripherals::{RTC_CNTL, TIMG0};
 use crate::{
@@ -144,9 +144,9 @@ impl<'d> Rtc<'d> {
 
     /// read the current value of the rtc time registers.
     pub fn get_time_raw(&self) -> u64 {
-        #[cfg(not(esp32c6))]
+        #[cfg(not(any(esp32c6, esp32h2)))]
         let rtc_cntl = unsafe { &*RTC_CNTL::ptr() };
-        #[cfg(esp32c6)]
+        #[cfg(any(esp32c6, esp32h2))]
         let rtc_cntl = unsafe { &*LP_TIMER::ptr() };
 
         #[cfg(esp32)]
@@ -169,7 +169,7 @@ impl<'d> Rtc<'d> {
             let l = rtc_cntl.time_low0.read().timer_value0_low().bits();
             (l, h)
         };
-        #[cfg(esp32c6)]
+        #[cfg(any(esp32c6, esp32h2))]
         let (l, h) = {
             rtc_cntl.update.write(|w| w.main_timer_update().set_bit());
             let h = rtc_cntl.main_buf0_high.read().main_timer_buf0_high().bits();

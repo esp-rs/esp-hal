@@ -339,7 +339,7 @@ impl RtcClock {
     }
 
     /// Get the RTC_SLOW_CLK source
-    fn get_slow_freq() -> RtcSlowClock {
+    pub(crate) fn get_slow_freq() -> RtcSlowClock {
         let lp_clrst = unsafe { &*LP_CLKRST::ptr() };
 
         let slow_freq = lp_clrst.lp_clk_conf.read().slow_clk_sel().bits();
