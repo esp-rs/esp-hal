@@ -5,14 +5,15 @@ use fugit::MicrosDurationU64;
 
 pub use self::rtc::SocResetReason;
 #[cfg(not(esp32c6))]
-use crate::clock::{Clock, XtalClock};
+use crate::clock::XtalClock;
 #[cfg(not(esp32))]
 use crate::efuse::Efuse;
 #[cfg(esp32c6)]
-use crate::peripherals::LP_WDT;
+use crate::peripherals::{LP_TIMER, LP_WDT};
 #[cfg(not(esp32c6))]
 use crate::peripherals::{RTC_CNTL, TIMG0};
 use crate::{
+    clock::Clock,
     peripheral::{Peripheral, PeripheralRef},
     reset::{SleepSource, WakeupReason},
     Cpu,
@@ -138,6 +139,53 @@ impl<'d> Rtc<'d> {
     #[cfg(not(esp32c6))]
     pub fn estimate_xtal_frequency(&mut self) -> u32 {
         RtcClock::estimate_xtal_frequency()
+    }
+
+    /// read the current value of the rtc time registers.
+    pub fn get_time_raw(&self) -> u64 {
+        #[cfg(not(esp32c6))]
+        let rtc_cntl = unsafe { &*RTC_CNTL::ptr() };
+        #[cfg(esp32c6)]
+        let rtc_cntl = unsafe { &*LP_TIMER::ptr() };
+
+        #[cfg(esp32)]
+        let (l, h) = {
+            rtc_cntl.time_update.write(|w| w.time_update().set_bit());
+            while rtc_cntl.time_update.read().time_valid().bit_is_clear() {
+                unsafe {
+                    // might take 1 RTC slowclk period, don't flood RTC bus
+                    ets_delay_us(1);
+                }
+            }
+            let h = rtc_cntl.time1.read().time_hi().bits();
+            let l = rtc_cntl.time0.read().time_lo().bits();
+            (l, h)
+        };
+        #[cfg(any(esp32c2, esp32c3, esp32s3, esp32s2))]
+        let (l, h) = {
+            rtc_cntl.time_update.write(|w| w.time_update().set_bit());
+            let h = rtc_cntl.time_high0.read().timer_value0_high().bits();
+            let l = rtc_cntl.time_low0.read().timer_value0_low().bits();
+            (l, h)
+        };
+        #[cfg(esp32c6)]
+        let (l, h) = {
+            rtc_cntl.update.write(|w| w.main_timer_update().set_bit());
+            let h = rtc_cntl.main_buf0_high.read().main_timer_buf0_high().bits();
+            let l = rtc_cntl.main_buf0_low.read().main_timer_buf0_low().bits();
+            (l, h)
+        };
+        ((h as u64) << 32) | (l as u64)
+    }
+
+    /// read the current value of the rtc time registers in microseconds.
+    pub fn get_time_us(&self) -> u64 {
+        self.get_time_raw() * 1_000_000 / RtcClock::get_slow_freq().frequency().to_Hz() as u64
+    }
+
+    /// read the current value of the rtc time registers in milliseconds
+    pub fn get_time_ms(&self) -> u64 {
+        self.get_time_raw() * 1_000 / RtcClock::get_slow_freq().frequency().to_Hz() as u64
     }
 }
 
