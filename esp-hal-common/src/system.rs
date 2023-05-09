@@ -13,11 +13,11 @@ use crate::peripheral::PeripheralRef;
 
 #[cfg(esp32)]
 type SystemPeripheral = crate::peripherals::DPORT;
-#[cfg(esp32c6)]
+#[cfg(any(esp32c6, esp32h2))]
 type SystemPeripheral = crate::peripherals::PCR;
-#[cfg(esp32c6)]
+#[cfg(any(esp32c6, esp32h2))]
 type IntPri = crate::peripherals::INTPRI;
-#[cfg(not(any(esp32, esp32c6)))]
+#[cfg(not(any(esp32, esp32c6, esp32h2)))]
 type SystemPeripheral = crate::peripherals::SYSTEM;
 
 pub enum SoftwareInterrupt {
@@ -33,11 +33,13 @@ pub enum Peripheral {
     Spi2,
     #[cfg(spi3)]
     Spi3,
+    #[cfg(i2c0)]
     I2cExt0,
     #[cfg(i2c1)]
     I2cExt1,
     #[cfg(rmt)]
     Rmt,
+    #[cfg(ledc)]
     Ledc,
     #[cfg(mcpwm0)]
     Mcpwm0,
@@ -69,25 +71,31 @@ pub enum Peripheral {
     Timg1,
     #[cfg(lp_wdt)]
     Wdt,
+    #[cfg(sha)]
     Sha,
     #[cfg(usb_device)]
     UsbDevice,
+    #[cfg(uart0)]
     Uart0,
+    #[cfg(uart1)]
     Uart1,
     #[cfg(uart2)]
     Uart2,
     #[cfg(rsa)]
     Rsa,
 }
+
 pub struct SoftwareInterruptControl {
     _private: (),
 }
+
 impl SoftwareInterruptControl {
     pub fn raise(&mut self, interrupt: SoftwareInterrupt) {
-        #[cfg(not(esp32c6))]
+        #[cfg(not(any(esp32c6, esp32h2)))]
         let system = unsafe { &*SystemPeripheral::PTR };
-        #[cfg(esp32c6)]
+        #[cfg(any(esp32c6, esp32h2))]
         let system = unsafe { &*IntPri::PTR };
+
         match interrupt {
             SoftwareInterrupt::SoftwareInterrupt0 => {
                 system
@@ -111,11 +119,13 @@ impl SoftwareInterruptControl {
             }
         }
     }
+
     pub fn reset(&mut self, interrupt: SoftwareInterrupt) {
-        #[cfg(not(esp32c6))]
+        #[cfg(not(any(esp32c6, esp32h2)))]
         let system = unsafe { &*SystemPeripheral::PTR };
-        #[cfg(esp32c6)]
+        #[cfg(any(esp32c6, esp32h2))]
         let system = unsafe { &*IntPri::PTR };
+
         match interrupt {
             SoftwareInterrupt::SoftwareInterrupt0 => {
                 system
@@ -146,7 +156,7 @@ pub struct PeripheralClockControl {
     _private: (),
 }
 
-#[cfg(not(esp32c6))]
+#[cfg(not(any(esp32c6, esp32h2)))]
 impl PeripheralClockControl {
     /// Enables and resets the given peripheral
     pub fn enable(&mut self, peripheral: Peripheral) {
@@ -344,7 +354,7 @@ impl PeripheralClockControl {
     }
 }
 
-#[cfg(esp32c6)]
+#[cfg(any(esp32c6, esp32h2))]
 impl PeripheralClockControl {
     /// Enables and resets the given peripheral
     pub fn enable(&mut self, peripheral: Peripheral) {
@@ -356,9 +366,19 @@ impl PeripheralClockControl {
                 system.spi2_conf.modify(|_, w| w.spi2_clk_en().set_bit());
                 system.spi2_conf.modify(|_, w| w.spi2_rst_en().clear_bit());
             }
+            #[cfg(i2c0)]
             Peripheral::I2cExt0 => {
-                system.i2c_conf.modify(|_, w| w.i2c_clk_en().set_bit());
-                system.i2c_conf.modify(|_, w| w.i2c_rst_en().clear_bit());
+                // TODO: align register names between C6 and H2 in the PACs
+                #[cfg(esp32c6)]
+                {
+                    system.i2c_conf.modify(|_, w| w.i2c_clk_en().set_bit());
+                    system.i2c_conf.modify(|_, w| w.i2c_rst_en().clear_bit());
+                }
+                #[cfg(esp32h2)]
+                {
+                    system.i2c0_conf.modify(|_, w| w.i2c0_clk_en().set_bit());
+                    system.i2c0_conf.modify(|_, w| w.i2c0_rst_en().clear_bit());
+                }
             }
             #[cfg(rmt)]
             Peripheral::Rmt => {
@@ -428,18 +448,20 @@ impl PeripheralClockControl {
                 system
                     .timergroup0_timer_clk_conf
                     .write(|w| w.tg0_timer_clk_en().set_bit());
+                let bits = if cfg!(esp32c6) { 1 } else { 2 };
                 system
                     .timergroup0_timer_clk_conf
-                    .write(|w| unsafe { w.tg0_timer_clk_sel().bits(1) });
+                    .write(|w| unsafe { w.tg0_timer_clk_sel().bits(bits) });
             }
             #[cfg(timg1)]
             Peripheral::Timg1 => {
                 system
                     .timergroup1_timer_clk_conf
                     .write(|w| w.tg1_timer_clk_en().set_bit());
+                let bits = if cfg!(esp32c6) { 1 } else { 2 };
                 system
                     .timergroup1_timer_clk_conf
-                    .write(|w| unsafe { w.tg1_timer_clk_sel().bits(1) });
+                    .write(|w| unsafe { w.tg1_timer_clk_sel().bits(bits) });
             }
             #[cfg(lp_wdt)]
             Peripheral::Wdt => {
@@ -457,10 +479,12 @@ impl PeripheralClockControl {
                     .timergroup1_timer_clk_conf
                     .write(|w| unsafe { w.tg1_timer_clk_sel().bits(1) });
             }
+            #[cfg(sha)]
             Peripheral::Sha => {
                 system.sha_conf.modify(|_, w| w.sha_clk_en().set_bit());
                 system.sha_conf.modify(|_, w| w.sha_rst_en().clear_bit());
             }
+            #[cfg(usb_device)]
             Peripheral::UsbDevice => {
                 system
                     .usb_device_conf
@@ -469,18 +493,21 @@ impl PeripheralClockControl {
                     .usb_device_conf
                     .modify(|_, w| w.usb_device_rst_en().clear_bit());
             }
+            #[cfg(uart0)]
             Peripheral::Uart0 => {
                 system.uart0_conf.modify(|_, w| w.uart0_clk_en().set_bit());
                 system
                     .uart0_conf
                     .modify(|_, w| w.uart0_rst_en().clear_bit());
             }
+            #[cfg(uart1)]
             Peripheral::Uart1 => {
                 system.uart1_conf.modify(|_, w| w.uart1_clk_en().set_bit());
                 system
                     .uart1_conf
                     .modify(|_, w| w.uart1_rst_en().clear_bit());
             }
+            #[cfg(rsa)]
             Peripheral::Rsa => {
                 system.rsa_conf.modify(|_, w| w.rsa_clk_en().set_bit());
                 system.rsa_conf.modify(|_, w| w.rsa_rst_en().clear_bit());

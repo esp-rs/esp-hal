@@ -10,6 +10,7 @@ use crate::{
 #[cfg_attr(esp32c2, path = "clocks_ll/esp32c2.rs")]
 #[cfg_attr(esp32c3, path = "clocks_ll/esp32c3.rs")]
 #[cfg_attr(esp32c6, path = "clocks_ll/esp32c6.rs")]
+#[cfg_attr(esp32h2, path = "clocks_ll/esp32h2.rs")]
 #[cfg_attr(esp32s2, path = "clocks_ll/esp32s2.rs")]
 #[cfg_attr(esp32s3, path = "clocks_ll/esp32s3.rs")]
 pub(crate) mod clocks_ll;
@@ -30,6 +31,8 @@ pub trait Clock {
 #[derive(Debug, Clone, Copy)]
 pub enum CpuClock {
     Clock80MHz,
+    #[cfg(esp32h2)]
+    Clock96MHz,
     #[cfg(esp32c2)]
     Clock120MHz,
     #[cfg(not(esp32c2))]
@@ -43,6 +46,8 @@ impl Clock for CpuClock {
     fn frequency(&self) -> HertzU32 {
         match self {
             CpuClock::Clock80MHz => HertzU32::MHz(80),
+            #[cfg(esp32h2)]
+            CpuClock::Clock96MHz => HertzU32::MHz(96),
             #[cfg(esp32c2)]
             CpuClock::Clock120MHz => HertzU32::MHz(120),
             #[cfg(not(esp32c2))]
@@ -60,7 +65,7 @@ pub(crate) enum XtalClock {
     RtcXtalFreq24M,
     #[cfg(any(esp32, esp32c2))]
     RtcXtalFreq26M,
-    #[cfg(any(esp32c3, esp32s3))]
+    #[cfg(any(esp32c3, esp32s3, esp32h2))]
     RtcXtalFreq32M,
     RtcXtalFreq40M,
     RtcXtalFreqOther(u32),
@@ -73,7 +78,7 @@ impl Clock for XtalClock {
             XtalClock::RtcXtalFreq24M => HertzU32::MHz(24),
             #[cfg(any(esp32, esp32c2))]
             XtalClock::RtcXtalFreq26M => HertzU32::MHz(26),
-            #[cfg(any(esp32c3, esp32s3))]
+            #[cfg(any(esp32c3, esp32s3, esp32h2))]
             XtalClock::RtcXtalFreq32M => HertzU32::MHz(32),
             XtalClock::RtcXtalFreq40M => HertzU32::MHz(40),
             XtalClock::RtcXtalFreqOther(mhz) => HertzU32::MHz(*mhz),
@@ -424,6 +429,58 @@ impl<'d> ClockControl<'d> {
                 xtal_clock: xtal_freq.frequency(),
                 i2c_clock: HertzU32::MHz(40),
                 crypto_clock: HertzU32::MHz(160),
+            },
+        }
+    }
+}
+
+#[cfg(esp32h2)]
+impl<'d> ClockControl<'d> {
+    /// Use what is considered the default settings after boot.
+    #[allow(unused)]
+    pub fn boot_defaults(
+        clock_control: impl Peripheral<P = SystemClockControl> + 'd,
+    ) -> ClockControl<'d> {
+        ClockControl {
+            _private: clock_control.into_ref(),
+            desired_rates: RawClocks {
+                cpu_clock: HertzU32::MHz(96),
+                apb_clock: HertzU32::MHz(32),
+                xtal_clock: HertzU32::MHz(32),
+                i2c_clock: HertzU32::MHz(32),
+            },
+        }
+    }
+
+    /// Configure the CPU clock speed.
+    #[allow(unused)]
+    pub fn configure(
+        clock_control: impl Peripheral<P = SystemClockControl> + 'd,
+        cpu_clock_speed: CpuClock,
+    ) -> ClockControl<'d> {
+        let apb_freq;
+        let xtal_freq = XtalClock::RtcXtalFreqOther(32);
+        let pll_freq = PllClock::Pll320MHz;
+
+        if cpu_clock_speed.mhz() <= xtal_freq.mhz() {
+            apb_freq = ApbClock::ApbFreqOther(cpu_clock_speed.mhz());
+            clocks_ll::esp32h2_rtc_update_to_xtal(xtal_freq, 1);
+            clocks_ll::esp32h2_rtc_apb_freq_update(apb_freq);
+        } else {
+            apb_freq = ApbClock::ApbFreqOther(32);
+            clocks_ll::esp32h2_rtc_bbpll_enable();
+            clocks_ll::esp32h2_rtc_bbpll_configure(xtal_freq, pll_freq);
+            clocks_ll::esp32h2_rtc_freq_to_pll_mhz(cpu_clock_speed);
+            clocks_ll::esp32h2_rtc_apb_freq_update(apb_freq);
+        }
+
+        ClockControl {
+            _private: clock_control.into_ref(),
+            desired_rates: RawClocks {
+                cpu_clock: cpu_clock_speed.frequency(),
+                apb_clock: apb_freq.frequency(),
+                xtal_clock: xtal_freq.frequency(),
+                i2c_clock: HertzU32::MHz(32),
             },
         }
     }

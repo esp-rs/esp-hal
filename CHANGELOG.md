@@ -12,11 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Add bare-bones PSRAM support for ESP32 (#506)
+- Add initial support for the ESP32-H2 (#513)
 
 ### Fixed
 
 - DMA is supported for SPI3 on ESP32-S3 (#507)
-
 
 ## [0.9.0] - 2023-05-02
 

@@ -55,6 +55,7 @@ esp32   = { version = "0.23.0", features = ["critical-section"], optional = true
 esp32c2 = { version = "0.11.0", features = ["critical-section"], optional = true }
 esp32c3 = { version = "0.14.0", features = ["critical-section"], optional = true }
 esp32c6 = { version = "0.4.0",  features = ["critical-section"], optional = true }
+esp32h2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "5828519", package = "esp32h2", features = ["critical-section"], optional = true }
 esp32s2 = { version = "0.14.0", features = ["critical-section"], optional = true }
 esp32s3 = { version = "0.18.0", features = ["critical-section"], optional = true }
 
@@ -67,6 +68,7 @@ esp32   = ["esp32/rt"  , "xtensa", "xtensa-lx/esp32",   "xtensa-lx-rt/esp32",   
 esp32c2 = ["esp32c2/rt", "riscv",  "procmacros/esp32c2"]
 esp32c3 = ["esp32c3/rt", "riscv",  "procmacros/esp32c3"]
 esp32c6 = ["esp32c6/rt", "riscv",  "procmacros/esp32c6"]
+esp32h2 = ["esp32h2/rt", "riscv",  "procmacros/esp32h2"]
 esp32s2 = ["esp32s2/rt", "xtensa", "xtensa-lx/esp32s2", "xtensa-lx-rt/esp32s2",             "esp-synopsys-usb-otg", "usb-device", "procmacros/esp32s2"]
 esp32s3 = ["esp32s3/rt", "xtensa", "xtensa-lx/esp32s3", "xtensa-lx-rt/esp32s3", "lock_api", "esp-synopsys-usb-otg", "usb-device", "procmacros/esp32s3"]
 
