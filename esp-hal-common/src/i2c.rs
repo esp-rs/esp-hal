@@ -267,6 +267,325 @@ where
 
         i2c
     }
+
+    #[cfg(feature = "async")]
+    pub(crate) fn inner(&self) -> &T {
+        &self.peripheral
+    }
+}
+
+#[cfg(feature = "async")]
+mod asynch {
+    use core::{
+        pin::Pin,
+        task::{Context, Poll},
+    };
+
+    use cfg_if::cfg_if;
+    use embassy_futures::select::select;
+    use embassy_sync::waitqueue::AtomicWaker;
+    use embedded_hal_1::i2c::Operation;
+    use procmacros::interrupt;
+
+    use super::*;
+
+    cfg_if! {
+        if #[cfg(all(i2c0, i2c1))] {
+            const NUM_I2C: usize = 2;
+        } else if #[cfg(i2c0)] {
+            const NUM_I2C: usize = 1;
+        }
+    }
+
+    const INIT: AtomicWaker = AtomicWaker::new();
+    static WAKERS: [AtomicWaker; NUM_I2C] = [INIT; NUM_I2C];
+
+    pub(crate) enum Event {
+        EndDetect,
+        TxComplete,
+        #[cfg(not(any(esp32, esp32s2)))]
+        TxFifoWatermark,
+    }
+
+    pub(crate) struct I2cFuture<'a, T>
+    where
+        T: Instance,
+    {
+        event: Event,
+        instance: &'a T,
+    }
+
+    impl<'a, T> I2cFuture<'a, T>
+    where
+        T: Instance,
+    {
+        pub fn new(event: Event, instance: &'a T) -> Self {
+            instance
+                .register_block()
+                .int_ena
+                .modify(|_, w| match event {
+                    Event::EndDetect => w.end_detect_int_ena().set_bit(),
+                    Event::TxComplete => w.trans_complete_int_ena().set_bit(),
+                    #[cfg(not(any(esp32, esp32s2)))]
+                    Event::TxFifoWatermark => w.txfifo_wm_int_ena().set_bit(),
+                });
+
+            Self { event, instance }
+        }
+
+        fn event_bit_is_clear(&self) -> bool {
+            let r = self.instance.register_block().int_ena.read();
+
+            match self.event {
+                Event::EndDetect => r.end_detect_int_ena().bit_is_clear(),
+                Event::TxComplete => r.trans_complete_int_ena().bit_is_clear(),
+                #[cfg(not(any(esp32, esp32s2)))]
+                Event::TxFifoWatermark => r.txfifo_wm_int_ena().bit_is_clear(),
+            }
+        }
+    }
+
+    impl<'a, T> core::future::Future for I2cFuture<'a, T>
+    where
+        T: Instance,
+    {
+        type Output = ();
+
+        fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
+            WAKERS[self.instance.i2c_number()].register(ctx.waker());
+
+            if self.event_bit_is_clear() {
+                Poll::Ready(())
+            } else {
+                Poll::Pending
+            }
+        }
+    }
+
+    impl<T> I2C<'_, T>
+    where
+        T: Instance,
+    {
+        async fn master_read(&mut self, addr: u8, buffer: &mut [u8]) -> Result<(), Error> {
+            // Reset FIFO and command list
+            self.peripheral.reset_fifo();
+            self.peripheral.reset_command_list();
+
+            self.perform_read(
+                addr,
+                buffer,
+                &mut self.peripheral.register_block().comd.iter(),
+            )
+            .await
+        }
+
+        async fn perform_read<'a, I>(
+            &self,
+            addr: u8,
+            buffer: &mut [u8],
+            cmd_iterator: &mut I,
+        ) -> Result<(), Error>
+        where
+            I: Iterator<Item = &'a COMD>,
+        {
+            self.peripheral.setup_read(addr, buffer, cmd_iterator)?;
+            self.peripheral.start_transmission();
+
+            self.read_all_from_fifo(buffer).await?;
+            self.wait_for_completion().await?;
+
+            Ok(())
+        }
+
+        #[cfg(any(esp32, esp32s2))]
+        async fn read_all_from_fifo(&self, buffer: &mut [u8]) -> Result<(), Error> {
+            if buffer.len() > 32 {
+                panic!("On ESP32 and ESP32-S2 the max I2C read is limited to 32 bytes");
+            }
+
+            self.wait_for_completion().await?;
+
+            for byte in buffer.iter_mut() {
+                *byte = read_fifo(self.peripheral.register_block());
+            }
+
+            Ok(())
+        }
+
+        #[cfg(not(any(esp32, esp32s2)))]
+        async fn read_all_from_fifo(&self, buffer: &mut [u8]) -> Result<(), Error> {
+            self.peripheral.read_all_from_fifo(buffer)
+        }
+
+        async fn master_write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Error> {
+            // Reset FIFO and command list
+            self.peripheral.reset_fifo();
+            self.peripheral.reset_command_list();
+
+            self.perform_write(
+                addr,
+                bytes,
+                &mut self.peripheral.register_block().comd.iter(),
+            )
+            .await
+        }
+
+        async fn perform_write<'a, I>(
+            &self,
+            addr: u8,
+            bytes: &[u8],
+            cmd_iterator: &mut I,
+        ) -> Result<(), Error>
+        where
+            I: Iterator<Item = &'a COMD>,
+        {
+            self.peripheral.setup_write(addr, bytes, cmd_iterator)?;
+            let index = self.peripheral.fill_tx_fifo(bytes);
+            self.peripheral.start_transmission();
+
+            // Fill the FIFO with the remaining bytes:
+            self.write_remaining_tx_fifo(index, bytes).await?;
+            self.wait_for_completion().await?;
+
+            Ok(())
+        }
+
+        #[cfg(any(esp32, esp32s2))]
+        async fn write_remaining_tx_fifo(
+            &self,
+            start_index: usize,
+            bytes: &[u8],
+        ) -> Result<(), Error> {
+            if start_index >= bytes.len() {
+                return Ok(());
+            }
+
+            for b in bytes {
+                write_fifo(self.peripheral.register_block(), *b);
+                self.peripheral.check_errors()?;
+            }
+
+            Ok(())
+        }
+
+        #[cfg(not(any(esp32, esp32s2)))]
+        async fn write_remaining_tx_fifo(
+            &self,
+            start_index: usize,
+            bytes: &[u8],
+        ) -> Result<(), Error> {
+            let mut index = start_index;
+            loop {
+                self.peripheral.check_errors()?;
+
+                I2cFuture::new(Event::TxFifoWatermark, self.inner()).await;
+
+                self.peripheral
+                    .register_block()
+                    .int_clr
+                    .write(|w| w.txfifo_wm_int_clr().set_bit());
+
+                I2cFuture::new(Event::TxFifoWatermark, self.inner()).await;
+
+                if index >= bytes.len() {
+                    break Ok(());
+                }
+
+                write_fifo(self.peripheral.register_block(), bytes[index]);
+                index += 1;
+            }
+        }
+
+        async fn wait_for_completion(&self) -> Result<(), Error> {
+            self.peripheral.check_errors()?;
+
+            select(
+                I2cFuture::new(Event::TxComplete, self.inner()),
+                I2cFuture::new(Event::EndDetect, self.inner()),
+            )
+            .await;
+
+            for cmd in self.peripheral.register_block().comd.iter() {
+                if cmd.read().command().bits() != 0x0 && cmd.read().command_done().bit_is_clear() {
+                    return Err(Error::ExecIncomplete);
+                }
+            }
+
+            Ok(())
+        }
+    }
+
+    impl<'d, T> embedded_hal_async::i2c::I2c for I2C<'d, T>
+    where
+        T: Instance,
+    {
+        async fn read(&mut self, address: u8, read: &mut [u8]) -> Result<(), Self::Error> {
+            self.master_read(address, read).await
+        }
+
+        async fn write(&mut self, address: u8, write: &[u8]) -> Result<(), Self::Error> {
+            self.master_write(address, write).await
+        }
+
+        async fn write_read(
+            &mut self,
+            address: u8,
+            write: &[u8],
+            read: &mut [u8],
+        ) -> Result<(), Self::Error> {
+            self.master_write(address, write).await?;
+            self.master_read(address, read).await?;
+
+            Ok(())
+        }
+
+        async fn transaction(
+            &mut self,
+            _address: u8,
+            _operations: &mut [Operation<'_>],
+        ) -> Result<(), Self::Error> {
+            todo!()
+        }
+    }
+
+    #[interrupt]
+    fn I2C_EXT0() {
+        unsafe { &*crate::peripherals::I2C0::PTR }
+            .int_ena
+            .modify(|_, w| {
+                w.end_detect_int_ena()
+                    .clear_bit()
+                    .trans_complete_int_ena()
+                    .clear_bit()
+            });
+
+        #[cfg(not(any(esp32, esp32s2)))]
+        unsafe { &*crate::peripherals::I2C0::PTR }
+            .int_ena
+            .modify(|_, w| w.txfifo_wm_int_ena().clear_bit());
+
+        WAKERS[0].wake();
+    }
+
+    #[cfg(i2c1)]
+    #[interrupt]
+    fn I2C_EXT1() {
+        unsafe { &*crate::peripherals::I2C1::PTR }
+            .int_ena
+            .modify(|_, w| {
+                w.end_detect_int_ena()
+                    .clear_bit()
+                    .trans_complete_int_ena()
+                    .clear_bit()
+            });
+
+        #[cfg(not(any(esp32, esp32s2)))]
+        unsafe { &*crate::peripherals::I2C0::PTR }
+            .int_ena
+            .modify(|_, w| w.txfifo_wm_int_ena().clear_bit());
+
+        WAKERS[1].wake();
+    }
 }
 
 fn enable_peripheral<'d, T>(
