@@ -707,12 +707,7 @@ pub trait Instance {
         }
     }
 
-    fn perform_write<'a, I>(
-        &self,
-        addr: u8,
-        bytes: &[u8],
-        cmd_iterator: &mut I,
-    ) -> Result<(), Error>
+    fn setup_write<'a, I>(&self, addr: u8, bytes: &[u8], cmd_iterator: &mut I) -> Result<(), Error>
     where
         I: Iterator<Item = &'a COMD>,
     {
@@ -747,19 +742,30 @@ pub trait Instance {
             addr << 1 | OperationType::Write as u8,
         );
 
-        let index = self.fill_tx_fifo(bytes);
+        Ok(())
+    }
 
+    fn perform_write<'a, I>(
+        &self,
+        addr: u8,
+        bytes: &[u8],
+        cmd_iterator: &mut I,
+    ) -> Result<(), Error>
+    where
+        I: Iterator<Item = &'a COMD>,
+    {
+        self.setup_write(addr, bytes, cmd_iterator)?;
+        let index = self.fill_tx_fifo(bytes);
         self.start_transmission();
 
-        // fill FIFO with remaining bytes
+        // Fill the FIFO with the remaining bytes:
         self.write_remaining_tx_fifo(index, bytes)?;
-
         self.wait_for_completion()?;
 
         Ok(())
     }
 
-    fn perform_read<'a, I>(
+    fn setup_read<'a, I>(
         &self,
         addr: u8,
         buffer: &mut [u8],
@@ -816,10 +822,21 @@ pub trait Instance {
         // Load address and R/W bit into FIFO
         write_fifo(self.register_block(), addr << 1 | OperationType::Read as u8);
 
+        Ok(())
+    }
+
+    fn perform_read<'a, I>(
+        &self,
+        addr: u8,
+        buffer: &mut [u8],
+        cmd_iterator: &mut I,
+    ) -> Result<(), Error>
+    where
+        I: Iterator<Item = &'a COMD>,
+    {
+        self.setup_read(addr, buffer, cmd_iterator)?;
         self.start_transmission();
-
         self.read_all_from_fifo(buffer)?;
-
         self.wait_for_completion()?;
 
         Ok(())
