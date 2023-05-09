@@ -29,8 +29,6 @@ pub fn init_psram(_peripheral: impl crate::peripheral::Peripheral<P = crate::per
 
     const MMU_ACCESS_SPIRAM: u32 = 1 << 16;
 
-    const PSRAM_VADDR: u32 = 0x3f500000;
-
     const CACHE_SIZE_8KB: u32 = 0;
     const CACHE_4WAYS_ASSOC: u32 = 0;
     const CACHE_LINE_SIZE_16B: u32 = 0;
