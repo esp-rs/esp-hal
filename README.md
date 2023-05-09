@@ -31,6 +31,7 @@ If you have any questions, comments, or concerns, please [open an issue], [start
 [esp32c2-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32c2-hal
 [esp32c3-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32c3-hal
 [esp32c6-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32c6-hal
+[esp32h2-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32h2-hal
 [esp32s2-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32s2-hal
 [esp32s3-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32s3-hal
 [esp32]: https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf
@@ -39,7 +40,6 @@ If you have any questions, comments, or concerns, please [open an issue], [start
 [esp32-c6]: https://www.espressif.com/sites/default/files/documentation/esp32-c6_technical_reference_manual_en.pdf
 [esp32-s2]: https://www.espressif.com/sites/default/files/documentation/esp32-s2_technical_reference_manual_en.pdf
 [esp32-s3]: https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf
-[atomic emulation]: https://github.com/esp-rs/riscv-atomic-emulation-trap
 
 ## Quickstart
 
