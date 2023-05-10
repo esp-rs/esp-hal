@@ -65,10 +65,13 @@ embassy-time-timg0 = ["esp-hal-common/embassy-time-timg0", "embassy-time/tick-hz
 interrupt-preemption = ["esp-hal-common/interrupt-preemption"]
 
 [profile.dev]
-opt-level = 1
+opt-level = 2
+lto = "thin"
 
 [profile.release]
 debug = true
+opt-level = 2
+lto = "thin"
 
 [[example]]
 name              = "spi_eh1_loopback"
