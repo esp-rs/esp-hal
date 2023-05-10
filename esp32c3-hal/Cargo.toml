@@ -101,3 +101,6 @@ required-features = ["embassy", "async"]
 [[example]]
 name              = "embassy_i2c"
 required-features = ["embassy", "async"]
+
+[patch.crates-io]
+esp32c3 = { git = "https://github.com/rustbox/esp-pacs", rev = "c8e7cbb1cef4f6b3fd565c8fbb30e37674657877" }
