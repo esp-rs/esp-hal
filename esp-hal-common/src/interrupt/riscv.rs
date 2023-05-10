@@ -268,7 +268,7 @@ mod vectored {
         }
     }
 
-    #[ram]
+    #[inline(always)]
     unsafe fn handle_interrupt(interrupt: Interrupt, save_frame: &mut TrapFrame) {
         extern "C" {
             // defined in each hal

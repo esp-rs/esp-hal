@@ -169,6 +169,7 @@ pub enum Cpu {
     AppCpu,
 }
 
+#[inline(always)]
 pub fn get_core() -> Cpu {
     #[cfg(all(xtensa, multi_core))]
     match ((xtensa_lx::get_processor_id() >> 13) & 1) != 0 {
