@@ -38,6 +38,7 @@ embassy-executor  = { version = "0.2.0", features = ["nightly", "integrated-time
 embedded-graphics = "0.7.1"
 esp-backtrace     = { version = "0.7.0", features = ["esp32c2", "panic-handler", "exception-handler", "print-uart"] }
 esp-println       = { version = "0.5.0", features = ["esp32c2"] }
+lis3dh-async      = "0.7.0"
 sha2              = { version = "0.10.6", default-features = false}
 ssd1306           = "0.7.1"
 static_cell       = "1.0.0"
@@ -83,4 +84,8 @@ required-features = ["interrupt-preemption"]
 
 [[example]]
 name              = "embassy_serial"
+required-features = ["embassy", "async"]
+
+[[example]]
+name              = "embassy_i2c"
 required-features = ["embassy", "async"]

@@ -82,6 +82,8 @@ jobs:
         run: cd esp32-hal/ && cargo check --example=embassy_spi --features=embassy,embassy-time-timg0,async
       - name: check esp32-hal (async, serial)
         run: cd esp32-hal/ && cargo check --example=embassy_serial --features=embassy,embassy-time-timg0,async
+      - name: check esp32-hal (async, i2c)
+        run: cd esp32-hal/ && cargo check --example=embassy_i2c --features=embassy,embassy-time-timg0,async
 
   esp32c2-hal:
     runs-on: ubuntu-latest
@@ -117,6 +119,8 @@ jobs:
         run: cd esp32c2-hal/ && cargo +nightly check --example=embassy_spi --features=embassy,embassy-time-systick,async
       - name: check esp32c2-hal (async, serial)
         run: cd esp32c2-hal/ && cargo +nightly check --example=embassy_serial --features=embassy,embassy-time-systick,async
+      - name: check esp32c2-hal (async, i2c)
+        run: cd esp32c2-hal/ && cargo +nightly check --example=embassy_i2c --features=embassy,embassy-time-systick,async
 
   esp32c3-hal:
     runs-on: ubuntu-latest
@@ -154,6 +158,8 @@ jobs:
         run: cd esp32c3-hal/ && cargo +nightly check --example=embassy_spi --features=embassy,embassy-time-systick,async
       - name: check esp32c3-hal (async, serial)
         run: cd esp32c3-hal/ && cargo +nightly check --example=embassy_serial --features=embassy,embassy-time-systick,async
+      - name: check esp32c3-hal (async, i2c)
+        run: cd esp32c3-hal/ && cargo +nightly check --example=embassy_i2c --features=embassy,embassy-time-systick,async
 
   esp32c6-hal:
     runs-on: ubuntu-latest
@@ -189,6 +195,8 @@ jobs:
         run: cd esp32c6-hal/ && cargo +nightly check --example=embassy_spi --features=embassy,embassy-time-systick,async
       - name: check esp32c6-hal (async, serial)
         run: cd esp32c6-hal/ && cargo +nightly check --example=embassy_serial --features=embassy,embassy-time-systick,async
+      - name: check esp32c6-hal (async, i2c)
+        run: cd esp32c6-hal/ && cargo +nightly check --example=embassy_i2c --features=embassy,embassy-time-systick,async
 
   esp32h2-hal:
     runs-on: ubuntu-latest
@@ -254,6 +262,8 @@ jobs:
         run: cd esp32s2-hal/ && cargo check --example=embassy_spi --features=embassy,embassy-time-timg0,async
       - name: check esp32s2-hal (async, serial)
         run: cd esp32s2-hal/ && cargo check --example=embassy_serial --features=embassy,embassy-time-timg0,async
+      - name: check esp32s2-hal (async, i2c)
+        run: cd esp32s2-hal/ && cargo check --example=embassy_i2c --features=embassy,embassy-time-timg0,async
 
   esp32s3-hal:
     runs-on: ubuntu-latest
@@ -289,6 +299,8 @@ jobs:
         run: cd esp32s3-hal/ && cargo check --example=embassy_spi --features=embassy,embassy-time-timg0,async
       - name: check esp32s3-hal (async, serial)
         run: cd esp32s3-hal/ && cargo check --example=embassy_serial --features=embassy,embassy-time-timg0,async
+      - name: check esp32s3-hal (async, i2c)
+        run: cd esp32s3-hal/ && cargo check --example=embassy_i2c --features=embassy,embassy-time-timg0,async
 
   # --------------------------------------------------------------------------
   # MSRV
