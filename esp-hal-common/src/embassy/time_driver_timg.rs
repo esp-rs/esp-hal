@@ -1,5 +1,3 @@
-use core::cell::RefCell;
-
 use critical_section::{CriticalSection, Mutex};
 use peripherals::TIMG0;
 
@@ -13,23 +11,22 @@ use crate::{
 
 pub const ALARM_COUNT: usize = 1;
 
-pub type TimerType = Timer<Timer0<TIMG0>>;
+pub type TimerInner = Timer0<TIMG0>;
+pub type TimerType = Timer<TimerInner>;
 
 pub struct EmbassyTimer {
     pub(crate) alarms: Mutex<[AlarmState; ALARM_COUNT]>,
-    pub(crate) timer: Mutex<RefCell<Option<TimerType>>>,
 }
 
 const ALARM_STATE_NONE: AlarmState = AlarmState::new();
 
 embassy_time::time_driver_impl!(static DRIVER: EmbassyTimer = EmbassyTimer {
     alarms: Mutex::new([ALARM_STATE_NONE; ALARM_COUNT]),
-    timer: Mutex::new(RefCell::new(None)),
 });
 
 impl EmbassyTimer {
     pub(crate) fn now() -> u64 {
-        critical_section::with(|cs| DRIVER.timer.borrow_ref(cs).as_ref().unwrap().now())
+        unsafe { TimerInner::steal() }.now()
     }
 
     pub(crate) fn trigger_alarm(&self, n: usize, cs: CriticalSection) {
@@ -43,10 +40,8 @@ impl EmbassyTimer {
     }
 
     fn on_interrupt(&self, id: u8) {
-        critical_section::with(|cs| {
-            let mut tg = self.timer.borrow_ref_mut(cs);
-            let tg = tg.as_mut().unwrap();
-            tg.clear_interrupt();
+        critical_section::with(|cs| unsafe {
+            TimerInner::steal().clear_interrupt();
             self.trigger_alarm(id as usize, cs);
         });
     }
@@ -57,8 +52,6 @@ impl EmbassyTimer {
         // set divider to get a 1mhz clock. abp (80mhz) / 80 = 1mhz... // TODO assert
         // abp clock is the source and its at the correct speed for the divider
         timer.set_divider(clocks.apb_clock.to_MHz() as u16);
-
-        critical_section::with(|cs| DRIVER.timer.borrow_ref_mut(cs).replace(timer));
 
         interrupt::enable(peripherals::Interrupt::TG0_T0_LEVEL, Priority::max()).unwrap();
 
@@ -76,8 +69,7 @@ impl EmbassyTimer {
         critical_section::with(|cs| {
             let now = Self::now();
             let alarm_state = unsafe { self.alarms.borrow(cs).get_unchecked(alarm.id() as usize) };
-            let mut tg = self.timer.borrow_ref_mut(cs);
-            let tg = tg.as_mut().unwrap();
+            let mut tg = unsafe { TimerInner::steal() };
             if timestamp < now {
                 tg.unlisten();
                 alarm_state.timestamp.set(u64::MAX);

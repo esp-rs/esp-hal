@@ -189,6 +189,17 @@ pub struct Timer0<TG> {
     phantom: PhantomData<TG>,
 }
 
+impl<TG> Timer0<TG>
+where
+    TG: TimerGroupInstance,
+{
+    pub(crate) unsafe fn steal() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
+
 /// Timer peripheral instance
 impl<TG> Instance for Timer0<TG>
 where
@@ -335,6 +346,18 @@ where
 #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
 pub struct Timer1<TG> {
     phantom: PhantomData<TG>,
+}
+
+#[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
+impl<TG> Timer1<TG>
+where
+    TG: TimerGroupInstance,
+{
+    pub(crate) unsafe fn steal() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
 }
 
 /// Timer peripheral instance
