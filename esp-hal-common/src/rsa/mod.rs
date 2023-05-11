@@ -28,6 +28,7 @@ use crate::{
 #[cfg_attr(esp32s3, path = "esp32sX.rs")]
 #[cfg_attr(esp32c3, path = "esp32cX.rs")]
 #[cfg_attr(esp32c6, path = "esp32cX.rs")]
+#[cfg_attr(esp32h2, path = "esp32cX.rs")]
 #[cfg_attr(esp32, path = "esp32.rs")]
 mod rsa_spec_impl;
 
