@@ -220,7 +220,7 @@ mod vectored {
 
         let configured_interrupts = get_configured_interrupts(crate::get_core(), status);
         let mut interrupt_mask =
-            status & configured_interrupts[INTERRUPT_TO_PRIORITY[cpu_intr as usize - 1]];
+            status & configured_interrupts[interrupt_to_priority(cpu_intr as usize)];
         while interrupt_mask != 0 {
             let interrupt_nr = interrupt_mask.trailing_zeros();
             // Interrupt::try_from can fail if interrupt already de-asserted:
@@ -605,6 +605,11 @@ unsafe fn get_assigned_cpu_interrupt(interrupt: Interrupt) -> CpuInterrupt {
 mod classic {
     use super::{CpuInterrupt, InterruptKind, Priority};
     use crate::Cpu;
+
+    #[inline(always)]
+    pub(super) const fn interrupt_to_priority(irq: usize) -> usize {
+        irq
+    }
 
     pub(super) const PRIORITY_TO_INTERRUPT: [usize; 15] =
         [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
