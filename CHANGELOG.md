@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bare-bones PSRAM support for ESP32 (#506)
 - Add initial support for the ESP32-H2 (#513)
+- Add bare-bones PSRAM support for ESP32-S3 (#517)
+- Add async support to the I2C driver (#519)
 - Add initial support for RSA in ESP32-H2 (#526)
 
 ### Fixed

@@ -43,6 +43,7 @@ embedded-graphics = "0.7.1"
 esp-backtrace     = { version = "0.7.0", features = ["esp32c3", "panic-handler", "exception-handler", "print-uart"] }
 esp-hal-smartled  = { version = "0.2.0", features = ["esp32c3"], path = "../esp-hal-smartled" }
 esp-println       = { version = "0.5.0", features = ["esp32c3"] }
+lis3dh-async      = "0.7.0"
 sha2              = { version = "0.10.6", default-features = false}
 smart-leds        = "0.3.0"
 ssd1306           = "0.7.1"
@@ -62,6 +63,12 @@ embassy              = ["esp-hal-common/embassy"]
 embassy-time-systick = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-hz-16_000_000"]
 embassy-time-timg0 = ["esp-hal-common/embassy-time-timg0", "embassy-time/tick-hz-1_000_000"]
 interrupt-preemption = ["esp-hal-common/interrupt-preemption"]
+
+[profile.dev]
+opt-level = 1
+
+[profile.release]
+debug = true
 
 [[example]]
 name              = "spi_eh1_loopback"
@@ -83,9 +90,6 @@ required-features = ["embassy", "async"]
 name = "interrupt_preemption"
 required-features = ["interrupt-preemption"]
 
-[profile.dev]
-opt-level = 1
-
 [[example]]
 name              = "embassy_spi"
 required-features = ["embassy", "async"]
@@ -94,5 +98,6 @@ required-features = ["embassy", "async"]
 name              = "embassy_serial"
 required-features = ["embassy", "async"]
 
-[profile.release]
-debug = true
+[[example]]
+name              = "embassy_i2c"
+required-features = ["embassy", "async"]
