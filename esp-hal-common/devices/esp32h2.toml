@@ -4,7 +4,7 @@ cores = "single_core"
 
 peripherals = [
     # Peripherals available in the PAC:
-    # "aes",
+    "aes",
     "apb_saradc",
     # "assist_debug",
     # "ds",
