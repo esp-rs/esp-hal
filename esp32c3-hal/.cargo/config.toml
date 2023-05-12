@@ -4,6 +4,8 @@ rustflags = [
   "-C", "link-arg=-Tlinkall.x",
   "-C", "force-frame-pointers",
 
+  "-C", "llvm-args=--max-jump-table-size=0",
+
   # comment the cfgs below if you do _not_ wish to emulate atomics.
   # enable the atomic codegen option for RISCV
   "-C", "target-feature=+a",
