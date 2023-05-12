@@ -15,11 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add initial support for the ESP32-H2 (#513)
 - Add bare-bones PSRAM support for ESP32-S3 (#517)
 - Add async support to the I2C driver (#519)
+- Add initial support for SHA in ESP32-H2 (#527)
 - Add initial support for AES in ESP32-H2 (#528)
 
 ### Fixed
 
 - DMA is supported for SPI3 on ESP32-S3 (#507)
+- `change_bus_frequency` is now available on `SpiDma` (#529)
 
 ## [0.9.0] - 2023-05-02
 

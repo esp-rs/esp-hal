@@ -1,5 +1,5 @@
 [device]
-arch  = "riscv"
+arch = "riscv"
 cores = "single_core"
 
 peripherals = [
@@ -42,7 +42,7 @@ peripherals = [
     # "rmt",
     # "rng",
     # "rsa",
-    # "sha",
+    "sha",
     # "soc_etm",
     # "spi0",
     # "spi1",
