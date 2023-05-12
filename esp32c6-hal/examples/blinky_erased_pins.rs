@@ -43,15 +43,16 @@ fn main() -> ! {
     wdt0.disable();
     wdt1.disable();
 
-    // Set GPIO4 as an output, and set its state high initially.
+    // Set LED GPIOs as an output.
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let led1 = io.pins.gpio3.into_push_pull_output();
     let led2 = io.pins.gpio4.into_push_pull_output();
     let led3 = io.pins.gpio5.into_push_pull_output();
 
+    // Set GPIO9 as an input.
     let button = io.pins.gpio9.into_pull_down_input().degrade();
 
-    // you can use `into` or `degrade`
+    // You can use `into` or `degrade`
     let mut pins = [led1.into(), led2.into(), led3.degrade()];
 
     // Initialize the Delay peripheral, and use it to toggle the LED state in a
