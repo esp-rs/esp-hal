@@ -8,7 +8,7 @@ command -v "cargo" >/dev/null 2>&1 || { echo >&2 "The 'cargo' command is not ins
 command -v "rustfmt" >/dev/null 2>&1 || { echo >&2 "The 'rustfmt' command is not installed, exiting"; exit 1; }
 
 # Check the formatting of all Rust code for every package.
-for package in "esp"*/; do
+for manifest in "esp"*/Cargo.toml; do
     # Check package is correctly formatted.
-    cargo fmt --all --manifest-path "${package}Cargo.toml" -- --check
+    cargo fmt --all --manifest-path "${manifest}" -- --check
 done

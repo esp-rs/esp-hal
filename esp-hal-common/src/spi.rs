@@ -731,6 +731,7 @@ pub mod dma {
     use core::{marker::PhantomData, mem};
 
     use embedded_dma::{ReadBuffer, WriteBuffer};
+    use fugit::HertzU32;
 
     #[cfg(any(esp32, esp32s2, esp32s3))]
     use super::Spi3Instance;
@@ -750,6 +751,7 @@ pub mod dma {
     #[cfg(any(esp32, esp32s2, esp32s3))]
     use crate::dma::Spi3Peripheral;
     use crate::{
+        clock::Clocks,
         dma::{Channel, DmaTransfer, DmaTransferRxTx, Rx, Spi2Peripheral, SpiPeripheral, Tx},
         peripheral::PeripheralRef,
     };
@@ -942,6 +944,19 @@ pub mod dma {
         pub(crate) spi: PeripheralRef<'d, T>,
         pub(crate) channel: Channel<TX, RX, P>,
         _mode: PhantomData<M>,
+    }
+
+    impl<'d, T, TX, RX, P, M> SpiDma<'d, T, TX, RX, P, M>
+    where
+        T: InstanceDma<TX, RX>,
+        TX: Tx,
+        RX: Rx,
+        P: SpiPeripheral,
+        M: DuplexMode,
+    {
+        pub fn change_bus_frequency(&mut self, frequency: HertzU32, clocks: &Clocks) {
+            self.spi.ch_bus_freq(frequency, clocks);
+        }
     }
 
     impl<'d, T, TX, RX, P, M> SpiDma<'d, T, TX, RX, P, M>
