@@ -1,7 +1,18 @@
-//! embassy hello world
+//! Embassy SPI
 //!
-//! This is an example of running the embassy executor with multiple tasks
-//! concurrently.
+//! Folowing pins are used:
+//! SCLK    GPIO19
+//! MISO    GPIO25
+//! MOSI    GPIO23
+//! CS      GPIO22
+//!
+//! Depending on your target and the board you are using you have to change the
+//! pins.
+//!
+//! Connect MISO and MOSI pins to see the outgoing data is read as incoming
+//! data.
+//!
+//! This is an example of running the embassy executor with SPI.
 
 #![no_std]
 #![no_main]

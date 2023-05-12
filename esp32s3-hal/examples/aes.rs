@@ -1,3 +1,5 @@
+//! Encrypt/Decrypt a message using AES.
+
 #![no_std]
 #![no_main]
 use aes::{
