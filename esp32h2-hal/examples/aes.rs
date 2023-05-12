@@ -1,18 +1,16 @@
-//! Encrypt/Decrypt a message using AES.
-
 #![no_std]
 #![no_main]
 use aes::{
     cipher::{generic_array::GenericArray, BlockDecrypt, BlockEncrypt, KeyInit},
     Aes128 as Aes128SW,
 };
-use esp32s3_hal::{
+use esp32h2_hal::{
     aes::{Aes, Aes128, Cipher, Key},
     clock::ClockControl,
     peripherals::Peripherals,
     prelude::*,
+    systimer::SystemTimer,
     timer::TimerGroup,
-    xtensa_lx,
     Rtc,
 };
 use esp_backtrace as _;
@@ -21,11 +19,14 @@ use esp_println::println;
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let mut system = peripherals.SYSTEM.split();
+    let mut system = peripherals.PCR.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    // Disable the RTC and TIMG watchdog timers
-    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
+    // Disable the watchdog timers. For the ESP32-H2, this includes the Super WDT,
+    // and the TIMG WDTs.
+    // Disable the watchdog timers. For the ESP32-H2, this includes the Super WDT,
+    // and the TIMG WDTs.
+    let mut rtc = Rtc::new(peripherals.LP_CLKRST);
     let timer_group0 = TimerGroup::new(
         peripherals.TIMG0,
         &clocks,
@@ -39,6 +40,7 @@ fn main() -> ! {
     );
     let mut wdt1 = timer_group1.wdt;
 
+    rtc.swd.disable();
     rtc.rwdt.disable();
     wdt0.disable();
     wdt1.disable();
@@ -59,17 +61,17 @@ fn main() -> ! {
     let key = Key::<Aes128>::from(&keybuf);
     let mut cipher = Cipher::new(&mut aes, &key);
     let mut block = block_buf.clone();
-    let pre_hw_encrypt = xtensa_lx::timer::get_cycle_count();
+    let pre_hw_encrypt = SystemTimer::now();
     cipher.encrypt_block(&mut block);
-    let post_hw_encrypt = xtensa_lx::timer::get_cycle_count();
+    let post_hw_encrypt = SystemTimer::now();
     println!(
         "it took {} cycles for hw encrypt",
         post_hw_encrypt - pre_hw_encrypt
     );
     let hw_encrypted = block.clone();
-    let pre_hw_decrypt = xtensa_lx::timer::get_cycle_count();
+    let pre_hw_decrypt = SystemTimer::now();
     cipher.decrypt_block(&mut block);
-    let post_hw_decrypt = xtensa_lx::timer::get_cycle_count();
+    let post_hw_decrypt = SystemTimer::now();
     println!(
         "it took {} cycles for hw decrypt",
         post_hw_decrypt - pre_hw_decrypt
@@ -79,17 +81,17 @@ fn main() -> ! {
     let key = GenericArray::from(keybuf);
     let mut block = GenericArray::from(block_buf);
     let cipher = Aes128SW::new(&key);
-    let pre_sw_encrypt = xtensa_lx::timer::get_cycle_count();
+    let pre_sw_encrypt = SystemTimer::now();
     cipher.encrypt_block(&mut block);
-    let post_sw_encrypt = xtensa_lx::timer::get_cycle_count();
+    let post_sw_encrypt = SystemTimer::now();
     println!(
         "it took {} cycles for sw encrypt",
         post_sw_encrypt - pre_sw_encrypt
     );
     let sw_encrypted = block.clone();
-    let pre_sw_decrypt = xtensa_lx::timer::get_cycle_count();
+    let pre_sw_decrypt = SystemTimer::now();
     cipher.decrypt_block(&mut block);
-    let post_sw_decrypt = xtensa_lx::timer::get_cycle_count();
+    let post_sw_decrypt = SystemTimer::now();
     println!(
         "it took {} cycles for sw decrypt",
         post_sw_decrypt - pre_sw_decrypt

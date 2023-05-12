@@ -1,3 +1,15 @@
+//! Embassy I2C
+//!
+//! Folowing pins are used:
+//! SDA    GPIO32
+//! SCL    GPIO33
+//!
+//! Depending on your target and the board you are using you have to change the
+//! pins.
+//!
+//! This is an example of running the embassy executor with IC2. It uses an
+//! LIS3DH to get accelerometer data.
+
 #![no_std]
 #![no_main]
 #![feature(type_alias_impl_trait)]

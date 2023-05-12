@@ -1,3 +1,5 @@
+//! Encrypt/Decrypt a message using RSA.
+
 #![no_std]
 #![no_main]
 
