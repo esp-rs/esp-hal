@@ -6,7 +6,7 @@ pub use pac::Interrupt;
 pub(crate) use self::peripherals::*;
 
 crate::peripherals! {
-    // AES => true,
+    AES => true,
     APB_SARADC => true,
     // ASSIST_DEBUG => true,
     // DS => true,
