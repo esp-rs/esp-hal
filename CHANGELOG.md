@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - DMA is supported for SPI3 on ESP32-S3 (#507)
 - `change_bus_frequency` is now available on `SpiDma` (#529)
 
+### Changed
+- Improve examples documentation (#533)
+
 ## [0.9.0] - 2023-05-02
 
 ### Added
