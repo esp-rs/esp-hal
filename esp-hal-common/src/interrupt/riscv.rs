@@ -166,6 +166,42 @@ mod vectored {
         }
     }
 
+    /// Similar to [intrinsics::cttz], except we are able to place the lookup
+    /// table in SRAM
+    #[link_section = ".rwtext"]
+    fn ctz(n: u128) -> u32 {
+        // this isn't quite what LLVM does, they lower cttz to `ctpop(~X & (X-1))`,
+        // which use some kind of binary-search-like-algorithm plus a lookup
+        // table
+        #[inline(always)]
+        fn ctz32(n: u32) -> u32 {
+            // cf. https://en.wikipedia.org/wiki/Find_first_set#CTZ
+            #[link_section = ".data"]
+            static TABLE: [u8; 32] = {
+                let mut t = [0u8; 32];
+                let mut i = 0;
+                while i < 32 {
+                    t[((0x077CB531_u32.wrapping_mul(1 << i)) >> 27) as usize] = i;
+                    i += 1;
+                }
+                t
+            };
+
+            let n = n & (n as i32).wrapping_neg() as u32; // isolate lowest 1 bit
+            TABLE[(n.wrapping_mul(0x077CB531) >> 27) as usize] as u32
+        }
+
+        let n = n.to_ne_bytes();
+        let (n, _) = n.as_chunks::<4>();
+        for (i, b) in n.iter().enumerate() {
+            let n = u32::from_ne_bytes(*b);
+            if n != 0 {
+                return ctz32(n) + i as u32 * 32;
+            }
+        }
+        u128::BITS
+    }
+
     /// Get the interrupts configured for the core
     #[inline]
     fn get_configured_interrupts(_core: Cpu, mut status: u128) -> [u128; 16] {
@@ -173,7 +209,7 @@ mod vectored {
             let mut prios = [0u128; 16];
 
             while status != 0 {
-                let interrupt_nr = status.trailing_zeros() as u16;
+                let interrupt_nr = ctz(status) as u16;
                 // safety: cast is safe because of repr(u16)
                 let cpu_interrupt: CpuInterrupt =
                     get_assigned_cpu_interrupt(core::mem::transmute(interrupt_nr as u16));
@@ -222,7 +258,7 @@ mod vectored {
         let mut interrupt_mask =
             status & configured_interrupts[interrupt_to_priority(cpu_intr as usize)];
         while interrupt_mask != 0 {
-            let interrupt_nr = interrupt_mask.trailing_zeros();
+            let interrupt_nr = ctz(interrupt_mask);
             // Interrupt::try_from can fail if interrupt already de-asserted:
             // silently ignore
             if let Ok(interrupt) = peripherals::Interrupt::try_from(interrupt_nr as u8) {

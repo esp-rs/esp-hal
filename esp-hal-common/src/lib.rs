@@ -31,6 +31,8 @@
     feature(impl_trait_projections)
 )]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
+#![feature(const_mut_refs)]
+#![feature(slice_as_chunks)]
 
 #[cfg(riscv)]
 pub use esp_riscv_rt::{self, entry, riscv};
