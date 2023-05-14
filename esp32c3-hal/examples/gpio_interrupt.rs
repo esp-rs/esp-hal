@@ -75,9 +75,15 @@ fn main() -> ! {
 }
 
 #[interrupt]
+#[ram]
 fn GPIO() {
     critical_section::with(|cs| {
-        esp_println::println!("GPIO interrupt");
+        // can't use println! here, because it delegates to `core::write!` which in turn
+        // is opaquely "stuck" in Flash
+        {
+            use core::fmt::Write;
+            (esp_println::Printer).write_str("GPIO interrupt\n").ok();
+        }
         BUTTON
             .borrow_ref_mut(cs)
             .as_mut()
