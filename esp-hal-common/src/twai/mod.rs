@@ -414,7 +414,7 @@ where
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum EspTwaiError {
     BusOff,
     EmbeddedHAL(ErrorKind),
