@@ -31,7 +31,7 @@ crate::peripherals! {
     // LP_PERI => true,
     // LP_TIMER => true,
     LP_WDT => true,
-    // MCPWM0 => true,
+    MCPWM0 => true,
     // MEM_MONITOR => true,
     // MODEM_LPCON => true,
     // MODEM_SYSCON => true,
