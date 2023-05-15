@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add initial support for I2C in ESP32-H2 (#538)
 - Implement Copy and Eq for EspTwaiError (#540)
 - Add LEDC hardware fade support
+- Added support for multicore async GPIO (#542)
 
 ### Fixed
 
