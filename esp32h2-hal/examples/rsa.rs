@@ -60,8 +60,6 @@ fn main() -> ! {
 
     // Disable the watchdog timers. For the ESP32-H2, this includes the Super WDT,
     // and the TIMG WDTs.
-    // Disable the watchdog timers. For the ESP32-H2, this includes the Super WDT,
-    // and the TIMG WDTs.
     let mut rtc = Rtc::new(peripherals.LP_CLKRST);
     let timer_group0 = TimerGroup::new(
         peripherals.TIMG0,
@@ -75,11 +73,6 @@ fn main() -> ! {
         &mut system.peripheral_clock_control,
     );
     let mut wdt1 = timer_group1.wdt;
-
-    rtc.swd.disable();
-    rtc.rwdt.disable();
-    wdt0.disable();
-    wdt1.disable();
 
     rtc.swd.disable();
     rtc.rwdt.disable();
