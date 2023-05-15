@@ -380,6 +380,14 @@ impl PeripheralClockControl {
                     system.i2c0_conf.modify(|_, w| w.i2c0_rst_en().clear_bit());
                 }
             }
+            #[cfg(i2c1)]
+            Peripheral::I2cExt1 => {
+                #[cfg(esp32h2)]
+                {
+                    system.i2c1_conf.modify(|_, w| w.i2c1_clk_en().set_bit());
+                    system.i2c1_conf.modify(|_, w| w.i2c1_rst_en().clear_bit());
+                }
+            }
             #[cfg(rmt)]
             Peripheral::Rmt => {
                 system.rmt_conf.modify(|_, w| w.rmt_clk_en().set_bit());

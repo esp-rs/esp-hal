@@ -38,11 +38,12 @@ esp-hal-common     = { version = "0.9.0",  features = ["esp32h2"], path = "../es
 aes               = "0.8.2"
 critical-section  = "1.1.1"
 crypto-bigint     = { version = "0.5.2", default-features = false }
-embassy-executor  = { version = "0.2.0", features = ["nightly", "integrated-timers"] }
+embassy-executor  = { version = "0.2.0", features = ["nightly", "integrated-timers", "arch-riscv32", "executor-thread"] }
 embedded-graphics = "0.7.1"
 esp-backtrace     = { version = "0.7.0", features = ["esp32h2", "panic-handler", "exception-handler", "print-uart"] }
 # esp-hal-smartled  = { version = "0.1.0", features = ["esp32h2"], path = "../esp-hal-smartled" }
 esp-println       = { version = "0.5.0", features = ["esp32h2"] }
+lis3dh-async      = "0.7.0"
 sha2              = { version = "0.10.6", default-features = false}
 smart-leds        = "0.3.0"
 ssd1306           = "0.7.1"
@@ -59,3 +60,7 @@ async                = ["esp-hal-common/async", "embedded-hal-async"]
 embassy              = ["esp-hal-common/embassy"]
 embassy-time-systick = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-hz-16_000_000"]
 embassy-time-timg0   = ["esp-hal-common/embassy-time-timg0",   "embassy-time/tick-hz-1_000_000"]
+
+[[example]]
+name              = "embassy_i2c"
+required-features = ["embassy", "async", "embassy-time-systick"]

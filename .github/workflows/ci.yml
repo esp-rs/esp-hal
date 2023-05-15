@@ -222,6 +222,8 @@ jobs:
       # confident that they link.
       - name: check esp32h2-hal (common features)
         run: cd esp32h2-hal/ && cargo +nightly check --examples --features=eh1,ufmt
+      - name: check esp32h2-hal (async, i2c)
+        run: cd esp32h2-hal/ && cargo check --example=embassy_i2c --features=embassy,embassy-time-systick,async
       # - name: check esp32h2-hal (async, systick)
       #   run: cd esp32h2-hal/ && cargo +nightly check --example=embassy_hello_world --features=embassy,embassy-time-systick
       # - name: check esp32h2-hal (async, timg0)
