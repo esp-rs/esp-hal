@@ -1909,18 +1909,41 @@ mod asynch {
 
     #[interrupt]
     unsafe fn GPIO() {
-        // TODO how to handle dual core reg access
-        // we need to check which core the interrupt is currently firing on
-        // and only fire interrupts registered for that core
-        type Bank0 = SingleCoreInteruptStatusRegisterAccessBank0;
-        #[cfg(any(esp32, esp32s2, esp32s3))]
-        type Bank1 = SingleCoreInteruptStatusRegisterAccessBank1;
-        let mut intrs = Bank0::pro_cpu_interrupt_status_read() as u64;
+        // Whilst the S3 is a dual core chip, it shares the enable registers between
+        // cores so treat it as a single core device
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s2, esp32s3))] {
+                type Bank0 = SingleCoreInteruptStatusRegisterAccessBank0;
+            } else {
+                type Bank0 = DualCoreInteruptStatusRegisterAccessBank0;
+            }
+        };
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32s2, esp32s3))] {
+                type Bank1 = SingleCoreInteruptStatusRegisterAccessBank1;
+            } else {
+                type Bank1 = DualCoreInteruptStatusRegisterAccessBank1;
+            }
+        };
+
+        let mut intrs = match crate::get_core() {
+            crate::Cpu::ProCpu => Bank0::pro_cpu_interrupt_status_read() as u64,
+            #[cfg(multi_core)]
+            crate::Cpu::AppCpu => Bank0::app_cpu_interrupt_status_read() as u64,
+        };
 
         #[cfg(any(esp32, esp32s2, esp32s3))]
-        {
-            intrs |= (Bank1::pro_cpu_interrupt_status_read() as u64) << 32;
-        }
+        match crate::get_core() {
+            crate::Cpu::ProCpu => intrs |= (Bank1::pro_cpu_interrupt_status_read() as u64) << 32,
+            #[cfg(multi_core)]
+            crate::Cpu::AppCpu => intrs |= (Bank1::app_cpu_interrupt_status_read() as u64) << 32,
+        };
+
+        log::trace!(
+            "Handling interrupt on {:?} - {:064b}",
+            crate::get_core(),
+            intrs
+        );
 
         while intrs != 0 {
             let pin_nr = intrs.trailing_zeros();

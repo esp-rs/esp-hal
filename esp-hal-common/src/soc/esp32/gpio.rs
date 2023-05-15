@@ -12,6 +12,7 @@ use crate::{
         Unknown,
     },
     peripherals::GPIO,
+    Cpu,
 };
 
 pub const NUM_PINS: usize = 39;
@@ -72,10 +73,10 @@ pub(crate) fn get_io_mux_reg(gpio_num: u8) -> &'static crate::peripherals::io_mu
 }
 
 pub(crate) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
-    int_enable as u8
-        | ((nmi_enable as u8) << 1)
-        | (int_enable as u8) << 2
-        | ((nmi_enable as u8) << 3)
+    match crate::get_core() {
+        Cpu::AppCpu => int_enable as u8 | ((nmi_enable as u8) << 1),
+        Cpu::ProCpu => (int_enable as u8) << 2 | ((nmi_enable as u8) << 3),
+    }
 }
 
 /// Peripheral input signals for the GPIO mux
