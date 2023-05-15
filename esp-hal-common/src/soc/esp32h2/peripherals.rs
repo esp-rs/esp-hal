@@ -43,7 +43,7 @@ crate::peripherals! {
     // PMU => true,
     // RMT => true,
     // RNG => true,
-    // RSA => true,
+    RSA => true,
     SHA => true,
     // SOC_ETM => true,
     // SPI0 => true,

@@ -41,7 +41,7 @@ peripherals = [
     # "pmu",
     # "rmt",
     # "rng",
-    # "rsa",
+    "rsa",
     "sha",
     # "soc_etm",
     # "spi0",
