@@ -1881,6 +1881,8 @@ mod asynch {
         P: crate::gpio::Pin + embedded_hal_1::digital::ErrorType,
     {
         pub fn new(pin: &'a mut P, event: Event) -> Self {
+            pin.clear_interrupt(); // clear stale interrupt flags, when we await we want to know when an event
+                                   // occurs from the await call, not if the pin event has happened recently.
             pin.listen(event);
             Self { pin }
         }
@@ -1913,18 +1915,12 @@ mod asynch {
         type Bank0 = SingleCoreInteruptStatusRegisterAccessBank0;
         #[cfg(any(esp32, esp32s2, esp32s3))]
         type Bank1 = SingleCoreInteruptStatusRegisterAccessBank1;
-
         let mut intrs = Bank0::pro_cpu_interrupt_status_read() as u64;
 
         #[cfg(any(esp32, esp32s2, esp32s3))]
         {
             intrs |= (Bank1::pro_cpu_interrupt_status_read() as u64) << 32;
         }
-
-        // clear interrupts
-        Bank0GpioRegisterAccess::write_interrupt_status_clear(!0);
-        #[cfg(any(esp32, esp32s2, esp32s3))]
-        Bank1GpioRegisterAccess::write_interrupt_status_clear(!0);
 
         while intrs != 0 {
             let pin_nr = intrs.trailing_zeros();
@@ -1933,7 +1929,7 @@ mod asynch {
                     if pin_nr < 32 {
                         Bank0GpioRegisterAccess::set_int_enable(pin_nr as u8, 0, 0, false);
                     } else {
-                        Bank1GpioRegisterAccess::set_int_enable(pin_nr as u8, 0, 0, false);
+                        Bank1GpioRegisterAccess::set_int_enable((pin_nr - 32) as u8, 0, 0, false);
                     }
                 } else {
                     Bank0GpioRegisterAccess::set_int_enable(pin_nr as u8, 0, 0, false);
@@ -1942,5 +1938,10 @@ mod asynch {
             PIN_WAKERS[pin_nr as usize].wake(); // wake task
             intrs &= !(1 << pin_nr);
         }
+
+        // clear interrupt bits
+        Bank0GpioRegisterAccess::write_interrupt_status_clear(intrs as u32);
+        #[cfg(any(esp32, esp32s2, esp32s3))]
+        Bank1GpioRegisterAccess::write_interrupt_status_clear((intrs >> 32) as u32);
     }
 }
