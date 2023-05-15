@@ -174,6 +174,16 @@ impl CpuControl {
         // set stack pointer to end of memory: no need to retain stack up to this point
         set_stack_pointer(&mut _stack_end_cpu1);
 
+        extern "C" {
+            static mut _init_start: u32;
+        }
+
+        unsafe {
+            // move vec table
+            let base = &_init_start as *const u32;
+            core::arch::asm!("wsr.vecbase {0}", in(reg) base, options(nostack));
+        }
+
         match START_CORE1_FUNCTION.take() {
             Some(entry) => (*entry)(),
             None => panic!("No start function set"),
