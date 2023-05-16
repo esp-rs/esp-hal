@@ -1195,7 +1195,10 @@ impl embedded_svc::wifi::Wifi for WifiController<'_> {
     }
 
     fn connect(&mut self) -> Result<(), Self::Error> {
-        esp_wifi_result!(unsafe { esp_wifi_connect() })
+        esp_wifi_result!(unsafe {
+            WIFI_STATE = -1;
+            esp_wifi_connect()
+        })
     }
 
     fn disconnect(&mut self) -> Result<(), Self::Error> {

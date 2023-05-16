@@ -38,8 +38,11 @@ pub fn create_network_interface<'a, 'd>(
 
     let mut socket_set = SocketSet::new(socket_set_entries);
 
-    let dhcp_socket = Dhcpv4Socket::new();
-    socket_set.add(dhcp_socket);
+    if !mode.is_ap() {
+        // only add DHCP client in STA mode
+        let dhcp_socket = Dhcpv4Socket::new();
+        socket_set.add(dhcp_socket);
+    }
 
     (iface, device, controller, socket_set)
 }
