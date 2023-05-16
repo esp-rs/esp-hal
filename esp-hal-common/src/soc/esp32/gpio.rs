@@ -9,9 +9,13 @@ use crate::{
         InputOnlyAnalogPinType,
         InputOutputAnalogPinType,
         InputOutputPinType,
+        InteruptStatusRegisterAccess,
+        InteruptStatusRegisterAccessBank0,
+        InteruptStatusRegisterAccessBank1,
         Unknown,
     },
     peripherals::GPIO,
+    Cpu,
 };
 
 pub const NUM_PINS: usize = 39;
@@ -72,10 +76,12 @@ pub(crate) fn get_io_mux_reg(gpio_num: u8) -> &'static crate::peripherals::io_mu
 }
 
 pub(crate) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
-    int_enable as u8
-        | ((nmi_enable as u8) << 1)
-        | (int_enable as u8) << 2
-        | ((nmi_enable as u8) << 3)
+    match crate::get_core() {
+        Cpu::AppCpu => int_enable as u8 | ((nmi_enable as u8) << 1),
+        // this should be bits 3 & 4 respectively, according to the TRM, but it doesn't seem to
+        // work. This does though.
+        Cpu::ProCpu => (int_enable as u8) << 2 | ((nmi_enable as u8) << 3),
+    }
 }
 
 /// Peripheral input signals for the GPIO mux
@@ -657,7 +663,6 @@ pub(crate) fn errata36(pin_num: u8, pull_up: bool, pull_down: bool) {
 }
 
 crate::gpio::gpio! {
-    Dual,
     (0, 0, InputOutputAnalog (5 => EMAC_TX_CLK) (1 => CLK_OUT1))
     (1, 0, InputOutput (5 => EMAC_RXD2) (0 => U0TXD 1 => CLK_OUT3))
     (2, 0, InputOutputAnalog (1 => HSPIWP 3 => HS2_DATA0 4 => SD_DATA0) (3 => HS2_DATA0 4 => SD_DATA0))
@@ -715,4 +720,40 @@ crate::gpio::analog! {
      (12, 15, touch_pad5,           mux_sel,        fun_sel,        fun_ie, rue,       rde      )
      (14, 16, touch_pad6,           mux_sel,        fun_sel,        fun_ie, rue,       rde      )
      (27, 17, touch_pad7,           mux_sel,        fun_sel,        fun_ie, rue,       rde      )
+}
+
+impl InteruptStatusRegisterAccess for InteruptStatusRegisterAccessBank0 {
+    fn pro_cpu_interrupt_status_read() -> u32 {
+        unsafe { &*GPIO::PTR }.pcpu_int.read().bits()
+    }
+
+    fn pro_cpu_nmi_status_read() -> u32 {
+        unsafe { &*GPIO::PTR }.pcpu_nmi_int.read().bits()
+    }
+
+    fn app_cpu_interrupt_status_read() -> u32 {
+        unsafe { &*GPIO::PTR }.acpu_int.read().bits()
+    }
+
+    fn app_cpu_nmi_status_read() -> u32 {
+        unsafe { &*GPIO::PTR }.acpu_nmi_int.read().bits()
+    }
+}
+
+impl InteruptStatusRegisterAccess for InteruptStatusRegisterAccessBank1 {
+    fn pro_cpu_interrupt_status_read() -> u32 {
+        unsafe { &*GPIO::PTR }.pcpu_int1.read().bits()
+    }
+
+    fn pro_cpu_nmi_status_read() -> u32 {
+        unsafe { &*GPIO::PTR }.pcpu_nmi_int1.read().bits()
+    }
+
+    fn app_cpu_interrupt_status_read() -> u32 {
+        unsafe { &*GPIO::PTR }.acpu_int1.read().bits()
+    }
+
+    fn app_cpu_nmi_status_read() -> u32 {
+        unsafe { &*GPIO::PTR }.acpu_nmi_int1.read().bits()
+    }
 }
