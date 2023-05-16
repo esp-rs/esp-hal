@@ -35,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Improve examples documentation (#533)
 
+### Breaking
+
+- As part of the refactoring in #537, the public GPIO type has changed. 
+
 ## [0.9.0] - 2023-05-02
 
 ### Added
