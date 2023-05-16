@@ -202,107 +202,25 @@ pub trait OutputPin: Pin {
 }
 
 #[doc(hidden)]
-pub struct SingleCoreInteruptStatusRegisterAccessBank0;
-#[doc(hidden)]
-pub struct DualCoreInteruptStatusRegisterAccessBank0;
-#[doc(hidden)]
-pub struct SingleCoreInteruptStatusRegisterAccessBank1;
-#[doc(hidden)]
-pub struct DualCoreInteruptStatusRegisterAccessBank1;
-
-#[doc(hidden)]
 pub trait InteruptStatusRegisterAccess {
     fn pro_cpu_interrupt_status_read() -> u32;
 
     fn pro_cpu_nmi_status_read() -> u32;
 
-    fn app_cpu_interrupt_status_read() -> u32;
-
-    fn app_cpu_nmi_status_read() -> u32;
-}
-
-impl InteruptStatusRegisterAccess for SingleCoreInteruptStatusRegisterAccessBank0 {
-    fn pro_cpu_interrupt_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_int.read().bits()
-    }
-
-    fn pro_cpu_nmi_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_nmi_int.read().bits()
-    }
-
     fn app_cpu_interrupt_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_int.read().bits()
+        Self::pro_cpu_interrupt_status_read()
     }
 
     fn app_cpu_nmi_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_nmi_int.read().bits()
+        Self::pro_cpu_nmi_status_read()
     }
 }
 
-#[cfg(any(esp32, esp32s2, esp32s3))]
-impl InteruptStatusRegisterAccess for SingleCoreInteruptStatusRegisterAccessBank1 {
-    fn pro_cpu_interrupt_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_int1.read().bits()
-    }
+#[doc(hidden)]
+pub struct InteruptStatusRegisterAccessBank0;
 
-    fn pro_cpu_nmi_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_nmi_int1.read().bits()
-    }
-
-    fn app_cpu_interrupt_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_int1.read().bits()
-    }
-
-    fn app_cpu_nmi_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_nmi_int1.read().bits()
-    }
-}
-
-// ESP32S3 is a dual-core chip however pro cpu and app cpu shares the same
-// interrupt enable bit see
-// https://github.com/espressif/esp-idf/blob/c04803e88b871a4044da152dfb3699cf47354d18/components/hal/esp32s3/include/hal/gpio_ll.h#L32
-// Treating it as SingleCore in the gpio macro makes this work.
-#[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s2, esp32s3)))]
-impl InteruptStatusRegisterAccess for DualCoreInteruptStatusRegisterAccessBank0 {
-    fn pro_cpu_interrupt_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_int.read().bits()
-    }
-
-    fn pro_cpu_nmi_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_nmi_int.read().bits()
-    }
-
-    fn app_cpu_interrupt_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.acpu_int.read().bits()
-    }
-
-    fn app_cpu_nmi_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.acpu_nmi_int.read().bits()
-    }
-}
-
-// ESP32S3 is a dual-core chip however pro cpu and app cpu shares the same
-// interrupt enable bit see
-// https://github.com/espressif/esp-idf/blob/c04803e88b871a4044da152dfb3699cf47354d18/components/hal/esp32s3/include/hal/gpio_ll.h#L32
-// Treating it as SingleCore in the gpio macro makes this work.
-#[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s2, esp32s3)))]
-impl InteruptStatusRegisterAccess for DualCoreInteruptStatusRegisterAccessBank1 {
-    fn pro_cpu_interrupt_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_int1.read().bits()
-    }
-
-    fn pro_cpu_nmi_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_nmi_int1.read().bits()
-    }
-
-    fn app_cpu_interrupt_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.acpu_int1.read().bits()
-    }
-
-    fn app_cpu_nmi_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.acpu_nmi_int1.read().bits()
-    }
-}
+#[doc(hidden)]
+pub struct InteruptStatusRegisterAccessBank1;
 
 #[doc(hidden)]
 pub trait InterruptStatusRegisters<RegisterAccess>
@@ -1530,7 +1448,6 @@ impl IO {
 #[macro_export]
 macro_rules! gpio {
     (
-        $cores:ident,
         $(
             ($gpionum:literal, $bank:literal, $type:ident
                 $(
@@ -1593,12 +1510,12 @@ macro_rules! gpio {
 
             pub struct Pins {
                 $(
-                    pub [< gpio $gpionum >] : GpioPin<Unknown, [< Bank $bank GpioRegisterAccess >], $crate::gpio::[< $cores CoreInteruptStatusRegisterAccessBank $bank >], [< $type PinType >], [<Gpio $gpionum Signals>], $gpionum>,
+                    pub [< gpio $gpionum >] : GpioPin<Unknown, [< Bank $bank GpioRegisterAccess >], $crate::gpio::[< InteruptStatusRegisterAccessBank $bank >], [< $type PinType >], [<Gpio $gpionum Signals>], $gpionum>,
                 )+
             }
 
             $(
-                pub type [<Gpio $gpionum >]<MODE> = GpioPin<MODE, [< Bank $bank GpioRegisterAccess >], $crate::gpio::[< $cores CoreInteruptStatusRegisterAccessBank $bank >], [< $type PinType >], [<Gpio $gpionum Signals>], $gpionum>;
+                pub type [<Gpio $gpionum >]<MODE> = GpioPin<MODE, [< Bank $bank GpioRegisterAccess >], $crate::gpio::[< InteruptStatusRegisterAccessBank $bank >], [< $type PinType >], [<Gpio $gpionum Signals>], $gpionum>;
             )+
 
             pub(crate) enum ErasedPin<MODE> {
@@ -1881,6 +1798,8 @@ mod asynch {
         P: crate::gpio::Pin + embedded_hal_1::digital::ErrorType,
     {
         pub fn new(pin: &'a mut P, event: Event) -> Self {
+            pin.clear_interrupt(); // clear stale interrupt flags, when we await we want to know when an event
+                                   // occurs from the await call, not if the pin event has happened recently.
             pin.listen(event);
             Self { pin }
         }
@@ -1907,24 +1826,34 @@ mod asynch {
 
     #[interrupt]
     unsafe fn GPIO() {
-        // TODO how to handle dual core reg access
-        // we need to check which core the interrupt is currently firing on
-        // and only fire interrupts registered for that core
-        type Bank0 = SingleCoreInteruptStatusRegisterAccessBank0;
-        #[cfg(any(esp32, esp32s2, esp32s3))]
-        type Bank1 = SingleCoreInteruptStatusRegisterAccessBank1;
+        let mut intrs = match crate::get_core() {
+            crate::Cpu::ProCpu => {
+                InteruptStatusRegisterAccessBank0::pro_cpu_interrupt_status_read() as u64
+            }
+            #[cfg(multi_core)]
+            crate::Cpu::AppCpu => {
+                InteruptStatusRegisterAccessBank0::app_cpu_interrupt_status_read() as u64
+            }
+        };
 
-        let mut intrs = Bank0::pro_cpu_interrupt_status_read() as u64;
-
         #[cfg(any(esp32, esp32s2, esp32s3))]
-        {
-            intrs |= (Bank1::pro_cpu_interrupt_status_read() as u64) << 32;
-        }
+        match crate::get_core() {
+            crate::Cpu::ProCpu => {
+                intrs |= (InteruptStatusRegisterAccessBank1::pro_cpu_interrupt_status_read() as u64)
+                    << 32
+            }
+            #[cfg(multi_core)]
+            crate::Cpu::AppCpu => {
+                intrs |= (InteruptStatusRegisterAccessBank1::app_cpu_interrupt_status_read() as u64)
+                    << 32
+            }
+        };
 
-        // clear interrupts
-        Bank0GpioRegisterAccess::write_interrupt_status_clear(!0);
-        #[cfg(any(esp32, esp32s2, esp32s3))]
-        Bank1GpioRegisterAccess::write_interrupt_status_clear(!0);
+        log::trace!(
+            "Handling interrupt on {:?} - {:064b}",
+            crate::get_core(),
+            intrs
+        );
 
         while intrs != 0 {
             let pin_nr = intrs.trailing_zeros();
@@ -1933,7 +1862,7 @@ mod asynch {
                     if pin_nr < 32 {
                         Bank0GpioRegisterAccess::set_int_enable(pin_nr as u8, 0, 0, false);
                     } else {
-                        Bank1GpioRegisterAccess::set_int_enable(pin_nr as u8, 0, 0, false);
+                        Bank1GpioRegisterAccess::set_int_enable((pin_nr - 32) as u8, 0, 0, false);
                     }
                 } else {
                     Bank0GpioRegisterAccess::set_int_enable(pin_nr as u8, 0, 0, false);
@@ -1942,5 +1871,10 @@ mod asynch {
             PIN_WAKERS[pin_nr as usize].wake(); // wake task
             intrs &= !(1 << pin_nr);
         }
+
+        // clear interrupt bits
+        Bank0GpioRegisterAccess::write_interrupt_status_clear(intrs as u32);
+        #[cfg(any(esp32, esp32s2, esp32s3))]
+        Bank1GpioRegisterAccess::write_interrupt_status_clear((intrs >> 32) as u32);
     }
 }

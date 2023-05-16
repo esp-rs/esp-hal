@@ -135,7 +135,7 @@ enum Ack {
     Nack,
 }
 
-#[cfg(any(esp32c2, esp32c3, esp32c6, esp32s3))]
+#[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
 enum Opcode {
     RStart = 6,
     Write  = 1,
@@ -648,11 +648,7 @@ pub trait Instance {
         // Configure frequency
         self.set_frequency(clocks.i2c_clock.convert(), frequency);
 
-        // Propagate configuration changes (only necessary with C2, C3, and S3)
-        #[cfg(any(esp32c2, esp32c3, esp32c6, esp32s3))]
-        self.register_block()
-            .ctr
-            .modify(|_, w| w.conf_upgate().set_bit());
+        self.update_config();
 
         // Reset entire peripheral (also resets fifo)
         self.reset();
@@ -850,7 +846,7 @@ pub trait Instance {
         );
     }
 
-    #[cfg(any(esp32c2, esp32c3, esp32c6, esp32s3))]
+    #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
     /// Sets the frequency of the I2C interface by calculating and applying the
     /// associated timings - corresponds to i2c_ll_cal_bus_clk and
     /// i2c_ll_set_bus_timing in ESP-IDF
@@ -938,7 +934,7 @@ pub trait Instance {
     ) {
         unsafe {
             // divider
-            #[cfg(any(esp32c2, esp32c3, esp32c6, esp32s3))]
+            #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
             self.register_block().clk_conf.modify(|_, w| {
                 w.sclk_sel()
                     .clear_bit()
@@ -1275,8 +1271,8 @@ pub trait Instance {
 
     fn update_config(&self) {
         // Ensure that the configuration of the peripheral is correctly propagated
-        // (only necessary for C3 and S3 variant)
-        #[cfg(any(esp32c2, esp32c3, esp32c6, esp32s3))]
+        // (only necessary for C2, C3, C6, H2 and S3 variant)
+        #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
         self.register_block()
             .ctr
             .modify(|_, w| w.conf_upgate().set_bit());

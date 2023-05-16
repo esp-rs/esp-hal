@@ -8,6 +8,9 @@ use crate::{
         GpioPin,
         InputOutputAnalogPinType,
         InputOutputPinType,
+        InteruptStatusRegisterAccess,
+        InteruptStatusRegisterAccessBank0,
+        InteruptStatusRegisterAccessBank1,
         Unknown,
     },
     peripherals::GPIO,
@@ -261,7 +264,6 @@ pub enum OutputSignal {
 }
 
 crate::gpio::gpio! {
-    Single,
     (0, 0, InputOutputAnalog)
     (1, 0, InputOutputAnalog)
     (2, 0, InputOutputAnalog)
@@ -380,6 +382,26 @@ crate::gpio::analog! {
     (19, 19,  rtc_pad19,      mux_sel,             fun_sel,             fun_ie,             rue,             rde)
     (20, 20,  rtc_pad20,      mux_sel,             fun_sel,             fun_ie,             rue,             rde)
     (21, 21,  rtc_pad21,      mux_sel,             fun_sel,             fun_ie,             rue,             rde)
+}
+
+impl InteruptStatusRegisterAccess for InteruptStatusRegisterAccessBank0 {
+    fn pro_cpu_interrupt_status_read() -> u32 {
+        unsafe { &*GPIO::PTR }.pcpu_int.read().bits()
+    }
+
+    fn pro_cpu_nmi_status_read() -> u32 {
+        unsafe { &*GPIO::PTR }.pcpu_nmi_int.read().bits()
+    }
+}
+
+impl InteruptStatusRegisterAccess for InteruptStatusRegisterAccessBank1 {
+    fn pro_cpu_interrupt_status_read() -> u32 {
+        unsafe { &*GPIO::PTR }.pcpu_int1.read().bits()
+    }
+
+    fn pro_cpu_nmi_status_read() -> u32 {
+        unsafe { &*GPIO::PTR }.pcpu_nmi_int1.read().bits()
+    }
 }
 
 // implement marker traits on USB pins

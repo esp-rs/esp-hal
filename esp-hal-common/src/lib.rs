@@ -159,6 +159,7 @@ pub fn disable_apm_filter() {
 
 /// Enumeration of CPU cores
 /// The actual number of available cores depends on the target.
+#[derive(Debug, PartialEq, Eq)]
 pub enum Cpu {
     /// The first core
     ProCpu = 0,

@@ -7,6 +7,8 @@ use crate::{
         GpioPin,
         InputOutputAnalogPinType,
         InputOutputPinType,
+        InteruptStatusRegisterAccess,
+        InteruptStatusRegisterAccessBank0,
         Unknown,
     },
     peripherals::GPIO,
@@ -165,7 +167,6 @@ pub enum OutputSignal {
 }
 
 crate::gpio::gpio! {
-    Single,
     (0, 0, InputOutputAnalog)
     (1, 0, InputOutputAnalog)
     (2, 0, InputOutputAnalog (2 => FSPIQ) (2 => FSPIQ))
@@ -197,4 +198,14 @@ crate::gpio::analog! {
     3
     4
     5
+}
+
+impl InteruptStatusRegisterAccess for InteruptStatusRegisterAccessBank0 {
+    fn pro_cpu_interrupt_status_read() -> u32 {
+        unsafe { &*GPIO::PTR }.pcpu_int.read().bits()
+    }
+
+    fn pro_cpu_nmi_status_read() -> u32 {
+        unsafe { &*GPIO::PTR }.pcpu_nmi_int.read().bits()
+    }
 }
