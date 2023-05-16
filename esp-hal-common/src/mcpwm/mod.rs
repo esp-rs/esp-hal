@@ -169,6 +169,8 @@ impl<'a> PeripheralClockConfig<'a> {
         let source_clock = clocks.crypto_clock;
         #[cfg(esp32s3)]
         let source_clock = clocks.crypto_pwm_clock;
+        #[cfg(esp32h2)]
+        let source_clock = clocks.xtal_clock;
 
         Self {
             frequency: source_clock / (prescaler as u32 + 1),
@@ -201,6 +203,8 @@ impl<'a> PeripheralClockConfig<'a> {
         let source_clock = clocks.crypto_clock;
         #[cfg(esp32s3)]
         let source_clock = clocks.crypto_pwm_clock;
+        #[cfg(esp32h2)]
+        let source_clock = clocks.xtal_clock;
 
         if target_freq.raw() == 0 || target_freq > source_clock {
             return Err(FrequencyError);

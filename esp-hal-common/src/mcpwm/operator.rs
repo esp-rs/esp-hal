@@ -224,7 +224,7 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
     }
 
     /// Set how a new timestamp syncs with the timer
-    #[cfg(esp32c6)]
+    #[cfg(any(esp32c6, esp32h2))]
     pub fn set_update_method(&mut self, update_method: PwmUpdateMethod) {
         // SAFETY:
         // We only write to our GENx_x_UPMETHOD register
@@ -300,7 +300,7 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
     /// Write a new timestamp.
     /// The written value will take effect according to the set
     /// [`PwmUpdateMethod`].
-    #[cfg(esp32c6)]
+    #[cfg(any(esp32c6, esp32h2))]
     pub fn set_timestamp(&mut self, value: u16) {
         // SAFETY:
         // We only write to our GENx_TSTMP_x register
