@@ -71,5 +71,16 @@ fn main() -> ! {
         })
         .unwrap();
 
-    loop {}
+    channel0.start_duty_fade(0, 100, 2000).expect_err(
+        "Fading from 0% to 100%, at 24kHz and 5-bit resolution, over 2 seconds, should fail",
+    );
+
+    loop {
+        // Set up a breathing LED: fade from off to on over a second, then
+        // from on back off over the next second.  Then loop.
+        channel0.start_duty_fade(0, 100, 1000).unwrap();
+        while channel0.is_duty_fade_running() {}
+        channel0.start_duty_fade(100, 0, 1000).unwrap();
+        while channel0.is_duty_fade_running() {}
+    }
 }
