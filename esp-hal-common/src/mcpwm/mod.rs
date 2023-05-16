@@ -118,7 +118,7 @@ impl<'d, PWM: PwmPeripheral> MCPWM<'d, PWM> {
             peripheral.clk.write(|w| w.en().set_bit());
         }
 
-        #[cfg(esp32c6)]
+        #[cfg(any(esp32c6, esp32h2))]
         {
             unsafe { &*crate::peripherals::PCR::PTR }
                 .pwm_clk_conf
