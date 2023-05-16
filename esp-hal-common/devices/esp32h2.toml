@@ -29,7 +29,7 @@ peripherals = [
     # "lp_peri",
     # "lp_timer",
     "lp_wdt",
-    # "mcpwm0",
+    "mcpwm0",
     # "mem_monitor",
     # "modem_lpcon",
     # "modem_syscon",

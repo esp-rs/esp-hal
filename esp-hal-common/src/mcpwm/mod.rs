@@ -134,6 +134,22 @@ impl<'d, PWM: PwmPeripheral> MCPWM<'d, PWM> {
             // TODO: Add other clock sources
         }
 
+        #[cfg(esp32h2)]
+        {
+            unsafe { &*crate::peripherals::PCR::PTR }
+                .pwm_clk_conf
+                .modify(|_, w| unsafe {
+                    w.pwm_div_num()
+                        .variant(peripheral_clock.prescaler)
+                        .pwm_clkm_en()
+                        .set_bit()
+                        .pwm_clkm_sel()
+                        .bits(0)
+                });
+
+            // TODO: Add other clock sources
+        }
+
         Self {
             _inner: peripheral,
             timer0: Timer::new(),
@@ -169,6 +185,8 @@ impl<'a> PeripheralClockConfig<'a> {
         let source_clock = clocks.crypto_clock;
         #[cfg(esp32s3)]
         let source_clock = clocks.crypto_pwm_clock;
+        #[cfg(esp32h2)]
+        let source_clock = clocks.xtal_clock;
 
         Self {
             frequency: source_clock / (prescaler as u32 + 1),
@@ -201,6 +219,8 @@ impl<'a> PeripheralClockConfig<'a> {
         let source_clock = clocks.crypto_clock;
         #[cfg(esp32s3)]
         let source_clock = clocks.crypto_pwm_clock;
+        #[cfg(esp32h2)]
+        let source_clock = clocks.xtal_clock;
 
         if target_freq.raw() == 0 || target_freq > source_clock {
             return Err(FrequencyError);
