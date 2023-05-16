@@ -62,7 +62,7 @@ fn main() -> ! {
     .unwrap();
 
     let mut delay = Delay::new(&clocks);
-    esp32c3_hal::adc::calibrate();
+    esp32c3_hal::adc::calibrate(esp32c3_hal::adc::Attenuation::Attenuation0dB);
 
     loop {
         let pin_value: u16 = nb::block!(adc1.read(&mut pin)).unwrap();

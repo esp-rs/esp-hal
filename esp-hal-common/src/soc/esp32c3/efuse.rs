@@ -111,217 +111,214 @@ const MAX_BLK_LEN: u32 = 256;
 //     ErrCoding = 0x1600 + 0x04,
 // }
 
-#[derive(Debug, PartialEq)]
-pub enum EfuseErr {
-    Ok = 0,
-    BadArgs,
-    Efuse = 0x1600,
-    OkEfuseCnt,
-    EfuseCntIsFull,
-    EfuseRepeatedProg,
-    Coding,
-    NotEnoughUnusedKeyBlocks,
-    DamagedReading,
-}
+// #[derive(Debug, PartialEq)]
+// pub enum EfuseErr {
+//     Ok = 0,
+//     BadArgs,
+//     Efuse = 0x1600,
+//     OkEfuseCnt,
+//     EfuseCntIsFull,
+//     EfuseRepeatedProg,
+//     Coding,
+//     NotEnoughUnusedKeyBlocks,
+//     DamagedReading,
+// }
 
-pub fn efuse_calib_get_version() {
+// pub fn efuse_calib_get_version() {
 
-}
+// }
 
 
-fn efuse_utility_get_number_of_items(bits: u32, size_of_base: u32) -> u32 {
-    bits / size_of_base + (bits % size_of_base > 0) as u32
-}
+// fn efuse_utility_get_number_of_items(bits: u32, size_of_base: u32) -> u32 {
+//     bits / size_of_base + (bits % size_of_base > 0) as u32
+// }
 
-pub fn get_field_size(field: &[&EFuseAddress]) -> u32  {
-    let mut bits_counter: u32 = 0;
-    for i in 0..field.len() {
-        if let Some(desc) = field.get(i) {
-            bits_counter += desc.size as u32;
-        }
-    }
-    bits_counter
+// pub fn get_field_size(field: &[&EFuseAddress]) -> u32  {
+//     let mut bits_counter: u32 = 0;
+//     for i in 0..field.len() {
+//         if let Some(desc) = field.get(i) {
+//             bits_counter += desc.size as u32;
+//         }
+//     }
+//     bits_counter
 
-}
+// }
 
-pub fn check_range_of_bits(blk: EFuseBlock, offset_in_bits: u8, size_bits: u8) -> bool {
-    let max_num_bits = offset_in_bits as u32 % MAX_BLK_LEN + size_bits as u32;
-    if max_num_bits > MAX_BLK_LEN {
-        return false
-    }
-    true
-}
+// pub fn check_range_of_bits(blk: EFuseBlock, offset_in_bits: u8, size_bits: u8) -> bool {
+//     let max_num_bits = offset_in_bits as u32 % MAX_BLK_LEN + size_bits as u32;
+//     if max_num_bits > MAX_BLK_LEN {
+//         return false
+//     }
+//     true
+// }
 
-type EfuseFuncProc = fn(
-    blk: EFuseBlock,
-    num_reg: u32,
-    bit_start: u32,
-    bit_count: u32,
-    arr: *mut core::ffi::c_void,
-    bits_counter: &mut u32,
-) -> EfuseErr;
+// type EfuseFuncProc = fn(
+//     blk: EFuseBlock,
+//     num_reg: u32,
+//     bit_start: u32,
+//     bit_count: u32,
+//     arr: *mut core::ffi::c_void,
+//     bits_counter: &mut u32,
+// ) -> EfuseErr;
 
-pub fn get_reg_num(bit_offset: i32, bit_count: i32, i_reg: i32) -> i32{
-    let bit_start = bit_offset as u32 % MAX_BLK_LEN;
-    let num_reg = i_reg + bit_start as i32 / 32;
+// pub fn get_reg_num(bit_offset: i32, bit_count: i32, i_reg: i32) -> i32{
+//     let bit_start = bit_offset as u32 % MAX_BLK_LEN;
+//     let num_reg = i_reg + bit_start as i32 / 32;
 
-    if num_reg > (bit_start as i32 + bit_count - 1) / 32 {
-      return -1;
-    }
+//     if num_reg > (bit_start as i32 + bit_count - 1) / 32 {
+//       return -1;
+//     }
 
-  num_reg
-}
+//   num_reg
+// }
 
-pub fn get_count_bits_in_reg(bit_offset: u32, bit_count: u32, i_reg: u32) -> u32 {
-    let mut ret_count = 0;
-    let mut num_reg = 0;
-    let bit_start = bit_offset as u32 % MAX_BLK_LEN;
-    let last_used_bit = bit_start + bit_count - 1;
+// pub fn get_count_bits_in_reg(bit_offset: u32, bit_count: u32, i_reg: u32) -> u32 {
+//     let mut ret_count = 0;
+//     let mut num_reg = 0;
+//     let bit_start = bit_offset as u32 % MAX_BLK_LEN;
+//     let last_used_bit = bit_start + bit_count - 1;
 
-    for num_bit in bit_start..=last_used_bit {
-      ret_count += 1;
-      if (((num_bit + 1) % 32) == 0) || (num_bit == last_used_bit) {
-          if i_reg == num_reg {
-              return ret_count;
-            }
+//     for num_bit in bit_start..=last_used_bit {
+//       ret_count += 1;
+//       if (((num_bit + 1) % 32) == 0) || (num_bit == last_used_bit) {
+//           if i_reg == num_reg {
+//               return ret_count;
+//             }
 
-          num_reg += 1;
-          ret_count = 0;
-        }
-    }
-    0
-}
+//           num_reg += 1;
+//           ret_count = 0;
+//         }
+//     }
+//     0
+// }
 
-pub fn efuse_get_mask(bit_count: u32, shift: u32) -> u32 {
-    let mut mask: u32 = 0;
+// pub fn efuse_get_mask(bit_count: u32, shift: u32) -> u32 {
+//     let mut mask: u32 = 0;
 
-    if bit_count != 32 {
-        mask = (1 << bit_count) - 1;
-    } else {
-        mask = 0xffff_ffff;
-    }
-    mask << shift
-}
+//     if bit_count != 32 {
+//         mask = (1 << bit_count) - 1;
+//     } else {
+//         mask = 0xffff_ffff;
+//     }
+//     mask << shift
+// }
 
-pub fn efuse_fill_buff(blk: EFuseBlock, num_reg: u32, bit_offset: u32, mut bit_count: u32, arr_out: &mut [u8], bits_counter: &mut u32) -> EfuseErr {
-    let blob = arr_out;
-    let efuse_block = bit_offset as u32/ MAX_BLK_LEN;
-    let bit_start = bit_offset as u32 % MAX_BLK_LEN;
-    // BUGFIX: address is way off, ESP-IDF reference 1610647644
-    esp_println::println!("Address {}", unsafe { *blk.address() });
-    // let reg = unsafe {
-    //     ((*blk.address() + num_reg * 4) as *const u32).read_volatile()
-    // };
-    let reg = unsafe {
-        ((1610647644 + 4 * 4) as *const u32).read_volatile()
-    };
-    esp_println::println!("Value: {reg}");
-    let reg_of_aligned_bits = (reg >> bit_start) & efuse_get_mask(bit_count, 0);
-    let mut sum_shift = 0;
-    let mut shift_bit = (*bits_counter) % 8;
+// pub fn efuse_fill_buff(blk: EFuseBlock, num_reg: u32, bit_offset: u32, mut bit_count: u32, arr_out: &mut [u8], bits_counter: &mut u32) -> EfuseErr {
+//     let blob = arr_out;
+//     let efuse_block = bit_offset as u32/ MAX_BLK_LEN;
+//     let bit_start = bit_offset as u32 % MAX_BLK_LEN;
+//     // BUGFIX: address is way off, ESP-IDF reference 1610647644
+//     esp_println::println!("Address {}", unsafe { *blk.address() });
+//     // let reg = unsafe {
+//     //     ((*blk.address() + num_reg * 4) as *const u32).read_volatile()
+//     // };
+//     let reg = unsafe {
+//         ((1610647644 + 4 * 4) as *const u32).read_volatile()
+//     };
+//     esp_println::println!("Value: {reg}");
+//     let reg_of_aligned_bits = (reg >> bit_start) & efuse_get_mask(bit_count, 0);
+//     let mut sum_shift = 0;
+//     let mut shift_bit = (*bits_counter) % 8;
 
-    if shift_bit != 0 {
-        blob[((*bits_counter) % 8) as usize] |= (reg_of_aligned_bits << shift_bit) as u8;
-        shift_bit = (8 - shift_bit).min(bit_count);
-        (*bits_counter) += shift_bit;
-        bit_count -= shift_bit;
-    }
+//     if shift_bit != 0 {
+//         blob[((*bits_counter) % 8) as usize] |= (reg_of_aligned_bits << shift_bit) as u8;
+//         shift_bit = (8 - shift_bit).min(bit_count);
+//         (*bits_counter) += shift_bit;
+//         bit_count -= shift_bit;
+//     }
 
-    while bit_count > 0 {
-        sum_shift += shift_bit;
-        blob[((*bits_counter) % 8) as usize] |= (reg_of_aligned_bits >> sum_shift) as u8;
-        shift_bit = bit_count.min(8);
-        (*bits_counter) += shift_bit;
-        bit_count -= shift_bit;
-    }
+//     while bit_count > 0 {
+//         sum_shift += shift_bit;
+//         blob[((*bits_counter) % 8) as usize] |= (reg_of_aligned_bits >> sum_shift) as u8;
+//         shift_bit = bit_count.min(8);
+//         (*bits_counter) += shift_bit;
+//         bit_count -= shift_bit;
+//     }
 
-    EfuseErr::Ok
-}
+//     EfuseErr::Ok
+// }
 
-pub fn efuse_utility_process(
-    field: &[&EFuseAddress],
-    ptr: *mut core::ffi::c_void,
-    ptr_size_bits: u32,
-    func_proc: EfuseFuncProc,
-) -> EfuseErr {
-    let mut err = EfuseErr::Ok;
-    let mut bits_counter = 0;
+// pub fn efuse_utility_process(
+//     field: &[&EFuseAddress],
+//     ptr: *mut core::ffi::c_void,
+//     ptr_size_bits: u32,
+//     func_proc: EfuseFuncProc,
+// ) -> EfuseErr {
+//     let mut err = EfuseErr::Ok;
+//     let mut bits_counter = 0;
 
-    // Get and check size.
-    let field_len = get_field_size(field);
-    let req_size = if ptr_size_bits == 0 {
-        field_len
-    } else {
-        core::cmp::min(ptr_size_bits, field_len)
-    };
+//     // Get and check size.
+//     let field_len = get_field_size(field);
+//     let req_size = if ptr_size_bits == 0 {
+//         field_len
+//     } else {
+//         core::cmp::min(ptr_size_bits, field_len)
+//     };
 
-    let mut i = 0;
-    let count_before = 0;
-    while err == EfuseErr::Ok && req_size > bits_counter && i < field.len() {
-        if let Some(desc) = field.get(i) {
-            if check_range_of_bits(desc.block, desc.offset, desc.size) == false {
-                return EfuseErr::Coding;
-            }
-            let mut i_reg:u32 = 0;
-            let num_reg = get_reg_num(desc.offset as i32, desc.size as i32, i_reg as i32);
-            while err == EfuseErr::Ok && req_size > bits_counter
-                && num_reg != -1
-            {
-                let mut num_bits = get_count_bits_in_reg(
-                    field[i].offset as u32,
-                    field[i].size as u32,
-                    i_reg);
-                let bit_offset = field[i].offset;
+//     let mut i = 0;
+//     let count_before = 0;
+//     while err == EfuseErr::Ok && req_size > bits_counter && i < field.len() {
+//         if let Some(desc) = field.get(i) {
+//             if check_range_of_bits(desc.block, desc.offset, desc.size) == false {
+//                 return EfuseErr::Coding;
+//             }
+//             let mut i_reg:u32 = 0;
+//             let num_reg = get_reg_num(desc.offset as i32, desc.size as i32, i_reg as i32);
+//             while err == EfuseErr::Ok && req_size > bits_counter
+//                 && num_reg != -1
+//             {
+//                 let mut num_bits = get_count_bits_in_reg(
+//                     field[i].offset as u32,
+//                     field[i].size as u32,
+//                     i_reg);
+//                 let bit_offset = field[i].offset;
 
-                if (bits_counter + num_bits) > req_size {
-                /* Limits the length of the field */
-                num_bits = req_size - bits_counter;
-                }
+//                 if (bits_counter + num_bits) > req_size {
+//                 /* Limits the length of the field */
+//                 num_bits = req_size - bits_counter;
+//                 }
 
-                err = func_proc((unsafe { *field.as_ptr() }).block, num_reg as u32, bit_offset as u32, num_bits, ptr, &mut bits_counter);
-                i_reg += 1;
-            }
-        }
-        i += 1;
-    }
-    // let count_after = 0;
-    // if err == EfuseErr::Ok
-    //     && (func_proc == esp_efuse_utility_fill_buff || func_proc == esp_efuse_utility_count_once) // These functions are used for read APIs: read_field_blob and read_field_cnt.
-    //     && (count_before != count_after || (count_after & 1) == 1)
-    // {
-    //     err = EfuseErr::DamagedReading;
-    // }
-    assert!(bits_counter <= req_size);
-    err
-}
+//                 err = func_proc((unsafe { *field.as_ptr() }).block, num_reg as u32, bit_offset as u32, num_bits, ptr, &mut bits_counter);
+//                 i_reg += 1;
+//             }
+//         }
+//         i += 1;
+//     }
+//     // let count_after = 0;
+//     // if err == EfuseErr::Ok
+//     //     && (func_proc == esp_efuse_utility_fill_buff || func_proc == esp_efuse_utility_count_once) // These functions are used for read APIs: read_field_blob and read_field_cnt.
+//     //     && (count_before != count_after || (count_after & 1) == 1)
+//     // {
+//     //     err = EfuseErr::DamagedReading;
+//     // }
+//     assert!(bits_counter <= req_size);
+//     err
+// }
 
-pub fn efuse_fill_buff_wrapper(
-    blk: EFuseBlock,
-    num_reg: u32,
-    bit_offset: u32,
-    bit_count: u32,
-    arr_out: *mut core::ffi::c_void,
-    bits_counter: &mut u32,
-) -> EfuseErr {
-    let arr_out = arr_out as *mut u8;
-    let arr_out = unsafe { core::slice::from_raw_parts_mut(arr_out, 8) };
-    efuse_fill_buff(blk, num_reg, bit_offset, bit_count, arr_out, bits_counter)
-}
+// pub fn efuse_fill_buff_wrapper(
+//     blk: EFuseBlock,
+//     num_reg: u32,
+//     bit_offset: u32,
+//     bit_count: u32,
+//     arr_out: *mut core::ffi::c_void,
+//     bits_counter: &mut u32,
+// ) -> EfuseErr {
+//     let arr_out = arr_out as *mut u8;
+//     let arr_out = unsafe { core::slice::from_raw_parts_mut(arr_out, 8) };
+//     efuse_fill_buff(blk, num_reg, bit_offset, bit_count, arr_out, bits_counter)
+// }
 
-pub fn efuse_read_field(field: &EFuseAddress, dst: *mut core::ffi::c_void, dst_size_bits: u32) -> EfuseErr {
-    let mut err = EfuseErr::Ok;
+// pub fn efuse_read_field(field: &EFuseAddress, dst: *mut core::ffi::c_void, dst_size_bits: u32) -> EfuseErr {
+//     let mut err = EfuseErr::Ok;
 
-    if dst.is_null() || dst_size_bits == 0 {
-        return EfuseErr::BadArgs;
-    } else {
-        esp_println::println!("qwer");
-        let dst_len = efuse_utility_get_number_of_items(dst_size_bits, 8);
-        esp_println::println!("qwertyu");
-        // unsafe { core::ptr::write_bytes(dst, 0, dst_len as usize) };
-        err = efuse_utility_process(&[&field], dst, dst_size_bits, efuse_fill_buff_wrapper);
-        esp_println::println!("qwertyuuiop");
-    }
-    err
+//     if dst.is_null() || dst_size_bits == 0 {
+//         return EfuseErr::BadArgs;
+//     } else {
+//         let dst_len = efuse_utility_get_number_of_items(dst_size_bits, 8);
+//         // unsafe { core::ptr::write_bytes(dst, 0, dst_len as usize) };
+//         err = efuse_utility_process(&[&field], dst, dst_size_bits, efuse_fill_buff_wrapper);
+//     }
+//     err
 
     // loop {
     //     unsafe {
@@ -331,73 +328,73 @@ pub fn efuse_read_field(field: &EFuseAddress, dst: *mut core::ffi::c_void, dst_s
     //         Ok(())
     //     }
     // }
-}
+// }
 
-pub fn calib_get_version() {
-    let blk_ver_major: u32 = 0;
+// pub fn calib_get_version() {
+//     let blk_ver_major: u32 = 0;
 
-}
+// }
 
-pub fn adc1_get_init_code(atten: Attenuation) -> u32 {
-    // logic taken from https://github.com/espressif/esp-idf/blob/7052a14d61d98dd387c4d99f435c42370b282fa6/components/efuse/esp32s3/esp_efuse_rtc_calib.c#L28-L61
-    // assert!(EFuseAddress::BLK_VERSION_MAJOR.read() == 1);
+// pub fn adc1_get_init_code(atten: Attenuation) -> u32 {
+//     // logic taken from https://github.com/espressif/esp-idf/blob/7052a14d61d98dd387c4d99f435c42370b282fa6/components/efuse/esp32s3/esp_efuse_rtc_calib.c#L28-L61
+//     // assert!(EFuseAddress::BLK_VERSION_MAJOR.read() == 1);
 
-    esp_println::println!(" version {}", EFuseAddress::BLK_VERSION_MAJOR.read());
+//     esp_println::println!(" version {}", EFuseAddress::BLK_VERSION_MAJOR.read());
 
-    let diffs = [
-        EFuseAddress::ADC1_INIT_CODE_ATTEN0.read(),
-        EFuseAddress::ADC1_INIT_CODE_ATTEN1.read(),
-        EFuseAddress::ADC1_INIT_CODE_ATTEN2.read(),
-        EFuseAddress::ADC1_INIT_CODE_ATTEN3.read(),
-    ];
+//     let diffs = [
+//         EFuseAddress::ADC1_INIT_CODE_ATTEN0.read(),
+//         EFuseAddress::ADC1_INIT_CODE_ATTEN1.read(),
+//         EFuseAddress::ADC1_INIT_CODE_ATTEN2.read(),
+//         EFuseAddress::ADC1_INIT_CODE_ATTEN3.read(),
+//     ];
 
-    let mut init_codes = [0, 0, 0, 0];
-    init_codes[0] = diffs[0] + 1850;
-    init_codes[1] = init_codes[0] + diffs[1] + 90;
-    init_codes[2] = init_codes[1] + diffs[2];
-    init_codes[3] = init_codes[2] + diffs[3] + 70;
+//     let mut init_codes = [0, 0, 0, 0];
+//     init_codes[0] = diffs[0] + 1850;
+//     init_codes[1] = init_codes[0] + diffs[1] + 90;
+//     init_codes[2] = init_codes[1] + diffs[2];
+//     init_codes[3] = init_codes[2] + diffs[3] + 70;
 
-    // let init_code_efuse = EFuseAddress::ADC1_CAL_VOL_ATTEN0;
-    let init_code_efuse = &[&EFuseAddress::ADC1_INIT_CODE_ATTEN0];
-    let init_code_size = get_field_size(init_code_efuse);
-    esp_println::println!("Length {init_code_size}");
+//     // let init_code_efuse = EFuseAddress::ADC1_CAL_VOL_ATTEN0;
+//     let init_code_efuse = &[&EFuseAddress::ADC1_INIT_CODE_ATTEN0];
+//     let init_code_size = get_field_size(init_code_efuse);
+//     esp_println::println!("Length {init_code_size}");
 
-    let mut init_code = [0u32; 10];
-    let err = efuse_read_field(init_code_efuse[0], init_code.as_mut_ptr() as *mut core::ffi::c_void, init_code_size);
-    esp_println::println!("Init_code {:?}", err);
-    esp_println::println!("Init_code {:?}", init_code);
-    match atten {
-        Attenuation::Attenuation0dB => init_codes[0],
-        Attenuation::Attenuation2p5dB => init_codes[1],
-        Attenuation::Attenuation6dB => init_codes[2],
-        Attenuation::Attenuation11dB => init_codes[3],
-    }
-}
+//     let mut init_code = [0u32; 10];
+//     let err = efuse_read_field(init_code_efuse[0], init_code.as_mut_ptr() as *mut core::ffi::c_void, init_code_size);
+//     esp_println::println!("Init_code {:?}", err);
+//     esp_println::println!("Init_code {:?}", init_code);
+//     match atten {
+//         Attenuation::Attenuation0dB => init_codes[0],
+//         Attenuation::Attenuation2p5dB => init_codes[1],
+//         Attenuation::Attenuation6dB => init_codes[2],
+//         Attenuation::Attenuation11dB => init_codes[3],
+//     }
+// }
 
-pub fn adc1_get_cal_voltage(atten: Attenuation) -> (u32, u32) {
-    // logic taken from https://github.com/espressif/esp-idf/blob/7052a14d61d98dd387c4d99f435c42370b282fa6/components/efuse/esp32s3/esp_efuse_rtc_calib.c#L63-L93
-    assert!(EFuseAddress::BLK_VERSION_MAJOR.read() == 1);
+// pub fn adc1_get_cal_voltage(atten: Attenuation) -> (u32, u32) {
+//     // logic taken from https://github.com/espressif/esp-idf/blob/7052a14d61d98dd387c4d99f435c42370b282fa6/components/efuse/esp32s3/esp_efuse_rtc_calib.c#L63-L93
+//     assert!(EFuseAddress::BLK_VERSION_MAJOR.read() == 1);
 
-    let diffs = [
-        EFuseAddress::ADC1_CAL_VOL_ATTEN0.read(),
-        EFuseAddress::ADC1_CAL_VOL_ATTEN1.read(),
-        EFuseAddress::ADC1_CAL_VOL_ATTEN2.read(),
-        EFuseAddress::ADC1_CAL_VOL_ATTEN3.read(),
-    ];
+//     let diffs = [
+//         EFuseAddress::ADC1_CAL_VOL_ATTEN0.read(),
+//         EFuseAddress::ADC1_CAL_VOL_ATTEN1.read(),
+//         EFuseAddress::ADC1_CAL_VOL_ATTEN2.read(),
+//         EFuseAddress::ADC1_CAL_VOL_ATTEN3.read(),
+//     ];
 
-    let mut voltages = [0, 0, 0, 0];
-    voltages[3] = diffs[3] + 900;
-    voltages[2] = voltages[3] + diffs[2] + 800;
-    voltages[1] = voltages[2] + diffs[1] + 700;
-    voltages[0] = voltages[1] + diffs[0] + 800;
+//     let mut voltages = [0, 0, 0, 0];
+//     voltages[3] = diffs[3] + 900;
+//     voltages[2] = voltages[3] + diffs[2] + 800;
+//     voltages[1] = voltages[2] + diffs[1] + 700;
+//     voltages[0] = voltages[1] + diffs[0] + 800;
 
-    match atten {
-        Attenuation::Attenuation0dB => (voltages[0], 850),
-        Attenuation::Attenuation2p5dB => (voltages[1], 850),
-        Attenuation::Attenuation6dB => (voltages[2], 850),
-        Attenuation::Attenuation11dB => (voltages[3], 850),
-    }
-}
+//     match atten {
+//         Attenuation::Attenuation0dB => (voltages[0], 850),
+//         Attenuation::Attenuation2p5dB => (voltages[1], 850),
+//         Attenuation::Attenuation6dB => (voltages[2], 850),
+//         Attenuation::Attenuation11dB => (voltages[3], 850),
+//     }
+// }
 
 #[allow(unused)]
 #[derive(Copy, Clone, PartialEq)]
@@ -441,20 +438,20 @@ pub struct EFuseAddress {
 }
 
 impl EFuseAddress {
-    pub fn read(&self) -> u32 {
-        let first_word_address = unsafe { self.block.address().add(self.offset as usize / 32) };
-        let first_word: u32 = unsafe { first_word_address.read_volatile() };
+    // pub fn read(&self) -> u32 {
+    //     let first_word_address = unsafe { self.block.address().add(self.offset as usize / 32) };
+    //     let first_word: u32 = unsafe { first_word_address.read_volatile() };
 
-        let offset_in_word = self.offset % 32;
-        let mask = u32::MAX >> (32 - self.size);
+    //     let offset_in_word = self.offset % 32;
+    //     let mask = u32::MAX >> (32 - self.size);
 
-        if offset_in_word + self.size > 32 {
-            let second_word: u32 = unsafe { first_word_address.add(1).read_volatile() };
-            ((first_word >> offset_in_word) | (second_word << (32 - offset_in_word))) & mask
-        } else {
-            (first_word >> offset_in_word) & mask
-        }
-    }
+    //     if offset_in_word + self.size > 32 {
+    //         let second_word: u32 = unsafe { first_word_address.add(1).read_volatile() };
+    //         ((first_word >> offset_in_word) | (second_word << (32 - offset_in_word))) & mask
+    //     } else {
+    //         (first_word >> offset_in_word) & mask
+    //     }
+    // }
 
     // taken from https://github.com/espressif/esp-idf/blob/045163a2ec99eb3cb7cc69e2763afd145156c4cf/components/efuse/esp32s3/esp_efuse_table.csv
 
