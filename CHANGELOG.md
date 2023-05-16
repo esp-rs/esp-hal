@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add initial support for SHA in ESP32-H2 (#527)
 - Add initial support for AES in ESP32-H2 (#528)
 - Add blinky_erased_pins example for ESP32-H2 (#530)
+- Add initial support for MCPWM in ESP32-H2 (#544)
 
 ### Fixed
 
