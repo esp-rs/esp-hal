@@ -58,6 +58,6 @@ crate::peripherals! {
     UART0 => true,
     UART1 => true,
     // UHCI0 => true,
-    // USB_DEVICE => true,
+    USB_DEVICE => true,
     RADIO => false,
 }
