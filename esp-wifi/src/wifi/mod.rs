@@ -140,6 +140,7 @@ pub enum WifiError {
     InternalError(InternalWifiError),
     WrongClockConfig,
     Disconnected,
+    UnknownWifiMode,
 }
 #[repr(i32)]
 #[derive(Debug, FromPrimitive, EnumSetType)]
@@ -694,14 +695,14 @@ pub fn new_with_config<'d>(
     config: embedded_svc::wifi::Configuration,
 ) -> (WifiDevice<'d>, WifiController<'d>) {
     esp_hal_common::into_ref!(device);
-    let mode = match config {
+    match config {
         embedded_svc::wifi::Configuration::None => panic!(),
-        embedded_svc::wifi::Configuration::Client(_) => WifiMode::Sta,
-        embedded_svc::wifi::Configuration::AccessPoint(_) => WifiMode::Ap,
+        embedded_svc::wifi::Configuration::Client(_) => (),
+        embedded_svc::wifi::Configuration::AccessPoint(_) => (),
         embedded_svc::wifi::Configuration::Mixed(_, _) => panic!(),
     };
     (
-        WifiDevice::new(unsafe { device.clone_unchecked() }, mode),
+        WifiDevice::new(unsafe { device.clone_unchecked() }),
         WifiController::new_with_config(device, config),
     )
 }
@@ -728,18 +729,23 @@ pub fn new<'d>(
 /// A wifi device implementing smoltcp's Device trait.
 pub struct WifiDevice<'d> {
     _device: PeripheralRef<'d, esp_hal_common::radio::Wifi>,
-
-    // only used by embassy-net
-    #[allow(unused)]
-    mode: WifiMode,
 }
 
 impl<'d> WifiDevice<'d> {
-    pub(crate) fn new(
-        _device: PeripheralRef<'d, esp_hal_common::radio::Wifi>,
-        mode: WifiMode,
-    ) -> WifiDevice {
-        Self { _device, mode }
+    pub(crate) fn new(_device: PeripheralRef<'d, esp_hal_common::radio::Wifi>) -> WifiDevice {
+        Self { _device }
+    }
+
+    pub(crate) fn get_wifi_mode(&self) -> Result<WifiMode, WifiError> {
+        let mut mode = wifi_mode_t_WIFI_MODE_NULL;
+        esp_wifi_result!(unsafe { esp_wifi_get_mode(&mut mode) })?;
+
+        #[allow(non_upper_case_globals)]
+        match mode {
+            wifi_mode_t_WIFI_MODE_STA => Ok(WifiMode::Sta),
+            wifi_mode_t_WIFI_MODE_AP => Ok(WifiMode::Ap),
+            _ => Err(WifiError::UnknownWifiMode),
+        }
     }
 }
 
@@ -1331,15 +1337,15 @@ pub(crate) mod embassy {
         fn link_state(&mut self, cx: &mut core::task::Context) -> embassy_net_driver::LinkState {
             LINK_STATE.register(cx.waker());
 
-            match self.mode {
-                WifiMode::Sta => {
+            match self.get_wifi_mode() {
+                Ok(WifiMode::Sta) => {
                     if matches!(get_wifi_state(), WifiState::StaConnected) {
                         embassy_net_driver::LinkState::Up
                     } else {
                         embassy_net_driver::LinkState::Down
                     }
                 }
-                WifiMode::Ap => {
+                Ok(WifiMode::Ap) => {
                     if matches!(
                         get_wifi_state(),
                         WifiState::ApStart
@@ -1350,6 +1356,10 @@ pub(crate) mod embassy {
                     } else {
                         embassy_net_driver::LinkState::Down
                     }
+                }
+                _ => {
+                    log::warn!("Unknown wifi mode in link_state");
+                    embassy_net_driver::LinkState::Down
                 }
             }
         }
@@ -1363,9 +1373,10 @@ pub(crate) mod embassy {
 
         fn ethernet_address(&self) -> [u8; 6] {
             let mut mac = [0; 6];
-            match self.mode.is_ap() {
-                true => get_ap_mac(&mut mac),
-                false => get_sta_mac(&mut mac),
+            match self.get_wifi_mode() {
+                Ok(WifiMode::Ap) => get_ap_mac(&mut mac),
+                Ok(WifiMode::Sta) => get_sta_mac(&mut mac),
+                _ => get_sta_mac(&mut mac),
             }
             mac
         }

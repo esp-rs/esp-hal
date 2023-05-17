@@ -11,7 +11,7 @@ use smoltcp::time::Instant;
 use smoltcp::wire::{IpAddress, IpCidr, IpEndpoint, Ipv4Address};
 
 use crate::current_millis;
-use crate::wifi::WifiDevice;
+use crate::wifi::{get_ap_mac, get_sta_mac, WifiDevice, WifiMode};
 
 use core::borrow::BorrowMut;
 
@@ -23,7 +23,7 @@ pub struct WifiStack<'a> {
     local_port: RefCell<u16>,
     pub(crate) network_config: RefCell<ipv4::Configuration>,
     pub(crate) ip_info: RefCell<Option<ipv4::IpInfo>>,
-    pub(crate) dhcp_socket_handle: Option<SocketHandle>,
+    pub(crate) dhcp_socket_handle: RefCell<Option<SocketHandle>>,
 }
 
 impl<'a> WifiStack<'a> {
@@ -52,17 +52,73 @@ impl<'a> WifiStack<'a> {
                 }),
             )),
             ip_info: RefCell::new(None),
-            dhcp_socket_handle,
+            dhcp_socket_handle: RefCell::new(dhcp_socket_handle),
             sockets: RefCell::new(sockets),
             current_millis_fn,
             local_port: RefCell::new(41000),
         }
     }
 
+    pub fn update_iface_configuration(
+        &self,
+        conf: &ipv4::Configuration,
+    ) -> Result<(), WifiStackError> {
+        let mut mac = [0u8; 6];
+        match self.device.borrow().get_wifi_mode() {
+            Ok(WifiMode::Sta) => get_sta_mac(&mut mac),
+            Ok(WifiMode::Ap) => get_ap_mac(&mut mac),
+            _ => (),
+        }
+        let hw_address = smoltcp::wire::HardwareAddress::Ethernet(
+            smoltcp::wire::EthernetAddress::from_bytes(&mac),
+        );
+        self.network_interface
+            .borrow_mut()
+            .set_hardware_addr(hw_address);
+        log::info!("Set hardware address: {:02x?}", hw_address);
+
+        self.reset(); // reset IP address
+
+        let mut dhcp_socket_handle_ref = self.dhcp_socket_handle.borrow_mut();
+        let mut sockets_ref = self.sockets.borrow_mut();
+
+        if let Some(dhcp_handle) = *dhcp_socket_handle_ref {
+            // remove the DHCP client if we use a static IP
+            if matches!(
+                conf,
+                ipv4::Configuration::Client(ipv4::ClientConfiguration::Fixed(_))
+            ) {
+                sockets_ref.remove(dhcp_handle);
+                *dhcp_socket_handle_ref = None;
+            }
+        }
+
+        // re-add the DHCP client if we use DHCP and it has been removed before
+        if matches!(
+            conf,
+            ipv4::Configuration::Client(ipv4::ClientConfiguration::DHCP(_))
+        ) && dhcp_socket_handle_ref.is_none()
+        {
+            let dhcp_socket = Dhcpv4Socket::new();
+            let dhcp_socket_handle = sockets_ref.add(dhcp_socket);
+            *dhcp_socket_handle_ref = Some(dhcp_socket_handle);
+        }
+
+        if let Some(dhcp_handle) = *dhcp_socket_handle_ref {
+            let dhcp_socket = sockets_ref.get_mut::<Dhcpv4Socket>(dhcp_handle);
+            log::info!("Reset DHCP client");
+            dhcp_socket.reset();
+        }
+
+        *self.network_config.borrow_mut() = conf.clone();
+        Ok(())
+    }
+
     pub fn reset(&self) {
         log::debug!("Reset TCP stack");
 
-        if let Some(dhcp_handle) = self.dhcp_socket_handle {
+        let dhcp_socket_handle_ref = self.dhcp_socket_handle.borrow_mut();
+        if let Some(dhcp_handle) = *dhcp_socket_handle_ref {
             self.with_mut(|_, _, sockets| {
                 let dhcp_socket = sockets.get_mut::<Dhcpv4Socket>(dhcp_handle);
                 log::debug!("Reset DHCP client");
@@ -84,7 +140,8 @@ impl<'a> WifiStack<'a> {
         interface: &mut Interface,
         sockets: &mut SocketSet<'a>,
     ) -> Result<(), WifiStackError> {
-        if let Some(dhcp_handle) = self.dhcp_socket_handle {
+        let dhcp_socket_handle_ref = self.dhcp_socket_handle.borrow_mut();
+        if let Some(dhcp_handle) = *dhcp_socket_handle_ref {
             let dhcp_socket = sockets.get_mut::<Dhcpv4Socket>(dhcp_handle);
             let event = dhcp_socket.poll();
             if let Some(event) = event {
@@ -258,23 +315,7 @@ impl<'a> ipv4::Interface for WifiStack<'a> {
     }
 
     fn set_iface_configuration(&mut self, conf: &ipv4::Configuration) -> Result<(), Self::Error> {
-        if let Some(dhcp_handle) = self.dhcp_socket_handle {
-            let dhcp_socket = self.sockets.get_mut().get_mut::<Dhcpv4Socket>(dhcp_handle);
-            log::info!("Reset DHCP client");
-            dhcp_socket.reset();
-
-            // remove the DHCP client if we use a static IP
-            if matches!(
-                conf,
-                ipv4::Configuration::Client(ipv4::ClientConfiguration::Fixed(_))
-            ) {
-                self.sockets.get_mut().remove(dhcp_handle);
-                self.dhcp_socket_handle = None;
-            }
-        }
-
-        *self.network_config.borrow_mut() = conf.clone();
-        Ok(())
+        self.update_iface_configuration(conf)
     }
 
     fn is_iface_up(&self) -> bool {
