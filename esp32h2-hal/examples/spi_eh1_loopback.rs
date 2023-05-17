@@ -1,10 +1,10 @@
 //! SPI loopback test
 //!
 //! Folowing pins are used:
-//! SCLK    GPIO6
+//! SCLK    GPIO1
 //! MISO    GPIO2
-//! MOSI    GPIO7
-//! CS      GPIO10
+//! MOSI    GPIO3
+//! CS      GPIO11
 //!
 //! Depending on your target and the board you are using you have to change the
 //! pins.
@@ -59,10 +59,10 @@ fn main() -> ! {
     wdt1.disable();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-    let sclk = io.pins.gpio6;
+    let sclk = io.pins.gpio1;
     let miso = io.pins.gpio2;
-    let mosi = io.pins.gpio7;
-    let cs = io.pins.gpio10;
+    let mosi = io.pins.gpio3;
+    let cs = io.pins.gpio11;
 
     let mut spi = Spi::new(
         peripherals.SPI2,

@@ -1,12 +1,12 @@
 //! SPI read manufacturer id from flash chip
 //!
 //! Folowing pins are used:
-//! SCLK            GPIO4
-//! MISOI/IO0       GPIO5
-//! MOSI/IO1        GPIO6
-//! IO2             GPIO7
-//! IO3             GPIO0
-//! CS              GPIO1
+//! SCLK            GPIO1
+//! MISOI/IO0       GPIO2
+//! MOSI/IO1        GPIO3
+//! IO2             GPIO4
+//! IO3             GPIO5
+//! CS              GPIO11
 //!
 //! Depending on your target and the board you are using you have to change the
 //! pins.
@@ -58,12 +58,12 @@ fn main() -> ! {
     wdt1.disable();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-    let sclk = io.pins.gpio4;
-    let miso = io.pins.gpio5;
-    let mosi = io.pins.gpio6;
-    let sio2 = io.pins.gpio7;
-    let sio3 = io.pins.gpio0;
-    let cs = io.pins.gpio1;
+    let sclk = io.pins.gpio1;
+    let miso = io.pins.gpio2;
+    let mosi = io.pins.gpio3;
+    let sio2 = io.pins.gpio4;
+    let sio3 = io.pins.gpio5;
+    let cs = io.pins.gpio11;
 
     let mut spi = Spi::new_half_duplex(
         peripherals.SPI2,

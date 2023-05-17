@@ -108,10 +108,10 @@ fn main() -> ! {
     .unwrap();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-    let sclk = io.pins.gpio6;
+    let sclk = io.pins.gpio1;
     let miso = io.pins.gpio2;
-    let mosi = io.pins.gpio7;
-    let cs = io.pins.gpio10;
+    let mosi = io.pins.gpio3;
+    let cs = io.pins.gpio11;
 
     let dma = Gdma::new(peripherals.DMA, &mut system.peripheral_clock_control);
     let dma_channel = dma.channel0;

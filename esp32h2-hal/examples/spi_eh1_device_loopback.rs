@@ -1,12 +1,12 @@
 //! SPI loopback test
 //!
 //! Folowing pins are used:
-//! SCLK    GPIO6
+//! SCLK    GPIO1
 //! MISO    GPIO2
-//! MOSI    GPIO7
-//! CS 1    GPIO3
-//! CS 2    GPIO4
-//! CS 3    GPIO5
+//! MOSI    GPIO3
+//! CS 1    GPIO11
+//! CS 2    GPIO12
+//! CS 3    GPIO25
 //!
 //! Depending on your target and the board you are using you have to change the
 //! pins.
@@ -61,9 +61,9 @@ fn main() -> ! {
     wdt1.disable();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-    let sclk = io.pins.gpio6;
+    let sclk = io.pins.gpio1;
     let miso = io.pins.gpio2;
-    let mosi = io.pins.gpio7;
+    let mosi = io.pins.gpio3;
 
     let spi_controller = SpiBusController::from_spi(Spi::new_no_cs(
         peripherals.SPI2,
@@ -75,9 +75,9 @@ fn main() -> ! {
         &mut system.peripheral_clock_control,
         &clocks,
     ));
-    let mut spi_device_1 = spi_controller.add_device(io.pins.gpio3);
-    let mut spi_device_2 = spi_controller.add_device(io.pins.gpio4);
-    let mut spi_device_3 = spi_controller.add_device(io.pins.gpio5);
+    let mut spi_device_1 = spi_controller.add_device(io.pins.gpio11);
+    let mut spi_device_2 = spi_controller.add_device(io.pins.gpio12);
+    let mut spi_device_3 = spi_controller.add_device(io.pins.gpio25);
 
     let mut delay = Delay::new(&clocks);
     println!("=== SPI example with embedded-hal-1 traits ===");
