@@ -236,8 +236,8 @@ jobs:
         run: cd esp32h2-hal/ && cargo +nightly check --example=embassy_hello_world --features=embassy,embassy-time-timg0
       # - name: check esp32h2-hal (async, gpio)
       #   run: cd esp32h2-hal/ && cargo +nightly check --example=embassy_wait --features=embassy,embassy-time-systick,async
-      # - name: check esp32h2-hal (async, spi)
-      #   run: cd esp32h2-hal/ && cargo +nightly check --example=embassy_spi --features=embassy,embassy-time-systick,async
+      - name: check esp32h2-hal (async, spi)
+        run: cd esp32h2-hal/ && cargo +nightly check --example=embassy_spi --features=embassy,embassy-time-systick,async
       - name: check esp32h2-hal (interrupt-preemption)
         run: cd esp32h2-hal/ && cargo check --example=interrupt_preemption --features=interrupt-preemption
 
@@ -437,6 +437,9 @@ jobs:
       - name: rustfmt (esp32s3-hal)
         run: cargo fmt --all --manifest-path=esp32s3-hal/Cargo.toml -- --check
 
+  # --------------------------------------------------------------------------
+  # Changelog
+
   changelog:
     name: Changelog
     runs-on: ubuntu-latest
@@ -450,5 +453,3 @@ jobs:
           changeLogPath: CHANGELOG.md
           skipLabels: "skip-changelog"
           missingUpdateErrorMessage: "Please add a changelog entry in the CHANGELOG.md file."
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
