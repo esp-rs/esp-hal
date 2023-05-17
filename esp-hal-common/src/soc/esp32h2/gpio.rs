@@ -159,7 +159,7 @@ pub enum OutputSignal {
     PARL_TX_DATA7    = 54,
     I2CEXT1_SCL      = 55,
     I2CEXT1_SDA      = 56,
-    FSPICLK_OUT_MUX  = 63,
+    FSPICLK_MUX      = 63,
     FSPIQ            = 64,
     FSPID            = 65,
     FSPIHD           = 66,
@@ -201,7 +201,7 @@ pub enum OutputSignal {
     CTE_ANT13        = 109,
     CTE_ANT14        = 110,
     CTE_ANT15        = 111,
-    SPICLK_OUT_MUX   = 114,
+    SPICLK           = 114,
     SPICS0           = 115,
     SPICS1           = 116,
     SPIQ             = 121,
@@ -216,12 +216,12 @@ pub enum OutputSignal {
 
 // FIXME: add alternate function numbers/signals where necessary
 crate::gpio::gpio! {
-    (0, 0, InputOutput)
-    (1, 0, InputOutputAnalog)
-    (2, 0, InputOutputAnalog)
-    (3, 0, InputOutputAnalog)
-    (4, 0, InputOutputAnalog)
-    (5, 0, InputOutputAnalog)
+    (0, 0, InputOutputAnalog (2 => FSPIQ) (2 => FSPIQ))
+    (1, 0, InputOutputAnalog (2 => FSPICS0) (2 => FSPICS0))
+    (2, 0, InputOutputAnalog (2 => FSPIWP) (2 => FSPIWP))
+    (3, 0, InputOutputAnalog (2 => FSPIHD) (2 => FSPIHD))
+    (4, 0, InputOutputAnalog (2 => FSPICLK) (2 => FSPICLK_MUX))
+    (5, 0, InputOutputAnalog (2 => FSPID) (2 => FSPID))
     (6, 0, InputOutput)
     (7, 0, InputOutput)
     (8, 0, InputOutput)
@@ -231,19 +231,19 @@ crate::gpio::gpio! {
     (12, 0, InputOutput)
     (13, 0, InputOutput)
     (14, 0, InputOutput)
-    (15, 0, InputOutput)
-    (16, 0, InputOutput)
-    (17, 0, InputOutput)
-    (18, 0, InputOutput)
-    (19, 0, InputOutput)
-    (20, 0, InputOutput)
+    (15, 0, InputOutput () (0 => SPICS0))
+    (16, 0, InputOutput (0 => SPIQ) (0 => SPIQ))
+    (17, 0, InputOutput (0 => SPIWP) (0 => SPIWP))
+    (18, 0, InputOutput (0 => SPIHD) (0 => SPIHD))
+    (19, 0, InputOutput () (0 => SPICLK))
+    (20, 0, InputOutput (0 => SPID) (0 => SPID))
     (21, 0, InputOutput)
     (22, 0, InputOutput)
-    (23, 0, InputOutput)
-    (24, 0, InputOutput)
-    (25, 0, InputOutput)
-    (26, 0, InputOutput)
-    (27, 0, InputOutput)
+    (23, 0, InputOutput () (2 => FSPICS1))
+    (24, 0, InputOutput () (2 => FSPICS2))
+    (25, 0, InputOutput () (2 => FSPICS3))
+    (26, 0, InputOutput () (2 => FSPICS4))
+    (27, 0, InputOutput () (2 => FSPICS5))
 }
 
 crate::gpio::analog! {

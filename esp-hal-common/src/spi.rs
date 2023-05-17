@@ -1977,7 +1977,7 @@ where
         }
     }
 
-    #[cfg(any(esp32c2, esp32c3, esp32c6, esp32s3))]
+    #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
     fn enable_dma(&self) {
         let reg_block = self.register_block();
         reg_block.dma_conf.modify(|_, w| w.dma_tx_ena().set_bit());
@@ -1989,7 +1989,7 @@ where
         // for non GDMA this is done in `assign_tx_device` / `assign_rx_device`
     }
 
-    #[cfg(any(esp32c2, esp32c3, esp32c6, esp32s3))]
+    #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
     fn clear_dma_interrupts(&self) {
         let reg_block = self.register_block();
         reg_block.dma_int_clr.write(|w| {
@@ -2153,9 +2153,9 @@ pub trait Instance {
                 .set_bit()
         });
 
-        #[cfg(esp32c6)]
+        #[cfg(any(esp32c6, esp32h2))]
         unsafe {
-            let pcr = &*esp32c6::PCR::PTR;
+            let pcr = &*crate::peripherals::PCR::PTR;
 
             // use default clock source PLL_F80M_CLK
             pcr.spi2_clkm_conf.modify(|_, w| w.spi2_clkm_sel().bits(1));
@@ -2761,9 +2761,9 @@ pub trait Instance {
                 .set_bit()
         });
 
-        #[cfg(esp32c6)]
+        #[cfg(any(esp32c6, esp32h2))]
         unsafe {
-            let pcr = &*esp32c6::PCR::PTR;
+            let pcr = &*crate::peripherals::PCR::PTR;
 
             // use default clock source PLL_F80M_CLK
             pcr.spi2_clkm_conf.modify(|_, w| w.spi2_clkm_sel().bits(1));
@@ -2922,12 +2922,12 @@ pub trait Instance {
         let reg_block = self.register_block();
         let len = if len > 0 { len - 1 } else { 0 };
 
-        #[cfg(any(esp32c2, esp32c3, esp32c6, esp32s3))]
+        #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
         reg_block
             .ms_dlen
             .write(|w| unsafe { w.ms_data_bitlen().bits(len) });
 
-        #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32s3)))]
+        #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3)))]
         {
             reg_block
                 .mosi_dlen
@@ -2940,7 +2940,7 @@ pub trait Instance {
     }
 }
 
-#[cfg(any(esp32c2, esp32c3, esp32c6))]
+#[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
 impl Instance for crate::peripherals::SPI2 {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
@@ -2978,7 +2978,7 @@ impl Instance for crate::peripherals::SPI2 {
     }
 }
 
-#[cfg(any(esp32c2, esp32c3, esp32c6))]
+#[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
 impl ExtendedInstance for crate::peripherals::SPI2 {
     #[inline(always)]
     fn sio0_input_signal(&self) -> InputSignal {
