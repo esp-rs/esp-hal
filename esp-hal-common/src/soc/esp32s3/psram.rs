@@ -110,6 +110,8 @@ pub fn init_psram(_peripheral: impl crate::peripheral::Peripheral<P = crate::per
 
 #[cfg(any(feature = "psram_2m", feature = "psram_4m", feature = "psram_8m"))]
 pub(crate) mod utils {
+    use procmacros::ram;
+
     // these should probably be configurable, relates to https://github.com/esp-rs/esp-hal/issues/42
     // probably also the PSRAM size shouldn't get configured via features
     const SPI_TIMING_CORE_CLOCK: SpiTimingConfigCoreClock =
@@ -152,6 +154,7 @@ pub(crate) mod utils {
         }
     }
 
+    #[ram]
     pub(crate) fn psram_init() {
         psram_gpio_config();
         psram_set_cs_timing();
@@ -261,6 +264,7 @@ pub(crate) mod utils {
 
     // Configure PSRAM SPI0 phase related registers here according to the PSRAM chip
     // requirement
+    #[ram]
     fn config_psram_spi_phases() {
         // Config CMD phase
         clear_peri_reg_mask(SPI0_MEM_CACHE_SCTRL_REG, SPI_MEM_USR_SRAM_DIO_M); // disable dio mode for cache command
@@ -315,6 +319,7 @@ pub(crate) mod utils {
         clear_peri_reg_mask(SPI0_MEM_MISC_REG, SPI_MEM_CS1_DIS_M); // ENABLE SPI0 CS1 TO PSRAM(CS0--FLASH; CS1--SRAM)
     }
 
+    #[ram]
     fn mspi_timing_psram_tuning() {
         // currently we only support !SPI_TIMING_PSRAM_NEEDS_TUNING
         // see https://github.com/espressif/esp-idf/blob/4e24516ee2731eb55687182d4e061b5b93a9e33f/components/esp_hw_support/mspi_timing_tuning.c#L391-L415
@@ -328,6 +333,7 @@ pub(crate) mod utils {
     ///
     /// This function should always be called after `mspi_timing_flash_tuning`
     /// or `calculate_best_flash_tuning_config`
+    #[ram]
     fn mspi_timing_enter_high_speed_mode(control_spi1: bool) {
         let core_clock: SpiTimingConfigCoreClock = get_mspi_core_clock();
         let flash_div: u32 = get_flash_clock_divider();
@@ -357,6 +363,7 @@ pub(crate) mod utils {
         // #endif
     }
 
+    #[ram]
     fn spi0_timing_config_set_core_clock(core_clock: SpiTimingConfigCoreClock) {
         let reg_val = match core_clock {
             SpiTimingConfigCoreClock::SpiTimingConfigCoreClock80m => 0,
@@ -368,6 +375,7 @@ pub(crate) mod utils {
         set_peri_reg_bits(SPI0_MEM_CORE_CLK_SEL_REG, SPI_MEM_CORE_CLK_SEL, reg_val, 0);
     }
 
+    #[ram]
     fn spi0_timing_config_set_flash_clock(freqdiv: u32) {
         if freqdiv == 1 {
             write_peri_reg(SPI0_MEM_CLOCK_REG, SPI_MEM_CLK_EQU_SYSCLK);
@@ -379,6 +387,7 @@ pub(crate) mod utils {
         }
     }
 
+    #[ram]
     fn spi1_timing_config_set_flash_clock(freqdiv: u32) {
         if freqdiv == 1 {
             write_peri_reg(SPI1_MEM_CLOCK_REG, SPI_MEM_CLK_EQU_SYSCLK);
@@ -390,6 +399,7 @@ pub(crate) mod utils {
         }
     }
 
+    #[ram]
     fn spi0_timing_config_set_psram_clock(freqdiv: u32) {
         if freqdiv == 1 {
             write_peri_reg(SPI0_MEM_SRAM_CLK_REG, SPI_MEM_SCLK_EQU_SYSCLK);
@@ -401,10 +411,12 @@ pub(crate) mod utils {
         }
     }
 
+    #[ram]
     fn get_mspi_core_clock() -> SpiTimingConfigCoreClock {
         SPI_TIMING_CORE_CLOCK
     }
 
+    #[ram]
     fn get_flash_clock_divider() -> u32 {
         match FLASH_FREQ {
             FlashFreq::FlashFreq20m => SPI_TIMING_CORE_CLOCK.mhz() / 20,
@@ -414,6 +426,7 @@ pub(crate) mod utils {
         }
     }
 
+    #[ram]
     fn get_psram_clock_divider() -> u32 {
         match SPIRAM_SPEED {
             SpiRamFreq::Freq40m => SPI_TIMING_CORE_CLOCK.mhz() / 40,
@@ -423,6 +436,7 @@ pub(crate) mod utils {
     }
 
     // send reset command to psram, in spi mode
+    #[ram]
     fn psram_reset_mode_spi1() {
         const PSRAM_RESET_EN: u16 = 0x66;
         const PSRAM_RESET: u16 = 0x99;
@@ -466,6 +480,7 @@ pub(crate) mod utils {
         PsramCmdSpi = 1,
     }
 
+    #[ram]
     fn psram_exec_cmd(
         mode: CommandMode,
         cmd: u16,
@@ -530,6 +545,7 @@ pub(crate) mod utils {
         }
     }
 
+    #[ram]
     fn _psram_exec_cmd(
         cmd: u16,
         cmd_bit_len: u16,
@@ -578,6 +594,7 @@ pub(crate) mod utils {
         }
     }
 
+    #[ram]
     fn psram_set_op_mode(mode: CommandMode) {
         extern "C" {
             fn esp_rom_spi_set_op_mode(spi: u32, mode: u32);
@@ -601,6 +618,7 @@ pub(crate) mod utils {
     }
 
     /// Enter QPI mode
+    #[ram]
     fn psram_enable_qio_mode_spi1() {
         const PSRAM_ENTER_QMODE: u16 = 0x35;
         const CS_PSRAM_SEL: u8 = 1 << 1;
@@ -621,6 +639,7 @@ pub(crate) mod utils {
         );
     }
 
+    #[ram]
     fn psram_set_cs_timing() {
         // SPI0/1 share the cs_hold / cs_setup, cd_hold_time / cd_setup_time registers
         // for PSRAM, so we only need to set SPI0 related registers here
@@ -642,6 +661,7 @@ pub(crate) mod utils {
         );
     }
 
+    #[ram]
     fn psram_gpio_config() {
         // CS1
         let cs1_io: u8 = PSRAM_CS_IO;
@@ -676,18 +696,21 @@ pub(crate) mod utils {
         }
     }
 
+    #[inline(always)]
     fn clear_peri_reg_mask(reg: u32, mask: u32) {
         unsafe {
             (reg as *mut u32).write_volatile((reg as *mut u32).read_volatile() & !mask);
         }
     }
 
+    #[inline(always)]
     fn set_peri_reg_mask(reg: u32, mask: u32) {
         unsafe {
             (reg as *mut u32).write_volatile((reg as *mut u32).read_volatile() | mask);
         }
     }
 
+    #[inline(always)]
     fn set_peri_reg_bits(reg: u32, bitmap: u32, value: u32, shift: u32) {
         unsafe {
             (reg as *mut u32).write_volatile(
@@ -697,6 +720,7 @@ pub(crate) mod utils {
         }
     }
 
+    #[inline(always)]
     fn write_peri_reg(reg: u32, val: u32) {
         unsafe {
             (reg as *mut u32).write_volatile(val);
