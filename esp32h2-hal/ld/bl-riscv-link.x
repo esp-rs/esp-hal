@@ -19,7 +19,7 @@ PROVIDE(MachineExternal = DefaultHandler);
 PROVIDE(DefaultHandler = DefaultInterruptHandler);
 PROVIDE(ExceptionHandler = DefaultExceptionHandler);
 
-/* The ESP32-C2 and ESP32-C3 have interrupt IDs 1-31, while the ESP32-C6 and ESP32-H2 has
+/* The ESP32-C2 and ESP32-C3 have interrupt IDs 1-31, while the ESP32-C6 and ESP32-H2 have
    IDs 0-31, so we much define the handler for the one additional interrupt
    ID: */
 PROVIDE(interrupt0 = DefaultHandler);
