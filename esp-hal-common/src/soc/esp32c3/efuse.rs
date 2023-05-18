@@ -1,6 +1,7 @@
 //! Reading of eFuses
 
 use crate::peripherals::EFUSE;
+
 pub struct Efuse;
 
 impl Efuse {
