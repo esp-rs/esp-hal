@@ -24,20 +24,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add LEDC hardware fade support
 - Added support for multicore async GPIO (#542)
 - Add initial support for MCPWM in ESP32-H2 (#544)
+- Add some miscellaneous examples for the ESP32-H2 (#548)
 
 ### Fixed
 
 - DMA is supported for SPI3 on ESP32-S3 (#507)
 - `change_bus_frequency` is now available on `SpiDma` (#529)
-- Fixed a bug where a GPIO interrupt could erroneously fire again causing the next `await` on that pin to instantly return `Poll::Ok` (#537) 
+- Fixed a bug where a GPIO interrupt could erroneously fire again causing the next `await` on that pin to instantly return `Poll::Ok` (#537)
 - Set `vecbase` on core 1 (ESP32, ESP32-S3) (#536)
+- ESP32-S3: Move PSRAM related function to RAM (#546)
 
 ### Changed
+
 - Improve examples documentation (#533)
 
 ### Breaking
 
-- As part of the refactoring in #537, the public GPIO type has changed. 
+- As part of the refactoring in #537, the public GPIO type has changed.
 
 ## [0.9.0] - 2023-05-02
 

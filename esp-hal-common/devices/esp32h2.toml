@@ -56,7 +56,7 @@ peripherals = [
     "uart0",
     "uart1",
     # "uhci0",
-    # "usb_device",
+    "usb_device",
 
     # Additional peripherals defined by us (the developers):
     "adc",

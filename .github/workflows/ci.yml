@@ -224,10 +224,10 @@ jobs:
         run: cd esp32h2-hal/ && cargo +nightly check --examples --features=eh1,ufmt
       - name: check esp32h2-hal (async, i2c)
         run: cd esp32h2-hal/ && cargo check --example=embassy_i2c --features=embassy,embassy-time-systick,async
-      # - name: check esp32h2-hal (async, systick)
-      #   run: cd esp32h2-hal/ && cargo +nightly check --example=embassy_hello_world --features=embassy,embassy-time-systick
-      # - name: check esp32h2-hal (async, timg0)
-      #   run: cd esp32h2-hal/ && cargo +nightly check --example=embassy_hello_world --features=embassy,embassy-time-timg0
+      - name: check esp32h2-hal (async, systick)
+        run: cd esp32h2-hal/ && cargo +nightly check --example=embassy_hello_world --features=embassy,embassy-time-systick
+      - name: check esp32h2-hal (async, timg0)
+        run: cd esp32h2-hal/ && cargo +nightly check --example=embassy_hello_world --features=embassy,embassy-time-timg0
       # - name: check esp32h2-hal (async, gpio)
       #   run: cd esp32h2-hal/ && cargo +nightly check --example=embassy_wait --features=embassy,embassy-time-systick,async
       # - name: check esp32h2-hal (async, spi)
@@ -440,7 +440,7 @@ jobs:
         uses: dangoslen/changelog-enforcer@v3
         with:
           changeLogPath: CHANGELOG.md
-          skipLabels: 'skip-changelog'
-          missingUpdateErrorMessage: 'Please add a changelog entry in the CHANGELOG.md file.'
+          skipLabels: "skip-changelog"
+          missingUpdateErrorMessage: "Please add a changelog entry in the CHANGELOG.md file."
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -62,5 +62,9 @@ embassy-time-systick = ["esp-hal-common/embassy-time-systick", "embassy-time/tic
 embassy-time-timg0   = ["esp-hal-common/embassy-time-timg0",   "embassy-time/tick-hz-1_000_000"]
 
 [[example]]
+name              = "embassy_hello_world"
+required-features = ["embassy"]
+
+[[example]]
 name              = "embassy_i2c"
 required-features = ["embassy", "async", "embassy-time-systick"]
