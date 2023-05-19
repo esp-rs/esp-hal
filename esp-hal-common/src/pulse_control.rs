@@ -86,7 +86,7 @@ use core::slice::Iter;
 use fugit::NanosDurationU32;
 pub use paste::paste;
 
-#[cfg(esp32c6)]
+#[cfg(any(esp32c6, esp32h2))]
 use crate::peripherals::PCR;
 use crate::{
     gpio::{OutputPin, OutputSignal},
@@ -140,6 +140,16 @@ pub enum ClockSource {
     XTAL   = 3,
 }
 
+/// Specify the clock source for the RMT peripheral on the ESP32-H"
+#[cfg(esp32h2)]
+#[derive(Debug, Copy, Clone)]
+pub enum ClockSource {
+    /// External clock source
+    XTAL   = 0,
+    /// 20 MHz internal oscillator
+    RTC20M = 1,
+}
+
 /// Specify the clock source for the RMT peripheral on the ESP32 and ESP32-S3
 /// variants
 #[cfg(any(esp32s2, esp32))]
@@ -155,7 +165,7 @@ pub enum ClockSource {
 // to the RMT channel
 #[cfg(any(esp32s2, esp32))]
 const CHANNEL_RAM_SIZE: u8 = 64;
-#[cfg(any(esp32c3, esp32c6, esp32s3))]
+#[cfg(any(esp32c3, esp32c6, esp32s3, esp32h2))]
 const CHANNEL_RAM_SIZE: u8 = 48;
 
 // Specifies where the RMT RAM section starts for the particular ESP32 variant
@@ -165,6 +175,8 @@ const RMT_RAM_START: usize = 0x3f416400;
 const RMT_RAM_START: usize = 0x60016400;
 #[cfg(esp32c6)]
 const RMT_RAM_START: usize = 0x60006400;
+#[cfg(esp32h2)]
+const RMT_RAM_START: usize = 0x60007400;
 #[cfg(esp32)]
 const RMT_RAM_START: usize = 0x3ff56800;
 #[cfg(esp32s3)]
