@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added support for multicore async GPIO (#542)
 - Add initial support for MCPWM in ESP32-H2 (#544)
 - Add some miscellaneous examples for the ESP32-H2 (#548)
+- Add initial support for PCNT in ESP32-H2 (#551)
 
 ### Fixed
 

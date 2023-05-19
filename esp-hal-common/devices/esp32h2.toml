@@ -36,7 +36,7 @@ peripherals = [
     # "otp_debug",
     # "parl_io",
     # "pau",
-    # "pcnt",
+    "pcnt",
     "pcr",
     # "pmu",
     # "rmt",

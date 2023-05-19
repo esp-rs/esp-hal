@@ -38,7 +38,7 @@ crate::peripherals! {
     // OTP_DEBUG => true,
     // PARL_IO => true,
     // PAU => true,
-    // PCNT => true,
+    PCNT => true,
     PCR => true,
     // PMU => true,
     // RMT => true,
