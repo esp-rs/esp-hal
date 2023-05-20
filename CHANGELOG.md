@@ -41,7 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking
 
-- As part of the refactoring in #537, the public GPIO type has changed.
+- Significantly simplified user-facing GPIO pin types. (#553)
 
 ## [0.9.0] - 2023-05-02
 

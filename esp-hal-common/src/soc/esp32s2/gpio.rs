@@ -3,14 +3,10 @@ use paste::paste;
 use crate::{
     gpio::{
         AlternateFunction,
-        Bank0GpioRegisterAccess,
-        Bank1GpioRegisterAccess,
         GpioPin,
-        InputOutputAnalogPinType,
-        InputOutputPinType,
-        InteruptStatusRegisterAccess,
-        InteruptStatusRegisterAccessBank0,
-        InteruptStatusRegisterAccessBank1,
+        InterruptStatusRegisterAccess,
+        InterruptStatusRegisterAccessBank0,
+        InterruptStatusRegisterAccessBank1,
         Unknown,
     },
     peripherals::GPIO,
@@ -384,7 +380,7 @@ crate::gpio::analog! {
     (21, 21,  rtc_pad21,      mux_sel,             fun_sel,             fun_ie,             rue,             rde)
 }
 
-impl InteruptStatusRegisterAccess for InteruptStatusRegisterAccessBank0 {
+impl InterruptStatusRegisterAccess for InterruptStatusRegisterAccessBank0 {
     fn pro_cpu_interrupt_status_read() -> u32 {
         unsafe { &*GPIO::PTR }.pcpu_int.read().bits()
     }
@@ -394,7 +390,7 @@ impl InteruptStatusRegisterAccess for InteruptStatusRegisterAccessBank0 {
     }
 }
 
-impl InteruptStatusRegisterAccess for InteruptStatusRegisterAccessBank1 {
+impl InterruptStatusRegisterAccess for InterruptStatusRegisterAccessBank1 {
     fn pro_cpu_interrupt_status_read() -> u32 {
         unsafe { &*GPIO::PTR }.pcpu_int1.read().bits()
     }
