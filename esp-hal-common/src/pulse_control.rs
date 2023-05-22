@@ -140,7 +140,7 @@ pub enum ClockSource {
     XTAL   = 3,
 }
 
-/// Specify the clock source for the RMT peripheral on the ESP32-H"
+/// Specify the clock source for the RMT peripheral on the ESP32-H2
 #[cfg(esp32h2)]
 #[derive(Debug, Copy, Clone)]
 pub enum ClockSource {
