@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add bare-bones PSRAM support for ESP32-S3 (#517)
 - Add async support to the I2C driver (#519)
 
+### Changed
+
+- Move core interrupt handling from Flash to RAM for RISC-V chips (ESP32-H2, ESP32-C2, ESP32-C3, ESP32-C6) (#541)
+
 ### Fixed
 
 - DMA is supported for SPI3 on ESP32-S3 (#507)
