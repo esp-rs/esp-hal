@@ -3,14 +3,10 @@ use paste::paste;
 use crate::{
     gpio::{
         AlternateFunction,
-        Bank0GpioRegisterAccess,
-        Bank1GpioRegisterAccess,
         GpioPin,
-        InputOutputAnalogPinType,
-        InputOutputPinType,
-        InteruptStatusRegisterAccess,
-        InteruptStatusRegisterAccessBank0,
-        InteruptStatusRegisterAccessBank1,
+        InterruptStatusRegisterAccess,
+        InterruptStatusRegisterAccessBank0,
+        InterruptStatusRegisterAccessBank1,
         Unknown,
     },
     peripherals::GPIO,
@@ -341,7 +337,7 @@ crate::gpio::analog! {
 
 // Whilst the S3 is a dual core chip, it shares the enable registers between
 // cores so treat it as a single core device
-impl InteruptStatusRegisterAccess for InteruptStatusRegisterAccessBank0 {
+impl InterruptStatusRegisterAccess for InterruptStatusRegisterAccessBank0 {
     fn pro_cpu_interrupt_status_read() -> u32 {
         unsafe { &*GPIO::PTR }.pcpu_int.read().bits()
     }
@@ -351,7 +347,7 @@ impl InteruptStatusRegisterAccess for InteruptStatusRegisterAccessBank0 {
     }
 }
 
-impl InteruptStatusRegisterAccess for InteruptStatusRegisterAccessBank1 {
+impl InterruptStatusRegisterAccess for InterruptStatusRegisterAccessBank1 {
     fn pro_cpu_interrupt_status_read() -> u32 {
         unsafe { &*GPIO::PTR }.pcpu_int1.read().bits()
     }
