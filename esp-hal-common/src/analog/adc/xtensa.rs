@@ -275,7 +275,7 @@ where
 
         for channel in 0..attenuations.len() {
             if let Some(attenuation) = attenuations[channel] {
-                ADC1::set_attenuation(channel, attenuation as u8);
+                ADCI::set_attenuation(channel, attenuation as u8);
             }
         }
 
