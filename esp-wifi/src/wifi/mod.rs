@@ -1212,7 +1212,12 @@ impl embedded_svc::wifi::Wifi for WifiController<'_> {
     }
 
     fn is_started(&self) -> Result<bool, Self::Error> {
-        Ok(self.is_sta_enabled()? || self.is_ap_enabled()?)
+        match crate::wifi::get_wifi_state() {
+            crate::wifi::WifiState::Invalid => Ok(false),
+            // We assume that wifi has been started in every other states
+            _ => Ok(true)
+        }
+
     }
 
     fn is_connected(&self) -> Result<bool, Self::Error> {
