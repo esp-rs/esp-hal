@@ -86,7 +86,7 @@ use core::slice::Iter;
 use fugit::NanosDurationU32;
 pub use paste::paste;
 
-#[cfg(any(esp32c6, esp32h2))]
+#[cfg(esp32c6)]
 use crate::peripherals::PCR;
 use crate::{
     gpio::{OutputPin, OutputSignal},
@@ -302,7 +302,7 @@ macro_rules! channel_instance {
                 let mut channel = $cxi { mem_offset: 0 };
 
                 cfg_if::cfg_if! {
-                    if #[cfg(any(esp32c3, esp32c6, esp32s3))] {
+                    if #[cfg(any(esp32c3, esp32c6, esp32s3, esp32h2))] {
                         // Apply default configuration
                         unsafe { &*RMT::PTR }.ch_tx_conf0[$num].modify(|_, w| unsafe {
                             // Configure memory block size
@@ -478,7 +478,7 @@ macro_rules! channel_instance {
                     }
                 }
 
-                #[cfg(any(esp32c3, esp32c6, esp32s3))]
+                #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
                 conf_reg.modify(|_, w| {
                     // Set config update bit
                     w.conf_update().set_bit()
@@ -559,14 +559,14 @@ macro_rules! channel_instance {
                 }
 
                 // always enable tx wrap
-                #[cfg(any(esp32c3, esp32c6, esp32s3))]
+                #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
                 unsafe { &*RMT::PTR }.ch_tx_conf0[$num].modify(|_, w| {
                     w.mem_tx_wrap_en()
                         .set_bit()
                 });
 
                 // apply configuration updates
-                #[cfg(any(esp32c3, esp32c6, esp32s3))]
+                #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
                 unsafe { &*RMT::PTR }.ch_tx_conf0[$num].modify(|_, w| {
                     w.conf_update()
                         .set_bit()
@@ -589,18 +589,28 @@ macro_rules! channel_instance {
                         let interrupts = unsafe { &*RMT::PTR }.int_raw.read();
 
                         match (
+                            #[cfg(not(esp32h2))]
                             unsafe { interrupts.ch_tx_end_int_raw($num).bit() },
+                            #[cfg(esp32h2)]
+                            interrupts.[<ch $num _tx_end_int_raw>]().bit(),
                             // The ESP32 variant does not support the loop functionality
-                            #[cfg(not(esp32))]
-                            unsafe {interrupts.ch_tx_loop_int_raw($num).bit()},
                             #[cfg(esp32)]
                             false,
+                            #[cfg(esp32h2)]
+                            interrupts.[<ch $num _tx_loop_int_raw>]().bit(),
+                            #[cfg(not(any(esp32, esp32h2)))]
+                            unsafe {interrupts.ch_tx_loop_int_raw($num).bit()},
                             // The C3/S3 have a slightly different interrupt naming scheme
                             #[cfg(any(esp32, esp32s2))]
                             unsafe { interrupts.ch_err_int_raw($num).bit() },
                             #[cfg(any(esp32c3, esp32c6, esp32s3))]
                             unsafe { interrupts.ch_tx_err_int_raw($num).bit() },
+                            #[cfg(not(esp32h2))]
                             unsafe { interrupts.ch_tx_thr_event_int_raw($num).bit() },
+                            #[cfg(esp32h2)]
+                            interrupts.[<ch $num _tx_err_int_raw>]().bit(),
+                            #[cfg(esp32h2)]
+                            interrupts.[<ch $num _tx_thr_event_int_raw>]().bit(),
                         ) {
                             // SingleShot completed and no error -> success
                             (true, false, false, _) => break,
@@ -624,18 +634,28 @@ macro_rules! channel_instance {
                             // Anything else constitutes an error state
                             _ => {
                                 return Err(TransmissionError::Failure(
+                                    #[cfg(not(esp32h2))]
                                     unsafe { interrupts.ch_tx_end_int_raw($num).bit() },
+                                     #[cfg(esp32h2)]
+                                    interrupts.[<ch $num _tx_end_int_raw>]().bit(),
                                     // The ESP32 variant does not support the loop functionality
-                                    #[cfg(not(esp32))]
-                                    unsafe {interrupts.ch_tx_loop_int_raw($num).bit()},
                                     #[cfg(esp32)]
                                     false,
+                                    #[cfg(esp32h2)]
+                                    interrupts.[<ch $num _tx_loop_int_raw>]().bit(),
+                                    #[cfg(not(any(esp32, esp32h2)))]
+                                    unsafe {interrupts.ch_tx_loop_int_raw($num).bit()},
                                     // The C3/S3 have a slightly different interrupt naming scheme
                                     #[cfg(any(esp32, esp32s2))]
                                     unsafe { interrupts.ch_err_int_raw($num).bit() },
                                     #[cfg(any(esp32c3, esp32c6, esp32s3))]
                                     unsafe { interrupts.ch_tx_err_int_raw($num).bit() },
+                                    #[cfg(not(esp32h2))]
                                     unsafe { interrupts.ch_tx_thr_event_int_raw($num).bit() },
+                                    #[cfg(esp32h2)]
+                                     interrupts.[<ch $num _tx_err_int_raw>]().bit(),
+                                    #[cfg(esp32h2)]
+                                    interrupts.[<ch $num _tx_thr_event_int_raw>]().bit(),
                                 ))
                             }
                         }
@@ -651,7 +671,7 @@ macro_rules! channel_instance {
             /// previously a sequence was sent with `RepeatMode::Forever`.
             fn stop_transmission(&self) {
                 cfg_if::cfg_if! {
-                    if #[cfg(any(esp32c3, esp32c6, esp32s3))] {
+                    if #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))] {
                         unsafe { &*RMT::PTR }
                             .ch_tx_conf0[$num]
                             .modify(|_, w| w.tx_stop().set_bit());
@@ -685,7 +705,7 @@ macro_rules! output_channel {
             #[inline(always)]
             fn set_idle_output_level(&mut self, level: bool) -> &mut Self {
                 cfg_if::cfg_if! {
-                    if #[cfg(any(esp32c3, esp32c6, esp32s3))] {
+                    if #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))] {
                         unsafe { &*RMT::PTR }
                             .ch_tx_conf0[$num]
                             .modify(|_, w| w.idle_out_lv().bit(level));
@@ -702,7 +722,7 @@ macro_rules! output_channel {
             #[inline(always)]
             fn set_idle_output(&mut self, state: bool) -> &mut Self {
                 cfg_if::cfg_if! {
-                    if #[cfg(any(esp32c3, esp32c6, esp32s3))] {
+                    if #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))] {
                         unsafe { &*RMT::PTR }
                             .ch_tx_conf0[$num]
                             .modify(|_, w| w.idle_out_en().bit(state));
@@ -719,7 +739,7 @@ macro_rules! output_channel {
             #[inline(always)]
             fn set_channel_divider(&mut self, divider: u8) -> &mut Self {
                 cfg_if::cfg_if! {
-                    if #[cfg(any(esp32c3, esp32c6, esp32s3))] {
+                    if #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))] {
                         unsafe { &*RMT::PTR }
                             .ch_tx_conf0[$num]
                             .modify(|_, w| unsafe { w.div_cnt().bits(divider) });
@@ -736,7 +756,7 @@ macro_rules! output_channel {
             #[inline(always)]
             fn set_carrier_modulation(&mut self, state: bool) -> &mut Self {
                 cfg_if::cfg_if! {
-                    if #[cfg(any(esp32c3, esp32c6, esp32s3))] {
+                    if #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))] {
                         unsafe { &*RMT::PTR }
                             .ch_tx_conf0[$num]
                             .modify(|_, w| w.carrier_en().bit(state));
@@ -864,7 +884,7 @@ macro_rules! rmt {
 
     impl<'d> PulseControl<'d> {
         /// Create a new pulse controller instance
-        #[cfg(any(esp32c3, esp32c6, esp32s3))]
+        #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
         pub fn new(
             instance: impl Peripheral<P = RMT> + 'd,
             peripheral_clock_control: &mut PeripheralClockControl,
@@ -921,7 +941,7 @@ macro_rules! rmt {
         /// clock is calculated as follows:
         ///
         /// divider = absolute_part + 1 + (fractional_part_a / fractional_part_b)
-        #[cfg(any(esp32c3, esp32c6, esp32s3))]
+        #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
         fn config_global(
             &self,
             clk_source: ClockSource,
@@ -1059,7 +1079,7 @@ macro_rules! rmt {
  };
 }
 
-#[cfg(any(esp32c3, esp32c6))]
+#[cfg(any(esp32c3, esp32c6, esp32h2))]
 rmt!(
     sys_conf,
     (0, Channel0, channel0, OutputSignal::RMT_SIG_0),
