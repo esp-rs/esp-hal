@@ -42,7 +42,7 @@ impl<'a> WifiStack<'a> {
             }
         }
 
-        Self {
+        let this = Self {
             device: RefCell::new(device),
             network_interface: RefCell::new(network_interface),
             network_config: RefCell::new(ipv4::Configuration::Client(
@@ -56,7 +56,11 @@ impl<'a> WifiStack<'a> {
             sockets: RefCell::new(sockets),
             current_millis_fn,
             local_port: RefCell::new(41000),
-        }
+        };
+
+        this.reset();
+
+        this
     }
 
     pub fn update_iface_configuration(
@@ -131,7 +135,51 @@ impl<'a> WifiStack<'a> {
             interface.update_ip_addrs(|addrs| {
                 addrs.clear();
             });
+
+            #[cfg(feature = "ipv6")]
+            {
+                interface
+                    .routes_mut()
+                    .add_default_ipv6_route(smoltcp::wire::Ipv6Address::new(
+                        0xfe80, 0, 0, 0, 0, 0, 0, 0,
+                    ))
+                    .unwrap();
+
+                let mut mac = [0u8; 6];
+                match interface.hardware_addr() {
+                    smoltcp::wire::HardwareAddress::Ethernet(hw_address) => {
+                        mac.copy_from_slice(hw_address.as_bytes());
+                    }
+                }
+
+                let a4 = ((mac[0] ^ 2) as u16) << 8 | mac[1] as u16;
+                let a5 = (mac[2] as u16) << 8 | 0xff;
+                let a6 = 0xfe << 8 | mac[3] as u16;
+                let a7 = (mac[4] as u16) << 8 | mac[5] as u16;
+
+                log::info!(
+                    "IPv6 link-local address fe80::{:x}:{:x}:{:x}:{:x}",
+                    a4,
+                    a5,
+                    a6,
+                    a7
+                );
+
+                interface.update_ip_addrs(|addrs| {
+                    addrs
+                        .push(IpCidr::new(
+                            smoltcp::wire::IpAddress::v6(0xfe80, 0, 0, 0, a4, a5, a6, a7),
+                            64,
+                        ))
+                        .unwrap();
+                });
+            }
         });
+    }
+
+    /// Retrieve all current IP addresses
+    pub fn get_ip_addresses(&self, f: impl FnOnce(&[smoltcp::wire::IpCidr])) {
+        self.with_mut(|interface, _, _| f(interface.ip_addrs()))
     }
 
     /// Convenience function to poll the DHCP socket.
@@ -333,7 +381,7 @@ pub struct Socket<'s, 'n: 's> {
 }
 
 impl<'s, 'n: 's> Socket<'s, 'n> {
-    pub fn open<'i>(&'i mut self, addr: Ipv4Address, port: u16) -> Result<(), IoError>
+    pub fn open<'i>(&'i mut self, addr: IpAddress, port: u16) -> Result<(), IoError>
     where
         's: 'i,
     {
@@ -636,7 +684,7 @@ impl<'s, 'n: 's> UdpSocket<'s, 'n> {
         self.work();
     }
 
-    pub fn send(&mut self, addr: Ipv4Address, port: u16, data: &[u8]) -> Result<(), IoError> {
+    pub fn send(&mut self, addr: IpAddress, port: u16, data: &[u8]) -> Result<(), IoError> {
         loop {
             self.work();
 
@@ -670,7 +718,7 @@ impl<'s, 'n: 's> UdpSocket<'s, 'n> {
         Ok(())
     }
 
-    pub fn receive(&mut self, data: &mut [u8]) -> Result<(usize, [u8; 4], u16), IoError> {
+    pub fn receive(&mut self, data: &mut [u8]) -> Result<(usize, IpAddress, u16), IoError> {
         self.work();
 
         let res = self.network.with_mut(|_interface, _device, sockets| {
@@ -681,16 +729,14 @@ impl<'s, 'n: 's> UdpSocket<'s, 'n> {
 
         match res {
             Ok((len, endpoint)) => {
-                let addr = match endpoint.addr {
-                    IpAddress::Ipv4(ipv4) => ipv4,
-                };
-                Ok((len, addr.0, endpoint.port))
+                let addr = endpoint.addr;
+                Ok((len, addr, endpoint.port))
             }
             Err(e) => Err(IoError::UdpRecvError(e)),
         }
     }
 
-    pub fn join_multicast_group(&mut self, addr: Ipv4Address) -> Result<bool, IoError> {
+    pub fn join_multicast_group(&mut self, addr: IpAddress) -> Result<bool, IoError> {
         self.work();
 
         let res = self.network.with_mut(|interface, device, _| {

@@ -782,6 +782,7 @@ impl<'d> WifiController<'d> {
         Ok(())
     }
 
+    #[allow(unused)]
     fn is_sta_enabled(&self) -> Result<bool, WifiError> {
         let mut mode: esp_wifi_sys::include::wifi_mode_t = 0;
         esp_wifi_result!(unsafe { esp_wifi_sys::include::esp_wifi_get_mode(&mut mode) })?;
@@ -789,6 +790,7 @@ impl<'d> WifiController<'d> {
         Ok(mode == wifi_mode_t_WIFI_MODE_STA)
     }
 
+    #[allow(unused)]
     fn is_ap_enabled(&self) -> Result<bool, WifiError> {
         let mut mode: esp_wifi_sys::include::wifi_mode_t = 0;
         esp_wifi_result!(unsafe { esp_wifi_sys::include::esp_wifi_get_mode(&mut mode) })?;
@@ -1215,9 +1217,8 @@ impl embedded_svc::wifi::Wifi for WifiController<'_> {
         match crate::wifi::get_wifi_state() {
             crate::wifi::WifiState::Invalid => Ok(false),
             // We assume that wifi has been started in every other states
-            _ => Ok(true)
+            _ => Ok(true),
         }
-
     }
 
     fn is_connected(&self) -> Result<bool, Self::Error> {
