@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed a bug where a GPIO interrupt could erroneously fire again causing the next `await` on that pin to instantly return `Poll::Ok` (#537)
 - Set `vecbase` on core 1 (ESP32, ESP32-S3) (#536)
 - ESP32-S3: Move PSRAM related function to RAM (#546)
+- ADC driver will now apply attenuation values to the correct ADC's channels. (#554)
 
 ### Changed
 
