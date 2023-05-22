@@ -2881,8 +2881,13 @@ pub trait Instance {
                 .modify(|_, w| w.usr_dummy_cyclelen().variant(dummy - 1));
         }
 
-        // re-using the full-duplex read which does dummy writes which is okay
-        self.read_bytes(buffer)
+        self.configure_datalen(buffer.len() as u32 * 8);
+        self.update();
+        reg_block.cmd.modify(|_, w| w.usr().set_bit());
+        while reg_block.cmd.read().usr().bit_is_set() {
+            // wait for completion
+        }
+        self.read_bytes_from_fifo(buffer)
     }
 
     #[cfg(not(any(esp32, esp32s2)))]
