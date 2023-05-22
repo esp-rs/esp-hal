@@ -44,8 +44,8 @@ jobs:
         run: cd esp-hal-smartled/ && cargo +nightly check --features=esp32c3
       - name: check (esp32c6)
         run: cd esp-hal-smartled/ && cargo +nightly check --features=esp32c6
-      # - name: check (esp32h2)
-      #   run: cd esp-hal-smartled/ && cargo +nightly check --features=esp32h2
+      - name: check (esp32h2)
+        run: cd esp-hal-smartled/ && cargo +nightly check --features=esp32h2
       # Check all Xtensa targets:
       - name: check (esp32)
         run: cd esp-hal-smartled/ && cargo +esp check --features=esp32,esp32_40mhz
