@@ -12,7 +12,7 @@
 #![no_std]
 #![no_main]
 
-use esp32c6_hal::{
+use esp32h2_hal::{
     clock::ClockControl,
     gpio::IO,
     peripherals::Peripherals,
@@ -30,7 +30,7 @@ fn main() -> ! {
     let mut system = peripherals.PCR.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    // Disable the watchdog timers. For the ESP32-C6, this includes the Super WDT,
+    // Disable the watchdog timers. For the ESP32-H2, this includes the Super WDT,
     // and the TIMG WDTs.
     let mut rtc = Rtc::new(peripherals.LP_CLKRST);
     let timer_group0 = TimerGroup::new(
@@ -58,7 +58,7 @@ fn main() -> ! {
     let pulse = PulseControl::new(
         peripherals.RMT,
         &mut system.peripheral_clock_control,
-        ClockSource::APB,
+        ClockSource::XTAL,
         0,
         0,
         0,
