@@ -1,6 +1,13 @@
-//! This demos basic usage of RMT / PulseControl
-//! Use a logic analyzer to see the generated pulses.
-//! The correct output is only achieved when running in release mode.
+//! RMT / PulseControl
+//!
+//! Folowing pins are used:
+//! GPIO4 (RMT channel 0)
+//!
+//! Depending on your target and the board you are using you have to change the
+//! pins.
+//!
+//! This is an example of generating pulses. Attach a Logic Analyzer to the RTM
+//! channel 0 pin to see the gerated signal.
 
 #![no_std]
 #![no_main]
