@@ -79,10 +79,7 @@ extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
 
     unsafe {
         let mut buf = [0u8; 256];
-        for i in 0..len {
-            let b = data.offset(i as isize).read();
-            buf[i as usize] = b;
-        }
+        buf[..len as usize].copy_from_slice(&core::slice::from_raw_parts(data, len as usize));
 
         let packet = ReceivedPacket {
             len: len as u8,
@@ -91,7 +88,9 @@ extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
 
         critical_section::with(|cs| {
             let mut queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
-            queue.enqueue(packet).unwrap();
+            if queue.enqueue(packet).is_err() {
+                log::warn!("Dropping BLE packet");
+            }
         });
 
         dump_packet_info(&core::slice::from_raw_parts(

@@ -1225,12 +1225,15 @@ unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, arg: *const c_void) {
         data[2] = len as u8;
         data[3..][..len].copy_from_slice(payload);
 
-        queue
+        if queue
             .enqueue(ReceivedPacket {
                 len: (len + 3) as u8,
                 data,
             })
-            .unwrap();
+            .is_err()
+        {
+            log::warn!("Dropping BLE packet");
+        }
 
         dump_packet_info(&data[..(len + 3) as usize]);
     });
@@ -1253,12 +1256,15 @@ unsafe extern "C" fn ble_hs_rx_data(om: *const OsMbuf, arg: *const c_void) {
         data[0] = 0x02; // ACL
         data[1..][..data_slice.len()].copy_from_slice(data_slice);
 
-        queue
+        if queue
             .enqueue(ReceivedPacket {
                 len: (len + 1) as u8,
                 data,
             })
-            .unwrap();
+            .is_err()
+        {
+            log::warn!("Dropping BLE packet");
+        }
 
         dump_packet_info(&data[..(len + 1) as usize]);
     });
