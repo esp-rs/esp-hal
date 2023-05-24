@@ -69,6 +69,11 @@ pub fn setup_timer_isr(timg1_timer0: Timer<Timer0<TIMG1>>) {
             interrupt::Priority::Priority1,
         )
         .unwrap();
+
+        // It's a mystery why these interrupts are enabled now since it worked without this before
+        // Now at least without disabling these nothing will work
+        interrupt::disable(esp32_hal::Cpu::ProCpu, peripherals::Interrupt::ETH_MAC);
+        interrupt::disable(esp32_hal::Cpu::ProCpu, peripherals::Interrupt::UART0);
     }
 
     timer1.listen();
