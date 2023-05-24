@@ -540,6 +540,20 @@ pub fn have_hci_read_data() -> bool {
     })
 }
 
+pub(crate) fn read_next(data: &mut [u8]) -> usize {
+    critical_section::with(|cs| {
+        let mut queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
+
+        match queue.dequeue() {
+            Some(packet) => {
+                data[..packet.len as usize].copy_from_slice(&packet.data[..packet.len as usize]);
+                packet.len as usize
+            }
+            None => 0,
+        }
+    })
+}
+
 pub fn read_hci(data: &mut [u8]) -> usize {
     unsafe {
         if BLE_HCI_READ_DATA_LEN == 0 {

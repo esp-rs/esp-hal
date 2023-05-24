@@ -4,7 +4,7 @@ use embedded_io::{
 };
 use esp_hal_common::peripheral::{Peripheral, PeripheralRef};
 
-use super::{read_hci, send_hci};
+use super::{read_hci, read_next, send_hci};
 
 pub struct BleConnector<'d> {
     _device: PeripheralRef<'d, esp_hal_common::radio::Bluetooth>,
@@ -17,6 +17,10 @@ impl<'d> BleConnector<'d> {
         Self {
             _device: device.into_ref(),
         }
+    }
+
+    pub fn get_next(&mut self, buf: &mut [u8]) -> Result<usize, BleConnectorError> {
+        Ok(read_next(buf))
     }
 }
 

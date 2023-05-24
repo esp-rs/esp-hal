@@ -14,6 +14,7 @@ use self::npl as ble;
 
 pub(crate) use ble::ble_init;
 pub(crate) use ble::read_hci;
+pub(crate) use ble::read_next;
 pub(crate) use ble::send_hci;
 
 pub mod controller;
