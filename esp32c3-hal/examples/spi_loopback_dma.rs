@@ -106,6 +106,13 @@ fn main() -> ! {
 
         let transfer = spi.dma_transfer(send, receive).unwrap();
         // here we could do something else while DMA transfer is in progress
+        let mut i = 0;
+        // Check is_done until the transfer is almost done (32000 bytes at 100kHz is
+        // 2.56 seconds), then move to wait().
+        while !transfer.is_done() && i < 10 {
+            delay.delay_ms(250u32);
+            i += 1;
+        }
         // the buffers and spi is moved into the transfer and we can get it back via
         // `wait`
         (receive, send, spi) = transfer.wait();
