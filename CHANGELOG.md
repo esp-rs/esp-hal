@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add initial support for PCNT in ESP32-H2 (#551)
 - Add initial support for RMT in ESP32-H2 (#556)
 - Add a fn to poll DMA transfers
+- Add initial support for LEDC in ESP32-H2 (#560)
 
 ### Changed
 

@@ -47,9 +47,9 @@ pub enum Number {
     Channel3,
     Channel4,
     Channel5,
-    #[cfg(not(any(esp32c2, esp32c3, esp32c6)))]
+    #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
     Channel6,
-    #[cfg(not(any(esp32c2, esp32c3, esp32c6)))]
+    #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
     Channel7,
 }
 
@@ -327,7 +327,7 @@ macro_rules! start_duty_without_fading {
     };
 }
 
-#[cfg(esp32c6)]
+#[cfg(any(esp32c6, esp32h2))]
 /// Macro to start duty cycle, without fading
 macro_rules! start_duty_without_fading {
     ($self: ident, $num: literal) => {
@@ -350,7 +350,7 @@ macro_rules! start_duty_without_fading {
     };
 }
 
-#[cfg(not(any(esp32, esp32c6)))]
+#[cfg(not(any(esp32, esp32c6, esp32h2)))]
 /// Macro to start duty cycle, without fading
 macro_rules! start_duty_without_fading {
     ($self: ident, $num: literal) => {
@@ -392,7 +392,7 @@ macro_rules! start_duty_fade {
     };
 }
 
-#[cfg(esp32c6)]
+#[cfg(any(esp32c6, esp32h2))]
 /// Macro to start a duty cycle fade
 macro_rules! start_duty_fade {
     ($self: ident, $num: literal, $duty_inc: ident, $duty_steps: ident, $cycles_per_step: ident, $duty_per_cycle: ident) => {
@@ -423,7 +423,7 @@ macro_rules! start_duty_fade {
     };
 }
 
-#[cfg(not(any(esp32, esp32c6)))]
+#[cfg(not(any(esp32, esp32c6, esp32h2)))]
 /// Macro to start a duty cycle fade
 macro_rules! start_duty_fade {
     ($self: ident, $num: literal, $duty_inc: ident, $duty_steps: ident, $cycles_per_step: ident, $duty_per_cycle: ident) => {
@@ -852,14 +852,14 @@ where
                     self.output_pin
                         .connect_peripheral_to_output(OutputSignal::LEDC_LS_SIG5);
                 }
-                #[cfg(not(any(esp32c2, esp32c3, esp32c6)))]
+                #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
                 Number::Channel6 => {
                     set_channel!(self, l, 6, timer_number);
                     update_channel!(self, l, 6);
                     self.output_pin
                         .connect_peripheral_to_output(OutputSignal::LEDC_LS_SIG6);
                 }
-                #[cfg(not(any(esp32c2, esp32c3, esp32c6)))]
+                #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
                 Number::Channel7 => {
                     set_channel!(self, l, 7, timer_number);
                     update_channel!(self, l, 7);
@@ -883,9 +883,9 @@ where
             Number::Channel3 => set_duty!(self, l, 3, duty),
             Number::Channel4 => set_duty!(self, l, 4, duty),
             Number::Channel5 => set_duty!(self, l, 5, duty),
-            #[cfg(not(any(esp32c2, esp32c3, esp32c6)))]
+            #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
             Number::Channel6 => set_duty!(self, l, 6, duty),
-            #[cfg(not(any(esp32c2, esp32c3, esp32c6)))]
+            #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
             Number::Channel7 => set_duty!(self, l, 7, duty),
         };
     }
@@ -960,7 +960,7 @@ where
                 cycles_per_step,
                 duty_per_cycle
             ),
-            #[cfg(not(any(esp32c2, esp32c3, esp32c6)))]
+            #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
             Number::Channel6 => set_duty_fade!(
                 self,
                 l,
@@ -971,7 +971,7 @@ where
                 cycles_per_step,
                 duty_per_cycle
             ),
-            #[cfg(not(any(esp32c2, esp32c3, esp32c6)))]
+            #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
             Number::Channel7 => set_duty_fade!(
                 self,
                 l,
@@ -993,9 +993,9 @@ where
             Number::Channel3 => is_duty_fade_running!(self, l, 3),
             Number::Channel4 => is_duty_fade_running!(self, l, 4),
             Number::Channel5 => is_duty_fade_running!(self, l, 5),
-            #[cfg(not(any(esp32c2, esp32c3, esp32c6)))]
+            #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
             Number::Channel6 => is_duty_fade_running!(self, l, 6),
-            #[cfg(not(any(esp32c2, esp32c3, esp32c6)))]
+            #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
             Number::Channel7 => is_duty_fade_running!(self, l, 7),
         }
     }
