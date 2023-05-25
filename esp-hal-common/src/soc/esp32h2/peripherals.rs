@@ -23,7 +23,7 @@ crate::peripherals! {
     INTERRUPT_CORE0 => true,
     INTPRI => true,
     IO_MUX => true,
-    // LEDC => true,
+    LEDC => true,
     // LP_ANA => true,
     // LP_AON => true,
     // LP_APM => true,

@@ -21,7 +21,7 @@ peripherals = [
     "interrupt_core0",
     "intpri",
     "io_mux",
-    # "ledc",
+    "ledc",
     # "lp_ana",
     # "lp_aon",
     # "lp_apm",
