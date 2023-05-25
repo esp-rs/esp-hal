@@ -121,6 +121,8 @@ jobs:
         run: cd esp32c2-hal/ && cargo +nightly check --example=embassy_serial --features=embassy,embassy-time-systick,async
       - name: check esp32c2-hal (async, i2c)
         run: cd esp32c2-hal/ && cargo +nightly check --example=embassy_i2c --features=embassy,embassy-time-systick,async
+      - name: check esp32c2-hal (interrupt-preemption)
+        run: cd esp32c2-hal/ && cargo check --example=interrupt_preemption --features=interrupt-preemption
 
   esp32c3-hal:
     runs-on: ubuntu-latest
@@ -160,6 +162,8 @@ jobs:
         run: cd esp32c3-hal/ && cargo +nightly check --example=embassy_serial --features=embassy,embassy-time-systick,async
       - name: check esp32c3-hal (async, i2c)
         run: cd esp32c3-hal/ && cargo +nightly check --example=embassy_i2c --features=embassy,embassy-time-systick,async
+      - name: check esp32c3-hal (interrupt-preemption)
+        run: cd esp32c3-hal/ && cargo check --example=interrupt_preemption --features=interrupt-preemption
 
   esp32c6-hal:
     runs-on: ubuntu-latest
@@ -197,6 +201,8 @@ jobs:
         run: cd esp32c6-hal/ && cargo +nightly check --example=embassy_serial --features=embassy,embassy-time-systick,async
       - name: check esp32c6-hal (async, i2c)
         run: cd esp32c6-hal/ && cargo +nightly check --example=embassy_i2c --features=embassy,embassy-time-systick,async
+      - name: check esp32c6-hal (interrupt-preemption)
+        run: cd esp32c6-hal/ && cargo check --example=interrupt_preemption --features=interrupt-preemption
 
   esp32h2-hal:
     runs-on: ubuntu-latest
@@ -232,6 +238,8 @@ jobs:
       #   run: cd esp32h2-hal/ && cargo +nightly check --example=embassy_wait --features=embassy,embassy-time-systick,async
       # - name: check esp32h2-hal (async, spi)
       #   run: cd esp32h2-hal/ && cargo +nightly check --example=embassy_spi --features=embassy,embassy-time-systick,async
+      - name: check esp32h2-hal (interrupt-preemption)
+        run: cd esp32h2-hal/ && cargo check --example=interrupt_preemption --features=interrupt-preemption
 
   esp32s2-hal:
     runs-on: ubuntu-latest
