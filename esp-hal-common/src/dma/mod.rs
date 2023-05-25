@@ -846,6 +846,8 @@ where
 pub trait DmaTransfer<B, T>: Drop {
     /// Wait for the transfer to finish.
     fn wait(self) -> (B, T);
+    /// Check if the transfer is finished.
+    fn is_done(&self) -> bool;
 }
 
 /// Trait to be implemented for an in progress dma transfer.
@@ -853,6 +855,8 @@ pub trait DmaTransfer<B, T>: Drop {
 pub trait DmaTransferRxTx<BR, BT, T>: Drop {
     /// Wait for the transfer to finish.
     fn wait(self) -> (BR, BT, T);
+    /// Check if the transfer is finished.
+    fn is_done(&self) -> bool;
 }
 
 #[cfg(feature = "async")]

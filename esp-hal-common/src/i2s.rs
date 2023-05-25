@@ -326,6 +326,11 @@ where
             (buffer, payload)
         }
     }
+
+    /// Check if the DMA transfer is complete
+    fn is_done(&self) -> bool {
+        self.i2s_tx.tx_channel.is_done()
+    }
 }
 
 impl<'d, T, P, TX, BUFFER> Drop for I2sWriteDmaTransfer<T, P, TX, BUFFER>
@@ -450,6 +455,11 @@ where
             core::mem::forget(self);
             (buffer, payload)
         }
+    }
+
+    /// Check if the DMA transfer is complete
+    fn is_done(&self) -> bool {
+        self.i2s_rx.rx_channel.is_done()
     }
 }
 
