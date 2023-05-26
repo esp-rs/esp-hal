@@ -21,9 +21,9 @@ pub const TICKS_PER_SECOND: u64 = 40_000_000;
 pub const COUNTER_BIT_MASK: u64 = 0xFFFF_FFFF_FFFF_FFFF;
 
 #[cfg(debug_assertions)]
-const TIMER_DELAY: fugit::MicrosDurationU64 = fugit::MicrosDurationU64::micros(4000);
+const TIMER_DELAY: fugit::HertzU64 = fugit::HertzU64::from_raw(50);
 #[cfg(not(debug_assertions))]
-const TIMER_DELAY: fugit::MicrosDurationU64 = fugit::MicrosDurationU64::micros(500);
+const TIMER_DELAY: fugit::HertzU64 = fugit::HertzU64::from_raw(100);
 
 static TIMER1: Mutex<RefCell<Option<Timer<Timer0<TIMG1>>>>> = Mutex::new(RefCell::new(None));
 
@@ -54,13 +54,6 @@ pub fn setup_timer_isr(timg1_timer0: Timer<Timer0<TIMG1>>) {
     )
     .unwrap();
 
-    #[cfg(feature = "wifi")]
-    interrupt::enable(
-        peripherals::Interrupt::WIFI_BB,
-        interrupt::Priority::Priority1,
-    )
-    .unwrap();
-
     #[cfg(feature = "ble")]
     {
         interrupt::enable(peripherals::Interrupt::RWBT, interrupt::Priority::Priority1).unwrap();
@@ -77,7 +70,7 @@ pub fn setup_timer_isr(timg1_timer0: Timer<Timer0<TIMG1>>) {
     }
 
     timer1.listen();
-    timer1.start(TIMER_DELAY.convert());
+    timer1.start(TIMER_DELAY.into_duration());
     critical_section::with(|cs| {
         TIMER1.borrow_ref_mut(cs).replace(timer1);
     });
@@ -85,12 +78,12 @@ pub fn setup_timer_isr(timg1_timer0: Timer<Timer0<TIMG1>>) {
     xtensa_lx::timer::set_ccompare0(0xffffffff);
 
     unsafe {
-        xtensa_lx::interrupt::disable();
+        let enabled = esp32_hal::xtensa_lx::interrupt::disable();
         xtensa_lx::interrupt::enable_mask(
             1 << 6 // Timer0
             | 1 << 29 // Software1
                 | xtensa_lx_rt::interrupt::CpuInterruptLevel::Level2.mask()
-                | xtensa_lx_rt::interrupt::CpuInterruptLevel::Level6.mask(),
+                | xtensa_lx_rt::interrupt::CpuInterruptLevel::Level6.mask() | enabled,
         );
     }
 
@@ -132,22 +125,6 @@ fn WIFI_MAC() {
             fnc(arg);
         }
     }
-}
-
-#[cfg(feature = "wifi")]
-#[interrupt]
-fn WIFI_BB() {
-    unsafe {
-        let (fnc, arg) = crate::wifi::os_adapter::ISR_INTERRUPT_1;
-        trace!("interrupt WIFI_BB {:p} {:p}", fnc, arg);
-
-        if !fnc.is_null() {
-            let fnc: fn(*mut crate::binary::c_types::c_void) = core::mem::transmute(fnc);
-            fnc(arg);
-        }
-
-        trace!("interrupt 1 done");
-    };
 }
 
 #[cfg(feature = "ble")]
@@ -202,7 +179,7 @@ fn TG1_T0_LEVEL(context: &mut Context) {
         let mut timer = TIMER1.borrow_ref_mut(cs);
         let timer = timer.as_mut().unwrap();
         timer.clear_interrupt();
-        timer.start(TIMER_DELAY.convert());
+        timer.start(TIMER_DELAY.into_duration());
     });
 }
 
@@ -222,7 +199,7 @@ fn Software1(_level: u32, context: &mut Context) {
         let mut timer = TIMER1.borrow_ref_mut(cs);
         let timer = timer.as_mut().unwrap();
         timer.clear_interrupt();
-        timer.start(TIMER_DELAY.convert());
+        timer.start(TIMER_DELAY.into_duration());
     });
 }
 

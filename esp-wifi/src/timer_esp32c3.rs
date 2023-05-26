@@ -16,9 +16,9 @@ pub const TICKS_PER_SECOND: u64 = 16_000_000;
 pub const COUNTER_BIT_MASK: u64 = 0x000F_FFFF_FFFF_FFFF;
 
 #[cfg(debug_assertions)]
-const TIMER_DELAY: fugit::HertzU32 = fugit::HertzU32::from_raw(500);
+const TIMER_DELAY: fugit::HertzU32 = fugit::HertzU32::from_raw(50);
 #[cfg(not(debug_assertions))]
-const TIMER_DELAY: fugit::HertzU32 = fugit::HertzU32::from_raw(1_000);
+const TIMER_DELAY: fugit::HertzU32 = fugit::HertzU32::from_raw(100);
 
 static ALARM0: Mutex<RefCell<Option<Alarm<Periodic, 0>>>> = Mutex::new(RefCell::new(None));
 
