@@ -60,8 +60,6 @@ SECTIONS
     KEEP(*(.init.rust));
     KEEP(*(.text.abort));
     . = ALIGN(4);
-    KEEP(*(.trap));
-    KEEP(*(.trap.rust));
 
     *(.text .text.*);
     _etext = .;
@@ -98,6 +96,8 @@ SECTIONS
     _srwtext = .;
     *(.rwtext);
     . = ALIGN(4);
+    KEEP(*(.trap));
+    *(.trap.*);
     _erwtext = .;
   } > REGION_RWTEXT
   _rwtext_size = _erwtext - _srwtext + 8;

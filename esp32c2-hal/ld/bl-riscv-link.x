@@ -56,11 +56,18 @@ SECTIONS {
     KEEP(*(.init));
     KEEP(*(.init.rust));
     KEEP(*(.text.abort));
-    KEEP(*(.trap));
-    KEEP(*(.trap.rust));
   } > ROTEXT
 }
 INSERT BEFORE .text;
+
+SECTIONS {
+  .trap : ALIGN(4)
+  {
+    KEEP(*(.trap));
+    *(.trap.*);
+  } > RWTEXT
+}
+INSERT AFTER .rwtext;
 
 SECTIONS {
   /**
@@ -86,6 +93,7 @@ SECTIONS {
     . = ALIGN(ALIGNOF(.rwtext));
     . = . + SIZEOF(.rwtext);
     . = . + SIZEOF(.rwtext.wifi);
+    . = . + SIZEOF(.trap);
   } > RWDATA
 }
 INSERT BEFORE .data;
