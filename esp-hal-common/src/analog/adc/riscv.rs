@@ -337,7 +337,7 @@ pub mod implementation {
 
     impl_adc_interface! {
         ADC2 [
-            (Gpio5, 4),
+            (Gpio5, 0),
         ]
     }
 }

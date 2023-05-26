@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-S3: Move PSRAM related function to RAM (#546)
 - ADC driver will now apply attenuation values to the correct ADC's channels. (#554)
 - Sometimes half-duplex non-DMA SPI reads were reading garbage in non-release mode (#552)
+- ESP32-C3: Fix GPIO5 ADC channel id (#562)
 
 ### Changed
 
