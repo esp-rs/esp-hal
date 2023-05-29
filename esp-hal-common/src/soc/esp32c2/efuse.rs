@@ -1,6 +1,7 @@
 //! Reading of eFuses
 
 use crate::peripherals::EFUSE;
+pub use crate::soc::efuse_field::*;
 
 pub struct Efuse;
 
@@ -23,40 +24,37 @@ impl Efuse {
     /// );
     /// ```
     pub fn get_mac_address() -> [u8; 6] {
-        let efuse = unsafe { &*EFUSE::ptr() };
-
-        let mac_low: u32 = efuse.rd_blk2_data0.read().bits();
-        let mac_high: u16 = efuse.rd_blk2_data1.read().mac_id_high().bits();
-
-        let mac_low_bytes = mac_low.to_be_bytes();
-        let mac_high_bytes = mac_high.to_be_bytes();
-
-        [
-            mac_high_bytes[0],
-            mac_high_bytes[1],
-            mac_low_bytes[0],
-            mac_low_bytes[1],
-            mac_low_bytes[2],
-            mac_low_bytes[3],
-        ]
+        Self::read_field_be(MAC_FACTORY)
     }
 
     /// Get status of SPI boot encryption.
     pub fn get_flash_encryption() -> bool {
-        let efuse = unsafe { &*EFUSE::ptr() };
-        (efuse
-            .rd_repeat_data0
-            .read()
-            .spi_boot_encrypt_decrypt_cnt()
-            .bits()
-            .count_ones()
-            % 2)
-            != 0
+        (Self::read_field_le::<u8>(SPI_BOOT_CRYPT_CNT).count_ones() % 2) != 0
     }
 
     /// Get the multiplier for the timeout value of the RWDT STAGE 0 register.
     pub fn get_rwdt_multiplier() -> u8 {
+        Self::read_field_le::<u8>(WDT_DELAY_SEL)
+    }
+}
+
+#[derive(Copy, Clone)]
+pub(crate) enum EfuseBlock {
+    Block0,
+    Block1,
+    Block2,
+    Block3,
+}
+
+impl EfuseBlock {
+    pub(crate) fn address(self) -> *const u32 {
+        use EfuseBlock::*;
         let efuse = unsafe { &*EFUSE::ptr() };
-        efuse.rd_repeat_data0.read().wdt_delay_sel().bits()
+        match self {
+            Block0 => efuse.rd_wr_dis.as_ptr(),
+            Block1 => efuse.rd_blk1_data0.as_ptr(),
+            Block2 => efuse.rd_blk2_data0.as_ptr(),
+            Block3 => efuse.rd_blk3_data0.as_ptr(),
+        }
     }
 }
