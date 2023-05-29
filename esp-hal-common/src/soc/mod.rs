@@ -8,3 +8,5 @@ pub use self::soc::*;
 #[cfg_attr(esp32s2, path = "esp32s2/mod.rs")]
 #[cfg_attr(esp32s3, path = "esp32s3/mod.rs")]
 mod soc;
+
+mod efuse_field;
