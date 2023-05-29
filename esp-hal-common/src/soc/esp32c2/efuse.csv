@@ -78,12 +78,7 @@ DISABLE_WAFER_VERSION_MAJOR,                     EFUSE_BLK0,  59,   1, [] Disabl
 DISABLE_BLK_VERSION_MAJOR,                       EFUSE_BLK0,  60,   1, [] Disables check of blk version major
 USER_DATA,                                       EFUSE_BLK1,   0,  88, [] User data block
 USER_DATA.MAC_CUSTOM,                            EFUSE_BLK1,   0,  48, [MAC_CUSTOM CUSTOM_MAC] Custom MAC address
-MAC,                                             EFUSE_BLK2,  40,   8, [MAC_FACTORY] MAC address
-,                                                EFUSE_BLK2,  32,   8, [MAC_FACTORY] MAC address
-,                                                EFUSE_BLK2,  24,   8, [MAC_FACTORY] MAC address
-,                                                EFUSE_BLK2,  16,   8, [MAC_FACTORY] MAC address
-,                                                EFUSE_BLK2,   8,   8, [MAC_FACTORY] MAC address
-,                                                EFUSE_BLK2,   0,   8, [MAC_FACTORY] MAC address
+MAC_FACTORY,                                     EFUSE_BLK2,   0,  48, [MAC_FACTORY] MAC address
 WAFER_VERSION_MINOR,                             EFUSE_BLK2,  48,   4, [] WAFER_VERSION_MINOR
 WAFER_VERSION_MAJOR,                             EFUSE_BLK2,  52,   2, [] WAFER_VERSION_MAJOR
 PKG_VERSION,                                     EFUSE_BLK2,  54,   3, [] EFUSE_PKG_VERSION

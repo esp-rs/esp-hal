@@ -128,12 +128,7 @@ SECURE_VERSION,                                  EFUSE_BLK0, 137,  16, [] Repres
 SECURE_BOOT_DISABLE_FAST_WAKE,                   EFUSE_BLK0, 153,   1, [] Represents whether FAST VERIFY ON WAKE is disabled or enabled when Secure Boot is enabled. 1: disabled. 0: enabled
 HYS_EN_PAD0,                                     EFUSE_BLK0, 154,   6, [] Set bits to enable hysteresis function of PAD0~5
 HYS_EN_PAD1,                                     EFUSE_BLK0, 160,  22, [] Set bits to enable hysteresis function of PAD6~27
-MAC,                                             EFUSE_BLK1,  40,   8, [MAC_FACTORY] MAC address
-,                                                EFUSE_BLK1,  32,   8, [MAC_FACTORY] MAC address
-,                                                EFUSE_BLK1,  24,   8, [MAC_FACTORY] MAC address
-,                                                EFUSE_BLK1,  16,   8, [MAC_FACTORY] MAC address
-,                                                EFUSE_BLK1,   8,   8, [MAC_FACTORY] MAC address
-,                                                EFUSE_BLK1,   0,   8, [MAC_FACTORY] MAC address
+MAC_FACTORY,                                     EFUSE_BLK1,   0,  48, [MAC_FACTORY] MAC address
 MAC_EXT,                                         EFUSE_BLK1,  48,  16, [] Stores the extended bits of MAC address
 RXIQ_VERSION,                                    EFUSE_BLK1,  64,   3, [] RF Calibration data. RXIQ version
 RXIQ_0,                                          EFUSE_BLK1,  67,   7, [] RF Calibration data. RXIQ data 0

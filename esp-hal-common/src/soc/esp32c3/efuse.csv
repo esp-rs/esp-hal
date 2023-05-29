@@ -141,12 +141,7 @@ SECURE_VERSION,                                  EFUSE_BLK0, 142,  16, [] Secure
 ERR_RST_ENABLE,                                  EFUSE_BLK0, 159,   1, [] Use BLOCK0 to check error record registers {0: "without check"; 1: "with check"}
 DISABLE_WAFER_VERSION_MAJOR,                     EFUSE_BLK0, 160,   1, [] Disables check of wafer version major
 DISABLE_BLK_VERSION_MAJOR,                       EFUSE_BLK0, 161,   1, [] Disables check of blk version major
-MAC,                                             EFUSE_BLK1,  40,   8, [MAC_FACTORY] MAC address
-,                                                EFUSE_BLK1,  32,   8, [MAC_FACTORY] MAC address
-,                                                EFUSE_BLK1,  24,   8, [MAC_FACTORY] MAC address
-,                                                EFUSE_BLK1,  16,   8, [MAC_FACTORY] MAC address
-,                                                EFUSE_BLK1,   8,   8, [MAC_FACTORY] MAC address
-,                                                EFUSE_BLK1,   0,   8, [MAC_FACTORY] MAC address
+MAC_FACTORY,                                     EFUSE_BLK1,   0,  48, [MAC_FACTORY] MAC address
 SPI_PAD_CONFIG_CLK,                              EFUSE_BLK1,  48,   6, [] SPI PAD CLK
 SPI_PAD_CONFIG_Q,                                EFUSE_BLK1,  54,   6, [] SPI PAD Q(D1)
 SPI_PAD_CONFIG_D,                                EFUSE_BLK1,  60,   6, [] SPI PAD D(D0)

@@ -71,12 +71,7 @@ RD_DIS.CODING_SCHEME,                            EFUSE_BLK0,  19,   1, [] rd_dis
 RD_DIS.KEY_STATUS,                               EFUSE_BLK0,  19,   1, [] rd_dis of KEY_STATUS
 FLASH_CRYPT_CNT,                                 EFUSE_BLK0,  20,   7, [] Flash encryption is enabled if this field has an odd number of bits set
 UART_DOWNLOAD_DIS,                               EFUSE_BLK0,  27,   1, [] Disable UART download mode. Valid for ESP32 V3 and newer; only
-MAC,                                             EFUSE_BLK0,  72,   8, [MAC_FACTORY] MAC address
-,                                                EFUSE_BLK0,  64,   8, [MAC_FACTORY] MAC address
-,                                                EFUSE_BLK0,  56,   8, [MAC_FACTORY] MAC address
-,                                                EFUSE_BLK0,  48,   8, [MAC_FACTORY] MAC address
-,                                                EFUSE_BLK0,  40,   8, [MAC_FACTORY] MAC address
-,                                                EFUSE_BLK0,  32,   8, [MAC_FACTORY] MAC address
+MAC_FACTORY,                                     EFUSE_BLK0,  32,   48, [MAC_FACTORY] MAC address
 MAC_CRC,                                         EFUSE_BLK0,  80,   8, [MAC_FACTORY_CRC] CRC8 for MAC address
 DISABLE_APP_CPU,                                 EFUSE_BLK0,  96,   1, [CHIP_VER_DIS_APP_CPU] Disables APP CPU
 DISABLE_BT,                                      EFUSE_BLK0,  97,   1, [CHIP_VER_DIS_BT] Disables Bluetooth
