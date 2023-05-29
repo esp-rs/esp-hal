@@ -164,7 +164,9 @@ fn main() {
         fs::copy("ld/riscv/asserts.x", out.join("asserts.x")).unwrap();
         fs::copy("ld/riscv/debug.x", out.join("debug.x")).unwrap();
     }
-    copy_dir_all("ld/sections", out).unwrap();
+    copy_dir_all("ld/sections", &out).unwrap();
+
+    gen_efuse_table(device_name, out);
 }
 
 fn copy_dir_all(
@@ -182,4 +184,69 @@ fn copy_dir_all(
         }
     }
     Ok(())
+}
+
+fn gen_efuse_table(device_name: &str, out_dir: impl AsRef<std::path::Path>) {
+    use std::io::{BufRead, Write};
+
+    let src_path = std::path::PathBuf::from(format!("src/soc/{device_name}/efuse.csv"));
+    let out_path = out_dir.as_ref().join("efuse_fields.rs");
+
+    println!("cargo:rerun-if-changed={}", src_path.display());
+
+    let mut writer = std::fs::File::create(out_path).unwrap();
+    let mut reader = std::io::BufReader::new(std::fs::File::open(src_path).unwrap());
+    let mut line = String::with_capacity(128);
+
+    while reader.read_line(&mut line).unwrap() > 0 {
+        if line.ends_with("\n") {
+            line.pop();
+            if line.ends_with("\r") {
+                line.pop();
+            }
+        }
+        // drop comment and trim
+        line.truncate(
+            if let Some((pfx, _cmt)) = line.split_once("#") {
+                pfx
+            } else {
+                &line
+            }
+            .trim()
+            .len(),
+        );
+        // skip empty
+        if line.is_empty() {
+            continue;
+        }
+
+        let mut fields = line.split(",");
+        match (
+            fields.next().map(|s| s.trim().replace(".", "_")),
+            fields
+                .next()
+                .map(|s| s.trim().replace(|c: char| !c.is_ascii_digit(), "")),
+            fields
+                .next()
+                .map(|s| s.trim())
+                .and_then(|s| s.parse::<u32>().ok()),
+            fields
+                .next()
+                .map(|s| s.trim())
+                .and_then(|s| s.parse::<u32>().ok()),
+            fields.next().map(|s| s.trim()),
+        ) {
+            (Some(name), Some(block), Some(bit_off), Some(bit_len), Some(desc)) => {
+                writeln!(writer, "/// {desc}").unwrap();
+                writeln!(
+                    writer,
+                    "pub const {name}: EfuseField = EfuseField::new(EfuseBlock::Block{block}, {bit_off}, {bit_len});"
+                )
+                .unwrap();
+            }
+            other => eprintln!("Invalid data: {other:?}"),
+        }
+
+        line.clear();
+    }
 }
