@@ -2166,7 +2166,7 @@ pub trait Instance {
         // correct clock rate. This should be further investigated.
         #[cfg(esp32h2)]
         unsafe {
-            // use clock source XTAL_CLOCK (48MHz)
+            // use clock source XTAL_CLOCK (32MHz)
             (&*crate::peripherals::PCR::PTR)
                 .spi2_clkm_conf
                 .modify(|_, w| w.spi2_clkm_sel().bits(0));
