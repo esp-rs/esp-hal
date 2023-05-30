@@ -1,5 +1,5 @@
 [device]
-arch  = "riscv"
+arch = "riscv"
 cores = "single_core"
 
 peripherals = [
@@ -29,10 +29,10 @@ peripherals = [
     "uart0",
     "uart1",
     "xts_aes",
-    "assist_debug_sp_monitor",
 
     # Additional peripherals defined by us (the developers):
     "adc",
+    "assist_debug_sp_monitor",
     "gdma",
     "radio",
     "phy",
