@@ -54,25 +54,19 @@ fn main() -> ! {
         &mut system.peripheral_clock_control,
     );
 
-    // 320k of RAM, 16k reserved for cache
-    // RAM starts at 0x40800000 + 16k = 0x40804000
-    // RAM length = 320k - 16k = 304k = 0x4c000
-    // RAM end = 0x40804000 + 0x4c000 = 0x40850000
-
     // Uncomment the functionality you want to test
+    // We use a 0x1200 wide SP and 0x100 regions, and RAM ends at 0x40850000
 
     // Monitor the SP so as to prevent stack overflow or erroneous push/pop. When
     // the SP exceeds the minimum or maximum threshold, the module will record the
-    // PC pointer and generate an interrup
-    da.enable_sp_monitor(0x40850002, 0x40860000);
-    // 0x40850000 - 0x1200 = 0x4084ee00
+    // PC pointer and generate an interrupt
+    // da.enable_sp_monitor(0x4084ee00, 0x40850000);
 
     // Monitor reads/writes performed by the CPU over data bus and peripheral bus
     // in a certain address space, i.e., memory region. Whenever the bus reads or
     // writes in the specified address space, an interrupt will be triggered
     // da.enable_region0_monitor(0x4084ee00, 0x4084ef00, true, true);
-    // da.enable_region1_monitor(0x4084ee00, 0x4084ef00, true, true);
-    // 0x4084ee00 + 0x100 = 0x4084ef00
+    da.enable_region1_monitor(0x4084ee00, 0x4084ef00, true, true);
 
     critical_section::with(|cs| DA.borrow_ref_mut(cs).replace(da));
 

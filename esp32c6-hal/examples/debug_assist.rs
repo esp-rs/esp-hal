@@ -56,17 +56,9 @@ fn main() -> ! {
 
     // uncomment the functionality you want to test
 
-    // 512K of RAM, 32K reserved for cache
-    // RAM starts at 0x40800000 + 32K = 0x40808000
-    // RAM length = 512K - 32K = 480K = 0x78000
-    // RAM end = 0x40808000 + 0x78000 = 0x40880000
-
     // da.enable_sp_monitor(0x4087ee00, 0x40880000);
-    // 0x40880000 - 0x4087ee00 = 0x1200
     // da.enable_region0_monitor(0x4087ee00, 0x4087ef00, true, true);
-    // 0x4087ef00 - 0x4087ee00 = 0x100
     da.enable_region1_monitor(0x4087ee00, 0x4087ef00, true, true);
-    // 0x4087ef00 - 0x4087ee00 = 0x100
 
     critical_section::with(|cs| DA.borrow_ref_mut(cs).replace(da));
 
