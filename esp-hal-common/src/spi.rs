@@ -2153,7 +2153,7 @@ pub trait Instance {
                 .set_bit()
         });
 
-        #[cfg(esp32c6)]
+        // #[cfg(esp32c6)]
         unsafe {
             // use default clock source PLL_F80M_CLK
             (&*crate::peripherals::PCR::PTR)
@@ -2161,16 +2161,16 @@ pub trait Instance {
                 .modify(|_, w| w.spi2_clkm_sel().bits(1));
         }
 
-        // NOTE: `spi2_clkm_sel` should be set to 1 for the ESP32-H2 as well, according
-        // to the TRM; however, this does not seem to work, while using 0 produces the
-        // correct clock rate. This should be further investigated.
-        #[cfg(esp32h2)]
-        unsafe {
-            // use clock source XTAL_CLOCK (32MHz)
-            (&*crate::peripherals::PCR::PTR)
-                .spi2_clkm_conf
-                .modify(|_, w| w.spi2_clkm_sel().bits(0));
-        }
+        // // NOTE: `spi2_clkm_sel` should be set to 1 for the ESP32-H2 as well, according
+        // // to the TRM; however, this does not seem to work, while using 0 produces the
+        // // correct clock rate. This should be further investigated.
+        // #[cfg(esp32h2)]
+        // unsafe {
+        //     // use clock source PLL_48M_CLK
+        //     (&*crate::peripherals::PCR::PTR)
+        //         .spi2_clkm_conf
+        //         .modify(|_, w| w.spi2_clkm_sel().bits(1));
+        // }
 
         #[cfg(not(any(esp32, esp32s2)))]
         reg_block.ctrl.modify(|_, w| {
@@ -2403,7 +2403,11 @@ pub trait Instance {
     // taken from https://github.com/apache/incubator-nuttx/blob/8267a7618629838231256edfa666e44b5313348e/arch/risc-v/src/esp32c3/esp32c3_spi.c#L496
     fn setup(&mut self, frequency: HertzU32, clocks: &Clocks) {
         // FIXME: this might not be always true
+        #[cfg(not(esp32h2))]
         let apb_clk_freq: HertzU32 = HertzU32::Hz(clocks.apb_clock.to_Hz());
+        // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
+        #[cfg(esp32h2)]
+        let apb_clk_freq: HertzU32 = HertzU32::Hz(clocks.pll_48m_clock.to_Hz());
 
         let reg_val: u32;
         let duty_cycle = 128;
