@@ -2153,24 +2153,14 @@ pub trait Instance {
                 .set_bit()
         });
 
-        // #[cfg(esp32c6)]
+        #[cfg(any(esp32c6, esp32h2))]
         unsafe {
-            // use default clock source PLL_F80M_CLK
+            // use default clock source PLL_F80M_CLK (ESP32-C6) and
+            // PLL_F48M_CLK (ESP32-H2)
             (&*crate::peripherals::PCR::PTR)
                 .spi2_clkm_conf
                 .modify(|_, w| w.spi2_clkm_sel().bits(1));
         }
-
-        // // NOTE: `spi2_clkm_sel` should be set to 1 for the ESP32-H2 as well, according
-        // // to the TRM; however, this does not seem to work, while using 0 produces the
-        // // correct clock rate. This should be further investigated.
-        // #[cfg(esp32h2)]
-        // unsafe {
-        //     // use clock source PLL_48M_CLK
-        //     (&*crate::peripherals::PCR::PTR)
-        //         .spi2_clkm_conf
-        //         .modify(|_, w| w.spi2_clkm_sel().bits(1));
-        // }
 
         #[cfg(not(any(esp32, esp32s2)))]
         reg_block.ctrl.modify(|_, w| {
