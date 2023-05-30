@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add initial support for LEDC in ESP32-H2 (#560)
 - Add initial support for ASSIST_DEBUG in ESP32-H2 (#566)
 - Add all `SPI` examples for the ESP32-H2 (#549)
+- Add initial support for ADC in ESP32-H2 (#564)
 
 ### Changed
 
