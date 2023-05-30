@@ -37,8 +37,8 @@ fn main() -> ! {
     let mut system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    // Disable the watchdog timers. For the ESP32-C3, this includes the Super WDT,
-    // the RTC WDT, and the TIMG WDTs.
+    // Disable the watchdog timers. For the ESP32-S2, this includes the RTC WDT, and
+    // the TIMG WDT.
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
     let timer_group0 = TimerGroup::new(
         peripherals.TIMG0,
@@ -98,6 +98,13 @@ fn main() -> ! {
 
         let transfer = spi.dma_transfer(send, receive).unwrap();
         // here we could do something else while DMA transfer is in progress
+        let mut i = 0;
+        // Check is_done until the transfer is almost done (32000 bytes at 100kHz is
+        // 2.56 seconds), then move to wait().
+        while !transfer.is_done() && i < 10 {
+            delay.delay_ms(250u32);
+            i += 1;
+        }
         // the buffers and spi is moved into the transfer and we can get it back via
         // `wait`
         (receive, send, spi) = transfer.wait();

@@ -9,7 +9,7 @@
 use core::cell::RefCell;
 
 use critical_section::Mutex;
-use esp32c6_hal::{
+use esp32h2_hal::{
     clock::ClockControl,
     interrupt::{self},
     peripherals::{self, Peripherals},
@@ -32,7 +32,7 @@ fn main() -> ! {
     let sw_int = system.software_interrupt_control;
     let clocks = ClockControl::boot_defaults(clockctrl).freeze();
 
-    // Disable the watchdog timers. For the ESP32-C6, this includes the Super WDT,
+    // Disable the watchdog timers. For the ESP32-H2, this includes the Super WDT,
     // the RTC WDT, and the TIMG WDTs.
     let mut rtc = Rtc::new(peripherals.LP_CLKRST);
     let timer_group0 = TimerGroup::new(

@@ -1,15 +1,16 @@
-//! Software Interrupts
+//! Interrupt Preemption
 //!
-//! An example of how software interrupts can be raised and reset
-//! Should rotate through all of the available interrupts printing their number
-//! when raised.
+//! An example of how an interrupt can be preempted by another with higher
+//! priority. Should show higher-numbered software interrupts happening during
+//! the handling of lower-numbered ones.
+
 #![no_std]
 #![no_main]
 
 use core::cell::RefCell;
 
 use critical_section::Mutex;
-use esp32c6_hal::{
+use esp32h2_hal::{
     clock::ClockControl,
     interrupt::{self},
     peripherals::{self, Peripherals},
@@ -17,7 +18,6 @@ use esp32c6_hal::{
     riscv,
     system::{SoftwareInterrupt, SoftwareInterruptControl},
     timer::TimerGroup,
-    Delay,
     Rtc,
 };
 use esp_backtrace as _;
@@ -32,7 +32,7 @@ fn main() -> ! {
     let sw_int = system.software_interrupt_control;
     let clocks = ClockControl::boot_defaults(clockctrl).freeze();
 
-    // Disable the watchdog timers. For the ESP32-C6, this includes the Super WDT,
+    // Disable the watchdog timers. For the ESP32-H2, this includes the Super WDT,
     // the RTC WDT, and the TIMG WDTs.
     let mut rtc = Rtc::new(peripherals.LP_CLKRST);
     let timer_group0 = TimerGroup::new(
@@ -57,65 +57,39 @@ fn main() -> ! {
 
     interrupt::enable(
         peripherals::Interrupt::FROM_CPU_INTR0,
-        interrupt::Priority::Priority3,
+        interrupt::Priority::Priority1,
     )
     .unwrap();
     interrupt::enable(
         peripherals::Interrupt::FROM_CPU_INTR1,
-        interrupt::Priority::Priority3,
+        interrupt::Priority::Priority2,
     )
     .unwrap();
     interrupt::enable(
         peripherals::Interrupt::FROM_CPU_INTR2,
-        interrupt::Priority::Priority3,
+        interrupt::Priority::Priority2,
     )
     .unwrap();
     interrupt::enable(
         peripherals::Interrupt::FROM_CPU_INTR3,
-        interrupt::Priority::Priority3,
+        interrupt::Priority::Priority15,
     )
     .unwrap();
     unsafe { riscv::interrupt::enable() }
-    let mut delay = Delay::new(&clocks);
-    let mut counter = 0;
-    loop {
-        delay.delay_ms(500u32);
-        match counter {
-            0 => critical_section::with(|cs| {
-                SWINT
-                    .borrow_ref_mut(cs)
-                    .as_mut()
-                    .unwrap()
-                    .raise(SoftwareInterrupt::SoftwareInterrupt0);
-            }),
-            1 => critical_section::with(|cs| {
-                SWINT
-                    .borrow_ref_mut(cs)
-                    .as_mut()
-                    .unwrap()
-                    .raise(SoftwareInterrupt::SoftwareInterrupt1);
-            }),
-            2 => critical_section::with(|cs| {
-                SWINT
-                    .borrow_ref_mut(cs)
-                    .as_mut()
-                    .unwrap()
-                    .raise(SoftwareInterrupt::SoftwareInterrupt2);
-            }),
-            3 => {
-                critical_section::with(|cs| {
-                    SWINT
-                        .borrow_ref_mut(cs)
-                        .as_mut()
-                        .unwrap()
-                        .raise(SoftwareInterrupt::SoftwareInterrupt3);
-                });
-                counter = -1
-            }
-            _ => {}
-        }
-        counter += 1;
-    }
+
+    // raise mid priority interrupt.
+    // The handler raises one interrupt at lower priority, one at same and one at
+    // higher. We expect to see the higher priority served immeiately before
+    // exiting the handler Once the handler is exited we expect to see same
+    // priority and low priority interrupts served in that order
+    critical_section::with(|cs| {
+        SWINT
+            .borrow_ref_mut(cs)
+            .as_mut()
+            .unwrap()
+            .raise(SoftwareInterrupt::SoftwareInterrupt1);
+    });
+    loop {}
 }
 
 #[interrupt]
@@ -131,14 +105,31 @@ fn FROM_CPU_INTR0() {
 }
 #[interrupt]
 fn FROM_CPU_INTR1() {
-    esp_println::println!("SW interrupt1");
+    esp_println::println!("SW interrupt1 entry");
     critical_section::with(|cs| {
         SWINT
             .borrow_ref_mut(cs)
             .as_mut()
             .unwrap()
             .reset(SoftwareInterrupt::SoftwareInterrupt1);
+        SWINT
+            .borrow_ref_mut(cs)
+            .as_mut()
+            .unwrap()
+            .raise(SoftwareInterrupt::SoftwareInterrupt2); // raise interrupt at same priority
+        SWINT
+            .borrow_ref_mut(cs)
+            .as_mut()
+            .unwrap()
+            .raise(SoftwareInterrupt::SoftwareInterrupt3); // raise interrupt at higher priority
+        SWINT
+            .borrow_ref_mut(cs)
+            .as_mut()
+            .unwrap()
+            .raise(SoftwareInterrupt::SoftwareInterrupt0); // raise interrupt at
+                                                           // lower priority
     });
+    esp_println::println!("SW interrupt1 exit");
 }
 #[interrupt]
 fn FROM_CPU_INTR2() {

@@ -861,6 +861,12 @@ pub mod dma {
                 (rbuffer, tbuffer, payload)
             }
         }
+
+        /// Check if the DMA transfer is complete
+        fn is_done(&self) -> bool {
+            let ch = &self.spi_dma.channel;
+            ch.tx.is_done() && ch.rx.is_done()
+        }
     }
 
     impl<'d, T, TX, RX, P, RXBUF, TXBUF, M> Drop
@@ -917,6 +923,12 @@ pub mod dma {
                 mem::forget(self);
                 (buffer, payload)
             }
+        }
+
+        /// Check if the DMA transfer is complete
+        fn is_done(&self) -> bool {
+            let ch = &self.spi_dma.channel;
+            ch.tx.is_done() && ch.rx.is_done()
         }
     }
 

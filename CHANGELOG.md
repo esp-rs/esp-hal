@@ -26,7 +26,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add initial support for MCPWM in ESP32-H2 (#544)
 - Add some miscellaneous examples for the ESP32-H2 (#548)
 - Add initial support for PCNT in ESP32-H2 (#551)
+- Add initial support for RMT in ESP32-H2 (#556)
+- Add a fn to poll DMA transfers
+- Add initial support for LEDC in ESP32-H2 (#560)
 - Add initial support for ASSIST_DEBUG in ESP32-H2 (#566)
+
+### Changed
+
+- Move core interrupt handling from Flash to RAM for RISC-V chips (ESP32-H2, ESP32-C2, ESP32-C3, ESP32-C6) (#541)
 
 ### Fixed
 
@@ -37,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-S3: Move PSRAM related function to RAM (#546)
 - ADC driver will now apply attenuation values to the correct ADC's channels. (#554)
 - Sometimes half-duplex non-DMA SPI reads were reading garbage in non-release mode (#552)
+- ESP32-C3: Fix GPIO5 ADC channel id (#562)
 
 ### Changed
 

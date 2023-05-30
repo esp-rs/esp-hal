@@ -54,11 +54,18 @@ SECTIONS {
     KEEP(*(.init));
     KEEP(*(.init.rust));
     KEEP(*(.text.abort));
-    KEEP(*(.trap));
-    KEEP(*(.trap.rust));
   } > ROTEXT
 }
 INSERT BEFORE .text;
+
+SECTIONS {
+  .trap : ALIGN(4)
+  {
+    KEEP(*(.trap));
+    *(.trap.*);
+  } > RWTEXT
+}
+INSERT AFTER .rwtext;
 
 SECTIONS {
   /**
