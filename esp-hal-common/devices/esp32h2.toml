@@ -6,7 +6,7 @@ peripherals = [
     # Peripherals available in the PAC:
     "aes",
     "apb_saradc",
-    # "assist_debug",
+    "assist_debug",
     # "ds",
     # "ecc",
     "efuse",
@@ -30,7 +30,7 @@ peripherals = [
     # "lp_timer",
     "lp_wdt",
     "mcpwm0",
-    # "mem_monitor",
+    "mem_monitor",
     # "modem_lpcon",
     # "modem_syscon",
     # "otp_debug",
@@ -60,5 +60,7 @@ peripherals = [
 
     # Additional peripherals defined by us (the developers):
     "adc",
+    "assist_debug_sp_monitor",
+    "assist_debug_region_monitor",
     "plic",
 ]

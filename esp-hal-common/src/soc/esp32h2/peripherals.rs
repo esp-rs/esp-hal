@@ -8,7 +8,7 @@ pub(crate) use self::peripherals::*;
 crate::peripherals! {
     AES => true,
     APB_SARADC => true,
-    // ASSIST_DEBUG => true,
+    ASSIST_DEBUG => true,
     // DS => true,
     // ECC => true,
     EFUSE => true,
@@ -32,7 +32,7 @@ crate::peripherals! {
     // LP_TIMER => true,
     LP_WDT => true,
     MCPWM0 => true,
-    // MEM_MONITOR => true,
+    MEM_MONITOR => true,
     // MODEM_LPCON => true,
     // MODEM_SYSCON => true,
     // OTP_DEBUG => true,
