@@ -80,15 +80,15 @@ required-features = ["eh1"]
 
 [[example]]
 name              = "embassy_hello_world"
-required-features = ["embassy"]
+required-features = ["embassy", "embassy-time-timg0"]
 
 [[example]]
 name              = "embassy_wait"
-required-features = ["embassy", "async"]
+required-features = ["async", "embassy", "embassy-time-timg0"]
 
 [[example]]
 name              = "embassy_spi"
-required-features = ["embassy", "async"]
+required-features = ["async", "embassy", "embassy-time-timg0"]
 
 [[example]]
 name              = "psram"
@@ -96,8 +96,8 @@ required-features = ["psram_2m"]
 
 [[example]]
 name              = "embassy_serial"
-required-features = ["embassy", "async"]
+required-features = ["async", "embassy", "embassy-time-timg0"]
 
 [[example]]
 name              = "embassy_i2c"
-required-features = ["embassy", "async"]
+required-features = ["async", "embassy", "embassy-time-timg0"]
