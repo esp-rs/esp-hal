@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add all `SPI` examples for the ESP32-H2 (#549)
 - Add initial support for ADC in ESP32-H2 (#564)
 - Simplify the `Delay` driver, derive `Clone` and `Copy` (#568)
+- Add `embassy_serial` and `embassy_wait` examples for ESP32-H2 (#569)
 
 ### Changed
 
