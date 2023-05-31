@@ -362,8 +362,8 @@ impl<'d> EspNow<'d> {
     }
 
     /// Check is peer is known
-    pub fn peer_exists(&mut self, peer_address: &[u8; 6]) -> Result<bool, EspNowError> {
-        unsafe { Ok(esp_now_is_peer_exist(peer_address.as_ptr())) }
+    pub fn peer_exists(&mut self, peer_address: &[u8; 6]) -> bool {
+        unsafe { esp_now_is_peer_exist(peer_address.as_ptr()) }
     }
 
     /// Get the number of peers
