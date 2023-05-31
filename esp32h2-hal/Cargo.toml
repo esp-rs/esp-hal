@@ -76,11 +76,19 @@ required-features = ["embassy"]
 
 [[example]]
 name              = "embassy_i2c"
-required-features = ["embassy", "async", "embassy-time-systick"]
+required-features = ["async", "embassy", "embassy-time-systick"]
+
+[[example]]
+name              = "embassy_serial"
+required-features = ["async", "embassy"]
 
 [[example]]
 name              = "embassy_spi"
-required-features = ["embassy", "async"]
+required-features = ["async", "embassy"]
+
+[[example]]
+name              = "embassy_wait"
+required-features = ["async", "embassy"]
 
 [[example]]
 name              = "interrupt_preemption"
