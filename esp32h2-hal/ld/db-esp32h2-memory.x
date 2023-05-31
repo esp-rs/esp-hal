@@ -18,7 +18,7 @@ MEMORY
     /* 320K of on soc RAM, 16K reserved for cache */
     ICACHE : ORIGIN = 0x40800000,  LENGTH = 16K
 
-    RAM : ORIGIN = 0x40800000 + 32K, LENGTH = 320K - 16K
+    RAM : ORIGIN = 0x40800000 + 16K, LENGTH = 320K - 16K
 
     /* External flash */
     ROM : ORIGIN =   0x42000000, LENGTH = 0x400000
