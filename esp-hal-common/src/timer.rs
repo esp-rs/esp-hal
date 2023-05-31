@@ -72,11 +72,26 @@ where
     ) -> Self {
         crate::into_ref!(timer_group);
 
+        use esp_println::println;
+
+        println!("123");
+
+        #[cfg(not(esp32h2))]
         let timer0 = Timer::new(
             Timer0 {
                 phantom: PhantomData::default(),
             },
             clocks.apb_clock,
+            peripheral_clock_control,
+        );
+
+        // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
+        #[cfg(esp32h2)]
+        let timer0 = Timer::new(
+            Timer0 {
+                phantom: PhantomData::default(),
+            },
+            clocks.pll_48m_clock,
             peripheral_clock_control,
         );
 
@@ -120,6 +135,9 @@ where
     ) -> Self {
         // TODO: this currently assumes APB_CLK is being used, as we don't yet have a
         //       way to select the XTAL_CLK.
+        use esp_println::println;
+
+        println!("LOLP {}", apb_clk_freq.to_Hz());
         timg.enable_peripheral(peripheral_clock_control);
         Self { timg, apb_clk_freq }
     }
