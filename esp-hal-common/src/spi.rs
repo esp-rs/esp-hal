@@ -1977,7 +1977,7 @@ where
         }
     }
 
-    #[cfg(any(esp32c2, esp32c3, esp32c6, esp32s3))]
+    #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
     fn enable_dma(&self) {
         let reg_block = self.register_block();
         reg_block.dma_conf.modify(|_, w| w.dma_tx_ena().set_bit());
@@ -1989,7 +1989,7 @@ where
         // for non GDMA this is done in `assign_tx_device` / `assign_rx_device`
     }
 
-    #[cfg(any(esp32c2, esp32c3, esp32c6, esp32s3))]
+    #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
     fn clear_dma_interrupts(&self) {
         let reg_block = self.register_block();
         reg_block.dma_int_clr.write(|w| {
@@ -2153,12 +2153,13 @@ pub trait Instance {
                 .set_bit()
         });
 
-        #[cfg(esp32c6)]
+        #[cfg(any(esp32c6, esp32h2))]
         unsafe {
-            let pcr = &*esp32c6::PCR::PTR;
-
-            // use default clock source PLL_F80M_CLK
-            pcr.spi2_clkm_conf.modify(|_, w| w.spi2_clkm_sel().bits(1));
+            // use default clock source PLL_F80M_CLK (ESP32-C6) and
+            // PLL_F48M_CLK (ESP32-H2)
+            (&*crate::peripherals::PCR::PTR)
+                .spi2_clkm_conf
+                .modify(|_, w| w.spi2_clkm_sel().bits(1));
         }
 
         #[cfg(not(any(esp32, esp32s2)))]
@@ -2392,7 +2393,11 @@ pub trait Instance {
     // taken from https://github.com/apache/incubator-nuttx/blob/8267a7618629838231256edfa666e44b5313348e/arch/risc-v/src/esp32c3/esp32c3_spi.c#L496
     fn setup(&mut self, frequency: HertzU32, clocks: &Clocks) {
         // FIXME: this might not be always true
+        #[cfg(not(esp32h2))]
         let apb_clk_freq: HertzU32 = HertzU32::Hz(clocks.apb_clock.to_Hz());
+        // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
+        #[cfg(esp32h2)]
+        let apb_clk_freq: HertzU32 = HertzU32::Hz(clocks.pll_48m_clock.to_Hz());
 
         let reg_val: u32;
         let duty_cycle = 128;
@@ -2761,9 +2766,9 @@ pub trait Instance {
                 .set_bit()
         });
 
-        #[cfg(esp32c6)]
+        #[cfg(any(esp32c6, esp32h2))]
         unsafe {
-            let pcr = &*esp32c6::PCR::PTR;
+            let pcr = &*crate::peripherals::PCR::PTR;
 
             // use default clock source PLL_F80M_CLK
             pcr.spi2_clkm_conf.modify(|_, w| w.spi2_clkm_sel().bits(1));
@@ -2922,12 +2927,12 @@ pub trait Instance {
         let reg_block = self.register_block();
         let len = if len > 0 { len - 1 } else { 0 };
 
-        #[cfg(any(esp32c2, esp32c3, esp32c6, esp32s3))]
+        #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
         reg_block
             .ms_dlen
             .write(|w| unsafe { w.ms_data_bitlen().bits(len) });
 
-        #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32s3)))]
+        #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3)))]
         {
             reg_block
                 .mosi_dlen
@@ -2940,7 +2945,7 @@ pub trait Instance {
     }
 }
 
-#[cfg(any(esp32c2, esp32c3, esp32c6))]
+#[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
 impl Instance for crate::peripherals::SPI2 {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
@@ -2978,7 +2983,7 @@ impl Instance for crate::peripherals::SPI2 {
     }
 }
 
-#[cfg(any(esp32c2, esp32c3, esp32c6))]
+#[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
 impl ExtendedInstance for crate::peripherals::SPI2 {
     #[inline(always)]
     fn sio0_input_signal(&self) -> InputSignal {

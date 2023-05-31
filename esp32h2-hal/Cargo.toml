@@ -63,12 +63,24 @@ embassy-time-timg0   = ["esp-hal-common/embassy-time-timg0",   "embassy-time/tic
 interrupt-preemption = ["esp-hal-common/interrupt-preemption"]
 
 [[example]]
+name              = "spi_eh1_loopback"
+required-features = ["eh1"]
+
+[[example]]
+name              = "spi_eh1_device_loopback"
+required-features = ["eh1"]
+
+[[example]]
 name              = "embassy_hello_world"
 required-features = ["embassy"]
 
 [[example]]
 name              = "embassy_i2c"
 required-features = ["embassy", "async", "embassy-time-systick"]
+
+[[example]]
+name              = "embassy_spi"
+required-features = ["embassy", "async"]
 
 [[example]]
 name              = "interrupt_preemption"

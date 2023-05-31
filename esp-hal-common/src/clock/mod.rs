@@ -128,6 +128,8 @@ pub struct Clocks<'d> {
     pub crypto_pwm_clock: HertzU32,
     #[cfg(esp32c6)]
     pub crypto_clock: HertzU32,
+    #[cfg(esp32h2)]
+    pub pll_48m_clock: HertzU32,
     // TODO chip specific additional ones as needed
 }
 
@@ -153,6 +155,8 @@ impl<'d> Clocks<'d> {
             crypto_pwm_clock: raw_clocks.crypto_pwm_clock,
             #[cfg(esp32c6)]
             crypto_clock: raw_clocks.crypto_clock,
+            #[cfg(esp32h2)]
+            pll_48m_clock: raw_clocks.pll_48m_clock,
         }
     }
 }
@@ -169,6 +173,8 @@ pub struct RawClocks {
     pub crypto_pwm_clock: HertzU32,
     #[cfg(esp32c6)]
     pub crypto_clock: HertzU32,
+    #[cfg(esp32h2)]
+    pub pll_48m_clock: HertzU32,
     // TODO chip specific additional ones as needed
 }
 
@@ -448,6 +454,7 @@ impl<'d> ClockControl<'d> {
                 apb_clock: HertzU32::MHz(32),
                 xtal_clock: HertzU32::MHz(32),
                 i2c_clock: HertzU32::MHz(32),
+                pll_48m_clock: HertzU32::MHz(48),
             },
         }
     }
@@ -481,6 +488,7 @@ impl<'d> ClockControl<'d> {
                 apb_clock: apb_freq.frequency(),
                 xtal_clock: xtal_freq.frequency(),
                 i2c_clock: HertzU32::MHz(32),
+                pll_48m_clock: HertzU32::MHz(48),
             },
         }
     }

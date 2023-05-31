@@ -1028,7 +1028,7 @@ pub(crate) mod asynch {
         }
     }
 
-    #[cfg(esp32c6)]
+    #[cfg(any(esp32c6, esp32h2))]
     mod interrupt {
         use super::*;
 
