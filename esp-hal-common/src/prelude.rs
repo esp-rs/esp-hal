@@ -38,7 +38,7 @@ pub use fugit::{
 };
 pub use nb;
 
-#[cfg(any(esp32c2, esp32c3, esp32c6))]
+#[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
 pub use crate::analog::SarAdcExt as _esp_hal_analog_SarAdcExt;
 #[cfg(sens)]
 pub use crate::analog::SensExt as _esp_hal_analog_SensExt;
