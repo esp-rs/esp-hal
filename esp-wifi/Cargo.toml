@@ -46,13 +46,24 @@ esp32s3 = [ "esp32s3-hal", "esp-wifi-sys/esp32s3", "esp-hal-common/esp32s3" ]
 esp32s2 = [ "esp32s2-hal", "esp-wifi-sys/esp32s2", "esp-hal-common/esp32s2" ]
 
 # async features
-esp32c3-async = [ "esp32c3-hal/embassy", "esp32c3-hal/embassy-time-timg0", "async" ]
-esp32c2-async = [ "esp32c2-hal/embassy", "esp32c2-hal/embassy-time-timg0", "async" ]
-esp32c6-async = [ "esp32c6-hal/embassy", "esp32c6-hal/embassy-time-timg0", "async" ]
-esp32-async = [ "esp32-hal/embassy", "esp32-hal/embassy-time-timg0", "async" ]
-esp32s2-async = [ "esp32s2-hal/embassy", "esp32s2-hal/embassy-time-timg0", "async" ]
-esp32s3-async = [ "esp32s3-hal/embassy", "esp32s3-hal/embassy-time-timg0", "async" ]
-async = [ "dep:embassy-sync", "dep:embassy-futures", "embedded-io/async"]
+async = [
+  "dep:embassy-sync",
+  "dep:embassy-futures",
+  "embedded-io/async",
+  "esp32c3-hal?/embassy",
+  "esp32c3-hal?/embassy-time-timg0",
+  "esp32c2-hal?/embassy",
+  "esp32c2-hal?/embassy-time-timg0",
+  "esp32c6-hal?/embassy",
+  "esp32c6-hal?/embassy-time-timg0",
+  "esp32-hal?/embassy",
+  "esp32-hal?/embassy-time-timg0",
+  "esp32s2-hal?/embassy",
+  "esp32s2-hal?/embassy-time-timg0",
+  "esp32s3-hal?/embassy",
+  "esp32s3-hal?/embassy-time-timg0",
+  ]
+
 embassy-net = ["dep:embassy-net", "dep:embassy-net-driver", "async"]
 
 # misc features
