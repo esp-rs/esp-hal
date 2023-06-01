@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add initial support for ADC in ESP32-H2 (#564)
 - Simplify the `Delay` driver, derive `Clone` and `Copy` (#568)
 - Add `embassy_serial` and `embassy_wait` examples for ESP32-H2 (#569)
+- Fix Async GPIO not disabling interupts on chips with multiple banks (#572)
 
 ### Changed
 
