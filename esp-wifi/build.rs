@@ -22,20 +22,6 @@ fn main() -> Result<(), String> {
         Err(_err) => (),
     }
 
-    let features: u8 = cfg!(feature = "wifi") as u8 + cfg!(feature = "ble") as u8;
-
-    if features == 0 {
-        return Err("You need to use feature `wifi` and/or `ble`".to_string());
-    }
-
-    if cfg!(feature = "esp32s2") && cfg!(feature = "ble") {
-        return Err("BLE is not supported for ESP32-S2".into());
-    }
-
-    if features >= 2 {
-        println!("cargo:rustc-cfg=coex");
-    }
-
     Ok(())
 }
 

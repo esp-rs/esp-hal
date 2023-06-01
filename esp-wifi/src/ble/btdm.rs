@@ -408,13 +408,13 @@ unsafe extern "C" fn btdm_sleep_exit_phase3() {
 
 unsafe extern "C" fn coex_schm_status_bit_set(_typ: i32, status: i32) {
     log::debug!("coex_schm_status_bit_set {} {}", _typ, status);
-    #[cfg(coex)]
+    #[cfg(feature = "coex")]
     crate::binary::include::coex_schm_status_bit_set(_typ as u32, status as u32);
 }
 
 unsafe extern "C" fn coex_schm_status_bit_clear(_typ: i32, status: i32) {
     log::debug!("coex_schm_status_bit_clear {} {}", _typ, status);
-    #[cfg(coex)]
+    #[cfg(feature = "coex")]
     crate::binary::include::coex_schm_status_bit_clear(_typ as u32, status as u32);
 }
 
@@ -470,7 +470,7 @@ pub(crate) fn ble_init() {
             panic!("btdm_osi_funcs_register returned {}", res);
         }
 
-        #[cfg(coex)]
+        #[cfg(feature = "coex")]
         {
             let res = crate::wifi::coex_init();
             if res != 0 {
@@ -501,7 +501,7 @@ pub(crate) fn ble_init() {
 
         log::debug!("The btdm_controller_init was initialized");
 
-        #[cfg(coex)]
+        #[cfg(feature = "coex")]
         crate::binary::include::coex_enable();
 
         crate::common_adapter::chip_specific::phy_enable();
@@ -516,7 +516,7 @@ pub(crate) fn ble_init() {
             coex_bt_high_prio();
         }
 
-        #[cfg(coex)]
+        #[cfg(feature = "coex")]
         coex_enable();
 
         btdm_controller_enable(esp_bt_mode_t_ESP_BT_MODE_BLE);

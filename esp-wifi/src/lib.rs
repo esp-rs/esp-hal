@@ -88,19 +88,19 @@ pub fn current_millis() -> u64 {
     get_systimer_count() / (TICKS_PER_SECOND / 1000)
 }
 
-#[cfg(all(not(coex), not(feature = "big-heap")))]
+#[cfg(all(not(feature = "coex"), not(feature = "big-heap")))]
 const HEAP_SIZE: usize = 64 * 1024;
 
-#[cfg(all(coex, not(feature = "big-heap")))]
+#[cfg(all(feature = "coex", not(feature = "big-heap")))]
 const HEAP_SIZE: usize = 64 * 1024;
 
-#[cfg(all(not(coex), not(feature = "esp32s2"), feature = "big-heap"))]
+#[cfg(all(not(feature = "coex"), not(feature = "esp32s2"), feature = "big-heap"))]
 const HEAP_SIZE: usize = 110 * 1024;
 
-#[cfg(all(not(coex), feature = "esp32s2", feature = "big-heap"))]
+#[cfg(all(not(feature = "coex"), feature = "esp32s2", feature = "big-heap"))]
 const HEAP_SIZE: usize = 72 * 1024;
 
-#[cfg(all(coex, feature = "big-heap"))]
+#[cfg(all(feature = "coex", feature = "big-heap"))]
 const HEAP_SIZE: usize = 110 * 1024;
 
 #[cfg_attr(feature = "esp32", link_section = ".dram2_uninit")]
@@ -244,7 +244,7 @@ pub fn initialize(
     init_clocks();
     init_buffer();
 
-    #[cfg(coex)]
+    #[cfg(feature = "coex")]
     {
         if init_for == EspWifiInitFor::WifiBle {
             log::debug!("coex init");

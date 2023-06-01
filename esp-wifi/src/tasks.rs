@@ -16,7 +16,7 @@ pub fn init_tasks() {
     task_create(worker_task2);
 
     // if coex then we know we have ble + wifi
-    #[cfg(coex)]
+    #[cfg(feature = "coex")]
     task_create(worker_task3);
 }
 

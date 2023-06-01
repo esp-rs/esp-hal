@@ -56,6 +56,7 @@ async = [ "dep:embassy-sync", "dep:embassy-futures", "embedded-io/async"]
 embassy-net = ["dep:embassy-net", "dep:embassy-net-driver", "async"]
 
 # misc features
+coex = []
 wifi-logs = []
 dump-packets = []
 utils = [ "dep:smoltcp" ]

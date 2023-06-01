@@ -1792,10 +1792,10 @@ pub unsafe extern "C" fn coex_deinit() {
 pub unsafe extern "C" fn coex_enable() -> crate::binary::c_types::c_int {
     log::debug!("coex_enable");
 
-    #[cfg(coex)]
+    #[cfg(feature = "coex")]
     return crate::binary::include::coex_enable();
 
-    #[cfg(not(coex))]
+    #[cfg(not(feature = "coex"))]
     0
 }
 
@@ -1809,7 +1809,7 @@ pub unsafe extern "C" fn coex_enable() -> crate::binary::c_types::c_int {
 pub unsafe extern "C" fn coex_disable() {
     log::debug!("coex_disable");
 
-    #[cfg(coex)]
+    #[cfg(feature = "coex")]
     crate::binary::include::coex_disable();
 }
 
@@ -1823,10 +1823,10 @@ pub unsafe extern "C" fn coex_disable() {
 pub unsafe extern "C" fn coex_status_get() -> u32 {
     log::debug!("coex_status_get");
 
-    #[cfg(coex)]
+    #[cfg(feature = "coex")]
     return crate::binary::include::coex_status_get();
 
-    #[cfg(not(coex))]
+    #[cfg(not(feature = "coex"))]
     0
 }
 
@@ -1841,7 +1841,7 @@ pub unsafe extern "C" fn coex_status_get() -> u32 {
 pub unsafe extern "C" fn coex_condition_set(type_: u32, dissatisfy: bool) {
     log::debug!("coex_condition_set");
 
-    #[cfg(coex)]
+    #[cfg(feature = "coex")]
     crate::binary::include::coex_condition_set(type_, dissatisfy);
 }
 
@@ -1860,10 +1860,10 @@ pub unsafe extern "C" fn coex_wifi_request(
 ) -> crate::binary::c_types::c_int {
     log::debug!("coex_wifi_request");
 
-    #[cfg(coex)]
+    #[cfg(feature = "coex")]
     return crate::binary::include::coex_wifi_request(event, latency, duration);
 
-    #[cfg(not(coex))]
+    #[cfg(not(feature = "coex"))]
     0
 }
 
@@ -1878,10 +1878,10 @@ pub unsafe extern "C" fn coex_wifi_request(
 pub unsafe extern "C" fn coex_wifi_release(event: u32) -> crate::binary::c_types::c_int {
     log::debug!("coex_wifi_release");
 
-    #[cfg(coex)]
+    #[cfg(feature = "coex")]
     return crate::binary::include::coex_wifi_release(event);
 
-    #[cfg(not(coex))]
+    #[cfg(not(feature = "coex"))]
     0
 }
 
@@ -1899,10 +1899,10 @@ pub unsafe extern "C" fn coex_wifi_channel_set(
 ) -> crate::binary::c_types::c_int {
     log::debug!("coex_wifi_channel_set");
 
-    #[cfg(coex)]
+    #[cfg(feature = "coex")]
     return crate::binary::include::coex_wifi_channel_set(primary, secondary);
 
-    #[cfg(not(coex))]
+    #[cfg(not(feature = "coex"))]
     0
 }
 
@@ -1920,10 +1920,10 @@ pub unsafe extern "C" fn coex_event_duration_get(
 ) -> crate::binary::c_types::c_int {
     log::debug!("coex_event_duration_get");
 
-    #[cfg(coex)]
+    #[cfg(feature = "coex")]
     return crate::binary::include::coex_event_duration_get(event, duration);
 
-    #[cfg(not(coex))]
+    #[cfg(not(feature = "coex"))]
     0
 }
 
@@ -1944,10 +1944,10 @@ pub unsafe extern "C" fn coex_event_duration_get(
 pub unsafe extern "C" fn coex_pti_get(event: u32, pti: *mut u8) -> crate::binary::c_types::c_int {
     log::debug!("coex_pti_get");
 
-    #[cfg(coex)]
+    #[cfg(feature = "coex")]
     return crate::binary::include::coex_pti_get(event, pti);
 
-    #[cfg(not(coex))]
+    #[cfg(not(feature = "coex"))]
     0
 }
 
@@ -1968,7 +1968,7 @@ pub unsafe extern "C" fn coex_pti_get(event: u32, pti: *mut u8) -> crate::binary
 pub unsafe extern "C" fn coex_schm_status_bit_clear(type_: u32, status: u32) {
     log::debug!("coex_schm_status_bit_clear");
 
-    #[cfg(coex)]
+    #[cfg(feature = "coex")]
     crate::binary::include::coex_schm_status_bit_clear(type_, status);
 }
 
@@ -1983,7 +1983,7 @@ pub unsafe extern "C" fn coex_schm_status_bit_clear(type_: u32, status: u32) {
 pub unsafe extern "C" fn coex_schm_status_bit_set(type_: u32, status: u32) {
     log::debug!("coex_schm_status_bit_set");
 
-    #[cfg(coex)]
+    #[cfg(feature = "coex")]
     crate::binary::include::coex_schm_status_bit_set(type_, status);
 }
 
@@ -1998,10 +1998,10 @@ pub unsafe extern "C" fn coex_schm_status_bit_set(type_: u32, status: u32) {
 pub unsafe extern "C" fn coex_schm_interval_set(interval: u32) -> crate::binary::c_types::c_int {
     log::debug!("coex_schm_interval_set");
 
-    #[cfg(coex)]
+    #[cfg(feature = "coex")]
     return crate::binary::include::coex_schm_interval_set(interval);
 
-    #[cfg(not(coex))]
+    #[cfg(not(feature = "coex"))]
     0
 }
 
@@ -2016,10 +2016,10 @@ pub unsafe extern "C" fn coex_schm_interval_set(interval: u32) -> crate::binary:
 pub unsafe extern "C" fn coex_schm_interval_get() -> u32 {
     log::debug!("coex_schm_interval_get");
 
-    #[cfg(coex)]
+    #[cfg(feature = "coex")]
     return crate::binary::include::coex_schm_interval_get();
 
-    #[cfg(not(coex))]
+    #[cfg(not(feature = "coex"))]
     0
 }
 
@@ -2034,10 +2034,10 @@ pub unsafe extern "C" fn coex_schm_interval_get() -> u32 {
 pub unsafe extern "C" fn coex_schm_curr_period_get() -> u8 {
     log::debug!("coex_schm_curr_period_get");
 
-    #[cfg(coex)]
+    #[cfg(feature = "coex")]
     return crate::binary::include::coex_schm_curr_period_get();
 
-    #[cfg(not(coex))]
+    #[cfg(not(feature = "coex"))]
     0
 }
 
@@ -2052,10 +2052,10 @@ pub unsafe extern "C" fn coex_schm_curr_period_get() -> u8 {
 pub unsafe extern "C" fn coex_schm_curr_phase_get() -> *mut crate::binary::c_types::c_void {
     log::debug!("coex_schm_curr_phase_get");
 
-    #[cfg(coex)]
+    #[cfg(feature = "coex")]
     return crate::binary::include::coex_schm_curr_phase_get();
 
-    #[cfg(not(coex))]
+    #[cfg(not(feature = "coex"))]
     return 0 as *mut crate::binary::c_types::c_void;
 }
 
@@ -2065,10 +2065,10 @@ pub unsafe extern "C" fn coex_schm_curr_phase_idx_set(
 ) -> crate::binary::c_types::c_int {
     log::debug!("coex_schm_curr_phase_idx_set");
 
-    #[cfg(coex)]
+    #[cfg(feature = "coex")]
     return crate::binary::include::coex_schm_curr_phase_idx_set(idx);
 
-    #[cfg(not(coex))]
+    #[cfg(not(feature = "coex"))]
     0
 }
 
@@ -2083,10 +2083,10 @@ pub unsafe extern "C" fn coex_schm_curr_phase_idx_set(
 pub unsafe extern "C" fn coex_schm_curr_phase_idx_get() -> crate::binary::c_types::c_int {
     log::debug!("coex_schm_curr_phase_idx_get");
 
-    #[cfg(coex)]
+    #[cfg(feature = "coex")]
     return crate::binary::include::coex_schm_curr_phase_idx_get();
 
-    #[cfg(not(coex))]
+    #[cfg(not(feature = "coex"))]
     0
 }
 

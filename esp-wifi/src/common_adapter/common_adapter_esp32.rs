@@ -54,7 +54,7 @@ pub(crate) unsafe fn phy_enable() {
                 phy_digital_regs_load();
             }
 
-            #[cfg(coex)]
+            #[cfg(feature = "coex")]
             coex_bt_high_prio();
 
             log::trace!("PHY ENABLE");

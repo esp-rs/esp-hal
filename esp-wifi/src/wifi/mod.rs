@@ -65,7 +65,7 @@ use hal::macros::ram;
 #[cfg(feature = "utils")]
 pub mod utils;
 
-#[cfg(coex)]
+#[cfg(feature = "coex")]
 use crate::binary::include::{coex_adapter_funcs_t, coex_pre_init, esp_coex_adapter_register};
 
 use crate::{
@@ -217,7 +217,7 @@ pub enum InternalWifiError {
     EspErrWifiTxDisallow = 0x3016,
 }
 
-#[cfg(all(feature = "esp32c3", coex))]
+#[cfg(all(feature = "esp32c3", feature = "coex"))]
 static mut G_COEX_ADAPTER_FUNCS: coex_adapter_funcs_t = coex_adapter_funcs_t {
     _version: crate::binary::include::COEX_ADAPTER_VERSION as i32,
     _task_yield_from_isr: Some(task_yield_from_isr),
@@ -236,7 +236,7 @@ static mut G_COEX_ADAPTER_FUNCS: coex_adapter_funcs_t = coex_adapter_funcs_t {
     _magic: crate::binary::include::COEX_ADAPTER_MAGIC as i32,
 };
 
-#[cfg(all(feature = "esp32s3", coex))]
+#[cfg(all(feature = "esp32s3", feature = "coex"))]
 static mut G_COEX_ADAPTER_FUNCS: coex_adapter_funcs_t = coex_adapter_funcs_t {
     _version: crate::binary::include::COEX_ADAPTER_VERSION as i32,
     _task_yield_from_isr: Some(task_yield_from_isr),
@@ -255,7 +255,7 @@ static mut G_COEX_ADAPTER_FUNCS: coex_adapter_funcs_t = coex_adapter_funcs_t {
     _magic: crate::binary::include::COEX_ADAPTER_MAGIC as i32,
 };
 
-#[cfg(all(feature = "esp32", coex))]
+#[cfg(all(feature = "esp32", feature = "coex"))]
 static mut G_COEX_ADAPTER_FUNCS: coex_adapter_funcs_t = coex_adapter_funcs_t {
     _version: crate::binary::include::COEX_ADAPTER_VERSION as i32,
     _task_yield_from_isr: Some(task_yield_from_isr),
@@ -282,7 +282,7 @@ static mut G_COEX_ADAPTER_FUNCS: coex_adapter_funcs_t = coex_adapter_funcs_t {
     _magic: crate::binary::include::COEX_ADAPTER_MAGIC as i32,
 };
 
-#[cfg(coex)]
+#[cfg(feature = "coex")]
 unsafe extern "C" fn semphr_take_from_isr_wrapper(
     semphr: *mut crate::binary::c_types::c_void,
     hptw: *mut crate::binary::c_types::c_void,
@@ -290,7 +290,7 @@ unsafe extern "C" fn semphr_take_from_isr_wrapper(
     crate::common_adapter::semphr_take_from_isr(semphr as *const (), hptw as *const ())
 }
 
-#[cfg(coex)]
+#[cfg(feature = "coex")]
 unsafe extern "C" fn semphr_give_from_isr_wrapper(
     semphr: *mut crate::binary::c_types::c_void,
     hptw: *mut crate::binary::c_types::c_void,
@@ -298,13 +298,13 @@ unsafe extern "C" fn semphr_give_from_isr_wrapper(
     crate::common_adapter::semphr_give_from_isr(semphr as *const (), hptw as *const ())
 }
 
-#[cfg(coex)]
+#[cfg(feature = "coex")]
 unsafe extern "C" fn is_in_isr_wrapper() -> i32 {
     // like original implementation
     0
 }
 
-#[cfg(coex)]
+#[cfg(feature = "coex")]
 pub(crate) fn coex_initialize() -> i32 {
     log::debug!("call coex-initialize");
     unsafe {
@@ -326,10 +326,10 @@ pub(crate) fn coex_initialize() -> i32 {
 
 pub unsafe extern "C" fn coex_init() -> i32 {
     log::debug!("coex-init");
-    #[cfg(coex)]
+    #[cfg(feature = "coex")]
     return crate::binary::include::coex_init();
 
-    #[cfg(not(coex))]
+    #[cfg(not(feature = "coex"))]
     0
 }
 
@@ -566,7 +566,7 @@ pub fn wifi_init() -> Result<(), WifiError> {
 
         crate::wifi_set_log_verbose();
 
-        #[cfg(coex)]
+        #[cfg(feature = "coex")]
         {
             esp_wifi_result!(coex_init())?;
         }
@@ -639,12 +639,12 @@ pub fn wifi_start() -> Result<(), WifiError> {
     unsafe {
         esp_wifi_result!(esp_wifi_start())?;
 
-        #[cfg(any(coex, feature = "ps-min-modem"))]
+        #[cfg(any(feature = "coex", feature = "ps-min-modem"))]
         esp_wifi_result!(esp_wifi_set_ps(
             crate::binary::include::wifi_ps_type_t_WIFI_PS_MIN_MODEM
         ))?;
 
-        #[cfg(not(any(coex, feature = "ps-min-modem")))]
+        #[cfg(not(any(feature = "coex", feature = "ps-min-modem")))]
         esp_wifi_result!(esp_wifi_set_ps(
             crate::binary::include::wifi_ps_type_t_WIFI_PS_NONE
         ))?;
@@ -666,10 +666,10 @@ pub fn wifi_start() -> Result<(), WifiError> {
 unsafe extern "C" fn coex_register_start_cb(
     _cb: ::core::option::Option<unsafe extern "C" fn() -> crate::binary::c_types::c_int>,
 ) -> crate::binary::c_types::c_int {
-    #[cfg(coex)]
+    #[cfg(feature = "coex")]
     return crate::binary::include::coex_register_start_cb(_cb);
 
-    #[cfg(not(coex))]
+    #[cfg(not(feature = "coex"))]
     0
 }
 
@@ -699,7 +699,7 @@ pub fn new_with_config<'d>(
     if !inited.is_wifi() {
         panic!("Not initialized for Wifi use");
     }
-    
+
     esp_hal_common::into_ref!(device);
     match config {
         embedded_svc::wifi::Configuration::None => panic!(),

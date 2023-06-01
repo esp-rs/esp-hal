@@ -1051,7 +1051,7 @@ pub(crate) fn ble_init() {
             panic!("esp_register_ext_funcs returned {}", res);
         }
 
-        #[cfg(coex)]
+        #[cfg(feature = "coex")]
         {
             let res = crate::wifi::coex_init();
             if res != 0 {
@@ -1108,7 +1108,7 @@ pub(crate) fn ble_init() {
             panic!("ble_controller_init returned {}", res);
         }
 
-        #[cfg(coex)]
+        #[cfg(feature = "coex")]
         crate::binary::include::coex_enable();
 
         let mut mac = [0u8; 6];
