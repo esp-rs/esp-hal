@@ -117,15 +117,23 @@ fn init_heap() {
 }
 
 #[cfg(any(feature = "esp32c3", feature = "esp32c2", feature = "esp32c6"))]
+type Timer = Alarm<Target, 0>;
+
+#[cfg(any(feature = "esp32", feature = "esp32s3", feature = "esp32s2"))]
+type Timer = hal::timer::Timer<hal::timer::Timer0<hal::peripherals::TIMG1>>;
+
 /// Initialize for using WiFi / BLE
 /// This will initialize internals and also initialize WiFi and BLE
 pub fn initialize(
-    systimer: Alarm<Target, 0>,
+    timer: Timer,
     rng: hal::Rng,
     radio_clocks: hal::system::RadioClockControl,
     clocks: &Clocks,
 ) -> Result<(), InitializationError> {
-    init_heap();
+    #[cfg(any(feature = "esp32", feature = "esp32s3", feature = "esp32s2"))]
+    if clocks.cpu_clock != MegahertzU32::MHz(240) {
+        return Err(InitializationError::WrongClockConfig);
+    }
 
     #[cfg(feature = "esp32c6")]
     if clocks.cpu_clock != MegahertzU32::MHz(160) {
@@ -142,11 +150,24 @@ pub fn initialize(
         return Err(InitializationError::WrongClockConfig);
     }
 
+    #[cfg(feature = "esp32s3")]
+    unsafe {
+        // should be done by the HAL in `ClockControl::configure`
+        const ETS_UPDATE_CPU_FREQUENCY: u32 = 0x40001a4c;
+
+        // cast to usize is just needed because of the way we run clippy in CI
+        let rom_ets_update_cpu_frequency: fn(ticks_per_us: u32) =
+            core::mem::transmute(ETS_UPDATE_CPU_FREQUENCY as usize);
+
+        rom_ets_update_cpu_frequency(240); // we know it's 240MHz because of the check above
+    }
+
+    init_heap();
     phy_mem_init();
     init_radio_clock_control(radio_clocks);
     init_rng(rng);
     init_tasks();
-    setup_timer_isr(systimer);
+    setup_timer_isr(timer);
     wifi_set_log_verbose();
     init_clocks();
     init_buffer();
@@ -191,68 +212,6 @@ impl From<WifiError> for InitializationError {
     fn from(value: WifiError) -> Self {
         InitializationError::WifiError(value)
     }
-}
-
-#[cfg(any(feature = "esp32", feature = "esp32s3", feature = "esp32s2"))]
-/// Initialize for using WiFi / BLE
-/// This will initialize internals and also initialize WiFi and BLE
-pub fn initialize(
-    timg1_timer0: hal::timer::Timer<hal::timer::Timer0<hal::peripherals::TIMG1>>,
-    rng: hal::Rng,
-    radio_clocks: hal::system::RadioClockControl,
-    clocks: &Clocks,
-) -> Result<(), InitializationError> {
-    init_heap();
-
-    if clocks.cpu_clock != MegahertzU32::MHz(240) {
-        return Err(InitializationError::WrongClockConfig);
-    }
-
-    #[cfg(feature = "esp32s3")]
-    unsafe {
-        // should be done by the HAL in `ClockControl::configure`
-        const ETS_UPDATE_CPU_FREQUENCY: u32 = 0x40001a4c;
-
-        // cast to usize is just needed because of the way we run clippy in CI
-        let rom_ets_update_cpu_frequency: fn(ticks_per_us: u32) =
-            core::mem::transmute(ETS_UPDATE_CPU_FREQUENCY as usize);
-
-        rom_ets_update_cpu_frequency(240); // we know it's 240MHz because of the check above
-    }
-
-    phy_mem_init();
-    init_radio_clock_control(radio_clocks);
-    init_rng(rng);
-    init_tasks();
-    setup_timer_isr(timg1_timer0);
-    wifi_set_log_verbose();
-    init_clocks();
-    init_buffer();
-
-    #[cfg(coex)]
-    {
-        let res = crate::wifi::coex_initialize();
-        if res != 0 {
-            return Err(InitializationError::General(res));
-        }
-    }
-
-    #[cfg(feature = "wifi")]
-    {
-        log::debug!("wifi init");
-        crate::wifi::wifi_init()?;
-    }
-
-    #[cfg(feature = "ble")]
-    {
-        // ble init
-        // for some reason things don't work when initializing things the other way around
-        // while the original implementation in NuttX does it like that
-        log::debug!("ble init");
-        crate::ble::ble_init();
-    }
-
-    Ok(())
 }
 
 pub fn wifi_set_log_verbose() {
