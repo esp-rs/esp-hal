@@ -271,60 +271,6 @@ pub trait BankGpioRegisterAccess {
     fn write_output_set(word: u32);
 
     fn write_output_clear(word: u32);
-
-    fn set_output_signal(gpio_num: u8, signal: u32) {
-        let gpio = unsafe { &*crate::peripherals::GPIO::PTR };
-        gpio.func_out_sel_cfg[gpio_num as usize]
-            .modify(|_, w| unsafe { w.out_sel().bits(signal as OutputSignalType) });
-    }
-
-    fn configure_out_sel(gpio_num: u8, signal: u32, invert: bool, oen: bool, oen_inv: bool) {
-        let gpio = unsafe { &*crate::peripherals::GPIO::PTR };
-        gpio.func_out_sel_cfg[gpio_num as usize].modify(|_, w| unsafe {
-            w.out_sel()
-                .bits(signal as OutputSignalType)
-                .inv_sel()
-                .bit(invert)
-                .oen_sel()
-                .bit(oen)
-                .oen_inv_sel()
-                .bit(oen_inv)
-        });
-    }
-
-    fn set_signal_to_level(signal: u32, high: bool) {
-        let gpio = unsafe { &*crate::peripherals::GPIO::PTR };
-        gpio.func_in_sel_cfg[signal as usize].modify(|_, w| unsafe {
-            w.sel()
-                .set_bit()
-                .in_inv_sel()
-                .bit(false)
-                .in_sel()
-                .bits(if high { ONE_INPUT } else { ZERO_INPUT })
-        });
-    }
-
-    fn clear_func_in_sel(signal: u32) {
-        let gpio = unsafe { &*crate::peripherals::GPIO::PTR };
-        gpio.func_in_sel_cfg[signal as usize].modify(|_, w| w.sel().clear_bit());
-    }
-
-    fn set_int_enable(gpio_num: u8, int_ena: u32, int_type: u8, wake_up_from_light_sleep: bool) {
-        let gpio = unsafe { &*crate::peripherals::GPIO::PTR };
-        gpio.pin[gpio_num as usize].modify(|_, w| unsafe {
-            w.int_ena()
-                .bits(int_ena as u8)
-                .int_type()
-                .bits(int_type as u8)
-                .wakeup_enable()
-                .bit(wake_up_from_light_sleep)
-        });
-    }
-
-    fn set_open_drain(&self, gpio_num: u8, open_drain: bool) {
-        let gpio = unsafe { &*crate::peripherals::GPIO::PTR };
-        gpio.pin[gpio_num as usize].modify(|_, w| w.pad_driver().bit(open_drain));
-    }
 }
 
 impl BankGpioRegisterAccess for Bank0GpioRegisterAccess {
@@ -1691,6 +1637,23 @@ mod asynch {
         }
     }
 
+    pub(crate) fn set_int_enable(
+        gpio_num: u8,
+        int_ena: u8,
+        int_type: u8,
+        wake_up_from_light_sleep: bool,
+    ) {
+        let gpio = unsafe { &*crate::peripherals::GPIO::PTR };
+        gpio.pin[gpio_num as usize].modify(|_, w| unsafe {
+            w.int_ena()
+                .bits(int_ena)
+                .int_type()
+                .bits(int_type)
+                .wakeup_enable()
+                .bit(wake_up_from_light_sleep)
+        });
+    }
+
     #[interrupt]
     unsafe fn GPIO() {
         let mut intrs = match crate::get_core() {
@@ -1726,17 +1689,7 @@ mod asynch {
 
         while intrs != 0 {
             let pin_nr = intrs.trailing_zeros();
-            cfg_if::cfg_if! {
-                if #[cfg(any(esp32, esp32s2, esp32s3))] {
-                    if pin_nr < 32 {
-                        Bank0GpioRegisterAccess::set_int_enable(pin_nr as u8, 0, 0, false);
-                    } else {
-                        Bank1GpioRegisterAccess::set_int_enable((pin_nr - 32) as u8, 0, 0, false);
-                    }
-                } else {
-                    Bank0GpioRegisterAccess::set_int_enable(pin_nr as u8, 0, 0, false);
-                }
-            }
+            set_int_enable(pin_nr as u8, 0, 0, false);
             PIN_WAKERS[pin_nr as usize].wake(); // wake task
             intrs &= !(1 << pin_nr);
         }
