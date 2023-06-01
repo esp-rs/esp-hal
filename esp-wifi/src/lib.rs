@@ -202,6 +202,11 @@ pub fn initialize(
     radio_clocks: hal::system::RadioClockControl,
     clocks: &Clocks,
 ) -> Result<EspWifiInitialization, InitializationError> {
+    #[cfg(not(feature = "coex"))]
+    if init_for == EspWifiInitFor::WifiBle {
+        panic!("Trying to use Wifi and BLE without COEX feature");
+    }
+
     #[cfg(any(feature = "esp32", feature = "esp32s3", feature = "esp32s2"))]
     if clocks.cpu_clock != MegahertzU32::MHz(240) {
         return Err(InitializationError::WrongClockConfig);
@@ -246,12 +251,10 @@ pub fn initialize(
 
     #[cfg(feature = "coex")]
     {
-        if init_for == EspWifiInitFor::WifiBle {
-            log::debug!("coex init");
-            let res = crate::wifi::coex_initialize();
-            if res != 0 {
-                return Err(InitializationError::General(res));
-            }
+        log::debug!("coex init");
+        let res = crate::wifi::coex_initialize();
+        if res != 0 {
+            return Err(InitializationError::General(res));
         }
     }
 
