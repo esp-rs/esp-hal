@@ -234,8 +234,25 @@ impl Debug for ReceivedData {
     }
 }
 
+pub struct EspNowWithWifiCreateToken {
+    _private: (),
+}
+
+pub fn enable_esp_now_with_wifi(
+    device: esp_hal_common::radio::Wifi,
+) -> (esp_hal_common::radio::Wifi, EspNowWithWifiCreateToken) {
+    (device, EspNowWithWifiCreateToken { _private: () })
+}
+
+/// ESP-NOW is a kind of connectionless Wi-Fi communication protocol that is defined by Espressif.
+/// In ESP-NOW, application data is encapsulated in a vendor-specific action frame and then transmitted from
+/// one Wi-Fi device to another without connection. CTR with CBC-MAC Protocol(CCMP) is used to protect the
+/// action frame for security. ESP-NOW is widely used in smart light, remote controlling, sensor, etc.
+///
+/// Currently this implementation (when used together with traditional Wi-Fi) ONLY support STA mode.
+///
 pub struct EspNow<'d> {
-    _device: PeripheralRef<'d, esp_hal_common::radio::Wifi>,
+    _device: Option<PeripheralRef<'d, esp_hal_common::radio::Wifi>>,
 }
 
 impl<'d> EspNow<'d> {
@@ -243,13 +260,28 @@ impl<'d> EspNow<'d> {
         inited: &EspWifiInitialization,
         device: impl Peripheral<P = esp_hal_common::radio::Wifi> + 'd,
     ) -> Result<EspNow<'d>, EspNowError> {
+        EspNow::new_internal(inited, Some(device.into_ref()))
+    }
+
+    pub fn new_with_wifi(
+        inited: &EspWifiInitialization,
+        _token: EspNowWithWifiCreateToken,
+    ) -> Result<EspNow<'d>, EspNowError> {
+        EspNow::new_internal(
+            inited,
+            None::<PeripheralRef<'d, esp_hal_common::radio::Wifi>>,
+        )
+    }
+
+    fn new_internal(
+        inited: &EspWifiInitialization,
+        device: Option<PeripheralRef<'d, esp_hal_common::radio::Wifi>>,
+    ) -> Result<EspNow<'d>, EspNowError> {
         if !inited.is_wifi() {
             panic!("Not initialized for Wifi use");
         }
 
-        let mut esp_now = EspNow {
-            _device: device.into_ref(),
-        };
+        let mut esp_now = EspNow { _device: device };
         check_error!({ esp_wifi_set_mode(wifi_mode_t_WIFI_MODE_STA) });
         check_error!({ esp_wifi_start() });
         check_error!({ esp_now_init() });
@@ -263,6 +295,13 @@ impl<'d> EspNow<'d> {
         })?;
 
         Ok(esp_now)
+    }
+
+    /// Set primary WiFi channel
+    /// Should only be used when using ESP-NOW without AP or STA
+    pub fn set_channel(&mut self, channel: u8) -> Result<(), EspNowError> {
+        check_error!({ esp_wifi_set_channel(channel, 0) });
+        Ok(())
     }
 
     /// Get the version of ESPNOW
