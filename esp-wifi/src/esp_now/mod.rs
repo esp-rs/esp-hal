@@ -12,6 +12,7 @@ use critical_section::Mutex;
 use esp_hal_common::peripheral::{Peripheral, PeripheralRef};
 
 use crate::compat::queue::SimpleQueue;
+use crate::EspWifiInitialization;
 
 use crate::binary::include::*;
 
@@ -239,8 +240,13 @@ pub struct EspNow<'d> {
 
 impl<'d> EspNow<'d> {
     pub fn new(
+        inited: &EspWifiInitialization,
         device: impl Peripheral<P = esp_hal_common::radio::Wifi> + 'd,
     ) -> Result<EspNow<'d>, EspNowError> {
+        if !inited.is_wifi() {
+            panic!("Not initialized for Wifi use");
+        }
+
         let mut esp_now = EspNow {
             _device: device.into_ref(),
         };

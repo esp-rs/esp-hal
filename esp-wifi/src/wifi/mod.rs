@@ -4,6 +4,7 @@ pub mod os_adapter;
 use core::{cell::RefCell, marker::PhantomData};
 
 use crate::common_adapter::*;
+use crate::EspWifiInitialization;
 
 use crate::esp_wifi_result;
 use critical_section::Mutex;
@@ -691,9 +692,14 @@ pub fn wifi_start_scan(block: bool) -> i32 {
 }
 
 pub fn new_with_config<'d>(
+    inited: &EspWifiInitialization,
     device: impl Peripheral<P = esp_hal_common::radio::Wifi> + 'd,
     config: embedded_svc::wifi::Configuration,
 ) -> (WifiDevice<'d>, WifiController<'d>) {
+    if !inited.is_wifi() {
+        panic!("Not initialized for Wifi use");
+    }
+    
     esp_hal_common::into_ref!(device);
     match config {
         embedded_svc::wifi::Configuration::None => panic!(),
@@ -708,10 +714,12 @@ pub fn new_with_config<'d>(
 }
 
 pub fn new_with_mode<'d>(
+    inited: &EspWifiInitialization,
     device: impl Peripheral<P = esp_hal_common::radio::Wifi> + 'd,
     mode: WifiMode,
 ) -> (WifiDevice<'d>, WifiController<'d>) {
     new_with_config(
+        inited,
         device,
         match mode {
             WifiMode::Sta => embedded_svc::wifi::Configuration::Client(Default::default()),
@@ -721,9 +729,10 @@ pub fn new_with_mode<'d>(
 }
 
 pub fn new<'d>(
+    inited: &EspWifiInitialization,
     device: impl Peripheral<P = esp_hal_common::radio::Wifi> + 'd,
 ) -> (WifiDevice<'d>, WifiController<'d>) {
-    new_with_config(device, Default::default())
+    new_with_config(&inited, device, Default::default())
 }
 
 /// A wifi device implementing smoltcp's Device trait.

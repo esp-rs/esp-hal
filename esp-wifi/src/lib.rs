@@ -122,14 +122,86 @@ type Timer = Alarm<Target, 0>;
 #[cfg(any(feature = "esp32", feature = "esp32s3", feature = "esp32s2"))]
 type Timer = hal::timer::Timer<hal::timer::Timer0<hal::peripherals::TIMG1>>;
 
+#[derive(Debug, PartialEq, PartialOrd)]
+pub struct EspWifiInitializationInternal {
+    _private: (),
+}
+
+impl EspWifiInitializationInternal {
+    fn new() -> Self {
+        Self { _private: () }
+    }
+}
+
+#[derive(Debug, PartialEq, PartialOrd)]
+pub enum EspWifiInitialization {
+    #[cfg(feature = "wifi")]
+    Wifi(EspWifiInitializationInternal),
+    #[cfg(feature = "ble")]
+    Ble(EspWifiInitializationInternal),
+    #[cfg(all(feature = "wifi", feature = "ble"))]
+    WifiBle(EspWifiInitializationInternal),
+}
+
+impl EspWifiInitialization {
+    #[allow(unused)]
+    fn is_wifi(&self) -> bool {
+        match self {
+            #[cfg(feature = "ble")]
+            EspWifiInitialization::Ble(_) => false,
+            _ => true,
+        }
+    }
+
+    #[allow(unused)]
+    fn is_ble(&self) -> bool {
+        match self {
+            #[cfg(feature = "wifi")]
+            EspWifiInitialization::Wifi(_) => false,
+            _ => true,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, PartialOrd)]
+pub enum EspWifiInitFor {
+    #[cfg(feature = "wifi")]
+    Wifi,
+    #[cfg(feature = "ble")]
+    Ble,
+    #[cfg(all(feature = "wifi", feature = "ble"))]
+    WifiBle,
+}
+
+impl EspWifiInitFor {
+    #[allow(unused)]
+    fn is_wifi(&self) -> bool {
+        match self {
+            #[cfg(feature = "ble")]
+            EspWifiInitFor::Ble => false,
+            _ => true,
+        }
+    }
+
+    #[allow(unused)]
+    fn is_ble(&self) -> bool {
+        match self {
+            #[cfg(feature = "wifi")]
+            EspWifiInitFor::Wifi => false,
+            _ => true,
+        }
+    }
+}
+
 /// Initialize for using WiFi / BLE
 /// This will initialize internals and also initialize WiFi and BLE
 pub fn initialize(
+    init_for: EspWifiInitFor,
     timer: Timer,
     rng: hal::Rng,
     radio_clocks: hal::system::RadioClockControl,
     clocks: &Clocks,
-) -> Result<(), InitializationError> {
+) -> Result<EspWifiInitialization, InitializationError> {
     #[cfg(any(feature = "esp32", feature = "esp32s3", feature = "esp32s2"))]
     if clocks.cpu_clock != MegahertzU32::MHz(240) {
         return Err(InitializationError::WrongClockConfig);
@@ -174,29 +246,49 @@ pub fn initialize(
 
     #[cfg(coex)]
     {
-        let res = crate::wifi::coex_initialize();
-        if res != 0 {
-            return Err(InitializationError::General(res));
+        if init_for == EspWifiInitFor::WifiBle {
+            log::debug!("coex init");
+            let res = crate::wifi::coex_initialize();
+            if res != 0 {
+                return Err(InitializationError::General(res));
+            }
         }
     }
 
     #[cfg(feature = "wifi")]
     {
-        log::debug!("wifi init");
-        // wifi init
-        crate::wifi::wifi_init()?;
+        if init_for.is_wifi() {
+            log::debug!("wifi init");
+            // wifi init
+            crate::wifi::wifi_init()?;
+        }
     }
 
     #[cfg(feature = "ble")]
     {
-        // ble init
-        // for some reason things don't work when initializing things the other way around
-        // while the original implementation in NuttX does it like that
-        log::debug!("ble init");
-        crate::ble::ble_init();
+        if init_for.is_ble() {
+            // ble init
+            // for some reason things don't work when initializing things the other way around
+            // while the original implementation in NuttX does it like that
+            log::debug!("ble init");
+            crate::ble::ble_init();
+        }
     }
 
-    Ok(())
+    match init_for {
+        #[cfg(feature = "wifi")]
+        EspWifiInitFor::Wifi => Ok(EspWifiInitialization::Wifi(
+            EspWifiInitializationInternal::new(),
+        )),
+        #[cfg(feature = "ble")]
+        EspWifiInitFor::Ble => Ok(EspWifiInitialization::Ble(
+            EspWifiInitializationInternal::new(),
+        )),
+        #[cfg(all(feature = "wifi", feature = "ble"))]
+        EspWifiInitFor::WifiBle => Ok(EspWifiInitialization::WifiBle(
+            EspWifiInitializationInternal::new(),
+        )),
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
