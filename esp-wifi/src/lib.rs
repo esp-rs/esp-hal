@@ -1,6 +1,7 @@
 #![no_std]
 #![cfg_attr(target_arch = "xtensa", feature(asm_experimental_arch))]
 #![feature(c_variadic)]
+#![feature(linkage)]
 #![cfg_attr(feature = "async", feature(async_fn_in_trait))]
 #![cfg_attr(feature = "async", allow(incomplete_features))]
 

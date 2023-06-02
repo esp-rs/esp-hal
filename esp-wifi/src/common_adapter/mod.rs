@@ -469,6 +469,7 @@ pub unsafe extern "C" fn strrchr(_s: *const (), _c: u32) -> *const u8 {
 }
 
 #[no_mangle]
+#[linkage = "weak"]
 pub unsafe extern "C" fn floor(_v: f64) -> f64 {
     todo!("floor")
 }
