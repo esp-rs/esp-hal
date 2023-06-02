@@ -117,10 +117,10 @@ fn init_heap() {
 }
 
 #[cfg(any(feature = "esp32c3", feature = "esp32c2", feature = "esp32c6"))]
-type Timer = Alarm<Target, 0>;
+pub type EspWifiTimer = Alarm<Target, 0>;
 
 #[cfg(any(feature = "esp32", feature = "esp32s3", feature = "esp32s2"))]
-type Timer = hal::timer::Timer<hal::timer::Timer0<hal::peripherals::TIMG1>>;
+pub type EspWifiTimer = hal::timer::Timer<hal::timer::Timer0<hal::peripherals::TIMG1>>;
 
 #[derive(Debug, PartialEq, PartialOrd)]
 pub struct EspWifiInitializationInternal {
@@ -197,7 +197,7 @@ impl EspWifiInitFor {
 /// This will initialize internals and also initialize WiFi and BLE
 pub fn initialize(
     init_for: EspWifiInitFor,
-    timer: Timer,
+    timer: EspWifiTimer,
     rng: hal::Rng,
     radio_clocks: hal::system::RadioClockControl,
     clocks: &Clocks,
