@@ -156,7 +156,7 @@ pub struct PeerInfo {
     // we always use STA for now
 }
 
-#[cfg(not(any(feature = "esp32c6")))]
+#[cfg(not(any(esp32c6)))]
 #[derive(Debug, Clone, Copy)]
 pub struct RxControlInfo {
     pub rssi: i32,
@@ -180,7 +180,7 @@ pub struct RxControlInfo {
     pub rx_state: u32,
 }
 
-#[cfg(any(feature = "esp32c6"))]
+#[cfg(any(esp32c6))]
 #[derive(Debug, Clone, Copy)]
 pub struct RxControlInfo {
     pub rssi: i32,
@@ -501,7 +501,7 @@ unsafe extern "C" fn rcv_cb(
     ];
 
     let rx_cntl = (*esp_now_info).rx_ctrl;
-    #[cfg(not(any(feature = "esp32c6")))]
+    #[cfg(not(any(esp32c6)))]
     let rx_control = RxControlInfo {
         rssi: (*rx_cntl).rssi(),
         rate: (*rx_cntl).rate(),
@@ -524,7 +524,7 @@ unsafe extern "C" fn rcv_cb(
         rx_state: (*rx_cntl).rx_state(),
     };
 
-    #[cfg(any(feature = "esp32c6"))]
+    #[cfg(any(esp32c6))]
     let rx_control = RxControlInfo {
         rssi: (*rx_cntl).rssi(),
         rate: (*rx_cntl).rate(),

@@ -328,17 +328,17 @@ pub(crate) fn disable_sleep_mode() {
 
 pub(crate) unsafe extern "C" fn coex_bt_wakeup_request() -> bool {
     log::debug!("coex_bt_wakeup_request");
-    #[cfg(feature = "coex")]
+    #[cfg(coex)]
     return async_wakeup_request(BTDM_ASYNC_WAKEUP_REQ_COEX);
 
-    #[cfg(not(feature = "coex"))]
+    #[cfg(not(coex))]
     true
 }
 
 pub(crate) unsafe extern "C" fn coex_bt_wakeup_request_end() {
     log::warn!("coex_bt_wakeup_request_end");
 
-    #[cfg(feature = "coex")]
+    #[cfg(coex)]
     async_wakeup_request_end(BTDM_ASYNC_WAKEUP_REQ_COEX);
 }
 
@@ -346,14 +346,14 @@ pub(crate) unsafe extern "C" fn coex_bt_wakeup_request_end() {
 pub(crate) unsafe extern "C" fn coex_bt_request(event: u32, latency: u32, duration: u32) -> i32 {
     log::debug!("coex_bt_request");
     extern "C" {
-        #[cfg(feature = "coex")]
+        #[cfg(coex)]
         fn coex_bt_request(event: u32, latency: u32, duration: u32) -> i32;
     }
 
-    #[cfg(feature = "coex")]
+    #[cfg(coex)]
     return coex_bt_request(event, latency, duration);
 
-    #[cfg(not(feature = "coex"))]
+    #[cfg(not(coex))]
     0
 }
 
@@ -361,14 +361,14 @@ pub(crate) unsafe extern "C" fn coex_bt_request(event: u32, latency: u32, durati
 pub(crate) unsafe extern "C" fn coex_bt_release(event: u32) -> i32 {
     log::debug!("coex_bt_release");
     extern "C" {
-        #[cfg(feature = "coex")]
+        #[cfg(coex)]
         fn coex_bt_release(event: u32) -> i32;
     }
 
-    #[cfg(feature = "coex")]
+    #[cfg(coex)]
     return coex_bt_release(event);
 
-    #[cfg(not(feature = "coex"))]
+    #[cfg(not(coex))]
     0
 }
 
@@ -377,28 +377,28 @@ pub(crate) unsafe extern "C" fn coex_register_bt_cb_wrapper(
 ) -> i32 {
     log::warn!("coex_register_bt_cb {:p}", callback);
     extern "C" {
-        #[cfg(feature = "coex")]
+        #[cfg(coex)]
         fn coex_register_bt_cb(callback: unsafe extern "C" fn()) -> i32;
     }
 
-    #[cfg(feature = "coex")]
+    #[cfg(coex)]
     return coex_register_bt_cb(callback);
 
-    #[cfg(not(feature = "coex"))]
+    #[cfg(not(coex))]
     0
 }
 
 pub(crate) unsafe extern "C" fn coex_bb_reset_lock() -> u32 {
     log::debug!("coex_bb_reset_lock");
     extern "C" {
-        #[cfg(feature = "coex")]
+        #[cfg(coex)]
         fn coex_bb_reset_lock() -> u32;
     }
 
-    #[cfg(feature = "coex")]
+    #[cfg(coex)]
     return coex_bb_reset_lock();
 
-    #[cfg(not(feature = "coex"))]
+    #[cfg(not(coex))]
     0
 }
 
@@ -406,11 +406,11 @@ pub(crate) unsafe extern "C" fn coex_bb_reset_lock() -> u32 {
 pub(crate) unsafe extern "C" fn coex_bb_reset_unlock(event: u32) {
     log::debug!("coex_bb_reset_unlock");
     extern "C" {
-        #[cfg(feature = "coex")]
+        #[cfg(coex)]
         fn coex_bb_reset_unlock(event: u32);
     }
 
-    #[cfg(feature = "coex")]
+    #[cfg(coex)]
     coex_bb_reset_unlock(event);
 }
 
@@ -419,24 +419,24 @@ pub(crate) unsafe extern "C" fn coex_schm_register_btdm_callback_wrapper(
 ) -> i32 {
     log::warn!("coex_schm_register_btdm_callback {:p}", callback);
     extern "C" {
-        #[cfg(feature = "coex")]
+        #[cfg(coex)]
         fn coex_schm_register_btdm_callback(callback: unsafe extern "C" fn()) -> i32;
     }
 
-    #[cfg(feature = "coex")]
+    #[cfg(coex)]
     return coex_schm_register_btdm_callback(callback);
 
-    #[cfg(not(feature = "coex"))]
+    #[cfg(not(coex))]
     0
 }
 
 pub(crate) unsafe extern "C" fn coex_schm_interval_get() -> u32 {
     log::debug!("coex_schm_interval_get");
 
-    #[cfg(feature = "coex")]
+    #[cfg(coex)]
     return crate::binary::include::coex_schm_interval_get();
 
-    #[cfg(not(feature = "coex"))]
+    #[cfg(not(coex))]
     0
 }
 
@@ -445,20 +445,20 @@ pub(crate) unsafe extern "C" fn coex_schm_curr_period_get() -> u8 {
     // BEWARE: One might expect to call coex_schm_curr_period_get
     //crate::binary::include::coex_schm_curr_period_get()
 
-    #[cfg(feature = "coex")]
+    #[cfg(coex)]
     return crate::binary::include::coex_schm_interval_get() as u8;
 
-    #[cfg(not(feature = "coex"))]
+    #[cfg(not(coex))]
     0
 }
 
 pub(crate) unsafe extern "C" fn coex_schm_curr_phase_get() -> *const () {
     log::debug!("coex_schm_curr_phase_get");
 
-    #[cfg(feature = "coex")]
+    #[cfg(coex)]
     return crate::binary::include::coex_schm_curr_phase_get() as *const ();
 
-    #[cfg(not(feature = "coex"))]
+    #[cfg(not(coex))]
     return 0 as *const ();
 }
 
@@ -466,14 +466,14 @@ pub(crate) unsafe extern "C" fn coex_schm_curr_phase_get() -> *const () {
 pub(crate) unsafe extern "C" fn coex_wifi_channel_get(primary: *mut u8, secondary: *mut u8) -> i32 {
     log::warn!("coex_wifi_channel_get");
     extern "C" {
-        #[cfg(feature = "coex")]
+        #[cfg(coex)]
         fn coex_wifi_channel_get(primary: *mut u8, secondary: *mut u8) -> i32;
     }
 
-    #[cfg(feature = "coex")]
+    #[cfg(coex)]
     return coex_wifi_channel_get(primary, secondary);
 
-    #[cfg(not(feature = "coex"))]
+    #[cfg(not(coex))]
     -1
 }
 
@@ -483,14 +483,14 @@ pub(crate) unsafe extern "C" fn coex_register_wifi_channel_change_callback(
 ) -> i32 {
     log::warn!("coex_register_wifi_channel_change_callback");
     extern "C" {
-        #[cfg(feature = "coex")]
+        #[cfg(coex)]
         fn coex_register_wifi_channel_change_callback(callback: unsafe extern "C" fn()) -> i32;
     }
 
-    #[cfg(feature = "coex")]
+    #[cfg(coex)]
     return coex_register_wifi_channel_change_callback(callback);
 
-    #[cfg(not(feature = "coex"))]
+    #[cfg(not(coex))]
     0
 }
 
@@ -518,10 +518,10 @@ pub(crate) unsafe extern "C" fn ints_on(mask: u32) {
     hal::xtensa_lx::interrupt::enable_mask(mask);
 }
 
-#[cfg(feature = "coex")]
+#[cfg(coex)]
 const BTDM_ASYNC_WAKEUP_REQ_HCI: i32 = 0;
 
-#[cfg(feature = "coex")]
+#[cfg(coex)]
 const BTDM_ASYNC_WAKEUP_REQ_COEX: i32 = 1;
 
 //const BTDM_ASYNC_WAKEUP_REQMAX: i32 = 2;
@@ -540,7 +540,7 @@ const BTDM_ASYNC_WAKEUP_REQ_COEX: i32 = 1;
  *
  ****************************************************************************/
 
-#[cfg(feature = "coex")]
+#[cfg(coex)]
 fn async_wakeup_request(event: i32) -> bool {
     let request_lock: bool;
     let mut do_wakeup_request = false;
@@ -584,7 +584,7 @@ fn async_wakeup_request(event: i32) -> bool {
  *
  ****************************************************************************/
 
-#[cfg(feature = "coex")]
+#[cfg(coex)]
 fn async_wakeup_request_end(event: i32) {
     let request_lock: bool;
 

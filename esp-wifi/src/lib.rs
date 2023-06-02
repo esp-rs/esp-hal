@@ -9,23 +9,23 @@ use core::mem::MaybeUninit;
 
 use common_adapter::RADIO_CLOCKS;
 use critical_section::Mutex;
-#[cfg(feature = "esp32")]
+#[cfg(esp32)]
 use esp32_hal as hal;
-#[cfg(feature = "esp32c2")]
+#[cfg(esp32c2)]
 use esp32c2_hal as hal;
-#[cfg(feature = "esp32c2")]
+#[cfg(esp32c2)]
 use esp32c2_hal::systimer::{Alarm, Target};
-#[cfg(feature = "esp32c3")]
+#[cfg(esp32c3)]
 use esp32c3_hal as hal;
-#[cfg(feature = "esp32c3")]
+#[cfg(esp32c3)]
 use esp32c3_hal::systimer::{Alarm, Target};
-#[cfg(feature = "esp32c6")]
+#[cfg(esp32c6)]
 use esp32c6_hal as hal;
-#[cfg(feature = "esp32c6")]
+#[cfg(esp32c6)]
 use esp32c6_hal::systimer::{Alarm, Target};
-#[cfg(feature = "esp32s2")]
+#[cfg(esp32s2)]
 use esp32s2_hal as hal;
-#[cfg(feature = "esp32s3")]
+#[cfg(esp32s3)]
 use esp32s3_hal as hal;
 
 use crate::hal::system::RadioClockController;
@@ -54,12 +54,12 @@ pub mod compat;
 pub mod preempt;
 
 #[doc(hidden)]
-#[cfg_attr(feature = "esp32", path = "timer_esp32.rs")]
-#[cfg_attr(feature = "esp32c3", path = "timer_esp32c3.rs")]
-#[cfg_attr(feature = "esp32c2", path = "timer_esp32c2.rs")]
-#[cfg_attr(feature = "esp32c6", path = "timer_esp32c6.rs")]
-#[cfg_attr(feature = "esp32s3", path = "timer_esp32s3.rs")]
-#[cfg_attr(feature = "esp32s2", path = "timer_esp32s2.rs")]
+#[cfg_attr(esp32, path = "timer_esp32.rs")]
+#[cfg_attr(esp32c3, path = "timer_esp32c3.rs")]
+#[cfg_attr(esp32c2, path = "timer_esp32c2.rs")]
+#[cfg_attr(esp32c6, path = "timer_esp32c6.rs")]
+#[cfg_attr(esp32s3, path = "timer_esp32s3.rs")]
+#[cfg_attr(esp32s2, path = "timer_esp32s2.rs")]
 pub mod timer;
 
 #[cfg(feature = "wifi")]
@@ -88,22 +88,22 @@ pub fn current_millis() -> u64 {
     get_systimer_count() / (TICKS_PER_SECOND / 1000)
 }
 
-#[cfg(all(not(feature = "coex"), not(feature = "big-heap")))]
+#[cfg(all(not(coex), not(feature = "big-heap")))]
 const HEAP_SIZE: usize = 64 * 1024;
 
-#[cfg(all(feature = "coex", not(feature = "big-heap")))]
+#[cfg(all(coex, not(feature = "big-heap")))]
 const HEAP_SIZE: usize = 64 * 1024;
 
-#[cfg(all(not(feature = "coex"), not(feature = "esp32s2"), feature = "big-heap"))]
+#[cfg(all(not(coex), not(esp32s2), feature = "big-heap"))]
 const HEAP_SIZE: usize = 110 * 1024;
 
-#[cfg(all(not(feature = "coex"), feature = "esp32s2", feature = "big-heap"))]
+#[cfg(all(not(coex), esp32s2, feature = "big-heap"))]
 const HEAP_SIZE: usize = 72 * 1024;
 
-#[cfg(all(feature = "coex", feature = "big-heap"))]
+#[cfg(all(coex, feature = "big-heap"))]
 const HEAP_SIZE: usize = 110 * 1024;
 
-#[cfg_attr(feature = "esp32", link_section = ".dram2_uninit")]
+#[cfg_attr(esp32, link_section = ".dram2_uninit")]
 static mut HEAP_DATA: [MaybeUninit<u8>; HEAP_SIZE] = [MaybeUninit::uninit(); HEAP_SIZE];
 
 pub(crate) static HEAP: Mutex<RefCell<Heap>> = Mutex::new(RefCell::new(Heap::empty()));
@@ -116,10 +116,10 @@ fn init_heap() {
     });
 }
 
-#[cfg(any(feature = "esp32c3", feature = "esp32c2", feature = "esp32c6"))]
+#[cfg(any(esp32c3, esp32c2, esp32c6))]
 pub type EspWifiTimer = Alarm<Target, 0>;
 
-#[cfg(any(feature = "esp32", feature = "esp32s3", feature = "esp32s2"))]
+#[cfg(any(esp32, esp32s3, esp32s2))]
 pub type EspWifiTimer = hal::timer::Timer<hal::timer::Timer0<hal::peripherals::TIMG1>>;
 
 #[derive(Debug, PartialEq, PartialOrd)]
@@ -202,32 +202,32 @@ pub fn initialize(
     radio_clocks: hal::system::RadioClockControl,
     clocks: &Clocks,
 ) -> Result<EspWifiInitialization, InitializationError> {
-    #[cfg(all(not(feature = "coex"), feature = "wifi", feature = "bluetooth"))]
+    #[cfg(all(not(coex), feature = "wifi", feature = "bluetooth"))]
     if init_for == EspWifiInitFor::WifiBle {
         panic!("Trying to use Wifi and BLE without COEX feature");
     }
 
-    #[cfg(any(feature = "esp32", feature = "esp32s3", feature = "esp32s2"))]
+    #[cfg(any(esp32, esp32s3, esp32s2))]
     if clocks.cpu_clock != MegahertzU32::MHz(240) {
         return Err(InitializationError::WrongClockConfig);
     }
 
-    #[cfg(feature = "esp32c6")]
+    #[cfg(esp32c6)]
     if clocks.cpu_clock != MegahertzU32::MHz(160) {
         return Err(InitializationError::WrongClockConfig);
     }
 
-    #[cfg(feature = "esp32c3")]
+    #[cfg(esp32c3)]
     if clocks.cpu_clock != MegahertzU32::MHz(160) {
         return Err(InitializationError::WrongClockConfig);
     }
 
-    #[cfg(feature = "esp32c2")]
+    #[cfg(esp32c2)]
     if clocks.cpu_clock != MegahertzU32::MHz(120) {
         return Err(InitializationError::WrongClockConfig);
     }
 
-    #[cfg(feature = "esp32s3")]
+    #[cfg(esp32s3)]
     unsafe {
         // should be done by the HAL in `ClockControl::configure`
         const ETS_UPDATE_CPU_FREQUENCY: u32 = 0x40001a4c;
@@ -249,7 +249,7 @@ pub fn initialize(
     init_clocks();
     init_buffer();
 
-    #[cfg(feature = "coex")]
+    #[cfg(coex)]
     {
         log::debug!("coex init");
         let res = crate::wifi::coex_initialize();

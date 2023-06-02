@@ -271,10 +271,10 @@ pub(crate) unsafe extern "C" fn coex_core_ble_conn_dyn_prio_get(
     }
     log::debug!("coex_core_ble_conn_dyn_prio_get");
 
-    #[cfg(feature = "coex")]
+    #[cfg(coex)]
     return coex_core_ble_conn_dyn_prio_get(low, high);
 
-    #[cfg(not(feature = "coex"))]
+    #[cfg(not(coex))]
     0
 }
 

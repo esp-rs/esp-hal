@@ -10,7 +10,7 @@ use crate::compat::common::StrBuf;
 use crate::compat::queue::SimpleQueue;
 use crate::timer::yield_task;
 
-#[cfg_attr(feature = "esp32c2", path = "os_adapter_esp32c2.rs")]
+#[cfg_attr(esp32c2, path = "os_adapter_esp32c2.rs")]
 pub(crate) mod ble_os_adapter_chip_specific;
 
 const TIME_FOREVER: u32 = u32::MAX;
@@ -1051,7 +1051,7 @@ pub(crate) fn ble_init() {
             panic!("esp_register_ext_funcs returned {}", res);
         }
 
-        #[cfg(feature = "coex")]
+        #[cfg(coex)]
         {
             let res = crate::wifi::coex_init();
             if res != 0 {
@@ -1108,7 +1108,7 @@ pub(crate) fn ble_init() {
             panic!("ble_controller_init returned {}", res);
         }
 
-        #[cfg(feature = "coex")]
+        #[cfg(coex)]
         crate::binary::include::coex_enable();
 
         let mut mac = [0u8; 6];

@@ -13,18 +13,18 @@ use crate::{
     timer::yield_task,
 };
 
-#[cfg(feature = "esp32")]
+#[cfg(esp32)]
 use esp32_hal as hal;
-#[cfg(feature = "esp32c3")]
+#[cfg(esp32c3)]
 use esp32c3_hal as hal;
-#[cfg(feature = "esp32s3")]
+#[cfg(esp32s3)]
 use esp32s3_hal as hal;
 
 use hal::macros::ram;
 
-#[cfg_attr(feature = "esp32c3", path = "os_adapter_esp32c3.rs")]
-#[cfg_attr(feature = "esp32s3", path = "os_adapter_esp32s3.rs")]
-#[cfg_attr(feature = "esp32", path = "os_adapter_esp32.rs")]
+#[cfg_attr(esp32c3, path = "os_adapter_esp32c3.rs")]
+#[cfg_attr(esp32s3, path = "os_adapter_esp32s3.rs")]
+#[cfg_attr(esp32, path = "os_adapter_esp32.rs")]
 pub(crate) mod ble_os_adapter_chip_specific;
 
 static BT_RECEIVE_QUEUE: Mutex<RefCell<SimpleQueue<ReceivedPacket, 10>>> =
@@ -49,10 +49,10 @@ extern "C" {
     fn btdm_osi_funcs_register(osi_funcs: *const ()) -> i32;
     fn btdm_controller_get_compile_version() -> *const u8;
 
-    #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+    #[cfg(any(esp32c3, esp32s3))]
     fn btdm_controller_init(config_opts: *const esp_bt_controller_config_t) -> i32;
 
-    #[cfg(feature = "esp32")]
+    #[cfg(esp32)]
     fn btdm_controller_init(
         config_mask: u32,
         config_opts: *const esp_bt_controller_config_t,
@@ -326,10 +326,10 @@ unsafe extern "C" fn is_in_isr() -> i32 {
 
 #[ram]
 unsafe extern "C" fn cause_sw_intr_to_core(_core: i32, _intr_no: i32) -> i32 {
-    #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+    #[cfg(any(esp32c3, esp32s3))]
     todo!("cause_sw_intr_to_core is not implemented for this target");
 
-    #[cfg(feature = "esp32")]
+    #[cfg(esp32)]
     {
         log::trace!("cause_sw_intr_to_core {} {}", _core, _intr_no);
         let intr = 1 << _intr_no;
@@ -408,13 +408,13 @@ unsafe extern "C" fn btdm_sleep_exit_phase3() {
 
 unsafe extern "C" fn coex_schm_status_bit_set(_typ: i32, status: i32) {
     log::debug!("coex_schm_status_bit_set {} {}", _typ, status);
-    #[cfg(feature = "coex")]
+    #[cfg(coex)]
     crate::binary::include::coex_schm_status_bit_set(_typ as u32, status as u32);
 }
 
 unsafe extern "C" fn coex_schm_status_bit_clear(_typ: i32, status: i32) {
     log::debug!("coex_schm_status_bit_clear {} {}", _typ, status);
-    #[cfg(feature = "coex")]
+    #[cfg(coex)]
     crate::binary::include::coex_schm_status_bit_clear(_typ as u32, status as u32);
 }
 
@@ -423,22 +423,22 @@ unsafe extern "C" fn read_efuse_mac(mac: *const ()) -> i32 {
     crate::common_adapter::read_mac(mac as *mut _, 2)
 }
 
-#[cfg(feature = "esp32")]
+#[cfg(esp32)]
 unsafe extern "C" fn set_isr13(n: i32, handler: unsafe extern "C" fn(), arg: *const ()) -> i32 {
     ble_os_adapter_chip_specific::set_isr(n, handler, arg)
 }
 
-#[cfg(feature = "esp32")]
+#[cfg(esp32)]
 unsafe extern "C" fn interrupt_l3_disable() {
     // log::info!("unimplemented interrupt_l3_disable");
 }
 
-#[cfg(feature = "esp32")]
+#[cfg(esp32)]
 unsafe extern "C" fn interrupt_l3_restore() {
     //  log::info!("unimplemented interrupt_l3_restore");
 }
 
-#[cfg(feature = "esp32")]
+#[cfg(esp32)]
 unsafe extern "C" fn custom_queue_create(
     _len: u32,
     _item_size: u32,
@@ -470,7 +470,7 @@ pub(crate) fn ble_init() {
             panic!("btdm_osi_funcs_register returned {}", res);
         }
 
-        #[cfg(feature = "coex")]
+        #[cfg(coex)]
         {
             let res = crate::wifi::coex_init();
             if res != 0 {
@@ -486,10 +486,10 @@ pub(crate) fn ble_init() {
 
         ble_os_adapter_chip_specific::disable_sleep_mode();
 
-        #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+        #[cfg(any(esp32c3, esp32s3))]
         let res = btdm_controller_init(&mut cfg as *mut esp_bt_controller_config_t);
 
-        #[cfg(feature = "esp32")]
+        #[cfg(esp32)]
         let res = btdm_controller_init(
             (1 << 3) | (1 << 4),
             &mut cfg as *mut esp_bt_controller_config_t,
@@ -501,12 +501,12 @@ pub(crate) fn ble_init() {
 
         log::debug!("The btdm_controller_init was initialized");
 
-        #[cfg(feature = "coex")]
+        #[cfg(coex)]
         crate::binary::include::coex_enable();
 
         crate::common_adapter::chip_specific::phy_enable();
 
-        #[cfg(feature = "esp32")]
+        #[cfg(esp32)]
         {
             extern "C" {
                 fn btdm_rf_bb_init_phase2();
@@ -516,7 +516,7 @@ pub(crate) fn ble_init() {
             coex_bt_high_prio();
         }
 
-        #[cfg(feature = "coex")]
+        #[cfg(coex)]
         coex_enable();
 
         btdm_controller_enable(esp_bt_mode_t_ESP_BT_MODE_BLE);

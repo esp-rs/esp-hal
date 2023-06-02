@@ -1,15 +1,15 @@
-#[cfg(any(feature = "esp32", feature = "esp32c3", feature = "esp32s3"))]
+#[cfg(any(esp32, esp32c3, esp32s3))]
 pub(crate) mod btdm;
 
-#[cfg(any(feature = "esp32c2"))]
+#[cfg(any(esp32c2))]
 pub(crate) mod npl;
 
 use core::mem::MaybeUninit;
 
-#[cfg(any(feature = "esp32", feature = "esp32c3", feature = "esp32s3"))]
+#[cfg(any(esp32, esp32c3, esp32s3))]
 use self::btdm as ble;
 
-#[cfg(any(feature = "esp32c2"))]
+#[cfg(any(esp32c2))]
 use self::npl as ble;
 
 pub(crate) use ble::ble_init;

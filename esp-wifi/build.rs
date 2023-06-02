@@ -22,6 +22,27 @@ fn main() -> Result<(), String> {
         Err(_err) => (),
     }
 
+    #[cfg(feature = "esp32")]
+    println!("cargo:rustc-cfg=esp32");
+
+    #[cfg(feature = "esp32c2")]
+    println!("cargo:rustc-cfg=esp32c2");
+
+    #[cfg(feature = "esp32c3")]
+    println!("cargo:rustc-cfg=esp32c3");
+
+    #[cfg(feature = "esp32c6")]
+    println!("cargo:rustc-cfg=esp32c6");
+
+    #[cfg(feature = "esp32s2")]
+    println!("cargo:rustc-cfg=esp32s2");
+
+    #[cfg(feature = "esp32s3")]
+    println!("cargo:rustc-cfg=esp32s3");
+
+    #[cfg(feature = "coex")]
+    println!("cargo:rustc-cfg=coex");
+
     Ok(())
 }
 

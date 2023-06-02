@@ -22,10 +22,10 @@ macro_rules! task_stack {
     };
 }
 
-#[cfg(feature = "coex")]
+#[cfg(coex)]
 task_stack!(8192, 8192, 8192);
 
-#[cfg(not(feature = "coex"))]
+#[cfg(not(coex))]
 task_stack!(8192, 8192);
 
 #[cfg_attr(target_arch = "riscv32", path = "preempt_riscv.rs")]
