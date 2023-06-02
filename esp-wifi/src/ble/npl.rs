@@ -997,13 +997,15 @@ unsafe extern "C" fn callout_timer_callback_wrapper(arg: *mut c_void) {
 unsafe extern "C" fn ble_npl_eventq_init(queue: *const ble_npl_eventq) {
     log::trace!("ble_npl_eventq_init {:p}", queue);
 
-    let queue = queue as *mut ble_npl_eventq;
+    critical_section::with(|_cs| {
+        let queue = queue as *mut ble_npl_eventq;
 
-    if (*queue).dummy == 0 {
-        (*queue).dummy = 1;
-    } else {
-        panic!("Only one emulated queue supported");
-    }
+        if (*queue).dummy == 0 {
+            (*queue).dummy = 1;
+        } else {
+            panic!("Only one emulated queue supported");
+        }
+    });
 }
 
 unsafe extern "C" fn ble_npl_mutex_init(_mutex: *const ble_npl_mutex) -> u32 {
@@ -1133,7 +1135,9 @@ pub(crate) fn ble_init() {
         // probably long term we should rather initialize syscall_table_ptr
         *(r_ble_stub_funcs_ptr.offset(0x7dc / 4)) = ble_ll_random_override as *const u32 as u32;
 
-        ets_delay_us(100);
+        // this is a workaround for an unclear problem
+        // (ASSERT r_ble_hci_ram_hs_cmd_tx:34 0 0)
+        ets_delay_us(10_000);
 
         log::debug!("The ble_controller_init was initialized");
     }
@@ -1346,33 +1350,37 @@ pub fn send_hci(data: &[u8]) {
 
                 dump_packet_info(&packet);
 
-                if packet[0] == DATA_TYPE_COMMAND {
-                    let res = (ble_hci_trans_funcs_ptr.ble_hci_trans_hs_cmd_tx.unwrap())(
-                        &packet[1] as *const _ as *mut u8, // don't send the TYPE
-                    );
+                critical_section::with(|_cs| {
+                    if packet[0] == DATA_TYPE_COMMAND {
+                        let res = (ble_hci_trans_funcs_ptr.ble_hci_trans_hs_cmd_tx.unwrap())(
+                            &packet[1] as *const _ as *mut u8, // don't send the TYPE
+                        );
 
-                    if res != 0 {
-                        log::warn!("ble_hci_trans_hs_cmd_tx res == {}", res);
+                        if res != 0 {
+                            log::warn!("ble_hci_trans_hs_cmd_tx res == {}", res);
+                        }
+                    } else if packet[0] == DATA_TYPE_ACL {
+                        let om = get_pkthdr(packet.len());
+
+                        let res = r_os_mbuf_append(
+                            om,
+                            packet.as_ptr().offset(1),
+                            (packet.len() - 1) as u16,
+                        );
+                        if res != 0 {
+                            panic!("r_os_mbuf_append returned {}", res);
+                        }
+
+                        // this modification of the ACL data packet makes it getting sent and received by the other side
+                        *((*om).om_data as *mut u8).offset(1) = 0;
+
+                        let res = (ble_hci_trans_funcs_ptr.ble_hci_trans_hs_acl_tx.unwrap())(om);
+                        if res != 0 {
+                            panic!("ble_hci_trans_hs_acl_tx returned {}", res);
+                        }
+                        log::trace!("ACL tx done");
                     }
-                } else if packet[0] == DATA_TYPE_ACL {
-                    let om = get_pkthdr(packet.len());
-
-                    let res =
-                        r_os_mbuf_append(om, packet.as_ptr().offset(1), (packet.len() - 1) as u16);
-                    if res != 0 {
-                        panic!("r_os_mbuf_append returned {}", res);
-                    }
-
-                    // this modification of the ACL data packet makes it getting sent and received by the other side
-                    *((*om).om_data as *mut u8).offset(1) = 0;
-
-                    let res = (ble_hci_trans_funcs_ptr.ble_hci_trans_hs_acl_tx.unwrap())(om);
-                    if res != 0 {
-                        panic!("ble_hci_trans_hs_acl_tx returned {}", res);
-                    }
-                    log::trace!("ACL tx done");
-                }
-
+                });
                 break;
             }
         }
@@ -1416,18 +1424,20 @@ fn is_mbuf_free(mbuf: *const OsMbuf) -> bool {
 }
 
 fn is_free(mempool: &OsMempool, mbuf: *const OsMbuf) -> bool {
-    let mut next = mempool.first as *const OsMbuf;
-    loop {
-        if next.is_null() {
-            break false;
-        }
+    critical_section::with(|_cs| {
+        let mut next = mempool.first as *const OsMbuf;
+        loop {
+            if next.is_null() {
+                break false;
+            }
 
-        if next == mbuf {
-            break true;
-        }
+            if next == mbuf {
+                break true;
+            }
 
-        next = unsafe { (*next).next };
-    }
+            next = unsafe { (*next).next };
+        }
+    })
 }
 
 #[allow(unreachable_code, unused_variables)]
