@@ -21,6 +21,10 @@ use crate::{
     Cpu,
 };
 
+// only include sleep where its been implemented
+#[cfg(any(esp32))]
+pub mod sleep;
+
 #[cfg(any(esp32c6, esp32h2))]
 type RtcCntl = crate::peripherals::LP_CLKRST;
 #[cfg(not(any(esp32c6, esp32h2)))]
