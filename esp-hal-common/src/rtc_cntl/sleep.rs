@@ -1,17 +1,43 @@
 use core::time::Duration;
 
-use crate::Rtc;
+use crate::{
+    gpio::{Pin, RTCPin},
+    Rtc,
+};
 
 #[cfg_attr(esp32, path = "rtc/esp32_sleep.rs")]
 mod rtc_sleep;
-pub use rtc_sleep::*;
-
 #[cfg(esp32)]
 use esp32 as pac;
+pub use rtc_sleep::*;
 
 #[derive(Debug, Default, Clone, Copy)]
-struct TimerWakeSource {
+pub enum WakeupLevel {
+    Low,
+    #[default]
+    High,
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+pub struct TimerWakeupSource {
     duration: Duration,
+}
+impl TimerWakeupSource {
+    pub fn new(duration: Duration) -> Self {
+        Self { duration }
+    }
+}
+
+#[allow(unused)]
+#[derive(Debug)]
+pub struct Ext0WakeupSource<'a, P: Pin + RTCPin> {
+    pin: &'a mut P,
+    level: WakeupLevel,
+}
+impl<'a, P: Pin + RTCPin> Ext0WakeupSource<'a, P> {
+    pub fn new(pin: &'a mut P, level: WakeupLevel) -> Self {
+        Self { pin, level }
+    }
 }
 
 bitfield::bitfield! {
@@ -42,40 +68,49 @@ bitfield::bitfield! {
     pub bt, set_bt: 10;
 }
 
-trait WakeSource {
-    fn prepare(&self, rtc: &Rtc);
+pub trait WakeSource {
+    fn prepare(&self, rtc: &Rtc, triggers: &mut WakeTriggers);
 }
 
-#[derive(Debug, Default)]
-pub struct Sleep {
+// non-alloc version?
+extern crate alloc;
+#[derive(Debug)]
+pub struct Sleep<'a, W: WakeSource> {
     sleep_config: RtcSleepConfig,
-    wakeup_triggers: WakeTriggers,
-    timer_wake: Option<TimerWakeSource>,
+    wake_sources: alloc::vec::Vec<&'a W>,
 }
 
-impl Sleep {
-    pub fn new() -> Sleep {
+impl<'a, W: WakeSource> Default for Sleep<'a, W> {
+    fn default() -> Self {
+        Self {
+            sleep_config: Default::default(),
+            wake_sources: Default::default(),
+        }
+    }
+}
+impl<'a, W: WakeSource> Sleep<'a, W> {
+    pub fn new() -> Sleep<'a, W> {
         Self {
             ..Default::default()
         }
     }
 
-    pub fn deep() -> Sleep {
+    pub fn deep() -> Sleep<'a, W> {
         Self {
             sleep_config: RtcSleepConfig::deep(),
             ..Default::default()
         }
     }
 
-    pub fn timer(&mut self, duration: Duration) {
-        self.timer_wake = Some(TimerWakeSource { duration });
-        self.wakeup_triggers.set_timer(true);
+    pub fn add_wakeup_source(&mut self, wake_source: &'a W) {
+        self.wake_sources.push(wake_source)
     }
 
     pub fn sleep(&self, rtc: &mut Rtc, delay: &mut crate::Delay) {
         self.sleep_config.apply(rtc);
-        if let Some(timer) = &self.timer_wake {
-            timer.prepare(rtc);
+        let mut wakeup_triggers = WakeTriggers::default();
+        for wake_source in &self.wake_sources {
+            wake_source.prepare(rtc, &mut wakeup_triggers)
         }
         use embedded_hal::blocking::delay::DelayMs;
         delay.delay_ms(100u32);
@@ -89,7 +124,7 @@ impl Sleep {
             // set bits for what can wake us up
             rtc_cntl
                 .wakeup_state
-                .modify(|_, w| w.wakeup_ena().bits(self.wakeup_triggers.0.into()));
+                .modify(|_, w| w.wakeup_ena().bits(wakeup_triggers.0.into()));
 
             // TODO: remove this!
             // esp_reg_dump::rtc_cntl::dump_all();

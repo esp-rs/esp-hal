@@ -1,5 +1,6 @@
-use super::{TimerWakeSource, WakeSource};
+use super::{Ext0WakeupSource, TimerWakeupSource, WakeSource, WakeTriggers};
 use crate::{
+    gpio::{Pin, RTCPin},
     rtc_cntl::{Clock, RtcClock},
     Rtc,
 };
@@ -38,8 +39,9 @@ pub const DG_WRAP_WAIT_CYCLES: u16 = RTC_CNTL_OTHER_BLOCKS_WAIT_CYCLES;
 pub const RTC_CNTL_CK8M_WAIT_DEFAULT: u8 = 20;
 pub const RTC_CK8M_ENABLE_WAIT_DEFAULT: u8 = 5;
 
-impl WakeSource for TimerWakeSource {
-    fn prepare(&self, rtc: &Rtc) {
+impl WakeSource for TimerWakeupSource {
+    fn prepare(&self, rtc: &Rtc, triggers: &mut WakeTriggers) {
+        triggers.set_timer(true);
         let rtc_cntl = unsafe { &*esp32::RTC_CNTL::ptr() };
         let clock_freq = RtcClock::get_slow_freq();
         // TODO: maybe add sleep time adjustlemnt like idf
@@ -59,6 +61,16 @@ impl WakeSource for TimerWakeSource {
                 .main_timer_alarm_en().set_bit()
             });
         }
+    }
+}
+
+impl<'a, EXT0: Pin + RTCPin> WakeSource for Ext0WakeupSource<'a, EXT0> {
+    fn prepare(&self, _rtc: &Rtc, triggers: &mut WakeTriggers) {
+        triggers.set_ext0(true);
+        // map pin# to rtc pin#
+        // set pin register field
+        // set level register field
+        todo!();
     }
 }
 
@@ -127,7 +139,7 @@ impl RtcSleepConfig {
         let mut cfg = Self::default();
         cfg.set_deep_slp(true);
         cfg.set_dig_dbias_slp(RTC_CNTL_DBIAS_0V90);
-        //cfg.set_rtc_dbias_slp(RTC_CNTL_DBIAS_0V90);
+        // cfg.set_rtc_dbias_slp(RTC_CNTL_DBIAS_0V90);
         cfg.set_vddsdio_pd_en(true);
         cfg.set_int_8m_pd_en(true);
         cfg.set_xtal_fpu(false);
@@ -199,7 +211,6 @@ impl RtcSleepConfig {
                 .brown_out_int_ena().set_bit()
             );
         }
-
     }
 
     pub(super) fn apply(&self, rtc: &Rtc) {
