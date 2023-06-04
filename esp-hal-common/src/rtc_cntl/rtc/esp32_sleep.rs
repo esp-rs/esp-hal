@@ -1,7 +1,7 @@
 use super::{Ext0WakeupSource, TimerWakeupSource, WakeSource, WakeTriggers};
 use crate::{
-    gpio::{Pin, RTCPin},
-    rtc_cntl::{Clock, RtcClock},
+    gpio::Pin,
+    rtc_cntl::{sleep::WakeupLevel, Clock, RtcClock},
     Rtc,
 };
 
@@ -64,13 +64,22 @@ impl WakeSource for TimerWakeupSource {
     }
 }
 
-impl<'a, EXT0: Pin + RTCPin> WakeSource for Ext0WakeupSource<'a, EXT0> {
+impl<'a, P: Pin> WakeSource for Ext0WakeupSource<'a, P> {
     fn prepare(&self, _rtc: &Rtc, triggers: &mut WakeTriggers) {
         triggers.set_ext0(true);
-        // map pin# to rtc pin#
-        // set pin register field
-        // set level register field
-        todo!();
+        let pin = self.to_rtc_pin().unwrap();
+        unsafe {
+            // TODO: set pin to RTC function
+
+            let rtc_io = &*esp32::RTC_IO::ptr();
+            // set pin register field
+            rtc_io.ext_wakeup0.modify(|_, w| w.sel().bits(pin));
+            // set level register field
+            let rtc_cntl = &*esp32::RTC_CNTL::ptr();
+            rtc_cntl
+                .ext_wakeup_conf
+                .modify(|_r, w| w.ext_wakeup0_lv().bit(self.level == WakeupLevel::High));
+        }
     }
 }
 
