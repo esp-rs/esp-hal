@@ -3,6 +3,7 @@
 use fugit::{HertzU32, RateExtU32};
 
 use crate::peripherals::EFUSE;
+pub use crate::soc::efuse_field::*;
 
 pub struct Efuse;
 
@@ -35,22 +36,7 @@ impl Efuse {
     /// );
     /// ```
     pub fn get_mac_address() -> [u8; 6] {
-        let efuse = unsafe { &*EFUSE::ptr() };
-
-        let mac_low: u32 = efuse.blk0_rdata1.read().rd_wifi_mac_crc_low().bits();
-        let mac_high: u32 = efuse.blk0_rdata2.read().rd_wifi_mac_crc_high().bits();
-
-        let mac_low_bytes = mac_low.to_be_bytes();
-        let mac_high_bytes = mac_high.to_be_bytes();
-
-        [
-            mac_high_bytes[2],
-            mac_high_bytes[3],
-            mac_low_bytes[0],
-            mac_low_bytes[1],
-            mac_low_bytes[2],
-            mac_low_bytes[3],
-        ]
+        Self::read_field_be(MAC_FACTORY)
     }
 
     /// Returns the number of CPUs available on the chip.
@@ -59,10 +45,7 @@ impl Efuse {
     /// CPU and application CPU), the application CPU is unavailable on
     /// some.
     pub fn get_core_count() -> u32 {
-        let efuse = unsafe { &*EFUSE::ptr() };
-
-        let cpu_disabled = efuse.blk0_rdata3.read().rd_chip_ver_dis_app_cpu().bit();
-        if cpu_disabled {
+        if Self::read_field_le::<bool>(DISABLE_APP_CPU) {
             1
         } else {
             2
@@ -74,10 +57,8 @@ impl Efuse {
     /// Note that the actual clock may be lower, depending on the current power
     /// configuration of the chip, clock source, and other settings.
     pub fn get_max_cpu_frequency() -> HertzU32 {
-        let efuse = unsafe { &*EFUSE::ptr() };
-
-        let has_rating = efuse.blk0_rdata3.read().rd_chip_cpu_freq_rated().bit();
-        let has_low_rating = efuse.blk0_rdata3.read().rd_chip_cpu_freq_low().bit();
+        let has_rating = Self::read_field_le::<bool>(CHIP_CPU_FREQ_RATED);
+        let has_low_rating = Self::read_field_le::<bool>(CHIP_CPU_FREQ_LOW);
 
         if has_rating && has_low_rating {
             160u32.MHz()
@@ -88,16 +69,15 @@ impl Efuse {
 
     /// Returns the CHIP_VER_DIS_BT eFuse value.
     pub fn is_bluetooth_enabled() -> bool {
-        let efuse = unsafe { &*EFUSE::ptr() };
-
-        !efuse.blk0_rdata3.read().rd_chip_ver_dis_bt().bit()
+        !Self::read_field_le::<bool>(DISABLE_BT)
     }
 
     /// Returns the CHIP_VER_PKG eFuse value.
     pub fn get_chip_type() -> ChipType {
-        let efuse = unsafe { &*EFUSE::ptr() };
+        let chip_ver = Self::read_field_le::<u8>(CHIP_PACKAGE)
+            | Self::read_field_le::<u8>(CHIP_PACKAGE_4BIT) << 4;
 
-        match efuse.blk0_rdata3.read().rd_chip_ver_pkg().bits() {
+        match chip_ver {
             0 => ChipType::Esp32D0wdq6,
             1 => ChipType::Esp32D0wdq5,
             2 => ChipType::Esp32D2wdq5,
@@ -109,14 +89,27 @@ impl Efuse {
 
     /// Get status of SPI boot encryption.
     pub fn get_flash_encryption() -> bool {
+        (Self::read_field_le::<u8>(FLASH_CRYPT_CNT).count_ones() % 2) != 0
+    }
+}
+
+#[derive(Copy, Clone)]
+pub(crate) enum EfuseBlock {
+    Block0,
+    Block1,
+    Block2,
+    Block3,
+}
+
+impl EfuseBlock {
+    pub(crate) fn address(self) -> *const u32 {
+        use EfuseBlock::*;
         let efuse = unsafe { &*EFUSE::ptr() };
-        (efuse
-            .blk0_rdata0
-            .read()
-            .rd_flash_crypt_cnt()
-            .bits()
-            .count_ones()
-            % 2)
-            != 0
+        match self {
+            Block0 => efuse.blk0_rdata0.as_ptr(),
+            Block1 => efuse.blk1_rdata0.as_ptr(),
+            Block2 => efuse.blk2_rdata0.as_ptr(),
+            Block3 => efuse.blk3_rdata0.as_ptr(),
+        }
     }
 }
