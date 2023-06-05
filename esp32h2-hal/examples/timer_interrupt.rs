@@ -92,7 +92,7 @@ fn TG0_T0_LEVEL() {
         let timer0 = timer0.as_mut().unwrap();
 
         timer0.clear_interrupt();
-        timer0.start(1000u64.millis());
+        timer0.start(500u64.millis());
     });
 }
 
