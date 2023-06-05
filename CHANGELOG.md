@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `embassy_serial` and `embassy_wait` examples for ESP32-H2 (#569)
 - Fix Async GPIO not disabling interupts on chips with multiple banks (#572)
 - Add unified field-based efuse access
+- Add `timer_interrupt` example in ESP32-H2 and refactor `clk_src` configuration (#575)
 
 ### Changed
 

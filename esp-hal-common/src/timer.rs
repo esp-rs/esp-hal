@@ -12,11 +12,10 @@ use embedded_hal::{
 use fugit::{HertzU32, MicrosDurationU64};
 use void::Void;
 
-#[cfg(any(esp32c6, esp32h2))]
-use crate::soc::constants::TIMG_DEFAULT_CLK_SRC;
-
 #[cfg(timg1)]
 use crate::peripherals::TIMG1;
+#[cfg(any(esp32c6, esp32h2))]
+use crate::soc::constants::TIMG_DEFAULT_CLK_SRC;
 use crate::{
     clock::Clocks,
     peripheral::{Peripheral, PeripheralRef},
@@ -47,9 +46,7 @@ where
 
 pub trait TimerGroupInstance {
     fn register_block() -> *const RegisterBlock;
-    #[cfg(any(esp32c6, esp32h2))]
     fn configure_src_clk();
-    #[cfg(any(esp32c6, esp32h2))]
     fn configure_wdt_src_clk();
 }
 
@@ -61,15 +58,44 @@ impl TimerGroupInstance for TIMG0 {
     #[inline(always)]
     #[cfg(any(esp32c6, esp32h2))]
     fn configure_src_clk() {
-        unsafe { &*crate::peripherals::PCR::PTR}
-                .timergroup0_timer_clk_conf
-                .modify(|_, w| unsafe { w.tg0_timer_clk_sel().bits(TIMG_DEFAULT_CLK_SRC) });
+        unsafe { &*crate::peripherals::PCR::PTR }
+            .timergroup0_timer_clk_conf
+            .modify(|_, w| unsafe { w.tg0_timer_clk_sel().bits(TIMG_DEFAULT_CLK_SRC) });
+    }
+    #[inline(always)]
+    #[cfg(any(esp32c2, esp32c3, esp32s2, esp32s3))]
+    fn configure_src_clk() {
+        unsafe {
+            (*Self::register_block())
+                .t0config
+                .modify(|_, w| w.use_xtal().clear_bit())
+        };
+    }
+    #[inline(always)]
+    #[cfg(esp32)]
+    fn configure_src_clk() {
+        // ESP32 has only APB clock source, do nothing
+    }
+    #[inline(always)]
+    #[cfg(any(esp32c2, esp32c3))]
+    fn configure_wdt_src_clk() {
+        unsafe {
+            (*Self::register_block())
+                .wdtconfig0
+                .modify(|_, w| w.wdt_use_xtal().clear_bit())
+        };
     }
     #[inline(always)]
     #[cfg(any(esp32c6, esp32h2))]
     fn configure_wdt_src_clk() {
-        unsafe { &*crate::peripherals::PCR::PTR}.timergroup0_wdt_clk_conf
-        .modify(|_, w| unsafe { w.tg0_wdt_clk_sel().bits(1) });
+        unsafe { &*crate::peripherals::PCR::PTR }
+            .timergroup0_wdt_clk_conf
+            .modify(|_, w| unsafe { w.tg0_wdt_clk_sel().bits(1) });
+    }
+    #[inline(always)]
+    #[cfg(any(esp32, esp32s2, esp32s3))]
+    fn configure_wdt_src_clk() {
+        // ESP32, ESP32-S2, and ESP32-S3 use only ABP, do nothing
     }
 }
 
@@ -82,15 +108,37 @@ impl TimerGroupInstance for TIMG1 {
     #[inline(always)]
     #[cfg(any(esp32c6, esp32h2))]
     fn configure_src_clk() {
-        unsafe { &*crate::peripherals::PCR::PTR}
-                .timergroup1_timer_clk_conf
-                .modify(|_, w| unsafe { w.tg1_timer_clk_sel().bits(TIMG_DEFAULT_CLK_SRC) });
+        unsafe { &*crate::peripherals::PCR::PTR }
+            .timergroup1_timer_clk_conf
+            .modify(|_, w| unsafe { w.tg1_timer_clk_sel().bits(TIMG_DEFAULT_CLK_SRC) });
+    }
+    #[inline(always)]
+    #[cfg(any(esp32s2, esp32s3))]
+    fn configure_src_clk() {
+        unsafe {
+            (*Self::register_block())
+                .t1config
+                .modify(|_, w| w.use_xtal().clear_bit())
+        };
+    }
+    #[inline(always)]
+    #[cfg(any(esp32, esp32c2, esp32c3))]
+    fn configure_src_clk() {
+        // ESP32 has only APB clock source, do nothing
+        // ESP32-C2 and ESP32-C3 don't have t1config only t0config, do nothing
     }
     #[inline(always)]
     #[cfg(any(esp32c6, esp32h2))]
     fn configure_wdt_src_clk() {
-        unsafe { &*crate::peripherals::PCR::PTR}.timergroup1_wdt_clk_conf
-        .modify(|_, w| unsafe { w.tg1_wdt_clk_sel().bits(1) });
+        unsafe { &*crate::peripherals::PCR::PTR }
+            .timergroup1_wdt_clk_conf
+            .modify(|_, w| unsafe { w.tg1_wdt_clk_sel().bits(1) });
+    }
+    #[inline(always)]
+    #[cfg(any(esp32, esp32s2, esp32s3, esp32c2, esp32c3))]
+    fn configure_wdt_src_clk() {
+        // ESP32-C2 and ESP32-C3 don't have t1config only t0config, do nothing
+        // ESP32, ESP32-S2, and ESP32-S3 use only ABP, do nothing
     }
 }
 
@@ -105,24 +153,16 @@ where
     ) -> Self {
         crate::into_ref!(timer_group);
 
-        #[cfg(any(esp32c6, esp32h2))]
         T::configure_src_clk();
 
-        #[cfg(not(esp32h2))]
-        let timer0 = Timer::new(
-            Timer0 {
-                phantom: PhantomData::default(),
-            },
-            clocks.apb_clock,
-            peripheral_clock_control,
-        );
-
         // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
-        #[cfg(esp32h2)]
         let timer0 = Timer::new(
             Timer0 {
                 phantom: PhantomData::default(),
             },
+            #[cfg(not(esp32h2))]
+            clocks.apb_clock,
+            #[cfg(esp32h2)]
             clocks.pll_48m_clock,
             peripheral_clock_control,
         );
@@ -241,6 +281,7 @@ impl<TG> Timer0<TG>
 where
     TG: TimerGroupInstance,
 {
+    #[cfg(feature = "embassy-time-timg0")]
     pub(crate) unsafe fn steal() -> Self {
         Self {
             phantom: PhantomData,
@@ -401,6 +442,7 @@ impl<TG> Timer1<TG>
 where
     TG: TimerGroupInstance,
 {
+    #[cfg(feature = "embassy-time-timg1")]
     pub(crate) unsafe fn steal() -> Self {
         Self {
             phantom: PhantomData,
@@ -645,7 +687,6 @@ where
     pub fn new(_peripheral_clock_control: &mut PeripheralClockControl) -> Self {
         #[cfg(lp_wdt)]
         _peripheral_clock_control.enable(crate::system::Peripheral::Wdt);
-        #[cfg(any(esp32c6, esp32h2))]
         TG::configure_wdt_src_clk();
         Self {
             phantom: PhantomData::default(),
