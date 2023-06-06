@@ -455,37 +455,22 @@ impl PeripheralClockControl {
             Peripheral::Timg0 => {
                 system
                     .timergroup0_timer_clk_conf
-                    .write(|w| w.tg0_timer_clk_en().set_bit());
-                let bits = if cfg!(esp32c6) { 1 } else { 2 };
-                system
-                    .timergroup0_timer_clk_conf
-                    .write(|w| unsafe { w.tg0_timer_clk_sel().bits(bits) });
+                    .modify(|_, w| w.tg0_timer_clk_en().set_bit());
             }
             #[cfg(timg1)]
             Peripheral::Timg1 => {
                 system
                     .timergroup1_timer_clk_conf
-                    .write(|w| w.tg1_timer_clk_en().set_bit());
-                let bits = if cfg!(esp32c6) { 1 } else { 2 };
-                system
-                    .timergroup1_timer_clk_conf
-                    .write(|w| unsafe { w.tg1_timer_clk_sel().bits(bits) });
+                    .modify(|_, w| w.tg1_timer_clk_en().set_bit());
             }
             #[cfg(lp_wdt)]
             Peripheral::Wdt => {
                 system
                     .timergroup0_wdt_clk_conf
-                    .write(|w| w.tg0_wdt_clk_en().set_bit());
-                system
-                    .timergroup0_wdt_clk_conf
-                    .write(|w| unsafe { w.tg0_wdt_clk_sel().bits(1) });
-
+                    .modify(|_, w| w.tg0_wdt_clk_en().set_bit());
                 system
                     .timergroup1_timer_clk_conf
-                    .write(|w| w.tg1_timer_clk_en().set_bit());
-                system
-                    .timergroup1_timer_clk_conf
-                    .write(|w| unsafe { w.tg1_timer_clk_sel().bits(1) });
+                    .modify(|_, w| w.tg1_timer_clk_en().set_bit());
             }
             #[cfg(sha)]
             Peripheral::Sha => {
