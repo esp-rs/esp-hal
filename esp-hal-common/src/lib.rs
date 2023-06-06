@@ -138,6 +138,8 @@ pub mod rtc_cntl;
 pub mod sha;
 #[cfg(any(spi0, spi1, spi2, spi3))]
 pub mod spi;
+#[cfg(any(spi0, spi1, spi2, spi3))]
+pub mod spi_slave;
 #[cfg(any(dport, pcr, system))]
 pub mod system;
 #[cfg(systimer)]

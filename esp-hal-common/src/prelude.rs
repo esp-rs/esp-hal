@@ -70,6 +70,12 @@ pub use crate::spi::{
     Instance as _esp_hal_spi_Instance,
     InstanceDma as _esp_hal_spi_InstanceDma,
 };
+#[cfg(any(spi0, spi1, spi2, spi3))]
+pub use crate::spi_slave::{
+    dma::WithDmaSpi2 as _esp_hal_spi_slave_dma_WithDmaSpi2,
+    Instance as _esp_hal_spi_slave_Instance,
+    InstanceDma as _esp_hal_spi_slave_InstanceDma,
+};
 #[cfg(any(dport, pcr, system))]
 pub use crate::system::SystemExt as _esp_hal_system_SystemExt;
 #[cfg(any(timg0, timg1))]
