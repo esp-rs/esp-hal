@@ -1,0 +1,26 @@
+[package]
+name         = "esp-riscv-rt"
+version      = "0.3.0"
+edition      = "2021"
+rust-version = "1.60"
+description  = "Minimal runtime / startup for RISC-V CPUs from Espressif"
+repository   = "https://github.com/esp-rs/esp-hal"
+license      = "MIT OR Apache-2.0"
+keywords     = ["esp32", "riscv", "runtime", "startup"]
+categories   = ["embedded", "no-std"]
+
+[dependencies]
+riscv           = "0.10.1"
+riscv-rt-macros = "0.2.0"
+
+[dev-dependencies]
+panic-halt = "0.2.0"
+
+[features]
+has-mie-mip = []
+zero-bss = []
+zero-rtc-fast-bss = []
+init-data = []
+init-rw-text = []
+init-rtc-fast-data = []
+init-rtc-fast-text = []
