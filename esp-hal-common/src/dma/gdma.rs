@@ -205,7 +205,7 @@ macro_rules! impl_channel {
                             .set_bit()
                     });
 
-                    #[cfg(any(esp32c6, esp32h2, esp32h2))]
+                    #[cfg(any(esp32c6, esp32h2))]
                     dma.[<in_int_clr_ch $num>].write(|w| {
                         w.in_suc_eof()
                             .set_bit()

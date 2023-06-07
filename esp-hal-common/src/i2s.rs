@@ -16,7 +16,7 @@ use crate::{
 #[cfg(any(esp32, esp32s2, esp32s3))]
 const I2S_LL_MCLK_DIVIDER_BIT_WIDTH: usize = 6;
 
-#[cfg(any(esp32c3, esp32c6))]
+#[cfg(any(esp32c3, esp32c6, esp32h2))]
 const I2S_LL_MCLK_DIVIDER_BIT_WIDTH: usize = 9;
 
 const I2S_LL_MCLK_DIVIDER_MAX: usize = (1 << I2S_LL_MCLK_DIVIDER_BIT_WIDTH) - 1;
@@ -1295,7 +1295,7 @@ mod private {
         }
     }
 
-    #[cfg(any(esp32c3, esp32c6, esp32s3))]
+    #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
     pub trait RegisterAccessPrivate: Signals + RegBlock {
         #[cfg(any(esp32c3, esp32s3))]
         fn set_clock(&self, clock_settings: I2sClockDividers) {
@@ -1397,10 +1397,10 @@ mod private {
             });
         }
 
-        #[cfg(any(esp32c6))]
+        #[cfg(any(esp32, esp32c6, esp32h2))]
         fn set_clock(&self, clock_settings: I2sClockDividers) {
             let i2s = self.register_block();
-            let pcr = unsafe { &*esp32c6::PCR::PTR }; // I2S clocks are configured via PCR
+            let pcr = unsafe { &*crate::peripherals::PCR::PTR }; // I2S clocks are configured via PCR
 
             let clkm_div_x: u32;
             let clkm_div_y: u32;
@@ -1458,12 +1458,18 @@ mod private {
                 w.i2s_tx_clkm_en()
                     .set_bit()
                     .i2s_tx_clkm_sel()
-                    .variant(2) // for now fixed at 160MHz
+                    .variant(0) // for now fixed at 160MHz
                     .i2s_tx_clkm_div_num()
                     .variant(clock_settings.mclk_divider as u8)
             });
 
+            #[cfg(not(esp32h2))]
             i2s.tx_conf1.modify(|_, w| {
+                w.tx_bck_div_num()
+                    .variant((clock_settings.bclk_divider - 1) as u8)
+            });
+            #[cfg(esp32h2)]
+            i2s.tx_conf.modify(|_, w| {
                 w.tx_bck_div_num()
                     .variant((clock_settings.bclk_divider - 1) as u8)
             });
@@ -1483,14 +1489,19 @@ mod private {
                 w.i2s_rx_clkm_en()
                     .set_bit()
                     .i2s_rx_clkm_sel()
-                    .variant(2) // for now fixed at 160MHz
+                    .variant(0) // for now fixed at 160MHz
                     .i2s_rx_clkm_div_num()
                     .variant(clock_settings.mclk_divider as u8)
                     .i2s_mclk_sel()
                     .variant(true)
             });
-
+            #[cfg(not(esp32h2))]
             i2s.rx_conf1.modify(|_, w| {
+                w.rx_bck_div_num()
+                    .variant((clock_settings.bclk_divider - 1) as u8)
+            });
+            #[cfg(esp32h2)]
+            i2s.rx_conf.modify(|_, w| {
                 w.rx_bck_div_num()
                     .variant((clock_settings.bclk_divider - 1) as u8)
             });
@@ -1500,17 +1511,18 @@ mod private {
             let i2s = self.register_block();
             i2s.tx_conf1.modify(|_, w| {
                 w.tx_tdm_ws_width()
-                    .variant(data_format.channel_bits() - 1)
+                    .variant((data_format.channel_bits() - 1).into())
                     .tx_bits_mod()
                     .variant(data_format.data_bits() - 1)
                     .tx_tdm_chan_bits()
                     .variant(data_format.channel_bits() - 1)
                     .tx_half_sample_bits()
                     .variant(data_format.channel_bits() - 1)
-                    .tx_msb_shift()
-                    .set_bit()
             });
-
+            #[cfg(not(esp32h2))]
+            i2s.tx_conf1.modify(|_, w| w.tx_msb_shift().set_bit());
+            #[cfg(esp32h2)]
+            i2s.tx_conf.modify(|_, w| w.tx_msb_shift().set_bit());
             i2s.tx_conf.modify(|_, w| {
                 w.tx_mono()
                     .clear_bit()
@@ -1573,16 +1585,18 @@ mod private {
 
             i2s.rx_conf1.modify(|_, w| {
                 w.rx_tdm_ws_width()
-                    .variant(data_format.channel_bits() - 1)
+                    .variant((data_format.channel_bits() - 1).into())
                     .rx_bits_mod()
                     .variant(data_format.data_bits() - 1)
                     .rx_tdm_chan_bits()
                     .variant(data_format.channel_bits() - 1)
                     .rx_half_sample_bits()
                     .variant(data_format.channel_bits() - 1)
-                    .rx_msb_shift()
-                    .set_bit()
             });
+            #[cfg(not(esp32h2))]
+            i2s.rx_conf1.modify(|_, w| w.rx_msb_shift().set_bit());
+            #[cfg(esp32h2)]
+            i2s.rx_conf.modify(|_, w| w.rx_msb_shift().set_bit());
 
             i2s.rx_conf.modify(|_, w| {
                 w.rx_mono()
@@ -1715,7 +1729,7 @@ mod private {
     #[derive(Clone)]
     pub struct I2sPeripheral1 {}
 
-    #[cfg(any(esp32c3, esp32c6))]
+    #[cfg(any(esp32c3, esp32c6, esp32h2))]
     impl Signals for I2sPeripheral0 {
         fn get_peripheral(&self) -> Peripheral {
             Peripheral::I2s0
@@ -1991,7 +2005,7 @@ mod private {
         // If data_bits is a power of two, use 256 as the mclk_multiple
         // If data_bits is 24, use 192 (24 * 8) as the mclk_multiple
         let mclk_multiple = if data_bits == 24 { 192 } else { 256 };
-        let sclk = 160_000_000; // for now it's fixed PLL_160M_CLK
+        let sclk = 160_000_000; // for now it's fixed PLL_160M_CLK TODO change this
 
         let rate_hz: HertzU32 = sample_rate.into();
         let rate = rate_hz.raw();
@@ -2008,35 +2022,69 @@ mod private {
 
         let freq_diff = sclk.abs_diff(mclk * mclk_divider);
 
-        if freq_diff != 0 {
-            let decimal = freq_diff as u64 * 10000 / mclk as u64;
+        if freq_diff != 0 {}
+        let decimal = freq_diff as u64 * 10000 / mclk as u64;
 
-            // Carry bit if the decimal is greater than 1.0 - 1.0 / (63.0 * 2) = 125.0 /
-            // 126.0
-            if decimal > 1250000 / 126 {
-                mclk_divider += 1;
-            } else {
-                let mut min: u32 = !0;
+        // Carry bit if the decimal is greater than 1.0 - 1.0 / (63.0 * 2) = 125.0 /
+        // 126.0
+        if decimal > 1250000 / 126 {
+            mclk_divider += 1;
 
-                for a in 2..=I2S_LL_MCLK_DIVIDER_MAX {
-                    let b = (a as u64) * (freq_diff as u64 * 10000u64 / mclk as u64) + 5000;
-                    ma = ((freq_diff as u64 * 10000u64 * a as u64) / 10000) as u32;
-                    mb = (mclk as u64 * (b / 10000)) as u32;
+            #[cfg(esp32h2)]
+            unsafe { super::workaround(denominator, numerator, mclk_divider) };
+        } else {
+            let mut min: u32 = !0;
 
-                    if ma == mb {
-                        denominator = a as u32;
-                        numerator = (b / 10000) as u32;
-                        break;
-                    }
+            for a in 2..=I2S_LL_MCLK_DIVIDER_MAX {
+                let b = (a as u64) * (freq_diff as u64 * 10000u64 / mclk as u64) + 5000;
+                ma = ((freq_diff as u64 * 10000u64 * a as u64) / 10000) as u32;
+                mb = (mclk as u64 * (b / 10000)) as u32;
 
-                    if mb.abs_diff(ma) < min {
-                        denominator = a as u32;
-                        numerator = b as u32;
-                        min = mb.abs_diff(ma);
-                    }
+                if ma == mb {
+                    denominator = a as u32;
+                    numerator = (b / 10000) as u32;
+                    #[cfg(esp32h2)]
+                    unsafe { super::workaround(denominator, numerator, mclk_divider) };
+                    break;
+                }
+
+                if mb.abs_diff(ma) < min {
+                    denominator = a as u32;
+                    numerator = b as u32;
+                    min = mb.abs_diff(ma);
                 }
             }
         }
+
+        // if freq_diff != 0 {
+        //     let decimal = freq_diff as u64 * 10000 / mclk as u64;
+
+        //     // Carry bit if the decimal is greater than 1.0 - 1.0 / (63.0 * 2) =
+        // 125.0 /     // 126.0
+        //     if decimal > 1250000 / 126 {
+        //         mclk_divider += 1;
+        //     } else {
+        //         let mut min: u32 = !0;
+
+        //         for a in 2..=I2S_LL_MCLK_DIVIDER_MAX {
+        //             let b = (a as u64) * (freq_diff as u64 * 10000u64 / mclk as u64)
+        // + 5000;             ma = ((freq_diff as u64 * 10000u64 * a as u64) /
+        // 10000) as u32;             mb = (mclk as u64 * (b / 10000)) as u32;
+
+        //             if ma == mb {
+        //                 denominator = a as u32;
+        //                 numerator = (b / 10000) as u32;
+        //                 break;
+        //             }
+
+        //             if mb.abs_diff(ma) < min {
+        //                 denominator = a as u32;
+        //                 numerator = b as u32;
+        //                 min = mb.abs_diff(ma);
+        //             }
+        //         }
+        //     }
+        // }
 
         I2sClockDividers {
             mclk_divider,
@@ -2044,5 +2092,104 @@ mod private {
             denominator,
             numerator,
         }
+    }
+}
+
+// Workaround for inaccurate clock while switching from a relatively low sample
+// rate to a high sample rate Set to particular coefficients first then
+// update to the target coefficients, otherwise the clock division might
+// be inaccurate. The particular coefficients here is calculated from
+// 44100 Hz with 2 slots & 16-bit width @96MHz sclk
+#[cfg(esp32h2)]
+pub unsafe fn workaround(denominator: u32, numerator: u32, mclk_divider: u32) {
+    unsafe {
+        { &*crate::peripherals::PCR::PTR }
+            .i2s_tx_clkm_div_conf
+            .modify(|_, w| {
+                w.i2s_tx_clkm_div_x()
+                    .bits(1)
+                    .i2s_tx_clkm_div_y()
+                    .bits(1)
+                    .i2s_tx_clkm_div_z()
+                    .bits(73)
+                    .i2s_tx_clkm_div_yn1()
+                    .set_bit()
+            });
+
+            { &*crate::peripherals::PCR::PTR }
+            .i2s_rx_clkm_div_conf
+            .modify(|_, w| {
+                w.i2s_rx_clkm_div_x()
+                    .bits(1)
+                    .i2s_rx_clkm_div_y()
+                    .bits(1)
+                    .i2s_rx_clkm_div_z()
+                    .bits(73)
+                    .i2s_rx_clkm_div_yn1()
+                    .set_bit()
+            });
+
+        { &*crate::peripherals::PCR::PTR }
+            .i2s_tx_clkm_conf
+            .modify(|_, w| w.i2s_tx_clkm_div_num().bits(8));
+
+            { &*crate::peripherals::PCR::PTR }
+            .i2s_rx_clkm_conf
+            .modify(|_, w| w.i2s_rx_clkm_div_num().bits(8));
+
+        let mut div_x = 0;
+        let mut div_y = 0;
+        let mut div_z = 0;
+        let mut div_yn1 = false;
+
+        // If any of denominator and numerator is 0, set all the coefficients to 0
+        if denominator != 0 && numerator != 0 {
+            div_yn1 = if numerator * 2 > denominator {
+                true
+            } else {
+                false
+            };
+            div_z = if !div_yn1 {
+                denominator - numerator
+            } else {
+                numerator
+            };
+            div_x = denominator / div_z - 1;
+            div_y = denominator % div_z;
+        }
+
+        { &*crate::peripherals::PCR::PTR }
+            .i2s_tx_clkm_div_conf
+            .modify(|_, w| {
+                w.i2s_tx_clkm_div_x()
+                    .bits(div_x as u16)
+                    .i2s_tx_clkm_div_y()
+                    .bits(div_y as u16)
+                    .i2s_tx_clkm_div_z()
+                    .bits(div_z as u16)
+                    .i2s_tx_clkm_div_yn1()
+                    .bit(div_yn1)
+            });
+
+            { &*crate::peripherals::PCR::PTR }
+            .i2s_rx_clkm_div_conf
+            .modify(|_, w| {
+                w.i2s_rx_clkm_div_x()
+                    .bits(div_x as u16)
+                    .i2s_rx_clkm_div_y()
+                    .bits(div_y as u16)
+                    .i2s_rx_clkm_div_z()
+                    .bits(div_z as u16)
+                    .i2s_rx_clkm_div_yn1()
+                    .bit(div_yn1)
+            });
+
+        { &*crate::peripherals::PCR::PTR }
+            .i2s_tx_clkm_conf
+            .modify(|_, w| w.i2s_tx_clkm_div_num().bits(mclk_divider as u8));
+
+            { &*crate::peripherals::PCR::PTR }
+            .i2s_rx_clkm_conf
+            .modify(|_, w| w.i2s_rx_clkm_div_num().bits(mclk_divider as u8));
     }
 }
