@@ -312,6 +312,23 @@ jobs:
       - name: check esp32s3-hal (async, i2c)
         run: cd esp32s3-hal/ && cargo check --example=embassy_i2c --features=embassy,embassy-time-timg0,async
 
+  esp-riscv-rt:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          target: riscv32imac-unknown-none-elf, riscv32imc-unknown-none-elf
+          toolchain: nightly
+          components: rust-src
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Check esp-riscv-rt (imc)
+        run: cd esp-riscv-rt/ && cargo check --target=riscv32imc-unknown-none-elf -Zbuild-std=core
+      - name: Check esp-riscv-rt (imac)
+        run: cd esp-riscv-rt/ && cargo check --target=riscv32imac-unknown-none-elf -Zbuild-std=core
+
   # --------------------------------------------------------------------------
   # MSRV
 
