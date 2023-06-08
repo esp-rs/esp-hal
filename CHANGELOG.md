@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Add initial LP-IO support for ESP32-C6 (#639)
+- Implement sleep with some wakeup methods for `esp32` (#574)
 
 ### Changed
 

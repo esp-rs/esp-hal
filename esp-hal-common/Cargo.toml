@@ -23,6 +23,7 @@ embedded-hal-1       = { version = "=1.0.0-alpha.11", optional = true, package =
 embedded-hal-nb      = { version = "=1.0.0-alpha.3", optional = true }
 esp-synopsys-usb-otg = { version = "0.3.2", optional = true, features = ["fs", "esp32sx"] }
 fugit                = "0.3.7"
+heapless             = "0.7.16"
 log                  = "=0.4.18"
 lock_api             = { version = "0.4.10", optional = true }
 nb                   = "1.1.0"
@@ -65,12 +66,12 @@ basic-toml = "0.1.2"
 serde      = { version = "1.0.164", features = ["derive"] }
 
 [features]
-esp32   = ["esp32/rt"  , "xtensa", "xtensa-lx/esp32",   "xtensa-lx-rt/esp32",   "lock_api", "procmacros/esp32"]
-esp32c2 = ["esp32c2/rt", "riscv",  "procmacros/esp32c2"]
-esp32c3 = ["esp32c3/rt", "riscv",  "procmacros/esp32c3"]
-esp32c6 = ["esp32c6/rt", "riscv",  "procmacros/esp32c6"]
-esp32h2 = ["esp32h2/rt", "riscv",  "procmacros/esp32h2"]
-esp32s2 = ["esp32s2/rt", "xtensa", "xtensa-lx/esp32s2", "xtensa-lx-rt/esp32s2",             "esp-synopsys-usb-otg", "usb-device", "procmacros/esp32s2"]
+esp32   = ["esp32/rt", "xtensa", "xtensa-lx/esp32", "xtensa-lx-rt/esp32", "lock_api", "procmacros/esp32"]
+esp32c2 = ["esp32c2/rt", "riscv", "procmacros/esp32c2"]
+esp32c3 = ["esp32c3/rt", "riscv", "procmacros/esp32c3"]
+esp32c6 = ["esp32c6/rt", "riscv", "procmacros/esp32c6"]
+esp32h2 = ["esp32h2/rt", "riscv", "procmacros/esp32h2"]
+esp32s2 = ["esp32s2/rt", "xtensa", "xtensa-lx/esp32s2", "xtensa-lx-rt/esp32s2", "esp-synopsys-usb-otg", "usb-device", "procmacros/esp32s2"]
 esp32s3 = ["esp32s3/rt", "xtensa", "xtensa-lx/esp32s3", "xtensa-lx-rt/esp32s3", "lock_api", "esp-synopsys-usb-otg", "usb-device", "procmacros/esp32s3"]
 
 esp32_40mhz = []

@@ -40,7 +40,7 @@ pub const RTC_CNTL_CK8M_WAIT_DEFAULT: u8 = 20;
 pub const RTC_CK8M_ENABLE_WAIT_DEFAULT: u8 = 5;
 
 impl WakeSource for TimerWakeupSource {
-    fn prepare(&self, rtc: &Rtc, triggers: &mut WakeTriggers) {
+    fn prepare(&self, rtc: &Rtc, triggers: &mut WakeTriggers, _sleep_config: &mut RtcSleepConfig) {
         triggers.set_timer(true);
         let rtc_cntl = unsafe { &*esp32::RTC_CNTL::ptr() };
         let clock_freq = RtcClock::get_slow_freq();
@@ -65,13 +65,102 @@ impl WakeSource for TimerWakeupSource {
 }
 
 impl<'a, P: Pin> WakeSource for Ext0WakeupSource<'a, P> {
-    fn prepare(&self, _rtc: &Rtc, triggers: &mut WakeTriggers) {
+    fn prepare(&self, _rtc: &Rtc, triggers: &mut WakeTriggers, sleep_config: &mut RtcSleepConfig) {
         triggers.set_ext0(true);
+        sleep_config.set_rtc_peri_pd_en(false);
         let pin = self.to_rtc_pin().unwrap();
         unsafe {
-            // TODO: set pin to RTC function
-
+            // TODO: set pin to RTC function (should be handled by RTCPin impl)
             let rtc_io = &*esp32::RTC_IO::ptr();
+            // TODO: this should be implemented by RTCPin!
+            match self.to_rtc_pin().unwrap() {
+                0 => {
+                    rtc_io
+                        .sensor_pads
+                        .modify(|_, w| w.sense1_mux_sel().bit(true));
+                    rtc_io.sensor_pads.modify(|_, w| w.sense1_fun_sel().bits(0));
+                }
+                1 => {
+                    rtc_io
+                        .sensor_pads
+                        .modify(|_, w| w.sense2_mux_sel().bit(true));
+                    rtc_io.sensor_pads.modify(|_, w| w.sense2_fun_sel().bits(0));
+                }
+                2 => {
+                    rtc_io
+                        .sensor_pads
+                        .modify(|_, w| w.sense3_mux_sel().bit(true));
+                    rtc_io.sensor_pads.modify(|_, w| w.sense3_fun_sel().bits(0));
+                }
+                3 => {
+                    rtc_io
+                        .sensor_pads
+                        .modify(|_, w| w.sense4_mux_sel().bit(true));
+                    rtc_io.sensor_pads.modify(|_, w| w.sense4_fun_sel().bits(0));
+                }
+                4 => {
+                    rtc_io.adc_pad.modify(|_, w| w.adc1_mux_sel().bit(true));
+                    rtc_io.adc_pad.modify(|_, w| w.adc1_fun_sel().bits(0));
+                }
+                5 => {
+                    rtc_io.adc_pad.modify(|_, w| w.adc2_mux_sel().bit(true));
+                    rtc_io.adc_pad.modify(|_, w| w.adc2_fun_sel().bits(0));
+                }
+                6 => {
+                    rtc_io.pad_dac1.modify(|_, w| w.pdac1_mux_sel().bit(true));
+                    rtc_io.pad_dac1.modify(|_, w| w.pdac1_fun_sel().bits(0));
+                }
+                7 => {
+                    rtc_io.pad_dac2.modify(|_, w| w.pdac2_mux_sel().bit(true));
+                    rtc_io.pad_dac2.modify(|_, w| w.pdac2_fun_sel().bits(0));
+                }
+                8 => {
+                    rtc_io
+                        .xtal_32k_pad
+                        .modify(|_, w| w.x32n_mux_sel().bit(true));
+                    rtc_io.xtal_32k_pad.modify(|_, w| w.x32n_fun_sel().bits(0));
+                }
+                9 => {
+                    rtc_io
+                        .xtal_32k_pad
+                        .modify(|_, w| w.x32p_mux_sel().bit(true));
+                    rtc_io.xtal_32k_pad.modify(|_, w| w.x32p_fun_sel().bits(0));
+                }
+                10 => {
+                    rtc_io.touch_pad0.modify(|_, w| w.mux_sel().bit(true));
+                    rtc_io.touch_pad0.modify(|_, w| w.fun_sel().bits(0));
+                }
+                11 => {
+                    rtc_io.touch_pad1.modify(|_, w| w.mux_sel().bit(true));
+                    rtc_io.touch_pad1.modify(|_, w| w.fun_sel().bits(0));
+                }
+                12 => {
+                    rtc_io.touch_pad2.modify(|_, w| w.mux_sel().bit(true));
+                    rtc_io.touch_pad2.modify(|_, w| w.fun_sel().bits(0));
+                }
+                13 => {
+                    rtc_io.touch_pad3.modify(|_, w| w.mux_sel().bit(true));
+                    rtc_io.touch_pad3.modify(|_, w| w.fun_sel().bits(0));
+                }
+                14 => {
+                    rtc_io.touch_pad4.modify(|_, w| w.mux_sel().bit(true));
+                    rtc_io.touch_pad4.modify(|_, w| w.fun_sel().bits(0));
+                }
+                15 => {
+                    rtc_io.touch_pad5.modify(|_, w| w.mux_sel().bit(true));
+                    rtc_io.touch_pad5.modify(|_, w| w.fun_sel().bits(0));
+                }
+                16 => {
+                    rtc_io.touch_pad6.modify(|_, w| w.mux_sel().bit(true));
+                    rtc_io.touch_pad6.modify(|_, w| w.fun_sel().bits(0));
+                }
+                17 => {
+                    rtc_io.touch_pad7.modify(|_, w| w.mux_sel().bit(true));
+                    rtc_io.touch_pad7.modify(|_, w| w.fun_sel().bits(0));
+                }
+                _ => panic!("invalid RTC pin"),
+            };
+
             // set pin register field
             rtc_io.ext_wakeup0.modify(|_, w| w.sel().bits(pin));
             // set level register field

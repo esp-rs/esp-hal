@@ -29,6 +29,7 @@ impl TimerWakeupSource {
 #[derive(Debug, Clone, Copy)]
 pub enum Error {
     NotRtcPin,
+    TooManyWakeupSources,
 }
 
 #[allow(unused)]
@@ -43,7 +44,7 @@ impl<'a, P: Pin> Ext0WakeupSource<'a, P> {
     pub fn new(pin: &'a mut P, level: WakeupLevel) -> Self {
         Self { pin, level }
     }
-    // TODO: esp32 only! - needs to be re-factored
+    // TODO: esp32 only! - needs to be re-factored (should be in RTCPin impl)
     fn to_rtc_pin(&self) -> Result<u8, Error> {
         match self.pin.number() {
             0 => Ok(11),
@@ -115,14 +116,14 @@ bitfield::bitfield! {
 }
 
 pub trait WakeSource {
-    fn prepare(&self, rtc: &Rtc, triggers: &mut WakeTriggers);
+    fn prepare(&self, rtc: &Rtc, triggers: &mut WakeTriggers, sleep_config: &mut RtcSleepConfig);
 }
 
 // non-alloc version?
 extern crate alloc;
 pub struct Sleep<'a> {
     sleep_config: RtcSleepConfig,
-    wake_sources: alloc::vec::Vec<&'a dyn WakeSource>,
+    wake_sources: heapless::Vec<&'a dyn WakeSource, 16>,
 }
 
 impl<'a> Default for Sleep<'a> {
@@ -147,15 +148,18 @@ impl<'a> Sleep<'a> {
         }
     }
 
-    pub fn add_wakeup_source(&mut self, wake_source: &'a impl WakeSource) {
-        self.wake_sources.push(wake_source)
+    pub fn add_wakeup_source(&mut self, wake_source: &'a impl WakeSource) -> Result<(), Error> {
+        self.wake_sources
+            .push(wake_source)
+            .map_err(|_| Error::TooManyWakeupSources)?;
+        Ok(())
     }
 
-    pub fn sleep(&self, rtc: &mut Rtc, delay: &mut crate::Delay) {
+    pub fn sleep(&mut self, rtc: &mut Rtc, delay: &mut crate::Delay) {
         self.sleep_config.apply(rtc);
         let mut wakeup_triggers = WakeTriggers::default();
         for wake_source in &self.wake_sources {
-            wake_source.prepare(rtc, &mut wakeup_triggers)
+            wake_source.prepare(rtc, &mut wakeup_triggers, &mut self.sleep_config)
         }
         use embedded_hal::blocking::delay::DelayMs;
         delay.delay_ms(100u32);
