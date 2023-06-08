@@ -1,4 +1,4 @@
-//! Demonstrates deep sleep with timer wakeup
+//! Demonstrates deep sleep with timer and ext0 (using gpio27) wakeup
 
 #![no_std]
 #![no_main]
@@ -16,12 +16,13 @@ use hal::{
     rtc_cntl::{
         get_reset_reason,
         get_wakeup_cause,
-        sleep::{Sleep, TimerWakeupSource},
+        sleep::{Ext0WakeupSource, Sleep, TimerWakeupSource, WakeupLevel},
         SocResetReason,
     },
     timer::TimerGroup,
     Delay,
     Rtc,
+    IO,
 };
 
 #[entry]
@@ -49,6 +50,9 @@ fn main() -> ! {
     wdt0.disable();
     wdt1.disable();
 
+    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let mut ext0_pin = io.pins.gpio27;
+
     println!("up and runnning!");
     let reason = get_reset_reason(hal::Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
     println!("reset reason: {:?}", reason);
@@ -60,6 +64,8 @@ fn main() -> ! {
     let mut sleep = Sleep::deep();
     let timer = TimerWakeupSource::new(Duration::from_secs(30));
     sleep.add_wakeup_source(&timer).unwrap();
+    let ext0 = Ext0WakeupSource::new(&mut ext0_pin, WakeupLevel::High);
+    sleep.add_wakeup_source(&ext0).unwrap();
     println!("sleeping!");
     delay.delay_ms(100u32);
     sleep.sleep(&mut rtc, &mut delay);
