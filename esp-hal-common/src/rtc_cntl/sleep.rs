@@ -119,8 +119,6 @@ pub trait WakeSource {
     fn prepare(&self, rtc: &Rtc, triggers: &mut WakeTriggers, sleep_config: &mut RtcSleepConfig);
 }
 
-// non-alloc version?
-extern crate alloc;
 pub struct Sleep<'a> {
     sleep_config: RtcSleepConfig,
     wake_sources: heapless::Vec<&'a dyn WakeSource, 16>,
