@@ -1,6 +1,6 @@
 //! Blinks an LED
 //!
-//! This assumes that a LED is connected to the pin assigned to `led`. (GPIO15)
+//! This uses the built-in LED that is connected to pin GPIO2.
 
 #![no_std]
 #![no_main]
@@ -34,9 +34,9 @@ fn main() -> ! {
     wdt.disable();
     rtc.rwdt.disable();
 
-    // Set GPIO15 as an output, and set its state high initially.
+    // Set GPIO2 as an output, and set its state high initially.
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-    let mut led = io.pins.gpio15.into_push_pull_output();
+    let mut led = io.pins.gpio2.into_push_pull_output();
 
     led.set_high().unwrap();
 
