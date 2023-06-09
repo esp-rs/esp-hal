@@ -11,9 +11,9 @@ This device uses the RISC-V ISA, which is officially supported by the Rust compi
 
 <!-- ## [Documentation]
 
-[documentation]: https://docs.rs/esp32c6-hal/
+[documentation]: https://docs.rs/esp32c6-hal/ -->
 
-## Getting Started
+Getting Started
 
 ### Installing the Rust Compiler Target
 
@@ -33,7 +33,7 @@ By default, [espflash](https://github.com/esp-rs/espflash) fetches the required 
 
 #### Direct Boot
 
-[Direct Boot](https://github.com/espressif/esp32c6-direct-boot-example#direct-boot-in-esp32-c6) allows an application stored in the External Flash to be executed directly, without being copied into Internal RAM.
+Direct Boot allows an application stored in the External Flash to be executed directly, without being copied into Internal RAM.
 
 ##### Booting the Hello World example using Direct Boot
 
@@ -52,14 +52,14 @@ cargo espflash --release --format direct-boot --features direct-boot --example h
 The ROM Bootloader will identify the firmware image built with Direct Boot support and load it appropriately from the External Flash:
 
 ```shell
-ESP-ROM:esp32c6-20220919
-Build:Sep 19 2022
-rst:0x1 (POWERON),boot:0x6e (SPI_FAST_FLASH_BOOT)
+ESP-ROM:esp32h2-20221101
+Build:Nov  1 2022
+rst:0x1 (POWERON),boot:0xc (SPI_FAST_FLASH_BOOT)
 Hello world!
 Hello world!
 Hello world!
 ```
--->
+
 ## License
 
 Licensed under either of:
