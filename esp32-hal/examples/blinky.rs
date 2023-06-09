@@ -1,6 +1,7 @@
 //! Blinks an LED
 //!
-//! This uses the built-in LED that is connected to pin GPIO2.
+//! This assumes that a LED is connected to the pin assigned to `led` (GPIO2).
+//! For the the DOIT ESP32 Devkit v1, GPIO2 is the onboard LED pin.
 
 #![no_std]
 #![no_main]
