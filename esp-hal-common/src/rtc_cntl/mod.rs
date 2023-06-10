@@ -199,6 +199,7 @@ impl<'d> Rtc<'d> {
     }
 
     /// enter deep sleep and wake with the provided `wake_sources`
+    #[cfg(esp32)]
     pub fn sleep_deep<'a>(
         &mut self,
         wake_sources: &[&'a dyn WakeSource],
@@ -208,6 +209,9 @@ impl<'d> Rtc<'d> {
         self.sleep(&config, wake_sources, delay);
         unreachable!();
     }
+
+    /// enter light sleep and wake with the provided `wake_sources`
+    #[cfg(esp32)]
     pub fn sleep_light<'a>(
         &mut self,
         wake_sources: &[&'a dyn WakeSource],
@@ -216,6 +220,10 @@ impl<'d> Rtc<'d> {
         let config = RtcSleepConfig::default();
         self.sleep(&config, wake_sources, delay)
     }
+
+    /// enter sleep wthe the provided `config` and wake with the provided
+    /// `wake_sources`
+    #[cfg(esp32)]
     pub fn sleep<'a>(
         &mut self,
         config: &RtcSleepConfig,
