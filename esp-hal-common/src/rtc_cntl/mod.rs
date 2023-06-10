@@ -6,7 +6,6 @@ use fugit::HertzU32;
 use fugit::MicrosDurationU64;
 
 pub use self::rtc::SocResetReason;
-use self::sleep::{RtcSleepConfig, WakeSource};
 #[cfg(not(any(esp32c6, esp32h2)))]
 use crate::clock::XtalClock;
 #[cfg(not(esp32))]
@@ -15,14 +14,14 @@ use crate::efuse::Efuse;
 use crate::peripherals::{LP_TIMER, LP_WDT};
 #[cfg(not(any(esp32c6, esp32h2)))]
 use crate::peripherals::{RTC_CNTL, TIMG0};
+#[cfg(any(esp32))]
+use crate::rtc_cntl::sleep::{RtcSleepConfig, WakeSource, WakeTriggers};
 use crate::{
     clock::Clock,
     peripheral::{Peripheral, PeripheralRef},
     reset::{SleepSource, WakeupReason},
-    rtc_cntl::sleep::WakeTriggers,
     Cpu,
 };
-
 // only include sleep where its been implemented
 #[cfg(any(esp32))]
 pub mod sleep;
