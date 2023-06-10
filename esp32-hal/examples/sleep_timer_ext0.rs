@@ -16,7 +16,7 @@ use hal::{
     rtc_cntl::{
         get_reset_reason,
         get_wakeup_cause,
-        sleep::{Ext0WakeupSource, Sleep, TimerWakeupSource, WakeupLevel},
+        sleep::{Ext0WakeupSource, TimerWakeupSource, WakeupLevel},
         SocResetReason,
     },
     timer::TimerGroup,
@@ -61,13 +61,9 @@ fn main() -> ! {
 
     let mut delay = Delay::new(&clocks);
 
-    let mut sleep = Sleep::deep();
     let timer = TimerWakeupSource::new(Duration::from_secs(30));
-    sleep.add_wakeup_source(&timer).unwrap();
     let ext0 = Ext0WakeupSource::new(&mut ext0_pin, WakeupLevel::High);
-    sleep.add_wakeup_source(&ext0).unwrap();
     println!("sleeping!");
     delay.delay_ms(100u32);
-    sleep.sleep(&mut rtc, &mut delay);
-    unreachable!();
+    rtc.sleep_deep(&[&timer, &ext0], &mut delay);
 }

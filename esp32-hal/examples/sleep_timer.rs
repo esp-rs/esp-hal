@@ -13,12 +13,7 @@ use hal::{
     entry,
     peripherals::Peripherals,
     prelude::*,
-    rtc_cntl::{
-        get_reset_reason,
-        get_wakeup_cause,
-        sleep::{Sleep, TimerWakeupSource},
-        SocResetReason,
-    },
+    rtc_cntl::{get_reset_reason, get_wakeup_cause, sleep::TimerWakeupSource, SocResetReason},
     timer::TimerGroup,
     Delay,
     Rtc,
@@ -57,11 +52,8 @@ fn main() -> ! {
 
     let mut delay = Delay::new(&clocks);
 
-    let mut sleep = Sleep::deep();
     let timer = TimerWakeupSource::new(Duration::from_secs(30));
-    sleep.add_wakeup_source(&timer).unwrap();
     println!("sleeping!");
     delay.delay_ms(100u32);
-    sleep.sleep(&mut rtc, &mut delay);
-    unreachable!();
+    rtc.sleep_deep(&[&timer], &mut delay);
 }
