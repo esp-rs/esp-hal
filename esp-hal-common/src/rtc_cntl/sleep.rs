@@ -4,8 +4,6 @@ use crate::{gpio::Pin, Rtc};
 
 #[cfg_attr(esp32, path = "rtc/esp32_sleep.rs")]
 mod rtc_sleep;
-#[cfg(esp32)]
-use esp32 as pac;
 pub use rtc_sleep::*;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
@@ -69,24 +67,7 @@ impl<'a, P: Pin> Ext0WakeupSource<'a, P> {
         }
     }
 }
-// RTCIO_GPIO0_CHANNEL,    //GPIO0
-// RTCIO_GPIO2_CHANNEL,    //GPIO2
-// RTCIO_GPIO4_CHANNEL,    //GPIO4
-// RTCIO_GPIO12_CHANNEL,   //GPIO12
-// RTCIO_GPIO13_CHANNEL,   //GPIO13
-// RTCIO_GPIO14_CHANNEL,   //GPIO14
-// RTCIO_GPIO15_CHANNEL,   //GPIO15
-// RTCIO_GPIO25_CHANNEL,   //GPIO25
-// RTCIO_GPIO26_CHANNEL,   //GPIO26
-// RTCIO_GPIO27_CHANNEL,   //GPIO27
-// RTCIO_GPIO32_CHANNEL,   //GPIO32
-// RTCIO_GPIO33_CHANNEL,   //GPIO33
-// RTCIO_GPIO34_CHANNEL,   //GPIO34
-// RTCIO_GPIO35_CHANNEL,   //GPIO35
-// RTCIO_GPIO36_CHANNEL,   //GPIO36
-// RTCIO_GPIO37_CHANNEL,   //GPIO37
-// RTCIO_GPIO38_CHANNEL,   //GPIO38
-// RTCIO_GPIO39_CHANNEL,   //GPIO39
+
 bitfield::bitfield! {
     #[derive(Default, Clone, Copy)]
     pub struct WakeTriggers(u16);
@@ -116,80 +97,5 @@ bitfield::bitfield! {
 }
 
 pub trait WakeSource {
-    fn add(&self, sleep_config: &mut RtcSleepConfig);
-    fn prepare(&self, rtc: &Rtc, triggers: &mut WakeTriggers);
-}
-
-pub struct Sleep<'a> {
-    sleep_config: RtcSleepConfig,
-    wake_sources: heapless::Vec<&'a dyn WakeSource, 16>,
-}
-
-impl core::fmt::Debug for Sleep<'_> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("Sleep")
-            .field("sleep_config", &self.sleep_config)
-            .field(
-                "wake_sources",
-                &format_args!("#{}", self.wake_sources.len()),
-            )
-            .finish()
-    }
-}
-
-impl<'a> Default for Sleep<'a> {
-    fn default() -> Self {
-        Self {
-            sleep_config: Default::default(),
-            wake_sources: Default::default(),
-        }
-    }
-}
-impl<'a> Sleep<'a> {
-    pub fn new() -> Self {
-        Self {
-            ..Default::default()
-        }
-    }
-
-    pub fn deep() -> Self {
-        Self {
-            sleep_config: RtcSleepConfig::deep(),
-            ..Default::default()
-        }
-    }
-
-    pub fn add_wakeup_source(&mut self, wake_source: &'a impl WakeSource) -> Result<(), Error> {
-        wake_source.add(&mut self.sleep_config);
-        self.wake_sources
-            .push(wake_source)
-            .map_err(|_| Error::TooManyWakeupSources)?;
-        Ok(())
-    }
-
-    pub fn sleep(&mut self, rtc: &mut Rtc, delay: &mut crate::Delay) {
-        self.sleep_config.apply(rtc);
-        let mut wakeup_triggers = WakeTriggers::default();
-        for wake_source in &self.wake_sources {
-            wake_source.prepare(rtc, &mut wakeup_triggers)
-        }
-        use embedded_hal::blocking::delay::DelayMs;
-        delay.delay_ms(100u32);
-        unsafe {
-            let rtc_cntl = &*pac::RTC_CNTL::ptr();
-
-            rtc_cntl
-                .reset_state
-                .modify(|_, w| w.procpu_stat_vector_sel().set_bit());
-
-            // set bits for what can wake us up
-            rtc_cntl
-                .wakeup_state
-                .modify(|_, w| w.wakeup_ena().bits(wakeup_triggers.0.into()));
-
-            rtc_cntl
-                .state0
-                .write(|w| w.sleep_en().set_bit().slp_wakeup().set_bit());
-        }
-    }
+    fn apply(&self, rtc: &Rtc, triggers: &mut WakeTriggers, sleep_config: &mut RtcSleepConfig);
 }

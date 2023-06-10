@@ -40,8 +40,7 @@ pub const RTC_CNTL_CK8M_WAIT_DEFAULT: u8 = 20;
 pub const RTC_CK8M_ENABLE_WAIT_DEFAULT: u8 = 5;
 
 impl WakeSource for TimerWakeupSource {
-    fn add(&self, _sleep_config: &mut RtcSleepConfig) {}
-    fn prepare(&self, rtc: &Rtc, triggers: &mut WakeTriggers) {
+    fn apply(&self, rtc: &Rtc, triggers: &mut WakeTriggers, _sleep_config: &mut RtcSleepConfig) {
         triggers.set_timer(true);
         let rtc_cntl = unsafe { &*esp32::RTC_CNTL::ptr() };
         let clock_freq = RtcClock::get_slow_freq();
@@ -66,10 +65,9 @@ impl WakeSource for TimerWakeupSource {
 }
 
 impl<'a, P: Pin> WakeSource for Ext0WakeupSource<'a, P> {
-    fn add(&self, sleep_config: &mut RtcSleepConfig) {
+    fn apply(&self, _rtc: &Rtc, triggers: &mut WakeTriggers, sleep_config: &mut RtcSleepConfig) {
+        // don't power down RTC peripherals
         sleep_config.set_rtc_peri_pd_en(false);
-    }
-    fn prepare(&self, _rtc: &Rtc, triggers: &mut WakeTriggers) {
         triggers.set_ext0(true);
         let pin = self.to_rtc_pin().unwrap();
         unsafe {
@@ -236,6 +234,7 @@ impl<'a, P: Pin> WakeSource for Ext0WakeupSource<'a, P> {
 }
 
 bitfield::bitfield! {
+    #[derive(Clone, Copy)]
     pub struct RtcSleepConfig(u32);
     impl Debug;
     /// force normal voltage in sleep mode (digital domain memory)
@@ -373,7 +372,7 @@ impl RtcSleepConfig {
         }
     }
 
-    pub(super) fn apply(&self, rtc: &Rtc) {
+    pub(crate) fn apply(&self, rtc: &Rtc) {
         self.base_settings(rtc);
         // like esp-idf rtc_sleep_init()
         unsafe {
