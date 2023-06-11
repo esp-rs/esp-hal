@@ -88,6 +88,15 @@ impl<'a, P: Pin + RTCPin> WakeSource for Ext0WakeupSource<'a, P> {
     }
 }
 
+impl<'a, P: Pin + RTCPin> Drop for Ext0WakeupSource<'a, P> {
+    fn drop(&mut self) {
+        // should we have saved the pin configuration first?
+        // set pin back to IO_MUX (input_enable and func have no effect when pin is sent
+        // to IO_MUX)
+        self.pin.borrow_mut().rtc_set_config(true, false, 0);
+    }
+}
+
 bitfield::bitfield! {
     #[derive(Clone, Copy)]
     pub struct RtcSleepConfig(u32);
