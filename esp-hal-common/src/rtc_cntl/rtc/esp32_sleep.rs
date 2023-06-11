@@ -1,6 +1,6 @@
 use super::{Ext0WakeupSource, TimerWakeupSource, WakeSource, WakeTriggers};
 use crate::{
-    gpio::Pin,
+    gpio::{Pin, RTCPin},
     rtc_cntl::{sleep::WakeupLevel, Clock, RtcClock},
     Rtc,
 };
@@ -64,166 +64,21 @@ impl WakeSource for TimerWakeupSource {
     }
 }
 
-impl<'a, P: Pin> WakeSource for Ext0WakeupSource<'a, P> {
+impl<'a, P: Pin + RTCPin> WakeSource for Ext0WakeupSource<'a, P> {
     fn apply(&self, _rtc: &Rtc, triggers: &mut WakeTriggers, sleep_config: &mut RtcSleepConfig) {
         // don't power down RTC peripherals
         sleep_config.set_rtc_peri_pd_en(false);
         triggers.set_ext0(true);
-        let pin = self.to_rtc_pin().unwrap();
-        unsafe {
-            // TODO: set pin to RTC function (should be handled by RTCPin impl)
-            let rtc_io = &*esp32::RTC_IO::ptr();
-            // TODO: this should be implemented by RTCPin!
-            match self.to_rtc_pin().unwrap() {
-                0 => {
-                    #[rustfmt::skip]
-                    rtc_io.sensor_pads.modify(|_, w| { w
-                        .sense1_fun_ie().bit(true)
-                        .sense1_mux_sel().bit(true)
-                        .sense1_fun_sel().bits(0)
-                    });
-                }
-                1 => {
-                    #[rustfmt::skip]
-                    rtc_io.sensor_pads.modify(|_, w| { w
-                        .sense2_fun_ie().bit(true)
-                        .sense2_mux_sel().bit(true)
-                        .sense2_fun_sel().bits(0)
-                    });
-                }
-                2 => {
-                    #[rustfmt::skip]
-                    rtc_io.sensor_pads.modify(|_, w| { w
-                        .sense3_fun_ie().bit(true)
-                        .sense3_mux_sel().bit(true)
-                        .sense3_fun_sel().bits(0)
-                    });
-                }
-                3 => {
-                    #[rustfmt::skip]
-                    rtc_io.sensor_pads.modify(|_, w| { w
-                        .sense4_fun_ie().bit(true)
-                        .sense4_mux_sel().bit(true)
-                        .sense4_fun_sel().bits(0)
-                    });
-                }
-                4 => {
-                    #[rustfmt::skip]
-                    rtc_io.adc_pad.modify(|_, w| { w
-                        .adc1_fun_ie().bit(true)
-                        .adc1_mux_sel().bit(true)
-                        .adc1_fun_sel().bits(0)
-                    });
-                }
-                5 => {
-                    #[rustfmt::skip]
-                    rtc_io.adc_pad.modify(|_, w| { w
-                        .adc2_fun_ie().bit(true)
-                        .adc2_mux_sel().bit(true)
-                        .adc2_fun_sel().bits(0)
-                    });
-                }
-                6 => {
-                    #[rustfmt::skip]
-                    rtc_io.pad_dac1.modify(|_, w| { w
-                        .pdac1_fun_ie().bit(true)
-                        .pdac1_mux_sel().bit(true)
-                        .pdac1_fun_sel().bits(0)
-                    });
-                }
-                7 => {
-                    #[rustfmt::skip]
-                    rtc_io.pad_dac2.modify(|_, w| { w
-                        .pdac2_fun_ie().bit(true)
-                        .pdac2_mux_sel().bit(true)
-                        .pdac2_fun_sel().bits(0)
-                    });
-                }
-                8 => {
-                    #[rustfmt::skip]
-                    rtc_io.xtal_32k_pad.modify(|_, w| { w
-                        .x32n_fun_ie().bit(true)
-                        .x32n_mux_sel().bit(true)
-                        .x32n_fun_sel().bits(0)
-                    });
-                }
-                9 => {
-                    #[rustfmt::skip]
-                    rtc_io.xtal_32k_pad.modify(|_, w| { w
-                        .x32p_fun_ie().bit(true)
-                        .x32p_mux_sel().bit(true)
-                        .x32p_fun_sel().bits(0)
-                    });
-                }
-                10 => {
-                    #[rustfmt::skip]
-                    rtc_io.touch_pad0.modify(|_, w| { w
-                        .fun_ie().bit(true)
-                        .mux_sel().bit(true)
-                        .fun_sel().bits(0)
-                    });
-                }
-                11 => {
-                    #[rustfmt::skip]
-                    rtc_io.touch_pad1.modify(|_, w| { w
-                        .fun_ie().bit(true)
-                        .mux_sel().bit(true)
-                        .fun_sel().bits(0)
-                    });
-                }
-                12 => {
-                    #[rustfmt::skip]
-                    rtc_io.touch_pad2.modify(|_, w| { w
-                        .fun_ie().bit(true)
-                        .mux_sel().bit(true)
-                        .fun_sel().bits(0)
-                    });
-                }
-                13 => {
-                    #[rustfmt::skip]
-                    rtc_io.touch_pad3.modify(|_, w| { w
-                        .fun_ie().bit(true)
-                        .mux_sel().bit(true)
-                        .fun_sel().bits(0)
-                    });
-                }
-                14 => {
-                    #[rustfmt::skip]
-                    rtc_io.touch_pad4.modify(|_, w| { w
-                        .fun_ie().bit(true)
-                        .mux_sel().bit(true)
-                        .fun_sel().bits(0)
-                    });
-                }
-                15 => {
-                    #[rustfmt::skip]
-                    rtc_io.touch_pad5.modify(|_, w| { w
-                        .fun_ie().bit(true)
-                        .mux_sel().bit(true)
-                        .fun_sel().bits(0)
-                    });
-                }
-                16 => {
-                    #[rustfmt::skip]
-                    rtc_io.touch_pad6.modify(|_, w| { w
-                        .fun_ie().bit(true)
-                        .mux_sel().bit(true)
-                        .fun_sel().bits(0)
-                    });
-                }
-                17 => {
-                    #[rustfmt::skip]
-                    rtc_io.touch_pad7.modify(|_, w| { w
-                        .fun_ie().bit(true)
-                        .mux_sel().bit(true)
-                        .fun_sel().bits(0)
-                    });
-                }
-                _ => panic!("invalid RTC pin"),
-            };
 
+        // set pin to RTC function
+        self.pin.borrow_mut().rtc_set_config(true, true, 0);
+
+        unsafe {
+            let rtc_io = &*esp32::RTC_IO::ptr();
             // set pin register field
-            rtc_io.ext_wakeup0.modify(|_, w| w.sel().bits(pin));
+            rtc_io
+                .ext_wakeup0
+                .modify(|_, w| w.sel().bits(self.pin.borrow().rtc_number()));
             // set level register field
             let rtc_cntl = &*esp32::RTC_CNTL::ptr();
             rtc_cntl

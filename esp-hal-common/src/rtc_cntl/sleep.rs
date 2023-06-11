@@ -1,6 +1,9 @@
-use core::time::Duration;
+use core::{cell::RefCell, time::Duration};
 
-use crate::{gpio::Pin, Rtc};
+use crate::{
+    gpio::{Pin, RTCPin},
+    Rtc,
+};
 
 #[cfg_attr(esp32, path = "rtc/esp32_sleep.rs")]
 mod rtc_sleep;
@@ -32,38 +35,16 @@ pub enum Error {
 
 #[allow(unused)]
 #[derive(Debug)]
-// TODO: restrict to RTCPin as well (when its implemented on RTC pins)
-pub struct Ext0WakeupSource<'a, P: Pin> {
-    pin: &'a mut P,
+pub struct Ext0WakeupSource<'a, P: RTCPin + Pin> {
+    pin: RefCell<&'a mut P>,
     level: WakeupLevel,
 }
 
-impl<'a, P: Pin> Ext0WakeupSource<'a, P> {
+impl<'a, P: RTCPin + Pin> Ext0WakeupSource<'a, P> {
     pub fn new(pin: &'a mut P, level: WakeupLevel) -> Self {
-        Self { pin, level }
-    }
-    // TODO: esp32 only! - needs to be re-factored (should be in RTCPin impl)
-    fn to_rtc_pin(&self) -> Result<u8, Error> {
-        match self.pin.number() {
-            0 => Ok(11),
-            2 => Ok(12),
-            4 => Ok(10),
-            12 => Ok(15),
-            13 => Ok(14),
-            14 => Ok(16),
-            15 => Ok(13),
-            25 => Ok(6),
-            26 => Ok(7),
-            27 => Ok(17),
-            32 => Ok(9),
-            33 => Ok(8),
-            34 => Ok(4),
-            35 => Ok(5),
-            36 => Ok(0),
-            37 => Ok(1),
-            38 => Ok(2),
-            39 => Ok(3),
-            _ => Err(Error::NotRtcPin),
+        Self {
+            pin: RefCell::new(pin),
+            level,
         }
     }
 }
