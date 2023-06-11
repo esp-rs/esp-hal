@@ -11,10 +11,10 @@
 use core::{convert::Infallible, marker::PhantomData};
 
 use crate::peripherals::{GPIO, IO_MUX};
-pub use crate::soc::gpio::*;
-pub(crate) use crate::{analog, gpio};
 #[cfg(xtensa)]
 pub(crate) use crate::rtc_pins;
+pub use crate::soc::gpio::*;
+pub(crate) use crate::{analog, gpio};
 
 /// Convenience type-alias for a no-pin / don't care - pin
 pub type NoPinType = Gpio0<Unknown>;

@@ -333,7 +333,7 @@ crate::gpio::analog! {
      (21, 21,  rtc_pad21,      mux_sel,      fun_sel,      fun_ie,              rue,       rde)
 }
 
-crate::gpio::rtc_pins!{
+crate::gpio::rtc_pins! {
     ( 0,  0,  touch_pad0,     "")
     ( 1,  1,  touch_pad1,     "")
     ( 2,  2,  touch_pad2,     "")
