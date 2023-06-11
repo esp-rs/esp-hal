@@ -378,6 +378,31 @@ crate::gpio::analog! {
     (21, 21,  rtc_pad21,      mux_sel,             fun_sel,             fun_ie,             rue,             rde)
 }
 
+crate::gpio::rtc_pins! {
+    ( 0,  0,  touch_pad[0],     touch_pad0_)
+    ( 1,  1,  touch_pad[1],     touch_pad0_)
+    ( 2,  2,  touch_pad[2],     touch_pad0_)
+    ( 3,  3,  touch_pad[3],     touch_pad0_)
+    ( 4,  4,  touch_pad[4],     touch_pad0_)
+    ( 5,  5,  touch_pad[5],     touch_pad0_)
+    ( 6,  6,  touch_pad[6],     touch_pad0_)
+    ( 7,  7,  touch_pad[7],     touch_pad0_)
+    ( 8,  8,  touch_pad[8],     touch_pad0_)
+    ( 9,  9,  touch_pad[9],     touch_pad0_)
+    (10, 10,  touch_pad[10],    touch_pad0_)
+    (11, 11,  touch_pad[11],    touch_pad0_)
+    (12, 12,  touch_pad[12],    touch_pad0_)
+    (13, 13,  touch_pad[13],    touch_pad0_)
+    (14, 14,  touch_pad[14],    touch_pad0_)
+    (15, 15,  xtal_32p_pad,   x32p_)
+    (16, 16,  xtal_32n_pad,   x32n_)
+    (17, 17,  pad_dac1,       pdac1_)
+    (18, 18,  pad_dac2,       pdac2_)
+    (19, 19,  rtc_pad19,      "")
+    (20, 20,  rtc_pad20,      "")
+    (21, 21,  rtc_pad21,      "")
+}
+
 impl InterruptStatusRegisterAccess for InterruptStatusRegisterAccessBank0 {
     fn pro_cpu_interrupt_status_read() -> u32 {
         unsafe { &*GPIO::PTR }.pcpu_int.read().bits()

@@ -12,7 +12,9 @@ use core::{convert::Infallible, marker::PhantomData};
 
 use crate::peripherals::{GPIO, IO_MUX};
 pub use crate::soc::gpio::*;
-pub(crate) use crate::{analog, gpio, rtc_pins};
+pub(crate) use crate::{analog, gpio};
+#[cfg(xtensa)]
+pub(crate) use crate::rtc_pins;
 
 /// Convenience type-alias for a no-pin / don't care - pin
 pub type NoPinType = Gpio0<Unknown>;
@@ -1403,11 +1405,12 @@ macro_rules! gpio {
     };
 }
 
+#[cfg(xtensa)]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! rtc_pins {
     (
-        $( ( $pin_num:expr, $rtc_pin:expr, $pin_reg:ident, $prefix:pat ) )+
+        $( ( $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat ) )+
     ) => {
         impl<MODE, const GPIONUM: u8> crate::gpio::RTCPin for GpioPin<MODE, GPIONUM>
         where
