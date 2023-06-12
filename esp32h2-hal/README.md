@@ -13,7 +13,7 @@ This device uses the RISC-V ISA, which is officially supported by the Rust compi
 
 [documentation]: https://docs.rs/esp32h2-hal/ -->
 
-Getting Started
+## Getting Started
 
 ### Installing the Rust Compiler Target
 
