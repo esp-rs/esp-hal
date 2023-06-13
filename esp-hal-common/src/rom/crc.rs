@@ -40,7 +40,7 @@
 //! xorout=0xffffffff ```
 //! let crc = crc32_le(!0xffffffff, &data);
 //! ```
-//!
+//! 
 //! CRC-32/BZIP2 poly=0x04c11db7 init=0xffffffff refin=false refout=false
 //! xorout=0xffffffff ```
 //! let crc = crc32_be(!0xffffffff, &data);
@@ -50,7 +50,7 @@
 //! xorout=0x00000000 ```
 //! let crc = !crc32_be(!0xffffffff, &data);
 //! ```
-//!
+//! 
 //! CRC-32/CKSUM poly=0x04c11db7 init=0x00000000 refin=false refout=false
 //! xorout=0xffffffff ```
 //! let crc = crc32_be(!0, &data);
