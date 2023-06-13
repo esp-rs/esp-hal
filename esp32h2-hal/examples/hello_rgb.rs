@@ -62,7 +62,7 @@ fn main() -> ! {
     let pulse = PulseControl::new(
         peripherals.RMT,
         &mut system.peripheral_clock_control,
-        ClockSource::RTC20M,
+        ClockSource::XTAL,
         0,
         0,
         0,
