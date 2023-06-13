@@ -68,4 +68,8 @@ peripherals = [
     "phy",
     "bt",
     "ieee802154",
+
+    # ROM capabilities
+    "rom_crc_le",
+    "rom_crc_be",
 ]

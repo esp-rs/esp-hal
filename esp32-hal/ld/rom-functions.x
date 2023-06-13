@@ -16,3 +16,10 @@ PROVIDE ( esp_rom_spiflash_config_clk = 0x40062bc8 );
 PROVIDE ( g_rom_spiflash_dummy_len_plus = 0x3ffae290 );
 PROVIDE ( g_rom_flashchip = 0x3ffae270 );
 PROVIDE ( cache_sram_mmu_set_rom = 0x400097f4 );
+
+PROVIDE (esp_rom_crc32_be = 0x4005d024);
+PROVIDE (esp_rom_crc16_be = 0x4005d09c);
+PROVIDE (esp_rom_crc8_be = 0x4005d114);
+PROVIDE (esp_rom_crc32_le = 0x4005cfec);
+PROVIDE (esp_rom_crc16_le = 0x4005d05c);
+PROVIDE (esp_rom_crc8_le = 0x4005d0e0);
