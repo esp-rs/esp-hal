@@ -1,5 +1,7 @@
 pub use paste::paste;
 
+pub mod crc;
+
 #[allow(unused)]
 extern "C" {
     pub(crate) fn rom_i2c_writeReg(block: u32, block_hostid: u32, reg_add: u32, indata: u32);

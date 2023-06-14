@@ -55,6 +55,9 @@ peripherals = [
     "wifi",
     "psram",
 
+    # ROM capabilities
+    "rom_crc_le",
+
     # Wakeup SOC based on ESP-IDF:
     "pm_support_ext0_wakeup",
     "pm_support_ext1_wakeup",

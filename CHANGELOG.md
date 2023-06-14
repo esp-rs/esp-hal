@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Move `esp-riscv-rt` into esp-hal (#578)
 - Add initial implementation of radio clocks for ESP32-H2 (#577)
 - Add initial support for `esp-hal-smartled` in ESP32-H2 (#589)
+- Add CRC functions from ESP ROM
 
 ### Changed
 
