@@ -41,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add initial implementation of radio clocks for ESP32-H2 (#577)
 - Add initial support for `esp-hal-smartled` in ESP32-H2 (#589)
 - Add CRC functions from ESP ROM
+- Add initial support for RNG in ESP32-H2 (#591)
 
 ### Changed
 

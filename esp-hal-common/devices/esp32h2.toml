@@ -40,7 +40,7 @@ peripherals = [
     "pcr",
     "pmu",
     "rmt",
-    # "rng",
+    "rng",
     "rsa",
     "sha",
     # "soc_etm",
