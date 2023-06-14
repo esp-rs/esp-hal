@@ -39,11 +39,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `timer_interrupt` example in ESP32-H2 and refactor `clk_src` configuration (#576)
 - Move `esp-riscv-rt` into esp-hal (#578)
 - Add initial implementation of radio clocks for ESP32-H2 (#577)
+- Add initial support for `esp-hal-smartled` in ESP32-H2 (#589)
 - Add CRC functions from ESP ROM
 
 ### Changed
 
 - Move core interrupt handling from Flash to RAM for RISC-V chips (ESP32-H2, ESP32-C2, ESP32-C3, ESP32-C6) (#541)
+- Change LED pin to GPIO2 in ESP32 blinky example (#581)
 
 ### Fixed
 
