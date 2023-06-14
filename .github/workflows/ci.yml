@@ -340,7 +340,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@v1
         with:
           target: riscv32imc-unknown-none-elf, riscv32imac-unknown-none-elf
-          toolchain: "1.65.0"
+          toolchain: "1.66.1"
       - uses: Swatinem/rust-cache@v2
 
       # Verify the MSRV for all RISC-V chips.
