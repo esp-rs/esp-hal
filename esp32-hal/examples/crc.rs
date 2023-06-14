@@ -9,10 +9,10 @@ use esp32_hal::{
     clock::ClockControl,
     peripherals::Peripherals,
     prelude::*,
+    rom::crc,
     timer::TimerGroup,
     Rtc,
     Uart,
-    rom::crc,
 };
 use esp_backtrace as _;
 use nb::block;
@@ -41,7 +41,11 @@ fn main() -> ! {
 
     let data = "123456789";
 
-    writeln!(serial0, "Performing CRC calculations on test string \"{data}\"").unwrap();
+    writeln!(
+        serial0,
+        "Performing CRC calculations on test string \"{data}\""
+    )
+    .unwrap();
 
     loop {
         let crc_hdlc = crc::crc32_le(!0xffffffff, data.as_ref());
@@ -62,8 +66,12 @@ fn main() -> ! {
         assert_eq!(crc_rohc, 0xd0);
         assert_eq!(crc_smbus, 0xf4);
 
-        writeln!(serial0, "{:08x} {:08x} {:08x} {:08x} {:04x} {:04x} {:02x} {:02x}",
-            crc_hdlc, crc_bzip2, crc_mpeg2, crc_cksum, crc_kermit, crc_genibus, crc_rohc, crc_smbus).unwrap();
+        writeln!(
+            serial0,
+            "{:08x} {:08x} {:08x} {:08x} {:04x} {:04x} {:02x} {:02x}",
+            crc_hdlc, crc_bzip2, crc_mpeg2, crc_cksum, crc_kermit, crc_genibus, crc_rohc, crc_smbus
+        )
+        .unwrap();
 
         block!(timer0.wait()).unwrap();
     }
