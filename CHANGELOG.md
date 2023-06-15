@@ -59,6 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Sometimes half-duplex non-DMA SPI reads were reading garbage in non-release mode (#552)
 - ESP32-C3: Fix GPIO5 ADC channel id (#562)
 - ESP32-H2: Fix direct-boot feature
+- ESP32-C6: Support FOSC CLK calibration for ECO1+ chip revisions
 
 ### Changed
 
