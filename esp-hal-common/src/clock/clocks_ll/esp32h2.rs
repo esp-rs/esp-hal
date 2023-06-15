@@ -160,13 +160,6 @@ pub(crate) fn esp32h2_rtc_bbpll_enable() {
 
     pmu.imm_hp_ck_power
         .modify(|_, w| w.tie_high_global_bbpll_icg().set_bit());
-
-    let pcr = unsafe { &*crate::peripherals::PCR::PTR };
-
-    // switch spimem to PLL 64Mhz clock
-    unsafe {
-        pcr.mspi_conf.modify(|_, w| w.mspi_clk_sel().bits(0b10));
-    }
 }
 
 pub(crate) fn esp32h2_rtc_update_to_xtal(freq: XtalClock, _div: u8) {
@@ -175,8 +168,7 @@ pub(crate) fn esp32h2_rtc_update_to_xtal(freq: XtalClock, _div: u8) {
         ets_update_cpu_frequency(freq.mhz());
         // Set divider from XTAL to APB clock. Need to set divider to 1 (reg. value 0)
         // first.
-        pcr.ahb_freq_conf
-            .modify(|_, w| w.ahb_div_num().bits(_div - 1));
+        clk_ll_ahb_set_divider(_div as u32);
 
         pcr.cpu_freq_conf
             .modify(|_, w| w.cpu_div_num().bits(_div - 1));

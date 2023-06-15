@@ -368,12 +368,6 @@ impl PeripheralClockControl {
             }
             #[cfg(i2c0)]
             Peripheral::I2cExt0 => {
-                // TODO: align register names between C6 and H2 in the PACs
-                #[cfg(esp32c6)]
-                {
-                    system.i2c_conf.modify(|_, w| w.i2c_clk_en().set_bit());
-                    system.i2c_conf.modify(|_, w| w.i2c_rst_en().clear_bit());
-                }
                 #[cfg(esp32h2)]
                 {
                     system.i2c0_conf.modify(|_, w| w.i2c0_clk_en().set_bit());
