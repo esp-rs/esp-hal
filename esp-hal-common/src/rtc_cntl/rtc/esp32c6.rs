@@ -1,4 +1,3 @@
-use esp_println::println;
 use fugit::HertzU32;
 use strum::FromRepr;
 
@@ -108,6 +107,7 @@ fn modem_clk_domain_active_state_icg_map_preinit() {
     unsafe {
         let pmu = &*PMU::PTR;
         let lp_clkrst = &*LP_CLKRST::PTR;
+        let pcr = &*PCR::PTR;
 
         pmu.hp_active_icg_modem
             .modify(|_, w| w.hp_active_dig_icg_modem_code().bits(2));
@@ -144,6 +144,12 @@ fn modem_clk_domain_active_state_icg_map_preinit() {
         lp_clkrst
             .rc32k_cntl
             .modify(|_, w| w.rc32k_dfreq().bits(100));
+
+        // https://github.com/espressif/esp-idf/commit/e3148369f32fdc6de62c35a67f7adb6f4faef4e3#diff-cc84d279f2f3d77fe252aa40a64d4813f271a52b5a4055e876efd012d888e135R810-R815
+        pcr
+        .ctrl_tick_conf
+        .modify(|_, w| w.fosc_tick_num().bits(255 as u8));
+        
     }
 }
 
@@ -567,6 +573,7 @@ impl RtcClock {
                 // And ensure that this modification will not affect ECO0.
                 // PS: For ESP32C6 ECO0 chip version is v0.0 only, which means that both MAJOR and MINOR are 0.
                 // The chip version is calculated using the following formula: MAJOR * 100 + MINOR. (if the result is 1, then version is v0.1)
+                // https://github.com/espressif/esp-idf/commit/e3148369f32fdc6de62c35a67f7adb6f4faef4e3
                 if (major * 100 + minor) > 0 {
                     if cal_clk == RtcCalSel::RtcCalRcFast {
                         break timg0.rtccalicfg1.read().rtc_cali_value().bits() >> 5;
@@ -650,7 +657,7 @@ impl RtcClock {
         // The chip version is calculated using the following formula: MAJOR * 100 + MINOR. (if the result is 1, then version is v0.1)
         if (major * 100 + minor) > 0 {
             if cal_clk == RtcCalSel::RtcCalRcFast {
-                slowclk_cycles = showclk_cycles >> 5;
+                let slowclk_cycles = slowclk_cycles >> 5;
             }
         }
 
