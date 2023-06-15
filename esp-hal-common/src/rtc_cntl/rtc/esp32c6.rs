@@ -4,7 +4,7 @@ use strum::FromRepr;
 use crate::{
     clock::{clocks_ll::regi2c_write_mask, Clock, XtalClock},
     peripherals::{LP_AON, LP_CLKRST, PCR, PMU, TIMG0},
-    soc::efuse::{Efuse,WAFER_VERSION_MINOR, WAFER_VERSION_MAJOR},
+    soc::efuse::{Efuse, WAFER_VERSION_MAJOR, WAFER_VERSION_MINOR},
 };
 
 const I2C_DIG_REG: u8 = 0x6d;
@@ -146,10 +146,8 @@ fn modem_clk_domain_active_state_icg_map_preinit() {
             .modify(|_, w| w.rc32k_dfreq().bits(100));
 
         // https://github.com/espressif/esp-idf/commit/e3148369f32fdc6de62c35a67f7adb6f4faef4e3#diff-cc84d279f2f3d77fe252aa40a64d4813f271a52b5a4055e876efd012d888e135R810-R815
-        pcr
-        .ctrl_tick_conf
-        .modify(|_, w| w.fosc_tick_num().bits(255 as u8));
-        
+        pcr.ctrl_tick_conf
+            .modify(|_, w| w.fosc_tick_num().bits(255 as u8));
     }
 }
 
@@ -564,27 +562,25 @@ impl RtcClock {
 
         let cal_val = loop {
             if timg0.rtccalicfg.read().rtc_cali_rdy().bit_is_set() {
-
                 let minor: u8 = Efuse::read_field_le(WAFER_VERSION_MINOR);
                 let major: u8 = Efuse::read_field_le(WAFER_VERSION_MAJOR);
 
                 // The Fosc CLK of calibration circuit is divided by 32 for ECO1.
-                // So we need to multiply the frequency of the Fosc for ECO1 and above chips by 32 times.
-                // And ensure that this modification will not affect ECO0.
-                // PS: For ESP32C6 ECO0 chip version is v0.0 only, which means that both MAJOR and MINOR are 0.
-                // The chip version is calculated using the following formula: MAJOR * 100 + MINOR. (if the result is 1, then version is v0.1)
-                // https://github.com/espressif/esp-idf/commit/e3148369f32fdc6de62c35a67f7adb6f4faef4e3
+                // So we need to multiply the frequency of the Fosc for ECO1 and above chips by
+                // 32 times. And ensure that this modification will not affect
+                // ECO0. PS: For ESP32C6 ECO0 chip version is v0.0 only, which
+                // means that both MAJOR and MINOR are 0. The chip version is
+                // calculated using the following formula: MAJOR * 100 + MINOR. (if the result
+                // is 1, then version is v0.1) https://github.com/espressif/esp-idf/commit/e3148369f32fdc6de62c35a67f7adb6f4faef4e3
                 if (major * 100 + minor) > 0 {
                     if cal_clk == RtcCalSel::RtcCalRcFast {
                         break timg0.rtccalicfg1.read().rtc_cali_value().bits() >> 5;
                     }
                     break timg0.rtccalicfg1.read().rtc_cali_value().bits();
-                }
-                else {
+                } else {
                     break timg0.rtccalicfg1.read().rtc_cali_value().bits();
                 }
-                
-            }       
+            }
 
             if timg0.rtccalicfg2.read().rtc_cali_timeout().bit_is_set() {
                 // Timed out waiting for calibration
@@ -651,10 +647,11 @@ impl RtcClock {
         let major: u8 = Efuse::read_field_le(WAFER_VERSION_MAJOR);
 
         // The Fosc CLK of calibration circuit is divided by 32 for ECO1.
-        // So we need to divide the calibrate cycles of the FOSC for ECO1 and above chips by 32 to
-        // avoid excessive calibration time.*/
-        // PS: For ESP32C6 ECO0 chip version is v0.0 only, which means that both MAJOR and MINOR are 0.
-        // The chip version is calculated using the following formula: MAJOR * 100 + MINOR. (if the result is 1, then version is v0.1)
+        // So we need to divide the calibrate cycles of the FOSC for ECO1 and above
+        // chips by 32 to avoid excessive calibration time.*/
+        // PS: For ESP32C6 ECO0 chip version is v0.0 only, which means that both MAJOR
+        // and MINOR are 0. The chip version is calculated using the following
+        // formula: MAJOR * 100 + MINOR. (if the result is 1, then version is v0.1)
         if (major * 100 + minor) > 0 {
             if cal_clk == RtcCalSel::RtcCalRcFast {
                 let slowclk_cycles = slowclk_cycles >> 5;
