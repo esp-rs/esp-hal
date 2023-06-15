@@ -368,7 +368,7 @@ impl PeripheralClockControl {
             }
             #[cfg(i2c0)]
             Peripheral::I2cExt0 => {
-                #[cfg(esp32h2)]
+                #[cfg(any(esp32c6, esp32h2))]
                 {
                     system.i2c0_conf.modify(|_, w| w.i2c0_clk_en().set_bit());
                     system.i2c0_conf.modify(|_, w| w.i2c0_rst_en().clear_bit());
