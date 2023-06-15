@@ -93,6 +93,8 @@ impl Clock for XtalClock {
 #[allow(unused)]
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum PllClock {
+    #[cfg(esp32h2)]
+    Pll8MHz,
     #[cfg(any(esp32c6, esp32h2))]
     Pll48MHz,
     #[cfg(esp32h2)]
@@ -101,6 +103,8 @@ pub(crate) enum PllClock {
     Pll80MHz,
     #[cfg(esp32h2)]
     Pll96MHz,
+    #[cfg(esp32c6)]
+    Pll120MHz,
     #[cfg(esp32c6)]
     Pll160MHz,
     #[cfg(esp32c6)]
