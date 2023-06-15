@@ -63,6 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Improve examples documentation (#533)
+- esp32h2-hal: added README (#585)
 
 ### Breaking
 
