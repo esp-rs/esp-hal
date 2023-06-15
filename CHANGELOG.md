@@ -42,11 +42,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add initial support for `esp-hal-smartled` in ESP32-H2 (#589)
 - Add CRC functions from ESP ROM
 - Add initial support for RNG in ESP32-H2 (#591)
-
+-
 ### Changed
 
 - Move core interrupt handling from Flash to RAM for RISC-V chips (ESP32-H2, ESP32-C2, ESP32-C3, ESP32-C6) (#541)
 - Change LED pin to GPIO2 in ESP32 blinky example (#581)
+- Udpate ESP32-H2 and C6 ESP32-clocks and remove i2c_clock for all chips but ESP32 (#592)
 
 ### Fixed
 
