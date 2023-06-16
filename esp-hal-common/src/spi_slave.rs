@@ -270,7 +270,7 @@ pub mod dma {
         /// Check if the DMA transfer is complete
         fn is_done(&self) -> bool {
             let ch = &self.spi_dma.channel;
-            ch.tx.is_done() && ch.rx.is_done()
+            ch.tx.is_done() && ch.rx.is_done() && !self.spi_dma.spi.is_bus_busy()
         }
     }
 
@@ -498,13 +498,13 @@ where
         self.enable_dma();
 
         reset_dma_before_load_dma_dscr(reg_block);
-        tx.prepare_transfer(
+        tx.prepare_transfer_without_start(
             self.dma_peripheral(),
             false,
             write_buffer_ptr,
             write_buffer_len,
         )?;
-        rx.prepare_transfer(
+        rx.prepare_transfer_without_start(
             false,
             self.dma_peripheral(),
             read_buffer_ptr,
@@ -522,7 +522,8 @@ where
             .dma_conf
             .modify(|_, w| w.dma_slv_seg_trans_en().clear_bit());
 
-        Ok(())
+        tx.start_transfer()?;
+        Ok(rx.start_transfer()?)
     }
 
     fn start_write_bytes_dma(
@@ -538,7 +539,7 @@ where
         self.enable_dma();
 
         reset_dma_before_load_dma_dscr(reg_block);
-        tx.prepare_transfer(self.dma_peripheral(), false, ptr, len)?;
+        tx.prepare_transfer_without_start(self.dma_peripheral(), false, ptr, len)?;
 
         self.clear_dma_interrupts();
         reset_dma_before_usr_cmd(reg_block);
@@ -551,7 +552,7 @@ where
             .dma_conf
             .modify(|_, w| w.dma_slv_seg_trans_en().clear_bit());
 
-        return Ok(());
+        Ok(tx.start_transfer()?)
     }
 
     fn start_read_bytes_dma(&mut self, ptr: *mut u8, len: usize, rx: &mut RX) -> Result<(), Error> {
@@ -562,7 +563,7 @@ where
         self.enable_dma();
 
         reset_dma_before_load_dma_dscr(reg_block);
-        rx.prepare_transfer(false, self.dma_peripheral(), ptr, len)?;
+        rx.prepare_transfer_without_start(false, self.dma_peripheral(), ptr, len)?;
 
         self.clear_dma_interrupts();
         reset_dma_before_usr_cmd(reg_block);
@@ -575,7 +576,7 @@ where
             .dma_conf
             .modify(|_, w| w.dma_slv_seg_trans_en().clear_bit());
 
-        return Ok(());
+        Ok(rx.start_transfer()?)
     }
 
     fn dma_peripheral(&self) -> DmaPeripheral {
@@ -848,22 +849,27 @@ pub trait Instance {
             .modify(|r, w| w.ck_i_edge().variant(r.ck_i_edge().bit_is_clear()));
     }
 
-    // Check if the bus is busy and if it is wait for it to be idle
-    fn flush(&mut self) -> Result<(), Error> {
+    fn is_bus_busy(&self) -> bool {
         let reg_block = self.register_block();
 
         #[cfg(any(esp32, esp32s2))]
-        while reg_block.slave.read().trans_done().bit_is_clear() {
-            // wait for bus to be clear
+        {
+            reg_block.slave.read().trans_done().bit_is_clear()
         }
         #[cfg(not(any(esp32, esp32s2)))]
-        while reg_block
-            .dma_int_raw
-            .read()
-            .trans_done_int_raw()
-            .bit_is_clear()
         {
-            // wait for bus to be clear
+            reg_block
+                .dma_int_raw
+                .read()
+                .trans_done_int_raw()
+                .bit_is_clear()
+        }
+    }
+
+    // Check if the bus is busy and if it is wait for it to be idle
+    fn flush(&mut self) -> Result<(), Error> {
+        while self.is_bus_busy() {
+            // Wait for bus to be clear
         }
         Ok(())
     }

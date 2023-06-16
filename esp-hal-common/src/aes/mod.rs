@@ -442,18 +442,24 @@ pub mod dma {
             self.channel.tx.is_done();
             self.channel.rx.is_done();
 
-            self.channel.tx.prepare_transfer(
-                self.dma_peripheral(),
-                false,
-                write_buffer_ptr,
-                write_buffer_len,
-            )?;
-            self.channel.rx.prepare_transfer(
-                false,
-                self.dma_peripheral(),
-                read_buffer_ptr,
-                read_buffer_len,
-            )?;
+            self.channel
+                .tx
+                .prepare_transfer_without_start(
+                    self.dma_peripheral(),
+                    false,
+                    write_buffer_ptr,
+                    write_buffer_len,
+                )
+                .and_then(|_| self.channel.tx.start_transfer())?;
+            self.channel
+                .rx
+                .prepare_transfer_without_start(
+                    false,
+                    self.dma_peripheral(),
+                    read_buffer_ptr,
+                    read_buffer_len,
+                )
+                .and_then(|_| self.channel.rx.start_transfer())?;
             self.enable_dma(true);
             self.enable_interrupt();
             self.set_mode(mode);

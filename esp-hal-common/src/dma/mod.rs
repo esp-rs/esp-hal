@@ -277,13 +277,15 @@ pub trait RxPrivate {
 
     fn init_channel(&mut self);
 
-    fn prepare_transfer(
+    fn prepare_transfer_without_start(
         &mut self,
         circular: bool,
         peri: DmaPeripheral,
         data: *mut u8,
         len: usize,
     ) -> Result<(), DmaError>;
+
+    fn start_transfer(&mut self) -> Result<(), DmaError>;
 
     fn listen_ch_in_done(&self);
 
@@ -331,7 +333,7 @@ where
         R::set_in_priority(priority);
     }
 
-    fn prepare_transfer(
+    fn prepare_transfer_without_start(
         &mut self,
         descriptors: &mut [u32],
         circular: bool,
@@ -382,13 +384,16 @@ where
         R::reset_in();
         R::set_in_descriptors(descriptors.as_ptr() as u32);
         R::set_in_peripheral(peri as u8);
+        Ok(())
+    }
+    fn start_transfer(&mut self) -> Result<(), DmaError> {
         R::start_in();
 
         if R::has_in_descriptor_error() {
-            return Err(DmaError::DescriptorError);
+            Err(DmaError::DescriptorError)
+        } else {
+            Ok(())
         }
-
-        Ok(())
     }
 
     fn is_done(&self) -> bool {
@@ -435,7 +440,7 @@ where
         self.rx_impl.init(burst_mode, priority);
     }
 
-    fn prepare_transfer(
+    fn prepare_transfer_without_start(
         &mut self,
         circular: bool,
         peri: DmaPeripheral,
@@ -464,8 +469,11 @@ where
         self.read_buffer_start = data;
 
         self.rx_impl
-            .prepare_transfer(self.descriptors, circular, peri, data, len)?;
-        Ok(())
+            .prepare_transfer_without_start(self.descriptors, circular, peri, data, len)
+    }
+
+    fn start_transfer(&mut self) -> Result<(), DmaError> {
+        self.rx_impl.start_transfer()
     }
 
     fn listen_ch_in_done(&self) {
@@ -616,13 +624,15 @@ pub trait TxPrivate {
 
     fn init_channel(&mut self);
 
-    fn prepare_transfer(
+    fn prepare_transfer_without_start(
         &mut self,
         peri: DmaPeripheral,
         circular: bool,
         data: *const u8,
         len: usize,
     ) -> Result<(), DmaError>;
+
+    fn start_transfer(&mut self) -> Result<(), DmaError>;
 
     fn clear_ch_out_done(&self);
 
@@ -661,7 +671,7 @@ where
         R::set_out_priority(priority);
     }
 
-    fn prepare_transfer(
+    fn prepare_transfer_without_start(
         &mut self,
         descriptors: &mut [u32],
         circular: bool,
@@ -712,13 +722,17 @@ where
         R::reset_out();
         R::set_out_descriptors(descriptors.as_ptr() as u32);
         R::set_out_peripheral(peri as u8);
+        Ok(())
+    }
+
+    fn start_transfer(&mut self) -> Result<(), DmaError> {
         R::start_out();
 
         if R::has_out_descriptor_error() {
-            return Err(DmaError::DescriptorError);
+            Err(DmaError::DescriptorError)
+        } else {
+            Ok(())
         }
-
-        Ok(())
     }
 
     fn clear_ch_out_done(&self) {
@@ -800,7 +814,7 @@ where
         R::init_channel();
     }
 
-    fn prepare_transfer(
+    fn prepare_transfer_without_start(
         &mut self,
         peri: DmaPeripheral,
         circular: bool,
@@ -827,9 +841,11 @@ where
         self.buffer_len = len;
 
         self.tx_impl
-            .prepare_transfer(self.descriptors, circular, peri, data, len)?;
+            .prepare_transfer_without_start(self.descriptors, circular, peri, data, len)
+    }
 
-        Ok(())
+    fn start_transfer(&mut self) -> Result<(), DmaError> {
+        self.tx_impl.start_transfer()
     }
 
     fn clear_ch_out_done(&self) {
