@@ -2,6 +2,10 @@
 //! You can short the TX and RX pin and see it reads what was written.
 //! Additionally you can connect a logic analzyer to TX and see how the changes
 //! of the configuration change the output signal.
+//!
+//! The following wiring is assumed:
+//! - TX => GPIO1
+//! - RX => GPIO2
 
 #![no_std]
 #![no_main]
