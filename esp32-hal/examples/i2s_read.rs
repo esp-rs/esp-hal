@@ -3,7 +3,7 @@
 //! Pins used
 //! BCLK    GPIO12
 //! WS      GPIO13
-//! DIN     GPIO17
+//! DIN     GPIO14
 //!
 //! Without an additional I2S source device you can connect 3V3 or GND to DIN to
 //! read 0 or 0xFF or connect DIN to WS to read two different values
@@ -72,7 +72,7 @@ fn main() -> ! {
     let i2s_rx = i2s.i2s_rx.with_pins(PinsBclkWsDin::new(
         io.pins.gpio12,
         io.pins.gpio13,
-        io.pins.gpio17,
+        io.pins.gpio14,
     ));
 
     let buffer = dma_buffer();
