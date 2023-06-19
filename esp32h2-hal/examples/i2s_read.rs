@@ -1,9 +1,10 @@
 //! This shows how to continously receive data via I2S
 //!
 //! Pins used
-//! BCLK    GPIO12
-//! WS      GPIO13
-//! DIN     GPIO14
+//! MCLK    GPIO4
+//! BCLK    GPIO1
+//! WS      GPIO2
+//! DIN     GPIO5
 //!
 //! Without an additional I2S source device you can connect 3V3 or GND to DIN to
 //! read 0 or 0xFF or connect DIN to WS to read two different values
@@ -13,11 +14,11 @@
 #![no_std]
 #![no_main]
 
-use esp32_hal::{
+use esp32h2_hal::{
     clock::ClockControl,
     dma::DmaPriority,
-    i2s::{DataFormat, I2s, I2s0New, I2sReadDma, NoMclk, PinsBclkWsDin, Standard},
-    pdma::Dma,
+    gdma::Gdma,
+    i2s::{DataFormat, I2s, I2s0New, I2sReadDma, MclkPin, PinsBclkWsDin, Standard},
     peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
@@ -30,32 +31,42 @@ use esp_println::println;
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let mut system = peripherals.DPORT.split();
+    let mut system = peripherals.PCR.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
+    // Disable the watchdog timers. For the ESP32-H2, this includes the Super WDT,
+    // and the TIMG WDTs.
+    let mut rtc = Rtc::new(peripherals.LP_CLKRST);
     let timer_group0 = TimerGroup::new(
         peripherals.TIMG0,
         &clocks,
         &mut system.peripheral_clock_control,
     );
-    let mut wdt = timer_group0.wdt;
-    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
+    let mut wdt0 = timer_group0.wdt;
+    let timer_group1 = TimerGroup::new(
+        peripherals.TIMG1,
+        &clocks,
+        &mut system.peripheral_clock_control,
+    );
+    let mut wdt1 = timer_group1.wdt;
 
-    // Disable MWDT and RWDT (Watchdog) flash boot protection
-    wdt.disable();
+    // Disable watchdog timers
+    rtc.swd.disable();
     rtc.rwdt.disable();
+    wdt0.disable();
+    wdt1.disable();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let dma = Dma::new(system.dma, &mut system.peripheral_clock_control);
-    let dma_channel = dma.i2s0channel;
+    let dma = Gdma::new(peripherals.DMA, &mut system.peripheral_clock_control);
+    let dma_channel = dma.channel0;
 
     let mut tx_descriptors = [0u32; 8 * 3];
     let mut rx_descriptors = [0u32; 8 * 3];
 
     let i2s = I2s::new(
         peripherals.I2S0,
-        NoMclk {},
+        MclkPin::new(io.pins.gpio4),
         Standard::Philips,
         DataFormat::Data16Channel16,
         44100u32.Hz(),
@@ -70,9 +81,9 @@ fn main() -> ! {
     );
 
     let i2s_rx = i2s.i2s_rx.with_pins(PinsBclkWsDin::new(
-        io.pins.gpio12,
-        io.pins.gpio13,
-        io.pins.gpio14,
+        io.pins.gpio1,
+        io.pins.gpio2,
+        io.pins.gpio5,
     ));
 
     let buffer = dma_buffer();
