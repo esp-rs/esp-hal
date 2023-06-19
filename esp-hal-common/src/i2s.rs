@@ -1116,7 +1116,8 @@ mod private {
             let i2s = self.register_block();
 
             i2s.clkm_conf.modify(|r, w| unsafe {
-                w.bits(r.bits() | (crate::soc::constants::I2S_DEFAULT_CLK_SRC << 21)) // select PLL_160M
+                w.bits(r.bits() | (crate::soc::constants::I2S_DEFAULT_CLK_SRC << 21))
+                // select PLL_160M
             });
 
             #[cfg(esp32)]
@@ -1397,7 +1398,7 @@ mod private {
             });
         }
 
-        #[cfg(any(esp32, esp32c6, esp32h2))]
+        #[cfg(any(esp32c6, esp32h2))]
         fn set_clock(&self, clock_settings: I2sClockDividers) {
             let i2s = self.register_block();
             let pcr = unsafe { &*crate::peripherals::PCR::PTR }; // I2S clocks are configured via PCR
@@ -1458,7 +1459,7 @@ mod private {
                 w.i2s_tx_clkm_en()
                     .set_bit()
                     .i2s_tx_clkm_sel()
-                    .variant(crate::soc::constants::I2S_DEFAULT_CLK_SRC) // for now fixed at 160MHz
+                    .variant(crate::soc::constants::I2S_DEFAULT_CLK_SRC) // for now fixed at 160MHz for C6 and 96MHz for H2
                     .i2s_tx_clkm_div_num()
                     .variant(clock_settings.mclk_divider as u8)
             });
@@ -2022,31 +2023,32 @@ mod private {
 
         let freq_diff = sclk.abs_diff(mclk * mclk_divider);
 
-        if freq_diff != 0 {}
-        let decimal = freq_diff as u64 * 10000 / mclk as u64;
+        if freq_diff != 0 {
+            let decimal = freq_diff as u64 * 10000 / mclk as u64;
 
-        // Carry bit if the decimal is greater than 1.0 - 1.0 / (63.0 * 2) = 125.0 /
-        // 126.0
-        if decimal > 1250000 / 126 {
-            mclk_divider += 1;
-        } else {
-            let mut min: u32 = !0;
+            // Carry bit if the decimal is greater than 1.0 - 1.0 / (63.0 * 2) = 125.0 /
+            // 126.0
+            if decimal > 1250000 / 126 {
+                mclk_divider += 1;
+            } else {
+                let mut min: u32 = !0;
 
-            for a in 2..=I2S_LL_MCLK_DIVIDER_MAX {
-                let b = (a as u64) * (freq_diff as u64 * 10000u64 / mclk as u64) + 5000;
-                ma = ((freq_diff as u64 * 10000u64 * a as u64) / 10000) as u32;
-                mb = (mclk as u64 * (b / 10000)) as u32;
+                for a in 2..=I2S_LL_MCLK_DIVIDER_MAX {
+                    let b = (a as u64) * (freq_diff as u64 * 10000u64 / mclk as u64) + 5000;
+                    ma = ((freq_diff as u64 * 10000u64 * a as u64) / 10000) as u32;
+                    mb = (mclk as u64 * (b / 10000)) as u32;
 
-                if ma == mb {
-                    denominator = a as u32;
-                    numerator = (b / 10000) as u32;
-                    break;
-                }
+                    if ma == mb {
+                        denominator = a as u32;
+                        numerator = (b / 10000) as u32;
+                        break;
+                    }
 
-                if mb.abs_diff(ma) < min {
-                    denominator = a as u32;
-                    numerator = b as u32;
-                    min = mb.abs_diff(ma);
+                    if mb.abs_diff(ma) < min {
+                        denominator = a as u32;
+                        numerator = b as u32;
+                        min = mb.abs_diff(ma);
+                    }
                 }
             }
         }
