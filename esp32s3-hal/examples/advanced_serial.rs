@@ -71,7 +71,7 @@ fn main() -> ! {
         let read = block!(serial1.read());
 
         match read {
-            Ok(read) => println!("Read {:02x}", read),
+            Ok(read) => println!("Read 0x{:02x}", read),
             Err(err) => println!("Error {:?}", err),
         }
 
