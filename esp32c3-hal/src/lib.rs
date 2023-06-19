@@ -4,7 +4,6 @@
 #[cfg(feature = "mcu-boot")]
 use core::mem::size_of;
 
-pub use embedded_hal as ehal;
 #[cfg(feature = "embassy")]
 pub use esp_hal_common::embassy;
 pub use esp_hal_common::*;

@@ -21,6 +21,7 @@ extern "C" {
     );
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! regi2c_write {
     ( $block: ident, $reg_add: ident, $indata: expr ) => {
@@ -34,6 +35,7 @@ macro_rules! regi2c_write {
     };
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! regi2c_write_mask {
     ( $block: ident, $reg_add: ident, $indata: expr ) => {
