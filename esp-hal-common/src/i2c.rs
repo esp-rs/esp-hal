@@ -646,7 +646,10 @@ pub trait Instance {
         self.set_filter(Some(7), Some(7));
 
         // Configure frequency
+        #[cfg(esp32)]
         self.set_frequency(clocks.i2c_clock.convert(), frequency);
+        #[cfg(not(esp32))]
+        self.set_frequency(clocks.xtal_clock.convert(), frequency);
 
         self.update_config();
 
