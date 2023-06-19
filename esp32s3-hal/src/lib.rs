@@ -1,3 +1,10 @@
+//! `no_std` HAL for the ESP32-S3 from Espressif.
+//!
+//! Implements a number of the traits defined by the various packages in the
+//! [embedded-hal] repository.
+//!
+//! [embedded-hal]: https://github.com/rust-embedded/embedded-hal
+
 #![no_std]
 #![cfg_attr(
     feature = "direct-boot",
