@@ -387,6 +387,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       # Run clippy on all packages targeting RISC-V.
+      - name: clippy (esp-riscv-rt)
+        run: cargo +stable clippy --manifest-path=esp-riscv-rt/Cargo.toml -- --no-deps
       - name: clippy (esp32c2-hal)
         run: cargo +stable clippy --manifest-path=esp32c2-hal/Cargo.toml -- --no-deps
       - name: clippy (esp32c3-hal)
@@ -439,6 +441,8 @@ jobs:
         run: cargo fmt --all --manifest-path=esp-hal-procmacros/Cargo.toml -- --check
       - name: rustfmt (esp-hal-smartled)
         run: cargo fmt --all --manifest-path=esp-hal-smartled/Cargo.toml -- --check
+      - name: rustfmt (esp-riscv-rt)
+        run: cargo fmt --all --manifest-path=esp-riscv-rt/Cargo.toml -- --check
       - name: rustfmt (esp32-hal)
         run: cargo fmt --all --manifest-path=esp32-hal/Cargo.toml -- --check
       - name: rustfmt (esp32c2-hal)
