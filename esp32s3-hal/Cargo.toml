@@ -55,6 +55,7 @@ usbd-serial       = "0.1.1"
 
 [features]
 default              = ["rt", "vectored"]
+debug                = ["esp-hal-common/debug"]
 direct-boot          = ["r0"]
 eh1                  = ["esp-hal-common/eh1", "dep:embedded-hal-1", "dep:embedded-hal-nb", "dep:embedded-can"]
 rt                   = []

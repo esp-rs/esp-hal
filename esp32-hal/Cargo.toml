@@ -51,6 +51,7 @@ static_cell       = "1.0.0"
 [features]
 default            = ["rt", "vectored", "xtal40mhz"]
 bluetooth          = []
+debug              = ["esp-hal-common/debug"]
 eh1                = ["esp-hal-common/eh1", "dep:embedded-hal-1", "dep:embedded-hal-nb"]
 rt                 = []
 ufmt               = ["esp-hal-common/ufmt"]
