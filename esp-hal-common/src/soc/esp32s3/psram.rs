@@ -1,4 +1,8 @@
-const PSRAM_VADDR: u32 = 0x3C030000;
+static mut PSRAM_VADDR: u32 = 0x3C000000;
+
+pub fn psram_vaddr_start() -> usize {
+    unsafe { PSRAM_VADDR as usize }
+}
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "psram_2m")] {
@@ -13,8 +17,6 @@ cfg_if::cfg_if! {
 }
 
 pub const PSRAM_BYTES: usize = PSRAM_SIZE as usize * 1024 * 1024;
-
-pub const PSRAM_VADDR_START: usize = PSRAM_VADDR as usize;
 
 /// Initialize PSRAM to be used for data.
 ///
@@ -65,6 +67,25 @@ pub fn init_psram(_peripheral: impl crate::peripheral::Peripheral<P = crate::per
         ) -> i32;
     }
     unsafe {
+        const MMU_PAGE_SIZE: u32 = 0x10000;
+        const ICACHE_MMU_SIZE: usize = 0x800;
+        const FLASH_MMU_TABLE_SIZE: usize = ICACHE_MMU_SIZE / core::mem::size_of::<u32>();
+        const MMU_INVALID: u32 = 1 << 14;
+        const DR_REG_MMU_TABLE: u32 = 0x600C5000;
+
+        // calculate the PSRAM start address to map
+        let mut start = PSRAM_VADDR;
+        let mmu_table_ptr = DR_REG_MMU_TABLE as *const u32;
+        for i in 0..FLASH_MMU_TABLE_SIZE {
+            if mmu_table_ptr.add(i).read_volatile() != MMU_INVALID {
+                start += MMU_PAGE_SIZE;
+            } else {
+                break;
+            }
+        }
+        log::debug!("PSRAM start address = {:x}", start);
+        PSRAM_VADDR = start;
+
         // Configure the mode of instruction cache : cache size, cache line size.
         rom_config_instruction_cache_mode(
             CONFIG_ESP32S3_INSTRUCTION_CACHE_SIZE,
