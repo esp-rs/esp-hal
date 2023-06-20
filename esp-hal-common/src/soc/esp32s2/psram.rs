@@ -1,5 +1,9 @@
 const PSRAM_VADDR: u32 = 0x3f500000;
 
+pub fn psram_vaddr_start() -> usize {
+    unsafe { PSRAM_VADDR_START as usize }
+}
+
 cfg_if::cfg_if! {
     if #[cfg(feature = "psram_2m")] {
         const PSRAM_SIZE: u32 = 2;

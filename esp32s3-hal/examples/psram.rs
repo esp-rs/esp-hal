@@ -24,7 +24,7 @@ static ALLOCATOR: esp_alloc::EspHeap = esp_alloc::EspHeap::empty();
 fn init_psram_heap() {
     unsafe {
         ALLOCATOR.init(
-            soc::psram::PSRAM_VADDR_START as *mut u8,
+            soc::psram::psram_vaddr_start() as *mut u8,
             soc::psram::PSRAM_BYTES,
         );
     }
