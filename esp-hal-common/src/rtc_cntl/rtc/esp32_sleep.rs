@@ -1,4 +1,4 @@
-use super::{Ext0WakeupSource, TimerWakeupSource, WakeSource, WakeTriggers, Ext1WakeupSource};
+use super::{Ext0WakeupSource, Ext1WakeupSource, TimerWakeupSource, WakeSource, WakeTriggers};
 use crate::{
     gpio::{Pin, RTCPin},
     rtc_cntl::{sleep::WakeupLevel, Clock, RtcClock},
@@ -108,7 +108,7 @@ impl<'a> WakeSource for Ext1WakeupSource<'a> {
         let mut bits = 0u32;
         for pin in pins.iter_mut() {
             pin.rtc_set_config(true, true, 0);
-            bits |= 1<<pin.rtc_number();
+            bits |= 1 << pin.rtc_number();
         }
 
         unsafe {
