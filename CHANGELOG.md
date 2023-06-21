@@ -45,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add a `debug` feature to enable the PACs' `impl-register-debug` feature (#596)
 - Add initial support for `I2S` in ESP32-H2 (#597)
 - Fix rom::crc docs
+- Add octal PSRAM support for ESP32-S3 (#610)
 
 ### Changed
 

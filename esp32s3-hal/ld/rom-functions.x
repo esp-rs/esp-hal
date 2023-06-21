@@ -26,3 +26,7 @@ PROVIDE(esp_rom_crc8_be = 0x40001cd4);
 PROVIDE(esp_rom_crc32_le = 0x40001c98);
 PROVIDE(esp_rom_crc16_le = 0x40001cb0);
 PROVIDE(esp_rom_crc8_le = 0x40001cc8);
+
+PROVIDE (esp_rom_opiflash_exec_cmd = 0x400008b8);
+PROVIDE( esp_rom_spi_set_dtr_swap_mode = 0x4000093c );
+PROVIDE( esp_rom_opiflash_pin_config = 0x40000894 );
