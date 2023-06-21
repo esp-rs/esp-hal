@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = [
     "Kirill Mikhailov <playfulfence@gmail.com>",
     "Jesse Braham <jesse@beta7.io>",
-    "Sergio Gasquez Arcows <sergio.gasquez@gmail.com",
+    "Sergio Gasquez Arcos <sergio.gasquez@gmail.com",
 ]
 edition      = "2021"
 rust-version = "1.60.0"
