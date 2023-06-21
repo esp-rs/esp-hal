@@ -8,14 +8,7 @@
 #![no_std]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 
-#[cfg(feature = "mcu-boot")]
-use core::mem::size_of;
-
-#[cfg(feature = "embassy")]
-pub use esp_hal_common::embassy;
 pub use esp_hal_common::*;
-
-pub use self::gpio::IO;
 
 /// Common module for analog functions
 pub mod analog {
@@ -96,7 +89,7 @@ unsafe fn configure_mmu() {
 
     const FLASH_MMU_TABLE: *mut u32 = 0x600c_5000 as *mut u32;
     const ICACHE_MMU_SIZE: usize = 0x200;
-    const FLASH_MMU_TABLE_SIZE: usize = ICACHE_MMU_SIZE / size_of::<u32>();
+    const FLASH_MMU_TABLE_SIZE: usize = ICACHE_MMU_SIZE / core::mem::size_of::<u32>();
     const MMU_TABLE_INVALID_VAL: u32 = 0x100;
 
     for i in 0..FLASH_MMU_TABLE_SIZE {

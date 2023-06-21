@@ -50,8 +50,8 @@ pub use self::delay::Delay;
 pub use self::dma::gdma;
 #[cfg(pdma)]
 pub use self::dma::pdma;
-#[cfg(any(dport, interrupt_core0, interrupt_core1))]
-pub use self::interrupt::*;
+#[cfg(gpio)]
+pub use self::gpio::IO;
 #[cfg(rmt)]
 pub use self::pulse_control::PulseControl;
 #[cfg(rng)]
@@ -117,7 +117,6 @@ pub mod rsa;
 pub mod rtc_cntl;
 #[cfg(sha)]
 pub mod sha;
-pub mod soc;
 #[cfg(any(spi0, spi1, spi2, spi3))]
 pub mod spi;
 #[cfg(any(dport, pcr, system))]
@@ -140,6 +139,10 @@ pub mod trapframe {
     #[cfg(xtensa)]
     pub use xtensa_lx_rt::exception::Context as TrapFrame;
 }
+
+// The `soc` module contains chip-specific implementation details and should not
+// be directly exposed.
+mod soc;
 
 #[no_mangle]
 extern "C" fn EspDefaultHandler(_level: u32, _interrupt: peripherals::Interrupt) {}

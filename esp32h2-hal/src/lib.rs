@@ -8,11 +8,7 @@
 #![no_std]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 
-#[cfg(feature = "embassy")]
-pub use esp_hal_common::embassy;
 pub use esp_hal_common::*;
-
-pub use self::gpio::IO;
 
 /// Common module for analog functions
 pub mod analog {
