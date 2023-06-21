@@ -9,7 +9,7 @@ use esp32s3_hal::{
     clock::ClockControl,
     peripherals::Peripherals,
     prelude::*,
-    soc,
+    psram,
     timer::TimerGroup,
     Rtc,
 };
@@ -23,10 +23,7 @@ static ALLOCATOR: esp_alloc::EspHeap = esp_alloc::EspHeap::empty();
 
 fn init_psram_heap() {
     unsafe {
-        ALLOCATOR.init(
-            soc::psram::psram_vaddr_start() as *mut u8,
-            soc::psram::PSRAM_BYTES,
-        );
+        ALLOCATOR.init(psram::psram_vaddr_start() as *mut u8, psram::PSRAM_BYTES);
     }
 }
 
@@ -38,7 +35,7 @@ fn main() -> ! {
     esp_println::logger::init_logger_from_env();
 
     let peripherals = Peripherals::take();
-    soc::psram::init_psram(peripherals.PSRAM);
+    psram::init_psram(peripherals.PSRAM);
     init_psram_heap();
 
     let mut system = peripherals.SYSTEM.split();

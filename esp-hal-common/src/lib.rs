@@ -63,6 +63,8 @@ pub use self::soc::cpu_control;
 #[cfg(efuse)]
 pub use self::soc::efuse;
 pub use self::soc::peripherals;
+#[cfg(psram)]
+pub use self::soc::psram;
 #[cfg(any(spi0, spi1, spi2, spi3))]
 pub use self::spi::Spi;
 #[cfg(any(timg0, timg1))]
