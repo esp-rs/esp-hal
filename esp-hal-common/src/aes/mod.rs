@@ -3,16 +3,6 @@
 //! This module provides functions and structs for AES encryption and
 //! decryption.
 //!
-//! ### Features
-//! The AES peripheral has the following features available on individual chips:
-//!
-//! | Feature          | ESP32    | ESP32-C3 | ESP32-S2 | ESP32-S3 |
-//! |------------------|----------|----------|----------|----------|
-//! |AES128            |Y         |Y         |Y         |Y         |
-//! |AES192            |Y         |N         |Y         |N         |
-//! |AES256            |Y         |Y         |Y         |Y         |
-//! |Custom endianness |Y         |N         |Y         |N         |
-//!
 //! ### Implementation State
 //! * DMA mode is currently not supported.
 

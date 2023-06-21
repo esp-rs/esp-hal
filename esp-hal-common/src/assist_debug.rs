@@ -9,7 +9,7 @@
 //! watchdog. Not an RTC or SWD watchdog.
 //!
 //! Not all targets support all the features.
-//!  
+//!
 //! Bus write access logging is not available via this API.
 
 use crate::{

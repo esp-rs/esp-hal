@@ -1,4 +1,5 @@
-//! Encrypt/Decrypt a message using RSA.
+//! Demonstrates the use of the RSA peripheral and compares the speed of
+//! multiple arithmetic operations.
 
 #![no_std]
 #![no_main]

@@ -6,10 +6,6 @@
 //! The following wiring is assumed:
 //! - TX => GPIO1
 //! - RX => GPIO2
-//!
-//! The following wiring is assumed:
-//! - TX => GPIO1
-//! - RX => GPIO2
 
 #![no_std]
 #![no_main]

@@ -1,6 +1,4 @@
-//! Uses timer0 and operator0 of the MCPWM0
-//!
-//!  to output a 50% duty
+//! Uses timer0 and operator0 of the MCPWM0 peripheral to output a 50% duty
 //! signal at 20 kHz.
 //!
 //! The signal will be output to the pin assigned to `pin`. (GPIO4)

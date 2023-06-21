@@ -2,16 +2,6 @@
 //!
 //! This module provides functions and structs for multi precision arithmetic
 //! operations used in RSA asym-metric cipher algorithms
-//!
-//! ### Features
-//! The RSA peripheral supports maximum operand of the following sizes for each
-//! individual chips:
-//!
-//! | Feature               | ESP32| ESP32-C3| ESP32-C6| ESP32-S2| ESP32-S3|
-//! |---------------------- |------|---------|---------|---------|---------|
-//! |modular exponentiation |4096  |3072     |3072     |4096     |4096     |
-//! |modular multiplication |4096  |3072     |3072     |4096     |4096     |
-//! |multiplication         |2048  |1536     |1536     |2048     |2048     |
 
 use core::{convert::Infallible, marker::PhantomData, ptr::copy_nonoverlapping};
 
