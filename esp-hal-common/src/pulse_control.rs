@@ -886,7 +886,7 @@ macro_rules! rmt {
         )+
     )
  => {
-    /// RMT peripheral (RMT)
+    /// Remote Control (RMT) peripheral driver
     pub struct PulseControl<'d> {
         /// The underlying register block
         reg: PeripheralRef<'d, RMT>,

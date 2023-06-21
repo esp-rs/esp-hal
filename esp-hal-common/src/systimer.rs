@@ -1,3 +1,5 @@
+//! System Timer peripheral driver
+
 use core::{intrinsics::transmute, marker::PhantomData};
 
 use fugit::MillisDurationU32;

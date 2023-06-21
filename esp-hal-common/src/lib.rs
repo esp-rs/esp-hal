@@ -151,16 +151,8 @@ extern "C" fn EspDefaultHandler(_level: u32, _interrupt: peripherals::Interrupt)
 #[no_mangle]
 extern "C" fn DefaultHandler() {}
 
-#[cfg(esp32c6)]
-pub fn disable_apm_filter() {
-    unsafe {
-        (&*esp32c6::LP_APM::PTR).func_ctrl.write(|w| w.bits(0));
-        (&*esp32c6::LP_APM0::PTR).func_ctrl.write(|w| w.bits(0));
-        (&*esp32c6::HP_APM::PTR).func_ctrl.write(|w| w.bits(0));
-    }
-}
-
-/// Enumeration of CPU cores
+/// Available CPU cores
+///
 /// The actual number of available cores depends on the target.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Cpu {
@@ -171,6 +163,7 @@ pub enum Cpu {
     AppCpu,
 }
 
+/// Which core the application is currently executing on
 pub fn get_core() -> Cpu {
     #[cfg(all(xtensa, multi_core))]
     match ((xtensa_lx::get_processor_id() >> 13) & 1) != 0 {

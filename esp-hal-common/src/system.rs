@@ -1,4 +1,4 @@
-//! System
+//! System Control
 //!
 //! The SYSTEM/DPORT peripheral needs to be split into several logical parts.
 //!

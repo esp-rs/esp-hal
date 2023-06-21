@@ -3,8 +3,6 @@
 //! Safe abstractions to the additional libraries provided in the ESP's
 //! read-only memory.
 
-pub use paste::paste;
-
 pub mod crc;
 
 #[allow(unused)]

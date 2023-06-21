@@ -1,3 +1,5 @@
+//! Exclusive peripheral access
+
 use core::{
     marker::PhantomData,
     ops::{Deref, DerefMut},
