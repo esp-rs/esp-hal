@@ -68,6 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-C6: Support FOSC CLK calibration for ECO1+ chip revisions
 - Fixed CI by pinning the log crate to 0.4.18 (#600)
 - ESP32-S3: Fix calculation of PSRAM start address
+- Fixed wrong variable access (FOSC CLK calibration for ESP32-C6 #593)
 
 ### Changed
 
