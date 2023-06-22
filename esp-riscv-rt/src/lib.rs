@@ -850,7 +850,6 @@ r#"
 .weak cpu_int_29_handler
 .weak cpu_int_30_handler
 .weak cpu_int_31_handler
-
 cpu_int_1_handler:
 cpu_int_2_handler:
 cpu_int_3_handler:
