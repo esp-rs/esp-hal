@@ -1,3 +1,5 @@
+//! Low-power Management
+
 use embedded_hal::watchdog::{Watchdog, WatchdogDisable, WatchdogEnable};
 #[cfg(not(any(esp32c6, esp32h2)))]
 use fugit::HertzU32;
@@ -116,6 +118,7 @@ pub(crate) enum RtcCalSel {
     RtcCalInternalOsc = 3,
 }
 
+/// Low-power Management
 pub struct Rtc<'d> {
     _inner: PeripheralRef<'d, RtcCntl>,
     pub rwdt: Rwdt,

@@ -1,3 +1,5 @@
+//! Wireless communication peripheral implementations
+
 pub trait RadioExt {
     type Components;
 

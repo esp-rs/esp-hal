@@ -1,3 +1,5 @@
+//! Secure Hash Algorithm peripheral driver
+
 use core::convert::Infallible;
 
 use crate::{

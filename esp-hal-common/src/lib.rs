@@ -50,8 +50,8 @@ pub use self::delay::Delay;
 pub use self::dma::gdma;
 #[cfg(pdma)]
 pub use self::dma::pdma;
-#[cfg(any(dport, interrupt_core0, interrupt_core1))]
-pub use self::interrupt::*;
+#[cfg(gpio)]
+pub use self::gpio::IO;
 #[cfg(rmt)]
 pub use self::pulse_control::PulseControl;
 #[cfg(rng)]
@@ -63,6 +63,8 @@ pub use self::soc::cpu_control;
 #[cfg(efuse)]
 pub use self::soc::efuse;
 pub use self::soc::peripherals;
+#[cfg(psram)]
+pub use self::soc::psram;
 #[cfg(any(spi0, spi1, spi2, spi3))]
 pub use self::spi::Spi;
 #[cfg(any(timg0, timg1))]
@@ -117,7 +119,6 @@ pub mod rsa;
 pub mod rtc_cntl;
 #[cfg(sha)]
 pub mod sha;
-pub mod soc;
 #[cfg(any(spi0, spi1, spi2, spi3))]
 pub mod spi;
 #[cfg(any(dport, pcr, system))]
@@ -141,6 +142,10 @@ pub mod trapframe {
     pub use xtensa_lx_rt::exception::Context as TrapFrame;
 }
 
+// The `soc` module contains chip-specific implementation details and should not
+// be directly exposed.
+mod soc;
+
 #[no_mangle]
 extern "C" fn EspDefaultHandler(_level: u32, _interrupt: peripherals::Interrupt) {}
 
@@ -148,16 +153,8 @@ extern "C" fn EspDefaultHandler(_level: u32, _interrupt: peripherals::Interrupt)
 #[no_mangle]
 extern "C" fn DefaultHandler() {}
 
-#[cfg(esp32c6)]
-pub fn disable_apm_filter() {
-    unsafe {
-        (&*esp32c6::LP_APM::PTR).func_ctrl.write(|w| w.bits(0));
-        (&*esp32c6::LP_APM0::PTR).func_ctrl.write(|w| w.bits(0));
-        (&*esp32c6::HP_APM::PTR).func_ctrl.write(|w| w.bits(0));
-    }
-}
-
-/// Enumeration of CPU cores
+/// Available CPU cores
+///
 /// The actual number of available cores depends on the target.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Cpu {
@@ -168,6 +165,7 @@ pub enum Cpu {
     AppCpu,
 }
 
+/// Which core the application is currently executing on
 pub fn get_core() -> Cpu {
     #[cfg(all(xtensa, multi_core))]
     match ((xtensa_lx::get_processor_id() >> 13) & 1) != 0 {

@@ -12,36 +12,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Add bare-bones PSRAM support for ESP32 (#506)
-- Add initial support for the ESP32-H2 (#513)
+- Add initial support for the ESP32-H2 (#513, #526, #527, #528, #530, #538, #544, #548, #551, #556, #560, #566, #549, #564, #569, #576, #577, #589, #591, #597)
 - Add bare-bones PSRAM support for ESP32-S3 (#517)
 - Add async support to the I2C driver (#519)
-- Add initial support for RSA in ESP32-H2 (#526)
-- Add initial support for SHA in ESP32-H2 (#527)
-- Add initial support for AES in ESP32-H2 (#528)
-- Add blinky_erased_pins example for ESP32-H2 (#530)
-- Add initial support for I2C in ESP32-H2 (#538)
 - Implement Copy and Eq for EspTwaiError (#540)
-- Add LEDC hardware fade support
+- Add LEDC hardware fade support (#475)
 - Added support for multicore async GPIO (#542)
-- Add initial support for MCPWM in ESP32-H2 (#544)
-- Add some miscellaneous examples for the ESP32-H2 (#548)
-- Add initial support for PCNT in ESP32-H2 (#551)
-- Add initial support for RMT in ESP32-H2 (#556)
-- Add a fn to poll DMA transfers
-- Add initial support for LEDC in ESP32-H2 (#560)
-- Add initial support for ASSIST_DEBUG in ESP32-H2 (#566)
-- Add all `SPI` examples for the ESP32-H2 (#549)
-- Add initial support for ADC in ESP32-H2 (#564)
+- Add a fn to poll DMA transfers (#559)
 - Simplify the `Delay` driver, derive `Clone` and `Copy` (#568)
-- Add `embassy_serial` and `embassy_wait` examples for ESP32-H2 (#569)
 - Fix Async GPIO not disabling interupts on chips with multiple banks (#572)
-- Add unified field-based efuse access
-- Add `timer_interrupt` example in ESP32-H2 and refactor `clk_src` configuration (#576)
+- Add unified field-based efuse access (#567)
 - Move `esp-riscv-rt` into esp-hal (#578)
-- Add initial implementation of radio clocks for ESP32-H2 (#577)
-- Add initial support for `esp-hal-smartled` in ESP32-H2 (#589)
-- Add CRC functions from ESP ROM
-- Add initial support for RNG in ESP32-H2 (#591)
+- Add CRC functions from ESP ROM (#587)
 - Add a `debug` feature to enable the PACs' `impl-register-debug` feature (#596)
 - Add initial support for `I2S` in ESP32-H2 (#597)
 - Fix rom::crc docs
@@ -51,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Move core interrupt handling from Flash to RAM for RISC-V chips (ESP32-H2, ESP32-C2, ESP32-C3, ESP32-C6) (#541)
 - Change LED pin to GPIO2 in ESP32 blinky example (#581)
-- Udpate ESP32-H2 and C6 ESP32-clocks and remove i2c_clock for all chips but ESP32 (#592)
+- Update ESP32-H2 and ESP32-C6 clocks and remove `i2c_clock` for all chips but ESP32 (#592)
 - Use both timers in `TIMG0` for embassy time driver when able (#609)
 
 ### Fixed
@@ -64,8 +46,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ADC driver will now apply attenuation values to the correct ADC's channels. (#554)
 - Sometimes half-duplex non-DMA SPI reads were reading garbage in non-release mode (#552)
 - ESP32-C3: Fix GPIO5 ADC channel id (#562)
-- ESP32-H2: Fix direct-boot feature
-- ESP32-C6: Support FOSC CLK calibration for ECO1+ chip revisions
+- ESP32-H2: Fix direct-boot feature (#570)
+- ESP32-C6: Support FOSC CLK calibration for ECO1+ chip revisions (#593)
 - Fixed CI by pinning the log crate to 0.4.18 (#600)
 - ESP32-S3: Fix calculation of PSRAM start address
 - Fixed wrong variable access (FOSC CLK calibration for ESP32-C6 #593)
@@ -78,6 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Breaking
 
 - Significantly simplified user-facing GPIO pin types. (#553)
+- No longer re-export the `soc` moduleand the contents of the `interrupt` module at the package level (#607)
 
 ## [0.9.0] - 2023-05-02
 

@@ -1,22 +1,17 @@
+//! `no_std` HAL for the ESP32-S2 from Espressif.
+//!
+//! Implements a number of the traits defined by the various packages in the
+//! [embedded-hal] repository.
+//!
+//! [embedded-hal]: https://github.com/rust-embedded/embedded-hal
+
 #![no_std]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 
-pub use embedded_hal as ehal;
-#[cfg(feature = "embassy")]
-pub use esp_hal_common::embassy;
-pub use esp_hal_common::*;
-
-#[rustfmt::skip]
 use esp_hal_common::xtensa_lx_rt::exception::ExceptionCause;
-
+pub use esp_hal_common::*;
 // Always enable atomic emulation on ESP32-S2
 use xtensa_atomic_emulation_trap as _;
-
-pub mod rt {
-    pub use esp_hal_common::xtensa_lx_rt::exception::ExceptionCause;
-}
-
-pub use self::gpio::IO;
 
 /// Common module for analog functions
 pub mod analog {

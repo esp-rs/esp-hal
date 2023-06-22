@@ -7,6 +7,7 @@ use crate::{
 };
 
 /// Enumeration of available CPU interrupts
+///
 /// It's possible to create one handler per priority level. (e.g
 /// `level1_interrupt`)
 #[allow(unused)]
@@ -47,7 +48,7 @@ pub enum CpuInterrupt {
     Interrupt31EdgePriority5,
 }
 
-/// Assign a peripheral interrupt to an CPU interrupt.
+/// Assign a peripheral interrupt to an CPU interrupt
 ///
 /// Great care **must** be taken when using this function with interrupt
 /// vectoring (enabled by default). Avoid the following CPU interrupts:
@@ -73,7 +74,7 @@ pub unsafe fn map(core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
         .write_volatile(cpu_interrupt_number as u32);
 }
 
-/// Disable the given peripheral interrupt.
+/// Disable the given peripheral interrupt
 pub fn disable(core: Cpu, interrupt: Interrupt) {
     unsafe {
         let interrupt_number = interrupt as isize;
@@ -264,6 +265,7 @@ mod vectored {
         }
     }
 
+    /// Enable the given peripheral interrupt
     pub fn enable(interrupt: Interrupt, level: Priority) -> Result<(), Error> {
         let cpu_interrupt =
             interrupt_level_to_cpu_interrupt(level, chip_specific::interrupt_is_edge(interrupt))?;

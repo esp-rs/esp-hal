@@ -1,3 +1,5 @@
+//! Peripheral instance singletons
+
 use esp32c3 as pac;
 // We need to export this for users to use
 pub use pac::Interrupt;

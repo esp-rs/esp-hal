@@ -1,3 +1,5 @@
+//! Interrupt support
+
 #[cfg(riscv)]
 pub use riscv::*;
 #[cfg(xtensa)]
