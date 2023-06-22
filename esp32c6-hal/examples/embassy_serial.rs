@@ -7,8 +7,10 @@
 #![no_main]
 #![feature(type_alias_impl_trait)]
 
+use core::fmt::Write;
+
 use embassy_executor::Executor;
-use embassy_time::{Duration, Timer};
+use embassy_time::{with_timeout, Duration};
 use esp32c6_hal::{
     clock::ClockControl,
     embassy,
@@ -19,18 +21,97 @@ use esp32c6_hal::{
     Uart,
 };
 use esp_backtrace as _;
+use esp_hal_common::uart::config::AtCmdConfig;
 use static_cell::StaticCell;
+
+struct Buffer<const N: usize> {
+    len: usize,
+    buf: [u8; N],
+}
+
+impl<const N: usize> Buffer<N> {
+    #[inline(always)]
+    pub fn as_slice(&self) -> &[u8] {
+        &self.buf[..self.len]
+    }
+
+    #[inline(always)]
+    pub fn is_full(&self) -> bool {
+        self.len == N
+    }
+}
+
+impl<const N: usize> core::fmt::Write for Buffer<N> {
+    #[inline]
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+        let sb = s.as_bytes();
+        let mut len = sb.len();
+        if self.len + len > N {
+            len = N - self.len;
+        }
+        if len > 0 {
+            self.buf[self.len..self.len + len].copy_from_slice(&sb[..len]);
+            self.len += len;
+        }
+        Ok(())
+    }
+}
+
+/// rx_fifo_full_threshold
+const READ_BUF_SIZE: usize = 128;
+/// EOT; CTRL-D
+const AT_CMD: u8 = 0x04;
 
 #[embassy_executor::task]
 async fn run(mut uart: Uart<'static, UART0>) {
+    /// max READ_BUF_SIZE buffers to receive
+    const MAX_BUFFERS: usize = 10;
+    /// timeout read
+    const READ_TIMEOUT: Duration = Duration::from_secs(5);
+    let mut rbuf = Buffer {
+        len: 0,
+        buf: [0; MAX_BUFFERS * READ_BUF_SIZE],
+    };
+    let mut wbuf = Buffer {
+        len: 0,
+        buf: [0; 128],
+    };
+
     loop {
-        embedded_hal_async::serial::Write::write(&mut uart, b"Hello async write!!!\r\n")
+        if rbuf.len == 0 {
+            embedded_hal_async::serial::Write::write(
+                &mut uart,
+                b"Hello async serial. Enter something ended with EOT (CTRL-D).\r\n",
+            )
             .await
             .unwrap();
+        } else {
+            wbuf.len = 0;
+            write!(&mut wbuf, "\r\n-- received {} bytes --\r\n", rbuf.len).unwrap();
+            embedded_hal_async::serial::Write::write(&mut uart, wbuf.as_slice())
+                .await
+                .unwrap();
+            embedded_hal_async::serial::Write::write(&mut uart, rbuf.as_slice())
+                .await
+                .unwrap();
+            embedded_hal_async::serial::Write::write(&mut uart, b"\r\n")
+                .await
+                .unwrap();
+        }
         embedded_hal_async::serial::Write::flush(&mut uart)
             .await
             .unwrap();
-        Timer::after(Duration::from_millis(1_000)).await;
+
+        rbuf.len = 0;
+        while let Ok(Ok(len)) =
+            with_timeout(READ_TIMEOUT, uart.read(&mut rbuf.buf[rbuf.len..])).await
+        {
+            rbuf.len += len;
+            // if set_at_cmd is used than stop reading
+            if rbuf.buf[rbuf.len - 1] == AT_CMD || rbuf.is_full() {
+                break;
+            }
+        }
     }
 }
 
@@ -72,7 +153,9 @@ fn main() -> ! {
     #[cfg(feature = "embassy-time-timg0")]
     embassy::init(&clocks, timer_group0.timer0);
 
-    let uart0 = Uart::new(peripherals.UART0, &mut system.peripheral_clock_control);
+    let mut uart0 = Uart::new(peripherals.UART0, &mut system.peripheral_clock_control);
+    uart0.set_at_cmd(AtCmdConfig::new(None, None, None, AT_CMD, None));
+    uart0.set_rx_fifo_full_threshold(READ_BUF_SIZE as u16);
 
     esp32c6_hal::interrupt::enable(Interrupt::UART0, esp32c6_hal::Priority::Priority1).unwrap();
 
