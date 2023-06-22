@@ -70,6 +70,9 @@ psram     = []
 psram_2m  = ["esp-hal-common/psram_2m", "psram"]
 psram_4m  = ["esp-hal-common/psram_4m", "psram"]
 psram_8m  = ["esp-hal-common/psram_8m", "psram"]
+opsram_2m  = ["esp-hal-common/opsram_2m", "psram"]
+opsram_4m  = ["esp-hal-common/opsram_4m", "psram"]
+opsram_8m  = ["esp-hal-common/opsram_8m", "psram"]
 
 [[example]]
 name              = "spi_eh1_loopback"
@@ -94,6 +97,10 @@ required-features = ["embassy", "async"]
 [[example]]
 name              = "psram"
 required-features = ["psram_2m"]
+
+[[example]]
+name              = "octal_psram"
+required-features = ["opsram_2m"]
 
 [[example]]
 name              = "embassy_serial"
