@@ -24,6 +24,9 @@
 //! * The **ESP32-C6** has 4 channels, `Channel0` and `Channel1` hardcoded for
 //!   transmitting signals and `Channel2` and `Channel3` hardcoded for receiving
 //!   signals.
+//! * The **ESP32-H2** has 4 channels, `Channel0` and `Channel1` hardcoded for
+//!   transmitting signals and `Channel2` and `Channel3` hardcoded for receiving
+//!   signals.
 //! * The **ESP32-S2** has 4 channels, each of them can be either receiver or
 //!   transmitter.
 //! * The **ESP32-S3** has 8 channels, `Channel0`-`Channel3` hardcdoded for
@@ -86,7 +89,7 @@ use core::slice::Iter;
 use fugit::NanosDurationU32;
 pub use paste::paste;
 
-#[cfg(esp32c6)]
+#[cfg(any(esp32c6, esp32h2))]
 use crate::peripherals::PCR;
 use crate::{
     gpio::{OutputPin, OutputSignal},
@@ -150,6 +153,17 @@ pub enum ClockSource {
     RTC20M = 1,
 }
 
+// Clock source to bool
+#[cfg(esp32h2)]
+impl Into<bool> for ClockSource {
+    fn into(self) -> bool {
+        match self {
+            ClockSource::XTAL => false,
+            ClockSource::RTC20M => true,
+        }
+    }
+}
+
 /// Specify the clock source for the RMT peripheral on the ESP32 and ESP32-S3
 /// variants
 #[cfg(any(esp32s2, esp32))]
@@ -165,7 +179,7 @@ pub enum ClockSource {
 // to the RMT channel
 #[cfg(any(esp32s2, esp32))]
 const CHANNEL_RAM_SIZE: u8 = 64;
-#[cfg(any(esp32c3, esp32c6, esp32s3, esp32h2))]
+#[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
 const CHANNEL_RAM_SIZE: u8 = 48;
 
 // Specifies where the RMT RAM section starts for the particular ESP32 variant
@@ -302,7 +316,7 @@ macro_rules! channel_instance {
                 let mut channel = $cxi { mem_offset: 0 };
 
                 cfg_if::cfg_if! {
-                    if #[cfg(any(esp32c3, esp32c6, esp32s3, esp32h2))] {
+                    if #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))] {
                         // Apply default configuration
                         unsafe { &*RMT::PTR }.ch_tx_conf0[$num].modify(|_, w| unsafe {
                             // Configure memory block size
@@ -653,7 +667,7 @@ macro_rules! channel_instance {
                                     #[cfg(not(esp32h2))]
                                     unsafe { interrupts.ch_tx_thr_event_int_raw($num).bit() },
                                     #[cfg(esp32h2)]
-                                     interrupts.[<ch $num _tx_err_int_raw>]().bit(),
+                                    interrupts.[<ch $num _tx_err_int_raw>]().bit(),
                                     #[cfg(esp32h2)]
                                     interrupts.[<ch $num _tx_thr_event_int_raw>]().bit(),
                                 ))
@@ -872,7 +886,7 @@ macro_rules! rmt {
         )+
     )
  => {
-    /// RMT peripheral (RMT)
+    /// Remote Control (RMT) peripheral driver
     pub struct PulseControl<'d> {
         /// The underlying register block
         reg: PeripheralRef<'d, RMT>,
@@ -962,10 +976,10 @@ macro_rules! rmt {
 
             // Configure peripheral
 
-            #[cfg(esp32c6)]
+            #[cfg(any(esp32c6, esp32h2))]
             let pcr = unsafe { &*PCR::ptr() };
 
-            #[cfg(esp32c6)]
+            #[cfg(any(esp32c6, esp32h2))]
             pcr.rmt_sclk_conf.write(|w| w.sclk_en().set_bit());
 
 
@@ -986,7 +1000,7 @@ macro_rules! rmt {
                     .apb_fifo_mask()
                     .set_bit());
                     // Select clock source
-                #[cfg(not(esp32c6))]
+                #[cfg(not(any(esp32c6, esp32h2)))]
                 self.reg.sys_conf.modify(|_, w| unsafe {
                     w.sclk_sel()
                     .bits(clk_source as u8)
@@ -1010,7 +1024,20 @@ macro_rules! rmt {
                     .bits(div_frac_a)
                     .sclk_div_b()
                     .bits(div_frac_b)
-            });
+                    });
+                #[cfg(esp32h2)]
+                pcr.rmt_sclk_conf.modify(|_,w| unsafe {
+                    w.sclk_sel()
+                    .bit(clk_source.into())
+                    // Set absolute part of divider
+                    .sclk_div_num()
+                    .bits(div_abs)
+                    // Set fractional parts of divider to 0
+                    .sclk_div_a()
+                    .bits(div_frac_a)
+                    .sclk_div_b()
+                    .bits(div_frac_b)
+                });
 
             // Disable all interrupts
             self.reg.int_ena.write(|w| unsafe { w.bits(0) });

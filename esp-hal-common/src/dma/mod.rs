@@ -54,19 +54,19 @@ pub enum DmaPeripheral {
     Spi2   = 0,
     #[cfg(any(pdma, esp32s3))]
     Spi3   = 1,
-    #[cfg(any(esp32c3, esp32c6, esp32s3))]
+    #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
     Uhci0  = 2,
-    #[cfg(any(esp32, esp32s2, esp32c3, esp32c6, esp32s3))]
+    #[cfg(any(esp32, esp32s2, esp32c3, esp32c6, esp32h2, esp32s3))]
     I2s0   = 3,
     #[cfg(any(esp32, esp32s3))]
     I2s1   = 4,
     #[cfg(esp32s3)]
     LcdCam = 5,
-    #[cfg(any(esp32c3, esp32c6, esp32s3))]
+    #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
     Aes    = 6,
     #[cfg(gdma)]
     Sha    = 7,
-    #[cfg(any(esp32c3, esp32c6, esp32s3))]
+    #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
     Adc    = 8,
     #[cfg(esp32s3)]
     Rmt    = 9,

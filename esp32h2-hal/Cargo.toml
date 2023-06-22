@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = [
     "Kirill Mikhailov <playfulfence@gmail.com>",
     "Jesse Braham <jesse@beta7.io>",
+    "Sergio Gasquez Arcos <sergio.gasquez@gmail.com",
 ]
 edition      = "2021"
 rust-version = "1.60.0"
@@ -41,7 +42,7 @@ crypto-bigint     = { version = "0.5.2", default-features = false }
 embassy-executor  = { version = "0.2.0", features = ["nightly", "integrated-timers", "arch-riscv32", "executor-thread"] }
 embedded-graphics = "0.7.1"
 esp-backtrace     = { version = "0.7.0", features = ["esp32h2", "panic-handler", "exception-handler", "print-uart"] }
-# esp-hal-smartled  = { version = "0.1.0", features = ["esp32h2"], path = "../esp-hal-smartled" }
+esp-hal-smartled  = { version = "0.2.0", features = ["esp32h2"], path = "../esp-hal-smartled" }
 esp-println       = { version = "0.5.0", features = ["esp32h2"] }
 lis3dh-async      = "0.7.0"
 sha2              = { version = "0.10.6", default-features = false}
@@ -51,6 +52,7 @@ static_cell       = "1.0.0"
 
 [features]
 default              = ["rt", "vectored", "esp-hal-common/rv-zero-rtc-bss"]
+debug                = ["esp-hal-common/debug"]
 direct-boot          = ["esp-hal-common/rv-init-data", "esp-hal-common/rv-init-rtc-data"]
 eh1                  = ["esp-hal-common/eh1", "dep:embedded-hal-1", "dep:embedded-hal-nb", "dep:embedded-can"]
 rt                   = []

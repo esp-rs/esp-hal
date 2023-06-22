@@ -12,3 +12,10 @@ PROVIDE(rtc_get_reset_reason = 0x40000018);
 ets_update_cpu_frequency = 0x40000048;
 PROVIDE(software_reset = 0x40000090);
 PROVIDE(software_reset_cpu = 0x40000094);
+
+PROVIDE(esp_rom_crc32_be = 0x40000764);
+PROVIDE(esp_rom_crc16_be = 0x40000768);
+PROVIDE(esp_rom_crc8_be = 0x4000076c);
+PROVIDE(esp_rom_crc32_le = 0x40000758);
+PROVIDE(esp_rom_crc16_le = 0x4000075c);
+PROVIDE(esp_rom_crc8_le = 0x40000760);

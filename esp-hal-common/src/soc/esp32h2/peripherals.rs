@@ -1,3 +1,5 @@
+//! Peripheral instance singletons
+
 use esp32h2 as pac;
 // We need to export this for users to use
 pub use pac::Interrupt;
@@ -19,7 +21,7 @@ crate::peripherals! {
     // HP_SYS => true,
     I2C0 => true,
     I2C1 => true,
-    // I2S0 => true,
+    I2S0 => true,
     INTERRUPT_CORE0 => true,
     INTPRI => true,
     IO_MUX => true,
@@ -42,7 +44,7 @@ crate::peripherals! {
     PCR => true,
     PMU => true,
     RMT => true,
-    // RNG => true,
+    RNG => true,
     RSA => true,
     SHA => true,
     // SOC_ETM => true,

@@ -1,3 +1,5 @@
+//! USB Serial JTAG peripheral driver
+
 use core::convert::Infallible;
 
 use crate::{
@@ -6,6 +8,7 @@ use crate::{
     system::PeripheralClockControl,
 };
 
+/// USB Serial JTAG driver
 pub struct UsbSerialJtag<'d> {
     usb_serial: PeripheralRef<'d, USB_DEVICE>,
 }
@@ -150,7 +153,7 @@ impl<'d> UsbSerialJtag<'d> {
     }
 }
 
-/// USB serial/JTAG peripheral instance
+/// USB Serial JTAG peripheral instance
 pub trait Instance {
     fn register_block(&self) -> &RegisterBlock;
 

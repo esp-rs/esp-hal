@@ -188,13 +188,12 @@ where
     }
 }
 
-/// General-purpose timer
+/// General-purpose Timer driver
 pub struct Timer<T> {
     timg: T,
     apb_clk_freq: HertzU32,
 }
 
-/// Timer driver
 impl<T> Timer<T>
 where
     T: Instance,

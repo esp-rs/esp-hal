@@ -1,4 +1,8 @@
-use std::{env, fs, path::PathBuf};
+use std::{
+    env,
+    fs,
+    path::{Path, PathBuf},
+};
 
 use serde::Deserialize;
 
@@ -144,11 +148,18 @@ fn main() {
         println!("cargo:rustc-cfg={peripheral}");
     }
 
-    // check PSRAM features are only given if the target supports PSRAM
+    // Check PSRAM features are only given if the target supports PSRAM
     if !&device.peripherals.contains(&String::from("psram"))
         && (cfg!(feature = "psram_2m") || cfg!(feature = "psram_4m") || cfg!(feature = "psram_8m"))
     {
         panic!("The target does not support PSRAM");
+    }
+
+    // If the `embassy` feature is enabled, ensure that a time driver implementation
+    // is available
+    #[cfg(feature = "embassy")]
+    {
+        assert_unique_used_features!("embassy-time-systick", "embassy-time-timg0");
     }
 
     // Place all linker scripts in `OUT_DIR`, and instruct Cargo how to find these
@@ -169,10 +180,7 @@ fn main() {
     gen_efuse_table(device_name, out);
 }
 
-fn copy_dir_all(
-    src: impl AsRef<std::path::Path>,
-    dst: impl AsRef<std::path::Path>,
-) -> std::io::Result<()> {
+fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> std::io::Result<()> {
     fs::create_dir_all(&dst)?;
     for entry in fs::read_dir(src)? {
         let entry = entry?;
@@ -186,10 +194,10 @@ fn copy_dir_all(
     Ok(())
 }
 
-fn gen_efuse_table(device_name: &str, out_dir: impl AsRef<std::path::Path>) {
+fn gen_efuse_table(device_name: &str, out_dir: impl AsRef<Path>) {
     use std::io::{BufRead, Write};
 
-    let src_path = std::path::PathBuf::from(format!("src/soc/{device_name}/efuse.csv"));
+    let src_path = PathBuf::from(format!("src/soc/{device_name}/efuse.csv"));
     let out_path = out_dir.as_ref().join("efuse_fields.rs");
 
     println!("cargo:rerun-if-changed={}", src_path.display());

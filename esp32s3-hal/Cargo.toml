@@ -55,6 +55,7 @@ usbd-serial       = "0.1.1"
 
 [features]
 default              = ["rt", "vectored"]
+debug                = ["esp-hal-common/debug"]
 direct-boot          = ["r0"]
 eh1                  = ["esp-hal-common/eh1", "dep:embedded-hal-1", "dep:embedded-hal-nb", "dep:embedded-can"]
 rt                   = []
@@ -69,6 +70,9 @@ psram     = []
 psram_2m  = ["esp-hal-common/psram_2m", "psram"]
 psram_4m  = ["esp-hal-common/psram_4m", "psram"]
 psram_8m  = ["esp-hal-common/psram_8m", "psram"]
+opsram_2m  = ["esp-hal-common/opsram_2m", "psram"]
+opsram_4m  = ["esp-hal-common/opsram_4m", "psram"]
+opsram_8m  = ["esp-hal-common/opsram_8m", "psram"]
 
 [[example]]
 name              = "spi_eh1_loopback"
@@ -93,6 +97,10 @@ required-features = ["embassy", "async"]
 [[example]]
 name              = "psram"
 required-features = ["psram_2m"]
+
+[[example]]
+name              = "octal_psram"
+required-features = ["opsram_2m"]
 
 [[example]]
 name              = "embassy_serial"

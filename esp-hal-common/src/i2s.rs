@@ -16,7 +16,7 @@ use crate::{
 #[cfg(any(esp32, esp32s2, esp32s3))]
 const I2S_LL_MCLK_DIVIDER_BIT_WIDTH: usize = 6;
 
-#[cfg(any(esp32c3, esp32c6))]
+#[cfg(any(esp32c3, esp32c6, esp32h2))]
 const I2S_LL_MCLK_DIVIDER_BIT_WIDTH: usize = 9;
 
 const I2S_LL_MCLK_DIVIDER_MAX: usize = (1 << I2S_LL_MCLK_DIVIDER_BIT_WIDTH) - 1;
@@ -1116,7 +1116,8 @@ mod private {
             let i2s = self.register_block();
 
             i2s.clkm_conf.modify(|r, w| unsafe {
-                w.bits(r.bits() | (2 << 21)) // select PLL_160M
+                w.bits(r.bits() | (crate::soc::constants::I2S_DEFAULT_CLK_SRC << 21))
+                // select PLL_160M
             });
 
             #[cfg(esp32)]
@@ -1295,7 +1296,7 @@ mod private {
         }
     }
 
-    #[cfg(any(esp32c3, esp32c6, esp32s3))]
+    #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
     pub trait RegisterAccessPrivate: Signals + RegBlock {
         #[cfg(any(esp32c3, esp32s3))]
         fn set_clock(&self, clock_settings: I2sClockDividers) {
@@ -1359,7 +1360,7 @@ mod private {
                     .tx_clk_active()
                     .set_bit()
                     .tx_clk_sel()
-                    .variant(2) // for now fixed at 160MHz
+                    .variant(crate::soc::constants::I2S_DEFAULT_CLK_SRC) // for now fixed at 160MHz
                     .tx_clkm_div_num()
                     .variant(clock_settings.mclk_divider as u8)
             });
@@ -1384,7 +1385,7 @@ mod private {
                 w.rx_clk_active()
                     .set_bit()
                     .rx_clk_sel()
-                    .variant(2) // for now fixed at 160MHz
+                    .variant(crate::soc::constants::I2S_DEFAULT_CLK_SRC) // for now fixed at 160MHz
                     .rx_clkm_div_num()
                     .variant(clock_settings.mclk_divider as u8)
                     .mclk_sel()
@@ -1397,10 +1398,10 @@ mod private {
             });
         }
 
-        #[cfg(any(esp32c6))]
+        #[cfg(any(esp32c6, esp32h2))]
         fn set_clock(&self, clock_settings: I2sClockDividers) {
             let i2s = self.register_block();
-            let pcr = unsafe { &*esp32c6::PCR::PTR }; // I2S clocks are configured via PCR
+            let pcr = unsafe { &*crate::peripherals::PCR::PTR }; // I2S clocks are configured via PCR
 
             let clkm_div_x: u32;
             let clkm_div_y: u32;
@@ -1458,12 +1459,18 @@ mod private {
                 w.i2s_tx_clkm_en()
                     .set_bit()
                     .i2s_tx_clkm_sel()
-                    .variant(2) // for now fixed at 160MHz
+                    .variant(crate::soc::constants::I2S_DEFAULT_CLK_SRC) // for now fixed at 160MHz for C6 and 96MHz for H2
                     .i2s_tx_clkm_div_num()
                     .variant(clock_settings.mclk_divider as u8)
             });
 
+            #[cfg(not(esp32h2))]
             i2s.tx_conf1.modify(|_, w| {
+                w.tx_bck_div_num()
+                    .variant((clock_settings.bclk_divider - 1) as u8)
+            });
+            #[cfg(esp32h2)]
+            i2s.tx_conf.modify(|_, w| {
                 w.tx_bck_div_num()
                     .variant((clock_settings.bclk_divider - 1) as u8)
             });
@@ -1483,14 +1490,19 @@ mod private {
                 w.i2s_rx_clkm_en()
                     .set_bit()
                     .i2s_rx_clkm_sel()
-                    .variant(2) // for now fixed at 160MHz
+                    .variant(crate::soc::constants::I2S_DEFAULT_CLK_SRC) // for now fixed at 160MHz for C6 and 96MHz for H2
                     .i2s_rx_clkm_div_num()
                     .variant(clock_settings.mclk_divider as u8)
                     .i2s_mclk_sel()
                     .variant(true)
             });
-
+            #[cfg(not(esp32h2))]
             i2s.rx_conf1.modify(|_, w| {
+                w.rx_bck_div_num()
+                    .variant((clock_settings.bclk_divider - 1) as u8)
+            });
+            #[cfg(esp32h2)]
+            i2s.rx_conf.modify(|_, w| {
                 w.rx_bck_div_num()
                     .variant((clock_settings.bclk_divider - 1) as u8)
             });
@@ -1500,17 +1512,18 @@ mod private {
             let i2s = self.register_block();
             i2s.tx_conf1.modify(|_, w| {
                 w.tx_tdm_ws_width()
-                    .variant(data_format.channel_bits() - 1)
+                    .variant((data_format.channel_bits() - 1).into())
                     .tx_bits_mod()
                     .variant(data_format.data_bits() - 1)
                     .tx_tdm_chan_bits()
                     .variant(data_format.channel_bits() - 1)
                     .tx_half_sample_bits()
                     .variant(data_format.channel_bits() - 1)
-                    .tx_msb_shift()
-                    .set_bit()
             });
-
+            #[cfg(not(esp32h2))]
+            i2s.tx_conf1.modify(|_, w| w.tx_msb_shift().set_bit());
+            #[cfg(esp32h2)]
+            i2s.tx_conf.modify(|_, w| w.tx_msb_shift().set_bit());
             i2s.tx_conf.modify(|_, w| {
                 w.tx_mono()
                     .clear_bit()
@@ -1573,16 +1586,18 @@ mod private {
 
             i2s.rx_conf1.modify(|_, w| {
                 w.rx_tdm_ws_width()
-                    .variant(data_format.channel_bits() - 1)
+                    .variant((data_format.channel_bits() - 1).into())
                     .rx_bits_mod()
                     .variant(data_format.data_bits() - 1)
                     .rx_tdm_chan_bits()
                     .variant(data_format.channel_bits() - 1)
                     .rx_half_sample_bits()
                     .variant(data_format.channel_bits() - 1)
-                    .rx_msb_shift()
-                    .set_bit()
             });
+            #[cfg(not(esp32h2))]
+            i2s.rx_conf1.modify(|_, w| w.rx_msb_shift().set_bit());
+            #[cfg(esp32h2)]
+            i2s.rx_conf.modify(|_, w| w.rx_msb_shift().set_bit());
 
             i2s.rx_conf.modify(|_, w| {
                 w.rx_mono()
@@ -1715,7 +1730,7 @@ mod private {
     #[derive(Clone)]
     pub struct I2sPeripheral1 {}
 
-    #[cfg(any(esp32c3, esp32c6))]
+    #[cfg(any(esp32c3, esp32c6, esp32h2))]
     impl Signals for I2sPeripheral0 {
         fn get_peripheral(&self) -> Peripheral {
             Peripheral::I2s0
@@ -1991,7 +2006,7 @@ mod private {
         // If data_bits is a power of two, use 256 as the mclk_multiple
         // If data_bits is 24, use 192 (24 * 8) as the mclk_multiple
         let mclk_multiple = if data_bits == 24 { 192 } else { 256 };
-        let sclk = 160_000_000; // for now it's fixed PLL_160M_CLK
+        let sclk = crate::soc::constants::I2S_SCLK; // for now it's fixed 160MHz and 96MHz (just H2)
 
         let rate_hz: HertzU32 = sample_rate.into();
         let rate = rate_hz.raw();
