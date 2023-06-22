@@ -313,6 +313,8 @@ jobs:
         run: cd esp32s3-hal/ && cargo check --example=embassy_serial --features=embassy,embassy-time-timg0,async
       - name: check esp32s3-hal (async, i2c)
         run: cd esp32s3-hal/ && cargo check --example=embassy_i2c --features=embassy,embassy-time-timg0,async
+      - name: check esp32s3-hal (octal psram)
+        run: cd esp32s3-hal/ && cargo check --example=octal_psram --features=opsram_2m --release # This example requires release!
 
   esp-riscv-rt:
     runs-on: ubuntu-latest
