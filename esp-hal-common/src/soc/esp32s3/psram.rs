@@ -1149,7 +1149,9 @@ pub(crate) mod utils {
         mspi_pin_init();
         init_psram_pins();
         set_psram_cs_timing();
-        // s_configure_psram_ecc();
+
+        // for now we don't support ECC
+        // "s_configure_psram_ecc();"
 
         // enter MSPI slow mode to init PSRAM device registers
         spi_timing_enter_mspi_low_speed_mode(true);
@@ -1360,9 +1362,8 @@ pub(crate) mod utils {
         // Set PSRAM module clock
         spi0_timing_config_set_psram_clock(4);
 
-        // #if SPI_TIMING_FLASH_NEEDS_TUNING || SPI_TIMING_PSRAM_NEEDS_TUNING
-        //     clear_timing_tuning_regs(control_spi1);
-        // #endif
+        // for now we don't support tuning the timing
+        // "clear_timing_tuning_regs(control_spi1);"
     }
 
     // Set SPI0 FLASH and PSRAM module clock, din_num, din_mode and extra dummy,
@@ -1389,9 +1390,8 @@ pub(crate) mod utils {
         // Set PSRAM module clock
         spi0_timing_config_set_psram_clock(psram_div);
 
-        // #if SPI_TIMING_FLASH_NEEDS_TUNING || SPI_TIMING_PSRAM_NEEDS_TUNING
-        //     set_timing_tuning_regs_as_required(true);
-        // #endif
+        // for now we don't support tuning the timing
+        // "set_timing_tuning_regs_as_required(true);"
     }
 
     fn set_psram_cs_timing() {
@@ -1426,7 +1426,6 @@ pub(crate) mod utils {
 
     fn init_psram_pins() {
         // Set cs1 pin function
-        // PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[OCT_PSRAM_CS1_IO],  FUNC_SPICS1_SPICS1);
         unsafe {
             let iomux = &*esp32s3::IO_MUX::PTR;
             iomux.gpio[OCT_PSRAM_CS1_IO as usize]
@@ -1434,14 +1433,12 @@ pub(crate) mod utils {
         }
 
         // Set mspi cs1 drive strength
-        // PIN_SET_DRV(GPIO_PIN_MUX_REG[OCT_PSRAM_CS1_IO], 3);
         unsafe {
             let iomux = &*esp32s3::IO_MUX::PTR;
             iomux.gpio[OCT_PSRAM_CS1_IO as usize].modify(|_, w| w.fun_drv().variant(3))
         }
 
         // Set psram clock pin drive strength
-        // REG_SET_FIELD(SPI_MEM_DATE_REG(0), SPI_MEM_SPI_SMEM_SPICLK_FUN_DRV, 3);
         set_peri_reg_bits(
             SPI0_MEM_DATE_REG,
             SPI_MEM_SPI_SMEM_SPICLK_FUN_DRV_V,
