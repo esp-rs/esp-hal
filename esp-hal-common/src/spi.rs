@@ -411,6 +411,7 @@ pub trait HalfDuplexReadWrite {
     ) -> Result<(), Self::Error>;
 }
 
+/// SPI peripheral driver
 pub struct Spi<'d, T, M> {
     spi: PeripheralRef<'d, T>,
     _mode: PhantomData<M>,

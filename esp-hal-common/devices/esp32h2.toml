@@ -17,7 +17,7 @@ peripherals = [
     # "hp_sys",
     "i2c0",
     "i2c1",
-    # "i2s0",
+    "i2s0",
     "interrupt_core0",
     "intpri",
     "io_mux",
@@ -40,7 +40,7 @@ peripherals = [
     "pcr",
     "pmu",
     "rmt",
-    # "rng",
+    "rng",
     "rsa",
     "sha",
     # "soc_etm",
@@ -68,4 +68,8 @@ peripherals = [
     "phy",
     "bt",
     "ieee802154",
+
+    # ROM capabilities
+    "rom_crc_le",
+    "rom_crc_be",
 ]

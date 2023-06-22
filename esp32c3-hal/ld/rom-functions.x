@@ -12,3 +12,10 @@ PROVIDE(rom_i2c_writeReg_Mask = 0x40001960);
 PROVIDE(rtc_get_reset_reason = 0x40000018);
 PROVIDE(software_reset = 0x40000090);
 PROVIDE(software_reset_cpu = 0x40000094);
+
+PROVIDE(esp_rom_crc32_be = 0x4000062c);
+PROVIDE(esp_rom_crc16_be = 0x40000634);
+PROVIDE(esp_rom_crc8_be = 0x4000063c);
+PROVIDE(esp_rom_crc32_le = 0x40000628);
+PROVIDE(esp_rom_crc16_le = 0x40000630);
+PROVIDE(esp_rom_crc8_le = 0x40000638);

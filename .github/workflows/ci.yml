@@ -222,22 +222,24 @@ jobs:
       # for each supported image format.
       - name: build esp32h2-hal (no features)
         run: cd esp32h2-hal/ && cargo +nightly build --examples
-      # - name: build esp32h2-hal (direct-boot)
-      #   run: cd esp32h2-hal/ && cargo +nightly build --examples --features=direct-boot
+      - name: build esp32h2-hal (direct-boot)
+        run: cd esp32h2-hal/ && cargo +nightly build --examples --features=direct-boot
       # Subsequent steps can just check the examples instead, as we're already
       # confident that they link.
       - name: check esp32h2-hal (common features)
         run: cd esp32h2-hal/ && cargo +nightly check --examples --features=eh1,ufmt
-      - name: check esp32h2-hal (async, i2c)
-        run: cd esp32h2-hal/ && cargo check --example=embassy_i2c --features=embassy,embassy-time-systick,async
       - name: check esp32h2-hal (async, systick)
         run: cd esp32h2-hal/ && cargo +nightly check --example=embassy_hello_world --features=embassy,embassy-time-systick
       - name: check esp32h2-hal (async, timg0)
         run: cd esp32h2-hal/ && cargo +nightly check --example=embassy_hello_world --features=embassy,embassy-time-timg0
-      # - name: check esp32h2-hal (async, gpio)
-      #   run: cd esp32h2-hal/ && cargo +nightly check --example=embassy_wait --features=embassy,embassy-time-systick,async
+      - name: check esp32h2-hal (async, gpio)
+        run: cd esp32h2-hal/ && cargo +nightly check --example=embassy_wait --features=embassy,embassy-time-systick,async
       - name: check esp32h2-hal (async, spi)
         run: cd esp32h2-hal/ && cargo +nightly check --example=embassy_spi --features=embassy,embassy-time-systick,async
+      - name: check esp32h2-hal (async, serial)
+        run: cd esp32h2-hal/ && cargo +nightly check --example=embassy_serial --features=embassy,embassy-time-systick,async
+      - name: check esp32h2-hal (async, i2c)
+        run: cd esp32h2-hal/ && cargo +nightly check --example=embassy_i2c --features=embassy,embassy-time-systick,async
       - name: check esp32h2-hal (interrupt-preemption)
         run: cd esp32h2-hal/ && cargo check --example=interrupt_preemption --features=interrupt-preemption
 
@@ -311,6 +313,8 @@ jobs:
         run: cd esp32s3-hal/ && cargo check --example=embassy_serial --features=embassy,embassy-time-timg0,async
       - name: check esp32s3-hal (async, i2c)
         run: cd esp32s3-hal/ && cargo check --example=embassy_i2c --features=embassy,embassy-time-timg0,async
+      - name: check esp32s3-hal (octal psram)
+        run: cd esp32s3-hal/ && cargo check --example=octal_psram --features=opsram_2m --release # This example requires release!
 
   esp-riscv-rt:
     runs-on: ubuntu-latest
@@ -387,6 +391,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       # Run clippy on all packages targeting RISC-V.
+      - name: clippy (esp-riscv-rt)
+        run: cargo +stable clippy --manifest-path=esp-riscv-rt/Cargo.toml -- --no-deps
       - name: clippy (esp32c2-hal)
         run: cargo +stable clippy --manifest-path=esp32c2-hal/Cargo.toml -- --no-deps
       - name: clippy (esp32c3-hal)
@@ -439,6 +445,8 @@ jobs:
         run: cargo fmt --all --manifest-path=esp-hal-procmacros/Cargo.toml -- --check
       - name: rustfmt (esp-hal-smartled)
         run: cargo fmt --all --manifest-path=esp-hal-smartled/Cargo.toml -- --check
+      - name: rustfmt (esp-riscv-rt)
+        run: cargo fmt --all --manifest-path=esp-riscv-rt/Cargo.toml -- --check
       - name: rustfmt (esp32-hal)
         run: cargo fmt --all --manifest-path=esp32-hal/Cargo.toml -- --check
       - name: rustfmt (esp32c2-hal)

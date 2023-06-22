@@ -1,4 +1,9 @@
-pub use paste::paste;
+//! ESP ROM libraries
+//!
+//! Safe abstractions to the additional libraries provided in the ESP's
+//! read-only memory.
+
+pub mod crc;
 
 #[allow(unused)]
 extern "C" {
@@ -14,6 +19,7 @@ extern "C" {
     );
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! regi2c_write {
     ( $block: ident, $reg_add: ident, $indata: expr ) => {
@@ -27,6 +33,7 @@ macro_rules! regi2c_write {
     };
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! regi2c_write_mask {
     ( $block: ident, $reg_add: ident, $indata: expr ) => {

@@ -20,10 +20,10 @@ use esp32_hal::{
     clock::ClockControl,
     embassy,
     i2c::I2C,
+    interrupt,
     peripherals::{Interrupt, Peripherals, I2C0},
     prelude::*,
     timer::TimerGroup,
-    Priority,
     Rtc,
     IO,
 };
@@ -77,7 +77,7 @@ fn main() -> ! {
         &clocks,
     );
 
-    esp32_hal::interrupt::enable(Interrupt::I2C_EXT0, Priority::Priority1).unwrap();
+    interrupt::enable(Interrupt::I2C_EXT0, interrupt::Priority::Priority1).unwrap();
 
     let executor = EXECUTOR.init(Executor::new());
     executor.run(|spawner| {

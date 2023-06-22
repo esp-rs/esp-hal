@@ -1,3 +1,5 @@
+//! Pulse Counter peripheral driver
+
 use self::unit::Unit;
 use crate::{
     peripheral::{Peripheral, PeripheralRef},

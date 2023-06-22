@@ -22,7 +22,7 @@ embedded-hal-1       = { version = "=1.0.0-alpha.10", optional = true, package =
 embedded-hal-nb      = { version = "=1.0.0-alpha.2", optional = true }
 esp-synopsys-usb-otg = { version = "0.3.1", optional = true, features = ["fs", "esp32sx"] }
 fugit                = "0.3.6"
-log                  = "0.4.17"
+log                  = "=0.4.18"
 lock_api             = { version = "0.4.9", optional = true }
 nb                   = "1.1.0"
 paste                = "1.0.12"
@@ -51,13 +51,13 @@ ufmt-write = { version = "0.1.0", optional = true }
 # IMPORTANT:
 # Each supported device MUST have its PAC included below along with a
 # corresponding feature.
-esp32   = { version = "0.23.0", features = ["critical-section"], optional = true }
-esp32c2 = { version = "0.11.0", features = ["critical-section"], optional = true }
-esp32c3 = { version = "0.14.0", features = ["critical-section"], optional = true }
-esp32c6 = { version = "0.4.0",  features = ["critical-section"], optional = true }
-esp32h2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "8903688", package = "esp32h2", features = ["critical-section"], optional = true }
-esp32s2 = { version = "0.14.0", features = ["critical-section"], optional = true }
-esp32s3 = { version = "0.18.0", features = ["critical-section"], optional = true }
+esp32   = { version = "0.24.0", features = ["critical-section"], optional = true }
+esp32c2 = { version = "0.12.0", features = ["critical-section"], optional = true }
+esp32c3 = { version = "0.15.0", features = ["critical-section"], optional = true }
+esp32c6 = { version = "0.5.0",  features = ["critical-section"], optional = true }
+esp32h2 = { version = "0.1.0",  features = ["critical-section"], optional = true }
+esp32s2 = { version = "0.15.0", features = ["critical-section"], optional = true }
+esp32s3 = { version = "0.19.0", features = ["critical-section"], optional = true }
 
 [build-dependencies]
 basic-toml = "0.1.2"
@@ -81,6 +81,10 @@ esp32c2_26mhz = []
 psram_2m = []
 psram_4m = []
 psram_8m = []
+
+opsram_2m = []
+opsram_4m = []
+opsram_8m = []
 
 # Implement the `embedded-hal==1.0.0-alpha.x` traits
 eh1 = ["embedded-hal-1", "embedded-hal-nb", "embedded-can"]
@@ -111,3 +115,13 @@ rv-zero-rtc-bss  = ["esp-riscv-rt/zero-rtc-fast-bss"]
 rv-init-rtc-data = ["esp-riscv-rt/init-rtc-fast-data", "esp-riscv-rt/init-rtc-fast-text"]
 
 direct-vectoring = ["esp-riscv-rt/direct-vectoring"]
+# Enable the `impl-register-debug` feature for the selected PAC
+debug = [
+    "esp32?/impl-register-debug",
+    "esp32c2?/impl-register-debug",
+    "esp32c3?/impl-register-debug",
+    "esp32c6?/impl-register-debug",
+    "esp32h2?/impl-register-debug",
+    "esp32s2?/impl-register-debug",
+    "esp32s3?/impl-register-debug",
+]

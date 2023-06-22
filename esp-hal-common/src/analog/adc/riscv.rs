@@ -296,7 +296,6 @@ pub mod implementation {
 
     use embedded_hal::adc::Channel;
 
-    use super::impl_adc_interface;
     pub use crate::analog::{adc::*, ADC1};
     use crate::gpio::*;
 
@@ -321,7 +320,6 @@ pub mod implementation {
 
     use embedded_hal::adc::Channel;
 
-    use super::impl_adc_interface;
     pub use crate::analog::{adc::*, ADC1, ADC2};
     use crate::gpio::*;
 
@@ -351,7 +349,6 @@ pub mod implementation {
 
     use embedded_hal::adc::Channel;
 
-    use super::impl_adc_interface;
     pub use crate::analog::{adc::*, ADC1};
     use crate::gpio::*;
 
@@ -377,7 +374,6 @@ pub mod implementation {
 
     use embedded_hal::adc::Channel;
 
-    use super::impl_adc_interface;
     pub use crate::analog::{adc::*, ADC1};
     use crate::gpio::*;
 

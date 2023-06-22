@@ -1,3 +1,5 @@
+//! Encrypt/Decrypt a message using AES
+
 #![no_std]
 #![no_main]
 use aes::{
@@ -22,8 +24,6 @@ fn main() -> ! {
     let mut system = peripherals.PCR.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    // Disable the watchdog timers. For the ESP32-H2, this includes the Super WDT,
-    // and the TIMG WDTs.
     // Disable the watchdog timers. For the ESP32-H2, this includes the Super WDT,
     // and the TIMG WDTs.
     let mut rtc = Rtc::new(peripherals.LP_CLKRST);

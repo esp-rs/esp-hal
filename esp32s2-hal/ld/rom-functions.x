@@ -19,3 +19,7 @@ PROVIDE ( SelectSpiQIO = 0x40015b88 );
 PROVIDE ( esp_rom_spi_set_op_mode = 0x400179e8 );
 PROVIDE ( esp_rom_spi_cmd_start = 0x40017ba8 );
 PROVIDE ( esp_rom_spi_cmd_config = 0x40017c58 );
+
+PROVIDE(esp_rom_crc32_le = 0x400119dc);
+PROVIDE(esp_rom_crc16_le = 0x40011a10);
+PROVIDE(esp_rom_crc8_le = 0x40011a4c);

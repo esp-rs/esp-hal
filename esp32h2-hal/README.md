@@ -1,9 +1,9 @@
 # esp32h2-hal
 
-<!-- [![Crates.io](https://img.shields.io/crates/v/esp32c6-hal?labelColor=1C2C2E&color=C96329&logo=Rust&style=flat-square)](https://crates.io/crates/esp32c6-hal)
-[![docs.rs](https://img.shields.io/docsrs/esp32c6-hal?labelColor=1C2C2E&color=C96329&logo=rust&style=flat-square)](https://docs.rs/esp32c6-hal)
-![Crates.io](https://img.shields.io/crates/l/esp32c6-hal?labelColor=1C2C2E&style=flat-square)
-[![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&labelColor=1C2C2E&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org) -->
+<!-- [![Crates.io](https://img.shields.io/crates/v/esp32h2-hal?labelColor=1C2C2E&color=C96329&logo=Rust&style=flat-square)](https://crates.io/crates/esp32h2-hal)
+[![docs.rs](https://img.shields.io/docsrs/esp32h2-hal?labelColor=1C2C2E&color=C96329&logo=rust&style=flat-square)](https://docs.rs/esp32h2-hal)
+![Crates.io](https://img.shields.io/crates/l/esp32h2-hal?labelColor=1C2C2E&style=flat-square) -->
+[![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&labelColor=1C2C2E&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
 
 `no_std` HAL for the ESP32-H2 from Espressif. Implements a number of the traits defined by [embedded-hal](https://github.com/rust-embedded/embedded-hal).
 
@@ -11,7 +11,7 @@ This device uses the RISC-V ISA, which is officially supported by the Rust compi
 
 <!-- ## [Documentation]
 
-[documentation]: https://docs.rs/esp32c6-hal/
+[documentation]: https://docs.rs/esp32h2-hal/ -->
 
 ## Getting Started
 
@@ -27,13 +27,13 @@ $ rustup target add riscv32imac-unknown-none-elf
 
 #### IDF Bootloader
 
-The [IDF second stage bootloader](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c6/api-guides/startup.html#second-stage-bootloader) is the default bootloader solution.
+The [IDF second stage bootloader](https://docs.espressif.com/projects/esp-idf/en/latest/esp32h2/api-guides/startup.html#second-stage-bootloader) is the default bootloader solution.
 
 By default, [espflash](https://github.com/esp-rs/espflash) fetches the required binaries (Bootloader and Partition Table) and flashes them onto the target device together with the Rust-based application firmware image.
 
 #### Direct Boot
 
-[Direct Boot](https://github.com/espressif/esp32c6-direct-boot-example#direct-boot-in-esp32-c6) allows an application stored in the External Flash to be executed directly, without being copied into Internal RAM.
+Direct Boot allows an application stored in the External Flash to be executed directly, without being copied into Internal RAM.
 
 ##### Booting the Hello World example using Direct Boot
 
@@ -52,14 +52,14 @@ cargo espflash --release --format direct-boot --features direct-boot --example h
 The ROM Bootloader will identify the firmware image built with Direct Boot support and load it appropriately from the External Flash:
 
 ```shell
-ESP-ROM:esp32c6-20220919
-Build:Sep 19 2022
-rst:0x1 (POWERON),boot:0x6e (SPI_FAST_FLASH_BOOT)
+ESP-ROM:esp32h2-20221101
+Build:Nov  1 2022
+rst:0x1 (POWERON),boot:0xc (SPI_FAST_FLASH_BOOT)
 Hello world!
 Hello world!
 Hello world!
 ```
--->
+
 ## License
 
 Licensed under either of:

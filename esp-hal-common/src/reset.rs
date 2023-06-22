@@ -1,3 +1,5 @@
+//! Hardware and Software Reset
+
 use crate::rtc_cntl::SocResetReason;
 
 pub enum SleepSource {

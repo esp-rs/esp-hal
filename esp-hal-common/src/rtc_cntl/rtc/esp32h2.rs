@@ -207,6 +207,7 @@ pub enum SocResetReason {
 pub(crate) enum RtcFastClock {
     /// Select RC_FAST_CLK as RTC_FAST_CLK source
     RtcFastClockRcFast = 0,
+    #[allow(dead_code)]
     /// Select XTAL_D2_CLK as RTC_FAST_CLK source
     RtcFastClockXtalD2 = 1,
 }

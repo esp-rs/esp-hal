@@ -2,6 +2,10 @@
 //! You can short the TX and RX pin and see it reads what was written.
 //! Additionally you can connect a logic analzyer to TX and see how the changes
 //! of the configuration change the output signal.
+//!
+//! The following wiring is assumed:
+//! - TX => GPIO16
+//! - RX => GPIO17
 
 #![no_std]
 #![no_main]
@@ -71,7 +75,7 @@ fn main() -> ! {
         let read = block!(serial1.read());
 
         match read {
-            Ok(read) => println!("Read {:02x}", read),
+            Ok(read) => println!("Read 0x{:02x}", read),
             Err(err) => println!("Error {:?}", err),
         }
 
