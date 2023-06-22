@@ -1,3 +1,5 @@
+//! Libraries in read-only memory
+
 pub use paste::paste;
 
 pub mod crc;
