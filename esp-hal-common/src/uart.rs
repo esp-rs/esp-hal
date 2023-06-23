@@ -996,12 +996,11 @@ mod asynch {
     use cfg_if::cfg_if;
     use embassy_futures::select::select;
     use embassy_sync::waitqueue::AtomicWaker;
-    use esp32c3::uart0::RegisterBlock;
     use procmacros::interrupt;
 
     use super::{Error, Instance};
     use crate::{
-        uart::{FIFO_SPEC, UART_FIFO_SIZE},
+        uart::{RegisterBlock, FIFO_SPEC, UART_FIFO_SIZE},
         Uart,
     };
 
