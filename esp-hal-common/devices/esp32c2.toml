@@ -42,6 +42,7 @@ peripherals = [
     # ROM capabilities
     "rom_crc_le",
     "rom_crc_be",
+    "rom_md5_mbedtls",
 
     # Wakeup SOC based on ESP-IDF:
     "pm_support_wifi_wakeup",
