@@ -48,6 +48,7 @@ fn main() -> ! {
     timer0.start(1u64.secs());
 
     let data = "123456789";
+    let sentence = "The quick brown fox jumps over a lazy dog";
 
     writeln!(
         uart0,
@@ -74,15 +75,23 @@ fn main() -> ! {
         assert_eq!(crc_rohc, 0xd0);
         assert_eq!(crc_smbus, 0xf4);
 
+        // Hash the sentence one word at a time to *really* test the context
+        // Use Peekable while iter_intersperse is unstable
         let mut md5_ctx = md5::Context::new();
-        md5_ctx.consume(data);
+        let mut it = sentence.split_whitespace().peekable();
+        while let Some(word) = it.next() {
+            md5_ctx.consume(word);
+            if it.peek().is_some() {
+                md5_ctx.consume(" ");
+            }
+        }
         let md5_digest = md5_ctx.compute();
 
         assert_eq!(
             md5_digest,
             md5::Digest([
-                0x25, 0xf9, 0xe7, 0x94, 0x32, 0x3b, 0x45, 0x38, 0x85, 0xf5, 0x18, 0x1f, 0x1b, 0x62,
-                0x4d, 0x0b
+                0x30, 0xde, 0xd8, 0x07, 0xd6, 0x5e, 0xe0, 0x37, 0x0f, 0xc6, 0xd7, 0x3d, 0x6a, 0xb5,
+                0x5a, 0x95
             ])
         );
 
