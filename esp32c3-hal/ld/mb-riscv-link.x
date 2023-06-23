@@ -64,9 +64,9 @@ SECTIONS
     KEEP(*(.init));
     KEEP(*(.init.rust));
     KEEP(*(.text.abort));
-    . = ALIGN(4);
     KEEP(*(.trap));
     *(.trap.*);
+    . = ALIGN(4);
 
     *libriscv-*.rlib:riscv.*(.literal .text .literal.* .text.*);
     *libesp_riscv_rt-*.rlib:esp-riscv-rt.*(.literal .text .literal.* .text.*);
