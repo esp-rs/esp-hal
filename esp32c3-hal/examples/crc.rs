@@ -9,7 +9,7 @@ use esp32c3_hal::{
     clock::ClockControl,
     peripherals::Peripherals,
     prelude::*,
-    rom::crc,
+    rom::{crc, md5},
     timer::TimerGroup,
     Rtc,
     Uart,
@@ -74,10 +74,30 @@ fn main() -> ! {
         assert_eq!(crc_rohc, 0xd0);
         assert_eq!(crc_smbus, 0xf4);
 
+        let mut md5_ctx = md5::Context::new();
+        md5_ctx.consume(data);
+        let md5_digest = md5_ctx.compute();
+
+        assert_eq!(
+            md5_digest,
+            md5::Digest([
+                0x25, 0xf9, 0xe7, 0x94, 0x32, 0x3b, 0x45, 0x38, 0x85, 0xf5, 0x18, 0x1f, 0x1b, 0x62,
+                0x4d, 0x0b
+            ])
+        );
+
         writeln!(
             uart0,
-            "{:08x} {:08x} {:08x} {:08x} {:04x} {:04x} {:02x} {:02x}",
-            crc_hdlc, crc_bzip2, crc_mpeg2, crc_cksum, crc_kermit, crc_genibus, crc_rohc, crc_smbus
+            "{:08x} {:08x} {:08x} {:08x} {:04x} {:04x} {:02x} {:02x} {}",
+            crc_hdlc,
+            crc_bzip2,
+            crc_mpeg2,
+            crc_cksum,
+            crc_kermit,
+            crc_genibus,
+            crc_rohc,
+            crc_smbus,
+            md5_digest
         )
         .unwrap();
 
