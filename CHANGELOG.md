@@ -52,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-S3: Fix calculation of PSRAM start address
 - Fixed wrong variable access (FOSC CLK calibration for ESP32-C6 #593)
 - Fixed [trap location in ram](https://github.com/esp-rs/esp-hal/pull/605#issuecomment-1604039683) (#605)
+- Fixed a possible overlap of `.data` and `.rwtext` (#616)
+
 ### Changed
 
 - Improve examples documentation (#533)
