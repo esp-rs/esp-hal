@@ -159,6 +159,13 @@ impl From<Digest> for [u8; 16] {
     }
 }
 
+impl From<Context> for Digest {
+    #[inline]
+    fn from(context: Context) -> Digest {
+        context.compute()
+    }
+}
+
 impl Deref for Digest {
     type Target = [u8; 16];
 
