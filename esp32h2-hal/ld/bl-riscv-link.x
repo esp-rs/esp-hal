@@ -65,7 +65,7 @@ SECTIONS {
     *(.trap.*);
   } > RWTEXT
 }
-INSERT AFTER .rwtext;
+INSERT BEFORE .rwtext;
 
 SECTIONS {
   /**

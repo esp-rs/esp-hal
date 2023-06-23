@@ -89,10 +89,10 @@ SECTIONS
   _data_size = _data_end - _data_start + 8;
   .rwtext ORIGIN(REGION_RWTEXT) + _data_size : AT(_text_size + _rodata_size + _data_size){
     _srwtext = .;
-    *(.rwtext);
-    . = ALIGN(4);
     KEEP(*(.trap));
     *(.trap.*);
+    *(.rwtext);
+    . = ALIGN(4);
     _erwtext = .;
   } > REGION_RWTEXT
   _rwtext_size = _erwtext - _srwtext + 8;
