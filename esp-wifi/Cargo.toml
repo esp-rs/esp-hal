@@ -51,18 +51,12 @@ async = [
   "dep:embassy-futures",
   "embedded-io/async",
   "esp32c3-hal?/embassy",
-  "esp32c3-hal?/embassy-time-timg0",
   "esp32c2-hal?/embassy",
-  "esp32c2-hal?/embassy-time-timg0",
   "esp32c6-hal?/embassy",
-  "esp32c6-hal?/embassy-time-timg0",
   "esp32-hal?/embassy",
-  "esp32-hal?/embassy-time-timg0",
   "esp32s2-hal?/embassy",
-  "esp32s2-hal?/embassy-time-timg0",
   "esp32s3-hal?/embassy",
-  "esp32s3-hal?/embassy-time-timg0",
-  ]
+]
 
 embassy-net = ["dep:embassy-net", "dep:embassy-net-driver", "async"]
 
