@@ -166,7 +166,6 @@ pub fn compute<T: AsRef<[u8]>>(data: T) -> Digest {
 }
 
 /// 16-byte message digest
-#[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Digest(pub [u8; 16]);
 
