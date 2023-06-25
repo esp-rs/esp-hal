@@ -69,8 +69,7 @@ pub enum InterruptKind {
     Edge,
 }
 
-/// Enumeration of available CPU interrupts
-///
+/// Enumeration of available CPU interrupts.
 /// It is possible to create a handler for each of the interrupts. (e.g.
 /// `interrupt3`)
 #[repr(u32)]
@@ -198,6 +197,7 @@ mod vectored {
     ///
     /// Note that interrupts still need to be enabled globally for interrupts
     /// to be serviced.
+    #[cfg(not(feature = "direct-vectoring"))]
     pub fn enable(interrupt: Interrupt, level: Priority) -> Result<(), Error> {
         if matches!(level, Priority::None) {
             return Err(Error::InvalidInterruptPriority);
@@ -206,6 +206,30 @@ mod vectored {
             let cpu_interrupt =
                 core::mem::transmute(PRIORITY_TO_INTERRUPT[(level as usize) - 1] as u32);
             map(crate::get_core(), interrupt, cpu_interrupt);
+            enable_cpu_interrupt(cpu_interrupt);
+        }
+        Ok(())
+    }
+    /// Enables an interrupt at a given priority, maps it to the given CPU
+    /// interrupt and assigns the given priority.
+    ///
+    /// This can be side-effectful since no guarantees can be made about the
+    /// CPU interrupt not already being in use.
+    ///
+    /// Note that interrupts still need to be enabled globally for interrupts
+    /// to be serviced.
+    #[cfg(feature = "direct-vectoring")]
+    pub unsafe fn enable(
+        interrupt: Interrupt,
+        level: Priority,
+        cpu_interrupt: CpuInterrupt,
+    ) -> Result<(), Error> {
+        if matches!(level, Priority::None) {
+            return Err(Error::InvalidInterruptPriority);
+        }
+        unsafe {
+            map(crate::get_core(), interrupt, cpu_interrupt);
+            set_priority(crate::get_core(), cpu_interrupt, level);
             enable_cpu_interrupt(cpu_interrupt);
         }
         Ok(())
@@ -532,7 +556,7 @@ pub fn _setup_interrupts() {
     }
 }
 
-/// Disable the given peripheral interrupt
+/// Disable the given peripheral interrupt.
 pub fn disable(_core: Cpu, interrupt: Interrupt) {
     unsafe {
         let interrupt_number = interrupt as isize;
@@ -578,7 +602,7 @@ pub fn get_status(_core: Cpu) -> u128 {
     }
 }
 
-/// Assign a peripheral interrupt to an CPU interrupt
+/// Assign a peripheral interrupt to an CPU interrupt.
 ///
 /// Great care must be taken when using the `vectored` feature (enabled by
 /// default). Avoid interrupts 1 - 15 when interrupt vectoring is enabled.
