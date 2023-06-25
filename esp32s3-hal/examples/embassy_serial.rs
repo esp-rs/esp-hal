@@ -1,7 +1,7 @@
 //! embassy serial
 //!
 //! This is an example of running the embassy executor and asynchronously
-//! writing to a uart.
+//! writing to and reading from uart
 
 #![no_std]
 #![no_main]
@@ -14,6 +14,7 @@ use embassy_time::{with_timeout, Duration};
 use esp32s3_hal::{
     clock::ClockControl,
     embassy,
+    interrupt,
     peripherals::{Interrupt, Peripherals, UART0},
     prelude::*,
     timer::TimerGroup,
@@ -22,63 +23,26 @@ use esp32s3_hal::{
 };
 use esp_backtrace as _;
 use esp_hal_common::uart::config::AtCmdConfig;
+use heapless::Vec;
 use static_cell::StaticCell;
 
-struct Buffer<const N: usize> {
-    len: usize,
-    buf: [u8; N],
-}
-
-impl<const N: usize> Buffer<N> {
-    #[inline(always)]
-    pub fn as_slice(&self) -> &[u8] {
-        &self.buf[..self.len]
-    }
-
-    #[inline(always)]
-    pub fn is_full(&self) -> bool {
-        self.len == N
-    }
-}
-
-impl<const N: usize> core::fmt::Write for Buffer<N> {
-    #[inline]
-    fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        let sb = s.as_bytes();
-        let mut len = sb.len();
-        if self.len + len > N {
-            len = N - self.len;
-        }
-        if len > 0 {
-            self.buf[self.len..self.len + len].copy_from_slice(&sb[..len]);
-            self.len += len;
-        }
-        Ok(())
-    }
-}
-
-/// rx_fifo_full_threshold
+// rx_fifo_full_threshold
 const READ_BUF_SIZE: usize = 128;
-/// EOT; CTRL-D
+// EOT (CTRL-D)
 const AT_CMD: u8 = 0x04;
 
 #[embassy_executor::task]
 async fn run(mut uart: Uart<'static, UART0>) {
-    /// max READ_BUF_SIZE buffers to receive
-    const MAX_BUFFERS: usize = 10;
-    /// timeout read
-    const READ_TIMEOUT: Duration = Duration::from_secs(5);
-    let mut rbuf = Buffer {
-        len: 0,
-        buf: [0; MAX_BUFFERS * READ_BUF_SIZE],
-    };
-    let mut wbuf = Buffer {
-        len: 0,
-        buf: [0; 128],
-    };
+    // max message size to receive
+    // leave some extra space for AT-CMD characters
+    const MAX_BUFFER_SIZE: usize = 10 * READ_BUF_SIZE + 16;
+    // timeout read
+    const READ_TIMEOUT: Duration = Duration::from_secs(10);
 
+    let mut rbuf: Vec<u8, MAX_BUFFER_SIZE> = Vec::new();
+    let mut wbuf: Vec<u8, MAX_BUFFER_SIZE> = Vec::new();
     loop {
-        if rbuf.len == 0 {
+        if rbuf.is_empty() {
             embedded_hal_async::serial::Write::write(
                 &mut uart,
                 b"Hello async serial. Enter something ended with EOT (CTRL-D).\r\n",
@@ -86,8 +50,8 @@ async fn run(mut uart: Uart<'static, UART0>) {
             .await
             .unwrap();
         } else {
-            wbuf.len = 0;
-            write!(&mut wbuf, "\r\n-- received {} bytes --\r\n", rbuf.len).unwrap();
+            wbuf.clear();
+            write!(&mut wbuf, "\r\n-- received {} bytes --\r\n", rbuf.len()).unwrap();
             embedded_hal_async::serial::Write::write(&mut uart, wbuf.as_slice())
                 .await
                 .unwrap();
@@ -102,14 +66,35 @@ async fn run(mut uart: Uart<'static, UART0>) {
             .await
             .unwrap();
 
-        rbuf.len = 0;
-        while let Ok(Ok(len)) =
-            with_timeout(READ_TIMEOUT, uart.read(&mut rbuf.buf[rbuf.len..])).await
-        {
-            rbuf.len += len;
-            // if set_at_cmd is used than stop reading
-            if rbuf.buf[rbuf.len - 1] == AT_CMD || rbuf.is_full() {
-                break;
+        // set rbuf full capacity
+        unsafe {
+            rbuf.set_len(rbuf.capacity());
+        }
+        let mut offset = 0;
+        loop {
+            match with_timeout(READ_TIMEOUT, uart.read(&mut rbuf[offset..])).await {
+                Ok(r) => {
+                    if let Ok(len) = r {
+                        offset += len;
+                        if offset == 0 {
+                            rbuf.truncate(0);
+                            break;
+                        }
+                        // if set_at_cmd is used than stop reading
+                        if len < READ_BUF_SIZE {
+                            rbuf.truncate(offset);
+                            break;
+                        }
+                    } else {
+                        // buffer is full
+                        break;
+                    }
+                }
+                Err(_) => {
+                    // Timeout
+                    rbuf.truncate(offset);
+                    break;
+                }
             }
         }
     }
@@ -157,7 +142,7 @@ fn main() -> ! {
     uart0.set_at_cmd(AtCmdConfig::new(None, None, None, AT_CMD, None));
     uart0.set_rx_fifo_full_threshold(READ_BUF_SIZE as u16);
 
-    esp32s3_hal::interrupt::enable(Interrupt::UART0, esp32s3_hal::Priority::Priority1).unwrap();
+    interrupt::enable(Interrupt::UART0, interrupt::Priority::Priority1).unwrap();
 
     let executor = EXECUTOR.init(Executor::new());
     executor.run(|spawner| {

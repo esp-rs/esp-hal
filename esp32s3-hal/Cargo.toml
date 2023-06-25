@@ -52,6 +52,7 @@ ssd1306           = "0.7.1"
 static_cell       = "1.0.0"
 usb-device        = "0.2.9"
 usbd-serial       = "0.1.1"
+heapless          = "0.7.16"
 
 [features]
 default              = ["rt", "vectored"]
