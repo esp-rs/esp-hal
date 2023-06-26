@@ -95,3 +95,7 @@ required-features = ["embassy", "async"]
 [[example]]
 name              = "embassy_i2c"
 required-features = ["embassy", "async"]
+
+[[example]]
+name    = "direct-vectoring"
+required-features = ["direct-vectoring"]
