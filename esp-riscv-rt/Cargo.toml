@@ -25,3 +25,6 @@ init-data = []
 init-rw-text = []
 init-rtc-fast-data = []
 init-rtc-fast-text = []
+
+[patch.crates-io]
+rtt-target = { git = 'https://github.com/onsdagens/rtt-target'}

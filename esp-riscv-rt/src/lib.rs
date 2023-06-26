@@ -717,7 +717,16 @@ r#"
     "#,
     #[cfg(feature = "direct-vectoring")] //jump to handler loaded in direct handler
     r#"
-    jalr ra, ra
+    addi sp, sp, -4 #build stack
+    sw ra, 0(sp)
+    jal ra, _handle_priority
+    lw ra, 0(sp)
+    sw a0, 0(sp) #reuse old stack, a0 is return of _handle_priority
+    addi a0, sp, 4 #the proper stack pointer is an argument to the HAL handler
+    jalr ra, ra #jump to label loaded in _start_trapx
+    lw a0, 0(sp) #load stored priority
+    jal ra, _restore_priority
+    addi sp, sp, 4 #pop
     "#,
     r#"
     lw t1, 31*4(sp)
@@ -818,6 +827,7 @@ _vector_table:
 "#,
 #[cfg(feature="direct-vectoring")]
 r#"
+#this is required for the linking step, these symbols for in-use interrupts should always be overwritten by the user.
 .section .trap, "ax"
 .weak cpu_int_1_handler
 .weak cpu_int_2_handler
@@ -884,4 +894,75 @@ cpu_int_31_handler:
     la ra, cpu_int_1_handler #panic spin since proper handler is not defined, this could also just load the default _start_trap_rust_hal address and let the hal handle it.
     jr ra
 "#,
+}
+// this is for the ESP32-C6, needs to be feature gated accordingly
+// const DR_REG_PLIC_MX_BASE: u32 = 0x20001000;
+// const PLIC_MXINT_ENABLE_REG: u32 = DR_REG_PLIC_MX_BASE + 0x0;
+// const PLIC_MXINT_TYPE_REG: u32 = DR_REG_PLIC_MX_BASE + 0x4;
+// const PLIC_MXINT_CLEAR_REG: u32 = DR_REG_PLIC_MX_BASE + 0x8;
+// const PLIC_MXINT0_PRI_REG: u32 = DR_REG_PLIC_MX_BASE + 0x10;
+// const PLIC_MXINT_THRESH_REG: u32 = DR_REG_PLIC_MX_BASE + 0x90;
+// #[no_mangle]
+// #[link_section=".trap"]
+// unsafe extern "C" fn _handle_priority() -> u32 {
+//     let plic_mxint_pri_ptr = PLIC_MXINT0_PRI_REG as *mut u32;
+//     let interrupt_id: isize = mcause::read().code().try_into().unwrap(); //
+// MSB is whether its exception or interrupt.     let interrupt_priority =
+// plic_mxint_pri_ptr.offset(interrupt_id).read_volatile();     rprintln!("id:
+// {}", interrupt_id);     rprintln!("priority:{}", interrupt_priority);
+//     let thresh_reg = PLIC_MXINT_THRESH_REG as *mut u32;
+//     let prev_interrupt_priority = thresh_reg.read_volatile() & 0x000000FF;
+//     rprintln!("old_prio:{}", prev_interrupt_priority);
+//     // this is a u8 according to esp-idf, so mask everything else.
+//     if interrupt_priority < 15 {
+//         // leave interrupts disabled if interrupt is of max priority.
+//         thresh_reg.write_volatile(interrupt_priority + 1);
+//         rprintln!("store:{}", interrupt_priority + 1);
+//         unsafe {
+//             //riscv::interrupt::enable();
+//         }
+//     }
+//     prev_interrupt_priority
+// }
+// #[no_mangle]
+// #[link_section=".trap"]
+// unsafe extern "C" fn _restore_priority(stored_prio: u32) {
+//     unsafe {
+//         riscv::interrupt::disable();
+//     }
+//     let thresh_reg = PLIC_MXINT_THRESH_REG as *mut u32;
+//     rprintln!("restore:{}", stored_prio);
+//     thresh_reg.write_volatile(stored_prio);
+// }
+
+#[cfg(feature = "direct-vectoring")]
+#[no_mangle]
+#[link_section = ".trap"]
+unsafe extern "C" fn _handle_priority() -> u32 {
+    let interrupt_id: usize = mcause::read().code(); // MSB is whether its exception or interrupt.
+    let intr_base = 0x600C_2000;
+    let intr = (intr_base + 0x114) as *mut u32;
+    let interrupt_priority = intr.offset(interrupt_id as isize).read_volatile();
+    let thresh_reg = (intr_base + 0x0194) as *mut u32;
+    let prev_interrupt_priority = thresh_reg.read_volatile();
+    if interrupt_priority < 15 {
+        // leave interrupts disabled if interrupt is of max priority.
+        thresh_reg.write_volatile(interrupt_priority + 1);
+        unsafe {
+            riscv::interrupt::enable();
+        }
+    }
+    prev_interrupt_priority
+}
+
+#[cfg(feature = "direct-vectoring")]
+#[no_mangle]
+#[link_section = ".trap"]
+unsafe extern "C" fn _restore_priority(stored_prio: u32) {
+    unsafe {
+        riscv::interrupt::disable();
+    }
+    let intr_base = 0x600C_2000;
+    let thresh_reg = (intr_base + 0x0194) as *mut u32;
+    thresh_reg.write_volatile(stored_prio);
 }
