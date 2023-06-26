@@ -224,7 +224,8 @@ macro_rules! ImplSpiChannel {
             impl [<Spi $num DmaChannelCreator>] {
                 /// Configure the channel for use
                 ///
-                /// Descriptors should be sized as (BUFFERSIZE / 4092) * 3
+                /// Descriptors should be sized as `((BUFFERSIZE + 4091) / 4092) * 3`. I.e., to
+                /// transfer buffers of size `1..=4092`, you need 3 descriptors.
                 pub fn configure<'a>(
                     self,
                     burst_mode: bool,
@@ -462,7 +463,8 @@ macro_rules! ImplI2sChannel {
             impl [<I2s $num DmaChannelCreator>] {
                 /// Configure the channel for use
                 ///
-                /// Descriptors should be sized as (BUFFERSIZE / 4092) * 3
+                /// Descriptors should be sized as `((BUFFERSIZE + 4091) / 4092) * 3`. I.e., to
+                /// transfer buffers of size `1..=4092`, you need 3 descriptors.
                 pub fn configure<'a>(
                     self,
                     burst_mode: bool,
