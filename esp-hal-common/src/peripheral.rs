@@ -1,3 +1,5 @@
+//! Exclusive peripheral access
+
 use core::{
     marker::PhantomData,
     ops::{Deref, DerefMut},
@@ -185,6 +187,7 @@ pub(crate) mod sealed {
 }
 
 mod peripheral_macros {
+    #[doc(hidden)]
     #[macro_export]
     macro_rules! peripherals {
         ($($(#[$cfg:meta])? $name:ident => $from_pac:tt),*$(,)?) => {
@@ -247,6 +250,7 @@ mod peripheral_macros {
         }
     }
 
+    #[doc(hidden)]
     #[macro_export]
     macro_rules! into_ref {
         ($($name:ident),*) => {
@@ -257,6 +261,7 @@ mod peripheral_macros {
         }
     }
 
+    #[doc(hidden)]
     #[macro_export]
     macro_rules! create_peripheral {
         ($(#[$cfg:meta])? $name:ident => true) => {

@@ -93,6 +93,7 @@ impl Efuse {
     }
 }
 
+#[allow(unused)]
 #[derive(Copy, Clone)]
 pub(crate) enum EfuseBlock {
     Block0,

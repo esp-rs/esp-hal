@@ -646,6 +646,8 @@ impl RtcClock {
         let minor: u8 = Efuse::read_field_le(WAFER_VERSION_MINOR);
         let major: u8 = Efuse::read_field_le(WAFER_VERSION_MAJOR);
 
+        let mut slowclk_cycles = slowclk_cycles;
+
         // The Fosc CLK of calibration circuit is divided by 32 for ECO1.
         // So we need to divide the calibrate cycles of the FOSC for ECO1 and above
         // chips by 32 to avoid excessive calibration time.*/
@@ -654,7 +656,7 @@ impl RtcClock {
         // formula: MAJOR * 100 + MINOR. (if the result is 1, then version is v0.1)
         if (major * 100 + minor) > 0 {
             if cal_clk == RtcCalSel::RtcCalRcFast {
-                let slowclk_cycles = slowclk_cycles >> 5;
+                slowclk_cycles >>= 5;
             }
         }
 

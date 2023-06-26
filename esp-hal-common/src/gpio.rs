@@ -1230,6 +1230,7 @@ impl<MODE> embedded_hal_async::digital::Wait for AnyPin<Input<MODE>> {
     }
 }
 
+/// General Purpose Input/Output driver
 pub struct IO {
     _io_mux: IO_MUX,
     pub pins: Pins,

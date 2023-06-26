@@ -8,11 +8,11 @@
 //!
 //! The ROM provides the following polynomials for each CRC width:
 //!
-//! | CRC Width | Polynomial |
-//! | --------- | ---------- |
-//! | CRC-8     | 0x07       |
-//! | CRC-16    | 0x1021     |
-//! | CRC-32    | 0x0411db7  |
+//! | CRC Width | Polynomial  |
+//! | --------- | ----------- |
+//! | CRC-8     | 0x07        |
+//! | CRC-16    | 0x1021      |
+//! | CRC-32    | 0x04c11db7  |
 //!
 //! The "big-endian" `*_be()` functions are left-shifting algorithms to be used
 //! when input and output reflection are **not** needed. If input and output
@@ -37,26 +37,35 @@
 //! <https://reveng.sourceforge.io/crc-catalogue/all.htm>
 //!
 //! CRC-32/ISO-HDLC poly=0x04c11db7 init=0xffffffff refin=true refout=true
-//! xorout=0xffffffff ```
+//! xorout=0xffffffff
+//!
+//! ```
 //! let crc = crc32_le(!0xffffffff, &data);
 //! ```
-//! 
+//!
 //! CRC-32/BZIP2 poly=0x04c11db7 init=0xffffffff refin=false refout=false
-//! xorout=0xffffffff ```
+//! xorout=0xffffffff
+//!
+//! ```
 //! let crc = crc32_be(!0xffffffff, &data);
 //! ```
 //!
 //! CRC-32/MPEG-2 poly=0x04c11db7 init=0xffffffff refin=false refout=false
-//! xorout=0x00000000 ```
+//! xorout=0x00000000
+//!
+//! ```
 //! let crc = !crc32_be(!0xffffffff, &data);
 //! ```
-//! 
+//!
 //! CRC-32/CKSUM poly=0x04c11db7 init=0x00000000 refin=false refout=false
-//! xorout=0xffffffff ```
+//! xorout=0xffffffff
+//!
+//! ```
 //! let crc = crc32_be(!0, &data);
 //! ```
 //!
 //! CRC-16/KERMIT poly=0x1021 init=0x0000 refin=true refout=true xorout=0x0000
+//!
 //! ```
 //! let crc = !crc16_le(!0, &data);
 //! ```
@@ -65,7 +74,7 @@
 // needed to access them, they are all referentially transparent, and the size
 // and alignment of `usize` and `u32` are identical on all ESP32 chips.
 
-/// Left-shifting CRC-32 with polynomial 0x0411db7
+/// Left-shifting CRC-32 with polynomial 0x04c11db7
 #[cfg(rom_crc_be)]
 #[inline(always)]
 pub fn crc32_be(crc: u32, buf: &[u8]) -> u32 {
@@ -95,7 +104,7 @@ pub fn crc8_be(crc: u8, buf: &[u8]) -> u8 {
     unsafe { esp_rom_crc8_be(crc, buf.as_ptr(), buf.len() as u32) }
 }
 
-/// Right-shifting CRC-32 with polynomial 0x0411db7
+/// Right-shifting CRC-32 with polynomial 0x04c11db7
 #[cfg(rom_crc_le)]
 #[inline(always)]
 pub fn crc32_le(crc: u32, buf: &[u8]) -> u32 {
@@ -208,7 +217,7 @@ static CRC8_BE_TABLE: [u8; 256] = [
     0xde, 0xd9, 0xd0, 0xd7, 0xc2, 0xc5, 0xcc, 0xcb, 0xe6, 0xe1, 0xe8, 0xef, 0xfa, 0xfd, 0xf4, 0xf3
 ];
 
-/// Left-shifting CRC-32 with polynomial 0x0411db7
+/// Left-shifting CRC-32 with polynomial 0x04c11db7
 #[cfg(not(rom_crc_be))]
 pub fn crc32_be(crc: u32, buf: &[u8]) -> u32 {
     let mut crc = !crc;
@@ -320,7 +329,7 @@ static CRC8_LE_TABLE: [u8; 256] = [
     0xb4, 0x25, 0x57, 0xc6, 0xb3, 0x22, 0x50, 0xc1, 0xba, 0x2b, 0x59, 0xc8, 0xbd, 0x2c, 0x5e, 0xcf
 ];
 
-/// Right-shifting CRC-32 with polynomial 0x0411db7
+/// Right-shifting CRC-32 with polynomial 0x04c11db7
 #[cfg(not(rom_crc_le))]
 pub fn crc32_le(crc: u32, buf: &[u8]) -> u32 {
     let mut crc = !crc;

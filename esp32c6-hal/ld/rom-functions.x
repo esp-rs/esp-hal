@@ -19,3 +19,7 @@ PROVIDE(esp_rom_crc8_be = 0x4000076c);
 PROVIDE(esp_rom_crc32_le = 0x40000758);
 PROVIDE(esp_rom_crc16_le = 0x4000075c);
 PROVIDE(esp_rom_crc8_le = 0x40000760);
+
+PROVIDE(esp_rom_md5_init = 0x4000074c);
+PROVIDE(esp_rom_md5_update = 0x40000750);
+PROVIDE(esp_rom_md5_final = 0x40000754);

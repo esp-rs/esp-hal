@@ -9,7 +9,10 @@ use crate::{
     timer::{Timer, Timer0},
 };
 
+#[cfg(not(any(esp32, esp32s2, esp32s3)))]
 pub const ALARM_COUNT: usize = 1;
+#[cfg(any(esp32, esp32s2, esp32s3))]
+pub const ALARM_COUNT: usize = 2;
 
 pub type TimerInner = Timer0<TIMG0>;
 pub type TimerType = Timer<TimerInner>;
@@ -49,15 +52,24 @@ impl EmbassyTimer {
     pub fn init(clocks: &Clocks, mut timer: TimerType) {
         use crate::{interrupt, interrupt::Priority};
 
-        // set divider to get a 1mhz clock. abp (80mhz) / 80 = 1mhz... // TODO assert
-        // abp clock is the source and its at the correct speed for the divider
+        // set divider to get a 1mhz clock. APB (80mhz) / 80 = 1mhz...
+        // TODO: assert APB clock is the source and its at the correct speed for the
+        // divider
         timer.set_divider(clocks.apb_clock.to_MHz() as u16);
 
         interrupt::enable(peripherals::Interrupt::TG0_T0_LEVEL, Priority::max()).unwrap();
+        #[cfg(any(esp32, esp32s2, esp32s3))]
+        interrupt::enable(peripherals::Interrupt::TG0_T1_LEVEL, Priority::max()).unwrap();
 
         #[interrupt]
         fn TG0_T0_LEVEL() {
             DRIVER.on_interrupt(0);
+        }
+
+        #[cfg(any(esp32, esp32s2, esp32s3))]
+        #[interrupt]
+        fn TG0_T1_LEVEL() {
+            DRIVER.on_interrupt(1);
         }
     }
 
