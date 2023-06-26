@@ -9,6 +9,7 @@ SECTIONS {
     *(.data .data.*);
     *(.data1)
     _data_end = ABSOLUTE(.);
+    . = ALIGN(4);
   } > RWDATA AT > RODATA
 
   /* LMA of .data */
@@ -32,18 +33,21 @@ SECTIONS {
     *(.gnu.linkonce.b.*)
     *(COMMON)
     _bss_end = ABSOLUTE(.);
+    . = ALIGN(4);
   } > RWDATA
 
   .noinit (NOLOAD) : ALIGN(4)
   {
     . = ALIGN(4);
     *(.noinit .noinit.*)
+    . = ALIGN(4);
   } > RWDATA
 
   .data.wifi :
   {
     . = ALIGN(4);
     *( .dram1 .dram1.*)
+    . = ALIGN(4);
   } > RWDATA AT > RODATA
 
   /* must be last segment using RWDATA */

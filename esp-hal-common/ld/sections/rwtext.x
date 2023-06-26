@@ -5,6 +5,7 @@ SECTIONS {
   {
     . = ALIGN (4);
     *(.rwtext.literal .rwtext .rwtext.literal.* .rwtext.*)
+    . = ALIGN(4);
   } > RWTEXT
 
   .rwtext.wifi :
@@ -16,5 +17,6 @@ SECTIONS {
     *( .wifislpiram  .wifislpiram.*)
     *( .phyiram  .phyiram.*)
     *( .iram1  .iram1.*)
+    . = ALIGN(4);
   } > RWTEXT AT > RODATA
 }
