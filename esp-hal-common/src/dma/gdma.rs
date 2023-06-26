@@ -9,6 +9,7 @@ use crate::{
 macro_rules! impl_channel {
     ($num: literal) => {
         paste::paste! {
+            #[non_exhaustive]
             pub struct [<Channel $num>] {}
 
             impl RegisterAccess for [<Channel $num>] {
@@ -365,6 +366,7 @@ macro_rules! impl_channel {
                 }
             }
 
+            #[non_exhaustive]
             pub struct [<Channel $num TxImpl>] {}
 
             impl<'a> TxChannel<[<Channel $num>]> for [<Channel $num TxImpl>] {
@@ -375,6 +377,7 @@ macro_rules! impl_channel {
                 }
             }
 
+            #[non_exhaustive]
             pub struct [<Channel $num RxImpl>] {}
 
             impl<'a> RxChannel<[<Channel $num>]> for [<Channel $num RxImpl>] {
@@ -385,6 +388,7 @@ macro_rules! impl_channel {
                 }
             }
 
+            #[non_exhaustive]
             pub struct [<ChannelCreator $num>] {}
 
             impl [<ChannelCreator $num>] {
@@ -437,6 +441,7 @@ macro_rules! impl_channel {
                 }
             }
 
+            #[non_exhaustive]
             pub struct [<SuitablePeripheral $num>] {}
             impl PeripheralMarker for [<SuitablePeripheral $num>] {}
 
