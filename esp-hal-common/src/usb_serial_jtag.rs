@@ -201,6 +201,10 @@ pub trait Instance {
 
         (wr_addr - rd_addr).into()
     }
+
+    fn txfifo_empty(&self) -> bool {
+        !self.register_block().jfifo_st.read().out_fifo_empty().bit_is_set()
+    }
 }
 
 impl Instance for USB_DEVICE {
@@ -336,8 +340,7 @@ mod asynch {
         }
 
         async fn flush(&mut self) -> Result<(), Error> {
-            let count = self.inner_mut().get_tx_fifo_count();
-            if count > 0 {
+            if self.inner().txfifo_empty() {
                 UsbSerialJtagFuture::new(self.inner()).await;
             }
             Ok(())
