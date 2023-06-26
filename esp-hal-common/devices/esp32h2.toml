@@ -72,4 +72,5 @@ peripherals = [
     # ROM capabilities
     "rom_crc_le",
     "rom_crc_be",
+    "rom_md5_bsd",
 ]

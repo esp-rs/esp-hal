@@ -23,3 +23,7 @@ PROVIDE ( esp_rom_spi_cmd_config = 0x40017c58 );
 PROVIDE(esp_rom_crc32_le = 0x400119dc);
 PROVIDE(esp_rom_crc16_le = 0x40011a10);
 PROVIDE(esp_rom_crc8_le = 0x40011a4c);
+
+PROVIDE(esp_rom_md5_final = 0x4000530c);
+PROVIDE(esp_rom_md5_init = 0x4000526c);
+PROVIDE(esp_rom_md5_update = 0x4000528c);

@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add initial support for `I2S` in ESP32-H2 (#597)
 - Fix rom::crc docs
 - Add octal PSRAM support for ESP32-S3 (#610)
+- Add MD5 functions from ESP ROM (#618)
 - Add feature enabling directly hooking the interrupt vector table
 
 ### Changed
@@ -54,6 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed wrong variable access (FOSC CLK calibration for ESP32-C6 #593)
 - Fixed [trap location in ram](https://github.com/esp-rs/esp-hal/pull/605#issuecomment-1604039683) (#605)
 - Fixed a possible overlap of `.data` and `.rwtext` (#616)
+- Avoid SDA/SCL being low while configuring pins for I2C
 
 ### Changed
 
@@ -63,7 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Breaking
 
 - Significantly simplified user-facing GPIO pin types. (#553)
-- No longer re-export the `soc` moduleand the contents of the `interrupt` module at the package level (#607)
+- No longer re-export the `soc` module and the contents of the `interrupt` module at the package level (#607)
 
 ## [0.9.0] - 2023-05-02
 
