@@ -4,6 +4,7 @@
 //! read-only memory.
 
 pub mod crc;
+pub mod md5;
 
 #[allow(unused)]
 extern "C" {
