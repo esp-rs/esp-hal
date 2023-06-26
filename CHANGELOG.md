@@ -26,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add CRC functions from ESP ROM (#587)
 - Add a `debug` feature to enable the PACs' `impl-register-debug` feature (#596)
 - Add initial support for `I2S` in ESP32-H2 (#597)
-- Add embassy async `read` support for `uart` (#615)
+- Add embassy async `read` support for `uart` (#620)
 - Fix rom::crc docs
 - Add octal PSRAM support for ESP32-S3 (#610)
 
