@@ -589,7 +589,6 @@ where
     TX: Tx,
     RX: Rx,
     IP: I2sPeripheral + I2s0Peripheral,
-    RX: Rx,
 {
     fn new(
         i2s: impl Peripheral<P = I> + 'd,
@@ -645,7 +644,6 @@ where
     TX: Tx,
     RX: Rx,
     IP: I2sPeripheral + I2s1Peripheral,
-    RX: Rx,
 {
     fn new(
         i2s: impl Peripheral<P = I> + 'd,
