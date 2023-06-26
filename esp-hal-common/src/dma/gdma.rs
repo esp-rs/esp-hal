@@ -12,6 +12,12 @@ macro_rules! impl_channel {
             #[non_exhaustive]
             pub struct [<Channel $num>] {}
 
+            impl ChannelTypes for [<Channel $num>] {
+                type P = [<SuitablePeripheral $num>];
+                type Tx<'a> = ChannelTx<'a, [<Channel $num TxImpl>], [<Channel $num>]>;
+                type Rx<'a> = ChannelRx<'a, [<Channel $num RxImpl>], [<Channel $num>]>;
+            }
+
             impl RegisterAccess for [<Channel $num>] {
                 fn init_channel() {
                     // nothing special to be done here
@@ -402,7 +408,7 @@ macro_rules! impl_channel {
                     tx_descriptors: &'a mut [u32],
                     rx_descriptors: &'a mut [u32],
                     priority: DmaPriority,
-                ) -> Channel<ChannelTx<'a, [<Channel $num TxImpl>], [<Channel $num>]>, ChannelRx<'a, [<Channel $num RxImpl>], [<Channel $num>]>, [<SuitablePeripheral $num>]> {
+                ) -> Channel<'a, [<Channel $num>]> {
                     let mut tx_impl = [<Channel $num TxImpl>] {};
                     tx_impl.init(burst_mode, priority);
 
@@ -436,7 +442,6 @@ macro_rules! impl_channel {
                     Channel {
                         tx: tx_channel,
                         rx: rx_channel,
-                        _phantom: PhantomData::default(),
                     }
                 }
             }

@@ -12,6 +12,12 @@ macro_rules! ImplSpiChannel {
             #[non_exhaustive]
             pub struct [<Spi $num DmaChannel>] {}
 
+            impl ChannelTypes for [<Spi $num DmaChannel>] {
+                type P = [<Spi $num DmaSuitablePeripheral>];
+                type Tx<'a> = ChannelTx<'a,[<Spi $num DmaChannelTxImpl>], [<Spi $num DmaChannel>]>;
+                type Rx<'a> = ChannelRx<'a,[<Spi $num DmaChannelRxImpl>], [<Spi $num DmaChannel>]>;
+            }
+
             impl RegisterAccess for [<Spi $num DmaChannel>] {
                 fn init_channel() {
                     // (only) on ESP32 we need to configure DPORT for the SPI DMA channels
@@ -232,11 +238,7 @@ macro_rules! ImplSpiChannel {
                     tx_descriptors: &'a mut [u32],
                     rx_descriptors: &'a mut [u32],
                     priority: DmaPriority,
-                ) -> Channel<
-                    ChannelTx<'a,[<Spi $num DmaChannelTxImpl>], [<Spi $num DmaChannel>]>,
-                    ChannelRx<'a,[<Spi $num DmaChannelRxImpl>], [<Spi $num DmaChannel>]>,
-                    [<Spi $num DmaSuitablePeripheral>],
-                > {
+                ) -> Channel<'a, [<Spi $num DmaChannel>]> {
                     let mut tx_impl = [<Spi $num DmaChannelTxImpl>] {};
                     tx_impl.init(burst_mode, priority);
 
@@ -270,7 +272,6 @@ macro_rules! ImplSpiChannel {
                     Channel {
                         tx: tx_channel,
                         rx: rx_channel,
-                        _phantom: PhantomData::default(),
                     }
                 }
             }
@@ -282,6 +283,12 @@ macro_rules! ImplI2sChannel {
     ($num: literal, $peripheral: literal) => {
         paste::paste! {
             pub struct [<I2s $num DmaChannel>] {}
+
+            impl ChannelTypes for [<I2s $num DmaChannel>] {
+                type P = [<I2s $num DmaSuitablePeripheral>];
+                type Tx<'a> = ChannelTx<'a,[<I2s $num DmaChannelTxImpl>], [<I2s $num DmaChannel>]>;
+                type Rx<'a> = ChannelRx<'a,[<I2s $num DmaChannelRxImpl>], [<I2s $num DmaChannel>]>;
+            }
 
             impl RegisterAccess for [<I2s $num DmaChannel>] {
                 fn init_channel() {
@@ -471,11 +478,7 @@ macro_rules! ImplI2sChannel {
                     tx_descriptors: &'a mut [u32],
                     rx_descriptors: &'a mut [u32],
                     priority: DmaPriority,
-                ) -> Channel<
-                    ChannelTx<'a,[<I2s $num DmaChannelTxImpl>], [<I2s $num DmaChannel>]>,
-                    ChannelRx<'a,[<I2s $num DmaChannelRxImpl>], [<I2s $num DmaChannel>]>,
-                    [<I2s $num DmaSuitablePeripheral>],
-                > {
+                ) -> Channel<'a, [<I2s $num DmaChannel>]> {
                     let mut tx_impl = [<I2s $num DmaChannelTxImpl>] {};
                     tx_impl.init(burst_mode, priority);
 
@@ -509,7 +512,6 @@ macro_rules! ImplI2sChannel {
                     Channel {
                         tx: tx_channel,
                         rx: rx_channel,
-                        _phantom: PhantomData::default(),
                     }
                 }
             }
