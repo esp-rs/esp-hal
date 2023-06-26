@@ -20,6 +20,7 @@ use esp32c3_hal::{
     timer::TimerGroup,
     Rtc,
     Uart,
+    UsbSerialJtag,
 };
 use esp_backtrace as _;
 use esp_hal_common::uart::config::AtCmdConfig;
@@ -140,10 +141,11 @@ fn main() -> ! {
     uart0.set_at_cmd(AtCmdConfig::new(None, None, None, AT_CMD, None));
     uart0.set_rx_fifo_full_threshold(READ_BUF_SIZE as u16);
 
-    interrupt::enable(Interrupt::UART0, interrupt::Priority::Priority1).unwrap();
-
+    esp32c3_hal::interrupt::enable(Interrupt::USB_SERIAL_JTAG, esp32c3_hal::Priority::Priority1).unwrap();
+    esp_println::println!("Before EXECUTOR.init");
     let executor = EXECUTOR.init(Executor::new());
+    esp_println::println!("Before spawn");
     executor.run(|spawner| {
-        spawner.spawn(run(uart0)).ok();
+        spawner.spawn(run(usj)).ok();
     });
 }
