@@ -465,7 +465,7 @@ _abs_start:
 .weak _start_trap30
 .weak _start_trap31
 "#,
-#[cfg(feature="direct-vectoring")]
+#[cfg(any(feature="direct-vectoring", feature="direct-vectoring-esp32c6"))]
 r#"
 _start_trap1:
     addi sp, sp, -40*4
@@ -623,7 +623,7 @@ _start_trap31:
     la ra, cpu_int_31_handler
     j _start_trap_direct
 "#,
-#[cfg(not(feature="direct-vectoring"))]
+#[cfg(not(any(feature="direct-vectoring", feature="direct-vectoring-esp32c6")))]
 r#"
 _start_trap1:
 _start_trap2:
@@ -662,7 +662,7 @@ r#"
 _start_trap: 
     addi sp, sp, -40*4
     sw ra, 0*4(sp)"#,
-#[cfg(feature="direct-vectoring")] //for the directly vectored handlers the above is stacked beforehand
+#[cfg(any(feature="direct-vectoring", feature="direct-vectoring-esp32c6"))] //for the directly vectored handlers the above is stacked beforehand
 r#"
     la ra, _start_trap_rust_hal #this runs on exception, use regular fault handler
 _start_trap_direct:
@@ -711,11 +711,11 @@ r#"
 
     add a0, sp, zero
     "#,
-    #[cfg(not(feature = "direct-vectoring"))]
+    #[cfg(not(any(feature="direct-vectoring", feature="direct-vectoring-esp32c6")))]
     r#"
     jal ra, _start_trap_rust_hal
     "#,
-    #[cfg(feature = "direct-vectoring")] //jump to handler loaded in direct handler
+    #[cfg(any(feature="direct-vectoring", feature="direct-vectoring-esp32c6"))] //jump to handler loaded in direct handler
     r#"
     addi sp, sp, -4 #build stack
     sw ra, 0(sp)
@@ -825,7 +825,7 @@ _vector_table:
 
 .option pop
 "#,
-#[cfg(feature="direct-vectoring")]
+#[cfg(any(feature="direct-vectoring", feature="direct-vectoring-esp32c6"))]
 r#"
 #this is required for the linking step, these symbols for in-use interrupts should always be overwritten by the user.
 .section .trap, "ax"
@@ -895,45 +895,40 @@ cpu_int_31_handler:
     jr ra
 "#,
 }
-// this is for the ESP32-C6, needs to be feature gated accordingly
-// const DR_REG_PLIC_MX_BASE: u32 = 0x20001000;
-// const PLIC_MXINT_ENABLE_REG: u32 = DR_REG_PLIC_MX_BASE + 0x0;
-// const PLIC_MXINT_TYPE_REG: u32 = DR_REG_PLIC_MX_BASE + 0x4;
-// const PLIC_MXINT_CLEAR_REG: u32 = DR_REG_PLIC_MX_BASE + 0x8;
-// const PLIC_MXINT0_PRI_REG: u32 = DR_REG_PLIC_MX_BASE + 0x10;
-// const PLIC_MXINT_THRESH_REG: u32 = DR_REG_PLIC_MX_BASE + 0x90;
-// #[no_mangle]
-// #[link_section=".trap"]
-// unsafe extern "C" fn _handle_priority() -> u32 {
-//     let plic_mxint_pri_ptr = PLIC_MXINT0_PRI_REG as *mut u32;
-//     let interrupt_id: isize = mcause::read().code().try_into().unwrap(); //
-// MSB is whether its exception or interrupt.     let interrupt_priority =
-// plic_mxint_pri_ptr.offset(interrupt_id).read_volatile();     rprintln!("id:
-// {}", interrupt_id);     rprintln!("priority:{}", interrupt_priority);
-//     let thresh_reg = PLIC_MXINT_THRESH_REG as *mut u32;
-//     let prev_interrupt_priority = thresh_reg.read_volatile() & 0x000000FF;
-//     rprintln!("old_prio:{}", prev_interrupt_priority);
-//     // this is a u8 according to esp-idf, so mask everything else.
-//     if interrupt_priority < 15 {
-//         // leave interrupts disabled if interrupt is of max priority.
-//         thresh_reg.write_volatile(interrupt_priority + 1);
-//         rprintln!("store:{}", interrupt_priority + 1);
-//         unsafe {
-//             //riscv::interrupt::enable();
-//         }
-//     }
-//     prev_interrupt_priority
-// }
-// #[no_mangle]
-// #[link_section=".trap"]
-// unsafe extern "C" fn _restore_priority(stored_prio: u32) {
-//     unsafe {
-//         riscv::interrupt::disable();
-//     }
-//     let thresh_reg = PLIC_MXINT_THRESH_REG as *mut u32;
-//     rprintln!("restore:{}", stored_prio);
-//     thresh_reg.write_volatile(stored_prio);
-// }
+#[cfg(feature = "direct-vectoring-esp32c6")]
+mod plic {
+    use super::mcause;
+    const DR_REG_PLIC_MX_BASE: u32 = 0x20001000;
+    const PLIC_MXINT0_PRI_REG: u32 = DR_REG_PLIC_MX_BASE + 0x10;
+    const PLIC_MXINT_THRESH_REG: u32 = DR_REG_PLIC_MX_BASE + 0x90;
+    #[no_mangle]
+    #[link_section = ".trap"]
+    unsafe extern "C" fn _handle_priority() -> u32 {
+        let plic_mxint_pri_ptr = PLIC_MXINT0_PRI_REG as *mut u32;
+        let interrupt_id: isize = mcause::read().code().try_into().unwrap(); // MSB is whether its exception or interrupt.     let interrupt_priority =
+        let interrupt_priority = plic_mxint_pri_ptr.offset(interrupt_id).read_volatile();
+        let thresh_reg = PLIC_MXINT_THRESH_REG as *mut u32;
+        let prev_interrupt_priority = thresh_reg.read_volatile() & 0x000000FF;
+        // this is a u8 according to esp-idf, so mask everything else.
+        if interrupt_priority < 15 {
+            // leave interrupts disabled if interrupt is of max priority.
+            thresh_reg.write_volatile(interrupt_priority + 1);
+            unsafe {
+                riscv::interrupt::enable();
+            }
+        }
+        prev_interrupt_priority
+    }
+    #[no_mangle]
+    #[link_section = ".trap"]
+    unsafe extern "C" fn _restore_priority(stored_prio: u32) {
+        unsafe {
+            riscv::interrupt::disable();
+        }
+        let thresh_reg = PLIC_MXINT_THRESH_REG as *mut u32;
+        thresh_reg.write_volatile(stored_prio);
+    }
+}
 
 #[cfg(feature = "direct-vectoring")]
 #[no_mangle]

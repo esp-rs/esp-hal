@@ -58,6 +58,7 @@ embassy-time-timg0   = ["esp-hal-common/embassy-time-timg0",   "embassy-time/tic
 xtal26mhz            = ["esp-hal-common/esp32c2_26mhz"]
 xtal40mhz            = ["esp-hal-common/esp32c2_40mhz"] 
 interrupt-preemption = ["esp-hal-common/interrupt-preemption"]
+direct-vectoring     = ["esp-hal-common/direct-vectoring"]
 
 [[example]]
 name              = "spi_eh1_loopback"
