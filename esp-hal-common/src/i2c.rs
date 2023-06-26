@@ -250,7 +250,10 @@ where
 
         let mut i2c = I2C { peripheral: i2c };
 
-        // initialize SCL first to not confuse some devices like MPU6050
+        // avoid SCL/SDA going low during configuration
+        scl.set_output_high(true);
+        sda.set_output_high(true);
+
         scl.set_to_open_drain_output()
             .enable_input(true)
             .internal_pull_up(true)
