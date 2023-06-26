@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix rom::crc docs
 - Add octal PSRAM support for ESP32-S3 (#610)
 - Add MD5 functions from ESP ROM (#618)
+- Add embassy async `read` support for `uart` (#620)
 
 ### Changed
 

@@ -19,7 +19,10 @@ const UART_FIFO_SIZE: u16 = 128;
 
 /// Custom serial error type
 #[derive(Debug)]
-pub enum Error {}
+pub enum Error {
+    #[cfg(feature = "async")]
+    ReadBufferFull,
+}
 
 /// UART configuration
 pub mod config {
@@ -994,11 +997,15 @@ mod asynch {
     use core::task::Poll;
 
     use cfg_if::cfg_if;
+    use embassy_futures::select::select;
     use embassy_sync::waitqueue::AtomicWaker;
     use procmacros::interrupt;
 
     use super::{Error, Instance};
-    use crate::{uart::UART_FIFO_SIZE, Uart};
+    use crate::{
+        uart::{RegisterBlock, UART_FIFO_SIZE},
+        Uart,
+    };
 
     cfg_if! {
         if #[cfg(all(uart0, uart1, uart2))] {
@@ -1016,6 +1023,8 @@ mod asynch {
     pub(crate) enum Event {
         TxDone,
         TxFiFoEmpty,
+        RxFifoFull,
+        RxCmdCharDetected,
     }
 
     pub(crate) struct UartFuture<'a, T: Instance> {
@@ -1034,6 +1043,14 @@ mod asynch {
                     .register_block()
                     .int_ena
                     .modify(|_, w| w.txfifo_empty_int_ena().set_bit()),
+                Event::RxFifoFull => instance
+                    .register_block()
+                    .int_ena
+                    .modify(|_, w| w.rxfifo_full_int_ena().set_bit()),
+                Event::RxCmdCharDetected => instance
+                    .register_block()
+                    .int_ena
+                    .modify(|_, w| w.at_cmd_char_det_int_ena().set_bit()),
             }
 
             Self { event, instance }
@@ -1054,6 +1071,20 @@ mod asynch {
                     .int_ena
                     .read()
                     .txfifo_empty_int_ena()
+                    .bit_is_clear(),
+                Event::RxFifoFull => self
+                    .instance
+                    .register_block()
+                    .int_ena
+                    .read()
+                    .rxfifo_full_int_ena()
+                    .bit_is_clear(),
+                Event::RxCmdCharDetected => self
+                    .instance
+                    .register_block()
+                    .int_ena
+                    .read()
+                    .at_cmd_char_det_int_ena()
                     .bit_is_clear(),
             }
         }
@@ -1079,11 +1110,42 @@ mod asynch {
     where
         T: Instance,
     {
-        async fn write(&mut self, words: &[u8]) -> Result<(), Error> {
-            for chunk in words.chunks(UART_FIFO_SIZE as usize) {
-                for &byte in chunk {
-                    self.write_byte(byte).unwrap() // should never fail
+        pub async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
+            let mut read_bytes = 0;
+
+            select(
+                UartFuture::new(Event::RxCmdCharDetected, self.inner()),
+                UartFuture::new(Event::RxFifoFull, self.inner()),
+            )
+            .await;
+
+            while let Ok(byte) = self.read_byte() {
+                if read_bytes < buf.len() {
+                    buf[read_bytes] = byte;
+                    read_bytes += 1;
+                } else {
+                    return Err(Error::ReadBufferFull);
                 }
+            }
+
+            Ok(read_bytes)
+        }
+
+        async fn write(&mut self, words: &[u8]) -> Result<(), Error> {
+            let mut offset: usize = 0;
+            loop {
+                let mut next_offset =
+                    offset + (UART_FIFO_SIZE - self.uart.get_tx_fifo_count()) as usize;
+                if next_offset > words.len() {
+                    next_offset = words.len();
+                }
+                for &byte in &words[offset..next_offset] {
+                    self.write_byte(byte).unwrap(); // should never fail
+                }
+                if next_offset == words.len() {
+                    break;
+                }
+                offset = next_offset;
                 UartFuture::new(Event::TxFiFoEmpty, self.inner()).await;
             }
             Ok(())
@@ -1111,42 +1173,63 @@ mod asynch {
         }
     }
 
+    fn intr_handler(uart: &RegisterBlock) -> bool {
+        let int_ena_val = uart.int_ena.read();
+        let int_raw_val = uart.int_raw.read();
+        if int_ena_val.txfifo_empty_int_ena().bit_is_set()
+            && int_raw_val.txfifo_empty_int_raw().bit_is_set()
+        {
+            uart.int_ena.write(|w| w.txfifo_empty_int_ena().clear_bit());
+            return true;
+        }
+        if int_ena_val.tx_done_int_ena().bit_is_set() && int_raw_val.tx_done_int_raw().bit_is_set()
+        {
+            uart.int_ena.write(|w| w.tx_done_int_ena().clear_bit());
+            return true;
+        }
+        if int_ena_val.at_cmd_char_det_int_ena().bit_is_set()
+            && int_raw_val.at_cmd_char_det_int_raw().bit_is_set()
+        {
+            uart.int_clr
+                .write(|w| w.at_cmd_char_det_int_clr().set_bit());
+            uart.int_ena
+                .write(|w| w.at_cmd_char_det_int_ena().clear_bit());
+            return true;
+        }
+        if int_ena_val.rxfifo_full_int_ena().bit_is_set()
+            && int_raw_val.rxfifo_full_int_raw().bit_is_set()
+        {
+            uart.int_clr.write(|w| w.rxfifo_full_int_clr().set_bit());
+            uart.int_ena.write(|w| w.rxfifo_full_int_ena().clear_bit());
+            return true;
+        }
+        false
+    }
+
     #[cfg(uart0)]
     #[interrupt]
     fn UART0() {
         let uart = unsafe { &*crate::peripherals::UART0::ptr() };
-        uart.int_ena.modify(|_, w| {
-            w.txfifo_empty_int_ena()
-                .clear_bit()
-                .tx_done_int_ena()
-                .clear_bit()
-        });
-        WAKERS[0].wake();
+        if intr_handler(uart) {
+            WAKERS[0].wake();
+        }
     }
 
     #[cfg(uart1)]
     #[interrupt]
     fn UART1() {
         let uart = unsafe { &*crate::peripherals::UART1::ptr() };
-        uart.int_ena.modify(|_, w| {
-            w.txfifo_empty_int_ena()
-                .clear_bit()
-                .tx_done_int_ena()
-                .clear_bit()
-        });
-        WAKERS[1].wake();
+        if intr_handler(uart) {
+            WAKERS[1].wake();
+        }
     }
 
     #[cfg(uart2)]
     #[interrupt]
     fn UART2() {
         let uart = unsafe { &*crate::peripherals::UART2::ptr() };
-        uart.int_ena.modify(|_, w| {
-            w.txfifo_empty_int_ena()
-                .clear_bit()
-                .tx_done_int_ena()
-                .clear_bit()
-        });
-        WAKERS[2].wake();
+        if intr_handler(uart) {
+            WAKERS[2].wake();
+        }
     }
 }
