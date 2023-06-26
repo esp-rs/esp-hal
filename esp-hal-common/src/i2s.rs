@@ -357,7 +357,7 @@ where
     TX: Tx,
 {
     /// Write I2S.
-    /// Returns [I2sWriteDmaTransfer] which represents the in-ptrogress DMA
+    /// Returns [I2sWriteDmaTransfer] which represents the in-progress DMA
     /// transfer
     fn write_dma(self, words: TXBUF) -> Result<I2sWriteDmaTransfer<T, P, TX, TXBUF>, Error>
     where
@@ -366,8 +366,8 @@ where
         TX: Tx,
         TXBUF: ReadBuffer<Word = u8>;
 
-    /// Continously write to I2S. Returns [I2sWriteDmaTransfer] which represents
-    /// the in-ptrogress DMA transfer
+    /// Continuously write to I2S. Returns [I2sWriteDmaTransfer] which
+    /// represents the in-progress DMA transfer
     fn write_dma_circular(
         self,
         words: TXBUF,
@@ -396,7 +396,7 @@ where
     P: I2sRxPins,
     RX: Rx,
 {
-    /// Amount of bytes which can be poped
+    /// Amount of bytes which can be popped
     pub fn available(&mut self) -> usize {
         self.i2s_rx.rx_channel.available()
     }
@@ -479,7 +479,7 @@ pub trait I2sRead<W> {
     fn read(&mut self, words: &mut [W]) -> Result<(), Error>;
 }
 
-/// Initate a DMA rx transfer
+/// Initiate a DMA rx transfer
 pub trait I2sReadDma<'d, T, P, RX, RXBUF>
 where
     T: RegisterAccess,
@@ -487,7 +487,7 @@ where
     RX: Rx,
 {
     /// Read I2S.
-    /// Returns [I2sReadDmaTransfer] which represents the in-ptrogress DMA
+    /// Returns [I2sReadDmaTransfer] which represents the in-progress DMA
     /// transfer
     fn read_dma(self, words: RXBUF) -> Result<I2sReadDmaTransfer<T, P, RX, RXBUF>, Error>
     where
@@ -496,8 +496,8 @@ where
         RX: Rx,
         RXBUF: WriteBuffer<Word = u8>;
 
-    /// Continously read from I2S.
-    /// Returns [I2sReadDmaTransfer] which represents the in-ptrogress DMA
+    /// Continuously read from I2S.
+    /// Returns [I2sReadDmaTransfer] which represents the in-progress DMA
     /// transfer
     fn read_dma_circular(self, words: RXBUF) -> Result<I2sReadDmaTransfer<T, P, RX, RXBUF>, Error>
     where
