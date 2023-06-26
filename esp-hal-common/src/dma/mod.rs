@@ -1,6 +1,7 @@
 //! Direct Memory Access Commons
 //!
-//! Descriptors should be sized as (BUFFERSIZE / 4092) * 3
+//! Descriptors should be sized as `((BUFFERSIZE + 4091) / 4092) * 3`. I.e., to
+//! transfer buffers of size `1..=4092`, you need 3 descriptors.
 
 use core::{marker::PhantomData, sync::atomic::compiler_fence};
 
@@ -347,7 +348,7 @@ where
             return Err(DmaError::InvalidDescriptorSize);
         }
 
-        if self.descriptors.len() / 3 < len / CHUNK_SIZE {
+        if self.descriptors.len() / 3 < (len + CHUNK_SIZE - 1) / CHUNK_SIZE {
             return Err(DmaError::OutOfDescriptors);
         }
 
@@ -647,7 +648,7 @@ where
             return Err(DmaError::InvalidDescriptorSize);
         }
 
-        if self.descriptors.len() / 3 < len / CHUNK_SIZE {
+        if self.descriptors.len() / 3 < (len + CHUNK_SIZE - 1) / CHUNK_SIZE {
             return Err(DmaError::OutOfDescriptors);
         }
 

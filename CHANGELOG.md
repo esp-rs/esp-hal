@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix rom::crc docs
 - Add octal PSRAM support for ESP32-S3 (#610)
 - Add MD5 functions from ESP ROM (#618)
+- Add embassy async `read` support for `uart` (#620)
 - Add feature enabling directly hooking the interrupt vector table
 
 ### Changed
@@ -40,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Corrected the expected DMA descriptor counts (#622)
 - DMA is supported for SPI3 on ESP32-S3 (#507)
 - `change_bus_frequency` is now available on `SpiDma` (#529)
 - Fixed a bug where a GPIO interrupt could erroneously fire again causing the next `await` on that pin to instantly return `Poll::Ok` (#537)
