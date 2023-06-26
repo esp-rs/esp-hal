@@ -19,7 +19,10 @@ const UART_FIFO_SIZE: u16 = 128;
 
 /// Custom serial error type
 #[derive(Debug)]
-pub enum Error {}
+pub enum Error {
+    #[cfg(feature = "async")]
+    ReadBufferFull,
+}
 
 /// UART configuration
 pub mod config {
@@ -1000,7 +1003,7 @@ mod asynch {
 
     use super::{Error, Instance};
     use crate::{
-        uart::{RegisterBlock, FIFO_SPEC, UART_FIFO_SIZE},
+        uart::{RegisterBlock, UART_FIFO_SIZE},
         Uart,
     };
 
@@ -1109,12 +1112,6 @@ mod asynch {
     {
         pub async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
             let mut read_bytes = 0;
-            #[allow(unused_variables)]
-            let offset = 0;
-
-            // on ESP32-S2 we need to use PeriBus2 to read the FIFO
-            #[cfg(esp32s2)]
-            let offset = 0x20c00000;
 
             select(
                 UartFuture::new(Event::RxCmdCharDetected, self.inner()),
@@ -1122,13 +1119,13 @@ mod asynch {
             )
             .await;
 
-            while self.uart.get_rx_fifo_count() > 0 && read_bytes < buf.len() {
-                buf[read_bytes] = unsafe {
-                    let fifo = (self.uart.register_block().fifo.as_ptr() as *mut u8).offset(offset)
-                        as *mut crate::peripherals::generic::Reg<FIFO_SPEC>;
-                    (*fifo).read().rxfifo_rd_byte().bits()
-                };
-                read_bytes += 1;
+            while let Ok(byte) = self.read_byte() {
+                if read_bytes < buf.len() {
+                    buf[read_bytes] = byte;
+                    read_bytes += 1;
+                } else {
+                    return Err(Error::ReadBufferFull);
+                }
             }
 
             Ok(read_bytes)

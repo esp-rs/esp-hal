@@ -67,9 +67,7 @@ async fn run(mut uart: Uart<'static, UART0>) {
             .unwrap();
 
         // set rbuf full capacity
-        unsafe {
-            rbuf.set_len(rbuf.capacity());
-        }
+        rbuf.resize_default(rbuf.capacity()).ok();
         let mut offset = 0;
         loop {
             match with_timeout(READ_TIMEOUT, uart.read(&mut rbuf[offset..])).await {
