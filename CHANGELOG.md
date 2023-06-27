@@ -39,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Change LED pin to GPIO2 in ESP32 blinky example (#581)
 - Update ESP32-H2 and ESP32-C6 clocks and remove `i2c_clock` for all chips but ESP32 (#592)
 - Use both timers in `TIMG0` for embassy time driver when able (#609)
+- Improve examples documentation (#533)
+- esp32h2-hal: added README (#585)
 
 ### Fixed
 
@@ -59,11 +61,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed [trap location in ram](https://github.com/esp-rs/esp-hal/pull/605#issuecomment-1604039683) (#605)
 - Fixed a possible overlap of `.data` and `.rwtext` (#616)
 - Avoid SDA/SCL being low while configuring pins for I2C
-
-### Changed
-
-- Improve examples documentation (#533)
-- esp32h2-hal: added README (#585)
 
 ### Breaking
 
