@@ -64,6 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking
 
+- Simplified user-facing SpiDma and I2s types (#626)
 - Significantly simplified user-facing GPIO pin types. (#553)
 - No longer re-export the `soc` module and the contents of the `interrupt` module at the package level (#607)
 
