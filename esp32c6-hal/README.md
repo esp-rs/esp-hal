@@ -33,7 +33,7 @@ By default, [espflash](https://github.com/esp-rs/espflash) fetches the required 
 
 #### Direct Boot
 
-[Direct Boot](https://github.com/espressif/esp32c6-direct-boot-example#direct-boot-in-esp32-c6) allows an application stored in the External Flash to be executed directly, without being copied into Internal RAM.
+[Direct Boot](https://github.com/espressif/esp32c3-direct-boot-example#direct-boot-in-esp32-c3) allows an application stored in the External Flash to be executed directly, without being copied into Internal RAM.
 
 ##### Booting the Hello World example using Direct Boot
 

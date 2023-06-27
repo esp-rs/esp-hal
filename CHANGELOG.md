@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Change LED pin to GPIO2 in ESP32 blinky example (#581)
 - Update ESP32-H2 and ESP32-C6 clocks and remove `i2c_clock` for all chips but ESP32 (#592)
 - Use both timers in `TIMG0` for embassy time driver when able (#609)
+- Re-work `RadioExt` implementations, add support for ESP32-H2 (#627)
 
 ### Fixed
 
