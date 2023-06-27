@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- DMA types can no longer be constructed by the user (#625)
 - Move core interrupt handling from Flash to RAM for RISC-V chips (ESP32-H2, ESP32-C2, ESP32-C3, ESP32-C6) (#541)
 - Change LED pin to GPIO2 in ESP32 blinky example (#581)
 - Update ESP32-H2 and ESP32-C6 clocks and remove `i2c_clock` for all chips but ESP32 (#592)
@@ -41,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Corrected the expected DMA descriptor counts (#622)
+- Corrected the expected DMA descriptor counts (#622, #625)
 - DMA is supported for SPI3 on ESP32-S3 (#507)
 - `change_bus_frequency` is now available on `SpiDma` (#529)
 - Fixed a bug where a GPIO interrupt could erroneously fire again causing the next `await` on that pin to instantly return `Poll::Ok` (#537)

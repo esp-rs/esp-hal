@@ -9,6 +9,7 @@ use crate::{
 macro_rules! ImplSpiChannel {
     ($num: literal) => {
         paste::paste! {
+            #[non_exhaustive]
             pub struct [<Spi $num DmaChannel>] {}
 
             impl RegisterAccess for [<Spi $num DmaChannel>] {
@@ -195,6 +196,7 @@ macro_rules! ImplSpiChannel {
                 }
             }
 
+            #[non_exhaustive]
             pub struct [<Spi $num DmaChannelTxImpl>] {}
 
             impl<'a> TxChannel<[<Spi $num DmaChannel>]> for [<Spi $num DmaChannelTxImpl>] {
@@ -205,6 +207,7 @@ macro_rules! ImplSpiChannel {
                 }
             }
 
+            #[non_exhaustive]
             pub struct [<Spi $num DmaChannelRxImpl>] {}
 
             impl<'a> RxChannel<[<Spi $num DmaChannel>]> for [<Spi $num DmaChannelRxImpl>] {
@@ -215,12 +218,14 @@ macro_rules! ImplSpiChannel {
                 }
             }
 
+            #[non_exhaustive]
             pub struct [<Spi $num DmaChannelCreator>] {}
 
             impl [<Spi $num DmaChannelCreator>] {
                 /// Configure the channel for use
                 ///
-                /// Descriptors should be sized as (BUFFERSIZE / 4092) * 3
+                /// Descriptors should be sized as `((BUFFERSIZE + 4091) / 4092) * 3`. I.e., to
+                /// transfer buffers of size `1..=4092`, you need 3 descriptors.
                 pub fn configure<'a>(
                     self,
                     burst_mode: bool,
@@ -458,7 +463,8 @@ macro_rules! ImplI2sChannel {
             impl [<I2s $num DmaChannelCreator>] {
                 /// Configure the channel for use
                 ///
-                /// Descriptors should be sized as (BUFFERSIZE / 4092) * 3
+                /// Descriptors should be sized as `((BUFFERSIZE + 4091) / 4092) * 3`. I.e., to
+                /// transfer buffers of size `1..=4092`, you need 3 descriptors.
                 pub fn configure<'a>(
                     self,
                     burst_mode: bool,
@@ -511,11 +517,13 @@ macro_rules! ImplI2sChannel {
     };
 }
 
+#[non_exhaustive]
 pub struct Spi2DmaSuitablePeripheral {}
 impl PeripheralMarker for Spi2DmaSuitablePeripheral {}
 impl SpiPeripheral for Spi2DmaSuitablePeripheral {}
 impl Spi2Peripheral for Spi2DmaSuitablePeripheral {}
 
+#[non_exhaustive]
 pub struct Spi3DmaSuitablePeripheral {}
 impl PeripheralMarker for Spi3DmaSuitablePeripheral {}
 impl SpiPeripheral for Spi3DmaSuitablePeripheral {}
@@ -524,6 +532,7 @@ impl Spi3Peripheral for Spi3DmaSuitablePeripheral {}
 ImplSpiChannel!(2);
 ImplSpiChannel!(3);
 
+#[non_exhaustive]
 pub struct I2s0DmaSuitablePeripheral {}
 impl PeripheralMarker for I2s0DmaSuitablePeripheral {}
 impl I2sPeripheral for I2s0DmaSuitablePeripheral {}
@@ -531,6 +540,7 @@ impl I2s0Peripheral for I2s0DmaSuitablePeripheral {}
 
 ImplI2sChannel!(0, "I2S0");
 
+#[non_exhaustive]
 pub struct I2s1DmaSuitablePeripheral {}
 impl PeripheralMarker for I2s1DmaSuitablePeripheral {}
 impl I2sPeripheral for I2s1DmaSuitablePeripheral {}
