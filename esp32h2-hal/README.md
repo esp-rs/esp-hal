@@ -1,17 +1,17 @@
 # esp32h2-hal
 
-<!-- [![Crates.io](https://img.shields.io/crates/v/esp32h2-hal?labelColor=1C2C2E&color=C96329&logo=Rust&style=flat-square)](https://crates.io/crates/esp32h2-hal)
+[![Crates.io](https://img.shields.io/crates/v/esp32h2-hal?labelColor=1C2C2E&color=C96329&logo=Rust&style=flat-square)](https://crates.io/crates/esp32h2-hal)
 [![docs.rs](https://img.shields.io/docsrs/esp32h2-hal?labelColor=1C2C2E&color=C96329&logo=rust&style=flat-square)](https://docs.rs/esp32h2-hal)
-![Crates.io](https://img.shields.io/crates/l/esp32h2-hal?labelColor=1C2C2E&style=flat-square) -->
+![Crates.io](https://img.shields.io/crates/l/esp32h2-hal?labelColor=1C2C2E&style=flat-square)
 [![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&labelColor=1C2C2E&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
 
 `no_std` HAL for the ESP32-H2 from Espressif. Implements a number of the traits defined by [embedded-hal](https://github.com/rust-embedded/embedded-hal).
 
 This device uses the RISC-V ISA, which is officially supported by the Rust compiler via the `riscv32imac-unknown-none-elf` target. Refer to the [Getting Started](#getting-started) section below for more information.
 
-<!-- ## [Documentation]
+## [Documentation]
 
-[documentation]: https://docs.rs/esp32h2-hal/ -->
+[documentation]: https://docs.rs/esp32h2-hal/
 
 ## Getting Started
 
@@ -33,7 +33,7 @@ By default, [espflash](https://github.com/esp-rs/espflash) fetches the required 
 
 #### Direct Boot
 
-Direct Boot allows an application stored in the External Flash to be executed directly, without being copied into Internal RAM.
+[Direct Boot](https://github.com/espressif/esp32c3-direct-boot-example#direct-boot-in-esp32-c3) allows an application stored in the External Flash to be executed directly, without being copied into Internal RAM.
 
 ##### Booting the Hello World example using Direct Boot
 
@@ -73,4 +73,4 @@ at your option.
 
 Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in
 the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without
-any additional terms or conditions. 
+any additional terms or conditions.
