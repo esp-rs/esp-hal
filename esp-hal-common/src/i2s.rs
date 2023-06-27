@@ -508,24 +508,21 @@ where
 }
 
 /// Instance of the I2S peripheral driver
-pub struct I2s<'d, I, T, P, CH>
+pub struct I2s<'d, I, P, CH>
 where
-    I: Instance<T>,
-    T: RegisterAccess + Clone,
+    I: Instance,
     P: I2sMclkPin,
     CH: ChannelTypes,
 {
     _peripheral: PeripheralRef<'d, I>,
-    _register_access: T,
     _pins: P,
-    pub i2s_tx: TxCreator<'d, T, CH>,
-    pub i2s_rx: RxCreator<'d, T, CH>,
+    pub i2s_tx: TxCreator<'d, I::Peripheral, CH>,
+    pub i2s_rx: RxCreator<'d, I::Peripheral, CH>,
 }
 
-impl<'d, I, T, P, CH> I2s<'d, I, T, P, CH>
+impl<'d, I, P, CH> I2s<'d, I, P, CH>
 where
-    I: Instance<T>,
-    T: RegisterAccess + Clone,
+    I: Instance,
     P: I2sMclkPin,
     CH: ChannelTypes,
 {
@@ -561,7 +558,6 @@ where
 
         Self {
             _peripheral: i2s,
-            _register_access: register_access.clone(),
             _pins: pins,
             i2s_tx: TxCreator {
                 register_access: register_access.clone(),
@@ -576,10 +572,9 @@ where
 }
 
 /// Construct a new I2S peripheral driver instance for the first I2S peripheral
-pub trait I2s0New<'d, I, T, P, CH>
+pub trait I2s0New<'d, I, P, CH>
 where
-    I: Instance<T>,
-    T: RegisterAccess + Clone,
+    I: Instance,
     P: I2sMclkPin,
     CH: ChannelTypes,
     CH::P: I2sPeripheral + I2s0Peripheral,
@@ -596,10 +591,9 @@ where
     ) -> Self;
 }
 
-impl<'d, I, T, P, CH> I2s0New<'d, I, T, P, CH> for I2s<'d, I, T, P, CH>
+impl<'d, I, P, CH> I2s0New<'d, I, P, CH> for I2s<'d, I, P, CH>
 where
-    I: Instance<T> + I2s0Instance,
-    T: RegisterAccess + Clone,
+    I: Instance + I2s0Instance,
     P: I2sMclkPin,
     CH: ChannelTypes,
     CH::P: I2sPeripheral + I2s0Peripheral,
@@ -629,10 +623,9 @@ where
 
 /// Construct a new I2S peripheral driver instance for the second I2S peripheral
 #[cfg(any(esp32s3))]
-pub trait I2s1New<'d, I, T, P, CH>
+pub trait I2s1New<'d, I, P, CH>
 where
-    I: Instance<T>,
-    T: RegisterAccess + Clone,
+    I: Instance,
     P: I2sMclkPin,
     CH: ChannelTypes,
     CH::P: I2sPeripheral + I2s1Peripheral,
@@ -650,10 +643,9 @@ where
 }
 
 #[cfg(any(esp32s3))]
-impl<'d, I, T, P, CH> I2s1New<'d, I, T, P, CH> for I2s<'d, I, T, P, CH>
+impl<'d, I, P, CH> I2s1New<'d, I, P, CH> for I2s<'d, I, P, CH>
 where
-    I: Instance<T> + I2s1Instance,
-    T: RegisterAccess + Clone,
+    I: Instance + I2s1Instance,
     P: I2sMclkPin,
     CH: ChannelTypes,
     CH::P: I2sPeripheral + I2s1Peripheral,
@@ -1056,14 +1048,15 @@ mod private {
 
     pub trait I2s1Instance {}
 
-    pub trait Instance<R>
-    where
-        R: RegisterAccess,
-    {
-        fn register_access(&self) -> R;
+    pub trait Instance {
+        type Peripheral: RegisterAccess + Clone;
+
+        fn register_access(&self) -> Self::Peripheral;
     }
 
-    impl Instance<I2sPeripheral0> for I2S0 {
+    impl Instance for I2S0 {
+        type Peripheral = I2sPeripheral0;
+
         fn register_access(&self) -> I2sPeripheral0 {
             I2sPeripheral0 {}
         }
@@ -1072,7 +1065,8 @@ mod private {
     impl I2s0Instance for I2S0 {}
 
     #[cfg(esp32s3)]
-    impl Instance<I2sPeripheral1> for crate::peripherals::I2S1 {
+    impl Instance for crate::peripherals::I2S1 {
+        type Peripheral = I2sPeripheral1;
         fn register_access(&self) -> I2sPeripheral1 {
             I2sPeripheral1 {}
         }
