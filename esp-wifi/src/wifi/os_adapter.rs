@@ -1467,8 +1467,13 @@ pub unsafe extern "C" fn nvs_erase_key(
  *   0 if success or -1 if fail
  *
  ****************************************************************************/
-pub unsafe extern "C" fn get_random(_buf: *mut u8, _len: size_t) -> crate::binary::c_types::c_int {
-    todo!("get_random")
+pub unsafe extern "C" fn get_random(buf: *mut u8, len: size_t) -> crate::binary::c_types::c_int {
+    for i in 0..len as usize {
+        buf.add(i)
+            .write_volatile((crate::wifi::rand() & 0xff) as u8)
+    }
+
+    0
 }
 
 /****************************************************************************
@@ -2054,35 +2059,30 @@ pub unsafe extern "C" fn coex_schm_curr_phase_get() -> *mut crate::binary::c_typ
     return 0 as *mut crate::binary::c_types::c_void;
 }
 
-#[allow(unused_variables)]
-pub unsafe extern "C" fn coex_schm_curr_phase_idx_set(
-    idx: crate::binary::c_types::c_int,
-) -> crate::binary::c_types::c_int {
-    log::debug!("coex_schm_curr_phase_idx_set");
-
-    #[cfg(coex)]
-    return crate::binary::include::coex_schm_curr_phase_idx_set(idx);
+pub unsafe extern "C" fn coex_schm_process_restart_wrapper() -> esp_wifi_sys::c_types::c_int {
+    log::debug!("UNIMPLEMENTED coex_schm_process_restart");
 
     #[cfg(not(coex))]
-    0
+    return 0;
+
+    #[cfg(coex)]
+    crate::binary::include::coex_schm_process_restart();
 }
 
-/****************************************************************************
- * Name: wifi_coex_set_schm_curr_phase_idx
- *
- * Description:
- *   Don't support
- *
- ****************************************************************************/
 #[allow(unused_variables)]
-pub unsafe extern "C" fn coex_schm_curr_phase_idx_get() -> crate::binary::c_types::c_int {
-    log::debug!("coex_schm_curr_phase_idx_get");
-
-    #[cfg(coex)]
-    return crate::binary::include::coex_schm_curr_phase_idx_get();
+pub unsafe extern "C" fn coex_schm_register_cb_wrapper(
+    arg1: esp_wifi_sys::c_types::c_int,
+    cb: ::core::option::Option<
+        unsafe extern "C" fn(arg1: esp_wifi_sys::c_types::c_int) -> esp_wifi_sys::c_types::c_int,
+    >,
+) -> esp_wifi_sys::c_types::c_int {
+    log::debug!("UNIMPLEMENTED coex_schm_register_cb");
 
     #[cfg(not(coex))]
-    0
+    return 0;
+
+    #[cfg(coex)]
+    crate::binary::include::coex_schm_register_cb(arg1, cb);
 }
 
 /****************************************************************************

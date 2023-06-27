@@ -97,11 +97,18 @@ pub(super) struct osi_funcs_s {
     interrupt_l3_restore: Option<unsafe extern "C" fn() -> ()>,
     custom_queue_create:
         Option<unsafe extern "C" fn(u32, u32) -> *mut crate::binary::c_types::c_void>,
+    coex_version_get: Option<
+        unsafe extern "C" fn(
+            *mut crate::binary::c_types::c_uint,
+            *mut crate::binary::c_types::c_uint,
+            *mut crate::binary::c_types::c_uint,
+        ) -> crate::binary::c_types::c_int,
+    >,
     magic: u32,
 }
 
 pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
-    version: 0x00010003,
+    version: 0x00010004,
     set_isr: Some(ble_os_adapter_chip_specific::set_isr),
     ints_on: Some(ble_os_adapter_chip_specific::ints_on),
     interrupt_disable: Some(interrupt_disable),
@@ -165,8 +172,24 @@ pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     interrupt_l3_disable: Some(interrupt_l3_disable),
     interrupt_l3_restore: Some(interrupt_l3_restore),
     custom_queue_create: Some(custom_queue_create),
+    coex_version_get: Some(coex_version_get_wrapper),
     magic: 0xfadebead,
 };
+
+extern "C" fn coex_version_get_wrapper(major: *mut u32, minor: *mut u32, patch: *mut u32) -> i32 {
+    unsafe {
+        let coex_version = core::ffi::CStr::from_ptr(crate::binary::include::coex_version_get())
+            .to_str()
+            .unwrap();
+        log::info!("COEX Version {}", coex_version);
+        // we should parse it ... for now just hardcoded
+        major.write_volatile(1);
+        minor.write_volatile(2);
+        patch.write_volatile(0);
+    }
+
+    0
+}
 
 #[repr(C)]
 struct btdm_dram_available_region_t {

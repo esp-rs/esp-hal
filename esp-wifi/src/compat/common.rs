@@ -278,7 +278,7 @@ pub fn sem_take(semphr: *mut crate::binary::c_types::c_void, tick: u32) -> i32 {
     let tick = if tick == 0 { 1 } else { tick };
     let end_time = crate::timer::get_systimer_count() + tick as u64;
 
-    loop {
+    'outer: loop {
         loop {
             let res = critical_section::with(|_| unsafe {
                 memory_fence();
@@ -301,7 +301,7 @@ pub fn sem_take(semphr: *mut crate::binary::c_types::c_void, tick: u32) -> i32 {
 
             if !forever {
                 if crate::timer::get_systimer_count() > end_time {
-                    break;
+                    break 'outer;
                 }
             }
 
