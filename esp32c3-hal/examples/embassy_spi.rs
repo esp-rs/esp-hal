@@ -44,14 +44,8 @@ macro_rules! singleton {
     }};
 }
 
-pub type SpiType<'d> = SpiDma<
-    'd,
-    esp32c3_hal::peripherals::SPI2,
-    ChannelTx<'d, Channel0TxImpl, esp32c3_hal::gdma::Channel0>,
-    ChannelRx<'d, Channel0RxImpl, esp32c3_hal::gdma::Channel0>,
-    SuitablePeripheral0,
-    FullDuplexMode,
->;
+pub type SpiType<'d> =
+    SpiDma<'d, esp32c3_hal::peripherals::SPI2, esp32c3_hal::gdma::Channel0, FullDuplexMode>;
 
 #[embassy_executor::task]
 async fn spi_task(spi: &'static mut SpiType<'static>) {

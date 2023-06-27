@@ -44,14 +44,9 @@ macro_rules! singleton {
     }};
 }
 
-pub type SpiType<'d> = SpiDma<
-    'd,
-    esp32s3_hal::peripherals::SPI2,
-    ChannelTx<'d, Channel0TxImpl, esp32s3_hal::gdma::Channel0>,
-    ChannelRx<'d, Channel0RxImpl, esp32s3_hal::gdma::Channel0>,
-    SuitablePeripheral0,
-    FullDuplexMode,
->;
+// This example uses SPI3 to test that WithDmaSpi3 is included in the prelude.
+pub type SpiType<'d> =
+    SpiDma<'d, esp32s3_hal::peripherals::SPI3, esp32s3_hal::gdma::Channel0, FullDuplexMode>;
 
 #[embassy_executor::task]
 async fn spi_task(spi: &'static mut SpiType<'static>) {
@@ -129,7 +124,7 @@ fn main() -> ! {
     let rx_descriptors = singleton!([0u32; 8 * 3]);
 
     let spi = singleton!(Spi::new(
-        peripherals.SPI2,
+        peripherals.SPI3,
         sclk,
         mosi,
         miso,
