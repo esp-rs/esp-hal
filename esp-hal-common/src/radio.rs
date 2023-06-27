@@ -70,17 +70,7 @@ impl crate::peripheral::Peripheral for LowRate {
 impl crate::peripheral::sealed::Sealed for LowRate {}
 
 cfg_if::cfg_if! {
-    if #[cfg(any(esp32, esp32c2, esp32c3, esp32s3))] {
-        impl RadioExt for crate::peripherals::RADIO {
-            type Components = (Wifi, Bluetooth);
-
-            fn split(self) -> Self::Components {
-                unsafe {
-                    (Wifi::steal(), Bluetooth::steal())
-                }
-            }
-        }
-    } else if #[cfg(esp32c6)] {
+    if #[cfg(all(bt, ieee802154, wifi))] {
         impl RadioExt for crate::peripherals::RADIO {
             type Components = (Wifi, Bluetooth, LowRate);
 
@@ -90,7 +80,27 @@ cfg_if::cfg_if! {
                 }
             }
         }
-    } else if #[cfg(esp32s2)] {
+    } else if #[cfg(all(bt, ieee802154))] {
+        impl RadioExt for crate::peripherals::RADIO {
+            type Components = (Bluetooth, LowRate);
+
+            fn split(self) -> Self::Components {
+                unsafe {
+                    (Bluetooth::steal(), LowRate::steal())
+                }
+            }
+        }
+    } else if #[cfg(all(bt, wifi))] {
+        impl RadioExt for crate::peripherals::RADIO {
+            type Components = (Wifi, Bluetooth);
+
+            fn split(self) -> Self::Components {
+                unsafe {
+                    (Wifi::steal(), Bluetooth::steal())
+                }
+            }
+        }
+    } else if #[cfg(wifi)] {
         impl RadioExt for crate::peripherals::RADIO {
             type Components = Wifi;
 
