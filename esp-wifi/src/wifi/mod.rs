@@ -232,8 +232,11 @@ static mut G_COEX_ADAPTER_FUNCS: coex_adapter_funcs_t = coex_adapter_funcs_t {
     _free: Some(free),
     _esp_timer_get_time: Some(esp_timer_get_time),
     _env_is_chip: Some(env_is_chip),
-    _slowclk_cal_get: Some(slowclk_cal_get),
     _magic: crate::binary::include::COEX_ADAPTER_MAGIC as i32,
+    _timer_disarm: Some(timer_disarm),
+    _timer_done: Some(timer_done),
+    _timer_setfn: Some(timer_setfn),
+    _timer_arm_us: Some(timer_arm_us),
 };
 
 #[cfg(all(esp32s3, coex))]
@@ -251,8 +254,11 @@ static mut G_COEX_ADAPTER_FUNCS: coex_adapter_funcs_t = coex_adapter_funcs_t {
     _free: Some(free),
     _esp_timer_get_time: Some(esp_timer_get_time),
     _env_is_chip: Some(env_is_chip),
-    _slowclk_cal_get: Some(slowclk_cal_get),
     _magic: crate::binary::include::COEX_ADAPTER_MAGIC as i32,
+    _timer_disarm: Some(timer_disarm),
+    _timer_done: Some(timer_done),
+    _timer_setfn: Some(timer_setfn),
+    _timer_arm_us: Some(timer_arm_us),
 };
 
 #[cfg(all(esp32, coex))]
@@ -278,7 +284,6 @@ static mut G_COEX_ADAPTER_FUNCS: coex_adapter_funcs_t = coex_adapter_funcs_t {
     _timer_setfn: Some(timer_setfn),
     _timer_arm_us: Some(timer_arm_us),
     _env_is_chip: Some(env_is_chip),
-    _slowclk_cal_get: Some(slowclk_cal_get),
     _magic: crate::binary::include::COEX_ADAPTER_MAGIC as i32,
 };
 

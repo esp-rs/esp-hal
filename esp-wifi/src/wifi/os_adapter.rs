@@ -2060,13 +2060,13 @@ pub unsafe extern "C" fn coex_schm_curr_phase_get() -> *mut crate::binary::c_typ
 }
 
 pub unsafe extern "C" fn coex_schm_process_restart_wrapper() -> esp_wifi_sys::c_types::c_int {
-    log::debug!("UNIMPLEMENTED coex_schm_process_restart");
+    log::debug!("coex_schm_process_restart_wrapper");
 
     #[cfg(not(coex))]
     return 0;
 
     #[cfg(coex)]
-    crate::binary::include::coex_schm_process_restart();
+    crate::binary::include::coex_schm_process_restart()
 }
 
 #[allow(unused_variables)]
@@ -2076,13 +2076,16 @@ pub unsafe extern "C" fn coex_schm_register_cb_wrapper(
         unsafe extern "C" fn(arg1: esp_wifi_sys::c_types::c_int) -> esp_wifi_sys::c_types::c_int,
     >,
 ) -> esp_wifi_sys::c_types::c_int {
-    log::debug!("UNIMPLEMENTED coex_schm_register_cb");
+    log::debug!("coex_schm_register_cb_wrapper {} {:?}", arg1, cb);
 
     #[cfg(not(coex))]
     return 0;
 
     #[cfg(coex)]
-    crate::binary::include::coex_schm_register_cb(arg1, cb);
+    crate::binary::include::coex_schm_register_callback(
+        arg1 as u32,
+        (cb.unwrap()) as *const esp_wifi_sys::c_types::c_void as *mut esp_wifi_sys::c_types::c_void,
+    )
 }
 
 /****************************************************************************
