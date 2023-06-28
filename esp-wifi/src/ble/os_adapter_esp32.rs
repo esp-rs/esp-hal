@@ -443,11 +443,11 @@ pub(crate) unsafe extern "C" fn coex_schm_register_btdm_callback_wrapper(
     log::warn!("coex_schm_register_btdm_callback {:p}", callback);
     extern "C" {
         #[cfg(coex)]
-        fn coex_schm_register_btdm_callback(callback: unsafe extern "C" fn()) -> i32;
+        fn coex_schm_register_callback(kind: u32, callback: unsafe extern "C" fn()) -> i32;
     }
 
     #[cfg(coex)]
-    return coex_schm_register_btdm_callback(callback);
+    return coex_schm_register_callback(1, callback); // COEX_SCHM_CALLBACK_TYPE_BT = 1
 
     #[cfg(not(coex))]
     0
