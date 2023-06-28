@@ -294,12 +294,6 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
         (f.sig.inputs.len() == 1).then(|| Ident::new("context", proc_macro2::Span::call_site()));
 
     quote!(
-        macro_rules! foo {
-            () => {
-            };
-        }
-        foo!();
-
         #(#cfgs)*
         #(#attrs)*
         #[doc(hidden)]
