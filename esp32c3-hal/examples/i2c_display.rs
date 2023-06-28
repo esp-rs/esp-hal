@@ -115,7 +115,7 @@ fn main() -> ! {
         // Write buffer to display
         display.flush().unwrap();
         // Clear display buffer
-        display.clear();
+        display.clear(BinaryColor::Off).unwrap();
 
         // Wait 5 seconds
         block!(timer0.wait()).unwrap();
@@ -133,7 +133,7 @@ fn main() -> ! {
         // Write buffer to display
         display.flush().unwrap();
         // Clear display buffer
-        display.clear();
+        display.clear(BinaryColor::Off).unwrap();
 
         // Wait 5 seconds
         block!(timer0.wait()).unwrap();
