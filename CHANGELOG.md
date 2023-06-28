@@ -42,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Re-work `RadioExt` implementations, add support for ESP32-H2 (#627)
 - Improve examples documentation (#533)
 - esp32h2-hal: added README (#585)
+- Update `esp-hal-procmacros` package dependencies and features (#628)
 
 ### Fixed
 

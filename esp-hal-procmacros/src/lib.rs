@@ -3,7 +3,7 @@
 
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 
-use darling::FromMeta;
+use darling::{ast::NestedMeta, FromMeta};
 use proc_macro::{self, Span, TokenStream};
 use proc_macro_error::{abort, proc_macro_error};
 use quote::quote;
@@ -23,7 +23,6 @@ use syn::{
 use syn::{
     parse::{Parse, ParseStream},
     parse_macro_input,
-    AttributeArgs,
 };
 
 #[derive(Debug, Default, FromMeta)]
@@ -47,7 +46,12 @@ struct RamArgs {
 #[proc_macro_attribute]
 #[proc_macro_error]
 pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
-    let attr_args = parse_macro_input!(args as AttributeArgs);
+    let attr_args = match NestedMeta::parse_meta_list(args.into()) {
+        Ok(v) => v,
+        Err(e) => {
+            return TokenStream::from(darling::Error::from(e).write_errors());
+        }
+    };
 
     let RamArgs {
         rtc_fast,
@@ -142,7 +146,12 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
 
     let mut f: ItemFn = syn::parse(input).expect("`#[interrupt]` must be applied to a function");
 
-    let attr_args = parse_macro_input!(args as AttributeArgs);
+    let attr_args = match NestedMeta::parse_meta_list(args.into()) {
+        Ok(v) => v,
+        Err(e) => {
+            return TokenStream::from(darling::Error::from(e).write_errors());
+        }
+    };
 
     if attr_args.len() > 1 {
         abort!(
@@ -156,7 +165,7 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
 
     if attr_args.len() == 1 {
         match &attr_args[0] {
-            syn::NestedMeta::Meta(Path(x)) => {
+            NestedMeta::Meta(Path(x)) => {
                 ident_s = x.get_ident().unwrap();
             }
             _ => {
@@ -285,12 +294,6 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
         (f.sig.inputs.len() == 1).then(|| Ident::new("context", proc_macro2::Span::call_site()));
 
     quote!(
-        macro_rules! foo {
-            () => {
-            };
-        }
-        foo!();
-
         #(#cfgs)*
         #(#attrs)*
         #[doc(hidden)]
@@ -351,7 +354,7 @@ fn check_attr_whitelist(attrs: &[Attribute], caller: WhiteListCaller) -> Result<
 /// Returns `true` if `attr.path` matches `name`
 #[cfg(feature = "interrupt")]
 fn eq(attr: &Attribute, name: &str) -> bool {
-    attr.style == AttrStyle::Outer && attr.path.is_ident(name)
+    attr.style == AttrStyle::Outer && attr.path().is_ident(name)
 }
 
 #[cfg(feature = "interrupt")]
