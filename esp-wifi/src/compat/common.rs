@@ -261,6 +261,7 @@ pub fn sem_create(max: u32, init: u32) -> *mut crate::binary::c_types::c_void {
 }
 
 pub fn sem_delete(semphr: *mut crate::binary::c_types::c_void) {
+    log::trace!(">>> sem delete");
     critical_section::with(|_| unsafe {
         CURR_SEM[semphr as usize - 1] = None;
         memory_fence();

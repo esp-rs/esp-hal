@@ -290,7 +290,7 @@ unsafe extern "C" fn task_create(
 ) -> i32 {
     let n = StrBuf::from(name);
     trace!(
-        "recheck implementation: task_create {:p} {:p} {} {} {:p} {} {:p} {}",
+        "task_create {:p} {:p} {} {} {:p} {} {:p} {}",
         func,
         name,
         n.as_str_ref(),

@@ -105,9 +105,6 @@ fn WIFI_PWR() {
 #[interrupt]
 fn RWBT() {
     unsafe {
-        let intr = &*pac::INTERRUPT_CORE0::ptr();
-        intr.cpu_int_clear.write(|w| w.bits(1 << 1));
-
         let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::BT_INTERRUPT_FUNCTION5;
 
         trace!("interrupt RWBT {:p} {:p}", fnc, arg);
@@ -125,9 +122,6 @@ fn RWBT() {
 #[interrupt]
 fn RWBLE() {
     unsafe {
-        let intr = &*pac::INTERRUPT_CORE0::ptr();
-        intr.cpu_int_clear.write(|w| w.bits(1 << 1));
-
         let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::BT_INTERRUPT_FUNCTION5;
 
         trace!("interrupt RWBLE {:p} {:p}", fnc, arg);
@@ -145,9 +139,6 @@ fn RWBLE() {
 #[interrupt]
 fn BT_BB(_trap_frame: &mut TrapFrame) {
     unsafe {
-        let intr = &*pac::INTERRUPT_CORE0::ptr();
-        intr.cpu_int_clear.write(|w| w.bits(1 << 1));
-
         let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::BT_INTERRUPT_FUNCTION8;
 
         trace!("interrupt BT_BB {:p} {:p}", fnc, arg);
