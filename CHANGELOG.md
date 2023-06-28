@@ -40,6 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update ESP32-H2 and ESP32-C6 clocks and remove `i2c_clock` for all chips but ESP32 (#592)
 - Use both timers in `TIMG0` for embassy time driver when able (#609)
 - Re-work `RadioExt` implementations, add support for ESP32-H2 (#627)
+- Improve examples documentation (#533)
+- esp32h2-hal: added README (#585)
 
 ### Fixed
 
@@ -61,13 +63,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed a possible overlap of `.data` and `.rwtext` (#616)
 - Avoid SDA/SCL being low while configuring pins for I2C
 
-### Changed
-
-- Improve examples documentation (#533)
-- esp32h2-hal: added README (#585)
-
 ### Breaking
 
+- Simplified user-facing SpiDma and I2s types (#626)
 - Significantly simplified user-facing GPIO pin types. (#553)
 - No longer re-export the `soc` module and the contents of the `interrupt` module at the package level (#607)
 
