@@ -12,7 +12,7 @@ repository   = "https://github.com/esp-rs/esp-hal"
 license      = "MIT OR Apache-2.0"
 
 [package.metadata.docs.rs]
-features = ["esp32c3", "interrupt", "riscv"]
+features = ["esp32c3", "interrupt"]
 
 [lib]
 proc-macro = true
@@ -26,10 +26,6 @@ quote            = "1.0.26"
 syn              = {version = "1.0.109", features = ["extra-traits", "full"]}
 
 [features]
-interrupt = []
-riscv     = []
-rtc_slow  = []
-xtensa    = []
 esp32     = []
 esp32c2   = []
 esp32c3   = []
@@ -37,3 +33,6 @@ esp32c6   = []
 esp32h2   = []
 esp32s2   = []
 esp32s3   = []
+
+interrupt = []
+rtc_slow  = []
