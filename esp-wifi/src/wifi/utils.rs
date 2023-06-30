@@ -1,11 +1,11 @@
 use smoltcp::{
     iface::{Config, Interface, SocketSet, SocketStorage},
-    phy::{Device, Medium},
     socket::dhcpv4::Socket as Dhcpv4Socket,
-    wire::EthernetAddress,
+    time::Instant,
+    wire::{EthernetAddress, HardwareAddress},
 };
 
-use crate::wifi::get_sta_mac;
+use crate::{current_millis, wifi::get_sta_mac};
 use crate::{wifi::get_ap_mac, EspWifiInitialization};
 
 use super::{WifiController, WifiDevice, WifiMode};
@@ -25,17 +25,16 @@ pub fn create_network_interface<'a, 'd>(
         true => get_ap_mac(&mut mac),
         false => get_sta_mac(&mut mac),
     }
-    let hw_address = EthernetAddress::from_bytes(&mac);
+    let hw_address = HardwareAddress::Ethernet(EthernetAddress::from_bytes(&mac));
 
     let (mut device, controller) = crate::wifi::new_with_mode(inited, device, mode);
 
-    let mut config = Config::new();
-
-    if device.capabilities().medium == Medium::Ethernet {
-        config.hardware_addr = Some(hw_address.into());
-    }
-
-    let iface = Interface::new(config, &mut device);
+    let config = Config::new(hw_address);
+    let iface = Interface::new(
+        config,
+        &mut device,
+        Instant::from_millis(current_millis() as i64),
+    );
 
     let mut socket_set = SocketSet::new(socket_set_entries);
 

@@ -6,7 +6,6 @@ use embedded_io::Io;
 use embedded_svc::ipv4;
 use smoltcp::iface::{Interface, SocketHandle, SocketSet};
 use smoltcp::socket::{dhcpv4::Socket as Dhcpv4Socket, tcp::Socket as TcpSocket};
-use smoltcp::storage::PacketMetadata;
 use smoltcp::time::Instant;
 use smoltcp::wire::{IpAddress, IpCidr, IpEndpoint, Ipv4Address};
 
@@ -251,9 +250,9 @@ impl<'a> WifiStack<'a> {
 
     pub fn get_udp_socket<'s>(
         &'s self,
-        rx_meta: &'a mut [PacketMetadata<IpEndpoint>],
+        rx_meta: &'a mut [smoltcp::socket::udp::PacketMetadata],
         rx_buffer: &'a mut [u8],
-        tx_meta: &'a mut [PacketMetadata<IpEndpoint>],
+        tx_meta: &'a mut [smoltcp::socket::udp::PacketMetadata],
         tx_buffer: &'a mut [u8],
     ) -> UdpSocket<'s, 'a>
     where
@@ -447,6 +446,23 @@ impl<'s, 'n: 's> Socket<'s, 'n> {
             self.work();
         }
 
+        Ok(())
+    }
+
+    pub fn listen_unblocking<'i>(&'i mut self, port: u16) -> Result<(), IoError>
+    where
+        's: 'i,
+    {
+        {
+            let res = self.network.with_mut(|_interface, _device, sockets| {
+                let sock = sockets.get_mut::<TcpSocket>(self.socket_handle);
+                sock.listen(port)
+            });
+
+            res.map_err(|e| IoError::ListenError(e))?;
+        }
+
+        self.work();
         Ok(())
     }
 
@@ -706,10 +722,11 @@ impl<'s, 'n: 's> UdpSocket<'s, 'n> {
         self.network
             .with_mut(|_interface, _device, sockets| {
                 let endpoint = (addr, port);
+                let endpoint: IpEndpoint = endpoint.into();
 
                 sockets
                     .get_mut::<smoltcp::socket::udp::Socket>(self.socket_handle)
-                    .send_slice(data, endpoint.into())
+                    .send_slice(data, endpoint)
             })
             .map_err(|e| IoError::UdpSendError(e))?;
 
@@ -729,8 +746,8 @@ impl<'s, 'n: 's> UdpSocket<'s, 'n> {
 
         match res {
             Ok((len, endpoint)) => {
-                let addr = endpoint.addr;
-                Ok((len, addr, endpoint.port))
+                let addr = endpoint.endpoint.addr;
+                Ok((len, addr, endpoint.endpoint.port))
             }
             Err(e) => Err(IoError::UdpRecvError(e)),
         }
