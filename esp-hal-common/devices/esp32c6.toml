@@ -79,6 +79,7 @@ peripherals = [
     "bt",
     "wifi",
     "ieee802154",
+    "lp_core",
 
     # ROM capabilities
     "rom_crc_le",
