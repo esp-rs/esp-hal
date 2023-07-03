@@ -1,5 +1,6 @@
 pub mod efuse;
 pub mod gpio;
+pub mod lp_core;
 pub mod peripherals;
 pub mod radio_clocks;
 

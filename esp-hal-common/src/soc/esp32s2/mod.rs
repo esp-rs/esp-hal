@@ -4,6 +4,7 @@ pub mod peripherals;
 #[cfg(psram)]
 pub mod psram;
 pub mod radio_clocks;
+pub mod ulp_core;
 
 pub(crate) mod constants {
     pub const I2S_SCLK: u32 = 160_000_000;
