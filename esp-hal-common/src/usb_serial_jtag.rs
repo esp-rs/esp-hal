@@ -7,7 +7,6 @@ use crate::{
     peripherals::{usb_device::RegisterBlock, USB_DEVICE},
     system::PeripheralClockControl,
 };
-
 /// USB Serial JTAG driver
 pub struct UsbSerialJtag<'d> {
     usb_serial: PeripheralRef<'d, USB_DEVICE>,
@@ -203,7 +202,12 @@ pub trait Instance {
     }
 
     fn txfifo_empty(&self) -> bool {
-        !self.register_block().jfifo_st.read().out_fifo_empty().bit_is_set()
+        !self
+            .register_block()
+            .jfifo_st
+            .read()
+            .out_fifo_empty()
+            .bit_is_set()
     }
 }
 
@@ -271,19 +275,19 @@ mod asynch {
     use procmacros::interrupt;
 
     use super::{Error, Instance};
-    use crate::{UsbSerialJtag};
+    use crate::UsbSerialJtag;
 
     // Single static instance of the waker
     static WAKER: AtomicWaker = AtomicWaker::new();
 
-
     pub(crate) struct UsbSerialJtagFuture<'d, T> {
-        instance : &'d T,
+        instance: &'d T,
     }
 
-    impl <'d, T: Instance> UsbSerialJtagFuture<'d, T> {
-        pub fn new(instance : &'d T) -> Self {
-            // Set the interrupt enable bit for the USB_SERIAL_JTAG_SERIAL_IN_EMPTY_INT interrupt
+    impl<'d, T: Instance> UsbSerialJtagFuture<'d, T> {
+        pub fn new(instance: &'d T) -> Self {
+            // Set the interrupt enable bit for the USB_SERIAL_JTAG_SERIAL_IN_EMPTY_INT
+            // interrupt
             instance
                 .register_block()
                 .int_ena
@@ -301,11 +305,11 @@ mod asynch {
                 .bit_is_clear()
         }
     }
-    
+
     impl<'d, T: Instance> core::future::Future for UsbSerialJtagFuture<'d, T> {
         type Output = ();
 
-        fn poll (
+        fn poll(
             self: core::pin::Pin<&mut Self>,
             cx: &mut core::task::Context<'_>,
         ) -> core::task::Poll<Self::Output> {
@@ -318,21 +322,15 @@ mod asynch {
         }
     }
 
-    impl UsbSerialJtag<'_>
-    {
+    impl UsbSerialJtag<'_> {
         async fn write(&mut self, words: &[u8]) -> Result<(), Error> {
             let reg_block = self.usb_serial.register_block();
-            // esp_println::println!("write");
             for chunk in words.chunks(64 as usize) {
                 unsafe {
                     for &b in chunk {
                         reg_block.ep1.write(|w| w.rdwr_byte().bits(b.into()))
                     }
                     reg_block.ep1_conf.write(|w| w.wr_done().set_bit());
-    
-                    // while reg_block.ep1_conf.read().bits() & 0b011 == 0b000 {
-                    //     // wait
-                    // }
                     UsbSerialJtagFuture::new(self.inner()).await;
                 }
             }
@@ -347,8 +345,7 @@ mod asynch {
         }
     }
 
-    impl embedded_hal_async::serial::Write for UsbSerialJtag<'_>
-    {
+    impl embedded_hal_async::serial::Write for UsbSerialJtag<'_> {
         async fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
             self.write(words).await
         }
@@ -358,8 +355,29 @@ mod asynch {
         }
     }
 
+    #[cfg(esp32c3)]
     #[interrupt]
     fn USB_SERIAL_JTAG() {
+        let usb_serial_jtag = unsafe { &*crate::peripherals::USB_DEVICE::ptr() };
+        usb_serial_jtag
+            .int_ena
+            .modify(|_, w| w.serial_in_empty_int_ena().clear_bit());
+        WAKER.wake();
+    }
+
+    #[cfg(esp32s3)] // TODO doesn't work now, issue is created
+    #[interrupt]
+    fn USB_DEVICE() {
+        let usb_serial_jtag = unsafe { &*crate::peripherals::USB_DEVICE::ptr() };
+        usb_serial_jtag
+            .int_ena
+            .modify(|_, w| w.serial_in_empty_int_ena().clear_bit());
+        WAKER.wake();
+    }
+
+    #[cfg(any(esp32c6, esp32h2))]
+    #[interrupt]
+    fn USB() {
         let usb_serial_jtag = unsafe { &*crate::peripherals::USB_DEVICE::ptr() };
         usb_serial_jtag
             .int_ena
