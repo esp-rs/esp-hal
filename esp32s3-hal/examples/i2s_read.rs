@@ -17,15 +17,17 @@
 use esp32s3_hal::{
     clock::ClockControl,
     dma::DmaPriority,
-    gdma::Gdma,
+    gdma::{Channel0, Gdma},
+    gpio::Unknown,
     i2s::{DataFormat, I2s, I2s0New, I2sReadDma, MclkPin, PinsBclkWsDin, Standard},
-    peripherals::Peripherals,
+    peripherals::{Peripherals, I2S0},
     prelude::*,
     timer::TimerGroup,
     Rtc,
     IO,
 };
 use esp_backtrace as _;
+use esp_hal_common::gpio::GpioPin;
 use esp_println::println;
 
 #[entry]
@@ -62,7 +64,11 @@ fn main() -> ! {
     let mut tx_descriptors = [0u32; 8 * 3];
     let mut rx_descriptors = [0u32; 8 * 3];
 
-    let i2s = I2s::new(
+    // Here we test that the type is
+    // 1) reasonably simple (or at least this will flag changes that may make it
+    // more complex)
+    // 2) can be spelled out by the user
+    let i2s: I2s<'_, I2S0, MclkPin<'_, GpioPin<Unknown, 4>>, Channel0> = I2s::new(
         peripherals.I2S0,
         MclkPin::new(io.pins.gpio4),
         Standard::Philips,

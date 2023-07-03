@@ -62,9 +62,13 @@ pub use self::rtc_cntl::{Rtc, Rwdt};
 pub use self::soc::cpu_control;
 #[cfg(efuse)]
 pub use self::soc::efuse;
+#[cfg(lp_core)]
+pub use self::soc::lp_core;
 pub use self::soc::peripherals;
 #[cfg(psram)]
 pub use self::soc::psram;
+#[cfg(ulp_riscv_core)]
+pub use self::soc::ulp_core;
 #[cfg(any(spi0, spi1, spi2, spi3))]
 pub use self::spi::Spi;
 #[cfg(any(timg0, timg1))]

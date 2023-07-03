@@ -830,16 +830,20 @@ pub trait RegisterAccess {
     fn unlisten_in_eof();
     fn unlisten_out_eof();
 }
+
+pub trait ChannelTypes {
+    type P: PeripheralMarker;
+    type Tx<'a>: Tx;
+    type Rx<'a>: Rx;
+}
+
 /// DMA Channel
-pub struct Channel<TX, RX, P>
+pub struct Channel<'d, C>
 where
-    TX: Tx,
-    RX: Rx,
-    P: PeripheralMarker,
+    C: ChannelTypes,
 {
-    pub(crate) tx: TX,
-    pub(crate) rx: RX,
-    _phantom: PhantomData<P>,
+    pub(crate) tx: C::Tx<'d>,
+    pub(crate) rx: C::Rx<'d>,
 }
 
 /// Trait to be implemented for an in progress dma transfer.

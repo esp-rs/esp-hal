@@ -66,6 +66,7 @@ peripherals = [
     "bt",
     "wifi",
     "psram",
+    "ulp_riscv_core",
 
     # ROM capabilities
     "rom_crc_le",

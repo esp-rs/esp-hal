@@ -70,7 +70,7 @@ pub use crate::pulse_control::{
 };
 #[cfg(radio)]
 pub use crate::radio::RadioExt as _esp_hal_RadioExt;
-#[cfg(any(esp32, esp32s2))]
+#[cfg(any(esp32, esp32s2, esp32s3))]
 pub use crate::spi::dma::WithDmaSpi3 as _esp_hal_spi_dma_WithDmaSpi3;
 #[cfg(any(spi0, spi1, spi2, spi3))]
 pub use crate::spi::{

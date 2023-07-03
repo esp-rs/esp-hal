@@ -51,4 +51,5 @@ crate::peripherals! {
     XTS_AES => true,
     RADIO => false,
     PSRAM => false,
+    ULP_RISCV_CORE => false,
 }

@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `WithDmaSpi3` to prelude for ESP32S3 (#623)
 - Add bare-bones PSRAM support for ESP32 (#506)
 - Add initial support for the ESP32-H2 (#513, #526, #527, #528, #530, #538, #544, #548, #551, #556, #560, #566, #549, #564, #569, #576, #577, #589, #591, #597)
 - Add bare-bones PSRAM support for ESP32-S3 (#517)
@@ -30,18 +31,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add octal PSRAM support for ESP32-S3 (#610)
 - Add MD5 functions from ESP ROM (#618)
 - Add embassy async `read` support for `uart` (#620)
+- Add bare-bones support to run code on ULP-RISCV / LP core (#631)
 - Add feature enabling directly hooking the interrupt vector table
 
 ### Changed
 
+- DMA types can no longer be constructed by the user (#625)
 - Move core interrupt handling from Flash to RAM for RISC-V chips (ESP32-H2, ESP32-C2, ESP32-C3, ESP32-C6) (#541)
 - Change LED pin to GPIO2 in ESP32 blinky example (#581)
 - Update ESP32-H2 and ESP32-C6 clocks and remove `i2c_clock` for all chips but ESP32 (#592)
 - Use both timers in `TIMG0` for embassy time driver when able (#609)
+- Re-work `RadioExt` implementations, add support for ESP32-H2 (#627)
+- Improve examples documentation (#533)
+- esp32h2-hal: added README (#585)
+- Update `esp-hal-procmacros` package dependencies and features (#628)
 
 ### Fixed
 
-- Corrected the expected DMA descriptor counts (#622)
+- Corrected the expected DMA descriptor counts (#622, #625)
 - DMA is supported for SPI3 on ESP32-S3 (#507)
 - `change_bus_frequency` is now available on `SpiDma` (#529)
 - Fixed a bug where a GPIO interrupt could erroneously fire again causing the next `await` on that pin to instantly return `Poll::Ok` (#537)
@@ -59,13 +66,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed a possible overlap of `.data` and `.rwtext` (#616)
 - Avoid SDA/SCL being low while configuring pins for I2C
 
-### Changed
-
-- Improve examples documentation (#533)
-- esp32h2-hal: added README (#585)
-
 ### Breaking
 
+- Simplified user-facing SpiDma and I2s types (#626)
 - Significantly simplified user-facing GPIO pin types. (#553)
 - No longer re-export the `soc` module and the contents of the `interrupt` module at the package level (#607)
 

@@ -71,4 +71,5 @@ crate::peripherals! {
     UHCI0 => true,
     USB_DEVICE => true,
     RADIO => false,
+    LP_CORE => false,
 }
