@@ -57,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add embassy async `read` support for `uart` (#620)
 - Add bare-bones support to run code on ULP-RISCV / LP core (#631)
 - Add ADC calibration implementation for a riscv chips (#555)
+- Add `async` implementation for `USB Serial/JTAG`(#632)
 
 ### Changed
 
