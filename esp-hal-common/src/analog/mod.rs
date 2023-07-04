@@ -5,6 +5,46 @@ pub mod adc;
 #[cfg(dac)]
 pub mod dac;
 
+/// A helper trait to do calibrated samples fitting
+pub trait AdcCalScheme<ADCI>: Sized {
+    /// Instantiate scheme
+    fn new_cal(atten: adc::Attenuation) -> Self;
+
+    /// Get ADC calibration value to set to ADC unit
+    fn adc_cal(&self) -> u16 {
+        0
+    }
+
+    /// Convert ADC value
+    fn adc_val(&self, val: u16) -> u16 {
+        val
+    }
+}
+
+impl<ADCI> AdcCalScheme<ADCI> for () {
+    fn new_cal(_atten: adc::Attenuation) -> Self {
+        ()
+    }
+}
+
+/// A helper trait to get access to ADC calibration efuses
+pub trait AdcCalEfuse {
+    /// Get ADC calibration init code
+    ///
+    /// Returns digital value for zero voltage for a given attenuation
+    fn get_init_code(atten: adc::Attenuation) -> Option<u16>;
+
+    /// Get ADC calibration reference point voltage
+    ///
+    /// Returns reference voltage (millivolts) for a given attenuation
+    fn get_cal_mv(atten: adc::Attenuation) -> u16;
+
+    /// Get ADC calibration reference point digital value
+    ///
+    /// Returns digital value for reference voltage for a given attenuation
+    fn get_cal_code(atten: adc::Attenuation) -> Option<u16>;
+}
+
 pub struct ADC1 {
     _private: (),
 }
