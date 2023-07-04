@@ -1416,49 +1416,51 @@ mod asynch {
         pub async fn scan_n<const N: usize>(
             &mut self,
         ) -> Result<(heapless::Vec<AccessPointInfo, N>, usize), WifiError> {
-            critical_section::with(|cs| WIFI_EVENTS.borrow_ref_mut(cs).remove(WifiEvent::ScanDone));
-            esp_wifi_result!(crate::wifi::wifi_start_scan(false))?;
-            WifiEventFuture::new(WifiEvent::ScanDone).await;
+            let future = self.wait_for_event(WifiEvent::ScanDone);
+            esp_wifi_result!(wifi_start_scan(false))?;
+            future.await;
             self.scan_results()
         }
 
         /// Async version of [`embedded_svc::wifi::Wifi`]'s `start` method
         pub async fn start(&mut self) -> Result<(), WifiError> {
-            critical_section::with(|cs| WIFI_EVENTS.borrow_ref_mut(cs).remove(WifiEvent::StaStart));
-            wifi_start()?;
-
             let is_ap = match self.config {
                 embedded_svc::wifi::Configuration::None => panic!(),
                 embedded_svc::wifi::Configuration::Client(_) => false,
                 embedded_svc::wifi::Configuration::AccessPoint(_) => true,
                 embedded_svc::wifi::Configuration::Mixed(_, _) => panic!(),
             };
-
-            if is_ap {
-                WifiEventFuture::new(WifiEvent::ApStart).await;
+            let event = if is_ap {
+                WifiEvent::ApStart
             } else {
-                WifiEventFuture::new(WifiEvent::StaStart).await;
-            }
+                WifiEvent::StaStart
+            };
+            critical_section::with(|cs| WIFI_EVENTS.borrow_ref_mut(cs).remove(event));
+            wifi_start()?;
+
+            self.wait_for_event(event).await;
             Ok(())
         }
 
         /// Async version of [`embedded_svc::wifi::Wifi`]'s `stop` method
         pub async fn stop(&mut self) -> Result<(), WifiError> {
-            critical_section::with(|cs| WIFI_EVENTS.borrow_ref_mut(cs).remove(WifiEvent::StaStop));
-            embedded_svc::wifi::Wifi::stop(self)?;
-
             let is_ap = match self.config {
                 embedded_svc::wifi::Configuration::None => panic!(),
                 embedded_svc::wifi::Configuration::Client(_) => false,
                 embedded_svc::wifi::Configuration::AccessPoint(_) => true,
                 embedded_svc::wifi::Configuration::Mixed(_, _) => panic!(),
             };
-
-            if is_ap {
-                WifiEventFuture::new(WifiEvent::ApStop).await;
+            let event = if is_ap {
+                WifiEvent::ApStop
             } else {
-                WifiEventFuture::new(WifiEvent::StaStop).await;
-            }
+                WifiEvent::StaStop
+            };
+
+            critical_section::with(|cs| WIFI_EVENTS.borrow_ref_mut(cs).remove(event));
+            embedded_svc::wifi::Wifi::stop(self)?;
+
+            self.wait_for_event(event).await;
+
             Ok(())
         }
 
@@ -1469,17 +1471,17 @@ mod asynch {
                     .borrow_ref_mut(cs)
                     .remove_all(WifiEvent::StaConnected | WifiEvent::StaDisconnected)
             });
+
             let err = embedded_svc::wifi::Wifi::connect(self).err();
-            match embassy_futures::select::select(
-                WifiEventFuture::new(WifiEvent::StaConnected),
-                WifiEventFuture::new(WifiEvent::StaDisconnected),
-            )
-            .await
+
+            if self
+                .wait_for_events(WifiEvent::StaConnected | WifiEvent::StaDisconnected, false)
+                .await
+                .contains(WifiEvent::StaDisconnected)
             {
-                embassy_futures::select::Either::First(_) => Ok(()),
-                embassy_futures::select::Either::Second(_) => {
-                    Err(err.unwrap_or(WifiError::Disconnected))
-                }
+                Err(err.unwrap_or(WifiError::Disconnected))
+            } else {
+                Ok(())
             }
         }
 
@@ -1491,14 +1493,25 @@ mod asynch {
                     .remove(WifiEvent::StaDisconnected)
             });
             embedded_svc::wifi::Wifi::disconnect(self)?;
-            WifiEventFuture::new(WifiEvent::StaDisconnected).await;
+            self.wait_for_event(WifiEvent::StaDisconnected).await;
             Ok(())
         }
 
-        /// Wait for a [`WifiEvent`].
+        /// Wait for one [`WifiEvent`].
         pub async fn wait_for_event(&mut self, event: WifiEvent) {
-            critical_section::with(|cs| WIFI_EVENTS.borrow_ref_mut(cs).remove_all(event));
-            WifiEventFuture::new(event).await;
+            self.wait_for_events(EnumSet::from(event), true).await;
+        }
+
+        /// Wait for multiple [`WifiEvent`]s. Returns the events that occurred while waiting.
+        pub async fn wait_for_events(
+            &mut self,
+            events: EnumSet<WifiEvent>,
+            clear_pending: bool,
+        ) -> EnumSet<WifiEvent> {
+            if clear_pending {
+                critical_section::with(|cs| WIFI_EVENTS.borrow_ref_mut(cs).remove_all(events));
+            }
+            WifiEventFuture::new(events).await
         }
     }
 
@@ -1598,11 +1611,11 @@ mod asynch {
     }
 
     pub(crate) struct WifiEventFuture {
-        event: WifiEvent,
+        event: EnumSet<WifiEvent>,
     }
 
     impl WifiEventFuture {
-        pub fn new(event: WifiEvent) -> Self {
+        pub fn new(event: EnumSet<WifiEvent>) -> Self {
             Self { event }
         }
     }
@@ -1614,13 +1627,17 @@ mod asynch {
             self: core::pin::Pin<&mut Self>,
             cx: &mut core::task::Context<'_>,
         ) -> Poll<Self::Output> {
-            self.event.waker().register(cx.waker());
-
             let output = critical_section::with(|cs| {
-                let events = WIFI_EVENTS.borrow_ref(cs);
-                events.intersection(self.event)
+                let mut events = WIFI_EVENTS.borrow_ref_mut(cs);
+                let active = events.intersection(self.event);
+                events.remove_all(active);
+                active
             });
             if output.is_empty() {
+                for event in self.event.iter() {
+                    event.waker().register(cx.waker());
+                }
+
                 Poll::Pending
             } else {
                 Poll::Ready(output)
