@@ -12,7 +12,7 @@ repository   = "https://github.com/esp-rs/esp-hal"
 license      = "MIT OR Apache-2.0"
 
 [dependencies]
-bitflags             = "2.2.1"
+bitflags             = "2.3.3"
 cfg-if               = "1.0.0"
 critical-section     = "1.1.1"
 embedded-can         = { version = "0.4.1", optional = true }
@@ -21,9 +21,9 @@ embedded-hal         = { version = "0.2.7", features = ["unproven"] }
 embedded-hal-1       = { version = "=1.0.0-alpha.10", optional = true, package = "embedded-hal" }
 embedded-hal-nb      = { version = "=1.0.0-alpha.2", optional = true }
 esp-synopsys-usb-otg = { version = "0.3.1", optional = true, features = ["fs", "esp32sx"] }
-fugit                = "0.3.6"
+fugit                = "0.3.7"
 log                  = "=0.4.18"
-lock_api             = { version = "0.4.9", optional = true }
+lock_api             = { version = "0.4.10", optional = true }
 nb                   = "1.1.0"
 paste                = "1.0.12"
 procmacros           = { version = "0.5.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
@@ -61,7 +61,7 @@ esp32s3 = { version = "0.19.0", features = ["critical-section"], optional = true
 
 [build-dependencies]
 basic-toml = "0.1.2"
-serde      = { version = "1.0.160", features = ["derive"] }
+serde      = { version = "1.0.164", features = ["derive"] }
 
 [features]
 esp32   = ["esp32/rt"  , "xtensa", "xtensa-lx/esp32",   "xtensa-lx-rt/esp32",   "lock_api", "procmacros/esp32"]
