@@ -1499,7 +1499,8 @@ mod asynch {
 
         /// Wait for one [`WifiEvent`].
         pub async fn wait_for_event(&mut self, event: WifiEvent) {
-            self.wait_for_events(EnumSet::from(event), true).await;
+            critical_section::with(|cs| WIFI_EVENTS.borrow_ref_mut(cs).remove(event));
+            WifiEventFuture::new(events).await
         }
 
         /// Wait for multiple [`WifiEvent`]s. Returns the events that occurred while waiting.
@@ -1511,7 +1512,7 @@ mod asynch {
             if clear_pending {
                 critical_section::with(|cs| WIFI_EVENTS.borrow_ref_mut(cs).remove_all(events));
             }
-            WifiEventFuture::new(events).await
+            WifiEventFuture::new(EnumSet::from(events)).await
         }
     }
 
@@ -1610,17 +1611,43 @@ mod asynch {
         }
     }
 
-    pub(crate) struct WifiEventFuture {
-        event: EnumSet<WifiEvent>,
+    pub(crate) struct EventFuture {
+        event: WifiEvent,
     }
 
     impl WifiEventFuture {
-        pub fn new(event: EnumSet<WifiEvent>) -> Self {
+        pub fn new(event: WifiEvent) -> Self {
             Self { event }
         }
     }
 
     impl core::future::Future for WifiEventFuture {
+        type Output = ();
+
+        fn poll(
+            self: core::pin::Pin<&mut Self>,
+            cx: &mut core::task::Context<'_>,
+        ) -> Poll<Self::Output> {
+            self.event.waker().register(cx.waker());
+            if critical_section::with(|cs| WIFI_EVENTS.borrow_ref(cs).contains(self.event)) {
+                Poll::Ready(())
+            } else {
+                Poll::Ready(output)
+            }
+        }
+    }
+
+    pub(crate) struct MultiWifiEventFuture {
+        event: EnumSet<WifiEvent>,
+    }
+
+    impl MultiWifiEventFuture {
+        pub fn new(event: EnumSet<WifiEvent>) -> Self {
+            Self { event }
+        }
+    }
+
+    impl core::future::Future for MultiWifiEventFuture {
         type Output = EnumSet<WifiEvent>;
 
         fn poll(
