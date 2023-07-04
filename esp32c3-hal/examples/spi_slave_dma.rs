@@ -106,7 +106,7 @@ fn main() -> ! {
         *v = (i % 255) as u8;
     }
     for (i, v) in slave_send.iter_mut().enumerate() {
-        *v = (255 - (i % 255)) as u8;
+        *v = (254 - (i % 255)) as u8;
     }
 
     loop {
@@ -114,6 +114,7 @@ fn main() -> ! {
         master_send[master_send.len() - 1] = i;
         slave_send[0] = i;
         slave_send[slave_send.len() - 1] = i;
+        slave_receive.fill(0xff);
         i = i.wrapping_add(1);
 
         let transfer = spi.dma_transfer(slave_send, slave_receive).unwrap();
