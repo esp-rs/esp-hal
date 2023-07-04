@@ -11,7 +11,7 @@ features = ["esp32c3"]
 
 [dependencies]
 esp-hal-common   = { version = "0.9.0", path = "../esp-hal-common" }
-fugit            = "0.3.6"
+fugit            = "0.3.7"
 smart-leds-trait = "0.2.1"
 
 [features]
