@@ -1500,7 +1500,7 @@ mod asynch {
         /// Wait for one [`WifiEvent`].
         pub async fn wait_for_event(&mut self, event: WifiEvent) {
             critical_section::with(|cs| WIFI_EVENTS.borrow_ref_mut(cs).remove(event));
-            WifiEventFuture::new(events).await
+            WifiEventFuture::new(event).await
         }
 
         /// Wait for multiple [`WifiEvent`]s. Returns the events that occurred while waiting.
@@ -1512,7 +1512,7 @@ mod asynch {
             if clear_pending {
                 critical_section::with(|cs| WIFI_EVENTS.borrow_ref_mut(cs).remove_all(events));
             }
-            WifiEventFuture::new(EnumSet::from(events)).await
+            MultiWifiEventFuture::new(EnumSet::from(events)).await
         }
     }
 
@@ -1611,7 +1611,7 @@ mod asynch {
         }
     }
 
-    pub(crate) struct EventFuture {
+    pub(crate) struct WifiEventFuture {
         event: WifiEvent,
     }
 
@@ -1629,10 +1629,10 @@ mod asynch {
             cx: &mut core::task::Context<'_>,
         ) -> Poll<Self::Output> {
             self.event.waker().register(cx.waker());
-            if critical_section::with(|cs| WIFI_EVENTS.borrow_ref(cs).contains(self.event)) {
+            if critical_section::with(|cs| WIFI_EVENTS.borrow_ref_mut(cs).remove(self.event)) {
                 Poll::Ready(())
             } else {
-                Poll::Ready(output)
+                Poll::Pending
             }
         }
     }
