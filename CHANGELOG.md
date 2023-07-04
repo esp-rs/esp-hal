@@ -7,7 +7,7 @@ Please note that only changes to the `esp-hal-common` package are tracked in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.10.0] - 2023-06-04
 
 ### Added
 
@@ -20,14 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add LEDC hardware fade support (#475)
 - Added support for multicore async GPIO (#542)
 - Add a fn to poll DMA transfers (#559)
-- Simplify the `Delay` driver, derive `Clone` and `Copy` (#568)
-- Fix Async GPIO not disabling interupts on chips with multiple banks (#572)
 - Add unified field-based efuse access (#567)
 - Move `esp-riscv-rt` into esp-hal (#578)
 - Add CRC functions from ESP ROM (#587)
 - Add a `debug` feature to enable the PACs' `impl-register-debug` feature (#596)
 - Add initial support for `I2S` in ESP32-H2 (#597)
-- Fix rom::crc docs
 - Add octal PSRAM support for ESP32-S3 (#610)
 - Add MD5 functions from ESP ROM (#618)
 - Add embassy async `read` support for `uart` (#620)
@@ -36,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Simplify the `Delay` driver, derive `Clone` and `Copy` (#568)
 - DMA types can no longer be constructed by the user (#625)
 - Move core interrupt handling from Flash to RAM for RISC-V chips (ESP32-H2, ESP32-C2, ESP32-C3, ESP32-C6) (#541)
 - Change LED pin to GPIO2 in ESP32 blinky example (#581)
@@ -58,13 +56,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Sometimes half-duplex non-DMA SPI reads were reading garbage in non-release mode (#552)
 - ESP32-C3: Fix GPIO5 ADC channel id (#562)
 - ESP32-H2: Fix direct-boot feature (#570)
+- Fix Async GPIO not disabling interupts on chips with multiple banks (#572)
 - ESP32-C6: Support FOSC CLK calibration for ECO1+ chip revisions (#593)
 - Fixed CI by pinning the log crate to 0.4.18 (#600)
-- ESP32-S3: Fix calculation of PSRAM start address
+- ESP32-S3: Fix calculation of PSRAM start address (#601)
 - Fixed wrong variable access (FOSC CLK calibration for ESP32-C6 #593)
 - Fixed [trap location in ram](https://github.com/esp-rs/esp-hal/pull/605#issuecomment-1604039683) (#605)
+- Fix rom::crc docs (#611)
 - Fixed a possible overlap of `.data` and `.rwtext` (#616)
-- Avoid SDA/SCL being low while configuring pins for I2C
+- Avoid SDA/SCL being low while configuring pins for I2C (#619)
 
 ### Breaking
 
@@ -122,7 +122,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2022-08-05
 
-[unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.9.0...HEAD
+[0.10.0]: https://github.com/esp-rs/esp-hal/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/esp-rs/esp-hal/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/esp-rs/esp-hal/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/esp-rs/esp-hal/compare/v0.7.0...v0.7.1
