@@ -123,6 +123,3 @@ debug = [
     "esp32s2?/impl-register-debug",
     "esp32s3?/impl-register-debug",
 ]
-
-[patch.crates-io]
-embassy-time = { git = "https://github.com/embassy-rs/embassy", rev = "46a4600" }
