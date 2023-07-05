@@ -1,4 +1,3 @@
-use paste::paste;
 use strum::FromRepr;
 
 use crate::{
