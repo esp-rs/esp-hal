@@ -1416,9 +1416,10 @@ mod asynch {
         pub async fn scan_n<const N: usize>(
             &mut self,
         ) -> Result<(heapless::Vec<AccessPointInfo, N>, usize), WifiError> {
-            let future = self.wait_for_event(WifiEvent::ScanDone);
+            Self::clear_events(WifiEvent::ScanDone);
             esp_wifi_result!(wifi_start_scan(false))?;
-            future.await;
+            WifiEventFuture::new(WifiEvent::ScanDone).await;
+
             self.scan_results()
         }
 
@@ -1435,10 +1436,11 @@ mod asynch {
             } else {
                 WifiEvent::StaStart
             };
-            critical_section::with(|cs| WIFI_EVENTS.borrow_ref_mut(cs).remove(event));
-            wifi_start()?;
 
-            self.wait_for_event(event).await;
+            Self::clear_events(event);
+            wifi_start()?;
+            WifiEventFuture::new(event).await;
+
             Ok(())
         }
 
@@ -1456,26 +1458,20 @@ mod asynch {
                 WifiEvent::StaStop
             };
 
-            critical_section::with(|cs| WIFI_EVENTS.borrow_ref_mut(cs).remove(event));
+            Self::clear_events(event);
             embedded_svc::wifi::Wifi::stop(self)?;
-
-            self.wait_for_event(event).await;
+            WifiEventFuture::new(event).await;
 
             Ok(())
         }
 
         /// Async version of [`embedded_svc::wifi::Wifi`]'s `connect` method
         pub async fn connect(&mut self) -> Result<(), WifiError> {
-            critical_section::with(|cs| {
-                WIFI_EVENTS
-                    .borrow_ref_mut(cs)
-                    .remove_all(WifiEvent::StaConnected | WifiEvent::StaDisconnected)
-            });
+            Self::clear_events(WifiEvent::StaConnected | WifiEvent::StaDisconnected);
 
             let err = embedded_svc::wifi::Wifi::connect(self).err();
 
-            if self
-                .wait_for_events(WifiEvent::StaConnected | WifiEvent::StaDisconnected, false)
+            if MultiWifiEventFuture::new(WifiEvent::StaConnected | WifiEvent::StaDisconnected)
                 .await
                 .contains(WifiEvent::StaDisconnected)
             {
@@ -1487,19 +1483,20 @@ mod asynch {
 
         /// Async version of [`embedded_svc::wifi::Wifi`]'s `Disconnect` method
         pub async fn disconnect(&mut self) -> Result<(), WifiError> {
-            critical_section::with(|cs| {
-                WIFI_EVENTS
-                    .borrow_ref_mut(cs)
-                    .remove(WifiEvent::StaDisconnected)
-            });
+            Self::clear_events(WifiEvent::StaDisconnected);
             embedded_svc::wifi::Wifi::disconnect(self)?;
-            self.wait_for_event(WifiEvent::StaDisconnected).await;
+            WifiEventFuture::new(WifiEvent::StaDisconnected).await;
+
             Ok(())
+        }
+
+        fn clear_events(events: impl Into<EnumSet<WifiEvent>>) {
+            critical_section::with(|cs| WIFI_EVENTS.borrow_ref_mut(cs).remove_all(events.into()));
         }
 
         /// Wait for one [`WifiEvent`].
         pub async fn wait_for_event(&mut self, event: WifiEvent) {
-            critical_section::with(|cs| WIFI_EVENTS.borrow_ref_mut(cs).remove(event));
+            Self::clear_events(event);
             WifiEventFuture::new(event).await
         }
 
@@ -1510,7 +1507,7 @@ mod asynch {
             clear_pending: bool,
         ) -> EnumSet<WifiEvent> {
             if clear_pending {
-                critical_section::with(|cs| WIFI_EVENTS.borrow_ref_mut(cs).remove_all(events));
+                Self::clear_events(events);
             }
             MultiWifiEventFuture::new(EnumSet::from(events)).await
         }
