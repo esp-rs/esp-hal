@@ -25,12 +25,14 @@ extern "C" {
 macro_rules! regi2c_write {
     ( $block: ident, $reg_add: ident, $indata: expr ) => {
         paste::paste! {
-            crate::rom::rom_i2c_writeReg(
-                $block as _,
-                [<$block _HOSTID>] as _,
-                $reg_add as _,
-                $indata as _
-            );
+            unsafe {
+                crate::rom::rom_i2c_writeReg(
+                    $block as u32,
+                    [<$block _HOSTID>] as u32,
+                    $reg_add as u32,
+                    $indata as u32
+                )
+            }
         }
     };
 }
@@ -40,14 +42,16 @@ macro_rules! regi2c_write {
 macro_rules! regi2c_write_mask {
     ( $block: ident, $reg_add: ident, $indata: expr ) => {
         paste::paste! {
-            crate::rom::rom_i2c_writeReg_Mask(
-                $block as _,
-                [<$block _HOSTID>] as _,
-                $reg_add as _,
-                [<$reg_add _MSB>] as _,
-                [<$reg_add _LSB>] as _,
-                $indata as _
-            );
+            unsafe {
+                crate::rom::rom_i2c_writeReg_Mask(
+                    $block as u32,
+                    [<$block _HOSTID>] as u32,
+                    $reg_add as u32,
+                    [<$reg_add _MSB>] as u32,
+                    [<$reg_add _LSB>] as u32,
+                    $indata as u32
+                )
+            }
         }
     };
 }

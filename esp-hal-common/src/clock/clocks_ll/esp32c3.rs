@@ -2,7 +2,6 @@ use crate::{
     clock::{ApbClock, Clock, CpuClock, PllClock, XtalClock},
     regi2c_write,
     regi2c_write_mask,
-    rom::{rom_i2c_writeReg, rom_i2c_writeReg_Mask},
 };
 
 extern "C" {

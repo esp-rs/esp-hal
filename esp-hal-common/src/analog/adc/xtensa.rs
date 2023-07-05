@@ -378,10 +378,8 @@ impl RegisterAccess for ADC1 {
     fn set_init_code(data: u16) {
         let [msb, lsb] = data.to_be_bytes();
 
-        unsafe {
-            crate::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR1_INITIAL_CODE_HIGH_ADDR, msb as u32);
-            crate::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR1_INITIAL_CODE_LOW_ADDR, lsb as u32);
-        }
+        crate::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR1_INITIAL_CODE_HIGH_ADDR, msb as u32);
+        crate::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR1_INITIAL_CODE_LOW_ADDR, lsb as u32);
     }
 
     fn reset() {
@@ -411,19 +409,17 @@ impl CalibrationAccess for ADC1 {
     const ADC_VAL_MASK: u16 = ADC_VAL_MASK;
 
     fn enable_vdef(enable: bool) {
-        unsafe {
-            crate::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR1_DREF_ADDR, enable as u8);
-        }
+        crate::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR1_DREF_ADDR, enable as u8);
     }
 
     fn connect_cal(source: AdcCalSource, enable: bool) {
         match source {
-            AdcCalSource::Gnd => unsafe {
+            AdcCalSource::Gnd => {
                 crate::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR1_ENCAL_GND_ADDR, enable as u8);
-            },
-            AdcCalSource::Ref => unsafe {
+            }
+            AdcCalSource::Ref => {
                 crate::regi2c_write_mask!(I2C_SAR_ADC, ADC_SARADC1_ENCAL_REF_ADDR, enable as u8);
-            },
+            }
         }
     }
 }
@@ -514,10 +510,8 @@ impl RegisterAccess for ADC2 {
     fn set_init_code(data: u16) {
         let [msb, lsb] = data.to_be_bytes();
 
-        unsafe {
-            crate::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR2_INITIAL_CODE_HIGH_ADDR, msb as u32);
-            crate::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR2_INITIAL_CODE_LOW_ADDR, lsb as u32);
-        }
+        crate::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR2_INITIAL_CODE_HIGH_ADDR, msb as u32);
+        crate::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR2_INITIAL_CODE_LOW_ADDR, lsb as u32);
     }
 
     fn reset() {
@@ -547,19 +541,17 @@ impl CalibrationAccess for ADC2 {
     const ADC_VAL_MASK: u16 = ADC_VAL_MASK;
 
     fn enable_vdef(enable: bool) {
-        unsafe {
-            crate::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR2_DREF_ADDR, enable as u8);
-        }
+        crate::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR2_DREF_ADDR, enable as u8);
     }
 
     fn connect_cal(source: AdcCalSource, enable: bool) {
         match source {
-            AdcCalSource::Gnd => unsafe {
+            AdcCalSource::Gnd => {
                 crate::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR2_ENCAL_GND_ADDR, enable as u8);
-            },
-            AdcCalSource::Ref => unsafe {
+            }
+            AdcCalSource::Ref => {
                 crate::regi2c_write_mask!(I2C_SAR_ADC, ADC_SARADC2_ENCAL_REF_ADDR, enable as u8);
-            },
+            }
         }
     }
 }
