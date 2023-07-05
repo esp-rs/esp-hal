@@ -136,7 +136,10 @@ pub struct AdcPin<PIN, ADCI, CS = ()> {
     _phantom: PhantomData<ADCI>,
 }
 
-impl<PIN: Channel<ADCI, ID = u8>, ADCI, CS> Channel<ADCI> for AdcPin<PIN, ADCI, CS> {
+impl<PIN, ADCI, CS> Channel<ADCI> for AdcPin<PIN, ADCI, CS>
+where
+    PIN: Channel<ADCI, ID = u8>,
+{
     type ID = u8;
 
     fn channel() -> Self::ID {
@@ -158,11 +161,10 @@ where
         Self::default()
     }
 
-    pub fn enable_pin<PIN: Channel<ADCI, ID = u8>>(
-        &mut self,
-        pin: PIN,
-        attenuation: Attenuation,
-    ) -> AdcPin<PIN, ADCI> {
+    pub fn enable_pin<PIN>(&mut self, pin: PIN, attenuation: Attenuation) -> AdcPin<PIN, ADCI>
+    where
+        PIN: Channel<ADCI, ID = u8>,
+    {
         self.attenuations[PIN::channel() as usize] = Some(attenuation);
 
         AdcPin {
@@ -172,13 +174,15 @@ where
         }
     }
 
-    pub fn enable_pin_with_cal<PIN: Channel<ADCI, ID = u8>, CS: AdcCalScheme<ADCI>>(
+    pub fn enable_pin_with_cal<PIN, CS>(
         &mut self,
         pin: PIN,
         attenuation: Attenuation,
     ) -> AdcPin<PIN, ADCI, CS>
     where
         ADCI: CalibrationAccess,
+        PIN: Channel<ADCI, ID = u8>,
+        CS: AdcCalScheme<ADCI>,
     {
         self.attenuations[PIN::channel() as usize] = Some(attenuation);
 
