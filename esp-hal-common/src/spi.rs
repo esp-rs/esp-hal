@@ -1252,46 +1252,7 @@ pub mod dma {
     mod asynch {
         use super::*;
 
-        impl<'d, T, C, M> embedded_hal_async::spi::SpiBusWrite for SpiDma<'d, T, C, M>
-        where
-            T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
-            C: ChannelTypes,
-            C::P: SpiPeripheral,
-            M: IsFullDuplex,
-        {
-            async fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-                for chunk in words.chunks(MAX_DMA_SIZE) {
-                    self.spi.start_write_bytes_dma(
-                        chunk.as_ptr(),
-                        chunk.len(),
-                        &mut self.channel.tx,
-                    )?;
-
-                    crate::dma::asynch::DmaTxFuture::new(&mut self.channel.tx).await;
-
-                    // FIXME: in the future we should use the peripheral DMA status registers to
-                    // await on both the dma transfer _and_ the peripherals status
-                    self.spi.flush()?;
-                }
-
-                Ok(())
-            }
-        }
-
-        impl<'d, T, C, M> embedded_hal_async::spi::SpiBusFlush for SpiDma<'d, T, C, M>
-        where
-            T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
-            C: ChannelTypes,
-            C::P: SpiPeripheral,
-            M: IsFullDuplex,
-        {
-            async fn flush(&mut self) -> Result<(), Self::Error> {
-                // TODO use async flush in the future
-                self.spi.flush()
-            }
-        }
-
-        impl<'d, T, C, M> embedded_hal_async::spi::SpiBusRead for SpiDma<'d, T, C, M>
+        impl<'d, T, C, M> embedded_hal_async::spi::SpiBus for SpiDma<'d, T, C, M>
         where
             T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
             C: ChannelTypes,
@@ -1309,20 +1270,26 @@ pub mod dma {
 
                 Ok(())
             }
-        }
 
-        impl<'d, T, C, M> embedded_hal_async::spi::SpiBus for SpiDma<'d, T, C, M>
-        where
-            T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
-            C: ChannelTypes,
-            C::P: SpiPeripheral,
-            M: IsFullDuplex,
-        {
-            async fn transfer<'a>(
-                &'a mut self,
-                read: &'a mut [u8],
-                write: &'a [u8],
-            ) -> Result<(), Self::Error> {
+            async fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
+                for chunk in words.chunks(MAX_DMA_SIZE) {
+                    self.spi.start_write_bytes_dma(
+                        chunk.as_ptr(),
+                        chunk.len(),
+                        &mut self.channel.tx,
+                    )?;
+
+                    crate::dma::asynch::DmaTxFuture::new(&mut self.channel.tx).await;
+
+                    // FIXME: in the future we should use the peripheral DMA status registers to
+                    // await on both the dma transfer _and_ the peripherals status
+                    self.spi.flush()?;
+                }
+
+                Ok(())
+            }
+
+            async fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
                 let mut idx = 0;
                 loop {
                     let write_idx = isize::min(idx, write.len() as isize);
@@ -1359,10 +1326,7 @@ pub mod dma {
                 Ok(())
             }
 
-            async fn transfer_in_place<'a>(
-                &'a mut self,
-                words: &'a mut [u8],
-            ) -> Result<(), Self::Error> {
+            async fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
                 for chunk in words.chunks_mut(MAX_DMA_SIZE) {
                     self.spi.start_transfer_dma(
                         chunk.as_ptr(),
@@ -1386,12 +1350,17 @@ pub mod dma {
 
                 Ok(())
             }
+
+            async fn flush(&mut self) -> Result<(), Self::Error> {
+                // TODO use async flush in the future
+                self.spi.flush()
+            }
         }
     }
 
     #[cfg(feature = "eh1")]
     mod ehal1 {
-        use embedded_hal_1::spi::{SpiBus, SpiBusFlush, SpiBusRead, SpiBusWrite};
+        use embedded_hal_1::spi::SpiBus;
 
         use super::{super::InstanceDma, SpiDma, SpiPeripheral};
         use crate::{dma::ChannelTypes, spi::IsFullDuplex};
@@ -1406,21 +1375,7 @@ pub mod dma {
             type Error = super::super::Error;
         }
 
-        impl<'d, T, C, M> SpiBusWrite for SpiDma<'d, T, C, M>
-        where
-            T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
-            C: ChannelTypes,
-            C::P: SpiPeripheral,
-            M: IsFullDuplex,
-        {
-            /// See also: [`write_bytes`].
-            fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-                self.spi.write_bytes_dma(words, &mut self.channel.tx)?;
-                self.flush()
-            }
-        }
-
-        impl<'d, T, C, M> SpiBusRead for SpiDma<'d, T, C, M>
+        impl<'d, T, C, M> SpiBus for SpiDma<'d, T, C, M>
         where
             T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
             C: ChannelTypes,
@@ -1432,23 +1387,12 @@ pub mod dma {
                     .transfer_dma(&[], words, &mut self.channel.tx, &mut self.channel.rx)?;
                 self.flush()
             }
-        }
 
-        impl<'d, T, C, M> SpiBus for SpiDma<'d, T, C, M>
-        where
-            T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
-            C: ChannelTypes,
-            C::P: SpiPeripheral,
-            M: IsFullDuplex,
-        {
-            /// Write out data from `write`, read response into `read`.
-            ///
-            /// `read` and `write` are allowed to have different lengths. If
-            /// `write` is longer, all other bytes received are
-            /// discarded. If `read` is longer, [`EMPTY_WRITE_PAD`]
-            /// is written out as necessary until enough bytes have
-            /// been read. Reading and writing happens
-            /// simultaneously.
+            fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
+                self.spi.write_bytes_dma(words, &mut self.channel.tx)?;
+                self.flush()
+            }
+
             fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
                 self.spi
                     .transfer_dma(write, read, &mut self.channel.tx, &mut self.channel.rx)?;
@@ -1459,8 +1403,8 @@ pub mod dma {
             ///
             /// Writes data from `words` out on the bus and stores the reply
             /// into `words`. A convenient wrapper around
-            /// [`write`](SpiBusWrite::write), [`flush`](SpiBusFlush::flush) and
-            /// [`read`](SpiBusRead::read).
+            /// [`write`](SpiBus::write), [`flush`](SpiBus::flush) and
+            /// [`read`](SpiBus::read).
             fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
                 self.spi.transfer_in_place_dma(
                     words,
@@ -1469,15 +1413,7 @@ pub mod dma {
                 )?;
                 self.flush()
             }
-        }
 
-        impl<'d, T, C, M> SpiBusFlush for SpiDma<'d, T, C, M>
-        where
-            T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
-            C: ChannelTypes,
-            C::P: SpiPeripheral,
-            M: IsFullDuplex,
-        {
             fn flush(&mut self) -> Result<(), Self::Error> {
                 self.spi.flush()
             }
@@ -1492,18 +1428,7 @@ pub use ehal1::*;
 mod ehal1 {
     use core::cell::RefCell;
 
-    use embedded_hal_1::spi::{
-        self,
-        ErrorType,
-        Operation,
-        SpiBus,
-        SpiBusFlush,
-        SpiBusRead,
-        SpiBusWrite,
-        SpiDevice,
-        SpiDeviceRead,
-        SpiDeviceWrite,
-    };
+    use embedded_hal_1::spi::{self, ErrorType, Operation, SpiBus, SpiDevice};
     use embedded_hal_nb::spi::FullDuplex;
 
     use super::*;
@@ -1527,46 +1452,25 @@ mod ehal1 {
         }
     }
 
-    impl<T, M> SpiBusWrite for Spi<'_, T, M>
-    where
-        T: Instance,
-        M: IsFullDuplex,
-    {
-        /// See also: [`write_bytes`].
-        fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-            self.spi.write_bytes(words)
-        }
-    }
-
-    impl<T, M> SpiBusRead for Spi<'_, T, M>
-    where
-        T: Instance,
-        M: IsFullDuplex,
-    {
-        /// See also: [`read_bytes`].
-        fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-            self.spi.read_bytes(words)
-        }
-    }
-
     impl<T, M> SpiBus for Spi<'_, T, M>
     where
         T: Instance,
         M: IsFullDuplex,
     {
-        /// Write out data from `write`, read response into `read`.
-        ///
-        /// `read` and `write` are allowed to have different lengths. If `write`
-        /// is longer, all other bytes received are discarded. If `read`
-        /// is longer, [`EMPTY_WRITE_PAD`] is written out as necessary
-        /// until enough bytes have been read. Reading and writing happens
-        /// simultaneously.
+        fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+            self.spi.read_bytes(words)
+        }
+
+        fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
+            self.spi.write_bytes(words)
+        }
+
         fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
             // Optimizations
             if read.len() == 0 {
-                SpiBusWrite::write(self, write)?;
+                SpiBus::write(self, write)?;
             } else if write.len() == 0 {
-                SpiBusRead::read(self, read)?;
+                SpiBus::read(self, read)?;
             }
 
             let mut write_from = 0;
@@ -1588,12 +1492,12 @@ mod ehal1 {
                     // Read more than we write, must pad writing part with zeros
                     let mut empty = [EMPTY_WRITE_PAD; FIFO_SIZE];
                     empty[0..write_inc].copy_from_slice(&write[write_from..write_to]);
-                    SpiBusWrite::write(self, &empty)?;
+                    SpiBus::write(self, &empty)?;
                 } else {
-                    SpiBusWrite::write(self, &write[write_from..write_to])?;
+                    SpiBus::write(self, &write[write_from..write_to])?;
                 }
 
-                SpiBusFlush::flush(self)?;
+                SpiBus::flush(self)?;
 
                 if read_inc > 0 {
                     self.spi
@@ -1606,28 +1510,16 @@ mod ehal1 {
             Ok(())
         }
 
-        /// Transfer data in place.
-        ///
-        /// Writes data from `words` out on the bus and stores the reply into
-        /// `words`. A convenient wrapper around
-        /// [`write`](SpiBusWrite::write), [`flush`](SpiBusFlush::flush) and
-        /// [`read`](SpiBusRead::read).
         fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
             // Since we have the traits so neatly implemented above, use them!
             for chunk in words.chunks_mut(FIFO_SIZE) {
-                SpiBusWrite::write(self, chunk)?;
-                SpiBusFlush::flush(self)?;
+                SpiBus::write(self, chunk)?;
+                SpiBus::flush(self)?;
                 self.spi.read_bytes_from_fifo(chunk)?;
             }
             Ok(())
         }
-    }
 
-    impl<T, M> SpiBusFlush for Spi<'_, T, M>
-    where
-        T: Instance,
-        M: IsFullDuplex,
-    {
         fn flush(&mut self) -> Result<(), Self::Error> {
             self.spi.flush()
         }
@@ -1698,60 +1590,6 @@ mod ehal1 {
         type Error = spi::ErrorKind;
     }
 
-    impl<'a, 'd, I, CS, M> SpiDeviceRead<u8> for SpiBusDevice<'a, 'd, I, CS, M>
-    where
-        I: Instance,
-        CS: OutputPin,
-        M: IsFullDuplex,
-    {
-        fn read_transaction(&mut self, operations: &mut [&mut [u8]]) -> Result<(), Self::Error> {
-            critical_section::with(|cs| {
-                let mut bus = self.bus.lock.borrow_ref_mut(cs);
-                self.cs.connect_peripheral_to_output(bus.spi.cs_signal());
-
-                let op_res = operations
-                    .iter_mut()
-                    .try_for_each(|buf| SpiBusRead::read(&mut (*bus), buf));
-
-                // On failure, it's important to still flush and de-assert CS.
-                let flush_res = bus.flush();
-                self.cs.disconnect_peripheral_from_output();
-
-                op_res.map_err(|_| spi::ErrorKind::Other)?;
-                flush_res.map_err(|_| spi::ErrorKind::Other)?;
-
-                Ok(())
-            })
-        }
-    }
-
-    impl<'a, 'd, I, CS, M> SpiDeviceWrite<u8> for SpiBusDevice<'a, 'd, I, CS, M>
-    where
-        I: Instance,
-        CS: OutputPin,
-        M: IsFullDuplex,
-    {
-        fn write_transaction(&mut self, operations: &[&[u8]]) -> Result<(), Self::Error> {
-            critical_section::with(|cs| {
-                let mut bus = self.bus.lock.borrow_ref_mut(cs);
-                self.cs.connect_peripheral_to_output(bus.spi.cs_signal());
-
-                let op_res = operations
-                    .iter()
-                    .try_for_each(|buf| SpiBusWrite::write(&mut (*bus), buf));
-
-                // On failure, it's important to still flush and de-assert CS.
-                let flush_res = bus.flush();
-                self.cs.disconnect_peripheral_from_output();
-
-                op_res.map_err(|_| spi::ErrorKind::Other)?;
-                flush_res.map_err(|_| spi::ErrorKind::Other)?;
-
-                Ok(())
-            })
-        }
-    }
-
     impl<'a, 'd, I, CS, M> SpiDevice<u8> for SpiBusDevice<'a, 'd, I, CS, M>
     where
         I: Instance,
@@ -1764,10 +1602,11 @@ mod ehal1 {
                 self.cs.connect_peripheral_to_output(bus.spi.cs_signal());
 
                 let op_res = operations.iter_mut().try_for_each(|op| match op {
-                    Operation::Read(buf) => SpiBusRead::read(&mut (*bus), buf),
-                    Operation::Write(buf) => SpiBusWrite::write(&mut (*bus), buf),
+                    Operation::Read(buf) => SpiBus::read(&mut (*bus), buf),
+                    Operation::Write(buf) => SpiBus::write(&mut (*bus), buf),
                     Operation::Transfer(read, write) => bus.transfer(read, write),
                     Operation::TransferInPlace(buf) => bus.transfer_in_place(buf),
+                    Operation::DelayUs(_delay) => unimplemented!(),
                 });
 
                 // On failure, it's important to still flush and de-assert CS.
