@@ -60,7 +60,7 @@ cfg_if::cfg_if! {
 
         const ADC_VAL_MASK: u16 = 0xfff;
         const ADC_CAL_CNT_MAX: u16 = 32;
-        const ADC_CAL_CHANNEL: u32 = 0xf;
+        const ADC_CAL_CHANNEL: u16 = 15;
 
         const ADC_SAR1_ENCAL_GND_ADDR: u8 = 0x7;
         const ADC_SAR1_ENCAL_GND_ADDR_MSB: u8 = 5;
@@ -192,7 +192,7 @@ where
         &mut self,
         pin: PIN,
         attenuation: Attenuation,
-    ) -> AdcPin<PIN, ADCI, ()> {
+    ) -> AdcPin<PIN, ADCI> {
         self.attenuations[PIN::channel() as usize] = Some(attenuation);
 
         AdcPin {
@@ -206,7 +206,10 @@ where
         &mut self,
         pin: PIN,
         attenuation: Attenuation,
-    ) -> AdcPin<PIN, ADCI, CS> {
+    ) -> AdcPin<PIN, ADCI, CS>
+    where
+        ADCI: CalibrationAccess,
+    {
         self.attenuations[PIN::channel() as usize] = Some(attenuation);
 
         AdcPin {
@@ -217,7 +220,10 @@ where
     }
 
     /// Calibrate ADC with specified attenuation and voltage source
-    pub fn adc_calibrate(atten: Attenuation, source: AdcCalSource) -> u16 {
+    pub fn adc_calibrate(atten: Attenuation, source: AdcCalSource) -> u16
+    where
+        ADCI: CalibrationAccess,
+    {
         let mut adc_max: u16 = 0;
         let mut adc_min: u16 = u16::MAX;
         let mut adc_sum: u32 = 0;
@@ -290,13 +296,19 @@ pub trait RegisterAccess {
     /// Reset flags
     fn reset();
 
-    fn enable_vdef(enable: bool);
-
-    /// Enable internal connect GND (for calibration)
-    fn connect_cal(source: AdcCalSource, enable: bool);
-
     /// Set calibration parameter to ADC hardware
     fn set_init_code(data: u16);
+}
+
+pub trait CalibrationAccess: RegisterAccess {
+    const ADC_CAL_CNT_MAX: u16;
+    const ADC_CAL_CHANNEL: u16;
+    const ADC_VAL_MASK: u16;
+
+    fn enable_vdef(enable: bool);
+
+    /// Enable internal calibration voltage source
+    fn connect_cal(source: AdcCalSource, enable: bool);
 }
 
 impl RegisterAccess for ADC1 {
@@ -347,6 +359,33 @@ impl RegisterAccess for ADC1 {
             .modify(|_, w| w.saradc_onetime_start().clear_bit());
     }
 
+    fn set_init_code(data: u16) {
+        let [msb, lsb] = data.to_be_bytes();
+
+        regi2c_write_mask(
+            I2C_SAR_ADC,
+            I2C_SAR_ADC_HOSTID,
+            ADC_SAR1_INITIAL_CODE_HIGH_ADDR,
+            ADC_SAR1_INITIAL_CODE_HIGH_ADDR_MSB,
+            ADC_SAR1_INITIAL_CODE_HIGH_ADDR_LSB,
+            msb as _,
+        );
+        regi2c_write_mask(
+            I2C_SAR_ADC,
+            I2C_SAR_ADC_HOSTID,
+            ADC_SAR1_INITIAL_CODE_LOW_ADDR,
+            ADC_SAR1_INITIAL_CODE_LOW_ADDR_MSB,
+            ADC_SAR1_INITIAL_CODE_LOW_ADDR_LSB,
+            lsb as _,
+        );
+    }
+}
+
+impl CalibrationAccess for ADC1 {
+    const ADC_CAL_CNT_MAX: u16 = ADC_CAL_CNT_MAX;
+    const ADC_CAL_CHANNEL: u16 = ADC_CAL_CHANNEL;
+    const ADC_VAL_MASK: u16 = ADC_VAL_MASK;
+
     fn enable_vdef(enable: bool) {
         let value = enable as _;
         regi2c_write_mask(
@@ -379,27 +418,6 @@ impl RegisterAccess for ADC1 {
                 value,
             ),
         }
-    }
-
-    fn set_init_code(data: u16) {
-        let [msb, lsb] = data.to_be_bytes();
-
-        regi2c_write_mask(
-            I2C_SAR_ADC,
-            I2C_SAR_ADC_HOSTID,
-            ADC_SAR1_INITIAL_CODE_HIGH_ADDR,
-            ADC_SAR1_INITIAL_CODE_HIGH_ADDR_MSB,
-            ADC_SAR1_INITIAL_CODE_HIGH_ADDR_LSB,
-            msb as _,
-        );
-        regi2c_write_mask(
-            I2C_SAR_ADC,
-            I2C_SAR_ADC_HOSTID,
-            ADC_SAR1_INITIAL_CODE_LOW_ADDR,
-            ADC_SAR1_INITIAL_CODE_LOW_ADDR_MSB,
-            ADC_SAR1_INITIAL_CODE_LOW_ADDR_LSB,
-            lsb as _,
-        );
     }
 }
 
@@ -450,6 +468,34 @@ impl RegisterAccess for ADC2 {
             .modify(|_, w| w.saradc_onetime_start().clear_bit());
     }
 
+    fn set_init_code(data: u16) {
+        let [msb, lsb] = data.to_be_bytes();
+
+        regi2c_write_mask(
+            I2C_SAR_ADC,
+            I2C_SAR_ADC_HOSTID,
+            ADC_SAR2_INITIAL_CODE_HIGH_ADDR,
+            ADC_SAR2_INITIAL_CODE_HIGH_ADDR_MSB,
+            ADC_SAR2_INITIAL_CODE_HIGH_ADDR_LSB,
+            msb as _,
+        );
+        regi2c_write_mask(
+            I2C_SAR_ADC,
+            I2C_SAR_ADC_HOSTID,
+            ADC_SAR2_INITIAL_CODE_LOW_ADDR,
+            ADC_SAR2_INITIAL_CODE_LOW_ADDR_MSB,
+            ADC_SAR2_INITIAL_CODE_LOW_ADDR_LSB,
+            lsb as _,
+        );
+    }
+}
+
+#[cfg(esp32c3)]
+impl CalibrationAccess for ADC2 {
+    const ADC_CAL_CNT_MAX: u16 = ADC_CAL_CNT_MAX;
+    const ADC_CAL_CHANNEL: u16 = ADC_CAL_CHANNEL;
+    const ADC_VAL_MASK: u16 = ADC_VAL_MASK;
+
     fn enable_vdef(enable: bool) {
         let value = enable as _;
         regi2c_write_mask(
@@ -482,27 +528,6 @@ impl RegisterAccess for ADC2 {
                 value,
             ),
         }
-    }
-
-    fn set_init_code(data: u16) {
-        let [msb, lsb] = data.to_be_bytes();
-
-        regi2c_write_mask(
-            I2C_SAR_ADC,
-            I2C_SAR_ADC_HOSTID,
-            ADC_SAR2_INITIAL_CODE_HIGH_ADDR,
-            ADC_SAR2_INITIAL_CODE_HIGH_ADDR_MSB,
-            ADC_SAR2_INITIAL_CODE_HIGH_ADDR_LSB,
-            msb as _,
-        );
-        regi2c_write_mask(
-            I2C_SAR_ADC,
-            I2C_SAR_ADC_HOSTID,
-            ADC_SAR2_INITIAL_CODE_LOW_ADDR,
-            ADC_SAR2_INITIAL_CODE_LOW_ADDR_MSB,
-            ADC_SAR2_INITIAL_CODE_LOW_ADDR_LSB,
-            lsb as _,
-        );
     }
 }
 

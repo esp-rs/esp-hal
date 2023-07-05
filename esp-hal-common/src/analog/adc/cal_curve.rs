@@ -6,7 +6,7 @@ use crate::adc::{
     AdcCalScheme,
     AdcHasLineCal,
     Attenuation,
-    RegisterAccess,
+    CalibrationAccess,
 };
 
 const COEFF_MUL: i64 = 1 << 52;
@@ -52,7 +52,7 @@ pub struct AdcCalCurve<ADCI> {
 
 impl<ADCI> AdcCalScheme<ADCI> for AdcCalCurve<ADCI>
 where
-    ADCI: AdcCalEfuse + AdcHasLineCal + AdcHasCurveCal + RegisterAccess,
+    ADCI: AdcCalEfuse + AdcHasLineCal + AdcHasCurveCal + CalibrationAccess,
 {
     fn new_cal(atten: Attenuation) -> Self {
         let line = AdcCalLine::<ADCI>::new_cal(atten);
