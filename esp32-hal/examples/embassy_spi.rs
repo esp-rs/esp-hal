@@ -22,7 +22,7 @@ use embassy_executor::Executor;
 use embassy_time::{Duration, Timer};
 use esp32_hal::{
     clock::ClockControl,
-    dma::{DmaPriority, *},
+    dma::DmaPriority,
     embassy,
     pdma::*,
     peripherals::Peripherals,

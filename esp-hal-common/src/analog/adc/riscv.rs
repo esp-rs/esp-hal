@@ -145,7 +145,7 @@ impl Attenuation {
     /// Vref = 10 ^ (Att / 20) * Vref0
     /// where Vref0 = 1.1 V, Att - attenuation in dB
     ///
-    /// To colvert raw value to millivolts use folmula:
+    /// To convert raw value to millivolts use formula:
     /// V = D * Vref / 2 ^ R
     /// where D - raw ADC value, R - resolution in bits
     pub const fn ref_mv(&self) -> u16 {

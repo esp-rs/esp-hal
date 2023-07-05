@@ -1,5 +1,3 @@
-use paste::paste;
-
 use crate::{
     clock::{ApbClock, Clock, CpuClock, PllClock, XtalClock},
     regi2c_write,

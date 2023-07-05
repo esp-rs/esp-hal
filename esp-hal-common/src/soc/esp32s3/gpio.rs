@@ -1,5 +1,3 @@
-use paste::paste;
-
 use crate::{
     gpio::{
         AlternateFunction,

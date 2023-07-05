@@ -23,7 +23,7 @@ pub struct CurveCoeffs {
 
 type CurvesCoeffs = &'static [CurveCoeffs];
 
-/// Marker trait for ADC which support curve futting
+/// Marker trait for ADC which support curve fitting
 ///
 /// See also [`AdcCalCurve`].
 pub trait AdcHasCurveCal {

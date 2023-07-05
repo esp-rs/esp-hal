@@ -154,7 +154,6 @@ fn check_opt_level() {
                 "{}",
                 OPT_LEVEL_Z_MSG
                     .lines()
-                    .into_iter()
                     .map(|l| format!("cargo:warning={l}"))
                     .collect::<Vec<String>>()
                     .join("\n")
