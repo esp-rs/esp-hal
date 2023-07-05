@@ -277,6 +277,17 @@ crate::gpio::analog! {
     7
 }
 
+crate::gpio::lp_gpio::lp_gpio! {
+    0
+    1
+    2
+    3
+    4
+    5
+    6
+    7
+}
+
 impl InterruptStatusRegisterAccess for InterruptStatusRegisterAccessBank0 {
     fn pro_cpu_interrupt_status_read() -> u32 {
         unsafe { &*GPIO::PTR }.pcpu_int.read().bits()
