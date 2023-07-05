@@ -1,5 +1,3 @@
-use paste::paste;
-
 use crate::{
     gpio::{
         AlternateFunction,
@@ -310,7 +308,7 @@ crate::gpio::gpio! {
 // named
 macro_rules! impl_get_rtc_pad {
     ($pad_name:ident) => {
-        paste!{
+        paste::paste! {
             pub(crate) fn [<esp32s2_get_rtc_pad_ $pad_name >]() -> &'static crate::peripherals::rtc_io::[< $pad_name:upper >] {
                 use crate::peripherals::RTC_IO;
                 let rtc_io = unsafe{ &*RTC_IO::ptr() };
@@ -322,7 +320,7 @@ macro_rules! impl_get_rtc_pad {
 
 macro_rules! impl_get_rtc_pad_indexed {
     ($pad_name:ident, $idx:literal) => {
-        paste!{
+        paste::paste! {
             pub(crate) fn [<esp32s2_get_rtc_pad_ $pad_name $idx>]() -> &'static crate::peripherals::rtc_io::[< $pad_name:upper >] {
                 use crate::peripherals::RTC_IO;
                 let rtc_io = unsafe{ &*RTC_IO::ptr() };

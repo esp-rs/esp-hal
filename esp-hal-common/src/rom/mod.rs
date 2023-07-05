@@ -24,7 +24,7 @@ extern "C" {
 #[macro_export]
 macro_rules! regi2c_write {
     ( $block: ident, $reg_add: ident, $indata: expr ) => {
-        paste! {
+        paste::paste! {
             rom_i2c_writeReg($block,
                 [<$block _HOSTID>],
                 $reg_add,
@@ -38,7 +38,7 @@ macro_rules! regi2c_write {
 #[macro_export]
 macro_rules! regi2c_write_mask {
     ( $block: ident, $reg_add: ident, $indata: expr ) => {
-        paste! {
+        paste::paste! {
             rom_i2c_writeReg_Mask($block,
                 [<$block _HOSTID>],
                 $reg_add,

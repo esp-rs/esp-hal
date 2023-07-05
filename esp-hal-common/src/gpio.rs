@@ -1273,7 +1273,7 @@ macro_rules! gpio {
             fn split(self) -> Self::Parts;
         }
 
-        paste!{
+        paste::paste! {
             impl GpioExt for GPIO {
                 type Parts = Pins;
                 fn split(self) -> Self::Parts {
@@ -1432,7 +1432,7 @@ macro_rules! analog {
                 $(
                     $pin_num => {
                         // disable input
-                        paste! {
+                        paste::paste! {
                             rtcio.$pin_reg.modify(|_,w| w.$fun_ie().bit(false));
 
                             // disable output
@@ -1489,7 +1489,7 @@ macro_rules! analog {
                 $(
                     $pin_num => {
 
-                        paste!{
+                        paste::paste! {
                             use $crate::gpio::[< esp32s2_get_rtc_pad_ $pin_reg>];
                             let rtc_pad = [< esp32s2_get_rtc_pad_ $pin_reg>]();
                         }
