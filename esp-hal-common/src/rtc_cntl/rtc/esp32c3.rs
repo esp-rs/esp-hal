@@ -28,11 +28,9 @@ const I2C_ULP_IR_FORCE_XPD_CK_LSB: u32 = 2;
 pub(crate) fn init() {
     let rtc_cntl = unsafe { &*RTC_CNTL::ptr() };
 
-    unsafe {
-        regi2c_write_mask!(I2C_DIG_REG, I2C_DIG_REG_XPD_DIG_REG, 0);
+    regi2c_write_mask!(I2C_DIG_REG, I2C_DIG_REG_XPD_DIG_REG, 0);
 
-        regi2c_write_mask!(I2C_DIG_REG, I2C_DIG_REG_XPD_RTC_REG, 0);
-    }
+    regi2c_write_mask!(I2C_DIG_REG, I2C_DIG_REG_XPD_RTC_REG, 0);
 
     rtc_cntl.ana_conf.modify(|_, w| w.pvtmon_pu().clear_bit());
 
@@ -82,9 +80,9 @@ pub(crate) fn init() {
     unsafe {
         rtc_cntl.int_ena_rtc.write(|w| w.bits(0));
         rtc_cntl.int_clr_rtc.write(|w| w.bits(u32::MAX));
-
-        regi2c_write_mask!(I2C_ULP, I2C_ULP_IR_FORCE_XPD_CK, 0);
     }
+
+    regi2c_write_mask!(I2C_ULP, I2C_ULP_IR_FORCE_XPD_CK, 0);
 }
 
 pub(crate) fn configure_clock() {
