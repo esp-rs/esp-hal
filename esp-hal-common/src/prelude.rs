@@ -24,11 +24,8 @@ pub use embedded_hal_async::{
     delay::DelayUs as _embedded_hal_async_delay_DelayUs,
     digital::Wait as _embedded_hal_async_digital_Wait,
     i2c::I2c as _embedded_hal_async_i2c_I2c,
-    spi::SpiBus as _embedded_hal_spi_SpiBus,
-    spi::SpiBusFlush as _embedded_hal_spi_SpiBusFlush,
-    spi::SpiBusRead as _embedded_hal_spi_SpiBusRead,
-    spi::SpiBusWrite as _embedded_hal_spi_SpiBusWrite,
-    spi::SpiDevice as _embedded_hal_spi_SpiDevice,
+    spi::SpiBus as _embedded_hal_async_spi_SpiBus,
+    spi::SpiDevice as _embedded_hal_async_spi_SpiDevice,
 };
 pub use fugit::{
     ExtU32 as _fugit_ExtU32,
@@ -100,20 +97,15 @@ pub mod eh1 {
         Frame as _embedded_can_Frame,
     };
     pub use embedded_hal_1::{
-        delay::DelayUs as _embedded_hal_delay_blocking_DelayUs,
+        delay::DelayUs as _embedded_hal_1_delay_DelayUs,
         digital::{
-            InputPin as _embedded_hal_digital_blocking_InputPin,
-            OutputPin as _embedded_hal_digital_blocking_OutputPin,
-            StatefulOutputPin as _embedded_hal_digital_blocking_StatefulOutputPin,
-            ToggleableOutputPin as _embedded_hal_digital_blocking_ToggleableOutputPin,
+            InputPin as _embedded_hal_1_digital_InputPin,
+            OutputPin as _embedded_hal_1_digital_OutputPin,
+            StatefulOutputPin as _embedded_hal_1_digital_StatefulOutputPin,
+            ToggleableOutputPin as _embedded_hal_1_digital_ToggleableOutputPin,
         },
-        i2c::I2c as _embedded_hal_i2c_blocking_I2c,
-        spi::{
-            SpiBus as _embedded_hal_spi_blocking_SpiBus,
-            SpiBusFlush as _embedded_hal_spi_blocking_SpiBusFlush,
-            SpiBusRead as _embedded_hal_spi_blocking_SpiBusRead,
-            SpiBusWrite as _embedded_hal_spi_blocking_SpiBusWrite,
-        },
+        i2c::I2c as _embedded_hal_1_i2c_I2c,
+        spi::{SpiBus as _embedded_hal_1_spi_SpiBus, SpiDevice as _embedded_hal_1_spi_SpiDevice},
     };
     pub use embedded_hal_nb::{
         serial::{Read as _embedded_hal_nb_serial_Read, Write as _embedded_hal_nb_serial_Write},

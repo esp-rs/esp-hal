@@ -29,9 +29,9 @@ categories = [
 cfg-if             = "1.0.0"
 embassy-time       = { version = "0.1.1", features = ["nightly"], optional = true }
 embedded-hal       = { version = "0.2.7", features = ["unproven"] }
-embedded-hal-1     = { version = "=1.0.0-alpha.10", optional = true, package = "embedded-hal" }
-embedded-hal-async = { version = "0.2.0-alpha.1", optional = true }
-embedded-hal-nb    = { version = "=1.0.0-alpha.2", optional = true }
+embedded-hal-1     = { version = "=1.0.0-alpha.11", optional = true, package = "embedded-hal" }
+embedded-hal-async = { version = "=0.2.0-alpha.2", optional = true }
+embedded-hal-nb    = { version = "=1.0.0-alpha.3", optional = true }
 embedded-can       = { version = "0.4.1", optional = true }
 esp-hal-common     = { version = "0.10.0",  features = ["esp32h2"], path = "../esp-hal-common" }
 
@@ -96,3 +96,6 @@ required-features = ["async", "embassy"]
 [[example]]
 name              = "interrupt_preemption"
 required-features = ["interrupt-preemption"]
+
+[patch.crates-io]
+embassy-time = { git = "https://github.com/embassy-rs/embassy", rev = "46a4600" }

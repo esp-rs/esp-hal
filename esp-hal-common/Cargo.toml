@@ -18,8 +18,8 @@ critical-section     = "1.1.1"
 embedded-can         = { version = "0.4.1", optional = true }
 embedded-dma         = "0.2.0"
 embedded-hal         = { version = "0.2.7", features = ["unproven"] }
-embedded-hal-1       = { version = "=1.0.0-alpha.10", optional = true, package = "embedded-hal" }
-embedded-hal-nb      = { version = "=1.0.0-alpha.2", optional = true }
+embedded-hal-1       = { version = "=1.0.0-alpha.11", optional = true, package = "embedded-hal" }
+embedded-hal-nb      = { version = "=1.0.0-alpha.3", optional = true }
 esp-synopsys-usb-otg = { version = "0.3.1", optional = true, features = ["fs", "esp32sx"] }
 fugit                = "0.3.7"
 log                  = "=0.4.18"
@@ -32,7 +32,7 @@ void                 = { version = "1.0.2", default-features = false }
 usb-device           = { version = "0.2.9", optional = true }
 
 # async
-embedded-hal-async = { version = "0.2.0-alpha.1", optional = true }
+embedded-hal-async = { version = "=0.2.0-alpha.2", optional = true }
 embassy-sync       = { version = "0.2.0", optional = true }
 embassy-time       = { version = "0.1.1", features = ["nightly"], optional = true }
 embassy-futures    = { version = "0.1.0", optional = true }
