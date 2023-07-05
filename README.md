@@ -18,7 +18,7 @@ If you have any questions, comments, or concerns, please [open an issue], [start
 | [esp32c2-hal] | `riscv32imc-unknown-none-elf`  |         [ESP32-C2]         |
 | [esp32c3-hal] | `riscv32imc-unknown-none-elf`  |         [ESP32-C3]         |
 | [esp32c6-hal] | `riscv32imac-unknown-none-elf` |         [ESP32-C6]         |
-| [esp32h2-hal] | `riscv32imac-unknown-none-elf` |  _Currently unavailable_   |
+| [esp32h2-hal] | `riscv32imac-unknown-none-elf` |         [ESP32-H2]         |
 | [esp32s2-hal] |   `xtensa-esp32s2-none-elf`    |         [ESP32-S2]         |
 | [esp32s3-hal] |   `xtensa-esp32s3-none-elf`    |         [ESP32-S3]         |
 
@@ -38,6 +38,7 @@ If you have any questions, comments, or concerns, please [open an issue], [start
 [esp32-c2]: https://www.espressif.com/sites/default/files/documentation/esp8684_technical_reference_manual_en.pdf
 [esp32-c3]: https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf
 [esp32-c6]: https://www.espressif.com/sites/default/files/documentation/esp32-c6_technical_reference_manual_en.pdf
+[esp32-h2]: https://www.espressif.com/sites/default/files/documentation/esp32-h2_technical_reference_manual_en.pdf
 [esp32-s2]: https://www.espressif.com/sites/default/files/documentation/esp32-s2_technical_reference_manual_en.pdf
 [esp32-s3]: https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf
 
