@@ -1643,7 +1643,7 @@ pub mod lp_gpio {
         (
             $($gpionum:literal)+
         ) => {
-            paste!{
+            paste::paste!{
                 $(
                     impl<MODE> crate::gpio::lp_gpio::IntoLowPowerPin<$gpionum> for GpioPin<MODE, $gpionum> {
                         fn into_low_power(self) -> crate::gpio::lp_gpio::LowPowerPin<$gpionum> {
