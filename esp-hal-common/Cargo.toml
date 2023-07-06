@@ -27,14 +27,14 @@ lock_api             = { version = "0.4.10", optional = true }
 nb                   = "1.1.0"
 paste                = "1.0.12"
 procmacros           = { version = "0.6.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
-strum                = { version = "0.24.1", default-features = false, features = ["derive"] }
+strum                = { version = "0.25.0", default-features = false, features = ["derive"] }
 void                 = { version = "1.0.2", default-features = false }
 usb-device           = { version = "0.2.9", optional = true }
 
 # async
 embedded-hal-async = { version = "=0.2.0-alpha.2", optional = true }
 embassy-sync       = { version = "0.2.0", optional = true }
-embassy-time       = { version = "0.1.1", features = ["nightly"], optional = true }
+embassy-time       = { version = "0.1.2", features = ["nightly"], optional = true }
 embassy-futures    = { version = "0.1.0", optional = true }
 
 # RISC-V
