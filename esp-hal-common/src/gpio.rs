@@ -1563,6 +1563,106 @@ macro_rules! analog {
     }
 }
 
+#[cfg(lp_io)]
+pub mod lp_gpio {
+    pub struct LowPowerPin<const PIN: u8> {
+        pub(crate) private: PhantomData<()>,
+    }
+
+    impl<const PIN: u8> LowPowerPin<PIN> {
+        pub fn output_enable(&mut self, enable: bool) {
+            let lp_io = unsafe { &*crate::peripherals::LP_IO::PTR };
+            if enable {
+                lp_io
+                    .out_enable_w1ts
+                    .write(|w| w.lp_gpio_enable_w1ts().variant(1 << PIN));
+            } else {
+                lp_io
+                    .out_enable_w1tc
+                    .write(|w| w.lp_gpio_enable_w1tc().variant(1 << PIN));
+            }
+        }
+
+        pub fn input_enable(&mut self, enable: bool) {
+            get_pin_reg(PIN).modify(|_, w| w.lp_gpio0_fun_ie().bit(enable));
+        }
+
+        pub fn pullup_enable(&mut self, enable: bool) {
+            get_pin_reg(PIN).modify(|_, w| w.lp_gpio0_fun_wpu().bit(enable));
+        }
+
+        pub fn pulldown_enable(&mut self, enable: bool) {
+            get_pin_reg(PIN).modify(|_, w| w.lp_gpio0_fun_wpd().bit(enable));
+        }
+
+        pub fn set_level(&mut self, level: bool) {
+            let lp_io = unsafe { &*crate::peripherals::LP_IO::PTR };
+            if level {
+                lp_io
+                    .out_data_w1ts
+                    .write(|w| w.lp_gpio_out_data_w1ts().variant(1 << PIN));
+            } else {
+                lp_io
+                    .out_data_w1tc
+                    .write(|w| w.lp_gpio_out_data_w1tc().variant(1 << PIN));
+            }
+        }
+
+        pub fn get_level(&self) -> bool {
+            let lp_io = unsafe { &*crate::peripherals::LP_IO::PTR };
+            (lp_io.in_.read().lp_gpio_in_data_next().bits() & 1 << PIN) != 0
+        }
+    }
+
+    pub(crate) fn init_low_power_pin(pin: u8) {
+        let lp_aon = unsafe { &*crate::peripherals::LP_AON::PTR };
+
+        lp_aon
+            .gpio_mux
+            .modify(|r, w| w.sel().variant(r.sel().bits() | 1 << pin));
+
+        get_pin_reg(pin).modify(|_, w| w.lp_gpio0_mcu_sel().variant(0));
+    }
+
+    #[inline(always)]
+    fn get_pin_reg(pin: u8) -> &'static crate::peripherals::lp_io::GPIO0 {
+        let lp_io = unsafe { &*crate::peripherals::LP_IO::PTR };
+
+        // ideally we should change the SVD and make the GPIOx registers into an
+        // array
+        unsafe { core::mem::transmute((lp_io.gpio0.as_ptr()).add(pin as usize)) }
+    }
+
+    pub trait IntoLowPowerPin<const PIN: u8> {
+        fn into_low_power(self) -> LowPowerPin<{ PIN }>;
+    }
+
+    #[doc(hidden)]
+    #[macro_export]
+    macro_rules! lp_gpio {
+        (
+            $($gpionum:literal)+
+        ) => {
+            paste::paste!{
+                $(
+                    impl<MODE> crate::gpio::lp_gpio::IntoLowPowerPin<$gpionum> for GpioPin<MODE, $gpionum> {
+                        fn into_low_power(self) -> crate::gpio::lp_gpio::LowPowerPin<$gpionum> {
+                            crate::gpio::lp_gpio::init_low_power_pin($gpionum);
+                            crate::gpio::lp_gpio::LowPowerPin {
+                                private: core::marker::PhantomData::default(),
+                            }
+                        }
+                    }
+                )+
+            }
+        }
+    }
+
+    use core::marker::PhantomData;
+
+    pub(crate) use lp_gpio;
+}
+
 #[cfg(feature = "async")]
 mod asynch {
     use core::task::{Context, Poll};

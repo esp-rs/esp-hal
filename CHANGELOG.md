@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add initial LP-IO support for ESP32-C6 (#639)
+
 ### Changed
 
 - Update `embedded-hal-*` alpha packages to their latest versions (#640)
