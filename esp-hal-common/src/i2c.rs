@@ -1,6 +1,52 @@
 //! I2C Driver
 //!
-//! Supports multiple I2C peripheral instances
+//! # Overview
+//! The I2C Peripheral Driver for ESP chips is a software module that facilitates 
+//! communication with I2C devices using ESP microcontroller chips. It provides an interface to initialize,
+//! configure, and perform read and write operations over the I2C bus. 
+//! The driver supports features such as handling transmission errors, asynchronous operations, 
+//! and interrupt-based communication, supports multiple I2C peripheral instances
+//! 
+//! # Example
+//! Following code shows how to read data from a BMP180 sensor using I2C.
+//! 
+//! ```no_run
+//! use hal::{
+//!     clock::ClockControl,
+//!     gpio::IO,
+//!     i2c::I2C,
+//!     peripherals::Peripherals,
+//!     prelude::*,
+//!     timer::TimerGroup,
+//!     Rtc,
+//! };
+//! ...
+//! 
+//! #[entry]
+//! fn main() -> ! {
+//!     let peripherals = Peripherals::take();
+//!     let mut system = peripherals.SYSTEM.split();
+//!     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+//!     ...
+//!     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+//!
+//!     // Create a new peripheral object with the described wiring
+//!     // and standard I2C clock speed
+//!     let mut i2c = I2C::new(
+//!         peripherals.I2C0,
+//!         io.pins.gpio1,
+//!         io.pins.gpio2,
+//!         100u32.kHz(),
+//!         &mut system.peripheral_clock_control,
+//!         &clocks,
+//!     );
+//!     loop {
+//!         let mut data = [0u8; 22];
+//!         i2c.write_read(0x77, &[0xaa], &mut data).ok();
+//!
+//!         println!("{:02x?}", data);
+//!     }
+//! ```
 
 use fugit::HertzU32;
 

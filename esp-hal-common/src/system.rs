@@ -1,8 +1,9 @@
 //! System Control
 //!
+//! ## Overview
 //! The SYSTEM/DPORT peripheral needs to be split into several logical parts.
 //!
-//! Example
+//! ## Example
 //! ```no_run
 //! let peripherals = Peripherals::take();
 //! let system = peripherals.SYSTEM.split();
