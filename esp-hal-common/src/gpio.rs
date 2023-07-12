@@ -494,6 +494,14 @@ where
                 .modify(|_, w| w.usb_pad_enable().clear_bit());
         }
 
+        // Same workaround as above for ESP32-S3
+        #[cfg(esp32s3)]
+        if GPIONUM == 19 || GPIONUM == 20 {
+            unsafe { &*crate::peripherals::USB_DEVICE::PTR }
+                .conf0
+                .modify(|_, w| w.usb_pad_enable().clear_bit());
+        }
+
         get_io_mux_reg(GPIONUM).modify(|_, w| unsafe {
             w.mcu_sel()
                 .bits(GPIO_FUNCTION as u8)
@@ -913,6 +921,14 @@ where
         //       default are assigned to the `USB_SERIAL_JTAG` peripheral.
         #[cfg(esp32c3)]
         if GPIONUM == 18 || GPIONUM == 19 {
+            unsafe { &*crate::peripherals::USB_DEVICE::PTR }
+                .conf0
+                .modify(|_, w| w.usb_pad_enable().clear_bit());
+        }
+
+        // Same workaround as above for ESP32-S3
+        #[cfg(esp32s3)]
+        if GPIONUM == 19 || GPIONUM == 20 {
             unsafe { &*crate::peripherals::USB_DEVICE::PTR }
                 .conf0
                 .modify(|_, w| w.usb_pad_enable().clear_bit());
