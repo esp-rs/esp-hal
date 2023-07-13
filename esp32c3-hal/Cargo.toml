@@ -59,11 +59,10 @@ eh1                  = ["esp-hal-common/eh1", "dep:embedded-hal-1", "dep:embedde
 rt                   = []
 ufmt                 = ["esp-hal-common/ufmt"]
 vectored             = ["esp-hal-common/vectored"]
-allow-opt-level-z    = []
 async                = ["esp-hal-common/async", "embedded-hal-async"]
 embassy              = ["esp-hal-common/embassy"]
 embassy-time-systick = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-hz-16_000_000"]
-embassy-time-timg0 = ["esp-hal-common/embassy-time-timg0", "embassy-time/tick-hz-1_000_000"]
+embassy-time-timg0   = ["esp-hal-common/embassy-time-timg0", "embassy-time/tick-hz-1_000_000"]
 interrupt-preemption = ["esp-hal-common/interrupt-preemption"]
 
 [profile.dev]
