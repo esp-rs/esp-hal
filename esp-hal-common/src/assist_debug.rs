@@ -1,5 +1,10 @@
 //! Debug Assistant
 //!
+//! ## Overview
+//! The Assist Debug driver provides functionality for debugging and monitoring features on ESP chips.
+//! It includes capabilities such as monitoring stack pointer (SP), monitoring memory
+//! regions, and handling interrupts related to debugging.
+//! 
 //! Debug Assistant is an auxiliary module that features a set of functions to
 //! help locate bugs and issues during software debugging.
 //!
@@ -8,9 +13,9 @@
 //! (e.g. _Saved PC:0x42002ff2_). Make sure the reset was triggered by a TIMG
 //! watchdog. Not an RTC or SWD watchdog.
 //!
-//! Not all targets support all the features.
+//! ⚠️ Not all targets support all the features. ⚠️
 //!
-//! Bus write access logging is not available via this API.
+//! ⚠️ Bus write access logging is not available via this API. ⚠️ 
 
 use crate::{
     peripheral::{Peripheral, PeripheralRef},

@@ -1,10 +1,62 @@
 //! Advanced Encryption Standard (AES) support.
 //!
-//! This module provides functions and structs for AES encryption and
-//! decryption.
+//! ## Overview
+//! The AES module provides an interface to interact with the AES peripheral, provides encryption 
+//! and decryption capabilities for ESP chips using the AES algorithm. We currently support following
+//! AES encryption modes:
+//! * AES-128
+//! * AES-192
+//! * AES-256
 //!
+//! ## Example
+//! ### Initialisation
+//! ```no_run
+//! let mut aes = Aes::new(peripherals.AES, &mut system.peripheral_clock_control);
+//! ```
+//! 
+//! ### Creating key and block Buffer
+//! ```no_run
+//! let keytext = "SUp4SeCp@sSw0rd".as_bytes();
+//! let plaintext = "message".as_bytes();
+//!
+//! // create an array with aes128 key size
+//! let mut keybuf = [0_u8; 16];
+//! keybuf[..keytext.len()].copy_from_slice(keytext);
+//!
+//! // create an array with aes block size
+//! let mut block_buf = [0_u8; 16];
+//! block_buf[..plaintext.len()].copy_from_slice(plaintext);
+//! ```
+//! 
+//! ### Encrypting and Decrypting (using hardware)
+//! ```no_run
+//! let key = Key::<Aes128>::from(&keybuf);
+//!
+//! let mut cipher = Cipher::new(&mut aes, &key);
+//! let mut block = block_buf.clone();
+//! cipher.encrypt_block(&mut block);
+//! 
+//! let hw_encrypted = block.clone();
+//! cipher.decrypt_block(&mut block);
+//! let hw_decrypted = block;
+//! ```
+//!
+//! ### Encrypting and Decrypting (using software)
+//! ```no_run
+//! let key = GenericArray::from(keybuf);
+//! 
+//! let mut block = GenericArray::from(block_buf);
+//! let cipher = Aes128SW::new(&key);
+//! cipher.encrypt_block(&mut block);
+//!
+//! let sw_encrypted = block.clone();
+//! cipher.decrypt_block(&mut block);
+//!
+//! let sw_decrypted = block;
+//! ```
+//! 
 //! ### Implementation State
-//! * DMA mode is currently not supported.
+//! * DMA mode is currently not supported. ⚠️
 
 use core::marker::PhantomData;
 
