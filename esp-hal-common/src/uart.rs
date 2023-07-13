@@ -22,6 +22,8 @@ const UART_FIFO_SIZE: u16 = 128;
 pub enum Error {
     #[cfg(feature = "async")]
     ReadBufferFull,
+    #[cfg(feature = "async")]
+    RxFifoOvf,
 }
 
 /// UART configuration
@@ -997,7 +999,7 @@ mod asynch {
     use core::task::Poll;
 
     use cfg_if::cfg_if;
-    use embassy_futures::select::select;
+    use embassy_futures::select::{select, select3, Either, Either3};
     use embassy_sync::waitqueue::AtomicWaker;
     use procmacros::interrupt;
 
@@ -1025,6 +1027,7 @@ mod asynch {
         TxFiFoEmpty,
         RxFifoFull,
         RxCmdCharDetected,
+        RxFifoOvf,
     }
 
     pub(crate) struct UartFuture<'a, T: Instance> {
@@ -1051,6 +1054,10 @@ mod asynch {
                     .register_block()
                     .int_ena
                     .modify(|_, w| w.at_cmd_char_det_int_ena().set_bit()),
+                Event::RxFifoOvf => instance
+                    .register_block()
+                    .int_ena
+                    .modify(|_, w| w.rxfifo_ovf_int_ena().set_bit()),
             }
 
             Self { event, instance }
@@ -1086,6 +1093,13 @@ mod asynch {
                     .read()
                     .at_cmd_char_det_int_ena()
                     .bit_is_clear(),
+                Event::RxFifoOvf => self
+                    .instance
+                    .register_block()
+                    .int_ena
+                    .read()
+                    .rxfifo_ovf_int_ena()
+                    .bit_is_clear(),
             }
         }
     }
@@ -1110,14 +1124,47 @@ mod asynch {
     where
         T: Instance,
     {
-        pub async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
+        /// Read async to buffer slice `buf`
+        ///
+        /// # Params
+        /// - `buf` buffer slice to write the bytes into
+        /// - `wait_at_cmd` boolean that specify to wait for `AtCmdConfig`
+        ///   condition interrupt. Set to false unless `set_at_cmd`
+        ///   configuration function was called for this uart device.
+        ///
+        /// # Errors
+        /// - `Err(ReadBufferFull)` if provided buffer slice is not enough to
+        ///   copy all avaialble bytes. Increase buffer slice length.
+        /// - `Err(RxFifoOvf)` when MCU Rx Fifo Overflow interrupt is triggered.
+        ///   To avoid this call this function more often.
+        ///
+        /// # Ok
+        /// When succesfull, returns the number of bytes written to
+        /// buf
+
+        pub async fn read(&mut self, buf: &mut [u8], wait_at_cmd: bool) -> Result<usize, Error> {
             let mut read_bytes = 0;
 
-            select(
-                UartFuture::new(Event::RxCmdCharDetected, self.inner()),
-                UartFuture::new(Event::RxFifoFull, self.inner()),
-            )
-            .await;
+            if wait_at_cmd {
+                if let Either3::Third(_) = select3(
+                    UartFuture::new(Event::RxCmdCharDetected, self.inner()),
+                    UartFuture::new(Event::RxFifoFull, self.inner()),
+                    UartFuture::new(Event::RxFifoOvf, self.inner()),
+                )
+                .await
+                {
+                    return Err(Error::RxFifoOvf);
+                }
+            } else {
+                if let Either::Second(_) = select(
+                    UartFuture::new(Event::RxFifoFull, self.inner()),
+                    UartFuture::new(Event::RxFifoOvf, self.inner()),
+                )
+                .await
+                {
+                    return Err(Error::RxFifoOvf);
+                }
+            }
 
             while let Ok(byte) = self.read_byte() {
                 if read_bytes < buf.len() {
@@ -1201,6 +1248,13 @@ mod asynch {
         {
             uart.int_clr.write(|w| w.rxfifo_full_int_clr().set_bit());
             uart.int_ena.write(|w| w.rxfifo_full_int_ena().clear_bit());
+            return true;
+        }
+        if int_ena_val.rxfifo_ovf_int_ena().bit_is_set()
+            && int_raw_val.rxfifo_ovf_int_raw().bit_is_set()
+        {
+            uart.int_clr.write(|w| w.rxfifo_ovf_int_clr().set_bit());
+            uart.int_ena.write(|w| w.rxfifo_ovf_int_ena().clear_bit());
             return true;
         }
         false

@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Implement the `Clone` and `Copy` traits for the `Rng` driver (#650)
 
 ### Fixed
-
+- Fixed Async Uart `read` when `set_at_cmd` is not used (#652)
 ### Removed
 
 ## [0.10.0] - 2023-06-04

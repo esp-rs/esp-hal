@@ -27,7 +27,7 @@ use heapless::Vec;
 use static_cell::StaticCell;
 
 // rx_fifo_full_threshold
-const READ_BUF_SIZE: usize = 128;
+const READ_BUF_SIZE: usize = 64;
 // EOT (CTRL-D)
 const AT_CMD: u8 = 0x04;
 
@@ -70,7 +70,7 @@ async fn run(mut uart: Uart<'static, UART0>) {
         rbuf.resize_default(rbuf.capacity()).ok();
         let mut offset = 0;
         loop {
-            match with_timeout(READ_TIMEOUT, uart.read(&mut rbuf[offset..])).await {
+            match with_timeout(READ_TIMEOUT, uart.read(&mut rbuf[offset..], true)).await {
                 Ok(r) => {
                     if let Ok(len) = r {
                         offset += len;
@@ -84,7 +84,7 @@ async fn run(mut uart: Uart<'static, UART0>) {
                             break;
                         }
                     } else {
-                        // buffer is full
+                        // buffer is full or rx fifo overflow
                         break;
                     }
                 }
