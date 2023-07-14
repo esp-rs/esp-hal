@@ -5,14 +5,16 @@
 //! that provides an interface to interact with the SHA peripheral on ESP microcontroller chips.
 //! This driver allows you to perform cryptographic hash operations using various hash
 //! algorithms supported by the SHA peripheral, such as:
-//!     * SHA-1
-//!     * SHA-224
-//!     * SHA-256
-//!     * SHA-384
-//!     * SHA-512.
+//!    * SHA-1
+//!    * SHA-224
+//!    * SHA-256
+//!    * SHA-384
+//!    * SHA-512
+//! 
 //! The driver supports two working modes: 
-//!     * Typical SHA 
-//!     * DMA-SHA (Direct Memory Access SHA is NOT implemented yet). 
+//!    * Typical SHA 
+//!    * DMA-SHA (Direct Memory Access SHA is NOT implemented yet). 
+//! 
 //! It provides functions to update the hash calculation with input data, finish the hash calculation 
 //! and retrieve the resulting hash value. The SHA peripheral on ESP chips can handle large data
 //! streams efficiently, making it suitable for cryptographic applications that require secure hashing.

@@ -13,7 +13,6 @@
 //! ```no_run
 //! let mut aes = Aes::new(peripherals.AES, &mut system.peripheral_clock_control);
 //! ```
-//! 
 //! ### Creating key and block Buffer
 //! ```no_run
 //! let keytext = "SUp4SeCp@sSw0rd".as_bytes();
@@ -56,7 +55,7 @@
 //! ```
 //! 
 //! ### Implementation State
-//! * DMA mode is currently not supported. ⚠️
+//! * DMA mode is currently not supported ⚠️
 
 use core::marker::PhantomData;
 

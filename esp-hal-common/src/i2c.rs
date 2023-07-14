@@ -4,6 +4,7 @@
 //! The I2C Peripheral Driver for ESP chips is a software module that facilitates 
 //! communication with I2C devices using ESP microcontroller chips. It provides an interface to initialize,
 //! configure, and perform read and write operations over the I2C bus. 
+//! 
 //! The driver supports features such as handling transmission errors, asynchronous operations, 
 //! and interrupt-based communication, supports multiple I2C peripheral instances
 //! 

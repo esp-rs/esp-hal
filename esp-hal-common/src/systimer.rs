@@ -3,6 +3,7 @@
 //! ## Overview
 //! This software module provides an interface to interact with the system timer (SYSTIME) peripheral
 //! on ESP microcontroller chips.
+//! 
 //! Each ESP chip provides a timer (`52-bit` or `64-bit`, depends on chip), which can be used to generate tick interrupts
 //! for operating system, or be used as a general timer to generate periodic interrupts
 //! or one-time interrupts. With the help of the RTC timer, system timer can be

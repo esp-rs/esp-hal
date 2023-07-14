@@ -27,7 +27,7 @@
 //! ```no_run
 //! let mut rtc = Rtc::new(peripherals.RTC_CNTL);
 //! ```
-//! //! ```no_run
+//! ```no_run
 //! let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 //! ```
 //! 

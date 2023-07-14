@@ -10,21 +10,6 @@
 //! 
 //! ## Example
 //! ```no_run
-//! use hal::{
-//!    prelude::*
-//!    uart::{
-//!         config::{Config, DataBits, Parity, StopBits},
-//!         TxRxPins,
-//!    },
-//! ...
-//! };
-//! ...
-//! #[entry]
-//! fn main() -> ! {
-//!     let peripherals = Peripherals::take();
-//!     let mut system = peripherals.PCR.split();
-//!     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-//!     ...
 //!     let config = Config {
 //!         baudrate: 115200,
 //!         data_bits: DataBits::DataBits8,
@@ -60,7 +45,6 @@
 //!
 //!         block!(timer0.wait()).unwrap();
 //!     }
-//! }
 //! ```
 
 use self::config::Config;

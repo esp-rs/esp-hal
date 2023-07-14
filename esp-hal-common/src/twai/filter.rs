@@ -1,4 +1,4 @@
-//! # Two-wire Automotive Interface (TWAI) Filters
+//! Two-wire Automotive Interface (TWAI) Filters
 //!
 //! These are acceptance filters that limit which packets are received by the
 //! TWAI peripheral.
