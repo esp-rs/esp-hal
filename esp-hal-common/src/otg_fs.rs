@@ -1,4 +1,26 @@
-//! USB OTG full-speed peripheral
+//! USB OTG full-speed peripheral (TBF examples)
+//! 
+//! ## Overview
+//! The USB OTG Full-speed peripheral driver provides support for the USB On-The-Go (OTG) full-speed
+//! functionality on ESP chips, allows communication with USB devices.
+//! 
+//! The driver uses the `esp_synopsys_usb_otg` crate, which provides the `USB bus` implementation
+//! and `USB peripheral traits`. It also relies on other peripheral modules,
+//! such as `GPIO`, `system`, and `clock control`, to configure and enable the `USB` peripheral.
+//!
+//! To use the USB OTG Full-speed peripheral driver, you need to initialize the peripheral and configure
+//! its settings. The USB struct represents the USB peripheral and requires the implementation
+//! of the `UsbSel`, `UsbDp`, and `UsbDm` traits, which define the specific types
+//! used for USB pin selection and data pins.
+//!
+//! The USB struct provides a `new` function for initialization.
+//! Inside the `new` function, the `into_ref!` macro is used to convert the peripheral
+//! references into `PeripheralRef` instances.
+//!
+//! The `USB` struct implements the `UsbPeripheral` trait from the `esp_synopsys_usb_otg` crate, which
+//! defines the required constants and functions for `USB peripheral` operation.
+//! The trait implementation includes enabling the `USB peripheral`, configuring the `USB` settings
+//! and connecting the appropriate `GPIO` pins to the `USB peripheral`.
 
 pub use esp_synopsys_usb_otg::UsbBus;
 use esp_synopsys_usb_otg::UsbPeripheral;
