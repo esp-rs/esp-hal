@@ -70,7 +70,7 @@ async fn run(mut uart: Uart<'static, UART0>) {
         rbuf.resize_default(rbuf.capacity()).ok();
         let mut offset = 0;
         loop {
-            match with_timeout(READ_TIMEOUT, uart.read(&mut rbuf[offset..], true)).await {
+            match with_timeout(READ_TIMEOUT, uart.read(&mut rbuf[offset..])).await {
                 Ok(r) => {
                     if let Ok(len) = r {
                         offset += len;
@@ -131,7 +131,9 @@ fn main() -> ! {
 
     let mut uart0 = Uart::new(peripherals.UART0, &mut system.peripheral_clock_control);
     uart0.set_at_cmd(AtCmdConfig::new(None, None, None, AT_CMD, None));
-    uart0.set_rx_fifo_full_threshold(READ_BUF_SIZE as u16);
+    uart0
+        .set_rx_fifo_full_threshold(READ_BUF_SIZE as u16)
+        .unwrap();
 
     interrupt::enable(Interrupt::UART0, interrupt::Priority::Priority1).unwrap();
 

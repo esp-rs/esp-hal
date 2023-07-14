@@ -20,10 +20,13 @@ const UART_FIFO_SIZE: u16 = 128;
 /// Custom serial error type
 #[derive(Debug)]
 pub enum Error {
+    InvalidArgument,
     #[cfg(feature = "async")]
     ReadBufferFull,
     #[cfg(feature = "async")]
     RxFifoOvf,
+    #[cfg(feature = "async")]
+    ReadNoConfig,
 }
 
 /// UART configuration
@@ -250,6 +253,8 @@ impl embedded_hal_1::serial::Error for Error {
 /// UART driver
 pub struct Uart<'d, T> {
     uart: PeripheralRef<'d, T>,
+    at_cmd_config: Option<config::AtCmdConfig>,
+    rxfifo_full_thrhd: Option<u16>,
 }
 
 impl<'d, T> Uart<'d, T>
@@ -269,7 +274,11 @@ where
     {
         crate::into_ref!(uart);
         uart.enable_peripheral(peripheral_clock_control);
-        let mut serial = Uart { uart };
+        let mut serial = Uart {
+            uart,
+            at_cmd_config: None,
+            rxfifo_full_thrhd: None,
+        };
         serial.uart.disable_rx_interrupts();
         serial.uart.disable_tx_interrupts();
 
@@ -299,7 +308,11 @@ where
     ) -> Self {
         crate::into_ref!(uart);
         uart.enable_peripheral(peripheral_clock_control);
-        let mut serial = Uart { uart };
+        let mut serial = Uart {
+            uart,
+            at_cmd_config: None,
+            rxfifo_full_thrhd: None,
+        };
         serial.uart.disable_rx_interrupts();
         serial.uart.disable_tx_interrupts();
 
@@ -355,10 +368,34 @@ where
             .modify(|_, w| w.sclk_en().set_bit());
 
         self.sync_regs();
+        self.at_cmd_config = Some(config);
     }
 
     /// Configures the RX-FIFO threshold
-    pub fn set_rx_fifo_full_threshold(&mut self, threshold: u16) {
+    ///
+    /// # Errors
+    /// `Err(Error::InvalidArgument)` if provided value exceeds maximum value
+    /// for SOC :
+    /// - `esp32` **0x7F**
+    /// - `esp32c6`, `esp32h2` **0xFF**
+    /// - `esp32c3`, `esp32c2`, `esp32s2` **0x1FF**
+    /// - `esp32s3` **0x3FF**
+    pub fn set_rx_fifo_full_threshold(&mut self, threshold: u16) -> Result<(), Error> {
+        #[cfg(esp32)]
+        const MAX_THRHD: u16 = 0x7F;
+        #[cfg(any(esp32c6, esp32h2))]
+        const MAX_THRHD: u16 = 0xFF;
+        #[cfg(any(esp32c3, esp32c2, esp32s2))]
+        const MAX_THRHD: u16 = 0x1FF;
+        #[cfg(esp32s3)]
+        const MAX_THRHD: u16 = 0x3FF;
+
+        if threshold > MAX_THRHD {
+            return Err(Error::InvalidArgument);
+        }
+
+        self.rxfifo_full_thrhd = Some(threshold);
+
         #[cfg(any(esp32, esp32c6, esp32h2))]
         let threshold: u8 = threshold as u8;
 
@@ -366,6 +403,8 @@ where
             .register_block()
             .conf1
             .modify(|_, w| unsafe { w.rxfifo_full_thrhd().bits(threshold) });
+
+        Ok(())
     }
 
     /// Listen for AT-CMD interrupts
@@ -1124,28 +1163,29 @@ mod asynch {
     where
         T: Instance,
     {
-        /// Read async to buffer slice `buf`
+        /// Read async to buffer slice `buf`. Wait for Rx Fifo Full interrupt
+        /// (set by `set_rx_fifo_full_threshold`) and/or Rx AT_CMD character
+        /// interrupt if `set_at_cmd` was called.
         ///
         /// # Params
         /// - `buf` buffer slice to write the bytes into
-        /// - `wait_at_cmd` boolean that specify to wait for `AtCmdConfig`
-        ///   condition interrupt. Set to false unless `set_at_cmd`
-        ///   configuration function was called for this uart device.
         ///
         /// # Errors
         /// - `Err(ReadBufferFull)` if provided buffer slice is not enough to
         ///   copy all avaialble bytes. Increase buffer slice length.
         /// - `Err(RxFifoOvf)` when MCU Rx Fifo Overflow interrupt is triggered.
-        ///   To avoid this call this function more often.
+        ///   To avoid this error, call this function more often.
+        /// - `Err(Error::ReadNoConfig)` if neither `set_rx_fifo_full_threshold`
+        ///   or `set_at_cmd` was called
         ///
         /// # Ok
         /// When succesfull, returns the number of bytes written to
         /// buf
 
-        pub async fn read(&mut self, buf: &mut [u8], wait_at_cmd: bool) -> Result<usize, Error> {
+        pub async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
             let mut read_bytes = 0;
 
-            if wait_at_cmd {
+            if self.at_cmd_config.is_some() && self.rxfifo_full_thrhd.is_some() {
                 if let Either3::Third(_) = select3(
                     UartFuture::new(Event::RxCmdCharDetected, self.inner()),
                     UartFuture::new(Event::RxFifoFull, self.inner()),
@@ -1155,7 +1195,16 @@ mod asynch {
                 {
                     return Err(Error::RxFifoOvf);
                 }
-            } else {
+            } else if self.at_cmd_config.is_some() {
+                if let Either::Second(_) = select(
+                    UartFuture::new(Event::RxCmdCharDetected, self.inner()),
+                    UartFuture::new(Event::RxFifoOvf, self.inner()),
+                )
+                .await
+                {
+                    return Err(Error::RxFifoOvf);
+                }
+            } else if self.rxfifo_full_thrhd.is_some() {
                 if let Either::Second(_) = select(
                     UartFuture::new(Event::RxFifoFull, self.inner()),
                     UartFuture::new(Event::RxFifoOvf, self.inner()),
@@ -1164,6 +1213,8 @@ mod asynch {
                 {
                     return Err(Error::RxFifoOvf);
                 }
+            } else {
+                return Err(Error::ReadNoConfig);
             }
 
             while let Ok(byte) = self.read_byte() {

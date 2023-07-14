@@ -54,7 +54,7 @@ fn main() -> ! {
     wdt1.disable();
 
     serial0.set_at_cmd(AtCmdConfig::new(None, None, None, b'#', None));
-    serial0.set_rx_fifo_full_threshold(30);
+    serial0.set_rx_fifo_full_threshold(30).unwrap();
     serial0.listen_at_cmd();
     serial0.listen_rx_fifo_full();
 
