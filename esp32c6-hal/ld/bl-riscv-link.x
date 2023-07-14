@@ -89,8 +89,8 @@ INSERT BEFORE .rodata;
 /* Shared sections - ordering matters */
 INCLUDE "text.x"
 INCLUDE "rodata.x"
-INCLUDE "rwdata.x"
 INCLUDE "rwtext.x"
+INCLUDE "rwdata.x"
 INCLUDE "rtc_fast.x"
 /* End of Shared sections */
 
