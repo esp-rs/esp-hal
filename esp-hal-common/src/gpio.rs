@@ -11,6 +11,8 @@
 use core::{convert::Infallible, marker::PhantomData};
 
 use crate::peripherals::{GPIO, IO_MUX};
+#[cfg(xtensa)]
+pub(crate) use crate::rtc_pins;
 pub use crate::soc::gpio::*;
 pub(crate) use crate::{analog, gpio};
 
@@ -89,7 +91,13 @@ pub enum AlternateFunction {
     Function5 = 5,
 }
 
-pub trait RTCPin {}
+pub trait RTCPin {
+    fn rtc_number(&self) -> u8;
+    fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: u8);
+}
+
+pub trait RTCInputPin: RTCPin {}
+pub trait RTCOutputPin: RTCPin {}
 
 pub trait AnalogPin {}
 
@@ -1393,6 +1401,51 @@ macro_rules! gpio {
                     )+
                 }
             );
+        }
+    };
+}
+
+#[cfg(xtensa)]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! rtc_pins {
+    (
+        $( ( $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat ) )+
+    ) => {
+        impl<MODE, const GPIONUM: u8> crate::gpio::RTCPin for GpioPin<MODE, GPIONUM>
+        where
+            Self: crate::gpio::GpioProperties,
+            <Self as crate::gpio::GpioProperties>::PinType: crate::gpio::IsAnalogPin,
+        {
+            fn rtc_number(&self) -> u8 {
+                match GPIONUM {
+                    $(
+                        $pin_num => $rtc_pin,
+                    )+
+                    _ => unreachable!(),
+                }
+            }
+            /// Set the RTC properties of the pin. If `mux` is true then then pin is
+            /// routed to RTC, when false it is routed to IO_MUX.
+            fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: u8) {
+                use crate::peripherals::RTC_IO;
+                let rtcio = unsafe{ &*RTC_IO::ptr() };
+                match GPIONUM {
+                    $(
+                        $pin_num => {
+                            // disable input
+                            paste::paste!{
+                                rtcio.$pin_reg.modify(|_,w| unsafe {w
+                                    .[<$prefix fun_ie>]().bit(input_enable)
+                                    .[<$prefix mux_sel>]().bit(mux)
+                                    .[<$prefix fun_sel>]().bits(func)
+                                });
+                            }
+                        }
+                    )+
+                        _ => unreachable!(),
+                }
+            }
         }
     };
 }

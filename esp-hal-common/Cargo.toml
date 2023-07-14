@@ -13,6 +13,7 @@ license      = "MIT OR Apache-2.0"
 
 [dependencies]
 bitflags             = "2.3.3"
+bitfield             = "0.14.0"
 cfg-if               = "1.0.0"
 critical-section     = "1.1.1"
 embedded-can         = { version = "0.4.1", optional = true }
@@ -64,12 +65,12 @@ basic-toml = "0.1.2"
 serde      = { version = "1.0.164", features = ["derive"] }
 
 [features]
-esp32   = ["esp32/rt"  , "xtensa", "xtensa-lx/esp32",   "xtensa-lx-rt/esp32",   "lock_api", "procmacros/esp32"]
+esp32   = ["esp32/rt",   "xtensa", "xtensa-lx/esp32", "xtensa-lx-rt/esp32", "lock_api", "procmacros/esp32"]
 esp32c2 = ["esp32c2/rt", "riscv",  "procmacros/esp32c2"]
 esp32c3 = ["esp32c3/rt", "riscv",  "procmacros/esp32c3"]
 esp32c6 = ["esp32c6/rt", "riscv",  "procmacros/esp32c6"]
 esp32h2 = ["esp32h2/rt", "riscv",  "procmacros/esp32h2"]
-esp32s2 = ["esp32s2/rt", "xtensa", "xtensa-lx/esp32s2", "xtensa-lx-rt/esp32s2",             "esp-synopsys-usb-otg", "usb-device", "procmacros/esp32s2"]
+esp32s2 = ["esp32s2/rt", "xtensa", "xtensa-lx/esp32s2", "xtensa-lx-rt/esp32s2", "esp-synopsys-usb-otg", "usb-device", "procmacros/esp32s2"]
 esp32s3 = ["esp32s3/rt", "xtensa", "xtensa-lx/esp32s3", "xtensa-lx-rt/esp32s3", "lock_api", "esp-synopsys-usb-otg", "usb-device", "procmacros/esp32s3"]
 
 esp32_40mhz = []

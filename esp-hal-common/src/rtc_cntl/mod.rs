@@ -14,12 +14,17 @@ use crate::efuse::Efuse;
 use crate::peripherals::{LP_TIMER, LP_WDT};
 #[cfg(not(any(esp32c6, esp32h2)))]
 use crate::peripherals::{RTC_CNTL, TIMG0};
+#[cfg(any(esp32))]
+use crate::rtc_cntl::sleep::{RtcSleepConfig, WakeSource, WakeTriggers};
 use crate::{
     clock::Clock,
     peripheral::{Peripheral, PeripheralRef},
     reset::{SleepSource, WakeupReason},
     Cpu,
 };
+// only include sleep where its been implemented
+#[cfg(any(esp32))]
+pub mod sleep;
 
 #[cfg(any(esp32c6, esp32h2))]
 type RtcCntl = crate::peripherals::LP_CLKRST;
@@ -190,6 +195,64 @@ impl<'d> Rtc<'d> {
     /// read the current value of the rtc time registers in milliseconds
     pub fn get_time_ms(&self) -> u64 {
         self.get_time_raw() * 1_000 / RtcClock::get_slow_freq().frequency().to_Hz() as u64
+    }
+
+    /// enter deep sleep and wake with the provided `wake_sources`
+    #[cfg(esp32)]
+    pub fn sleep_deep<'a>(
+        &mut self,
+        wake_sources: &[&'a dyn WakeSource],
+        delay: &mut crate::Delay,
+    ) -> ! {
+        let config = RtcSleepConfig::deep();
+        self.sleep(&config, wake_sources, delay);
+        unreachable!();
+    }
+
+    /// enter light sleep and wake with the provided `wake_sources`
+    #[cfg(esp32)]
+    pub fn sleep_light<'a>(
+        &mut self,
+        wake_sources: &[&'a dyn WakeSource],
+        delay: &mut crate::Delay,
+    ) {
+        let config = RtcSleepConfig::default();
+        self.sleep(&config, wake_sources, delay)
+    }
+
+    /// enter sleep wthe the provided `config` and wake with the provided
+    /// `wake_sources`
+    #[cfg(esp32)]
+    pub fn sleep<'a>(
+        &mut self,
+        config: &RtcSleepConfig,
+        wake_sources: &[&'a dyn WakeSource],
+        delay: &mut crate::Delay,
+    ) {
+        let mut config = config.clone();
+        let mut wakeup_triggers = WakeTriggers::default();
+        for wake_source in wake_sources {
+            wake_source.apply(self, &mut wakeup_triggers, &mut config)
+        }
+        config.apply(self);
+        use embedded_hal::blocking::delay::DelayMs;
+        delay.delay_ms(100u32);
+        unsafe {
+            let rtc_cntl = &*RTC_CNTL::ptr();
+
+            rtc_cntl
+                .reset_state
+                .modify(|_, w| w.procpu_stat_vector_sel().set_bit());
+
+            // set bits for what can wake us up
+            rtc_cntl
+                .wakeup_state
+                .modify(|_, w| w.wakeup_ena().bits(wakeup_triggers.0.into()));
+
+            rtc_cntl
+                .state0
+                .write(|w| w.sleep_en().set_bit().slp_wakeup().set_bit());
+        }
     }
 }
 
