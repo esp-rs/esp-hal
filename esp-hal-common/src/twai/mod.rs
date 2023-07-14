@@ -1,8 +1,79 @@
 //! # Two-wire Automotive Interface (TWAI)
 //!
+//! ## Overview
+//! The TWAI peripheral driver provides functions and structs specifically designed
+//! for the Two-Wire Automotive Interface (TWAI) on ESP chips. TWAI is a communication protocol 
+//! commonly used in automotive applications for sending and receiving messages
+//! between electronic control units (ECUs) in a vehicle.
+//! 
+//! The driver enables you to configure and utilize the TWAI module on ESP chips.
+//! It offers functions for initializing the TWAI peripheral, setting up the ti1ming
+//! parameters, configuring acceptance filters, handling interrupts, and transmitting/receiving
+//! messages on the TWAI bus.
+//! 
 //! This driver manages the ISO 11898-1 (CAN Specification 2.0) compatible TWAI
 //! controllers. It supports Standard Frame Format (11-bit) and Extended Frame
 //! Format (29-bit) frame identifiers.
+//! 
+//! ## Example
+//! ```no_run
+//! // Use GPIO pins 2 and 3 to connect to the respective pins on the CAN
+//! // transceiver.
+//! let can_tx_pin = io.pins.gpio2;
+//! let can_rx_pin = io.pins.gpio3;
+//!
+//! // The speed of the CAN bus.
+//! const CAN_BAUDRATE: twai::BaudRate = twai::BaudRate::B1000K;
+//!
+//! // Begin configuring the TWAI peripheral. The peripheral is in a reset like
+//! // state that prevents transmission but allows configuration.
+//! let mut can_config = twai::TwaiConfiguration::new(
+//!     peripherals.TWAI0,
+//!     can_tx_pin,
+//!     can_rx_pin,
+//!     &mut system.peripheral_clock_control,
+//!     &clocks,
+//!     CAN_BAUDRATE,
+//! );
+//!
+//! // Partially filter the incoming messages to reduce overhead of receiving undesired messages
+//! const FILTER: twai::filter::SingleStandardFilter =
+//!     twai::filter::SingleStandardFilter::new(b"xxxxxxxxxx0", b"x", [b"xxxxxxxx", b"xxxxxxxx"]);
+//! can_config.set_filter(FILTER);
+//!
+//! // Start the peripheral. This locks the configuration settings of the peripheral
+//! // and puts it into operation mode, allowing packets to be sent and
+//! // received.
+//! let mut can = can_config.start();
+//! 
+//! loop {
+//!     // Wait for a frame to be received.
+//!     let frame = block!(can.receive()).unwrap();
+//!
+//!     println!("Received a frame:");
+//! 
+//!     // Print different messages based on the frame id type.
+//!     match frame.id() {
+//!         Id::Standard(id) => {
+//!             println!("\tStandard Id: {:?}", id);
+//!         }
+//!         Id::Extended(id) => {
+//!             println!("\tExtended Id: {:?}", id);
+//!         }
+//!     }
+//!
+//!     // Print out the frame data or the requested data length code for a remote
+//!     // transmission request frame.
+//!     if frame.is_data_frame() {
+//!         println!("\tData: {:?}", frame.data());
+//!     } else {
+//!         println!("\tRemote Frame. Data Length Code: {}", frame.dlc());
+//!     }
+//!
+//!     // Transmit the frame back.
+//!     let _result = block!(can.transmit(&frame)).unwrap();
+//! }
+//! ```
 
 #[cfg(feature = "eh1")]
 use embedded_can::{nb::Can, Error, ErrorKind, ExtendedId, Frame, Id, StandardId};

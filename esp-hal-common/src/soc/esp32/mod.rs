@@ -1,3 +1,11 @@
+//! SOC (System-on-Chip) module(ESP32)
+//! 
+//! ## Overview
+//! 
+//! The SOC module provides access, functions and structures that are useful for interacting with various
+//! system-related peripherals on `ESP32` chip.
+
+
 pub mod cpu_control;
 pub mod efuse;
 pub mod gpio;
