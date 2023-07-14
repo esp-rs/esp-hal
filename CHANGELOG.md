@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- USB device support is working again
+- USB device support is working again (#656)
 
 ### Removed
 
