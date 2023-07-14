@@ -1434,7 +1434,7 @@ macro_rules! rtc_pins {
                     $(
                         $pin_num => {
                             // disable input
-                            paste!{
+                            paste::paste!{
                                 rtcio.$pin_reg.modify(|_,w| unsafe {w
                                     .[<$prefix fun_ie>]().bit(input_enable)
                                     .[<$prefix mux_sel>]().bit(mux)
