@@ -20,7 +20,7 @@ embedded-dma         = "0.2.0"
 embedded-hal         = { version = "0.2.7", features = ["unproven"] }
 embedded-hal-1       = { version = "=1.0.0-alpha.11", optional = true, package = "embedded-hal" }
 embedded-hal-nb      = { version = "=1.0.0-alpha.3", optional = true }
-esp-synopsys-usb-otg = { version = "0.3.1", optional = true, features = ["fs", "esp32sx"] }
+esp-synopsys-usb-otg = { version = "0.3.2", optional = true, features = ["fs", "esp32sx"] }
 fugit                = "0.3.7"
 log                  = "=0.4.18"
 lock_api             = { version = "0.4.10", optional = true }
