@@ -1,10 +1,11 @@
 //! Cyclic Redundancy Check
 //!
+//! ## Overview
 //! These are safe abstractions to the CRC functions in the ESP32 ROM.
 //! Some chips may not include all of these functions so they will be compiled
 //! into the program binary in those cases.
 //!
-//! # Parameters
+//! ## Parameters
 //!
 //! The ROM provides the following polynomials for each CRC width:
 //!
@@ -31,7 +32,7 @@
 //! crc = !crc32_be(crc, &data2); // finish
 //! ```
 //!
-//! # Examples
+//! ## Examples
 //!
 //! A catalogue of these parameters can be found at
 //! <https://reveng.sourceforge.io/crc-catalogue/all.htm>

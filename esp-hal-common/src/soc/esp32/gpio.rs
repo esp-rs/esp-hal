@@ -2,8 +2,8 @@
 //! 
 //! ## Overview
 //! 
-//! The GPIO module provides functions and configurations for controlling the General Purpose Input/Output pins
-//! on the ESP32 chip. It allows you to configure pins as inputs or outputs, set their state and read their state.
+//! The `GPIO` module provides functions and configurations for controlling the `General Purpose Input/Output` pins
+//! on the `ESP32` chip. It allows you to configure pins as inputs or outputs, set their state and read their state.
 //! 
 //! Let's get through the functionality and configurations provided by this GPIO module:
 //!   - `get_io_mux_reg(gpio_num: u8) -> &'static crate::peripherals::io_mux::GPIO0:`: 

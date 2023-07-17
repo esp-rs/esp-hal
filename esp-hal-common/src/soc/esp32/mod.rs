@@ -2,7 +2,7 @@
 //! 
 //! ## Overview
 //! 
-//! The SOC module provides access, functions and structures that are useful for interacting with various
+//! The `SOC` module provides access, functions and structures that are useful for interacting with various
 //! system-related peripherals on `ESP32` chip.
 
 

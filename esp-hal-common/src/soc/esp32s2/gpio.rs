@@ -1,3 +1,45 @@
+//! GPIO configuration module (ESP32-S2)
+//! 
+//! ## Overview
+//! 
+//! The `GPIO` module provides functions and configurations for controlling the `General Purpose Input/Output` pins
+//! on the `ESP32-S2` chip. It allows you to configure pins as inputs or outputs, set their state and read their state.
+//! 
+//! Let's get through the functionality and configurations provided by this GPIO module:
+//!   - `get_io_mux_reg(gpio_num: u8) -> &'static crate::peripherals::io_mux::GPIO0:`: 
+//!       * This function returns a reference to the GPIO register associated with the given GPIO number.
+//!         It uses unsafe code and transmutation to access the GPIO registers based on the provided GPIO number.
+//!   - `gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8`:
+//!       * This function enables or disables GPIO interrupts and Non-Maskable Interrupts (NMI). 
+//!         It takes two boolean arguments int_enable and nmi_enable to control the interrupt and NMI enable settings.
+//!         The function returns an u8 value representing the interrupt enable settings.
+//!   - `impl_get_rtc_pad`:
+//!       *  This macro_rule generates a function to get a specific RTC pad.
+//!          It takes a single argument `$pad_name`, which is an identifier representing the name of the pad.
+//!          Returns a reference to the corresponding RTC pad.
+//!   - `impl_get_rtc_pad_indexed`:
+//!       *  This macro_rule generates a function similar to the previous one but for indexed RTC pads.
+//!          It takes two arguments: `$pad_name`, which represents the name of the pad, and `$idx`, which
+//!          is the index of the specific pad.
+//!          Returns a reference to the indexed RTC pad.
+//!   - `gpio` block:
+//!       *  Defines the pin configurations for various GPIO pins. Each line represents a pin and its associated
+//!          options such as input/output mode, analog capability, and corresponding functions.
+//!   - `analog` block: 
+//!       *  Block defines the analog capabilities of various GPIO pins. Each line represents a pin and its associated
+//!          options such as mux selection, function selection, and input enable.
+//!   - `enum InputSignal`: 
+//!       *  This enumeration defines input signals for the GPIO mux. Each input signal is assigned a specific value.
+//!   - `enum OutputSignal`:
+//!       *  This enumeration defines output signals for the GPIO mux. Each output signal is assigned a specific value.
+//! 
+//! Module also implements the `InterruptStatusRegisterAccess` trait for two different banks:
+//!   * `InterruptStatusRegisterAccessBank0`
+//!   * `InterruptStatusRegisterAccessBank1`.
+//! This trait provides functions to read the interrupt status and NMI status registers for 
+//! both the `PRO CPU` and `APP CPU`. The implementation uses the `gpio` peripheral to access the appropriate registers.
+
+
 use crate::{
     gpio::{
         AlternateFunction,

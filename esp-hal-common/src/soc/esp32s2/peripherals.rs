@@ -1,4 +1,20 @@
-//! Peripheral instance singletons
+//! Peripheral instance singletons(ESP32-S2)
+//! 
+//! ## Overview
+//! 
+//! The `Peripherals` module is a part of the `SOC` functionality of `ESP32-S2` chip. It provides singleton instances
+//! of various peripherals and allows users to access and use them in their applications.
+//! 
+//! These peripherals provide various functionalities and interfaces for interacting with different hardware
+//! components on the `ESP32-S2` chip, such as timers, `GPIO` pins, `I2C`, `SPI`, `UART`, and more.
+//! Users can access and utilize these peripherals by importing the respective singleton instances from this module.
+//! 
+//! It's important to note that the module also exports the `Interrupt` enum from the `ESP32-S2` `PAC (Peripheral Access Crate)` for
+//! users to handle interrupts associated with these peripherals.
+//! 
+//! NOTE: notice that `psram`, `radio` and `ulp_riscv_core` are marked with `false` in the `peripherals!` macro.
+//! Basically, that means that there's no real peripheral (no `PSRAM` nor `RADIO` peripheral in the `PAC`s) but we're
+//! creating "virtual peripherals" for them in order to ensure the uniqueness of the instances (Singletons).
 
 use esp32s2 as pac;
 // We need to export this for users to use

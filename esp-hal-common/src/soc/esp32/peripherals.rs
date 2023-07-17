@@ -2,14 +2,14 @@
 //! 
 //! ## Overview
 //! 
-//! The peripheral module is a part of the SOC module for the ESP32 chip. It provides singleton instances
+//! The `Peripherals` module is a part of the `SOC` functionality of `ESP32` chip. It provides singleton instances
 //! of various peripherals and allows users to access and use them in their applications.
 //! 
 //! These peripherals provide various functionalities and interfaces for interacting with different hardware
-//! components on the ESP32 chip, such as timers, GPIO pins, I2C, SPI, UART, and more.
+//! components on the `ESP32` chip, such as timers, `GPIO` pins, `I2C`, `SPI`, `UART`, and more.
 //! Users can access and utilize these peripherals by importing the respective singleton instances from this module.
 //! 
-//! It's important to note that the module also exports the `Interrupt` enum from the ESP32 PAC (Peripheral Access Crate) for
+//! It's important to note that the module also exports the `Interrupt` enum from the `ESP32` `PAC (Peripheral Access Crate)` for
 //! users to handle interrupts associated with these peripherals.
 //! 
 //! NOTE: notice that `psram` and `radio` are marked with `false` in the `peripherals!` macro.

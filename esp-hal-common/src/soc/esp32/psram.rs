@@ -2,19 +2,19 @@
 //! 
 //! ## Overview
 //! 
-//! The PSRAM module is a part of the SOC module for the ESP32 chip. It provides support for accessing and
-//! controlling the Pseudo Static Random Access Memory (PSRAM) on the ESP32.
+//! The `PSRAM` module is a part of the `SOC` functionality the `ESP32` chip. It provides support for accessing and
+//! controlling the `Pseudo Static Random Access Memory (PSRAM)` on the `ESP32`.
 //! 
-//! The PSRAM module enables users to interface with the PSRAM memory present on the ESP32 chip.
-//! PSRAM provides additional external memory to supplement the internal memory of the ESP32, allowing for increased
+//! The `PSRAM` module enables users to interface with the `PSRAM` memory present on the `ESP32` chip.
+//! `PSRAM` provides additional external memory to supplement the internal memory of the `ESP32`, allowing for increased
 //! storage capacity and improved performance in certain applications.
 //! 
-//! The PSRAM module is accessed through a virtual address, defined as `PSRAM_VADDR`. 
+//! The `PSRAM` module is accessed through a virtual address, defined as `PSRAM_VADDR`. 
 //! The starting virtual address for the PSRAM module is 0x3F800000.
-//! The PSRAM module size depends on the configuration specified during the compilation process.
-//! The available PSRAM sizes are `2MB`, `4MB`, and `8MB`. 
+//! The `PSRAM` module size depends on the configuration specified during the compilation process.
+//! The available `PSRAM` sizes are `2MB`, `4MB`, and `8MB`. 
 //! 
-//! NOTE: If you want to use `PSRAM` on `ESP32` or `ESP32S3`, it'll work only in `release` mode.
+//! NOTE: If you want to use `PSRAM` on `ESP32` or `ESP32-S3`, it'll work only in `release` mode.
 
 
 
