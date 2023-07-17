@@ -129,6 +129,71 @@ fn register_set_bits(reg: u32, bits: u32) {
     modify_register(reg, bits, bits)
 }
 
+fn register_modify_bits(reg: u32, bits: u32, set: bool) {
+    if set {
+        modify_register(reg, bits, bits);
+    } else {
+        modify_register(reg, bits, 0);
+    }
+}
+
+fn rtc_sleep_pu(val: bool) {
+    #[rustfmt::skip]
+    rtc_cntl
+        .dig_pwc
+        .modify(|_, w| w
+            .lslp_mem_force_pu().bit(val)
+        );
+
+    #[rustfmt::skip]
+    rtc_cntl.pwc.modify(|_, w| w
+        .slowmem_force_lpu().bit(val)
+        .fastmem_force_lpu().bit(val)
+    );
+
+    #[rustfmt::skip]
+    register_modify_bits(
+        SYSCON_FRONT_END_MEM_PD_REG,
+        SYSCON_DC_MEM_FORCE_PU | SYSCON_PBUS_MEM_FORCE_PU | SYSCON_AGC_MEM_FORCE_PU,
+        val,
+    );
+
+    #[rustfmt::skip]
+    register_modify_bits(
+        BBPD_CTRL,
+        BB_FFT_FORCE_PU | BB_DC_EST_FORCE_PU,
+        val,
+    );
+
+    #[rustfmt::skip]
+    register_modify_bits(
+        NRXPD_CTRL,
+        NRX_RX_ROT_FORCE_PU | NRX_VIT_FORCE_PU | NRX_DEMAP_FORCE_PU,
+        val,
+    );
+
+    #[rustfmt::skip]
+    register_modify_bits(
+        FE_GEN_CTRL,
+        FE_IQ_EST_FORCE_PU,
+        val,
+    );
+
+    #[rustfmt::skip]
+    register_modify_bits(
+        FE2_TX_INTERP_CTRL,
+        FE2_TX_INF_FORCE_PU,
+        val,
+    );
+
+    #[rustfmt::skip]
+    register_modify_bits(
+        SYSCON_MEM_POWER_UP_REG,
+        SYSCON_SRAM_POWER_UP | SYSCON_ROM_POWER_UP,
+        val,
+    );
+}
+
 impl RtcSleepConfig {
     pub fn deep() -> Self {
         let mut cfg = Self::default();
@@ -214,56 +279,7 @@ impl RtcSleepConfig {
         let rtc_cntl = unsafe { &*esp32s3::RTC_CNTL::ptr() };
 
         if self.lslp_mem_inf_fpu() {
-            // rtc_sleep_pu
-
-            #[rustfmt::skip]
-            rtc_cntl
-                .dig_pwc
-                .modify(|_, w| w
-                    .lslp_mem_force_pu().set_bit()
-                );
-
-            #[rustfmt::skip]
-            rtc_cntl.pwc.modify(|_, w| w
-                .slowmem_force_lpu().set_bit()
-                .fastmem_force_lpu().set_bit()
-            );
-
-            #[rustfmt::skip]
-            register_set_bits(
-                SYSCON_FRONT_END_MEM_PD_REG,
-                SYSCON_DC_MEM_FORCE_PU | SYSCON_PBUS_MEM_FORCE_PU | SYSCON_AGC_MEM_FORCE_PU,
-            );
-
-            #[rustfmt::skip]
-            register_set_bits(
-                BBPD_CTRL,
-                BB_FFT_FORCE_PU | BB_DC_EST_FORCE_PU,
-            );
-
-            #[rustfmt::skip]
-            register_set_bits(
-                NRXPD_CTRL,
-                NRX_RX_ROT_FORCE_PU | NRX_VIT_FORCE_PU | NRX_DEMAP_FORCE_PU,
-            );
-
-            #[rustfmt::skip]
-            register_set_bits(
-                FE_GEN_CTRL,
-                FE_IQ_EST_FORCE_PU,
-            );
-
-            #[rustfmt::skip]
-            register_set_bits(
-                FE2_TX_INTERP_CTRL,
-                FE2_TX_INF_FORCE_PU,
-            );
-
-            #[rustfmt::skip]
-            register_set_bits(
-                SYSCON_MEM_POWER_UP_REG,
-                SYSCON_SRAM_POWER_UP | SYSCON_ROM_POWER_UP,
-            );
+            rtc_sleep_pu(true);
         }
 
         if self.modem_pd_en() {
