@@ -1,6 +1,7 @@
 use std::{
     env,
-    fs,
+    fs::{self, File},
+    io::{BufRead, BufReader, Write},
     path::{Path, PathBuf},
 };
 
@@ -82,6 +83,7 @@ struct Device {
     pub arch: Arch,
     pub cores: CoreCount,
     pub peripherals: Vec<String>,
+    pub symbols: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -131,7 +133,8 @@ fn main() {
     // Load the configuration file for the configured device:
     let chip_toml_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("devices")
-        .join(format!("{}.toml", device_name))
+        .join(device_name)
+        .join("device.toml")
         .canonicalize()
         .unwrap();
 
@@ -146,6 +149,10 @@ fn main() {
 
     for peripheral in &device.peripherals {
         println!("cargo:rustc-cfg={peripheral}");
+    }
+
+    for symbol in &device.symbols {
+        println!("cargo:rustc-cfg={symbol}");
     }
 
     // Check PSRAM features are only given if the target supports PSRAM
@@ -195,15 +202,13 @@ fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> std::io::Result
 }
 
 fn gen_efuse_table(device_name: &str, out_dir: impl AsRef<Path>) {
-    use std::io::{BufRead, Write};
-
-    let src_path = PathBuf::from(format!("src/soc/{device_name}/efuse.csv"));
+    let src_path = PathBuf::from(format!("devices/{device_name}/efuse.csv"));
     let out_path = out_dir.as_ref().join("efuse_fields.rs");
 
     println!("cargo:rerun-if-changed={}", src_path.display());
 
-    let mut writer = std::fs::File::create(out_path).unwrap();
-    let mut reader = std::io::BufReader::new(std::fs::File::open(src_path).unwrap());
+    let mut writer = File::create(out_path).unwrap();
+    let mut reader = BufReader::new(File::open(src_path).unwrap());
     let mut line = String::with_capacity(128);
 
     while reader.read_line(&mut line).unwrap() > 0 {
