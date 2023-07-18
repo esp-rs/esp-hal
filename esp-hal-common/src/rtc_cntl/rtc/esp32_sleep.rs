@@ -212,7 +212,7 @@ impl RtcSleepConfig {
         cfg
     }
 
-    fn base_settings(&self, _rtc: &Rtc) {
+    pub(crate) fn base_settings(&self, _rtc: &Rtc) {
         // settings derived from esp-idf after basic boot
         unsafe {
             let rtc_cntl = &*esp32::RTC_CNTL::ptr();
@@ -274,8 +274,7 @@ impl RtcSleepConfig {
         }
     }
 
-    pub(crate) fn apply(&self, rtc: &Rtc) {
-        self.base_settings(rtc);
+    pub(crate) fn apply(&self) {
         // like esp-idf rtc_sleep_init()
         unsafe {
             let rtc_cntl = &*esp32::RTC_CNTL::ptr();
@@ -446,6 +445,25 @@ impl RtcSleepConfig {
                 .deep_slp_reject_en().bit(self.deep_slp_reject())
                 .light_slp_reject_en().bit(self.light_slp_reject())
             );
+        }
+    }
+
+    pub(crate) fn start_sleep(&self, wakeup_triggers: WakeTriggers) {
+        unsafe {
+            let rtc_cntl = &*esp32::RTC_CNTL::ptr();
+
+            rtc_cntl
+                .reset_state
+                .modify(|_, w| w.procpu_stat_vector_sel().set_bit());
+
+            // set bits for what can wake us up
+            rtc_cntl
+                .wakeup_state
+                .modify(|_, w| w.wakeup_ena().bits(wakeup_triggers.0.into()));
+
+            rtc_cntl
+                .state0
+                .write(|w| w.sleep_en().set_bit().slp_wakeup().set_bit());
         }
     }
 }

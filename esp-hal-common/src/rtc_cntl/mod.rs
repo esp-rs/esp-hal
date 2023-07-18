@@ -234,25 +234,16 @@ impl<'d> Rtc<'d> {
         for wake_source in wake_sources {
             wake_source.apply(self, &mut wakeup_triggers, &mut config)
         }
-        config.apply(self);
+
+        // TODO: base_settings should be applied on startup, and probably after waking
+        // up from light sleep.
+        config.base_settings(self);
+        config.apply();
+
         use embedded_hal::blocking::delay::DelayMs;
         delay.delay_ms(100u32);
-        unsafe {
-            let rtc_cntl = &*RTC_CNTL::ptr();
 
-            rtc_cntl
-                .reset_state
-                .modify(|_, w| w.procpu_stat_vector_sel().set_bit());
-
-            // set bits for what can wake us up
-            rtc_cntl
-                .wakeup_state
-                .modify(|_, w| w.wakeup_ena().bits(wakeup_triggers.0.into()));
-
-            rtc_cntl
-                .state0
-                .write(|w| w.sleep_en().set_bit().slp_wakeup().set_bit());
-        }
+        config.start_sleep(wakeup_triggers);
     }
 }
 

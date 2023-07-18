@@ -1,4 +1,4 @@
-use crate::{regi2c_write_mask, rom::rom_i2c_writeReg_Mask, Rtc};
+use crate::{regi2c_write_mask, rom::rom_i2c_writeReg_Mask, rtc_cntl::sleep::WakeTriggers, Rtc};
 
 const I2C_DIG_REG: u32 = 0x6d;
 const I2C_DIG_REG_HOSTID: u32 = 1;
@@ -262,7 +262,7 @@ impl RtcSleepConfig {
         cfg
     }
 
-    fn base_settings(&self, _rtc: &Rtc) {
+    pub(crate) fn base_settings(&self, _rtc: &Rtc) {
         // TODO: some of this needs to run at startup, possibly during clock setup
         // settings derived from esp_clk_init -> rtc_init
 
@@ -519,9 +519,7 @@ impl RtcSleepConfig {
         }
     }
 
-    pub(crate) fn apply(&self, rtc: &Rtc) {
-        self.base_settings(rtc);
-
+    pub(crate) fn apply(&self) {
         // like esp-idf rtc_sleep_init()
         let rtc_cntl = unsafe { &*esp32s3::RTC_CNTL::ptr() };
 
@@ -699,6 +697,25 @@ impl RtcSleepConfig {
             rtc_cntl.clk_conf.modify(|_, w| w
                 .xtal_global_force_nogating().bit(self.xtal_fpu())
             );
+        }
+    }
+
+    pub(crate) fn start_sleep(&self, wakeup_triggers: WakeTriggers) {
+        unsafe {
+            let rtc_cntl = &*esp32s3::RTC_CNTL::ptr();
+
+            rtc_cntl
+                .reset_state
+                .modify(|_, w| w.procpu_stat_vector_sel().set_bit());
+
+            // set bits for what can wake us up
+            rtc_cntl
+                .wakeup_state
+                .modify(|_, w| w.wakeup_ena().bits(wakeup_triggers.0.into()));
+
+            rtc_cntl
+                .state0
+                .write(|w| w.sleep_en().set_bit().slp_wakeup().set_bit());
         }
     }
 }
