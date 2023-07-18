@@ -20,7 +20,7 @@ use esp32c3_hal::{
 use esp_backtrace as _;
 use esp_println::{print, println};
 
-const WIDHT: usize = 80;
+const WIDTH: usize = 80;
 
 #[entry]
 fn main() -> ! {
@@ -89,7 +89,7 @@ fn main() -> ! {
                 break;
             }
 
-            let count = WIDHT / (total / entry.length1 as usize);
+            let count = WIDTH / (total / entry.length1 as usize);
             let c = if entry.level1 { '-' } else { '_' };
             for _ in 0..count + 1 {
                 print!("{}", c);
@@ -99,7 +99,7 @@ fn main() -> ! {
                 break;
             }
 
-            let count = WIDHT / (total / entry.length2 as usize);
+            let count = WIDTH / (total / entry.length2 as usize);
             let c = if entry.level2 { '-' } else { '_' };
             for _ in 0..count + 1 {
                 print!("{}", c);

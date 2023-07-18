@@ -230,10 +230,6 @@ impl<'d> Rmt<'d> {
             return Err(Error::UnreachableTargetFrequency);
         }
 
-        if frequency > src_clock {
-            return Err(Error::UnreachableTargetFrequency);
-        }
-
         let div = (src_clock / frequency) - 1;
 
         if div > u8::MAX as u32 {
