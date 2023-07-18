@@ -47,6 +47,7 @@ pub const RTC_CNTL_ULPCP_TOUCH_START_WAIT_DEFAULT: u16 = 0x10;
 pub const RTC_CNTL_PLL_BUF_WAIT_DEFAULT: u8 = 20;
 pub const RTC_CNTL_CK8M_WAIT_DEFAULT: u8 = 20;
 pub const RTC_CNTL_MIN_SLP_VAL_MIN: u8 = 2;
+pub const RTC_CNTL_DBG_ATTEN_DEEPSLEEP_ULTRA_LOW: u8 = 15;
 
 pub const OTHER_BLOCKS_POWERUP: u8 = 1;
 pub const OTHER_BLOCKS_WAIT: u16 = 1;
@@ -248,17 +249,39 @@ fn rtc_sleep_pu(val: bool) {
 
 impl RtcSleepConfig {
     pub fn deep() -> Self {
+        // Set up for ultra-low power sleep. Wakeup sources may modify these settings.
         let mut cfg = Self::default();
-        cfg.set_deep_slp(true);
-        cfg.set_dig_dbias_slp(RTC_CNTL_DBIAS_0V90);
-        // cfg.set_rtc_dbias_slp(RTC_CNTL_DBIAS_0V90);
-        cfg.set_vddsdio_pd_en(true);
-        cfg.set_int_8m_pd_en(true);
-        cfg.set_xtal_fpu(false);
-        cfg.set_modem_pd_en(true);
-        cfg.set_rtc_peri_pd_en(true);
+
+        cfg.set_lslp_mem_inf_fpu(false);
+        cfg.set_rtc_mem_inf_follow_cpu(true); // ?
         cfg.set_rtc_fastmem_pd_en(true);
         cfg.set_rtc_slowmem_pd_en(true);
+        cfg.set_rtc_peri_pd_en(true);
+        cfg.set_modem_pd_en(true);
+        cfg.set_cpu_pd_en(true);
+        cfg.set_int_8m_pd_en(true);
+
+        cfg.set_dig_peri_pd_en(true);
+        cfg.set_dig_dbias_slp(0); // because of dig_peri_pd_en
+
+        cfg.set_deep_slp(true);
+        cfg.set_wdt_flashboot_mod_en(false);
+        cfg.set_vddsdio_pd_en(true);
+        cfg.set_xtal_fpu(false);
+        cfg.set_deep_slp_reject(true);
+        cfg.set_light_slp_reject(true);
+        cfg.set_rtc_dbias_slp(RTC_CNTL_DBIAS_1V10);
+
+        // because of dig_peri_pd_en
+        cfg.set_rtc_regulator_fpu(false);
+        cfg.set_dbg_atten_slp(RTC_CNTL_DBG_ATTEN_DEEPSLEEP_ULTRA_LOW);
+
+        // because of xtal_fpu
+        cfg.set_bias_sleep_monitor(true);
+        cfg.set_pd_cur_monitor(true);
+        cfg.set_bias_sleep_slp(true);
+        cfg.set_pd_cur_slp(true);
+
         cfg
     }
 
