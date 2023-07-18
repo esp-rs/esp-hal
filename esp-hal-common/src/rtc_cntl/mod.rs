@@ -222,7 +222,7 @@ impl<'d> Rtc<'d> {
         delay: &mut crate::Delay,
     ) {
         let config = RtcSleepConfig::default();
-        self.sleep(&config, wake_sources, delay)
+        self.sleep(&config, wake_sources, delay);
     }
 
     /// enter sleep with the provided `config` and wake with the provided
@@ -246,6 +246,7 @@ impl<'d> Rtc<'d> {
         delay.delay_ms(100u32);
 
         config.start_sleep(wakeup_triggers);
+        config.finish_sleep();
     }
 }
 

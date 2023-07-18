@@ -24,6 +24,7 @@ pub const RTC_CNTL_WAKEUP_DELAY_CYCLES: u8 = 7;
 pub const RTC_CNTL_OTHER_BLOCKS_POWERUP_CYCLES: u8 = 1;
 pub const RTC_CNTL_OTHER_BLOCKS_WAIT_CYCLES: u16 = 1;
 pub const RTC_CNTL_MIN_SLP_VAL_MIN: u8 = 128;
+pub const RTC_CNTL_DBG_ATTEN_DEFAULT: u8 = 3;
 
 pub const RTC_MEM_POWERUP_CYCLES: u8 = RTC_CNTL_OTHER_BLOCKS_POWERUP_CYCLES;
 pub const RTC_MEM_WAIT_CYCLES: u16 = RTC_CNTL_OTHER_BLOCKS_WAIT_CYCLES;
@@ -464,6 +465,25 @@ impl RtcSleepConfig {
             rtc_cntl
                 .state0
                 .write(|w| w.sleep_en().set_bit().slp_wakeup().set_bit());
+        }
+    }
+
+    pub(crate) fn finish_sleep(&self) {
+        // In deep sleep mode, we never get here
+        unsafe {
+            let rtc_cntl = &*esp32::RTC_CNTL::ptr();
+
+            #[rustfmt::skip]
+            rtc_cntl.int_clr.write(|w| w
+                .slp_reject_int_clr().set_bit()
+                .slp_wakeup_int_clr().set_bit()
+            );
+
+            // restore DBG_ATTEN to the default value
+            #[rustfmt::skip]
+            rtc_cntl.bias_conf.modify(|_,w| w
+                .dbg_atten().bits(RTC_CNTL_DBG_ATTEN_DEFAULT)
+            );
         }
     }
 }

@@ -739,4 +739,28 @@ impl RtcSleepConfig {
                 .write(|w| w.sleep_en().set_bit().slp_wakeup().set_bit());
         }
     }
+
+    pub(crate) fn finish_sleep(&self) {
+        // In deep sleep mode, we never get here
+        unsafe {
+            let rtc_cntl = &*esp32s3::RTC_CNTL::ptr();
+
+            #[rustfmt::skip]
+            rtc_cntl.int_clr_rtc.write(|w| w
+                .slp_reject_int_clr().set_bit()
+                .slp_wakeup_int_clr().set_bit()
+            );
+
+            // restore config if it is a light sleep
+            if self.lslp_mem_inf_fpu() {
+                rtc_sleep_pu(true);
+            }
+
+            // Recover default wait cycle for touch or COCPU after wakeup.
+            #[rustfmt::skip]
+            rtc_cntl.timer2.modify(|_,w| w
+                .ulpcp_touch_start_wait().bits(RTC_CNTL_ULPCP_TOUCH_START_WAIT_DEFAULT)
+            );
+        }
+    }
 }
