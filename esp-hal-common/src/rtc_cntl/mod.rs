@@ -136,12 +136,17 @@ impl<'d> Rtc<'d> {
         rtc::init();
         rtc::configure_clock();
 
-        Self {
+        let this = Self {
             _inner: rtc_cntl.into_ref(),
             rwdt: Rwdt::default(),
             #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
             swd: Swd::new(),
-        }
+        };
+
+        #[cfg(any(esp32, esp32s3))]
+        RtcSleepConfig::base_settings(&this);
+
+        this
     }
 
     // TODO: implement for ESP32-C6
@@ -235,9 +240,6 @@ impl<'d> Rtc<'d> {
             wake_source.apply(self, &mut wakeup_triggers, &mut config)
         }
 
-        // TODO: base_settings should be applied on startup, and probably after waking
-        // up from light sleep.
-        config.base_settings(self);
         config.apply();
 
         use embedded_hal::blocking::delay::DelayMs;

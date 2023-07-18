@@ -262,10 +262,8 @@ impl RtcSleepConfig {
         cfg
     }
 
-    pub(crate) fn base_settings(&self, _rtc: &Rtc) {
-        // TODO: some of this needs to run at startup, possibly during clock setup
+    pub(crate) fn base_settings(_rtc: &Rtc) {
         // settings derived from esp_clk_init -> rtc_init
-
         unsafe {
             let rtc_cntl = &*esp32s3::RTC_CNTL::ptr();
 

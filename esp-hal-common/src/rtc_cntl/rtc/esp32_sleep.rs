@@ -212,7 +212,7 @@ impl RtcSleepConfig {
         cfg
     }
 
-    pub(crate) fn base_settings(&self, _rtc: &Rtc) {
+    pub(crate) fn base_settings(_rtc: &Rtc) {
         // settings derived from esp-idf after basic boot
         unsafe {
             let rtc_cntl = &*esp32::RTC_CNTL::ptr();
