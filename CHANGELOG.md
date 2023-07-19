@@ -111,6 +111,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Move `rwtext` after other RAM data sections (#464)
 - ESP32-C3: Disable `usb_pad_enable` when setting GPIO18/19 to input/output (#461)
 - Fix 802.15.4 clock enabling (ESP32-C6) (#458)
+- ESP32-S3: Disable usb_pad_enable when setting GPIO19/20 to input/output (#645)
 
 ### Changed
 
