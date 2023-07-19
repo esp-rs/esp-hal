@@ -1116,10 +1116,10 @@ rmt!(
 #[cfg(esp32s2)]
 rmt!(
     apb_conf,
-    (0, Channel0, channel0, OutputSignal::RMT_SIG_OUT0),
-    (1, Channel1, channel1, OutputSignal::RMT_SIG_OUT1),
-    (2, Channel2, channel2, OutputSignal::RMT_SIG_OUT2),
-    (3, Channel3, channel3, OutputSignal::RMT_SIG_OUT3),
+    (0, Channel0, channel0, OutputSignal::RMT_SIG_0),
+    (1, Channel1, channel1, OutputSignal::RMT_SIG_1),
+    (2, Channel2, channel2, OutputSignal::RMT_SIG_2),
+    (3, Channel3, channel3, OutputSignal::RMT_SIG_3),
 );
 
 #[cfg(esp32)]
@@ -1138,8 +1138,8 @@ rmt!(
 #[cfg(esp32s3)]
 rmt!(
     sys_conf,
-    (0, Channel0, channel0, OutputSignal::RMT_SIG_OUT0),
-    (1, Channel1, channel1, OutputSignal::RMT_SIG_OUT1),
-    (2, Channel2, channel2, OutputSignal::RMT_SIG_OUT2),
-    (3, Channel3, channel3, OutputSignal::RMT_SIG_OUT3),
+    (0, Channel0, channel0, OutputSignal::RMT_SIG_0),
+    (1, Channel1, channel1, OutputSignal::RMT_SIG_1),
+    (2, Channel2, channel2, OutputSignal::RMT_SIG_2),
+    (3, Channel3, channel3, OutputSignal::RMT_SIG_3),
 );

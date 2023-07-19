@@ -54,6 +54,8 @@ pub use self::dma::pdma;
 pub use self::gpio::IO;
 #[cfg(rmt)]
 pub use self::pulse_control::PulseControl;
+#[cfg(rmt)]
+pub use self::rmt::Rmt;
 #[cfg(rng)]
 pub use self::rng::Rng;
 #[cfg(any(lp_clkrst, rtc_cntl))]
@@ -114,6 +116,8 @@ pub mod pulse_control;
 #[cfg(radio)]
 pub mod radio;
 pub mod reset;
+#[cfg(rmt)]
+pub mod rmt;
 #[cfg(rng)]
 pub mod rng;
 pub mod rom;
