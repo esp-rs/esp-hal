@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - USB device support is working again (#656)
+- Add missing interrupt status read for esp32s3, which fixes USB-SERIAL-JTAG interrupts (#664)
 
 ### Removed
 
