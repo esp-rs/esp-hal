@@ -34,17 +34,16 @@
 //! - Use the [`SpiBus`](embedded_hal_1::spi::SpiBus) trait (requires the "eh1"
 //!   feature) and its associated functions to initiate transactions with
 //!   simultaneous reads and writes, or
-//! - Use the [`SpiBusWrite`](embedded_hal_1::spi::SpiBusWrite) and
-//!   [`SpiBusRead`](embedded_hal_1::spi::SpiBusRead) traits (requires the "eh1"
-//!   feature) and their associated functions to read or write mutiple bytes at
-//!   a time.
+// TODO async moved to embedded-hal-bus:
+//! - Use the `ExclusiveDevice` struct from `embedded-hal-bus` or
+//!   `embedded-hal-async` (recommended).
 //!
 //!
 //! ## Shared SPI access
 //!
 //! If you have multiple devices on the same SPI bus that each have their own CS
-//! line, you may want to have a look at the [`SpiBusController`] and
-//! [`SpiBusDevice`] implemented here. These give exclusive access to the
+//! line, you may want to have a look at the [`ehal1::SpiBusController`] and
+//! [`ehal1::SpiBusDevice`] implemented here. These give exclusive access to the
 //! underlying SPI bus by means of a Mutex. This ensures that device
 //! transactions do not interfere with each other.
 
@@ -2408,7 +2407,7 @@ pub trait Instance {
     /// sequential transfers are performed. This function will return before
     /// all bytes of the last chunk to transmit have been sent to the wire. If
     /// you must ensure that the whole messages was written correctly, use
-    /// [`flush`].
+    /// [`Self::flush`].
     // FIXME: See below.
     fn write_bytes(&mut self, words: &[u8]) -> Result<(), Error> {
         let reg_block = self.register_block();
@@ -2472,7 +2471,7 @@ pub trait Instance {
     ///
     /// Sends out a stuffing byte for every byte to read. This function doesn't
     /// perform flushing. If you want to read the response to something you
-    /// have written before, consider using [`transfer`] instead.
+    /// have written before, consider using [`Self::transfer`] instead.
     fn read_bytes(&mut self, words: &mut [u8]) -> Result<(), Error> {
         let empty_array = [EMPTY_WRITE_PAD; FIFO_SIZE];
 
@@ -2488,7 +2487,7 @@ pub trait Instance {
     ///
     /// Copies the contents of the SPI receive FIFO into `words`. This function
     /// doesn't perform flushing. If you want to read the response to
-    /// something you have written before, consider using [`transfer`]
+    /// something you have written before, consider using [`Self::transfer`]
     /// instead.
     // FIXME: Using something like `core::slice::from_raw_parts` and
     // `copy_from_slice` on the receive registers works only for the esp32 and

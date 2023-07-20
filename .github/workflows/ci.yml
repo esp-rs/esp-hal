@@ -59,7 +59,7 @@ jobs:
         run: cd esp-hal-smartled/ && cargo +esp check --features=esp32s3
       # Ensure documentation can be built (requires a chip feature!)
       - name: rustdoc
-        run: cd esp-hal-smartled/ && cargo doc --features=esp32c3
+        run: cd esp-hal-smartled/ && cargo doc --features=esp32c3,esp-hal-common/eh1
 
   esp32-hal:
     runs-on: ubuntu-latest
