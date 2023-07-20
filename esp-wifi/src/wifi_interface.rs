@@ -7,7 +7,7 @@ use embedded_svc::ipv4;
 use smoltcp::iface::{Interface, SocketHandle, SocketSet};
 use smoltcp::socket::{dhcpv4::Socket as Dhcpv4Socket, tcp::Socket as TcpSocket};
 use smoltcp::time::Instant;
-use smoltcp::wire::{IpAddress, IpCidr, IpEndpoint, Ipv4Address};
+use smoltcp::wire::{IpAddress, IpCidr, IpEndpoint, Ipv4Address, DnsQueryType};
 
 use crate::current_millis;
 use crate::wifi::{get_ap_mac, get_sta_mac, WifiDevice, WifiMode};
@@ -23,6 +23,7 @@ pub struct WifiStack<'a> {
     pub(crate) network_config: RefCell<ipv4::Configuration>,
     pub(crate) ip_info: RefCell<Option<ipv4::IpInfo>>,
     pub(crate) dhcp_socket_handle: RefCell<Option<SocketHandle>>,
+    dns_socket_handle: RefCell<Option<SocketHandle>>,
 }
 
 impl<'a> WifiStack<'a> {
@@ -33,10 +34,12 @@ impl<'a> WifiStack<'a> {
         current_millis_fn: fn() -> u64,
     ) -> WifiStack<'a> {
         let mut dhcp_socket_handle: Option<SocketHandle> = None;
+        let mut dns_socket_handle: Option<SocketHandle> = None;
 
         for (handle, socket) in sockets.iter_mut() {
             match socket {
                 smoltcp::socket::Socket::Dhcpv4(_) => dhcp_socket_handle = Some(handle),
+                smoltcp::socket::Socket::Dns(_) => dns_socket_handle = Some(handle),
                 _ => {}
             }
         }
@@ -55,6 +58,7 @@ impl<'a> WifiStack<'a> {
             sockets: RefCell::new(sockets),
             current_millis_fn,
             local_port: RefCell::new(41000),
+            dns_socket_handle: RefCell::new(dns_socket_handle),
         };
 
         this.reset();
@@ -198,13 +202,14 @@ impl<'a> WifiStack<'a> {
                         interface.routes_mut().remove_default_ipv4_route();
                     }
                     smoltcp::socket::dhcpv4::Event::Configured(config) => {
+                        let dns = config.dns_servers.get(0);
                         *self.ip_info.borrow_mut() = Some(ipv4::IpInfo {
                             ip: config.address.address().0.into(),
                             subnet: ipv4::Subnet {
                                 gateway: config.router.unwrap().0.into(),
                                 mask: ipv4::Mask(config.address.prefix_len()),
                             },
-                            dns: config.dns_servers.get(0).map(|x| x.0.into()),
+                            dns: dns.map(|x| x.0.into()),
                             secondary_dns: config.dns_servers.get(1).map(|x| x.0.into()),
                         });
 
@@ -217,6 +222,13 @@ impl<'a> WifiStack<'a> {
                                 .routes_mut()
                                 .add_default_ipv4_route(route)
                                 .unwrap();
+                        }
+
+                        if let (Some(&dns), Some(dns_handle)) =
+                            (dns, *self.dns_socket_handle.borrow()) {
+
+                            sockets.get_mut::<smoltcp::socket::dns::Socket>(dns_handle)
+                                .update_servers(&[dns.into()]);
                         }
                     }
                 }
@@ -269,6 +281,81 @@ impl<'a> WifiStack<'a> {
         UdpSocket {
             socket_handle,
             network: self,
+        }
+    }
+
+    pub fn is_dns_configured(&self) -> bool {
+        self.dns_socket_handle.borrow().is_some()
+    }
+
+    pub fn configure_dns(
+        &'a self,
+        servers: &[IpAddress],
+        query_storage: &'a mut [Option<smoltcp::socket::dns::DnsQuery>]
+    ) {
+        if let Some(old_handle) = self.dns_socket_handle.take() {
+            self.with_mut(|_interface, _device, sockets| sockets.remove(old_handle));
+            // the returned socket get dropped and frees a slot for the new one
+        }
+
+        let dns = smoltcp::socket::dns::Socket::new(servers, query_storage);
+        let handle = self.with_mut(|_interface, _device, sockets| sockets.add(dns));
+        self.dns_socket_handle.replace(Some(handle));
+    }
+
+    pub fn update_dns_servers(&self, servers: &[IpAddress]) {
+        if let Some(dns_handle) = *self.dns_socket_handle.borrow_mut() {
+            self.with_mut(|_interface, _device, sockets| {
+                sockets.get_mut::<smoltcp::socket::dns::Socket>(dns_handle)
+                    .update_servers(servers);
+            });
+        }
+    }
+
+    pub fn dns_query(
+        &self,
+        name: &str,
+        query_type: DnsQueryType,
+    ) -> Result<heapless::Vec<IpAddress, 1>, WifiStackError> {
+        use smoltcp::socket::dns;
+
+        match query_type { // check if name is already an IP
+            DnsQueryType::A => {
+                if let Ok(ip) = name.parse::<Ipv4Address>() {
+                    return Ok([ip.into()].into_iter().collect());
+                }
+            }
+            #[cfg(feature = "ipv6")]
+            DnsQueryType::Aaaa => {
+                if let Ok(ip) = name.parse::<smoltcp::wire::Ipv6Address>() {
+                    return Ok([ip.into()].into_iter().collect());
+                }
+            }
+            _ => {}
+        }
+
+        let Some(dns_handle) = *self.dns_socket_handle.borrow() else {
+            return Err(WifiStackError::DnsNotConfigured);
+        };
+
+        let query = self.with_mut(|interface, _device, sockets| {
+            sockets.get_mut::<dns::Socket>(dns_handle)
+                .start_query(interface.context(), name, query_type)
+                .map_err(|e| WifiStackError::DnsQueryError(e))
+        })?;
+
+        loop {
+            self.work();
+
+            let result = self.with_mut(|_interface, _device, sockets| {
+                sockets.get_mut::<dns::Socket>(dns_handle).get_query_result(query)
+            });
+
+            match result {
+                Ok(addrs) => return Ok(addrs), // query finished
+                Err(dns::GetQueryResultError::Pending) => {}, // query not finished
+                Err(_) => return Err(WifiStackError::DnsQueryFailed)
+            }
         }
     }
 
@@ -342,6 +429,9 @@ pub enum WifiStackError {
     InitializationError(crate::InitializationError),
     DeviceError(crate::wifi::WifiError),
     MissingIp,
+    DnsNotConfigured,
+    DnsQueryError(smoltcp::socket::dns::StartQueryError),
+    DnsQueryFailed
 }
 
 impl Display for WifiStackError {
