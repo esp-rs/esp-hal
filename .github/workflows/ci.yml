@@ -95,7 +95,7 @@ jobs:
         run: cd esp32-hal/ && cargo check --example=embassy_i2c --features=embassy,embassy-time-timg0,async
       # Ensure documentation can be built
       - name: rustdoc
-        run: cd esp32-hal/ && cargo doc
+        run: cd esp32-hal/ && cargo doc --features=eh1
 
   esp32c2-hal:
     runs-on: ubuntu-latest
@@ -139,7 +139,7 @@ jobs:
         run: cd esp32c2-hal/ && cargo check --example=interrupt_preemption --features=interrupt-preemption
       # Ensure documentation can be built
       - name: rustdoc
-        run: cd esp32c2-hal/ && cargo doc
+        run: cd esp32c2-hal/ && cargo doc --features=eh1
 
   esp32c3-hal:
     runs-on: ubuntu-latest
@@ -185,7 +185,7 @@ jobs:
         run: cd esp32c3-hal/ && cargo check --example=interrupt_preemption --features=interrupt-preemption
       # Ensure documentation can be built
       - name: rustdoc
-        run: cd esp32c3-hal/ && cargo doc
+        run: cd esp32c3-hal/ && cargo doc --features=eh1
 
   esp32c6-hal:
     runs-on: ubuntu-latest
@@ -229,7 +229,7 @@ jobs:
         run: cd esp32c6-hal/ && cargo check --example=interrupt_preemption --features=interrupt-preemption
       # Ensure documentation can be built
       - name: rustdoc
-        run: cd esp32c6-hal/ && cargo doc
+        run: cd esp32c6-hal/ && cargo doc --features=eh1
 
   esp32h2-hal:
     runs-on: ubuntu-latest
@@ -273,7 +273,7 @@ jobs:
         run: cd esp32h2-hal/ && cargo check --example=interrupt_preemption --features=interrupt-preemption
       # Ensure documentation can be built
       - name: rustdoc
-        run: cd esp32h2-hal/ && cargo doc
+        run: cd esp32h2-hal/ && cargo doc --features=eh1
 
   esp32s2-hal:
     runs-on: ubuntu-latest
@@ -312,7 +312,7 @@ jobs:
         run: cd esp32s2-hal/ && cargo check --example=embassy_i2c --features=embassy,embassy-time-timg0,async
       # Ensure documentation can be built
       - name: rustdoc
-        run: cd esp32s2-hal/ && cargo doc
+        run: cd esp32s2-hal/ && cargo doc --features=eh1
 
   esp32s3-hal:
     runs-on: ubuntu-latest
@@ -356,7 +356,7 @@ jobs:
         run: cd esp32s3-hal/ && cargo check --example=octal_psram --features=opsram_2m --release # This example requires release!
       # Ensure documentation can be built
       - name: rustdoc
-        run: cd esp32s3-hal/ && cargo doc
+        run: cd esp32s3-hal/ && cargo doc --features=eh1
 
   esp-riscv-rt:
     runs-on: ubuntu-latest
