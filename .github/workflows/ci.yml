@@ -425,21 +425,21 @@ jobs:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@v1
         with:
-          toolchain: stable
-          components: clippy
+          toolchain: nightly
+          components: clippy, rust-src
       - uses: Swatinem/rust-cache@v2
 
       # Run clippy on all packages targeting RISC-V.
       - name: clippy (esp-riscv-rt)
-        run: cargo +stable clippy --manifest-path=esp-riscv-rt/Cargo.toml -- --no-deps
+        run: cd esp-riscv-rt/ && cargo +nightly clippy -- --no-deps
       - name: clippy (esp32c2-hal)
-        run: cargo +stable clippy --manifest-path=esp32c2-hal/Cargo.toml -- --no-deps
+        run: cd esp32c2-hal/ && cargo +nightly clippy -- --no-deps
       - name: clippy (esp32c3-hal)
-        run: cargo +stable clippy --manifest-path=esp32c3-hal/Cargo.toml -- --no-deps
+        run: cd esp32c3-hal/ && cargo +nightly clippy -- --no-deps
       - name: clippy (esp32c6-hal)
-        run: cargo +stable clippy --manifest-path=esp32c6-hal/Cargo.toml -- --no-deps
+        run: cd esp32c6-hal/ && cargo +nightly clippy -- --no-deps
       - name: clippy (esp32h2-hal)
-        run: cargo +stable clippy --manifest-path=esp32h2-hal/Cargo.toml -- --no-deps
+        run: cd esp32h2-hal/ && cargo +nightly clippy -- --no-deps
 
   clippy-xtensa:
     runs-on: ubuntu-latest
@@ -456,11 +456,11 @@ jobs:
       # The ESP32-S2 requires some additional information in order for the
       # atomic emulation crate to build.
       - name: clippy (esp32-hal)
-        run: cargo +esp clippy --manifest-path=esp32-hal/Cargo.toml -- --no-deps
+        run: cd esp32-hal/ && cargo +esp clippy -- --no-deps
       - name: clippy (esp32s2-hal)
-        run: cargo +esp clippy --manifest-path=esp32s2-hal/Cargo.toml -- --no-deps
+        run: cd esp32s2-hal/ && cargo +esp clippy -- --no-deps
       - name: clippy (esp32s3-hal)
-        run: cargo +esp clippy --manifest-path=esp32s3-hal/Cargo.toml -- --no-deps
+        run: cd esp32s3-hal/ && cargo +esp clippy -- --no-deps
 
   rustfmt:
     runs-on: ubuntu-latest
