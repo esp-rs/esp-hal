@@ -1,6 +1,6 @@
 use super::{Ext0WakeupSource, Ext1WakeupSource, TimerWakeupSource, WakeSource, WakeTriggers};
 use crate::{
-    gpio::{Pin, RTCPin},
+    gpio::{Pin, RTCPin, RtcFunction},
     rtc_cntl::{sleep::WakeupLevel, Clock, RtcClock},
     Rtc,
 };
@@ -72,7 +72,9 @@ impl<'a, P: Pin + RTCPin> WakeSource for Ext0WakeupSource<'a, P> {
         triggers.set_ext0(true);
 
         // set pin to RTC function
-        self.pin.borrow_mut().rtc_set_config(true, true, 0);
+        self.pin
+            .borrow_mut()
+            .rtc_set_config(true, true, RtcFunction::Rtc);
 
         unsafe {
             let rtc_io = &*esp32::RTC_IO::ptr();
@@ -94,7 +96,9 @@ impl<'a, P: Pin + RTCPin> Drop for Ext0WakeupSource<'a, P> {
         // should we have saved the pin configuration first?
         // set pin back to IO_MUX (input_enable and func have no effect when pin is sent
         // to IO_MUX)
-        self.pin.borrow_mut().rtc_set_config(true, false, 0);
+        self.pin
+            .borrow_mut()
+            .rtc_set_config(true, false, RtcFunction::Rtc);
     }
 }
 
@@ -108,7 +112,7 @@ impl<'a> WakeSource for Ext1WakeupSource<'a> {
         let mut pins = self.pins.borrow_mut();
         let mut bits = 0u32;
         for pin in pins.iter_mut() {
-            pin.rtc_set_config(true, true, 0);
+            pin.rtc_set_config(true, true, RtcFunction::Rtc);
             bits |= 1 << pin.rtc_number();
         }
 
@@ -131,7 +135,7 @@ impl<'a> Drop for Ext1WakeupSource<'a> {
         // to IO_MUX)
         let mut pins = self.pins.borrow_mut();
         for pin in pins.iter_mut() {
-            pin.rtc_set_config(true, false, 0);
+            pin.rtc_set_config(true, false, RtcFunction::Rtc);
         }
     }
 }
