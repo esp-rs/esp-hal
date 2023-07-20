@@ -1,4 +1,18 @@
-use crate::{regi2c_write_mask, rom::rom_i2c_writeReg_Mask, rtc_cntl::sleep::WakeTriggers, Rtc};
+use super::{
+    Ext0WakeupSource,
+    Ext1WakeupSource,
+    TimerWakeupSource,
+    WakeSource,
+    WakeTriggers,
+    WakeupLevel,
+};
+use crate::{
+    gpio::{Pin, RTCPin, RtcFunction},
+    regi2c_write_mask,
+    rom::rom_i2c_writeReg_Mask,
+    rtc_cntl::{Clock, RtcClock},
+    Rtc,
+};
 
 const I2C_DIG_REG: u32 = 0x6d;
 const I2C_DIG_REG_HOSTID: u32 = 1;
@@ -66,6 +80,117 @@ pub const DG_PERI_POWERUP_CYCLES: u8 = OTHER_BLOCKS_POWERUP;
 pub const DG_PERI_WAIT_CYCLES: u16 = OTHER_BLOCKS_WAIT;
 pub const RTC_MEM_POWERUP_CYCLES: u8 = OTHER_BLOCKS_POWERUP;
 pub const RTC_MEM_WAIT_CYCLES: u16 = OTHER_BLOCKS_WAIT;
+
+impl WakeSource for TimerWakeupSource {
+    fn apply(&self, rtc: &Rtc, triggers: &mut WakeTriggers, _sleep_config: &mut RtcSleepConfig) {
+        triggers.set_timer(true);
+        let rtc_cntl = unsafe { &*esp32s3::RTC_CNTL::ptr() };
+        let clock_freq = RtcClock::get_slow_freq();
+        // TODO: maybe add sleep time adjustlemnt like idf
+        // TODO: maybe add check to prevent overflow?
+        let clock_hz = clock_freq.frequency().to_Hz() as u64;
+        let ticks = self.duration.as_micros() as u64 * clock_hz / 1_000_000u64;
+        // "alarm" time in slow rtc ticks
+        let now = rtc.get_time_raw();
+        let time_in_ticks = now + ticks;
+        unsafe {
+            rtc_cntl
+                .slp_timer0
+                .write(|w| w.slp_val_lo().bits((time_in_ticks & 0xffffffff) as u32));
+
+            rtc_cntl
+                .int_clr_rtc
+                .write(|w| w.main_timer_int_clr().set_bit());
+
+            #[rustfmt::skip]
+            rtc_cntl.slp_timer1.write(|w| { w
+                .slp_val_hi().bits(((time_in_ticks >> 32) & 0xffff) as u16)
+                .main_timer_alarm_en().set_bit()
+            });
+        }
+    }
+}
+
+impl<'a, P: Pin + RTCPin> WakeSource for Ext0WakeupSource<'a, P> {
+    fn apply(&self, _rtc: &Rtc, triggers: &mut WakeTriggers, sleep_config: &mut RtcSleepConfig) {
+        // don't power down RTC peripherals
+        sleep_config.set_rtc_peri_pd_en(false);
+        triggers.set_ext0(true);
+
+        // set pin to RTC function
+        self.pin
+            .borrow_mut()
+            .rtc_set_config(true, true, RtcFunction::Rtc);
+
+        unsafe {
+            let rtc_io = &*esp32s3::RTC_IO::ptr();
+            // set pin register field
+            rtc_io
+                .ext_wakeup0
+                .modify(|_, w| w.sel().bits(self.pin.borrow().rtc_number()));
+            // set level register field
+            let rtc_cntl = &*esp32s3::RTC_CNTL::ptr();
+            rtc_cntl
+                .ext_wakeup_conf
+                .modify(|_r, w| w.ext_wakeup0_lv().bit(self.level == WakeupLevel::High));
+        }
+    }
+}
+
+impl<'a, P: Pin + RTCPin> Drop for Ext0WakeupSource<'a, P> {
+    fn drop(&mut self) {
+        // should we have saved the pin configuration first?
+        // set pin back to IO_MUX (input_enable and func have no effect when pin is sent
+        // to IO_MUX)
+        self.pin
+            .borrow_mut()
+            .rtc_set_config(true, false, RtcFunction::Rtc);
+    }
+}
+
+impl<'a> WakeSource for Ext1WakeupSource<'a> {
+    fn apply(&self, _rtc: &Rtc, triggers: &mut WakeTriggers, sleep_config: &mut RtcSleepConfig) {
+        // don't power down RTC peripherals
+        sleep_config.set_rtc_peri_pd_en(false);
+        triggers.set_ext1(true);
+
+        // set pins to RTC function
+        let mut pins = self.pins.borrow_mut();
+        let mut bits = 0u32;
+        for pin in pins.iter_mut() {
+            pin.rtc_set_config(true, true, RtcFunction::Rtc);
+            bits |= 1 << pin.rtc_number();
+        }
+
+        unsafe {
+            let rtc_cntl = &*esp32s3::RTC_CNTL::ptr();
+            // clear previous wakeup status
+            rtc_cntl
+                .ext_wakeup1
+                .modify(|_, w| w.ext_wakeup1_status_clr().set_bit());
+            // set pin register field
+            rtc_cntl
+                .ext_wakeup1
+                .modify(|_, w| w.ext_wakeup1_sel().bits(bits));
+            // set level register field
+            rtc_cntl
+                .ext_wakeup_conf
+                .modify(|_r, w| w.ext_wakeup1_lv().bit(self.level == WakeupLevel::High));
+        }
+    }
+}
+
+impl<'a> Drop for Ext1WakeupSource<'a> {
+    fn drop(&mut self) {
+        // should we have saved the pin configuration first?
+        // set pin back to IO_MUX (input_enable and func have no effect when pin is sent
+        // to IO_MUX)
+        let mut pins = self.pins.borrow_mut();
+        for pin in pins.iter_mut() {
+            pin.rtc_set_config(true, false, RtcFunction::Rtc);
+        }
+    }
+}
 
 bitfield::bitfield! {
     #[derive(Clone, Copy)]
