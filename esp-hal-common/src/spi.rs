@@ -756,6 +756,7 @@ pub mod dma {
         dma::{
             Channel,
             ChannelTypes,
+            DmaError,
             DmaTransfer,
             DmaTransferRxTx,
             RxPrivate,
@@ -846,7 +847,12 @@ pub mod dma {
     {
         /// Wait for the DMA transfer to complete and return the buffers and the
         /// SPI instance.
-        fn wait(mut self) -> (RXBUF, TXBUF, SpiDma<'d, T, C, M>) {
+        fn wait(
+            mut self,
+        ) -> Result<
+            (RXBUF, TXBUF, SpiDma<'d, T, C, M>),
+            (DmaError, RXBUF, TXBUF, SpiDma<'d, T, C, M>),
+        > {
             self.spi_dma.spi.flush().ok(); // waiting for the DMA transfer is not enough
 
             // `DmaTransfer` needs to have a `Drop` implementation, because we accept
@@ -860,8 +866,14 @@ pub mod dma {
                 let rbuffer = core::ptr::read(&self.rbuffer);
                 let tbuffer = core::ptr::read(&self.tbuffer);
                 let payload = core::ptr::read(&self.spi_dma);
+                let err = (&self).spi_dma.channel.rx.has_error()
+                    || (&self).spi_dma.channel.tx.has_error();
                 mem::forget(self);
-                (rbuffer, tbuffer, payload)
+                if err {
+                    Err((DmaError::DescriptorError, rbuffer, tbuffer, payload))
+                } else {
+                    Ok((rbuffer, tbuffer, payload))
+                }
             }
         }
 
@@ -906,7 +918,10 @@ pub mod dma {
     {
         /// Wait for the DMA transfer to complete and return the buffers and the
         /// SPI instance.
-        fn wait(mut self) -> (BUFFER, SpiDma<'d, T, C, M>) {
+        fn wait(
+            mut self,
+        ) -> Result<(BUFFER, SpiDma<'d, T, C, M>), (DmaError, BUFFER, SpiDma<'d, T, C, M>)>
+        {
             self.spi_dma.spi.flush().ok(); // waiting for the DMA transfer is not enough
 
             // `DmaTransfer` needs to have a `Drop` implementation, because we accept
@@ -919,8 +934,14 @@ pub mod dma {
             unsafe {
                 let buffer = core::ptr::read(&self.buffer);
                 let payload = core::ptr::read(&self.spi_dma);
+                let err = (&self).spi_dma.channel.rx.has_error()
+                    || (&self).spi_dma.channel.tx.has_error();
                 mem::forget(self);
-                (buffer, payload)
+                if err {
+                    Err((DmaError::DescriptorError, buffer, payload))
+                } else {
+                    Ok((buffer, payload))
+                }
             }
         }
 
@@ -953,6 +974,17 @@ pub mod dma {
         pub(crate) spi: PeripheralRef<'d, T>,
         pub(crate) channel: Channel<'d, C>,
         _mode: PhantomData<M>,
+    }
+
+    impl<'d, T, C, M> core::fmt::Debug for SpiDma<'d, T, C, M>
+    where
+        C: ChannelTypes,
+        C::P: SpiPeripheral,
+        M: DuplexMode,
+    {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            f.debug_struct("SpiDma").finish()
+        }
     }
 
     impl<'d, T, C, M> SpiDma<'d, T, C, M>

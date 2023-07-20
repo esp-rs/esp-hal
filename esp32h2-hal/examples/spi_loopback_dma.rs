@@ -109,7 +109,7 @@ fn main() -> ! {
         // here we could do something else while DMA transfer is in progress
         // the buffers and spi is moved into the transfer and we can get it back via
         // `wait`
-        (receive, send, spi) = transfer.wait();
+        (receive, send, spi) = transfer.wait().unwrap();
         println!(
             "{:x?} .. {:x?}",
             &receive[..10],
