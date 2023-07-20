@@ -1,4 +1,4 @@
-use xtensa_lx::interrupt::{self, InterruptNumber};
+use xtensa_lx::interrupt;
 use xtensa_lx_rt::exception::Context;
 
 use crate::{
@@ -93,7 +93,7 @@ pub fn disable(core: Cpu, interrupt: Interrupt) {
 /// Clear the given CPU interrupt
 pub fn clear(_core: Cpu, which: CpuInterrupt) {
     unsafe {
-        xtensa_lx::interrupt::clear(1 << which as u32);
+        interrupt::clear(1 << which as u32);
     }
 }
 
@@ -161,25 +161,23 @@ pub fn get_status(core: Cpu) -> u128 {
 }
 
 #[cfg(esp32)]
-unsafe fn core0_interrupt_peripheral() -> *const crate::peripherals::dport::RegisterBlock {
-    crate::peripherals::DPORT::PTR
+unsafe fn core0_interrupt_peripheral() -> *const peripherals::dport::RegisterBlock {
+    peripherals::DPORT::PTR
 }
 
 #[cfg(esp32)]
-unsafe fn core1_interrupt_peripheral() -> *const crate::peripherals::dport::RegisterBlock {
-    crate::peripherals::DPORT::PTR
+unsafe fn core1_interrupt_peripheral() -> *const peripherals::dport::RegisterBlock {
+    peripherals::DPORT::PTR
 }
 
 #[cfg(any(esp32s2, esp32s3))]
-unsafe fn core0_interrupt_peripheral() -> *const crate::peripherals::interrupt_core0::RegisterBlock
-{
-    crate::peripherals::INTERRUPT_CORE0::PTR
+unsafe fn core0_interrupt_peripheral() -> *const peripherals::interrupt_core0::RegisterBlock {
+    peripherals::INTERRUPT_CORE0::PTR
 }
 
 #[cfg(esp32s3)]
-unsafe fn core1_interrupt_peripheral() -> *const crate::peripherals::interrupt_core1::RegisterBlock
-{
-    crate::peripherals::INTERRUPT_CORE1::PTR
+unsafe fn core1_interrupt_peripheral() -> *const peripherals::interrupt_core1::RegisterBlock {
+    peripherals::INTERRUPT_CORE1::PTR
 }
 
 #[cfg(feature = "vectored")]
@@ -188,6 +186,7 @@ pub use vectored::*;
 #[cfg(feature = "vectored")]
 mod vectored {
     use procmacros::ram;
+    use xtensa_lx::interrupt::InterruptNumber;
 
     use super::*;
     use crate::get_core;
@@ -298,9 +297,7 @@ mod vectored {
         unsafe {
             map(get_core(), interrupt, cpu_interrupt);
 
-            xtensa_lx::interrupt::enable_mask(
-                xtensa_lx::interrupt::get_mask() | 1 << cpu_interrupt as u32,
-            );
+            interrupt::enable_mask(interrupt::get_mask() | 1 << cpu_interrupt as u32);
         }
         Ok(())
     }
