@@ -510,7 +510,7 @@ pub fn _setup_interrupts() {
         // at least after the 2nd stage bootloader there are some interrupts enabled
         // (e.g. UART)
         for peripheral_interrupt in 0..255 {
-            crate::soc::peripherals::Interrupt::try_from(peripheral_interrupt)
+            Interrupt::try_from(peripheral_interrupt)
                 .map(|intr| {
                     #[cfg(multi_core)]
                     disable(Cpu::AppCpu, intr);
@@ -548,16 +548,16 @@ pub fn disable(_core: Cpu, interrupt: Interrupt) {
 pub fn get_status(_core: Cpu) -> u128 {
     #[cfg(large_intr_status)]
     unsafe {
-        ((*crate::peripherals::INTERRUPT_CORE0::PTR)
+        ((*peripherals::INTERRUPT_CORE0::PTR)
             .intr_status_reg_0
             .read()
             .bits() as u128)
-            | ((*crate::peripherals::INTERRUPT_CORE0::PTR)
+            | ((*peripherals::INTERRUPT_CORE0::PTR)
                 .intr_status_reg_1
                 .read()
                 .bits() as u128)
                 << 32
-            | ((*crate::peripherals::INTERRUPT_CORE0::PTR)
+            | ((*peripherals::INTERRUPT_CORE0::PTR)
                 .int_status_reg_2
                 .read()
                 .bits() as u128)
@@ -566,11 +566,11 @@ pub fn get_status(_core: Cpu) -> u128 {
 
     #[cfg(not(large_intr_status))]
     unsafe {
-        ((*crate::peripherals::INTERRUPT_CORE0::PTR)
+        ((*peripherals::INTERRUPT_CORE0::PTR)
             .intr_status_reg_0
             .read()
             .bits() as u128)
-            | ((*crate::peripherals::INTERRUPT_CORE0::PTR)
+            | ((*peripherals::INTERRUPT_CORE0::PTR)
                 .intr_status_reg_1
                 .read()
                 .bits() as u128)
@@ -593,6 +593,7 @@ pub unsafe fn map(_core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
 
 /// Get cpu interrupt assigned to peripheral interrupt
 #[inline]
+#[cfg(feature = "vectored")]
 unsafe fn get_assigned_cpu_interrupt(interrupt: Interrupt) -> CpuInterrupt {
     let interrupt_number = interrupt as isize;
     let intr_map_base = crate::soc::registers::INTERRUPT_MAP_BASE as *mut u32;
@@ -605,18 +606,20 @@ unsafe fn get_assigned_cpu_interrupt(interrupt: Interrupt) -> CpuInterrupt {
 #[cfg(not(plic))]
 mod classic {
     use super::{CpuInterrupt, InterruptKind, Priority};
-    use crate::Cpu;
+    use crate::{peripherals, Cpu};
 
+    #[cfg(feature = "vectored")]
     pub(super) const PRIORITY_TO_INTERRUPT: [usize; 15] =
         [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
+    #[cfg(feature = "vectored")]
     pub(super) const INTERRUPT_TO_PRIORITY: [usize; 15] =
         [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
     /// Enable a CPU interrupt
     pub unsafe fn enable_cpu_interrupt(which: CpuInterrupt) {
         let cpu_interrupt_number = which as isize;
-        let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
+        let intr = &*peripherals::INTERRUPT_CORE0::PTR;
         intr.cpu_int_enable
             .modify(|r, w| w.bits((1 << cpu_interrupt_number) | r.bits()));
     }
@@ -628,7 +631,7 @@ mod classic {
     /// bits.
     pub fn set_kind(_core: Cpu, which: CpuInterrupt, kind: InterruptKind) {
         unsafe {
-            let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
+            let intr = &*peripherals::INTERRUPT_CORE0::PTR;
             let cpu_interrupt_number = which as isize;
 
             let interrupt_type = match kind {
@@ -650,7 +653,7 @@ mod classic {
     /// default). Avoid changing the priority of interrupts 1 - 15 when
     /// interrupt vectoring is enabled.
     pub unsafe fn set_priority(_core: Cpu, which: CpuInterrupt, priority: Priority) {
-        let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
+        let intr = &*peripherals::INTERRUPT_CORE0::PTR;
         let cpu_interrupt_number = which as isize;
         let intr_prio_base = intr.cpu_int_pri_0.as_ptr();
 
@@ -664,7 +667,7 @@ mod classic {
     pub fn clear(_core: Cpu, which: CpuInterrupt) {
         unsafe {
             let cpu_interrupt_number = which as isize;
-            let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
+            let intr = &*peripherals::INTERRUPT_CORE0::PTR;
             intr.cpu_int_clear
                 .write(|w| w.bits(1 << cpu_interrupt_number));
         }
@@ -672,8 +675,9 @@ mod classic {
 
     /// Get interrupt priority
     #[inline]
+    #[cfg(feature = "vectored")]
     pub(super) unsafe fn get_priority(cpu_interrupt: CpuInterrupt) -> Priority {
-        let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
+        let intr = &*peripherals::INTERRUPT_CORE0::PTR;
         let intr_prio_base = intr.cpu_int_pri_0.as_ptr();
 
         let prio = intr_prio_base
@@ -689,7 +693,7 @@ mod classic {
         use super::mcause;
         use crate::riscv;
         let interrupt_id: usize = mcause::read().code(); // MSB is whether its exception or interrupt.
-        let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
+        let intr = &*peripherals::INTERRUPT_CORE0::PTR;
         let interrupt_priority = intr
             .cpu_int_pri_0
             .as_ptr()
@@ -714,7 +718,7 @@ mod classic {
         unsafe {
             riscv::interrupt::disable();
         }
-        let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
+        let intr = &*peripherals::INTERRUPT_CORE0::PTR;
         intr.cpu_int_thresh.write(|w| w.bits(stored_prio));
     }
 }
@@ -727,9 +731,11 @@ mod plic {
     // don't use interrupts reserved for CLIC (0,3,4,7)
     // for some reason also CPU interrupt 8 doesn't work by default since it's
     // disabled after reset - so don't use that, too
+    #[cfg(feature = "vectored")]
     pub(super) const PRIORITY_TO_INTERRUPT: [usize; 15] =
         [1, 2, 5, 6, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
 
+    #[cfg(feature = "vectored")]
     pub(super) const INTERRUPT_TO_PRIORITY: [usize; 19] = [
         1, 2, 0, 0, 3, 4, 0, 0, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
     ];
@@ -797,6 +803,7 @@ mod plic {
 
     /// Get interrupt priority
     #[inline]
+    #[cfg(feature = "vectored")]
     pub(super) unsafe fn get_priority(cpu_interrupt: CpuInterrupt) -> Priority {
         let plic_mxint_pri_ptr = PLIC_MXINT0_PRI_REG as *mut u32;
 
