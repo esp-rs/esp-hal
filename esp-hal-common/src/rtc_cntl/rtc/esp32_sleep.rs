@@ -117,10 +117,12 @@ impl<'a> WakeSource for Ext1WakeupSource<'a> {
         }
 
         unsafe {
-            // set pin register field
-            // set level register field
             let rtc_cntl = &*esp32::RTC_CNTL::ptr();
+            // clear previous wakeup status
+            rtc_cntl.ext_wakeup1.modify(|_, w| w.status_clr().set_bit());
+            // set pin register field
             rtc_cntl.ext_wakeup1.modify(|_, w| w.sel().bits(bits));
+            // set level register field
             rtc_cntl
                 .ext_wakeup_conf
                 .modify(|_r, w| w.ext_wakeup1_lv().bit(self.level == WakeupLevel::High));
