@@ -51,7 +51,7 @@ extern "C" {
 /// never returns.
 #[link_section = ".init.rust"]
 #[export_name = "_start_rust"]
-pub unsafe extern "C" fn start_rust(a0: usize, a1: usize, a2: usize) -> ! {
+extern "C" fn start_rust(a0: usize, a1: usize, a2: usize) -> ! {
     extern "Rust" {
         // This symbol will be provided by the user via `#[entry]`
         fn main(a0: usize, a1: usize, a2: usize) -> !;
@@ -62,11 +62,13 @@ pub unsafe extern "C" fn start_rust(a0: usize, a1: usize, a2: usize) -> ! {
 
     }
 
-    __post_init();
+    unsafe {
+        __post_init();
 
-    _setup_interrupts();
+        _setup_interrupts();
 
-    main(a0, a1, a2);
+        main(a0, a1, a2);
+    }
 }
 
 /// Registers saved in trap handler
@@ -118,7 +120,7 @@ pub struct TrapFrame {
 /// ExceptionHandler or one of the core interrupt handlers is called.
 #[link_section = ".trap.rust"]
 #[export_name = "_start_trap_rust"]
-pub unsafe extern "C" fn start_trap_rust(trap_frame: *const TrapFrame) {
+extern "C" fn start_trap_rust(trap_frame: *const TrapFrame) {
     extern "C" {
         fn ExceptionHandler(trap_frame: &TrapFrame);
         fn DefaultHandler();
