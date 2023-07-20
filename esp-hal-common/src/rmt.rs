@@ -28,7 +28,7 @@
 //!   signals.
 //! * The **ESP32-S2** has 4 channels, each of them can be either receiver or
 //!   transmitter.
-//! * The **ESP32-S3** has 8 channels, `Channel0`-`Channel3` hardcdoded for
+//! * The **ESP32-S3** has 8 channels, `Channel0`-`Channel3` hardcoded for
 //!   transmitting signals and `Channel4`-`Channel7` hardcoded for receiving
 //!   signals.
 //!
@@ -103,7 +103,7 @@ pub enum Error {
 
 /// Convenience representation of a pulse code entry.
 ///
-/// Allows for the assignment of two levels and their lenghts
+/// Allows for the assignment of two levels and their lengths
 #[derive(Clone, Copy, Debug, Default)]
 pub struct PulseCode {
     /// Logical output level in the first pulse code interval
@@ -386,21 +386,21 @@ where
     }
 }
 
-/// An in-progress continous TX transaction
-pub struct ContinousTxTransaction<C, const CHANNEL: u8>
+/// An in-progress continuous TX transaction
+pub struct ContinuousTxTransaction<C, const CHANNEL: u8>
 where
     C: TxChannel<CHANNEL>,
 {
     channel: C,
 }
 
-impl<C, const CHANNEL: u8> ContinousTxTransaction<C, CHANNEL>
+impl<C, const CHANNEL: u8> ContinuousTxTransaction<C, CHANNEL>
 where
     C: TxChannel<CHANNEL>,
 {
     /// Stop transaction when the current iteration ends.
     pub fn stop_next(self) -> Result<C, (Error, C)> {
-        <C as private::TxChannelInternal<CHANNEL>>::set_continous(false);
+        <C as private::TxChannelInternal<CHANNEL>>::set_continuous(false);
         <C as private::TxChannelInternal<CHANNEL>>::update();
 
         loop {
@@ -418,7 +418,7 @@ where
 
     /// Stop transaction as soon as possible.
     pub fn stop(self) -> Result<C, (Error, C)> {
-        <C as private::TxChannelInternal<CHANNEL>>::set_continous(false);
+        <C as private::TxChannelInternal<CHANNEL>>::set_continuous(false);
         <C as private::TxChannelInternal<CHANNEL>>::update();
 
         let ptr = (constants::RMT_RAM_START
@@ -791,7 +791,7 @@ pub struct Channel7<const CHANNEL: u8> {}
 
 pub trait TxChannel<const CHANNEL: u8>: private::TxChannelInternal<CHANNEL> {
     /// Start transmitting the given pulse code sequence.
-    /// This returns a [SingleShotTxTransaction] which can be used to wait for
+    /// This returns a [`SingleShotTxTransaction`] which can be used to wait for
     /// the transaction to complete and get back the channel for further
     /// use.
     fn transmit<'a, T: Into<u32> + Copy>(
@@ -809,28 +809,28 @@ pub trait TxChannel<const CHANNEL: u8>: private::TxChannelInternal<CHANNEL> {
         }
     }
 
-    /// Start transmitting the given pulse code continously.
-    /// This returns a [ContinousTxTransaction] which can be used to stop the
+    /// Start transmitting the given pulse code continuously.
+    /// This returns a [`ContinuousTxTransaction`] which can be used to stop the
     /// ongoing transmission and get back the channel for further use.
     /// The length of sequence cannot exceed the size of the allocated RMT RAM.
-    fn transmit_continously<'a, T: Into<u32> + Copy>(
+    fn transmit_continuously<'a, T: Into<u32> + Copy>(
         self,
         data: &'a [T],
-    ) -> Result<ContinousTxTransaction<Self, CHANNEL>, Error>
+    ) -> Result<ContinuousTxTransaction<Self, CHANNEL>, Error>
     where
         Self: Sized,
     {
-        self.transmit_continously_with_loopcount(0, data)
+        self.transmit_continuously_with_loopcount(0, data)
     }
 
-    /// Like [transmit_continously] but also sets a loop count.
-    /// [ContinousTxTransaction] can be used to check if the loop count is
+    /// Like [`Self::transmit_continuously`] but also sets a loop count.
+    /// [`ContinuousTxTransaction`] can be used to check if the loop count is
     /// reached.
-    fn transmit_continously_with_loopcount<'a, T: Into<u32> + Copy>(
+    fn transmit_continuously_with_loopcount<'a, T: Into<u32> + Copy>(
         self,
         loopcount: u16,
         data: &'a [T],
-    ) -> Result<ContinousTxTransaction<Self, CHANNEL>, Error>
+    ) -> Result<ContinuousTxTransaction<Self, CHANNEL>, Error>
     where
         Self: Sized,
     {
@@ -839,7 +839,7 @@ pub trait TxChannel<const CHANNEL: u8>: private::TxChannelInternal<CHANNEL> {
         }
 
         let _index = Self::send_raw(data, true, loopcount);
-        Ok(ContinousTxTransaction { channel: self })
+        Ok(ContinuousTxTransaction { channel: self })
     }
 }
 
@@ -928,7 +928,7 @@ mod private {
 
         fn clear_interrupts();
 
-        fn set_continous(continous: bool);
+        fn set_continuous(continuous: bool);
 
         fn set_wrap_mode(wrap: bool);
 
@@ -952,7 +952,7 @@ mod private {
 
         fn is_loopcount_interrupt_set() -> bool;
 
-        fn send_raw<T: Into<u32> + Copy>(data: &[T], continous: bool, repeat: u16) -> usize {
+        fn send_raw<T: Into<u32> + Copy>(data: &[T], continuous: bool, repeat: u16) -> usize {
             Self::clear_interrupts();
 
             let ptr = (constants::RMT_RAM_START
@@ -969,7 +969,7 @@ mod private {
             }
 
             Self::set_threshold((constants::RMT_CHANNEL_RAM_SIZE / 2) as u8);
-            Self::set_continous(continous);
+            Self::set_continuous(continuous);
             Self::set_generate_repeat_interrupt(repeat);
             Self::set_wrap_mode(true);
             Self::set_memsize(1);
@@ -1130,10 +1130,10 @@ mod chip_specific {
                         });
                     }
 
-                    fn set_continous(continous: bool) {
+                    fn set_continuous(continuous: bool) {
                         let rmt = unsafe { &*crate::peripherals::RMT::PTR };
 
-                        rmt.ch_tx_conf0[$num].modify(|_, w| w.tx_conti_mode().bit(continous));
+                        rmt.ch_tx_conf0[$num].modify(|_, w| w.tx_conti_mode().bit(continuous));
                     }
 
                     fn set_wrap_mode(wrap: bool) {
@@ -1414,10 +1414,10 @@ mod chip_specific {
                         });
                     }
 
-                    fn set_continous(continous: bool) {
+                    fn set_continuous(continuous: bool) {
                         let rmt = unsafe { &*crate::peripherals::RMT::PTR };
 
-                        rmt.[< ch $ch_num conf1 >].modify(|_, w| w.tx_conti_mode().bit(continous));
+                        rmt.[< ch $ch_num conf1 >].modify(|_, w| w.tx_conti_mode().bit(continuous));
                     }
 
                     fn set_wrap_mode(_wrap: bool) {

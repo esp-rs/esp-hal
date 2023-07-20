@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Update `embedded-hal-*` alpha packages to their latest versions (#640)
-- Implement the `Clone` and `Copy` traits for the `Rng` driver (#650)
+- Implement the `Clone` and `Copy` traits for the `Rng` driver (#650, #666)
 
 ### Fixed
 
