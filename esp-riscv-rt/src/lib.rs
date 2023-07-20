@@ -15,6 +15,7 @@
 
 // NOTE: Adapted from riscv-rt/src/lib.rs
 #![no_std]
+#![deny(warnings)]
 
 use core::arch::global_asm;
 

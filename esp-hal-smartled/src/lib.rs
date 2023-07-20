@@ -26,8 +26,9 @@
 //! ```
 
 #![no_std]
-#![deny(missing_docs)]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
+#![deny(missing_docs)]
+#![deny(warnings)]
 
 use core::slice::IterMut;
 

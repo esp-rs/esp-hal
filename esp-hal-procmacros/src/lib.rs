@@ -2,6 +2,7 @@
 //! marking interrupt handlers.
 
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
+#![deny(warnings)]
 
 use darling::{ast::NestedMeta, FromMeta};
 use proc_macro::{self, Span, TokenStream};
