@@ -18,7 +18,6 @@ use esp_hal_common::{
     rmt::{PulseCode, TxChannel, TxChannelConfig, TxChannelCreator},
     Rmt,
 };
-use esp_println::println;
 
 #[entry]
 fn main() -> ! {
