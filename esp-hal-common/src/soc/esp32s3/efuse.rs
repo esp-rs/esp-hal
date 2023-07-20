@@ -39,10 +39,10 @@ impl Efuse {
 
     /// Get efuse block version
     ///
-    /// see https://github.com/espressif/esp-idf/blob/dc016f5987/components/hal/efuse_hal.c#L27-L30
+    /// see <https://github.com/espressif/esp-idf/blob/dc016f5987/components/hal/efuse_hal.c#L27-L30>
     pub fn get_block_version() -> (u8, u8) {
-        // see https://github.com/espressif/esp-idf/blob/dc016f5987/components/hal/esp32s3/include/hal/efuse_ll.h#L65-L73
-        // https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32s3/esp_efuse_table.csv#L196
+        // see <https://github.com/espressif/esp-idf/blob/dc016f5987/components/hal/esp32s3/include/hal/efuse_ll.h#L65-L73>
+        // <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32s3/esp_efuse_table.csv#L196>
         (
             Self::read_field_le::<u8>(BLK_VERSION_MAJOR),
             Self::read_field_le::<u8>(BLK_VERSION_MINOR),
@@ -51,7 +51,7 @@ impl Efuse {
 
     /// Get version of RTC calibration block
     ///
-    /// see https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32s3/esp_efuse_rtc_calib.c#L15
+    /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32s3/esp_efuse_rtc_calib.c#L15>
     pub fn get_rtc_calib_version() -> u8 {
         let (major, _minor) = Self::get_block_version();
 
@@ -64,7 +64,7 @@ impl Efuse {
 
     /// Get ADC initial code for specified attenuation from efuse
     ///
-    /// see https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32s3/esp_efuse_rtc_calib.c#L28
+    /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32s3/esp_efuse_rtc_calib.c#L28>
     pub fn get_rtc_calib_init_code(unit: u8, atten: Attenuation) -> Option<u16> {
         let version = Self::get_rtc_calib_version();
 
@@ -115,14 +115,14 @@ impl Efuse {
 
     /// Get ADC reference point voltage for specified attenuation in millivolts
     ///
-    /// see https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32s3/esp_efuse_rtc_calib.c#L63
+    /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32s3/esp_efuse_rtc_calib.c#L63>
     pub fn get_rtc_calib_cal_mv(_unit: u8, _atten: Attenuation) -> u16 {
         850
     }
 
     /// Get ADC reference point digital code for specified attenuation
     ///
-    /// see https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32s3/esp_efuse_rtc_calib.c#L63
+    /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32s3/esp_efuse_rtc_calib.c#L63>
     pub fn get_rtc_calib_cal_code(unit: u8, atten: Attenuation) -> Option<u16> {
         let version = Self::get_rtc_calib_version();
 
