@@ -10,7 +10,7 @@
 //! The module defines a `RadioClockController` trait implemented by the `RadioClockControl` struct.
 //! This trait provides methods to enable, disable, reset the MAC, initialize clocks
 //! and perform other related operations.
-//! 
+
 use crate::system::{RadioClockControl, RadioClockController, RadioPeripherals};
 
 // Mask for clock bits used by both WIFI and Bluetooth, bit 0, 3, 6, 7, 8, 9

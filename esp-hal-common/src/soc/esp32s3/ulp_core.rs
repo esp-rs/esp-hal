@@ -1,4 +1,38 @@
 //! Control the ULP RISCV core
+//! 
+//! ## Overview
+//! 
+//! The `ULP RISCV CORE` peripheral allows control over the `Ultra-Low Power (ULP) RISC-V core` in `ESP` chips.
+//! The ULP core is a low-power processor designed for executing tasks in deep sleep mode, enabling
+//! efficient power management in ESP systems.
+//! 
+//! The `UlpCore` struct provides an interface to interact with the `ULP RISCV CORE` peripheral. 
+//! It allows starting and configuring the ULP core for operation.
+//! The `UlpCore` struct is initialized with a peripheral reference to the `ULP RISCV CORE` instance.
+//! 
+//! ## Example
+//! ```no_run
+//! let mut ulp_core = esp32s3_hal::ulp_core::UlpCore::new(peripherals.ULP_RISCV_CORE);
+//! ulp_core.stop();
+//! println!("ulp core stopped");
+//!
+//! // copy code to RTC ram
+//! let lp_ram = 0x5000_0000 as *mut u8;
+//! unsafe {
+//!     core::ptr::copy_nonoverlapping(CODE as *const _ as *const u8, lp_ram, CODE.len());
+//! }
+//! println!("copied code (len {})", CODE.len());
+//!
+//! // start ULP core
+//! ulp_core.run(esp32s3_hal::ulp_core::UlpCoreWakeupSource::HpCpu);
+//! println!("ulpcore run");
+//!
+//! let data = (0x5000_0010 - 0) as *mut u32;
+//! loop {
+//!     println!("Current {}", unsafe { data.read_volatile() });
+//! }
+//!
+//! ```
 
 use esp32s3 as pac;
 
