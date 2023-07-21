@@ -423,8 +423,12 @@ pub use impl_adc_interface;
 pub mod implementation {
     //! Analog to digital (ADC) conversion support.
     //!
-    //! This module provides functions for reading analog values from two
-    //! analog to digital converters available on the ESP32: `ADC1` and `ADC2`.
+    //! ## Overview
+    //! The `ADC` functionality in the `analog` driver enables users to perform analog-to-digital conversions,
+    //! allowing them to measure real-world analog signals with high accuracy.
+    //! 
+    //! Module provides functions for reading analog values from the
+    //! analog to digital converter available on the ESP32: `ADC1` and `ADC2`.
     //!
     //! The following pins can be configured for analog readout:
     //!
@@ -440,6 +444,28 @@ pub mod implementation {
     //! | 7       | GPIO35 (VDET_2)      | GPIO27        |
     //! | 8       |                      | GPIO25        |
     //! | 9       |                      | GPIO26        |
+    //! 
+    //! ## Example
+    //! #### ADC on Xtensa architecture
+    //! ```no_run
+    //! // Create ADC instances
+    //! let analog = peripherals.SENS.split();
+    //!
+    //! let mut adc1_config = AdcConfig::new();
+    //!
+    //! let mut pin3 =
+    //!     adc1_config.enable_pin(io.pins.gpio3.into_analog(), Attenuation::Attenuation11dB);
+    //!
+    //! let mut adc1 = ADC::<ADC1>::adc(analog.adc1, adc1_config).unwrap();
+    //!
+    //! let mut delay = Delay::new(&clocks);
+    //!
+    //! loop {
+    //!     let pin3_value: u16 = nb::block!(adc1.read(&mut pin3)).unwrap();
+    //!     println!("PIN3 ADC reading = {}", pin3_value);
+    //!     delay.delay_ms(1500u32);
+    //! }
+    //! ```
 
     use embedded_hal::adc::Channel;
 

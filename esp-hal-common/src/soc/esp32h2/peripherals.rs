@@ -12,7 +12,7 @@
 //! It's important to note that the module also exports the `Interrupt` enum from the `ESP32-H2` `PAC (Peripheral Access Crate)` for
 //! users to handle interrupts associated with these peripherals.
 //! 
-//! NOTE: notice that `radio` is marked with `false` in the `peripherals!` macro.
+//! ⚠️ NOTE: notice that `radio` is marked with `false` in the `peripherals!` macro.
 //! Basically, that means that there's no real peripheral (no `RADIO` peripheral in the PACs) but we're
 //! creating "virtual peripherals" for it in order to ensure the uniqueness of the instance (Singleton).
 

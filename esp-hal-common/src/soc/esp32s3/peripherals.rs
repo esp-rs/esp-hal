@@ -12,7 +12,7 @@
 //! It's important to note that the module also exports the `Interrupt` enum from the `ESP32-S3` `PAC (Peripheral Access Crate)` for
 //! users to handle interrupts associated with these peripherals.
 //! 
-//! NOTE: notice that `psram`, `radio` and `ulp_riscv_core` are marked with `false` in the `peripherals!` macro.
+//! ⚠️ NOTE: notice that `psram`, `radio` and `ulp_riscv_core` are marked with `false` in the `peripherals!` macro.
 //! Basically, that means that there's no real peripheral (no `PSRAM` nor `RADIO` peripheral in the `PAC`s) but we're
 //! creating "virtual peripherals" for them in order to ensure the uniqueness of the instances (Singletons).
 

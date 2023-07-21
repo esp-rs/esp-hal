@@ -11,7 +11,6 @@
 //! to multiple ADC units, such as `ADC1` and `ADC2`, which may differ based on the specific
 //! ESP microcontroller being used.
 //! 
-//! 
 //! The `DAC` functionality in the analog driver enables users to generate analog output signals
 //! with precise control over voltage levels. The module supports multiple DAC units,
 //! such as `DAC1` and `DAC2`, which may vary depending on the specific ESP microcontroller.
@@ -32,7 +31,7 @@
 //!   * ADC1
 //!   * ADC2
 //! 
-//! ## Example
+//! ## Examples
 //! #### ADC on Risc-V architecture
 //! ```no_run
 //! // Create ADC instances
