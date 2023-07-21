@@ -10,7 +10,7 @@ esp32c3-hal = { workspace = true, optional = true }
 esp32c2-hal = { workspace = true, optional = true }
 esp32c6-hal = { workspace = true, optional = true }
 esp32-hal = { workspace = true, optional = true }
-esp32s3-hal = {workspace = true, optional = true }
+esp32s3-hal = { workspace = true, optional = true }
 esp32s2-hal = { workspace = true, optional = true }
 esp32c3 = { workspace = true, optional = true }
 esp32c2 = { workspace = true, optional = true }
@@ -21,7 +21,7 @@ critical-section.workspace = true
 atomic-polyfill.workspace = true
 log.workspace = true
 embedded-svc = { workspace = true, optional = true }
-enumset = {workspace = true, optional = true }
+enumset = { workspace = true, optional = true }
 linked_list_allocator = { workspace = true }
 embedded-io.workspace = true
 fugit.workspace = true
