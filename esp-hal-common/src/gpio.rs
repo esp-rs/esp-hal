@@ -1857,11 +1857,12 @@ mod asynch {
             intrs
         );
 
-        while intrs != 0 {
-            let pin_nr = intrs.trailing_zeros();
+        let mut intr_bits = intrs;
+        while intr_bits != 0 {
+            let pin_nr = intr_bits.trailing_zeros();
             set_int_enable(pin_nr as u8, 0, 0, false);
             PIN_WAKERS[pin_nr as usize].wake(); // wake task
-            intrs &= !(1 << pin_nr);
+            intr_bits &= !(1 << pin_nr);
         }
 
         // clear interrupt bits
