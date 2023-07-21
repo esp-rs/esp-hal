@@ -1,3 +1,22 @@
+//! RTC Control Sleep Module
+//! 
+//! ## Overview
+//! The `sleep` module in the `RTC CNTL (Real-Time Clock Control)` driver provides functionality to manage sleep and wakeup
+//! sources for `ESP` chips. The `RTC_CNTL` is responsible for controlling the power and sleep behavior of the chip.
+//!
+//! The `sleep` module allows configuring various wakeup sources and setting up the sleep behavior based on those sources.
+//! The supported wakeup sources include:
+//!    * `GPIO` pins - light sleep only
+//!    *  timers
+//!    * `SDIO (Secure Digital Input/Output) - light sleep only`
+//!    * `MAC (Media Access Control)` wake - light sleep only
+//!    * `UART0` - light sleep only
+//!    * `UART1` - light sleep only
+//!    * `touch`
+//!    * `ULP (Ultra-Low Power)` wake
+//!    * `BT (Bluetooth) wake` - light sleep only
+
+
 use core::{cell::RefCell, time::Duration};
 
 use crate::{

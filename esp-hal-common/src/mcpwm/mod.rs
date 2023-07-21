@@ -1,6 +1,7 @@
 //! MCPWM (Motor Control Pulse Width Modulator) peripheral
 //!
-//! # Peripheral capabilities:
+//! ## Overview
+//! #### Peripheral capabilities
 //! * PWM Timers 0, 1 and 2
 //!     * Every PWM timer has a dedicated 8-bit clock prescaler.
 //!     * The 16-bit counter in the PWM timer can work in count-up mode,
@@ -22,11 +23,11 @@
 //! * Fault Detection Module (Not yet implemented)
 //! * Capture Module (Not yet implemented)
 //!
-//! # Example
+//! ## Example
 //! Uses timer0 and operator0 of the MCPWM0 peripheral to output a 50% duty
 //! signal at 20 kHz. The signal will be output to the pin assigned to `pin`.
 //!
-//! ```
+//! ```no_run
 //! # use esp_hal_common::{mcpwm, prelude::*};
 //! use mcpwm::{operator::PwmPinConfig, timer::PwmWorkingMode, PeripheralClockConfig, MCPWM};
 //!

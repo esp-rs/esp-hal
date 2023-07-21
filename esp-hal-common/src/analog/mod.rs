@@ -1,3 +1,83 @@
+//! Analog peripherals
+//! 
+//! ## Overview
+//! The `Analog` Driver is a module designed for ESP microcontrollers, that provides an interface
+//! to interact with analog peripherals on the chip. The module includes support
+//! for `Analog-to-Digital Converters (ADC)` and `Digital-to-Analog Converters (DAC)`, offering
+//! functionality for precise analog measurements and generating analog output signals.
+//! 
+//! The `ADC` functionality in the `analog` driver enables users to perform analog-to-digital conversions,
+//! allowing them to measure real-world analog signals with high accuracy. The module provides access
+//! to multiple ADC units, such as `ADC1` and `ADC2`, which may differ based on the specific
+//! ESP microcontroller being used.
+//! 
+//! 
+//! The `DAC` functionality in the analog driver enables users to generate analog output signals
+//! with precise control over voltage levels. The module supports multiple DAC units,
+//! such as `DAC1` and `DAC2`, which may vary depending on the specific ESP microcontroller.
+//! 
+//! #### Xtensa architecture
+//! For ESP microcontrollers using the `Xtensa` architecture, the driver provides access
+//! to the `SENS` peripheral, allowing users to split it into independent parts
+//! using the [`SensExt`] trait. This extension trait provides access to the following analog peripherals:
+//!   * ADC1
+//!   * ADC2
+//!   * DAC1
+//!   * DAC2
+//! 
+//! #### RISC-V architecture
+//! For ESP microcontrollers using the `RISC-V` architecture, the driver provides
+//! access to the `APB_SARADC` peripheral. The `SarAdcExt` trait allows users to split this peripheral
+//! into independent parts, providing access to the following analog peripheral:
+//!   * ADC1
+//!   * ADC2
+//! 
+//! ## Example
+//! #### ADC on Risc-V architecture
+//! ```no_run
+//! // Create ADC instances
+//! let analog = peripherals.APB_SARADC.split();
+//!
+//! let mut adc1_config = AdcConfig::new();
+//!
+//! let mut pin = adc1_config.enable_pin(io.pins.gpio2.into_analog(), Attenuation::Attenuation11dB);
+//!
+//! let mut adc1 = ADC::<ADC1>::adc(
+//!     &mut system.peripheral_clock_control,
+//!     analog.adc1,
+//!     adc1_config,
+//! )
+//! .unwrap();
+//!
+//! let mut delay = Delay::new(&clocks);
+//!
+//! loop {
+//!     let pin_value: u16 = nb::block!(adc1.read(&mut pin)).unwrap();
+//!     println!("PIN2 ADC reading = {}", pin_value);
+//!     delay.delay_ms(1500u32);
+//! } 
+//! ```
+//! #### ADC on Xtensa architecture
+//! ```no_run
+//! // Create ADC instances
+//! let analog = peripherals.SENS.split();
+//!
+//! let mut adc1_config = AdcConfig::new();
+//!
+//! let mut pin3 =
+//!     adc1_config.enable_pin(io.pins.gpio3.into_analog(), Attenuation::Attenuation11dB);
+//!
+//! let mut adc1 = ADC::<ADC1>::adc(analog.adc1, adc1_config).unwrap();
+//!
+//! let mut delay = Delay::new(&clocks);
+//!
+//! loop {
+//!     let pin3_value: u16 = nb::block!(adc1.read(&mut pin3)).unwrap();
+//!     println!("PIN3 ADC reading = {}", pin3_value);
+//!     delay.delay_ms(1500u32);
+//! }
+//! ```
+
 #[cfg_attr(esp32, path = "adc/esp32.rs")]
 #[cfg_attr(riscv, path = "adc/riscv.rs")]
 #[cfg_attr(any(esp32s2, esp32s3), path = "adc/xtensa.rs")]

@@ -1,4 +1,70 @@
-//! Low-power Management
+//! RTC_CNTL (Real-Time Clock Control)
+//! 
+//! ## Overview
+//! The `rtc_cntl` module provides a driver for the `RTC_CNTL` peripheral on ESP chips.
+//! 
+//! The `Real-Time Clock Control (RTC_CNTL)` peripheral is responsible for managing the real-time
+//! clock and low-power modes on the chip.
+//! 
+//! The `rtc_cntl` driver module contains functions and data structures to interact with the `RTC_CNTL` peripheral on ESP chips.
+//! It also includes the necessary configurations and constants for clock sources and low-power management.
+//! The driver provides the following features and functionalities:
+//!    * Clock Configuration
+//!    * Calibration
+//!    * Low-Power Management
+//!    * Real-Time Clock
+//!    * Handling Watchdog Timers
+//! 
+//! ## Examples 
+//! ### Print time in milliseconds from the RTC Timer
+//! ```no_run
+//! let mut delay = Delay::new(&clocks);
+//!
+//! loop {
+//!     esp_println::println!("rtc time in milliseconds is {}", rtc.get_time_ms());
+//!     delay.delay_ms(1000u32);
+//! }
+//! ```
+//! 
+//! ### RTC Watchdog Timer
+//! ```no_run
+//! rtc.rwdt.start(2000u64.millis());
+//! rtc.rwdt.listen();
+//!
+//! interrupt::enable(
+//!     peripherals::Interrupt::LP_WDT,
+//!     interrupt::Priority::Priority1,
+//! )
+//! .unwrap();
+//!
+//! critical_section::with(|cs| RWDT.borrow_ref_mut(cs).replace(rtc.rwdt));
+//!
+//! unsafe {
+//!     riscv::interrupt::enable();
+//! }
+//!
+//! loop {}
+//! ...
+//! // Handle the corresponding interrupt
+//! #[interrupt]
+//! fn LP_WDT() {
+//! critical_section::with(|cs| {
+//!    esp_println::println!("RWDT Interrupt");
+//!
+//!     let mut rwdt = RWDT.borrow_ref_mut(cs);
+//!     let rwdt = rwdt.as_mut().unwrap();
+//!
+//!     rwdt.clear_interrupt();
+//!
+//!     esp_println::println!("Restarting in 5 seconds...");
+//!
+//!     rwdt.start(5000u64.millis());
+//!     rwdt.unlisten();
+//! });
+//! }
+//! ``` 
+
+
 
 use embedded_hal::watchdog::{Watchdog, WatchdogDisable, WatchdogEnable};
 #[cfg(not(any(esp32c6, esp32h2)))]
