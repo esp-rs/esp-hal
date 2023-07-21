@@ -1840,23 +1840,28 @@ mod asynch {
 
     #[interrupt]
     unsafe fn GPIO() {
-        let mut intrs = InterruptStatusRegisterAccessBank0::interrupt_status_read() as u64;
+        let intrs_bank0 = InterruptStatusRegisterAccessBank0::interrupt_status_read();
 
         #[cfg(any(esp32, esp32s2, esp32s3))]
-        {
-            intrs |= (InterruptStatusRegisterAccessBank1::interrupt_status_read() as u64) << 32;
-        }
+        let intrs_bank1 = InterruptStatusRegisterAccessBank1::interrupt_status_read();
 
+        #[cfg(not(any(esp32, esp32s2, esp32s3)))]
         trace!(
-            "Handling interrupt on {:?} - {:064b}",
+            "Handling interrupt on {:?} - {:032b}",
             crate::get_core(),
-            intrs
+            intrs_bank0,
         );
 
-        let mut intr_bits = intrs;
+        #[cfg(any(esp32, esp32s2, esp32s3))]
+        trace!(
+            "Handling interrupt on {:?} - {:032b}{:032b}",
+            crate::get_core(),
+            intrs_bank1,
+            intrs_bank0,
+        );
+
+        let mut intr_bits = intrs_bank0;
         while intr_bits != 0 {
-            // TODO: we should probably call `leading_zeros` on Xtensa
-            // when that lowers to NSAU.
             let pin_nr = intr_bits.trailing_zeros();
             set_int_enable(pin_nr as u8, 0, 0, false);
             PIN_WAKERS[pin_nr as usize].wake(); // wake task
@@ -1864,8 +1869,18 @@ mod asynch {
         }
 
         // clear interrupt bits
-        Bank0GpioRegisterAccess::write_interrupt_status_clear(intrs as u32);
+        Bank0GpioRegisterAccess::write_interrupt_status_clear(intrs_bank0);
+
         #[cfg(any(esp32, esp32s2, esp32s3))]
-        Bank1GpioRegisterAccess::write_interrupt_status_clear((intrs >> 32) as u32);
+        {
+            let mut intr_bits = intrs_bank1;
+            while intr_bits != 0 {
+                let pin_nr = intr_bits.trailing_zeros();
+                set_int_enable(pin_nr as u8 + 32, 0, 0, false);
+                PIN_WAKERS[pin_nr as usize + 32].wake(); // wake task
+                intr_bits -= 1 << pin_nr;
+            }
+            Bank1GpioRegisterAccess::write_interrupt_status_clear(intrs_bank1);
+        }
     }
 }
