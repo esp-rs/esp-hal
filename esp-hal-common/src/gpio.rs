@@ -1859,6 +1859,8 @@ mod asynch {
 
         let mut intr_bits = intrs;
         while intr_bits != 0 {
+            // TODO: we should probably call `leading_zeros` on Xtensa
+            // when that lowers to NSAU.
             let pin_nr = intr_bits.trailing_zeros();
             set_int_enable(pin_nr as u8, 0, 0, false);
             PIN_WAKERS[pin_nr as usize].wake(); // wake task
