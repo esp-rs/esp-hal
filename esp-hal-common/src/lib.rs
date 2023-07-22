@@ -302,3 +302,15 @@ mod critical_section_impl {
         }
     }
 }
+
+
+pub struct FlashSafeDma<T, const SIZE: usize> {
+    inner: T,
+    buffer: [u8; SIZE],
+}
+
+impl<T, const SIZE: usize> FlashSafeDma<T, SIZE> {
+    pub fn new(inner: T) -> Self {
+        Self { inner, buffer: [0u8; SIZE] }
+    }
+}

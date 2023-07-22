@@ -3122,3 +3122,29 @@ impl Spi2Instance for crate::peripherals::SPI2 {}
 
 #[cfg(any(esp32, esp32s2, esp32s3))]
 impl Spi3Instance for crate::peripherals::SPI3 {}
+
+use crate::FlashSafeDma;
+
+
+impl<T: embedded_hal::blocking::spi::Transfer<u8>, const SIZE: usize> embedded_hal::blocking::spi::Transfer<u8> for FlashSafeDma<T, SIZE> {
+    type Error = T::Error;
+
+    fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Self::Error> {
+        self.inner.transfer(words)
+    }
+}
+
+impl<T: embedded_hal::blocking::spi::Write<u8>, const SIZE: usize> embedded_hal::blocking::spi::Write<u8> for FlashSafeDma<T, SIZE> {
+    type Error = T::Error;
+
+    fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
+        Ok(if !crate::soc::is_valid_ram_address(&words[0] as *const _ as u32) {
+            for chunk in words.chunks(SIZE) {
+                self.buffer[..chunk.len()].copy_from_slice(chunk);
+                self.inner.write(&self.buffer[..chunk.len()])?;
+            }
+        } else {
+            self.inner.write(words)?;
+        })
+    }
+}
