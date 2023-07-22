@@ -175,9 +175,8 @@ impl<const OP: u8, PWM: PwmPeripheral> Operator<OP, PWM> {
         });
     }
 
-    // TODO: dt_cfg, dt_fed, dt_red (and similar functions in mcpwm can be made safe
-    // by patching PACS)
-    fn dt_cfg(&mut self) -> &crate::peripherals::pwm0::DB0_CFG {
+    #[cfg(feature = "esp32s3")]
+    fn dt_cfg(&mut self) -> &crate::peripherals::mcpwm0::DB0_CFG {
         let block = unsafe { &*PWM::block() };
         match OP {
             0 => &block.db0_cfg,
@@ -186,8 +185,8 @@ impl<const OP: u8, PWM: PwmPeripheral> Operator<OP, PWM> {
             _ => unreachable!(),
         }
     }
-
-    fn dt_fed(&mut self) -> &crate::peripherals::pwm0::DB0_FED_CFG {
+    #[cfg(feature = "esp32s3")]
+    fn dt_fed(&mut self) -> &crate::peripherals::mcpwm0::DB0_FED_CFG {
         let block = unsafe { &*PWM::block() };
         match OP {
             0 => &block.db0_fed_cfg,
@@ -196,13 +195,47 @@ impl<const OP: u8, PWM: PwmPeripheral> Operator<OP, PWM> {
             _ => unreachable!(),
         }
     }
-
-    fn dt_red(&mut self) -> &crate::peripherals::pwm0::DB0_RED_CFG {
+    #[cfg(feature = "esp32s3")]
+    fn dt_red(&mut self) -> &crate::peripherals::mcpwm0::DB0_RED_CFG {
         let block = unsafe { &*PWM::block() };
         match OP {
             0 => &block.db0_red_cfg,
             1 => unsafe { &*(&block.db1_red_cfg as *const _ as *const _) },
             2 => unsafe { &*(&block.db2_red_cfg as *const _ as *const _) },
+            _ => unreachable!(),
+        }
+    }
+
+    // TODO: dt_cfg, dt_fed, dt_red (and similar functions in mcpwm can be made safe
+    // by patching PACS)
+    #[cfg(not(feature = "esp32s3"))]
+    fn dt_cfg(&mut self) -> &crate::peripherals::mcpwm0::DT0_CFG {
+        let block = unsafe { &*PWM::block() };
+        match OP {
+            0 => &block.dt0_cfg,
+            1 => unsafe { &*(&block.dt1_cfg as *const _ as *const _) },
+            2 => unsafe { &*(&block.dt2_cfg as *const _ as *const _) },
+            _ => unreachable!(),
+        }
+    }
+
+    #[cfg(not(feature = "esp32s3"))]
+    fn dt_fed(&mut self) -> &crate::peripherals::mcpwm0::DT0_FED_CFG {
+        let block = unsafe { &*PWM::block() };
+        match OP {
+            0 => &block.dt0_fed_cfg,
+            1 => unsafe { &*(&block.dt1_fed_cfg as *const _ as *const _) },
+            2 => unsafe { &*(&block.dt2_fed_cfg as *const _ as *const _) },
+            _ => unreachable!(),
+        }
+    }
+    #[cfg(not(feature = "esp32s3"))]
+    fn dt_red(&mut self) -> &crate::peripherals::mcpwm0::DT0_RED_CFG {
+        let block = unsafe { &*PWM::block() };
+        match OP {
+            0 => &block.dt0_red_cfg,
+            1 => unsafe { &*(&block.dt1_red_cfg as *const _ as *const _) },
+            2 => unsafe { &*(&block.dt2_red_cfg as *const _ as *const _) },
             _ => unreachable!(),
         }
     }
