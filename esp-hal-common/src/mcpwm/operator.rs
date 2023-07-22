@@ -140,7 +140,7 @@ fn dt_cfg<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mc
     }
 }
 #[cfg(feature = "esp32s3")]
-fn dt_fedg<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mcpwm0::DB0_FED_CFG {
+fn dt_fed<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mcpwm0::DB0_FED_CFG {
     let block = unsafe { &*PWM::block() };
     match OP {
         0 => &block.db0_fed_cfg,
@@ -150,7 +150,7 @@ fn dt_fedg<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::m
     }
 }
 #[cfg(feature = "esp32s3")]
-fn dt_redg<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mcpwm0::DB0_RED_CFG {
+fn dt_red<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mcpwm0::DB0_RED_CFG {
     let block = unsafe { &*PWM::block() };
     match OP {
         0 => &block.db0_red_cfg,
@@ -163,7 +163,7 @@ fn dt_redg<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::m
 // TODO: dt_cfg, dt_fed, dt_red (and similar functions in mcpwm can be made safe
 // by patching PACS)
 #[cfg(not(feature = "esp32s3"))]
-fn dt_cfgg<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mcpwm0::DT0_CFG {
+fn dt_cfg<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mcpwm0::DT0_CFG {
     let block = unsafe { &*PWM::block() };
     match OP {
         0 => &block.dt0_cfg,
@@ -174,7 +174,7 @@ fn dt_cfgg<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::m
 }
 
 #[cfg(not(feature = "esp32s3"))]
-fn dt_fedg<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mcpwm0::DT0_FED_CFG {
+fn dt_fed<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mcpwm0::DT0_FED_CFG {
     let block = unsafe { &*PWM::block() };
     match OP {
         0 => &block.dt0_fed_cfg,
@@ -184,7 +184,7 @@ fn dt_fedg<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::m
     }
 }
 #[cfg(not(feature = "esp32s3"))]
-fn dt_redg<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mcpwm0::DT0_RED_CFG {
+fn dt_red<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mcpwm0::DT0_RED_CFG {
     let block = unsafe { &*PWM::block() };
     match OP {
         0 => &block.dt0_red_cfg,
@@ -242,8 +242,8 @@ impl<const OP: u8, PWM: PwmPeripheral> Operator<OP, PWM> {
 
     /// Configures deadtime for this operator
     pub fn set_deadtime(&mut self, cfg: &DeadTimeCfg) {
-        dt_fedg::<OP, PWM>().write(|w| unsafe { w.bits(cfg.falling_edge_delay as u32) });
-        dt_redg::<OP, PWM>().write(|w| unsafe { w.bits(cfg.rising_edge_delay as u32) });
+        dt_fed::<OP, PWM>().write(|w| unsafe { w.bits(cfg.falling_edge_delay as u32) });
+        dt_red::<OP, PWM>().write(|w| unsafe { w.bits(cfg.rising_edge_delay as u32) });
         dt_cfg::<OP, PWM>().write(|w| unsafe { w.bits(cfg.cfg_reg) });
     }
 
@@ -337,7 +337,7 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
     /// another pin
     #[inline]
     pub fn update_fed(&self, cycles: u16) {
-        dt_fedg::<OP, PWM>().write(|w| unsafe { w.bits(cycles as u32) });
+        dt_fed::<OP, PWM>().write(|w| unsafe { w.bits(cycles as u32) });
     }
 
     /// Updates dead-time RED register
@@ -346,7 +346,7 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
     /// another pin
     #[inline]
     pub fn update_red(&self, cycles: u16) {
-        dt_fedg::<OP, PWM>().write(|w| unsafe { w.bits(cycles as u32) });
+        dt_red::<OP, PWM>().write(|w| unsafe { w.bits(cycles as u32) });
     }
 
     /// Configure what actions should be taken on timing events
