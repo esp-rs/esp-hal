@@ -318,7 +318,9 @@ where
 {
     /// Wait for the DMA transfer to complete and return the buffers and the
     /// I2sTx instance.
-    fn wait(self) -> (BUFFER, I2sTx<'d, T, P, CH>) {
+    fn wait(
+        self,
+    ) -> Result<(BUFFER, I2sTx<'d, T, P, CH>), (DmaError, BUFFER, I2sTx<'d, T, P, CH>)> {
         self.i2s_tx.wait_tx_dma_done().ok(); // waiting for the DMA transfer is not enough
 
         // `DmaTransfer` needs to have a `Drop` implementation, because we accept
@@ -331,8 +333,13 @@ where
         unsafe {
             let buffer = core::ptr::read(&self.buffer);
             let payload = core::ptr::read(&self.i2s_tx);
+            let err = (&self).i2s_tx.tx_channel.has_error();
             core::mem::forget(self);
-            (buffer, payload)
+            if err {
+                Err((DmaError::DescriptorError, buffer, payload))
+            } else {
+                Ok((buffer, payload))
+            }
         }
     }
 
@@ -412,7 +419,11 @@ where
     /// I2sTx instance after copying the read data to the given buffer.
     /// Length of the received data is returned at the third element of the
     /// tuple.
-    pub fn wait_receive(mut self, dst: &mut [u8]) -> (BUFFER, I2sRx<'d, T, P, CH>, usize) {
+    pub fn wait_receive(
+        mut self,
+        dst: &mut [u8],
+    ) -> Result<(BUFFER, I2sRx<'d, T, P, CH>, usize), (DmaError, BUFFER, I2sRx<'d, T, P, CH>, usize)>
+    {
         self.i2s_rx.wait_rx_dma_done().ok(); // waiting for the DMA transfer is not enough
 
         let len = self.i2s_rx.rx_channel.drain_buffer(dst).unwrap();
@@ -427,8 +438,13 @@ where
         unsafe {
             let buffer = core::ptr::read(&self.buffer);
             let payload = core::ptr::read(&self.i2s_rx);
+            let err = (&self).i2s_rx.rx_channel.has_error();
             core::mem::forget(self);
-            (buffer, payload, len)
+            if err {
+                Err((DmaError::DescriptorError, buffer, payload, len))
+            } else {
+                Ok((buffer, payload, len))
+            }
         }
     }
 }
@@ -442,7 +458,9 @@ where
 {
     /// Wait for the DMA transfer to complete and return the buffers and the
     /// I2sTx instance.
-    fn wait(self) -> (BUFFER, I2sRx<'d, T, P, CH>) {
+    fn wait(
+        self,
+    ) -> Result<(BUFFER, I2sRx<'d, T, P, CH>), (DmaError, BUFFER, I2sRx<'d, T, P, CH>)> {
         self.i2s_rx.wait_rx_dma_done().ok(); // waiting for the DMA transfer is not enough
 
         // `DmaTransfer` needs to have a `Drop` implementation, because we accept
@@ -455,8 +473,13 @@ where
         unsafe {
             let buffer = core::ptr::read(&self.buffer);
             let payload = core::ptr::read(&self.i2s_rx);
+            let err = (&self).i2s_rx.rx_channel.has_error();
             core::mem::forget(self);
-            (buffer, payload)
+            if err {
+                Err((DmaError::DescriptorError, buffer, payload))
+            } else {
+                Ok((buffer, payload))
+            }
         }
     }
 

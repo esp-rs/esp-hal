@@ -30,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Remove the `allow-opt-level-z` feature from `esp32c3-hal` (#654)
 
+### Breaking
+
+- `DmaTransfer::wait` and `I2sReadDmaTransfer::wait_receive` now return `Result` (#665)
+
 ## [0.10.0] - 2023-06-04
 
 ### Added
