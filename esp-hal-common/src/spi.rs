@@ -72,6 +72,8 @@ const EMPTY_WRITE_PAD: u8 = 0x00u8;
 #[allow(unused)]
 const MAX_DMA_SIZE: usize = 32736;
 
+const TX_RAM_BUFFER: usize = 1024;
+
 #[derive(Debug, Clone, Copy)]
 pub enum Error {
     DmaError(DmaError),
@@ -1690,12 +1692,25 @@ where
         rx: &mut RX,
     ) -> Result<&'w [u8], Error> {
         let mut idx = 0;
+        let (max, copy) = if !crate::soc::is_valid_ram_address(&write_buffer[0] as *const _ as u32) {
+            (TX_RAM_BUFFER, true)
+        } else {
+            (MAX_DMA_SIZE, false)
+        };
         loop {
             let write_idx = isize::min(idx, write_buffer.len() as isize);
-            let write_len = usize::min(write_buffer.len() - idx as usize, MAX_DMA_SIZE);
-
+            let write_len = usize::min(write_buffer.len() - idx as usize, max);
+            
             let read_idx = isize::min(idx, read_buffer.len() as isize);
-            let read_len = usize::min(read_buffer.len() - idx as usize, MAX_DMA_SIZE);
+            let read_len = usize::min(read_buffer.len() - idx as usize, max);
+            
+            let mut tmp = [0; TX_RAM_BUFFER]; // TODO it would be good to move this to a closure or something to lazy load this stack data
+            let write_buffer = if copy {
+                tmp[..write_len].copy_from_slice(&write_buffer[idx as usize..idx as usize+write_len]);
+                &mut tmp[..write_len]
+            } else {
+                write_buffer
+            };
 
             self.start_transfer_dma(
                 unsafe { write_buffer.as_ptr().offset(write_idx) },
@@ -1709,7 +1724,7 @@ where
             while !tx.is_done() && !rx.is_done() {}
             self.flush().unwrap();
 
-            idx += MAX_DMA_SIZE as isize;
+            idx += max as isize;
             if idx >= write_buffer.len() as isize && idx >= read_buffer.len() as isize {
                 break;
             }
@@ -1759,7 +1774,19 @@ where
     }
 
     fn write_bytes_dma<'w>(&mut self, words: &'w [u8], tx: &mut TX) -> Result<&'w [u8], Error> {
-        for chunk in words.chunks(MAX_DMA_SIZE) {
+         let (max, copy) = if !crate::soc::is_valid_ram_address(&words[0] as *const _ as u32) {
+            (TX_RAM_BUFFER, true)
+        } else {
+            (MAX_DMA_SIZE, false)
+        };
+        for chunk in words.chunks(max) {
+            let mut tmp = [0; TX_RAM_BUFFER]; // TODO it would be good to move this to a closure or something to lazy load this stack data
+            let chunk = if copy {
+                tmp[..chunk.len()].copy_from_slice(&chunk);
+                &mut tmp[..chunk.len()]
+            } else {
+                chunk
+            };
             self.start_write_bytes_dma(chunk.as_ptr(), chunk.len(), tx)?;
 
             while !tx.is_done() {}

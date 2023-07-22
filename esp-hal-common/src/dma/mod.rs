@@ -22,6 +22,8 @@ pub enum DmaError {
     Overflow,
     Exhausted,
     BufferTooSmall,
+    RxBufferNotInRam,
+    TxBufferNotInRam,
 }
 
 /// DMA Priorities
@@ -362,6 +364,10 @@ where
             return Err(DmaError::BufferTooSmall);
         }
 
+        if !crate::soc::is_valid_ram_address(data as u32) {
+            return Err(DmaError::RxBufferNotInRam);
+        }
+
         self.available = 0;
         self.read_descr_ptr = self.descriptors.as_ptr() as *const u32;
         self.last_seen_handled_descriptor_ptr = core::ptr::null();
@@ -662,6 +668,10 @@ where
 
         if circular && len < CHUNK_SIZE * 2 {
             return Err(DmaError::BufferTooSmall);
+        }
+
+        if !crate::soc::is_valid_ram_address(data as u32) {
+            return Err(DmaError::TxBufferNotInRam);
         }
 
         self.write_offset = 0;
