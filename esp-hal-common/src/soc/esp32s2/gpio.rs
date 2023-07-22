@@ -304,71 +304,22 @@ crate::gpio::gpio! {
     (46, 1, InputOutput)
 }
 
-// on ESP32-S2 the touch_pad registers are indexed and the fields are weirdly
-// named
-macro_rules! impl_get_rtc_pad {
-    ($pad_name:ident) => {
-        paste::paste! {
-            pub(crate) fn [<esp32s2_get_rtc_pad_ $pad_name >]() -> &'static crate::peripherals::rtc_io::[< $pad_name:upper >] {
-                use crate::peripherals::RTC_IO;
-                let rtc_io = unsafe{ &*RTC_IO::ptr() };
-                &rtc_io.$pad_name
-            }
-        }
-    };
-}
-
-macro_rules! impl_get_rtc_pad_indexed {
-    ($pad_name:ident, $idx:literal) => {
-        paste::paste! {
-            pub(crate) fn [<esp32s2_get_rtc_pad_ $pad_name $idx>]() -> &'static crate::peripherals::rtc_io::[< $pad_name:upper >] {
-                use crate::peripherals::RTC_IO;
-                let rtc_io = unsafe{ &*RTC_IO::ptr() };
-                &rtc_io.$pad_name[$idx]
-            }
-        }
-    };
-}
-
-impl_get_rtc_pad_indexed!(touch_pad, 0);
-impl_get_rtc_pad_indexed!(touch_pad, 1);
-impl_get_rtc_pad_indexed!(touch_pad, 2);
-impl_get_rtc_pad_indexed!(touch_pad, 3);
-impl_get_rtc_pad_indexed!(touch_pad, 4);
-impl_get_rtc_pad_indexed!(touch_pad, 5);
-impl_get_rtc_pad_indexed!(touch_pad, 6);
-impl_get_rtc_pad_indexed!(touch_pad, 7);
-impl_get_rtc_pad_indexed!(touch_pad, 8);
-impl_get_rtc_pad_indexed!(touch_pad, 9);
-impl_get_rtc_pad_indexed!(touch_pad, 10);
-impl_get_rtc_pad_indexed!(touch_pad, 11);
-impl_get_rtc_pad_indexed!(touch_pad, 12);
-impl_get_rtc_pad_indexed!(touch_pad, 13);
-impl_get_rtc_pad_indexed!(touch_pad, 14);
-impl_get_rtc_pad!(xtal_32p_pad);
-impl_get_rtc_pad!(xtal_32n_pad);
-impl_get_rtc_pad!(pad_dac1);
-impl_get_rtc_pad!(pad_dac2);
-impl_get_rtc_pad!(rtc_pad19);
-impl_get_rtc_pad!(rtc_pad20);
-impl_get_rtc_pad!(rtc_pad21);
-
 crate::gpio::analog! {
-    ( 0,  0,  touch_pad0,     mux_sel,       fun_sel,       fun_ie,       rue,       rde)
-    ( 1,  1,  touch_pad1,     mux_sel,       fun_sel,       fun_ie,       rue,       rde)
-    ( 2,  2,  touch_pad2,     mux_sel,       fun_sel,       fun_ie,       rue,       rde)
-    ( 3,  3,  touch_pad3,     mux_sel,       fun_sel,       fun_ie,       rue,       rde)
-    ( 4,  4,  touch_pad4,     mux_sel,       fun_sel,       fun_ie,       rue,       rde)
-    ( 5,  5,  touch_pad5,     mux_sel,       fun_sel,       fun_ie,       rue,       rde)
-    ( 6,  6,  touch_pad6,     mux_sel,       fun_sel,       fun_ie,       rue,       rde)
-    ( 7,  7,  touch_pad7,     mux_sel,       fun_sel,       fun_ie,       rue,       rde)
-    ( 8,  8,  touch_pad8,     mux_sel,       fun_sel,       fun_ie,       rue,       rde)
-    ( 9,  9,  touch_pad9,     mux_sel,       fun_sel,       fun_ie,       rue,       rde)
-    (10, 10,  touch_pad10,    mux_sel,       fun_sel,       fun_ie,       rue,       rde)
-    (11, 11,  touch_pad11,    mux_sel,       fun_sel,       fun_ie,       rue,       rde)
-    (12, 12,  touch_pad12,    mux_sel,       fun_sel,       fun_ie,       rue,       rde)
-    (13, 13,  touch_pad13,    mux_sel,       fun_sel,       fun_ie,       rue,       rde)
-    (14, 14,  touch_pad14,    mux_sel,       fun_sel,       fun_ie,       rue,       rde)
+    ( 0,  0,  touch_pad[0],   mux_sel,       fun_sel,       fun_ie,       rue,       rde)
+    ( 1,  1,  touch_pad[1],   mux_sel,       fun_sel,       fun_ie,       rue,       rde)
+    ( 2,  2,  touch_pad[2],   mux_sel,       fun_sel,       fun_ie,       rue,       rde)
+    ( 3,  3,  touch_pad[3],   mux_sel,       fun_sel,       fun_ie,       rue,       rde)
+    ( 4,  4,  touch_pad[4],   mux_sel,       fun_sel,       fun_ie,       rue,       rde)
+    ( 5,  5,  touch_pad[5],   mux_sel,       fun_sel,       fun_ie,       rue,       rde)
+    ( 6,  6,  touch_pad[6],   mux_sel,       fun_sel,       fun_ie,       rue,       rde)
+    ( 7,  7,  touch_pad[7],   mux_sel,       fun_sel,       fun_ie,       rue,       rde)
+    ( 8,  8,  touch_pad[8],   mux_sel,       fun_sel,       fun_ie,       rue,       rde)
+    ( 9,  9,  touch_pad[9],   mux_sel,       fun_sel,       fun_ie,       rue,       rde)
+    (10, 10,  touch_pad[10],  mux_sel,       fun_sel,       fun_ie,       rue,       rde)
+    (11, 11,  touch_pad[11],  mux_sel,       fun_sel,       fun_ie,       rue,       rde)
+    (12, 12,  touch_pad[12],  mux_sel,       fun_sel,       fun_ie,       rue,       rde)
+    (13, 13,  touch_pad[13],  mux_sel,       fun_sel,       fun_ie,       rue,       rde)
+    (14, 14,  touch_pad[14],  mux_sel,       fun_sel,       fun_ie,       rue,       rde)
     (15, 15,  xtal_32p_pad,   x32p_mux_sel,  x32p_fun_sel,  x32p_fun_ie,  x32p_rue,  x32p_rde)
     (16, 16,  xtal_32n_pad,   x32n_mux_sel,  x32n_fun_sel,  x32n_fun_ie,  x32n_rue,  x32n_rde)
     (17, 17,  pad_dac1,       pdac1_mux_sel, pdac1_fun_sel, pdac1_fun_ie, pdac1_rue, pdac1_rde)
