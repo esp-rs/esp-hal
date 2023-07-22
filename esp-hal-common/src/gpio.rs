@@ -1781,8 +1781,6 @@ mod asynch {
         P: crate::gpio::Pin + embedded_hal_1::digital::ErrorType,
     {
         pub fn new(pin: &'a mut P, event: Event) -> Self {
-            pin.clear_interrupt(); // clear stale interrupt flags, when we await we want to know when an event
-                                   // occurs from the await call, not if the pin event has happened recently.
             pin.listen(event);
             Self { pin }
         }
