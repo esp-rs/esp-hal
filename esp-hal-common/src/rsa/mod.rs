@@ -22,7 +22,7 @@
 //! ```
 //! 
 //! ⚠️: The examples for RSA peripheral are quite extensive, so for a more detailed study of
-//! how to use this driver please</br>visit [the repository with corresponding example].
+//! how to use this driver please<br>visit [the repository with corresponding example].
 //! 
 //! [nb]: https://docs.rs/nb/1.1.0/nb/
 //! [the repository with corresponding example]: https://github.com/esp-rs/esp-hal/blob/main/esp32-hal/examples/rsa.rs

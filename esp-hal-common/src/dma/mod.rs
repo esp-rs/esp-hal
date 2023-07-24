@@ -8,18 +8,18 @@
 //! The driver is organized into several components and traits, each responsible for handling specific
 //! functionalities of the `DMA` controller. Below is an overview of the main components and their functionalities:
 //!   * `Tx` and `Rx` traits:
-//!      - These traits define the behaviors and functionalities required for DMA transmit and receive operations.</br>
-//!        The `Tx` trait includes functions to start, stop, and check the completion status of an outbound DMA transfer.</br>
+//!      - These traits define the behaviors and functionalities required for DMA transmit and receive operations.<br>
+//!        The `Tx` trait includes functions to start, stop, and check the completion status of an outbound DMA transfer.<br>
 //!        On the other hand, the Rx trait provides similar functionalities for inbound DMA transfers.
 //!   * `DmaTransfer` and `DmaTransferRxTx` traits:
-//!      - The `DmaTransfer` trait and `DmaTransferRxTx` trait are used for in-progress DMA transfers.</br>
+//!      - The `DmaTransfer` trait and `DmaTransferRxTx` trait are used for in-progress DMA transfers.<br>
 //!        They allow waiting for the transfer to complete and checking its status.
 //!        Additionally, the `DmaTransferRxTx` trait extends the functionalities to support both receive and transmit
 //!        operations in a single trait.
 //!   * `RegisterAccess` trait:
-//!      - This trait defines a set of methods that allow low-level access to the DMA controller's registers.</br>
+//!      - This trait defines a set of methods that allow low-level access to the DMA controller's registers.<br>
 //!        It provides functions to initialize DMA channels, configure burst mode, priority, and peripheral for both
-//!        input and output data transfers.</br>Additionally, it supports clearing interrupts, resetting channels, setting
+//!        input and output data transfers.<br>Additionally, it supports clearing interrupts, resetting channels, setting
 //!        descriptor addresses, and checking for descriptor errors.
 //! 
 //! Notice, that this module is a common version of the DMA driver, `ESP32` and `ESP32-S2` are using older `PDMA` controller,
