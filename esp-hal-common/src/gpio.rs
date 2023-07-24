@@ -91,9 +91,15 @@ pub enum AlternateFunction {
     Function5 = 5,
 }
 
+#[derive(PartialEq)]
+pub enum RtcFunction {
+    Rtc     = 0,
+    Digital = 1,
+}
+
 pub trait RTCPin {
     fn rtc_number(&self) -> u8;
-    fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: u8);
+    fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: RtcFunction);
 }
 
 pub trait RTCInputPin: RTCPin {}
@@ -1438,7 +1444,7 @@ macro_rules! rtc_pins {
 
             /// Set the RTC properties of the pin. If `mux` is true then then pin is
             /// routed to RTC, when false it is routed to IO_MUX.
-            fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: u8) {
+            fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: crate::gpio::RtcFunction) {
                 use crate::peripherals::RTC_IO;
                 let rtcio = unsafe{ &*RTC_IO::ptr() };
 
@@ -1447,7 +1453,7 @@ macro_rules! rtc_pins {
                     rtcio.$pin_reg.modify(|_,w| unsafe {w
                         .[<$prefix fun_ie>]().bit(input_enable)
                         .[<$prefix mux_sel>]().bit(mux)
-                        .[<$prefix fun_sel>]().bits(func)
+                        .[<$prefix fun_sel>]().bits(func as u8)
                     });
                 }
             }

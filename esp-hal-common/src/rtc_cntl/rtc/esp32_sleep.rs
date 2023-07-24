@@ -1,6 +1,6 @@
 use super::{Ext0WakeupSource, Ext1WakeupSource, TimerWakeupSource, WakeSource, WakeTriggers};
 use crate::{
-    gpio::{Pin, RTCPin},
+    gpio::{Pin, RTCPin, RtcFunction},
     rtc_cntl::{sleep::WakeupLevel, Clock, RtcClock},
     Rtc,
 };
@@ -24,6 +24,7 @@ pub const RTC_CNTL_WAKEUP_DELAY_CYCLES: u8 = 7;
 pub const RTC_CNTL_OTHER_BLOCKS_POWERUP_CYCLES: u8 = 1;
 pub const RTC_CNTL_OTHER_BLOCKS_WAIT_CYCLES: u16 = 1;
 pub const RTC_CNTL_MIN_SLP_VAL_MIN: u8 = 128;
+pub const RTC_CNTL_DBG_ATTEN_DEFAULT: u8 = 3;
 
 pub const RTC_MEM_POWERUP_CYCLES: u8 = RTC_CNTL_OTHER_BLOCKS_POWERUP_CYCLES;
 pub const RTC_MEM_WAIT_CYCLES: u16 = RTC_CNTL_OTHER_BLOCKS_WAIT_CYCLES;
@@ -71,7 +72,9 @@ impl<'a, P: Pin + RTCPin> WakeSource for Ext0WakeupSource<'a, P> {
         triggers.set_ext0(true);
 
         // set pin to RTC function
-        self.pin.borrow_mut().rtc_set_config(true, true, 0);
+        self.pin
+            .borrow_mut()
+            .rtc_set_config(true, true, RtcFunction::Rtc);
 
         unsafe {
             let rtc_io = &*esp32::RTC_IO::ptr();
@@ -93,7 +96,9 @@ impl<'a, P: Pin + RTCPin> Drop for Ext0WakeupSource<'a, P> {
         // should we have saved the pin configuration first?
         // set pin back to IO_MUX (input_enable and func have no effect when pin is sent
         // to IO_MUX)
-        self.pin.borrow_mut().rtc_set_config(true, false, 0);
+        self.pin
+            .borrow_mut()
+            .rtc_set_config(true, false, RtcFunction::Rtc);
     }
 }
 
@@ -107,15 +112,17 @@ impl<'a> WakeSource for Ext1WakeupSource<'a> {
         let mut pins = self.pins.borrow_mut();
         let mut bits = 0u32;
         for pin in pins.iter_mut() {
-            pin.rtc_set_config(true, true, 0);
+            pin.rtc_set_config(true, true, RtcFunction::Rtc);
             bits |= 1 << pin.rtc_number();
         }
 
         unsafe {
-            // set pin register field
-            // set level register field
             let rtc_cntl = &*esp32::RTC_CNTL::ptr();
+            // clear previous wakeup status
+            rtc_cntl.ext_wakeup1.modify(|_, w| w.status_clr().set_bit());
+            // set pin register field
             rtc_cntl.ext_wakeup1.modify(|_, w| w.sel().bits(bits));
+            // set level register field
             rtc_cntl
                 .ext_wakeup_conf
                 .modify(|_r, w| w.ext_wakeup1_lv().bit(self.level == WakeupLevel::High));
@@ -130,7 +137,7 @@ impl<'a> Drop for Ext1WakeupSource<'a> {
         // to IO_MUX)
         let mut pins = self.pins.borrow_mut();
         for pin in pins.iter_mut() {
-            pin.rtc_set_config(true, false, 0);
+            pin.rtc_set_config(true, false, RtcFunction::Rtc);
         }
     }
 }
@@ -212,7 +219,7 @@ impl RtcSleepConfig {
         cfg
     }
 
-    fn base_settings(&self, _rtc: &Rtc) {
+    pub(crate) fn base_settings(_rtc: &Rtc) {
         // settings derived from esp-idf after basic boot
         unsafe {
             let rtc_cntl = &*esp32::RTC_CNTL::ptr();
@@ -274,8 +281,7 @@ impl RtcSleepConfig {
         }
     }
 
-    pub(crate) fn apply(&self, rtc: &Rtc) {
-        self.base_settings(rtc);
+    pub(crate) fn apply(&self) {
         // like esp-idf rtc_sleep_init()
         unsafe {
             let rtc_cntl = &*esp32::RTC_CNTL::ptr();
@@ -445,6 +451,44 @@ impl RtcSleepConfig {
             rtc_cntl.slp_reject_conf.modify(|_, w| w
                 .deep_slp_reject_en().bit(self.deep_slp_reject())
                 .light_slp_reject_en().bit(self.light_slp_reject())
+            );
+        }
+    }
+
+    pub(crate) fn start_sleep(&self, wakeup_triggers: WakeTriggers) {
+        unsafe {
+            let rtc_cntl = &*esp32::RTC_CNTL::ptr();
+
+            rtc_cntl
+                .reset_state
+                .modify(|_, w| w.procpu_stat_vector_sel().set_bit());
+
+            // set bits for what can wake us up
+            rtc_cntl
+                .wakeup_state
+                .modify(|_, w| w.wakeup_ena().bits(wakeup_triggers.0.into()));
+
+            rtc_cntl
+                .state0
+                .write(|w| w.sleep_en().set_bit().slp_wakeup().set_bit());
+        }
+    }
+
+    pub(crate) fn finish_sleep(&self) {
+        // In deep sleep mode, we never get here
+        unsafe {
+            let rtc_cntl = &*esp32::RTC_CNTL::ptr();
+
+            #[rustfmt::skip]
+            rtc_cntl.int_clr.write(|w| w
+                .slp_reject_int_clr().set_bit()
+                .slp_wakeup_int_clr().set_bit()
+            );
+
+            // restore DBG_ATTEN to the default value
+            #[rustfmt::skip]
+            rtc_cntl.bias_conf.modify(|_,w| w
+                .dbg_atten().bits(RTC_CNTL_DBG_ATTEN_DEFAULT)
             );
         }
     }

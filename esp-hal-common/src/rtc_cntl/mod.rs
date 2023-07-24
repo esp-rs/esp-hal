@@ -14,7 +14,7 @@ use crate::efuse::Efuse;
 use crate::peripherals::{LP_TIMER, LP_WDT};
 #[cfg(not(any(esp32c6, esp32h2)))]
 use crate::peripherals::{RTC_CNTL, TIMG0};
-#[cfg(any(esp32))]
+#[cfg(any(esp32, esp32s3))]
 use crate::rtc_cntl::sleep::{RtcSleepConfig, WakeSource, WakeTriggers};
 use crate::{
     clock::Clock,
@@ -23,7 +23,7 @@ use crate::{
     Cpu,
 };
 // only include sleep where its been implemented
-#[cfg(any(esp32))]
+#[cfg(any(esp32, esp32s3))]
 pub mod sleep;
 
 #[cfg(any(esp32c6, esp32h2))]
@@ -136,12 +136,17 @@ impl<'d> Rtc<'d> {
         rtc::init();
         rtc::configure_clock();
 
-        Self {
+        let this = Self {
             _inner: rtc_cntl.into_ref(),
             rwdt: Rwdt::default(),
             #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
             swd: Swd::new(),
-        }
+        };
+
+        #[cfg(any(esp32, esp32s3))]
+        RtcSleepConfig::base_settings(&this);
+
+        this
     }
 
     // TODO: implement for ESP32-C6
@@ -198,7 +203,7 @@ impl<'d> Rtc<'d> {
     }
 
     /// enter deep sleep and wake with the provided `wake_sources`
-    #[cfg(esp32)]
+    #[cfg(any(esp32, esp32s3))]
     pub fn sleep_deep<'a>(
         &mut self,
         wake_sources: &[&'a dyn WakeSource],
@@ -210,19 +215,19 @@ impl<'d> Rtc<'d> {
     }
 
     /// enter light sleep and wake with the provided `wake_sources`
-    #[cfg(esp32)]
+    #[cfg(any(esp32, esp32s3))]
     pub fn sleep_light<'a>(
         &mut self,
         wake_sources: &[&'a dyn WakeSource],
         delay: &mut crate::Delay,
     ) {
         let config = RtcSleepConfig::default();
-        self.sleep(&config, wake_sources, delay)
+        self.sleep(&config, wake_sources, delay);
     }
 
-    /// enter sleep wthe the provided `config` and wake with the provided
+    /// enter sleep with the provided `config` and wake with the provided
     /// `wake_sources`
-    #[cfg(esp32)]
+    #[cfg(any(esp32, esp32s3))]
     pub fn sleep<'a>(
         &mut self,
         config: &RtcSleepConfig,
@@ -234,25 +239,14 @@ impl<'d> Rtc<'d> {
         for wake_source in wake_sources {
             wake_source.apply(self, &mut wakeup_triggers, &mut config)
         }
-        config.apply(self);
+
+        config.apply();
+
         use embedded_hal::blocking::delay::DelayMs;
         delay.delay_ms(100u32);
-        unsafe {
-            let rtc_cntl = &*RTC_CNTL::ptr();
 
-            rtc_cntl
-                .reset_state
-                .modify(|_, w| w.procpu_stat_vector_sel().set_bit());
-
-            // set bits for what can wake us up
-            rtc_cntl
-                .wakeup_state
-                .modify(|_, w| w.wakeup_ena().bits(wakeup_triggers.0.into()));
-
-            rtc_cntl
-                .state0
-                .write(|w| w.sleep_en().set_bit().slp_wakeup().set_bit());
-        }
+        config.start_sleep(wakeup_triggers);
+        config.finish_sleep();
     }
 }
 
