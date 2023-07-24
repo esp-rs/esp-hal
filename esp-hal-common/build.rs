@@ -250,6 +250,7 @@ fn gen_efuse_table(device_name: &str, out_dir: impl AsRef<Path>) {
             fields.next().map(|s| s.trim()),
         ) {
             (Some(name), Some(block), Some(bit_off), Some(bit_len), Some(desc)) => {
+                let desc = desc.replace('[', "`[").replace(']', "]`");
                 writeln!(writer, "/// {desc}").unwrap();
                 writeln!(
                     writer,
