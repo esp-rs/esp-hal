@@ -21,7 +21,7 @@
 //!
 //! ## Examples
 //!
-//! ### Initialisation
+//! ### initialization
 //! ```no_run
 //! let i2s = I2s::new(
 //!     peripherals.I2S0,

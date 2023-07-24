@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Implement sleep with some wakeup methods for `esp32-s3` (#660, #689, #696)
 - Add feature enabling directly hooking the interrupt vector table
 - Add `ClockControl::max` helper for all chips (#701)
+- Added module-level documentation for all peripherals
 
 ### Changed
 

@@ -9,7 +9,7 @@
 //! * AES-256
 //!
 //! ## Example
-//! ### Initialisation
+//! ### initialization
 //! ```no_run
 //! let mut aes = Aes::new(peripherals.AES, &mut system.peripheral_clock_control);
 //! ```
