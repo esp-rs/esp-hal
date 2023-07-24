@@ -2,7 +2,6 @@ use crate::{
     clock::{ApbClock, Clock, CpuClock, PllClock, XtalClock},
     regi2c_write,
     regi2c_write_mask,
-    rom::{rom_i2c_writeReg, rom_i2c_writeReg_Mask},
 };
 
 extern "C" {
@@ -43,18 +42,18 @@ const I2C_MST_BBPLL_STOP_FORCE_LOW: u32 = 1 << 3;
 pub(crate) fn esp32c2_rtc_bbpll_configure(xtal_freq: XtalClock, _pll_freq: PllClock) {
     let system = unsafe { &*crate::peripherals::SYSTEM::ptr() };
 
-    unsafe {
-        let div_ref: u32;
-        let div7_0: u32;
-        let dr1: u32;
-        let dr3: u32;
-        let dchgp: u32;
-        let dcur: u32;
-        let dbias: u32;
-        let i2c_bbpll_lref: u32;
-        let i2c_bbpll_div_7_0: u32;
-        let i2c_bbpll_dcur: u32;
+    let div_ref: u32;
+    let div7_0: u32;
+    let dr1: u32;
+    let dr3: u32;
+    let dchgp: u32;
+    let dcur: u32;
+    let dbias: u32;
+    let i2c_bbpll_lref: u32;
+    let i2c_bbpll_div_7_0: u32;
+    let i2c_bbpll_dcur: u32;
 
+    unsafe {
         let clear_reg_mask = |reg, mask: u32| {
             (reg as *mut u32).write_volatile((reg as *mut u32).read_volatile() & !mask)
         };
@@ -64,53 +63,52 @@ pub(crate) fn esp32c2_rtc_bbpll_configure(xtal_freq: XtalClock, _pll_freq: PllCl
 
         clear_reg_mask(I2C_MST_ANA_CONF0_REG, I2C_MST_BBPLL_STOP_FORCE_HIGH);
         set_reg_mask(I2C_MST_ANA_CONF0_REG, I2C_MST_BBPLL_STOP_FORCE_LOW);
-
-        // Set this register to let the digital part know 480M PLL is used
-        system
-            .cpu_per_conf
-            .modify(|_, w| w.pll_freq_sel().set_bit());
-
-        // Configure 480M PLL
-        match xtal_freq {
-            XtalClock::RtcXtalFreq26M => {
-                div_ref = 12;
-                div7_0 = 236;
-                dr1 = 4;
-                dr3 = 4;
-                dchgp = 0;
-                dcur = 0;
-                dbias = 2;
-            }
-            XtalClock::RtcXtalFreq40M | XtalClock::RtcXtalFreqOther(_) => {
-                div_ref = 0;
-                div7_0 = 8;
-                dr1 = 0;
-                dr3 = 0;
-                dchgp = 5;
-                dcur = 3;
-                dbias = 2;
-            }
-        }
-
-        regi2c_write!(I2C_BBPLL, I2C_BBPLL_MODE_HF, 0x6b);
-
-        i2c_bbpll_lref = (dchgp << I2C_BBPLL_OC_DCHGP_LSB) | div_ref;
-        i2c_bbpll_div_7_0 = div7_0;
-        i2c_bbpll_dcur =
-            (1 << I2C_BBPLL_OC_DLREF_SEL_LSB) | (3 << I2C_BBPLL_OC_DHREF_SEL_LSB) | dcur;
-
-        regi2c_write!(I2C_BBPLL, I2C_BBPLL_OC_REF_DIV, i2c_bbpll_lref);
-
-        regi2c_write!(I2C_BBPLL, I2C_BBPLL_OC_DIV_7_0, i2c_bbpll_div_7_0);
-
-        regi2c_write_mask!(I2C_BBPLL, I2C_BBPLL_OC_DR1, dr1);
-
-        regi2c_write_mask!(I2C_BBPLL, I2C_BBPLL_OC_DR3, dr3);
-
-        regi2c_write!(I2C_BBPLL, I2C_BBPLL_OC_DCUR, i2c_bbpll_dcur);
-
-        regi2c_write_mask!(I2C_BBPLL, I2C_BBPLL_OC_VCO_DBIAS, dbias);
     }
+
+    // Set this register to let the digital part know 480M PLL is used
+    system
+        .cpu_per_conf
+        .modify(|_, w| w.pll_freq_sel().set_bit());
+
+    // Configure 480M PLL
+    match xtal_freq {
+        XtalClock::RtcXtalFreq26M => {
+            div_ref = 12;
+            div7_0 = 236;
+            dr1 = 4;
+            dr3 = 4;
+            dchgp = 0;
+            dcur = 0;
+            dbias = 2;
+        }
+        XtalClock::RtcXtalFreq40M | XtalClock::RtcXtalFreqOther(_) => {
+            div_ref = 0;
+            div7_0 = 8;
+            dr1 = 0;
+            dr3 = 0;
+            dchgp = 5;
+            dcur = 3;
+            dbias = 2;
+        }
+    }
+
+    regi2c_write!(I2C_BBPLL, I2C_BBPLL_MODE_HF, 0x6b);
+
+    i2c_bbpll_lref = (dchgp << I2C_BBPLL_OC_DCHGP_LSB) | div_ref;
+    i2c_bbpll_div_7_0 = div7_0;
+    i2c_bbpll_dcur = (1 << I2C_BBPLL_OC_DLREF_SEL_LSB) | (3 << I2C_BBPLL_OC_DHREF_SEL_LSB) | dcur;
+
+    regi2c_write!(I2C_BBPLL, I2C_BBPLL_OC_REF_DIV, i2c_bbpll_lref);
+
+    regi2c_write!(I2C_BBPLL, I2C_BBPLL_OC_DIV_7_0, i2c_bbpll_div_7_0);
+
+    regi2c_write_mask!(I2C_BBPLL, I2C_BBPLL_OC_DR1, dr1);
+
+    regi2c_write_mask!(I2C_BBPLL, I2C_BBPLL_OC_DR3, dr3);
+
+    regi2c_write!(I2C_BBPLL, I2C_BBPLL_OC_DCUR, i2c_bbpll_dcur);
+
+    regi2c_write_mask!(I2C_BBPLL, I2C_BBPLL_OC_VCO_DBIAS, dbias);
 }
 
 pub(crate) fn esp32c2_rtc_bbpll_enable() {

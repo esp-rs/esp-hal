@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add initial LP-IO support for ESP32-C6 (#639)
 - Implement sleep with some wakeup methods for `esp32` (#574)
 - Add a new RMT driver (#653, #667)
+- Implemented calibrated ADC API for ESP32-S3 (#641)
 - Add MCPWM DeadTime configuration (#406)
 
 ### Changed

@@ -7,7 +7,7 @@ use crate::adc::{
     AdcCalSource,
     AdcConfig,
     Attenuation,
-    RegisterAccess,
+    CalibrationAccess,
 };
 
 /// Marker trait for ADC units which support line fitting
@@ -46,7 +46,7 @@ pub struct AdcCalLine<ADCI> {
 
 impl<ADCI> AdcCalScheme<ADCI> for AdcCalLine<ADCI>
 where
-    ADCI: AdcCalEfuse + AdcHasLineCal + RegisterAccess,
+    ADCI: AdcCalEfuse + AdcHasLineCal + CalibrationAccess,
 {
     fn new_cal(atten: Attenuation) -> Self {
         let basic = AdcCalBasic::<ADCI>::new_cal(atten);
@@ -93,8 +93,8 @@ where
     }
 }
 
-#[cfg(any(esp32c2, esp32c3, esp32c6))]
+#[cfg(any(esp32c2, esp32c3, esp32c6, esp32s3))]
 impl AdcHasLineCal for crate::adc::ADC1 {}
 
-#[cfg(esp32c3)]
+#[cfg(any(esp32c3, esp32s3))]
 impl AdcHasLineCal for crate::adc::ADC2 {}
