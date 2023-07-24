@@ -202,12 +202,11 @@ pub trait Instance {
     }
 
     fn txfifo_empty(&self) -> bool {
-        !self
-            .register_block()
+        self.register_block()
             .jfifo_st
             .read()
             .out_fifo_empty()
-            .bit_is_set()
+            .bit_is_clear()
     }
 }
 
@@ -280,12 +279,12 @@ mod asynch {
     // Single static instance of the waker
     static WAKER: AtomicWaker = AtomicWaker::new();
 
-    pub(crate) struct UsbSerialJtagFuture<'d, T> {
-        instance: &'d T,
+    pub(crate) struct UsbSerialJtagFuture<'d> {
+        instance: &'d crate::peripherals::USB_DEVICE,
     }
 
-    impl<'d, T: Instance> UsbSerialJtagFuture<'d, T> {
-        pub fn new(instance: &'d T) -> Self {
+    impl<'d> UsbSerialJtagFuture<'d> {
+        pub fn new(instance: &'d crate::peripherals::USB_DEVICE) -> Self {
             // Set the interrupt enable bit for the USB_SERIAL_JTAG_SERIAL_IN_EMPTY_INT
             // interrupt
             instance
@@ -306,7 +305,7 @@ mod asynch {
         }
     }
 
-    impl<'d, T: Instance> core::future::Future for UsbSerialJtagFuture<'d, T> {
+    impl<'d> core::future::Future for UsbSerialJtagFuture<'d> {
         type Output = ();
 
         fn poll(
@@ -365,7 +364,7 @@ mod asynch {
         WAKER.wake();
     }
 
-    #[cfg(esp32s3)] // TODO doesn't work now, issue is created
+    #[cfg(esp32s3)]
     #[interrupt]
     fn USB_DEVICE() {
         let usb_serial_jtag = unsafe { &*crate::peripherals::USB_DEVICE::ptr() };
