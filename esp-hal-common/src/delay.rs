@@ -13,6 +13,7 @@
 //! ```no_run
 //! let mut clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 //! let mut delay = Delay::new(&clocks);
+//! ...
 //! delay.delay_ms(1000 as u32);
 //! ```
 //!

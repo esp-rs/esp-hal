@@ -4,10 +4,15 @@
 //! 
 //! The `efuse` module is part of the `SOC (System-on-Chip)` funtionality of the `ESP32-S3` chip.
 //! This module provides functionality for reading eFuse data from the `ESP32-S3` chip, allowing
-//! access to various chip-specific information such as MAC address, core count, CPU frequency,
-//! chip type, and more. It is useful for retrieving chip-specific configuration and identification
-//! data during runtime.
+//! access to various chip-specific information such as :
+//!   * MAC address
+//!   * core count
+//!   * CPU frequency
+//!   * chip type 
 //! 
+//! and more. It is useful for retrieving chip-specific configuration and identification
+//! data during runtime.
+//!
 //! The `Efuse` struct represents the eFuse peripheral and is responsible for reading
 //! various eFuse fields and values.
 //! 

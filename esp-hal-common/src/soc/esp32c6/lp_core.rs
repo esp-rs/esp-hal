@@ -59,8 +59,6 @@
 //! }
 //! ```
 
-The LP_CORE driver allows starting and stopping the low power core, as well as specifying the wakeup source for the core.
-
 use esp32c6 as pac;
 
 use crate::peripheral::{Peripheral, PeripheralRef};

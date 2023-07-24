@@ -9,7 +9,7 @@
 //! The following will configure the Low Speed Channel0 to 24kHz output with
 //! 10% duty using the ABPClock
 //!
-//! ```rust,ignore
+//! ```no_run
 //! let mut ledc = LEDC::new(peripherals.LEDC, &clock_control, &mut system.peripheral_clock_control);
 //! ledc.set_global_slow_clock(LSGlobalClkSource::APBClk);
 //!
@@ -36,7 +36,7 @@
 //! The following will configure the High Speed Channel0 to 24kHz output with
 //! 10% duty using the ABPClock
 //!
-//! ```rust,ignore
+//! ```no_run
 //! let ledc = LEDC::new(peripherals.LEDC, &clock_control, &mut system.peripheral_clock_control);
 //!
 //! let mut hstimer0 = ledc.get_timer::<HighSpeed>(timer::Number::Timer0);
