@@ -3125,8 +3125,9 @@ impl Spi3Instance for crate::peripherals::SPI3 {}
 
 use crate::FlashSafeDma;
 
-
-impl<T: embedded_hal::blocking::spi::Transfer<u8>, const SIZE: usize> embedded_hal::blocking::spi::Transfer<u8> for FlashSafeDma<T, SIZE> {
+impl<T: embedded_hal::blocking::spi::Transfer<u8>, const SIZE: usize>
+    embedded_hal::blocking::spi::Transfer<u8> for FlashSafeDma<T, SIZE>
+{
     type Error = T::Error;
 
     fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Self::Error> {
@@ -3134,17 +3135,43 @@ impl<T: embedded_hal::blocking::spi::Transfer<u8>, const SIZE: usize> embedded_h
     }
 }
 
-impl<T: embedded_hal::blocking::spi::Write<u8>, const SIZE: usize> embedded_hal::blocking::spi::Write<u8> for FlashSafeDma<T, SIZE> {
+impl<T: embedded_hal::blocking::spi::Write<u8>, const SIZE: usize>
+    embedded_hal::blocking::spi::Write<u8> for FlashSafeDma<T, SIZE>
+{
     type Error = T::Error;
 
     fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-        Ok(if !crate::soc::is_valid_ram_address(&words[0] as *const _ as u32) {
-            for chunk in words.chunks(SIZE) {
-                self.buffer[..chunk.len()].copy_from_slice(chunk);
-                self.inner.write(&self.buffer[..chunk.len()])?;
-            }
-        } else {
-            self.inner.write(words)?;
-        })
+        Ok(
+            if !crate::soc::is_valid_ram_address(&words[0] as *const _ as u32) {
+                for chunk in words.chunks(SIZE) {
+                    self.buffer[..chunk.len()].copy_from_slice(chunk);
+                    self.inner.write(&self.buffer[..chunk.len()])?;
+                }
+            } else {
+                self.inner.write(words)?;
+            },
+        )
+    }
+}
+
+impl<T: embedded_hal::spi::FullDuplex<u8>, const SIZE: usize> embedded_hal::spi::FullDuplex<u8>
+    for FlashSafeDma<T, SIZE>
+where
+    Self: embedded_hal::blocking::spi::Transfer<u8, Error = T::Error>,
+    Self: embedded_hal::blocking::spi::Write<u8, Error = T::Error>,
+{
+    type Error = T::Error;
+
+    fn read(&mut self) -> nb::Result<u8, Self::Error> {
+        use embedded_hal::blocking::spi::Transfer;
+        let mut buf = [0; 1];
+        self.transfer(&mut buf)?;
+        Ok(buf[0])
+    }
+
+    fn send(&mut self, word: u8) -> nb::Result<(), Self::Error> {
+        use embedded_hal::blocking::spi::Write;
+        self.write(&[word])?;
+        Ok(())
     }
 }
