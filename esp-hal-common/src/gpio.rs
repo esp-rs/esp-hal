@@ -1426,43 +1426,40 @@ macro_rules! gpio {
 #[macro_export]
 macro_rules! rtc_pins {
     (
-        $( ( $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat ) )+
+        $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat
     ) => {
-        impl<MODE, const GPIONUM: u8> crate::gpio::RTCPin for GpioPin<MODE, GPIONUM>
+        impl<MODE> crate::gpio::RTCPin for GpioPin<MODE, $pin_num>
         where
             Self: crate::gpio::GpioProperties,
-            <Self as crate::gpio::GpioProperties>::PinType: crate::gpio::IsAnalogPin,
         {
             fn rtc_number(&self) -> u8 {
-                match GPIONUM {
-                    $(
-                        $pin_num => $rtc_pin,
-                    )+
-                    _ => unreachable!(),
-                }
+                $rtc_pin
             }
+
             /// Set the RTC properties of the pin. If `mux` is true then then pin is
             /// routed to RTC, when false it is routed to IO_MUX.
             fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: u8) {
                 use crate::peripherals::RTC_IO;
                 let rtcio = unsafe{ &*RTC_IO::ptr() };
-                match GPIONUM {
-                    $(
-                        $pin_num => {
-                            // disable input
-                            paste::paste!{
-                                rtcio.$pin_reg.modify(|_,w| unsafe {w
-                                    .[<$prefix fun_ie>]().bit(input_enable)
-                                    .[<$prefix mux_sel>]().bit(mux)
-                                    .[<$prefix fun_sel>]().bits(func)
-                                });
-                            }
-                        }
-                    )+
-                        _ => unreachable!(),
+
+                // disable input
+                paste::paste!{
+                    rtcio.$pin_reg.modify(|_,w| unsafe {w
+                        .[<$prefix fun_ie>]().bit(input_enable)
+                        .[<$prefix mux_sel>]().bit(mux)
+                        .[<$prefix fun_sel>]().bits(func)
+                    });
                 }
             }
         }
+    };
+
+    (
+        $( ( $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat ) )+
+    ) => {
+        $(
+            crate::gpio::rtc_pins!($pin_num, $rtc_pin, $pin_reg, $prefix);
+        )+
     };
 }
 
@@ -1857,11 +1854,14 @@ mod asynch {
             intrs
         );
 
-        while intrs != 0 {
-            let pin_nr = intrs.trailing_zeros();
+        let mut intr_bits = intrs;
+        while intr_bits != 0 {
+            // TODO: we should probably call `leading_zeros` on Xtensa
+            // when that lowers to NSAU.
+            let pin_nr = intr_bits.trailing_zeros();
             set_int_enable(pin_nr as u8, 0, 0, false);
             PIN_WAKERS[pin_nr as usize].wake(); // wake task
-            intrs &= !(1 << pin_nr);
+            intr_bits -= 1 << pin_nr;
         }
 
         // clear interrupt bits

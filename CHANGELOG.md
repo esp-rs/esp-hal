@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Implement sleep with some wakeup methods for `esp32` (#574)
 - Add a new RMT driver (#653, #667)
 - Implemented calibrated ADC API for ESP32-S3 (#641)
+- Add MCPWM DeadTime configuration (#406)
 
 ### Changed
 
@@ -25,10 +26,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - USB device support is working again (#656)
 - Add missing interrupt status read for esp32s3, which fixes USB-SERIAL-JTAG interrupts (#664)
+- GPIO interrupt status bits are now properly cleared (#670)
 
 ### Removed
 
 - Remove the `allow-opt-level-z` feature from `esp32c3-hal` (#654)
+
+### Breaking
+
+- `DmaTransfer::wait` and `I2sReadDmaTransfer::wait_receive` now return `Result` (#665)
 
 ## [0.10.0] - 2023-06-04
 
@@ -53,6 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add embassy async `read` support for `uart` (#620)
 - Add bare-bones support to run code on ULP-RISCV / LP core (#631)
 - Add ADC calibration implementation for a riscv chips (#555)
+- Add `async` implementation for `USB Serial/JTAG`(#632)
 
 ### Changed
 

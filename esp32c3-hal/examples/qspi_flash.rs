@@ -110,7 +110,7 @@ fn main() -> ! {
             zero_buf,
         )
         .unwrap();
-    (zero_buf, spi) = transfer.wait();
+    (zero_buf, spi) = transfer.wait().unwrap();
     delay.delay_ms(250u32);
 
     // erase sector
@@ -123,7 +123,7 @@ fn main() -> ! {
             zero_buf,
         )
         .unwrap();
-    (zero_buf, spi) = transfer.wait();
+    (zero_buf, spi) = transfer.wait().unwrap();
     delay.delay_ms(250u32);
 
     // write enable
@@ -136,7 +136,7 @@ fn main() -> ! {
             zero_buf,
         )
         .unwrap();
-    (_, spi) = transfer.wait();
+    (_, spi) = transfer.wait().unwrap();
     delay.delay_ms(250u32);
 
     // write data / program page
@@ -151,7 +151,7 @@ fn main() -> ! {
             send,
         )
         .unwrap();
-    (_, spi) = transfer.wait();
+    (_, spi) = transfer.wait().unwrap();
     delay.delay_ms(250u32);
 
     loop {
@@ -169,7 +169,7 @@ fn main() -> ! {
         // here we could do something else while DMA transfer is in progress
         // the buffers and spi is moved into the transfer and we can get it back via
         // `wait`
-        (receive, spi) = transfer.wait();
+        (receive, spi) = transfer.wait().unwrap();
 
         println!("{:x?}", &receive);
         for b in &mut receive.iter() {

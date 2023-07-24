@@ -20,7 +20,7 @@ use esp_backtrace as _;
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let mut system = peripherals.PCR.split();
+    let system = peripherals.PCR.split();
     let mut clock_control = system.peripheral_clock_control;
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
