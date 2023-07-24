@@ -1,14 +1,17 @@
 //! Analog peripherals - Digital to Analog Converter
-//! 
-//! ## Overview
-//! The `DAC` module is part of the `ADC` driver designed for ESP microcontrollers, providing functionalities
-//! for `digital-to-analog` conversion. 
 //!
-//! This module simplifies digital-to-analog conversion on ESP microcontrollers, enabling precise control over analog
-//! output signals. Developers can choose the `DAC` channel they want to use based on the GPIO pin assignments for each channel.
-//! By providing a unified interface for DAC control, the module makes it easier for users to generate
-//! accurate analog voltages in their applications, such as audio generation, sensor calibration, and analog signal synthesis.
-//! 
+//! ## Overview
+//! The `DAC` module is part of the `ADC` driver designed for ESP
+//! microcontrollers, providing functionalities for `digital-to-analog`
+//! conversion.
+//!
+//! This module simplifies digital-to-analog conversion on ESP microcontrollers,
+//! enabling precise control over analog output signals. Developers can choose
+//! the `DAC` channel they want to use based on the GPIO pin assignments for
+//! each channel. By providing a unified interface for DAC control, the module
+//! makes it easier for users to generate accurate analog voltages in their
+//! applications, such as audio generation, sensor calibration, and analog
+//! signal synthesis.
 use crate::{
     peripheral::PeripheralRef,
     peripherals::{RTC_IO, SENS},

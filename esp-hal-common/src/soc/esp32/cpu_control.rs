@@ -1,17 +1,19 @@
 //! Control CPU Cores(ESP32)
-//! 
+//!
 //! ## Overview
-//! 
-//! This module is part of the `SOC (System-on-Chip)` functionality of the `ESP32` chip.
-//! It module provides essential functionality for controlling and managing the CPU cores on the `ESP32` chip
-//! allowing for fine-grained control over their execution and cache behavior.
-//! It is used in scenarios where precise control over CPU core operation is required, such as
-//! multi-threading or power management.
-//! 
-//! The `CpuControl` struct represents the CPU control module and is responsible for managing the behavior and
-//! operation of the CPU cores. It is typically initialized with the `SystemCpuControl` struct,
-//! which is provided by the `system` module.
-//! 
+//!
+//! This module is part of the `SOC (System-on-Chip)` functionality of the
+//! `ESP32` chip. It module provides essential functionality for controlling and
+//! managing the CPU cores on the `ESP32` chip allowing for fine-grained control
+//! over their execution and cache behavior. It is used in scenarios where
+//! precise control over CPU core operation is required, such as multi-threading
+//! or power management.
+//!
+//! The `CpuControl` struct represents the CPU control module and is responsible
+//! for managing the behavior and operation of the CPU cores. It is typically
+//! initialized with the `SystemCpuControl` struct, which is provided by the
+//! `system` module.
+//!
 //! ## Example
 //! ```no_run
 //! let counter = Mutex::new(RefCell::new(0));
@@ -29,12 +31,12 @@
 //!     println!("Hello World - Core 0! Counter is {}", count);
 //! }
 //! ```
-//! 
+//!
 //! Where `cpu1_task()` may be defined as:
 //! ```no_run
 //! fn cpu1_task(
-//!    timer: &mut Timer<Timer0<TIMG1>>,
-//!    counter: &critical_section::Mutex<RefCell<i32>>,
+//!     timer: &mut Timer<Timer0<TIMG1>>,
+//!     counter: &critical_section::Mutex<RefCell<i32>>,
 //! ) -> ! {
 //!     println!("Hello World - Core 1!");
 //!     loop {

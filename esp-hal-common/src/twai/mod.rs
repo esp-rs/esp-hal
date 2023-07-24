@@ -1,20 +1,21 @@
 //! # Two-wire Automotive Interface (TWAI)
 //!
 //! ## Overview
-//! The TWAI peripheral driver provides functions and structs specifically designed
-//! for the Two-Wire Automotive Interface (TWAI) on ESP chips. TWAI is a communication protocol 
-//! commonly used in automotive applications for sending and receiving messages
-//! between electronic control units (ECUs) in a vehicle.
-//! 
-//! The driver enables you to configure and utilize the TWAI module on ESP chips.
-//! It offers functions for initializing the TWAI peripheral, setting up the ti1ming
-//! parameters, configuring acceptance filters, handling interrupts, and transmitting/receiving
-//! messages on the TWAI bus.
-//! 
+//! The TWAI peripheral driver provides functions and structs specifically
+//! designed for the Two-Wire Automotive Interface (TWAI) on ESP chips. TWAI is
+//! a communication protocol commonly used in automotive applications for
+//! sending and receiving messages between electronic control units (ECUs) in a
+//! vehicle.
+//!
+//! The driver enables you to configure and utilize the TWAI module on ESP
+//! chips. It offers functions for initializing the TWAI peripheral, setting up
+//! the ti1ming parameters, configuring acceptance filters, handling interrupts,
+//! and transmitting/receiving messages on the TWAI bus.
+//!
 //! This driver manages the ISO 11898-1 (CAN Specification 2.0) compatible TWAI
 //! controllers. It supports Standard Frame Format (11-bit) and Extended Frame
 //! Format (29-bit) frame identifiers.
-//! 
+//!
 //! ## Example
 //! ```no_run
 //! // Use GPIO pins 2 and 3 to connect to the respective pins on the CAN
@@ -45,13 +46,13 @@
 //! // and puts it into operation mode, allowing packets to be sent and
 //! // received.
 //! let mut can = can_config.start();
-//! 
+//!
 //! loop {
 //!     // Wait for a frame to be received.
 //!     let frame = block!(can.receive()).unwrap();
 //!
 //!     println!("Received a frame:");
-//! 
+//!
 //!     // Print different messages based on the frame id type.
 //!     match frame.id() {
 //!         Id::Standard(id) => {

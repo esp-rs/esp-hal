@@ -10,17 +10,21 @@
 //! 10% duty using the ABPClock
 //!
 //! ```no_run
-//! let mut ledc = LEDC::new(peripherals.LEDC, &clock_control, &mut system.peripheral_clock_control);
+//! let mut ledc = LEDC::new(
+//!     peripherals.LEDC,
+//!     &clock_control,
+//!     &mut system.peripheral_clock_control,
+//! );
 //! ledc.set_global_slow_clock(LSGlobalClkSource::APBClk);
 //!
 //! let mut lstimer0 = ledc.get_timer::<LowSpeed>(timer::Number::Timer0);
 //! lstimer0
-//! .configure(timer::config::Config {
-//!            duty: timer::config::Duty::Duty5Bit,
-//!            clock_source: timer::LSClockSource::APBClk,
-//!            frequency: 24u32.kHz(),
-//!        })
-//!        .unwrap();
+//!     .configure(timer::config::Config {
+//!         duty: timer::config::Duty::Duty5Bit,
+//!         clock_source: timer::LSClockSource::APBClk,
+//!         frequency: 24u32.kHz(),
+//!     })
+//!     .unwrap();
 //!
 //! let mut channel0 = ledc.get_channel(channel::Number::Channel0, led);
 //! channel0
@@ -37,16 +41,20 @@
 //! 10% duty using the ABPClock
 //!
 //! ```no_run
-//! let ledc = LEDC::new(peripherals.LEDC, &clock_control, &mut system.peripheral_clock_control);
+//! let ledc = LEDC::new(
+//!     peripherals.LEDC,
+//!     &clock_control,
+//!     &mut system.peripheral_clock_control,
+//! );
 //!
 //! let mut hstimer0 = ledc.get_timer::<HighSpeed>(timer::Number::Timer0);
 //! hstimer0
-//! .configure(timer::config::Config {
-//!            duty: timer::config::Duty::Duty5Bit,
-//!            clock_source: timer::HSClockSource::APBClk,
-//!            frequency: 24u32.kHz(),
-//!        })
-//!        .unwrap();
+//!     .configure(timer::config::Config {
+//!         duty: timer::config::Duty::Duty5Bit,
+//!         clock_source: timer::HSClockSource::APBClk,
+//!         frequency: 24u32.kHz(),
+//!     })
+//!     .unwrap();
 //!
 //! let mut channel0 = ledc.get_channel(channel::Number::Channel0, led);
 //! channel0

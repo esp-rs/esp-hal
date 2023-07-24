@@ -1,36 +1,41 @@
 //! Analog peripherals
-//! 
+//!
 //! ## Overview
-//! The `Analog` Driver is a module designed for ESP microcontrollers, that provides an interface
-//! to interact with analog peripherals on the chip. The module includes support
-//! for `Analog-to-Digital Converters (ADC)` and `Digital-to-Analog Converters (DAC)`, offering
-//! functionality for precise analog measurements and generating analog output signals.
-//! 
-//! The `ADC` functionality in the `analog` driver enables users to perform analog-to-digital conversions,
-//! allowing them to measure real-world analog signals with high accuracy. The module provides access
-//! to multiple ADC units, such as `ADC1` and `ADC2`, which may differ based on the specific
-//! ESP microcontroller being used.
-//! 
-//! The `DAC` functionality in the analog driver enables users to generate analog output signals
-//! with precise control over voltage levels. The module supports multiple DAC units,
-//! such as `DAC1` and `DAC2`, which may vary depending on the specific ESP microcontroller.
-//! 
+//! The `Analog` Driver is a module designed for ESP microcontrollers, that
+//! provides an interface to interact with analog peripherals on the chip. The
+//! module includes support for `Analog-to-Digital Converters (ADC)` and
+//! `Digital-to-Analog Converters (DAC)`, offering functionality for precise
+//! analog measurements and generating analog output signals.
+//!
+//! The `ADC` functionality in the `analog` driver enables users to perform
+//! analog-to-digital conversions, allowing them to measure real-world analog
+//! signals with high accuracy. The module provides access to multiple ADC
+//! units, such as `ADC1` and `ADC2`, which may differ based on the specific ESP
+//! microcontroller being used.
+//!
+//! The `DAC` functionality in the analog driver enables users to generate
+//! analog output signals with precise control over voltage levels. The module
+//! supports multiple DAC units, such as `DAC1` and `DAC2`, which may vary
+//! depending on the specific ESP microcontroller.
+//!
 //! #### Xtensa architecture
-//! For ESP microcontrollers using the `Xtensa` architecture, the driver provides access
-//! to the `SENS` peripheral, allowing users to split it into independent parts
-//! using the [`SensExt`] trait. This extension trait provides access to the following analog peripherals:
+//! For ESP microcontrollers using the `Xtensa` architecture, the driver
+//! provides access to the `SENS` peripheral, allowing users to split it into
+//! independent parts using the [`SensExt`] trait. This extension trait provides
+//! access to the following analog peripherals:
 //!   * ADC1
 //!   * ADC2
 //!   * DAC1
 //!   * DAC2
-//! 
+//!
 //! #### RISC-V architecture
-//! For ESP microcontrollers using the `RISC-V` architecture, the driver provides
-//! access to the `APB_SARADC` peripheral. The `SarAdcExt` trait allows users to split this peripheral
-//! into independent parts, providing access to the following analog peripheral:
+//! For ESP microcontrollers using the `RISC-V` architecture, the driver
+//! provides access to the `APB_SARADC` peripheral. The `SarAdcExt` trait allows
+//! users to split this peripheral into independent parts, providing access to
+//! the following analog peripheral:
 //!   * ADC1
 //!   * ADC2
-//! 
+//!
 //! ## Examples
 //! #### ADC on Risc-V architecture
 //! ```no_run
@@ -54,7 +59,7 @@
 //!     let pin_value: u16 = nb::block!(adc1.read(&mut pin)).unwrap();
 //!     println!("PIN2 ADC reading = {}", pin_value);
 //!     delay.delay_ms(1500u32);
-//! } 
+//! }
 //! ```
 //! #### ADC on Xtensa architecture
 //! ```no_run

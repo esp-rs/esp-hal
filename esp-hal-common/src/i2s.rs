@@ -1,24 +1,26 @@
 //! I2S Master
-//! 
+//!
 //! ## Overview
-//! 
-//! The I2S Master peripheral driver provides support for the I2S (Inter-IC Sound) Master functionality
-//! on ESP chips. It enables audio data transmission and reception with external
-//! audio devices, such as DACs (Digital-to-Analog Converters) and ADCs (Analog-to-Digital Converters)
-//! through the I2S interface.
-//! Also this module supports different data formats, including
-//! varying data and channel widths, different standards, such as the Philips standard and configurable
-//! pin mappings for I2S clock (BCLK), word select (WS), and data input/output (DOUT/DIN).
-//! 
-//! The driver uses DMA (Direct Memory Access) for efficient data transfer and supports various
-//! configurations, such as different data formats, standards (e.g., Philips)
-//! and pin configurations. It relies on other peripheral modules, such as
+//!
+//! The I2S Master peripheral driver provides support for the I2S (Inter-IC
+//! Sound) Master functionality on ESP chips. It enables audio data transmission
+//! and reception with external audio devices, such as DACs (Digital-to-Analog
+//! Converters) and ADCs (Analog-to-Digital Converters) through the I2S
+//! interface. Also this module supports different data formats, including
+//! varying data and channel widths, different standards, such as the Philips
+//! standard and configurable pin mappings for I2S clock (BCLK), word select
+//! (WS), and data input/output (DOUT/DIN).
+//!
+//! The driver uses DMA (Direct Memory Access) for efficient data transfer and
+//! supports various configurations, such as different data formats, standards
+//! (e.g., Philips) and pin configurations. It relies on other peripheral
+//! modules, such as
 //!     - `GPIO`
 //!     - `DMA`
 //!     - `system` (to configure and enable the I2S peripheral)
-//! 
-//! ## Examples 
-//! 
+//!
+//! ## Examples
+//!
 //! ### Initialisation
 //! ```no_run
 //! let i2s = I2s::new(
@@ -37,15 +39,15 @@
 //!     &clocks,
 //! );
 //! ```
-//! 
+//!
 //! ### Reading
 //! ```no_run
 //! let i2s_rx = i2s.i2s_rx.with_pins(PinsBclkWsDin::new(
-//! io.pins.gpio1,
-//! io.pins.gpio2,
-//! io.pins.gpio5,
+//!     io.pins.gpio1,
+//!     io.pins.gpio2,
+//!     io.pins.gpio5,
 //! ));
-//! 
+//!
 //! // Creating DMA buffer
 //! static mut BUFFER: [u8; 4092 * 4] = [0u8; 4092 * 4];
 //! let buffer: &'static mut [u8; 4092 * 4] = unsafe { &mut BUFFER };

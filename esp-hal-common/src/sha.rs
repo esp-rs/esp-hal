@@ -1,29 +1,32 @@
 //! Secure Hash Algorithm peripheral driver
-//! 
+//!
 //! ## Overview
 //! This SHA (Secure Hash Algorithm) driver for ESP chips is a software module
-//! that provides an interface to interact with the SHA peripheral on ESP microcontroller chips.
-//! This driver allows you to perform cryptographic hash operations using various hash
-//! algorithms supported by the SHA peripheral, such as:
+//! that provides an interface to interact with the SHA peripheral on ESP
+//! microcontroller chips. This driver allows you to perform cryptographic hash
+//! operations using various hash algorithms supported by the SHA peripheral,
+//! such as:
 //!    * SHA-1
 //!    * SHA-224
 //!    * SHA-256
 //!    * SHA-384
 //!    * SHA-512
-//! 
-//! The driver supports two working modes: 
-//!    * Typical SHA 
-//!    * DMA-SHA (Direct Memory Access SHA is NOT implemented yet). 
-//! 
-//! It provides functions to update the hash calculation with input data, finish the hash calculation 
-//! and retrieve the resulting hash value. The SHA peripheral on ESP chips can handle large data
-//! streams efficiently, making it suitable for cryptographic applications that require secure hashing.
 //!
-//! To use the SHA Peripheral Driver, you need to initialize it with the desired SHA mode
-//! and the corresponding SHA peripheral. Once initialized, you can update the hash calculation by
-//! providing input data, finish the calculation to retrieve the hash value 
-//! and repeat the process for a new hash calculation if needed.
-//! 
+//! The driver supports two working modes:
+//!    * Typical SHA
+//!    * DMA-SHA (Direct Memory Access SHA is NOT implemented yet).
+//!
+//! It provides functions to update the hash calculation with input data, finish
+//! the hash calculation and retrieve the resulting hash value. The SHA
+//! peripheral on ESP chips can handle large data streams efficiently, making it
+//! suitable for cryptographic applications that require secure hashing.
+//!
+//! To use the SHA Peripheral Driver, you need to initialize it with the desired
+//! SHA mode and the corresponding SHA peripheral. Once initialized, you can
+//! update the hash calculation by providing input data, finish the calculation
+//! to retrieve the hash value and repeat the process for a new hash calculation
+//! if needed.
+//!
 //! ## Example
 //! ```no_run
 //! let source_data = "HELLO, ESPRESSIF!".as_bytes();
@@ -56,7 +59,6 @@
 //!
 //! println!("SHA256 Hash output {:02x?}", soft_result);
 //! ```
-
 
 use core::convert::Infallible;
 

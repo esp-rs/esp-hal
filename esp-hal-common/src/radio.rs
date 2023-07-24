@@ -1,18 +1,18 @@
 //! Wireless communication peripheral implementations (TBF)
-//! 
+//!
 //! ## Overview
-//! The Wireless Communication Peripheral Implementations module provides implementations for different
-//! wireless communication peripherals, including WiFi, Bluetooth and
-//! IEEE 802.15.4 Low Rate wireless personal area radio.
-//! 
-//! In addition to the structures defined in this module, the module also defines the `RadioExt` trait, which
-//! provides a `split` method. This method allows splitting the general 
-//! `Radio` peripheral into its individual components.
+//! The Wireless Communication Peripheral Implementations module provides
+//! implementations for different wireless communication peripherals, including
+//! WiFi, Bluetooth and IEEE 802.15.4 Low Rate wireless personal area radio.
 //!
-//! Additionally, the module includes implementation blocks for each wireless 
-//! communication peripheral, providing necessary functions and traits for each peripheral.
+//! In addition to the structures defined in this module, the module also
+//! defines the `RadioExt` trait, which provides a `split` method. This method
+//! allows splitting the general `Radio` peripheral into its individual
+//! components.
 //!
-//!
+//! Additionally, the module includes implementation blocks for each wireless
+//! communication peripheral, providing necessary functions and traits for each
+//! peripheral.
 pub trait RadioExt {
     type Components;
 

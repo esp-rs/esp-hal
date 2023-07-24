@@ -1,18 +1,21 @@
 //! PSRAM "virtual peripheral" driver (ESP32-S2)
-//! 
+//!
 //! ## Overview
-//! 
-//! The `PSRAM` module is a part of the `SOC` functionality the `ESP32-S2` chip. It provides support for accessing and
-//! controlling the `Pseudo Static Random Access Memory (PSRAM)` on the `ESP32-S2`.
-//! 
-//! The `PSRAM` module enables users to interface with the `PSRAM` memory present on the `ESP32-S2` chip.
-//! `PSRAM` provides additional external memory to supplement the internal memory of the `ESP32-S2`, allowing for increased
+//!
+//! The `PSRAM` module is a part of the `SOC` functionality the `ESP32-S2` chip.
+//! It provides support for accessing and controlling the `Pseudo Static Random
+//! Access Memory (PSRAM)` on the `ESP32-S2`.
+//!
+//! The `PSRAM` module enables users to interface with the `PSRAM` memory
+//! present on the `ESP32-S2` chip. `PSRAM` provides additional external memory
+//! to supplement the internal memory of the `ESP32-S2`, allowing for increased
 //! storage capacity and improved performance in certain applications.
-//! 
-//! The `PSRAM` module is accessed through a virtual address, defined as `PSRAM_VADDR`. 
-//! The starting virtual address for the PSRAM module is 0x3f500000.
-//! The `PSRAM` module size depends on the configuration specified during the compilation process.
-//! The available `PSRAM` sizes are `2MB`, `4MB`, and `8MB`.
+//!
+//! The `PSRAM` module is accessed through a virtual address, defined as
+//! `PSRAM_VADDR`. The starting virtual address for the PSRAM module is
+//! 0x3f500000. The `PSRAM` module size depends on the configuration specified
+//! during the compilation process. The available `PSRAM` sizes are `2MB`,
+//! `4MB`, and `8MB`.
 static mut PSRAM_VADDR: u32 = 0x3C000000;
 
 pub fn psram_vaddr_start() -> usize {

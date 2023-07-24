@@ -1,16 +1,16 @@
 //! Radio clocks driver(ESP32-S3)
-//! 
+//!
 //! ## Overview
-//! 
-//! The `Radio Clocks` module is a part of the `SOC` functionality of the `ESP32-S3` chip. It provides control and configuration
-//! functions for various radio peripherals, such as `PHY`, `Bluetooth (BT)`, and `Wi-Fi`. 
-//! The module allows enabling and disabling these peripherals, resetting the `Media Access Control (MAC)`
-//! and initializing clocks.
-//! 
-//! The module defines a `RadioClockController` trait implemented by the `RadioClockControl` struct.
-//! This trait provides methods to enable, disable, reset the MAC, initialize clocks
-//! and perform other related operations.
-//! 
+//!
+//! The `Radio Clocks` module is a part of the `SOC` functionality of the
+//! `ESP32-S3` chip. It provides control and configuration functions for various
+//! radio peripherals, such as `PHY`, `Bluetooth (BT)`, and `Wi-Fi`. The module
+//! allows enabling and disabling these peripherals, resetting the `Media Access
+//! Control (MAC)` and initializing clocks.
+//!
+//! The module defines a `RadioClockController` trait implemented by the
+//! `RadioClockControl` struct. This trait provides methods to enable, disable,
+//! reset the MAC, initialize clocks and perform other related operations.
 use crate::system::{RadioClockControl, RadioClockController, RadioPeripherals};
 
 // Note: this comment has been copied from esp-idf, including the mistake.

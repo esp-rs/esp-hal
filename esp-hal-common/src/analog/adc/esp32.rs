@@ -424,9 +424,10 @@ pub mod implementation {
     //! Analog to digital (ADC) conversion support.
     //!
     //! ## Overview
-    //! The `ADC` functionality in the `analog` driver enables users to perform analog-to-digital conversions,
-    //! allowing them to measure real-world analog signals with high accuracy.
-    //! 
+    //! The `ADC` functionality in the `analog` driver enables users to perform
+    //! analog-to-digital conversions, allowing them to measure real-world
+    //! analog signals with high accuracy.
+    //!
     //! Module provides functions for reading analog values from the
     //! analog to digital converter available on the ESP32: `ADC1` and `ADC2`.
     //!
@@ -444,7 +445,7 @@ pub mod implementation {
     //! | 7       | GPIO35 (VDET_2)      | GPIO27        |
     //! | 8       |                      | GPIO25        |
     //! | 9       |                      | GPIO26        |
-    //! 
+    //!
     //! ## Example
     //! #### ADC on Xtensa architecture
     //! ```no_run

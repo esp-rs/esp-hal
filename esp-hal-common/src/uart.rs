@@ -1,50 +1,51 @@
 //! UART driver
-//! 
+//!
 //! ## Overview
-//! In embedded system applications, data is required to be transferred in a simple way
-//! with minimal system resources. This can be achieved by a
+//! In embedded system applications, data is required to be transferred in a
+//! simple way with minimal system resources. This can be achieved by a
 //! Universal Asynchronous Receiver/Transmitter (UART), which flexibly exchanges
 //! data with other peripheral devices in full-duplex mode.
-//! The UART driver provides an interface to communicate with UART peripherals on ESP chips. 
-//! It enables serial communication between the microcontroller and external devices using the UART protocol.
-//! 
+//! The UART driver provides an interface to communicate with UART peripherals
+//! on ESP chips. It enables serial communication between the microcontroller
+//! and external devices using the UART protocol.
+//!
 //! ## Example
 //! ```no_run
-//!     let config = Config {
-//!         baudrate: 115200,
-//!         data_bits: DataBits::DataBits8,
-//!         parity: Parity::ParityNone,
-//!         stop_bits: StopBits::STOP1,
-//!     };
+//! let config = Config {
+//!     baudrate: 115200,
+//!     data_bits: DataBits::DataBits8,
+//!     parity: Parity::ParityNone,
+//!     stop_bits: StopBits::STOP1,
+//! };
 //!
-//!     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-//!     let pins = TxRxPins::new_tx_rx(
-//!         io.pins.gpio1.into_push_pull_output(),
-//!         io.pins.gpio2.into_floating_input(),
-//!     );
+//! let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+//! let pins = TxRxPins::new_tx_rx(
+//!     io.pins.gpio1.into_push_pull_output(),
+//!     io.pins.gpio2.into_floating_input(),
+//! );
 //!
-//!     let mut serial1 = Uart::new_with_config(
-//!         peripherals.UART1,
-//!         Some(config),
-//!         Some(pins),
-//!         &clocks,
-//!         &mut system.peripheral_clock_control,
-//!     );  
+//! let mut serial1 = Uart::new_with_config(
+//!     peripherals.UART1,
+//!     Some(config),
+//!     Some(pins),
+//!     &clocks,
+//!     &mut system.peripheral_clock_control,
+//! );
 //!
-//!     timer0.start(250u64.millis());
+//! timer0.start(250u64.millis());
 //!
-//!     println!("Start");
-//!     loop {
-//!         serial1.write(0x42).ok();
-//!         let read = block!(serial1.read());
+//! println!("Start");
+//! loop {
+//!     serial1.write(0x42).ok();
+//!     let read = block!(serial1.read());
 //!
-//!         match read {
-//!             Ok(read) => println!("Read 0x{:02x}", read),
-//!             Err(err) => println!("Error {:?}", err),
-//!         }
-//!
-//!         block!(timer0.wait()).unwrap();
+//!     match read {
+//!         Ok(read) => println!("Read 0x{:02x}", read),
+//!         Err(err) => println!("Error {:?}", err),
 //!     }
+//!
+//!     block!(timer0.wait()).unwrap();
+//! }
 //! ```
 
 use self::config::Config;

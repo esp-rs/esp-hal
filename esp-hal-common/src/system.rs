@@ -1,18 +1,22 @@
 //! System Control
 //!
 //! ## Overview
-//! The system driver provides functionality for controlling various aspects of the chip's system on ESP chips.
-//! It includes the configuration of peripheral clocks, chip clocks, software interrupts, and CPU control.
-//! 
+//! The system driver provides functionality for controlling various aspects of
+//! the chip's system on ESP chips. It includes the configuration of peripheral
+//! clocks, chip clocks, software interrupts, and CPU control.
+//!
 //! ### Software Interrupts
-//! The `SoftwareInterrupt` enum represents the available software interrupt sources.
-//! 
-//! The SoftwareInterruptControl struct allows raising or resetting software interrupts
-//! using the `raise()` and `reset()` methods. The behavior of these methods depends on the specific chip variant.
-//! 
+//! The `SoftwareInterrupt` enum represents the available software interrupt
+//! sources.
+//!
+//! The SoftwareInterruptControl struct allows raising or resetting software
+//! interrupts using the `raise()` and `reset()` methods. The behavior of these
+//! methods depends on the specific chip variant.
+//!
 //! ### Peripheral Clock Control
-//! The `PeripheralClockControl` struct controls the enablement of peripheral clocks. 
-//! 
+//! The `PeripheralClockControl` struct controls the enablement of peripheral
+//! clocks.
+//!
 //! It provides an `enable()` method to enable and reset specific peripherals.
 //! The available peripherals are represented by the `Peripheral` enum
 //!

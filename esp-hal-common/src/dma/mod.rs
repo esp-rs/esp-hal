@@ -1,36 +1,44 @@
 //! Direct Memory Access Commons
 //!
 //! ## Overview
-//! The `DMA` driver provides an interface to efficiently transfer data between different memory regions
-//! within the ESP microcontroller without involving the CPU. The `Direct Memory Access` (DMA) controller is a hardware
+//! The `DMA` driver provides an interface to efficiently transfer data between
+//! different memory regions within the ESP microcontroller without involving
+//! the CPU. The `Direct Memory Access` (DMA) controller is a hardware
 //! block responsible for managing these data transfers.
-//! 
-//! The driver is organized into several components and traits, each responsible for handling specific
-//! functionalities of the `DMA` controller. Below is an overview of the main components and their functionalities:
+//!
+//! The driver is organized into several components and traits, each responsible
+//! for handling specific functionalities of the `DMA` controller. Below is an
+//! overview of the main components and their functionalities:
 //!   * `Tx` and `Rx` traits:
-//!      - These traits define the behaviors and functionalities required for DMA transmit and receive operations.<br>
-//!        The `Tx` trait includes functions to start, stop, and check the completion status of an outbound DMA transfer.<br>
-//!        On the other hand, the Rx trait provides similar functionalities for inbound DMA transfers.
+//!      - These traits define the behaviors and functionalities required for
+//!        DMA transmit and receive operations.<br> The `Tx` trait includes
+//!        functions to start, stop, and check the completion status of an
+//!        outbound DMA transfer.<br> On the other hand, the Rx trait provides
+//!        similar functionalities for inbound DMA transfers.
 //!   * `DmaTransfer` and `DmaTransferRxTx` traits:
-//!      - The `DmaTransfer` trait and `DmaTransferRxTx` trait are used for in-progress DMA transfers.<br>
-//!        They allow waiting for the transfer to complete and checking its status.
-//!        Additionally, the `DmaTransferRxTx` trait extends the functionalities to support both receive and transmit
-//!        operations in a single trait.
+//!      - The `DmaTransfer` trait and `DmaTransferRxTx` trait are used for
+//!        in-progress DMA transfers.<br> They allow waiting for the transfer to
+//!        complete and checking its status. Additionally, the `DmaTransferRxTx`
+//!        trait extends the functionalities to support both receive and
+//!        transmit operations in a single trait.
 //!   * `RegisterAccess` trait:
-//!      - This trait defines a set of methods that allow low-level access to the DMA controller's registers.<br>
-//!        It provides functions to initialize DMA channels, configure burst mode, priority, and peripheral for both
-//!        input and output data transfers.<br>Additionally, it supports clearing interrupts, resetting channels, setting
+//!      - This trait defines a set of methods that allow low-level access to
+//!        the DMA controller's registers.<br> It provides functions to
+//!        initialize DMA channels, configure burst mode, priority, and
+//!        peripheral for both input and output data transfers.<br>Additionally,
+//!        it supports clearing interrupts, resetting channels, setting
 //!        descriptor addresses, and checking for descriptor errors.
-//! 
-//! Notice, that this module is a common version of the DMA driver, `ESP32` and `ESP32-S2` are using older `PDMA` controller,
-//! whenever other chips are using newer `GDMA` controller.
-//! 
+//!
+//! Notice, that this module is a common version of the DMA driver, `ESP32` and
+//! `ESP32-S2` are using older `PDMA` controller, whenever other chips are using
+//! newer `GDMA` controller.
+//!
 //! ## Example
 //! #### Initialize and utilize DMA controller in `SPI`
 //! ```no_run
 //! let dma = Gdma::new(peripherals.DMA, &mut system.peripheral_clock_control);
 //! let dma_channel = dma.channel0;
-//! 
+//!
 //! // For `ESP32` and `ESP32-S2` chips use `Pdma` controller instead:
 //! // let dma = Dma::new(system.dma, &mut system.peripheral_clock_control);
 //! // let dma_channel = dma.spi2channel;
@@ -56,9 +64,9 @@
 //!     DmaPriority::Priority0,
 //! ));
 //! ```
-//! 
-//! ⚠️ Note: Descriptors should be sized as `((BUFFERSIZE + 4091) / 4092) * 3`. I.e., to
-//! transfer buffers of size `1..=4092`, you need 3 descriptors.
+//!
+//! ⚠️ Note: Descriptors should be sized as `((BUFFERSIZE + 4091) / 4092) * 3`.
+//! I.e., to transfer buffers of size `1..=4092`, you need 3 descriptors.
 
 use core::{marker::PhantomData, sync::atomic::compiler_fence};
 

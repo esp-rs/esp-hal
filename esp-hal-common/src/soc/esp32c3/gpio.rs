@@ -1,33 +1,44 @@
 //! GPIO configuration module (ESP32-C3)
-//! 
+//!
 //! ## Overview
-//! 
-//! The `GPIO` module provides functions and configurations for controlling the `General Purpose Input/Output` pins
-//! on the `ESP32-C3` chip. It allows you to configure pins as inputs or outputs, set their state and read their state.
-//! 
-//! Let's get through the functionality and configurations provided by this GPIO module:
-//!   - `get_io_mux_reg(gpio_num: u8) -> &'static crate::peripherals::io_mux::GPIO0:`: 
+//!
+//! The `GPIO` module provides functions and configurations for controlling the
+//! `General Purpose Input/Output` pins on the `ESP32-C3` chip. It allows you to
+//! configure pins as inputs or outputs, set their state and read their state.
+//!
+//! Let's get through the functionality and configurations provided by this GPIO
+//! module:
+//!   - `get_io_mux_reg(gpio_num: u8) -> &'static
+//!     crate::peripherals::io_mux::GPIO0:`:
 //!       * Returns the IO_MUX register for the specified GPIO pin number.
 //!   - `gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8`:
-//!       * This function enables or disables GPIO interrupts and Non-Maskable Interrupts (NMI). 
-//!         It takes two boolean arguments int_enable and nmi_enable to control the interrupt and NMI enable settings.
-//!         The function returns an u8 value representing the interrupt enable settings.
+//!       * This function enables or disables GPIO interrupts and Non-Maskable
+//!         Interrupts (NMI). It takes two boolean arguments int_enable and
+//!         nmi_enable to control the interrupt and NMI enable settings. The
+//!         function returns an u8 value representing the interrupt enable
+//!         settings.
 //!   - `gpio` block:
-//!       *  Defines the pin configurations for various GPIO pins. Each line represents a pin and its associated
-//!          options such as input/output mode, analog capability, and corresponding functions.
-//!   - `analog` block: 
-//!       *  Block defines the analog capabilities of various GPIO pins. Each line represents a pin and its associated
-//!          options such as mux selection, function selection, and input enable.
-//!   - `enum InputSignal`: 
-//!       *  This enumeration defines input signals for the GPIO mux. Each input signal is assigned a specific value.
+//!       * Defines the pin configurations for various GPIO pins. Each line
+//!         represents a pin and its associated options such as input/output
+//!         mode, analog capability, and corresponding functions.
+//!   - `analog` block:
+//!       * Block defines the analog capabilities of various GPIO pins. Each
+//!         line represents a pin and its associated options such as mux
+//!         selection, function selection, and input enable.
+//!   - `enum InputSignal`:
+//!       * This enumeration defines input signals for the GPIO mux. Each input
+//!         signal is assigned a specific value.
 //!   - `enum OutputSignal`:
-//!       *  This enumeration defines output signals for the GPIO mux. Each output signal is assigned a specific value.
-//! 
-//! Module also implements the `InterruptStatusRegisterAccess` trait for two different banks:
+//!       * This enumeration defines output signals for the GPIO mux. Each
+//!         output signal is assigned a specific value.
+//!
+//! Module also implements the `InterruptStatusRegisterAccess` trait for two
+//! different banks:
 //!   * `InterruptStatusRegisterAccessBank0`
 //!   * `InterruptStatusRegisterAccessBank1`.
-//! This trait provides functions to read the interrupt status and NMI status registers for 
-//! both the `PRO CPU` and `APP CPU`. The implementation uses the `gpio` peripheral to access the appropriate registers.
+//! This trait provides functions to read the interrupt status and NMI status
+//! registers for both the `PRO CPU` and `APP CPU`. The implementation uses the
+//! `gpio` peripheral to access the appropriate registers.
 
 use crate::{
     gpio::{

@@ -693,12 +693,13 @@ pub use impl_adc_interface;
 pub mod implementation {
     //! Analog to digital (ADC) conversion support.
     //!
-    //! The `ADC` functionality in the `analog` driver enables users to perform analog-to-digital conversions,
-    //! allowing them to measure real-world analog signals with high accuracy.
-    //! 
+    //! The `ADC` functionality in the `analog` driver enables users to perform
+    //! analog-to-digital conversions, allowing them to measure real-world
+    //! analog signals with high accuracy.
+    //!
     //! Module provides functions for reading analog values from the
     //! analog to digital converter available on the ESP32-C2: `ADC1`.
-    //! 
+    //!
     //! ## Example
     //! #### ADC on Risc-V architecture
     //! ```no_run
@@ -722,7 +723,7 @@ pub mod implementation {
     //!     let pin_value: u16 = nb::block!(adc1.read(&mut pin)).unwrap();
     //!     println!("PIN2 ADC reading = {}", pin_value);
     //!     delay.delay_ms(1500u32);
-    //! } 
+    //! }
     //! ```
 
     use embedded_hal::adc::Channel;
@@ -744,14 +745,15 @@ pub mod implementation {
 #[cfg(esp32c3)]
 pub mod implementation {
     //! Analog to digital (ADC) conversion support.
-    //! 
-    //! The `ADC` functionality in the `analog` driver enables users to perform analog-to-digital conversions,
-    //! allowing them to measure real-world analog signals with high accuracy.
-    //! 
+    //!
+    //! The `ADC` functionality in the `analog` driver enables users to perform
+    //! analog-to-digital conversions, allowing them to measure real-world
+    //! analog signals with high accuracy.
+    //!
     //! Module provides functions for reading analog values from the
     //! analog to digital converter available on the ESP32-C3: `ADC1` and
     //! `ADC2`.
-    //! 
+    //!
     //! ## Example
     //! #### ADC on Risc-V architecture
     //! ```no_run
@@ -775,7 +777,7 @@ pub mod implementation {
     //!     let pin_value: u16 = nb::block!(adc1.read(&mut pin)).unwrap();
     //!     println!("PIN2 ADC reading = {}", pin_value);
     //!     delay.delay_ms(1500u32);
-    //! } 
+    //! }
     //! ```
 
     use embedded_hal::adc::Channel;
@@ -804,12 +806,13 @@ pub mod implementation {
 pub mod implementation {
     //! Analog to digital (ADC) conversion support.
     //!
-    //! The `ADC` functionality in the `analog` driver enables users to perform analog-to-digital conversions,
-    //! allowing them to measure real-world analog signals with high accuracy.
-    //! 
+    //! The `ADC` functionality in the `analog` driver enables users to perform
+    //! analog-to-digital conversions, allowing them to measure real-world
+    //! analog signals with high accuracy.
+    //!
     //! Module provides functions for reading analog values from the
     //! analog to digital converter available on the ESP32-C6: `ADC1`.
-    //! 
+    //!
     //! ## Example
     //! #### ADC on Risc-V architecture
     //! ```no_run
@@ -833,7 +836,7 @@ pub mod implementation {
     //!     let pin_value: u16 = nb::block!(adc1.read(&mut pin)).unwrap();
     //!     println!("PIN2 ADC reading = {}", pin_value);
     //!     delay.delay_ms(1500u32);
-    //! } 
+    //! }
     //! ```
 
     use embedded_hal::adc::Channel;
@@ -857,13 +860,14 @@ pub mod implementation {
 #[cfg(esp32h2)]
 pub mod implementation {
     //! Analog to digital (ADC) conversion support.
-    //! 
-    //! The `ADC` functionality in the `analog` driver enables users to perform analog-to-digital conversions,
-    //! allowing them to measure real-world analog signals with high accuracy.
-    //! 
+    //!
+    //! The `ADC` functionality in the `analog` driver enables users to perform
+    //! analog-to-digital conversions, allowing them to measure real-world
+    //! analog signals with high accuracy.
+    //!
     //! Module provides functions for reading analog values from the
     //! analog to digital converter available on the  ESP32-H2: `ADC1`.
-    //! 
+    //!
     //! ## Example
     //! #### ADC on Risc-V architecture
     //! ```no_run
@@ -887,7 +891,7 @@ pub mod implementation {
     //!     let pin_value: u16 = nb::block!(adc1.read(&mut pin)).unwrap();
     //!     println!("PIN2 ADC reading = {}", pin_value);
     //!     delay.delay_ms(1500u32);
-    //! } 
+    //! }
     //! ```
 
     use embedded_hal::adc::Channel;

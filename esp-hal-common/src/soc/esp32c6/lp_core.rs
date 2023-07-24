@@ -1,17 +1,18 @@
 //! Control the LP core
-//! 
+//!
 //! ## Overview
-//! The `LP_CORE` driver provides an interface for controlling and managing the low power
-//! core of `ESP` chips, allowing efficient low power operation and wakeup from sleep
-//! based on configurable sources. The low power core is responsible for executing
-//! low power tasks while the high power core is in sleep mode.
-//! 
+//! The `LP_CORE` driver provides an interface for controlling and managing the
+//! low power core of `ESP` chips, allowing efficient low power operation and
+//! wakeup from sleep based on configurable sources. The low power core is
+//! responsible for executing low power tasks while the high power core is in
+//! sleep mode.
+//!
 //! The `LpCore` struct provides methods to stop and run the low power core.
-//! 
+//!
 //! The `stop` method stops the low power core, putting it into a sleep state.
-//! 
+//!
 //! The `run` method starts the low power core and specifies the wakeup source.
-//! 
+//!
 //! ## Example
 //! ```no_run
 //! const CODE: &[u8] = &[
@@ -31,7 +32,7 @@
 //!     0x00, 0x00,
 //! ];
 //! ...
-//! 
+//!
 //! // configure GPIO 1 as LP output pin
 //! let mut lp_pin = io.pins.gpio1.into_low_power();
 //! lp_pin.output_enable(true);

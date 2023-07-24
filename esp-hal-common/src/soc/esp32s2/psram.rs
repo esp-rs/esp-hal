@@ -1,19 +1,21 @@
 //! PSRAM "virtual peripheral" driver (ESP32-S2)
-//! 
+//!
 //! ## Overview
-//! 
-//! The `PSRAM` module is a part of the `SOC` functionality the `ESP32-S2` chip. It provides support for accessing and
-//! controlling the `Pseudo Static Random Access Memory (PSRAM)` on the `ESP32-S2`.
-//! 
-//! The `PSRAM` module enables users to interface with the `PSRAM` memory present on the `ESP32-S2` chip.
-//! `PSRAM` provides additional external memory to supplement the internal memory of the `ESP32-S2`, allowing for increased
+//!
+//! The `PSRAM` module is a part of the `SOC` functionality the `ESP32-S2` chip.
+//! It provides support for accessing and controlling the `Pseudo Static Random
+//! Access Memory (PSRAM)` on the `ESP32-S2`.
+//!
+//! The `PSRAM` module enables users to interface with the `PSRAM` memory
+//! present on the `ESP32-S2` chip. `PSRAM` provides additional external memory
+//! to supplement the internal memory of the `ESP32-S2`, allowing for increased
 //! storage capacity and improved performance in certain applications.
-//! 
-//! The `PSRAM` module is accessed through a virtual address, defined as `PSRAM_VADDR`. 
-//! The starting virtual address for the PSRAM module is 0x3f500000.
-//! The `PSRAM` module size depends on the configuration specified during the compilation process.
-//! The available `PSRAM` sizes are `2MB`, `4MB`, and `8MB`.
-//! 
+//!
+//! The `PSRAM` module is accessed through a virtual address, defined as
+//! `PSRAM_VADDR`. The starting virtual address for the PSRAM module is
+//! 0x3f500000. The `PSRAM` module size depends on the configuration specified
+//! during the compilation process. The available `PSRAM` sizes are `2MB`,
+//! `4MB`, and `8MB`.
 const PSRAM_VADDR: u32 = 0x3f500000;
 
 pub fn psram_vaddr_start() -> usize {
@@ -139,9 +141,9 @@ pub fn init_psram(_peripheral: impl crate::peripheral::Peripheral<P = crate::per
 
 #[cfg(any(feature = "psram_2m", feature = "psram_4m", feature = "psram_8m"))]
 pub(crate) mod utils {
-    // Function initializes the PSRAM by configuring GPIO pins, resetting the PSRAM, and enabling
-    // Quad I/O (QIO) mode. It also calls the psram_cache_init function to configure
-    // cache parameters and read/write commands.
+    // Function initializes the PSRAM by configuring GPIO pins, resetting the PSRAM,
+    // and enabling Quad I/O (QIO) mode. It also calls the psram_cache_init
+    // function to configure cache parameters and read/write commands.
     pub(crate) fn psram_init() {
         psram_gpio_config();
 

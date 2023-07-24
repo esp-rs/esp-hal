@@ -1,25 +1,32 @@
 //! Embassy driver
-//! 
+//!
 //! ## Overview
-//! The `embassy` driver for ESP chips is an essential part of the Embassy embedded async/await runtime and is used
-//! by applications to perform time-based operations and schedule asynchronous tasks.
-//! It provides a high-level API for handling timers and alarms, abstracting the underlying hardware details, and allowing
-//! users to focus on application logic rather than low-level timer management.
-//! 
+//! The `embassy` driver for ESP chips is an essential part of the Embassy
+//! embedded async/await runtime and is used by applications to perform
+//! time-based operations and schedule asynchronous tasks. It provides a
+//! high-level API for handling timers and alarms, abstracting the underlying
+//! hardware details, and allowing users to focus on application logic rather
+//! than low-level timer management.
+//!
 //! Here are important details about the module:
-//!   * `time_driver` module (`time_driver_systimer` or `time_driver_timg`, depends on enabled feature)
-//!     - This module contains the implementations of the timer drivers for different ESP chips.<br>
-//!       It includes the `EmbassyTimer` struct, which is responsible for handling alarms and timer events.
-//!     - `EmbassyTimer` struct represents timer driver for ESP chips. It contains `alarms` - an array of `AlarmState` structs, 
-//!        which describe the state of alarms associated with the timer driver.
-//!   * `AlarmState` struct 
-//!     - This struct represents the state of an alarm. It contains information about the alarm's timestamp, a callback
-//!       function to be executed when the alarm triggers, and a context pointer for passing user-defined data to the callback.
-//! 
+//!   * `time_driver` module (`time_driver_systimer` or `time_driver_timg`,
+//!     depends on enabled feature)
+//!     - This module contains the implementations of the timer drivers for
+//!       different ESP chips.<br> It includes the `EmbassyTimer` struct, which
+//!       is responsible for handling alarms and timer events.
+//!     - `EmbassyTimer` struct represents timer driver for ESP chips. It
+//!       contains `alarms` - an array of `AlarmState` structs, which describe
+//!       the state of alarms associated with the timer driver.
+//!   * `AlarmState` struct
+//!     - This struct represents the state of an alarm. It contains information
+//!       about the alarm's timestamp, a callback function to be executed when
+//!       the alarm triggers, and a context pointer for passing user-defined
+//!       data to the callback.
+//!
 //! ## Example
-//! The following example demonstrates how to use the `embassy` driver to schedule asynchronous tasks.<br>
-//! In this example, we use the `embassy` driver to wait for a GPIO 9 pin state to change.
-//! ```no_run
+//! The following example demonstrates how to use the `embassy` driver to
+//! schedule asynchronous tasks.<br> In this example, we use the `embassy`
+//! driver to wait for a GPIO 9 pin state to change. ```no_run
 //! #[cfg(feature = "embassy-time-systick")]
 //! embassy::init(
 //!     &clocks,
@@ -56,13 +63,9 @@
 //!         Timer::after(Duration::from_millis(100)).await;
 //!     }
 //! }
-//! 
-//! 
 //! ```
 //! For more embassy-related examples check out the [examples repo](https://github.com/esp-rs/esp-hal/tree/main/esp32-hal/examples)
-//! for a corresponding board. 
-
-
+//! for a corresponding board.
 
 use core::{cell::Cell, ptr};
 

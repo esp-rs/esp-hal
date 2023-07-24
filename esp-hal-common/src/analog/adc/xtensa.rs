@@ -755,13 +755,14 @@ pub use impl_adc_interface;
 pub mod implementation {
     //! Analog to digital (ADC) conversion support.
     //!
-    //! The `ADC` functionality in the `analog` driver enables users to perform analog-to-digital conversions,
-    //! allowing them to measure real-world analog signals with high accuracy.
-    //! 
+    //! The `ADC` functionality in the `analog` driver enables users to perform
+    //! analog-to-digital conversions, allowing them to measure real-world
+    //! analog signals with high accuracy.
+    //!
     //! Module provides functions for reading analog values from the
     //! analog to digital converter available on the ESP32-S3: `ADC1` and
     //! `ADC2`.
-    //! 
+    //!
     //! ## Example
     //! #### ADC on Xtensa architecture
     //! ```no_run
@@ -826,13 +827,14 @@ pub mod implementation {
     //! Analog to digital (ADC) conversion support.
     //!
     //! ## Overview
-    //! The `ADC` functionality in the `analog` driver enables users to perform analog-to-digital conversions,
-    //! allowing them to measure real-world analog signals with high accuracy.
-    //! 
+    //! The `ADC` functionality in the `analog` driver enables users to perform
+    //! analog-to-digital conversions, allowing them to measure real-world
+    //! analog signals with high accuracy.
+    //!
     //! Module provides functions for reading analog values from the
     //! analog to digital converter available on the ESP32-S2: `ADC1` and
     //! `ADC2`.
-    //! 
+    //!
     //! ## Example
     //! #### ADC on Xtensa architecture
     //! ```no_run

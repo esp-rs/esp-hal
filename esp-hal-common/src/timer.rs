@@ -1,35 +1,37 @@
 //! General-purpose timers
-//! 
+//!
 //! ## Overview
-//! The general-purpose timer peripheral is a part of ESP chips and provides timer functionality.
-//! It consists of a timergroup, which can have up to two timers (depending on the chip)
-//! and a watchdog timer. The timer group allows for the management of multiple timers
-//! and synchronization between them.
+//! The general-purpose timer peripheral is a part of ESP chips and provides
+//! timer functionality. It consists of a timergroup, which can have up to two
+//! timers (depending on the chip) and a watchdog timer. The timer group allows
+//! for the management of multiple timers and synchronization between them.
 //!
-//! The general-purpose timer peripheral can be used to perform a variety of tasks, 
-//! such as triggering an interrupt after a particular interval (periodically and aperiodically),
-//! precisely time an interval, act as a hardware clock and so on.
+//! The general-purpose timer peripheral can be used to perform a variety of
+//! tasks, such as triggering an interrupt after a particular interval
+//! (periodically and aperiodically), precisely time an interval, act as a
+//! hardware clock and so on.
 //!
-//! Each timer group consists of two general purpose timers and one Main System Watchdog Timer(MSWDT).
-//! All general purpose timers are based on 16-bit prescalers and 54-bit auto-reload-capable up-down counters.
-//! 
+//! Each timer group consists of two general purpose timers and one Main System
+//! Watchdog Timer(MSWDT). All general purpose timers are based on 16-bit
+//! prescalers and 54-bit auto-reload-capable up-down counters.
+//!
 //! ## Example
-//! 
+//!
 //! ```no_run
 //! let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-//! 
+//!
 //! // Create timer groups
 //! let timer_group0 = TimerGroup::new(
-//!    peripherals.TIMG0,
-//!    &clocks,
-//!    &mut system.peripheral_clock_control,
+//!     peripherals.TIMG0,
+//!     &clocks,
+//!     &mut system.peripheral_clock_control,
 //! );
 //! // Get watchdog timers of timer groups
 //! let mut wdt0 = timer_group0.wdt;
 //! let timer_group1 = TimerGroup::new(
-//!    peripherals.TIMG1,
-//!    &clocks,
-//!    &mut system.peripheral_clock_control,
+//!     peripherals.TIMG1,
+//!     &clocks,
+//!     &mut system.peripheral_clock_control,
 //! );
 //! let mut wdt1 = timer_group1.wdt;
 //!

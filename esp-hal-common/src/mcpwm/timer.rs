@@ -1,9 +1,10 @@
 //! MCPWM peripheral - timer module
-//! 
+//!
 //! ## Overview
-//! The `timer` module is a part of the `MCPWM (Motor Control Pulse Width Modulator)` driver for ESP chips.
-//! It provides an interface to configure and use timers for generating `PWM` signals used in motor
-//! control and other applications.
+//! The `timer` module is a part of the `MCPWM (Motor Control Pulse Width
+//! Modulator)` driver for ESP chips. It provides an interface to configure and
+//! use timers for generating `PWM` signals used in motor control and other
+//! applications.
 
 use core::marker::PhantomData;
 

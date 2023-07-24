@@ -1,19 +1,20 @@
 //! Direct Memory Access
-//! 
+//!
 //! ## Overview
-//! The `pdma` module is part of the DMA (Direct Memory Access) driver designed for ESP chips.
-//! Of the Espressif chip range, only `ESP32` and `ESP32-S2` use the `PDMA` type of direct memory access.
-//! 
-//! This module provides efficient direct data transfer capabilities between peripherals and memory without involving the CPU.
-//! It enables bidirectional data transfers through DMA channels, making it particularly useful for high-speed
-//! data transfers, such as [SPI (Serial Peripheral Interface)] and [I2S (Inter-IC Sound)] communication.
-//! 
-//! 
-//! 
+//! The `pdma` module is part of the DMA (Direct Memory Access) driver designed
+//! for ESP chips. Of the Espressif chip range, only `ESP32` and `ESP32-S2` use
+//! the `PDMA` type of direct memory access.
+//!
+//! This module provides efficient direct data transfer capabilities between
+//! peripherals and memory without involving the CPU. It enables bidirectional
+//! data transfers through DMA channels, making it particularly useful for
+//! high-speed data transfers, such as [SPI (Serial Peripheral Interface)] and
+//! [I2S (Inter-IC Sound)] communication.
+//!
+//!
+//!
 //! [SPI (Serial Peripheral Interface)]: ../spi/index.html
 //! [I2S (Inter-IC Sound)]: ../i2s/index.html
-
-
 
 use crate::{
     dma::*,
