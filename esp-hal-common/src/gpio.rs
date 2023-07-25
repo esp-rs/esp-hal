@@ -110,9 +110,9 @@ pub trait AnalogPin {}
 pub trait Pin {
     fn number(&self) -> u8;
 
-    fn sleep_mode(&mut self, on: bool) -> &mut Self;
+    fn sleep_mode(&mut self, on: bool);
 
-    fn set_alternate_function(&mut self, alternate: AlternateFunction) -> &mut Self;
+    fn set_alternate_function(&mut self, alternate: AlternateFunction);
 
     fn listen(&mut self, event: Event) {
         self.listen_with_options(event, true, false, false)
@@ -629,15 +629,12 @@ where
         GPIONUM
     }
 
-    fn sleep_mode(&mut self, on: bool) -> &mut Self {
+    fn sleep_mode(&mut self, on: bool) {
         get_io_mux_reg(GPIONUM).modify(|_, w| w.slp_sel().bit(on));
-
-        self
     }
 
-    fn set_alternate_function(&mut self, alternate: AlternateFunction) -> &mut Self {
+    fn set_alternate_function(&mut self, alternate: AlternateFunction) {
         get_io_mux_reg(GPIONUM).modify(|_, w| unsafe { w.mcu_sel().bits(alternate as u8) });
-        self
     }
 
     fn listen_with_options(
