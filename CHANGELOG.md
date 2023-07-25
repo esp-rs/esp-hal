@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add the `esp32c6-lp-hal` package (#714)
 - Add GPIO (output) and delay functionality to `esp32c6-lp-hal` (#715)
+- Implement RTCIO pullup, pulldown and hold control for Xtensa MCUs (#684)
 
 ### Changed
 
