@@ -27,7 +27,7 @@ use heapless::Vec;
 use static_cell::StaticCell;
 
 // rx_fifo_full_threshold
-const READ_BUF_SIZE: usize = 128;
+const READ_BUF_SIZE: usize = 64;
 /// EOT; CTRL-D
 const AT_CMD: u8 = 0x04;
 
@@ -84,7 +84,7 @@ async fn run(mut uart: Uart<'static, UART0>) {
                             break;
                         }
                     } else {
-                        // buffer is full
+                        // buffer is full or rx fifo overflow
                         break;
                     }
                 }
@@ -131,7 +131,9 @@ fn main() -> ! {
 
     let mut uart0 = Uart::new(peripherals.UART0, &mut system.peripheral_clock_control);
     uart0.set_at_cmd(AtCmdConfig::new(None, None, None, AT_CMD, None));
-    uart0.set_rx_fifo_full_threshold(READ_BUF_SIZE as u16);
+    uart0
+        .set_rx_fifo_full_threshold(READ_BUF_SIZE as u16)
+        .unwrap();
 
     interrupt::enable(Interrupt::UART0, interrupt::Priority::Priority1).unwrap();
 
