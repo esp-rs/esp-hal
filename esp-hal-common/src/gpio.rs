@@ -97,7 +97,7 @@ pub enum RtcFunction {
     Digital = 1,
 }
 
-pub trait RTCPin {
+pub trait RTCPin: Pin {
     fn rtc_number(&self) -> u8;
     fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: RtcFunction);
 }
