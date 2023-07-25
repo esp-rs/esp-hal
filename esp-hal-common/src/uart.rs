@@ -25,8 +25,6 @@ pub enum Error {
     ReadBufferFull,
     #[cfg(feature = "async")]
     RxFifoOvf,
-    #[cfg(feature = "async")]
-    ReadNoConfig,
 }
 
 /// UART configuration
@@ -254,7 +252,6 @@ impl embedded_hal_1::serial::Error for Error {
 pub struct Uart<'d, T> {
     uart: PeripheralRef<'d, T>,
     at_cmd_config: Option<config::AtCmdConfig>,
-    rxfifo_full_thrhd: Option<u16>,
 }
 
 impl<'d, T> Uart<'d, T>
@@ -277,7 +274,6 @@ where
         let mut serial = Uart {
             uart,
             at_cmd_config: None,
-            rxfifo_full_thrhd: None,
         };
         serial.uart.disable_rx_interrupts();
         serial.uart.disable_tx_interrupts();
@@ -311,7 +307,6 @@ where
         let mut serial = Uart {
             uart,
             at_cmd_config: None,
-            rxfifo_full_thrhd: None,
         };
         serial.uart.disable_rx_interrupts();
         serial.uart.disable_tx_interrupts();
@@ -393,8 +388,6 @@ where
         if threshold > MAX_THRHD {
             return Err(Error::InvalidArgument);
         }
-
-        self.rxfifo_full_thrhd = Some(threshold);
 
         #[cfg(any(esp32, esp32c6, esp32h2))]
         let threshold: u8 = threshold as u8;
@@ -1185,7 +1178,7 @@ mod asynch {
         pub async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
             let mut read_bytes = 0;
 
-            if self.at_cmd_config.is_some() && self.rxfifo_full_thrhd.is_some() {
+            if self.at_cmd_config.is_some() {
                 if let Either3::Third(_) = select3(
                     UartFuture::new(Event::RxCmdCharDetected, self.inner()),
                     UartFuture::new(Event::RxFifoFull, self.inner()),
@@ -1195,16 +1188,7 @@ mod asynch {
                 {
                     return Err(Error::RxFifoOvf);
                 }
-            } else if self.at_cmd_config.is_some() {
-                if let Either::Second(_) = select(
-                    UartFuture::new(Event::RxCmdCharDetected, self.inner()),
-                    UartFuture::new(Event::RxFifoOvf, self.inner()),
-                )
-                .await
-                {
-                    return Err(Error::RxFifoOvf);
-                }
-            } else if self.rxfifo_full_thrhd.is_some() {
+            } else {
                 if let Either::Second(_) = select(
                     UartFuture::new(Event::RxFifoFull, self.inner()),
                     UartFuture::new(Event::RxFifoOvf, self.inner()),
@@ -1213,8 +1197,6 @@ mod asynch {
                 {
                     return Err(Error::RxFifoOvf);
                 }
-            } else {
-                return Err(Error::ReadNoConfig);
             }
 
             while let Ok(byte) = self.read_byte() {
