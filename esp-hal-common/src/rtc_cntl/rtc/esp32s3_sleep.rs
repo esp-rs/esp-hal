@@ -9,7 +9,7 @@ use super::{
 use crate::{
     gpio::{RTCPin, RtcFunction},
     regi2c_write_mask,
-    rtc_cntl::{Clock, RtcClock},
+    rtc_cntl::{sleep::RtcioWakeupSource, Clock, RtcClock},
     Rtc,
 };
 
@@ -186,6 +186,58 @@ impl Drop for Ext1WakeupSource<'_, '_> {
         // to IO_MUX)
         let mut pins = self.pins.borrow_mut();
         for pin in pins.iter_mut() {
+            pin.rtc_set_config(true, false, RtcFunction::Rtc);
+        }
+    }
+}
+
+impl<'a, 'b> RtcioWakeupSource<'a, 'b> {
+    fn apply_pin(&self, pin: &mut dyn RTCPin, level: WakeupLevel) {
+        let rtcio = unsafe { &*crate::peripherals::RTC_IO::PTR };
+
+        pin.rtc_set_config(true, true, RtcFunction::Rtc);
+
+        rtcio.pin[pin.number() as usize].modify(|_, w| {
+            w.wakeup_enable().set_bit().int_type().variant(match level {
+                WakeupLevel::Low => 4,
+                WakeupLevel::High => 5,
+            })
+        });
+    }
+}
+
+impl WakeSource for RtcioWakeupSource<'_, '_> {
+    fn apply(&self, _rtc: &Rtc, triggers: &mut WakeTriggers, sleep_config: &mut RtcSleepConfig) {
+        let mut pins = self.pins.borrow_mut();
+
+        if pins.is_empty() {
+            return;
+        }
+
+        // don't power down RTC peripherals
+        sleep_config.set_rtc_peri_pd_en(false);
+        triggers.set_gpio(true);
+
+        // Since we only use RTCIO pins, we can keep deep sleep enabled.
+        let sens = unsafe { &*crate::peripherals::SENS::PTR };
+
+        // TODO: disable clock when not in use
+        sens.sar_peri_clk_gate_conf
+            .modify(|_, w| w.iomux_clk_en().set_bit());
+
+        for (pin, level) in pins.iter_mut() {
+            self.apply_pin(*pin, *level);
+        }
+    }
+}
+
+impl Drop for RtcioWakeupSource<'_, '_> {
+    fn drop(&mut self) {
+        // should we have saved the pin configuration first?
+        // set pin back to IO_MUX (input_enable and func have no effect when pin is sent
+        // to IO_MUX)
+        let mut pins = self.pins.borrow_mut();
+        for (pin, _level) in pins.iter_mut() {
             pin.rtc_set_config(true, false, RtcFunction::Rtc);
         }
     }
