@@ -51,13 +51,13 @@ impl<'a, P: RTCPin + Pin> Ext0WakeupSource<'a, P> {
     }
 }
 
-pub struct Ext1WakeupSource<'a> {
-    pins: RefCell<&'a mut [&'a mut dyn RTCPin]>,
+pub struct Ext1WakeupSource<'a, 'b> {
+    pins: RefCell<&'a mut [&'b mut dyn RTCPin]>,
     level: WakeupLevel,
 }
 
-impl<'a> Ext1WakeupSource<'a> {
-    pub fn new(pins: &'a mut [&'a mut dyn RTCPin], level: WakeupLevel) -> Self {
+impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
+    pub fn new(pins: &'a mut [&'b mut dyn RTCPin], level: WakeupLevel) -> Self {
         Self {
             pins: RefCell::new(pins),
             level,
