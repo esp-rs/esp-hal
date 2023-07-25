@@ -1,4 +1,4 @@
-//! RTC_CNTL (Real-Time Clock Control)
+//! RTC_CNTL (Real-Time Clock Control) and Low-power Management
 //!
 //! ## Overview
 //! The `rtc_cntl` module provides a driver for the `RTC_CNTL` peripheral on ESP

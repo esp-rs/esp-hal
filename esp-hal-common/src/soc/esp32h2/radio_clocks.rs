@@ -1,4 +1,4 @@
-//! Radio clocks driver(ESP32-H2)
+//! Radio clocks driver (ESP32-H2)
 //!
 //! ## Overview
 //!

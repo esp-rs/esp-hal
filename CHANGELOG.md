@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add feature enabling directly hooking the interrupt vector table
 - Add `ClockControl::max` helper for all chips (#701)
 - Added module-level documentation for all peripherals
+- Added module-level documentation for all peripherals (#680)
 
 ### Changed
 

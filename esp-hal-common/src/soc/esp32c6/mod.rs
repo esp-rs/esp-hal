@@ -1,4 +1,4 @@
-//! SOC (System-on-Chip) module(ESP32-C6)
+//! SOC (System-on-Chip) module (ESP32-C6)
 //!
 //! ## Overview
 //!

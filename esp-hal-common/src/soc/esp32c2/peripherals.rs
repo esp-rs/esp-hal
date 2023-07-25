@@ -1,4 +1,4 @@
-//! Peripheral instance singletons(ESP32-C2)
+//! Peripheral instance singletons (ESP32-C2)
 //!
 //! ## Overview
 //!

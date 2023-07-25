@@ -1,4 +1,4 @@
-//! Control CPU Cores(ESP32-S3)
+//! Control CPU Cores (ESP32-S3)
 //!
 //! ## Overview
 //!

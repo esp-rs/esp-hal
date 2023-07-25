@@ -1,6 +1,6 @@
 //! MD5 Message-Digest Algorithm
 //!
-//! ## Security Warning
+//! ## ⚠️ Security Warning ⚠️
 //!
 //! MD5 is a **cryptographically broken** message digest. It should **not**
 //! be used for data security, for example, to check if data has been

@@ -54,7 +54,7 @@
 //!
 //!     // raise mid priority interrupt.
 //!     // The handler raises one interrupt at lower priority, one at same and one at
-//!     // higher. We expect to see the higher priority served immeiately before
+//!     // higher. We expect to see the higher priority served immediately before
 //!     // exiting the handler Once the handler is exited we expect to see same
 //!     // priority and low priority interrupts served in that order
 //!     critical_section::with(|cs| {
@@ -83,10 +83,10 @@
 //!     esp_println::println!("SW interrupt1 entry");
 //!     critical_section::with(|cs| {
 //!         SWINT
-//!         .borrow_ref_mut(cs)
-//!         .as_mut()
-//!         .unwrap()
-//!         .reset(SoftwareInterrupt::SoftwareInterrupt1);
+//!             .borrow_ref_mut(cs)
+//!             .as_mut()
+//!             .unwrap()
+//!             .reset(SoftwareInterrupt::SoftwareInterrupt1);
 //!     SWINT
 //!         .borrow_ref_mut(cs)
 //!         .as_mut()

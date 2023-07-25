@@ -47,7 +47,7 @@
 //!     remaining = block!(hasher.update(remaining)).unwrap();
 //! }
 //!
-//! // Finish can be called as many times as desired to get mutliple copies of the
+//! // Finish can be called as many times as desired to get multiple copies of the
 //! // output.
 //! block!(hasher.finish(output.as_mut_slice())).unwrap();
 //!

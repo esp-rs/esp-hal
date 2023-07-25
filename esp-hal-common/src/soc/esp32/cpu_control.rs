@@ -1,4 +1,4 @@
-//! Control CPU Cores(ESP32)
+//! Control CPU Cores (ESP32)
 //!
 //! ## Overview
 //!

@@ -1,4 +1,4 @@
-//! Reading of eFuses(ESP32-H2)
+//! Reading of eFuses (ESP32-H2)
 //!
 //! ## Overview
 //!

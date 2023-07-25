@@ -29,7 +29,7 @@
 //! ```
 //!
 //! ⚠️: The examples for RSA peripheral are quite extensive, so for a more
-//! detailed study of how to use this driver please<br>visit [the repository
+//! detailed study of how to use this driver please visit [the repository
 //! with corresponding example].
 //!
 //! [nb]: https://docs.rs/nb/1.1.0/nb/

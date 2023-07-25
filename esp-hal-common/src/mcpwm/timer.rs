@@ -35,7 +35,7 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
     /// Apply the given timer configuration.
     ///
     /// ### Note:
-    /// The prescalar and period configuration will be applied immediately and
+    /// The prescaler and period configuration will be applied immediately and
     /// before setting the [`PwmWorkingMode`].
     /// If the timer is already running you might want to call [`Timer::stop`]
     /// and/or [`Timer::set_counter`] first

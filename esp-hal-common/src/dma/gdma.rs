@@ -14,8 +14,8 @@
 //! on. Each channel struct implements the `ChannelTypes` trait, which provides
 //! associated types for peripheral configuration.
 //!
-//! GDMA peripheral can be initializes using the `new` function, which reqires a
-//! DMA peripheral instance and a clock control reference. ```no_run
+//! GDMA peripheral can be initializes using the `new` function, which requires
+//! a DMA peripheral instance and a clock control reference. ```no_run
 //! let dma = Gdma::new(peripherals.DMA, &mut system.peripheral_clock_control);
 //! ```
 //! 

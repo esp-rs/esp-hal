@@ -1,7 +1,7 @@
 //! PCNT - Unit module
 //!
 //! ## Overview
-//! The `unit` module is a part of the `PCNT (Pulse Control)` peripheral driver
+//! The `unit` module is a part of the `PCNT` peripheral driver
 //! for ESP chips. It offers functionalities for configuring and utilizing
 //! specific units of the PCNT peripheral.
 //!

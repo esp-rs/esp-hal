@@ -1,4 +1,4 @@
-//! PSRAM "virtual peripheral" driver(ESP32)
+//! PSRAM "virtual peripheral" driver (ESP32)
 //!
 //! ## Overview
 //!

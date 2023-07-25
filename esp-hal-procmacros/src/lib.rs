@@ -12,7 +12,7 @@
 //! Key Components:
 //!   - [ram](attr.ram.html) - Attribute macro for placing statics and functions
 //!     into specific memory sections, such as SRAM or RTC RAM (slow or fast)
-//!     with different initialization options. Supported opitons are:
+//!     with different initialization options. Supported options are:
 //!       - `rtc_fast` - Use RTC fast RAM
 //!       - `rtc_slow` - Use RTC slow RAM (not all targets support slow RTC RAM)
 //!       - `uninitialized` - Skip initialization of the memory

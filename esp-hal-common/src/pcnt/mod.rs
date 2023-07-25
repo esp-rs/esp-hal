@@ -1,7 +1,7 @@
 //! Pulse Counter peripheral driver
 //!
 //! ## Overview
-//! The `PCNT (Pulse Control)` driver for `ESP` chips is a software component
+//! The `PCNT (Pulse Counter)` driver for `ESP` chips is a software component
 //! that provides an interface for controlling and utilizing the `PCNT`
 //! peripheral. The `PCNT` peripheral is a hardware module available in `ESP`
 //! chips, which functions as a pulse counter and encoder. It is capable of
@@ -14,17 +14,15 @@
 //!    * [channel]
 //!    * [unit]
 //!
-//! Each serving sprecific purposes.
-//!
 //! The `channel` module allows users to configure and manage individual
-//! channels of the PCNT peripheral. It provides methods to set various
+//! channels of the `PCNT` peripheral. It provides methods to set various
 //! parameters for each channel, such as control modes for signal edges, action
 //! on control level, and configurations for positive and negative edge count
 //! modes.
 //!
 //! The `unit` module is responsible for configuring and handling individual
-//! units of the PCNT peripheral. Each unit represents a separate instance of
-//! the PCNT module, identified by unit numbers like `Unit0`, `Unit1`, and so
+//! units of the `PCNT` peripheral. Each unit represents a separate instance of
+//! the `PCNT` module, identified by unit numbers like `Unit0`, `Unit1`, and so
 //! on. User can interact with these units to configure settings such as low and
 //! high limits, thresholds, and optional filtering. The unit module also
 //! enables users to pause, resume, and clear the counter, as well as enable or
