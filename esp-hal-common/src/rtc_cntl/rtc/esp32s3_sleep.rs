@@ -9,7 +9,6 @@ use super::{
 use crate::{
     gpio::{Pin, RTCPin, RtcFunction},
     regi2c_write_mask,
-    rom::rom_i2c_writeReg_Mask,
     rtc_cntl::{Clock, RtcClock},
     Rtc,
 };
