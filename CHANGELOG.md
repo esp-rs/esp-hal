@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GPIO interrupt status bits are now properly cleared (#670)
 - Increase frequency resolution in `set_periodic` (#686)
 - Fixed ESP32-S3 radio clock gating (#679)
+- Fixed ESP32-S2 radio clock gating (#681)
 
 ### Removed
 
