@@ -13,6 +13,7 @@ license      = "MIT OR Apache-2.0"
 
 [dependencies]
 bitflags             = "2.3.3"
+bitfield             = "0.14.0"
 cfg-if               = "1.0.0"
 critical-section     = "1.1.1"
 embedded-can         = { version = "0.4.1", optional = true }
@@ -20,7 +21,7 @@ embedded-dma         = "0.2.0"
 embedded-hal         = { version = "0.2.7", features = ["unproven"] }
 embedded-hal-1       = { version = "=1.0.0-alpha.11", optional = true, package = "embedded-hal" }
 embedded-hal-nb      = { version = "=1.0.0-alpha.3", optional = true }
-esp-synopsys-usb-otg = { version = "0.3.1", optional = true, features = ["fs", "esp32sx"] }
+esp-synopsys-usb-otg = { version = "0.3.2", optional = true, features = ["fs", "esp32sx"] }
 fugit                = "0.3.7"
 log                  = "=0.4.18"
 lock_api             = { version = "0.4.10", optional = true }
@@ -51,25 +52,25 @@ ufmt-write = { version = "0.1.0", optional = true }
 # IMPORTANT:
 # Each supported device MUST have its PAC included below along with a
 # corresponding feature.
-esp32   = { version = "0.24.0", features = ["critical-section"], optional = true }
+esp32   = { git = "https://github.com/esp-rs/esp-pacs.git", rev = "c72707e", version = "0.24.0", features = ["critical-section"], optional = true }
 esp32c2 = { version = "0.12.0", features = ["critical-section"], optional = true }
-esp32c3 = { version = "0.15.0", features = ["critical-section"], optional = true }
-esp32c6 = { version = "0.5.0",  features = ["critical-section"], optional = true }
-esp32h2 = { version = "0.1.0",  features = ["critical-section"], optional = true }
+esp32c3 = { git = "https://github.com/esp-rs/esp-pacs.git", rev = "c72707e", version = "0.15.0", features = ["critical-section"], optional = true }
+esp32c6 = { git = "https://github.com/esp-rs/esp-pacs.git", rev = "c72707e", version = "0.5.0",  features = ["critical-section"], optional = true }
+esp32h2 = { git = "https://github.com/esp-rs/esp-pacs.git", rev = "c72707e", version = "0.1.0",  features = ["critical-section"], optional = true }
 esp32s2 = { version = "0.15.0", features = ["critical-section"], optional = true }
-esp32s3 = { version = "0.19.0", features = ["critical-section"], optional = true }
+esp32s3 = { git = "https://github.com/esp-rs/esp-pacs.git", rev = "c72707e", version = "0.19.0", features = ["critical-section"], optional = true }
 
 [build-dependencies]
 basic-toml = "0.1.2"
 serde      = { version = "1.0.164", features = ["derive"] }
 
 [features]
-esp32   = ["esp32/rt"  , "xtensa", "xtensa-lx/esp32",   "xtensa-lx-rt/esp32",   "lock_api", "procmacros/esp32"]
+esp32   = ["esp32/rt",   "xtensa", "xtensa-lx/esp32", "xtensa-lx-rt/esp32", "lock_api", "procmacros/esp32"]
 esp32c2 = ["esp32c2/rt", "riscv",  "procmacros/esp32c2"]
 esp32c3 = ["esp32c3/rt", "riscv",  "procmacros/esp32c3"]
 esp32c6 = ["esp32c6/rt", "riscv",  "procmacros/esp32c6"]
 esp32h2 = ["esp32h2/rt", "riscv",  "procmacros/esp32h2"]
-esp32s2 = ["esp32s2/rt", "xtensa", "xtensa-lx/esp32s2", "xtensa-lx-rt/esp32s2",             "esp-synopsys-usb-otg", "usb-device", "procmacros/esp32s2"]
+esp32s2 = ["esp32s2/rt", "xtensa", "xtensa-lx/esp32s2", "xtensa-lx-rt/esp32s2", "esp-synopsys-usb-otg", "usb-device", "procmacros/esp32s2"]
 esp32s3 = ["esp32s3/rt", "xtensa", "xtensa-lx/esp32s3", "xtensa-lx-rt/esp32s3", "lock_api", "esp-synopsys-usb-otg", "usb-device", "procmacros/esp32s3"]
 
 esp32_40mhz = []

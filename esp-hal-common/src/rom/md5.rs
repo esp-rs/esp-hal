@@ -58,9 +58,6 @@ use core::{
 // toml file then `InternalContext` will be either undefined or multiple
 // defined and this module will fail to compile letting you know to fix it
 
-#[cfg(doc)]
-struct InternalContext;
-
 #[cfg(rom_md5_bsd)]
 #[derive(Clone)]
 #[repr(C)]

@@ -7,7 +7,6 @@ use crate::{
     peripherals::{usb_device::RegisterBlock, USB_DEVICE},
     system::PeripheralClockControl,
 };
-
 /// USB Serial JTAG driver
 pub struct UsbSerialJtag<'d> {
     usb_serial: PeripheralRef<'d, USB_DEVICE>,
@@ -151,6 +150,15 @@ impl<'d> UsbSerialJtag<'d> {
             .int_clr
             .write(|w| w.serial_out_recv_pkt_int_clr().set_bit())
     }
+    #[cfg(feature = "async")]
+    pub(crate) fn inner(&self) -> &USB_DEVICE {
+        &self.usb_serial
+    }
+
+    #[cfg(feature = "async")]
+    pub(crate) fn inner_mut(&mut self) -> &mut USB_DEVICE {
+        &mut self.usb_serial
+    }
 }
 
 /// USB Serial JTAG peripheral instance
@@ -191,6 +199,14 @@ pub trait Instance {
         let rd_addr = ep1_state.in_ep1_rd_addr().bits();
 
         (wr_addr - rd_addr).into()
+    }
+
+    fn txfifo_empty(&self) -> bool {
+        self.register_block()
+            .jfifo_st
+            .read()
+            .out_fifo_empty()
+            .bit_is_clear()
     }
 }
 
@@ -247,5 +263,124 @@ impl embedded_hal_nb::serial::Write for UsbSerialJtag<'_> {
 
     fn flush(&mut self) -> nb::Result<(), Self::Error> {
         self.flush_tx_nb()
+    }
+}
+
+#[cfg(feature = "async")]
+mod asynch {
+    use core::task::Poll;
+
+    use embassy_sync::waitqueue::AtomicWaker;
+    use procmacros::interrupt;
+
+    use super::{Error, Instance};
+    use crate::UsbSerialJtag;
+
+    // Single static instance of the waker
+    static WAKER: AtomicWaker = AtomicWaker::new();
+
+    pub(crate) struct UsbSerialJtagFuture<'d> {
+        instance: &'d crate::peripherals::USB_DEVICE,
+    }
+
+    impl<'d> UsbSerialJtagFuture<'d> {
+        pub fn new(instance: &'d crate::peripherals::USB_DEVICE) -> Self {
+            // Set the interrupt enable bit for the USB_SERIAL_JTAG_SERIAL_IN_EMPTY_INT
+            // interrupt
+            instance
+                .register_block()
+                .int_ena
+                .modify(|_, w| w.serial_in_empty_int_ena().set_bit());
+
+            Self { instance }
+        }
+
+        fn event_bit_is_clear(&self) -> bool {
+            self.instance
+                .register_block()
+                .int_ena
+                .read()
+                .serial_in_empty_int_ena()
+                .bit_is_clear()
+        }
+    }
+
+    impl<'d> core::future::Future for UsbSerialJtagFuture<'d> {
+        type Output = ();
+
+        fn poll(
+            self: core::pin::Pin<&mut Self>,
+            cx: &mut core::task::Context<'_>,
+        ) -> core::task::Poll<Self::Output> {
+            WAKER.register(cx.waker());
+            if self.event_bit_is_clear() {
+                Poll::Ready(())
+            } else {
+                Poll::Pending
+            }
+        }
+    }
+
+    impl UsbSerialJtag<'_> {
+        async fn write(&mut self, words: &[u8]) -> Result<(), Error> {
+            let reg_block = self.usb_serial.register_block();
+            for chunk in words.chunks(64 as usize) {
+                unsafe {
+                    for &b in chunk {
+                        reg_block.ep1.write(|w| w.rdwr_byte().bits(b.into()))
+                    }
+                    reg_block.ep1_conf.write(|w| w.wr_done().set_bit());
+                    UsbSerialJtagFuture::new(self.inner()).await;
+                }
+            }
+            Ok(())
+        }
+
+        async fn flush(&mut self) -> Result<(), Error> {
+            if self.inner().txfifo_empty() {
+                UsbSerialJtagFuture::new(self.inner()).await;
+            }
+            Ok(())
+        }
+    }
+
+    impl embedded_hal_async::serial::Write for UsbSerialJtag<'_> {
+        async fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
+            self.write(words).await
+        }
+
+        async fn flush(&mut self) -> Result<(), Self::Error> {
+            self.flush().await
+        }
+    }
+
+    #[cfg(esp32c3)]
+    #[interrupt]
+    fn USB_SERIAL_JTAG() {
+        let usb_serial_jtag = unsafe { &*crate::peripherals::USB_DEVICE::ptr() };
+        usb_serial_jtag
+            .int_ena
+            .modify(|_, w| w.serial_in_empty_int_ena().clear_bit());
+        WAKER.wake();
+    }
+
+    #[cfg(esp32s3)]
+    #[interrupt]
+    fn USB_DEVICE() {
+        let usb_serial_jtag = unsafe { &*crate::peripherals::USB_DEVICE::ptr() };
+        usb_serial_jtag
+            .int_ena
+            .modify(|_, w| w.serial_in_empty_int_ena().clear_bit());
+        WAKER.wake();
+    }
+
+    #[cfg(any(esp32c6, esp32h2))]
+    #[interrupt]
+    fn USB() {
+        let usb_serial_jtag = unsafe { &*crate::peripherals::USB_DEVICE::ptr() };
+        usb_serial_jtag
+            .int_ena
+            .modify(|_, w| w.serial_in_empty_int_ena().clear_bit());
+        WAKER.wake();
     }
 }

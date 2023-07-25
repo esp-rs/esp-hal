@@ -221,6 +221,8 @@ pub trait RxPrivate {
 
     fn drain_buffer(&mut self, dst: &mut [u8]) -> Result<usize, DmaError>;
 
+    fn has_error(&self) -> bool;
+
     #[cfg(feature = "async")]
     fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker;
 }
@@ -474,6 +476,10 @@ where
         R::unlisten_in_eof()
     }
 
+    fn has_error(&self) -> bool {
+        R::has_in_descriptor_error()
+    }
+
     #[cfg(feature = "async")]
     fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
         T::waker()
@@ -503,6 +509,8 @@ pub trait TxPrivate {
     fn unlisten_eof(&self);
 
     fn available(&mut self) -> usize;
+
+    fn has_error(&self) -> bool;
 
     fn push(&mut self, data: &[u8]) -> Result<usize, DmaError>;
 
@@ -790,6 +798,10 @@ where
         R::unlisten_out_eof()
     }
 
+    fn has_error(&self) -> bool {
+        R::has_out_descriptor_error()
+    }
+
     #[cfg(feature = "async")]
     fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
         T::waker()
@@ -850,7 +862,7 @@ where
 #[allow(drop_bounds)]
 pub trait DmaTransfer<B, T>: Drop {
     /// Wait for the transfer to finish.
-    fn wait(self) -> (B, T);
+    fn wait(self) -> Result<(B, T), (DmaError, B, T)>;
     /// Check if the transfer is finished.
     fn is_done(&self) -> bool;
 }
@@ -859,7 +871,7 @@ pub trait DmaTransfer<B, T>: Drop {
 #[allow(drop_bounds)]
 pub trait DmaTransferRxTx<BR, BT, T>: Drop {
     /// Wait for the transfer to finish.
-    fn wait(self) -> (BR, BT, T);
+    fn wait(self) -> Result<(BR, BT, T), (DmaError, BR, BT, T)>;
     /// Check if the transfer is finished.
     fn is_done(&self) -> bool;
 }

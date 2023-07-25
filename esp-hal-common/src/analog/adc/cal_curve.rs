@@ -6,7 +6,7 @@ use crate::adc::{
     AdcCalScheme,
     AdcHasLineCal,
     Attenuation,
-    RegisterAccess,
+    CalibrationAccess,
 };
 
 const COEFF_MUL: i64 = 1 << 52;
@@ -38,8 +38,8 @@ pub trait AdcHasCurveCal {
 /// This scheme implements final polynomial error correction using predefined
 /// coefficient sets for each attenuation.
 ///
-/// This scheme also includes basic calibration ([`AdcCalBasic`]) and line
-/// fitting ([`AdcCalLine`]).
+/// This scheme also includes basic calibration ([`super::AdcCalBasic`]) and
+/// line fitting ([`AdcCalLine`]).
 #[derive(Clone, Copy)]
 pub struct AdcCalCurve<ADCI> {
     line: AdcCalLine<ADCI>,
@@ -52,7 +52,7 @@ pub struct AdcCalCurve<ADCI> {
 
 impl<ADCI> AdcCalScheme<ADCI> for AdcCalCurve<ADCI>
 where
-    ADCI: AdcCalEfuse + AdcHasLineCal + AdcHasCurveCal + RegisterAccess,
+    ADCI: AdcCalEfuse + AdcHasLineCal + AdcHasCurveCal + CalibrationAccess,
 {
     fn new_cal(atten: Attenuation) -> Self {
         let line = AdcCalLine::<ADCI>::new_cal(atten);
@@ -131,7 +131,7 @@ mod impls {
     }
 
     coeff_tables! {
-        /// Error curve coefficients derived from https://github.com/espressif/esp-idf/blob/903af13e8/components/esp_adc/esp32c3/curve_fitting_coefficients.c
+        /// Error curve coefficients derived from <https://github.com/espressif/esp-idf/blob/903af13e8/components/esp_adc/esp32c3/curve_fitting_coefficients.c>
         #[cfg(esp32c3)]
         CURVES_COEFFS1 [
             Attenuation0dB => [
@@ -158,7 +158,7 @@ mod impls {
             ],
         ];
 
-        /// Error curve coefficients derived from https://github.com/espressif/esp-idf/blob/903af13e8/components/esp_adc/esp32c6/curve_fitting_coefficients.c
+        /// Error curve coefficients derived from <https://github.com/espressif/esp-idf/blob/903af13e8/components/esp_adc/esp32c6/curve_fitting_coefficients.c>
         #[cfg(esp32c6)]
         CURVES_COEFFS1 [
             Attenuation0dB => [
@@ -183,7 +183,7 @@ mod impls {
             ],
         ];
 
-        /// Error curve coefficients derived from https://github.com/espressif/esp-idf/blob/903af13e8/components/esp_adc/esp32s3/curve_fitting_coefficients.c
+        /// Error curve coefficients derived from <https://github.com/espressif/esp-idf/blob/903af13e8/components/esp_adc/esp32s3/curve_fitting_coefficients.c>
         #[cfg(esp32s3)]
         CURVES_COEFFS1 [
             Attenuation0dB => [
@@ -210,7 +210,7 @@ mod impls {
             ],
         ];
 
-        /// Error curve coefficients derived from https://github.com/espressif/esp-idf/blob/903af13e8/components/esp_adc/esp32s3/curve_fitting_coefficients.c
+        /// Error curve coefficients derived from <https://github.com/espressif/esp-idf/blob/903af13e8/components/esp_adc/esp32s3/curve_fitting_coefficients.c>
         #[cfg(esp32s3)]
         CURVES_COEFFS2 [
             Attenuation0dB => [

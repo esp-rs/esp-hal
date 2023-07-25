@@ -1,17 +1,12 @@
 /* before memory.x to allow override */
 ENTRY(ESP32Reset)
 
-INCLUDE memory.x
-
 /* after memory.x to allow override */
 PROVIDE(__pre_init = DefaultPreInit);
 PROVIDE(__zero_bss = default_mem_hook);
 PROVIDE(__init_data = default_mem_hook);
 
 INCLUDE exception.x
-
-/* map generic regions to output sections */
-INCLUDE "alias.x"
 
 /* ESP32S3 fixups */
 SECTIONS {

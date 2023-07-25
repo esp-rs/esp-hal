@@ -1,6 +1,13 @@
 use core::marker::PhantomData;
 
-use crate::adc::{AdcCalEfuse, AdcCalScheme, AdcCalSource, AdcConfig, Attenuation, RegisterAccess};
+use crate::adc::{
+    AdcCalEfuse,
+    AdcCalScheme,
+    AdcCalSource,
+    AdcConfig,
+    Attenuation,
+    CalibrationAccess,
+};
 
 /// Basic ADC calibration scheme
 ///
@@ -18,7 +25,7 @@ pub struct AdcCalBasic<ADCI> {
 
 impl<ADCI> AdcCalScheme<ADCI> for AdcCalBasic<ADCI>
 where
-    ADCI: AdcCalEfuse + RegisterAccess,
+    ADCI: AdcCalEfuse + CalibrationAccess,
 {
     fn new_cal(atten: Attenuation) -> Self {
         // Try to get init code (Dout0) from efuse

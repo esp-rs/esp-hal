@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Add initial LP-IO support for ESP32-C6 (#639)
+- Implement sleep with some wakeup methods for `esp32` (#574)
+- Add a new RMT driver (#653, #667)
+- Implemented calibrated ADC API for ESP32-S3 (#641)
+- Add MCPWM DeadTime configuration (#406)
+- Implement sleep with some wakeup methods for `esp32-s3` (#660)
 
 ### Changed
 
@@ -19,8 +24,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Implement the `Clone` and `Copy` traits for the `Rng` driver (#650)
 
 ### Fixed
+
 - Fixed Async Uart `read` when `set_at_cmd` is not used (#652)
+- USB device support is working again (#656)
+- Add missing interrupt status read for esp32s3, which fixes USB-SERIAL-JTAG interrupts (#664)
+- GPIO interrupt status bits are now properly cleared (#670)
+
 ### Removed
+
+- Remove the `allow-opt-level-z` feature from `esp32c3-hal` (#654)
+
+### Breaking
+
+- `DmaTransfer::wait` and `I2sReadDmaTransfer::wait_receive` now return `Result` (#665)
 
 ## [0.10.0] - 2023-06-04
 
@@ -45,6 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add embassy async `read` support for `uart` (#620)
 - Add bare-bones support to run code on ULP-RISCV / LP core (#631)
 - Add ADC calibration implementation for a riscv chips (#555)
+- Add `async` implementation for `USB Serial/JTAG`(#632)
 
 ### Changed
 
@@ -106,6 +123,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Move `rwtext` after other RAM data sections (#464)
 - ESP32-C3: Disable `usb_pad_enable` when setting GPIO18/19 to input/output (#461)
 - Fix 802.15.4 clock enabling (ESP32-C6) (#458)
+- ESP32-S3: Disable usb_pad_enable when setting GPIO19/20 to input/output (#645)
 
 ### Changed
 

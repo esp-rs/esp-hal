@@ -128,10 +128,10 @@ pub enum InputSignal {
     SPI3_D            = 74,
     SPI3_HD           = 75,
     SPI3_CS0          = 76,
-    RMT_SIG_IN0       = 83,
-    RMT_SIG_IN1       = 84,
-    RMT_SIG_IN2       = 85,
-    RMT_SIG_IN3       = 86,
+    RMT_SIG_0         = 83,
+    RMT_SIG_1         = 84,
+    RMT_SIG_2         = 85,
+    RMT_SIG_3         = 86,
     I2CEXT1_SCL       = 95,
     I2CEXT1_SDA       = 96,
     FSPICLK           = 108,
@@ -202,10 +202,10 @@ pub enum OutputSignal {
     LEDC_LS_SIG5     = 84,
     LEDC_LS_SIG6     = 85,
     LEDC_LS_SIG7     = 86,
-    RMT_SIG_OUT0     = 87,
-    RMT_SIG_OUT1     = 88,
-    RMT_SIG_OUT2     = 89,
-    RMT_SIG_OUT3     = 90,
+    RMT_SIG_0        = 87,
+    RMT_SIG_1        = 88,
+    RMT_SIG_2        = 89,
+    RMT_SIG_3        = 90,
     I2CEXT1_SCL      = 95,
     I2CEXT1_SDA      = 96,
     GPIO_SD0         = 100,
@@ -376,6 +376,31 @@ crate::gpio::analog! {
     (19, 19,  rtc_pad19,      mux_sel,             fun_sel,             fun_ie,             rue,             rde)
     (20, 20,  rtc_pad20,      mux_sel,             fun_sel,             fun_ie,             rue,             rde)
     (21, 21,  rtc_pad21,      mux_sel,             fun_sel,             fun_ie,             rue,             rde)
+}
+
+crate::gpio::rtc_pins! {
+    ( 0,  0,  touch_pad[0],     touch_pad0_)
+    ( 1,  1,  touch_pad[1],     touch_pad0_)
+    ( 2,  2,  touch_pad[2],     touch_pad0_)
+    ( 3,  3,  touch_pad[3],     touch_pad0_)
+    ( 4,  4,  touch_pad[4],     touch_pad0_)
+    ( 5,  5,  touch_pad[5],     touch_pad0_)
+    ( 6,  6,  touch_pad[6],     touch_pad0_)
+    ( 7,  7,  touch_pad[7],     touch_pad0_)
+    ( 8,  8,  touch_pad[8],     touch_pad0_)
+    ( 9,  9,  touch_pad[9],     touch_pad0_)
+    (10, 10,  touch_pad[10],    touch_pad0_)
+    (11, 11,  touch_pad[11],    touch_pad0_)
+    (12, 12,  touch_pad[12],    touch_pad0_)
+    (13, 13,  touch_pad[13],    touch_pad0_)
+    (14, 14,  touch_pad[14],    touch_pad0_)
+    (15, 15,  xtal_32p_pad,   x32p_)
+    (16, 16,  xtal_32n_pad,   x32n_)
+    (17, 17,  pad_dac1,       pdac1_)
+    (18, 18,  pad_dac2,       pdac2_)
+    (19, 19,  rtc_pad19,      "")
+    (20, 20,  rtc_pad20,      "")
+    (21, 21,  rtc_pad21,      "")
 }
 
 impl InterruptStatusRegisterAccess for InterruptStatusRegisterAccessBank0 {

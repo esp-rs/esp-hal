@@ -34,17 +34,16 @@
 //! - Use the [`SpiBus`](embedded_hal_1::spi::SpiBus) trait (requires the "eh1"
 //!   feature) and its associated functions to initiate transactions with
 //!   simultaneous reads and writes, or
-//! - Use the [`SpiBusWrite`](embedded_hal_1::spi::SpiBusWrite) and
-//!   [`SpiBusRead`](embedded_hal_1::spi::SpiBusRead) traits (requires the "eh1"
-//!   feature) and their associated functions to read or write mutiple bytes at
-//!   a time.
+// TODO async moved to embedded-hal-bus:
+//! - Use the `ExclusiveDevice` struct from `embedded-hal-bus` or
+//!   `embedded-hal-async` (recommended).
 //!
 //!
 //! ## Shared SPI access
 //!
 //! If you have multiple devices on the same SPI bus that each have their own CS
-//! line, you may want to have a look at the [`SpiBusController`] and
-//! [`SpiBusDevice`] implemented here. These give exclusive access to the
+//! line, you may want to have a look at the [`ehal1::SpiBusController`] and
+//! [`ehal1::SpiBusDevice`] implemented here. These give exclusive access to the
 //! underlying SPI bus by means of a Mutex. This ensures that device
 //! transactions do not interfere with each other.
 
@@ -756,6 +755,7 @@ pub mod dma {
         dma::{
             Channel,
             ChannelTypes,
+            DmaError,
             DmaTransfer,
             DmaTransferRxTx,
             RxPrivate,
@@ -846,7 +846,12 @@ pub mod dma {
     {
         /// Wait for the DMA transfer to complete and return the buffers and the
         /// SPI instance.
-        fn wait(mut self) -> (RXBUF, TXBUF, SpiDma<'d, T, C, M>) {
+        fn wait(
+            mut self,
+        ) -> Result<
+            (RXBUF, TXBUF, SpiDma<'d, T, C, M>),
+            (DmaError, RXBUF, TXBUF, SpiDma<'d, T, C, M>),
+        > {
             self.spi_dma.spi.flush().ok(); // waiting for the DMA transfer is not enough
 
             // `DmaTransfer` needs to have a `Drop` implementation, because we accept
@@ -860,8 +865,14 @@ pub mod dma {
                 let rbuffer = core::ptr::read(&self.rbuffer);
                 let tbuffer = core::ptr::read(&self.tbuffer);
                 let payload = core::ptr::read(&self.spi_dma);
+                let err = (&self).spi_dma.channel.rx.has_error()
+                    || (&self).spi_dma.channel.tx.has_error();
                 mem::forget(self);
-                (rbuffer, tbuffer, payload)
+                if err {
+                    Err((DmaError::DescriptorError, rbuffer, tbuffer, payload))
+                } else {
+                    Ok((rbuffer, tbuffer, payload))
+                }
             }
         }
 
@@ -906,7 +917,10 @@ pub mod dma {
     {
         /// Wait for the DMA transfer to complete and return the buffers and the
         /// SPI instance.
-        fn wait(mut self) -> (BUFFER, SpiDma<'d, T, C, M>) {
+        fn wait(
+            mut self,
+        ) -> Result<(BUFFER, SpiDma<'d, T, C, M>), (DmaError, BUFFER, SpiDma<'d, T, C, M>)>
+        {
             self.spi_dma.spi.flush().ok(); // waiting for the DMA transfer is not enough
 
             // `DmaTransfer` needs to have a `Drop` implementation, because we accept
@@ -919,8 +933,14 @@ pub mod dma {
             unsafe {
                 let buffer = core::ptr::read(&self.buffer);
                 let payload = core::ptr::read(&self.spi_dma);
+                let err = (&self).spi_dma.channel.rx.has_error()
+                    || (&self).spi_dma.channel.tx.has_error();
                 mem::forget(self);
-                (buffer, payload)
+                if err {
+                    Err((DmaError::DescriptorError, buffer, payload))
+                } else {
+                    Ok((buffer, payload))
+                }
             }
         }
 
@@ -953,6 +973,17 @@ pub mod dma {
         pub(crate) spi: PeripheralRef<'d, T>,
         pub(crate) channel: Channel<'d, C>,
         _mode: PhantomData<M>,
+    }
+
+    impl<'d, T, C, M> core::fmt::Debug for SpiDma<'d, T, C, M>
+    where
+        C: ChannelTypes,
+        C::P: SpiPeripheral,
+        M: DuplexMode,
+    {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            f.debug_struct("SpiDma").finish()
+        }
     }
 
     impl<'d, T, C, M> SpiDma<'d, T, C, M>
@@ -2408,7 +2439,7 @@ pub trait Instance {
     /// sequential transfers are performed. This function will return before
     /// all bytes of the last chunk to transmit have been sent to the wire. If
     /// you must ensure that the whole messages was written correctly, use
-    /// [`flush`].
+    /// [`Self::flush`].
     // FIXME: See below.
     fn write_bytes(&mut self, words: &[u8]) -> Result<(), Error> {
         let reg_block = self.register_block();
@@ -2472,7 +2503,7 @@ pub trait Instance {
     ///
     /// Sends out a stuffing byte for every byte to read. This function doesn't
     /// perform flushing. If you want to read the response to something you
-    /// have written before, consider using [`transfer`] instead.
+    /// have written before, consider using [`Self::transfer`] instead.
     fn read_bytes(&mut self, words: &mut [u8]) -> Result<(), Error> {
         let empty_array = [EMPTY_WRITE_PAD; FIFO_SIZE];
 
@@ -2488,7 +2519,7 @@ pub trait Instance {
     ///
     /// Copies the contents of the SPI receive FIFO into `words`. This function
     /// doesn't perform flushing. If you want to read the response to
-    /// something you have written before, consider using [`transfer`]
+    /// something you have written before, consider using [`Self::transfer`]
     /// instead.
     // FIXME: Using something like `core::slice::from_raw_parts` and
     // `copy_from_slice` on the receive registers works only for the esp32 and

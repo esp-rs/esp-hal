@@ -1,11 +1,6 @@
 /* before memory.x to allow override */
 ENTRY(Reset)
 
-INCLUDE memory.x
-
-/* map generic regions to output sections */
-INCLUDE "alias.x"
-
 _external_ram_start = ABSOLUTE(ORIGIN(psram_seg));
 _external_ram_end = ABSOLUTE(ORIGIN(psram_seg)+LENGTH(psram_seg));
 

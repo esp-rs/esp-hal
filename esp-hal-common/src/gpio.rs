@@ -11,6 +11,8 @@
 use core::{convert::Infallible, marker::PhantomData};
 
 use crate::peripherals::{GPIO, IO_MUX};
+#[cfg(xtensa)]
+pub(crate) use crate::rtc_pins;
 pub use crate::soc::gpio::*;
 pub(crate) use crate::{analog, gpio};
 
@@ -89,7 +91,19 @@ pub enum AlternateFunction {
     Function5 = 5,
 }
 
-pub trait RTCPin {}
+#[derive(PartialEq)]
+pub enum RtcFunction {
+    Rtc     = 0,
+    Digital = 1,
+}
+
+pub trait RTCPin {
+    fn rtc_number(&self) -> u8;
+    fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: RtcFunction);
+}
+
+pub trait RTCInputPin: RTCPin {}
+pub trait RTCOutputPin: RTCPin {}
 
 pub trait AnalogPin {}
 
@@ -489,6 +503,14 @@ where
         //       default are assigned to the `USB_SERIAL_JTAG` peripheral.
         #[cfg(esp32c3)]
         if GPIONUM == 18 || GPIONUM == 19 {
+            unsafe { &*crate::peripherals::USB_DEVICE::PTR }
+                .conf0
+                .modify(|_, w| w.usb_pad_enable().clear_bit());
+        }
+
+        // Same workaround as above for ESP32-S3
+        #[cfg(esp32s3)]
+        if GPIONUM == 19 || GPIONUM == 20 {
             unsafe { &*crate::peripherals::USB_DEVICE::PTR }
                 .conf0
                 .modify(|_, w| w.usb_pad_enable().clear_bit());
@@ -913,6 +935,14 @@ where
         //       default are assigned to the `USB_SERIAL_JTAG` peripheral.
         #[cfg(esp32c3)]
         if GPIONUM == 18 || GPIONUM == 19 {
+            unsafe { &*crate::peripherals::USB_DEVICE::PTR }
+                .conf0
+                .modify(|_, w| w.usb_pad_enable().clear_bit());
+        }
+
+        // Same workaround as above for ESP32-S3
+        #[cfg(esp32s3)]
+        if GPIONUM == 19 || GPIONUM == 20 {
             unsafe { &*crate::peripherals::USB_DEVICE::PTR }
                 .conf0
                 .modify(|_, w| w.usb_pad_enable().clear_bit());
@@ -1397,6 +1427,48 @@ macro_rules! gpio {
     };
 }
 
+#[cfg(xtensa)]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! rtc_pins {
+    (
+        $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat
+    ) => {
+        impl<MODE> crate::gpio::RTCPin for GpioPin<MODE, $pin_num>
+        where
+            Self: crate::gpio::GpioProperties,
+        {
+            fn rtc_number(&self) -> u8 {
+                $rtc_pin
+            }
+
+            /// Set the RTC properties of the pin. If `mux` is true then then pin is
+            /// routed to RTC, when false it is routed to IO_MUX.
+            fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: crate::gpio::RtcFunction) {
+                use crate::peripherals::RTC_IO;
+                let rtcio = unsafe{ &*RTC_IO::ptr() };
+
+                // disable input
+                paste::paste!{
+                    rtcio.$pin_reg.modify(|_,w| unsafe {w
+                        .[<$prefix fun_ie>]().bit(input_enable)
+                        .[<$prefix mux_sel>]().bit(mux)
+                        .[<$prefix fun_sel>]().bits(func as u8)
+                    });
+                }
+            }
+        }
+    };
+
+    (
+        $( ( $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat ) )+
+    ) => {
+        $(
+            crate::gpio::rtc_pins!($pin_num, $rtc_pin, $pin_reg, $prefix);
+        )+
+    };
+}
+
 // Following code enables `into_analog`
 
 #[doc(hidden)]
@@ -1788,11 +1860,14 @@ mod asynch {
             intrs
         );
 
-        while intrs != 0 {
-            let pin_nr = intrs.trailing_zeros();
+        let mut intr_bits = intrs;
+        while intr_bits != 0 {
+            // TODO: we should probably call `leading_zeros` on Xtensa
+            // when that lowers to NSAU.
+            let pin_nr = intr_bits.trailing_zeros();
             set_int_enable(pin_nr as u8, 0, 0, false);
             PIN_WAKERS[pin_nr as usize].wake(); // wake task
-            intrs &= !(1 << pin_nr);
+            intr_bits -= 1 << pin_nr;
         }
 
         // clear interrupt bits

@@ -2,6 +2,7 @@
 
 use crate::rtc_cntl::SocResetReason;
 
+#[derive(Debug, Copy, Clone)]
 pub enum SleepSource {
     /// In case of deep sleep, reset was not caused by exit from deep sleep
     Undefined = 0,
