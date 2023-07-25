@@ -114,6 +114,12 @@ pub enum RtcFunction {
 pub trait RTCPin: Pin {
     fn rtc_number(&self) -> u8;
     fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: RtcFunction);
+    fn rtcio_pad_hold(&mut self, enable: bool);
+}
+
+pub trait RTCPinWithResistors: RTCPin {
+    fn rtcio_pullup(&mut self, enable: bool);
+    fn rtcio_pulldown(&mut self, enable: bool);
 }
 
 pub trait RTCInputPin: RTCPin {}
@@ -1443,11 +1449,9 @@ macro_rules! gpio {
 #[macro_export]
 macro_rules! rtc_pins {
     (
-        $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat
+        $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat, $hold:ident $(, $rue:ident, $rde:ident)?
     ) => {
         impl<MODE> crate::gpio::RTCPin for GpioPin<MODE, $pin_num>
-        where
-            Self: crate::gpio::GpioProperties,
         {
             fn rtc_number(&self) -> u8 {
                 $rtc_pin
@@ -1468,14 +1472,45 @@ macro_rules! rtc_pins {
                     });
                 }
             }
+
+            fn rtcio_pad_hold(&mut self, enable: bool) {
+                let rtc_ctrl = unsafe { &*crate::peripherals::RTC_CNTL::PTR };
+
+                #[cfg(esp32)]
+                rtc_ctrl.hold_force.modify(|_, w| w.$hold().bit(enable));
+
+                #[cfg(not(esp32))]
+                rtc_ctrl.pad_hold.modify(|_, w| w.$hold().bit(enable));
+            }
         }
+
+        $(
+            impl<MODE> crate::gpio::RTCPinWithResistors for GpioPin<MODE, $pin_num>
+            {
+                fn rtcio_pullup(&mut self, enable: bool) {
+                    let rtcio = unsafe { &*crate::peripherals::RTC_IO::PTR };
+
+                    paste::paste! {
+                        rtcio.$pin_reg.modify(|_, w| w.$rue().bit([< enable >]));
+                    }
+                }
+
+                fn rtcio_pulldown(&mut self, enable: bool) {
+                    let rtcio = unsafe { &*crate::peripherals::RTC_IO::PTR };
+
+                    paste::paste! {
+                        rtcio.$pin_reg.modify(|_, w| w.$rde().bit([< enable >]));
+                    }
+                }
+            }
+        )?
     };
 
     (
-        $( ( $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat ) )+
+        $( ( $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat, $hold:ident $(, $rue:ident, $rde:ident)? ) )+
     ) => {
         $(
-            crate::gpio::rtc_pins!($pin_num, $rtc_pin, $pin_reg, $prefix);
+            crate::gpio::rtc_pins!($pin_num, $rtc_pin, $pin_reg, $prefix, $hold $(, $rue, $rde)?);
         )+
     };
 }
