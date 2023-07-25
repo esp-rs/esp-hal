@@ -25,6 +25,7 @@ extern "C" {
 macro_rules! regi2c_write {
     ( $block: ident, $reg_add: ident, $indata: expr ) => {
         paste::paste! {
+            #[allow(unused_unsafe)]
             unsafe {
                 crate::rom::rom_i2c_writeReg(
                     $block as u32,
@@ -42,6 +43,7 @@ macro_rules! regi2c_write {
 macro_rules! regi2c_write_mask {
     ( $block: ident, $reg_add: ident, $indata: expr ) => {
         paste::paste! {
+            #[allow(unused_unsafe)]
             unsafe {
                 crate::rom::rom_i2c_writeReg_Mask(
                     $block as u32,
