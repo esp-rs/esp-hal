@@ -339,4 +339,16 @@ impl<T, const SIZE: usize> FlashSafeDma<T, SIZE> {
             buffer: [0u8; SIZE],
         }
     }
+
+    pub fn inner_mut(&mut self) -> &mut T {
+        &mut self.inner
+    }
+
+    pub fn inner(&self) -> &T {
+        &self.inner
+    }
+
+    pub fn free(self) -> T {
+        self.inner
+    }
 }
