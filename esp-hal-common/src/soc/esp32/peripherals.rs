@@ -34,7 +34,7 @@ crate::peripherals! {
     RTC_CNTL => true,
     RTC_IO => true,
     RTC_I2C => true,
-    SDMMC => true,
+    SDHOST => true,
     SENS => true,
     SHA => true,
     SLC => true,
