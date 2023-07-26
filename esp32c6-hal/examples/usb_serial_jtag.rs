@@ -60,7 +60,11 @@ fn main() -> ! {
 
     critical_section::with(|cs| USB_SERIAL.borrow_ref_mut(cs).replace(usb_serial));
 
-    interrupt::enable(peripherals::Interrupt::USB, interrupt::Priority::Priority1).unwrap();
+    interrupt::enable(
+        peripherals::Interrupt::USB_DEVICE,
+        interrupt::Priority::Priority1,
+    )
+    .unwrap();
 
     interrupt::set_kind(
         Cpu::ProCpu,
@@ -86,7 +90,7 @@ fn main() -> ! {
 }
 
 #[interrupt]
-fn USB() {
+fn USB_DEVICE() {
     critical_section::with(|cs| {
         let mut usb_serial = USB_SERIAL.borrow_ref_mut(cs);
         let usb_serial = usb_serial.as_mut().unwrap();
