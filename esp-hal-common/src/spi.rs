@@ -1448,7 +1448,7 @@ pub mod dma {
         use embedded_hal_1::spi::SpiBus;
 
         use super::{super::InstanceDma, SpiDma, SpiPeripheral};
-        use crate::{dma::ChannelTypes, spi::IsFullDuplex};
+        use crate::{dma::ChannelTypes, spi::IsFullDuplex, FlashSafeDma};
 
         impl<'d, T, C, M> embedded_hal_1::spi::ErrorType for SpiDma<'d, T, C, M>
         where
@@ -1532,13 +1532,13 @@ pub mod dma {
 
             fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
                 Ok(
-                    if !crate::soc::is_valid_ram_address(&words[0] as *const _ as u32) {
-                        for (read, write) in read.chunks_mut(SIZE).chain(write.chunks(SIZE)) {
+                    if !crate::soc::is_valid_ram_address(&write[0] as *const _ as u32) {
+                        for (read, write) in read.chunks_mut(SIZE).zip(write.chunks(SIZE)) {
                             self.buffer[..write.len()].copy_from_slice(write);
                             self.inner.transfer(read, &self.buffer[..write.len()])?;
                         }
                     } else {
-                        self.inner.write(words)?;
+                        self.inner.transfer(read, write)?;
                     },
                 )
             }
