@@ -766,6 +766,7 @@ pub mod dma {
             TxPrivate,
         },
         peripheral::PeripheralRef,
+        FlashSafeDma,
     };
 
     pub trait WithDmaSpi2<'d, T, C, M>
@@ -1281,6 +1282,57 @@ pub mod dma {
         }
     }
 
+    impl<T: embedded_hal::blocking::spi::Transfer<u8>, const SIZE: usize>
+        embedded_hal::blocking::spi::Transfer<u8> for FlashSafeDma<T, SIZE>
+    {
+        type Error = T::Error;
+
+        fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Self::Error> {
+            self.inner.transfer(words)
+        }
+    }
+
+    impl<T: embedded_hal::blocking::spi::Write<u8>, const SIZE: usize>
+        embedded_hal::blocking::spi::Write<u8> for FlashSafeDma<T, SIZE>
+    {
+        type Error = T::Error;
+
+        fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
+            Ok(
+                if !crate::soc::is_valid_ram_address(&words[0] as *const _ as u32) {
+                    for chunk in words.chunks(SIZE) {
+                        self.buffer[..chunk.len()].copy_from_slice(chunk);
+                        self.inner.write(&self.buffer[..chunk.len()])?;
+                    }
+                } else {
+                    self.inner.write(words)?;
+                },
+            )
+        }
+    }
+
+    impl<T: embedded_hal::spi::FullDuplex<u8>, const SIZE: usize> embedded_hal::spi::FullDuplex<u8>
+        for FlashSafeDma<T, SIZE>
+    where
+        Self: embedded_hal::blocking::spi::Transfer<u8, Error = T::Error>,
+        Self: embedded_hal::blocking::spi::Write<u8, Error = T::Error>,
+    {
+        type Error = T::Error;
+
+        fn read(&mut self) -> nb::Result<u8, Self::Error> {
+            use embedded_hal::blocking::spi::Transfer;
+            let mut buf = [0; 1];
+            self.transfer(&mut buf)?;
+            Ok(buf[0])
+        }
+
+        fn send(&mut self, word: u8) -> nb::Result<(), Self::Error> {
+            use embedded_hal::blocking::spi::Write;
+            self.write(&[word])?;
+            Ok(())
+        }
+    }
+
     #[cfg(feature = "async")]
     mod asynch {
         use super::*;
@@ -1449,6 +1501,54 @@ pub mod dma {
 
             fn flush(&mut self) -> Result<(), Self::Error> {
                 self.spi.flush()
+            }
+        }
+
+        impl<T: embedded_hal_1::spi::ErrorType, const SIZE: usize> embedded_hal_1::spi::ErrorType
+            for FlashSafeDma<T, SIZE>
+        {
+            type Error = T::Error;
+        }
+
+        impl<T: embedded_hal_1::spi::SpiBus, const SIZE: usize> embedded_hal_1::spi::SpiBus
+            for FlashSafeDma<T, SIZE>
+        {
+            fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+                self.inner.read(words)
+            }
+
+            fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
+                Ok(
+                    if !crate::soc::is_valid_ram_address(&words[0] as *const _ as u32) {
+                        for chunk in words.chunks(SIZE) {
+                            self.buffer[..chunk.len()].copy_from_slice(chunk);
+                            self.inner.write(&self.buffer[..chunk.len()])?;
+                        }
+                    } else {
+                        self.inner.write(words)?;
+                    },
+                )
+            }
+
+            fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
+                Ok(
+                    if !crate::soc::is_valid_ram_address(&words[0] as *const _ as u32) {
+                        for (read, write) in read.chunks_mut(SIZE).chain(write.chunks(SIZE)) {
+                            self.buffer[..write.len()].copy_from_slice(write);
+                            self.inner.transfer(read, &self.buffer[..write.len()])?;
+                        }
+                    } else {
+                        self.inner.write(words)?;
+                    },
+                )
+            }
+
+            fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+                self.inner.transfer_in_place(words)
+            }
+
+            fn flush(&mut self) -> Result<(), Self::Error> {
+                self.inner.flush()
             }
         }
     }
@@ -3122,56 +3222,3 @@ impl Spi2Instance for crate::peripherals::SPI2 {}
 
 #[cfg(any(esp32, esp32s2, esp32s3))]
 impl Spi3Instance for crate::peripherals::SPI3 {}
-
-use crate::FlashSafeDma;
-
-impl<T: embedded_hal::blocking::spi::Transfer<u8>, const SIZE: usize>
-    embedded_hal::blocking::spi::Transfer<u8> for FlashSafeDma<T, SIZE>
-{
-    type Error = T::Error;
-
-    fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Self::Error> {
-        self.inner.transfer(words)
-    }
-}
-
-impl<T: embedded_hal::blocking::spi::Write<u8>, const SIZE: usize>
-    embedded_hal::blocking::spi::Write<u8> for FlashSafeDma<T, SIZE>
-{
-    type Error = T::Error;
-
-    fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-        Ok(
-            if !crate::soc::is_valid_ram_address(&words[0] as *const _ as u32) {
-                for chunk in words.chunks(SIZE) {
-                    self.buffer[..chunk.len()].copy_from_slice(chunk);
-                    self.inner.write(&self.buffer[..chunk.len()])?;
-                }
-            } else {
-                self.inner.write(words)?;
-            },
-        )
-    }
-}
-
-impl<T: embedded_hal::spi::FullDuplex<u8>, const SIZE: usize> embedded_hal::spi::FullDuplex<u8>
-    for FlashSafeDma<T, SIZE>
-where
-    Self: embedded_hal::blocking::spi::Transfer<u8, Error = T::Error>,
-    Self: embedded_hal::blocking::spi::Write<u8, Error = T::Error>,
-{
-    type Error = T::Error;
-
-    fn read(&mut self) -> nb::Result<u8, Self::Error> {
-        use embedded_hal::blocking::spi::Transfer;
-        let mut buf = [0; 1];
-        self.transfer(&mut buf)?;
-        Ok(buf[0])
-    }
-
-    fn send(&mut self, word: u8) -> nb::Result<(), Self::Error> {
-        use embedded_hal::blocking::spi::Write;
-        self.write(&[word])?;
-        Ok(())
-    }
-}
