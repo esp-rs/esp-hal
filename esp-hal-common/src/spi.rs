@@ -1441,6 +1441,50 @@ pub mod dma {
                 self.spi.flush()
             }
         }
+
+        impl<T: embedded_hal_async::spi::SpiBus, const SIZE: usize> embedded_hal_async::spi::SpiBus
+            for FlashSafeDma<T, SIZE>
+        {
+            async fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+                self.inner.read(words).await
+            }
+
+            async fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
+                Ok(
+                    if !crate::soc::is_valid_ram_address(&words[0] as *const _ as u32) {
+                        for chunk in words.chunks(SIZE) {
+                            self.buffer[..chunk.len()].copy_from_slice(chunk);
+                            self.inner.write(&self.buffer[..chunk.len()]).await?;
+                        }
+                    } else {
+                        self.inner.write(words).await?;
+                    },
+                )
+            }
+
+            async fn flush(&mut self) -> Result<(), Self::Error> {
+                self.inner.flush().await
+            }
+
+            async fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+                self.inner.transfer_in_place(words).await
+            }
+
+            async fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
+                Ok(
+                    if !crate::soc::is_valid_ram_address(&write[0] as *const _ as u32) {
+                        for (read, write) in read.chunks_mut(SIZE).zip(write.chunks(SIZE)) {
+                            self.buffer[..write.len()].copy_from_slice(write);
+                            self.inner
+                                .transfer(read, &self.buffer[..write.len()])
+                                .await?;
+                        }
+                    } else {
+                        self.inner.transfer(read, write).await?;
+                    },
+                )
+            }
+        }
     }
 
     #[cfg(feature = "eh1")]
