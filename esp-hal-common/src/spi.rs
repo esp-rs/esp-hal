@@ -4,14 +4,27 @@
 //! which way you choose, you must first create an SPI instance with
 //! [`Spi::new`].
 //!
-//! ```rust
+//! ```rust,no_run
+//! # #![no_std]
+//! # use esp_hal_common::{IO, clock::ClockControl, peripherals::Peripherals, prelude::*, spi::{Spi, SpiMode}};
+//! # fn main () {
+//! # let peripherals = Peripherals::take();
+//! # #[cfg(system)]
+//! # let mut system = peripherals.SYSTEM.split();
+//! # #[cfg(pcr)]
+//! # let mut system = peripherals.PCR.split();
+//! # #[cfg(dport)]
+//! # let mut system = peripherals.DPORT.split();
+//! # let mut peripheral_clock_control = system.peripheral_clock_control;
+//! # let mut clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+//! # 
 //! let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 //! let sclk = io.pins.gpio12;
 //! let miso = io.pins.gpio11;
 //! let mosi = io.pins.gpio13;
 //! let cs = io.pins.gpio10;
 //!
-//! let mut spi = hal::spi::Spi::new(
+//! let mut spi = Spi::new(
 //!     peripherals.SPI2,
 //!     sclk,
 //!     mosi,
@@ -22,6 +35,11 @@
 //!     &mut peripheral_clock_control,
 //!     &mut clocks,
 //! );
+//! # }
+//! # #[panic_handler]
+//! # fn panic(_ : &core::panic::PanicInfo) -> ! {
+//! #     loop {}
+//! # }
 //! ```
 //!
 //! ## Exclusive access to the SPI bus

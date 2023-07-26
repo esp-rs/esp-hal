@@ -22,7 +22,7 @@
 //! [esp32s2-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32s2-hal
 //! [esp32s3-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32s3-hal
 
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
 #![cfg_attr(
     feature = "async",
