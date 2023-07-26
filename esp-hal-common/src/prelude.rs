@@ -60,11 +60,6 @@ pub use crate::ledc::{
     },
     timer::{TimerHW as _esp_hal_ledc_timer_TimerHW, TimerIFace as _esp_hal_ledc_timer_TimerIFace},
 };
-#[cfg(rmt)]
-pub use crate::pulse_control::{
-    ConfiguredChannel as _esp_hal_pulse_control_ConfiguredChannel,
-    OutputChannel as _esp_hal_pulse_control_OutputChannel,
-};
 #[cfg(radio)]
 pub use crate::radio::RadioExt as _esp_hal_RadioExt;
 #[cfg(any(esp32, esp32s2, esp32s3))]

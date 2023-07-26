@@ -53,8 +53,6 @@ pub use self::dma::pdma;
 #[cfg(gpio)]
 pub use self::gpio::IO;
 #[cfg(rmt)]
-pub use self::pulse_control::PulseControl;
-#[cfg(rmt)]
 pub use self::rmt::Rmt;
 #[cfg(rng)]
 pub use self::rng::Rng;
@@ -111,8 +109,6 @@ pub mod otg_fs;
 pub mod pcnt;
 pub mod peripheral;
 pub mod prelude;
-#[cfg(rmt)]
-pub mod pulse_control;
 #[cfg(radio)]
 pub mod radio;
 pub mod reset;
