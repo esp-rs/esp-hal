@@ -12,33 +12,28 @@
 //!
 //! ```rust,ignore
 //! let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-//! let pulse = PulseControl::new(
+//! let rmt = Rmt::new(
 //!     peripherals.RMT,
+//!     80u32.MHz(),
 //!     &mut system.peripheral_clock_control,
-//!     ClockSource::APB,
-//!     0,
-//!     0,
-//!     0,
+//!     &clocks,
 //! )
 //! .unwrap();
 //!
-//! let led = <smartLedAdapter!(1)>::new(pulse.channel0, io.pins.gpio0);
+//! let led = <smartLedAdapter!(0, 1)>::new(rmt.channel0, io.pins.gpio0);
 //! ```
 
 #![no_std]
 #![deny(missing_docs)]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 
-use core::slice::IterMut;
+use core::{fmt::Debug, slice::IterMut};
 
-#[cfg(any(feature = "esp32", feature = "esp32s2"))]
-use esp_hal_common::pulse_control::ClockSource;
 use esp_hal_common::{
     gpio::OutputPin,
     peripheral::Peripheral,
-    pulse_control::{ConfiguredChannel, OutputChannel, PulseCode, RepeatMode, TransmissionError},
+    rmt::{Error as RmtError, PulseCode, TxChannel, TxChannelConfig, TxChannelCreator},
 };
-use fugit::NanosDuration;
 use smart_leds_trait::{SmartLedsWrite, RGB8};
 
 // Specifies what clock frequency we're using for the RMT peripheral (if
@@ -65,14 +60,10 @@ const SK68XX_T0L_NS: u32 = SK68XX_CODE_PERIOD - SK68XX_T0H_NS;
 const SK68XX_T1H_NS: u32 = 640;
 const SK68XX_T1L_NS: u32 = SK68XX_CODE_PERIOD - SK68XX_T1H_NS;
 
-const SK68XX_T0H_CYCLES: NanosDuration<u32> =
-    NanosDuration::<u32>::from_ticks((SK68XX_T0H_NS * (SOURCE_CLK_FREQ / 1_000_000)) / 500);
-const SK68XX_T0L_CYCLES: NanosDuration<u32> =
-    NanosDuration::<u32>::from_ticks((SK68XX_T0L_NS * (SOURCE_CLK_FREQ / 1_000_000)) / 500);
-const SK68XX_T1H_CYCLES: NanosDuration<u32> =
-    NanosDuration::<u32>::from_ticks((SK68XX_T1H_NS * (SOURCE_CLK_FREQ / 1_000_000)) / 500);
-const SK68XX_T1L_CYCLES: NanosDuration<u32> =
-    NanosDuration::<u32>::from_ticks((SK68XX_T1L_NS * (SOURCE_CLK_FREQ / 1_000_000)) / 500);
+const SK68XX_T0H_CYCLES: u16 = ((SK68XX_T0H_NS * (SOURCE_CLK_FREQ / 1_000_000)) / 500) as u16;
+const SK68XX_T0L_CYCLES: u16 = ((SK68XX_T0L_NS * (SOURCE_CLK_FREQ / 1_000_000)) / 500) as u16;
+const SK68XX_T1H_CYCLES: u16 = ((SK68XX_T1H_NS * (SOURCE_CLK_FREQ / 1_000_000)) / 500) as u16;
+const SK68XX_T1L_CYCLES: u16 = ((SK68XX_T1L_NS * (SOURCE_CLK_FREQ / 1_000_000)) / 500) as u16;
 
 /// All types of errors that can happen during the conversion and transmission
 /// of LED commands
@@ -81,7 +72,7 @@ pub enum LedAdapterError {
     /// Raised in the event that the provided data container is not large enough
     BufferSizeExceeded,
     /// Raised if something goes wrong in the transmission,
-    TransmissionError(TransmissionError),
+    TransmissionError(RmtError),
 }
 
 /// Macro to generate adapters with an arbitrary buffer size fitting for a
@@ -91,55 +82,53 @@ pub enum LedAdapterError {
 /// an `LedAdapterError:BufferSizeExceeded` error.
 #[macro_export]
 macro_rules! smartLedAdapter {
-    ( $buffer_size: literal ) => {
+    ( $channel: literal, $buffer_size: literal ) => {
         // The size we're assigning here is calculated as following
         //  (
         //   Nr. of LEDs
         //   * channels (r,g,b -> 3)
         //   * pulses per channel 8)
         //  ) + 1 additional pulse for the end delimiter
-        SmartLedsAdapter::<_, { $buffer_size * 24 + 1 }>
+        SmartLedsAdapter::<_, $channel, { $buffer_size * 24 + 1 }>
     };
 }
 
 /// Adapter taking an RMT channel and a specific pin and providing RGB LED
 /// interaction functionality using the `smart-leds` crate
-pub struct SmartLedsAdapter<CHANNEL, const BUFFER_SIZE: usize> {
-    channel: CHANNEL,
+pub struct SmartLedsAdapter<TX, const CHANNEL: u8, const BUFFER_SIZE: usize>
+where
+    TX: TxChannel<CHANNEL>,
+{
+    channel: Option<TX>,
     rmt_buffer: [u32; BUFFER_SIZE],
 }
 
-impl<'d, CHANNEL, const BUFFER_SIZE: usize> SmartLedsAdapter<CHANNEL, BUFFER_SIZE>
+impl<'d, TX, const CHANNEL: u8, const BUFFER_SIZE: usize> SmartLedsAdapter<TX, CHANNEL, BUFFER_SIZE>
 where
-    CHANNEL: ConfiguredChannel,
+    TX: TxChannel<CHANNEL>,
 {
     /// Create a new adapter object that drives the pin using the RMT channel.
-    pub fn new<UnconfiguredChannel, O: OutputPin + 'd>(
-        mut channel: UnconfiguredChannel,
+    pub fn new<C, O>(
+        channel: C,
         pin: impl Peripheral<P = O> + 'd,
-    ) -> SmartLedsAdapter<CHANNEL, BUFFER_SIZE>
+    ) -> SmartLedsAdapter<TX, CHANNEL, BUFFER_SIZE>
     where
-        UnconfiguredChannel: OutputChannel<ConfiguredChannel<'d, O> = CHANNEL>,
+        O: OutputPin + 'd,
+        C: TxChannelCreator<'d, TX, O, CHANNEL>,
     {
-        #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
-        channel
-            .set_idle_output_level(false)
-            .set_carrier_modulation(false)
-            .set_channel_divider(1)
-            .set_idle_output(true);
+        let config = TxChannelConfig {
+            clk_divider: 1,
+            idle_output_level: false,
+            carrier_modulation: false,
+            idle_output: true,
 
-        #[cfg(any(feature = "esp32", feature = "esp32s2"))]
-        channel
-            .set_idle_output_level(false)
-            .set_carrier_modulation(false)
-            .set_channel_divider(1)
-            .set_idle_output(true)
-            .set_clock_source(ClockSource::APB);
+            ..TxChannelConfig::default()
+        };
 
-        let channel = channel.assign_pin(pin);
+        let channel = channel.configure(pin, config).unwrap();
 
         Self {
-            channel,
+            channel: Some(channel),
             rmt_buffer: [0; BUFFER_SIZE],
         }
     }
@@ -148,9 +137,9 @@ where
         value: RGB8,
         mut_iter: &mut IterMut<u32>,
     ) -> Result<(), LedAdapterError> {
-        SmartLedsAdapter::<CHANNEL, BUFFER_SIZE>::convert_rgb_channel_to_pulses(value.g, mut_iter)?;
-        SmartLedsAdapter::<CHANNEL, BUFFER_SIZE>::convert_rgb_channel_to_pulses(value.r, mut_iter)?;
-        SmartLedsAdapter::<CHANNEL, BUFFER_SIZE>::convert_rgb_channel_to_pulses(value.b, mut_iter)?;
+        Self::convert_rgb_channel_to_pulses(value.g, mut_iter)?;
+        Self::convert_rgb_channel_to_pulses(value.r, mut_iter)?;
+        Self::convert_rgb_channel_to_pulses(value.b, mut_iter)?;
 
         Ok(())
     }
@@ -183,9 +172,10 @@ where
     }
 }
 
-impl<CHANNEL, const BUFFER_SIZE: usize> SmartLedsWrite for SmartLedsAdapter<CHANNEL, BUFFER_SIZE>
+impl<TX, const CHANNEL: u8, const BUFFER_SIZE: usize> SmartLedsWrite
+    for SmartLedsAdapter<TX, CHANNEL, BUFFER_SIZE>
 where
-    CHANNEL: ConfiguredChannel,
+    TX: TxChannel<CHANNEL>,
 {
     type Error = LedAdapterError;
     type Color = RGB8;
@@ -205,22 +195,23 @@ where
         // This will result in an `BufferSizeExceeded` error in case
         // the iterator provides more elements than the buffer can take.
         for item in iterator {
-            SmartLedsAdapter::<CHANNEL, BUFFER_SIZE>::convert_rgb_to_pulse(
-                item.into(),
-                &mut seq_iter,
-            )?;
+            Self::convert_rgb_to_pulse(item.into(), &mut seq_iter)?;
         }
 
         // Finally, add an end element.
         *seq_iter.next().ok_or(LedAdapterError::BufferSizeExceeded)? = 0;
 
         // Perform the actual RMT operation. We use the u32 values here right away.
-        match self
-            .channel
-            .send_pulse_sequence_raw(RepeatMode::SingleShot, &self.rmt_buffer)
-        {
-            Ok(_) => Ok(()),
-            Err(x) => Err(LedAdapterError::TransmissionError(x)),
+        let channel = self.channel.take().unwrap();
+        match channel.transmit(&self.rmt_buffer).wait() {
+            Ok(chan) => {
+                self.channel = Some(chan);
+                Ok(())
+            }
+            Err((e, chan)) => {
+                self.channel = Some(chan);
+                Err(LedAdapterError::TransmissionError(e))
+            }
         }
     }
 }

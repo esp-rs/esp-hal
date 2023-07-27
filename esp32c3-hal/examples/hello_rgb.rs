@@ -15,14 +15,12 @@ use esp32c3_hal::{
     clock::ClockControl,
     peripherals,
     prelude::*,
-    pulse_control::ClockSource,
+    rmt::Rmt,
     timer::TimerGroup,
     Delay,
-    PulseControl,
     Rtc,
     IO,
 };
-#[allow(unused_imports)]
 use esp_backtrace as _;
 use esp_hal_smartled::{smartLedAdapter, SmartLedsAdapter};
 use smart_leds::{
@@ -39,33 +37,31 @@ fn main() -> ! {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-    let timer_group0 = TimerGroup::new(
+    let mut timer_group0 = TimerGroup::new(
         peripherals.TIMG0,
         &clocks,
         &mut system.peripheral_clock_control,
     );
-    let mut wdt0 = timer_group0.wdt;
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
     // Disable watchdogs
     rtc.swd.disable();
     rtc.rwdt.disable();
-    wdt0.disable();
+    timer_group0.wdt.disable();
+
+    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
     // Configure RMT peripheral globally
-    let pulse = PulseControl::new(
+    let rmt = Rmt::new(
         peripherals.RMT,
+        80u32.MHz(),
         &mut system.peripheral_clock_control,
-        ClockSource::APB,
-        0,
-        0,
-        0,
+        &clocks,
     )
     .unwrap();
 
     // We use one of the RMT channels to instantiate a `SmartLedsAdapter` which can
     // be used directly with all `smart_led` implementations
-    let mut led = <smartLedAdapter!(1)>::new(pulse.channel0, io.pins.gpio8);
+    let mut led = <smartLedAdapter!(0, 1)>::new(rmt.channel0, io.pins.gpio8);
 
     // Initialize the Delay peripheral, and use it to toggle the LED state in a
     // loop.

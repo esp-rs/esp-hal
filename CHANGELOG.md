@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - Remove the `allow-opt-level-z` feature from `esp32c3-hal` (#654)
+- Remove the old `pulse_control` driver (#694)
 
 ### Breaking
 
