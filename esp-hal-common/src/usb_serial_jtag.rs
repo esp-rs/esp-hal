@@ -354,31 +354,9 @@ mod asynch {
         }
     }
 
-    #[cfg(esp32c3)]
-    #[interrupt]
-    fn USB_SERIAL_JTAG() {
-        let usb_serial_jtag = unsafe { &*crate::peripherals::USB_DEVICE::ptr() };
-        usb_serial_jtag
-            .int_ena
-            .modify(|_, w| w.serial_in_empty_int_ena().clear_bit());
-        WAKER.wake();
-    }
-
-    #[cfg(esp32s3)]
     #[interrupt]
     fn USB_DEVICE() {
-        let usb_serial_jtag = unsafe { &*crate::peripherals::USB_DEVICE::ptr() };
-        usb_serial_jtag
-            .int_ena
-            .modify(|_, w| w.serial_in_empty_int_ena().clear_bit());
-        WAKER.wake();
-    }
-
-    #[cfg(any(esp32c6, esp32h2))]
-    #[interrupt]
-    fn USB() {
-        let usb_serial_jtag = unsafe { &*crate::peripherals::USB_DEVICE::ptr() };
-        usb_serial_jtag
+        unsafe { &*crate::peripherals::USB_DEVICE::ptr() }
             .int_ena
             .modify(|_, w| w.serial_in_empty_int_ena().clear_bit());
         WAKER.wake();
