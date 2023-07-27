@@ -303,6 +303,11 @@ impl<'d> ClockControl<'d> {
             },
         }
     }
+
+    #[allow(unused)]
+    pub fn max(clock_control: impl Peripheral<P = SystemClockControl> + 'd) -> ClockControl<'d> {
+        Self::configure(clock_control, CpuClock::Clock240MHz)
+    }
 }
 
 #[cfg(esp32c2)]
@@ -367,6 +372,11 @@ impl<'d> ClockControl<'d> {
             },
         }
     }
+
+    #[allow(unused)]
+    pub fn max(clock_control: impl Peripheral<P = SystemClockControl> + 'd) -> ClockControl<'d> {
+        Self::configure(clock_control, CpuClock::Clock120MHz)
+    }
 }
 
 #[cfg(esp32c3)]
@@ -416,6 +426,11 @@ impl<'d> ClockControl<'d> {
                 xtal_clock: xtal_freq.frequency(),
             },
         }
+    }
+
+    #[allow(unused)]
+    pub fn max(clock_control: impl Peripheral<P = SystemClockControl> + 'd) -> ClockControl<'d> {
+        Self::configure(clock_control, CpuClock::Clock160MHz)
     }
 }
 
@@ -468,6 +483,11 @@ impl<'d> ClockControl<'d> {
                 crypto_clock: HertzU32::MHz(160),
             },
         }
+    }
+
+    #[allow(unused)]
+    pub fn max(clock_control: impl Peripheral<P = SystemClockControl> + 'd) -> ClockControl<'d> {
+        Self::configure(clock_control, CpuClock::Clock160MHz)
     }
 }
 
@@ -525,6 +545,11 @@ impl<'d> ClockControl<'d> {
             },
         }
     }
+
+    #[allow(unused)]
+    pub fn max(clock_control: impl Peripheral<P = SystemClockControl> + 'd) -> ClockControl<'d> {
+        Self::configure(clock_control, CpuClock::Clock96MHz)
+    }
 }
 
 #[cfg(esp32s2)]
@@ -560,6 +585,11 @@ impl<'d> ClockControl<'d> {
                 xtal_clock: HertzU32::MHz(40),
             },
         }
+    }
+
+    #[allow(unused)]
+    pub fn max(clock_control: impl Peripheral<P = SystemClockControl> + 'd) -> ClockControl<'d> {
+        Self::configure(clock_control, CpuClock::Clock240MHz)
     }
 }
 
@@ -598,5 +628,10 @@ impl<'d> ClockControl<'d> {
                 crypto_pwm_clock: HertzU32::MHz(160),
             },
         }
+    }
+
+    #[allow(unused)]
+    pub fn max(clock_control: impl Peripheral<P = SystemClockControl> + 'd) -> ClockControl<'d> {
+        Self::configure(clock_control, CpuClock::Clock240MHz)
     }
 }
