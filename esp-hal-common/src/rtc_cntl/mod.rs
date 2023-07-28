@@ -14,12 +14,17 @@ use crate::efuse::Efuse;
 use crate::peripherals::{LP_TIMER, LP_WDT};
 #[cfg(not(any(esp32c6, esp32h2)))]
 use crate::peripherals::{RTC_CNTL, TIMG0};
+#[cfg(any(esp32, esp32s3))]
+use crate::rtc_cntl::sleep::{RtcSleepConfig, WakeSource, WakeTriggers};
 use crate::{
     clock::Clock,
     peripheral::{Peripheral, PeripheralRef},
     reset::{SleepSource, WakeupReason},
     Cpu,
 };
+// only include sleep where its been implemented
+#[cfg(any(esp32, esp32s3))]
+pub mod sleep;
 
 #[cfg(any(esp32c6, esp32h2))]
 type RtcCntl = crate::peripherals::LP_CLKRST;
@@ -131,12 +136,17 @@ impl<'d> Rtc<'d> {
         rtc::init();
         rtc::configure_clock();
 
-        Self {
+        let this = Self {
             _inner: rtc_cntl.into_ref(),
             rwdt: Rwdt::default(),
             #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
             swd: Swd::new(),
-        }
+        };
+
+        #[cfg(any(esp32, esp32s3))]
+        RtcSleepConfig::base_settings(&this);
+
+        this
     }
 
     // TODO: implement for ESP32-C6
@@ -190,6 +200,53 @@ impl<'d> Rtc<'d> {
     /// read the current value of the rtc time registers in milliseconds
     pub fn get_time_ms(&self) -> u64 {
         self.get_time_raw() * 1_000 / RtcClock::get_slow_freq().frequency().to_Hz() as u64
+    }
+
+    /// enter deep sleep and wake with the provided `wake_sources`
+    #[cfg(any(esp32, esp32s3))]
+    pub fn sleep_deep<'a>(
+        &mut self,
+        wake_sources: &[&'a dyn WakeSource],
+        delay: &mut crate::Delay,
+    ) -> ! {
+        let config = RtcSleepConfig::deep();
+        self.sleep(&config, wake_sources, delay);
+        unreachable!();
+    }
+
+    /// enter light sleep and wake with the provided `wake_sources`
+    #[cfg(any(esp32, esp32s3))]
+    pub fn sleep_light<'a>(
+        &mut self,
+        wake_sources: &[&'a dyn WakeSource],
+        delay: &mut crate::Delay,
+    ) {
+        let config = RtcSleepConfig::default();
+        self.sleep(&config, wake_sources, delay);
+    }
+
+    /// enter sleep with the provided `config` and wake with the provided
+    /// `wake_sources`
+    #[cfg(any(esp32, esp32s3))]
+    pub fn sleep<'a>(
+        &mut self,
+        config: &RtcSleepConfig,
+        wake_sources: &[&'a dyn WakeSource],
+        delay: &mut crate::Delay,
+    ) {
+        let mut config = config.clone();
+        let mut wakeup_triggers = WakeTriggers::default();
+        for wake_source in wake_sources {
+            wake_source.apply(self, &mut wakeup_triggers, &mut config)
+        }
+
+        config.apply();
+
+        use embedded_hal::blocking::delay::DelayMs;
+        delay.delay_ms(100u32);
+
+        config.start_sleep(wakeup_triggers);
+        config.finish_sleep();
     }
 }
 

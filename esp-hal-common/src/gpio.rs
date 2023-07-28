@@ -11,6 +11,8 @@
 use core::{convert::Infallible, marker::PhantomData};
 
 use crate::peripherals::{GPIO, IO_MUX};
+#[cfg(xtensa)]
+pub(crate) use crate::rtc_pins;
 pub use crate::soc::gpio::*;
 pub(crate) use crate::{analog, gpio};
 
@@ -89,16 +91,28 @@ pub enum AlternateFunction {
     Function5 = 5,
 }
 
-pub trait RTCPin {}
+#[derive(PartialEq)]
+pub enum RtcFunction {
+    Rtc     = 0,
+    Digital = 1,
+}
+
+pub trait RTCPin: Pin {
+    fn rtc_number(&self) -> u8;
+    fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: RtcFunction);
+}
+
+pub trait RTCInputPin: RTCPin {}
+pub trait RTCOutputPin: RTCPin {}
 
 pub trait AnalogPin {}
 
 pub trait Pin {
     fn number(&self) -> u8;
 
-    fn sleep_mode(&mut self, on: bool) -> &mut Self;
+    fn sleep_mode(&mut self, on: bool);
 
-    fn set_alternate_function(&mut self, alternate: AlternateFunction) -> &mut Self;
+    fn set_alternate_function(&mut self, alternate: AlternateFunction);
 
     fn listen(&mut self, event: Event) {
         self.listen_with_options(event, true, false, false)
@@ -494,6 +508,14 @@ where
                 .modify(|_, w| w.usb_pad_enable().clear_bit());
         }
 
+        // Same workaround as above for ESP32-S3
+        #[cfg(esp32s3)]
+        if GPIONUM == 19 || GPIONUM == 20 {
+            unsafe { &*crate::peripherals::USB_DEVICE::PTR }
+                .conf0
+                .modify(|_, w| w.usb_pad_enable().clear_bit());
+        }
+
         get_io_mux_reg(GPIONUM).modify(|_, w| unsafe {
             w.mcu_sel()
                 .bits(GPIO_FUNCTION as u8)
@@ -607,15 +629,12 @@ where
         GPIONUM
     }
 
-    fn sleep_mode(&mut self, on: bool) -> &mut Self {
+    fn sleep_mode(&mut self, on: bool) {
         get_io_mux_reg(GPIONUM).modify(|_, w| w.slp_sel().bit(on));
-
-        self
     }
 
-    fn set_alternate_function(&mut self, alternate: AlternateFunction) -> &mut Self {
+    fn set_alternate_function(&mut self, alternate: AlternateFunction) {
         get_io_mux_reg(GPIONUM).modify(|_, w| unsafe { w.mcu_sel().bits(alternate as u8) });
-        self
     }
 
     fn listen_with_options(
@@ -913,6 +932,14 @@ where
         //       default are assigned to the `USB_SERIAL_JTAG` peripheral.
         #[cfg(esp32c3)]
         if GPIONUM == 18 || GPIONUM == 19 {
+            unsafe { &*crate::peripherals::USB_DEVICE::PTR }
+                .conf0
+                .modify(|_, w| w.usb_pad_enable().clear_bit());
+        }
+
+        // Same workaround as above for ESP32-S3
+        #[cfg(esp32s3)]
+        if GPIONUM == 19 || GPIONUM == 20 {
             unsafe { &*crate::peripherals::USB_DEVICE::PTR }
                 .conf0
                 .modify(|_, w| w.usb_pad_enable().clear_bit());
@@ -1273,7 +1300,7 @@ macro_rules! gpio {
             fn split(self) -> Self::Parts;
         }
 
-        paste!{
+        paste::paste! {
             impl GpioExt for GPIO {
                 type Parts = Pins;
                 fn split(self) -> Self::Parts {
@@ -1397,6 +1424,48 @@ macro_rules! gpio {
     };
 }
 
+#[cfg(xtensa)]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! rtc_pins {
+    (
+        $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat
+    ) => {
+        impl<MODE> crate::gpio::RTCPin for GpioPin<MODE, $pin_num>
+        where
+            Self: crate::gpio::GpioProperties,
+        {
+            fn rtc_number(&self) -> u8 {
+                $rtc_pin
+            }
+
+            /// Set the RTC properties of the pin. If `mux` is true then then pin is
+            /// routed to RTC, when false it is routed to IO_MUX.
+            fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: crate::gpio::RtcFunction) {
+                use crate::peripherals::RTC_IO;
+                let rtcio = unsafe{ &*RTC_IO::ptr() };
+
+                // disable input
+                paste::paste!{
+                    rtcio.$pin_reg.modify(|_,w| unsafe {w
+                        .[<$prefix fun_ie>]().bit(input_enable)
+                        .[<$prefix mux_sel>]().bit(mux)
+                        .[<$prefix fun_sel>]().bits(func as u8)
+                    });
+                }
+            }
+        }
+    };
+
+    (
+        $( ( $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat ) )+
+    ) => {
+        $(
+            crate::gpio::rtc_pins!($pin_num, $rtc_pin, $pin_reg, $prefix);
+        )+
+    };
+}
+
 // Following code enables `into_analog`
 
 #[doc(hidden)]
@@ -1411,7 +1480,7 @@ pub fn enable_iomux_clk_gate() {
     }
 }
 
-#[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s2)))]
+#[cfg(any(esp32, esp32s2, esp32s3))]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! analog {
@@ -1431,9 +1500,11 @@ macro_rules! analog {
             match pin {
                 $(
                     $pin_num => {
-                        // disable input
-                        paste! {
-                            rtcio.$pin_reg.modify(|_,w| w.$fun_ie().bit(false));
+                        // We need `paste` (and a [< >] in it) to rewrite the token stream to
+                        // handle indexed pins.
+                        paste::paste! {
+                            // disable input
+                            rtcio.$pin_reg.modify(|_,w| w.$fun_ie().bit([< false >]));
 
                             // disable output
                             rtcio.enable_w1tc.write(|w| unsafe { w.enable_w1tc().bits(1 << $rtc_pin) });
@@ -1441,15 +1512,15 @@ macro_rules! analog {
                             // disable open drain
                             rtcio.pin[$rtc_pin].modify(|_,w| w.pad_driver().bit(false));
 
-                                rtcio.$pin_reg.modify(|_,w| {
-                                    w.$fun_ie().clear_bit();
+                            rtcio.$pin_reg.modify(|_,w| {
+                                w.$fun_ie().clear_bit();
 
-                                    // Connect pin to analog / RTC module instead of standard GPIO
-                                    w.$mux_sel().set_bit();
+                                // Connect pin to analog / RTC module instead of standard GPIO
+                                w.$mux_sel().set_bit();
 
-                                    // Select function "RTC function 1" (GPIO) for analog use
-                                    unsafe { w.$fun_sel().bits(0b00) }
-                                });
+                                // Select function "RTC function 1" (GPIO) for analog use
+                                unsafe { w.$fun_sel().bits(0b00) }
+                            });
 
                             // Disable pull-up and pull-down resistors on the pin, if it has them
                             $(
@@ -1460,67 +1531,6 @@ macro_rules! analog {
                                 });
                             )?
                         }
-                    }
-                )+
-                    _ => unreachable!(),
-            }
-        }
-    }
-}
-
-#[cfg(esp32s2)]
-#[doc(hidden)]
-#[macro_export]
-macro_rules! analog {
-    (
-        $(
-            (
-                $pin_num:expr, $rtc_pin:expr, $pin_reg:expr,
-                $mux_sel:ident, $fun_sel:ident, $fun_ie:ident $(, $rue:ident, $rde:ident)?
-            )
-        )+
-    ) => {
-        pub(crate) fn internal_into_analog(pin: u8) {
-            use crate::peripherals::RTC_IO;
-            let rtcio = unsafe{ &*RTC_IO::ptr() };
-            $crate::gpio::enable_iomux_clk_gate();
-
-            match pin {
-                $(
-                    $pin_num => {
-
-                        paste!{
-                            use $crate::gpio::[< esp32s2_get_rtc_pad_ $pin_reg>];
-                            let rtc_pad = [< esp32s2_get_rtc_pad_ $pin_reg>]();
-                        }
-
-                        // disable input
-                        rtc_pad.modify(|_,w| w.$fun_ie().bit(false));
-
-                        // disable output
-                        rtcio.enable_w1tc.write(|w| unsafe { w.enable_w1tc().bits(1 << $rtc_pin) });
-
-                        // disable open drain
-                        rtcio.pin[$rtc_pin].modify(|_,w| w.pad_driver().bit(false));
-
-                        rtc_pad.modify(|_,w| {
-                            w.$fun_ie().clear_bit();
-
-                            // Connect pin to analog / RTC module instead of standard GPIO
-                            w.$mux_sel().set_bit();
-
-                            // Select function "RTC function 1" (GPIO) for analog use
-                            unsafe { w.$fun_sel().bits(0b00) }
-                        });
-
-                        // Disable pull-up and pull-down resistors on the pin, if it has them
-                        $(
-                            rtc_pad.modify(|_,w| {
-                                w
-                                .$rue().bit(false)
-                                .$rde().bit(false)
-                            });
-                        )?
                     }
                 )+
                     _ => unreachable!(),
@@ -1561,6 +1571,106 @@ macro_rules! analog {
 
         }
     }
+}
+
+#[cfg(lp_io)]
+pub mod lp_gpio {
+    pub struct LowPowerPin<const PIN: u8> {
+        pub(crate) private: PhantomData<()>,
+    }
+
+    impl<const PIN: u8> LowPowerPin<PIN> {
+        pub fn output_enable(&mut self, enable: bool) {
+            let lp_io = unsafe { &*crate::peripherals::LP_IO::PTR };
+            if enable {
+                lp_io
+                    .out_enable_w1ts
+                    .write(|w| w.lp_gpio_enable_w1ts().variant(1 << PIN));
+            } else {
+                lp_io
+                    .out_enable_w1tc
+                    .write(|w| w.lp_gpio_enable_w1tc().variant(1 << PIN));
+            }
+        }
+
+        pub fn input_enable(&mut self, enable: bool) {
+            get_pin_reg(PIN).modify(|_, w| w.lp_gpio0_fun_ie().bit(enable));
+        }
+
+        pub fn pullup_enable(&mut self, enable: bool) {
+            get_pin_reg(PIN).modify(|_, w| w.lp_gpio0_fun_wpu().bit(enable));
+        }
+
+        pub fn pulldown_enable(&mut self, enable: bool) {
+            get_pin_reg(PIN).modify(|_, w| w.lp_gpio0_fun_wpd().bit(enable));
+        }
+
+        pub fn set_level(&mut self, level: bool) {
+            let lp_io = unsafe { &*crate::peripherals::LP_IO::PTR };
+            if level {
+                lp_io
+                    .out_data_w1ts
+                    .write(|w| w.lp_gpio_out_data_w1ts().variant(1 << PIN));
+            } else {
+                lp_io
+                    .out_data_w1tc
+                    .write(|w| w.lp_gpio_out_data_w1tc().variant(1 << PIN));
+            }
+        }
+
+        pub fn get_level(&self) -> bool {
+            let lp_io = unsafe { &*crate::peripherals::LP_IO::PTR };
+            (lp_io.in_.read().lp_gpio_in_data_next().bits() & 1 << PIN) != 0
+        }
+    }
+
+    pub(crate) fn init_low_power_pin(pin: u8) {
+        let lp_aon = unsafe { &*crate::peripherals::LP_AON::PTR };
+
+        lp_aon
+            .gpio_mux
+            .modify(|r, w| w.sel().variant(r.sel().bits() | 1 << pin));
+
+        get_pin_reg(pin).modify(|_, w| w.lp_gpio0_mcu_sel().variant(0));
+    }
+
+    #[inline(always)]
+    fn get_pin_reg(pin: u8) -> &'static crate::peripherals::lp_io::GPIO0 {
+        let lp_io = unsafe { &*crate::peripherals::LP_IO::PTR };
+
+        // ideally we should change the SVD and make the GPIOx registers into an
+        // array
+        unsafe { core::mem::transmute((lp_io.gpio0.as_ptr()).add(pin as usize)) }
+    }
+
+    pub trait IntoLowPowerPin<const PIN: u8> {
+        fn into_low_power(self) -> LowPowerPin<{ PIN }>;
+    }
+
+    #[doc(hidden)]
+    #[macro_export]
+    macro_rules! lp_gpio {
+        (
+            $($gpionum:literal)+
+        ) => {
+            paste::paste!{
+                $(
+                    impl<MODE> crate::gpio::lp_gpio::IntoLowPowerPin<$gpionum> for GpioPin<MODE, $gpionum> {
+                        fn into_low_power(self) -> crate::gpio::lp_gpio::LowPowerPin<$gpionum> {
+                            crate::gpio::lp_gpio::init_low_power_pin($gpionum);
+                            crate::gpio::lp_gpio::LowPowerPin {
+                                private: core::marker::PhantomData::default(),
+                            }
+                        }
+                    }
+                )+
+            }
+        }
+    }
+
+    use core::marker::PhantomData;
+
+    pub(crate) use lp_gpio;
 }
 
 #[cfg(feature = "async")]
@@ -1688,11 +1798,14 @@ mod asynch {
             intrs
         );
 
-        while intrs != 0 {
-            let pin_nr = intrs.trailing_zeros();
+        let mut intr_bits = intrs;
+        while intr_bits != 0 {
+            // TODO: we should probably call `leading_zeros` on Xtensa
+            // when that lowers to NSAU.
+            let pin_nr = intr_bits.trailing_zeros();
             set_int_enable(pin_nr as u8, 0, 0, false);
             PIN_WAKERS[pin_nr as usize].wake(); // wake task
-            intrs &= !(1 << pin_nr);
+            intr_bits -= 1 << pin_nr;
         }
 
         // clear interrupt bits

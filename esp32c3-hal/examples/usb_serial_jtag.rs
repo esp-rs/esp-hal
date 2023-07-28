@@ -62,7 +62,7 @@ fn main() -> ! {
     critical_section::with(|cs| USB_SERIAL.borrow_ref_mut(cs).replace(usb_serial));
 
     interrupt::enable(
-        peripherals::Interrupt::USB_SERIAL_JTAG,
+        peripherals::Interrupt::USB_DEVICE,
         interrupt::Priority::Priority1,
     )
     .unwrap();
@@ -91,7 +91,7 @@ fn main() -> ! {
 }
 
 #[interrupt]
-fn USB_SERIAL_JTAG() {
+fn USB_DEVICE() {
     critical_section::with(|cs| {
         let mut usb_serial = USB_SERIAL.borrow_ref_mut(cs);
         let usb_serial = usb_serial.as_mut().unwrap();

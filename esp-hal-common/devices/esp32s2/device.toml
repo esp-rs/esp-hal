@@ -1,14 +1,12 @@
 [device]
-arch = "xtensa"
-cores = "multi_core"
+arch  = "xtensa"
+cores = "single_core"
 
 peripherals = [
     # Peripherals available in the PAC:
     "aes",
-    "apb_ctrl",
     "apb_saradc",
-    "assist_debug",
-    "dma",
+    "dedicated_gpio",
     "ds",
     "efuse",
     "extmem",
@@ -18,16 +16,11 @@ peripherals = [
     "i2c0",
     "i2c1",
     "i2s0",
-    "i2s1",
     "interrupt_core0",
-    "interrupt_core1",
     "io_mux",
-    "lcd_cam",
     "ledc",
-    "mcpwm0",
-    "mcpwm1",
     "pcnt",
-    "peri_backup",
+    "pms",
     "rmt",
     "rng",
     "rsa",
@@ -35,12 +28,12 @@ peripherals = [
     "rtc_i2c",
     "rtc_io",
     "sens",
-    "sensitive",
     "sha",
     "spi0",
     "spi1",
     "spi2",
     "spi3",
+    "spi4",
     "system",
     "systimer",
     "timg0",
@@ -48,29 +41,25 @@ peripherals = [
     "twai0",
     "uart0",
     "uart1",
-    "uart2",
     "uhci0",
-    "uhci1",
     "usb0",
-    "usb_device",
     "usb_wrap",
-    "wcl",
     "xts_aes",
+]
 
+symbols = [
     # Additional peripherals defined by us (the developers):
     "adc",
-    "assist_debug_region_monitor",
-    "gdma",
+    "dac",
+    "pdma",
     "radio",
     "phy",
-    "bt",
     "wifi",
     "psram",
     "ulp_riscv_core",
 
     # ROM capabilities
     "rom_crc_le",
-    "rom_crc_be",
     "rom_md5_bsd",
 
     # Wakeup SOC based on ESP-IDF:
@@ -78,7 +67,6 @@ peripherals = [
     "pm_support_ext1_wakeup",
     "pm_support_touch_sensor_wakeup",
     "pm_support_wifi_wakeup",
-    "pm_support_bt_wakeup",
     "uart_support_wakeup_int",
     "ulp_supported",
     "riscv_coproc_supported",

@@ -18,7 +18,7 @@ If you have any questions, comments, or concerns, please [open an issue], [start
 | [esp32c2-hal] | `riscv32imc-unknown-none-elf`  |         [ESP32-C2]         |
 | [esp32c3-hal] | `riscv32imc-unknown-none-elf`  |         [ESP32-C3]         |
 | [esp32c6-hal] | `riscv32imac-unknown-none-elf` |         [ESP32-C6]         |
-| [esp32h2-hal] | `riscv32imac-unknown-none-elf` |  _Currently unavailable_   |
+| [esp32h2-hal] | `riscv32imac-unknown-none-elf` |         [ESP32-H2]         |
 | [esp32s2-hal] |   `xtensa-esp32s2-none-elf`    |         [ESP32-S2]         |
 | [esp32s3-hal] |   `xtensa-esp32s3-none-elf`    |         [ESP32-S3]         |
 
@@ -38,12 +38,17 @@ If you have any questions, comments, or concerns, please [open an issue], [start
 [esp32-c2]: https://www.espressif.com/sites/default/files/documentation/esp8684_technical_reference_manual_en.pdf
 [esp32-c3]: https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf
 [esp32-c6]: https://www.espressif.com/sites/default/files/documentation/esp32-c6_technical_reference_manual_en.pdf
+[esp32-h2]: https://www.espressif.com/sites/default/files/documentation/esp32-h2_technical_reference_manual_en.pdf
 [esp32-s2]: https://www.espressif.com/sites/default/files/documentation/esp32-s2_technical_reference_manual_en.pdf
 [esp32-s3]: https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf
 
 ## Quickstart
 
-We recommend using [cargo-generate] and [esp-template] in order to generate a new project with all the required dependencies and configuration:
+If you have not already, we strongly encourage you to read [The Rust on ESP Book] prior to starting.
+
+We recommend using [cargo-generate] and [esp-template] in order to generate a new project. This will allow you to generate a minimal project skeleton with all the required dependencies and configuration ready to go.
+
+You can install [cargo-generate] and generate a new project by running:
 
 ```bash
 $ cargo install cargo-generate
@@ -52,6 +57,7 @@ $ cargo generate -a esp-rs/esp-template
 
 For more information on using this template, please refer to [its README].
 
+[the rust on esp book]: https://esp-rs.github.io/book/
 [cargo-generate]: https://github.com/cargo-generate/cargo-generate
 [esp-template]: https://github.com/esp-rs/esp-template
 [its readme]: https://github.com/esp-rs/esp-template/blob/main/README.md
@@ -60,17 +66,19 @@ For more information on using this template, please refer to [its README].
 
 There are a number of other crates within the [esp-rs organization] which can be used in conjunction with `esp-hal`:
 
-|      Crate      |                                  Description                                   |
-| :-------------: | :----------------------------------------------------------------------------: |
-|   [esp-alloc]   |                        A simple `no_std` heap allocator                        |
-| [esp-backtrace] |                 Backtrace support for bare-metal applications                  |
-|  [esp-println]  |                Provides `print!` and `println!` implementations                |
-|  [esp-storage]  | Implementation of [embedded-storage] traits to access unencrypted flash memory |
-|   [esp-wifi]    |                      `no_std` Wi-Fi/Bluetooth LE support                       |
+|      Crate       |                                  Description                                   |
+| :--------------: | :----------------------------------------------------------------------------: |
+|   [esp-alloc]    |                        A simple `no_std` heap allocator                        |
+| [esp-backtrace]  |                 Backtrace support for bare-metal applications                  |
+| [esp-ieee802154] |          Low-level IEEE802.15.4 driver for the ESP32-C6 and ESP32-H2           |
+|  [esp-println]   |                Provides `print!` and `println!` implementations                |
+|  [esp-storage]   | Implementation of [embedded-storage] traits to access unencrypted flash memory |
+|    [esp-wifi]    |                      `no_std` Wi-Fi/Bluetooth LE support                       |
 
 [esp-rs organization]: https://github.com/esp-rs
 [esp-alloc]: https://github.com/esp-rs/esp-alloc
 [esp-backtrace]: https://github.com/esp-rs/esp-backtrace
+[esp-ieee802154]: https://github.com/esp-rs/esp-ieee802154
 [esp-println]: https://github.com/esp-rs/esp-println
 [esp-storage]: https://github.com/esp-rs/esp-storage
 [embedded-storage]: https://github.com/rust-embedded-community/embedded-storage
@@ -84,16 +92,18 @@ The **M**inimum **S**upported **R**ust **V**ersions are:
 - `1.65.0` for Xtensa devices (**ESP32**, **ESP32-S2**, **ESP32-S3**)
 - `1.67.0` for all `async` examples (`embassy_hello_world`, `embassy_wait`, etc.)
 
-Note that targeting the Xtensa ISA currently requires the use of the [esp-rs/rust] compiler fork. The [esp-rs/rust-build] repository has pre-compiled release artifacts for most common platforms, and provides installation scripts to aid you in the process.
+Note that targeting the Xtensa ISA currently requires the use of the [esp-rs/rust] compiler fork. Our recommend method of installation is [espup].
 
 RISC-V is officially supported by the official Rust compiler.
 
 [esp-rs/rust]: https://github.com/esp-rs/rust
-[esp-rs/rust-build]: https://github.com/esp-rs/rust-build
+[espup]: https://github.com/esp-rs/espup
 
 ## Git Hooks
 
-We provide a simple `pre-commit` hook to verify the formatting of each package prior to committing changes. This can be enabled by placing it in the `.git/hooks/` directory:
+We provide a simple `pre-commit` hook to verify the formatting of each package prior to committing changes. We strongly encourage use of this git hook.
+
+The hook can be enabled by placing it in the `.git/hooks/` directory:
 
 ```bash
 $ cp pre-commit .git/hooks/pre-commit

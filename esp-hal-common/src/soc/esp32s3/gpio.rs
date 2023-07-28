@@ -1,5 +1,3 @@
-use paste::paste;
-
 use crate::{
     gpio::{
         AlternateFunction,
@@ -95,10 +93,10 @@ pub enum InputSignal {
     SPI3_HD           = 69,
     SPI3_WP           = 70,
     SPI3_CS0          = 71,
-    RMT_SIG_IN0       = 81,
-    RMT_SIG_IN1       = 82,
-    RMT_SIG_IN2       = 83,
-    RMT_SIG_IN3       = 84,
+    RMT_SIG_0         = 81,
+    RMT_SIG_1         = 82,
+    RMT_SIG_2         = 83,
+    RMT_SIG_3         = 84,
     I2CEXT0_SCL       = 89,
     I2CEXT0_SDA       = 90,
     I2CEXT1_SCL       = 91,
@@ -197,10 +195,10 @@ pub enum OutputSignal {
     LEDC_LS_SIG5    = 78,
     LEDC_LS_SIG6    = 79,
     LEDC_LS_SIG7    = 80,
-    RMT_SIG_OUT0    = 81,
-    RMT_SIG_OUT1    = 82,
-    RMT_SIG_OUT2    = 83,
-    RMT_SIG_OUT3    = 84,
+    RMT_SIG_0       = 81,
+    RMT_SIG_1       = 82,
+    RMT_SIG_2       = 83,
+    RMT_SIG_3       = 84,
     I2CEXT0_SCL     = 89,
     I2CEXT0_SDA     = 90,
     I2CEXT1_SCL     = 91,
@@ -333,6 +331,31 @@ crate::gpio::analog! {
      (19, 19,  rtc_pad19,      mux_sel,      fun_sel,      fun_ie,              rue,       rde)
      (20, 20,  rtc_pad20,      mux_sel,      fun_sel,      fun_ie,              rue,       rde)
      (21, 21,  rtc_pad21,      mux_sel,      fun_sel,      fun_ie,              rue,       rde)
+}
+
+crate::gpio::rtc_pins! {
+    ( 0,  0,  touch_pad0,     "")
+    ( 1,  1,  touch_pad1,     "")
+    ( 2,  2,  touch_pad2,     "")
+    ( 3,  3,  touch_pad3,     "")
+    ( 4,  4,  touch_pad4,     "")
+    ( 5,  5,  touch_pad5,     "")
+    ( 6,  6,  touch_pad6,     "")
+    ( 7,  7,  touch_pad7,     "")
+    ( 8,  8,  touch_pad8,     "")
+    ( 9,  9,  touch_pad9,     "")
+    (10, 10,  touch_pad10,    "")
+    (11, 11,  touch_pad11,    "")
+    (12, 12,  touch_pad12,    "")
+    (13, 13,  touch_pad13,    "")
+    (14, 14,  touch_pad14,    "")
+    (15, 15,  xtal_32p_pad,   x32p_)
+    (16, 16,  xtal_32n_pad,   x32n_)
+    (17, 17,  pad_dac1,       pdac1_)
+    (18, 18,  pad_dac2,       pdac2_)
+    (19, 19,  rtc_pad19,      "")
+    (20, 20,  rtc_pad20,      "")
+    (21, 21,  rtc_pad21,      "")
 }
 
 // Whilst the S3 is a dual core chip, it shares the enable registers between

@@ -35,6 +35,7 @@ impl<'d> UlpCore<'d> {
     }
 }
 
+#[allow(unused)] // TODO: remove cfg when implementation is corrected
 fn ulp_stop() {
     let rtc_cntl = unsafe { &*pac::RTC_CNTL::PTR };
     rtc_cntl

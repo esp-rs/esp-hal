@@ -14,10 +14,9 @@ use esp32h2_hal::{
     clock::ClockControl,
     peripherals,
     prelude::*,
-    pulse_control::ClockSource,
+    rmt::Rmt,
     timer::TimerGroup,
     Delay,
-    PulseControl,
     Rtc,
     IO,
 };
@@ -39,40 +38,37 @@ fn main() -> ! {
     // Disable the watchdog timers. For the ESP32-H2, this includes the Super WDT,
     // and the TIMG WDTs.
     let mut rtc = Rtc::new(peripherals.LP_CLKRST);
-    let timer_group0 = TimerGroup::new(
+    let mut timer_group0 = TimerGroup::new(
         peripherals.TIMG0,
         &clocks,
         &mut system.peripheral_clock_control,
     );
-    let mut wdt0 = timer_group0.wdt;
-    let timer_group1 = TimerGroup::new(
+    let mut timer_group1 = TimerGroup::new(
         peripherals.TIMG1,
         &clocks,
         &mut system.peripheral_clock_control,
     );
-    let mut wdt1 = timer_group1.wdt;
 
     // Disable watchdog timers
     rtc.swd.disable();
     rtc.rwdt.disable();
-    wdt0.disable();
-    wdt1.disable();
+    timer_group0.wdt.disable();
+    timer_group1.wdt.disable();
+
+    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
     // Configure RMT peripheral globally
-    let pulse = PulseControl::new(
+    let rmt = Rmt::new(
         peripherals.RMT,
+        80u32.MHz(),
         &mut system.peripheral_clock_control,
-        ClockSource::XTAL,
-        0,
-        0,
-        0,
+        &clocks,
     )
     .unwrap();
 
     // We use one of the RMT channels to instantiate a `SmartLedsAdapter` which can
     // be used directly with all `smart_led` implementations
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-    let mut led = <smartLedAdapter!(1)>::new(pulse.channel0, io.pins.gpio8);
+    let mut led = <smartLedAdapter!(0, 1)>::new(rmt.channel0, io.pins.gpio8);
 
     // Initialize the Delay peripheral, and use it to toggle the LED state in a
     // loop.

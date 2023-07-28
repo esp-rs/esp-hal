@@ -115,7 +115,7 @@ fn main() -> ! {
         }
         // the buffers and spi is moved into the transfer and we can get it back via
         // `wait`
-        (receive, send, spi) = transfer.wait();
+        (receive, send, spi) = transfer.wait().unwrap();
         println!(
             "{:x?} .. {:x?}",
             &receive[..10],

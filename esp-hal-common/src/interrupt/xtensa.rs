@@ -83,7 +83,10 @@ pub fn disable(core: Cpu, interrupt: Interrupt) {
             #[cfg(multi_core)]
             Cpu::AppCpu => (*core1_interrupt_peripheral()).app_mac_intr_map.as_ptr(),
         };
-        intr_map_base.offset(interrupt_number).write_volatile(0);
+        // To disable an interrupt, map it to a CPU peripheral interrupt
+        intr_map_base
+            .offset(interrupt_number)
+            .write_volatile(CpuInterrupt::Interrupt16Timer2Priority5 as _);
     }
 }
 
@@ -97,7 +100,8 @@ pub fn clear(_core: Cpu, which: CpuInterrupt) {
 /// Get status of peripheral interrupts
 pub fn get_status(core: Cpu) -> u128 {
     unsafe {
-        match core {
+        #[allow(unused_mut)]
+        let mut status = match core {
             Cpu::ProCpu => {
                 ((*core0_interrupt_peripheral())
                     .pro_intr_status_0
@@ -131,7 +135,28 @@ pub fn get_status(core: Cpu) -> u128 {
                         .bits() as u128)
                         << 64
             }
+        };
+
+        #[cfg(feature = "esp32s3")]
+        match core {
+            Cpu::ProCpu => {
+                status |= ((*core0_interrupt_peripheral())
+                    .pro_intr_status_3
+                    .read()
+                    .bits() as u128)
+                    << 96;
+            }
+            #[cfg(multi_core)]
+            Cpu::AppCpu => {
+                status |= ((*core1_interrupt_peripheral())
+                    .app_intr_status_3
+                    .read()
+                    .bits() as u128)
+                    << 96;
+            }
         }
+
+        status
     }
 }
 

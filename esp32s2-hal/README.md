@@ -25,7 +25,7 @@ espup install
 # Windows does not require sourcing any file
 ```
 
-See the [Installation chapter of The Rust on ESP Book](https://esp-rs.github.io/book/installation/installation.html#installing-rust-for-espressif-socs) for more details.
+See the [Installation chapter of The Rust on ESP Book](https://esp-rs.github.io/book/installation/index.html) for more details.
 
 ## License
 

@@ -1,55 +1,64 @@
 [device]
-arch = "riscv"
-cores = "single_core"
+arch  = "xtensa"
+cores = "multi_core"
 
 peripherals = [
     # Peripherals available in the PAC:
     "aes",
     "apb_ctrl",
-    "apb_saradc",
-    "assist_debug",
-    "dma",
-    "ds",
+    "bb",
+    "dport",
     "efuse",
-    "extmem",
+    "flash_encryption",
+    "frc_timer",
     "gpio",
     "gpio_sd",
-    "hmac",
+    "hinf",
     "i2c0",
+    "i2c1",
     "i2s0",
-    "interrupt_core0",
+    "i2s1",
     "io_mux",
     "ledc",
+    "mcpwm0",
+    "mcpwm1",
+    "nrx",
+    "pcnt",
     "rmt",
     "rng",
     "rsa",
     "rtc_cntl",
-    "sensitive",
+    "rtc_i2c",
+    "rtc_io",
+    "sdhost",
+    "sens",
     "sha",
+    "slc",
+    "slchost",
     "spi0",
     "spi1",
     "spi2",
-    "system",
-    "systimer",
+    "spi3",
     "timg0",
     "timg1",
     "twai0",
     "uart0",
     "uart1",
+    "uart2",
     "uhci0",
     "uhci1",
-    "usb_device",
-    "xts_aes",
+]
 
+symbols = [
     # Additional peripherals defined by us (the developers):
     "adc",
-    "assist_debug_sp_monitor",
-    "assist_debug_region_monitor",
-    "gdma",
+    "dac",
+    "pdma",
     "radio",
     "phy",
     "bt",
     "wifi",
+    "psram",
 
     # ROM capabilities
     "rom_crc_le",
@@ -57,8 +66,8 @@ peripherals = [
     "rom_md5_bsd",
 
     # Wakeup SOC based on ESP-IDF:
-    "pm_support_wifi_wakeup",
-    "pm_support_bt_wakeup",
-    "uart_support_wakeup_int",
-    "gpio_support_deepsleep_wakeup",
+    "pm_support_ext0_wakeup",
+    "pm_support_ext1_wakeup",
+    "pm_support_touch_sensor_wakeup",
+    "ulp_supported",
 ]

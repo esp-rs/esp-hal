@@ -1,5 +1,3 @@
-use paste::paste;
-
 use crate::{
     gpio::{
         AlternateFunction,
@@ -269,6 +267,17 @@ crate::gpio::gpio! {
 }
 
 crate::gpio::analog! {
+    0
+    1
+    2
+    3
+    4
+    5
+    6
+    7
+}
+
+crate::gpio::lp_gpio::lp_gpio! {
     0
     1
     2
