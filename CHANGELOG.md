@@ -17,7 +17,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Implemented calibrated ADC API for ESP32-S3 (#641)
 - Add MCPWM DeadTime configuration (#406)
 - Implement sleep with some wakeup methods for `esp32-s3` (#660, #689)
-- Implement sleep with some wakeup methods for `esp32-s3` (#660)
 - Add `ClockControl::max` helper for all chips (#701)
 
 ### Changed

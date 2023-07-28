@@ -237,7 +237,6 @@ impl<'d> ClockControl<'d> {
 #[cfg(esp32)]
 impl<'d> ClockControl<'d> {
     /// Use what is considered the default settings after boot.
-    #[allow(unused)]
     pub fn boot_defaults(
         clock_control: impl Peripheral<P = SystemClockControl> + 'd,
     ) -> ClockControl<'d> {
@@ -267,7 +266,6 @@ impl<'d> ClockControl<'d> {
     }
 
     /// Configure the CPU clock speed.
-    #[allow(unused)]
     pub fn configure(
         clock_control: impl Peripheral<P = SystemClockControl> + 'd,
         cpu_clock_speed: CpuClock,
@@ -304,7 +302,6 @@ impl<'d> ClockControl<'d> {
         }
     }
 
-    #[allow(unused)]
     pub fn max(clock_control: impl Peripheral<P = SystemClockControl> + 'd) -> ClockControl<'d> {
         Self::configure(clock_control, CpuClock::Clock240MHz)
     }
@@ -313,7 +310,6 @@ impl<'d> ClockControl<'d> {
 #[cfg(esp32c2)]
 impl<'d> ClockControl<'d> {
     /// Use what is considered the default settings after boot.
-    #[allow(unused)]
     pub fn boot_defaults(
         clock_control: impl Peripheral<P = SystemClockControl> + 'd,
     ) -> ClockControl<'d> {
@@ -339,7 +335,6 @@ impl<'d> ClockControl<'d> {
     }
 
     /// Configure the CPU clock speed.
-    #[allow(unused)]
     pub fn configure(
         clock_control: impl Peripheral<P = SystemClockControl> + 'd,
         cpu_clock_speed: CpuClock,
@@ -373,7 +368,6 @@ impl<'d> ClockControl<'d> {
         }
     }
 
-    #[allow(unused)]
     pub fn max(clock_control: impl Peripheral<P = SystemClockControl> + 'd) -> ClockControl<'d> {
         Self::configure(clock_control, CpuClock::Clock120MHz)
     }
@@ -382,7 +376,6 @@ impl<'d> ClockControl<'d> {
 #[cfg(esp32c3)]
 impl<'d> ClockControl<'d> {
     /// Use what is considered the default settings after boot.
-    #[allow(unused)]
     pub fn boot_defaults(
         clock_control: impl Peripheral<P = SystemClockControl> + 'd,
     ) -> ClockControl<'d> {
@@ -397,7 +390,6 @@ impl<'d> ClockControl<'d> {
     }
 
     /// Configure the CPU clock speed.
-    #[allow(unused)]
     pub fn configure(
         clock_control: impl Peripheral<P = SystemClockControl> + 'd,
         cpu_clock_speed: CpuClock,
@@ -428,7 +420,6 @@ impl<'d> ClockControl<'d> {
         }
     }
 
-    #[allow(unused)]
     pub fn max(clock_control: impl Peripheral<P = SystemClockControl> + 'd) -> ClockControl<'d> {
         Self::configure(clock_control, CpuClock::Clock160MHz)
     }
@@ -437,7 +428,6 @@ impl<'d> ClockControl<'d> {
 #[cfg(esp32c6)]
 impl<'d> ClockControl<'d> {
     /// Use what is considered the default settings after boot.
-    #[allow(unused)]
     pub fn boot_defaults(
         clock_control: impl Peripheral<P = SystemClockControl> + 'd,
     ) -> ClockControl<'d> {
@@ -453,7 +443,6 @@ impl<'d> ClockControl<'d> {
     }
 
     /// Configure the CPU clock speed.
-    #[allow(unused)]
     pub fn configure(
         clock_control: impl Peripheral<P = SystemClockControl> + 'd,
         cpu_clock_speed: CpuClock,
@@ -485,7 +474,6 @@ impl<'d> ClockControl<'d> {
         }
     }
 
-    #[allow(unused)]
     pub fn max(clock_control: impl Peripheral<P = SystemClockControl> + 'd) -> ClockControl<'d> {
         Self::configure(clock_control, CpuClock::Clock160MHz)
     }
@@ -494,7 +482,6 @@ impl<'d> ClockControl<'d> {
 #[cfg(esp32h2)]
 impl<'d> ClockControl<'d> {
     /// Use what is considered the default settings after boot.
-    #[allow(unused)]
     pub fn boot_defaults(
         clock_control: impl Peripheral<P = SystemClockControl> + 'd,
     ) -> ClockControl<'d> {
@@ -512,7 +499,6 @@ impl<'d> ClockControl<'d> {
     }
 
     /// Configure the CPU clock speed.
-    #[allow(unused)]
     pub fn configure(
         clock_control: impl Peripheral<P = SystemClockControl> + 'd,
         cpu_clock_speed: CpuClock,
@@ -546,7 +532,6 @@ impl<'d> ClockControl<'d> {
         }
     }
 
-    #[allow(unused)]
     pub fn max(clock_control: impl Peripheral<P = SystemClockControl> + 'd) -> ClockControl<'d> {
         Self::configure(clock_control, CpuClock::Clock96MHz)
     }
@@ -555,7 +540,6 @@ impl<'d> ClockControl<'d> {
 #[cfg(esp32s2)]
 impl<'d> ClockControl<'d> {
     /// Use what is considered the default settings after boot.
-    #[allow(unused)]
     pub fn boot_defaults(
         clock_control: impl Peripheral<P = SystemClockControl> + 'd,
     ) -> ClockControl<'d> {
@@ -570,7 +554,6 @@ impl<'d> ClockControl<'d> {
     }
 
     /// Configure the CPU clock speed.
-    #[allow(unused)]
     pub fn configure(
         clock_control: impl Peripheral<P = SystemClockControl> + 'd,
         cpu_clock_speed: CpuClock,
@@ -587,7 +570,6 @@ impl<'d> ClockControl<'d> {
         }
     }
 
-    #[allow(unused)]
     pub fn max(clock_control: impl Peripheral<P = SystemClockControl> + 'd) -> ClockControl<'d> {
         Self::configure(clock_control, CpuClock::Clock240MHz)
     }
@@ -596,7 +578,6 @@ impl<'d> ClockControl<'d> {
 #[cfg(esp32s3)]
 impl<'d> ClockControl<'d> {
     /// Use what is considered the default settings after boot.
-    #[allow(unused)]
     pub fn boot_defaults(
         clock_control: impl Peripheral<P = SystemClockControl> + 'd,
     ) -> ClockControl<'d> {
@@ -612,7 +593,6 @@ impl<'d> ClockControl<'d> {
     }
 
     /// Configure the CPU clock speed.
-    #[allow(unused)]
     pub fn configure(
         clock_control: impl Peripheral<P = SystemClockControl> + 'd,
         cpu_clock_speed: CpuClock,
@@ -630,7 +610,6 @@ impl<'d> ClockControl<'d> {
         }
     }
 
-    #[allow(unused)]
     pub fn max(clock_control: impl Peripheral<P = SystemClockControl> + 'd) -> ClockControl<'d> {
         Self::configure(clock_control, CpuClock::Clock240MHz)
     }
