@@ -38,6 +38,7 @@ crate::peripherals! {
     SPI2 => true,
     SPI3 => true,
     SPI4 => true,
+    SYSCON => true,
     SYSTEM => true,
     SYSTIMER => true,
     TIMG0 => true,
