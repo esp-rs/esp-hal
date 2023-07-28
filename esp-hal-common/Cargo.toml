@@ -116,7 +116,6 @@ rv-zero-rtc-bss  = ["esp-riscv-rt/zero-rtc-fast-bss"]
 rv-init-rtc-data = ["esp-riscv-rt/init-rtc-fast-data", "esp-riscv-rt/init-rtc-fast-text"]
 
 direct-vectoring = ["esp-riscv-rt/direct-vectoring"]
-#direct-vectoring-esp32c6 = ["esp-riscv-rt/direct-vectoring-esp32c6"]
 # Enable the `impl-register-debug` feature for the selected PAC
 debug = [
     "esp32?/impl-register-debug",
