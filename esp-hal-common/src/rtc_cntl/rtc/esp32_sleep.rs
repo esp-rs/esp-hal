@@ -65,7 +65,7 @@ impl WakeSource for TimerWakeupSource {
     }
 }
 
-impl<'a, P: Pin + RTCPin> WakeSource for Ext0WakeupSource<'a, P> {
+impl<P: Pin + RTCPin> WakeSource for Ext0WakeupSource<'_, P> {
     fn apply(&self, _rtc: &Rtc, triggers: &mut WakeTriggers, sleep_config: &mut RtcSleepConfig) {
         // don't power down RTC peripherals
         sleep_config.set_rtc_peri_pd_en(false);
@@ -91,7 +91,7 @@ impl<'a, P: Pin + RTCPin> WakeSource for Ext0WakeupSource<'a, P> {
     }
 }
 
-impl<'a, P: Pin + RTCPin> Drop for Ext0WakeupSource<'a, P> {
+impl<P: Pin + RTCPin> Drop for Ext0WakeupSource<'_, P> {
     fn drop(&mut self) {
         // should we have saved the pin configuration first?
         // set pin back to IO_MUX (input_enable and func have no effect when pin is sent
@@ -102,7 +102,7 @@ impl<'a, P: Pin + RTCPin> Drop for Ext0WakeupSource<'a, P> {
     }
 }
 
-impl<'a> WakeSource for Ext1WakeupSource<'a> {
+impl WakeSource for Ext1WakeupSource<'_, '_> {
     fn apply(&self, _rtc: &Rtc, triggers: &mut WakeTriggers, sleep_config: &mut RtcSleepConfig) {
         // don't power down RTC peripherals
         sleep_config.set_rtc_peri_pd_en(false);
@@ -130,7 +130,7 @@ impl<'a> WakeSource for Ext1WakeupSource<'a> {
     }
 }
 
-impl<'a> Drop for Ext1WakeupSource<'a> {
+impl Drop for Ext1WakeupSource<'_, '_> {
     fn drop(&mut self) {
         // should we have saved the pin configuration first?
         // set pin back to IO_MUX (input_enable and func have no effect when pin is sent
