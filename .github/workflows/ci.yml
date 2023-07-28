@@ -267,6 +267,8 @@ jobs:
         run: cd esp32h2-hal/ && cargo +nightly check --example=embassy_i2c --features=embassy,embassy-time-systick,async
       - name: check esp32h2-hal (interrupt-preemption)
         run: cd esp32h2-hal/ && cargo check --example=interrupt_preemption --features=interrupt-preemption
+      - name: check esp32h2-hal (direct-vectoring)
+        run: cd esp32h2-hal/ && cargo check --example=direct-vectoring --features=direct-vectoring
       # Ensure documentation can be built
       - name: rustdoc
         run: cd esp32h2-hal/ && cargo doc --features=eh1
