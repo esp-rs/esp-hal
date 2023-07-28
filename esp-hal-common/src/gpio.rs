@@ -1483,7 +1483,7 @@ pub fn enable_iomux_clk_gate() {
     }
 }
 
-#[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s2)))]
+#[cfg(any(esp32, esp32s2, esp32s3))]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! analog {
@@ -1503,9 +1503,11 @@ macro_rules! analog {
             match pin {
                 $(
                     $pin_num => {
-                        // disable input
+                        // We need `paste` (and a [< >] in it) to rewrite the token stream to
+                        // handle indexed pins.
                         paste::paste! {
-                            rtcio.$pin_reg.modify(|_,w| w.$fun_ie().bit(false));
+                            // disable input
+                            rtcio.$pin_reg.modify(|_,w| w.$fun_ie().bit([< false >]));
 
                             // disable output
                             rtcio.enable_w1tc.write(|w| unsafe { w.enable_w1tc().bits(1 << $rtc_pin) });
@@ -1513,15 +1515,15 @@ macro_rules! analog {
                             // disable open drain
                             rtcio.pin[$rtc_pin].modify(|_,w| w.pad_driver().bit(false));
 
-                                rtcio.$pin_reg.modify(|_,w| {
-                                    w.$fun_ie().clear_bit();
+                            rtcio.$pin_reg.modify(|_,w| {
+                                w.$fun_ie().clear_bit();
 
-                                    // Connect pin to analog / RTC module instead of standard GPIO
-                                    w.$mux_sel().set_bit();
+                                // Connect pin to analog / RTC module instead of standard GPIO
+                                w.$mux_sel().set_bit();
 
-                                    // Select function "RTC function 1" (GPIO) for analog use
-                                    unsafe { w.$fun_sel().bits(0b00) }
-                                });
+                                // Select function "RTC function 1" (GPIO) for analog use
+                                unsafe { w.$fun_sel().bits(0b00) }
+                            });
 
                             // Disable pull-up and pull-down resistors on the pin, if it has them
                             $(
@@ -1532,67 +1534,6 @@ macro_rules! analog {
                                 });
                             )?
                         }
-                    }
-                )+
-                    _ => unreachable!(),
-            }
-        }
-    }
-}
-
-#[cfg(esp32s2)]
-#[doc(hidden)]
-#[macro_export]
-macro_rules! analog {
-    (
-        $(
-            (
-                $pin_num:expr, $rtc_pin:expr, $pin_reg:expr,
-                $mux_sel:ident, $fun_sel:ident, $fun_ie:ident $(, $rue:ident, $rde:ident)?
-            )
-        )+
-    ) => {
-        pub(crate) fn internal_into_analog(pin: u8) {
-            use crate::peripherals::RTC_IO;
-            let rtcio = unsafe{ &*RTC_IO::ptr() };
-            $crate::gpio::enable_iomux_clk_gate();
-
-            match pin {
-                $(
-                    $pin_num => {
-
-                        paste::paste! {
-                            use $crate::gpio::[< esp32s2_get_rtc_pad_ $pin_reg>];
-                            let rtc_pad = [< esp32s2_get_rtc_pad_ $pin_reg>]();
-                        }
-
-                        // disable input
-                        rtc_pad.modify(|_,w| w.$fun_ie().bit(false));
-
-                        // disable output
-                        rtcio.enable_w1tc.write(|w| unsafe { w.enable_w1tc().bits(1 << $rtc_pin) });
-
-                        // disable open drain
-                        rtcio.pin[$rtc_pin].modify(|_,w| w.pad_driver().bit(false));
-
-                        rtc_pad.modify(|_,w| {
-                            w.$fun_ie().clear_bit();
-
-                            // Connect pin to analog / RTC module instead of standard GPIO
-                            w.$mux_sel().set_bit();
-
-                            // Select function "RTC function 1" (GPIO) for analog use
-                            unsafe { w.$fun_sel().bits(0b00) }
-                        });
-
-                        // Disable pull-up and pull-down resistors on the pin, if it has them
-                        $(
-                            rtc_pad.modify(|_,w| {
-                                w
-                                .$rue().bit(false)
-                                .$rde().bit(false)
-                            });
-                        )?
                     }
                 )+
                     _ => unreachable!(),
