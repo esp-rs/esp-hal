@@ -18,7 +18,6 @@ panic-halt = "0.2.0"
 
 [features]
 direct-vectoring = []
-direct-vectoring-esp32c6 = []
 has-mie-mip = []
 zero-bss = []
 zero-rtc-fast-bss = []
