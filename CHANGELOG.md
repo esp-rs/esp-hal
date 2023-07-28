@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Breaking
 
 - `DmaTransfer::wait` and `I2sReadDmaTransfer::wait_receive` now return `Result` (#665)
+- `gpio::Pin` is now object-safe (#687)
 
 ## [0.10.0] - 2023-06-04
 
