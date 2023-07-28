@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed ESP32-S2 radio clock gating (#681)
 - Fixed ESP32 and ESP32-S2 radio clock gating (#681)
 - Fixed ESP32, ESP32-S2, ESP32-C2 radio clock gating (#681)
+- Fixed ESP32, ESP32-S2, ESP32-C2, ESP32-C3 radio clock gating (#681)
 
 ### Removed
 
