@@ -4,8 +4,7 @@ use crate::system::{RadioClockControl, RadioClockController, RadioPeripherals};
 // 19, 20, 21, 22, 23
 const SYSTEM_WIFI_CLK_WIFI_BT_COMMON_M: u32 = 0x78078F;
 // SYSTEM_WIFI_CLK_EN : R/W ;bitpos:[31:0] ;default: 32'hfffce030
-// from experiments `0x00FB9FCF` is not enough for esp-wifi to work
-const SYSTEM_WIFI_CLK_EN: u32 = 0xFFFFFFFF;
+const SYSTEM_WIFI_CLK_EN: u32 = 0x00FB9FCF;
 
 impl RadioClockController for RadioClockControl {
     fn enable(&mut self, peripheral: RadioPeripherals) {
@@ -42,31 +41,27 @@ impl RadioClockController for RadioClockControl {
 }
 
 fn enable_phy() {
-    let system = unsafe { &*esp32c2::SYSTEM::PTR };
-    system
-        .perip_clk_en1
+    // `periph_ll_wifi_bt_module_enable_clk_clear_rst`
+    let syscon = unsafe { &*esp32c2::APB_CTRL::PTR };
+    syscon
+        .wifi_clk_en
         .modify(|r, w| unsafe { w.bits(r.bits() | SYSTEM_WIFI_CLK_WIFI_BT_COMMON_M) });
 }
 
 fn disable_phy() {
-    let system = unsafe { &*esp32c2::SYSTEM::PTR };
-    system
-        .perip_clk_en1
+    // `periph_ll_wifi_bt_module_disable_clk_set_rst`
+    let syscon = unsafe { &*esp32c2::APB_CTRL::PTR };
+    syscon
+        .wifi_clk_en
         .modify(|r, w| unsafe { w.bits(r.bits() & !SYSTEM_WIFI_CLK_WIFI_BT_COMMON_M) });
 }
 
 fn common_wifi_bt_clock_enable() {
-    let system = unsafe { &*esp32c2::SYSTEM::PTR };
-    system
-        .perip_clk_en1
-        .modify(|r, w| unsafe { w.bits(r.bits() | SYSTEM_WIFI_CLK_EN) });
+    // `periph_ll_wifi_module_enable_clk_clear_rst`, no-op
 }
 
 fn common_wifi_bt_clock_disable() {
-    let system = unsafe { &*esp32c2::SYSTEM::PTR };
-    system
-        .perip_clk_en1
-        .modify(|r, w| unsafe { w.bits(r.bits() & !SYSTEM_WIFI_CLK_EN) });
+    // `periph_ll_wifi_module_disable_clk_clear_rst`, no-op
 }
 
 fn reset_mac() {
@@ -81,10 +76,15 @@ fn reset_mac() {
 }
 
 fn init_clocks() {
+    // from `esp_perip_clk_init`
+    const SYSTEM_WIFI_CLK_UNUSED_BIT5: u32 = 1 << 5;
+    const SYSTEM_WIFI_CLK_UNUSED_BIT12: u32 = 1 << 12;
+    const WIFI_BT_SDIO_CLK: u32 = SYSTEM_WIFI_CLK_UNUSED_BIT5 | SYSTEM_WIFI_CLK_UNUSED_BIT12;
+
     let syscon = unsafe { &*esp32c2::APB_CTRL::PTR };
     syscon
         .wifi_clk_en
-        .modify(|_, w| unsafe { w.bits(0xffffffff) });
+        .modify(|r, w| unsafe { w.bits(r.bits() & !WIFI_BT_SDIO_CLK | SYSTEM_WIFI_CLK_EN) });
 }
 
 fn ble_rtc_clk_init() {
