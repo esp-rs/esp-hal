@@ -103,7 +103,7 @@ embassy = ["embassy-time"]
 embassy-time-systick = []
 embassy-time-timg0   = []
 
-interrupt-preemption = []
+interrupt-preemption = ["esp-riscv-rt/interrupt-preemption"]
 
 
 # Architecture-specific features (intended for internal use)

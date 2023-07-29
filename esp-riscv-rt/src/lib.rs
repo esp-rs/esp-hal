@@ -711,11 +711,7 @@ r#"
 
     add a0, sp, zero
     "#,
-    #[cfg(not(feature="direct-vectoring"))]
-    r#"
-    jal ra, _start_trap_rust_hal
-    "#,
-    #[cfg(feature="direct-vectoring")] //jump to handler loaded in direct handler
+    #[cfg(all(feature="interrupt-preemption", feature="direct-vectoring"))] //store current priority, set threshold, enable interrupts
     r#"
     addi sp, sp, -4 #build stack
     sw ra, 0(sp)
@@ -723,7 +719,17 @@ r#"
     lw ra, 0(sp)
     sw a0, 0(sp) #reuse old stack, a0 is return of _handle_priority
     addi a0, sp, 4 #the proper stack pointer is an argument to the HAL handler
+    "#,
+    #[cfg(not(feature="direct-vectoring"))] //jump to HAL handler
+    r#"
+    jal ra, _start_trap_rust_hal
+    "#,
+    #[cfg(feature="direct-vectoring")] //jump to handler loaded in direct handler
+    r#"
     jalr ra, ra #jump to label loaded in _start_trapx
+    "#,
+    #[cfg(all(feature="interrupt-preemption", feature="direct-vectoring"))] //restore threshold
+    r#"
     lw a0, 0(sp) #load stored priority
     jal ra, _restore_priority
     addi sp, sp, 4 #pop
