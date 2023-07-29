@@ -154,11 +154,6 @@ impl<'d> UsbSerialJtag<'d> {
     pub(crate) fn inner(&self) -> &USB_DEVICE {
         &self.usb_serial
     }
-
-    #[cfg(feature = "async")]
-    pub(crate) fn inner_mut(&mut self) -> &mut USB_DEVICE {
-        &mut self.usb_serial
-    }
 }
 
 /// USB Serial JTAG peripheral instance
