@@ -46,6 +46,12 @@ fn main() -> ! {
     wdt1.disable();
 
     critical_section::with(|cs| SWINT.borrow_ref_mut(cs).replace(sw_int));
+    interrupt::enable(
+        peripherals::Interrupt::FROM_CPU_INTR0,
+        interrupt::Priority::Priority3,
+        CpuInterrupt::Interrupt1,
+    )
+    .unwrap();
     unsafe {
         asm!(
             "
@@ -60,7 +66,7 @@ fn main() -> ! {
     unsafe {
         asm!(
             "
-        li t0, 0x600C0028 #FROM_CPU_INTR0 address
+        li t0, 0x0x600C5090 #FROM_CPU_INTR0 address
         li t1, 1    #Flip flag
         csrrwi x0, 0x7e1, 1 #enable timer
         sw t1, 0(t0) #trigger FROM_CPU_INTR0
