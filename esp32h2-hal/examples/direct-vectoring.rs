@@ -6,6 +6,10 @@ use core::{arch::asm, cell::RefCell};
 use critical_section::Mutex;
 use esp32h2_hal::{
     clock::ClockControl,
+    interrupt::{
+        CpuInterrupt,
+        {self},
+    },
     peripherals::Peripherals,
     prelude::*,
     system::{SoftwareInterrupt, SoftwareInterruptControl},
