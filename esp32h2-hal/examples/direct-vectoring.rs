@@ -10,7 +10,7 @@ use esp32h2_hal::{
         CpuInterrupt,
         {self},
     },
-    peripherals::Peripherals,
+    peripherals::{self, Peripherals},
     prelude::*,
     system::{SoftwareInterrupt, SoftwareInterruptControl},
     timer::TimerGroup,
@@ -50,13 +50,13 @@ fn main() -> ! {
     wdt1.disable();
 
     critical_section::with(|cs| SWINT.borrow_ref_mut(cs).replace(sw_int));
-    interrupt::enable(
-        peripherals::Interrupt::FROM_CPU_INTR0,
-        interrupt::Priority::Priority3,
-        CpuInterrupt::Interrupt1,
-    )
-    .unwrap();
     unsafe {
+        interrupt::enable(
+            peripherals::Interrupt::FROM_CPU_INTR0,
+            interrupt::Priority::Priority3,
+            CpuInterrupt::Interrupt1,
+        )
+        .unwrap();
         asm!(
             "
         csrrwi x0, 0x7e0, 1 #what to count, for cycles write 1 for instructions write 2
@@ -70,7 +70,7 @@ fn main() -> ! {
     unsafe {
         asm!(
             "
-        li t0, 0x0x600C5090 #FROM_CPU_INTR0 address
+        li t0, 0x600C5090 #FROM_CPU_INTR0 address
         li t1, 1    #Flip flag
         csrrwi x0, 0x7e1, 1 #enable timer
         sw t1, 0(t0) #trigger FROM_CPU_INTR0
