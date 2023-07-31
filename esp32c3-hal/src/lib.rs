@@ -142,9 +142,18 @@ unsafe fn configure_mmu() {
 #[export_name = "__post_init"]
 #[doc(hidden)]
 #[cfg_attr(feature = "mcu-boot", link_section = ".rwtext")]
-pub fn post_init() {
+unsafe fn post_init() {
     #[cfg(feature = "mcu-boot")]
     unsafe {
         configure_mmu();
     }
+    use esp_hal_common::{peripherals::*, prelude::*, timer::Wdt};
+
+    // RTC domain must be enabled before wet try and disable
+    let mut rtc = Rtc::new(RTC_CNTL::steal());
+    rtc.swd.disable();
+    rtc.rwdt.disable();
+
+    Wdt::<TIMG0>::force_set_wdt_enabled(false);
+    Wdt::<TIMG1>::force_set_wdt_enabled(false);
 }

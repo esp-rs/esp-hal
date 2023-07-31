@@ -19,15 +19,7 @@ use embedded_graphics::{
     prelude::*,
     text::{Alignment, Text},
 };
-use esp32c3_hal::{
-    clock::ClockControl,
-    gpio::IO,
-    i2c::I2C,
-    peripherals::Peripherals,
-    prelude::*,
-    timer::TimerGroup,
-    Rtc,
-};
+use esp32c3_hal::{clock::ClockControl, gpio::IO, i2c::I2C, peripherals::Peripherals, prelude::*};
 use esp_backtrace as _;
 use nb::block;
 use ssd1306::{prelude::*, I2CDisplayInterface, Ssd1306};
@@ -37,27 +29,6 @@ fn main() -> ! {
     let peripherals = Peripherals::take();
     let mut system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-
-    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-    let timer_group0 = TimerGroup::new(
-        peripherals.TIMG0,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
-    let mut timer0 = timer_group0.timer0;
-    let mut wdt0 = timer_group0.wdt;
-    let timer_group1 = TimerGroup::new(
-        peripherals.TIMG1,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
-    let mut wdt1 = timer_group1.wdt;
-
-    // Disable watchdog timers
-    rtc.swd.disable();
-    rtc.rwdt.disable();
-    wdt0.disable();
-    wdt1.disable();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 

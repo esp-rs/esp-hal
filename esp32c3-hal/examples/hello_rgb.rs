@@ -11,16 +11,7 @@
 #![no_std]
 #![no_main]
 
-use esp32c3_hal::{
-    clock::ClockControl,
-    peripherals,
-    prelude::*,
-    rmt::Rmt,
-    timer::TimerGroup,
-    Delay,
-    Rtc,
-    IO,
-};
+use esp32c3_hal::{clock::ClockControl, peripherals, prelude::*, rmt::Rmt, Delay, IO};
 use esp_backtrace as _;
 use esp_hal_smartled::{smartLedAdapter, SmartLedsAdapter};
 use smart_leds::{
@@ -35,18 +26,6 @@ fn main() -> ! {
     let peripherals = peripherals::Peripherals::take();
     let mut system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-
-    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-    let mut timer_group0 = TimerGroup::new(
-        peripherals.TIMG0,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
-
-    // Disable watchdogs
-    rtc.swd.disable();
-    rtc.rwdt.disable();
-    timer_group0.wdt.disable();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
