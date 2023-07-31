@@ -2,7 +2,7 @@
 
 use core::{intrinsics::transmute, marker::PhantomData};
 
-use fugit::MillisDurationU32;
+use fugit::MicrosDurationU32;
 
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
@@ -202,14 +202,14 @@ impl<const CHANNEL: u8> Alarm<Target, CHANNEL> {
 
 impl<const CHANNEL: u8> Alarm<Periodic, CHANNEL> {
     pub fn set_period(&self, period: fugit::HertzU32) {
-        let time_period: MillisDurationU32 = period.into_duration();
-        let cycles = time_period.ticks();
+        let time_period: MicrosDurationU32 = period.into_duration();
+        let us = time_period.ticks();
         self.configure(|tconf, hi, lo| unsafe {
             tconf.write(|w| {
                 w.target0_period_mode()
                     .set_bit()
                     .target0_period()
-                    .bits(cycles * (SystemTimer::TICKS_PER_SECOND as u32 / 1000))
+                    .bits(us * (SystemTimer::TICKS_PER_SECOND as u32 / 1000_000))
             });
             hi.write(|w| w.timer_target0_hi().bits(0));
             lo.write(|w| w.timer_target0_lo().bits(0));
