@@ -464,7 +464,167 @@ _abs_start:
 .weak _start_trap29
 .weak _start_trap30
 .weak _start_trap31
-
+"#,
+#[cfg(feature="direct-vectoring")]
+r#"
+_start_trap1:
+    addi sp, sp, -40*4
+    sw ra, 0(sp)
+    la ra, cpu_int_1_handler
+    j _start_trap_direct
+_start_trap2:
+    addi sp, sp, -40*4
+    sw ra, 0(sp)
+    la ra, cpu_int_2_handler
+    j _start_trap_direct
+_start_trap3:
+    addi sp, sp, -40*4
+    sw ra, 0(sp)
+    la ra, cpu_int_3_handler
+    j _start_trap_direct
+_start_trap4:
+    addi sp, sp, -40*4
+    sw ra, 0(sp)
+    la ra, cpu_int_4_handler
+    j _start_trap_direct
+_start_trap5:
+    addi sp, sp, -40*4
+    sw ra, 0(sp)
+    la ra, cpu_int_5_handler
+    j _start_trap_direct
+_start_trap6:
+    addi sp, sp, -40*4
+    sw ra, 0(sp)
+    la ra, cpu_int_6_handler
+    j _start_trap_direct
+_start_trap7:
+    addi sp, sp, -40*4
+    sw ra, 0(sp)
+    la ra, cpu_int_7_handler
+    j _start_trap_direct
+_start_trap8:
+    addi sp, sp, -40*4
+    sw ra, 0(sp)
+    la ra, cpu_int_8_handler
+    j _start_trap_direct
+_start_trap9:
+    addi sp, sp, -40*4
+    sw ra, 0(sp)
+    la ra, cpu_int_9_handler
+    j _start_trap_direct
+_start_trap10:
+    addi sp, sp, -40*4
+    sw ra, 0(sp)
+    la ra, cpu_int_10_handler
+    j _start_trap_direct
+_start_trap11:
+    addi sp, sp, -40*4
+    sw ra, 0(sp)
+    la ra, cpu_int_11_handler
+    j _start_trap_direct
+_start_trap12:
+    addi sp, sp, -40*4
+    sw ra, 0(sp)
+    la ra, cpu_int_12_handler
+    j _start_trap_direct
+_start_trap13:
+    addi sp, sp, -40*4
+    sw ra, 0(sp)
+    la ra, cpu_int_13_handler
+    j _start_trap_direct
+_start_trap14:
+    addi sp, sp, -40*4
+    sw ra, 0(sp)
+    la ra, cpu_int_14_handler
+    j _start_trap_direct
+_start_trap15:
+    addi sp, sp, -40*4
+    sw ra, 0(sp)
+    la ra, cpu_int_15_handler
+    j _start_trap_direct
+_start_trap16:
+    addi sp, sp, -40*4
+    sw ra, 0(sp)
+    la ra, cpu_int_16_handler
+    j _start_trap_direct
+_start_trap17:
+    addi sp, sp, -40*4
+    sw ra, 0(sp)
+    la ra, cpu_int_17_handler
+    j _start_trap_direct
+_start_trap18:
+    addi sp, sp, -40*4
+    sw ra, 0(sp)
+    la ra, cpu_int_18_handler
+    j _start_trap_direct
+_start_trap19:
+    addi sp, sp, -40*4
+    sw ra, 0(sp)
+    la ra, cpu_int_19_handler
+    j _start_trap_direct
+_start_trap20:
+    addi sp, sp, -40*4
+    sw ra, 0(sp)
+    la ra, cpu_int_20_handler
+    j _start_trap_direct
+_start_trap21:
+    addi sp, sp, -40*4
+    sw ra, 0(sp)
+    la ra, cpu_int_21_handler
+    j _start_trap_direct
+_start_trap22:
+    addi sp, sp, -40*4
+    sw ra, 0(sp)
+    la ra, cpu_int_22_handler
+    j _start_trap_direct
+_start_trap23:
+    addi sp, sp, -40*4
+    sw ra, 0(sp)
+    la ra, cpu_int_23_handler
+    j _start_trap_direct
+_start_trap24:
+    addi sp, sp, -40*4
+    sw ra, 0(sp)
+    la ra, cpu_int_24_handler
+    j _start_trap_direct
+_start_trap25:
+    addi sp, sp, -40*4
+    sw ra, 0(sp)
+    la ra, cpu_int_25_handler
+    j _start_trap_direct
+_start_trap26:
+    addi sp, sp, -40*4
+    sw ra, 0(sp)
+    la ra, cpu_int_26_handler
+    j _start_trap_direct
+_start_trap27:
+    addi sp, sp, -40*4
+    sw ra, 0(sp)
+    la ra, cpu_int_27_handler
+    j _start_trap_direct
+_start_trap28:
+    addi sp, sp, -40*4
+    sw ra, 0(sp)
+    la ra, cpu_int_28_handler
+    j _start_trap_direct
+_start_trap29:
+    addi sp, sp, -40*4
+    sw ra, 0(sp)
+    la ra, cpu_int_29_handler
+    j _start_trap_direct
+_start_trap30:
+    addi sp, sp, -40*4
+    sw ra, 0(sp)
+    la ra, cpu_int_30_handler
+    j _start_trap_direct
+_start_trap31:
+    addi sp, sp, -40*4
+    sw ra, 0(sp)
+    la ra, cpu_int_31_handler
+    j _start_trap_direct
+"#,
+#[cfg(not(feature="direct-vectoring"))]
+r#"
 _start_trap1:
 _start_trap2:
 _start_trap3:
@@ -497,10 +657,17 @@ _start_trap29:
 _start_trap30:
 _start_trap31:
 
-_start_trap:
+"#,
+r#"
+_start_trap: 
     addi sp, sp, -40*4
-
-    sw ra, 0*4(sp)
+    sw ra, 0*4(sp)"#,
+#[cfg(feature="direct-vectoring")] //for the directly vectored handlers the above is stacked beforehand
+r#"
+    la ra, _start_trap_rust_hal #this runs on exception, use regular fault handler
+_start_trap_direct:
+"#,
+r#"
     sw t0, 1*4(sp)
     sw t1, 2*4(sp)
     sw t2, 3*4(sp)
@@ -543,8 +710,31 @@ _start_trap:
     sw s0, 30*4(sp)
 
     add a0, sp, zero
+    "#,
+    #[cfg(all(feature="interrupt-preemption", feature="direct-vectoring"))] //store current priority, set threshold, enable interrupts
+    r#"
+    addi sp, sp, -4 #build stack
+    sw ra, 0(sp)
+    jal ra, _handle_priority
+    lw ra, 0(sp)
+    sw a0, 0(sp) #reuse old stack, a0 is return of _handle_priority
+    addi a0, sp, 4 #the proper stack pointer is an argument to the HAL handler
+    "#,
+    #[cfg(not(feature="direct-vectoring"))] //jump to HAL handler
+    r#"
     jal ra, _start_trap_rust_hal
-
+    "#,
+    #[cfg(feature="direct-vectoring")] //jump to handler loaded in direct handler
+    r#"
+    jalr ra, ra #jump to label loaded in _start_trapx
+    "#,
+    #[cfg(all(feature="interrupt-preemption", feature="direct-vectoring"))] //restore threshold
+    r#"
+    lw a0, 0(sp) #load stored priority
+    jal ra, _restore_priority
+    addi sp, sp, 4 #pop
+    "#,
+    r#"
     lw t1, 31*4(sp)
     csrrw x0, mepc, t1
 
@@ -640,5 +830,74 @@ _vector_table:
     j _start_trap31
 
 .option pop
+"#,
+#[cfg(feature="direct-vectoring")]
+r#"
+#this is required for the linking step, these symbols for in-use interrupts should always be overwritten by the user.
+.section .trap, "ax"
+.weak cpu_int_1_handler
+.weak cpu_int_2_handler
+.weak cpu_int_3_handler
+.weak cpu_int_4_handler
+.weak cpu_int_5_handler
+.weak cpu_int_6_handler
+.weak cpu_int_7_handler
+.weak cpu_int_8_handler
+.weak cpu_int_9_handler
+.weak cpu_int_10_handler
+.weak cpu_int_11_handler
+.weak cpu_int_12_handler
+.weak cpu_int_13_handler
+.weak cpu_int_14_handler
+.weak cpu_int_15_handler
+.weak cpu_int_16_handler
+.weak cpu_int_17_handler
+.weak cpu_int_18_handler
+.weak cpu_int_19_handler
+.weak cpu_int_20_handler
+.weak cpu_int_21_handler
+.weak cpu_int_22_handler
+.weak cpu_int_23_handler
+.weak cpu_int_24_handler
+.weak cpu_int_25_handler
+.weak cpu_int_26_handler
+.weak cpu_int_27_handler
+.weak cpu_int_28_handler
+.weak cpu_int_29_handler
+.weak cpu_int_30_handler
+.weak cpu_int_31_handler
+cpu_int_1_handler:
+cpu_int_2_handler:
+cpu_int_3_handler:
+cpu_int_4_handler:
+cpu_int_5_handler:
+cpu_int_6_handler:
+cpu_int_7_handler:
+cpu_int_8_handler:
+cpu_int_9_handler:
+cpu_int_10_handler:
+cpu_int_11_handler:
+cpu_int_12_handler:
+cpu_int_13_handler:
+cpu_int_14_handler:
+cpu_int_15_handler:
+cpu_int_16_handler:
+cpu_int_17_handler:
+cpu_int_18_handler:
+cpu_int_19_handler:
+cpu_int_20_handler:
+cpu_int_21_handler:
+cpu_int_22_handler:
+cpu_int_23_handler:
+cpu_int_24_handler:
+cpu_int_25_handler:
+cpu_int_26_handler:
+cpu_int_27_handler:
+cpu_int_28_handler:
+cpu_int_29_handler:
+cpu_int_30_handler:
+cpu_int_31_handler:
+    la ra, abort #abort since proper handler is not defined, this could also just load the default _start_trap_rust_hal address and let the hal handle it.
+    jr ra
 "#,
 }

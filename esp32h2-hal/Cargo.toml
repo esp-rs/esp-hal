@@ -64,7 +64,7 @@ embassy              = ["esp-hal-common/embassy"]
 embassy-time-systick = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-hz-16_000_000"]
 embassy-time-timg0   = ["esp-hal-common/embassy-time-timg0",   "embassy-time/tick-hz-1_000_000"]
 interrupt-preemption = ["esp-hal-common/interrupt-preemption"]
-
+direct-vectoring     = ["esp-hal-common/direct-vectoring"]
 [[example]]
 name              = "spi_eh1_loopback"
 required-features = ["eh1"]
@@ -96,3 +96,7 @@ required-features = ["async", "embassy"]
 [[example]]
 name              = "interrupt_preemption"
 required-features = ["interrupt-preemption"]
+
+[[example]]
+name              = "direct-vectoring"
+required-features = ["direct-vectoring"]
