@@ -254,34 +254,16 @@ impl Default for RtcSleepConfig {
     }
 }
 
-const DR_REG_SYSCON_BASE: u32 = 0x60026000;
-const DR_REG_BB_BASE: u32 = 0x6001D000;
 const DR_REG_NRX_BASE: u32 = 0x6001CC00;
 const DR_REG_FE_BASE: u32 = 0x60006000;
 const DR_REG_FE2_BASE: u32 = 0x60005000;
-const DR_REG_SPI1_BASE: u32 = 0x60002000;
-const DR_REG_SPI0_BASE: u32 = 0x60003000;
 
-const SPI_MEM_CLOCK_GATE_REG0: u32 = DR_REG_SPI0_BASE + 0xE8;
-const SPI_MEM_CLOCK_GATE_REG1: u32 = DR_REG_SPI1_BASE + 0xE8;
-
-const SYSCON_FRONT_END_MEM_PD_REG: u32 = DR_REG_SYSCON_BASE + 0x9C;
-const SYSCON_CLKGATE_FORCE_ON_REG: u32 = DR_REG_SYSCON_BASE + 0xA8;
-const SYSCON_MEM_POWER_UP_REG: u32 = DR_REG_SYSCON_BASE + 0xB0;
-
-const BBPD_CTRL: u32 = DR_REG_BB_BASE + 0x0054;
 const NRXPD_CTRL: u32 = DR_REG_NRX_BASE + 0x00d4;
 const FE_GEN_CTRL: u32 = DR_REG_FE_BASE + 0x0090;
 const FE2_TX_INTERP_CTRL: u32 = DR_REG_FE2_BASE + 0x00f0;
 
-const SYSCON_DC_MEM_FORCE_PU: u32 = 1 << 4;
-const SYSCON_PBUS_MEM_FORCE_PU: u32 = 1 << 2;
-const SYSCON_AGC_MEM_FORCE_PU: u32 = 1 << 0;
-const SYSCON_SRAM_POWER_UP: u32 = 0x7FF << 3;
-const SYSCON_ROM_POWER_UP: u32 = 0x7 << 0;
-
-const BB_FFT_FORCE_PU: u32 = 1 << 3;
-const BB_DC_EST_FORCE_PU: u32 = 1 << 1;
+const SYSCON_SRAM_POWER_UP: u16 = 0x7FF;
+const SYSCON_ROM_POWER_UP: u8 = 0x7;
 
 const NRX_RX_ROT_FORCE_PU: u32 = 1 << 5;
 const NRX_VIT_FORCE_PU: u32 = 1 << 3;
@@ -289,14 +271,6 @@ const NRX_DEMAP_FORCE_PU: u32 = 1 << 1;
 
 const FE_IQ_EST_FORCE_PU: u32 = 1 << 5;
 const FE2_TX_INF_FORCE_PU: u32 = 1 << 10;
-
-const SPI_MEM_CLK_EN: u32 = 1 << 0;
-
-fn write_register(reg: u32, value: u32) {
-    let reg = reg as *mut u32;
-
-    unsafe { reg.write_volatile(value) };
-}
 
 fn modify_register(reg: u32, mask: u32, value: u32) {
     let reg = reg as *mut u32;
@@ -314,6 +288,8 @@ fn register_modify_bits(reg: u32, bits: u32, set: bool) {
 
 fn rtc_sleep_pu(val: bool) {
     let rtc_cntl = unsafe { &*esp32s3::RTC_CNTL::ptr() };
+    let syscon = unsafe { &*esp32s3::APB_CTRL::ptr() };
+    let bb = unsafe { &*esp32s3::BB::ptr() };
 
     #[rustfmt::skip]
     rtc_cntl
@@ -329,17 +305,16 @@ fn rtc_sleep_pu(val: bool) {
     );
 
     #[rustfmt::skip]
-    register_modify_bits(
-        SYSCON_FRONT_END_MEM_PD_REG,
-        SYSCON_DC_MEM_FORCE_PU | SYSCON_PBUS_MEM_FORCE_PU | SYSCON_AGC_MEM_FORCE_PU,
-        val,
+    syscon.front_end_mem_pd.modify(|_r, w| w
+        .dc_mem_force_pu().bit(val)
+        .pbus_mem_force_pu().bit(val)
+        .agc_mem_force_pu().bit(val)
     );
 
     #[rustfmt::skip]
-    register_modify_bits(
-        BBPD_CTRL,
-        BB_FFT_FORCE_PU | BB_DC_EST_FORCE_PU,
-        val,
+    bb.bbpd_ctrl.modify(|_r, w| w
+        .fft_force_pu().bit(val)
+        .dc_est_force_pu().bit(val)
     );
 
     #[rustfmt::skip]
@@ -363,12 +338,12 @@ fn rtc_sleep_pu(val: bool) {
         val,
     );
 
-    #[rustfmt::skip]
-    register_modify_bits(
-        SYSCON_MEM_POWER_UP_REG,
-        SYSCON_SRAM_POWER_UP | SYSCON_ROM_POWER_UP,
-        val,
-    );
+    syscon.mem_power_up.modify(|_r, w| unsafe {
+        w.sram_power_up()
+            .bits(if val { SYSCON_SRAM_POWER_UP } else { 0 })
+            .rom_power_up()
+            .bits(if val { SYSCON_ROM_POWER_UP } else { 0 })
+    });
 }
 
 impl RtcSleepConfig {
@@ -413,6 +388,9 @@ impl RtcSleepConfig {
         // settings derived from esp_clk_init -> rtc_init
         unsafe {
             let rtc_cntl = &*esp32s3::RTC_CNTL::ptr();
+            let syscon = &*esp32s3::APB_CTRL::ptr();
+            let extmem = &*esp32s3::EXTMEM::ptr();
+            let system = &*esp32s3::SYSTEM::ptr();
 
             #[rustfmt::skip]
             rtc_cntl.dig_pwc.modify(|_, w| w
@@ -497,26 +475,30 @@ impl RtcSleepConfig {
 
             // clear CMMU clock force on
             #[rustfmt::skip]
-            (&*esp32s3::EXTMEM::ptr()).cache_mmu_power_ctrl.modify(|_,w| w
+            extmem.cache_mmu_power_ctrl.modify(|_, w| w
                 .cache_mmu_mem_force_on().clear_bit()
             );
 
             // clear clkgate force on
-            write_register(SYSCON_CLKGATE_FORCE_ON_REG, 0);
+            syscon.clkgate_force_on.write(|w| w.bits(0));
 
             // clear tag clock force on
             #[rustfmt::skip]
-            (&*esp32s3::EXTMEM::ptr()).dcache_tag_power_ctrl.modify(|_,w| w
+            extmem.dcache_tag_power_ctrl.modify(|_, w| w
                 .dcache_tag_mem_force_on().clear_bit()
             );
             #[rustfmt::skip]
-            (&*esp32s3::EXTMEM::ptr()).icache_tag_power_ctrl.modify(|_,w| w
+            extmem.icache_tag_power_ctrl.modify(|_, w| w
                 .icache_tag_mem_force_on().clear_bit()
             );
 
             // clear register clock force on
-            register_modify_bits(SPI_MEM_CLOCK_GATE_REG0, SPI_MEM_CLK_EN, false);
-            register_modify_bits(SPI_MEM_CLOCK_GATE_REG1, SPI_MEM_CLK_EN, false);
+            (&*esp32s3::SPI0::ptr())
+                .clock_gate
+                .modify(|_, w| w.clk_en().clear_bit());
+            (&*esp32s3::SPI1::ptr())
+                .clock_gate
+                .modify(|_, w| w.clk_en().clear_bit());
 
             #[rustfmt::skip]
             rtc_cntl.clk_conf.modify(|_, w| w
@@ -569,7 +551,7 @@ impl RtcSleepConfig {
             // We should control soc memory power down mode from RTC, so we will not touch
             // this register any more
             #[rustfmt::skip]
-            (&*esp32s3::SYSTEM::ptr()).mem_pd_mask.modify(|_,w| w
+            system.mem_pd_mask.modify(|_, w| w
                 .lslp_mem_pd_mask().clear_bit()
             );
 
@@ -638,7 +620,7 @@ impl RtcSleepConfig {
             // if SYSTEM_CPU_WAIT_MODE_FORCE_ON == 0,
             // the cpu clk will be closed when cpu enter WAITI mode
             #[rustfmt::skip]
-            (&*esp32s3::SYSTEM::ptr()).cpu_per_conf.modify(|_,w| w
+            system.cpu_per_conf.modify(|_, w| w
                 .cpu_wait_mode_force_on().clear_bit()
             );
 
@@ -882,7 +864,7 @@ impl RtcSleepConfig {
 
             // Recover default wait cycle for touch or COCPU after wakeup.
             #[rustfmt::skip]
-            rtc_cntl.timer2.modify(|_,w| w
+            rtc_cntl.timer2.modify(|_, w| w
                 .ulpcp_touch_start_wait().bits(RTC_CNTL_ULPCP_TOUCH_START_WAIT_DEFAULT)
             );
         }
