@@ -16,7 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add a new RMT driver (#653, #667, #695)
 - Implemented calibrated ADC API for ESP32-S3 (#641)
 - Add MCPWM DeadTime configuration (#406)
-- Implement sleep with some wakeup methods for `esp32-s3` (#660, #689)
+- Implement sleep with some wakeup methods for `esp32-s3` (#660, #689, #696)
+- Add feature enabling directly hooking the interrupt vector table
 - Add `ClockControl::max` helper for all chips (#701)
 
 ### Changed
@@ -30,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - USB device support is working again (#656)
 - Add missing interrupt status read for esp32s3, which fixes USB-SERIAL-JTAG interrupts (#664)
 - GPIO interrupt status bits are now properly cleared (#670)
+- Increase frequency resolution in `set_periodic` (#686)
 
 ### Removed
 

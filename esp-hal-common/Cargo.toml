@@ -103,7 +103,8 @@ embassy = ["embassy-time"]
 embassy-time-systick = []
 embassy-time-timg0   = []
 
-interrupt-preemption = []
+interrupt-preemption = ["esp-riscv-rt/interrupt-preemption"]
+
 
 # Architecture-specific features (intended for internal use)
 riscv  = ["critical-section/restore-state-u8", "esp-riscv-rt", "esp-riscv-rt/zero-bss", "riscv-atomic-emulation-trap"]
@@ -114,6 +115,7 @@ rv-init-data     = ["esp-riscv-rt/init-data", "esp-riscv-rt/init-rw-text"]
 rv-zero-rtc-bss  = ["esp-riscv-rt/zero-rtc-fast-bss"]
 rv-init-rtc-data = ["esp-riscv-rt/init-rtc-fast-data", "esp-riscv-rt/init-rtc-fast-text"]
 
+direct-vectoring = ["esp-riscv-rt/direct-vectoring"]
 # Enable the `impl-register-debug` feature for the selected PAC
 debug = [
     "esp32?/impl-register-debug",

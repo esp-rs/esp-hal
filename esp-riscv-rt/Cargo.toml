@@ -17,6 +17,8 @@ riscv-rt-macros = "0.2.0"
 panic-halt = "0.2.0"
 
 [features]
+direct-vectoring = []
+interrupt-preemption = []
 has-mie-mip = []
 zero-bss = []
 zero-rtc-fast-bss = []
