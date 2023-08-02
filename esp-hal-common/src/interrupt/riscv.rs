@@ -1,4 +1,4 @@
-//! Interrupt handling - RISCV
+//! Interrupt handling - RISC-V
 //!
 //! When the `vectored` feature is enabled, CPU interrupts 1 through 15 are
 //! reserved for each of the possible interrupt priorities.

@@ -23,8 +23,8 @@
 //! The `unit` module is responsible for configuring and handling individual
 //! units of the `PCNT` peripheral. Each unit represents a separate instance of
 //! the `PCNT` module, identified by unit numbers like `Unit0`, `Unit1`, and so
-//! on. User can interact with these units to configure settings such as low and
-//! high limits, thresholds, and optional filtering. The unit module also
+//! on. Users can interact with these units to configure settings such as low
+//! and high limits, thresholds, and optional filtering. The unit module also
 //! enables users to pause, resume, and clear the counter, as well as enable or
 //! disable interrupts for specific events associated with the unit.
 //!

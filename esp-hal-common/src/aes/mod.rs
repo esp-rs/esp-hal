@@ -3,13 +3,13 @@
 //! ## Overview
 //! The AES module provides an interface to interact with the AES peripheral,
 //! provides encryption and decryption capabilities for ESP chips using the AES
-//! algorithm. We currently support following AES encryption modes:
+//! algorithm. We currently support the following AES encryption modes:
 //! * AES-128
 //! * AES-192
 //! * AES-256
 //!
 //! ## Example
-//! ### initialization
+//! ### Initialization
 //! ```no_run
 //! let mut aes = Aes::new(peripherals.AES, &mut system.peripheral_clock_control);
 //! ```

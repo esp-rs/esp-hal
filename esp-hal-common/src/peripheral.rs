@@ -6,10 +6,10 @@
 //! exclusive reference to a peripheral. It offers memory efficiency benefits
 //! for zero-sized types.
 //!
-//! The PeripheralRef struct is used to access and interact with peripherals.
+//! The `PeripheralRef` struct is used to access and interact with peripherals.
 //! It implements the `Deref` and `DerefMut` traits, allowing you to dereference
 //! it to access the underlying peripheral. It also provides methods for cloning
-//! and reborrowing the peripheral.
+//! and re-borrowing the peripheral.
 //!
 //! The module also defines the `Peripheral` trait, which is implemented by
 //! types that can be used as peripherals. The trait allows conversion between

@@ -6,7 +6,7 @@
 //! generating `PWM (Pulse Width Modulation)` signals and handling various
 //! aspects related to `PWM` signal generation.
 //!
-//! Module provides flexibility in configuring the PWM outputs. Its
+//! This module provides flexibility in configuring the PWM outputs. Its
 //! implementation allows for motor control and other applications that demand
 //! accurate pulse timing and sophisticated modulation techniques.
 

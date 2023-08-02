@@ -428,7 +428,7 @@ pub mod implementation {
     //! analog-to-digital conversions, allowing them to measure real-world
     //! analog signals with high accuracy.
     //!
-    //! Module provides functions for reading analog values from the
+    //! This module provides functions for reading analog values from the
     //! analog to digital converter available on the ESP32: `ADC1` and `ADC2`.
     //!
     //! The following pins can be configured for analog readout:

@@ -4,7 +4,7 @@
 //! The `channel` module is part of the `PCNT` peripheral driver
 //! for `ESP` chips.
 //!
-//! It provides provides a convenient and efficient way to configure and use
+//! It provides a convenient and efficient way to configure and use
 //! individual channels of the `PCNT` peripheral of pulse counting and signal
 //! edge detection on ESP chips.
 
