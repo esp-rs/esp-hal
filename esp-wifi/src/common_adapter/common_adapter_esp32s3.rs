@@ -20,6 +20,46 @@ pub(crate) fn phy_mem_init() {
     }
 }
 
+pub(crate) fn enable_wifi_power_domain() {
+    const SYSTEM_WIFIBB_RST: u32 = 1 << 0;
+    const SYSTEM_FE_RST: u32 = 1 << 1;
+    const SYSTEM_WIFIMAC_RST: u32 = 1 << 2;
+    const SYSTEM_BTBB_RST: u32 = 1 << 3; /* Bluetooth Baseband */
+    const SYSTEM_BTMAC_RST: u32 = 1 << 4; /* deprecated */
+    const SYSTEM_RW_BTMAC_RST: u32 = 1 << 9; /* Bluetooth MAC */
+    const SYSTEM_RW_BTMAC_REG_RST: u32 = 1 << 11; /* Bluetooth MAC Regsiters */
+    const SYSTEM_BTBB_REG_RST: u32 = 1 << 13; /* Bluetooth Baseband Registers */
+
+    const MODEM_RESET_FIELD_WHEN_PU: u32 = SYSTEM_WIFIBB_RST
+        | SYSTEM_FE_RST
+        | SYSTEM_WIFIMAC_RST
+        | SYSTEM_BTBB_RST
+        | SYSTEM_BTMAC_RST
+        | SYSTEM_RW_BTMAC_RST
+        | SYSTEM_RW_BTMAC_REG_RST
+        | SYSTEM_BTBB_REG_RST;
+
+    unsafe {
+        let rtc_cntl = &*crate::hal::peripherals::RTC_CNTL::ptr();
+        let syscon = &*crate::hal::peripherals::APB_CTRL::ptr();
+
+        rtc_cntl
+            .dig_pwc
+            .modify(|_, w| w.wifi_force_pd().clear_bit());
+
+        syscon
+            .wifi_rst_en
+            .modify(|r, w| w.bits(r.bits() | MODEM_RESET_FIELD_WHEN_PU));
+        syscon
+            .wifi_rst_en
+            .modify(|r, w| w.bits(r.bits() & !MODEM_RESET_FIELD_WHEN_PU));
+
+        rtc_cntl
+            .dig_iso
+            .modify(|_, w| w.wifi_force_iso().clear_bit());
+    }
+}
+
 pub(crate) unsafe fn phy_enable() {
     let count = PHY_ACCESS_REF.fetch_add(1, atomic_polyfill::Ordering::SeqCst);
     if count == 0 {

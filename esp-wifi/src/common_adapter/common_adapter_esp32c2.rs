@@ -15,6 +15,11 @@ static mut G_PHY_DIGITAL_REGS_MEM: *mut u32 = core::ptr::null_mut();
 static mut S_IS_PHY_REG_STORED: bool = false;
 static mut PHY_ACCESS_REF: AtomicU32 = AtomicU32::new(0);
 
+pub(crate) fn enable_wifi_power_domain() {
+    // In esp-idf, neither SOC_PM_SUPPORT_MODEM_PD or SOC_PM_SUPPORT_WIFI_PD are defined,
+    // which makes `esp_wifi_bt_power_domain_on` a no-op.
+}
+
 pub(crate) fn phy_mem_init() {
     unsafe {
         G_PHY_DIGITAL_REGS_MEM = SOC_PHY_DIG_REGS_MEM.as_ptr() as *mut u32;

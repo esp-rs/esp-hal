@@ -16,6 +16,20 @@ static mut S_IS_PHY_REG_STORED: bool = false;
 static mut PHY_ACCESS_REF: AtomicU32 = AtomicU32::new(0);
 static mut PHY_CLOCK_ENABLE_REF: AtomicU32 = AtomicU32::new(0);
 
+pub(crate) fn enable_wifi_power_domain() {
+    unsafe {
+        let rtc_cntl = &*crate::hal::peripherals::RTC_CNTL::ptr();
+
+        rtc_cntl
+            .dig_pwc
+            .modify(|_, w| w.wifi_force_pd().clear_bit());
+
+        rtc_cntl
+            .dig_iso
+            .modify(|_, w| w.wifi_force_iso().clear_bit());
+    }
+}
+
 pub(crate) fn phy_mem_init() {
     unsafe {
         G_PHY_DIGITAL_REGS_MEM = SOC_PHY_DIG_REGS_MEM.as_ptr() as *mut u32;

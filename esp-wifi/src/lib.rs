@@ -233,6 +233,8 @@ pub fn initialize(
         rom_ets_update_cpu_frequency(240); // we know it's 240MHz because of the check above
     }
 
+    crate::common_adapter::chip_specific::enable_wifi_power_domain();
+
     init_heap();
     phy_mem_init();
     init_radio_clock_control(radio_clocks);
