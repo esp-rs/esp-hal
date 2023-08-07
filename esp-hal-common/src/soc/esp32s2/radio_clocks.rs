@@ -1,24 +1,21 @@
 use crate::system::{RadioClockControl, RadioClockController, RadioPeripherals};
 
-// Mask for clock bits used by both WIFI and Bluetooth, 0, 1, 2, 3, 7, 8, 9, 10,
-// 19, 20, 21, 22, 23
-const SYSTEM_WIFI_CLK_WIFI_BT_COMMON_M: u32 = 0x78078F;
-// SYSTEM_WIFI_CLK_EN : R/W ;bitpos:[31:0] ;default: 32'hfffce030
-// from experiments `0x00FB9FCF` is not enough for esp-wifi to work
-const SYSTEM_WIFI_CLK_EN: u32 = 0xFFFFFFFF;
+// Mask for clock bits used by both WIFI and Bluetooth, bit 0, 3, 6, 7, 8, 9
+const DPORT_WIFI_CLK_WIFI_BT_COMMON_M: u32 = 0x000003c9;
+const DPORT_WIFI_CLK_WIFI_EN_M: u32 = 0x000007cf;
 
 impl RadioClockController for RadioClockControl {
     fn enable(&mut self, peripheral: RadioPeripherals) {
         match peripheral {
             RadioPeripherals::Phy => enable_phy(),
-            RadioPeripherals::Wifi => common_wifi_bt_clock_enable(),
+            RadioPeripherals::Wifi => wifi_clock_enable(),
         }
     }
 
     fn disable(&mut self, peripheral: RadioPeripherals) {
         match peripheral {
             RadioPeripherals::Phy => disable_phy(),
-            RadioPeripherals::Wifi => common_wifi_bt_clock_disable(),
+            RadioPeripherals::Wifi => wifi_clock_disable(),
         }
     }
 
@@ -40,31 +37,35 @@ impl RadioClockController for RadioClockControl {
 }
 
 fn enable_phy() {
-    let system = unsafe { &*esp32s2::SYSTEM::PTR };
-    system
-        .perip_clk_en1
-        .modify(|r, w| unsafe { w.bits(r.bits() | SYSTEM_WIFI_CLK_WIFI_BT_COMMON_M) });
+    // `periph_ll_wifi_bt_module_enable_clk_clear_rst`
+    let dport = unsafe { &*esp32s2::SYSCON::PTR };
+    dport
+        .wifi_clk_en
+        .modify(|r, w| unsafe { w.bits(r.bits() | DPORT_WIFI_CLK_WIFI_BT_COMMON_M) });
 }
 
 fn disable_phy() {
-    let system = unsafe { &*esp32s2::SYSTEM::PTR };
-    system
-        .perip_clk_en1
-        .modify(|r, w| unsafe { w.bits(r.bits() & !SYSTEM_WIFI_CLK_WIFI_BT_COMMON_M) });
+    // `periph_ll_wifi_bt_module_disable_clk_set_rst`
+    let syscon = unsafe { &*esp32s2::SYSCON::PTR };
+    syscon
+        .wifi_clk_en
+        .modify(|r, w| unsafe { w.bits(r.bits() & !DPORT_WIFI_CLK_WIFI_BT_COMMON_M) });
 }
 
-fn common_wifi_bt_clock_enable() {
-    let system = unsafe { &*esp32s2::SYSTEM::PTR };
-    system
-        .perip_clk_en1
-        .modify(|r, w| unsafe { w.bits(r.bits() | SYSTEM_WIFI_CLK_EN) });
+fn wifi_clock_enable() {
+    // `periph_ll_wifi_module_enable_clk_clear_rst`
+    let syscon = unsafe { &*esp32s2::SYSCON::PTR };
+    syscon
+        .wifi_clk_en
+        .modify(|r, w| unsafe { w.bits(r.bits() | DPORT_WIFI_CLK_WIFI_EN_M) });
 }
 
-fn common_wifi_bt_clock_disable() {
-    let system = unsafe { &*esp32s2::SYSTEM::PTR };
-    system
-        .perip_clk_en1
-        .modify(|r, w| unsafe { w.bits(r.bits() & !SYSTEM_WIFI_CLK_EN) });
+fn wifi_clock_disable() {
+    // `periph_ll_wifi_module_disable_clk_set_rst`
+    let syscon = unsafe { &*esp32s2::SYSCON::PTR };
+    syscon
+        .wifi_clk_en
+        .modify(|r, w| unsafe { w.bits(r.bits() & !DPORT_WIFI_CLK_WIFI_EN_M) });
 }
 
 fn reset_mac() {
@@ -80,7 +81,24 @@ fn reset_mac() {
 
 fn init_clocks() {
     let syscon = unsafe { &*esp32s2::SYSCON::PTR };
+
+    const DPORT_WIFI_CLK_WIFI_EN: u32 = 0x003807cf;
+    const DPORT_WIFI_CLK_BT_EN_M: u32 = 0x61 << 11;
+    const DPORT_WIFI_CLK_SDIOSLAVE_EN: u32 = 1 << 4;
+    const DPORT_WIFI_CLK_UNUSED_BIT5: u32 = 1 << 5;
+    const DPORT_WIFI_CLK_UNUSED_BIT12: u32 = 1 << 12;
+    const DPORT_WIFI_CLK_SDIO_HOST_EN: u32 = 1 << 13;
+    const DPORT_WIFI_CLK_EMAC_EN: u32 = 1 << 14;
+
+    const WIFI_BT_SDIO_CLK: u32 = DPORT_WIFI_CLK_WIFI_EN
+        | DPORT_WIFI_CLK_BT_EN_M
+        | DPORT_WIFI_CLK_UNUSED_BIT5
+        | DPORT_WIFI_CLK_UNUSED_BIT12
+        | DPORT_WIFI_CLK_SDIOSLAVE_EN
+        | DPORT_WIFI_CLK_SDIO_HOST_EN
+        | DPORT_WIFI_CLK_EMAC_EN;
+
     syscon
         .wifi_clk_en
-        .modify(|_, w| unsafe { w.bits(0xffffffff) });
+        .modify(|r, w| unsafe { w.bits(r.bits() & !WIFI_BT_SDIO_CLK | DPORT_WIFI_CLK_WIFI_EN) });
 }
