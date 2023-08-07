@@ -1462,6 +1462,8 @@ mod asynch {
             embedded_svc::wifi::Wifi::stop(self)?;
             WifiEventFuture::new(event).await;
 
+            unsafe { WIFI_STATE = -1 };
+
             Ok(())
         }
 
