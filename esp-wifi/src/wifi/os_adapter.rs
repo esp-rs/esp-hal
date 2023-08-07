@@ -1579,7 +1579,7 @@ pub unsafe extern "C" fn log_writev(
  *
  ****************************************************************************/
 pub unsafe extern "C" fn log_timestamp() -> u32 {
-    (crate::timer::get_systimer_count() / crate::timer::TICKS_PER_SECOND / 1_000) as u32
+    (crate::timer::get_systimer_count() / (crate::timer::TICKS_PER_SECOND / 1_000)) as u32
 }
 
 /****************************************************************************
