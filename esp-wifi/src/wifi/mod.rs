@@ -1,7 +1,7 @@
 #[doc(hidden)]
 pub mod os_adapter;
 
-use core::{cell::RefCell, marker::PhantomData};
+use core::{cell::RefCell, marker::PhantomData, mem::MaybeUninit};
 
 use crate::common_adapter::*;
 use crate::EspWifiInitialization;
@@ -759,6 +759,58 @@ impl<'d> WifiDevice<'d> {
     }
 }
 
+fn convert_ap_info(record: &crate::binary::include::wifi_ap_record_t) -> AccessPointInfo {
+    let str_len = record
+        .ssid
+        .iter()
+        .position(|&c| c == 0)
+        .unwrap_or(record.ssid.len());
+    let ssid_ref = unsafe { core::str::from_utf8_unchecked(&record.ssid[..str_len]) };
+
+    let auth_method = match record.authmode {
+        crate::binary::include::wifi_auth_mode_t_WIFI_AUTH_OPEN => AuthMethod::None,
+        crate::binary::include::wifi_auth_mode_t_WIFI_AUTH_WEP => AuthMethod::WEP,
+        crate::binary::include::wifi_auth_mode_t_WIFI_AUTH_WPA_PSK => AuthMethod::WPA,
+        crate::binary::include::wifi_auth_mode_t_WIFI_AUTH_WPA2_PSK => AuthMethod::WPA2Personal,
+        crate::binary::include::wifi_auth_mode_t_WIFI_AUTH_WPA_WPA2_PSK => {
+            AuthMethod::WPAWPA2Personal
+        }
+        crate::binary::include::wifi_auth_mode_t_WIFI_AUTH_WPA2_ENTERPRISE => {
+            AuthMethod::WPA2Enterprise
+        }
+        crate::binary::include::wifi_auth_mode_t_WIFI_AUTH_WPA3_PSK => AuthMethod::WPA3Personal,
+        crate::binary::include::wifi_auth_mode_t_WIFI_AUTH_WPA2_WPA3_PSK => {
+            AuthMethod::WPA2WPA3Personal
+        }
+        crate::binary::include::wifi_auth_mode_t_WIFI_AUTH_WAPI_PSK => AuthMethod::WAPIPersonal,
+        _ => panic!(),
+    };
+
+    let mut ssid = heapless::String::<32>::new();
+    ssid.push_str(ssid_ref).unwrap();
+
+    AccessPointInfo {
+        ssid,
+        bssid: record.bssid,
+        channel: record.primary,
+        secondary_channel: match record.second {
+            crate::binary::include::wifi_second_chan_t_WIFI_SECOND_CHAN_NONE => {
+                SecondaryChannel::None
+            }
+            crate::binary::include::wifi_second_chan_t_WIFI_SECOND_CHAN_ABOVE => {
+                SecondaryChannel::Above
+            }
+            crate::binary::include::wifi_second_chan_t_WIFI_SECOND_CHAN_BELOW => {
+                SecondaryChannel::Below
+            }
+            _ => panic!(),
+        },
+        signal_strength: record.rssi,
+        protocols: EnumSet::empty(), // TODO
+        auth_method,
+    }
+}
+
 /// A wifi controller implementing embedded_svc::Wifi traits
 pub struct WifiController<'d> {
     _device: PeripheralRef<'d, esp_hal_common::radio::Wifi>,
@@ -808,122 +860,51 @@ impl<'d> WifiController<'d> {
         Ok(mode == wifi_mode_t_WIFI_MODE_AP || mode == wifi_mode_t_WIFI_MODE_APSTA)
     }
 
+    fn scan_result_count(&mut self) -> Result<usize, WifiError> {
+        let mut bss_total: u16 = 0;
+
+        unsafe {
+            esp_wifi_result!(crate::binary::include::esp_wifi_scan_get_ap_num(
+                &mut bss_total
+            ))
+            .map_err(|e| {
+                crate::binary::include::esp_wifi_clear_ap_list();
+                e
+            })?;
+        }
+
+        Ok(bss_total as usize)
+    }
+
     fn scan_results<const N: usize>(
         &mut self,
-    ) -> Result<(heapless::Vec<AccessPointInfo, N>, usize), WifiError> {
-        let scan = || -> Result<(heapless::Vec<AccessPointInfo, N>, usize), WifiError> {
-            let mut scanned = heapless::Vec::<AccessPointInfo, N>::new();
-            let mut bss_total: u16 = N as u16;
+    ) -> Result<heapless::Vec<AccessPointInfo, N>, WifiError> {
+        let mut scanned = heapless::Vec::<AccessPointInfo, N>::new();
+        let mut bss_total: u16 = N as u16;
 
-            unsafe {
-                esp_wifi_result!(crate::binary::include::esp_wifi_scan_get_ap_num(
-                    &mut bss_total
-                ))?;
-                if bss_total as usize > N {
-                    bss_total = N as u16;
-                }
+        unsafe {
+            let mut records: [MaybeUninit<crate::binary::include::wifi_ap_record_t>; N] =
+                [MaybeUninit::uninit(); N];
 
-                let mut records = [crate::binary::include::wifi_ap_record_t {
-                    bssid: [0u8; 6],
-                    ssid: [0u8; 33],
-                    primary: 0u8,
-                    second: 0u32,
-                    rssi: 0i8,
-                    authmode: 0u32,
-                    pairwise_cipher: 0u32,
-                    group_cipher: 0u32,
-                    ant: 0u32,
-                    _bitfield_align_1: [0u32; 0],
-                    _bitfield_1: crate::binary::include::__BindgenBitfieldUnit::new([0u8; 4usize]),
-                    country: crate::binary::include::wifi_country_t {
-                        cc: [0; 3],
-                        schan: 0u8,
-                        nchan: 0u8,
-                        max_tx_power: 0i8,
-                        policy: 0u32,
-                    },
-                    he_ap: crate::binary::include::wifi_he_ap_info_t {
-                        _bitfield_align_1: [0u8; 0],
-                        _bitfield_1: crate::binary::include::wifi_he_ap_info_t::new_bitfield_1(
-                            0, 0, 0,
-                        ),
-                        bssid_index: 0,
-                    },
-                }; N];
+            esp_wifi_result!(crate::binary::include::esp_wifi_scan_get_ap_records(
+                &mut bss_total,
+                records[0].as_mut_ptr(),
+            ))
+            .map_err(|e| {
+                // upon scan failure, list should be cleared to avoid memory leakage
+                crate::binary::include::esp_wifi_clear_ap_list();
+                e
+            })?;
 
-                esp_wifi_result!(crate::binary::include::esp_wifi_scan_get_ap_records(
-                    &mut bss_total,
-                    &mut records as *mut crate::binary::include::wifi_ap_record_t,
-                ))?;
+            for i in 0..bss_total {
+                let record = MaybeUninit::assume_init_ref(&records[i as usize]);
+                let ap_info = convert_ap_info(record);
 
-                for i in 0..bss_total {
-                    let record = records[i as usize];
-                    let ssid_strbuf =
-                        crate::compat::common::StrBuf::from(&record.ssid as *const u8);
-
-                    let auth_method = match record.authmode {
-                        crate::binary::include::wifi_auth_mode_t_WIFI_AUTH_OPEN => AuthMethod::None,
-                        crate::binary::include::wifi_auth_mode_t_WIFI_AUTH_WEP => AuthMethod::WEP,
-                        crate::binary::include::wifi_auth_mode_t_WIFI_AUTH_WPA_PSK => {
-                            AuthMethod::WPA
-                        }
-                        crate::binary::include::wifi_auth_mode_t_WIFI_AUTH_WPA2_PSK => {
-                            AuthMethod::WPA2Personal
-                        }
-                        crate::binary::include::wifi_auth_mode_t_WIFI_AUTH_WPA_WPA2_PSK => {
-                            AuthMethod::WPAWPA2Personal
-                        }
-                        crate::binary::include::wifi_auth_mode_t_WIFI_AUTH_WPA2_ENTERPRISE => {
-                            AuthMethod::WPA2Enterprise
-                        }
-                        crate::binary::include::wifi_auth_mode_t_WIFI_AUTH_WPA3_PSK => {
-                            AuthMethod::WPA3Personal
-                        }
-                        crate::binary::include::wifi_auth_mode_t_WIFI_AUTH_WPA2_WPA3_PSK => {
-                            AuthMethod::WPA2WPA3Personal
-                        }
-                        crate::binary::include::wifi_auth_mode_t_WIFI_AUTH_WAPI_PSK => {
-                            AuthMethod::WAPIPersonal
-                        }
-                        _ => panic!(),
-                    };
-
-                    let mut ssid = heapless::String::<32>::new();
-                    ssid.push_str(ssid_strbuf.as_str_ref()).ok();
-
-                    let ap_info = AccessPointInfo {
-                        ssid: ssid,
-                        bssid: record.bssid,
-                        channel: record.primary,
-                        secondary_channel: match record.second {
-                            crate::binary::include::wifi_second_chan_t_WIFI_SECOND_CHAN_NONE => {
-                                SecondaryChannel::None
-                            }
-                            crate::binary::include::wifi_second_chan_t_WIFI_SECOND_CHAN_ABOVE => {
-                                SecondaryChannel::Above
-                            }
-                            crate::binary::include::wifi_second_chan_t_WIFI_SECOND_CHAN_BELOW => {
-                                SecondaryChannel::Below
-                            }
-                            _ => panic!(),
-                        },
-                        signal_strength: record.rssi,
-                        protocols: EnumSet::empty(), // TODO
-                        auth_method: auth_method,
-                    };
-
-                    scanned.push(ap_info).ok();
-                }
+                scanned.push(ap_info).ok();
             }
+        }
 
-            Ok((scanned, bss_total as usize))
-        };
-
-        scan().map_err(|e| {
-            // upon scan failure, list should be cleared to avoid memory leakage
-            unsafe { crate::binary::include::esp_wifi_clear_ap_list() };
-            e
-        })
+        Ok(scanned)
     }
 }
 
@@ -1070,7 +1051,11 @@ impl embedded_svc::wifi::Wifi for WifiController<'_> {
         &mut self,
     ) -> Result<(heapless::Vec<AccessPointInfo, N>, usize), Self::Error> {
         esp_wifi_result!(crate::wifi::wifi_start_scan(true))?;
-        self.scan_results()
+
+        let count = self.scan_result_count()?;
+        let result = self.scan_results()?;
+
+        Ok((result, count))
     }
 
     /// Get the currently used configuration.
@@ -1420,7 +1405,10 @@ mod asynch {
             esp_wifi_result!(wifi_start_scan(false))?;
             WifiEventFuture::new(WifiEvent::ScanDone).await;
 
-            self.scan_results()
+            let count = self.scan_result_count()?;
+            let result = self.scan_results()?;
+
+            Ok((result, count))
         }
 
         /// Async version of [`embedded_svc::wifi::Wifi`]'s `start` method
