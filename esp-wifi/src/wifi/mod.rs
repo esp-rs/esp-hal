@@ -8,7 +8,7 @@ use crate::EspWifiInitialization;
 
 use crate::esp_wifi_result;
 use critical_section::Mutex;
-use embedded_svc::wifi::{AccessPointInfo, AuthMethod, Protocol, SecondaryChannel};
+use embedded_svc::wifi::{AccessPointInfo, AuthMethod, Protocol, SecondaryChannel, Wifi};
 use enumset::EnumSet;
 use enumset::EnumSetType;
 use esp_hal_common::peripheral::Peripheral;
@@ -138,6 +138,7 @@ pub(crate) static DATA_QUEUE_TX: Mutex<RefCell<SimpleQueue<DataFrame, 3>>> =
 
 #[derive(Debug, Clone, Copy)]
 pub enum WifiError {
+    NotInitialized,
     InternalError(InternalWifiError),
     WrongClockConfig,
     Disconnected,
@@ -696,9 +697,9 @@ pub fn new_with_config<'d>(
     inited: &EspWifiInitialization,
     device: impl Peripheral<P = esp_hal_common::radio::Wifi> + 'd,
     config: embedded_svc::wifi::Configuration,
-) -> (WifiDevice<'d>, WifiController<'d>) {
+) -> Result<(WifiDevice<'d>, WifiController<'d>), WifiError> {
     if !inited.is_wifi() {
-        panic!("Not initialized for Wifi use");
+        return Err(WifiError::NotInitialized);
     }
 
     esp_hal_common::into_ref!(device);
@@ -708,17 +709,18 @@ pub fn new_with_config<'d>(
         embedded_svc::wifi::Configuration::AccessPoint(_) => (),
         embedded_svc::wifi::Configuration::Mixed(_, _) => panic!(),
     };
-    (
+
+    Ok((
         WifiDevice::new(unsafe { device.clone_unchecked() }),
-        WifiController::new_with_config(device, config),
-    )
+        WifiController::new_with_config(device, config)?,
+    ))
 }
 
 pub fn new_with_mode<'d>(
     inited: &EspWifiInitialization,
     device: impl Peripheral<P = esp_hal_common::radio::Wifi> + 'd,
     mode: WifiMode,
-) -> (WifiDevice<'d>, WifiController<'d>) {
+) -> Result<(WifiDevice<'d>, WifiController<'d>), WifiError> {
     new_with_config(
         inited,
         device,
@@ -732,7 +734,7 @@ pub fn new_with_mode<'d>(
 pub fn new<'d>(
     inited: &EspWifiInitialization,
     device: impl Peripheral<P = esp_hal_common::radio::Wifi> + 'd,
-) -> (WifiDevice<'d>, WifiController<'d>) {
+) -> Result<(WifiDevice<'d>, WifiController<'d>), WifiError> {
     new_with_config(&inited, device, Default::default())
 }
 
@@ -821,8 +823,13 @@ impl<'d> WifiController<'d> {
     pub(crate) fn new_with_config(
         _device: PeripheralRef<'d, esp_hal_common::radio::Wifi>,
         config: embedded_svc::wifi::Configuration,
-    ) -> Self {
-        Self { _device, config }
+    ) -> Result<Self, WifiError> {
+        let mut this = Self {
+            _device,
+            config: Default::default(),
+        };
+        this.set_configuration(&config)?;
+        Ok(this)
     }
 
     /// Set the wifi mode.
@@ -1034,7 +1041,7 @@ pub fn send_data_if_needed() {
     });
 }
 
-impl embedded_svc::wifi::Wifi for WifiController<'_> {
+impl Wifi for WifiController<'_> {
     type Error = WifiError;
 
     /// This currently only supports the `Client` and `AccessPoint` capability.

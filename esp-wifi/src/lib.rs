@@ -124,15 +124,8 @@ pub type EspWifiTimer = Alarm<Target, 0>;
 pub type EspWifiTimer = hal::timer::Timer<hal::timer::Timer0<hal::peripherals::TIMG1>>;
 
 #[derive(Debug, PartialEq, PartialOrd)]
-pub struct EspWifiInitializationInternal {
-    _private: (),
-}
-
-impl EspWifiInitializationInternal {
-    fn new() -> Self {
-        Self { _private: () }
-    }
-}
+#[non_exhaustive]
+pub struct EspWifiInitializationInternal;
 
 #[derive(Debug, PartialEq, PartialOrd)]
 pub enum EspWifiInitialization {
@@ -281,16 +274,12 @@ pub fn initialize(
 
     match init_for {
         #[cfg(feature = "wifi")]
-        EspWifiInitFor::Wifi => Ok(EspWifiInitialization::Wifi(
-            EspWifiInitializationInternal::new(),
-        )),
+        EspWifiInitFor::Wifi => Ok(EspWifiInitialization::Wifi(EspWifiInitializationInternal)),
         #[cfg(feature = "ble")]
-        EspWifiInitFor::Ble => Ok(EspWifiInitialization::Ble(
-            EspWifiInitializationInternal::new(),
-        )),
+        EspWifiInitFor::Ble => Ok(EspWifiInitialization::Ble(EspWifiInitializationInternal)),
         #[cfg(all(feature = "wifi", feature = "ble"))]
         EspWifiInitFor::WifiBle => Ok(EspWifiInitialization::WifiBle(
-            EspWifiInitializationInternal::new(),
+            EspWifiInitializationInternal,
         )),
     }
 }

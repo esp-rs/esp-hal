@@ -278,7 +278,7 @@ impl<'d> EspNow<'d> {
         device: Option<PeripheralRef<'d, esp_hal_common::radio::Wifi>>,
     ) -> Result<EspNow<'d>, EspNowError> {
         if !inited.is_wifi() {
-            panic!("Not initialized for Wifi use");
+            return Err(EspNowError::Error(Error::NotInitialized));
         }
 
         let mut esp_now = EspNow { _device: device };

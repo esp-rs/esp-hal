@@ -8,7 +8,7 @@ use smoltcp::{
 use crate::{current_millis, wifi::get_sta_mac};
 use crate::{wifi::get_ap_mac, EspWifiInitialization};
 
-use super::{WifiController, WifiDevice, WifiMode};
+use super::{WifiController, WifiDevice, WifiError, WifiMode};
 
 /// Convenient way to create an `smoltcp` ethernet interface
 /// You can use the provided macros to create and pass a suitable backing storage.
@@ -17,7 +17,7 @@ pub fn create_network_interface<'a, 'd>(
     device: impl esp_hal_common::peripheral::Peripheral<P = esp_hal_common::radio::Wifi> + 'd,
     mode: WifiMode,
     storage: &'a mut [SocketStorage<'a>],
-) -> (Interface, WifiDevice<'d>, WifiController<'d>, SocketSet<'a>) {
+) -> Result<(Interface, WifiDevice<'d>, WifiController<'d>, SocketSet<'a>), WifiError> {
     let socket_set_entries = storage;
 
     let mut mac = [0u8; 6];
@@ -27,7 +27,7 @@ pub fn create_network_interface<'a, 'd>(
     }
     let hw_address = HardwareAddress::Ethernet(EthernetAddress::from_bytes(&mac));
 
-    let (mut device, controller) = crate::wifi::new_with_mode(inited, device, mode);
+    let (mut device, controller) = crate::wifi::new_with_mode(inited, device, mode)?;
 
     let config = Config::new(hw_address);
     let iface = Interface::new(
@@ -44,5 +44,5 @@ pub fn create_network_interface<'a, 'd>(
         socket_set.add(dhcp_socket);
     }
 
-    (iface, device, controller, socket_set)
+    Ok((iface, device, controller, socket_set))
 }
