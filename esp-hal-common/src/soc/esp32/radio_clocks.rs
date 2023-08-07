@@ -98,21 +98,28 @@ fn reset_mac() {
 fn init_clocks() {
     let dport = unsafe { &*esp32::DPORT::PTR };
 
-    const DPORT_WIFI_CLK_SDIOSLAVE_EN: u32 = 1 << 4;
-    const DPORT_WIFI_CLK_UNUSED_BIT5: u32 = 1 << 5;
-    const DPORT_WIFI_CLK_UNUSED_BIT12: u32 = 1 << 12;
-    const DPORT_WIFI_CLK_SDIO_HOST_EN: u32 = 1 << 13;
-    const DPORT_WIFI_CLK_EMAC_EN: u32 = 1 << 14;
+    // esp-idf assumes all clocks are enabled by default, and disables the following
+    // bits:
+    //
+    // ```
+    // const DPORT_WIFI_CLK_SDIOSLAVE_EN: u32 = 1 << 4;
+    // const DPORT_WIFI_CLK_UNUSED_BIT5: u32 = 1 << 5;
+    // const DPORT_WIFI_CLK_UNUSED_BIT12: u32 = 1 << 12;
+    // const DPORT_WIFI_CLK_SDIO_HOST_EN: u32 = 1 << 13;
+    // const DPORT_WIFI_CLK_EMAC_EN: u32 = 1 << 14;
+    //
+    // const WIFI_BT_SDIO_CLK: u32 = DPORT_WIFI_CLK_WIFI_EN_M
+    //     | DPORT_WIFI_CLK_BT_EN_M
+    //     | DPORT_WIFI_CLK_UNUSED_BIT5
+    //     | DPORT_WIFI_CLK_UNUSED_BIT12
+    //     | DPORT_WIFI_CLK_SDIOSLAVE_EN
+    //     | DPORT_WIFI_CLK_SDIO_HOST_EN
+    //     | DPORT_WIFI_CLK_EMAC_EN;
+    // ```
+    //
+    // However, we can't do this because somehow our initialization process is
+    // different, and disabling some bits, or not enabling them makes the BT
+    // stack crash.
 
-    const WIFI_BT_SDIO_CLK: u32 = DPORT_WIFI_CLK_WIFI_EN_M
-        | DPORT_WIFI_CLK_BT_EN_M
-        | DPORT_WIFI_CLK_UNUSED_BIT5
-        | DPORT_WIFI_CLK_UNUSED_BIT12
-        | DPORT_WIFI_CLK_SDIOSLAVE_EN
-        | DPORT_WIFI_CLK_SDIO_HOST_EN
-        | DPORT_WIFI_CLK_EMAC_EN;
-
-    dport
-        .wifi_clk_en
-        .modify(|r, w| unsafe { w.bits(r.bits() & !WIFI_BT_SDIO_CLK) });
+    dport.wifi_clk_en.write(|w| unsafe { w.bits(u32::MAX) });
 }
