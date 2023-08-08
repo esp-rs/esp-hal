@@ -602,7 +602,7 @@ impl<'s, 'n: 's> Drop for Socket<'s, 'n> {
 pub enum IoError {
     SocketClosed,
     MultiCastError(smoltcp::iface::MulticastError),
-    TcpRecvError(smoltcp::socket::tcp::RecvError),
+    TcpRecvError,
     UdpRecvError(smoltcp::socket::udp::RecvError),
     TcpSendError(smoltcp::socket::tcp::SendError),
     UdpSendError(smoltcp::socket::udp::SendError),
@@ -623,52 +623,20 @@ impl<'s, 'n: 's> Io for Socket<'s, 'n> {
 
 impl<'s, 'n: 's> Read for Socket<'s, 'n> {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        loop {
-            self.network.with_mut(|interface, device, sockets| {
-                interface.poll(
-                    Instant::from_millis((self.network.current_millis_fn)() as i64),
-                    device,
-                    sockets,
-                )
-            });
+        self.network.with_mut(|interface, device, sockets| {
+            use smoltcp::socket::tcp::RecvError;
 
-            let (may_recv, is_open, can_recv) =
-                self.network.with_mut(|_interface, _device, sockets| {
-                    let socket = sockets.get_mut::<TcpSocket>(self.socket_handle);
+            loop {
+                interface.poll(timestamp(), device, sockets);
+                let socket = sockets.get_mut::<TcpSocket>(self.socket_handle);
 
-                    (socket.may_recv(), socket.is_open(), socket.can_recv())
-                });
-            if may_recv {
-                break;
+                match socket.recv_slice(buf) {
+                    Ok(0) => continue, // no data
+                    Ok(n) => return Ok(n),
+                    Err(RecvError::Finished) => return Err(IoError::SocketClosed), // eof
+                    Err(RecvError::InvalidState) => return Err(IoError::TcpRecvError)
+                }
             }
-
-            if !is_open {
-                return Err(IoError::SocketClosed);
-            }
-
-            if !can_recv {
-                return Err(IoError::SocketClosed);
-            }
-        }
-
-        loop {
-            let res = self.network.with_mut(|interface, device, sockets| {
-                interface.poll(
-                    Instant::from_millis((self.network.current_millis_fn)() as i64),
-                    device,
-                    sockets,
-                )
-            });
-
-            if let false = res {
-                break;
-            }
-        }
-
-        self.network.with_mut(|_interface, _device, sockets| {
-            let socket = sockets.get_mut::<TcpSocket>(self.socket_handle);
-
-            socket.recv_slice(buf).map_err(|e| IoError::TcpRecvError(e))
         })
     }
 }
