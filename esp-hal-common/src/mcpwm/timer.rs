@@ -1,3 +1,11 @@
+//! # MCPWM peripheral - timer module
+//!
+//! ## Overview
+//! The `timer` module is a part of the `MCPWM (Motor Control Pulse Width
+//! Modulator)` driver for ESP chips. It provides an interface to configure and
+//! use timers for generating `PWM` signals used in motor control and other
+//! applications.
+
 use core::marker::PhantomData;
 
 use fugit::HertzU32;
@@ -27,7 +35,7 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
     /// Apply the given timer configuration.
     ///
     /// ### Note:
-    /// The prescalar and period configuration will be applied immediately and
+    /// The prescaler and period configuration will be applied immediately and
     /// before setting the [`PwmWorkingMode`].
     /// If the timer is already running you might want to call [`Timer::stop`]
     /// and/or [`Timer::set_counter`] first

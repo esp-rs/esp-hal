@@ -1,4 +1,70 @@
-//! I2S Master
+//! # I2S Master
+//!
+//! ## Overview
+//!
+//! The I2S Master peripheral driver provides support for the I2S (Inter-IC
+//! Sound) Master functionality on ESP chips. It enables audio data transmission
+//! and reception with external audio devices, such as DACs (Digital-to-Analog
+//! Converters) and ADCs (Analog-to-Digital Converters) through the I2S
+//! interface. Also this module supports different data formats, including
+//! varying data and channel widths, different standards, such as the Philips
+//! standard and configurable pin mappings for I2S clock (BCLK), word select
+//! (WS), and data input/output (DOUT/DIN).
+//!
+//! The driver uses DMA (Direct Memory Access) for efficient data transfer and
+//! supports various configurations, such as different data formats, standards
+//! (e.g., Philips) and pin configurations. It relies on other peripheral
+//! modules, such as
+//!     - `GPIO`
+//!     - `DMA`
+//!     - `system` (to configure and enable the I2S peripheral)
+//!
+//! ## Examples
+//!
+//! ### initialization
+//! ```no_run
+//! let i2s = I2s::new(
+//!     peripherals.I2S0,
+//!     MclkPin::new(io.pins.gpio4),
+//!     Standard::Philips,
+//!     DataFormat::Data16Channel16,
+//!     44100u32.Hz(),
+//!     dma_channel.configure(
+//!         false,
+//!         &mut tx_descriptors,
+//!         &mut rx_descriptors,
+//!         DmaPriority::Priority0,
+//!     ),
+//!     &mut system.peripheral_clock_control,
+//!     &clocks,
+//! );
+//! ```
+//!
+//! ### Reading
+//! ```no_run
+//! let i2s_rx = i2s.i2s_rx.with_pins(PinsBclkWsDin::new(
+//!     io.pins.gpio1,
+//!     io.pins.gpio2,
+//!     io.pins.gpio5,
+//! ));
+//!
+//! // Creating DMA buffer
+//! static mut BUFFER: [u8; 4092 * 4] = [0u8; 4092 * 4];
+//! let buffer: &'static mut [u8; 4092 * 4] = unsafe { &mut BUFFER };
+//!
+//! let mut transfer = i2s_rx.read_dma_circular(buffer).unwrap();
+//! println!("Started transfer");
+//!
+//! loop {
+//!     let avail = transfer.available();
+//!
+//!     if avail > 0 {
+//!         let mut rcv = [0u8; 5000];
+//!         transfer.pop(&mut rcv[..avail]).unwrap();
+//!         println!("Received {:x?}...", &rcv[..30]);
+//!     }
+//! }
+//! ```
 
 use embedded_dma::{ReadBuffer, WriteBuffer};
 use private::*;

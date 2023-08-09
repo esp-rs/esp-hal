@@ -1,4 +1,25 @@
-//! Peripheral instance singletons
+//! # Peripheral instance singletons (ESP32-C6)
+//!
+//! ## Overview
+//!
+//! The `Peripherals` module provides singleton instances of various peripherals
+//! and allows users to access and use them in their applications.
+//!
+//! These peripherals provide various functionalities and interfaces for
+//! interacting with different hardware components on the `ESP32-C6` chip, such
+//! as timers, `GPIO` pins, `I2C`, `SPI`, `UART`, and more. Users can access and
+//! utilize these peripherals by importing the respective singleton instances
+//! from this module.
+//!
+//! It's important to note that the module also exports the `Interrupt` enum
+//! from the `ESP32-C6` `PAC (Peripheral Access Crate)` for users to handle
+//! interrupts associated with these peripherals.
+//!
+//! ⚠️ NOTE: notice that `radio` and `lp_core` are marked with `false` in the
+//! `peripherals!` macro. Basically, that means that there's no real peripheral
+//! (no `RADIO` nor `LP_CORE` peripheral in the PACs) but we're
+//! creating "virtual peripherals" for them in order to ensure the uniqueness of
+//! the instances (Singletons).
 
 use esp32c6 as pac;
 // We need to export this for users to use

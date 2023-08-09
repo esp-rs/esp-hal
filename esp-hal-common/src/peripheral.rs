@@ -1,4 +1,39 @@
-//! Exclusive peripheral access
+//! # Exclusive peripheral access
+//!
+//! ## Overview
+//! The Peripheral module provides an exclusive access mechanism to peripherals
+//! on ESP chips. It includes the `PeripheralRef` struct, which represents an
+//! exclusive reference to a peripheral. It offers memory efficiency benefits
+//! for zero-sized types.
+//!
+//! The `PeripheralRef` struct is used to access and interact with peripherals.
+//! It implements the `Deref` and `DerefMut` traits, allowing you to dereference
+//! it to access the underlying peripheral. It also provides methods for cloning
+//! and re-borrowing the peripheral.
+//!
+//! The module also defines the `Peripheral` trait, which is implemented by
+//! types that can be used as peripherals. The trait allows conversion between
+//! owned and borrowed peripherals and provides an unsafe method for cloning the
+//! peripheral. By implementing this trait, a type can be used with the
+//! `PeripheralRef` struct.
+//!
+//! The module also includes a `peripheral_macros` module, which contains macros
+//! for generating peripheral structs and associated traits based on
+//! configuration options.
+//!
+//! ## Examples
+//!
+//! ### Initialization
+//! ```no_run
+//! let peripherals = Peripherals::take();
+//! ```
+//! ### Accessing peripherals
+//! ```no_run
+//! let mut rtc = Rtc::new(peripherals.RTC_CNTL);
+//! ```
+//! ```no_run
+//! let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+//! ```
 
 use core::{
     marker::PhantomData,

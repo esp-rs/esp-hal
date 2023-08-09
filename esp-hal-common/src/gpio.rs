@@ -1,12 +1,26 @@
-//! General Purpose I/Os
+//! # General Purpose I/Os
+//!
+//! ## Overview
+//! The GPIO peripheral provides access to General Purpose Input/Output pins on
+//! ESP chips.
+//!
+//! This driver supports various operations on GPIO pins, including setting the
+//! pin mode, direction, and manipulating the pin state (setting high/low,
+//! toggling). It provides an interface to interact with GPIO pins on ESP chips,
+//! allowing developers to control and read the state of the pins. This module
+//! also implements a number of traits from [embedded-hal] to provide a common
+//! interface for GPIO pins.
 //!
 //! To get access to the pins, you first need to convert them into a HAL
 //! designed struct from the pac struct `GPIO` and `IO_MUX` using `IO::new`.
 //!
+//! ## Example
 //! ```no_run
 //! let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 //! let mut led = io.pins.gpio5.into_push_pull_output();
 //! ```
+//!
+//! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
 
 use core::{convert::Infallible, marker::PhantomData};
 

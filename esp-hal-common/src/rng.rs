@@ -1,5 +1,6 @@
-//! Random Number Generator
+//! # Random Number Generator
 //!
+//! ## Overview
 //! The Random Number Generator (RNG) Driver for ESP chips is a software module
 //! that provides an interface to generate random numbers using the RNG
 //! peripheral on ESP chips. This driver allows you to generate random numbers

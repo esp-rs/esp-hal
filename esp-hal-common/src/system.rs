@@ -1,8 +1,27 @@
-//! System Control
+//! # System Control
 //!
-//! The SYSTEM/DPORT peripheral needs to be split into several logical parts.
+//! ## Overview
+//! This `system` driver provides an interface to control and configure various
+//! system-related features and peripherals on ESP chips. It includes
+//! functionality to control peripheral clocks, manage software interrupts,
+//! configure chip clocks, and control radio peripherals.
 //!
-//! Example
+//! ### Software Interrupts
+//! The `SoftwareInterrupt` enum represents the available software interrupt
+//! sources.
+//!
+//! The SoftwareInterruptControl struct allows raising or resetting software
+//! interrupts using the `raise()` and `reset()` methods. The behavior of these
+//! methods depends on the specific chip variant.
+//!
+//! ### Peripheral Clock Control
+//! The `PeripheralClockControl` struct controls the enablement of peripheral
+//! clocks.
+//!
+//! It provides an `enable()` method to enable and reset specific peripherals.
+//! The available peripherals are represented by the `Peripheral` enum
+//!
+//! ## Example
 //! ```no_run
 //! let peripherals = Peripherals::take();
 //! let system = peripherals.SYSTEM.split();

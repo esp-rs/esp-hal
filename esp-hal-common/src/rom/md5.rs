@@ -1,6 +1,6 @@
-//! MD5 Message-Digest Algorithm
+//! # MD5 Message-Digest Algorithm
 //!
-//! # Security Warning
+//! ## ⚠️ Security Warning ⚠️
 //!
 //! MD5 is a **cryptographically broken** message digest. It should **not**
 //! be used for data security, for example, to check if data has been
@@ -12,7 +12,7 @@
 //! flash. This is especially important on microcontrollers where the
 //! computational efficiency of MD5 is desired.
 //!
-//! # Compatibility
+//! ## Compatibility
 //!
 //! The public API exposed by this module tries to *mimic* the public API
 //! offered by the [MD5][1] crate in an effort to act as a drop-in replacement.
@@ -24,7 +24,7 @@
 //! all of them. Usage of this module may help make program binaries smaller
 //! than it would be if you included an MD5 implementation in your project.
 //!
-//! # Example
+//! ## Example
 //!
 //! To compute a full digest from a single buffer, use the following:
 //!

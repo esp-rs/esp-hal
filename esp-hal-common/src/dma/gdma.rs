@@ -1,4 +1,25 @@
-//! Direct Memory Access
+//! # Direct Memory Access
+//!
+//! ## Overview
+//! The GDMA (General DMA) module is a part of the DMA (Direct Memory Access)
+//! driver for ESP chips. Of the Espressif chip range, every chip except of
+//! `ESP32` and `ESP32-S2` uses the `GDMA` type of direct memory access.
+//!
+//! DMA is a hardware feature that allows data transfer between memory and
+//! peripherals without involving the CPU, resulting in efficient data movement
+//! and reduced CPU overhead. The `GDMA` module provides multiple DMA channels,
+//! each capable of managing data transfer for various peripherals.
+//!
+//! This module implements DMA channels, such as `channel0`, `channel1` and so
+//! on. Each channel struct implements the `ChannelTypes` trait, which provides
+//! associated types for peripheral configuration.
+//!
+//! GDMA peripheral can be initializes using the `new` function, which requires
+//! a DMA peripheral instance and a clock control reference. ```no_run
+//! let dma = Gdma::new(peripherals.DMA, &mut system.peripheral_clock_control);
+//! ```
+//! 
+//! <em>PS: Note that the number of DMA channels is chip-specific.</em>
 
 use crate::{
     dma::*,

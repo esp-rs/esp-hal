@@ -1,7 +1,39 @@
-//! RSA Accelerator support.
+//! # RSA Accelerator support.
 //!
-//! This module provides functions and structs for multi precision arithmetic
-//! operations used in RSA asym-metric cipher algorithms
+//! ## Overview
+//! The `RSA` driver provides a set of functions to accelerate `RSA
+//! (Rivest–Shamir–Adleman)` cryptographic operations on ESP chips. `RSA` is a
+//! widely used `public-key` cryptographic algorithm that involves complex
+//! mathematical computations, and the `RSA` accelerator on `ESP` chips is
+//! designed to optimize these computations for faster performance.
+//!
+//! Implementation details;
+//!    * The driver uses low-level peripheral access to read and write data
+//!      from/to the `RSA` peripheral.
+//!    * The driver contains `unsafe` code blocks as it directly manipulates
+//!      memory addresses for data transfer.
+//!    * The driver supports different sizes of operands based on the generic
+//!      types provided during instantiation.
+//!    * The [nb] crate is used to handle non-blocking operations.
+//!    * The driver provides a set of high-level abstractions to simplify `RSA`
+//!      cryptographic operations on `ESP` chips, allowing developers to
+//!      leverage the `RSA accelerator` for improved performance.
+//!
+//! ## Examples
+//! ### Initialization
+//! ```no_run
+//! let peripherals = Peripherals::take();
+//! let mut system = peripherals.PCR.split();
+//!
+//! let mut rsa = Rsa::new(peripherals.RSA, &mut system.peripheral_clock_control);
+//! ```
+//!
+//! ⚠️: The examples for RSA peripheral are quite extensive, so for a more
+//! detailed study of how to use this driver please visit [the repository
+//! with corresponding example].
+//!
+//! [nb]: https://docs.rs/nb/1.1.0/nb/
+//! [the repository with corresponding example]: https://github.com/esp-rs/esp-hal/blob/main/esp32-hal/examples/rsa.rs
 
 use core::{convert::Infallible, marker::PhantomData, ptr::copy_nonoverlapping};
 

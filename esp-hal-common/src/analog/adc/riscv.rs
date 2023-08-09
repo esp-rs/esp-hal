@@ -691,10 +691,41 @@ pub use impl_adc_interface;
 
 #[cfg(esp32c2)]
 pub mod implementation {
-    //! Analog to digital (ADC) conversion support.
+    //! # Analog to digital (ADC) conversion support.
+    //!
+    //! ## Overview
+    //! The `ADC` module in the `analog` driver enables users to perform
+    //! analog-to-digital conversions, allowing them to measure real-world
+    //! analog signals with high accuracy.
     //!
     //! This module provides functions for reading analog values from the
     //! analog to digital converter available on the ESP32-C2: `ADC1`.
+    //!
+    //! ## Example
+    //! #### ADC on Risc-V architecture
+    //! ```no_run
+    //! // Create ADC instances
+    //! let analog = peripherals.APB_SARADC.split();
+    //!
+    //! let mut adc1_config = AdcConfig::new();
+    //!
+    //! let mut pin = adc1_config.enable_pin(io.pins.gpio2.into_analog(), Attenuation::Attenuation11dB);
+    //!
+    //! let mut adc1 = ADC::<ADC1>::adc(
+    //!     &mut system.peripheral_clock_control,
+    //!     analog.adc1,
+    //!     adc1_config,
+    //! )
+    //! .unwrap();
+    //!
+    //! let mut delay = Delay::new(&clocks);
+    //!
+    //! loop {
+    //!     let pin_value: u16 = nb::block!(adc1.read(&mut pin)).unwrap();
+    //!     println!("PIN2 ADC reading = {}", pin_value);
+    //!     delay.delay_ms(1500u32);
+    //! }
+    //! ```
 
     use embedded_hal::adc::Channel;
 
@@ -714,11 +745,42 @@ pub mod implementation {
 
 #[cfg(esp32c3)]
 pub mod implementation {
-    //! Analog to digital (ADC) conversion support.
+    //! # Analog to digital (ADC) conversion support.
     //!
-    //! This module provides functions for reading analog values from two
-    //! analog to digital converters available on the ESP32-C3: `ADC1` and
+    //! ## Overview
+    //! The `ADC` module in the `analog` driver enables users to perform
+    //! analog-to-digital conversions, allowing them to measure real-world
+    //! analog signals with high accuracy.
+    //!
+    //! This module provides functions for reading analog values from the
+    //! analog to digital converter available on the ESP32-C3: `ADC1` and
     //! `ADC2`.
+    //!
+    //! ## Example
+    //! #### ADC on Risc-V architecture
+    //! ```no_run
+    //! // Create ADC instances
+    //! let analog = peripherals.APB_SARADC.split();
+    //!
+    //! let mut adc1_config = AdcConfig::new();
+    //!
+    //! let mut pin = adc1_config.enable_pin(io.pins.gpio2.into_analog(), Attenuation::Attenuation11dB);
+    //!
+    //! let mut adc1 = ADC::<ADC1>::adc(
+    //!     &mut system.peripheral_clock_control,
+    //!     analog.adc1,
+    //!     adc1_config,
+    //! )
+    //! .unwrap();
+    //!
+    //! let mut delay = Delay::new(&clocks);
+    //!
+    //! loop {
+    //!     let pin_value: u16 = nb::block!(adc1.read(&mut pin)).unwrap();
+    //!     println!("PIN2 ADC reading = {}", pin_value);
+    //!     delay.delay_ms(1500u32);
+    //! }
+    //! ```
 
     use embedded_hal::adc::Channel;
 
@@ -744,10 +806,41 @@ pub mod implementation {
 
 #[cfg(esp32c6)]
 pub mod implementation {
-    //! Analog to digital (ADC) conversion support.
+    //! # Analog to digital (ADC) conversion support.
     //!
-    //! This module provides functions for reading analog values from one
+    //! ## Overview
+    //! The `ADC` module in the `analog` driver enables users to perform
+    //! analog-to-digital conversions, allowing them to measure real-world
+    //! analog signals with high accuracy.
+    //!
+    //! This module provides functions for reading analog values from the
     //! analog to digital converter available on the ESP32-C6: `ADC1`.
+    //!
+    //! ## Example
+    //! #### ADC on Risc-V architecture
+    //! ```no_run
+    //! // Create ADC instances
+    //! let analog = peripherals.APB_SARADC.split();
+    //!
+    //! let mut adc1_config = AdcConfig::new();
+    //!
+    //! let mut pin = adc1_config.enable_pin(io.pins.gpio2.into_analog(), Attenuation::Attenuation11dB);
+    //!
+    //! let mut adc1 = ADC::<ADC1>::adc(
+    //!     &mut system.peripheral_clock_control,
+    //!     analog.adc1,
+    //!     adc1_config,
+    //! )
+    //! .unwrap();
+    //!
+    //! let mut delay = Delay::new(&clocks);
+    //!
+    //! loop {
+    //!     let pin_value: u16 = nb::block!(adc1.read(&mut pin)).unwrap();
+    //!     println!("PIN2 ADC reading = {}", pin_value);
+    //!     delay.delay_ms(1500u32);
+    //! }
+    //! ```
 
     use embedded_hal::adc::Channel;
 
@@ -769,10 +862,41 @@ pub mod implementation {
 
 #[cfg(esp32h2)]
 pub mod implementation {
-    //! Analog to digital (ADC) conversion support.
+    //! # Analog to digital (ADC) conversion support.
     //!
-    //! This module provides functions for reading analog values from one
-    //! analog to digital converter available on the ESP32-H2: `ADC1`.
+    //! ## Overview
+    //! The `ADC` module in the `analog` driver enables users to perform
+    //! analog-to-digital conversions, allowing them to measure real-world
+    //! analog signals with high accuracy.
+    //!
+    //! This module provides functions for reading analog values from the
+    //! analog to digital converter available on the  ESP32-H2: `ADC1`.
+    //!
+    //! ## Example
+    //! #### ADC on Risc-V architecture
+    //! ```no_run
+    //! // Create ADC instances
+    //! let analog = peripherals.APB_SARADC.split();
+    //!
+    //! let mut adc1_config = AdcConfig::new();
+    //!
+    //! let mut pin = adc1_config.enable_pin(io.pins.gpio2.into_analog(), Attenuation::Attenuation11dB);
+    //!
+    //! let mut adc1 = ADC::<ADC1>::adc(
+    //!     &mut system.peripheral_clock_control,
+    //!     analog.adc1,
+    //!     adc1_config,
+    //! )
+    //! .unwrap();
+    //!
+    //! let mut delay = Delay::new(&clocks);
+    //!
+    //! loop {
+    //!     let pin_value: u16 = nb::block!(adc1.read(&mut pin)).unwrap();
+    //!     println!("PIN2 ADC reading = {}", pin_value);
+    //!     delay.delay_ms(1500u32);
+    //! }
+    //! ```
 
     use embedded_hal::adc::Channel;
 

@@ -1,5 +1,39 @@
-//! Control the ULP RISCV core
-
+//! # Control the ULP core
+//!
+//! ## Overview
+//!
+//! The `ULP CORE` peripheral allows control over the `Ultra-Low Power
+//! (ULP) core` in `ESP` chips. The ULP core is a low-power processor
+//! designed for executing tasks in deep sleep mode, enabling efficient power
+//! management in ESP systems.
+//!
+//! The `UlpCore` struct provides an interface to interact with the `ULP`
+//! peripheral. It allows starting and configuring the ULP core for operation.
+//! The `UlpCore` struct is initialized with a peripheral reference to the `ULP
+//! CORE` instance.
+//!
+//! ## Example
+//! ```no_run
+//! let mut ulp_core = esp32s3_hal::ulp_core::UlpCore::new(peripherals.ULP_RISCV_CORE);
+//! ulp_core.stop();
+//! println!("ulp core stopped");
+//!
+//! // copy code to RTC ram
+//! let lp_ram = 0x5000_0000 as *mut u8;
+//! unsafe {
+//!     core::ptr::copy_nonoverlapping(CODE as *const _ as *const u8, lp_ram, CODE.len());
+//! }
+//! println!("copied code (len {})", CODE.len());
+//!
+//! // start ULP core
+//! ulp_core.run(esp32s3_hal::ulp_core::UlpCoreWakeupSource::HpCpu);
+//! println!("ulpcore run");
+//!
+//! let data = (0x5000_0010 - 0) as *mut u32;
+//! loop {
+//!     println!("Current {}", unsafe { data.read_volatile() });
+//! }
+//! ```
 use esp32s2 as pac;
 
 use crate::peripheral::{Peripheral, PeripheralRef};
@@ -23,7 +57,7 @@ impl<'d> UlpCore<'d> {
         Self { _lp_core: lp_core }
     }
 
-    // currently stopping the ULP doesn't work (while following the proedures
+    // currently stopping the ULP doesn't work (while following the proсedures
     // outlines in the TRM) - so don't offer this funtion for now
     //
     // pub fn stop(&mut self) {

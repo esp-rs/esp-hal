@@ -1,4 +1,32 @@
-//! Hardware and Software Reset
+//! # Hardware and Software Reset
+//!
+//! ## Overview
+//! The Hardware and Software Reset module provides functions for performing
+//! hardware and software resets on ESP chips. It also includes functions for
+//! retrieving the reset reason and the wakeup cause after a reset.
+//!
+//! The module defines a set of sleep sources (`SleepSource`) that indicate the
+//! source of the wakeup event. These sources include:
+//!     - external signals
+//!     - timers
+//!     - touchpads
+//!     - ULP programs
+//!     - GPIOs
+//!     - UART
+//!     - Wi-Fi
+//!     - COCPU interrupts
+//!     - BT (Bluetooth)
+//!
+//! The module also includes a set of flags (`WakeupReason`) that represent
+//! different wakeup sources and enable/disable wakeup triggers for specific
+//! events such as:
+//!     - GPIO
+//!     - timers
+//!     - UART
+//!     - touch sensors
+//!     - ULP
+//!     - Wi-Fi
+//!     - BT
 
 use crate::rtc_cntl::SocResetReason;
 
@@ -70,17 +98,20 @@ bitflags::bitflags! {
     }
 }
 
+/// Performs a software reset on the chip.
 pub fn software_reset() {
     unsafe { crate::rtc_cntl::software_reset() }
 }
+/// Performs a software reset on the CPU.
 pub fn software_reset_cpu() {
     unsafe { crate::rtc_cntl::software_reset_cpu() }
 }
-
+/// Retrieves the reason for the last reset as a SocResetReason enum value.
+/// Returns `None` if the reset reason cannot be determined.
 pub fn get_reset_reason() -> Option<SocResetReason> {
     crate::rtc_cntl::get_reset_reason(crate::get_core())
 }
-
+/// Retrieves the cause of the last wakeup event as a SleepSource enum value.
 pub fn get_wakeup_cause() -> SleepSource {
     crate::rtc_cntl::get_wakeup_cause()
 }

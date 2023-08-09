@@ -1,4 +1,22 @@
-//! USB Serial JTAG peripheral driver
+//! # USB Serial JTAG peripheral driver
+//!
+//! ## Overview
+//! The USB Serial JTAG peripheral driver provides an interface to communicate
+//! with the USB Serial/JTAG peripheral on ESP chips. It enables serial
+//! communication and JTAG debugging capabilities, allowing developers to
+//! interact with the ESP chip for programming, debugging, and data transfer
+//! purposes, can be also used to program the SoC's flash, read program output,
+//! as well as attach a debugger to a running program.
+//!
+//! ## Example
+//! ```no_run
+//! let peripherals = Peripherals::take();
+//! let mut system = peripherals.SYSTEM.split();
+//! let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+//! ...
+//! // Initialize USB Serial/JTAG peripheral
+//! let mut usb_serial =
+//!    UsbSerialJtag::new(peripherals.USB_DEVICE, &mut system.peripheral_clock_control);
 
 use core::convert::Infallible;
 

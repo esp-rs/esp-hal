@@ -1,4 +1,53 @@
 //! # Clock Control
+//!
+//! ## Overview
+//! This `Clock` driver provides an interface for configuring and managing
+//! various clocks present on the `ESP` microcontrollers.
+//!
+//! Proper clock configuration is essential for the correct functioning of the
+//! microcontroller and its peripherals.
+//!
+//! The `Clock` driver supports configuring multiple clocks, including:
+//!   * CPU clock
+//!   * APB (Advanced Peripheral Bus) clock
+//!   * XTAL clock
+//!   * PLL clock
+//!
+//! and other specific clocks based on the ESP microcontroller's architecture.
+//!
+//! The `CPU clock` is responsible for defining the speed at which the central
+//! processing unit (CPU) operates. This driver provides predefined options for
+//! different CPU clock speeds, such
+//!   * 80 MHz
+//!   * 96 MHz
+//!   * 120 MHz
+//!   * 160 MHz
+//!   * 240 MHz
+//!
+//! and others, depending on the microcontroller model.
+//!
+//! #### Clock Control
+//! The `ClockControl` struct allows users to configure the desired clock
+//! frequencies before applying them. It offers flexibility in selecting
+//! appropriate clock frequencies based on specific application requirements.
+//!
+//! #### Frozen clock frequencies
+//! Once the clock configuration is applied using the `freeze` function of the
+//! ClockControl struct, the clock frequencies become `frozen` and cannot be
+//! changed. The `Clocks` struct is returned after freezing, providing read-only
+//! access to the configured clock frequencies.
+//!
+//! ## Examples
+//!
+//! #### Initialize with default clock frequency for this chip
+//! ```no_run
+//! let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+//! ```
+//!
+//! #### Initialize with custom clock frequency
+//! ```no_run
+//! let clocks = ClockControl::configure(system.clock_control, CpuClock::Clock160MHz).freeze();
+//! ```
 use fugit::HertzU32;
 
 use crate::{

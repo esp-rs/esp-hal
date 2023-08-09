@@ -1,4 +1,53 @@
-//! Control CPU Cores
+//! # Control CPU Cores (ESP32-S3)
+//!
+//! ## Overview
+//!
+//! This module provides essential functionality for controlling
+//! and managing the CPU cores on the `ESP32-S3` chip allowing for fine-grained
+//! control over their execution and cache behavior. It is used in scenarios
+//! where precise control over CPU core operation is required, such as
+//! multi-threading or power management.
+//!
+//! The `CpuControl` struct represents the CPU control module and is responsible
+//! for managing the behavior and operation of the CPU cores. It is typically
+//! initialized with the `SystemCpuControl` struct, which is provided by the
+//! `system` module.
+//!
+//! ## Example
+//! ```no_run
+//! let counter = Mutex::new(RefCell::new(0));
+//!
+//! let mut cpu_control = CpuControl::new(system.cpu_control);
+//! let mut cpu1_fnctn = || {
+//!     cpu1_task(&mut timer1, &counter);
+//! };
+//! let _guard = cpu_control.start_app_core(&mut cpu1_fnctn).unwrap();
+//!
+//! loop {
+//!     block!(timer0.wait()).unwrap();
+//!
+//!     let count = critical_section::with(|cs| *counter.borrow_ref(cs));
+//!     println!("Hello World - Core 0! Counter is {}", count);
+//! }
+//! ```
+//!
+//! Where `cpu1_task()` may be defined as:
+//! ```no_run
+//! fn cpu1_task(
+//!     timer: &mut Timer<Timer0<TIMG1>>,
+//!     counter: &critical_section::Mutex<RefCell<i32>>,
+//! ) -> ! {
+//!     println!("Hello World - Core 1!");
+//!     loop {
+//!         block!(timer.wait()).unwrap();
+//!
+//!         critical_section::with(|cs| {
+//!             let new_val = counter.borrow_ref_mut(cs).wrapping_add(1);
+//!             *counter.borrow_ref_mut(cs) = new_val;
+//!         });
+//!     }
+//! }
+//! ```
 
 use core::marker::PhantomData;
 
