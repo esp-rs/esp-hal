@@ -104,6 +104,33 @@ const HEAP_SIZE: usize = 72 * 1024;
 #[cfg(all(coex, feature = "big-heap"))]
 const HEAP_SIZE: usize = 110 * 1024;
 
+#[derive(Debug)]
+#[toml_cfg::toml_config]
+struct Config {
+    #[default(5)]
+    rx_queue_size: usize,
+    #[default(3)]
+    tx_queue_size: usize,
+    #[default(10)]
+    static_rx_buf_num: usize,
+    #[default(32)]
+    dynamic_rx_buf_num: usize,
+    #[default(0)]
+    static_tx_buf_num: usize,
+    #[default(32)]
+    dynamic_tx_buf_num: usize,
+    #[default(0)]
+    ampdu_rx_enable: usize,
+    #[default(0)]
+    ampdu_tx_enable: usize,
+    #[default(0)]
+    amsdu_tx_enable: usize,
+    #[default(6)]
+    rx_ba_win: usize,
+    #[default(1)]
+    max_burst_size: usize,
+}
+
 #[cfg_attr(esp32, link_section = ".dram2_uninit")]
 static mut HEAP_DATA: [MaybeUninit<u8>; HEAP_SIZE] = [MaybeUninit::uninit(); HEAP_SIZE];
 
@@ -232,6 +259,8 @@ pub fn initialize(
 
         rom_ets_update_cpu_frequency(240); // we know it's 240MHz because of the check above
     }
+
+    log::info!("esp-wifi configuration {:?}", crate::CONFIG);
 
     crate::common_adapter::chip_specific::enable_wifi_power_domain();
 

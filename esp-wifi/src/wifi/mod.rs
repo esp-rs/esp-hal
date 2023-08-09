@@ -38,6 +38,8 @@ use num_traits::FromPrimitive;
 pub use os_adapter::*;
 use smoltcp::phy::{Device, DeviceCapabilities, RxToken, TxToken};
 
+const ETHERNET_FRAME_HEADER_SIZE: usize = 18;
+
 #[cfg(feature = "mtu-1514")]
 const MTU: usize = 1514;
 #[cfg(feature = "mtu-1500")]
@@ -105,7 +107,7 @@ impl WifiMode {
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct DataFrame<'a> {
     len: usize,
-    data: [u8; 1536],
+    data: [u8; MTU + ETHERNET_FRAME_HEADER_SIZE],
     _phantom: PhantomData<&'a ()>,
 }
 
@@ -113,7 +115,7 @@ impl<'a> DataFrame<'a> {
     pub(crate) fn new() -> DataFrame<'a> {
         DataFrame {
             len: 0,
-            data: [0u8; 1536],
+            data: [0u8; MTU + ETHERNET_FRAME_HEADER_SIZE],
             _phantom: Default::default(),
         }
     }
@@ -130,10 +132,13 @@ impl<'a> DataFrame<'a> {
     }
 }
 
-pub(crate) static DATA_QUEUE_RX: Mutex<RefCell<SimpleQueue<DataFrame, 5>>> =
+const RX_QUEUE_SIZE: usize = crate::CONFIG.rx_queue_size;
+const TX_QUEUE_SIZE: usize = crate::CONFIG.tx_queue_size;
+
+pub(crate) static DATA_QUEUE_RX: Mutex<RefCell<SimpleQueue<DataFrame, RX_QUEUE_SIZE>>> =
     Mutex::new(RefCell::new(SimpleQueue::new()));
 
-pub(crate) static DATA_QUEUE_TX: Mutex<RefCell<SimpleQueue<DataFrame, 3>>> =
+pub(crate) static DATA_QUEUE_TX: Mutex<RefCell<SimpleQueue<DataFrame, TX_QUEUE_SIZE>>> =
     Mutex::new(RefCell::new(SimpleQueue::new()));
 
 #[derive(Debug, Clone, Copy)]
@@ -174,6 +179,8 @@ pub enum WifiEvent {
 #[repr(i32)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, FromPrimitive)]
 pub enum InternalWifiError {
+    ///Out of memory
+    EspErrNoMem = 0x101,
     ///Invalid argument
     EspErrInvalidArg = 0x102,
     ///WiFi driver was not installed by esp_wifi_init */
@@ -528,19 +535,19 @@ static mut G_CONFIG: wifi_init_config_t = wifi_init_config_t {
         sha256_vector: None,
         crc32: None,
     },
-    static_rx_buf_num: 10,
-    dynamic_rx_buf_num: 32,
-    tx_buf_type: 1, // offset 0x78
-    static_tx_buf_num: 0,
-    dynamic_tx_buf_num: 32,
+    static_rx_buf_num: crate::CONFIG.static_rx_buf_num as i32,
+    dynamic_rx_buf_num: crate::CONFIG.dynamic_rx_buf_num as i32,
+    tx_buf_type: 1,
+    static_tx_buf_num: crate::CONFIG.static_tx_buf_num as i32,
+    dynamic_tx_buf_num: crate::CONFIG.dynamic_tx_buf_num as i32,
     cache_tx_buf_num: 0,
     csi_enable: 1,
-    ampdu_rx_enable: 0,
-    ampdu_tx_enable: 0,
-    amsdu_tx_enable: 0,
+    ampdu_rx_enable: crate::CONFIG.ampdu_rx_enable as i32,
+    ampdu_tx_enable: crate::CONFIG.ampdu_tx_enable as i32,
+    amsdu_tx_enable: crate::CONFIG.amsdu_tx_enable as i32,
     nvs_enable: 0,
     nano_enable: 0,
-    rx_ba_win: 6,
+    rx_ba_win: crate::CONFIG.rx_ba_win as i32,
     wifi_task_core_id: 0,
     beacon_max_len: 752,
     mgmt_sbuf_num: 32,
@@ -608,23 +615,26 @@ unsafe extern "C" fn recv_cb(
     len: u16,
     eb: *mut crate::binary::c_types::c_void,
 ) -> esp_err_t {
-    critical_section::with(|cs| {
+    let src = core::slice::from_raw_parts_mut(buffer as *mut u8, len as usize);
+    let packet = DataFrame::from_bytes(src);
+
+    let res = critical_section::with(|cs| {
         let mut queue = DATA_QUEUE_RX.borrow_ref_mut(cs);
         if !queue.is_full() {
-            let src = core::slice::from_raw_parts_mut(buffer as *mut u8, len as usize);
-            let packet = DataFrame::from_bytes(src);
             queue.enqueue(packet).unwrap();
-            esp_wifi_internal_free_rx_buffer(eb);
 
             #[cfg(feature = "embassy-net")]
             embassy::RECEIVE_WAKER.wake();
 
             0
         } else {
-            esp_wifi_internal_free_rx_buffer(eb);
+            log::error!("RX QUEUE FULL");
             1
         }
-    })
+    });
+    esp_wifi_internal_free_rx_buffer(eb);
+
+    res
 }
 
 #[ram]
@@ -941,6 +951,7 @@ impl<'d> Device for WifiDevice<'d> {
             if !tx.is_full() {
                 Some(WifiTxToken::default())
             } else {
+                log::warn!("no Tx token available");
                 None
             }
         })
@@ -949,7 +960,7 @@ impl<'d> Device for WifiDevice<'d> {
     fn capabilities(&self) -> smoltcp::phy::DeviceCapabilities {
         let mut caps = DeviceCapabilities::default();
         caps.max_transmission_unit = MTU;
-        caps.max_burst_size = Some(1);
+        caps.max_burst_size = Some(crate::CONFIG.max_burst_size);
         caps
     }
 }
