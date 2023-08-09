@@ -1421,8 +1421,10 @@ mod chip_specific {
                         rmt.[< ch $ch_num conf1 >].modify(|_, w| w.tx_conti_mode().bit(continuous));
                     }
 
-                    fn set_wrap_mode(_wrap: bool) {
-                        // no-op
+                    fn set_wrap_mode(wrap: bool) {
+                        let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                        // this is "okay", because we use all TX channels always in wrap mode
+                        rmt.apb_conf.modify(|_, w| w.mem_tx_wrap_en().bit(wrap));
                     }
 
                     fn set_carrier(carrier: bool, high: u16, low: u16, level: bool) {
