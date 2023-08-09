@@ -1,4 +1,4 @@
-//! Analog peripherals
+//! # Analog peripherals
 //!
 //! ## Overview
 //! The `Analog` Driver is a module designed for ESP microcontrollers, that
@@ -7,13 +7,13 @@
 //! `Digital-to-Analog Converters (DAC)`, offering functionality for precise
 //! analog measurements and generating analog output signals.
 //!
-//! The `ADC` functionality in the `analog` driver enables users to perform
+//! The `ADC` module in the `analog` driver enables users to perform
 //! analog-to-digital conversions, allowing them to measure real-world analog
 //! signals with high accuracy. The module provides access to multiple ADC
 //! units, such as `ADC1` and `ADC2`, which may differ based on the specific ESP
 //! microcontroller being used.
 //!
-//! The `DAC` functionality in the analog driver enables users to generate
+//! The `DAC` module in the `analog` driver enables users to generate
 //! analog output signals with precise control over voltage levels. The module
 //! supports multiple DAC units, such as `DAC1` and `DAC2`, which may vary
 //! depending on the specific ESP microcontroller.

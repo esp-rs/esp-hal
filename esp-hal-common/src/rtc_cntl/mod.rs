@@ -1,4 +1,4 @@
-//! RTC_CNTL (Real-Time Clock Control) and Low-power Management
+//! # RTC_CNTL (Real-Time Clock Control) and Low-power Management
 //!
 //! ## Overview
 //! The `rtc_cntl` module provides a driver for the `RTC_CNTL` peripheral on ESP
@@ -46,23 +46,26 @@
 //! }
 //!
 //! loop {}
-//! ...
+//! ```
+//!
+//! Where the `LP_WDT` interrupt handler is defined as:
+//! ```no_run
 //! // Handle the corresponding interrupt
 //! #[interrupt]
 //! fn LP_WDT() {
-//! critical_section::with(|cs| {
-//!    esp_println::println!("RWDT Interrupt");
+//!     critical_section::with(|cs| {
+//!         esp_println::println!("RWDT Interrupt");
 //!
-//!     let mut rwdt = RWDT.borrow_ref_mut(cs);
-//!     let rwdt = rwdt.as_mut().unwrap();
+//!         let mut rwdt = RWDT.borrow_ref_mut(cs);
+//!         let rwdt = rwdt.as_mut().unwrap();
 //!
-//!     rwdt.clear_interrupt();
+//!         rwdt.clear_interrupt();
 //!
-//!     esp_println::println!("Restarting in 5 seconds...");
+//!         esp_println::println!("Restarting in 5 seconds...");
 //!
-//!     rwdt.start(5000u64.millis());
-//!     rwdt.unlisten();
-//! });
+//!         rwdt.start(5000u64.millis());
+//!         rwdt.unlisten();
+//!     });
 //! }
 //! ```
 

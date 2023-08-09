@@ -421,10 +421,10 @@ macro_rules! impl_adc_interface {
 pub use impl_adc_interface;
 
 pub mod implementation {
-    //! Analog to digital (ADC) conversion support.
+    //! # Analog to digital (ADC) conversion support.
     //!
     //! ## Overview
-    //! The `ADC` functionality in the `analog` driver enables users to perform
+    //! The `ADC` module in the `analog` driver enables users to perform
     //! analog-to-digital conversions, allowing them to measure real-world
     //! analog signals with high accuracy.
     //!

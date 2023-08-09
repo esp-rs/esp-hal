@@ -1,4 +1,4 @@
-//! PCNT - Unit module
+//! # PCNT - Unit module
 //!
 //! ## Overview
 //! The `unit` module is a part of the `PCNT` peripheral driver

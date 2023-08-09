@@ -1,9 +1,8 @@
-//! Control CPU Cores (ESP32-S3)
+//! # Control CPU Cores (ESP32-S3)
 //!
 //! ## Overview
 //!
-//! This module is part of the `SOC (System-on-Chip)` functionality of the
-//! `ESP32-S3` chip. It module provides essential functionality for controlling
+//! This module provides essential functionality for controlling
 //! and managing the CPU cores on the `ESP32-S3` chip allowing for fine-grained
 //! control over their execution and cache behavior. It is used in scenarios
 //! where precise control over CPU core operation is required, such as

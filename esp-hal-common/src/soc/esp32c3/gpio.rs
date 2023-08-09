@@ -1,4 +1,4 @@
-//! GPIO configuration module (ESP32-C3)
+//! # GPIO configuration module (ESP32-C3)
 //!
 //! ## Overview
 //!

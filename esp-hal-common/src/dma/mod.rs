@@ -1,4 +1,4 @@
-//! Direct Memory Access Commons
+//! # Direct Memory Access Commons
 //!
 //! ## Overview
 //! The `DMA` driver provides an interface to efficiently transfer data between

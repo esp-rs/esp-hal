@@ -1,4 +1,4 @@
-//! PCNT - channel configuration
+//! # PCNT - channel configuration
 //!
 //! ## Overview
 //! The `channel` module is part of the `PCNT` peripheral driver

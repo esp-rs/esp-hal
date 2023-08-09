@@ -1,4 +1,4 @@
-//! LEDC (LED PWM Controller) peripheral control
+//! # LEDC (LED PWM Controller) peripheral control
 //!
 //! Currently only supports fixed-frequency output. Interrupts are not currently
 //! implemented. High Speed channels are available for the ESP32 only, while Low

@@ -1,4 +1,4 @@
-//! Exclusive peripheral access
+//! # Exclusive peripheral access
 //!
 //! ## Overview
 //! The Peripheral module provides an exclusive access mechanism to peripherals

@@ -1,4 +1,4 @@
-//! Interrupt support
+//! # Interrupt support
 //!
 //! ## Overview
 //! The `interrupt` driver is a crucial module for ESP chips. Its primary
@@ -35,35 +35,7 @@
 //!         interrupt::Priority::Priority1,
 //!     )
 //!     .unwrap();
-//!     interrupt::enable(
-//!         peripherals::Interrupt::FROM_CPU_INTR1,
-//!         interrupt::Priority::Priority2,
-//!     )
-//!     .unwrap();
-//!     interrupt::enable(
-//!         peripherals::Interrupt::FROM_CPU_INTR2,
-//!         interrupt::Priority::Priority2,
-//!     )
-//!     .unwrap();
-//!     interrupt::enable(
-//!         peripherals::Interrupt::FROM_CPU_INTR3,
-//!         interrupt::Priority::Priority15,
-//!     )
-//!     .unwrap();
-//!     unsafe { riscv::interrupt::enable() }
 //!
-//!     // raise mid priority interrupt.
-//!     // The handler raises one interrupt at lower priority, one at same and one at
-//!     // higher. We expect to see the higher priority served immediately before
-//!     // exiting the handler Once the handler is exited we expect to see same
-//!     // priority and low priority interrupts served in that order
-//!     critical_section::with(|cs| {
-//!         SWINT
-//!             .borrow_ref_mut(cs)
-//!             .as_mut()
-//!             .unwrap()
-//!             .raise(SoftwareInterrupt::SoftwareInterrupt1);
-//!     });
 //!     loop {}
 //! }
 //!
@@ -76,56 +48,6 @@
 //!             .as_mut()
 //!             .unwrap()
 //!             .reset(SoftwareInterrupt::SoftwareInterrupt0);
-//!     });
-//! }
-//! #[interrupt]
-//! fn FROM_CPU_INTR1() {
-//!     esp_println::println!("SW interrupt1 entry");
-//!     critical_section::with(|cs| {
-//!         SWINT
-//!             .borrow_ref_mut(cs)
-//!             .as_mut()
-//!             .unwrap()
-//!             .reset(SoftwareInterrupt::SoftwareInterrupt1);
-//!     SWINT
-//!         .borrow_ref_mut(cs)
-//!         .as_mut()
-//!         .unwrap()
-//!         .raise(SoftwareInterrupt::SoftwareInterrupt2); // raise interrupt at same priority
-//!     SWINT
-//!         .borrow_ref_mut(cs)
-//!         .as_mut()
-//!         .unwrap()
-//!         .raise(SoftwareInterrupt::SoftwareInterrupt3); // raise interrupt at higher priority
-//!     SWINT
-//!         .borrow_ref_mut(cs)
-//!         .as_mut()
-//!         .unwrap()
-//!         .raise(SoftwareInterrupt::SoftwareInterrupt0); // raise interrupt at
-//!                                                        // lower priority
-//! });
-//! esp_println::println!("SW interrupt1 exit");
-//! }
-//! #[interrupt]
-//! fn FROM_CPU_INTR2() {
-//!     esp_println::println!("SW interrupt2");
-//!     critical_section::with(|cs| {
-//!     SWINT
-//!         .borrow_ref_mut(cs)
-//!         .as_mut()
-//!         .unwrap()
-//!         .reset(SoftwareInterrupt::SoftwareInterrupt2);
-//!     });
-//! }
-//! #[interrupt]
-//! fn FROM_CPU_INTR3() {
-//!     esp_println::println!("SW interrupt3");
-//!     critical_section::with(|cs| {
-//!     SWINT
-//!         .borrow_ref_mut(cs)
-//!         .as_mut()
-//!         .unwrap()
-//!         .reset(SoftwareInterrupt::SoftwareInterrupt3);
 //!     });
 //! }
 //! ```

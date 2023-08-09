@@ -1,4 +1,4 @@
-//! USB Serial JTAG peripheral driver
+//! # USB Serial JTAG peripheral driver
 //!
 //! ## Overview
 //! The USB Serial JTAG peripheral driver provides an interface to communicate

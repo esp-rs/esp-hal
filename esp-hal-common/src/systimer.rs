@@ -1,4 +1,4 @@
-//! System Timer peripheral driver
+//! # System Timer peripheral driver
 //!
 //! ## Overview
 //! This software module provides an interface to interact with the system timer
@@ -14,14 +14,14 @@
 //! setting alarms for specific time points or periodic intervals, enabling and
 //! clearing interrupts, configuring various settings of the system timer.
 //!
-//! By using the SYSTIME peripheral driver, you can leverage the system timer
+//! By using the SYSTIMER peripheral driver, you can leverage the system timer
 //! functionality of ESP chips for accurate timing measurements, event
 //! triggering and synchronization in your applications.
 //!
 //! ## Example
 //! ```no_run
 //! let peripherals = Peripherals::take();
-//! ...
+//!
 //! let syst = SystemTimer::new(peripherals.SYSTIMER);
 //! println!("SYSTIMER Current value = {}", SystemTimer::now());
 //! ```

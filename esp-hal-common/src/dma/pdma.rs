@@ -1,4 +1,4 @@
-//! Direct Memory Access
+//! # Direct Memory Access
 //!
 //! ## Overview
 //! The `pdma` module is part of the DMA (Direct Memory Access) driver designed

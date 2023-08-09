@@ -1,4 +1,4 @@
-//! Advanced Encryption Standard (AES) support.
+//! # Advanced Encryption Standard (AES) support.
 //!
 //! ## Overview
 //! The AES module provides an interface to interact with the AES peripheral,

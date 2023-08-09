@@ -1,4 +1,4 @@
-//! I2S Master
+//! # I2S Master
 //!
 //! ## Overview
 //!

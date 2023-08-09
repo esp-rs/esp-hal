@@ -1,4 +1,4 @@
-//! ESP ROM libraries
+//! # ESP ROM libraries
 //!
 //! ## Overview
 //! The `rom` driver provides functionality related to the ROM (Read-Only

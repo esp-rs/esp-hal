@@ -1,4 +1,4 @@
-//! LEDC timer
+//! # LEDC timer
 //!
 //! ## Overview
 //! The `LEDC Timer` module is a part of the `LED Controller (LEDC)` driver

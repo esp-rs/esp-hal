@@ -1,9 +1,8 @@
-//! Reading of eFuses (ESP32)
+//! # Reading of eFuses (ESP32)
 //!
 //! ## Overview
 //!
-//! The `efuse` module is part of the `SOC (System-on-Chip)` functionality of
-//! the `ESP32` chip. This module provides functionality for reading eFuse data
+//! The `efuse` module provides functionality for reading eFuse data
 //! from the `ESP32` chip, allowing access to various chip-specific information
 //! such as :
 //!   * MAC address

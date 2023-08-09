@@ -1,4 +1,4 @@
-//! MD5 Message-Digest Algorithm
+//! # MD5 Message-Digest Algorithm
 //!
 //! ## ⚠️ Security Warning ⚠️
 //!

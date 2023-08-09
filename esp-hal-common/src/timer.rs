@@ -1,12 +1,12 @@
-//! General-purpose timers
+//! # General-purpose timers
 //!
 //! ## Overview
-//! The general-purpose timer peripheral is a part of ESP chips and provides
-//! timer functionality. It consists of a timer group, which can have up to two
-//! timers (depending on the chip) and a watchdog timer. The timer group allows
-//! for the management of multiple timers and synchronization between them.
+//! The `general-purpose timer` peripheral consists of a timer group, which can
+//! have up to two timers (depending on the chip) and a watchdog timer. The
+//! timer group allows for the management of multiple timers and synchronization
+//! between them.
 //!
-//! The general-purpose timer peripheral can be used to perform a variety of
+//! This peripheral can be used to perform a variety of
 //! tasks, such as triggering an interrupt after a particular interval
 //! (periodically and aperiodically), precisely time an interval, act as a
 //! hardware clock and so on.

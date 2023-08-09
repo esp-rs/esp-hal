@@ -1,4 +1,4 @@
-//! MCPWM peripheral - timer module
+//! # MCPWM peripheral - timer module
 //!
 //! ## Overview
 //! The `timer` module is a part of the `MCPWM (Motor Control Pulse Width

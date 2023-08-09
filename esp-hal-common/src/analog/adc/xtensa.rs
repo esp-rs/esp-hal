@@ -753,9 +753,10 @@ pub use impl_adc_interface;
 
 #[cfg(esp32s3)]
 pub mod implementation {
-    //! Analog to digital (ADC) conversion support.
+    //! # Analog to digital (ADC) conversion support.
     //!
-    //! The `ADC` functionality in the `analog` driver enables users to perform
+    //! ## Overview
+    //! The `ADC` module in the `analog` driver enables users to perform
     //! analog-to-digital conversions, allowing them to measure real-world
     //! analog signals with high accuracy.
     //!
@@ -824,10 +825,10 @@ pub mod implementation {
 
 #[cfg(esp32s2)]
 pub mod implementation {
-    //! Analog to digital (ADC) conversion support.
+    //! # Analog to digital (ADC) conversion support.
     //!
     //! ## Overview
-    //! The `ADC` functionality in the `analog` driver enables users to perform
+    //! The `ADC` module in the `analog` driver enables users to perform
     //! analog-to-digital conversions, allowing them to measure real-world
     //! analog signals with high accuracy.
     //!

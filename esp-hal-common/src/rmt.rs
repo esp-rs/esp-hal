@@ -1,5 +1,6 @@
 //! # Remote Control Peripheral (RMT)
 //!
+//! ## Overview
 //! Some ESP32 variants include a remote control peripheral (RMT) that
 //! is designed to handle infrared remote control signals. For that
 //! purpose, it can convert bitstreams of data (from the RAM) into
@@ -35,9 +36,9 @@
 //! For more information, please refer to the ESP-IDF documentation:
 //! <https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/peripherals/rmt.html>
 //!
-//! # Examples
+//! ## Examples
 //!
-//! ## Initialization
+//! ### Initialization
 //!
 //! ```no_run
 //! let rmt = Rmt::new(peripherals.RMT, 80u32.MHz(), &mut clock_control, &clocks).unwrap();
@@ -60,7 +61,7 @@
 //! (on ESP32 and ESP32-S2 you cannot specify a base frequency other than 80
 //! MHz)
 //!
-//! ## Sending a pulse sequence
+//! ### Sending a pulse sequence
 //!
 //! ```no_run
 //! let data = [

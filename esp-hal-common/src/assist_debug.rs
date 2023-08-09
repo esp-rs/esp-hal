@@ -1,4 +1,4 @@
-//! Debug Assistant
+//! # Debug Assistant
 //!
 //! ## Overview
 //! The Assist Debug driver provides functionality for debugging and monitoring
@@ -13,8 +13,6 @@
 //! Instead the ROM bootloader will always enable it and print the last seen PC
 //! (e.g. _Saved PC:0x42002ff2_). Make sure the reset was triggered by a TIMG
 //! watchdog. Not an RTC or SWD watchdog.
-//!
-//! ⚠️ Not all targets support all the features. ⚠️
 //!
 //! ⚠️ Bus write access logging is not available via this API. ⚠️
 

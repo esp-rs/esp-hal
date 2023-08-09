@@ -1,10 +1,9 @@
-//! Peripheral instance singletons (ESP32-S3)
+//! # Peripheral instance singletons (ESP32-S3)
 //!
 //! ## Overview
 //!
-//! The `Peripherals` module is a part of the `SOC` functionality of `ESP32-S3`
-//! chip. It provides singleton instances of various peripherals and allows
-//! users to access and use them in their applications.
+//! The `Peripherals` module provides singleton instances of various peripherals
+//! and allows users to access and use them in their applications.
 //!
 //! These peripherals provide various functionalities and interfaces for
 //! interacting with different hardware components on the `ESP32-S3` chip, such

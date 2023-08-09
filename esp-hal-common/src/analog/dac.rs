@@ -1,7 +1,7 @@
-//! Analog peripherals - Digital to Analog Converter
+//! # Analog peripherals - Digital to Analog Converter
 //!
 //! ## Overview
-//! The `DAC` module is part of the `ADC` driver designed for ESP
+//! The `DAC` module is part of the `Analog` driver designed for ESP
 //! microcontrollers, providing functionalities for `digital-to-analog`
 //! conversion.
 //!

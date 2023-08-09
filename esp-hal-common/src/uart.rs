@@ -1,4 +1,4 @@
-//! UART driver
+//! # UART driver
 //!
 //! ## Overview
 //! In embedded system applications, data is required to be transferred in a

@@ -1,7 +1,7 @@
-//! LEDC channel
+//! # LEDC channel
 //!
 //! ## Overview
-//! The `LEDC Channel` Module is a part of the `LED Controller (LEDC)` driver
+//! The `LEDC Channel` module is a part of the `LED Controller (LEDC)` driver
 //! designed for ESP microcontrollers. It provides a high-level interface to
 //! configure and control individual PWM channels of the LEDC peripheral.
 //!

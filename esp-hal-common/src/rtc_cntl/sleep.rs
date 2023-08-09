@@ -1,4 +1,4 @@
-//! RTC Control Sleep Module
+//! # RTC Control Sleep Module
 //!
 //! ## Overview
 //! The `sleep` module in the `RTC CNTL (Real-Time Clock Control)` driver

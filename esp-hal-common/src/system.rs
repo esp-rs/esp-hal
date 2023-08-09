@@ -1,9 +1,10 @@
-//! System Control
+//! # System Control
 //!
 //! ## Overview
-//! The system driver provides functionality for controlling various aspects of
-//! the chip's system on ESP chips. It includes the configuration of peripheral
-//! clocks, chip clocks, software interrupts, and CPU control.
+//! This `system` driver provides an interface to control and configure various
+//! system-related features and peripherals on ESP chips. It includes
+//! functionality to control peripheral clocks, manage software interrupts,
+//! configure chip clocks, and control radio peripherals.
 //!
 //! ### Software Interrupts
 //! The `SoftwareInterrupt` enum represents the available software interrupt

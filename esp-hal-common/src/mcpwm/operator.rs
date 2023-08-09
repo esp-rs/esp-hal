@@ -1,4 +1,4 @@
-//! MCPWM peripheral - operator module
+//! # MCPWM peripheral - operator module
 //!
 //! ## Overview
 //! The `operator` module is part of the `MCPWM` peripheral driver for

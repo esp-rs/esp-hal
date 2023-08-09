@@ -1,9 +1,8 @@
 //! # Clock Control
 //!
 //! ## Overview
-//! This `Clock` driver is designed for ESP microcontrollers. It provides an
-//! interface for configuring and managing various clocks present on the
-//! microcontroller.
+//! This `Clock` driver provides an interface for configuring and managing
+//! various clocks present on the `ESP` microcontrollers.
 //!
 //! Proper clock configuration is essential for the correct functioning of the
 //! microcontroller and its peripherals.

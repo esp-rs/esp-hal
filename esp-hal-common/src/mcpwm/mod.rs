@@ -1,4 +1,4 @@
-//! MCPWM (Motor Control Pulse Width Modulator) peripheral
+//! # MCPWM (Motor Control Pulse Width Modulator) peripheral
 //!
 //! ## Overview
 //! #### Peripheral capabilities

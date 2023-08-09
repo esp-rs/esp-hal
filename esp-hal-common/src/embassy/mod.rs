@@ -1,4 +1,4 @@
-//! Embassy driver
+//! # Embassy driver
 //!
 //! ## Overview
 //! The `embassy` driver for ESP chips is an essential part of the Embassy

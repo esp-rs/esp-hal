@@ -1,4 +1,4 @@
-//! Pulse Counter peripheral driver
+//! # Pulse Counter peripheral driver
 //!
 //! ## Overview
 //! The `PCNT (Pulse Counter)` driver for `ESP` chips is a software component
@@ -107,8 +107,10 @@
 //!         }
 //!     });
 //! }
-//! ...
+//! ```
 //!
+//! Where the `PCNT` interrupt handler is defined as:
+//! ```no_run
 //! #[interrupt]
 //! fn PCNT() {
 //!     critical_section::with(|cs| {

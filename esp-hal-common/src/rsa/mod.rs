@@ -1,4 +1,4 @@
-//! RSA Accelerator support.
+//! # RSA Accelerator support.
 //!
 //! ## Overview
 //! The `RSA` driver provides a set of functions to accelerate `RSA
@@ -24,7 +24,7 @@
 //! ```no_run
 //! let peripherals = Peripherals::take();
 //! let mut system = peripherals.PCR.split();
-//! ...
+//!
 //! let mut rsa = Rsa::new(peripherals.RSA, &mut system.peripheral_clock_control);
 //! ```
 //!

@@ -1,4 +1,4 @@
-//! Hardware and Software Reset
+//! # Hardware and Software Reset
 //!
 //! ## Overview
 //! The Hardware and Software Reset module provides functions for performing

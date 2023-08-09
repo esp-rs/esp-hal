@@ -1,4 +1,4 @@
-//! GPIO configuration module (ESP32-C2)
+//! # GPIO configuration module (ESP32-C2)
 //!
 //! ## Overview
 //!

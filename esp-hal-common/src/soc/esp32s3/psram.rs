@@ -1,10 +1,9 @@
-//! PSRAM "virtual peripheral" driver (ESP32-S2)
+//! # PSRAM "virtual peripheral" driver (ESP32-S2)
 //!
 //! ## Overview
 //!
-//! The `PSRAM` module is a part of the `SOC` functionality the `ESP32-S2` chip.
-//! It provides support for accessing and controlling the `Pseudo Static Random
-//! Access Memory (PSRAM)` on the `ESP32-S2`.
+//! The `PSRAM` module provides support for accessing and controlling the
+//! `Pseudo Static Random Access Memory (PSRAM)` on the `ESP32-S2`.
 //!
 //! The `PSRAM` module enables users to interface with the `PSRAM` memory
 //! present on the `ESP32-S2` chip. `PSRAM` provides additional external memory

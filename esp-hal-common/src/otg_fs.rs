@@ -1,4 +1,4 @@
-//! USB OTG full-speed peripheral (TBF examples)
+//! # USB OTG full-speed peripheral
 //!
 //! ## Overview
 //! The USB OTG Full-speed peripheral driver provides support for the USB

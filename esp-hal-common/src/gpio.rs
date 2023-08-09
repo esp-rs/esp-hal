@@ -1,4 +1,4 @@
-//! General Purpose I/Os
+//! # General Purpose I/Os
 //!
 //! ## Overview
 //! The GPIO peripheral provides access to General Purpose Input/Output pins on

@@ -1,4 +1,4 @@
-//! GPIO configuration module (ESP32-S3)
+//! # GPIO configuration module (ESP32-S3)
 //!
 //! ## Overview
 //!
@@ -32,8 +32,8 @@
 //!       * This enumeration defines output signals for the GPIO mux. Each
 //!         output signal is assigned a specific value.
 //!
-//! Module also implements the `InterruptStatusRegisterAccess` trait for two
-//! different banks:
+//! This module also implements the `InterruptStatusRegisterAccess` trait for
+//! two different banks:
 //!   * `InterruptStatusRegisterAccessBank0`
 //!   * `InterruptStatusRegisterAccessBank1`.
 //! This trait provides functions to read the interrupt status and NMI status

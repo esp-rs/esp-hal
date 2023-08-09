@@ -1,4 +1,4 @@
-//! Cyclic Redundancy Check
+//! # Cyclic Redundancy Check
 //!
 //! ## Overview
 //! These are safe abstractions to the CRC functions in the ESP32 ROM.

@@ -1,4 +1,4 @@
-//! Direct Memory Access
+//! # Direct Memory Access
 //!
 //! ## Overview
 //! The GDMA (General DMA) module is a part of the DMA (Direct Memory Access)

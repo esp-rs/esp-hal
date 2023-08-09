@@ -1,4 +1,4 @@
-//! Secure Hash Algorithm peripheral driver
+//! # Secure Hash Algorithm peripheral driver
 //!
 //! ## Overview
 //! This SHA (Secure Hash Algorithm) driver for ESP chips is a software module
