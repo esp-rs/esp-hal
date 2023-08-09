@@ -26,4 +26,7 @@ pub(crate) mod constants {
     pub const RMT_CHANNEL_RAM_SIZE: usize = 48;
     pub const RMT_CLOCK_SRC: u8 = 1;
     pub const RMT_CLOCK_SRC_FREQ: fugit::HertzU32 = fugit::HertzU32::MHz(80);
+
+    pub const SOC_DRAM_LOW: u32 = 0x3FC8_0000;
+    pub const SOC_DRAM_HIGH: u32 = 0x3FCE_0000;
 }

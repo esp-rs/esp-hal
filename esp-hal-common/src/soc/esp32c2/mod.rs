@@ -13,3 +13,8 @@ pub mod radio_clocks;
 pub(crate) mod registers {
     pub const INTERRUPT_MAP_BASE: u32 = 0x600c2000;
 }
+
+pub(crate) mod constants {
+    pub const SOC_DRAM_LOW: u32 = 0x3FCA_0000;
+    pub const SOC_DRAM_HIGH: u32 = 0x3FCE_0000;
+}
