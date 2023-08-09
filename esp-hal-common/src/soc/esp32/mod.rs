@@ -19,4 +19,7 @@ pub(crate) mod constants {
 
     pub const RMT_RAM_START: usize = 0x3ff56800;
     pub const RMT_CHANNEL_RAM_SIZE: usize = 64;
+
+    pub const SOC_DRAM_LOW: u32 = 0x3FFA_E000;
+    pub const SOC_DRAM_HIGH: u32 = 0x4000_0000;
 }

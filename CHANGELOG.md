@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `ClockControl::max` helper for all chips (#701)
 - Added module-level documentation for all peripherals
 - Added module-level documentation for all peripherals (#680)
+- Implement sleep with some wakeup methods for `esp32-s3` (#660)
+- Add `FlashSafeDma` wrapper for eh traits which ensure correct DMA transfer from source data in flash (ROM) (#678)
 
 ### Changed
 

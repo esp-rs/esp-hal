@@ -10,3 +10,11 @@ pub use self::soc::*;
 mod soc;
 
 mod efuse_field;
+
+pub fn is_valid_ram_address(address: u32) -> bool {
+    if (soc::constants::SOC_DRAM_LOW..=soc::constants::SOC_DRAM_HIGH).contains(&address) {
+        true
+    } else {
+        false
+    }
+}
