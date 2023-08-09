@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Increase frequency resolution in `set_periodic` (#686)
 - Fixed ESP32-S2, ESP32-S3, ESP32-C2, ESP32-C3 radio clock gating (#679, #681)
 - Partially fix ESP32 radio clocks (#709)
+- Fixed "ESP32/ESP32-S2 RMT transmission with with data.len() > RMT_CHANNEL_RAM_SIZE results in TransmissionError" #707
 
 ### Removed
 
