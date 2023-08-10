@@ -52,13 +52,13 @@ ufmt-write = { version = "0.1.0", optional = true }
 # IMPORTANT:
 # Each supported device MUST have its PAC included below along with a
 # corresponding feature.
-esp32   = { git = "https://github.com/esp-rs/esp-pacs", rev = "ce6d5b5", features = ["critical-section"], optional = true }
-esp32c2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "ce6d5b5", features = ["critical-section"], optional = true }
-esp32c3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "ce6d5b5", features = ["critical-section"], optional = true }
-esp32c6 = { git = "https://github.com/esp-rs/esp-pacs", rev = "ce6d5b5", features = ["critical-section"], optional = true }
-esp32h2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "ce6d5b5", features = ["critical-section"], optional = true }
-esp32s2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "ce6d5b5", features = ["critical-section"], optional = true }
-esp32s3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "ce6d5b5", features = ["critical-section"], optional = true }
+esp32   = { version = "0.25.0", features = ["critical-section"], optional = true }
+esp32c2 = { version = "0.13.0", features = ["critical-section"], optional = true }
+esp32c3 = { version = "0.16.0", features = ["critical-section"], optional = true }
+esp32c6 = { version = "0.6.0",  features = ["critical-section"], optional = true }
+esp32h2 = { version = "0.2.0",  features = ["critical-section"], optional = true }
+esp32s2 = { version = "0.16.0", features = ["critical-section"], optional = true }
+esp32s3 = { version = "0.20.0", features = ["critical-section"], optional = true }
 
 [build-dependencies]
 basic-toml = "0.1.2"
