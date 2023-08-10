@@ -1,0 +1,31 @@
+[package]
+name         = "esp32c6-lp-hal"
+version      = "0.1.0"
+edition      = "2021"
+rust-version = "1.65.0"
+description  = "HAL for ESP32-C6's low-power coprocessor"
+repository   = "https://github.com/esp-rs/esp-hal"
+license      = "MIT OR Apache-2.0"
+
+keywords = [
+    "embedded",
+    "embedded-hal",
+    "esp",
+    "esp32c6",
+    "no-std",
+]
+categories = [
+    "embedded",
+    "hardware-support",
+    "no-std",
+]
+
+[dependencies]
+critical-section = { version = "1.1.2", features = ["restore-state-u8"] }
+embedded-hal     = { version = "0.2.7", features = ["unproven"] }
+esp32c6-lp       = { git = "https://github.com/esp-rs/esp-pacs", rev = "a9cad5e", features = ["critical-section"] }
+riscv            = "0.10.1"
+
+[features]
+default = []
+debug   = ["esp32c6-lp/impl-register-debug"]
