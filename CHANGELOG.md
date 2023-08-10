@@ -7,7 +7,7 @@ Please note that only changes to the `esp-hal-common` package are tracked in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.11.0] - 2023-08-10
 
 ### Added
 
@@ -17,9 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Implemented calibrated ADC API for ESP32-S3 (#641)
 - Add MCPWM DeadTime configuration (#406)
 - Implement sleep with some wakeup methods for `esp32-s3` (#660, #689, #696)
-- Add feature enabling directly hooking the interrupt vector table
+- Add feature enabling directly hooking the interrupt vector table (#621)
 - Add `ClockControl::max` helper for all chips (#701)
-- Added module-level documentation for all peripherals
 - Added module-level documentation for all peripherals (#680)
 - Implement sleep with some wakeup methods for `esp32-s3` (#660)
 - Add `FlashSafeDma` wrapper for eh traits which ensure correct DMA transfer from source data in flash (ROM) (#678)
@@ -167,7 +166,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2022-08-05
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.10.0...HEAD
+[0.11.0]: https://github.com/esp-rs/esp-hal/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/esp-rs/esp-hal/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/esp-rs/esp-hal/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/esp-rs/esp-hal/compare/v0.7.1...v0.8.0
