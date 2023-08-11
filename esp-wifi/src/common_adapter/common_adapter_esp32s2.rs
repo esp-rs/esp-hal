@@ -17,38 +17,35 @@ static mut PHY_ACCESS_REF: AtomicU32 = AtomicU32::new(0);
 static mut PHY_CLOCK_ENABLE_REF: AtomicU32 = AtomicU32::new(0);
 
 pub(crate) fn enable_wifi_power_domain() {
-    // FIXME: commented code depends on the next esp-hal release that contains
-    // https://github.com/esp-rs/esp-hal/pull/697
+    const DPORT_WIFIBB_RST: u32 = 1 << 0;
+    const DPORT_FE_RST: u32 = 1 << 1;
+    const DPORT_WIFIMAC_RST: u32 = 1 << 2;
+    const DPORT_BTBB_RST: u32 = 1 << 3;
+    const DPORT_BTMAC_RST: u32 = 1 << 4;
+    const DPORT_RW_BTMAC_RST: u32 = 1 << 9;
 
-    // const DPORT_WIFIBB_RST: u32 = 1 << 0;
-    // const DPORT_FE_RST: u32 = 1 << 1;
-    // const DPORT_WIFIMAC_RST: u32 = 1 << 2;
-    // const DPORT_BTBB_RST: u32 = 1 << 3;
-    // const DPORT_BTMAC_RST: u32 = 1 << 4;
-    // const DPORT_RW_BTMAC_RST: u32 = 1 << 9;
-
-    // const MODEM_RESET_FIELD_WHEN_PU: u32 = DPORT_WIFIBB_RST
-    //     | DPORT_FE_RST
-    //     | DPORT_WIFIMAC_RST
-    //     | DPORT_BTBB_RST
-    //     | DPORT_BTMAC_RST
-    //     | DPORT_RW_BTMAC_RST;
+    const MODEM_RESET_FIELD_WHEN_PU: u32 = DPORT_WIFIBB_RST
+        | DPORT_FE_RST
+        | DPORT_WIFIMAC_RST
+        | DPORT_BTBB_RST
+        | DPORT_BTMAC_RST
+        | DPORT_RW_BTMAC_RST;
 
     unsafe {
         let rtc_cntl = &*crate::hal::peripherals::RTC_CNTL::ptr();
 
-        // let syscon = &*crate::hal::peripherals::SYSCON::ptr();
+        let syscon = &*crate::hal::peripherals::SYSCON::ptr();
 
         rtc_cntl
             .dig_pwc
             .modify(|_, w| w.wifi_force_pd().clear_bit());
 
-        // syscon
-        //     .wifi_rst_en
-        //     .modify(|r, w| w.bits(r.bits() | MODEM_RESET_FIELD_WHEN_PU));
-        // syscon
-        //     .wifi_rst_en
-        //     .modify(|r, w| w.bits(r.bits() & !MODEM_RESET_FIELD_WHEN_PU));
+        syscon
+            .wifi_rst_en
+            .modify(|r, w| w.bits(r.bits() | MODEM_RESET_FIELD_WHEN_PU));
+        syscon
+            .wifi_rst_en
+            .modify(|r, w| w.bits(r.bits() & !MODEM_RESET_FIELD_WHEN_PU));
 
         rtc_cntl
             .dig_iso
