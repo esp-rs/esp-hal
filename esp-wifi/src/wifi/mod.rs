@@ -40,14 +40,7 @@ use smoltcp::phy::{Device, DeviceCapabilities, RxToken, TxToken};
 
 const ETHERNET_FRAME_HEADER_SIZE: usize = 18;
 
-#[cfg(feature = "mtu-1514")]
-const MTU: usize = 1514;
-#[cfg(feature = "mtu-1500")]
-const MTU: usize = 1500;
-#[cfg(feature = "mtu-1492")]
-const MTU: usize = 1492;
-#[cfg(feature = "mtu-746")]
-const MTU: usize = 746;
+const MTU: usize = crate::CONFIG.mtu;
 
 #[cfg(esp32)]
 use esp32_hal as hal;
@@ -661,7 +654,13 @@ pub fn wifi_start() -> Result<(), WifiError> {
             crate::binary::include::wifi_ps_type_t_WIFI_PS_NONE
         ))?;
 
-        let cntry_code = [b'C', b'N', 0];
+        let mut cntry_code = [0u8; 3];
+        cntry_code[..crate::CONFIG.country_code.len()]
+            .copy_from_slice(crate::CONFIG.country_code.as_bytes());
+        if crate::CONFIG.country_code_operating_class != 0 {
+            cntry_code[2] = crate::CONFIG.country_code_operating_class;
+        }
+
         let country = wifi_country_t {
             cc: core::mem::transmute(cntry_code),
             schan: 1,

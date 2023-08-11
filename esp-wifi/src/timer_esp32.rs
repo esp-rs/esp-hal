@@ -20,10 +20,7 @@ pub const TICKS_PER_SECOND: u64 = 40_000_000;
 
 pub const COUNTER_BIT_MASK: u64 = 0xFFFF_FFFF_FFFF_FFFF;
 
-#[cfg(debug_assertions)]
-const TIMER_DELAY: fugit::HertzU64 = fugit::HertzU64::from_raw(50);
-#[cfg(not(debug_assertions))]
-const TIMER_DELAY: fugit::HertzU64 = fugit::HertzU64::from_raw(100);
+const TIMER_DELAY: fugit::HertzU32 = fugit::HertzU32::from_raw(crate::CONFIG.tick_rate_hz);
 
 static TIMER1: Mutex<RefCell<Option<Timer<Timer0<TIMG1>>>>> = Mutex::new(RefCell::new(None));
 

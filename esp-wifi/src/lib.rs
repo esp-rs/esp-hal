@@ -89,20 +89,27 @@ pub fn current_millis() -> u64 {
     get_systimer_count() / (TICKS_PER_SECOND / 1000)
 }
 
-#[cfg(all(not(coex), not(feature = "big-heap")))]
-const HEAP_SIZE: usize = 64 * 1024;
+#[allow(unused)]
+#[cfg(all(not(feature = "big-heap")))]
+const DEFAULT_HEAP_SIZE: usize = 64 * 1024;
 
-#[cfg(all(coex, not(feature = "big-heap")))]
-const HEAP_SIZE: usize = 64 * 1024;
+#[allow(unused)]
+#[cfg(all(not(esp32s2), feature = "big-heap"))]
+const DEFAULT_HEAP_SIZE: usize = 110 * 1024;
 
-#[cfg(all(not(coex), not(esp32s2), feature = "big-heap"))]
-const HEAP_SIZE: usize = 110 * 1024;
+#[allow(unused)]
+#[cfg(all(esp32s2, feature = "big-heap"))]
+const DEFAULT_HEAP_SIZE: usize = 72 * 1024;
 
-#[cfg(all(not(coex), esp32s2, feature = "big-heap"))]
-const HEAP_SIZE: usize = 72 * 1024;
+const HEAP_SIZE: usize = crate::CONFIG.heap_size;
 
-#[cfg(all(coex, feature = "big-heap"))]
-const HEAP_SIZE: usize = 110 * 1024;
+#[allow(unused)]
+#[cfg(debug_assertions)]
+const DEFAULT_TICK_RATE_HZ: u32 = 50;
+
+#[allow(unused)]
+#[cfg(not(debug_assertions))]
+const DEFAULT_TICK_RATE_HZ: u32 = 100;
 
 #[derive(Debug)]
 #[toml_cfg::toml_config]
@@ -129,6 +136,16 @@ struct Config {
     rx_ba_win: usize,
     #[default(1)]
     max_burst_size: usize,
+    #[default("CN")]
+    country_code: &'static str,
+    #[default(0)]
+    country_code_operating_class: u8,
+    #[default(1492)]
+    mtu: usize,
+    #[default(DEFAULT_HEAP_SIZE)]
+    heap_size: usize,
+    #[default(DEFAULT_TICK_RATE_HZ)]
+    tick_rate_hz: u32,
 }
 
 #[cfg_attr(esp32, link_section = ".dram2_uninit")]

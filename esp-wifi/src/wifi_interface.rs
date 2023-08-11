@@ -7,7 +7,7 @@ use embedded_svc::ipv4;
 use smoltcp::iface::{Interface, SocketHandle, SocketSet};
 use smoltcp::socket::{dhcpv4::Socket as Dhcpv4Socket, tcp::Socket as TcpSocket};
 use smoltcp::time::Instant;
-use smoltcp::wire::{IpAddress, IpCidr, IpEndpoint, Ipv4Address, DnsQueryType};
+use smoltcp::wire::{DnsQueryType, IpAddress, IpCidr, IpEndpoint, Ipv4Address};
 
 use crate::current_millis;
 use crate::wifi::{get_ap_mac, get_sta_mac, WifiDevice, WifiMode};
@@ -225,9 +225,10 @@ impl<'a> WifiStack<'a> {
                         }
 
                         if let (Some(&dns), Some(dns_handle)) =
-                            (dns, *self.dns_socket_handle.borrow()) {
-
-                            sockets.get_mut::<smoltcp::socket::dns::Socket>(dns_handle)
+                            (dns, *self.dns_socket_handle.borrow())
+                        {
+                            sockets
+                                .get_mut::<smoltcp::socket::dns::Socket>(dns_handle)
                                 .update_servers(&[dns.into()]);
                         }
                     }
@@ -291,7 +292,7 @@ impl<'a> WifiStack<'a> {
     pub fn configure_dns(
         &'a self,
         servers: &[IpAddress],
-        query_storage: &'a mut [Option<smoltcp::socket::dns::DnsQuery>]
+        query_storage: &'a mut [Option<smoltcp::socket::dns::DnsQuery>],
     ) {
         if let Some(old_handle) = self.dns_socket_handle.take() {
             self.with_mut(|_interface, _device, sockets| sockets.remove(old_handle));
@@ -306,7 +307,8 @@ impl<'a> WifiStack<'a> {
     pub fn update_dns_servers(&self, servers: &[IpAddress]) {
         if let Some(dns_handle) = *self.dns_socket_handle.borrow_mut() {
             self.with_mut(|_interface, _device, sockets| {
-                sockets.get_mut::<smoltcp::socket::dns::Socket>(dns_handle)
+                sockets
+                    .get_mut::<smoltcp::socket::dns::Socket>(dns_handle)
                     .update_servers(servers);
             });
         }
@@ -319,7 +321,8 @@ impl<'a> WifiStack<'a> {
     ) -> Result<heapless::Vec<IpAddress, 1>, WifiStackError> {
         use smoltcp::socket::dns;
 
-        match query_type { // check if name is already an IP
+        match query_type {
+            // check if name is already an IP
             DnsQueryType::A => {
                 if let Ok(ip) = name.parse::<Ipv4Address>() {
                     return Ok([ip.into()].into_iter().collect());
@@ -339,7 +342,8 @@ impl<'a> WifiStack<'a> {
         };
 
         let query = self.with_mut(|interface, _device, sockets| {
-            sockets.get_mut::<dns::Socket>(dns_handle)
+            sockets
+                .get_mut::<dns::Socket>(dns_handle)
                 .start_query(interface.context(), name, query_type)
                 .map_err(|e| WifiStackError::DnsQueryError(e))
         })?;
@@ -348,13 +352,15 @@ impl<'a> WifiStack<'a> {
             self.work();
 
             let result = self.with_mut(|_interface, _device, sockets| {
-                sockets.get_mut::<dns::Socket>(dns_handle).get_query_result(query)
+                sockets
+                    .get_mut::<dns::Socket>(dns_handle)
+                    .get_query_result(query)
             });
 
             match result {
-                Ok(addrs) => return Ok(addrs), // query finished
-                Err(dns::GetQueryResultError::Pending) => {}, // query not finished
-                Err(_) => return Err(WifiStackError::DnsQueryFailed)
+                Ok(addrs) => return Ok(addrs),               // query finished
+                Err(dns::GetQueryResultError::Pending) => {} // query not finished
+                Err(_) => return Err(WifiStackError::DnsQueryFailed),
             }
         }
     }
@@ -431,7 +437,7 @@ pub enum WifiStackError {
     MissingIp,
     DnsNotConfigured,
     DnsQueryError(smoltcp::socket::dns::StartQueryError),
-    DnsQueryFailed
+    DnsQueryFailed,
 }
 
 impl Display for WifiStackError {
@@ -634,7 +640,7 @@ impl<'s, 'n: 's> Read for Socket<'s, 'n> {
                     Ok(0) => continue, // no data
                     Ok(n) => return Ok(n),
                     Err(RecvError::Finished) => return Err(IoError::SocketClosed), // eof
-                    Err(RecvError::InvalidState) => return Err(IoError::TcpRecvError)
+                    Err(RecvError::InvalidState) => return Err(IoError::TcpRecvError),
                 }
             }
         })
