@@ -37,7 +37,7 @@ macro_rules! check_error {
     ($block:block) => {
         match unsafe { $block } {
             0 => Ok(()),
-            res @ _ => Err(EspNowError::Error(Error::from_code(res as u32)))
+            res => Err(EspNowError::Error(Error::from_code(res as u32)))
         }
     };
 }
@@ -289,7 +289,7 @@ impl<'d> EspNow<'d> {
             return Err(EspNowError::Error(Error::NotInitialized));
         }
 
-        let mut esp_now = EspNow { _device: device };
+        let esp_now = EspNow { _device: device };
         check_error!({ esp_wifi_set_mode(wifi_mode_t_WIFI_MODE_STA) })?;
         check_error!({ esp_wifi_start() })?;
         check_error!({ esp_now_init() })?;
@@ -308,7 +308,7 @@ impl<'d> EspNow<'d> {
 
     /// Set primary WiFi channel
     /// Should only be used when using ESP-NOW without AP or STA
-    pub fn set_channel(&mut self, channel: u8) -> Result<(), EspNowError> {
+    pub fn set_channel(&self, channel: u8) -> Result<(), EspNowError> {
         check_error!({ esp_wifi_set_channel(channel, 0) })
     }
 
@@ -320,7 +320,7 @@ impl<'d> EspNow<'d> {
     }
 
     /// Add a peer to the list of known peers
-    pub fn add_peer(&mut self, peer: PeerInfo) -> Result<(), EspNowError> {
+    pub fn add_peer(&self, peer: PeerInfo) -> Result<(), EspNowError> {
         let raw_peer = esp_now_peer_info_t {
             peer_addr: peer.peer_address,
             lmk: peer.lmk.unwrap_or_else(|| [0u8; 16]),
@@ -333,12 +333,12 @@ impl<'d> EspNow<'d> {
     }
 
     /// Remove the given peer
-    pub fn remove_peer(&mut self, peer_address: &[u8; 6]) -> Result<(), EspNowError> {
+    pub fn remove_peer(&self, peer_address: &[u8; 6]) -> Result<(), EspNowError> {
         check_error!({ esp_now_del_peer(peer_address.as_ptr()) })
     }
 
     /// Modify a peer information
-    pub fn modify_peer(&mut self, peer: PeerInfo) -> Result<(), EspNowError> {
+    pub fn modify_peer(&self, peer: PeerInfo) -> Result<(), EspNowError> {
         let raw_peer = esp_now_peer_info_t {
             peer_addr: peer.peer_address,
             lmk: peer.lmk.unwrap_or_else(|| [0u8; 16]),
@@ -351,7 +351,7 @@ impl<'d> EspNow<'d> {
     }
 
     /// Get peer by MAC address
-    pub fn get_peer(&mut self, peer_address: &[u8; 6]) -> Result<PeerInfo, EspNowError> {
+    pub fn get_peer(&self, peer_address: &[u8; 6]) -> Result<PeerInfo, EspNowError> {
         let mut raw_peer = esp_now_peer_info_t {
             peer_addr: [0u8; 6],
             lmk: [0u8; 16],
@@ -382,7 +382,7 @@ impl<'d> EspNow<'d> {
     ///
     /// Only returns peers which address is unicast, for multicast/broadcast addresses, the function will
     /// skip the entry and find the next in the peer list.
-    pub fn fetch_peer(&mut self, from_head: bool) -> Result<PeerInfo, EspNowError> {
+    pub fn fetch_peer(&self, from_head: bool) -> Result<PeerInfo, EspNowError> {
         let mut raw_peer = esp_now_peer_info_t {
             peer_addr: [0u8; 6],
             lmk: [0u8; 16],
@@ -410,12 +410,12 @@ impl<'d> EspNow<'d> {
     }
 
     /// Check is peer is known
-    pub fn peer_exists(&mut self, peer_address: &[u8; 6]) -> bool {
+    pub fn peer_exists(&self, peer_address: &[u8; 6]) -> bool {
         unsafe { esp_now_is_peer_exist(peer_address.as_ptr()) }
     }
 
     /// Get the number of peers
-    pub fn peer_count(&mut self) -> Result<PeerCount, EspNowError> {
+    pub fn peer_count(&self) -> Result<PeerCount, EspNowError> {
         let mut peer_num = esp_now_peer_num_t {
             total_num: 0,
             encrypt_num: 0,
@@ -429,19 +429,19 @@ impl<'d> EspNow<'d> {
     }
 
     /// Set the primary master key
-    pub fn set_pmk(&mut self, pmk: &[u8; 16]) -> Result<(), EspNowError> {
+    pub fn set_pmk(&self, pmk: &[u8; 16]) -> Result<(), EspNowError> {
         check_error!({ esp_now_set_pmk(pmk.as_ptr()) })
     }
 
     /// Set wake window for esp_now to wake up in interval unit
     ///
     /// Window is milliseconds the chip keep waked each interval, from 0 to 65535.
-    pub fn set_wake_window(&mut self, wake_window: u16) -> Result<(), EspNowError> {
+    pub fn set_wake_window(&self, wake_window: u16) -> Result<(), EspNowError> {
         check_error!({ esp_now_set_wake_window(wake_window) })
     }
 
     /// Config ESPNOW rate
-    pub fn set_rate(&mut self, rate: WifiPhyRate) -> Result<(), EspNowError> {
+    pub fn set_rate(&self, rate: WifiPhyRate) -> Result<(), EspNowError> {
         check_error!({ esp_wifi_config_espnow_rate(wifi_interface_t_WIFI_IF_STA, rate as u32,) })
     }
 
@@ -454,7 +454,7 @@ impl<'d> EspNow<'d> {
     /// `SendWaiter` and make sure it returns `SendStatus::Success`. 
     /// However, this method will block current task for milliseconds. 
     /// So you can just drop the waiter if you want high frequency sending.
-    pub fn send(&mut self, dst_addr: &[u8; 6], data: &[u8]) -> Result<SendWaiter, EspNowError> {
+    pub fn send(&self, dst_addr: &[u8; 6], data: &[u8]) -> Result<SendWaiter, EspNowError> {
         let mut addr = [0u8; 6];
         addr.copy_from_slice(dst_addr);
 
@@ -638,11 +638,11 @@ mod asynch {
     pub(super) static ESP_NOW_RX_WAKER: AtomicWaker = AtomicWaker::new();
 
     impl<'d> EspNow<'d> {
-        pub async fn receive_async(&mut self) -> ReceivedData {
+        pub async fn receive_async(&self) -> ReceivedData {
             ReceiveFuture.await
         }
 
-        pub fn send_async(&mut self, dst_addr: &[u8; 6], data: &[u8]) -> Result<SendFuture, EspNowError> {
+        pub fn send_async(&self, dst_addr: &[u8; 6], data: &[u8]) -> Result<SendFuture, EspNowError> {
             let mut addr = [0u8; 6];
             addr.copy_from_slice(dst_addr);
             ESP_NOW_SEND_CB_INVOKED.store(false, Ordering::Release);
