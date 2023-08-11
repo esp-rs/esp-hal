@@ -10,9 +10,6 @@ ERROR(riscv-rt): the start of the RODATA must be 4-byte aligned");
 ASSERT(ORIGIN(REGION_DATA) % 4 == 0, "
 ERROR(riscv-rt): the start of the REGION_DATA must be 4-byte aligned");
 
-ASSERT(ORIGIN(REGION_HEAP) % 4 == 0, "
-ERROR(riscv-rt): the start of the REGION_HEAP must be 4-byte aligned");
-
 ASSERT(ORIGIN(ROTEXT) % 4 == 0, "
 ERROR(riscv-rt): the start of the ROTEXT must be 4-byte aligned");
 
@@ -30,9 +27,6 @@ BUG(riscv-rt): the LMA of .data is not 4-byte aligned");
 
 ASSERT(_bss_start % 4 == 0 && _bss_end % 4 == 0, "
 BUG(riscv-rt): .bss is not 4-byte aligned");
-
-ASSERT(_sheap % 4 == 0, "
-BUG(riscv-rt): start of .heap is not 4-byte aligned");
 
 ASSERT(_stext + SIZEOF(.text) < ORIGIN(ROTEXT) + LENGTH(ROTEXT), "
 ERROR(riscv-rt): The .text section must be placed inside the ROTEXT region.

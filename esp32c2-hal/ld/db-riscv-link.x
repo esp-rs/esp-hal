@@ -111,15 +111,6 @@ SECTIONS
     _bss_end = .;
   } > REGION_BSS
 
-  /* fictitious region that represents the memory available for the heap */
-  .heap (NOLOAD) :
-  {
-    _sheap = .;
-    . += _heap_size;
-    . = ALIGN(4);
-    _eheap = .;
-  } > REGION_HEAP
-
   /* fictitious region that represents the memory available for the stack */
   .stack (NOLOAD) :
   {
@@ -154,9 +145,6 @@ ERROR(riscv-rt): the start of the REGION_RODATA must be 4-byte aligned");
 ASSERT(ORIGIN(REGION_DATA) % 4 == 0, "
 ERROR(riscv-rt): the start of the REGION_DATA must be 4-byte aligned");
 
-ASSERT(ORIGIN(REGION_HEAP) % 4 == 0, "
-ERROR(riscv-rt): the start of the REGION_HEAP must be 4-byte aligned");
-
 ASSERT(ORIGIN(REGION_TEXT) % 4 == 0, "
 ERROR(riscv-rt): the start of the REGION_TEXT must be 4-byte aligned");
 
@@ -174,9 +162,6 @@ BUG(riscv-rt): the LMA of .data is not 4-byte aligned");
 
 ASSERT(_bss_start % 4 == 0 && _bss_end % 4 == 0, "
 BUG(riscv-rt): .bss is not 4-byte aligned");
-
-ASSERT(_sheap % 4 == 0, "
-BUG(riscv-rt): start of .heap is not 4-byte aligned");
 
 ASSERT(_stext + SIZEOF(.text) < ORIGIN(REGION_TEXT) + LENGTH(REGION_TEXT), "
 ERROR(riscv-rt): The .text section must be placed inside the REGION_TEXT region.
