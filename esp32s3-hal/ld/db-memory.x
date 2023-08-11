@@ -8,9 +8,6 @@ RESERVE_DRAM = 0x8000;
 RESERVE_RTC_FAST = 0;
 RESERVE_RTC_SLOW = 0;
 
-/* define stack size for both cores */
-STACK_SIZE = 8k;
-
 /* Specify main memory areas */
 MEMORY
 {

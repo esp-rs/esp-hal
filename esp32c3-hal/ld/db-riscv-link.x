@@ -3,8 +3,6 @@ ENTRY(_start)
 PROVIDE(_stext = ORIGIN(REGION_TEXT));
 PROVIDE(_stack_start = ORIGIN(REGION_STACK) + LENGTH(REGION_STACK));
 PROVIDE(_max_hart_id = 0);
-PROVIDE(_hart_stack_size = 2K);
-PROVIDE(_heap_size = 0);
 
 PROVIDE(UserSoft = DefaultHandler);
 PROVIDE(SupervisorSoft = DefaultHandler);

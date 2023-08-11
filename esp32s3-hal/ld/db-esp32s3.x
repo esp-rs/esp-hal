@@ -270,37 +270,4 @@ SECTIONS {
     *(.rtc_slow.noinit .rtc_slow.noinit.*)
     . = ALIGN (4);
   }
-
- .external.data :
-  {
-    _external_data_start = ABSOLUTE(.);
-    . = ALIGN(4);
-    *(.external.data .external.data.*)
-    . = ALIGN (4);
-    _external_data_end = ABSOLUTE(.);
-  } > psram_seg AT > RODATA
-
- .external.bss (NOLOAD) :
-  {
-    _external_bss_start = ABSOLUTE(.);
-    . = ALIGN(4);
-    *(.external.bss .external.bss.*)
-    . = ALIGN (4);
-    _external_bss_end = ABSOLUTE(.);
-  } > psram_seg
-
- .external.noinit (NOLOAD) :
-  {
-    . = ALIGN(4);
-    *(.external.noinit .external.noinit.*)
-    . = ALIGN (4);
-  } > psram_seg
-
-  /* must be last segment using psram_seg */
-  .external_heap_start (NOLOAD) :
-  {
-    . = ALIGN (4);
-    _external_heap_start = ABSOLUTE(.);
-    . = ALIGN (4);
-  } > psram_seg 
 }
