@@ -2,6 +2,9 @@
 
 use core::arch::global_asm;
 
+pub mod delay;
+pub mod gpio;
+
 pub mod riscv {
     //! Low level access to RISC-V processors.
     //!
@@ -9,6 +12,9 @@ pub mod riscv {
 
     pub use riscv::*;
 }
+pub mod prelude;
+
+const CPU_CLOCK: u32 = 16_000_000;
 
 global_asm!(
     r#"
