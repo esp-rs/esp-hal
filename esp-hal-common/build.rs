@@ -156,7 +156,7 @@ fn main() {
     }
 
     // Check PSRAM features are only given if the target supports PSRAM
-    if !&device.peripherals.contains(&String::from("psram"))
+    if !&device.symbols.contains(&String::from("psram"))
         && (cfg!(feature = "psram_2m") || cfg!(feature = "psram_4m") || cfg!(feature = "psram_8m"))
     {
         panic!("The target does not support PSRAM");
