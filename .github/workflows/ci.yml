@@ -244,7 +244,7 @@ jobs:
       # Perform a full build initially to verify that the examples not only
       # build, but also link successfully.
       - name: build esp32c6-lp-hal (no features)
-        run: cd esp32c6-lp-hal/ && cargo +nightly build --examples
+        run: cd esp32c6-lp-hal/ && cargo +nightly build --release --examples
       # Ensure documentation can be built
       - name: rustdoc
         run: cd esp32c6-lp-hal/ && cargo doc

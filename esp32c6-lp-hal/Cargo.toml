@@ -25,6 +25,11 @@ critical-section = { version = "1.1.2", features = ["restore-state-u8"] }
 embedded-hal     = { version = "0.2.7", features = ["unproven"] }
 esp32c6-lp       = { git = "https://github.com/esp-rs/esp-pacs", rev = "a9cad5e", features = ["critical-section"] }
 riscv            = "0.10.1"
+riscv-rt-macros  = "0.2.0"
+paste            = "1.0.14"
+
+[dev-dependencies]
+panic-halt       = "0.2.0"
 
 [features]
 default = []
