@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix `psram` availability lookup in `esp-hal-common` build script (#718)
+
 ### Removed
 
 ## [0.11.0] - 2023-08-10
