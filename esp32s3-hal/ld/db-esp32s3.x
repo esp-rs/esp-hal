@@ -5,13 +5,10 @@ _stack_region_top = ABSOLUTE(ORIGIN(dram_seg))+LENGTH(dram_seg);
 _stack_region_bottom = _stack_end;
 
 /*
- use the whole remaining memory as stack / evenly divided for each core
- TODO: how to make this more flexible, e.g. give one core more stack than the other
+ use the whole remaining memory as core-0's stack
 */
 _stack_end_cpu0 = _stack_region_top;
-_stack_start_cpu0 = _stack_region_top - ((_stack_region_top - _stack_region_bottom) / 2);
-_stack_end_cpu1 = _stack_start_cpu0 - (_stack_start_cpu0 % 16);
-_stack_start_cpu1 = _stack_region_bottom;
+_stack_start_cpu0 = _stack_region_bottom;
 
 EXTERN(DefaultHandler);
 

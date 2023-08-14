@@ -15,13 +15,17 @@
 //!
 //! ## Example
 //! ```no_run
+//! static mut APP_CORE_STACK: Stack<8192> = Stack::new();
+//!
 //! let counter = Mutex::new(RefCell::new(0));
 //!
 //! let mut cpu_control = CpuControl::new(system.cpu_control);
 //! let mut cpu1_fnctn = || {
 //!     cpu1_task(&mut timer1, &counter);
 //! };
-//! let _guard = cpu_control.start_app_core(&mut cpu1_fnctn).unwrap();
+//! let _guard = cpu_control
+//!     .start_app_core(unsafe { &mut APP_CORE_STACK }, &mut cpu1_fnctn)
+//!     .unwrap();
 //!
 //! loop {
 //!     block!(timer0.wait()).unwrap();
@@ -55,7 +59,23 @@ use xtensa_lx::set_stack_pointer;
 
 use crate::Cpu;
 
+/// Data type for a properly aligned stack of N bytes
+#[repr(C, align(64))]
+pub struct Stack<const SIZE: usize> {
+    /// Memory to be used for the stack
+    pub mem: [u8; SIZE],
+}
+
+impl<const SIZE: usize> Stack<SIZE> {
+    /// Construct a stack of length SIZE, initialized to 0
+    pub const fn new() -> Stack<SIZE> {
+        Stack { mem: [0_u8; SIZE] }
+    }
+}
+
 static mut START_CORE1_FUNCTION: Option<&'static mut (dyn FnMut() + 'static)> = None;
+
+static mut APP_CORE_STACK_TOP: Option<*mut u32> = None;
 
 /// Will park the APP (second) core when dropped
 #[must_use]
@@ -143,10 +163,6 @@ impl CpuControl {
     }
 
     unsafe fn start_core1_init() -> ! {
-        extern "C" {
-            static mut _stack_end_cpu1: u32;
-        }
-
         // disables interrupts
         xtensa_lx::interrupt::set_mask(0);
 
@@ -156,7 +172,7 @@ impl CpuControl {
         xtensa_lx::timer::set_ccompare2(0);
 
         // set stack pointer to end of memory: no need to retain stack up to this point
-        set_stack_pointer(&mut _stack_end_cpu1);
+        set_stack_pointer(unsafe { APP_CORE_STACK_TOP.unwrap() });
 
         extern "C" {
             static mut _init_start: u32;
@@ -181,8 +197,9 @@ impl CpuControl {
     /// The second core will start running the closure `entry`.
     ///
     /// Dropping the returned guard will park the core.
-    pub fn start_app_core<'a>(
+    pub fn start_app_core<'a, const SIZE: usize>(
         &mut self,
+        stack: &'static mut Stack<SIZE>,
         entry: &'a mut (dyn FnMut() + Send),
     ) -> Result<AppCoreGuard<'a>, Error> {
         let system_control = crate::peripherals::SYSTEM::PTR;
@@ -199,6 +216,9 @@ impl CpuControl {
         }
 
         unsafe {
+            let stack_size = (stack.mem.len() - 4) & !0xf;
+            APP_CORE_STACK_TOP = Some((stack as *mut _ as usize + stack_size) as *mut u32);
+
             let entry_fn: &'static mut (dyn FnMut() + 'static) = core::mem::transmute(entry);
             START_CORE1_FUNCTION = Some(entry_fn);
         }
