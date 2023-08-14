@@ -32,10 +32,6 @@ ASSERT(_stext + SIZEOF(.text) < ORIGIN(ROTEXT) + LENGTH(ROTEXT), "
 ERROR(riscv-rt): The .text section must be placed inside the ROTEXT region.
 Set _stext to an address smaller than 'ORIGIN(ROTEXT) + LENGTH(ROTEXT)'");
 
-ASSERT(SIZEOF(.stack) > (_max_hart_id + 1) * _hart_stack_size, "
-ERROR(riscv-rt): .stack section is too small for allocating stacks for all the harts.
-Consider changing `_max_hart_id` or `_hart_stack_size`.");
-
 ASSERT(SIZEOF(.got) == 0, "
 .got section detected in the input files. Dynamic relocations are not
 supported. If you are linking to C code compiled using the `gcc` crate

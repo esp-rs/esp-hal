@@ -1,17 +1,17 @@
 /* before memory.x to allow override */
 ENTRY(Reset)
 
-_external_ram_start = ABSOLUTE(ORIGIN(psram_seg));
-_external_ram_end = ABSOLUTE(ORIGIN(psram_seg)+LENGTH(psram_seg));
+_stack_region_top = ABSOLUTE(ORIGIN(dram_seg))+LENGTH(dram_seg);
+_stack_region_bottom = _stack_end;
 
-_heap_end = ABSOLUTE(ORIGIN(dram_seg))+LENGTH(dram_seg)+LENGTH(reserved_for_boot_seg) - 2*STACK_SIZE;
-_text_heap_end = ABSOLUTE(ORIGIN(iram_seg)+LENGTH(iram_seg));
-_external_heap_end = ABSOLUTE(ORIGIN(psram_seg)+LENGTH(psram_seg));
-
-_stack_start_cpu1 = _heap_end;
-_stack_end_cpu1 = _stack_start_cpu1 + STACK_SIZE;
-_stack_start_cpu0 = _stack_end_cpu1;
-_stack_end_cpu0 = _stack_start_cpu0 + STACK_SIZE;
+/*
+ use the whole remaining memory as stack / evenly divided for each core
+ TODO: how to make this more flexible, e.g. give one core more stack than the other
+*/
+_stack_end_cpu0 = _stack_region_top;
+_stack_start_cpu0 = _stack_region_top - ((_stack_region_top - _stack_region_bottom) / 2);
+_stack_end_cpu1 = _stack_start_cpu0 - (_stack_start_cpu0 % 16);
+_stack_start_cpu1 = _stack_region_bottom;
 
 EXTERN(DefaultHandler);
 
@@ -187,6 +187,13 @@ SECTIONS {
     . = ALIGN (4);
   } > RWDATA
 
+  /* must be last segment using RWDATA */
+  .stack_end (NOLOAD) : ALIGN(4)
+  {
+    . = ALIGN (4);
+    _stack_end = ABSOLUTE(.);
+  } > RWDATA
+  
   .rtc_fast.text ORIGIN(rtc_fast_iram_seg) : 
       AT(_text_size + SIZEOF(.header) + SIZEOF(.pre_header) + SIZEOF(.rodata) + SIZEOF(.rwtext) )
   {

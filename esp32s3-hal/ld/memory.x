@@ -47,7 +47,4 @@ MEMORY
 
   /* RTC slow memory (data accessible). Persists over deep sleep. */
   rtc_slow_seg(RW)       : ORIGIN = 0x50000000 + RESERVE_RTC_SLOW, len = 8k - RESERVE_RTC_SLOW
-
-  /* external memory, including data and text */
-  psram_seg(RWX)         : ORIGIN =  0x3F500000, len = 0xA80000 /* ??? */
 }
