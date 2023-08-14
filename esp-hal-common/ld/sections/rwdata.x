@@ -51,9 +51,9 @@ SECTIONS {
   } > RWDATA AT > RODATA
 
   /* must be last segment using RWDATA */
-  .heap_start (NOLOAD) : ALIGN(4)
+  .stack_end (NOLOAD) : ALIGN(4)
   {
     . = ALIGN (4);
-    _heap_start = ABSOLUTE(.);
+    _stack_end = ABSOLUTE(.);
   } > RWDATA
 }

@@ -1,17 +1,14 @@
 /* before memory.x to allow override */
 ENTRY(Reset)
 
-_external_ram_start = ABSOLUTE(ORIGIN(psram_seg));
-_external_ram_end = ABSOLUTE(ORIGIN(psram_seg)+LENGTH(psram_seg));
+_stack_region_top = ABSOLUTE(ORIGIN(dram_seg))+LENGTH(dram_seg);
+_stack_region_bottom = _stack_end;
 
-_heap_end = ABSOLUTE(ORIGIN(dram_seg))+LENGTH(dram_seg)+LENGTH(reserved_for_boot_seg) - 2*STACK_SIZE;
-_text_heap_end = ABSOLUTE(ORIGIN(iram_seg)+LENGTH(iram_seg));
-_external_heap_end = ABSOLUTE(ORIGIN(psram_seg)+LENGTH(psram_seg));
-
-_stack_start_cpu1 = _heap_end;
-_stack_end_cpu1 = _stack_start_cpu1 + STACK_SIZE;
-_stack_start_cpu0 = _stack_end_cpu1;
-_stack_end_cpu0 = _stack_start_cpu0 + STACK_SIZE;
+/*
+ use the whole remaining memory as core-0's stack
+*/
+_stack_end_cpu0 = _stack_region_top;
+_stack_start_cpu0 = _stack_region_bottom;
 
 EXTERN(DefaultHandler);
 
@@ -187,6 +184,13 @@ SECTIONS {
     . = ALIGN (4);
   } > RWDATA
 
+  /* must be last segment using RWDATA */
+  .stack_end (NOLOAD) : ALIGN(4)
+  {
+    . = ALIGN (4);
+    _stack_end = ABSOLUTE(.);
+  } > RWDATA
+  
   .rtc_fast.text ORIGIN(rtc_fast_iram_seg) : 
       AT(_text_size + SIZEOF(.header) + SIZEOF(.pre_header) + SIZEOF(.rodata) + SIZEOF(.rwtext) )
   {
@@ -270,37 +274,4 @@ SECTIONS {
     *(.rtc_slow.noinit .rtc_slow.noinit.*)
     . = ALIGN (4);
   }
-
- .external.data :
-  {
-    _external_data_start = ABSOLUTE(.);
-    . = ALIGN(4);
-    *(.external.data .external.data.*)
-    . = ALIGN (4);
-    _external_data_end = ABSOLUTE(.);
-  } > psram_seg AT > RODATA
-
- .external.bss (NOLOAD) :
-  {
-    _external_bss_start = ABSOLUTE(.);
-    . = ALIGN(4);
-    *(.external.bss .external.bss.*)
-    . = ALIGN (4);
-    _external_bss_end = ABSOLUTE(.);
-  } > psram_seg
-
- .external.noinit (NOLOAD) :
-  {
-    . = ALIGN(4);
-    *(.external.noinit .external.noinit.*)
-    . = ALIGN (4);
-  } > psram_seg
-
-  /* must be last segment using psram_seg */
-  .external_heap_start (NOLOAD) :
-  {
-    . = ALIGN (4);
-    _external_heap_start = ABSOLUTE(.);
-    . = ALIGN (4);
-  } > psram_seg 
 }
