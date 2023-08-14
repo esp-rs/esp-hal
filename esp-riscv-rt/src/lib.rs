@@ -405,6 +405,8 @@ _abs_start:
 
     // Allocate stack
     la sp, _stack_start
+    lui t0, 16
+    sub sp, sp, t0
 
     // Set frame pointer
     add s0, sp, zero
