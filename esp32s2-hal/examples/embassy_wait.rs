@@ -6,12 +6,11 @@
 #![no_main]
 #![feature(type_alias_impl_trait)]
 
-use embassy_executor::Executor;
 use embassy_time::{Duration, Timer};
 use embedded_hal_async::digital::Wait;
 use esp32s2_hal::{
     clock::ClockControl,
-    embassy,
+    embassy::{self, executor::Executor},
     gpio::{Gpio0, Input, PullDown},
     peripherals::Peripherals,
     prelude::*,

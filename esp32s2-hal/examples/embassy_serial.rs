@@ -9,11 +9,10 @@
 
 use core::fmt::Write;
 
-use embassy_executor::Executor;
 use embassy_time::{with_timeout, Duration};
 use esp32s2_hal::{
     clock::ClockControl,
-    embassy,
+    embassy::{self, executor::Executor},
     interrupt,
     peripherals::{Interrupt, Peripherals, UART0},
     prelude::*,

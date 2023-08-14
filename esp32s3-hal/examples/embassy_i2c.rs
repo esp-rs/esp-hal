@@ -14,11 +14,10 @@
 #![no_main]
 #![feature(type_alias_impl_trait)]
 
-use embassy_executor::Executor;
 use embassy_time::{Duration, Timer};
 use esp32s3_hal::{
     clock::ClockControl,
-    embassy,
+    embassy::{self, executor::Executor},
     i2c::I2C,
     interrupt,
     peripherals::{Interrupt, Peripherals, I2C0},

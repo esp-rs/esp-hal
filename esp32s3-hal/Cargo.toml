@@ -33,7 +33,6 @@ r0             = { version = "1.0.0",  optional = true }
 aes                = "0.8.3"
 critical-section   = "1.1.2"
 crypto-bigint      = { version = "0.5.2", default-features = false}
-embassy-executor   = { version = "0.2.0", features = ["nightly", "integrated-timers", "arch-xtensa", "executor-thread"] }
 embedded-graphics  = "0.8.1"
 embedded-hal       = { version = "0.2.7",  features = ["unproven"] }
 embedded-hal-1     = { version = "=1.0.0-rc.1", package = "embedded-hal" }
@@ -67,6 +66,9 @@ embassy              = ["esp-hal-common/embassy"]
 embassy-time-systick = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-hz-16_000_000"]
 embassy-time-timg0   = ["esp-hal-common/embassy-time-timg0", "embassy-time/tick-hz-1_000_000"]
 
+embassy-executor-thread    = ["esp-hal-common/embassy-executor-thread"]
+embassy-executor-interrupt = ["esp-hal-common/embassy-executor-interrupt"]
+
 psram     = []
 psram_2m  = ["esp-hal-common/psram_2m", "psram"]
 psram_4m  = ["esp-hal-common/psram_4m", "psram"]
@@ -88,15 +90,15 @@ required-features = ["eh1"]
 
 [[example]]
 name              = "embassy_hello_world"
-required-features = ["embassy"]
+required-features = ["embassy", "embassy-executor-thread"]
 
 [[example]]
 name              = "embassy_wait"
-required-features = ["embassy", "async"]
+required-features = ["embassy", "embassy-executor-thread", "async"]
 
 [[example]]
 name              = "embassy_spi"
-required-features = ["embassy", "async"]
+required-features = ["embassy", "embassy-executor-thread", "async"]
 
 [[example]]
 name              = "psram"
@@ -108,8 +110,8 @@ required-features = ["opsram_2m"]
 
 [[example]]
 name              = "embassy_serial"
-required-features = ["embassy", "async"]
+required-features = ["embassy", "embassy-executor-thread", "async"]
 
 [[example]]
 name              = "embassy_i2c"
-required-features = ["embassy", "async"]
+required-features = ["embassy", "embassy-executor-thread", "async"]

@@ -18,12 +18,11 @@
 #![no_main]
 #![feature(type_alias_impl_trait)]
 
-use embassy_executor::Executor;
 use embassy_time::{Duration, Timer};
 use esp32s2_hal::{
     clock::ClockControl,
     dma::DmaPriority,
-    embassy,
+    embassy::{self, executor::Executor},
     pdma::*,
     peripherals::Peripherals,
     prelude::*,

@@ -22,11 +22,16 @@
 //!       about the alarm's timestamp, a callback function to be executed when
 //!       the alarm triggers, and a context pointer for passing user-defined
 //!       data to the callback.
+//!   * `executor` module
+//!     - This module contains the implementations of a multi-core safe
+//!       thread-mode and an interrupt-mode executor for Xtensa-based ESP chips.
 //!
 //! ## Example
 //! The following example demonstrates how to use the `embassy` driver to
 //! schedule asynchronous tasks.<br> In this example, we use the `embassy`
-//! driver to wait for a GPIO 9 pin state to change. ```no_run
+//! driver to wait for a GPIO 9 pin state to change.
+//!
+//! ```no_run
 //! #[cfg(feature = "embassy-time-systick")]
 //! embassy::init(
 //!     &clocks,
@@ -52,7 +57,7 @@
 //!     spawner.spawn(ping(input)).ok();
 //! });
 //! ```
-//! 
+//!
 //! Where `ping` defined as:
 //! ```no_run
 //! async fn ping(mut pin: Gpio9<Input<PullDown>>) {
@@ -67,12 +72,18 @@
 //! For more embassy-related examples check out the [examples repo](https://github.com/esp-rs/esp-hal/tree/main/esp32-hal/examples)
 //! for a corresponding board.
 
+#[cfg(any(
+    feature = "embassy-executor-interrupt",
+    feature = "embassy-executor-thread"
+))]
+pub mod executor;
+
 use core::cell::Cell;
 
 use embassy_time::driver::{AlarmHandle, Driver};
 
 #[cfg_attr(
-    all(systimer, feature = "embassy-time-systick",),
+    all(systimer, feature = "embassy-time-systick"),
     path = "time_driver_systimer.rs"
 )]
 #[cfg_attr(
