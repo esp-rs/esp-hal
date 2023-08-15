@@ -33,6 +33,8 @@ xtensa-atomic-emulation-trap = "0.4.0"
 aes                = "0.8.3"
 critical-section   = "1.1.2"
 crypto-bigint      = { version = "0.5.2", default-features = false }
+embassy-executor   = { version = "0.2.1", features = ["nightly"] }
+embassy-sync       = "0.2.0"
 embedded-graphics  = "0.8.1"
 embedded-hal-1     = { version = "=1.0.0-rc.1", package = "embedded-hal" }
 embedded-hal-async = "=1.0.0-rc.1"
@@ -44,7 +46,7 @@ esp-println        = { version = "0.5.0", features = ["esp32s2"] }
 heapless           = "0.7.16"
 hmac               = { version = "0.12.1", default-features = false }
 lis3dh-async       = { git = "https://github.com/jessebraham/lis3dh-rs-async", branch = "feature/eh-rc1" }
-sha2               = { version = "0.10.7", default-features = false}
+sha2               = { version = "0.10.7", default-features = false }
 smart-leds         = "0.3.0"
 ssd1306            = "0.8.0"
 static_cell        = "1.2.0"
@@ -88,6 +90,10 @@ required-features = ["eh1"]
 [[example]]
 name              = "embassy_hello_world"
 required-features = ["embassy", "embassy-executor-thread"]
+
+[[example]]
+name              = "embassy_multiprio"
+required-features = ["embassy", "embassy-executor-interrupt"]
 
 [[example]]
 name              = "embassy_wait"

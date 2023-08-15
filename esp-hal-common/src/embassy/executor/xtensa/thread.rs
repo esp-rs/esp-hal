@@ -10,10 +10,12 @@ use embassy_executor::{
 };
 #[cfg(esp32)]
 use peripherals::DPORT as SystemPeripheral;
-#[cfg(not(esp32))]
+#[cfg(all(not(esp32), multi_core))]
 use peripherals::SYSTEM as SystemPeripheral;
 
-use crate::{get_core, interrupt, peripherals, prelude::interrupt};
+use crate::{get_core, prelude::interrupt};
+#[cfg(multi_core)]
+use crate::{interrupt, peripherals};
 
 /// global atomic used to keep track of whether there is work to do since sev()
 /// is not available on Xtensa

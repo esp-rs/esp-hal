@@ -4,20 +4,19 @@ use core::{
     marker::PhantomData,
     mem::MaybeUninit,
     ptr,
-    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+    sync::atomic::{AtomicUsize, Ordering},
 };
 
 use embassy_executor::{
     raw::{self, Pender},
     SendSpawner,
-    Spawner,
 };
 #[cfg(esp32)]
 use peripherals::DPORT as SystemPeripheral;
 #[cfg(not(esp32))]
 use peripherals::SYSTEM as SystemPeripheral;
 
-use crate::{get_core, interrupt, peripherals, prelude::interrupt};
+use crate::{get_core, interrupt, peripherals};
 
 static FROM_CPU_IRQ_USED: AtomicUsize = AtomicUsize::new(0);
 
@@ -45,7 +44,7 @@ macro_rules! from_cpu {
 
             impl SwPendableInterrupt for [<FromCpu $cpu>] {
                 fn enable(priority: interrupt::Priority) {
-                    let mask = 1 << get_core() as usize;
+                    let mask = 1 << $cpu;
                     if FROM_CPU_IRQ_USED.fetch_or(mask, Ordering::SeqCst) & mask != 0 {
                         panic!(concat!("FROM_CPU_", $cpu, " is already used by a different executor."));
                     }
