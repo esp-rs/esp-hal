@@ -403,7 +403,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@v1
         with:
           target: riscv32imc-unknown-none-elf, riscv32imac-unknown-none-elf
-          toolchain: "1.65.0"
+          toolchain: "nightly-2022-09-16"
+          components: rust-src
       - uses: Swatinem/rust-cache@v2
 
       # Verify the MSRV for all RISC-V chips.
