@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fix `psram` availability lookup in `esp-hal-common` build script (#718)
+- Fix wrong `dram_seg` length in `esp32s2-hal` linker script (#732)
 
 ### Removed
 
