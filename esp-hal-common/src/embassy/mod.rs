@@ -67,7 +67,7 @@
 //! For more embassy-related examples check out the [examples repo](https://github.com/esp-rs/esp-hal/tree/main/esp32-hal/examples)
 //! for a corresponding board.
 
-use core::{cell::Cell, ptr};
+use core::cell::Cell;
 
 use embassy_time::driver::{AlarmHandle, Driver};
 
@@ -91,11 +91,7 @@ pub fn init(clocks: &Clocks, td: time_driver::TimerType) {
 
 pub struct AlarmState {
     pub timestamp: Cell<u64>,
-
-    // This is really a Option<(fn(*mut ()), *mut ())>
-    // but fn pointers aren't allowed in const yet
-    pub callback: Cell<*const ()>,
-    pub ctx: Cell<*mut ()>,
+    pub callback: Cell<Option<(fn(*mut ()), *mut ())>>,
     pub allocated: Cell<bool>,
 }
 
@@ -104,9 +100,8 @@ unsafe impl Send for AlarmState {}
 impl AlarmState {
     pub const fn new() -> Self {
         Self {
-            timestamp: Cell::new(u64::MAX),
-            callback: Cell::new(ptr::null()),
-            ctx: Cell::new(ptr::null_mut()),
+            timestamp: Cell::new(0),
+            callback: Cell::new(None),
             allocated: Cell::new(false),
         }
     }
@@ -138,10 +133,10 @@ impl Driver for EmbassyTimer {
         callback: fn(*mut ()),
         ctx: *mut (),
     ) {
+        let n = alarm.id() as usize;
         critical_section::with(|cs| {
-            let alarm = unsafe { self.alarms.borrow(cs).get_unchecked(alarm.id() as usize) };
-            alarm.callback.set(callback as *const ());
-            alarm.ctx.set(ctx);
+            let alarm = &self.alarms.borrow(cs)[n];
+            alarm.callback.set(Some((callback, ctx)));
         })
     }
 
