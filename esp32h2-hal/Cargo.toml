@@ -66,6 +66,9 @@ embassy-time-timg0   = ["esp-hal-common/embassy-time-timg0",   "embassy-time/tic
 interrupt-preemption = ["esp-hal-common/interrupt-preemption"]
 direct-vectoring     = ["esp-hal-common/direct-vectoring"]
 
+[profile.release]
+debug = true
+
 [[example]]
 name              = "spi_eh1_loopback"
 required-features = ["eh1"]
