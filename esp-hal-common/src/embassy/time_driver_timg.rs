@@ -2,11 +2,13 @@ use critical_section::{CriticalSection, Mutex};
 use peripherals::TIMG0;
 
 use super::AlarmState;
+#[cfg(any(esp32, esp32s2, esp32s3))]
+use crate::timer::Timer1;
 use crate::{
     clock::Clocks,
     peripherals,
     prelude::*,
-    timer::{Timer, Timer0},
+    timer::{Instance, Timer, Timer0},
 };
 
 #[cfg(not(any(esp32, esp32s2, esp32s3)))]
@@ -14,8 +16,7 @@ pub const ALARM_COUNT: usize = 1;
 #[cfg(any(esp32, esp32s2, esp32s3))]
 pub const ALARM_COUNT: usize = 2;
 
-pub type TimerInner = Timer0<TIMG0>;
-pub type TimerType = Timer<TimerInner>;
+pub type TimerType = Timer<Timer0<TIMG0>>;
 
 pub struct EmbassyTimer {
     pub(crate) alarms: Mutex<[AlarmState; ALARM_COUNT]>,
@@ -29,7 +30,7 @@ embassy_time::time_driver_impl!(static DRIVER: EmbassyTimer = EmbassyTimer {
 
 impl EmbassyTimer {
     pub(crate) fn now() -> u64 {
-        unsafe { TimerInner::steal() }.now()
+        unsafe { Timer0::<TIMG0>::steal() }.now()
     }
 
     pub(crate) fn trigger_alarm(&self, n: usize, cs: CriticalSection) {
@@ -41,9 +42,9 @@ impl EmbassyTimer {
         }
     }
 
-    fn on_interrupt(&self, id: u8) {
-        critical_section::with(|cs| unsafe {
-            TimerInner::steal().clear_interrupt();
+    fn on_interrupt<Timer: Instance>(&self, id: u8, mut timer: Timer) {
+        critical_section::with(|cs| {
+            timer.clear_interrupt();
             self.trigger_alarm(id as usize, cs);
         });
     }
@@ -62,13 +63,15 @@ impl EmbassyTimer {
 
         #[interrupt]
         fn TG0_T0_LEVEL() {
-            DRIVER.on_interrupt(0);
+            let timer = unsafe { Timer0::<TIMG0>::steal() };
+            DRIVER.on_interrupt(0, timer);
         }
 
         #[cfg(any(esp32, esp32s2, esp32s3))]
         #[interrupt]
         fn TG0_T1_LEVEL() {
-            DRIVER.on_interrupt(1);
+            let timer = unsafe { Timer1::<TIMG0>::steal() };
+            DRIVER.on_interrupt(1, timer);
         }
     }
 
@@ -79,23 +82,49 @@ impl EmbassyTimer {
     ) -> bool {
         critical_section::with(|cs| {
             let now = Self::now();
-            let alarm_state = unsafe { self.alarms.borrow(cs).get_unchecked(alarm.id() as usize) };
-            let mut tg = unsafe { TimerInner::steal() };
-            if timestamp < now {
-                tg.unlisten();
-                alarm_state.timestamp.set(u64::MAX);
-                return false;
+
+            let n = alarm.id() as usize;
+            let alarm_state = unsafe { self.alarms.borrow(cs).get_unchecked(n) };
+
+            #[cfg(any(esp32, esp32s2, esp32s3))]
+            if n == 1 {
+                let tg = unsafe { Timer1::<TIMG0>::steal() };
+                return Self::set_alarm_impl(tg, alarm_state, now, timestamp);
             }
-            alarm_state.timestamp.set(timestamp);
 
-            tg.load_alarm_value(timestamp);
-            tg.listen();
-            tg.set_counter_decrementing(false);
-            tg.set_auto_reload(false);
-            tg.set_counter_active(true);
-            tg.set_alarm_active(true);
-
-            true
+            let tg = unsafe { Timer0::<TIMG0>::steal() };
+            Self::set_alarm_impl(tg, alarm_state, now, timestamp)
         })
+    }
+
+    fn set_alarm_impl<Timer: Instance>(
+        tg: Timer,
+        alarm_state: &AlarmState,
+        now: u64,
+        timestamp: u64,
+    ) -> bool {
+        if timestamp < now {
+            Self::disarm(tg);
+            alarm_state.timestamp.set(u64::MAX);
+            return false;
+        }
+        alarm_state.timestamp.set(timestamp);
+
+        Self::arm(tg, timestamp);
+
+        true
+    }
+
+    fn disarm<Timer: Instance>(mut tg: Timer) {
+        tg.unlisten();
+    }
+
+    fn arm<Timer: Instance>(mut tg: Timer, timestamp: u64) {
+        tg.load_alarm_value(timestamp);
+        tg.listen();
+        tg.set_counter_decrementing(false);
+        tg.set_auto_reload(false);
+        tg.set_counter_active(true);
+        tg.set_alarm_active(true);
     }
 }
