@@ -34,12 +34,11 @@ impl EmbassyTimer {
 
     pub(crate) fn trigger_alarm(&self, n: usize, cs: CriticalSection) {
         let alarm = &self.alarms.borrow(cs)[n];
-        // safety:
-        // - we can ignore the possiblity of `f` being unset (null) because of the
-        //   safety contract of `allocate_alarm`.
-        // - other than that we only store valid function pointers into alarm.callback
-        let f: fn(*mut ()) = unsafe { core::mem::transmute(alarm.callback.get()) };
-        f(alarm.ctx.get());
+        alarm.timestamp.set(u64::MAX);
+
+        if let Some((f, ctx)) = alarm.callback.get() {
+            f(ctx);
+        }
     }
 
     fn on_interrupt(&self, id: u8) {
