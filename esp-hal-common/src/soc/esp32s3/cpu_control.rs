@@ -3,28 +3,22 @@
 //! ## Overview
 //!
 //! This module provides essential functionality for controlling
-//! and managing the CPU cores on the `ESP32-S3` chip allowing for fine-grained
-//! control over their execution and cache behavior. It is used in scenarios
-//! where precise control over CPU core operation is required, such as
-//! multi-threading or power management.
-//!
-//! The `CpuControl` struct represents the CPU control module and is responsible
-//! for managing the behavior and operation of the CPU cores. It is typically
-//! initialized with the `SystemCpuControl` struct, which is provided by the
-//! `system` module.
+//! and managing the APP (second) CPU core on the `ESP32-S3` chip. It is used to
+//! start and stop program execution on the APP core.
 //!
 //! ## Example
+//!
 //! ```no_run
 //! static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 //!
 //! let counter = Mutex::new(RefCell::new(0));
 //!
 //! let mut cpu_control = CpuControl::new(system.cpu_control);
-//! let mut cpu1_fnctn = || {
+//! let cpu1_fnctn = || {
 //!     cpu1_task(&mut timer1, &counter);
 //! };
 //! let _guard = cpu_control
-//!     .start_app_core(unsafe { &mut APP_CORE_STACK }, &mut cpu1_fnctn)
+//!     .start_app_core(unsafe { &mut APP_CORE_STACK }, cpu1_fnctn)
 //!     .unwrap();
 //!
 //! loop {
@@ -36,6 +30,7 @@
 //! ```
 //!
 //! Where `cpu1_task()` may be defined as:
+//!
 //! ```no_run
 //! fn cpu1_task(
 //!     timer: &mut Timer<Timer0<TIMG1>>,
@@ -53,27 +48,63 @@
 //! }
 //! ```
 
-use core::marker::PhantomData;
+use core::{
+    marker::PhantomData,
+    mem::{ManuallyDrop, MaybeUninit},
+};
 
 use xtensa_lx::set_stack_pointer;
 
 use crate::Cpu;
 
 /// Data type for a properly aligned stack of N bytes
-#[repr(C, align(64))]
+// Xtensa ISA 10.5: [B]y default, the
+// stack frame is 16-byte aligned. However, the maximal alignment allowed for a
+// TIE ctype is 64-bytes. If a function has any wide-aligned (>16-byte aligned)
+// data type for their arguments or the return values, the caller has to ensure
+// that the SP is aligned to the largest alignment right before the call.
+//
+// ^ this means that we should be able to get away with 16 bytes of alignment
+// because our root stack frame has no arguments and no return values.
+//
+// This alignment also doesn't align the stack frames, only the end of stack.
+// Stack frame alignment depends on the SIZE as well as the placement of the
+// array.
+#[repr(C, align(16))]
 pub struct Stack<const SIZE: usize> {
     /// Memory to be used for the stack
-    pub mem: [u8; SIZE],
+    pub mem: MaybeUninit<[u8; SIZE]>,
 }
 
 impl<const SIZE: usize> Stack<SIZE> {
-    /// Construct a stack of length SIZE, initialized to 0
+    const _ALIGNED: () = assert!(SIZE % 16 == 0); // Make sure stack top is aligned, too.
+
+    /// Construct a stack of length SIZE, uninitialized
+    #[allow(path_statements)]
     pub const fn new() -> Stack<SIZE> {
-        Stack { mem: [0_u8; SIZE] }
+        Self::_ALIGNED;
+
+        Stack {
+            mem: MaybeUninit::uninit(),
+        }
+    }
+
+    pub const fn len(&self) -> usize {
+        SIZE
+    }
+
+    pub fn bottom(&mut self) -> *mut u32 {
+        self.mem.as_mut_ptr() as *mut u32
+    }
+
+    pub fn top(&mut self) -> *mut u32 {
+        unsafe { self.bottom().add(SIZE) }
     }
 }
 
-static mut START_CORE1_FUNCTION: Option<&'static mut (dyn FnMut() + 'static)> = None;
+// Pointer to the closure that will be executed on the second core. The closure
+// is copied to the core's stack.
+static mut START_CORE1_FUNCTION: Option<*mut ()> = None;
 
 static mut APP_CORE_STACK_TOP: Option<*mut u32> = None;
 
@@ -139,8 +170,7 @@ impl CpuControl {
 
     /// Unpark the given core
     pub fn unpark_core(&mut self, core: Cpu) {
-        let rtc_control = crate::peripherals::RTC_CNTL::PTR;
-        let rtc_control = unsafe { &*rtc_control };
+        let rtc_control = unsafe { &*crate::peripherals::RTC_CNTL::ptr() };
 
         match core {
             Cpu::ProCpu => {
@@ -162,7 +192,10 @@ impl CpuControl {
         }
     }
 
-    unsafe fn start_core1_init() -> ! {
+    unsafe fn start_core1_init<F>() -> !
+    where
+        F: FnOnce(),
+    {
         // disables interrupts
         xtensa_lx::interrupt::set_mask(0);
 
@@ -185,11 +218,15 @@ impl CpuControl {
         }
 
         match START_CORE1_FUNCTION.take() {
-            Some(entry) => (*entry)(),
+            Some(entry) => {
+                let entry = unsafe { ManuallyDrop::take(&mut *entry.cast::<ManuallyDrop<F>>()) };
+                entry();
+                loop {
+                    unsafe { internal_park_core(crate::get_core()) };
+                }
+            }
             None => panic!("No start function set"),
         }
-
-        panic!("Return from second core's entry");
     }
 
     /// Start the APP (second) core
@@ -197,11 +234,15 @@ impl CpuControl {
     /// The second core will start running the closure `entry`.
     ///
     /// Dropping the returned guard will park the core.
-    pub fn start_app_core<'a, const SIZE: usize>(
+    pub fn start_app_core<'a, const SIZE: usize, F>(
         &mut self,
         stack: &'static mut Stack<SIZE>,
-        entry: &'a mut (dyn FnMut() + Send),
-    ) -> Result<AppCoreGuard<'a>, Error> {
+        entry: F,
+    ) -> Result<AppCoreGuard<'a>, Error>
+    where
+        F: FnOnce(),
+        F: Send + 'a,
+    {
         let system_control = crate::peripherals::SYSTEM::PTR;
         let system_control = unsafe { &*system_control };
 
@@ -215,12 +256,22 @@ impl CpuControl {
             return Err(Error::CoreAlreadyRunning);
         }
 
-        unsafe {
-            let stack_size = (stack.mem.len() - 4) & !0xf;
-            APP_CORE_STACK_TOP = Some((stack as *mut _ as usize + stack_size) as *mut u32);
+        // We don't want to drop this, since it's getting moved to the other core.
+        let entry = ManuallyDrop::new(entry);
 
-            let entry_fn: &'static mut (dyn FnMut() + 'static) = core::mem::transmute(entry);
+        unsafe {
+            let stack_bottom = stack.bottom().cast::<u8>();
+
+            // Push `entry` to an aligned address at the (physical) bottom of the stack.
+            // The second core will copy it into its proper place, then calls it.
+            let align_offset = stack_bottom.align_offset(core::mem::align_of::<F>());
+            let entry_dst = stack_bottom.add(align_offset).cast::<ManuallyDrop<F>>();
+
+            entry_dst.write(entry);
+
+            let entry_fn = entry_dst.cast::<()>();
             START_CORE1_FUNCTION = Some(entry_fn);
+            APP_CORE_STACK_TOP = Some(stack.top());
         }
 
         // TODO there is no boot_addr register in SVD or TRM - ESP-IDF uses a ROM
@@ -229,7 +280,7 @@ impl CpuControl {
         unsafe {
             let ets_set_appcpu_boot_addr: unsafe extern "C" fn(u32) =
                 core::mem::transmute(ETS_SET_APPCPU_BOOT_ADDR);
-            ets_set_appcpu_boot_addr(Self::start_core1_init as *const u32 as u32);
+            ets_set_appcpu_boot_addr(Self::start_core1_init::<F> as *const u32 as u32);
         };
 
         system_control

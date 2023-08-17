@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+### Breaking
+
+- `CpuControl::start_app_core()` now takes an `FnOnce` closure (#739)
+
 ## [0.11.0] - 2023-08-10
 
 ### Added
