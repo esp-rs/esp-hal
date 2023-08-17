@@ -96,15 +96,6 @@ impl EmbassyTimer {
         }
     }
 
-    fn disarm(&self, id: usize) {
-        match id {
-            0 => self.alarm0.interrupt_enable(false),
-            1 => self.alarm1.interrupt_enable(false),
-            2 => self.alarm2.interrupt_enable(false),
-            _ => {}
-        };
-    }
-
     fn arm(&self, id: usize, timestamp: u64) {
         match id {
             0 => {

@@ -110,10 +110,6 @@ impl EmbassyTimer {
         true
     }
 
-    fn disarm<Timer: Instance>(tg: &mut Timer) {
-        tg.unlisten();
-    }
-
     fn arm<Timer: Instance>(tg: &mut Timer, timestamp: u64) {
         tg.load_alarm_value(timestamp);
         tg.listen();
