@@ -75,20 +75,12 @@ impl EmbassyTimer {
         timestamp: u64,
     ) -> bool {
         critical_section::with(|cs| {
-            let now = Self::now();
-
             let n = alarm.id() as usize;
             let alarm_state = &self.alarms.borrow(cs)[n];
 
-            if timestamp < now {
-                // If alarm timestamp has passed the alarm will not fire.
-                // Disarm the alarm and return `false` to indicate that.
-                self.disarm(n);
-                alarm_state.timestamp.set(u64::MAX);
-                return false;
-            }
+            // The hardware fires the alarm even if timestamp is lower than the current
+            // time.
             alarm_state.timestamp.set(timestamp);
-
             self.arm(n, timestamp);
 
             true

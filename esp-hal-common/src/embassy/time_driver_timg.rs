@@ -81,45 +81,38 @@ impl EmbassyTimer {
         timestamp: u64,
     ) -> bool {
         critical_section::with(|cs| {
-            let now = Self::now();
-
             let n = alarm.id() as usize;
             let alarm_state = unsafe { self.alarms.borrow(cs).get_unchecked(n) };
 
             #[cfg(any(esp32, esp32s2, esp32s3))]
             if n == 1 {
                 let tg = unsafe { Timer1::<TIMG0>::steal() };
-                return Self::set_alarm_impl(tg, alarm_state, now, timestamp);
+                return Self::set_alarm_impl(tg, alarm_state, timestamp);
             }
 
             let tg = unsafe { Timer0::<TIMG0>::steal() };
-            Self::set_alarm_impl(tg, alarm_state, now, timestamp)
+            Self::set_alarm_impl(tg, alarm_state, timestamp)
         })
     }
 
     fn set_alarm_impl<Timer: Instance>(
-        tg: Timer,
+        mut tg: Timer,
         alarm_state: &AlarmState,
-        now: u64,
         timestamp: u64,
     ) -> bool {
-        if timestamp < now {
-            Self::disarm(tg);
-            alarm_state.timestamp.set(u64::MAX);
-            return false;
-        }
+        // The hardware fires the alarm even if timestamp is lower than the current
+        // time.
         alarm_state.timestamp.set(timestamp);
-
-        Self::arm(tg, timestamp);
+        Self::arm(&mut tg, timestamp);
 
         true
     }
 
-    fn disarm<Timer: Instance>(mut tg: Timer) {
+    fn disarm<Timer: Instance>(tg: &mut Timer) {
         tg.unlisten();
     }
 
-    fn arm<Timer: Instance>(mut tg: Timer, timestamp: u64) {
+    fn arm<Timer: Instance>(tg: &mut Timer, timestamp: u64) {
         tg.load_alarm_value(timestamp);
         tg.listen();
         tg.set_counter_decrementing(false);
