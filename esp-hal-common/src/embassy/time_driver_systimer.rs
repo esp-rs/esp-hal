@@ -41,15 +41,10 @@ impl EmbassyTimer {
         }
     }
 
-    fn on_interrupt(&self, id: u8) {
-        match id {
-            0 => self.alarm0.clear_interrupt(),
-            1 => self.alarm1.clear_interrupt(),
-            2 => self.alarm2.clear_interrupt(),
-            _ => unreachable!(),
-        };
+    fn on_interrupt(&self, id: usize) {
         critical_section::with(|cs| {
-            self.trigger_alarm(id as usize, cs);
+            self.clear_interrupt(id);
+            self.trigger_alarm(id, cs);
         })
     }
 
@@ -81,41 +76,58 @@ impl EmbassyTimer {
     ) -> bool {
         critical_section::with(|cs| {
             let now = Self::now();
-            let alarm_state = unsafe { self.alarms.borrow(cs).get_unchecked(alarm.id() as usize) };
+
+            let n = alarm.id() as usize;
+            let alarm_state = &self.alarms.borrow(cs)[n];
+
             if timestamp < now {
                 // If alarm timestamp has passed the alarm will not fire.
                 // Disarm the alarm and return `false` to indicate that.
-                self.disable_interrupt(alarm.id());
+                self.disarm(n);
                 alarm_state.timestamp.set(u64::MAX);
                 return false;
             }
             alarm_state.timestamp.set(timestamp);
-            match alarm.id() {
-                0 => {
-                    self.alarm0.set_target(timestamp);
-                    self.alarm0.interrupt_enable(true);
-                }
-                1 => {
-                    self.alarm1.set_target(timestamp);
-                    self.alarm1.interrupt_enable(true);
-                }
-                2 => {
-                    self.alarm2.set_target(timestamp);
-                    self.alarm2.interrupt_enable(true);
-                }
-                _ => panic!(),
-            }
+
+            self.arm(n, timestamp);
 
             true
         })
     }
 
-    fn disable_interrupt(&self, id: u8) {
+    fn clear_interrupt(&self, id: usize) {
+        match id {
+            0 => self.alarm0.clear_interrupt(),
+            1 => self.alarm1.clear_interrupt(),
+            2 => self.alarm2.clear_interrupt(),
+            _ => {}
+        }
+    }
+
+    fn disarm(&self, id: usize) {
         match id {
             0 => self.alarm0.interrupt_enable(false),
             1 => self.alarm1.interrupt_enable(false),
             2 => self.alarm2.interrupt_enable(false),
-            _ => unreachable!(),
+            _ => {}
         };
+    }
+
+    fn arm(&self, id: usize, timestamp: u64) {
+        match id {
+            0 => {
+                self.alarm0.set_target(timestamp);
+                self.alarm0.interrupt_enable(true);
+            }
+            1 => {
+                self.alarm1.set_target(timestamp);
+                self.alarm1.interrupt_enable(true);
+            }
+            2 => {
+                self.alarm2.set_target(timestamp);
+                self.alarm2.interrupt_enable(true);
+            }
+            _ => {}
+        }
     }
 }
