@@ -84,7 +84,7 @@ impl EmbassyTimer {
     ) -> bool {
         critical_section::with(|cs| {
             let n = alarm.id() as usize;
-            let alarm_state = unsafe { self.alarms.borrow(cs).get_unchecked(n) };
+            let alarm_state = &self.alarms.borrow(cs)[n];
 
             #[cfg(any(esp32, esp32s2, esp32s3))]
             if n == 1 {
