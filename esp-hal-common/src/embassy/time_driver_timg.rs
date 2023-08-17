@@ -57,6 +57,8 @@ impl EmbassyTimer {
         // divider
         timer.set_divider(clocks.apb_clock.to_MHz() as u16);
 
+        timer.set_counter_active(true);
+
         interrupt::enable(peripherals::Interrupt::TG0_T0_LEVEL, Priority::max()).unwrap();
         #[cfg(any(esp32, esp32s2, esp32s3))]
         interrupt::enable(peripherals::Interrupt::TG0_T1_LEVEL, Priority::max()).unwrap();
@@ -117,7 +119,6 @@ impl EmbassyTimer {
         tg.listen();
         tg.set_counter_decrementing(false);
         tg.set_auto_reload(false);
-        tg.set_counter_active(true);
         tg.set_alarm_active(true);
     }
 }
