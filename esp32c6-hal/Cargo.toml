@@ -27,13 +27,13 @@ categories = [
 
 [dependencies]
 esp-hal-common = { version = "0.11.0", features = ["esp32c6"], path = "../esp-hal-common" }
+embassy-time   = { version = "0.1.2", features = ["nightly"], optional = true }
 
 [dev-dependencies]
 aes                = "0.8.3"
 critical-section   = "1.1.2"
 crypto-bigint      = { version = "0.5.2", default-features = false}
 embassy-executor   = { version = "0.2.0", features = ["nightly", "integrated-timers", "arch-riscv32", "executor-thread"] }
-embassy-time       = { version = "0.1.2", features = ["nightly"] }
 embedded-graphics  = "0.8.1"
 embedded-hal-1     = { version = "=1.0.0-alpha.11", package = "embedded-hal" }
 embedded-hal-async = "=0.2.0-alpha.2"
