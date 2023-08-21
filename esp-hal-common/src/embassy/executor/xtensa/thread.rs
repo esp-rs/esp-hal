@@ -4,10 +4,7 @@ use core::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
-use embassy_executor::{
-    raw::{self, Pender},
-    Spawner,
-};
+use embassy_executor::{raw, Spawner};
 #[cfg(all(dport, multi_core))]
 use peripherals::DPORT as SystemPeripheral;
 #[cfg(all(system, multi_core))]
@@ -39,6 +36,32 @@ fn FROM_CPU_INTR0() {
     }
 }
 
+pub(super) fn pend_thread_mode(core: usize) {
+    use core::sync::atomic::Ordering;
+
+    #[cfg(dport)]
+    use crate::peripherals::DPORT as SystemPeripheral;
+    #[cfg(system)]
+    use crate::peripherals::SYSTEM as SystemPeripheral;
+
+    // Signal that there is work to be done.
+    SIGNAL_WORK_THREAD_MODE[core].store(true, Ordering::SeqCst);
+
+    // If we are pending a task on the current core, we're done. Otherwise, we
+    // need to make sure the other core wakes up.
+    #[cfg(multi_core)]
+    if core != crate::get_core() as usize {
+        // We need to clear the interrupt from software. We don't actually
+        // need it to trigger and run the interrupt handler, we just need to
+        // kick waiti to return.
+
+        let system = unsafe { &*SystemPeripheral::PTR };
+        system
+            .cpu_intr_from_cpu_0
+            .write(|w| w.cpu_intr_from_cpu_0().bit(true));
+    }
+}
+
 /// Multi-core Xtensa Executor
 pub struct Executor {
     inner: raw::Executor,
@@ -56,27 +79,7 @@ impl Executor {
         .unwrap();
 
         Self {
-            inner: raw::Executor::new(Pender::new_from_callback(
-                |ctx| {
-                    let core = ctx as usize;
-
-                    // Signal that there is work to be done.
-                    SIGNAL_WORK_THREAD_MODE[core].store(true, Ordering::SeqCst);
-
-                    // If we are pending a task on the current core, we're done. Otherwise, we
-                    // need to make sure the other core wakes up.
-                    #[cfg(multi_core)]
-                    if core != get_core() as usize {
-                        // We need to clear the interrupt from software.
-
-                        let system = unsafe { &*SystemPeripheral::PTR };
-                        system
-                            .cpu_intr_from_cpu_0
-                            .write(|w| w.cpu_intr_from_cpu_0().bit(true));
-                    }
-                },
-                get_core() as usize as *mut (),
-            )),
+            inner: raw::Executor::new(usize::from_le_bytes([0, get_core() as u8, 0, 0]) as *mut ()),
             not_send: PhantomData,
         }
     }

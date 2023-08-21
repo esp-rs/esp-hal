@@ -3,14 +3,10 @@ use core::{
     cell::UnsafeCell,
     marker::PhantomData,
     mem::MaybeUninit,
-    ptr,
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use embassy_executor::{
-    raw::{self, Pender},
-    SendSpawner,
-};
+use embassy_executor::{raw, SendSpawner};
 #[cfg(dport)]
 use peripherals::DPORT as SystemPeripheral;
 #[cfg(system)]
@@ -22,34 +18,39 @@ static FROM_CPU_IRQ_USED: AtomicUsize = AtomicUsize::new(0);
 
 pub trait SwPendableInterrupt {
     fn enable(priority: interrupt::Priority);
+    fn number() -> usize;
     fn pend();
     fn clear();
 }
 
 macro_rules! from_cpu {
-    ($cpu:literal) => {
+    ($irq:literal) => {
         paste::paste! {
-            pub struct [<FromCpu $cpu>];
+            pub struct [<FromCpu $irq>];
 
             /// We don't allow using the same interrupt for multiple executors.
 
-            impl [<FromCpu $cpu>] {
+            impl [<FromCpu $irq>] {
                 fn set_bit(value: bool) {
                     let system = unsafe { &*SystemPeripheral::PTR };
                     system
-                        .[<cpu_intr_from_cpu_ $cpu>]
-                        .write(|w| w.[<cpu_intr_from_cpu_ $cpu>]().bit(value));
+                        .[<cpu_intr_from_cpu_ $irq>]
+                        .write(|w| w.[<cpu_intr_from_cpu_ $irq>]().bit(value));
                 }
             }
 
-            impl SwPendableInterrupt for [<FromCpu $cpu>] {
+            impl SwPendableInterrupt for [<FromCpu $irq>] {
                 fn enable(priority: interrupt::Priority) {
-                    let mask = 1 << $cpu;
+                    let mask = 1 << $irq;
                     if FROM_CPU_IRQ_USED.fetch_or(mask, Ordering::SeqCst) & mask != 0 {
-                        panic!(concat!("FROM_CPU_", $cpu, " is already used by a different executor."));
+                        panic!(concat!("FROM_CPU_", $irq, " is already used by a different executor."));
                     }
 
-                    interrupt::enable(peripherals::Interrupt::[<FROM_CPU_INTR $cpu>], priority).unwrap();
+                    interrupt::enable(peripherals::Interrupt::[<FROM_CPU_INTR $irq>], priority).unwrap();
+                }
+
+                fn number() -> usize {
+                    $irq
                 }
 
                 fn pend() {
@@ -165,10 +166,7 @@ where
         unsafe {
             (*self.executor.get())
                 .as_mut_ptr()
-                .write(raw::Executor::new(Pender::new_from_callback(
-                    |_| SWI::pend(),
-                    ptr::null_mut(),
-                )))
+                .write(raw::Executor::new(SWI::number() as *mut ()))
         }
 
         SWI::enable(priority);

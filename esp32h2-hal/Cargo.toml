@@ -33,7 +33,7 @@ embassy-time   = { version = "0.1.3", features = ["nightly"], optional = true }
 aes                = "0.8.3"
 critical-section   = "1.1.2"
 crypto-bigint      = { version = "0.5.2", default-features = false }
-embassy-executor   = { version = "0.2.0", features = ["nightly", "integrated-timers", "arch-riscv32", "executor-thread"] }
+embassy-executor   = { version = "0.3.0", features = ["nightly", "integrated-timers", "arch-riscv32", "executor-thread"] }
 embedded-graphics  = "0.8.1"
 embedded-hal-1     = { version = "=1.0.0-rc.1", package = "embedded-hal" }
 embedded-hal-async = "=1.0.0-rc.1"
