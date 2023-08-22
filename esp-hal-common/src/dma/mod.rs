@@ -140,7 +140,7 @@ pub enum DmaPeripheral {
     Adc    = 8,
     #[cfg(esp32s3)]
     Rmt    = 9,
-    #[cfg(any(esp32c6, esp32h2))]
+    #[cfg(parl_io)]
     ParlIo = 9,
 }
 
