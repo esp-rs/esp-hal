@@ -277,6 +277,9 @@ pub fn initialize(
         rom_ets_update_cpu_frequency(240); // we know it's 240MHz because of the check above
     }
 
+    #[cfg(feature = "wifi")]
+    crate::wifi::DataFrame::internal_init();
+
     log::info!("esp-wifi configuration {:?}", crate::CONFIG);
 
     crate::common_adapter::chip_specific::enable_wifi_power_domain();
