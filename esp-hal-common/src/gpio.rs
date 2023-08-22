@@ -29,7 +29,7 @@ use crate::peripherals::{GPIO, IO_MUX};
 pub(crate) use crate::rtc_pins;
 pub use crate::soc::gpio::*;
 pub(crate) use crate::{gpiopin_HList, gpiopin_hlist, analog, gpio};
-use frunk::hlist::Plucker;
+pub use frunk::hlist::{HList, Plucker };
 
 
 /// Convenience type-alias for a no-pin / don't care - pin
