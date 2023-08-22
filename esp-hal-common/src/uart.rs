@@ -1132,8 +1132,12 @@ where
     }
 
     fn flush(&mut self) -> Result<(), Self::Error> {
-        while let Err(nb::Error::WouldBlock) = self.flush_tx() {
-            // Wait
+        loop {
+            match self.flush_tx() {
+                Ok(_) => break,
+                Err(nb::Error::WouldBlock) => { /* Wait */ }
+                Err(nb::Error::Other(e)) => return Err(e),
+            }
         }
 
         Ok(())

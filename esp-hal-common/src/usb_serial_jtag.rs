@@ -52,16 +52,14 @@ impl<'d> UsbSerialJtag<'d> {
     }
 
     /// Write data to the serial output in chunks of up to 64 bytes
-    pub fn write_bytes(&mut self, data: &[u8]) -> Result<usize, Error> {
+    pub fn write_bytes(&mut self, data: &[u8]) -> Result<(), Error> {
         let reg_block = self.usb_serial.register_block();
 
-        let mut count = 0;
         for chunk in data.chunks(64) {
             for byte in chunk {
                 reg_block
                     .ep1
                     .write(|w| unsafe { w.rdwr_byte().bits(*byte) });
-                count += 1;
             }
             reg_block.ep1_conf.write(|w| w.wr_done().set_bit());
 
@@ -70,7 +68,7 @@ impl<'d> UsbSerialJtag<'d> {
             }
         }
 
-        Ok(count)
+        Ok(())
     }
 
     /// Write data to the serial output in a non-blocking manner
@@ -318,7 +316,9 @@ impl embedded_io::Read for UsbSerialJtag<'_> {
 
 impl embedded_io::Write for UsbSerialJtag<'_> {
     fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        self.write_bytes(buf)
+        self.write_bytes(buf)?;
+
+        Ok(buf.len())
     }
 
     fn flush(&mut self) -> Result<(), Self::Error> {
@@ -382,23 +382,21 @@ mod asynch {
     }
 
     impl UsbSerialJtag<'_> {
-        async fn write_bytes_async(&mut self, words: &[u8]) -> Result<usize, Error> {
+        async fn write_bytes_async(&mut self, words: &[u8]) -> Result<(), Error> {
             let reg_block = self.usb_serial.register_block();
 
-            let mut count = 0;
             for chunk in words.chunks(64) {
                 for byte in chunk {
                     reg_block
                         .ep1
                         .write(|w| unsafe { w.rdwr_byte().bits(*byte) });
-                    count += 1;
                 }
                 reg_block.ep1_conf.write(|w| w.wr_done().set_bit());
 
                 UsbSerialJtagFuture::new(self.inner()).await;
             }
 
-            Ok(count)
+            Ok(())
         }
 
         async fn flush_tx_async(&mut self) -> Result<(), Error> {
@@ -414,7 +412,9 @@ mod asynch {
 
     impl embedded_io_async::Write for UsbSerialJtag<'_> {
         async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-            self.write_bytes_async(buf).await
+            self.write_bytes_async(buf).await?;
+
+            Ok(buf.len())
         }
 
         async fn flush(&mut self) -> Result<(), Self::Error> {
