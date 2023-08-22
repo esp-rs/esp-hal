@@ -57,11 +57,11 @@ fn main() -> ! {
     let counter = Mutex::new(RefCell::new(0));
 
     let mut cpu_control = CpuControl::new(system.cpu_control);
-    let mut cpu1_fnctn = || {
+    let cpu1_fnctn = || {
         cpu1_task(&mut timer1, &counter);
     };
     let _guard = cpu_control
-        .start_app_core(unsafe { &mut APP_CORE_STACK }, &mut cpu1_fnctn)
+        .start_app_core(unsafe { &mut APP_CORE_STACK }, cpu1_fnctn)
         .unwrap();
 
     loop {
