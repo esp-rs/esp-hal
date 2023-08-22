@@ -1,13 +1,14 @@
 //! Blinky, but manages the pins with an HList from the `frunk` crate
 //!
-//! This assumes that a LED is connected to the pin assigned in the `Blinker`s pin-field
+//! This assumes that a LED is connected to the pin assigned in the `Blinker`s
+//! pin-field
 
 #![no_std]
 #![no_main]
 
 use esp32s3_hal::{
     clock::ClockControl,
-    gpio::{ Output, Plucker, PushPull, Unknown, IO},
+    gpio::{Output, Plucker, PushPull, Unknown, IO},
     peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
@@ -20,7 +21,6 @@ use esp_hal_common::gpio::GpioPin;
 struct Blinker {
     pin: GpioPin<Output<PushPull>, 4>,
 }
-
 
 impl Blinker {
     fn initialize<T, Remaining>(io: IO<T>) -> (Self, IO<T::Remainder>)
