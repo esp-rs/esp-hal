@@ -43,15 +43,16 @@ INCLUDE "rwtext.x"
 INCLUDE "rwdata.x"
 INCLUDE "rtc_fast.x"
 INCLUDE "rtc_slow.x"
-INCLUDE "external.x"
 /* End of Shared sections */
 
-_heap_end = ABSOLUTE(ORIGIN(dram_seg))+LENGTH(dram_seg) - 2*STACK_SIZE;
+_stack_region_top = ABSOLUTE(ORIGIN(dram_seg))+LENGTH(dram_seg);
+_stack_region_bottom = _stack_end;
 
-_stack_start_cpu1 = _heap_end;
-_stack_end_cpu1 = _stack_start_cpu1 + STACK_SIZE;
-_stack_start_cpu0 = _stack_end_cpu1;
-_stack_end_cpu0 = _stack_start_cpu0 + STACK_SIZE;
+/*
+ use the whole remaining memory as core-0's stack
+*/
+_stack_end_cpu0 = _stack_region_top;
+_stack_start_cpu0 = _stack_region_bottom;
 
 EXTERN(DefaultHandler);
 

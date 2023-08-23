@@ -403,19 +403,9 @@ _abs_start:
     add t0, t0, %lo(_max_hart_id)
     bgtu t2, t0, abort
 
-    // Allocate stacks
+    // Allocate stack
     la sp, _stack_start
-    lui t0, %hi(_hart_stack_size)
-    add t0, t0, %lo(_hart_stack_size)
-
-    beqz t2, 2f  // Jump if single-hart
-    mv t1, t2
-    mv t3, t0
-1:
-    add t0, t0, t3
-    addi t1, t1, -1
-    bnez t1, 1b
-2:
+    lui t0, 16
     sub sp, sp, t0
 
     // Set frame pointer

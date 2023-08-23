@@ -10,7 +10,7 @@ use core::cell::RefCell;
 use critical_section::Mutex;
 use esp32s3_hal::{
     clock::ClockControl,
-    cpu_control::CpuControl,
+    cpu_control::{CpuControl, Stack},
     peripherals::{Peripherals, TIMG1},
     prelude::*,
     timer::{Timer, Timer0, TimerGroup},
@@ -19,6 +19,8 @@ use esp32s3_hal::{
 use esp_backtrace as _;
 use esp_println::println;
 use nb::block;
+
+static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 
 #[entry]
 fn main() -> ! {
@@ -55,10 +57,12 @@ fn main() -> ! {
     let counter = Mutex::new(RefCell::new(0));
 
     let mut cpu_control = CpuControl::new(system.cpu_control);
-    let mut cpu1_fnctn = || {
+    let cpu1_fnctn = || {
         cpu1_task(&mut timer1, &counter);
     };
-    let _guard = cpu_control.start_app_core(&mut cpu1_fnctn).unwrap();
+    let _guard = cpu_control
+        .start_app_core(unsafe { &mut APP_CORE_STACK }, cpu1_fnctn)
+        .unwrap();
 
     loop {
         block!(timer0.wait()).unwrap();

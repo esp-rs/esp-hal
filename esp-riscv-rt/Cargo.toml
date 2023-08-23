@@ -1,8 +1,8 @@
 [package]
 name         = "esp-riscv-rt"
-version      = "0.3.0"
+version      = "0.5.0"
 edition      = "2021"
-rust-version = "1.60"
+rust-version = "1.65"
 description  = "Minimal runtime / startup for RISC-V CPUs from Espressif"
 repository   = "https://github.com/esp-rs/esp-hal"
 license      = "MIT OR Apache-2.0"

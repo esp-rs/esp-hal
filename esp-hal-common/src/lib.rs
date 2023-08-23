@@ -305,7 +305,7 @@ mod critical_section_impl {
 
 /// FlashSafeDma
 ///
-/// The embedded-hal traits make no guarentees about
+/// The embedded-hal traits make no guarantees about
 /// where the buffers are placed. The DMA implementation in Espressif chips has
 /// a limitation in that it can only access the RAM address space, meaning data
 /// to be transmitted from the flash address space must be copied into RAM

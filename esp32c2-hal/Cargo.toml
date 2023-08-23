@@ -1,6 +1,6 @@
 [package]
 name    = "esp32c2-hal"
-version = "0.8.0"
+version = "0.9.0"
 authors = [
     "Jesse Braham <jesse@beta7.io>",
     "Björn Quentin <bjoern.quentin@mobile-j.de>",
@@ -25,34 +25,33 @@ categories = [
 ]
 
 [dependencies]
-embassy-time       = { version = "0.1.2", features = ["nightly"], optional = true }
-embedded-hal       = { version = "0.2.7", features = ["unproven"] }
-embedded-hal-1     = { version = "=1.0.0-alpha.11", optional = true, package = "embedded-hal" }
-embedded-hal-async = { version = "=0.2.0-alpha.2",   optional = true }
-embedded-hal-nb    = { version = "=1.0.0-alpha.3",  optional = true }
-esp-hal-common     = { version = "0.10.0", features = ["esp32c2"], path = "../esp-hal-common" }
+esp-hal-common = { version = "0.11.0", features = ["esp32c2"], path = "../esp-hal-common" }
+embassy-time   = { git = "https://github.com/embassy-rs/embassy", rev = "4f453d7", features = ["nightly"], optional = true }
 
 [dev-dependencies]
-critical-section  = "1.1.1"
-embassy-executor  = { version = "0.2.0", features = ["nightly", "integrated-timers", "arch-riscv32", "executor-thread"] }
-embedded-graphics = "0.8.0"
-esp-backtrace     = { version = "0.7.0", features = ["esp32c2", "panic-handler", "exception-handler", "print-uart"] }
-esp-println       = { version = "0.5.0", features = ["esp32c2"] }
-lis3dh-async      = "0.7.0"
-sha2              = { version = "0.10.7", default-features = false}
-ssd1306           = "0.8.0"
-static_cell       = "1.1.0"
-heapless          = "0.7.16"
+critical-section   = "1.1.2"
+embassy-executor   = { version = "0.2.0", features = ["nightly", "integrated-timers", "arch-riscv32", "executor-thread"] }
+embedded-graphics  = "0.8.1"
+embedded-hal-1     = { version = "=1.0.0-rc.1", package = "embedded-hal" }
+embedded-hal-async = "=1.0.0-rc.1"
+embedded-io-async  = "0.5.0"
+esp-backtrace      = { version = "0.7.0", features = ["esp32c2", "panic-handler", "exception-handler", "print-uart"] }
+esp-println        = { version = "0.5.0", features = ["esp32c2"] }
+heapless           = "0.7.16"
+lis3dh-async       = { git = "https://github.com/jessebraham/lis3dh-rs-async", branch = "feature/eh-rc1" }
+sha2               = { version = "0.10.7", default-features = false}
+ssd1306            = "0.8.0"
+static_cell        = "1.2.0"
 
 [features]
 default              = ["rt", "vectored", "xtal40mhz"]
 debug                = ["esp-hal-common/debug"]
 direct-boot          = ["esp-hal-common/rv-init-data"]
-eh1                  = ["esp-hal-common/eh1", "dep:embedded-hal-1", "dep:embedded-hal-nb"]
+eh1                  = ["esp-hal-common/eh1"]
 rt                   = []
 ufmt                 = ["esp-hal-common/ufmt"]
 vectored             = ["esp-hal-common/vectored"]
-async                = ["esp-hal-common/async", "embedded-hal-async"]
+async                = ["esp-hal-common/async"]
 embassy              = ["esp-hal-common/embassy"]
 embassy-time-systick = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-hz-16_000_000"]
 embassy-time-timg0   = ["esp-hal-common/embassy-time-timg0",   "embassy-time/tick-hz-1_000_000"]
@@ -60,6 +59,9 @@ xtal26mhz            = ["esp-hal-common/esp32c2_26mhz"]
 xtal40mhz            = ["esp-hal-common/esp32c2_40mhz"] 
 interrupt-preemption = ["esp-hal-common/interrupt-preemption"]
 direct-vectoring     = ["esp-hal-common/direct-vectoring"]
+
+[profile.release]
+debug = true
 
 [[example]]
 name              = "spi_eh1_loopback"

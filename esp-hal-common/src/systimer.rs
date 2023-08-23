@@ -179,11 +179,9 @@ impl<T, const CHANNEL: u8> Alarm<T, CHANNEL> {
             #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
             {
                 match CHANNEL {
-                    0 => {
-                        systimer
-                            .comp0_load
-                            .write(|w| w.timer_comp0_load().set_bit());
-                    }
+                    0 => systimer
+                        .comp0_load
+                        .write(|w| w.timer_comp0_load().set_bit()),
                     1 => systimer
                         .comp1_load
                         .write(|w| w.timer_comp1_load().set_bit()),

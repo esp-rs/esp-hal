@@ -11,15 +11,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add the `esp32c6-lp-hal` package (#714)
+- Add GPIO (output) and delay functionality to `esp32c6-lp-hal` (#715)
+- Implement RTCIO pullup, pulldown and hold control for Xtensa MCUs (#684)
+- Add GPIO input support and implement additional `embedded-hal` output traits for the C6's LP core [#720]
+
+### Changed
+
+- Update the `embedded-hal-*` packages to `1.0.0-rc.1` and implement traits from `embedded-io` and `embedded-io-async` (#747)
+
+### Fixed
+
+- Fix `psram` availability lookup in `esp-hal-common` build script (#718)
+- Fix wrong `dram_seg` length in `esp32s2-hal` linker script (#732)
+- Fix setting alarm when a timer group is used as the alarm source. (#730)
+- Fix `Instant::now()` not counting in some cases when using TIMG0 as the timebase (#737)
+
+### Removed
+
+### Breaking
+
+- `CpuControl::start_app_core()` now takes an `FnOnce` closure (#739)
+
+## [0.11.0] - 2023-08-10
+
+### Added
+
 - Add initial LP-IO support for ESP32-C6 (#639)
 - Implement sleep with some wakeup methods for `esp32` (#574)
 - Add a new RMT driver (#653, #667, #695)
 - Implemented calibrated ADC API for ESP32-S3 (#641)
 - Add MCPWM DeadTime configuration (#406)
 - Implement sleep with some wakeup methods for `esp32-s3` (#660, #689, #696)
-- Add feature enabling directly hooking the interrupt vector table
+- Add feature enabling directly hooking the interrupt vector table (#621)
 - Add `ClockControl::max` helper for all chips (#701)
-- Added module-level documentation for all peripherals
 - Added module-level documentation for all peripherals (#680)
 - Implement sleep with some wakeup methods for `esp32-s3` (#660)
 - Add `FlashSafeDma` wrapper for eh traits which ensure correct DMA transfer from source data in flash (ROM) (#678)
@@ -28,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Update `embedded-hal-*` alpha packages to their latest versions (#640)
 - Implement the `Clone` and `Copy` traits for the `Rng` driver (#650)
+- Use all remaining memory as core-0's stack (#716)
 
 ### Fixed
 
@@ -167,7 +193,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2022-08-05
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/esp-rs/esp-hal/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/esp-rs/esp-hal/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/esp-rs/esp-hal/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/esp-rs/esp-hal/compare/v0.7.1...v0.8.0

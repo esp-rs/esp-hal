@@ -8,9 +8,6 @@ RESERVE_DRAM = 0x8000;
 RESERVE_RTC_FAST = 0;
 RESERVE_RTC_SLOW = 0;
 
-/* define stack size for both cores */
-STACK_SIZE = 8k;
-
 /* Specify main memory areas */
 MEMORY
 {
@@ -38,7 +35,4 @@ MEMORY
 
   /* RTC slow memory (data accessible). Persists over deep sleep. */
   rtc_slow_seg(RW)       : ORIGIN = 0x50000000 + RESERVE_RTC_SLOW, len = 8k - RESERVE_RTC_SLOW
-
-  /* external memory, including data and text */
-  psram_seg(RWX)         : ORIGIN =  0x3F500000, len = 0xA80000 /* ??? */
 }

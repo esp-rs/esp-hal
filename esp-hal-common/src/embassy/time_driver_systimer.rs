@@ -34,23 +34,17 @@ impl EmbassyTimer {
 
     pub(crate) fn trigger_alarm(&self, n: usize, cs: CriticalSection) {
         let alarm = &self.alarms.borrow(cs)[n];
-        // safety:
-        // - we can ignore the possiblity of `f` being unset (null) because of the
-        //   safety contract of `allocate_alarm`.
-        // - other than that we only store valid function pointers into alarm.callback
-        let f: fn(*mut ()) = unsafe { core::mem::transmute(alarm.callback.get()) };
-        f(alarm.ctx.get());
+        alarm.timestamp.set(u64::MAX);
+
+        if let Some((f, ctx)) = alarm.callback.get() {
+            f(ctx);
+        }
     }
 
-    fn on_interrupt(&self, id: u8) {
-        match id {
-            0 => self.alarm0.clear_interrupt(),
-            1 => self.alarm1.clear_interrupt(),
-            2 => self.alarm2.clear_interrupt(),
-            _ => unreachable!(),
-        };
+    fn on_interrupt(&self, id: usize) {
         critical_section::with(|cs| {
-            self.trigger_alarm(id as usize, cs);
+            self.clear_interrupt(id);
+            self.trigger_alarm(id, cs);
         })
     }
 
@@ -81,42 +75,42 @@ impl EmbassyTimer {
         timestamp: u64,
     ) -> bool {
         critical_section::with(|cs| {
-            let now = Self::now();
-            let alarm_state = unsafe { self.alarms.borrow(cs).get_unchecked(alarm.id() as usize) };
-            if timestamp < now {
-                // If alarm timestamp has passed the alarm will not fire.
-                // Disarm the alarm and return `false` to indicate that.
-                self.disable_interrupt(alarm.id());
-                alarm_state.timestamp.set(u64::MAX);
-                return false;
-            }
+            let n = alarm.id() as usize;
+            let alarm_state = &self.alarms.borrow(cs)[n];
+
+            // The hardware fires the alarm even if timestamp is lower than the current
+            // time.
             alarm_state.timestamp.set(timestamp);
-            match alarm.id() {
-                0 => {
-                    self.alarm0.set_target(timestamp);
-                    self.alarm0.interrupt_enable(true);
-                }
-                1 => {
-                    self.alarm1.set_target(timestamp);
-                    self.alarm1.interrupt_enable(true);
-                }
-                2 => {
-                    self.alarm2.set_target(timestamp);
-                    self.alarm2.interrupt_enable(true);
-                }
-                _ => panic!(),
-            }
+            self.arm(n, timestamp);
 
             true
         })
     }
 
-    fn disable_interrupt(&self, id: u8) {
+    fn clear_interrupt(&self, id: usize) {
         match id {
-            0 => self.alarm0.interrupt_enable(false),
-            1 => self.alarm1.interrupt_enable(false),
-            2 => self.alarm2.interrupt_enable(false),
-            _ => unreachable!(),
-        };
+            0 => self.alarm0.clear_interrupt(),
+            1 => self.alarm1.clear_interrupt(),
+            2 => self.alarm2.clear_interrupt(),
+            _ => {}
+        }
+    }
+
+    fn arm(&self, id: usize, timestamp: u64) {
+        match id {
+            0 => {
+                self.alarm0.set_target(timestamp);
+                self.alarm0.interrupt_enable(true);
+            }
+            1 => {
+                self.alarm1.set_target(timestamp);
+                self.alarm1.interrupt_enable(true);
+            }
+            2 => {
+                self.alarm2.set_target(timestamp);
+                self.alarm2.interrupt_enable(true);
+            }
+            _ => {}
+        }
     }
 }

@@ -229,6 +229,26 @@ jobs:
       - name: rustdoc
         run: cd esp32c6-hal/ && cargo doc --features=eh1
 
+  esp32c6-lp-hal:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          target: riscv32imac-unknown-none-elf
+          toolchain: nightly
+          components: rust-src
+      - uses: Swatinem/rust-cache@v2
+
+      # Perform a full build initially to verify that the examples not only
+      # build, but also link successfully.
+      - name: build esp32c6-lp-hal (no features)
+        run: cd esp32c6-lp-hal/ && cargo +nightly build --release --examples
+      # Ensure documentation can be built
+      - name: rustdoc
+        run: cd esp32c6-lp-hal/ && cargo doc
+
   esp32h2-hal:
     runs-on: ubuntu-latest
 
@@ -383,7 +403,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@v1
         with:
           target: riscv32imc-unknown-none-elf, riscv32imac-unknown-none-elf
-          toolchain: "1.65.0"
+          toolchain: "nightly-2022-09-16"
+          components: rust-src
       - uses: Swatinem/rust-cache@v2
 
       # Verify the MSRV for all RISC-V chips.
@@ -393,6 +414,8 @@ jobs:
         run: cd esp32c3-hal/ && cargo check --features=eh1,ufmt
       - name: msrv (esp32c6-hal)
         run: cd esp32c6-hal/ && cargo check --features=eh1,ufmt
+      - name: msrv (esp32c6-lp-hal)
+        run: cd esp32c6-lp-hal/ && cargo check
       - name: msrv (esp32h2-hal)
         run: cd esp32h2-hal/ && cargo check --features=eh1,ufmt
 
@@ -438,6 +461,8 @@ jobs:
         run: cargo +stable clippy --manifest-path=esp32c3-hal/Cargo.toml -- --no-deps
       - name: clippy (esp32c6-hal)
         run: cargo +stable clippy --manifest-path=esp32c6-hal/Cargo.toml -- --no-deps
+      - name: clippy (esp32c6-lp-hal)
+        run: cargo +stable clippy --manifest-path=esp32c6-lp-hal/Cargo.toml -- --no-deps
       - name: clippy (esp32h2-hal)
         run: cargo +stable clippy --manifest-path=esp32h2-hal/Cargo.toml -- --no-deps
 
@@ -494,6 +519,8 @@ jobs:
         run: cargo fmt --all --manifest-path=esp32c3-hal/Cargo.toml -- --check
       - name: rustfmt (esp32c6-hal)
         run: cargo fmt --all --manifest-path=esp32c6-hal/Cargo.toml -- --check
+      - name: rustfmt (esp32c6-lp-hal)
+        run: cargo fmt --all --manifest-path=esp32c6-lp-hal/Cargo.toml -- --check
       - name: rustfmt (esp32h2-hal)
         run: cargo fmt --all --manifest-path=esp32h2-hal/Cargo.toml -- --check
       - name: rustfmt (esp32s2-hal)
@@ -505,14 +532,13 @@ jobs:
   # Changelog
 
   changelog:
-    name: Changelog
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout sources
         uses: actions/checkout@v3
 
-      - name: Check that changelog updated
-        uses: dangoslen/changelog-enforcer@v3
+      - uses: dangoslen/changelog-enforcer@v3
         with:
           changeLogPath: CHANGELOG.md
           skipLabels: "skip-changelog"
