@@ -105,6 +105,8 @@ pub mod ledc;
 pub mod mcpwm;
 #[cfg(usb0)]
 pub mod otg_fs;
+#[cfg(parl_io)]
+pub mod parl_io;
 #[cfg(pcnt)]
 pub mod pcnt;
 pub mod peripheral;

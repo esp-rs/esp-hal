@@ -479,6 +479,8 @@ macro_rules! impl_channel {
             impl I2sPeripheral for [<SuitablePeripheral $num>] {}
             impl I2s0Peripheral for [<SuitablePeripheral $num>] {}
             impl I2s1Peripheral for [<SuitablePeripheral $num>] {}
+            #[cfg(parl_io)]
+            impl ParlIoPeripheral for [<SuitablePeripheral $num>] {}
         }
     };
 }

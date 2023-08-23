@@ -102,6 +102,8 @@ pub enum Peripheral {
     Uart2,
     #[cfg(rsa)]
     Rsa,
+    #[cfg(parl_io)]
+    ParlIo,
 }
 
 pub struct SoftwareInterruptControl {
@@ -518,6 +520,14 @@ impl PeripheralClockControl {
                 system.rsa_conf.modify(|_, w| w.rsa_clk_en().set_bit());
                 system.rsa_conf.modify(|_, w| w.rsa_rst_en().clear_bit());
                 system.rsa_pd_ctrl.modify(|_, w| w.rsa_mem_pd().clear_bit());
+            }
+            #[cfg(parl_io)]
+            Peripheral::ParlIo => {
+                system.parl_io_conf.modify(|_, w| w.parl_clk_en().set_bit());
+                system.parl_io_conf.modify(|_, w| w.parl_rst_en().set_bit());
+                system
+                    .parl_io_conf
+                    .modify(|_, w| w.parl_rst_en().clear_bit());
             }
         }
     }

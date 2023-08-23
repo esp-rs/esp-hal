@@ -30,6 +30,8 @@ pub(crate) mod constants {
     pub const RMT_CLOCK_SRC: bool = false;
     pub const RMT_CLOCK_SRC_FREQ: fugit::HertzU32 = fugit::HertzU32::MHz(32);
 
+    pub const PARL_IO_SCLK: u32 = 96_000_000;
+
     pub const SOC_DRAM_LOW: u32 = 0x4080_0000;
     pub const SOC_DRAM_HIGH: u32 = 0x4085_0000;
 }
