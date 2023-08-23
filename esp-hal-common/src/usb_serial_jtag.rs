@@ -240,6 +240,25 @@ impl core::fmt::Write for UsbSerialJtag<'_> {
     }
 }
 
+#[cfg(feature = "ufmt")]
+impl ufmt_write::uWrite for UsbSerialJtag<'_> {
+    type Error = Error;
+
+    #[inline]
+    fn write_str(&mut self, s: &str) -> Result<(), Self::Error> {
+        self.write_bytes(s.as_bytes())?;
+        Ok(())
+    }
+
+    #[inline]
+    fn write_char(&mut self, ch: char) -> Result<(), Self::Error> {
+        let mut buffer = [0u8; 4];
+        self.write_bytes(ch.encode_utf8(&mut buffer).as_bytes())?;
+
+        Ok(())
+    }
+}
+
 impl embedded_hal::serial::Read<u8> for UsbSerialJtag<'_> {
     type Error = Error;
 
