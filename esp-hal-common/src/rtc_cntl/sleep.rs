@@ -21,10 +21,7 @@
 
 use core::{cell::RefCell, time::Duration};
 
-use crate::{
-    gpio::{Pin, RTCPin},
-    Rtc,
-};
+use crate::{gpio::RTCPin, Rtc};
 
 #[cfg_attr(esp32, path = "rtc/esp32_sleep.rs")]
 #[cfg_attr(esp32s3, path = "rtc/esp32s3_sleep.rs")]
@@ -58,12 +55,12 @@ pub enum Error {
 
 #[allow(unused)]
 #[derive(Debug)]
-pub struct Ext0WakeupSource<'a, P: RTCPin + Pin> {
+pub struct Ext0WakeupSource<'a, P: RTCPin> {
     pin: RefCell<&'a mut P>,
     level: WakeupLevel,
 }
 
-impl<'a, P: RTCPin + Pin> Ext0WakeupSource<'a, P> {
+impl<'a, P: RTCPin> Ext0WakeupSource<'a, P> {
     pub fn new(pin: &'a mut P, level: WakeupLevel) -> Self {
         Self {
             pin: RefCell::new(pin),
@@ -82,6 +79,24 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
         Self {
             pins: RefCell::new(pins),
             level,
+        }
+    }
+}
+
+/// RTC_IO wakeup source
+///
+/// RTC_IO wakeup allows configuring any combination of RTC_IO pins with
+/// arbitrary wakeup levels to wake up the chip from sleep. This wakeup source
+/// can be used to wake up from both light and deep sleep.
+#[allow(unused)]
+pub struct RtcioWakeupSource<'a, 'b> {
+    pins: RefCell<&'a mut [(&'b mut dyn RTCPin, WakeupLevel)]>,
+}
+
+impl<'a, 'b> RtcioWakeupSource<'a, 'b> {
+    pub fn new(pins: &'a mut [(&'b mut dyn RTCPin, WakeupLevel)]) -> Self {
+        Self {
+            pins: RefCell::new(pins),
         }
     }
 }
