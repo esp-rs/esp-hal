@@ -75,6 +75,19 @@ pub enum Error {
     RxFifoOvf,
 }
 
+#[cfg(feature = "eh1")]
+impl embedded_hal_nb::serial::Error for Error {
+    fn kind(&self) -> embedded_hal_nb::serial::ErrorKind {
+        embedded_hal_nb::serial::ErrorKind::Other
+    }
+}
+
+impl embedded_io::Error for Error {
+    fn kind(&self) -> embedded_io::ErrorKind {
+        embedded_io::ErrorKind::Other
+    }
+}
+
 /// UART configuration
 pub mod config {
     /// Number of data bits
@@ -289,13 +302,6 @@ impl<TX: OutputPin, RX: InputPin> UartPins for TxRxPins<'_, TX, RX> {
     }
 }
 
-#[cfg(feature = "eh1")]
-impl embedded_hal_1::serial::Error for Error {
-    fn kind(&self) -> embedded_hal_1::serial::ErrorKind {
-        embedded_hal_1::serial::ErrorKind::Other
-    }
-}
-
 /// UART driver
 pub struct Uart<'d, T> {
     uart: PeripheralRef<'d, T>,
@@ -363,9 +369,13 @@ where
     }
 
     /// Writes bytes
-    pub fn write_bytes(&mut self, data: &[u8]) -> Result<(), Error> {
+    pub fn write_bytes(&mut self, data: &[u8]) -> Result<usize, Error> {
+        let count = data.len();
+
         data.iter()
-            .try_for_each(|c| nb::block!(self.write_byte(*c)))
+            .try_for_each(|c| nb::block!(self.write_byte(*c)))?;
+
+        Ok(count)
     }
 
     /// Configures the AT-CMD detection settings.
@@ -999,13 +1009,16 @@ where
 
     #[inline]
     fn write_str(&mut self, s: &str) -> Result<(), Self::Error> {
-        self.write_bytes(s.as_bytes())
+        self.write_bytes(s.as_bytes())?;
+        Ok(())
     }
 
     #[inline]
     fn write_char(&mut self, ch: char) -> Result<(), Self::Error> {
         let mut buffer = [0u8; 4];
-        self.write_bytes(ch.encode_utf8(&mut buffer).as_bytes())
+        self.write_bytes(ch.encode_utf8(&mut buffer).as_bytes())?;
+
+        Ok(())
     }
 }
 
@@ -1015,7 +1028,9 @@ where
 {
     #[inline]
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        self.write_bytes(s.as_bytes()).map_err(|_| core::fmt::Error)
+        self.write_bytes(s.as_bytes())
+            .map_err(|_| core::fmt::Error)?;
+        Ok(())
     }
 }
 
@@ -1046,7 +1061,7 @@ where
 }
 
 #[cfg(feature = "eh1")]
-impl<T> embedded_hal_1::serial::ErrorType for Uart<'_, T> {
+impl<T> embedded_hal_nb::serial::ErrorType for Uart<'_, T> {
     type Error = Error;
 }
 
@@ -1071,6 +1086,61 @@ where
 
     fn flush(&mut self) -> nb::Result<(), Self::Error> {
         self.flush_tx()
+    }
+}
+
+impl<T> embedded_io::ErrorType for Uart<'_, T> {
+    type Error = Error;
+}
+
+impl<T> embedded_io::Read for Uart<'_, T>
+where
+    T: Instance,
+{
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
+        let mut count = 0;
+        loop {
+            if count >= buf.len() {
+                break;
+            }
+
+            match self.read_byte() {
+                Ok(byte) => {
+                    buf[count] = byte;
+                    count += 1;
+                }
+                Err(nb::Error::WouldBlock) => {
+                    // Block until we have read at least one byte
+                    if count > 0 {
+                        break;
+                    }
+                }
+                Err(nb::Error::Other(e)) => return Err(e),
+            }
+        }
+
+        Ok(count)
+    }
+}
+
+impl<T> embedded_io::Write for Uart<'_, T>
+where
+    T: Instance,
+{
+    fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
+        self.write_bytes(buf)
+    }
+
+    fn flush(&mut self) -> Result<(), Self::Error> {
+        loop {
+            match self.flush_tx() {
+                Ok(_) => break,
+                Err(nb::Error::WouldBlock) => { /* Wait */ }
+                Err(nb::Error::Other(e)) => return Err(e),
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -1222,8 +1292,7 @@ mod asynch {
         /// # Ok
         /// When succesfull, returns the number of bytes written to
         /// buf
-
-        pub async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
+        async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
             let mut read_bytes = 0;
 
             if self.at_cmd_config.is_some() {
@@ -1259,7 +1328,8 @@ mod asynch {
             Ok(read_bytes)
         }
 
-        async fn write(&mut self, words: &[u8]) -> Result<(), Error> {
+        async fn write_async(&mut self, words: &[u8]) -> Result<usize, Error> {
+            let mut count = 0;
             let mut offset: usize = 0;
             loop {
                 let mut next_offset =
@@ -1267,54 +1337,72 @@ mod asynch {
                 if next_offset > words.len() {
                     next_offset = words.len();
                 }
-                for &byte in &words[offset..next_offset] {
-                    self.write_byte(byte).unwrap(); // should never fail
+
+                for byte in &words[offset..next_offset] {
+                    self.write_byte(*byte).unwrap(); // should never fail
+                    count += 1;
                 }
-                if next_offset == words.len() {
+
+                if next_offset >= words.len() {
                     break;
                 }
+
                 offset = next_offset;
                 UartFuture::new(Event::TxFiFoEmpty, self.inner()).await;
             }
-            Ok(())
+
+            Ok(count)
         }
 
-        async fn flush(&mut self) -> Result<(), Error> {
+        async fn flush_async(&mut self) -> Result<(), Error> {
             let count = self.inner_mut().get_tx_fifo_count();
             if count > 0 {
                 UartFuture::new(Event::TxDone, self.inner()).await;
             }
+
             Ok(())
         }
     }
 
-    impl<T> embedded_hal_async::serial::Write for Uart<'_, T>
+    impl<T> embedded_io_async::Read for Uart<'_, T>
     where
         T: Instance,
     {
-        async fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-            self.write(words).await
+        async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
+            self.read_async(buf).await
+        }
+    }
+
+    impl<T> embedded_io_async::Write for Uart<'_, T>
+    where
+        T: Instance,
+    {
+        async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
+            self.write_async(buf).await
         }
 
         async fn flush(&mut self) -> Result<(), Self::Error> {
-            self.flush().await
+            self.flush_async().await
         }
     }
 
     fn intr_handler(uart: &RegisterBlock) -> bool {
         let int_ena_val = uart.int_ena.read();
         let int_raw_val = uart.int_raw.read();
+
         if int_ena_val.txfifo_empty_int_ena().bit_is_set()
             && int_raw_val.txfifo_empty_int_raw().bit_is_set()
         {
             uart.int_ena.write(|w| w.txfifo_empty_int_ena().clear_bit());
             return true;
         }
+
         if int_ena_val.tx_done_int_ena().bit_is_set() && int_raw_val.tx_done_int_raw().bit_is_set()
         {
             uart.int_ena.write(|w| w.tx_done_int_ena().clear_bit());
             return true;
         }
+
         if int_ena_val.at_cmd_char_det_int_ena().bit_is_set()
             && int_raw_val.at_cmd_char_det_int_raw().bit_is_set()
         {
@@ -1324,6 +1412,7 @@ mod asynch {
                 .write(|w| w.at_cmd_char_det_int_ena().clear_bit());
             return true;
         }
+
         if int_ena_val.rxfifo_full_int_ena().bit_is_set()
             && int_raw_val.rxfifo_full_int_raw().bit_is_set()
         {
@@ -1331,6 +1420,7 @@ mod asynch {
             uart.int_ena.write(|w| w.rxfifo_full_int_ena().clear_bit());
             return true;
         }
+
         if int_ena_val.rxfifo_ovf_int_ena().bit_is_set()
             && int_raw_val.rxfifo_ovf_int_raw().bit_is_set()
         {
@@ -1338,6 +1428,7 @@ mod asynch {
             uart.int_ena.write(|w| w.rxfifo_ovf_int_ena().clear_bit());
             return true;
         }
+
         false
     }
 

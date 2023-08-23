@@ -43,7 +43,7 @@ async fn run(mut uart: Uart<'static, UART0>) {
     let mut wbuf: Vec<u8, MAX_BUFFER_SIZE> = Vec::new();
     loop {
         if rbuf.is_empty() {
-            embedded_hal_async::serial::Write::write(
+            embedded_io_async::Write::write(
                 &mut uart,
                 b"Hello async serial. Enter something ended with EOT (CTRL-D).\r\n",
             )
@@ -52,25 +52,28 @@ async fn run(mut uart: Uart<'static, UART0>) {
         } else {
             wbuf.clear();
             write!(&mut wbuf, "\r\n-- received {} bytes --\r\n", rbuf.len()).unwrap();
-            embedded_hal_async::serial::Write::write(&mut uart, wbuf.as_slice())
+            embedded_io_async::Write::write(&mut uart, wbuf.as_slice())
                 .await
                 .unwrap();
-            embedded_hal_async::serial::Write::write(&mut uart, rbuf.as_slice())
+            embedded_io_async::Write::write(&mut uart, rbuf.as_slice())
                 .await
                 .unwrap();
-            embedded_hal_async::serial::Write::write(&mut uart, b"\r\n")
+            embedded_io_async::Write::write(&mut uart, b"\r\n")
                 .await
                 .unwrap();
         }
-        embedded_hal_async::serial::Write::flush(&mut uart)
-            .await
-            .unwrap();
+        embedded_io_async::Write::flush(&mut uart).await.unwrap();
 
         // set rbuf full capacity
         rbuf.resize_default(rbuf.capacity()).ok();
         let mut offset = 0;
         loop {
-            match with_timeout(READ_TIMEOUT, uart.read(&mut rbuf[offset..])).await {
+            match with_timeout(
+                READ_TIMEOUT,
+                embedded_io_async::Read::read(&mut uart, &mut rbuf[offset..]),
+            )
+            .await
+            {
                 Ok(r) => {
                     if let Ok(len) = r {
                         offset += len;

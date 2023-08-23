@@ -140,6 +140,8 @@ pub enum DmaPeripheral {
     Adc    = 8,
     #[cfg(esp32s3)]
     Rmt    = 9,
+    #[cfg(parl_io)]
+    ParlIo = 9,
 }
 
 #[derive(PartialEq, PartialOrd)]
@@ -252,6 +254,8 @@ pub trait I2s0Peripheral: I2sPeripheral + PeripheralMarker {}
 
 /// Marks channels as useable for I2S1
 pub trait I2s1Peripheral: I2sPeripheral + PeripheralMarker {}
+
+pub trait ParlIoPeripheral: PeripheralMarker {}
 
 /// DMA Rx
 pub trait Rx: RxPrivate {}

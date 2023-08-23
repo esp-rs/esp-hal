@@ -16,14 +16,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Implement RTCIO pullup, pulldown and hold control for Xtensa MCUs (#684)
 - Add GPIO input support and implement additional `embedded-hal` output traits for the C6's LP core [#720]
 - S3: Implement RTCIO wakeup source (#690)
+- Add PARL_IO TX driver for ESP32-C6 / ESP32-H2 (#733)
+- Implement `ufmt_write::uWrite` trait for USB Serial JTAG (#751)
 
 ### Changed
+
+- Update the `embedded-hal-*` packages to `1.0.0-rc.1` and implement traits from `embedded-io` and `embedded-io-async` (#747)
 
 ### Fixed
 
 - Fix `psram` availability lookup in `esp-hal-common` build script (#718)
+- Fix wrong `dram_seg` length in `esp32s2-hal` linker script (#732)
+- Fix setting alarm when a timer group is used as the alarm source. (#730)
+- Fix `Instant::now()` not counting in some cases when using TIMG0 as the timebase (#737)
 
 ### Removed
+
+### Breaking
+
+- `CpuControl::start_app_core()` now takes an `FnOnce` closure (#739)
 
 ## [0.11.0] - 2023-08-10
 
