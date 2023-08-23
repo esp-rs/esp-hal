@@ -22,7 +22,7 @@ MEMORY
   vectors_seg ( RX )     : ORIGIN = 0x40020000 + RESERVE_CACHES, len = VECTORS_SIZE /* SRAM0 */
   iram_seg ( RX )        : ORIGIN = 0x40020000 + RESERVE_CACHES + VECTORS_SIZE, len = 192k - RESERVE_CACHES - VECTORS_SIZE /* SRAM0 */
 
-  dram_seg ( RW )        : ORIGIN = 0x3FFB0000 + RESERVE_CACHES + VECTORS_SIZE, len = 192k - RESERVE_CACHES - VECTORS_SIZE
+  dram_seg ( RW )        : ORIGIN = 0x3FFB0000 + RESERVE_CACHES + VECTORS_SIZE, len = 188k - RESERVE_CACHES - VECTORS_SIZE
 
   /* external flash 
      The 0x20 offset is a convenience for the app binary image generation.

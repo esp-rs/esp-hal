@@ -8,9 +8,33 @@
 
 These HALs are `no_std`; if you are looking for `std` support, please use [esp-idf-hal] instead.
 
-This project is still in the early stages of development, and as such there should be no expectation of API stability. A significant number of peripherals currently have drivers implemented (you can see a full list [here]) but have varying levels of functionality. For most basic tasks, this should be usable already.
+If you have any questions, comments, or concerns, please [open an issue], [start a new discussion], or join us on [Matrix]. For additional information regarding any of the crates in this repository, please refer to the relevant crate's README.
 
-If you have any questions, comments, or concerns, please [open an issue], [start a new discussion], or join us on [Matrix]. For additional information regarding any of the crates in this repository, please refer to the crate's README.
+> **Note**
+>
+> This project is still in the relatively early stages of development, and as such there should be no expectation of API stability. A significant number of peripherals currently have drivers implemented but have varying levels of functionality. For most basic tasks, this should be usable already, however some more advanced or uncommon features may not yet be implemented.
+
+[esp-idf-hal]: https://github.com/esp-rs/esp-idf-hal
+[open an issue]: https://github.com/esp-rs/esp-hal/issues/new
+[start a new discussion]: https://github.com/esp-rs/esp-hal/discussions/new
+[matrix]: https://matrix.to/#/#esp-rs:matrix.org
+
+## Getting Started
+
+For information relating to the development of Rust applications on ESP devices, please first read [The Rust on ESP Book].
+
+For information about the HAL and how to use it in your own projects, please refer to the documentation on [crates.io] for the relevant chip.
+
+[The Rust on ESP Book]: (https://esp-rs.github.io/book/)
+[crates.io]: https://crates.io
+
+## Resources
+
+- [The Rust Programming Language](https://doc.rust-lang.org/book/)
+- [The Embedded Rust Book](https://docs.rust-embedded.org/book/index.html)
+- [The Rust on ESP Book](https://esp-rs.github.io/book/)
+
+## HAL Crates
 
 |      Crate       |             Target             | Technical Reference Manual |
 | :--------------: | :----------------------------: | :------------------------: |
@@ -23,11 +47,6 @@ If you have any questions, comments, or concerns, please [open an issue], [start
 |  [esp32s2-hal]   |   `xtensa-esp32s2-none-elf`    |         [ESP32-S2]         |
 |  [esp32s3-hal]   |   `xtensa-esp32s3-none-elf`    |         [ESP32-S3]         |
 
-[here]: https://github.com/esp-rs/esp-hal/issues/19
-[esp-idf-hal]: https://github.com/esp-rs/esp-idf-hal
-[open an issue]: https://github.com/esp-rs/esp-hal/issues/new
-[start a new discussion]: https://github.com/esp-rs/esp-hal/discussions/new
-[matrix]: https://matrix.to/#/#esp-rs:matrix.org
 [esp32-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32-hal
 [esp32c2-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32c2-hal
 [esp32c3-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32c3-hal
@@ -43,26 +62,6 @@ If you have any questions, comments, or concerns, please [open an issue], [start
 [esp32-h2]: https://www.espressif.com/sites/default/files/documentation/esp32-h2_technical_reference_manual_en.pdf
 [esp32-s2]: https://www.espressif.com/sites/default/files/documentation/esp32-s2_technical_reference_manual_en.pdf
 [esp32-s3]: https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf
-
-## Quickstart
-
-If you have not already, we strongly encourage you to read [The Rust on ESP Book] prior to starting.
-
-We recommend using [cargo-generate] and [esp-template] in order to generate a new project. This will allow you to generate a minimal project skeleton with all the required dependencies and configuration ready to go.
-
-You can install [cargo-generate] and generate a new project by running:
-
-```bash
-$ cargo install cargo-generate
-$ cargo generate -a esp-rs/esp-template
-```
-
-For more information on using this template, please refer to [its README].
-
-[the rust on esp book]: https://esp-rs.github.io/book/
-[cargo-generate]: https://github.com/cargo-generate/cargo-generate
-[esp-template]: https://github.com/esp-rs/esp-template
-[its readme]: https://github.com/esp-rs/esp-template/blob/main/README.md
 
 ## Ancillary Crates
 
@@ -86,6 +85,18 @@ There are a number of other crates within the [esp-rs organization] which can be
 [embedded-storage]: https://github.com/rust-embedded-community/embedded-storage
 [esp-wifi]: https://github.com/esp-rs/esp-wifi
 
+## Git Hooks
+
+We provide a simple `pre-commit` hook to verify the formatting of each package prior to committing changes. We _strongly_ encourage use of this git hook.
+
+The hook can be enabled by copying it in to the `.git/hooks/` directory:
+
+```bash
+cp pre-commit .git/hooks/pre-commit
+```
+
+When using this hook, you can choose to ignore its failure on a per-commit basis by committing with the `--no-verify` flag; however, you will need to be sure that all packages are formatted when submitting a pull request.
+
 ## MSRV
 
 The **M**inimum **S**upported **R**ust **V**ersions are:
@@ -95,24 +106,12 @@ The **M**inimum **S**upported **R**ust **V**ersions are:
 - `1.65.0` for Xtensa devices (**ESP32**, **ESP32-S2**, **ESP32-S3**)
 - `1.67.0` for all `async` examples (`embassy_hello_world`, `embassy_wait`, etc.)
 
-Note that targeting the Xtensa ISA currently requires the use of the [esp-rs/rust] compiler fork. Our recommend method of installation is [espup].
+It should be noted that targeting the Xtensa ISA currently requires the use of the [esp-rs/rust] compiler fork. Our recommend method of installation is [espup].
 
 RISC-V is officially supported by the official Rust compiler.
 
 [esp-rs/rust]: https://github.com/esp-rs/rust
 [espup]: https://github.com/esp-rs/espup
-
-## Git Hooks
-
-We provide a simple `pre-commit` hook to verify the formatting of each package prior to committing changes. We strongly encourage use of this git hook.
-
-The hook can be enabled by placing it in the `.git/hooks/` directory:
-
-```bash
-$ cp pre-commit .git/hooks/pre-commit
-```
-
-When using this hook, you can choose to ignore its failure on a per-commit basis by committing with the `--no-verify` flag; however, you will need to be sure that all packages are formatted when submitting a pull request.
 
 ## License
 
