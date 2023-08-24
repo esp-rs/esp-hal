@@ -8,9 +8,9 @@ use embassy_executor::{
     raw::{self, Pender},
     Spawner,
 };
-#[cfg(esp32)]
+#[cfg(all(dport, multi_core))]
 use peripherals::DPORT as SystemPeripheral;
-#[cfg(all(not(esp32), multi_core))]
+#[cfg(all(system, multi_core))]
 use peripherals::SYSTEM as SystemPeripheral;
 
 use crate::{get_core, prelude::interrupt};

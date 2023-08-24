@@ -11,9 +11,9 @@ use embassy_executor::{
     raw::{self, Pender},
     SendSpawner,
 };
-#[cfg(esp32)]
+#[cfg(dport)]
 use peripherals::DPORT as SystemPeripheral;
-#[cfg(not(esp32))]
+#[cfg(system)]
 use peripherals::SYSTEM as SystemPeripheral;
 
 use crate::{get_core, interrupt, peripherals};
