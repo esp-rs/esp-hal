@@ -52,7 +52,7 @@
 //! )
 //! .unwrap();
 //!
-//! let executor = EXECUTOR.init(Executor::new());
+//! let executor = make_static!(Executor::new());
 //! executor.run(|spawner| {
 //!     spawner.spawn(ping(input)).ok();
 //! });

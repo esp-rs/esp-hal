@@ -17,7 +17,7 @@ use esp32_hal::{
     Rtc,
 };
 use esp_backtrace as _;
-use static_cell::StaticCell;
+use static_cell::make_static;
 
 #[embassy_executor::task]
 async fn run1() {
@@ -34,8 +34,6 @@ async fn run2() {
         Timer::after(Duration::from_millis(5_000)).await;
     }
 }
-
-static EXECUTOR: StaticCell<Executor> = StaticCell::new();
 
 #[entry]
 fn main() -> ! {
@@ -66,7 +64,7 @@ fn main() -> ! {
     #[cfg(feature = "embassy-time-timg0")]
     embassy::init(&clocks, timer_group0.timer0);
 
-    let executor = EXECUTOR.init(Executor::new());
+    let executor = make_static!(Executor::new());
     executor.run(|spawner| {
         spawner.spawn(run1()).ok();
         spawner.spawn(run2()).ok();

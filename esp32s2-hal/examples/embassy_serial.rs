@@ -23,7 +23,7 @@ use esp32s2_hal::{
 use esp_backtrace as _;
 use esp_hal_common::uart::config::AtCmdConfig;
 use heapless::Vec;
-use static_cell::StaticCell;
+use static_cell::make_static;
 
 // rx_fifo_full_threshold
 const READ_BUF_SIZE: usize = 64;
@@ -100,8 +100,6 @@ async fn run(mut uart: Uart<'static, UART0>) {
     }
 }
 
-static EXECUTOR: StaticCell<Executor> = StaticCell::new();
-
 #[entry]
 fn main() -> ! {
     esp_println::println!("Init!");
@@ -139,7 +137,7 @@ fn main() -> ! {
 
     interrupt::enable(Interrupt::UART0, interrupt::Priority::Priority1).unwrap();
 
-    let executor = EXECUTOR.init(Executor::new());
+    let executor = make_static!(Executor::new());
     executor.run(|spawner| {
         spawner.spawn(run(uart0)).ok();
     });

@@ -19,7 +19,7 @@ use esp32s3_hal::{
     IO,
 };
 use esp_backtrace as _;
-use static_cell::StaticCell;
+use static_cell::make_static;
 
 #[embassy_executor::task]
 async fn ping(mut pin: Gpio0<Input<PullDown>>) {
@@ -30,8 +30,6 @@ async fn ping(mut pin: Gpio0<Input<PullDown>>) {
         Timer::after(Duration::from_millis(100)).await;
     }
 }
-
-static EXECUTOR: StaticCell<Executor> = StaticCell::new();
 
 #[entry]
 fn main() -> ! {
@@ -80,7 +78,7 @@ fn main() -> ! {
     )
     .unwrap();
 
-    let executor = EXECUTOR.init(Executor::new());
+    let executor = make_static!(Executor::new());
     executor.run(|spawner| {
         spawner.spawn(ping(input)).ok();
     });

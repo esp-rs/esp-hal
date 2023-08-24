@@ -25,7 +25,7 @@ use esp32_hal::{
 use esp_backtrace as _;
 use esp_hal_common::get_core;
 use esp_println::println;
-use static_cell::StaticCell;
+use static_cell::make_static;
 
 static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 
@@ -40,15 +40,6 @@ fn FROM_CPU_INTR1() {
 #[interrupt]
 fn FROM_CPU_INTR2() {
     unsafe { INT_EXECUTOR_CORE_1.on_interrupt() }
-}
-
-macro_rules! singleton {
-    ($val:expr) => {{
-        type T = impl Sized;
-        static STATIC_CELL: StaticCell<T> = StaticCell::new();
-        let (x,) = STATIC_CELL.init(($val,));
-        x
-    }};
 }
 
 /// Waits for a message that contains a duration, then flashes a led for that
@@ -120,7 +111,7 @@ fn main() -> ! {
 
     let mut cpu_control = CpuControl::new(system.cpu_control);
 
-    let led_ctrl_signal = &*singleton!(Signal::new());
+    let led_ctrl_signal = &*make_static!(Signal::new());
 
     let led = io.pins.gpio0.into_push_pull_output();
     let cpu1_fnctn = move || {

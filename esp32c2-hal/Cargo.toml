@@ -41,7 +41,7 @@ heapless           = "0.7.16"
 lis3dh-async       = { git = "https://github.com/jessebraham/lis3dh-rs-async", branch = "feature/eh-rc1" }
 sha2               = { version = "0.10.7", default-features = false}
 ssd1306            = "0.8.0"
-static_cell        = "1.2.0"
+static_cell        = { version = "1.2.0", features = ["nightly"] }
 
 [features]
 default              = ["rt", "vectored", "xtal40mhz"]

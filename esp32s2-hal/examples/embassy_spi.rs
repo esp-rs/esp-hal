@@ -32,16 +32,7 @@ use esp32s2_hal::{
     IO,
 };
 use esp_backtrace as _;
-use static_cell::StaticCell;
-
-macro_rules! singleton {
-    ($val:expr) => {{
-        type T = impl Sized;
-        static STATIC_CELL: StaticCell<T> = StaticCell::new();
-        let (x,) = STATIC_CELL.init(($val,));
-        x
-    }};
-}
+use static_cell::make_static;
 
 pub type SpiType<'d> = SpiDma<'d, esp32s2_hal::peripherals::SPI2, Spi2DmaChannel, FullDuplexMode>;
 
@@ -58,8 +49,6 @@ async fn spi_task(spi: &'static mut SpiType<'static>) {
         Timer::after(Duration::from_millis(5_000)).await;
     }
 }
-
-static EXECUTOR: StaticCell<Executor> = StaticCell::new();
 
 #[entry]
 fn main() -> ! {
@@ -111,10 +100,10 @@ fn main() -> ! {
     let dma = Dma::new(system.dma, &mut system.peripheral_clock_control);
     let dma_channel = dma.spi2channel;
 
-    let descriptors = singleton!([0u32; 8 * 3]);
-    let rx_descriptors = singleton!([0u32; 8 * 3]);
+    let descriptors = make_static!([0u32; 8 * 3]);
+    let rx_descriptors = make_static!([0u32; 8 * 3]);
 
-    let spi = singleton!(Spi::new(
+    let spi = make_static!(Spi::new(
         peripherals.SPI2,
         sclk,
         mosi,
@@ -132,7 +121,7 @@ fn main() -> ! {
         DmaPriority::Priority0,
     )));
 
-    let executor = EXECUTOR.init(Executor::new());
+    let executor = make_static!(Executor::new());
     executor.run(|spawner| {
         spawner.spawn(spi_task(spi)).ok();
     });

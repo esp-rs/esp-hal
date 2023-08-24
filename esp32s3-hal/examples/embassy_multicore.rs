@@ -21,18 +21,9 @@ use esp32s3_hal::{
 use esp_backtrace as _;
 use esp_hal_common::get_core;
 use esp_println::println;
-use static_cell::StaticCell;
+use static_cell::make_static;
 
 static mut APP_CORE_STACK: Stack<8192> = Stack::new();
-
-macro_rules! singleton {
-    ($val:expr) => {{
-        type T = impl Sized;
-        static STATIC_CELL: StaticCell<T> = StaticCell::new();
-        let (x,) = STATIC_CELL.init(($val,));
-        x
-    }};
-}
 
 /// Waits for a message that contains a duration, then flashes a led for that
 /// duration of time.
@@ -109,11 +100,11 @@ fn main() -> ! {
 
     let mut cpu_control = CpuControl::new(system.cpu_control);
 
-    let led_ctrl_signal = &*singleton!(Signal::new());
+    let led_ctrl_signal = &*make_static!(Signal::new());
 
     let led = io.pins.gpio0.into_push_pull_output();
     let cpu1_fnctn = move || {
-        let executor = singleton!(Executor::new());
+        let executor = make_static!(Executor::new());
         executor.run(|spawner| {
             spawner.spawn(control_led(led, led_ctrl_signal)).ok();
         });
@@ -122,7 +113,7 @@ fn main() -> ! {
         .start_app_core(unsafe { &mut APP_CORE_STACK }, cpu1_fnctn)
         .unwrap();
 
-    let executor = singleton!(Executor::new());
+    let executor = make_static!(Executor::new());
     executor.run(|spawner| {
         spawner.spawn(enable_disable_led(led_ctrl_signal)).ok();
     });
