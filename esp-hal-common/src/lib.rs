@@ -114,7 +114,7 @@ pub mod prelude;
 #[cfg(radio)]
 pub mod radio;
 #[cfg(any(hmac, sha))]
-pub mod reg_access;
+mod reg_access;
 pub mod reset;
 #[cfg(rmt)]
 pub mod rmt;

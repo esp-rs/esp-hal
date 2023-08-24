@@ -14,6 +14,9 @@ const U32_FROM_BYTES: fn([u8; 4]) -> u32 = u32::from_be_bytes;
 #[cfg(not(esp32))]
 const U32_FROM_BYTES: fn([u8; 4]) -> u32 = u32::from_ne_bytes;
 
+#[cfg(esp32)]
+const U32_TO_BYTES: fn(u32) -> [u8; 4] = u32::to_be_bytes;
+#[cfg(not(esp32))]
 const U32_TO_BYTES: fn(u32) -> [u8; 4] = u32::to_ne_bytes;
 
 // The alignment helper helps you write to registers that only accept u32
