@@ -113,6 +113,8 @@ pub mod peripheral;
 pub mod prelude;
 #[cfg(radio)]
 pub mod radio;
+#[cfg(any(hmac, sha))]
+mod reg_access;
 pub mod reset;
 #[cfg(rmt)]
 pub mod rmt;
