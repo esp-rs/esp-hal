@@ -39,6 +39,32 @@
 //! [embedded-io]: https://github.com/rust-embedded/embedded-hal/tree/master/embedded-io
 //! [embassy]: https://github.com/embassy-rs/embassy
 //! [`ufmt_write::uWrite`]: https://docs.rs/ufmt-write/latest/ufmt_write/trait.uWrite.html
+//!
+//! ### Supported Image Formats
+//!
+//! This HAL supports building multiple different application image formats. You
+//! can read about each below.
+//!
+//! The ESP-IDF Bootloader format is used unless some other format is specified
+//! via its feature.
+//!
+//! #### ESP-IDF Bootloader
+//!
+//! Use the second-stage bootloader from [ESP-IDF] and its associated
+//! application image format. See the [App Image Format] documentation for more
+//! information about this format.
+//!
+//! [ESP-IDF]: https://github.com/espressif/esp-idf
+//! [App Image Format]: https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/app_image_format.html
+//!
+//! #### Direct Boot
+//!
+//! This device additionally supports direct-boot, which allows an application
+//! to be executed directly from flash, without using the second-stage
+//! bootloader. For more information please see the
+//! [esp32c3-direct-boot-example] in the Espressif organization on GitHub.
+//!
+//! [esp32c3-direct-boot-example]: https://github.com/espressif/esp32c3-direct-boot-example
 
 #![no_std]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
