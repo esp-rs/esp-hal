@@ -7,14 +7,11 @@
 //! unit can have up to 8 or 16 data signals (depending on your target hardware)
 //! plus 1 or 2 clock signals.
 //!
-//! At the moment, the Parallel IO driver only supports TX mode. The RX feature
-//! is still working in progress.
-//!
 //! The driver uses DMA (Direct Memory Access) for efficient data transfer.
 //!
 //! ## Examples
 //!
-//! ### Initialization
+//! ### Initialization for TX
 //! ```no_run
 //! // configure the data pins to use
 //! let tx_pins = TxFourBits::new(io.pins.gpio1, io.pins.gpio2, io.pins.gpio3, io.pins.gpio4);
@@ -39,22 +36,64 @@
 //! // configure a pin for the clock signal
 //! let cp = ClkOutPin::new(io.pins.gpio6);
 //!
-//! let mut parl_io_tx =
-//!     parl_io
-//!         .tx
-//!         .with_config(pin_conf, cp, 0, SampleEdge::Normal, BitPackOrder::Msb);
+//! let mut parl_io_tx = parl_io
+//!     .tx
+//!     .with_config(pin_conf, cp, 0, SampleEdge::Normal, BitPackOrder::Msb)
+//!     .unwrap();
+//! ```
+//!
+//! ### Start TX transfer
+//! ```no_run
+//! let transfer = parl_io_tx.write_dma(buffer).unwrap();
+//!
+//! // the buffer and driver is moved into the transfer and we can get it back via
+//! // `wait`
+//! (buffer, parl_io_tx) = transfer.wait().unwrap();
+//! ```
+//!
+//! ### Initialization for RX
+//! ```no_run
+//! let rx_pins = RxFourBits::new(io.pins.gpio1, io.pins.gpio2, io.pins.gpio3, io.pins.gpio4);
+//!
+//! let parl_io = ParlIoRxOnly::new(
+//!     peripherals.PARL_IO,
+//!     dma_channel.configure(
+//!         false,
+//!         &mut tx_descriptors,
+//!         &mut rx_descriptors,
+//!         DmaPriority::Priority0,
+//!     ),
+//!     1u32.MHz(),
+//!     &mut system.peripheral_clock_control,
+//!     &clocks,
+//! )
+//! .unwrap();
+//!
+//! let mut parl_io_rx = parl_io
+//!     .rx
+//!     .with_config(rx_pins, NoClkPin, BitPackOrder::Msb, Some(0xfff))
+//!     .unwrap();
+//! ```
+//!
+//! ### Start RX transfer
+//! ```no_run
+//! let transfer = parl_io_rx.read_dma(buffer).unwrap();
+//!
+//! // the buffer and driver is moved into the transfer and we can get it back via
+//! // `wait`
+//! (buffer, parl_io_rx) = transfer.wait().unwrap();
 //! ```
 
 use core::mem;
 
-use embedded_dma::ReadBuffer;
+use embedded_dma::{ReadBuffer, WriteBuffer};
 use fugit::HertzU32;
 use peripheral::PeripheralRef;
 use private::*;
 
 use crate::{
     clock::Clocks,
-    dma::{Channel, ChannelTypes, DmaError, DmaPeripheral, ParlIoPeripheral, TxPrivate},
+    dma::{Channel, ChannelTypes, DmaError, DmaPeripheral, ParlIoPeripheral, RxPrivate, TxPrivate},
     gpio::{InputPin, OutputPin},
     peripheral::{self, Peripheral},
     peripherals,
@@ -99,9 +138,155 @@ pub enum BitPackOrder {
     Lsb = 1,
 }
 
+#[cfg(esp32c6)]
+/// Enable Mode
+#[derive(Debug, Clone, Copy)]
+pub enum EnableMode {
+    /// Enable at high level
+    HighLevel,
+    /// Enable at low level
+    LowLevel,
+    /// Positive pulse start (data bit included) & Positive pulse end (data bit
+    /// included)
+    PulseMode1,
+    /// Positive pulse start (data bit included) & Positive pulse end (data bit
+    /// excluded)
+    PulseMode2,
+    /// Positive pulse start (data bit excluded) & Positive pulse end (data bit
+    /// included)
+    PulseMode3,
+    /// Positive pulse start (data bit excluded) & Positive pulse end (data bit
+    /// excluded)
+    PulseMode4,
+    /// Positive pulse start (data bit included) & Length end
+    PulseMode5,
+    /// Positive pulse start (data bit excluded) & Length end
+    PulseMode6,
+    /// Negative pulse start (data bit included) & Negative pulse end(data bit
+    /// included)
+    PulseMode7,
+    /// Negative pulse start (data bit included) & Negative pulse end (data bit
+    /// excluded)
+    PulseMode8,
+    /// Negative pulse start (data bit excluded) & Negative pulse end (data bit
+    /// included)
+    PulseMode9,
+    /// Negative pulse start (data bit excluded) & Negative pulse end (data bit
+    /// excluded)
+    PulseMode10,
+    /// Negative pulse start (data bit included) & Length end
+    PulseMode11,
+    /// Negative pulse start (data bit excluded) & Length end
+    PulseMode12,
+}
+
+#[cfg(esp32c6)]
+impl EnableMode {
+    fn pulse_submode_sel(&self) -> Option<u8> {
+        match self {
+            EnableMode::PulseMode1 => Some(0),
+            EnableMode::PulseMode2 => Some(1),
+            EnableMode::PulseMode3 => Some(2),
+            EnableMode::PulseMode4 => Some(3),
+            EnableMode::PulseMode5 => Some(4),
+            EnableMode::PulseMode6 => Some(5),
+            EnableMode::PulseMode7 => Some(6),
+            EnableMode::PulseMode8 => Some(7),
+            EnableMode::PulseMode9 => Some(8),
+            EnableMode::PulseMode10 => Some(9),
+            EnableMode::PulseMode11 => Some(10),
+            EnableMode::PulseMode12 => Some(11),
+            _ => None,
+        }
+    }
+
+    fn level_submode_sel(&self) -> Option<u8> {
+        match self {
+            EnableMode::HighLevel => Some(0),
+            EnableMode::LowLevel => Some(1),
+            _ => None,
+        }
+    }
+
+    fn smp_model_sel(&self) -> Option<self::private::SampleMode> {
+        match self {
+            EnableMode::HighLevel => Some(self::private::SampleMode::ExternalLevel),
+            EnableMode::LowLevel => Some(self::private::SampleMode::ExternalLevel),
+            _ => Some(self::private::SampleMode::ExternalPulse),
+        }
+    }
+}
+
+#[cfg(esp32h2)]
+/// Enable Mode
+#[derive(Debug, Clone, Copy)]
+pub enum EnableMode {
+    /// Enable at high level
+    HighLevel,
+    /// Positive pulse start (data bit included) & Positive pulse end (data bit
+    /// included)
+    PulseMode1,
+    /// Positive pulse start (data bit included) & Positive pulse end (data bit
+    /// excluded)
+    PulseMode2,
+    /// Positive pulse start (data bit excluded) & Positive pulse end (data bit
+    /// included)
+    PulseMode3,
+    /// Positive pulse start (data bit excluded) & Positive pulse end (data bit
+    /// excluded)
+    PulseMode4,
+    /// Positive pulse start (data bit included) & Length end
+    PulseMode5,
+    /// Positive pulse start (data bit excluded) & Length end
+    PulseMode6,
+}
+
+#[cfg(esp32h2)]
+impl EnableMode {
+    fn pulse_submode_sel(&self) -> Option<u8> {
+        match self {
+            EnableMode::PulseMode1 => Some(0),
+            EnableMode::PulseMode2 => Some(1),
+            EnableMode::PulseMode3 => Some(2),
+            EnableMode::PulseMode4 => Some(3),
+            EnableMode::PulseMode5 => Some(4),
+            EnableMode::PulseMode6 => Some(5),
+            _ => None,
+        }
+    }
+
+    fn level_submode_sel(&self) -> Option<u8> {
+        match self {
+            EnableMode::HighLevel => Some(0),
+            _ => None,
+        }
+    }
+
+    fn smp_model_sel(&self) -> Option<self::private::SampleMode> {
+        match self {
+            EnableMode::HighLevel => Some(self::private::SampleMode::ExternalLevel),
+            _ => Some(self::private::SampleMode::ExternalPulse),
+        }
+    }
+}
+
+/// Generation of GDMA SUC EOF
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EofMode {
+    /// Generate GDMA SUC EOF by data byte length
+    ByteLen,
+    /// Generate GDMA SUC EOF by the external enable signal
+    EnableSignal,
+}
+
 /// Used to configure no pin as clock output
 pub struct NoClkPin;
 impl TxClkPin for NoClkPin {
+    fn configure(&mut self) {
+        // nothing
+    }
+}
+impl RxClkPin for NoClkPin {
     fn configure(&mut self) {
         // nothing
     }
@@ -134,7 +319,7 @@ where
     }
 }
 
-/// Wraps a GPIO pin which will be used as the clock input signal
+/// Wraps a GPIO pin which will be used as the TX clock input signal
 pub struct ClkInPin<'d, P>
 where
     P: InputPin,
@@ -166,6 +351,44 @@ where
         self.pin
             .set_to_input()
             .connect_input_to_peripheral(crate::gpio::InputSignal::PARL_TX_CLK);
+    }
+}
+
+/// Wraps a GPIO pin which will be used as the RX clock input signal
+pub struct RxClkInPin<'d, P>
+where
+    P: InputPin,
+{
+    pin: PeripheralRef<'d, P>,
+    sample_edge: SampleEdge,
+}
+impl<'d, P> RxClkInPin<'d, P>
+where
+    P: InputPin,
+{
+    pub fn new(pin: impl Peripheral<P = P> + 'd, sample_edge: SampleEdge) -> Self {
+        crate::into_ref!(pin);
+        Self { pin, sample_edge }
+    }
+}
+impl<'d, P> RxClkPin for RxClkInPin<'d, P>
+where
+    P: InputPin,
+{
+    fn configure(&mut self) {
+        let pcr = unsafe { &*crate::peripherals::PCR::PTR };
+        pcr.parl_clk_rx_conf.modify(|_, w| {
+            w.parl_clk_rx_sel()
+                .variant(3)
+                .parl_clk_rx_div_num()
+                .variant(0)
+        }); // PAD_CLK_TX, no divider
+
+        self.pin
+            .set_to_input()
+            .connect_input_to_peripheral(crate::gpio::InputSignal::PARL_RX_CLK);
+
+        Instance::set_rx_clk_edge_sel(self.sample_edge);
     }
 }
 
@@ -202,12 +425,13 @@ where
     P: NotContainsValidSignalPin + TxPins + ConfigurePins,
     VP: OutputPin,
 {
-    fn configure(&mut self) {
-        self.tx_pins.configure();
+    fn configure(&mut self) -> Result<(), Error> {
+        self.tx_pins.configure()?;
         self.valid_pin
             .set_to_push_pull_output()
             .connect_peripheral_to_output(Instance::tx_valid_pin_signal());
         Instance::set_tx_hw_valid_en(true);
+        Ok(())
     }
 }
 
@@ -237,9 +461,10 @@ impl<P> ConfigurePins for TxPinConfigIncludingValidPin<P>
 where
     P: ContainsValidSignalPin + TxPins + ConfigurePins,
 {
-    fn configure(&mut self) {
-        self.tx_pins.configure();
+    fn configure(&mut self) -> Result<(), Error> {
+        self.tx_pins.configure()?;
         Instance::set_tx_hw_valid_en(true);
+        Ok(())
     }
 }
 
@@ -273,7 +498,7 @@ macro_rules! tx_pins {
             where
                 $($pin: OutputPin),+
             {
-                fn configure(&mut self) {
+                fn configure(&mut self) -> Result<(), Error>{
                     $(
                         self.[< pin_ $pin:lower >]
                             .set_to_push_pull_output()
@@ -281,6 +506,7 @@ macro_rules! tx_pins {
                     )+
 
                     private::Instance::set_tx_bit_width( private::WidSel::[< Bits $width >]);
+                    Ok(())
                 }
             }
 
@@ -369,6 +595,249 @@ impl<'d, P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15>
 {
 }
 
+/// Pin configuration with an additional pin for the valid signal.
+pub struct RxPinConfigWithValidPin<'d, P, VP>
+where
+    P: NotContainsValidSignalPin + RxPins + ConfigurePins,
+    VP: InputPin,
+{
+    rx_pins: P,
+    valid_pin: PeripheralRef<'d, VP>,
+    enable_mode: EnableMode,
+    eof_mode: EofMode,
+}
+
+impl<'d, P, VP> RxPinConfigWithValidPin<'d, P, VP>
+where
+    P: NotContainsValidSignalPin + RxPins + ConfigurePins,
+    VP: InputPin,
+{
+    pub fn new(
+        rx_pins: P,
+        valid_pin: impl Peripheral<P = VP> + 'd,
+        enable_mode: EnableMode,
+        eof_mode: EofMode,
+    ) -> Self {
+        crate::into_ref!(valid_pin);
+        Self {
+            rx_pins,
+            valid_pin,
+            enable_mode,
+            eof_mode,
+        }
+    }
+}
+
+impl<'d, P, VP> RxPins for RxPinConfigWithValidPin<'d, P, VP>
+where
+    P: NotContainsValidSignalPin + RxPins + ConfigurePins,
+    VP: InputPin,
+{
+}
+
+impl<'d, P, VP> ConfigurePins for RxPinConfigWithValidPin<'d, P, VP>
+where
+    P: NotContainsValidSignalPin + RxPins + ConfigurePins,
+    VP: InputPin,
+{
+    fn configure(&mut self) -> Result<(), Error> {
+        self.rx_pins.configure()?;
+        self.valid_pin
+            .set_to_input()
+            .connect_input_to_peripheral(Instance::rx_valid_pin_signal());
+        Instance::set_rx_sw_en(false);
+        if let Some(sel) = self.enable_mode.pulse_submode_sel() {
+            Instance::set_rx_pulse_submode_sel(sel);
+        }
+        if let Some(sel) = self.enable_mode.level_submode_sel() {
+            Instance::set_rx_level_submode_sel(sel);
+        }
+        if let Some(sel) = self.enable_mode.smp_model_sel() {
+            Instance::set_rx_sample_mode(sel);
+        }
+        Instance::set_eof_gen_sel(self.eof_mode);
+
+        Ok(())
+    }
+}
+
+/// Pin configuration where the pin for the valid signal is the MSB pin.
+pub struct RxPinConfigIncludingValidPin<P>
+where
+    P: ContainsValidSignalPin + RxPins + ConfigurePins,
+{
+    rx_pins: P,
+    enable_mode: EnableMode,
+    eof_mode: EofMode,
+}
+
+impl<P> RxPinConfigIncludingValidPin<P>
+where
+    P: ContainsValidSignalPin + RxPins + ConfigurePins,
+{
+    pub fn new(rx_pins: P, enable_mode: EnableMode, eof_mode: EofMode) -> Self {
+        Self {
+            rx_pins,
+            enable_mode,
+            eof_mode,
+        }
+    }
+}
+
+impl<P> RxPins for RxPinConfigIncludingValidPin<P> where
+    P: ContainsValidSignalPin + RxPins + ConfigurePins
+{
+}
+
+impl<P> ConfigurePins for RxPinConfigIncludingValidPin<P>
+where
+    P: ContainsValidSignalPin + RxPins + ConfigurePins,
+{
+    fn configure(&mut self) -> Result<(), Error> {
+        self.rx_pins.configure()?;
+        Instance::set_rx_sw_en(false);
+        if let Some(sel) = self.enable_mode.pulse_submode_sel() {
+            Instance::set_rx_pulse_submode_sel(sel);
+        }
+        if let Some(sel) = self.enable_mode.level_submode_sel() {
+            Instance::set_rx_level_submode_sel(sel);
+        }
+        if let Some(sel) = self.enable_mode.smp_model_sel() {
+            Instance::set_rx_sample_mode(sel);
+        }
+        Instance::set_eof_gen_sel(self.eof_mode);
+
+        Ok(())
+    }
+}
+
+macro_rules! rx_pins {
+    ($name:ident, $width:literal, $($pin:ident = $signal:ident),+ ) => {
+        paste::paste! {
+            #[doc = "Data pin configuration for "]
+            #[doc = stringify!($width)]
+            #[doc = "bit input mode"]
+            pub struct $name<'d, $($pin),+> {
+                $(
+                    [< pin_ $pin:lower >] : PeripheralRef<'d, $pin>,
+                )+
+            }
+
+            impl<'d, $($pin),+> $name<'d, $($pin),+>
+            where
+                $($pin: InputPin),+
+            {
+                pub fn new(
+                    $(
+                        [< pin_ $pin:lower >] : impl Peripheral<P = $pin> + 'd,
+                    )+
+                    ) -> Self {
+                    crate::into_ref!($( [< pin_ $pin:lower >] ),+);
+                    Self { $( [< pin_ $pin:lower >] ),+ }
+                }
+            }
+
+            impl<'d, $($pin),+> ConfigurePins for $name<'d, $($pin),+>
+            where
+                $($pin: InputPin),+
+            {
+                fn configure(&mut self)  -> Result<(), Error> {
+                    $(
+                        self.[< pin_ $pin:lower >]
+                            .set_to_input()
+                            .connect_input_to_peripheral(crate::gpio::InputSignal::$signal);
+                    )+
+
+                    private::Instance::set_rx_bit_width( private::WidSel::[< Bits $width >]);
+                    Ok(())
+                }
+            }
+
+            impl<'d, $($pin),+> RxPins for $name<'d, $($pin),+> {}
+        }
+    };
+}
+
+rx_pins!(RxOneBit, 1, P0 = PARL_RX_DATA0);
+rx_pins!(RxTwoBits, 2, P0 = PARL_RX_DATA0, P1 = PARL_RX_DATA1);
+rx_pins!(
+    RxFourBits,
+    4,
+    P0 = PARL_RX_DATA0,
+    P1 = PARL_RX_DATA1,
+    P2 = PARL_RX_DATA2,
+    P3 = PARL_RX_DATA3
+);
+rx_pins!(
+    RxEightBits,
+    8,
+    P0 = PARL_RX_DATA0,
+    P1 = PARL_RX_DATA1,
+    P2 = PARL_RX_DATA2,
+    P3 = PARL_RX_DATA3,
+    P4 = PARL_RX_DATA4,
+    P5 = PARL_RX_DATA5,
+    P6 = PARL_RX_DATA6,
+    P7 = PARL_RX_DATA7
+);
+#[cfg(esp32c6)]
+rx_pins!(
+    RxSixteenBits,
+    16,
+    P0 = PARL_RX_DATA0,
+    P1 = PARL_RX_DATA1,
+    P2 = PARL_RX_DATA2,
+    P3 = PARL_RX_DATA3,
+    P4 = PARL_RX_DATA4,
+    P5 = PARL_RX_DATA5,
+    P6 = PARL_RX_DATA6,
+    P7 = PARL_RX_DATA7,
+    P8 = PARL_RX_DATA8,
+    P9 = PARL_RX_DATA9,
+    P10 = PARL_RX_DATA10,
+    P11 = PARL_RX_DATA11,
+    P12 = PARL_RX_DATA12,
+    P13 = PARL_RX_DATA13,
+    P14 = PARL_RX_DATA14,
+    P15 = PARL_RX_DATA15
+);
+
+impl<'d, P0> FullDuplex for RxOneBit<'d, P0> {}
+
+impl<'d, P0, P1> FullDuplex for RxTwoBits<'d, P0, P1> {}
+
+impl<'d, P0, P1, P2, P3> FullDuplex for RxFourBits<'d, P0, P1, P2, P3> {}
+
+impl<'d, P0, P1, P2, P3, P4, P5, P6, P7> FullDuplex
+    for RxEightBits<'d, P0, P1, P2, P3, P4, P5, P6, P7>
+{
+}
+
+impl<'d, P0> NotContainsValidSignalPin for RxOneBit<'d, P0> {}
+
+impl<'d, P0, P1> NotContainsValidSignalPin for RxTwoBits<'d, P0, P1> {}
+
+impl<'d, P0, P1, P2, P3> NotContainsValidSignalPin for RxFourBits<'d, P0, P1, P2, P3> {}
+
+#[cfg(esp32c6)]
+impl<'d, P0, P1, P2, P3, P4, P5, P6, P7> NotContainsValidSignalPin
+    for RxEightBits<'d, P0, P1, P2, P3, P4, P5, P6, P7>
+{
+}
+
+#[cfg(esp32h2)]
+impl<'d, P0, P1, P2, P3, P4, P5, P6, P7> ContainsValidSignalPin
+    for RxEightBits<'d, P0, P1, P2, P3, P4, P5, P6, P7>
+{
+}
+
+#[cfg(esp32c6)]
+impl<'d, P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15>
+    ContainsValidSignalPin
+    for RxSixteenBits<'d, P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15>
+{
+}
+
 trait RegisterAccess {}
 
 impl<'d, CH> TxCreatorFullDuplex<'d, CH>
@@ -382,23 +851,23 @@ where
         idle_value: u16,
         sample_edge: SampleEdge,
         bit_order: BitPackOrder,
-    ) -> ParlIoTx<'d, CH, P, CP>
+    ) -> Result<ParlIoTx<'d, CH, P, CP>, Error>
     where
         P: FullDuplex + TxPins + ConfigurePins,
         CP: TxClkPin,
     {
-        tx_pins.configure();
+        tx_pins.configure()?;
         clk_pin.configure();
 
         Instance::set_tx_idle_value(idle_value);
         Instance::set_tx_sample_edge(sample_edge);
         Instance::set_tx_bit_order(bit_order);
 
-        ParlIoTx {
+        Ok(ParlIoTx {
             tx_channel: self.tx_channel,
             _pins: tx_pins,
             _clk_pin: clk_pin,
-        }
+        })
     }
 }
 
@@ -413,23 +882,23 @@ where
         idle_value: u16,
         sample_edge: SampleEdge,
         bit_order: BitPackOrder,
-    ) -> ParlIoTx<'d, CH, P, CP>
+    ) -> Result<ParlIoTx<'d, CH, P, CP>, Error>
     where
         P: TxPins + ConfigurePins,
         CP: TxClkPin,
     {
-        tx_pins.configure();
+        tx_pins.configure()?;
         clk_pin.configure();
 
         Instance::set_tx_idle_value(idle_value);
         Instance::set_tx_sample_edge(sample_edge);
         Instance::set_tx_bit_order(bit_order);
 
-        ParlIoTx {
+        Ok(ParlIoTx {
             tx_channel: self.tx_channel,
             _pins: tx_pins,
             _clk_pin: clk_pin,
-        }
+        })
     }
 }
 
@@ -450,6 +919,87 @@ where
     CH: ChannelTypes,
     P: TxPins + ConfigurePins,
     CP: TxClkPin,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("ParlIoTx").finish()
+    }
+}
+
+impl<'d, CH> RxCreatorFullDuplex<'d, CH>
+where
+    CH: ChannelTypes,
+{
+    pub fn with_config<P, CP>(
+        self,
+        mut rx_pins: P,
+        mut clk_pin: CP,
+        bit_order: BitPackOrder,
+        timeout_ticks: Option<u16>,
+    ) -> Result<ParlIoRx<'d, CH, P, CP>, Error>
+    where
+        P: FullDuplex + RxPins + ConfigurePins,
+        CP: RxClkPin,
+    {
+        rx_pins.configure()?;
+        clk_pin.configure();
+
+        Instance::set_rx_bit_order(bit_order);
+        Instance::set_rx_timeout_ticks(timeout_ticks);
+
+        Ok(ParlIoRx {
+            rx_channel: self.rx_channel,
+            _pins: rx_pins,
+            _clk_pin: clk_pin,
+        })
+    }
+}
+
+impl<'d, CH> RxCreator<'d, CH>
+where
+    CH: ChannelTypes,
+{
+    pub fn with_config<P, CP>(
+        self,
+        mut rx_pins: P,
+        mut clk_pin: CP,
+        bit_order: BitPackOrder,
+        timeout_ticks: Option<u16>,
+    ) -> Result<ParlIoRx<'d, CH, P, CP>, Error>
+    where
+        P: RxPins + ConfigurePins,
+        CP: RxClkPin,
+    {
+        rx_pins.configure()?;
+        clk_pin.configure();
+
+        Instance::set_rx_bit_order(bit_order);
+        Instance::set_rx_timeout_ticks(timeout_ticks);
+
+        Ok(ParlIoRx {
+            rx_channel: self.rx_channel,
+            _pins: rx_pins,
+            _clk_pin: clk_pin,
+        })
+    }
+}
+
+/// Parallel IO RX channel
+pub struct ParlIoRx<'d, CH, P, CP>
+where
+    CH: ChannelTypes,
+    P: RxPins + ConfigurePins,
+    CP: RxClkPin,
+{
+    rx_channel: CH::Rx<'d>,
+    _pins: P,
+    _clk_pin: CP,
+}
+
+impl<'d, CH, P, CP> core::fmt::Debug for ParlIoRx<'d, CH, P, CP>
+where
+    CH: ChannelTypes,
+    P: RxPins + ConfigurePins,
+    CP: RxClkPin,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("ParlIoTx").finish()
@@ -530,6 +1080,40 @@ where
     }
 }
 
+/// Parallel IO in half duplex / RX only mode
+pub struct ParlIoRxOnly<'d, CH>
+where
+    CH: ChannelTypes,
+    CH::P: ParlIoPeripheral,
+{
+    _parl_io: PeripheralRef<'d, peripherals::PARL_IO>,
+    pub rx: RxCreator<'d, CH>,
+}
+
+impl<'d, CH> ParlIoRxOnly<'d, CH>
+where
+    CH: ChannelTypes,
+    CH::P: ParlIoPeripheral,
+{
+    pub fn new(
+        parl_io: impl Peripheral<P = peripherals::PARL_IO> + 'd,
+        mut dma_channel: Channel<'d, CH>,
+        frequency: HertzU32,
+        peripheral_clock_control: &mut PeripheralClockControl,
+        _clocks: &Clocks,
+    ) -> Result<Self, Error> {
+        crate::into_ref!(parl_io);
+        internal_init(&mut dma_channel, frequency, peripheral_clock_control)?;
+
+        Ok(Self {
+            _parl_io: parl_io,
+            rx: RxCreator {
+                rx_channel: dma_channel.rx,
+            },
+        })
+    }
+}
+
 fn internal_init<'d, CH>(
     dma_channel: &mut Channel<'d, CH>,
     frequency: HertzU32,
@@ -562,7 +1146,19 @@ where
             .variant(divider)
     });
 
+    pcr.parl_clk_rx_conf.modify(|_, w| {
+        w.parl_clk_rx_en()
+            .set_bit()
+            .parl_clk_rx_sel()
+            .variant(1) // PLL
+            .parl_clk_rx_div_num()
+            .variant(divider)
+    });
+    Instance::set_rx_sw_en(true);
+    Instance::set_rx_sample_mode(SampleMode::InternalSoftwareEnable);
+
     dma_channel.tx.init_channel();
+    dma_channel.rx.init_channel();
     Ok(())
 }
 
@@ -576,8 +1172,9 @@ where
     /// Perform a DMA write.
     ///
     /// This will return a [DmaTransfer] owning the buffer(s) and the driver
-    /// instance. The maximum amount of data to be sent is 32736
-    /// bytes.
+    /// instance.
+    ///
+    /// The maximum amount of data to be sent is 32736 bytes.
     pub fn write_dma<TXBUF>(
         mut self,
         words: TXBUF,
@@ -621,7 +1218,7 @@ where
         }
 
         Instance::set_tx_start(true);
-        return Ok(());
+        Ok(())
     }
 }
 
@@ -684,8 +1281,133 @@ where
     }
 }
 
+impl<'d, CH, P, CP> ParlIoRx<'d, CH, P, CP>
+where
+    CH: ChannelTypes,
+    CH::P: ParlIoPeripheral,
+    P: RxPins + ConfigurePins,
+    CP: RxClkPin,
+{
+    /// Perform a DMA read.
+    ///
+    /// This will return a [RxDmaTransfer] owning the buffer(s) and the driver
+    /// instance.
+    ///
+    /// The maximum amount of data is 32736 bytes when using [EofMode::ByteLen].
+    ///
+    /// It's only limited by the size of the DMA buffer when using
+    /// [EofMode::EnableSignal].
+    pub fn read_dma<RXBUF>(
+        mut self,
+        mut words: RXBUF,
+    ) -> Result<RxDmaTransfer<'d, CH, RXBUF, P, CP>, Error>
+    where
+        RXBUF: WriteBuffer<Word = u8>,
+    {
+        let (ptr, len) = unsafe { words.write_buffer() };
+
+        if !Instance::is_suc_eof_generated_externally() {
+            if len > MAX_DMA_SIZE {
+                return Err(Error::MaxDmaTransferSizeExceeded);
+            }
+        }
+
+        self.start_receive_bytes_dma(ptr, len)?;
+
+        Ok(RxDmaTransfer {
+            instance: self,
+            buffer: words,
+        })
+    }
+
+    fn start_receive_bytes_dma<'w>(&mut self, ptr: *mut u8, len: usize) -> Result<(), Error> {
+        let pcr = unsafe { &*crate::peripherals::PCR::PTR };
+        pcr.parl_clk_rx_conf
+            .modify(|_, w| w.parl_rx_rst_en().set_bit());
+        pcr.parl_clk_rx_conf
+            .modify(|_, w| w.parl_rx_rst_en().clear_bit());
+
+        Instance::clear_rx_interrupts();
+        Instance::set_rx_bytes(len as u16);
+
+        self.rx_channel
+            .prepare_transfer(false, DmaPeripheral::ParlIo, ptr, len)?;
+
+        Instance::set_rx_reg_update();
+
+        Instance::set_rx_start(true);
+        Ok(())
+    }
+}
+
+/// An in-progress DMA transfer.
+pub struct RxDmaTransfer<'d, C, BUFFER, P, CP>
+where
+    C: ChannelTypes,
+    C::P: ParlIoPeripheral,
+    P: RxPins + ConfigurePins,
+    CP: RxClkPin,
+{
+    instance: ParlIoRx<'d, C, P, CP>,
+    buffer: BUFFER,
+}
+
+impl<'d, C, BUFFER, P, CP> RxDmaTransfer<'d, C, BUFFER, P, CP>
+where
+    C: ChannelTypes,
+    C::P: ParlIoPeripheral,
+    P: RxPins + ConfigurePins,
+    CP: RxClkPin,
+{
+    /// Wait for the DMA transfer to complete and return the buffers and the
+    /// SPI instance.
+    pub fn wait(
+        self,
+    ) -> Result<(BUFFER, ParlIoRx<'d, C, P, CP>), (DmaError, BUFFER, ParlIoRx<'d, C, P, CP>)> {
+        loop {
+            if self.is_done() || self.is_eof_error() {
+                break;
+            }
+        }
+
+        Instance::set_rx_start(false);
+
+        // `DmaTransfer` needs to have a `Drop` implementation, because we accept
+        // managed buffers that can free their memory on drop. Because of that
+        // we can't move out of the `DmaTransfer`'s fields, so we use `ptr::read`
+        // and `mem::forget`.
+        //
+        // NOTE(unsafe) There is no panic branch between getting the resources
+        // and forgetting `self`.
+        unsafe {
+            let buffer = core::ptr::read(&self.buffer);
+            let payload = core::ptr::read(&self.instance);
+            let err = (&self).instance.rx_channel.has_error();
+            mem::forget(self);
+            if err {
+                Err((DmaError::DescriptorError, buffer, payload))
+            } else {
+                Ok((buffer, payload))
+            }
+        }
+    }
+
+    /// Check if the DMA transfer is complete
+    pub fn is_done(&self) -> bool {
+        let ch = &self.instance.rx_channel;
+        ch.is_done()
+    }
+
+    /// Check if the DMA transfer is completed by buffer full or source EOF
+    /// error
+    pub fn is_eof_error(&self) -> bool {
+        let ch = &self.instance.rx_channel;
+        ch.has_eof_error() || ch.has_dscr_empty_error()
+    }
+}
+
 mod private {
-    use super::{BitPackOrder, SampleEdge};
+    use super::{BitPackOrder, EofMode, Error, SampleEdge};
     use crate::dma::ChannelTypes;
 
     pub trait FullDuplex {}
@@ -698,12 +1420,18 @@ mod private {
 
     pub trait TxPins {}
 
+    pub trait RxPins {}
+
     pub trait TxClkPin {
         fn configure(&mut self);
     }
 
-    pub trait ConfigurePins {
+    pub trait RxClkPin {
         fn configure(&mut self);
+    }
+
+    pub trait ConfigurePins {
+        fn configure(&mut self) -> Result<(), Error>;
     }
 
     pub struct TxCreator<'d, CH>
@@ -711,6 +1439,13 @@ mod private {
         CH: ChannelTypes,
     {
         pub tx_channel: CH::Tx<'d>,
+    }
+
+    pub struct RxCreator<'d, CH>
+    where
+        CH: ChannelTypes,
+    {
+        pub rx_channel: CH::Rx<'d>,
     }
 
     pub struct TxCreatorFullDuplex<'d, CH>
@@ -742,6 +1477,12 @@ mod private {
         Bits4 = 2,
         Bits2 = 1,
         Bits1 = 0,
+    }
+
+    pub(super) enum SampleMode {
+        ExternalLevel          = 0,
+        ExternalPulse          = 1,
+        InternalSoftwareEnable = 2,
     }
 
     pub(super) struct Instance;
@@ -834,6 +1575,129 @@ mod private {
             reg_block
                 .tx_cfg0
                 .modify(|_, w| w.tx_hw_valid_en().bit(value));
+        }
+
+        pub fn set_rx_bit_width(width: WidSel) {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+
+            reg_block
+                .rx_cfg0
+                .modify(|_, w| w.rx_bus_wid_sel().variant(width as u8));
+        }
+
+        pub fn rx_valid_pin_signal() -> crate::gpio::InputSignal {
+            crate::gpio::InputSignal::PARL_RX_DATA15
+        }
+
+        pub fn set_rx_sw_en(value: bool) {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+
+            reg_block.rx_cfg0.modify(|_, w| w.rx_sw_en().bit(value));
+        }
+
+        pub fn clear_rx_interrupts() {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+
+            reg_block
+                .int_clr
+                .write(|w| w.rx_fifo_wfull_int_clr().set_bit());
+        }
+
+        pub fn set_rx_bytes(len: u16) {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+
+            reg_block
+                .rx_cfg0
+                .modify(|_, w| w.rx_data_bytelen().variant(len as u16));
+        }
+
+        pub fn set_rx_sample_mode(sample_mode: SampleMode) {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+
+            reg_block
+                .rx_cfg0
+                .modify(|_, w| w.rx_smp_mode_sel().variant(sample_mode as u8));
+        }
+
+        pub fn set_eof_gen_sel(mode: EofMode) {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+
+            reg_block
+                .rx_cfg0
+                .modify(|_, w| w.rx_eof_gen_sel().variant(mode == EofMode::EnableSignal));
+        }
+
+        pub fn set_rx_pulse_submode_sel(sel: u8) {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+
+            reg_block
+                .rx_cfg0
+                .modify(|_, w| w.rx_pulse_submode_sel().variant(sel));
+        }
+
+        pub fn set_rx_level_submode_sel(sel: u8) {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+
+            reg_block
+                .rx_cfg0
+                .modify(|_, w| w.rx_level_submode_sel().variant(sel == 1));
+        }
+
+        pub fn set_rx_clk_edge_sel(edge: SampleEdge) {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+
+            reg_block
+                .rx_cfg0
+                .modify(|_, w| w.rx_clk_edge_sel().variant(edge as u8 == 1));
+        }
+
+        pub fn set_rx_start(value: bool) {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+
+            reg_block.rx_cfg0.modify(|_, w| w.rx_start().bit(value));
+        }
+
+        pub fn set_rx_reg_update() {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+
+            reg_block.rx_cfg1.modify(|_, w| w.rx_reg_update().bit(true));
+        }
+
+        pub fn set_rx_bit_order(value: BitPackOrder) {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+            reg_block
+                .rx_cfg0
+                .modify(|_, w| w.rx_bit_pack_order().variant(value as u8 == 1));
+        }
+
+        pub fn set_rx_timeout_ticks(value: Option<u16>) {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+            reg_block.rx_cfg1.modify(|_, w| {
+                w.rx_timeout_en()
+                    .bit(value.is_some())
+                    .rx_timeout_threshold()
+                    .variant(value.unwrap_or(0xfff))
+            });
+        }
+
+        pub fn is_suc_eof_generated_externally() -> bool {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+
+            reg_block.rx_cfg0.read().rx_eof_gen_sel().bit_is_set()
         }
     }
 
@@ -930,6 +1794,129 @@ mod private {
             reg_block
                 .tx_genrl_cfg
                 .modify(|_, w| w.tx_valid_output_en().bit(value));
+        }
+
+        pub fn set_rx_bit_width(width: WidSel) {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+
+            reg_block
+                .rx_data_cfg
+                .modify(|_, w| w.rx_bus_wid_sel().variant(width as u8));
+        }
+
+        pub fn rx_valid_pin_signal() -> crate::gpio::InputSignal {
+            crate::gpio::InputSignal::PARL_RX_DATA7
+        }
+
+        pub fn set_rx_sw_en(value: bool) {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+
+            reg_block.rx_mode_cfg.modify(|_, w| w.rx_sw_en().bit(value));
+        }
+
+        pub fn clear_rx_interrupts() {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+
+            reg_block
+                .int_clr
+                .write(|w| w.rx_fifo_wovf_int_clr().set_bit());
+        }
+
+        pub fn set_rx_bytes(len: u16) {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+
+            reg_block
+                .rx_data_cfg
+                .modify(|_, w| w.rx_bitlen().variant((len as u32) * 8));
+        }
+
+        pub fn set_rx_sample_mode(sample_mode: SampleMode) {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+
+            reg_block
+                .rx_mode_cfg
+                .modify(|_, w| w.rx_smp_mode_sel().variant(sample_mode as u8));
+        }
+
+        pub fn set_eof_gen_sel(mode: EofMode) {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+
+            reg_block
+                .rx_genrl_cfg
+                .modify(|_, w| w.rx_eof_gen_sel().variant(mode == EofMode::EnableSignal));
+        }
+
+        pub fn set_rx_pulse_submode_sel(sel: u8) {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+
+            reg_block
+                .rx_mode_cfg
+                .modify(|_, w| w.rx_pulse_submode_sel().variant(sel));
+        }
+
+        pub fn set_rx_level_submode_sel(_sel: u8) {
+            // unsupported, always high
+        }
+
+        pub fn set_rx_clk_edge_sel(value: SampleEdge) {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+
+            reg_block.rx_clk_cfg.modify(|_, w| {
+                w.rx_clk_i_inv()
+                    .bit(value == SampleEdge::Invert)
+                    .rx_clk_o_inv()
+                    .bit(value == SampleEdge::Invert)
+            });
+        }
+
+        pub fn set_rx_start(value: bool) {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+
+            reg_block
+                .rx_start_cfg
+                .modify(|_, w| w.rx_start().bit(value));
+        }
+
+        pub fn set_rx_reg_update() {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+
+            reg_block.reg_update.write(|w| w.rx_reg_update().bit(true));
+        }
+
+        pub fn set_rx_bit_order(value: BitPackOrder) {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+            reg_block
+                .rx_data_cfg
+                .modify(|_, w| w.rx_data_order_inv().variant(value as u8 == 1));
+        }
+
+        pub fn set_rx_timeout_ticks(value: Option<u16>) {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+            reg_block.rx_genrl_cfg.modify(|_, w| {
+                w.rx_timeout_en()
+                    .bit(value.is_some())
+                    .rx_timeout_thres()
+                    .variant(value.unwrap_or(0xfff))
+            });
+        }
+
+        pub fn is_suc_eof_generated_externally() -> bool {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+
+            reg_block.rx_genrl_cfg.read().rx_eof_gen_sel().bit_is_set()
         }
     }
 }
