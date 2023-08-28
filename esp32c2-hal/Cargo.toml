@@ -26,7 +26,7 @@ categories = [
 
 [dependencies]
 esp-hal-common = { version = "0.11.0", features = ["esp32c2"], path = "../esp-hal-common" }
-embassy-time   = { git = "https://github.com/embassy-rs/embassy", rev = "4f453d7", features = ["nightly"], optional = true }
+embassy-time   = { version = "0.1.3", features = ["nightly"], optional = true }
 
 [dev-dependencies]
 critical-section   = "1.1.2"
