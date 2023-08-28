@@ -93,6 +93,8 @@ pub mod dma;
 pub mod embassy;
 #[cfg(gpio)]
 pub mod gpio;
+#[cfg(hmac)]
+pub mod hmac;
 #[cfg(any(i2c0, i2c1))]
 pub mod i2c;
 #[cfg(any(i2s0, i2s1))]
