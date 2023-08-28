@@ -4,6 +4,40 @@
 //! [embedded-hal] repository.
 //!
 //! [embedded-hal]: https://github.com/rust-embedded/embedded-hal
+//!
+//! ### Cargo Features
+//!
+//! - `async` - Enable support for asynchronous operation, with interfaces
+//!   provided by [embedded-hal-async] and [embedded-io-async]
+//! - `debug` - Enable debug features in the HAL (used for development)
+//! - `direct-boot` - Use the direct boot image format
+//! - `direct-vectoring` - Enable direct vector table hooking support
+//! - `eh1` - Implement the traits defined in the `1.0.0-xxx` pre-releases of
+//!   [embedded-hal], [embedded-hal-nb], and [embedded-io]
+//! - `embassy` - Enable support for [embassy], a modern asynchronous embedded
+//!   framework
+//! - `embassy-time-systick` - Enable the [embassy] time driver using the
+//!   `SYSTIMER` peripheral
+//! - `embassy-time-timg0` - Enable the [embassy] time driver using the `TIMG0`
+//!   peripheral
+//! - `interrupt-preemption` - Enable priority-based interrupt preemption
+//! - `mcu-boot` - Use the MCUboot image format
+//! - `rt` - Runtime support
+//! - `ufmt` - Implement the [`ufmt_write::uWrite`] trait for the UART and USB
+//!   Serial JTAG drivers
+//! - `vectored` - Enable interrupt vectoring
+//!
+//! #### Default Features
+//!
+//! The `rt` and `vectored` features are enabled by default.
+//!
+//! [embedded-hal-async]: https://github.com/rust-embedded/embedded-hal/tree/master/embedded-hal-async
+//! [embedded-io-async]: https://github.com/rust-embedded/embedded-hal/tree/master/embedded-io-async
+//! [embedded-hal]: https://github.com/rust-embedded/embedded-hal/tree/master/embedded-hal
+//! [embedded-hal-nb]: https://github.com/rust-embedded/embedded-hal/tree/master/embedded-hal-nb
+//! [embedded-io]: https://github.com/rust-embedded/embedded-hal/tree/master/embedded-io
+//! [embassy]: https://github.com/embassy-rs/embassy
+//! [`ufmt_write::uWrite`]: https://docs.rs/ufmt-write/latest/ufmt_write/trait.uWrite.html
 
 #![no_std]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
