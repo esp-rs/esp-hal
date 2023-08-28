@@ -18,12 +18,11 @@
 #![no_main]
 #![feature(type_alias_impl_trait)]
 
-use embassy_executor::Executor;
 use embassy_time::{Duration, Timer};
 use esp32s3_hal::{
     clock::ClockControl,
     dma::DmaPriority,
-    embassy,
+    embassy::{self, executor::Executor},
     gdma::*,
     peripherals::Peripherals,
     prelude::*,
@@ -33,16 +32,7 @@ use esp32s3_hal::{
     IO,
 };
 use esp_backtrace as _;
-use static_cell::StaticCell;
-
-macro_rules! singleton {
-    ($val:expr) => {{
-        type T = impl Sized;
-        static STATIC_CELL: StaticCell<T> = StaticCell::new();
-        let (x,) = STATIC_CELL.init(($val,));
-        x
-    }};
-}
+use static_cell::make_static;
 
 // This example uses SPI3 to test that WithDmaSpi3 is included in the prelude.
 pub type SpiType<'d> =
@@ -61,8 +51,6 @@ async fn spi_task(spi: &'static mut SpiType<'static>) {
         Timer::after(Duration::from_millis(5_000)).await;
     }
 }
-
-static EXECUTOR: StaticCell<Executor> = StaticCell::new();
 
 #[entry]
 fn main() -> ! {
@@ -120,10 +108,10 @@ fn main() -> ! {
     let dma = Gdma::new(peripherals.DMA, &mut system.peripheral_clock_control);
     let dma_channel = dma.channel0;
 
-    let descriptors = singleton!([0u32; 8 * 3]);
-    let rx_descriptors = singleton!([0u32; 8 * 3]);
+    let descriptors = make_static!([0u32; 8 * 3]);
+    let rx_descriptors = make_static!([0u32; 8 * 3]);
 
-    let spi = singleton!(Spi::new(
+    let spi = make_static!(Spi::new(
         peripherals.SPI3,
         sclk,
         mosi,
@@ -141,7 +129,7 @@ fn main() -> ! {
         DmaPriority::Priority0,
     )));
 
-    let executor = EXECUTOR.init(Executor::new());
+    let executor = make_static!(Executor::new());
     executor.run(|spawner| {
         spawner.spawn(spi_task(spi)).ok();
     });

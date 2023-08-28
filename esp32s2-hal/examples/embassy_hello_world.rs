@@ -7,18 +7,17 @@
 #![no_main]
 #![feature(type_alias_impl_trait)]
 
-use embassy_executor::Executor;
 use embassy_time::{Duration, Timer};
 use esp32s2_hal::{
     clock::ClockControl,
-    embassy,
+    embassy::{self, executor::Executor},
     peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
     Rtc,
 };
 use esp_backtrace as _;
-use static_cell::StaticCell;
+use static_cell::make_static;
 use xtensa_atomic_emulation_trap as _;
 
 #[embassy_executor::task]
@@ -36,8 +35,6 @@ async fn run2() {
         Timer::after(Duration::from_millis(5_000)).await;
     }
 }
-
-static EXECUTOR: StaticCell<Executor> = StaticCell::new();
 
 #[entry]
 fn main() -> ! {
@@ -68,7 +65,7 @@ fn main() -> ! {
     #[cfg(feature = "embassy-time-timg0")]
     embassy::init(&clocks, timer_group0.timer0);
 
-    let executor = EXECUTOR.init(Executor::new());
+    let executor = make_static!(Executor::new());
     executor.run(|spawner| {
         spawner.spawn(run1()).ok();
         spawner.spawn(run2()).ok();
