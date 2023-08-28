@@ -1365,6 +1365,7 @@ mod chip_specific {
         rmt.apb_conf.modify(|_, w| w.clk_en().set_bit());
     }
 
+    #[doc(hidden)]
     #[macro_export]
     macro_rules! impl_tx_channel {
         ($channel:ident, $signal:ident, $ch_num:literal) => {
@@ -1505,6 +1506,7 @@ mod chip_specific {
         }
     }
 
+    #[doc(hidden)]
     #[macro_export]
     macro_rules! impl_rx_channel {
         ($channel:ident, $signal:ident, $ch_num:literal) => {
