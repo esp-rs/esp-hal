@@ -19,8 +19,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add PARL_IO TX driver for ESP32-C6 / ESP32-H2 (#733)
 - Implement `ufmt_write::uWrite` trait for USB Serial JTAG (#751)
 - Add HMAC peripheral support (#755)
-- Add multicore-aware embassy executor for Xtensa MCUs (#723).
-- Add interrupt-executor for Xtensa MCUs (#723).
 - Add PARL_IO RX driver for ESP32-C6 / ESP32-H2 (#760)
 - Add multicore-aware embassy executor for Xtensa MCUs (#723, #756).
 - Add interrupt-executor for Xtensa MCUs (#723, #756).
@@ -30,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Update the `embedded-hal-*` packages to `1.0.0-rc.1` and implement traits from `embedded-io` and `embedded-io-async` (#747)
 - Moved AlignmentHelper to its own module (#753)
+- Disable all watchdog timers by default at startup (#763)
 
 ### Fixed
 
