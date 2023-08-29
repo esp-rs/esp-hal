@@ -37,7 +37,7 @@ impl<'d> Rsa<'d> {
     }
 
     fn write_mode(&mut self, mode: u32) {
-        Self::write_to_register(&mut self.rsa.mode, mode as u32);
+        self.rsa.mode.write(|w| unsafe { w.bits(mode as u32) });
     }
 
     /// Enables/disables search acceleration, when enabled it would increases
@@ -62,7 +62,9 @@ impl<'d> Rsa<'d> {
     }
 
     pub(super) fn write_search_position(&mut self, search_position: u32) {
-        Self::write_to_register(&mut self.rsa.search_pos, search_position);
+        self.rsa
+            .search_pos
+            .write(|w| unsafe { w.bits(search_position) });
     }
 
     /// Enables/disables constant time acceleration, when enabled it would

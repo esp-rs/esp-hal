@@ -6,6 +6,7 @@ ENTRY(Reset)
 PROVIDE(__pre_init = DefaultPreInit);
 PROVIDE(__zero_bss = default_mem_hook);
 PROVIDE(__init_data = default_mem_hook);
+PROVIDE(__post_init = default_post_init);
 
 INCLUDE exception.x
 

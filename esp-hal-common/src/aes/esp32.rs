@@ -28,7 +28,7 @@ impl<'d> Aes<'d> {
     }
 
     pub(super) fn write_mode(&mut self, mode: u32) {
-        Self::write_to_register(&mut self.aes.mode, mode);
+        self.aes.mode.write(|w| unsafe { w.bits(mode) });
     }
 
     /// Configures how the state matrix would be laid out
@@ -48,7 +48,7 @@ impl<'d> Aes<'d> {
         to_write |= (input_text_word_endianess as u32) << 3;
         to_write |= (output_text_byte_endianess as u32) << 4;
         to_write |= (output_text_word_endianess as u32) << 5;
-        Self::write_to_register(&mut self.aes.endian, to_write);
+        self.aes.endian.write(|w| unsafe { w.bits(to_write) });
     }
 
     pub(super) fn write_start(&mut self) {
