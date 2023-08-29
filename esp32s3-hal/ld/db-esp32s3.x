@@ -18,6 +18,7 @@ INCLUDE "device.x"
 PROVIDE(__pre_init = DefaultPreInit);
 PROVIDE(__zero_bss = default_mem_hook);
 PROVIDE(__init_data = default_mem_hook);
+PROVIDE(__post_init = default_post_init);
 
 /*INCLUDE exception.x*/
 /* exception vector for the ESP32, requiring high priority interrupts and register window support */
