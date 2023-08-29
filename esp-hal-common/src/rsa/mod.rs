@@ -39,10 +39,7 @@ use core::{convert::Infallible, marker::PhantomData, ptr::copy_nonoverlapping};
 
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
-    peripherals::{
-        generic::{Reg, RegisterSpec, Resettable, Writable},
-        RSA,
-    },
+    peripherals::RSA,
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
 };
 
@@ -89,7 +86,7 @@ impl<'d> Rsa<'d> {
     }
 
     fn write_mprime(&mut self, m_prime: u32) {
-        Self::write_to_register(&mut self.rsa.m_prime, m_prime);
+        self.rsa.m_prime.write(|w| unsafe { w.bits(m_prime) });
     }
 
     unsafe fn write_operand_a<const N: usize>(&mut self, operand_a: &[u8; N]) {
@@ -106,13 +103,6 @@ impl<'d> Rsa<'d> {
 
     unsafe fn read_out<const N: usize>(&mut self, outbuf: &mut [u8; N]) {
         copy_nonoverlapping(self.rsa.z_mem.as_ptr() as *const u8, outbuf.as_mut_ptr(), N);
-    }
-
-    fn write_to_register<T>(reg: &mut Reg<T>, data: u32)
-    where
-        T: RegisterSpec<Ux = u32> + Resettable + Writable,
-    {
-        reg.write(|w| unsafe { w.bits(data) });
     }
 }
 

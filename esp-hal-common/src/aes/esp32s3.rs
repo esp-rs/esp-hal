@@ -28,7 +28,7 @@ impl<'d> Aes<'d> {
     }
 
     pub(super) fn write_mode(&mut self, mode: u32) {
-        Self::write_to_register(&mut self.aes.mode, mode);
+        self.aes.mode.write(|w| unsafe { w.bits(mode) });
     }
 
     pub(super) fn write_start(&mut self) {

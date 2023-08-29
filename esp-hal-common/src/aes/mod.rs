@@ -121,13 +121,6 @@ impl<'d> Aes<'d> {
             }
         }
     }
-
-    fn write_to_register<T>(reg: &mut Reg<T>, data: u32)
-    where
-        T: RegisterSpec<Ux = u32> + Resettable + Writable,
-    {
-        reg.write(|w| unsafe { w.bits(data) });
-    }
 }
 
 mod sealed {

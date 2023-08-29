@@ -26,11 +26,11 @@ impl<'d> Rsa<'d> {
     }
 
     pub(super) fn write_multi_mode(&mut self, mode: u32) {
-        Self::write_to_register(&mut self.rsa.mult_mode, mode as u32);
+        self.rsa.mult_mode.write(|w| unsafe { w.bits(mode as u32) });
     }
 
     pub(super) fn write_modexp_mode(&mut self, mode: u32) {
-        Self::write_to_register(&mut self.rsa.modexp_mode, mode);
+        self.rsa.modexp_mode.write(|w| unsafe { w.bits(mode) });
     }
 
     pub(super) fn write_modexp_start(&mut self) {
