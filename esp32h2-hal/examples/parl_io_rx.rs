@@ -23,8 +23,6 @@ use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
-
     let peripherals = Peripherals::take();
     let mut system = peripherals.PCR.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
