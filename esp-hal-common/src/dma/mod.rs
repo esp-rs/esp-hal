@@ -294,7 +294,14 @@ pub trait RxPrivate {
 
     fn drain_buffer(&mut self, dst: &mut [u8]) -> Result<usize, DmaError>;
 
+    /// Descriptor error detected
     fn has_error(&self) -> bool;
+
+    /// ERR_DSCR_EMPTY error detected
+    fn has_dscr_empty_error(&self) -> bool;
+
+    /// ERR_EOF error detected
+    fn has_eof_error(&self) -> bool;
 
     #[cfg(feature = "async")]
     fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker;
@@ -552,6 +559,14 @@ where
 
     fn has_error(&self) -> bool {
         R::has_in_descriptor_error()
+    }
+
+    fn has_dscr_empty_error(&self) -> bool {
+        R::has_in_descriptor_error_dscr_empty()
+    }
+
+    fn has_eof_error(&self) -> bool {
+        R::has_in_descriptor_error_err_eof()
     }
 
     #[cfg(feature = "async")]
@@ -904,6 +919,8 @@ pub trait RegisterAccess {
     fn reset_in();
     fn set_in_descriptors(address: u32);
     fn has_in_descriptor_error() -> bool;
+    fn has_in_descriptor_error_dscr_empty() -> bool;
+    fn has_in_descriptor_error_err_eof() -> bool;
     fn set_in_peripheral(peripheral: u8);
     fn start_in();
     fn is_in_done() -> bool;

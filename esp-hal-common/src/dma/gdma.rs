@@ -298,6 +298,28 @@ macro_rules! impl_channel {
                     ret
                 }
 
+                fn has_in_descriptor_error_dscr_empty() -> bool {
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
+
+                    #[cfg(not(any(esp32c6, esp32h2, esp32s3)))]
+                    let ret = dma.[<int_raw_ch $num>].read().in_dscr_empty().bit();
+                    #[cfg(any(esp32c6, esp32h2, esp32s3))]
+                    let ret = dma.[<in_int_raw_ch $num>].read().in_dscr_empty().bit();
+
+                    ret
+                }
+
+                fn has_in_descriptor_error_err_eof() -> bool {
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
+
+                    #[cfg(not(any(esp32c6, esp32h2, esp32s3)))]
+                    let ret = dma.[<int_raw_ch $num>].read().in_err_eof().bit();
+                    #[cfg(any(esp32c6, esp32h2, esp32s3))]
+                    let ret = dma.[<in_int_raw_ch $num>].read().in_err_eof().bit();
+
+                    ret
+                }
+
                 fn set_in_peripheral(peripheral: u8) {
                     let dma = unsafe { &*crate::peripherals::DMA::PTR };
 

@@ -86,13 +86,16 @@ fn main() -> ! {
 
     let clock_pin = ClkOutPin::new(io.pins.gpio6);
 
-    let mut parl_io_tx = parl_io.tx.with_config(
-        pin_conf,
-        clock_pin,
-        0,
-        SampleEdge::Normal,
-        BitPackOrder::Msb,
-    );
+    let mut parl_io_tx = parl_io
+        .tx
+        .with_config(
+            pin_conf,
+            clock_pin,
+            0,
+            SampleEdge::Normal,
+            BitPackOrder::Msb,
+        )
+        .unwrap();
 
     let mut buffer = dma_buffer();
     for i in 0..buffer.len() {

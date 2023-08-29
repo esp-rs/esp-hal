@@ -168,6 +168,16 @@ macro_rules! ImplSpiChannel {
                     spi.dma_int_raw.read().inlink_dscr_error_int_raw().bit()
                 }
 
+                fn has_in_descriptor_error_dscr_empty() -> bool {
+                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
+                    spi.dma_int_raw.read().inlink_dscr_empty_int_raw().bit()
+                }
+
+                fn has_in_descriptor_error_err_eof() -> bool {
+                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
+                    spi.dma_int_raw.read().in_err_eof_int_raw().bit()
+                }
+
                 fn set_in_peripheral(_peripheral: u8) {
                     // no-op
                 }
@@ -419,6 +429,16 @@ macro_rules! ImplI2sChannel {
                 fn has_in_descriptor_error() -> bool {
                     let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
                     reg_block.int_raw.read().in_dscr_err_int_raw().bit()
+                }
+
+                fn has_in_descriptor_error_dscr_empty() -> bool {
+                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
+                    reg_block.int_raw.read().in_dscr_empty_int_raw().bit()
+                }
+
+                fn has_in_descriptor_error_err_eof() -> bool {
+                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
+                    reg_block.int_raw.read().in_err_eof_int_raw().bit()
                 }
 
                 fn set_in_peripheral(_peripheral: u8) {

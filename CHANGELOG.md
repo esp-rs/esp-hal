@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add HMAC peripheral support (#755)
 - Add multicore-aware embassy executor for Xtensa MCUs (#723).
 - Add interrupt-executor for Xtensa MCUs (#723).
+- Add PARL_IO RX driver for ESP32-C6 / ESP32-H2 (#760)
 
 ### Changed
 
