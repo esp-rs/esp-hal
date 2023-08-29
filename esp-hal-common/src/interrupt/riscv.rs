@@ -24,43 +24,6 @@ use crate::{
     Cpu,
 };
 
-// User code shouldn't usually take the mutable TrapFrame or the TrapFrame in
-// general. However this makes things like preemtive multitasking easier in
-// future
-extern "C" {
-    fn interrupt1(frame: &mut TrapFrame);
-    fn interrupt2(frame: &mut TrapFrame);
-    fn interrupt3(frame: &mut TrapFrame);
-    fn interrupt4(frame: &mut TrapFrame);
-    fn interrupt5(frame: &mut TrapFrame);
-    fn interrupt6(frame: &mut TrapFrame);
-    fn interrupt7(frame: &mut TrapFrame);
-    fn interrupt8(frame: &mut TrapFrame);
-    fn interrupt9(frame: &mut TrapFrame);
-    fn interrupt10(frame: &mut TrapFrame);
-    fn interrupt11(frame: &mut TrapFrame);
-    fn interrupt12(frame: &mut TrapFrame);
-    fn interrupt13(frame: &mut TrapFrame);
-    fn interrupt14(frame: &mut TrapFrame);
-    fn interrupt15(frame: &mut TrapFrame);
-    fn interrupt16(frame: &mut TrapFrame);
-    fn interrupt17(frame: &mut TrapFrame);
-    fn interrupt18(frame: &mut TrapFrame);
-    fn interrupt19(frame: &mut TrapFrame);
-    fn interrupt20(frame: &mut TrapFrame);
-    fn interrupt21(frame: &mut TrapFrame);
-    fn interrupt22(frame: &mut TrapFrame);
-    fn interrupt23(frame: &mut TrapFrame);
-    fn interrupt24(frame: &mut TrapFrame);
-    fn interrupt25(frame: &mut TrapFrame);
-    fn interrupt26(frame: &mut TrapFrame);
-    fn interrupt27(frame: &mut TrapFrame);
-    fn interrupt28(frame: &mut TrapFrame);
-    fn interrupt29(frame: &mut TrapFrame);
-    fn interrupt30(frame: &mut TrapFrame);
-    fn interrupt31(frame: &mut TrapFrame);
-}
-
 /// Interrupt kind
 pub enum InterruptKind {
     /// Level interrupt
@@ -210,6 +173,7 @@ mod vectored {
         }
         Ok(())
     }
+
     /// Enables an interrupt at a given priority, maps it to the given CPU
     /// interrupt and assigns the given priority.
     ///
@@ -283,89 +247,106 @@ mod vectored {
     pub unsafe fn interrupt2(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt2, context)
     }
+
     #[no_mangle]
     #[ram]
     pub unsafe fn interrupt3(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt3, context)
     }
+
     #[no_mangle]
     #[ram]
     pub unsafe fn interrupt4(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt4, context)
     }
+
     #[no_mangle]
     #[ram]
     pub unsafe fn interrupt5(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt5, context)
     }
+
     #[no_mangle]
     #[ram]
     pub unsafe fn interrupt6(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt6, context)
     }
+
     #[no_mangle]
     #[ram]
     pub unsafe fn interrupt7(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt7, context)
     }
+
     #[no_mangle]
     #[ram]
     pub unsafe fn interrupt8(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt8, context)
     }
+
     #[no_mangle]
     #[ram]
     pub unsafe fn interrupt9(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt9, context)
     }
+
     #[no_mangle]
     #[ram]
     pub unsafe fn interrupt10(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt10, context)
     }
+
     #[no_mangle]
     #[ram]
     pub unsafe fn interrupt11(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt11, context)
     }
+
     #[no_mangle]
     #[ram]
     pub unsafe fn interrupt12(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt12, context)
     }
+
     #[no_mangle]
     #[ram]
     pub unsafe fn interrupt13(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt13, context)
     }
+
     #[no_mangle]
     #[ram]
     pub unsafe fn interrupt14(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt14, context)
     }
+
     #[no_mangle]
     #[ram]
     pub unsafe fn interrupt15(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt15, context)
     }
+
     #[cfg(plic)]
     #[no_mangle]
     #[ram]
     pub unsafe fn interrupt16(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt16, context)
     }
+
     #[cfg(plic)]
     #[no_mangle]
     #[ram]
     pub unsafe fn interrupt17(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt17, context)
     }
+
     #[cfg(plic)]
     #[no_mangle]
     #[ram]
     pub unsafe fn interrupt18(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt18, context)
     }
+
     #[cfg(plic)]
     #[no_mangle]
     #[ram]
@@ -381,8 +362,43 @@ mod vectored {
 #[link_section = ".trap.rust"]
 #[export_name = "_start_trap_rust_hal"]
 pub unsafe extern "C" fn start_trap_rust_hal(trap_frame: *mut TrapFrame) {
+    // User code shouldn't usually take the mutable TrapFrame or the TrapFrame in
+    // general. However this makes things like preemtive multitasking easier in
+    // future
     extern "C" {
-        // defined in riscv-rt
+        fn interrupt1(frame: &mut TrapFrame);
+        fn interrupt2(frame: &mut TrapFrame);
+        fn interrupt3(frame: &mut TrapFrame);
+        fn interrupt4(frame: &mut TrapFrame);
+        fn interrupt5(frame: &mut TrapFrame);
+        fn interrupt6(frame: &mut TrapFrame);
+        fn interrupt7(frame: &mut TrapFrame);
+        fn interrupt8(frame: &mut TrapFrame);
+        fn interrupt9(frame: &mut TrapFrame);
+        fn interrupt10(frame: &mut TrapFrame);
+        fn interrupt11(frame: &mut TrapFrame);
+        fn interrupt12(frame: &mut TrapFrame);
+        fn interrupt13(frame: &mut TrapFrame);
+        fn interrupt14(frame: &mut TrapFrame);
+        fn interrupt15(frame: &mut TrapFrame);
+        fn interrupt16(frame: &mut TrapFrame);
+        fn interrupt17(frame: &mut TrapFrame);
+        fn interrupt18(frame: &mut TrapFrame);
+        fn interrupt19(frame: &mut TrapFrame);
+        fn interrupt20(frame: &mut TrapFrame);
+        fn interrupt21(frame: &mut TrapFrame);
+        fn interrupt22(frame: &mut TrapFrame);
+        fn interrupt23(frame: &mut TrapFrame);
+        fn interrupt24(frame: &mut TrapFrame);
+        fn interrupt25(frame: &mut TrapFrame);
+        fn interrupt26(frame: &mut TrapFrame);
+        fn interrupt27(frame: &mut TrapFrame);
+        fn interrupt28(frame: &mut TrapFrame);
+        fn interrupt29(frame: &mut TrapFrame);
+        fn interrupt30(frame: &mut TrapFrame);
+        fn interrupt31(frame: &mut TrapFrame);
+
+        // Defined in `esp-riscv-rt`
         pub fn DefaultHandler();
     }
 
@@ -393,6 +409,7 @@ pub unsafe extern "C" fn start_trap_rust_hal(trap_frame: *mut TrapFrame) {
     } else {
         #[cfg(feature = "interrupt-preemption")]
         let interrupt_priority = _handle_priority();
+
         let code = mcause::read().code();
         match code {
             1 => interrupt1(trap_frame.as_mut().unwrap()),
@@ -428,6 +445,7 @@ pub unsafe extern "C" fn start_trap_rust_hal(trap_frame: *mut TrapFrame) {
             31 => interrupt31(trap_frame.as_mut().unwrap()),
             _ => DefaultHandler(),
         };
+
         #[cfg(feature = "interrupt-preemption")]
         _restore_priority(interrupt_priority);
     }
