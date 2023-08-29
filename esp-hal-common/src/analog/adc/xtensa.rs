@@ -29,18 +29,11 @@ pub use crate::analog::{AdcCalEfuse, AdcCalScheme};
 // Constants taken from:
 // https://github.com/espressif/esp-idf/blob/903af13e8/components/soc/esp32s2/include/soc/regi2c_saradc.h
 // https://github.com/espressif/esp-idf/blob/903af13e8/components/soc/esp32s3/include/soc/regi2c_saradc.h
+
 cfg_if::cfg_if! {
     if #[cfg(any(esp32s2, esp32s3))] {
         const I2C_SAR_ADC: u8 = 0x69;
         const I2C_SAR_ADC_HOSTID: u8 = 1;
-
-        const ADC_VAL_MASK: u16 = 0xfff;
-        const ADC_CAL_CNT_MAX: u16 = 32;
-        const ADC_CAL_CHANNEL: u16 = 15;
-
-        const ADC_SAR1_ENCAL_GND_ADDR: u8 = 0x7;
-        const ADC_SAR1_ENCAL_GND_ADDR_MSB: u8 = 5;
-        const ADC_SAR1_ENCAL_GND_ADDR_LSB: u8 = 5;
 
         const ADC_SAR1_INITIAL_CODE_HIGH_ADDR: u8 = 0x1;
         const ADC_SAR1_INITIAL_CODE_HIGH_ADDR_MSB: u8 = 0x3;
@@ -50,22 +43,6 @@ cfg_if::cfg_if! {
         const ADC_SAR1_INITIAL_CODE_LOW_ADDR_MSB: u8 = 0x7;
         const ADC_SAR1_INITIAL_CODE_LOW_ADDR_LSB: u8 = 0x0;
 
-        const ADC_SAR1_DREF_ADDR: u8 = 0x2;
-        const ADC_SAR1_DREF_ADDR_MSB: u8 = 0x6;
-        const ADC_SAR1_DREF_ADDR_LSB: u8 = 0x4;
-
-        const ADC_SARADC1_ENCAL_REF_ADDR: u8 = 0x7;
-        const ADC_SARADC1_ENCAL_REF_ADDR_MSB: u8 = 4;
-        const ADC_SARADC1_ENCAL_REF_ADDR_LSB: u8 = 4;
-    }
-}
-
-cfg_if::cfg_if! {
-    if #[cfg(any(esp32s2, esp32s3))] {
-        const ADC_SAR2_ENCAL_GND_ADDR: u8 = 0x7;
-        const ADC_SAR2_ENCAL_GND_ADDR_MSB: u8 = 5;
-        const ADC_SAR2_ENCAL_GND_ADDR_LSB: u8 = 5;
-
         const ADC_SAR2_INITIAL_CODE_HIGH_ADDR: u8 = 0x4;
         const ADC_SAR2_INITIAL_CODE_HIGH_ADDR_MSB: u8 = 0x3;
         const ADC_SAR2_INITIAL_CODE_HIGH_ADDR_LSB: u8 = 0x0;
@@ -73,6 +50,30 @@ cfg_if::cfg_if! {
         const ADC_SAR2_INITIAL_CODE_LOW_ADDR: u8 = 0x3;
         const ADC_SAR2_INITIAL_CODE_LOW_ADDR_MSB: u8 = 0x7;
         const ADC_SAR2_INITIAL_CODE_LOW_ADDR_LSB: u8 = 0x0;
+    }
+}
+
+cfg_if::cfg_if! {
+    if #[cfg(esp32s3)] {
+        const ADC_VAL_MASK: u16 = 0xfff;
+        const ADC_CAL_CNT_MAX: u16 = 32;
+        const ADC_CAL_CHANNEL: u16 = 15;
+
+        const ADC_SAR1_ENCAL_GND_ADDR: u8 = 0x7;
+        const ADC_SAR1_ENCAL_GND_ADDR_MSB: u8 = 5;
+        const ADC_SAR1_ENCAL_GND_ADDR_LSB: u8 = 5;
+
+        const ADC_SAR1_DREF_ADDR: u8 = 0x2;
+        const ADC_SAR1_DREF_ADDR_MSB: u8 = 0x6;
+        const ADC_SAR1_DREF_ADDR_LSB: u8 = 0x4;
+
+        const ADC_SARADC1_ENCAL_REF_ADDR: u8 = 0x7;
+        const ADC_SARADC1_ENCAL_REF_ADDR_MSB: u8 = 4;
+        const ADC_SARADC1_ENCAL_REF_ADDR_LSB: u8 = 4;
+
+        const ADC_SAR2_ENCAL_GND_ADDR: u8 = 0x7;
+        const ADC_SAR2_ENCAL_GND_ADDR_MSB: u8 = 5;
+        const ADC_SAR2_ENCAL_GND_ADDR_LSB: u8 = 5;
 
         const ADC_SAR2_DREF_ADDR: u8 = 0x5;
         const ADC_SAR2_DREF_ADDR_MSB: u8 = 0x6;
