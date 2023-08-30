@@ -73,3 +73,19 @@ pub use esp_hal_common::*;
 pub mod analog {
     pub use esp_hal_common::analog::{AvailableAnalog, SarAdcExt};
 }
+
+#[export_name = "__post_init"]
+unsafe fn post_init() {
+    use esp_hal_common::{
+        peripherals::{LP_CLKRST, TIMG0, TIMG1},
+        timer::Wdt,
+    };
+
+    // RTC domain must be enabled before we try to disable
+    let mut rtc = Rtc::new(LP_CLKRST::steal());
+    rtc.swd.disable();
+    rtc.rwdt.disable();
+
+    Wdt::<TIMG0>::set_wdt_enabled(false);
+    Wdt::<TIMG1>::set_wdt_enabled(false);
+}

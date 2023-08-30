@@ -28,10 +28,6 @@ fn main() -> ! {
     let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-
-    // Disable watchdog timer
-    rtc.rwdt.disable();
-
     rtc.rwdt.start(2000u64.millis());
     rtc.rwdt.listen();
 
@@ -49,6 +45,8 @@ fn main() -> ! {
 #[interrupt]
 fn RTC_CORE() {
     critical_section::with(|cs| {
+        esp_println::println!("RWDT Interrupt");
+
         let mut rwdt = RWDT.borrow_ref_mut(cs);
         let rwdt = rwdt.as_mut().unwrap();
         rwdt.clear_interrupt();

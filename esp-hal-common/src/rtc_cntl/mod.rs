@@ -701,6 +701,16 @@ impl Default for Rwdt {
 
 /// RTC Watchdog Timer driver
 impl Rwdt {
+    /// Enable the watchdog timer instance
+    pub fn enable(&mut self) {
+        self.set_enabled(true);
+    }
+
+    /// Disable the watchdog timer instance
+    pub fn disable(&mut self) {
+        self.set_enabled(false);
+    }
+
     pub fn listen(&mut self) {
         #[cfg(not(any(esp32c6, esp32h2)))]
         let rtc_cntl = unsafe { &*RTC_CNTL::PTR };
@@ -782,7 +792,17 @@ impl Rwdt {
         }
     }
 
-    /// Enable/disable write protection for WDT registers
+    pub fn feed(&mut self) {
+        #[cfg(not(any(esp32c6, esp32h2)))]
+        let rtc_cntl = unsafe { &*RTC_CNTL::PTR };
+        #[cfg(any(esp32c6, esp32h2))]
+        let rtc_cntl = unsafe { &*LP_WDT::PTR };
+
+        self.set_write_protection(false);
+        rtc_cntl.wdtfeed.write(|w| unsafe { w.bits(1) });
+        self.set_write_protection(true);
+    }
+
     fn set_write_protection(&mut self, enable: bool) {
         #[cfg(not(any(esp32c6, esp32h2)))]
         let rtc_cntl = unsafe { &*RTC_CNTL::PTR };
@@ -793,10 +813,8 @@ impl Rwdt {
 
         rtc_cntl.wdtwprotect.write(|w| unsafe { w.bits(wkey) });
     }
-}
 
-impl WatchdogDisable for Rwdt {
-    fn disable(&mut self) {
+    fn set_enabled(&mut self, enable: bool) {
         #[cfg(not(any(esp32c6, esp32h2)))]
         let rtc_cntl = unsafe { &*RTC_CNTL::PTR };
         #[cfg(any(esp32c6, esp32h2))]
@@ -806,26 +824,18 @@ impl WatchdogDisable for Rwdt {
 
         rtc_cntl
             .wdtconfig0
-            .modify(|_, w| w.wdt_en().clear_bit().wdt_flashboot_mod_en().clear_bit());
+            .modify(|_, w| w.wdt_en().bit(enable).wdt_flashboot_mod_en().bit(enable));
 
         self.set_write_protection(true);
     }
-}
 
-// TODO: this can be refactored
-impl WatchdogEnable for Rwdt {
-    type Time = MicrosDurationU64;
-
-    fn start<T>(&mut self, period: T)
-    where
-        T: Into<Self::Time>,
-    {
+    fn set_timeout(&mut self, timeout: MicrosDurationU64) {
         #[cfg(not(any(esp32c6, esp32h2)))]
         let rtc_cntl = unsafe { &*RTC_CNTL::PTR };
         #[cfg(any(esp32c6, esp32h2))]
         let rtc_cntl = unsafe { &*LP_WDT::PTR };
 
-        let timeout_raw = (period.into().to_millis() * (RtcClock::cycles_to_1ms() as u64)) as u32;
+        let timeout_raw = (timeout.to_millis() * (RtcClock::cycles_to_1ms() as u64)) as u32;
         self.set_write_protection(false);
 
         unsafe {
@@ -835,7 +845,7 @@ impl WatchdogEnable for Rwdt {
                 .modify(|_, w| w.wdt_stg0_hold().bits(timeout_raw));
 
             #[cfg(any(esp32c6, esp32h2))]
-            (&*LP_WDT::PTR).config1.modify(|_, w| {
+            rtc_cntl.config1.modify(|_, w| {
                 w.wdt_stg0_hold()
                     .bits(timeout_raw >> (1 + Efuse::get_rwdt_multiplier()))
             });
@@ -868,16 +878,26 @@ impl WatchdogEnable for Rwdt {
     }
 }
 
+impl WatchdogDisable for Rwdt {
+    fn disable(&mut self) {
+        self.disable();
+    }
+}
+
+impl WatchdogEnable for Rwdt {
+    type Time = MicrosDurationU64;
+
+    fn start<T>(&mut self, period: T)
+    where
+        T: Into<Self::Time>,
+    {
+        self.set_timeout(period.into());
+    }
+}
+
 impl Watchdog for Rwdt {
     fn feed(&mut self) {
-        #[cfg(not(any(esp32c6, esp32h2)))]
-        let rtc_cntl = unsafe { &*RTC_CNTL::PTR };
-        #[cfg(any(esp32c6, esp32h2))]
-        let rtc_cntl = unsafe { &*LP_WDT::PTR };
-
-        self.set_write_protection(false);
-        rtc_cntl.wdtfeed.write(|w| unsafe { w.bits(1) });
-        self.set_write_protection(true);
+        self.feed();
     }
 }
 
@@ -888,8 +908,14 @@ pub struct Swd;
 #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
 /// Super Watchdog driver
 impl Swd {
+    /// Create a new super watchdog timer instance
     pub fn new() -> Self {
         Self
+    }
+
+    /// Disable the watchdog timer instance
+    pub fn disable(&mut self) {
+        self.set_enabled(false);
     }
 
     /// Enable/disable write protection for WDT registers
@@ -908,19 +934,25 @@ impl Swd {
             .swd_wprotect
             .write(|w| unsafe { w.swd_wkey().bits(wkey) });
     }
-}
 
-#[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
-impl WatchdogDisable for Swd {
-    fn disable(&mut self) {
+    fn set_enabled(&mut self, enable: bool) {
         #[cfg(not(any(esp32c6, esp32h2)))]
         let rtc_cntl = unsafe { &*RTC_CNTL::PTR };
         #[cfg(any(esp32c6, esp32h2))]
         let rtc_cntl = unsafe { &*LP_WDT::PTR };
 
         self.set_write_protection(false);
-        rtc_cntl.swd_conf.write(|w| w.swd_auto_feed_en().set_bit());
+        rtc_cntl
+            .swd_conf
+            .write(|w| w.swd_auto_feed_en().bit(!enable));
         self.set_write_protection(true);
+    }
+}
+
+#[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
+impl WatchdogDisable for Swd {
+    fn disable(&mut self) {
+        self.disable();
     }
 }
 

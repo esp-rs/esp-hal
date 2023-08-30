@@ -728,13 +728,30 @@ where
     pub fn new(_peripheral_clock_control: &mut PeripheralClockControl) -> Self {
         #[cfg(lp_wdt)]
         _peripheral_clock_control.enable(crate::system::Peripheral::Wdt);
+
         TG::configure_wdt_src_clk();
+
         Self {
             phantom: PhantomData::default(),
         }
     }
 
-    fn set_wdt_enabled(&mut self, enabled: bool) {
+    /// Enable the watchdog timer instance
+    pub fn enable(&mut self) {
+        // SAFETY: The `TG` instance being modified is owned by `self`, which is behind
+        //         a mutable reference.
+        unsafe { Self::set_wdt_enabled(true) };
+    }
+
+    /// Disable the watchdog timer instance
+    pub fn disable(&mut self) {
+        // SAFETY: The `TG` instance being modified is owned by `self`, which is behind
+        //         a mutable reference.
+        unsafe { Self::set_wdt_enabled(false) };
+    }
+
+    /// Forcibly enable or disable the watchdog timer
+    pub unsafe fn set_wdt_enabled(enabled: bool) {
         let reg_block = unsafe { &*TG::register_block() };
 
         reg_block
@@ -817,7 +834,7 @@ where
     TG: TimerGroupInstance,
 {
     fn disable(&mut self) {
-        self.set_wdt_enabled(false);
+        self.disable();
     }
 }
 
@@ -831,6 +848,7 @@ where
     where
         T: Into<Self::Time>,
     {
+        self.enable();
         self.set_timeout(period.into());
     }
 }
