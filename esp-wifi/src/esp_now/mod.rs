@@ -8,8 +8,8 @@
 
 use core::{cell::RefCell, fmt::Debug};
 
+use atomic_polyfill::{AtomicBool, Ordering};
 use critical_section::Mutex;
-use atomic_polyfill::{Ordering, AtomicBool};
 use esp_hal_common::peripheral::{Peripheral, PeripheralRef};
 
 use crate::compat::queue::SimpleQueue;
@@ -27,7 +27,7 @@ static RECEIVE_QUEUE: Mutex<RefCell<SimpleQueue<ReceivedData, 10>>> =
     Mutex::new(RefCell::new(SimpleQueue::new()));
 /// This atomic behaves like a guard, so we need strict memory ordering when
 /// operating it.
-/// 
+///
 /// This flag indicates whether the send callback has been called after a sending.
 static ESP_NOW_SEND_CB_INVOKED: AtomicBool = AtomicBool::new(false);
 /// Status of esp now send, true for success, false for failure
@@ -37,13 +37,14 @@ macro_rules! check_error {
     ($block:block) => {
         match unsafe { $block } {
             0 => Ok(()),
-            res => Err(EspNowError::Error(Error::from_code(res as u32)))
+            res => Err(EspNowError::Error(Error::from_code(res as u32))),
         }
     };
 }
 
 #[repr(u32)]
 #[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
     NotInitialized = 12389,
     InvalidArgument = 12390,
@@ -73,17 +74,20 @@ impl Error {
 }
 
 #[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum EspNowError {
     Error(Error),
 }
 
 #[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct PeerCount {
     pub total_count: i32,
     pub encrypted_count: i32,
 }
 
 #[repr(u32)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum WifiPhyRate {
     /// < 1 Mbps with long preamble
     Rate1mL = 0,
@@ -156,6 +160,7 @@ pub enum WifiPhyRate {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct PeerInfo {
     pub peer_address: [u8; 6],
     pub lmk: Option<[u8; 16]>,
@@ -166,6 +171,7 @@ pub struct PeerInfo {
 
 #[cfg(not(any(esp32c6)))]
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct RxControlInfo {
     pub rssi: i32,
     pub rate: u32,
@@ -190,6 +196,7 @@ pub struct RxControlInfo {
 
 #[cfg(any(esp32c6))]
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct RxControlInfo {
     pub rssi: i32,
     pub rate: u32,
@@ -214,6 +221,7 @@ pub struct RxControlInfo {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ReceiveInfo {
     pub src_address: [u8; 6],
     pub dst_address: [u8; 6],
@@ -221,6 +229,7 @@ pub struct ReceiveInfo {
 }
 
 #[derive(Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ReceivedData {
     pub len: u8,
     pub data: [u8; 256],
@@ -448,11 +457,11 @@ impl<'d> EspNow<'d> {
     /// Send data to peer
     ///
     /// The peer needs to be added to the peer list first.
-    /// 
-    /// This method returns a `SendWaiter` on success. ESP-NOW protocol provides guaranteed 
-    /// delivery on MAC layer. If you need this guatantee, call `wait` method of the returned 
-    /// `SendWaiter` and make sure it returns `SendStatus::Success`. 
-    /// However, this method will block current task for milliseconds. 
+    ///
+    /// This method returns a `SendWaiter` on success. ESP-NOW protocol provides guaranteed
+    /// delivery on MAC layer. If you need this guarantee, call `wait` method of the returned
+    /// `SendWaiter` and make sure it returns `SendStatus::Success`.
+    /// However, this method will block current task for milliseconds.
     /// So you can just drop the waiter if you want high frequency sending.
     pub fn send(&self, dst_addr: &[u8; 6], data: &[u8]) -> Result<SendWaiter, EspNowError> {
         let mut addr = [0u8; 6];
@@ -483,20 +492,21 @@ impl Drop for EspNow<'_> {
 
 /// This is essentially [esp_now_send_status_t](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_now.html#_CPPv421esp_now_send_status_t)
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum SendStatus {
     Success,
-    Failed
+    Failed,
 }
 
 /// This struct is returned by a sync esp now send. Invoking `wait` method of this
 /// struct will block current task until the callback function of esp now send is called
-/// and return the status of previous sending. 
+/// and return the status of previous sending.
 pub struct SendWaiter(());
 
 impl SendWaiter {
-    /// Wait for the previous sending to complete, i.e. the send callback is invoked with 
+    /// Wait for the previous sending to complete, i.e. the send callback is invoked with
     /// status of the sending.
-    /// 
+    ///
     /// Note: if you firstly dropped waiter of a sending and then wait for a following sending,
     /// you probably get unreliable status because we cannot determine which sending the waited status
     /// belongs to.
@@ -511,14 +521,11 @@ impl SendWaiter {
     }
 }
 
-unsafe extern "C" fn send_cb(
-    _mac_addr: *const u8,
-    status: esp_now_send_status_t
-) {
+unsafe extern "C" fn send_cb(_mac_addr: *const u8, status: esp_now_send_status_t) {
     critical_section::with(|_| {
         let is_success = status == esp_now_send_status_t_ESP_NOW_SEND_SUCCESS;
         ESP_NOW_SEND_STATUS.store(is_success, Ordering::Relaxed);
-    
+
         ESP_NOW_SEND_CB_INVOKED.store(true, Ordering::Release);
 
         #[cfg(feature = "async")]
@@ -642,7 +649,11 @@ mod asynch {
             ReceiveFuture.await
         }
 
-        pub fn send_async(&self, dst_addr: &[u8; 6], data: &[u8]) -> Result<SendFuture, EspNowError> {
+        pub fn send_async(
+            &self,
+            dst_addr: &[u8; 6],
+            data: &[u8],
+        ) -> Result<SendFuture, EspNowError> {
             let mut addr = [0u8; 6];
             addr.copy_from_slice(dst_addr);
             ESP_NOW_SEND_CB_INVOKED.store(false, Ordering::Release);

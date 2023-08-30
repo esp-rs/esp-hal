@@ -31,6 +31,7 @@ static BT_RECEIVE_QUEUE: Mutex<RefCell<SimpleQueue<ReceivedPacket, 10>>> =
     Mutex::new(RefCell::new(SimpleQueue::new()));
 
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ReceivedPacket {
     pub len: u8,
     pub data: [u8; 256],

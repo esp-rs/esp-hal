@@ -84,6 +84,7 @@ use crate::{
 use log::debug;
 
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum WifiMode {
     Sta,
     Ap,
@@ -177,6 +178,7 @@ pub(crate) static DATA_QUEUE_TX: Mutex<RefCell<SimpleQueue<DataFrame, TX_QUEUE_S
     Mutex::new(RefCell::new(SimpleQueue::new()));
 
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum WifiError {
     NotInitialized,
     InternalError(InternalWifiError),
@@ -186,6 +188,7 @@ pub enum WifiError {
 }
 #[repr(i32)]
 #[derive(Debug, FromPrimitive, EnumSetType)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum WifiEvent {
     WifiReady = 0,
     ScanDone,
@@ -213,6 +216,7 @@ pub enum WifiEvent {
 
 #[repr(i32)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, FromPrimitive)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum InternalWifiError {
     ///Out of memory
     EspErrNoMem = 0x101,

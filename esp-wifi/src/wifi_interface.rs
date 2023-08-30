@@ -430,6 +430,7 @@ impl<'a> WifiStack<'a> {
 }
 
 #[derive(Debug, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum WifiStackError {
     Unknown(i32),
     InitializationError(crate::InitializationError),
@@ -605,6 +606,7 @@ impl<'s, 'n: 's> Drop for Socket<'s, 'n> {
 }
 
 #[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum IoError {
     SocketClosed,
     MultiCastError(smoltcp::iface::MulticastError),

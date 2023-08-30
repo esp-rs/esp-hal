@@ -168,10 +168,12 @@ pub type EspWifiTimer = Alarm<Target, 0>;
 pub type EspWifiTimer = hal::timer::Timer<hal::timer::Timer0<hal::peripherals::TIMG1>>;
 
 #[derive(Debug, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct EspWifiInitializationInternal;
 
 #[derive(Debug, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum EspWifiInitialization {
     #[cfg(feature = "wifi")]
     Wifi(EspWifiInitializationInternal),
@@ -202,6 +204,7 @@ impl EspWifiInitialization {
 }
 
 #[derive(Debug, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum EspWifiInitFor {
     #[cfg(feature = "wifi")]
     Wifi,
@@ -336,6 +339,7 @@ pub fn initialize(
 }
 
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum InitializationError {
     General(i32),
     #[cfg(feature = "wifi")]

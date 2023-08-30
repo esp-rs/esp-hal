@@ -5,6 +5,7 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
+defmt = { workspace = true, optional = true }
 embedded-hal.workspace = true
 esp32c3-hal = { workspace = true, optional = true }
 esp32c2-hal = { workspace = true, optional = true }
@@ -74,3 +75,4 @@ ps-min-modem = []
 esp-now = [ "wifi" ]
 big-heap = []
 ipv6 = ["smoltcp?/proto-ipv6"]
+defmt = ["dep:defmt", "smoltcp?/defmt"]
