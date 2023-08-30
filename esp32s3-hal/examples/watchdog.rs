@@ -28,7 +28,7 @@ fn main() -> ! {
     timer0.start(1u64.secs());
 
     loop {
-        // wdt.feed();
+        wdt.feed();
         println!("Hello world!");
         block!(timer0.wait()).unwrap();
     }
