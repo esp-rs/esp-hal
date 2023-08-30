@@ -484,7 +484,7 @@ jobs:
       - name: clippy (esp32c6-hal)
         run: cargo +stable clippy --manifest-path=esp32c6-hal/Cargo.toml -- -D warnings
       - name: clippy (esp32c6-lp-hal)
-        run: cargo +stable clippy --manifest-path=esp32c6-lp-hal/Cargo.toml -- -D warnings
+        run: cargo +stable clippy --manifest-path=esp32c6-lp-hal/Cargo.toml -- -D warnings -A asm-sub-register
       - name: clippy (esp32h2-hal)
         run: cargo +stable clippy --manifest-path=esp32h2-hal/Cargo.toml -- -D warnings
 

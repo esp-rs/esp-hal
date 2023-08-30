@@ -19,6 +19,12 @@ impl Delay {
     }
 }
 
+impl Default for Delay {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DelayUs<u64> for Delay {
     #[inline(always)]
     fn delay_us(&mut self, us: u64) {
