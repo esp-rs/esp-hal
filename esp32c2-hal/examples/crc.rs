@@ -11,7 +11,6 @@ use esp32c2_hal::{
     prelude::*,
     rom::{crc, md5},
     timer::TimerGroup,
-    Rtc,
     Uart,
 };
 use esp_backtrace as _;
@@ -23,28 +22,20 @@ fn main() -> ! {
     let mut system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-    let mut serial0 = Uart::new(peripherals.UART0, &mut system.peripheral_clock_control);
+    let mut uart0 = Uart::new(peripherals.UART0, &mut system.peripheral_clock_control);
     let timer_group0 = TimerGroup::new(
         peripherals.TIMG0,
         &clocks,
         &mut system.peripheral_clock_control,
     );
     let mut timer0 = timer_group0.timer0;
-    let mut wdt0 = timer_group0.wdt;
-
-    // Disable watchdog timers
-    rtc.swd.disable();
-    rtc.rwdt.disable();
-    wdt0.disable();
-
     timer0.start(1u64.secs());
 
     let data = "123456789";
     let sentence = "The quick brown fox jumps over a lazy dog";
 
     writeln!(
-        serial0,
+        uart0,
         "Performing CRC calculations on test string \"{data}\""
     )
     .unwrap();
@@ -89,7 +80,7 @@ fn main() -> ! {
         );
 
         writeln!(
-            serial0,
+            uart0,
             "{:08x} {:08x} {:08x} {:08x} {:04x} {:04x} {:02x} {:02x} {}",
             crc_hdlc,
             crc_bzip2,

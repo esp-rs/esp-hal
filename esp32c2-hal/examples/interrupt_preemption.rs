@@ -32,19 +32,6 @@ fn main() -> ! {
     let sw_int = system.software_interrupt_control;
     let clocks = ClockControl::boot_defaults(clockctrl).freeze();
 
-    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-    let timer_group0 = TimerGroup::new(
-        peripherals.TIMG0,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
-    let mut wdt0 = timer_group0.wdt;
-
-    // Disable watchdog timers
-    rtc.swd.disable();
-    rtc.rwdt.disable();
-    wdt0.disable();
-
     critical_section::with(|cs| SWINT.borrow_ref_mut(cs).replace(sw_int));
 
     interrupt::enable(

@@ -1,5 +1,5 @@
 //! Turns on LED with the option to change LED intensity depending on `duty`
-//! value. Possible values (`u32`) are in range 0..100.
+//! value, then fades it. Possible starting values (`u32`) are in range 0..100.
 //!
 //! This assumes that a LED is connected to the pin assigned to `led`. (GPIO4)
 
@@ -18,8 +18,6 @@ use esp32c2_hal::{
     },
     peripherals::Peripherals,
     prelude::*,
-    timer::TimerGroup,
-    Rtc,
 };
 use esp_backtrace as _;
 
@@ -28,19 +26,6 @@ fn main() -> ! {
     let peripherals = Peripherals::take();
     let mut system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-
-    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-    let timer_group0 = TimerGroup::new(
-        peripherals.TIMG0,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
-    let mut wdt0 = timer_group0.wdt;
-
-    // Disable watchdog timers
-    rtc.swd.disable();
-    rtc.rwdt.disable();
-    wdt0.disable();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let led = io.pins.gpio4.into_push_pull_output();
@@ -65,7 +50,7 @@ fn main() -> ! {
     channel0
         .configure(channel::config::Config {
             timer: &lstimer0,
-            duty_pct: 90,
+            duty_pct: 10,
             pin_config: channel::config::PinConfig::PushPull,
         })
         .unwrap();
