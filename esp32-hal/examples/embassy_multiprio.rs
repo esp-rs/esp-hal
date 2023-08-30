@@ -19,7 +19,6 @@ use esp32_hal::{
     peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
-    Rtc,
 };
 use esp_backtrace as _;
 use esp_hal_common::get_core;
@@ -86,28 +85,15 @@ fn main() -> ! {
     let mut system = peripherals.DPORT.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-    let mut timer_group0 = TimerGroup::new(
+    let timer_group0 = TimerGroup::new(
         peripherals.TIMG0,
         &clocks,
         &mut system.peripheral_clock_control,
     );
-    let mut timer_group1 = TimerGroup::new(
-        peripherals.TIMG1,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
-
-    // Disable watchdog timers
-    rtc.rwdt.disable();
-    timer_group0.wdt.disable();
-    timer_group1.wdt.disable();
+    embassy::init(&clocks, timer_group0.timer0);
 
     // Set GPIO2 as an output, and set its state high initially.
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-
-    #[cfg(feature = "embassy-time-timg0")]
-    embassy::init(&clocks, timer_group0.timer0);
 
     let led = make_static!(io.pins.gpio0.into_push_pull_output());
 
