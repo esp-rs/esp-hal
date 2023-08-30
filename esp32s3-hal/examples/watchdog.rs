@@ -5,13 +5,7 @@
 #![no_std]
 #![no_main]
 
-use esp32s3_hal::{
-    clock::ClockControl,
-    peripherals::Peripherals,
-    prelude::*,
-    timer::TimerGroup,
-    Rtc,
-};
+use esp32s3_hal::{clock::ClockControl, peripherals::Peripherals, prelude::*, timer::TimerGroup};
 use esp_backtrace as _;
 use esp_println::println;
 use nb::block;
@@ -29,15 +23,12 @@ fn main() -> ! {
     );
     let mut timer0 = timer_group0.timer0;
     let mut wdt = timer_group0.wdt;
-    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
 
     wdt.start(2u64.secs());
-    rtc.rwdt.disable();
-
     timer0.start(1u64.secs());
 
     loop {
-        wdt.feed();
+        // wdt.feed();
         println!("Hello world!");
         block!(timer0.wait()).unwrap();
     }
