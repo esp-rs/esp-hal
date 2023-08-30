@@ -859,7 +859,7 @@ where
     <Self as GpioProperties>::PinType: IsOutputPin,
     GpioPin<Unknown, GPIONUM>: GpioProperties,
 {
-    fn from(pin: GpioPin<Unknown, GPIONUM>) -> GpioPin<Input<Floating>, GPIONUM> {
+    fn from(pin: GpioPin<Unknown, GPIONUM>) -> Self {
         pin.into_floating_input()
     }
 }
@@ -870,7 +870,7 @@ where
     <Self as GpioProperties>::PinType: IsOutputPin,
     GpioPin<Unknown, GPIONUM>: GpioProperties,
 {
-    fn from(pin: GpioPin<Unknown, GPIONUM>) -> GpioPin<Input<PullUp>, GPIONUM> {
+    fn from(pin: GpioPin<Unknown, GPIONUM>) -> Self {
         pin.into_pull_up_input()
     }
 }
@@ -881,7 +881,7 @@ where
     <Self as GpioProperties>::PinType: IsInputPin,
     GpioPin<Unknown, GPIONUM>: GpioProperties,
 {
-    fn from(pin: GpioPin<Unknown, GPIONUM>) -> GpioPin<Input<PullDown>, GPIONUM> {
+    fn from(pin: GpioPin<Unknown, GPIONUM>) -> Self {
         pin.into_pull_down_input()
     }
 }
@@ -893,8 +893,20 @@ where
     GpioPin<Unknown, GPIONUM>: GpioProperties,
     <GpioPin<Unknown, GPIONUM> as GpioProperties>::PinType: IsOutputPin,
 {
-    fn from(pin: GpioPin<Unknown, GPIONUM>) -> GpioPin<Output<PushPull>, GPIONUM> {
+    fn from(pin: GpioPin<Unknown, GPIONUM>) -> Self {
         pin.into_push_pull_output()
+    }
+}
+
+impl<const GPIONUM: u8> From<GpioPin<Unknown, GPIONUM>> for GpioPin<Analog, GPIONUM>
+where
+    Self: GpioProperties,
+    <Self as GpioProperties>::PinType: IsAnalogPin,
+    GpioPin<Unknown, GPIONUM>: GpioProperties,
+    <GpioPin<Unknown, GPIONUM> as GpioProperties>::PinType: IsAnalogPin,
+{
+    fn from(pin: GpioPin<Unknown, GPIONUM>) -> Self {
+        pin.into_analog()
     }
 }
 
@@ -905,7 +917,7 @@ where
     GpioPin<Unknown, GPIONUM>: GpioProperties,
     <GpioPin<Unknown, GPIONUM> as GpioProperties>::PinType: IsOutputPin,
 {
-    fn from(pin: GpioPin<Unknown, GPIONUM>) -> GpioPin<Output<OpenDrain>, GPIONUM> {
+    fn from(pin: GpioPin<Unknown, GPIONUM>) -> Self {
         pin.into_open_drain_output()
     }
 }
@@ -917,7 +929,7 @@ where
     GpioPin<Unknown, GPIONUM>: GpioProperties,
     <GpioPin<Unknown, GPIONUM> as GpioProperties>::PinType: IsOutputPin,
 {
-    fn from(pin: GpioPin<Unknown, GPIONUM>) -> GpioPin<Alternate<AF1>, GPIONUM> {
+    fn from(pin: GpioPin<Unknown, GPIONUM>) -> Self {
         pin.into_alternate_1()
     }
 }
@@ -929,7 +941,7 @@ where
     GpioPin<Unknown, GPIONUM>: GpioProperties,
     <GpioPin<Unknown, GPIONUM> as GpioProperties>::PinType: IsOutputPin,
 {
-    fn from(pin: GpioPin<Unknown, GPIONUM>) -> GpioPin<Alternate<AF2>, GPIONUM> {
+    fn from(pin: GpioPin<Unknown, GPIONUM>) -> Self {
         pin.into_alternate_2()
     }
 }
