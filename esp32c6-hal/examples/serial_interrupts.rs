@@ -17,7 +17,6 @@ use esp32c6_hal::{
     timer::TimerGroup,
     uart::config::AtCmdConfig,
     Cpu,
-    Rtc,
     Uart,
 };
 use esp_backtrace as _;
@@ -31,28 +30,14 @@ fn main() -> ! {
     let mut system = peripherals.PCR.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let mut rtc = Rtc::new(peripherals.LP_CLKRST);
-    let mut serial0 = Uart::new(peripherals.UART0, &mut system.peripheral_clock_control);
     let timer_group0 = TimerGroup::new(
         peripherals.TIMG0,
         &clocks,
         &mut system.peripheral_clock_control,
     );
     let mut timer0 = timer_group0.timer0;
-    let mut wdt0 = timer_group0.wdt;
-    let timer_group1 = TimerGroup::new(
-        peripherals.TIMG1,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
-    let mut wdt1 = timer_group1.wdt;
 
-    // Disable watchdog timers
-    rtc.swd.disable();
-    rtc.rwdt.disable();
-    wdt0.disable();
-    wdt1.disable();
-
+    let mut serial0 = Uart::new(peripherals.UART0, &mut system.peripheral_clock_control);
     serial0.set_at_cmd(AtCmdConfig::new(None, None, None, b'#', None));
     serial0.set_rx_fifo_full_threshold(30).unwrap();
     serial0.listen_at_cmd();
