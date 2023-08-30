@@ -476,17 +476,17 @@ jobs:
 
       # Run clippy on all packages targeting RISC-V.
       - name: clippy (esp-riscv-rt)
-        run: cargo +stable clippy --manifest-path=esp-riscv-rt/Cargo.toml -- --no-deps
+        run: cargo +stable clippy --manifest-path=esp-riscv-rt/Cargo.toml -- -D warnings
       - name: clippy (esp32c2-hal)
-        run: cargo +stable clippy --manifest-path=esp32c2-hal/Cargo.toml -- --no-deps
+        run: cargo +stable clippy --manifest-path=esp32c2-hal/Cargo.toml -- -D warnings
       - name: clippy (esp32c3-hal)
-        run: cargo +stable clippy --manifest-path=esp32c3-hal/Cargo.toml -- --no-deps
+        run: cargo +stable clippy --manifest-path=esp32c3-hal/Cargo.toml -- -D warnings
       - name: clippy (esp32c6-hal)
-        run: cargo +stable clippy --manifest-path=esp32c6-hal/Cargo.toml -- --no-deps
+        run: cargo +stable clippy --manifest-path=esp32c6-hal/Cargo.toml -- -D warnings
       - name: clippy (esp32c6-lp-hal)
-        run: cargo +stable clippy --manifest-path=esp32c6-lp-hal/Cargo.toml -- --no-deps
+        run: cargo +stable clippy --manifest-path=esp32c6-lp-hal/Cargo.toml -- -D warnings
       - name: clippy (esp32h2-hal)
-        run: cargo +stable clippy --manifest-path=esp32h2-hal/Cargo.toml -- --no-deps
+        run: cargo +stable clippy --manifest-path=esp32h2-hal/Cargo.toml -- -D warnings
 
   clippy-xtensa:
     runs-on: ubuntu-latest
@@ -499,15 +499,12 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       # Run clippy on all packages targeting Xtensa.
-      #
-      # The ESP32-S2 requires some additional information in order for the
-      # atomic emulation crate to build.
       - name: clippy (esp32-hal)
-        run: cargo +esp clippy --manifest-path=esp32-hal/Cargo.toml -- --no-deps
+        run: cargo +esp clippy --manifest-path=esp32-hal/Cargo.toml -- -D warnings
       - name: clippy (esp32s2-hal)
-        run: cargo +esp clippy --manifest-path=esp32s2-hal/Cargo.toml -- --no-deps
+        run: cargo +esp clippy --manifest-path=esp32s2-hal/Cargo.toml -- -D warnings
       - name: clippy (esp32s3-hal)
-        run: cargo +esp clippy --manifest-path=esp32s3-hal/Cargo.toml -- --no-deps
+        run: cargo +esp clippy --manifest-path=esp32s3-hal/Cargo.toml -- -D warnings
 
   rustfmt:
     runs-on: ubuntu-latest
