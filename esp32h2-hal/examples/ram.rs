@@ -34,28 +34,12 @@ fn main() -> ! {
     let mut system = peripherals.PCR.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    // Disable the watchdog timers. For the ESP32-H2, this includes the Super WDT,
-    // and the TIMG WDTs.
     let timer_group0 = TimerGroup::new(
         peripherals.TIMG0,
         &clocks,
         &mut system.peripheral_clock_control,
     );
     let mut timer0 = timer_group0.timer0;
-    let mut wdt0 = timer_group0.wdt;
-    let timer_group1 = TimerGroup::new(
-        peripherals.TIMG1,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
-    let mut wdt1 = timer_group1.wdt;
-
-    // Disable MWDT flash boot protection
-    wdt0.disable();
-    wdt1.disable();
-    // The RWDT flash boot protection remains enabled and it being triggered is part
-    // of the example
-
     timer0.start(1u64.secs());
 
     println!("RAM function located at {:p}", function_in_ram as *const ());
