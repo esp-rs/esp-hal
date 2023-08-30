@@ -9,9 +9,7 @@ use esp32s3_hal::{
     peripherals::Peripherals,
     prelude::*,
     sha::{Sha, ShaMode},
-    timer::TimerGroup,
     xtensa_lx,
-    Rtc,
 };
 use esp_backtrace as _;
 use esp_println::println;
@@ -22,19 +20,7 @@ use sha2::{Digest, Sha512};
 fn main() -> ! {
     let peripherals = Peripherals::take();
     let mut system = peripherals.SYSTEM.split();
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-
-    let timer_group0 = TimerGroup::new(
-        peripherals.TIMG0,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
-    let mut wdt = timer_group0.wdt;
-    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-
-    // Disable MWDT and RWDT (Watchdog) flash boot protection
-    wdt.disable();
-    rtc.rwdt.disable();
+    let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let source_data = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".as_bytes();
     let mut remaining = source_data.clone();

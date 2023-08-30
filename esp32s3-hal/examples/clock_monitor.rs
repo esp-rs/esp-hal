@@ -27,10 +27,6 @@ fn main() -> ! {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-
-    // Disable watchdog timer
-    rtc.rwdt.disable();
-
     rtc.rwdt.start(2000u64.millis());
     rtc.rwdt.listen();
 

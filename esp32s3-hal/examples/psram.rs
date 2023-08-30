@@ -11,7 +11,6 @@ use esp32s3_hal::{
     prelude::*,
     psram,
     timer::TimerGroup,
-    Rtc,
 };
 use esp_backtrace as _;
 use esp_println::println;
@@ -44,18 +43,6 @@ fn main() -> ! {
         esp_hal_common::clock::CpuClock::Clock240MHz,
     )
     .freeze();
-
-    let timer_group0 = TimerGroup::new(
-        peripherals.TIMG0,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
-    let mut wdt = timer_group0.wdt;
-    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-
-    // Disable MWDT and RWDT (Watchdog) flash boot protection
-    wdt.disable();
-    rtc.rwdt.disable();
 
     println!("Going to access PSRAM");
     let mut large_vec: alloc::vec::Vec<u32> = alloc::vec::Vec::with_capacity(500 * 1024 / 4);

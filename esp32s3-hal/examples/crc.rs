@@ -11,7 +11,6 @@ use esp32s3_hal::{
     prelude::*,
     rom::{crc, md5},
     timer::TimerGroup,
-    Rtc,
     Uart,
 };
 use esp_backtrace as _;
@@ -29,13 +28,8 @@ fn main() -> ! {
         &mut system.peripheral_clock_control,
     );
     let mut timer0 = timer_group0.timer0;
-    let mut wdt = timer_group0.wdt;
-    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-    let mut serial0 = Uart::new(peripherals.UART0, &mut system.peripheral_clock_control);
 
-    // Disable MWDT and RWDT (Watchdog) flash boot protection
-    wdt.disable();
-    rtc.rwdt.disable();
+    let mut serial0 = Uart::new(peripherals.UART0, &mut system.peripheral_clock_control);
 
     timer0.start(1u64.secs());
 
