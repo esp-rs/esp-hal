@@ -185,7 +185,7 @@ fn TG1_T0_LEVEL(context: &mut Context) {
 fn Software1(_level: u32, context: &mut Context) {
     let intr = 1 << 29;
     unsafe {
-        core::arch::asm!("wsr.227  {0}", in(reg) intr, options(nostack)); // 227 = "intclear"
+        core::arch::asm!("wsr.intclear  {0}", in(reg) intr, options(nostack));
     }
 
     task_switch(context);
@@ -203,6 +203,6 @@ fn Software1(_level: u32, context: &mut Context) {
 pub fn yield_task() {
     let intr = 1 << 29;
     unsafe {
-        core::arch::asm!("wsr.226  {0}", in(reg) intr, options(nostack)); // 226 = "intset"
+        core::arch::asm!("wsr.intset  {0}", in(reg) intr, options(nostack));
     }
 }
