@@ -40,12 +40,6 @@ fn main() -> ! {
         &mut system.peripheral_clock_control,
     );
     let mut timer0 = timer_group0.timer0;
-    let mut wdt = timer_group0.wdt;
-
-    // Disable MWDT flash boot protection
-    wdt.disable();
-    // The RWDT flash boot protection remains enabled and it being triggered is part
-    // of the example
 
     timer0.start(1u64.secs());
 

@@ -10,10 +10,8 @@ use esp32s2_hal::{
     peripherals::Peripherals,
     prelude::*,
     rmt::{PulseCode, TxChannel, TxChannelConfig, TxChannelCreator},
-    timer::TimerGroup,
     Delay,
     Rmt,
-    Rtc,
 };
 use esp_backtrace as _;
 
@@ -23,14 +21,6 @@ fn main() -> ! {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
     let mut clock_control = system.peripheral_clock_control;
-
-    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks, &mut clock_control);
-    let mut wdt = timer_group0.wdt;
-    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-
-    // Disable MWDT and RWDT (Watchdog) flash boot protection
-    wdt.disable();
-    rtc.rwdt.disable();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let mut delay = Delay::new(&clocks);

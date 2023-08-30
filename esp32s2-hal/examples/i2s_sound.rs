@@ -37,8 +37,6 @@ use esp32s2_hal::{
     pdma::Dma,
     peripherals::Peripherals,
     prelude::*,
-    timer::TimerGroup,
-    Rtc,
     IO,
 };
 use esp_backtrace as _;
@@ -56,18 +54,6 @@ fn main() -> ! {
     let peripherals = Peripherals::take();
     let mut system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-
-    let timer_group0 = TimerGroup::new(
-        peripherals.TIMG0,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
-    let mut wdt = timer_group0.wdt;
-    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-
-    // Disable watchdog timer
-    wdt.disable();
-    rtc.rwdt.disable();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 

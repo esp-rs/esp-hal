@@ -14,8 +14,6 @@ use esp32s2_hal::{
     gpio::{Gpio0, Input, PullDown},
     peripherals::Peripherals,
     prelude::*,
-    timer::TimerGroup,
-    Rtc,
     IO,
 };
 use esp_backtrace as _;
@@ -38,27 +36,15 @@ fn main() -> ! {
     let mut system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-    let timer_group0 = TimerGroup::new(
-        peripherals.TIMG0,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
-    let mut wdt0 = timer_group0.wdt;
-    let timer_group1 = TimerGroup::new(
-        peripherals.TIMG1,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
-    let mut wdt1 = timer_group1.wdt;
-
-    // Disable watchdog timers
-    rtc.rwdt.disable();
-    wdt0.disable();
-    wdt1.disable();
-
     #[cfg(feature = "embassy-time-timg0")]
-    embassy::init(&clocks, timer_group0.timer0);
+    {
+        let timer_group0 = esp32s2_hal::timer::TimerGroup::new(
+            peripherals.TIMG0,
+            &clocks,
+            &mut system.peripheral_clock_control,
+        );
+        embassy::init(&clocks, timer_group0.timer0);
+    }
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     // GPIO 0 as input
