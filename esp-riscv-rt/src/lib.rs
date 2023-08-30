@@ -48,6 +48,11 @@ extern "C" {
 ///
 /// Zeros bss section, initializes data section and calls main. This function
 /// never returns.
+///
+/// # Safety
+///
+/// This function should not be called directly by the user, and should instead
+/// be invoked by the runtime implicitly.
 #[link_section = ".init.rust"]
 #[export_name = "_start_rust"]
 pub unsafe extern "C" fn start_rust(a0: usize, a1: usize, a2: usize) -> ! {
@@ -115,6 +120,11 @@ pub struct TrapFrame {
 /// `scause`/`mcause` is read to determine the cause of the trap. XLEN-1 bit
 /// indicates if it's an interrupt or an exception. The result is examined and
 /// ExceptionHandler or one of the core interrupt handlers is called.
+///
+/// # Safety
+///
+/// This function should not be called directly by the user, and should instead
+/// be invoked by the runtime implicitly.
 #[link_section = ".trap.rust"]
 #[export_name = "_start_trap_rust"]
 pub unsafe extern "C" fn start_trap_rust(trap_frame: *const TrapFrame) {
