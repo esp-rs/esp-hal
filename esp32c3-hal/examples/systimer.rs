@@ -14,9 +14,7 @@ use esp32c3_hal::{
     peripherals::{self, Peripherals},
     prelude::*,
     systimer::{Alarm, Periodic, SystemTimer, Target},
-    timer::TimerGroup,
     Delay,
-    Rtc,
 };
 use esp_backtrace as _;
 use esp_println::println;
@@ -28,21 +26,8 @@ static ALARM2: Mutex<RefCell<Option<Alarm<Target, 2>>>> = Mutex::new(RefCell::ne
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let mut system = peripherals.SYSTEM.split();
+    let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-
-    let timer_group0 = TimerGroup::new(
-        peripherals.TIMG0,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
-    let mut wdt = timer_group0.wdt;
-    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-
-    // Disable MWDT and RWDT (Watchdog) flash boot protection
-    wdt.disable();
-    rtc.swd.disable();
-    rtc.rwdt.disable();
 
     let syst = SystemTimer::new(peripherals.SYSTIMER);
 
