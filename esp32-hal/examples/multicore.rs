@@ -14,7 +14,6 @@ use esp32_hal::{
     peripherals::{Peripherals, TIMG1},
     prelude::*,
     timer::{Timer, Timer0, TimerGroup},
-    Rtc,
 };
 use esp_backtrace as _;
 use esp_println::println;
@@ -34,7 +33,6 @@ fn main() -> ! {
         &mut system.peripheral_clock_control,
     );
     let mut timer0 = timer_group0.timer0;
-    let mut wdt0 = timer_group0.wdt;
 
     let timer_group1 = TimerGroup::new(
         peripherals.TIMG1,
@@ -42,14 +40,6 @@ fn main() -> ! {
         &mut system.peripheral_clock_control,
     );
     let mut timer1 = timer_group1.timer0;
-    let mut wdt1 = timer_group1.wdt;
-
-    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-
-    // Disable MWDT and RWDT (Watchdog) flash boot protection
-    wdt0.disable();
-    wdt1.disable();
-    rtc.rwdt.disable();
 
     timer0.start(1u64.secs());
     timer1.start(500u64.millis());

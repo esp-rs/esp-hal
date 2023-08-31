@@ -17,7 +17,6 @@ use esp32c3_hal::{
     riscv,
     timer::TimerGroup,
     Cpu,
-    Rtc,
     UsbSerialJtag,
 };
 use esp_backtrace as _;
@@ -31,26 +30,12 @@ fn main() -> ! {
     let mut system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
     let timer_group0 = TimerGroup::new(
         peripherals.TIMG0,
         &clocks,
         &mut system.peripheral_clock_control,
     );
     let mut timer0 = timer_group0.timer0;
-    let mut wdt0 = timer_group0.wdt;
-    let timer_group1 = TimerGroup::new(
-        peripherals.TIMG1,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
-    let mut wdt1 = timer_group1.wdt;
-
-    // Disable watchdog timers
-    rtc.swd.disable();
-    rtc.rwdt.disable();
-    wdt0.disable();
-    wdt1.disable();
 
     let mut usb_serial =
         UsbSerialJtag::new(peripherals.USB_DEVICE, &mut system.peripheral_clock_control);

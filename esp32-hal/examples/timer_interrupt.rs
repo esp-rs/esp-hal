@@ -15,7 +15,6 @@ use esp32_hal::{
     peripherals::{self, Peripherals, TIMG0, TIMG1},
     prelude::*,
     timer::{Timer, Timer0, Timer1, TimerGroup},
-    Rtc,
 };
 use esp_backtrace as _;
 
@@ -30,7 +29,6 @@ fn main() -> ! {
     let mut system = peripherals.DPORT.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    // Disable the TIMG watchdog timer.
     let timer_group0 = TimerGroup::new(
         peripherals.TIMG0,
         &clocks,
@@ -38,7 +36,6 @@ fn main() -> ! {
     );
     let mut timer00 = timer_group0.timer0;
     let mut timer01 = timer_group0.timer1;
-    let mut wdt0 = timer_group0.wdt;
 
     let timer_group1 = TimerGroup::new(
         peripherals.TIMG1,
@@ -47,19 +44,12 @@ fn main() -> ! {
     );
     let mut timer10 = timer_group1.timer0;
     let mut timer11 = timer_group1.timer1;
-    let mut wdt1 = timer_group1.wdt;
-
-    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-
-    // Disable MWDT and RWDT (Watchdog) flash boot protection
-    wdt0.disable();
-    wdt1.disable();
-    rtc.rwdt.disable();
 
     interrupt::enable(peripherals::Interrupt::TG0_T0_LEVEL, Priority::Priority2).unwrap();
     interrupt::enable(peripherals::Interrupt::TG0_T1_LEVEL, Priority::Priority2).unwrap();
     interrupt::enable(peripherals::Interrupt::TG1_T0_LEVEL, Priority::Priority3).unwrap();
     interrupt::enable(peripherals::Interrupt::TG1_T1_LEVEL, Priority::Priority3).unwrap();
+
     timer00.start(500u64.millis());
     timer00.listen();
     timer01.start(2500u64.millis());

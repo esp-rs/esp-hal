@@ -16,7 +16,6 @@ use esp32s3_hal::{
     peripherals::{self, Peripherals},
     prelude::*,
     timer::TimerGroup,
-    Rtc,
     UsbSerialJtag,
 };
 use esp_backtrace as _;
@@ -30,18 +29,12 @@ fn main() -> ! {
     let mut system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
     let timer_group0 = TimerGroup::new(
         peripherals.TIMG0,
         &clocks,
         &mut system.peripheral_clock_control,
     );
     let mut timer0 = timer_group0.timer0;
-    let mut wdt = timer_group0.wdt;
-
-    // Disable MWDT and RWDT (Watchdog) flash boot protection
-    wdt.disable();
-    rtc.rwdt.disable();
 
     let mut usb_serial =
         UsbSerialJtag::new(peripherals.USB_DEVICE, &mut system.peripheral_clock_control);

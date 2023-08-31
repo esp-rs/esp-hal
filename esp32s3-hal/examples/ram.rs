@@ -14,6 +14,7 @@ use esp32s3_hal::{
     peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
+    Rtc,
 };
 use esp_backtrace as _;
 use esp_println::println;
@@ -40,12 +41,11 @@ fn main() -> ! {
         &mut system.peripheral_clock_control,
     );
     let mut timer0 = timer_group0.timer0;
-    let mut wdt = timer_group0.wdt;
 
-    // Disable MWDT flash boot protection
-    wdt.disable();
-    // The RWDT flash boot protection remains enabled and it being triggered is part
-    // of the example
+    // The RWDT flash boot protection must be enabled, as it is triggered as part of
+    // the example.
+    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
+    rtc.rwdt.enable();
 
     timer0.start(1u64.secs());
 

@@ -26,7 +26,6 @@ use esp32s3_hal::{
     peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
-    Rtc,
 };
 use esp_backtrace as _;
 use nb::block;
@@ -44,12 +43,6 @@ fn main() -> ! {
         &mut system.peripheral_clock_control,
     );
     let mut timer0 = timer_group0.timer0;
-    let mut wdt = timer_group0.wdt;
-    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-
-    // Disable watchdog timer
-    wdt.disable();
-    rtc.rwdt.disable();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 

@@ -10,16 +10,7 @@
 #![no_std]
 #![no_main]
 
-use esp32c6_hal::{
-    clock::ClockControl,
-    peripherals,
-    prelude::*,
-    rmt::Rmt,
-    timer::TimerGroup,
-    Delay,
-    Rtc,
-    IO,
-};
+use esp32c6_hal::{clock::ClockControl, peripherals, prelude::*, rmt::Rmt, Delay, IO};
 use esp_backtrace as _;
 use esp_hal_smartled::{smartLedAdapter, SmartLedsAdapter};
 use smart_leds::{
@@ -34,26 +25,6 @@ fn main() -> ! {
     let peripherals = peripherals::Peripherals::take();
     let mut system = peripherals.PCR.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-
-    // Disable the watchdog timers. For the ESP32-C6, this includes the Super WDT,
-    // and the TIMG WDTs.
-    let mut rtc = Rtc::new(peripherals.LP_CLKRST);
-    let mut timer_group0 = TimerGroup::new(
-        peripherals.TIMG0,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
-    let mut timer_group1 = TimerGroup::new(
-        peripherals.TIMG1,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
-
-    // Disable watchdog timers
-    rtc.swd.disable();
-    rtc.rwdt.disable();
-    timer_group0.wdt.disable();
-    timer_group1.wdt.disable();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 

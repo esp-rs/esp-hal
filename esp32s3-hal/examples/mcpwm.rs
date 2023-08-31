@@ -12,8 +12,6 @@ use esp32s3_hal::{
     mcpwm::{operator::PwmPinConfig, timer::PwmWorkingMode, PeripheralClockConfig, MCPWM},
     peripherals::Peripherals,
     prelude::*,
-    timer::TimerGroup,
-    Rtc,
 };
 use esp_backtrace as _;
 
@@ -22,18 +20,6 @@ fn main() -> ! {
     let peripherals = Peripherals::take();
     let mut system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-
-    let timer_group0 = TimerGroup::new(
-        peripherals.TIMG0,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
-    let mut wdt = timer_group0.wdt;
-    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-
-    // Disable watchdog timer
-    wdt.disable();
-    rtc.rwdt.disable();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let pin = io.pins.gpio4;

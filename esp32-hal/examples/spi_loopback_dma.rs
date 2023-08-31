@@ -24,9 +24,7 @@ use esp32_hal::{
     peripherals::Peripherals,
     prelude::*,
     spi::{Spi, SpiMode},
-    timer::TimerGroup,
     Delay,
-    Rtc,
 };
 use esp_backtrace as _;
 use esp_println::println;
@@ -36,19 +34,6 @@ fn main() -> ! {
     let peripherals = Peripherals::take();
     let mut system = peripherals.DPORT.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-
-    // Disable the watchdog timers. For the ESP32 this includes
-    // the RTC WDT, and the TIMG WDTs.
-    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-    let timer_group0 = TimerGroup::new(
-        peripherals.TIMG0,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
-    let mut wdt = timer_group0.wdt;
-
-    wdt.disable();
-    rtc.rwdt.disable();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let sclk = io.pins.gpio19;

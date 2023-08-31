@@ -16,9 +16,7 @@ use esp32_hal::{
     peripherals::{self, Peripherals},
     prelude::*,
     system::{SoftwareInterrupt, SoftwareInterruptControl},
-    timer::TimerGroup,
     Delay,
-    Rtc,
 };
 use esp_backtrace as _;
 
@@ -27,21 +25,9 @@ static SWINT: Mutex<RefCell<Option<SoftwareInterruptControl>>> = Mutex::new(RefC
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let mut system = peripherals.DPORT.split();
+    let system = peripherals.DPORT.split();
     let sw_int = system.software_interrupt_control;
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-
-    let timer_group0 = TimerGroup::new(
-        peripherals.TIMG0,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
-    let mut wdt = timer_group0.wdt;
-    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-
-    // Disable MWDT and RWDT (Watchdog) flash boot protection
-    wdt.disable();
-    rtc.rwdt.disable();
 
     critical_section::with(|cs| SWINT.borrow_ref_mut(cs).replace(sw_int));
 

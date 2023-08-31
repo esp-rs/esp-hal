@@ -15,7 +15,6 @@ use esp32s2_hal::{
     prelude::*,
     timer::TimerGroup,
     uart::config::AtCmdConfig,
-    Rtc,
     Uart,
 };
 use esp_backtrace as _;
@@ -36,23 +35,8 @@ fn main() -> ! {
         &mut system.peripheral_clock_control,
     );
     let mut timer0 = timer_group0.timer0;
-    let mut wdt0 = timer_group0.wdt;
-
-    let timer_group1 = TimerGroup::new(
-        peripherals.TIMG1,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
-    let mut wdt1 = timer_group1.wdt;
 
     let mut serial0 = Uart::new(peripherals.UART0, &mut system.peripheral_clock_control);
-    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-
-    // Disable MWDT and RWDT (Watchdog) flash boot protection
-    wdt0.disable();
-    wdt1.disable();
-    rtc.rwdt.disable();
-
     serial0.set_at_cmd(AtCmdConfig::new(None, None, None, b'#', None));
     serial0.set_rx_fifo_full_threshold(30).unwrap();
     serial0.listen_at_cmd();
