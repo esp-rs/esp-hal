@@ -108,6 +108,16 @@ cfg_if::cfg_if! {
     }
 }
 
+// The number of analog IO pins, and in turn the number of attentuations,
+// depends on which chip is being used
+cfg_if::cfg_if! {
+    if #[cfg(esp32c6)] {
+        const NUM_ATTENS: usize = 7;
+    } else {
+        const NUM_ATTENS: usize = 5;
+    }
+}
+
 /// The sampling/readout resolution of the ADC
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum Resolution {
@@ -179,7 +189,7 @@ where
 
 pub struct AdcConfig<ADCI> {
     pub resolution: Resolution,
-    pub attenuations: [Option<Attenuation>; 5],
+    pub attenuations: [Option<Attenuation>; NUM_ATTENS],
     _phantom: PhantomData<ADCI>,
 }
 
@@ -271,7 +281,7 @@ impl<ADCI> Default for AdcConfig<ADCI> {
     fn default() -> Self {
         AdcConfig {
             resolution: Resolution::Resolution12Bit,
-            attenuations: [None; 5],
+            attenuations: [None; NUM_ATTENS],
             _phantom: PhantomData::default(),
         }
     }
@@ -537,7 +547,7 @@ impl CalibrationAccess for ADC2 {
 
 pub struct ADC<'d, ADCI> {
     _adc: PeripheralRef<'d, ADCI>,
-    attenuations: [Option<Attenuation>; 5],
+    attenuations: [Option<Attenuation>; NUM_ATTENS],
     active_channel: Option<u8>,
 }
 
