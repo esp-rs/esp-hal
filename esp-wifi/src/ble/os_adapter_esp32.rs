@@ -8,6 +8,8 @@ use crate::binary::{
     },
 };
 
+use core::ptr::addr_of_mut;
+
 pub static mut ISR_INTERRUPT_5: (
     *mut crate::binary::c_types::c_void,
     *mut crate::binary::c_types::c_void,
@@ -285,26 +287,27 @@ pub(crate) fn create_ble_config() -> esp_bt_controller_config_t {
 
 pub(crate) fn btdm_controller_mem_init() {
     extern "C" {
-        static _data_start_btdm: u32;
+        static mut _data_start_btdm: u32;
+        static mut _data_end_btdm: u32;
         static _data_start_btdm_rom: u32;
-        static _data_end_btdm: u32;
     }
 
     // initialise .data section
     unsafe {
-        let len = (&_data_end_btdm as *const _ as *const u8 as usize)
-            - (&_data_start_btdm as *const _ as *const u8 as usize);
+        let data_start = addr_of_mut!(_data_start_btdm).cast::<u8>();
+        let data_end = addr_of_mut!(_data_end_btdm).cast::<u8>();
 
-        core::ptr::copy_nonoverlapping(
-            _data_start_btdm_rom as *const u8,
-            &_data_start_btdm as *const _ as *mut u8,
-            len,
-        );
+        // `_data_start_btdm_rom` is a pointer to the actual initialization data in the ROM.
+        let data_start_rom = _data_start_btdm_rom as *const u8;
+
+        let len = data_end as usize - data_start as usize;
+
+        core::ptr::copy_nonoverlapping(data_start_rom, data_start, len);
 
         log::debug!(
             "btdm_controller_mem_init {:p} {:p} {}",
-            _data_start_btdm_rom as *const u8,
-            &_data_start_btdm as *const _ as *mut u8,
+            data_start_rom,
+            data_start,
             len,
         );
     }
