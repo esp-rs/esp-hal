@@ -44,6 +44,11 @@
 //! let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 //! ```
 //!
+//! #### Initialize with the highest possible frequency for this chip
+//! ```no_run
+//! let clocks = ClockControl::max(system.clock_control).freeze();
+//! ```
+//!
 //! #### Initialize with custom clock frequency
 //! ```no_run
 //! let clocks = ClockControl::configure(system.clock_control, CpuClock::Clock160MHz).freeze();
@@ -351,6 +356,7 @@ impl<'d> ClockControl<'d> {
         }
     }
 
+    /// Use the highest possible frequency for a particular chip
     pub fn max(clock_control: impl Peripheral<P = SystemClockControl> + 'd) -> ClockControl<'d> {
         Self::configure(clock_control, CpuClock::Clock240MHz)
     }
@@ -417,6 +423,7 @@ impl<'d> ClockControl<'d> {
         }
     }
 
+    /// Use the highest possible frequency for a particular chip
     pub fn max(clock_control: impl Peripheral<P = SystemClockControl> + 'd) -> ClockControl<'d> {
         Self::configure(clock_control, CpuClock::Clock120MHz)
     }
@@ -469,6 +476,7 @@ impl<'d> ClockControl<'d> {
         }
     }
 
+    /// Use the highest possible frequency for a particular chip
     pub fn max(clock_control: impl Peripheral<P = SystemClockControl> + 'd) -> ClockControl<'d> {
         Self::configure(clock_control, CpuClock::Clock160MHz)
     }
@@ -523,6 +531,7 @@ impl<'d> ClockControl<'d> {
         }
     }
 
+    /// Use the highest possible frequency for a particular chip
     pub fn max(clock_control: impl Peripheral<P = SystemClockControl> + 'd) -> ClockControl<'d> {
         Self::configure(clock_control, CpuClock::Clock160MHz)
     }
@@ -581,6 +590,7 @@ impl<'d> ClockControl<'d> {
         }
     }
 
+    /// Use the highest possible frequency for a particular chip
     pub fn max(clock_control: impl Peripheral<P = SystemClockControl> + 'd) -> ClockControl<'d> {
         Self::configure(clock_control, CpuClock::Clock96MHz)
     }
@@ -619,6 +629,7 @@ impl<'d> ClockControl<'d> {
         }
     }
 
+    /// Use the highest possible frequency for a particular chip
     pub fn max(clock_control: impl Peripheral<P = SystemClockControl> + 'd) -> ClockControl<'d> {
         Self::configure(clock_control, CpuClock::Clock240MHz)
     }
@@ -659,6 +670,7 @@ impl<'d> ClockControl<'d> {
         }
     }
 
+    /// Use the highest possible frequency for a particular chip
     pub fn max(clock_control: impl Peripheral<P = SystemClockControl> + 'd) -> ClockControl<'d> {
         Self::configure(clock_control, CpuClock::Clock240MHz)
     }
