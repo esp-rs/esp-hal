@@ -188,6 +188,7 @@ pub(crate) mod utils {
 
     #[allow(unused)]
     #[derive(Debug)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     enum SpiTimingConfigCoreClock {
         SpiTimingConfigCoreClock80m,
         SpiTimingConfigCoreClock120m,
@@ -806,6 +807,7 @@ pub(crate) mod utils {
 
     #[allow(unused)]
     #[derive(Debug)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     enum SpiTimingConfigCoreClock {
         SpiTimingConfigCoreClock80m,
         SpiTimingConfigCoreClock120m,

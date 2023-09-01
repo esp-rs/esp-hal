@@ -25,6 +25,7 @@ use crate::{
 };
 
 /// Interrupt kind
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum InterruptKind {
     /// Level interrupt
     Level,
@@ -37,6 +38,7 @@ pub enum InterruptKind {
 /// `interrupt3`)
 #[repr(u32)]
 #[derive(Debug, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum CpuInterrupt {
     Interrupt1 = 1,
     Interrupt2,
@@ -72,6 +74,7 @@ pub enum CpuInterrupt {
 }
 
 /// Interrupt priority levels.
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(u8)]
 pub enum Priority {
     None = 0,
@@ -152,6 +155,7 @@ mod vectored {
 
     /// Interrupt Error
     #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     pub enum Error {
         InvalidInterruptPriority,
     }

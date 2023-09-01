@@ -77,6 +77,7 @@ psram_4m  = ["esp-hal-common/psram_4m", "psram"]
 psram_8m  = ["esp-hal-common/psram_8m", "psram"]
 
 log = ["esp-hal-common/log"]
+defmt = ["esp-hal-common/defmt"]
 
 [profile.release]
 debug = true

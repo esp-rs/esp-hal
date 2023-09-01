@@ -24,12 +24,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add interrupt-executor for Xtensa MCUs (#723, #756).
 - Add missing `Into<Gpio<Analog, GPIONUN>>` conversion (#764)
 - Updated `clock` module documentation (#774)
+- Add `log` feature to enable log output (#773)
+- Add `defmt` feature to enable log output (#773)
 
 ### Changed
 
 - Update the `embedded-hal-*` packages to `1.0.0-rc.1` and implement traits from `embedded-io` and `embedded-io-async` (#747)
 - Moved AlignmentHelper to its own module (#753)
 - Disable all watchdog timers by default at startup (#763)
+- `log` crate is now opt-in (#773)
 
 ### Fixed
 

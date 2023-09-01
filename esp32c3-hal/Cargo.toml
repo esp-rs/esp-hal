@@ -68,6 +68,7 @@ interrupt-preemption = ["esp-hal-common/interrupt-preemption"]
 direct-vectoring     = ["esp-hal-common/direct-vectoring"]
 
 log = ["esp-hal-common/log"]
+defmt = ["esp-hal-common/defmt"]
 
 [profile.release]
 debug = true

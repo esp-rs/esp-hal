@@ -79,6 +79,7 @@ const CHUNK_SIZE: usize = 4092;
 
 /// DMA Errors
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DmaError {
     InvalidAlignment,
     OutOfDescriptors,
@@ -96,6 +97,7 @@ pub enum DmaError {
 /// DMA Priorities
 #[cfg(gdma)]
 #[derive(Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DmaPriority {
     Priority0 = 0,
     Priority1 = 1,
@@ -113,6 +115,7 @@ pub enum DmaPriority {
 /// The values need to match the TRM
 #[cfg(pdma)]
 #[derive(Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DmaPriority {
     Priority0 = 0,
 }
@@ -120,6 +123,7 @@ pub enum DmaPriority {
 /// DMA capable peripherals
 /// The values need to match the TRM
 #[derive(Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DmaPeripheral {
     Spi2   = 0,
     #[cfg(any(pdma, esp32s3))]

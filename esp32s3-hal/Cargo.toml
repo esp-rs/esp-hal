@@ -80,6 +80,7 @@ opsram_4m  = ["esp-hal-common/opsram_4m", "psram"]
 opsram_8m  = ["esp-hal-common/opsram_8m", "psram"]
 
 log = ["esp-hal-common/log"]
+defmt = ["esp-hal-common/defmt"]
 
 [profile.release]
 debug = true

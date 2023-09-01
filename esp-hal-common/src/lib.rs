@@ -170,6 +170,7 @@ extern "C" fn DefaultHandler() {}
 ///
 /// The actual number of available cores depends on the target.
 #[derive(Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Cpu {
     /// The first core
     ProCpu = 0,
