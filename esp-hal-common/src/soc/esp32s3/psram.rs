@@ -15,6 +15,7 @@
 //! 0x3f500000. The `PSRAM` module size depends on the configuration specified
 //! during the compilation process. The available `PSRAM` sizes are `2MB`,
 //! `4MB`, and `8MB`.
+
 static mut PSRAM_VADDR: u32 = 0x3C000000;
 
 pub fn psram_vaddr_start() -> usize {
@@ -113,7 +114,7 @@ pub fn init_psram(_peripheral: impl crate::peripheral::Peripheral<P = crate::per
                 break;
             }
         }
-        log::debug!("PSRAM start address = {:x}", start);
+        debug!("PSRAM start address = {:x}", start);
         PSRAM_VADDR = start;
 
         // Configure the mode of instruction cache : cache size, cache line size.
@@ -390,11 +391,9 @@ pub(crate) mod utils {
         let flash_div: u32 = get_flash_clock_divider();
         let psram_div: u32 = get_psram_clock_divider();
 
-        log::info!(
+        info!(
             "PSRAM core_clock {:?}, flash_div = {}, psram_div = {}",
-            core_clock,
-            flash_div,
-            psram_div
+            core_clock, flash_div, psram_div
         );
 
         // Set SPI01 core clock
@@ -1194,7 +1193,7 @@ pub(crate) mod utils {
         print_psram_info(&mode_reg);
 
         if mode_reg.vendor_id() != OCT_PSRAM_VENDOR_ID {
-            log::warn!("PSRAM ID read error: {:x}, PSRAM chip not found or not supported, or wrong PSRAM line mode", mode_reg.vendor_id());
+            warn!("PSRAM ID read error: {:x}, PSRAM chip not found or not supported, or wrong PSRAM line mode", mode_reg.vendor_id());
             return;
         }
 
@@ -1206,7 +1205,7 @@ pub(crate) mod utils {
             0x7 => PSRAM_SIZE_32MB,
             _ => 0,
         };
-        log::info!("{psram_size} bytes of PSRAM");
+        info!("{} bytes of PSRAM", psram_size);
 
         // Do PSRAM timing tuning, we use SPI1 to do the tuning, and set the
         // SPI0 PSRAM timing related registers accordingly
@@ -1597,7 +1596,7 @@ pub(crate) mod utils {
     }
 
     fn print_psram_info(reg_val: &OpiPsramModeReg) {
-        log::info!(
+        info!(
             "vendor id    : {:02x} ({})",
             reg_val.vendor_id(),
             if reg_val.vendor_id() == 0x0d {
@@ -1606,12 +1605,12 @@ pub(crate) mod utils {
                 "UNKNOWN"
             }
         );
-        log::info!(
+        info!(
             "dev id       : {:02x} (generation {})",
             reg_val.dev_id(),
             reg_val.dev_id() + 1
         );
-        log::info!(
+        info!(
             "density      : {:02x} ({} Mbit)",
             reg_val.density(),
             if reg_val.density() == 0x1 {
@@ -1626,12 +1625,12 @@ pub(crate) mod utils {
                 0
             }
         );
-        log::info!(
+        info!(
             "good-die     : {:02x} ({})",
             reg_val.gb(),
             if reg_val.gb() == 1 { "Pass" } else { "Fail" }
         );
-        log::info!(
+        info!(
             "Latency      : {:02x} ({})",
             reg_val.lt(),
             if reg_val.lt() == 1 {
@@ -1640,17 +1639,17 @@ pub(crate) mod utils {
                 "Variable"
             }
         );
-        log::info!(
+        info!(
             "VCC          : {:02x} ({})",
             reg_val.vcc(),
             if reg_val.vcc() == 1 { "3V" } else { "1.8V" }
         );
-        log::info!(
+        info!(
             "SRF          : {:02x} ({} Refresh)",
             reg_val.srf(),
             if reg_val.srf() == 0x1 { "Fast" } else { "Slow" }
         );
-        log::info!(
+        info!(
             "BurstType    : {:02x} ({} Wrap)",
             reg_val.bt(),
             if reg_val.bt() == 1 && reg_val.bl() != 3 {
@@ -1659,7 +1658,7 @@ pub(crate) mod utils {
                 ""
             }
         );
-        log::info!(
+        info!(
             "BurstLen     : {:02x} ({} Byte)",
             reg_val.bl(),
             if reg_val.bl() == 0x00 {
@@ -1672,7 +1671,7 @@ pub(crate) mod utils {
                 1024
             }
         );
-        log::info!(
+        info!(
             "Readlatency  : {:02x} ({} cycles@{})",
             reg_val.read_latency(),
             reg_val.read_latency() * 2 + 6,
@@ -1682,7 +1681,7 @@ pub(crate) mod utils {
                 "Variable"
             }
         );
-        log::info!(
+        info!(
             "DriveStrength: {:02x} (1/{})",
             reg_val.drive_str(),
             if reg_val.drive_str() == 0x00 {

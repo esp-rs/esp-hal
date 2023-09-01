@@ -24,6 +24,7 @@
 //!   executor
 //! - `embassy-time-timg0` - Enable the [embassy] time driver using the `TIMG0`
 //!   peripheral
+//! - `log` - enable log output using the `log` crate
 //! - `psram_2m` - Use externally connected PSRAM (2MB)
 //! - `psram_4m` - Use externally connected PSRAM (4MB)
 //! - `psram_8m` - Use externally connected PSRAM (8MB)

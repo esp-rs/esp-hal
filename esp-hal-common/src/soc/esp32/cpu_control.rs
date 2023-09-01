@@ -77,7 +77,7 @@ pub struct Stack<const SIZE: usize> {
 }
 
 impl<const SIZE: usize> Stack<SIZE> {
-    const _ALIGNED: () = assert!(SIZE % 16 == 0); // Make sure stack top is aligned, too.
+    const _ALIGNED: () = ::core::assert!(SIZE % 16 == 0); // Make sure stack top is aligned, too.
 
     /// Construct a stack of length SIZE, uninitialized
     #[allow(path_statements)]
@@ -269,7 +269,7 @@ impl CpuControl {
         xtensa_lx::timer::set_ccompare2(0);
 
         // set stack pointer to end of memory: no need to retain stack up to this point
-        set_stack_pointer(unsafe { APP_CORE_STACK_TOP.unwrap() });
+        set_stack_pointer(unsafe { unwrap!(APP_CORE_STACK_TOP) });
 
         extern "C" {
             static mut _init_start: u32;

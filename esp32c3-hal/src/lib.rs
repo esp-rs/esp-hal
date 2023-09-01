@@ -21,6 +21,7 @@
 //! - `embassy-time-timg0` - Enable the [embassy] time driver using the `TIMG0`
 //!   peripheral
 //! - `interrupt-preemption` - Enable priority-based interrupt preemption
+//! - `log` - enable log output using the `log` crate
 //! - `mcu-boot` - Use the MCUboot image format
 //! - `rt` - Runtime support
 //! - `ufmt` - Implement the [`ufmt_write::uWrite`] trait for the UART and USB

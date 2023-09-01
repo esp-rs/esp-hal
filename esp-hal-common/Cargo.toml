@@ -24,7 +24,7 @@ embedded-hal-nb      = { version = "=1.0.0-rc.1", optional = true }
 embedded-io          = "0.5.0"
 esp-synopsys-usb-otg = { version = "0.3.2", optional = true, features = ["fs", "esp32sx"] }
 fugit                = "0.3.7"
-log                  = "0.4.20"
+log                  = { version = "0.4.20", optional = true }
 lock_api             = { version = "0.4.10", optional = true }
 nb                   = "1.1.0"
 paste                = "1.0.14"
@@ -132,3 +132,5 @@ debug = [
     "esp32s2?/impl-register-debug",
     "esp32s3?/impl-register-debug",
 ]
+
+log = ["dep:log"]

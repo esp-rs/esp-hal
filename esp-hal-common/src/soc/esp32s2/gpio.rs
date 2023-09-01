@@ -119,7 +119,7 @@ pub(crate) const fn get_io_mux_reg(gpio_num: u8) -> &'static crate::peripherals:
             44 => core::mem::transmute(&(iomux.gpio44)),
             45 => core::mem::transmute(&(iomux.gpio45)),
             46 => core::mem::transmute(&(iomux.gpio46)),
-            _ => panic!(),
+            _ => ::core::unreachable!(),
         }
     }
 }

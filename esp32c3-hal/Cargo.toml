@@ -42,7 +42,7 @@ embedded-hal-async = "=1.0.0-rc.1"
 embedded-io-async  = "0.5.0"
 esp-backtrace      = { version = "0.7.0", features = ["esp32c3", "panic-handler", "exception-handler", "print-uart"] }
 esp-hal-smartled   = { version = "0.4.0", features = ["esp32c3"], path = "../esp-hal-smartled" }
-esp-println        = { version = "0.5.0", features = ["esp32c3"] }
+esp-println        = { version = "0.5.0", features = ["esp32c3", "log"] }
 heapless           = "0.7.16"
 hmac               = { version = "0.12.1", default-features = false }
 lis3dh-async       = { git = "https://github.com/jessebraham/lis3dh-rs-async", branch = "feature/eh-rc1" }
@@ -66,6 +66,8 @@ embassy-time-systick = ["esp-hal-common/embassy-time-systick", "embassy-time/tic
 embassy-time-timg0   = ["esp-hal-common/embassy-time-timg0", "embassy-time/tick-hz-1_000_000"]
 interrupt-preemption = ["esp-hal-common/interrupt-preemption"]
 direct-vectoring     = ["esp-hal-common/direct-vectoring"]
+
+log = ["esp-hal-common/log"]
 
 [profile.release]
 debug = true

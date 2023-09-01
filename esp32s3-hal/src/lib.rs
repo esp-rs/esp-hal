@@ -23,6 +23,7 @@
 //!   `SYSTIMER` peripheral
 //! - `embassy-time-timg0` - Enable the [embassy] time driver using the `TIMG0`
 //!   peripheral
+//! - `log` - enable log output using the `log` crate
 //! - `opsram_2m` - Use externally connected Octal PSRAM (2MB)
 //! - `opsram_4m` - Use externally connected Octal PSRAM (4MB)
 //! - `opsram_8m` - Use externally connected Octal PSRAM (8MB)
