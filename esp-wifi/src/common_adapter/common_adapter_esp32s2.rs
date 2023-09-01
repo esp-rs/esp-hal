@@ -3,9 +3,9 @@ use crate::binary::include::*;
 use crate::common_adapter::RADIO_CLOCKS;
 use crate::hal::system::RadioClockController;
 use crate::hal::system::RadioPeripherals;
+use crate::{trace, unwrap};
 use atomic_polyfill::AtomicU32;
 use esp32s2_hal::prelude::ram;
-use log::trace;
 
 const SOC_PHY_DIG_REGS_MEM_SIZE: usize = 21 * 4;
 
@@ -134,7 +134,7 @@ pub(crate) unsafe fn phy_enable_clock() {
     let count = PHY_CLOCK_ENABLE_REF.fetch_add(1, atomic_polyfill::Ordering::SeqCst);
     if count == 0 {
         critical_section::with(|_| {
-            RADIO_CLOCKS.as_mut().unwrap().enable(RadioPeripherals::Phy);
+            unwrap!(RADIO_CLOCKS.as_mut()).enable(RadioPeripherals::Phy);
         });
 
         trace!("phy_enable_clock done!");
@@ -146,10 +146,7 @@ pub(crate) unsafe fn phy_disable_clock() {
     let count = PHY_CLOCK_ENABLE_REF.fetch_sub(1, atomic_polyfill::Ordering::SeqCst);
     if count == 1 {
         critical_section::with(|_| {
-            RADIO_CLOCKS
-                .as_mut()
-                .unwrap()
-                .disable(RadioPeripherals::Phy);
+            unwrap!(RADIO_CLOCKS.as_mut()).disable(RadioPeripherals::Phy);
         });
 
         trace!("phy_disable_clock done!");

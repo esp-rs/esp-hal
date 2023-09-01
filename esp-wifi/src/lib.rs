@@ -77,6 +77,10 @@ pub(crate) mod common_adapter;
 #[doc(hidden)]
 pub mod tasks;
 
+mod log_macros;
+
+pub use log_macros::panic;
+
 pub(crate) mod memory_fence;
 
 pub use critical_section;
@@ -112,6 +116,7 @@ const DEFAULT_TICK_RATE_HZ: u32 = 50;
 const DEFAULT_TICK_RATE_HZ: u32 = 100;
 
 #[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[toml_cfg::toml_config]
 struct Config {
     #[default(5)]
@@ -283,7 +288,7 @@ pub fn initialize(
     #[cfg(feature = "wifi")]
     crate::wifi::DataFrame::internal_init();
 
-    log::info!("esp-wifi configuration {:?}", crate::CONFIG);
+    info!("esp-wifi configuration {:?}", crate::CONFIG);
 
     crate::common_adapter::chip_specific::enable_wifi_power_domain();
 
@@ -299,7 +304,7 @@ pub fn initialize(
 
     #[cfg(coex)]
     {
-        log::debug!("coex init");
+        debug!("coex init");
         let res = crate::wifi::coex_initialize();
         if res != 0 {
             return Err(InitializationError::General(res));
@@ -309,7 +314,7 @@ pub fn initialize(
     #[cfg(feature = "wifi")]
     {
         if init_for.is_wifi() {
-            log::debug!("wifi init");
+            debug!("wifi init");
             // wifi init
             crate::wifi::wifi_init()?;
         }
@@ -321,7 +326,7 @@ pub fn initialize(
             // ble init
             // for some reason things don't work when initializing things the other way around
             // while the original implementation in NuttX does it like that
-            log::debug!("ble init");
+            debug!("ble init");
             crate::ble::ble_init();
         }
     }
@@ -370,6 +375,6 @@ pub fn init_buffer() {
 
 pub fn init_clocks() {
     unsafe {
-        RADIO_CLOCKS.as_mut().unwrap().init_clocks();
+        unwrap!(RADIO_CLOCKS.as_mut()).init_clocks();
     }
 }

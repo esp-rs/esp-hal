@@ -1,4 +1,4 @@
-use log::trace;
+use crate::{panic, trace};
 
 pub(crate) fn chip_ints_on(mask: u32) {
     let cpuint = match mask {
@@ -26,7 +26,7 @@ pub(crate) unsafe extern "C" fn wifi_int_disable(
     esp32c2_hal::riscv::interrupt::disable();
 
     trace!(
-        "wifi_int_disable wifi_int_mux {:p} - return {}",
+        "wifi_int_disable wifi_int_mux {:?} - return {}",
         wifi_int_mux,
         res,
     );
@@ -39,7 +39,7 @@ pub(crate) unsafe extern "C" fn wifi_int_restore(
     tmp: u32,
 ) {
     trace!(
-        "wifi_int_restore wifi_int_mux {:p} tmp {}",
+        "wifi_int_restore wifi_int_mux {:?} tmp {}",
         wifi_int_mux,
         tmp
     );

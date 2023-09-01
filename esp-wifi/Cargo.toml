@@ -20,7 +20,7 @@ smoltcp = { workspace = true, optional = true }
 esp-hal-common = { workspace = true, optional = true }
 critical-section.workspace = true
 atomic-polyfill.workspace = true
-log.workspace = true
+log = { workspace = true, optional = true }
 embedded-svc = { workspace = true, optional = true }
 enumset = { workspace = true, optional = true }
 linked_list_allocator = { workspace = true }
@@ -36,7 +36,7 @@ embassy-net-driver = { workspace = true, optional = true }
 toml-cfg.workspace = true
 
 [features]
-default = [ "utils" ]
+default = [ "utils", "log" ]
 
 # chip features
 esp32c3 = [ "esp32c3-hal", "dep:esp32c3", "esp-wifi-sys/esp32c3", "esp-hal-common/esp32c3" ]
@@ -76,3 +76,5 @@ esp-now = [ "wifi" ]
 big-heap = []
 ipv6 = ["smoltcp?/proto-ipv6"]
 defmt = ["dep:defmt", "smoltcp?/defmt"]
+log-defmt = ["defmt"]
+log = ["dep:log"]

@@ -1,6 +1,6 @@
 use super::*;
 use crate::binary::include::esp_bt_controller_config_t;
-use log::trace;
+use crate::{debug, panic, trace};
 
 pub static mut ISR_INTERRUPT_5: (
     *mut crate::binary::c_types::c_void,
@@ -178,7 +178,7 @@ pub(crate) fn create_ble_config() -> esp_bt_controller_config_t {
 }
 
 pub(crate) unsafe extern "C" fn interrupt_on(intr_num: i32) {
-    log::trace!("interrupt_on {}", intr_num);
+    trace!("interrupt_on {}", intr_num);
     unsafe {
         esp32s3_hal::xtensa_lx::interrupt::enable_mask(1 << 1);
     }
@@ -210,7 +210,7 @@ pub(crate) unsafe extern "C" fn interrupt_set(
     interrupt_no: i32,
     interrupt_prio: i32,
 ) {
-    log::trace!(
+    trace!(
         "interrupt_set {} {} {} {}",
         cpu_no,
         intr_source,
@@ -229,7 +229,7 @@ pub(crate) unsafe extern "C" fn interrupt_handler_set(
     arg: *const (),
 ) {
     trace!(
-        "interrupt_handler_set {} {:p} {:p}",
+        "interrupt_handler_set {} {:?} {:?}",
         interrupt_no,
         func,
         arg
@@ -252,7 +252,7 @@ pub(crate) unsafe extern "C" fn interrupt_handler_set(
 }
 
 pub(crate) unsafe extern "C" fn coex_wifi_sleep_set(sleep: i32) {
-    log::debug!(
+    debug!(
         "ignored coex_wifi_sleep_set {} - because original implementation does the same",
         sleep
     );
@@ -266,7 +266,7 @@ pub(crate) unsafe extern "C" fn coex_core_ble_conn_dyn_prio_get(
     extern "C" {
         fn coex_core_ble_conn_dyn_prio_get(low: *mut i32, high: *mut i32) -> i32;
     }
-    log::debug!("coex_core_ble_conn_dyn_prio_get");
+    debug!("coex_core_ble_conn_dyn_prio_get");
 
     #[cfg(coex)]
     return coex_core_ble_conn_dyn_prio_get(low, high);

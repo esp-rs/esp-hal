@@ -17,6 +17,8 @@ use crate::EspWifiInitialization;
 
 use crate::binary::include::*;
 
+use crate::unwrap;
+
 /// Maximum payload length
 pub const ESP_NOW_MAX_DATA_LEN: usize = 250;
 
@@ -619,13 +621,11 @@ unsafe extern "C" fn rcv_cb(
             queue.dequeue();
         }
 
-        queue
-            .enqueue(ReceivedData {
-                len: slice.len() as u8,
-                data: data,
-                info,
-            })
-            .unwrap();
+        unwrap!(queue.enqueue(ReceivedData {
+            len: slice.len() as u8,
+            data: data,
+            info,
+        }));
 
         #[cfg(feature = "async")]
         asynch::ESP_NOW_RX_WAKER.wake();

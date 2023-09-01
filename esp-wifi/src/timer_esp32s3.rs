@@ -9,9 +9,9 @@ use esp32s3_hal::{
     prelude::*,
     timer::{Timer, Timer0},
 };
-use log::trace;
 
 use crate::preempt::preempt::task_switch;
+use crate::{trace, unwrap};
 use esp32s3_hal::macros::interrupt;
 
 pub const TICKS_PER_SECOND: u64 = 40_000_000;
@@ -36,38 +36,33 @@ fn read_timer_value() -> u64 {
 
 pub fn setup_timer_isr(timg1_timer0: Timer<Timer0<TIMG1>>) {
     let mut timer1 = timg1_timer0;
-    interrupt::enable(
+    unwrap!(interrupt::enable(
         peripherals::Interrupt::TG1_T0_LEVEL,
         interrupt::Priority::Priority2,
-    )
-    .unwrap();
+    ));
 
     #[cfg(feature = "wifi")]
-    interrupt::enable(
+    unwrap!(interrupt::enable(
         peripherals::Interrupt::WIFI_MAC,
         interrupt::Priority::Priority1,
-    )
-    .unwrap();
+    ));
 
     #[cfg(feature = "wifi")]
-    interrupt::enable(
+    unwrap!(interrupt::enable(
         peripherals::Interrupt::WIFI_PWR,
         interrupt::Priority::Priority1,
-    )
-    .unwrap();
+    ));
 
     #[cfg(feature = "ble")]
     {
-        interrupt::enable(
+        unwrap!(interrupt::enable(
             peripherals::Interrupt::BT_BB,
             interrupt::Priority::Priority1,
-        )
-        .unwrap();
-        interrupt::enable(
+        ));
+        unwrap!(interrupt::enable(
             peripherals::Interrupt::RWBLE,
             interrupt::Priority::Priority1,
-        )
-        .unwrap();
+        ));
     }
 
     timer1.listen();
@@ -104,7 +99,7 @@ fn Timer0(_level: u32) {
 fn WIFI_MAC() {
     unsafe {
         let (fnc, arg) = crate::wifi::os_adapter::ISR_INTERRUPT_1;
-        trace!("interrupt WIFI_MAC {:p} {:p}", fnc, arg);
+        trace!("interrupt WIFI_MAC {:?} {:?}", fnc, arg);
 
         if !fnc.is_null() {
             let fnc: fn(*mut crate::binary::c_types::c_void) = core::mem::transmute(fnc);
@@ -118,7 +113,7 @@ fn WIFI_MAC() {
 fn WIFI_PWR() {
     unsafe {
         let (fnc, arg) = crate::wifi::os_adapter::ISR_INTERRUPT_1;
-        trace!("interrupt WIFI_PWR {:p} {:p}", fnc, arg);
+        trace!("interrupt WIFI_PWR {:?} {:?}", fnc, arg);
 
         if !fnc.is_null() {
             let fnc: fn(*mut crate::binary::c_types::c_void) = core::mem::transmute(fnc);
@@ -134,7 +129,7 @@ fn WIFI_PWR() {
 fn RWBLE() {
     critical_section::with(|_| unsafe {
         let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::ISR_INTERRUPT_5;
-        trace!("interrupt RWBLE {:p} {:p}", fnc, arg);
+        trace!("interrupt RWBLE {:?} {:?}", fnc, arg);
         if !fnc.is_null() {
             let fnc: fn(*mut crate::binary::c_types::c_void) = core::mem::transmute(fnc);
             fnc(arg);
@@ -147,7 +142,7 @@ fn RWBLE() {
 fn BT_BB() {
     critical_section::with(|_| unsafe {
         let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::ISR_INTERRUPT_8;
-        trace!("interrupt RWBT {:p} {:p}", fnc, arg);
+        trace!("interrupt RWBT {:?} {:?}", fnc, arg);
 
         if !fnc.is_null() {
             let fnc: fn(*mut crate::binary::c_types::c_void) = core::mem::transmute(fnc);
@@ -164,7 +159,7 @@ fn TG1_T0_LEVEL(context: &mut TrapFrame) {
         crate::memory_fence::memory_fence();
 
         let mut timer = TIMER1.borrow_ref_mut(cs);
-        let timer = timer.as_mut().unwrap();
+        let timer = unwrap!(timer.as_mut());
         timer.clear_interrupt();
         timer.start(TIMER_DELAY.into_duration());
     });
@@ -184,7 +179,7 @@ fn Software1(_level: u32, context: &mut TrapFrame) {
         crate::memory_fence::memory_fence();
 
         let mut timer = TIMER1.borrow_ref_mut(cs);
-        let timer = timer.as_mut().unwrap();
+        let timer = unwrap!(timer.as_mut());
         timer.clear_interrupt();
         timer.start(TIMER_DELAY.into_duration());
     });

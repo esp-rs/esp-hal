@@ -1,5 +1,6 @@
 use core::cell::RefCell;
 
+use crate::{trace, unwrap};
 use atomic_polyfill::{AtomicU64, Ordering};
 use critical_section::Mutex;
 use esp32s2_hal::xtensa_lx;
@@ -11,7 +12,6 @@ use esp32s2_hal::{
     prelude::*,
     timer::{Timer, Timer0},
 };
-use log::trace;
 
 use crate::preempt::preempt::task_switch;
 use esp32s2_hal::macros::interrupt;
@@ -38,25 +38,22 @@ fn read_timer_value() -> u64 {
 
 pub fn setup_timer_isr(timg1_timer0: Timer<Timer0<TIMG1>>) {
     let mut timer1 = timg1_timer0;
-    interrupt::enable(
+    unwrap!(interrupt::enable(
         peripherals::Interrupt::TG1_T0_LEVEL,
         interrupt::Priority::Priority2,
-    )
-    .unwrap();
+    ));
 
     #[cfg(feature = "wifi")]
-    interrupt::enable(
+    unwrap!(interrupt::enable(
         peripherals::Interrupt::WIFI_MAC,
         interrupt::Priority::Priority1,
-    )
-    .unwrap();
+    ));
 
     #[cfg(feature = "wifi")]
-    interrupt::enable(
+    unwrap!(interrupt::enable(
         peripherals::Interrupt::WIFI_PWR,
         interrupt::Priority::Priority1,
-    )
-    .unwrap();
+    ));
 
     timer1.listen();
     timer1.start(TIMER_DELAY.into_duration());
@@ -92,7 +89,7 @@ fn Timer0(_level: u32) {
 fn WIFI_MAC() {
     unsafe {
         let (fnc, arg) = crate::wifi::os_adapter::ISR_INTERRUPT_1;
-        trace!("interrupt WIFI_MAC {:p} {:p}", fnc, arg);
+        trace!("interrupt WIFI_MAC {:?} {:?}", fnc, arg);
 
         if !fnc.is_null() {
             let fnc: fn(*mut crate::binary::c_types::c_void) = core::mem::transmute(fnc);
@@ -107,7 +104,7 @@ fn WIFI_PWR() {
     unsafe {
         let (fnc, arg) = crate::wifi::os_adapter::ISR_INTERRUPT_1;
 
-        trace!("interrupt WIFI_PWR {:p} {:p}", fnc, arg);
+        trace!("interrupt WIFI_PWR {:?} {:?}", fnc, arg);
 
         if !fnc.is_null() {
             let fnc: fn(*mut crate::binary::c_types::c_void) = core::mem::transmute(fnc);
@@ -126,7 +123,7 @@ fn TG1_T0_LEVEL(context: &mut Context) {
         crate::memory_fence::memory_fence();
 
         let mut timer = TIMER1.borrow_ref_mut(cs);
-        let timer = timer.as_mut().unwrap();
+        let timer = unwrap!(timer.as_mut());
         timer.clear_interrupt();
         timer.start(TIMER_DELAY.into_duration());
     });
@@ -146,7 +143,7 @@ fn Software1(_level: u32, context: &mut Context) {
         crate::memory_fence::memory_fence();
 
         let mut timer = TIMER1.borrow_ref_mut(cs);
-        let timer = timer.as_mut().unwrap();
+        let timer = unwrap!(timer.as_mut());
         timer.clear_interrupt();
         timer.start(TIMER_DELAY.into_duration());
     });

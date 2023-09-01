@@ -1,7 +1,6 @@
 use core::cell::RefCell;
 
 use critical_section::Mutex;
-use log::trace;
 
 use crate::ble::btdm::ble_os_adapter_chip_specific::G_OSI_FUNCS;
 use crate::ble::HciOutCollector;
@@ -12,6 +11,7 @@ use crate::{
     memory_fence::memory_fence,
     timer::yield_task,
 };
+use crate::{debug, info, panic, trace, unwrap, warn};
 
 #[cfg(esp32)]
 use esp32_hal as hal;
@@ -76,7 +76,7 @@ extern "C" fn notify_host_send_available() {
 }
 
 extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
-    trace!("notify_host_recv {:p} {}", data, len);
+    trace!("notify_host_recv {:?} {}", data, len);
 
     unsafe {
         let mut buf = [0u8; 256];
@@ -90,7 +90,7 @@ extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
         critical_section::with(|cs| {
             let mut queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
             if queue.enqueue(packet).is_err() {
-                log::warn!("Dropping BLE packet");
+                warn!("Dropping BLE packet");
             }
         });
 
@@ -118,17 +118,17 @@ static mut INTERRUPT_DISABLE_CNT: usize = 0;
 unsafe extern "C" fn interrupt_enable() {
     INTERRUPT_DISABLE_CNT -= 1;
     let flags = G_INTER_FLAGS[INTERRUPT_DISABLE_CNT];
-    log::trace!("interrupt_enable {}", flags);
+    trace!("interrupt_enable {}", flags);
     critical_section::release(core::mem::transmute(flags));
 }
 
 #[ram]
 unsafe extern "C" fn interrupt_disable() {
-    log::trace!("interrupt_disable");
+    trace!("interrupt_disable");
     let flags = core::mem::transmute(critical_section::acquire());
     G_INTER_FLAGS[INTERRUPT_DISABLE_CNT] = flags;
     INTERRUPT_DISABLE_CNT += 1;
-    log::trace!("interrupt_disable {}", flags);
+    trace!("interrupt_disable {}", flags);
 }
 
 #[ram]
@@ -180,7 +180,7 @@ unsafe extern "C" fn queue_create(len: u32, item_size: u32) -> *const () {
 }
 
 unsafe extern "C" fn queue_delete(queue: *const ()) {
-    trace!("Unimplemented queue_delete {:p}", queue);
+    trace!("Unimplemented queue_delete {:?}", queue);
 }
 
 #[ram]
@@ -193,11 +193,11 @@ unsafe extern "C" fn queue_send(queue: *const (), item: *const (), _block_time_m
             for i in 0..8 as usize {
                 data[i] = *(message.offset(i as isize));
             }
-            trace!("queue posting {:x?}", data);
+            trace!("queue posting {:?}", data);
 
             critical_section::with(|cs| {
                 let mut queue = BT_INTERNAL_QUEUE.borrow_ref_mut(cs);
-                queue.enqueue(data).unwrap();
+                unwrap!(queue.enqueue(data));
             });
             memory_fence();
         });
@@ -213,7 +213,7 @@ unsafe extern "C" fn queue_send_from_isr(
     _item: *const (),
     _hptw: *const (),
 ) -> i32 {
-    log::trace!("queue_send_from_isr {:p} {:p} {:p}", _queue, _item, _hptw);
+    trace!("queue_send_from_isr {:?} {:?} {:?}", _queue, _item, _hptw);
     // Force to set the value to be false
     *(_hptw as *mut bool) = false;
     queue_send(_queue, _item, 0)
@@ -221,7 +221,7 @@ unsafe extern "C" fn queue_send_from_isr(
 
 unsafe extern "C" fn queue_recv(queue: *const (), item: *const (), block_time_ms: u32) -> i32 {
     trace!(
-        "queue_recv {:p} item {:p} block_time_tick {}",
+        "queue_recv {:?} item {:?} block_time_tick {}",
         queue,
         item,
         block_time_ms
@@ -244,7 +244,7 @@ unsafe extern "C" fn queue_recv(queue: *const (), item: *const (), block_time_ms
                         for i in 0..8 {
                             item.offset(i).write_volatile(message[i as usize]);
                         }
-                        trace!("received {:x?}", message);
+                        trace!("received {:?}", message);
                         1
                     } else {
                         0
@@ -291,7 +291,7 @@ unsafe extern "C" fn task_create(
 ) -> i32 {
     let n = StrBuf::from(name);
     trace!(
-        "task_create {:p} {:p} {} {} {:p} {} {:p} {}",
+        "task_create {:?} {:?} {} {} {:?} {} {:?} {}",
         func,
         name,
         n.as_str_ref(),
@@ -332,9 +332,9 @@ unsafe extern "C" fn cause_sw_intr_to_core(_core: i32, _intr_no: i32) -> i32 {
 
     #[cfg(esp32)]
     {
-        log::trace!("cause_sw_intr_to_core {} {}", _core, _intr_no);
+        trace!("cause_sw_intr_to_core {} {}", _core, _intr_no);
         let intr = 1 << _intr_no;
-        core::arch::asm!("wsr.intset  {0}", in(reg) intr, options(nostack)); 
+        core::arch::asm!("wsr.intset  {0}", in(reg) intr, options(nostack));
         0
     }
 }
@@ -354,7 +354,7 @@ unsafe extern "C" fn free(ptr: *const ()) {
 #[allow(unused)]
 #[ram]
 unsafe extern "C" fn srand(seed: u32) {
-    log::debug!("!!!! unimplemented srand {}", seed);
+    debug!("!!!! unimplemented srand {}", seed);
 }
 
 #[allow(unused)]
@@ -377,7 +377,7 @@ unsafe extern "C" fn btdm_hus_2_lpcycles(us: u32) -> u32 {
 
     // Converts a duration in half us into a number of low power clock cycles.
     let cycles: u64 = (us as u64) << (g_btdm_lpcycle_us_frac as u64 / g_btdm_lpcycle_us as u64);
-    log::debug!("*** NOT implemented btdm_hus_2_lpcycles {} {}", us, cycles);
+    debug!("*** NOT implemented btdm_hus_2_lpcycles {} {}", us, cycles);
     // probably not right ... NX returns half of the values we calculate here
 
     cycles as u32
@@ -408,13 +408,13 @@ unsafe extern "C" fn btdm_sleep_exit_phase3() {
 }
 
 unsafe extern "C" fn coex_schm_status_bit_set(_typ: i32, status: i32) {
-    log::debug!("coex_schm_status_bit_set {} {}", _typ, status);
+    debug!("coex_schm_status_bit_set {} {}", _typ, status);
     #[cfg(coex)]
     crate::binary::include::coex_schm_status_bit_set(_typ as u32, status as u32);
 }
 
 unsafe extern "C" fn coex_schm_status_bit_clear(_typ: i32, status: i32) {
-    log::debug!("coex_schm_status_bit_clear {} {}", _typ, status);
+    debug!("coex_schm_status_bit_clear {} {}", _typ, status);
     #[cfg(coex)]
     crate::binary::include::coex_schm_status_bit_clear(_typ as u32, status as u32);
 }
@@ -431,12 +431,12 @@ unsafe extern "C" fn set_isr13(n: i32, handler: unsafe extern "C" fn(), arg: *co
 
 #[cfg(esp32)]
 unsafe extern "C" fn interrupt_l3_disable() {
-    // log::info!("unimplemented interrupt_l3_disable");
+    // info!("unimplemented interrupt_l3_disable");
 }
 
 #[cfg(esp32)]
 unsafe extern "C" fn interrupt_l3_restore() {
-    //  log::info!("unimplemented interrupt_l3_restore");
+    //  info!("unimplemented interrupt_l3_restore");
 }
 
 #[cfg(esp32)]
@@ -457,7 +457,7 @@ pub(crate) fn ble_init() {
                 static mut g_bt_plf_log_level: u32;
             }
 
-            log::debug!("g_bt_plf_log_level = {}", g_bt_plf_log_level);
+            debug!("g_bt_plf_log_level = {}", g_bt_plf_log_level);
             g_bt_plf_log_level = 10;
         }
 
@@ -481,7 +481,7 @@ pub(crate) fn ble_init() {
 
         let version = btdm_controller_get_compile_version();
         let version_str = StrBuf::from(version);
-        log::debug!("BT controller compile version {}", version_str.as_str_ref());
+        debug!("BT controller compile version {}", version_str.as_str_ref());
 
         ble_os_adapter_chip_specific::bt_periph_module_enable();
 
@@ -500,7 +500,7 @@ pub(crate) fn ble_init() {
             panic!("btdm_controller_init returned {}", res);
         }
 
-        log::debug!("The btdm_controller_init was initialized");
+        debug!("The btdm_controller_init was initialized");
 
         #[cfg(coex)]
         crate::binary::include::coex_enable();
@@ -597,12 +597,12 @@ pub fn send_hci(data: &[u8]) {
                 let can_send = API_vhci_host_check_send_available();
 
                 if !can_send {
-                    log::trace!("can_send is false");
+                    trace!("can_send is false");
                     continue;
                 }
 
                 API_vhci_host_send_packet(packet.as_ptr() as *const u8, packet.len() as u16);
-                log::trace!("sent vhci host packet");
+                trace!("sent vhci host packet");
 
                 dump_packet_info(packet);
 
@@ -620,6 +620,6 @@ fn dump_packet_info(buffer: &[u8]) {
     return;
 
     critical_section::with(|cs| {
-        log::info!("@HCIFRAME {:02x?}", buffer);
+        info!("@HCIFRAME {:?}", buffer);
     });
 }

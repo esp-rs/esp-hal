@@ -4,6 +4,7 @@ use embedded_io::{
 };
 use esp_hal_common::peripheral::{Peripheral, PeripheralRef};
 
+use crate::panic;
 use crate::EspWifiInitialization;
 
 use super::{read_hci, read_next, send_hci};

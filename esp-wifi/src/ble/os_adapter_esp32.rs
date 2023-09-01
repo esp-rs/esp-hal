@@ -7,6 +7,7 @@ use crate::binary::{
         esp_bt_mode_t_ESP_BT_MODE_IDLE,
     },
 };
+use crate::{debug, info, panic, trace, unwrap, warn};
 
 use core::ptr::addr_of_mut;
 
@@ -180,10 +181,9 @@ pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
 
 extern "C" fn coex_version_get_wrapper(major: *mut u32, minor: *mut u32, patch: *mut u32) -> i32 {
     unsafe {
-        let coex_version = core::ffi::CStr::from_ptr(crate::binary::include::coex_version_get())
-            .to_str()
-            .unwrap();
-        log::info!("COEX Version {}", coex_version);
+        let coex_version =
+            unwrap!(core::ffi::CStr::from_ptr(crate::binary::include::coex_version_get()).to_str());
+        info!("COEX Version {}", coex_version);
         // we should parse it ... for now just hardcoded
         major.write_volatile(1);
         minor.write_volatile(2);
@@ -304,11 +304,9 @@ pub(crate) fn btdm_controller_mem_init() {
 
         core::ptr::copy_nonoverlapping(data_start_rom, data_start, len);
 
-        log::debug!(
-            "btdm_controller_mem_init {:p} {:p} {}",
-            data_start_rom,
-            data_start,
-            len,
+        debug!(
+            "btdm_controller_mem_init {:?} {:?} {}",
+            data_start_rom, data_start, len,
         );
     }
 
@@ -325,15 +323,14 @@ pub(crate) fn btdm_controller_mem_init() {
                         as usize,
                 );
             }
-            log::debug!(
+            debug!(
                 ".bss initialise {:x} - {:x}\n",
-                BTDM_DRAM_AVAILABLE_REGION[i].start,
-                BTDM_DRAM_AVAILABLE_REGION[i].end
+                BTDM_DRAM_AVAILABLE_REGION[i].start, BTDM_DRAM_AVAILABLE_REGION[i].end
             );
         }
     }
 
-    log::debug!("btdm_controller_mem_init done");
+    debug!("btdm_controller_mem_init done");
 }
 
 pub(crate) fn bt_periph_module_enable() {
@@ -353,7 +350,7 @@ pub(crate) fn disable_sleep_mode() {
 }
 
 pub(crate) unsafe extern "C" fn coex_bt_wakeup_request() -> bool {
-    log::debug!("coex_bt_wakeup_request");
+    debug!("coex_bt_wakeup_request");
     #[cfg(coex)]
     return async_wakeup_request(BTDM_ASYNC_WAKEUP_REQ_COEX);
 
@@ -362,7 +359,7 @@ pub(crate) unsafe extern "C" fn coex_bt_wakeup_request() -> bool {
 }
 
 pub(crate) unsafe extern "C" fn coex_bt_wakeup_request_end() {
-    log::warn!("coex_bt_wakeup_request_end");
+    warn!("coex_bt_wakeup_request_end");
 
     #[cfg(coex)]
     async_wakeup_request_end(BTDM_ASYNC_WAKEUP_REQ_COEX);
@@ -370,7 +367,7 @@ pub(crate) unsafe extern "C" fn coex_bt_wakeup_request_end() {
 
 #[allow(unused_variables)]
 pub(crate) unsafe extern "C" fn coex_bt_request(event: u32, latency: u32, duration: u32) -> i32 {
-    log::debug!("coex_bt_request");
+    debug!("coex_bt_request");
     extern "C" {
         #[cfg(coex)]
         fn coex_bt_request(event: u32, latency: u32, duration: u32) -> i32;
@@ -385,7 +382,7 @@ pub(crate) unsafe extern "C" fn coex_bt_request(event: u32, latency: u32, durati
 
 #[allow(unused_variables)]
 pub(crate) unsafe extern "C" fn coex_bt_release(event: u32) -> i32 {
-    log::debug!("coex_bt_release");
+    debug!("coex_bt_release");
     extern "C" {
         #[cfg(coex)]
         fn coex_bt_release(event: u32) -> i32;
@@ -401,7 +398,7 @@ pub(crate) unsafe extern "C" fn coex_bt_release(event: u32) -> i32 {
 pub(crate) unsafe extern "C" fn coex_register_bt_cb_wrapper(
     callback: unsafe extern "C" fn(),
 ) -> i32 {
-    log::warn!("coex_register_bt_cb {:p}", callback);
+    warn!("coex_register_bt_cb {:?}", callback);
     extern "C" {
         #[cfg(coex)]
         fn coex_register_bt_cb(callback: unsafe extern "C" fn()) -> i32;
@@ -415,7 +412,7 @@ pub(crate) unsafe extern "C" fn coex_register_bt_cb_wrapper(
 }
 
 pub(crate) unsafe extern "C" fn coex_bb_reset_lock() -> u32 {
-    log::debug!("coex_bb_reset_lock");
+    debug!("coex_bb_reset_lock");
     extern "C" {
         #[cfg(coex)]
         fn coex_bb_reset_lock() -> u32;
@@ -430,7 +427,7 @@ pub(crate) unsafe extern "C" fn coex_bb_reset_lock() -> u32 {
 
 #[allow(unused_variables)]
 pub(crate) unsafe extern "C" fn coex_bb_reset_unlock(event: u32) {
-    log::debug!("coex_bb_reset_unlock");
+    debug!("coex_bb_reset_unlock");
     extern "C" {
         #[cfg(coex)]
         fn coex_bb_reset_unlock(event: u32);
@@ -443,7 +440,7 @@ pub(crate) unsafe extern "C" fn coex_bb_reset_unlock(event: u32) {
 pub(crate) unsafe extern "C" fn coex_schm_register_btdm_callback_wrapper(
     callback: unsafe extern "C" fn(),
 ) -> i32 {
-    log::warn!("coex_schm_register_btdm_callback {:p}", callback);
+    warn!("coex_schm_register_btdm_callback {:?}", callback);
     extern "C" {
         #[cfg(coex)]
         fn coex_schm_register_callback(kind: u32, callback: unsafe extern "C" fn()) -> i32;
@@ -457,7 +454,7 @@ pub(crate) unsafe extern "C" fn coex_schm_register_btdm_callback_wrapper(
 }
 
 pub(crate) unsafe extern "C" fn coex_schm_interval_get() -> u32 {
-    log::debug!("coex_schm_interval_get");
+    debug!("coex_schm_interval_get");
 
     #[cfg(coex)]
     return crate::binary::include::coex_schm_interval_get();
@@ -467,7 +464,7 @@ pub(crate) unsafe extern "C" fn coex_schm_interval_get() -> u32 {
 }
 
 pub(crate) unsafe extern "C" fn coex_schm_curr_period_get() -> u8 {
-    log::debug!("coex_schm_curr_period_get");
+    debug!("coex_schm_curr_period_get");
     // BEWARE: One might expect to call coex_schm_curr_period_get
     //crate::binary::include::coex_schm_curr_period_get()
 
@@ -479,7 +476,7 @@ pub(crate) unsafe extern "C" fn coex_schm_curr_period_get() -> u8 {
 }
 
 pub(crate) unsafe extern "C" fn coex_schm_curr_phase_get() -> *const () {
-    log::debug!("coex_schm_curr_phase_get");
+    debug!("coex_schm_curr_phase_get");
 
     #[cfg(coex)]
     return crate::binary::include::coex_schm_curr_phase_get() as *const ();
@@ -490,7 +487,7 @@ pub(crate) unsafe extern "C" fn coex_schm_curr_phase_get() -> *const () {
 
 #[allow(unused_variables)]
 pub(crate) unsafe extern "C" fn coex_wifi_channel_get(primary: *mut u8, secondary: *mut u8) -> i32 {
-    log::warn!("coex_wifi_channel_get");
+    warn!("coex_wifi_channel_get");
     extern "C" {
         #[cfg(coex)]
         fn coex_wifi_channel_get(primary: *mut u8, secondary: *mut u8) -> i32;
@@ -507,7 +504,7 @@ pub(crate) unsafe extern "C" fn coex_wifi_channel_get(primary: *mut u8, secondar
 pub(crate) unsafe extern "C" fn coex_register_wifi_channel_change_callback(
     callback: unsafe extern "C" fn(),
 ) -> i32 {
-    log::warn!("coex_register_wifi_channel_change_callback");
+    warn!("coex_register_wifi_channel_change_callback");
     extern "C" {
         #[cfg(coex)]
         fn coex_register_wifi_channel_change_callback(callback: unsafe extern "C" fn()) -> i32;
@@ -521,7 +518,7 @@ pub(crate) unsafe extern "C" fn coex_register_wifi_channel_change_callback(
 }
 
 pub(crate) unsafe extern "C" fn set_isr(n: i32, f: unsafe extern "C" fn(), arg: *const ()) -> i32 {
-    log::trace!("set_isr called {} {:p} {:p}", n, f, arg);
+    trace!("set_isr called {} {:?} {:?}", n, f, arg);
 
     match n {
         5 => {
@@ -540,7 +537,7 @@ pub(crate) unsafe extern "C" fn set_isr(n: i32, f: unsafe extern "C" fn(), arg: 
 }
 
 pub(crate) unsafe extern "C" fn ints_on(mask: u32) {
-    log::trace!("chip_ints_on esp32 {:b}", mask);
+    trace!("chip_ints_on esp32 {:b}", mask);
     hal::xtensa_lx::interrupt::enable_mask(mask);
 }
 

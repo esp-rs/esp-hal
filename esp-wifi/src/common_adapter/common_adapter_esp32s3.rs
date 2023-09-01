@@ -3,8 +3,8 @@ use crate::binary::include::*;
 use crate::common_adapter::RADIO_CLOCKS;
 use crate::hal::system::RadioClockController;
 use crate::hal::system::RadioPeripherals;
+use crate::{trace, unwrap};
 use atomic_polyfill::AtomicU32;
-use log::trace;
 
 const SOC_PHY_DIG_REGS_MEM_SIZE: usize = 21 * 4;
 
@@ -102,7 +102,7 @@ pub(crate) unsafe fn phy_enable() {
                 coex_pti_v2();
             }
 
-            log::trace!("PHY ENABLE");
+            trace!("PHY ENABLE");
         });
     }
 }
@@ -122,7 +122,7 @@ pub(crate) unsafe fn phy_disable() {
             // Disable WiFi/BT common peripheral clock. Do not disable clock for hardware RNG
             phy_disable_clock();
 
-            log::trace!("PHY DISABLE");
+            trace!("PHY DISABLE");
         });
     }
 }
@@ -147,7 +147,7 @@ fn phy_digital_regs_store() {
 pub(crate) unsafe fn phy_enable_clock() {
     trace!("phy_enable_clock");
     critical_section::with(|_| {
-        RADIO_CLOCKS.as_mut().unwrap().enable(RadioPeripherals::Phy);
+        unwrap!(RADIO_CLOCKS.as_mut()).enable(RadioPeripherals::Phy);
     });
 
     trace!("phy_enable_clock done!");
@@ -157,10 +157,7 @@ pub(crate) unsafe fn phy_enable_clock() {
 pub(crate) unsafe fn phy_disable_clock() {
     trace!("phy_disable_clock");
     critical_section::with(|_| {
-        RADIO_CLOCKS
-            .as_mut()
-            .unwrap()
-            .disable(RadioPeripherals::Phy);
+        unwrap!(RADIO_CLOCKS.as_mut()).disable(RadioPeripherals::Phy);
     });
 
     trace!("phy_enable_clock done!");

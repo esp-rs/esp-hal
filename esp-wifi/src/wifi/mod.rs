@@ -5,6 +5,7 @@ use core::{cell::RefCell, mem::MaybeUninit};
 
 use crate::common_adapter::*;
 use crate::EspWifiInitialization;
+use crate::{debug, error, info, panic, trace, unwrap, warn};
 
 use crate::esp_wifi_result;
 use critical_section::Mutex;
@@ -81,7 +82,6 @@ use crate::{
     },
     compat::queue::SimpleQueue,
 };
-use log::debug;
 
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -119,7 +119,7 @@ impl DataFrame {
         critical_section::with(|cs| {
             let mut free_slots = DATA_FRAME_BACKING_MEMORY_FREE_SLOTS.borrow_ref_mut(cs);
             for i in 0..DATA_FRAMES_MAX_COUNT {
-                free_slots.push(i).unwrap();
+                unwrap!(free_slots.push(i));
             }
         });
     }
@@ -140,7 +140,7 @@ impl DataFrame {
     pub(crate) fn free(self) {
         critical_section::with(|cs| {
             let mut free_slots = DATA_FRAME_BACKING_MEMORY_FREE_SLOTS.borrow_ref_mut(cs);
-            free_slots.push(self.index).unwrap();
+            unwrap!(free_slots.push(self.index));
         });
     }
 
@@ -155,7 +155,7 @@ impl DataFrame {
         let mem = unsafe { DATA_FRAME_BACKING_MEMORY.assume_init_mut() };
         let len = usize::min(bytes.len(), DATA_FRAME_SIZE);
         if len != bytes.len() {
-            log::warn!("Trying to store more data than available into DataFrame. Check MTU");
+            warn!("Trying to store more data than available into DataFrame. Check MTU");
         }
 
         mem[(data.index * DATA_FRAME_SIZE)..][..len].copy_from_slice(bytes);
@@ -358,18 +358,18 @@ unsafe extern "C" fn is_in_isr_wrapper() -> i32 {
 
 #[cfg(coex)]
 pub(crate) fn coex_initialize() -> i32 {
-    log::debug!("call coex-initialize");
+    debug!("call coex-initialize");
     unsafe {
         let res = esp_coex_adapter_register(
             &mut G_COEX_ADAPTER_FUNCS as *mut _ as *mut coex_adapter_funcs_t,
         );
         if res != 0 {
-            log::error!("Error: esp_coex_adapter_register {}", res);
+            error!("Error: esp_coex_adapter_register {}", res);
             return res;
         }
         let res = coex_pre_init();
         if res != 0 {
-            log::error!("Error: coex_pre_init {}", res);
+            error!("Error: coex_pre_init {}", res);
             return res;
         }
         0
@@ -377,7 +377,7 @@ pub(crate) fn coex_initialize() -> i32 {
 }
 
 pub unsafe extern "C" fn coex_init() -> i32 {
-    log::debug!("coex-init");
+    debug!("coex-init");
     #[cfg(coex)]
     return crate::binary::include::coex_init();
 
@@ -664,7 +664,7 @@ unsafe extern "C" fn recv_cb(
     let res = critical_section::with(|cs| {
         let mut queue = DATA_QUEUE_RX.borrow_ref_mut(cs);
         if !queue.is_full() {
-            queue.enqueue(packet).unwrap();
+            unwrap!(queue.enqueue(packet));
 
             #[cfg(feature = "embassy-net")]
             embassy::RECEIVE_WAKER.wake();
@@ -672,7 +672,7 @@ unsafe extern "C" fn recv_cb(
             0
         } else {
             packet.free();
-            log::error!("RX QUEUE FULL");
+            error!("RX QUEUE FULL");
             1
         }
     });
@@ -850,7 +850,7 @@ fn convert_ap_info(record: &crate::binary::include::wifi_ap_record_t) -> AccessP
     };
 
     let mut ssid = heapless::String::<32>::new();
-    ssid.push_str(ssid_ref).unwrap();
+    unwrap!(ssid.push_str(ssid_ref));
 
     AccessPointInfo {
         ssid,
@@ -1002,7 +1002,7 @@ impl<'d> Device for WifiDevice<'d> {
             if !tx.is_full() {
                 Some(WifiTxToken::default())
             } else {
-                log::warn!("no Tx token available");
+                warn!("no Tx token available");
                 None
             }
         })
@@ -1027,9 +1027,10 @@ impl RxToken for WifiRxToken {
         critical_section::with(|cs| {
             let mut queue = DATA_QUEUE_RX.borrow_ref_mut(cs);
 
-            let mut data = queue
-                .dequeue()
-                .expect("unreachable: transmit()/receive() ensures there is a packet to process");
+            let mut data = unwrap!(
+                queue.dequeue(),
+                "unreachable: transmit()/receive() ensures there is a packet to process"
+            );
             let len = data.len;
             let buffer = &mut data.data_mut()[..len];
             dump_packet_info(&buffer);
@@ -1051,12 +1052,13 @@ impl TxToken for WifiTxToken {
         let res = critical_section::with(|cs| {
             let mut queue = DATA_QUEUE_TX.borrow_ref_mut(cs);
 
-            let mut packet = DataFrame::new().expect("unreachable: transmit()/receive() ensures there is a buffer free (which means we also have free buffer space)");
+            let mut packet = unwrap!(DataFrame::new(), "unreachable: transmit()/receive() ensures there is a buffer free (which means we also have free buffer space)");
             packet.len = len;
             let res = f(&mut packet.data_mut()[..len]);
-            queue
-                .enqueue(packet)
-                .expect("unreachable: transmit()/receive() ensures there is a buffer free");
+            unwrap!(
+                queue.enqueue(packet),
+                "unreachable: transmit()/receive() ensures there is a buffer free"
+            );
             res
         });
 
@@ -1080,7 +1082,7 @@ pub fn send_data_if_needed() {
         );
 
         while let Some(mut packet) = queue.dequeue() {
-            log::trace!("sending... {} bytes", packet.len);
+            trace!("sending... {} bytes", packet.len);
             dump_packet_info(packet.slice());
 
             let interface = if is_ap {
@@ -1096,9 +1098,9 @@ pub fn send_data_if_needed() {
                     packet.len as u16,
                 );
                 if _res != 0 {
-                    log::warn!("esp_wifi_internal_tx {}", _res);
+                    warn!("esp_wifi_internal_tx {}", _res);
                 }
-                log::trace!("esp_wifi_internal_tx {}", _res);
+                trace!("esp_wifi_internal_tx {}", _res);
             }
             #[cfg(feature = "embassy-net")]
             embassy::TRANSMIT_WAKER.wake();
@@ -1307,16 +1309,16 @@ fn dump_packet_info(buffer: &[u8]) {
     #[cfg(not(feature = "dump-packets"))]
     return;
 
-    log::info!("@WIFIFRAME {:02x?}", buffer);
+    info!("@WIFIFRAME {:?}", buffer);
 }
 
 #[macro_export]
 macro_rules! esp_wifi_result {
     ($value:expr) => {
         if $value != crate::binary::include::ESP_OK as i32 {
-            Err(WifiError::InternalError(
-                FromPrimitive::from_i32($value).unwrap(),
-            ))
+            Err(WifiError::InternalError(unwrap!(FromPrimitive::from_i32(
+                $value
+            ))))
         } else {
             core::result::Result::<(), WifiError>::Ok(())
         }
@@ -1341,8 +1343,9 @@ pub(crate) mod embassy {
             critical_section::with(|cs| {
                 let mut queue = DATA_QUEUE_RX.borrow_ref_mut(cs);
 
-                let mut data = queue.dequeue().expect(
-                    "unreachable: transmit()/receive() ensures there is a packet to process",
+                let mut data = unwrap!(
+                    queue.dequeue(),
+                    "unreachable: transmit()/receive() ensures there is a packet to process"
                 );
                 let len = data.len;
                 let buffer = &mut data.data_mut()[..len];
@@ -1362,13 +1365,17 @@ pub(crate) mod embassy {
             let res = critical_section::with(|cs| {
                 let mut queue = DATA_QUEUE_TX.borrow_ref_mut(cs);
 
-                let mut packet = DataFrame::new().expect("unreachable: transmit()/receive() ensures there is a buffer free and space available");
+                let mut packet = unwrap!(
+                    DataFrame::new(),
+                    "unreachable: transmit()/receive() ensures there is a buffer free and space available"
+                );
 
                 packet.len = len;
                 let res = f(&mut packet.data_mut()[..len]);
-                queue
-                    .enqueue(packet)
-                    .expect("unreachable: transmit()/receive() ensures there is a buffer free");
+                unwrap!(
+                    queue.enqueue(packet),
+                    "unreachable: transmit()/receive() ensures there is a buffer free"
+                );
                 res
             });
 
@@ -1438,7 +1445,7 @@ pub(crate) mod embassy {
                     }
                 }
                 _ => {
-                    log::warn!("Unknown wifi mode in link_state");
+                    warn!("Unknown wifi mode in link_state");
                     embassy_net_driver::LinkState::Down
                 }
             }
@@ -1471,6 +1478,7 @@ mod asynch {
     use num_traits::FromPrimitive;
 
     use super::*;
+    use crate::panic;
 
     // TODO assumes STA mode only
     impl<'d> WifiController<'d> {

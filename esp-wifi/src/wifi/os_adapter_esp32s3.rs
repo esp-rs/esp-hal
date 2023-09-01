@@ -1,7 +1,7 @@
 #![allow(unused_variables)]
 #![allow(dead_code)]
 #![allow(non_snake_case)]
-use log::trace;
+use crate::trace;
 
 pub(crate) fn chip_ints_on(mask: u32) {
     trace!("chip_ints_on esp32");
