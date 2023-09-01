@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add multicore-aware embassy executor for Xtensa MCUs (#723, #756).
 - Add interrupt-executor for Xtensa MCUs (#723, #756).
 - Add missing `Into<Gpio<Analog, GPIONUN>>` conversion (#764)
+- Updated `clock` module documentation (#774)
 
 ### Changed
 
