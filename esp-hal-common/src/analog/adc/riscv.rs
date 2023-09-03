@@ -670,15 +670,13 @@ where
     }
 }
 
-#[doc(hidden)]
-#[macro_export]
 macro_rules! impl_adc_interface {
     ($adc:ident [
         $( ($pin:ident, $channel:expr) ,)+
     ]) => {
 
         $(
-            impl Channel<$adc> for $pin<Analog> {
+            impl embedded_hal::adc::Channel<$adc> for crate::gpio::$pin<crate::gpio::Analog> {
                 type ID = u8;
 
                 fn channel() -> u8 { $channel }
@@ -686,8 +684,6 @@ macro_rules! impl_adc_interface {
         )+
     }
 }
-
-pub use impl_adc_interface;
 
 #[cfg(esp32c2)]
 pub mod implementation {
@@ -727,10 +723,7 @@ pub mod implementation {
     //! }
     //! ```
 
-    use embedded_hal::adc::Channel;
-
     pub use crate::analog::{adc::*, ADC1};
-    use crate::gpio::*;
 
     impl_adc_interface! {
         ADC1 [
@@ -782,10 +775,7 @@ pub mod implementation {
     //! }
     //! ```
 
-    use embedded_hal::adc::Channel;
-
     pub use crate::analog::{adc::*, ADC1, ADC2};
-    use crate::gpio::*;
 
     impl_adc_interface! {
         ADC1 [
@@ -842,10 +832,7 @@ pub mod implementation {
     //! }
     //! ```
 
-    use embedded_hal::adc::Channel;
-
     pub use crate::analog::{adc::*, ADC1};
-    use crate::gpio::*;
 
     impl_adc_interface! {
         ADC1 [
@@ -898,10 +885,7 @@ pub mod implementation {
     //! }
     //! ```
 
-    use embedded_hal::adc::Channel;
-
     pub use crate::analog::{adc::*, ADC1};
-    use crate::gpio::*;
 
     impl_adc_interface! {
         ADC1 [
