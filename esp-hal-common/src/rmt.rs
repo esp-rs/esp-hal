@@ -1068,7 +1068,6 @@ mod chip_specific {
         }
     }
 
-    #[macro_export]
     macro_rules! impl_tx_channel {
         ($channel:ident, $signal:ident, $ch_num:literal) => {
             paste::paste! {
@@ -1228,7 +1227,6 @@ mod chip_specific {
         }
     }
 
-    #[macro_export]
     macro_rules! impl_rx_channel {
         ($channel:ident, $signal:ident, $ch_num:literal) => {
             paste::paste! {
@@ -1338,8 +1336,8 @@ mod chip_specific {
         }
     }
 
-    pub use impl_rx_channel;
-    pub use impl_tx_channel;
+    pub(crate) use impl_rx_channel;
+    pub(crate) use impl_tx_channel;
 }
 
 #[cfg(any(esp32, esp32s2))]
@@ -1365,8 +1363,6 @@ mod chip_specific {
         rmt.apb_conf.modify(|_, w| w.clk_en().set_bit());
     }
 
-    #[doc(hidden)]
-    #[macro_export]
     macro_rules! impl_tx_channel {
         ($channel:ident, $signal:ident, $ch_num:literal) => {
             paste::paste! {
@@ -1506,8 +1502,6 @@ mod chip_specific {
         }
     }
 
-    #[doc(hidden)]
-    #[macro_export]
     macro_rules! impl_rx_channel {
         ($channel:ident, $signal:ident, $ch_num:literal) => {
             paste::paste! {
@@ -1624,6 +1618,6 @@ mod chip_specific {
         }
     }
 
-    pub use impl_rx_channel;
-    pub use impl_tx_channel;
+    pub(crate) use impl_rx_channel;
+    pub(crate) use impl_tx_channel;
 }
