@@ -41,9 +41,9 @@ pub use xtensa_lx;
 pub use xtensa_lx_rt::{self, entry};
 
 #[cfg(adc)]
-pub use self::analog::adc::implementation as adc;
+pub use self::analog::adc;
 #[cfg(dac)]
-pub use self::analog::dac::implementation as dac;
+pub use self::analog::dac;
 #[cfg(any(xtensa, all(riscv, systimer)))]
 pub use self::delay::Delay;
 #[cfg(gdma)]

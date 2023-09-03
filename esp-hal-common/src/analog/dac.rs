@@ -97,7 +97,7 @@ macro_rules! impl_dac {
             paste::paste! {
                 use $crate::analog::dac::[<DAC $number Impl>];
 
-                /// DAC channel
+                #[doc = "DAC channel " $number]
                 pub struct [<DAC $number>]<'d, DAC> {
                     _dac: $crate::peripheral::PeripheralRef<'d, DAC>,
                     _private: ::core::marker::PhantomData<()>,
@@ -119,7 +119,7 @@ macro_rules! impl_dac {
                         Ok(dac)
                     }
 
-                    /// Write the given value
+                    /// Writes the given value
                     ///
                     /// For each DAC channel, the output analog voltage can be calculated as follows:
                     /// DACn_OUT = VDD3P3_RTC * PDACn_DAC/256
@@ -132,8 +132,10 @@ macro_rules! impl_dac {
     };
 }
 
+pub use implementation::*;
+
 #[cfg(esp32)]
-pub mod implementation {
+mod implementation {
     //! Digital to analog (DAC) conversion.
     //!
     //! This module provides functions for controlling two digital to
@@ -145,7 +147,7 @@ pub mod implementation {
 }
 
 #[cfg(esp32s2)]
-pub mod implementation {
+mod implementation {
     //! Digital to analog (DAC) conversion.
     //!
     //! This module provides functions for controlling two digital to
