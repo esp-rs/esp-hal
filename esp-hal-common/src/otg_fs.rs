@@ -30,10 +30,10 @@ pub use esp_synopsys_usb_otg::UsbBus;
 use esp_synopsys_usb_otg::UsbPeripheral;
 
 use crate::{
-    gpio::InputSignal,
+    gpio::{InputSignal},
     peripheral::{Peripheral, PeripheralRef},
     peripherals,
-    system::{Peripheral as PeripheralEnable, PeripheralClockControl},
+    system::{Peripheral as PeripheralEnable, PeripheralClockControl}, IO,
 };
 
 #[doc(hidden)]

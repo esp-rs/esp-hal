@@ -32,7 +32,7 @@ procmacros           = { version = "0.6.0", package = "esp-hal-procmacros", path
 strum                = { version = "0.25.0", default-features = false, features = ["derive"] }
 void                 = { version = "1.0.2", default-features = false }
 usb-device           = { version = "0.2.9", optional = true }
-frunk 		     = {version = "0.4.2", default-features = false}
+frunk 		     = { version = "0.4.2", default-features = false, optional = true }
 
 
 # async
@@ -130,3 +130,5 @@ debug = [
     "esp32s2?/impl-register-debug",
     "esp32s3?/impl-register-debug",
 ]
+# Enable list-based management of gpio-pins
+frunk_list = ["frunk"]
