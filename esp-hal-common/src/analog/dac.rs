@@ -12,16 +12,12 @@
 //! makes it easier for users to generate accurate analog voltages in their
 //! applications, such as audio generation, sensor calibration, and analog
 //! signal synthesis.
-use crate::{
-    peripheral::PeripheralRef,
-    peripherals::{RTC_IO, SENS},
-};
+use crate::peripherals::{RTC_IO, SENS};
 pub trait DAC {
     fn write(&mut self, value: u8);
 }
 
-#[doc(hidden)]
-pub trait DAC1Impl {
+trait DAC1Impl {
     fn set_power(self) -> Self
     where
         Self: Sized,
@@ -58,8 +54,7 @@ pub trait DAC1Impl {
     }
 }
 
-#[doc(hidden)]
-pub trait DAC2Impl {
+trait DAC2Impl {
     fn set_power(self) -> Self
     where
         Self: Sized,
@@ -96,21 +91,16 @@ pub trait DAC2Impl {
     }
 }
 
-#[doc(hidden)]
-#[macro_export]
 macro_rules! impl_dac {
-    ($($number:literal => $gpio:ident,)+) => {
-        use core::marker::PhantomData;
-        use crate::gpio;
-
+    ($($number:literal => $gpio:ident),+) => {
         $(
             paste::paste! {
-                pub use $crate::analog::dac::[<DAC $number Impl>];
+                use $crate::analog::dac::[<DAC $number Impl>];
 
                 /// DAC channel
                 pub struct [<DAC $number>]<'d, DAC> {
-                    _dac: PeripheralRef<'d, DAC>,
-                    _private: PhantomData<()>,
+                    _dac: $crate::peripheral::PeripheralRef<'d, DAC>,
+                    _private: ::core::marker::PhantomData<()>,
                 }
 
                 impl<'d, DAC> [<DAC $number Impl>] for [<DAC $number>]<'d, DAC> {}
@@ -119,11 +109,11 @@ macro_rules! impl_dac {
                     /// Constructs a new DAC instance
                     pub fn dac(
                         dac: impl $crate::peripheral::Peripheral<P = DAC> +'d,
-                        _pin: gpio::$gpio<$crate::gpio::Analog>,
+                        _pin: $crate::gpio::$gpio<$crate::gpio::Analog>,
                     ) -> Result<Self, ()> {
                         let dac = Self {
                             _dac: dac.into_ref(),
-                            _private: PhantomData,
+                            _private: ::core::marker::PhantomData,
                         }
                         .set_power();
                         Ok(dac)
@@ -142,8 +132,6 @@ macro_rules! impl_dac {
     };
 }
 
-pub use impl_dac;
-
 #[cfg(esp32)]
 pub mod implementation {
     //! Digital to analog (DAC) conversion.
@@ -153,10 +141,7 @@ pub mod implementation {
     //!
     //! The DAC1 is available on the GPIO pin 25, and DAC2 on pin 26.
 
-    pub use super::*;
-    use crate::impl_dac;
-
-    impl_dac!(1 => Gpio25, 2 => Gpio26,);
+    impl_dac!(1 => Gpio25, 2 => Gpio26);
 }
 
 #[cfg(esp32s2)]
@@ -164,12 +149,9 @@ pub mod implementation {
     //! Digital to analog (DAC) conversion.
     //!
     //! This module provides functions for controlling two digital to
-    //! analog converters, available on ESP32: `DAC1` and `DAC2`.
+    //! analog converters, available on ESP32-S2: `DAC1` and `DAC2`.
     //!
     //! The DAC1 is available on the GPIO pin 17, and DAC2 on pin 18.
 
-    pub use super::*;
-    use crate::impl_dac;
-
-    impl_dac!(1 => Gpio17, 2 => Gpio18,);
+    impl_dac!(1 => Gpio17, 2 => Gpio18);
 }
