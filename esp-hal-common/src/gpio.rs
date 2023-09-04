@@ -1636,12 +1636,16 @@ macro_rules! analog {
 
 #[cfg(lp_io)]
 pub mod lp_gpio {
-    pub struct LowPowerPin<const PIN: u8> {
-        pub(crate) private: PhantomData<()>,
+    use core::marker::PhantomData;
+
+    use super::{Floating, Input, Output, PullDown, PullUp, PushPull, Unknown};
+
+    pub struct LowPowerPin<MODE, const PIN: u8> {
+        pub(crate) private: PhantomData<MODE>,
     }
 
-    impl<const PIN: u8> LowPowerPin<PIN> {
-        pub fn output_enable(&mut self, enable: bool) {
+    impl<MODE, const PIN: u8> LowPowerPin<MODE, PIN> {
+        pub fn output_enable(&self, enable: bool) {
             let lp_io = unsafe { &*crate::peripherals::LP_IO::PTR };
             if enable {
                 lp_io
@@ -1654,15 +1658,15 @@ pub mod lp_gpio {
             }
         }
 
-        pub fn input_enable(&mut self, enable: bool) {
+        fn input_enable(&self, enable: bool) {
             get_pin_reg(PIN).modify(|_, w| w.lp_gpio0_fun_ie().bit(enable));
         }
 
-        pub fn pullup_enable(&mut self, enable: bool) {
+        fn pullup_enable(&self, enable: bool) {
             get_pin_reg(PIN).modify(|_, w| w.lp_gpio0_fun_wpu().bit(enable));
         }
 
-        pub fn pulldown_enable(&mut self, enable: bool) {
+        fn pulldown_enable(&self, enable: bool) {
             get_pin_reg(PIN).modify(|_, w| w.lp_gpio0_fun_wpd().bit(enable));
         }
 
@@ -1682,6 +1686,40 @@ pub mod lp_gpio {
         pub fn get_level(&self) -> bool {
             let lp_io = unsafe { &*crate::peripherals::LP_IO::PTR };
             (lp_io.in_.read().lp_gpio_in_data_next().bits() & 1 << PIN) != 0
+        }
+
+        pub fn into_pull_up_input(self) -> LowPowerPin<Input<PullUp>, PIN> {
+            self.input_enable(true);
+            self.pullup_enable(true);
+            self.pulldown_enable(false);
+            LowPowerPin {
+                private: PhantomData::default(),
+            }
+        }
+
+        pub fn into_pull_down_input(self) -> LowPowerPin<Input<PullDown>, PIN> {
+            self.input_enable(true);
+            self.pullup_enable(false);
+            self.pulldown_enable(true);
+            LowPowerPin {
+                private: PhantomData::default(),
+            }
+        }
+
+        pub fn into_floating_input(self) -> LowPowerPin<Input<Floating>, PIN> {
+            self.input_enable(true);
+            self.pullup_enable(false);
+            self.pulldown_enable(false);
+            LowPowerPin {
+                private: PhantomData::default(),
+            }
+        }
+
+        pub fn into_push_pull_output(self) -> LowPowerPin<Output<PushPull>, PIN> {
+            self.output_enable(true);
+            LowPowerPin {
+                private: PhantomData::default(),
+            }
         }
     }
 
@@ -1705,7 +1743,7 @@ pub mod lp_gpio {
     }
 
     pub trait IntoLowPowerPin<const PIN: u8> {
-        fn into_low_power(self) -> LowPowerPin<{ PIN }>;
+        fn into_low_power(self) -> LowPowerPin<Unknown, { PIN }>;
     }
 
     #[doc(hidden)]
@@ -1717,7 +1755,7 @@ pub mod lp_gpio {
             paste::paste!{
                 $(
                     impl<MODE> crate::gpio::lp_gpio::IntoLowPowerPin<$gpionum> for GpioPin<MODE, $gpionum> {
-                        fn into_low_power(self) -> crate::gpio::lp_gpio::LowPowerPin<$gpionum> {
+                        fn into_low_power(self) -> crate::gpio::lp_gpio::LowPowerPin<Unknown, $gpionum> {
                             crate::gpio::lp_gpio::init_low_power_pin($gpionum);
                             crate::gpio::lp_gpio::LowPowerPin {
                                 private: core::marker::PhantomData::default(),
@@ -1728,8 +1766,6 @@ pub mod lp_gpio {
             }
         }
     }
-
-    use core::marker::PhantomData;
 
     pub(crate) use lp_gpio;
 }

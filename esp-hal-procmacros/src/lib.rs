@@ -48,6 +48,7 @@
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 
 use darling::{ast::NestedMeta, FromMeta};
+use object::{ObjectSection, ObjectSymbol};
 use proc_macro::{self, Span, TokenStream};
 use proc_macro_error::{abort, proc_macro_error};
 use quote::quote;
@@ -510,6 +511,149 @@ pub fn make_gpio_enum_dispatch_macro(input: TokenStream) -> TokenStream {
         }
 
         pub(crate) use #macro_name;
+    }
+    .into()
+}
+
+#[cfg(feature = "esp32c6")]
+#[proc_macro]
+pub fn load_lp_code(input: TokenStream) -> TokenStream {
+    use object::Object;
+    use proc_macro_crate::{crate_name, FoundCrate};
+
+    #[cfg(feature = "esp32c6")]
+    let hal_crate = crate_name("esp32c6-hal");
+
+    #[cfg(feature = "esp32c6")]
+    let hal_crate_name = Ident::new("esp32c6_hal", Span::call_site().into());
+
+    let hal_crate = match hal_crate {
+        Ok(FoundCrate::Itself) => {
+            quote!( #hal_crate_name )
+        }
+        Ok(FoundCrate::Name(ref name)) => {
+            let ident = Ident::new(&name, Span::call_site().into());
+            quote!( #ident )
+        }
+        Err(_) => {
+            quote!(crate)
+        }
+    };
+
+    let first_token = match input.into_iter().next() {
+        Some(token) => token,
+        None => {
+            return parse::Error::new(
+                Span::call_site().into(),
+                "You need to give the path to an ELF file",
+            )
+            .to_compile_error()
+            .into();
+        }
+    };
+    let arg = match litrs::StringLit::try_from(&first_token) {
+        Ok(arg) => arg,
+        Err(_) => {
+            return parse::Error::new(
+                Span::call_site().into(),
+                "You need to give the path to an ELF file",
+            )
+            .to_compile_error()
+            .into();
+        }
+    };
+    let elf_file = arg.value();
+
+    if !std::path::Path::new(elf_file).exists() {
+        return parse::Error::new(Span::call_site().into(), "File not found")
+            .to_compile_error()
+            .into();
+    }
+
+    let bin_data = std::fs::read(elf_file).unwrap();
+    let obj_file = object::File::parse(&*bin_data).unwrap();
+    let sections = obj_file.sections();
+
+    let mut sections: Vec<object::Section> = sections
+        .into_iter()
+        .filter(|section| section.address() != 0)
+        .collect();
+    sections.sort_by(|a, b| a.address().partial_cmp(&b.address()).unwrap());
+
+    let mut binary: Vec<u8> = Vec::new();
+    let mut last_address = 0x50_000_000;
+
+    for section in sections {
+        if section.address() > last_address {
+            for _ in 0..(section.address() - last_address) {
+                binary.push(0);
+            }
+        }
+
+        binary.extend_from_slice(section.data().unwrap());
+        last_address = section.address() + section.size();
+    }
+
+    let magic_symbol = obj_file
+        .symbols()
+        .find(|s| s.name().unwrap().starts_with("__ULP_MAGIC_"));
+
+    if let None = magic_symbol {
+        return parse::Error::new(
+            Span::call_site().into(),
+            "Given file doesn't seem to be an LP core application.",
+        )
+        .to_compile_error()
+        .into();
+    }
+
+    let magic_symbol = magic_symbol.unwrap().name().unwrap();
+
+    let magic_symbol = magic_symbol.trim_start_matches("__ULP_MAGIC_");
+    let args: Vec<proc_macro2::TokenStream> = magic_symbol
+        .split("$")
+        .into_iter()
+        .map(|t| {
+            let t = t.replace("GpioPin", "LowPowerPin");
+            t.parse().unwrap()
+        })
+        .filter(|v: &proc_macro2::TokenStream| !v.is_empty())
+        .collect();
+
+    quote! {
+        {
+            use #hal_crate::lp_core::LpCore;
+            use #hal_crate::lp_core::LpCoreWakeupSource;
+            use #hal_crate::gpio::lp_gpio::LowPowerPin;
+            use #hal_crate::gpio::*;
+
+            struct LpCoreCode {
+            }
+
+            static LP_CODE: &[u8] = &[#(#binary),*];
+
+            extern "C" {
+                static _rtc_fast_data_start: u32;
+            }
+
+            unsafe {
+                core::ptr::copy_nonoverlapping(LP_CODE as *const _ as *const u8, &_rtc_fast_data_start as *const u32 as *mut u8, LP_CODE.len());
+            }
+
+            impl LpCoreCode {
+                pub fn run(
+                        &self,
+                        lp_core: &mut LpCore,
+                        wakeup_source: LpCoreWakeupSource,
+                        #(_: #args),*
+                    ) {
+                    lp_core.run(wakeup_source);
+                }
+            }
+
+            LpCoreCode {
+            }
+        }
     }
     .into()
 }

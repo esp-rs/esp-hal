@@ -12,4 +12,4 @@ pub use embedded_hal::{
     },
     prelude::*,
 };
-pub use riscv_rt_macros::entry;
+pub use esp32c6_lp_hal_procmacros::entry;
