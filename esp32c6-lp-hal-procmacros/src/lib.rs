@@ -29,6 +29,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
 
     let mut argument_types = Vec::new();
 
+    let mut used_pins: Vec<u8> = Vec::new();
     for arg in &f.sig.inputs {
         match arg {
             FnArg::Receiver(_) => {
@@ -37,6 +38,19 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
                     .into();
             }
             FnArg::Typed(t) => {
+                if get_simplename(&t.ty) != "GpioPin" {
+                    return parse::Error::new(arg.span(), "invalid argument to main")
+                        .to_compile_error()
+                        .into();
+                }
+                let pin = extract_pin(&t.ty);
+                if used_pins.contains(&pin) {
+                    return parse::Error::new(arg.span(), "duplicate pin")
+                        .to_compile_error()
+                        .into();
+                }
+                used_pins.push(pin);
+
                 argument_types.push(t);
             }
         }
@@ -114,5 +128,42 @@ fn to_string(t: &syn::Type) -> String {
         }
         _ => (),
     }
+    res
+}
+
+fn get_simplename(t: &syn::Type) -> String {
+    String::from(match t {
+        syn::Type::Path(p) => String::from(&p.path.segments.last().unwrap().ident.to_string()),
+        _ => String::new(),
+    })
+}
+
+fn extract_pin(t: &syn::Type) -> u8 {
+    let mut res = 255u8;
+
+    match t {
+        syn::Type::Path(p) => {
+            let segment = p.path.segments.last().unwrap();
+            match &segment.arguments {
+                syn::PathArguments::None => (),
+                syn::PathArguments::Parenthesized(_) => (),
+                syn::PathArguments::AngleBracketed(g) => {
+                    for arg in &g.args {
+                        match arg {
+                            syn::GenericArgument::Type(t) => {
+                                res = extract_pin(t);
+                            }
+                            syn::GenericArgument::Const(c) => {
+                                res = (&quote! { #c }.to_string()).parse().unwrap();
+                            }
+                            _ => (),
+                        }
+                    }
+                }
+            }
+        }
+        _ => (),
+    }
+
     res
 }
