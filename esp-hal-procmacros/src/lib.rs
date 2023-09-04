@@ -520,6 +520,7 @@ pub fn make_gpio_enum_dispatch_macro(input: TokenStream) -> TokenStream {
 pub fn load_lp_code(input: TokenStream) -> TokenStream {
     use object::Object;
     use proc_macro_crate::{crate_name, FoundCrate};
+    #[cfg(not(feature = "interrupt"))]
     use syn::{parse, Ident};
 
     #[cfg(feature = "esp32c6")]
