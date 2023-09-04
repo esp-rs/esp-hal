@@ -65,11 +65,10 @@ impl Executor {
     /// Create a new Executor.
     pub fn new() -> Self {
         #[cfg(multi_core)]
-        interrupt::enable(
+        unwrap!(interrupt::enable(
             peripherals::Interrupt::FROM_CPU_INTR0,
             interrupt::Priority::Priority1,
-        )
-        .unwrap();
+        ));
 
         Self {
             inner: raw::Executor::new(usize::from_le_bytes([0, get_core() as u8, 0, 0]) as *mut ()),

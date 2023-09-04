@@ -105,6 +105,7 @@ The **M**inimum **S**upported **R**ust **V**ersions are:
   - This corresponds to the date that the `1.65.0` release was branched from `master`
 - `1.65.0` for Xtensa devices (**ESP32**, **ESP32-S2**, **ESP32-S3**)
 - `1.67.0` for all `async` examples (`embassy_hello_world`, `embassy_wait`, etc.)
+- latest `stable` when using the `defmt` feature
 
 It should be noted that targeting the Xtensa ISA currently requires the use of the [esp-rs/rust] compiler fork. Our recommend method of installation is [espup].
 

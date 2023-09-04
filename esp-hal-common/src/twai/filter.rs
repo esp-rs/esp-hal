@@ -41,7 +41,7 @@ macro_rules! set_bit_from_byte {
                 $mask |= 1 << $shift;
             }
             b'x' => {}
-            _ => panic!("BitFilter bits must be either '1', '0' or 'x'."),
+            _ => ::core::panic!("BitFilter bits must be either '1', '0' or 'x'."),
         }
     };
 }

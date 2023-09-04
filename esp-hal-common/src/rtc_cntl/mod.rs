@@ -964,7 +964,7 @@ pub fn get_reset_reason(cpu: Cpu) -> Option<SocResetReason> {
 }
 
 pub fn get_wakeup_cause() -> SleepSource {
-    if get_reset_reason(Cpu::ProCpu).unwrap() != SocResetReason::CoreDeepSleep {
+    if get_reset_reason(Cpu::ProCpu) != Some(SocResetReason::CoreDeepSleep) {
         return SleepSource::Undefined;
     }
 

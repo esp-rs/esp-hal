@@ -43,10 +43,10 @@ macro_rules! from_cpu {
                 fn enable(priority: interrupt::Priority) {
                     let mask = 1 << $irq;
                     if FROM_CPU_IRQ_USED.fetch_or(mask, Ordering::SeqCst) & mask != 0 {
-                        panic!(concat!("FROM_CPU_", $irq, " is already used by a different executor."));
+                        panic!("FROM_CPU_{} is already used by a different executor.", $irq);
                     }
 
-                    interrupt::enable(peripherals::Interrupt::[<FROM_CPU_INTR $irq>], priority).unwrap();
+                    unwrap!(interrupt::enable(peripherals::Interrupt::[<FROM_CPU_INTR $irq>], priority));
                 }
 
                 fn number() -> usize {

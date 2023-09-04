@@ -39,9 +39,9 @@ embedded-hal-1     = { version = "=1.0.0-rc.1", package = "embedded-hal" }
 embedded-hal-async = "=1.0.0-rc.1"
 embedded-io-async  = "0.5.0"
 esp-alloc          = "0.3.0"
-esp-backtrace      = { version = "0.7.0", features = ["esp32", "panic-handler", "exception-handler", "print-uart"] }
+esp-backtrace      = { version = "0.8.0", features = ["esp32", "panic-handler", "exception-handler", "print-uart"] }
 esp-hal-smartled   = { version = "0.4.0", features = ["esp32"], path = "../esp-hal-smartled" }
-esp-println        = { version = "0.5.0", features = ["esp32", "log"] }
+esp-println        = { version = "0.6.0", features = ["esp32", "log"] }
 heapless           = "0.7.16"
 lis3dh-async       = { git = "https://github.com/jessebraham/lis3dh-rs-async", branch = "feature/eh-rc1" }
 sha2               = { version = "0.10.7", default-features = false}
@@ -70,6 +70,9 @@ psram     = []
 psram_2m  = ["esp-hal-common/psram_2m", "psram"]
 psram_4m  = ["esp-hal-common/psram_4m", "psram"]
 psram_8m  = ["esp-hal-common/psram_8m", "psram"]
+
+log = ["esp-hal-common/log"]
+defmt = ["esp-hal-common/defmt"]
 
 [profile.release]
 debug = true

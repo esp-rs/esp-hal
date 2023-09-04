@@ -59,9 +59,15 @@ impl EmbassyTimer {
 
         timer.set_counter_active(true);
 
-        interrupt::enable(peripherals::Interrupt::TG0_T0_LEVEL, Priority::max()).unwrap();
+        unwrap!(interrupt::enable(
+            peripherals::Interrupt::TG0_T0_LEVEL,
+            Priority::max()
+        ));
         #[cfg(any(esp32, esp32s2, esp32s3))]
-        interrupt::enable(peripherals::Interrupt::TG0_T1_LEVEL, Priority::max()).unwrap();
+        unwrap!(interrupt::enable(
+            peripherals::Interrupt::TG0_T1_LEVEL,
+            Priority::max()
+        ));
 
         #[interrupt]
         fn TG0_T0_LEVEL() {

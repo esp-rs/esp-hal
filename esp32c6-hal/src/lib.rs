@@ -10,6 +10,7 @@
 //! - `async` - Enable support for asynchronous operation, with interfaces
 //!   provided by [embedded-hal-async] and [embedded-io-async]
 //! - `debug` - Enable debug features in the HAL (used for development)
+//! - `defmt` - Enable [`defmt::Format`] on certain types
 //! - `direct-boot` - Use the direct boot image format
 //! - `direct-vectoring` - Enable direct vector table hooking support
 //! - `eh1` - Implement the traits defined in the `1.0.0-xxx` pre-releases of
@@ -21,6 +22,7 @@
 //! - `embassy-time-timg0` - Enable the [embassy] time driver using the `TIMG0`
 //!   peripheral
 //! - `interrupt-preemption` - Enable priority-based interrupt preemption
+//! - `log` - enable log output using the `log` crate
 //! - `rt` - Runtime support
 //! - `ufmt` - Implement the [`ufmt_write::uWrite`] trait for the UART and USB
 //!   Serial JTAG drivers
@@ -37,6 +39,7 @@
 //! [embedded-io]: https://github.com/rust-embedded/embedded-hal/tree/master/embedded-io
 //! [embassy]: https://github.com/embassy-rs/embassy
 //! [`ufmt_write::uWrite`]: https://docs.rs/ufmt-write/latest/ufmt_write/trait.uWrite.html
+//! [`defmt::Format`]: https://docs.rs/defmt/0.3.5/defmt/trait.Format.html
 //!
 //! ### Supported Image Formats
 //!

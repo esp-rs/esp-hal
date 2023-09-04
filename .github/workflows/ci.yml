@@ -80,7 +80,10 @@ jobs:
       # Subsequent steps can just check the examples instead, as we're already
       # confident that they link.
       - name: check esp32-hal (common features)
-        run: cd esp32-hal/ && cargo check --examples --features=eh1,ufmt
+        run: |
+          cd esp32-hal/
+          cargo check --examples --features=eh1,ufmt,log
+          cargo check --examples --features=eh1,ufmt,defmt
       - name: check esp32-hal (embassy)
         run: |
           cd esp32-hal/
@@ -88,6 +91,8 @@ jobs:
           cargo check --example=embassy_multicore --features=embassy,embassy-time-timg0,embassy-executor-thread
           cargo check --example=embassy_multicore_interrupt --features=embassy,embassy-time-timg0,embassy-executor-interrupt
           cargo check --example=embassy_multiprio --features=embassy,embassy-time-timg0,embassy-executor-interrupt
+          cargo check --examples --features=embassy,embassy-time-timg0,embassy-executor-interrupt,embassy-executor-thread,defmt
+          cargo check --examples --features=embassy,embassy-time-timg0,embassy-executor-interrupt,embassy-executor-thread,log
       - name: check esp32-hal (embassy, async)
         run: |
           cd esp32-hal/
@@ -95,6 +100,11 @@ jobs:
           cargo check --example=embassy_spi --features=embassy,embassy-time-timg0,async,embassy-executor-thread
           cargo check --example=embassy_serial --features=embassy,embassy-time-timg0,async,embassy-executor-thread
           cargo check --example=embassy_i2c --features=embassy,embassy-time-timg0,async,embassy-executor-thread
+      - name: check esp32-hal (embassy, log/defmt)
+        run: |
+          cd esp32-hal/
+          cargo check --examples --features=embassy,embassy-time-timg0,embassy-executor-interrupt,embassy-executor-thread,defmt
+          cargo check --examples --features=embassy,embassy-time-timg0,embassy-executor-interrupt,embassy-executor-thread,log
       # Ensure documentation can be built
       - name: rustdoc
         run: cd esp32-hal/ && cargo doc --features=eh1
@@ -122,7 +132,10 @@ jobs:
       # Subsequent steps can just check the examples instead, as we're already
       # confident that they link.
       - name: check esp32c2-hal (common features)
-        run: cd esp32c2-hal/ && cargo +nightly check --examples --features=eh1,ufmt
+        run: |
+          cd esp32c2-hal/
+          cargo +nightly check --examples --features=eh1,ufmt,log
+          cargo +nightly check --examples --features=eh1,ufmt,defmt
       - name: check esp32c2-hal (async, systick)
         run: cd esp32c2-hal/ && cargo +nightly check --example=embassy_hello_world --features=embassy,embassy-time-systick
       - name: check esp32c2-hal (async, timg0)
@@ -139,6 +152,11 @@ jobs:
         run: cd esp32c2-hal/ && cargo check --example=interrupt_preemption --features=interrupt-preemption
       - name: check esp32c2-hal (direct-vectoring)
         run: cd esp32c2-hal/ && cargo check --example=direct-vectoring --features=direct-vectoring
+      - name: check esp32c2-hal (embassy, log/defmt)
+        run: |
+          cd esp32c2-hal/
+          cargo +nightly check --examples --features=embassy,embassy-time-timg0,defmt
+          cargo +nightly check --examples --features=embassy,embassy-time-timg0,log
       # Ensure documentation can be built
       - name: rustdoc
         run: cd esp32c2-hal/ && cargo doc --features=eh1
@@ -168,7 +186,10 @@ jobs:
       # Subsequent steps can just check the examples instead, as we're already
       # confident that they link.
       - name: check esp32c3-hal (common features)
-        run: cd esp32c3-hal/ && cargo +nightly check --examples --features=eh1,ufmt
+        run: |
+          cd esp32c3-hal/
+          cargo +nightly check --examples --features=eh1,ufmt,log
+          cargo +nightly check --examples --features=eh1,ufmt,defmt
       - name: check esp32c3-hal (async, systick)
         run: cd esp32c3-hal/ && cargo +nightly check --example=embassy_hello_world --features=embassy,embassy-time-systick
       - name: check esp32c3-hal (async, timg0)
@@ -185,6 +206,11 @@ jobs:
         run: cd esp32c3-hal/ && cargo check --example=interrupt_preemption --features=interrupt-preemption
       - name: check esp32c3-hal (direct-vectoring)
         run: cd esp32c3-hal/ && cargo check --example=direct-vectoring --features=direct-vectoring
+      - name: check esp32c3-hal (embassy, log/defmt)
+        run: |
+          cd esp32c3-hal/
+          cargo +nightly check --examples --features=embassy,embassy-time-timg0,defmt
+          cargo +nightly check --examples --features=embassy,embassy-time-timg0,log
       # Ensure documentation can be built
       - name: rustdoc
         run: cd esp32c3-hal/ && cargo doc --features=eh1
@@ -212,7 +238,10 @@ jobs:
       # Subsequent steps can just check the examples instead, as we're already
       # confident that they link.
       - name: check esp32c6-hal (common features)
-        run: cd esp32c6-hal/ && cargo +nightly check --examples --features=eh1,ufmt
+        run: |
+          cd esp32c6-hal/
+          cargo +nightly check --examples --features=eh1,ufmt,log
+          cargo +nightly check --examples --features=eh1,ufmt,defmt
       - name: check esp32c6-hal (async, systick)
         run: cd esp32c6-hal/ && cargo +nightly check --example=embassy_hello_world --features=embassy,embassy-time-systick
       - name: check esp32c6-hal (async, timg0)
@@ -229,6 +258,11 @@ jobs:
         run: cd esp32c6-hal/ && cargo check --example=interrupt_preemption --features=interrupt-preemption
       - name: check esp32c6-hal (direct-vectoring)
         run: cd esp32c6-hal/ && cargo check --example=direct-vectoring --features=direct-vectoring
+      - name: check esp32c6-hal (embassy, log/defmt)
+        run: |
+          cd esp32c6-hal/
+          cargo +nightly check --examples --features=embassy,embassy-time-timg0,defmt
+          cargo +nightly check --examples --features=embassy,embassy-time-timg0,log
       # Ensure documentation can be built
       - name: rustdoc
         run: cd esp32c6-hal/ && cargo doc --features=eh1
@@ -276,7 +310,10 @@ jobs:
       # Subsequent steps can just check the examples instead, as we're already
       # confident that they link.
       - name: check esp32h2-hal (common features)
-        run: cd esp32h2-hal/ && cargo +nightly check --examples --features=eh1,ufmt
+        run: |
+          cd esp32h2-hal/
+          cargo +nightly check --examples --features=eh1,ufmt,log
+          cargo +nightly check --examples --features=eh1,ufmt,defmt
       - name: check esp32h2-hal (async, systick)
         run: cd esp32h2-hal/ && cargo +nightly check --example=embassy_hello_world --features=embassy,embassy-time-systick
       - name: check esp32h2-hal (async, timg0)
@@ -293,6 +330,11 @@ jobs:
         run: cd esp32h2-hal/ && cargo check --example=interrupt_preemption --features=interrupt-preemption
       - name: check esp32h2-hal (direct-vectoring)
         run: cd esp32h2-hal/ && cargo check --example=direct-vectoring --features=direct-vectoring
+      - name: check esp32h2-hal (embassy, log/defmt)
+        run: |
+          cd esp32h2-hal/
+          cargo +nightly check --examples --features=embassy,embassy-time-timg0,defmt
+          cargo +nightly check --examples --features=embassy,embassy-time-timg0,log
       # Ensure documentation can be built
       - name: rustdoc
         run: cd esp32h2-hal/ && cargo doc --features=eh1
@@ -316,7 +358,10 @@ jobs:
       # Subsequent steps can just check the examples instead, as we're already
       # confident that they link.
       - name: check esp32s2-hal (common features)
-        run: cd esp32s2-hal/ && cargo check --examples --features=eh1,ufmt
+        run: |
+          cd esp32s2-hal/
+          cargo check --examples --features=eh1,ufmt,log
+          cargo check --examples --features=eh1,ufmt,defmt
       # FIXME: `time-systick` feature disabled for now, see 'esp32s2-hal/Cargo.toml'.
       # - name: check esp32s2-hal (async, systick)
       #   run: cd esp32s2-hal/ && cargo check --example=embassy_hello_world --features=embassy,embassy-time-systick,executor
@@ -332,6 +377,11 @@ jobs:
           cargo check --example=embassy_spi --features=embassy,embassy-time-timg0,async,embassy-executor-thread
           cargo check --example=embassy_serial --features=embassy,embassy-time-timg0,async,embassy-executor-thread
           cargo check --example=embassy_i2c --features=embassy,embassy-time-timg0,async,embassy-executor-thread
+      - name: check esp32s2-hal (embassy, log/defmt)
+        run: |
+          cd esp32s2-hal/
+          cargo check --examples --features=embassy,embassy-time-timg0,embassy-executor-interrupt,embassy-executor-thread,defmt
+          cargo check --examples --features=embassy,embassy-time-timg0,embassy-executor-interrupt,embassy-executor-thread,log
       # Ensure documentation can be built
       - name: rustdoc
         run: cd esp32s2-hal/ && cargo doc --features=eh1
@@ -359,7 +409,10 @@ jobs:
       # Subsequent steps can just check the examples instead, as we're already
       # confident that they link.
       - name: check esp32s3-hal (common features)
-        run: cd esp32s3-hal/ && cargo check --examples --features=eh1,ufmt
+        run: |
+          cd esp32s3-hal/
+          cargo check --examples --features=eh1,ufmt,log
+          cargo check --examples --features=eh1,ufmt,defmt
       - name: check esp32s3-hal (embassy, timg0)
         run: |
           cd esp32s3-hal/
@@ -390,6 +443,11 @@ jobs:
           cargo check --example=embassy_i2c --features=embassy,embassy-time-systick,async,embassy-executor-thread
       - name: check esp32s3-hal (octal psram)
         run: cd esp32s3-hal/ && cargo check --example=octal_psram --features=opsram_2m --release # This example requires release!
+      - name: check esp32s3-hal (embassy, log/defmt)
+        run: |
+          cd esp32s3-hal/
+          cargo check --examples --features=embassy,embassy-time-timg0,embassy-executor-interrupt,embassy-executor-thread,defmt
+          cargo check --examples --features=embassy,embassy-time-timg0,embassy-executor-interrupt,embassy-executor-thread,log
       # Ensure documentation can be built
       - name: rustdoc
         run: cd esp32s3-hal/ && cargo doc --features=eh1
@@ -431,15 +489,15 @@ jobs:
 
       # Verify the MSRV for all RISC-V chips.
       - name: msrv (esp32c2-hal)
-        run: cd esp32c2-hal/ && cargo check --features=eh1,ufmt
+        run: cd esp32c2-hal/ && cargo check --features=eh1,ufmt,log
       - name: msrv (esp32c3-hal)
-        run: cd esp32c3-hal/ && cargo check --features=eh1,ufmt
+        run: cd esp32c3-hal/ && cargo check --features=eh1,ufmt,log
       - name: msrv (esp32c6-hal)
-        run: cd esp32c6-hal/ && cargo check --features=eh1,ufmt
+        run: cd esp32c6-hal/ && cargo check --features=eh1,ufmt,log
       - name: msrv (esp32c6-lp-hal)
         run: cd esp32c6-lp-hal/ && cargo check
       - name: msrv (esp32h2-hal)
-        run: cd esp32h2-hal/ && cargo check --features=eh1,ufmt
+        run: cd esp32h2-hal/ && cargo check --features=eh1,ufmt,log
 
   msrv-xtensa:
     runs-on: ubuntu-latest
@@ -454,11 +512,11 @@ jobs:
 
       # Verify the MSRV for all Xtensa chips.
       - name: msrv (esp32-hal)
-        run: cd esp32-hal/ && cargo check --features=eh1,ufmt
+        run: cd esp32-hal/ && cargo check --features=eh1,ufmt,log
       - name: msrv (esp32s2-hal)
-        run: cd esp32s2-hal/ && cargo check --features=eh1,ufmt
+        run: cd esp32s2-hal/ && cargo check --features=eh1,ufmt,log
       - name: msrv (esp32s3-hal)
-        run: cd esp32s3-hal/ && cargo check --features=eh1,ufmt
+        run: cd esp32s3-hal/ && cargo check --features=eh1,ufmt,log
 
   # --------------------------------------------------------------------------
   # Lint

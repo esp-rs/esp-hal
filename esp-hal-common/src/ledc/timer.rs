@@ -248,7 +248,7 @@ impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
     #[cfg(esp32)]
     /// Configure the HW for the timer
     fn configure_hw(&self, divisor: u32) {
-        let duty = self.duty.unwrap() as u8;
+        let duty = unwrap!(self.duty) as u8;
         let use_apb = !self.use_ref_tick;
 
         match self.number {
@@ -306,7 +306,7 @@ impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
     #[cfg(not(esp32))]
     /// Configure the HW for the timer
     fn configure_hw(&self, divisor: u32) {
-        let duty = self.duty.unwrap() as u8;
+        let duty = unwrap!(self.duty) as u8;
         let use_ref_tick = self.use_ref_tick;
 
         match self.number {
@@ -397,7 +397,7 @@ impl<'a> TimerHW<HighSpeed> for Timer<'a, HighSpeed> {
 
     /// Configure the HW for the timer
     fn configure_hw(&self, divisor: u32) {
-        let duty = self.duty.unwrap() as u8;
+        let duty = unwrap!(self.duty) as u8;
         let sel_hstimer = self.clock_source == Some(HSClockSource::APBClk);
 
         match self.number {

@@ -12,6 +12,7 @@ use crate::{
 /// `level1_interrupt`)
 #[allow(unused)]
 #[derive(Debug, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(u32)]
 pub enum CpuInterrupt {
     Interrupt0LevelPriority1 = 0,
@@ -193,12 +194,14 @@ mod vectored {
     use crate::get_core;
 
     #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     pub enum Error {
         InvalidInterrupt,
     }
 
     /// Interrupt priority levels.
     #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     #[repr(u8)]
     pub enum Priority {
         None = 0,

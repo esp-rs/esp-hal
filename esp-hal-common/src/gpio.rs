@@ -1851,7 +1851,7 @@ mod asynch {
             }
         };
 
-        log::trace!(
+        trace!(
             "Handling interrupt on {:?} - {:064b}",
             crate::get_core(),
             intrs

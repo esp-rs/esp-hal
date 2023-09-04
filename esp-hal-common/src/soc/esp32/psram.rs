@@ -281,6 +281,7 @@ pub(crate) mod utils {
     }
 
     #[derive(PartialEq, Eq, Debug, Default)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     struct PsramIo {
         flash_clk_io: u8,
         flash_cs_io: u8,
@@ -392,7 +393,7 @@ pub(crate) mod utils {
             // EFUSE_SPICONFIG_RET_SPIHD(spiconfig);
             // psram_io.psram_spiwp_sd3_io = bootloader_flash_get_wp_pin();
         }
-        log::info!("PS-RAM pins {:?}", &psram_io);
+        info!("PS-RAM pins {:?}", &psram_io);
 
         write_peri_reg(SPI0_EXT3_REG, 0x1);
         clear_peri_reg_mask(SPI1_USER_REG, SPI_USR_PREP_HOLD_M);
@@ -469,7 +470,7 @@ pub(crate) mod utils {
         psram_set_cs_timing_spi0(mode, clk_mode); // SPI_CACHE_PORT
         psram_enable_qio_mode_spi1(clk_mode, mode);
 
-        log::info!(
+        info!(
             "PS-RAM vaddrmode = {:?}",
             PsramVaddrMode::PsramVaddrModeLowhigh
         );
@@ -484,6 +485,7 @@ pub(crate) mod utils {
 
     #[allow(unused)]
     #[derive(Debug, Clone, Copy, PartialEq)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     enum PsramVaddrMode {
         /// App and pro CPU use their own flash cache for external RAM access
         PsramVaddrModeNormal = 0,
@@ -502,11 +504,9 @@ pub(crate) mod utils {
         clk_mode: PsramClkMode,
         extra_dummy: u32,
     ) {
-        log::info!(
+        info!(
             "PS-RAM cache_init, psram_cache_mode={:?}, extra_dummy={}, clk_mode={:?}",
-            psram_cache_mode,
-            extra_dummy,
-            clk_mode
+            psram_cache_mode, extra_dummy, clk_mode
         );
         match psram_cache_mode {
             PsramCacheSpeed::PsramCacheF80mS80m => {
@@ -1262,7 +1262,7 @@ pub(crate) mod utils {
         gpio_hal_iomux_func_sel(gpio_pin_mux_reg(psram_io.psram_spiwp_sd3_io), PIN_FUNC_GPIO);
 
         let flash_id: u32 = unsafe { g_rom_flashchip.device_id };
-        log::info!("Flash-ID = {}", flash_id);
+        info!("Flash-ID = {}", flash_id);
 
         if flash_id == FLASH_ID_GD25LQ32C {
             // Set drive ability for 1.8v flash in 80Mhz.
