@@ -99,7 +99,7 @@ impl WifiMode {
     }
 }
 
-const DATA_FRAMES_MAX_COUNT: usize = RX_QUEUE_SIZE + RX_QUEUE_SIZE;
+const DATA_FRAMES_MAX_COUNT: usize = RX_QUEUE_SIZE + TX_QUEUE_SIZE;
 const DATA_FRAME_SIZE: usize = MTU + ETHERNET_FRAME_HEADER_SIZE;
 
 static mut DATA_FRAME_BACKING_MEMORY: MaybeUninit<[u8; DATA_FRAMES_MAX_COUNT * DATA_FRAME_SIZE]> =
@@ -108,7 +108,7 @@ static mut DATA_FRAME_BACKING_MEMORY: MaybeUninit<[u8; DATA_FRAMES_MAX_COUNT * D
 static DATA_FRAME_BACKING_MEMORY_FREE_SLOTS: Mutex<RefCell<Vec<usize, DATA_FRAMES_MAX_COUNT>>> =
     Mutex::new(RefCell::new(Vec::new()));
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub(crate) struct DataFrame {
     len: usize,
     index: usize,
@@ -138,33 +138,44 @@ impl DataFrame {
     }
 
     pub(crate) fn free(self) {
-        critical_section::with(|cs| {
-            let mut free_slots = DATA_FRAME_BACKING_MEMORY_FREE_SLOTS.borrow_ref_mut(cs);
-            unwrap!(free_slots.push(self.index));
-        });
+        // Drop impl will free up the frame
     }
 
-    pub(crate) fn data_mut(&mut self) -> &mut [u8] {
+    fn data_mut(&mut self) -> &mut [u8] {
         let data = unsafe { DATA_FRAME_BACKING_MEMORY.assume_init_mut() };
         &mut data[(self.index * DATA_FRAME_SIZE)..][..DATA_FRAME_SIZE]
     }
 
-    pub(crate) fn from_bytes(bytes: &[u8]) -> Option<DataFrame> {
-        let mut data = DataFrame::new()?;
-        data.len = bytes.len();
-        let mem = unsafe { DATA_FRAME_BACKING_MEMORY.assume_init_mut() };
-        let len = usize::min(bytes.len(), DATA_FRAME_SIZE);
-        if len != bytes.len() {
+    pub(crate) fn from_bytes(mut bytes: &[u8]) -> Option<DataFrame> {
+        if bytes.len() > DATA_FRAME_SIZE {
             warn!("Trying to store more data than available into DataFrame. Check MTU");
+            bytes = &bytes[..DATA_FRAME_SIZE];
         }
 
-        mem[(data.index * DATA_FRAME_SIZE)..][..len].copy_from_slice(bytes);
+        let mut data = DataFrame::new()?;
+        data.len = bytes.len();
+        data.slice_mut().copy_from_slice(bytes);
+
         Some(data)
     }
 
     pub(crate) fn slice(&self) -> &[u8] {
         let data = unsafe { DATA_FRAME_BACKING_MEMORY.assume_init_ref() };
         &data[(self.index * DATA_FRAME_SIZE)..][..self.len]
+    }
+
+    pub(crate) fn slice_mut(&mut self) -> &mut [u8] {
+        let len = self.len;
+        &mut self.data_mut()[..len]
+    }
+}
+
+impl Drop for DataFrame {
+    fn drop(&mut self) {
+        critical_section::with(|cs| {
+            let mut free_slots = DATA_FRAME_BACKING_MEMORY_FREE_SLOTS.borrow_ref_mut(cs);
+            unwrap!(free_slots.push(self.index));
+        });
     }
 }
 
@@ -655,25 +666,22 @@ unsafe extern "C" fn recv_cb(
     eb: *mut crate::binary::c_types::c_void,
 ) -> esp_err_t {
     let src = core::slice::from_raw_parts_mut(buffer as *mut u8, len as usize);
-    let packet = if let Some(packet) = DataFrame::from_bytes(src) {
-        packet
-    } else {
-        return esp_wifi_sys::include::ESP_ERR_NO_MEM as esp_err_t;
-    };
 
     let res = critical_section::with(|cs| {
         let mut queue = DATA_QUEUE_RX.borrow_ref_mut(cs);
-        if !queue.is_full() {
+        if queue.is_full() {
+            error!("RX QUEUE FULL");
+            esp_wifi_sys::include::ESP_ERR_NO_MEM as esp_err_t
+        } else if let Some(packet) = DataFrame::from_bytes(src) {
             unwrap!(queue.enqueue(packet));
 
             #[cfg(feature = "embassy-net")]
             embassy::RECEIVE_WAKER.wake();
 
-            0
+            esp_wifi_sys::include::ESP_OK as esp_err_t
         } else {
-            packet.free();
-            error!("RX QUEUE FULL");
-            1
+            error!("No free DataFrame");
+            esp_wifi_sys::include::ESP_ERR_NO_MEM as esp_err_t
         }
     });
 
@@ -1031,8 +1039,7 @@ impl RxToken for WifiRxToken {
                 queue.dequeue(),
                 "unreachable: transmit()/receive() ensures there is a packet to process"
             );
-            let len = data.len;
-            let buffer = &mut data.data_mut()[..len];
+            let buffer = data.slice_mut();
             dump_packet_info(&buffer);
             let res = f(buffer);
             data.free();
@@ -1054,7 +1061,7 @@ impl TxToken for WifiTxToken {
 
             let mut packet = unwrap!(DataFrame::new(), "unreachable: transmit()/receive() ensures there is a buffer free (which means we also have free buffer space)");
             packet.len = len;
-            let res = f(&mut packet.data_mut()[..len]);
+            let res = f(packet.slice_mut());
             unwrap!(
                 queue.enqueue(packet),
                 "unreachable: transmit()/receive() ensures there is a buffer free"
@@ -1081,22 +1088,21 @@ pub fn send_data_if_needed() {
             wifi_mode_t_WIFI_MODE_AP | wifi_mode_t_WIFI_MODE_APSTA
         );
 
+        let interface = if is_ap {
+            wifi_interface_t_WIFI_IF_AP
+        } else {
+            wifi_interface_t_WIFI_IF_STA
+        };
+
         while let Some(mut packet) = queue.dequeue() {
             trace!("sending... {} bytes", packet.len);
             dump_packet_info(packet.slice());
 
-            let interface = if is_ap {
-                wifi_interface_t_WIFI_IF_AP
-            } else {
-                wifi_interface_t_WIFI_IF_STA
-            };
-
             unsafe {
-                let _res = esp_wifi_internal_tx(
-                    interface,
-                    packet.data_mut() as *const _ as *mut crate::binary::c_types::c_void,
-                    packet.len as u16,
-                );
+                let len = packet.len as u16;
+                let ptr = packet.slice_mut().as_mut_ptr().cast();
+
+                let _res = esp_wifi_internal_tx(interface, ptr, len);
                 if _res != 0 {
                     warn!("esp_wifi_internal_tx {}", _res);
                 }
@@ -1347,8 +1353,7 @@ pub(crate) mod embassy {
                     queue.dequeue(),
                     "unreachable: transmit()/receive() ensures there is a packet to process"
                 );
-                let len = data.len;
-                let buffer = &mut data.data_mut()[..len];
+                let buffer = data.slice_mut();
                 dump_packet_info(&buffer);
                 let res = f(buffer);
                 data.free();
@@ -1371,7 +1376,7 @@ pub(crate) mod embassy {
                 );
 
                 packet.len = len;
-                let res = f(&mut packet.data_mut()[..len]);
+                let res = f(packet.slice_mut());
                 unwrap!(
                     queue.enqueue(packet),
                     "unreachable: transmit()/receive() ensures there is a buffer free"
