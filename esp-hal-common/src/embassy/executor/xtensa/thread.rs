@@ -37,13 +37,6 @@ fn FROM_CPU_INTR0() {
 }
 
 pub(super) fn pend_thread_mode(core: usize) {
-    use core::sync::atomic::Ordering;
-
-    #[cfg(dport)]
-    use crate::peripherals::DPORT as SystemPeripheral;
-    #[cfg(system)]
-    use crate::peripherals::SYSTEM as SystemPeripheral;
-
     // Signal that there is work to be done.
     SIGNAL_WORK_THREAD_MODE[core].store(true, Ordering::SeqCst);
 

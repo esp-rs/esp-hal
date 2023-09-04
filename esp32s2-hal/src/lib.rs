@@ -14,6 +14,8 @@
 //!   [embedded-hal], [embedded-hal-nb], and [embedded-io]
 //! - `embassy` - Enable support for [embassy], a modern asynchronous embedded
 //!   framework
+//! - `embassy-executor-interrupt` - Use the interrupt-mode embassy executor
+//! - `embassy-executor-thread` - Use the thread-mode embassy executor
 //! - `embassy-time-timg0` - Enable the [embassy] time driver using the `TIMG0`
 //!   peripheral
 //! - `psram_2m` - Use externally connected PSRAM (2MB)

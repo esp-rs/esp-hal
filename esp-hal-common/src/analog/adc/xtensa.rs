@@ -2,10 +2,10 @@ use core::marker::PhantomData;
 
 use embedded_hal::adc::{Channel, OneShot};
 
+pub use crate::analog::{ADC1, ADC2};
 #[cfg(esp32s3)]
 use crate::efuse::Efuse;
 use crate::{
-    analog::{ADC1, ADC2},
     peripheral::PeripheralRef,
     peripherals::{APB_SARADC, SENS},
 };
@@ -733,15 +733,13 @@ where
     }
 }
 
-#[doc(hidden)]
-#[macro_export]
 macro_rules! impl_adc_interface {
     ($adc:ident [
         $( ($pin:ident, $channel:expr) ,)+
     ]) => {
 
         $(
-            impl Channel<$adc> for $pin<Analog> {
+            impl embedded_hal::adc::Channel<$adc> for crate::gpio::$pin<crate::gpio::Analog> {
                 type ID = u8;
 
                 fn channel() -> u8 { $channel }
@@ -750,10 +748,10 @@ macro_rules! impl_adc_interface {
     }
 }
 
-pub use impl_adc_interface;
+pub use implementation::*;
 
 #[cfg(esp32s3)]
-pub mod implementation {
+mod implementation {
     //! # Analog to digital (ADC) conversion support.
     //!
     //! ## Overview
@@ -787,11 +785,7 @@ pub mod implementation {
     //! }
     //! ```
 
-    use embedded_hal::adc::Channel;
-
-    use super::impl_adc_interface;
-    pub use crate::analog::{adc::*, ADC1, ADC2};
-    use crate::gpio::*;
+    use crate::analog::{ADC1, ADC2};
 
     impl_adc_interface! {
         ADC1 [
@@ -825,7 +819,7 @@ pub mod implementation {
 }
 
 #[cfg(esp32s2)]
-pub mod implementation {
+mod implementation {
     //! # Analog to digital (ADC) conversion support.
     //!
     //! ## Overview
@@ -859,11 +853,7 @@ pub mod implementation {
     //! }
     //! ```
 
-    use embedded_hal::adc::Channel;
-
-    use super::impl_adc_interface;
-    pub use crate::analog::{adc::*, ADC1, ADC2};
-    use crate::gpio::*;
+    use crate::analog::{ADC1, ADC2};
 
     impl_adc_interface! {
         ADC1 [
