@@ -6,7 +6,6 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 defmt = { workspace = true, optional = true }
-embedded-hal.workspace = true
 esp32c3-hal = { workspace = true, optional = true }
 esp32c2-hal = { workspace = true, optional = true }
 esp32c6-hal = { workspace = true, optional = true }
