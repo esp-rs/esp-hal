@@ -41,7 +41,7 @@ fn main() -> ! {
     lp_core_code.run(&mut lp_core, lp_core::LpCoreWakeupSource::HpCpu, lp_pin);
     println!("lpcore run");
 
-    let data = (0x500000c0) as *mut u32;
+    let data = (0x5000_2000) as *mut u32;
     loop {
         print!("Current {:x}           \u{000d}", unsafe {
             data.read_volatile()

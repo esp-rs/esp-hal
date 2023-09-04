@@ -76,9 +76,43 @@ fn make_magic_symbol_name(args: &Vec<&PatType>) -> String {
 
     for &a in args {
         let t = &a.ty;
-        let foo = quote! { #t }.to_string();
-        res.push_str(&foo);
+        let quoted = to_string(&t);
+        res.push_str(&quoted);
         res.push_str("$");
+    }
+    res
+}
+
+// this is a specialized implementation - won't fit other use-cases
+fn to_string(t: &syn::Type) -> String {
+    let mut res = String::new();
+
+    match t {
+        syn::Type::Path(p) => {
+            let segment = p.path.segments.last().unwrap();
+            res.push_str(&segment.ident.to_string());
+            match &segment.arguments {
+                syn::PathArguments::None => (),
+                syn::PathArguments::Parenthesized(_) => (),
+                syn::PathArguments::AngleBracketed(g) => {
+                    res.push_str("<");
+                    for arg in &g.args {
+                        match arg {
+                            syn::GenericArgument::Type(t) => {
+                                res.push_str(&to_string(t));
+                            }
+                            syn::GenericArgument::Const(c) => {
+                                res.push_str(",");
+                                res.push_str(&quote! { #c }.to_string());
+                            }
+                            _ => (),
+                        }
+                    }
+                    res.push_str(">");
+                }
+            }
+        }
+        _ => (),
     }
     res
 }
