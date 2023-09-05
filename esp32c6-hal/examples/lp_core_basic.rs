@@ -33,9 +33,7 @@ fn main() -> ! {
     println!("lp core stopped");
 
     // load code to LP core
-    let lp_core_code = load_lp_code!(
-        "../esp32c6-lp-hal/target/riscv32imac-unknown-none-elf/release/examples/blinky"
-    );
+    let lp_core_code = load_lp_code!("./examples/assets/lp_blinky.elf");
 
     // start LP core
     lp_core_code.run(&mut lp_core, lp_core::LpCoreWakeupSource::HpCpu, lp_pin);
