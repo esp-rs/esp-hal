@@ -48,7 +48,6 @@
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 
 use darling::{ast::NestedMeta, FromMeta};
-use object::{ObjectSection, ObjectSymbol};
 use proc_macro::{self, Span, TokenStream};
 use proc_macro_error::{abort, proc_macro_error};
 use quote::quote;
@@ -518,7 +517,7 @@ pub fn make_gpio_enum_dispatch_macro(input: TokenStream) -> TokenStream {
 #[cfg(feature = "esp32c6")]
 #[proc_macro]
 pub fn load_lp_code(input: TokenStream) -> TokenStream {
-    use object::Object;
+    use object::{Object, ObjectSection, ObjectSymbol};
     use proc_macro_crate::{crate_name, FoundCrate};
     #[cfg(not(feature = "interrupt"))]
     use syn::{parse, Ident};
