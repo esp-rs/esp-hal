@@ -11,15 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add the `esp32c6-lp-hal` package (#714)
-- Add GPIO (output) and delay functionality to `esp32c6-lp-hal` (#715)
 - Implement RTCIO pullup, pulldown and hold control for Xtensa MCUs (#684)
-- Add GPIO input support and implement additional `embedded-hal` output traits for the C6's LP core [#720]
 - S3: Implement RTCIO wakeup source (#690)
-- Add PARL_IO TX driver for ESP32-C6 / ESP32-H2 (#733)
+- Add PARL_IO driver for ESP32-C6 / ESP32-H2 (#733, #760)
 - Implement `ufmt_write::uWrite` trait for USB Serial JTAG (#751)
 - Add HMAC peripheral support (#755)
-- Add PARL_IO RX driver for ESP32-C6 / ESP32-H2 (#760)
 - Add multicore-aware embassy executor for Xtensa MCUs (#723, #756).
 - Add interrupt-executor for Xtensa MCUs (#723, #756).
 - Add missing `Into<Gpio<Analog, GPIONUN>>` conversion (#764)
