@@ -13,8 +13,7 @@ use embassy_executor::Executor;
 use embassy_time::{with_timeout, Duration};
 use esp32c2_hal::{
     clock::ClockControl,
-    embassy,
-    interrupt,
+    embassy, interrupt,
     peripherals::{Interrupt, Peripherals, UART0},
     prelude::*,
     Uart,
