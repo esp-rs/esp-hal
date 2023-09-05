@@ -12,7 +12,7 @@ pub unsafe fn conjour<MODE, const PIN: u8>() -> Option<GpioPin<MODE, PIN>> {
         None
     } else {
         Some(GpioPin {
-            phantom: PhantomData::default(),
+            phantom: PhantomData,
         })
     }
 }
