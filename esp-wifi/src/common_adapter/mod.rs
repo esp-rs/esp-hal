@@ -6,18 +6,7 @@ use crate::trace;
 
 use crate::compat::common::*;
 
-#[cfg(esp32)]
-use esp32_hal as hal;
-#[cfg(esp32c2)]
-use esp32c2_hal as hal;
-#[cfg(esp32c3)]
-use esp32c3_hal as hal;
-#[cfg(esp32c6)]
-use esp32c6_hal as hal;
-#[cfg(esp32s2)]
-use esp32s2_hal as hal;
-#[cfg(esp32s3)]
-use esp32s3_hal as hal;
+use crate::hal;
 
 use hal::system::RadioClockControl;
 use hal::Rng;

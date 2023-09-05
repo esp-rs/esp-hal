@@ -1,3 +1,4 @@
+use crate::hal::{peripherals, riscv};
 use crate::{panic, trace};
 
 pub(crate) fn chip_ints_on(mask: u32) {
@@ -9,7 +10,7 @@ pub(crate) fn chip_ints_on(mask: u32) {
     trace!("ints_on n={}", cpuint);
 
     unsafe {
-        (*esp32c2::INTERRUPT_CORE0::PTR)
+        (*peripherals::INTERRUPT_CORE0::PTR)
             .cpu_int_enable
             .modify(|r, w| w.bits(r.bits() | 1 << cpuint));
     }
@@ -18,12 +19,12 @@ pub(crate) fn chip_ints_on(mask: u32) {
 pub(crate) unsafe extern "C" fn wifi_int_disable(
     wifi_int_mux: *mut crate::binary::c_types::c_void,
 ) -> u32 {
-    let res = if esp32c2_hal::riscv::register::mstatus::read().mie() {
+    let res = if riscv::register::mstatus::read().mie() {
         1
     } else {
         0
     };
-    esp32c2_hal::riscv::interrupt::disable();
+    riscv::interrupt::disable();
 
     trace!(
         "wifi_int_disable wifi_int_mux {:?} - return {}",
@@ -45,7 +46,7 @@ pub(crate) unsafe extern "C" fn wifi_int_restore(
     );
 
     if tmp == 1 {
-        esp32c2_hal::riscv::interrupt::enable();
+        riscv::interrupt::enable();
     }
 }
 

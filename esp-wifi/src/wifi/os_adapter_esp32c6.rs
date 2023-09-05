@@ -1,5 +1,5 @@
+use crate::hal::{peripherals, riscv};
 use crate::{panic, trace};
-use esp32c6_hal::riscv;
 
 pub(crate) fn chip_ints_on(mask: u32) {
     let cpuint = match mask {
@@ -10,7 +10,7 @@ pub(crate) fn chip_ints_on(mask: u32) {
     trace!("ints_on n={}", cpuint);
 
     unsafe {
-        (*esp32c6::INTPRI::PTR)
+        (*peripherals::INTPRI::PTR)
             .cpu_int_enable
             .modify(|r, w| w.bits(r.bits() | 1 << cpuint));
     }

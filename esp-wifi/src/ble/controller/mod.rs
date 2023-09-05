@@ -2,21 +2,24 @@ use embedded_io::{
     blocking::{Read, Write},
     Error, Io,
 };
-use esp_hal_common::peripheral::{Peripheral, PeripheralRef};
 
+use crate::hal::{
+    peripheral::{Peripheral, PeripheralRef},
+    radio,
+};
 use crate::panic;
 use crate::EspWifiInitialization;
 
 use super::{read_hci, read_next, send_hci};
 
 pub struct BleConnector<'d> {
-    _device: PeripheralRef<'d, esp_hal_common::radio::Bluetooth>,
+    _device: PeripheralRef<'d, radio::Bluetooth>,
 }
 
 impl<'d> BleConnector<'d> {
     pub fn new(
         init: &EspWifiInitialization,
-        device: impl Peripheral<P = esp_hal_common::radio::Bluetooth> + 'd,
+        device: impl Peripheral<P = radio::Bluetooth> + 'd,
     ) -> BleConnector<'d> {
         if !init.is_ble() {
             panic!("Not initialized for BLE use");
@@ -89,10 +92,10 @@ pub mod asynch {
 
     use super::BleConnectorError;
     use super::{read_hci, send_hci};
+    use crate::hal::peripheral::{Peripheral, PeripheralRef};
     use embassy_sync::waitqueue::AtomicWaker;
     use embedded_io::asynch;
     use embedded_io::Io;
-    use esp_hal_common::peripheral::{Peripheral, PeripheralRef};
 
     static HCI_WAKER: AtomicWaker = AtomicWaker::new();
 
@@ -101,13 +104,13 @@ pub mod asynch {
     }
 
     pub struct BleConnector<'d> {
-        _device: PeripheralRef<'d, esp_hal_common::radio::Bluetooth>,
+        _device: PeripheralRef<'d, crate::hal::radio::Bluetooth>,
     }
 
     impl<'d> BleConnector<'d> {
         pub fn new(
             init: &EspWifiInitialization,
-            device: impl Peripheral<P = esp_hal_common::radio::Bluetooth> + 'd,
+            device: impl Peripheral<P = crate::hal::radio::Bluetooth> + 'd,
         ) -> BleConnector<'d> {
             if !init.is_ble() {
                 panic!("Not initialized for BLE use");

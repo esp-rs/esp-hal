@@ -29,8 +29,8 @@ use esp32s2_hal as hal;
 #[cfg(esp32s3)]
 use esp32s3_hal as hal;
 
-use crate::hal::system::RadioClockController;
 use common_adapter::init_radio_clock_control;
+use hal::system::RadioClockController;
 
 use fugit::MegahertzU32;
 use hal::clock::Clocks;

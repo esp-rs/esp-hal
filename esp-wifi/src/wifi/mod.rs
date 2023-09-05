@@ -4,16 +4,17 @@ pub mod os_adapter;
 use core::{cell::RefCell, mem::MaybeUninit};
 
 use crate::common_adapter::*;
+use crate::esp_wifi_result;
+use crate::hal::macros::ram;
+use crate::hal::peripheral::Peripheral;
+use crate::hal::peripheral::PeripheralRef;
 use crate::EspWifiInitialization;
 use crate::{debug, error, info, panic, trace, unwrap, warn};
 
-use crate::esp_wifi_result;
 use critical_section::Mutex;
 use embedded_svc::wifi::{AccessPointInfo, AuthMethod, Protocol, SecondaryChannel, Wifi};
 use enumset::EnumSet;
 use enumset::EnumSetType;
-use esp_hal_common::peripheral::Peripheral;
-use esp_hal_common::peripheral::PeripheralRef;
 use esp_wifi_sys::include::esp_interface_t_ESP_IF_WIFI_AP;
 use esp_wifi_sys::include::esp_wifi_disconnect;
 use esp_wifi_sys::include::esp_wifi_get_mode;
@@ -43,21 +44,6 @@ use smoltcp::phy::{Device, DeviceCapabilities, RxToken, TxToken};
 const ETHERNET_FRAME_HEADER_SIZE: usize = 18;
 
 const MTU: usize = crate::CONFIG.mtu;
-
-#[cfg(esp32)]
-use esp32_hal as hal;
-#[cfg(esp32c2)]
-use esp32c2_hal as hal;
-#[cfg(esp32c3)]
-use esp32c3_hal as hal;
-#[cfg(esp32c6)]
-use esp32c6_hal as hal;
-#[cfg(esp32s2)]
-use esp32s2_hal as hal;
-#[cfg(esp32s3)]
-use esp32s3_hal as hal;
-
-use hal::macros::ram;
 
 #[cfg(feature = "utils")]
 pub mod utils;
@@ -764,14 +750,14 @@ pub fn wifi_start_scan(block: bool) -> i32 {
 
 pub fn new_with_config<'d>(
     inited: &EspWifiInitialization,
-    device: impl Peripheral<P = esp_hal_common::radio::Wifi> + 'd,
+    device: impl Peripheral<P = crate::hal::radio::Wifi> + 'd,
     config: embedded_svc::wifi::Configuration,
 ) -> Result<(WifiDevice<'d>, WifiController<'d>), WifiError> {
     if !inited.is_wifi() {
         return Err(WifiError::NotInitialized);
     }
 
-    esp_hal_common::into_ref!(device);
+    crate::hal::into_ref!(device);
     match config {
         embedded_svc::wifi::Configuration::None => panic!(),
         embedded_svc::wifi::Configuration::Client(_) => (),
@@ -787,7 +773,7 @@ pub fn new_with_config<'d>(
 
 pub fn new_with_mode<'d>(
     inited: &EspWifiInitialization,
-    device: impl Peripheral<P = esp_hal_common::radio::Wifi> + 'd,
+    device: impl Peripheral<P = crate::hal::radio::Wifi> + 'd,
     mode: WifiMode,
 ) -> Result<(WifiDevice<'d>, WifiController<'d>), WifiError> {
     new_with_config(
@@ -802,18 +788,18 @@ pub fn new_with_mode<'d>(
 
 pub fn new<'d>(
     inited: &EspWifiInitialization,
-    device: impl Peripheral<P = esp_hal_common::radio::Wifi> + 'd,
+    device: impl Peripheral<P = crate::hal::radio::Wifi> + 'd,
 ) -> Result<(WifiDevice<'d>, WifiController<'d>), WifiError> {
     new_with_config(&inited, device, Default::default())
 }
 
 /// A wifi device implementing smoltcp's Device trait.
 pub struct WifiDevice<'d> {
-    _device: PeripheralRef<'d, esp_hal_common::radio::Wifi>,
+    _device: PeripheralRef<'d, crate::hal::radio::Wifi>,
 }
 
 impl<'d> WifiDevice<'d> {
-    pub(crate) fn new(_device: PeripheralRef<'d, esp_hal_common::radio::Wifi>) -> WifiDevice {
+    pub(crate) fn new(_device: PeripheralRef<'d, crate::hal::radio::Wifi>) -> WifiDevice {
         Self { _device }
     }
 
@@ -884,13 +870,13 @@ fn convert_ap_info(record: &crate::binary::include::wifi_ap_record_t) -> AccessP
 
 /// A wifi controller implementing embedded_svc::Wifi traits
 pub struct WifiController<'d> {
-    _device: PeripheralRef<'d, esp_hal_common::radio::Wifi>,
+    _device: PeripheralRef<'d, crate::hal::radio::Wifi>,
     config: embedded_svc::wifi::Configuration,
 }
 
 impl<'d> WifiController<'d> {
     pub(crate) fn new_with_config(
-        _device: PeripheralRef<'d, esp_hal_common::radio::Wifi>,
+        _device: PeripheralRef<'d, crate::hal::radio::Wifi>,
         config: embedded_svc::wifi::Configuration,
     ) -> Result<Self, WifiError> {
         let mut this = Self {

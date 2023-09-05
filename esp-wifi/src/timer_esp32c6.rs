@@ -1,12 +1,12 @@
 use core::cell::RefCell;
 
 use critical_section::Mutex;
-use esp32c6 as pac;
-use esp32c6_hal as hal;
-use esp32c6_hal::prelude::*;
-use esp32c6_hal::trapframe::TrapFrame;
-use hal::peripherals::Interrupt;
-use hal::systimer::{Alarm, Periodic, Target};
+
+use crate::hal::interrupt::{self, TrapFrame};
+use crate::hal::peripherals::{self, Interrupt};
+use crate::hal::prelude::*;
+use crate::hal::riscv;
+use crate::hal::systimer::{Alarm, Periodic, Target};
 
 use crate::{binary, preempt::preempt::task_switch};
 use crate::{trace, unwrap};
@@ -27,26 +27,26 @@ pub fn setup_timer_isr(systimer: Alarm<Target, 0>) {
 
     critical_section::with(|cs| ALARM0.borrow_ref_mut(cs).replace(alarm0));
 
-    unwrap!(esp32c6_hal::interrupt::enable(
+    unwrap!(interrupt::enable(
         Interrupt::SYSTIMER_TARGET0,
-        hal::interrupt::Priority::Priority1,
+        interrupt::Priority::Priority1,
     ));
 
     #[cfg(feature = "wifi")]
-    unwrap!(esp32c6_hal::interrupt::enable(
+    unwrap!(interrupt::enable(
         Interrupt::WIFI_MAC,
-        hal::interrupt::Priority::Priority1
+        interrupt::Priority::Priority1
     ));
 
     #[cfg(feature = "wifi")]
-    unwrap!(esp32c6_hal::interrupt::enable(
+    unwrap!(interrupt::enable(
         Interrupt::WIFI_PWR,
-        hal::interrupt::Priority::Priority1
+        interrupt::Priority::Priority1
     ));
 
     // make sure to disable WIFI_BB/MODEM_PERI_TIMEOUT by mapping it to CPU interrupt 31 which is masked by default
     // for some reason for this interrupt, mapping it to 0 doesn't deactivate it
-    let interrupt_core0 = unsafe { &*esp32c6::INTERRUPT_CORE0::PTR };
+    let interrupt_core0 = unsafe { &*peripherals::INTERRUPT_CORE0::PTR };
     interrupt_core0
         .wifi_bb_intr_map
         .write(|w| w.wifi_bb_intr_map().variant(31));
@@ -56,27 +56,27 @@ pub fn setup_timer_isr(systimer: Alarm<Target, 0>) {
 
     #[cfg(feature = "ble")]
     {
-        unwrap!(esp32c6_hal::interrupt::enable(
+        unwrap!(interrupt::enable(
             Interrupt::RWBT,
-            hal::interrupt::Priority::Priority1
+            interrupt::Priority::Priority1
         ));
-        unwrap!(esp32c6_hal::interrupt::enable(
+        unwrap!(interrupt::enable(
             Interrupt::RWBLE,
-            hal::interrupt::Priority::Priority1
+            interrupt::Priority::Priority1
         ));
-        unwrap!(esp32c6_hal::interrupt::enable(
+        unwrap!(interrupt::enable(
             Interrupt::BT_BB,
-            hal::interrupt::Priority::Priority1
+            interrupt::Priority::Priority1
         ));
     }
 
-    unwrap!(esp32c6_hal::interrupt::enable(
+    unwrap!(interrupt::enable(
         Interrupt::FROM_CPU_INTR3,
-        hal::interrupt::Priority::Priority1,
+        interrupt::Priority::Priority1,
     ));
 
     unsafe {
-        esp32c6_hal::riscv::interrupt::enable();
+        riscv::interrupt::enable();
     }
 
     while unsafe { crate::preempt::FIRST_SWITCH.load(core::sync::atomic::Ordering::Relaxed) } {}
@@ -120,7 +120,7 @@ fn WIFI_PWR() {
 #[interrupt]
 fn RWBT() {
     unsafe {
-        let intr = &*pac::INTERRUPT_CORE0::ptr();
+        let intr = &*peripherals::INTERRUPT_CORE0::ptr();
         intr.cpu_int_clear.write(|w| w.bits(1 << 1));
 
         let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::BT_INTERRUPT_FUNCTION5;
@@ -140,7 +140,7 @@ fn RWBT() {
 #[interrupt]
 fn RWBLE() {
     unsafe {
-        let intr = &*pac::INTERRUPT_CORE0::ptr();
+        let intr = &*peripherals::INTERRUPT_CORE0::ptr();
         intr.cpu_int_clear.write(|w| w.bits(1 << 1));
 
         let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::BT_INTERRUPT_FUNCTION5;
@@ -160,7 +160,7 @@ fn RWBLE() {
 #[interrupt]
 fn BT_BB(_trap_frame: &mut TrapFrame) {
     unsafe {
-        let intr = &*pac::INTERRUPT_CORE0::ptr();
+        let intr = &*peripherals::INTERRUPT_CORE0::ptr();
         intr.cpu_int_clear.write(|w| w.bits(1 << 1));
 
         let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::BT_INTERRUPT_FUNCTION8;
@@ -190,7 +190,7 @@ fn SYSTIMER_TARGET0(trap_frame: &mut TrapFrame) {
 fn FROM_CPU_INTR3(trap_frame: &mut TrapFrame) {
     unsafe {
         // clear FROM_CPU_INTR3
-        (&*pac::INTPRI::PTR)
+        (&*peripherals::INTPRI::PTR)
             .cpu_intr_from_cpu_3
             .modify(|_, w| w.cpu_intr_from_cpu_3().clear_bit());
     }
@@ -208,7 +208,7 @@ fn FROM_CPU_INTR3(trap_frame: &mut TrapFrame) {
 
 pub fn yield_task() {
     unsafe {
-        (&*pac::INTPRI::PTR)
+        (&*peripherals::INTPRI::PTR)
             .cpu_intr_from_cpu_3
             .modify(|_, w| w.cpu_intr_from_cpu_3().set_bit());
     }
@@ -218,7 +218,7 @@ pub fn yield_task() {
 /// A tick is 1 / 16_000_000 seconds
 pub fn get_systimer_count() -> u64 {
     critical_section::with(|_| unsafe {
-        let systimer = &(*pac::SYSTIMER::ptr());
+        let systimer = &(*peripherals::SYSTIMER::ptr());
 
         systimer.unit0_op.write(|w| w.bits(1 << 30));
 
