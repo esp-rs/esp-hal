@@ -1,5 +1,4 @@
 use crate::hal::{peripherals, riscv};
-use crate::{panic, trace};
 
 pub(crate) fn chip_ints_on(mask: u32) {
     let cpuint = match mask {

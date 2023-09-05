@@ -3,7 +3,6 @@ use crate::binary::include::*;
 use crate::common_adapter::RADIO_CLOCKS;
 use crate::hal::system::RadioClockController;
 use crate::hal::system::RadioPeripherals;
-use crate::{trace, unwrap};
 use atomic_polyfill::AtomicU32;
 use esp32_hal::prelude::ram;
 

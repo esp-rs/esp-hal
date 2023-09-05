@@ -186,7 +186,7 @@ pub fn task_switch(trap_frame: &mut TrapFrame) {
         //         CNT += 1;
         //     } else {
         //         CNT = 0;
-        //         crate::info!("@@@ Task {} PC = {:x} {:?}", CTX_NOW, new_pc, trap_frame);
+        //         info!("@@@ Task {} PC = {:x} {:?}", CTX_NOW, new_pc, trap_frame);
         //     }
         // }
     }

@@ -17,8 +17,6 @@ use crate::EspWifiInitialization;
 
 use crate::binary::include::*;
 
-use crate::unwrap;
-
 /// Maximum payload length
 pub const ESP_NOW_MAX_DATA_LEN: usize = 250;
 

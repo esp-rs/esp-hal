@@ -5,6 +5,9 @@
 #![cfg_attr(feature = "async", feature(async_fn_in_trait))]
 #![cfg_attr(feature = "async", allow(incomplete_features))]
 
+// MUST be the first module
+mod fmt;
+
 use core::cell::RefCell;
 use core::mem::MaybeUninit;
 
@@ -76,10 +79,6 @@ pub(crate) mod common_adapter;
 
 #[doc(hidden)]
 pub mod tasks;
-
-mod log_macros;
-
-pub use log_macros::panic;
 
 pub(crate) mod memory_fence;
 

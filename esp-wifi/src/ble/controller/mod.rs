@@ -7,7 +7,6 @@ use crate::hal::{
     peripheral::{Peripheral, PeripheralRef},
     radio,
 };
-use crate::panic;
 use crate::EspWifiInitialization;
 
 use super::{read_hci, read_next, send_hci};

@@ -3,7 +3,6 @@ use crate::binary::include::*;
 use crate::common_adapter::RADIO_CLOCKS;
 use crate::hal::system::RadioClockController;
 use crate::hal::system::RadioPeripherals;
-use crate::{trace, unwrap};
 use atomic_polyfill::AtomicU32;
 
 const SOC_PHY_DIG_REGS_MEM_SIZE: usize = 21 * 4;

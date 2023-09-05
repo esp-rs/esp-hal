@@ -9,7 +9,6 @@ use crate::hal::riscv;
 use crate::hal::systimer::{Alarm, Periodic, Target};
 
 use crate::{binary, preempt::preempt::task_switch};
-use crate::{trace, unwrap};
 
 pub const TICKS_PER_SECOND: u64 = 16_000_000;
 

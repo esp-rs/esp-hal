@@ -1,7 +1,6 @@
 use core::alloc::Layout;
 
 use crate::HEAP;
-use crate::{trace, warn};
 
 pub unsafe extern "C" fn malloc(size: u32) -> *const u8 {
     trace!("alloc {}", size);

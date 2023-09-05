@@ -1,7 +1,6 @@
 #![allow(unused_variables)]
 #![allow(dead_code)]
 #![allow(non_snake_case)]
-use crate::trace;
 
 const DR_REG_DPORT_BASE: u32 = 0x3ff00000;
 const DPORT_WIFI_CLK_EN_REG: u32 = DR_REG_DPORT_BASE + 0x0CC;

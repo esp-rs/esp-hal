@@ -1,6 +1,5 @@
 use core::cell::RefCell;
 
-use crate::{trace, unwrap};
 use atomic_polyfill::{AtomicU64, Ordering};
 use critical_section::Mutex;
 use esp32s2_hal::xtensa_lx;

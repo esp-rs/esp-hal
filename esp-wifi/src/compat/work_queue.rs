@@ -1,5 +1,4 @@
 use super::queue::SimpleQueue;
-use crate::{trace, unwrap};
 
 static mut WORKER_HIGH: Option<
     SimpleQueue<

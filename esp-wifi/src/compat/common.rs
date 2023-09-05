@@ -9,7 +9,6 @@ use crate::{
     preempt::preempt::current_task,
     timer::yield_task,
 };
-use crate::{info, panic, trace, unwrap};
 
 static mut CURR_SEM: [Option<u32>; 20] = [
     None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,

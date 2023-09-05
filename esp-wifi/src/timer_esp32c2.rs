@@ -8,7 +8,6 @@ use crate::hal::systimer::{Alarm, Periodic, Target};
 use critical_section::Mutex;
 
 use crate::{binary, preempt::preempt::task_switch};
-use crate::{trace, unwrap};
 
 pub const TICKS_PER_SECOND: u64 = 16_000_000;
 

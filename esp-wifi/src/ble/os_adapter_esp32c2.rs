@@ -1,7 +1,6 @@
 use crate::binary::include::esp_bt_controller_config_t;
 use crate::common_adapter::RADIO_CLOCKS;
 use crate::hal::system::RadioClockController;
-use crate::{panic, trace, unwrap};
 
 pub(crate) static mut ISR_INTERRUPT_4: (
     *mut crate::binary::c_types::c_void,

@@ -2,7 +2,6 @@ use crate::{
     binary::include::{esp_timer_create_args_t, esp_timer_handle_t},
     memory_fence::memory_fence,
 };
-use crate::{debug, panic, trace, unwrap};
 
 static ESP_FAKE_TIMER: () = ();
 

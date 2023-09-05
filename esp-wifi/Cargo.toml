@@ -70,6 +70,22 @@ ps-min-modem = []
 esp-now = [ "wifi" ]
 big-heap = []
 ipv6 = ["smoltcp?/proto-ipv6"]
-defmt = ["dep:defmt", "smoltcp?/defmt"]
-log-defmt = ["defmt"]
-log = ["dep:log"]
+defmt = [
+  "dep:defmt",
+  "smoltcp?/defmt",
+  "esp32c3-hal?/defmt",
+  "esp32c2-hal?/defmt",
+  "esp32c6-hal?/defmt",
+  "esp32-hal?/defmt",
+  "esp32s2-hal?/defmt",
+  "esp32s3-hal?/defmt",
+]
+log = [
+  "dep:log",
+  "esp32c3-hal?/log",
+  "esp32c2-hal?/log",
+  "esp32c6-hal?/log",
+  "esp32-hal?/log",
+  "esp32s2-hal?/log",
+  "esp32s3-hal?/log",
+]

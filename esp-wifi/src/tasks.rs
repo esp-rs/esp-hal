@@ -1,5 +1,3 @@
-use crate::{debug, trace, unwrap};
-
 use crate::{
     compat::{
         self,

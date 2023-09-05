@@ -11,7 +11,6 @@ use smoltcp::wire::{DnsQueryType, IpAddress, IpCidr, IpEndpoint, Ipv4Address};
 
 use crate::current_millis;
 use crate::wifi::{get_ap_mac, get_sta_mac, WifiDevice, WifiMode};
-use crate::{debug, info, unwrap};
 
 use core::borrow::BorrowMut;
 

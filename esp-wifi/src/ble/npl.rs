@@ -9,7 +9,6 @@ use crate::compat;
 use crate::compat::common::StrBuf;
 use crate::compat::queue::SimpleQueue;
 use crate::timer::yield_task;
-use crate::{debug, info, panic, trace, unwrap, warn};
 
 #[cfg_attr(esp32c2, path = "os_adapter_esp32c2.rs")]
 pub(crate) mod ble_os_adapter_chip_specific;
