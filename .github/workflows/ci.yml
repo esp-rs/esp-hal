@@ -483,21 +483,21 @@ jobs:
       - uses: dtolnay/rust-toolchain@v1
         with:
           target: riscv32imc-unknown-none-elf, riscv32imac-unknown-none-elf
-          toolchain: "nightly-2022-09-16"
+          toolchain: "1.65"
           components: rust-src
       - uses: Swatinem/rust-cache@v2
 
       # Verify the MSRV for all RISC-V chips.
       - name: msrv (esp32c2-hal)
-        run: cd esp32c2-hal/ && cargo check --features=eh1,ufmt,log
+        run: cd esp32c2-hal/ && RUSTC_BOOTSTRAP=1 && cargo check --features=eh1,ufmt,log
       - name: msrv (esp32c3-hal)
-        run: cd esp32c3-hal/ && cargo check --features=eh1,ufmt,log
+        run: cd esp32c3-hal/ && RUSTC_BOOTSTRAP=1 && cargo check --features=eh1,ufmt,log
       - name: msrv (esp32c6-hal)
-        run: cd esp32c6-hal/ && cargo check --features=eh1,ufmt,log
+        run: cd esp32c6-hal/ && RUSTC_BOOTSTRAP=1 && cargo check --features=eh1,ufmt,log
       - name: msrv (esp32c6-lp-hal)
-        run: cd esp32c6-lp-hal/ && cargo check
+        run: cd esp32c6-lp-hal/ && RUSTC_BOOTSTRAP=1 && cargo check
       - name: msrv (esp32h2-hal)
-        run: cd esp32h2-hal/ && cargo check --features=eh1,ufmt,log
+        run: cd esp32h2-hal/ && RUSTC_BOOTSTRAP=1 && cargo check --features=eh1,ufmt,log
 
   msrv-xtensa:
     runs-on: ubuntu-latest
