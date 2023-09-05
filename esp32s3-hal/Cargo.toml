@@ -133,6 +133,10 @@ name              = "embassy_serial"
 required-features = ["embassy", "embassy-executor-thread", "async"]
 
 [[example]]
+name              = "embassy_serial_split"
+required-features = ["embassy", "async"]
+
+[[example]]
 name              = "embassy_i2c"
 required-features = ["embassy", "embassy-executor-thread", "async"]
 
