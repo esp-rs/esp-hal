@@ -48,6 +48,8 @@
 //! }
 //! ```
 
+use core::marker::PhantomData;
+
 use self::config::Config;
 use crate::{
     clock::Clocks,
@@ -56,7 +58,6 @@ use crate::{
     peripherals::uart0::{fifo::FIFO_SPEC, RegisterBlock},
     system::PeripheralClockControl,
 };
-use core::marker::PhantomData;
 
 const UART_FIFO_SIZE: u16 = 128;
 
@@ -110,11 +111,11 @@ pub mod config {
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     pub enum StopBits {
         /// 1 stop bit
-        STOP1 = 1,
+        STOP1   = 1,
         /// 1.5 stop bits
         STOP1P5 = 2,
         /// 2 stop bits
-        STOP2 = 3,
+        STOP2   = 3,
     }
 
     /// UART configuration
@@ -1228,7 +1229,7 @@ where
 
 #[cfg(feature = "async")]
 mod asynch {
-    use core::task::Poll;
+    use core::{marker::PhantomData, task::Poll};
 
     use cfg_if::cfg_if;
     use embassy_futures::select::{select, select3, Either, Either3};
@@ -1238,9 +1239,10 @@ mod asynch {
     use super::{Error, Instance};
     use crate::{
         uart::{RegisterBlock, UART_FIFO_SIZE},
-        Uart, UartRx, UartTx,
+        Uart,
+        UartRx,
+        UartTx,
     };
-    use core::marker::PhantomData;
 
     cfg_if! {
         if #[cfg(all(uart0, uart1, uart2))] {

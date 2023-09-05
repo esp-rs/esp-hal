@@ -77,7 +77,7 @@ pub use self::spi::Spi;
 #[cfg(any(timg0, timg1))]
 pub use self::timer::Timer;
 #[cfg(any(uart0, uart1, uart2))]
-pub use self::uart::{Uart, UartTx, UartRx};
+pub use self::uart::{Uart, UartRx, UartTx};
 #[cfg(usb_device)]
 pub use self::usb_serial_jtag::UsbSerialJtag;
 
