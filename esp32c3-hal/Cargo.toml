@@ -1,6 +1,6 @@
 [package]
 name    = "esp32c3-hal"
-version = "0.11.0"
+version = "0.12.0"
 authors = [
     "Jesse Braham <jesse@beta7.io>",
     "Björn Quentin <bjoern.quentin@mobile-j.de>",
@@ -26,13 +26,13 @@ categories = [
 
 [dependencies]
 cfg-if         = "1.0.0"
-esp-hal-common = { version = "0.11.0", features = ["esp32c3"], path = "../esp-hal-common" }
-embassy-time   = { version = "0.1.3", features = ["nightly"], optional = true }
+esp-hal-common = { version = "0.12.0", features = ["esp32c3"], path = "../esp-hal-common" }
+embassy-time   = { version = "0.1.3",  features = ["nightly"], optional = true }
 
 [dev-dependencies]
 aes                = "0.8.3"
 critical-section   = "1.1.2"
-crypto-bigint      = { version = "0.5.2", default-features = false }
+crypto-bigint      = { version = "0.5.3", default-features = false }
 embassy-executor   = { version = "0.3.0", features = ["nightly", "integrated-timers", "arch-riscv32", "executor-thread"] }
 embedded-can       = "0.4.1"
 embedded-graphics  = "0.8.1"
@@ -41,34 +41,35 @@ embedded-hal-1     = { version = "=1.0.0-rc.1", package = "embedded-hal" }
 embedded-hal-async = "=1.0.0-rc.1"
 embedded-io-async  = "0.5.0"
 esp-backtrace      = { version = "0.8.0", features = ["esp32c3", "panic-handler", "exception-handler", "print-uart"] }
-esp-hal-smartled   = { version = "0.4.0", features = ["esp32c3"], path = "../esp-hal-smartled" }
+esp-hal-smartled   = { version = "0.5.0", features = ["esp32c3"], path = "../esp-hal-smartled" }
 esp-println        = { version = "0.6.0", features = ["esp32c3", "log"] }
 heapless           = "0.7.16"
 hmac               = { version = "0.12.1", default-features = false }
-lis3dh-async       = { git = "https://github.com/jessebraham/lis3dh-rs-async", branch = "feature/eh-rc1" }
+lis3dh-async       = "0.8.0"
 sha2               = { version = "0.10.7", default-features = false }
 smart-leds         = "0.3.0"
-ssd1306            = "0.8.0"
+ssd1306            = "0.8.1"
 static_cell        = { version = "1.2.0", features = ["nightly"] }
 
 [features]
 default              = ["rt", "vectored", "esp-hal-common/rv-zero-rtc-bss"]
+async                = ["esp-hal-common/async"]
 debug                = ["esp-hal-common/debug"]
-mcu-boot             = []
+defmt                = ["esp-hal-common/defmt"]
 direct-boot          = ["esp-hal-common/rv-init-data", "esp-hal-common/rv-init-rtc-data"]
+direct-vectoring     = ["esp-hal-common/direct-vectoring"]
 eh1                  = ["esp-hal-common/eh1"]
+interrupt-preemption = ["esp-hal-common/interrupt-preemption"]
+log                  = ["esp-hal-common/log"]
+mcu-boot             = []
 rt                   = []
 ufmt                 = ["esp-hal-common/ufmt"]
 vectored             = ["esp-hal-common/vectored"]
-async                = ["esp-hal-common/async"]
+
+# Embassy support
 embassy              = ["esp-hal-common/embassy"]
 embassy-time-systick = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-hz-16_000_000"]
 embassy-time-timg0   = ["esp-hal-common/embassy-time-timg0", "embassy-time/tick-hz-1_000_000"]
-interrupt-preemption = ["esp-hal-common/interrupt-preemption"]
-direct-vectoring     = ["esp-hal-common/direct-vectoring"]
-
-log = ["esp-hal-common/log"]
-defmt = ["esp-hal-common/defmt"]
 
 [profile.release]
 debug = true
