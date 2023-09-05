@@ -2078,8 +2078,7 @@ pub unsafe extern "C" fn coex_schm_register_cb_wrapper(
     #[cfg(coex)]
     crate::binary::include::coex_schm_register_callback(
         arg1 as u32,
-        unwrap!(cb) as *const esp_wifi_sys::c_types::c_void
-            as *mut esp_wifi_sys::c_types::c_void,
+        unwrap!(cb) as *const esp_wifi_sys::c_types::c_void as *mut esp_wifi_sys::c_types::c_void,
     )
 }
 

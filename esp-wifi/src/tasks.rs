@@ -85,9 +85,6 @@ pub extern "C" fn worker_task2() {
             trace!("timer callback called");
         }
 
-        #[cfg(feature = "wifi")]
-        crate::wifi::send_data_if_needed();
-
         yield_task();
     }
 }
