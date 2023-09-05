@@ -8,7 +8,7 @@
 #![feature(type_alias_impl_trait)]
 
 use embassy_executor::Executor;
-use esp32s3_hal::{
+use esp32_hal::{
     clock::ClockControl,
     embassy,
     interrupt,
@@ -69,7 +69,7 @@ static EXECUTOR: StaticCell<Executor> = StaticCell::new();
 fn main() -> ! {
     esp_println::println!("Init!");
     let peripherals = Peripherals::take();
-    let mut system = peripherals.SYSTEM.split();
+    let mut system = peripherals.DPORT.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
@@ -87,16 +87,9 @@ fn main() -> ! {
     let mut wdt1 = timer_group1.wdt;
 
     // Disable watchdog timers
-    rtc.swd.disable();
     rtc.rwdt.disable();
     wdt0.disable();
     wdt1.disable();
-
-    #[cfg(feature = "embassy-time-systick")]
-    embassy::init(
-        &clocks,
-        esp32s3_hal::systimer::SystemTimer::new(peripherals.SYSTIMER),
-    );
 
     #[cfg(feature = "embassy-time-timg0")]
     embassy::init(&clocks, timer_group0.timer0);

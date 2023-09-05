@@ -8,15 +8,13 @@
 #![feature(type_alias_impl_trait)]
 
 use embassy_executor::Executor;
-use esp32s3_hal::{
+use esp32c2_hal::{
     clock::ClockControl,
-    embassy,
-    interrupt,
+    embassy, interrupt,
     peripherals::{Interrupt, Peripherals, UART0},
     prelude::*,
     timer::TimerGroup,
-    Rtc,
-    Uart,
+    Rtc, Uart,
 };
 use esp_backtrace as _;
 use esp_hal_common::uart::{config::AtCmdConfig, UartRx, UartTx};
@@ -79,23 +77,16 @@ fn main() -> ! {
         &mut system.peripheral_clock_control,
     );
     let mut wdt0 = timer_group0.wdt;
-    let timer_group1 = TimerGroup::new(
-        peripherals.TIMG1,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
-    let mut wdt1 = timer_group1.wdt;
 
     // Disable watchdog timers
     rtc.swd.disable();
     rtc.rwdt.disable();
     wdt0.disable();
-    wdt1.disable();
 
     #[cfg(feature = "embassy-time-systick")]
     embassy::init(
         &clocks,
-        esp32s3_hal::systimer::SystemTimer::new(peripherals.SYSTIMER),
+        esp32c2_hal::systimer::SystemTimer::new(peripherals.SYSTIMER),
     );
 
     #[cfg(feature = "embassy-time-timg0")]

@@ -8,15 +8,13 @@
 #![feature(type_alias_impl_trait)]
 
 use embassy_executor::Executor;
-use esp32s3_hal::{
+use esp32c3_hal::{
     clock::ClockControl,
-    embassy,
-    interrupt,
+    embassy, interrupt,
     peripherals::{Interrupt, Peripherals, UART0},
     prelude::*,
     timer::TimerGroup,
-    Rtc,
-    Uart,
+    Rtc, Uart,
 };
 use esp_backtrace as _;
 use esp_hal_common::uart::{config::AtCmdConfig, UartRx, UartTx};
@@ -95,7 +93,7 @@ fn main() -> ! {
     #[cfg(feature = "embassy-time-systick")]
     embassy::init(
         &clocks,
-        esp32s3_hal::systimer::SystemTimer::new(peripherals.SYSTIMER),
+        esp32c3_hal::systimer::SystemTimer::new(peripherals.SYSTIMER),
     );
 
     #[cfg(feature = "embassy-time-timg0")]

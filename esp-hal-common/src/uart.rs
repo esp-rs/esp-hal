@@ -1099,7 +1099,7 @@ where
     T: Instance,
 {
     fn read(&mut self) -> nb::Result<u8, Self::Error> {
-        self.rx.read()
+        self.read_byte()
     }
 }
 
@@ -1119,11 +1119,11 @@ where
     T: Instance,
 {
     fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
-        self.tx.write(word)
+        self.write_byte(word)
     }
 
     fn flush(&mut self) -> nb::Result<(), Self::Error> {
-        self.tx.flush()
+        self.flush_tx()
     }
 }
 
@@ -1399,7 +1399,7 @@ mod asynch {
                 }
 
                 offset = next_offset;
-                UartFuture::new(Event::TxFiFoEmpty).await;
+                UartFuture::<T>::new(Event::TxFiFoEmpty).await;
             }
 
             Ok(count)
@@ -1408,7 +1408,7 @@ mod asynch {
         async fn flush_async(&mut self) -> Result<(), Error> {
             let count = T::get_tx_fifo_count();
             if count > 0 {
-                UartFuture::new(Event::TxDone).await;
+                UartFuture::<T>::new(Event::TxDone).await;
             }
 
             Ok(())
@@ -1442,9 +1442,9 @@ mod asynch {
 
             if self.at_cmd_config.is_some() {
                 if let Either3::Third(_) = select3(
-                    UartFuture::new(Event::RxCmdCharDetected),
-                    UartFuture::new(Event::RxFifoFull),
-                    UartFuture::new(Event::RxFifoOvf),
+                    UartFuture::<T>::new(Event::RxCmdCharDetected),
+                    UartFuture::<T>::new(Event::RxFifoFull),
+                    UartFuture::<T>::new(Event::RxFifoOvf),
                 )
                 .await
                 {
@@ -1452,8 +1452,8 @@ mod asynch {
                 }
             } else {
                 if let Either::Second(_) = select(
-                    UartFuture::new(Event::RxFifoFull),
-                    UartFuture::new(Event::RxFifoOvf),
+                    UartFuture::<T>::new(Event::RxFifoFull),
+                    UartFuture::<T>::new(Event::RxFifoOvf),
                 )
                 .await
                 {
@@ -1479,7 +1479,7 @@ mod asynch {
         T: Instance,
     {
         async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-            self.rx.read(buf).await
+            self.read_async(buf).await
         }
     }
 
@@ -1497,11 +1497,11 @@ mod asynch {
         T: Instance,
     {
         async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-            self.tx.write(buf).await
+            self.write_async(buf).await
         }
 
         async fn flush(&mut self) -> Result<(), Self::Error> {
-            self.tx.flush().await
+            self.flush_async().await
         }
     }
 

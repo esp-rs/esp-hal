@@ -99,6 +99,7 @@ jobs:
           cargo check --example=embassy_wait --features=embassy,embassy-time-timg0,async,embassy-executor-thread
           cargo check --example=embassy_spi --features=embassy,embassy-time-timg0,async,embassy-executor-thread
           cargo check --example=embassy_serial --features=embassy,embassy-time-timg0,async,embassy-executor-thread
+          cargo check --example=embassy_serial_split --features=embassy,embassy-time-timg0,async,embassy-executor-thread
           cargo check --example=embassy_i2c --features=embassy,embassy-time-timg0,async,embassy-executor-thread
       - name: check esp32-hal (embassy, log/defmt)
         run: |
@@ -146,6 +147,8 @@ jobs:
         run: cd esp32c2-hal/ && cargo +nightly check --example=embassy_spi --features=embassy,embassy-time-systick,async
       - name: check esp32c2-hal (async, serial)
         run: cd esp32c2-hal/ && cargo +nightly check --example=embassy_serial --features=embassy,embassy-time-systick,async
+      - name: check esp32c2-hal (async, serial, split)
+        run: cd esp32c2-hal/ && cargo +nightly check --example=embassy_serial_split --features=embassy,embassy-time-systick,async
       - name: check esp32c2-hal (async, i2c)
         run: cd esp32c2-hal/ && cargo +nightly check --example=embassy_i2c --features=embassy,embassy-time-systick,async
       - name: check esp32c2-hal (interrupt-preemption)
@@ -200,6 +203,8 @@ jobs:
         run: cd esp32c3-hal/ && cargo +nightly check --example=embassy_spi --features=embassy,embassy-time-systick,async
       - name: check esp32c3-hal (async, serial)
         run: cd esp32c3-hal/ && cargo +nightly check --example=embassy_serial --features=embassy,embassy-time-systick,async
+      - name: check esp32c3-hal (async, serial, split)
+        run: cd esp32c3-hal/ && cargo +nightly check --example=embassy_serial_split --features=embassy,embassy-time-timg0,async
       - name: check esp32c3-hal (async, i2c)
         run: cd esp32c3-hal/ && cargo +nightly check --example=embassy_i2c --features=embassy,embassy-time-systick,async
       - name: check esp32c3-hal (interrupt-preemption)
@@ -257,6 +262,8 @@ jobs:
         run: cd esp32c6-hal/ && cargo +nightly check --example=embassy_spi --features=embassy,embassy-time-systick,async
       - name: check esp32c6-hal (async, serial)
         run: cd esp32c6-hal/ && cargo +nightly check --example=embassy_serial --features=embassy,embassy-time-systick,async
+      - name: check esp32c6-hal (async, serial, split)
+        run: cd esp32c6-hal/ && cargo +nightly check --example=embassy_serial_split --features=embassy,embassy-time-timg0,async
       - name: check esp32c6-hal (async, i2c)
         run: cd esp32c6-hal/ && cargo +nightly check --example=embassy_i2c --features=embassy,embassy-time-systick,async
       - name: check esp32c6-hal (interrupt-preemption)
@@ -329,6 +336,8 @@ jobs:
         run: cd esp32h2-hal/ && cargo +nightly check --example=embassy_spi --features=embassy,embassy-time-systick,async
       - name: check esp32h2-hal (async, serial)
         run: cd esp32h2-hal/ && cargo +nightly check --example=embassy_serial --features=embassy,embassy-time-systick,async
+      - name: check esp32h2-hal (async, serial, split)
+        run: cd esp32h2-hal/ && cargo +nightly check --example=embassy_serial_split --features=embassy,embassy-time-timg0,async
       - name: check esp32h2-hal (async, i2c)
         run: cd esp32h2-hal/ && cargo +nightly check --example=embassy_i2c --features=embassy,embassy-time-systick,async
       - name: check esp32h2-hal (interrupt-preemption)
@@ -381,6 +390,7 @@ jobs:
           cargo check --example=embassy_wait --features=embassy,embassy-time-timg0,async,embassy-executor-thread
           cargo check --example=embassy_spi --features=embassy,embassy-time-timg0,async,embassy-executor-thread
           cargo check --example=embassy_serial --features=embassy,embassy-time-timg0,async,embassy-executor-thread
+          cargo check --example=embassy_serial_split --features=embassy,embassy-time-timg0,async,embassy-executor-thread
           cargo check --example=embassy_i2c --features=embassy,embassy-time-timg0,async,embassy-executor-thread
       - name: check esp32s2-hal (embassy, log/defmt)
         run: |
@@ -438,6 +448,7 @@ jobs:
           cargo check --example=embassy_wait --features=embassy,embassy-time-timg0,async,embassy-executor-thread
           cargo check --example=embassy_spi --features=embassy,embassy-time-timg0,async,embassy-executor-thread
           cargo check --example=embassy_serial --features=embassy,embassy-time-timg0,async,embassy-executor-thread
+          cargo check --example=embassy_serial_split --features=embassy,embassy-time-timg0,async,embassy-executor-thread
           cargo check --example=embassy_i2c --features=embassy,embassy-time-timg0,async,embassy-executor-thread
       - name: check esp32s3-hal (embassy, systick, async)
         run: |
@@ -445,6 +456,7 @@ jobs:
           cargo check --example=embassy_wait --features=embassy,embassy-time-systick,async,embassy-executor-thread
           cargo check --example=embassy_spi --features=embassy,embassy-time-systick,async,embassy-executor-thread
           cargo check --example=embassy_serial --features=embassy,embassy-time-systick,async,embassy-executor-thread
+          cargo check --example=embassy_serial_split --features=embassy,embassy-time-systick,async,embassy-executor-thread
           cargo check --example=embassy_i2c --features=embassy,embassy-time-systick,async,embassy-executor-thread
       - name: check esp32s3-hal (octal psram)
         run: cd esp32s3-hal/ && cargo check --example=octal_psram --features=opsram_2m --release # This example requires release!
