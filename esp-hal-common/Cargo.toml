@@ -1,6 +1,6 @@
 [package]
 name    = "esp-hal-common"
-version = "0.11.0"
+version = "0.12.0"
 authors = [
     "Jesse Braham <jesse@beta7.io>",
     "Björn Quentin <bjoern.quentin@mobile-j.de>",
@@ -12,7 +12,7 @@ repository   = "https://github.com/esp-rs/esp-hal"
 license      = "MIT OR Apache-2.0"
 
 [dependencies]
-bitflags             = "2.3.3"
+bitflags             = "2.4.0"
 bitfield             = "0.14.0"
 cfg-if               = "1.0.0"
 critical-section     = "1.1.2"
@@ -29,7 +29,7 @@ log                  = { version = "0.4.20", optional = true }
 lock_api             = { version = "0.4.10", optional = true }
 nb                   = "1.1.0"
 paste                = "1.0.14"
-procmacros           = { version = "0.6.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
+procmacros           = { version = "0.6.1", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 strum                = { version = "0.25.0", default-features = false, features = ["derive"] }
 void                 = { version = "1.0.2", default-features = false }
 usb-device           = { version = "0.2.9", optional = true }
@@ -66,7 +66,7 @@ esp32s3 = { version = "0.21.0", features = ["critical-section"], optional = true
 
 [build-dependencies]
 basic-toml = "0.1.4"
-serde      = { version = "1.0.183", features = ["derive"] }
+serde      = { version = "1.0.188", features = ["derive"] }
 
 [features]
 esp32   = ["esp32/rt",   "xtensa", "xtensa-lx/esp32", "xtensa-lx-rt/esp32", "lock_api", "procmacros/esp32"]
@@ -77,16 +77,18 @@ esp32h2 = ["esp32h2/rt", "riscv",  "procmacros/esp32h2"]
 esp32s2 = ["esp32s2/rt", "xtensa", "xtensa-lx/esp32s2", "xtensa-lx-rt/esp32s2", "esp-synopsys-usb-otg", "usb-device", "procmacros/esp32s2"]
 esp32s3 = ["esp32s3/rt", "xtensa", "xtensa-lx/esp32s3", "xtensa-lx-rt/esp32s3", "lock_api", "esp-synopsys-usb-otg", "usb-device", "procmacros/esp32s3"]
 
-esp32_40mhz = []
-esp32_26mhz = []
-
-esp32c2_40mhz = []
+# Crystal frequency selection (ESP32 and ESP32-C2 only!)
+esp32_26mhz   = []
+esp32_40mhz   = []
 esp32c2_26mhz = []
+esp32c2_40mhz = []
 
+# PSRAM support
 psram_2m = []
 psram_4m = []
 psram_8m = []
 
+# Octal RAM support
 opsram_2m = []
 opsram_4m = []
 opsram_8m = []
@@ -94,24 +96,33 @@ opsram_8m = []
 # Implement the `embedded-hal==1.0.0-alpha.x` traits
 eh1 = ["embedded-hal-1", "embedded-hal-nb", "embedded-can"]
 
+# Enable logging
+log = ["dep:log"]
+
 # To support `ufmt`
 ufmt = ["ufmt-write"]
 
 # To use vectored interrupts (calling the handlers defined in the PAC)
 vectored = ["procmacros/interrupt"]
 
-# Implement the `embedded-hal-async==1.0.0-alpha.x` traits
-async    = ["embedded-hal-async", "eh1", "embassy-sync", "embassy-futures", "embedded-io-async"]
-embassy  = ["embassy-time"]
+# Use direct interrupt vectoring (RISC-V only!)
+direct-vectoring = ["esp-riscv-rt/direct-vectoring"]
 
-embassy-executor-thread    = ["embassy", "embassy-executor"]
+# Use interrupt preemption (RISC-V only!)
+interrupt-preemption = ["esp-riscv-rt/interrupt-preemption"]
+
+# Support for asynchronous operation, implementing traits from
+# `embedded-hal-async` and `embedded-io-async`
+async = ["embedded-hal-async", "eh1", "embassy-sync", "embassy-futures", "embedded-io-async"]
+
+# Embassy support
+embassy = ["embassy-time"]
+
 embassy-executor-interrupt = ["embassy", "embassy-executor"]
+embassy-executor-thread    = ["embassy", "embassy-executor"]
 
 embassy-time-systick = []
 embassy-time-timg0   = []
-
-interrupt-preemption = ["esp-riscv-rt/interrupt-preemption"]
-
 
 # Architecture-specific features (intended for internal use)
 riscv  = ["critical-section/restore-state-u8", "esp-riscv-rt", "esp-riscv-rt/zero-bss", "riscv-atomic-emulation-trap"]
@@ -122,7 +133,6 @@ rv-init-data     = ["esp-riscv-rt/init-data", "esp-riscv-rt/init-rw-text"]
 rv-zero-rtc-bss  = ["esp-riscv-rt/zero-rtc-fast-bss"]
 rv-init-rtc-data = ["esp-riscv-rt/init-rtc-fast-data", "esp-riscv-rt/init-rtc-fast-text"]
 
-direct-vectoring = ["esp-riscv-rt/direct-vectoring"]
 # Enable the `impl-register-debug` feature for the selected PAC
 debug = [
     "esp32?/impl-register-debug",
@@ -134,7 +144,7 @@ debug = [
     "esp32s3?/impl-register-debug",
 ]
 
-log = ["dep:log"]
+# Enable support for `defmt`, for `esp-hal-common` and also for all our dependencies
 defmt = [
     "dep:defmt",
     "embassy-executor?/defmt",
