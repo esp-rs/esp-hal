@@ -10,7 +10,8 @@
 use embassy_executor::Executor;
 use esp32c6_hal::{
     clock::ClockControl,
-    embassy, interrupt,
+    embassy,
+    interrupt,
     peripherals::{Interrupt, Peripherals, UART0},
     prelude::*,
     Uart,
