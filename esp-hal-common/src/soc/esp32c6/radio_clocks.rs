@@ -18,7 +18,7 @@ impl RadioClockController for RadioClockControl {
         match peripheral {
             RadioPeripherals::Phy => enable_phy(),
             RadioPeripherals::Wifi => wifi_clock_enable(),
-            RadioPeripherals::Bt => todo!("BLE not yet supported"),
+            RadioPeripherals::Bt => ble_clock_enable(),
             RadioPeripherals::Ieee802154 => ieee802154_clock_enable(),
         }
     }
@@ -27,7 +27,7 @@ impl RadioClockController for RadioClockControl {
         match peripheral {
             RadioPeripherals::Phy => disable_phy(),
             RadioPeripherals::Wifi => wifi_clock_disable(),
-            RadioPeripherals::Bt => todo!("BLE not yet supported"),
+            RadioPeripherals::Bt => ble_clock_disable(),
             RadioPeripherals::Ieee802154 => ieee802154_clock_disable(),
         }
     }
@@ -243,6 +243,88 @@ fn ieee802154_clock_disable() {
     modem_lpcon
         .clk_conf
         .modify(|_, w| w.clk_coex_en().clear_bit());
+}
+
+fn ble_clock_enable() {
+    let modem_syscon = unsafe { &*esp32c6::MODEM_SYSCON::PTR };
+    let modem_lpcon = unsafe { &*esp32c6::MODEM_LPCON::PTR };
+
+    modem_syscon.clk_conf.modify(|_, w| {
+        w.clk_etm_en()
+            .set_bit()
+            .clk_modem_sec_en()
+            .set_bit()
+            .clk_modem_sec_ecb_en()
+            .set_bit()
+            .clk_modem_sec_ccm_en()
+            .set_bit()
+            .clk_modem_sec_bah_en()
+            .set_bit()
+            .clk_modem_sec_apb_en()
+            .set_bit()
+            .clk_ble_timer_en()
+            .set_bit()
+    });
+
+    modem_syscon.clk_conf1.modify(|_, w| {
+        w.clk_fe_apb_en()
+            .set_bit()
+            .clk_fe_cal_160m_en()
+            .set_bit()
+            .clk_fe_160m_en()
+            .set_bit()
+            .clk_fe_80m_en()
+            .set_bit()
+            .clk_bt_apb_en()
+            .set_bit()
+            .clk_bt_en()
+            .set_bit()
+    });
+
+    modem_lpcon
+        .clk_conf
+        .modify(|_, w| w.clk_coex_en().set_bit());
+}
+
+fn ble_clock_disable() {
+    let modem_syscon = unsafe { &*esp32c6::MODEM_SYSCON::PTR };
+    let modem_lpcon = unsafe { &*esp32c6::MODEM_LPCON::PTR };
+
+    modem_syscon.clk_conf.modify(|_, w| {
+        w.clk_etm_en()
+            .clear_bit()
+            .clk_modem_sec_en()
+            .clear_bit()
+            .clk_modem_sec_ecb_en()
+            .clear_bit()
+            .clk_modem_sec_ccm_en()
+            .clear_bit()
+            .clk_modem_sec_bah_en()
+            .clear_bit()
+            .clk_modem_sec_apb_en()
+            .clear_bit()
+            .clk_ble_timer_en()
+            .clear_bit()
+    });
+
+    modem_syscon.clk_conf1.modify(|_, w| {
+        w.clk_fe_apb_en()
+            .clear_bit()
+            .clk_fe_cal_160m_en()
+            .clear_bit()
+            .clk_fe_160m_en()
+            .clear_bit()
+            .clk_fe_80m_en()
+            .clear_bit()
+            .clk_bt_apb_en()
+            .clear_bit()
+            .clk_bt_en()
+            .clear_bit()
+    });
+
+    modem_lpcon
+        .clk_conf
+        .modify(|_, w| w.clk_coex_en().set_bit());
 }
 
 fn reset_mac() {
