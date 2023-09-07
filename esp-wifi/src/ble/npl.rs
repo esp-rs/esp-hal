@@ -11,15 +11,16 @@ use crate::compat::queue::SimpleQueue;
 use crate::timer::yield_task;
 
 #[cfg_attr(esp32c2, path = "os_adapter_esp32c2.rs")]
+#[cfg_attr(esp32c6, path = "os_adapter_esp32c6.rs")]
 pub(crate) mod ble_os_adapter_chip_specific;
 
 const TIME_FOREVER: u32 = u32::MAX;
 
 const OS_MSYS_1_BLOCK_COUNT: i32 = 24;
-const SYSINIT_MSYS_1_MEMPOOL_SIZE: u32 = 768;
+const SYSINIT_MSYS_1_MEMPOOL_SIZE: usize = 768;
 const SYSINIT_MSYS_1_MEMBLOCK_SIZE: i32 = 128;
 const OS_MSYS_2_BLOCK_COUNT: i32 = 24;
-const SYSINIT_MSYS_2_MEMPOOL_SIZE: u32 = 1920;
+const SYSINIT_MSYS_2_MEMPOOL_SIZE: usize = 1920;
 const SYSINIT_MSYS_2_MEMBLOCK_SIZE: i32 = 320;
 
 const BLE_HCI_TRANS_BUF_CMD: i32 = 3;
@@ -217,6 +218,7 @@ pub(crate) static mut OS_MSYS_INIT_2_MEMPOOL: OsMempool = OsMempool::zeroed();
 extern "C" {
     static ble_hci_trans_funcs_ptr: &'static BleHciTransFuncsT;
 
+    #[cfg(esp32c2)]
     static mut r_ble_stub_funcs_ptr: *mut u32;
 
     pub(crate) fn ble_controller_init(cfg: *const esp_bt_controller_config_t) -> i32;
@@ -319,6 +321,7 @@ pub struct ext_funcs_t {
     ecc_gen_key_pair: Option<unsafe extern "C" fn(*const u8, *const u8) -> i32>,
     ecc_gen_dh_key: Option<unsafe extern "C" fn(*const u8, *const u8, *const u8, *const u8) -> i32>,
     esp_reset_rpa_moudle: Option<unsafe extern "C" fn()>,
+    #[cfg(esp32c2)]
     esp_bt_track_pll_cap: Option<unsafe extern "C" fn()>,
     magic: u32,
 }
@@ -327,7 +330,7 @@ static G_OSI_FUNCS: ext_funcs_t = ext_funcs_t {
     ext_version: 0x20221122,
     esp_intr_alloc: Some(self::ble_os_adapter_chip_specific::esp_intr_alloc),
     esp_intr_free: Some(esp_intr_free),
-    malloc: Some(malloc),
+    malloc: Some(self::malloc),
     free: Some(free),
     hal_uart_start_tx: None,
     hal_uart_init_cbs: None,
@@ -342,6 +345,7 @@ static G_OSI_FUNCS: ext_funcs_t = ext_funcs_t {
     ecc_gen_key_pair: Some(ecc_gen_key_pair),
     ecc_gen_dh_key: Some(ecc_gen_dh_key),
     esp_reset_rpa_moudle: Some(self::ble_os_adapter_chip_specific::esp_reset_rpa_moudle),
+    #[cfg(esp32c2)]
     esp_bt_track_pll_cap: None,
     magic: 0xA5A5A5A5,
 };
@@ -420,7 +424,7 @@ unsafe extern "C" fn esp_intr_free(_ret_handle: *mut *mut crate::binary::c_types
 }
 
 unsafe extern "C" fn malloc(size: u32) -> *const u8 {
-    crate::compat::malloc::malloc(size)
+    crate::compat::malloc::malloc(size as usize)
 }
 
 unsafe extern "C" fn free(ptr: *const crate::binary::c_types::c_void) {
@@ -1112,7 +1116,11 @@ pub(crate) fn ble_init() {
 
         // "patch" r_ble_ll_random - it needs syscall_table_ptr
         // probably long term we should rather initialize syscall_table_ptr
-        *(r_ble_stub_funcs_ptr.offset(0x7dc / 4)) = ble_ll_random_override as *const u32 as u32;
+        #[cfg(esp32c2)]
+        {
+            *(r_ble_stub_funcs_ptr.offset(0x7dc / 4)) =
+                self::ble_os_adapter_chip_specific::ble_ll_random_override as *const u32 as u32;
+        }
 
         // this is a workaround for an unclear problem
         // (ASSERT r_ble_hci_ram_hs_cmd_tx:34 0 0)
@@ -1122,24 +1130,15 @@ pub(crate) fn ble_init() {
     }
 }
 
-unsafe extern "C" fn ble_ll_random_override() -> u32 {
-    // this is not very random but good enough for now - it's not used for crypto
-    unsafe {
-        static mut VALUE: u32 = 0;
-        VALUE = VALUE.wrapping_add(3);
-        VALUE
-    }
-}
-
 fn os_msys_buf_alloc() -> bool {
     unsafe {
         OS_MSYS_INIT_1_DATA = crate::compat::malloc::calloc(
             1,
-            core::mem::size_of::<OsMembufT>() as u32 * SYSINIT_MSYS_1_MEMPOOL_SIZE,
+            core::mem::size_of::<OsMembufT>() * SYSINIT_MSYS_1_MEMPOOL_SIZE as usize,
         ) as *mut u32;
         OS_MSYS_INIT_2_DATA = crate::compat::malloc::calloc(
             1,
-            core::mem::size_of::<OsMembufT>() as u32 * SYSINIT_MSYS_2_MEMPOOL_SIZE,
+            core::mem::size_of::<OsMembufT>() * SYSINIT_MSYS_2_MEMPOOL_SIZE,
         ) as *mut u32;
 
         !(OS_MSYS_INIT_1_DATA.is_null() || OS_MSYS_INIT_2_DATA.is_null())

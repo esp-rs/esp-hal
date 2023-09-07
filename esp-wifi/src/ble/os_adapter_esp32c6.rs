@@ -1,6 +1,7 @@
 use crate::binary::include::esp_bt_controller_config_t;
 use crate::common_adapter::RADIO_CLOCKS;
 use crate::hal::system::RadioClockController;
+use crate::hal::system::RadioPeripherals;
 
 pub(crate) static mut ISR_INTERRUPT_4: (
     *mut crate::binary::c_types::c_void,
@@ -63,10 +64,16 @@ pub(crate) static BLE_CONFIG: esp_bt_controller_config_t = esp_bt_controller_con
     main_xtal_freq: 40,
     ignore_wl_for_direct_adv: 0,
     config_magic: 0x5A5AA5A5,
+
+    cpu_freq_mhz: 160,
+    enable_pcl: 0, // CONFIG_BT_LE_POWER_CONTROL_ENABLED
+    version_num: 0,
 };
 
 pub(crate) fn bt_periph_module_enable() {
-    // nothing
+    unsafe {
+        unwrap!(RADIO_CLOCKS.as_mut()).enable(RadioPeripherals::Bt);
+    }
 }
 
 pub(crate) fn disable_sleep_mode() {
@@ -80,13 +87,9 @@ pub(super) unsafe extern "C" fn esp_intr_alloc(
     arg: *mut crate::binary::c_types::c_void,
     ret_handle: *mut *mut crate::binary::c_types::c_void,
 ) -> i32 {
-    trace!(
+    debug!(
         "esp_intr_alloc {} {} {:?} {:?} {:?}",
-        source,
-        flags,
-        handler,
-        arg,
-        ret_handle
+        source, flags, handler, arg, ret_handle
     );
 
     match source {
@@ -111,11 +114,15 @@ pub(super) unsafe extern "C" fn esp_reset_rpa_moudle() {
     }
 }
 
-pub(super) unsafe extern "C" fn ble_ll_random_override() -> u32 {
-    // this is not very random but good enough for now - it's not used for crypto
+#[allow(improper_ctypes_definitions)]
+#[no_mangle]
+unsafe extern "C" fn jrand48(
+    _xsubi: [crate::binary::c_types::c_ushort; 3],
+) -> crate::binary::c_types::c_long {
+    // this is not very random but good enough for now - it's apparently not used for crypto
     unsafe {
         static mut VALUE: u32 = 0;
         VALUE = VALUE.wrapping_add(3);
-        VALUE
+        VALUE as i32
     }
 }

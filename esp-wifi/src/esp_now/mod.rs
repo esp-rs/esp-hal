@@ -428,7 +428,7 @@ impl<'d> EspNowSender<'d> {
         data: &[u8],
     ) -> Result<SendWaiter<'s>, EspNowError> {
         ESP_NOW_SEND_CB_INVOKED.store(false, Ordering::Release);
-        check_error!({ esp_now_send(dst_addr.as_ptr(), data.as_ptr(), data.len() as u32) })?;
+        check_error!({ esp_now_send(dst_addr.as_ptr(), data.as_ptr(), data.len()) })?;
         Ok(SendWaiter(PhantomData))
     }
 }
@@ -851,11 +851,7 @@ mod asynch {
                 ESP_NOW_TX_WAKER.register(cx.waker());
                 ESP_NOW_SEND_CB_INVOKED.store(false, Ordering::Release);
                 if let Err(e) = check_error!({
-                    esp_now_send(
-                        self.addr.as_ptr(),
-                        self.data.as_ptr(),
-                        self.data.len() as u32,
-                    )
+                    esp_now_send(self.addr.as_ptr(), self.data.as_ptr(), self.data.len())
                 }) {
                     return Poll::Ready(Err(e));
                 }

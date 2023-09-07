@@ -339,11 +339,11 @@ unsafe extern "C" fn cause_sw_intr_to_core(_core: i32, _intr_no: i32) -> i32 {
 }
 
 unsafe extern "C" fn malloc(size: u32) -> *const () {
-    crate::compat::malloc::malloc(size) as *const ()
+    crate::compat::malloc::malloc(size as usize) as *const ()
 }
 
 unsafe extern "C" fn malloc_internal(size: u32) -> *const () {
-    crate::compat::malloc::malloc(size) as *const ()
+    crate::compat::malloc::malloc(size as usize) as *const ()
 }
 
 unsafe extern "C" fn free(ptr: *const ()) {

@@ -2,7 +2,7 @@ use core::alloc::Layout;
 
 use crate::HEAP;
 
-pub unsafe extern "C" fn malloc(size: u32) -> *const u8 {
+pub unsafe extern "C" fn malloc(size: usize) -> *const u8 {
     trace!("alloc {}", size);
 
     let total_size = size as usize + 4;
@@ -44,10 +44,10 @@ pub unsafe extern "C" fn free(ptr: *const u8) {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn calloc(number: u32, size: u32) -> *const u8 {
+pub unsafe extern "C" fn calloc(number: u32, size: usize) -> *const u8 {
     trace!("calloc {} {}", number, size);
 
-    let total_size = number * size;
+    let total_size = number as usize * size;
     let ptr = malloc(total_size) as *mut u8;
 
     if !ptr.is_null() {

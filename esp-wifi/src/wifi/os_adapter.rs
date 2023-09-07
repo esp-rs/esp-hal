@@ -861,10 +861,8 @@ pub unsafe extern "C" fn task_get_max_priority() -> i32 {
  *
  ****************************************************************************/
 #[no_mangle]
-pub unsafe extern "C" fn malloc(
-    size: crate::binary::c_types::c_uint,
-) -> *mut crate::binary::c_types::c_void {
-    crate::compat::malloc::malloc(size as u32) as *mut crate::binary::c_types::c_void
+pub unsafe extern "C" fn malloc(size: usize) -> *mut crate::binary::c_types::c_void {
+    crate::compat::malloc::malloc(size) as *mut crate::binary::c_types::c_void
 }
 
 /****************************************************************************
@@ -906,7 +904,7 @@ pub unsafe extern "C" fn event_post(
     event_base: *const crate::binary::c_types::c_char,
     event_id: i32,
     event_data: *mut crate::binary::c_types::c_void,
-    event_data_size: size_t,
+    event_data_size: usize,
     ticks_to_wait: u32,
 ) -> i32 {
     trace!(
@@ -1395,7 +1393,7 @@ pub unsafe extern "C" fn nvs_set_blob(
     _handle: u32,
     _key: *const crate::binary::c_types::c_char,
     _value: *const crate::binary::c_types::c_void,
-    _length: size_t,
+    _length: usize,
 ) -> crate::binary::c_types::c_int {
     todo!("nvs_set_blob")
 }
@@ -1420,7 +1418,7 @@ pub unsafe extern "C" fn nvs_get_blob(
     _handle: u32,
     _key: *const crate::binary::c_types::c_char,
     _out_value: *mut crate::binary::c_types::c_void,
-    _length: *mut size_t,
+    _length: *mut usize,
 ) -> crate::binary::c_types::c_int {
     todo!("nvs_get_blob")
 }
@@ -1460,7 +1458,7 @@ pub unsafe extern "C" fn nvs_erase_key(
  *   0 if success or -1 if fail
  *
  ****************************************************************************/
-pub unsafe extern "C" fn get_random(buf: *mut u8, len: size_t) -> crate::binary::c_types::c_int {
+pub unsafe extern "C" fn get_random(buf: *mut u8, len: usize) -> crate::binary::c_types::c_int {
     for i in 0..len as usize {
         buf.add(i)
             .write_volatile((crate::wifi::rand() & 0xff) as u8)
@@ -1588,8 +1586,8 @@ pub unsafe extern "C" fn log_timestamp() -> u32 {
  *   Memory pointer
  *
  ****************************************************************************/
-pub unsafe extern "C" fn malloc_internal(size: size_t) -> *mut crate::binary::c_types::c_void {
-    crate::compat::malloc::malloc(size as u32) as *mut crate::binary::c_types::c_void
+pub unsafe extern "C" fn malloc_internal(size: usize) -> *mut crate::binary::c_types::c_void {
+    crate::compat::malloc::malloc(size) as *mut crate::binary::c_types::c_void
 }
 
 /****************************************************************************
@@ -1608,7 +1606,7 @@ pub unsafe extern "C" fn malloc_internal(size: size_t) -> *mut crate::binary::c_
  ****************************************************************************/
 pub unsafe extern "C" fn realloc_internal(
     _ptr: *mut crate::binary::c_types::c_void,
-    _size: size_t,
+    _size: usize,
 ) -> *mut crate::binary::c_types::c_void {
     todo!("realloc_internal")
 }
@@ -1628,10 +1626,10 @@ pub unsafe extern "C" fn realloc_internal(
  *
  ****************************************************************************/
 pub unsafe extern "C" fn calloc_internal(
-    n: size_t,
-    size: size_t,
+    n: usize,
+    size: usize,
 ) -> *mut crate::binary::c_types::c_void {
-    calloc(n as u32, size as u32) as *mut crate::binary::c_types::c_void
+    calloc(n as u32, size) as *mut crate::binary::c_types::c_void
 }
 
 /****************************************************************************
@@ -1647,8 +1645,8 @@ pub unsafe extern "C" fn calloc_internal(
  *   New memory pointer
  *
  ****************************************************************************/
-pub unsafe extern "C" fn zalloc_internal(size: size_t) -> *mut crate::binary::c_types::c_void {
-    calloc(size as u32, 1u32) as *mut crate::binary::c_types::c_void
+pub unsafe extern "C" fn zalloc_internal(size: usize) -> *mut crate::binary::c_types::c_void {
+    calloc(size as u32, 1usize) as *mut crate::binary::c_types::c_void
 }
 
 /****************************************************************************
@@ -1664,8 +1662,8 @@ pub unsafe extern "C" fn zalloc_internal(size: size_t) -> *mut crate::binary::c_
  *   Memory pointer
  *
  ****************************************************************************/
-pub unsafe extern "C" fn wifi_malloc(size: size_t) -> *mut crate::binary::c_types::c_void {
-    malloc(size as u32)
+pub unsafe extern "C" fn wifi_malloc(size: usize) -> *mut crate::binary::c_types::c_void {
+    malloc(size)
 }
 
 /****************************************************************************
@@ -1684,7 +1682,7 @@ pub unsafe extern "C" fn wifi_malloc(size: size_t) -> *mut crate::binary::c_type
  ****************************************************************************/
 pub unsafe extern "C" fn wifi_realloc(
     _ptr: *mut crate::binary::c_types::c_void,
-    _size: size_t,
+    _size: usize,
 ) -> *mut crate::binary::c_types::c_void {
     todo!("wifi_realloc")
 }
@@ -1703,12 +1701,9 @@ pub unsafe extern "C" fn wifi_realloc(
  *   New memory pointer
  *
  ****************************************************************************/
-pub unsafe extern "C" fn wifi_calloc(
-    n: size_t,
-    size: size_t,
-) -> *mut crate::binary::c_types::c_void {
+pub unsafe extern "C" fn wifi_calloc(n: usize, size: usize) -> *mut crate::binary::c_types::c_void {
     trace!("wifi_calloc {} {}", n, size);
-    calloc(n as u32, size as u32) as *mut crate::binary::c_types::c_void
+    calloc(n as u32, size) as *mut crate::binary::c_types::c_void
 }
 
 /****************************************************************************
@@ -1724,7 +1719,7 @@ pub unsafe extern "C" fn wifi_calloc(
  *   New memory pointer
  *
  ****************************************************************************/
-pub unsafe extern "C" fn wifi_zalloc(size: size_t) -> *mut crate::binary::c_types::c_void {
+pub unsafe extern "C" fn wifi_zalloc(size: usize) -> *mut crate::binary::c_types::c_void {
     wifi_calloc(size, 1)
 }
 
