@@ -6,7 +6,7 @@ use crate::hal::interrupt::{self, TrapFrame};
 use crate::hal::peripherals::{self, Interrupt};
 use crate::hal::prelude::*;
 use crate::hal::riscv;
-use crate::hal::systimer::{Alarm, Periodic, Target};
+use crate::hal::systimer::{Alarm, Periodic, SystemTimer, Target};
 
 use crate::{binary, preempt::preempt::task_switch};
 
@@ -216,22 +216,5 @@ pub fn yield_task() {
 /// Current systimer count value
 /// A tick is 1 / 16_000_000 seconds
 pub fn get_systimer_count() -> u64 {
-    critical_section::with(|_| unsafe {
-        let systimer = &(*peripherals::SYSTIMER::ptr());
-
-        systimer.unit0_op.write(|w| w.bits(1 << 30));
-
-        // wait for value available
-        loop {
-            let valid = (systimer.unit0_op.read().bits() >> 29) & 1;
-            if valid != 0 {
-                break;
-            }
-        }
-
-        let value_lo = systimer.unit0_value_lo.read().bits() as u64;
-        let value_hi = (systimer.unit0_value_hi.read().bits() as u64) << 32;
-
-        (value_lo | value_hi) as u64
-    })
+    SystemTimer::now()
 }
