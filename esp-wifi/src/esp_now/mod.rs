@@ -6,13 +6,15 @@
 //!
 //! For more information see https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_now.html
 
+use core::marker::PhantomData;
 use core::{cell::RefCell, fmt::Debug};
 
-use crate::hal::peripheral::{Peripheral, PeripheralRef};
-use atomic_polyfill::{AtomicBool, Ordering};
+use atomic_polyfill::{AtomicBool, AtomicU8, Ordering};
 use critical_section::Mutex;
 
 use crate::compat::queue::SimpleQueue;
+use crate::hal::peripheral::{Peripheral, PeripheralRef};
+use crate::hal::radio;
 use crate::EspWifiInitialization;
 
 use crate::binary::include::*;
@@ -77,6 +79,9 @@ impl Error {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum EspNowError {
     Error(Error),
+    SendFailed,
+    /// Attempt to create EspNow instance twice
+    DuplicateInstance,
 }
 
 #[derive(Debug)]
@@ -261,57 +266,9 @@ pub fn enable_esp_now_with_wifi(
     (device, EspNowWithWifiCreateToken { _private: () })
 }
 
-/// ESP-NOW is a kind of connectionless Wi-Fi communication protocol that is defined by Espressif.
-/// In ESP-NOW, application data is encapsulated in a vendor-specific action frame and then transmitted from
-/// one Wi-Fi device to another without connection. CTR with CBC-MAC Protocol(CCMP) is used to protect the
-/// action frame for security. ESP-NOW is widely used in smart light, remote controlling, sensor, etc.
-///
-/// Currently this implementation (when used together with traditional Wi-Fi) ONLY support STA mode.
-///
-pub struct EspNow<'d> {
-    _device: Option<PeripheralRef<'d, crate::hal::radio::Wifi>>,
-}
+pub struct EspNowManager<'d>(EspNowRc<'d>);
 
-impl<'d> EspNow<'d> {
-    pub fn new(
-        inited: &EspWifiInitialization,
-        device: impl Peripheral<P = crate::hal::radio::Wifi> + 'd,
-    ) -> Result<EspNow<'d>, EspNowError> {
-        EspNow::new_internal(inited, Some(device.into_ref()))
-    }
-
-    pub fn new_with_wifi(
-        inited: &EspWifiInitialization,
-        _token: EspNowWithWifiCreateToken,
-    ) -> Result<EspNow<'d>, EspNowError> {
-        EspNow::new_internal(inited, None::<PeripheralRef<'d, crate::hal::radio::Wifi>>)
-    }
-
-    fn new_internal(
-        inited: &EspWifiInitialization,
-        device: Option<PeripheralRef<'d, crate::hal::radio::Wifi>>,
-    ) -> Result<EspNow<'d>, EspNowError> {
-        if !inited.is_wifi() {
-            return Err(EspNowError::Error(Error::NotInitialized));
-        }
-
-        let esp_now = EspNow { _device: device };
-        check_error!({ esp_wifi_set_mode(wifi_mode_t_WIFI_MODE_STA) })?;
-        check_error!({ esp_wifi_start() })?;
-        check_error!({ esp_now_init() })?;
-        check_error!({ esp_now_register_recv_cb(Some(rcv_cb)) })?;
-        check_error!({ esp_now_register_send_cb(Some(send_cb)) })?;
-
-        esp_now.add_peer(PeerInfo {
-            peer_address: BROADCAST_ADDRESS,
-            lmk: None,
-            channel: None,
-            encrypt: false,
-        })?;
-
-        Ok(esp_now)
-    }
-
+impl<'d> EspNowManager<'d> {
     /// Set primary WiFi channel
     /// Should only be used when using ESP-NOW without AP or STA
     pub fn set_channel(&self, channel: u8) -> Result<(), EspNowError> {
@@ -450,26 +407,73 @@ impl<'d> EspNow<'d> {
     pub fn set_rate(&self, rate: WifiPhyRate) -> Result<(), EspNowError> {
         check_error!({ esp_wifi_config_espnow_rate(wifi_interface_t_WIFI_IF_STA, rate as u32,) })
     }
+}
 
+/// This is the sender part of ESP-NOW. You can get this sender by splitting
+/// a `EspNow` instance.
+///
+/// You need a lock when using this sender in multiple tasks.
+/// **DO NOT USE** a lock implementation that disables interrupts since the
+/// completion of a sending requires waiting for a callback invoked in an
+/// interrupt.
+pub struct EspNowSender<'d>(EspNowRc<'d>);
+
+impl<'d> EspNowSender<'d> {
     /// Send data to peer
     ///
     /// The peer needs to be added to the peer list first.
-    ///
-    /// This method returns a `SendWaiter` on success. ESP-NOW protocol provides guaranteed
-    /// delivery on MAC layer. If you need this guarantee, call `wait` method of the returned
-    /// `SendWaiter` and make sure it returns `SendStatus::Success`.
-    /// However, this method will block current task for milliseconds.
-    /// So you can just drop the waiter if you want high frequency sending.
-    pub fn send(&self, dst_addr: &[u8; 6], data: &[u8]) -> Result<SendWaiter, EspNowError> {
-        let mut addr = [0u8; 6];
-        addr.copy_from_slice(dst_addr);
-
+    pub fn send<'s>(
+        &'s mut self,
+        dst_addr: &[u8; 6],
+        data: &[u8],
+    ) -> Result<SendWaiter<'s>, EspNowError> {
         ESP_NOW_SEND_CB_INVOKED.store(false, Ordering::Release);
-        check_error!({ esp_now_send(addr.as_ptr(), data.as_ptr(), data.len() as u32) })?;
-        Ok(SendWaiter(()))
+        check_error!({ esp_now_send(dst_addr.as_ptr(), data.as_ptr(), data.len() as u32) })?;
+        Ok(SendWaiter(PhantomData))
     }
+}
 
-    /// Receive data
+/// This struct is returned by a sync esp now send. Invoking `wait` method of this
+/// struct will block current task until the callback function of esp now send is called
+/// and return the status of previous sending.
+///
+/// This waiter borrows the sender, so when used in multiple tasks, the lock will only be
+/// released when the waiter is dropped or consumed via `wait`.
+///
+/// When using a lock that disables interrupts, the waiter will block forever since
+/// the callback which signals the completion of sending will never be invoked.
+#[must_use]
+pub struct SendWaiter<'s>(PhantomData<&'s mut EspNowSender<'s>>);
+
+impl<'s> SendWaiter<'s> {
+    /// Wait for the previous sending to complete, i.e. the send callback is invoked with
+    /// status of the sending.
+    pub fn wait(self) -> Result<(), EspNowError> {
+        // prevent redundant waiting since we waits for the callback in the Drop implementation
+        core::mem::forget(self);
+        while !ESP_NOW_SEND_CB_INVOKED.load(Ordering::Acquire) {}
+
+        if ESP_NOW_SEND_STATUS.load(Ordering::Relaxed) {
+            Ok(())
+        } else {
+            Err(EspNowError::SendFailed)
+        }
+    }
+}
+
+impl<'s> Drop for SendWaiter<'s> {
+    /// wait for the send to complete to prevent the lock on `EspNowSender` get unlocked
+    /// before a callback is invoked.
+    fn drop(&mut self) {
+        while !ESP_NOW_SEND_CB_INVOKED.load(Ordering::Acquire) {}
+    }
+}
+
+/// This is the sender part of ESP-NOW. You can get this sender by splitting
+/// a `EspNow` instance.
+pub struct EspNowReceiver<'d>(EspNowRc<'d>);
+
+impl<'d> EspNowReceiver<'d> {
     pub fn receive(&self) -> Option<ReceivedData> {
         critical_section::with(|cs| {
             let mut queue = RECEIVE_QUEUE.borrow_ref_mut(cs);
@@ -478,43 +482,193 @@ impl<'d> EspNow<'d> {
     }
 }
 
-impl Drop for EspNow<'_> {
-    fn drop(&mut self) {
-        unsafe {
-            esp_now_unregister_recv_cb();
-            esp_now_deinit();
+/// The reference counter for properly deinit espnow after all parts are dropped.
+struct EspNowRc<'d> {
+    rc: &'static AtomicU8,
+    inner: PhantomData<EspNow<'d>>,
+}
+
+impl<'d> EspNowRc<'d> {
+    fn new() -> Result<Self, EspNowError> {
+        static ESP_NOW_RC: AtomicU8 = AtomicU8::new(0);
+        // The reference counter is not 0, which means there is another instance of
+        // EspNow, which is not allowed
+        if ESP_NOW_RC.fetch_add(1, Ordering::AcqRel) != 0 {
+            return Err(EspNowError::DuplicateInstance);
+        }
+
+        Ok(Self {
+            rc: &ESP_NOW_RC,
+            inner: PhantomData,
+        })
+    }
+}
+
+impl<'d> Clone for EspNowRc<'d> {
+    fn clone(&self) -> Self {
+        self.rc.fetch_add(1, Ordering::Release);
+        Self {
+            rc: self.rc,
+            inner: PhantomData,
         }
     }
 }
 
-/// This is essentially [esp_now_send_status_t](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_now.html#_CPPv421esp_now_send_status_t)
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum SendStatus {
-    Success,
-    Failed,
+impl<'d> Drop for EspNowRc<'d> {
+    fn drop(&mut self) {
+        if self.rc.fetch_sub(1, Ordering::AcqRel) == 1 {
+            unsafe {
+                esp_now_unregister_recv_cb();
+                esp_now_deinit();
+            }
+        }
+    }
 }
 
-/// This struct is returned by a sync esp now send. Invoking `wait` method of this
-/// struct will block current task until the callback function of esp now send is called
-/// and return the status of previous sending.
-pub struct SendWaiter(());
+/// ESP-NOW is a kind of connectionless Wi-Fi communication protocol that is defined by Espressif.
+/// In ESP-NOW, application data is encapsulated in a vendor-specific action frame and then transmitted from
+/// one Wi-Fi device to another without connection. CTR with CBC-MAC Protocol(CCMP) is used to protect the
+/// action frame for security. ESP-NOW is widely used in smart light, remote controlling, sensor, etc.
+///
+/// Currently this implementation (when used together with traditional Wi-Fi) ONLY support STA mode.
+///
+pub struct EspNow<'d> {
+    _device: Option<PeripheralRef<'d, radio::Wifi>>,
+    manager: EspNowManager<'d>,
+    sender: EspNowSender<'d>,
+    receiver: EspNowReceiver<'d>,
+}
 
-impl SendWaiter {
-    /// Wait for the previous sending to complete, i.e. the send callback is invoked with
-    /// status of the sending.
-    ///
-    /// Note: if you firstly dropped waiter of a sending and then wait for a following sending,
-    /// you probably get unreliable status because we cannot determine which sending the waited status
-    /// belongs to.
-    pub fn wait(self) -> SendStatus {
-        while !ESP_NOW_SEND_CB_INVOKED.load(Ordering::Acquire) {}
+impl<'d> EspNow<'d> {
+    pub fn new(
+        inited: &EspWifiInitialization,
+        device: impl Peripheral<P = radio::Wifi> + 'd,
+    ) -> Result<EspNow<'d>, EspNowError> {
+        EspNow::new_internal(inited, Some(device.into_ref()))
+    }
 
-        if ESP_NOW_SEND_STATUS.load(Ordering::Relaxed) {
-            SendStatus::Success
-        } else {
-            SendStatus::Failed
+    pub fn new_with_wifi(
+        inited: &EspWifiInitialization,
+        _token: EspNowWithWifiCreateToken,
+    ) -> Result<EspNow<'d>, EspNowError> {
+        EspNow::new_internal(inited, None::<PeripheralRef<'d, radio::Wifi>>)
+    }
+
+    fn new_internal(
+        inited: &EspWifiInitialization,
+        device: Option<PeripheralRef<'d, radio::Wifi>>,
+    ) -> Result<EspNow<'d>, EspNowError> {
+        if !inited.is_wifi() {
+            return Err(EspNowError::Error(Error::NotInitialized));
         }
+
+        let espnow_rc = EspNowRc::new()?;
+        let esp_now = EspNow {
+            _device: device,
+            manager: EspNowManager(espnow_rc.clone()),
+            sender: EspNowSender(espnow_rc.clone()),
+            receiver: EspNowReceiver(espnow_rc),
+        };
+        check_error!({ esp_wifi_set_mode(wifi_mode_t_WIFI_MODE_STA) })?;
+        check_error!({ esp_wifi_start() })?;
+        check_error!({ esp_now_init() })?;
+        check_error!({ esp_now_register_recv_cb(Some(rcv_cb)) })?;
+        check_error!({ esp_now_register_send_cb(Some(send_cb)) })?;
+
+        esp_now.add_peer(PeerInfo {
+            peer_address: BROADCAST_ADDRESS,
+            lmk: None,
+            channel: None,
+            encrypt: false,
+        })?;
+
+        Ok(esp_now)
+    }
+
+    pub fn split(self) -> (EspNowManager<'d>, EspNowSender<'d>, EspNowReceiver<'d>) {
+        (self.manager, self.sender, self.receiver)
+    }
+
+    /// Set primary WiFi channel
+    /// Should only be used when using ESP-NOW without AP or STA
+    pub fn set_channel(&self, channel: u8) -> Result<(), EspNowError> {
+        self.manager.set_channel(channel)
+    }
+
+    /// Get the version of ESPNOW
+    pub fn get_version(&self) -> Result<u32, EspNowError> {
+        self.manager.get_version()
+    }
+
+    /// Add a peer to the list of known peers
+    pub fn add_peer(&self, peer: PeerInfo) -> Result<(), EspNowError> {
+        self.manager.add_peer(peer)
+    }
+
+    /// Remove the given peer
+    pub fn remove_peer(&self, peer_address: &[u8; 6]) -> Result<(), EspNowError> {
+        self.manager.remove_peer(peer_address)
+    }
+
+    /// Modify a peer information
+    pub fn modify_peer(&self, peer: PeerInfo) -> Result<(), EspNowError> {
+        self.manager.modify_peer(peer)
+    }
+
+    /// Get peer by MAC address
+    pub fn get_peer(&self, peer_address: &[u8; 6]) -> Result<PeerInfo, EspNowError> {
+        self.manager.get_peer(peer_address)
+    }
+
+    /// Fetch a peer from peer list
+    ///
+    /// Only returns peers which address is unicast, for multicast/broadcast addresses, the function will
+    /// skip the entry and find the next in the peer list.
+    pub fn fetch_peer(&self, from_head: bool) -> Result<PeerInfo, EspNowError> {
+        self.manager.fetch_peer(from_head)
+    }
+
+    /// Check is peer is known
+    pub fn peer_exists(&self, peer_address: &[u8; 6]) -> bool {
+        self.manager.peer_exists(peer_address)
+    }
+
+    /// Get the number of peers
+    pub fn peer_count(&self) -> Result<PeerCount, EspNowError> {
+        self.manager.peer_count()
+    }
+
+    /// Set the primary master key
+    pub fn set_pmk(&self, pmk: &[u8; 16]) -> Result<(), EspNowError> {
+        self.manager.set_pmk(pmk)
+    }
+
+    /// Set wake window for esp_now to wake up in interval unit
+    ///
+    /// Window is milliseconds the chip keep waked each interval, from 0 to 65535.
+    pub fn set_wake_window(&self, wake_window: u16) -> Result<(), EspNowError> {
+        self.manager.set_wake_window(wake_window)
+    }
+
+    /// Config ESPNOW rate
+    pub fn set_rate(&self, rate: WifiPhyRate) -> Result<(), EspNowError> {
+        self.manager.set_rate(rate)
+    }
+
+    /// Send data to peer
+    ///
+    /// The peer needs to be added to the peer list first.
+    pub fn send<'s>(
+        &'s mut self,
+        dst_addr: &[u8; 6],
+        data: &[u8],
+    ) -> Result<SendWaiter<'s>, EspNowError> {
+        self.sender.send(dst_addr, data)
+    }
+
+    /// Receive data
+    pub fn receive(&self) -> Option<ReceivedData> {
+        self.receiver.receive()
     }
 }
 
@@ -639,47 +793,92 @@ mod asynch {
     pub(super) static ESP_NOW_TX_WAKER: AtomicWaker = AtomicWaker::new();
     pub(super) static ESP_NOW_RX_WAKER: AtomicWaker = AtomicWaker::new();
 
-    impl<'d> EspNow<'d> {
-        pub async fn receive_async(&self) -> ReceivedData {
-            ReceiveFuture.await
-        }
-
-        pub fn send_async(
-            &self,
-            dst_addr: &[u8; 6],
-            data: &[u8],
-        ) -> Result<SendFuture, EspNowError> {
-            let mut addr = [0u8; 6];
-            addr.copy_from_slice(dst_addr);
-            ESP_NOW_SEND_CB_INVOKED.store(false, Ordering::Release);
-            check_error!({ esp_now_send(addr.as_ptr(), data.as_ptr(), data.len() as u32) })?;
-            Ok(SendFuture(()))
+    impl<'d> EspNowReceiver<'d> {
+        /// This function takes mutable reference to self because the implementation of
+        /// `ReceiveFuture` is not logically thread safe.
+        pub fn receive_async<'r>(&'r mut self) -> ReceiveFuture<'r> {
+            ReceiveFuture(PhantomData)
         }
     }
 
-    pub struct SendFuture(());
-
-    impl core::future::Future for SendFuture {
-        type Output = SendStatus;
-
-        fn poll(self: core::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-            ESP_NOW_TX_WAKER.register(cx.waker());
-
-            if ESP_NOW_SEND_CB_INVOKED.load(Ordering::Acquire) {
-                Poll::Ready(if ESP_NOW_SEND_STATUS.load(Ordering::Relaxed) {
-                    SendStatus::Success
-                } else {
-                    SendStatus::Failed
-                })
-            } else {
-                Poll::Pending
+    impl<'d> EspNowSender<'d> {
+        pub fn send_async<'s, 'r>(
+            &'s mut self,
+            addr: &'r [u8; 6],
+            data: &'r [u8],
+        ) -> SendFuture<'s, 'r> {
+            SendFuture {
+                _sender: PhantomData,
+                addr,
+                data,
+                sent: false,
             }
         }
     }
 
-    struct ReceiveFuture;
+    impl<'d> EspNow<'d> {
+        /// This function takes mutable reference to self because the implementation of
+        /// `ReceiveFuture` is not logically thread safe.
+        #[must_use]
+        pub fn receive_async<'r>(&'r mut self) -> ReceiveFuture<'r> {
+            self.receiver.receive_async()
+        }
 
-    impl core::future::Future for ReceiveFuture {
+        /// The returned future must not be dropped before it's ready to avoid getting wrong status
+        /// for sendings.
+        #[must_use]
+        pub fn send_async<'s, 'r>(
+            &'s mut self,
+            dst_addr: &'r [u8; 6],
+            data: &'r [u8],
+        ) -> SendFuture<'s, 'r> {
+            self.sender.send_async(dst_addr, data)
+        }
+    }
+
+    pub struct SendFuture<'s, 'r> {
+        _sender: PhantomData<&'s mut EspNowSender<'s>>,
+        addr: &'r [u8; 6],
+        data: &'r [u8],
+        sent: bool,
+    }
+
+    impl<'s, 'r> core::future::Future for SendFuture<'s, 'r> {
+        type Output = Result<(), EspNowError>;
+
+        fn poll(mut self: core::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+            if !self.sent {
+                ESP_NOW_TX_WAKER.register(cx.waker());
+                ESP_NOW_SEND_CB_INVOKED.store(false, Ordering::Release);
+                if let Err(e) = check_error!({
+                    esp_now_send(
+                        self.addr.as_ptr(),
+                        self.data.as_ptr(),
+                        self.data.len() as u32,
+                    )
+                }) {
+                    return Poll::Ready(Err(e));
+                }
+                self.sent = true;
+            }
+
+            if !ESP_NOW_SEND_CB_INVOKED.load(Ordering::Acquire) {
+                Poll::Pending
+            } else {
+                Poll::Ready(if ESP_NOW_SEND_STATUS.load(Ordering::Relaxed) {
+                    Ok(())
+                } else {
+                    Err(EspNowError::SendFailed)
+                })
+            }
+        }
+    }
+
+    /// It's not logically safe to poll multiple instances of `ReceiveFuture` simultaneously
+    /// since the callback can only wake one future, leaving the rest of them unwakable.
+    pub struct ReceiveFuture<'r>(PhantomData<&'r mut EspNowReceiver<'r>>);
+
+    impl<'r> core::future::Future for ReceiveFuture<'r> {
         type Output = ReceivedData;
 
         fn poll(self: core::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
