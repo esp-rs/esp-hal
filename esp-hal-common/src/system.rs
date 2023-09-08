@@ -106,6 +106,8 @@ pub enum Peripheral {
     ParlIo,
     #[cfg(hmac)]
     Hmac,
+    #[cfg(ecc)]
+    Ecc,
 }
 
 pub struct SoftwareInterruptControl {
@@ -378,6 +380,11 @@ impl PeripheralClockControl {
                 perip_clk_en1.modify(|_, w| w.crypto_hmac_clk_en().set_bit());
                 perip_rst_en1.modify(|_, w| w.crypto_hmac_rst().clear_bit());
             }
+            #[cfg(ecc)]
+            Peripheral::Ecc => {
+                perip_clk_en1.modify(|_, w| w.crypto_ecc_clk_en().set_bit());
+                perip_rst_en1.modify(|_, w| w.crypto_ecc_rst().clear_bit());
+            }
         }
     }
 }
@@ -540,6 +547,11 @@ impl PeripheralClockControl {
             Peripheral::Hmac => {
                 system.hmac_conf.modify(|_, w| w.hmac_clk_en().set_bit());
                 system.hmac_conf.modify(|_, w| w.hmac_rst_en().clear_bit());
+            }
+            #[cfg(ecc)]
+            Peripheral::Ecc => {
+                system.ecc_conf.modify(|_, w| w.ecc_clk_en().set_bit());
+                system.ecc_conf.modify(|_, w| w.ecc_rst_en().clear_bit());
             }
         }
     }
