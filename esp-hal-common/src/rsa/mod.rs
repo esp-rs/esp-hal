@@ -36,7 +36,7 @@
 //! [the repository with corresponding example]: https://github.com/esp-rs/esp-hal/blob/main/esp32-hal/examples/rsa.rs
 
 use core::{convert::Infallible, marker::PhantomData, ptr::copy_nonoverlapping};
-
+use nb::block;
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::RSA,
@@ -141,6 +141,66 @@ macro_rules! implement_op {
 
 pub(self) use implement_op;
 
+#[cfg(feature = "async")]
+pub(crate) mod asynch {
+    use core::task::Poll;
+    use crate::rsa::Infallible;
+
+    use embassy_sync::waitqueue::AtomicWaker;
+    use procmacros::interrupt;
+
+    use crate::rsa::{Rsa, RsaModularExponentiation, RsaMode};
+
+    static WAKER: AtomicWaker = AtomicWaker::new();
+
+    pub(crate) struct RsaFuture<'d> {
+        instance: &'d crate::peripherals::RSA,
+    }
+
+    impl <'d> RsaFuture<'d> {
+        pub fn new(instance: &'d crate::peripherals::RSA) -> Self {
+            instance
+                .int_ena
+                .modify(|_, w| w.int_ena().set_bit());
+
+            Self { instance }
+        }
+
+        fn event_bit_is_clear(&self) -> bool {
+            self.instance
+                .int_ena
+                .read()
+                .int_ena()
+                .bit_is_clear()
+        }
+    }
+
+    impl<'d> core::future::Future for RsaFuture<'d> {
+        type Output = ();
+
+        fn poll(
+            self: core::pin::Pin<&mut Self>,
+            cx: &mut core::task::Context<'_>,
+        ) -> core::task::Poll<Self::Output> {
+            WAKER.register(cx.waker());
+            if self.event_bit_is_clear() {
+                Poll::Ready(())
+            } else {
+                Poll::Pending
+            }
+        }
+    }
+
+    #[interrupt]
+    fn RSA()
+    {
+        unsafe { &*crate::peripherals::RSA::ptr() }
+            .int_ena
+            .modify(|_, w| w.int_ena().clear_bit());
+        WAKER.wake();
+    }
+}
+
 /// Support for RSA peripheral's modular exponentiation feature that could be
 /// used to find the `(base ^ exponent) mod modulus`.
 ///
@@ -179,6 +239,19 @@ where
         self.rsa.clear_interrupt();
         Ok(())
     }
+
+    #[cfg(feature = "async")]
+    pub(crate) fn inner(&self) -> &RSA {
+        &self.rsa.rsa
+    }
+
+    #[cfg(feature = "async")]
+    pub async fn rsa_exponentiation (&mut self, base: &T::InputType, r: &T::InputType, outbuf: &mut T::InputType)
+    {
+        self.start_exponentiation(&base, &r);  
+        asynch::RsaFuture::new(self.inner());
+        block!(self.read_results(outbuf)).unwrap();
+    }
 }
 
 /// Support for RSA peripheral's modular multiplication feature that could be
@@ -206,6 +279,21 @@ where
         }
         self.rsa.clear_interrupt();
         Ok(())
+    }
+    
+    #[cfg(feature = "async")]
+    pub(crate) fn inner(&self) -> &RSA {
+        &self.rsa.rsa
+    }
+
+    #[cfg(feature = "async")]
+    pub async fn rsa_modular_multiplication (&mut self, r: &T::InputType, outbuf: &mut T::InputType)
+    {
+        self.start_modular_multiplication(r);
+       
+        asynch::RsaFuture::new(self.inner());
+        
+        block!(self.read_results(outbuf)).unwrap();
     }
 }
 
@@ -241,5 +329,22 @@ where
         }
         self.rsa.clear_interrupt();
         Ok(())
+    }
+
+    #[cfg(feature = "async")]
+    pub(crate) fn inner(&self) -> &RSA {
+        &self.rsa.rsa
+    }
+
+    #[cfg(feature = "async")]
+    pub async fn rsa_multiplication<'b, const O: usize>(&mut self, operand_b: &T::InputType, outbuf: &mut T::OutputType)
+    where
+        T: Multi<OutputType = [u8; O]>,
+    {
+        self.start_multiplication(operand_b);
+       
+        asynch::RsaFuture::new(self.inner());
+        
+        block!(self.read_results(outbuf)).unwrap();
     }
 }
