@@ -121,3 +121,11 @@ required-features = ["embassy", "embassy-executor-thread", "async"]
 [[example]]
 name              = "embassy_i2c"
 required-features = ["embassy", "embassy-executor-thread", "async"]
+
+[[example]]
+name              = "embassy_rmt_tx"
+required-features = ["embassy", "async"]
+
+[[example]]
+name              = "embassy_rmt_rx"
+required-features = ["embassy", "async"]
