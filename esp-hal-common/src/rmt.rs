@@ -459,6 +459,9 @@ macro_rules! impl_tx_channel_creator {
             }
 
             impl<const CHANNEL: u8> $crate::rmt::TxChannel<CHANNEL> for $crate::rmt::[< Channel $channel >]<CHANNEL> {}
+
+            #[cfg(feature = "async")]
+            impl<const CHANNEL: u8> $crate::rmt::asynch::TxChannelAsync<CHANNEL> for $crate::rmt::[< Channel $channel >]<CHANNEL> {}
         }
     }
 }
@@ -474,6 +477,9 @@ macro_rules! impl_rx_channel_creator {
             }
 
             impl<const CHANNEL: u8> $crate::rmt::RxChannel<CHANNEL> for $crate::rmt::[< Channel $channel >]<CHANNEL> {}
+
+            #[cfg(feature = "async")]
+            impl<const CHANNEL: u8> $crate::rmt::asynch::RxChannelAsync<CHANNEL> for $crate::rmt::[< Channel $channel >]<CHANNEL> {}
         }
     }
 }
@@ -523,8 +529,8 @@ mod impl_for_chip {
     super::chip_specific::impl_tx_channel!(Channel0, RMT_SIG_0, 0);
     super::chip_specific::impl_tx_channel!(Channel1, RMT_SIG_1, 1);
 
-    super::chip_specific::impl_rx_channel!(Channel2, RMT_SIG_0, 2);
-    super::chip_specific::impl_rx_channel!(Channel3, RMT_SIG_1, 3);
+    super::chip_specific::impl_rx_channel!(Channel2, RMT_SIG_0, 2, 0);
+    super::chip_specific::impl_rx_channel!(Channel3, RMT_SIG_1, 3, 1);
 }
 
 #[cfg(any(esp32))]
@@ -740,10 +746,10 @@ mod impl_for_chip {
     super::chip_specific::impl_tx_channel!(Channel2, RMT_SIG_2, 2);
     super::chip_specific::impl_tx_channel!(Channel3, RMT_SIG_3, 3);
 
-    super::chip_specific::impl_rx_channel!(Channel4, RMT_SIG_0, 4);
-    super::chip_specific::impl_rx_channel!(Channel5, RMT_SIG_1, 5);
-    super::chip_specific::impl_rx_channel!(Channel6, RMT_SIG_2, 6);
-    super::chip_specific::impl_rx_channel!(Channel7, RMT_SIG_3, 7);
+    super::chip_specific::impl_rx_channel!(Channel4, RMT_SIG_0, 4, 0);
+    super::chip_specific::impl_rx_channel!(Channel5, RMT_SIG_1, 5, 1);
+    super::chip_specific::impl_rx_channel!(Channel6, RMT_SIG_2, 6, 2);
+    super::chip_specific::impl_rx_channel!(Channel7, RMT_SIG_3, 7, 3);
 }
 
 /// RMT Channel 0
@@ -909,8 +915,359 @@ pub trait RxChannel<const CHANNEL: u8>: private::RxChannelInternal<CHANNEL> {
     }
 }
 
+#[cfg(feature = "async")]
+pub mod asynch {
+    use core::{
+        marker::PhantomData,
+        pin::Pin,
+        task::{Context, Poll},
+    };
+
+    use embassy_sync::waitqueue::AtomicWaker;
+    use procmacros::interrupt;
+
+    use super::{private::Event, *};
+
+    #[cfg(any(esp32, esp32s3))]
+    const NUM_CHANNELS: usize = 8;
+    #[cfg(not(any(esp32, esp32s3)))]
+    const NUM_CHANNELS: usize = 4;
+
+    const INIT: AtomicWaker = AtomicWaker::new();
+    static WAKER: [AtomicWaker; NUM_CHANNELS] = [INIT; NUM_CHANNELS];
+
+    pub(crate) struct RmtTxFuture<T, const CHANNEL: u8>
+    where
+        T: TxChannelAsync<CHANNEL>,
+    {
+        _phantom: PhantomData<T>,
+    }
+
+    impl<T, const CHANNEL: u8> RmtTxFuture<T, CHANNEL>
+    where
+        T: TxChannelAsync<CHANNEL>,
+    {
+        pub fn new(_instance: &T) -> Self {
+            Self {
+                _phantom: PhantomData,
+            }
+        }
+    }
+
+    impl<T, const CHANNEL: u8> core::future::Future for RmtTxFuture<T, CHANNEL>
+    where
+        T: TxChannelAsync<CHANNEL>,
+    {
+        type Output = ();
+
+        fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
+            WAKER[CHANNEL as usize].register(ctx.waker());
+
+            if T::is_error() || T::is_done() {
+                Poll::Ready(())
+            } else {
+                Poll::Pending
+            }
+        }
+    }
+
+    pub trait TxChannelAsync<const CHANNEL: u8>: private::TxChannelInternal<CHANNEL> {
+        /// Start transmitting the given pulse code sequence.
+        /// The length of sequence cannot exceed the size of the allocated RMT
+        /// RAM.
+        async fn transmit<'a, T: Into<u32> + Copy>(&mut self, data: &'a [T]) -> Result<(), Error>
+        where
+            Self: Sized,
+        {
+            if data.len() > constants::RMT_CHANNEL_RAM_SIZE {
+                return Err(Error::InvalidArgument);
+            }
+
+            Self::clear_interrupts();
+            Self::listen_interrupt(super::private::Event::End);
+            Self::listen_interrupt(super::private::Event::Error);
+            Self::send_raw(data, false, 0);
+
+            RmtTxFuture::new(self).await;
+
+            if Self::is_error() {
+                Err(Error::TransmissionError)
+            } else {
+                Ok(())
+            }
+        }
+    }
+
+    pub(crate) struct RmtRxFuture<T, const CHANNEL: u8>
+    where
+        T: RxChannelAsync<CHANNEL>,
+    {
+        _phantom: PhantomData<T>,
+    }
+
+    impl<T, const CHANNEL: u8> RmtRxFuture<T, CHANNEL>
+    where
+        T: RxChannelAsync<CHANNEL>,
+    {
+        pub fn new(_instance: &T) -> Self {
+            Self {
+                _phantom: PhantomData,
+            }
+        }
+    }
+
+    impl<T, const CHANNEL: u8> core::future::Future for RmtRxFuture<T, CHANNEL>
+    where
+        T: RxChannelAsync<CHANNEL>,
+    {
+        type Output = ();
+
+        fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
+            WAKER[CHANNEL as usize].register(ctx.waker());
+            if T::is_error() || T::is_done() {
+                Poll::Ready(())
+            } else {
+                Poll::Pending
+            }
+        }
+    }
+
+    pub trait RxChannelAsync<const CHANNEL: u8>: private::RxChannelInternal<CHANNEL> {
+        /// Start receiving a pulse code sequence.
+        /// The length of sequence cannot exceed the size of the allocated RMT
+        /// RAM.
+        async fn receive<'a, T: From<u32> + Copy>(&mut self, data: &'a mut [T]) -> Result<(), Error>
+        where
+            Self: Sized,
+        {
+            if data.len() > constants::RMT_CHANNEL_RAM_SIZE {
+                return Err(Error::InvalidArgument);
+            }
+
+            Self::clear_interrupts();
+            Self::listen_interrupt(super::private::Event::End);
+            Self::listen_interrupt(super::private::Event::Error);
+            Self::start_receive_raw();
+
+            RmtRxFuture::new(self).await;
+
+            if Self::is_error() {
+                Err(Error::TransmissionError)
+            } else {
+                Self::stop();
+                Self::clear_interrupts();
+                Self::update();
+
+                let ptr = (constants::RMT_RAM_START
+                    + CHANNEL as usize * constants::RMT_CHANNEL_RAM_SIZE * 4)
+                    as *mut u32;
+                let len = data.len();
+                for (idx, entry) in data.iter_mut().take(len).enumerate() {
+                    *entry = unsafe { ptr.add(idx).read_volatile().into() };
+                }
+
+                Ok(())
+            }
+        }
+    }
+
+    #[cfg(not(any(esp32, esp32s2)))]
+    #[interrupt]
+    fn RMT() {
+        if let Some(channel) = super::chip_specific::pending_interrupt_for_channel() {
+            use crate::rmt::private::{RxChannelInternal, TxChannelInternal};
+
+            match channel {
+                0 => {
+                    super::Channel0::<0>::unlisten_interrupt(Event::End);
+                    super::Channel0::<0>::unlisten_interrupt(Event::Error);
+                }
+                1 => {
+                    super::Channel1::<1>::unlisten_interrupt(Event::End);
+                    super::Channel1::<1>::unlisten_interrupt(Event::Error);
+                }
+                2 => {
+                    super::Channel2::<2>::unlisten_interrupt(Event::End);
+                    super::Channel2::<2>::unlisten_interrupt(Event::Error);
+                }
+                3 => {
+                    super::Channel3::<3>::unlisten_interrupt(Event::End);
+                    super::Channel3::<3>::unlisten_interrupt(Event::Error);
+                }
+
+                // TODO ... how to handle chips which can use a channel for tx AND rx?
+                #[cfg(any(esp32, esp32s3))]
+                4 => {
+                    super::Channel4::<4>::unlisten_interrupt(Event::End);
+                    super::Channel4::<4>::unlisten_interrupt(Event::Error);
+                }
+                #[cfg(any(esp32, esp32s3))]
+                5 => {
+                    super::Channel5::<5>::unlisten_interrupt(Event::End);
+                    super::Channel5::<5>::unlisten_interrupt(Event::Error);
+                }
+                #[cfg(any(esp32, esp32s3))]
+                6 => {
+                    super::Channel6::<6>::unlisten_interrupt(Event::End);
+                    super::Channel6::<6>::unlisten_interrupt(Event::Error);
+                }
+                #[cfg(any(esp32, esp32s3))]
+                7 => {
+                    super::Channel7::<7>::unlisten_interrupt(Event::End);
+                    super::Channel7::<7>::unlisten_interrupt(Event::Error);
+                }
+
+                _ => unreachable!(),
+            }
+
+            let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+            rmt.int_ena.write(|w| unsafe { w.bits(0) });
+
+            WAKER[channel].wake();
+        }
+    }
+
+    #[cfg(any(esp32, esp32s2))]
+    #[interrupt]
+    fn RMT() {
+        if let Some(channel) = super::chip_specific::pending_interrupt_for_channel() {
+            match channel {
+                0 => {
+                    <Channel0<0> as super::private::TxChannelInternal<0>>::unlisten_interrupt(
+                        Event::End,
+                    );
+                    <Channel0<0> as super::private::TxChannelInternal<0>>::unlisten_interrupt(
+                        Event::Error,
+                    );
+                    <Channel0<0> as super::private::RxChannelInternal<0>>::unlisten_interrupt(
+                        Event::End,
+                    );
+                    <Channel0<0> as super::private::RxChannelInternal<0>>::unlisten_interrupt(
+                        Event::Error,
+                    );
+                }
+                1 => {
+                    <Channel1<1> as super::private::TxChannelInternal<1>>::unlisten_interrupt(
+                        Event::End,
+                    );
+                    <Channel1<1> as super::private::TxChannelInternal<1>>::unlisten_interrupt(
+                        Event::Error,
+                    );
+                    <Channel1<1> as super::private::RxChannelInternal<1>>::unlisten_interrupt(
+                        Event::End,
+                    );
+                    <Channel1<1> as super::private::RxChannelInternal<1>>::unlisten_interrupt(
+                        Event::Error,
+                    );
+                }
+                2 => {
+                    <Channel2<2> as super::private::TxChannelInternal<2>>::unlisten_interrupt(
+                        Event::End,
+                    );
+                    <Channel2<2> as super::private::TxChannelInternal<2>>::unlisten_interrupt(
+                        Event::Error,
+                    );
+                    <Channel2<2> as super::private::RxChannelInternal<2>>::unlisten_interrupt(
+                        Event::End,
+                    );
+                    <Channel2<2> as super::private::RxChannelInternal<2>>::unlisten_interrupt(
+                        Event::Error,
+                    );
+                }
+                3 => {
+                    <Channel3<3> as super::private::TxChannelInternal<3>>::unlisten_interrupt(
+                        Event::End,
+                    );
+                    <Channel3<3> as super::private::TxChannelInternal<3>>::unlisten_interrupt(
+                        Event::Error,
+                    );
+                    <Channel3<3> as super::private::RxChannelInternal<3>>::unlisten_interrupt(
+                        Event::End,
+                    );
+                    <Channel3<3> as super::private::RxChannelInternal<3>>::unlisten_interrupt(
+                        Event::Error,
+                    );
+                }
+                #[cfg(any(esp32))]
+                4 => {
+                    <Channel4<4> as super::private::TxChannelInternal<4>>::unlisten_interrupt(
+                        Event::End,
+                    );
+                    <Channel4<4> as super::private::TxChannelInternal<4>>::unlisten_interrupt(
+                        Event::Error,
+                    );
+                    <Channel4<4> as super::private::RxChannelInternal<4>>::unlisten_interrupt(
+                        Event::End,
+                    );
+                    <Channel4<4> as super::private::RxChannelInternal<4>>::unlisten_interrupt(
+                        Event::Error,
+                    );
+                }
+                #[cfg(any(esp32, esp32s3))]
+                5 => {
+                    <Channel5<5> as super::private::TxChannelInternal<5>>::unlisten_interrupt(
+                        Event::End,
+                    );
+                    <Channel5<5> as super::private::TxChannelInternal<5>>::unlisten_interrupt(
+                        Event::Error,
+                    );
+                    <Channel5<5> as super::private::RxChannelInternal<5>>::unlisten_interrupt(
+                        Event::End,
+                    );
+                    <Channel5<5> as super::private::RxChannelInternal<5>>::unlisten_interrupt(
+                        Event::Error,
+                    );
+                }
+                #[cfg(any(esp32, esp32s3))]
+                6 => {
+                    <Channel6<6> as super::private::TxChannelInternal<6>>::unlisten_interrupt(
+                        Event::End,
+                    );
+                    <Channel6<6> as super::private::TxChannelInternal<6>>::unlisten_interrupt(
+                        Event::Error,
+                    );
+                    <Channel6<6> as super::private::RxChannelInternal<6>>::unlisten_interrupt(
+                        Event::End,
+                    );
+                    <Channel6<6> as super::private::RxChannelInternal<6>>::unlisten_interrupt(
+                        Event::Error,
+                    );
+                }
+                #[cfg(any(esp32, esp32s3))]
+                7 => {
+                    <Channel7<7> as super::private::TxChannelInternal<7>>::unlisten_interrupt(
+                        Event::End,
+                    );
+                    <Channel7<7> as super::private::TxChannelInternal<7>>::unlisten_interrupt(
+                        Event::Error,
+                    );
+                    <Channel7<7> as super::private::RxChannelInternal<7>>::unlisten_interrupt(
+                        Event::End,
+                    );
+                    <Channel7<7> as super::private::RxChannelInternal<7>>::unlisten_interrupt(
+                        Event::Error,
+                    );
+                }
+
+                _ => unreachable!(),
+            }
+
+            let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+            rmt.int_ena.write(|w| unsafe { w.bits(0) });
+
+            WAKER[channel].wake();
+        }
+    }
+}
+
 mod private {
     use crate::{peripheral::Peripheral, soc::constants};
+
+    pub enum Event {
+        Error,
+        Threshold,
+        End,
+    }
 
     pub trait CreateInstance<'d> {
         fn create(peripheral: impl Peripheral<P = crate::peripherals::RMT> + 'd) -> Self;
@@ -986,6 +1343,10 @@ mod private {
         }
 
         fn stop();
+
+        fn listen_interrupt(event: Event);
+
+        fn unlisten_interrupt(event: Event);
     }
 
     pub trait RxChannelInternal<const CHANNEL: u8> {
@@ -1024,6 +1385,10 @@ mod private {
         fn set_filter_threshold(value: u8);
 
         fn set_idle_threshold(value: u16);
+
+        fn listen_interrupt(event: Event);
+
+        fn unlisten_interrupt(event: Event);
     }
 }
 
@@ -1065,6 +1430,52 @@ mod chip_specific {
 
             let rmt = unsafe { &*crate::peripherals::RMT::PTR };
             rmt.sys_conf.modify(|_, w| w.apb_fifo_mask().set_bit());
+        }
+    }
+
+    #[allow(unused)]
+    #[cfg(not(esp32s3))]
+    pub fn pending_interrupt_for_channel() -> Option<usize> {
+        let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+        let st = rmt.int_st.read();
+
+        if st.ch0_tx_end().bit() || st.ch0_tx_err().bit() {
+            Some(0)
+        } else if st.ch1_tx_end().bit() || st.ch1_tx_err().bit() {
+            Some(1)
+        } else if st.ch2_rx_end().bit() || st.ch2_rx_err().bit() {
+            Some(2)
+        } else if st.ch3_rx_end().bit() || st.ch3_rx_err().bit() {
+            Some(3)
+        } else {
+            None
+        }
+    }
+
+    #[allow(unused)]
+    #[cfg(esp32s3)]
+    pub fn pending_interrupt_for_channel() -> Option<usize> {
+        let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+        let st = rmt.int_st.read();
+
+        if st.ch0_tx_end().bit() || st.ch0_tx_err().bit() {
+            Some(0)
+        } else if st.ch1_tx_end().bit() || st.ch1_tx_err().bit() {
+            Some(1)
+        } else if st.ch2_tx_end().bit() || st.ch2_tx_err().bit() {
+            Some(2)
+        } else if st.ch3_tx_end().bit() || st.ch3_tx_err().bit() {
+            Some(3)
+        } else if st.ch4_rx_end().bit() || st.ch4_rx_err().bit() {
+            Some(4)
+        } else if st.ch5_rx_end().bit() || st.ch5_rx_err().bit() {
+            Some(5)
+        } else if st.ch6_rx_end().bit() || st.ch6_rx_err().bit() {
+            Some(6)
+        } else if st.ch7_rx_end().bit() || st.ch7_rx_err().bit() {
+            Some(7)
+        } else {
+            None
         }
     }
 
@@ -1222,13 +1633,43 @@ mod chip_specific {
                         rmt.ch_tx_conf0[$ch_num].modify(|_, w| w.tx_stop().set_bit());
                         Self::update();
                     }
+
+                    fn listen_interrupt(event: $crate::rmt::private::Event) {
+                        let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                        match event {
+                            $crate::rmt::private::Event::Error => {
+                                rmt.int_ena.modify(|_,w| w.[< ch $ch_num _tx_err >]().set_bit());
+                            }
+                            $crate::rmt::private::Event::End => {
+                                rmt.int_ena.modify(|_,w| w.[< ch $ch_num _tx_end >]().set_bit());
+                            }
+                            $crate::rmt::private::Event::Threshold => {
+                                rmt.int_ena.modify(|_,w| w.[< ch $ch_num _tx_thr_event >]().set_bit());
+                            }
+                        }
+                    }
+
+                    fn unlisten_interrupt(event: $crate::rmt::private::Event) {
+                        let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                        match event {
+                            $crate::rmt::private::Event::Error => {
+                                rmt.int_ena.modify(|_,w| w.[< ch $ch_num _tx_err >]().clear_bit());
+                            }
+                            $crate::rmt::private::Event::End => {
+                                rmt.int_ena.modify(|_,w| w.[< ch $ch_num _tx_end >]().clear_bit());
+                            }
+                            $crate::rmt::private::Event::Threshold => {
+                                rmt.int_ena.modify(|_,w| w.[< ch $ch_num _tx_thr_event >]().clear_bit());
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 
     macro_rules! impl_rx_channel {
-        ($channel:ident, $signal:ident, $ch_num:literal) => {
+        ($channel:ident, $signal:ident, $ch_num:literal, $ch_index:literal) => {
             paste::paste! {
                 impl<const CHANNEL: u8> $crate::rmt::private::RxChannelInternal<CHANNEL> for $crate::rmt:: $channel <CHANNEL> {
                     fn new() -> Self {
@@ -1270,7 +1711,7 @@ mod chip_specific {
                     fn set_carrier(carrier: bool, high: u16, low: u16, level: bool) {
                         let rmt = unsafe { &*crate::peripherals::RMT::PTR };
 
-                        rmt.ch_rx_carrier_rm[$ch_num].write(|w| {
+                        rmt.ch_rx_carrier_rm[$ch_index].write(|w| {
                             w.carrier_high_thres()
                                 .variant(high)
                                 .carrier_low_thres()
@@ -1331,6 +1772,36 @@ mod chip_specific {
 
                         rmt.[< ch $ch_num _rx_conf0 >].modify(|_, w| w.idle_thres().variant(value));
                     }
+
+                    fn listen_interrupt(event: $crate::rmt::private::Event) {
+                        let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                        match event {
+                            $crate::rmt::private::Event::Error => {
+                                rmt.int_ena.modify(|_,w| w.[< ch $ch_num _rx_err >]().set_bit());
+                            }
+                            $crate::rmt::private::Event::End => {
+                                rmt.int_ena.modify(|_,w| w.[< ch $ch_num _rx_end >]().set_bit());
+                            }
+                            $crate::rmt::private::Event::Threshold => {
+                                rmt.int_ena.modify(|_,w| w.[< ch $ch_num _rx_thr_event >]().set_bit());
+                            }
+                        }
+                    }
+
+                    fn unlisten_interrupt(event: $crate::rmt::private::Event) {
+                        let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                        match event {
+                            $crate::rmt::private::Event::Error => {
+                                rmt.int_ena.modify(|_,w| w.[< ch $ch_num _rx_err >]().clear_bit());
+                            }
+                            $crate::rmt::private::Event::End => {
+                                rmt.int_ena.modify(|_,w| w.[< ch $ch_num _rx_end >]().clear_bit());
+                            }
+                            $crate::rmt::private::Event::Threshold => {
+                                rmt.int_ena.modify(|_,w| w.[< ch $ch_num _rx_thr_event >]().clear_bit());
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1361,6 +1832,52 @@ mod chip_specific {
 
         #[cfg(not(esp32))]
         rmt.apb_conf.modify(|_, w| w.clk_en().set_bit());
+    }
+
+    #[allow(unused)]
+    #[cfg(esp32)]
+    pub fn pending_interrupt_for_channel() -> Option<usize> {
+        let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+        let st = rmt.int_st.read();
+
+        if st.ch0_rx_end().bit() || st.ch0_tx_end().bit() || st.ch0_err().bit() {
+            Some(0)
+        } else if st.ch1_rx_end().bit() || st.ch1_tx_end().bit() || st.ch1_err().bit() {
+            Some(1)
+        } else if st.ch2_rx_end().bit() || st.ch2_tx_end().bit() || st.ch2_err().bit() {
+            Some(2)
+        } else if st.ch3_rx_end().bit() || st.ch3_tx_end().bit() || st.ch3_err().bit() {
+            Some(3)
+        } else if st.ch4_rx_end().bit() || st.ch4_tx_end().bit() || st.ch4_err().bit() {
+            Some(4)
+        } else if st.ch5_rx_end().bit() || st.ch5_tx_end().bit() || st.ch5_err().bit() {
+            Some(5)
+        } else if st.ch6_rx_end().bit() || st.ch6_tx_end().bit() || st.ch6_err().bit() {
+            Some(6)
+        } else if st.ch7_rx_end().bit() || st.ch7_tx_end().bit() || st.ch7_err().bit() {
+            Some(7)
+        } else {
+            None
+        }
+    }
+
+    #[allow(unused)]
+    #[cfg(esp32s2)]
+    pub fn pending_interrupt_for_channel() -> Option<usize> {
+        let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+        let st = rmt.int_st.read();
+
+        if st.ch0_rx_end().bit() || st.ch0_tx_end().bit() || st.ch0_err().bit() {
+            Some(0)
+        } else if st.ch1_rx_end().bit() || st.ch1_tx_end().bit() || st.ch1_err().bit() {
+            Some(1)
+        } else if st.ch2_rx_end().bit() || st.ch2_tx_end().bit() || st.ch2_err().bit() {
+            Some(2)
+        } else if st.ch3_rx_end().bit() || st.ch3_tx_end().bit() || st.ch3_err().bit() {
+            Some(3)
+        } else {
+            None
+        }
     }
 
     macro_rules! impl_tx_channel {
@@ -1497,6 +2014,36 @@ mod chip_specific {
                             rmt.[< ch $ch_num conf1 >].modify(|_, w| w.tx_stop().set_bit());
                         }
                     }
+
+                    fn listen_interrupt(event: $crate::rmt::private::Event) {
+                        let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                        match event {
+                            $crate::rmt::private::Event::Error => {
+                                rmt.int_ena.modify(|_,w| w.[< ch $ch_num _err >]().set_bit());
+                            }
+                            $crate::rmt::private::Event::End => {
+                                rmt.int_ena.modify(|_,w| w.[< ch $ch_num _tx_end >]().set_bit());
+                            }
+                            $crate::rmt::private::Event::Threshold => {
+                                rmt.int_ena.modify(|_,w| w.[< ch $ch_num _tx_thr_event >]().set_bit());
+                            }
+                        }
+                    }
+
+                    fn unlisten_interrupt(event: $crate::rmt::private::Event) {
+                        let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                        match event {
+                            $crate::rmt::private::Event::Error => {
+                                rmt.int_ena.modify(|_,w| w.[< ch $ch_num _err >]().clear_bit());
+                            }
+                            $crate::rmt::private::Event::End => {
+                                rmt.int_ena.modify(|_,w| w.[< ch $ch_num _tx_end >]().clear_bit());
+                            }
+                            $crate::rmt::private::Event::Threshold => {
+                                rmt.int_ena.modify(|_,w| w.[< ch $ch_num _tx_thr_event >]().clear_bit());
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1612,6 +2159,36 @@ mod chip_specific {
                         let rmt = unsafe { &*crate::peripherals::RMT::PTR };
 
                         rmt.[< ch $ch_num conf0 >].modify(|_, w| w.idle_thres().variant(value));
+                    }
+
+                    fn listen_interrupt(event: $crate::rmt::private::Event) {
+                        let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                        match event {
+                            $crate::rmt::private::Event::Error => {
+                                rmt.int_ena.modify(|_,w| w.[< ch $ch_num _err >]().set_bit());
+                            }
+                            $crate::rmt::private::Event::End => {
+                                rmt.int_ena.modify(|_,w| w.[< ch $ch_num _rx_end >]().set_bit());
+                            }
+                            $crate::rmt::private::Event::Threshold => {
+                                rmt.int_ena.modify(|_,w| w.[< ch $ch_num _tx_thr_event >]().set_bit());
+                            }
+                        }
+                    }
+
+                    fn unlisten_interrupt(event: $crate::rmt::private::Event) {
+                        let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                        match event {
+                            $crate::rmt::private::Event::Error => {
+                                rmt.int_ena.modify(|_,w| w.[< ch $ch_num _err >]().clear_bit());
+                            }
+                            $crate::rmt::private::Event::End => {
+                                rmt.int_ena.modify(|_,w| w.[< ch $ch_num _rx_end >]().clear_bit());
+                            }
+                            $crate::rmt::private::Event::Threshold => {
+                                rmt.int_ena.modify(|_,w| w.[< ch $ch_num _tx_thr_event >]().clear_bit());
+                            }
+                        }
                     }
                 }
             }
