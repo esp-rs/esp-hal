@@ -149,8 +149,6 @@ pub(crate) mod asynch {
     use embassy_sync::waitqueue::AtomicWaker;
     use procmacros::interrupt;
 
-    use crate::rsa::{Rsa, RsaModularExponentiation, RsaMode};
-
     static WAKER: AtomicWaker = AtomicWaker::new();
 
     pub(crate) struct RsaFuture<'d> {
@@ -159,19 +157,45 @@ pub(crate) mod asynch {
 
     impl <'d> RsaFuture<'d> {
         pub fn new(instance: &'d crate::peripherals::RSA) -> Self {
+            #[cfg(not(any(esp32,esp32s2)))]
             instance
                 .int_ena
                 .modify(|_, w| w.int_ena().set_bit());
+            
+            #[cfg(esp32s2)]
+            instance
+                .interrupt_ena
+                .modify(|_, w| w.interrupt_ena().set_bit());
+    
+            #[cfg(esp32)]
+            instance
+                .interrupt
+                .modify(|_, w| w.interrupt().set_bit());
 
             Self { instance }
         }
 
         fn event_bit_is_clear(&self) -> bool {
-            self.instance
-                .int_ena
-                .read()
-                .int_ena()
-                .bit_is_clear()
+            #[cfg(not(any(esp32,esp32s2)))]
+            return self.instance
+                    .int_ena
+                    .read()
+                    .int_ena()
+                    .bit_is_clear();
+
+            #[cfg(esp32s2)]
+            return self.instance
+                    .interrupt_ena
+                    .read()
+                    .interrupt_ena()
+                    .bit_is_clear();
+
+            #[cfg(esp32)]
+            return self.instance
+                    .interrupt
+                    .read()
+                    .interrupt()
+                    .bit_is_clear();
         }
     }
 
@@ -194,9 +218,21 @@ pub(crate) mod asynch {
     #[interrupt]
     fn RSA()
     {
+        #[cfg(not(any(esp32, esp32s2)))]
         unsafe { &*crate::peripherals::RSA::ptr() }
             .int_ena
             .modify(|_, w| w.int_ena().clear_bit());
+
+        #[cfg(esp32)]
+        unsafe { &*crate::peripherals::RSA::ptr() }
+            .interrupt
+            .modify(|_, w| w.interrupt().clear_bit());
+
+        #[cfg(esp32s2)]
+        unsafe { &*crate::peripherals::RSA::ptr() }
+            .interrupt_ena
+            .modify(|_, w| w.interrupt_ena().clear_bit());
+
         WAKER.wake();
     }
 }
@@ -287,6 +323,7 @@ where
     }
 
     #[cfg(feature = "async")]
+    #[cfg(not(esp32))]
     pub async fn rsa_modular_multiplication (&mut self, r: &T::InputType, outbuf: &mut T::InputType)
     {
         self.start_modular_multiplication(r);
@@ -337,6 +374,7 @@ where
     }
 
     #[cfg(feature = "async")]
+    #[cfg(not(esp32))]
     pub async fn rsa_multiplication<'b, const O: usize>(&mut self, operand_b: &T::InputType, outbuf: &mut T::OutputType)
     where
         T: Multi<OutputType = [u8; O]>,
@@ -345,6 +383,17 @@ where
        
         asynch::RsaFuture::new(self.inner());
         
+        block!(self.read_results(outbuf)).unwrap();
+    }
+
+    #[cfg(feature = "async")]
+    #[cfg(esp32)]
+    pub async fn rsa_multiplication<'b, const O: usize>(&mut self, operand_a: &T::InputType, operand_b: &T::InputType, outbuf: &mut T::OutputType)
+    where
+        T: Multi<OutputType = [u8; O]>,
+    {
+        self.start_multiplication(operand_a, operand_b);
+        asynch::RsaFuture::new(self.inner());
         block!(self.read_results(outbuf)).unwrap();
     }
 }
