@@ -24,6 +24,8 @@ proc-macro-error = "1.0.4"
 proc-macro2      = "1.0.66"
 quote            = "1.0.33"
 syn              = {version = "2.0.31", features = ["extra-traits", "full"]}
+# toml_edit is a dependency of proc-macro-crate. Unfortunately they raised their MSRV on 0.19.15 so we pin the version for now
+toml_edit        = "=0.19.14"
 
 [features]
 esp32     = []
