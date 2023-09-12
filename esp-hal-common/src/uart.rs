@@ -66,7 +66,8 @@ use crate::{
 const UART_FIFO_SIZE: u16 = 128;
 
 /// Custom serial error type
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
     InvalidArgument,
     #[cfg(feature = "async")]
@@ -92,6 +93,7 @@ impl embedded_io::Error for Error {
 pub mod config {
     /// Number of data bits
     #[derive(PartialEq, Eq, Copy, Clone, Debug)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     pub enum DataBits {
         DataBits5 = 0,
         DataBits6 = 1,
@@ -101,6 +103,7 @@ pub mod config {
 
     /// Parity check
     #[derive(PartialEq, Eq, Copy, Clone, Debug)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     pub enum Parity {
         ParityNone,
         ParityEven,
@@ -109,6 +112,7 @@ pub mod config {
 
     /// Number of stop bits
     #[derive(PartialEq, Eq, Copy, Clone, Debug)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     pub enum StopBits {
         /// 1 stop bit
         STOP1   = 1,
@@ -120,6 +124,7 @@ pub mod config {
 
     /// UART configuration
     #[derive(Debug, Copy, Clone)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     pub struct Config {
         pub baudrate: u32,
         pub data_bits: DataBits,

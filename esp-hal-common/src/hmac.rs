@@ -51,16 +51,18 @@ pub struct Hmac<'d> {
 }
 
 /// HMAC interface error
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
     /// It means the purpose of the selected block does not match the
     /// configured key purpose and the calculation will not proceed.
     KeyPurposeMismatch,
 }
 
-/// The peripheral can be configured to deliver its output directrly to the
-/// user. It can also deliver to other periperals.
-#[derive(Clone, Copy, Debug)]
+/// The peripheral can be configured to deliver its output directly to the
+/// user. It can also deliver to other peripherals.
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum HmacPurpose {
     /// HMAC is used to re-enable JTAG after soft-disabling it.
     ToJtag     = 6,
@@ -73,7 +75,8 @@ pub enum HmacPurpose {
     ToDsOrJtag = 5,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum KeyId {
     Key0 = 0,
     Key1 = 1,

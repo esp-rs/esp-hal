@@ -283,6 +283,7 @@ impl<'a> PeripheralClockConfig<'a> {
 /// Target frequency could not be set.
 /// Check how the frequency is calculated in the corresponding method docs.
 #[derive(Copy, Clone, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct FrequencyError;
 
 /// A MCPWM peripheral

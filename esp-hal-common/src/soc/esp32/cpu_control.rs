@@ -122,7 +122,8 @@ impl<'a> Drop for AppCoreGuard<'a> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
     CoreAlreadyRunning,
 }

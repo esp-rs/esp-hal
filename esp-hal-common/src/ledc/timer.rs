@@ -19,7 +19,8 @@ use crate::{clock::Clocks, peripherals::ledc};
 const LEDC_TIMER_DIV_NUM_MAX: u64 = 0x3FFFF;
 
 /// Timer errors
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
     /// Invalid Divisor
     Divisor,
@@ -28,6 +29,7 @@ pub enum Error {
 #[cfg(esp32)]
 /// Clock source for HS Timers
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum HSClockSource {
     APBClk,
     // TODO RefTick,
@@ -35,6 +37,7 @@ pub enum HSClockSource {
 
 /// Clock source for LS Timers
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum LSClockSource {
     APBClk,
     // TODO SLOWClk
@@ -42,6 +45,7 @@ pub enum LSClockSource {
 
 /// Timer number
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Number {
     Timer0,
     Timer1,
@@ -55,6 +59,7 @@ pub mod config {
 
     /// Number of bits reserved for duty cycle adjustment
     #[derive(PartialEq, Eq, Copy, Clone, Debug)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     pub enum Duty {
         Duty1Bit = 1,
         Duty2Bit,

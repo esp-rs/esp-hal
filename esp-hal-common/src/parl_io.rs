@@ -104,7 +104,8 @@ use crate::{
 const MAX_DMA_SIZE: usize = 32736;
 
 /// Parallel IO errors
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
     /// General DMA error
     DmaError(DmaError),
@@ -122,6 +123,7 @@ impl From<DmaError> for Error {
 
 /// Parallel IO sample edge
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum SampleEdge {
     /// Positive edge
     Normal = 0,
@@ -130,7 +132,8 @@ pub enum SampleEdge {
 }
 
 /// Parallel IO bit packing order
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum BitPackOrder {
     /// Bit pack order: MSB
     Msb = 0,
@@ -140,7 +143,8 @@ pub enum BitPackOrder {
 
 #[cfg(esp32c6)]
 /// Enable Mode
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum EnableMode {
     /// Enable at high level
     HighLevel,
@@ -219,7 +223,8 @@ impl EnableMode {
 
 #[cfg(esp32h2)]
 /// Enable Mode
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum EnableMode {
     /// Enable at high level
     HighLevel,
@@ -272,6 +277,7 @@ impl EnableMode {
 
 /// Generation of GDMA SUC EOF
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum EofMode {
     /// Generate GDMA SUC EOF by data byte length
     ByteLen,

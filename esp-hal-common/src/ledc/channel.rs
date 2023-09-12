@@ -24,7 +24,8 @@ use crate::{
 };
 
 /// Fade parameter sub-errors
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum FadeError {
     /// Start duty % out of range
     StartDuty,
@@ -37,7 +38,8 @@ pub enum FadeError {
 }
 
 /// Channel errors
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
     /// Invalid duty % value
     Duty,
@@ -51,6 +53,7 @@ pub enum Error {
 
 /// Channel number
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Number {
     Channel0,
     Channel1,
@@ -68,7 +71,8 @@ pub enum Number {
 pub mod config {
     use crate::ledc::timer::{TimerIFace, TimerSpeed};
 
-    #[derive(Copy, Clone)]
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     pub enum PinConfig {
         PushPull,
         OpenDrain,

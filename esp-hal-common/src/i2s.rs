@@ -105,7 +105,8 @@ impl AcceptedWord for i16 {}
 impl AcceptedWord for i32 {}
 
 /// I2S Error
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
     Unknown,
     DmaError(DmaError),
@@ -119,6 +120,8 @@ impl From<DmaError> for Error {
 }
 
 /// Supported standards.
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Standard {
     Philips,
     // Tdm,
@@ -126,6 +129,8 @@ pub enum Standard {
 }
 
 /// Supported data formats
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg(not(any(esp32, esp32s2)))]
 pub enum DataFormat {
     Data32Channel32,
@@ -138,6 +143,8 @@ pub enum DataFormat {
 }
 
 /// Supported data formats
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg(any(esp32, esp32s2))]
 pub enum DataFormat {
     Data32Channel32,
