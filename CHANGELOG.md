@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Implement enabling/disabling BLE clock on ESP32-C6 (#784)
+- Async support for RMT (#787)
 
 ### Changed
 
