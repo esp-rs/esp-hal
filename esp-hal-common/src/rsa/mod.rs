@@ -36,7 +36,7 @@
 //! [the repository with corresponding example]: https://github.com/esp-rs/esp-hal/blob/main/esp32-hal/examples/rsa.rs
 
 use core::{convert::Infallible, marker::PhantomData, ptr::copy_nonoverlapping};
-use nb::block;
+
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::RSA,
@@ -51,6 +51,8 @@ use crate::{
 #[cfg_attr(esp32, path = "esp32.rs")]
 mod rsa_spec_impl;
 
+#[cfg(feature = "async")]
+use nb::block;
 pub use rsa_spec_impl::operand_sizes;
 
 /// RSA peripheral container
@@ -144,7 +146,6 @@ pub(self) use implement_op;
 #[cfg(feature = "async")]
 pub(crate) mod asynch {
     use core::task::Poll;
-    use crate::rsa::Infallible;
 
     use embassy_sync::waitqueue::AtomicWaker;
     use procmacros::interrupt;
@@ -155,47 +156,36 @@ pub(crate) mod asynch {
         instance: &'d crate::peripherals::RSA,
     }
 
-    impl <'d> RsaFuture<'d> {
+    impl<'d> RsaFuture<'d> {
         pub fn new(instance: &'d crate::peripherals::RSA) -> Self {
-            #[cfg(not(any(esp32,esp32s2)))]
-            instance
-                .int_ena
-                .modify(|_, w| w.int_ena().set_bit());
-            
-            #[cfg(esp32s2)]
+            #[cfg(not(any(esp32, esp32s2, esp32s3)))]
+            instance.int_ena.modify(|_, w| w.int_ena().set_bit());
+
+            #[cfg(any(esp32s2, esp32s3))]
             instance
                 .interrupt_ena
                 .modify(|_, w| w.interrupt_ena().set_bit());
-    
+
             #[cfg(esp32)]
-            instance
-                .interrupt
-                .modify(|_, w| w.interrupt().set_bit());
+            instance.interrupt.modify(|_, w| w.interrupt().set_bit());
 
             Self { instance }
         }
 
         fn event_bit_is_clear(&self) -> bool {
-            #[cfg(not(any(esp32,esp32s2)))]
-            return self.instance
-                    .int_ena
-                    .read()
-                    .int_ena()
-                    .bit_is_clear();
+            #[cfg(not(any(esp32, esp32s2, esp32s3)))]
+            return self.instance.int_ena.read().int_ena().bit_is_clear();
 
-            #[cfg(esp32s2)]
-            return self.instance
-                    .interrupt_ena
-                    .read()
-                    .interrupt_ena()
-                    .bit_is_clear();
+            #[cfg(any(esp32s2, esp32s3))]
+            return self
+                .instance
+                .interrupt_ena
+                .read()
+                .interrupt_ena()
+                .bit_is_clear();
 
             #[cfg(esp32)]
-            return self.instance
-                    .interrupt
-                    .read()
-                    .interrupt()
-                    .bit_is_clear();
+            return self.instance.interrupt.read().interrupt().bit_is_clear();
         }
     }
 
@@ -216,9 +206,8 @@ pub(crate) mod asynch {
     }
 
     #[interrupt]
-    fn RSA()
-    {
-        #[cfg(not(any(esp32, esp32s2)))]
+    fn RSA() {
+        #[cfg(not(any(esp32, esp32s2, esp32s3)))]
         unsafe { &*crate::peripherals::RSA::ptr() }
             .int_ena
             .modify(|_, w| w.int_ena().clear_bit());
@@ -228,7 +217,7 @@ pub(crate) mod asynch {
             .interrupt
             .modify(|_, w| w.interrupt().clear_bit());
 
-        #[cfg(esp32s2)]
+        #[cfg(any(esp32s2, esp32s3))]
         unsafe { &*crate::peripherals::RSA::ptr() }
             .interrupt_ena
             .modify(|_, w| w.interrupt_ena().clear_bit());
@@ -282,9 +271,13 @@ where
     }
 
     #[cfg(feature = "async")]
-    pub async fn rsa_exponentiation (&mut self, base: &T::InputType, r: &T::InputType, outbuf: &mut T::InputType)
-    {
-        self.start_exponentiation(&base, &r);  
+    pub async fn async_exponentiation(
+        &mut self,
+        base: &T::InputType,
+        r: &T::InputType,
+        outbuf: &mut T::InputType,
+    ) {
+        self.start_exponentiation(&base, &r);
         asynch::RsaFuture::new(self.inner());
         block!(self.read_results(outbuf)).unwrap();
     }
@@ -316,7 +309,7 @@ where
         self.rsa.clear_interrupt();
         Ok(())
     }
-    
+
     #[cfg(feature = "async")]
     pub(crate) fn inner(&self) -> &RSA {
         &self.rsa.rsa
@@ -324,12 +317,30 @@ where
 
     #[cfg(feature = "async")]
     #[cfg(not(esp32))]
-    pub async fn rsa_modular_multiplication (&mut self, r: &T::InputType, outbuf: &mut T::InputType)
-    {
+    pub async fn async_modular_multiplication(
+        &mut self,
+        r: &T::InputType,
+        outbuf: &mut T::InputType,
+    ) {
         self.start_modular_multiplication(r);
-       
+
         asynch::RsaFuture::new(self.inner());
-        
+
+        block!(self.read_results(outbuf)).unwrap();
+    }
+
+    #[cfg(feature = "async")]
+    #[cfg(esp32)]
+    pub async fn async_modular_multiplication(
+        &mut self,
+        operand_a: &T::InputType,
+        operand_b: &T::InputType,
+        r: &T::InputType,
+        outbuf: &mut T::InputType,
+    ) {
+        self.start_step1(operand_a, r);
+        block!(self.start_step2(operand_b)).unwrap();
+        asynch::RsaFuture::new(self.inner());
         block!(self.read_results(outbuf)).unwrap();
     }
 }
@@ -375,25 +386,34 @@ where
 
     #[cfg(feature = "async")]
     #[cfg(not(esp32))]
-    pub async fn rsa_multiplication<'b, const O: usize>(&mut self, operand_b: &T::InputType, outbuf: &mut T::OutputType)
-    where
+    pub async fn async_multiplication<'b, const O: usize>(
+        &mut self,
+        operand_b: &T::InputType,
+        outbuf: &mut T::OutputType,
+    ) where
         T: Multi<OutputType = [u8; O]>,
     {
         self.start_multiplication(operand_b);
-       
+
         asynch::RsaFuture::new(self.inner());
-        
+
         block!(self.read_results(outbuf)).unwrap();
     }
 
     #[cfg(feature = "async")]
     #[cfg(esp32)]
-    pub async fn rsa_multiplication<'b, const O: usize>(&mut self, operand_a: &T::InputType, operand_b: &T::InputType, outbuf: &mut T::OutputType)
-    where
+    pub async fn async_multiplication<'b, const O: usize>(
+        &mut self,
+        operand_a: &T::InputType,
+        operand_b: &T::InputType,
+        outbuf: &mut T::OutputType,
+    ) where
         T: Multi<OutputType = [u8; O]>,
     {
         self.start_multiplication(operand_a, operand_b);
+
         asynch::RsaFuture::new(self.inner());
+
         block!(self.read_results(outbuf)).unwrap();
     }
 }
