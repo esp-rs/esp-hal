@@ -47,7 +47,8 @@ impl TimerWakeupSource {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
     NotRtcPin,
     TooManyWakeupSources,

@@ -52,7 +52,8 @@ cfg_if::cfg_if! {
 }
 
 /// I2C-specific transmission errors
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
     ExceedingFifo,
     AckCheckFailed,

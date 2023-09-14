@@ -78,7 +78,7 @@ pub mod pdma;
 const CHUNK_SIZE: usize = 4092;
 
 /// DMA Errors
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DmaError {
     InvalidAlignment,
@@ -96,7 +96,7 @@ pub enum DmaError {
 
 /// DMA Priorities
 #[cfg(gdma)]
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DmaPriority {
     Priority0 = 0,
@@ -114,7 +114,7 @@ pub enum DmaPriority {
 /// DMA Priorities
 /// The values need to match the TRM
 #[cfg(pdma)]
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DmaPriority {
     Priority0 = 0,
@@ -122,7 +122,7 @@ pub enum DmaPriority {
 
 /// DMA capable peripherals
 /// The values need to match the TRM
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DmaPeripheral {
     Spi2   = 0,

@@ -66,7 +66,8 @@ use crate::{
 };
 
 /// Custom timer error type
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
     TimerActive,
     TimerInactive,

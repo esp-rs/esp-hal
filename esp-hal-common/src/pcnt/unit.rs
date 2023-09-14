@@ -32,7 +32,8 @@ pub enum Number {
 }
 
 /// Unit errors
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
     /// Invalid filter threshold value
     InvalidFilterThresh,
@@ -43,7 +44,8 @@ pub enum Error {
 }
 
 /// the current status of the counter.
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ZeroMode {
     /// pulse counter decreases from positive to 0.
     #[default]
@@ -70,6 +72,7 @@ impl From<u8> for ZeroMode {
 
 // Events
 #[derive(Copy, Clone, Debug, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Events {
     pub low_limit: bool,
     pub high_limit: bool,
@@ -80,6 +83,7 @@ pub struct Events {
 
 /// Unit configuration
 #[derive(Copy, Clone, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Config {
     pub low_limit: i16,
     pub high_limit: i16,

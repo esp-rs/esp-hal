@@ -94,7 +94,8 @@ use crate::{
     system::PeripheralClockControl,
 };
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
     UnreachableTargetFrequency,
     Overflow,
@@ -106,6 +107,7 @@ pub enum Error {
 ///
 /// Allows for the assignment of two levels and their lengths
 #[derive(Clone, Copy, Debug, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct PulseCode {
     /// Logical output level in the first pulse code interval
     pub level1: bool,
@@ -159,6 +161,7 @@ impl From<PulseCode> for u32 {
 
 /// Channel configuration for TX channels
 #[derive(Debug, Copy, Clone, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct TxChannelConfig {
     /// Channel's clock divider
     pub clk_divider: u8,
@@ -178,6 +181,7 @@ pub struct TxChannelConfig {
 
 /// Channel configuration for RX channels
 #[derive(Debug, Copy, Clone, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct RxChannelConfig {
     /// Channel's clock divider
     pub clk_divider: u8,

@@ -73,7 +73,8 @@ const EMPTY_WRITE_PAD: u8 = 0x00u8;
 #[allow(unused)]
 const MAX_DMA_SIZE: usize = 32736;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
     DmaError(DmaError),
     MaxDmaTransferSizeExceeded,
@@ -95,7 +96,8 @@ impl embedded_hal_1::spi::Error for Error {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum SpiMode {
     Mode0,
     Mode1,
@@ -112,7 +114,8 @@ pub trait IsHalfDuplex: DuplexMode {}
 /// Single = 1 bit, 2 wires
 /// Dual = 2 bit, 2 wires
 /// Quad = 4 bit, 4 wires
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum SpiDataMode {
     Single,
     Dual,
