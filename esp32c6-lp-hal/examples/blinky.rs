@@ -4,17 +4,16 @@
 #![no_std]
 #![no_main]
 
-use esp32c6_lp_hal::{delay::Delay, gpio::IO, prelude::*};
+use esp32c6_lp_hal::{
+    delay::Delay,
+    gpio::{GpioPin, Output, PushPull},
+    prelude::*,
+};
 use panic_halt as _;
 
 #[entry]
-fn main() -> ! {
+fn main(mut gpio1: GpioPin<Output<PushPull>, 1>) -> ! {
     let mut i: u32 = 0;
-
-    let peripherals = esp32c6_lp::Peripherals::take().unwrap();
-
-    let io = IO::new(peripherals.LP_IO);
-    let mut gpio1 = io.gpio1.into_output();
 
     let ptr = 0x5000_2000 as *mut u32;
     let mut delay = Delay::new();

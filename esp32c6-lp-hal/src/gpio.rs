@@ -6,75 +6,47 @@ use core::{convert::Infallible, marker::PhantomData};
 
 use esp32c6_lp::LP_IO;
 
-#[non_exhaustive]
-pub struct IO {
-    _peripheral: LP_IO,
-
-    pub gpio0: GpioPin<0, Unknown>,
-    pub gpio1: GpioPin<1, Unknown>,
-    pub gpio2: GpioPin<2, Unknown>,
-    pub gpio3: GpioPin<3, Unknown>,
-    pub gpio4: GpioPin<4, Unknown>,
-    pub gpio5: GpioPin<5, Unknown>,
-    pub gpio6: GpioPin<6, Unknown>,
-    pub gpio7: GpioPin<7, Unknown>,
-}
-
-impl IO {
-    pub fn new(peripheral: LP_IO) -> Self {
-        Self {
-            _peripheral: peripheral,
-
-            gpio0: GpioPin::new(),
-            gpio1: GpioPin::new(),
-            gpio2: GpioPin::new(),
-            gpio3: GpioPin::new(),
-            gpio4: GpioPin::new(),
-            gpio5: GpioPin::new(),
-            gpio6: GpioPin::new(),
-            gpio7: GpioPin::new(),
-        }
+#[doc(hidden)]
+pub unsafe fn conjour<MODE, const PIN: u8>() -> Option<GpioPin<MODE, PIN>> {
+    if PIN > 7 {
+        None
+    } else {
+        Some(GpioPin {
+            phantom: PhantomData,
+        })
     }
 }
 
 pub struct Unknown {}
 
-pub struct Input;
+pub struct Input<MODE> {
+    _mode: PhantomData<MODE>,
+}
 
-pub struct Output;
+pub struct Floating;
+
+pub struct PullDown;
+
+pub struct PullUp;
+
+pub struct Output<MODE> {
+    _mode: PhantomData<MODE>,
+}
+
+pub struct PushPull;
 
 #[non_exhaustive]
-pub struct GpioPin<const PIN: u8, MODE> {
+pub struct GpioPin<MODE, const PIN: u8> {
     phantom: PhantomData<MODE>,
 }
 
-impl<const PIN: u8, MODE> GpioPin<PIN, MODE> {
-    fn new() -> Self {
-        GpioPin {
-            phantom: PhantomData,
-        }
-    }
-
-    /// Assuming the GPIO is already configured by the HP core this makes the
-    /// GPIO into an input pin.
-    pub fn into_input(self) -> GpioPin<PIN, Input> {
-        GpioPin::new()
-    }
-
-    /// Assuming the GPIO is already configured by the HP core this makes the
-    /// GPIO into an output pin.
-    pub fn into_output(self) -> GpioPin<PIN, Output> {
-        GpioPin::new()
-    }
-}
-
-impl<const PIN: u8> GpioPin<PIN, Input> {
+impl<MODE, const PIN: u8> GpioPin<Input<MODE>, PIN> {
     fn input_state(&self) -> bool {
         unsafe { &*LP_IO::PTR }.in_.read().bits() >> PIN & 0x1 != 0
     }
 }
 
-impl<const PIN: u8> GpioPin<PIN, Output> {
+impl<MODE, const PIN: u8> GpioPin<Output<MODE>, PIN> {
     fn output_state(&self) -> bool {
         unsafe { &*LP_IO::PTR }.out.read().bits() >> PIN & 0x1 != 0
     }
@@ -92,7 +64,7 @@ impl<const PIN: u8> GpioPin<PIN, Output> {
     }
 }
 
-impl<const PIN: u8> embedded_hal::digital::v2::InputPin for GpioPin<PIN, Input> {
+impl<MODE, const PIN: u8> embedded_hal::digital::v2::InputPin for GpioPin<Input<MODE>, PIN> {
     type Error = Infallible;
 
     fn is_high(&self) -> Result<bool, Self::Error> {
@@ -104,7 +76,7 @@ impl<const PIN: u8> embedded_hal::digital::v2::InputPin for GpioPin<PIN, Input> 
     }
 }
 
-impl<const PIN: u8> embedded_hal::digital::v2::OutputPin for GpioPin<PIN, Output> {
+impl<MODE, const PIN: u8> embedded_hal::digital::v2::OutputPin for GpioPin<Output<MODE>, PIN> {
     type Error = Infallible;
 
     fn set_low(&mut self) -> Result<(), Self::Error> {
@@ -118,7 +90,9 @@ impl<const PIN: u8> embedded_hal::digital::v2::OutputPin for GpioPin<PIN, Output
     }
 }
 
-impl<const PIN: u8> embedded_hal::digital::v2::StatefulOutputPin for GpioPin<PIN, Output> {
+impl<MODE, const PIN: u8> embedded_hal::digital::v2::StatefulOutputPin
+    for GpioPin<Output<MODE>, PIN>
+{
     fn is_set_high(&self) -> Result<bool, Self::Error> {
         Ok(self.output_state())
     }
@@ -128,4 +102,7 @@ impl<const PIN: u8> embedded_hal::digital::v2::StatefulOutputPin for GpioPin<PIN
     }
 }
 
-impl<const PIN: u8> embedded_hal::digital::v2::toggleable::Default for GpioPin<PIN, Output> {}
+impl<MODE, const PIN: u8> embedded_hal::digital::v2::toggleable::Default
+    for GpioPin<Output<MODE>, PIN>
+{
+}
