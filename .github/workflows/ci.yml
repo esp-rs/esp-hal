@@ -227,6 +227,11 @@ jobs:
           components: rust-src
       - uses: Swatinem/rust-cache@v2
 
+      # build the lp-hal examples first to make sure the examples which expect
+      # the ELF files to be present will compile
+      - name: build esp32c6-lp-hal prerequisites
+        run: cd esp32c6-lp-hal/ && cargo +nightly build --release --examples
+
       # Perform a full build initially to verify that the examples not only
       # build, but also link successfully.
       # We also use this as an opportunity to verify that the examples link
@@ -486,6 +491,11 @@ jobs:
           toolchain: "1.65"
           components: rust-src
       - uses: Swatinem/rust-cache@v2
+
+      # build the lp-hal examples first to make sure the examples which expect
+      # the ELF files to be present will compile
+      - name: build esp32c6-lp-hal prerequisites
+        run: cd esp32c6-lp-hal/ && RUSTC_BOOTSTRAP=1 cargo build --release --examples
 
       # Verify the MSRV for all RISC-V chips.
       - name: msrv (esp32c2-hal)
