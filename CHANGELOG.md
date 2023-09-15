@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- Removed the generic return type for ADC reads.
+- Removed the generic return type for ADC reads (#792)
 
 ## [0.12.0]
 
