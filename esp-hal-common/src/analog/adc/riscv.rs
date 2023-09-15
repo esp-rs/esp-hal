@@ -613,16 +613,15 @@ impl AdcCalEfuse for ADC2 {
     }
 }
 
-impl<'d, ADCI, WORD, PIN, CS> OneShot<ADCI, WORD, AdcPin<PIN, ADCI, CS>> for ADC<'d, ADCI>
+impl<'d, ADCI, PIN, CS> OneShot<ADCI, u16, AdcPin<PIN, ADCI, CS>> for ADC<'d, ADCI>
 where
-    WORD: From<u16>,
     PIN: Channel<ADCI, ID = u8>,
     ADCI: RegisterAccess,
     CS: AdcCalScheme<ADCI>,
 {
     type Error = ();
 
-    fn read(&mut self, pin: &mut AdcPin<PIN, ADCI, CS>) -> nb::Result<WORD, Self::Error> {
+    fn read(&mut self, pin: &mut AdcPin<PIN, ADCI, CS>) -> nb::Result<u16, Self::Error> {
         if self.attenuations[AdcPin::<PIN, ADCI>::channel() as usize] == None {
             panic!(
                 "Channel {} is not configured reading!",
@@ -676,7 +675,7 @@ where
         // Mark that no conversions are currently in progress
         self.active_channel = None;
 
-        Ok(converted_value.into())
+        Ok(converted_value)
     }
 }
 
