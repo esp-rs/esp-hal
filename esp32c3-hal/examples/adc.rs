@@ -41,7 +41,7 @@ fn main() -> ! {
     let mut delay = Delay::new(&clocks);
 
     loop {
-        let pin_value: u16 = nb::block!(adc1.read(&mut pin)).unwrap();
+        let pin_value = nb::block!(adc1.read(&mut pin)).unwrap();
         println!("PIN2 ADC reading = {}", pin_value);
         delay.delay_ms(1500u32);
     }

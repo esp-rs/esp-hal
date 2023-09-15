@@ -50,7 +50,7 @@ fn main() -> ! {
     let mut delay = Delay::new(&clocks);
 
     loop {
-        let pin_value: u16 = nb::block!(adc1.read(&mut pin)).unwrap();
+        let pin_value = nb::block!(adc1.read(&mut pin)).unwrap();
         let pin_value_mv = pin_value as u32 * atten.ref_mv() as u32 / 4096;
         println!("PIN2 ADC reading = {pin_value} ({pin_value_mv} mV)");
         delay.delay_ms(1500u32);
