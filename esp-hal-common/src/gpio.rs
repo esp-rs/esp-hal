@@ -151,16 +151,6 @@ pub trait Pin {
     fn unlisten(&mut self);
 
     fn clear_interrupt(&mut self);
-
-    fn is_pcore_interrupt_set(&self) -> bool;
-
-    fn is_pcore_non_maskable_interrupt_set(&self) -> bool;
-
-    fn is_acore_interrupt_set(&self) -> bool;
-
-    fn is_acore_non_maskable_interrupt_set(&self) -> bool;
-
-    fn enable_hold(&mut self, on: bool);
 }
 
 pub trait InputPin: Pin {
@@ -701,34 +691,6 @@ where
 
     fn clear_interrupt(&mut self) {
         <Self as GpioProperties>::Bank::write_interrupt_status_clear(1 << (GPIONUM % 32));
-    }
-
-    fn is_pcore_interrupt_set(&self) -> bool {
-        (<Self as GpioProperties>::InterruptStatus::pro_cpu_interrupt_status_read()
-            & (1 << (GPIONUM % 32)))
-            != 0
-    }
-
-    fn is_pcore_non_maskable_interrupt_set(&self) -> bool {
-        (<Self as GpioProperties>::InterruptStatus::pro_cpu_nmi_status_read()
-            & (1 << (GPIONUM % 32)))
-            != 0
-    }
-
-    fn is_acore_interrupt_set(&self) -> bool {
-        (<Self as GpioProperties>::InterruptStatus::app_cpu_interrupt_status_read()
-            & (1 << (GPIONUM % 32)))
-            != 0
-    }
-
-    fn is_acore_non_maskable_interrupt_set(&self) -> bool {
-        (<Self as GpioProperties>::InterruptStatus::app_cpu_nmi_status_read()
-            & (1 << (GPIONUM % 32)))
-            != 0
-    }
-
-    fn enable_hold(&mut self, _on: bool) {
-        todo!();
     }
 }
 
