@@ -238,6 +238,22 @@ pub trait InterruptStatusRegisterAccess {
     fn app_cpu_nmi_status_read() -> u32 {
         Self::pro_cpu_nmi_status_read()
     }
+
+    fn interrupt_status_read() -> u32 {
+        match crate::get_core() {
+            crate::Cpu::ProCpu => Self::pro_cpu_interrupt_status_read(),
+            #[cfg(multi_core)]
+            crate::Cpu::AppCpu => Self::app_cpu_interrupt_status_read(),
+        }
+    }
+
+    fn nmi_status_read() -> u32 {
+        match crate::get_core() {
+            crate::Cpu::ProCpu => Self::pro_cpu_nmi_status_read(),
+            #[cfg(multi_core)]
+            crate::Cpu::AppCpu => Self::app_cpu_nmi_status_read(),
+        }
+    }
 }
 
 #[doc(hidden)]
@@ -1824,30 +1840,12 @@ mod asynch {
 
     #[interrupt]
     unsafe fn GPIO() {
-        let mut intrs = match crate::get_core() {
-            crate::Cpu::ProCpu => {
-                InterruptStatusRegisterAccessBank0::pro_cpu_interrupt_status_read() as u64
-            }
-            #[cfg(multi_core)]
-            crate::Cpu::AppCpu => {
-                InterruptStatusRegisterAccessBank0::app_cpu_interrupt_status_read() as u64
-            }
-        };
+        let mut intrs = InterruptStatusRegisterAccessBank0::interrupt_status_read() as u64;
 
         #[cfg(any(esp32, esp32s2, esp32s3))]
-        match crate::get_core() {
-            crate::Cpu::ProCpu => {
-                intrs |= (InterruptStatusRegisterAccessBank1::pro_cpu_interrupt_status_read()
-                    as u64)
-                    << 32
-            }
-            #[cfg(multi_core)]
-            crate::Cpu::AppCpu => {
-                intrs |= (InterruptStatusRegisterAccessBank1::app_cpu_interrupt_status_read()
-                    as u64)
-                    << 32
-            }
-        };
+        {
+            intrs |= (InterruptStatusRegisterAccessBank1::interrupt_status_read() as u64) << 32;
+        }
 
         trace!(
             "Handling interrupt on {:?} - {:064b}",
