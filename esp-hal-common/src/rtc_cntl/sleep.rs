@@ -25,6 +25,7 @@ use crate::{gpio::RTCPin, Rtc};
 
 #[cfg_attr(esp32, path = "rtc/esp32_sleep.rs")]
 #[cfg_attr(esp32s3, path = "rtc/esp32s3_sleep.rs")]
+#[cfg_attr(esp32c3, path = "rtc/esp32c3_sleep.rs")]
 mod rtc_sleep;
 
 pub use rtc_sleep::*;
