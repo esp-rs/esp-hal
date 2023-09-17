@@ -1845,21 +1845,6 @@ mod asynch {
         #[cfg(any(esp32, esp32s2, esp32s3))]
         let intrs_bank1 = InterruptStatusRegisterAccessBank1::interrupt_status_read();
 
-        #[cfg(not(any(esp32, esp32s2, esp32s3)))]
-        trace!(
-            "Handling interrupt on {:?} - {:032b}",
-            crate::get_core(),
-            intrs_bank0,
-        );
-
-        #[cfg(any(esp32, esp32s2, esp32s3))]
-        trace!(
-            "Handling interrupt on {:?} - {:032b}{:032b}",
-            crate::get_core(),
-            intrs_bank1,
-            intrs_bank0,
-        );
-
         let mut intr_bits = intrs_bank0;
         while intr_bits != 0 {
             let pin_nr = intr_bits.trailing_zeros();
