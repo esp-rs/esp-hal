@@ -151,16 +151,6 @@ pub trait Pin {
     fn unlisten(&mut self);
 
     fn clear_interrupt(&mut self);
-
-    fn is_pcore_interrupt_set(&self) -> bool;
-
-    fn is_pcore_non_maskable_interrupt_set(&self) -> bool;
-
-    fn is_acore_interrupt_set(&self) -> bool;
-
-    fn is_acore_non_maskable_interrupt_set(&self) -> bool;
-
-    fn enable_hold(&mut self, on: bool);
 }
 
 pub trait InputPin: Pin {
@@ -247,6 +237,22 @@ pub trait InterruptStatusRegisterAccess {
 
     fn app_cpu_nmi_status_read() -> u32 {
         Self::pro_cpu_nmi_status_read()
+    }
+
+    fn interrupt_status_read() -> u32 {
+        match crate::get_core() {
+            crate::Cpu::ProCpu => Self::pro_cpu_interrupt_status_read(),
+            #[cfg(multi_core)]
+            crate::Cpu::AppCpu => Self::app_cpu_interrupt_status_read(),
+        }
+    }
+
+    fn nmi_status_read() -> u32 {
+        match crate::get_core() {
+            crate::Cpu::ProCpu => Self::pro_cpu_nmi_status_read(),
+            #[cfg(multi_core)]
+            crate::Cpu::AppCpu => Self::app_cpu_nmi_status_read(),
+        }
     }
 }
 
@@ -701,34 +707,6 @@ where
 
     fn clear_interrupt(&mut self) {
         <Self as GpioProperties>::Bank::write_interrupt_status_clear(1 << (GPIONUM % 32));
-    }
-
-    fn is_pcore_interrupt_set(&self) -> bool {
-        (<Self as GpioProperties>::InterruptStatus::pro_cpu_interrupt_status_read()
-            & (1 << (GPIONUM % 32)))
-            != 0
-    }
-
-    fn is_pcore_non_maskable_interrupt_set(&self) -> bool {
-        (<Self as GpioProperties>::InterruptStatus::pro_cpu_nmi_status_read()
-            & (1 << (GPIONUM % 32)))
-            != 0
-    }
-
-    fn is_acore_interrupt_set(&self) -> bool {
-        (<Self as GpioProperties>::InterruptStatus::app_cpu_interrupt_status_read()
-            & (1 << (GPIONUM % 32)))
-            != 0
-    }
-
-    fn is_acore_non_maskable_interrupt_set(&self) -> bool {
-        (<Self as GpioProperties>::InterruptStatus::app_cpu_nmi_status_read()
-            & (1 << (GPIONUM % 32)))
-            != 0
-    }
-
-    fn enable_hold(&mut self, _on: bool) {
-        todo!();
     }
 }
 
@@ -1862,41 +1840,13 @@ mod asynch {
 
     #[interrupt]
     unsafe fn GPIO() {
-        let mut intrs = match crate::get_core() {
-            crate::Cpu::ProCpu => {
-                InterruptStatusRegisterAccessBank0::pro_cpu_interrupt_status_read() as u64
-            }
-            #[cfg(multi_core)]
-            crate::Cpu::AppCpu => {
-                InterruptStatusRegisterAccessBank0::app_cpu_interrupt_status_read() as u64
-            }
-        };
+        let intrs_bank0 = InterruptStatusRegisterAccessBank0::interrupt_status_read();
 
         #[cfg(any(esp32, esp32s2, esp32s3))]
-        match crate::get_core() {
-            crate::Cpu::ProCpu => {
-                intrs |= (InterruptStatusRegisterAccessBank1::pro_cpu_interrupt_status_read()
-                    as u64)
-                    << 32
-            }
-            #[cfg(multi_core)]
-            crate::Cpu::AppCpu => {
-                intrs |= (InterruptStatusRegisterAccessBank1::app_cpu_interrupt_status_read()
-                    as u64)
-                    << 32
-            }
-        };
+        let intrs_bank1 = InterruptStatusRegisterAccessBank1::interrupt_status_read();
 
-        trace!(
-            "Handling interrupt on {:?} - {:064b}",
-            crate::get_core(),
-            intrs
-        );
-
-        let mut intr_bits = intrs;
+        let mut intr_bits = intrs_bank0;
         while intr_bits != 0 {
-            // TODO: we should probably call `leading_zeros` on Xtensa
-            // when that lowers to NSAU.
             let pin_nr = intr_bits.trailing_zeros();
             set_int_enable(pin_nr as u8, 0, 0, false);
             PIN_WAKERS[pin_nr as usize].wake(); // wake task
@@ -1904,8 +1854,18 @@ mod asynch {
         }
 
         // clear interrupt bits
-        Bank0GpioRegisterAccess::write_interrupt_status_clear(intrs as u32);
+        Bank0GpioRegisterAccess::write_interrupt_status_clear(intrs_bank0);
+
         #[cfg(any(esp32, esp32s2, esp32s3))]
-        Bank1GpioRegisterAccess::write_interrupt_status_clear((intrs >> 32) as u32);
+        {
+            let mut intr_bits = intrs_bank1;
+            while intr_bits != 0 {
+                let pin_nr = intr_bits.trailing_zeros();
+                set_int_enable(pin_nr as u8 + 32, 0, 0, false);
+                PIN_WAKERS[pin_nr as usize + 32].wake(); // wake task
+                intr_bits -= 1 << pin_nr;
+            }
+            Bank1GpioRegisterAccess::write_interrupt_status_clear(intrs_bank1);
+        }
     }
 }

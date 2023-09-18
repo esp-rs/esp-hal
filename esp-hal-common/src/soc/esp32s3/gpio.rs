@@ -410,6 +410,14 @@ impl InterruptStatusRegisterAccess for InterruptStatusRegisterAccessBank0 {
     fn pro_cpu_nmi_status_read() -> u32 {
         unsafe { &*GPIO::PTR }.pcpu_nmi_int.read().bits()
     }
+
+    fn interrupt_status_read() -> u32 {
+        Self::pro_cpu_interrupt_status_read()
+    }
+
+    fn nmi_status_read() -> u32 {
+        Self::pro_cpu_nmi_status_read()
+    }
 }
 
 impl InterruptStatusRegisterAccess for InterruptStatusRegisterAccessBank1 {
@@ -419,6 +427,14 @@ impl InterruptStatusRegisterAccess for InterruptStatusRegisterAccessBank1 {
 
     fn pro_cpu_nmi_status_read() -> u32 {
         unsafe { &*GPIO::PTR }.pcpu_nmi_int1.read().bits()
+    }
+
+    fn interrupt_status_read() -> u32 {
+        Self::pro_cpu_interrupt_status_read()
+    }
+
+    fn nmi_status_read() -> u32 {
+        Self::pro_cpu_nmi_status_read()
     }
 }
 
