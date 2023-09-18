@@ -204,25 +204,38 @@ mod critical_section_impl {
 
     #[cfg(xtensa)]
     mod xtensa {
+
+        #[cfg(multi_core)]
+        use super::multicore::{LockKind, MULTICORE_LOCK};
+
         unsafe impl critical_section::Impl for super::CriticalSection {
             unsafe fn acquire() -> critical_section::RawRestoreState {
-                let tkn: critical_section::RawRestoreState;
+                let mut tkn: critical_section::RawRestoreState;
                 core::arch::asm!("rsil {0}, 5", out(reg) tkn);
                 #[cfg(multi_core)]
                 {
-                    let guard = super::multicore::MULTICORE_LOCK.lock();
-                    core::mem::forget(guard); // forget it so drop doesn't run
+                    match super::multicore::MULTICORE_LOCK.lock() {
+                        LockKind::Lock => {}
+                        LockKind::Reentry => tkn |= 1 << 31,
+                    }
                 }
                 tkn
             }
 
-            unsafe fn release(token: critical_section::RawRestoreState) {
+            unsafe fn release(mut token: critical_section::RawRestoreState) {
                 if token != 0 {
                     #[cfg(multi_core)]
                     {
                         debug_assert!(super::multicore::MULTICORE_LOCK.is_owned_by_current_thread());
-                        // safety: we logically own the mutex from acquire()
-                        super::multicore::MULTICORE_LOCK.force_unlock();
+
+                        let lock_kind = if token & (1 << 31) != 0 {
+                            token = token & !(1 << 31);
+                            LockKind::Reentry
+                        } else {
+                            LockKind::Lock
+                        };
+
+                        super::multicore::MULTICORE_LOCK.unlock(lock_kind);
                     }
                     core::arch::asm!(
                         "wsr.ps {0}",
@@ -240,14 +253,16 @@ mod critical_section_impl {
             unsafe fn acquire() -> critical_section::RawRestoreState {
                 let mut mstatus = 0u32;
                 core::arch::asm!("csrrci {0}, mstatus, 8", inout(reg) mstatus);
-                let interrupts_active = (mstatus & 0b1000) != 0;
+                let mut tkn = ((mstatus & 0b1000) != 0) as critical_section::RawRestoreState;
                 #[cfg(multi_core)]
                 {
-                    let guard = multicore::MULTICORE_LOCK.lock();
-                    core::mem::forget(guard); // forget it so drop doesn't run
+                    match super::multicore::MULTICORE_LOCK.lock() {
+                        LockKind::Lock => {}
+                        LockKind::Reentry => tkn |= 1 << 7,
+                    }
                 }
 
-                interrupts_active as _
+                tkn
             }
 
             unsafe fn release(token: critical_section::RawRestoreState) {
@@ -255,8 +270,14 @@ mod critical_section_impl {
                     #[cfg(multi_core)]
                     {
                         debug_assert!(multicore::MULTICORE_LOCK.is_owned_by_current_thread());
-                        // safety: we logically own the mutex from acquire()
-                        multicore::MULTICORE_LOCK.force_unlock();
+
+                        let lock_kind = if token & (1 << 7) != 0 {
+                            LockKind::Reentry
+                        } else {
+                            LockKind::Lock
+                        };
+
+                        super::multicore::MULTICORE_LOCK.unlock(lock_kind);
                     }
                     riscv::interrupt::enable();
                 }
@@ -266,50 +287,62 @@ mod critical_section_impl {
 
     #[cfg(multi_core)]
     mod multicore {
-        use core::sync::atomic::{AtomicBool, Ordering};
+        use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
-        use lock_api::{GetThreadId, GuardSend, RawMutex};
-
-        use crate::get_core;
-
-        /// Reentrant Mutex
-        ///
-        /// Currently implemented using an atomic spin lock.
-        /// In the future we can optimize this raw mutex to use some hardware
-        /// features.
-        pub(crate) static MULTICORE_LOCK: lock_api::ReentrantMutex<RawSpinlock, RawThreadId, ()> =
-            lock_api::ReentrantMutex::const_new(RawSpinlock::INIT, RawThreadId::INIT, ());
-
-        pub(crate) struct RawThreadId;
-
-        unsafe impl lock_api::GetThreadId for RawThreadId {
-            const INIT: Self = RawThreadId;
-
-            fn nonzero_thread_id(&self) -> core::num::NonZeroUsize {
-                core::num::NonZeroUsize::new((get_core() as usize) + 1).unwrap()
-            }
+        fn thread_id() -> core::num::NonZeroUsize {
+            core::num::NonZeroUsize::new((crate::get_core() as usize) + 1).unwrap()
         }
 
-        pub(crate) struct RawSpinlock(AtomicBool);
+        pub(super) static MULTICORE_LOCK: ReentrantMutex = ReentrantMutex::new();
 
-        unsafe impl lock_api::RawMutex for RawSpinlock {
-            const INIT: RawSpinlock = RawSpinlock(AtomicBool::new(false));
+        pub(super) enum LockKind {
+            Lock = 0,
+            Reentry,
+        }
 
-            // A spinlock guard can be sent to another thread and unlocked there
-            type GuardMarker = GuardSend;
+        pub(super) struct ReentrantMutex {
+            owner: AtomicUsize,
+        }
 
-            fn lock(&self) {
-                while !self.try_lock() {}
+        impl ReentrantMutex {
+            const fn new() -> Self {
+                Self {
+                    owner: AtomicUsize::new(0),
+                }
             }
 
-            fn try_lock(&self) -> bool {
-                self.0
-                    .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            pub fn is_owned_by_current_thread(&self) -> bool {
+                self.owner.load(Ordering::Relaxed) == thread_id().get()
+            }
+
+            pub(super) fn lock(&self) -> LockKind {
+                let current_thread_id = thread_id().get();
+
+                if self.try_lock(current_thread_id) {
+                    return LockKind::Lock;
+                }
+
+                let current_owner = self.owner.load(Ordering::Relaxed);
+                if current_owner == current_thread_id {
+                    return LockKind::Reentry;
+                }
+
+                while !self.try_lock(current_thread_id) {}
+
+                LockKind::Lock
+            }
+
+            fn try_lock(&self, new_owner: usize) -> bool {
+                self.owner
+                    .compare_exchange(0, new_owner, Ordering::Acquire, Ordering::Relaxed)
                     .is_ok()
             }
 
-            unsafe fn unlock(&self) {
-                self.0.store(false, Ordering::Release);
+            pub(super) fn unlock(&self, kind: LockKind) {
+                match kind {
+                    LockKind::Lock => self.owner.store(0, Ordering::Release),
+                    LockKind::Reentry => {}
+                }
             }
         }
     }

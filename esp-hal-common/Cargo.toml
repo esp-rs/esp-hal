@@ -26,7 +26,6 @@ embedded-io          = "0.5.0"
 esp-synopsys-usb-otg = { version = "0.3.2", optional = true, features = ["fs", "esp32sx"] }
 fugit                = "0.3.7"
 log                  = { version = "0.4.20", optional = true }
-lock_api             = { version = "0.4.10", optional = true }
 nb                   = "1.1.0"
 paste                = "1.0.14"
 procmacros           = { version = "0.6.1", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
@@ -70,13 +69,13 @@ basic-toml = "0.1.4"
 serde      = { version = "1.0.188", features = ["derive"] }
 
 [features]
-esp32   = ["esp32/rt",   "xtensa", "xtensa-lx/esp32", "xtensa-lx-rt/esp32", "lock_api", "procmacros/esp32"]
+esp32   = ["esp32/rt",   "xtensa", "xtensa-lx/esp32", "xtensa-lx-rt/esp32", "procmacros/esp32"]
 esp32c2 = ["esp32c2/rt", "riscv",  "procmacros/esp32c2"]
 esp32c3 = ["esp32c3/rt", "riscv",  "procmacros/esp32c3"]
 esp32c6 = ["esp32c6/rt", "riscv",  "procmacros/esp32c6"]
 esp32h2 = ["esp32h2/rt", "riscv",  "procmacros/esp32h2"]
 esp32s2 = ["esp32s2/rt", "xtensa", "xtensa-lx/esp32s2", "xtensa-lx-rt/esp32s2", "esp-synopsys-usb-otg", "usb-device", "procmacros/esp32s2"]
-esp32s3 = ["esp32s3/rt", "xtensa", "xtensa-lx/esp32s3", "xtensa-lx-rt/esp32s3", "lock_api", "esp-synopsys-usb-otg", "usb-device", "procmacros/esp32s3"]
+esp32s3 = ["esp32s3/rt", "xtensa", "xtensa-lx/esp32s3", "xtensa-lx-rt/esp32s3", "esp-synopsys-usb-otg", "usb-device", "procmacros/esp32s3"]
 
 # Crystal frequency selection (ESP32 and ESP32-C2 only!)
 esp32_26mhz   = []
