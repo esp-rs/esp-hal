@@ -99,17 +99,11 @@ When using this hook, you can choose to ignore its failure on a per-commit basis
 
 ## MSRV
 
-The **M**inimum **S**upported **R**ust **V**ersions are:
+The **M**inimum **S**upported **R**ust **V**ersion is `1.67.0` for all packages.
 
-- `nightly-2022-09-16` for RISC-V devices (**ESP32-C2**, **ESP32-C3**, **ESP32-C6**, **ESP32-H2**)
-  - This corresponds to the date that the `1.65.0` release was branched from `master`
-- `1.65.0` for Xtensa devices (**ESP32**, **ESP32-S2**, **ESP32-S3**)
-- `1.67.0` for all `async` examples (`embassy_hello_world`, `embassy_wait`, etc.)
-- latest `stable` when using the `defmt` feature
+RISC-V is officially supported by the official Rust compiler, however, it should be noted that targeting the Xtensa ISA currently requires the use of the [esp-rs/rust] compiler fork. Our recommend method of installation is [espup].
 
-It should be noted that targeting the Xtensa ISA currently requires the use of the [esp-rs/rust] compiler fork. Our recommend method of installation is [espup].
-
-RISC-V is officially supported by the official Rust compiler.
+When targetting the RISC-V architecture, it is necessary to set `RUSTC_BOOTSTRAP=1` in order to build with a previous stable release; this is not required when targeting Xtensa.
 
 [esp-rs/rust]: https://github.com/esp-rs/rust
 [espup]: https://github.com/esp-rs/espup
