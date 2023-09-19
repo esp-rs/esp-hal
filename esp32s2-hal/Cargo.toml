@@ -126,3 +126,11 @@ required-features = ["embassy", "async"]
 [[example]]
 name              = "embassy_rmt_rx"
 required-features = ["embassy", "async"]
+
+[[example]]
+name              = "embassy_i2s_sound"
+required-features = ["embassy", "async"]
+
+[[example]]
+name              = "embassy_i2s_read"
+required-features = ["embassy", "async"]

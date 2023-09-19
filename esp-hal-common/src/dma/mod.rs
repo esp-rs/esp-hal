@@ -284,6 +284,16 @@ pub trait RxPrivate {
         len: usize,
     ) -> Result<(), DmaError>;
 
+    fn listen_ch_in_done(&self);
+
+    fn clear_ch_in_done(&self);
+
+    fn is_ch_in_done_set(&self) -> bool;
+
+    fn unlisten_ch_in_done(&self);
+
+    fn is_listening_ch_in_done(&self) -> bool;
+
     fn is_done(&self) -> bool;
 
     fn is_listening_eof(&self) -> bool;
@@ -457,6 +467,26 @@ where
         Ok(())
     }
 
+    fn listen_ch_in_done(&self) {
+        R::listen_ch_in_done();
+    }
+
+    fn clear_ch_in_done(&self) {
+        R::clear_ch_in_done();
+    }
+
+    fn is_ch_in_done_set(&self) -> bool {
+        R::is_ch_in_done_set()
+    }
+
+    fn unlisten_ch_in_done(&self) {
+        R::unlisten_ch_in_done();
+    }
+
+    fn is_listening_ch_in_done(&self) -> bool {
+        R::is_listening_ch_in_done()
+    }
+
     fn is_done(&self) -> bool {
         self.rx_impl.is_done()
     }
@@ -593,6 +623,16 @@ pub trait TxPrivate {
         len: usize,
     ) -> Result<(), DmaError>;
 
+    fn clear_ch_out_done(&self);
+
+    fn is_ch_out_done_set(&self) -> bool;
+
+    fn listen_ch_out_done(&self);
+
+    fn unlisten_ch_out_done(&self);
+
+    fn is_listening_ch_out_done(&self) -> bool;
+
     fn is_done(&self) -> bool;
 
     fn is_listening_eof(&self) -> bool;
@@ -678,6 +718,26 @@ where
         }
 
         Ok(())
+    }
+
+    fn clear_ch_out_done(&self) {
+        R::clear_ch_out_done();
+    }
+
+    fn is_ch_out_done_set(&self) -> bool {
+        R::is_ch_out_done_set()
+    }
+
+    fn listen_ch_out_done(&self) {
+        R::listen_ch_out_done();
+    }
+
+    fn unlisten_ch_out_done(&self) {
+        R::unlisten_ch_out_done();
+    }
+
+    fn is_listening_ch_out_done(&self) -> bool {
+        R::is_listening_ch_out_done()
     }
 
     fn is_done(&self) -> bool {
@@ -769,6 +829,26 @@ where
             .prepare_transfer(self.descriptors, circular, peri, data, len)?;
 
         Ok(())
+    }
+
+    fn clear_ch_out_done(&self) {
+        self.tx_impl.clear_ch_out_done();
+    }
+
+    fn is_ch_out_done_set(&self) -> bool {
+        self.tx_impl.is_ch_out_done_set()
+    }
+
+    fn listen_ch_out_done(&self) {
+        self.tx_impl.listen_ch_out_done();
+    }
+
+    fn unlisten_ch_out_done(&self) {
+        self.tx_impl.unlisten_ch_out_done();
+    }
+
+    fn is_listening_ch_out_done(&self) -> bool {
+        self.tx_impl.is_listening_ch_out_done()
     }
 
     fn is_done(&self) -> bool {
@@ -912,6 +992,11 @@ pub trait RegisterAccess {
     fn has_out_descriptor_error() -> bool;
     fn set_out_peripheral(peripheral: u8);
     fn start_out();
+    fn clear_ch_out_done();
+    fn is_ch_out_done_set() -> bool;
+    fn listen_ch_out_done();
+    fn unlisten_ch_out_done();
+    fn is_listening_ch_out_done() -> bool;
     fn is_out_done() -> bool;
     fn is_out_eof_interrupt_set() -> bool;
     fn reset_out_eof_interrupt();
@@ -937,6 +1022,12 @@ pub trait RegisterAccess {
     fn listen_out_eof();
     fn unlisten_in_eof();
     fn unlisten_out_eof();
+
+    fn listen_ch_in_done();
+    fn clear_ch_in_done();
+    fn is_ch_in_done_set() -> bool;
+    fn unlisten_ch_in_done();
+    fn is_listening_ch_in_done() -> bool;
 }
 
 pub trait ChannelTypes {
@@ -1047,6 +1138,74 @@ pub(crate) mod asynch {
         }
     }
 
+    pub struct DmaTxDoneChFuture<'a, TX> {
+        pub(crate) tx: &'a mut TX,
+        _a: (),
+    }
+
+    impl<'a, TX> DmaTxDoneChFuture<'a, TX>
+    where
+        TX: Tx,
+    {
+        pub fn new(tx: &'a mut TX) -> Self {
+            tx.listen_ch_out_done();
+            Self { tx, _a: () }
+        }
+    }
+
+    impl<'a, TX> core::future::Future for DmaTxDoneChFuture<'a, TX>
+    where
+        TX: Tx,
+    {
+        type Output = (); // TODO handle DMA errors
+
+        fn poll(
+            self: core::pin::Pin<&mut Self>,
+            cx: &mut core::task::Context<'_>,
+        ) -> Poll<Self::Output> {
+            TX::waker().register(cx.waker());
+            if self.tx.is_listening_ch_out_done() {
+                Poll::Pending
+            } else {
+                Poll::Ready(())
+            }
+        }
+    }
+
+    pub struct DmaRxDoneChFuture<'a, RX> {
+        pub(crate) rx: &'a mut RX,
+        _a: (),
+    }
+
+    impl<'a, RX> DmaRxDoneChFuture<'a, RX>
+    where
+        RX: Rx,
+    {
+        pub fn new(rx: &'a mut RX) -> Self {
+            rx.listen_ch_in_done();
+            Self { rx, _a: () }
+        }
+    }
+
+    impl<'a, RX> core::future::Future for DmaRxDoneChFuture<'a, RX>
+    where
+        RX: Rx,
+    {
+        type Output = (); // TODO handle DMA errors
+
+        fn poll(
+            self: core::pin::Pin<&mut Self>,
+            cx: &mut core::task::Context<'_>,
+        ) -> Poll<Self::Output> {
+            RX::waker().register(cx.waker());
+            if self.rx.is_listening_ch_in_done() {
+                Poll::Pending
+            } else {
+                Poll::Ready(())
+            }
+        }
+    }
+
     #[cfg(esp32c2)]
     mod interrupt {
         use super::*;
@@ -1059,7 +1218,7 @@ pub(crate) mod asynch {
                 Channel0TxImpl as ChannelTxImpl,
             };
 
-            if Channel::is_in_done() {
+            if Channel::is_in_done() && Channel::is_listening_in_eof() {
                 Channel::clear_in_interrupts();
                 Channel::unlisten_in_eof();
                 ChannelRxImpl::waker().wake()
@@ -1068,6 +1227,12 @@ pub(crate) mod asynch {
             if Channel::is_out_done() {
                 Channel::clear_out_interrupts();
                 Channel::unlisten_out_eof();
+                ChannelTxImpl::waker().wake()
+            }
+
+            if Channel::is_ch_out_done_set() {
+                Channel::clear_ch_out_done();
+                Channel::unlisten_ch_out_done();
                 ChannelTxImpl::waker().wake()
             }
         }
@@ -1085,7 +1250,7 @@ pub(crate) mod asynch {
                 Channel0TxImpl as ChannelTxImpl,
             };
 
-            if Channel::is_in_done() {
+            if Channel::is_in_done() && Channel::is_listening_in_eof() {
                 Channel::clear_in_interrupts();
                 Channel::unlisten_in_eof();
                 ChannelRxImpl::waker().wake()
@@ -1095,6 +1260,18 @@ pub(crate) mod asynch {
                 Channel::clear_out_interrupts();
                 Channel::unlisten_out_eof();
                 ChannelTxImpl::waker().wake()
+            }
+
+            if Channel::is_ch_out_done_set() {
+                Channel::clear_ch_out_done();
+                Channel::unlisten_ch_out_done();
+                ChannelTxImpl::waker().wake()
+            }
+
+            if Channel::is_ch_in_done_set() {
+                Channel::clear_ch_in_done();
+                Channel::unlisten_ch_in_done();
+                ChannelRxImpl::waker().wake()
             }
         }
 
@@ -1106,7 +1283,7 @@ pub(crate) mod asynch {
                 Channel1TxImpl as ChannelTxImpl,
             };
 
-            if Channel::is_in_done() {
+            if Channel::is_in_done() && Channel::is_listening_in_eof() {
                 Channel::clear_in_interrupts();
                 Channel::unlisten_in_eof();
                 ChannelRxImpl::waker().wake()
@@ -1116,6 +1293,18 @@ pub(crate) mod asynch {
                 Channel::clear_out_interrupts();
                 Channel::unlisten_out_eof();
                 ChannelTxImpl::waker().wake()
+            }
+
+            if Channel::is_ch_out_done_set() {
+                Channel::clear_ch_out_done();
+                Channel::unlisten_ch_out_done();
+                ChannelTxImpl::waker().wake()
+            }
+
+            if Channel::is_ch_in_done_set() {
+                Channel::clear_ch_in_done();
+                Channel::unlisten_ch_in_done();
+                ChannelRxImpl::waker().wake()
             }
         }
 
@@ -1127,7 +1316,7 @@ pub(crate) mod asynch {
                 Channel2TxImpl as ChannelTxImpl,
             };
 
-            if Channel::is_in_done() {
+            if Channel::is_in_done() && Channel::is_listening_in_eof() {
                 Channel::clear_in_interrupts();
                 Channel::unlisten_in_eof();
                 ChannelRxImpl::waker().wake()
@@ -1137,6 +1326,18 @@ pub(crate) mod asynch {
                 Channel::clear_out_interrupts();
                 Channel::unlisten_out_eof();
                 ChannelTxImpl::waker().wake()
+            }
+
+            if Channel::is_ch_out_done_set() {
+                Channel::clear_ch_out_done();
+                Channel::unlisten_ch_out_done();
+                ChannelTxImpl::waker().wake()
+            }
+
+            if Channel::is_ch_in_done_set() {
+                Channel::clear_ch_in_done();
+                Channel::unlisten_ch_in_done();
+                ChannelRxImpl::waker().wake()
             }
         }
     }
@@ -1149,9 +1350,15 @@ pub(crate) mod asynch {
         fn DMA_IN_CH0() {
             use crate::dma::gdma::{Channel0 as Channel, Channel0RxImpl as ChannelRxImpl};
 
-            if Channel::is_in_done() {
+            if Channel::is_in_done() && Channel::is_listening_in_eof() {
                 Channel::clear_in_interrupts();
                 Channel::unlisten_in_eof();
+                ChannelRxImpl::waker().wake()
+            }
+
+            if Channel::is_ch_in_done_set() {
+                Channel::clear_ch_in_done();
+                Channel::unlisten_ch_in_done();
                 ChannelRxImpl::waker().wake()
             }
         }
@@ -1165,15 +1372,27 @@ pub(crate) mod asynch {
                 Channel::unlisten_out_eof();
                 ChannelTxImpl::waker().wake()
             }
+
+            if Channel::is_ch_out_done_set() {
+                Channel::clear_ch_out_done();
+                Channel::unlisten_ch_out_done();
+                ChannelTxImpl::waker().wake()
+            }
         }
 
         #[interrupt]
         fn DMA_IN_CH1() {
             use crate::dma::gdma::{Channel1 as Channel, Channel1RxImpl as ChannelRxImpl};
 
-            if Channel::is_in_done() {
+            if Channel::is_in_done() && Channel::is_listening_in_eof() {
                 Channel::clear_in_interrupts();
                 Channel::unlisten_in_eof();
+                ChannelRxImpl::waker().wake()
+            }
+
+            if Channel::is_ch_in_done_set() {
+                Channel::clear_ch_in_done();
+                Channel::unlisten_ch_in_done();
                 ChannelRxImpl::waker().wake()
             }
         }
@@ -1187,15 +1406,27 @@ pub(crate) mod asynch {
                 Channel::unlisten_out_eof();
                 ChannelTxImpl::waker().wake()
             }
+
+            if Channel::is_ch_out_done_set() {
+                Channel::clear_ch_out_done();
+                Channel::unlisten_ch_out_done();
+                ChannelTxImpl::waker().wake()
+            }
         }
 
         #[interrupt]
         fn DMA_IN_CH2() {
             use crate::dma::gdma::{Channel2 as Channel, Channel2RxImpl as ChannelRxImpl};
 
-            if Channel::is_in_done() {
+            if Channel::is_in_done() && Channel::is_listening_in_eof() {
                 Channel::clear_in_interrupts();
                 Channel::unlisten_in_eof();
+                ChannelRxImpl::waker().wake()
+            }
+
+            if Channel::is_ch_in_done_set() {
+                Channel::clear_ch_in_done();
+                Channel::unlisten_ch_in_done();
                 ChannelRxImpl::waker().wake()
             }
         }
@@ -1209,6 +1440,12 @@ pub(crate) mod asynch {
                 Channel::unlisten_out_eof();
                 ChannelTxImpl::waker().wake()
             }
+
+            if Channel::is_ch_out_done_set() {
+                Channel::clear_ch_out_done();
+                Channel::unlisten_ch_out_done();
+                ChannelTxImpl::waker().wake()
+            }
         }
     }
 
@@ -1220,9 +1457,15 @@ pub(crate) mod asynch {
         fn DMA_IN_CH0() {
             use crate::dma::gdma::{Channel0 as Channel, Channel0RxImpl as ChannelRxImpl};
 
-            if Channel::is_in_done() {
+            if Channel::is_in_done() && Channel::is_listening_in_eof() {
                 Channel::clear_in_interrupts();
                 Channel::unlisten_in_eof();
+                ChannelRxImpl::waker().wake()
+            }
+
+            if Channel::is_ch_in_done_set() {
+                Channel::clear_ch_in_done();
+                Channel::unlisten_ch_in_done();
                 ChannelRxImpl::waker().wake()
             }
         }
@@ -1236,15 +1479,27 @@ pub(crate) mod asynch {
                 Channel::unlisten_out_eof();
                 ChannelTxImpl::waker().wake()
             }
+
+            if Channel::is_ch_out_done_set() {
+                Channel::clear_ch_out_done();
+                Channel::unlisten_ch_out_done();
+                ChannelTxImpl::waker().wake()
+            }
         }
 
         #[interrupt]
         fn DMA_IN_CH1() {
             use crate::dma::gdma::{Channel1 as Channel, Channel1RxImpl as ChannelRxImpl};
 
-            if Channel::is_in_done() {
+            if Channel::is_in_done() && Channel::is_listening_in_eof() {
                 Channel::clear_in_interrupts();
                 Channel::unlisten_in_eof();
+                ChannelRxImpl::waker().wake()
+            }
+
+            if Channel::is_ch_in_done_set() {
+                Channel::clear_ch_in_done();
+                Channel::unlisten_ch_in_done();
                 ChannelRxImpl::waker().wake()
             }
         }
@@ -1258,15 +1513,27 @@ pub(crate) mod asynch {
                 Channel::unlisten_out_eof();
                 ChannelTxImpl::waker().wake()
             }
+
+            if Channel::is_ch_out_done_set() {
+                Channel::clear_ch_out_done();
+                Channel::unlisten_ch_out_done();
+                ChannelTxImpl::waker().wake()
+            }
         }
 
         #[interrupt]
         fn DMA_IN_CH3() {
             use crate::dma::gdma::{Channel3 as Channel, Channel3RxImpl as ChannelRxImpl};
 
-            if Channel::is_in_done() {
+            if Channel::is_in_done() && Channel::is_listening_in_eof() {
                 Channel::clear_in_interrupts();
                 Channel::unlisten_in_eof();
+                ChannelRxImpl::waker().wake()
+            }
+
+            if Channel::is_ch_in_done_set() {
+                Channel::clear_ch_in_done();
+                Channel::unlisten_ch_in_done();
                 ChannelRxImpl::waker().wake()
             }
         }
@@ -1280,15 +1547,27 @@ pub(crate) mod asynch {
                 Channel::unlisten_out_eof();
                 ChannelTxImpl::waker().wake()
             }
+
+            if Channel::is_ch_out_done_set() {
+                Channel::clear_ch_out_done();
+                Channel::unlisten_ch_out_done();
+                ChannelTxImpl::waker().wake()
+            }
         }
 
         #[interrupt]
         fn DMA_IN_CH4() {
             use crate::dma::gdma::{Channel4 as Channel, Channel4RxImpl as ChannelRxImpl};
 
-            if Channel::is_in_done() {
+            if Channel::is_in_done() && Channel::is_listening_in_eof() {
                 Channel::clear_in_interrupts();
                 Channel::unlisten_in_eof();
+                ChannelRxImpl::waker().wake()
+            }
+
+            if Channel::is_ch_in_done_set() {
+                Channel::clear_ch_in_done();
+                Channel::unlisten_ch_in_done();
                 ChannelRxImpl::waker().wake()
             }
         }
@@ -1300,6 +1579,12 @@ pub(crate) mod asynch {
             if Channel::is_out_done() {
                 Channel::clear_out_interrupts();
                 Channel::unlisten_out_eof();
+                ChannelTxImpl::waker().wake()
+            }
+
+            if Channel::is_ch_out_done_set() {
+                Channel::clear_ch_out_done();
+                Channel::unlisten_ch_out_done();
                 ChannelTxImpl::waker().wake()
             }
         }
@@ -1317,7 +1602,7 @@ pub(crate) mod asynch {
                 Spi2DmaChannelTxImpl as ChannelTxImpl,
             };
 
-            if Channel::is_in_done() {
+            if Channel::is_in_done() && Channel::is_listening_in_eof() {
                 Channel::clear_in_interrupts();
                 Channel::unlisten_in_eof();
                 ChannelRxImpl::waker().wake()
@@ -1327,6 +1612,18 @@ pub(crate) mod asynch {
                 Channel::clear_out_interrupts();
                 Channel::unlisten_out_eof();
                 ChannelTxImpl::waker().wake()
+            }
+
+            if Channel::is_ch_out_done_set() {
+                Channel::clear_ch_out_done();
+                Channel::unlisten_ch_out_done();
+                ChannelTxImpl::waker().wake()
+            }
+
+            if Channel::is_ch_in_done_set() {
+                Channel::clear_ch_in_done();
+                Channel::unlisten_ch_in_done();
+                ChannelRxImpl::waker().wake()
             }
         }
 
@@ -1338,7 +1635,7 @@ pub(crate) mod asynch {
                 Spi3DmaChannelTxImpl as ChannelTxImpl,
             };
 
-            if Channel::is_in_done() {
+            if Channel::is_in_done() && Channel::is_listening_in_eof() {
                 Channel::clear_in_interrupts();
                 Channel::unlisten_in_eof();
                 ChannelRxImpl::waker().wake()
@@ -1348,6 +1645,85 @@ pub(crate) mod asynch {
                 Channel::clear_out_interrupts();
                 Channel::unlisten_out_eof();
                 ChannelTxImpl::waker().wake()
+            }
+
+            if Channel::is_ch_out_done_set() {
+                Channel::clear_ch_out_done();
+                Channel::unlisten_ch_out_done();
+                ChannelTxImpl::waker().wake()
+            }
+
+            if Channel::is_ch_in_done_set() {
+                Channel::clear_ch_in_done();
+                Channel::unlisten_ch_in_done();
+                ChannelRxImpl::waker().wake()
+            }
+        }
+
+        #[interrupt]
+        fn I2S0() {
+            use crate::dma::pdma::{
+                I2s0DmaChannel as Channel,
+                I2s0DmaChannelRxImpl as ChannelRxImpl,
+                I2s0DmaChannelTxImpl as ChannelTxImpl,
+            };
+
+            if Channel::is_in_done() && Channel::is_listening_in_eof() {
+                Channel::clear_in_interrupts();
+                Channel::unlisten_in_eof();
+                ChannelRxImpl::waker().wake()
+            }
+
+            if Channel::is_out_done() && Channel::is_listening_out_eof() {
+                Channel::clear_out_interrupts();
+                Channel::unlisten_out_eof();
+                ChannelTxImpl::waker().wake()
+            }
+
+            if Channel::is_ch_out_done_set() {
+                Channel::clear_ch_out_done();
+                Channel::unlisten_ch_out_done();
+                ChannelTxImpl::waker().wake()
+            }
+
+            if Channel::is_ch_in_done_set() {
+                Channel::clear_ch_in_done();
+                Channel::unlisten_ch_in_done();
+                ChannelRxImpl::waker().wake()
+            }
+        }
+
+        #[cfg(esp32)]
+        #[interrupt]
+        fn I2S1() {
+            use crate::dma::pdma::{
+                I2s1DmaChannel as Channel,
+                I2s1DmaChannelRxImpl as ChannelRxImpl,
+                I2s1DmaChannelTxImpl as ChannelTxImpl,
+            };
+
+            if Channel::is_in_done() && Channel::is_listening_in_eof() {
+                Channel::clear_in_interrupts();
+                Channel::unlisten_in_eof();
+                ChannelRxImpl::waker().wake()
+            }
+
+            if Channel::is_out_done() && Channel::is_listening_out_eof() {
+                Channel::clear_out_interrupts();
+                Channel::unlisten_out_eof();
+                ChannelTxImpl::waker().wake()
+            }
+
+            if Channel::is_ch_out_done_set() {
+                Channel::clear_ch_out_done();
+                Channel::unlisten_ch_out_done();
+                ChannelTxImpl::waker().wake()
+            }
+
+            if Channel::is_ch_in_done_set() {
+                Channel::clear_ch_in_done();
+                Channel::unlisten_ch_in_done();
+                ChannelRxImpl::waker().wake()
             }
         }
     }

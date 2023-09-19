@@ -864,6 +864,34 @@ where
 
         Ok(())
     }
+
+    #[cfg(feature = "async")]
+    fn start_tx_transfer_async(
+        &mut self,
+        ptr: *const u8,
+        len: usize,
+        circular: bool,
+    ) -> Result<(), Error> {
+        // Reset TX unit and TX FIFO
+        self.register_access.reset_tx();
+
+        // Enable corresponding interrupts if needed
+
+        // configure DMA outlink
+        self.tx_channel.prepare_transfer(
+            self.register_access.get_dma_peripheral(),
+            circular,
+            ptr,
+            len,
+        )?;
+
+        // set I2S_TX_STOP_EN if needed
+
+        // start: set I2S_TX_START
+        self.register_access.tx_start();
+
+        Ok(())
+    }
 }
 
 impl<'d, T, P, W, CH> I2sWrite<W> for I2sTx<'d, T, P, CH>
@@ -1009,6 +1037,42 @@ where
 
         Ok(())
     }
+
+    #[cfg(feature = "async")]
+    fn start_rx_transfer_async(
+        &mut self,
+        ptr: *mut u8,
+        len: usize,
+        circular: bool,
+    ) -> Result<(), Error> {
+        if len % 4 != 0 {
+            return Err(Error::IllegalArgument);
+        }
+
+        // Reset TX unit and TX FIFO
+        self.register_access.reset_rx();
+
+        // Enable corresponding interrupts if needed
+
+        // configure DMA outlink
+        self.rx_channel.prepare_transfer(
+            circular,
+            self.register_access.get_dma_peripheral(),
+            ptr,
+            len,
+        )?;
+
+        // set I2S_TX_STOP_EN if needed
+
+        // start: set I2S_RX_START
+        #[cfg(not(esp32))]
+        self.register_access.rx_start(len - 1);
+
+        #[cfg(esp32)]
+        self.register_access.rx_start(len);
+
+        Ok(())
+    }
 }
 
 impl<'d, W, T, P, CH> I2sRead<W> for I2sRx<'d, T, P, CH>
@@ -1075,6 +1139,15 @@ pub trait I2sMclkPin: I2sPins {
     where
         I: RegisterAccess;
 }
+
+#[derive(Clone)]
+#[non_exhaustive]
+pub struct I2sPeripheral0 {}
+
+#[cfg(any(esp32s3, esp32))]
+#[derive(Clone)]
+#[non_exhaustive]
+pub struct I2sPeripheral1 {}
 
 mod private {
     use fugit::HertzU32;
@@ -1151,10 +1224,10 @@ mod private {
     }
 
     impl Instance for I2S0 {
-        type Peripheral = I2sPeripheral0;
+        type Peripheral = super::I2sPeripheral0;
 
-        fn register_access(&self) -> I2sPeripheral0 {
-            I2sPeripheral0 {}
+        fn register_access(&self) -> super::I2sPeripheral0 {
+            super::I2sPeripheral0 {}
         }
     }
 
@@ -1162,9 +1235,9 @@ mod private {
 
     #[cfg(esp32s3)]
     impl Instance for crate::peripherals::I2S1 {
-        type Peripheral = I2sPeripheral1;
-        fn register_access(&self) -> I2sPeripheral1 {
-            I2sPeripheral1 {}
+        type Peripheral = super::I2sPeripheral1;
+        fn register_access(&self) -> super::I2sPeripheral1 {
+            super::I2sPeripheral1 {}
         }
     }
 
@@ -1808,15 +1881,8 @@ mod private {
         }
     }
 
-    #[derive(Clone)]
-    pub struct I2sPeripheral0 {}
-
-    #[cfg(any(esp32s3, esp32))]
-    #[derive(Clone)]
-    pub struct I2sPeripheral1 {}
-
     #[cfg(any(esp32c3, esp32c6, esp32h2))]
-    impl Signals for I2sPeripheral0 {
+    impl Signals for super::I2sPeripheral0 {
         fn get_peripheral(&self) -> Peripheral {
             Peripheral::I2s0
         }
@@ -1855,7 +1921,7 @@ mod private {
     }
 
     #[cfg(esp32s3)]
-    impl Signals for I2sPeripheral0 {
+    impl Signals for super::I2sPeripheral0 {
         fn get_peripheral(&self) -> Peripheral {
             Peripheral::I2s0
         }
@@ -1894,7 +1960,7 @@ mod private {
     }
 
     #[cfg(esp32s3)]
-    impl Signals for I2sPeripheral1 {
+    impl Signals for super::I2sPeripheral1 {
         fn get_peripheral(&self) -> Peripheral {
             Peripheral::I2s1
         }
@@ -1933,7 +1999,7 @@ mod private {
     }
 
     #[cfg(esp32)]
-    impl Signals for I2sPeripheral0 {
+    impl Signals for super::I2sPeripheral0 {
         fn get_peripheral(&self) -> Peripheral {
             Peripheral::I2s0
         }
@@ -1972,7 +2038,7 @@ mod private {
     }
 
     #[cfg(esp32)]
-    impl Signals for I2sPeripheral1 {
+    impl Signals for super::I2sPeripheral1 {
         fn get_peripheral(&self) -> Peripheral {
             Peripheral::I2s1
         }
@@ -2011,7 +2077,7 @@ mod private {
     }
 
     #[cfg(esp32s2)]
-    impl Signals for I2sPeripheral0 {
+    impl Signals for super::I2sPeripheral0 {
         fn get_peripheral(&self) -> Peripheral {
             Peripheral::I2s0
         }
@@ -2049,26 +2115,26 @@ mod private {
         }
     }
 
-    impl RegBlock for I2sPeripheral0 {
+    impl RegBlock for super::I2sPeripheral0 {
         fn register_block(&self) -> &'static RegisterBlock {
             unsafe { core::mem::transmute(I2S0::PTR) }
         }
     }
 
     #[cfg(any(esp32s3, esp32))]
-    impl RegBlock for I2sPeripheral1 {
+    impl RegBlock for super::I2sPeripheral1 {
         fn register_block(&self) -> &'static RegisterBlock {
             unsafe { core::mem::transmute(crate::peripherals::I2S1::PTR) }
         }
     }
 
-    impl RegisterAccessPrivate for I2sPeripheral0 {}
-    impl super::RegisterAccess for I2sPeripheral0 {}
+    impl RegisterAccessPrivate for super::I2sPeripheral0 {}
+    impl super::RegisterAccess for super::I2sPeripheral0 {}
 
     #[cfg(any(esp32s3, esp32))]
-    impl RegisterAccessPrivate for I2sPeripheral1 {}
+    impl RegisterAccessPrivate for super::I2sPeripheral1 {}
     #[cfg(any(esp32s3, esp32))]
-    impl super::RegisterAccess for I2sPeripheral1 {}
+    impl super::RegisterAccess for super::I2sPeripheral1 {}
 
     pub struct I2sClockDividers {
         mclk_divider: u32,
@@ -2143,6 +2209,211 @@ mod private {
             bclk_divider,
             denominator,
             numerator,
+        }
+    }
+}
+
+#[cfg(feature = "async")]
+pub mod asynch {
+    use embedded_dma::{ReadBuffer, WriteBuffer};
+
+    use super::{Error, I2sRx, I2sRxPins, I2sTx, I2sTxPins, RegisterAccess};
+    use crate::dma::{
+        asynch::{DmaRxDoneChFuture, DmaRxFuture, DmaTxDoneChFuture, DmaTxFuture},
+        ChannelTypes,
+        RxPrivate,
+        TxPrivate,
+    };
+
+    /// Initiate an async DMA tx transfer
+    pub trait I2sWriteDmaAsync<'d, T, P, CH>
+    where
+        T: RegisterAccess,
+        CH: ChannelTypes,
+        P: I2sTxPins,
+    {
+        /// One-shot write I2S.
+        async fn write_dma_async(&mut self, words: &mut [u8]) -> Result<(), Error>;
+
+        /// Continuously write to I2S. Returns [I2sWriteDmaTransferAsync]
+        fn write_dma_circular_async<TXBUF>(
+            self,
+            words: TXBUF,
+        ) -> Result<I2sWriteDmaTransferAsync<'d, T, P, CH, TXBUF>, Error>
+        where
+            TXBUF: ReadBuffer<Word = u8>;
+    }
+
+    impl<'d, T, P, CH> I2sWriteDmaAsync<'d, T, P, CH> for super::I2sTx<'d, T, P, CH>
+    where
+        T: RegisterAccess,
+        CH: ChannelTypes,
+        P: I2sTxPins,
+    {
+        async fn write_dma_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
+            let (ptr, len) = (words.as_ptr(), words.len());
+            self.start_tx_transfer_async(ptr, len, false)?;
+
+            let future = DmaTxFuture::new(&mut self.tx_channel);
+            future.await;
+
+            self.register_access.reset_tx();
+
+            Ok(())
+        }
+
+        fn write_dma_circular_async<TXBUF>(
+            mut self,
+            words: TXBUF,
+        ) -> Result<I2sWriteDmaTransferAsync<'d, T, P, CH, TXBUF>, Error>
+        where
+            TXBUF: ReadBuffer<Word = u8>,
+        {
+            let (ptr, len) = unsafe { words.read_buffer() };
+            self.start_tx_transfer_async(ptr, len, true)?;
+
+            Ok(I2sWriteDmaTransferAsync {
+                i2s_tx: self,
+                _buffer: words,
+            })
+        }
+    }
+
+    /// An in-progress async circular DMA write transfer.
+    #[non_exhaustive]
+
+    pub struct I2sWriteDmaTransferAsync<'d, T, P, CH, BUFFER>
+    where
+        T: RegisterAccess,
+        CH: ChannelTypes,
+        P: I2sTxPins,
+    {
+        i2s_tx: I2sTx<'d, T, P, CH>,
+        _buffer: BUFFER,
+    }
+
+    impl<'d, T, P, CH, BUFFER> I2sWriteDmaTransferAsync<'d, T, P, CH, BUFFER>
+    where
+        T: RegisterAccess,
+        CH: ChannelTypes,
+        P: I2sTxPins,
+    {
+        /// How many bytes can be pushed into the DMA transaction.
+        /// Will wait for more than 0 bytes available.
+        pub async fn available(&mut self) -> usize {
+            loop {
+                let res = self.i2s_tx.tx_channel.available();
+
+                if res != 0 {
+                    break res;
+                }
+
+                let future = DmaTxDoneChFuture::new(&mut self.i2s_tx.tx_channel);
+                future.await;
+            }
+        }
+
+        /// Push bytes into the DMA transaction.
+        pub async fn push(&mut self, data: &[u8]) -> Result<usize, Error> {
+            let avail = self.available().await;
+            let to_send = usize::min(avail, data.len());
+            Ok(self.i2s_tx.tx_channel.push(&data[..to_send])?)
+        }
+    }
+
+    /// Initiate an async DMA rx transfer
+    pub trait I2sReadDmaAsync<'d, T, P, CH>
+    where
+        T: RegisterAccess,
+        CH: ChannelTypes,
+        P: I2sRxPins,
+    {
+        /// One-shot read I2S.
+        async fn read_dma_async(&mut self, words: &mut [u8]) -> Result<(), Error>;
+
+        /// Continuously read frm I2S. Returns [I2sReadDmaTransferAsync]
+        fn read_dma_circular_async<RXBUF>(
+            self,
+            words: RXBUF,
+        ) -> Result<I2sReadDmaTransferAsync<'d, T, P, CH, RXBUF>, Error>
+        where
+            RXBUF: WriteBuffer<Word = u8>;
+    }
+
+    impl<'d, T, P, CH> I2sReadDmaAsync<'d, T, P, CH> for super::I2sRx<'d, T, P, CH>
+    where
+        T: RegisterAccess,
+        CH: ChannelTypes,
+        P: I2sRxPins,
+    {
+        async fn read_dma_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
+            let (ptr, len) = (words.as_mut_ptr(), words.len());
+            self.start_rx_transfer_async(ptr, len, false)?;
+
+            let future = DmaRxFuture::new(&mut self.rx_channel);
+            future.await;
+
+            // ??? self.register_access.reset_tx();
+
+            Ok(())
+        }
+
+        fn read_dma_circular_async<RXBUF>(
+            mut self,
+            mut words: RXBUF,
+        ) -> Result<I2sReadDmaTransferAsync<'d, T, P, CH, RXBUF>, Error>
+        where
+            RXBUF: WriteBuffer<Word = u8>,
+        {
+            let (ptr, len) = unsafe { words.write_buffer() };
+            self.start_rx_transfer_async(ptr, len, true)?;
+
+            Ok(I2sReadDmaTransferAsync {
+                i2s_rx: self,
+                _buffer: words,
+            })
+        }
+    }
+
+    /// An in-progress async circular DMA read transfer.
+    #[non_exhaustive]
+
+    pub struct I2sReadDmaTransferAsync<'d, T, P, CH, BUFFER>
+    where
+        T: RegisterAccess,
+        CH: ChannelTypes,
+        P: I2sRxPins,
+    {
+        i2s_rx: I2sRx<'d, T, P, CH>,
+        _buffer: BUFFER,
+    }
+
+    impl<'d, T, P, CH, BUFFER> I2sReadDmaTransferAsync<'d, T, P, CH, BUFFER>
+    where
+        T: RegisterAccess,
+        CH: ChannelTypes,
+        P: I2sRxPins,
+    {
+        /// How many bytes can be popped from the DMA transaction.
+        /// Will wait for more than 0 bytes available.
+        pub async fn available(&mut self) -> usize {
+            loop {
+                let res = self.i2s_rx.rx_channel.available();
+
+                if res != 0 {
+                    break res;
+                }
+
+                let future = DmaRxDoneChFuture::new(&mut self.i2s_rx.rx_channel);
+                future.await;
+            }
+        }
+
+        /// Pop bytes from the DMA transaction.
+        pub async fn pop(&mut self, data: &mut [u8]) -> Result<usize, Error> {
+            let avail = self.available().await;
+            let to_rcv = usize::min(avail, data.len());
+            Ok(self.i2s_rx.rx_channel.pop(&mut data[..to_rcv])?)
         }
     }
 }
