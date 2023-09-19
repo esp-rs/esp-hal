@@ -183,21 +183,13 @@ pub enum Cpu {
 
 #[cfg(all(xtensa, multi_core))]
 fn get_raw_core() -> u32 {
-    // We use 0x2001 to force the compiler to use the `addi.n` instruction when
-    // incrementing
-    xtensa_lx::get_processor_id() & 0x2001
-}
-
-#[cfg(all(not(xtensa), multi_core))]
-fn get_raw_core() -> u32 {
-    // TODO get hart_id
-    0
+    xtensa_lx::get_processor_id() & 0x2000
 }
 
 /// Which core the application is currently executing on
 #[cfg(all(xtensa, multi_core))]
 pub fn get_core() -> Cpu {
-    match xtensa_lx::get_processor_id() & 0x2000 {
+    match get_raw_core() {
         0 => Cpu::ProCpu,
         _ => Cpu::AppCpu,
     }
@@ -321,8 +313,14 @@ mod critical_section_impl {
     mod multicore {
         use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
-        fn thread_id() -> core::num::NonZeroUsize {
-            core::num::NonZeroUsize::new((crate::get_raw_core() as usize) + 1).unwrap()
+        // We're using a value that we know get_raw_core() will never return. This
+        // avoids an unnecessary increment of the core ID.
+        #[cfg(xtensa)] // TODO: first multi-core RISC-V target will show if this value is OK
+                       // globally or only for Xtensa
+        const UNUSED_THREAD_ID_VALUE: usize = 0x0001;
+
+        fn thread_id() -> usize {
+            crate::get_raw_core() as usize
         }
 
         pub(super) static MULTICORE_LOCK: ReentrantMutex = ReentrantMutex::new();
@@ -339,16 +337,16 @@ mod critical_section_impl {
         impl ReentrantMutex {
             const fn new() -> Self {
                 Self {
-                    owner: AtomicUsize::new(0),
+                    owner: AtomicUsize::new(UNUSED_THREAD_ID_VALUE),
                 }
             }
 
             pub fn is_owned_by_current_thread(&self) -> bool {
-                self.owner.load(Ordering::Relaxed) == thread_id().get()
+                self.owner.load(Ordering::Relaxed) == thread_id()
             }
 
             pub(super) fn lock(&self) -> LockKind {
-                let current_thread_id = thread_id().get();
+                let current_thread_id = thread_id();
 
                 if self.try_lock(current_thread_id) {
                     return LockKind::Lock;
@@ -366,13 +364,18 @@ mod critical_section_impl {
 
             fn try_lock(&self, new_owner: usize) -> bool {
                 self.owner
-                    .compare_exchange(0, new_owner, Ordering::Acquire, Ordering::Relaxed)
+                    .compare_exchange(
+                        UNUSED_THREAD_ID_VALUE,
+                        new_owner,
+                        Ordering::Acquire,
+                        Ordering::Relaxed,
+                    )
                     .is_ok()
             }
 
             pub(super) fn unlock(&self, kind: LockKind) {
                 match kind {
-                    LockKind::Lock => self.owner.store(0, Ordering::Release),
+                    LockKind::Lock => self.owner.store(UNUSED_THREAD_ID_VALUE, Ordering::Release),
                     LockKind::Reentry => {}
                 }
             }
