@@ -229,22 +229,18 @@ mod critical_section_impl {
                 tkn
             }
 
-            unsafe fn release(mut token: critical_section::RawRestoreState) {
+            unsafe fn release(token: critical_section::RawRestoreState) {
                 #[cfg(multi_core)]
                 {
-                    use super::multicore::{LockKind, MULTICORE_LOCK};
+                    use super::multicore::MULTICORE_LOCK;
 
                     debug_assert!(MULTICORE_LOCK.is_owned_by_current_thread());
 
-                    let lock_kind = if token & REENTRY_FLAG != 0 {
-                        // We must only write 0 to the reserved bits
-                        token = token & !REENTRY_FLAG;
-                        LockKind::Reentry
-                    } else {
-                        LockKind::Lock
-                    };
+                    if token & REENTRY_FLAG != 0 {
+                        return;
+                    }
 
-                    MULTICORE_LOCK.unlock(lock_kind);
+                    MULTICORE_LOCK.unlock();
                 }
 
                 const RESERVED_MASK: u32 = 0b1111_1111_1111_1000_1111_0000_0000_0000;
@@ -285,21 +281,18 @@ mod critical_section_impl {
                 tkn
             }
 
-            unsafe fn release(mut token: critical_section::RawRestoreState) {
+            unsafe fn release(token: critical_section::RawRestoreState) {
                 #[cfg(multi_core)]
                 {
-                    use super::multicore::{LockKind, MULTICORE_LOCK};
+                    use super::multicore::MULTICORE_LOCK;
 
                     debug_assert!(MULTICORE_LOCK.is_owned_by_current_thread());
 
-                    let lock_kind = if token & REENTRY_FLAG != 0 {
-                        token = token & !REENTRY_FLAG;
-                        LockKind::Reentry
-                    } else {
-                        LockKind::Lock
-                    };
+                    if token & REENTRY_FLAG != 0 {
+                        return;
+                    }
 
-                    MULTICORE_LOCK.unlock(lock_kind);
+                    MULTICORE_LOCK.unlock();
                 }
 
                 if token != 0 {
@@ -373,11 +366,8 @@ mod critical_section_impl {
                     .is_ok()
             }
 
-            pub(super) fn unlock(&self, kind: LockKind) {
-                match kind {
-                    LockKind::Lock => self.owner.store(UNUSED_THREAD_ID_VALUE, Ordering::Release),
-                    LockKind::Reentry => {}
-                }
+            pub(super) fn unlock(&self) {
+                self.owner.store(UNUSED_THREAD_ID_VALUE, Ordering::Release);
             }
         }
     }
