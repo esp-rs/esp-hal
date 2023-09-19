@@ -34,9 +34,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Pin::enable_hold` (#793)
 
 ## [0.12.0]
-### Breaking
-
-## [0.12.0] - 2023-09-05
 
 ### Added
 
@@ -53,7 +50,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `defmt` feature to enable log output (#773)
 - A new macro to load LP core code on ESP32-C6 (#779)
 - Add `ECC`` peripheral driver (#785)
-- Add UART support for splitting into TX and RX (#754)
 
 ### Changed
 
