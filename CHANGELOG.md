@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Bumped MSRV to 1.67 (#798)
+
 ### Fixed
 
 - S3: Allow powering down RC_FAST_CLK (#796)

@@ -488,7 +488,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@v1
         with:
           target: riscv32imc-unknown-none-elf, riscv32imac-unknown-none-elf
-          toolchain: "1.65"
+          toolchain: "1.67"
           components: rust-src
       - uses: Swatinem/rust-cache@v2
 
@@ -499,15 +499,27 @@ jobs:
 
       # Verify the MSRV for all RISC-V chips.
       - name: msrv (esp32c2-hal)
-        run: cd esp32c2-hal/ && RUSTC_BOOTSTRAP=1 cargo check --features=eh1,ufmt,log
+        run: |
+          cd esp32c2-hal/
+          RUSTC_BOOTSTRAP=1 cargo check --features=eh1,ufmt,log
+          RUSTC_BOOTSTRAP=1 cargo check --features=defmt
       - name: msrv (esp32c3-hal)
-        run: cd esp32c3-hal/ && RUSTC_BOOTSTRAP=1 cargo check --features=eh1,ufmt,log
+        run: |
+          cd esp32c3-hal/
+          RUSTC_BOOTSTRAP=1 cargo check --features=eh1,ufmt,log
+          RUSTC_BOOTSTRAP=1 cargo check --features=defmt
       - name: msrv (esp32c6-hal)
-        run: cd esp32c6-hal/ && RUSTC_BOOTSTRAP=1 cargo check --features=eh1,ufmt,log
+        run: |
+          cd esp32c6-hal/
+          RUSTC_BOOTSTRAP=1 cargo check --features=eh1,ufmt,log
+          RUSTC_BOOTSTRAP=1 cargo check --features=defmt
       - name: msrv (esp32c6-lp-hal)
         run: cd esp32c6-lp-hal/ && RUSTC_BOOTSTRAP=1 cargo check
       - name: msrv (esp32h2-hal)
-        run: cd esp32h2-hal/ && RUSTC_BOOTSTRAP=1 cargo check --features=eh1,ufmt,log
+        run: |
+          cd esp32h2-hal/
+          RUSTC_BOOTSTRAP=1 cargo check --features=eh1,ufmt,log
+          RUSTC_BOOTSTRAP=1 cargo check --features=defmt
 
   msrv-xtensa:
     runs-on: ubuntu-latest
@@ -517,16 +529,25 @@ jobs:
       - uses: esp-rs/xtensa-toolchain@v1.5
         with:
           ldproxy: false
-          version: "1.65.0"
+          version: "1.67.0"
       - uses: Swatinem/rust-cache@v2
 
       # Verify the MSRV for all Xtensa chips.
       - name: msrv (esp32-hal)
-        run: cd esp32-hal/ && cargo check --features=eh1,ufmt,log
+        run: |
+          cd esp32-hal/
+          cargo check --features=eh1,ufmt,log
+          cargo check --features=defmt
       - name: msrv (esp32s2-hal)
-        run: cd esp32s2-hal/ && cargo check --features=eh1,ufmt,log
+        run: |
+          cd esp32s2-hal/
+          cargo check --features=eh1,ufmt,log
+          cargo check --features=defmt
       - name: msrv (esp32s3-hal)
-        run: cd esp32s3-hal/ && cargo check --features=eh1,ufmt,log
+        run: |
+          cd esp32s3-hal/
+          cargo check --features=eh1,ufmt,log
+          cargo check --features=defmt
 
   # --------------------------------------------------------------------------
   # Lint
