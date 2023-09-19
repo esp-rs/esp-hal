@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Bumped MSRV to 1.67 (#798)
+- Optimised multi-core critical section implementation (#797)
 
 ### Fixed
 
