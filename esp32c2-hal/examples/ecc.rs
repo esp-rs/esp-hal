@@ -14,14 +14,11 @@ use crypto_bigint::{
 };
 use elliptic_curve::sec1::ToEncodedPoint;
 use esp32c2_hal::{
-    clock::ClockControl,
     ecc::{Ecc, EllipticCurve, Error},
     peripherals::Peripherals,
     prelude::*,
     systimer::SystemTimer,
-    timer::TimerGroup,
     Rng,
-    Rtc,
 };
 use esp_backtrace as _;
 use esp_println::{print, println};
@@ -46,23 +43,8 @@ const TEST_PARAMS_VECTOR: TestParams = TestParams {
 fn main() -> ! {
     let peripherals = Peripherals::take();
     let mut system = peripherals.SYSTEM.split();
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-
-    // Disable the RTC and TIMG watchdog timers
-    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-    let timer_group0 = TimerGroup::new(
-        peripherals.TIMG0,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
-    let mut wdt0 = timer_group0.wdt;
 
     let mut rng = Rng::new(peripherals.RNG);
-
-    // Disable MWDT and RWDT (Watchdog) flash boot protection
-    rtc.swd.disable();
-    rtc.rwdt.disable();
-    wdt0.disable();
 
     println!("ECC example");
 
@@ -520,7 +502,7 @@ fn test_jacobian_point_multiplication(ecc: &mut Ecc, rng: &mut Rng) {
             };
 
             let begin_time = SystemTimer::now();
-            ecc.jacobian_point_multication(curve, k, x, y)
+            ecc.jacobian_point_multiplication(curve, k, x, y)
                 .expect("Inputs data doesn't match the key length selected.");
             let end_time = SystemTimer::now();
             delta_time += end_time - begin_time;
