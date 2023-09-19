@@ -144,8 +144,6 @@ impl<'d> Ecc<'d> {
         self.alignment_helper
             .volatile_write_regset(&mut self.ecc.py_mem[0], tmp.as_ref(), 8);
 
-        self.enable_interrupt();
-
         self.ecc.mult_conf.write(|w| unsafe {
             w.work_mode()
                 .bits(mode as u8)
@@ -157,8 +155,6 @@ impl<'d> Ecc<'d> {
 
         // wait for interrupt
         while self.is_busy() {}
-
-        self.clear_interrupt();
 
         self.alignment_helper
             .volatile_read_regset(&self.ecc.px_mem[0], &mut tmp, 8);
@@ -212,8 +208,6 @@ impl<'d> Ecc<'d> {
         self.alignment_helper
             .volatile_write_regset(&mut self.ecc.py_mem[0], tmp.as_ref(), 8);
 
-        self.enable_interrupt();
-
         self.ecc.mult_conf.write(|w| unsafe {
             w.work_mode()
                 .bits(mode as u8)
@@ -225,8 +219,6 @@ impl<'d> Ecc<'d> {
 
         // wait for interrupt
         while self.is_busy() {}
-
-        self.clear_interrupt();
 
         self.alignment_helper
             .volatile_read_regset(&self.ecc.py_mem[0], &mut tmp, 8);
@@ -277,8 +269,6 @@ impl<'d> Ecc<'d> {
         self.alignment_helper
             .volatile_write_regset(&mut self.ecc.py_mem[0], tmp.as_ref(), 8);
 
-        self.enable_interrupt();
-
         self.ecc.mult_conf.write(|w| unsafe {
             w.work_mode()
                 .bits(mode as u8)
@@ -290,8 +280,6 @@ impl<'d> Ecc<'d> {
 
         // wait for interrupt
         while self.is_busy() {}
-
-        self.clear_interrupt();
 
         if !self.ecc.mult_conf.read().verification_result().bit() {
             self.ecc.mult_conf.reset();
@@ -351,8 +339,6 @@ impl<'d> Ecc<'d> {
         self.alignment_helper
             .volatile_write_regset(&mut self.ecc.py_mem[0], tmp.as_ref(), 8);
 
-        self.enable_interrupt();
-
         self.ecc.mult_conf.write(|w| unsafe {
             w.work_mode()
                 .bits(mode as u8)
@@ -364,8 +350,6 @@ impl<'d> Ecc<'d> {
 
         // wait for interrupt
         while self.is_busy() {}
-
-        self.clear_interrupt();
 
         if !self.ecc.mult_conf.read().verification_result().bit() {
             self.ecc.mult_conf.reset();
@@ -437,8 +421,6 @@ impl<'d> Ecc<'d> {
         self.alignment_helper
             .volatile_write_regset(&mut self.ecc.py_mem[0], tmp.as_ref(), 8);
 
-        self.enable_interrupt();
-
         self.ecc.mult_conf.write(|w| unsafe {
             w.work_mode()
                 .bits(mode as u8)
@@ -450,8 +432,6 @@ impl<'d> Ecc<'d> {
 
         // wait for interrupt
         while self.is_busy() {}
-
-        self.clear_interrupt();
 
         if !self.ecc.mult_conf.read().verification_result().bit() {
             self.ecc.mult_conf.reset();
@@ -620,8 +600,6 @@ impl<'d> Ecc<'d> {
             }
         }
 
-        self.enable_interrupt();
-
         self.ecc.mult_conf.write(|w| unsafe {
             w.work_mode()
                 .bits(mode as u8)
@@ -633,8 +611,6 @@ impl<'d> Ecc<'d> {
 
         // wait for interrupt
         while self.is_busy() {}
-
-        self.clear_interrupt();
 
         if !self.ecc.mult_conf.read().verification_result().bit() {
             self.ecc.mult_conf.reset();
@@ -693,8 +669,6 @@ impl<'d> Ecc<'d> {
         self.alignment_helper
             .volatile_write_regset(&mut self.ecc.py_mem[0], tmp.as_ref(), 8);
 
-        self.enable_interrupt();
-
         self.ecc.mult_conf.write(|w| unsafe {
             w.work_mode()
                 .bits(mode as u8)
@@ -711,8 +685,6 @@ impl<'d> Ecc<'d> {
             self.ecc.mult_conf.reset();
             return Err(Error::PointNotOnSelectedCurve);
         }
-
-        self.clear_interrupt();
 
         if !self.ecc.mult_conf.read().verification_result().bit() {
             self.ecc.mult_conf.reset();
@@ -832,8 +804,6 @@ impl<'d> Ecc<'d> {
                 .volatile_write_regset(&mut self.ecc.qz_mem[0], qz, 8);
         }
 
-        self.enable_interrupt();
-
         self.ecc.mult_conf.write(|w| unsafe {
             w.work_mode()
                 .bits(mode as u8)
@@ -845,8 +815,6 @@ impl<'d> Ecc<'d> {
 
         // wait for interrupt
         while self.is_busy() {}
-
-        self.clear_interrupt();
 
         // padding for 192 curve
         if !curve {
@@ -938,8 +906,6 @@ impl<'d> Ecc<'d> {
                 .volatile_write_regset(&mut self.ecc.py_mem[0], b.as_ref(), 8);
         }
 
-        self.enable_interrupt();
-
         self.ecc.mult_conf.write(|w| unsafe {
             w.work_mode()
                 .bits(work_mode.clone() as u8)
@@ -951,8 +917,6 @@ impl<'d> Ecc<'d> {
 
         // wait for interrupt
         while self.is_busy() {}
-
-        self.clear_interrupt();
 
         match work_mode {
             WorkMode::ModAdd | WorkMode::ModSub => {
@@ -985,18 +949,6 @@ impl<'d> Ecc<'d> {
 
     fn is_busy(&self) -> bool {
         self.ecc.mult_conf.read().start().bit_is_set()
-    }
-
-    fn enable_interrupt(&self) {
-        self.ecc
-            .mult_int_ena
-            .write(|w| w.calc_done_int_ena().set_bit());
-    }
-
-    fn clear_interrupt(&self) {
-        self.ecc
-            .mult_int_clr
-            .write(|w| w.calc_done_int_clr().set_bit());
     }
 
     fn reverse_words(&self, src: &[u8], dst: &mut [u8]) {
