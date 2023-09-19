@@ -208,6 +208,11 @@ mod critical_section_impl {
         #[cfg(multi_core)]
         use super::multicore::{LockKind, MULTICORE_LOCK};
 
+        // PS has 15 useful bits. Bits 12..16 and 19..32 are unused, so we can use bit
+        // #31 as our reentry flag.
+        #[cfg(multi_core)]
+        const REENTRY_FLAG: u32 = 1 << 31;
+
         unsafe impl critical_section::Impl for super::CriticalSection {
             unsafe fn acquire() -> critical_section::RawRestoreState {
                 let mut tkn: critical_section::RawRestoreState;
@@ -215,32 +220,35 @@ mod critical_section_impl {
                 #[cfg(multi_core)]
                 {
                     match super::multicore::MULTICORE_LOCK.lock() {
-                        LockKind::Lock => {}
-                        LockKind::Reentry => tkn |= 1 << 31,
+                        LockKind::Lock => {} // the reserved bit is initially 0
+                        LockKind::Reentry => tkn |= REENTRY_FLAG,
                     }
                 }
                 tkn
             }
 
             unsafe fn release(mut token: critical_section::RawRestoreState) {
-                if token != 0 {
-                    #[cfg(multi_core)]
-                    {
-                        debug_assert!(super::multicore::MULTICORE_LOCK.is_owned_by_current_thread());
+                #[cfg(multi_core)]
+                {
+                    debug_assert!(super::multicore::MULTICORE_LOCK.is_owned_by_current_thread());
 
-                        let lock_kind = if token & (1 << 31) != 0 {
-                            token = token & !(1 << 31);
-                            LockKind::Reentry
-                        } else {
-                            LockKind::Lock
-                        };
+                    let lock_kind = if token & REENTRY_FLAG != 0 {
+                        // We must only write 0 to the reserved bits
+                        token = token & !REENTRY_FLAG;
+                        LockKind::Reentry
+                    } else {
+                        LockKind::Lock
+                    };
 
-                        super::multicore::MULTICORE_LOCK.unlock(lock_kind);
-                    }
-                    core::arch::asm!(
-                        "wsr.ps {0}",
-                        "rsync", in(reg) token)
+                    super::multicore::MULTICORE_LOCK.unlock(lock_kind);
                 }
+
+                const RESERVED_MASK: u32 = 0b1111_1111_1111_1000_1111_0000_0000_0000;
+                debug_assert!(token & RESERVED_MASK == 0);
+
+                core::arch::asm!(
+                    "wsr.ps {0}",
+                    "rsync", in(reg) token)
             }
         }
     }
@@ -249,36 +257,44 @@ mod critical_section_impl {
     mod riscv {
         use esp_riscv_rt::riscv;
 
+        #[cfg(multi_core)]
+        // The restore state is a u8 that is casted from a bool, so it has a value of
+        // 0x00 or 0x01 before we add the reentry flag to it.
+        const REENTRY_FLAG: u8 = 1 << 7;
+
         unsafe impl critical_section::Impl for super::CriticalSection {
             unsafe fn acquire() -> critical_section::RawRestoreState {
                 let mut mstatus = 0u32;
                 core::arch::asm!("csrrci {0}, mstatus, 8", inout(reg) mstatus);
                 let mut tkn = ((mstatus & 0b1000) != 0) as critical_section::RawRestoreState;
+
                 #[cfg(multi_core)]
                 {
                     match super::multicore::MULTICORE_LOCK.lock() {
                         LockKind::Lock => {}
-                        LockKind::Reentry => tkn |= 1 << 7,
+                        LockKind::Reentry => tkn |= REENTRY_FLAG,
                     }
                 }
 
                 tkn
             }
 
-            unsafe fn release(token: critical_section::RawRestoreState) {
+            unsafe fn release(mut token: critical_section::RawRestoreState) {
+                #[cfg(multi_core)]
+                {
+                    debug_assert!(multicore::MULTICORE_LOCK.is_owned_by_current_thread());
+
+                    let lock_kind = if token & REENTRY_FLAG != 0 {
+                        token = token & !REENTRY_FLAG;
+                        LockKind::Reentry
+                    } else {
+                        LockKind::Lock
+                    };
+
+                    super::multicore::MULTICORE_LOCK.unlock(lock_kind);
+                }
+
                 if token != 0 {
-                    #[cfg(multi_core)]
-                    {
-                        debug_assert!(multicore::MULTICORE_LOCK.is_owned_by_current_thread());
-
-                        let lock_kind = if token & (1 << 7) != 0 {
-                            LockKind::Reentry
-                        } else {
-                            LockKind::Lock
-                        };
-
-                        super::multicore::MULTICORE_LOCK.unlock(lock_kind);
-                    }
                     riscv::interrupt::enable();
                 }
             }
