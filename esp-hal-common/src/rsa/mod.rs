@@ -51,8 +51,6 @@ use crate::{
 #[cfg_attr(esp32, path = "esp32.rs")]
 mod rsa_spec_impl;
 
-#[cfg(feature = "async")]
-use nb::block;
 pub use rsa_spec_impl::operand_sizes;
 
 /// RSA peripheral container
@@ -266,11 +264,6 @@ where
     }
 
     #[cfg(feature = "async")]
-    pub(crate) fn inner(&self) -> &RSA {
-        &self.rsa.rsa
-    }
-
-    #[cfg(feature = "async")]
     pub async fn async_exponentiation(
         &mut self,
         base: &T::InputType,
@@ -278,8 +271,8 @@ where
         outbuf: &mut T::InputType,
     ) {
         self.start_exponentiation(&base, &r);
-        asynch::RsaFuture::new(self.inner());
-        block!(self.read_results(outbuf)).unwrap();
+        asynch::RsaFuture::new(&self.rsa.rsa);
+        nb::block!(self.read_results(outbuf)).unwrap();
     }
 }
 
@@ -311,11 +304,6 @@ where
     }
 
     #[cfg(feature = "async")]
-    pub(crate) fn inner(&self) -> &RSA {
-        &self.rsa.rsa
-    }
-
-    #[cfg(feature = "async")]
     #[cfg(not(esp32))]
     pub async fn async_modular_multiplication(
         &mut self,
@@ -324,9 +312,9 @@ where
     ) {
         self.start_modular_multiplication(r);
 
-        asynch::RsaFuture::new(self.inner());
+        asynch::RsaFuture::new(&self.rsa.rsa);
 
-        block!(self.read_results(outbuf)).unwrap();
+        nb::block!(self.read_results(outbuf)).unwrap();
     }
 
     #[cfg(feature = "async")]
@@ -339,9 +327,9 @@ where
         outbuf: &mut T::InputType,
     ) {
         self.start_step1(operand_a, r);
-        block!(self.start_step2(operand_b)).unwrap();
-        asynch::RsaFuture::new(self.inner());
-        block!(self.read_results(outbuf)).unwrap();
+        nb::block!(self.start_step2(operand_b)).unwrap();
+        asynch::RsaFuture::new(&self.rsa.rsa);
+        nb::block!(self.read_results(outbuf)).unwrap();
     }
 }
 
@@ -380,11 +368,6 @@ where
     }
 
     #[cfg(feature = "async")]
-    pub(crate) fn inner(&self) -> &RSA {
-        &self.rsa.rsa
-    }
-
-    #[cfg(feature = "async")]
     #[cfg(not(esp32))]
     pub async fn async_multiplication<'b, const O: usize>(
         &mut self,
@@ -395,9 +378,9 @@ where
     {
         self.start_multiplication(operand_b);
 
-        asynch::RsaFuture::new(self.inner());
+        asynch::RsaFuture::new(&self.rsa.rsa);
 
-        block!(self.read_results(outbuf)).unwrap();
+        nb::block!(self.read_results(outbuf)).unwrap();
     }
 
     #[cfg(feature = "async")]
@@ -412,8 +395,8 @@ where
     {
         self.start_multiplication(operand_a, operand_b);
 
-        asynch::RsaFuture::new(self.inner());
+        asynch::RsaFuture::new(&self.rsa.rsa);
 
-        block!(self.read_results(outbuf)).unwrap();
+        nb::block!(self.read_results(outbuf)).unwrap();
     }
 }
