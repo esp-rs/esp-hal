@@ -181,19 +181,31 @@ pub enum Cpu {
     AppCpu,
 }
 
-/// Which core the application is currently executing on
-pub fn get_core() -> Cpu {
-    #[cfg(all(xtensa, multi_core))]
-    match ((xtensa_lx::get_processor_id() >> 13) & 1) != 0 {
-        false => Cpu::ProCpu,
-        true => Cpu::AppCpu,
-    }
+#[cfg(all(xtensa, multi_core))]
+fn get_raw_core() -> u32 {
+    // We use 0x2001 to force the compiler to use the `addi.n` instruction when
+    // incrementing
+    xtensa_lx::get_processor_id() & 0x2001
+}
 
-    // #[cfg(all(riscv, multi_core))]
+#[cfg(all(not(xtensa), multi_core))]
+fn get_raw_core() -> u32 {
     // TODO get hart_id
+    0
+}
 
-    // single core always has ProCpu only
-    #[cfg(single_core)]
+/// Which core the application is currently executing on
+#[cfg(all(xtensa, multi_core))]
+pub fn get_core() -> Cpu {
+    match xtensa_lx::get_processor_id() & 0x2000 {
+        0 => Cpu::ProCpu,
+        _ => Cpu::AppCpu,
+    }
+}
+
+/// Which core the application is currently executing on
+#[cfg(not(all(xtensa, multi_core)))]
+pub fn get_core() -> Cpu {
     Cpu::ProCpu
 }
 
@@ -310,7 +322,7 @@ mod critical_section_impl {
         use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
         fn thread_id() -> core::num::NonZeroUsize {
-            core::num::NonZeroUsize::new((crate::get_core() as usize) + 1).unwrap()
+            core::num::NonZeroUsize::new((crate::get_raw_core() as usize) + 1).unwrap()
         }
 
         pub(super) static MULTICORE_LOCK: ReentrantMutex = ReentrantMutex::new();
