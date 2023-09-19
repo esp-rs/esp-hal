@@ -42,6 +42,11 @@ lis3dh-async       = "0.8.0"
 sha2               = { version = "0.10.7", default-features = false}
 ssd1306            = "0.8.1"
 static_cell        = { version = "1.2.0", features = ["nightly"] }
+hex-literal       = "0"
+crypto-bigint     = {version = "0.5.1", default-features = false }
+elliptic-curve    = {version = "0.13.4", default-features = false, features = ["sec1"] }
+p192              = {version = "0.13.0", default-features = false, features = ["arithmetic"] }
+p256              = {version = "0.13.2", default-features = false, features = ["arithmetic"] }
 
 [features]
 default              = ["rt", "vectored", "xtal40mhz"]

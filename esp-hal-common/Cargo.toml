@@ -60,7 +60,8 @@ esp32   = { version = "0.26.0", features = ["critical-section"], optional = true
 esp32c2 = { version = "0.14.0", features = ["critical-section"], optional = true }
 esp32c3 = { version = "0.17.0", features = ["critical-section"], optional = true }
 esp32c6 = { version = "0.7.0",  features = ["critical-section"], optional = true }
-esp32h2 = { version = "0.3.0",  features = ["critical-section"], optional = true }
+# until new H2 pacs are relesed, required because of https://github.com/esp-rs/esp-pacs/pull/156
+esp32h2 = { git = "https://github.com/esp-rs/esp-pacs.git", rev = "2545b66f4c11dd78dc02a3c77c44a78fa5893beb",  features = ["critical-section"], optional = true }
 esp32s2 = { version = "0.17.0", features = ["critical-section"], optional = true }
 esp32s3 = { version = "0.21.0", features = ["critical-section"], optional = true }
 
