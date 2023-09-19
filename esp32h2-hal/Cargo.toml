@@ -97,10 +97,6 @@ name              = "embassy_serial"
 required-features = ["async", "embassy"]
 
 [[example]]
-name              = "embassy_serial_split"
-required-features = ["async", "embassy"]
-
-[[example]]
 name              = "embassy_spi"
 required-features = ["async", "embassy"]
 
