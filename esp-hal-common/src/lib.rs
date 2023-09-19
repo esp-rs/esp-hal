@@ -307,7 +307,7 @@ mod critical_section_impl {
 
     #[cfg(multi_core)]
     mod multicore {
-        use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+        use core::sync::atomic::{AtomicUsize, Ordering};
 
         // We're using a value that we know get_raw_core() will never return. This
         // avoids an unnecessary increment of the core ID.
