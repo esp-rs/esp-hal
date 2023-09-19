@@ -222,7 +222,10 @@ mod critical_section_impl {
                     use super::multicore::{LockKind, MULTICORE_LOCK};
 
                     match MULTICORE_LOCK.lock() {
-                        LockKind::Lock => tkn &= !REENTRY_FLAG,
+                        LockKind::Lock => {
+                            // We can assume the reserved bit is 0 otherwise
+                            // rsil - wsr pairings would be undefined behavior
+                        }
                         LockKind::Reentry => tkn |= REENTRY_FLAG,
                     }
                 }
