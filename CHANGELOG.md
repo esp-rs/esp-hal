@@ -46,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `log` feature to enable log output (#773)
 - Add `defmt` feature to enable log output (#773)
 - A new macro to load LP core code on ESP32-C6 (#779)
+- Add `ECC`` peripheral driver (#785)
 
 ### Changed
 
