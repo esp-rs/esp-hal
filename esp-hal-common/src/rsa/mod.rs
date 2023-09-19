@@ -271,7 +271,7 @@ where
         outbuf: &mut T::InputType,
     ) {
         self.start_exponentiation(&base, &r);
-        asynch::RsaFuture::new(&self.rsa.rsa);
+        asynch::RsaFuture::new(&self.rsa.rsa).await;
         nb::block!(self.read_results(outbuf)).unwrap();
     }
 }
@@ -312,7 +312,7 @@ where
     ) {
         self.start_modular_multiplication(r);
 
-        asynch::RsaFuture::new(&self.rsa.rsa);
+        asynch::RsaFuture::new(&self.rsa.rsa).await;
 
         nb::block!(self.read_results(outbuf)).unwrap();
     }
@@ -328,7 +328,7 @@ where
     ) {
         self.start_step1(operand_a, r);
         nb::block!(self.start_step2(operand_b)).unwrap();
-        asynch::RsaFuture::new(&self.rsa.rsa);
+        asynch::RsaFuture::new(&self.rsa.rsa).await;
         nb::block!(self.read_results(outbuf)).unwrap();
     }
 }
@@ -378,7 +378,7 @@ where
     {
         self.start_multiplication(operand_b);
 
-        asynch::RsaFuture::new(&self.rsa.rsa);
+        asynch::RsaFuture::new(&self.rsa.rsa).await;
 
         nb::block!(self.read_results(outbuf)).unwrap();
     }
@@ -395,7 +395,7 @@ where
     {
         self.start_multiplication(operand_a, operand_b);
 
-        asynch::RsaFuture::new(&self.rsa.rsa);
+        asynch::RsaFuture::new(&self.rsa.rsa).await;
 
         nb::block!(self.read_results(outbuf)).unwrap();
     }
