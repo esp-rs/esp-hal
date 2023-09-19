@@ -54,15 +54,26 @@ pub enum EllipticCurve {
     P256 = 1,
 }
 
-enum WorkMode {
+#[derive(Clone)]
+pub enum WorkMode {
     PointMultiMode          = 0,
     #[cfg(esp32c2)]
     DivisionMode            = 1,
     PointVerif              = 2,
     PointVerifMulti         = 3,
     JacobianPointMulti      = 4,
+    #[cfg(esp32h2)]
+    PointAdd                = 5,
     JacobianPointVerif      = 6,
     PointVerifJacobianMulti = 7,
+    #[cfg(esp32h2)]
+    ModAdd                  = 8,
+    #[cfg(esp32h2)]
+    ModSub                  = 9,
+    #[cfg(esp32h2)]
+    ModMulti                = 10,
+    #[cfg(esp32h2)]
+    ModDiv                  = 11,
 }
 
 impl<'d> Ecc<'d> {
@@ -92,6 +103,8 @@ impl<'d> Ecc<'d> {
     ///
     /// Base Point Multiplication can be represented as:
     /// (Q_x, Q_y) = k * (P_x, P_y)
+    ///
+    /// Output is stored in `x` and `y`.
     ///
     /// # Error
     ///
@@ -131,6 +144,8 @@ impl<'d> Ecc<'d> {
         self.alignment_helper
             .volatile_write_regset(&mut self.ecc.py_mem[0], tmp.as_ref(), 8);
 
+        self.enable_interrupt();
+
         self.ecc.mult_conf.write(|w| unsafe {
             w.work_mode()
                 .bits(mode as u8)
@@ -140,7 +155,10 @@ impl<'d> Ecc<'d> {
                 .set_bit()
         });
 
+        // wait for interrupt
         while self.is_busy() {}
+
+        self.clear_interrupt();
 
         self.alignment_helper
             .volatile_read_regset(&self.ecc.px_mem[0], &mut tmp, 8);
@@ -152,16 +170,18 @@ impl<'d> Ecc<'d> {
         Ok(())
     }
 
-    #[cfg(esp32c2)]
     /// # Finite Field Division
     ///
     /// Finite Field Division can be represented as:
     /// Result = P_y * k^{−1} mod p
     ///
+    /// Output is stored in `y`.
+    ///
     /// # Error
     ///
     /// This function will return an error if any bitlength value is different
     /// from the bitlength of the prime fields of the curve.
+    #[cfg(esp32c2)]
     pub fn finite_field_division(
         &mut self,
         curve: &EllipticCurve,
@@ -192,6 +212,8 @@ impl<'d> Ecc<'d> {
         self.alignment_helper
             .volatile_write_regset(&mut self.ecc.py_mem[0], tmp.as_ref(), 8);
 
+        self.enable_interrupt();
+
         self.ecc.mult_conf.write(|w| unsafe {
             w.work_mode()
                 .bits(mode as u8)
@@ -201,7 +223,10 @@ impl<'d> Ecc<'d> {
                 .set_bit()
         });
 
+        // wait for interrupt
         while self.is_busy() {}
+
+        self.clear_interrupt();
 
         self.alignment_helper
             .volatile_read_regset(&self.ecc.py_mem[0], &mut tmp, 8);
@@ -252,6 +277,8 @@ impl<'d> Ecc<'d> {
         self.alignment_helper
             .volatile_write_regset(&mut self.ecc.py_mem[0], tmp.as_ref(), 8);
 
+        self.enable_interrupt();
+
         self.ecc.mult_conf.write(|w| unsafe {
             w.work_mode()
                 .bits(mode as u8)
@@ -261,7 +288,10 @@ impl<'d> Ecc<'d> {
                 .set_bit()
         });
 
+        // wait for interrupt
         while self.is_busy() {}
+
+        self.clear_interrupt();
 
         if !self.ecc.mult_conf.read().verification_result().bit() {
             self.ecc.mult_conf.reset();
@@ -277,6 +307,8 @@ impl<'d> Ecc<'d> {
     /// selected elliptic curve or not. If yes, then perform the multiplication:
     /// (Q_x, Q_y) = k * (P_x, P_y)
     ///
+    /// Output is stored in `x` and `y`.
+    ///
     /// # Error
     ///
     /// This function will return an error if any bitlength value is different
@@ -284,6 +316,7 @@ impl<'d> Ecc<'d> {
     ///
     /// This function will return an error if the point is not on the selected
     /// elliptic curve.
+    #[cfg(not(esp32h2))]
     pub fn affine_point_verification_multiplication(
         &mut self,
         curve: &EllipticCurve,
@@ -318,6 +351,8 @@ impl<'d> Ecc<'d> {
         self.alignment_helper
             .volatile_write_regset(&mut self.ecc.py_mem[0], tmp.as_ref(), 8);
 
+        self.enable_interrupt();
+
         self.ecc.mult_conf.write(|w| unsafe {
             w.work_mode()
                 .bits(mode as u8)
@@ -327,7 +362,10 @@ impl<'d> Ecc<'d> {
                 .set_bit()
         });
 
+        // wait for interrupt
         while self.is_busy() {}
+
+        self.clear_interrupt();
 
         if !self.ecc.mult_conf.read().verification_result().bit() {
             self.ecc.mult_conf.reset();
@@ -344,16 +382,113 @@ impl<'d> Ecc<'d> {
         Ok(())
     }
 
-    /// # Jacobian Point Multiplication
+    /// # Base Point Verification + Base Point Multiplication
     ///
-    /// Jacobian Point Multiplication can be represented as:
-    /// (Q_x, Q_y, Q_z) = k * (P_x, P_y, 1)
+    /// In this working mode, ECC first verifies if Point (P_x, P_y) is on the
+    /// selected elliptic curve or not. If yes, then perform the multiplication:
+    /// (Q_x, Q_y) = (J_x, J_y, J_z) = k * (P_x, P_y)
+    ///
+    /// The affine point representation output is stored in `px` and `py`.
+    /// The Jacobian point representation output is stored in `qx`, `qy`, and
+    /// `qz`.
     ///
     /// # Error
     ///
     /// This function will return an error if any bitlength value is different
     /// from the bitlength of the prime fields of the curve.
-    pub fn jacobian_point_multication(
+    ///
+    /// This function will return an error if the point is not on the selected
+    /// elliptic curve.
+    #[cfg(esp32h2)]
+    pub fn affine_point_verification_multiplication(
+        &mut self,
+        curve: &EllipticCurve,
+        k: &[u8],
+        px: &mut [u8],
+        py: &mut [u8],
+        qx: &mut [u8],
+        qy: &mut [u8],
+        qz: &mut [u8],
+    ) -> Result<(), Error> {
+        let curve = match curve {
+            EllipticCurve::P192 => {
+                if k.len() != 24 || px.len() != 24 || py.len() != 24 {
+                    return Err(Error::SizeMismatchCurve);
+                }
+                false
+            }
+            EllipticCurve::P256 => {
+                if k.len() != 32 || px.len() != 32 || py.len() != 32 {
+                    return Err(Error::SizeMismatchCurve);
+                }
+                true
+            }
+        };
+        let mode = WorkMode::PointVerifMulti;
+
+        let mut tmp = [0_u8; 32];
+        self.reverse_words(k, &mut tmp);
+        self.alignment_helper
+            .volatile_write_regset(&mut self.ecc.k_mem[0], tmp.as_ref(), 8);
+        self.reverse_words(px, &mut tmp);
+        self.alignment_helper
+            .volatile_write_regset(&mut self.ecc.px_mem[0], tmp.as_ref(), 8);
+        self.reverse_words(py, &mut tmp);
+        self.alignment_helper
+            .volatile_write_regset(&mut self.ecc.py_mem[0], tmp.as_ref(), 8);
+
+        self.enable_interrupt();
+
+        self.ecc.mult_conf.write(|w| unsafe {
+            w.work_mode()
+                .bits(mode as u8)
+                .key_length()
+                .bit(curve)
+                .start()
+                .set_bit()
+        });
+
+        // wait for interrupt
+        while self.is_busy() {}
+
+        self.clear_interrupt();
+
+        if !self.ecc.mult_conf.read().verification_result().bit() {
+            self.ecc.mult_conf.reset();
+            return Err(Error::PointNotOnSelectedCurve);
+        }
+
+        self.alignment_helper
+            .volatile_read_regset(&self.ecc.px_mem[0], &mut tmp, 8);
+        self.reverse_words(tmp.as_ref(), px);
+        self.alignment_helper
+            .volatile_read_regset(&self.ecc.py_mem[0], &mut tmp, 8);
+        self.reverse_words(tmp.as_ref(), py);
+        self.alignment_helper
+            .volatile_read_regset(&self.ecc.qx_mem[0], &mut tmp, 8);
+        self.reverse_words(tmp.as_ref(), qx);
+        self.alignment_helper
+            .volatile_read_regset(&self.ecc.qy_mem[0], &mut tmp, 8);
+        self.reverse_words(tmp.as_ref(), qy);
+        self.alignment_helper
+            .volatile_read_regset(&self.ecc.qz_mem[0], &mut tmp, 8);
+        self.reverse_words(tmp.as_ref(), qz);
+
+        Ok(())
+    }
+
+    /// # Jacobian Point Multiplication
+    ///
+    /// Jacobian Point Multiplication can be represented as:
+    /// (Q_x, Q_y, Q_z) = k * (P_x, P_y, 1)
+    ///
+    /// Output is stored in `x`, `y`, and `k`.
+    ///
+    /// # Error
+    ///
+    /// This function will return an error if any bitlength value is different
+    /// from the bitlength of the prime fields of the curve.
+    pub fn jacobian_point_multiplication(
         &mut self,
         curve: &EllipticCurve,
         k: &mut [u8],
@@ -398,15 +533,29 @@ impl<'d> Ecc<'d> {
 
         while self.is_busy() {}
 
-        self.alignment_helper
-            .volatile_read_regset(&self.ecc.px_mem[0], &mut tmp, 8);
-        self.reverse_words(tmp.as_ref(), x);
-        self.alignment_helper
-            .volatile_read_regset(&self.ecc.py_mem[0], &mut tmp, 8);
-        self.reverse_words(tmp.as_ref(), y);
-        self.alignment_helper
-            .volatile_read_regset(&self.ecc.k_mem[0], &mut tmp, 8);
-        self.reverse_words(tmp.as_ref(), k);
+        cfg_if::cfg_if! {
+            if #[cfg(not(esp32h2))] {
+            self.alignment_helper
+                .volatile_read_regset(&self.ecc.px_mem[0], &mut tmp, 8);
+            self.reverse_words(tmp.as_ref(), x);
+            self.alignment_helper
+                .volatile_read_regset(&self.ecc.py_mem[0], &mut tmp, 8);
+            self.reverse_words(tmp.as_ref(), y);
+            self.alignment_helper
+                .volatile_read_regset(&self.ecc.k_mem[0], &mut tmp, 8);
+            self.reverse_words(tmp.as_ref(), k);
+            } else {
+            self.alignment_helper
+                .volatile_read_regset(&self.ecc.qx_mem[0], &mut tmp, 8);
+            self.reverse_words(tmp.as_ref(), x);
+            self.alignment_helper
+                .volatile_read_regset(&self.ecc.qy_mem[0], &mut tmp, 8);
+            self.reverse_words(tmp.as_ref(), y);
+            self.alignment_helper
+                .volatile_read_regset(&self.ecc.qz_mem[0], &mut tmp, 8);
+            self.reverse_words(tmp.as_ref(), k);
+            }
+        }
 
         Ok(())
     }
@@ -448,14 +597,30 @@ impl<'d> Ecc<'d> {
 
         let mut tmp = [0_u8; 32];
         self.reverse_words(x, &mut tmp);
-        self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.px_mem[0], tmp.as_ref(), 8);
-        self.reverse_words(y, &mut tmp);
-        self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.py_mem[0], tmp.as_ref(), 8);
-        self.reverse_words(z, &mut tmp);
-        self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.k_mem[0], tmp.as_ref(), 8);
+
+        cfg_if::cfg_if! {
+            if #[cfg(not(esp32h2))] {
+                self.alignment_helper
+                    .volatile_write_regset(&mut self.ecc.px_mem[0], tmp.as_ref(), 8);
+                self.reverse_words(y, &mut tmp);
+                self.alignment_helper
+                    .volatile_write_regset(&mut self.ecc.py_mem[0], tmp.as_ref(), 8);
+                self.reverse_words(z, &mut tmp);
+                self.alignment_helper
+                    .volatile_write_regset(&mut self.ecc.k_mem[0], tmp.as_ref(), 8);
+            } else {
+                self.alignment_helper
+                    .volatile_write_regset(&mut self.ecc.qx_mem[0], tmp.as_ref(), 8);
+                self.reverse_words(y, &mut tmp);
+                self.alignment_helper
+                    .volatile_write_regset(&mut self.ecc.qy_mem[0], tmp.as_ref(), 8);
+                self.reverse_words(z, &mut tmp);
+                self.alignment_helper
+                    .volatile_write_regset(&mut self.ecc.qz_mem[0], tmp.as_ref(), 8);
+            }
+        }
+
+        self.enable_interrupt();
 
         self.ecc.mult_conf.write(|w| unsafe {
             w.work_mode()
@@ -466,7 +631,10 @@ impl<'d> Ecc<'d> {
                 .set_bit()
         });
 
+        // wait for interrupt
         while self.is_busy() {}
+
+        self.clear_interrupt();
 
         if !self.ecc.mult_conf.read().verification_result().bit() {
             self.ecc.mult_conf.reset();
@@ -481,6 +649,8 @@ impl<'d> Ecc<'d> {
     /// In this working mode, ECC first verifies if Point (Px, Py) is on the
     /// selected elliptic curve or not. If yes, then perform the multiplication:
     /// (Q_x, Q_y, Q_z) = k * (P_x, P_y, 1)
+    ///
+    /// Output is stored in `x`, `y`, and `k`.
     ///
     /// # Error
     ///
@@ -523,6 +693,8 @@ impl<'d> Ecc<'d> {
         self.alignment_helper
             .volatile_write_regset(&mut self.ecc.py_mem[0], tmp.as_ref(), 8);
 
+        self.enable_interrupt();
+
         self.ecc.mult_conf.write(|w| unsafe {
             w.work_mode()
                 .bits(mode as u8)
@@ -532,6 +704,7 @@ impl<'d> Ecc<'d> {
                 .set_bit()
         });
 
+        // wait for interrupt
         while self.is_busy() {}
 
         if !self.ecc.mult_conf.read().verification_result().bit() {
@@ -539,21 +712,291 @@ impl<'d> Ecc<'d> {
             return Err(Error::PointNotOnSelectedCurve);
         }
 
-        self.alignment_helper
-            .volatile_read_regset(&self.ecc.px_mem[0], &mut tmp, 8);
-        self.reverse_words(tmp.as_ref(), x);
-        self.alignment_helper
-            .volatile_read_regset(&self.ecc.py_mem[0], &mut tmp, 8);
-        self.reverse_words(tmp.as_ref(), y);
-        self.alignment_helper
-            .volatile_read_regset(&self.ecc.k_mem[0], &mut tmp, 8);
-        self.reverse_words(tmp.as_ref(), k);
+        self.clear_interrupt();
+
+        if !self.ecc.mult_conf.read().verification_result().bit() {
+            self.ecc.mult_conf.reset();
+            return Err(Error::PointNotOnSelectedCurve);
+        }
+
+        cfg_if::cfg_if! {
+            if #[cfg(not(esp32h2))] {
+                self.alignment_helper
+                    .volatile_read_regset(&self.ecc.px_mem[0], &mut tmp, 8);
+                self.reverse_words(tmp.as_ref(), x);
+                self.alignment_helper
+                    .volatile_read_regset(&self.ecc.py_mem[0], &mut tmp, 8);
+                self.reverse_words(tmp.as_ref(), y);
+                self.alignment_helper
+                    .volatile_read_regset(&self.ecc.k_mem[0], &mut tmp, 8);
+                self.reverse_words(tmp.as_ref(), k);
+            } else {
+                self.alignment_helper
+                    .volatile_read_regset(&self.ecc.qx_mem[0], &mut tmp, 8);
+                self.reverse_words(tmp.as_ref(), x);
+                self.alignment_helper
+                    .volatile_read_regset(&self.ecc.qy_mem[0], &mut tmp, 8);
+                self.reverse_words(tmp.as_ref(), y);
+                self.alignment_helper
+                    .volatile_read_regset(&self.ecc.qz_mem[0], &mut tmp, 8);
+                self.reverse_words(tmp.as_ref(), k);
+            }
+        }
+
+        Ok(())
+    }
+
+    /// # Point Addition
+    ///
+    /// In this working mode, ECC first verifies if Point (Px, Py) is on the
+    /// selected elliptic curve or not. If yes, then perform the addition:
+    /// (R_x, R_y) = (J_x, J_y, J_z) = (P_x, P_y, 1) + (Q_x, Q_y, Q_z)
+    ///
+    /// This functions requires data in Little Endian.
+    /// The affine point representation output is stored in `px` and `py`.
+    /// The Jacobian point representation output is stored in `qx`, `qy`, and
+    /// `qz`.
+    ///
+    /// # Error
+    ///
+    /// This function will return an error if any bitlength value is different
+    /// from the bitlength of the prime fields of the curve.
+    ///
+    /// This function will return an error if the point is not on the selected
+    /// elliptic curve.
+    #[cfg(esp32h2)]
+    pub fn affine_point_addition(
+        &mut self,
+        curve: &EllipticCurve,
+        px: &mut [u8],
+        py: &mut [u8],
+        qx: &mut [u8],
+        qy: &mut [u8],
+        qz: &mut [u8],
+    ) -> Result<(), Error> {
+        let curve = match curve {
+            EllipticCurve::P192 => {
+                if px.len() != 24
+                    || py.len() != 24
+                    || qx.len() != 24
+                    || qy.len() != 24
+                    || qz.len() != 24
+                {
+                    return Err(Error::SizeMismatchCurve);
+                }
+                false
+            }
+            EllipticCurve::P256 => {
+                if px.len() != 32
+                    || py.len() != 32
+                    || qx.len() != 32
+                    || qy.len() != 32
+                    || qz.len() != 32
+                {
+                    return Err(Error::SizeMismatchCurve);
+                }
+                true
+            }
+        };
+        let mode = WorkMode::PointAdd;
+
+        let mut tmp = [0_u8; 32];
+
+        // padding for 192 curve
+        if !curve {
+            tmp[0..px.len()].copy_from_slice(&px);
+            self.alignment_helper
+                .volatile_write_regset(&mut self.ecc.px_mem[0], &mut tmp, 8);
+            tmp[0..py.len()].copy_from_slice(&py);
+            self.alignment_helper
+                .volatile_write_regset(&mut self.ecc.py_mem[0], &mut tmp, 8);
+            tmp[0..qx.len()].copy_from_slice(&qx);
+            self.alignment_helper
+                .volatile_write_regset(&mut self.ecc.qx_mem[0], &mut tmp, 8);
+            tmp[0..qy.len()].copy_from_slice(&qy);
+            self.alignment_helper
+                .volatile_write_regset(&mut self.ecc.qy_mem[0], &mut tmp, 8);
+            tmp[0..qz.len()].copy_from_slice(&qz);
+            self.alignment_helper
+                .volatile_write_regset(&mut self.ecc.qz_mem[0], &mut tmp, 8);
+        } else {
+            self.alignment_helper
+                .volatile_write_regset(&mut self.ecc.px_mem[0], px, 8);
+            self.alignment_helper
+                .volatile_write_regset(&mut self.ecc.py_mem[0], py, 8);
+            self.alignment_helper
+                .volatile_write_regset(&mut self.ecc.qx_mem[0], qx, 8);
+            self.alignment_helper
+                .volatile_write_regset(&mut self.ecc.qy_mem[0], qy, 8);
+            self.alignment_helper
+                .volatile_write_regset(&mut self.ecc.qz_mem[0], qz, 8);
+        }
+
+        self.enable_interrupt();
+
+        self.ecc.mult_conf.write(|w| unsafe {
+            w.work_mode()
+                .bits(mode as u8)
+                .key_length()
+                .bit(curve)
+                .start()
+                .set_bit()
+        });
+
+        // wait for interrupt
+        while self.is_busy() {}
+
+        self.clear_interrupt();
+
+        // padding for 192 curve
+        if !curve {
+            self.alignment_helper
+                .volatile_read_regset(&self.ecc.px_mem[0], &mut tmp, 8);
+            px[..].copy_from_slice(&tmp[..24]);
+            self.alignment_helper
+                .volatile_read_regset(&self.ecc.py_mem[0], &mut tmp, 8);
+            py[..].copy_from_slice(&tmp[..24]);
+            self.alignment_helper
+                .volatile_read_regset(&self.ecc.qx_mem[0], &mut tmp, 8);
+            qx[..].copy_from_slice(&tmp[..24]);
+            self.alignment_helper
+                .volatile_read_regset(&self.ecc.qy_mem[0], &mut tmp, 8);
+            qy[..].copy_from_slice(&tmp[..24]);
+            self.alignment_helper
+                .volatile_read_regset(&self.ecc.qz_mem[0], &mut tmp, 8);
+            qz[..].copy_from_slice(&tmp[..24]);
+        } else {
+            self.alignment_helper
+                .volatile_read_regset(&self.ecc.px_mem[0], px, 8);
+            self.alignment_helper
+                .volatile_read_regset(&self.ecc.py_mem[0], py, 8);
+            self.alignment_helper
+                .volatile_read_regset(&self.ecc.qx_mem[0], qx, 8);
+            self.alignment_helper
+                .volatile_read_regset(&self.ecc.qy_mem[0], qy, 8);
+            self.alignment_helper
+                .volatile_read_regset(&self.ecc.qz_mem[0], qz, 8);
+        }
+
+        Ok(())
+    }
+
+    /// # Mod Operations (+-*/)
+    ///
+    /// In this working mode, ECC first verifies if Point (A, B) is on the
+    /// selected elliptic curve or not. If yes, then perform single mod
+    /// operation: R = A (+-*/) B mod N
+    ///
+    /// This functions requires data in Little Endian.
+    /// Output is stored in `a` (+-) and in `b` (*/).
+    ///
+    /// # Error
+    ///
+    /// This function will return an error if any bitlength value is different
+    /// from the bitlength of the prime fields of the curve.
+    ///
+    /// This function will return an error if the point is not on the selected
+    /// elliptic curve.
+    #[cfg(esp32h2)]
+    pub fn mod_operations(
+        &mut self,
+        curve: &EllipticCurve,
+        a: &mut [u8],
+        b: &mut [u8],
+        work_mode: WorkMode,
+    ) -> Result<(), Error> {
+        let curve = match curve {
+            EllipticCurve::P192 => {
+                if a.len() != 24 || b.len() != 24 {
+                    return Err(Error::SizeMismatchCurve);
+                }
+                false
+            }
+            EllipticCurve::P256 => {
+                if a.len() != 32 || b.len() != 32 {
+                    return Err(Error::SizeMismatchCurve);
+                }
+                true
+            }
+        };
+
+        let mut tmp = [0_u8; 32];
+
+        // padding for 192 curve
+        if !curve {
+            tmp[0..a.len()].copy_from_slice(&a);
+
+            self.alignment_helper
+                .volatile_write_regset(&mut self.ecc.px_mem[0], &mut tmp, 8);
+            tmp[0..b.len()].copy_from_slice(&b);
+            self.alignment_helper
+                .volatile_write_regset(&mut self.ecc.py_mem[0], &mut tmp, 8);
+        } else {
+            self.alignment_helper
+                .volatile_write_regset(&mut self.ecc.px_mem[0], a.as_ref(), 8);
+            self.alignment_helper
+                .volatile_write_regset(&mut self.ecc.py_mem[0], b.as_ref(), 8);
+        }
+
+        self.enable_interrupt();
+
+        self.ecc.mult_conf.write(|w| unsafe {
+            w.work_mode()
+                .bits(work_mode.clone() as u8)
+                .key_length()
+                .bit(curve)
+                .start()
+                .set_bit()
+        });
+
+        // wait for interrupt
+        while self.is_busy() {}
+
+        self.clear_interrupt();
+
+        match work_mode {
+            WorkMode::ModAdd | WorkMode::ModSub => {
+                // padding for 192 curve
+                if !curve {
+                    self.alignment_helper
+                        .volatile_read_regset(&self.ecc.px_mem[0], &mut tmp, 8);
+                    a[..].copy_from_slice(&tmp[..24]);
+                } else {
+                    self.alignment_helper
+                        .volatile_read_regset(&self.ecc.px_mem[0], a, 8);
+                }
+            }
+            WorkMode::ModMulti | WorkMode::ModDiv => {
+                // padding for 192 curve
+                if !curve {
+                    self.alignment_helper
+                        .volatile_read_regset(&self.ecc.py_mem[0], &mut tmp, 8);
+                    b[..].copy_from_slice(&tmp[..24]);
+                } else {
+                    self.alignment_helper
+                        .volatile_read_regset(&self.ecc.py_mem[0], b, 8);
+                }
+            }
+            _ => unreachable!(),
+        }
 
         Ok(())
     }
 
     fn is_busy(&self) -> bool {
         self.ecc.mult_conf.read().start().bit_is_set()
+    }
+
+    fn enable_interrupt(&self) {
+        self.ecc
+            .mult_int_ena
+            .write(|w| w.calc_done_int_ena().set_bit());
+    }
+
+    fn clear_interrupt(&self) {
+        self.ecc
+            .mult_int_clr
+            .write(|w| w.calc_done_int_clr().set_bit());
     }
 
     fn reverse_words(&self, src: &[u8], dst: &mut [u8]) {
