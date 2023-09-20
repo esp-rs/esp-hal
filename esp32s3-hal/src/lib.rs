@@ -11,7 +11,6 @@
 //!   provided by [embedded-hal-async] and [embedded-io-async]
 //! - `debug` - Enable debug features in the HAL (used for development)
 //! - `defmt` - Enable [`defmt::Format`] on certain types
-//! - `direct-boot` - Use the direct boot image format
 //! - `eh1` - Implement the traits defined in the `1.0.0-xxx` pre-releases of
 //!   [embedded-hal], [embedded-hal-nb], and [embedded-io]
 //! - `embassy` - Enable support for [embassy], a modern asynchronous embedded
@@ -64,22 +63,8 @@
 //!
 //! [ESP-IDF]: https://github.com/espressif/esp-idf
 //! [App Image Format]: https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/app_image_format.html
-//!
-//! #### Direct Boot
-//!
-//! This device additionally supports direct-boot, which allows an application
-//! to be executed directly from flash, without using the second-stage
-//! bootloader. For more information please see the
-//! [esp32c3-direct-boot-example] in the Espressif organization on GitHub.
-//!
-//! [esp32c3-direct-boot-example]: https://github.com/espressif/esp32c3-direct-boot-example
 
 #![no_std]
-#![cfg_attr(
-    feature = "direct-boot",
-    feature(asm_experimental_arch),
-    feature(naked_functions)
-)]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 
 pub use esp_hal_common::*;
@@ -87,118 +72,6 @@ pub use esp_hal_common::*;
 /// Common module for analog functions
 pub mod analog {
     pub use esp_hal_common::analog::{AvailableAnalog, SensExt};
-}
-
-#[cfg(all(feature = "rt", feature = "direct-boot"))]
-#[doc(hidden)]
-#[no_mangle]
-#[link_section = ".init"]
-#[naked]
-unsafe extern "C" fn init() {
-    core::arch::asm!("call0 startup_direct_boot", options(noreturn));
-}
-
-#[cfg(all(feature = "rt", feature = "direct-boot"))]
-#[doc(hidden)]
-#[no_mangle]
-pub unsafe fn startup_direct_boot() -> ! {
-    // These symbols are from `memory.x`
-    extern "C" {
-        static mut _rtc_fast_bss_start: u32;
-        static mut _rtc_fast_bss_end: u32;
-
-        static mut _rtc_slow_bss_start: u32;
-        static mut _rtc_slow_bss_end: u32;
-
-        // Boundaries of the .rtc_fast.text section
-        static mut _rtc_fast_text_start: u32;
-        static mut _rtc_fast_text_end: u32;
-        static mut _irtc_fast_text: u32;
-
-        // Boundaries of the .rtc_fast.data section
-        static mut _rtc_fast_data_start: u32;
-        static mut _rtc_fast_data_end: u32;
-        static mut _irtc_fast_data: u32;
-
-        // Boundaries of the .rtc_slow.text section
-        static mut _rtc_slow_text_start: u32;
-        static mut _rtc_slow_text_end: u32;
-        static mut _irtc_slow_text: u32;
-
-        // Boundaries of the .rtc_slow.data section
-        static mut _rtc_slow_data_start: u32;
-        static mut _rtc_slow_data_end: u32;
-        static mut _irtc_slow_data: u32;
-
-        static mut _stack_end_cpu0: u32;
-    }
-
-    // set stack pointer to end of memory: no need to retain stack up to this point
-    xtensa_lx::set_stack_pointer(&mut _stack_end_cpu0);
-
-    // copy rtc data from flash to destinations
-    r0::init_data(
-        &mut _rtc_fast_data_start,
-        &mut _rtc_fast_data_end,
-        &_irtc_fast_data,
-    );
-
-    r0::init_data(
-        &mut _rtc_fast_text_start,
-        &mut _rtc_fast_text_end,
-        &_irtc_fast_text,
-    );
-
-    r0::init_data(
-        &mut _rtc_slow_data_start,
-        &mut _rtc_slow_data_end,
-        &_irtc_slow_data,
-    );
-
-    r0::init_data(
-        &mut _rtc_slow_text_start,
-        &mut _rtc_slow_text_end,
-        &_irtc_slow_text,
-    );
-
-    // Initialize RTC RAM
-    esp_hal_common::xtensa_lx_rt::zero_bss(&mut _rtc_fast_bss_start, &mut _rtc_fast_bss_end);
-    esp_hal_common::xtensa_lx_rt::zero_bss(&mut _rtc_slow_bss_start, &mut _rtc_slow_bss_end);
-
-    // first of all copy rwtext
-    extern "C" {
-        // Boundaries of the .iram section
-        static mut _srwtext: u32;
-        static mut _erwtext: u32;
-        static mut _irwtext: u32;
-    }
-    r0::init_data(&mut _srwtext, &mut _erwtext, &_irwtext);
-
-    // do some configurations for compatability with the 2nd stage bootloader
-    // this is a workaround and ideally we should deal with these settings in other
-    // places
-    (&*crate::peripherals::TIMG0::PTR)
-        .int_ena_timers
-        .modify(|_, w| w.t0_int_ena().set_bit().t1_int_ena().set_bit());
-    (&*crate::peripherals::TIMG1::PTR)
-        .int_ena_timers
-        .modify(|_, w| w.t0_int_ena().set_bit().t1_int_ena().set_bit());
-
-    (&*crate::peripherals::RTC_CNTL::PTR)
-        .swd_wprotect
-        .write(|w| w.bits(0x8f1d312a));
-    (&*crate::peripherals::RTC_CNTL::PTR)
-        .swd_conf
-        .modify(|_, w| w.swd_disable().set_bit());
-    (&*crate::peripherals::RTC_CNTL::PTR)
-        .swd_wprotect
-        .write(|w| w.bits(0));
-
-    (&*crate::peripherals::SYSTEM::PTR)
-        .sysclk_conf
-        .modify(|_, w| w.soc_clk_sel().bits(1));
-
-    esp_hal_common::xtensa_lx_rt::Reset();
 }
 
 #[cfg(feature = "rt")]
@@ -274,13 +147,7 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
 #[no_mangle]
 #[rustfmt::skip]
 pub extern "Rust" fn __init_data() -> bool {
-    #[cfg(feature = "direct-boot")]
-    let res = true;
-
-    #[cfg(not(feature = "direct-boot"))]
-    let res = false;
-
-    res
+    false
 }
 
 #[export_name = "__post_init"]

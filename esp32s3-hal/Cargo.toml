@@ -27,7 +27,6 @@ categories = [
 [dependencies]
 esp-hal-common = { version = "0.12.0", features = ["esp32s3"], path = "../esp-hal-common" }
 embassy-time   = { version = "0.1.3",  features = ["nightly"], optional = true }
-r0             = { version = "1.0.0",  optional = true }
 
 [dev-dependencies]
 aes                = "0.8.3"
@@ -60,7 +59,6 @@ default              = ["rt", "vectored"]
 async                = ["esp-hal-common/async"]
 debug                = ["esp-hal-common/debug"]
 defmt                = ["esp-hal-common/defmt"]
-direct-boot          = ["r0"]
 eh1                  = ["esp-hal-common/eh1"]
 log                  = ["esp-hal-common/log"]
 rt                   = []
