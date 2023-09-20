@@ -34,7 +34,7 @@ fn main() -> ! {
 
     // We use one of the RMT channels to instantiate a `SmartLedsAdapter` which can
     // be used directly with all `smart_led` implementations
-    let mut led = <smartLedAdapter!(0, 1)>::new(rmt.channel0, io.pins.gpio7);
+    let mut led = <smartLedAdapter!(0, 1)>::new(rmt.channel0, io.pins.gpio8);
 
     // Initialize the Delay peripheral, and use it to toggle the LED state in a
     // loop.
