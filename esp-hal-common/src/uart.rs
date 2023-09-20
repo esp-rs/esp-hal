@@ -891,12 +891,46 @@ pub trait Instance {
     }
 
     fn get_rx_fifo_count() -> u16 {
-        Self::register_block()
+        let fifo_cnt: u16 = Self::register_block()
             .status
             .read()
             .rxfifo_cnt()
             .bits()
-            .into()
+            .into();
+
+        // Calculate the real count based on the FIFO read and write offset address:
+        // https://www.espressif.com/sites/default/files/documentation/esp32_errata_en.pdf
+        // section 3.17
+        #[cfg(esp32)]
+        {
+            let rd_addr: u16 = Self::register_block()
+                .mem_rx_status
+                .read()
+                .mem_rx_rd_addr()
+                .bits()
+                .into();
+            let wr_addr: u16 = Self::register_block()
+                .mem_rx_status
+                .read()
+                .mem_rx_wr_addr()
+                .bits()
+                .into();
+
+            if wr_addr > rd_addr {
+                wr_addr - rd_addr
+            } else if wr_addr < rd_addr {
+                (wr_addr + UART_FIFO_SIZE) - rd_addr
+            } else {
+                if fifo_cnt > 0 {
+                    UART_FIFO_SIZE
+                } else {
+                    0
+                }
+            }
+        }
+
+        #[cfg(not(esp32))]
+        fifo_cnt
     }
 
     fn is_tx_idle() -> bool {
