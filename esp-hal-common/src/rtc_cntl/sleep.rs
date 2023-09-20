@@ -71,6 +71,7 @@ impl<'a, P: RTCPin> Ext0WakeupSource<'a, P> {
     }
 }
 
+#[allow(unused)]
 pub struct Ext1WakeupSource<'a, 'b> {
     pins: RefCell<&'a mut [&'b mut dyn RTCPin]>,
     level: WakeupLevel,
