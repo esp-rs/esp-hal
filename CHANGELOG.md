@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Implement `defmt::Format` for more types (#786)
 - Add new_no_miso to Spi FullDuplexMode (#794)
 - Add UART support for splitting into TX and RX (#754)
+- Async support for I2S (#801)
 
 ### Changed
 
