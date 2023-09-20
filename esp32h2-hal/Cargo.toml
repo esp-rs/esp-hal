@@ -119,3 +119,11 @@ required-features = ["interrupt-preemption"]
 [[example]]
 name              = "direct-vectoring"
 required-features = ["direct-vectoring"]
+
+[[example]]
+name              = "embassy_i2s_sound"
+required-features = ["embassy", "async"]
+
+[[example]]
+name              = "embassy_i2s_read"
+required-features = ["embassy", "async"]
