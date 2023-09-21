@@ -127,3 +127,11 @@ required-features = ["embassy", "async"]
 [[example]]
 name              = "embassy_i2s_read"
 required-features = ["embassy", "async"]
+
+[[example]]
+name              = "embassy_parl_io_tx"
+required-features = ["embassy", "async"]
+
+[[example]]
+name              = "embassy_parl_io_rx"
+required-features = ["embassy", "async"]
