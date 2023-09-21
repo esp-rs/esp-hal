@@ -91,8 +91,6 @@ jobs:
           cargo check --example=embassy_multicore --features=embassy,embassy-time-timg0,embassy-executor-thread
           cargo check --example=embassy_multicore_interrupt --features=embassy,embassy-time-timg0,embassy-executor-interrupt
           cargo check --example=embassy_multiprio --features=embassy,embassy-time-timg0,embassy-executor-interrupt
-          cargo check --examples --features=embassy,embassy-time-timg0,embassy-executor-interrupt,embassy-executor-thread,defmt
-          cargo check --examples --features=embassy,embassy-time-timg0,embassy-executor-interrupt,embassy-executor-thread,log
       - name: check esp32-hal (embassy, async)
         run: |
           cd esp32-hal/
@@ -155,9 +153,9 @@ jobs:
       - name: check esp32c2-hal (async, i2c)
         run: cd esp32c2-hal/ && cargo +nightly check --example=embassy_i2c --features=embassy,embassy-time-systick,async
       - name: check esp32c2-hal (interrupt-preemption)
-        run: cd esp32c2-hal/ && cargo check --example=interrupt_preemption --features=interrupt-preemption
+        run: cd esp32c2-hal/ && cargo +nightly check --example=interrupt_preemption --features=interrupt-preemption
       - name: check esp32c2-hal (direct-vectoring)
-        run: cd esp32c2-hal/ && cargo check --example=direct-vectoring --features=direct-vectoring
+        run: cd esp32c2-hal/ && cargo +nightly check --example=direct-vectoring --features=direct-vectoring
       - name: check esp32c2-hal (embassy, log/defmt)
         run: |
           cd esp32c2-hal/
@@ -209,9 +207,9 @@ jobs:
       - name: check esp32c3-hal (async, i2c)
         run: cd esp32c3-hal/ && cargo +nightly check --example=embassy_i2c --features=embassy,embassy-time-systick,async
       - name: check esp32c3-hal (interrupt-preemption)
-        run: cd esp32c3-hal/ && cargo check --example=interrupt_preemption --features=interrupt-preemption
+        run: cd esp32c3-hal/ && cargo +nightly check --example=interrupt_preemption --features=interrupt-preemption
       - name: check esp32c3-hal (direct-vectoring)
-        run: cd esp32c3-hal/ && cargo check --example=direct-vectoring --features=direct-vectoring
+        run: cd esp32c3-hal/ && cargo +nightly check --example=direct-vectoring --features=direct-vectoring
       - name: check esp32c3-hal (embassy, log/defmt)
         run: |
           cd esp32c3-hal/
@@ -266,9 +264,9 @@ jobs:
       - name: check esp32c6-hal (async, i2c)
         run: cd esp32c6-hal/ && cargo +nightly check --example=embassy_i2c --features=embassy,embassy-time-systick,async
       - name: check esp32c6-hal (interrupt-preemption)
-        run: cd esp32c6-hal/ && cargo check --example=interrupt_preemption --features=interrupt-preemption
+        run: cd esp32c6-hal/ && cargo +nightly check --example=interrupt_preemption --features=interrupt-preemption
       - name: check esp32c6-hal (direct-vectoring)
-        run: cd esp32c6-hal/ && cargo check --example=direct-vectoring --features=direct-vectoring
+        run: cd esp32c6-hal/ && cargo +nightly check --example=direct-vectoring --features=direct-vectoring
       - name: check esp32c6-hal (embassy, log/defmt)
         run: |
           cd esp32c6-hal/
@@ -338,9 +336,9 @@ jobs:
       - name: check esp32h2-hal (async, i2c)
         run: cd esp32h2-hal/ && cargo +nightly check --example=embassy_i2c --features=embassy,embassy-time-systick,async
       - name: check esp32h2-hal (interrupt-preemption)
-        run: cd esp32h2-hal/ && cargo check --example=interrupt_preemption --features=interrupt-preemption
+        run: cd esp32h2-hal/ && cargo +nightly check --example=interrupt_preemption --features=interrupt-preemption
       - name: check esp32h2-hal (direct-vectoring)
-        run: cd esp32h2-hal/ && cargo check --example=direct-vectoring --features=direct-vectoring
+        run: cd esp32h2-hal/ && cargo +nightly check --example=direct-vectoring --features=direct-vectoring
       - name: check esp32h2-hal (embassy, log/defmt)
         run: |
           cd esp32h2-hal/
