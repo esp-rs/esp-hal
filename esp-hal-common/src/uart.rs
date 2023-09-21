@@ -26,7 +26,7 @@
 //!
 //! let mut serial1 = Uart::new_with_config(
 //!     peripherals.UART1,
-//!     Some(config),
+//!     config,
 //!     Some(pins),
 //!     &clocks,
 //!     &mut system.peripheral_clock_control,
@@ -413,7 +413,7 @@ where
     /// Create a new UART instance with defaults
     pub fn new_with_config<P>(
         _uart: impl Peripheral<P = T> + 'd,
-        config: Option<Config>,
+        config: Config,
         mut pins: Option<P>,
         clocks: &Clocks,
         peripheral_clock_control: &mut PeripheralClockControl,
@@ -439,28 +439,30 @@ where
             rx: UartRx::new_inner(),
         };
 
-        config.map(|config| {
-            serial.change_data_bits(config.data_bits);
-            serial.change_parity(config.parity);
-            serial.change_stop_bits(config.stop_bits);
-            serial.change_baud(config.baudrate, clocks);
-        });
+        serial.change_data_bits(config.data_bits);
+        serial.change_parity(config.parity);
+        serial.change_stop_bits(config.stop_bits);
+        serial.change_baud(config.baudrate, clocks);
 
         serial
     }
 
     /// Create a new UART instance with defaults
     pub fn new(
-        _uart: impl Peripheral<P = T> + 'd,
+        uart: impl Peripheral<P = T> + 'd,
+        clocks: &Clocks,
         peripheral_clock_control: &mut PeripheralClockControl,
     ) -> Self {
-        T::enable_peripheral(peripheral_clock_control);
-        T::disable_rx_interrupts();
-        T::disable_tx_interrupts();
-        Uart {
-            tx: UartTx::new_inner(),
-            rx: UartRx::new_inner(),
-        }
+        use crate::gpio::*;
+        // not real, just to satify the type
+        type Pins<'a> = TxRxPins<'a, GpioPin<Output<PushPull>, 2>, GpioPin<Input<Floating>, 0>>;
+        Self::new_with_config(
+            uart,
+            Default::default(),
+            None::<Pins<'_>>,
+            clocks,
+            peripheral_clock_control,
+        )
     }
 
     /// Split the Uart into a transmitter and receiver, which is
