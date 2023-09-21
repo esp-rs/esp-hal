@@ -65,6 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix setting alarm when a timer group is used as the alarm source. (#730)
 - Fix `Instant::now()` not counting in some cases when using TIMG0 as the timebase (#737)
 - Fix number of ADC attenuations for ESP32-C6 (#771)
+- Fix SHA registers access (#805)
 
 ### Breaking
 
