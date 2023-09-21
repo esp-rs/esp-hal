@@ -183,6 +183,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     copy_dir_all("ld/sections", &out)?;
 
+    #[cfg(feature = "defmt")]
+    println!("cargo:rustc-link-arg=-Tdefmt.x");
+
     // Generate the eFuse table from the selected device's CSV file:
     gen_efuse_table(device_name, out)?;
 
