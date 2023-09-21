@@ -28,6 +28,7 @@ use esp32_hal::{
     IO,
 };
 use esp_backtrace as _;
+use esp_println::println;
 use static_cell::make_static;
 
 #[embassy_executor::task]
@@ -45,16 +46,16 @@ async fn i2s_task(
     >,
 ) {
     let buffer = dma_buffer();
-    esp_println::println!("Start");
+    println!("Start");
 
     let mut data = [0u8; 5000];
     let mut transaction = i2s_rx.read_dma_circular_async(buffer).unwrap();
     loop {
         let avail = transaction.available().await;
-        esp_println::println!("available {}", avail);
+        println!("available {}", avail);
 
         let count = transaction.pop(&mut data).await.unwrap();
-        esp_println::println!(
+        println!(
             "got {} bytes, {:x?}..{:x?}",
             count,
             &data[..10],
@@ -65,8 +66,9 @@ async fn i2s_task(
 
 #[entry]
 fn main() -> ! {
+    #[cfg(feature = "log")]
     esp_println::logger::init_logger_from_env();
-    esp_println::println!("Init!");
+    println!("Init!");
     let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();

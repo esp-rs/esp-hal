@@ -90,6 +90,7 @@ async fn signal_task(mut pin: Gpio15<Output<PushPull>>) {
 
 #[entry]
 fn main() -> ! {
+    #[cfg(feature = "log")]
     esp_println::logger::init_logger_from_env();
     println!("Init!");
     let peripherals = Peripherals::take();
