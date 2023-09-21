@@ -17,7 +17,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add new_no_miso to Spi FullDuplexMode (#794)
 - Add UART support for splitting into TX and RX (#754)
 - Async support for I2S (#801)
-- UART/ESP32: fix calculating FIFO counter with `get_rx_fifo_count()` (#804)
 
 ### Changed
 
@@ -26,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - S3: Allow powering down RC_FAST_CLK (#796)
+- UART/ESP32: fix calculating FIFO counter with `get_rx_fifo_count()` (#804)
 
 ### Removed
 
@@ -34,6 +34,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Pin::is_acore_interrupt_set` (#793)
 - `Pin::is_acore_non_maskable_interrupt_set` (#793)
 - `Pin::enable_hold` (#793)
+
+### Breaking
+
+- `Uart::new` now takes the `&Clocks` struct to ensure baudrate is correct for CPU/APB speed. (#808)
+- `Uart::new_with_config` takes an `Config` instead of `Option<Config>`. (#808)
 
 ## [0.12.0]
 
