@@ -17,10 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add new_no_miso to Spi FullDuplexMode (#794)
 - Add UART support for splitting into TX and RX (#754)
 - Async support for I2S (#801)
+- UART/ESP32: fix calculating FIFO counter with `get_rx_fifo_count()` (#804)
+- Async support for PARL_IO (#807)
 
 ### Changed
 
 - Bumped MSRV to 1.67 (#798)
+- Optimised multi-core critical section implementation (#797)
 
 ### Fixed
 
@@ -72,6 +75,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix setting alarm when a timer group is used as the alarm source. (#730)
 - Fix `Instant::now()` not counting in some cases when using TIMG0 as the timebase (#737)
 - Fix number of ADC attenuations for ESP32-C6 (#771)
+- Fix SHA registers access (#805)
 
 ### Breaking
 

@@ -1412,6 +1412,124 @@ where
     }
 }
 
+#[cfg(feature = "async")]
+pub mod asynch {
+    use core::task::Poll;
+
+    use embassy_sync::waitqueue::AtomicWaker;
+
+    use super::{
+        private::{ConfigurePins, Instance, RxClkPin, RxPins, TxClkPin, TxPins},
+        Error,
+        ParlIoRx,
+        ParlIoTx,
+        MAX_DMA_SIZE,
+    };
+    use crate::{
+        dma::{asynch::DmaRxDoneChFuture, ChannelTypes, ParlIoPeripheral},
+        macros::interrupt,
+    };
+
+    static TX_WAKER: AtomicWaker = AtomicWaker::new();
+
+    pub struct TxDoneFuture {}
+
+    impl TxDoneFuture {
+        pub fn new() -> Self {
+            Instance::listen_tx_done();
+            Self {}
+        }
+    }
+
+    impl core::future::Future for TxDoneFuture {
+        type Output = ();
+
+        fn poll(
+            self: core::pin::Pin<&mut Self>,
+            cx: &mut core::task::Context<'_>,
+        ) -> Poll<Self::Output> {
+            TX_WAKER.register(cx.waker());
+            if Instance::is_listening_tx_done() {
+                Poll::Pending
+            } else {
+                Poll::Ready(())
+            }
+        }
+    }
+
+    #[cfg(esp32c6)]
+    #[interrupt]
+    fn PARL_IO() {
+        if Instance::is_tx_done_set() {
+            Instance::clear_is_tx_done();
+            Instance::unlisten_tx_done();
+            TX_WAKER.wake()
+        }
+    }
+
+    #[cfg(esp32h2)]
+    #[interrupt]
+    fn PARL_IO_TX() {
+        if Instance::is_tx_done_set() {
+            Instance::clear_is_tx_done();
+            Instance::unlisten_tx_done();
+            TX_WAKER.wake()
+        }
+    }
+
+    impl<'d, CH, P, CP> ParlIoTx<'d, CH, P, CP>
+    where
+        CH: ChannelTypes,
+        CH::P: ParlIoPeripheral,
+        P: TxPins + ConfigurePins,
+        CP: TxClkPin,
+    {
+        /// Perform a DMA write.
+        ///
+        /// The maximum amount of data to be sent is 32736 bytes.
+        pub async fn write_dma_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
+            let (ptr, len) = (words.as_ptr(), words.len());
+
+            if len > MAX_DMA_SIZE {
+                return Err(Error::MaxDmaTransferSizeExceeded);
+            }
+
+            self.start_write_bytes_dma(ptr, len)?;
+
+            TxDoneFuture::new().await;
+
+            Ok(())
+        }
+    }
+
+    impl<'d, CH, P, CP> ParlIoRx<'d, CH, P, CP>
+    where
+        CH: ChannelTypes,
+        CH::P: ParlIoPeripheral,
+        P: RxPins + ConfigurePins,
+        CP: RxClkPin,
+    {
+        /// Perform a DMA write.
+        ///
+        /// The maximum amount of data to be sent is 32736 bytes.
+        pub async fn read_dma_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
+            let (ptr, len) = (words.as_mut_ptr(), words.len());
+
+            if !Instance::is_suc_eof_generated_externally() {
+                if len > MAX_DMA_SIZE {
+                    return Err(Error::MaxDmaTransferSizeExceeded);
+                }
+            }
+
+            self.start_receive_bytes_dma(ptr, len)?;
+
+            DmaRxDoneChFuture::new(&mut self.rx_channel).await;
+
+            Ok(())
+        }
+    }
+}
+
 mod private {
     use super::{BitPackOrder, EofMode, Error, SampleEdge};
     use crate::dma::ChannelTypes;
@@ -1705,6 +1823,50 @@ mod private {
 
             reg_block.rx_cfg0.read().rx_eof_gen_sel().bit_is_set()
         }
+
+        #[cfg(feature = "async")]
+        pub fn listen_tx_done() {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+
+            reg_block
+                .int_ena
+                .modify(|_, w| w.tx_eof_int_ena().set_bit());
+        }
+
+        #[cfg(feature = "async")]
+        pub fn unlisten_tx_done() {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+
+            reg_block
+                .int_ena
+                .modify(|_, w| w.tx_eof_int_ena().clear_bit());
+        }
+
+        #[cfg(feature = "async")]
+        pub fn is_listening_tx_done() -> bool {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+
+            reg_block.int_ena.read().tx_eof_int_ena().bit()
+        }
+
+        #[cfg(feature = "async")]
+        pub fn is_tx_done_set() -> bool {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+
+            reg_block.int_raw.read().tx_eof_int_raw().bit()
+        }
+
+        #[cfg(feature = "async")]
+        pub fn clear_is_tx_done() {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+
+            reg_block.int_clr.write(|w| w.tx_eof_int_clr().set_bit());
+        }
     }
 
     #[cfg(esp32h2)]
@@ -1923,6 +2085,50 @@ mod private {
                 unsafe { crate::peripherals::PARL_IO::steal() };
 
             reg_block.rx_genrl_cfg.read().rx_eof_gen_sel().bit_is_set()
+        }
+
+        #[cfg(feature = "async")]
+        pub fn listen_tx_done() {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+
+            reg_block
+                .int_ena
+                .modify(|_, w| w.tx_eof_int_ena().set_bit());
+        }
+
+        #[cfg(feature = "async")]
+        pub fn unlisten_tx_done() {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+
+            reg_block
+                .int_ena
+                .modify(|_, w| w.tx_eof_int_ena().clear_bit());
+        }
+
+        #[cfg(feature = "async")]
+        pub fn is_listening_tx_done() -> bool {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+
+            reg_block.int_ena.read().tx_eof_int_ena().bit()
+        }
+
+        #[cfg(feature = "async")]
+        pub fn is_tx_done_set() -> bool {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+
+            reg_block.int_raw.read().tx_eof_int_raw().bit()
+        }
+
+        #[cfg(feature = "async")]
+        pub fn clear_is_tx_done() {
+            let reg_block: crate::peripherals::PARL_IO =
+                unsafe { crate::peripherals::PARL_IO::steal() };
+
+            reg_block.int_clr.write(|w| w.tx_eof_int_clr().set_bit());
         }
     }
 }
