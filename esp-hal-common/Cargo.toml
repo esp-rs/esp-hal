@@ -154,4 +154,12 @@ defmt = [
     "embedded-hal-1?/defmt-03",
     "embedded-io/defmt-03",
     "embedded-io-async?/defmt-03",
+
+    "esp32?/defmt",
+    "esp32c2?/defmt",
+    "esp32c3?/defmt",
+    "esp32c6?/defmt",
+    "esp32h2?/defmt",
+    "esp32s2?/defmt",
+    "esp32s3?/defmt",
 ]
