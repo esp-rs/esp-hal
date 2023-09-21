@@ -26,7 +26,7 @@
 //!
 //! let mut serial1 = Uart::new_with_config(
 //!     peripherals.UART1,
-//!     Some(config),
+//!     config,
 //!     Some(pins),
 //!     &clocks,
 //!     &mut system.peripheral_clock_control,
@@ -456,7 +456,13 @@ where
         use crate::gpio::*;
         // not real, just to satify the type
         type Pins<'a> = TxRxPins<'a, GpioPin<Output<PushPull>, 2>, GpioPin<Input<Floating>, 0>>;
-        Self::new_with_config(uart, Default::default(),  None::<Pins<'_>>, clocks,  peripheral_clock_control)
+        Self::new_with_config(
+            uart,
+            Default::default(),
+            None::<Pins<'_>>,
+            clocks,
+            peripheral_clock_control,
+        )
     }
 
     /// Split the Uart into a transmitter and receiver, which is

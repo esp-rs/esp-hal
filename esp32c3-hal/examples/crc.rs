@@ -22,7 +22,11 @@ fn main() -> ! {
     let mut system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let mut uart0 = Uart::new(peripherals.UART0, &mut system.peripheral_clock_control);
+    let mut uart0 = Uart::new(
+        peripherals.UART0,
+        &clocks,
+        &mut system.peripheral_clock_control,
+    );
     let timer_group0 = TimerGroup::new(
         peripherals.TIMG0,
         &clocks,

@@ -77,7 +77,11 @@ fn main() -> ! {
         embassy::init(&clocks, timer_group0.timer0);
     }
 
-    let mut uart0 = Uart::new(peripherals.UART0, &mut system.peripheral_clock_control);
+    let mut uart0 = Uart::new(
+        peripherals.UART0,
+        &clocks,
+        &mut system.peripheral_clock_control,
+    );
     uart0.set_at_cmd(AtCmdConfig::new(None, None, None, AT_CMD, None));
     uart0
         .set_rx_fifo_full_threshold(READ_BUF_SIZE as u16)
