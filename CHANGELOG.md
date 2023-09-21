@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add UART support for splitting into TX and RX (#754)
 - Async support for I2S (#801)
 - UART/ESP32: fix calculating FIFO counter with `get_rx_fifo_count()` (#804)
+- Async support for PARL_IO (#807)
 
 ### Changed
 
