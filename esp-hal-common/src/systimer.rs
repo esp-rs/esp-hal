@@ -56,7 +56,7 @@ impl<'d> SystemTimer<'d> {
     #[cfg(esp32s2)]
     pub const BIT_MASK: u64 = u64::MAX;
     #[cfg(not(esp32s2))]
-    pub const BIT_MASK: u64 = 0xFFFFFFFFFFFFF;
+    pub const BIT_MASK: u64 = 0xF_FFFF_FFFF_FFFF;
 
     #[cfg(esp32s2)]
     pub const TICKS_PER_SECOND: u64 = 80_000_000; // TODO this can change when we have support for changing APB frequency
@@ -124,7 +124,7 @@ impl<T, const CHANNEL: u8> Alarm<T, CHANNEL> {
         }
     }
 
-    pub fn clear_interrupt(&self) {
+    pub fn interrupt_clear(&self) {
         let systimer = unsafe { &*SYSTIMER::ptr() };
         match CHANNEL {
             0 => systimer.int_clr.write(|w| w.target0_int_clr().set_bit()),
@@ -225,19 +225,20 @@ impl<const CHANNEL: u8> Alarm<Target, CHANNEL> {
 }
 
 impl<const CHANNEL: u8> Alarm<Periodic, CHANNEL> {
-    pub fn set_period(&self, period: fugit::HertzU32) {
-        let time_period: MicrosDurationU32 = period.into_duration();
-        let us = time_period.ticks();
+    pub fn set_period(&self, period: MicrosDurationU32) {
+        let us = period.ticks();
+        let ticks = us * (SystemTimer::TICKS_PER_SECOND / 1_000_000) as u32;
+
         self.configure(|tconf, hi, lo| unsafe {
             tconf.write(|w| {
                 w.target0_period_mode()
                     .set_bit()
                     .target0_period()
-                    .bits(us * (SystemTimer::TICKS_PER_SECOND as u32 / 1000_000))
+                    .bits(ticks)
             });
             hi.write(|w| w.timer_target0_hi().bits(0));
             lo.write(|w| w.timer_target0_lo().bits(0));
-        })
+        });
     }
 
     pub fn into_target(self) -> Alarm<Target, CHANNEL> {
@@ -260,5 +261,107 @@ impl<T> Alarm<T, 1> {
 impl<T> Alarm<T, 2> {
     pub const unsafe fn conjure() -> Self {
         Self { _pd: PhantomData }
+    }
+}
+
+#[cfg(feature = "async")]
+mod asynch {
+    use core::{
+        pin::Pin,
+        task::{Context, Poll},
+    };
+
+    use embassy_sync::waitqueue::AtomicWaker;
+    use procmacros::interrupt;
+
+    use super::*;
+
+    const NUM_ALARMS: usize = 3;
+
+    const INIT: AtomicWaker = AtomicWaker::new();
+    static WAKERS: [AtomicWaker; NUM_ALARMS] = [INIT; NUM_ALARMS];
+
+    pub(crate) struct AlarmFuture<'a, const N: u8> {
+        phantom: PhantomData<&'a Alarm<Periodic, N>>,
+    }
+
+    impl<'a, const N: u8> AlarmFuture<'a, N> {
+        pub(crate) fn new(alarm: &'a Alarm<Periodic, N>) -> Self {
+            alarm.interrupt_clear();
+            alarm.interrupt_enable(true);
+
+            Self {
+                phantom: PhantomData,
+            }
+        }
+
+        fn event_bit_is_clear(&self) -> bool {
+            let r = unsafe { &*crate::peripherals::SYSTIMER::PTR }
+                .int_ena
+                .read();
+
+            match N {
+                0 => r.target0_int_ena().bit_is_clear(),
+                1 => r.target1_int_ena().bit_is_clear(),
+                2 => r.target2_int_ena().bit_is_clear(),
+                _ => unreachable!(),
+            }
+        }
+    }
+
+    impl<'a, const N: u8> core::future::Future for AlarmFuture<'a, N> {
+        type Output = ();
+
+        fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
+            WAKERS[N as usize].register(ctx.waker());
+
+            if self.event_bit_is_clear() {
+                Poll::Ready(())
+            } else {
+                Poll::Pending
+            }
+        }
+    }
+
+    impl<const CHANNEL: u8> embedded_hal_async::delay::DelayUs for Alarm<Periodic, CHANNEL> {
+        async fn delay_us(&mut self, us: u32) {
+            let period = MicrosDurationU32::from_ticks(us);
+            self.set_period(period);
+
+            AlarmFuture::new(self).await;
+        }
+
+        async fn delay_ms(&mut self, ms: u32) {
+            for _ in 0..ms {
+                self.delay_us(1000).await;
+            }
+        }
+    }
+
+    #[interrupt]
+    fn SYSTIMER_TARGET0() {
+        unsafe { &*crate::peripherals::SYSTIMER::PTR }
+            .int_ena
+            .modify(|_, w| w.target0_int_ena().clear_bit());
+
+        WAKERS[0].wake();
+    }
+
+    #[interrupt]
+    fn SYSTIMER_TARGET1() {
+        unsafe { &*crate::peripherals::SYSTIMER::PTR }
+            .int_ena
+            .modify(|_, w| w.target1_int_ena().clear_bit());
+
+        WAKERS[1].wake();
+    }
+
+    #[interrupt]
+    fn SYSTIMER_TARGET2() {
+        unsafe { &*crate::peripherals::SYSTIMER::PTR }
+            .int_ena
+            .modify(|_, w| w.target2_int_ena().clear_bit());
+
+        WAKERS[2].wake();
     }
 }
