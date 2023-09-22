@@ -17,8 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add new_no_miso to Spi FullDuplexMode (#794)
 - Add UART support for splitting into TX and RX (#754)
 - Async support for I2S (#801)
-- UART/ESP32: fix calculating FIFO counter with `get_rx_fifo_count()` (#804)
 - Async support for PARL_IO (#807)
+- Implement `embeded_hal_async::delay::DelayUs` trait for `SYSTIMER` alarms (#812)
 
 ### Changed
 
@@ -42,6 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `Uart::new` now takes the `&Clocks` struct to ensure baudrate is correct for CPU/APB speed. (#808)
 - `Uart::new_with_config` takes an `Config` instead of `Option<Config>`. (#808)
+- `Alarm::set_period` takes a period (duration) instead of a frequency (#812)
+- `Alarm::interrupt_clear` is now `Alarm::clear_interrupt` to be consistent (#812)
 
 ## [0.12.0]
 
