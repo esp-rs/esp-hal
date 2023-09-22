@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Pin::is_acore_interrupt_set` (#793)
 - `Pin::is_acore_non_maskable_interrupt_set` (#793)
 - `Pin::enable_hold` (#793)
+- Removed the generic return type for ADC reads (#792)
 
 ### Breaking
 

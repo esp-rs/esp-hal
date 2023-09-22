@@ -352,15 +352,14 @@ impl<'d, ADC1> ADC<'d, ADC1> {
     }
 }
 
-impl<'d, ADCI, WORD, PIN> OneShot<ADCI, WORD, AdcPin<PIN, ADCI>> for ADC<'d, ADCI>
+impl<'d, ADCI, PIN> OneShot<ADCI, u16, AdcPin<PIN, ADCI>> for ADC<'d, ADCI>
 where
-    WORD: From<u16>,
     PIN: Channel<ADCI, ID = u8>,
     ADCI: RegisterAccess,
 {
     type Error = ();
 
-    fn read(&mut self, _pin: &mut AdcPin<PIN, ADCI>) -> nb::Result<WORD, Self::Error> {
+    fn read(&mut self, _pin: &mut AdcPin<PIN, ADCI>) -> nb::Result<u16, Self::Error> {
         if self.attenuations[AdcPin::<PIN, ADCI>::channel() as usize] == None {
             panic!(
                 "Channel {} is not configured reading!",
@@ -397,7 +396,7 @@ where
         // Mark that no conversions are currently in progress
         self.active_channel = None;
 
-        Ok(converted_value.into())
+        Ok(converted_value)
     }
 }
 
