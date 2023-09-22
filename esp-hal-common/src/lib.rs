@@ -77,7 +77,7 @@ pub use self::spi::Spi;
 #[cfg(any(timg0, timg1))]
 pub use self::timer::Timer;
 #[cfg(any(uart0, uart1, uart2))]
-pub use self::uart::Uart;
+pub use self::uart::{Uart, UartRx, UartTx};
 #[cfg(usb_device)]
 pub use self::usb_serial_jtag::UsbSerialJtag;
 
@@ -92,6 +92,8 @@ pub mod clock;
 pub mod delay;
 #[cfg(any(gdma, pdma))]
 pub mod dma;
+#[cfg(ecc)]
+pub mod ecc;
 #[cfg(feature = "embassy")]
 pub mod embassy;
 #[cfg(gpio)]
@@ -160,7 +162,9 @@ pub mod trapframe {
 mod soc;
 
 #[no_mangle]
-extern "C" fn EspDefaultHandler(_level: u32, _interrupt: peripherals::Interrupt) {}
+extern "C" fn EspDefaultHandler(_level: u32, _interrupt: peripherals::Interrupt) {
+    warn!("Unhandled level {} interrupt: {:?}", _level, _interrupt);
+}
 
 #[cfg(xtensa)]
 #[no_mangle]
@@ -179,19 +183,23 @@ pub enum Cpu {
     AppCpu,
 }
 
+#[cfg(all(xtensa, multi_core))]
+fn get_raw_core() -> u32 {
+    xtensa_lx::get_processor_id() & 0x2000
+}
+
 /// Which core the application is currently executing on
+#[cfg(all(xtensa, multi_core))]
 pub fn get_core() -> Cpu {
-    #[cfg(all(xtensa, multi_core))]
-    match ((xtensa_lx::get_processor_id() >> 13) & 1) != 0 {
-        false => Cpu::ProCpu,
-        true => Cpu::AppCpu,
+    match get_raw_core() {
+        0 => Cpu::ProCpu,
+        _ => Cpu::AppCpu,
     }
+}
 
-    // #[cfg(all(riscv, multi_core))]
-    // TODO get hart_id
-
-    // single core always has ProCpu only
-    #[cfg(single_core)]
+/// Which core the application is currently executing on
+#[cfg(not(all(xtensa, multi_core)))]
+pub fn get_core() -> Cpu {
     Cpu::ProCpu
 }
 
@@ -202,30 +210,50 @@ mod critical_section_impl {
 
     #[cfg(xtensa)]
     mod xtensa {
+        // PS has 15 useful bits. Bits 12..16 and 19..32 are unused, so we can use bit
+        // #31 as our reentry flag.
+        #[cfg(multi_core)]
+        const REENTRY_FLAG: u32 = 1 << 31;
+
         unsafe impl critical_section::Impl for super::CriticalSection {
             unsafe fn acquire() -> critical_section::RawRestoreState {
-                let tkn: critical_section::RawRestoreState;
+                let mut tkn: critical_section::RawRestoreState;
                 core::arch::asm!("rsil {0}, 5", out(reg) tkn);
                 #[cfg(multi_core)]
                 {
-                    let guard = super::multicore::MULTICORE_LOCK.lock();
-                    core::mem::forget(guard); // forget it so drop doesn't run
+                    use super::multicore::{LockKind, MULTICORE_LOCK};
+
+                    match MULTICORE_LOCK.lock() {
+                        LockKind::Lock => {
+                            // We can assume the reserved bit is 0 otherwise
+                            // rsil - wsr pairings would be undefined behavior
+                        }
+                        LockKind::Reentry => tkn |= REENTRY_FLAG,
+                    }
                 }
                 tkn
             }
 
             unsafe fn release(token: critical_section::RawRestoreState) {
-                if token != 0 {
-                    #[cfg(multi_core)]
-                    {
-                        debug_assert!(super::multicore::MULTICORE_LOCK.is_owned_by_current_thread());
-                        // safety: we logically own the mutex from acquire()
-                        super::multicore::MULTICORE_LOCK.force_unlock();
+                #[cfg(multi_core)]
+                {
+                    use super::multicore::MULTICORE_LOCK;
+
+                    debug_assert!(MULTICORE_LOCK.is_owned_by_current_thread());
+
+                    if token & REENTRY_FLAG != 0 {
+                        return;
                     }
-                    core::arch::asm!(
-                        "wsr.ps {0}",
-                        "rsync", in(reg) token)
+
+                    MULTICORE_LOCK.unlock();
                 }
+
+                const RESERVED_MASK: u32 = 0b1111_1111_1111_1000_1111_0000_0000_0000;
+                debug_assert!(token & RESERVED_MASK == 0);
+
+                core::arch::asm!(
+                    "wsr.ps {0}",
+                    "rsync", in(reg) token)
             }
         }
     }
@@ -234,28 +262,45 @@ mod critical_section_impl {
     mod riscv {
         use esp_riscv_rt::riscv;
 
+        #[cfg(multi_core)]
+        // The restore state is a u8 that is casted from a bool, so it has a value of
+        // 0x00 or 0x01 before we add the reentry flag to it.
+        const REENTRY_FLAG: u8 = 1 << 7;
+
         unsafe impl critical_section::Impl for super::CriticalSection {
             unsafe fn acquire() -> critical_section::RawRestoreState {
                 let mut mstatus = 0u32;
                 core::arch::asm!("csrrci {0}, mstatus, 8", inout(reg) mstatus);
-                let interrupts_active = (mstatus & 0b1000) != 0;
+                let mut tkn = ((mstatus & 0b1000) != 0) as critical_section::RawRestoreState;
+
                 #[cfg(multi_core)]
                 {
-                    let guard = multicore::MULTICORE_LOCK.lock();
-                    core::mem::forget(guard); // forget it so drop doesn't run
+                    use super::multicore::{LockKind, MULTICORE_LOCK};
+
+                    match MULTICORE_LOCK.lock() {
+                        LockKind::Lock => {}
+                        LockKind::Reentry => tkn |= REENTRY_FLAG,
+                    }
                 }
 
-                interrupts_active as _
+                tkn
             }
 
             unsafe fn release(token: critical_section::RawRestoreState) {
-                if token != 0 {
-                    #[cfg(multi_core)]
-                    {
-                        debug_assert!(multicore::MULTICORE_LOCK.is_owned_by_current_thread());
-                        // safety: we logically own the mutex from acquire()
-                        multicore::MULTICORE_LOCK.force_unlock();
+                #[cfg(multi_core)]
+                {
+                    use super::multicore::MULTICORE_LOCK;
+
+                    debug_assert!(MULTICORE_LOCK.is_owned_by_current_thread());
+
+                    if token & REENTRY_FLAG != 0 {
+                        return;
                     }
+
+                    MULTICORE_LOCK.unlock();
+                }
+
+                if token != 0 {
                     riscv::interrupt::enable();
                 }
             }
@@ -264,50 +309,70 @@ mod critical_section_impl {
 
     #[cfg(multi_core)]
     mod multicore {
-        use core::sync::atomic::{AtomicBool, Ordering};
+        use core::sync::atomic::{AtomicUsize, Ordering};
 
-        use lock_api::{GetThreadId, GuardSend, RawMutex};
+        // We're using a value that we know get_raw_core() will never return. This
+        // avoids an unnecessary increment of the core ID.
+        #[cfg(xtensa)] // TODO: first multi-core RISC-V target will show if this value is OK
+                       // globally or only for Xtensa
+        const UNUSED_THREAD_ID_VALUE: usize = 0x0001;
 
-        use crate::get_core;
-
-        /// Reentrant Mutex
-        ///
-        /// Currently implemented using an atomic spin lock.
-        /// In the future we can optimize this raw mutex to use some hardware
-        /// features.
-        pub(crate) static MULTICORE_LOCK: lock_api::ReentrantMutex<RawSpinlock, RawThreadId, ()> =
-            lock_api::ReentrantMutex::const_new(RawSpinlock::INIT, RawThreadId::INIT, ());
-
-        pub(crate) struct RawThreadId;
-
-        unsafe impl lock_api::GetThreadId for RawThreadId {
-            const INIT: Self = RawThreadId;
-
-            fn nonzero_thread_id(&self) -> core::num::NonZeroUsize {
-                core::num::NonZeroUsize::new((get_core() as usize) + 1).unwrap()
-            }
+        fn thread_id() -> usize {
+            crate::get_raw_core() as usize
         }
 
-        pub(crate) struct RawSpinlock(AtomicBool);
+        pub(super) static MULTICORE_LOCK: ReentrantMutex = ReentrantMutex::new();
 
-        unsafe impl lock_api::RawMutex for RawSpinlock {
-            const INIT: RawSpinlock = RawSpinlock(AtomicBool::new(false));
+        pub(super) enum LockKind {
+            Lock = 0,
+            Reentry,
+        }
 
-            // A spinlock guard can be sent to another thread and unlocked there
-            type GuardMarker = GuardSend;
+        pub(super) struct ReentrantMutex {
+            owner: AtomicUsize,
+        }
 
-            fn lock(&self) {
-                while !self.try_lock() {}
+        impl ReentrantMutex {
+            const fn new() -> Self {
+                Self {
+                    owner: AtomicUsize::new(UNUSED_THREAD_ID_VALUE),
+                }
             }
 
-            fn try_lock(&self) -> bool {
-                self.0
-                    .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            pub fn is_owned_by_current_thread(&self) -> bool {
+                self.owner.load(Ordering::Relaxed) == thread_id()
+            }
+
+            pub(super) fn lock(&self) -> LockKind {
+                let current_thread_id = thread_id();
+
+                if self.try_lock(current_thread_id) {
+                    return LockKind::Lock;
+                }
+
+                let current_owner = self.owner.load(Ordering::Relaxed);
+                if current_owner == current_thread_id {
+                    return LockKind::Reentry;
+                }
+
+                while !self.try_lock(current_thread_id) {}
+
+                LockKind::Lock
+            }
+
+            fn try_lock(&self, new_owner: usize) -> bool {
+                self.owner
+                    .compare_exchange(
+                        UNUSED_THREAD_ID_VALUE,
+                        new_owner,
+                        Ordering::Acquire,
+                        Ordering::Relaxed,
+                    )
                     .is_ok()
             }
 
-            unsafe fn unlock(&self) {
-                self.0.store(false, Ordering::Release);
+            pub(super) fn unlock(&self) {
+                self.owner.store(UNUSED_THREAD_ID_VALUE, Ordering::Release);
             }
         }
     }

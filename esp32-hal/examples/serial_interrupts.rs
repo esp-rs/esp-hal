@@ -35,11 +35,15 @@ fn main() -> ! {
     );
     let mut timer0 = timer_group0.timer0;
 
-    let mut serial0 = Uart::new(peripherals.UART0, &mut system.peripheral_clock_control);
-    serial0.set_at_cmd(AtCmdConfig::new(None, None, None, b'#', None));
-    serial0.set_rx_fifo_full_threshold(30).unwrap();
-    serial0.listen_at_cmd();
-    serial0.listen_rx_fifo_full();
+    let mut uart0 = Uart::new(
+        peripherals.UART0,
+        &clocks,
+        &mut system.peripheral_clock_control,
+    );
+    uart0.set_at_cmd(AtCmdConfig::new(None, None, None, b'#', None));
+    uart0.set_rx_fifo_full_threshold(30).unwrap();
+    uart0.listen_at_cmd();
+    uart0.listen_rx_fifo_full();
 
     interrupt::enable(
         peripherals::Interrupt::UART0,
@@ -49,7 +53,7 @@ fn main() -> ! {
 
     timer0.start(1u64.secs());
 
-    critical_section::with(|cs| SERIAL.borrow_ref_mut(cs).replace(serial0));
+    critical_section::with(|cs| SERIAL.borrow_ref_mut(cs).replace(uart0));
 
     loop {
         critical_section::with(|cs| {

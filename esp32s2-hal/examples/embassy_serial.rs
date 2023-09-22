@@ -7,9 +7,6 @@
 #![no_main]
 #![feature(type_alias_impl_trait)]
 
-use core::fmt::Write;
-
-use embassy_time::{with_timeout, Duration};
 use esp32s2_hal::{
     clock::ClockControl,
     embassy::{self, executor::Executor},
@@ -19,7 +16,7 @@ use esp32s2_hal::{
     Uart,
 };
 use esp_backtrace as _;
-use esp_hal_common::uart::config::AtCmdConfig;
+use esp_hal_common::uart::{config::AtCmdConfig, UartRx, UartTx};
 use heapless::Vec;
 use static_cell::make_static;
 
@@ -29,71 +26,36 @@ const READ_BUF_SIZE: usize = 64;
 const AT_CMD: u8 = 0x04;
 
 #[embassy_executor::task]
-async fn run(mut uart: Uart<'static, UART0>) {
+async fn writer(mut tx: UartTx<'static, UART0>) {
+    esp_println::println!("writing...");
+    embedded_io_async::Write::write(
+        &mut tx,
+        b"Hello async serial. Enter something ended with EOT (CTRL-D).\r\n",
+    )
+    .await
+    .unwrap();
+    embedded_io_async::Write::flush(&mut tx).await.unwrap();
+}
+
+#[embassy_executor::task]
+async fn reader(mut rx: UartRx<'static, UART0>) {
+    esp_println::println!("reading...");
     // max message size to receive
     // leave some extra space for AT-CMD characters
     const MAX_BUFFER_SIZE: usize = 10 * READ_BUF_SIZE + 16;
-    // timeout read
-    const READ_TIMEOUT: Duration = Duration::from_secs(10);
 
     let mut rbuf: Vec<u8, MAX_BUFFER_SIZE> = Vec::new();
-    let mut wbuf: Vec<u8, MAX_BUFFER_SIZE> = Vec::new();
-    loop {
-        if rbuf.is_empty() {
-            embedded_io_async::Write::write(
-                &mut uart,
-                b"Hello async serial. Enter something ended with EOT (CTRL-D).\r\n",
-            )
-            .await
-            .unwrap();
-        } else {
-            wbuf.clear();
-            write!(&mut wbuf, "\r\n-- received {} bytes --\r\n", rbuf.len()).unwrap();
-            embedded_io_async::Write::write(&mut uart, wbuf.as_slice())
-                .await
-                .unwrap();
-            embedded_io_async::Write::write(&mut uart, rbuf.as_slice())
-                .await
-                .unwrap();
-            embedded_io_async::Write::write(&mut uart, b"\r\n")
-                .await
-                .unwrap();
+    let mut offset = 0;
+    while let Ok(len) = embedded_io_async::Read::read(&mut rx, &mut rbuf[offset..]).await {
+        offset += len;
+        if offset == 0 {
+            rbuf.truncate(0);
+            break;
         }
-        embedded_io_async::Write::flush(&mut uart).await.unwrap();
-
-        // set rbuf full capacity
-        rbuf.resize_default(rbuf.capacity()).ok();
-        let mut offset = 0;
-        loop {
-            match with_timeout(
-                READ_TIMEOUT,
-                embedded_io_async::Read::read(&mut uart, &mut rbuf[offset..]),
-            )
-            .await
-            {
-                Ok(r) => {
-                    if let Ok(len) = r {
-                        offset += len;
-                        if offset == 0 {
-                            rbuf.truncate(0);
-                            break;
-                        }
-                        // if set_at_cmd is used than stop reading
-                        if len < READ_BUF_SIZE {
-                            rbuf.truncate(offset);
-                            break;
-                        }
-                    } else {
-                        // buffer is full or rx fifo overflow
-                        break;
-                    }
-                }
-                Err(_) => {
-                    // Timeout
-                    rbuf.truncate(offset);
-                    break;
-                }
-            }
+        // if set_at_cmd is used than stop reading
+        if len < READ_BUF_SIZE {
+            rbuf.truncate(offset);
+            break;
         }
     }
 }
@@ -115,16 +77,22 @@ fn main() -> ! {
         embassy::init(&clocks, timer_group0.timer0);
     }
 
-    let mut uart0 = Uart::new(peripherals.UART0, &mut system.peripheral_clock_control);
+    let mut uart0 = Uart::new(
+        peripherals.UART0,
+        &clocks,
+        &mut system.peripheral_clock_control,
+    );
     uart0.set_at_cmd(AtCmdConfig::new(None, None, None, AT_CMD, None));
     uart0
         .set_rx_fifo_full_threshold(READ_BUF_SIZE as u16)
         .unwrap();
+    let (tx, rx) = uart0.split();
 
     interrupt::enable(Interrupt::UART0, interrupt::Priority::Priority1).unwrap();
 
     let executor = make_static!(Executor::new());
     executor.run(|spawner| {
-        spawner.spawn(run(uart0)).ok();
+        spawner.spawn(reader(rx)).ok();
+        spawner.spawn(writer(tx)).ok();
     });
 }

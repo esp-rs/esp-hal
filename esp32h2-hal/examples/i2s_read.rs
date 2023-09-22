@@ -1,4 +1,4 @@
-//! This shows how to continously receive data via I2S
+//! This shows how to continuously receive data via I2S
 //!
 //! Pins used
 //! MCLK    GPIO4

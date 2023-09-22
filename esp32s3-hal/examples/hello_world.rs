@@ -1,4 +1,4 @@
-//! This shows how to write text to serial0.
+//! This shows how to write text to uart0.
 //! You can see the output with `espflash` if you provide the `--monitor` option
 
 #![no_std]
@@ -29,12 +29,16 @@ fn main() -> ! {
     );
     let mut timer0 = timer_group0.timer0;
 
-    let mut serial0 = Uart::new(peripherals.UART0, &mut system.peripheral_clock_control);
+    let mut uart0 = Uart::new(
+        peripherals.UART0,
+        &clocks,
+        &mut system.peripheral_clock_control,
+    );
 
     timer0.start(1u64.secs());
 
     loop {
-        writeln!(serial0, "Hello world!").unwrap();
+        writeln!(uart0, "Hello world!").unwrap();
         block!(timer0.wait()).unwrap();
     }
 }

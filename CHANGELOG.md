@@ -14,14 +14,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Implement enabling/disabling BLE clock on ESP32-C6 (#784)
 - Async support for RMT (#787)
 - Implement `defmt::Format` for more types (#786)
+- Add new_no_miso to Spi FullDuplexMode (#794)
+- Add UART support for splitting into TX and RX (#754)
+- Async support for I2S (#801)
+- UART/ESP32: fix calculating FIFO counter with `get_rx_fifo_count()` (#804)
+- Async support for PARL_IO (#807)
 
 ### Changed
 
+- Bumped MSRV to 1.67 (#798)
+- Optimised multi-core critical section implementation (#797)
+
 ### Fixed
+
+- S3: Allow powering down RC_FAST_CLK (#796)
+- UART/ESP32: fix calculating FIFO counter with `get_rx_fifo_count()` (#804)
 
 ### Removed
 
+- `Pin::is_pcore_interrupt_set` (#793)
+- `Pin::is_pcore_non_maskable_interrupt_set` (#793)
+- `Pin::is_acore_interrupt_set` (#793)
+- `Pin::is_acore_non_maskable_interrupt_set` (#793)
+- `Pin::enable_hold` (#793)
 - Removed the generic return type for ADC reads (#792)
+
+### Breaking
+
+- `Uart::new` now takes the `&Clocks` struct to ensure baudrate is correct for CPU/APB speed. (#808)
+- `Uart::new_with_config` takes an `Config` instead of `Option<Config>`. (#808)
 
 ## [0.12.0]
 
@@ -39,6 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `log` feature to enable log output (#773)
 - Add `defmt` feature to enable log output (#773)
 - A new macro to load LP core code on ESP32-C6 (#779)
+- Add `ECC`` peripheral driver (#785)
 
 ### Changed
 
@@ -54,6 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix setting alarm when a timer group is used as the alarm source. (#730)
 - Fix `Instant::now()` not counting in some cases when using TIMG0 as the timebase (#737)
 - Fix number of ADC attenuations for ESP32-C6 (#771)
+- Fix SHA registers access (#805)
 
 ### Breaking
 

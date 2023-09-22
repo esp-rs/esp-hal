@@ -105,6 +105,31 @@ macro_rules! ImplSpiChannel {
                     spi.dma_out_link.modify(|_, w| w.outlink_start().set_bit());
                 }
 
+                fn clear_ch_out_done() {
+                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
+                    spi.dma_int_clr.write(|w| w.out_done_int_clr().set_bit());
+                }
+
+                fn is_ch_out_done_set() -> bool {
+                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
+                    spi.dma_int_raw.read().out_done_int_raw().bit()
+                }
+
+                fn listen_ch_out_done() {
+                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
+                    spi.dma_int_ena.modify(|_, w| w.out_done_int_ena().set_bit());
+                }
+
+                fn unlisten_ch_out_done() {
+                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
+                    spi.dma_int_ena.modify(|_, w| w.out_done_int_ena().clear_bit());
+                }
+
+                fn is_listening_ch_out_done() -> bool {
+                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
+                    spi.dma_int_ena.read().out_done_int_ena().bit()
+                }
+
                 fn is_out_done() -> bool {
                     let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
                     // FIXME this should be out_total_eof_int_raw? but on esp32 this interrupt doesn't seem to fire
@@ -225,6 +250,31 @@ macro_rules! ImplSpiChannel {
                 fn unlisten_out_eof() {
                     let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
                     spi.dma_int_ena.modify(|_, w| w.out_total_eof_int_ena().clear_bit());
+                }
+
+                fn listen_ch_in_done(){
+                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
+                    spi.dma_int_ena.modify(|_, w| w.in_done_int_ena().set_bit());
+                }
+
+                fn clear_ch_in_done(){
+                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
+                    spi.dma_int_clr.write(|w| w.in_done_int_clr().set_bit());
+                }
+
+                fn is_ch_in_done_set() -> bool {
+                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
+                    spi.dma_int_raw.read().in_done_int_raw().bit()
+                }
+
+                fn unlisten_ch_in_done() {
+                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
+                    spi.dma_int_ena.modify(|_, w| w.in_done_int_ena().clear_bit());
+                }
+
+                fn is_listening_ch_in_done() -> bool {
+                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
+                    spi.dma_int_ena.read().in_done_int_ena().bit()
                 }
             }
 
@@ -369,9 +419,34 @@ macro_rules! ImplI2sChannel {
                     reg_block.out_link.modify(|_, w| w.outlink_start().set_bit());
                 }
 
-                fn is_out_done() -> bool {
+                fn clear_ch_out_done() {
+                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
+                    reg_block.int_clr.write(|w| w.out_done_int_clr().set_bit());
+                }
+
+                fn is_ch_out_done_set() -> bool {
                     let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
                     reg_block.int_raw.read().out_done_int_raw().bit()
+                }
+
+                fn listen_ch_out_done() {
+                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
+                    reg_block.int_ena.modify(|_, w| w.out_done_int_ena().set_bit());
+                }
+
+                fn unlisten_ch_out_done() {
+                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
+                    reg_block.int_ena.modify(|_, w| w.out_done_int_ena().clear_bit());
+                }
+
+                fn is_listening_ch_out_done() -> bool {
+                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
+                    reg_block.int_ena.read().out_done_int_ena().bit()
+                }
+
+                fn is_out_done() -> bool {
+                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
+                    reg_block.int_raw.read().out_eof_int_raw().bit()
                 }
 
                 fn last_out_dscr_address() -> usize {
@@ -461,23 +536,58 @@ macro_rules! ImplI2sChannel {
                 }
 
                 fn is_listening_in_eof() -> bool {
-                    todo!()
+                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
+                    reg_block.int_ena.read().in_suc_eof_int_ena().bit()
                 }
+
                 fn is_listening_out_eof() -> bool {
-                    todo!()
+                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
+                    reg_block.int_ena.read().out_eof_int_ena().bit()
                 }
 
                 fn listen_in_eof() {
-                    todo!()
+                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
+                    reg_block.int_ena.modify(|_,w| w.in_suc_eof_int_ena().set_bit() );
                 }
+
                 fn listen_out_eof() {
-                    todo!()
+                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
+                    reg_block.int_ena.modify(|_,w| w.out_eof_int_ena().set_bit() );
                 }
+
                 fn unlisten_in_eof() {
-                    todo!()
+                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
+                    reg_block.int_ena.modify(|_,w| w.in_suc_eof_int_ena().clear_bit() );
                 }
+
                 fn unlisten_out_eof() {
-                    todo!()
+                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
+                    reg_block.int_ena.modify(|_,w| w.out_eof_int_ena().clear_bit() );
+                }
+
+                fn listen_ch_in_done(){
+                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
+                    reg_block.int_ena.modify(|_, w| w.in_done_int_ena().set_bit());
+                }
+
+                fn clear_ch_in_done(){
+                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
+                    reg_block.int_clr.write(|w| w.in_done_int_clr().set_bit());
+                }
+
+                fn is_ch_in_done_set() -> bool {
+                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
+                    reg_block.int_raw.read().in_done_int_raw().bit()
+                }
+
+                fn unlisten_ch_in_done() {
+                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
+                    reg_block.int_ena.modify(|_, w| w.in_done_int_ena().clear_bit());
+                }
+
+                fn is_listening_ch_in_done() -> bool {
+                    let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
+                    reg_block.int_ena.read().in_done_int_ena().bit()
                 }
             }
 

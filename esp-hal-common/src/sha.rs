@@ -182,19 +182,13 @@ impl<'d> Sha<'d> {
 
     #[cfg(not(esp32))]
     fn process_buffer(&mut self) {
-        // FIXME: SHA_START_REG & SHA_CONTINUE_REG are wrongly marked as RO (they are
-        // WO)
         if self.first_run {
             // Set SHA_START_REG
-            unsafe {
-                self.sha.start.as_ptr().write_volatile(1u32);
-            }
+            self.sha.start.write(|w| unsafe { w.bits(1) });
             self.first_run = false;
         } else {
             // SET SHA_CONTINUE_REG
-            unsafe {
-                self.sha.continue_.as_ptr().write_volatile(1u32);
-            }
+            self.sha.continue_.write(|w| unsafe { w.bits(1) });
         }
     }
 

@@ -28,6 +28,9 @@
       "path": "esp32c6-lp-hal"
     },
     {
+      "path": "esp32c6-lp-hal-procmacros"
+    },
+    {
       "path": "esp32h2-hal"
     },
     {

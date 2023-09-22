@@ -844,7 +844,7 @@ impl RtcSleepConfig {
 
             #[rustfmt::skip]
             rtc_cntl.clk_conf.modify(|_, w| w
-                .ck8m_force_pu().bit(self.int_8m_pd_en())
+                .ck8m_force_pu().bit(!self.int_8m_pd_en())
             );
 
             // enable VDDSDIO control by state machine

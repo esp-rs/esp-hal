@@ -7,7 +7,7 @@ authors = [
     "Sergio Gasquez Arcos <sergio.gasquez@gmail.com",
 ]
 edition      = "2021"
-rust-version = "1.65.0"
+rust-version = "1.67.0"
 description  = "HAL for ESP32-H2 microcontrollers"
 repository   = "https://github.com/esp-rs/esp-hal"
 license      = "MIT OR Apache-2.0"
@@ -49,6 +49,10 @@ sha2               = { version = "0.10.7", default-features = false}
 smart-leds         = "0.3.0"
 ssd1306            = "0.8.1"
 static_cell        = { version = "1.2.0", features = ["nightly"] }
+hex-literal       = "0"
+elliptic-curve    = {version = "0.13.4", default-features = false, features = ["sec1"] }
+p192              = {version = "0.13.0", default-features = false, features = ["arithmetic"] }
+p256              = {version = "0.13.2", default-features = false, features = ["arithmetic"] }
 
 [features]
 default              = ["rt", "vectored", "esp-hal-common/rv-zero-rtc-bss"]
@@ -115,3 +119,19 @@ required-features = ["interrupt-preemption"]
 [[example]]
 name              = "direct-vectoring"
 required-features = ["direct-vectoring"]
+
+[[example]]
+name              = "embassy_i2s_sound"
+required-features = ["embassy", "async"]
+
+[[example]]
+name              = "embassy_i2s_read"
+required-features = ["embassy", "async"]
+
+[[example]]
+name              = "embassy_parl_io_tx"
+required-features = ["embassy", "async"]
+
+[[example]]
+name              = "embassy_parl_io_rx"
+required-features = ["embassy", "async"]
