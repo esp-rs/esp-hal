@@ -163,7 +163,15 @@ mod soc;
 
 #[no_mangle]
 extern "C" fn EspDefaultHandler(_level: u32, _interrupt: peripherals::Interrupt) {
+    #[cfg(feature = "log")]
     warn!("Unhandled level {} interrupt: {:?}", _level, _interrupt);
+
+    #[cfg(feature = "defmt")]
+    warn!(
+        "Unhandled level {} interrupt: {:?}",
+        _level,
+        defmt::Debug2Format(&_interrupt)
+    );
 }
 
 #[cfg(xtensa)]
