@@ -21,16 +21,14 @@ use hal::{
         SocResetReason,
     },
     Delay,
-    Rmt,
     Rtc,
     IO,
 };
-use smart_leds::{SmartLedsWrite, RGB8};
 
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let mut system = peripherals.SYSTEM.split();
+    let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
