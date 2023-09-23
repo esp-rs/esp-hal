@@ -25,9 +25,7 @@
 use core::{convert::Infallible, marker::PhantomData};
 
 use crate::peripherals::{GPIO, IO_MUX};
-#[cfg(xtensa)]
-pub(crate) use crate::rtc_pins;
-#[cfg(esp32c3)]
+#[cfg(any(xtensa, esp32c3))]
 pub(crate) use crate::rtc_pins;
 pub use crate::soc::gpio::*;
 pub(crate) use crate::{analog, gpio};
@@ -125,16 +123,10 @@ pub trait RTCPin: Pin {
     // rtc_cntl.gpio_wakeup.gpio_pinX_int_type
     #[cfg(esp32c3)]
     unsafe fn apply_wakeup(&mut self, wakeup: bool, level: u8);
-    #[cfg(esp32c3)]
-    fn gpio_pullup(&mut self, enable: bool);
-    #[cfg(esp32c3)]
-    fn gpio_pulldown(&mut self, enable: bool);
 }
 
 pub trait RTCPinWithResistors: RTCPin {
-    #[cfg(xtensa)]
     fn rtcio_pullup(&mut self, enable: bool);
-    #[cfg(xtensa)]
     fn rtcio_pulldown(&mut self, enable: bool);
 }
 
@@ -1537,16 +1529,6 @@ macro_rules! rtc_pins {
                 }
             }
 
-            fn gpio_pullup(&mut self, enable: bool) {
-                let io_mux = unsafe { &*crate::peripherals::IO_MUX::ptr() };
-                io_mux.gpio[$pin_num].modify(|_, w| w.fun_wpu().bit(enable));
-            }
-
-            fn gpio_pulldown(&mut self, enable: bool) {
-                let io_mux = unsafe { &*crate::peripherals::IO_MUX::ptr() };
-                io_mux.gpio[$pin_num].modify(|_, w| w.fun_wpd().bit(enable));
-            }
-
             fn rtcio_pad_hold(&mut self, enable: bool) {
                 let rtc_cntl = unsafe { &*crate::peripherals::RTC_CNTL::ptr() };
                 paste::paste! {
@@ -1554,6 +1536,19 @@ macro_rules! rtc_pins {
                 }
             }
         }
+
+        impl<MODE> crate::gpio::RTCPinWithResistors for GpioPin<MODE, $pin_num> {
+            fn rtcio_pullup(&mut self, enable: bool) {
+                let io_mux = unsafe { &*crate::peripherals::IO_MUX::ptr() };
+                io_mux.gpio[$pin_num].modify(|_, w| w.fun_wpu().bit(enable));
+            }
+
+            fn rtcio_pulldown(&mut self, enable: bool) {
+                let io_mux = unsafe { &*crate::peripherals::IO_MUX::ptr() };
+                io_mux.gpio[$pin_num].modify(|_, w| w.fun_wpd().bit(enable));
+            }
+        }
+
     };
 
     ( $( $pin_num:expr )+ ) => { $( crate::gpio::rtc_pins!($pin_num); )+ };

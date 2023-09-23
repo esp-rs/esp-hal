@@ -1,6 +1,6 @@
 use super::{TimerWakeupSource, WakeSource, WakeTriggers, WakeupLevel};
 use crate::{
-    gpio::RTCPin,
+    gpio::RTCPinWithResistors,
     regi2c_write_mask,
     rtc_cntl::{sleep::RtcioWakeupSource, Clock, RtcClock},
     Rtc,
@@ -53,15 +53,6 @@ pub const RTC_CNTL_DBIAS_1V20: u32 = 28;
 pub const RTC_CNTL_DBIAS_1V25: u32 = 30;
 pub const RTC_CNTL_DBIAS_1V30: u32 = 31; //< voltage is about 1.34v in fact
 
-// pub const RTC_CNTL_DBG_ATTEN_MONITOR_DEFAULT: u8 = 0;
-// pub const RTC_CNTL_ULPCP_TOUCH_START_WAIT_IN_SLEEP: u16 = 0xFF;
-// pub const RTC_CNTL_ULPCP_TOUCH_START_WAIT_DEFAULT: u16 = 0x10;
-
-// pub const RTC_CNTL_PLL_BUF_WAIT_DEFAULT: u8 = 20;
-// pub const RTC_CNTL_CK8M_WAIT_DEFAULT: u8 = 20;
-// pub const RTC_CNTL_MIN_SLP_VAL_MIN: u8 = 2;
-// pub const RTC_CNTL_DBG_ATTEN_DEEPSLEEP_ULTRA_LOW: u8 = 15;
-
 pub const RTC_CNTL_DBG_ATTEN_LIGHTSLEEP_DEFAULT: u8 = 5;
 pub const RTC_CNTL_DBG_ATTEN_LIGHTSLEEP_NODROP: u8 = 0;
 pub const RTC_CNTL_DBG_ATTEN_DEEPSLEEP_DEFAULT: u8 = 15;
@@ -90,20 +81,9 @@ pub const GPIO_INTR_DISABLE: u8 = 0;
 pub const GPIO_INTR_LOW_LEVEL: u8 = 4;
 pub const GPIO_INTR_HIGH_LEVEL: u8 = 5;
 
-// pub const WIFI_POWERUP_CYCLES: u8 = OTHER_BLOCKS_POWERUP;
-// pub const WIFI_WAIT_CYCLES: u16 = OTHER_BLOCKS_WAIT;
-// pub const BT_POWERUP_CYCLES: u8 = OTHER_BLOCKS_POWERUP;
-// pub const BT_WAIT_CYCLES: u16 = OTHER_BLOCKS_WAIT;
-// pub const RTC_POWERUP_CYCLES: u8 = OTHER_BLOCKS_POWERUP;
-// pub const RTC_WAIT_CYCLES: u16 = OTHER_BLOCKS_WAIT;
-// pub const CPU_TOP_POWERUP_CYCLES: u8 = OTHER_BLOCKS_POWERUP;
-// pub const CPU_TOP_WAIT_CYCLES: u16 = OTHER_BLOCKS_WAIT;
-// pub const DG_WRAP_POWERUP_CYCLES: u8 = OTHER_BLOCKS_POWERUP;
-// pub const DG_WRAP_WAIT_CYCLES: u16 = OTHER_BLOCKS_WAIT;
-// pub const DG_PERI_POWERUP_CYCLES: u8 = OTHER_BLOCKS_POWERUP;
-// pub const DG_PERI_WAIT_CYCLES: u16 = OTHER_BLOCKS_WAIT;
-// pub const RTC_MEM_POWERUP_CYCLES: u8 = OTHER_BLOCKS_POWERUP;
-// pub const RTC_MEM_WAIT_CYCLES: u16 = OTHER_BLOCKS_WAIT;
+pub const PIN_FUNC_GPIO: u8 = 1;
+pub const SIG_GPIO_OUT_IDX: u32 = 128;
+pub const GPIO_NUM_MAX: usize = 22;
 
 impl WakeSource for TimerWakeupSource {
     fn apply(&self, rtc: &Rtc, triggers: &mut WakeTriggers, _sleep_config: &mut RtcSleepConfig) {
@@ -135,86 +115,67 @@ impl WakeSource for TimerWakeupSource {
     }
 }
 
-// impl<P: RTCPin> Drop for Ext0WakeupSource<'_, P> {
-// fn drop(&mut self) {
-// should we have saved the pin configuration first?
-// set pin back to IO_MUX (input_enable and func have no effect when pin is sent
-// to IO_MUX)
-// self.pin
-// .borrow_mut()
-// .rtc_set_config(true, false, RtcFunction::Rtc);
-// }
-// }
-//
-// impl WakeSource for Ext1WakeupSource<'_, '_> {
-// fn apply(&self, _rtc: &Rtc, triggers: &mut WakeTriggers, sleep_config: &mut
-// RtcSleepConfig) { don't power down RTC peripherals
-// sleep_config.set_rtc_peri_pd_en(false);
-// triggers.set_ext1(true);
-//
-// set pins to RTC function
-// let mut pins = self.pins.borrow_mut();
-// let mut bits = 0u32;
-// for pin in pins.iter_mut() {
-// pin.rtc_set_config(true, true, RtcFunction::Rtc);
-// bits |= 1 << pin.rtc_number();
-// }
-//
-// unsafe {
-// let rtc_cntl = &*esp32s3::RTC_CNTL::ptr();
-// clear previous wakeup status
-// rtc_cntl
-// .ext_wakeup1
-// .modify(|_, w| w.ext_wakeup1_status_clr().set_bit());
-// set pin register field
-// rtc_cntl
-// .ext_wakeup1
-// .modify(|_, w| w.ext_wakeup1_sel().bits(bits));
-// set level register field
-// rtc_cntl
-// .ext_wakeup_conf
-// .modify(|_r, w| w.ext_wakeup1_lv().bit(self.level == WakeupLevel::High));
-// }
-// }
-// }
-//
-// impl Drop for Ext1WakeupSource<'_, '_> {
-// fn drop(&mut self) {
-// should we have saved the pin configuration first?
-// set pin back to IO_MUX (input_enable and func have no effect when pin is sent
-// to IO_MUX)
-// let mut pins = self.pins.borrow_mut();
-// for pin in pins.iter_mut() {
-// pin.rtc_set_config(true, false, RtcFunction::Rtc);
-// }
-// }
-// }
-//
-
 impl<'a, 'b> RtcioWakeupSource<'a, 'b> {
-    fn apply_pin(&self, pin: &mut dyn RTCPin, level: WakeupLevel) {
+    fn apply_pin(&self, pin: &mut dyn RTCPinWithResistors, level: WakeupLevel) {
+        // The pullup/pulldown part is like in gpio_deep_sleep_wakeup_prepare
         let level = match level {
             WakeupLevel::High => {
-                // like gpio_deep_sleep_wakeup_prepare
-                pin.gpio_pullup(false);
-                pin.gpio_pulldown(true);
+                pin.rtcio_pullup(false);
+                pin.rtcio_pulldown(true);
                 GPIO_INTR_HIGH_LEVEL
             }
             WakeupLevel::Low => {
-                pin.gpio_pullup(true);
-                pin.gpio_pulldown(false);
+                pin.rtcio_pullup(true);
+                pin.rtcio_pulldown(false);
                 GPIO_INTR_LOW_LEVEL
             }
         };
         pin.rtcio_pad_hold(true);
+
+        // apply_wakeup does the same as idf's esp_deep_sleep_enable_gpio_wakeup
         unsafe {
             pin.apply_wakeup(true, level);
         }
     }
 }
 
+fn isolate_digital_gpio() {
+    // like esp_sleep_isolate_digital_gpio
+    let rtc_cntl = unsafe { &*crate::peripherals::RTC_CNTL::ptr() };
+    let io_mux = unsafe { &*crate::peripherals::IO_MUX::ptr() };
+    let gpio = unsafe { &*crate::peripherals::GPIO::ptr() };
+
+    let dig_iso = &rtc_cntl.dig_iso.read();
+    let deep_sleep_hold_is_en =
+        !dig_iso.dg_pad_force_unhold().bit() && dig_iso.dg_pad_autohold_en().bit();
+    if !deep_sleep_hold_is_en {
+        return;
+    }
+
+    // TODO: assert that the task stack is not in external ram
+
+    for pin_num in 0..GPIO_NUM_MAX {
+        let pin_hold = rtc_cntl.dig_pad_hold.read().bits() & (1 << pin_num) != 0;
+        if !pin_hold {
+            // input disable, like gpio_ll_input_disable
+            io_mux.gpio[pin_num].modify(|_, w| w.fun_ie().clear_bit());
+            // output disable, like gpio_ll_output_disable
+            unsafe {
+                gpio.func_out_sel_cfg[pin_num].modify(|_, w| w.bits(SIG_GPIO_OUT_IDX));
+            }
+
+            // disable pull-up and pull-down
+            io_mux.gpio[pin_num].modify(|_, w| w.fun_wpu().clear_bit());
+            io_mux.gpio[pin_num].modify(|_, w| w.fun_wpd().clear_bit());
+
+            // make pad work as gpio (otherwise, deep_sleep bottom current will rise)
+            io_mux.gpio[pin_num].modify(|_, w| w.mcu_sel().variant(PIN_FUNC_GPIO));
+        }
+    }
+}
+
 impl WakeSource for RtcioWakeupSource<'_, '_> {
-    fn apply(&self, _rtc: &Rtc, triggers: &mut WakeTriggers, _sleep_config: &mut RtcSleepConfig) {
+    fn apply(&self, _rtc: &Rtc, triggers: &mut WakeTriggers, sleep_config: &mut RtcSleepConfig) {
         let mut pins = self.pins.borrow_mut();
 
         if pins.is_empty() {
@@ -222,6 +183,22 @@ impl WakeSource for RtcioWakeupSource<'_, '_> {
         }
 
         triggers.set_gpio(true);
+
+        // If deep sleep is enabled, esp_start_sleep calls
+        // gpio_deep_sleep_wakeup_prepare which sets these pullup and
+        // pulldown values. But later in esp_start_sleep it calls
+        // esp_sleep_isolate_digital_gpio, which disables the pullup and pulldown (but
+        // only if it isn't held).
+        // But it looks like gpio_deep_sleep_wakeup_prepare enables hold for all pins
+        // in the wakeup mask.
+        //
+        // So: all pins in the wake mask should get this treatment here, and all pins
+        // not in the wake mask should get
+        // - pullup and pulldowns disabled
+        // - input and output disabled, and
+        // - their func should get set to GPIO.
+        // But this last block of things gets skipped if hold is disabled globally (see
+        // gpio_ll_deep_sleep_hold_is_en)
 
         let rtc_cntl = unsafe { &*crate::peripherals::RTC_CNTL::PTR };
 
@@ -233,8 +210,12 @@ impl WakeSource for RtcioWakeupSource<'_, '_> {
             .ext_wakeup_conf
             .modify(|_, w| w.gpio_wakeup_filter().set_bit());
 
-        for (pin, level) in pins.iter_mut() {
-            self.apply_pin(*pin, *level);
+        if sleep_config.deep_slp() {
+            for (pin, level) in pins.iter_mut() {
+                self.apply_pin(*pin, *level);
+            }
+
+            isolate_digital_gpio();
         }
 
         // like rtc_cntl_ll_gpio_clear_wakeup_status, as called from
