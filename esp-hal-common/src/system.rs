@@ -46,7 +46,7 @@ pub enum SoftwareInterrupt {
     SoftwareInterrupt3,
 }
 
-/// Peripherals which can be enabled via [PeripheralClockControl]
+/// Peripherals which can be enabled via `PeripheralClockControl`
 pub enum Peripheral {
     #[cfg(spi2)]
     Spi2,
@@ -179,9 +179,7 @@ impl SoftwareInterruptControl {
 }
 
 /// Controls the enablement of peripheral clocks.
-pub(crate) struct PeripheralClockControl {
-    _private: (),
-}
+pub(crate) struct PeripheralClockControl;
 
 #[cfg(not(any(esp32c6, esp32h2)))]
 impl PeripheralClockControl {
