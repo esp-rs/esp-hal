@@ -114,7 +114,7 @@ impl<T, const CHANNEL: u8> Alarm<T, CHANNEL> {
         Self { _pd: PhantomData }
     }
 
-    pub fn interrupt_enable(&self, val: bool) {
+    pub fn enable_interrupt(&self, val: bool) {
         let systimer = unsafe { &*SYSTIMER::ptr() };
         match CHANNEL {
             0 => systimer.int_ena.modify(|_, w| w.target0_int_ena().bit(val)),
@@ -288,7 +288,7 @@ mod asynch {
     impl<'a, const N: u8> AlarmFuture<'a, N> {
         pub(crate) fn new(alarm: &'a Alarm<Periodic, N>) -> Self {
             alarm.interrupt_clear();
-            alarm.interrupt_enable(true);
+            alarm.enable_interrupt(true);
 
             Self {
                 phantom: PhantomData,

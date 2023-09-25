@@ -109,15 +109,15 @@ impl EmbassyTimer {
         match id {
             0 => {
                 self.alarm0.set_target(timestamp);
-                self.alarm0.interrupt_enable(true);
+                self.alarm0.enable_interrupt(true);
             }
             1 => {
                 self.alarm1.set_target(timestamp);
-                self.alarm1.interrupt_enable(true);
+                self.alarm1.enable_interrupt(true);
             }
             2 => {
                 self.alarm2.set_target(timestamp);
-                self.alarm2.interrupt_enable(true);
+                self.alarm2.enable_interrupt(true);
             }
             _ => {}
         }
