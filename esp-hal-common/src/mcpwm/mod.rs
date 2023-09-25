@@ -33,11 +33,7 @@
 //!
 //! // initialize peripheral
 //! let clock_cfg = PeripheralClockConfig::with_frequency(&clocks, 40u32.MHz()).unwrap();
-//! let mut mcpwm = MCPWM::new(
-//!     peripherals.PWM0,
-//!     clock_cfg,
-//!     &mut system.peripheral_clock_control,
-//! );
+//! let mut mcpwm = MCPWM::new(peripherals.PWM0, clock_cfg);
 //!
 //! // connect operator0 to timer0
 //! mcpwm.operator0.set_timer(&mcpwm.timer0);
@@ -102,11 +98,10 @@ impl<'d, PWM: PwmPeripheral> MCPWM<'d, PWM> {
     pub fn new(
         peripheral: impl Peripheral<P = PWM> + 'd,
         peripheral_clock: PeripheralClockConfig,
-        system: &mut PeripheralClockControl,
     ) -> Self {
         crate::into_ref!(peripheral);
 
-        PWM::enable(system);
+        PWM::enable();
 
         #[cfg(not(esp32c6))]
         {
@@ -289,7 +284,7 @@ pub struct FrequencyError;
 /// A MCPWM peripheral
 pub unsafe trait PwmPeripheral: Deref<Target = RegisterBlock> {
     /// Enable peripheral
-    fn enable(system: &mut PeripheralClockControl);
+    fn enable();
     /// Get a pointer to the peripheral RegisterBlock
     fn block() -> *const RegisterBlock;
     /// Get operator GPIO mux output signal
@@ -298,8 +293,8 @@ pub unsafe trait PwmPeripheral: Deref<Target = RegisterBlock> {
 
 #[cfg(mcpwm0)]
 unsafe impl PwmPeripheral for crate::peripherals::MCPWM0 {
-    fn enable(system: &mut PeripheralClockControl) {
-        system.enable(PeripheralEnable::Mcpwm0)
+    fn enable() {
+        PeripheralClockControl::enable(PeripheralEnable::Mcpwm0)
     }
 
     fn block() -> *const RegisterBlock {
@@ -321,8 +316,8 @@ unsafe impl PwmPeripheral for crate::peripherals::MCPWM0 {
 
 #[cfg(mcpwm1)]
 unsafe impl PwmPeripheral for crate::peripherals::MCPWM1 {
-    fn enable(system: &mut PeripheralClockControl) {
-        system.enable(PeripheralEnable::Mcpwm1)
+    fn enable() {
+        PeripheralClockControl::enable(PeripheralEnable::Mcpwm1)
     }
 
     fn block() -> *const RegisterBlock {

@@ -31,11 +31,7 @@
 //! ```no_run
 //! let source_data = "HELLO, ESPRESSIF!".as_bytes();
 //! let mut remaining = source_data.clone();
-//! let mut hasher = Sha::new(
-//!     peripherals.SHA,
-//!     ShaMode::SHA256,
-//!     &mut system.peripheral_clock_control,
-//! );
+//! let mut hasher = Sha::new(peripherals.SHA, ShaMode::SHA256);
 //!
 //! // Short hashes can be created by decreasing the output buffer to the desired
 //! // length
@@ -149,13 +145,10 @@ fn mode_as_bits(mode: ShaMode) -> u8 {
 // This implementation might fail after u32::MAX/8 bytes, to increase please see
 // ::finish() length/self.cursor usage
 impl<'d> Sha<'d> {
-    pub fn new(
-        sha: impl Peripheral<P = SHA> + 'd,
-        mode: ShaMode,
-        peripheral_clock_control: &mut PeripheralClockControl,
-    ) -> Self {
+    pub fn new(sha: impl Peripheral<P = SHA> + 'd, mode: ShaMode) -> Self {
         crate::into_ref!(sha);
-        peripheral_clock_control.enable(crate::system::Peripheral::Sha);
+
+        PeripheralClockControl::enable(crate::system::Peripheral::Sha);
 
         // Setup SHA Mode
         #[cfg(not(esp32))]

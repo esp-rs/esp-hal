@@ -179,14 +179,14 @@ impl SoftwareInterruptControl {
 }
 
 /// Controls the enablement of peripheral clocks.
-pub struct PeripheralClockControl {
+pub(crate) struct PeripheralClockControl {
     _private: (),
 }
 
 #[cfg(not(any(esp32c6, esp32h2)))]
 impl PeripheralClockControl {
     /// Enables and resets the given peripheral
-    pub fn enable(&mut self, peripheral: Peripheral) {
+    pub(crate) fn enable(peripheral: Peripheral) {
         let system = unsafe { &*SystemPeripheral::PTR };
 
         #[cfg(not(esp32))]
@@ -394,7 +394,7 @@ impl PeripheralClockControl {
 #[cfg(any(esp32c6, esp32h2))]
 impl PeripheralClockControl {
     /// Enables and resets the given peripheral
-    pub fn enable(&mut self, peripheral: Peripheral) {
+    pub(crate) fn enable(peripheral: Peripheral) {
         let system = unsafe { &*SystemPeripheral::PTR };
 
         match peripheral {
@@ -618,7 +618,6 @@ pub trait RadioClockController {
 /// The SYSTEM/DPORT splitted into it's different logical parts.
 pub struct SystemParts<'d> {
     _private: PeripheralRef<'d, SystemPeripheral>,
-    pub peripheral_clock_control: PeripheralClockControl,
     pub clock_control: SystemClockControl,
     pub cpu_control: CpuControl,
     #[cfg(pdma)]
@@ -642,7 +641,6 @@ impl<'d, T: crate::peripheral::Peripheral<P = SystemPeripheral> + 'd> SystemExt<
     fn split(self) -> Self::Parts {
         Self::Parts {
             _private: self.into_ref(),
-            peripheral_clock_control: PeripheralClockControl { _private: () },
             clock_control: SystemClockControl { _private: () },
             cpu_control: CpuControl { _private: () },
             #[cfg(pdma)]

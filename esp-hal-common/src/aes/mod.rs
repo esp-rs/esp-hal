@@ -11,7 +11,7 @@
 //! ## Example
 //! ### Initialization
 //! ```no_run
-//! let mut aes = Aes::new(peripherals.AES, &mut system.peripheral_clock_control);
+//! let mut aes = Aes::new(peripherals.AES);
 //! ```
 //! ### Creating key and block Buffer
 //! ```no_run
@@ -65,7 +65,6 @@ use crate::{
         generic::{Readable, Reg, RegisterSpec, Resettable, Writable},
         AES,
     },
-    system::PeripheralClockControl,
 };
 
 #[cfg_attr(esp32, path = "esp32.rs")]
@@ -84,13 +83,12 @@ pub struct Aes<'d> {
 }
 
 impl<'d> Aes<'d> {
-    pub fn new(
-        aes: impl Peripheral<P = AES> + 'd,
-        peripheral_clock_control: &mut PeripheralClockControl,
-    ) -> Self {
+    pub fn new(aes: impl Peripheral<P = AES> + 'd) -> Self {
         crate::into_ref!(aes);
-        let mut ret = Self { aes: aes };
-        ret.init(peripheral_clock_control);
+
+        let mut ret = Self { aes };
+        ret.init();
+
         ret
     }
 

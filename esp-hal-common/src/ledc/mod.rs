@@ -10,11 +10,7 @@
 //! 10% duty using the ABPClock
 //!
 //! ```no_run
-//! let mut ledc = LEDC::new(
-//!     peripherals.LEDC,
-//!     &clock_control,
-//!     &mut system.peripheral_clock_control,
-//! );
+//! let mut ledc = LEDC::new(peripherals.LEDC, &clock_control);
 //! ledc.set_global_slow_clock(LSGlobalClkSource::APBClk);
 //!
 //! let mut lstimer0 = ledc.get_timer::<LowSpeed>(timer::Number::Timer0);
@@ -41,11 +37,7 @@
 //! 10% duty using the ABPClock
 //!
 //! ```no_run
-//! let ledc = LEDC::new(
-//!     peripherals.LEDC,
-//!     &clock_control,
-//!     &mut system.peripheral_clock_control,
-//! );
+//! let ledc = LEDC::new(peripherals.LEDC, &clock_control);
 //!
 //! let mut hstimer0 = ledc.get_timer::<HighSpeed>(timer::Number::Timer0);
 //! hstimer0
@@ -116,10 +108,9 @@ impl<'d> LEDC<'d> {
     pub fn new(
         _instance: impl Peripheral<P = crate::peripherals::LEDC> + 'd,
         clock_control_config: &'d Clocks,
-        system: &mut PeripheralClockControl,
     ) -> Self {
         crate::into_ref!(_instance);
-        system.enable(PeripheralEnable::Ledc);
+        PeripheralClockControl::enable(PeripheralEnable::Ledc);
 
         let ledc = unsafe { &*crate::peripherals::LEDC::ptr() };
         LEDC {

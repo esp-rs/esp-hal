@@ -21,18 +21,10 @@
 //! let mut rtc = Rtc::new(peripherals.RTC_CNTL);
 //!
 //! // Create timer groups
-//! let timer_group0 = TimerGroup::new(
-//!     peripherals.TIMG0,
-//!     &clocks,
-//!     &mut system.peripheral_clock_control,
-//! );
+//! let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
 //! // Get watchdog timers of timer groups
 //! let mut wdt0 = timer_group0.wdt;
-//! let timer_group1 = TimerGroup::new(
-//!     peripherals.TIMG1,
-//!     &clocks,
-//!     &mut system.peripheral_clock_control,
-//! );
+//! let timer_group1 = TimerGroup::new(peripherals.TIMG1, &clocks);
 //! let mut wdt1 = timer_group1.wdt;
 //!
 //! // Disable watchdog timers
@@ -189,11 +181,7 @@ impl<'d, T> TimerGroup<'d, T>
 where
     T: TimerGroupInstance,
 {
-    pub fn new(
-        timer_group: impl Peripheral<P = T> + 'd,
-        clocks: &Clocks,
-        peripheral_clock_control: &mut PeripheralClockControl,
-    ) -> Self {
+    pub fn new(timer_group: impl Peripheral<P = T> + 'd, clocks: &Clocks) -> Self {
         crate::into_ref!(timer_group);
 
         T::configure_src_clk();
@@ -207,7 +195,6 @@ where
             clocks.apb_clock,
             #[cfg(esp32h2)]
             clocks.pll_48m_clock,
-            peripheral_clock_control,
         );
 
         #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
@@ -216,17 +203,14 @@ where
                 phantom: PhantomData::default(),
             },
             clocks.apb_clock,
-            peripheral_clock_control,
         );
-
-        let wdt = Wdt::new(peripheral_clock_control);
 
         Self {
             _timer_group: timer_group,
             timer0,
             #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
             timer1,
-            wdt,
+            wdt: Wdt::new(),
         }
     }
 }
@@ -242,15 +226,12 @@ where
     T: Instance,
 {
     /// Create a new timer instance
-    pub fn new(
-        timg: T,
-        apb_clk_freq: HertzU32,
-        peripheral_clock_control: &mut PeripheralClockControl,
-    ) -> Self {
+    pub fn new(timg: T, apb_clk_freq: HertzU32) -> Self {
         // TODO: this currently assumes APB_CLK is being used, as we don't yet have a
         //       way to select the XTAL_CLK.
 
-        timg.enable_peripheral(peripheral_clock_control);
+        timg.enable_peripheral();
+
         Self { timg, apb_clk_freq }
     }
 
@@ -312,7 +293,7 @@ pub trait Instance {
 
     fn is_interrupt_set(&self) -> bool;
 
-    fn enable_peripheral(&self, peripheral_clock_control: &mut PeripheralClockControl);
+    fn enable_peripheral(&self);
 }
 
 pub struct Timer0<TG> {
@@ -469,8 +450,8 @@ where
             .modify(|_, w| unsafe { w.divider().bits(divider) })
     }
 
-    fn enable_peripheral(&self, peripheral_clock_control: &mut PeripheralClockControl) {
-        peripheral_clock_control.enable(crate::system::Peripheral::Timg0);
+    fn enable_peripheral(&self) {
+        PeripheralClockControl::enable(crate::system::Peripheral::Timg0);
     }
 }
 
@@ -631,8 +612,8 @@ where
             .modify(|_, w| unsafe { w.divider().bits(divider) })
     }
 
-    fn enable_peripheral(&self, peripheral_clock_control: &mut PeripheralClockControl) {
-        peripheral_clock_control.enable(crate::system::Peripheral::Timg1);
+    fn enable_peripheral(&self) {
+        PeripheralClockControl::enable(crate::system::Peripheral::Timg1);
     }
 }
 
@@ -726,9 +707,9 @@ where
     TG: TimerGroupInstance,
 {
     /// Create a new watchdog timer instance
-    pub fn new(_peripheral_clock_control: &mut PeripheralClockControl) -> Self {
+    pub fn new() -> Self {
         #[cfg(lp_wdt)]
-        _peripheral_clock_control.enable(crate::system::Peripheral::Wdt);
+        PeripheralClockControl::enable(crate::system::Peripheral::Wdt);
 
         TG::configure_wdt_src_clk();
 

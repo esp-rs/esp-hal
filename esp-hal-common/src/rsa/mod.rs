@@ -25,7 +25,7 @@
 //! let peripherals = Peripherals::take();
 //! let mut system = peripherals.PCR.split();
 //!
-//! let mut rsa = Rsa::new(peripherals.RSA, &mut system.peripheral_clock_control);
+//! let mut rsa = Rsa::new(peripherals.RSA);
 //! ```
 //!
 //! ⚠️: The examples for RSA peripheral are quite extensive, so for a more
@@ -59,18 +59,12 @@ pub struct Rsa<'d> {
 }
 
 impl<'d> Rsa<'d> {
-    pub fn new(
-        rsa: impl Peripheral<P = RSA> + 'd,
-        peripheral_clock_control: &mut PeripheralClockControl,
-    ) -> Self {
+    pub fn new(rsa: impl Peripheral<P = RSA> + 'd) -> Self {
         crate::into_ref!(rsa);
-        let mut ret = Self { rsa };
-        ret.init(peripheral_clock_control);
-        ret
-    }
 
-    fn init(&mut self, peripheral_clock_control: &mut PeripheralClockControl) {
-        peripheral_clock_control.enable(PeripheralEnable::Rsa);
+        PeripheralClockControl::enable(PeripheralEnable::Rsa);
+
+        Self { rsa }
     }
 
     unsafe fn write_operand_b<const N: usize>(&mut self, operand_b: &[u8; N]) {

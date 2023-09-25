@@ -22,7 +22,6 @@
 //!     io.pins.gpio1,
 //!     io.pins.gpio2,
 //!     100u32.kHz(),
-//!     &mut system.peripheral_clock_control,
 //!     &clocks,
 //! );
 //! loop {
@@ -274,11 +273,16 @@ where
         sda: impl Peripheral<P = SDA> + 'd,
         scl: impl Peripheral<P = SCL> + 'd,
         frequency: HertzU32,
-        peripheral_clock_control: &mut PeripheralClockControl,
         clocks: &Clocks,
     ) -> Self {
         crate::into_ref!(i2c, sda, scl);
-        enable_peripheral(&i2c, peripheral_clock_control);
+
+        PeripheralClockControl::enable(match i2c.i2c_number() {
+            0 => crate::system::Peripheral::I2cExt0,
+            #[cfg(i2c1)]
+            1 => crate::system::Peripheral::I2cExt1,
+            _ => unreachable!(), // will never happen
+        });
 
         let mut i2c = I2C { peripheral: i2c };
 
@@ -620,21 +624,6 @@ mod asynch {
             .modify(|_, w| w.txfifo_wm_int_ena().clear_bit());
 
         WAKERS[1].wake();
-    }
-}
-
-fn enable_peripheral<'d, T>(
-    i2c: &PeripheralRef<'d, T>,
-    peripheral_clock_control: &mut PeripheralClockControl,
-) where
-    T: Instance,
-{
-    // enable peripheral
-    match i2c.i2c_number() {
-        0 => peripheral_clock_control.enable(crate::system::Peripheral::I2cExt0),
-        #[cfg(i2c1)]
-        1 => peripheral_clock_control.enable(crate::system::Peripheral::I2cExt1),
-        _ => unreachable!(), // will never happen
     }
 }
 

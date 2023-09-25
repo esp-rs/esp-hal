@@ -24,13 +24,7 @@
 //!     io.pins.gpio2.into_floating_input(),
 //! );
 //!
-//! let mut serial1 = Uart::new_with_config(
-//!     peripherals.UART1,
-//!     config,
-//!     Some(pins),
-//!     &clocks,
-//!     &mut system.peripheral_clock_control,
-//! );
+//! let mut serial1 = Uart::new_with_config(peripherals.UART1, config, Some(pins), &clocks);
 //!
 //! timer0.start(250u64.millis());
 //!
@@ -416,12 +410,11 @@ where
         config: Config,
         mut pins: Option<P>,
         clocks: &Clocks,
-        peripheral_clock_control: &mut PeripheralClockControl,
     ) -> Self
     where
         P: UartPins,
     {
-        T::enable_peripheral(peripheral_clock_control);
+        T::enable_peripheral();
         T::disable_rx_interrupts();
         T::disable_tx_interrupts();
 
@@ -448,21 +441,11 @@ where
     }
 
     /// Create a new UART instance with defaults
-    pub fn new(
-        uart: impl Peripheral<P = T> + 'd,
-        clocks: &Clocks,
-        peripheral_clock_control: &mut PeripheralClockControl,
-    ) -> Self {
+    pub fn new(uart: impl Peripheral<P = T> + 'd, clocks: &Clocks) -> Self {
         use crate::gpio::*;
         // not real, just to satify the type
         type Pins<'a> = TxRxPins<'a, GpioPin<Output<PushPull>, 2>, GpioPin<Input<Floating>, 0>>;
-        Self::new_with_config(
-            uart,
-            Default::default(),
-            None::<Pins<'_>>,
-            clocks,
-            peripheral_clock_control,
-        )
+        Self::new_with_config(uart, Default::default(), None::<Pins<'_>>, clocks)
     }
 
     /// Split the Uart into a transmitter and receiver, which is
@@ -957,7 +940,7 @@ pub trait Instance {
     fn rx_signal() -> InputSignal;
     fn cts_signal() -> InputSignal;
     fn rts_signal() -> OutputSignal;
-    fn enable_peripheral(peripheral_clock_control: &mut PeripheralClockControl);
+    fn enable_peripheral();
 }
 
 macro_rules! impl_instance {
@@ -989,8 +972,8 @@ macro_rules! impl_instance {
                 OutputSignal::$rts
             }
 
-            fn enable_peripheral(peripheral_clock_control: &mut PeripheralClockControl) {
-                peripheral_clock_control.enable(crate::system::Peripheral::$peri);
+            fn enable_peripheral() {
+                PeripheralClockControl::enable(crate::system::Peripheral::$peri);
             }
         }
     };

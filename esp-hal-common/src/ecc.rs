@@ -77,13 +77,10 @@ pub enum WorkMode {
 }
 
 impl<'d> Ecc<'d> {
-    pub fn new(
-        ecc: impl Peripheral<P = ECC> + 'd,
-        peripheral_clock_control: &mut PeripheralClockControl,
-    ) -> Self {
+    pub fn new(ecc: impl Peripheral<P = ECC> + 'd) -> Self {
         crate::into_ref!(ecc);
 
-        peripheral_clock_control.enable(PeripheralEnable::Ecc);
+        PeripheralClockControl::enable(PeripheralEnable::Ecc);
 
         Self {
             ecc,

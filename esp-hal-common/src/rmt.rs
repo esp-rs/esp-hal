@@ -206,7 +206,6 @@ impl<'d> Rmt<'d> {
     pub fn new(
         peripheral: impl Peripheral<P = crate::peripherals::RMT> + 'd,
         frequency: HertzU32,
-        peripheral_clock_control: &mut PeripheralClockControl,
         _clocks: &Clocks,
     ) -> Result<Self, Error> {
         let me = Rmt::create(peripheral);
@@ -216,7 +215,7 @@ impl<'d> Rmt<'d> {
             return Err(Error::UnreachableTargetFrequency);
         }
 
-        peripheral_clock_control.enable(crate::system::Peripheral::Rmt);
+        PeripheralClockControl::enable(crate::system::Peripheral::Rmt);
 
         #[cfg(not(any(esp32, esp32s2)))]
         me.configure_clock(frequency, _clocks)?;

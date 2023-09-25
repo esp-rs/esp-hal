@@ -34,7 +34,7 @@
 //!
 //! // setup a pulse couter
 //! println!("setup pulse counter unit 0");
-//! let pcnt = PCNT::new(peripherals.PCNT, &mut system.peripheral_clock_control);
+//! let pcnt = PCNT::new(peripherals.PCNT);
 //! let mut u0 = pcnt.get_unit(unit_number);
 //! u0.configure(unit::Config {
 //!     low_limit: -100,
@@ -147,13 +147,11 @@ pub struct PCNT<'d> {
 
 impl<'d> PCNT<'d> {
     /// Return a new PCNT
-    pub fn new(
-        _instance: impl Peripheral<P = crate::peripherals::PCNT> + 'd,
-        peripheral_clock_control: &mut PeripheralClockControl,
-    ) -> Self {
+    pub fn new(_instance: impl Peripheral<P = crate::peripherals::PCNT> + 'd) -> Self {
         crate::into_ref!(_instance);
         // Enable the PCNT peripherals clock in the system peripheral
-        peripheral_clock_control.enable(crate::system::Peripheral::Pcnt);
+        PeripheralClockControl::enable(crate::system::Peripheral::Pcnt);
+
         PCNT { _instance }
     }
 

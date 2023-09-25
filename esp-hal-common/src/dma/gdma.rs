@@ -16,7 +16,7 @@
 //!
 //! GDMA peripheral can be initializes using the `new` function, which requires
 //! a DMA peripheral instance and a clock control reference. ```no_run
-//! let dma = Gdma::new(peripherals.DMA, &mut system.peripheral_clock_control);
+//! let dma = Gdma::new(peripherals.DMA);
 //! ```
 //! 
 //! <em>PS: Note that the number of DMA channels is chip-specific.</em>
@@ -643,11 +643,10 @@ impl<'d> Gdma<'d> {
     /// Create a DMA instance.
     pub fn new(
         dma: impl crate::peripheral::Peripheral<P = crate::peripherals::DMA> + 'd,
-        peripheral_clock_control: &mut PeripheralClockControl,
     ) -> Gdma<'d> {
         crate::into_ref!(dma);
 
-        peripheral_clock_control.enable(Peripheral::Gdma);
+        PeripheralClockControl::enable(Peripheral::Gdma);
         dma.misc_conf.modify(|_, w| w.ahbm_rst_inter().set_bit());
         dma.misc_conf.modify(|_, w| w.ahbm_rst_inter().clear_bit());
         dma.misc_conf.modify(|_, w| w.clk_en().set_bit());

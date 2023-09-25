@@ -711,11 +711,8 @@ pub struct Dma<'d> {
 
 impl<'d> Dma<'d> {
     /// Create a DMA instance.
-    pub fn new(
-        dma: impl crate::peripheral::Peripheral<P = crate::system::Dma> + 'd,
-        peripheral_clock_control: &mut PeripheralClockControl,
-    ) -> Dma<'d> {
-        peripheral_clock_control.enable(Peripheral::Dma);
+    pub fn new(dma: impl crate::peripheral::Peripheral<P = crate::system::Dma> + 'd) -> Dma<'d> {
+        PeripheralClockControl::enable(Peripheral::Dma);
 
         Dma {
             _inner: dma.into_ref(),
