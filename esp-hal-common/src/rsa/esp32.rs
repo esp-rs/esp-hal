@@ -139,6 +139,20 @@ where
         Ok(())
     }
 
+    #[cfg(feature = "async")]
+    pub async fn start_step2_async(&mut self, operand_b: &T::InputType) {
+        loop {
+            if self.rsa.is_idle() {
+                self.rsa.clear_interrupt();
+                unsafe {
+                    self.rsa.write_operand_a(operand_b);
+                }
+                self.set_start();
+                break;
+            }
+        }
+    }
+
     fn set_start(&mut self) {
         self.rsa.write_multi_start();
     }

@@ -155,7 +155,7 @@ pub(crate) mod asynch {
     }
 
     impl<'d> RsaFuture<'d> {
-        pub fn new(instance: &'d crate::peripherals::RSA) -> Self {
+        pub async fn new(instance: &'d crate::peripherals::RSA) -> Self {
             #[cfg(not(any(esp32, esp32s2, esp32s3)))]
             instance.int_ena.modify(|_, w| w.int_ena().set_bit());
 
@@ -264,6 +264,19 @@ where
     }
 
     #[cfg(feature = "async")]
+    pub async fn read_async(&mut self, outbuf: &mut T::InputType) {
+        loop {
+            if self.rsa.is_idle() {
+                unsafe {
+                    self.rsa.read_out(outbuf);
+                }
+                self.rsa.clear_interrupt();
+                break;
+            }
+        }
+    }
+
+    #[cfg(feature = "async")]
     pub async fn async_exponentiation(
         &mut self,
         base: &T::InputType,
@@ -272,7 +285,7 @@ where
     ) {
         self.start_exponentiation(&base, &r);
         asynch::RsaFuture::new(&self.rsa.rsa).await;
-        nb::block!(self.read_results(outbuf)).unwrap();
+        self.read_async(outbuf).await;
     }
 }
 
@@ -304,6 +317,19 @@ where
     }
 
     #[cfg(feature = "async")]
+    pub async fn read_async(&mut self, outbuf: &mut T::InputType) {
+        loop {
+            if self.rsa.is_idle() {
+                unsafe {
+                    self.rsa.read_out(outbuf);
+                }
+                self.rsa.clear_interrupt();
+                break;
+            }
+        }
+    }
+
+    #[cfg(feature = "async")]
     #[cfg(not(esp32))]
     pub async fn async_modular_multiplication(
         &mut self,
@@ -311,10 +337,8 @@ where
         outbuf: &mut T::InputType,
     ) {
         self.start_modular_multiplication(r);
-
         asynch::RsaFuture::new(&self.rsa.rsa).await;
-
-        nb::block!(self.read_results(outbuf)).unwrap();
+        self.read_async(outbuf).await;
     }
 
     #[cfg(feature = "async")]
@@ -327,9 +351,9 @@ where
         outbuf: &mut T::InputType,
     ) {
         self.start_step1(operand_a, r);
-        nb::block!(self.start_step2(operand_b)).unwrap();
+        self.start_step2_async(operand_b).await;
         asynch::RsaFuture::new(&self.rsa.rsa).await;
-        nb::block!(self.read_results(outbuf)).unwrap();
+        self.read_async(outbuf).await;
     }
 }
 
@@ -368,6 +392,22 @@ where
     }
 
     #[cfg(feature = "async")]
+    pub async fn read_async<'b, const O: usize>(&mut self, outbuf: &mut T::OutputType)
+    where
+        T: Multi<OutputType = [u8; O]>,
+    {
+        loop {
+            if self.rsa.is_idle() {
+                unsafe {
+                    self.rsa.read_out(outbuf);
+                }
+                self.rsa.clear_interrupt();
+                break;
+            }
+        }
+    }
+
+    #[cfg(feature = "async")]
     #[cfg(not(esp32))]
     pub async fn async_multiplication<'b, const O: usize>(
         &mut self,
@@ -377,10 +417,8 @@ where
         T: Multi<OutputType = [u8; O]>,
     {
         self.start_multiplication(operand_b);
-
         asynch::RsaFuture::new(&self.rsa.rsa).await;
-
-        nb::block!(self.read_results(outbuf)).unwrap();
+        self.read_async(outbuf).await;
     }
 
     #[cfg(feature = "async")]
@@ -394,9 +432,7 @@ where
         T: Multi<OutputType = [u8; O]>,
     {
         self.start_multiplication(operand_a, operand_b);
-
         asynch::RsaFuture::new(&self.rsa.rsa).await;
-
-        nb::block!(self.read_results(outbuf)).unwrap();
+        self.read_async(outbuf).await;
     }
 }
