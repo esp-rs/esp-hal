@@ -29,6 +29,7 @@ embassy-sync = { workspace = true, optional = true }
 embassy-futures = { workspace = true, optional = true }
 embassy-net-driver = { workspace = true, optional = true }
 toml-cfg.workspace = true
+libm.workspace = true
 
 [features]
 default = [ "utils", "log" ]
