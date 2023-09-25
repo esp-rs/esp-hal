@@ -100,6 +100,10 @@ jobs:
           cargo check --example=embassy_spi --features=embassy,embassy-time-timg0,async,embassy-executor-thread
           cargo check --example=embassy_serial --features=embassy,embassy-time-timg0,async,embassy-executor-thread
           cargo check --example=embassy_i2c --features=embassy,embassy-time-timg0,async,embassy-executor-thread
+          cargo check --example=embassy_i2s_read --features=embassy,embassy-time-timg0,async,embassy-executor-thread
+          cargo check --example=embassy_i2s_sound --features=embassy,embassy-time-timg0,async,embassy-executor-thread
+          cargo check --example=embassy_rmt_rx --features=embassy,embassy-time-timg0,async,embassy-executor-thread --release
+          cargo check --example=embassy_rmt_tx --features=embassy,embassy-time-timg0,async,embassy-executor-thread
       - name: check esp32-hal (embassy, log/defmt)
         run: |
           cd esp32-hal/
@@ -382,6 +386,10 @@ jobs:
           cargo check --example=embassy_spi --features=embassy,embassy-time-timg0,async,embassy-executor-thread
           cargo check --example=embassy_serial --features=embassy,embassy-time-timg0,async,embassy-executor-thread
           cargo check --example=embassy_i2c --features=embassy,embassy-time-timg0,async,embassy-executor-thread
+          cargo check --example=embassy_i2s_read --features=embassy,embassy-time-timg0,async,embassy-executor-thread
+          cargo check --example=embassy_i2s_sound --features=embassy,embassy-time-timg0,async,embassy-executor-thread
+          cargo check --example=embassy_rmt_rx --features=embassy,embassy-time-timg0,async,embassy-executor-thread --release
+          cargo check --example=embassy_rmt_tx --features=embassy,embassy-time-timg0,async,embassy-executor-thread
       - name: check esp32s2-hal (embassy, log/defmt)
         run: |
           cd esp32s2-hal/
@@ -439,6 +447,10 @@ jobs:
           cargo check --example=embassy_spi --features=embassy,embassy-time-timg0,async,embassy-executor-thread
           cargo check --example=embassy_serial --features=embassy,embassy-time-timg0,async,embassy-executor-thread
           cargo check --example=embassy_i2c --features=embassy,embassy-time-timg0,async,embassy-executor-thread
+          cargo check --example=embassy_i2s_read --features=embassy,embassy-time-timg0,async,embassy-executor-thread
+          cargo check --example=embassy_i2s_sound --features=embassy,embassy-time-timg0,async,embassy-executor-thread
+          cargo check --example=embassy_rmt_rx --features=embassy,embassy-time-timg0,async,embassy-executor-thread
+          cargo check --example=embassy_rmt_tx --features=embassy,embassy-time-timg0,async,embassy-executor-thread
       - name: check esp32s3-hal (embassy, systick, async)
         run: |
           cd esp32s3-hal/
