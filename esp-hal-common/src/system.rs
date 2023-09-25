@@ -108,6 +108,8 @@ pub enum Peripheral {
     Hmac,
     #[cfg(ecc)]
     Ecc,
+    #[cfg(soc_etm)]
+    Etm,
 }
 
 pub struct SoftwareInterruptControl {
@@ -552,6 +554,11 @@ impl PeripheralClockControl {
             Peripheral::Ecc => {
                 system.ecc_conf.modify(|_, w| w.ecc_clk_en().set_bit());
                 system.ecc_conf.modify(|_, w| w.ecc_rst_en().clear_bit());
+            }
+            #[cfg(soc_etm)]
+            Peripheral::Etm => {
+                system.etm_conf.modify(|_, w| w.etm_clk_en().set_bit());
+                system.etm_conf.modify(|_, w| w.etm_rst_en().clear_bit());
             }
         }
     }
