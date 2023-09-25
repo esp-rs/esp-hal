@@ -43,7 +43,7 @@ impl EmbassyTimer {
 
     fn on_interrupt(&self, id: usize) {
         critical_section::with(|cs| {
-            self.clear_interrupt(id);
+            self.interrupt_clear(id);
             self.trigger_alarm(id, cs);
         })
     }
@@ -96,11 +96,11 @@ impl EmbassyTimer {
         })
     }
 
-    fn clear_interrupt(&self, id: usize) {
+    fn interrupt_clear(&self, id: usize) {
         match id {
-            0 => self.alarm0.clear_interrupt(),
-            1 => self.alarm1.clear_interrupt(),
-            2 => self.alarm2.clear_interrupt(),
+            0 => self.alarm0.interrupt_clear(),
+            1 => self.alarm1.interrupt_clear(),
+            2 => self.alarm2.interrupt_clear(),
             _ => {}
         }
     }
@@ -109,15 +109,15 @@ impl EmbassyTimer {
         match id {
             0 => {
                 self.alarm0.set_target(timestamp);
-                self.alarm0.interrupt_enable(true);
+                self.alarm0.enable_interrupt(true);
             }
             1 => {
                 self.alarm1.set_target(timestamp);
-                self.alarm1.interrupt_enable(true);
+                self.alarm1.enable_interrupt(true);
             }
             2 => {
                 self.alarm2.set_target(timestamp);
-                self.alarm2.interrupt_enable(true);
+                self.alarm2.enable_interrupt(true);
             }
             _ => {}
         }

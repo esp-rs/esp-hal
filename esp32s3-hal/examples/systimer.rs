@@ -34,16 +34,16 @@ fn main() -> ! {
     println!("SYSTIMER Current value = {}", SystemTimer::now());
 
     let alarm0 = syst.alarm0.into_periodic();
-    alarm0.set_period(1u32.Hz());
-    alarm0.interrupt_enable(true);
+    alarm0.set_period(1u32.secs());
+    alarm0.enable_interrupt(true);
 
     let alarm1 = syst.alarm1;
     alarm1.set_target(SystemTimer::now() + (SystemTimer::TICKS_PER_SECOND * 2));
-    alarm1.interrupt_enable(true);
+    alarm1.enable_interrupt(true);
 
     let alarm2 = syst.alarm2;
     alarm2.set_target(SystemTimer::now() + (SystemTimer::TICKS_PER_SECOND * 3));
-    alarm2.interrupt_enable(true);
+    alarm2.enable_interrupt(true);
 
     critical_section::with(|cs| {
         ALARM0.borrow_ref_mut(cs).replace(alarm0);
@@ -84,7 +84,7 @@ fn SYSTIMER_TARGET0() {
             .borrow_ref_mut(cs)
             .as_mut()
             .unwrap()
-            .clear_interrupt()
+            .interrupt_clear()
     });
 }
 
@@ -96,7 +96,7 @@ fn SYSTIMER_TARGET1() {
             .borrow_ref_mut(cs)
             .as_mut()
             .unwrap()
-            .clear_interrupt()
+            .interrupt_clear()
     });
 }
 
@@ -108,6 +108,6 @@ fn SYSTIMER_TARGET2() {
             .borrow_ref_mut(cs)
             .as_mut()
             .unwrap()
-            .clear_interrupt()
+            .interrupt_clear()
     });
 }
