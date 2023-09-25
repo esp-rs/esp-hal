@@ -22,13 +22,10 @@ static DA: Mutex<RefCell<Option<DebugAssist>>> = Mutex::new(RefCell::new(None));
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let mut system = peripherals.SYSTEM.split();
+    let system = peripherals.SYSTEM.split();
     let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let mut da = DebugAssist::new(
-        peripherals.ASSIST_DEBUG,
-        &mut system.peripheral_clock_control,
-    );
+    let mut da = DebugAssist::new(peripherals.ASSIST_DEBUG);
 
     da.enable_sp_monitor(0x3fccee00, 0x3fcd0000);
 

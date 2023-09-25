@@ -28,12 +28,12 @@ use esp_println::println;
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let mut system = peripherals.DPORT.split();
+    let system = peripherals.DPORT.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let dma = Dma::new(system.dma, &mut system.peripheral_clock_control);
+    let dma = Dma::new(system.dma);
     let dma_channel = dma.i2s0channel;
 
     let mut tx_descriptors = [0u32; 8 * 3];
@@ -51,7 +51,6 @@ fn main() -> ! {
             &mut rx_descriptors,
             DmaPriority::Priority0,
         ),
-        &mut system.peripheral_clock_control,
         &clocks,
     );
 

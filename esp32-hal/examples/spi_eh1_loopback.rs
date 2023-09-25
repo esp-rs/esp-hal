@@ -31,7 +31,7 @@ use esp_println::{print, println};
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let mut system = peripherals.DPORT.split();
+    let system = peripherals.DPORT.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
@@ -48,7 +48,6 @@ fn main() -> ! {
         cs,
         1000u32.kHz(),
         SpiMode::Mode0,
-        &mut system.peripheral_clock_control,
         &clocks,
     );
 

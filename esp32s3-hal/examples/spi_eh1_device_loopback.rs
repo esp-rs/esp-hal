@@ -48,7 +48,6 @@ fn main() -> ! {
         miso,
         1000u32.kHz(),
         SpiMode::Mode0,
-        &mut system.peripheral_clock_control,
         &clocks,
     ));
     let mut spi_device_1 = spi_controller.add_device(io.pins.gpio4);

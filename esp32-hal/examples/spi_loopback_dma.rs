@@ -32,7 +32,7 @@ use esp_println::println;
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let mut system = peripherals.DPORT.split();
+    let system = peripherals.DPORT.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
@@ -41,7 +41,7 @@ fn main() -> ! {
     let mosi = io.pins.gpio23;
     let cs = io.pins.gpio22;
 
-    let dma = Dma::new(system.dma, &mut system.peripheral_clock_control);
+    let dma = Dma::new(system.dma);
     let dma_channel = dma.spi2channel;
 
     let mut descriptors = [0u32; 8 * 3];
@@ -55,7 +55,6 @@ fn main() -> ! {
         cs,
         100u32.kHz(),
         SpiMode::Mode0,
-        &mut system.peripheral_clock_control,
         &clocks,
     )
     .with_dma(dma_channel.configure(

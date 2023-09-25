@@ -33,7 +33,7 @@ use esp_println::println;
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let mut system = peripherals.PCR.split();
+    let system = peripherals.PCR.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
@@ -41,7 +41,7 @@ fn main() -> ! {
     let mut tx_descriptors = [0u32; 8 * 3];
     let mut rx_descriptors = [0u32; 8 * 3];
 
-    let dma = Gdma::new(peripherals.DMA, &mut system.peripheral_clock_control);
+    let dma = Gdma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
 
     let tx_pins = TxFourBits::new(io.pins.gpio1, io.pins.gpio2, io.pins.gpio3, io.pins.gpio4);
@@ -57,7 +57,6 @@ fn main() -> ! {
             DmaPriority::Priority0,
         ),
         1u32.MHz(),
-        &mut system.peripheral_clock_control,
         &clocks,
     )
     .unwrap();

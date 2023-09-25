@@ -19,16 +19,12 @@ use sha2::{Digest, Sha512};
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let mut system = peripherals.SYSTEM.split();
+    let system = peripherals.SYSTEM.split();
     let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let source_data = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".as_bytes();
     let mut remaining = source_data.clone();
-    let mut hasher = Sha::new(
-        peripherals.SHA,
-        ShaMode::SHA512,
-        &mut system.peripheral_clock_control,
-    );
+    let mut hasher = Sha::new(peripherals.SHA, ShaMode::SHA512);
 
     // Short hashes can be created by decreasing the output buffer to the desired
     // length

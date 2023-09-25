@@ -32,14 +32,10 @@ static mut SOME_ZEROED_DATA: [u8; 8] = [0; 8];
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let mut system = peripherals.SYSTEM.split();
+    let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timer_group0 = TimerGroup::new(
-        peripherals.TIMG0,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
+    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let mut timer0 = timer_group0.timer0;
 
     // The RWDT flash boot protection must be enabled, as it is triggered as part of

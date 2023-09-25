@@ -19,10 +19,10 @@ use esp_println::println;
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let mut system = peripherals.SYSTEM.split();
+    let system = peripherals.SYSTEM.split();
     let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let mut aes = Aes::new(peripherals.AES, &mut system.peripheral_clock_control);
+    let mut aes = Aes::new(peripherals.AES);
 
     let keytext = "SUp4SeCp@sSw0rd".as_bytes();
     let plaintext = "message".as_bytes();

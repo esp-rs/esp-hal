@@ -24,22 +24,14 @@ use esp_println::println;
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let mut system = peripherals.PCR.split();
+    let system = peripherals.PCR.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     // Disable the watchdog timers.
     let mut rtc = Rtc::new(peripherals.LP_CLKRST);
-    let timer_group0 = TimerGroup::new(
-        peripherals.TIMG0,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
+    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let mut wdt0 = timer_group0.wdt;
-    let timer_group1 = TimerGroup::new(
-        peripherals.TIMG1,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
+    let timer_group1 = TimerGroup::new(peripherals.TIMG1, &clocks);
     let mut wdt1 = timer_group1.wdt;
 
     rtc.swd.disable();
@@ -52,7 +44,7 @@ fn main() -> ! {
     let mut tx_descriptors = [0u32; 8 * 3];
     let mut rx_descriptors = [0u32; 8 * 3];
 
-    let dma = Gdma::new(peripherals.DMA, &mut system.peripheral_clock_control);
+    let dma = Gdma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
 
     let rx_pins = RxFourBits::new(io.pins.gpio1, io.pins.gpio2, io.pins.gpio3, io.pins.gpio4);
@@ -66,7 +58,6 @@ fn main() -> ! {
             DmaPriority::Priority0,
         ),
         1u32.MHz(),
-        &mut system.peripheral_clock_control,
         &clocks,
     )
     .unwrap();

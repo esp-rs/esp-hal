@@ -65,7 +65,7 @@ async fn reader(mut rx: UartRx<'static, UART0>) {
 fn main() -> ! {
     esp_println::println!("Init!");
     let peripherals = Peripherals::take();
-    let mut system = peripherals.SYSTEM.split();
+    let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     #[cfg(feature = "embassy-time-systick")]
@@ -77,19 +77,10 @@ fn main() -> ! {
     #[cfg(feature = "embassy-time-timg0")]
     embassy::init(
         &clocks,
-        esp32c3_hal::timer::TimerGroup::new(
-            peripherals.TIMG0,
-            &clocks,
-            &mut system.peripheral_clock_control,
-        )
-        .timer0,
+        esp32c3_hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks).timer0,
     );
 
-    let mut uart0 = Uart::new(
-        peripherals.UART0,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
+    let mut uart0 = Uart::new(peripherals.UART0, &clocks);
     uart0.set_at_cmd(AtCmdConfig::new(None, None, None, AT_CMD, None));
     uart0
         .set_rx_fifo_full_threshold(READ_BUF_SIZE as u16)

@@ -34,7 +34,7 @@ async fn ping(mut pin: Gpio9<Input<PullDown>>) {
 fn main() -> ! {
     esp_println::println!("Init!");
     let peripherals = Peripherals::take();
-    let mut system = peripherals.PCR.split();
+    let system = peripherals.PCR.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     #[cfg(feature = "embassy-time-systick")]
@@ -45,11 +45,7 @@ fn main() -> ! {
 
     #[cfg(feature = "embassy-time-timg0")]
     {
-        let timer_group0 = esp32c6_hal::timer::TimerGroup::new(
-            peripherals.TIMG0,
-            &clocks,
-            &mut system.peripheral_clock_control,
-        );
+        let timer_group0 = esp32c6_hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks);
         embassy::init(&clocks, timer_group0.timer0);
     }
 

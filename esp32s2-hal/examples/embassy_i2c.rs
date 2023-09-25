@@ -44,16 +44,12 @@ async fn run(i2c: I2C<'static, I2C0>) {
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let mut system = peripherals.SYSTEM.split();
+    let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     #[cfg(feature = "embassy-time-timg0")]
     {
-        let timer_group0 = esp32s2_hal::timer::TimerGroup::new(
-            peripherals.TIMG0,
-            &clocks,
-            &mut system.peripheral_clock_control,
-        );
+        let timer_group0 = esp32s2_hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks);
         embassy::init(&clocks, timer_group0.timer0);
     }
 
@@ -64,7 +60,6 @@ fn main() -> ! {
         io.pins.gpio1,
         io.pins.gpio2,
         400u32.kHz(),
-        &mut system.peripheral_clock_control,
         &clocks,
     );
 

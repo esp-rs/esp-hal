@@ -29,7 +29,7 @@ use nb::block;
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let mut system = peripherals.DPORT.split();
+    let system = peripherals.DPORT.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let config = Config {
@@ -45,13 +45,7 @@ fn main() -> ! {
         io.pins.gpio17.into_floating_input(),
     );
 
-    let mut serial1 = Uart::new_with_config(
-        peripherals.UART1,
-        config,
-        Some(pins),
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
+    let mut serial1 = Uart::new_with_config(peripherals.UART1, config, Some(pins), &clocks);
 
     let mut delay = Delay::new(&clocks);
 

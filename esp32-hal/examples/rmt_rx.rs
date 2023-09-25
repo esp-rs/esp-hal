@@ -21,12 +21,11 @@ fn main() -> ! {
     let peripherals = Peripherals::take();
     let system = peripherals.DPORT.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-    let mut clock_control = system.peripheral_clock_control;
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let mut out = io.pins.gpio15.into_push_pull_output();
 
-    let rmt = Rmt::new(peripherals.RMT, 80u32.MHz(), &mut clock_control, &clocks).unwrap();
+    let rmt = Rmt::new(peripherals.RMT, 80u32.MHz(), &clocks).unwrap();
 
     let mut channel = rmt
         .channel0

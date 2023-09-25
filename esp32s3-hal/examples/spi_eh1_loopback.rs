@@ -48,7 +48,6 @@ fn main() -> ! {
         cs,
         1000u32.kHz(),
         SpiMode::Mode0,
-        &mut system.peripheral_clock_control,
         &clocks,
     );
 

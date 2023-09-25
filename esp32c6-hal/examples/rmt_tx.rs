@@ -19,12 +19,11 @@ use esp_backtrace as _;
 fn main() -> ! {
     let peripherals = Peripherals::take();
     let system = peripherals.PCR.split();
-    let mut clock_control = system.peripheral_clock_control;
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let rmt = Rmt::new(peripherals.RMT, 8u32.MHz(), &mut clock_control, &clocks).unwrap();
+    let rmt = Rmt::new(peripherals.RMT, 8u32.MHz(), &clocks).unwrap();
 
     let mut channel = rmt
         .channel0
