@@ -1940,15 +1940,39 @@ pub mod etm {
 
 #[cfg(lp_io)]
 pub mod lp_gpio {
+    //! Low Power IO (LP_IO)
+    //!
+    //! # Overview
+    //!
+    //! The hardware provides a couple of GPIO pins with low power (LP)
+    //! capabilities and analog functions. These pins can be controlled by
+    //! either IO MUX or LP IO MUX.
+    //!
+    //! If controlled by LP IO MUX, these pins will bypass IO MUX and GPIO
+    //! matrix for the use by ULP and peripherals in LP system.
+    //!
+    //! When configured as LP GPIOs, the pins can still be controlled by ULP or
+    //! the peripherals in LP system during chip Deep-sleep, and wake up the
+    //! chip from Deep-sleep.
+    //!
+    //! # Example
+    //! ```no_run
+    //! let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    //! // configure GPIO 1 as LP output pin
+    //! let lp_pin = io.pins.gpio1.into_low_power().into_push_pull_output();
+    //! ```
+
     use core::marker::PhantomData;
 
     use super::{Floating, Input, Output, PullDown, PullUp, PushPull, Unknown};
 
+    /// A GPIO pin configured for low power operation
     pub struct LowPowerPin<MODE, const PIN: u8> {
         pub(crate) private: PhantomData<MODE>,
     }
 
     impl<MODE, const PIN: u8> LowPowerPin<MODE, PIN> {
+        #[doc(hidden)]
         pub fn output_enable(&self, enable: bool) {
             let lp_io = unsafe { &*crate::peripherals::LP_IO::PTR };
             if enable {
@@ -1974,6 +1998,7 @@ pub mod lp_gpio {
             get_pin_reg(PIN).modify(|_, w| w.lp_gpio0_fun_wpd().bit(enable));
         }
 
+        #[doc(hidden)]
         pub fn set_level(&mut self, level: bool) {
             let lp_io = unsafe { &*crate::peripherals::LP_IO::PTR };
             if level {
@@ -1987,11 +2012,14 @@ pub mod lp_gpio {
             }
         }
 
+        #[doc(hidden)]
         pub fn get_level(&self) -> bool {
             let lp_io = unsafe { &*crate::peripherals::LP_IO::PTR };
             (lp_io.in_.read().lp_gpio_in_data_next().bits() & 1 << PIN) != 0
         }
 
+        /// Configures the pin as an input with the internal pull-up resistor
+        /// enabled.
         pub fn into_pull_up_input(self) -> LowPowerPin<Input<PullUp>, PIN> {
             self.input_enable(true);
             self.pullup_enable(true);
@@ -2001,6 +2029,8 @@ pub mod lp_gpio {
             }
         }
 
+        /// Configures the pin as an input with the internal pull-down resistor
+        /// enabled.
         pub fn into_pull_down_input(self) -> LowPowerPin<Input<PullDown>, PIN> {
             self.input_enable(true);
             self.pullup_enable(false);
@@ -2010,6 +2040,7 @@ pub mod lp_gpio {
             }
         }
 
+        /// Configures the pin as a floating input pin.
         pub fn into_floating_input(self) -> LowPowerPin<Input<Floating>, PIN> {
             self.input_enable(true);
             self.pullup_enable(false);
@@ -2019,6 +2050,7 @@ pub mod lp_gpio {
             }
         }
 
+        /// Configures the pin as an output pin.
         pub fn into_push_pull_output(self) -> LowPowerPin<Output<PushPull>, PIN> {
             self.output_enable(true);
             LowPowerPin {
@@ -2046,6 +2078,7 @@ pub mod lp_gpio {
         unsafe { core::mem::transmute((lp_io.gpio0.as_ptr()).add(pin as usize)) }
     }
 
+    /// Configures a pin for use as a low power pin
     pub trait IntoLowPowerPin<const PIN: u8> {
         fn into_low_power(self) -> LowPowerPin<Unknown, { PIN }>;
     }
