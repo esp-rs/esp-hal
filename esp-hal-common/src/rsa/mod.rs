@@ -264,7 +264,7 @@ where
     }
 
     #[cfg(feature = "async")]
-    pub async fn read_async(&mut self, outbuf: &mut T::InputType) {
+    pub async fn read(&mut self, outbuf: &mut T::InputType) {
         loop {
             if self.rsa.is_idle() {
                 unsafe {
@@ -277,7 +277,7 @@ where
     }
 
     #[cfg(feature = "async")]
-    pub async fn async_exponentiation(
+    pub async fn exponentiation(
         &mut self,
         base: &T::InputType,
         r: &T::InputType,
@@ -285,7 +285,7 @@ where
     ) {
         self.start_exponentiation(&base, &r);
         asynch::RsaFuture::new(&self.rsa.rsa).await;
-        self.read_async(outbuf).await;
+        self.read(outbuf).await;
     }
 }
 
@@ -317,7 +317,7 @@ where
     }
 
     #[cfg(feature = "async")]
-    pub async fn read_async(&mut self, outbuf: &mut T::InputType) {
+    pub async fn read(&mut self, outbuf: &mut T::InputType) {
         loop {
             if self.rsa.is_idle() {
                 unsafe {
@@ -331,19 +331,15 @@ where
 
     #[cfg(feature = "async")]
     #[cfg(not(esp32))]
-    pub async fn async_modular_multiplication(
-        &mut self,
-        r: &T::InputType,
-        outbuf: &mut T::InputType,
-    ) {
+    pub async fn modular_multiplication(&mut self, r: &T::InputType, outbuf: &mut T::InputType) {
         self.start_modular_multiplication(r);
         asynch::RsaFuture::new(&self.rsa.rsa).await;
-        self.read_async(outbuf).await;
+        self.read(outbuf).await;
     }
 
     #[cfg(feature = "async")]
     #[cfg(esp32)]
-    pub async fn async_modular_multiplication(
+    pub async fn modular_multiplication(
         &mut self,
         operand_a: &T::InputType,
         operand_b: &T::InputType,
@@ -351,9 +347,9 @@ where
         outbuf: &mut T::InputType,
     ) {
         self.start_step1(operand_a, r);
-        self.start_step2_async(operand_b).await;
+        self.start_step2(operand_b);
         asynch::RsaFuture::new(&self.rsa.rsa).await;
-        self.read_async(outbuf).await;
+        self.read(outbuf).await;
     }
 }
 
@@ -392,7 +388,7 @@ where
     }
 
     #[cfg(feature = "async")]
-    pub async fn read_async<'b, const O: usize>(&mut self, outbuf: &mut T::OutputType)
+    pub async fn read<'b, const O: usize>(&mut self, outbuf: &mut T::OutputType)
     where
         T: Multi<OutputType = [u8; O]>,
     {
@@ -409,7 +405,7 @@ where
 
     #[cfg(feature = "async")]
     #[cfg(not(esp32))]
-    pub async fn async_multiplication<'b, const O: usize>(
+    pub async fn multiplication<'b, const O: usize>(
         &mut self,
         operand_b: &T::InputType,
         outbuf: &mut T::OutputType,
@@ -418,12 +414,12 @@ where
     {
         self.start_multiplication(operand_b);
         asynch::RsaFuture::new(&self.rsa.rsa).await;
-        self.read_async(outbuf).await;
+        self.read(outbuf).await;
     }
 
     #[cfg(feature = "async")]
     #[cfg(esp32)]
-    pub async fn async_multiplication<'b, const O: usize>(
+    pub async fn multiplication<'b, const O: usize>(
         &mut self,
         operand_a: &T::InputType,
         operand_b: &T::InputType,
@@ -433,6 +429,6 @@ where
     {
         self.start_multiplication(operand_a, operand_b);
         asynch::RsaFuture::new(&self.rsa.rsa).await;
-        self.read_async(outbuf).await;
+        self.read(outbuf).await;
     }
 }
