@@ -27,6 +27,31 @@
 //!
 //! let mut rsa = Rsa::new(peripherals.RSA);
 //! ```
+//!  
+//! ### Async (modular exponentiation)
+//! ```no_run
+//! #[embassy_executor::task]
+//! async fn mod_exp_example(mut rsa: Rsa<'static>) {
+//!     let mut outbuf = [0_u8; U512::BYTES];
+//!     let mut mod_exp = RsaModularExponentiation::<operand_sizes::Op512>::new(
+//!         &mut rsa,
+//!         &BIGNUM_2.to_le_bytes(),
+//!         &BIGNUM_3.to_le_bytes(),
+//!         compute_mprime(&BIGNUM_3),
+//!     );
+//!     let r = compute_r(&BIGNUM_3).to_le_bytes();
+//!     let base = &BIGNUM_1.to_le_bytes();
+//!     mod_exp.exponentiation(&base, &r, &mut outbuf).await;
+//!     let residue_params = DynResidueParams::new(&BIGNUM_3);
+//!     let residue = DynResidue::new(&BIGNUM_1, residue_params);
+//!     let sw_out = residue.pow(&BIGNUM_2);
+//!     assert_eq!(U512::from_le_bytes(outbuf), sw_out.retrieve());
+//!     println!("modular exponentiation done");
+//! }
+//! ```
+
+//! This peripheral supports `async` on every available chip except of `esp32`
+//! (to be solved).
 //!
 //! ⚠️: The examples for RSA peripheral are quite extensive, so for a more
 //! detailed study of how to use this driver please visit [the repository

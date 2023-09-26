@@ -78,7 +78,7 @@ fn mod_multi_example(rsa: &mut Rsa) {
     let r = compute_r(&BIGNUM_3).to_le_bytes();
     let pre_hw_modmul = xtensa_lx::timer::get_cycle_count();
     mod_multi.start_step1(&BIGNUM_1.to_le_bytes(), &r);
-    block!(mod_multi.start_step2(&BIGNUM_2.to_le_bytes())).unwrap();
+    mod_multi.start_step2(&BIGNUM_2.to_le_bytes());
     block!(mod_multi.read_results(&mut outbuf)).unwrap();
     let post_hw_modmul = xtensa_lx::timer::get_cycle_count();
     println!(
