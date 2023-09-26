@@ -36,6 +36,7 @@ crate::peripherals! {
     ECC => true,
     EFUSE => true,
     GPIO => true,
+    GPIO_SD => true,
     HMAC => true,
     HP_APM => true,
     HP_SYS => true,

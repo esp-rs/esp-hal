@@ -12,6 +12,7 @@ peripherals = [
     "ecc",
     "efuse",
     "gpio",
+    "gpio_sd",
     "hmac",
     "hp_apm",
     "hp_sys",
