@@ -202,7 +202,7 @@ impl PeripheralClockControl {
         #[cfg(any(esp32c2, esp32c3, esp32s2, esp32s3))]
         let (perip_clk_en1, perip_rst_en1) = { (&system.perip_clk_en1, &system.perip_rst_en1) };
 
-        match peripheral {
+        critical_section::with(|_cs| match peripheral {
             #[cfg(spi2)]
             Peripheral::Spi2 => {
                 perip_clk_en0.modify(|_, w| w.spi2_clk_en().set_bit());
@@ -385,7 +385,7 @@ impl PeripheralClockControl {
                 perip_clk_en1.modify(|_, w| w.crypto_ecc_clk_en().set_bit());
                 perip_rst_en1.modify(|_, w| w.crypto_ecc_rst().clear_bit());
             }
-        }
+        });
     }
 }
 
