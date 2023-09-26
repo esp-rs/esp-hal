@@ -556,11 +556,10 @@ where
     ADCI: RegisterAccess + 'd,
 {
     pub fn adc(
-        peripheral_clock_controller: &mut PeripheralClockControl,
         adc_instance: impl crate::peripheral::Peripheral<P = ADCI> + 'd,
         config: AdcConfig<ADCI>,
     ) -> Result<Self, ()> {
-        peripheral_clock_controller.enable(Peripheral::ApbSarAdc);
+        PeripheralClockControl::enable(Peripheral::ApbSarAdc);
 
         let sar_adc = unsafe { &*APB_SARADC::PTR };
         sar_adc.ctrl.modify(|_, w| unsafe {
@@ -718,12 +717,7 @@ mod implementation {
     //!
     //! let mut pin = adc1_config.enable_pin(io.pins.gpio2.into_analog(), Attenuation::Attenuation11dB);
     //!
-    //! let mut adc1 = ADC::<ADC1>::adc(
-    //!     &mut system.peripheral_clock_control,
-    //!     analog.adc1,
-    //!     adc1_config,
-    //! )
-    //! .unwrap();
+    //! let mut adc1 = ADC::<ADC1>::adc(analog.adc1, adc1_config).unwrap();
     //!
     //! let mut delay = Delay::new(&clocks);
     //!
@@ -770,12 +764,7 @@ mod implementation {
     //!
     //! let mut pin = adc1_config.enable_pin(io.pins.gpio2.into_analog(), Attenuation::Attenuation11dB);
     //!
-    //! let mut adc1 = ADC::<ADC1>::adc(
-    //!     &mut system.peripheral_clock_control,
-    //!     analog.adc1,
-    //!     adc1_config,
-    //! )
-    //! .unwrap();
+    //! let mut adc1 = ADC::<ADC1>::adc(analog.adc1, adc1_config).unwrap();
     //!
     //! let mut delay = Delay::new(&clocks);
     //!
@@ -827,12 +816,7 @@ mod implementation {
     //!
     //! let mut pin = adc1_config.enable_pin(io.pins.gpio2.into_analog(), Attenuation::Attenuation11dB);
     //!
-    //! let mut adc1 = ADC::<ADC1>::adc(
-    //!     &mut system.peripheral_clock_control,
-    //!     analog.adc1,
-    //!     adc1_config,
-    //! )
-    //! .unwrap();
+    //! let mut adc1 = ADC::<ADC1>::adc(analog.adc1, adc1_config).unwrap();
     //!
     //! let mut delay = Delay::new(&clocks);
     //!
@@ -880,12 +864,7 @@ mod implementation {
     //!
     //! let mut pin = adc1_config.enable_pin(io.pins.gpio2.into_analog(), Attenuation::Attenuation11dB);
     //!
-    //! let mut adc1 = ADC::<ADC1>::adc(
-    //!     &mut system.peripheral_clock_control,
-    //!     analog.adc1,
-    //!     adc1_config,
-    //! )
-    //! .unwrap();
+    //! let mut adc1 = ADC::<ADC1>::adc(analog.adc1, adc1_config).unwrap();
     //!
     //! let mut delay = Delay::new(&clocks);
     //!

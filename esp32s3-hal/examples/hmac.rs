@@ -74,7 +74,7 @@ type HmacSha256 = HmacSw<Sha256>;
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let mut system = peripherals.SYSTEM.split();
+    let system = peripherals.SYSTEM.split();
     let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let mut rng = Rng::new(peripherals.RNG);
@@ -82,7 +82,7 @@ fn main() -> ! {
     // Set sw key
     let key = [0_u8; 32].as_ref();
 
-    let mut hw_hmac = Hmac::new(peripherals.HMAC, &mut system.peripheral_clock_control);
+    let mut hw_hmac = Hmac::new(peripherals.HMAC);
 
     let mut src = [0_u8; 1024];
     rng.read(src.as_mut_slice()).unwrap();

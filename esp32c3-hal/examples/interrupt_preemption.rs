@@ -17,8 +17,6 @@ use esp32c3_hal::{
     prelude::*,
     riscv,
     system::{SoftwareInterrupt, SoftwareInterruptControl},
-    timer::TimerGroup,
-    Rtc,
 };
 use esp_backtrace as _;
 
@@ -27,10 +25,10 @@ static SWINT: Mutex<RefCell<Option<SoftwareInterruptControl>>> = Mutex::new(RefC
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let mut system = peripherals.SYSTEM.split();
+    let system = peripherals.SYSTEM.split();
     let clockctrl = system.clock_control;
     let sw_int = system.software_interrupt_control;
-    let clocks = ClockControl::boot_defaults(clockctrl).freeze();
+    let _clocks = ClockControl::boot_defaults(clockctrl).freeze();
 
     critical_section::with(|cs| SWINT.borrow_ref_mut(cs).replace(sw_int));
 

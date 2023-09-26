@@ -95,18 +95,16 @@ fn main() -> ! {
     let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-    let mut clock_control = system.peripheral_clock_control;
 
     #[cfg(feature = "embassy-time-timg0")]
     {
-        let timer_group0 =
-            esp32s2_hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks, &mut clock_control);
+        let timer_group0 = esp32s2_hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks);
         embassy::init(&clocks, timer_group0.timer0);
     }
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let rmt = Rmt::new(peripherals.RMT, 80u32.MHz(), &mut clock_control, &clocks).unwrap();
+    let rmt = Rmt::new(peripherals.RMT, 80u32.MHz(), &clocks).unwrap();
 
     let channel = rmt
         .channel2

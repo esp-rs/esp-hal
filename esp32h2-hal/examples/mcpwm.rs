@@ -18,7 +18,7 @@ use esp_backtrace as _;
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let mut system = peripherals.PCR.split();
+    let system = peripherals.PCR.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
@@ -26,11 +26,7 @@ fn main() -> ! {
 
     // initialize peripheral
     let clock_cfg = PeripheralClockConfig::with_frequency(&clocks, 32u32.MHz()).unwrap();
-    let mut mcpwm = MCPWM::new(
-        peripherals.MCPWM0,
-        clock_cfg,
-        &mut system.peripheral_clock_control,
-    );
+    let mut mcpwm = MCPWM::new(peripherals.MCPWM0, clock_cfg);
 
     // connect operator0 to timer0
     mcpwm.operator0.set_timer(&mcpwm.timer0);

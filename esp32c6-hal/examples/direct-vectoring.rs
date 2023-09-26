@@ -21,10 +21,10 @@ static SWINT: Mutex<RefCell<Option<SoftwareInterruptControl>>> = Mutex::new(RefC
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let mut system = peripherals.PCR.split();
+    let system = peripherals.PCR.split();
     let clockctrl = system.clock_control;
     let sw_int = system.software_interrupt_control;
-    let clocks = ClockControl::boot_defaults(clockctrl).freeze();
+    let _clocks = ClockControl::boot_defaults(clockctrl).freeze();
 
     critical_section::with(|cs| SWINT.borrow_ref_mut(cs).replace(sw_int));
     unsafe {

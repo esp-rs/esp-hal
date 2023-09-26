@@ -81,17 +81,12 @@ fn main() -> ! {
     #[cfg(feature = "embassy-time-timg0")]
     embassy::init(
         &clocks,
-        esp32h2_hal::timer::TimerGroup::new(
-            peripherals.TIMG0,
-            &clocks,
-            &mut system.peripheral_clock_control,
-        )
-        .timer0,
+        esp32h2_hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks).timer0,
     );
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let dma = Gdma::new(peripherals.DMA, &mut system.peripheral_clock_control);
+    let dma = Gdma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
 
     let tx_descriptors = make_static!([0u32; 20 * 3]);
@@ -109,7 +104,6 @@ fn main() -> ! {
             rx_descriptors,
             DmaPriority::Priority0,
         ),
-        &mut system.peripheral_clock_control,
         &clocks,
     );
 

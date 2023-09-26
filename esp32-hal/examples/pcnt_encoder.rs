@@ -33,7 +33,7 @@ static VALUE: AtomicI32 = AtomicI32::new(0);
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let mut system = peripherals.DPORT.split();
+    let system = peripherals.DPORT.split();
     let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
@@ -42,7 +42,7 @@ fn main() -> ! {
 
     // setup a pulse couter
     println!("setup pulse counter unit 0");
-    let pcnt = PCNT::new(peripherals.PCNT, &mut system.peripheral_clock_control);
+    let pcnt = PCNT::new(peripherals.PCNT);
     let mut u0 = pcnt.get_unit(unit_number);
     u0.configure(unit::Config {
         low_limit: -100,

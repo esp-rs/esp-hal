@@ -53,14 +53,10 @@ async fn spi_task(spi: &'static mut SpiType<'static>) {
 fn main() -> ! {
     esp_println::println!("Init!");
     let peripherals = Peripherals::take();
-    let mut system = peripherals.DPORT.split();
+    let system = peripherals.DPORT.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timer_group0 = TimerGroup::new(
-        peripherals.TIMG0,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
+    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     embassy::init(&clocks, timer_group0.timer0);
 
     esp32_hal::interrupt::enable(
@@ -75,7 +71,7 @@ fn main() -> ! {
     let mosi = io.pins.gpio23;
     let cs = io.pins.gpio22;
 
-    let dma = Dma::new(system.dma, &mut system.peripheral_clock_control);
+    let dma = Dma::new(system.dma);
     let dma_channel = dma.spi2channel;
 
     let descriptors = make_static!([0u32; 8 * 3]);
@@ -89,7 +85,6 @@ fn main() -> ! {
         cs,
         100u32.kHz(),
         SpiMode::Mode0,
-        &mut system.peripheral_clock_control,
         &clocks,
     )
     .with_dma(dma_channel.configure(

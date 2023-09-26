@@ -25,11 +25,10 @@ fn main() -> ! {
     let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-    let mut clock_control = system.peripheral_clock_control;
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let rmt = Rmt::new(peripherals.RMT, 1u32.MHz(), &mut clock_control, &clocks).unwrap();
+    let rmt = Rmt::new(peripherals.RMT, 1u32.MHz(), &clocks).unwrap();
 
     let mut channel = rmt
         .channel7

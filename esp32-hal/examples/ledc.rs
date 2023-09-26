@@ -23,17 +23,13 @@ use esp_backtrace as _;
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let mut system = peripherals.DPORT.split();
+    let system = peripherals.DPORT.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let led = io.pins.gpio4.into_push_pull_output();
 
-    let ledc = LEDC::new(
-        peripherals.LEDC,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
+    let ledc = LEDC::new(peripherals.LEDC, &clocks);
     let mut hstimer0 = ledc.get_timer::<HighSpeed>(timer::Number::Timer0);
 
     hstimer0

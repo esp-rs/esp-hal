@@ -18,22 +18,19 @@
 
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
-    system::PeripheralClockControl,
+    peripherals::ASSIST_DEBUG,
 };
 
 pub struct DebugAssist<'d> {
-    debug_assist: PeripheralRef<'d, crate::peripherals::ASSIST_DEBUG>,
+    debug_assist: PeripheralRef<'d, ASSIST_DEBUG>,
 }
 
 impl<'d> DebugAssist<'d> {
-    pub fn new(
-        debug_assist: impl Peripheral<P = crate::peripherals::ASSIST_DEBUG> + 'd,
-        _peripheral_clock_control: &mut PeripheralClockControl,
-    ) -> Self {
+    pub fn new(debug_assist: impl Peripheral<P = ASSIST_DEBUG> + 'd) -> Self {
         crate::into_ref!(debug_assist);
 
-        // we should use peripheral clock control to enable the debug assist however
-        // it's always enabled in ROM code already
+        // NOTE: We should enable the debug assist, however, it's always enabled in ROM
+        //       code already.
 
         DebugAssist { debug_assist }
     }

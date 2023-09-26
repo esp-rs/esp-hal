@@ -31,7 +31,7 @@
 //! let led_task = gpio_ext.channel0_task.toggle(&mut led);
 //! let button_event = gpio_ext.channel0_event.falling_edge(button);
 //!
-//! let etm = Etm::new(peripherals.SOC_ETM, &mut system.peripheral_clock_control);
+//! let etm = Etm::new(peripherals.SOC_ETM);
 //! let channel0 = etm.channel0;
 //!
 //! // make sure the configured channel doesn't get dropped - dropping it will
@@ -241,12 +241,10 @@ macro_rules! create_etm_constructor {
     ($($num:literal),+) => {
         paste::paste! {
             impl<'d> Etm<'d> {
-                pub fn new(
-                    peripheral: impl Peripheral<P = crate::peripherals::SOC_ETM> + 'd,
-                    peripheral_clock_control: &mut PeripheralClockControl,
-                ) -> Self {
+                pub fn new(peripheral: impl Peripheral<P = crate::peripherals::SOC_ETM> + 'd) -> Self {
                     crate::into_ref!(peripheral);
-                    peripheral_clock_control.enable(crate::system::Peripheral::Etm);
+
+                    PeripheralClockControl::enable(crate::system::Peripheral::Etm);
 
                     Self {
                         _peripheral: peripheral,

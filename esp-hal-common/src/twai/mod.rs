@@ -32,7 +32,6 @@
 //!     peripherals.TWAI0,
 //!     can_tx_pin,
 //!     can_rx_pin,
-//!     &mut system.peripheral_clock_control,
 //!     &clocks,
 //!     CAN_BAUDRATE,
 //! );
@@ -274,12 +273,11 @@ where
         peripheral: impl Peripheral<P = T> + 'd,
         tx_pin: impl Peripheral<P = TX> + 'd,
         rx_pin: impl Peripheral<P = RX> + 'd,
-        clock_control: &mut PeripheralClockControl,
         clocks: &Clocks,
         baud_rate: BaudRate,
     ) -> Self {
         // Enable the peripheral clock for the TWAI peripheral.
-        clock_control.enable(T::SYSTEM_PERIPHERAL);
+        PeripheralClockControl::enable(T::SYSTEM_PERIPHERAL);
 
         // Set up the GPIO pins.
         crate::into_ref!(tx_pin, rx_pin);

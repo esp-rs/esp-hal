@@ -36,11 +36,11 @@
 //! ## Example
 //! #### Initialize and utilize DMA controller in `SPI`
 //! ```no_run
-//! let dma = Gdma::new(peripherals.DMA, &mut system.peripheral_clock_control);
+//! let dma = Gdma::new(peripherals.DMA);
 //! let dma_channel = dma.channel0;
 //!
 //! // For `ESP32` and `ESP32-S2` chips use `Pdma` controller instead:
-//! // let dma = Dma::new(system.dma, &mut system.peripheral_clock_control);
+//! // let dma = Dma::new(system.dma);
 //! // let dma_channel = dma.spi2channel;
 //!
 //! let mut descriptors = [0u32; 8 * 3];
@@ -54,7 +54,6 @@
 //!     cs,
 //!     100u32.kHz(),
 //!     SpiMode::Mode0,
-//!     &mut system.peripheral_clock_control,
 //!     &clocks,
 //! )
 //! .with_dma(dma_channel.configure(

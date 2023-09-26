@@ -434,7 +434,6 @@ where
         cs: impl Peripheral<P = CS> + 'd,
         frequency: HertzU32,
         mode: SpiMode,
-        peripheral_clock_control: &mut PeripheralClockControl,
         clocks: &Clocks,
     ) -> Spi<'d, T, FullDuplexMode> {
         crate::into_ref!(spi, sck, mosi, miso, cs);
@@ -450,7 +449,7 @@ where
         cs.set_to_push_pull_output()
             .connect_peripheral_to_output(spi.cs_signal());
 
-        Self::new_internal(spi, frequency, mode, peripheral_clock_control, clocks)
+        Self::new_internal(spi, frequency, mode, clocks)
     }
 
     /// Constructs an SPI instance in 8bit dataframe mode without CS pin.
@@ -461,7 +460,6 @@ where
         miso: impl Peripheral<P = MISO> + 'd,
         frequency: HertzU32,
         mode: SpiMode,
-        peripheral_clock_control: &mut PeripheralClockControl,
         clocks: &Clocks,
     ) -> Spi<'d, T, FullDuplexMode> {
         crate::into_ref!(spi, sck, mosi, miso);
@@ -474,7 +472,7 @@ where
         miso.set_to_input()
             .connect_input_to_peripheral(spi.miso_signal());
 
-        Self::new_internal(spi, frequency, mode, peripheral_clock_control, clocks)
+        Self::new_internal(spi, frequency, mode, clocks)
     }
 
     /// Constructs an SPI instance in 8bit dataframe mode without MISO pin.
@@ -485,7 +483,6 @@ where
         cs: impl Peripheral<P = CS> + 'd,
         frequency: HertzU32,
         mode: SpiMode,
-        peripheral_clock_control: &mut PeripheralClockControl,
         clocks: &Clocks,
     ) -> Spi<'d, T, FullDuplexMode> {
         crate::into_ref!(spi, sck, mosi, cs);
@@ -498,7 +495,7 @@ where
         cs.set_to_push_pull_output()
             .connect_peripheral_to_output(spi.cs_signal());
 
-        Self::new_internal(spi, frequency, mode, peripheral_clock_control, clocks)
+        Self::new_internal(spi, frequency, mode, clocks)
     }
 
     /// Constructs an SPI instance in 8bit dataframe mode without CS and MISO
@@ -509,7 +506,6 @@ where
         mosi: impl Peripheral<P = MOSI> + 'd,
         frequency: HertzU32,
         mode: SpiMode,
-        peripheral_clock_control: &mut PeripheralClockControl,
         clocks: &Clocks,
     ) -> Spi<'d, T, FullDuplexMode> {
         crate::into_ref!(spi, sck, mosi);
@@ -519,7 +515,7 @@ where
         mosi.set_to_push_pull_output()
             .connect_peripheral_to_output(spi.mosi_signal());
 
-        Self::new_internal(spi, frequency, mode, peripheral_clock_control, clocks)
+        Self::new_internal(spi, frequency, mode, clocks)
     }
 
     /// Constructs an SPI instance in 8bit dataframe mode with only MOSI
@@ -531,24 +527,22 @@ where
         mosi: impl Peripheral<P = MOSI> + 'd,
         frequency: HertzU32,
         mode: SpiMode,
-        peripheral_clock_control: &mut PeripheralClockControl,
         clocks: &Clocks,
     ) -> Spi<'d, T, FullDuplexMode> {
         crate::into_ref!(spi, mosi);
         mosi.set_to_push_pull_output()
             .connect_peripheral_to_output(spi.mosi_signal());
 
-        Self::new_internal(spi, frequency, mode, peripheral_clock_control, clocks)
+        Self::new_internal(spi, frequency, mode, clocks)
     }
 
     pub(crate) fn new_internal(
         spi: PeripheralRef<'d, T>,
         frequency: HertzU32,
         mode: SpiMode,
-        peripheral_clock_control: &mut PeripheralClockControl,
         clocks: &Clocks,
     ) -> Spi<'d, T, FullDuplexMode> {
-        spi.enable_peripheral(peripheral_clock_control);
+        spi.enable_peripheral();
 
         let mut spi = Spi {
             spi,
@@ -591,7 +585,6 @@ where
         cs: Option<impl Peripheral<P = CS> + 'd>,
         frequency: HertzU32,
         mode: SpiMode,
-        peripheral_clock_control: &mut PeripheralClockControl,
         clocks: &Clocks,
     ) -> Spi<'d, T, HalfDuplexMode> {
         crate::into_ref!(spi);
@@ -639,17 +632,16 @@ where
                 .connect_peripheral_to_output(spi.cs_signal());
         }
 
-        Self::new_internal(spi, frequency, mode, peripheral_clock_control, clocks)
+        Self::new_internal(spi, frequency, mode, clocks)
     }
 
     pub(crate) fn new_internal(
         spi: PeripheralRef<'d, T>,
         frequency: HertzU32,
         mode: SpiMode,
-        peripheral_clock_control: &mut PeripheralClockControl,
         clocks: &Clocks,
     ) -> Spi<'d, T, HalfDuplexMode> {
-        spi.enable_peripheral(peripheral_clock_control);
+        spi.enable_peripheral();
 
         let mut spi = Spi {
             spi,
@@ -2138,7 +2130,7 @@ pub trait Instance {
 
     fn cs_signal(&self) -> OutputSignal;
 
-    fn enable_peripheral(&self, peripheral_clock_control: &mut PeripheralClockControl);
+    fn enable_peripheral(&self);
 
     fn spi_num(&self) -> u8;
 
@@ -2996,8 +2988,8 @@ impl Instance for crate::peripherals::SPI2 {
     }
 
     #[inline(always)]
-    fn enable_peripheral(&self, peripheral_clock_control: &mut PeripheralClockControl) {
-        peripheral_clock_control.enable(crate::system::Peripheral::Spi2);
+    fn enable_peripheral(&self) {
+        PeripheralClockControl::enable(crate::system::Peripheral::Spi2);
     }
 
     #[inline(always)]
@@ -3067,8 +3059,8 @@ impl Instance for crate::peripherals::SPI2 {
     }
 
     #[inline(always)]
-    fn enable_peripheral(&self, peripheral_clock_control: &mut PeripheralClockControl) {
-        peripheral_clock_control.enable(crate::system::Peripheral::Spi2);
+    fn enable_peripheral(&self) {
+        PeripheralClockControl::enable(crate::system::Peripheral::Spi2);
     }
 
     #[inline(always)]
@@ -3132,8 +3124,8 @@ impl Instance for crate::peripherals::SPI3 {
     }
 
     #[inline(always)]
-    fn enable_peripheral(&self, peripheral_clock_control: &mut PeripheralClockControl) {
-        peripheral_clock_control.enable(crate::system::Peripheral::Spi3)
+    fn enable_peripheral(&self) {
+        PeripheralClockControl::enable(crate::system::Peripheral::Spi3)
     }
 
     #[inline(always)]
@@ -3170,8 +3162,8 @@ impl Instance for crate::peripherals::SPI2 {
     }
 
     #[inline(always)]
-    fn enable_peripheral(&self, peripheral_clock_control: &mut PeripheralClockControl) {
-        peripheral_clock_control.enable(crate::system::Peripheral::Spi2)
+    fn enable_peripheral(&self) {
+        PeripheralClockControl::enable(crate::system::Peripheral::Spi2)
     }
 
     #[inline(always)]
@@ -3241,8 +3233,8 @@ impl Instance for crate::peripherals::SPI3 {
     }
 
     #[inline(always)]
-    fn enable_peripheral(&self, peripheral_clock_control: &mut PeripheralClockControl) {
-        peripheral_clock_control.enable(crate::system::Peripheral::Spi3)
+    fn enable_peripheral(&self) {
+        PeripheralClockControl::enable(crate::system::Peripheral::Spi3)
     }
 
     #[inline(always)]

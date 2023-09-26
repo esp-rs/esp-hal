@@ -25,17 +25,13 @@ use xtensa_atomic_emulation_trap as _;
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let mut system = peripherals.SYSTEM.split();
+    let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let led = io.pins.gpio4.into_push_pull_output();
 
-    let mut ledc = LEDC::new(
-        peripherals.LEDC,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
+    let mut ledc = LEDC::new(peripherals.LEDC, &clocks);
 
     ledc.set_global_slow_clock(LSGlobalClkSource::APBClk);
 

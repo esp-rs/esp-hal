@@ -54,7 +54,7 @@ async fn spi_task(spi: &'static mut SpiType<'static>) {
 fn main() -> ! {
     esp_println::println!("Init!");
     let peripherals = Peripherals::take();
-    let mut system = peripherals.SYSTEM.split();
+    let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     #[cfg(feature = "embassy-time-systick")]
@@ -66,12 +66,7 @@ fn main() -> ! {
     #[cfg(feature = "embassy-time-timg0")]
     embassy::init(
         &clocks,
-        esp32c3_hal::timer::TimerGroup::new(
-            peripherals.TIMG0,
-            &clocks,
-            &mut system.peripheral_clock_control,
-        )
-        .timer0,
+        esp32c3_hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks).timer0,
     );
 
     esp32c3_hal::interrupt::enable(
@@ -86,7 +81,7 @@ fn main() -> ! {
     let mosi = io.pins.gpio7;
     let cs = io.pins.gpio10;
 
-    let dma = Gdma::new(peripherals.DMA, &mut system.peripheral_clock_control);
+    let dma = Gdma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
 
     let descriptors = make_static!([0u32; 8 * 3]);
@@ -100,7 +95,6 @@ fn main() -> ! {
         cs,
         100u32.kHz(),
         SpiMode::Mode0,
-        &mut system.peripheral_clock_control,
         &clocks,
     )
     .with_dma(dma_channel.configure(

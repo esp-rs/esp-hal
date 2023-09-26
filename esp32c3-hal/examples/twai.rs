@@ -18,7 +18,7 @@ use nb::block;
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let mut system = peripherals.SYSTEM.split();
+    let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
@@ -37,7 +37,6 @@ fn main() -> ! {
         peripherals.TWAI0,
         can_tx_pin,
         can_rx_pin,
-        &mut system.peripheral_clock_control,
         &clocks,
         CAN_BAUDRATE,
     );

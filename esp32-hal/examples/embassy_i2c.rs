@@ -45,14 +45,10 @@ async fn run(i2c: I2C<'static, I2C0>) {
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let mut system = peripherals.DPORT.split();
+    let system = peripherals.DPORT.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timer_group0 = TimerGroup::new(
-        peripherals.TIMG0,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
+    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     embassy::init(&clocks, timer_group0.timer0);
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
@@ -62,7 +58,6 @@ fn main() -> ! {
         io.pins.gpio32,
         io.pins.gpio33,
         400u32.kHz(),
-        &mut system.peripheral_clock_control,
         &clocks,
     );
 

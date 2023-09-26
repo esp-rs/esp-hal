@@ -12,13 +12,7 @@
 //!
 //! ```rust,ignore
 //! let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-//! let rmt = Rmt::new(
-//!     peripherals.RMT,
-//!     80u32.MHz(),
-//!     &mut system.peripheral_clock_control,
-//!     &clocks,
-//! )
-//! .unwrap();
+//! let rmt = Rmt::new(peripherals.RMT, 80u32.MHz(), &clocks).unwrap();
 //!
 //! let led = <smartLedAdapter!(0, 1)>::new(rmt.channel0, io.pins.gpio0);
 //! ```

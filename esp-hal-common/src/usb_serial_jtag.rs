@@ -11,12 +11,9 @@
 //! ## Example
 //! ```no_run
 //! let peripherals = Peripherals::take();
-//! let mut system = peripherals.SYSTEM.split();
-//! let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 //! ...
 //! // Initialize USB Serial/JTAG peripheral
-//! let mut usb_serial =
-//!    UsbSerialJtag::new(peripherals.USB_DEVICE, &mut system.peripheral_clock_control);
+//! let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE);
 
 use core::convert::Infallible;
 
@@ -26,23 +23,20 @@ use crate::{
     system::PeripheralClockControl,
 };
 
+/// Custom USB serial error type
+type Error = Infallible;
+
 /// USB Serial JTAG driver
 pub struct UsbSerialJtag<'d> {
     usb_serial: PeripheralRef<'d, USB_DEVICE>,
 }
 
-/// Custom USB serial error type
-type Error = Infallible;
-
 impl<'d> UsbSerialJtag<'d> {
     /// Create a new USB serial/JTAG instance with defaults
-    pub fn new(
-        usb_serial: impl Peripheral<P = USB_DEVICE> + 'd,
-        peripheral_clock_control: &mut PeripheralClockControl,
-    ) -> Self {
+    pub fn new(usb_serial: impl Peripheral<P = USB_DEVICE> + 'd) -> Self {
         crate::into_ref!(usb_serial);
 
-        peripheral_clock_control.enable(crate::system::Peripheral::Sha);
+        PeripheralClockControl::enable(crate::system::Peripheral::UsbDevice);
 
         let mut dev = Self { usb_serial };
         dev.usb_serial.disable_rx_interrupts();

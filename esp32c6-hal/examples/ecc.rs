@@ -40,13 +40,13 @@ const TEST_PARAMS_VECTOR: TestParams = TestParams {
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let mut system = peripherals.PCR.split();
+    let _system = peripherals.PCR.split();
 
     let mut rng = Rng::new(peripherals.RNG);
 
     println!("ECC example");
 
-    let mut hw_ecc = Ecc::new(peripherals.ECC, &mut system.peripheral_clock_control);
+    let mut hw_ecc = Ecc::new(peripherals.ECC);
 
     println!("Beginning stress tests...");
     test_affine_point_multiplication(&mut hw_ecc, &mut rng);

@@ -35,7 +35,6 @@
 //!         &mut rx_descriptors,
 //!         DmaPriority::Priority0,
 //!     ),
-//!     &mut system.peripheral_clock_control,
 //!     &clocks,
 //! );
 //! ```
@@ -629,7 +628,6 @@ where
         data_format: DataFormat,
         sample_rate: impl Into<fugit::HertzU32>,
         mut channel: Channel<'d, CH>,
-        peripheral_clock_control: &mut PeripheralClockControl,
         clocks: &Clocks,
     ) -> Self {
         // on ESP32-C3 / ESP32-S3 and later RX and TX are independent and
@@ -640,7 +638,7 @@ where
         let mut register_access = i2s.register_access();
 
         channel.tx.init_channel();
-        peripheral_clock_control.enable(register_access.get_peripheral());
+        PeripheralClockControl::enable(register_access.get_peripheral());
         pins.configure(&mut register_access);
         register_access.set_clock(calculate_clock(
             sample_rate,
@@ -682,7 +680,6 @@ where
         data_format: DataFormat,
         sample_rate: impl Into<fugit::HertzU32>,
         channel: Channel<'d, CH>,
-        peripheral_clock_control: &mut PeripheralClockControl,
         clocks: &Clocks,
     ) -> Self;
 }
@@ -701,7 +698,6 @@ where
         data_format: DataFormat,
         sample_rate: impl Into<fugit::HertzU32>,
         channel: Channel<'d, CH>,
-        peripheral_clock_control: &mut PeripheralClockControl,
         clocks: &Clocks,
     ) -> Self {
         Self::new_internal(
@@ -711,7 +707,6 @@ where
             data_format,
             sample_rate,
             channel,
-            peripheral_clock_control,
             clocks,
         )
     }
@@ -733,7 +728,6 @@ where
         data_format: DataFormat,
         sample_rate: impl Into<fugit::HertzU32>,
         channel: Channel<'d, CH>,
-        peripheral_clock_control: &mut PeripheralClockControl,
         clocks: &Clocks,
     ) -> Self;
 }
@@ -753,7 +747,6 @@ where
         data_format: DataFormat,
         sample_rate: impl Into<fugit::HertzU32>,
         channel: Channel<'d, CH>,
-        peripheral_clock_control: &mut PeripheralClockControl,
         clocks: &Clocks,
     ) -> Self {
         Self::new_internal(
@@ -763,7 +756,6 @@ where
             data_format,
             sample_rate,
             channel,
-            peripheral_clock_control,
             clocks,
         )
     }

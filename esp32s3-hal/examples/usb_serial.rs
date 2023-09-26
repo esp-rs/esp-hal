@@ -20,7 +20,7 @@ static mut EP_MEMORY: [u32; 1024] = [0; 1024];
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let mut system = peripherals.SYSTEM.split();
+    let system = peripherals.SYSTEM.split();
     let _clocks = ClockControl::configure(system.clock_control, CpuClock::Clock240MHz).freeze();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
@@ -30,7 +30,6 @@ fn main() -> ! {
         io.pins.gpio18,
         io.pins.gpio19,
         io.pins.gpio20,
-        &mut system.peripheral_clock_control,
     );
 
     let usb_bus = UsbBus::new(usb, unsafe { &mut EP_MEMORY });

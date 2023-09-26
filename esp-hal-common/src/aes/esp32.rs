@@ -4,8 +4,8 @@ use crate::{
 };
 
 impl<'d> Aes<'d> {
-    pub(super) fn init(&mut self, peripheral_clock_control: &mut PeripheralClockControl) {
-        peripheral_clock_control.enable(PeripheralEnable::Aes);
+    pub(super) fn init(&mut self) {
+        PeripheralClockControl::enable(PeripheralEnable::Aes);
         self.write_endianness(
             Endianness::BigEndian,
             Endianness::BigEndian,

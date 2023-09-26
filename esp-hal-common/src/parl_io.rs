@@ -28,7 +28,6 @@
 //!         DmaPriority::Priority0,
 //!     ),
 //!     1u32.MHz(),
-//!     &mut system.peripheral_clock_control,
 //!     &clocks,
 //! )
 //! .unwrap();
@@ -64,7 +63,6 @@
 //!         DmaPriority::Priority0,
 //!     ),
 //!     1u32.MHz(),
-//!     &mut system.peripheral_clock_control,
 //!     &clocks,
 //! )
 //! .unwrap();
@@ -1034,11 +1032,10 @@ where
         parl_io: impl Peripheral<P = peripherals::PARL_IO> + 'd,
         mut dma_channel: Channel<'d, CH>,
         frequency: HertzU32,
-        peripheral_clock_control: &mut PeripheralClockControl,
         _clocks: &Clocks,
     ) -> Result<Self, Error> {
         crate::into_ref!(parl_io);
-        internal_init(&mut dma_channel, frequency, peripheral_clock_control)?;
+        internal_init(&mut dma_channel, frequency)?;
 
         Ok(Self {
             _parl_io: parl_io,
@@ -1071,11 +1068,10 @@ where
         parl_io: impl Peripheral<P = peripherals::PARL_IO> + 'd,
         mut dma_channel: Channel<'d, CH>,
         frequency: HertzU32,
-        peripheral_clock_control: &mut PeripheralClockControl,
         _clocks: &Clocks,
     ) -> Result<Self, Error> {
         crate::into_ref!(parl_io);
-        internal_init(&mut dma_channel, frequency, peripheral_clock_control)?;
+        internal_init(&mut dma_channel, frequency)?;
 
         Ok(Self {
             _parl_io: parl_io,
@@ -1105,11 +1101,10 @@ where
         parl_io: impl Peripheral<P = peripherals::PARL_IO> + 'd,
         mut dma_channel: Channel<'d, CH>,
         frequency: HertzU32,
-        peripheral_clock_control: &mut PeripheralClockControl,
         _clocks: &Clocks,
     ) -> Result<Self, Error> {
         crate::into_ref!(parl_io);
-        internal_init(&mut dma_channel, frequency, peripheral_clock_control)?;
+        internal_init(&mut dma_channel, frequency)?;
 
         Ok(Self {
             _parl_io: parl_io,
@@ -1123,7 +1118,6 @@ where
 fn internal_init<'d, CH>(
     dma_channel: &mut Channel<'d, CH>,
     frequency: HertzU32,
-    peripheral_clock_control: &mut PeripheralClockControl,
 ) -> Result<(), Error>
 where
     CH: ChannelTypes,
@@ -1133,7 +1127,7 @@ where
         return Err(Error::UnreachableClockRate);
     }
 
-    peripheral_clock_control.enable(crate::system::Peripheral::ParlIo);
+    PeripheralClockControl::enable(crate::system::Peripheral::ParlIo);
 
     let pcr = unsafe { &*crate::peripherals::PCR::PTR };
 

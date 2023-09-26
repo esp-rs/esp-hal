@@ -52,12 +52,12 @@ const SINE: [i16; 64] = [
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let mut system = peripherals.SYSTEM.split();
+    let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let dma = Dma::new(system.dma, &mut system.peripheral_clock_control);
+    let dma = Dma::new(system.dma);
     let dma_channel = dma.i2s0channel;
 
     let mut tx_descriptors = [0u32; 20 * 3];
@@ -75,7 +75,6 @@ fn main() -> ! {
             &mut rx_descriptors,
             DmaPriority::Priority0,
         ),
-        &mut system.peripheral_clock_control,
         &clocks,
     );
 

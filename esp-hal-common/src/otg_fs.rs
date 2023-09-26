@@ -68,10 +68,11 @@ where
         usb_sel: impl Peripheral<P = S> + 'd,
         usb_dp: impl Peripheral<P = P> + 'd,
         usb_dm: impl Peripheral<P = M> + 'd,
-        peripheral_clock_control: &mut PeripheralClockControl,
     ) -> Self {
         crate::into_ref!(usb_sel, usb_dp, usb_dm);
-        peripheral_clock_control.enable(PeripheralEnable::Usb);
+
+        PeripheralClockControl::enable(PeripheralEnable::Usb);
+
         Self {
             _usb0: usb0.into_ref(),
             _usb_sel: usb_sel,

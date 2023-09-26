@@ -68,18 +68,10 @@ fn main() -> ! {
     let mut system = peripherals.DPORT.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timer_group0 = TimerGroup::new(
-        peripherals.TIMG0,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
+    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     embassy::init(&clocks, timer_group0.timer0);
 
-    let mut uart0 = Uart::new(
-        peripherals.UART0,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
+    let mut uart0 = Uart::new(peripherals.UART0, &clocks);
     uart0.set_at_cmd(AtCmdConfig::new(None, None, None, AT_CMD, None));
     uart0
         .set_rx_fifo_full_threshold(READ_BUF_SIZE as u16)

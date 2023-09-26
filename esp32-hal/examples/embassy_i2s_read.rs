@@ -68,19 +68,15 @@ fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     esp_println::println!("Init!");
     let peripherals = Peripherals::take();
-    let mut system = peripherals.DPORT.split();
+    let system = peripherals.DPORT.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timer_group0 = TimerGroup::new(
-        peripherals.TIMG0,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
+    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     embassy::init(&clocks, timer_group0.timer0);
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let dma = Dma::new(system.dma, &mut system.peripheral_clock_control);
+    let dma = Dma::new(system.dma);
     let dma_channel = dma.i2s0channel;
 
     let tx_descriptors = make_static!([0u32; 20 * 3]);
@@ -98,7 +94,6 @@ fn main() -> ! {
             rx_descriptors,
             DmaPriority::Priority0,
         ),
-        &mut system.peripheral_clock_control,
         &clocks,
     );
 

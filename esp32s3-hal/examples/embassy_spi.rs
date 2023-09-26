@@ -65,11 +65,7 @@ fn main() -> ! {
 
     #[cfg(feature = "embassy-time-timg0")]
     {
-        let timer_group0 = esp32s3_hal::timer::TimerGroup::new(
-            peripherals.TIMG0,
-            &clocks,
-            &mut system.peripheral_clock_control,
-        );
+        let timer_group0 = esp32s3_hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks);
         embassy::init(&clocks, timer_group0.timer0);
     }
 
@@ -90,7 +86,7 @@ fn main() -> ! {
     let mosi = io.pins.gpio7;
     let cs = io.pins.gpio10;
 
-    let dma = Gdma::new(peripherals.DMA, &mut system.peripheral_clock_control);
+    let dma = Gdma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
 
     let descriptors = make_static!([0u32; 8 * 3]);
@@ -104,7 +100,6 @@ fn main() -> ! {
         cs,
         100u32.kHz(),
         SpiMode::Mode0,
-        &mut system.peripheral_clock_control,
         &clocks,
     )
     .with_dma(dma_channel.configure(

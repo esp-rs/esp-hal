@@ -93,14 +93,11 @@ enum NextCommand {
 }
 
 impl<'d> Hmac<'d> {
-    pub fn new(
-        hmac: impl Peripheral<P = HMAC> + 'd,
-        peripheral_clock_control: &mut PeripheralClockControl,
-    ) -> Self {
+    pub fn new(hmac: impl Peripheral<P = HMAC> + 'd) -> Self {
         crate::into_ref!(hmac);
 
-        peripheral_clock_control.enable(PeripheralEnable::Sha);
-        peripheral_clock_control.enable(PeripheralEnable::Hmac);
+        PeripheralClockControl::enable(PeripheralEnable::Sha);
+        PeripheralClockControl::enable(PeripheralEnable::Hmac);
 
         Self {
             hmac,

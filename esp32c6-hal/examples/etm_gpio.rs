@@ -16,7 +16,7 @@ use esp_backtrace as _;
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     let peripherals = Peripherals::take();
-    let mut system = peripherals.PCR.split();
+    let system = peripherals.PCR.split();
     let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
@@ -30,7 +30,7 @@ fn main() -> ! {
     let led_task = gpio_ext.channel0_task.toggle(&mut led);
     let button_event = gpio_ext.channel0_event.falling_edge(button);
 
-    let etm = Etm::new(peripherals.SOC_ETM, &mut system.peripheral_clock_control);
+    let etm = Etm::new(peripherals.SOC_ETM);
     let channel0 = etm.channel0;
 
     // make sure the configured channel doesn't get dropped - dropping it will
