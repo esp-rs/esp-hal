@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Async support for I2S (#801)
 - Async support for PARL_IO (#807)
 - Implement `embeded_hal_async::delay::DelayUs` trait for `SYSTIMER` alarms (#812)
+- ETM driver, GPIO ETM (#819)
 
 ### Changed
 
