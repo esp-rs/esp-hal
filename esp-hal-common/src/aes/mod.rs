@@ -289,7 +289,7 @@ pub mod dma {
         }
     }
 
-    /// An in-proress DMA transfer
+    /// An in-progress DMA transfer
     pub struct AesDmaTransferRxTx<'d, C, RBUFFER, TBUFFER>
     where
         C: ChannelTypes,
