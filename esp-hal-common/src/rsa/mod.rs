@@ -27,6 +27,31 @@
 //!
 //! let mut rsa = Rsa::new(peripherals.RSA);
 //! ```
+//!  
+//! ### Async (modular exponentiation)
+//! ```no_run
+//! #[embassy_executor::task]
+//! async fn mod_exp_example(mut rsa: Rsa<'static>) {
+//!     let mut outbuf = [0_u8; U512::BYTES];
+//!     let mut mod_exp = RsaModularExponentiation::<operand_sizes::Op512>::new(
+//!         &mut rsa,
+//!         &BIGNUM_2.to_le_bytes(),
+//!         &BIGNUM_3.to_le_bytes(),
+//!         compute_mprime(&BIGNUM_3),
+//!     );
+//!     let r = compute_r(&BIGNUM_3).to_le_bytes();
+//!     let base = &BIGNUM_1.to_le_bytes();
+//!     mod_exp.exponentiation(&base, &r, &mut outbuf).await;
+//!     let residue_params = DynResidueParams::new(&BIGNUM_3);
+//!     let residue = DynResidue::new(&BIGNUM_1, residue_params);
+//!     let sw_out = residue.pow(&BIGNUM_2);
+//!     assert_eq!(U512::from_le_bytes(outbuf), sw_out.retrieve());
+//!     println!("modular exponentiation done");
+//! }
+//! ```
+
+//! This peripheral supports `async` on every available chip except of `esp32`
+//! (to be solved).
 //!
 //! ⚠️: The examples for RSA peripheral are quite extensive, so for a more
 //! detailed study of how to use this driver please visit [the repository
@@ -35,7 +60,7 @@
 //! [nb]: https://docs.rs/nb/1.1.0/nb/
 //! [the repository with corresponding example]: https://github.com/esp-rs/esp-hal/blob/main/esp32-hal/examples/rsa.rs
 
-use core::{convert::Infallible, marker::PhantomData, ptr::copy_nonoverlapping};
+use core::{marker::PhantomData, ptr::copy_nonoverlapping};
 
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
@@ -169,15 +194,16 @@ where
     /// This is a non blocking function that returns without an error if
     /// operation is completed successfully. `start_exponentiation` must be
     /// called before calling this function.
-    pub fn read_results(&mut self, outbuf: &mut T::InputType) -> nb::Result<(), Infallible> {
-        if !self.rsa.is_idle() {
-            return Err(nb::Error::WouldBlock);
+    pub fn read_results(&mut self, outbuf: &mut T::InputType) {
+        loop {
+            if self.rsa.is_idle() {
+                unsafe {
+                    self.rsa.read_out(outbuf);
+                }
+                self.rsa.clear_interrupt();
+                break;
+            }
         }
-        unsafe {
-            self.rsa.read_out(outbuf);
-        }
-        self.rsa.clear_interrupt();
-        Ok(())
     }
 }
 
@@ -197,15 +223,16 @@ where
     /// Reads the result to the given buffer.
     /// This is a non blocking function that returns without an error if
     /// operation is completed successfully.
-    pub fn read_results(&mut self, outbuf: &mut T::InputType) -> nb::Result<(), Infallible> {
-        if !self.rsa.is_idle() {
-            return Err(nb::Error::WouldBlock);
+    pub fn read_results(&mut self, outbuf: &mut T::InputType) {
+        loop {
+            if self.rsa.is_idle() {
+                unsafe {
+                    self.rsa.read_out(outbuf);
+                }
+                self.rsa.clear_interrupt();
+                break;
+            }
         }
-        unsafe {
-            self.rsa.read_out(outbuf);
-        }
-        self.rsa.clear_interrupt();
-        Ok(())
     }
 }
 
@@ -226,20 +253,187 @@ where
     /// This is a non blocking function that returns without an error if
     /// operation is completed successfully. `start_multiplication` must be
     /// called before calling this function.
-    pub fn read_results<'b, const O: usize>(
-        &mut self,
-        outbuf: &mut T::OutputType,
-    ) -> nb::Result<(), Infallible>
+    pub fn read_results<'b, const O: usize>(&mut self, outbuf: &mut T::OutputType)
     where
         T: Multi<OutputType = [u8; O]>,
     {
-        if !self.rsa.is_idle() {
-            return Err(nb::Error::WouldBlock);
+        loop {
+            if self.rsa.is_idle() {
+                unsafe {
+                    self.rsa.read_out(outbuf);
+                }
+                self.rsa.clear_interrupt();
+                break;
+            }
         }
-        unsafe {
-            self.rsa.read_out(outbuf);
+    }
+}
+
+#[cfg(feature = "async")]
+pub(crate) mod asynch {
+    use core::task::Poll;
+
+    use embassy_sync::waitqueue::AtomicWaker;
+    use procmacros::interrupt;
+
+    use crate::rsa::{
+        Multi,
+        RsaMode,
+        RsaModularExponentiation,
+        RsaModularMultiplication,
+        RsaMultiplication,
+    };
+
+    static WAKER: AtomicWaker = AtomicWaker::new();
+
+    pub(crate) struct RsaFuture<'d> {
+        instance: &'d crate::peripherals::RSA,
+    }
+
+    impl<'d> RsaFuture<'d> {
+        pub async fn new(instance: &'d crate::peripherals::RSA) -> Self {
+            #[cfg(not(any(esp32, esp32s2, esp32s3)))]
+            instance.int_ena.modify(|_, w| w.int_ena().set_bit());
+
+            #[cfg(any(esp32s2, esp32s3))]
+            instance
+                .interrupt_ena
+                .modify(|_, w| w.interrupt_ena().set_bit());
+
+            #[cfg(esp32)]
+            instance.interrupt.modify(|_, w| w.interrupt().set_bit());
+
+            Self { instance }
         }
-        self.rsa.clear_interrupt();
-        Ok(())
+
+        fn event_bit_is_clear(&self) -> bool {
+            #[cfg(not(any(esp32, esp32s2, esp32s3)))]
+            return self.instance.int_ena.read().int_ena().bit_is_clear();
+
+            #[cfg(any(esp32s2, esp32s3))]
+            return self
+                .instance
+                .interrupt_ena
+                .read()
+                .interrupt_ena()
+                .bit_is_clear();
+
+            #[cfg(esp32)]
+            return self.instance.interrupt.read().interrupt().bit_is_clear();
+        }
+    }
+
+    impl<'d> core::future::Future for RsaFuture<'d> {
+        type Output = ();
+
+        fn poll(
+            self: core::pin::Pin<&mut Self>,
+            cx: &mut core::task::Context<'_>,
+        ) -> core::task::Poll<Self::Output> {
+            WAKER.register(cx.waker());
+            if self.event_bit_is_clear() {
+                Poll::Ready(())
+            } else {
+                Poll::Pending
+            }
+        }
+    }
+
+    impl<'a, 'd, T: RsaMode, const N: usize> RsaModularExponentiation<'a, 'd, T>
+    where
+        T: RsaMode<InputType = [u8; N]>,
+    {
+        pub async fn exponentiation(
+            &mut self,
+            base: &T::InputType,
+            r: &T::InputType,
+            outbuf: &mut T::InputType,
+        ) {
+            self.start_exponentiation(&base, &r);
+            RsaFuture::new(&self.rsa.rsa).await;
+            self.read_results(outbuf);
+        }
+    }
+
+    impl<'a, 'd, T: RsaMode, const N: usize> RsaModularMultiplication<'a, 'd, T>
+    where
+        T: RsaMode<InputType = [u8; N]>,
+    {
+        #[cfg(not(esp32))]
+        pub async fn modular_multiplication(
+            &mut self,
+            r: &T::InputType,
+            outbuf: &mut T::InputType,
+        ) {
+            self.start_modular_multiplication(r);
+            RsaFuture::new(&self.rsa.rsa).await;
+            self.read_results(outbuf);
+        }
+
+        #[cfg(esp32)]
+        pub async fn modular_multiplication(
+            &mut self,
+            operand_a: &T::InputType,
+            operand_b: &T::InputType,
+            r: &T::InputType,
+            outbuf: &mut T::InputType,
+        ) {
+            self.start_step1(operand_a, r);
+            self.start_step2(operand_b);
+            RsaFuture::new(&self.rsa.rsa).await;
+            self.read_results(outbuf);
+        }
+    }
+
+    impl<'a, 'd, T: RsaMode + Multi, const N: usize> RsaMultiplication<'a, 'd, T>
+    where
+        T: RsaMode<InputType = [u8; N]>,
+    {
+        #[cfg(not(esp32))]
+        pub async fn multiplication<'b, const O: usize>(
+            &mut self,
+            operand_b: &T::InputType,
+            outbuf: &mut T::OutputType,
+        ) where
+            T: Multi<OutputType = [u8; O]>,
+        {
+            self.start_multiplication(operand_b);
+            RsaFuture::new(&self.rsa.rsa).await;
+            self.read_results(outbuf);
+        }
+
+        #[cfg(esp32)]
+        pub async fn multiplication<'b, const O: usize>(
+            &mut self,
+            operand_a: &T::InputType,
+            operand_b: &T::InputType,
+            outbuf: &mut T::OutputType,
+        ) where
+            T: Multi<OutputType = [u8; O]>,
+        {
+            self.start_multiplication(operand_a, operand_b);
+            RsaFuture::new(&self.rsa.rsa).await;
+            self.read_results(outbuf);
+        }
+    }
+
+    #[interrupt]
+    fn RSA() {
+        #[cfg(not(any(esp32, esp32s2, esp32s3)))]
+        unsafe { &*crate::peripherals::RSA::ptr() }
+            .int_ena
+            .modify(|_, w| w.int_ena().clear_bit());
+
+        #[cfg(esp32)]
+        unsafe { &*crate::peripherals::RSA::ptr() }
+            .interrupt
+            .modify(|_, w| w.interrupt().clear_bit());
+
+        #[cfg(any(esp32s2, esp32s3))]
+        unsafe { &*crate::peripherals::RSA::ptr() }
+            .interrupt_ena
+            .modify(|_, w| w.interrupt_ena().clear_bit());
+
+        WAKER.wake();
     }
 }

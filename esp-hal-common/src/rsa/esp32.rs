@@ -127,16 +127,17 @@ where
     /// This is a non blocking function that returns without an error if
     /// operation is completed successfully. `start_step1` must be called
     /// before calling this function.
-    pub fn start_step2(&mut self, operand_b: &T::InputType) -> nb::Result<(), Infallible> {
-        if !self.rsa.is_idle() {
-            return Err(nb::Error::WouldBlock);
+    pub fn start_step2(&mut self, operand_b: &T::InputType) {
+        loop {
+            if self.rsa.is_idle() {
+                self.rsa.clear_interrupt();
+                unsafe {
+                    self.rsa.write_operand_a(operand_b);
+                }
+                self.set_start();
+                break;
+            }
         }
-        self.rsa.clear_interrupt();
-        unsafe {
-            self.rsa.write_operand_a(operand_b);
-        }
-        self.set_start();
-        Ok(())
     }
 
     fn set_start(&mut self) {

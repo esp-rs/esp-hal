@@ -26,7 +26,6 @@ use esp32_hal::{
 };
 use esp_backtrace as _;
 use esp_println::println;
-use nb::block;
 
 const BIGNUM_1: U512 = Uint::from_be_hex(
     "c7f61058f96db3bd87dbab08ab03b4f7f2f864eac249144adea6a65f97803b719d8ca980b7b3c0389c1c7c6\
@@ -61,7 +60,7 @@ fn main() -> ! {
 
     let rsa = peripherals.RSA;
     let mut rsa = Rsa::new(rsa);
-    block!(rsa.ready()).unwrap();
+    nb::block!(rsa.ready()).unwrap();
     mod_exp_example(&mut rsa);
     mod_multi_example(&mut rsa);
     multiplication_example(&mut rsa);
@@ -78,8 +77,8 @@ fn mod_multi_example(rsa: &mut Rsa) {
     let r = compute_r(&BIGNUM_3).to_le_bytes();
     let pre_hw_modmul = xtensa_lx::timer::get_cycle_count();
     mod_multi.start_step1(&BIGNUM_1.to_le_bytes(), &r);
-    block!(mod_multi.start_step2(&BIGNUM_2.to_le_bytes())).unwrap();
-    block!(mod_multi.read_results(&mut outbuf)).unwrap();
+    mod_multi.start_step2(&BIGNUM_2.to_le_bytes());
+    mod_multi.read_results(&mut outbuf);
     let post_hw_modmul = xtensa_lx::timer::get_cycle_count();
     println!(
         "it took {} cycles for hw modular multiplication",
@@ -112,7 +111,7 @@ fn mod_exp_example(rsa: &mut Rsa) {
     let base = &BIGNUM_1.to_le_bytes();
     let pre_hw_exp = xtensa_lx::timer::get_cycle_count();
     mod_exp.start_exponentiation(base, &r);
-    block!(mod_exp.read_results(&mut outbuf)).unwrap();
+    mod_exp.read_results(&mut outbuf);
     let post_hw_exp = xtensa_lx::timer::get_cycle_count();
     println!(
         "it took {} cycles for hw modular exponentiation",
@@ -138,7 +137,7 @@ fn multiplication_example(rsa: &mut Rsa) {
     let operand_b = &BIGNUM_2.to_le_bytes();
     let pre_hw_mul = xtensa_lx::timer::get_cycle_count();
     rsamulti.start_multiplication(&operand_a, &operand_b);
-    block!(rsamulti.read_results(&mut out)).unwrap();
+    rsamulti.read_results(&mut out);
     let post_hw_mul = xtensa_lx::timer::get_cycle_count();
     println!(
         "it took {} cycles for hw multiplication",
