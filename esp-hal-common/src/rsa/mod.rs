@@ -60,7 +60,7 @@
 //! [nb]: https://docs.rs/nb/1.1.0/nb/
 //! [the repository with corresponding example]: https://github.com/esp-rs/esp-hal/blob/main/esp32-hal/examples/rsa.rs
 
-use core::{convert::Infallible, marker::PhantomData, ptr::copy_nonoverlapping};
+use core::{marker::PhantomData, ptr::copy_nonoverlapping};
 
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
@@ -166,12 +166,123 @@ macro_rules! implement_op {
 
 pub(self) use implement_op;
 
+/// Support for RSA peripheral's modular exponentiation feature that could be
+/// used to find the `(base ^ exponent) mod modulus`.
+///
+/// Each operand is a little endian byte array of the same size
+pub struct RsaModularExponentiation<'a, 'd, T: RsaMode> {
+    rsa: &'a mut Rsa<'d>,
+    phantom: PhantomData<T>,
+}
+
+impl<'a, 'd, T: RsaMode, const N: usize> RsaModularExponentiation<'a, 'd, T>
+where
+    T: RsaMode<InputType = [u8; N]>,
+{
+    /// starts the modular exponentiation operation. `r` could be calculated
+    /// using `2 ^ ( bitlength * 2 ) mod modulus`, for more information
+    /// check 24.3.2 in the <https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf>
+    pub fn start_exponentiation(&mut self, base: &T::InputType, r: &T::InputType) {
+        unsafe {
+            self.rsa.write_operand_a(base);
+            self.rsa.write_r(r);
+        }
+        self.set_start();
+    }
+
+    /// reads the result to the given buffer.
+    /// This is a non blocking function that returns without an error if
+    /// operation is completed successfully. `start_exponentiation` must be
+    /// called before calling this function.
+    pub fn read_results(&mut self, outbuf: &mut T::InputType) {
+        loop {
+            if self.rsa.is_idle() {
+                unsafe {
+                    self.rsa.read_out(outbuf);
+                }
+                self.rsa.clear_interrupt();
+                break;
+            }
+        }
+    }
+}
+
+/// Support for RSA peripheral's modular multiplication feature that could be
+/// used to find the `(operand a * operand b) mod modulus`.
+///
+/// Each operand is a little endian byte array of the same size
+pub struct RsaModularMultiplication<'a, 'd, T: RsaMode> {
+    rsa: &'a mut Rsa<'d>,
+    phantom: PhantomData<T>,
+}
+
+impl<'a, 'd, T: RsaMode, const N: usize> RsaModularMultiplication<'a, 'd, T>
+where
+    T: RsaMode<InputType = [u8; N]>,
+{
+    /// Reads the result to the given buffer.
+    /// This is a non blocking function that returns without an error if
+    /// operation is completed successfully.
+    pub fn read_results(&mut self, outbuf: &mut T::InputType) {
+        loop {
+            if self.rsa.is_idle() {
+                unsafe {
+                    self.rsa.read_out(outbuf);
+                }
+                self.rsa.clear_interrupt();
+                break;
+            }
+        }
+    }
+}
+
+/// Support for RSA peripheral's large number multiplication feature that could
+/// be used to find the `operand a * operand b`.
+///
+/// Each operand is a little endian byte array of the same size
+pub struct RsaMultiplication<'a, 'd, T: RsaMode + Multi> {
+    rsa: &'a mut Rsa<'d>,
+    phantom: PhantomData<T>,
+}
+
+impl<'a, 'd, T: RsaMode + Multi, const N: usize> RsaMultiplication<'a, 'd, T>
+where
+    T: RsaMode<InputType = [u8; N]>,
+{
+    /// Reads the result to the given buffer.
+    /// This is a non blocking function that returns without an error if
+    /// operation is completed successfully. `start_multiplication` must be
+    /// called before calling this function.
+    pub fn read_results<'b, const O: usize>(&mut self, outbuf: &mut T::OutputType)
+    where
+        T: Multi<OutputType = [u8; O]>,
+    {
+        loop {
+            if self.rsa.is_idle() {
+                unsafe {
+                    self.rsa.read_out(outbuf);
+                }
+                self.rsa.clear_interrupt();
+                break;
+            }
+        }
+    }
+}
+
 #[cfg(feature = "async")]
 pub(crate) mod asynch {
     use core::task::Poll;
 
     use embassy_sync::waitqueue::AtomicWaker;
     use procmacros::interrupt;
+
+    use crate::rsa::{
+        Multi,
+        RsaMode,
+        RsaModularExponentiation,
+        RsaModularMultiplication,
+        RsaMultiplication,
+    };
 
     static WAKER: AtomicWaker = AtomicWaker::new();
 
@@ -228,6 +339,84 @@ pub(crate) mod asynch {
         }
     }
 
+    impl<'a, 'd, T: RsaMode, const N: usize> RsaModularExponentiation<'a, 'd, T>
+    where
+        T: RsaMode<InputType = [u8; N]>,
+    {
+        pub async fn exponentiation(
+            &mut self,
+            base: &T::InputType,
+            r: &T::InputType,
+            outbuf: &mut T::InputType,
+        ) {
+            self.start_exponentiation(&base, &r);
+            RsaFuture::new(&self.rsa.rsa).await;
+            self.read_results(outbuf);
+        }
+    }
+
+    impl<'a, 'd, T: RsaMode, const N: usize> RsaModularMultiplication<'a, 'd, T>
+    where
+        T: RsaMode<InputType = [u8; N]>,
+    {
+        #[cfg(not(esp32))]
+        pub async fn modular_multiplication(
+            &mut self,
+            r: &T::InputType,
+            outbuf: &mut T::InputType,
+        ) {
+            self.start_modular_multiplication(r);
+            RsaFuture::new(&self.rsa.rsa).await;
+            self.read_results(outbuf);
+        }
+
+        #[cfg(esp32)]
+        pub async fn modular_multiplication(
+            &mut self,
+            operand_a: &T::InputType,
+            operand_b: &T::InputType,
+            r: &T::InputType,
+            outbuf: &mut T::InputType,
+        ) {
+            self.start_step1(operand_a, r);
+            self.start_step2(operand_b);
+            RsaFuture::new(&self.rsa.rsa).await;
+            self.read_results(outbuf);
+        }
+    }
+
+    impl<'a, 'd, T: RsaMode + Multi, const N: usize> RsaMultiplication<'a, 'd, T>
+    where
+        T: RsaMode<InputType = [u8; N]>,
+    {
+        #[cfg(not(esp32))]
+        pub async fn multiplication<'b, const O: usize>(
+            &mut self,
+            operand_b: &T::InputType,
+            outbuf: &mut T::OutputType,
+        ) where
+            T: Multi<OutputType = [u8; O]>,
+        {
+            self.start_multiplication(operand_b);
+            RsaFuture::new(&self.rsa.rsa).await;
+            self.read_results(outbuf);
+        }
+
+        #[cfg(esp32)]
+        pub async fn multiplication<'b, const O: usize>(
+            &mut self,
+            operand_a: &T::InputType,
+            operand_b: &T::InputType,
+            outbuf: &mut T::OutputType,
+        ) where
+            T: Multi<OutputType = [u8; O]>,
+        {
+            self.start_multiplication(operand_a, operand_b);
+            RsaFuture::new(&self.rsa.rsa).await;
+            self.read_results(outbuf);
+        }
+    }
+
     #[interrupt]
     fn RSA() {
         #[cfg(not(any(esp32, esp32s2, esp32s3)))]
@@ -246,214 +435,5 @@ pub(crate) mod asynch {
             .modify(|_, w| w.interrupt_ena().clear_bit());
 
         WAKER.wake();
-    }
-}
-
-/// Support for RSA peripheral's modular exponentiation feature that could be
-/// used to find the `(base ^ exponent) mod modulus`.
-///
-/// Each operand is a little endian byte array of the same size
-pub struct RsaModularExponentiation<'a, 'd, T: RsaMode> {
-    rsa: &'a mut Rsa<'d>,
-    phantom: PhantomData<T>,
-}
-
-impl<'a, 'd, T: RsaMode, const N: usize> RsaModularExponentiation<'a, 'd, T>
-where
-    T: RsaMode<InputType = [u8; N]>,
-{
-    /// starts the modular exponentiation operation. `r` could be calculated
-    /// using `2 ^ ( bitlength * 2 ) mod modulus`, for more information
-    /// check 24.3.2 in the <https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf>
-    pub fn start_exponentiation(&mut self, base: &T::InputType, r: &T::InputType) {
-        unsafe {
-            self.rsa.write_operand_a(base);
-            self.rsa.write_r(r);
-        }
-        self.set_start();
-    }
-
-    /// reads the result to the given buffer.
-    /// This is a non blocking function that returns without an error if
-    /// operation is completed successfully. `start_exponentiation` must be
-    /// called before calling this function.
-    pub fn read_results(&mut self, outbuf: &mut T::InputType) -> nb::Result<(), Infallible> {
-        if !self.rsa.is_idle() {
-            return Err(nb::Error::WouldBlock);
-        }
-        unsafe {
-            self.rsa.read_out(outbuf);
-        }
-        self.rsa.clear_interrupt();
-        Ok(())
-    }
-
-    #[cfg(feature = "async")]
-    pub async fn read(&mut self, outbuf: &mut T::InputType) {
-        loop {
-            if self.rsa.is_idle() {
-                unsafe {
-                    self.rsa.read_out(outbuf);
-                }
-                self.rsa.clear_interrupt();
-                break;
-            }
-        }
-    }
-
-    #[cfg(feature = "async")]
-    pub async fn exponentiation(
-        &mut self,
-        base: &T::InputType,
-        r: &T::InputType,
-        outbuf: &mut T::InputType,
-    ) {
-        self.start_exponentiation(&base, &r);
-        asynch::RsaFuture::new(&self.rsa.rsa).await;
-        self.read(outbuf).await;
-    }
-}
-
-/// Support for RSA peripheral's modular multiplication feature that could be
-/// used to find the `(operand a * operand b) mod modulus`.
-///
-/// Each operand is a little endian byte array of the same size
-pub struct RsaModularMultiplication<'a, 'd, T: RsaMode> {
-    rsa: &'a mut Rsa<'d>,
-    phantom: PhantomData<T>,
-}
-
-impl<'a, 'd, T: RsaMode, const N: usize> RsaModularMultiplication<'a, 'd, T>
-where
-    T: RsaMode<InputType = [u8; N]>,
-{
-    /// Reads the result to the given buffer.
-    /// This is a non blocking function that returns without an error if
-    /// operation is completed successfully.
-    pub fn read_results(&mut self, outbuf: &mut T::InputType) -> nb::Result<(), Infallible> {
-        if !self.rsa.is_idle() {
-            return Err(nb::Error::WouldBlock);
-        }
-        unsafe {
-            self.rsa.read_out(outbuf);
-        }
-        self.rsa.clear_interrupt();
-        Ok(())
-    }
-
-    #[cfg(feature = "async")]
-    pub async fn read(&mut self, outbuf: &mut T::InputType) {
-        loop {
-            if self.rsa.is_idle() {
-                unsafe {
-                    self.rsa.read_out(outbuf);
-                }
-                self.rsa.clear_interrupt();
-                break;
-            }
-        }
-    }
-
-    #[cfg(feature = "async")]
-    #[cfg(not(esp32))]
-    pub async fn modular_multiplication(&mut self, r: &T::InputType, outbuf: &mut T::InputType) {
-        self.start_modular_multiplication(r);
-        asynch::RsaFuture::new(&self.rsa.rsa).await;
-        self.read(outbuf).await;
-    }
-
-    #[cfg(feature = "async")]
-    #[cfg(esp32)]
-    pub async fn modular_multiplication(
-        &mut self,
-        operand_a: &T::InputType,
-        operand_b: &T::InputType,
-        r: &T::InputType,
-        outbuf: &mut T::InputType,
-    ) {
-        self.start_step1(operand_a, r);
-        self.start_step2(operand_b);
-        asynch::RsaFuture::new(&self.rsa.rsa).await;
-        self.read(outbuf).await;
-    }
-}
-
-/// Support for RSA peripheral's large number multiplication feature that could
-/// be used to find the `operand a * operand b`.
-///
-/// Each operand is a little endian byte array of the same size
-pub struct RsaMultiplication<'a, 'd, T: RsaMode + Multi> {
-    rsa: &'a mut Rsa<'d>,
-    phantom: PhantomData<T>,
-}
-
-impl<'a, 'd, T: RsaMode + Multi, const N: usize> RsaMultiplication<'a, 'd, T>
-where
-    T: RsaMode<InputType = [u8; N]>,
-{
-    /// Reads the result to the given buffer.
-    /// This is a non blocking function that returns without an error if
-    /// operation is completed successfully. `start_multiplication` must be
-    /// called before calling this function.
-    pub fn read_results<'b, const O: usize>(
-        &mut self,
-        outbuf: &mut T::OutputType,
-    ) -> nb::Result<(), Infallible>
-    where
-        T: Multi<OutputType = [u8; O]>,
-    {
-        if !self.rsa.is_idle() {
-            return Err(nb::Error::WouldBlock);
-        }
-        unsafe {
-            self.rsa.read_out(outbuf);
-        }
-        self.rsa.clear_interrupt();
-        Ok(())
-    }
-
-    #[cfg(feature = "async")]
-    pub async fn read<'b, const O: usize>(&mut self, outbuf: &mut T::OutputType)
-    where
-        T: Multi<OutputType = [u8; O]>,
-    {
-        loop {
-            if self.rsa.is_idle() {
-                unsafe {
-                    self.rsa.read_out(outbuf);
-                }
-                self.rsa.clear_interrupt();
-                break;
-            }
-        }
-    }
-
-    #[cfg(feature = "async")]
-    #[cfg(not(esp32))]
-    pub async fn multiplication<'b, const O: usize>(
-        &mut self,
-        operand_b: &T::InputType,
-        outbuf: &mut T::OutputType,
-    ) where
-        T: Multi<OutputType = [u8; O]>,
-    {
-        self.start_multiplication(operand_b);
-        asynch::RsaFuture::new(&self.rsa.rsa).await;
-        self.read(outbuf).await;
-    }
-
-    #[cfg(feature = "async")]
-    #[cfg(esp32)]
-    pub async fn multiplication<'b, const O: usize>(
-        &mut self,
-        operand_a: &T::InputType,
-        operand_b: &T::InputType,
-        outbuf: &mut T::OutputType,
-    ) where
-        T: Multi<OutputType = [u8; O]>,
-    {
-        self.start_multiplication(operand_a, operand_b);
-        asynch::RsaFuture::new(&self.rsa.rsa).await;
-        self.read(outbuf).await;
     }
 }
