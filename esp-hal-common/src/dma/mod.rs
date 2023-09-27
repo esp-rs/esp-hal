@@ -135,7 +135,7 @@ pub enum DmaPeripheral {
     I2s1   = 4,
     #[cfg(esp32s3)]
     LcdCam = 5,
-    #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
+    #[cfg(not(esp32c2))]
     Aes    = 6,
     #[cfg(gdma)]
     Sha    = 7,
@@ -259,6 +259,8 @@ pub trait I2s0Peripheral: I2sPeripheral + PeripheralMarker {}
 pub trait I2s1Peripheral: I2sPeripheral + PeripheralMarker {}
 
 pub trait ParlIoPeripheral: PeripheralMarker {}
+/// Marks channels as useable for AES
+pub trait AesPeripheral: PeripheralMarker {}
 
 /// DMA Rx
 pub trait Rx: RxPrivate {}
