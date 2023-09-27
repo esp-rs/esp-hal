@@ -101,10 +101,11 @@ impl WakeSource for TimerWakeupSource {
                 .int_clr_rtc
                 .write(|w| w.main_timer_int_clr().set_bit());
 
-            #[rustfmt::skip]
-            rtc_cntl.slp_timer1.write(|w| { w
-                .slp_val_hi().bits(((time_in_ticks >> 32) & 0xffff) as u16)
-                .main_timer_alarm_en().set_bit()
+            rtc_cntl.slp_timer1.write(|w| {
+                w.slp_val_hi()
+                    .bits(((time_in_ticks >> 32) & 0xffff) as u16)
+                    .main_timer_alarm_en()
+                    .set_bit()
             });
         }
     }
@@ -343,52 +344,35 @@ fn rtc_sleep_pu(val: bool) {
     let syscon = unsafe { &*esp32s3::APB_CTRL::ptr() };
     let bb = unsafe { &*esp32s3::BB::ptr() };
 
-    #[rustfmt::skip]
     rtc_cntl
         .dig_pwc
-        .modify(|_, w| w
-            .lslp_mem_force_pu().bit(val)
-        );
+        .modify(|_, w| w.lslp_mem_force_pu().bit(val));
 
-    #[rustfmt::skip]
-    rtc_cntl.pwc.modify(|_, w| w
-        .slowmem_force_lpu().bit(val)
-        .fastmem_force_lpu().bit(val)
-    );
+    rtc_cntl
+        .pwc
+        .modify(|_, w| w.slowmem_force_lpu().bit(val).fastmem_force_lpu().bit(val));
 
-    #[rustfmt::skip]
-    syscon.front_end_mem_pd.modify(|_r, w| w
-        .dc_mem_force_pu().bit(val)
-        .pbus_mem_force_pu().bit(val)
-        .agc_mem_force_pu().bit(val)
-    );
+    syscon.front_end_mem_pd.modify(|_r, w| {
+        w.dc_mem_force_pu()
+            .bit(val)
+            .pbus_mem_force_pu()
+            .bit(val)
+            .agc_mem_force_pu()
+            .bit(val)
+    });
 
-    #[rustfmt::skip]
-    bb.bbpd_ctrl.modify(|_r, w| w
-        .fft_force_pu().bit(val)
-        .dc_est_force_pu().bit(val)
-    );
+    bb.bbpd_ctrl
+        .modify(|_r, w| w.fft_force_pu().bit(val).dc_est_force_pu().bit(val));
 
-    #[rustfmt::skip]
     register_modify_bits(
         NRXPD_CTRL,
         NRX_RX_ROT_FORCE_PU | NRX_VIT_FORCE_PU | NRX_DEMAP_FORCE_PU,
         val,
     );
 
-    #[rustfmt::skip]
-    register_modify_bits(
-        FE_GEN_CTRL,
-        FE_IQ_EST_FORCE_PU,
-        val,
-    );
+    register_modify_bits(FE_GEN_CTRL, FE_IQ_EST_FORCE_PU, val);
 
-    #[rustfmt::skip]
-    register_modify_bits(
-        FE2_TX_INTERP_CTRL,
-        FE2_TX_INF_FORCE_PU,
-        val,
-    );
+    register_modify_bits(FE2_TX_INTERP_CTRL, FE2_TX_INF_FORCE_PU, val);
 
     syscon.mem_power_up.modify(|_r, w| unsafe {
         w.sram_power_up()
@@ -444,64 +428,70 @@ impl RtcSleepConfig {
             let extmem = &*esp32s3::EXTMEM::ptr();
             let system = &*esp32s3::SYSTEM::ptr();
 
-            #[rustfmt::skip]
-            rtc_cntl.dig_pwc.modify(|_, w| w
-                .wifi_force_pd().clear_bit()
-            );
+            rtc_cntl
+                .dig_pwc
+                .modify(|_, w| w.wifi_force_pd().clear_bit());
 
             regi2c_write_mask!(I2C_DIG_REG, I2C_DIG_REG_XPD_RTC_REG, 0);
-
             regi2c_write_mask!(I2C_DIG_REG, I2C_DIG_REG_XPD_DIG_REG, 0);
 
-            #[rustfmt::skip]
-            rtc_cntl.ana_conf.modify(|_, w| w
-                .pvtmon_pu().clear_bit()
-            );
+            rtc_cntl.ana_conf.modify(|_, w| w.pvtmon_pu().clear_bit());
 
-            #[rustfmt::skip]
-            rtc_cntl.timer1.modify(|_, w| w
-                .pll_buf_wait().bits(RTC_CNTL_PLL_BUF_WAIT_DEFAULT)
-                .ck8m_wait().bits(RTC_CNTL_CK8M_WAIT_DEFAULT)
-            );
+            rtc_cntl.timer1.modify(|_, w| {
+                w.pll_buf_wait()
+                    .bits(RTC_CNTL_PLL_BUF_WAIT_DEFAULT)
+                    .ck8m_wait()
+                    .bits(RTC_CNTL_CK8M_WAIT_DEFAULT)
+            });
 
             // Moved from rtc sleep to rtc init to save sleep function running time
             // set shortest possible sleep time limit
-            #[rustfmt::skip]
-            rtc_cntl.timer5.modify(|_, w| w
-                .min_slp_val().bits(RTC_CNTL_MIN_SLP_VAL_MIN)
-            );
 
-            #[rustfmt::skip]
-            rtc_cntl.timer3.modify(|_, w| w
-                // set wifi timer
-                .wifi_powerup_timer().bits(WIFI_POWERUP_CYCLES)
-                .wifi_wait_timer().bits(WIFI_WAIT_CYCLES)
-                // set bt timer
-                .bt_powerup_timer().bits(BT_POWERUP_CYCLES)
-                .bt_wait_timer().bits(BT_WAIT_CYCLES)
-            );
+            rtc_cntl
+                .timer5
+                .modify(|_, w| w.min_slp_val().bits(RTC_CNTL_MIN_SLP_VAL_MIN));
 
-            #[rustfmt::skip]
-            rtc_cntl.timer6.modify(|_, w| w
-                .cpu_top_powerup_timer().bits(CPU_TOP_POWERUP_CYCLES)
-                .cpu_top_wait_timer().bits(CPU_TOP_WAIT_CYCLES)
-            );
+            rtc_cntl.timer3.modify(|_, w| {
+                w
+                    // set wifi timer
+                    .wifi_powerup_timer()
+                    .bits(WIFI_POWERUP_CYCLES)
+                    .wifi_wait_timer()
+                    .bits(WIFI_WAIT_CYCLES)
+                    // set bt timer
+                    .bt_powerup_timer()
+                    .bits(BT_POWERUP_CYCLES)
+                    .bt_wait_timer()
+                    .bits(BT_WAIT_CYCLES)
+            });
 
-            #[rustfmt::skip]
-            rtc_cntl.timer4.modify(|_, w| w
-                // set rtc peri timer
-                .powerup_timer().bits(RTC_POWERUP_CYCLES)
-                .wait_timer().bits(RTC_WAIT_CYCLES)
-                // set digital wrap timer
-                .dg_wrap_powerup_timer().bits(DG_WRAP_POWERUP_CYCLES)
-                .dg_wrap_wait_timer().bits(DG_WRAP_WAIT_CYCLES)
-            );
+            rtc_cntl.timer6.modify(|_, w| {
+                w.cpu_top_powerup_timer()
+                    .bits(CPU_TOP_POWERUP_CYCLES)
+                    .cpu_top_wait_timer()
+                    .bits(CPU_TOP_WAIT_CYCLES)
+            });
 
-            #[rustfmt::skip]
-            rtc_cntl.timer6.modify(|_, w| w
-                .dg_peri_powerup_timer().bits(DG_PERI_POWERUP_CYCLES)
-                .dg_peri_wait_timer().bits(DG_PERI_WAIT_CYCLES)
-            );
+            rtc_cntl.timer4.modify(|_, w| {
+                w
+                    // set rtc peri timer
+                    .powerup_timer()
+                    .bits(RTC_POWERUP_CYCLES)
+                    .wait_timer()
+                    .bits(RTC_WAIT_CYCLES)
+                    // set digital wrap timer
+                    .dg_wrap_powerup_timer()
+                    .bits(DG_WRAP_POWERUP_CYCLES)
+                    .dg_wrap_wait_timer()
+                    .bits(DG_WRAP_WAIT_CYCLES)
+            });
+
+            rtc_cntl.timer6.modify(|_, w| {
+                w.dg_peri_powerup_timer()
+                    .bits(DG_PERI_POWERUP_CYCLES)
+                    .dg_peri_wait_timer()
+                    .bits(DG_PERI_WAIT_CYCLES)
+            });
 
             // Reset RTC bias to default value (needed if waking up from deep sleep)
             regi2c_write_mask!(
@@ -512,10 +502,11 @@ impl RtcSleepConfig {
             regi2c_write_mask!(I2C_DIG_REG, I2C_DIG_REG_EXT_RTC_DREG, RTC_CNTL_DBIAS_1V10);
 
             // Set the wait time to the default value.
-            #[rustfmt::skip]
-            rtc_cntl.timer2.modify(|_, w| w
-                .ulpcp_touch_start_wait().bits(RTC_CNTL_ULPCP_TOUCH_START_WAIT_DEFAULT)
-            );
+
+            rtc_cntl.timer2.modify(|_, w| {
+                w.ulpcp_touch_start_wait()
+                    .bits(RTC_CNTL_ULPCP_TOUCH_START_WAIT_DEFAULT)
+            });
 
             // LDO dbias initialization
             // TODO: this modifies g_rtc_dbias_pvt_non_240m and g_dig_dbias_pvt_non_240m.
@@ -526,23 +517,23 @@ impl RtcSleepConfig {
             regi2c_write_mask!(I2C_DIG_REG, I2C_DIG_REG_EXT_DIG_DREG, RTC_CNTL_DBIAS_1V25);
 
             // clear CMMU clock force on
-            #[rustfmt::skip]
-            extmem.cache_mmu_power_ctrl.modify(|_, w| w
-                .cache_mmu_mem_force_on().clear_bit()
-            );
+
+            extmem
+                .cache_mmu_power_ctrl
+                .modify(|_, w| w.cache_mmu_mem_force_on().clear_bit());
 
             // clear clkgate force on
             syscon.clkgate_force_on.write(|w| w.bits(0));
 
             // clear tag clock force on
-            #[rustfmt::skip]
-            extmem.dcache_tag_power_ctrl.modify(|_, w| w
-                .dcache_tag_mem_force_on().clear_bit()
-            );
-            #[rustfmt::skip]
-            extmem.icache_tag_power_ctrl.modify(|_, w| w
-                .icache_tag_mem_force_on().clear_bit()
-            );
+
+            extmem
+                .dcache_tag_power_ctrl
+                .modify(|_, w| w.dcache_tag_mem_force_on().clear_bit());
+
+            extmem
+                .icache_tag_power_ctrl
+                .modify(|_, w| w.icache_tag_mem_force_on().clear_bit());
 
             // clear register clock force on
             (&*esp32s3::SPI0::ptr())
@@ -552,146 +543,147 @@ impl RtcSleepConfig {
                 .clock_gate
                 .modify(|_, w| w.clk_en().clear_bit());
 
-            #[rustfmt::skip]
-            rtc_cntl.clk_conf.modify(|_, w| w
-                .ck8m_force_pu().clear_bit()
-            );
-            #[rustfmt::skip]
-            rtc_cntl.options0.modify(|_, w| w
-                .xtl_force_pu().clear_bit()
-            );
+            rtc_cntl
+                .clk_conf
+                .modify(|_, w| w.ck8m_force_pu().clear_bit());
 
-            #[rustfmt::skip]
-            rtc_cntl.ana_conf.modify(|_, w| w
-                // open sar_i2c protect function to avoid sar_i2c reset when rtc_ldo is low.
-                // clear i2c_reset_protect pd force, need tested in low temperature.
-                // NOTE: this bit is written again in esp-idf, but it's not clear why.
-                .i2c_reset_por_force_pd().clear_bit()
-            );
+            rtc_cntl
+                .options0
+                .modify(|_, w| w.xtl_force_pu().clear_bit());
+
+            rtc_cntl.ana_conf.modify(|_, w| {
+                w
+                    // open sar_i2c protect function to avoid sar_i2c reset when rtc_ldo is low.
+                    // clear i2c_reset_protect pd force, need tested in low temperature.
+                    // NOTE: this bit is written again in esp-idf, but it's not clear why.
+                    .i2c_reset_por_force_pd()
+                    .clear_bit()
+            });
 
             // cancel bbpll force pu if setting no force power up
-            #[rustfmt::skip]
-            rtc_cntl.options0.modify(|_, w| w
-                .bbpll_force_pu().clear_bit()
-                .bbpll_i2c_force_pu().clear_bit()
-                .bb_i2c_force_pu().clear_bit()
-            );
+
+            rtc_cntl.options0.modify(|_, w| {
+                w.bbpll_force_pu()
+                    .clear_bit()
+                    .bbpll_i2c_force_pu()
+                    .clear_bit()
+                    .bb_i2c_force_pu()
+                    .clear_bit()
+            });
 
             // cancel RTC REG force PU
-            #[rustfmt::skip]
-            rtc_cntl.pwc.modify(|_, w| w
-                .force_pu().clear_bit()
-            );
-            #[rustfmt::skip]
-            rtc_cntl.rtc.modify(|_, w| w
-                .regulator_force_pu().clear_bit()
-                .dboost_force_pu().clear_bit()
-            );
 
-            #[rustfmt::skip]
-            rtc_cntl.pwc.modify(|_, w| w
-                .slowmem_force_noiso().clear_bit()
-                .fastmem_force_noiso().clear_bit()
-            );
+            rtc_cntl.pwc.modify(|_, w| w.force_pu().clear_bit());
 
-            #[rustfmt::skip]
-            rtc_cntl.rtc.modify(|_, w| w
-                .dboost_force_pd().set_bit()
-            );
+            rtc_cntl.rtc.modify(|_, w| {
+                w.regulator_force_pu()
+                    .clear_bit()
+                    .dboost_force_pu()
+                    .clear_bit()
+            });
+
+            rtc_cntl.pwc.modify(|_, w| {
+                w.slowmem_force_noiso()
+                    .clear_bit()
+                    .fastmem_force_noiso()
+                    .clear_bit()
+            });
+
+            rtc_cntl.rtc.modify(|_, w| w.dboost_force_pd().set_bit());
 
             // If this mask is enabled, all soc memories cannot enter power down mode
             // We should control soc memory power down mode from RTC, so we will not touch
             // this register any more
-            #[rustfmt::skip]
-            system.mem_pd_mask.modify(|_, w| w
-                .lslp_mem_pd_mask().clear_bit()
-            );
+
+            system
+                .mem_pd_mask
+                .modify(|_, w| w.lslp_mem_pd_mask().clear_bit());
 
             // If this pd_cfg is set to 1, all memory won't enter low power mode during
             // light sleep If this pd_cfg is set to 0, all memory will enter low
             // power mode during light sleep
             rtc_sleep_pu(false);
 
-            #[rustfmt::skip]
-            rtc_cntl.dig_pwc.modify(|_, w| w
-                .dg_wrap_force_pu().clear_bit()
-            );
-            #[rustfmt::skip]
-            rtc_cntl.dig_iso.modify(|_, w| w
-                .dg_wrap_force_noiso().clear_bit()
-                .dg_wrap_force_iso().clear_bit()
-            );
+            rtc_cntl
+                .dig_pwc
+                .modify(|_, w| w.dg_wrap_force_pu().clear_bit());
 
-            #[rustfmt::skip]
-            rtc_cntl.dig_iso.modify(|_, w| w
-                .wifi_force_noiso().clear_bit()
-                .wifi_force_iso().clear_bit()
-            );
-            #[rustfmt::skip]
-            rtc_cntl.dig_pwc.modify(|_, w| w
-                .wifi_force_pu().clear_bit()
-            );
+            rtc_cntl.dig_iso.modify(|_, w| {
+                w.dg_wrap_force_noiso()
+                    .clear_bit()
+                    .dg_wrap_force_iso()
+                    .clear_bit()
+            });
 
-            #[rustfmt::skip]
-            rtc_cntl.dig_iso.modify(|_, w| w
-                .bt_force_noiso().clear_bit()
-                .bt_force_iso().clear_bit()
-            );
-            #[rustfmt::skip]
-            rtc_cntl.dig_pwc.modify(|_, w| w
-                .bt_force_pu().clear_bit()
-            );
+            rtc_cntl.dig_iso.modify(|_, w| {
+                w.wifi_force_noiso()
+                    .clear_bit()
+                    .wifi_force_iso()
+                    .clear_bit()
+            });
 
-            #[rustfmt::skip]
-            rtc_cntl.dig_iso.modify(|_, w| w
-                .cpu_top_force_noiso().clear_bit()
-                .cpu_top_force_iso().clear_bit()
-            );
-            #[rustfmt::skip]
-            rtc_cntl.dig_pwc.modify(|_, w| w
-                .cpu_top_force_pu().clear_bit()
-            );
+            rtc_cntl
+                .dig_pwc
+                .modify(|_, w| w.wifi_force_pu().clear_bit());
 
-            #[rustfmt::skip]
-            rtc_cntl.dig_iso.modify(|_, w| w
-                .dg_peri_force_noiso().clear_bit()
-                .dg_peri_force_iso().clear_bit()
-            );
-            #[rustfmt::skip]
-            rtc_cntl.dig_pwc.modify(|_, w| w
-                .dg_peri_force_pu().clear_bit()
-            );
+            rtc_cntl
+                .dig_iso
+                .modify(|_, w| w.bt_force_noiso().clear_bit().bt_force_iso().clear_bit());
 
-            #[rustfmt::skip]
-            rtc_cntl.pwc.modify(|_, w| w
-                .force_noiso().clear_bit()
-                .force_iso().clear_bit()
-                .force_pu().clear_bit()
-            );
+            rtc_cntl.dig_pwc.modify(|_, w| w.bt_force_pu().clear_bit());
+
+            rtc_cntl.dig_iso.modify(|_, w| {
+                w.cpu_top_force_noiso()
+                    .clear_bit()
+                    .cpu_top_force_iso()
+                    .clear_bit()
+            });
+
+            rtc_cntl
+                .dig_pwc
+                .modify(|_, w| w.cpu_top_force_pu().clear_bit());
+
+            rtc_cntl.dig_iso.modify(|_, w| {
+                w.dg_peri_force_noiso()
+                    .clear_bit()
+                    .dg_peri_force_iso()
+                    .clear_bit()
+            });
+
+            rtc_cntl
+                .dig_pwc
+                .modify(|_, w| w.dg_peri_force_pu().clear_bit());
+
+            rtc_cntl.pwc.modify(|_, w| {
+                w.force_noiso()
+                    .clear_bit()
+                    .force_iso()
+                    .clear_bit()
+                    .force_pu()
+                    .clear_bit()
+            });
 
             // if SYSTEM_CPU_WAIT_MODE_FORCE_ON == 0,
             // the cpu clk will be closed when cpu enter WAITI mode
-            #[rustfmt::skip]
-            system.cpu_per_conf.modify(|_, w| w
-                .cpu_wait_mode_force_on().clear_bit()
-            );
+
+            system
+                .cpu_per_conf
+                .modify(|_, w| w.cpu_wait_mode_force_on().clear_bit());
 
             // cancel digital PADS force no iso
-            #[rustfmt::skip]
-            rtc_cntl.dig_iso.modify(|_, w| w
-                .dg_pad_force_unhold().clear_bit()
-                .dg_pad_force_noiso().clear_bit()
-            );
+
+            rtc_cntl.dig_iso.modify(|_, w| {
+                w.dg_pad_force_unhold()
+                    .clear_bit()
+                    .dg_pad_force_noiso()
+                    .clear_bit()
+            });
 
             // force power down modem(wifi and ble) power domain
-            #[rustfmt::skip]
-            rtc_cntl.dig_iso.modify(|_, w| w
-                .wifi_force_iso().set_bit()
-            );
-            #[rustfmt::skip]
-            rtc_cntl.dig_pwc.modify(|_, w| w
-                .wifi_force_pd().set_bit()
-            );
+
+            rtc_cntl.dig_iso.modify(|_, w| w.wifi_force_iso().set_bit());
+
+            rtc_cntl.dig_pwc.modify(|_, w| w.wifi_force_pd().set_bit());
 
             rtc_cntl.int_ena_rtc.write(|w| w.bits(0));
             rtc_cntl.int_clr_rtc.write(|w| w.bits(u32::MAX));
@@ -707,75 +699,67 @@ impl RtcSleepConfig {
         }
 
         if self.modem_pd_en() {
-            #[rustfmt::skip]
-            rtc_cntl.dig_iso.modify(|_, w| w
-                .wifi_force_noiso().clear_bit()
-                .wifi_force_iso().clear_bit()
-            );
+            rtc_cntl.dig_iso.modify(|_, w| {
+                w.wifi_force_noiso()
+                    .clear_bit()
+                    .wifi_force_iso()
+                    .clear_bit()
+            });
 
-            #[rustfmt::skip]
-            rtc_cntl.dig_pwc.modify(|_, w| w
-                .wifi_force_pu().clear_bit()
-                .wifi_pd_en().set_bit()
-            );
+            rtc_cntl
+                .dig_pwc
+                .modify(|_, w| w.wifi_force_pu().clear_bit().wifi_pd_en().set_bit());
         } else {
-            #[rustfmt::skip]
-            rtc_cntl.dig_pwc.modify(|_, w| w
-                .wifi_pd_en().clear_bit()
-            );
+            rtc_cntl.dig_pwc.modify(|_, w| w.wifi_pd_en().clear_bit());
         }
 
         if self.cpu_pd_en() {
-            #[rustfmt::skip]
-            rtc_cntl.dig_iso.modify(|_, w| w
-                .cpu_top_force_noiso().clear_bit()
-                .cpu_top_force_iso().clear_bit()
-            );
+            rtc_cntl.dig_iso.modify(|_, w| {
+                w.cpu_top_force_noiso()
+                    .clear_bit()
+                    .cpu_top_force_iso()
+                    .clear_bit()
+            });
 
-            #[rustfmt::skip]
-            rtc_cntl.dig_pwc.modify(|_, w| w
-                .cpu_top_force_pu().clear_bit()
-                .cpu_top_pd_en().set_bit()
-            );
+            rtc_cntl
+                .dig_pwc
+                .modify(|_, w| w.cpu_top_force_pu().clear_bit().cpu_top_pd_en().set_bit());
         } else {
-            #[rustfmt::skip]
-            rtc_cntl.dig_pwc.modify(|_, w| w
-                .cpu_top_pd_en().clear_bit()
-            );
+            rtc_cntl
+                .dig_pwc
+                .modify(|_, w| w.cpu_top_pd_en().clear_bit());
         }
 
         if self.dig_peri_pd_en() {
-            #[rustfmt::skip]
-            rtc_cntl.dig_iso.modify(|_, w| w
-                .dg_peri_force_noiso().clear_bit()
-                .dg_peri_force_iso().clear_bit()
-            );
+            rtc_cntl.dig_iso.modify(|_, w| {
+                w.dg_peri_force_noiso()
+                    .clear_bit()
+                    .dg_peri_force_iso()
+                    .clear_bit()
+            });
 
-            #[rustfmt::skip]
-            rtc_cntl.dig_pwc.modify(|_, w| w
-                .dg_peri_force_pu().clear_bit()
-                .dg_peri_pd_en().set_bit()
-            );
+            rtc_cntl
+                .dig_pwc
+                .modify(|_, w| w.dg_peri_force_pu().clear_bit().dg_peri_pd_en().set_bit());
         } else {
-            #[rustfmt::skip]
-            rtc_cntl.dig_pwc.modify(|_, w| w
-                .dg_peri_pd_en().clear_bit()
-            );
+            rtc_cntl
+                .dig_pwc
+                .modify(|_, w| w.dg_peri_pd_en().clear_bit());
         }
 
         if self.rtc_peri_pd_en() {
-            #[rustfmt::skip]
-            rtc_cntl.pwc.modify(|_, w| w
-                .force_noiso().clear_bit()
-                .force_iso().clear_bit()
-                .force_pu().clear_bit()
-                .pd_en().set_bit()
-            );
+            rtc_cntl.pwc.modify(|_, w| {
+                w.force_noiso()
+                    .clear_bit()
+                    .force_iso()
+                    .clear_bit()
+                    .force_pu()
+                    .clear_bit()
+                    .pd_en()
+                    .set_bit()
+            });
         } else {
-            #[rustfmt::skip]
-            rtc_cntl.pwc.modify(|_, w| w
-                .pd_en().clear_bit()
-            );
+            rtc_cntl.pwc.modify(|_, w| w.pd_en().clear_bit());
         }
 
         unsafe {
@@ -791,91 +775,93 @@ impl RtcSleepConfig {
                 self.dig_dbias_slp()
             );
 
-            #[rustfmt::skip]
-            rtc_cntl.bias_conf.modify(|_, w| w
-                .dbg_atten_deep_slp().bits(self.dbg_atten_slp())
-                .bias_sleep_deep_slp().bit(self.bias_sleep_slp())
-                .pd_cur_deep_slp().bit(self.pd_cur_slp())
-                .dbg_atten_monitor().bits(RTC_CNTL_DBG_ATTEN_MONITOR_DEFAULT)
-                .bias_sleep_monitor().bit(self.bias_sleep_monitor())
-                .pd_cur_monitor().bit(self.pd_cur_monitor())
-            );
+            rtc_cntl.bias_conf.modify(|_, w| {
+                w.dbg_atten_deep_slp()
+                    .bits(self.dbg_atten_slp())
+                    .bias_sleep_deep_slp()
+                    .bit(self.bias_sleep_slp())
+                    .pd_cur_deep_slp()
+                    .bit(self.pd_cur_slp())
+                    .dbg_atten_monitor()
+                    .bits(RTC_CNTL_DBG_ATTEN_MONITOR_DEFAULT)
+                    .bias_sleep_monitor()
+                    .bit(self.bias_sleep_monitor())
+                    .pd_cur_monitor()
+                    .bit(self.pd_cur_monitor())
+            });
 
             if self.deep_slp() {
-                #[rustfmt::skip]
-                rtc_cntl.dig_pwc.modify(|_, w| w
-                    .dg_wrap_pd_en().set_bit()
-                );
+                rtc_cntl.dig_pwc.modify(|_, w| w.dg_wrap_pd_en().set_bit());
 
-                #[rustfmt::skip]
-                rtc_cntl.ana_conf.modify(|_, w| w
-                    .ckgen_i2c_pu().clear_bit()
-                    .pll_i2c_pu().clear_bit()
-                    .rfrx_pbus_pu().clear_bit()
-                    .txrf_i2c_pu().clear_bit()
-                );
+                rtc_cntl.ana_conf.modify(|_, w| {
+                    w.ckgen_i2c_pu()
+                        .clear_bit()
+                        .pll_i2c_pu()
+                        .clear_bit()
+                        .rfrx_pbus_pu()
+                        .clear_bit()
+                        .txrf_i2c_pu()
+                        .clear_bit()
+                });
 
-                #[rustfmt::skip]
-                rtc_cntl.options0.modify(|_, w| w
-                    .bb_i2c_force_pu().clear_bit()
-                );
+                rtc_cntl
+                    .options0
+                    .modify(|_, w| w.bb_i2c_force_pu().clear_bit());
             } else {
-                #[rustfmt::skip]
-                rtc_cntl.regulator_drv_ctrl.modify(|_, w| w
-                    .dg_vdd_drv_b_slp().bits(0xF)
-                );
+                rtc_cntl
+                    .regulator_drv_ctrl
+                    .modify(|_, w| w.dg_vdd_drv_b_slp().bits(0xF));
 
-                #[rustfmt::skip]
-                rtc_cntl.dig_pwc.modify(|_, w| w
-                    .dg_wrap_pd_en().clear_bit()
-                );
+                rtc_cntl
+                    .dig_pwc
+                    .modify(|_, w| w.dg_wrap_pd_en().clear_bit());
             }
 
             // mem force pu
-            #[rustfmt::skip]
-            rtc_cntl.dig_pwc.modify(|_, w| w
-                .lslp_mem_force_pu().set_bit()
-            );
 
-            #[rustfmt::skip]
-            rtc_cntl.rtc.modify(|_, w| w
-                .regulator_force_pu().bit(self.rtc_regulator_fpu())
-            );
+            rtc_cntl
+                .dig_pwc
+                .modify(|_, w| w.lslp_mem_force_pu().set_bit());
 
-            #[rustfmt::skip]
-            rtc_cntl.clk_conf.modify(|_, w| w
-                .ck8m_force_pu().bit(!self.int_8m_pd_en())
-            );
+            rtc_cntl
+                .rtc
+                .modify(|_, w| w.regulator_force_pu().bit(self.rtc_regulator_fpu()));
+
+            rtc_cntl
+                .clk_conf
+                .modify(|_, w| w.ck8m_force_pu().bit(!self.int_8m_pd_en()));
 
             // enable VDDSDIO control by state machine
-            #[rustfmt::skip]
-            rtc_cntl.sdio_conf.modify(|_, w| w
-                .sdio_force().clear_bit()
-                .sdio_reg_pd_en().bit(self.vddsdio_pd_en())
-            );
 
-            #[rustfmt::skip]
-            rtc_cntl.slp_reject_conf.modify(|_, w| w
-                .deep_slp_reject_en().bit(self.deep_slp_reject())
-                .light_slp_reject_en().bit(self.light_slp_reject())
-            );
+            rtc_cntl.sdio_conf.modify(|_, w| {
+                w.sdio_force()
+                    .clear_bit()
+                    .sdio_reg_pd_en()
+                    .bit(self.vddsdio_pd_en())
+            });
+
+            rtc_cntl.slp_reject_conf.modify(|_, w| {
+                w.deep_slp_reject_en()
+                    .bit(self.deep_slp_reject())
+                    .light_slp_reject_en()
+                    .bit(self.light_slp_reject())
+            });
 
             // Set wait cycle for touch or COCPU after deep sleep and light
             // sleep.
-            #[rustfmt::skip]
-            rtc_cntl.timer2.modify(|_, w| w
-                .ulpcp_touch_start_wait().bits(RTC_CNTL_ULPCP_TOUCH_START_WAIT_IN_SLEEP)
-            );
 
-            #[rustfmt::skip]
-            rtc_cntl.options0.modify(|_, w| w
-                .xtl_force_pu().bit(self.xtal_fpu())
-            );
+            rtc_cntl.timer2.modify(|_, w| {
+                w.ulpcp_touch_start_wait()
+                    .bits(RTC_CNTL_ULPCP_TOUCH_START_WAIT_IN_SLEEP)
+            });
 
-            #[rustfmt::skip]
-            rtc_cntl.clk_conf.modify(|_, w| w
-                .xtal_global_force_nogating().bit(self.xtal_fpu())
-            );
+            rtc_cntl
+                .options0
+                .modify(|_, w| w.xtl_force_pu().bit(self.xtal_fpu()));
+
+            rtc_cntl
+                .clk_conf
+                .modify(|_, w| w.xtal_global_force_nogating().bit(self.xtal_fpu()));
         }
     }
 
@@ -903,11 +889,12 @@ impl RtcSleepConfig {
         unsafe {
             let rtc_cntl = &*esp32s3::RTC_CNTL::ptr();
 
-            #[rustfmt::skip]
-            rtc_cntl.int_clr_rtc.write(|w| w
-                .slp_reject_int_clr().set_bit()
-                .slp_wakeup_int_clr().set_bit()
-            );
+            rtc_cntl.int_clr_rtc.write(|w| {
+                w.slp_reject_int_clr()
+                    .set_bit()
+                    .slp_wakeup_int_clr()
+                    .set_bit()
+            });
 
             // restore config if it is a light sleep
             if self.lslp_mem_inf_fpu() {
@@ -915,10 +902,11 @@ impl RtcSleepConfig {
             }
 
             // Recover default wait cycle for touch or COCPU after wakeup.
-            #[rustfmt::skip]
-            rtc_cntl.timer2.modify(|_, w| w
-                .ulpcp_touch_start_wait().bits(RTC_CNTL_ULPCP_TOUCH_START_WAIT_DEFAULT)
-            );
+
+            rtc_cntl.timer2.modify(|_, w| {
+                w.ulpcp_touch_start_wait()
+                    .bits(RTC_CNTL_ULPCP_TOUCH_START_WAIT_DEFAULT)
+            });
         }
     }
 }
