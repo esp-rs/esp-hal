@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Implement `embeded_hal_async::delay::DelayUs` trait for `SYSTIMER` alarms (#812)
 - ETM driver, GPIO ETM (#819)
 - (G)DMA AES support (#821)
+- SYSTIMER ETM functionality (#828)
 
 ### Changed
 
