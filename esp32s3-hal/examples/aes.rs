@@ -7,7 +7,7 @@ use aes::{
     Aes128 as Aes128SW,
 };
 use esp32s3_hal::{
-    aes::{Aes, Aes128, Cipher, Key},
+    aes::{Aes, Mode},
     clock::ClockControl,
     peripherals::Peripherals,
     prelude::*,
@@ -35,11 +35,9 @@ fn main() -> ! {
     let mut block_buf = [0_u8; 16];
     block_buf[..plaintext.len()].copy_from_slice(plaintext);
 
-    let key = Key::<Aes128>::from(&keybuf);
-    let mut cipher = Cipher::new(&mut aes, &key);
     let mut block = block_buf.clone();
     let pre_hw_encrypt = xtensa_lx::timer::get_cycle_count();
-    cipher.encrypt_block(&mut block);
+    aes.start_operation(&mut block, Mode::Encryption128, &keybuf);
     let post_hw_encrypt = xtensa_lx::timer::get_cycle_count();
     println!(
         "it took {} cycles for hw encrypt",
@@ -47,7 +45,7 @@ fn main() -> ! {
     );
     let hw_encrypted = block.clone();
     let pre_hw_decrypt = xtensa_lx::timer::get_cycle_count();
-    cipher.decrypt_block(&mut block);
+    aes.start_operation(&mut block, Mode::Decryption128, &keybuf);
     let post_hw_decrypt = xtensa_lx::timer::get_cycle_count();
     println!(
         "it took {} cycles for hw decrypt",
