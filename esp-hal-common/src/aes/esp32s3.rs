@@ -19,12 +19,16 @@ impl<'d> Aes<'d> {
     pub(super) fn write_key(&mut self, key: &[u8]) {
         debug_assert!(key.len() <= self.aes.key_.len() * ALIGN_SIZE);
         debug_assert_eq!(key.len() % ALIGN_SIZE, 0);
-        Self::write_to_regset(key, self.aes.key_.len(), &mut self.aes.key_[0]);
+        let len = self.aes.key_.len();
+        self.alignment_helper
+            .volatile_write_regset(&mut self.aes.key_[0], key, len);
     }
 
     pub(super) fn write_block(&mut self, block: &[u8]) {
         debug_assert_eq!(block.len(), self.aes.text_in_.len() * ALIGN_SIZE);
-        Self::write_to_regset(block, self.aes.text_in_.len(), &mut self.aes.text_in_[0]);
+        let len = self.aes.text_in_.len();
+        self.alignment_helper
+            .volatile_write_regset(&mut self.aes.text_in_[0], block, len);
     }
 
     pub(super) fn write_mode(&mut self, mode: u32) {
@@ -41,7 +45,9 @@ impl<'d> Aes<'d> {
 
     pub(super) fn read_block(&self, block: &mut [u8]) {
         debug_assert_eq!(block.len(), self.aes.text_out_.len() * ALIGN_SIZE);
-        Self::read_from_regset(block, self.aes.text_out_.len(), &self.aes.text_out_[0]);
+        let len = self.aes.text_out_.len();
+        self.alignment_helper
+            .volatile_read_regset(&self.aes.text_out_[0], block, len);
     }
 }
 
