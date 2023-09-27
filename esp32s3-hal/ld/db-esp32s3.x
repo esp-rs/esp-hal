@@ -1,5 +1,5 @@
 /* before memory.x to allow override */
-ENTRY(Reset)
+ENTRY(ESP32Reset)
 
 _stack_region_top = ABSOLUTE(ORIGIN(dram_seg))+LENGTH(dram_seg);
 _stack_region_bottom = _stack_end;
