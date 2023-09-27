@@ -30,10 +30,10 @@
 //! ### Encrypting and Decrypting (using hardware)
 //! ```no_run
 //! let mut block = block_buf.clone();
-//! aes.start_operation(&mut block, Mode::Encryption128, &keybuf);
+//! aes.process(&mut block, Mode::Encryption128, &keybuf);
 //! let hw_encrypted = block.clone();
 //!
-//! aes.start_operation(&mut block, Mode::Decryption128, &keybuf);
+//! aes.process(&mut block, Mode::Decryption128, &keybuf);
 //! let hw_decrypted = block;
 //! ```
 //!
@@ -77,7 +77,7 @@
 //! ### Operation
 //! ```no_run
 //! let transfer = aes
-//!     .dma_transfer(
+//!     .process(
 //!         plaintext,
 //!         hw_encrypted,
 //!         Mode::Encryption128,
@@ -135,7 +135,7 @@ impl<'d> Aes<'d> {
     }
 
     /// Encrypts/Decrypts the given buffer based on `mode` parameter
-    pub fn start_operation(&mut self, block: &mut [u8; 16], mode: Mode, key: &[u8; 16]) {
+    pub fn process(&mut self, block: &mut [u8; 16], mode: Mode, key: &[u8; 16]) {
         self.write_key(key);
         self.set_mode(mode as u8);
         self.set_block(block);
@@ -233,19 +233,18 @@ pub mod dma {
 
     use embedded_dma::{ReadBuffer, WriteBuffer};
 
-    use crate::aes::Mode;
-    use crate::dma::{
-        AesPeripheral,
-        Channel,
-        ChannelTypes,
-        DmaError,
-        DmaPeripheral,
-        // DmaTransfer,
-        DmaTransferRxTx,
-        // Rx,
-        RxPrivate,
-        // Tx,
-        TxPrivate,
+    use crate::{
+        aes::Mode,
+        dma::{
+            AesPeripheral,
+            Channel,
+            ChannelTypes,
+            DmaError,
+            DmaPeripheral,
+            DmaTransferRxTx,
+            RxPrivate,
+            TxPrivate,
+        },
     };
 
     const ALIGN_SIZE: usize = core::mem::size_of::<u32>();
@@ -395,7 +394,7 @@ pub mod dma {
         /// This will return a [AesDmaTransferRxTx] owning the buffer(s) and the
         /// AES instance. The maximum amount of data to be sent/received
         /// is 32736 bytes.
-        pub fn dma_transfer<TXBUF, RXBUF>(
+        pub fn process<TXBUF, RXBUF>(
             mut self,
             words: TXBUF,
             mut read_buffer: RXBUF,

@@ -37,7 +37,7 @@ fn main() -> ! {
 
     let mut block = block_buf.clone();
     let pre_hw_encrypt = xtensa_lx::timer::get_cycle_count();
-    aes.start_operation(&mut block, Mode::Encryption128, &keybuf);
+    aes.process(&mut block, Mode::Encryption128, &keybuf);
     let post_hw_encrypt = xtensa_lx::timer::get_cycle_count();
     println!(
         "it took {} cycles for hw encrypt",
@@ -45,7 +45,7 @@ fn main() -> ! {
     );
     let hw_encrypted = block.clone();
     let pre_hw_decrypt = xtensa_lx::timer::get_cycle_count();
-    aes.start_operation(&mut block, Mode::Decryption128, &keybuf);
+    aes.process(&mut block, Mode::Decryption128, &keybuf);
     let post_hw_decrypt = xtensa_lx::timer::get_cycle_count();
     println!(
         "it took {} cycles for hw decrypt",

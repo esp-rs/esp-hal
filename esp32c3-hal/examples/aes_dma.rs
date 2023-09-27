@@ -57,7 +57,7 @@ fn main() -> ! {
     let hw_encrypted = buffer3();
     let pre_hw_encrypt = SystemTimer::now();
     let transfer = aes
-        .dma_transfer(
+        .process(
             plaintext,
             hw_encrypted,
             Mode::Encryption128,
@@ -82,7 +82,7 @@ fn main() -> ! {
     let hw_decrypted = buffer5();
     let pre_hw_decrypt = SystemTimer::now();
     let transfer = aes
-        .dma_transfer(
+        .process(
             plaintext,
             hw_decrypted,
             Mode::Decryption128,

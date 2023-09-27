@@ -135,7 +135,7 @@ pub enum DmaPeripheral {
     I2s1   = 4,
     #[cfg(esp32s3)]
     LcdCam = 5,
-    #[cfg(not(any(esp32, esp32c2)))]
+    #[cfg(not(esp32c2))]
     Aes    = 6,
     #[cfg(gdma)]
     Sha    = 7,
