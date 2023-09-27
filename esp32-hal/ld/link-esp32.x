@@ -1,6 +1,6 @@
 
 /* before memory.x to allow override */
-ENTRY(Reset)
+ENTRY(ESP32Reset)
 
 /* after memory.x to allow override */
 PROVIDE(__pre_init = DefaultPreInit);
