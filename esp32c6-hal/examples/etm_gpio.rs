@@ -14,7 +14,6 @@ use esp_backtrace as _;
 
 #[entry]
 fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
     let peripherals = Peripherals::take();
     let system = peripherals.PCR.split();
     let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
