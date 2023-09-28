@@ -54,7 +54,7 @@ async fn spi_task(spi: &'static mut SpiType<'static>) {
 fn main() -> ! {
     esp_println::println!("Init!");
     let peripherals = Peripherals::take();
-    let mut system = peripherals.SYSTEM.split();
+    let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     #[cfg(feature = "embassy-time-systick")]

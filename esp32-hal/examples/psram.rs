@@ -5,14 +5,7 @@
 #![no_std]
 #![no_main]
 
-use esp32_hal::{
-    clock::ClockControl,
-    peripherals::Peripherals,
-    prelude::*,
-    psram,
-    timer::TimerGroup,
-    Rtc,
-};
+use esp32_hal::{clock::ClockControl, peripherals::Peripherals, prelude::*, psram};
 use esp_backtrace as _;
 use esp_println::println;
 
@@ -38,8 +31,8 @@ fn main() -> ! {
     psram::init_psram(peripherals.PSRAM);
     init_psram_heap();
 
-    let mut system = peripherals.DPORT.split();
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let system = peripherals.DPORT.split();
+    let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     println!("Going to access PSRAM");
 

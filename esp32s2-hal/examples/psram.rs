@@ -26,8 +26,8 @@ fn main() -> ! {
     psram::init_psram(peripherals.PSRAM);
     init_psram_heap();
 
-    let mut system = peripherals.SYSTEM.split();
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let system = peripherals.SYSTEM.split();
+    let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     println!("Going to access PSRAM");
 

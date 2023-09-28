@@ -64,7 +64,7 @@ async fn enable_disable_led(control: &'static Signal<CriticalSectionRawMutex, bo
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let mut system = peripherals.SYSTEM.split();
+    let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     // Set GPIO2 as an output, and set its state high initially.
