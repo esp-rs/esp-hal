@@ -26,7 +26,7 @@ categories = [
 
 [dependencies]
 esp-hal-common               = { version = "0.12.0", features = ["esp32s2"], path = "../esp-hal-common" }
-embassy-time                 = { version = "0.1.3",  features = ["nightly"], optional = true }
+embassy-time                 = { version = "0.1.4",  features = ["nightly"], optional = true }
 xtensa-atomic-emulation-trap = "0.4.0"
 
 [dev-dependencies]
@@ -66,10 +66,7 @@ vectored  = ["esp-hal-common/vectored"]
 
 # Embassy support
 embassy = ["esp-hal-common/embassy"]
-# FIXME:
-# - add 80_000_000 support to embassy time
-# - Fix https://github.com/esp-rs/esp-hal/issues/253
-# embassy-time-systick = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-hz-1_000_000"] 
+embassy-time-systick       = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-hz-80_000_000"] 
 embassy-time-timg0         = ["esp-hal-common/embassy-time-timg0", "embassy-time/tick-hz-1_000_000"]
 embassy-executor-interrupt = ["esp-hal-common/embassy-executor-interrupt"]
 embassy-executor-thread    = ["esp-hal-common/embassy-executor-thread"]

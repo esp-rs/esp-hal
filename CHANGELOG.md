@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `embassy-time-systick` to ESP32-S2 (#827)
 - Implement enabling/disabling BLE clock on ESP32-C6 (#784)
 - Async support for RMT (#787)
 - Implement `defmt::Format` for more types (#786)
