@@ -37,13 +37,13 @@ usb-device           = { version = "0.2.9", optional = true }
 embedded-hal-async = { version = "=1.0.0-rc.1", optional = true }
 embedded-io-async  = { version = "0.5.0", optional = true }
 embassy-executor   = { version = "0.3.0", features = ["integrated-timers"], optional = true }
-embassy-sync       = { version = "0.2.0", optional = true }
+embassy-sync       = { version = "0.3.0", optional = true }
 embassy-time       = { version = "0.1.3", features = ["nightly"], optional = true }
 embassy-futures    = { version = "0.1.0", optional = true }
 
 # RISC-V
-esp-riscv-rt                = { version = "0.5.0", path = "../esp-riscv-rt", optional = true }
-riscv-atomic-emulation-trap = { version = "0.4.0", optional = true }
+esp-riscv-rt                = { version = "0.5.0", optional = true, path = "../esp-riscv-rt" }
+riscv-atomic-emulation-trap = { version = "0.4.1", optional = true }
 
 # Xtensa
 xtensa-lx    = { version = "0.8.0",  optional = true }
@@ -58,25 +58,23 @@ ufmt-write = { version = "0.1.0", optional = true }
 esp32   = { version = "0.26.0", features = ["critical-section"], optional = true }
 esp32c2 = { version = "0.14.0", features = ["critical-section"], optional = true }
 esp32c3 = { version = "0.17.0", features = ["critical-section"], optional = true }
-# until new C6 pacs are relesed, required because of a wrong base address of GPIO_SD
-esp32c6 = { git = "https://github.com/esp-rs/esp-pacs", package = "esp32c6", rev = "1b1ce7ba631cb349a8255f5959e768d5c52fad40", version = "0.7.0",  features = ["critical-section"], optional = true }
-# until new H2 pacs are relesed, required because of https://github.com/esp-rs/esp-pacs/pull/156
-esp32h2 = { git = "https://github.com/esp-rs/esp-pacs.git", rev = "1b1ce7ba631cb349a8255f5959e768d5c52fad40",  features = ["critical-section"], optional = true }
+esp32c6 = { git = "https://github.com/esp-rs/esp-pacs", rev = "1b1ce7b", features = ["critical-section"], optional = true }
+esp32h2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "1b1ce7b", features = ["critical-section"], optional = true }
 esp32s2 = { version = "0.17.0", features = ["critical-section"], optional = true }
-esp32s3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "c1283ca", features = ["critical-section",], optional = true }
+esp32s3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "1b1ce7b", features = ["critical-section"], optional = true }
 
 [build-dependencies]
 basic-toml = "0.1.4"
 serde      = { version = "1.0.188", features = ["derive"] }
 
 [features]
-esp32   = ["esp32/rt",   "xtensa", "xtensa-lx/esp32", "xtensa-lx-rt/esp32", "procmacros/esp32"]
-esp32c2 = ["esp32c2/rt", "riscv",  "procmacros/esp32c2"]
-esp32c3 = ["esp32c3/rt", "riscv",  "procmacros/esp32c3"]
-esp32c6 = ["esp32c6/rt", "riscv",  "procmacros/esp32c6"]
-esp32h2 = ["esp32h2/rt", "riscv",  "procmacros/esp32h2"]
-esp32s2 = ["esp32s2/rt", "xtensa", "xtensa-lx/esp32s2", "xtensa-lx-rt/esp32s2", "esp-synopsys-usb-otg", "usb-device", "procmacros/esp32s2"]
-esp32s3 = ["esp32s3/rt", "xtensa", "xtensa-lx/esp32s3", "xtensa-lx-rt/esp32s3", "esp-synopsys-usb-otg", "usb-device", "procmacros/esp32s3"]
+esp32   = ["xtensa", "esp32/rt",   "procmacros/esp32",   "xtensa-lx/esp32",   "xtensa-lx-rt/esp32"]
+esp32c2 = ["riscv",  "esp32c2/rt", "procmacros/esp32c2"]
+esp32c3 = ["riscv",  "esp32c3/rt", "procmacros/esp32c3"]
+esp32c6 = ["riscv",  "esp32c6/rt", "procmacros/esp32c6"]
+esp32h2 = ["riscv",  "esp32h2/rt", "procmacros/esp32h2"]
+esp32s2 = ["xtensa", "esp32s2/rt", "procmacros/esp32s2", "xtensa-lx/esp32s2", "xtensa-lx-rt/esp32s2", "usb-otg"]
+esp32s3 = ["xtensa", "esp32s3/rt", "procmacros/esp32s3", "xtensa-lx/esp32s3", "xtensa-lx-rt/esp32s3", "usb-otg"]
 
 # Crystal frequency selection (ESP32 and ESP32-C2 only!)
 xtal_26mhz = []
@@ -92,23 +90,25 @@ opsram_2m = []
 opsram_4m = []
 opsram_8m = []
 
-# Implement the `embedded-hal==1.0.0-alpha.x` traits
-eh1 = ["embedded-hal-1", "embedded-hal-nb", "embedded-can"]
+# USB OTG support (ESP32-S2 and ESP32-S3 only! Enabled by default)
+usb-otg = ["esp-synopsys-usb-otg", "usb-device"]
+
+# Interrupt-related feature:
+#  - Use direct interrupt vectoring (RISC-V only!)
+#  - Use interrupt preemption (RISC-V only!)
+#  - Use vectored interrupts (calling the handlers defined in the PAC)
+direct-vectoring     = ["esp-riscv-rt/direct-vectoring"]
+interrupt-preemption = ["esp-riscv-rt/interrupt-preemption"]
+vectored             = ["procmacros/interrupt"]
 
 # Enable logging
 log = ["dep:log"]
 
-# To support `ufmt`
+# Trait implementation features:
+#  - Implement the `embedded-hal@1.0.0-rc.x` traits (and friends)
+#  - Implement the `ufmt_write::Write` trait where able
+eh1  = ["embedded-hal-1", "embedded-hal-nb", "embedded-can"]
 ufmt = ["ufmt-write"]
-
-# To use vectored interrupts (calling the handlers defined in the PAC)
-vectored = ["procmacros/interrupt"]
-
-# Use direct interrupt vectoring (RISC-V only!)
-direct-vectoring = ["esp-riscv-rt/direct-vectoring"]
-
-# Use interrupt preemption (RISC-V only!)
-interrupt-preemption = ["esp-riscv-rt/interrupt-preemption"]
 
 # Support for asynchronous operation, implementing traits from
 # `embedded-hal-async` and `embedded-io-async`
@@ -147,9 +147,9 @@ debug = [
 defmt = [
     "dep:defmt",
     "embassy-executor?/defmt",
+    "embassy-futures?/defmt",
     "embassy-sync?/defmt",
     "embassy-time?/defmt",
-    "embassy-futures?/defmt",
     "embedded-hal-1?/defmt-03",
     "embedded-io/defmt-03",
     "embedded-io-async?/defmt-03",
