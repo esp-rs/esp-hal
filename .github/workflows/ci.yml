@@ -52,7 +52,7 @@ jobs:
         run: cd esp-hal-smartled/ && cargo +nightly check --features=esp32h2
       # Check all Xtensa targets:
       - name: check (esp32)
-        run: cd esp-hal-smartled/ && cargo +esp check --features=esp32,esp32_40mhz
+        run: cd esp-hal-smartled/ && cargo +esp check --features=esp32,xtal_40mhz
       - name: check (esp32s2)
         run: cd esp-hal-smartled/ && cargo +esp check --features=esp32s2
       - name: check (esp32s3)
@@ -463,7 +463,7 @@ jobs:
           cargo check --example=embassy_serial --features=embassy,embassy-time-systick,async,embassy-executor-thread
           cargo check --example=embassy_i2c --features=embassy,embassy-time-systick,async,embassy-executor-thread
       - name: check esp32s3-hal (octal psram and psram)
-        run: |  # This examples require release!
+        run: | # This examples require release!
           cd esp32s3-hal/
           cargo check --example=octal_psram --features=opsram_2m --release
           cargo check --example=psram --features=psram_2m --release
