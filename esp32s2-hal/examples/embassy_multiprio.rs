@@ -87,6 +87,12 @@ fn main() -> ! {
     // Set GPIO2 as an output, and set its state high initially.
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
+    #[cfg(feature = "embassy-time-systick")]
+    embassy::init(
+        &clocks,
+        esp32s2_hal::systimer::SystemTimer::new(peripherals.SYSTIMER),
+    );
+
     #[cfg(feature = "embassy-time-timg0")]
     {
         let timer_group0 = esp32s2_hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks);

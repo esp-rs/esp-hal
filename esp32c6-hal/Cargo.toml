@@ -27,7 +27,7 @@ categories = [
 
 [dependencies]
 esp-hal-common = { version = "0.12.0", features = ["esp32c6"], path = "../esp-hal-common" }
-embassy-time   = { version = "0.1.3",  features = ["nightly"], optional = true }
+embassy-time   = { version = "0.1.4",  features = ["nightly"], optional = true }
 
 [dev-dependencies]
 aes                = "0.8.3"

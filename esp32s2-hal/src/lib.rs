@@ -18,6 +18,8 @@
 //!   using this feature.
 //! - `embassy-executor-interrupt` - Use the interrupt-mode embassy executor
 //! - `embassy-executor-thread` - Use the thread-mode embassy executor
+//! - `embassy-time-systick` - Enable the [embassy] time driver using the
+//!   `SYSTIMER` peripheral
 //! - `embassy-time-timg0` - Enable the [embassy] time driver using the `TIMG0`
 //!   peripheral
 //! - `log` - enable log output using the `log` crate

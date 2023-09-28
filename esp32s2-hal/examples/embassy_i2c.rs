@@ -34,6 +34,12 @@ async fn main(_spawner: Spawner) -> ! {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
+    #[cfg(feature = "embassy-time-systick")]
+    embassy::init(
+        &clocks,
+        esp32s2_hal::systimer::SystemTimer::new(peripherals.SYSTIMER),
+    );
+
     #[cfg(feature = "embassy-time-timg0")]
     {
         let timer_group0 = esp32s2_hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks);
