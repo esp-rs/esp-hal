@@ -281,7 +281,7 @@ mod critical_section_impl {
             unsafe fn acquire() -> critical_section::RawRestoreState {
                 let mut mstatus = 0u32;
                 core::arch::asm!("csrrci {0}, mstatus, 8", inout(reg) mstatus);
-                let mut tkn = ((mstatus & 0b1000) != 0) as critical_section::RawRestoreState;
+                let tkn = ((mstatus & 0b1000) != 0) as critical_section::RawRestoreState;
 
                 #[cfg(multi_core)]
                 {
