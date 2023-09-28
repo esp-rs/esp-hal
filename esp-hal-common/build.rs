@@ -98,16 +98,11 @@ fn main() {
         "esp32", "esp32c2", "esp32c3", "esp32c6", "esp32h2", "esp32s2", "esp32s3"
     );
 
-    // Handle the features for the ESP32's different crystal frequencies:
-    #[cfg(feature = "esp32")]
+    // Handle the features for the ESP32's and ESP32-C2's different crystal
+    // frequencies:
+    #[cfg(any(feature = "esp32", feature = "esp32c2"))]
     {
-        assert_unique_used_features!("esp32_26mhz", "esp32_40mhz");
-    }
-
-    // Handle the features for the ESP32-C2's different crystal frequencies:
-    #[cfg(feature = "esp32c2")]
-    {
-        assert_unique_used_features!("esp32c2_26mhz", "esp32c2_40mhz");
+        assert_unique_used_features!("xtal_26mhz", "xtal_40mhz");
     }
 
     // NOTE: update when adding new device support!

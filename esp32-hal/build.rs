@@ -59,7 +59,7 @@ fn generate_memory_extras() -> Vec<u8> {
 }
 
 fn check_features() {
-    if cfg!(feature = "xtal40mhz") && cfg!(feature = "xtal26mhz") {
+    if cfg!(feature = "xtal_40mhz") && cfg!(feature = "xtal_26mhz") {
         panic!("Only one xtal speed feature can be selected");
     }
 }
