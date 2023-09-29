@@ -21,10 +21,14 @@
 
 use core::{cell::RefCell, time::Duration};
 
-use crate::{gpio::RTCPin, Rtc};
+use crate::{
+    gpio::{RTCPin, RTCPinWithResistors},
+    Rtc,
+};
 
 #[cfg_attr(esp32, path = "rtc/esp32_sleep.rs")]
 #[cfg_attr(esp32s3, path = "rtc/esp32s3_sleep.rs")]
+#[cfg_attr(esp32c3, path = "rtc/esp32c3_sleep.rs")]
 mod rtc_sleep;
 
 pub use rtc_sleep::*;
@@ -70,6 +74,7 @@ impl<'a, P: RTCPin> Ext0WakeupSource<'a, P> {
     }
 }
 
+#[allow(unused)]
 pub struct Ext1WakeupSource<'a, 'b> {
     pins: RefCell<&'a mut [&'b mut dyn RTCPin]>,
     level: WakeupLevel,
@@ -91,11 +96,22 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 /// can be used to wake up from both light and deep sleep.
 #[allow(unused)]
 pub struct RtcioWakeupSource<'a, 'b> {
+    #[cfg(xtensa)]
     pins: RefCell<&'a mut [(&'b mut dyn RTCPin, WakeupLevel)]>,
+    #[cfg(esp32c3)]
+    pins: RefCell<&'a mut [(&'b mut dyn RTCPinWithResistors, WakeupLevel)]>,
 }
 
 impl<'a, 'b> RtcioWakeupSource<'a, 'b> {
+    #[cfg(xtensa)]
     pub fn new(pins: &'a mut [(&'b mut dyn RTCPin, WakeupLevel)]) -> Self {
+        Self {
+            pins: RefCell::new(pins),
+        }
+    }
+
+    #[cfg(esp32c3)]
+    pub fn new(pins: &'a mut [(&'b mut dyn RTCPinWithResistors, WakeupLevel)]) -> Self {
         Self {
             pins: RefCell::new(pins),
         }

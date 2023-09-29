@@ -228,6 +228,15 @@ crate::gpio::gpio! {
     (21, 0, InputOutput () (0 => U0TXD))
 }
 
+crate::gpio::rtc_pins! {
+    0
+    1
+    2
+    3
+    4
+    5
+}
+
 crate::gpio::analog! {
     0
     1
@@ -236,6 +245,8 @@ crate::gpio::analog! {
     4
     5
 }
+
+// RTC pins 0 through 5 (inclusive) support GPIO wakeup
 
 impl InterruptStatusRegisterAccess for InterruptStatusRegisterAccessBank0 {
     fn pro_cpu_interrupt_status_read() -> u32 {
