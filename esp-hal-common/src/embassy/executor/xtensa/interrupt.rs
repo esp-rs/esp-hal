@@ -7,12 +7,8 @@ use core::{
 };
 
 use embassy_executor::{raw, SendSpawner};
-#[cfg(dport)]
-use peripherals::DPORT as SystemPeripheral;
-#[cfg(system)]
-use peripherals::SYSTEM as SystemPeripheral;
 
-use crate::{get_core, interrupt, peripherals};
+use crate::{get_core, interrupt, peripherals, peripherals::SYSTEM};
 
 static FROM_CPU_IRQ_USED: AtomicUsize = AtomicUsize::new(0);
 
@@ -32,7 +28,7 @@ macro_rules! from_cpu {
 
             impl [<FromCpu $irq>] {
                 fn set_bit(value: bool) {
-                    let system = unsafe { &*SystemPeripheral::PTR };
+                    let system = unsafe { &*SYSTEM::PTR };
                     system
                         .[<cpu_intr_from_cpu_ $irq>]
                         .write(|w| w.[<cpu_intr_from_cpu_ $irq>]().bit(value));

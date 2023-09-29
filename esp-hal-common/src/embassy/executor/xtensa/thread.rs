@@ -5,14 +5,13 @@ use core::{
 };
 
 use embassy_executor::{raw, Spawner};
-#[cfg(all(dport, multi_core))]
-use peripherals::DPORT as SystemPeripheral;
-#[cfg(all(system, multi_core))]
-use peripherals::SYSTEM as SystemPeripheral;
 
 use crate::{get_core, prelude::interrupt};
 #[cfg(multi_core)]
-use crate::{interrupt, peripherals};
+use crate::{
+    interrupt,
+    peripherals::{self, SYSTEM},
+};
 
 /// global atomic used to keep track of whether there is work to do since sev()
 /// is not available on Xtensa
@@ -29,7 +28,7 @@ fn FROM_CPU_INTR0() {
         // woken. It doesn't matter which core handles this interrupt first, the
         // point is just to wake up the core that is currently executing
         // `waiti`.
-        let system = unsafe { &*SystemPeripheral::PTR };
+        let system = unsafe { &*SYSTEM::PTR };
         system
             .cpu_intr_from_cpu_0
             .write(|w| w.cpu_intr_from_cpu_0().bit(false));
@@ -48,7 +47,7 @@ pub(super) fn pend_thread_mode(core: usize) {
         // need it to trigger and run the interrupt handler, we just need to
         // kick waiti to return.
 
-        let system = unsafe { &*SystemPeripheral::PTR };
+        let system = unsafe { &*SYSTEM::PTR };
         system
             .cpu_intr_from_cpu_0
             .write(|w| w.cpu_intr_from_cpu_0().bit(true));

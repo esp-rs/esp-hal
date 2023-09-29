@@ -28,16 +28,10 @@
 //! let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 //! ```
 
-use crate::peripheral::PeripheralRef;
+use crate::{peripheral::PeripheralRef, peripherals::SYSTEM};
 
-#[cfg(esp32)]
-type SystemPeripheral = crate::peripherals::DPORT;
-#[cfg(any(esp32c6, esp32h2))]
-type SystemPeripheral = crate::peripherals::PCR;
 #[cfg(any(esp32c6, esp32h2))]
 type IntPri = crate::peripherals::INTPRI;
-#[cfg(not(any(esp32, esp32c6, esp32h2)))]
-type SystemPeripheral = crate::peripherals::SYSTEM;
 
 pub enum SoftwareInterrupt {
     SoftwareInterrupt0,
@@ -119,7 +113,7 @@ pub struct SoftwareInterruptControl {
 impl SoftwareInterruptControl {
     pub fn raise(&mut self, interrupt: SoftwareInterrupt) {
         #[cfg(not(any(esp32c6, esp32h2)))]
-        let system = unsafe { &*SystemPeripheral::PTR };
+        let system = unsafe { &*SYSTEM::PTR };
         #[cfg(any(esp32c6, esp32h2))]
         let system = unsafe { &*IntPri::PTR };
 
@@ -149,7 +143,7 @@ impl SoftwareInterruptControl {
 
     pub fn reset(&mut self, interrupt: SoftwareInterrupt) {
         #[cfg(not(any(esp32c6, esp32h2)))]
-        let system = unsafe { &*SystemPeripheral::PTR };
+        let system = unsafe { &*SYSTEM::PTR };
         #[cfg(any(esp32c6, esp32h2))]
         let system = unsafe { &*IntPri::PTR };
 
@@ -185,7 +179,7 @@ pub(crate) struct PeripheralClockControl;
 impl PeripheralClockControl {
     /// Enables and resets the given peripheral
     pub(crate) fn enable(peripheral: Peripheral) {
-        let system = unsafe { &*SystemPeripheral::PTR };
+        let system = unsafe { &*SYSTEM::PTR };
 
         #[cfg(not(esp32))]
         let (perip_clk_en0, perip_rst_en0) = { (&system.perip_clk_en0, &system.perip_rst_en0) };
@@ -393,7 +387,7 @@ impl PeripheralClockControl {
 impl PeripheralClockControl {
     /// Enables and resets the given peripheral
     pub(crate) fn enable(peripheral: Peripheral) {
-        let system = unsafe { &*SystemPeripheral::PTR };
+        let system = unsafe { &*SYSTEM::PTR };
 
         match peripheral {
             #[cfg(spi2)]
@@ -615,7 +609,7 @@ pub trait RadioClockController {
 
 /// The SYSTEM/DPORT splitted into it's different logical parts.
 pub struct SystemParts<'d> {
-    _private: PeripheralRef<'d, SystemPeripheral>,
+    _private: PeripheralRef<'d, SYSTEM>,
     pub clock_control: SystemClockControl,
     pub cpu_control: CpuControl,
     #[cfg(pdma)]
@@ -633,7 +627,7 @@ pub trait SystemExt<'d> {
     fn split(self) -> Self::Parts;
 }
 
-impl<'d, T: crate::peripheral::Peripheral<P = SystemPeripheral> + 'd> SystemExt<'d> for T {
+impl<'d, T: crate::peripheral::Peripheral<P = SYSTEM> + 'd> SystemExt<'d> for T {
     type Parts = SystemParts<'d>;
 
     fn split(self) -> Self::Parts {

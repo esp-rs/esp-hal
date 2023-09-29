@@ -74,7 +74,7 @@ type HmacSha256 = HmacSw<Sha256>;
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.PCR.split();
+    let system = peripherals.SYSTEM.split();
     let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let mut rng = Rng::new(peripherals.RNG);

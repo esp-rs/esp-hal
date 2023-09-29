@@ -55,7 +55,7 @@ const fn compute_mprime(modulus: &U512) -> u32 {
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.PCR.split();
+    let system = peripherals.SYSTEM.split();
     let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let mut rsa = Rsa::new(peripherals.RSA);
