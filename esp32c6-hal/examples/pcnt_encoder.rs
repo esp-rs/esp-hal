@@ -33,7 +33,7 @@ static VALUE: AtomicI32 = AtomicI32::new(0);
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.PCR.split();
+    let system = peripherals.SYSTEM.split();
     let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let unit_number = unit::Number::Unit1;

@@ -41,7 +41,7 @@ const TEST_PARAMS_VECTOR: TestParams = TestParams {
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let _system = peripherals.PCR.split();
+    let _system = peripherals.SYSTEM.split();
 
     let mut rng = Rng::new(peripherals.RNG);
 

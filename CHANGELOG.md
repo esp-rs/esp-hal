@@ -53,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Alarm::set_period` takes a period (duration) instead of a frequency (#812)
 - `Alarm::interrupt_clear` is now `Alarm::clear_interrupt` to be consistent (#812)
 - The `PeripheralClockControl` struct is no longer public, drivers no longer take this as a parameter (#817)
+- Unify the system peripheral, `SYSTEM`, `DPORT` and `PCR` are now all exposed as `SYSTEM` (#832).
 
 ## [0.12.0]
 

@@ -26,7 +26,7 @@ static TIMER11: Mutex<RefCell<Option<Timer<Timer1<TIMG1>>>>> = Mutex::new(RefCel
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.DPORT.split();
+    let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);

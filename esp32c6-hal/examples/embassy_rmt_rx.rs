@@ -80,7 +80,7 @@ fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     println!("Init!");
     let peripherals = Peripherals::take();
-    let system = peripherals.PCR.split();
+    let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
     let mut clock_control = system.peripheral_clock_control;
 

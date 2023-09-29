@@ -19,7 +19,7 @@ use nb::block;
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.PCR.split();
+    let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let mut uart0 = Uart::new(peripherals.UART0, &clocks);

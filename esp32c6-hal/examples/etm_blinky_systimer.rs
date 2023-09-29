@@ -16,7 +16,7 @@ use esp_backtrace as _;
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.PCR.split();
+    let system = peripherals.SYSTEM.split();
     let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let syst = SystemTimer::new(peripherals.SYSTIMER);

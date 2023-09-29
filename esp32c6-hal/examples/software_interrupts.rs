@@ -25,7 +25,7 @@ static SWINT: Mutex<RefCell<Option<SoftwareInterruptControl>>> = Mutex::new(RefC
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
-    let system = peripherals.PCR.split();
+    let system = peripherals.SYSTEM.split();
     let clockctrl = system.clock_control;
     let sw_int = system.software_interrupt_control;
     let clocks = ClockControl::boot_defaults(clockctrl).freeze();
