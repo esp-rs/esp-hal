@@ -70,7 +70,7 @@ pub use crate::spi::{
     Instance as _esp_hal_spi_Instance,
     InstanceDma as _esp_hal_spi_InstanceDma,
 };
-#[cfg(any(spi0, spi1, spi2, spi3))]
+#[cfg(all(any(spi0, spi1, spi2, spi3), not(pdma)))]
 pub use crate::spi_slave::{
     dma::WithDmaSpi2 as _esp_hal_spi_slave_dma_WithDmaSpi2,
     Instance as _esp_hal_spi_slave_Instance,
