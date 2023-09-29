@@ -153,6 +153,10 @@ struct Config {
     heap_size: usize,
     #[default(DEFAULT_TICK_RATE_HZ)]
     tick_rate_hz: u32,
+    #[default(3)]
+    listen_interval: u16,
+    #[default(6)]
+    beacon_timeout: u16,
 }
 
 #[cfg_attr(esp32, link_section = ".dram2_uninit")]

@@ -17,6 +17,7 @@ use enumset::EnumSetType;
 use esp_wifi_sys::include::esp_interface_t_ESP_IF_WIFI_AP;
 use esp_wifi_sys::include::esp_wifi_disconnect;
 use esp_wifi_sys::include::esp_wifi_get_mode;
+use esp_wifi_sys::include::esp_wifi_set_inactive_time;
 use esp_wifi_sys::include::esp_wifi_set_protocol;
 use esp_wifi_sys::include::wifi_ap_config_t;
 use esp_wifi_sys::include::wifi_auth_mode_t_WIFI_AUTH_WAPI_PSK;
@@ -640,16 +641,30 @@ unsafe extern "C" fn esp_wifi_tx_done_cb(
 pub fn wifi_start() -> Result<(), WifiError> {
     unsafe {
         esp_wifi_result!(esp_wifi_start())?;
-
-        #[cfg(any(coex, feature = "ps-min-modem"))]
-        esp_wifi_result!(esp_wifi_set_ps(
-            crate::binary::include::wifi_ps_type_t_WIFI_PS_MIN_MODEM
+        esp_wifi_result!(esp_wifi_set_inactive_time(
+            wifi_interface_t_WIFI_IF_STA,
+            crate::CONFIG.beacon_timeout
         ))?;
 
-        #[cfg(not(any(coex, feature = "ps-min-modem")))]
-        esp_wifi_result!(esp_wifi_set_ps(
-            crate::binary::include::wifi_ps_type_t_WIFI_PS_NONE
-        ))?;
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "ps-min-modem")] {
+                esp_wifi_result!(esp_wifi_set_ps(
+                    crate::binary::include::wifi_ps_type_t_WIFI_PS_MIN_MODEM
+                ))?;
+            } else if #[cfg(feature = "ps-max-modem")] {
+                esp_wifi_result!(esp_wifi_set_ps(
+                    crate::binary::include::wifi_ps_type_t_WIFI_PS_MAX_MODEM
+                ))?;
+            } else if #[cfg(coex)] {
+                esp_wifi_result!(esp_wifi_set_ps(
+                    crate::binary::include::wifi_ps_type_t_WIFI_PS_MIN_MODEM
+                ))?;
+            } else {
+                esp_wifi_result!(esp_wifi_set_ps(
+                    crate::binary::include::wifi_ps_type_t_WIFI_PS_NONE
+                ))?;
+            }
+        };
 
         let mut cntry_code = [0u8; 3];
         cntry_code[..crate::CONFIG.country_code.len()]
@@ -1110,7 +1125,7 @@ impl Wifi for WifiController<'_> {
                         bssid_set: config.bssid.is_some(),
                         bssid,
                         channel: config.channel.unwrap_or(0u8),
-                        listen_interval: 3,
+                        listen_interval: crate::CONFIG.listen_interval,
                         sort_method: wifi_sort_method_t_WIFI_CONNECT_AP_BY_SIGNAL,
                         threshold: wifi_scan_threshold_t {
                             rssi: -99,

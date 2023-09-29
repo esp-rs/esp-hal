@@ -571,6 +571,28 @@ impl<'d> EspNow<'d> {
         };
         check_error!({ esp_wifi_set_mode(wifi_mode_t_WIFI_MODE_STA) })?;
         check_error!({ esp_wifi_start() })?;
+        check_error!({
+            esp_wifi_set_inactive_time(wifi_interface_t_WIFI_IF_STA, crate::CONFIG.beacon_timeout)
+        })?;
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "ps-min-modem")] {
+                check_error!({esp_wifi_set_ps(
+                    crate::binary::include::wifi_ps_type_t_WIFI_PS_MIN_MODEM
+                )})?;
+            } else if #[cfg(feature = "ps-max-modem")] {
+                check_error!({esp_wifi_set_ps(
+                    crate::binary::include::wifi_ps_type_t_WIFI_PS_MAX_MODEM
+                )})?;
+            } else if #[cfg(coex)] {
+                check_error!({esp_wifi_set_ps(
+                    crate::binary::include::wifi_ps_type_t_WIFI_PS_MIN_MODEM
+                )})?;
+            } else {
+                check_error!({esp_wifi_set_ps(
+                    crate::binary::include::wifi_ps_type_t_WIFI_PS_NONE
+                )})?;
+            }
+        };
         check_error!({ esp_now_init() })?;
         check_error!({ esp_now_register_recv_cb(Some(rcv_cb)) })?;
         check_error!({ esp_now_register_send_cb(Some(send_cb)) })?;

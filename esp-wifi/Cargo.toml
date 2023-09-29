@@ -30,6 +30,7 @@ embassy-futures = { workspace = true, optional = true }
 embassy-net-driver = { workspace = true, optional = true }
 toml-cfg.workspace = true
 libm.workspace = true
+cfg-if.workspace = true
 
 [features]
 default = [ "utils", "log" ]
@@ -68,6 +69,7 @@ wifi = [ "embedded-svc" ]
 ble = [ "esp32-hal?/bluetooth" ]
 phy-enable-usb = []
 ps-min-modem = []
+ps-max-modem = []
 esp-now = [ "wifi" ]
 big-heap = []
 ipv6 = ["smoltcp?/proto-ipv6"]
