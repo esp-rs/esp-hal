@@ -1,68 +1,39 @@
-use std::{env, fs::File, io::Write, path::PathBuf};
+use std::{env, error::Error, fs, path::PathBuf};
 
 #[cfg(not(feature = "direct-boot"))]
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     // Put the linker script somewhere the linker can find it
     let out = &PathBuf::from(env::var_os("OUT_DIR").unwrap());
-    File::create(out.join("memory.x"))
-        .unwrap()
-        .write_all(include_bytes!("ld/memory.x"))
-        .unwrap();
-
-    File::create(out.join("link-esp32s3.x"))
-        .unwrap()
-        .write_all(include_bytes!("ld/link-esp32s3.x"))
-        .unwrap();
-
-    File::create(out.join("linkall.x"))
-        .unwrap()
-        .write_all(include_bytes!("ld/linkall.x"))
-        .unwrap();
-
     println!("cargo:rustc-link-search={}", out.display());
+
+    fs::copy("ld/memory.x", out.join("memory.x"))?;
+    fs::copy("ld/link-esp32s3.x", out.join("link-esp32s3.x"))?;
+    fs::copy("ld/linkall.x", out.join("linkall.x"))?;
+
+    fs::copy("ld/rom-functions.x", out.join("rom-functions.x"))?;
 
     // Only re-run the build script when memory.x is changed,
     // instead of when any part of the source code changes.
     println!("cargo:rerun-if-changed=ld/memory.x");
 
-    add_defaults();
+    Ok(())
 }
 
 #[cfg(feature = "direct-boot")]
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     // Put the linker script somewhere the linker can find it
     let out = &PathBuf::from(env::var_os("OUT_DIR").unwrap());
-    File::create(out.join("memory.x"))
-        .unwrap()
-        .write_all(include_bytes!("ld/db-memory.x"))
-        .unwrap();
-
-    File::create(out.join("link-esp32s3.x"))
-        .unwrap()
-        .write_all(include_bytes!("ld/db-esp32s3.x"))
-        .unwrap();
-
-    File::create(out.join("linkall.x"))
-        .unwrap()
-        .write_all(include_bytes!("ld/linkall.x"))
-        .unwrap();
-
     println!("cargo:rustc-link-search={}", out.display());
+
+    fs::copy("ld/db-memory.x", out.join("memory.x"))?;
+    fs::copy("ld/db-esp32s3.x", out.join("link-esp32s3.x"))?;
+    fs::copy("ld/linkall.x", out.join("linkall.x"))?;
+
+    fs::copy("ld/rom-functions.x", out.join("rom-functions.x"))?;
 
     // Only re-run the build script when memory.x is changed,
     // instead of when any part of the source code changes.
     println!("cargo:rerun-if-changed=ld/memory.x");
 
-    add_defaults();
-}
-
-fn add_defaults() {
-    let out = &PathBuf::from(env::var_os("OUT_DIR").unwrap());
-
-    File::create(out.join("rom-functions.x"))
-        .unwrap()
-        .write_all(include_bytes!("ld/rom-functions.x"))
-        .unwrap();
-
-    println!("cargo:rustc-link-search={}", out.display());
+    Ok(())
 }

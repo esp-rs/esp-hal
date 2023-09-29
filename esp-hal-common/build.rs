@@ -1,5 +1,6 @@
 use std::{
     env,
+    error::Error,
     fs::{self, File},
     io::{BufRead, BufReader, Write},
     path::{Path, PathBuf},
@@ -10,6 +11,7 @@ use serde::Deserialize;
 // Macros taken from:
 // https://github.com/TheDan64/inkwell/blob/36c3b10/src/lib.rs#L81-L110
 
+// Given some features, assert that AT MOST one of the features is enabled.
 macro_rules! assert_unique_features {
     () => {};
 
@@ -22,6 +24,7 @@ macro_rules! assert_unique_features {
     };
 }
 
+// Given some features, assert that AT LEAST one of the features is enabled.
 macro_rules! assert_used_features {
     ( $($all:tt),* ) => {
         #[cfg(not(any($(feature = $all),*)))]
@@ -29,6 +32,7 @@ macro_rules! assert_used_features {
     }
 }
 
+// Given some features, assert that EXACTLY one of the features is enabled.
 macro_rules! assert_unique_used_features {
     ( $($all:tt),* ) => {
         assert_unique_features!($($all),*);
@@ -44,7 +48,7 @@ enum Arch {
     Xtensa,
 }
 
-impl core::fmt::Display for Arch {
+impl std::fmt::Display for Arch {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
@@ -65,7 +69,7 @@ enum CoreCount {
     Multi,
 }
 
-impl core::fmt::Display for CoreCount {
+impl std::fmt::Display for CoreCount {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
@@ -91,7 +95,7 @@ struct Config {
     pub device: Device,
 }
 
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     // NOTE: update when adding new device support!
     // Ensure that exactly one chip has been specified:
     assert_unique_used_features!(
@@ -103,6 +107,13 @@ fn main() {
     #[cfg(any(feature = "esp32", feature = "esp32c2"))]
     {
         assert_unique_used_features!("xtal-26mhz", "xtal-40mhz");
+    }
+
+    // If the `embassy` feature is enabled, ensure that a time driver implementation
+    // is available:
+    #[cfg(feature = "embassy")]
+    {
+        assert_unique_used_features!("embassy-time-systick", "embassy-time-timg0");
     }
 
     // NOTE: update when adding new device support!
@@ -130,12 +141,18 @@ fn main() {
         .join("devices")
         .join(device_name)
         .join("device.toml")
-        .canonicalize()
-        .unwrap();
+        .canonicalize()?;
 
-    let config = fs::read_to_string(chip_toml_path).unwrap();
-    let config: Config = basic_toml::from_str(&config).unwrap();
+    let config = fs::read_to_string(chip_toml_path)?;
+    let config: Config = basic_toml::from_str(&config)?;
     let device = config.device;
+
+    // Check PSRAM features are only given if the target supports PSRAM:
+    if !&device.symbols.contains(&String::from("psram"))
+        && (cfg!(feature = "psram-2m") || cfg!(feature = "psram-4m") || cfg!(feature = "psram-8m"))
+    {
+        panic!("The target does not support PSRAM");
+    }
 
     // Define all necessary configuration symbols for the configured device:
     println!("cargo:rustc-cfg={}", device_name);
@@ -150,36 +167,26 @@ fn main() {
         println!("cargo:rustc-cfg={symbol}");
     }
 
-    // Check PSRAM features are only given if the target supports PSRAM
-    if !&device.symbols.contains(&String::from("psram"))
-        && (cfg!(feature = "psram-2m") || cfg!(feature = "psram-4m") || cfg!(feature = "psram-8m"))
-    {
-        panic!("The target does not support PSRAM");
-    }
-
-    // If the `embassy` feature is enabled, ensure that a time driver implementation
-    // is available
-    #[cfg(feature = "embassy")]
-    {
-        assert_unique_used_features!("embassy-time-systick", "embassy-time-timg0");
-    }
-
     // Place all linker scripts in `OUT_DIR`, and instruct Cargo how to find these
     // files:
     let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
     println!("cargo:rustc-link-search={}", out.display());
 
     if cfg!(feature = "esp32") || cfg!(feature = "esp32s2") || cfg!(feature = "esp32s3") {
-        fs::copy("ld/xtensa/hal-defaults.x", out.join("hal-defaults.x")).unwrap();
-        fs::copy("ld/xtensa/rom.x", out.join("alias.x")).unwrap();
+        fs::copy("ld/xtensa/hal-defaults.x", out.join("hal-defaults.x"))?;
+        fs::copy("ld/xtensa/rom.x", out.join("alias.x"))?;
     } else {
-        fs::copy("ld/riscv/hal-defaults.x", out.join("hal-defaults.x")).unwrap();
-        fs::copy("ld/riscv/asserts.x", out.join("asserts.x")).unwrap();
-        fs::copy("ld/riscv/debug.x", out.join("debug.x")).unwrap();
+        fs::copy("ld/riscv/hal-defaults.x", out.join("hal-defaults.x"))?;
+        fs::copy("ld/riscv/asserts.x", out.join("asserts.x"))?;
+        fs::copy("ld/riscv/debug.x", out.join("debug.x"))?;
     }
-    copy_dir_all("ld/sections", &out).unwrap();
 
-    gen_efuse_table(device_name, out);
+    copy_dir_all("ld/sections", &out)?;
+
+    // Generate the eFuse table from the selected device's CSV file:
+    gen_efuse_table(device_name, out)?;
+
+    Ok(())
 }
 
 fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> std::io::Result<()> {
@@ -196,17 +203,17 @@ fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> std::io::Result
     Ok(())
 }
 
-fn gen_efuse_table(device_name: &str, out_dir: impl AsRef<Path>) {
+fn gen_efuse_table(device_name: &str, out_dir: impl AsRef<Path>) -> Result<(), Box<dyn Error>> {
     let src_path = PathBuf::from(format!("devices/{device_name}/efuse.csv"));
     let out_path = out_dir.as_ref().join("efuse_fields.rs");
 
     println!("cargo:rerun-if-changed={}", src_path.display());
 
-    let mut writer = File::create(out_path).unwrap();
-    let mut reader = BufReader::new(File::open(src_path).unwrap());
+    let mut writer = File::create(out_path)?;
+    let mut reader = BufReader::new(File::open(src_path)?);
     let mut line = String::with_capacity(128);
 
-    while reader.read_line(&mut line).unwrap() > 0 {
+    while reader.read_line(&mut line)? > 0 {
         if line.ends_with("\n") {
             line.pop();
             if line.ends_with("\r") {
@@ -246,16 +253,17 @@ fn gen_efuse_table(device_name: &str, out_dir: impl AsRef<Path>) {
         ) {
             (Some(name), Some(block), Some(bit_off), Some(bit_len), Some(desc)) => {
                 let desc = desc.replace('[', "`[").replace(']', "]`");
-                writeln!(writer, "/// {desc}").unwrap();
+                writeln!(writer, "/// {desc}")?;
                 writeln!(
                     writer,
                     "pub const {name}: EfuseField = EfuseField::new(EfuseBlock::Block{block}, {bit_off}, {bit_len});"
-                )
-                .unwrap();
+                )?;
             }
             other => eprintln!("Invalid data: {other:?}"),
         }
 
         line.clear();
     }
+
+    Ok(())
 }
