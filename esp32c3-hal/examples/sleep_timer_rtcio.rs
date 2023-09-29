@@ -1,4 +1,5 @@
-//! Demonstrates deep sleep with timer and ext0 (using gpio18) wakeup
+//! Demonstrates deep sleep with timer, using gpio2 (low) and gpio3 (high) as
+//! wakeup.
 
 #![no_std]
 #![no_main]
