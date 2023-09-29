@@ -26,11 +26,11 @@ pub fn psram_vaddr_start() -> usize {
 }
 
 cfg_if::cfg_if! {
-    if #[cfg(feature = "psram_2m")] {
+    if #[cfg(feature = "psram-2m")] {
         const PSRAM_SIZE: u32 = 2;
-    } else if #[cfg(feature = "psram_4m")] {
+    } else if #[cfg(feature = "psram-4m")] {
         const PSRAM_SIZE: u32 = 4;
-    } else if #[cfg(feature = "psram_8m")] {
+    } else if #[cfg(feature = "psram-8m")] {
         const PSRAM_SIZE: u32 = 8;
     } else {
         const PSRAM_SIZE: u32 = 0;
@@ -41,13 +41,13 @@ pub const PSRAM_BYTES: usize = PSRAM_SIZE as usize * 1024 * 1024;
 
 pub const PSRAM_VADDR_START: usize = PSRAM_VADDR as usize;
 
-#[cfg(any(feature = "psram_2m", feature = "psram_4m", feature = "psram_8m"))]
+#[cfg(any(feature = "psram-2m", feature = "psram-4m", feature = "psram-8m"))]
 pub fn init_psram(_peripheral: impl crate::peripheral::Peripheral<P = crate::peripherals::PSRAM>) {
     utils::psram_init();
     utils::s_mapping(PSRAM_VADDR, PSRAM_BYTES as u32);
 }
 
-#[cfg(any(feature = "psram_2m", feature = "psram_4m", feature = "psram_8m"))]
+#[cfg(any(feature = "psram-2m", feature = "psram-4m", feature = "psram-8m"))]
 pub(crate) mod utils {
     use procmacros::ram;
 

@@ -102,7 +102,7 @@ fn main() {
     // frequencies:
     #[cfg(any(feature = "esp32", feature = "esp32c2"))]
     {
-        assert_unique_used_features!("xtal_26mhz", "xtal_40mhz");
+        assert_unique_used_features!("xtal-26mhz", "xtal-40mhz");
     }
 
     // NOTE: update when adding new device support!
@@ -152,7 +152,7 @@ fn main() {
 
     // Check PSRAM features are only given if the target supports PSRAM
     if !&device.symbols.contains(&String::from("psram"))
-        && (cfg!(feature = "psram_2m") || cfg!(feature = "psram_4m") || cfg!(feature = "psram_8m"))
+        && (cfg!(feature = "psram-2m") || cfg!(feature = "psram-4m") || cfg!(feature = "psram-8m"))
     {
         panic!("The target does not support PSRAM");
     }

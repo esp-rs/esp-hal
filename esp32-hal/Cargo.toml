@@ -50,7 +50,7 @@ ssd1306            = "0.8.1"
 static_cell        = { version = "1.2.0", features = ["nightly"] }
 
 [features]
-default            = ["rt", "vectored", "xtal_40mhz"]
+default            = ["rt", "vectored", "xtal-40mhz"]
 async              = ["esp-hal-common/async"]
 bluetooth          = []
 debug              = ["esp-hal-common/debug"]
@@ -60,8 +60,8 @@ log                = ["esp-hal-common/log"]
 rt                 = []
 ufmt               = ["esp-hal-common/ufmt"]
 vectored           = ["esp-hal-common/vectored"]
-xtal_26mhz         = ["esp-hal-common/xtal_26mhz"]
-xtal_40mhz         = ["esp-hal-common/xtal_40mhz"]
+xtal-26mhz         = ["esp-hal-common/xtal-26mhz"]
+xtal-40mhz         = ["esp-hal-common/xtal-40mhz"]
 
 # Embassy support
 embassy                    = ["esp-hal-common/embassy"]
@@ -71,9 +71,9 @@ embassy-executor-interrupt = ["esp-hal-common/embassy-executor-interrupt"]
 
 # PSRAM support
 psram     = []
-psram_2m  = ["esp-hal-common/psram_2m", "psram"]
-psram_4m  = ["esp-hal-common/psram_4m", "psram"]
-psram_8m  = ["esp-hal-common/psram_8m", "psram"]
+psram-2m  = ["esp-hal-common/psram-2m", "psram"]
+psram-4m  = ["esp-hal-common/psram-4m", "psram"]
+psram-8m  = ["esp-hal-common/psram-8m", "psram"]
 
 [profile.release]
 debug = true
@@ -112,7 +112,7 @@ required-features = ["embassy", "embassy-executor-thread", "async"]
 
 [[example]]
 name              = "psram"
-required-features = ["psram_2m"]
+required-features = ["psram-2m"]
 
 [[example]]
 name              = "embassy_serial"

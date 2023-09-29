@@ -49,7 +49,7 @@ p192              = {version = "0.13.0", default-features = false, features = ["
 p256              = {version = "0.13.2", default-features = false, features = ["arithmetic"] }
 
 [features]
-default              = ["rt", "vectored", "xtal_40mhz"]
+default              = ["rt", "vectored", "xtal-40mhz"]
 async                = ["esp-hal-common/async"]
 debug                = ["esp-hal-common/debug"]
 defmt                = ["esp-hal-common/defmt"]
@@ -61,8 +61,8 @@ log                  = ["esp-hal-common/log"]
 rt                   = []
 ufmt                 = ["esp-hal-common/ufmt"]
 vectored             = ["esp-hal-common/vectored"]
-xtal_26mhz           = ["esp-hal-common/xtal_26mhz"]
-xtal_40mhz           = ["esp-hal-common/xtal_40mhz"]
+xtal-26mhz           = ["esp-hal-common/xtal-26mhz"]
+xtal-40mhz           = ["esp-hal-common/xtal-40mhz"]
 
 # Embassy support
 embassy              = ["esp-hal-common/embassy"]

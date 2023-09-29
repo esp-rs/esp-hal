@@ -23,5 +23,5 @@ esp32h2 = ["esp-hal-common/esp32h2"]
 esp32s2 = ["esp-hal-common/esp32s2"]
 esp32s3 = ["esp-hal-common/esp32s3"]
 
-xtal_26mhz = ["esp-hal-common/xtal_26mhz"]
-xtal_40mhz = ["esp-hal-common/xtal_40mhz"]
+xtal-26mhz = ["esp-hal-common/xtal-26mhz"]
+xtal-40mhz = ["esp-hal-common/xtal-40mhz"]
