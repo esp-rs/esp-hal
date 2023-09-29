@@ -26,18 +26,18 @@
 //! - `embassy-time-timg0` - Enable the [embassy] time driver using the `TIMG0`
 //!   peripheral
 //! - `log` - enable log output using the `log` crate
-//! - `psram_2m` - Use externally connected PSRAM (2MB)
-//! - `psram_4m` - Use externally connected PSRAM (4MB)
-//! - `psram_8m` - Use externally connected PSRAM (8MB)
+//! - `psram-2m` - Use externally connected PSRAM (2MB)
+//! - `psram-4m` - Use externally connected PSRAM (4MB)
+//! - `psram-8m` - Use externally connected PSRAM (8MB)
 //! - `rt` - Runtime support
 //! - `ufmt` - Implement the [`ufmt_write::uWrite`] trait for the UART driver
 //! - `vectored` - Enable interrupt vectoring
-//! - `xtal_26mhz` - The target device uses a 26MHz crystal
-//! - `xtal_40mhz` - The target device uses a 40MHz crystal
+//! - `xtal-26mhz` - The target device uses a 26MHz crystal
+//! - `xtal-40mhz` - The target device uses a 40MHz crystal
 //!
 //! #### Default Features
 //!
-//! The `rt`, `vectored`, and `xtal_40mhz` features are enabled by default.
+//! The `rt`, `vectored`, and `xtal-40mhz` features are enabled by default.
 //!
 //! [embedded-hal-async]: https://github.com/rust-embedded/embedded-hal/tree/master/embedded-hal-async
 //! [embedded-io-async]: https://github.com/rust-embedded/embedded-hal/tree/master/embedded-io-async

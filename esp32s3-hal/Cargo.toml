@@ -76,14 +76,14 @@ embassy-executor-thread    = ["esp-hal-common/embassy-executor-thread"]
 
 # PSRAM support
 psram     = []
-psram_2m  = ["esp-hal-common/psram_2m", "psram"]
-psram_4m  = ["esp-hal-common/psram_4m", "psram"]
-psram_8m  = ["esp-hal-common/psram_8m", "psram"]
+psram-2m  = ["esp-hal-common/psram-2m", "psram"]
+psram-4m  = ["esp-hal-common/psram-4m", "psram"]
+psram-8m  = ["esp-hal-common/psram-8m", "psram"]
 
 # Octal RAM support
-opsram_2m  = ["esp-hal-common/opsram_2m", "psram"]
-opsram_4m  = ["esp-hal-common/opsram_4m", "psram"]
-opsram_8m  = ["esp-hal-common/opsram_8m", "psram"]
+opsram-2m  = ["esp-hal-common/opsram-2m", "psram"]
+opsram-4m  = ["esp-hal-common/opsram-4m", "psram"]
+opsram-8m  = ["esp-hal-common/opsram-8m", "psram"]
 
 [profile.release]
 debug = true
@@ -122,11 +122,11 @@ required-features = ["embassy", "embassy-executor-thread", "async"]
 
 [[example]]
 name              = "psram"
-required-features = ["psram_2m"]
+required-features = ["psram-2m"]
 
 [[example]]
 name              = "octal_psram"
-required-features = ["opsram_2m"]
+required-features = ["opsram-2m"]
 
 [[example]]
 name              = "embassy_serial"

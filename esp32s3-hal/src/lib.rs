@@ -25,12 +25,12 @@
 //! - `embassy-time-timg0` - Enable the [embassy] time driver using the `TIMG0`
 //!   peripheral
 //! - `log` - enable log output using the `log` crate
-//! - `opsram_2m` - Use externally connected Octal PSRAM (2MB)
-//! - `opsram_4m` - Use externally connected Octal PSRAM (4MB)
-//! - `opsram_8m` - Use externally connected Octal PSRAM (8MB)
-//! - `psram_2m` - Use externally connected PSRAM (2MB)
-//! - `psram_4m` - Use externally connected PSRAM (4MB)
-//! - `psram_8m` - Use externally connected PSRAM (8MB)
+//! - `opsram-2m` - Use externally connected Octal PSRAM (2MB)
+//! - `opsram-4m` - Use externally connected Octal PSRAM (4MB)
+//! - `opsram-8m` - Use externally connected Octal PSRAM (8MB)
+//! - `psram-2m` - Use externally connected PSRAM (2MB)
+//! - `psram-4m` - Use externally connected PSRAM (4MB)
+//! - `psram-8m` - Use externally connected PSRAM (8MB)
 //! - `rt` - Runtime support
 //! - `ufmt` - Implement the [`ufmt_write::uWrite`] trait for the UART driver
 //! - `vectored` - Enable interrupt vectoring

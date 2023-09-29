@@ -23,17 +23,17 @@ pub fn psram_vaddr_start() -> usize {
 }
 
 cfg_if::cfg_if! {
-    if #[cfg(feature = "psram_2m")] {
+    if #[cfg(feature = "psram-2m")] {
         const PSRAM_SIZE: u32 = 2;
-    } else if #[cfg(feature = "psram_4m")] {
+    } else if #[cfg(feature = "psram-4m")] {
         const PSRAM_SIZE: u32 = 4;
-    } else if #[cfg(feature = "psram_8m")] {
+    } else if #[cfg(feature = "psram-8m")] {
         const PSRAM_SIZE: u32 = 8;
-    } else if #[cfg(feature = "opsram_2m")] {
+    } else if #[cfg(feature = "opsram-2m")] {
         const PSRAM_SIZE: u32 = 2;
-    } else if #[cfg(feature = "opsram_4m")] {
+    } else if #[cfg(feature = "opsram-4m")] {
         const PSRAM_SIZE: u32 = 4;
-    } else if #[cfg(feature = "opsram_8m")] {
+    } else if #[cfg(feature = "opsram-8m")] {
         const PSRAM_SIZE: u32 = 8;
     } else {
         const PSRAM_SIZE: u32 = 0;
@@ -46,12 +46,12 @@ pub const PSRAM_BYTES: usize = PSRAM_SIZE as usize * 1024 * 1024;
 ///
 /// Currently only QSPI is supported.
 #[cfg(any(
-    feature = "psram_2m",
-    feature = "psram_4m",
-    feature = "psram_8m",
-    feature = "opsram_2m",
-    feature = "opsram_4m",
-    feature = "opsram_8m"
+    feature = "psram-2m",
+    feature = "psram-4m",
+    feature = "psram-8m",
+    feature = "opsram-2m",
+    feature = "opsram-4m",
+    feature = "opsram-8m"
 ))]
 pub fn init_psram(_peripheral: impl crate::peripheral::Peripheral<P = crate::peripherals::PSRAM>) {
     const CONFIG_ESP32S3_INSTRUCTION_CACHE_SIZE: u32 = 0x4000;
@@ -160,7 +160,7 @@ pub fn init_psram(_peripheral: impl crate::peripheral::Peripheral<P = crate::per
     utils::psram_init();
 }
 
-#[cfg(any(feature = "psram_2m", feature = "psram_4m", feature = "psram_8m"))]
+#[cfg(any(feature = "psram-2m", feature = "psram-4m", feature = "psram-8m"))]
 pub(crate) mod utils {
     use procmacros::ram;
 
@@ -779,7 +779,7 @@ pub(crate) mod utils {
     }
 }
 
-#[cfg(any(feature = "opsram_2m", feature = "opsram_4m", feature = "opsram_8m"))]
+#[cfg(any(feature = "opsram-2m", feature = "opsram-4m", feature = "opsram-8m"))]
 pub(crate) mod utils {
     use procmacros::ram;
 

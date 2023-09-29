@@ -67,7 +67,7 @@ fn main() {
 }
 
 fn check_features() {
-    if cfg!(feature = "xtal_40mhz") && cfg!(feature = "xtal_26mhz") {
+    if cfg!(feature = "xtal-40mhz") && cfg!(feature = "xtal-26mhz") {
         panic!("Only one xtal speed feature can be selected");
     }
 }

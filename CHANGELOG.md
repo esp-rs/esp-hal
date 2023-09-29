@@ -29,7 +29,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Bumped MSRV to 1.67 (#798)
 - Optimised multi-core critical section implementation (#797)
-- Unified the ESP32's and ESP32-C2's xtal frequency features (#831)
 
 ### Fixed
 
@@ -54,6 +53,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Alarm::interrupt_clear` is now `Alarm::clear_interrupt` to be consistent (#812)
 - The `PeripheralClockControl` struct is no longer public, drivers no longer take this as a parameter (#817)
 - Unify the system peripheral, `SYSTEM`, `DPORT` and `PCR` are now all exposed as `SYSTEM` (#832).
+- Unified the ESP32's and ESP32-C2's xtal frequency features (#831)
+- Replace any underscores in feature names with dashes (#833)
 
 ## [0.12.0]
 

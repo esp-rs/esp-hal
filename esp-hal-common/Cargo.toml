@@ -77,18 +77,18 @@ esp32s2 = ["xtensa", "esp32s2/rt", "procmacros/esp32s2", "xtensa-lx/esp32s2", "x
 esp32s3 = ["xtensa", "esp32s3/rt", "procmacros/esp32s3", "xtensa-lx/esp32s3", "xtensa-lx-rt/esp32s3", "usb-otg"]
 
 # Crystal frequency selection (ESP32 and ESP32-C2 only!)
-xtal_26mhz = []
-xtal_40mhz = []
+xtal-26mhz = []
+xtal-40mhz = []
 
 # PSRAM support
-psram_2m = []
-psram_4m = []
-psram_8m = []
+psram-2m = []
+psram-4m = []
+psram-8m = []
 
 # Octal RAM support
-opsram_2m = []
-opsram_4m = []
-opsram_8m = []
+opsram-2m = []
+opsram-4m = []
+opsram-8m = []
 
 # USB OTG support (ESP32-S2 and ESP32-S3 only! Enabled by default)
 usb-otg = ["esp-synopsys-usb-otg", "usb-device"]

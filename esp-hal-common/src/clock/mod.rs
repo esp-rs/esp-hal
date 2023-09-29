@@ -294,7 +294,7 @@ impl<'d> ClockControl<'d> {
     pub fn boot_defaults(
         clock_control: impl Peripheral<P = SystemClockControl> + 'd,
     ) -> ClockControl<'d> {
-        #[cfg(feature = "xtal_40mhz")]
+        #[cfg(feature = "xtal-40mhz")]
         return ClockControl {
             _private: clock_control.into_ref(),
             desired_rates: RawClocks {
@@ -306,7 +306,7 @@ impl<'d> ClockControl<'d> {
             },
         };
 
-        #[cfg(feature = "xtal_26mhz")]
+        #[cfg(feature = "xtal-26mhz")]
         return ClockControl {
             _private: clock_control.into_ref(),
             desired_rates: RawClocks {
@@ -326,9 +326,9 @@ impl<'d> ClockControl<'d> {
     ) -> ClockControl<'d> {
         // like NuttX use 40M hardcoded - if it turns out to be a problem
         // we will take care then
-        #[cfg(feature = "xtal_40mhz")]
+        #[cfg(feature = "xtal-40mhz")]
         let xtal_freq = XtalClock::RtcXtalFreq40M;
-        #[cfg(feature = "xtal_26mhz")]
+        #[cfg(feature = "xtal-26mhz")]
         let xtal_freq = XtalClock::RtcXtalFreq26M;
         let pll_freq = match cpu_clock_speed {
             CpuClock::Clock80MHz => PllClock::Pll320MHz,
@@ -368,7 +368,7 @@ impl<'d> ClockControl<'d> {
     pub fn boot_defaults(
         clock_control: impl Peripheral<P = SystemClockControl> + 'd,
     ) -> ClockControl<'d> {
-        #[cfg(feature = "xtal_40mhz")]
+        #[cfg(feature = "xtal-40mhz")]
         return ClockControl {
             _private: clock_control.into_ref(),
             desired_rates: RawClocks {
@@ -378,7 +378,7 @@ impl<'d> ClockControl<'d> {
             },
         };
 
-        #[cfg(feature = "xtal_26mhz")]
+        #[cfg(feature = "xtal-26mhz")]
         return ClockControl {
             _private: clock_control.into_ref(),
             desired_rates: RawClocks {
@@ -395,9 +395,9 @@ impl<'d> ClockControl<'d> {
         cpu_clock_speed: CpuClock,
     ) -> ClockControl<'d> {
         let apb_freq;
-        #[cfg(feature = "xtal_40mhz")]
+        #[cfg(feature = "xtal-40mhz")]
         let xtal_freq = XtalClock::RtcXtalFreq40M;
-        #[cfg(feature = "xtal_26mhz")]
+        #[cfg(feature = "xtal-26mhz")]
         let xtal_freq = XtalClock::RtcXtalFreq26M;
         let pll_freq = PllClock::Pll480MHz;
 
