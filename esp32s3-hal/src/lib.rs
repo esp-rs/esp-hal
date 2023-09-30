@@ -15,7 +15,8 @@
 //! - `eh1` - Implement the traits defined in the `1.0.0-xxx` pre-releases of
 //!   [embedded-hal], [embedded-hal-nb], and [embedded-io]
 //! - `embassy` - Enable support for [embassy], a modern asynchronous embedded
-//!   framework
+//!   framework. One of `embassy-time-*` features must also be enabled when
+//!   using this feature.
 //! - `embassy-executor-interrupt` - Use the multicore-aware interrupt-mode
 //!   embassy executor
 //! - `embassy-executor-thread` - Use the multicore-aware thread-mode embassy
