@@ -24,6 +24,7 @@ Please refer to the documentation for more information.
 - [The Rust Programming Language](https://doc.rust-lang.org/book/)
 - [The Embedded Rust Book](https://docs.rust-embedded.org/book/index.html)
 - [The Rust on ESP Book](https://esp-rs.github.io/book/)
+- [Embassy-rs Support](examples/README-embassy.md)
 
 ## Getting Started
 
