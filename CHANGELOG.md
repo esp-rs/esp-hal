@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Bumped MSRV to 1.67 (#798)
 - Optimised multi-core critical section implementation (#797)
+- Changed linear-calibrated ADC to provide readings in mV (#836)
 
 ### Fixed
 
