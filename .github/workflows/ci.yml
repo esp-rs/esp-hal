@@ -654,19 +654,3 @@ jobs:
         run: cargo fmt --all --manifest-path=esp32s2-hal/Cargo.toml -- --check
       - name: rustfmt (esp32s3-hal)
         run: cargo fmt --all --manifest-path=esp32s3-hal/Cargo.toml -- --check
-
-  # --------------------------------------------------------------------------
-  # Changelog
-
-  changelog:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v3
-
-      - uses: dangoslen/changelog-enforcer@v3
-        with:
-          changeLogPath: CHANGELOG.md
-          skipLabels: "skip-changelog"
-          missingUpdateErrorMessage: "Please add a changelog entry in the CHANGELOG.md file."
