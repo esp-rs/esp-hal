@@ -514,7 +514,7 @@ pub fn make_gpio_enum_dispatch_macro(input: TokenStream) -> TokenStream {
     .into()
 }
 
-#[cfg(feature = "esp32c6")]
+#[cfg(any(feature = "esp32c6", feature = "esp32s2", feature = "esp32s3"))]
 #[proc_macro]
 pub fn load_lp_code(input: TokenStream) -> TokenStream {
     use object::{Object, ObjectSection, ObjectSymbol};
@@ -524,9 +524,17 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
 
     #[cfg(feature = "esp32c6")]
     let hal_crate = crate_name("esp32c6-hal");
+    #[cfg(feature = "esp32s2")]
+    let hal_crate = crate_name("esp32s2-hal");
+    #[cfg(feature = "esp32s3")]
+    let hal_crate = crate_name("esp32s3-hal");
 
     #[cfg(feature = "esp32c6")]
     let hal_crate_name = Ident::new("esp32c6_hal", Span::call_site().into());
+    #[cfg(feature = "esp32s2")]
+    let hal_crate_name = Ident::new("esp32s2_hal", Span::call_site().into());
+    #[cfg(feature = "esp32s3")]
+    let hal_crate_name = Ident::new("esp32s3_hal", Span::call_site().into());
 
     let hal_crate = match hal_crate {
         Ok(FoundCrate::Itself) => {
@@ -577,12 +585,21 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
 
     let mut sections: Vec<object::Section> = sections
         .into_iter()
-        .filter(|section| section.address() != 0)
+        .filter(|section| match section.kind() {
+            object::SectionKind::Text
+            | object::SectionKind::ReadOnlyData
+            | object::SectionKind::Data
+            | object::SectionKind::UninitializedData => true,
+            _ => false,
+        })
         .collect();
     sections.sort_by(|a, b| a.address().partial_cmp(&b.address()).unwrap());
 
     let mut binary: Vec<u8> = Vec::new();
+    #[cfg(feature = "esp32c6")]
     let mut last_address = 0x50_000_000;
+    #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
+    let mut last_address = 0x0;
 
     for section in sections {
         if section.address() > last_address {
@@ -602,7 +619,7 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
     if let None = magic_symbol {
         return parse::Error::new(
             Span::call_site().into(),
-            "Given file doesn't seem to be an LP core application.",
+            "Given file doesn't seem to be an LP/ULP core application.",
         )
         .to_compile_error()
         .into();
@@ -621,12 +638,28 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
         .filter(|v: &proc_macro2::TokenStream| !v.is_empty())
         .collect();
 
+    #[cfg(feature = "esp32c6")]
+    let imports = quote! {
+        use #hal_crate::lp_core::LpCore;
+        use #hal_crate::lp_core::LpCoreWakeupSource;
+        use #hal_crate::gpio::lp_gpio::LowPowerPin;
+        use #hal_crate::gpio::*;
+    };
+    #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
+    let imports = quote! {
+        use #hal_crate::ulp_core::UlpCore as LpCore;
+        use #hal_crate::ulp_core::UlpCoreWakeupSource as LpCoreWakeupSource;
+        use #hal_crate::gpio::*;
+    };
+
+    #[cfg(feature = "esp32c6")]
+    let rtc_code_start = quote! { _rtc_fast_data_start };
+    #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
+    let rtc_code_start = quote! { _rtc_slow_data_start };
+
     quote! {
         {
-            use #hal_crate::lp_core::LpCore;
-            use #hal_crate::lp_core::LpCoreWakeupSource;
-            use #hal_crate::gpio::lp_gpio::LowPowerPin;
-            use #hal_crate::gpio::*;
+            #imports
 
             struct LpCoreCode {
             }
@@ -634,11 +667,11 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
             static LP_CODE: &[u8] = &[#(#binary),*];
 
             extern "C" {
-                static _rtc_fast_data_start: u32;
+                static #rtc_code_start: u32;
             }
 
             unsafe {
-                core::ptr::copy_nonoverlapping(LP_CODE as *const _ as *const u8, &_rtc_fast_data_start as *const u32 as *mut u8, LP_CODE.len());
+                core::ptr::copy_nonoverlapping(LP_CODE as *const _ as *const u8, &#rtc_code_start as *const u32 as *mut u8, LP_CODE.len());
             }
 
             impl LpCoreCode {
