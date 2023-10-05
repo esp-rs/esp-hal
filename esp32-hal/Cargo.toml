@@ -41,7 +41,7 @@ embedded-io-async  = "0.5.0"
 esp-alloc          = "0.3.0"
 esp-backtrace      = { version = "0.8.0", features = ["esp32", "panic-handler", "exception-handler", "print-uart"] }
 esp-hal-smartled   = { version = "0.5.0", features = ["esp32"], path = "../esp-hal-smartled" }
-esp-println        = { version = "0.6.0", features = ["esp32", "log"] }
+esp-println        = { version = "0.6.0", features = ["esp32"] }
 heapless           = "0.7.16"
 lis3dh-async       = "0.8.0"
 sha2               = { version = "0.10.7", default-features = false}
@@ -54,9 +54,9 @@ default            = ["rt", "vectored", "xtal-40mhz"]
 async              = ["esp-hal-common/async"]
 bluetooth          = []
 debug              = ["esp-hal-common/debug"]
-defmt              = ["esp-hal-common/defmt"]
+defmt              = ["esp-hal-common/defmt", "esp-println/defmt"]
 eh1                = ["esp-hal-common/eh1"]
-log                = ["esp-hal-common/log"]
+log                = ["esp-hal-common/log", "esp-println/log"]
 rt                 = []
 ufmt               = ["esp-hal-common/ufmt"]
 vectored           = ["esp-hal-common/vectored"]

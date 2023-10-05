@@ -24,6 +24,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     // instead of when any part of the source code changes.
     println!("cargo:rerun-if-changed=ld/memory.x");
 
+    #[cfg(feature = "defmt")]
+    println!("cargo:rustc-link-arg=-Tdefmt.x");
+
     Ok(())
 }
 

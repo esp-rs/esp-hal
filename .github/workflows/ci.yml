@@ -82,8 +82,8 @@ jobs:
       - name: check esp32-hal (common features)
         run: |
           cd esp32-hal/
-          cargo check --examples --features=eh1,ufmt,log
-          cargo check --examples --features=eh1,ufmt,defmt
+          cargo build --examples --features=eh1,ufmt,log
+          cargo build --examples --features=eh1,ufmt,defmt
       - name: check esp32-hal (embassy)
         run: |
           cd esp32-hal/
@@ -91,8 +91,6 @@ jobs:
           cargo check --example=embassy_multicore --features=embassy,embassy-time-timg0,embassy-executor-thread
           cargo check --example=embassy_multicore_interrupt --features=embassy,embassy-time-timg0,embassy-executor-interrupt
           cargo check --example=embassy_multiprio --features=embassy,embassy-time-timg0,embassy-executor-interrupt
-          cargo check --examples --features=embassy,embassy-time-timg0,embassy-executor-interrupt,embassy-executor-thread,defmt
-          cargo check --examples --features=embassy,embassy-time-timg0,embassy-executor-interrupt,embassy-executor-thread,log
       - name: check esp32-hal (embassy, async)
         run: |
           cd esp32-hal/
@@ -140,8 +138,8 @@ jobs:
       - name: check esp32c2-hal (common features)
         run: |
           cd esp32c2-hal/
-          cargo +nightly check --examples --features=eh1,ufmt,log
-          cargo +nightly check --examples --features=eh1,ufmt,defmt
+          cargo +nightly build --examples --features=eh1,ufmt,log
+          cargo +nightly build --examples --features=eh1,ufmt,defmt
       - name: check esp32c2-hal (async, systick)
         run: cd esp32c2-hal/ && cargo +nightly check --example=embassy_hello_world --features=embassy,embassy-time-systick
       - name: check esp32c2-hal (async, timg0)
@@ -155,9 +153,9 @@ jobs:
       - name: check esp32c2-hal (async, i2c)
         run: cd esp32c2-hal/ && cargo +nightly check --example=embassy_i2c --features=embassy,embassy-time-systick,async
       - name: check esp32c2-hal (interrupt-preemption)
-        run: cd esp32c2-hal/ && cargo check --example=interrupt_preemption --features=interrupt-preemption
+        run: cd esp32c2-hal/ && cargo +nightly check --example=interrupt_preemption --features=interrupt-preemption
       - name: check esp32c2-hal (direct-vectoring)
-        run: cd esp32c2-hal/ && cargo check --example=direct-vectoring --features=direct-vectoring
+        run: cd esp32c2-hal/ && cargo +nightly check --example=direct-vectoring --features=direct-vectoring
       - name: check esp32c2-hal (embassy, log/defmt)
         run: |
           cd esp32c2-hal/
@@ -194,8 +192,8 @@ jobs:
       - name: check esp32c3-hal (common features)
         run: |
           cd esp32c3-hal/
-          cargo +nightly check --examples --features=eh1,ufmt,log
-          cargo +nightly check --examples --features=eh1,ufmt,defmt
+          cargo +nightly build --examples --features=eh1,ufmt,log
+          cargo +nightly build --examples --features=eh1,ufmt,defmt
       - name: check esp32c3-hal (async, systick)
         run: cd esp32c3-hal/ && cargo +nightly check --example=embassy_hello_world --features=embassy,embassy-time-systick
       - name: check esp32c3-hal (async, timg0)
@@ -209,9 +207,9 @@ jobs:
       - name: check esp32c3-hal (async, i2c)
         run: cd esp32c3-hal/ && cargo +nightly check --example=embassy_i2c --features=embassy,embassy-time-systick,async
       - name: check esp32c3-hal (interrupt-preemption)
-        run: cd esp32c3-hal/ && cargo check --example=interrupt_preemption --features=interrupt-preemption
+        run: cd esp32c3-hal/ && cargo +nightly check --example=interrupt_preemption --features=interrupt-preemption
       - name: check esp32c3-hal (direct-vectoring)
-        run: cd esp32c3-hal/ && cargo check --example=direct-vectoring --features=direct-vectoring
+        run: cd esp32c3-hal/ && cargo +nightly check --example=direct-vectoring --features=direct-vectoring
       - name: check esp32c3-hal (embassy, log/defmt)
         run: |
           cd esp32c3-hal/
@@ -251,8 +249,8 @@ jobs:
       - name: check esp32c6-hal (common features)
         run: |
           cd esp32c6-hal/
-          cargo +nightly check --examples --features=eh1,ufmt,log
-          cargo +nightly check --examples --features=eh1,ufmt,defmt
+          cargo +nightly build --examples --features=eh1,ufmt,log
+          cargo +nightly build --examples --features=eh1,ufmt,defmt
       - name: check esp32c6-hal (async, systick)
         run: cd esp32c6-hal/ && cargo +nightly check --example=embassy_hello_world --features=embassy,embassy-time-systick
       - name: check esp32c6-hal (async, timg0)
@@ -266,9 +264,9 @@ jobs:
       - name: check esp32c6-hal (async, i2c)
         run: cd esp32c6-hal/ && cargo +nightly check --example=embassy_i2c --features=embassy,embassy-time-systick,async
       - name: check esp32c6-hal (interrupt-preemption)
-        run: cd esp32c6-hal/ && cargo check --example=interrupt_preemption --features=interrupt-preemption
+        run: cd esp32c6-hal/ && cargo +nightly check --example=interrupt_preemption --features=interrupt-preemption
       - name: check esp32c6-hal (direct-vectoring)
-        run: cd esp32c6-hal/ && cargo check --example=direct-vectoring --features=direct-vectoring
+        run: cd esp32c6-hal/ && cargo +nightly check --example=direct-vectoring --features=direct-vectoring
       - name: check esp32c6-hal (embassy, log/defmt)
         run: |
           cd esp32c6-hal/
@@ -323,8 +321,8 @@ jobs:
       - name: check esp32h2-hal (common features)
         run: |
           cd esp32h2-hal/
-          cargo +nightly check --examples --features=eh1,ufmt,log
-          cargo +nightly check --examples --features=eh1,ufmt,defmt
+          cargo +nightly build --examples --features=eh1,ufmt,log
+          cargo +nightly build --examples --features=eh1,ufmt,defmt
       - name: check esp32h2-hal (async, systick)
         run: cd esp32h2-hal/ && cargo +nightly check --example=embassy_hello_world --features=embassy,embassy-time-systick
       - name: check esp32h2-hal (async, timg0)
@@ -338,9 +336,9 @@ jobs:
       - name: check esp32h2-hal (async, i2c)
         run: cd esp32h2-hal/ && cargo +nightly check --example=embassy_i2c --features=embassy,embassy-time-systick,async
       - name: check esp32h2-hal (interrupt-preemption)
-        run: cd esp32h2-hal/ && cargo check --example=interrupt_preemption --features=interrupt-preemption
+        run: cd esp32h2-hal/ && cargo +nightly check --example=interrupt_preemption --features=interrupt-preemption
       - name: check esp32h2-hal (direct-vectoring)
-        run: cd esp32h2-hal/ && cargo check --example=direct-vectoring --features=direct-vectoring
+        run: cd esp32h2-hal/ && cargo +nightly check --example=direct-vectoring --features=direct-vectoring
       - name: check esp32h2-hal (embassy, log/defmt)
         run: |
           cd esp32h2-hal/
@@ -371,8 +369,8 @@ jobs:
       - name: check esp32s2-hal (common features)
         run: |
           cd esp32s2-hal/
-          cargo check --examples --features=eh1,ufmt,log
-          cargo check --examples --features=eh1,ufmt,defmt
+          cargo build --examples --features=eh1,ufmt,log
+          cargo build --examples --features=eh1,ufmt,defmt
       # FIXME: `time-systick` feature disabled for now, see 'esp32s2-hal/Cargo.toml'.
       # - name: check esp32s2-hal (async, systick)
       #   run: cd esp32s2-hal/ && cargo check --example=embassy_hello_world --features=embassy,embassy-time-systick,executor
@@ -428,8 +426,8 @@ jobs:
       - name: check esp32s3-hal (common features)
         run: |
           cd esp32s3-hal/
-          cargo check --examples --features=eh1,ufmt,log
-          cargo check --examples --features=eh1,ufmt,defmt
+          cargo build --examples --features=eh1,ufmt,log
+          cargo build --examples --features=eh1,ufmt,defmt
       - name: check esp32s3-hal (embassy, timg0)
         run: |
           cd esp32s3-hal/

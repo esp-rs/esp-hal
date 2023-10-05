@@ -76,6 +76,7 @@ async fn rmt_task(mut channel: Channel4<4>) {
 
 #[entry]
 fn main() -> ! {
+    #[cfg(feature = "log")]
     esp_println::logger::init_logger_from_env();
     println!("Init!");
     let peripherals = Peripherals::take();

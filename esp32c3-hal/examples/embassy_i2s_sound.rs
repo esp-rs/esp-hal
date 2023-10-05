@@ -45,6 +45,7 @@ use esp32c3_hal::{
     IO,
 };
 use esp_backtrace as _;
+use esp_println::println;
 use static_cell::make_static;
 
 const SINE: [i16; 64] = [
@@ -87,24 +88,25 @@ async fn i2s_task(
     let mut filler = [0u8; 10000];
     let mut idx = 32000 % data.len();
 
-    esp_println::println!("Start");
+    println!("Start");
     let mut transaction = i2s_tx.write_dma_circular_async(buffer).unwrap();
     loop {
         for i in 0..filler.len() {
             filler[i] = data[(idx + i) % data.len()];
         }
-        esp_println::println!("Next");
+        println!("Next");
 
         let written = transaction.push(&filler).await.unwrap();
         idx = (idx + written) % data.len();
-        esp_println::println!("written {}", written);
+        println!("written {}", written);
     }
 }
 
 #[entry]
 fn main() -> ! {
+    #[cfg(feature = "log")]
     esp_println::logger::init_logger_from_env();
-    esp_println::println!("Init!");
+    println!("Init!");
     let peripherals = Peripherals::take();
     let mut system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();

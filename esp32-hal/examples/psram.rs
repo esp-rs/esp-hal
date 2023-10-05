@@ -25,6 +25,7 @@ fn main() -> ! {
     #[cfg(debug_assertions)]
     compile_error!("PSRAM on ESP32 needs to be built in release mode");
 
+    #[cfg(feature = "log")]
     esp_println::logger::init_logger_from_env();
 
     let peripherals = Peripherals::take();

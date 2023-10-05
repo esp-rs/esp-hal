@@ -17,6 +17,7 @@ use esp32c6_hal::{
     IO,
 };
 use esp_backtrace as _;
+use esp_println::println;
 use static_cell::make_static;
 
 #[embassy_executor::task]
@@ -37,17 +38,18 @@ async fn rmt_task(mut channel: Channel0<0>) {
     data[data.len() - 1] = PulseCode::default();
 
     loop {
-        esp_println::println!("transmit");
+        println!("transmit");
         channel.transmit(&data).await.unwrap();
-        esp_println::println!("transmitted\n");
+        println!("transmitted\n");
         Timer::after(Duration::from_millis(500)).await;
     }
 }
 
 #[entry]
 fn main() -> ! {
+    #[cfg(feature = "log")]
     esp_println::logger::init_logger_from_env();
-    esp_println::println!("Init!");
+    println!("Init!");
     let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
