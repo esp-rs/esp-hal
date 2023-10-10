@@ -5,47 +5,22 @@
 #![no_main]
 #![feature(type_alias_impl_trait)]
 
+use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp32s3_hal::{
     clock::ClockControl,
-    embassy::{self, executor::Executor},
+    embassy::{self},
     peripherals::Peripherals,
     prelude::*,
-    rmt::{asynch::TxChannelAsync, Channel0, PulseCode, TxChannelConfig, TxChannelCreator},
+    rmt::{asynch::TxChannelAsync, PulseCode, TxChannelConfig, TxChannelCreator},
     Rmt,
     IO,
 };
 use esp_backtrace as _;
 use esp_println::println;
-use static_cell::make_static;
 
-#[embassy_executor::task]
-async fn rmt_task(mut channel: Channel0<0>) {
-    let mut data = [PulseCode {
-        level1: true,
-        length1: 200,
-        level2: false,
-        length2: 50,
-    }; 20];
-
-    data[data.len() - 2] = PulseCode {
-        level1: true,
-        length1: 3000,
-        level2: false,
-        length2: 500,
-    };
-    data[data.len() - 1] = PulseCode::default();
-
-    loop {
-        println!("transmit");
-        channel.transmit(&data).await.unwrap();
-        println!("transmitted\n");
-        Timer::after(Duration::from_millis(500)).await;
-    }
-}
-
-#[entry]
-fn main() -> ! {
+#[main]
+async fn main(_spawner: Spawner) -> ! {
     #[cfg(feature = "log")]
     esp_println::logger::init_logger_from_env();
     println!("Init!");
@@ -69,7 +44,7 @@ fn main() -> ! {
 
     let rmt = Rmt::new(peripherals.RMT, 8u32.MHz(), &clocks).unwrap();
 
-    let channel = rmt
+    let mut channel = rmt
         .channel0
         .configure(
             io.pins.gpio1.into_push_pull_output(),
@@ -87,8 +62,25 @@ fn main() -> ! {
     )
     .unwrap();
 
-    let executor = make_static!(Executor::new());
-    executor.run(|spawner| {
-        spawner.spawn(rmt_task(channel)).ok();
-    });
+    let mut data = [PulseCode {
+        level1: true,
+        length1: 200,
+        level2: false,
+        length2: 50,
+    }; 20];
+
+    data[data.len() - 2] = PulseCode {
+        level1: true,
+        length1: 3000,
+        level2: false,
+        length2: 500,
+    };
+    data[data.len() - 1] = PulseCode::default();
+
+    loop {
+        println!("transmit");
+        channel.transmit(&data).await.unwrap();
+        println!("transmitted\n");
+        Timer::after(Duration::from_millis(500)).await;
+    }
 }

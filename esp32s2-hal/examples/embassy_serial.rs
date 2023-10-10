@@ -7,9 +7,10 @@
 #![no_main]
 #![feature(type_alias_impl_trait)]
 
+use embassy_executor::Spawner;
 use esp32s2_hal::{
     clock::ClockControl,
-    embassy::{self, executor::Executor},
+    embassy::{self},
     interrupt,
     peripherals::{Interrupt, Peripherals, UART0},
     prelude::*,
@@ -18,7 +19,6 @@ use esp32s2_hal::{
 use esp_backtrace as _;
 use esp_hal_common::uart::{config::AtCmdConfig, UartRx, UartTx};
 use heapless::Vec;
-use static_cell::make_static;
 
 // rx_fifo_full_threshold
 const READ_BUF_SIZE: usize = 64;
@@ -60,8 +60,8 @@ async fn reader(mut rx: UartRx<'static, UART0>) {
     }
 }
 
-#[entry]
-fn main() -> ! {
+#[main]
+async fn main(spawner: Spawner) {
     esp_println::println!("Init!");
     let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();
@@ -82,9 +82,6 @@ fn main() -> ! {
 
     interrupt::enable(Interrupt::UART0, interrupt::Priority::Priority1).unwrap();
 
-    let executor = make_static!(Executor::new());
-    executor.run(|spawner| {
-        spawner.spawn(reader(rx)).ok();
-        spawner.spawn(writer(tx)).ok();
-    });
+    spawner.spawn(reader(rx)).ok();
+    spawner.spawn(writer(tx)).ok();
 }

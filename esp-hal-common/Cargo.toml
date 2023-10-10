@@ -115,7 +115,7 @@ ufmt = ["ufmt-write"]
 async = ["embedded-hal-async", "eh1", "embassy-sync", "embassy-futures", "embedded-io-async"]
 
 # Embassy support
-embassy = ["embassy-time"]
+embassy = ["embassy-time","procmacros/embassy"]
 
 embassy-executor-interrupt = ["embassy", "embassy-executor"]
 embassy-executor-thread    = ["embassy", "embassy-executor"]

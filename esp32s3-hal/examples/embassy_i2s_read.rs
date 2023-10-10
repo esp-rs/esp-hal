@@ -15,57 +15,22 @@
 #![no_main]
 #![feature(type_alias_impl_trait)]
 
+use embassy_executor::Spawner;
 use esp32s3_hal::{
     clock::ClockControl,
     dma::DmaPriority,
-    embassy::{self, executor::Executor},
+    embassy::{self},
     gdma::Gdma,
-    gpio::GpioPin,
-    i2s,
-    i2s::{asynch::*, DataFormat, I2s, I2s0New, I2sRx, MclkPin, PinsBclkWsDin, Standard},
+    i2s::{asynch::*, DataFormat, I2s, I2s0New, MclkPin, PinsBclkWsDin, Standard},
     peripherals::Peripherals,
     prelude::*,
     IO,
 };
 use esp_backtrace as _;
 use esp_println::println;
-use static_cell::make_static;
 
-#[embassy_executor::task]
-async fn i2s_task(
-    i2s_rx: I2sRx<
-        'static,
-        i2s::I2sPeripheral0,
-        PinsBclkWsDin<
-            'static,
-            GpioPin<esp32s3_hal::gpio::Unknown, 1>,
-            GpioPin<esp32s3_hal::gpio::Unknown, 2>,
-            GpioPin<esp32s3_hal::gpio::Unknown, 3>,
-        >,
-        esp32s3_hal::gdma::Channel0,
-    >,
-) {
-    let buffer = dma_buffer();
-    println!("Start");
-
-    let mut data = [0u8; 5000];
-    let mut transaction = i2s_rx.read_dma_circular_async(buffer).unwrap();
-    loop {
-        let avail = transaction.available().await;
-        println!("available {}", avail);
-
-        let count = transaction.pop(&mut data).await.unwrap();
-        println!(
-            "got {} bytes, {:x?}..{:x?}",
-            count,
-            &data[..10],
-            &data[count - 10..count]
-        );
-    }
-}
-
-#[entry]
-fn main() -> ! {
+#[main]
+async fn main(_spawner: Spawner) -> ! {
     #[cfg(feature = "log")]
     esp_println::logger::init_logger_from_env();
     println!("Init!");
@@ -90,8 +55,8 @@ fn main() -> ! {
     let dma = Gdma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
 
-    let tx_descriptors = make_static!([0u32; 20 * 3]);
-    let rx_descriptors = make_static!([0u32; 8 * 3]);
+    let mut tx_descriptors = [0u32; 20 * 3];
+    let mut rx_descriptors = [0u32; 8 * 3];
 
     let i2s = I2s::new(
         peripherals.I2S0,
@@ -101,8 +66,8 @@ fn main() -> ! {
         44100u32.Hz(),
         dma_channel.configure(
             false,
-            tx_descriptors,
-            rx_descriptors,
+            &mut tx_descriptors,
+            &mut rx_descriptors,
             DmaPriority::Priority0,
         ),
         &clocks,
@@ -121,10 +86,23 @@ fn main() -> ! {
     )
     .unwrap();
 
-    let executor = make_static!(Executor::new());
-    executor.run(|spawner| {
-        spawner.spawn(i2s_task(i2s_rx)).ok();
-    });
+    let buffer = dma_buffer();
+    println!("Start");
+
+    let mut data = [0u8; 5000];
+    let mut transaction = i2s_rx.read_dma_circular_async(buffer).unwrap();
+    loop {
+        let avail = transaction.available().await;
+        println!("available {}", avail);
+
+        let count = transaction.pop(&mut data).await.unwrap();
+        println!(
+            "got {} bytes, {:x?}..{:x?}",
+            count,
+            &data[..10],
+            &data[count - 10..count]
+        );
+    }
 }
 
 fn dma_buffer() -> &'static mut [u8; 4092 * 4] {

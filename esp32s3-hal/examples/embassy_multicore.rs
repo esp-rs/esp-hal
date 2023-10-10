@@ -6,6 +6,7 @@
 #![no_main]
 #![feature(type_alias_impl_trait)]
 
+use embassy_executor::Spawner;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
 use embassy_time::{Duration, Ticker};
 use esp32s3_hal::{
@@ -42,27 +43,8 @@ async fn control_led(
     }
 }
 
-/// Sends periodic messages to control_led, enabling or disabling it.
-#[embassy_executor::task]
-async fn enable_disable_led(control: &'static Signal<CriticalSectionRawMutex, bool>) {
-    println!(
-        "Starting enable_disable_led() on core {}",
-        get_core() as usize
-    );
-    let mut ticker = Ticker::every(Duration::from_secs(1));
-    loop {
-        esp_println::println!("Sending LED on");
-        control.signal(true);
-        ticker.next().await;
-
-        esp_println::println!("Sending LED off");
-        control.signal(false);
-        ticker.next().await;
-    }
-}
-
-#[entry]
-fn main() -> ! {
+#[main]
+async fn main(_spawner: Spawner) -> ! {
     let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
@@ -97,8 +79,19 @@ fn main() -> ! {
         .start_app_core(unsafe { &mut APP_CORE_STACK }, cpu1_fnctn)
         .unwrap();
 
-    let executor = make_static!(Executor::new());
-    executor.run(|spawner| {
-        spawner.spawn(enable_disable_led(led_ctrl_signal)).ok();
-    });
+    // Sends periodic messages to control_led, enabling or disabling it.
+    println!(
+        "Starting enable_disable_led() on core {}",
+        get_core() as usize
+    );
+    let mut ticker = Ticker::every(Duration::from_secs(1));
+    loop {
+        esp_println::println!("Sending LED on");
+        led_ctrl_signal.signal(true);
+        ticker.next().await;
+
+        esp_println::println!("Sending LED off");
+        led_ctrl_signal.signal(false);
+        ticker.next().await;
+    }
 }
