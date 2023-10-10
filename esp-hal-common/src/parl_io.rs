@@ -1209,7 +1209,8 @@ where
         self.tx_channel.is_done();
 
         self.tx_channel
-            .prepare_transfer(DmaPeripheral::ParlIo, false, ptr, len)?;
+            .prepare_transfer_without_start(DmaPeripheral::ParlIo, false, ptr, len)
+            .and_then(|_| self.tx_channel.start_transfer())?;
 
         loop {
             if Instance::is_tx_ready() {
@@ -1331,7 +1332,8 @@ where
         Instance::set_rx_bytes(len as u16);
 
         self.rx_channel
-            .prepare_transfer(false, DmaPeripheral::ParlIo, ptr, len)?;
+            .prepare_transfer_without_start(false, DmaPeripheral::ParlIo, ptr, len)
+            .and_then(|_| self.rx_channel.start_transfer())?;
 
         Instance::set_rx_reg_update();
 

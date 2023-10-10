@@ -1901,18 +1901,20 @@ where
         self.update();
 
         reset_dma_before_load_dma_dscr(reg_block);
-        tx.prepare_transfer(
+        tx.prepare_transfer_without_start(
             self.dma_peripheral(),
             false,
             write_buffer_ptr,
             write_buffer_len,
-        )?;
-        rx.prepare_transfer(
+        )
+        .and_then(|_| tx.start_transfer())?;
+        rx.prepare_transfer_without_start(
             false,
             self.dma_peripheral(),
             read_buffer_ptr,
             read_buffer_len,
-        )?;
+        )
+        .and_then(|_| rx.start_transfer())?;
 
         self.clear_dma_interrupts();
         reset_dma_before_usr_cmd(reg_block);
@@ -1948,7 +1950,8 @@ where
         self.update();
 
         reset_dma_before_load_dma_dscr(reg_block);
-        tx.prepare_transfer(self.dma_peripheral(), false, ptr, len)?;
+        tx.prepare_transfer_without_start(self.dma_peripheral(), false, ptr, len)
+            .and_then(|_| tx.start_transfer())?;
 
         self.clear_dma_interrupts();
         reset_dma_before_usr_cmd(reg_block);
@@ -1973,7 +1976,8 @@ where
         self.update();
 
         reset_dma_before_load_dma_dscr(reg_block);
-        rx.prepare_transfer(false, self.dma_peripheral(), ptr, len)?;
+        rx.prepare_transfer_without_start(false, self.dma_peripheral(), ptr, len)
+            .and_then(|_| rx.start_transfer())?;
 
         self.clear_dma_interrupts();
         reset_dma_before_usr_cmd(reg_block);

@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Adding async support for RSA peripheral(doesn't work properly for `esp32` chip - issue will be created)(#790)
 - Added sleep support for ESP32-C3 with timer and GPIO wakeups (#795)
 - Support for ULP-RISCV including Delay and GPIO (#840)
+- Add bare-bones SPI slave support, DMA only (#580)
 
 ### Changed
 

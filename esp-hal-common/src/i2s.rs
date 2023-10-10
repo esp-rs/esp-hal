@@ -798,12 +798,14 @@ where
         // Enable corresponding interrupts if needed
 
         // configure DMA outlink
-        self.tx_channel.prepare_transfer(
-            self.register_access.get_dma_peripheral(),
-            false,
-            ptr,
-            data.len(),
-        )?;
+        self.tx_channel
+            .prepare_transfer_without_start(
+                self.register_access.get_dma_peripheral(),
+                false,
+                ptr,
+                data.len(),
+            )
+            .and_then(|_| self.tx_channel.start_transfer())?;
 
         // set I2S_TX_STOP_EN if needed
 
@@ -832,12 +834,14 @@ where
         // Enable corresponding interrupts if needed
 
         // configure DMA outlink
-        self.tx_channel.prepare_transfer(
-            self.register_access.get_dma_peripheral(),
-            circular,
-            ptr,
-            len,
-        )?;
+        self.tx_channel
+            .prepare_transfer_without_start(
+                self.register_access.get_dma_peripheral(),
+                circular,
+                ptr,
+                len,
+            )
+            .and_then(|_| self.tx_channel.start_transfer())?;
 
         // set I2S_TX_STOP_EN if needed
 
@@ -870,12 +874,14 @@ where
         // Enable corresponding interrupts if needed
 
         // configure DMA outlink
-        self.tx_channel.prepare_transfer(
-            self.register_access.get_dma_peripheral(),
-            circular,
-            ptr,
-            len,
-        )?;
+        self.tx_channel
+            .prepare_transfer_without_start(
+                self.register_access.get_dma_peripheral(),
+                circular,
+                ptr,
+                len,
+            )
+            .and_then(|_| self.tx_channel.start_transfer())?;
 
         // set I2S_TX_STOP_EN if needed
 
@@ -964,12 +970,14 @@ where
         // Enable corresponding interrupts if needed
 
         // configure DMA outlink
-        self.rx_channel.prepare_transfer(
-            false,
-            self.register_access.get_dma_peripheral(),
-            ptr,
-            data.len(),
-        )?;
+        self.rx_channel
+            .prepare_transfer_without_start(
+                false,
+                self.register_access.get_dma_peripheral(),
+                ptr,
+                data.len(),
+            )
+            .and_then(|_| self.rx_channel.start_transfer())?;
 
         // set I2S_TX_STOP_EN if needed
 
@@ -1002,12 +1010,14 @@ where
         // Enable corresponding interrupts if needed
 
         // configure DMA outlink
-        self.rx_channel.prepare_transfer(
-            circular,
-            self.register_access.get_dma_peripheral(),
-            ptr,
-            len,
-        )?;
+        self.rx_channel
+            .prepare_transfer_without_start(
+                circular,
+                self.register_access.get_dma_peripheral(),
+                ptr,
+                len,
+            )
+            .and_then(|_| self.rx_channel.start_transfer())?;
 
         // set I2S_TX_STOP_EN if needed
 
@@ -1047,12 +1057,14 @@ where
         // Enable corresponding interrupts if needed
 
         // configure DMA outlink
-        self.rx_channel.prepare_transfer(
-            circular,
-            self.register_access.get_dma_peripheral(),
-            ptr,
-            len,
-        )?;
+        self.rx_channel
+            .prepare_transfer_without_start(
+                circular,
+                self.register_access.get_dma_peripheral(),
+                ptr,
+                len,
+            )
+            .and_then(|_| self.rx_channel.start_transfer())?;
 
         // set I2S_TX_STOP_EN if needed
 
