@@ -8,11 +8,17 @@ use syn::{parse, parse_macro_input, spanned::Spanned, FnArg, ItemFn, PatType};
 #[proc_macro_error]
 #[proc_macro_attribute]
 pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
+    #[cfg(feature = "esp32c6")]
     let found_crate =
         crate_name("esp32c6-lp-hal").expect("esp32c6_lp_hal is present in `Cargo.toml`");
+    #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
+    let found_crate = crate_name("ulp-riscv-hal").expect("ulp-riscv-ha is present in `Cargo.toml`");
 
     let hal_crate = match found_crate {
+        #[cfg(feature = "esp32c6")]
         FoundCrate::Itself => quote!(esp32c6_lp_hal),
+        #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
+        FoundCrate::Itself => quote!(ulp_riscv_hal),
         FoundCrate::Name(name) => {
             let ident = Ident::new(&name, Span::call_site());
             quote!( #ident::Something )

@@ -1,0 +1,36 @@
+[package]
+name = "lp-hal-procmacros"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.67.0"
+description = "Procedural macros for the LP/ULP coprocessors"
+repository = "https://github.com/esp-rs/esp-hal"
+license = "MIT OR Apache-2.0"
+
+keywords = [
+    "embedded",
+    "embedded-hal",
+    "esp",
+    "esp32c6",
+    "esp32s2",
+    "esp32s3",
+    "no-std",
+]
+categories = ["embedded", "hardware-support", "no-std"]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+litrs = "0.4.0"
+proc-macro-crate = "1.3.1"
+proc-macro-error = "1.0.4"
+proc-macro2 = "1.0.63"
+quote = "1.0.28"
+syn = { version = "2.0.22", features = ["extra-traits", "full"] }
+toml_edit = "0.20.0"
+
+[features]
+esp32c6 = []
+esp32s2 = []
+esp32s3 = []
