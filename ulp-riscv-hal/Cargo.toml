@@ -1,0 +1,39 @@
+[package]
+name         = "ulp-riscv-hal"
+version      = "0.1.0"
+edition      = "2021"
+rust-version = "1.67.0"
+description  = "HAL for ESP32-S2 / ESP32-S3 ULP RISC-V coprocessor"
+repository   = "https://github.com/esp-rs/esp-hal"
+license      = "MIT OR Apache-2.0"
+
+keywords = [
+    "embedded",
+    "embedded-hal",
+    "esp",
+    "esp32s2",
+    "esp32s3",
+    "no-std",
+]
+categories = [
+    "embedded",
+    "hardware-support",
+    "no-std",
+]
+
+[dependencies]
+embedded-hal      = { version = "0.2.7", features = ["unproven"] }
+lp-hal-procmacros = { path = "../lp-hal-procmacros" }
+paste             = "1.0.14"
+esp32s2-ulp    = { git = "https://github.com/esp-rs/esp-pacs", package = "esp32s2-ulp", optional = true }
+esp32s3-ulp    = { git = "https://github.com/esp-rs/esp-pacs", package = "esp32s3-ulp", optional = true }
+
+
+[dev-dependencies]
+panic-halt       = "0.2.0"
+
+[features]
+default = []
+debug   = []
+esp32s2 = [ "dep:esp32s2-ulp", "lp-hal-procmacros/esp32s2" ]
+esp32s3 = [ "dep:esp32s3-ulp", "lp-hal-procmacros/esp32s3" ]

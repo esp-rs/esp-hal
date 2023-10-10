@@ -1,32 +1,21 @@
 //! This shows a very basic example of running code on the ULP RISCV core.
 //!
-//! Code on ULP core just increments a counter. The current value is printed by
-//! the HP core.
+//! Code on ULP core just increments a counter and blinks GPIO 1. The current
+//! value is printed by the HP core.
 
 #![no_std]
 #![no_main]
 
-use esp32s3_hal::{clock::ClockControl, peripherals::Peripherals, prelude::*};
+use esp32s3_hal::{
+    clock::ClockControl,
+    gpio::rtc_io::*,
+    peripherals::Peripherals,
+    prelude::*,
+    ulp_core,
+    IO,
+};
 use esp_backtrace as _;
-use esp_println::println;
-
-// 50000000 <_start>:
-// 50000000:       00000517                auipc   a0,0x0
-// 50000004:       01050513                addi    a0,a0,16 # 50000010 <data>
-// 50000008:       4581                    li      a1,0
-//
-// 5000000a <_loop>:
-// 5000000a:       0585                    addi    a1,a1,1
-// 5000000c:       c10c                    sw      a1,0(a0)
-// 5000000e:       bff5                    j       5000000a <_loop>
-//
-// 50000010 <data>:
-// 50000010:       0000 0000
-
-const CODE: &[u8] = &[
-    0x17, 0x05, 0x00, 0x00, 0x13, 0x05, 0x05, 0x01, 0x81, 0x45, 0x85, 0x05, 0x0c, 0xc1, 0xf5, 0xbf,
-    0x00, 0x00, 0x00, 0x00,
-];
+use esp_println::{print, println};
 
 #[entry]
 fn main() -> ! {
@@ -34,23 +23,26 @@ fn main() -> ! {
     let system = peripherals.SYSTEM.split();
     let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let mut ulp_core = esp32s3_hal::ulp_core::UlpCore::new(peripherals.ULP_RISCV_CORE);
+    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let pin = io.pins.gpio1.into_low_power().into_push_pull_output();
+
+    let mut ulp_core = ulp_core::UlpCore::new(peripherals.ULP_RISCV_CORE);
     ulp_core.stop();
     println!("ulp core stopped");
 
-    // copy code to RTC ram
-    let lp_ram = 0x5000_0000 as *mut u8;
-    unsafe {
-        core::ptr::copy_nonoverlapping(CODE as *const _ as *const u8, lp_ram, CODE.len());
-    }
-    println!("copied code (len {})", CODE.len());
+    // load code to LP core
+    let lp_core_code = load_lp_code!(
+        "../ulp-riscv-hal/target/riscv32imc-unknown-none-elf/release/examples/blinky"
+    );
 
-    // start ULP core
-    ulp_core.run(esp32s3_hal::ulp_core::UlpCoreWakeupSource::HpCpu);
+    // start LP core
+    lp_core_code.run(&mut ulp_core, ulp_core::UlpCoreWakeupSource::HpCpu, pin);
     println!("ulpcore run");
 
-    let data = (0x5000_0010 - 0) as *mut u32;
+    let data = (0x5000_0400) as *mut u32;
     loop {
-        println!("Current {}", unsafe { data.read_volatile() });
+        print!("Current {:x}           \u{000d}", unsafe {
+            data.read_volatile()
+        });
     }
 }

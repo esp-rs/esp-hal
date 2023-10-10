@@ -1461,6 +1461,11 @@ macro_rules! rtc_pins {
                 use crate::peripherals::RTC_IO;
                 let rtcio = unsafe{ &*RTC_IO::ptr() };
 
+                #[cfg(esp32s3)]
+                unsafe { crate::peripherals::SENS::steal() }.sar_peri_clk_gate_conf.modify(|_,w| w.iomux_clk_en().set_bit());
+                #[cfg(esp32s2)]
+                unsafe { crate::peripherals::SENS::steal() }.sar_io_mux_conf.modify(|_,w| w.iomux_clk_gate_en().set_bit());
+
                 // disable input
                 paste::paste!{
                     rtcio.$pin_reg.modify(|_,w| unsafe {w
@@ -1498,6 +1503,21 @@ macro_rules! rtc_pins {
 
                     paste::paste! {
                         rtcio.$pin_reg.modify(|_, w| w.$rde().bit([< enable >]));
+                    }
+                }
+            }
+
+            #[cfg(not(esp32))]
+            paste::paste!{
+                impl<MODE> crate::gpio::rtc_io::IntoLowPowerPin<$pin_num> for GpioPin<MODE, $pin_num> {
+                    fn into_low_power(mut self) -> crate::gpio::rtc_io::LowPowerPin<Unknown, $pin_num> {
+                        use crate::gpio::RTCPin;
+
+                        self.rtc_set_config(false, true, crate::gpio::RtcFunction::Rtc);
+
+                        crate::gpio::rtc_io::LowPowerPin {
+                            private: core::marker::PhantomData::default(),
+                        }
                     }
                 }
             }
@@ -1984,6 +2004,168 @@ pub mod etm {
         gpio_sd.etm_event_ch_cfg[channel as usize]
             .modify(|_, w| w.etm_ch0_event_sel().variant(pin));
         gpio_sd.etm_event_ch_cfg[channel as usize].modify(|_, w| w.etm_ch0_event_en().set_bit());
+    }
+}
+
+#[cfg(all(rtc_io, not(esp32)))]
+pub mod rtc_io {
+    //! RTC IO
+    //!
+    //! # Overview
+    //!
+    //! The hardware provides a couple of GPIO pins with low power (LP)
+    //! capabilities and analog functions. These pins can be controlled by
+    //! either IO MUX or RTC IO.
+    //!
+    //! If controlled by RTC IO, these pins will bypass IO MUX and GPIO
+    //! matrix for the use by ULP and peripherals in RTC system.
+    //!
+    //! When configured as RTC GPIOs, the pins can still be controlled by ULP or
+    //! the peripherals in RTC system during chip Deep-sleep, and wake up the
+    //! chip from Deep-sleep.
+    //!
+    //! # Example
+    //! ```no_run
+    //! let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    //! // configure GPIO 1 as ULP output pin
+    //! let lp_pin = io.pins.gpio1.into_low_power().into_push_pull_output();
+    //! ```
+
+    use core::marker::PhantomData;
+
+    use super::{Floating, Input, Output, PullDown, PullUp, PushPull, Unknown};
+
+    /// A GPIO pin configured for low power operation
+    pub struct LowPowerPin<MODE, const PIN: u8> {
+        pub(crate) private: PhantomData<MODE>,
+    }
+
+    /// Configures a pin for use as a low power pin
+    pub trait IntoLowPowerPin<const PIN: u8> {
+        fn into_low_power(self) -> LowPowerPin<Unknown, { PIN }>;
+    }
+
+    impl<MODE, const PIN: u8> LowPowerPin<MODE, PIN> {
+        #[doc(hidden)]
+        pub fn output_enable(&self, enable: bool) {
+            let rtc_io = unsafe { crate::peripherals::RTC_IO::steal() };
+            if enable {
+                // TODO align PAC
+                #[cfg(esp32s2)]
+                rtc_io
+                    .rtc_gpio_enable_w1ts
+                    .write(|w| w.reg_rtcio_reg_gpio_enable_w1ts().variant(1 << PIN));
+
+                #[cfg(esp32s3)]
+                rtc_io
+                    .rtc_gpio_enable_w1ts
+                    .write(|w| w.rtc_gpio_enable_w1ts().variant(1 << PIN));
+            } else {
+                rtc_io
+                    .enable_w1tc
+                    .write(|w| w.enable_w1tc().variant(1 << PIN));
+            }
+        }
+
+        fn input_enable(&self, enable: bool) {
+            get_pin_reg(PIN).modify(|_, w| w.fun_ie().bit(enable));
+        }
+
+        fn pullup_enable(&self, enable: bool) {
+            get_pin_reg(PIN).modify(|_, w| w.rue().bit(enable));
+        }
+
+        fn pulldown_enable(&self, enable: bool) {
+            get_pin_reg(PIN).modify(|_, w| w.rde().bit(enable));
+        }
+
+        #[doc(hidden)]
+        pub fn set_level(&mut self, level: bool) {
+            let rtc_io = unsafe { &*crate::peripherals::RTC_IO::PTR };
+
+            // TODO align PACs
+            #[cfg(esp32s2)]
+            if level {
+                rtc_io
+                    .rtc_gpio_out_w1ts
+                    .write(|w| w.gpio_out_data_w1ts().variant(1 << PIN));
+            } else {
+                rtc_io
+                    .rtc_gpio_out_w1tc
+                    .write(|w| w.gpio_out_data_w1tc().variant(1 << PIN));
+            }
+
+            #[cfg(esp32s3)]
+            if level {
+                rtc_io
+                    .rtc_gpio_out_w1ts
+                    .write(|w| w.rtc_gpio_out_data_w1ts().variant(1 << PIN));
+            } else {
+                rtc_io
+                    .rtc_gpio_out_w1tc
+                    .write(|w| w.rtc_gpio_out_data_w1tc().variant(1 << PIN));
+            }
+        }
+
+        #[doc(hidden)]
+        pub fn get_level(&self) -> bool {
+            let rtc_io = unsafe { &*crate::peripherals::RTC_IO::PTR };
+            (rtc_io.rtc_gpio_in.read().bits() & 1 << PIN) != 0
+        }
+
+        /// Configures the pin as an input with the internal pull-up resistor
+        /// enabled.
+        pub fn into_pull_up_input(self) -> LowPowerPin<Input<PullUp>, PIN> {
+            self.input_enable(true);
+            self.pullup_enable(true);
+            self.pulldown_enable(false);
+            LowPowerPin {
+                private: PhantomData::default(),
+            }
+        }
+
+        /// Configures the pin as an input with the internal pull-down resistor
+        /// enabled.
+        pub fn into_pull_down_input(self) -> LowPowerPin<Input<PullDown>, PIN> {
+            self.input_enable(true);
+            self.pullup_enable(false);
+            self.pulldown_enable(true);
+            LowPowerPin {
+                private: PhantomData::default(),
+            }
+        }
+
+        /// Configures the pin as a floating input pin.
+        pub fn into_floating_input(self) -> LowPowerPin<Input<Floating>, PIN> {
+            self.input_enable(true);
+            self.pullup_enable(false);
+            self.pulldown_enable(false);
+            LowPowerPin {
+                private: PhantomData::default(),
+            }
+        }
+
+        /// Configures the pin as an output pin.
+        pub fn into_push_pull_output(self) -> LowPowerPin<Output<PushPull>, PIN> {
+            self.output_enable(true);
+            LowPowerPin {
+                private: PhantomData::default(),
+            }
+        }
+    }
+
+    #[cfg(esp32s3)]
+    #[inline(always)]
+    fn get_pin_reg(pin: u8) -> &'static crate::peripherals::rtc_io::TOUCH_PAD0 {
+        let rtc_io = unsafe { &*crate::peripherals::RTC_IO::PTR };
+        unsafe { core::mem::transmute((rtc_io.touch_pad0.as_ptr()).add(pin as usize)) }
+    }
+
+    #[cfg(esp32s2)]
+    #[inline(always)]
+    fn get_pin_reg(pin: u8) -> &'static crate::peripherals::rtc_io::TOUCH_PAD {
+        let rtc_io = unsafe { &*crate::peripherals::RTC_IO::PTR };
+        unsafe { core::mem::transmute((rtc_io.touch_pad[0].as_ptr()).add(pin as usize)) }
     }
 }
 
