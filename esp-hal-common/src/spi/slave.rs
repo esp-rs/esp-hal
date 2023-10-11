@@ -1,11 +1,13 @@
-//! # Serial Peripheral Interface, slave mode
+//! # Serial Peripheral Interface - Slave Mode
 //!
 //! ## Overview
+//!
 //! There are multiple ways to use SPI, depending on your needs. Regardless of
 //! which way you choose, you must first create an SPI instance with
 //! [`Spi::new`].
 //!
 //! ## Example
+//!
 //! ```rust
 //! let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 //! let sclk = io.pins.gpio12;

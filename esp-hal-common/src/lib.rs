@@ -398,7 +398,7 @@ mod critical_section_impl {
 /// needs to transmit data from flash (ROM) via the embedded-hal traits. This is
 /// often a `const` variable.
 ///
-/// Example usage using [`spi::dma::SpiDma`]
+/// Example usage using [`spi::master::dma::SpiDma`]
 /// ```no_run
 /// const ARRAY_IN_FLASH = [0xAA; 128]
 ///

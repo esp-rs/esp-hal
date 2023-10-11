@@ -1,9 +1,16 @@
+//! Serial Peripheral Interface
+//!
+//! This peripheral is capable of operating in either master or slave mode. For
+//! more information on these modes, please refer to the documentation in their
+//! respective modules.
+
 use crate::dma::DmaError;
 
 pub mod master;
 #[cfg(all(any(spi0, spi1, spi2, spi3), not(pdma)))]
 pub mod slave;
 
+/// SPI errors
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
@@ -27,6 +34,7 @@ impl embedded_hal_1::spi::Error for Error {
     }
 }
 
+/// SPI modes
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum SpiMode {
@@ -53,10 +61,12 @@ pub enum SpiDataMode {
     Quad,
 }
 
+/// Full-duplex operation
 pub struct FullDuplexMode {}
 impl DuplexMode for FullDuplexMode {}
 impl IsFullDuplex for FullDuplexMode {}
 
+/// Half-duplex operation
 pub struct HalfDuplexMode {}
 impl DuplexMode for HalfDuplexMode {}
 impl IsHalfDuplex for HalfDuplexMode {}

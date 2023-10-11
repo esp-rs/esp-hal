@@ -1,6 +1,7 @@
-//! # Serial Peripheral Interface
+//! # Serial Peripheral Interface - Master Mode
 //!
 //! ## Overview
+//!
 //! There are multiple ways to use SPI, depending on your needs. Regardless of
 //! which way you choose, you must first create an SPI instance with
 //! [`Spi::new`].
@@ -708,7 +709,7 @@ pub mod dma {
     use embedded_dma::{ReadBuffer, WriteBuffer};
     use fugit::HertzU32;
 
-    #[cfg(any(esp32, esp32s2, esp32s3))]
+    #[cfg(spi3)]
     use super::Spi3Instance;
     use super::{
         Address,
@@ -723,7 +724,7 @@ pub mod dma {
         SpiDataMode,
         MAX_DMA_SIZE,
     };
-    #[cfg(any(esp32, esp32s2, esp32s3))]
+    #[cfg(spi3)]
     use crate::dma::Spi3Peripheral;
     use crate::{
         clock::Clocks,
@@ -752,7 +753,7 @@ pub mod dma {
         fn with_dma(self, channel: Channel<'d, C>) -> SpiDma<'d, T, C, M>;
     }
 
-    #[cfg(any(esp32, esp32s2, esp32s3))]
+    #[cfg(spi3)]
     pub trait WithDmaSpi3<'d, T, C, M>
     where
         T: Instance + Spi3Instance,
@@ -781,7 +782,7 @@ pub mod dma {
         }
     }
 
-    #[cfg(any(esp32, esp32s2, esp32s3))]
+    #[cfg(spi3)]
     impl<'d, T, C, M> WithDmaSpi3<'d, T, C, M> for Spi<'d, T, M>
     where
         T: Instance + Spi3Instance,
@@ -1944,7 +1945,7 @@ where
     fn dma_peripheral(&self) -> DmaPeripheral {
         match self.spi_num() {
             2 => DmaPeripheral::Spi2,
-            #[cfg(any(esp32, esp32s2, esp32s3))]
+            #[cfg(spi3)]
             3 => DmaPeripheral::Spi3,
             _ => panic!("Illegal SPI instance"),
         }
@@ -2055,7 +2056,7 @@ where
 {
 }
 
-#[cfg(any(esp32, esp32s2, esp32s3))]
+#[cfg(spi3)]
 impl<TX, RX> InstanceDma<TX, RX> for crate::peripherals::SPI3
 where
     TX: Tx,
@@ -3236,10 +3237,10 @@ impl ExtendedInstance for crate::peripherals::SPI3 {
 
 pub trait Spi2Instance {}
 
-#[cfg(any(esp32, esp32s2, esp32s3))]
+#[cfg(spi3)]
 pub trait Spi3Instance {}
 
 impl Spi2Instance for crate::peripherals::SPI2 {}
 
-#[cfg(any(esp32, esp32s2, esp32s3))]
+#[cfg(spi3)]
 impl Spi3Instance for crate::peripherals::SPI3 {}
