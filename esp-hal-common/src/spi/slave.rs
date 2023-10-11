@@ -59,7 +59,7 @@
 
 use core::marker::PhantomData;
 
-pub use super::{Error, FullDuplexMode, SpiMode};
+use super::{Error, FullDuplexMode, SpiMode};
 use crate::{
     dma::{DmaPeripheral, Rx, Tx},
     gpio::{InputPin, InputSignal, OutputPin, OutputSignal},
