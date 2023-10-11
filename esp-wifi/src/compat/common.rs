@@ -31,8 +31,8 @@ static mut MUTEXES: [Mutex; 10] = [Mutex {
 }; 10];
 static mut MUTEX_IDX_CURRENT: usize = 0;
 
-static mut FAKE_WIFI_QUEUE: &Option<SimpleQueue<[u8; 8], 200>> = unsafe { &REAL_WIFI_QUEUE };
-static mut REAL_WIFI_QUEUE: Option<SimpleQueue<[u8; 8], 200>> = None; // first there is a ptr to the real queue - driver checks it's not null
+static mut FAKE_WIFI_QUEUE: &SimpleQueue<[u8; 8], 200> = unsafe { &REAL_WIFI_QUEUE };
+static mut REAL_WIFI_QUEUE: SimpleQueue<[u8; 8], 200> = SimpleQueue::new(); // first there is a ptr to the real queue - driver checks it's not null
 
 pub struct StrBuf {
     buffer: [u8; 512],
@@ -269,43 +269,39 @@ pub fn sem_delete(semphr: *mut crate::binary::c_types::c_void) {
 pub fn sem_take(semphr: *mut crate::binary::c_types::c_void, tick: u32) -> i32 {
     trace!(">>>> semphr_take {:?} block_time_tick {}", semphr, tick);
 
-    let forever = if tick == OSI_FUNCS_TIME_BLOCKING {
-        true
-    } else {
-        false
-    };
+    let forever = tick == OSI_FUNCS_TIME_BLOCKING;
     let tick = if tick == 0 { 1 } else { tick };
     let end_time = crate::timer::get_systimer_count() + tick as u64;
 
+    let sem_idx = semphr as usize - 1;
+
     'outer: loop {
-        loop {
-            let res = critical_section::with(|_| unsafe {
-                memory_fence();
-                if let Some(cnt) = CURR_SEM[semphr as usize - 1] {
-                    if cnt > 0 {
-                        CURR_SEM[semphr as usize - 1] = Some(cnt - 1);
-                        1
-                    } else {
-                        0
-                    }
+        let res = critical_section::with(|_| unsafe {
+            memory_fence();
+            if let Some(cnt) = CURR_SEM[sem_idx] {
+                if cnt > 0 {
+                    CURR_SEM[sem_idx] = Some(cnt - 1);
+                    1
                 } else {
                     0
                 }
-            });
-
-            if res == 1 {
-                trace!(">>>> return from semphr_take");
-                return 1;
+            } else {
+                0
             }
+        });
 
-            if !forever {
-                if crate::timer::get_systimer_count() > end_time {
-                    break 'outer;
-                }
-            }
-
-            yield_task();
+        if res == 1 {
+            trace!(">>>> return from semphr_take");
+            return 1;
         }
+
+        if !forever {
+            if crate::timer::get_systimer_count() > end_time {
+                break 'outer;
+            }
+        }
+
+        yield_task();
     }
 
     trace!(">>>> return from semphr_take with timeout");
@@ -314,10 +310,11 @@ pub fn sem_take(semphr: *mut crate::binary::c_types::c_void, tick: u32) -> i32 {
 
 pub fn sem_give(semphr: *mut crate::binary::c_types::c_void) -> i32 {
     trace!("semphr_give {:?}", semphr);
+    let sem_idx = semphr as usize - 1;
 
     let res = critical_section::with(|_| unsafe {
-        if let Some(cnt) = CURR_SEM[semphr as usize - 1] {
-            CURR_SEM[semphr as usize - 1] = Some(cnt + 1);
+        if let Some(cnt) = CURR_SEM[sem_idx] {
+            CURR_SEM[sem_idx] = Some(cnt + 1);
             memory_fence();
             1
         } else {
@@ -332,14 +329,13 @@ pub fn thread_sem_get() -> *mut crate::binary::c_types::c_void {
     trace!("wifi_thread_semphr_get");
     critical_section::with(|_| unsafe {
         let tid = current_task();
-        if PER_THREAD_SEM[tid].is_none() {
+        if let Some(sem) = PER_THREAD_SEM[tid] {
+            trace!("wifi_thread_semphr_get - return for {} {:?}", tid, sem);
+            sem
+        } else {
             let sem = sem_create(1, 0);
             trace!("wifi_thread_semphr_get - create for {} {:?}", tid, sem);
             PER_THREAD_SEM[tid] = Some(sem);
-            sem
-        } else {
-            let sem = unwrap!(PER_THREAD_SEM[tid]);
-            trace!("wifi_thread_semphr_get - return for {} {:?}", tid, sem);
             sem
         }
     })
@@ -359,39 +355,27 @@ pub fn create_recursive_mutex() -> *mut crate::binary::c_types::c_void {
 pub fn lock_mutex(mutex: *mut crate::binary::c_types::c_void) -> i32 {
     trace!("mutex_lock ptr = {:?}", mutex);
 
-    unsafe {
-        let success = loop {
-            let ptr = mutex as *mut Mutex;
-            let current_task = current_task();
+    let ptr = mutex as *mut Mutex;
+    let current_task = current_task();
 
-            let (should_break, success) = critical_section::with(|_| {
-                if (*ptr).count == 0 {
-                    (*ptr).locking_pid = current_task;
-                    (*ptr).count += 1;
-                    (true, true)
-                } else if (*ptr).count != 0 && (*ptr).locking_pid == current_task {
-                    (*ptr).count += 1;
-                    (true, true)
-                } else if (*ptr).count != 0 && (*ptr).locking_pid != current_task {
-                    (true, false)
-                } else {
-                    (false, false)
-                }
-            });
-            memory_fence();
-
-            if should_break {
-                break success;
-            }
-
-            yield_task();
-        };
-
-        if success {
-            1
+    let mutex_locked = critical_section::with(|_| unsafe {
+        if (*ptr).count == 0 {
+            (*ptr).locking_pid = current_task;
+            (*ptr).count += 1;
+            true
+        } else if (*ptr).locking_pid == current_task {
+            (*ptr).count += 1;
+            true
         } else {
-            0
+            false
         }
+    });
+    memory_fence();
+
+    if mutex_locked {
+        1
+    } else {
+        0
     }
 }
 
@@ -428,15 +412,7 @@ pub fn create_wifi_queue(
         panic!("don't expecting the wifi queue to hold items larger than 8");
     }
 
-    unsafe {
-        if REAL_WIFI_QUEUE.is_none() {
-            REAL_WIFI_QUEUE = Some(SimpleQueue::new());
-        } else {
-            panic!("don't expecting more than one wifi queue");
-        }
-
-        &mut FAKE_WIFI_QUEUE as *mut _ as *mut crate::binary::c_types::c_void
-    }
+    unsafe { &mut FAKE_WIFI_QUEUE as *mut _ as *mut crate::binary::c_types::c_void }
 }
 
 pub fn send_queued(
@@ -454,16 +430,16 @@ pub fn send_queued(
     // handle the WIFI_QUEUE
     unsafe {
         if queue == &mut REAL_WIFI_QUEUE as *mut _ as *mut crate::binary::c_types::c_void {
-            critical_section::with(|_| {
-                // assume the size is 8 - shouldn't rely on that
-                let message = item as *const u8;
-                let mut data = [0u8; 8];
-                for i in 0..8 as usize {
-                    data[i] = *(message.offset(i as isize));
-                }
-                trace!("queue posting {:?}", data);
+            // assume the size is 8 - shouldn't rely on that
+            let message = item as *const u8;
+            let mut data = [0u8; 8];
+            for i in 0..8 as usize {
+                data[i] = *(message.offset(i as isize));
+            }
+            trace!("queue posting {:?}", data);
 
-                unwrap!(REAL_WIFI_QUEUE.as_mut()).enqueue(data);
+            critical_section::with(|_| {
+                REAL_WIFI_QUEUE.enqueue(data);
                 memory_fence();
             });
         }
@@ -488,41 +464,34 @@ pub fn receive_queued(
 
     // handle the WIFI_QUEUE
     unsafe {
-        if queue == &mut REAL_WIFI_QUEUE as *mut _ as *mut crate::binary::c_types::c_void {
-            loop {
-                let res = critical_section::with(|_| {
-                    memory_fence();
-                    let message = unwrap!(REAL_WIFI_QUEUE.as_mut()).dequeue();
-                    if message.is_some() {
-                        let message = unwrap!(message);
-                        let item = item as *mut u8;
-                        for i in 0..8 {
-                            item.offset(i).write_volatile(message[i as usize]);
-                        }
-                        trace!("received {:?}", message);
-                        1
-                    } else {
-                        0
-                    }
-                });
-
-                if res == 1 {
-                    trace!("queue_recv returns");
-                    return res;
-                }
-
-                if block_time_tick != OSI_FUNCS_TIME_BLOCKING
-                    && crate::timer::get_systimer_count() > end_time
-                {
-                    trace!("queue_recv returns with timeout");
-                    return -1;
-                }
-
-                yield_task();
-            }
-        } else {
+        if queue != &mut REAL_WIFI_QUEUE as *mut _ as *mut crate::binary::c_types::c_void {
             panic!("Unknown queue to handle in queue_recv");
-            -1
+        }
+
+        loop {
+            let message = critical_section::with(|_| {
+                memory_fence();
+                REAL_WIFI_QUEUE.dequeue()
+            });
+
+            if let Some(message) = message {
+                let item = item as *mut u8;
+                for i in 0..8 {
+                    item.offset(i).write_volatile(message[i as usize]);
+                }
+                trace!("received {:?}", message);
+
+                return 1;
+            };
+
+            if block_time_tick != OSI_FUNCS_TIME_BLOCKING
+                && crate::timer::get_systimer_count() > end_time
+            {
+                trace!("queue_recv returns with timeout");
+                return -1;
+            }
+
+            yield_task();
         }
     }
 }

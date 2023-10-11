@@ -166,8 +166,7 @@ pub(crate) static HEAP: Mutex<RefCell<Heap>> = Mutex::new(RefCell::new(Heap::emp
 
 fn init_heap() {
     critical_section::with(|cs| {
-        HEAP.borrow(cs)
-            .borrow_mut()
+        HEAP.borrow_ref_mut(cs)
             .init_from_slice(unsafe { &mut HEAP_DATA })
     });
 }

@@ -9,8 +9,7 @@ pub unsafe extern "C" fn malloc(size: usize) -> *const u8 {
 
     let layout = Layout::from_size_align_unchecked(total_size, 4);
     let ptr = critical_section::with(|cs| {
-        HEAP.borrow(cs)
-            .borrow_mut()
+        HEAP.borrow_ref_mut(cs)
             .allocate_first_fit(layout)
             .ok()
             .map_or(core::ptr::null_mut(), |allocation| allocation.as_ptr())
@@ -21,7 +20,7 @@ pub unsafe extern "C" fn malloc(size: usize) -> *const u8 {
         return ptr;
     }
 
-    *(ptr as *mut _ as *mut usize) = total_size;
+    *(ptr as *mut usize) = total_size;
     ptr.offset(4)
 }
 
@@ -37,8 +36,7 @@ pub unsafe extern "C" fn free(ptr: *const u8) {
 
     let layout = Layout::from_size_align_unchecked(total_size, 4);
     critical_section::with(|cs| {
-        HEAP.borrow(cs)
-            .borrow_mut()
+        HEAP.borrow_ref_mut(cs)
             .deallocate(core::ptr::NonNull::new_unchecked(ptr as *mut u8), layout)
     });
 }

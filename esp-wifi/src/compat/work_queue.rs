@@ -1,22 +1,19 @@
+use crate::binary::c_types;
+
 use super::queue::SimpleQueue;
 
-static mut WORKER_HIGH: Option<
-    SimpleQueue<
-        (
-            extern "C" fn(*mut crate::binary::c_types::c_void),
-            *mut crate::binary::c_types::c_void,
-        ),
-        10,
-    >,
-> = None;
+static mut WORKER_HIGH: SimpleQueue<
+    (extern "C" fn(*mut c_types::c_void), *mut c_types::c_void),
+    10,
+> = SimpleQueue::new();
 
 pub fn queue_work(
-    task_func: *mut crate::binary::c_types::c_void,
-    _name: *const crate::binary::c_types::c_char,
+    task_func: *mut c_types::c_void,
+    _name: *const c_types::c_char,
     _stack_depth: u32,
-    param: *mut crate::binary::c_types::c_void,
+    param: *mut c_types::c_void,
     prio: u32,
-    _task_handle: *mut crate::binary::c_types::c_void,
+    _task_handle: *mut c_types::c_void,
     _core_id: u32,
 ) {
     trace!(
@@ -27,48 +24,34 @@ pub fn queue_work(
     );
 
     critical_section::with(|_| unsafe {
-        if WORKER_HIGH.is_none() {
-            WORKER_HIGH = Some(SimpleQueue::new());
+        if WORKER_HIGH
+            .enqueue((core::mem::transmute(task_func), param))
+            .is_err()
+        {
+            warn!("work queue full");
         }
-
-        let _ = &unwrap!(WORKER_HIGH.as_mut()).enqueue((core::mem::transmute(task_func), param));
     });
 }
 
 pub fn do_work() {
     unsafe {
-        let mut todo: [Option<(
-            extern "C" fn(*mut crate::binary::c_types::c_void),
-            *mut crate::binary::c_types::c_void,
-        )>; 10] = [None; 10];
+        let mut todo = [None; 10];
 
         critical_section::with(|_| {
-            if WORKER_HIGH.is_none() {
-                return;
-            }
-
             todo.iter_mut().for_each(|e| {
-                let work = &unwrap!(WORKER_HIGH.as_mut()).dequeue();
-
-                match work {
-                    Some(worker) => {
-                        e.replace(*worker);
-                    }
-                    None => {}
+                if let Some(work) = WORKER_HIGH.dequeue() {
+                    _ = e.replace(work);
                 }
             });
         });
 
         for worker in todo.iter() {
-            match worker {
-                core::option::Option::Some((f, p)) => {
-                    trace!("before worker {:?} {:?}", f, *p);
+            if let Some((f, p)) = worker {
+                trace!("before worker {:?} {:?}", f, *p);
 
-                    f(*p);
+                f(*p);
 
-                    trace!("after worker");
-                }
-                core::option::Option::None => {}
+                trace!("after worker");
             }
         }
     }
