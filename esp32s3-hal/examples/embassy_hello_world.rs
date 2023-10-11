@@ -7,34 +7,26 @@
 #![no_main]
 #![feature(type_alias_impl_trait)]
 
+use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp32s3_hal::{
     clock::ClockControl,
-    embassy::{self, executor::Executor},
+    embassy::{self},
     peripherals::Peripherals,
     prelude::*,
 };
 use esp_backtrace as _;
-use static_cell::make_static;
 
 #[embassy_executor::task]
-async fn run1() {
+async fn run() {
     loop {
         esp_println::println!("Hello world from embassy using esp-hal-async!");
         Timer::after(Duration::from_millis(1_000)).await;
     }
 }
 
-#[embassy_executor::task]
-async fn run2() {
-    loop {
-        esp_println::println!("Bing!");
-        Timer::after(Duration::from_millis(5_000)).await;
-    }
-}
-
-#[entry]
-fn main() -> ! {
+#[main]
+async fn main(spawner: Spawner) -> ! {
     esp_println::println!("Init!");
     let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();
@@ -52,9 +44,10 @@ fn main() -> ! {
         embassy::init(&clocks, timer_group0.timer0);
     }
 
-    let executor = make_static!(Executor::new());
-    executor.run(|spawner| {
-        spawner.spawn(run1()).ok();
-        spawner.spawn(run2()).ok();
-    });
+    spawner.spawn(run()).ok();
+
+    loop {
+        esp_println::println!("Bing!");
+        Timer::after(Duration::from_millis(5_000)).await;
+    }
 }

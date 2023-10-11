@@ -40,3 +40,4 @@ esp32s3   = ["dep:object"]
 
 interrupt = []
 rtc_slow  = []
+embassy   = []

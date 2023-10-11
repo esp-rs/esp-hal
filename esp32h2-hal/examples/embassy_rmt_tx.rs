@@ -5,23 +5,63 @@
 #![no_main]
 #![feature(type_alias_impl_trait)]
 
-use embassy_executor::Executor;
+use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp32h2_hal::{
     clock::ClockControl,
     embassy,
     peripherals::Peripherals,
     prelude::*,
-    rmt::{asynch::TxChannelAsync, Channel0, PulseCode, TxChannelConfig, TxChannelCreator},
+    rmt::{asynch::TxChannelAsync, PulseCode, TxChannelConfig, TxChannelCreator},
     Rmt,
     IO,
 };
 use esp_backtrace as _;
 use esp_println::println;
-use static_cell::make_static;
 
-#[embassy_executor::task]
-async fn rmt_task(mut channel: Channel0<0>) {
+#[main]
+async fn main(_spawner: Spawner) -> ! {
+    #[cfg(feature = "log")]
+    esp_println::logger::init_logger_from_env();
+    println!("Init!");
+    let peripherals = Peripherals::take();
+    let system = peripherals.SYSTEM.split();
+    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+
+    #[cfg(feature = "embassy-time-systick")]
+    embassy::init(
+        &clocks,
+        esp32h2_hal::systimer::SystemTimer::new(peripherals.SYSTIMER),
+    );
+
+    #[cfg(feature = "embassy-time-timg0")]
+    embassy::init(
+        &clocks,
+        esp32h2_hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks).timer0,
+    );
+
+    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+
+    let rmt = Rmt::new(peripherals.RMT, 8u32.MHz(), &clocks).unwrap();
+
+    let mut channel = rmt
+        .channel0
+        .configure(
+            io.pins.gpio1.into_push_pull_output(),
+            TxChannelConfig {
+                clk_divider: 255,
+                ..TxChannelConfig::default()
+            },
+        )
+        .unwrap();
+
+    // you have to enable the interrupt for async to work
+    esp32h2_hal::interrupt::enable(
+        esp32h2_hal::peripherals::Interrupt::RMT,
+        esp32h2_hal::interrupt::Priority::Priority1,
+    )
+    .unwrap();
+
     let mut data = [PulseCode {
         level1: true,
         length1: 200,
@@ -43,54 +83,4 @@ async fn rmt_task(mut channel: Channel0<0>) {
         println!("transmitted\n");
         Timer::after(Duration::from_millis(500)).await;
     }
-}
-
-#[entry]
-fn main() -> ! {
-    #[cfg(feature = "log")]
-    esp_println::logger::init_logger_from_env();
-    println!("Init!");
-    let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-    let mut clock_control = system.peripheral_clock_control;
-
-    #[cfg(feature = "embassy-time-systick")]
-    embassy::init(
-        &clocks,
-        esp32h2_hal::systimer::SystemTimer::new(peripherals.SYSTIMER),
-    );
-
-    #[cfg(feature = "embassy-time-timg0")]
-    embassy::init(
-        &clocks,
-        esp32h2_hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks, &mut clock_control).timer0,
-    );
-
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-
-    let rmt = Rmt::new(peripherals.RMT, 8u32.MHz(), &mut clock_control, &clocks).unwrap();
-
-    let channel = rmt
-        .channel0
-        .configure(
-            io.pins.gpio1.into_push_pull_output(),
-            TxChannelConfig {
-                clk_divider: 255,
-                ..TxChannelConfig::default()
-            },
-        )
-        .unwrap();
-
-    // you have to enable the interrupt for async to work
-    esp32h2_hal::interrupt::enable(
-        esp32h2_hal::peripherals::Interrupt::RMT,
-        esp32h2_hal::interrupt::Priority::Priority1,
-    )
-    .unwrap();
-
-    let executor = make_static!(Executor::new());
-    executor.run(|spawner| {
-        spawner.spawn(rmt_task(channel)).ok();
-    });
 }

@@ -6,32 +6,14 @@
 #![no_main]
 #![feature(type_alias_impl_trait)]
 
-use embassy_executor::Executor;
+use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use embedded_hal_async::digital::Wait;
-use esp32c3_hal::{
-    clock::ClockControl,
-    embassy,
-    gpio::{Gpio9, Input, PullDown},
-    peripherals::Peripherals,
-    prelude::*,
-    IO,
-};
+use esp32c3_hal::{clock::ClockControl, embassy, peripherals::Peripherals, prelude::*, IO};
 use esp_backtrace as _;
-use static_cell::make_static;
 
-#[embassy_executor::task]
-async fn ping(mut pin: Gpio9<Input<PullDown>>) {
-    loop {
-        esp_println::println!("Waiting...");
-        pin.wait_for_rising_edge().await.unwrap();
-        esp_println::println!("Ping!");
-        Timer::after(Duration::from_millis(100)).await;
-    }
-}
-
-#[entry]
-fn main() -> ! {
+#[main]
+async fn main(_spawner: Spawner) -> ! {
     esp_println::println!("Init!");
     let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();
@@ -51,7 +33,7 @@ fn main() -> ! {
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     // GPIO 9 as input
-    let input = io.pins.gpio9.into_pull_down_input();
+    let mut input = io.pins.gpio9.into_pull_down_input();
 
     // Async requires the GPIO interrupt to wake futures
     esp32c3_hal::interrupt::enable(
@@ -60,8 +42,10 @@ fn main() -> ! {
     )
     .unwrap();
 
-    let executor = make_static!(Executor::new());
-    executor.run(|spawner| {
-        spawner.spawn(ping(input)).ok();
-    });
+    loop {
+        esp_println::println!("Waiting...");
+        input.wait_for_rising_edge().await.unwrap();
+        esp_println::println!("Ping!");
+        Timer::after(Duration::from_millis(100)).await;
+    }
 }

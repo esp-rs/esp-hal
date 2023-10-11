@@ -49,6 +49,7 @@
 
 use darling::{ast::NestedMeta, FromMeta};
 use proc_macro::{self, Span, TokenStream};
+use proc_macro2::Ident;
 use proc_macro_error::{abort, proc_macro_error};
 use quote::quote;
 #[cfg(feature = "interrupt")]
@@ -57,7 +58,6 @@ use syn::{
     spanned::Spanned,
     AttrStyle,
     Attribute,
-    Ident,
     ItemFn,
     Meta::Path,
     ReturnType,
@@ -69,6 +69,12 @@ use syn::{
     parse_macro_input,
 };
 
+#[cfg(all(
+    feature = "embassy",
+    any(feature = "esp32", feature = "esp32s2", feature = "esp32s3")
+))]
+mod embassy_xtensa;
+
 #[derive(Debug, Default, FromMeta)]
 #[darling(default)]
 struct RamArgs {
@@ -76,6 +82,45 @@ struct RamArgs {
     rtc_slow: bool,
     uninitialized: bool,
     zeroed: bool,
+}
+
+fn get_hal_crate() -> (
+    Result<proc_macro_crate::FoundCrate, proc_macro_crate::Error>,
+    proc_macro2::Ident,
+) {
+    use proc_macro_crate::crate_name;
+
+    #[cfg(feature = "esp32")]
+    let hal_crate = crate_name("esp32-hal");
+    #[cfg(feature = "esp32s2")]
+    let hal_crate = crate_name("esp32s2-hal");
+    #[cfg(feature = "esp32s3")]
+    let hal_crate = crate_name("esp32s3-hal");
+    #[cfg(feature = "esp32c2")]
+    let hal_crate = crate_name("esp32c2-hal");
+    #[cfg(feature = "esp32c3")]
+    let hal_crate = crate_name("esp32c3-hal");
+    #[cfg(feature = "esp32c6")]
+    let hal_crate = crate_name("esp32c6-hal");
+    #[cfg(feature = "esp32h2")]
+    let hal_crate = crate_name("esp32h2-hal");
+
+    #[cfg(feature = "esp32")]
+    let hal_crate_name = Ident::new("esp32_hal", Span::call_site().into());
+    #[cfg(feature = "esp32s2")]
+    let hal_crate_name = Ident::new("esp32s2_hal", Span::call_site().into());
+    #[cfg(feature = "esp32s3")]
+    let hal_crate_name = Ident::new("esp32s3_hal", Span::call_site().into());
+    #[cfg(feature = "esp32c2")]
+    let hal_crate_name = Ident::new("esp32c2_hal", Span::call_site().into());
+    #[cfg(feature = "esp32c3")]
+    let hal_crate_name = Ident::new("esp32c3_hal", Span::call_site().into());
+    #[cfg(feature = "esp32c6")]
+    let hal_crate_name = Ident::new("esp32c6_hal", Span::call_site().into());
+    #[cfg(feature = "esp32h2")]
+    let hal_crate_name = Ident::new("esp32h2_hal", Span::call_site().into());
+
+    (hal_crate, hal_crate_name)
 }
 
 /// This attribute allows placing statics and functions into ram.
@@ -186,7 +231,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
 #[cfg(feature = "interrupt")]
 #[proc_macro_attribute]
 pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
-    use proc_macro_crate::{crate_name, FoundCrate};
+    use proc_macro_crate::FoundCrate;
 
     let mut f: ItemFn = syn::parse(input).expect("`#[interrupt]` must be applied to a function");
 
@@ -260,35 +305,7 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
         proc_macro2::Span::call_site(),
     );
 
-    #[cfg(feature = "esp32")]
-    let hal_crate = crate_name("esp32-hal");
-    #[cfg(feature = "esp32s2")]
-    let hal_crate = crate_name("esp32s2-hal");
-    #[cfg(feature = "esp32s3")]
-    let hal_crate = crate_name("esp32s3-hal");
-    #[cfg(feature = "esp32c2")]
-    let hal_crate = crate_name("esp32c2-hal");
-    #[cfg(feature = "esp32c3")]
-    let hal_crate = crate_name("esp32c3-hal");
-    #[cfg(feature = "esp32c6")]
-    let hal_crate = crate_name("esp32c6-hal");
-    #[cfg(feature = "esp32h2")]
-    let hal_crate = crate_name("esp32h2-hal");
-
-    #[cfg(feature = "esp32")]
-    let hal_crate_name = Ident::new("esp32_hal", Span::call_site().into());
-    #[cfg(feature = "esp32s2")]
-    let hal_crate_name = Ident::new("esp32s2_hal", Span::call_site().into());
-    #[cfg(feature = "esp32s3")]
-    let hal_crate_name = Ident::new("esp32s3_hal", Span::call_site().into());
-    #[cfg(feature = "esp32c2")]
-    let hal_crate_name = Ident::new("esp32c2_hal", Span::call_site().into());
-    #[cfg(feature = "esp32c3")]
-    let hal_crate_name = Ident::new("esp32c3_hal", Span::call_site().into());
-    #[cfg(feature = "esp32c6")]
-    let hal_crate_name = Ident::new("esp32c6_hal", Span::call_site().into());
-    #[cfg(feature = "esp32h2")]
-    let hal_crate_name = Ident::new("esp32h2_hal", Span::call_site().into());
+    let (hal_crate, hal_crate_name) = get_hal_crate();
 
     let interrupt_in_hal_crate = match hal_crate {
         Ok(FoundCrate::Itself) => {
@@ -470,6 +487,8 @@ impl Parse for MakeGpioEnumDispatchMacro {
 }
 
 /// Create an enum for erased GPIO pins, using the enum-dispatch pattern
+///
+/// Only used internally
 #[proc_macro]
 pub fn make_gpio_enum_dispatch_macro(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as MakeGpioEnumDispatchMacro);
@@ -515,6 +534,13 @@ pub fn make_gpio_enum_dispatch_macro(input: TokenStream) -> TokenStream {
 }
 
 #[cfg(any(feature = "esp32c6", feature = "esp32s2", feature = "esp32s3"))]
+/// Load code to be run on the LP/ULP core.
+///
+/// ## Example
+/// ```no_run
+/// let lp_core_code = load_lp_code!("path.elf");
+/// lp_core_code.run(&mut lp_core, lp_core::LpCoreWakeupSource::HpCpu, lp_pin);
+/// ````
 #[proc_macro]
 pub fn load_lp_code(input: TokenStream) -> TokenStream {
     use object::{Object, ObjectSection, ObjectSymbol};
@@ -690,4 +716,81 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
         }
     }
     .into()
+}
+
+// just delegates to embassy's macro for RISC-V
+#[cfg(all(
+    feature = "embassy",
+    not(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))
+))]
+/// Creates a new `executor` instance and declares an application entry point
+/// spawning the corresponding function body as an async task.
+///
+/// The following restrictions apply:
+///
+/// * The function must accept exactly 1 parameter, an
+///   `embassy_executor::Spawner` handle that it can use to spawn additional
+///   tasks.
+/// * The function must be declared `async`.
+/// * The function must not use generics.
+/// * Only a single `main` task may be declared.
+///
+/// ## Examples
+/// Spawning a task:
+///
+/// ``` rust
+/// #[embassy_executor::main]
+/// async fn main(_s: embassy_executor::Spawner) {
+///     // Function body
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn main(_args: TokenStream, input: TokenStream) -> TokenStream {
+    let f = parse_macro_input!(input as ItemFn);
+
+    let asyncness = f.sig.asyncness;
+    let args = f.sig.inputs;
+    let stmts = f.block.stmts;
+
+    quote!(
+        #[embassy_executor::main(entry = "entry")]
+        #asyncness fn main(#args) {
+             #(#stmts)*
+        }
+    )
+    .into()
+}
+
+#[cfg(all(
+    feature = "embassy",
+    any(feature = "esp32", feature = "esp32s2", feature = "esp32s3")
+))]
+/// Creates a new `executor` instance and declares an application entry point
+/// spawning the corresponding function body as an async task.
+///
+/// The following restrictions apply:
+///
+/// * The function must accept exactly 1 parameter, an
+///   `embassy_executor::Spawner` handle that it can use to spawn additional
+///   tasks.
+/// * The function must be declared `async`.
+/// * The function must not use generics.
+/// * Only a single `main` task may be declared.
+///
+/// ## Examples
+/// Spawning a task:
+///
+/// ``` rust
+/// #[embassy_executor::main]
+/// async fn main(_s: embassy_executor::Spawner) {
+///     // Function body
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
+    let args = syn::parse_macro_input!(args as embassy_xtensa::Args);
+    let f = syn::parse_macro_input!(item as syn::ItemFn);
+    embassy_xtensa::main::run(&args.meta, f, embassy_xtensa::main::main())
+        .unwrap_or_else(|x| x)
+        .into()
 }
