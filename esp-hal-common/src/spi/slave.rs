@@ -57,6 +57,7 @@
 
 use core::marker::PhantomData;
 
+pub use super::{Error, FullDuplexMode, SpiMode};
 use crate::{
     dma::{DmaPeripheral, Rx, Tx},
     gpio::{InputPin, InputSignal, OutputPin, OutputSignal},
@@ -66,7 +67,6 @@ use crate::{
 };
 
 const MAX_DMA_SIZE: usize = 32768 - 32;
-pub use crate::spi::master::{Error, FullDuplexMode, SpiMode};
 
 /// SPI peripheral driver
 pub struct Spi<'d, T, M> {
@@ -128,12 +128,8 @@ pub mod dma {
 
     use embedded_dma::{ReadBuffer, WriteBuffer};
 
-    #[cfg(any(esp32, esp32s2, esp32s3))]
-    use super::Spi3Instance;
-    #[allow(unused_imports)]
-    use super::SpiMode;
-    use super::{FullDuplexMode, Instance, InstanceDma, Spi, Spi2Instance, MAX_DMA_SIZE};
-    #[cfg(any(esp32, esp32s2, esp32s3))]
+    use super::*;
+    #[cfg(spi3)]
     use crate::dma::Spi3Peripheral;
     use crate::{
         dma::{
@@ -159,7 +155,7 @@ pub mod dma {
         fn with_dma(self, channel: Channel<'d, C>) -> SpiDma<'d, T, C>;
     }
 
-    #[cfg(any(esp32, esp32s2, esp32s3))]
+    #[cfg(spi3)]
     pub trait WithDmaSpi3<'d, T, C>
     where
         T: Instance + Spi3Instance,
@@ -193,7 +189,7 @@ pub mod dma {
         }
     }
 
-    #[cfg(any(esp32, esp32s2, esp32s3))]
+    #[cfg(spi3)]
     impl<'d, T, C> WithDmaSpi3<'d, T, C> for Spi<'d, T, FullDuplexMode>
     where
         T: Instance + Spi3Instance,
@@ -388,14 +384,14 @@ pub mod dma {
         pub fn dma_write<TXBUF>(
             mut self,
             words: TXBUF,
-        ) -> Result<SpiDmaTransfer<'d, T, C, TXBUF>, super::Error>
+        ) -> Result<SpiDmaTransfer<'d, T, C, TXBUF>, Error>
         where
             TXBUF: ReadBuffer<Word = u8>,
         {
             let (ptr, len) = unsafe { words.read_buffer() };
 
             if len > MAX_DMA_SIZE {
-                return Err(super::Error::MaxDmaTransferSizeExceeded);
+                return Err(Error::MaxDmaTransferSizeExceeded);
             }
 
             self.spi
@@ -416,14 +412,14 @@ pub mod dma {
         pub fn dma_read<RXBUF>(
             mut self,
             mut words: RXBUF,
-        ) -> Result<SpiDmaTransfer<'d, T, C, RXBUF>, super::Error>
+        ) -> Result<SpiDmaTransfer<'d, T, C, RXBUF>, Error>
         where
             RXBUF: WriteBuffer<Word = u8>,
         {
             let (ptr, len) = unsafe { words.write_buffer() };
 
             if len > MAX_DMA_SIZE {
-                return Err(super::Error::MaxDmaTransferSizeExceeded);
+                return Err(Error::MaxDmaTransferSizeExceeded);
             }
 
             self.spi
@@ -446,7 +442,7 @@ pub mod dma {
             mut self,
             words: TXBUF,
             mut read_buffer: RXBUF,
-        ) -> Result<SpiDmaTransferRxTx<'d, T, C, RXBUF, TXBUF>, super::Error>
+        ) -> Result<SpiDmaTransferRxTx<'d, T, C, RXBUF, TXBUF>, Error>
         where
             TXBUF: ReadBuffer<Word = u8>,
             RXBUF: WriteBuffer<Word = u8>,
@@ -455,7 +451,7 @@ pub mod dma {
             let (read_ptr, read_len) = unsafe { read_buffer.write_buffer() };
 
             if write_len > MAX_DMA_SIZE || read_len > MAX_DMA_SIZE {
-                return Err(super::Error::MaxDmaTransferSizeExceeded);
+                return Err(Error::MaxDmaTransferSizeExceeded);
             }
 
             self.spi
@@ -582,7 +578,7 @@ where
     fn dma_peripheral(&self) -> DmaPeripheral {
         match self.spi_num() {
             2 => DmaPeripheral::Spi2,
-            #[cfg(any(esp32, esp32s2, esp32s3))]
+            #[cfg(spi3)]
             3 => DmaPeripheral::Spi3,
             _ => panic!("Illegal SPI instance"),
         }
@@ -688,7 +684,7 @@ where
 {
 }
 
-#[cfg(any(esp32, esp32s2, esp32s3))]
+#[cfg(spi3)]
 impl<TX, RX> InstanceDma<TX, RX> for crate::peripherals::SPI3
 where
     TX: Tx,
@@ -1080,10 +1076,10 @@ impl Instance for crate::peripherals::SPI3 {
 
 pub trait Spi2Instance {}
 
-#[cfg(any(esp32, esp32s2, esp32s3))]
+#[cfg(spi3)]
 pub trait Spi3Instance {}
 
 impl Spi2Instance for crate::peripherals::SPI2 {}
 
-#[cfg(any(esp32, esp32s2, esp32s3))]
+#[cfg(spi3)]
 impl Spi3Instance for crate::peripherals::SPI3 {}

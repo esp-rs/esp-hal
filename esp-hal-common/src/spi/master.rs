@@ -53,9 +53,19 @@ use core::marker::PhantomData;
 
 use fugit::HertzU32;
 
+use super::{
+    DuplexMode,
+    Error,
+    FullDuplexMode,
+    HalfDuplexMode,
+    IsFullDuplex,
+    IsHalfDuplex,
+    SpiDataMode,
+    SpiMode,
+};
 use crate::{
     clock::Clocks,
-    dma::{DmaError, DmaPeripheral, Rx, Tx},
+    dma::{DmaPeripheral, Rx, Tx},
     gpio::{InputPin, InputSignal, OutputPin, OutputSignal},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::spi2::RegisterBlock,
@@ -67,68 +77,12 @@ use crate::{
 const FIFO_SIZE: usize = 64;
 #[cfg(esp32s2)]
 const FIFO_SIZE: usize = 72;
+
 /// Padding byte for empty write transfers
 const EMPTY_WRITE_PAD: u8 = 0x00u8;
 
 #[allow(unused)]
 const MAX_DMA_SIZE: usize = 32736;
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum Error {
-    DmaError(DmaError),
-    MaxDmaTransferSizeExceeded,
-    FifoSizeExeeded,
-    Unsupported,
-    Unknown,
-}
-
-impl From<DmaError> for Error {
-    fn from(value: DmaError) -> Self {
-        Error::DmaError(value)
-    }
-}
-
-#[cfg(feature = "eh1")]
-impl embedded_hal_1::spi::Error for Error {
-    fn kind(&self) -> embedded_hal_1::spi::ErrorKind {
-        embedded_hal_1::spi::ErrorKind::Other
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum SpiMode {
-    Mode0,
-    Mode1,
-    Mode2,
-    Mode3,
-}
-
-pub trait DuplexMode {}
-pub trait IsFullDuplex: DuplexMode {}
-pub trait IsHalfDuplex: DuplexMode {}
-
-/// SPI data mode
-///
-/// Single = 1 bit, 2 wires
-/// Dual = 2 bit, 2 wires
-/// Quad = 4 bit, 4 wires
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum SpiDataMode {
-    Single,
-    Dual,
-    Quad,
-}
-
-pub struct FullDuplexMode {}
-impl DuplexMode for FullDuplexMode {}
-impl IsFullDuplex for FullDuplexMode {}
-
-pub struct HalfDuplexMode {}
-impl DuplexMode for HalfDuplexMode {}
-impl IsHalfDuplex for HalfDuplexMode {}
 
 /// SPI command, 1 to 16 bits.
 ///
