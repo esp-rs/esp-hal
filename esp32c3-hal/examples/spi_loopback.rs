@@ -21,7 +21,7 @@ use esp32c3_hal::{
     gpio::IO,
     peripherals::Peripherals,
     prelude::*,
-    spi::master::{Spi, SpiMode},
+    spi::{master::Spi, SpiMode},
     Delay,
 };
 use esp_backtrace as _;
