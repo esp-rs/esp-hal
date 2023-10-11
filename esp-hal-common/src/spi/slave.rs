@@ -13,7 +13,7 @@
 //! let mosi = io.pins.gpio13;
 //! let cs = io.pins.gpio10;
 //!
-//! let mut spi = hal::spi_slave::Spi::new(peripherals.SPI2, sclk, mosi, miso, cs, SpiMode::Mode0);
+//! let mut spi = hal::spi::slave::Spi::new(peripherals.SPI2, sclk, mosi, miso, cs, SpiMode::Mode0);
 //! ```
 //!
 //! There are several options for working with the SPI peripheral in slave mode,
@@ -66,7 +66,7 @@ use crate::{
 };
 
 const MAX_DMA_SIZE: usize = 32768 - 32;
-pub use crate::spi::{Error, FullDuplexMode, SpiMode};
+pub use crate::spi::master::{Error, FullDuplexMode, SpiMode};
 
 /// SPI peripheral driver
 pub struct Spi<'d, T, M> {

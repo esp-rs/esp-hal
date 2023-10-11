@@ -1510,8 +1510,8 @@ pub mod dma {
     mod ehal1 {
         use embedded_hal_1::spi::SpiBus;
 
-        use super::{super::InstanceDma, SpiDma, SpiPeripheral};
-        use crate::{dma::ChannelTypes, spi::IsFullDuplex, FlashSafeDma};
+        use super::{super::InstanceDma, *};
+        use crate::{dma::ChannelTypes, FlashSafeDma};
 
         impl<'d, T, C, M> embedded_hal_1::spi::ErrorType for SpiDma<'d, T, C, M>
         where
@@ -2803,8 +2803,8 @@ pub trait Instance {
 
     fn write_bytes_half_duplex(
         &mut self,
-        cmd: crate::spi::Command,
-        address: crate::spi::Address,
+        cmd: Command,
+        address: Address,
         dummy: u8,
         buffer: &[u8],
     ) -> Result<(), Error> {
@@ -2866,8 +2866,8 @@ pub trait Instance {
 
     fn read_bytes_half_duplex(
         &mut self,
-        cmd: crate::spi::Command,
-        address: crate::spi::Address,
+        cmd: Command,
+        address: Address,
         dummy: u8,
         buffer: &mut [u8],
     ) -> Result<(), Error> {

@@ -63,15 +63,15 @@ pub use crate::ledc::{
 #[cfg(radio)]
 pub use crate::radio::RadioExt as _esp_hal_RadioExt;
 #[cfg(any(esp32, esp32s2, esp32s3))]
-pub use crate::spi::dma::WithDmaSpi3 as _esp_hal_spi_dma_WithDmaSpi3;
+pub use crate::spi::master::dma::WithDmaSpi3 as _esp_hal_spi_dma_WithDmaSpi3;
 #[cfg(any(spi0, spi1, spi2, spi3))]
-pub use crate::spi::{
+pub use crate::spi::master::{
     dma::WithDmaSpi2 as _esp_hal_spi_dma_WithDmaSpi2,
     Instance as _esp_hal_spi_Instance,
     InstanceDma as _esp_hal_spi_InstanceDma,
 };
 #[cfg(all(any(spi0, spi1, spi2, spi3), not(pdma)))]
-pub use crate::spi_slave::{
+pub use crate::spi::slave::{
     dma::WithDmaSpi2 as _esp_hal_spi_slave_dma_WithDmaSpi2,
     Instance as _esp_hal_spi_slave_Instance,
     InstanceDma as _esp_hal_spi_slave_InstanceDma,
