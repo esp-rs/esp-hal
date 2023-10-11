@@ -35,8 +35,8 @@ pub extern "C" fn worker_task2() {
     loop {
         let mut to_run = SimpleQueue::<_, 20>::new();
 
+        let current_timestamp = get_systimer_count();
         critical_section::with(|_| unsafe {
-            let current_timestamp = get_systimer_count();
             memory_fence();
             for i in 0..TIMERS.len() {
                 if let Some(ref mut timer) = TIMERS[i] {

@@ -1,6 +1,6 @@
 use core::cell::RefCell;
 
-use atomic_polyfill::{AtomicU64, Ordering};
+use atomic_polyfill::{AtomicU32, Ordering};
 use critical_section::Mutex;
 use esp32s3_hal::trapframe::TrapFrame;
 use esp32s3_hal::{
@@ -8,6 +8,7 @@ use esp32s3_hal::{
     peripherals::{self, TIMG1},
     prelude::*,
     timer::{Timer, Timer0},
+    xtensa_lx, xtensa_lx_rt,
 };
 
 use crate::preempt::preempt::task_switch;
@@ -21,16 +22,24 @@ const TIMER_DELAY: fugit::HertzU32 = fugit::HertzU32::from_raw(crate::CONFIG.tic
 
 static TIMER1: Mutex<RefCell<Option<Timer<Timer0<TIMG1>>>>> = Mutex::new(RefCell::new(None));
 
-static TIME: AtomicU64 = AtomicU64::new(0);
+static TIMER_OVERFLOWS: AtomicU32 = AtomicU32::new(0);
 
+/// This function must not be called in a critical section. Doing so may return an incorrect value.
 pub fn get_systimer_count() -> u64 {
-    TIME.load(Ordering::Relaxed) + read_timer_value()
-}
+    // We read the cycle counter twice to detect overflows.
+    // If we don't detect an overflow, we use the TIMER_OVERFLOWS count we read between.
+    // If we detect an overflow, we read the TIMER_OVERFLOWS count again to make sure we use the
+    // value after the overflow has been handled.
 
-#[inline(always)]
-fn read_timer_value() -> u64 {
-    let value = esp32s3_hal::xtensa_lx::timer::get_cycle_count() as u64;
-    value * 40_000_000 / 240_000_000
+    let counter_before = xtensa_lx::timer::get_cycle_count();
+    let mut overflow = TIMER_OVERFLOWS.load(Ordering::Relaxed);
+    let counter_after = xtensa_lx::timer::get_cycle_count();
+
+    if counter_after < counter_before {
+        overflow = TIMER_OVERFLOWS.load(Ordering::Relaxed);
+    }
+
+    (((overflow as u64) << 32) + counter_after as u64) * 40_000_000 / 240_000_000
 }
 
 pub fn setup_timer_isr(timg1_timer0: Timer<Timer0<TIMG1>>) {
@@ -73,12 +82,12 @@ pub fn setup_timer_isr(timg1_timer0: Timer<Timer0<TIMG1>>) {
     esp32s3_hal::xtensa_lx::timer::set_ccompare0(0xffffffff);
 
     unsafe {
-        let enabled = esp32s3_hal::xtensa_lx::interrupt::disable();
-        esp32s3_hal::xtensa_lx::interrupt::enable_mask(
+        let enabled = xtensa_lx::interrupt::disable();
+        xtensa_lx::interrupt::enable_mask(
             1 << 6 // Timer0
             | 1 << 29 // Software1
-                | esp32s3_hal::xtensa_lx_rt::interrupt::CpuInterruptLevel::Level2.mask()
-                | esp32s3_hal::xtensa_lx_rt::interrupt::CpuInterruptLevel::Level6.mask() | enabled,
+                | xtensa_lx_rt::interrupt::CpuInterruptLevel::Level2.mask()
+                | xtensa_lx_rt::interrupt::CpuInterruptLevel::Level6.mask() | enabled,
         );
     }
 
@@ -88,7 +97,7 @@ pub fn setup_timer_isr(timg1_timer0: Timer<Timer0<TIMG1>>) {
 #[allow(non_snake_case)]
 #[no_mangle]
 fn Timer0(_level: u32) {
-    TIME.fetch_add(0x1_0000_0000 * 40_000_000 / 240_000_000, Ordering::Relaxed);
+    TIMER_OVERFLOWS.fetch_add(1, Ordering::Relaxed);
 
     esp32s3_hal::xtensa_lx::timer::set_ccompare0(0xffffffff);
 }
