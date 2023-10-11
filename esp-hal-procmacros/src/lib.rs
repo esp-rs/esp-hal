@@ -47,34 +47,92 @@
 
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 
-use darling::{ast::NestedMeta, FromMeta};
-use proc_macro::{self, Span, TokenStream};
-use proc_macro2::Ident;
-use proc_macro_error::{abort, proc_macro_error};
+#[cfg(feature = "ram")]
+use darling::{ast::NestedMeta, Error as DarlingError, FromMeta};
+use proc_macro::TokenStream;
+use proc_macro_crate::FoundCrate;
+use proc_macro_error::proc_macro_error;
 use quote::quote;
-#[cfg(feature = "interrupt")]
-use syn::{
-    parse,
-    spanned::Spanned,
-    AttrStyle,
-    Attribute,
-    ItemFn,
-    Meta::Path,
-    ReturnType,
-    Type,
-    Visibility,
-};
-use syn::{
-    parse::{Parse, ParseStream},
-    parse_macro_input,
-};
+use syn::parse_macro_input;
 
 #[cfg(all(
     feature = "embassy",
     any(feature = "esp32", feature = "esp32s2", feature = "esp32s3")
 ))]
 mod embassy_xtensa;
+#[cfg(feature = "enum-dispatch")]
+mod enum_dispatch;
+#[cfg(feature = "interrupt")]
+mod interrupt;
+#[cfg(any(
+    feature = "esp32c6-lp",
+    feature = "esp32s2-ulp",
+    feature = "esp32s3-ulp"
+))]
+mod lp_core;
 
+#[cfg(any(
+    feature = "esp32c6",
+    feature = "esp32s2",
+    feature = "esp32s3",
+    feature = "interrupt"
+))]
+fn get_hal_crate() -> (
+    Result<FoundCrate, proc_macro_crate::Error>,
+    proc_macro2::Ident,
+) {
+    use proc_macro::Span;
+    use proc_macro2::Ident;
+    use proc_macro_crate::crate_name;
+
+    // Package name:
+    #[cfg(feature = "esp32")]
+    let hal_crate = crate_name("esp32-hal");
+    #[cfg(feature = "esp32c2")]
+    let hal_crate = crate_name("esp32c2-hal");
+    #[cfg(feature = "esp32c3")]
+    let hal_crate = crate_name("esp32c3-hal");
+    #[cfg(feature = "esp32c6")]
+    let hal_crate = crate_name("esp32c6-hal");
+    #[cfg(feature = "esp32c6-lp")]
+    let hal_crate = crate_name("esp32c6-lp-hal");
+    #[cfg(feature = "esp32h2")]
+    let hal_crate = crate_name("esp32h2-hal");
+    #[cfg(feature = "esp32s2")]
+    let hal_crate = crate_name("esp32s2-hal");
+    #[cfg(feature = "esp32s2-ulp")]
+    let hal_crate = crate_name("ulp-riscv-hal");
+    #[cfg(feature = "esp32s3")]
+    let hal_crate = crate_name("esp32s3-hal");
+    #[cfg(feature = "esp32s3-ulp")]
+    let hal_crate = crate_name("ulp-riscv-hal");
+
+    // Crate name:
+    #[cfg(feature = "esp32")]
+    let hal_crate_name = Ident::new("esp32_hal", Span::call_site().into());
+    #[cfg(feature = "esp32c2")]
+    let hal_crate_name = Ident::new("esp32c2_hal", Span::call_site().into());
+    #[cfg(feature = "esp32c3")]
+    let hal_crate_name = Ident::new("esp32c3_hal", Span::call_site().into());
+    #[cfg(feature = "esp32c6")]
+    let hal_crate_name = Ident::new("esp32c6_hal", Span::call_site().into());
+    #[cfg(feature = "esp32c6-lp")]
+    let hal_crate_name = Ident::new("esp32c6_lp_hal", Span::call_site().into());
+    #[cfg(feature = "esp32h2")]
+    let hal_crate_name = Ident::new("esp32h2_hal", Span::call_site().into());
+    #[cfg(feature = "esp32s2")]
+    let hal_crate_name = Ident::new("esp32s2_hal", Span::call_site().into());
+    #[cfg(feature = "esp32s2-ulp")]
+    let hal_crate_name = Ident::new("ulp_riscv_hal", Span::call_site().into());
+    #[cfg(feature = "esp32s3")]
+    let hal_crate_name = Ident::new("esp32s3_hal", Span::call_site().into());
+    #[cfg(feature = "esp32s3-ulp")]
+    let hal_crate_name = Ident::new("ulp_riscv_hal", Span::call_site().into());
+
+    (hal_crate, hal_crate_name)
+}
+
+#[cfg(feature = "ram")]
 #[derive(Debug, Default, FromMeta)]
 #[darling(default)]
 struct RamArgs {
@@ -82,45 +140,6 @@ struct RamArgs {
     rtc_slow: bool,
     uninitialized: bool,
     zeroed: bool,
-}
-
-fn get_hal_crate() -> (
-    Result<proc_macro_crate::FoundCrate, proc_macro_crate::Error>,
-    proc_macro2::Ident,
-) {
-    use proc_macro_crate::crate_name;
-
-    #[cfg(feature = "esp32")]
-    let hal_crate = crate_name("esp32-hal");
-    #[cfg(feature = "esp32s2")]
-    let hal_crate = crate_name("esp32s2-hal");
-    #[cfg(feature = "esp32s3")]
-    let hal_crate = crate_name("esp32s3-hal");
-    #[cfg(feature = "esp32c2")]
-    let hal_crate = crate_name("esp32c2-hal");
-    #[cfg(feature = "esp32c3")]
-    let hal_crate = crate_name("esp32c3-hal");
-    #[cfg(feature = "esp32c6")]
-    let hal_crate = crate_name("esp32c6-hal");
-    #[cfg(feature = "esp32h2")]
-    let hal_crate = crate_name("esp32h2-hal");
-
-    #[cfg(feature = "esp32")]
-    let hal_crate_name = Ident::new("esp32_hal", Span::call_site().into());
-    #[cfg(feature = "esp32s2")]
-    let hal_crate_name = Ident::new("esp32s2_hal", Span::call_site().into());
-    #[cfg(feature = "esp32s3")]
-    let hal_crate_name = Ident::new("esp32s3_hal", Span::call_site().into());
-    #[cfg(feature = "esp32c2")]
-    let hal_crate_name = Ident::new("esp32c2_hal", Span::call_site().into());
-    #[cfg(feature = "esp32c3")]
-    let hal_crate_name = Ident::new("esp32c3_hal", Span::call_site().into());
-    #[cfg(feature = "esp32c6")]
-    let hal_crate_name = Ident::new("esp32c6_hal", Span::call_site().into());
-    #[cfg(feature = "esp32h2")]
-    let hal_crate_name = Ident::new("esp32h2_hal", Span::call_site().into());
-
-    (hal_crate, hal_crate_name)
 }
 
 /// This attribute allows placing statics and functions into ram.
@@ -132,13 +151,17 @@ fn get_hal_crate() -> (
 /// (e.g. to persist it across resets or deep sleep mode for the RTC RAM)
 ///
 /// Not all targets support RTC slow ram.
+#[cfg(feature = "ram")]
 #[proc_macro_attribute]
 #[proc_macro_error]
 pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
+    use proc_macro::Span;
+    use proc_macro_error::abort;
+
     let attr_args = match NestedMeta::parse_meta_list(args.into()) {
         Ok(v) => v,
         Err(e) => {
-            return TokenStream::from(darling::Error::from(e).write_errors());
+            return TokenStream::from(DarlingError::from(e).write_errors());
         }
     };
 
@@ -200,6 +223,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
         #section
         #item
     };
+
     output.into()
 }
 
@@ -231,7 +255,22 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
 #[cfg(feature = "interrupt")]
 #[proc_macro_attribute]
 pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
-    use proc_macro_crate::FoundCrate;
+    use std::iter;
+
+    use proc_macro::Span;
+    use proc_macro2::Ident;
+    use proc_macro_error::abort;
+    use syn::{
+        parse::Error as ParseError,
+        spanned::Spanned,
+        ItemFn,
+        Meta,
+        ReturnType,
+        Type,
+        Visibility,
+    };
+
+    use self::interrupt::{check_attr_whitelist, extract_cfgs, WhiteListCaller};
 
     let mut f: ItemFn = syn::parse(input).expect("`#[interrupt]` must be applied to a function");
 
@@ -254,7 +293,7 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
 
     if attr_args.len() == 1 {
         match &attr_args[0] {
-            NestedMeta::Meta(Path(x)) => {
+            NestedMeta::Meta(Meta::Path(x)) => {
                 ident_s = x.get_ident().unwrap();
             }
             _ => {
@@ -292,7 +331,7 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
         && f.sig.inputs.len() <= 1;
 
     if !valid_signature {
-        return parse::Error::new(
+        return ParseError::new(
             f.span(),
             "`#[interrupt]` handlers must have signature `[unsafe] fn([&mut Context]) [-> !]`",
         )
@@ -320,7 +359,7 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
         }
     };
 
-    f.block.stmts.extend(std::iter::once(
+    f.block.stmts.extend(iter::once(
         syn::parse2(quote! {{
             // Check that this interrupt actually exists
             #interrupt_in_hal_crate;
@@ -371,133 +410,22 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
     .into()
 }
 
-#[cfg(feature = "interrupt")]
-enum WhiteListCaller {
-    Interrupt,
-}
-
-#[cfg(feature = "interrupt")]
-fn check_attr_whitelist(attrs: &[Attribute], caller: WhiteListCaller) -> Result<(), TokenStream> {
-    let whitelist = &[
-        "doc",
-        "link_section",
-        "cfg",
-        "allow",
-        "warn",
-        "deny",
-        "forbid",
-        "cold",
-        "ram",
-        "inline",
-    ];
-
-    'o: for attr in attrs {
-        for val in whitelist {
-            if eq(&attr, &val) {
-                continue 'o;
-            }
-        }
-
-        let err_str = match caller {
-            WhiteListCaller::Interrupt => {
-                "this attribute is not allowed on an interrupt handler controlled by esp-hal"
-            }
-        };
-
-        return Err(parse::Error::new(attr.span(), &err_str)
-            .to_compile_error()
-            .into());
-    }
-
-    Ok(())
-}
-
-/// Returns `true` if `attr.path` matches `name`
-#[cfg(feature = "interrupt")]
-fn eq(attr: &Attribute, name: &str) -> bool {
-    attr.style == AttrStyle::Outer && attr.path().is_ident(name)
-}
-
-#[cfg(feature = "interrupt")]
-fn extract_cfgs(attrs: Vec<Attribute>) -> (Vec<Attribute>, Vec<Attribute>) {
-    let mut cfgs = vec![];
-    let mut not_cfgs = vec![];
-
-    for attr in attrs {
-        if eq(&attr, "cfg") {
-            cfgs.push(attr);
-        } else {
-            not_cfgs.push(attr);
-        }
-    }
-
-    (cfgs, not_cfgs)
-}
-
-#[derive(Debug)]
-struct MakeGpioEnumDispatchMacro {
-    name: String,
-    filter: Vec<String>,
-    elements: Vec<(String, usize)>,
-}
-
-impl Parse for MakeGpioEnumDispatchMacro {
-    fn parse(input: ParseStream) -> syn::parse::Result<Self> {
-        let name = input.parse::<syn::Ident>()?.to_string();
-        let filter = input
-            .parse::<proc_macro2::Group>()?
-            .stream()
-            .into_iter()
-            .map(|v| match v {
-                proc_macro2::TokenTree::Group(_) => String::new(),
-                proc_macro2::TokenTree::Ident(ident) => ident.to_string(),
-                proc_macro2::TokenTree::Punct(_) => String::new(),
-                proc_macro2::TokenTree::Literal(_) => String::new(),
-            })
-            .filter(|p| !p.is_empty())
-            .collect();
-
-        let mut stream = input.parse::<proc_macro2::Group>()?.stream().into_iter();
-
-        let mut elements = vec![];
-
-        let mut element_name = String::new();
-        loop {
-            match stream.next() {
-                Some(v) => match v {
-                    proc_macro2::TokenTree::Ident(ident) => {
-                        element_name = ident.to_string();
-                    }
-                    proc_macro2::TokenTree::Literal(lit) => {
-                        let index = lit.to_string().parse().unwrap();
-                        elements.push((element_name.clone(), index));
-                    }
-                    _ => (),
-                },
-                None => break,
-            }
-        }
-
-        Ok(MakeGpioEnumDispatchMacro {
-            name,
-            filter,
-            elements,
-        })
-    }
-}
-
 /// Create an enum for erased GPIO pins, using the enum-dispatch pattern
 ///
 /// Only used internally
+#[cfg(feature = "enum-dispatch")]
 #[proc_macro]
 pub fn make_gpio_enum_dispatch_macro(input: TokenStream) -> TokenStream {
+    use quote::format_ident;
+
+    use self::enum_dispatch::MakeGpioEnumDispatchMacro;
+
     let input = parse_macro_input!(input as MakeGpioEnumDispatchMacro);
 
     let mut arms = Vec::new();
-
     for (gpio_type, num) in input.elements {
-        let enum_name = quote::format_ident!("ErasedPin");
-        let variant_name = quote::format_ident!("Gpio{}", num);
+        let enum_name = format_ident!("ErasedPin");
+        let variant_name = format_ident!("Gpio{}", num);
 
         if input.filter.contains(&gpio_type) {
             let arm = {
@@ -515,7 +443,7 @@ pub fn make_gpio_enum_dispatch_macro(input: TokenStream) -> TokenStream {
         }
     }
 
-    let macro_name = quote::format_ident!("{}", input.name);
+    let macro_name = format_ident!("{}", input.name);
 
     quote! {
         #[doc(hidden)]
@@ -533,7 +461,6 @@ pub fn make_gpio_enum_dispatch_macro(input: TokenStream) -> TokenStream {
     .into()
 }
 
-#[cfg(any(feature = "esp32c6", feature = "esp32s2", feature = "esp32s3"))]
 /// Load code to be run on the LP/ULP core.
 ///
 /// ## Example
@@ -541,26 +468,16 @@ pub fn make_gpio_enum_dispatch_macro(input: TokenStream) -> TokenStream {
 /// let lp_core_code = load_lp_code!("path.elf");
 /// lp_core_code.run(&mut lp_core, lp_core::LpCoreWakeupSource::HpCpu, lp_pin);
 /// ````
+#[cfg(any(feature = "esp32c6", feature = "esp32s2", feature = "esp32s3"))]
 #[proc_macro]
 pub fn load_lp_code(input: TokenStream) -> TokenStream {
+    use std::{fs, path};
+
     use object::{Object, ObjectSection, ObjectSymbol};
-    use proc_macro_crate::{crate_name, FoundCrate};
-    #[cfg(not(feature = "interrupt"))]
+    use proc_macro::Span;
     use syn::{parse, Ident};
 
-    #[cfg(feature = "esp32c6")]
-    let hal_crate = crate_name("esp32c6-hal");
-    #[cfg(feature = "esp32s2")]
-    let hal_crate = crate_name("esp32s2-hal");
-    #[cfg(feature = "esp32s3")]
-    let hal_crate = crate_name("esp32s3-hal");
-
-    #[cfg(feature = "esp32c6")]
-    let hal_crate_name = Ident::new("esp32c6_hal", Span::call_site().into());
-    #[cfg(feature = "esp32s2")]
-    let hal_crate_name = Ident::new("esp32s2_hal", Span::call_site().into());
-    #[cfg(feature = "esp32s3")]
-    let hal_crate_name = Ident::new("esp32s3_hal", Span::call_site().into());
+    let (hal_crate, hal_crate_name) = get_hal_crate();
 
     let hal_crate = match hal_crate {
         Ok(FoundCrate::Itself) => {
@@ -599,13 +516,13 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
     };
     let elf_file = arg.value();
 
-    if !std::path::Path::new(elf_file).exists() {
+    if !path::Path::new(elf_file).exists() {
         return parse::Error::new(Span::call_site().into(), "File not found")
             .to_compile_error()
             .into();
     }
 
-    let bin_data = std::fs::read(elf_file).unwrap();
+    let bin_data = fs::read(elf_file).unwrap();
     let obj_file = object::File::parse(&*bin_data).unwrap();
     let sections = obj_file.sections();
 
@@ -718,11 +635,105 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
     .into()
 }
 
-// just delegates to embassy's macro for RISC-V
-#[cfg(all(
-    feature = "embassy",
-    not(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))
+#[cfg(any(
+    feature = "esp32c6-lp",
+    feature = "esp32s2-ulp",
+    feature = "esp32s3-ulp"
 ))]
+#[proc_macro_error]
+#[proc_macro_attribute]
+pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
+    use proc_macro2::{Ident, Span};
+    use proc_macro_crate::crate_name;
+    use quote::{format_ident, quote};
+    use syn::{parse, parse_macro_input, spanned::Spanned, FnArg, ItemFn};
+
+    use self::lp_core::{extract_pin, get_simplename, make_magic_symbol_name};
+
+    #[cfg(feature = "esp32c6-lp")]
+    let found_crate =
+        crate_name("esp32c6-lp-hal").expect("esp32c6_lp_hal is present in `Cargo.toml`");
+    #[cfg(any(feature = "esp32s2-ulp", feature = "esp32s3-ulp"))]
+    let found_crate =
+        crate_name("ulp-riscv-hal").expect("ulp-riscv-hal is present in `Cargo.toml`");
+
+    let hal_crate = match found_crate {
+        #[cfg(feature = "esp32c6-lp")]
+        FoundCrate::Itself => quote!(esp32c6_lp_hal),
+        #[cfg(any(feature = "esp32s2-ulp", feature = "esp32s3-ulp"))]
+        FoundCrate::Itself => quote!(ulp_riscv_hal),
+        FoundCrate::Name(name) => {
+            let ident = Ident::new(&name, Span::call_site());
+            quote!( #ident::Something )
+        }
+    };
+
+    if !args.is_empty() {
+        return parse::Error::new(Span::call_site(), "This attribute accepts no arguments")
+            .to_compile_error()
+            .into();
+    }
+
+    let f = parse_macro_input!(input as ItemFn);
+
+    let mut argument_types = Vec::new();
+
+    let mut used_pins: Vec<u8> = Vec::new();
+    for arg in &f.sig.inputs {
+        match arg {
+            FnArg::Receiver(_) => {
+                return parse::Error::new(arg.span(), "invalid argument")
+                    .to_compile_error()
+                    .into();
+            }
+            FnArg::Typed(t) => {
+                if get_simplename(&t.ty) != "GpioPin" {
+                    return parse::Error::new(arg.span(), "invalid argument to main")
+                        .to_compile_error()
+                        .into();
+                }
+                let pin = extract_pin(&t.ty);
+                if used_pins.contains(&pin) {
+                    return parse::Error::new(arg.span(), "duplicate pin")
+                        .to_compile_error()
+                        .into();
+                }
+                used_pins.push(pin);
+
+                argument_types.push(t);
+            }
+        }
+    }
+
+    let magic_symbol_name = make_magic_symbol_name(&argument_types);
+
+    let param_names: Vec<Ident> = argument_types
+        .into_iter()
+        .enumerate()
+        .map(|(num, _)| format_ident!("param{}", num))
+        .collect();
+
+    quote!(
+        #[allow(non_snake_case)]
+        #[export_name = "main"]
+        pub fn __risc_v_rt__main() -> ! {
+            #[export_name = #magic_symbol_name]
+            static ULP_MAGIC: [u32; 0] = [0u32; 0];
+
+            unsafe { ULP_MAGIC.as_ptr().read_volatile(); }
+
+            use #hal_crate as the_hal;
+            #(
+                let mut #param_names = unsafe { the_hal::gpio::conjour().unwrap() };
+            )*
+
+            main(#(#param_names),*);
+        }
+        #f
+    )
+    .into()
+}
+
 /// Creates a new `executor` instance and declares an application entry point
 /// spawning the corresponding function body as an async task.
 ///
@@ -744,9 +755,13 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
 ///     // Function body
 /// }
 /// ```
+#[cfg(all(
+    feature = "embassy",
+    not(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))
+))]
 #[proc_macro_attribute]
 pub fn main(_args: TokenStream, input: TokenStream) -> TokenStream {
-    let f = parse_macro_input!(input as ItemFn);
+    let f = parse_macro_input!(input as syn::ItemFn);
 
     let asyncness = f.sig.asyncness;
     let args = f.sig.inputs;
@@ -761,10 +776,6 @@ pub fn main(_args: TokenStream, input: TokenStream) -> TokenStream {
     .into()
 }
 
-#[cfg(all(
-    feature = "embassy",
-    any(feature = "esp32", feature = "esp32s2", feature = "esp32s3")
-))]
 /// Creates a new `executor` instance and declares an application entry point
 /// spawning the corresponding function body as an async task.
 ///
@@ -786,11 +797,19 @@ pub fn main(_args: TokenStream, input: TokenStream) -> TokenStream {
 ///     // Function body
 /// }
 /// ```
+#[cfg(all(
+    feature = "embassy",
+    any(feature = "esp32", feature = "esp32s2", feature = "esp32s3")
+))]
 #[proc_macro_attribute]
 pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
-    let args = syn::parse_macro_input!(args as embassy_xtensa::Args);
-    let f = syn::parse_macro_input!(item as syn::ItemFn);
-    embassy_xtensa::main::run(&args.meta, f, embassy_xtensa::main::main())
-        .unwrap_or_else(|x| x)
-        .into()
+    use self::embassy_xtensa::{
+        main::{main, run},
+        Args,
+    };
+
+    let args = parse_macro_input!(args as Args);
+    let f = parse_macro_input!(item as syn::ItemFn);
+
+    run(&args.meta, f, main()).unwrap_or_else(|x| x).into()
 }
