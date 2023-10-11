@@ -22,7 +22,7 @@ use esp32s3_hal::{
     gpio::IO,
     peripherals::Peripherals,
     prelude::*,
-    spi::{Address, Command, HalfDuplexReadWrite, Spi, SpiDataMode, SpiMode},
+    spi::master::{Address, Command, HalfDuplexReadWrite, Spi, SpiDataMode, SpiMode},
     Delay,
 };
 use esp_backtrace as _;

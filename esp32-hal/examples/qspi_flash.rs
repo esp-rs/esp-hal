@@ -24,7 +24,7 @@ use esp32_hal::{
     pdma::Dma,
     peripherals::Peripherals,
     prelude::*,
-    spi::{Address, Command, Spi, SpiDataMode, SpiMode},
+    spi::master::{Address, Command, Spi, SpiDataMode, SpiMode},
     Delay,
 };
 use esp_backtrace as _;

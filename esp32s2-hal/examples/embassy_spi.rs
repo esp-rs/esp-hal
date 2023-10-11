@@ -27,7 +27,7 @@ use esp32s2_hal::{
     pdma::*,
     peripherals::Peripherals,
     prelude::*,
-    spi::{Spi, SpiMode},
+    spi::master::{Spi, SpiMode},
     IO,
 };
 use esp_backtrace as _;
