@@ -27,7 +27,7 @@ use esp32_hal::{
     pdma::*,
     peripherals::Peripherals,
     prelude::*,
-    spi::{Spi, SpiMode},
+    spi::{master::Spi, SpiMode},
     timer::TimerGroup,
     IO,
 };

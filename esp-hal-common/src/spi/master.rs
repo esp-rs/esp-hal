@@ -1,6 +1,7 @@
-//! # Serial Peripheral Interface
+//! # Serial Peripheral Interface - Master Mode
 //!
 //! ## Overview
+//!
 //! There are multiple ways to use SPI, depending on your needs. Regardless of
 //! which way you choose, you must first create an SPI instance with
 //! [`Spi::new`].
@@ -53,9 +54,19 @@ use core::marker::PhantomData;
 
 use fugit::HertzU32;
 
+use super::{
+    DuplexMode,
+    Error,
+    FullDuplexMode,
+    HalfDuplexMode,
+    IsFullDuplex,
+    IsHalfDuplex,
+    SpiDataMode,
+    SpiMode,
+};
 use crate::{
     clock::Clocks,
-    dma::{DmaError, DmaPeripheral, Rx, Tx},
+    dma::{DmaPeripheral, Rx, Tx},
     gpio::{InputPin, InputSignal, OutputPin, OutputSignal},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::spi2::RegisterBlock,
@@ -67,68 +78,12 @@ use crate::{
 const FIFO_SIZE: usize = 64;
 #[cfg(esp32s2)]
 const FIFO_SIZE: usize = 72;
+
 /// Padding byte for empty write transfers
 const EMPTY_WRITE_PAD: u8 = 0x00u8;
 
 #[allow(unused)]
 const MAX_DMA_SIZE: usize = 32736;
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum Error {
-    DmaError(DmaError),
-    MaxDmaTransferSizeExceeded,
-    FifoSizeExeeded,
-    Unsupported,
-    Unknown,
-}
-
-impl From<DmaError> for Error {
-    fn from(value: DmaError) -> Self {
-        Error::DmaError(value)
-    }
-}
-
-#[cfg(feature = "eh1")]
-impl embedded_hal_1::spi::Error for Error {
-    fn kind(&self) -> embedded_hal_1::spi::ErrorKind {
-        embedded_hal_1::spi::ErrorKind::Other
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum SpiMode {
-    Mode0,
-    Mode1,
-    Mode2,
-    Mode3,
-}
-
-pub trait DuplexMode {}
-pub trait IsFullDuplex: DuplexMode {}
-pub trait IsHalfDuplex: DuplexMode {}
-
-/// SPI data mode
-///
-/// Single = 1 bit, 2 wires
-/// Dual = 2 bit, 2 wires
-/// Quad = 4 bit, 4 wires
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum SpiDataMode {
-    Single,
-    Dual,
-    Quad,
-}
-
-pub struct FullDuplexMode {}
-impl DuplexMode for FullDuplexMode {}
-impl IsFullDuplex for FullDuplexMode {}
-
-pub struct HalfDuplexMode {}
-impl DuplexMode for HalfDuplexMode {}
-impl IsHalfDuplex for HalfDuplexMode {}
 
 /// SPI command, 1 to 16 bits.
 ///
@@ -754,7 +709,7 @@ pub mod dma {
     use embedded_dma::{ReadBuffer, WriteBuffer};
     use fugit::HertzU32;
 
-    #[cfg(any(esp32, esp32s2, esp32s3))]
+    #[cfg(spi3)]
     use super::Spi3Instance;
     use super::{
         Address,
@@ -769,7 +724,7 @@ pub mod dma {
         SpiDataMode,
         MAX_DMA_SIZE,
     };
-    #[cfg(any(esp32, esp32s2, esp32s3))]
+    #[cfg(spi3)]
     use crate::dma::Spi3Peripheral;
     use crate::{
         clock::Clocks,
@@ -798,7 +753,7 @@ pub mod dma {
         fn with_dma(self, channel: Channel<'d, C>) -> SpiDma<'d, T, C, M>;
     }
 
-    #[cfg(any(esp32, esp32s2, esp32s3))]
+    #[cfg(spi3)]
     pub trait WithDmaSpi3<'d, T, C, M>
     where
         T: Instance + Spi3Instance,
@@ -827,7 +782,7 @@ pub mod dma {
         }
     }
 
-    #[cfg(any(esp32, esp32s2, esp32s3))]
+    #[cfg(spi3)]
     impl<'d, T, C, M> WithDmaSpi3<'d, T, C, M> for Spi<'d, T, M>
     where
         T: Instance + Spi3Instance,
@@ -1510,8 +1465,8 @@ pub mod dma {
     mod ehal1 {
         use embedded_hal_1::spi::SpiBus;
 
-        use super::{super::InstanceDma, SpiDma, SpiPeripheral};
-        use crate::{dma::ChannelTypes, spi::IsFullDuplex, FlashSafeDma};
+        use super::{super::InstanceDma, *};
+        use crate::{dma::ChannelTypes, FlashSafeDma};
 
         impl<'d, T, C, M> embedded_hal_1::spi::ErrorType for SpiDma<'d, T, C, M>
         where
@@ -1990,7 +1945,7 @@ where
     fn dma_peripheral(&self) -> DmaPeripheral {
         match self.spi_num() {
             2 => DmaPeripheral::Spi2,
-            #[cfg(any(esp32, esp32s2, esp32s3))]
+            #[cfg(spi3)]
             3 => DmaPeripheral::Spi3,
             _ => panic!("Illegal SPI instance"),
         }
@@ -2101,7 +2056,7 @@ where
 {
 }
 
-#[cfg(any(esp32, esp32s2, esp32s3))]
+#[cfg(spi3)]
 impl<TX, RX> InstanceDma<TX, RX> for crate::peripherals::SPI3
 where
     TX: Tx,
@@ -2803,8 +2758,8 @@ pub trait Instance {
 
     fn write_bytes_half_duplex(
         &mut self,
-        cmd: crate::spi::Command,
-        address: crate::spi::Address,
+        cmd: Command,
+        address: Address,
         dummy: u8,
         buffer: &[u8],
     ) -> Result<(), Error> {
@@ -2866,8 +2821,8 @@ pub trait Instance {
 
     fn read_bytes_half_duplex(
         &mut self,
-        cmd: crate::spi::Command,
-        address: crate::spi::Address,
+        cmd: Command,
+        address: Address,
         dummy: u8,
         buffer: &mut [u8],
     ) -> Result<(), Error> {
@@ -3282,10 +3237,10 @@ impl ExtendedInstance for crate::peripherals::SPI3 {
 
 pub trait Spi2Instance {}
 
-#[cfg(any(esp32, esp32s2, esp32s3))]
+#[cfg(spi3)]
 pub trait Spi3Instance {}
 
 impl Spi2Instance for crate::peripherals::SPI2 {}
 
-#[cfg(any(esp32, esp32s2, esp32s3))]
+#[cfg(spi3)]
 impl Spi3Instance for crate::peripherals::SPI3 {}

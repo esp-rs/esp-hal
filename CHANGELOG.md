@@ -26,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Adding async support for RSA peripheral(doesn't work properly for `esp32` chip - issue will be created)(#790)
 - Added sleep support for ESP32-C3 with timer and GPIO wakeups (#795)
 - Support for ULP-RISCV including Delay and GPIO (#840)
-- Add bare-bones SPI slave support, DMA only (#580)
+- Add bare-bones SPI slave support, DMA only (#580, #843)
 - Embassy `#[main]` convenience macro
 
 ### Changed
@@ -60,6 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unify the system peripheral, `SYSTEM`, `DPORT` and `PCR` are now all exposed as `SYSTEM` (#832).
 - Unified the ESP32's and ESP32-C2's xtal frequency features (#831)
 - Replace any underscores in feature names with dashes (#833)
+- The `spi` and `spi_slave` modules have been refactored into the `spi`, `spi::master`, and `spi::slave` modules (#843)
 
 ## [0.12.0]
 
