@@ -11,6 +11,7 @@ license      = "MIT OR Apache-2.0"
 features = ["esp32c3"]
 
 [dependencies]
+defmt            = { version = "0.3.5",  optional = true }
 esp-hal-common   = { version = "0.12.0", path = "../esp-hal-common" }
 fugit            = "0.3.7"
 smart-leds-trait = "0.2.1"
@@ -25,3 +26,5 @@ esp32s3 = ["esp-hal-common/esp32s3"]
 
 xtal-26mhz = ["esp-hal-common/xtal-26mhz"]
 xtal-40mhz = ["esp-hal-common/xtal-40mhz"]
+
+defmt = ["dep:defmt", "esp-hal-common/defmt"]
