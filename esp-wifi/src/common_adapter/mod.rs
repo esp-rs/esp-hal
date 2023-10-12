@@ -318,19 +318,19 @@ pub(crate) unsafe extern "C" fn semphr_give_from_isr(sem: *const (), hptw: *cons
 // other functions
 #[no_mangle]
 pub unsafe extern "C" fn puts(s: *const u8) {
-    let cstr = StrBuf::from(s);
-    trace!("{}", cstr.as_str_ref());
+    let cstr = str_from_c(s);
+    trace!("{}", cstr);
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn sprintf(dst: *mut u8, format: *const u8, args: ...) -> i32 {
-    let str = StrBuf::from(format);
-    trace!("sprintf {}", str.as_str_ref());
+    let str = str_from_c(format);
+    trace!("sprintf format: {}", str);
 
-    let len = crate::compat::common::vsnprintf(dst, 511, format, args);
+    let len = crate::compat::common::vsnprintf(dst, 512, format, args);
 
-    let s = StrBuf::from(dst);
-    trace!("sprintf {}", s.as_str_ref());
+    let s = str_from_c(dst);
+    trace!("sprintf result: {}", s);
 
     len
 }

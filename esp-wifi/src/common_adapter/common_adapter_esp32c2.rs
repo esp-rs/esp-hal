@@ -1,7 +1,7 @@
 use super::phy_init_data::PHY_INIT_DATA_DEFAULT;
 use crate::binary::include::*;
 use crate::common_adapter::RADIO_CLOCKS;
-use crate::compat::common::StrBuf;
+use crate::compat::common::str_from_c;
 use crate::hal::system::RadioClockController;
 use crate::hal::system::RadioPeripherals;
 use atomic_polyfill::AtomicU32;
@@ -36,10 +36,7 @@ pub(crate) unsafe fn phy_enable() {
                     [0u8; core::mem::size_of::<esp_phy_calibration_data_t>()];
 
                 let phy_version = get_phy_version_str();
-                trace!(
-                    "phy_version {}",
-                    StrBuf::from(phy_version as *const u8).as_str_ref()
-                );
+                trace!("phy_version {}", str_from_c(phy_version as *const u8));
 
                 let init_data = &PHY_INIT_DATA_DEFAULT;
 

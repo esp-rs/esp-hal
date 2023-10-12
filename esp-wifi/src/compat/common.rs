@@ -34,102 +34,104 @@ static mut MUTEX_IDX_CURRENT: usize = 0;
 static mut FAKE_WIFI_QUEUE: &SimpleQueue<[u8; 8], 200> = unsafe { &REAL_WIFI_QUEUE };
 static mut REAL_WIFI_QUEUE: SimpleQueue<[u8; 8], 200> = SimpleQueue::new(); // first there is a ptr to the real queue - driver checks it's not null
 
-pub struct StrBuf {
-    buffer: [u8; 512],
+pub struct StrWriter {
+    dst: *mut u8,
+    capacity: usize,
     len: usize,
 }
 
-impl StrBuf {
-    pub fn new() -> StrBuf {
-        StrBuf {
-            buffer: [0u8; 512],
+impl StrWriter {
+    pub fn new(dst: *mut u8, capacity: usize) -> Self {
+        Self {
+            dst,
+            capacity,
             len: 0,
         }
     }
 
-    pub unsafe fn from(c_str: *const u8) -> StrBuf {
-        let mut res = StrBuf {
-            buffer: [0u8; 512],
-            len: 0,
-        };
-
-        let mut idx: usize = 0;
-        while *(c_str.offset(idx as isize)) != 0 {
-            res.buffer[idx] = *(c_str.offset(idx as isize));
-            idx += 1;
-        }
-
-        res.len = idx;
-        res
+    pub fn len(&self) -> usize {
+        self.len
     }
 
-    pub unsafe fn append_from(&mut self, c_str: *const u8) {
-        let mut src_idx: usize = 0;
-        let mut idx: usize = self.len;
-        while *(c_str.offset(src_idx as isize)) != 0 {
-            self.buffer[idx] = *(c_str.offset(src_idx as isize));
-            idx += 1;
-            src_idx += 1;
-        }
-
-        self.len = idx;
+    fn space(&self) -> usize {
+        self.capacity - self.len
     }
 
-    pub fn append(&mut self, s: &str) {
-        let mut idx: usize = self.len;
-        s.chars().for_each(|c| {
-            self.buffer[idx] = c as u8;
-            idx += 1;
-        });
-        self.len = idx;
+    fn write(&mut self, byte: u8) {
+        unsafe {
+            self.dst.write(byte);
+            self.dst = self.dst.add(1);
+        }
     }
 
     pub fn append_char(&mut self, c: char) {
-        let mut idx: usize = self.len;
-        self.buffer[idx] = c as u8;
-        idx += 1;
-        self.len = idx;
+        let mut buf = [0u8; 4];
+        let char = c.encode_utf8(&mut buf);
+        self.append(char);
     }
 
-    pub unsafe fn as_str_ref(&self) -> &str {
-        core::str::from_utf8_unchecked(&self.buffer[..self.len])
+    pub fn append(&mut self, s: &str) {
+        // Write as many bytes as possible. We're writing a c string which means we don't have
+        // to deal with utf8 character boundaries, so this should be fine.
+        let len = s.len().min(self.space());
+        for byte in &s.as_bytes()[..len] {
+            self.write(*byte);
+        }
+
+        // vsnprintf's semantics: it counts unwritten bytes, too
+        self.len += s.len();
+    }
+
+    pub fn append_byte(&mut self, b: u8) {
+        if self.space() >= 1 {
+            self.write(b);
+        }
+
+        // vsnprintf's semantics: it counts unwritten bytes, too
+        self.len += 1;
     }
 }
 
-impl Write for StrBuf {
+impl Write for StrWriter {
     fn write_str(&mut self, s: &str) -> Result<(), core::fmt::Error> {
         self.append(s);
         Ok(())
     }
 }
 
+pub unsafe fn str_from_c<'a>(s: *const u8) -> &'a str {
+    let c_str = core::ffi::CStr::from_ptr(s.cast());
+    core::str::from_utf8_unchecked(c_str.to_bytes())
+}
+
 pub unsafe extern "C" fn syslog(_priority: u32, format: *const u8, mut args: VaListImpl) {
-    #[cfg(all(feature = "wifi-logs", target_arch = "riscv32"))]
+    #[cfg(feature = "wifi-logs")]
     {
-        let mut buf = [0u8; 512];
-        vsnprintf(&mut buf as *mut u8, 511, format, args);
-        let res_str = StrBuf::from(&buf as *const u8);
-        info!("{}", res_str.as_str_ref());
-    }
-    #[cfg(all(feature = "wifi-logs", not(target_arch = "riscv32")))]
-    {
-        let res_str = StrBuf::from(format);
-        info!("{}", res_str.as_str_ref());
+        #[cfg(target_arch = "riscv32")]
+        {
+            let mut buf = [0u8; 512];
+            vsnprintf(&mut buf as *mut u8, 512, format, args);
+            let res_str = str_from_c(&buf as *const u8);
+            info!("{}", res_str);
+        }
+        #[cfg(not(target_arch = "riscv32"))]
+        {
+            let res_str = str_from_c(format);
+            info!("{}", res_str);
+        }
     }
 }
 
+/// Returns the number of character that would have been written if the buffer was big enough.
 pub(crate) unsafe fn vsnprintf(
     dst: *mut u8,
-    _n: u32,
+    capacity: u32,
     format: *const u8,
     mut args: VaListImpl,
 ) -> i32 {
-    let fmt_str_ptr = format;
+    let mut res_str = StrWriter::new(dst, capacity as usize - 1);
 
-    let mut res_str = StrBuf::new();
-
-    let strbuf = StrBuf::from(fmt_str_ptr);
-    let s = strbuf.as_str_ref();
+    let s = str_from_c(format);
 
     let mut format_char = ' ';
     let mut is_long = false;
@@ -159,6 +161,7 @@ pub(crate) unsafe fn vsnprintf(
             // have to format an arg
             match format_char {
                 'd' => {
+                    // FIXME: This is sus - both branches have the same impl
                     if is_long {
                         let v = args.arg::<i32>();
                         write!(res_str, "{}", v).ok();
@@ -190,14 +193,14 @@ pub(crate) unsafe fn vsnprintf(
 
                 's' => {
                     let v = args.arg::<u32>() as *const u8;
-                    let vbuf = StrBuf::from(v);
-                    write!(res_str, "{}", vbuf.as_str_ref()).ok();
+                    let vbuf = str_from_c(v);
+                    res_str.append(vbuf);
                 }
 
                 'c' => {
                     let v = args.arg::<u8>();
                     if v != 0 {
-                        write!(res_str, "{}", v as char).ok();
+                        res_str.append_byte(v);
                     }
                 }
 
@@ -211,14 +214,12 @@ pub(crate) unsafe fn vsnprintf(
             is_long = false;
         }
     }
-    let mut idx = 0;
-    res_str.as_str_ref().chars().for_each(|c| {
-        *(dst.offset(idx)) = c as u8;
-        idx += 1;
-    });
-    *(dst.offset(idx)) = 0;
 
-    idx as i32
+    let chars_written = res_str.len();
+    let terminating_at = chars_written.min(capacity as usize - 1);
+    dst.add(terminating_at).write(0);
+
+    chars_written as i32
 }
 
 #[no_mangle]

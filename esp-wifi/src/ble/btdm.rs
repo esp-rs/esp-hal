@@ -7,7 +7,7 @@ use crate::ble::HciOutCollector;
 use crate::ble::HCI_OUT_COLLECTOR;
 use crate::{
     binary::include::*,
-    compat::{common::StrBuf, queue::SimpleQueue, work_queue::queue_work},
+    compat::{common::str_from_c, queue::SimpleQueue, work_queue::queue_work},
     memory_fence::memory_fence,
     timer::yield_task,
 };
@@ -288,12 +288,12 @@ unsafe extern "C" fn task_create(
     handle: *mut crate::binary::c_types::c_void,
     core_id: u32,
 ) -> i32 {
-    let n = StrBuf::from(name);
+    let n = str_from_c(name);
     trace!(
         "task_create {:?} {:?} {} {} {:?} {} {:?} {}",
         func,
         name,
-        n.as_str_ref(),
+        n,
         stack_depth,
         param,
         prio,
@@ -479,8 +479,8 @@ pub(crate) fn ble_init() {
         }
 
         let version = btdm_controller_get_compile_version();
-        let version_str = StrBuf::from(version);
-        debug!("BT controller compile version {}", version_str.as_str_ref());
+        let version_str = str_from_c(version);
+        debug!("BT controller compile version {}", version_str);
 
         ble_os_adapter_chip_specific::bt_periph_module_enable();
 

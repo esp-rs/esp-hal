@@ -17,7 +17,7 @@ use crate::{
     compat::{
         common::{
             create_recursive_mutex, create_wifi_queue, lock_mutex, receive_queued, send_queued,
-            thread_sem_get, unlock_mutex, StrBuf,
+            str_from_c, thread_sem_get, unlock_mutex,
         },
         malloc::calloc,
         work_queue::queue_work,
@@ -697,7 +697,7 @@ pub unsafe extern "C" fn task_create_pinned_to_core(
 ) -> i32 {
     trace!("task_create_pinned_to_core task_func {:?} name {} stack_depth {} param {:?} prio {}, task_handle {:?} core_id {}",
         task_func,
-        StrBuf::from(name as *const u8).as_str_ref(),
+        str_from_c(name as *const u8),
         stack_depth,
         param,
         prio,
@@ -1538,21 +1538,19 @@ pub unsafe extern "C" fn log_writev(
     _format: *const crate::binary::c_types::c_char,
     _args: va_list,
 ) {
-    #[cfg(not(feature = "wifi-logs"))]
-    return;
-
-    #[cfg(target_arch = "xtensa")]
-    #[allow(unreachable_code)]
+    #[cfg(feature = "wifi-logs")]
     {
-        let s = StrBuf::from(_format as *const u8);
-        info!("{}", s.as_str_ref());
-    }
+        #[cfg(target_arch = "xtensa")]
+        {
+            let s = str_from_c(_format as *const u8);
+            info!("{}", s);
+        }
 
-    #[cfg(target_arch = "riscv32")]
-    #[allow(unreachable_code)]
-    {
-        let _args = core::mem::transmute(_args);
-        syslog(_level, _format as *const u8, _args);
+        #[cfg(target_arch = "riscv32")]
+        {
+            let _args = core::mem::transmute(_args);
+            syslog(_level, _format as *const u8, _args);
+        }
     }
 }
 

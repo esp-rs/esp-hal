@@ -6,7 +6,7 @@ use super::*;
 use crate::binary::c_types::c_void;
 use crate::binary::include::*;
 use crate::compat;
-use crate::compat::common::StrBuf;
+use crate::compat::common::str_from_c;
 use crate::compat::queue::SimpleQueue;
 use crate::timer::yield_task;
 
@@ -372,11 +372,11 @@ unsafe extern "C" fn task_create(
     task_handle: *const crate::binary::c_types::c_void,
     core_id: u32,
 ) -> i32 {
-    let name_str = StrBuf::from(name as *const u8);
+    let name_str = str_from_c(name as *const u8);
     trace!(
         "task_create {:?} {} {} {:?} {} {:?} {}",
         task_func,
-        name_str.as_str_ref(),
+        name_str,
         stack_depth,
         param,
         prio,
@@ -409,14 +409,8 @@ unsafe extern "C" fn osi_assert(
     param1: u32,
     param2: u32,
 ) {
-    let name_str = StrBuf::from(fn_name as *const u8);
-    panic!(
-        "ASSERT {}:{} {} {}",
-        name_str.as_str_ref(),
-        ln,
-        param1,
-        param2
-    );
+    let name_str = str_from_c(fn_name as *const u8);
+    panic!("ASSERT {}:{} {} {}", name_str, ln, param1, param2);
 }
 
 unsafe extern "C" fn esp_intr_free(_ret_handle: *mut *mut crate::binary::c_types::c_void) -> i32 {
