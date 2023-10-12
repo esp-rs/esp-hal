@@ -12,4 +12,4 @@ pub use embedded_hal::{
     },
     prelude::*,
 };
-pub use lp_hal_procmacros::entry;
+pub use procmacros::entry;
