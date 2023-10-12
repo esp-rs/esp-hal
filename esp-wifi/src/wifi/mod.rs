@@ -17,7 +17,6 @@ use enumset::EnumSetType;
 use esp_wifi_sys::include::esp_interface_t_ESP_IF_WIFI_AP;
 use esp_wifi_sys::include::esp_wifi_disconnect;
 use esp_wifi_sys::include::esp_wifi_get_mode;
-use esp_wifi_sys::include::esp_wifi_set_inactive_time;
 use esp_wifi_sys::include::esp_wifi_set_protocol;
 use esp_wifi_sys::include::wifi_ap_config_t;
 use esp_wifi_sys::include::wifi_auth_mode_t_WIFI_AUTH_WAPI_PSK;
@@ -641,10 +640,19 @@ unsafe extern "C" fn esp_wifi_tx_done_cb(
 pub fn wifi_start() -> Result<(), WifiError> {
     unsafe {
         esp_wifi_result!(esp_wifi_start())?;
-        esp_wifi_result!(esp_wifi_set_inactive_time(
-            wifi_interface_t_WIFI_IF_STA,
-            crate::CONFIG.beacon_timeout
-        ))?;
+
+        let mode = get_wifi_mode()?;
+        if mode.is_ap() {
+            esp_wifi_result!(esp_wifi_sys::include::esp_wifi_set_inactive_time(
+                wifi_interface_t_WIFI_IF_AP,
+                crate::CONFIG.ap_beacon_timeout
+            ))?;
+        } else {
+            esp_wifi_result!(esp_wifi_sys::include::esp_wifi_set_inactive_time(
+                wifi_interface_t_WIFI_IF_STA,
+                crate::CONFIG.beacon_timeout
+            ))?;
+        };
 
         cfg_if::cfg_if! {
             if #[cfg(feature = "ps-min-modem")] {
@@ -759,6 +767,18 @@ pub fn new<'d>(
     new_with_config(&inited, device, Default::default())
 }
 
+pub(crate) fn get_wifi_mode() -> Result<WifiMode, WifiError> {
+    let mut mode = wifi_mode_t_WIFI_MODE_NULL;
+    esp_wifi_result!(unsafe { esp_wifi_get_mode(&mut mode) })?;
+
+    #[allow(non_upper_case_globals)]
+    match mode {
+        wifi_mode_t_WIFI_MODE_STA => Ok(WifiMode::Sta),
+        wifi_mode_t_WIFI_MODE_AP => Ok(WifiMode::Ap),
+        _ => Err(WifiError::UnknownWifiMode),
+    }
+}
+
 /// A wifi device implementing smoltcp's Device trait.
 pub struct WifiDevice<'d> {
     _device: PeripheralRef<'d, crate::hal::radio::Wifi>,
@@ -770,15 +790,7 @@ impl<'d> WifiDevice<'d> {
     }
 
     pub(crate) fn get_wifi_mode(&self) -> Result<WifiMode, WifiError> {
-        let mut mode = wifi_mode_t_WIFI_MODE_NULL;
-        esp_wifi_result!(unsafe { esp_wifi_get_mode(&mut mode) })?;
-
-        #[allow(non_upper_case_globals)]
-        match mode {
-            wifi_mode_t_WIFI_MODE_STA => Ok(WifiMode::Sta),
-            wifi_mode_t_WIFI_MODE_AP => Ok(WifiMode::Ap),
-            _ => Err(WifiError::UnknownWifiMode),
-        }
+        get_wifi_mode()
     }
 }
 
@@ -1037,18 +1049,9 @@ fn esp_wifi_can_send() -> bool {
 // Casting const to mut is instant UB, even though in reality `esp_wifi_internal_tx` copies the buffer into its own memory and
 // does not modify
 pub fn esp_wifi_send_data(data: &mut [u8]) {
-    let mut wifi_mode = 0u32;
-    unsafe {
-        esp_wifi_get_mode(&mut wifi_mode);
-    }
+    let mode = unwrap!(get_wifi_mode());
 
-    #[allow(non_upper_case_globals)]
-    let is_ap = matches!(
-        wifi_mode,
-        wifi_mode_t_WIFI_MODE_AP | wifi_mode_t_WIFI_MODE_APSTA
-    );
-
-    let interface = if is_ap {
+    let interface = if mode.is_ap() {
         wifi_interface_t_WIFI_IF_AP
     } else {
         wifi_interface_t_WIFI_IF_STA
@@ -1273,15 +1276,17 @@ fn dump_packet_info(buffer: &[u8]) {
 
 #[macro_export]
 macro_rules! esp_wifi_result {
-    ($value:expr) => {
-        if $value != crate::binary::include::ESP_OK as i32 {
+    ($value:expr) => {{
+        let result = $value;
+        if result != crate::binary::include::ESP_OK as i32 {
+            warn!("{} returned an error: {}", stringify!($value), result);
             Err(WifiError::InternalError(unwrap!(FromPrimitive::from_i32(
-                $value
+                result
             ))))
         } else {
-            core::result::Result::<(), WifiError>::Ok(())
+            Ok::<(), WifiError>(())
         }
-    };
+    }};
 }
 
 #[cfg(feature = "embassy-net")]

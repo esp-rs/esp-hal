@@ -157,6 +157,8 @@ struct Config {
     listen_interval: u16,
     #[default(6)]
     beacon_timeout: u16,
+    #[default(300)]
+    ap_beacon_timeout: u16,
 }
 
 #[cfg_attr(esp32, link_section = ".dram2_uninit")]
