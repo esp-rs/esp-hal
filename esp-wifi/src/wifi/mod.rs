@@ -62,10 +62,10 @@ use crate::{
         wifi_auth_mode_t_WIFI_AUTH_OPEN, wifi_config_t,
         wifi_country_policy_t_WIFI_COUNTRY_POLICY_MANUAL, wifi_country_t, wifi_init_config_t,
         wifi_interface_t_WIFI_IF_STA, wifi_mode_t_WIFI_MODE_STA, wifi_osi_funcs_t,
-        wifi_pmf_config_t, wifi_scan_config_t, wifi_scan_method_t_WIFI_FAST_SCAN,
-        wifi_scan_threshold_t, wifi_scan_time_t, wifi_scan_type_t_WIFI_SCAN_TYPE_ACTIVE,
-        wifi_sort_method_t_WIFI_CONNECT_AP_BY_SIGNAL, wifi_sta_config_t, wpa_crypto_funcs_t,
-        ESP_WIFI_OS_ADAPTER_MAGIC, ESP_WIFI_OS_ADAPTER_VERSION, WIFI_INIT_CONFIG_MAGIC,
+        wifi_pmf_config_t, wifi_scan_config_t, wifi_scan_threshold_t, wifi_scan_time_t,
+        wifi_scan_type_t_WIFI_SCAN_TYPE_ACTIVE, wifi_sort_method_t_WIFI_CONNECT_AP_BY_SIGNAL,
+        wifi_sta_config_t, wpa_crypto_funcs_t, ESP_WIFI_OS_ADAPTER_MAGIC,
+        ESP_WIFI_OS_ADAPTER_VERSION, WIFI_INIT_CONFIG_MAGIC,
     },
     compat::queue::SimpleQueue,
 };
@@ -1124,7 +1124,7 @@ impl Wifi for WifiController<'_> {
                     sta: wifi_sta_config_t {
                         ssid: [0; 32],
                         password: [0; 64],
-                        scan_method: wifi_scan_method_t_WIFI_FAST_SCAN,
+                        scan_method: crate::CONFIG.scan_method,
                         bssid_set: config.bssid.is_some(),
                         bssid,
                         channel: config.channel.unwrap_or(0u8),
@@ -1157,7 +1157,7 @@ impl Wifi for WifiController<'_> {
                         sae_pwe_h2e: 3,
                         _bitfield_align_1: [0u32; 0],
                         _bitfield_1: __BindgenBitfieldUnit::new([0u8; 4usize]),
-                        failure_retry_cnt: 1,
+                        failure_retry_cnt: crate::CONFIG.failure_retry_cnt,
                         _bitfield_align_2: [0u32; 0],
                         _bitfield_2: __BindgenBitfieldUnit::new([0u8; 4usize]),
                         sae_pk_mode: 0, // ??

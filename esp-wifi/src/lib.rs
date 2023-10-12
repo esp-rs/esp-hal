@@ -159,6 +159,10 @@ struct Config {
     beacon_timeout: u16,
     #[default(300)]
     ap_beacon_timeout: u16,
+    #[default(1)]
+    failure_retry_cnt: u8,
+    #[default(0)]
+    scan_method: u32,
 }
 
 #[cfg_attr(esp32, link_section = ".dram2_uninit")]
