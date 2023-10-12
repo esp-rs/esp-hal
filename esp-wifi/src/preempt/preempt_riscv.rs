@@ -80,7 +80,7 @@ fn task_create_from_mepc(mepc: usize) -> usize {
     }
 }
 
-pub fn task_to_trap_frame(id: usize, trap_frame: &mut TrapFrame) -> usize {
+pub fn restore_task_context(id: usize, trap_frame: &mut TrapFrame) -> usize {
     unsafe {
         trap_frame.ra = CTX_TASKS[id].trap_frame.ra;
         trap_frame.sp = CTX_TASKS[id].trap_frame.sp;
@@ -118,7 +118,7 @@ pub fn task_to_trap_frame(id: usize, trap_frame: &mut TrapFrame) -> usize {
     }
 }
 
-pub fn trap_frame_to_task(id: usize, pc: usize, trap_frame: &TrapFrame) {
+pub fn save_task_context(id: usize, pc: usize, trap_frame: &TrapFrame) {
     unsafe {
         CTX_TASKS[id].trap_frame.ra = trap_frame.ra;
         CTX_TASKS[id].trap_frame.sp = trap_frame.sp;
@@ -172,11 +172,11 @@ pub fn task_switch(trap_frame: &mut TrapFrame) {
             CTX_NOW = main_task;
         }
 
-        trap_frame_to_task(CTX_NOW, old_mepc, trap_frame);
+        save_task_context(CTX_NOW, old_mepc, trap_frame);
 
         next_task();
 
-        let new_pc = task_to_trap_frame(CTX_NOW, trap_frame);
+        let new_pc = restore_task_context(CTX_NOW, trap_frame);
         trap_frame.pc = new_pc;
 
         // debug aid! remove when not needed anymore!!!!!

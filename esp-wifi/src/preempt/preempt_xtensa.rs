@@ -96,121 +96,15 @@ pub fn task_create(task: extern "C" fn()) -> usize {
     }
 }
 
-pub fn task_to_trap_frame(id: usize, trap_frame: &mut TrapFrame) {
+fn restore_task_context(id: usize, trap_frame: &mut TrapFrame) {
     unsafe {
-        trap_frame.PC = CTX_TASKS[id].trap_frame.PC;
-        trap_frame.PS = CTX_TASKS[id].trap_frame.PS;
-        trap_frame.A0 = CTX_TASKS[id].trap_frame.A0;
-        trap_frame.A1 = CTX_TASKS[id].trap_frame.A1;
-        trap_frame.A2 = CTX_TASKS[id].trap_frame.A2;
-        trap_frame.A3 = CTX_TASKS[id].trap_frame.A3;
-        trap_frame.A4 = CTX_TASKS[id].trap_frame.A4;
-        trap_frame.A5 = CTX_TASKS[id].trap_frame.A5;
-        trap_frame.A6 = CTX_TASKS[id].trap_frame.A6;
-        trap_frame.A7 = CTX_TASKS[id].trap_frame.A7;
-        trap_frame.A8 = CTX_TASKS[id].trap_frame.A8;
-        trap_frame.A9 = CTX_TASKS[id].trap_frame.A9;
-        trap_frame.A10 = CTX_TASKS[id].trap_frame.A10;
-        trap_frame.A11 = CTX_TASKS[id].trap_frame.A11;
-        trap_frame.A12 = CTX_TASKS[id].trap_frame.A12;
-        trap_frame.A13 = CTX_TASKS[id].trap_frame.A13;
-        trap_frame.A14 = CTX_TASKS[id].trap_frame.A14;
-        trap_frame.A15 = CTX_TASKS[id].trap_frame.A15;
-        trap_frame.SAR = CTX_TASKS[id].trap_frame.SAR;
-        trap_frame.EXCCAUSE = CTX_TASKS[id].trap_frame.EXCCAUSE;
-        trap_frame.EXCVADDR = CTX_TASKS[id].trap_frame.EXCVADDR;
-        trap_frame.LBEG = CTX_TASKS[id].trap_frame.LBEG;
-        trap_frame.LEND = CTX_TASKS[id].trap_frame.LEND;
-        trap_frame.LCOUNT = CTX_TASKS[id].trap_frame.LCOUNT;
-        trap_frame.THREADPTR = CTX_TASKS[id].trap_frame.THREADPTR;
-        trap_frame.SCOMPARE1 = CTX_TASKS[id].trap_frame.SCOMPARE1;
-        trap_frame.BR = CTX_TASKS[id].trap_frame.BR;
-        trap_frame.ACCLO = CTX_TASKS[id].trap_frame.ACCLO;
-        trap_frame.ACCHI = CTX_TASKS[id].trap_frame.ACCHI;
-        trap_frame.M0 = CTX_TASKS[id].trap_frame.M0;
-        trap_frame.M1 = CTX_TASKS[id].trap_frame.M1;
-        trap_frame.M2 = CTX_TASKS[id].trap_frame.M2;
-        trap_frame.M3 = CTX_TASKS[id].trap_frame.M3;
-        trap_frame.F64R_LO = CTX_TASKS[id].trap_frame.F64R_LO;
-        trap_frame.F64R_HI = CTX_TASKS[id].trap_frame.F64R_HI;
-        trap_frame.F64S = CTX_TASKS[id].trap_frame.F64S;
-        trap_frame.FCR = CTX_TASKS[id].trap_frame.FCR;
-        trap_frame.FSR = CTX_TASKS[id].trap_frame.FSR;
-        trap_frame.F0 = CTX_TASKS[id].trap_frame.F0;
-        trap_frame.F1 = CTX_TASKS[id].trap_frame.F1;
-        trap_frame.F2 = CTX_TASKS[id].trap_frame.F2;
-        trap_frame.F3 = CTX_TASKS[id].trap_frame.F3;
-        trap_frame.F4 = CTX_TASKS[id].trap_frame.F4;
-        trap_frame.F5 = CTX_TASKS[id].trap_frame.F5;
-        trap_frame.F6 = CTX_TASKS[id].trap_frame.F6;
-        trap_frame.F7 = CTX_TASKS[id].trap_frame.F7;
-        trap_frame.F8 = CTX_TASKS[id].trap_frame.F8;
-        trap_frame.F9 = CTX_TASKS[id].trap_frame.F9;
-        trap_frame.F10 = CTX_TASKS[id].trap_frame.F10;
-        trap_frame.F11 = CTX_TASKS[id].trap_frame.F11;
-        trap_frame.F12 = CTX_TASKS[id].trap_frame.F12;
-        trap_frame.F13 = CTX_TASKS[id].trap_frame.F13;
-        trap_frame.F14 = CTX_TASKS[id].trap_frame.F14;
-        trap_frame.F15 = CTX_TASKS[id].trap_frame.F15;
+        *trap_frame = CTX_TASKS[id].trap_frame;
     }
 }
 
-pub fn trap_frame_to_task(id: usize, trap_frame: &TrapFrame) {
+fn save_task_context(id: usize, trap_frame: &TrapFrame) {
     unsafe {
-        CTX_TASKS[id].trap_frame.PC = trap_frame.PC;
-        CTX_TASKS[id].trap_frame.PS = trap_frame.PS;
-        CTX_TASKS[id].trap_frame.A0 = trap_frame.A0;
-        CTX_TASKS[id].trap_frame.A1 = trap_frame.A1;
-        CTX_TASKS[id].trap_frame.A2 = trap_frame.A2;
-        CTX_TASKS[id].trap_frame.A3 = trap_frame.A3;
-        CTX_TASKS[id].trap_frame.A4 = trap_frame.A4;
-        CTX_TASKS[id].trap_frame.A5 = trap_frame.A5;
-        CTX_TASKS[id].trap_frame.A6 = trap_frame.A6;
-        CTX_TASKS[id].trap_frame.A7 = trap_frame.A7;
-        CTX_TASKS[id].trap_frame.A8 = trap_frame.A8;
-        CTX_TASKS[id].trap_frame.A9 = trap_frame.A9;
-        CTX_TASKS[id].trap_frame.A10 = trap_frame.A10;
-        CTX_TASKS[id].trap_frame.A11 = trap_frame.A11;
-        CTX_TASKS[id].trap_frame.A12 = trap_frame.A12;
-        CTX_TASKS[id].trap_frame.A13 = trap_frame.A13;
-        CTX_TASKS[id].trap_frame.A14 = trap_frame.A14;
-        CTX_TASKS[id].trap_frame.A15 = trap_frame.A15;
-        CTX_TASKS[id].trap_frame.SAR = trap_frame.SAR;
-        CTX_TASKS[id].trap_frame.EXCCAUSE = trap_frame.EXCCAUSE;
-        CTX_TASKS[id].trap_frame.EXCVADDR = trap_frame.EXCVADDR;
-        CTX_TASKS[id].trap_frame.LBEG = trap_frame.LBEG;
-        CTX_TASKS[id].trap_frame.LEND = trap_frame.LEND;
-        CTX_TASKS[id].trap_frame.LCOUNT = trap_frame.LCOUNT;
-        CTX_TASKS[id].trap_frame.THREADPTR = trap_frame.THREADPTR;
-        CTX_TASKS[id].trap_frame.SCOMPARE1 = trap_frame.SCOMPARE1;
-        CTX_TASKS[id].trap_frame.BR = trap_frame.BR;
-        CTX_TASKS[id].trap_frame.ACCLO = trap_frame.ACCLO;
-        CTX_TASKS[id].trap_frame.ACCHI = trap_frame.ACCHI;
-        CTX_TASKS[id].trap_frame.M0 = trap_frame.M0;
-        CTX_TASKS[id].trap_frame.M1 = trap_frame.M1;
-        CTX_TASKS[id].trap_frame.M2 = trap_frame.M2;
-        CTX_TASKS[id].trap_frame.M3 = trap_frame.M3;
-        CTX_TASKS[id].trap_frame.F64R_LO = trap_frame.F64R_LO;
-        CTX_TASKS[id].trap_frame.F64R_HI = trap_frame.F64R_HI;
-        CTX_TASKS[id].trap_frame.F64S = trap_frame.F64S;
-        CTX_TASKS[id].trap_frame.FCR = trap_frame.FCR;
-        CTX_TASKS[id].trap_frame.FSR = trap_frame.FSR;
-        CTX_TASKS[id].trap_frame.F0 = trap_frame.F0;
-        CTX_TASKS[id].trap_frame.F1 = trap_frame.F1;
-        CTX_TASKS[id].trap_frame.F2 = trap_frame.F2;
-        CTX_TASKS[id].trap_frame.F3 = trap_frame.F3;
-        CTX_TASKS[id].trap_frame.F4 = trap_frame.F4;
-        CTX_TASKS[id].trap_frame.F5 = trap_frame.F5;
-        CTX_TASKS[id].trap_frame.F6 = trap_frame.F6;
-        CTX_TASKS[id].trap_frame.F7 = trap_frame.F7;
-        CTX_TASKS[id].trap_frame.F8 = trap_frame.F8;
-        CTX_TASKS[id].trap_frame.F9 = trap_frame.F9;
-        CTX_TASKS[id].trap_frame.F10 = trap_frame.F10;
-        CTX_TASKS[id].trap_frame.F11 = trap_frame.F11;
-        CTX_TASKS[id].trap_frame.F12 = trap_frame.F12;
-        CTX_TASKS[id].trap_frame.F13 = trap_frame.F13;
-        CTX_TASKS[id].trap_frame.F14 = trap_frame.F14;
-        CTX_TASKS[id].trap_frame.F15 = trap_frame.F15;
+        CTX_TASKS[id].trap_frame = *trap_frame;
     }
 }
 
@@ -228,9 +122,9 @@ pub fn task_switch(trap_frame: &mut TrapFrame) {
             CTX_NOW = TASK_TOP - 1;
         }
 
-        trap_frame_to_task(CTX_NOW, trap_frame);
+        save_task_context(CTX_NOW, trap_frame);
         next_task();
-        task_to_trap_frame(CTX_NOW, trap_frame);
+        restore_task_context(CTX_NOW, trap_frame);
 
         // debug aid! remove when not needed anymore!!!!!
         // static mut CNT: u32 = 0;
