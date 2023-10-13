@@ -14,24 +14,22 @@ use core::mem::MaybeUninit;
 
 use common_adapter::RADIO_CLOCKS;
 use critical_section::Mutex;
+
 #[cfg(esp32)]
 use esp32_hal as hal;
 #[cfg(esp32c2)]
 use esp32c2_hal as hal;
-#[cfg(esp32c2)]
-use esp32c2_hal::systimer::{Alarm, Target};
 #[cfg(esp32c3)]
 use esp32c3_hal as hal;
-#[cfg(esp32c3)]
-use esp32c3_hal::systimer::{Alarm, Target};
 #[cfg(esp32c6)]
 use esp32c6_hal as hal;
-#[cfg(esp32c6)]
-use esp32c6_hal::systimer::{Alarm, Target};
 #[cfg(esp32s2)]
 use esp32s2_hal as hal;
 #[cfg(esp32s3)]
 use esp32s3_hal as hal;
+
+#[cfg(any(esp32c2, esp32c3, esp32c6))]
+use hal::systimer::{Alarm, Target};
 
 use common_adapter::init_radio_clock_control;
 use hal::system::RadioClockController;
@@ -47,25 +45,13 @@ use crate::tasks::init_tasks;
 use crate::timer::setup_timer_isr;
 use common_adapter::chip_specific::phy_mem_init;
 
-#[doc(hidden)]
-pub mod binary {
+mod binary {
     pub use esp_wifi_sys::*;
 }
+mod compat;
+mod preempt;
 
-#[doc(hidden)]
-pub mod compat;
-
-#[doc(hidden)]
-pub mod preempt;
-
-#[doc(hidden)]
-#[cfg_attr(esp32, path = "timer_esp32.rs")]
-#[cfg_attr(esp32c3, path = "timer_esp32c3.rs")]
-#[cfg_attr(esp32c2, path = "timer_esp32c2.rs")]
-#[cfg_attr(esp32c6, path = "timer_esp32c6.rs")]
-#[cfg_attr(esp32s3, path = "timer_esp32s3.rs")]
-#[cfg_attr(esp32s2, path = "timer_esp32s2.rs")]
-pub mod timer;
+mod timer;
 
 #[cfg(feature = "wifi")]
 pub mod wifi;

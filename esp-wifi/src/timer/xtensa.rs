@@ -1,28 +1,30 @@
 use core::cell::RefCell;
 
-use atomic_polyfill::{AtomicU32, Ordering};
 use critical_section::Mutex;
-use esp32s2_hal::trapframe::TrapFrame;
-use esp32s2_hal::{
-    interrupt,
-    peripherals::{self, TIMG1},
-    prelude::*,
-    timer::{Timer, Timer0},
-    xtensa_lx, xtensa_lx_rt,
+
+use crate::{
+    hal::{
+        interrupt,
+        macros::interrupt,
+        peripherals::{self, TIMG1},
+        prelude::*,
+        timer::{Timer, Timer0},
+        trapframe::TrapFrame,
+        xtensa_lx, xtensa_lx_rt,
+    },
+    preempt::preempt::task_switch,
 };
+use atomic_polyfill::{AtomicU32, Ordering};
 
-use crate::preempt::preempt::task_switch;
-use esp32s2_hal::macros::interrupt;
+pub type TimeBase = Timer<Timer0<TIMG1>>;
 
-pub const TICKS_PER_SECOND: u64 = 40_000_000;
+static TIMER1: Mutex<RefCell<Option<TimeBase>>> = Mutex::new(RefCell::new(None));
 
-pub const COUNTER_BIT_MASK: u64 = 0xFFFF_FFFF_FFFF_FFFF;
+static TIMER_OVERFLOWS: AtomicU32 = AtomicU32::new(0);
 
 const TIMER_DELAY: fugit::HertzU32 = fugit::HertzU32::from_raw(crate::CONFIG.tick_rate_hz);
 
-static TIMER1: Mutex<RefCell<Option<Timer<Timer0<TIMG1>>>>> = Mutex::new(RefCell::new(None));
-
-static TIMER_OVERFLOWS: AtomicU32 = AtomicU32::new(0);
+pub const TICKS_PER_SECOND: u64 = 40_000_000;
 
 /// This function must not be called in a critical section. Doing so may return an incorrect value.
 pub fn get_systimer_count() -> u64 {
@@ -42,23 +44,10 @@ pub fn get_systimer_count() -> u64 {
     (((overflow as u64) << 32) + counter_after as u64) * 40_000_000 / 240_000_000
 }
 
-pub fn setup_timer_isr(timg1_timer0: Timer<Timer0<TIMG1>>) {
-    let mut timer1 = timg1_timer0;
+pub fn setup_timer(mut timer1: TimeBase) {
     unwrap!(interrupt::enable(
         peripherals::Interrupt::TG1_T0_LEVEL,
         interrupt::Priority::Priority2,
-    ));
-
-    #[cfg(feature = "wifi")]
-    unwrap!(interrupt::enable(
-        peripherals::Interrupt::WIFI_MAC,
-        interrupt::Priority::Priority1,
-    ));
-
-    #[cfg(feature = "wifi")]
-    unwrap!(interrupt::enable(
-        peripherals::Interrupt::WIFI_PWR,
-        interrupt::Priority::Priority1,
     ));
 
     timer1.listen();
@@ -68,7 +57,9 @@ pub fn setup_timer_isr(timg1_timer0: Timer<Timer0<TIMG1>>) {
     });
 
     xtensa_lx::timer::set_ccompare0(0xffffffff);
+}
 
+pub fn setup_multitasking() {
     unsafe {
         let enabled = xtensa_lx::interrupt::disable();
         xtensa_lx::interrupt::enable_mask(
@@ -90,39 +81,7 @@ fn Timer0(_level: u32) {
     xtensa_lx::timer::set_ccompare0(0xffffffff);
 }
 
-#[cfg(feature = "wifi")]
-#[interrupt]
-fn WIFI_MAC() {
-    unsafe {
-        let (fnc, arg) = crate::wifi::os_adapter::ISR_INTERRUPT_1;
-        trace!("interrupt WIFI_MAC {:?} {:?}", fnc, arg);
-
-        if !fnc.is_null() {
-            let fnc: fn(*mut crate::binary::c_types::c_void) = core::mem::transmute(fnc);
-            fnc(arg);
-        }
-    }
-}
-
-#[cfg(feature = "wifi")]
-#[interrupt]
-fn WIFI_PWR() {
-    unsafe {
-        let (fnc, arg) = crate::wifi::os_adapter::ISR_INTERRUPT_1;
-
-        trace!("interrupt WIFI_PWR {:?} {:?}", fnc, arg);
-
-        if !fnc.is_null() {
-            let fnc: fn(*mut crate::binary::c_types::c_void) = core::mem::transmute(fnc);
-            fnc(arg);
-        }
-
-        trace!("interrupt 1 done");
-    };
-}
-
-#[interrupt]
-fn TG1_T0_LEVEL(context: &mut TrapFrame) {
+fn do_task_switch(context: &mut TrapFrame) {
     task_switch(context);
 
     critical_section::with(|cs| {
@@ -133,6 +92,11 @@ fn TG1_T0_LEVEL(context: &mut TrapFrame) {
         timer.clear_interrupt();
         timer.start(TIMER_DELAY.into_duration());
     });
+}
+
+#[interrupt]
+fn TG1_T0_LEVEL(context: &mut TrapFrame) {
+    do_task_switch(context);
 }
 
 #[allow(non_snake_case)]
@@ -143,16 +107,7 @@ fn Software1(_level: u32, context: &mut TrapFrame) {
         core::arch::asm!("wsr.intclear  {0}", in(reg) intr, options(nostack));
     }
 
-    task_switch(context);
-
-    critical_section::with(|cs| {
-        crate::memory_fence::memory_fence();
-
-        let mut timer = TIMER1.borrow_ref_mut(cs);
-        let timer = unwrap!(timer.as_mut());
-        timer.clear_interrupt();
-        timer.start(TIMER_DELAY.into_duration());
-    });
+    do_task_switch(context);
 }
 
 pub fn yield_task() {
