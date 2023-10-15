@@ -257,7 +257,7 @@ where
         _address: u8,
         _operations: &mut [embedded_hal_1::i2c::Operation<'a>],
     ) -> Result<(), Self::Error> {
-        todo!()
+        panic!("I2C transaction API not yet implemented")
     }
 }
 
@@ -568,14 +568,11 @@ mod asynch {
 
         async fn write_read(
             &mut self,
-            address: u8,
-            write: &[u8],
-            read: &mut [u8],
+            _address: u8,
+            _write: &[u8],
+            _read: &mut [u8],
         ) -> Result<(), Self::Error> {
-            self.master_write(address, write).await?;
-            self.master_read(address, read).await?;
-
-            Ok(())
+            panic!("I2C write_read API not yet implemented")
         }
 
         async fn transaction(
@@ -583,7 +580,7 @@ mod asynch {
             _address: u8,
             _operations: &mut [Operation<'_>],
         ) -> Result<(), Self::Error> {
-            todo!()
+            panic!("I2C transaction API not yet implemented")
         }
     }
 
@@ -1497,17 +1494,15 @@ pub trait Instance {
     /// the `buffer` array with n being the size of the array.
     fn master_write_read(
         &mut self,
-        addr: u8,
-        bytes: &[u8],
-        buffer: &mut [u8],
+        _addr: u8,
+        _bytes: &[u8],
+        _buffer: &mut [u8],
     ) -> Result<(), Error> {
         // it would be possible to combine the write and read
         // in one transaction but filling the tx fifo with
         // the current code is somewhat slow even in release mode
         // which can cause issues
-        self.master_write(addr, bytes)?;
-        self.master_read(addr, buffer)?;
-        Ok(())
+        panic!("I2C write_read API not yet implemented")
     }
 }
 
