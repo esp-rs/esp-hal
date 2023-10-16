@@ -76,4 +76,7 @@ symbols = [
     "rom_crc_le",
     "rom_crc_be",
     "rom_md5_bsd",
+
+    # We derive `RTC_CNTL` from `LP_CLKRST` for this device:
+    "rtc_cntl",
 ]

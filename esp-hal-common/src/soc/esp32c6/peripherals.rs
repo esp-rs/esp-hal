@@ -55,7 +55,8 @@ crate::peripherals! {
     LP_AON <= LP_AON,
     LP_APM <= LP_APM,
     LP_APM0 <= LP_APM0,
-    LP_CLKRST <= LP_CLKRST,
+    // RTC_CNTL is derived from LP_CLKRST
+    RTC_CNTL <= LP_CLKRST,
     LP_I2C0 <= LP_I2C0,
     LP_I2C_ANA_MST <= LP_I2C_ANA_MST,
     LP_IO <= LP_IO,

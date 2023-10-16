@@ -95,4 +95,7 @@ symbols = [
     "gpio_support_deepsleep_wakeup",
     "uart_support_wakeup_int",
     "pm_support_ext1_wakeup",
+
+    # We derive `RTC_CNTL` from `LP_CLKRST` for this device:
+    "rtc_cntl",
 ]

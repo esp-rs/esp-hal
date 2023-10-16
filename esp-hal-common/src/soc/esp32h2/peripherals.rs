@@ -50,7 +50,8 @@ crate::peripherals! {
     LP_ANA <= LP_ANA,
     LP_AON <= LP_AON,
     LP_APM <= LP_APM,
-    LP_CLKRST <= LP_CLKRST,
+    // RTC_CNTL is derived from LP_CLKRST
+    RTC_CNTL <= LP_CLKRST,
     LP_PERI <= LP_PERI,
     LP_TIMER <= LP_TIMER,
     LP_WDT <= LP_WDT,

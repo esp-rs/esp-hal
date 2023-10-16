@@ -3,7 +3,7 @@ use strum::FromRepr;
 
 use crate::{
     clock::{clocks_ll::regi2c_write_mask, Clock, XtalClock},
-    peripherals::{LP_AON, LP_CLKRST, PCR, PMU, TIMG0},
+    peripherals::{LP_AON, PCR, PMU, RTC_CNTL, TIMG0},
     soc::efuse::{Efuse, WAFER_VERSION_MAJOR, WAFER_VERSION_MINOR},
 };
 
@@ -106,7 +106,7 @@ pub(crate) fn configure_clock() {
 fn modem_clk_domain_active_state_icg_map_preinit() {
     unsafe {
         let pmu = &*PMU::PTR;
-        let lp_clkrst = &*LP_CLKRST::PTR;
+        let rtc_cntl = &*RTC_CNTL::PTR;
         let pcr = &*PCR::PTR;
 
         pmu.hp_active_icg_modem
@@ -132,7 +132,7 @@ fn modem_clk_domain_active_state_icg_map_preinit() {
         pmu.imm_sleep_sysclk
             .write(|w| w.update_dig_icg_switch().set_bit());
 
-        lp_clkrst.fosc_cntl.modify(|_, w| w.fosc_dfreq().bits(100));
+        rtc_cntl.fosc_cntl.modify(|_, w| w.fosc_dfreq().bits(100));
         regi2c_write_mask(
             I2C_DIG_REG,
             I2C_DIG_REG_HOSTID,
@@ -141,9 +141,7 @@ fn modem_clk_domain_active_state_icg_map_preinit() {
             I2C_DIG_REG_SCK_DCAP_LSB,
             128,
         );
-        lp_clkrst
-            .rc32k_cntl
-            .modify(|_, w| w.rc32k_dfreq().bits(100));
+        rtc_cntl.rc32k_cntl.modify(|_, w| w.rc32k_dfreq().bits(100));
 
         // https://github.com/espressif/esp-idf/commit/e3148369f32fdc6de62c35a67f7adb6f4faef4e3#diff-cc84d279f2f3d77fe252aa40a64d4813f271a52b5a4055e876efd012d888e135R810-R815
         pcr.ctrl_tick_conf
@@ -307,7 +305,7 @@ impl RtcClock {
 
     /// Get the RTC_SLOW_CLK source
     pub(crate) fn get_slow_freq() -> RtcSlowClock {
-        let lp_clrst = unsafe { &*LP_CLKRST::ptr() };
+        let lp_clrst = unsafe { &*RTC_CNTL::ptr() };
 
         let slow_freq = lp_clrst.lp_clk_conf.read().slow_clk_sel().bits();
         match slow_freq {
@@ -321,12 +319,12 @@ impl RtcClock {
 
     fn set_slow_freq(slow_freq: RtcSlowClock) {
         unsafe {
-            let lp_clkrst = &*LP_CLKRST::PTR;
+            let rtc_cntl = &*RTC_CNTL::PTR;
 
-            lp_clkrst
+            rtc_cntl
                 .lp_clk_conf
                 .modify(|_, w| w.slow_clk_sel().bits(slow_freq as u8));
-            lp_clkrst.clk_to_hp.modify(|_, w| {
+            rtc_cntl.clk_to_hp.modify(|_, w| {
                 w.icg_hp_xtal32k()
                     .bit(match slow_freq {
                         RtcSlowClock::RtcSlowClock32kXtal => true,
@@ -346,8 +344,8 @@ impl RtcClock {
     // stage bootloader https://github.com/espressif/esp-idf/blob/master/components/bootloader_support/src/bootloader_clock_init.c#L65-L67
     fn set_fast_freq(fast_freq: RtcFastClock) {
         unsafe {
-            let lp_clkrst = &*LP_CLKRST::PTR;
-            lp_clkrst.lp_clk_conf.modify(|_, w| {
+            let rtc_cntl = &*RTC_CNTL::PTR;
+            rtc_cntl.lp_clk_conf.modify(|_, w| {
                 w.fast_clk_sel().bit(match fast_freq {
                     RtcFastClock::RtcFastClockRcFast => false,
                     RtcFastClock::RtcFastClockXtalD2 => true,
@@ -377,7 +375,7 @@ impl RtcClock {
             };
         }
 
-        let lp_clkrst = unsafe { &*LP_CLKRST::ptr() };
+        let rtc_cntl = unsafe { &*RTC_CNTL::ptr() };
         let pcr = unsafe { &*PCR::ptr() };
         let pmu = unsafe { &*PMU::ptr() };
 
@@ -427,17 +425,17 @@ impl RtcClock {
         // Only enable if originaly was disabled
         // If clock is already on, do nothing
 
-        let dig_32k_xtal_enabled = lp_clkrst.clk_to_hp.read().icg_hp_xtal32k().bit_is_set();
+        let dig_32k_xtal_enabled = rtc_cntl.clk_to_hp.read().icg_hp_xtal32k().bit_is_set();
 
         if cal_clk == RtcCalSel::RtcCal32kXtal && !dig_32k_xtal_enabled {
-            lp_clkrst
+            rtc_cntl
                 .clk_to_hp
                 .modify(|_, w| w.icg_hp_xtal32k().set_bit());
         }
 
         // TODO: very hacky
         // in ESP-IDF these are not called in this function but the fields are set
-        lp_clkrst
+        rtc_cntl
             .clk_to_hp
             .modify(|_, w| w.icg_hp_xtal32k().set_bit());
         pmu.hp_sleep_lp_ck_power
@@ -451,7 +449,7 @@ impl RtcClock {
             .read()
             .hp_sleep_xpd_fosc_clk()
             .bit_is_set();
-        let dig_rc_fast_enabled = lp_clkrst.clk_to_hp.read().icg_hp_fosc().bit_is_set();
+        let dig_rc_fast_enabled = rtc_cntl.clk_to_hp.read().icg_hp_fosc().bit_is_set();
 
         if cal_clk == RtcCalSel::RtcCalRcFast {
             if !rc_fast_enabled {
@@ -463,7 +461,7 @@ impl RtcClock {
             }
 
             if !dig_rc_fast_enabled {
-                lp_clkrst.clk_to_hp.modify(|_, w| w.icg_hp_fosc().set_bit());
+                rtc_cntl.clk_to_hp.modify(|_, w| w.icg_hp_fosc().set_bit());
                 unsafe {
                     ets_delay_us(5);
                 }
@@ -475,7 +473,7 @@ impl RtcClock {
             .read()
             .hp_sleep_xpd_rc32k()
             .bit_is_set();
-        let dig_rc32k_enabled = lp_clkrst.clk_to_hp.read().icg_hp_osc32k().bit_is_set();
+        let dig_rc32k_enabled = rtc_cntl.clk_to_hp.read().icg_hp_osc32k().bit_is_set();
 
         if cal_clk == RtcCalSel::RtcCal32kRc {
             if !rc32k_enabled {
@@ -487,7 +485,7 @@ impl RtcClock {
             }
 
             if !dig_rc32k_enabled {
-                lp_clkrst
+                rtc_cntl
                     .clk_to_hp
                     .modify(|_, w| w.icg_hp_osc32k().set_bit());
             }
@@ -593,7 +591,7 @@ impl RtcClock {
             .modify(|_, w| w.rtc_cali_start().clear_bit());
 
         if cal_clk == RtcCalSel::RtcCal32kXtal && !dig_32k_xtal_enabled {
-            lp_clkrst
+            rtc_cntl
                 .clk_to_hp
                 .modify(|_, w| w.icg_hp_xtal32k().clear_bit());
         }
@@ -608,7 +606,7 @@ impl RtcClock {
             }
 
             if dig_rc_fast_enabled {
-                lp_clkrst.clk_to_hp.modify(|_, w| w.icg_hp_fosc().set_bit());
+                rtc_cntl.clk_to_hp.modify(|_, w| w.icg_hp_fosc().set_bit());
                 unsafe {
                     ets_delay_us(5);
                 }
@@ -624,7 +622,7 @@ impl RtcClock {
                 }
             }
             if dig_rc32k_enabled {
-                lp_clkrst
+                rtc_cntl
                     .clk_to_hp
                     .modify(|_, w| w.icg_hp_osc32k().set_bit());
             }

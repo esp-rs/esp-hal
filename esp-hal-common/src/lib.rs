@@ -59,7 +59,7 @@ pub use self::gpio::IO;
 pub use self::rmt::Rmt;
 #[cfg(rng)]
 pub use self::rng::Rng;
-#[cfg(any(lp_clkrst, rtc_cntl))]
+#[cfg(rtc_cntl)]
 pub use self::rtc_cntl::{Rtc, Rwdt};
 #[cfg(any(esp32, esp32s3))]
 pub use self::soc::cpu_control;
@@ -130,7 +130,7 @@ pub mod rng;
 pub mod rom;
 #[cfg(rsa)]
 pub mod rsa;
-#[cfg(any(lp_clkrst, rtc_cntl))]
+#[cfg(rtc_cntl)]
 pub mod rtc_cntl;
 #[cfg(sha)]
 pub mod sha;

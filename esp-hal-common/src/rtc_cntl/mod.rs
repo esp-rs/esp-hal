@@ -79,26 +79,22 @@ pub use self::rtc::SocResetReason;
 use crate::clock::XtalClock;
 #[cfg(not(esp32))]
 use crate::efuse::Efuse;
+#[cfg(not(any(esp32c6, esp32h2)))]
+use crate::peripherals::TIMG0;
 #[cfg(any(esp32c6, esp32h2))]
 use crate::peripherals::{LP_TIMER, LP_WDT};
-#[cfg(not(any(esp32c6, esp32h2)))]
-use crate::peripherals::{RTC_CNTL, TIMG0};
 #[cfg(any(esp32, esp32s3, esp32c3))]
 use crate::rtc_cntl::sleep::{RtcSleepConfig, WakeSource, WakeTriggers};
 use crate::{
     clock::Clock,
     peripheral::{Peripheral, PeripheralRef},
+    peripherals::RTC_CNTL,
     reset::{SleepSource, WakeupReason},
     Cpu,
 };
 // only include sleep where its been implemented
 #[cfg(any(esp32, esp32s3, esp32c3))]
 pub mod sleep;
-
-#[cfg(any(esp32c6, esp32h2))]
-type RtcCntl = crate::peripherals::LP_CLKRST;
-#[cfg(not(any(esp32c6, esp32h2)))]
-type RtcCntl = crate::peripherals::RTC_CNTL;
 
 #[cfg_attr(esp32, path = "rtc/esp32.rs")]
 #[cfg_attr(esp32c2, path = "rtc/esp32c2.rs")]
@@ -194,14 +190,14 @@ pub(crate) enum RtcCalSel {
 
 /// Low-power Management
 pub struct Rtc<'d> {
-    _inner: PeripheralRef<'d, RtcCntl>,
+    _inner: PeripheralRef<'d, RTC_CNTL>,
     pub rwdt: Rwdt,
     #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
     pub swd: Swd,
 }
 
 impl<'d> Rtc<'d> {
-    pub fn new(rtc_cntl: impl Peripheral<P = RtcCntl> + 'd) -> Self {
+    pub fn new(rtc_cntl: impl Peripheral<P = RTC_CNTL> + 'd) -> Self {
         rtc::init();
         rtc::configure_clock();
 

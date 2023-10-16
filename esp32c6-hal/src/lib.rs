@@ -81,12 +81,12 @@ pub mod analog {
 #[export_name = "__post_init"]
 unsafe fn post_init() {
     use esp_hal_common::{
-        peripherals::{LP_CLKRST, TIMG0, TIMG1},
+        peripherals::{RTC_CNTL, TIMG0, TIMG1},
         timer::Wdt,
     };
 
     // RTC domain must be enabled before we try to disable
-    let mut rtc = Rtc::new(LP_CLKRST::steal());
+    let mut rtc = Rtc::new(RTC_CNTL::steal());
     rtc.swd.disable();
     rtc.rwdt.disable();
 
