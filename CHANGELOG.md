@@ -63,6 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unified the ESP32's and ESP32-C2's xtal frequency features (#831)
 - Replace any underscores in feature names with dashes (#833)
 - The `spi` and `spi_slave` modules have been refactored into the `spi`, `spi::master`, and `spi::slave` modules (#843)
+- The `WithDmaSpi2`/`WithDmaSpi3` structs are no longer generic around the inner peripheral type (#853)
 
 ## [0.12.0]
 
