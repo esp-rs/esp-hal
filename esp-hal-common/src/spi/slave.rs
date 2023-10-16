@@ -148,32 +148,29 @@ pub mod dma {
         peripheral::PeripheralRef,
     };
 
-    pub trait WithDmaSpi2<'d, T, C>
+    pub trait WithDmaSpi2<'d, C>
     where
-        T: Instance + Spi2Instance,
         C: ChannelTypes,
         C::P: SpiPeripheral,
     {
-        fn with_dma(self, channel: Channel<'d, C>) -> SpiDma<'d, T, C>;
+        fn with_dma(self, channel: Channel<'d, C>) -> SpiDma<'d, crate::peripherals::SPI2, C>;
     }
 
     #[cfg(spi3)]
-    pub trait WithDmaSpi3<'d, T, C>
+    pub trait WithDmaSpi3<'d, C>
     where
-        T: Instance + Spi3Instance,
         C: ChannelTypes,
         C::P: SpiPeripheral,
     {
-        fn with_dma(self, channel: Channel<'d, C>) -> SpiDma<'d, T, C>;
+        fn with_dma(self, channel: Channel<'d, C>) -> SpiDma<'d, crate::peripherals::SPI3, C>;
     }
 
-    impl<'d, T, C> WithDmaSpi2<'d, T, C> for Spi<'d, T, FullDuplexMode>
+    impl<'d, C> WithDmaSpi2<'d, C> for Spi<'d, crate::peripherals::SPI2, FullDuplexMode>
     where
-        T: Instance + Spi2Instance,
         C: ChannelTypes,
         C::P: SpiPeripheral + Spi2Peripheral,
     {
-        fn with_dma(self, mut channel: Channel<'d, C>) -> SpiDma<'d, T, C> {
+        fn with_dma(self, mut channel: Channel<'d, C>) -> SpiDma<'d, crate::peripherals::SPI2, C> {
             channel.tx.init_channel(); // no need to call this for both, TX and RX
 
             #[cfg(esp32)]
@@ -192,13 +189,12 @@ pub mod dma {
     }
 
     #[cfg(spi3)]
-    impl<'d, T, C> WithDmaSpi3<'d, T, C> for Spi<'d, T, FullDuplexMode>
+    impl<'d, C> WithDmaSpi3<'d, C> for Spi<'d, crate::peripherals::SPI3, FullDuplexMode>
     where
-        T: Instance + Spi3Instance,
         C: ChannelTypes,
         C::P: SpiPeripheral + Spi3Peripheral,
     {
-        fn with_dma(self, mut channel: Channel<'d, C>) -> SpiDma<'d, T, C> {
+        fn with_dma(self, mut channel: Channel<'d, C>) -> SpiDma<'d, crate::peripherals::SPI3, C> {
             channel.tx.init_channel(); // no need to call this for both, TX and RX
 
             #[cfg(esp32)]
@@ -1075,13 +1071,3 @@ impl Instance for crate::peripherals::SPI3 {
         3
     }
 }
-
-pub trait Spi2Instance {}
-
-#[cfg(spi3)]
-pub trait Spi3Instance {}
-
-impl Spi2Instance for crate::peripherals::SPI2 {}
-
-#[cfg(spi3)]
-impl Spi3Instance for crate::peripherals::SPI3 {}

@@ -709,21 +709,7 @@ pub mod dma {
     use embedded_dma::{ReadBuffer, WriteBuffer};
     use fugit::HertzU32;
 
-    #[cfg(spi3)]
-    use super::Spi3Instance;
-    use super::{
-        Address,
-        Command,
-        DuplexMode,
-        Instance,
-        InstanceDma,
-        IsFullDuplex,
-        IsHalfDuplex,
-        Spi,
-        Spi2Instance,
-        SpiDataMode,
-        MAX_DMA_SIZE,
-    };
+    use super::*;
     #[cfg(spi3)]
     use crate::dma::Spi3Peripheral;
     use crate::{
@@ -743,35 +729,35 @@ pub mod dma {
         FlashSafeDma,
     };
 
-    pub trait WithDmaSpi2<'d, T, C, M>
+    pub trait WithDmaSpi2<'d, C, M>
     where
-        T: Instance + Spi2Instance,
         C: ChannelTypes,
         C::P: SpiPeripheral,
         M: DuplexMode,
     {
-        fn with_dma(self, channel: Channel<'d, C>) -> SpiDma<'d, T, C, M>;
+        fn with_dma(self, channel: Channel<'d, C>) -> SpiDma<'d, crate::peripherals::SPI2, C, M>;
     }
 
     #[cfg(spi3)]
-    pub trait WithDmaSpi3<'d, T, C, M>
+    pub trait WithDmaSpi3<'d, C, M>
     where
-        T: Instance + Spi3Instance,
         C: ChannelTypes,
         C::P: SpiPeripheral,
         M: DuplexMode,
     {
-        fn with_dma(self, channel: Channel<'d, C>) -> SpiDma<'d, T, C, M>;
+        fn with_dma(self, channel: Channel<'d, C>) -> SpiDma<'d, crate::peripherals::SPI3, C, M>;
     }
 
-    impl<'d, T, C, M> WithDmaSpi2<'d, T, C, M> for Spi<'d, T, M>
+    impl<'d, C, M> WithDmaSpi2<'d, C, M> for Spi<'d, crate::peripherals::SPI2, M>
     where
-        T: Instance + Spi2Instance,
         C: ChannelTypes,
         C::P: SpiPeripheral + Spi2Peripheral,
         M: DuplexMode,
     {
-        fn with_dma(self, mut channel: Channel<'d, C>) -> SpiDma<'d, T, C, M> {
+        fn with_dma(
+            self,
+            mut channel: Channel<'d, C>,
+        ) -> SpiDma<'d, crate::peripherals::SPI2, C, M> {
             channel.tx.init_channel(); // no need to call this for both, TX and RX
 
             SpiDma {
@@ -783,14 +769,16 @@ pub mod dma {
     }
 
     #[cfg(spi3)]
-    impl<'d, T, C, M> WithDmaSpi3<'d, T, C, M> for Spi<'d, T, M>
+    impl<'d, C, M> WithDmaSpi3<'d, C, M> for Spi<'d, crate::peripherals::SPI3, M>
     where
-        T: Instance + Spi3Instance,
         C: ChannelTypes,
         C::P: SpiPeripheral + Spi3Peripheral,
         M: DuplexMode,
     {
-        fn with_dma(self, mut channel: Channel<'d, C>) -> SpiDma<'d, T, C, M> {
+        fn with_dma(
+            self,
+            mut channel: Channel<'d, C>,
+        ) -> SpiDma<'d, crate::peripherals::SPI3, C, M> {
             channel.tx.init_channel(); // no need to call this for both, TX and RX
 
             SpiDma {
@@ -3234,13 +3222,3 @@ impl ExtendedInstance for crate::peripherals::SPI3 {
         InputSignal::SPI3_HD
     }
 }
-
-pub trait Spi2Instance {}
-
-#[cfg(spi3)]
-pub trait Spi3Instance {}
-
-impl Spi2Instance for crate::peripherals::SPI2 {}
-
-#[cfg(spi3)]
-impl Spi3Instance for crate::peripherals::SPI3 {}
