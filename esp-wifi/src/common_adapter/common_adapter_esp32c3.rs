@@ -167,5 +167,5 @@ pub(crate) unsafe fn phy_disable_clock() {
         unwrap!(RADIO_CLOCKS.as_mut()).disable(RadioPeripherals::Phy);
     });
 
-    trace!("phy_enable_clock done!");
+    trace!("phy_disable_clock done!");
 }
