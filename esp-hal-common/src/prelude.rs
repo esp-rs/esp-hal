@@ -35,10 +35,8 @@ pub use fugit::{
 };
 pub use nb;
 
-#[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
-pub use crate::analog::SarAdcExt as _esp_hal_analog_SarAdcExt;
-#[cfg(sens)]
-pub use crate::analog::SensExt as _esp_hal_analog_SensExt;
+#[cfg(any(apb_saradc, sens))]
+pub use crate::analog::AnalogExt as _esp_hal_analog_AnalogExt;
 #[cfg(any(gdma, pdma))]
 pub use crate::dma::{
     DmaTransfer as _esp_hal_dma_DmaTransfer,
@@ -62,7 +60,7 @@ pub use crate::ledc::{
 };
 #[cfg(radio)]
 pub use crate::radio::RadioExt as _esp_hal_RadioExt;
-#[cfg(any(esp32, esp32s2, esp32s3))]
+#[cfg(spi3)]
 pub use crate::spi::master::dma::WithDmaSpi3 as _esp_hal_spi_dma_WithDmaSpi3;
 #[cfg(any(spi0, spi1, spi2, spi3))]
 pub use crate::spi::master::{

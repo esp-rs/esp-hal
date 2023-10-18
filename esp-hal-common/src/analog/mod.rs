@@ -21,8 +21,8 @@
 //! #### Xtensa architecture
 //! For ESP microcontrollers using the `Xtensa` architecture, the driver
 //! provides access to the `SENS` peripheral, allowing users to split it into
-//! independent parts using the [`SensExt`] trait. This extension trait provides
-//! access to the following analog peripherals:
+//! independent parts using the [`AnalogExt`] trait. This extension trait
+//! provides access to the following analog peripherals:
 //!   * ADC1
 //!   * ADC2
 //!   * DAC1
@@ -30,7 +30,7 @@
 //!
 //! #### RISC-V architecture
 //! For ESP microcontrollers using the `RISC-V` architecture, the driver
-//! provides access to the `APB_SARADC` peripheral. The `SarAdcExt` trait allows
+//! provides access to the `APB_SARADC` peripheral. The `AnalogExt` trait allows
 //! users to split this peripheral into independent parts, providing access to
 //! the following analog peripheral:
 //!   * ADC1
@@ -207,11 +207,11 @@ cfg_if::cfg_if! {
         }
 
         /// Extension trait to split a SENS peripheral in independent parts
-        pub trait SensExt {
+        pub trait AnalogExt {
             fn split(self) -> AvailableAnalog;
         }
 
-        impl SensExt for SENS {
+        impl AnalogExt for SENS {
             fn split(self) -> AvailableAnalog {
                 AvailableAnalog {
                     adc1: ADC1 {
@@ -243,11 +243,11 @@ cfg_if::cfg_if! {
         }
 
         /// Extension trait to split a APB_SARADC peripheral in independent parts
-        pub trait SarAdcExt {
+        pub trait AnalogExt {
             fn split(self) -> AvailableAnalog;
         }
 
-        impl<'d, T: crate::peripheral::Peripheral<P = APB_SARADC> + 'd> SarAdcExt for T {
+        impl<'d, T: crate::peripheral::Peripheral<P = APB_SARADC> + 'd> AnalogExt for T {
             fn split(self) -> AvailableAnalog {
                 AvailableAnalog {
                     adc1: ADC1 {
