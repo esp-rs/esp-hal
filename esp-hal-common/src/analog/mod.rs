@@ -195,10 +195,13 @@ impl crate::peripheral::Peripheral for DAC2 {
 
 impl crate::peripheral::sealed::Sealed for DAC2 {}
 
+/// Extension trait to split a SENS peripheral in independent parts
+pub trait AnalogExt {
+    fn split(self) -> AvailableAnalog;
+}
+
 cfg_if::cfg_if! {
     if #[cfg(xtensa)] {
-        use crate::peripherals::SENS;
-
         pub struct AvailableAnalog {
             pub adc1: ADC1,
             pub adc2: ADC2,
@@ -206,12 +209,7 @@ cfg_if::cfg_if! {
             pub dac2: DAC2,
         }
 
-        /// Extension trait to split a SENS peripheral in independent parts
-        pub trait AnalogExt {
-            fn split(self) -> AvailableAnalog;
-        }
-
-        impl AnalogExt for SENS {
+        impl AnalogExt for crate::peripherals::SENS {
             fn split(self) -> AvailableAnalog {
                 AvailableAnalog {
                     adc1: ADC1 {
@@ -234,20 +232,13 @@ cfg_if::cfg_if! {
 
 cfg_if::cfg_if! {
     if #[cfg(riscv)] {
-        use crate::peripherals::APB_SARADC;
-
         pub struct AvailableAnalog {
             pub adc1: ADC1,
             #[cfg(esp32c3)]
             pub adc2: ADC2,
         }
 
-        /// Extension trait to split a APB_SARADC peripheral in independent parts
-        pub trait AnalogExt {
-            fn split(self) -> AvailableAnalog;
-        }
-
-        impl<'d, T: crate::peripheral::Peripheral<P = APB_SARADC> + 'd> AnalogExt for T {
+        impl AnalogExt for crate::peripherals::APB_SARADC {
             fn split(self) -> AvailableAnalog {
                 AvailableAnalog {
                     adc1: ADC1 {
