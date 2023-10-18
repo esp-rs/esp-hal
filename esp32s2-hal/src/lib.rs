@@ -51,11 +51,6 @@ pub use esp_hal_common::*;
 // Always enable atomic emulation on ESP32-S2
 use xtensa_atomic_emulation_trap as _;
 
-/// Common module for analog functions
-pub mod analog {
-    pub use esp_hal_common::analog::{AvailableAnalog, SensExt};
-}
-
 /// Function initializes ESP32 specific memories (RTC slow and fast) and
 /// then calls original Reset function
 ///
