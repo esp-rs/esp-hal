@@ -58,20 +58,6 @@ pub use crate::ledc::{
     },
     timer::{TimerHW as _esp_hal_ledc_timer_TimerHW, TimerIFace as _esp_hal_ledc_timer_TimerIFace},
 };
-#[cfg(spi3)]
-pub use crate::spi::master::dma::WithDmaSpi3 as _esp_hal_spi_dma_WithDmaSpi3;
-#[cfg(any(spi0, spi1, spi2, spi3))]
-pub use crate::spi::master::{
-    dma::WithDmaSpi2 as _esp_hal_spi_dma_WithDmaSpi2,
-    Instance as _esp_hal_spi_Instance,
-    InstanceDma as _esp_hal_spi_InstanceDma,
-};
-#[cfg(all(any(spi0, spi1, spi2, spi3), not(pdma)))]
-pub use crate::spi::slave::{
-    dma::WithDmaSpi2 as _esp_hal_spi_slave_dma_WithDmaSpi2,
-    Instance as _esp_hal_spi_slave_Instance,
-    InstanceDma as _esp_hal_spi_slave_InstanceDma,
-};
 #[cfg(any(dport, pcr, system))]
 pub use crate::system::SystemExt as _esp_hal_system_SystemExt;
 #[cfg(any(timg0, timg1))]

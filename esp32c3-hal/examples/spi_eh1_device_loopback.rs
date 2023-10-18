@@ -25,7 +25,7 @@ use esp32c3_hal::{
     peripherals::Peripherals,
     prelude::*,
     spi::{
-        master::{Spi, SpiBusController},
+        master::{prelude::*, Spi, SpiBusController},
         SpiMode,
     },
     Delay,

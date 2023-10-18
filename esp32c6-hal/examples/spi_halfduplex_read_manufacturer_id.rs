@@ -23,7 +23,7 @@ use esp32c6_hal::{
     peripherals::Peripherals,
     prelude::*,
     spi::{
-        master::{Address, Command, HalfDuplexReadWrite, Spi},
+        master::{prelude::*, Address, Command, HalfDuplexReadWrite, Spi},
         SpiDataMode,
         SpiMode,
     },
