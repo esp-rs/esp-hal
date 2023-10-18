@@ -41,7 +41,9 @@ pub fn get_systimer_count() -> u64 {
         overflow = TIMER_OVERFLOWS.load(Ordering::Relaxed);
     }
 
-    (((overflow as u64) << 32) + counter_after as u64) * 40_000_000 / 240_000_000
+    // We have to precompute the divider to avoid overflow when multiplying.
+    const DIVIDER: u64 = 240_000_000 / TICKS_PER_SECOND;
+    (((overflow as u64) << 32) + counter_after as u64) / DIVIDER
 }
 
 pub fn setup_timer(mut timer1: TimeBase) {
