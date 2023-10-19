@@ -75,11 +75,6 @@
 
 pub use esp_hal_common::*;
 
-/// Common module for analog functions
-pub mod analog {
-    pub use esp_hal_common::analog::{AvailableAnalog, SarAdcExt};
-}
-
 #[export_name = "__post_init"]
 unsafe fn post_init() {
     use esp_hal_common::{

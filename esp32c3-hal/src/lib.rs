@@ -81,11 +81,6 @@
 
 pub use esp_hal_common::*;
 
-/// Common module for analog functions
-pub mod analog {
-    pub use esp_hal_common::analog::{AvailableAnalog, SarAdcExt};
-}
-
 extern "C" {
     cfg_if::cfg_if! {
         if #[cfg(feature = "mcu-boot")] {

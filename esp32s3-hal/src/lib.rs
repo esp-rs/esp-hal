@@ -85,11 +85,6 @@
 
 pub use esp_hal_common::*;
 
-/// Common module for analog functions
-pub mod analog {
-    pub use esp_hal_common::analog::{AvailableAnalog, SensExt};
-}
-
 #[cfg(all(feature = "rt", feature = "direct-boot"))]
 #[doc(hidden)]
 #[no_mangle]
