@@ -64,5 +64,8 @@ crate::peripherals! {
     UHCI1 <= UHCI1,
     USB_DEVICE <= USB_DEVICE,
     XTS_AES <= XTS_AES,
-    RADIO <= virtual
+
+    // Virtual peripherals:
+    BT <= virtual,
+    WIFI <= virtual,
 }

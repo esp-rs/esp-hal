@@ -62,8 +62,6 @@ crate::peripherals! {
     PARL_IO <= PARL_IO,
     PAU <= PAU,
     PCNT <= PCNT,
-    // SYSTEM is derived from PCR
-    SYSTEM <= PCR,
     PMU <= PMU,
     RMT <= RMT,
     RNG <= RNG,
@@ -73,6 +71,8 @@ crate::peripherals! {
     SPI0 <= SPI0,
     SPI1 <= SPI1,
     SPI2 <= SPI2,
+    // SYSTEM is derived from PCR:
+    SYSTEM <= PCR,
     SYSTIMER <= SYSTIMER,
     TEE <= TEE,
     TIMG0 <= TIMG0,
@@ -83,5 +83,8 @@ crate::peripherals! {
     UART1 <= UART1,
     UHCI0 <= UHCI0,
     USB_DEVICE <= USB_DEVICE,
-    RADIO <= virtual,
+
+    // Virtual peripherals:
+    BT <= virtual,
+    IEEE802154 <= virtual,
 }

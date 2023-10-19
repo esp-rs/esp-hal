@@ -81,7 +81,10 @@ crate::peripherals! {
     USB_WRAP <= USB_WRAP,
     WCL <= WCL,
     XTS_AES <= XTS_AES,
-    RADIO <= virtual,
+
+    // Virtual peripherals:
+    BT <= virtual,
     PSRAM <= virtual,
     ULP_RISCV_CORE <= virtual,
+    WIFI <= virtual,
 }

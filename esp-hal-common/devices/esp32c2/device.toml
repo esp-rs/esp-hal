@@ -36,7 +36,6 @@ symbols = [
     "adc",
     "assist_debug_sp_monitor",
     "gdma",
-    "radio",
     "phy",
     "bt",
     "wifi",
