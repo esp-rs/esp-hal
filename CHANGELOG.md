@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add bare-bones SPI slave support, DMA only (#580, #843)
 - Embassy `#[main]` convenience macro (#841)
 - Add a `defmt` feature to the `esp-hal-smartled` package (#846)
+- Support 16MB octal PS-RAM for ESP32-S3 (#858)
 
 ### Changed
 
