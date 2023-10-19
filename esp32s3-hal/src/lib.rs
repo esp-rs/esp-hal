@@ -29,6 +29,7 @@
 //! - `opsram-2m` - Use externally connected Octal PSRAM (2MB)
 //! - `opsram-4m` - Use externally connected Octal PSRAM (4MB)
 //! - `opsram-8m` - Use externally connected Octal PSRAM (8MB)
+//! - `opsram-16m`- Use externally connected Octal PSRAM (16MB)
 //! - `psram-2m` - Use externally connected PSRAM (2MB)
 //! - `psram-4m` - Use externally connected PSRAM (4MB)
 //! - `psram-8m` - Use externally connected PSRAM (8MB)

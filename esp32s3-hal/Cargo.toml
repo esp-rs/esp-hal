@@ -84,6 +84,7 @@ psram-8m  = ["esp-hal-common/psram-8m", "psram"]
 opsram-2m  = ["esp-hal-common/opsram-2m", "psram"]
 opsram-4m  = ["esp-hal-common/opsram-4m", "psram"]
 opsram-8m  = ["esp-hal-common/opsram-8m", "psram"]
+opsram-16m = ["esp-hal-common/opsram-16m", "psram"]
 
 [profile.release]
 debug = true
