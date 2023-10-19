@@ -19,14 +19,6 @@ pub use embedded_hal::{
     },
     prelude::*,
 };
-#[cfg(feature = "async")]
-pub use embedded_hal_async::{
-    delay::DelayUs as _embedded_hal_async_delay_DelayUs,
-    digital::Wait as _embedded_hal_async_digital_Wait,
-    i2c::I2c as _embedded_hal_async_i2c_I2c,
-    spi::SpiBus as _embedded_hal_async_spi_SpiBus,
-    spi::SpiDevice as _embedded_hal_async_spi_SpiDevice,
-};
 pub use fugit::{
     ExtU32 as _fugit_ExtU32,
     ExtU64 as _fugit_ExtU64,
@@ -68,32 +60,3 @@ pub use crate::timer::{
 #[cfg(any(uart0, uart1, uart2))]
 pub use crate::uart::{Instance as _esp_hal_uart_Instance, UartPins as _esp_hal_uart_UartPins};
 pub use crate::{clock::Clock as _esp_hal_clock_Clock, entry, macros::*};
-
-/// All traits required for using the 1.0.0-alpha.x release of embedded-hal
-#[cfg(feature = "eh1")]
-pub mod eh1 {
-    #[cfg(any(twai0, twai1))]
-    pub use embedded_can::{
-        blocking::Can as _embedded_can_blocking_Can,
-        nb::Can as _embedded_can_nb_Can,
-        Error as _embedded_can_Error,
-        Frame as _embedded_can_Frame,
-    };
-    pub use embedded_hal_1::{
-        delay::DelayUs as _embedded_hal_1_delay_DelayUs,
-        digital::{
-            InputPin as _embedded_hal_1_digital_InputPin,
-            OutputPin as _embedded_hal_1_digital_OutputPin,
-            StatefulOutputPin as _embedded_hal_1_digital_StatefulOutputPin,
-            ToggleableOutputPin as _embedded_hal_1_digital_ToggleableOutputPin,
-        },
-        i2c::I2c as _embedded_hal_1_i2c_I2c,
-        spi::{SpiBus as _embedded_hal_1_spi_SpiBus, SpiDevice as _embedded_hal_1_spi_SpiDevice},
-    };
-    pub use embedded_hal_nb::{
-        serial::{Read as _embedded_hal_nb_serial_Read, Write as _embedded_hal_nb_serial_Write},
-        spi::FullDuplex as _embedded_hal_nb_spi_FullDuplex,
-    };
-
-    pub use super::*;
-}
