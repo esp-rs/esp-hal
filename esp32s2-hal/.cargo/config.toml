@@ -3,8 +3,13 @@ runner = "espflash flash --monitor"
 
 [build]
 rustflags = [
+  # GCC
   "-C", "link-arg=-nostartfiles",
   "-C", "link-arg=-Wl,-Tlinkall.x",
+
+  # LLD
+  # "-C", "linker=rust-lld",
+  # "-C", "link-arg=-Tlinkall.x",
 
   # enable the atomic codegen option for Xtensa
   "-C", "target-feature=+s32c1i",
