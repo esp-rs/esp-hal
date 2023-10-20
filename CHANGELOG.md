@@ -67,6 +67,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `WithDmaSpi2`/`WithDmaSpi3` structs are no longer generic around the inner peripheral type (#853)
 - The `SarAdcExt`/`SensExt` traits are now collectively named `AnalogExt` instead (#857)
 - Replace the `radio` module with peripheral singleton structs (#852)
+- The SPI traits are no longer re-exported in the main prelude, but from preludes in `spi::master`/`spi::slave` instead (#860)
+- The `embedded-hal-1` and `embedded-hal-async` traits are no longer re-exported in the prelude (#860)
 
 ## [0.12.0]
 

@@ -73,6 +73,17 @@ use crate::{
     system::PeripheralClockControl,
 };
 
+/// Prelude for the SPI (Master) driver
+pub mod prelude {
+    #[cfg(spi3)]
+    pub use super::dma::WithDmaSpi3 as _esp_hal_spi_master_dma_WithDmaSpi3;
+    pub use super::{
+        dma::WithDmaSpi2 as _esp_hal_spi_master_dma_WithDmaSpi2,
+        Instance as _esp_hal_spi_master_Instance,
+        InstanceDma as _esp_hal_spi_master_InstanceDma,
+    };
+}
+
 /// The size of the FIFO buffer for SPI
 #[cfg(not(esp32s2))]
 const FIFO_SIZE: usize = 64;

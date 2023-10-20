@@ -68,6 +68,17 @@ use crate::{
     system::PeripheralClockControl,
 };
 
+/// Prelude for the SPI (Slave) driver
+pub mod prelude {
+    #[cfg(spi3)]
+    pub use super::dma::WithDmaSpi3 as _esp_hal_spi_slave_dma_WithDmaSpi3;
+    pub use super::{
+        dma::WithDmaSpi2 as _esp_hal_spi_slave_dma_WithDmaSpi2,
+        Instance as _esp_hal_spi_slave_Instance,
+        InstanceDma as _esp_hal_spi_slave_InstanceDma,
+    };
+}
+
 const MAX_DMA_SIZE: usize = 32768 - 32;
 
 /// SPI peripheral driver

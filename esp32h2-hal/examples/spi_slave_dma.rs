@@ -32,7 +32,10 @@ use esp32h2_hal::{
     gpio::IO,
     peripherals::Peripherals,
     prelude::*,
-    spi::{slave::Spi, SpiMode},
+    spi::{
+        slave::{prelude::*, Spi},
+        SpiMode,
+    },
     timer::TimerGroup,
     Delay,
     Rtc,
