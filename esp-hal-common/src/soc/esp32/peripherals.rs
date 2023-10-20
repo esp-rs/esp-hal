@@ -32,8 +32,6 @@ crate::peripherals! {
     AES <= AES,
     APB_CTRL <= APB_CTRL,
     BB <= BB,
-    // SYSTEM is derived from DPORT
-    SYSTEM <= DPORT,
     EFUSE <= EFUSE,
     FLASH_ENCRYPTION <= FLASH_ENCRYPTION,
     FRC_TIMER <= FRC_TIMER,
@@ -65,6 +63,8 @@ crate::peripherals! {
     SPI1 <= SPI1,
     SPI2 <= SPI2,
     SPI3 <= SPI3,
+    // SYSTEM is derived from DPORT:
+    SYSTEM <= DPORT,
     TIMG0 <= TIMG0,
     TIMG1 <= TIMG1,
     TWAI0 <= TWAI0,
@@ -73,6 +73,9 @@ crate::peripherals! {
     UART2 <= UART2,
     UHCI0 <= UHCI0,
     UHCI1 <= UHCI1,
-    RADIO <= virtual,
+
+    // Virtual peripherals:
+    BT <= virtual,
     PSRAM <= virtual,
+    WIFI <= virtual,
 }

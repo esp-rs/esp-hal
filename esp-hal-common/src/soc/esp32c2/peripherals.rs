@@ -53,5 +53,8 @@ crate::peripherals! {
     UART0 <= UART0,
     UART1 <= UART1,
     XTS_AES <= XTS_AES,
-    RADIO <= virtual
+
+    // Virtual peripherals:
+    BT <= virtual,
+    WIFI <= virtual,
 }

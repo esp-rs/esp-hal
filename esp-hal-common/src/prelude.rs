@@ -58,8 +58,6 @@ pub use crate::ledc::{
     },
     timer::{TimerHW as _esp_hal_ledc_timer_TimerHW, TimerIFace as _esp_hal_ledc_timer_TimerIFace},
 };
-#[cfg(radio)]
-pub use crate::radio::RadioExt as _esp_hal_RadioExt;
 #[cfg(spi3)]
 pub use crate::spi::master::dma::WithDmaSpi3 as _esp_hal_spi_dma_WithDmaSpi3;
 #[cfg(any(spi0, spi1, spi2, spi3))]

@@ -48,7 +48,6 @@ symbols = [
     "assist_debug_sp_monitor",
     "assist_debug_region_monitor",
     "gdma",
-    "radio",
     "phy",
     "bt",
     "wifi",

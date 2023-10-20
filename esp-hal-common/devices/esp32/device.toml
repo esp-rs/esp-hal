@@ -54,7 +54,6 @@ symbols = [
     "adc",
     "dac",
     "pdma",
-    "radio",
     "phy",
     "bt",
     "wifi",

@@ -67,7 +67,6 @@ symbols = [
     "assist_debug_region_monitor",
     "gdma",
     "plic",
-    "radio",
     "phy",
     "bt",
     "ieee802154",
