@@ -247,7 +247,7 @@ pub fn initialize(
     radio_clocks: hal::system::RadioClockControl,
     clocks: &Clocks,
 ) -> Result<EspWifiInitialization, InitializationError> {
-    #[cfg(all(not(coex), feature = "wifi", feature = "bluetooth"))]
+    #[cfg(all(not(coex), feature = "wifi", feature = "ble"))]
     if init_for == EspWifiInitFor::WifiBle {
         panic!("Trying to use Wifi and BLE without COEX feature");
     }
