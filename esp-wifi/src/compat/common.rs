@@ -106,15 +106,15 @@ pub unsafe fn str_from_c<'a>(s: *const u8) -> &'a str {
 
 pub unsafe extern "C" fn syslog(_priority: u32, format: *const u8, mut args: VaListImpl) {
     #[cfg(feature = "wifi-logs")]
-    {
-        #[cfg(target_arch = "riscv32")]
+    cfg_if::cfg_if! {
+        if #[cfg(any(target_arch = "riscv32", all(target_arch = "xtensa", xtensa_has_vaarg)))]
         {
             let mut buf = [0u8; 512];
             vsnprintf(&mut buf as *mut u8, 512, format, args);
             let res_str = str_from_c(&buf as *const u8);
             info!("{}", res_str);
         }
-        #[cfg(not(target_arch = "riscv32"))]
+        else
         {
             let res_str = str_from_c(format);
             info!("{}", res_str);

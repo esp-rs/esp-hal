@@ -28,7 +28,6 @@ use crate::{
     timer::yield_task,
 };
 
-#[cfg(target_arch = "riscv32")]
 use crate::compat::common::syslog;
 
 use super::WifiEvent;
@@ -1508,10 +1507,7 @@ pub unsafe extern "C" fn log_write(
     _format: *const crate::binary::c_types::c_char,
     _args: ...
 ) {
-    #[cfg(not(feature = "wifi-logs"))]
-    return;
-
-    #[cfg(target_arch = "riscv32")]
+    let _args = core::mem::transmute(_args);
     syslog(_level, _format as *const u8, _args);
 }
 
@@ -1538,20 +1534,8 @@ pub unsafe extern "C" fn log_writev(
     _format: *const crate::binary::c_types::c_char,
     _args: va_list,
 ) {
-    #[cfg(feature = "wifi-logs")]
-    {
-        #[cfg(target_arch = "xtensa")]
-        {
-            let s = str_from_c(_format as *const u8);
-            info!("{}", s);
-        }
-
-        #[cfg(target_arch = "riscv32")]
-        {
-            let _args = core::mem::transmute(_args);
-            syslog(_level, _format as *const u8, _args);
-        }
-    }
+    let _args = core::mem::transmute(_args);
+    syslog(_level, _format as *const u8, _args);
 }
 
 /****************************************************************************

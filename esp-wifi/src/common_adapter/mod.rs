@@ -319,7 +319,7 @@ pub(crate) unsafe extern "C" fn semphr_give_from_isr(sem: *const (), hptw: *cons
 #[no_mangle]
 pub unsafe extern "C" fn puts(s: *const u8) {
     let cstr = str_from_c(s);
-    trace!("{}", cstr);
+    info!("{}", cstr);
 }
 
 #[no_mangle]

@@ -43,6 +43,41 @@ fn main() -> Result<(), String> {
     #[cfg(feature = "coex")]
     println!("cargo:rustc-cfg=coex");
 
+    let version_output = std::process::Command::new(
+        std::env::var_os("RUSTC").unwrap_or_else(|| std::ffi::OsString::from("rustc")),
+    )
+    .arg("-V")
+    .output()
+    .unwrap()
+    .stdout;
+    let version_string = String::from_utf8_lossy(&version_output);
+
+    // HACK: we detect the xtensa-enabled compiler by existence of the second version string in parens
+    // - upstream output format: rustc 1.75.0-nightly (cae0791da 2023-10-05)
+    // - xtensa output format: rustc 1.73.0-nightly (9163a2087 2023-10-03) (1.73.0.0)
+    if version_string.chars().filter(|&c| c == '(').count() == 2 {
+        let version = version_string
+            .split('(')
+            .last()
+            .unwrap()
+            .split(')')
+            .next()
+            .unwrap();
+
+        let mut version = version.split('.');
+
+        let major = version.next().unwrap().parse::<u32>().unwrap();
+        let minor = version.next().unwrap().parse::<u32>().unwrap();
+        let patch = version.next().unwrap().parse::<u32>().unwrap();
+        let release = version.next().unwrap().parse::<u32>().unwrap();
+
+        let version = Version4(major, minor, patch, release);
+
+        if version >= Version4(1, 73, 0, 1) {
+            println!("cargo:rustc-cfg=xtensa_has_vaarg");
+        }
+    }
+
     Ok(())
 }
 
@@ -56,4 +91,27 @@ fn main() -> Result<(), String> {
 )))]
 fn main() {
     panic!("Select a chip via it's cargo feature");
+}
+
+use std::cmp::Ordering;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct Version4(u32, u32, u32, u32);
+
+impl PartialOrd for Version4 {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match self.0.partial_cmp(&other.0) {
+            Some(Ordering::Equal) => {}
+            ord => return ord,
+        }
+        match self.1.partial_cmp(&other.1) {
+            Some(Ordering::Equal) => {}
+            ord => return ord,
+        }
+        match self.2.partial_cmp(&other.2) {
+            Some(Ordering::Equal) => {}
+            ord => return ord,
+        }
+        self.3.partial_cmp(&other.3)
+    }
 }
