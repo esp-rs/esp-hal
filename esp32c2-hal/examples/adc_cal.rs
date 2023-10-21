@@ -32,14 +32,13 @@ fn main() -> ! {
 
     let atten = Attenuation::Attenuation11dB;
 
-    // You can try any of the following calibration methods by uncommenting them.
-    // Note that only AdcCalLine and AdcCalCurve return readings in mV; the other
-    // two return raw readings in some unspecified scale.
+    // You can try any of the following calibration methods by uncommenting
+    // them. Note that only AdcCalLine returns readings in mV; the other two
+    // return raw readings in some unspecified scale.
     //
     // type AdcCal = ();
     // type AdcCal = adc::AdcCalBasic<ADC1>;
-    // type AdcCal = adc::AdcCalLine<ADC1>;
-    type AdcCal = adc::AdcCalCurve<ADC1>;
+    type AdcCal = adc::AdcCalLine<ADC1>;
 
     let mut pin = adc1_config.enable_pin_with_cal::<_, AdcCal>(io.pins.gpio2.into_analog(), atten);
 
