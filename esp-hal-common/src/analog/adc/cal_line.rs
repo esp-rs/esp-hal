@@ -21,7 +21,8 @@ const GAIN_SCALE: u32 = 1 << 16;
 
 /// Line fitting ADC calibration scheme
 ///
-/// This scheme implements gain correction based on reference points.
+/// This scheme implements gain correction based on reference points, and
+/// returns readings in mV.
 ///
 /// A reference point is a pair of a reference voltage and the corresponding
 /// mean raw digital ADC value. Such values are usually stored in efuse bit

@@ -32,10 +32,14 @@ fn main() -> ! {
 
     let atten = Attenuation::Attenuation11dB;
 
-    // You can try any of the following calibration methods by uncommenting them
+    // You can try any of the following calibration methods by uncommenting them.
+    // Note that only AdcCalLine and AdcCalCurve return readings in mV; the other
+    // two return raw readings in some unspecified scale.
+    //
     // type AdcCal = ();
     // type AdcCal = adc::AdcCalBasic<ADC1>;
-    type AdcCal = adc::AdcCalLine<ADC1>;
+    // type AdcCal = adc::AdcCalLine<ADC1>;
+    type AdcCal = adc::AdcCalCurve<ADC1>;
 
     let mut pin = adc1_config.enable_pin_with_cal::<_, AdcCal>(io.pins.gpio2.into_analog(), atten);
 
@@ -44,9 +48,8 @@ fn main() -> ! {
     let mut delay = Delay::new(&clocks);
 
     loop {
-        let pin_value: u16 = nb::block!(adc1.read(&mut pin)).unwrap();
-        let pin_value_mv = pin_value as u32 * atten.ref_mv() as u32 / 4096;
-        println!("PIN2 ADC reading = {pin_value} ({pin_value_mv} mV)");
+        let pin_mv = nb::block!(adc1.read(&mut pin)).unwrap();
+        println!("PIN2 ADC reading = {pin_mv} mV");
         delay.delay_ms(1500u32);
     }
 }

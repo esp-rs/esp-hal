@@ -37,8 +37,8 @@ pub trait AdcHasCurveCal {
 
 /// Curve fitting ADC calibration scheme
 ///
-/// This scheme implements final polynomial error correction using predefined
-/// coefficient sets for each attenuation.
+/// This scheme implements polynomial error correction using predefined
+/// coefficient sets for each attenuation. It returns readings in mV.
 ///
 /// This scheme also includes basic calibration ([`super::AdcCalBasic`]) and
 /// line fitting ([`AdcCalLine`]).
