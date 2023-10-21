@@ -37,7 +37,11 @@ const GAIN_SCALE: u32 = 1 << 16;
 pub struct AdcCalLine<ADCI> {
     basic: AdcCalBasic<ADCI>,
 
-    /// Gain of ADC-value
+    /// ADC gain.
+    ///
+    /// After being de-biased by the basic calibration, the reading is
+    /// multiplied by this value. Despite the type, it is a fixed-point
+    /// number with 16 fractional bits.
     gain: u32,
 
     _phantom: PhantomData<ADCI>,

@@ -11,6 +11,8 @@ use crate::adc::{
 
 const COEFF_MUL: i64 = 1 << 52;
 
+/// Integer type for the error polynomial's coefficients. Despite
+/// the type, this is a fixed-point number with 52 fractional bits.
 type CurveCoeff = i64;
 
 /// Polynomial coefficients for specified attenuation.
@@ -44,7 +46,15 @@ pub trait AdcHasCurveCal {
 pub struct AdcCalCurve<ADCI> {
     line: AdcCalLine<ADCI>,
 
-    /// Coefficients for each term (3..=5)
+    /// Coefficients of the error estimation polynomial.
+    ///
+    /// The constant coefficient comes first; the error polynomial is
+    /// `coeff[0] + coeff[1] * x + ... + coeff[n] * x^n`.
+    ///
+    /// This calibration works by first applying linear calibration. Then
+    /// the error polynomial is applied to the output of linear calibration.
+    /// The output of the polynomial is our estimate of the error; it gets
+    /// subtracted from linear calibration's output to get the final reading.
     coeff: &'static [CurveCoeff],
 
     _phantom: PhantomData<ADCI>,
@@ -104,7 +114,7 @@ macro_rules! coeff_tables {
                 $(CurveCoeffs {
                     atten: Attenuation::$att,
                     coeff: &[
-                        $(($val as f64 * COEFF_MUL as f64 * 4096f64 / Attenuation::$att.ref_mv() as f64) as CurveCoeff,)*
+                        $(($val as f64 * COEFF_MUL as f64) as CurveCoeff,)*
                     ],
                 },)*
             ];
