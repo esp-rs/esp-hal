@@ -140,6 +140,8 @@ pub mod system;
 pub mod systimer;
 #[cfg(any(timg0, timg1))]
 pub mod timer;
+#[cfg(trace)]
+pub mod trace;
 #[cfg(any(twai0, twai1))]
 pub mod twai;
 #[cfg(any(uart0, uart1, uart2))]
