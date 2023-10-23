@@ -28,7 +28,7 @@ const U32_TO_BYTES: fn(u32) -> [u8; 4] = u32::to_ne_bytes;
 // It assumes incoming `dst` are aligned to desired layout (in future
 // ptr.is_aligned can be used). It also assumes that writes are done in FIFO
 // order.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct AlignmentHelper {
     buf: [u8; U32_ALIGN_SIZE],
     buf_fill: usize,
