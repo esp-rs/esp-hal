@@ -34,7 +34,6 @@ SECTIONS {
 INSERT BEFORE .data;
 
 INCLUDE "fixups/rodata_dummy.x"
-INCLUDE "fixups/rtc_fast_rwdata_dummy.x"
 /* End of ESP32S3 fixups */
 
 /* Shared sections - ordering matters */

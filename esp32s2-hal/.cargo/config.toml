@@ -3,7 +3,7 @@ runner = "espflash flash --monitor"
 
 [build]
 rustflags = [
-  # GCC
+  # GNU LD
   "-C", "link-arg=-nostartfiles",
   "-C", "link-arg=-Wl,-Tlinkall.x",
 
