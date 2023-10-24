@@ -1,6 +1,8 @@
 #[doc(hidden)]
 pub mod os_adapter;
 
+use atomic_polyfill::AtomicUsize;
+use core::sync::atomic::Ordering;
 use core::{cell::RefCell, mem::MaybeUninit};
 
 use crate::common_adapter::*;
@@ -34,9 +36,6 @@ use esp_wifi_sys::include::wifi_mode_t_WIFI_MODE_APSTA;
 use esp_wifi_sys::include::wifi_mode_t_WIFI_MODE_NULL;
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
-
-use atomic_polyfill::AtomicUsize;
-use core::sync::atomic::Ordering;
 
 #[doc(hidden)]
 pub use os_adapter::*;
@@ -1238,10 +1237,7 @@ impl Wifi for WifiController<'_> {
     }
 
     fn connect(&mut self) -> Result<(), Self::Error> {
-        esp_wifi_result!(unsafe {
-            WIFI_STATE = -1;
-            esp_wifi_connect()
-        })
+        esp_wifi_result!(unsafe { esp_wifi_connect() })
     }
 
     fn disconnect(&mut self) -> Result<(), Self::Error> {
@@ -1249,15 +1245,20 @@ impl Wifi for WifiController<'_> {
     }
 
     fn is_started(&self) -> Result<bool, Self::Error> {
-        match crate::wifi::get_wifi_state() {
-            crate::wifi::WifiState::Invalid => Ok(false),
-            // We assume that wifi has been started in every other states
-            _ => Ok(true),
+        if matches!(
+            crate::wifi::get_sta_state(),
+            WifiState::StaStarted | WifiState::StaConnected | WifiState::StaDisconnected
+        ) {
+            return Ok(true);
         }
+        if matches!(crate::wifi::get_ap_state(), WifiState::ApStarted) {
+            return Ok(true);
+        }
+        Ok(false)
     }
 
     fn is_connected(&self) -> Result<bool, Self::Error> {
-        match crate::wifi::get_wifi_state() {
+        match crate::wifi::get_sta_state() {
             crate::wifi::WifiState::StaConnected => Ok(true),
             crate::wifi::WifiState::StaDisconnected => Err(WifiError::Disconnected),
             //FIXME: Should any other enum value trigger an error instead of returning false?
@@ -1355,19 +1356,14 @@ pub(crate) mod embassy {
 
             match self.get_wifi_mode() {
                 Ok(WifiMode::Sta) => {
-                    if matches!(get_wifi_state(), WifiState::StaConnected) {
+                    if matches!(get_sta_state(), WifiState::StaConnected) {
                         embassy_net_driver::LinkState::Up
                     } else {
                         embassy_net_driver::LinkState::Down
                     }
                 }
                 Ok(WifiMode::Ap) => {
-                    if matches!(
-                        get_wifi_state(),
-                        WifiState::ApStart
-                            | WifiState::ApStaConnected
-                            | WifiState::ApStaDisconnected
-                    ) {
+                    if matches!(get_ap_state(), WifiState::ApStarted) {
                         embassy_net_driver::LinkState::Up
                     } else {
                         embassy_net_driver::LinkState::Down
@@ -1463,7 +1459,8 @@ mod asynch {
             embedded_svc::wifi::Wifi::stop(self)?;
             WifiEventFuture::new(event).await;
 
-            unsafe { WIFI_STATE = -1 };
+            AP_STATE.store(WifiState::Invalid, Ordering::Relaxed);
+            STA_STATE.store(WifiState::Invalid, Ordering::Relaxed);
 
             Ok(())
         }

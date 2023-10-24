@@ -1,4 +1,6 @@
+use atomic_polyfill::AtomicU32;
 use core::cell::RefCell;
+use core::sync::atomic::Ordering;
 
 use critical_section::Mutex;
 
@@ -14,7 +16,6 @@ use crate::{
     },
     preempt::preempt::task_switch,
 };
-use atomic_polyfill::{AtomicU32, Ordering};
 
 pub type TimeBase = Timer<Timer0<TIMG1>>;
 
@@ -72,7 +73,7 @@ pub fn setup_multitasking() {
         );
     }
 
-    while unsafe { crate::preempt::FIRST_SWITCH.load(core::sync::atomic::Ordering::Relaxed) } {}
+    while unsafe { crate::preempt::FIRST_SWITCH.load(Ordering::Relaxed) } {}
 }
 
 #[allow(non_snake_case)]

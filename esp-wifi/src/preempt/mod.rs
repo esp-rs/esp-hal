@@ -1,4 +1,5 @@
-use atomic_polyfill::*;
+use atomic_polyfill::AtomicBool;
+use core::sync::atomic::Ordering;
 
 pub static mut FIRST_SWITCH: AtomicBool = AtomicBool::new(true);
 

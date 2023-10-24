@@ -14,7 +14,6 @@ esp32s3-hal = { workspace = true, optional = true }
 esp32s2-hal = { workspace = true, optional = true }
 smoltcp = { workspace = true, optional = true }
 critical-section.workspace = true
-atomic-polyfill.workspace = true
 log = { workspace = true, optional = true }
 embedded-svc = { workspace = true, optional = true }
 enumset = { workspace = true, optional = true }
@@ -31,6 +30,8 @@ embassy-net-driver = { workspace = true, optional = true }
 toml-cfg.workspace = true
 libm.workspace = true
 cfg-if.workspace = true
+atomic-polyfill = { workspace = true }
+atomic_enum = { workspace = true }
 
 [features]
 default = [ "utils", "log" ]

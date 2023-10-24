@@ -3,8 +3,10 @@ use crate::binary::include::*;
 use crate::common_adapter::RADIO_CLOCKS;
 use crate::hal::system::RadioClockController;
 use crate::hal::system::RadioPeripherals;
-use atomic_polyfill::AtomicU32;
 use esp32s2_hal::prelude::ram;
+
+use atomic_polyfill::AtomicU32;
+use core::sync::atomic::Ordering;
 
 const SOC_PHY_DIG_REGS_MEM_SIZE: usize = 21 * 4;
 
@@ -59,7 +61,7 @@ pub(crate) fn phy_mem_init() {
 }
 
 pub(crate) unsafe fn phy_enable() {
-    let count = PHY_ACCESS_REF.fetch_add(1, atomic_polyfill::Ordering::SeqCst);
+    let count = PHY_ACCESS_REF.fetch_add(1, Ordering::SeqCst);
     if count == 0 {
         critical_section::with(|_| {
             phy_enable_clock();
@@ -96,7 +98,7 @@ pub(crate) unsafe fn phy_enable() {
 
 #[allow(unused)]
 pub(crate) unsafe fn phy_disable() {
-    let count = PHY_ACCESS_REF.fetch_sub(1, atomic_polyfill::Ordering::SeqCst);
+    let count = PHY_ACCESS_REF.fetch_sub(1, Ordering::SeqCst);
     if count == 1 {
         critical_section::with(|_| {
             phy_digital_regs_store();
@@ -130,7 +132,7 @@ fn phy_digital_regs_store() {
 }
 
 pub(crate) unsafe fn phy_enable_clock() {
-    let count = PHY_CLOCK_ENABLE_REF.fetch_add(1, atomic_polyfill::Ordering::SeqCst);
+    let count = PHY_CLOCK_ENABLE_REF.fetch_add(1, Ordering::SeqCst);
     if count == 0 {
         critical_section::with(|_| {
             unwrap!(RADIO_CLOCKS.as_mut()).enable(RadioPeripherals::Phy);
@@ -142,7 +144,7 @@ pub(crate) unsafe fn phy_enable_clock() {
 
 #[allow(unused)]
 pub(crate) unsafe fn phy_disable_clock() {
-    let count = PHY_CLOCK_ENABLE_REF.fetch_sub(1, atomic_polyfill::Ordering::SeqCst);
+    let count = PHY_CLOCK_ENABLE_REF.fetch_sub(1, Ordering::SeqCst);
     if count == 1 {
         critical_section::with(|_| {
             unwrap!(RADIO_CLOCKS.as_mut()).disable(RadioPeripherals::Phy);
