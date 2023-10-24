@@ -55,7 +55,7 @@ static_cell        = { version = "2.0.0", features = ["nightly"] }
 embassy-sync       = "0.4.0"
 
 [features]
-default              = ["rt", "vectored", "esp-hal-common/rv-zero-rtc-bss"]
+default              = ["rt", "vectored", "zero-rtc-bss"]
 async                = ["esp-hal-common/async"]
 debug                = ["esp-hal-common/debug"]
 defmt                = ["esp-hal-common/defmt", "esp-println/defmt"]
@@ -66,6 +66,11 @@ log                  = ["esp-hal-common/log", "esp-println/log"]
 rt                   = []
 ufmt                 = ["esp-hal-common/ufmt"]
 vectored             = ["esp-hal-common/vectored"]
+
+# Initialize / clear data sections and RTC memory
+zero-rtc-bss         = ["esp-hal-common/rv-zero-rtc-bss"]
+init-data            = ["esp-hal-common/rv-init-data"]
+init-rtc-data        = ["esp-hal-common/rv-init-rtc-data"]
 
 # Embassy support
 embassy              = ["esp-hal-common/embassy"]

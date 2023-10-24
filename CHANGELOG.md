@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - C2, C3: atomic emulation trap is now opt-in (#904)
 - Improve DMA documentation & clean up module (#915)
 - Only allow a single version of `esp-hal-common` to be present in an application (#934)
+- C3, C6 and H2 can now use the `zero-rtc-bss` feature to enable `esp-hal-common/rv-zero-rtc-bss` (#867)
 
 ### Fixed
 
