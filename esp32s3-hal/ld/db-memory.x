@@ -4,10 +4,6 @@ ENTRY(ESP32Reset)
 /* reserved at the start of DRAM */
 RESERVE_DRAM = 0x8000;
 
-/* reserved at the start of the RTC memories for use by the ULP processor */
-RESERVE_RTC_FAST = 0;
-RESERVE_RTC_SLOW = 0;
-
 /* Specify main memory areas */
 MEMORY
 {
@@ -28,11 +24,8 @@ MEMORY
 
 
   /* RTC fast memory (executable). Persists over deep sleep. Only for core 0 (PRO_CPU) */
-  rtc_fast_iram_seg(RWX) : ORIGIN = 0x600fe000, len = 8k
-
-  /* RTC fast memory (same block as above), viewed from data bus. Only for core 0 (PRO_CPU) */
-  rtc_fast_dram_seg(RW)  : ORIGIN = 0x600fe000 + RESERVE_RTC_FAST, len = 8k - RESERVE_RTC_FAST
+  rtc_fast_seg(RWX) : ORIGIN = 0x600fe000, len = 8k
 
   /* RTC slow memory (data accessible). Persists over deep sleep. */
-  rtc_slow_seg(RW)       : ORIGIN = 0x50000000 + RESERVE_RTC_SLOW, len = 8k - RESERVE_RTC_SLOW
+  rtc_slow_seg(RW)       : ORIGIN = 0x50000000, len = 8k
 }

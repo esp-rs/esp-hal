@@ -41,10 +41,6 @@ fn generate_memory_extras() -> Vec<u8> {
         "
     /* reserved at the start of DRAM for e.g. the BT stack */
     RESERVE_DRAM = {reserve_dram};
-    
-    /* reserved at the start of the RTC memories for use by the ULP processor */
-    RESERVE_RTC_FAST = 0;
-    RESERVE_RTC_SLOW = 0;
         "
     )
     .as_bytes()

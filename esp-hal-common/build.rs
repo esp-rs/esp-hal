@@ -173,8 +173,24 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rustc-link-search={}", out.display());
 
     if cfg!(feature = "esp32") || cfg!(feature = "esp32s2") || cfg!(feature = "esp32s3") {
-        fs::copy("ld/xtensa/hal-defaults.x", out.join("hal-defaults.x"))?;
-        fs::copy("ld/xtensa/rom.x", out.join("alias.x"))?;
+        fs::copy("ld/xtensa/hal-defaults.x", out.join("hal-defaults.x")).unwrap();
+        let (irtc, drtc) = if cfg!(feature = "esp32s3") {
+            ("rtc_fast_seg", "rtc_fast_seg")
+        } else {
+            ("rtc_fast_iram_seg", "rtc_fast_dram_seg")
+        };
+        let alias = format!(
+            r#"
+            REGION_ALIAS("ROTEXT", irom_seg);
+            REGION_ALIAS("RWTEXT", iram_seg);
+            REGION_ALIAS("RODATA", drom_seg);
+            REGION_ALIAS("RWDATA", dram_seg);
+            REGION_ALIAS("RTC_FAST_RWTEXT", {});
+            REGION_ALIAS("RTC_FAST_RWDATA", {});
+        "#,
+            irtc, drtc
+        );
+        fs::write(out.join("alias.x"), alias).unwrap();
     } else {
         fs::copy("ld/riscv/hal-defaults.x", out.join("hal-defaults.x"))?;
         fs::copy("ld/riscv/asserts.x", out.join("asserts.x"))?;

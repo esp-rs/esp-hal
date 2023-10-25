@@ -189,7 +189,7 @@ SECTIONS {
     _stack_end = ABSOLUTE(.);
   } > RWDATA
   
-  .rtc_fast.text ORIGIN(rtc_fast_iram_seg) : 
+  .rtc_fast.text ORIGIN(rtc_fast_seg) : 
   {
    . = ALIGN(4);
    _rtc_fast_text_start = ABSOLUTE(.);
@@ -198,8 +198,8 @@ SECTIONS {
    _rtc_fast_text_end = ABSOLUTE(.);
   }
   _irtc_fast_text = ORIGIN(RODATA) + _text_size + SIZEOF(.header) + SIZEOF(.pre_header) + SIZEOF(.rodata) + SIZEOF(.rwtext);
- 
-  .rtc_fast.data ORIGIN(rtc_fast_dram_seg) + SIZEOF(.rtc_fast.text) : 
+
+  .rtc_fast.data ORIGIN(rtc_fast_seg) + SIZEOF(.rtc_fast.text) : 
   {
     . = ALIGN(4);
     _rtc_fast_data_start = ABSOLUTE(.);
@@ -209,7 +209,7 @@ SECTIONS {
   }
   _irtc_fast_data = ORIGIN(RODATA) + _text_size + SIZEOF(.header) + SIZEOF(.pre_header) + SIZEOF(.rodata) + SIZEOF(.rwtext) + SIZEOF(.rtc_fast.text);
 
- .rtc_fast.bss ORIGIN(rtc_fast_dram_seg) + SIZEOF(.rtc_fast.text) + SIZEOF(.rtc_fast.data) (NOLOAD) : 
+ .rtc_fast.bss ORIGIN(rtc_fast_seg) + SIZEOF(.rtc_fast.text) (NOLOAD) : 
   {
     . = ALIGN(4);
     _rtc_fast_bss_start = ABSOLUTE(.);
@@ -218,7 +218,7 @@ SECTIONS {
     _rtc_fast_bss_end = ABSOLUTE(.);
   }
 
- .rtc_fast.noinit ORIGIN(rtc_fast_dram_seg) + SIZEOF(.rtc_fast.text) + SIZEOF(.rtc_fast.data) + SIZEOF(.rtc_fast.bss) (NOLOAD)  :
+ .rtc_fast.noinit ORIGIN(rtc_fast_seg) + SIZEOF(.rtc_fast.text) + SIZEOF(.rtc_fast.bss) (NOLOAD)  :
   {
     . = ALIGN(4);
     *(.rtc_fast.noinit .rtc_fast.noinit.*)
@@ -234,7 +234,7 @@ SECTIONS {
    _rtc_slow_text_end = ABSOLUTE(.);
   }
   _irtc_slow_text = ORIGIN(RODATA) + _text_size + SIZEOF(.header) + SIZEOF(.pre_header) + SIZEOF(.rodata) + SIZEOF(.rwtext) + 
-      SIZEOF(.rtc_fast.text) + SIZEOF(.rtc_fast.data) + SIZEOF(.rtc_fast.bss);
+      SIZEOF(.rtc_fast.text) + SIZEOF(.rtc_fast.bss);
 
   .rtc_slow.data ORIGIN(rtc_slow_seg) + SIZEOF(.rtc_slow.text) : 
   {
@@ -245,7 +245,7 @@ SECTIONS {
     _rtc_slow_data_end = ABSOLUTE(.);
   }
   _irtc_slow_data = ORIGIN(RODATA) + _text_size + SIZEOF(.header) + SIZEOF(.pre_header) + SIZEOF(.rodata) + SIZEOF(.rwtext) + 
-        SIZEOF(.rtc_fast.text) + SIZEOF(.rtc_fast.data) + SIZEOF(.rtc_fast.bss) + SIZEOF(.rtc_slow.text);
+        SIZEOF(.rtc_fast.text) + SIZEOF(.rtc_fast.bss) + SIZEOF(.rtc_slow.text);
 
  .rtc_slow.bss ORIGIN(rtc_slow_seg) + SIZEOF(.rtc_slow.text) + SIZEOF(.rtc_slow.data) (NOLOAD) : 
   {

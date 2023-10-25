@@ -24,7 +24,7 @@ SECTIONS {
     /*  Create an empty gap as big as .rwtext section - 32k (SRAM0) 
      *  because SRAM1 is available on the data bus and instruction bus 
      */
-    . = MAX(SIZEOF(.rwtext) + SIZEOF(.rwtext.wifi) + RESERVE_ICACHE + VECTORS_SIZE, 32k) - 32k;
+    . = . + MAX(SIZEOF(.rwtext) + SIZEOF(.rwtext.wifi) + RESERVE_ICACHE + VECTORS_SIZE, 32k) - 32k;
 
     /* Prepare the alignment of the section above. */
     . = ALIGN(4);
@@ -34,7 +34,6 @@ SECTIONS {
 INSERT BEFORE .data;
 
 INCLUDE "fixups/rodata_dummy.x"
-INCLUDE "fixups/rtc_fast_rwdata_dummy.x"
 /* End of ESP32S3 fixups */
 
 /* Shared sections - ordering matters */
