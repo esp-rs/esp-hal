@@ -39,7 +39,7 @@ fn main() -> ! {
         load_lp_code!("../esp-lp-hal/target/riscv32imac-unknown-none-elf/release/examples/blinky");
 
     // start LP core
-    lp_core_code.run(&mut lp_core, lp_core::LpCoreWakeupSource::HpCpu, lp_pin);
+    lp_core_code.run(&mut lp_core, lp_core::LpCoreWakeupSource::HpCpu);
     println!("lpcore run");
 
     let data = (0x5000_2000) as *mut u32;

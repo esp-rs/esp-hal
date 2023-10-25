@@ -4,7 +4,7 @@ use esp32c6_lp::{LP_AON, LP_CLKRST, LP_I2C, LP_IO};
 use fugit::HertzU32;
 
 use crate::{
-    gpio::{LpInputPin, LpOutputPin},
+    gpio::{GpioPin, LpInputPin, LpOutputPin},
     CPU_CLOCK,
 };
 
@@ -178,16 +178,12 @@ impl CommandRegister {
 // Configure LP_EXT_I2C_CK_EN high to enable the clock source of I2C_SCLK.
 // Adjust the timing registers accordingly when the clock frequency changes.
 
-pub struct I2c {
+pub struct I2C {
     i2c: LP_I2C,
 }
 
-impl<'d> I2c {
-    pub fn new<GPIO6, GPIO7>(i2c: LP_I2C, frequency: HertzU32) -> Self
-    where
-        GPIO6: LpOutputPin<6> + LpInputPin<6>,
-        GPIO7: LpInputPin<7> + LpInputPin<7>,
-    {
+impl<'d> I2C {
+    pub fn new(i2c: LP_I2C, frequency: HertzU32) -> Self {
         let mut me = Self { i2c };
 
         // peripheral_clock_control.enable(crate::system::Peripheral::I2cExt0);  ???
@@ -541,6 +537,21 @@ impl<'d> I2c {
         Ok(())
     }
 
+    fn master_write_read(
+        &mut self,
+        addr: u8,
+        bytes: &[u8],
+        buffer: &mut [u8],
+    ) -> Result<(), Error> {
+        // it would be possible to combine the write and read
+        // in one transaction but filling the tx fifo with
+        // the current code is somewhat slow even in release mode
+        // which can cause issues
+        self.master_write(addr, bytes)?;
+        self.master_read(addr, buffer)?;
+        Ok(())
+    }
+
     /// Update I2C configuration
     fn lp_i2c_update(&self) {
         self.i2c.ctr.modify(|_, w| w.conf_upgate().set_bit());
@@ -716,6 +727,35 @@ impl<'d> I2c {
         }
         command_register.advance();
         Ok(())
+    }
+}
+
+impl embedded_hal::blocking::i2c::Read for I2C {
+    type Error = Error;
+
+    fn read(&mut self, address: u8, buffer: &mut [u8]) -> Result<(), Self::Error> {
+        self.master_read(address, buffer)
+    }
+}
+
+impl embedded_hal::blocking::i2c::Write for I2C {
+    type Error = Error;
+
+    fn write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Self::Error> {
+        self.master_write(addr, bytes)
+    }
+}
+
+impl embedded_hal::blocking::i2c::WriteRead for I2C {
+    type Error = Error;
+
+    fn write_read(
+        &mut self,
+        address: u8,
+        bytes: &[u8],
+        buffer: &mut [u8],
+    ) -> Result<(), Self::Error> {
+        self.master_write_read(address, bytes, buffer)
     }
 }
 
