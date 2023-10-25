@@ -23,6 +23,12 @@
   ],
 
   "[toml]": {
-    "editor.formatOnSave": false
+    "editor.formatOnSave": false,
+  },
+  "[markdown]": {
+    "editor.formatOnSave": false,
+  },
+  "[jsonc]": {
+    "editor.formatOnSave": false,
   }
 }
