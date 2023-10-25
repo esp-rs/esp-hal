@@ -47,6 +47,7 @@ crypto-bigint     = {version = "0.5.1", default-features = false }
 elliptic-curve    = {version = "0.13.4", default-features = false, features = ["sec1"] }
 p192              = {version = "0.13.0", default-features = false, features = ["arithmetic"] }
 p256              = {version = "0.13.2", default-features = false, features = ["arithmetic"] }
+embassy-sync       = "0.2.0"
 
 [features]
 default              = ["rt", "vectored", "xtal-40mhz"]
