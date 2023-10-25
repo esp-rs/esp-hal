@@ -44,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - UART/ESP32: fix calculating FIFO counter with `get_rx_fifo_count()` (#804)
 - Xtensa targets: Use ESP32Reset - not Reset (#823)
 - Examples should now work with the `defmt` feature (#810)
+- Fixed a race condition causing SpiDma to stop working unexpectedly (#869)
 
 ### Removed
 

@@ -1000,7 +1000,7 @@ pub mod dma {
             }
 
             self.spi
-                .start_write_bytes_dma(ptr, len, &mut self.channel.tx)?;
+                .start_write_bytes_dma(ptr, len, &mut self.channel.tx, false)?;
             Ok(SpiDmaTransfer {
                 spi_dma: self,
                 buffer: words,
@@ -1026,7 +1026,7 @@ pub mod dma {
             }
 
             self.spi
-                .start_read_bytes_dma(ptr, len, &mut self.channel.rx)?;
+                .start_read_bytes_dma(ptr, len, &mut self.channel.rx, false)?;
             Ok(SpiDmaTransfer {
                 spi_dma: self,
                 buffer: words,
@@ -1061,6 +1061,7 @@ pub mod dma {
                 read_len,
                 &mut self.channel.tx,
                 &mut self.channel.rx,
+                false,
             )?;
             Ok(SpiDmaTransferRxTx {
                 spi_dma: self,
@@ -1143,7 +1144,7 @@ pub mod dma {
             }
 
             self.spi
-                .start_read_bytes_dma(ptr, len, &mut self.channel.rx)?;
+                .start_read_bytes_dma(ptr, len, &mut self.channel.rx, false)?;
             Ok(SpiDmaTransfer {
                 spi_dma: self,
                 buffer: buffer,
@@ -1216,7 +1217,7 @@ pub mod dma {
             }
 
             self.spi
-                .start_write_bytes_dma(ptr, len, &mut self.channel.tx)?;
+                .start_write_bytes_dma(ptr, len, &mut self.channel.tx, false)?;
             Ok(SpiDmaTransfer {
                 spi_dma: self,
                 buffer: buffer,
@@ -1322,6 +1323,7 @@ pub mod dma {
                     words.as_mut_ptr(),
                     words.len(),
                     &mut self.channel.rx,
+                    true,
                 )?;
 
                 crate::dma::asynch::DmaRxFuture::new(&mut self.channel.rx).await;
@@ -1335,6 +1337,7 @@ pub mod dma {
                         chunk.as_ptr(),
                         chunk.len(),
                         &mut self.channel.tx,
+                        true,
                     )?;
 
                     crate::dma::asynch::DmaTxFuture::new(&mut self.channel.tx).await;
@@ -1363,6 +1366,7 @@ pub mod dma {
                         read_len,
                         &mut self.channel.tx,
                         &mut self.channel.rx,
+                        true,
                     )?;
 
                     embassy_futures::join::join(
@@ -1393,6 +1397,7 @@ pub mod dma {
                         chunk.len(),
                         &mut self.channel.tx,
                         &mut self.channel.rx,
+                        true,
                     )?;
 
                     embassy_futures::join::join(
@@ -1791,6 +1796,7 @@ where
                 chunk.len(),
                 tx,
                 rx,
+                false,
             )?;
 
             while !tx.is_done() && !rx.is_done() {}
@@ -1822,6 +1828,7 @@ where
                 read_len,
                 tx,
                 rx,
+                false,
             )?;
 
             while !tx.is_done() && !rx.is_done() {}
@@ -1844,6 +1851,7 @@ where
         read_buffer_len: usize,
         tx: &mut TX,
         rx: &mut RX,
+        listen: bool,
     ) -> Result<(), Error> {
         let reg_block = self.register_block();
         self.configure_datalen(usize::max(read_buffer_len, write_buffer_len) as u32 * 8);
@@ -1873,6 +1881,10 @@ where
         self.clear_dma_interrupts();
         reset_dma_before_usr_cmd(reg_block);
 
+        if listen {
+            tx.listen_eof();
+            rx.listen_eof();
+        }
         reg_block.cmd.modify(|_, w| w.usr().set_bit());
 
         Ok(())
@@ -1880,7 +1892,7 @@ where
 
     fn write_bytes_dma<'w>(&mut self, words: &'w [u8], tx: &mut TX) -> Result<&'w [u8], Error> {
         for chunk in words.chunks(MAX_DMA_SIZE) {
-            self.start_write_bytes_dma(chunk.as_ptr(), chunk.len(), tx)?;
+            self.start_write_bytes_dma(chunk.as_ptr(), chunk.len(), tx, false)?;
 
             while !tx.is_done() {}
             self.flush().unwrap(); // seems "is_done" doesn't work as intended?
@@ -1894,6 +1906,7 @@ where
         ptr: *const u8,
         len: usize,
         tx: &mut TX,
+        listen: bool,
     ) -> Result<(), Error> {
         let reg_block = self.register_block();
         self.configure_datalen(len as u32 * 8);
@@ -1910,6 +1923,9 @@ where
         self.clear_dma_interrupts();
         reset_dma_before_usr_cmd(reg_block);
 
+        if listen {
+            tx.listen_eof();
+        }
         reg_block.cmd.modify(|_, w| w.usr().set_bit());
 
         return Ok(());
@@ -1920,6 +1936,7 @@ where
         ptr: *mut u8,
         len: usize,
         rx: &mut RX,
+        listen: bool,
     ) -> Result<(), Error> {
         let reg_block = self.register_block();
         self.configure_datalen(len as u32 * 8);
@@ -1936,6 +1953,9 @@ where
         self.clear_dma_interrupts();
         reset_dma_before_usr_cmd(reg_block);
 
+        if listen {
+            rx.listen_eof();
+        }
         reg_block.cmd.modify(|_, w| w.usr().set_bit());
 
         return Ok(());

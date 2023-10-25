@@ -1097,7 +1097,6 @@ pub(crate) mod asynch {
         TX: Tx,
     {
         pub fn new(tx: &'a mut TX) -> Self {
-            tx.listen_eof();
             Self { tx, _a: () }
         }
     }
@@ -1131,7 +1130,6 @@ pub(crate) mod asynch {
         RX: Rx,
     {
         pub fn new(rx: &'a mut RX) -> Self {
-            rx.listen_eof();
             Self { rx, _a: () }
         }
     }
