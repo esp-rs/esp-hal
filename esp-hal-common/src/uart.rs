@@ -61,8 +61,6 @@ const UART_FIFO_SIZE: u16 = 128;
 pub enum Error {
     InvalidArgument,
     #[cfg(feature = "async")]
-    ReadBufferFull,
-    #[cfg(feature = "async")]
     RxFifoOvf,
 }
 
@@ -854,6 +852,8 @@ pub trait Instance {
                 .set_bit()
                 .rxfifo_tout_int_clr()
                 .set_bit()
+                .at_cmd_char_det_int_clr()
+                .set_bit()
         });
 
         Self::register_block().int_ena.write(|w| {
@@ -862,6 +862,8 @@ pub trait Instance {
                 .rxfifo_ovf_int_ena()
                 .clear_bit()
                 .rxfifo_tout_int_ena()
+                .clear_bit()
+                .at_cmd_char_det_int_ena()
                 .clear_bit()
         });
     }
@@ -1374,8 +1376,6 @@ mod asynch {
         /// - `buf` buffer slice to write the bytes into
         ///
         /// # Errors
-        /// - `Err(ReadBufferFull)` if provided buffer slice is not enough to
-        ///   copy all avaialble bytes. Increase buffer slice length.
         /// - `Err(RxFifoOvf)` when MCU Rx Fifo Overflow interrupt is triggered.
         ///   To avoid this error, call this function more often.
         /// - `Err(Error::ReadNoConfig)` if neither `set_rx_fifo_full_threshold`
@@ -1448,8 +1448,6 @@ mod asynch {
         /// - `buf` buffer slice to write the bytes into
         ///
         /// # Errors
-        /// - `Err(ReadBufferFull)` if provided buffer slice is not enough to
-        ///   copy all avaialble bytes. Increase buffer slice length.
         /// - `Err(RxFifoOvf)` when MCU Rx Fifo Overflow interrupt is triggered.
         ///   To avoid this error, call this function more often.
         /// - `Err(Error::ReadNoConfig)` if neither `set_rx_fifo_full_threshold`
@@ -1459,6 +1457,10 @@ mod asynch {
         /// When succesfull, returns the number of bytes written to
         /// buf
         async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
+            if buf.len() == 0 {
+                return Ok(0);
+            }
+
             let mut read_bytes = 0;
 
             if self.at_cmd_config.is_some() {
@@ -1487,7 +1489,7 @@ mod asynch {
                     buf[read_bytes] = byte;
                     read_bytes += 1;
                 } else {
-                    return Err(Error::ReadBufferFull);
+                    break;
                 }
             }
 
@@ -1540,20 +1542,25 @@ mod asynch {
     }
 
     fn intr_handler(uart: &RegisterBlock) -> bool {
-        let int_ena_val = uart.int_ena.read();
         let int_raw_val = uart.int_raw.read();
+        let int_ena_val = uart.int_ena.read();
+
+        let mut wake = false;
 
         if int_ena_val.txfifo_empty_int_ena().bit_is_set()
             && int_raw_val.txfifo_empty_int_raw().bit_is_set()
         {
-            uart.int_ena.write(|w| w.txfifo_empty_int_ena().clear_bit());
-            return true;
+            uart.int_clr.write(|w| w.txfifo_empty_int_clr().set_bit());
+            uart.int_ena
+                .modify(|_, w| w.txfifo_empty_int_ena().clear_bit());
+            wake = true;
         }
 
         if int_ena_val.tx_done_int_ena().bit_is_set() && int_raw_val.tx_done_int_raw().bit_is_set()
         {
-            uart.int_ena.write(|w| w.tx_done_int_ena().clear_bit());
-            return true;
+            uart.int_clr.write(|w| w.tx_done_int_clr().set_bit());
+            uart.int_ena.modify(|_, w| w.tx_done_int_ena().clear_bit());
+            wake = true;
         }
 
         if int_ena_val.at_cmd_char_det_int_ena().bit_is_set()
@@ -1562,27 +1569,29 @@ mod asynch {
             uart.int_clr
                 .write(|w| w.at_cmd_char_det_int_clr().set_bit());
             uart.int_ena
-                .write(|w| w.at_cmd_char_det_int_ena().clear_bit());
-            return true;
+                .modify(|_, w| w.at_cmd_char_det_int_ena().clear_bit());
+            wake = true;
         }
 
         if int_ena_val.rxfifo_full_int_ena().bit_is_set()
             && int_raw_val.rxfifo_full_int_raw().bit_is_set()
         {
             uart.int_clr.write(|w| w.rxfifo_full_int_clr().set_bit());
-            uart.int_ena.write(|w| w.rxfifo_full_int_ena().clear_bit());
-            return true;
+            uart.int_ena
+                .modify(|_, w| w.rxfifo_full_int_ena().clear_bit());
+            wake = true;
         }
 
         if int_ena_val.rxfifo_ovf_int_ena().bit_is_set()
             && int_raw_val.rxfifo_ovf_int_raw().bit_is_set()
         {
             uart.int_clr.write(|w| w.rxfifo_ovf_int_clr().set_bit());
-            uart.int_ena.write(|w| w.rxfifo_ovf_int_ena().clear_bit());
-            return true;
+            uart.int_ena
+                .modify(|_, w| w.rxfifo_ovf_int_ena().clear_bit());
+            wake = true;
         }
 
-        false
+        wake
     }
 
     #[cfg(uart0)]
