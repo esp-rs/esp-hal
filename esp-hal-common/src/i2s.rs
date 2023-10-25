@@ -2256,10 +2256,12 @@ pub mod asynch {
     {
         async fn write_dma_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
             let (ptr, len) = (words.as_ptr(), words.len());
+
+            self.tx_channel.listen_eof();
+
             self.start_tx_transfer_async(ptr, len, false)?;
 
-            let future = DmaTxFuture::new(&mut self.tx_channel);
-            future.await;
+            DmaTxFuture::new(&mut self.tx_channel).await;
 
             self.register_access.reset_tx();
 
@@ -2352,10 +2354,12 @@ pub mod asynch {
     {
         async fn read_dma_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
             let (ptr, len) = (words.as_mut_ptr(), words.len());
+
+            self.rx_channel.listen_eof();
+
             self.start_rx_transfer_async(ptr, len, false)?;
 
-            let future = DmaRxFuture::new(&mut self.rx_channel);
-            future.await;
+            DmaRxFuture::new(&mut self.rx_channel).await;
 
             // ??? self.register_access.reset_tx();
 
