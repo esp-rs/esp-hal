@@ -1,11 +1,15 @@
 use crate::binary::include::esp_event_base_t;
 use crate::binary::include::esp_timer_create_args_t;
+use crate::binary::include::esp_timer_get_time;
 use crate::binary::include::esp_timer_handle_t;
+use crate::binary::include::timeval;
+
 use crate::compat::common::*;
 use crate::compat::timer_compat::*;
 
 use crate::hal;
 
+use esp_wifi_sys::include::timespec;
 use hal::system::RadioClockControl;
 use hal::Rng;
 
@@ -373,12 +377,23 @@ static mut WIFI_EVENT: esp_event_base_t = unsafe { &EVT };
 // stuff needed by wpa-supplicant
 #[no_mangle]
 pub unsafe extern "C" fn __assert_func(
-    _file: *const u8,
-    _line: u32,
-    _func: *const u8,
-    _failed_expr: *const u8,
+    file: *const u8,
+    line: u32,
+    func: *const u8,
+    failed_expr: *const u8,
 ) {
-    todo!("__assert_func");
+    let file = str_from_c(file);
+    let (func_pre, func) = if func.is_null() {
+        ("", "")
+    } else {
+        (", function: ", str_from_c(func))
+    };
+    let expr = str_from_c(failed_expr);
+
+    panic!(
+        "assertion \"{}\" failed: file \"{}\", line {}{}{}",
+        expr, file, line, func_pre, func
+    );
 }
 
 #[no_mangle]
@@ -410,8 +425,16 @@ pub unsafe extern "C" fn ets_timer_arm(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn gettimeofday(_tv: *const (), _tz: *const ()) {
-    todo!("gettimeofday");
+pub unsafe extern "C" fn gettimeofday(tv: *mut timespec, _tz: *mut ()) -> i32 {
+    if !tv.is_null() {
+        unsafe {
+            let microseconds = esp_timer_get_time();
+            (*tv).tv_sec = (microseconds / 1_000_000) as i32;
+            (*tv).tv_nsec = (microseconds % 1_000_000) as i32 * 1000;
+        }
+    }
+
+    0
 }
 
 #[no_mangle]
