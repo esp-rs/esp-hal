@@ -46,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Examples should now work with the `defmt` feature (#810)
 - Fixed a race condition causing SpiDma to stop working unexpectedly (#869)
 - Fixed async uart serial, and updated the embassy_serial examples (#871).
+- Fix ESP32-S3 direct-boot (#873)
 
 ### Removed
 
