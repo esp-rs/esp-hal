@@ -645,27 +645,34 @@ unsafe extern "C" fn recv_cb(
     len: u16,
     eb: *mut c_types::c_void,
 ) -> esp_err_t {
-    let res = critical_section::with(|cs| {
-        let mut queue = DATA_QUEUE_RX.borrow_ref_mut(cs);
-        if queue.is_full() {
-            error!("RX QUEUE FULL");
-            esp_wifi_internal_free_rx_buffer(eb);
-            include::ESP_ERR_NO_MEM as esp_err_t
-        } else {
-            let packet = EspWifiPacketBuffer { buffer, len, eb };
-            unwrap!(queue.enqueue(packet));
+    critical_section::with(|cs| {
+        let packet = EspWifiPacketBuffer { buffer, len, eb };
 
-            #[cfg(feature = "embassy-net")]
-            embassy::RECEIVE_WAKER.wake();
+        match DATA_QUEUE_RX.borrow_ref_mut(cs).enqueue(packet) {
+            Ok(_) => {
+                #[cfg(feature = "embassy-net")]
+                embassy::RECEIVE_WAKER.wake();
 
-            include::ESP_OK as esp_err_t
+                include::ESP_OK as esp_err_t
+            }
+
+            _ => {
+                debug!("RX QUEUE FULL");
+                include::ESP_ERR_NO_MEM as esp_err_t
+            }
         }
-    });
-
-    res
+    })
 }
 
 pub(crate) static WIFI_TX_INFLIGHT: AtomicUsize = AtomicUsize::new(0);
+
+fn decrement_inflight_counter() {
+    WIFI_TX_INFLIGHT
+        .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |x| {
+            Some(x.saturating_sub(1))
+        })
+        .unwrap();
+}
 
 #[ram]
 unsafe extern "C" fn esp_wifi_tx_done_cb(
@@ -675,11 +682,8 @@ unsafe extern "C" fn esp_wifi_tx_done_cb(
     _tx_status: bool,
 ) {
     trace!("esp_wifi_tx_done_cb");
-    WIFI_TX_INFLIGHT
-        .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |x| {
-            Some(x.saturating_sub(1))
-        })
-        .unwrap();
+
+    decrement_inflight_counter();
 
     #[cfg(feature = "embassy-net")]
     embassy::TRANSMIT_WAKER.wake();
@@ -913,12 +917,12 @@ impl<'d> WifiController<'d> {
     fn scan_result_count(&mut self) -> Result<usize, WifiError> {
         let mut bss_total: u16 = 0;
 
-        unsafe {
-            esp_wifi_result!(include::esp_wifi_scan_get_ap_num(&mut bss_total)).map_err(|e| {
-                include::esp_wifi_clear_ap_list();
-                e
-            })?;
-        }
+        // Prevents memory leak on error
+        let guard = FreeApListOnDrop;
+
+        unsafe { esp_wifi_result!(include::esp_wifi_scan_get_ap_num(&mut bss_total))? };
+
+        guard.defuse();
 
         Ok(bss_total as usize)
     }
@@ -929,26 +933,25 @@ impl<'d> WifiController<'d> {
         let mut scanned = heapless::Vec::<AccessPointInfo, N>::new();
         let mut bss_total: u16 = N as u16;
 
-        unsafe {
-            let mut records: [MaybeUninit<include::wifi_ap_record_t>; N] =
-                [MaybeUninit::uninit(); N];
+        let mut records: [MaybeUninit<include::wifi_ap_record_t>; N] = [MaybeUninit::uninit(); N];
 
+        // Prevents memory leak on error
+        let guard = FreeApListOnDrop;
+
+        unsafe {
             esp_wifi_result!(include::esp_wifi_scan_get_ap_records(
                 &mut bss_total,
                 records[0].as_mut_ptr(),
-            ))
-            .map_err(|e| {
-                // upon scan failure, list should be cleared to avoid memory leakage
-                include::esp_wifi_clear_ap_list();
-                e
-            })?;
+            ))?
+        };
 
-            for i in 0..bss_total {
-                let record = MaybeUninit::assume_init_ref(&records[i as usize]);
-                let ap_info = convert_ap_info(record);
+        guard.defuse();
 
-                scanned.push(ap_info).ok();
-            }
+        for i in 0..bss_total {
+            let record = unsafe { MaybeUninit::assume_init_ref(&records[i as usize]) };
+            let ap_info = convert_ap_info(record);
+
+            scanned.push(ap_info).ok();
         }
 
         Ok(scanned)
@@ -1073,16 +1076,16 @@ pub fn esp_wifi_send_data(interface: wifi_interface_t, data: &mut [u8]) {
     trace!("sending... {} bytes", data.len());
     dump_packet_info(data);
 
-    unsafe {
-        let len = data.len() as u16;
-        let ptr = data.as_mut_ptr().cast();
+    let len = data.len() as u16;
+    let ptr = data.as_mut_ptr().cast();
 
-        let _res = esp_wifi_internal_tx(interface, ptr, len);
-        if _res != 0 {
-            warn!("esp_wifi_internal_tx {}", _res);
-        } else {
-            trace!("esp_wifi_internal_tx {}", _res);
-        }
+    let res = unsafe { esp_wifi_internal_tx(interface, ptr, len) };
+
+    if res != 0 {
+        warn!("esp_wifi_internal_tx {}", res);
+        decrement_inflight_counter();
+    } else {
+        trace!("esp_wifi_internal_tx ok");
     }
 }
 
@@ -1307,6 +1310,8 @@ pub(crate) mod embassy {
             cx: &mut core::task::Context,
         ) -> Option<(Self::RxToken<'_>, Self::TxToken<'_>)> {
             RECEIVE_WAKER.register(cx.waker());
+            TRANSMIT_WAKER.register(cx.waker());
+
             critical_section::with(|cs| {
                 let rx = DATA_QUEUE_RX.borrow_ref_mut(cs);
                 if !rx.is_empty() && esp_wifi_can_send() {
@@ -1391,7 +1396,13 @@ mod asynch {
         ) -> Result<(heapless::Vec<AccessPointInfo, N>, usize), WifiError> {
             Self::clear_events(WifiEvent::ScanDone);
             esp_wifi_result!(wifi_start_scan(false))?;
+
+            // Prevents memory leak if `scan_n`'s future is dropped.
+            let guard = FreeApListOnDrop;
+
             WifiEventFuture::new(WifiEvent::ScanDone).await;
+
+            guard.defuse();
 
             let count = self.scan_result_count()?;
             let result = self.scan_results()?;
@@ -1671,6 +1682,21 @@ mod asynch {
             } else {
                 Poll::Ready(output)
             }
+        }
+    }
+}
+
+struct FreeApListOnDrop;
+impl FreeApListOnDrop {
+    pub fn defuse(self) {
+        core::mem::forget(self);
+    }
+}
+
+impl Drop for FreeApListOnDrop {
+    fn drop(&mut self) {
+        unsafe {
+            include::esp_wifi_clear_ap_list();
         }
     }
 }
