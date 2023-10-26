@@ -75,13 +75,13 @@ SECTIONS {
   .pre_header (NOLOAD) : AT(0)
   {
     . = . + 0x400;
-  }
+  } > irom_seg
 
-  .header ORIGIN(ROTEXT) : AT(0x400)
+  .header ORIGIN(ROTEXT) + 0x400 : AT(0x400)
   {
     LONG(0xaedb041d)
     LONG(0xaedb041d)
-  }
+  } > irom_seg
 
   .text ORIGIN(ROTEXT) + 0x408 : AT(0x408)
   {
@@ -94,17 +94,17 @@ SECTIONS {
     . = ALIGN (4);
     _text_end = ABSOLUTE(.);
     _etext = .;
-  }
+  } > REGION_TEXT
   _text_size = _etext - _stext;
 
   .rodata ORIGIN(RODATA) + 0x408 + _text_size : AT(_text_size + SIZEOF(.header) + SIZEOF(.pre_header))
   {
-    _rodata_start = ABSOLUTE(.);
     . = ALIGN (4);
+    _rodata_start = ABSOLUTE(.);
     *(.rodata .rodata.*)
     . = ALIGN (4);
     _rodata_end = ABSOLUTE(.);
-  }
+  } > REGION_RODATA
 
   .rwtext ORIGIN(RWTEXT) + 0x408 + _text_size + SIZEOF(.rodata) : 
       AT(_text_size + SIZEOF(.header) + SIZEOF(.pre_header) + SIZEOF(.rodata))
@@ -153,7 +153,7 @@ SECTIONS {
 
     . = ALIGN (4);
     _erwtext = .;
-  }
+  } > REGION_RWTEXT
 
   .data ORIGIN(RWDATA) : 
       AT(_text_size + SIZEOF(.header) + SIZEOF(.pre_header) + SIZEOF(.rodata) + SIZEOF(.rwtext))
@@ -163,7 +163,7 @@ SECTIONS {
     *(.data .data.*)
     . = ALIGN (4);
     _data_end = ABSOLUTE(.);
-  }
+  } > REGION_DATA
  
 
   /* LMA of .data */
@@ -176,21 +176,21 @@ SECTIONS {
     *(.bss .bss.* COMMON)
     . = ALIGN (4);
     _bss_end = ABSOLUTE(.);
-  } > RWDATA
+  } > REGION_BSS
 
   .noinit (NOLOAD) : ALIGN(4)
   {
     . = ALIGN(4);
     *(.noinit .noinit.*)
     . = ALIGN (4);
-  } > RWDATA
+  } > REGION_BSS
 
   /* must be last segment using RWDATA */
   .stack_end (NOLOAD) : ALIGN(4)
   {
     . = ALIGN (4);
     _stack_end = ABSOLUTE(.);
-  } > RWDATA
+  } > REGION_STACK
   
   .rtc_fast.text ORIGIN(rtc_fast_seg) : 
       AT(_text_size + SIZEOF(.header) + SIZEOF(.pre_header) + SIZEOF(.rodata) + SIZEOF(.rwtext) + SIZEOF(.data) + SIZEOF(.bss) + SIZEOF(.noinit))
@@ -200,7 +200,7 @@ SECTIONS {
     *(.rtc_fast.literal .rtc_fast.text .rtc_fast.literal.* .rtc_fast.text.*)
    . = ALIGN(4);
    _rtc_fast_text_end = ABSOLUTE(.);
-  }
+  } > REGION_RTC_FAST
   _irtc_fast_text = ORIGIN(RODATA) + _text_size + SIZEOF(.header) + SIZEOF(.pre_header) + SIZEOF(.rodata) + SIZEOF(.rwtext) + SIZEOF(.data) + SIZEOF(.bss) + SIZEOF(.noinit);
  
   .rtc_fast.data ORIGIN(rtc_fast_seg) + SIZEOF(.rtc_fast.text) : 
@@ -211,7 +211,7 @@ SECTIONS {
     *(.rtc_fast.data .rtc_fast.data.*)
    . = ALIGN(4);
     _rtc_fast_data_end = ABSOLUTE(.);
-  }
+  } > REGION_RTC_FAST
   _irtc_fast_data = ORIGIN(RODATA) + _text_size + SIZEOF(.header) + SIZEOF(.pre_header) + SIZEOF(.rodata) + SIZEOF(.rwtext) + SIZEOF(.data) + SIZEOF(.bss) + SIZEOF(.noinit) + SIZEOF(.rtc_fast.text);
 
  .rtc_fast.bss ORIGIN(rtc_fast_seg) + SIZEOF(.rtc_fast.text) + SIZEOF(.rtc_fast.data) (NOLOAD) : 
@@ -222,14 +222,14 @@ SECTIONS {
     *(.rtc_fast.bss .rtc_fast.bss.*)
     . = ALIGN (4);
     _rtc_fast_bss_end = ABSOLUTE(.);
-  }
+  } > REGION_RTC_FAST
 
  .rtc_fast.noinit ORIGIN(rtc_fast_seg) + SIZEOF(.rtc_fast.text) + SIZEOF(.rtc_fast.data) + SIZEOF(.rtc_fast.bss) (NOLOAD)  :
   {
     . = ALIGN(4);
     *(.rtc_fast.noinit .rtc_fast.noinit.*)
     . = ALIGN (4);
-  }
+  } > REGION_RTC_FAST
 
  .rtc_slow.text ORIGIN(rtc_slow_seg) : 
     AT(_text_size + SIZEOF(.header) + SIZEOF(.pre_header) + SIZEOF(.rodata) + SIZEOF(.rwtext) + 
@@ -240,7 +240,7 @@ SECTIONS {
     *(.rtc_slow.literal .rtc_slow.text .rtc_slow.literal.* .rtc_slow.text.*)
    . = ALIGN(4);
    _rtc_slow_text_end = ABSOLUTE(.);
-  }
+  } > REGION_RTC_SLOW
   _irtc_slow_text = ORIGIN(RODATA) + _text_size + SIZEOF(.header) + SIZEOF(.pre_header) + SIZEOF(.rodata) + SIZEOF(.rwtext) + 
       SIZEOF(.rtc_fast.text) + SIZEOF(.rtc_fast.data) + SIZEOF(.rtc_fast.bss);
 
@@ -253,7 +253,7 @@ SECTIONS {
     *(.rtc_slow.data .rtc_slow.data.*)
     . = ALIGN(4);
     _rtc_slow_data_end = ABSOLUTE(.);
-  }
+  } > REGION_RTC_SLOW
   _irtc_slow_data = ORIGIN(RODATA) + _text_size + SIZEOF(.header) + SIZEOF(.pre_header) + SIZEOF(.rodata) + SIZEOF(.rwtext) + 
         SIZEOF(.rtc_fast.text) + SIZEOF(.rtc_fast.data) + SIZEOF(.rtc_fast.bss) + SIZEOF(.rtc_slow.text);
 
@@ -266,12 +266,12 @@ SECTIONS {
     *(.rtc_slow.bss .rtc_slow.bss.*)
     . = ALIGN (4);
     _rtc_slow_bss_end = ABSOLUTE(.);
-  }
+  } > REGION_RTC_SLOW
 
  .rtc_slow.noinit ORIGIN(rtc_slow_seg) + SIZEOF(.rtc_slow.text) + SIZEOF(.rtc_slow.data) + SIZEOF(.rtc_slow.bss) (NOLOAD) :
   {
     . = ALIGN(4);
     *(.rtc_slow.noinit .rtc_slow.noinit.*)
     . = ALIGN (4);
-  }
+  } > REGION_RTC_SLOW
 }
