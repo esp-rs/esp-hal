@@ -2,7 +2,6 @@ use crate::binary::include::esp_event_base_t;
 use crate::binary::include::esp_timer_create_args_t;
 use crate::binary::include::esp_timer_get_time;
 use crate::binary::include::esp_timer_handle_t;
-use crate::binary::include::timeval;
 
 use crate::compat::common::*;
 use crate::compat::timer_compat::*;
