@@ -23,30 +23,31 @@ If you have any questions, comments, or concerns, please [open an issue], [start
 
 For information relating to the development of Rust applications on ESP devices, please first read [The Rust on ESP Book].
 
-For information about the HAL and how to use it in your own projects, please refer to the documentation on [crates.io] for the relevant chip.
+For information about the HAL and how to use it in your own projects, please refer to the documentation on [docs.rs] for the relevant chip.
 
 [The Rust on ESP Book]: https://esp-rs.github.io/book/
-[crates.io]: https://crates.io
+[docs.rs]: https://docs.rs
 
 ## Resources
 
 - [The Rust Programming Language](https://doc.rust-lang.org/book/)
 - [The Embedded Rust Book](https://docs.rust-embedded.org/book/index.html)
+- [The Embedonomicon](https://docs.rust-embedded.org/embedonomicon/)
 - [The Rust on ESP Book](https://esp-rs.github.io/book/)
 - [Embedded Rust (no_std) on Espressif](https://esp-rs.github.io/no_std-training/)
 
 ## HAL Crates
 
-|      Crate       |             Target             | Technical Reference Manual |
-| :--------------: | :----------------------------: | :------------------------: |
-|   [esp32-hal]    |    `xtensa-esp32-none-elf`     |          [ESP32]           |
-|  [esp32c2-hal]   | `riscv32imc-unknown-none-elf`  |         [ESP32-C2]         |
-|  [esp32c3-hal]   | `riscv32imc-unknown-none-elf`  |         [ESP32-C3]         |
-|  [esp32c6-hal]   | `riscv32imac-unknown-none-elf` |         [ESP32-C6]         |
-| [esp32c6-lp-hal] | `riscv32imac-unknown-none-elf` |            N/A             |
-|  [esp32h2-hal]   | `riscv32imac-unknown-none-elf` |         [ESP32-H2]         |
-|  [esp32s2-hal]   |   `xtensa-esp32s2-none-elf`    |         [ESP32-S2]         |
-|  [esp32s3-hal]   |   `xtensa-esp32s3-none-elf`    |         [ESP32-S3]         |
+|      Crate       |                   Documentation                    | Technical Reference Manual |             Target             |
+| :--------------: | :------------------------------------------------: | :------------------------: | :----------------------------: |
+|   [esp32-hal]    |   [![esp32-hal-docs]](https://docs.rs/esp32-hal)   |          [ESP32]           |    `xtensa-esp32-none-elf`     |
+|  [esp32c2-hal]   | [![esp32c2-hal-docs]](https://docs.rs/esp32c2-hal) |         [ESP32-C2]         | `riscv32imc-unknown-none-elf`  |
+|  [esp32c3-hal]   | [![esp32c3-hal-docs]](https://docs.rs/esp32c3-hal) |         [ESP32-C3]         | `riscv32imc-unknown-none-elf`  |
+|  [esp32c6-hal]   | [![esp32c6-hal-docs]](https://docs.rs/esp32c6-hal) |         [ESP32-C6]         | `riscv32imac-unknown-none-elf` |
+| [esp32c6-lp-hal] |                        N/A                         |            N/A             | `riscv32imac-unknown-none-elf` |
+|  [esp32h2-hal]   | [![esp32h2-hal-docs]](https://docs.rs/esp32h2-hal) |         [ESP32-H2]         | `riscv32imac-unknown-none-elf` |
+|  [esp32s2-hal]   | [![esp32s2-hal-docs]](https://docs.rs/esp32s2-hal) |         [ESP32-S2]         |   `xtensa-esp32s2-none-elf`    |
+|  [esp32s3-hal]   | [![esp32s3-hal-docs]](https://docs.rs/esp32s3-hal) |         [ESP32-S3]         |   `xtensa-esp32s3-none-elf`    |
 
 [esp32-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32-hal
 [esp32c2-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32c2-hal
@@ -56,6 +57,13 @@ For information about the HAL and how to use it in your own projects, please ref
 [esp32h2-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32h2-hal
 [esp32s2-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32s2-hal
 [esp32s3-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32s3-hal
+[esp32-hal-docs]: https://img.shields.io/docsrs/esp32-hal?color=C96329&logo=rust&style=flat-square
+[esp32c2-hal-docs]: https://img.shields.io/docsrs/esp32c2-hal?color=C96329&logo=rust&style=flat-square
+[esp32c3-hal-docs]: https://img.shields.io/docsrs/esp32c3-hal?color=C96329&logo=rust&style=flat-square
+[esp32c6-hal-docs]: https://img.shields.io/docsrs/esp32c6-hal?color=C96329&logo=rust&style=flat-square
+[esp32h2-hal-docs]: https://img.shields.io/docsrs/esp32h2-hal?color=C96329&logo=rust&style=flat-square
+[esp32s2-hal-docs]: https://img.shields.io/docsrs/esp32s2-hal?color=C96329&logo=rust&style=flat-square
+[esp32s3-hal-docs]: https://img.shields.io/docsrs/esp32s3-hal?color=C96329&logo=rust&style=flat-square
 [esp32]: https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf
 [esp32-c2]: https://www.espressif.com/sites/default/files/documentation/esp8684_technical_reference_manual_en.pdf
 [esp32-c3]: https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf
@@ -104,7 +112,7 @@ The **M**inimum **S**upported **R**ust **V**ersion is `1.67.0` for all packages.
 
 RISC-V is officially supported by the official Rust compiler, however, it should be noted that targeting the Xtensa ISA currently requires the use of the [esp-rs/rust] compiler fork. Our recommend method of installation is [espup].
 
-When targetting the RISC-V architecture, it is necessary to set `RUSTC_BOOTSTRAP=1` in order to build with a previous stable release; this is not required when targeting Xtensa.
+When targetting the RISC-V architecture *and* using a `stable` Rust release, it is necessary to set `RUSTC_BOOTSTRAP=1` in order to build successfully; this is not required when using a `nightly` release or when targeting Xtensa.
 
 [esp-rs/rust]: https://github.com/esp-rs/rust
 [espup]: https://github.com/esp-rs/espup
