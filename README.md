@@ -111,7 +111,7 @@ The **M**inimum **S**upported **R**ust **V**ersion is `1.67.0` for all packages.
 
 RISC-V is officially supported by the official Rust compiler, however, it should be noted that targeting the Xtensa ISA currently requires the use of the [esp-rs/rust] compiler fork. Our recommend method of installation is [espup].
 
-When targetting the RISC-V architecture, it is necessary to set `RUSTC_BOOTSTRAP=1` in order to build with a previous stable release; this is not required when targeting Xtensa.
+When targetting the RISC-V architecture *and* using a `stable` Rust release, it is necessary to set `RUSTC_BOOTSTRAP=1` in order to build successfully; this is not required when using a `nightly` release or when targeting Xtensa.
 
 [esp-rs/rust]: https://github.com/esp-rs/rust
 [espup]: https://github.com/esp-rs/espup
