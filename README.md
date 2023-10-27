@@ -25,15 +25,16 @@ For information relating to the development of Rust applications on ESP devices,
 
 For information about the HAL and how to use it in your own projects, please refer to the documentation on [docs.rs] for the relevant chip.
 
-[The Rust on ESP Book]: (https://esp-rs.github.io/book/)
+[The Rust on ESP Book]: https://esp-rs.github.io/book/
 [docs.rs]: https://docs.rs
 
 ## Resources
 
 - [The Rust Programming Language](https://doc.rust-lang.org/book/)
 - [The Embedded Rust Book](https://docs.rust-embedded.org/book/index.html)
-- [The Rust on ESP Book](https://esp-rs.github.io/book/)
 - [The Embedonomicon](https://docs.rust-embedded.org/embedonomicon/)
+- [The Rust on ESP Book](https://esp-rs.github.io/book/)
+- [Embedded Rust (no_std) on Espressif](https://esp-rs.github.io/no_std-training/)
 
 ## HAL Crates
 
@@ -82,7 +83,7 @@ There are a number of other crates within the [esp-rs organization] which can be
 | [esp-ieee802154] |          Low-level IEEE802.15.4 driver for the ESP32-C6 and ESP32-H2           |
 |  [esp-println]   |                Provides `print!` and `println!` implementations                |
 |  [esp-storage]   | Implementation of [embedded-storage] traits to access unencrypted flash memory |
-|    [esp-wifi]    |                      `no_std` Wi-Fi/Bluetooth LE support                       |
+|    [esp-wifi]    |                       `no_std` Wi-Fi/BLE/ESP-NOW support                       |
 
 [esp-rs organization]: https://github.com/esp-rs
 [esp-alloc]: https://github.com/esp-rs/esp-alloc
