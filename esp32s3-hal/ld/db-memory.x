@@ -29,3 +29,14 @@ MEMORY
   /* RTC slow memory (data accessible). Persists over deep sleep. */
   rtc_slow_seg(RW)       : ORIGIN = 0x50000000, len = 8k
 }
+
+REGION_ALIAS("REGION_TEXT", irom_seg);
+REGION_ALIAS("REGION_RODATA", drom_seg);
+
+REGION_ALIAS("REGION_DATA", dram_seg);
+REGION_ALIAS("REGION_BSS", dram_seg);
+REGION_ALIAS("REGION_STACK", dram_seg);
+
+REGION_ALIAS("REGION_RWTEXT", iram_seg);
+REGION_ALIAS("REGION_RTC_FAST", rtc_fast_seg);
+REGION_ALIAS("REGION_RTC_SLOW", rtc_slow_seg);

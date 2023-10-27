@@ -38,5 +38,5 @@ MEMORY
   rtc_fast_dram_seg(RW)  : ORIGIN = 0x3ff9e000, len = 8k
 
   /* RTC slow memory (data accessible). Persists over deep sleep. */
-  rtc_slow_seg(RW)       : ORIGIN = 0x50000000 + RESERVE_RTC_SLOW, len = 8k - RESERVE_RTC_SLOW
+  rtc_slow_seg(RW)       : ORIGIN = 0x50000000, len = 8k
 }
