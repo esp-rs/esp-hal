@@ -501,6 +501,27 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
         }
     }
 
+    /// Get the old timestamp.
+    /// The value of the timestamp will take effect according to the set
+    /// [`PwmUpdateMethod`].
+    #[cfg(esp32)]
+    pub fn get_timestamp(&self) -> u16 {
+        // SAFETY:
+        // We only read to our GENx_TSTMP_x register
+        let block = unsafe { &*PWM::block() };
+        match (OP, IS_A) {
+            (0, true) => block.gen0_tstmp_a.read().gen0_a().bits(),
+            (1, true) => block.gen1_tstmp_a.read().gen1_a().bits(),
+            (2, true) => block.gen2_tstmp_a.read().gen2_a().bits(),
+            (0, false) => block.gen0_tstmp_b.read().gen0_b().bits(),
+            (1, false) => block.gen1_tstmp_b.read().gen1_b().bits(),
+            (2, false) => block.gen2_tstmp_b.read().gen2_b().bits(),
+            _ => {
+                unreachable!()
+            }
+        }
+    }
+
     /// Write a new timestamp.
     /// The written value will take effect according to the set
     /// [`PwmUpdateMethod`].
@@ -516,6 +537,27 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
             (0, false) => block.cmpr0_value1.write(|w| w.cmpr0_b().variant(value)),
             (1, false) => block.cmpr1_value1.write(|w| w.cmpr1_b().variant(value)),
             (2, false) => block.cmpr2_value1.write(|w| w.cmpr2_b().variant(value)),
+            _ => {
+                unreachable!()
+            }
+        }
+    }
+
+    /// Get the old timestamp.
+    /// The value of the timestamp will take effect according to the set
+    /// [`PwmUpdateMethod`].
+    #[cfg(esp32s3)]
+    pub fn get_timestamp(&self) -> u16 {
+        // SAFETY:
+        // We only read to our GENx_TSTMP_x register
+        let block = unsafe { &*PWM::block() };
+        match (OP, IS_A) {
+            (0, true) => block.cmpr0_value0.read().cmpr0_a().bits(),
+            (1, true) => block.cmpr1_value0.read().cmpr1_a().bits(),
+            (2, true) => block.cmpr2_value0.read().cmpr2_a().bits(),
+            (0, false) => block.cmpr0_value1.read().cmpr0_b().bits(),
+            (1, false) => block.cmpr1_value1.read().cmpr1_b().bits(),
+            (2, false) => block.cmpr2_value1.read().cmpr2_b().bits(),
             _ => {
                 unreachable!()
             }
@@ -541,6 +583,104 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
                 unreachable!()
             }
         }
+    }
+
+    /// Get the old timestamp.
+    /// The value of the timestamp will take effect according to the set
+    /// [`PwmUpdateMethod`].
+    #[cfg(any(esp32c6, esp32h2))]
+    pub fn get_timestamp(&self) -> u16 {
+        // SAFETY:
+        // We only read to our GENx_TSTMP_x register
+        let block = unsafe { &*PWM::block() };
+        match (OP, IS_A) {
+            (0, true) => block.gen0_tstmp_a.get().cmpr0_a().bits(),
+            (1, true) => block.gen1_tstmp_a.get().cmpr1_a().bits(),
+            (2, true) => block.gen2_tstmp_a.get().cmpr2_a().bits(),
+            (0, false) => block.gen0_tstmp_b.get().cmpr0_b().bits(),
+            (1, false) => block.gen1_tstmp_b.get().cmpr1_b().bits(),
+            (2, false) => block.gen2_tstmp_b.get().cmpr2_b().bits(),
+            _ => {
+                unreachable!()
+            }
+        }
+    }
+
+    fn get_period(&self) -> u16 {
+        // SAFETY:
+        // We only grant access to our CFG0 register with the lifetime of &mut self
+        let block = unsafe { &*PWM::block() };
+
+        let tim_select = block.operator_timersel.read();
+        let tim = match OP {
+            0 => tim_select.operator0_timersel().bits(),
+            1 => tim_select.operator1_timersel().bits(),
+            2 => tim_select.operator2_timersel().bits(),
+            _ => {
+                unreachable!()
+            }
+        };
+
+        // SAFETY:
+        // The CFG0 registers are identical for all timers so we can pretend they're
+        // TIMER0_CFG0
+        let timer0_cfg = match tim {
+            0 => &block.timer0_cfg0,
+            1 => unsafe { &*(&block.timer1_cfg0 as *const _ as *const _) },
+            2 => unsafe { &*(&block.timer2_cfg0 as *const _ as *const _) },
+            _ => unreachable!(),
+        };
+        timer0_cfg.read().timer0_period().bits()
+    }
+}
+
+impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal::PwmPin
+    for PwmPin<'d, Pin, PWM, OP, IS_A>
+{
+    type Duty = u16;
+
+    /// This only set the timestamp to 0, if you want to disable the PwmPin,
+    /// it must be done on the timer itself.
+    fn disable(&mut self) {
+        self.set_timestamp(0);
+    }
+
+    /// This only set the timestamp to the maximum, if you want to disable the
+    /// PwmPin, it must be done on the timer itself.
+    fn enable(&mut self) {
+        self.set_timestamp(u16::MAX);
+    }
+
+    fn get_duty(&self) -> Self::Duty {
+        self.get_timestamp()
+    }
+
+    fn get_max_duty(&self) -> Self::Duty {
+        self.get_period()
+    }
+
+    fn set_duty(&mut self, duty: Self::Duty) {
+        self.set_timestamp(duty);
+    }
+}
+
+#[cfg(feature = "eh1")]
+impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
+    embedded_hal_1::pwm::ErrorType for &mut PwmPin<'d, Pin, PWM, OP, IS_A>
+{
+    type Error = core::convert::Infallible;
+}
+
+#[cfg(feature = "eh1")]
+impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
+    embedded_hal_1::pwm::SetDutyCycle for &mut PwmPin<'d, Pin, PWM, OP, IS_A>
+{
+    fn get_max_duty_cycle(&self) -> u16 {
+        self.get_period()
+    }
+    fn set_duty_cycle(&mut self, duty: u16) -> Result<(), core::convert::Infallible> {
+        self.set_timestamp(duty);
+        Ok(())
     }
 }
 
