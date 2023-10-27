@@ -312,6 +312,9 @@ where
         let tseg_2 = timing.tseg_2 - 1;
         let triple_sample = timing.triple_sample;
 
+        #[cfg(esp32)]
+        let prescale = prescale as u8;
+
         // Set up the prescaler and sync jump width.
         self.peripheral
             .register_block()
