@@ -606,6 +606,7 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
         }
     }
 
+    /// Get the period of the timer.
     fn get_period(&self) -> u16 {
         // SAFETY:
         // We only grant access to our CFG0 register with the lifetime of &mut self
@@ -651,19 +652,23 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> emb
         self.set_timestamp(u16::MAX);
     }
 
+    /// Get the duty of the pin
     fn get_duty(&self) -> Self::Duty {
         self.get_timestamp()
     }
 
+    /// Get the max duty of the pin
     fn get_max_duty(&self) -> Self::Duty {
         self.get_period()
     }
 
+    /// Set the duty of the pin
     fn set_duty(&mut self, duty: Self::Duty) {
         self.set_timestamp(duty);
     }
 }
 
+/// Implement no error type for the PwmPin because the method are infallible
 #[cfg(feature = "eh1")]
 impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
     embedded_hal_1::pwm::ErrorType for &mut PwmPin<'d, Pin, PWM, OP, IS_A>
@@ -671,13 +676,16 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
     type Error = core::convert::Infallible;
 }
 
+/// Implement the trait SetDutyCycle for PwmPin
 #[cfg(feature = "eh1")]
 impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
     embedded_hal_1::pwm::SetDutyCycle for &mut PwmPin<'d, Pin, PWM, OP, IS_A>
 {
+    /// Get the max duty of the PwmPin
     fn get_max_duty_cycle(&self) -> u16 {
         self.get_period()
     }
+    /// Set the max duty of the PwmPin
     fn set_duty_cycle(&mut self, duty: u16) -> Result<(), core::convert::Infallible> {
         self.set_timestamp(duty);
         Ok(())
