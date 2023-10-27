@@ -5,7 +5,13 @@
 ![Crates.io](https://img.shields.io/crates/l/esp-hal-procmacros?labelColor=1C2C2E&style=flat-square)
 [![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&labelColor=1C2C2E&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
 
-Procedural macros for placing statics and functions into RAM, and for marking interrupt handlers.
+Procedural macros for use with the `esp-hal` family of HAL packages.
+
+Provides macros for:
+
+- Placing statics and functions into RAM
+- Marking interrupt handlers
+- Automatically creating an `embassy` executor instance and spawning the defined entry point
 
 ## [Documentation]
 
