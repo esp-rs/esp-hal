@@ -594,12 +594,12 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
         // We only read to our GENx_TSTMP_x register
         let block = unsafe { &*PWM::block() };
         match (OP, IS_A) {
-            (0, true) => block.gen0_tstmp_a.get().cmpr0_a().bits(),
-            (1, true) => block.gen1_tstmp_a.get().cmpr1_a().bits(),
-            (2, true) => block.gen2_tstmp_a.get().cmpr2_a().bits(),
-            (0, false) => block.gen0_tstmp_b.get().cmpr0_b().bits(),
-            (1, false) => block.gen1_tstmp_b.get().cmpr1_b().bits(),
-            (2, false) => block.gen2_tstmp_b.get().cmpr2_b().bits(),
+            (0, true) => block.gen0_tstmp_a.read().cmpr0_a().bits(),
+            (1, true) => block.gen1_tstmp_a.read().cmpr1_a().bits(),
+            (2, true) => block.gen2_tstmp_a.read().cmpr2_a().bits(),
+            (0, false) => block.gen0_tstmp_b.read().cmpr0_b().bits(),
+            (1, false) => block.gen1_tstmp_b.read().cmpr1_b().bits(),
+            (2, false) => block.gen2_tstmp_b.read().cmpr2_b().bits(),
             _ => {
                 unreachable!()
             }
