@@ -272,7 +272,9 @@ impl<T> Alarm<T, 2> {
 //        interferes with the embassy time driver, which also uses the
 //        `SYSTIMER` peripheral. Until we come up with a solution, do not
 //        implement this trait if the `embassy-time-systick` feature is enabled.
-#[cfg(all(feature = "async", not(feature = "embassy-time-systick")))]
+// #[cfg(all(feature = "async", not(feature = "embassy-time-systick")))]
+// HACK: disable `asynch` module *always* until we come up with a solution
+#[cfg(not(systimer))]
 mod asynch {
     use core::{
         pin::Pin,

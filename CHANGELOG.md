@@ -19,8 +19,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add UART support for splitting into TX and RX (#754)
 - Async support for I2S (#801)
 - Async support for PARL_IO (#807)
-- Implement `embeded_hal_async::delay::DelayUs` trait for `SYSTIMER` alarms (#812)
-  - This trait is NOT implemented when the `embassy-time-systick` feature is enabled!
 - ETM driver, GPIO ETM (#819)
 - (G)DMA AES support (#821)
 - SYSTIMER ETM functionality (#828)
