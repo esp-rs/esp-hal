@@ -30,7 +30,7 @@
 //! ## Example
 //! ```no_run
 //! let source_data = "HELLO, ESPRESSIF!".as_bytes();
-//! let mut remaining = source_data.clone();
+//! let mut remaining = source_data;
 //! let mut hasher = Sha::new(peripherals.SHA, ShaMode::SHA256);
 //!
 //! // Short hashes can be created by decreasing the output buffer to the desired
