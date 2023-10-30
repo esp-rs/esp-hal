@@ -11,10 +11,14 @@ use crate::adc::{
 
 /// Basic ADC calibration scheme
 ///
-/// Basic calibration is related to setting some initial bias value in ADC.
-/// Such values usually is stored in efuse bit fields but also can be measured
-/// in runtime by connecting ADC input to ground internally a fallback when
-/// it is not available.
+/// Basic calibration sets the initial ADC bias value so that a zero voltage
+/// gives a reading of zero. The correct bias value is usually stored in efuse,
+/// but can also be measured at runtime by connecting the ADC input to ground
+/// internally.
+///
+/// Failing to apply basic calibration can substantially reduce the ADC's output
+/// range because bias correction is done *before* the ADC's output is truncated
+/// to 12 bits.
 #[derive(Clone, Copy)]
 pub struct AdcCalBasic<ADCI> {
     /// Calibration value to set to ADC unit
