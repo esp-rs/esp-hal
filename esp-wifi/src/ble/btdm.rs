@@ -5,21 +5,13 @@ use critical_section::Mutex;
 use crate::ble::btdm::ble_os_adapter_chip_specific::G_OSI_FUNCS;
 use crate::ble::HciOutCollector;
 use crate::ble::HCI_OUT_COLLECTOR;
+use crate::hal::macros::ram;
 use crate::{
     binary::include::*,
     compat::{common::str_from_c, queue::SimpleQueue, work_queue::queue_work},
     memory_fence::memory_fence,
     timer::yield_task,
 };
-
-#[cfg(esp32)]
-use esp32_hal as hal;
-#[cfg(esp32c3)]
-use esp32c3_hal as hal;
-#[cfg(esp32s3)]
-use esp32s3_hal as hal;
-
-use hal::macros::ram;
 
 #[cfg_attr(esp32c3, path = "os_adapter_esp32c3.rs")]
 #[cfg_attr(esp32s3, path = "os_adapter_esp32s3.rs")]
@@ -226,9 +218,8 @@ unsafe extern "C" fn queue_recv(queue: *const (), item: *const (), block_time_ms
         block_time_ms
     );
 
-    // is this ticks or millis?
-    let end_time = crate::timer::get_systimer_count()
-        + (block_time_ms as u64 * (crate::timer::TICKS_PER_SECOND / 1000));
+    let end_time_ticks =
+        crate::timer::get_systimer_count() + crate::timer::millis_to_ticks(block_time_ms as u64);
 
     // handle the BT_QUEUE
     if queue == &BT_INTERNAL_QUEUE as *const _ as *const () {
@@ -257,7 +248,7 @@ unsafe extern "C" fn queue_recv(queue: *const (), item: *const (), block_time_ms
             }
 
             if block_time_ms != OSI_FUNCS_TIME_BLOCKING
-                && crate::timer::get_systimer_count() > end_time
+                && crate::timer::get_systimer_count() > end_time_ticks
             {
                 trace!("queue_recv returns with timeout");
                 return -1;
@@ -336,18 +327,6 @@ unsafe extern "C" fn cause_sw_intr_to_core(_core: i32, _intr_no: i32) -> i32 {
         core::arch::asm!("wsr.intset  {0}", in(reg) intr, options(nostack));
         0
     }
-}
-
-unsafe extern "C" fn malloc(size: u32) -> *const () {
-    crate::compat::malloc::malloc(size as usize) as *const ()
-}
-
-unsafe extern "C" fn malloc_internal(size: u32) -> *const () {
-    crate::compat::malloc::malloc(size as usize) as *const ()
-}
-
-unsafe extern "C" fn free(ptr: *const ()) {
-    crate::compat::malloc::free(ptr as *const u8);
 }
 
 #[allow(unused)]

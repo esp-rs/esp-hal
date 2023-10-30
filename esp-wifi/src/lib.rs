@@ -70,14 +70,14 @@ pub mod tasks;
 pub(crate) mod memory_fence;
 
 use critical_section;
-use timer::{get_systimer_count, TICKS_PER_SECOND};
+use timer::{get_systimer_count, ticks_to_millis};
 
 #[cfg(all(feature = "embedded-svc", feature = "wifi"))]
 pub mod wifi_interface;
 
 /// Return the current systimer time in milliseconds
 pub fn current_millis() -> u64 {
-    get_systimer_count() / (TICKS_PER_SECOND / 1000)
+    ticks_to_millis(get_systimer_count())
 }
 
 #[allow(unused)]

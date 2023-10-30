@@ -1,9 +1,9 @@
 use super::phy_init_data::PHY_INIT_DATA_DEFAULT;
 use crate::binary::include::*;
 use crate::common_adapter::RADIO_CLOCKS;
+use crate::hal::prelude::ram;
 use crate::hal::system::RadioClockController;
 use crate::hal::system::RadioPeripherals;
-use esp32_hal::prelude::ram;
 
 use atomic_polyfill::AtomicU32;
 use core::sync::atomic::Ordering;

@@ -10,16 +10,16 @@ const DPORT_WIFI_CLK_WIFI_EN_S: u32 = 0;
 const DPORT_WIFI_CLK_WIFI_EN_M: u32 = (DPORT_WIFI_CLK_WIFI_EN_V) << (DPORT_WIFI_CLK_WIFI_EN_S);
 
 pub(crate) fn chip_ints_on(mask: u32) {
-    trace!("chip_ints_on esp32");
-    unsafe {
-        esp32_hal::xtensa_lx::interrupt::enable_mask(1 << 0);
-    }
+    unsafe { crate::hal::xtensa_lx::interrupt::enable_mask(mask) };
+}
+
+pub(crate) fn chip_ints_off(mask: u32) {
+    crate::hal::xtensa_lx::interrupt::disable_mask(mask);
 }
 
 pub(crate) unsafe extern "C" fn wifi_int_disable(
     wifi_int_mux: *mut crate::binary::c_types::c_void,
 ) -> u32 {
-    trace!("wifi_int_disable() esp32");
     core::mem::transmute(critical_section::acquire())
 }
 
@@ -27,7 +27,6 @@ pub(crate) unsafe extern "C" fn wifi_int_restore(
     wifi_int_mux: *mut crate::binary::c_types::c_void,
     tmp: u32,
 ) {
-    trace!("wifi_int_restore() esp32");
     critical_section::release(core::mem::transmute(tmp))
 }
 
@@ -40,10 +39,10 @@ pub(crate) unsafe extern "C" fn phy_common_clock_enable() {
 }
 
 pub(crate) unsafe extern "C" fn set_intr(
-    cpu_no: i32,
+    _cpu_no: i32,
     intr_source: u32,
     intr_num: u32,
-    intr_prio: i32,
+    _intr_prio: i32,
 ) {
     extern "C" {
         fn intr_matrix_set(cpu_no: u32, model_num: u32, intr_num: u32);
@@ -53,16 +52,12 @@ pub(crate) unsafe extern "C" fn set_intr(
 }
 
 pub(crate) unsafe extern "C" fn wifi_clock_enable() {
-    trace!("wifi_clock_enable");
-
     let ptr = DPORT_WIFI_CLK_EN_REG as *mut u32;
     let old = ptr.read_volatile();
     ptr.write_volatile(old | DPORT_WIFI_CLK_WIFI_EN_M);
 }
 
 pub(crate) unsafe extern "C" fn wifi_clock_disable() {
-    trace!("wifi_clock_disable");
-
     let ptr = DPORT_WIFI_CLK_EN_REG as *mut u32;
     let old = ptr.read_volatile();
     ptr.write_volatile(old & !DPORT_WIFI_CLK_WIFI_EN_M);

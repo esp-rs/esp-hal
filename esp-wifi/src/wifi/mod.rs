@@ -139,8 +139,8 @@ impl TryFrom<wifi_mode_t> for WifiMode {
     fn try_from(value: wifi_mode_t) -> Result<Self, Self::Error> {
         #[allow(non_upper_case_globals)]
         match value {
-            wifi_mode_t_WIFI_MODE_STA => Ok(WifiMode::Sta),
-            wifi_mode_t_WIFI_MODE_AP => Ok(WifiMode::Ap),
+            include::wifi_mode_t_WIFI_MODE_STA => Ok(WifiMode::Sta),
+            include::wifi_mode_t_WIFI_MODE_AP => Ok(WifiMode::Ap),
             _ => Err(WifiError::UnknownWifiMode),
         }
     }

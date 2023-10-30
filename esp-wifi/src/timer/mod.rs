@@ -20,3 +20,23 @@ pub fn setup_timer_isr(timebase: TimeBase) {
 
     setup_multitasking();
 }
+
+#[allow(unused)]
+pub fn micros_to_ticks(us: u64) -> u64 {
+    us * (TICKS_PER_SECOND / 1_000_000)
+}
+
+#[allow(unused)]
+pub fn millis_to_ticks(ms: u64) -> u64 {
+    ms * (TICKS_PER_SECOND / 1_000)
+}
+
+#[allow(unused)]
+pub fn ticks_to_micros(ticks: u64) -> u64 {
+    ticks / (TICKS_PER_SECOND / 1_000_000)
+}
+
+#[allow(unused)]
+pub fn ticks_to_millis(ticks: u64) -> u64 {
+    ticks / (TICKS_PER_SECOND / 1_000)
+}

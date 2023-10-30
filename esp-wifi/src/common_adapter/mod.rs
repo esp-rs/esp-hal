@@ -35,15 +35,11 @@ pub(crate) static mut RANDOM_GENERATOR: Option<Rng> = None;
 pub(crate) static mut RADIO_CLOCKS: Option<RadioClockControl> = None;
 
 pub(crate) fn init_rng(rng: Rng) {
-    unsafe {
-        crate::common_adapter::RANDOM_GENERATOR = Some(core::mem::transmute(rng));
-    }
+    unsafe { RANDOM_GENERATOR = Some(core::mem::transmute(rng)) };
 }
 
 pub(crate) fn init_radio_clock_control(rcc: RadioClockControl) {
-    unsafe {
-        crate::common_adapter::RADIO_CLOCKS = Some(core::mem::transmute(rcc));
-    }
+    unsafe { RADIO_CLOCKS = Some(core::mem::transmute(rcc)) };
 }
 
 /****************************************************************************

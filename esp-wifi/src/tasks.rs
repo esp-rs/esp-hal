@@ -41,7 +41,7 @@ pub extern "C" fn worker_task2() {
             for i in 0..TIMERS.len() {
                 if let Some(ref mut timer) = TIMERS[i] {
                     if timer.active && current_timestamp >= timer.expire {
-                        debug!("timer is due.... {:?}", timer.ptimer);
+                        debug!("timer is due.... {:x}", timer.ptimer as usize);
                         let fnctn: fn(*mut c_types::c_void) = mem::transmute(timer.timer_ptr);
 
                         _ = to_run.enqueue((fnctn, timer.arg_ptr));

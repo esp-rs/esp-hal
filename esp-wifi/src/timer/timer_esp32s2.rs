@@ -1,3 +1,4 @@
+#[cfg(feature = "wifi")]
 use crate::hal::{interrupt, macros::interrupt, peripherals};
 
 pub fn setup_radio_isr() {

@@ -288,8 +288,8 @@ pub struct ext_funcs_t {
     >,
     esp_intr_free:
         Option<unsafe extern "C" fn(ret_handle: *mut *mut crate::binary::c_types::c_void) -> i32>,
-    malloc: Option<unsafe extern "C" fn(size: u32) -> *const u8>,
-    free: Option<unsafe extern "C" fn(*const crate::binary::c_types::c_void)>,
+    malloc: Option<unsafe extern "C" fn(size: u32) -> *mut crate::binary::c_types::c_void>,
+    free: Option<unsafe extern "C" fn(*mut crate::binary::c_types::c_void)>,
     hal_uart_start_tx: Option<unsafe extern "C" fn(i32)>,
     hal_uart_init_cbs: Option<
         unsafe extern "C" fn(
@@ -330,8 +330,8 @@ static G_OSI_FUNCS: ext_funcs_t = ext_funcs_t {
     ext_version: 0x20221122,
     esp_intr_alloc: Some(self::ble_os_adapter_chip_specific::esp_intr_alloc),
     esp_intr_free: Some(esp_intr_free),
-    malloc: Some(self::malloc),
-    free: Some(free),
+    malloc: Some(crate::ble::malloc),
+    free: Some(crate::ble::free),
     hal_uart_start_tx: None,
     hal_uart_init_cbs: None,
     hal_uart_config: None,
@@ -415,14 +415,6 @@ unsafe extern "C" fn osi_assert(
 
 unsafe extern "C" fn esp_intr_free(_ret_handle: *mut *mut crate::binary::c_types::c_void) -> i32 {
     todo!();
-}
-
-unsafe extern "C" fn malloc(size: u32) -> *const u8 {
-    crate::compat::malloc::malloc(size as usize)
-}
-
-unsafe extern "C" fn free(ptr: *const crate::binary::c_types::c_void) {
-    crate::compat::malloc::free(ptr as *const u8);
 }
 
 #[repr(C)]

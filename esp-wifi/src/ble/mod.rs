@@ -19,6 +19,18 @@ pub(crate) use ble::send_hci;
 
 pub mod controller;
 
+pub unsafe extern "C" fn malloc(size: u32) -> *mut crate::binary::c_types::c_void {
+    crate::compat::malloc::malloc(size as usize).cast()
+}
+
+pub unsafe extern "C" fn malloc_internal(size: u32) -> *mut crate::binary::c_types::c_void {
+    crate::compat::malloc::malloc(size as usize).cast()
+}
+
+pub unsafe extern "C" fn free(ptr: *mut crate::binary::c_types::c_void) {
+    crate::compat::malloc::free(ptr.cast())
+}
+
 static mut HCI_OUT_COLLECTOR: MaybeUninit<HciOutCollector> = MaybeUninit::uninit();
 
 #[derive(PartialEq, Debug)]
