@@ -158,7 +158,12 @@ impl Into<wifi_mode_t> for WifiMode {
 
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct EspWifiPacketBuffer {
+/// Take care not to drop this while in a critical section.
+///
+/// Dropping an EspWifiPacketBuffer will call `esp_wifi_internal_free_rx_buffer` which
+/// will try to lock an internal mutex. If the mutex is already taken, the function will
+/// try to trigger a context switch, which will fail if we are in a critical section.
+pub(crate) struct EspWifiPacketBuffer {
     pub(crate) buffer: *mut c_types::c_void,
     pub(crate) len: u16,
     pub(crate) eb: *mut c_types::c_void,
@@ -174,10 +179,6 @@ impl Drop for EspWifiPacketBuffer {
 }
 
 impl EspWifiPacketBuffer {
-    pub fn as_slice(&self) -> &[u8] {
-        unsafe { core::slice::from_raw_parts(self.buffer as *mut u8, self.len as usize) }
-    }
-
     pub fn as_slice_mut(&mut self) -> &mut [u8] {
         unsafe { core::slice::from_raw_parts_mut(self.buffer as *mut u8, self.len as usize) }
     }
@@ -645,23 +646,30 @@ unsafe extern "C" fn recv_cb(
     len: u16,
     eb: *mut c_types::c_void,
 ) -> esp_err_t {
-    critical_section::with(|cs| {
+    let result = critical_section::with(|cs| {
         let packet = EspWifiPacketBuffer { buffer, len, eb };
 
-        match DATA_QUEUE_RX.borrow_ref_mut(cs).enqueue(packet) {
-            Ok(_) => {
-                #[cfg(feature = "embassy-net")]
-                embassy::RECEIVE_WAKER.wake();
+        DATA_QUEUE_RX.borrow_ref_mut(cs).enqueue(packet)
+    });
 
-                include::ESP_OK as esp_err_t
-            }
+    // We must handle the result outside of the critical section because
+    // EspWifiPacketBuffer::drop must not be called in a critical section.
+    // Dropping an EspWifiPacketBuffer will call `esp_wifi_internal_free_rx_buffer` which
+    // will try to lock an internal mutex. If the mutex is already taken, the function will
+    // try to trigger a context switch, which will fail if we are in a critical section.
+    match result {
+        Ok(_) => {
+            #[cfg(feature = "embassy-net")]
+            embassy::RECEIVE_WAKER.wake();
 
-            _ => {
-                debug!("RX QUEUE FULL");
-                include::ESP_ERR_NO_MEM as esp_err_t
-            }
+            include::ESP_OK as esp_err_t
         }
-    })
+
+        Err(_) => {
+            debug!("RX QUEUE FULL");
+            include::ESP_ERR_NO_MEM as esp_err_t
+        }
+    }
 }
 
 pub(crate) static WIFI_TX_INFLIGHT: AtomicUsize = AtomicUsize::new(0);
@@ -1026,18 +1034,24 @@ fn rx_token_consume<R, F>(f: F) -> R
 where
     F: FnOnce(&mut [u8]) -> R,
 {
-    critical_section::with(|cs| {
+    let mut data = critical_section::with(|cs| {
         let mut queue = DATA_QUEUE_RX.borrow_ref_mut(cs);
 
-        let mut data = unwrap!(
+        unwrap!(
             queue.dequeue(),
             "unreachable: transmit()/receive() ensures there is a packet to process"
-        );
-        let buffer = data.as_slice_mut();
-        dump_packet_info(&buffer);
+        )
+    });
 
-        f(buffer)
-    })
+    // We handle the received data outside of the critical section because
+    // EspWifiPacketBuffer::drop must not be called in a critical section.
+    // Dropping an EspWifiPacketBuffer will call `esp_wifi_internal_free_rx_buffer` which
+    // will try to lock an internal mutex. If the mutex is already taken, the function will
+    // try to trigger a context switch, which will fail if we are in a critical section.
+    let buffer = data.as_slice_mut();
+    dump_packet_info(&buffer);
+
+    f(buffer)
 }
 
 fn tx_token_consume<R, F>(len: usize, f: F) -> R

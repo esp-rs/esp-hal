@@ -353,30 +353,33 @@ pub fn create_recursive_mutex() -> *mut crate::binary::c_types::c_void {
     })
 }
 
+/// Lock a mutex. Block until successful.
 pub fn lock_mutex(mutex: *mut crate::binary::c_types::c_void) -> i32 {
     trace!("mutex_lock ptr = {:?}", mutex);
 
     let ptr = mutex as *mut Mutex;
     let current_task = current_task();
 
-    let mutex_locked = critical_section::with(|_| unsafe {
-        if (*ptr).count == 0 {
-            (*ptr).locking_pid = current_task;
-            (*ptr).count += 1;
-            true
-        } else if (*ptr).locking_pid == current_task {
-            (*ptr).count += 1;
-            true
-        } else {
-            false
-        }
-    });
-    memory_fence();
+    loop {
+        let mutex_locked = critical_section::with(|_| unsafe {
+            if (*ptr).count == 0 {
+                (*ptr).locking_pid = current_task;
+                (*ptr).count += 1;
+                true
+            } else if (*ptr).locking_pid == current_task {
+                (*ptr).count += 1;
+                true
+            } else {
+                false
+            }
+        });
+        memory_fence();
 
-    if mutex_locked {
-        1
-    } else {
-        0
+        if mutex_locked {
+            return 1;
+        }
+
+        yield_task();
     }
 }
 
