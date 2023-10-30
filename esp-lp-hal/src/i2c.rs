@@ -3,10 +3,7 @@
 use esp32c6_lp::{LP_AON, LP_CLKRST, LP_I2C, LP_IO};
 use fugit::HertzU32;
 
-use crate::{
-    gpio::{GpioPin, LpInputPin, LpOutputPin},
-    CPU_CLOCK,
-};
+use crate::{gpio::GpioPin, CPU_CLOCK};
 
 const RTC_XTAL_FREQ_REG: u32 = 0x600B1000 + 0x10;
 const LPPERI_CLK_EN_REG: u32 = 0x600B2800 + 0x0;
@@ -215,6 +212,8 @@ impl<'d> I2C {
             // Enable pullup
             (&*LP_IO::PTR).gpio[6].modify(|_, w| w.fun_wpu().set_bit());
 
+            (&*LP_IO::PTR).gpio[6].modify(|_, w| w.mcu_sel().bits(1));
+
             // Same process for SCL pin
             (&*LP_IO::PTR).pin[7].modify(|_, w| w.pad_driver().bit(false));
             // Enable output (writing to write-1-to-set register, then internally the
@@ -230,7 +229,6 @@ impl<'d> I2C {
             (&*LP_IO::PTR).gpio[7].modify(|_, w| w.fun_wpu().set_bit());
 
             // Select LP I2C function for the SDA and SCL pins
-            (&*LP_IO::PTR).gpio[6].modify(|_, w| w.mcu_sel().bits(1));
             (&*LP_IO::PTR).gpio[7].modify(|_, w| w.mcu_sel().bits(1));
         }
 
@@ -265,7 +263,7 @@ impl<'d> I2C {
         // Set LP I2C source clock
         unsafe { &*LP_CLKRST::PTR }
             .lpperi
-            .modify(|_, w| w.lp_i2c_clk_sel().set_bit());
+            .modify(|_, w| w.lp_i2c_clk_sel().clear_bit());
 
         // Configure LP I2C timing paramters. source_clk is ignored for LP_I2C in this
         // call
@@ -568,10 +566,6 @@ impl<'d> I2C {
                 .set_bit()
                 .fifo_prt_en()
                 .set_bit()
-                .rxfifo_wm_thrhd()
-                .variant(1)
-                .txfifo_wm_thrhd()
-                .variant(8)
         });
 
         self.i2c

@@ -3,12 +3,7 @@
 
 use core::fmt::Write;
 
-use esp32c6_lp_hal::{
-    delay::Delay,
-    gpio::{Floating, GpioPin, Input, Output, PushPull},
-    i2c::*,
-    prelude::*,
-};
+use esp32c6_lp_hal::{delay::Delay, i2c::*, prelude::*};
 use fugit::*;
 use liquid_crystal::{prelude::*, I2C as I2C_interface};
 use panic_halt as _;
