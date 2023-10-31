@@ -271,8 +271,8 @@ pub fn sem_take(semphr: *mut crate::binary::c_types::c_void, tick: u32) -> i32 {
     trace!(">>>> semphr_take {:?} block_time_tick {}", semphr, tick);
 
     let forever = tick == OSI_FUNCS_TIME_BLOCKING;
-    let tick = if tick == 0 { 1 } else { tick };
-    let end_time = crate::timer::get_systimer_count() + tick as u64;
+    let timeout = tick as u64;
+    let start = crate::timer::get_systimer_count();
 
     let sem_idx = semphr as usize - 1;
 
@@ -296,10 +296,8 @@ pub fn sem_take(semphr: *mut crate::binary::c_types::c_void, tick: u32) -> i32 {
             return 1;
         }
 
-        if !forever {
-            if crate::timer::get_systimer_count() > end_time {
-                break 'outer;
-            }
+        if !forever && crate::timer::elapsed_time_since(start) > timeout {
+            break 'outer;
         }
 
         yield_task();
@@ -464,7 +462,9 @@ pub fn receive_queued(
         block_time_tick
     );
 
-    let end_time = crate::timer::get_systimer_count() + block_time_tick as u64;
+    let forever = block_time_tick == OSI_FUNCS_TIME_BLOCKING;
+    let timeout = block_time_tick as u64;
+    let start = crate::timer::get_systimer_count();
 
     // handle the WIFI_QUEUE
     unsafe {
@@ -486,11 +486,9 @@ pub fn receive_queued(
                 trace!("received {:?}", message);
 
                 return 1;
-            };
+            }
 
-            if block_time_tick != OSI_FUNCS_TIME_BLOCKING
-                && crate::timer::get_systimer_count() > end_time
-            {
+            if !forever && crate::timer::elapsed_time_since(start) > timeout {
                 trace!("queue_recv returns with timeout");
                 return -1;
             }

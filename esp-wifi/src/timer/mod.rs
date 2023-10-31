@@ -40,3 +40,9 @@ pub fn ticks_to_micros(ticks: u64) -> u64 {
 pub fn ticks_to_millis(ticks: u64) -> u64 {
     ticks / (TICKS_PER_SECOND / 1_000)
 }
+
+/// Do not call this in a critical section!
+pub fn elapsed_time_since(start: u64) -> u64 {
+    let now = get_systimer_count();
+    time_diff(start, now)
+}

@@ -1,190 +1,168 @@
-use crate::{
-    binary::{
-        c_types,
-        include::{esp_timer_create_args_t, esp_timer_handle_t, ets_timer},
-    },
-    memory_fence::memory_fence,
+use crate::binary::{
+    c_types,
+    include::{esp_timer_create_args_t, esp_timer_handle_t, ets_timer},
 };
 
-static ESP_FAKE_TIMER: () = ();
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct TimerCallback {
+    f: unsafe extern "C" fn(*mut c_types::c_void),
+    args: *mut c_types::c_void,
+}
+
+impl TimerCallback {
+    fn new(f: unsafe extern "C" fn(*mut c_types::c_void), args: *mut c_types::c_void) -> Self {
+        Self { f, args }
+    }
+
+    pub fn call(self) {
+        unsafe { (self.f)(self.args) };
+    }
+}
+
+impl From<&esp_timer_create_args_t> for TimerCallback {
+    fn from(args: &esp_timer_create_args_t) -> Self {
+        Self::new(unwrap!(args.callback), args.arg)
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
-pub struct Timer {
-    pub ptimer: *mut c_types::c_void,
-    pub expire: u64,
-    pub period: u64,
+pub(crate) struct Timer {
+    pub ets_timer: *mut ets_timer,
+    pub started: u64,
+    pub timeout: u64,
     pub active: bool,
-    pub timer_ptr: *mut c_types::c_void,
-    pub arg_ptr: *mut c_types::c_void,
+    pub periodic: bool,
+    pub callback: TimerCallback,
 }
 
-pub static mut TIMERS: [Option<Timer>; 20] = [None; 20];
-
-pub fn compat_timer_arm(ptimer: *mut c_types::c_void, tmout: u32, repeat: bool) {
-    compat_timer_arm_us(ptimer, tmout * 1000, repeat);
+impl Timer {
+    pub fn id(&self) -> usize {
+        self.ets_timer as usize
+    }
 }
 
-pub fn compat_timer_arm_us(ptimer: *mut c_types::c_void, us: u32, repeat: bool) {
+pub(crate) static mut TIMERS: heapless::Vec<Timer, 20> = heapless::Vec::new();
+
+pub fn compat_timer_arm(ets_timer: *mut ets_timer, tmout: u32, repeat: bool) {
+    compat_timer_arm_us(ets_timer, tmout * 1000, repeat);
+}
+
+pub fn compat_timer_arm_us(ets_timer: *mut ets_timer, us: u32, repeat: bool) {
     let systick = crate::timer::get_systimer_count();
-
     let ticks = crate::timer::micros_to_ticks(us as u64);
+
     debug!(
         "timer_arm_us {:x} current: {} ticks: {} repeat: {}",
-        ptimer as usize, systick, ticks, repeat
+        ets_timer as usize, systick, ticks, repeat
     );
+
     critical_section::with(|_| unsafe {
-        memory_fence();
-
-        for i in 0..TIMERS.len() {
-            if let Some(ref mut timer) = TIMERS[i] {
-                if timer.ptimer == ptimer {
-                    trace!("found timer ...");
-                    timer.expire = ticks + systick;
-                    timer.active = true;
-                    timer.period = if repeat { ticks } else { 0 };
-                    break;
-                }
-            }
+        if let Some(timer) = TIMERS.iter_mut().find(|t| t.ets_timer == ets_timer) {
+            timer.started = systick;
+            timer.timeout = ticks;
+            timer.active = true;
+            timer.periodic = repeat;
+        } else {
+            debug!("timer_arm_us {:x} not found", ets_timer as usize);
         }
-
-        memory_fence();
-    });
+    })
 }
 
-pub fn compat_timer_disarm(ptimer: *mut c_types::c_void) {
-    debug!("timer_disarm {:x}", ptimer as usize);
+pub fn compat_timer_disarm(ets_timer: *mut ets_timer) {
     critical_section::with(|_| unsafe {
-        memory_fence();
-
-        for i in 0..TIMERS.len() {
-            if let Some(ref mut timer) = TIMERS[i] {
-                if timer.ptimer == ptimer {
-                    trace!("found timer ...");
-                    timer.active = false;
-                    break;
-                }
-            }
+        if let Some(timer) = TIMERS.iter_mut().find(|t| t.ets_timer == ets_timer) {
+            debug!("timer_disarm {:x}", timer.id());
+            timer.active = false;
+        } else {
+            debug!("timer_disarm {:x} not found", ets_timer as usize);
         }
-
-        memory_fence();
-    });
+    })
 }
 
-pub fn compat_timer_done(ptimer: *mut c_types::c_void) {
-    debug!("timer_done {:x}", ptimer as usize);
+pub fn compat_timer_done(ets_timer: *mut ets_timer) {
     critical_section::with(|_| unsafe {
-        memory_fence();
+        if let Some(timer) = TIMERS.iter_mut().find(|t| t.ets_timer == ets_timer) {
+            debug!("timer_done {:x}", timer.id());
+            timer.active = false;
 
-        for i in 0..TIMERS.len() {
-            if let Some(ref mut timer) = TIMERS[i] {
-                if timer.ptimer == ptimer {
-                    trace!("found timer ...");
-                    timer.active = false;
-
-                    let ets_timer = ptimer as *mut ets_timer;
-                    (*ets_timer).priv_ = core::ptr::null_mut();
-                    (*ets_timer).expire = 0;
-                    break;
-                }
-            }
+            (*ets_timer).priv_ = core::ptr::null_mut();
+            (*ets_timer).expire = 0;
+        } else {
+            debug!("timer_done {:x} not found", ets_timer as usize);
         }
-
-        memory_fence();
-    });
+    })
 }
 
 pub fn compat_timer_setfn(
-    ptimer: *mut c_types::c_void,
-    pfunction: *mut c_types::c_void,
+    ets_timer: *mut ets_timer,
+    pfunction: unsafe extern "C" fn(*mut c_types::c_void),
     parg: *mut c_types::c_void,
 ) {
     debug!(
         "timer_setfn {:x} {:?} {:?}",
-        ptimer as usize, pfunction, parg
+        ets_timer as usize, pfunction, parg
     );
 
-    critical_section::with(|_| unsafe {
-        memory_fence();
-        let mut timer_found = false;
-        for i in 0..TIMERS.len() {
-            if let Some(ref mut timer) = TIMERS[i] {
-                if timer.ptimer == ptimer {
-                    timer.timer_ptr = pfunction;
-                    timer.arg_ptr = parg;
-                    timer.active = false;
+    let set = critical_section::with(|_| unsafe {
+        if let Some(timer) = TIMERS.iter_mut().find(|t| t.ets_timer == ets_timer) {
+            timer.callback = TimerCallback::new(pfunction, parg);
+            timer.active = false;
 
-                    timer_found = true;
-                    break;
-                }
-            }
-        }
+            (*ets_timer).expire = 0;
 
-        let ets_timer = ptimer as *mut ets_timer;
-        (*ets_timer).expire = 0;
-
-        if !timer_found {
+            true
+        } else {
             (*ets_timer).next = core::ptr::null_mut();
             (*ets_timer).period = 0;
             (*ets_timer).func = None;
             (*ets_timer).priv_ = core::ptr::null_mut();
-
-            for i in 0..TIMERS.len() {
-                if TIMERS[i].is_none() {
-                    TIMERS[i] = Some(Timer {
-                        ptimer,
-                        expire: 0,
-                        period: 0,
-                        active: false,
-                        timer_ptr: pfunction,
-                        arg_ptr: parg,
-                    });
-                    break;
-                }
-            }
+            TIMERS
+                .push(Timer {
+                    ets_timer,
+                    started: 0,
+                    timeout: 0,
+                    active: false,
+                    periodic: false,
+                    callback: TimerCallback::new(pfunction, parg),
+                })
+                .is_ok()
         }
-        memory_fence();
     });
+
+    if !set {
+        warn!("Failed to set timer function {:x}", ets_timer as usize);
+    }
 }
 
 pub fn compat_esp_timer_create(
     args: *const esp_timer_create_args_t,
-    mut out_handle: *mut esp_timer_handle_t,
+    out_handle: *mut esp_timer_handle_t,
 ) -> i32 {
     unsafe {
-        debug!(
-            "esp_timer_create {:?} {:?} {:?}",
-            (*args).callback,
-            (*args).arg,
-            out_handle
-        );
+        debug!("esp_timer_create {:?} {:?}", (*args).callback, (*args).arg);
     }
 
     critical_section::with(|_| unsafe {
-        let mut timer_found = false;
-        memory_fence();
-
-        for i in 0..TIMERS.len() {
-            if TIMERS[i].is_none() {
-                TIMERS[i] = Some(Timer {
-                    ptimer: &ESP_FAKE_TIMER as *const _ as *mut c_types::c_void,
-                    expire: 0,
-                    period: 0,
-                    active: false,
-                    timer_ptr: core::mem::transmute(unwrap!((*args).callback)),
-                    arg_ptr: (*args).arg,
-                });
-                out_handle = &ESP_FAKE_TIMER as *const _ as *mut esp_timer_handle_t;
-                timer_found = true;
-                debug!("esp_timer_create {:?} {:?}", args, out_handle);
-
-                break;
-            }
-        }
-        if !timer_found {
+        if TIMERS.is_full() {
+            // TODO: should we return -1 instead?
             panic!("ran out of timers");
         }
-        memory_fence();
-    });
 
-    0
+        let ets_timer =
+            crate::compat::malloc::calloc(1, core::mem::size_of::<ets_timer>()).cast::<ets_timer>();
+
+        _ = TIMERS.push(Timer {
+            ets_timer,
+            started: 0,
+            timeout: 0,
+            active: false,
+            periodic: false,
+            callback: TimerCallback::from(unwrap!(args.as_ref())),
+        });
+
+        debug!("esp_timer_create {:x}", ets_timer as usize);
+        *out_handle = ets_timer as _;
+
+        return 0;
+    })
 }

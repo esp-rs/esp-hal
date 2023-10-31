@@ -119,3 +119,8 @@ pub fn yield_task() {
         core::arch::asm!("wsr.intset  {0}", in(reg) intr, options(nostack));
     }
 }
+
+// TODO: use an Instance type instead...
+pub fn time_diff(start: u64, end: u64) -> u64 {
+    end.wrapping_sub(start)
+}

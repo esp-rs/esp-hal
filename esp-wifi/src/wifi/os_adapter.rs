@@ -748,11 +748,8 @@ pub unsafe extern "C" fn task_delete(_task_handle: *mut crate::binary::c_types::
  ****************************************************************************/
 pub unsafe extern "C" fn task_delay(tick: u32) {
     trace!("task_delay tick {}", tick);
-    let timeout = crate::timer::get_systimer_count() + tick as u64;
-    loop {
-        if crate::timer::get_systimer_count() >= timeout {
-            break;
-        }
+    let start_time = crate::timer::get_systimer_count();
+    while crate::timer::elapsed_time_since(start_time) < tick as u64 {
         yield_task();
     }
 }

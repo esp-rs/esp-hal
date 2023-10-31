@@ -1,9 +1,12 @@
-use core::cell::RefCell;
+use core::{
+    cell::RefCell,
+    ptr::{addr_of, addr_of_mut},
+};
 
 use critical_section::Mutex;
 
 use super::*;
-use crate::binary::c_types::c_void;
+use crate::binary::c_types::{c_char, c_void};
 use crate::binary::include::*;
 use crate::compat;
 use crate::compat::common::str_from_c;
@@ -28,29 +31,21 @@ const BLE_HCI_TRANS_BUF_CMD: i32 = 3;
 /* ACL_DATA_MBUF_LEADINGSPCAE: The leadingspace in user info header for ACL data */
 const ACL_DATA_MBUF_LEADINGSPACE: usize = 4;
 
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone)]
 struct Callout {
-    _callout_id: u32,
-    eventq_id: u32,
-    event_id: u32,
-    timer_handle: u32,
+    _callout: *const ble_npl_callout,
+    eventq: *const ble_npl_eventq,
+    timer_handle: ets_timer,
+    events: ble_npl_event,
 }
 
 static mut CALLOUTS: [Option<Callout>; 12] = [None; 12];
-static mut CALLOUT_TIMERS: [ets_timer; 12] = [ets_timer {
-    next: core::ptr::null_mut(),
-    expire: 0,
-    period: 0,
-    func: None,
-    priv_: core::ptr::null_mut(),
-}; 12];
-static mut CALLOUT_EVENTS: [u32; 12] = [0u32; 12];
 
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone)]
 struct Event {
-    event_id: u32,
-    event_fn_ptr: u32,
-    ev_arg_ptr: u32,
+    event: *const ble_npl_event,
+    event_fn_ptr: *const ble_npl_event_fn,
+    ev_arg_ptr: *const c_void,
     queued: bool,
 }
 
@@ -281,42 +276,35 @@ pub struct ext_funcs_t {
         unsafe extern "C" fn(
             source: u32,
             flags: u32,
-            handler: *mut crate::binary::c_types::c_void,
-            arg: *mut crate::binary::c_types::c_void,
-            ret_handle: *mut *mut crate::binary::c_types::c_void,
+            handler: *mut c_void,
+            arg: *mut c_void,
+            ret_handle: *mut *mut c_void,
         ) -> i32,
     >,
-    esp_intr_free:
-        Option<unsafe extern "C" fn(ret_handle: *mut *mut crate::binary::c_types::c_void) -> i32>,
-    malloc: Option<unsafe extern "C" fn(size: u32) -> *mut crate::binary::c_types::c_void>,
-    free: Option<unsafe extern "C" fn(*mut crate::binary::c_types::c_void)>,
+    esp_intr_free: Option<unsafe extern "C" fn(ret_handle: *mut *mut c_void) -> i32>,
+    malloc: Option<unsafe extern "C" fn(size: u32) -> *mut c_void>,
+    free: Option<unsafe extern "C" fn(*mut c_void)>,
     hal_uart_start_tx: Option<unsafe extern "C" fn(i32)>,
     hal_uart_init_cbs: Option<
-        unsafe extern "C" fn(
-            i32,
-            *const crate::binary::c_types::c_void,
-            crate::binary::c_types::c_void,
-            crate::binary::c_types::c_void,
-            crate::binary::c_types::c_void,
-        ) -> i32,
+        unsafe extern "C" fn(i32, *const c_void, *const c_void, *const c_void, c_void) -> i32,
     >,
     hal_uart_config: Option<unsafe extern "C" fn(i32, i32, u8, u8, u8, u8) -> i32>,
     hal_uart_close: Option<unsafe extern "C" fn(i32) -> i32>,
     hal_uart_blocking_tx: Option<unsafe extern "C" fn(i32, u8)>,
-    hal_uart_init: Option<unsafe extern "C" fn(i32, *const crate::binary::c_types::c_void) -> i32>,
+    hal_uart_init: Option<unsafe extern "C" fn(i32, *const c_void) -> i32>,
     task_create: Option<
         unsafe extern "C" fn(
-            *const crate::binary::c_types::c_void,
-            *const crate::binary::c_types::c_char,
+            *const c_void,
+            *const c_char,
             u32,
-            *const crate::binary::c_types::c_void,
+            *const c_void,
             u32,
-            *const crate::binary::c_types::c_void,
+            *const c_void,
             u32,
         ) -> i32,
     >,
-    task_delete: Option<unsafe extern "C" fn(*const crate::binary::c_types::c_void)>,
-    osi_assert: Option<unsafe extern "C" fn(u32, *const crate::binary::c_types::c_void, u32, u32)>,
+    task_delete: Option<unsafe extern "C" fn(*const c_void)>,
+    osi_assert: Option<unsafe extern "C" fn(u32, *const c_void, u32, u32)>,
     os_random: Option<unsafe extern "C" fn() -> u32>,
     ecc_gen_key_pair: Option<unsafe extern "C" fn(*const u8, *const u8) -> i32>,
     ecc_gen_dh_key: Option<unsafe extern "C" fn(*const u8, *const u8, *const u8, *const u8) -> i32>,
@@ -364,12 +352,12 @@ unsafe extern "C" fn os_random() -> u32 {
 }
 
 unsafe extern "C" fn task_create(
-    task_func: *const crate::binary::c_types::c_void,
-    name: *const crate::binary::c_types::c_char,
+    task_func: *const c_void,
+    name: *const c_char,
     stack_depth: u32,
-    param: *const crate::binary::c_types::c_void,
+    param: *const c_void,
     prio: u32,
-    task_handle: *const crate::binary::c_types::c_void,
+    task_handle: *const c_void,
     core_id: u32,
 ) -> i32 {
     let name_str = str_from_c(name as *const u8);
@@ -387,33 +375,28 @@ unsafe extern "C" fn task_create(
     *(task_handle as *mut usize) = 0; // we will run it in task 0
 
     crate::compat::work_queue::queue_work(
-        task_func as *mut crate::binary::c_types::c_void,
-        name as *const crate::binary::c_types::c_char,
+        task_func as *mut c_void,
+        name as *const c_char,
         stack_depth,
-        param as *mut crate::binary::c_types::c_void,
+        param as *mut c_void,
         prio,
-        task_handle as *mut crate::binary::c_types::c_void,
+        task_handle as *mut c_void,
         core_id,
     );
 
     1
 }
 
-unsafe extern "C" fn task_delete(_: *const crate::binary::c_types::c_void) {
+unsafe extern "C" fn task_delete(_: *const c_void) {
     todo!();
 }
 
-unsafe extern "C" fn osi_assert(
-    ln: u32,
-    fn_name: *const crate::binary::c_types::c_void,
-    param1: u32,
-    param2: u32,
-) {
+unsafe extern "C" fn osi_assert(ln: u32, fn_name: *const c_void, param1: u32, param2: u32) {
     let name_str = str_from_c(fn_name as *const u8);
     panic!("ASSERT {}:{} {} {}", name_str, ln, param1, param2);
 }
 
-unsafe extern "C" fn esp_intr_free(_ret_handle: *mut *mut crate::binary::c_types::c_void) -> i32 {
+unsafe extern "C" fn esp_intr_free(_ret_handle: *mut *mut c_void) -> i32 {
     todo!();
 }
 
@@ -694,7 +677,7 @@ unsafe extern "C" fn ble_npl_callout_stop(callout: *const ble_npl_callout) {
     let co = unwrap!(CALLOUTS[((*callout).dummy - 1) as usize].as_mut());
 
     // stop timer
-    compat::timer_compat::compat_timer_disarm(co.timer_handle as *mut c_void);
+    compat::timer_compat::compat_timer_disarm(addr_of_mut!(co.timer_handle));
 }
 
 unsafe extern "C" fn ble_npl_callout_reset(
@@ -706,7 +689,7 @@ unsafe extern "C" fn ble_npl_callout_reset(
     let co = unwrap!(CALLOUTS[((*callout).dummy - 1) as usize].as_mut());
 
     // start timer
-    compat::timer_compat::compat_timer_arm(co.timer_handle as *mut c_void, time, false);
+    compat::timer_compat::compat_timer_arm(addr_of_mut!(co.timer_handle), time, false);
 
     0
 }
@@ -755,7 +738,7 @@ unsafe extern "C" fn ble_npl_event_set_arg(event: *const ble_npl_event, arg: *co
         panic!("Call set_arg on uninitialized event");
     }
 
-    unwrap!(EVENTS[((*event).dummy - 1) as usize].as_mut()).ev_arg_ptr = arg as u32;
+    unwrap!(EVENTS[((*event).dummy - 1) as usize].as_mut()).ev_arg_ptr = arg;
 }
 
 unsafe extern "C" fn ble_npl_event_get_arg(event: *const ble_npl_event) -> *const c_void {
@@ -764,12 +747,11 @@ unsafe extern "C" fn ble_npl_event_get_arg(event: *const ble_npl_event) -> *cons
         panic!("Call get_arg on uninitialized event");
     }
 
-    trace!(
-        "returning arg {:x}",
-        unwrap!(EVENTS[((*event).dummy - 1) as usize].as_mut()).ev_arg_ptr
-    );
+    let arg_ptr = unwrap!(EVENTS[((*event).dummy - 1) as usize].as_mut()).ev_arg_ptr;
 
-    unwrap!(EVENTS[((*event).dummy - 1) as usize].as_mut()).ev_arg_ptr as *const c_void
+    trace!("returning arg {:x}", arg_ptr as usize);
+
+    arg_ptr
 }
 
 unsafe extern "C" fn ble_npl_event_is_queued(event: *const ble_npl_event) -> bool {
@@ -803,16 +785,16 @@ unsafe extern "C" fn ble_npl_event_init(
 ) {
     trace!("ble_npl_event_init {:?} {:?} {:?}", event, func, arg);
 
-    let event = event as *mut ble_npl_event;
-
     if (*event).dummy == 0 {
         let idx = unwrap!(EVENTS.iter().position(|item| item.is_none()));
         EVENTS[idx] = Some(Event {
-            event_id: event as u32,
-            event_fn_ptr: func as u32,
-            ev_arg_ptr: arg as u32,
+            event,
+            event_fn_ptr: func,
+            ev_arg_ptr: arg,
             queued: false,
         });
+
+        let event = event.cast_mut();
         (*event).dummy = (idx + 1) as i32;
     }
 }
@@ -835,7 +817,7 @@ unsafe extern "C" fn ble_npl_event_run(event: *const ble_npl_event) {
         panic!("Trying to run an uninitialized event");
     } else {
         let ev = unwrap!(EVENTS[((*event).dummy - 1) as usize].as_mut());
-        trace!("info {:x} with arg {:x}", ev.event_fn_ptr, event as u32);
+        trace!("info {:?} with arg {:x}", ev.event_fn_ptr, event as u32);
         let func: unsafe extern "C" fn(u32) = core::mem::transmute(ev.event_fn_ptr);
         func(event as u32);
     }
@@ -891,10 +873,10 @@ unsafe extern "C" fn ble_npl_eventq_get(
 
             if let Some(event_idx) = dequeued {
                 let evt = unwrap!(EVENTS[event_idx - 1].as_mut());
-                if evt.queued == true {
-                    trace!("got {:x}", evt.event_id);
+                if evt.queued {
+                    trace!("got {:x}", evt.event as usize);
                     evt.queued = false;
-                    return evt.event_id as *const ble_npl_event;
+                    return evt.event;
                 }
             }
 
@@ -923,26 +905,31 @@ unsafe extern "C" fn ble_npl_callout_init(
         args
     );
 
-    let callout = callout as *mut ble_npl_callout;
-
     if (*callout).dummy == 0 {
+        let callout = callout.cast_mut();
         let idx = unwrap!(CALLOUTS.iter().position(|item| item.is_none()));
 
-        let timer = &CALLOUT_TIMERS[idx];
+        let new_callout = CALLOUTS[idx].insert(Callout {
+            _callout: callout,
+            eventq,
+            timer_handle: ets_timer {
+                next: core::ptr::null_mut(),
+                expire: 0,
+                period: 0,
+                func: None,
+                priv_: core::ptr::null_mut(),
+            },
+            events: ble_npl_event { dummy: 0 },
+        });
+
+        ble_npl_event_init(addr_of_mut!(new_callout.events), func, args);
+
         crate::compat::timer_compat::compat_timer_setfn(
-            core::mem::transmute(timer),
-            callout_timer_callback_wrapper as *mut c_void,
+            addr_of_mut!(new_callout.timer_handle),
+            callout_timer_callback_wrapper,
             idx as *mut c_void,
         );
 
-        ble_npl_event_init(core::mem::transmute(&CALLOUT_EVENTS), func, args);
-
-        CALLOUTS[idx] = Some(Callout {
-            _callout_id: callout as u32,
-            eventq_id: eventq as u32,
-            event_id: core::mem::transmute(&CALLOUT_EVENTS),
-            timer_handle: timer as *const _ as u32,
-        });
         (*callout).dummy = (idx + 1) as i32;
     }
 
@@ -953,13 +940,10 @@ unsafe extern "C" fn callout_timer_callback_wrapper(arg: *mut c_void) {
     info!("callout_timer_callback_wrapper {:?}", arg);
     let co = unwrap!(CALLOUTS[arg as usize].as_mut());
 
-    if co.eventq_id == 0 {
-        ble_npl_eventq_put(
-            co.event_id as *const ble_npl_eventq,
-            co.event_id as *const ble_npl_event,
-        );
+    if co.eventq.is_null() {
+        ble_npl_eventq_put(addr_of!(co.events).cast(), addr_of!(co.events));
     } else {
-        ble_npl_event_run(co.event_id as *const ble_npl_event);
+        ble_npl_event_run(addr_of!(co.events));
     }
 }
 

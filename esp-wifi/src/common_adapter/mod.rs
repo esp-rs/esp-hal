@@ -138,110 +138,6 @@ pub unsafe extern "C" fn random() -> crate::binary::c_types::c_ulong {
 }
 
 /****************************************************************************
- * Name: ets_timer_arm
- *
- * Description:
- *   Set timer timeout period and repeat flag
- *
- * Input Parameters:
- *   ptimer - timer data pointer
- *   ms     - millim seconds
- *   repeat - true: run cycle, false: run once
- *
- * Returned Value:
- *   None
- *
- ****************************************************************************/
-pub unsafe extern "C" fn timer_arm(
-    ptimer: *mut crate::binary::c_types::c_void,
-    tmout: u32,
-    repeat: bool,
-) {
-    compat_timer_arm(ptimer, tmout, repeat);
-}
-
-/****************************************************************************
- * Name: ets_timer_disarm
- *
- * Description:
- *   Disable timer
- *
- * Input Parameters:
- *   ptimer - timer data pointer
- *
- * Returned Value:
- *   None
- *
- ****************************************************************************/
-pub unsafe extern "C" fn timer_disarm(ptimer: *mut crate::binary::c_types::c_void) {
-    compat_timer_disarm(ptimer);
-}
-
-/****************************************************************************
- * Name: ets_timer_done
- *
- * Description:
- *   Disable and free timer
- *
- * Input Parameters:
- *   ptimer - timer data pointer
- *
- * Returned Value:
- *   None
- *
- ****************************************************************************/
-pub unsafe extern "C" fn timer_done(ptimer: *mut crate::binary::c_types::c_void) {
-    compat_timer_done(ptimer);
-}
-
-/****************************************************************************
- * Name: ets_timer_setfn
- *
- * Description:
- *   Set timer callback function and private data
- *
- * Input Parameters:
- *   ptimer    - Timer data pointer
- *   pfunction - Callback function
- *   parg      - Callback function private data
- *
- * Returned Value:
- *   None
- *
- ****************************************************************************/
-pub unsafe extern "C" fn timer_setfn(
-    ptimer: *mut crate::binary::c_types::c_void,
-    pfunction: *mut crate::binary::c_types::c_void,
-    parg: *mut crate::binary::c_types::c_void,
-) {
-    compat_timer_setfn(ptimer, pfunction, parg);
-}
-
-/****************************************************************************
- * Name: ets_timer_arm_us
- *
- * Description:
- *   Set timer timeout period and repeat flag
- *
- * Input Parameters:
- *   ptimer - timer data pointer
- *   us     - micro seconds
- *   repeat - true: run cycle, false: run once
- *
- * Returned Value:
- *   None
- *
- ****************************************************************************/
-#[allow(unused)]
-pub unsafe extern "C" fn timer_arm_us(
-    ptimer: *mut crate::binary::c_types::c_void,
-    us: u32,
-    repeat: bool,
-) {
-    compat_timer_arm_us(ptimer, us, repeat);
-}
-
-/****************************************************************************
  * Name: esp_wifi_read_mac
  *
  * Description:
@@ -393,12 +289,12 @@ pub unsafe extern "C" fn __assert_func(
 
 #[no_mangle]
 pub unsafe extern "C" fn ets_timer_disarm(timer: *mut crate::binary::c_types::c_void) {
-    timer_disarm(timer);
+    compat_timer_disarm(timer.cast());
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn ets_timer_done(timer: *mut crate::binary::c_types::c_void) {
-    timer_done(timer);
+    compat_timer_done(timer.cast());
 }
 
 #[no_mangle]
@@ -407,7 +303,7 @@ pub unsafe extern "C" fn ets_timer_setfn(
     pfunction: *mut crate::binary::c_types::c_void,
     parg: *mut crate::binary::c_types::c_void,
 ) {
-    timer_setfn(ptimer, pfunction, parg);
+    compat_timer_setfn(ptimer.cast(), core::mem::transmute(pfunction), parg);
 }
 
 #[no_mangle]
@@ -416,7 +312,16 @@ pub unsafe extern "C" fn ets_timer_arm(
     tmout: u32,
     repeat: bool,
 ) {
-    timer_arm(timer, tmout, repeat);
+    compat_timer_arm(timer.cast(), tmout, repeat);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn ets_timer_arm_us(
+    timer: *mut crate::binary::c_types::c_void,
+    tmout: u32,
+    repeat: bool,
+) {
+    compat_timer_arm_us(timer.cast(), tmout, repeat);
 }
 
 #[no_mangle]

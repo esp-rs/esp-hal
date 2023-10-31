@@ -218,8 +218,9 @@ unsafe extern "C" fn queue_recv(queue: *const (), item: *const (), block_time_ms
         block_time_ms
     );
 
-    let end_time_ticks =
-        crate::timer::get_systimer_count() + crate::timer::millis_to_ticks(block_time_ms as u64);
+    let forever = block_time_ms == OSI_FUNCS_TIME_BLOCKING;
+    let start = crate::timer::get_systimer_count();
+    let block_ticks = crate::timer::millis_to_ticks(block_time_ms as u64);
 
     // handle the BT_QUEUE
     if queue == &BT_INTERNAL_QUEUE as *const _ as *const () {
@@ -247,9 +248,7 @@ unsafe extern "C" fn queue_recv(queue: *const (), item: *const (), block_time_ms
                 return res;
             }
 
-            if block_time_ms != OSI_FUNCS_TIME_BLOCKING
-                && crate::timer::get_systimer_count() > end_time_ticks
-            {
+            if !forever && crate::timer::elapsed_time_since(start) > block_ticks {
                 trace!("queue_recv returns with timeout");
                 return -1;
             }

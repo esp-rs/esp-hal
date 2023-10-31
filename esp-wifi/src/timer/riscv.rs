@@ -97,3 +97,9 @@ pub fn yield_task() {
 pub fn get_systimer_count() -> u64 {
     SystemTimer::now()
 }
+
+// TODO: use an Instance type instead...
+pub fn time_diff(start: u64, end: u64) -> u64 {
+    // 52-bit wrapping sub
+    end.wrapping_sub(start) & 0x000f_ffff_ffff_ffff
+}
