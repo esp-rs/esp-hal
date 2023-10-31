@@ -15,11 +15,12 @@ macro_rules! sum {
 
 macro_rules! task_stack {
     ($($task_stack_size:literal),+) => {
-        const TASKS_COUNT: usize = [$($task_stack_size),+].len();
-        const TASK_STACK_SIZE: [usize; TASKS_COUNT] = [$($task_stack_size),+];
+        const TASK_COUNT: usize = [$($task_stack_size),+].len();
+        const TASK_STACK_SIZE: [usize; TASK_COUNT] = [$($task_stack_size),+];
         const TOTAL_STACK_SIZE: usize = sum!($($task_stack_size),+);
+        const MAX_TASK: usize = TASK_COUNT + 1; // +1 for the user program
+
         static mut TASK_STACK: [u8; TOTAL_STACK_SIZE] = [0u8; TOTAL_STACK_SIZE];
-        const MAX_TASK: usize = [$($task_stack_size),+].len() + 1;
     };
 }
 

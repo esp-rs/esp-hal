@@ -8,7 +8,7 @@ use crate::ble::HCI_OUT_COLLECTOR;
 use crate::hal::macros::ram;
 use crate::{
     binary::include::*,
-    compat::{common::str_from_c, queue::SimpleQueue, work_queue::queue_work},
+    compat::{common::str_from_c, queue::SimpleQueue, task_runner::spawn_task},
     memory_fence::memory_fence,
     timer::yield_task,
 };
@@ -293,7 +293,7 @@ unsafe extern "C" fn task_create(
 
     *(handle as *mut usize) = 0; // we will run it in task 0
 
-    queue_work(
+    if spawn_task(
         func,
         name as *const i8,
         stack_depth,
@@ -301,8 +301,11 @@ unsafe extern "C" fn task_create(
         prio,
         handle,
         core_id,
-    );
-    1
+    ) {
+        1
+    } else {
+        0
+    }
 }
 
 unsafe extern "C" fn task_delete(_task: *const ()) {

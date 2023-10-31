@@ -11,6 +11,7 @@ use crate::binary::include::*;
 use crate::compat;
 use crate::compat::common::str_from_c;
 use crate::compat::queue::SimpleQueue;
+use crate::compat::task_runner::spawn_task;
 use crate::timer::yield_task;
 
 #[cfg_attr(esp32c2, path = "os_adapter_esp32c2.rs")]
@@ -374,7 +375,7 @@ unsafe extern "C" fn task_create(
 
     *(task_handle as *mut usize) = 0; // we will run it in task 0
 
-    crate::compat::work_queue::queue_work(
+    if spawn_task(
         task_func as *mut c_void,
         name as *const c_char,
         stack_depth,
@@ -382,9 +383,11 @@ unsafe extern "C" fn task_create(
         prio,
         task_handle as *mut c_void,
         core_id,
-    );
-
-    1
+    ) {
+        1
+    } else {
+        0
+    }
 }
 
 unsafe extern "C" fn task_delete(_: *const c_void) {

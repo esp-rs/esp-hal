@@ -20,7 +20,7 @@ use crate::{
             str_from_c, thread_sem_get, unlock_mutex,
         },
         malloc::calloc,
-        work_queue::queue_work,
+        task_runner::spawn_task,
     },
     hal::system::RadioClockController,
     hal::system::RadioPeripherals,
@@ -673,7 +673,7 @@ pub unsafe extern "C" fn task_create_pinned_to_core(
 
     *(task_handle as *mut usize) = 0; // we will run it in task 0
 
-    queue_work(
+    if spawn_task(
         task_func,
         name,
         stack_depth,
@@ -681,8 +681,11 @@ pub unsafe extern "C" fn task_create_pinned_to_core(
         prio,
         task_handle,
         core_id,
-    );
-    1
+    ) {
+        1
+    } else {
+        0
+    }
 }
 
 /****************************************************************************

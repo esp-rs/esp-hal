@@ -6,29 +6,15 @@ use crate::{
 };
 
 pub fn init_tasks() {
-    task_create(worker_task1);
-    task_create(worker_task2);
+    task_create(compat::task_runner::run_c_task);
+    task_create(timer_task);
 
     // if coex then we know we have ble + wifi
     #[cfg(coex)]
-    task_create(worker_task3);
+    task_create(compat::task_runner::run_c_task);
 }
 
-pub extern "C" fn worker_task1() {
-    loop {
-        compat::work_queue::do_work();
-        yield_task();
-    }
-}
-
-pub extern "C" fn worker_task3() {
-    loop {
-        compat::work_queue::do_work();
-        yield_task();
-    }
-}
-
-pub extern "C" fn worker_task2() {
+pub extern "C" fn timer_task() {
     loop {
         let mut to_run = SimpleQueue::<_, 20>::new();
 
