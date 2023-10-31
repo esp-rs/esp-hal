@@ -128,7 +128,7 @@ impl<T, const CHANNEL: u8> Alarm<T, CHANNEL> {
         }
     }
 
-    pub fn interrupt_clear(&self) {
+    pub fn clear_interrupt(&self) {
         let systimer = unsafe { &*SYSTIMER::ptr() };
         match CHANNEL {
             0 => systimer.int_clr.write(|w| w.target0_int_clr().set_bit()),
@@ -272,7 +272,9 @@ impl<T> Alarm<T, 2> {
 //        interferes with the embassy time driver, which also uses the
 //        `SYSTIMER` peripheral. Until we come up with a solution, do not
 //        implement this trait if the `embassy-time-systick` feature is enabled.
-#[cfg(all(feature = "async", not(feature = "embassy-time-systick")))]
+// #[cfg(all(feature = "async", not(feature = "embassy-time-systick")))]
+// HACK: disable `asynch` module *always* until we come up with a solution
+#[cfg(not(systimer))]
 mod asynch {
     use core::{
         pin::Pin,
@@ -295,7 +297,7 @@ mod asynch {
 
     impl<'a, const N: u8> AlarmFuture<'a, N> {
         pub(crate) fn new(alarm: &'a Alarm<Periodic, N>) -> Self {
-            alarm.interrupt_clear();
+            alarm.clear_interrupt();
             alarm.enable_interrupt(true);
 
             Self {
