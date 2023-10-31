@@ -4,6 +4,7 @@ use crate::binary::include::esp_timer_get_time;
 use crate::binary::include::esp_timer_handle_t;
 
 use crate::compat::common::*;
+use crate::compat::syslog::syslog;
 use crate::compat::timer_compat::*;
 
 use crate::hal;
@@ -222,7 +223,7 @@ pub unsafe extern "C" fn sprintf(dst: *mut u8, format: *const u8, args: ...) -> 
     let str = str_from_c(format);
     trace!("sprintf format: {}", str);
 
-    let len = crate::compat::common::vsnprintf(dst, 512, format, args);
+    let len = crate::compat::syslog::vsnprintf(dst, 512, format, args);
 
     let s = str_from_c(dst);
     trace!("sprintf result: {}", s);

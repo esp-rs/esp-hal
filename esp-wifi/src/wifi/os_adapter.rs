@@ -28,7 +28,7 @@ use crate::{
     timer::yield_task,
 };
 
-use crate::compat::common::syslog;
+use crate::compat::syslog::syslog;
 
 use super::WifiEvent;
 
