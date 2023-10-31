@@ -199,6 +199,8 @@ jobs:
         run: cd esp32c3-hal/ && cargo +nightly check --example=embassy_serial --features=embassy,embassy-time-systick,async
       - name: check esp32c3-hal (async, i2c)
         run: cd esp32c3-hal/ && cargo +nightly check --example=embassy_i2c --features=embassy,embassy-time-systick,async
+      - name: check esp32c3-hal (async, usb_serial_jtag)
+        run: cd esp32c3-hal/ && cargo +nightly check --example=embassy_usb_serial_jtag --features=embassy,embassy-time-systick,async
       - name: check esp32c3-hal (interrupt-preemption)
         run: cd esp32c3-hal/ && cargo +nightly check --example=interrupt_preemption --features=interrupt-preemption
       - name: check esp32c3-hal (direct-vectoring)
