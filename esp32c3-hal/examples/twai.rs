@@ -4,11 +4,12 @@
 // Run this example with the eh1 feature enabled to use embedded-can instead of
 // embedded-hal-0.2.7. embedded-can was split off from embedded-hal before it's
 // upgrade to 1.0.0. cargo run --example twai --features eh1 --release
-#[cfg(feature = "eh1")]
+// Note: `async` also activates `eh1`
+#[cfg(any(feature = "eh1", feature = "async"))]
 use embedded_can::{nb::Can, Frame, Id};
 // Run this example without the eh1 flag to use the embedded-hal 0.2.7 CAN traits.
 // cargo run --example twai --release
-#[cfg(not(feature = "eh1"))]
+#[cfg(not(any(feature = "eh1", feature = "async")))]
 use embedded_hal::can::{Can, Frame, Id};
 use esp32c3_hal::{clock::ClockControl, gpio::IO, peripherals::Peripherals, prelude::*, twai};
 use esp_backtrace as _;
