@@ -128,7 +128,7 @@ impl<T, const CHANNEL: u8> Alarm<T, CHANNEL> {
         }
     }
 
-    pub fn interrupt_clear(&self) {
+    pub fn clear_interrupt(&self) {
         let systimer = unsafe { &*SYSTIMER::ptr() };
         match CHANNEL {
             0 => systimer.int_clr.write(|w| w.target0_int_clr().set_bit()),
@@ -297,7 +297,7 @@ mod asynch {
 
     impl<'a, const N: u8> AlarmFuture<'a, N> {
         pub(crate) fn new(alarm: &'a Alarm<Periodic, N>) -> Self {
-            alarm.interrupt_clear();
+            alarm.clear_interrupt();
             alarm.enable_interrupt(true);
 
             Self {
