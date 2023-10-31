@@ -28,6 +28,11 @@ const TIMER_DELAY: fugit::HertzU32 = fugit::HertzU32::from_raw(crate::CONFIG.tic
 static ALARM0: Mutex<RefCell<Option<Alarm<Periodic, 0>>>> = Mutex::new(RefCell::new(None));
 
 pub fn setup_timer(systimer: TimeBase) {
+    // make sure the scheduling won't start before everything is setup
+    unsafe {
+        riscv::interrupt::disable();
+    }
+
     let alarm0 = systimer.into_periodic();
     alarm0.set_period(TIMER_DELAY.into());
     alarm0.clear_interrupt();
