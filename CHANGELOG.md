@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - ESP32-C3: Make sure BLE and WiFi are not powered down when esp-wifi needs them (#891)
+- ESP32-C6/H2: Fix setting UART baud rate (#893)
 
 ### Removed
 
