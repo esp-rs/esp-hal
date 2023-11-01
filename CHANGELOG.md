@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 ### Fixed
+- ESP32-C3: Make sure BLE and WiFi are not powered down when esp-wifi needs them (#891)
 
 ### Removed
 
