@@ -3,22 +3,19 @@ use embedded_io::{
     Error, Io,
 };
 
-use crate::hal::{
-    peripheral::{Peripheral, PeripheralRef},
-    radio,
-};
+use crate::hal::peripheral::{Peripheral, PeripheralRef};
 use crate::EspWifiInitialization;
 
 use super::{read_hci, read_next, send_hci};
 
 pub struct BleConnector<'d> {
-    _device: PeripheralRef<'d, radio::Bluetooth>,
+    _device: PeripheralRef<'d, crate::hal::peripherals::BT>,
 }
 
 impl<'d> BleConnector<'d> {
     pub fn new(
         init: &EspWifiInitialization,
-        device: impl Peripheral<P = radio::Bluetooth> + 'd,
+        device: impl Peripheral<P = crate::hal::peripherals::BT> + 'd,
     ) -> BleConnector<'d> {
         if !init.is_ble() {
             panic!("Not initialized for BLE use");
@@ -103,13 +100,13 @@ pub mod asynch {
     }
 
     pub struct BleConnector<'d> {
-        _device: PeripheralRef<'d, crate::hal::radio::Bluetooth>,
+        _device: PeripheralRef<'d, crate::hal::peripherals::BT>,
     }
 
     impl<'d> BleConnector<'d> {
         pub fn new(
             init: &EspWifiInitialization,
-            device: impl Peripheral<P = crate::hal::radio::Bluetooth> + 'd,
+            device: impl Peripheral<P = crate::hal::peripherals::BT> + 'd,
         ) -> BleConnector<'d> {
             if !init.is_ble() {
                 panic!("Not initialized for BLE use");

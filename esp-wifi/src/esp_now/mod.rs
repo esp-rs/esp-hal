@@ -16,7 +16,6 @@ use critical_section::Mutex;
 
 use crate::compat::queue::SimpleQueue;
 use crate::hal::peripheral::{Peripheral, PeripheralRef};
-use crate::hal::radio;
 use crate::EspWifiInitialization;
 
 use crate::binary::include::*;
@@ -263,8 +262,8 @@ pub struct EspNowWithWifiCreateToken {
 }
 
 pub fn enable_esp_now_with_wifi(
-    device: crate::hal::radio::Wifi,
-) -> (crate::hal::radio::Wifi, EspNowWithWifiCreateToken) {
+    device: crate::hal::peripherals::WIFI,
+) -> (crate::hal::peripherals::WIFI, EspNowWithWifiCreateToken) {
     (device, EspNowWithWifiCreateToken { _private: () })
 }
 
@@ -535,7 +534,7 @@ impl<'d> Drop for EspNowRc<'d> {
 /// Currently this implementation (when used together with traditional Wi-Fi) ONLY support STA mode.
 ///
 pub struct EspNow<'d> {
-    _device: Option<PeripheralRef<'d, radio::Wifi>>,
+    _device: Option<PeripheralRef<'d, crate::hal::peripherals::WIFI>>,
     manager: EspNowManager<'d>,
     sender: EspNowSender<'d>,
     receiver: EspNowReceiver<'d>,
@@ -544,7 +543,7 @@ pub struct EspNow<'d> {
 impl<'d> EspNow<'d> {
     pub fn new(
         inited: &EspWifiInitialization,
-        device: impl Peripheral<P = radio::Wifi> + 'd,
+        device: impl Peripheral<P = crate::hal::peripherals::WIFI> + 'd,
     ) -> Result<EspNow<'d>, EspNowError> {
         EspNow::new_internal(inited, Some(device.into_ref()))
     }
@@ -553,12 +552,15 @@ impl<'d> EspNow<'d> {
         inited: &EspWifiInitialization,
         _token: EspNowWithWifiCreateToken,
     ) -> Result<EspNow<'d>, EspNowError> {
-        EspNow::new_internal(inited, None::<PeripheralRef<'d, radio::Wifi>>)
+        EspNow::new_internal(
+            inited,
+            None::<PeripheralRef<'d, crate::hal::peripherals::WIFI>>,
+        )
     }
 
     fn new_internal(
         inited: &EspWifiInitialization,
-        device: Option<PeripheralRef<'d, radio::Wifi>>,
+        device: Option<PeripheralRef<'d, crate::hal::peripherals::WIFI>>,
     ) -> Result<EspNow<'d>, EspNowError> {
         if !inited.is_wifi() {
             return Err(EspNowError::Error(Error::NotInitialized));

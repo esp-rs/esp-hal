@@ -35,9 +35,9 @@ pub fn setup_timer(systimer: TimeBase) {
     }
 
     let alarm0 = systimer.into_periodic();
-    alarm0.set_period(TIMESLICE_FREQUENCY.into());
+    alarm0.set_period(TIMESLICE_FREQUENCY.into_duration());
     alarm0.clear_interrupt();
-    alarm0.interrupt_enable(true);
+    alarm0.enable_interrupt(true);
 
     critical_section::with(|cs| ALARM0.borrow_ref_mut(cs).replace(alarm0));
 
@@ -83,7 +83,7 @@ fn FROM_CPU_INTR3(trap_frame: &mut TrapFrame) {
         let mut alarm0 = ALARM0.borrow_ref_mut(cs);
         let alarm0 = unwrap!(alarm0.as_mut());
 
-        alarm0.set_period(TIMESLICE_FREQUENCY.into());
+        alarm0.set_period(TIMESLICE_FREQUENCY.into_duration());
         alarm0.clear_interrupt();
     });
 

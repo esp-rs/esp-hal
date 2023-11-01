@@ -7,6 +7,31 @@
     feature = "esp32s3",
 ))]
 fn main() -> Result<(), String> {
+    #[cfg(all(feature = "ble", feature = "esp32s2"))]
+    {
+        panic!(
+            r#"
+
+        BLE is not supported on this target.
+
+        "#
+        );
+    }
+    #[cfg(all(
+        feature = "coex",
+        any(feature = "esp32s2", feature = "esp32c2", feature = "esp32c6")
+    ))]
+    {
+        panic!(
+            r#"
+
+        COEX is not yet supported on this target. 
+
+        See https://github.com/esp-rs/esp-wifi/issues/92.
+
+        "#
+        );
+    }
     match std::env::var("OPT_LEVEL") {
         Ok(level) => {
             if level != "2" && level != "3" {

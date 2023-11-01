@@ -36,16 +36,33 @@ atomic_enum = { workspace = true }
 [build-dependencies]
 toml-cfg.workspace = true
 
+[dev-dependencies]
+esp-println = { workspace = true, features = ["log"] }
+esp-backtrace = { workspace = true }
+embedded-svc.workspace = true
+embassy-executor = { workspace = true }
+embassy-time.workspace = true
+embassy-futures.workspace = true
+futures-util.workspace = true
+embassy-net = { workspace = true }
+embassy-sync.workspace = true
+bleps.workspace = true
+embedded-io.workspace = true
+embedded-hal-async = { workspace = true }
+log = { workspace = true }
+smoltcp.workspace = true
+static_cell = { workspace = true }
+
 [features]
 default = [ "utils", "log" ]
 
 # chip features
-esp32c2 = [ "esp32c2-hal", "esp-wifi-sys/esp32c2" ]
-esp32c3 = [ "esp32c3-hal", "esp-wifi-sys/esp32c3" ]
-esp32c6 = [ "esp32c6-hal", "esp-wifi-sys/esp32c6" ]
-esp32 = [ "esp32-hal",  "esp-wifi-sys/esp32" ]
-esp32s2 = [ "esp32s2-hal", "esp-wifi-sys/esp32s2" ]
-esp32s3 = [ "esp32s3-hal", "esp-wifi-sys/esp32s3" ]
+esp32c2 = [ "esp32c2-hal", "esp-wifi-sys/esp32c2", "esp-println/esp32c2", "esp-backtrace/esp32c2", "embassy-executor/arch-riscv32" ]
+esp32c3 = [ "esp32c3-hal", "esp-wifi-sys/esp32c3", "esp-println/esp32c3", "esp-backtrace/esp32c3", "embassy-executor/arch-riscv32" ]
+esp32c6 = [ "esp32c6-hal", "esp-wifi-sys/esp32c6", "esp-println/esp32c6", "esp-backtrace/esp32c6", "embassy-executor/arch-riscv32" ]
+esp32 = [ "esp32-hal",  "esp-wifi-sys/esp32", "esp-println/esp32", "esp-backtrace/esp32" ]
+esp32s2 = [ "esp32s2-hal", "esp-wifi-sys/esp32s2", "esp-println/esp32s2", "esp-backtrace/esp32s2" ]
+esp32s3 = [ "esp32s3-hal", "esp-wifi-sys/esp32s3", "esp-println/esp32s3", "esp-backtrace/esp32s3" ]
 
 # async features
 async = [
@@ -58,6 +75,13 @@ async = [
   "esp32-hal?/embassy",
   "esp32s2-hal?/embassy",
   "esp32s3-hal?/embassy",
+  "esp32c3-hal?/async",
+  "esp32c2-hal?/async",
+  "esp32c6-hal?/async",
+  "esp32-hal?/async",
+  "esp32s2-hal?/async",
+  "esp32s3-hal?/async",
+  "bleps/async"
 ]
 
 embassy-net = ["dep:embassy-net-driver", "async"]
