@@ -4,6 +4,7 @@ pub(crate) mod state;
 use atomic_polyfill::AtomicUsize;
 use core::ptr::addr_of;
 use core::sync::atomic::Ordering;
+use core::time::Duration;
 use core::{cell::RefCell, mem::MaybeUninit};
 
 use crate::common_adapter::*;
@@ -22,7 +23,6 @@ use embedded_svc::wifi::{
 
 use enumset::EnumSet;
 use enumset::EnumSetType;
-
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 
@@ -59,9 +59,9 @@ use crate::{
             wifi_interface_t_WIFI_IF_STA, wifi_mode_t, wifi_mode_t_WIFI_MODE_AP,
             wifi_mode_t_WIFI_MODE_NULL, wifi_mode_t_WIFI_MODE_STA, wifi_osi_funcs_t,
             wifi_pmf_config_t, wifi_scan_config_t, wifi_scan_threshold_t, wifi_scan_time_t,
-            wifi_scan_type_t_WIFI_SCAN_TYPE_ACTIVE, wifi_sort_method_t_WIFI_CONNECT_AP_BY_SIGNAL,
-            wifi_sta_config_t, wpa_crypto_funcs_t, ESP_WIFI_OS_ADAPTER_MAGIC,
-            ESP_WIFI_OS_ADAPTER_VERSION, WIFI_INIT_CONFIG_MAGIC,
+            wifi_scan_type_t_WIFI_SCAN_TYPE_ACTIVE, wifi_scan_type_t_WIFI_SCAN_TYPE_PASSIVE,
+            wifi_sort_method_t_WIFI_CONNECT_AP_BY_SIGNAL, wifi_sta_config_t, wpa_crypto_funcs_t,
+            ESP_WIFI_OS_ADAPTER_MAGIC, ESP_WIFI_OS_ADAPTER_VERSION, WIFI_INIT_CONFIG_MAGIC,
         },
     },
     compat::queue::SimpleQueue,
@@ -760,18 +760,133 @@ unsafe extern "C" fn coex_register_start_cb(
     0
 }
 
-pub fn wifi_start_scan(block: bool) -> i32 {
-    let scan_time = wifi_scan_time_t {
-        active: wifi_active_scan_time_t { min: 10, max: 20 },
-        passive: 20,
+/// Configuration for active or passive scan. For details see the [WIFI Alliance FAQ](https://www.wi-fi.org/knowledge-center/faq/what-are-passive-and-active-scanning).
+///
+/// # Comparison of active and passive scan
+///
+///|                                      | **Active** | **Passive** |
+///|--------------------------------------|------------|-------------|
+///| **Power consumption**                |    High    |     Low     |
+///| **Time required (typical behavior)** |     Low    |     High    |
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum ScanTypeConfig {
+    /// Active scan with min and max scan time per channel. This is the default and recommended if
+    /// you are unsure.
+    ///
+    /// # Procedure
+    /// 1. Send probe request on each channel.
+    /// 2. Wait for probe response. Wait at least `min` time, but if no response is received, wait up to `max` time.
+    /// 3. Switch channel.
+    /// 4. Repeat from 1.
+    Active {
+        /// Minimum scan time per channel. Defaults to 10ms.
+        min: Duration,
+        /// Maximum scan time per channel. Defaults to 20ms.
+        max: Duration,
+    },
+    /// Passive scan
+    ///
+    /// # Procedure
+    /// 1. Wait for beacon for given duration.
+    /// 2. Switch channel.
+    /// 3. Repeat from 1.
+    ///
+    /// # Note
+    /// It is recommended to avoid duration longer thean 1500ms, as it may cause a station to
+    /// disconnect from the AP.
+    Passive(Duration),
+}
+
+impl Default for ScanTypeConfig {
+    fn default() -> Self {
+        Self::Active {
+            min: Duration::from_millis(10),
+            max: Duration::from_millis(20),
+        }
+    }
+}
+
+impl ScanTypeConfig {
+    fn validate(&self) {
+        if matches!(self, Self::Passive(dur) if *dur > Duration::from_millis(1500)) {
+            warn!("Passive scan duration longer than 1500ms may cause a station to disconnect from the AP");
+        }
+    }
+}
+
+/// Scan configuration
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
+pub struct ScanConfig<'a> {
+    /// SSID to filter for.
+    /// If [`None`] is passed, all SSIDs will be returned.
+    /// If [`Some`] is passed, only the APs matching the given SSID will be returned.
+    pub ssid: Option<&'a str>,
+    /// BSSID to filter for.
+    /// If [`None`] is passed, all BSSIDs will be returned.
+    /// If [`Some`] is passed, only the APs matching the given BSSID will be returned.
+    pub bssid: Option<[u8; 6]>,
+    /// Channel to filter for.
+    /// If [`None`] is passed, all channels will be returned.
+    /// If [`Some`] is passed, only the APs on the given channel will be returned.
+    pub channel: Option<u8>,
+    /// Whether to show hidden networks.
+    pub show_hidden: bool,
+    /// Scan type, active or passive.
+    pub scan_type: ScanTypeConfig,
+}
+
+pub fn wifi_start_scan(
+    block: bool,
+    ScanConfig {
+        ssid,
+        mut bssid,
+        channel,
+        show_hidden,
+        scan_type,
+    }: ScanConfig<'_>,
+) -> i32 {
+    scan_type.validate();
+    let (scan_time, scan_type) = match scan_type {
+        ScanTypeConfig::Active { min, max } => (
+            wifi_scan_time_t {
+                active: wifi_active_scan_time_t {
+                    min: min.as_millis() as u32,
+                    max: max.as_millis() as u32,
+                },
+                passive: 0,
+            },
+            wifi_scan_type_t_WIFI_SCAN_TYPE_ACTIVE,
+        ),
+        ScanTypeConfig::Passive(dur) => (
+            wifi_scan_time_t {
+                active: wifi_active_scan_time_t { min: 0, max: 0 },
+                passive: dur.as_millis() as u32,
+            },
+            wifi_scan_type_t_WIFI_SCAN_TYPE_PASSIVE,
+        ),
     };
 
+    let mut ssid_buf = ssid.map(|m| {
+        let mut buf = heapless::Vec::<u8, 33>::from_iter(m.bytes());
+        unwrap!(buf.push(b'\0').ok());
+        buf
+    });
+
+    let ssid = ssid_buf
+        .as_mut()
+        .map(|e| e.as_mut_ptr())
+        .unwrap_or_else(core::ptr::null_mut);
+    let bssid = bssid
+        .as_mut()
+        .map(|e| e.as_mut_ptr())
+        .unwrap_or_else(core::ptr::null_mut);
+
     let scan_config = wifi_scan_config_t {
-        ssid: core::ptr::null_mut(),
-        bssid: core::ptr::null_mut(),
-        channel: 0,
-        show_hidden: false,
-        scan_type: wifi_scan_type_t_WIFI_SCAN_TYPE_ACTIVE,
+        ssid,
+        bssid,
+        channel: channel.unwrap_or(0),
+        show_hidden,
+        scan_type,
         scan_time,
     };
 
@@ -1190,7 +1305,7 @@ impl Wifi for WifiController<'_> {
     fn scan_n<const N: usize>(
         &mut self,
     ) -> Result<(heapless::Vec<AccessPointInfo, N>, usize), Self::Error> {
-        esp_wifi_result!(crate::wifi::wifi_start_scan(true))?;
+        esp_wifi_result!(crate::wifi::wifi_start_scan(true, Default::default()))?;
 
         let count = self.scan_result_count()?;
         let result = self.scan_results()?;
@@ -1408,12 +1523,18 @@ mod asynch {
         pub async fn scan_n<const N: usize>(
             &mut self,
         ) -> Result<(heapless::Vec<AccessPointInfo, N>, usize), WifiError> {
+            self.scan_with_config(Default::default()).await
+        }
+
+        pub async fn scan_with_config<const N: usize>(
+            &mut self,
+            config: ScanConfig<'_>,
+        ) -> Result<(heapless::Vec<AccessPointInfo, N>, usize), WifiError> {
             Self::clear_events(WifiEvent::ScanDone);
-            esp_wifi_result!(wifi_start_scan(false))?;
+            esp_wifi_result!(wifi_start_scan(false, config))?;
 
             // Prevents memory leak if `scan_n`'s future is dropped.
             let guard = FreeApListOnDrop;
-
             WifiEventFuture::new(WifiEvent::ScanDone).await;
 
             guard.defuse();
