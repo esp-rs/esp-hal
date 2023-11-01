@@ -17,15 +17,17 @@ use crate::{
     preempt::preempt::task_switch,
 };
 
+/// The timer responsible for time slicing.
 pub type TimeBase = Timer<Timer0<TIMG1>>;
-
 static TIMER1: Mutex<RefCell<Option<TimeBase>>> = Mutex::new(RefCell::new(None));
+const TIMESLICE_FREQUENCY: fugit::HertzU32 = fugit::HertzU32::from_raw(crate::CONFIG.tick_rate_hz);
+
+// Time keeping
 
 static TIMER_OVERFLOWS: AtomicU32 = AtomicU32::new(0);
-
-const TIMER_DELAY: fugit::HertzU32 = fugit::HertzU32::from_raw(crate::CONFIG.tick_rate_hz);
-
-pub const TICKS_PER_SECOND: u64 = 40_000_000;
+pub const CPU_CLOCK: u64 = 240_000_000; // ESP32, ESP32-S2 and ESP32-S3 all have 240MHz CPU clocks.
+pub const CLOCK_CYCLES_PER_TICK: u64 = 8;
+pub const TICKS_PER_SECOND: u64 = CPU_CLOCK / CLOCK_CYCLES_PER_TICK;
 
 /// This function must not be called in a critical section. Doing so may return an incorrect value.
 pub fn get_systimer_count() -> u64 {
@@ -42,9 +44,7 @@ pub fn get_systimer_count() -> u64 {
         overflow = TIMER_OVERFLOWS.load(Ordering::Relaxed);
     }
 
-    // We have to precompute the divider to avoid overflow when multiplying.
-    const DIVIDER: u64 = 240_000_000 / TICKS_PER_SECOND;
-    (((overflow as u64) << 32) + counter_after as u64) / DIVIDER
+    (((overflow as u64) << 32) + counter_after as u64) / CLOCK_CYCLES_PER_TICK
 }
 
 pub fn setup_timer(mut timer1: TimeBase) {
@@ -54,11 +54,12 @@ pub fn setup_timer(mut timer1: TimeBase) {
     ));
 
     timer1.listen();
-    timer1.start(TIMER_DELAY.into_duration());
+    timer1.start(TIMESLICE_FREQUENCY.into_duration());
     critical_section::with(|cs| {
         TIMER1.borrow_ref_mut(cs).replace(timer1);
     });
 
+    // Set up the time keeping timer.
     xtensa_lx::timer::set_ccompare0(0xffffffff);
 }
 
@@ -85,16 +86,14 @@ fn Timer0(_level: u32) {
 }
 
 fn do_task_switch(context: &mut TrapFrame) {
-    task_switch(context);
-
     critical_section::with(|cs| {
-        crate::memory_fence::memory_fence();
-
         let mut timer = TIMER1.borrow_ref_mut(cs);
         let timer = unwrap!(timer.as_mut());
         timer.clear_interrupt();
-        timer.start(TIMER_DELAY.into_duration());
+        timer.start(TIMESLICE_FREQUENCY.into_duration());
     });
+
+    task_switch(context);
 }
 
 #[interrupt]
