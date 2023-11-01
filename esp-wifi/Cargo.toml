@@ -33,6 +33,9 @@ cfg-if.workspace = true
 atomic-polyfill = { workspace = true }
 atomic_enum = { workspace = true }
 
+[build-dependencies]
+toml-cfg.workspace = true
+
 [features]
 default = [ "utils", "log" ]
 
