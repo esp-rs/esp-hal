@@ -183,7 +183,7 @@ pub enum EspWifiInitialization {
     Wifi(EspWifiInitializationInternal),
     #[cfg(feature = "ble")]
     Ble(EspWifiInitializationInternal),
-    #[cfg(all(feature = "wifi", feature = "ble"))]
+    #[cfg(coex)]
     WifiBle(EspWifiInitializationInternal),
 }
 
@@ -215,7 +215,7 @@ pub enum EspWifiInitFor {
     Wifi,
     #[cfg(feature = "ble")]
     Ble,
-    #[cfg(all(feature = "wifi", feature = "ble"))]
+    #[cfg(coex)]
     WifiBle,
 }
 
@@ -247,28 +247,16 @@ pub fn initialize(
     radio_clocks: hal::system::RadioClockControl,
     clocks: &Clocks,
 ) -> Result<EspWifiInitialization, InitializationError> {
-    #[cfg(all(not(coex), feature = "wifi", feature = "ble"))]
-    if init_for == EspWifiInitFor::WifiBle {
-        panic!("Trying to use Wifi and BLE without COEX feature");
-    }
-
     #[cfg(any(esp32, esp32s3, esp32s2))]
-    if clocks.cpu_clock != MegahertzU32::MHz(240) {
-        return Err(InitializationError::WrongClockConfig);
-    }
+    const MAX_CLOCK: u32 = 240;
 
-    #[cfg(esp32c6)]
-    if clocks.cpu_clock != MegahertzU32::MHz(160) {
-        return Err(InitializationError::WrongClockConfig);
-    }
-
-    #[cfg(esp32c3)]
-    if clocks.cpu_clock != MegahertzU32::MHz(160) {
-        return Err(InitializationError::WrongClockConfig);
-    }
+    #[cfg(any(esp32c3, esp32c6))]
+    const MAX_CLOCK: u32 = 160;
 
     #[cfg(esp32c2)]
-    if clocks.cpu_clock != MegahertzU32::MHz(120) {
+    const MAX_CLOCK: u32 = 120;
+
+    if clocks.cpu_clock != MegahertzU32::MHz(MAX_CLOCK) {
         return Err(InitializationError::WrongClockConfig);
     }
 
@@ -298,32 +286,25 @@ pub fn initialize(
     init_clocks();
 
     #[cfg(coex)]
-    {
-        debug!("coex init");
-        let res = crate::wifi::coex_initialize();
-        if res != 0 {
-            return Err(InitializationError::General(res));
-        }
+    match crate::wifi::coex_initialize() {
+        0 => {}
+        error => return Err(InitializationError::General(error)),
     }
 
     #[cfg(feature = "wifi")]
-    {
-        if init_for.is_wifi() {
-            debug!("wifi init");
-            // wifi init
-            crate::wifi::wifi_init()?;
-        }
+    if init_for.is_wifi() {
+        debug!("wifi init");
+        // wifi init
+        crate::wifi::wifi_init()?;
     }
 
     #[cfg(feature = "ble")]
-    {
-        if init_for.is_ble() {
-            // ble init
-            // for some reason things don't work when initializing things the other way around
-            // while the original implementation in NuttX does it like that
-            debug!("ble init");
-            crate::ble::ble_init();
-        }
+    if init_for.is_ble() {
+        // ble init
+        // for some reason things don't work when initializing things the other way around
+        // while the original implementation in NuttX does it like that
+        debug!("ble init");
+        crate::ble::ble_init();
     }
 
     match init_for {
@@ -331,7 +312,7 @@ pub fn initialize(
         EspWifiInitFor::Wifi => Ok(EspWifiInitialization::Wifi(EspWifiInitializationInternal)),
         #[cfg(feature = "ble")]
         EspWifiInitFor::Ble => Ok(EspWifiInitialization::Ble(EspWifiInitializationInternal)),
-        #[cfg(all(feature = "wifi", feature = "ble"))]
+        #[cfg(coex)]
         EspWifiInitFor::WifiBle => Ok(EspWifiInitialization::WifiBle(
             EspWifiInitializationInternal,
         )),
@@ -360,10 +341,11 @@ impl From<WifiError> for InitializationError {
 pub fn wifi_set_log_verbose() {
     #[cfg(feature = "wifi-logs")]
     unsafe {
-        use crate::binary::include::{esp_wifi_internal_set_log_level, wifi_log_level_t};
+        use crate::binary::include::{
+            esp_wifi_internal_set_log_level, wifi_log_level_t_WIFI_LOG_VERBOSE,
+        };
 
-        let level: wifi_log_level_t = crate::binary::include::wifi_log_level_t_WIFI_LOG_VERBOSE;
-        esp_wifi_internal_set_log_level(level);
+        esp_wifi_internal_set_log_level(wifi_log_level_t_WIFI_LOG_VERBOSE);
     }
 }
 

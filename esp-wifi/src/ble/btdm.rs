@@ -1,8 +1,8 @@
-use core::cell::RefCell;
+use core::{cell::RefCell, ptr::addr_of};
 
 use critical_section::Mutex;
 
-use crate::ble::btdm::ble_os_adapter_chip_specific::G_OSI_FUNCS;
+use crate::ble::btdm::ble_os_adapter_chip_specific::{osi_funcs_s, G_OSI_FUNCS};
 use crate::ble::HciOutCollector;
 use crate::ble::HCI_OUT_COLLECTOR;
 use crate::hal::macros::ram;
@@ -38,7 +38,7 @@ struct vhci_host_callback_s {
 }
 
 extern "C" {
-    fn btdm_osi_funcs_register(osi_funcs: *const ()) -> i32;
+    fn btdm_osi_funcs_register(osi_funcs: *const osi_funcs_s) -> i32;
     fn btdm_controller_get_compile_version() -> *const u8;
 
     #[cfg(any(esp32c3, esp32s3))]
@@ -446,7 +446,7 @@ pub(crate) fn ble_init() {
 
         let mut cfg = ble_os_adapter_chip_specific::create_ble_config();
 
-        let res = btdm_osi_funcs_register(&G_OSI_FUNCS as *const _ as *const ());
+        let res = btdm_osi_funcs_register(addr_of!(G_OSI_FUNCS));
         if res != 0 {
             panic!("btdm_osi_funcs_register returned {}", res);
         }

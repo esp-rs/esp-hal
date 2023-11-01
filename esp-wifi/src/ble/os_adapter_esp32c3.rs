@@ -17,7 +17,7 @@ pub(super) struct osi_funcs_s {
     version: u32,
     interrupt_set: Option<unsafe extern "C" fn(i32, i32, i32, i32)>,
     interrupt_clear: Option<unsafe extern "C" fn(i32, i32)>,
-    interrupt_handler_set: Option<unsafe extern "C" fn(i32, extern "C" fn(), *const ())>,
+    interrupt_handler_set: Option<unsafe extern "C" fn(i32, extern "C" fn(*const ()), *const ())>,
     interrupt_disable: Option<unsafe extern "C" fn()>,
     interrupt_enable: Option<unsafe extern "C" fn()>,
     task_yield: Option<unsafe extern "C" fn()>,
@@ -228,7 +228,7 @@ pub(crate) unsafe extern "C" fn interrupt_clear(_interrupt_source: i32, _interru
 
 pub(crate) unsafe extern "C" fn interrupt_handler_set(
     interrupt_no: i32,
-    func: extern "C" fn(),
+    func: extern "C" fn(*const ()),
     arg: *const (),
 ) {
     trace!(

@@ -609,9 +609,7 @@ pub fn wifi_init() -> Result<(), WifiError> {
         G_CONFIG.feature_caps = g_wifi_feature_caps;
 
         #[cfg(coex)]
-        {
-            esp_wifi_result!(coex_init())?;
-        }
+        esp_wifi_result!(coex_init())?;
 
         esp_wifi_result!(esp_wifi_init_internal(&G_CONFIG))?;
         esp_wifi_result!(esp_wifi_set_mode(wifi_mode_t_WIFI_MODE_NULL))?;
