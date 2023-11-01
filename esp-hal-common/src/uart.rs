@@ -721,9 +721,9 @@ where
 
     #[cfg(any(esp32c6, esp32h2))]
     fn change_baud(&self, baudrate: u32, clocks: &Clocks) {
-        // we force the clock source to be APB and don't use the decimal part of the
-        // divider
-        let clk = clocks.apb_clock.to_Hz();
+        // we force the clock source to be XTAL and don't use the decimal part of
+        // the divider
+        let clk = clocks.xtal_clock.to_Hz();
         let max_div = 0b1111_1111_1111 - 1;
         let clk_div = ((clk) + (max_div * baudrate) - 1) / (max_div * baudrate);
 
@@ -743,7 +743,7 @@ where
                         .uart0_sclk_div_num()
                         .bits(clk_div as u8 - 1)
                         .uart0_sclk_sel()
-                        .bits(0x1) // TODO: this probably shouldn't be hard-coded
+                        .bits(0x3) // TODO: this probably shouldn't be hard-coded
                         .uart0_sclk_en()
                         .set_bit()
                 });
@@ -760,7 +760,7 @@ where
                         .uart1_sclk_div_num()
                         .bits(clk_div as u8 - 1)
                         .uart1_sclk_sel()
-                        .bits(0x1) // TODO: this probably shouldn't be hard-coded
+                        .bits(0x3) // TODO: this probably shouldn't be hard-coded
                         .uart1_sclk_en()
                         .set_bit()
                 });
@@ -775,6 +775,8 @@ where
         T::register_block()
             .clkdiv
             .write(|w| unsafe { w.clkdiv().bits(divider).frag().bits(0) });
+
+        self.sync_regs();
     }
 
     #[cfg(any(esp32, esp32s2))]
@@ -795,7 +797,7 @@ where
 
     #[cfg(any(esp32c6, esp32h2))] // TODO introduce a cfg symbol for this
     #[inline(always)]
-    fn sync_regs(&mut self) {
+    fn sync_regs(&self) {
         T::register_block()
             .reg_update
             .modify(|_, w| w.reg_update().set_bit());
