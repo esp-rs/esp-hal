@@ -89,6 +89,16 @@ fn reset_mac() {
 }
 
 fn init_clocks() {
+    // undo the power down in base_settings (esp32c3_sleep)
+    let rtc_cntl = unsafe { crate::peripherals::RTC_CNTL::steal() };
+    rtc_cntl
+        .dig_iso
+        .modify(|_, w| w.wifi_force_iso().clear_bit().bt_force_iso().clear_bit());
+
+    rtc_cntl
+        .dig_pwc
+        .modify(|_, w| w.wifi_force_pd().clear_bit().bt_force_pd().clear_bit());
+
     // from `esp_perip_clk_init`
     const SYSTEM_WIFI_CLK_I2C_CLK_EN: u32 = 1 << 5;
     const SYSTEM_WIFI_CLK_UNUSED_BIT12: u32 = 1 << 12;
