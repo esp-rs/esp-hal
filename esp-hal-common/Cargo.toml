@@ -1,6 +1,6 @@
 [package]
 name    = "esp-hal-common"
-version = "0.13.0"
+version = "0.13.1"
 authors = [
     "Jesse Braham <jesse@beta7.io>",
     "Björn Quentin <bjoern.quentin@mobile-j.de>",
