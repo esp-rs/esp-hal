@@ -18,7 +18,7 @@ use esp_wifi::{
     EspWifiInitFor,
 };
 
-use embedded_io::blocking::*;
+use embedded_io::*;
 use embedded_svc::ipv4::Interface;
 use embedded_svc::wifi::{AccessPointInfo, ClientConfiguration, Configuration, Wifi};
 

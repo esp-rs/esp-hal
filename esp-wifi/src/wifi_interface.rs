@@ -1,7 +1,7 @@
 use core::cell::RefCell;
 use core::fmt::Display;
-use embedded_io::blocking::{Read, Write};
-use embedded_io::Io;
+use embedded_io::ErrorType;
+use embedded_io::{Read, Write};
 
 use embedded_svc::ipv4;
 use smoltcp::iface::{Interface, SocketHandle, SocketSet};
@@ -612,7 +612,7 @@ impl embedded_io::Error for IoError {
     }
 }
 
-impl<'s, 'n: 's> Io for Socket<'s, 'n> {
+impl<'s, 'n: 's> ErrorType for Socket<'s, 'n> {
     type Error = IoError;
 }
 

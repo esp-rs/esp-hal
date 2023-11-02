@@ -19,6 +19,7 @@ embedded-svc = { workspace = true, optional = true }
 enumset = { workspace = true, optional = true }
 linked_list_allocator = { workspace = true }
 embedded-io.workspace = true
+embedded-io-async = { workspace = true, optional = true }
 fugit.workspace = true
 heapless = { workspace = true, default-features = false }
 num-derive = { workspace = true, features = ["full-syntax"] }
@@ -26,32 +27,28 @@ num-traits = { workspace = true, default-features = false }
 esp-wifi-sys = { version = "0.1.0", path = "../esp-wifi-sys" }
 embassy-sync = { workspace = true, optional = true }
 embassy-futures = { workspace = true, optional = true }
-embassy-net-driver = { workspace = true, optional = true }
+embassy-net = { workspace = true, optional = true }
 toml-cfg.workspace = true
 libm.workspace = true
 cfg-if.workspace = true
-atomic-polyfill = { workspace = true }
-atomic_enum = { workspace = true }
+atomic-polyfill.workspace = true
+atomic_enum.workspace = true
 
 [build-dependencies]
 toml-cfg.workspace = true
 
 [dev-dependencies]
 esp-println = { workspace = true, features = ["log"] }
-esp-backtrace = { workspace = true }
+esp-backtrace.workspace = true
 embedded-svc.workspace = true
-embassy-executor = { workspace = true }
+embassy-executor.workspace = true
 embassy-time.workspace = true
-embassy-futures.workspace = true
 futures-util.workspace = true
-embassy-net = { workspace = true }
-embassy-sync.workspace = true
 bleps.workspace = true
-embedded-io.workspace = true
-embedded-hal-async = { workspace = true }
-log = { workspace = true }
+embedded-hal-async.workspace = true
+log.workspace = true
 smoltcp.workspace = true
-static_cell = { workspace = true }
+static_cell.workspace = true
 
 [features]
 default = [ "utils", "log" ]
@@ -68,7 +65,7 @@ esp32s3 = [ "esp32s3-hal", "esp-wifi-sys/esp32s3", "esp-println/esp32s3", "esp-b
 async = [
   "dep:embassy-sync",
   "dep:embassy-futures",
-  "embedded-io/async",
+  "dep:embedded-io-async",
   "esp32c3-hal?/embassy",
   "esp32c2-hal?/embassy",
   "esp32c6-hal?/embassy",
@@ -84,7 +81,7 @@ async = [
   "bleps/async"
 ]
 
-embassy-net = ["dep:embassy-net-driver", "async"]
+embassy-net = ["dep:embassy-net", "async"]
 
 # misc features
 coex = []

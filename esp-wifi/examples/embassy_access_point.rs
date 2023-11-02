@@ -55,13 +55,11 @@ async fn main(spawner: Spawner) -> ! {
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     embassy::init(&clocks, timer_group0.timer0);
 
-    let config = Config {
-        ipv4: ConfigV4::Static(StaticConfigV4 {
-            address: Ipv4Cidr::new(Ipv4Address::new(192, 168, 2, 1), 24),
-            gateway: Some(Ipv4Address::from_bytes(&[192, 168, 2, 1])),
-            dns_servers: Default::default(),
-        }),
-    };
+    let config = Config::ipv4_static(StaticConfigV4 {
+        address: Ipv4Cidr::new(Ipv4Address::new(192, 168, 2, 1), 24),
+        gateway: Some(Ipv4Address::from_bytes(&[192, 168, 2, 1])),
+        dns_servers: Default::default(),
+    });
 
     let seed = 1234; // very random, very secure seed
 
@@ -105,7 +103,7 @@ async fn main(spawner: Spawner) -> ! {
             continue;
         }
 
-        use embedded_io::asynch::Write;
+        use embedded_io_async::Write;
 
         let mut buffer = [0u8; 1024];
         let mut pos = 0;
