@@ -45,13 +45,15 @@ fn main() -> ! {
 
     let mut spi = Spi::new(
         peripherals.SPI2,
-        sclk,
-        mosi,
-        miso,
-        cs,
         1000u32.kHz(),
         SpiMode::Mode0,
         &clocks,
+    )
+    .with_pins(
+        Some(sclk),
+        Some(mosi),
+        Some(miso),
+        Some(cs),
     );
 
     let mut delay = Delay::new(&clocks);
