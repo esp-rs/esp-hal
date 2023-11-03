@@ -395,7 +395,7 @@ where
     ///
     /// All pins are optional. Pass [crate::gpio::NO_PIN] if you don't need the
     /// given pin.
-    pub fn new<SCK: OutputPin, MOSI: OutputPin, MISO: InputPin, CS: OutputPin>(
+    pub fn new(
         spi: impl Peripheral<P = T> + 'd,
         frequency: HertzU32,
         mode: SpiMode,
