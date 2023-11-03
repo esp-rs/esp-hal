@@ -93,7 +93,7 @@ name              = "embassy_hello_world"
 required-features = ["embassy", "embassy-executor-thread"]
 
 [[example]]
-name              = "embassy_multiprio"
+name              = "embassyinterrupt_multiprio"
 required-features = ["embassy", "embassy-executor-interrupt"]
 
 [[example]]
@@ -118,16 +118,16 @@ required-features = ["embassy", "embassy-executor-thread", "async"]
 
 [[example]]
 name              = "embassy_rmt_tx"
-required-features = ["embassy", "async"]
+required-features = ["embassy", "async", "embassy-executor-thread"]
 
 [[example]]
 name              = "embassy_rmt_rx"
-required-features = ["embassy", "async"]
+required-features = ["embassy", "async", "embassy-executor-thread"]
 
 [[example]]
 name              = "embassy_i2s_sound"
-required-features = ["embassy", "async"]
+required-features = ["embassy", "async", "embassy-executor-thread"]
 
 [[example]]
 name              = "embassy_i2s_read"
-required-features = ["embassy", "async"]
+required-features = ["embassy", "async", "embassy-executor-thread"]
