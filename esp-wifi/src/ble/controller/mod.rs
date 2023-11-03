@@ -5,6 +5,7 @@ use crate::EspWifiInitialization;
 
 use super::{read_hci, read_next, send_hci};
 
+/// A blocking HCI connector
 pub struct BleConnector<'d> {
     _device: PeripheralRef<'d, crate::hal::peripherals::BT>,
 }
@@ -76,6 +77,7 @@ impl Write for BleConnector<'_> {
     }
 }
 
+/// Async Interface
 #[cfg(feature = "async")]
 pub mod asynch {
     use core::task::Poll;
@@ -95,6 +97,7 @@ pub mod asynch {
         HCI_WAKER.wake();
     }
 
+    /// Async HCI connector
     pub struct BleConnector<'d> {
         _device: PeripheralRef<'d, crate::hal::peripherals::BT>,
     }

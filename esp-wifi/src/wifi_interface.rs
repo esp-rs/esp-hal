@@ -1,3 +1,5 @@
+//! Non-async Networking primitives for TCP/UDP communication.
+
 use core::cell::RefCell;
 use core::fmt::Display;
 use embedded_io::ErrorType;
@@ -14,6 +16,9 @@ use crate::wifi::{get_ap_mac, get_sta_mac, WifiDevice, WifiMode};
 
 use core::borrow::BorrowMut;
 
+/// Non-async TCP/IP network stack
+///
+/// Mostly a convenience wrapper for `smoltcp`
 pub struct WifiStack<'a> {
     device: RefCell<WifiDevice<'static>>, // TODO allow non static lifetime
     network_interface: RefCell<Interface>,
@@ -66,6 +71,7 @@ impl<'a> WifiStack<'a> {
         this
     }
 
+    /// Update the interface configuration
     pub fn update_iface_configuration(
         &self,
         conf: &ipv4::Configuration,
@@ -121,6 +127,7 @@ impl<'a> WifiStack<'a> {
         Ok(())
     }
 
+    /// Reset the stack
     pub fn reset(&self) {
         debug!("Reset TCP stack");
 
@@ -228,6 +235,7 @@ impl<'a> WifiStack<'a> {
         Ok(())
     }
 
+    /// Create a new [Socket]
     pub fn get_socket<'s>(
         &'s self,
         rx_buffer: &'a mut [u8],
@@ -250,6 +258,7 @@ impl<'a> WifiStack<'a> {
         }
     }
 
+    /// Create a new [UdpSocket]
     pub fn get_udp_socket<'s>(
         &'s self,
         rx_meta: &'a mut [smoltcp::socket::udp::PacketMetadata],
@@ -274,10 +283,12 @@ impl<'a> WifiStack<'a> {
         }
     }
 
+    /// Check if DNS is configured
     pub fn is_dns_configured(&self) -> bool {
         self.dns_socket_handle.borrow().is_some()
     }
 
+    /// Configure DNS
     pub fn configure_dns(
         &'a self,
         servers: &[IpAddress],
@@ -293,6 +304,7 @@ impl<'a> WifiStack<'a> {
         self.dns_socket_handle.replace(Some(handle));
     }
 
+    /// Update the DNS servers
     pub fn update_dns_servers(&self, servers: &[IpAddress]) {
         if let Some(dns_handle) = *self.dns_socket_handle.borrow_mut() {
             self.with_mut(|_interface, _device, sockets| {
@@ -303,6 +315,7 @@ impl<'a> WifiStack<'a> {
         }
     }
 
+    /// Perform a DNS query
     pub fn dns_query(
         &self,
         name: &str,
@@ -354,6 +367,9 @@ impl<'a> WifiStack<'a> {
         }
     }
 
+    /// Let the stack make progress
+    ///
+    /// Make sure to regularly call this function.
     pub fn work(&self) {
         loop {
             if let false = self.with_mut(|interface, device, sockets| {
@@ -416,6 +432,7 @@ impl<'a> WifiStack<'a> {
     }
 }
 
+/// Errors returned by functions in this module
 #[derive(Debug, Copy, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum WifiStackError {
@@ -434,6 +451,7 @@ impl Display for WifiStackError {
     }
 }
 
+/// [current_millis] as an Instant
 pub fn timestamp() -> Instant {
     Instant::from_millis(current_millis() as i64)
 }
@@ -458,12 +476,14 @@ impl<'a> ipv4::Interface for WifiStack<'a> {
     }
 }
 
+/// A TCP socket
 pub struct Socket<'s, 'n: 's> {
     socket_handle: SocketHandle,
     network: &'s WifiStack<'n>,
 }
 
 impl<'s, 'n: 's> Socket<'s, 'n> {
+    /// Connect the socket
     pub fn open<'i>(&'i mut self, addr: IpAddress, port: u16) -> Result<(), IoError>
     where
         's: 'i,
@@ -500,6 +520,7 @@ impl<'s, 'n: 's> Socket<'s, 'n> {
         Ok(())
     }
 
+    /// Listen on the given port. This blocks until there is a peer connected
     pub fn listen<'i>(&'i mut self, port: u16) -> Result<(), IoError>
     where
         's: 'i,
@@ -533,6 +554,7 @@ impl<'s, 'n: 's> Socket<'s, 'n> {
         Ok(())
     }
 
+    /// Listen on the given port. This doesn't block
     pub fn listen_unblocking<'i>(&'i mut self, port: u16) -> Result<(), IoError>
     where
         's: 'i,
@@ -550,6 +572,7 @@ impl<'s, 'n: 's> Socket<'s, 'n> {
         Ok(())
     }
 
+    /// Closes the socket
     pub fn close(&mut self) {
         self.network.with_mut(|_interface, _device, sockets| {
             sockets.get_mut::<TcpSocket>(self.socket_handle).close();
@@ -558,6 +581,7 @@ impl<'s, 'n: 's> Socket<'s, 'n> {
         self.work();
     }
 
+    /// Disconnect the socket
     pub fn disconnect(&mut self) {
         self.network.with_mut(|_interface, _device, sockets| {
             sockets.get_mut::<TcpSocket>(self.socket_handle).abort();
@@ -566,12 +590,14 @@ impl<'s, 'n: 's> Socket<'s, 'n> {
         self.work();
     }
 
+    /// Checks if the socket is currently open
     pub fn is_open(&mut self) -> bool {
         self.network.with_mut(|_interface, _device, sockets| {
             sockets.get_mut::<TcpSocket>(self.socket_handle).is_open()
         })
     }
 
+    /// Checks if the socket is currently connected
     pub fn is_connected(&mut self) -> bool {
         self.network.with_mut(|_interface, _device, sockets| {
             let socket = sockets.get_mut::<TcpSocket>(self.socket_handle);
@@ -580,6 +606,7 @@ impl<'s, 'n: 's> Socket<'s, 'n> {
         })
     }
 
+    /// Delegates to [WifiStack::work]
     pub fn work(&mut self) {
         self.network.work()
     }
@@ -592,6 +619,7 @@ impl<'s, 'n: 's> Drop for Socket<'s, 'n> {
     }
 }
 
+/// IO Errors
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum IoError {
@@ -700,12 +728,14 @@ impl<'s, 'n: 's> Write for Socket<'s, 'n> {
     }
 }
 
+/// A UDP socket
 pub struct UdpSocket<'s, 'n: 's> {
     socket_handle: SocketHandle,
     network: &'s WifiStack<'n>,
 }
 
 impl<'s, 'n: 's> UdpSocket<'s, 'n> {
+    /// Binds the socket to the given port
     pub fn bind<'i>(&'i mut self, port: u16) -> Result<(), IoError>
     where
         's: 'i,
@@ -743,6 +773,7 @@ impl<'s, 'n: 's> UdpSocket<'s, 'n> {
         Ok(())
     }
 
+    /// Close the socket
     pub fn close(&mut self) {
         self.network.with_mut(|_interface, _device, sockets| {
             sockets
@@ -753,6 +784,7 @@ impl<'s, 'n: 's> UdpSocket<'s, 'n> {
         self.work();
     }
 
+    /// Sends data on the socket to the given address
     pub fn send(&mut self, addr: IpAddress, port: u16, data: &[u8]) -> Result<(), IoError> {
         loop {
             self.work();
@@ -788,6 +820,7 @@ impl<'s, 'n: 's> UdpSocket<'s, 'n> {
         Ok(())
     }
 
+    /// Receives a single datagram message on the socket
     pub fn receive(&mut self, data: &mut [u8]) -> Result<(usize, IpAddress, u16), IoError> {
         self.work();
 
@@ -806,6 +839,7 @@ impl<'s, 'n: 's> UdpSocket<'s, 'n> {
         }
     }
 
+    /// This function specifies a new multicast group for this socket to join
     pub fn join_multicast_group(&mut self, addr: IpAddress) -> Result<bool, IoError> {
         self.work();
 
@@ -822,6 +856,7 @@ impl<'s, 'n: 's> UdpSocket<'s, 'n> {
         res.map_err(|e| IoError::MultiCastError(e))
     }
 
+    /// Delegates to [WifiStack::work]
     pub fn work(&mut self) {
         self.network.work()
     }

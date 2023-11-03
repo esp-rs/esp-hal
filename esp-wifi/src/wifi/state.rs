@@ -3,6 +3,7 @@ use super::WifiEvent;
 use atomic_enum::atomic_enum;
 use core::sync::atomic::Ordering;
 
+/// Wifi interface state
 #[atomic_enum]
 #[derive(PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -35,10 +36,12 @@ impl From<WifiEvent> for WifiState {
 pub(crate) static STA_STATE: AtomicWifiState = AtomicWifiState::new(WifiState::Invalid);
 pub(crate) static AP_STATE: AtomicWifiState = AtomicWifiState::new(WifiState::Invalid);
 
+/// Get the current state of the AP
 pub fn get_ap_state() -> WifiState {
     AP_STATE.load(Ordering::Relaxed)
 }
 
+/// Get the current state of the STA
 pub fn get_sta_state() -> WifiState {
     STA_STATE.load(Ordering::Relaxed)
 }

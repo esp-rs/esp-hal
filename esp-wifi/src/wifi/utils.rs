@@ -1,3 +1,5 @@
+//! Convenience utilities for non-async code
+
 use smoltcp::{
     iface::{Config, Interface, SocketSet, SocketStorage},
     socket::dhcpv4::Socket as Dhcpv4Socket,
