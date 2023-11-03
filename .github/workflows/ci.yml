@@ -45,18 +45,18 @@ jobs:
 
       # Check all RISC-V targets:
       - name: check (esp32c3)
-        run: cd esp-hal-smartled/ && cargo +nightly build --features=esp32c3
+        run: cd esp-hal-smartled/ && cargo +nightly build --features=esp32c3 --target=riscv32imc-unknown-none-elf
       - name: check (esp32c6)
-        run: cd esp-hal-smartled/ && cargo +nightly build --features=esp32c6
+        run: cd esp-hal-smartled/ && cargo +nightly build --features=esp32c6 --target=riscv32imac-unknown-none-elf
       - name: check (esp32h2)
-        run: cd esp-hal-smartled/ && cargo +nightly build --features=esp32h2
+        run: cd esp-hal-smartled/ && cargo +nightly build --features=esp32h2 --target=riscv32imac-unknown-none-elf
       # Check all Xtensa targets:
       - name: check (esp32)
-        run: cd esp-hal-smartled/ && cargo +esp build --features=esp32,xtal-40mhz
+        run: cd esp-hal-smartled/ && cargo +esp build --features=esp32,xtal-40mhz -Zbuild-std=core --target=xtensa-esp32-none-elf
       - name: check (esp32s2)
-        run: cd esp-hal-smartled/ && cargo +esp build --features=esp32s2
+        run: cd esp-hal-smartled/ && cargo +esp build --features=esp32s2 -Zbuild-std=core --target=xtensa-esp32s2-none-elf
       - name: check (esp32s3)
-        run: cd esp-hal-smartled/ && cargo +esp build --features=esp32s3
+        run: cd esp-hal-smartled/ && cargo +esp build --features=esp32s3 -Zbuild-std=core --target=xtensa-esp32s3-none-elf
       # Ensure documentation can be built (requires a chip feature!)
       - name: rustdoc
         run: cd esp-hal-smartled/ && cargo doc --features=esp32c3,esp-hal-common/eh1
