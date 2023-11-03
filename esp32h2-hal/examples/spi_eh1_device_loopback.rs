@@ -44,18 +44,14 @@ fn main() -> ! {
     let miso = io.pins.gpio2;
     let mosi = io.pins.gpio3;
 
-    let spi_controller = SpiBusController::from_spi(Spi::new(
-        peripherals.SPI2,
-        1000u32.kHz(),
-        SpiMode::Mode0,
-        &clocks,
-    )
-    .with_pins(
-        Some(sclk),
-        Some(mosi),
-        Some(miso),
-        gpio::NO_PIN,
-    ));
+    let spi_controller = SpiBusController::from_spi(
+        Spi::new(peripherals.SPI2, 1000u32.kHz(), SpiMode::Mode0, &clocks).with_pins(
+            Some(sclk),
+            Some(mosi),
+            Some(miso),
+            gpio::NO_PIN,
+        ),
+    );
     let mut spi_device_1 = spi_controller.add_device(io.pins.gpio11);
     let mut spi_device_2 = spi_controller.add_device(io.pins.gpio12);
     let mut spi_device_3 = spi_controller.add_device(io.pins.gpio25);
