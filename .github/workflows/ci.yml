@@ -95,8 +95,8 @@ jobs:
       - name: check esp32-hal (embassy, async, log/defmt)
         run: |
           cd esp32-hal/
-          cargo build --example=embassy_* --features=embassy,embassy-time-timg0,async,embassy-executor-interrupt,embassy-executor-thread,defmt
-          cargo build --example=embassy_* --features=embassy,embassy-time-timg0,async,embassy-executor-interrupt,embassy-executor-thread,log
+          cargo build --example=embassy_* --release --features=embassy,embassy-time-timg0,async,embassy-executor-interrupt,embassy-executor-thread,defmt
+          cargo build --example=embassy_* --release --features=embassy,embassy-time-timg0,async,embassy-executor-interrupt,embassy-executor-thread,log
       - name: check esp32-hal (psram)
         run: cd esp32-hal/ && cargo build --example=psram --features=psram-2m --release # This example requires release!
       # Ensure documentation can be built
@@ -374,8 +374,8 @@ jobs:
       - name: check esp32s2-hal (embassy, async, log/defmt)
         run: |
           cd esp32s2-hal/
-          cargo +esp build --example=embassy_* --features=embassy,async,embassy-time-timg0,embassy-executor-interrupt,embassy-executor-thread,defmt
-          cargo +esp build --example=embassy_* --features=embassy,async,embassy-time-timg0,embassy-executor-interrupt,embassy-executor-thread,log
+          cargo +esp build --example=embassy_* --release --features=embassy,async,embassy-time-timg0,embassy-executor-interrupt,embassy-executor-thread,defmt
+          cargo +esp build --example=embassy_* --release --features=embassy,async,embassy-time-timg0,embassy-executor-interrupt,embassy-executor-thread,log
       - name: check esp32s2-hal (psram)
         run: cd esp32s2-hal/ && cargo +esp build --example=psram --features=psram-2m --release # This example requires release!
       # Ensure documentation can be built
@@ -439,8 +439,8 @@ jobs:
       - name: check esp32s3-hal (embassy, async, log/defmt)
         run: |
           cd esp32s3-hal/
-          cargo +esp build --example=embassy_* --features=embassy,async,embassy-time-timg0,embassy-executor-interrupt,embassy-executor-thread,defmt
-          cargo +esp build --example=embassy_* --features=embassy,async,embassy-time-timg0,embassy-executor-interrupt,embassy-executor-thread,log
+          cargo +esp build --example=embassy_* --release --features=embassy,async,embassy-time-timg0,embassy-executor-interrupt,embassy-executor-thread,defmt
+          cargo +esp build --example=embassy_* --release --features=embassy,async,embassy-time-timg0,embassy-executor-interrupt,embassy-executor-thread,log
       # Ensure documentation can be built
       - name: rustdoc
         run: cd esp32s3-hal/ && cargo doc --features=eh1
