@@ -56,15 +56,17 @@ fn main() -> ! {
 
     let mut spi = Spi::new_half_duplex(
         peripherals.SPI2,
+        100u32.kHz(),
+        SpiMode::Mode0,
+        &clocks,
+    )
+    .with_pins(
         Some(sclk),
         Some(mosi),
         Some(miso),
         Some(sio2),
         Some(sio3),
         Some(cs),
-        100u32.kHz(),
-        SpiMode::Mode0,
-        &clocks,
     )
     .with_dma(dma_channel.configure(
         false,
