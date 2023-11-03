@@ -52,7 +52,7 @@ use crate::{
     peripherals::GPIO,
 };
 
-pub const NUM_PINS: usize = 48;
+pub const NUM_PINS: usize = 49;
 
 pub type OutputSignalType = u16;
 pub const OUTPUT_SIGNAL_MAX: u16 = 256;

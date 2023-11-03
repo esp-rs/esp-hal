@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - ESP32-C2/C3 examples: fix build error (#899)
+- ESP32-S3: Fix GPIO interrupt handler crashing when using GPIO48. (#898)
 
 ### Removed
 
