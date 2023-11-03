@@ -21,7 +21,7 @@
 use embedded_hal_1::spi::SpiDevice;
 use esp32_hal::{
     clock::ClockControl,
-    gpio::IO,
+    gpio::{self, IO},
     peripherals::Peripherals,
     prelude::*,
     spi::{
@@ -44,14 +44,17 @@ fn main() -> ! {
     let miso = io.pins.gpio25;
     let mosi = io.pins.gpio23;
 
-    let spi_controller = SpiBusController::from_spi(Spi::new_no_cs(
+    let spi_controller = SpiBusController::from_spi(Spi::new(
         peripherals.SPI2,
-        sclk,
-        mosi,
-        miso,
         1000u32.kHz(),
         SpiMode::Mode0,
         &clocks,
+    )
+    .with_pins(
+        Some(sclk),
+        Some(mosi),
+        Some(miso),
+        gpio::NO_PIN,
     ));
     let mut spi_device_1 = spi_controller.add_device(io.pins.gpio12);
     let mut spi_device_2 = spi_controller.add_device(io.pins.gpio13);
