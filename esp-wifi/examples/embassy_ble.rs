@@ -22,14 +22,7 @@ use esp_wifi::{ble::controller::asynch::BleConnector, initialize, EspWifiInitFor
 #[path = "../../examples-util/util.rs"]
 mod examples_util;
 use examples_util::hal;
-use hal::{
-    clock::ClockControl,
-    embassy::{self},
-    peripherals::*,
-    prelude::*,
-    timer::TimerGroup,
-    Rng, IO,
-};
+use hal::{clock::ClockControl, embassy, peripherals::*, prelude::*, timer::TimerGroup, Rng, IO};
 
 #[main]
 async fn main(_spawner: Spawner) -> ! {

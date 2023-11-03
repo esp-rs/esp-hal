@@ -1,11 +1,8 @@
 #![no_std]
 #![no_main]
-#![feature(c_variadic)]
-#![feature(const_mut_refs)]
 #![feature(type_alias_impl_trait)]
 
 use embassy_net::tcp::TcpSocket;
-use embassy_net::ConfigV4;
 use embassy_net::{
     Config, IpListenEndpoint, Ipv4Address, Ipv4Cidr, Stack, StackResources, StaticConfigV4,
 };

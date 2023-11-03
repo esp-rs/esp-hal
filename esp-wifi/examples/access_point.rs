@@ -1,7 +1,5 @@
 #![no_std]
 #![no_main]
-#![feature(c_variadic)]
-#![feature(const_mut_refs)]
 
 #[path = "../../examples-util/util.rs"]
 mod examples_util;
