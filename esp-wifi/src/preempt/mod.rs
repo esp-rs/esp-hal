@@ -1,12 +1,3 @@
-use atomic_polyfill::AtomicBool;
-use core::sync::atomic::Ordering;
-
-pub static mut FIRST_SWITCH: AtomicBool = AtomicBool::new(true);
-
-static mut TASK_TOP: usize = 0;
-
-static mut CTX_NOW: usize = 0;
-
 macro_rules! sum {
     ($h:expr) => ($h);
     ($h:expr, $($t:expr),*) =>
@@ -22,6 +13,28 @@ macro_rules! task_stack {
 
         static mut TASK_STACK: [u8; TOTAL_STACK_SIZE] = [0u8; TOTAL_STACK_SIZE];
     };
+}
+
+static mut TASK_TOP: usize = 1;
+static mut CTX_NOW: usize = 0;
+
+fn allocate_task() -> usize {
+    unsafe {
+        let i = TASK_TOP - 1;
+        CTX_NOW = TASK_TOP;
+        TASK_TOP += 1;
+        i
+    }
+}
+
+fn next_task() {
+    unsafe {
+        CTX_NOW = (CTX_NOW + 1) % TASK_TOP;
+    }
+}
+
+pub fn current_task() -> usize {
+    unsafe { CTX_NOW }
 }
 
 #[cfg(coex)]

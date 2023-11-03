@@ -19,6 +19,8 @@ pub fn setup_timer_isr(timebase: TimeBase) {
     setup_timer(timebase);
 
     setup_multitasking();
+
+    yield_task();
 }
 
 #[allow(unused)]

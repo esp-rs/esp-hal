@@ -9,7 +9,7 @@ use crate::{
         include::OSI_FUNCS_TIME_BLOCKING,
     },
     memory_fence::memory_fence,
-    preempt::preempt::current_task,
+    preempt::current_task,
     timer::yield_task,
 };
 

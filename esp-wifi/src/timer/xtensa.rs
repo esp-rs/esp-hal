@@ -73,8 +73,6 @@ pub fn setup_multitasking() {
                 | xtensa_lx_rt::interrupt::CpuInterruptLevel::Level6.mask() | enabled,
         );
     }
-
-    while unsafe { crate::preempt::FIRST_SWITCH.load(Ordering::Relaxed) } {}
 }
 
 #[allow(non_snake_case)]

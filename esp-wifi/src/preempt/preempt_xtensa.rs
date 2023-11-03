@@ -1,4 +1,5 @@
 use super::*;
+
 use crate::hal::trapframe::TrapFrame;
 
 #[derive(Debug, Clone, Copy)]
@@ -65,10 +66,9 @@ static mut CTX_TASKS: [TaskContext; MAX_TASK] = [TaskContext {
     },
 }; MAX_TASK];
 
-pub fn task_create(task: extern "C" fn()) -> usize {
+pub fn task_create(task: extern "C" fn()) {
     unsafe {
-        let i = TASK_TOP;
-        TASK_TOP += 1;
+        let i = allocate_task();
 
         CTX_TASKS[i].trap_frame.PC = task as u32;
 
@@ -90,9 +90,6 @@ pub fn task_create(task: extern "C" fn()) -> usize {
         *((task_stack_ptr - 8) as *mut u32) = 0;
         *((task_stack_ptr - 12) as *mut u32) = stack_ptr;
         *((task_stack_ptr - 16) as *mut u32) = 0;
-
-        CTX_NOW = i;
-        i
     }
 }
 
@@ -108,37 +105,19 @@ fn save_task_context(id: usize, trap_frame: &TrapFrame) {
     }
 }
 
-pub fn next_task() {
-    unsafe {
-        CTX_NOW = (CTX_NOW + 1) % TASK_TOP;
-    }
-}
-
 pub fn task_switch(trap_frame: &mut TrapFrame) {
-    unsafe {
-        if FIRST_SWITCH.load(Ordering::Relaxed) {
-            FIRST_SWITCH.store(false, Ordering::Relaxed);
-            TASK_TOP += 1;
-            CTX_NOW = TASK_TOP - 1;
-        }
+    save_task_context(current_task(), trap_frame);
+    next_task();
+    restore_task_context(current_task(), trap_frame);
 
-        save_task_context(CTX_NOW, trap_frame);
-        next_task();
-        restore_task_context(CTX_NOW, trap_frame);
-
-        // debug aid! remove when not needed anymore!!!!!
-        // static mut CNT: u32 = 0;
-        // if CTX_NOW == 0 {
-        //     if CNT < 2_000 {
-        //         CNT += 1;
-        //     } else {
-        //         CNT = 0;
-        //         info!("@@@ Task {} {:?} ", 1, CTX_TASKS[1].trap_frame.PC);
-        //     }
-        // }
-    };
-}
-
-pub fn current_task() -> usize {
-    unsafe { CTX_NOW }
+    // debug aid! remove when not needed anymore!!!!!
+    // static mut CNT: u32 = 0;
+    // if CTX_NOW == 0 {
+    //     if CNT < 2_000 {
+    //         CNT += 1;
+    //     } else {
+    //         CNT = 0;
+    //         info!("@@@ Task {} {:?} ", 1, CTX_TASKS[1].trap_frame.PC);
+    //     }
+    // }
 }

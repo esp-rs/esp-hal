@@ -49,10 +49,10 @@ static mut CTX_TASKS: [Context; MAX_TASK] = [Context {
     _running: false,
 }; MAX_TASK];
 
-pub fn task_create(task: extern "C" fn()) -> usize {
+pub fn task_create(task: extern "C" fn()) {
     unsafe {
-        let i = TASK_TOP;
-        TASK_TOP += 1;
+        let i = allocate_task();
+
         CTX_TASKS[i].trap_frame.pc = task as usize;
 
         let task_stack_size = TASK_STACK_SIZE[i];
@@ -64,19 +64,6 @@ pub fn task_create(task: extern "C" fn()) -> usize {
             - 4;
         let stack_ptr = task_stack_ptr - (task_stack_ptr % 0x10);
         CTX_TASKS[i].trap_frame.sp = stack_ptr;
-
-        CTX_NOW = i;
-        i
-    }
-}
-
-fn task_create_from_mepc(mepc: usize) -> usize {
-    unsafe {
-        let i = TASK_TOP;
-        TASK_TOP += 1;
-        CTX_TASKS[i].trap_frame.pc = mepc;
-        CTX_NOW = i;
-        i
     }
 }
 
@@ -156,42 +143,24 @@ pub fn save_task_context(id: usize, pc: usize, trap_frame: &TrapFrame) {
     }
 }
 
-pub fn next_task() {
-    unsafe {
-        CTX_NOW = (CTX_NOW + 1) % TASK_TOP;
-    }
-}
-
 pub fn task_switch(trap_frame: &mut TrapFrame) {
-    unsafe {
-        let old_mepc = trap_frame.pc;
+    let old_mepc = trap_frame.pc;
 
-        if FIRST_SWITCH.load(Ordering::Relaxed) {
-            FIRST_SWITCH.store(false, Ordering::Relaxed);
-            let main_task = task_create_from_mepc(old_mepc);
-            CTX_NOW = main_task;
-        }
+    save_task_context(current_task(), old_mepc, trap_frame);
 
-        save_task_context(CTX_NOW, old_mepc, trap_frame);
+    next_task();
 
-        next_task();
+    let new_pc = restore_task_context(current_task(), trap_frame);
+    trap_frame.pc = new_pc;
 
-        let new_pc = restore_task_context(CTX_NOW, trap_frame);
-        trap_frame.pc = new_pc;
-
-        // debug aid! remove when not needed anymore!!!!!
-        // static mut CNT: u32 = 0;
-        // if CTX_NOW == 0 {
-        //     if CNT < 5_000 {
-        //         CNT += 1;
-        //     } else {
-        //         CNT = 0;
-        //         info!("@@@ Task {} PC = {:x} {:?}", CTX_NOW, new_pc, trap_frame);
-        //     }
-        // }
-    }
-}
-
-pub fn current_task() -> usize {
-    unsafe { CTX_NOW }
+    // debug aid! remove when not needed anymore!!!!!
+    // static mut CNT: u32 = 0;
+    // if CTX_NOW == 0 {
+    //     if CNT < 5_000 {
+    //         CNT += 1;
+    //     } else {
+    //         CNT = 0;
+    //         info!("@@@ Task {} PC = {:x} {:?}", CTX_NOW, new_pc, trap_frame);
+    //     }
+    // }
 }

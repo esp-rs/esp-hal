@@ -789,7 +789,7 @@ pub unsafe extern "C" fn task_ms_to_tick(ms: u32) -> i32 {
  *
  ****************************************************************************/
 pub unsafe extern "C" fn task_get_current_task() -> *mut crate::binary::c_types::c_void {
-    let res = crate::preempt::preempt::current_task() as *mut crate::binary::c_types::c_void;
+    let res = crate::preempt::current_task() as *mut crate::binary::c_types::c_void;
     trace!("task get current task - return {:?}", res);
 
     res
