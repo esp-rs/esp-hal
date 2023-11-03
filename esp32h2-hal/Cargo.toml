@@ -91,7 +91,7 @@ required-features = ["embassy"]
 
 [[example]]
 name              = "embassy_i2c"
-required-features = ["async", "embassy", "embassy-time-systick"]
+required-features = ["async", "embassy"]
 
 [[example]]
 name              = "embassy_serial"
