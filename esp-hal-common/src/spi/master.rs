@@ -406,7 +406,7 @@ where
         Self::new_internal(spi, frequency, mode, clocks)
     }
 
-    pub fn with_sck<SCK: OutputPin>(&mut self, sck: impl Peripheral<P = SCK> + 'd) -> &mut Self {
+    pub fn with_sck<SCK: OutputPin>(self, sck: impl Peripheral<P = SCK> + 'd) -> Self {
         crate::into_ref!(sck);
         sck.set_to_push_pull_output()
             .connect_peripheral_to_output(self.spi.sclk_signal());
@@ -414,7 +414,7 @@ where
         self
     }
 
-    pub fn with_mosi<MOSI: OutputPin>(&mut self, mosi: impl Peripheral<P = MOSI> + 'd) -> &mut Self {
+    pub fn with_mosi<MOSI: OutputPin>(self, mosi: impl Peripheral<P = MOSI> + 'd) -> Self {
         crate::into_ref!(mosi);
         mosi.set_to_push_pull_output()
             .connect_peripheral_to_output(self.spi.mosi_signal());
@@ -422,7 +422,7 @@ where
         self
     }
 
-    pub fn with_miso<MISO: InputPin>(&mut self, miso: impl Peripheral<P = MISO> + 'd) -> &mut Self {
+    pub fn with_miso<MISO: InputPin>(self, miso: impl Peripheral<P = MISO> + 'd) -> Self {
         crate::into_ref!(miso);
         miso.set_to_input()
             .connect_input_to_peripheral(self.spi.miso_signal());
@@ -430,7 +430,7 @@ where
         self
     }
 
-    pub fn with_cs<CS: OutputPin>(&mut self, cs: impl Peripheral<P = CS> + 'd) -> &mut Self {
+    pub fn with_cs<CS: OutputPin>(self, cs: impl Peripheral<P = CS> + 'd) -> Self {
         crate::into_ref!(cs);
         cs.set_to_push_pull_output()
             .connect_peripheral_to_output(self.spi.cs_signal());
@@ -443,12 +443,12 @@ where
     /// All pins are optional. Pass [crate::gpio::NO_PIN] if you don't need the
     /// given pin.
     pub fn with_pins<SCK: OutputPin, MOSI: OutputPin, MISO: InputPin, CS: OutputPin>(
-        &mut self,
+        self,
         sck: Option<impl Peripheral<P = SCK> + 'd>,
         mosi: Option<impl Peripheral<P = MOSI> + 'd>,
         miso: Option<impl Peripheral<P = MISO> + 'd>,
         cs: Option<impl Peripheral<P = CS> + 'd>,
-    ) -> &mut Self {
+    ) -> Self {
         if let Some(sck) = sck {
             crate::into_ref!(sck);
             sck.set_to_push_pull_output()
@@ -518,7 +518,7 @@ where
         Self::new_internal(spi, frequency, mode, clocks)
     }
 
-    pub fn with_sck<SCK: OutputPin>(&mut self, sck: impl Peripheral<P = SCK> + 'd) -> &mut Self {
+    pub fn with_sck<SCK: OutputPin>(self, sck: impl Peripheral<P = SCK> + 'd) -> Self {
         crate::into_ref!(sck);
         sck.set_to_push_pull_output()
             .connect_peripheral_to_output(self.spi.sclk_signal());
@@ -526,7 +526,7 @@ where
         self
     }
 
-    pub fn with_mosi<MOSI: OutputPin + InputPin>(&mut self, mosi: impl Peripheral<P = MOSI> + 'd) -> &mut Self {
+    pub fn with_mosi<MOSI: OutputPin + InputPin>(self, mosi: impl Peripheral<P = MOSI> + 'd) -> Self {
         crate::into_ref!(mosi);
         mosi.enable_output(true);
         mosi.connect_peripheral_to_output(self.spi.mosi_signal());
@@ -536,7 +536,7 @@ where
         self
     }
 
-    pub fn with_miso<MISO: OutputPin + InputPin>(&mut self, miso: impl Peripheral<P = MISO> + 'd) -> &mut Self {
+    pub fn with_miso<MISO: OutputPin + InputPin>(self, miso: impl Peripheral<P = MISO> + 'd) -> Self {
         crate::into_ref!(miso);
         miso.enable_output(true);
         miso.connect_peripheral_to_output(self.spi.sio1_output_signal());
@@ -546,7 +546,7 @@ where
         self
     }
 
-    pub fn with_sio2<SIO2: OutputPin + InputPin>(&mut self, sio2: impl Peripheral<P = SIO2> + 'd) -> &mut Self {
+    pub fn with_sio2<SIO2: OutputPin + InputPin>(self, sio2: impl Peripheral<P = SIO2> + 'd) -> Self {
         crate::into_ref!(sio2);
         sio2.enable_output(true);
         sio2.connect_peripheral_to_output(self.spi.sio2_output_signal());
@@ -556,7 +556,7 @@ where
         self
     }
 
-    pub fn with_sio3<SIO3: OutputPin + InputPin>(&mut self, sio3: impl Peripheral<P = SIO3> + 'd) -> &mut Self {
+    pub fn with_sio3<SIO3: OutputPin + InputPin>(self, sio3: impl Peripheral<P = SIO3> + 'd) -> Self {
         crate::into_ref!(sio3);
         sio3.enable_output(true);
         sio3.connect_peripheral_to_output(self.spi.sio3_output_signal());
@@ -566,7 +566,7 @@ where
         self
     }
 
-    pub fn with_cs<CS: OutputPin>(&mut self, cs: impl Peripheral<P = CS> + 'd) -> &mut Self {
+    pub fn with_cs<CS: OutputPin>(self, cs: impl Peripheral<P = CS> + 'd) -> Self {
         crate::into_ref!(cs);
         cs.set_to_push_pull_output()
             .connect_peripheral_to_output(self.spi.cs_signal());
@@ -586,14 +586,14 @@ where
         SIO3: OutputPin + InputPin,
         CS: OutputPin,
     >(
-        &mut self,
+        self,
         sck: Option<impl Peripheral<P = SCK> + 'd>,
         mosi: Option<impl Peripheral<P = MOSI> + 'd>,
         miso: Option<impl Peripheral<P = MISO> + 'd>,
         sio2: Option<impl Peripheral<P = SIO2> + 'd>,
         sio3: Option<impl Peripheral<P = SIO3> + 'd>,
         cs: Option<impl Peripheral<P = CS> + 'd>,
-    ) {
+    ) -> Self {
         if let Some(sck) = sck {
             crate::into_ref!(sck);
             sck.set_to_push_pull_output()
@@ -637,6 +637,8 @@ where
             cs.set_to_push_pull_output()
                 .connect_peripheral_to_output(self.spi.cs_signal());
         }
+
+        self
     }
 
     pub(crate) fn new_internal(
