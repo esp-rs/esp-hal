@@ -16,14 +16,15 @@
 //!
 //! let mut spi = hal::spi::Spi::new(
 //!     peripherals.SPI2,
-//!     sclk,
-//!     mosi,
-//!     miso,
-//!     cs,
 //!     100u32.kHz(),
 //!     SpiMode::Mode0,
 //!     &mut peripheral_clock_control,
 //!     &mut clocks,
+//! ).with_pins(
+//!     Some(sclk),
+//!     Some(mosi),
+//!     Some(miso),
+//!     Some(cs),
 //! );
 //! ```
 //!
@@ -393,8 +394,8 @@ where
 {
     /// Constructs an SPI instance in 8bit dataframe mode.
     ///
-    /// All pins are optional. Pass [crate::gpio::NO_PIN] if you don't need the
-    /// given pin.
+    /// All pins are optional. Setup these pins using [with_pins](Self::with_pins) or
+    /// individual methods for each pin.
     pub fn new(
         spi: impl Peripheral<P = T> + 'd,
         frequency: HertzU32,
@@ -429,6 +430,10 @@ where
             .connect_peripheral_to_output(self.spi.cs_signal());
     }
 
+    /// Setup pins for this SPI instance.
+    ///
+    /// All pins are optional. Pass [crate::gpio::NO_PIN] if you don't need the
+    /// given pin.
     pub fn with_pins<SCK: OutputPin, MOSI: OutputPin, MISO: InputPin, CS: OutputPin>(
         &mut self,
         sck: Option<impl Peripheral<P = SCK> + 'd>,
@@ -491,8 +496,8 @@ where
 {
     /// Constructs an SPI instance in half-duplex mode.
     ///
-    /// All pins are optional. Pass [crate::gpio::NO_PIN] if you don't need the
-    /// given pin.
+    /// All pins are optional. Setup these pins using [with_pins](Self::with_pins) or
+    /// individual methods for each pin.
     pub fn new_half_duplex(
         spi: impl Peripheral<P = T> + 'd,
         frequency: HertzU32,
@@ -547,6 +552,10 @@ where
             .connect_peripheral_to_output(self.spi.cs_signal());
     }
 
+    /// Setup pins for this SPI instance.
+    ///
+    /// All pins are optional. Pass [crate::gpio::NO_PIN] if you don't need the
+    /// given pin.
     pub fn with_pins<
         SCK: OutputPin,
         MOSI: OutputPin + InputPin,
