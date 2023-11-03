@@ -7,20 +7,28 @@ Please note that only changes to the `esp-hal-common` package are tracked in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-[Unreleased]
+## [Unreleased]
 
 ### Added
 
 ### Changed
 
 ### Fixed
-- ESP32-C3: Make sure BLE and WiFi are not powered down when esp-wifi needs them (#891)
-- ESP32-C6/H2: Fix setting UART baud rate (#893)
+
+- ESP32-C2/C3 examples: fix build error (#899)
+- ESP32-S3: Fix GPIO interrupt handler crashing when using GPIO48. (#898)
 
 ### Removed
 
 ### Breaking
 - `Spi::new`/`Spi::new_half_duplex` takes no gpio pin now, instead you need to call `with_pins` to setup those (#901).
+
+## [0.13.1] - 2023-11-02
+
+### Fixed
+
+- ESP32-C3: Make sure BLE and WiFi are not powered down when esp-wifi needs them (#891)
+- ESP32-C6/H2: Fix setting UART baud rate (#893)
 
 ## [0.13.0] - 2023-10-31
 
@@ -288,7 +296,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2022-08-05
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.13.1...HEAD
+[0.13.1]: https://github.com/esp-rs/esp-hal/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/esp-rs/esp-hal/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/esp-rs/esp-hal/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/esp-rs/esp-hal/compare/v0.10.0...v0.11.0
