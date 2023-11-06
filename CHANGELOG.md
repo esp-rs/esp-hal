@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+### Breaking
+
+- Direct boot support has been removed (#903).
+
 ## [0.13.1] - 2023-11-02
 
 ### Fixed
