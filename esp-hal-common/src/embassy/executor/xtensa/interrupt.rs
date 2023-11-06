@@ -1,14 +1,14 @@
 //! Multicore-aware interrupt-mode executor.
-use core::{
-    cell::UnsafeCell,
-    marker::PhantomData,
-    mem::MaybeUninit,
-    sync::atomic::{AtomicUsize, Ordering},
-};
+use core::{cell::UnsafeCell, marker::PhantomData, mem::MaybeUninit};
 
 use embassy_executor::{raw, SendSpawner};
 
-use crate::{get_core, interrupt, peripherals, peripherals::SYSTEM};
+use crate::{
+    atomic::{AtomicUsize, Ordering},
+    get_core,
+    interrupt,
+    peripherals::{self, SYSTEM},
+};
 
 static FROM_CPU_IRQ_USED: AtomicUsize = AtomicUsize::new(0);
 

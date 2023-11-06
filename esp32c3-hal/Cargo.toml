@@ -28,6 +28,7 @@ categories = [
 cfg-if         = "1.0.0"
 esp-hal-common = { version = "0.13.0", features = ["esp32c3"], path = "../esp-hal-common" }
 embassy-time   = { version = "0.1.5",  features = ["nightly"], optional = true }
+portable-atomic = { version = "1.5.1",  features = ["unsafe-assume-single-core"], optional = true }
 
 [dev-dependencies]
 aes                = "0.8.3"
@@ -49,11 +50,11 @@ lis3dh-async       = "0.8.0"
 sha2               = { version = "0.10.8", default-features = false }
 smart-leds         = "0.3.0"
 ssd1306            = "0.8.4"
-static_cell        = { version = "=1.2.0", features = ["nightly"] }
+static_cell        = { version = "2.0.0", features = ["nightly"] }
 embassy-sync       = "0.3.0"
 
 [features]
-default              = ["rt", "vectored", "esp-hal-common/rv-zero-rtc-bss"]
+default              = ["rt", "vectored", "esp-hal-common/rv-zero-rtc-bss", "portable-atomic"]
 async                = ["esp-hal-common/async"]
 debug                = ["esp-hal-common/debug"]
 defmt                = ["esp-hal-common/defmt", "esp-println/defmt"]
@@ -70,6 +71,9 @@ vectored             = ["esp-hal-common/vectored"]
 embassy              = ["esp-hal-common/embassy"]
 embassy-time-systick = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-hz-16_000_000"]
 embassy-time-timg0   = ["esp-hal-common/embassy-time-timg0", "embassy-time/tick-hz-1_000_000"]
+
+portable-atomic  = ["dep:portable-atomic", "esp-hal-common/portable-atomic"]
+atomic-emulation = ["esp-hal-common/riscv-atomic-emulation"]
 
 [profile.release]
 debug = true
