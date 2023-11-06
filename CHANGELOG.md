@@ -50,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add a `defmt` feature to the `esp-hal-smartled` package (#846)
 - Support 16MB octal PS-RAM for ESP32-S3 (#858)
 - RISCV TRACE Encoder driver for ESP32-C6 / ESP32-H2 (#864)
+- `embedded_hal` 1 `InputPin` and `embedded_hal_async` `Wait` impls for open drain outputs (#905)
 
 ### Changed
 
