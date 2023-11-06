@@ -131,8 +131,6 @@ jobs:
       # for each supported image format.
       - name: build esp32c2-hal (no features)
         run: cd esp32c2-hal/ && cargo build --examples
-      - name: build esp32c2-hal (direct-boot)
-        run: cd esp32c2-hal/ && cargo build --examples --features=direct-boot
       # Subsequent steps can just check the examples instead, as we're already
       # confident that they link.
       - name: check esp32c2-hal (common features)
@@ -183,8 +181,6 @@ jobs:
       # for each supported image format.
       - name: build esp32c3-hal (no features)
         run: cd esp32c3-hal/ && cargo +nightly build --examples
-      - name: build esp32c3-hal (direct-boot)
-        run: cd esp32c3-hal/ && cargo +nightly build --examples --features=direct-boot
       - name: build esp32c3-hal (mcu-boot)
         run: cd esp32c3-hal/ && cargo +nightly build --examples --features=mcu-boot
       # Subsequent steps can just check the examples instead, as we're already
@@ -242,8 +238,6 @@ jobs:
       # for each supported image format.
       - name: build esp32c6-hal (no features)
         run: cd esp32c6-hal/ && cargo +nightly build --examples
-      - name: build esp32c6-hal (direct-boot)
-        run: cd esp32c6-hal/ && cargo +nightly build --examples --features=direct-boot
       # Subsequent steps can just check the examples instead, as we're already
       # confident that they link.
       - name: check esp32c6-hal (common features)
@@ -314,8 +308,6 @@ jobs:
       # for each supported image format.
       - name: build esp32h2-hal (no features)
         run: cd esp32h2-hal/ && cargo +nightly build --examples
-      - name: build esp32h2-hal (direct-boot)
-        run: cd esp32h2-hal/ && cargo +nightly build --examples --features=direct-boot
       # Subsequent steps can just check the examples instead, as we're already
       # confident that they link.
       - name: check esp32h2-hal (common features)
@@ -382,7 +374,7 @@ jobs:
         with:
           target: riscv32imc-unknown-none-elf
           toolchain: nightly
-          components: rust-src          
+          components: rust-src
       - uses: Swatinem/rust-cache@v2
 
       # build the ulp-riscv-hal examples first to make sure the examples which expect
@@ -457,7 +449,7 @@ jobs:
         with:
           target: riscv32imc-unknown-none-elf
           toolchain: nightly
-          components: rust-src          
+          components: rust-src
       - uses: Swatinem/rust-cache@v2
 
       # build the ulp-riscv-hal examples first to make sure the examples which expect
@@ -471,8 +463,6 @@ jobs:
       # for each supported image format.
       - name: build esp32s3-hal (no features)
         run: cd esp32s3-hal/ && cargo +esp build --examples
-      - name: build esp32s3-hal (direct-boot)
-        run: cd esp32s3-hal/ && cargo +esp build --examples --features=direct-boot
       # Subsequent steps can just check the examples instead, as we're already
       # confident that they link.
       - name: check esp32s3-hal (common features)
@@ -603,7 +593,7 @@ jobs:
         with:
           target: riscv32imc-unknown-none-elf
           toolchain: "1.67"
-          components: rust-src          
+          components: rust-src
       - uses: Swatinem/rust-cache@v2
 
       # build the ulp-riscv-hal examples first to make sure the examples which expect
