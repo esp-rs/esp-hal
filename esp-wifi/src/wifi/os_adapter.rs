@@ -893,14 +893,16 @@ pub unsafe extern "C" fn event_post(
     event.waker().wake();
 
     #[cfg(feature = "embassy-net")]
-    if matches!(
-        event,
-        WifiEvent::StaConnected
-            | WifiEvent::StaDisconnected
-            | WifiEvent::ApStart
-            | WifiEvent::ApStop
-    ) {
-        crate::wifi::embassy::LINK_STATE.wake();
+    match event {
+        WifiEvent::StaConnected | WifiEvent::StaDisconnected => {
+            crate::wifi::embassy::STA_LINK_STATE_WAKER.wake();
+        }
+
+        WifiEvent::ApStart | WifiEvent::ApStop => {
+            crate::wifi::embassy::AP_LINK_STATE_WAKER.wake();
+        }
+
+        _ => {}
     }
 
     memory_fence();

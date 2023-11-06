@@ -14,7 +14,7 @@ use bleps::{
 };
 
 use esp_wifi::{
-    ble::controller::BleConnector, current_millis, wifi::WifiMode, wifi_interface::WifiStack,
+    ble::controller::BleConnector, current_millis, wifi::WifiStaDevice, wifi_interface::WifiStack,
     EspWifiInitFor,
 };
 
@@ -61,7 +61,7 @@ fn main() -> ! {
 
     let mut socket_set_entries: [SocketStorage; 3] = Default::default();
     let (iface, device, mut controller, sockets) =
-        create_network_interface(&init, wifi, WifiMode::Sta, &mut socket_set_entries).unwrap();
+        create_network_interface(&init, wifi, WifiStaDevice, &mut socket_set_entries).unwrap();
     let wifi_stack = WifiStack::new(iface, device, sockets, current_millis);
 
     let client_config = Configuration::Client(ClientConfiguration {

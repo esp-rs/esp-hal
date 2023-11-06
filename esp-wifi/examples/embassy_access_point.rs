@@ -15,7 +15,7 @@ use embassy_time::{Duration, Timer};
 use embedded_svc::wifi::{AccessPointConfiguration, Configuration, Wifi};
 use esp_backtrace as _;
 use esp_println::{print, println};
-use esp_wifi::wifi::{WifiController, WifiDevice, WifiEvent, WifiMode, WifiState};
+use esp_wifi::wifi::{WifiApDevice, WifiController, WifiDevice, WifiEvent, WifiState};
 use esp_wifi::{initialize, EspWifiInitFor};
 use hal::clock::ClockControl;
 use hal::Rng;
@@ -47,7 +47,7 @@ async fn main(spawner: Spawner) -> ! {
 
     let wifi = peripherals.WIFI;
     let (wifi_interface, controller) =
-        esp_wifi::wifi::new_with_mode(&init, wifi, WifiMode::Ap).unwrap();
+        esp_wifi::wifi::new_with_mode(&init, wifi, WifiApDevice).unwrap();
 
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     embassy::init(&clocks, timer_group0.timer0);
@@ -71,8 +71,8 @@ async fn main(spawner: Spawner) -> ! {
     spawner.spawn(connection(controller)).ok();
     spawner.spawn(net_task(&stack)).ok();
 
-    let mut rx_buffer = [0; 4096];
-    let mut tx_buffer = [0; 4096];
+    let mut rx_buffer = [0; 1536];
+    let mut tx_buffer = [0; 1536];
 
     loop {
         if stack.is_link_up() {
@@ -184,6 +184,6 @@ async fn connection(mut controller: WifiController<'static>) {
 }
 
 #[embassy_executor::task]
-async fn net_task(stack: &'static Stack<WifiDevice<'static>>) {
+async fn net_task(stack: &'static Stack<WifiDevice<'static, WifiApDevice>>) {
     stack.run().await
 }

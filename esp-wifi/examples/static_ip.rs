@@ -12,7 +12,7 @@ use embedded_svc::wifi::{AccessPointInfo, ClientConfiguration, Configuration, Wi
 use esp_backtrace as _;
 use esp_println::{print, println};
 use esp_wifi::initialize;
-use esp_wifi::wifi::WifiMode;
+use esp_wifi::wifi::WifiStaDevice;
 use esp_wifi::wifi::{utils::create_network_interface, WifiError};
 use esp_wifi::wifi_interface::WifiStack;
 use esp_wifi::{current_millis, EspWifiInitFor};
@@ -53,7 +53,7 @@ fn main() -> ! {
     let wifi = peripherals.WIFI;
     let mut socket_set_entries: [SocketStorage; 3] = Default::default();
     let (iface, device, mut controller, sockets) =
-        create_network_interface(&init, wifi, WifiMode::Sta, &mut socket_set_entries).unwrap();
+        create_network_interface(&init, wifi, WifiStaDevice, &mut socket_set_entries).unwrap();
     let mut wifi_stack = WifiStack::new(iface, device, sockets, current_millis);
 
     let client_config = Configuration::Client(ClientConfiguration {

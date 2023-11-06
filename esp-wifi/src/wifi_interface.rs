@@ -12,15 +12,15 @@ use smoltcp::time::Instant;
 use smoltcp::wire::{DnsQueryType, IpAddress, IpCidr, IpEndpoint, Ipv4Address};
 
 use crate::current_millis;
-use crate::wifi::{get_ap_mac, get_sta_mac, WifiDevice, WifiMode};
+use crate::wifi::{WifiDevice, WifiDeviceMode};
 
 use core::borrow::BorrowMut;
 
 /// Non-async TCP/IP network stack
 ///
 /// Mostly a convenience wrapper for `smoltcp`
-pub struct WifiStack<'a> {
-    device: RefCell<WifiDevice<'static>>, // TODO allow non static lifetime
+pub struct WifiStack<'a, MODE: WifiDeviceMode> {
+    device: RefCell<WifiDevice<'static, MODE>>, // TODO allow non static lifetime
     network_interface: RefCell<Interface>,
     sockets: RefCell<SocketSet<'a>>,
     current_millis_fn: fn() -> u64,
@@ -31,13 +31,13 @@ pub struct WifiStack<'a> {
     dns_socket_handle: RefCell<Option<SocketHandle>>,
 }
 
-impl<'a> WifiStack<'a> {
+impl<'a, MODE: WifiDeviceMode> WifiStack<'a, MODE> {
     pub fn new(
         network_interface: Interface,
-        device: WifiDevice<'static>, // TODO relax this lifetime requirement
+        device: WifiDevice<'static, MODE>, // TODO relax this lifetime requirement
         mut sockets: SocketSet<'a>,
         current_millis_fn: fn() -> u64,
-    ) -> WifiStack<'a> {
+    ) -> WifiStack<'a, MODE> {
         let mut dhcp_socket_handle: Option<SocketHandle> = None;
         let mut dns_socket_handle: Option<SocketHandle> = None;
 
@@ -76,12 +76,7 @@ impl<'a> WifiStack<'a> {
         &self,
         conf: &ipv4::Configuration,
     ) -> Result<(), WifiStackError> {
-        let mut mac = [0u8; 6];
-        match self.device.borrow().get_wifi_mode() {
-            Ok(WifiMode::Sta) => get_sta_mac(&mut mac),
-            Ok(WifiMode::Ap) => get_ap_mac(&mut mac),
-            _ => (),
-        }
+        let mac = self.device.borrow().mac_address();
         let hw_address = smoltcp::wire::HardwareAddress::Ethernet(
             smoltcp::wire::EthernetAddress::from_bytes(&mac),
         );
@@ -240,7 +235,7 @@ impl<'a> WifiStack<'a> {
         &'s self,
         rx_buffer: &'a mut [u8],
         tx_buffer: &'a mut [u8],
-    ) -> Socket<'s, 'a>
+    ) -> Socket<'s, 'a, MODE>
     where
         'a: 's,
     {
@@ -265,7 +260,7 @@ impl<'a> WifiStack<'a> {
         rx_buffer: &'a mut [u8],
         tx_meta: &'a mut [smoltcp::socket::udp::PacketMetadata],
         tx_buffer: &'a mut [u8],
-    ) -> UdpSocket<'s, 'a>
+    ) -> UdpSocket<'s, 'a, MODE>
     where
         'a: 's,
     {
@@ -412,7 +407,7 @@ impl<'a> WifiStack<'a> {
     }
 
     #[allow(unused)]
-    fn with<R>(&self, f: impl FnOnce(&Interface, &WifiDevice, &SocketSet<'a>) -> R) -> R {
+    fn with<R>(&self, f: impl FnOnce(&Interface, &WifiDevice<MODE>, &SocketSet<'a>) -> R) -> R {
         f(
             &self.network_interface.borrow(),
             &self.device.borrow(),
@@ -422,7 +417,7 @@ impl<'a> WifiStack<'a> {
 
     fn with_mut<R>(
         &self,
-        f: impl FnOnce(&mut Interface, &mut WifiDevice, &mut SocketSet<'a>) -> R,
+        f: impl FnOnce(&mut Interface, &mut WifiDevice<MODE>, &mut SocketSet<'a>) -> R,
     ) -> R {
         f(
             &mut self.network_interface.borrow_mut(),
@@ -456,7 +451,7 @@ pub fn timestamp() -> Instant {
     Instant::from_millis(current_millis() as i64)
 }
 
-impl<'a> ipv4::Interface for WifiStack<'a> {
+impl<MODE: WifiDeviceMode> ipv4::Interface for WifiStack<'_, MODE> {
     type Error = WifiStackError;
 
     fn get_iface_configuration(&self) -> Result<ipv4::Configuration, Self::Error> {
@@ -477,12 +472,12 @@ impl<'a> ipv4::Interface for WifiStack<'a> {
 }
 
 /// A TCP socket
-pub struct Socket<'s, 'n: 's> {
+pub struct Socket<'s, 'n: 's, MODE: WifiDeviceMode> {
     socket_handle: SocketHandle,
-    network: &'s WifiStack<'n>,
+    network: &'s WifiStack<'n, MODE>,
 }
 
-impl<'s, 'n: 's> Socket<'s, 'n> {
+impl<'s, 'n: 's, MODE: WifiDeviceMode> Socket<'s, 'n, MODE> {
     /// Connect the socket
     pub fn open<'i>(&'i mut self, addr: IpAddress, port: u16) -> Result<(), IoError>
     where
@@ -612,7 +607,7 @@ impl<'s, 'n: 's> Socket<'s, 'n> {
     }
 }
 
-impl<'s, 'n: 's> Drop for Socket<'s, 'n> {
+impl<'s, 'n: 's, MODE: WifiDeviceMode> Drop for Socket<'s, 'n, MODE> {
     fn drop(&mut self) {
         self.network
             .with_mut(|_interface, _device, sockets| sockets.remove(self.socket_handle));
@@ -640,11 +635,11 @@ impl embedded_io::Error for IoError {
     }
 }
 
-impl<'s, 'n: 's> ErrorType for Socket<'s, 'n> {
+impl<'s, 'n: 's, MODE: WifiDeviceMode> ErrorType for Socket<'s, 'n, MODE> {
     type Error = IoError;
 }
 
-impl<'s, 'n: 's> Read for Socket<'s, 'n> {
+impl<'s, 'n: 's, MODE: WifiDeviceMode> Read for Socket<'s, 'n, MODE> {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
         self.network.with_mut(|interface, device, sockets| {
             use smoltcp::socket::tcp::RecvError;
@@ -664,7 +659,7 @@ impl<'s, 'n: 's> Read for Socket<'s, 'n> {
     }
 }
 
-impl<'s, 'n: 's> Write for Socket<'s, 'n> {
+impl<'s, 'n: 's, MODE: WifiDeviceMode> Write for Socket<'s, 'n, MODE> {
     fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
         loop {
             let (may_send, is_open, can_send) =
@@ -729,12 +724,12 @@ impl<'s, 'n: 's> Write for Socket<'s, 'n> {
 }
 
 /// A UDP socket
-pub struct UdpSocket<'s, 'n: 's> {
+pub struct UdpSocket<'s, 'n: 's, MODE: WifiDeviceMode> {
     socket_handle: SocketHandle,
-    network: &'s WifiStack<'n>,
+    network: &'s WifiStack<'n, MODE>,
 }
 
-impl<'s, 'n: 's> UdpSocket<'s, 'n> {
+impl<'s, 'n: 's, MODE: WifiDeviceMode> UdpSocket<'s, 'n, MODE> {
     /// Binds the socket to the given port
     pub fn bind<'i>(&'i mut self, port: u16) -> Result<(), IoError>
     where
@@ -862,7 +857,7 @@ impl<'s, 'n: 's> UdpSocket<'s, 'n> {
     }
 }
 
-impl<'s, 'n: 's> Drop for UdpSocket<'s, 'n> {
+impl<'s, 'n: 's, MODE: WifiDeviceMode> Drop for UdpSocket<'s, 'n, MODE> {
     fn drop(&mut self) {
         self.network
             .with_mut(|_, _, sockets| sockets.borrow_mut().remove(self.socket_handle));
