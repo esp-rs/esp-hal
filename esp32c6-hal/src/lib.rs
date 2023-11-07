@@ -11,7 +11,6 @@
 //!   provided by [embedded-hal-async] and [embedded-io-async]
 //! - `debug` - Enable debug features in the HAL (used for development)
 //! - `defmt` - Enable [`defmt::Format`] on certain types
-//! - `direct-boot` - Use the direct boot image format
 //! - `direct-vectoring` - Enable direct vector table hooking support
 //! - `eh1` - Implement the traits defined in the `1.0.0-xxx` pre-releases of
 //!   [embedded-hal], [embedded-hal-nb], and [embedded-io]
@@ -58,16 +57,6 @@
 //!
 //! [ESP-IDF]: https://github.com/espressif/esp-idf
 //! [App Image Format]: https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/app_image_format.html
-//!
-//! #### Direct Boot
-//!
-//! This device additionally supports direct-boot, which allows an application
-//! to be executed directly from flash, without using the second-stage
-//! bootloader. For more information please see the
-//! [esp32c3-direct-boot-example] in the Espressif organization on GitHub.
-//!
-//! [esp32c3-direct-boot-example]: https://github.com/espressif/esp32c3-direct-boot-example
-
 #![no_std]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 
