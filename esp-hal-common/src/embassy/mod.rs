@@ -127,6 +127,7 @@ impl Driver for EmbassyTimer {
                 if !alarm.allocated.get() {
                     // set alarm so it is not overwritten
                     alarm.allocated.set(true);
+                    self.on_alarm_allocated(i);
                     return Some(AlarmHandle::new(i as u8));
                 }
             }

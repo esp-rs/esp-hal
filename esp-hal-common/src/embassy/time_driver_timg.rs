@@ -33,13 +33,15 @@ impl EmbassyTimer {
         unsafe { Timer0::<TIMG0>::steal() }.now()
     }
 
-    pub(crate) fn trigger_alarm(&self, n: usize, cs: CriticalSection) {
+    fn trigger_alarm(&self, n: usize, cs: CriticalSection) {
         let alarm = &self.alarms.borrow(cs)[n];
 
         if let Some((f, ctx)) = alarm.callback.get() {
             f(ctx);
         }
     }
+
+    pub(super) fn on_alarm_allocated(&self, _n: usize) {}
 
     fn on_interrupt<Timer: Instance>(&self, id: u8, mut timer: Timer) {
         critical_section::with(|cs| {
@@ -89,7 +91,8 @@ impl EmbassyTimer {
     ) -> bool {
         critical_section::with(|cs| {
             // The hardware fires the alarm even if timestamp is lower than the current
-            // time.
+            // time. In this case the interrupt handler will pend a wakeup when we exit the
+            // critical section.
             #[cfg(any(esp32, esp32s2, esp32s3))]
             if alarm.id() == 1 {
                 let mut tg = unsafe { Timer1::<TIMG0>::steal() };
