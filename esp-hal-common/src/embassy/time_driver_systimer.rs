@@ -84,7 +84,6 @@ impl EmbassyTimer {
     ) -> bool {
         critical_section::with(|cs| {
             let n = alarm.id() as usize;
-            let alarm_state = &self.alarms.borrow(cs)[n];
 
             // The hardware fires the alarm even if timestamp is lower than the current
             // time.

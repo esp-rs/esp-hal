@@ -122,18 +122,16 @@ impl Driver for EmbassyTimer {
     }
 
     unsafe fn allocate_alarm(&self) -> Option<AlarmHandle> {
-        return critical_section::with(|cs| {
-            let alarms = self.alarms.borrow(cs);
-            for i in 0..time_driver::ALARM_COUNT {
-                let c = alarms.get_unchecked(i);
-                if !c.allocated.get() {
+        critical_section::with(|cs| {
+            for (i, alarm) in self.alarms.borrow(cs).iter().enumerate() {
+                if !alarm.allocated.get() {
                     // set alarm so it is not overwritten
-                    c.allocated.set(true);
-                    return Option::Some(AlarmHandle::new(i as u8));
+                    alarm.allocated.set(true);
+                    return Some(AlarmHandle::new(i as u8));
                 }
             }
-            return Option::None;
-        });
+            None
+        })
     }
 
     fn set_alarm_callback(
