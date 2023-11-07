@@ -93,7 +93,7 @@ use crate::{
 pub mod filter;
 
 /// Structure backing the embedded_hal::can::Frame/embedded_can::Frame trait.
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct EspTwaiFrame {
     id: Id,
     dlc: usize,
