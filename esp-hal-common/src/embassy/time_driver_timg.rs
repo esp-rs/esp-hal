@@ -35,7 +35,6 @@ impl EmbassyTimer {
 
     pub(crate) fn trigger_alarm(&self, n: usize, cs: CriticalSection) {
         let alarm = &self.alarms.borrow(cs)[n];
-        alarm.timestamp.set(u64::MAX);
 
         if let Some((f, ctx)) = alarm.callback.get() {
             f(ctx);
@@ -110,7 +109,6 @@ impl EmbassyTimer {
     ) -> bool {
         // The hardware fires the alarm even if timestamp is lower than the current
         // time.
-        alarm_state.timestamp.set(timestamp);
         Self::arm(&mut tg, timestamp);
 
         true
