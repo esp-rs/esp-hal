@@ -117,3 +117,24 @@ log = [
   "esp32s2-hal?/log",
   "esp32s3-hal?/log",
 ]
+
+# These examples are used in test automation
+[[example]]
+name = "test_esp_now"
+path = "automated-tests/test_esp_now.rs"
+
+[[example]]
+name = "esp_now_broadcaster"
+path = "automated-tests/esp_now_broadcaster.rs"
+
+[[example]]
+name = "open_access_point"
+path = "automated-tests/open_access_point.rs"
+
+[[example]]
+name = "test_connect"
+path = "automated-tests/test_connect.rs"
+
+[[example]]
+name = "test_ble"
+path = "automated-tests/test_ble.rs"
