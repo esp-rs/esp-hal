@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- ESP32-C6: LP core clock is configurable (#907)
 
 ### Changed
 
