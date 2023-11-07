@@ -82,7 +82,7 @@ impl EmbassyTimer {
         alarm: embassy_time::driver::AlarmHandle,
         timestamp: u64,
     ) -> bool {
-        critical_section::with(|cs| {
+        critical_section::with(|_cs| {
             let n = alarm.id() as usize;
 
             // The hardware fires the alarm even if timestamp is lower than the current

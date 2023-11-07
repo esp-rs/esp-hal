@@ -88,28 +88,18 @@ impl EmbassyTimer {
         timestamp: u64,
     ) -> bool {
         critical_section::with(|cs| {
-            let n = alarm.id() as usize;
-            let alarm_state = &self.alarms.borrow(cs)[n];
-
+            // The hardware fires the alarm even if timestamp is lower than the current
+            // time.
             #[cfg(any(esp32, esp32s2, esp32s3))]
-            if n == 1 {
-                let tg = unsafe { Timer1::<TIMG0>::steal() };
-                return Self::set_alarm_impl(tg, alarm_state, timestamp);
+            if alarm.id() == 1 {
+                let mut tg = unsafe { Timer1::<TIMG0>::steal() };
+                Self::arm(&mut tg, timestamp);
+                return;
             }
 
-            let tg = unsafe { Timer0::<TIMG0>::steal() };
-            Self::set_alarm_impl(tg, alarm_state, timestamp)
-        })
-    }
-
-    fn set_alarm_impl<Timer: Instance>(
-        mut tg: Timer,
-        alarm_state: &AlarmState,
-        timestamp: u64,
-    ) -> bool {
-        // The hardware fires the alarm even if timestamp is lower than the current
-        // time.
-        Self::arm(&mut tg, timestamp);
+            let mut tg = unsafe { Timer0::<TIMG0>::steal() };
+            Self::arm(&mut tg, timestamp);
+        });
 
         true
     }
