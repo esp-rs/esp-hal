@@ -32,12 +32,20 @@ impl EmbassyTimer {
         SystemTimer::now()
     }
 
-    pub(crate) fn trigger_alarm(&self, n: usize, cs: CriticalSection) {
+    fn trigger_alarm(&self, n: usize, cs: CriticalSection) {
         let alarm = &self.alarms.borrow(cs)[n];
-        alarm.timestamp.set(u64::MAX);
 
         if let Some((f, ctx)) = alarm.callback.get() {
             f(ctx);
+        }
+    }
+
+    pub(super) fn on_alarm_allocated(&self, n: usize) {
+        match n {
+            0 => self.alarm0.enable_interrupt(true),
+            1 => self.alarm1.enable_interrupt(true),
+            2 => self.alarm2.enable_interrupt(true),
+            _ => {}
         }
     }
 
@@ -83,17 +91,20 @@ impl EmbassyTimer {
         alarm: embassy_time::driver::AlarmHandle,
         timestamp: u64,
     ) -> bool {
-        critical_section::with(|cs| {
+        critical_section::with(|_cs| {
             let n = alarm.id() as usize;
-            let alarm_state = &self.alarms.borrow(cs)[n];
 
             // The hardware fires the alarm even if timestamp is lower than the current
-            // time.
-            alarm_state.timestamp.set(timestamp);
+            // time. In this case the interrupt handler will pend a wakeup when we exit the
+            // critical section.
             self.arm(n, timestamp);
+        });
 
-            true
-        })
+        // In theory, the above comment is true. However, in practice, we seem to be
+        // missing interrupt for very short timeouts, so let's make sure and catch
+        // timestamps that already passed. Returning `false` means embassy will
+        // run one more poll loop.
+        Self::now() < timestamp
     }
 
     fn clear_interrupt(&self, id: usize) {
@@ -107,18 +118,9 @@ impl EmbassyTimer {
 
     fn arm(&self, id: usize, timestamp: u64) {
         match id {
-            0 => {
-                self.alarm0.set_target(timestamp);
-                self.alarm0.enable_interrupt(true);
-            }
-            1 => {
-                self.alarm1.set_target(timestamp);
-                self.alarm1.enable_interrupt(true);
-            }
-            2 => {
-                self.alarm2.set_target(timestamp);
-                self.alarm2.enable_interrupt(true);
-            }
+            0 => self.alarm0.set_target(timestamp),
+            1 => self.alarm1.set_target(timestamp),
+            2 => self.alarm2.set_target(timestamp),
             _ => {}
         }
     }
