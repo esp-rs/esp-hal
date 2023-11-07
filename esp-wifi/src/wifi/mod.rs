@@ -58,7 +58,7 @@ use crate::{
             esp_wifi_scan_start, esp_wifi_set_config, esp_wifi_set_country, esp_wifi_set_mode,
             esp_wifi_set_protocol, esp_wifi_set_ps, esp_wifi_set_tx_done_cb, esp_wifi_start,
             esp_wifi_stop, g_wifi_default_wpa_crypto_funcs, wifi_active_scan_time_t,
-            wifi_ap_config_t, wifi_auth_mode_t, wifi_cipher_type_t_WIFI_CIPHER_TYPE_TKIP,
+            wifi_ap_config_t, wifi_auth_mode_t, wifi_cipher_type_t_WIFI_CIPHER_TYPE_CCMP,
             wifi_config_t, wifi_country_policy_t_WIFI_COUNTRY_POLICY_MANUAL, wifi_country_t,
             wifi_init_config_t, wifi_interface_t, wifi_interface_t_WIFI_IF_AP,
             wifi_interface_t_WIFI_IF_STA, wifi_mode_t, wifi_mode_t_WIFI_MODE_AP,
@@ -1500,7 +1500,7 @@ fn apply_ap_config(config: &AccessPointConfiguration) -> Result<(), WifiError> {
             ssid_hidden: if config.ssid_hidden { 1 } else { 0 },
             max_connection: config.max_connections as u8,
             beacon_interval: 100,
-            pairwise_cipher: wifi_cipher_type_t_WIFI_CIPHER_TYPE_TKIP,
+            pairwise_cipher: wifi_cipher_type_t_WIFI_CIPHER_TYPE_CCMP,
             ftm_responder: false,
             pmf_cfg: wifi_pmf_config_t {
                 capable: true,
