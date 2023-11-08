@@ -515,6 +515,20 @@ where
     }
 }
 
+#[cfg(feature = "eh1")]
+impl<const GPIONUM: u8> embedded_hal_1::digital::InputPin for GpioPin<Output<OpenDrain>, GPIONUM>
+where
+    Self: GpioProperties,
+    <Self as GpioProperties>::PinType: IsOutputPin,
+{
+    fn is_high(&self) -> Result<bool, Self::Error> {
+        Ok(<Self as GpioProperties>::Bank::read_input() & (1 << (GPIONUM % 32)) != 0)
+    }
+    fn is_low(&self) -> Result<bool, Self::Error> {
+        Ok(!self.is_high()?)
+    }
+}
+
 impl<MODE, const GPIONUM: u8> GpioPin<MODE, GPIONUM>
 where
     Self: GpioProperties,
@@ -2356,6 +2370,32 @@ mod asynch {
     where
         Self: GpioProperties,
         <Self as GpioProperties>::PinType: IsInputPin,
+    {
+        async fn wait_for_high(&mut self) -> Result<(), Self::Error> {
+            PinFuture::new(self, Event::HighLevel).await
+        }
+
+        async fn wait_for_low(&mut self) -> Result<(), Self::Error> {
+            PinFuture::new(self, Event::LowLevel).await
+        }
+
+        async fn wait_for_rising_edge(&mut self) -> Result<(), Self::Error> {
+            PinFuture::new(self, Event::RisingEdge).await
+        }
+
+        async fn wait_for_falling_edge(&mut self) -> Result<(), Self::Error> {
+            PinFuture::new(self, Event::FallingEdge).await
+        }
+
+        async fn wait_for_any_edge(&mut self) -> Result<(), Self::Error> {
+            PinFuture::new(self, Event::AnyEdge).await
+        }
+    }
+
+    impl<const GPIONUM: u8> Wait for GpioPin<Output<OpenDrain>, GPIONUM>
+    where
+        Self: GpioProperties,
+        <Self as GpioProperties>::PinType: IsInputPin + IsOutputPin,
     {
         async fn wait_for_high(&mut self) -> Result<(), Self::Error> {
             PinFuture::new(self, Event::HighLevel).await
