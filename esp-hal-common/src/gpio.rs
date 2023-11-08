@@ -55,26 +55,22 @@ pub struct InvertedInput<MODE> {
     _mode: PhantomData<MODE>,
 }
 
+/// Used to decide if the pin is inverted or not when the pin gets connected to
+/// a peripheral
 trait InputMode {
-    fn inverted() -> bool;
+    const PIN_IS_INVERTED: bool;
 }
 
 impl<MODE> InputMode for Input<MODE> {
-    fn inverted() -> bool {
-        false
-    }
+    const PIN_IS_INVERTED: bool = false;
 }
 
 impl<MODE> InputMode for InvertedInput<MODE> {
-    fn inverted() -> bool {
-        true
-    }
+    const PIN_IS_INVERTED: bool = true;
 }
 
 impl InputMode for Unknown {
-    fn inverted() -> bool {
-        false
-    }
+    const PIN_IS_INVERTED: bool = false;
 }
 
 pub struct RTCInput<MODE> {
@@ -95,26 +91,22 @@ pub struct InvertedOutput<MODE> {
     _mode: PhantomData<MODE>,
 }
 
+/// Used to decide if the pin is inverted or not when the pin gets connected to
+/// a peripheral
 trait OutputMode {
-    fn inverted() -> bool;
+    const PIN_IS_INVERTED: bool;
 }
 
 impl<MODE> OutputMode for Output<MODE> {
-    fn inverted() -> bool {
-        false
-    }
+    const PIN_IS_INVERTED: bool = false;
 }
 
 impl<MODE> OutputMode for InvertedOutput<MODE> {
-    fn inverted() -> bool {
-        true
-    }
+    const PIN_IS_INVERTED: bool = true;
 }
 
 impl OutputMode for Unknown {
-    fn inverted() -> bool {
-        false
-    }
+    const PIN_IS_INVERTED: bool = false;
 }
 
 pub struct RTCOutput<MODE> {
@@ -688,7 +680,11 @@ where
     }
 
     fn connect_input_to_peripheral(&mut self, signal: InputSignal) -> &mut Self {
-        self.connect_input_to_peripheral_with_options(signal, MODE::inverted(), MODE::inverted())
+        self.connect_input_to_peripheral_with_options(
+            signal,
+            MODE::PIN_IS_INVERTED,
+            MODE::PIN_IS_INVERTED,
+        )
     }
 
     fn connect_input_to_peripheral_with_options(
@@ -1178,10 +1174,10 @@ where
     fn connect_peripheral_to_output(&mut self, signal: OutputSignal) -> &mut Self {
         self.connect_peripheral_to_output_with_options(
             signal,
-            MODE::inverted(),
+            MODE::PIN_IS_INVERTED,
             false,
             false,
-            MODE::inverted(),
+            MODE::PIN_IS_INVERTED,
         )
     }
 
