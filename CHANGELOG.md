@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- C2, C3: atomic emulation trap is now opt-in and `esp-hal` now uses `portable-atomic` by default (#904)
+- C2, C3: atomic emulation trap is now opt-in (#904)
 
 ### Fixed
 
