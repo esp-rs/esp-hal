@@ -64,6 +64,8 @@ rt        = []
 ufmt      = ["esp-hal-common/ufmt"]
 vectored  = ["esp-hal-common/vectored"]
 
+portable-atomic  = ["esp-hal-common/portable-atomic"]
+
 # Embassy support
 embassy = ["esp-hal-common/embassy"]
 embassy-time-systick       = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-hz-80_000_000"] 

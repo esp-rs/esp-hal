@@ -27,7 +27,6 @@ categories = [
 [dependencies]
 esp-hal-common = { version = "0.13.0", features = ["esp32c2"], path = "../esp-hal-common" }
 embassy-time   = { version = "0.1.5",  features = ["nightly"], optional = true }
-portable-atomic = { version = "1.5.1",  features = ["unsafe-assume-single-core"], optional = true }
 
 [dev-dependencies]
 critical-section   = "1.1.2"
@@ -42,7 +41,9 @@ heapless           = "0.7.16"
 lis3dh-async       = "0.8.0"
 sha2               = { version = "0.10.8", default-features = false}
 ssd1306            = "0.8.4"
+portable-atomic    = "1.5.1"
 static_cell        = { version = "2.0.0", features = ["nightly"] }
+esp-hal-common     = { features = ["portable-atomic"], path = "../esp-hal-common" } # enable portable-atomic by default for examples
 hex-literal       = "0.4.1"
 crypto-bigint     = {version = "0.5.3", default-features = false }
 elliptic-curve    = {version = "0.13.6", default-features = false, features = ["sec1"] }
@@ -51,7 +52,7 @@ p256              = {version = "0.13.2", default-features = false, features = ["
 embassy-sync       = "0.4.0"
 
 [features]
-default              = ["rt", "vectored", "xtal-40mhz", "portable-atomic"]
+default              = ["rt", "vectored", "xtal-40mhz"]
 async                = ["esp-hal-common/async"]
 debug                = ["esp-hal-common/debug"]
 defmt                = ["esp-hal-common/defmt", "esp-println/defmt"]
@@ -70,7 +71,7 @@ embassy              = ["esp-hal-common/embassy"]
 embassy-time-systick = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-hz-16_000_000"]
 embassy-time-timg0   = ["esp-hal-common/embassy-time-timg0",   "embassy-time/tick-hz-1_000_000"]
 
-portable-atomic  = ["dep:portable-atomic", "esp-hal-common/portable-atomic"]
+portable-atomic  = ["esp-hal-common/portable-atomic"]
 atomic-emulation = ["esp-hal-common/riscv-atomic-emulation"]
 
 [profile.release]
