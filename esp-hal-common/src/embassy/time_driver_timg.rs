@@ -86,15 +86,15 @@ impl EmbassyTimer {
 
     pub(crate) fn set_alarm(
         &self,
-        alarm: embassy_time::driver::AlarmHandle,
+        _alarm: embassy_time::driver::AlarmHandle,
         timestamp: u64,
     ) -> bool {
-        critical_section::with(|cs| {
+        critical_section::with(|_cs| {
             // The hardware fires the alarm even if timestamp is lower than the current
             // time. In this case the interrupt handler will pend a wakeup when we exit the
             // critical section.
             #[cfg(any(esp32, esp32s2, esp32s3))]
-            if alarm.id() == 1 {
+            if _alarm.id() == 1 {
                 let mut tg = unsafe { Timer1::<TIMG0>::steal() };
                 Self::arm(&mut tg, timestamp);
                 return;

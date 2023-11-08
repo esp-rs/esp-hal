@@ -26,7 +26,7 @@
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
 #![cfg_attr(
     feature = "async",
-    allow(incomplete_features),
+    allow(incomplete_features, stable_features, unknown_lints, async_fn_in_trait),
     feature(async_fn_in_trait),
     feature(impl_trait_projections)
 )]

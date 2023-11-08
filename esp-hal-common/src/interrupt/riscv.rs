@@ -461,11 +461,10 @@ pub unsafe extern "C" fn start_trap_rust_hal(trap_frame: *mut TrapFrame) {
 /// # Safety
 ///
 /// This function is called from an trap handler.
-#[doc(hidden)]
-unsafe fn handle_exception(pc: usize, trap_frame: *mut TrapFrame) {
+unsafe fn handle_exception(_pc: usize, trap_frame: *mut TrapFrame) {
     #[cfg(feature = "atomic-emulation")]
     {
-        let insn: usize = *(pc as *const _);
+        let insn: usize = *(_pc as *const _);
         let needs_atomic_emulation = (insn & 0b1111111) == 0b0101111;
         if needs_atomic_emulation {
             let mut frame = [
