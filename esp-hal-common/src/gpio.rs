@@ -938,6 +938,18 @@ where
     }
 }
 
+impl<const GPIONUM: u8> From<GpioPin<Unknown, GPIONUM>>
+    for GpioPin<InvertedInput<Floating>, GPIONUM>
+where
+    Self: GpioProperties,
+    <Self as GpioProperties>::PinType: IsInputPin,
+    GpioPin<Unknown, GPIONUM>: GpioProperties,
+{
+    fn from(pin: GpioPin<Unknown, GPIONUM>) -> Self {
+        pin.into_inverted_floating_input()
+    }
+}
+
 impl<const GPIONUM: u8> From<GpioPin<Unknown, GPIONUM>> for GpioPin<Input<PullUp>, GPIONUM>
 where
     Self: GpioProperties,
@@ -946,6 +958,17 @@ where
 {
     fn from(pin: GpioPin<Unknown, GPIONUM>) -> Self {
         pin.into_pull_up_input()
+    }
+}
+
+impl<const GPIONUM: u8> From<GpioPin<Unknown, GPIONUM>> for GpioPin<InvertedInput<PullUp>, GPIONUM>
+where
+    Self: GpioProperties,
+    <Self as GpioProperties>::PinType: IsOutputPin,
+    GpioPin<Unknown, GPIONUM>: GpioProperties,
+{
+    fn from(pin: GpioPin<Unknown, GPIONUM>) -> Self {
+        pin.into_inverted_pull_up_input()
     }
 }
 
@@ -960,6 +983,18 @@ where
     }
 }
 
+impl<const GPIONUM: u8> From<GpioPin<Unknown, GPIONUM>>
+    for GpioPin<InvertedInput<PullDown>, GPIONUM>
+where
+    Self: GpioProperties,
+    <Self as GpioProperties>::PinType: IsInputPin,
+    GpioPin<Unknown, GPIONUM>: GpioProperties,
+{
+    fn from(pin: GpioPin<Unknown, GPIONUM>) -> Self {
+        pin.into_inverted_pull_down_input()
+    }
+}
+
 impl<const GPIONUM: u8> From<GpioPin<Unknown, GPIONUM>> for GpioPin<Output<PushPull>, GPIONUM>
 where
     Self: GpioProperties,
@@ -969,6 +1004,19 @@ where
 {
     fn from(pin: GpioPin<Unknown, GPIONUM>) -> Self {
         pin.into_push_pull_output()
+    }
+}
+
+impl<const GPIONUM: u8> From<GpioPin<Unknown, GPIONUM>>
+    for GpioPin<InvertedOutput<PushPull>, GPIONUM>
+where
+    Self: GpioProperties,
+    <Self as GpioProperties>::PinType: IsOutputPin,
+    GpioPin<Unknown, GPIONUM>: GpioProperties,
+    <GpioPin<Unknown, GPIONUM> as GpioProperties>::PinType: IsOutputPin,
+{
+    fn from(pin: GpioPin<Unknown, GPIONUM>) -> Self {
+        pin.into_inverted_push_pull_output()
     }
 }
 
@@ -993,6 +1041,19 @@ where
 {
     fn from(pin: GpioPin<Unknown, GPIONUM>) -> Self {
         pin.into_open_drain_output()
+    }
+}
+
+impl<const GPIONUM: u8> From<GpioPin<Unknown, GPIONUM>>
+    for GpioPin<InvertedOutput<OpenDrain>, GPIONUM>
+where
+    Self: GpioProperties,
+    <Self as GpioProperties>::PinType: IsOutputPin,
+    GpioPin<Unknown, GPIONUM>: GpioProperties,
+    <GpioPin<Unknown, GPIONUM> as GpioProperties>::PinType: IsOutputPin,
+{
+    fn from(pin: GpioPin<Unknown, GPIONUM>) -> Self {
+        pin.into_inverted_open_drain_output()
     }
 }
 
