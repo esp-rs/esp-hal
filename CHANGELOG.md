@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - ESP32-C6: LP core clock is configurable (#907)
+- Derive `Clone` and `Copy` for `EspTwaiFrame` (#914)
 
 ### Changed
 
