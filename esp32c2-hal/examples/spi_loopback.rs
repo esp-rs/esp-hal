@@ -42,15 +42,11 @@ fn main() -> ! {
     let mosi = io.pins.gpio7;
     let cs = io.pins.gpio10;
 
-    let mut spi = Spi::new(
-        peripherals.SPI2,
-        sclk,
-        mosi,
-        miso,
-        cs,
-        100u32.kHz(),
-        SpiMode::Mode0,
-        &clocks,
+    let mut spi = Spi::new(peripherals.SPI2, 100u32.kHz(), SpiMode::Mode0, &clocks).with_pins(
+        Some(sclk),
+        Some(mosi),
+        Some(miso),
+        Some(cs),
     );
 
     let mut delay = Delay::new(&clocks);

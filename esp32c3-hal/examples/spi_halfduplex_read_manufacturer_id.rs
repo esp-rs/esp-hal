@@ -46,18 +46,15 @@ fn main() -> ! {
     let sio3 = io.pins.gpio5;
     let cs = io.pins.gpio10;
 
-    let mut spi = Spi::new_half_duplex(
-        peripherals.SPI2,
-        Some(sclk),
-        Some(mosi),
-        Some(miso),
-        Some(sio2),
-        Some(sio3),
-        Some(cs),
-        100u32.kHz(),
-        SpiMode::Mode0,
-        &clocks,
-    );
+    let mut spi = Spi::new_half_duplex(peripherals.SPI2, 100u32.kHz(), SpiMode::Mode0, &clocks)
+        .with_pins(
+            Some(sclk),
+            Some(mosi),
+            Some(miso),
+            Some(sio2),
+            Some(sio3),
+            Some(cs),
+        );
 
     let mut delay = Delay::new(&clocks);
 

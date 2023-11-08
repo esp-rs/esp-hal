@@ -54,24 +54,21 @@ fn main() -> ! {
     let mut descriptors = [0u32; 8 * 3];
     let mut rx_descriptors = [0u32; 8 * 3];
 
-    let mut spi = Spi::new_half_duplex(
-        peripherals.SPI2,
-        Some(sclk),
-        Some(mosi),
-        Some(miso),
-        Some(sio2),
-        Some(sio3),
-        Some(cs),
-        100u32.kHz(),
-        SpiMode::Mode0,
-        &clocks,
-    )
-    .with_dma(dma_channel.configure(
-        false,
-        &mut descriptors,
-        &mut rx_descriptors,
-        DmaPriority::Priority0,
-    ));
+    let mut spi = Spi::new_half_duplex(peripherals.SPI2, 100u32.kHz(), SpiMode::Mode0, &clocks)
+        .with_pins(
+            Some(sclk),
+            Some(mosi),
+            Some(miso),
+            Some(sio2),
+            Some(sio3),
+            Some(cs),
+        )
+        .with_dma(dma_channel.configure(
+            false,
+            &mut descriptors,
+            &mut rx_descriptors,
+            DmaPriority::Priority0,
+        ));
 
     let mut delay = Delay::new(&clocks);
 

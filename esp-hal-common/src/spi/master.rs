@@ -16,15 +16,12 @@
 //!
 //! let mut spi = hal::spi::Spi::new(
 //!     peripherals.SPI2,
-//!     sclk,
-//!     mosi,
-//!     miso,
-//!     cs,
 //!     100u32.kHz(),
 //!     SpiMode::Mode0,
 //!     &mut peripheral_clock_control,
 //!     &mut clocks,
-//! );
+//! )
+//! .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs));
 //! ```
 //!
 //! ## Exclusive access to the SPI bus
@@ -392,114 +389,87 @@ where
     T: Instance,
 {
     /// Constructs an SPI instance in 8bit dataframe mode.
-    pub fn new<SCK: OutputPin, MOSI: OutputPin, MISO: InputPin, CS: OutputPin>(
+    ///
+    /// All pins are optional. Setup these pins using
+    /// [with_pins](Self::with_pins) or individual methods for each pin.
+    pub fn new(
         spi: impl Peripheral<P = T> + 'd,
-        sck: impl Peripheral<P = SCK> + 'd,
-        mosi: impl Peripheral<P = MOSI> + 'd,
-        miso: impl Peripheral<P = MISO> + 'd,
-        cs: impl Peripheral<P = CS> + 'd,
         frequency: HertzU32,
         mode: SpiMode,
         clocks: &Clocks,
     ) -> Spi<'d, T, FullDuplexMode> {
-        crate::into_ref!(spi, sck, mosi, miso, cs);
+        crate::into_ref!(spi);
+        Self::new_internal(spi, frequency, mode, clocks)
+    }
+
+    pub fn with_sck<SCK: OutputPin>(self, sck: impl Peripheral<P = SCK> + 'd) -> Self {
+        crate::into_ref!(sck);
         sck.set_to_push_pull_output()
-            .connect_peripheral_to_output(spi.sclk_signal());
+            .connect_peripheral_to_output(self.spi.sclk_signal());
 
+        self
+    }
+
+    pub fn with_mosi<MOSI: OutputPin>(self, mosi: impl Peripheral<P = MOSI> + 'd) -> Self {
+        crate::into_ref!(mosi);
         mosi.set_to_push_pull_output()
-            .connect_peripheral_to_output(spi.mosi_signal());
+            .connect_peripheral_to_output(self.spi.mosi_signal());
 
+        self
+    }
+
+    pub fn with_miso<MISO: InputPin>(self, miso: impl Peripheral<P = MISO> + 'd) -> Self {
+        crate::into_ref!(miso);
         miso.set_to_input()
-            .connect_input_to_peripheral(spi.miso_signal());
+            .connect_input_to_peripheral(self.spi.miso_signal());
 
+        self
+    }
+
+    pub fn with_cs<CS: OutputPin>(self, cs: impl Peripheral<P = CS> + 'd) -> Self {
+        crate::into_ref!(cs);
         cs.set_to_push_pull_output()
-            .connect_peripheral_to_output(spi.cs_signal());
+            .connect_peripheral_to_output(self.spi.cs_signal());
 
-        Self::new_internal(spi, frequency, mode, clocks)
+        self
     }
 
-    /// Constructs an SPI instance in 8bit dataframe mode without CS pin.
-    pub fn new_no_cs<SCK: OutputPin, MOSI: OutputPin, MISO: InputPin>(
-        spi: impl Peripheral<P = T> + 'd,
-        sck: impl Peripheral<P = SCK> + 'd,
-        mosi: impl Peripheral<P = MOSI> + 'd,
-        miso: impl Peripheral<P = MISO> + 'd,
-        frequency: HertzU32,
-        mode: SpiMode,
-        clocks: &Clocks,
-    ) -> Spi<'d, T, FullDuplexMode> {
-        crate::into_ref!(spi, sck, mosi, miso);
-        sck.set_to_push_pull_output()
-            .connect_peripheral_to_output(spi.sclk_signal());
+    /// Setup pins for this SPI instance.
+    ///
+    /// All pins are optional. Pass [crate::gpio::NO_PIN] if you don't need the
+    /// given pin.
+    pub fn with_pins<SCK: OutputPin, MOSI: OutputPin, MISO: InputPin, CS: OutputPin>(
+        self,
+        sck: Option<impl Peripheral<P = SCK> + 'd>,
+        mosi: Option<impl Peripheral<P = MOSI> + 'd>,
+        miso: Option<impl Peripheral<P = MISO> + 'd>,
+        cs: Option<impl Peripheral<P = CS> + 'd>,
+    ) -> Self {
+        if let Some(sck) = sck {
+            crate::into_ref!(sck);
+            sck.set_to_push_pull_output()
+                .connect_peripheral_to_output(self.spi.sclk_signal());
+        }
 
-        mosi.set_to_push_pull_output()
-            .connect_peripheral_to_output(spi.mosi_signal());
+        if let Some(mosi) = mosi {
+            crate::into_ref!(mosi);
+            mosi.set_to_push_pull_output()
+                .connect_peripheral_to_output(self.spi.mosi_signal());
+        }
 
-        miso.set_to_input()
-            .connect_input_to_peripheral(spi.miso_signal());
+        if let Some(miso) = miso {
+            crate::into_ref!(miso);
+            miso.set_to_input()
+                .connect_input_to_peripheral(self.spi.miso_signal());
+        }
 
-        Self::new_internal(spi, frequency, mode, clocks)
-    }
+        if let Some(cs) = cs {
+            crate::into_ref!(cs);
+            cs.set_to_push_pull_output()
+                .connect_peripheral_to_output(self.spi.cs_signal());
+        }
 
-    /// Constructs an SPI instance in 8bit dataframe mode without MISO pin.
-    pub fn new_no_miso<SCK: OutputPin, MOSI: OutputPin, CS: OutputPin>(
-        spi: impl Peripheral<P = T> + 'd,
-        sck: impl Peripheral<P = SCK> + 'd,
-        mosi: impl Peripheral<P = MOSI> + 'd,
-        cs: impl Peripheral<P = CS> + 'd,
-        frequency: HertzU32,
-        mode: SpiMode,
-        clocks: &Clocks,
-    ) -> Spi<'d, T, FullDuplexMode> {
-        crate::into_ref!(spi, sck, mosi, cs);
-        sck.set_to_push_pull_output()
-            .connect_peripheral_to_output(spi.sclk_signal());
-
-        mosi.set_to_push_pull_output()
-            .connect_peripheral_to_output(spi.mosi_signal());
-
-        cs.set_to_push_pull_output()
-            .connect_peripheral_to_output(spi.cs_signal());
-
-        Self::new_internal(spi, frequency, mode, clocks)
-    }
-
-    /// Constructs an SPI instance in 8bit dataframe mode without CS and MISO
-    /// pin.
-    pub fn new_no_cs_no_miso<SCK: OutputPin, MOSI: OutputPin>(
-        spi: impl Peripheral<P = T> + 'd,
-        sck: impl Peripheral<P = SCK> + 'd,
-        mosi: impl Peripheral<P = MOSI> + 'd,
-        frequency: HertzU32,
-        mode: SpiMode,
-        clocks: &Clocks,
-    ) -> Spi<'d, T, FullDuplexMode> {
-        crate::into_ref!(spi, sck, mosi);
-        sck.set_to_push_pull_output()
-            .connect_peripheral_to_output(spi.sclk_signal());
-
-        mosi.set_to_push_pull_output()
-            .connect_peripheral_to_output(spi.mosi_signal());
-
-        Self::new_internal(spi, frequency, mode, clocks)
-    }
-
-    /// Constructs an SPI instance in 8bit dataframe mode with only MOSI
-    /// connected. This might be useful for (ab)using SPI to  implement
-    /// other protocols by bitbanging (WS2812B, onewire, generating arbitrary
-    /// waveforms…)
-    pub fn new_mosi_only<MOSI: OutputPin>(
-        spi: impl Peripheral<P = T> + 'd,
-        mosi: impl Peripheral<P = MOSI> + 'd,
-        frequency: HertzU32,
-        mode: SpiMode,
-        clocks: &Clocks,
-    ) -> Spi<'d, T, FullDuplexMode> {
-        crate::into_ref!(spi, mosi);
-        mosi.set_to_push_pull_output()
-            .connect_peripheral_to_output(spi.mosi_signal());
-
-        Self::new_internal(spi, frequency, mode, clocks)
+        self
     }
 
     pub(crate) fn new_internal(
@@ -532,9 +502,91 @@ where
 {
     /// Constructs an SPI instance in half-duplex mode.
     ///
+    /// All pins are optional. Setup these pins using
+    /// [with_pins](Self::with_pins) or individual methods for each pin.
+    pub fn new_half_duplex(
+        spi: impl Peripheral<P = T> + 'd,
+        frequency: HertzU32,
+        mode: SpiMode,
+        clocks: &Clocks,
+    ) -> Spi<'d, T, HalfDuplexMode> {
+        crate::into_ref!(spi);
+        Self::new_internal(spi, frequency, mode, clocks)
+    }
+
+    pub fn with_sck<SCK: OutputPin>(self, sck: impl Peripheral<P = SCK> + 'd) -> Self {
+        crate::into_ref!(sck);
+        sck.set_to_push_pull_output()
+            .connect_peripheral_to_output(self.spi.sclk_signal());
+
+        self
+    }
+
+    pub fn with_mosi<MOSI: OutputPin + InputPin>(
+        self,
+        mosi: impl Peripheral<P = MOSI> + 'd,
+    ) -> Self {
+        crate::into_ref!(mosi);
+        mosi.enable_output(true);
+        mosi.connect_peripheral_to_output(self.spi.mosi_signal());
+        mosi.enable_input(true);
+        mosi.connect_input_to_peripheral(self.spi.sio0_input_signal());
+
+        self
+    }
+
+    pub fn with_miso<MISO: OutputPin + InputPin>(
+        self,
+        miso: impl Peripheral<P = MISO> + 'd,
+    ) -> Self {
+        crate::into_ref!(miso);
+        miso.enable_output(true);
+        miso.connect_peripheral_to_output(self.spi.sio1_output_signal());
+        miso.enable_input(true);
+        miso.connect_input_to_peripheral(self.spi.miso_signal());
+
+        self
+    }
+
+    pub fn with_sio2<SIO2: OutputPin + InputPin>(
+        self,
+        sio2: impl Peripheral<P = SIO2> + 'd,
+    ) -> Self {
+        crate::into_ref!(sio2);
+        sio2.enable_output(true);
+        sio2.connect_peripheral_to_output(self.spi.sio2_output_signal());
+        sio2.enable_input(true);
+        sio2.connect_input_to_peripheral(self.spi.sio2_input_signal());
+
+        self
+    }
+
+    pub fn with_sio3<SIO3: OutputPin + InputPin>(
+        self,
+        sio3: impl Peripheral<P = SIO3> + 'd,
+    ) -> Self {
+        crate::into_ref!(sio3);
+        sio3.enable_output(true);
+        sio3.connect_peripheral_to_output(self.spi.sio3_output_signal());
+        sio3.enable_input(true);
+        sio3.connect_input_to_peripheral(self.spi.sio3_input_signal());
+
+        self
+    }
+
+    pub fn with_cs<CS: OutputPin>(self, cs: impl Peripheral<P = CS> + 'd) -> Self {
+        crate::into_ref!(cs);
+        cs.set_to_push_pull_output()
+            .connect_peripheral_to_output(self.spi.cs_signal());
+
+        self
+    }
+
+    /// Setup pins for this SPI instance.
+    ///
     /// All pins are optional. Pass [crate::gpio::NO_PIN] if you don't need the
     /// given pin.
-    pub fn new_half_duplex<
+    pub fn with_pins<
         SCK: OutputPin,
         MOSI: OutputPin + InputPin,
         MISO: OutputPin + InputPin,
@@ -542,63 +594,59 @@ where
         SIO3: OutputPin + InputPin,
         CS: OutputPin,
     >(
-        spi: impl Peripheral<P = T> + 'd,
+        self,
         sck: Option<impl Peripheral<P = SCK> + 'd>,
         mosi: Option<impl Peripheral<P = MOSI> + 'd>,
         miso: Option<impl Peripheral<P = MISO> + 'd>,
         sio2: Option<impl Peripheral<P = SIO2> + 'd>,
         sio3: Option<impl Peripheral<P = SIO3> + 'd>,
         cs: Option<impl Peripheral<P = CS> + 'd>,
-        frequency: HertzU32,
-        mode: SpiMode,
-        clocks: &Clocks,
-    ) -> Spi<'d, T, HalfDuplexMode> {
-        crate::into_ref!(spi);
+    ) -> Self {
         if let Some(sck) = sck {
             crate::into_ref!(sck);
             sck.set_to_push_pull_output()
-                .connect_peripheral_to_output(spi.sclk_signal());
+                .connect_peripheral_to_output(self.spi.sclk_signal());
         }
 
         if let Some(mosi) = mosi {
             crate::into_ref!(mosi);
             mosi.enable_output(true);
-            mosi.connect_peripheral_to_output(spi.mosi_signal());
+            mosi.connect_peripheral_to_output(self.spi.mosi_signal());
             mosi.enable_input(true);
-            mosi.connect_input_to_peripheral(spi.sio0_input_signal());
+            mosi.connect_input_to_peripheral(self.spi.sio0_input_signal());
         }
 
         if let Some(miso) = miso {
             crate::into_ref!(miso);
             miso.enable_output(true);
-            miso.connect_peripheral_to_output(spi.sio1_output_signal());
+            miso.connect_peripheral_to_output(self.spi.sio1_output_signal());
             miso.enable_input(true);
-            miso.connect_input_to_peripheral(spi.miso_signal());
+            miso.connect_input_to_peripheral(self.spi.miso_signal());
         }
 
         if let Some(sio2) = sio2 {
             crate::into_ref!(sio2);
             sio2.enable_output(true);
-            sio2.connect_peripheral_to_output(spi.sio2_output_signal());
+            sio2.connect_peripheral_to_output(self.spi.sio2_output_signal());
             sio2.enable_input(true);
-            sio2.connect_input_to_peripheral(spi.sio2_input_signal());
+            sio2.connect_input_to_peripheral(self.spi.sio2_input_signal());
         }
 
         if let Some(sio3) = sio3 {
             crate::into_ref!(sio3);
             sio3.enable_output(true);
-            sio3.connect_peripheral_to_output(spi.sio3_output_signal());
+            sio3.connect_peripheral_to_output(self.spi.sio3_output_signal());
             sio3.enable_input(true);
-            sio3.connect_input_to_peripheral(spi.sio3_input_signal());
+            sio3.connect_input_to_peripheral(self.spi.sio3_input_signal());
         }
 
         if let Some(cs) = cs {
             crate::into_ref!(cs);
             cs.set_to_push_pull_output()
-                .connect_peripheral_to_output(spi.cs_signal());
+                .connect_peripheral_to_output(self.spi.cs_signal());
         }
 
-        Self::new_internal(spi, frequency, mode, clocks)
+        self
     }
 
     pub(crate) fn new_internal(
