@@ -1,4 +1,11 @@
-use crate::clock::{ApbClock, Clock, CpuClock, PllClock, XtalClock};
+use core::cell::Cell;
+
+use critical_section::{CriticalSection, Mutex};
+
+use crate::{
+    clock::{ApbClock, Clock, CpuClock, PllClock, XtalClock},
+    rtc_cntl::rtc::CpuClockSource,
+};
 
 extern "C" {
     fn ets_update_cpu_frequency(ticks_per_us: u32);
@@ -36,22 +43,109 @@ const I2C_MST_BBPLL_STOP_FORCE_HIGH: u32 = 1 << 2;
 const I2C_MST_BBPLL_STOP_FORCE_LOW: u32 = 1 << 3;
 const I2C_MST_BBPLL_CAL_DONE: u32 = 1 << 24;
 
-const MODEM_LPCON_CLK_CONF_FORCE_ON_REG: u32 = DR_REG_MODEM_LPCON_BASE + 0x1c;
-const MODEM_LPCON_CLK_I2C_MST_FO: u32 = 1 << 2;
-const MODEM_LPCON_I2C_MST_CLK_CONF_REG: u32 = DR_REG_MODEM_LPCON_BASE + 0x10;
-const MODEM_LPCON_CLK_I2C_MST_SEL_160M: u32 = 1 << 0;
+bitfield::bitfield! {
+    #[derive(Clone, Copy, Default)]
+    // `modem_clock_device_t`
+    pub struct ModemClockDevice(u32);
 
-pub(crate) fn esp32c6_rtc_bbpll_configure(_xtal_freq: XtalClock, _pll_freq: PllClock) {
+    pub bool, adc_common_fe, set_adc_common_fe: 0;
+    pub bool, private_fe   , set_private_fe   : 1;
+    pub bool, coexist      , set_coexist      : 2;
+    pub bool, i2c_master   , set_i2c_master   : 3;
+    pub bool, wifi_mac     , set_wifi_mac     : 4;
+    pub bool, wifi_bb      , set_wifi_bb      : 5;
+    pub bool, etm          , set_etm          : 6;
+    pub bool, ble_mac      , set_ble_mac      : 7;
+    pub bool, ble_bb       , set_ble_bb       : 8;
+    pub bool, _802154_mac  , set_802154_mac   : 9;
+    pub bool, datadump     , set_datadump     : 10;
+}
+
+struct Refcounted {
+    refcount: Mutex<Cell<u32>>,
+    on_enabled: fn(),
+    on_disabled: fn(),
+}
+
+impl Refcounted {
+    const fn new(on_enabled: fn(), on_disabled: fn()) -> Self {
+        Refcounted {
+            refcount: Mutex::new(Cell::new(0)),
+            on_enabled,
+            on_disabled,
+        }
+    }
+
+    fn enable(&self, enable: bool, cs: CriticalSection) {
+        let refcount = self.refcount.borrow(cs);
+        let count = refcount.get();
+
+        if enable {
+            refcount.set(count + 1);
+            if count == 1 {
+                (self.on_enabled)();
+            }
+        } else {
+            if count == 1 {
+                (self.on_disabled)();
+            }
+            refcount.set(count - 1);
+        }
+    }
+}
+
+unsafe fn modem_lpcon<'a>() -> &'a esp32c6::modem_lpcon::RegisterBlock {
+    &*esp32c6::MODEM_LPCON::ptr()
+}
+
+unsafe fn pcr<'a>() -> &'a esp32c6::pcr::RegisterBlock {
+    &*esp32c6::PCR::ptr()
+}
+
+fn modem_clock_device_enable(sources: ModemClockDevice, enable: bool) {
+    // TODO: implement the rest
+    static I2C_MASTER: Refcounted = Refcounted::new(
+        || unsafe {
+            modem_lpcon()
+                .clk_conf()
+                .modify(|_, w| w.clk_i2c_mst_en().set_bit());
+        },
+        || unsafe {
+            modem_lpcon()
+                .clk_conf()
+                .modify(|_, w| w.clk_i2c_mst_en().clear_bit());
+        },
+    );
+
+    critical_section::with(|cs| {
+        if sources.i2c_master() {
+            I2C_MASTER.enable(enable, cs);
+        }
+    });
+}
+
+// rtc_clk_bbpll_configure
+pub(crate) fn esp32c6_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock) {
+    esp32c6_rtc_bbpll_configure_raw(xtal_freq.mhz(), pll_freq.mhz())
+}
+
+pub(crate) fn esp32c6_rtc_bbpll_configure_raw(_xtal_freq: u32, pll_freq: u32) {
+    // clk_ll_bbpll_set_freq_mhz
+    // The target SPLL is fixed to 480MHz
+    // Do nothing
+    debug_assert!(pll_freq == 480);
+
     unsafe {
         // enable i2c mst clk by force on temporarily
-        (MODEM_LPCON_CLK_CONF_FORCE_ON_REG as *mut u32).write_volatile(
-            (MODEM_LPCON_CLK_CONF_FORCE_ON_REG as *mut u32).read_volatile()
-                | MODEM_LPCON_CLK_I2C_MST_FO,
-        );
-        (MODEM_LPCON_I2C_MST_CLK_CONF_REG as *mut u32).write_volatile(
-            (MODEM_LPCON_I2C_MST_CLK_CONF_REG as *mut u32).read_volatile()
-                | MODEM_LPCON_CLK_I2C_MST_SEL_160M,
-        );
+        let mut i2c_clock = ModemClockDevice::default();
+        i2c_clock.set_i2c_master(true);
+        let i2c_clock = i2c_clock;
+
+        modem_clock_device_enable(i2c_clock, true);
+
+        modem_lpcon()
+            .i2c_mst_clk_conf()
+            .modify(|_, w| w.clk_i2c_mst_sel_160m().set_bit());
 
         let i2c_mst_ana_conf0_reg_ptr = I2C_MST_ANA_CONF0_REG as *mut u32;
         // BBPLL CALIBRATION START
@@ -128,6 +222,8 @@ pub(crate) fn esp32c6_rtc_bbpll_configure(_xtal_freq: XtalClock, _pll_freq: PllC
         i2c_mst_ana_conf0_reg_ptr.write_volatile(
             i2c_mst_ana_conf0_reg_ptr.read_volatile() & !I2C_MST_BBPLL_STOP_FORCE_LOW,
         );
+
+        modem_clock_device_enable(i2c_clock, false);
     }
 }
 
@@ -147,21 +243,33 @@ pub(crate) fn esp32c6_rtc_bbpll_enable() {
         .modify(|_, w| w.tie_high_global_bbpll_icg().set_bit());
 }
 
-pub(crate) fn esp32c6_rtc_update_to_xtal(freq: XtalClock, _div: u8) {
-    let pcr = unsafe { &*crate::peripherals::PCR::PTR };
-    unsafe {
-        ets_update_cpu_frequency(freq.mhz());
-        // Set divider from XTAL to APB clock. Need to set divider to 1 (reg. value 0)
-        // first.
-        pcr.apb_freq_conf()
-            .modify(|_, w| w.apb_div_num().bits(0).apb_div_num().bits(_div - 1));
+pub(crate) fn esp32c6_rtc_update_to_xtal(freq: XtalClock, div: u8) {
+    esp32c6_rtc_update_to_xtal_raw(freq.mhz(), div)
+}
 
-        // Switch clock source
-        pcr.sysclk_conf().modify(|_, w| w.soc_clk_sel().bits(0));
+pub(crate) fn esp32c6_rtc_update_to_xtal_raw(freq_mhz: u32, div: u8) {
+    unsafe {
+        esp32c6_ahb_set_ls_divider(div);
+        esp32c6_cpu_set_ls_divider(div);
+        CpuClockSource::Xtal.select();
+        ets_update_cpu_frequency(freq_mhz);
+    }
+}
+
+pub(crate) fn esp32c6_rtc_update_to_8m() {
+    unsafe {
+        esp32c6_ahb_set_ls_divider(1);
+        esp32c6_cpu_set_ls_divider(1);
+        CpuClockSource::RcFast.select();
+        ets_update_cpu_frequency(20);
     }
 }
 
 pub(crate) fn esp32c6_rtc_freq_to_pll_mhz(cpu_clock_speed: CpuClock) {
+    esp32c6_rtc_freq_to_pll_mhz_raw(cpu_clock_speed.mhz());
+}
+
+pub(crate) fn esp32c6_rtc_freq_to_pll_mhz_raw(cpu_clock_speed_mhz: u32) {
     // On ESP32C6, MSPI source clock's default HS divider leads to 120MHz, which is
     // unusable before calibration Therefore, before switching SOC_ROOT_CLK to
     // HS, we need to set MSPI source clock HS divider to make it run at
@@ -172,7 +280,7 @@ pub(crate) fn esp32c6_rtc_freq_to_pll_mhz(cpu_clock_speed: CpuClock) {
     unsafe {
         pcr.cpu_freq_conf().modify(|_, w| {
             w.cpu_hs_div_num()
-                .bits(((480 / cpu_clock_speed.mhz() / 3) - 1) as u8)
+                .bits(((480 / cpu_clock_speed_mhz / 3) - 1) as u8)
                 .cpu_hs_120m_force()
                 .clear_bit()
         });
@@ -180,10 +288,9 @@ pub(crate) fn esp32c6_rtc_freq_to_pll_mhz(cpu_clock_speed: CpuClock) {
         pcr.cpu_freq_conf()
             .modify(|_, w| w.cpu_hs_120m_force().clear_bit());
 
-        pcr.sysclk_conf().modify(|_, w| {
-            w.soc_clk_sel().bits(1) // PLL = 1
-        });
-        ets_update_cpu_frequency(cpu_clock_speed.mhz());
+        CpuClockSource::PLL.select();
+
+        ets_update_cpu_frequency(cpu_clock_speed_mhz);
     }
 }
 
@@ -286,19 +393,19 @@ fn regi2c_enable_block(block: u8) {
 
     // Before config I2C register, enable corresponding slave.
     match block {
-        REGI2C_BBPLL => {
+        v if v == REGI2C_BBPLL => {
             reg_set_bit(LP_I2C_ANA_MST_DEVICE_EN_REG, REGI2C_BBPLL_DEVICE_EN);
         }
-        REGI2C_BIAS => {
+        v if v == REGI2C_BIAS => {
             reg_set_bit(LP_I2C_ANA_MST_DEVICE_EN_REG, REGI2C_BIAS_DEVICE_EN);
         }
-        REGI2C_DIG_REG => {
+        v if v == REGI2C_DIG_REG => {
             reg_set_bit(LP_I2C_ANA_MST_DEVICE_EN_REG, REGI2C_DIG_REG_DEVICE_EN);
         }
-        REGI2C_ULP_CAL => {
+        v if v == REGI2C_ULP_CAL => {
             reg_set_bit(LP_I2C_ANA_MST_DEVICE_EN_REG, REGI2C_ULP_CAL_DEVICE_EN);
         }
-        REGI2C_SAR_I2C => {
+        v if v == REGI2C_SAR_I2C => {
             reg_set_bit(LP_I2C_ANA_MST_DEVICE_EN_REG, REGI2C_SAR_I2C_DEVICE_EN);
         }
         _ => (),
@@ -307,19 +414,19 @@ fn regi2c_enable_block(block: u8) {
 
 fn regi2c_disable_block(block: u8) {
     match block {
-        REGI2C_BBPLL => {
+        v if v == REGI2C_BBPLL => {
             reg_clr_bit(LP_I2C_ANA_MST_DEVICE_EN_REG, REGI2C_BBPLL_DEVICE_EN);
         }
-        REGI2C_BIAS => {
+        v if v == REGI2C_BIAS => {
             reg_clr_bit(LP_I2C_ANA_MST_DEVICE_EN_REG, REGI2C_BIAS_DEVICE_EN);
         }
-        REGI2C_DIG_REG => {
+        v if v == REGI2C_DIG_REG => {
             reg_clr_bit(LP_I2C_ANA_MST_DEVICE_EN_REG, REGI2C_DIG_REG_DEVICE_EN);
         }
-        REGI2C_ULP_CAL => {
+        v if v == REGI2C_ULP_CAL => {
             reg_clr_bit(LP_I2C_ANA_MST_DEVICE_EN_REG, REGI2C_ULP_CAL_DEVICE_EN);
         }
-        REGI2C_SAR_I2C => {
+        v if v == REGI2C_SAR_I2C => {
             reg_clr_bit(LP_I2C_ANA_MST_DEVICE_EN_REG, REGI2C_SAR_I2C_DEVICE_EN);
         }
         _ => (),
@@ -366,4 +473,52 @@ pub(crate) fn regi2c_write_mask(block: u8, _host_id: u8, reg_add: u8, msb: u8, l
     while reg_get_bit(LP_I2C_ANA_MST_I2C0_CTRL_REG, LP_I2C_ANA_MST_I2C0_BUSY) != 0 {}
 
     regi2c_disable_block(block);
+}
+
+// clk_ll_ahb_set_ls_divider
+fn esp32c6_ahb_set_ls_divider(div: u8) {
+    unsafe {
+        pcr()
+            .ahb_freq_conf()
+            .modify(|_, w| w.ahb_ls_div_num().bits(div - 1));
+    }
+}
+
+// clk_ll_cpu_set_ls_divider
+fn esp32c6_cpu_set_ls_divider(div: u8) {
+    unsafe {
+        pcr()
+            .cpu_freq_conf()
+            .modify(|_, w| w.cpu_ls_div_num().bits(div - 1));
+    }
+}
+
+// clk_ll_cpu_get_ls_divider
+pub(crate) fn esp32c6_cpu_get_ls_divider() -> u8 {
+    unsafe {
+        let cpu_ls_div = pcr().cpu_freq_conf().read().cpu_ls_div_num().bits();
+        let hp_root_ls_div = pcr().sysclk_conf().read().ls_div_num().bits();
+        (hp_root_ls_div + 1) * (cpu_ls_div + 1)
+    }
+}
+
+// clk_ll_cpu_get_hs_divider
+pub(crate) fn esp32c6_cpu_get_hs_divider() -> u8 {
+    unsafe {
+        let force_120m = pcr().cpu_freq_conf().read().cpu_hs_120m_force().bit();
+        let cpu_hs_div = pcr().cpu_freq_conf().read().cpu_hs_div_num().bits();
+        if cpu_hs_div == 0 && force_120m {
+            return 4;
+        }
+        let hp_root_hs_div = pcr().sysclk_conf().read().hs_div_num().bits();
+        (hp_root_hs_div + 1) * (cpu_hs_div + 1)
+    }
+}
+
+// clk_ll_bbpll_get_freq_mhz
+pub(crate) fn esp32c6_bbpll_get_freq_mhz() -> u32 {
+    // The target has a fixed 480MHz SPLL
+    const CLK_LL_PLL_480M_FREQ_MHZ: u32 = 480;
+
+    CLK_LL_PLL_480M_FREQ_MHZ
 }

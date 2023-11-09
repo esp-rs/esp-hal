@@ -1,6 +1,6 @@
 use super::{TimerWakeupSource, WakeSource, WakeTriggers, WakeupLevel};
 use crate::{
-    gpio::RTCPinWithResistors,
+    gpio::{RTCPinWithResistors, RtcFunction},
     regi2c_write_mask,
     rtc_cntl::{sleep::RtcioWakeupSource, Clock, RtcClock},
     Rtc,
@@ -173,7 +173,7 @@ fn isolate_digital_gpio() {
             // make pad work as gpio (otherwise, deep_sleep bottom current will rise)
             io_mux
                 .gpio(pin_num)
-                .modify(|_, w| w.mcu_sel().variant(PIN_FUNC_GPIO));
+                .modify(|_, w| w.mcu_sel().variant(RtcFunction::Digital as u8));
         }
     }
 }

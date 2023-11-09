@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - ESP32-C6: Properly initialize PMU (#974)
 - Implement overriding base mac address (#1044)
+- ESP32-C6: Implement deep sleep (#918)
 
 ### Changed
 
