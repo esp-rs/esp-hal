@@ -29,9 +29,11 @@
 //! ulp_core.run(esp32s3_hal::ulp_core::UlpCoreWakeupSource::HpCpu);
 //! println!("ulpcore run");
 //!
-//! let data = (0x5000_0010 - 0) as *mut u32;
-//! loop {
-//!     println!("Current {}", unsafe { data.read_volatile() });
+//! unsafe {
+//!     let data = 0x5000_0010 as *mut u32;
+//!     loop {
+//!         println!("Current {}", unsafe { data.read_volatile() });
+//!     }
 //! }
 //! ```
 use esp32s2 as pac;
@@ -54,11 +56,17 @@ pub struct UlpCore<'d> {
 impl<'d> UlpCore<'d> {
     pub fn new(lp_core: impl Peripheral<P = crate::soc::peripherals::ULP_RISCV_CORE> + 'd) -> Self {
         crate::into_ref!(lp_core);
+
+        // clear all of RTC_SLOW_RAM - this makes sure .bss is cleared without relying
+        let lp_ram =
+            unsafe { core::slice::from_raw_parts_mut(0x5000_0000 as *mut u32, 8 * 1024 / 4) };
+        lp_ram.fill(0u32);
+
         Self { _lp_core: lp_core }
     }
 
-    // currently stopping the ULP doesn't work (while following the proсedures
-    // outlines in the TRM) - so don't offer this funtion for now
+    // currently stopping the ULP doesn't work (while following the procedures
+    // outlines in the TRM) - so don't offer this function for now
     //
     // pub fn stop(&mut self) {
     //     ulp_stop();
