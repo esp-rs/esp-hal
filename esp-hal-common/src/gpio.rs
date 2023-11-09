@@ -51,6 +51,28 @@ pub struct Input<MODE> {
     _mode: PhantomData<MODE>,
 }
 
+pub struct InvertedInput<MODE> {
+    _mode: PhantomData<MODE>,
+}
+
+/// Used to decide if the pin is inverted or not when the pin gets connected to
+/// a peripheral
+trait InputMode {
+    const PIN_IS_INVERTED: bool;
+}
+
+impl<MODE> InputMode for Input<MODE> {
+    const PIN_IS_INVERTED: bool = false;
+}
+
+impl<MODE> InputMode for InvertedInput<MODE> {
+    const PIN_IS_INVERTED: bool = true;
+}
+
+impl InputMode for Unknown {
+    const PIN_IS_INVERTED: bool = false;
+}
+
 pub struct RTCInput<MODE> {
     _mode: PhantomData<MODE>,
 }
@@ -63,6 +85,28 @@ pub struct PullUp;
 
 pub struct Output<MODE> {
     _mode: PhantomData<MODE>,
+}
+
+pub struct InvertedOutput<MODE> {
+    _mode: PhantomData<MODE>,
+}
+
+/// Used to decide if the pin is inverted or not when the pin gets connected to
+/// a peripheral
+trait OutputMode {
+    const PIN_IS_INVERTED: bool;
+}
+
+impl<MODE> OutputMode for Output<MODE> {
+    const PIN_IS_INVERTED: bool = false;
+}
+
+impl<MODE> OutputMode for InvertedOutput<MODE> {
+    const PIN_IS_INVERTED: bool = true;
+}
+
+impl OutputMode for Unknown {
+    const PIN_IS_INVERTED: bool = false;
 }
 
 pub struct RTCOutput<MODE> {
@@ -170,9 +214,7 @@ pub trait InputPin: Pin {
 
     fn is_input_high(&self) -> bool;
 
-    fn connect_input_to_peripheral(&mut self, signal: InputSignal) -> &mut Self {
-        self.connect_input_to_peripheral_with_options(signal, false, false)
-    }
+    fn connect_input_to_peripheral(&mut self, signal: InputSignal) -> &mut Self;
 
     fn connect_input_to_peripheral_with_options(
         &mut self,
@@ -208,9 +250,11 @@ pub trait OutputPin: Pin {
 
     fn internal_pull_down_in_sleep_mode(&mut self, on: bool) -> &mut Self;
 
-    fn connect_peripheral_to_output(&mut self, signal: OutputSignal) -> &mut Self {
-        self.connect_peripheral_to_output_with_options(signal, false, false, false, false)
-    }
+    fn internal_pull_up(&mut self, on: bool) -> &mut Self;
+
+    fn internal_pull_down(&mut self, on: bool) -> &mut Self;
+
+    fn connect_peripheral_to_output(&mut self, signal: OutputSignal) -> &mut Self;
 
     fn connect_peripheral_to_output_with_options(
         &mut self,
@@ -227,10 +271,6 @@ pub trait OutputPin: Pin {
     /// pin with a previously connected [signal](`InputSignal`). Any other
     /// outputs connected to the signal remain intact.
     fn disconnect_peripheral_from_output(&mut self) -> &mut Self;
-
-    fn internal_pull_up(&mut self, on: bool) -> &mut Self;
-
-    fn internal_pull_down(&mut self, on: bool) -> &mut Self;
 }
 
 #[doc(hidden)]
@@ -578,17 +618,41 @@ where
         });
     }
 
+    /// Configures the pin to operate as a floating input pin
     pub fn into_floating_input(self) -> GpioPin<Input<Floating>, GPIONUM> {
         self.init_input(false, false);
         GpioPin { _mode: PhantomData }
     }
 
+    /// Configures the pin to operate as a pulled up input pin
     pub fn into_pull_up_input(self) -> GpioPin<Input<PullUp>, GPIONUM> {
         self.init_input(false, true);
         GpioPin { _mode: PhantomData }
     }
 
+    /// Configures the pin to operate as a pulled down input pin
     pub fn into_pull_down_input(self) -> GpioPin<Input<PullDown>, GPIONUM> {
+        self.init_input(true, false);
+        GpioPin { _mode: PhantomData }
+    }
+
+    /// Configures the pin to operate as an inverted floating input pin.
+    /// Only suitable to be passed into a peripheral driver.
+    pub fn into_inverted_floating_input(self) -> GpioPin<InvertedInput<Floating>, GPIONUM> {
+        self.init_input(false, false);
+        GpioPin { _mode: PhantomData }
+    }
+
+    /// Configures the pin to operate as an inverted pulled up input pin.
+    /// Only suitable to be passed into a peripheral driver.
+    pub fn into_inverted_pull_up_input(self) -> GpioPin<InvertedInput<PullUp>, GPIONUM> {
+        self.init_input(false, true);
+        GpioPin { _mode: PhantomData }
+    }
+
+    /// Configures the pin to operate as an inverted pulled down input pin.
+    /// Only suitable to be passed into a peripheral driver.
+    pub fn into_inverted_pull_down_input(self) -> GpioPin<InvertedInput<PullDown>, GPIONUM> {
         self.init_input(true, false);
         GpioPin { _mode: PhantomData }
     }
@@ -597,6 +661,7 @@ where
 impl<MODE, const GPIONUM: u8> InputPin for GpioPin<MODE, GPIONUM>
 where
     Self: GpioProperties,
+    MODE: InputMode,
 {
     fn set_to_input(&mut self) -> &mut Self {
         self.init_input(false, false);
@@ -613,6 +678,15 @@ where
     fn is_input_high(&self) -> bool {
         <Self as GpioProperties>::Bank::read_input() & (1 << (GPIONUM % 32)) != 0
     }
+
+    fn connect_input_to_peripheral(&mut self, signal: InputSignal) -> &mut Self {
+        self.connect_input_to_peripheral_with_options(
+            signal,
+            MODE::PIN_IS_INVERTED,
+            MODE::PIN_IS_INVERTED,
+        )
+    }
+
     fn connect_input_to_peripheral_with_options(
         &mut self,
         signal: InputSignal,
@@ -864,6 +938,18 @@ where
     }
 }
 
+impl<const GPIONUM: u8> From<GpioPin<Unknown, GPIONUM>>
+    for GpioPin<InvertedInput<Floating>, GPIONUM>
+where
+    Self: GpioProperties,
+    <Self as GpioProperties>::PinType: IsInputPin,
+    GpioPin<Unknown, GPIONUM>: GpioProperties,
+{
+    fn from(pin: GpioPin<Unknown, GPIONUM>) -> Self {
+        pin.into_inverted_floating_input()
+    }
+}
+
 impl<const GPIONUM: u8> From<GpioPin<Unknown, GPIONUM>> for GpioPin<Input<PullUp>, GPIONUM>
 where
     Self: GpioProperties,
@@ -872,6 +958,17 @@ where
 {
     fn from(pin: GpioPin<Unknown, GPIONUM>) -> Self {
         pin.into_pull_up_input()
+    }
+}
+
+impl<const GPIONUM: u8> From<GpioPin<Unknown, GPIONUM>> for GpioPin<InvertedInput<PullUp>, GPIONUM>
+where
+    Self: GpioProperties,
+    <Self as GpioProperties>::PinType: IsOutputPin,
+    GpioPin<Unknown, GPIONUM>: GpioProperties,
+{
+    fn from(pin: GpioPin<Unknown, GPIONUM>) -> Self {
+        pin.into_inverted_pull_up_input()
     }
 }
 
@@ -886,6 +983,18 @@ where
     }
 }
 
+impl<const GPIONUM: u8> From<GpioPin<Unknown, GPIONUM>>
+    for GpioPin<InvertedInput<PullDown>, GPIONUM>
+where
+    Self: GpioProperties,
+    <Self as GpioProperties>::PinType: IsInputPin,
+    GpioPin<Unknown, GPIONUM>: GpioProperties,
+{
+    fn from(pin: GpioPin<Unknown, GPIONUM>) -> Self {
+        pin.into_inverted_pull_down_input()
+    }
+}
+
 impl<const GPIONUM: u8> From<GpioPin<Unknown, GPIONUM>> for GpioPin<Output<PushPull>, GPIONUM>
 where
     Self: GpioProperties,
@@ -895,6 +1004,19 @@ where
 {
     fn from(pin: GpioPin<Unknown, GPIONUM>) -> Self {
         pin.into_push_pull_output()
+    }
+}
+
+impl<const GPIONUM: u8> From<GpioPin<Unknown, GPIONUM>>
+    for GpioPin<InvertedOutput<PushPull>, GPIONUM>
+where
+    Self: GpioProperties,
+    <Self as GpioProperties>::PinType: IsOutputPin,
+    GpioPin<Unknown, GPIONUM>: GpioProperties,
+    <GpioPin<Unknown, GPIONUM> as GpioProperties>::PinType: IsOutputPin,
+{
+    fn from(pin: GpioPin<Unknown, GPIONUM>) -> Self {
+        pin.into_inverted_push_pull_output()
     }
 }
 
@@ -919,6 +1041,19 @@ where
 {
     fn from(pin: GpioPin<Unknown, GPIONUM>) -> Self {
         pin.into_open_drain_output()
+    }
+}
+
+impl<const GPIONUM: u8> From<GpioPin<Unknown, GPIONUM>>
+    for GpioPin<InvertedOutput<OpenDrain>, GPIONUM>
+where
+    Self: GpioProperties,
+    <Self as GpioProperties>::PinType: IsOutputPin,
+    GpioPin<Unknown, GPIONUM>: GpioProperties,
+    <GpioPin<Unknown, GPIONUM> as GpioProperties>::PinType: IsOutputPin,
+{
+    fn from(pin: GpioPin<Unknown, GPIONUM>) -> Self {
+        pin.into_inverted_open_drain_output()
     }
 }
 
@@ -993,12 +1128,28 @@ where
         });
     }
 
+    /// Configures the pin to operate as an push pull output pin
     pub fn into_push_pull_output(self) -> GpioPin<Output<PushPull>, GPIONUM> {
         self.init_output(GPIO_FUNCTION, false);
         GpioPin { _mode: PhantomData }
     }
 
+    /// Configures the pin to operate as an open drain output pin
     pub fn into_open_drain_output(self) -> GpioPin<Output<OpenDrain>, GPIONUM> {
+        self.init_output(GPIO_FUNCTION, true);
+        GpioPin { _mode: PhantomData }
+    }
+
+    /// Configures the pin to operate as an inverted push pull output pin.
+    /// Only suitable to be passed into an peripheral driver
+    pub fn into_inverted_push_pull_output(self) -> GpioPin<InvertedOutput<PushPull>, GPIONUM> {
+        self.init_output(GPIO_FUNCTION, false);
+        GpioPin { _mode: PhantomData }
+    }
+
+    /// Configures the pin to operate as an open drain output pin.
+    /// Only suitable to be passed into an peripheral driver
+    pub fn into_inverted_open_drain_output(self) -> GpioPin<InvertedOutput<OpenDrain>, GPIONUM> {
         self.init_output(GPIO_FUNCTION, true);
         GpioPin { _mode: PhantomData }
     }
@@ -1018,6 +1169,7 @@ impl<MODE, const GPIONUM: u8> OutputPin for GpioPin<MODE, GPIONUM>
 where
     Self: GpioProperties,
     <Self as GpioProperties>::PinType: IsOutputPin,
+    MODE: OutputMode,
 {
     fn set_to_open_drain_output(&mut self) -> &mut Self {
         self.init_output(GPIO_FUNCTION, true);
@@ -1069,6 +1221,25 @@ where
     fn enable_output_in_sleep_mode(&mut self, on: bool) -> &mut Self {
         get_io_mux_reg(GPIONUM).modify(|_, w| w.mcu_oe().bit(on));
         self
+    }
+
+    fn internal_pull_up(&mut self, on: bool) -> &mut Self {
+        get_io_mux_reg(GPIONUM).modify(|_, w| w.fun_wpu().bit(on));
+        self
+    }
+    fn internal_pull_down(&mut self, on: bool) -> &mut Self {
+        get_io_mux_reg(GPIONUM).modify(|_, w| w.fun_wpd().bit(on));
+        self
+    }
+
+    fn connect_peripheral_to_output(&mut self, signal: OutputSignal) -> &mut Self {
+        self.connect_peripheral_to_output_with_options(
+            signal,
+            MODE::PIN_IS_INVERTED,
+            false,
+            false,
+            MODE::PIN_IS_INVERTED,
+        )
     }
 
     fn connect_peripheral_to_output_with_options(
@@ -1130,15 +1301,6 @@ where
         self.set_alternate_function(GPIO_FUNCTION);
         unsafe { &*GPIO::PTR }.func_out_sel_cfg[GPIONUM as usize]
             .modify(|_, w| unsafe { w.out_sel().bits(OutputSignal::GPIO as OutputSignalType) });
-        self
-    }
-
-    fn internal_pull_up(&mut self, on: bool) -> &mut Self {
-        get_io_mux_reg(GPIONUM).modify(|_, w| w.fun_wpu().bit(on));
-        self
-    }
-    fn internal_pull_down(&mut self, on: bool) -> &mut Self {
-        get_io_mux_reg(GPIONUM).modify(|_, w| w.fun_wpd().bit(on));
         self
     }
 }
