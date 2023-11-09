@@ -6,12 +6,12 @@
 #![no_std]
 #![no_main]
 
-use panic_halt as _;
-use ulp_riscv_hal::{
+use esp_ulp_riscv_hal::{
     delay::Delay,
     gpio::{GpioPin, Output, PushPull},
     prelude::*,
 };
+use panic_halt as _;
 
 #[entry]
 fn main(mut gpio1: GpioPin<Output<PushPull>, 1>) -> ! {
