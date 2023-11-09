@@ -1,8 +1,8 @@
 # ulp-lp-hal
 
-[![Crates.io](https://img.shields.io/crates/v/ulp-lp-hal?labelColor=1C2C2E&color=C96329&logo=Rust&style=flat-square)](https://crates.io/crates/ulp-lp-hal)
-[![docs.rs](https://img.shields.io/docsrs/ulp-lp-hal?labelColor=1C2C2E&color=C96329&logo=rust&style=flat-square)](https://docs.rs/ulp-lp-hal)
-![Crates.io](https://img.shields.io/crates/l/ulp-lp-hal?labelColor=1C2C2E&style=flat-square)
+[![Crates.io](https://img.shields.io/crates/v/esp-ulp-lp-hal?labelColor=1C2C2E&color=C96329&logo=Rust&style=flat-square)](https://crates.io/crates/esp-ulp-lp-hal)
+[![docs.rs](https://img.shields.io/docsrs/esp-ulp-lp-hal?labelColor=1C2C2E&color=C96329&logo=rust&style=flat-square)](https://docs.rs/esp-ulp-lp-hal)
+![Crates.io](https://img.shields.io/crates/l/esp-ulp-lp-hal?labelColor=1C2C2E&style=flat-square)
 [![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&labelColor=1C2C2E&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
 
 `no_std` HAL for the ESP32-S2/ESP32-S3 from Espressif's ultra-low-power coprocessor.
@@ -15,7 +15,7 @@ Please refer to the documentation for more information.
 
 ## [Documentation]
 
-[documentation]: https://docs.rs/ulp-lp-hal/
+[documentation]: https://docs.rs/esp-ulp-lp-hal/
 
 ## Resources
 
