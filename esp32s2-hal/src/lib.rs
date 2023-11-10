@@ -48,8 +48,6 @@
 
 use esp_hal_common::xtensa_lx_rt::exception::ExceptionCause;
 pub use esp_hal_common::*;
-// Always enable atomic emulation on ESP32-S2
-use xtensa_atomic_emulation_trap as _;
 
 /// Function initializes ESP32 specific memories (RTC slow and fast) and
 /// then calls original Reset function

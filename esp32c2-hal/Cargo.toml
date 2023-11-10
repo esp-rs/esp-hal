@@ -30,7 +30,7 @@ embassy-time   = { version = "0.1.5",  features = ["nightly"], optional = true }
 
 [dev-dependencies]
 critical-section   = "1.1.2"
-embassy-executor   = { version = "0.3.0", features = ["nightly", "integrated-timers", "arch-riscv32", "executor-thread"] }
+embassy-executor   = { version = "0.3.2", features = ["nightly", "integrated-timers", "arch-riscv32", "executor-thread"] }
 embedded-graphics  = "0.8.1"
 embedded-hal-1     = { version = "=1.0.0-rc.1", package = "embedded-hal" }
 embedded-hal-async = "=1.0.0-rc.1"
@@ -41,13 +41,15 @@ heapless           = "0.7.16"
 lis3dh-async       = "0.8.0"
 sha2               = { version = "0.10.8", default-features = false}
 ssd1306            = "0.8.4"
-static_cell        = { version = "=1.2.0", features = ["nightly"] }
+portable-atomic    = "1.5.1"
+static_cell        = { version = "2.0.0", features = ["nightly"] }
+esp-hal-common     = { features = ["portable-atomic"], path = "../esp-hal-common" } # enable portable-atomic by default for examples
 hex-literal       = "0.4.1"
 crypto-bigint     = {version = "0.5.3", default-features = false }
 elliptic-curve    = {version = "0.13.6", default-features = false, features = ["sec1"] }
 p192              = {version = "0.13.0", default-features = false, features = ["arithmetic"] }
 p256              = {version = "0.13.2", default-features = false, features = ["arithmetic"] }
-embassy-sync       = "0.3.0"
+embassy-sync       = "0.4.0"
 
 [features]
 default              = ["rt", "vectored", "xtal-40mhz"]
@@ -68,6 +70,9 @@ xtal-40mhz           = ["esp-hal-common/xtal-40mhz"]
 embassy              = ["esp-hal-common/embassy"]
 embassy-time-systick = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-hz-16_000_000"]
 embassy-time-timg0   = ["esp-hal-common/embassy-time-timg0",   "embassy-time/tick-hz-1_000_000"]
+
+portable-atomic  = ["esp-hal-common/portable-atomic"]
+atomic-emulation = ["esp-hal-common/riscv-atomic-emulation"]
 
 [profile.release]
 debug = true

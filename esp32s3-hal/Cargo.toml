@@ -33,8 +33,8 @@ r0             = { version = "1.0.0",  optional = true }
 aes                = "0.8.3"
 critical-section   = "1.1.2"
 crypto-bigint      = { version = "0.5.3", default-features = false }
-embassy-executor   = { version = "0.3.0", features = ["nightly"] }
-embassy-sync       = "0.3.0"
+embassy-executor   = { version = "0.3.2", features = ["nightly"] }
+embassy-sync       = "0.4.0"
 embedded-graphics  = "0.8.1"
 embedded-hal       = { version = "0.2.7",  features = ["unproven"] }
 embedded-hal-1     = { version = "=1.0.0-rc.1", package = "embedded-hal" }
@@ -51,7 +51,7 @@ lis3dh-async       = "0.8.0"
 sha2               = { version = "0.10.8", default-features = false }
 smart-leds         = "0.3.0"
 ssd1306            = "0.8.4"
-static_cell        = { version = "=1.2.0", features = ["nightly"] }
+static_cell        = { version = "2.0.0", features = ["nightly"] }
 usb-device         = "0.2.9"
 usbd-serial        = "0.1.1"
 

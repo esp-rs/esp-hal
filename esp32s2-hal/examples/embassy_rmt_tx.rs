@@ -18,7 +18,6 @@ use esp32s2_hal::{
 };
 use esp_backtrace as _;
 use esp_println::println;
-use xtensa_atomic_emulation_trap as _;
 
 #[main]
 async fn main(_spawner: Spawner) -> ! {

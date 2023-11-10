@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- C2, C3: atomic emulation trap is now opt-in (#904)
+
 ### Fixed
 
 - ESP32-C2/C3 examples: fix build error (#899)

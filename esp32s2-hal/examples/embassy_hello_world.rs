@@ -16,7 +16,6 @@ use esp32s2_hal::{
     prelude::*,
 };
 use esp_backtrace as _;
-use xtensa_atomic_emulation_trap as _;
 
 #[embassy_executor::task]
 async fn run() {

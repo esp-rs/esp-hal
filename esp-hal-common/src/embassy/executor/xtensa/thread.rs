@@ -1,12 +1,13 @@
 //! Multicore-aware thread-mode embassy executor.
-use core::{
-    marker::PhantomData,
-    sync::atomic::{AtomicBool, Ordering},
-};
+use core::marker::PhantomData;
 
 use embassy_executor::{raw, Spawner};
 
-use crate::{get_core, prelude::interrupt};
+use crate::{
+    atomic::{AtomicBool, Ordering},
+    get_core,
+    prelude::interrupt,
+};
 #[cfg(multi_core)]
 use crate::{
     interrupt,

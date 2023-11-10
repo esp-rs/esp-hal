@@ -19,7 +19,6 @@ use esp32s2_hal::{
 use esp_backtrace as _;
 use esp_hal_common::gpio::{Gpio15, Output, PushPull};
 use esp_println::{print, println};
-use xtensa_atomic_emulation_trap as _;
 
 const WIDTH: usize = 80;
 

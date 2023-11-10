@@ -1153,11 +1153,13 @@ pub(crate) mod asynch {
         }
     }
 
+    #[cfg(any(i2s0, i2s1))]
     pub struct DmaTxDoneChFuture<'a, TX> {
         pub(crate) tx: &'a mut TX,
         _a: (),
     }
 
+    #[cfg(any(i2s0, i2s1))]
     impl<'a, TX> DmaTxDoneChFuture<'a, TX>
     where
         TX: Tx,
@@ -1168,6 +1170,7 @@ pub(crate) mod asynch {
         }
     }
 
+    #[cfg(any(i2s0, i2s1))]
     impl<'a, TX> core::future::Future for DmaTxDoneChFuture<'a, TX>
     where
         TX: Tx,
@@ -1187,11 +1190,13 @@ pub(crate) mod asynch {
         }
     }
 
+    #[cfg(any(i2s0, i2s1))]
     pub struct DmaRxDoneChFuture<'a, RX> {
         pub(crate) rx: &'a mut RX,
         _a: (),
     }
 
+    #[cfg(any(i2s0, i2s1))]
     impl<'a, RX> DmaRxDoneChFuture<'a, RX>
     where
         RX: Rx,
@@ -1202,6 +1207,7 @@ pub(crate) mod asynch {
         }
     }
 
+    #[cfg(any(i2s0, i2s1))]
     impl<'a, RX> core::future::Future for DmaRxDoneChFuture<'a, RX>
     where
         RX: Rx,

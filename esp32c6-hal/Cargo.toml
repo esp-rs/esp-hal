@@ -33,7 +33,7 @@ embassy-time   = { version = "0.1.5",  features = ["nightly"], optional = true }
 aes                = "0.8.3"
 critical-section   = "1.1.2"
 crypto-bigint      = { version = "0.5.3", default-features = false}
-embassy-executor   = { version = "0.3.0", features = ["nightly", "integrated-timers", "arch-riscv32", "executor-thread"] }
+embassy-executor   = { version = "0.3.2", features = ["nightly", "integrated-timers", "arch-riscv32", "executor-thread"] }
 embedded-graphics  = "0.8.1"
 embedded-hal-1     = { version = "=1.0.0-rc.1", package = "embedded-hal" }
 embedded-hal-async = "=1.0.0-rc.1"
@@ -48,12 +48,12 @@ lis3dh-async       = "0.8.0"
 sha2               = { version = "0.10.8", default-features = false}
 smart-leds         = "0.3.0"
 ssd1306            = "0.8.4"
-static_cell        = { version = "=1.2.0", features = ["nightly"] }
+static_cell        = { version = "2.0.0", features = ["nightly"] }
 hex-literal       = "0.4.1"
 elliptic-curve    = {version = "0.13.6", default-features = false, features = ["sec1"] }
 p192              = {version = "0.13.0", default-features = false, features = ["arithmetic"] }
 p256              = {version = "0.13.2", default-features = false, features = ["arithmetic"] }
-embassy-sync       = "0.3.0"
+embassy-sync       = "0.4.0"
 
 [features]
 default              = ["rt", "vectored", "esp-hal-common/rv-zero-rtc-bss"]

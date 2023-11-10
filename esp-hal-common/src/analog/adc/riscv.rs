@@ -687,8 +687,6 @@ macro_rules! impl_adc_interface {
     }
 }
 
-pub use implementation::*;
-
 #[cfg(esp32c2)]
 mod implementation {
     //! # Analog to digital (ADC) conversion support.
@@ -722,7 +720,7 @@ mod implementation {
     //! }
     //! ```
 
-    pub use crate::analog::ADC1;
+    use crate::analog::ADC1;
 
     impl_adc_interface! {
         ADC1 [
@@ -769,7 +767,7 @@ mod implementation {
     //! }
     //! ```
 
-    pub use crate::analog::{ADC1, ADC2};
+    use crate::analog::{ADC1, ADC2};
 
     impl_adc_interface! {
         ADC1 [
@@ -821,7 +819,7 @@ mod implementation {
     //! }
     //! ```
 
-    pub use crate::analog::ADC1;
+    use crate::analog::ADC1;
 
     impl_adc_interface! {
         ADC1 [
@@ -869,7 +867,7 @@ mod implementation {
     //! }
     //! ```
 
-    pub use crate::analog::ADC1;
+    use crate::analog::ADC1;
 
     impl_adc_interface! {
         ADC1 [
