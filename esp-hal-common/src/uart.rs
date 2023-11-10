@@ -1018,14 +1018,6 @@ where
         self.write_bytes(s.as_bytes())?;
         Ok(())
     }
-
-    #[inline]
-    fn write_char(&mut self, ch: char) -> Result<(), Self::Error> {
-        let mut buffer = [0u8; 4];
-        self.write_bytes(ch.encode_utf8(&mut buffer).as_bytes())?;
-
-        Ok(())
-    }
 }
 
 impl<T> core::fmt::Write for Uart<'_, T>
