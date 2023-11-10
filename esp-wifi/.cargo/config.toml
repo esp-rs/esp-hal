@@ -1,21 +1,22 @@
 # Alias' for quickly building for different chips or running examples
 # By default we enable 
+#   - `default` HAL features to set up basic chip specific settings
 #   - `embassy-time-timg0` as the examples assume we are using this time driver
 #   - `embassy-executor-thread` on Xtensa chips to take advantage of the Xtensa specific executor we have in esp-hal
 [alias]
-esp32 =   "run --features   esp32 --target xtensa-esp32-none-elf        --features esp32-hal/embassy-time-timg0,esp32-hal/embassy-executor-thread"
-esp32s2 = "run --features esp32s2 --target xtensa-esp32s2-none-elf      --features esp32s2-hal/embassy-time-timg0,esp32s2-hal/embassy-executor-thread"
-esp32s3 = "run --features esp32s3 --target xtensa-esp32s3-none-elf      --features esp32s3-hal/embassy-time-timg0,esp32s3-hal/embassy-executor-thread"
-esp32c2 = "run --features esp32c2 --target riscv32imc-unknown-none-elf  --features esp32c2-hal/embassy-time-timg0"
-esp32c3 = "run --features esp32c3 --target riscv32imc-unknown-none-elf  --features esp32c3-hal/embassy-time-timg0"
-esp32c6 = "run --features esp32c6 --target riscv32imac-unknown-none-elf --features esp32c6-hal/embassy-time-timg0"
+esp32 =   "run --features   esp32 --target xtensa-esp32-none-elf        --features esp32-hal/default,esp32-hal/embassy-time-timg0,esp32-hal/embassy-executor-thread"
+esp32s2 = "run --features esp32s2 --target xtensa-esp32s2-none-elf      --features esp32s2-hal/default,esp32s2-hal/embassy-time-timg0,esp32s2-hal/embassy-executor-thread"
+esp32s3 = "run --features esp32s3 --target xtensa-esp32s3-none-elf      --features esp32s3-hal/default,esp32s3-hal/embassy-time-timg0,esp32s3-hal/embassy-executor-thread"
+esp32c2 = "run --features esp32c2 --target riscv32imc-unknown-none-elf  --features esp32c2-hal/default,esp32c2-hal/embassy-time-timg0"
+esp32c3 = "run --features esp32c3 --target riscv32imc-unknown-none-elf  --features esp32c3-hal/default,esp32c3-hal/embassy-time-timg0"
+esp32c6 = "run --features esp32c6 --target riscv32imac-unknown-none-elf --features esp32c6-hal/default,esp32c6-hal/embassy-time-timg0"
 
-besp32 =   "build --features   esp32 --target xtensa-esp32-none-elf        --features esp32-hal/embassy-time-timg0,esp32-hal/embassy-executor-thread"
-besp32s2 = "build --features esp32s2 --target xtensa-esp32s2-none-elf      --features esp32s2-hal/embassy-time-timg0,esp32s2-hal/embassy-executor-thread"
-besp32s3 = "build --features esp32s3 --target xtensa-esp32s3-none-elf      --features esp32s3-hal/embassy-time-timg0,esp32s3-hal/embassy-executor-thread"
-besp32c2 = "build --features esp32c2 --target riscv32imc-unknown-none-elf  --features esp32c2-hal/embassy-time-timg0"
-besp32c3 = "build --features esp32c3 --target riscv32imc-unknown-none-elf  --features esp32c3-hal/embassy-time-timg0"
-besp32c6 = "build --features esp32c6 --target riscv32imac-unknown-none-elf --features esp32c6-hal/embassy-time-timg0"
+besp32 =   "build --features   esp32 --target xtensa-esp32-none-elf        --features esp32-hal/default,esp32-hal/embassy-time-timg0,esp32-hal/embassy-executor-thread"
+besp32s2 = "build --features esp32s2 --target xtensa-esp32s2-none-elf      --features esp32s2-hal/default,esp32s2-hal/embassy-time-timg0,esp32s2-hal/embassy-executor-thread"
+besp32s3 = "build --features esp32s3 --target xtensa-esp32s3-none-elf      --features esp32s3-hal/default,esp32s3-hal/embassy-time-timg0,esp32s3-hal/embassy-executor-thread"
+besp32c2 = "build --features esp32c2 --target riscv32imc-unknown-none-elf  --features esp32c2-hal/default,esp32c2-hal/embassy-time-timg0"
+besp32c3 = "build --features esp32c3 --target riscv32imc-unknown-none-elf  --features esp32c3-hal/default,esp32c3-hal/embassy-time-timg0"
+besp32c6 = "build --features esp32c6 --target riscv32imac-unknown-none-elf --features esp32c6-hal/default,esp32c6-hal/embassy-time-timg0"
 
 [target.riscv32imc-unknown-none-elf]
 runner = "espflash flash --monitor"

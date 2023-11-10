@@ -57,7 +57,7 @@ default = [ "utils", "log" ]
 esp32c2 = [ "esp32c2-hal", "esp-wifi-sys/esp32c2", "esp-println/esp32c2", "esp-backtrace/esp32c2", "embassy-executor/arch-riscv32" ]
 esp32c3 = [ "esp32c3-hal", "esp-wifi-sys/esp32c3", "esp-println/esp32c3", "esp-backtrace/esp32c3", "embassy-executor/arch-riscv32" ]
 esp32c6 = [ "esp32c6-hal", "esp-wifi-sys/esp32c6", "esp-println/esp32c6", "esp-backtrace/esp32c6", "embassy-executor/arch-riscv32" ]
-esp32 = [ "esp32-hal",  "esp-wifi-sys/esp32", "esp-println/esp32", "esp-backtrace/esp32" ]
+esp32   = [ "esp32-hal",   "esp-wifi-sys/esp32",   "esp-println/esp32",   "esp-backtrace/esp32" ]
 esp32s2 = [ "esp32s2-hal", "esp-wifi-sys/esp32s2", "esp-println/esp32s2", "esp-backtrace/esp32s2" ]
 esp32s3 = [ "esp32s3-hal", "esp-wifi-sys/esp32s3", "esp-println/esp32s3", "esp-backtrace/esp32s3" ]
 
