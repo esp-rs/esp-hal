@@ -1,17 +1,14 @@
 //! # Direct Memory Access
 //!
 //! ## Overview
-//! The `pdma` module is part of the DMA (Direct Memory Access) driver designed
-//! for ESP chips. Of the Espressif chip range, only `ESP32` and `ESP32-S2` use
-//! the `PDMA` type of direct memory access.
+//!
+//! The `pdma` module is part of the DMA (Direct Memory Access) driver of
+//! `ESP32` and `ESP32-S2`.
 //!
 //! This module provides efficient direct data transfer capabilities between
 //! peripherals and memory without involving the CPU. It enables bidirectional
 //! data transfers through DMA channels, making it particularly useful for
-//! high-speed data transfers, such as [SPI] and
-//! [I2S] communication.
-//!
-//!
+//! high-speed data transfers, such as [SPI] and [I2S] communication.
 //!
 //! [SPI]: ../spi/index.html
 //! [I2S]: ../i2s/index.html
@@ -21,6 +18,16 @@ use crate::{
     peripheral::PeripheralRef,
     system::{Peripheral, PeripheralClockControl},
 };
+
+#[cold]
+fn on_tx_descriptor_not_divisible_by_3() {
+    panic!("The number of tx descriptors must be a multiple of 3");
+}
+
+#[cold]
+fn on_rx_descriptor_not_divisible_by_3() {
+    panic!("The number of rx descriptors must be a multiple of 3");
+}
 
 macro_rules! ImplSpiChannel {
     ($num: literal) => {
@@ -306,8 +313,9 @@ macro_rules! ImplSpiChannel {
             impl [<Spi $num DmaChannelCreator>] {
                 /// Configure the channel for use
                 ///
-                /// Descriptors should be sized as `((BUFFERSIZE + 4091) / 4092) * 3`. I.e., to
-                /// transfer buffers of size `1..=4092`, you need 3 descriptors.
+                /// Descriptors should be sized as `((CHUNK_SIZE + 4091) / 4092) * 3`. I.e., to
+                /// transfer buffers of size `1..=4092`, you need 3 descriptors. The number of
+                /// descriptors must be a multiple of 3.
                 pub fn configure<'a>(
                     self,
                     burst_mode: bool,
@@ -315,6 +323,14 @@ macro_rules! ImplSpiChannel {
                     rx_descriptors: &'a mut [u32],
                     priority: DmaPriority,
                 ) -> Channel<'a, [<Spi $num DmaChannel>]> {
+                    if tx_descriptors.len() % 3 != 0 {
+                        on_tx_descriptor_not_divisible_by_3();
+                    }
+
+                    if rx_descriptors.len() % 3 != 0 {
+                        on_rx_descriptor_not_divisible_by_3();
+                    }
+
                     let mut tx_impl = [<Spi $num DmaChannelTxImpl>] {};
                     tx_impl.init(burst_mode, priority);
 
@@ -616,7 +632,7 @@ macro_rules! ImplI2sChannel {
             impl [<I2s $num DmaChannelCreator>] {
                 /// Configure the channel for use
                 ///
-                /// Descriptors should be sized as `((BUFFERSIZE + 4091) / 4092) * 3`. I.e., to
+                /// Descriptors should be sized as `((CHUNK_SIZE + 4091) / 4092) * 3`. I.e., to
                 /// transfer buffers of size `1..=4092`, you need 3 descriptors.
                 pub fn configure<'a>(
                     self,
