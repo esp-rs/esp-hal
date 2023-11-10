@@ -393,7 +393,10 @@ where
     fn wait(
         self,
     ) -> Result<(BUFFER, I2sTx<'d, T, P, CH>), (DmaError, BUFFER, I2sTx<'d, T, P, CH>)> {
-        self.i2s_tx.wait_tx_dma_done().ok(); // waiting for the DMA transfer is not enough
+        // Waiting for the DMA transfer is not enough. We need to wait for the
+        // peripheral to finish flushing its buffers, too.
+        self.i2s_tx.wait_tx_dma_done().ok();
+        let err = self.i2s_tx.tx_channel.has_error();
 
         // `DmaTransfer` needs to have a `Drop` implementation, because we accept
         // managed buffers that can free their memory on drop. Because of that
@@ -405,7 +408,6 @@ where
         unsafe {
             let buffer = core::ptr::read(&self.buffer);
             let payload = core::ptr::read(&self.i2s_tx);
-            let err = (&self).i2s_tx.tx_channel.has_error();
             core::mem::forget(self);
             if err {
                 Err((DmaError::DescriptorError, buffer, payload))
@@ -496,9 +498,11 @@ where
         dst: &mut [u8],
     ) -> Result<(BUFFER, I2sRx<'d, T, P, CH>, usize), (DmaError, BUFFER, I2sRx<'d, T, P, CH>, usize)>
     {
-        self.i2s_rx.wait_rx_dma_done().ok(); // waiting for the DMA transfer is not enough
-
+        // Waiting for the DMA transfer is not enough. We need to wait for the
+        // peripheral to finish flushing its buffers, too.
+        self.i2s_rx.wait_rx_dma_done().ok();
         let len = self.i2s_rx.rx_channel.drain_buffer(dst).unwrap();
+        let err = self.i2s_rx.rx_channel.has_error();
 
         // `DmaTransfer` needs to have a `Drop` implementation, because we accept
         // managed buffers that can free their memory on drop. Because of that
@@ -510,7 +514,6 @@ where
         unsafe {
             let buffer = core::ptr::read(&self.buffer);
             let payload = core::ptr::read(&self.i2s_rx);
-            let err = (&self).i2s_rx.rx_channel.has_error();
             core::mem::forget(self);
             if err {
                 Err((DmaError::DescriptorError, buffer, payload, len))
@@ -533,7 +536,10 @@ where
     fn wait(
         self,
     ) -> Result<(BUFFER, I2sRx<'d, T, P, CH>), (DmaError, BUFFER, I2sRx<'d, T, P, CH>)> {
-        self.i2s_rx.wait_rx_dma_done().ok(); // waiting for the DMA transfer is not enough
+        // Waiting for the DMA transfer is not enough. We need to wait for the
+        // peripheral to finish flushing its buffers, too.
+        self.i2s_rx.wait_rx_dma_done().ok();
+        let err = self.i2s_rx.rx_channel.has_error();
 
         // `DmaTransfer` needs to have a `Drop` implementation, because we accept
         // managed buffers that can free their memory on drop. Because of that
@@ -545,7 +551,6 @@ where
         unsafe {
             let buffer = core::ptr::read(&self.buffer);
             let payload = core::ptr::read(&self.i2s_rx);
-            let err = (&self).i2s_rx.rx_channel.has_error();
             core::mem::forget(self);
             if err {
                 Err((DmaError::DescriptorError, buffer, payload))

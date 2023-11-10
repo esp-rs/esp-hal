@@ -876,7 +876,10 @@ pub mod dma {
             (RXBUF, TXBUF, SpiDma<'d, T, C, M>),
             (DmaError, RXBUF, TXBUF, SpiDma<'d, T, C, M>),
         > {
-            self.spi_dma.spi.flush().ok(); // waiting for the DMA transfer is not enough
+            // Waiting for the DMA transfer is not enough. We need to wait for the
+            // peripheral to finish flushing its buffers, too.
+            self.spi_dma.spi.flush().ok();
+            let err = self.spi_dma.channel.rx.has_error() || self.spi_dma.channel.tx.has_error();
 
             // `DmaTransfer` needs to have a `Drop` implementation, because we accept
             // managed buffers that can free their memory on drop. Because of that
@@ -889,8 +892,6 @@ pub mod dma {
                 let rbuffer = core::ptr::read(&self.rbuffer);
                 let tbuffer = core::ptr::read(&self.tbuffer);
                 let payload = core::ptr::read(&self.spi_dma);
-                let err = (&self).spi_dma.channel.rx.has_error()
-                    || (&self).spi_dma.channel.tx.has_error();
                 mem::forget(self);
                 if err {
                     Err((DmaError::DescriptorError, rbuffer, tbuffer, payload))
@@ -945,7 +946,10 @@ pub mod dma {
             mut self,
         ) -> Result<(BUFFER, SpiDma<'d, T, C, M>), (DmaError, BUFFER, SpiDma<'d, T, C, M>)>
         {
-            self.spi_dma.spi.flush().ok(); // waiting for the DMA transfer is not enough
+            // Waiting for the DMA transfer is not enough. We need to wait for the
+            // peripheral to finish flushing its buffers, too.
+            self.spi_dma.spi.flush().ok();
+            let err = self.spi_dma.channel.rx.has_error() || self.spi_dma.channel.tx.has_error();
 
             // `DmaTransfer` needs to have a `Drop` implementation, because we accept
             // managed buffers that can free their memory on drop. Because of that
@@ -957,8 +961,6 @@ pub mod dma {
             unsafe {
                 let buffer = core::ptr::read(&self.buffer);
                 let payload = core::ptr::read(&self.spi_dma);
-                let err = (&self).spi_dma.channel.rx.has_error()
-                    || (&self).spi_dma.channel.tx.has_error();
                 mem::forget(self);
                 if err {
                     Err((DmaError::DescriptorError, buffer, payload))
@@ -1515,19 +1517,19 @@ pub mod dma {
 
     #[cfg(feature = "eh1")]
     mod ehal1 {
-        use embedded_hal_1::spi::SpiBus;
+        use embedded_hal_1::spi::{ErrorType, SpiBus};
 
         use super::{super::InstanceDma, *};
         use crate::{dma::ChannelTypes, FlashSafeDma};
 
-        impl<'d, T, C, M> embedded_hal_1::spi::ErrorType for SpiDma<'d, T, C, M>
+        impl<'d, T, C, M> ErrorType for SpiDma<'d, T, C, M>
         where
             T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
             C: ChannelTypes,
             C::P: SpiPeripheral,
             M: IsFullDuplex,
         {
-            type Error = super::super::Error;
+            type Error = Error;
         }
 
         impl<'d, T, C, M> SpiBus for SpiDma<'d, T, C, M>
@@ -1574,15 +1576,11 @@ pub mod dma {
             }
         }
 
-        impl<T: embedded_hal_1::spi::ErrorType, const SIZE: usize> embedded_hal_1::spi::ErrorType
-            for FlashSafeDma<T, SIZE>
-        {
+        impl<T: ErrorType, const SIZE: usize> ErrorType for FlashSafeDma<T, SIZE> {
             type Error = T::Error;
         }
 
-        impl<T: embedded_hal_1::spi::SpiBus, const SIZE: usize> embedded_hal_1::spi::SpiBus
-            for FlashSafeDma<T, SIZE>
-        {
+        impl<T: SpiBus, const SIZE: usize> SpiBus for FlashSafeDma<T, SIZE> {
             fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
                 self.inner.read(words)
             }
@@ -1851,7 +1849,7 @@ where
             self.flush().unwrap();
         }
 
-        return Ok(words);
+        Ok(words)
     }
 
     fn transfer_dma<'w>(
@@ -1888,7 +1886,7 @@ where
             }
         }
 
-        return Ok(read_buffer);
+        Ok(read_buffer)
     }
 
     fn start_transfer_dma<'w>(
@@ -1946,7 +1944,7 @@ where
             self.flush().unwrap(); // seems "is_done" doesn't work as intended?
         }
 
-        return Ok(words);
+        Ok(words)
     }
 
     fn start_write_bytes_dma<'w>(
@@ -1976,7 +1974,7 @@ where
         }
         reg_block.cmd.modify(|_, w| w.usr().set_bit());
 
-        return Ok(());
+        Ok(())
     }
 
     fn start_read_bytes_dma<'w>(
@@ -2006,7 +2004,7 @@ where
         }
         reg_block.cmd.modify(|_, w| w.usr().set_bit());
 
-        return Ok(());
+        Ok(())
     }
 
     fn dma_peripheral(&self) -> DmaPeripheral {
@@ -2596,24 +2594,22 @@ pub trait Instance {
     }
 
     fn read_byte(&mut self) -> nb::Result<u8, Error> {
-        let reg_block = self.register_block();
-
-        if reg_block.cmd.read().usr().bit_is_set() {
+        if self.busy() {
             return Err(nb::Error::WouldBlock);
         }
 
+        let reg_block = self.register_block();
         Ok(u32::try_into(reg_block.w0.read().bits()).unwrap_or_default())
     }
 
     fn write_byte(&mut self, word: u8) -> nb::Result<(), Error> {
-        let reg_block = self.register_block();
-
-        if reg_block.cmd.read().usr().bit_is_set() {
+        if self.busy() {
             return Err(nb::Error::WouldBlock);
         }
 
         self.configure_datalen(8);
 
+        let reg_block = self.register_block();
         reg_block.w0.write(|w| unsafe { w.bits(word.into()) });
 
         self.update();
@@ -2633,7 +2629,6 @@ pub trait Instance {
     /// [`Self::flush`].
     // FIXME: See below.
     fn write_bytes(&mut self, words: &[u8]) -> Result<(), Error> {
-        let reg_block = self.register_block();
         let num_chunks = words.len() / FIFO_SIZE;
 
         // The fifo has a limited fixed size, so the data must be chunked and then
@@ -2641,7 +2636,7 @@ pub trait Instance {
         for (i, chunk) in words.chunks(FIFO_SIZE).enumerate() {
             self.configure_datalen(chunk.len() as u32 * 8);
 
-            let fifo_ptr = reg_block.w0.as_ptr();
+            let fifo_ptr = self.register_block().w0.as_ptr();
             for i in (0..chunk.len()).step_by(4) {
                 let state = if chunk.len() - i < 4 {
                     chunk.len() % 4
@@ -2673,7 +2668,7 @@ pub trait Instance {
 
             self.update();
 
-            reg_block.cmd.modify(|_, w| w.usr().set_bit());
+            self.register_block().cmd.modify(|_, w| w.usr().set_bit());
 
             // Wait for all chunks to complete except the last one.
             // The function is allowed to return before the bus is idle.
@@ -2682,9 +2677,7 @@ pub trait Instance {
             // THIS IS NOT TRUE FOR EH 0.2.X! MAKE SURE TO FLUSH IN EH 0.2.X TRAIT
             // IMPLEMENTATIONS!
             if i < num_chunks {
-                while reg_block.cmd.read().usr().bit_is_set() {
-                    // wait
-                }
+                self.flush()?;
             }
         }
         Ok(())
@@ -2738,11 +2731,14 @@ pub trait Instance {
         Ok(())
     }
 
+    fn busy(&self) -> bool {
+        let reg_block = self.register_block();
+        reg_block.cmd.read().usr().bit_is_set()
+    }
+
     // Check if the bus is busy and if it is wait for it to be idle
     fn flush(&mut self) -> Result<(), Error> {
-        let reg_block = self.register_block();
-
-        while reg_block.cmd.read().usr().bit_is_set() {
+        while self.busy() {
             // wait for bus to be clear
         }
         Ok(())
@@ -2942,9 +2938,7 @@ pub trait Instance {
         self.configure_datalen(buffer.len() as u32 * 8);
         self.update();
         reg_block.cmd.modify(|_, w| w.usr().set_bit());
-        while reg_block.cmd.read().usr().bit_is_set() {
-            // wait for completion
-        }
+        self.flush()?;
         self.read_bytes_from_fifo(buffer)
     }
 
