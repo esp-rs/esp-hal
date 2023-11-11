@@ -1,6 +1,7 @@
 //! Read calibration data from ICM42670 sensor
 //!
-//! This example dumps the accelerometer and gyroscope data from an ICM42670 sensor
+//! This example dumps the accelerometer and gyroscope data from an ICM42670
+//! sensor
 //!
 //! The following wiring is assumed:
 //! - SDA => GPIO10
