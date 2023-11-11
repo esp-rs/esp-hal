@@ -21,7 +21,7 @@ use esp32_hal::{
     embassy::{self},
     i2c::I2C,
     interrupt,
-    peripherals::{Interrupt, Peripherals, I2C0},
+    peripherals::{Interrupt, Peripherals},
     prelude::*,
     timer::TimerGroup,
     IO,

@@ -30,7 +30,6 @@ use esp32s2_hal::{
 use esp_backtrace as _;
 use nb::block;
 use ssd1306::{prelude::*, I2CDisplayInterface, Ssd1306};
-use xtensa_atomic_emulation_trap as _;
 
 #[entry]
 fn main() -> ! {

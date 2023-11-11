@@ -131,8 +131,6 @@ jobs:
       # for each supported image format.
       - name: build esp32c2-hal (no features)
         run: cd esp32c2-hal/ && cargo build --examples
-      - name: build esp32c2-hal (direct-boot)
-        run: cd esp32c2-hal/ && cargo build --examples --features=direct-boot
       # Subsequent steps can just check the examples instead, as we're already
       # confident that they link.
       - name: check esp32c2-hal (common features)
@@ -183,8 +181,6 @@ jobs:
       # for each supported image format.
       - name: build esp32c3-hal (no features)
         run: cd esp32c3-hal/ && cargo +nightly build --examples
-      - name: build esp32c3-hal (direct-boot)
-        run: cd esp32c3-hal/ && cargo +nightly build --examples --features=direct-boot
       - name: build esp32c3-hal (mcu-boot)
         run: cd esp32c3-hal/ && cargo +nightly build --examples --features=mcu-boot
       # Subsequent steps can just check the examples instead, as we're already
@@ -242,8 +238,6 @@ jobs:
       # for each supported image format.
       - name: build esp32c6-hal (no features)
         run: cd esp32c6-hal/ && cargo +nightly build --examples
-      - name: build esp32c6-hal (direct-boot)
-        run: cd esp32c6-hal/ && cargo +nightly build --examples --features=direct-boot
       # Subsequent steps can just check the examples instead, as we're already
       # confident that they link.
       - name: check esp32c6-hal (common features)
@@ -314,8 +308,6 @@ jobs:
       # for each supported image format.
       - name: build esp32h2-hal (no features)
         run: cd esp32h2-hal/ && cargo +nightly build --examples
-      - name: build esp32h2-hal (direct-boot)
-        run: cd esp32h2-hal/ && cargo +nightly build --examples --features=direct-boot
       # Subsequent steps can just check the examples instead, as we're already
       # confident that they link.
       - name: check esp32h2-hal (common features)
@@ -348,7 +340,7 @@ jobs:
       - name: rustdoc
         run: cd esp32h2-hal/ && cargo doc --features=eh1
 
-  ulp-riscv-hal:
+  esp-ulp-riscv-hal:
     runs-on: ubuntu-latest
 
     steps:
@@ -362,11 +354,11 @@ jobs:
 
       # Perform a full build initially to verify that the examples not only
       # build, but also link successfully.
-      - name: build ulp-riscv-hal (esp32s3)
-        run: cd ulp-riscv-hal/ && cargo +nightly build --release --features=esp32s3 --examples
+      - name: build esp-ulp-riscv-hal (esp32s3)
+        run: cd esp-ulp-riscv-hal/ && cargo +nightly build --release --features=esp32s3 --examples
       # Ensure documentation can be built
       - name: rustdoc
-        run: cd ulp-riscv-hal/ && cargo doc --features=esp32s3
+        run: cd esp-ulp-riscv-hal/ && cargo doc --features=esp32s3
 
   esp32s2-hal:
     runs-on: ubuntu-latest
@@ -382,13 +374,13 @@ jobs:
         with:
           target: riscv32imc-unknown-none-elf
           toolchain: nightly
-          components: rust-src          
+          components: rust-src
       - uses: Swatinem/rust-cache@v2
 
-      # build the ulp-riscv-hal examples first to make sure the examples which expect
+      # build the esp-ulp-riscv-hal examples first to make sure the examples which expect
       # the ELF files to be present will compile
-      - name: build ulp-riscv-hal prerequisites
-        run: cd ulp-riscv-hal/ && cargo +nightly build --release --features=esp32s2 --examples
+      - name: build esp-ulp-riscv-hal prerequisites
+        run: cd esp-ulp-riscv-hal/ && cargo +nightly build --release --features=esp32s2 --examples
 
       # Perform a full build initially to verify that the examples not only
       # build, but also link successfully.
@@ -457,13 +449,13 @@ jobs:
         with:
           target: riscv32imc-unknown-none-elf
           toolchain: nightly
-          components: rust-src          
+          components: rust-src
       - uses: Swatinem/rust-cache@v2
 
-      # build the ulp-riscv-hal examples first to make sure the examples which expect
+      # build the esp-ulp-riscv-hal examples first to make sure the examples which expect
       # the ELF files to be present will compile
-      - name: build ulp-riscv-hal prerequisites
-        run: cd ulp-riscv-hal/ && cargo +nightly build --release --features=esp32s3 --examples
+      - name: build esp-ulp-riscv-hal prerequisites
+        run: cd esp-ulp-riscv-hal/ && cargo +nightly build --release --features=esp32s3 --examples
 
       # Perform a full build initially to verify that the examples not only
       # build, but also link successfully.
@@ -471,8 +463,6 @@ jobs:
       # for each supported image format.
       - name: build esp32s3-hal (no features)
         run: cd esp32s3-hal/ && cargo +esp build --examples
-      - name: build esp32s3-hal (direct-boot)
-        run: cd esp32s3-hal/ && cargo +esp build --examples --features=direct-boot
       # Subsequent steps can just check the examples instead, as we're already
       # confident that they link.
       - name: check esp32s3-hal (common features)
@@ -603,13 +593,13 @@ jobs:
         with:
           target: riscv32imc-unknown-none-elf
           toolchain: "1.67"
-          components: rust-src          
+          components: rust-src
       - uses: Swatinem/rust-cache@v2
 
-      # build the ulp-riscv-hal examples first to make sure the examples which expect
+      # build the esp-ulp-riscv-hal examples first to make sure the examples which expect
       # the ELF files to be present will compile
-      - name: build ulp-riscv-hal prerequisites
-        run: cd ulp-riscv-hal/ && RUSTC_BOOTSTRAP=1 cargo +1.67 build --release --features=esp32s3 --examples
+      - name: build esp-ulp-riscv-hal prerequisites
+        run: cd esp-ulp-riscv-hal/ && RUSTC_BOOTSTRAP=1 cargo +1.67 build --release --features=esp32s3 --examples
 
       # Verify the MSRV for all Xtensa chips.
       - name: msrv (esp32-hal)
@@ -638,25 +628,26 @@ jobs:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@v1
         with:
+          target: riscv32imc-unknown-none-elf, riscv32imac-unknown-none-elf
           toolchain: stable
           components: clippy
       - uses: Swatinem/rust-cache@v2
 
       # Run clippy on all packages targeting RISC-V.
       - name: clippy (esp-riscv-rt)
-        run: cargo +stable clippy --manifest-path=esp-riscv-rt/Cargo.toml -- -D warnings
+        run: cd esp-riscv-rt && cargo +stable clippy -- -D warnings
       - name: clippy (esp32c2-hal)
-        run: cargo +stable clippy --manifest-path=esp32c2-hal/Cargo.toml -- -D warnings
+        run: cd esp32c2-hal && cargo +stable clippy -- -D warnings
       - name: clippy (esp32c3-hal)
-        run: cargo +stable clippy --manifest-path=esp32c3-hal/Cargo.toml -- -D warnings
+        run: cd esp32c3-hal && cargo +stable clippy -- -D warnings
       - name: clippy (esp32c6-hal)
-        run: cargo +stable clippy --manifest-path=esp32c6-hal/Cargo.toml -- -D warnings
+        run: cd esp32c6-hal && cargo +stable clippy -- -D warnings
       - name: clippy (esp32c6-lp-hal)
-        run: cargo +stable clippy --manifest-path=esp32c6-lp-hal/Cargo.toml -- -D warnings -A asm-sub-register
+        run: cd esp32c6-lp-hal && cargo +stable clippy -- -D warnings -A asm-sub-register
       - name: clippy (esp32h2-hal)
-        run: cargo +stable clippy --manifest-path=esp32h2-hal/Cargo.toml -- -D warnings
-      - name: clippy (ulp-riscv-hal)
-        run: cargo +stable clippy --manifest-path=ulp-riscv-hal/Cargo.toml --features=esp32s3 -- -D warnings -A asm-sub-register
+        run: cd esp32h2-hal && cargo +stable clippy -- -D warnings
+      - name: clippy (esp-ulp-riscv-hal)
+        run: cd esp-ulp-riscv-hal && cargo +stable clippy --features=esp32s3 -- -D warnings -A asm-sub-register
 
   clippy-xtensa:
     runs-on: ubuntu-latest
@@ -716,5 +707,5 @@ jobs:
         run: cargo fmt --all --manifest-path=esp32s2-hal/Cargo.toml -- --check
       - name: rustfmt (esp32s3-hal)
         run: cargo fmt --all --manifest-path=esp32s3-hal/Cargo.toml -- --check
-      - name: rustfmt (ulp-riscv-hal)
-        run: cargo fmt --all --manifest-path=ulp-riscv-hal/Cargo.toml -- --check
+      - name: rustfmt (esp-ulp-riscv-hal)
+        run: cargo fmt --all --manifest-path=esp-ulp-riscv-hal/Cargo.toml -- --check

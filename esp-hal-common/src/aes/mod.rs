@@ -1,19 +1,25 @@
 //! # Advanced Encryption Standard (AES) support.
 //!
 //! ## Overview
+//!
 //! The AES module provides an interface to interact with the AES peripheral,
 //! provides encryption and decryption capabilities for ESP chips using the AES
 //! algorithm. We currently support the following AES encryption modes:
+//!
 //! * AES-128
 //! * AES-192
 //! * AES-256
 //!
 //! ## Example
+//!
 //! ### Initialization
+//!
 //! ```no_run
 //! let mut aes = Aes::new(peripherals.AES);
 //! ```
+//!
 //! ### Creating key and block Buffer
+//!
 //! ```no_run
 //! let keytext = "SUp4SeCp@sSw0rd".as_bytes();
 //! let plaintext = "message".as_bytes();
@@ -28,6 +34,7 @@
 //! ```
 //!
 //! ### Encrypting and Decrypting (using hardware)
+//!
 //! ```no_run
 //! let mut block = block_buf.clone();
 //! aes.process(&mut block, Mode::Encryption128, &keybuf);
@@ -38,6 +45,7 @@
 //! ```
 //!
 //! ### Encrypting and Decrypting (using software)
+//!
 //! ```no_run
 //! let key = GenericArray::from(keybuf);
 //!
@@ -52,13 +60,19 @@
 //! ```
 //!
 //! ### Implementation State
+//!
 //! * DMA mode is currently not supported on ESP32 and ESP32S2 ⚠️
+//!
 //! ## DMA-AES Mode
+//!
 //! Supports 6 block cipher modes including `ECB/CBC/OFB/CTR/CFB8/CFB128`.
+//!
 //! * Initialization vector (IV) is currently not supported ⚠️
 //!
 //! ## Example
-//! ### Initializaton
+//!
+//! ### Initialization
+//!
 //! ```no_run
 //! let dma = Gdma::new(peripherals.DMA);
 //! let dma_channel = dma.channel0;
@@ -75,6 +89,7 @@
 //! ```
 //!
 //! ### Operation
+//!
 //! ```no_run
 //! let transfer = aes
 //!     .process(
@@ -312,6 +327,8 @@ pub mod dma {
             self,
         ) -> Result<(RXBUF, TXBUF, AesDma<'d, C>), (DmaError, RXBUF, TXBUF, AesDma<'d, C>)>
         {
+            // Waiting for the DMA transfer is not enough. We need to wait for the
+            // peripheral to finish flushing its buffers, too.
             while self.aes_dma.aes.aes.state.read().state().bits() != 2 // DMA status DONE == 2
                 && !self.aes_dma.channel.tx.is_done()
             {
@@ -319,6 +336,8 @@ pub mod dma {
             }
 
             self.aes_dma.finish_transform();
+
+            let err = self.aes_dma.channel.rx.has_error() || self.aes_dma.channel.tx.has_error();
 
             // `DmaTransferRxTx` needs to have a `Drop` implementation, because we accept
             // managed buffers that can free their memory on drop. Because of that
@@ -331,8 +350,6 @@ pub mod dma {
                 let rbuffer = core::ptr::read(&self.rbuffer);
                 let tbuffer = core::ptr::read(&self.tbuffer);
                 let payload = core::ptr::read(&self.aes_dma);
-                let err = (&self).aes_dma.channel.rx.has_error()
-                    || (&self).aes_dma.channel.tx.has_error();
                 mem::forget(self);
                 if err {
                     Err((DmaError::DescriptorError, rbuffer, tbuffer, payload))

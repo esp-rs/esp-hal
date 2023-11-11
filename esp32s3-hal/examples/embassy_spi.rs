@@ -77,22 +77,14 @@ async fn main(_spawner: Spawner) -> ! {
     let mut descriptors = [0u32; 8 * 3];
     let mut rx_descriptors = [0u32; 8 * 3];
 
-    let mut spi = Spi::new(
-        peripherals.SPI3,
-        sclk,
-        mosi,
-        miso,
-        cs,
-        100u32.kHz(),
-        SpiMode::Mode0,
-        &clocks,
-    )
-    .with_dma(dma_channel.configure(
-        false,
-        &mut descriptors,
-        &mut rx_descriptors,
-        DmaPriority::Priority0,
-    ));
+    let mut spi = Spi::new(peripherals.SPI3, 100u32.kHz(), SpiMode::Mode0, &clocks)
+        .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
+        .with_dma(dma_channel.configure(
+            false,
+            &mut descriptors,
+            &mut rx_descriptors,
+            DmaPriority::Priority0,
+        ));
 
     let send_buffer = [0, 1, 2, 3, 4, 5, 6, 7];
     loop {

@@ -7,7 +7,7 @@ SECTIONS {
   .rtc_fast.dummy (NOLOAD) :
   {
     _rtc_dummy_start = ABSOLUTE(.); /* needed to make section proper size */
-    . = SIZEOF(.rtc_fast.text);
+    . = . + SIZEOF(.rtc_fast.text);
     _rtc_dummy_end = ABSOLUTE(.); /* needed to make section proper size */
   } > RTC_FAST_RWDATA
 }

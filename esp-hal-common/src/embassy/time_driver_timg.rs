@@ -33,14 +33,15 @@ impl EmbassyTimer {
         unsafe { Timer0::<TIMG0>::steal() }.now()
     }
 
-    pub(crate) fn trigger_alarm(&self, n: usize, cs: CriticalSection) {
+    fn trigger_alarm(&self, n: usize, cs: CriticalSection) {
         let alarm = &self.alarms.borrow(cs)[n];
-        alarm.timestamp.set(u64::MAX);
 
         if let Some((f, ctx)) = alarm.callback.get() {
             f(ctx);
         }
     }
+
+    pub(super) fn on_alarm_allocated(&self, _n: usize) {}
 
     fn on_interrupt<Timer: Instance>(&self, id: u8, mut timer: Timer) {
         critical_section::with(|cs| {
@@ -85,33 +86,23 @@ impl EmbassyTimer {
 
     pub(crate) fn set_alarm(
         &self,
-        alarm: embassy_time::driver::AlarmHandle,
+        _alarm: embassy_time::driver::AlarmHandle,
         timestamp: u64,
     ) -> bool {
-        critical_section::with(|cs| {
-            let n = alarm.id() as usize;
-            let alarm_state = &self.alarms.borrow(cs)[n];
-
+        critical_section::with(|_cs| {
+            // The hardware fires the alarm even if timestamp is lower than the current
+            // time. In this case the interrupt handler will pend a wakeup when we exit the
+            // critical section.
             #[cfg(any(esp32, esp32s2, esp32s3))]
-            if n == 1 {
-                let tg = unsafe { Timer1::<TIMG0>::steal() };
-                return Self::set_alarm_impl(tg, alarm_state, timestamp);
+            if _alarm.id() == 1 {
+                let mut tg = unsafe { Timer1::<TIMG0>::steal() };
+                Self::arm(&mut tg, timestamp);
+                return;
             }
 
-            let tg = unsafe { Timer0::<TIMG0>::steal() };
-            Self::set_alarm_impl(tg, alarm_state, timestamp)
-        })
-    }
-
-    fn set_alarm_impl<Timer: Instance>(
-        mut tg: Timer,
-        alarm_state: &AlarmState,
-        timestamp: u64,
-    ) -> bool {
-        // The hardware fires the alarm even if timestamp is lower than the current
-        // time.
-        alarm_state.timestamp.set(timestamp);
-        Self::arm(&mut tg, timestamp);
+            let mut tg = unsafe { Timer0::<TIMG0>::steal() };
+            Self::arm(&mut tg, timestamp);
+        });
 
         true
     }

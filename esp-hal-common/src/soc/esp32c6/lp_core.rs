@@ -68,20 +68,64 @@ pub enum LpCoreWakeupSource {
     HpCpu,
 }
 
+/// Clock sources for the LP core
+#[derive(Debug, Clone, Copy)]
+pub enum LpCoreClockSource {
+    /// 17.5 MHz clock
+    ///
+    /// Might not be very accurate
+    RcFastClk,
+    /// 20 MHz clock
+    XtalD2Clk,
+}
+
 pub struct LpCore<'d> {
     _lp_core: PeripheralRef<'d, crate::soc::peripherals::LP_CORE>,
 }
 
 impl<'d> LpCore<'d> {
+    /// Create a new instance using [LpCoreClockSource::RcFastClk]
     pub fn new(lp_core: impl Peripheral<P = crate::soc::peripherals::LP_CORE> + 'd) -> Self {
-        crate::into_ref!(lp_core);
-        Self { _lp_core: lp_core }
+        LpCore::new_with_clock(lp_core, LpCoreClockSource::RcFastClk)
     }
 
+    /// Create a new instance using the given clock
+    pub fn new_with_clock(
+        lp_core: impl Peripheral<P = crate::soc::peripherals::LP_CORE> + 'd,
+        clk_src: LpCoreClockSource,
+    ) -> Self {
+        crate::into_ref!(lp_core);
+
+        match clk_src {
+            LpCoreClockSource::RcFastClk => unsafe {
+                (&*crate::soc::peripherals::LP_CLKRST::PTR)
+                    .lp_clk_conf
+                    .modify(|_, w| w.fast_clk_sel().clear_bit())
+            },
+            LpCoreClockSource::XtalD2Clk => unsafe {
+                (&*crate::soc::peripherals::LP_CLKRST::PTR)
+                    .lp_clk_conf
+                    .modify(|_, w| w.fast_clk_sel().set_bit())
+            },
+        }
+
+        let mut this = Self { _lp_core: lp_core };
+        this.stop();
+
+        // clear all of LP_RAM - this makes sure .bss is cleared without relying
+        let lp_ram =
+            unsafe { core::slice::from_raw_parts_mut(0x5000_0000 as *mut u32, 16 * 1024 / 4) };
+        lp_ram.fill(0u32);
+
+        this
+    }
+
+    /// Stop the LP core
     pub fn stop(&mut self) {
         ulp_lp_core_stop();
     }
 
+    /// Start the LP core
     pub fn run(&mut self, wakeup_src: LpCoreWakeupSource) {
         ulp_lp_core_run(wakeup_src);
     }

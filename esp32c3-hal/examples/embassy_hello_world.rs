@@ -11,7 +11,6 @@ use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp32c3_hal::{clock::ClockControl, embassy, peripherals::Peripherals, prelude::*};
 use esp_backtrace as _;
-use static_cell::make_static;
 
 #[embassy_executor::task]
 async fn run() {

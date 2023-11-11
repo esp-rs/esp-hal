@@ -16,15 +16,12 @@
 //!
 //! let mut spi = hal::spi::Spi::new(
 //!     peripherals.SPI2,
-//!     sclk,
-//!     mosi,
-//!     miso,
-//!     cs,
 //!     100u32.kHz(),
 //!     SpiMode::Mode0,
 //!     &mut peripheral_clock_control,
 //!     &mut clocks,
-//! );
+//! )
+//! .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs));
 //! ```
 //!
 //! ## Exclusive access to the SPI bus
@@ -392,114 +389,87 @@ where
     T: Instance,
 {
     /// Constructs an SPI instance in 8bit dataframe mode.
-    pub fn new<SCK: OutputPin, MOSI: OutputPin, MISO: InputPin, CS: OutputPin>(
+    ///
+    /// All pins are optional. Setup these pins using
+    /// [with_pins](Self::with_pins) or individual methods for each pin.
+    pub fn new(
         spi: impl Peripheral<P = T> + 'd,
-        sck: impl Peripheral<P = SCK> + 'd,
-        mosi: impl Peripheral<P = MOSI> + 'd,
-        miso: impl Peripheral<P = MISO> + 'd,
-        cs: impl Peripheral<P = CS> + 'd,
         frequency: HertzU32,
         mode: SpiMode,
         clocks: &Clocks,
     ) -> Spi<'d, T, FullDuplexMode> {
-        crate::into_ref!(spi, sck, mosi, miso, cs);
+        crate::into_ref!(spi);
+        Self::new_internal(spi, frequency, mode, clocks)
+    }
+
+    pub fn with_sck<SCK: OutputPin>(self, sck: impl Peripheral<P = SCK> + 'd) -> Self {
+        crate::into_ref!(sck);
         sck.set_to_push_pull_output()
-            .connect_peripheral_to_output(spi.sclk_signal());
+            .connect_peripheral_to_output(self.spi.sclk_signal());
 
+        self
+    }
+
+    pub fn with_mosi<MOSI: OutputPin>(self, mosi: impl Peripheral<P = MOSI> + 'd) -> Self {
+        crate::into_ref!(mosi);
         mosi.set_to_push_pull_output()
-            .connect_peripheral_to_output(spi.mosi_signal());
+            .connect_peripheral_to_output(self.spi.mosi_signal());
 
+        self
+    }
+
+    pub fn with_miso<MISO: InputPin>(self, miso: impl Peripheral<P = MISO> + 'd) -> Self {
+        crate::into_ref!(miso);
         miso.set_to_input()
-            .connect_input_to_peripheral(spi.miso_signal());
+            .connect_input_to_peripheral(self.spi.miso_signal());
 
+        self
+    }
+
+    pub fn with_cs<CS: OutputPin>(self, cs: impl Peripheral<P = CS> + 'd) -> Self {
+        crate::into_ref!(cs);
         cs.set_to_push_pull_output()
-            .connect_peripheral_to_output(spi.cs_signal());
+            .connect_peripheral_to_output(self.spi.cs_signal());
 
-        Self::new_internal(spi, frequency, mode, clocks)
+        self
     }
 
-    /// Constructs an SPI instance in 8bit dataframe mode without CS pin.
-    pub fn new_no_cs<SCK: OutputPin, MOSI: OutputPin, MISO: InputPin>(
-        spi: impl Peripheral<P = T> + 'd,
-        sck: impl Peripheral<P = SCK> + 'd,
-        mosi: impl Peripheral<P = MOSI> + 'd,
-        miso: impl Peripheral<P = MISO> + 'd,
-        frequency: HertzU32,
-        mode: SpiMode,
-        clocks: &Clocks,
-    ) -> Spi<'d, T, FullDuplexMode> {
-        crate::into_ref!(spi, sck, mosi, miso);
-        sck.set_to_push_pull_output()
-            .connect_peripheral_to_output(spi.sclk_signal());
+    /// Setup pins for this SPI instance.
+    ///
+    /// All pins are optional. Pass [crate::gpio::NO_PIN] if you don't need the
+    /// given pin.
+    pub fn with_pins<SCK: OutputPin, MOSI: OutputPin, MISO: InputPin, CS: OutputPin>(
+        self,
+        sck: Option<impl Peripheral<P = SCK> + 'd>,
+        mosi: Option<impl Peripheral<P = MOSI> + 'd>,
+        miso: Option<impl Peripheral<P = MISO> + 'd>,
+        cs: Option<impl Peripheral<P = CS> + 'd>,
+    ) -> Self {
+        if let Some(sck) = sck {
+            crate::into_ref!(sck);
+            sck.set_to_push_pull_output()
+                .connect_peripheral_to_output(self.spi.sclk_signal());
+        }
 
-        mosi.set_to_push_pull_output()
-            .connect_peripheral_to_output(spi.mosi_signal());
+        if let Some(mosi) = mosi {
+            crate::into_ref!(mosi);
+            mosi.set_to_push_pull_output()
+                .connect_peripheral_to_output(self.spi.mosi_signal());
+        }
 
-        miso.set_to_input()
-            .connect_input_to_peripheral(spi.miso_signal());
+        if let Some(miso) = miso {
+            crate::into_ref!(miso);
+            miso.set_to_input()
+                .connect_input_to_peripheral(self.spi.miso_signal());
+        }
 
-        Self::new_internal(spi, frequency, mode, clocks)
-    }
+        if let Some(cs) = cs {
+            crate::into_ref!(cs);
+            cs.set_to_push_pull_output()
+                .connect_peripheral_to_output(self.spi.cs_signal());
+        }
 
-    /// Constructs an SPI instance in 8bit dataframe mode without MISO pin.
-    pub fn new_no_miso<SCK: OutputPin, MOSI: OutputPin, CS: OutputPin>(
-        spi: impl Peripheral<P = T> + 'd,
-        sck: impl Peripheral<P = SCK> + 'd,
-        mosi: impl Peripheral<P = MOSI> + 'd,
-        cs: impl Peripheral<P = CS> + 'd,
-        frequency: HertzU32,
-        mode: SpiMode,
-        clocks: &Clocks,
-    ) -> Spi<'d, T, FullDuplexMode> {
-        crate::into_ref!(spi, sck, mosi, cs);
-        sck.set_to_push_pull_output()
-            .connect_peripheral_to_output(spi.sclk_signal());
-
-        mosi.set_to_push_pull_output()
-            .connect_peripheral_to_output(spi.mosi_signal());
-
-        cs.set_to_push_pull_output()
-            .connect_peripheral_to_output(spi.cs_signal());
-
-        Self::new_internal(spi, frequency, mode, clocks)
-    }
-
-    /// Constructs an SPI instance in 8bit dataframe mode without CS and MISO
-    /// pin.
-    pub fn new_no_cs_no_miso<SCK: OutputPin, MOSI: OutputPin>(
-        spi: impl Peripheral<P = T> + 'd,
-        sck: impl Peripheral<P = SCK> + 'd,
-        mosi: impl Peripheral<P = MOSI> + 'd,
-        frequency: HertzU32,
-        mode: SpiMode,
-        clocks: &Clocks,
-    ) -> Spi<'d, T, FullDuplexMode> {
-        crate::into_ref!(spi, sck, mosi);
-        sck.set_to_push_pull_output()
-            .connect_peripheral_to_output(spi.sclk_signal());
-
-        mosi.set_to_push_pull_output()
-            .connect_peripheral_to_output(spi.mosi_signal());
-
-        Self::new_internal(spi, frequency, mode, clocks)
-    }
-
-    /// Constructs an SPI instance in 8bit dataframe mode with only MOSI
-    /// connected. This might be useful for (ab)using SPI to  implement
-    /// other protocols by bitbanging (WS2812B, onewire, generating arbitrary
-    /// waveforms…)
-    pub fn new_mosi_only<MOSI: OutputPin>(
-        spi: impl Peripheral<P = T> + 'd,
-        mosi: impl Peripheral<P = MOSI> + 'd,
-        frequency: HertzU32,
-        mode: SpiMode,
-        clocks: &Clocks,
-    ) -> Spi<'d, T, FullDuplexMode> {
-        crate::into_ref!(spi, mosi);
-        mosi.set_to_push_pull_output()
-            .connect_peripheral_to_output(spi.mosi_signal());
-
-        Self::new_internal(spi, frequency, mode, clocks)
+        self
     }
 
     pub(crate) fn new_internal(
@@ -532,9 +502,91 @@ where
 {
     /// Constructs an SPI instance in half-duplex mode.
     ///
+    /// All pins are optional. Setup these pins using
+    /// [with_pins](Self::with_pins) or individual methods for each pin.
+    pub fn new_half_duplex(
+        spi: impl Peripheral<P = T> + 'd,
+        frequency: HertzU32,
+        mode: SpiMode,
+        clocks: &Clocks,
+    ) -> Spi<'d, T, HalfDuplexMode> {
+        crate::into_ref!(spi);
+        Self::new_internal(spi, frequency, mode, clocks)
+    }
+
+    pub fn with_sck<SCK: OutputPin>(self, sck: impl Peripheral<P = SCK> + 'd) -> Self {
+        crate::into_ref!(sck);
+        sck.set_to_push_pull_output()
+            .connect_peripheral_to_output(self.spi.sclk_signal());
+
+        self
+    }
+
+    pub fn with_mosi<MOSI: OutputPin + InputPin>(
+        self,
+        mosi: impl Peripheral<P = MOSI> + 'd,
+    ) -> Self {
+        crate::into_ref!(mosi);
+        mosi.enable_output(true);
+        mosi.connect_peripheral_to_output(self.spi.mosi_signal());
+        mosi.enable_input(true);
+        mosi.connect_input_to_peripheral(self.spi.sio0_input_signal());
+
+        self
+    }
+
+    pub fn with_miso<MISO: OutputPin + InputPin>(
+        self,
+        miso: impl Peripheral<P = MISO> + 'd,
+    ) -> Self {
+        crate::into_ref!(miso);
+        miso.enable_output(true);
+        miso.connect_peripheral_to_output(self.spi.sio1_output_signal());
+        miso.enable_input(true);
+        miso.connect_input_to_peripheral(self.spi.miso_signal());
+
+        self
+    }
+
+    pub fn with_sio2<SIO2: OutputPin + InputPin>(
+        self,
+        sio2: impl Peripheral<P = SIO2> + 'd,
+    ) -> Self {
+        crate::into_ref!(sio2);
+        sio2.enable_output(true);
+        sio2.connect_peripheral_to_output(self.spi.sio2_output_signal());
+        sio2.enable_input(true);
+        sio2.connect_input_to_peripheral(self.spi.sio2_input_signal());
+
+        self
+    }
+
+    pub fn with_sio3<SIO3: OutputPin + InputPin>(
+        self,
+        sio3: impl Peripheral<P = SIO3> + 'd,
+    ) -> Self {
+        crate::into_ref!(sio3);
+        sio3.enable_output(true);
+        sio3.connect_peripheral_to_output(self.spi.sio3_output_signal());
+        sio3.enable_input(true);
+        sio3.connect_input_to_peripheral(self.spi.sio3_input_signal());
+
+        self
+    }
+
+    pub fn with_cs<CS: OutputPin>(self, cs: impl Peripheral<P = CS> + 'd) -> Self {
+        crate::into_ref!(cs);
+        cs.set_to_push_pull_output()
+            .connect_peripheral_to_output(self.spi.cs_signal());
+
+        self
+    }
+
+    /// Setup pins for this SPI instance.
+    ///
     /// All pins are optional. Pass [crate::gpio::NO_PIN] if you don't need the
     /// given pin.
-    pub fn new_half_duplex<
+    pub fn with_pins<
         SCK: OutputPin,
         MOSI: OutputPin + InputPin,
         MISO: OutputPin + InputPin,
@@ -542,63 +594,59 @@ where
         SIO3: OutputPin + InputPin,
         CS: OutputPin,
     >(
-        spi: impl Peripheral<P = T> + 'd,
+        self,
         sck: Option<impl Peripheral<P = SCK> + 'd>,
         mosi: Option<impl Peripheral<P = MOSI> + 'd>,
         miso: Option<impl Peripheral<P = MISO> + 'd>,
         sio2: Option<impl Peripheral<P = SIO2> + 'd>,
         sio3: Option<impl Peripheral<P = SIO3> + 'd>,
         cs: Option<impl Peripheral<P = CS> + 'd>,
-        frequency: HertzU32,
-        mode: SpiMode,
-        clocks: &Clocks,
-    ) -> Spi<'d, T, HalfDuplexMode> {
-        crate::into_ref!(spi);
+    ) -> Self {
         if let Some(sck) = sck {
             crate::into_ref!(sck);
             sck.set_to_push_pull_output()
-                .connect_peripheral_to_output(spi.sclk_signal());
+                .connect_peripheral_to_output(self.spi.sclk_signal());
         }
 
         if let Some(mosi) = mosi {
             crate::into_ref!(mosi);
             mosi.enable_output(true);
-            mosi.connect_peripheral_to_output(spi.mosi_signal());
+            mosi.connect_peripheral_to_output(self.spi.mosi_signal());
             mosi.enable_input(true);
-            mosi.connect_input_to_peripheral(spi.sio0_input_signal());
+            mosi.connect_input_to_peripheral(self.spi.sio0_input_signal());
         }
 
         if let Some(miso) = miso {
             crate::into_ref!(miso);
             miso.enable_output(true);
-            miso.connect_peripheral_to_output(spi.sio1_output_signal());
+            miso.connect_peripheral_to_output(self.spi.sio1_output_signal());
             miso.enable_input(true);
-            miso.connect_input_to_peripheral(spi.miso_signal());
+            miso.connect_input_to_peripheral(self.spi.miso_signal());
         }
 
         if let Some(sio2) = sio2 {
             crate::into_ref!(sio2);
             sio2.enable_output(true);
-            sio2.connect_peripheral_to_output(spi.sio2_output_signal());
+            sio2.connect_peripheral_to_output(self.spi.sio2_output_signal());
             sio2.enable_input(true);
-            sio2.connect_input_to_peripheral(spi.sio2_input_signal());
+            sio2.connect_input_to_peripheral(self.spi.sio2_input_signal());
         }
 
         if let Some(sio3) = sio3 {
             crate::into_ref!(sio3);
             sio3.enable_output(true);
-            sio3.connect_peripheral_to_output(spi.sio3_output_signal());
+            sio3.connect_peripheral_to_output(self.spi.sio3_output_signal());
             sio3.enable_input(true);
-            sio3.connect_input_to_peripheral(spi.sio3_input_signal());
+            sio3.connect_input_to_peripheral(self.spi.sio3_input_signal());
         }
 
         if let Some(cs) = cs {
             crate::into_ref!(cs);
             cs.set_to_push_pull_output()
-                .connect_peripheral_to_output(spi.cs_signal());
+                .connect_peripheral_to_output(self.spi.cs_signal());
         }
 
-        Self::new_internal(spi, frequency, mode, clocks)
+        self
     }
 
     pub(crate) fn new_internal(
@@ -828,7 +876,10 @@ pub mod dma {
             (RXBUF, TXBUF, SpiDma<'d, T, C, M>),
             (DmaError, RXBUF, TXBUF, SpiDma<'d, T, C, M>),
         > {
-            self.spi_dma.spi.flush().ok(); // waiting for the DMA transfer is not enough
+            // Waiting for the DMA transfer is not enough. We need to wait for the
+            // peripheral to finish flushing its buffers, too.
+            self.spi_dma.spi.flush().ok();
+            let err = self.spi_dma.channel.rx.has_error() || self.spi_dma.channel.tx.has_error();
 
             // `DmaTransfer` needs to have a `Drop` implementation, because we accept
             // managed buffers that can free their memory on drop. Because of that
@@ -841,8 +892,6 @@ pub mod dma {
                 let rbuffer = core::ptr::read(&self.rbuffer);
                 let tbuffer = core::ptr::read(&self.tbuffer);
                 let payload = core::ptr::read(&self.spi_dma);
-                let err = (&self).spi_dma.channel.rx.has_error()
-                    || (&self).spi_dma.channel.tx.has_error();
                 mem::forget(self);
                 if err {
                     Err((DmaError::DescriptorError, rbuffer, tbuffer, payload))
@@ -897,7 +946,10 @@ pub mod dma {
             mut self,
         ) -> Result<(BUFFER, SpiDma<'d, T, C, M>), (DmaError, BUFFER, SpiDma<'d, T, C, M>)>
         {
-            self.spi_dma.spi.flush().ok(); // waiting for the DMA transfer is not enough
+            // Waiting for the DMA transfer is not enough. We need to wait for the
+            // peripheral to finish flushing its buffers, too.
+            self.spi_dma.spi.flush().ok();
+            let err = self.spi_dma.channel.rx.has_error() || self.spi_dma.channel.tx.has_error();
 
             // `DmaTransfer` needs to have a `Drop` implementation, because we accept
             // managed buffers that can free their memory on drop. Because of that
@@ -909,8 +961,6 @@ pub mod dma {
             unsafe {
                 let buffer = core::ptr::read(&self.buffer);
                 let payload = core::ptr::read(&self.spi_dma);
-                let err = (&self).spi_dma.channel.rx.has_error()
-                    || (&self).spi_dma.channel.tx.has_error();
                 mem::forget(self);
                 if err {
                     Err((DmaError::DescriptorError, buffer, payload))
@@ -1000,7 +1050,7 @@ pub mod dma {
             }
 
             self.spi
-                .start_write_bytes_dma(ptr, len, &mut self.channel.tx)?;
+                .start_write_bytes_dma(ptr, len, &mut self.channel.tx, false)?;
             Ok(SpiDmaTransfer {
                 spi_dma: self,
                 buffer: words,
@@ -1026,7 +1076,7 @@ pub mod dma {
             }
 
             self.spi
-                .start_read_bytes_dma(ptr, len, &mut self.channel.rx)?;
+                .start_read_bytes_dma(ptr, len, &mut self.channel.rx, false)?;
             Ok(SpiDmaTransfer {
                 spi_dma: self,
                 buffer: words,
@@ -1061,6 +1111,7 @@ pub mod dma {
                 read_len,
                 &mut self.channel.tx,
                 &mut self.channel.rx,
+                false,
             )?;
             Ok(SpiDmaTransferRxTx {
                 spi_dma: self,
@@ -1143,7 +1194,7 @@ pub mod dma {
             }
 
             self.spi
-                .start_read_bytes_dma(ptr, len, &mut self.channel.rx)?;
+                .start_read_bytes_dma(ptr, len, &mut self.channel.rx, false)?;
             Ok(SpiDmaTransfer {
                 spi_dma: self,
                 buffer: buffer,
@@ -1216,7 +1267,7 @@ pub mod dma {
             }
 
             self.spi
-                .start_write_bytes_dma(ptr, len, &mut self.channel.tx)?;
+                .start_write_bytes_dma(ptr, len, &mut self.channel.tx, false)?;
             Ok(SpiDmaTransfer {
                 spi_dma: self,
                 buffer: buffer,
@@ -1322,6 +1373,7 @@ pub mod dma {
                     words.as_mut_ptr(),
                     words.len(),
                     &mut self.channel.rx,
+                    true,
                 )?;
 
                 crate::dma::asynch::DmaRxFuture::new(&mut self.channel.rx).await;
@@ -1335,6 +1387,7 @@ pub mod dma {
                         chunk.as_ptr(),
                         chunk.len(),
                         &mut self.channel.tx,
+                        true,
                     )?;
 
                     crate::dma::asynch::DmaTxFuture::new(&mut self.channel.tx).await;
@@ -1363,6 +1416,7 @@ pub mod dma {
                         read_len,
                         &mut self.channel.tx,
                         &mut self.channel.rx,
+                        true,
                     )?;
 
                     embassy_futures::join::join(
@@ -1393,6 +1447,7 @@ pub mod dma {
                         chunk.len(),
                         &mut self.channel.tx,
                         &mut self.channel.rx,
+                        true,
                     )?;
 
                     embassy_futures::join::join(
@@ -1462,19 +1517,19 @@ pub mod dma {
 
     #[cfg(feature = "eh1")]
     mod ehal1 {
-        use embedded_hal_1::spi::SpiBus;
+        use embedded_hal_1::spi::{ErrorType, SpiBus};
 
         use super::{super::InstanceDma, *};
         use crate::{dma::ChannelTypes, FlashSafeDma};
 
-        impl<'d, T, C, M> embedded_hal_1::spi::ErrorType for SpiDma<'d, T, C, M>
+        impl<'d, T, C, M> ErrorType for SpiDma<'d, T, C, M>
         where
             T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
             C: ChannelTypes,
             C::P: SpiPeripheral,
             M: IsFullDuplex,
         {
-            type Error = super::super::Error;
+            type Error = Error;
         }
 
         impl<'d, T, C, M> SpiBus for SpiDma<'d, T, C, M>
@@ -1521,15 +1576,11 @@ pub mod dma {
             }
         }
 
-        impl<T: embedded_hal_1::spi::ErrorType, const SIZE: usize> embedded_hal_1::spi::ErrorType
-            for FlashSafeDma<T, SIZE>
-        {
+        impl<T: ErrorType, const SIZE: usize> ErrorType for FlashSafeDma<T, SIZE> {
             type Error = T::Error;
         }
 
-        impl<T: embedded_hal_1::spi::SpiBus, const SIZE: usize> embedded_hal_1::spi::SpiBus
-            for FlashSafeDma<T, SIZE>
-        {
+        impl<T: SpiBus, const SIZE: usize> SpiBus for FlashSafeDma<T, SIZE> {
             fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
                 self.inner.read(words)
             }
@@ -1791,13 +1842,14 @@ where
                 chunk.len(),
                 tx,
                 rx,
+                false,
             )?;
 
             while !tx.is_done() && !rx.is_done() {}
             self.flush().unwrap();
         }
 
-        return Ok(words);
+        Ok(words)
     }
 
     fn transfer_dma<'w>(
@@ -1822,6 +1874,7 @@ where
                 read_len,
                 tx,
                 rx,
+                false,
             )?;
 
             while !tx.is_done() && !rx.is_done() {}
@@ -1833,7 +1886,7 @@ where
             }
         }
 
-        return Ok(read_buffer);
+        Ok(read_buffer)
     }
 
     fn start_transfer_dma<'w>(
@@ -1844,6 +1897,7 @@ where
         read_buffer_len: usize,
         tx: &mut TX,
         rx: &mut RX,
+        listen: bool,
     ) -> Result<(), Error> {
         let reg_block = self.register_block();
         self.configure_datalen(usize::max(read_buffer_len, write_buffer_len) as u32 * 8);
@@ -1873,6 +1927,10 @@ where
         self.clear_dma_interrupts();
         reset_dma_before_usr_cmd(reg_block);
 
+        if listen {
+            tx.listen_eof();
+            rx.listen_eof();
+        }
         reg_block.cmd.modify(|_, w| w.usr().set_bit());
 
         Ok(())
@@ -1880,13 +1938,13 @@ where
 
     fn write_bytes_dma<'w>(&mut self, words: &'w [u8], tx: &mut TX) -> Result<&'w [u8], Error> {
         for chunk in words.chunks(MAX_DMA_SIZE) {
-            self.start_write_bytes_dma(chunk.as_ptr(), chunk.len(), tx)?;
+            self.start_write_bytes_dma(chunk.as_ptr(), chunk.len(), tx, false)?;
 
             while !tx.is_done() {}
             self.flush().unwrap(); // seems "is_done" doesn't work as intended?
         }
 
-        return Ok(words);
+        Ok(words)
     }
 
     fn start_write_bytes_dma<'w>(
@@ -1894,6 +1952,7 @@ where
         ptr: *const u8,
         len: usize,
         tx: &mut TX,
+        listen: bool,
     ) -> Result<(), Error> {
         let reg_block = self.register_block();
         self.configure_datalen(len as u32 * 8);
@@ -1910,9 +1969,12 @@ where
         self.clear_dma_interrupts();
         reset_dma_before_usr_cmd(reg_block);
 
+        if listen {
+            tx.listen_eof();
+        }
         reg_block.cmd.modify(|_, w| w.usr().set_bit());
 
-        return Ok(());
+        Ok(())
     }
 
     fn start_read_bytes_dma<'w>(
@@ -1920,6 +1982,7 @@ where
         ptr: *mut u8,
         len: usize,
         rx: &mut RX,
+        listen: bool,
     ) -> Result<(), Error> {
         let reg_block = self.register_block();
         self.configure_datalen(len as u32 * 8);
@@ -1936,9 +1999,12 @@ where
         self.clear_dma_interrupts();
         reset_dma_before_usr_cmd(reg_block);
 
+        if listen {
+            rx.listen_eof();
+        }
         reg_block.cmd.modify(|_, w| w.usr().set_bit());
 
-        return Ok(());
+        Ok(())
     }
 
     fn dma_peripheral(&self) -> DmaPeripheral {
@@ -2528,24 +2594,22 @@ pub trait Instance {
     }
 
     fn read_byte(&mut self) -> nb::Result<u8, Error> {
-        let reg_block = self.register_block();
-
-        if reg_block.cmd.read().usr().bit_is_set() {
+        if self.busy() {
             return Err(nb::Error::WouldBlock);
         }
 
+        let reg_block = self.register_block();
         Ok(u32::try_into(reg_block.w0.read().bits()).unwrap_or_default())
     }
 
     fn write_byte(&mut self, word: u8) -> nb::Result<(), Error> {
-        let reg_block = self.register_block();
-
-        if reg_block.cmd.read().usr().bit_is_set() {
+        if self.busy() {
             return Err(nb::Error::WouldBlock);
         }
 
         self.configure_datalen(8);
 
+        let reg_block = self.register_block();
         reg_block.w0.write(|w| unsafe { w.bits(word.into()) });
 
         self.update();
@@ -2565,7 +2629,6 @@ pub trait Instance {
     /// [`Self::flush`].
     // FIXME: See below.
     fn write_bytes(&mut self, words: &[u8]) -> Result<(), Error> {
-        let reg_block = self.register_block();
         let num_chunks = words.len() / FIFO_SIZE;
 
         // The fifo has a limited fixed size, so the data must be chunked and then
@@ -2573,7 +2636,7 @@ pub trait Instance {
         for (i, chunk) in words.chunks(FIFO_SIZE).enumerate() {
             self.configure_datalen(chunk.len() as u32 * 8);
 
-            let fifo_ptr = reg_block.w0.as_ptr();
+            let fifo_ptr = self.register_block().w0.as_ptr();
             for i in (0..chunk.len()).step_by(4) {
                 let state = if chunk.len() - i < 4 {
                     chunk.len() % 4
@@ -2605,7 +2668,7 @@ pub trait Instance {
 
             self.update();
 
-            reg_block.cmd.modify(|_, w| w.usr().set_bit());
+            self.register_block().cmd.modify(|_, w| w.usr().set_bit());
 
             // Wait for all chunks to complete except the last one.
             // The function is allowed to return before the bus is idle.
@@ -2614,9 +2677,7 @@ pub trait Instance {
             // THIS IS NOT TRUE FOR EH 0.2.X! MAKE SURE TO FLUSH IN EH 0.2.X TRAIT
             // IMPLEMENTATIONS!
             if i < num_chunks {
-                while reg_block.cmd.read().usr().bit_is_set() {
-                    // wait
-                }
+                self.flush()?;
             }
         }
         Ok(())
@@ -2670,11 +2731,14 @@ pub trait Instance {
         Ok(())
     }
 
+    fn busy(&self) -> bool {
+        let reg_block = self.register_block();
+        reg_block.cmd.read().usr().bit_is_set()
+    }
+
     // Check if the bus is busy and if it is wait for it to be idle
     fn flush(&mut self) -> Result<(), Error> {
-        let reg_block = self.register_block();
-
-        while reg_block.cmd.read().usr().bit_is_set() {
+        while self.busy() {
             // wait for bus to be clear
         }
         Ok(())
@@ -2874,9 +2938,7 @@ pub trait Instance {
         self.configure_datalen(buffer.len() as u32 * 8);
         self.update();
         reg_block.cmd.modify(|_, w| w.usr().set_bit());
-        while reg_block.cmd.read().usr().bit_is_set() {
-            // wait for completion
-        }
+        self.flush()?;
         self.read_bytes_from_fifo(buffer)
     }
 

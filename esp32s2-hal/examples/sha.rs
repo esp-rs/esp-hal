@@ -23,7 +23,7 @@ fn main() -> ! {
     let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let source_data = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".as_bytes();
-    let mut remaining = source_data.clone();
+    let mut remaining = source_data;
     let mut hasher = Sha::new(peripherals.SHA, ShaMode::SHA512);
 
     // Short hashes can be created by decreasing the output buffer to the desired

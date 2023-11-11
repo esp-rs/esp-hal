@@ -84,12 +84,17 @@ pub mod adc;
 #[cfg(dac)]
 pub mod dac;
 
-/// A helper trait to do calibrated samples fitting
+/// A trait abstracting over calibration methods.
+///
+/// The methods in this trait are mostly for internal use. To get
+/// calibrated ADC reads, all you need to do is call `enable_pin_with_cal`
+/// and specify some implementor of this trait.
 pub trait AdcCalScheme<ADCI>: Sized {
-    /// Instantiate scheme
+    /// Create a new calibration scheme for the given attenuation.
     fn new_cal(atten: adc::Attenuation) -> Self;
 
-    /// Get ADC calibration value to set to ADC unit
+    /// Return the basic ADC bias value. See [`adc::AdcCalBasic`] for
+    /// details.
     fn adc_cal(&self) -> u16 {
         0
     }

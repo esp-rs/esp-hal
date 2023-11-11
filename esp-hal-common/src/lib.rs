@@ -26,7 +26,7 @@
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
 #![cfg_attr(
     feature = "async",
-    allow(incomplete_features),
+    allow(incomplete_features, stable_features, unknown_lints, async_fn_in_trait),
     feature(async_fn_in_trait),
     feature(impl_trait_projections)
 )]
@@ -140,6 +140,8 @@ pub mod system;
 pub mod systimer;
 #[cfg(any(timg0, timg1))]
 pub mod timer;
+#[cfg(trace)]
+pub mod trace;
 #[cfg(any(twai0, twai1))]
 pub mod twai;
 #[cfg(any(uart0, uart1, uart2))]
@@ -158,6 +160,15 @@ pub mod trapframe {
 // The `soc` module contains chip-specific implementation details and should not
 // be directly exposed.
 mod soc;
+
+#[allow(unused_imports)]
+mod atomic {
+    #[cfg(any(has_native_atomic_support, feature = "atomic-emulation"))]
+    pub use core::sync::atomic::*;
+
+    #[cfg(feature = "portable-atomic")]
+    pub use portable_atomic::*;
+}
 
 #[no_mangle]
 extern "C" fn EspDefaultHandler(_level: u32, _interrupt: peripherals::Interrupt) {
@@ -315,7 +326,7 @@ mod critical_section_impl {
 
     #[cfg(multi_core)]
     mod multicore {
-        use core::sync::atomic::{AtomicUsize, Ordering};
+        use crate::atomic::{AtomicUsize, Ordering};
 
         // We're using a value that we know get_raw_core() will never return. This
         // avoids an unnecessary increment of the core ID.

@@ -14,7 +14,11 @@ pub mod riscv {
 }
 pub mod prelude;
 
-const CPU_CLOCK: u32 = 16_000_000;
+// LP_FAST_CLK is not very accurate, for now use a rough estimate
+const LP_FAST_CLK_HZ: u32 = 16_000_000;
+const XTAL_D2_CLK_HZ: u32 = 20_000_000;
+
+pub static mut CPU_CLOCK: u32 = LP_FAST_CLK_HZ;
 
 global_asm!(
     r#"
@@ -58,6 +62,11 @@ _vector_table:
 unsafe extern "C" fn lp_core_startup() -> ! {
     extern "Rust" {
         fn main() -> !;
+    }
+
+    let clkrst = &*esp32c6_lp::LP_CLKRST::PTR;
+    if clkrst.lp_clk_conf.read().fast_clk_sel().bit_is_set() {
+        CPU_CLOCK = XTAL_D2_CLK_HZ;
     }
 
     main();

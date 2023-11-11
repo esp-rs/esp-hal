@@ -45,9 +45,9 @@ MEMORY
   rtc_fast_iram_seg(RWX) : ORIGIN = 0x400C0000, len = 8k
 
   /* RTC fast memory (same block as above), viewed from data bus. Only for core 0 (PRO_CPU) */
-  rtc_fast_dram_seg(RW)  : ORIGIN = 0x3FF80000 + RESERVE_RTC_FAST, len = 8k - RESERVE_RTC_FAST
+  rtc_fast_dram_seg(RW)  : ORIGIN = 0x3FF80000, len = 8k
 
   /* RTC slow memory (data accessible). Persists over deep sleep. */
-  rtc_slow_seg(RW)       : ORIGIN = 0x50000000 + RESERVE_RTC_SLOW, len = 8k - RESERVE_RTC_SLOW
+  rtc_slow_seg(RW)       : ORIGIN = 0x50000000, len = 8k
 }
 

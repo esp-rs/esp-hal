@@ -247,8 +247,12 @@ pub mod dma {
             mut self,
         ) -> Result<(RXBUF, TXBUF, SpiDma<'d, T, C>), (DmaError, RXBUF, TXBUF, SpiDma<'d, T, C>)>
         {
+            // Waiting for the DMA transfer is not enough. We need to wait for the
+            // peripheral to finish flushing its buffers, too.
             while !self.is_done() {}
-            self.spi_dma.spi.flush().ok(); // waiting for the DMA transfer is not enough
+            self.spi_dma.spi.flush().ok();
+
+            let err = self.spi_dma.channel.rx.has_error() || self.spi_dma.channel.tx.has_error();
 
             // `DmaTransfer` needs to have a `Drop` implementation, because we accept
             // managed buffers that can free their memory on drop. Because of that
@@ -261,8 +265,6 @@ pub mod dma {
                 let rbuffer = core::ptr::read(&self.rbuffer);
                 let tbuffer = core::ptr::read(&self.tbuffer);
                 let payload = core::ptr::read(&self.spi_dma);
-                let err = (&self).spi_dma.channel.rx.has_error()
-                    || (&self).spi_dma.channel.tx.has_error();
                 mem::forget(self);
                 if err {
                     Err((DmaError::DescriptorError, rbuffer, tbuffer, payload))
@@ -313,8 +315,12 @@ pub mod dma {
         fn wait(
             mut self,
         ) -> Result<(BUFFER, SpiDma<'d, T, C>), (DmaError, BUFFER, SpiDma<'d, T, C>)> {
+            // Waiting for the DMA transfer is not enough. We need to wait for the
+            // peripheral to finish flushing its buffers, too.
             while !self.is_done() {}
-            self.spi_dma.spi.flush().ok(); // waiting for the DMA transfer is not enough
+            self.spi_dma.spi.flush().ok();
+
+            let err = self.spi_dma.channel.rx.has_error() || self.spi_dma.channel.tx.has_error();
 
             // `DmaTransfer` needs to have a `Drop` implementation, because we accept
             // managed buffers that can free their memory on drop. Because of that
@@ -326,8 +332,6 @@ pub mod dma {
             unsafe {
                 let buffer = core::ptr::read(&self.buffer);
                 let payload = core::ptr::read(&self.spi_dma);
-                let err = (&self).spi_dma.channel.rx.has_error()
-                    || (&self).spi_dma.channel.tx.has_error();
                 mem::forget(self);
                 if err {
                     Err((DmaError::DescriptorError, buffer, payload))

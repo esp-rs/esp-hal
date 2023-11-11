@@ -35,7 +35,7 @@ fn main() -> ! {
 
     let alarm0 = syst.alarm0.into_periodic();
     alarm0.set_period(1u32.secs());
-    alarm0.interrupt_clear();
+    alarm0.clear_interrupt();
     alarm0.enable_interrupt(true);
 
     let alarm1 = syst.alarm1;
@@ -85,7 +85,7 @@ fn SYSTIMER_TARGET0() {
             .borrow_ref_mut(cs)
             .as_mut()
             .unwrap()
-            .interrupt_clear()
+            .clear_interrupt()
     });
 }
 
@@ -97,7 +97,7 @@ fn SYSTIMER_TARGET1() {
             .borrow_ref_mut(cs)
             .as_mut()
             .unwrap()
-            .interrupt_clear()
+            .clear_interrupt()
     });
 }
 
@@ -109,6 +109,6 @@ fn SYSTIMER_TARGET2() {
             .borrow_ref_mut(cs)
             .as_mut()
             .unwrap()
-            .interrupt_clear()
+            .clear_interrupt()
     });
 }

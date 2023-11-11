@@ -7,10 +7,43 @@ Please note that only changes to the `esp-hal-common` package are tracked in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-[Unreleased]
+## [Unreleased]
+
+### Added
+- ESP32-C6: LP core clock is configurable (#907)
+- Derive `Clone` and `Copy` for `EspTwaiFrame` (#914)
+- A way to configure inverted pins (#912)
+
+### Changed
+
+- C2, C3: atomic emulation trap is now opt-in (#904)
+- Improve DMA documentation & clean up module (#915)
+
+### Fixed
+
+- ESP32-C2/C3 examples: fix build error (#899)
+- ESP32-S3: Fix GPIO interrupt handler crashing when using GPIO48. (#898)
+- Fixed short wait times in embassy causing hangs (#906)
+- Make sure to clear LP/RTC RAM before loading code (#916)
+
+### Removed
+
+### Breaking
+- Direct boot support has been removed (#903).
+- `Spi::new`/`Spi::new_half_duplex` takes no gpio pin now, instead you need to call `with_pins` to setup those (#901).
+
+## [0.13.1] - 2023-11-02
+
+### Fixed
+
+- ESP32-C3: Make sure BLE and WiFi are not powered down when esp-wifi needs them (#891)
+- ESP32-C6/H2: Fix setting UART baud rate (#893)
+
+## [0.13.0] - 2023-10-31
 
 ### Added
 
+- Implement SetFrequencyCycle and PwmPin from embedded_hal for PwmPin of MCPWM. (#880)
 - Added `embassy-time-systick` to ESP32-S2 (#827)
 - Implement enabling/disabling BLE clock on ESP32-C6 (#784)
 - Async support for RMT (#787)
@@ -19,8 +52,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add UART support for splitting into TX and RX (#754)
 - Async support for I2S (#801)
 - Async support for PARL_IO (#807)
-- Implement `embeded_hal_async::delay::DelayUs` trait for `SYSTIMER` alarms (#812)
-  - This trait is NOT implemented when the `embassy-time-systick` feature is enabled!
 - ETM driver, GPIO ETM (#819)
 - (G)DMA AES support (#821)
 - SYSTIMER ETM functionality (#828)
@@ -31,11 +62,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Embassy `#[main]` convenience macro (#841)
 - Add a `defmt` feature to the `esp-hal-smartled` package (#846)
 - Support 16MB octal PS-RAM for ESP32-S3 (#858)
+- RISCV TRACE Encoder driver for ESP32-C6 / ESP32-H2 (#864)
+- `embedded_hal` 1 `InputPin` and `embedded_hal_async` `Wait` impls for open drain outputs (#905)
 
 ### Changed
 
 - Bumped MSRV to 1.67 (#798)
 - Optimised multi-core critical section implementation (#797)
+- Changed linear- and curve-calibrated ADC to provide readings in mV (#836)
 
 ### Fixed
 
@@ -43,6 +77,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - UART/ESP32: fix calculating FIFO counter with `get_rx_fifo_count()` (#804)
 - Xtensa targets: Use ESP32Reset - not Reset (#823)
 - Examples should now work with the `defmt` feature (#810)
+- Fixed a race condition causing SpiDma to stop working unexpectedly (#869)
+- Fixed async uart serial, and updated the embassy_serial examples (#871).
+- Fix ESP32-S3 direct-boot (#873)
+- Fix ESP32-C6 ADC (#876)
 
 ### Removed
 
@@ -70,7 +108,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The SPI traits are no longer re-exported in the main prelude, but from preludes in `spi::master`/`spi::slave` instead (#860)
 - The `embedded-hal-1` and `embedded-hal-async` traits are no longer re-exported in the prelude (#860)
 
-## [0.12.0]
+## [0.12.0] - 2023-09-05
 
 ### Added
 
@@ -87,6 +125,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `defmt` feature to enable log output (#773)
 - A new macro to load LP core code on ESP32-C6 (#779)
 - Add `ECC`` peripheral driver (#785)
+- Initial LLD support for Xtensa chips (#861).
 
 ### Changed
 
@@ -268,7 +307,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2022-08-05
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.13.1...HEAD
+[0.13.1]: https://github.com/esp-rs/esp-hal/compare/v0.13.0...v0.13.1
+[0.13.0]: https://github.com/esp-rs/esp-hal/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/esp-rs/esp-hal/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/esp-rs/esp-hal/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/esp-rs/esp-hal/compare/v0.9.0...v0.10.0

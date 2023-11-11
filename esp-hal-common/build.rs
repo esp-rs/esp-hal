@@ -136,6 +136,28 @@ fn main() -> Result<(), Box<dyn Error>> {
         unreachable!() // We've confirmed exactly one known device was selected
     };
 
+    // The C6 has an "atomic" peripheral but it's an exception, not the rule
+    // For S2, we just keep lying for now. The target has emulation support
+    // force-enabled.
+    let has_native_atomic_support = matches!(
+        device_name,
+        "esp32" | "esp32s2" | "esp32s3" | "esp32c6" | "esp32h2"
+    );
+
+    let atomic_emulation_enabled = cfg!(feature = "atomic-emulation");
+    let portable_atomic_enabled = cfg!(feature = "portable-atomic");
+
+    if atomic_emulation_enabled && portable_atomic_enabled {
+        panic!("The `atomic-emulation` and `portable-atomic` features cannot be used together");
+    }
+
+    if has_native_atomic_support {
+        if atomic_emulation_enabled {
+            println!("cargo:warning={} has native atomic instructions, the `atomic-emulation` feature is not needed", device_name);
+        }
+        println!("cargo:rustc-cfg=has_native_atomic_support");
+    }
+
     // Load the configuration file for the configured device:
     let chip_toml_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("devices")
@@ -173,8 +195,24 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rustc-link-search={}", out.display());
 
     if cfg!(feature = "esp32") || cfg!(feature = "esp32s2") || cfg!(feature = "esp32s3") {
-        fs::copy("ld/xtensa/hal-defaults.x", out.join("hal-defaults.x"))?;
-        fs::copy("ld/xtensa/rom.x", out.join("alias.x"))?;
+        fs::copy("ld/xtensa/hal-defaults.x", out.join("hal-defaults.x")).unwrap();
+        let (irtc, drtc) = if cfg!(feature = "esp32s3") {
+            ("rtc_fast_seg", "rtc_fast_seg")
+        } else {
+            ("rtc_fast_iram_seg", "rtc_fast_dram_seg")
+        };
+        let alias = format!(
+            r#"
+            REGION_ALIAS("ROTEXT", irom_seg);
+            REGION_ALIAS("RWTEXT", iram_seg);
+            REGION_ALIAS("RODATA", drom_seg);
+            REGION_ALIAS("RWDATA", dram_seg);
+            REGION_ALIAS("RTC_FAST_RWTEXT", {});
+            REGION_ALIAS("RTC_FAST_RWDATA", {});
+        "#,
+            irtc, drtc
+        );
+        fs::write(out.join("alias.x"), alias).unwrap();
     } else {
         fs::copy("ld/riscv/hal-defaults.x", out.join("hal-defaults.x"))?;
         fs::copy("ld/riscv/asserts.x", out.join("asserts.x"))?;

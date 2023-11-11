@@ -14,7 +14,7 @@ pub struct Delay {
 impl Delay {
     pub fn new() -> Self {
         Self {
-            rv_delay: riscv::delay::McycleDelay::new(CPU_CLOCK),
+            rv_delay: riscv::delay::McycleDelay::new(unsafe { CPU_CLOCK }),
         }
     }
 }

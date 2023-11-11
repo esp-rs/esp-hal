@@ -16,13 +16,13 @@ use crate::adc::{
 /// See also [`AdcCalLine`].
 pub trait AdcHasLineCal {}
 
-/// Coefficients is actually a fixed-point numbers.
-/// It is scaled to put them into integer.
+/// We store the gain as a u32, but it's really a fixed-point number.
 const GAIN_SCALE: u32 = 1 << 16;
 
 /// Line fitting ADC calibration scheme
 ///
-/// This scheme implements gain correction based on reference points.
+/// This scheme implements gain correction based on reference points, and
+/// returns readings in mV.
 ///
 /// A reference point is a pair of a reference voltage and the corresponding
 /// mean raw digital ADC value. Such values are usually stored in efuse bit
@@ -38,7 +38,11 @@ const GAIN_SCALE: u32 = 1 << 16;
 pub struct AdcCalLine<ADCI> {
     basic: AdcCalBasic<ADCI>,
 
-    /// Gain of ADC-value
+    /// ADC gain.
+    ///
+    /// After being de-biased by the basic calibration, the reading is
+    /// multiplied by this value. Despite the type, it is a fixed-point
+    /// number with 16 fractional bits.
     gain: u32,
 
     _phantom: PhantomData<ADCI>,
@@ -57,8 +61,8 @@ where
             .map(|code| (code, ADCI::get_cal_mv(atten)))
             .unwrap_or_else(|| {
                 // As a fallback try to calibrate using reference voltage source.
-                // This methos is no to good because actual reference voltage may varies
-                // in range 1000..=1200 mV and this value currently cannot be given from efuse.
+                // This method is not too good because actual reference voltage may varies
+                // in range 1000..=1200 mV and this value currently cannot be read from efuse.
                 (
                     AdcConfig::<ADCI>::adc_calibrate(atten, AdcCalSource::Ref),
                     1100, // use 1100 mV as a middle of typical reference voltage range
@@ -69,10 +73,9 @@ where
         // the voltage with the previously done measurement when the chip was
         // manufactured.
         //
-        // Rounding formula: R = (OP(A * 2) + 1) / 2
-        // where R - result, A - argument, O - operation
-        let gain =
-            ((mv as u32 * GAIN_SCALE * 2 / code as u32 + 1) * 4096 / atten.ref_mv() as u32 + 1) / 2;
+        // Note that the constant term is zero because the basic calibration takes care
+        // of it already.
+        let gain = mv as u32 * GAIN_SCALE / code as u32;
 
         Self {
             basic,
@@ -88,7 +91,6 @@ where
     fn adc_val(&self, val: u16) -> u16 {
         let val = self.basic.adc_val(val);
 
-        // pointers are checked in the upper layer
         (val as u32 * self.gain / GAIN_SCALE) as u16
     }
 }

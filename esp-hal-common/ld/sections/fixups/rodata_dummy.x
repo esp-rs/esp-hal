@@ -14,7 +14,7 @@ SECTIONS {
 
     /* Create an empty gap as big as .text section */
 
-    . = SIZEOF(.text);
+    . = . + SIZEOF(.text);
 
     /* Prepare the alignment of the section above. Few bytes (0x20) must be
      * added for the mapping header.

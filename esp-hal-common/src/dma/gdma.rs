@@ -1,6 +1,7 @@
 //! # Direct Memory Access
 //!
 //! ## Overview
+//!
 //! The GDMA (General DMA) module is a part of the DMA (Direct Memory Access)
 //! driver for ESP chips. Of the Espressif chip range, every chip except of
 //! `ESP32` and `ESP32-S2` uses the `GDMA` type of direct memory access.
@@ -15,10 +16,12 @@
 //! associated types for peripheral configuration.
 //!
 //! GDMA peripheral can be initializes using the `new` function, which requires
-//! a DMA peripheral instance and a clock control reference. ```no_run
+//! a DMA peripheral instance and a clock control reference.
+//!
+//! ```no_run
 //! let dma = Gdma::new(peripherals.DMA);
 //! ```
-//! 
+//!
 //! <em>PS: Note that the number of DMA channels is chip-specific.</em>
 
 use crate::{
@@ -26,6 +29,16 @@ use crate::{
     peripheral::PeripheralRef,
     system::{Peripheral, PeripheralClockControl},
 };
+
+#[cold]
+fn on_tx_descriptor_not_divisible_by_3() {
+    panic!("The number of tx descriptors must be a multiple of 3");
+}
+
+#[cold]
+fn on_rx_descriptor_not_divisible_by_3() {
+    panic!("The number of rx descriptors must be a multiple of 3");
+}
 
 macro_rules! impl_channel {
     ($num: literal) => {
@@ -549,8 +562,9 @@ macro_rules! impl_channel {
             impl [<ChannelCreator $num>] {
                 /// Configure the channel for use
                 ///
-                /// Descriptors should be sized as `((BUFFERSIZE + 4091) / 4092) * 3`. I.e., to
-                /// transfer buffers of size `1..=4092`, you need 3 descriptors.
+                /// Descriptors should be sized as `((CHUNK_SIZE + 4091) / 4092) * 3`. I.e., to
+                /// transfer buffers of size `1..=4092`, you need 3 descriptors. The number of
+                /// descriptors must be a multiple of 3.
                 pub fn configure<'a>(
                     self,
                     burst_mode: bool,
@@ -558,6 +572,14 @@ macro_rules! impl_channel {
                     rx_descriptors: &'a mut [u32],
                     priority: DmaPriority,
                 ) -> Channel<'a, [<Channel $num>]> {
+                    if tx_descriptors.len() % 3 != 0 {
+                        on_tx_descriptor_not_divisible_by_3();
+                    }
+
+                    if rx_descriptors.len() % 3 != 0 {
+                        on_rx_descriptor_not_divisible_by_3();
+                    }
+
                     let mut tx_impl = [<Channel $num TxImpl>] {};
                     tx_impl.init(burst_mode, priority);
 

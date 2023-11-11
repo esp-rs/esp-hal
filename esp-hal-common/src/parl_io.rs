@@ -1247,13 +1247,13 @@ where
     pub fn wait(
         self,
     ) -> Result<(BUFFER, ParlIoTx<'d, C, P, CP>), (DmaError, BUFFER, ParlIoTx<'d, C, P, CP>)> {
-        loop {
-            if Instance::is_tx_eof() {
-                break;
-            }
-        }
+        // Waiting for the DMA transfer is not enough. We need to wait for the
+        // peripheral to finish flushing its buffers, too.
+        while !Instance::is_tx_eof() {}
 
         Instance::set_tx_start(false);
+
+        let err = self.instance.tx_channel.has_error();
 
         // `DmaTransfer` needs to have a `Drop` implementation, because we accept
         // managed buffers that can free their memory on drop. Because of that
@@ -1265,7 +1265,6 @@ where
         unsafe {
             let buffer = core::ptr::read(&self.buffer);
             let payload = core::ptr::read(&self.instance);
-            let err = (&self).instance.tx_channel.has_error();
             mem::forget(self);
             if err {
                 Err((DmaError::DescriptorError, buffer, payload))

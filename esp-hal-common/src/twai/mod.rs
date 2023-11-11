@@ -93,7 +93,7 @@ use crate::{
 pub mod filter;
 
 /// Structure backing the embedded_hal::can::Frame/embedded_can::Frame trait.
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct EspTwaiFrame {
     id: Id,
     dlc: usize,
@@ -311,6 +311,9 @@ where
         let tseg_1 = timing.tseg_1 - 1;
         let tseg_2 = timing.tseg_2 - 1;
         let triple_sample = timing.triple_sample;
+
+        #[cfg(esp32)]
+        let prescale = prescale as u8;
 
         // Set up the prescaler and sync jump width.
         self.peripheral

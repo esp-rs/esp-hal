@@ -104,6 +104,8 @@ pub enum Peripheral {
     Ecc,
     #[cfg(soc_etm)]
     Etm,
+    #[cfg(trace)]
+    Trace,
 }
 
 pub struct SoftwareInterruptControl {
@@ -551,6 +553,13 @@ impl PeripheralClockControl {
             Peripheral::Etm => {
                 system.etm_conf.modify(|_, w| w.etm_clk_en().set_bit());
                 system.etm_conf.modify(|_, w| w.etm_rst_en().clear_bit());
+            }
+            #[cfg(trace)]
+            Peripheral::Trace => {
+                system.trace_conf.modify(|_, w| w.trace_clk_en().set_bit());
+                system
+                    .trace_conf
+                    .modify(|_, w| w.trace_rst_en().clear_bit());
             }
         }
     }

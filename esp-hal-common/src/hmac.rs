@@ -135,16 +135,11 @@ impl<'d> Hmac<'d> {
             .set_para_finish
             .write(|w| w.set_para_end().set_bit());
 
-        // TODO align `query_check` in SVDs/PACs
-        #[cfg(esp32h2)]
         if self.hmac.query_error.read().query_check().bit_is_set() {
             return Err(nb::Error::Other(Error::KeyPurposeMismatch));
         }
-        #[cfg(not(esp32h2))]
-        if self.hmac.query_error.read().qurey_check().bit_is_set() {
-            return Err(nb::Error::Other(Error::KeyPurposeMismatch));
-        }
-        return Ok(());
+
+        Ok(())
     }
 
     /// Process the msg block after block

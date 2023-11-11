@@ -149,25 +149,6 @@ impl Attenuation {
         Attenuation::Attenuation6dB,
         Attenuation::Attenuation11dB,
     ];
-
-    /// Reference voltage in millivolts
-    ///
-    /// Vref = 10 ^ (Att / 20) * Vref0
-    /// where Vref0 = 1.1 V, Att - attenuation in dB
-    ///
-    /// To convert raw value to millivolts use formula:
-    /// V = D * Vref / 2 ^ R
-    /// where D - raw ADC value, R - resolution in bits
-    pub const fn ref_mv(&self) -> u16 {
-        match self {
-            Attenuation::Attenuation0dB => 1100,
-            #[cfg(not(esp32c2))]
-            Attenuation::Attenuation2p5dB => 1467,
-            #[cfg(not(esp32c2))]
-            Attenuation::Attenuation6dB => 2195,
-            Attenuation::Attenuation11dB => 3903,
-        }
-    }
 }
 
 pub struct AdcPin<PIN, ADCI, CS = ()> {
@@ -646,6 +627,19 @@ where
             let attenuation = self.attenuations[channel as usize].unwrap() as u8;
             ADCI::config_onetime_sample(channel, attenuation);
             ADCI::start_onetime_sample();
+
+            // see https://github.com/espressif/esp-idf/blob/b4268c874a4cf8fcf7c0c4153cffb76ad2ddda4e/components/hal/adc_oneshot_hal.c#L105-L107
+            // the delay might be a bit generous but longer delay seem to not cause problems
+            #[cfg(esp32c6)]
+            {
+                extern "C" {
+                    fn ets_delay_us(us: u32);
+                }
+                unsafe {
+                    ets_delay_us(40);
+                }
+                ADCI::start_onetime_sample();
+            }
         }
 
         // Wait for ADC to finish conversion
@@ -693,8 +687,6 @@ macro_rules! impl_adc_interface {
     }
 }
 
-pub use implementation::*;
-
 #[cfg(esp32c2)]
 mod implementation {
     //! # Analog to digital (ADC) conversion support.
@@ -728,7 +720,7 @@ mod implementation {
     //! }
     //! ```
 
-    pub use crate::analog::ADC1;
+    use crate::analog::ADC1;
 
     impl_adc_interface! {
         ADC1 [
@@ -775,7 +767,7 @@ mod implementation {
     //! }
     //! ```
 
-    pub use crate::analog::{ADC1, ADC2};
+    use crate::analog::{ADC1, ADC2};
 
     impl_adc_interface! {
         ADC1 [
@@ -827,7 +819,7 @@ mod implementation {
     //! }
     //! ```
 
-    pub use crate::analog::ADC1;
+    use crate::analog::ADC1;
 
     impl_adc_interface! {
         ADC1 [
@@ -875,7 +867,7 @@ mod implementation {
     //! }
     //! ```
 
-    pub use crate::analog::ADC1;
+    use crate::analog::ADC1;
 
     impl_adc_interface! {
         ADC1 [
