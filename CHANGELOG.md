@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-C6: LP core clock is configurable (#907)
 - Derive `Clone` and `Copy` for `EspTwaiFrame` (#914)
 - A way to configure inverted pins (#912)
+- Added API to check a GPIO-pin's interrupt status bit (#929)
 
 ### Changed
 
