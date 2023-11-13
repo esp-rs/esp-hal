@@ -40,7 +40,9 @@ impl Timer {
         self.ets_timer as usize
     }
 }
-
+#[cfg(coex)]
+pub(crate) static mut TIMERS: heapless::Vec<Timer, 30> = heapless::Vec::new();
+#[cfg(not(coex))]
 pub(crate) static mut TIMERS: heapless::Vec<Timer, 20> = heapless::Vec::new();
 
 pub fn compat_timer_arm(ets_timer: *mut ets_timer, tmout: u32, repeat: bool) {

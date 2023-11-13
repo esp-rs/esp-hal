@@ -1055,10 +1055,13 @@ pub(crate) fn ble_init() {
         // init bb
         bt_bb_v2_init_cmplx(1);
 
-        // let rc = ble_osi_coex_funcs_register(&G_COEX_FUNCS as *const osi_coex_funcs_t);
-        // if res != 0 {
-        //     panic!("ble_osi_coex_funcs_register returned {}", res);
-        // }
+        #[cfg(coex)]
+        {
+            let rc = ble_osi_coex_funcs_register(&G_COEX_FUNCS as *const osi_coex_funcs_t);
+            if rc != 0 {
+                panic!("ble_osi_coex_funcs_register returned {}", rc);
+            }
+        }
 
         let res = ble_controller_init(&cfg as *const esp_bt_controller_config_t);
 
