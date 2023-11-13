@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-S3: Fix GPIO interrupt handler crashing when using GPIO48. (#898)
 - Fixed short wait times in embassy causing hangs (#906)
 - Make sure to clear LP/RTC RAM before loading code (#916)
+- Async RMT channels can be used concurrently (#925)
 
 ### Removed
 
