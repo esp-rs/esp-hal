@@ -21,6 +21,7 @@ use crate::EspWifiInitialization;
 
 use critical_section::{CriticalSection, Mutex};
 
+#[cfg(feature = "embedded-svc")]
 use embedded_svc::wifi::{
     AccessPointConfiguration, AccessPointInfo, AuthMethod, ClientConfiguration, Configuration,
     Protocol, SecondaryChannel, Wifi,
@@ -35,6 +36,7 @@ use num_traits::FromPrimitive;
 pub use os_adapter::*;
 pub use state::*;
 
+#[cfg(feature = "smoltcp")]
 use smoltcp::phy::{Device, DeviceCapabilities, RxToken, TxToken};
 
 const ETHERNET_FRAME_HEADER_SIZE: usize = 18;
@@ -1227,6 +1229,16 @@ impl<'d, MODE: WifiDeviceMode> WifiDevice<'d, MODE> {
     pub fn mac_address(&self) -> [u8; 6] {
         self.mode.mac_address()
     }
+
+    #[cfg(not(feature = "smoltcp"))]
+    pub fn receive(&mut self) -> Option<(WifiRxToken<MODE>, WifiTxToken<MODE>)> {
+        self.mode.rx_token()
+    }
+
+    #[cfg(not(feature = "smoltcp"))]
+    pub fn transmit(&mut self) -> Option<WifiTxToken<MODE>> {
+        self.mode.tx_token()
+    }
 }
 
 fn convert_ap_info(record: &include::wifi_ap_record_t) -> AccessPointInfo {
@@ -1365,6 +1377,7 @@ impl<'d> WifiController<'d> {
 }
 
 // see https://docs.rs/smoltcp/0.7.1/smoltcp/phy/index.html
+#[cfg(feature = "smoltcp")]
 impl<MODE: WifiDeviceMode> Device for WifiDevice<'_, MODE> {
     type RxToken<'a> = WifiRxToken<MODE> where Self: 'a;
     type TxToken<'a> = WifiTxToken<MODE> where Self: 'a;
@@ -1399,7 +1412,7 @@ pub struct WifiRxToken<MODE: Sealed> {
 }
 
 impl<MODE: Sealed> WifiRxToken<MODE> {
-    fn consume_token<R, F>(self, f: F) -> R
+    pub fn consume_token<R, F>(self, f: F) -> R
     where
         F: FnOnce(&mut [u8]) -> R,
     {
@@ -1424,6 +1437,7 @@ impl<MODE: Sealed> WifiRxToken<MODE> {
     }
 }
 
+#[cfg(feature = "smoltcp")]
 impl<MODE: Sealed> RxToken for WifiRxToken<MODE> {
     fn consume<R, F>(self, f: F) -> R
     where
@@ -1440,7 +1454,7 @@ pub struct WifiTxToken<MODE: Sealed> {
 }
 
 impl<MODE: Sealed> WifiTxToken<MODE> {
-    fn consume_token<R, F>(self, len: usize, f: F) -> R
+    pub fn consume_token<R, F>(self, len: usize, f: F) -> R
     where
         F: FnOnce(&mut [u8]) -> R,
     {
@@ -1460,6 +1474,7 @@ impl<MODE: Sealed> WifiTxToken<MODE> {
     }
 }
 
+#[cfg(feature = "smoltcp")]
 impl<MODE: Sealed> TxToken for WifiTxToken<MODE> {
     fn consume<R, F>(self, len: usize, f: F) -> R
     where

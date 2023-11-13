@@ -51,7 +51,7 @@ smoltcp.workspace = true
 static_cell.workspace = true
 
 [features]
-default = [ "utils", "log" ]
+default = [ "log", "ipv4", "tcp", "udp", "icmp", "igmp", "dns", "dhcpv4" ]
 
 # chip features
 esp32c2 = [ "esp32c2-hal", "esp-wifi-sys/esp32c2", "esp-println/esp32c2", "esp-backtrace/esp32c2", "embassy-executor/arch-riscv32" ]
@@ -87,9 +87,10 @@ embassy-net = ["dep:embassy-net", "async"]
 coex = []
 wifi-logs = []
 dump-packets = []
-utils = [ "dep:smoltcp" ]
+smoltcp = [ "dep:smoltcp" ]
+utils = [ "smoltcp" ]
 enumset = []
-embedded-svc = [ "dep:enumset", "dep:embedded-svc", "utils" ]
+embedded-svc = [ "dep:enumset", "dep:embedded-svc" ]
 wifi = [ "embedded-svc" ]
 ble = [ "esp32-hal?/bluetooth" ]
 phy-enable-usb = []
@@ -97,7 +98,14 @@ ps-min-modem = []
 ps-max-modem = []
 esp-now = [ "wifi" ]
 big-heap = []
-ipv6 = ["smoltcp?/proto-ipv6"]
+ipv6 = ["wifi", "utils", "smoltcp?/proto-ipv6"]
+ipv4 = ["wifi", "utils", "smoltcp?/proto-ipv4"]
+tcp = ["ipv4", "smoltcp?/socket-tcp"]
+udp = ["ipv4", "smoltcp?/socket-udp"]
+icmp = ["ipv4", "smoltcp?/socket-icmp"]
+igmp = ["ipv4", "smoltcp?/proto-igmp"]
+dns = ["udp", "smoltcp?/proto-dns", "smoltcp?/socket-dns"]
+dhcpv4 = ["wifi", "utils", "smoltcp?/proto-dhcpv4", "smoltcp?/socket-dhcpv4"]
 defmt = [
   "dep:defmt",
   "smoltcp?/defmt",

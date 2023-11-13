@@ -2,14 +2,23 @@
 
 use core::cell::RefCell;
 use core::fmt::Display;
+#[cfg(feature = "tcp")]
 use embedded_io::ErrorType;
+#[cfg(feature = "tcp")]
 use embedded_io::{Read, Write};
 
 use embedded_svc::ipv4;
 use smoltcp::iface::{Interface, SocketHandle, SocketSet};
-use smoltcp::socket::{dhcpv4::Socket as Dhcpv4Socket, tcp::Socket as TcpSocket};
+#[cfg(feature = "dhcpv4")]
+use smoltcp::socket::dhcpv4::Socket as Dhcpv4Socket;
+#[cfg(feature = "tcp")]
+use smoltcp::socket::tcp::Socket as TcpSocket;
 use smoltcp::time::Instant;
-use smoltcp::wire::{DnsQueryType, IpAddress, IpCidr, IpEndpoint, Ipv4Address};
+#[cfg(feature = "dns")]
+use smoltcp::wire::DnsQueryType;
+#[cfg(feature = "udp")]
+use smoltcp::wire::IpEndpoint;
+use smoltcp::wire::{IpAddress, IpCidr, Ipv4Address};
 
 use crate::current_millis;
 use crate::wifi::{WifiDevice, WifiDeviceMode};
@@ -24,10 +33,13 @@ pub struct WifiStack<'a, MODE: WifiDeviceMode> {
     network_interface: RefCell<Interface>,
     sockets: RefCell<SocketSet<'a>>,
     current_millis_fn: fn() -> u64,
+    #[cfg(feature = "tcp")]
     local_port: RefCell<u16>,
     pub(crate) network_config: RefCell<ipv4::Configuration>,
     pub(crate) ip_info: RefCell<Option<ipv4::IpInfo>>,
+    #[cfg(feature = "dhcpv4")]
     pub(crate) dhcp_socket_handle: RefCell<Option<SocketHandle>>,
+    #[cfg(feature = "dns")]
     dns_socket_handle: RefCell<Option<SocketHandle>>,
 }
 
@@ -35,15 +47,20 @@ impl<'a, MODE: WifiDeviceMode> WifiStack<'a, MODE> {
     pub fn new(
         network_interface: Interface,
         device: WifiDevice<'static, MODE>, // TODO relax this lifetime requirement
-        mut sockets: SocketSet<'a>,
+        #[allow(unused_mut)] mut sockets: SocketSet<'a>,
         current_millis_fn: fn() -> u64,
     ) -> WifiStack<'a, MODE> {
+        #[cfg(feature = "dhcpv4")]
         let mut dhcp_socket_handle: Option<SocketHandle> = None;
+        #[cfg(feature = "dns")]
         let mut dns_socket_handle: Option<SocketHandle> = None;
 
+        #[cfg(any(feature = "dhcpv4", feature = "dns"))]
         for (handle, socket) in sockets.iter_mut() {
             match socket {
+                #[cfg(feature = "dhcpv4")]
                 smoltcp::socket::Socket::Dhcpv4(_) => dhcp_socket_handle = Some(handle),
+                #[cfg(feature = "dns")]
                 smoltcp::socket::Socket::Dns(_) => dns_socket_handle = Some(handle),
                 _ => {}
             }
@@ -59,10 +76,13 @@ impl<'a, MODE: WifiDeviceMode> WifiStack<'a, MODE> {
                 }),
             )),
             ip_info: RefCell::new(None),
+            #[cfg(feature = "dhcpv4")]
             dhcp_socket_handle: RefCell::new(dhcp_socket_handle),
             sockets: RefCell::new(sockets),
             current_millis_fn,
+            #[cfg(feature = "tcp")]
             local_port: RefCell::new(41000),
+            #[cfg(feature = "dns")]
             dns_socket_handle: RefCell::new(dns_socket_handle),
         };
 
@@ -87,35 +107,38 @@ impl<'a, MODE: WifiDeviceMode> WifiStack<'a, MODE> {
 
         self.reset(); // reset IP address
 
-        let mut dhcp_socket_handle_ref = self.dhcp_socket_handle.borrow_mut();
-        let mut sockets_ref = self.sockets.borrow_mut();
+        #[cfg(feature = "dhcpv4")]
+        {
+            let mut dhcp_socket_handle_ref = self.dhcp_socket_handle.borrow_mut();
+            let mut sockets_ref = self.sockets.borrow_mut();
 
-        if let Some(dhcp_handle) = *dhcp_socket_handle_ref {
-            // remove the DHCP client if we use a static IP
+            if let Some(dhcp_handle) = *dhcp_socket_handle_ref {
+                // remove the DHCP client if we use a static IP
+                if matches!(
+                    conf,
+                    ipv4::Configuration::Client(ipv4::ClientConfiguration::Fixed(_))
+                ) {
+                    sockets_ref.remove(dhcp_handle);
+                    *dhcp_socket_handle_ref = None;
+                }
+            }
+
+            // re-add the DHCP client if we use DHCP and it has been removed before
             if matches!(
                 conf,
-                ipv4::Configuration::Client(ipv4::ClientConfiguration::Fixed(_))
-            ) {
-                sockets_ref.remove(dhcp_handle);
-                *dhcp_socket_handle_ref = None;
+                ipv4::Configuration::Client(ipv4::ClientConfiguration::DHCP(_))
+            ) && dhcp_socket_handle_ref.is_none()
+            {
+                let dhcp_socket = Dhcpv4Socket::new();
+                let dhcp_socket_handle = sockets_ref.add(dhcp_socket);
+                *dhcp_socket_handle_ref = Some(dhcp_socket_handle);
             }
-        }
 
-        // re-add the DHCP client if we use DHCP and it has been removed before
-        if matches!(
-            conf,
-            ipv4::Configuration::Client(ipv4::ClientConfiguration::DHCP(_))
-        ) && dhcp_socket_handle_ref.is_none()
-        {
-            let dhcp_socket = Dhcpv4Socket::new();
-            let dhcp_socket_handle = sockets_ref.add(dhcp_socket);
-            *dhcp_socket_handle_ref = Some(dhcp_socket_handle);
-        }
-
-        if let Some(dhcp_handle) = *dhcp_socket_handle_ref {
-            let dhcp_socket = sockets_ref.get_mut::<Dhcpv4Socket>(dhcp_handle);
-            info!("Reset DHCP client");
-            dhcp_socket.reset();
+            if let Some(dhcp_handle) = *dhcp_socket_handle_ref {
+                let dhcp_socket = sockets_ref.get_mut::<Dhcpv4Socket>(dhcp_handle);
+                info!("Reset DHCP client");
+                dhcp_socket.reset();
+            }
         }
 
         *self.network_config.borrow_mut() = conf.clone();
@@ -126,13 +149,16 @@ impl<'a, MODE: WifiDeviceMode> WifiStack<'a, MODE> {
     pub fn reset(&self) {
         debug!("Reset TCP stack");
 
-        let dhcp_socket_handle_ref = self.dhcp_socket_handle.borrow_mut();
-        if let Some(dhcp_handle) = *dhcp_socket_handle_ref {
-            self.with_mut(|_, _, sockets| {
-                let dhcp_socket = sockets.get_mut::<Dhcpv4Socket>(dhcp_handle);
-                debug!("Reset DHCP client");
-                dhcp_socket.reset();
-            });
+        #[cfg(feature = "dhcpv4")]
+        {
+            let dhcp_socket_handle_ref = self.dhcp_socket_handle.borrow_mut();
+            if let Some(dhcp_handle) = *dhcp_socket_handle_ref {
+                self.with_mut(|_, _, sockets| {
+                    let dhcp_socket = sockets.get_mut::<Dhcpv4Socket>(dhcp_handle);
+                    debug!("Reset DHCP client");
+                    dhcp_socket.reset();
+                });
+            }
         }
 
         self.with_mut(|interface, _, _| {
@@ -180,6 +206,7 @@ impl<'a, MODE: WifiDeviceMode> WifiStack<'a, MODE> {
     }
 
     /// Convenience function to poll the DHCP socket.
+    #[cfg(feature = "dhcpv4")]
     pub fn poll_dhcp(
         &self,
         interface: &mut Interface,
@@ -215,6 +242,7 @@ impl<'a, MODE: WifiDeviceMode> WifiStack<'a, MODE> {
                             unwrap!(interface.routes_mut().add_default_ipv4_route(route));
                         }
 
+                        #[cfg(feature = "dns")]
                         if let (Some(&dns), Some(dns_handle)) =
                             (dns, *self.dns_socket_handle.borrow())
                         {
@@ -231,6 +259,7 @@ impl<'a, MODE: WifiDeviceMode> WifiStack<'a, MODE> {
     }
 
     /// Create a new [Socket]
+    #[cfg(feature = "tcp")]
     pub fn get_socket<'s>(
         &'s self,
         rx_buffer: &'a mut [u8],
@@ -254,6 +283,7 @@ impl<'a, MODE: WifiDeviceMode> WifiStack<'a, MODE> {
     }
 
     /// Create a new [UdpSocket]
+    #[cfg(feature = "udp")]
     pub fn get_udp_socket<'s>(
         &'s self,
         rx_meta: &'a mut [smoltcp::socket::udp::PacketMetadata],
@@ -279,11 +309,13 @@ impl<'a, MODE: WifiDeviceMode> WifiStack<'a, MODE> {
     }
 
     /// Check if DNS is configured
+    #[cfg(feature = "dns")]
     pub fn is_dns_configured(&self) -> bool {
         self.dns_socket_handle.borrow().is_some()
     }
 
     /// Configure DNS
+    #[cfg(feature = "dns")]
     pub fn configure_dns(
         &'a self,
         servers: &[IpAddress],
@@ -300,6 +332,7 @@ impl<'a, MODE: WifiDeviceMode> WifiStack<'a, MODE> {
     }
 
     /// Update the DNS servers
+    #[cfg(feature = "dns")]
     pub fn update_dns_servers(&self, servers: &[IpAddress]) {
         if let Some(dns_handle) = *self.dns_socket_handle.borrow_mut() {
             self.with_mut(|_interface, _device, sockets| {
@@ -311,6 +344,7 @@ impl<'a, MODE: WifiDeviceMode> WifiStack<'a, MODE> {
     }
 
     /// Perform a DNS query
+    #[cfg(feature = "dns")]
     pub fn dns_query(
         &self,
         name: &str,
@@ -372,6 +406,7 @@ impl<'a, MODE: WifiDeviceMode> WifiStack<'a, MODE> {
                 if let ipv4::Configuration::Client(ipv4::ClientConfiguration::DHCP(_)) =
                     network_config
                 {
+                    #[cfg(feature = "dhcpv4")]
                     self.poll_dhcp(interface, sockets).ok();
                 } else if let ipv4::Configuration::Client(ipv4::ClientConfiguration::Fixed(
                     settings,
@@ -397,6 +432,7 @@ impl<'a, MODE: WifiDeviceMode> WifiStack<'a, MODE> {
         }
     }
 
+    #[cfg(feature = "tcp")]
     fn next_local_port(&self) -> u16 {
         let mut local_port = self.local_port.borrow_mut();
         *local_port += 1;
@@ -435,8 +471,11 @@ pub enum WifiStackError {
     InitializationError(crate::InitializationError),
     DeviceError(crate::wifi::WifiError),
     MissingIp,
+    #[cfg(feature = "dns")]
     DnsNotConfigured,
+    #[cfg(feature = "dns")]
     DnsQueryError(smoltcp::socket::dns::StartQueryError),
+    #[cfg(feature = "dns")]
     DnsQueryFailed,
 }
 
@@ -472,11 +511,13 @@ impl<MODE: WifiDeviceMode> ipv4::Interface for WifiStack<'_, MODE> {
 }
 
 /// A TCP socket
+#[cfg(feature = "tcp")]
 pub struct Socket<'s, 'n: 's, MODE: WifiDeviceMode> {
     socket_handle: SocketHandle,
     network: &'s WifiStack<'n, MODE>,
 }
 
+#[cfg(feature = "tcp")]
 impl<'s, 'n: 's, MODE: WifiDeviceMode> Socket<'s, 'n, MODE> {
     /// Connect the socket
     pub fn open<'i>(&'i mut self, addr: IpAddress, port: u16) -> Result<(), IoError>
@@ -607,6 +648,7 @@ impl<'s, 'n: 's, MODE: WifiDeviceMode> Socket<'s, 'n, MODE> {
     }
 }
 
+#[cfg(feature = "tcp")]
 impl<'s, 'n: 's, MODE: WifiDeviceMode> Drop for Socket<'s, 'n, MODE> {
     fn drop(&mut self) {
         self.network
@@ -619,13 +661,21 @@ impl<'s, 'n: 's, MODE: WifiDeviceMode> Drop for Socket<'s, 'n, MODE> {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum IoError {
     SocketClosed,
+    #[cfg(feature = "igmp")]
     MultiCastError(smoltcp::iface::MulticastError),
+    #[cfg(feature = "tcp")]
     TcpRecvError,
+    #[cfg(feature = "udp")]
     UdpRecvError(smoltcp::socket::udp::RecvError),
+    #[cfg(feature = "tcp")]
     TcpSendError(smoltcp::socket::tcp::SendError),
+    #[cfg(feature = "udp")]
     UdpSendError(smoltcp::socket::udp::SendError),
+    #[cfg(feature = "tcp")]
     ConnectError(smoltcp::socket::tcp::ConnectError),
+    #[cfg(feature = "udp")]
     BindError(smoltcp::socket::udp::BindError),
+    #[cfg(feature = "tcp")]
     ListenError(smoltcp::socket::tcp::ListenError),
 }
 
@@ -635,10 +685,12 @@ impl embedded_io::Error for IoError {
     }
 }
 
+#[cfg(feature = "tcp")]
 impl<'s, 'n: 's, MODE: WifiDeviceMode> ErrorType for Socket<'s, 'n, MODE> {
     type Error = IoError;
 }
 
+#[cfg(feature = "tcp")]
 impl<'s, 'n: 's, MODE: WifiDeviceMode> Read for Socket<'s, 'n, MODE> {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
         self.network.with_mut(|interface, device, sockets| {
@@ -659,6 +711,7 @@ impl<'s, 'n: 's, MODE: WifiDeviceMode> Read for Socket<'s, 'n, MODE> {
     }
 }
 
+#[cfg(feature = "tcp")]
 impl<'s, 'n: 's, MODE: WifiDeviceMode> Write for Socket<'s, 'n, MODE> {
     fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
         loop {
@@ -724,11 +777,13 @@ impl<'s, 'n: 's, MODE: WifiDeviceMode> Write for Socket<'s, 'n, MODE> {
 }
 
 /// A UDP socket
+#[cfg(feature = "udp")]
 pub struct UdpSocket<'s, 'n: 's, MODE: WifiDeviceMode> {
     socket_handle: SocketHandle,
     network: &'s WifiStack<'n, MODE>,
 }
 
+#[cfg(feature = "udp")]
 impl<'s, 'n: 's, MODE: WifiDeviceMode> UdpSocket<'s, 'n, MODE> {
     /// Binds the socket to the given port
     pub fn bind<'i>(&'i mut self, port: u16) -> Result<(), IoError>
@@ -835,6 +890,7 @@ impl<'s, 'n: 's, MODE: WifiDeviceMode> UdpSocket<'s, 'n, MODE> {
     }
 
     /// This function specifies a new multicast group for this socket to join
+    #[cfg(feature = "igmp")]
     pub fn join_multicast_group(&mut self, addr: IpAddress) -> Result<bool, IoError> {
         self.work();
 
@@ -857,6 +913,7 @@ impl<'s, 'n: 's, MODE: WifiDeviceMode> UdpSocket<'s, 'n, MODE> {
     }
 }
 
+#[cfg(feature = "udp")]
 impl<'s, 'n: 's, MODE: WifiDeviceMode> Drop for UdpSocket<'s, 'n, MODE> {
     fn drop(&mut self) {
         self.network

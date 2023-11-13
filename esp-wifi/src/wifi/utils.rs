@@ -1,8 +1,9 @@
 //! Convenience utilities for non-async code
 
+#[cfg(feature = "dhcpv4")]
+use smoltcp::socket::dhcpv4::Socket as Dhcpv4Socket;
 use smoltcp::{
     iface::{Config, Interface, SocketSet, SocketStorage},
-    socket::dhcpv4::Socket as Dhcpv4Socket,
     time::Instant,
     wire::{EthernetAddress, HardwareAddress},
 };
@@ -27,8 +28,10 @@ fn setup_iface<'a, MODE: WifiDeviceMode>(
         Instant::from_millis(current_millis() as i64),
     );
 
+    #[allow(unused_mut)]
     let mut socket_set = SocketSet::new(storage);
 
+    #[cfg(feature = "dhcpv4")]
     if mode.mode().is_sta() {
         // only add DHCP client in STA mode
         let dhcp_socket = Dhcpv4Socket::new();
