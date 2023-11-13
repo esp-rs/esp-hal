@@ -186,12 +186,15 @@ pub trait Pin {
 
     fn set_alternate_function(&mut self, alternate: AlternateFunction);
 
+    /// Listen for interrupts
     fn listen(&mut self, event: Event) {
         self.listen_with_options(event, true, false, false)
     }
 
+    /// Checks if listening for interrupts is enabled for this Pin
     fn is_listening(&self) -> bool;
 
+    /// Listen for interrupts
     fn listen_with_options(
         &mut self,
         event: Event,
@@ -200,8 +203,13 @@ pub trait Pin {
         wake_up_from_light_sleep: bool,
     );
 
+    /// Stop listening for interrupts
     fn unlisten(&mut self);
 
+    /// Checks if the interrupt status bit for this Pin is set
+    fn is_interrupt_set(&self) -> bool;
+
+    /// Clear the interrupt status bit for this Pin
     fn clear_interrupt(&mut self);
 }
 
@@ -354,6 +362,8 @@ pub trait BankGpioRegisterAccess {
 
     fn read_output() -> u32;
 
+    fn read_interrupt_status() -> u32;
+
     fn write_interrupt_status_clear(word: u32);
 
     fn write_output_set(word: u32);
@@ -380,6 +390,10 @@ impl BankGpioRegisterAccess for Bank0GpioRegisterAccess {
 
     fn read_output() -> u32 {
         unsafe { &*GPIO::PTR }.out.read().bits()
+    }
+
+    fn read_interrupt_status() -> u32 {
+        unsafe { &*GPIO::PTR }.status.read().bits()
     }
 
     fn write_interrupt_status_clear(word: u32) {
@@ -421,6 +435,10 @@ impl BankGpioRegisterAccess for Bank1GpioRegisterAccess {
 
     fn read_output() -> u32 {
         unsafe { &*GPIO::PTR }.out1.read().bits()
+    }
+
+    fn read_interrupt_status() -> u32 {
+        unsafe { &*GPIO::PTR }.status1.read().bits()
     }
 
     fn write_interrupt_status_clear(word: u32) {
@@ -799,6 +817,10 @@ where
             (&*GPIO::PTR).pin[GPIONUM as usize]
                 .modify(|_, w| w.int_ena().bits(0).int_type().bits(0).int_ena().bits(0));
         }
+    }
+
+    fn is_interrupt_set(&self) -> bool {
+        <Self as GpioProperties>::Bank::read_interrupt_status() & 1 << (GPIONUM % 32) != 0
     }
 
     fn clear_interrupt(&mut self) {
