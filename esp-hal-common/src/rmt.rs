@@ -1123,9 +1123,6 @@ pub mod asynch {
                 _ => unreachable!(),
             }
 
-            let rmt = unsafe { &*crate::peripherals::RMT::PTR };
-            rmt.int_ena.write(|w| unsafe { w.bits(0) });
-
             WAKER[channel].wake();
         }
     }
@@ -1254,9 +1251,6 @@ pub mod asynch {
 
                 _ => unreachable!(),
             }
-
-            let rmt = unsafe { &*crate::peripherals::RMT::PTR };
-            rmt.int_ena.write(|w| unsafe { w.bits(0) });
 
             WAKER[channel].wake();
         }
