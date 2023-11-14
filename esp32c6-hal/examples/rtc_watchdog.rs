@@ -14,7 +14,6 @@ use esp32c6_hal::{
     interrupt,
     peripherals::{self, Peripherals},
     prelude::*,
-    riscv,
     Rtc,
     Rwdt,
 };
@@ -39,10 +38,6 @@ fn main() -> ! {
     .unwrap();
 
     critical_section::with(|cs| RWDT.borrow_ref_mut(cs).replace(rtc.rwdt));
-
-    unsafe {
-        riscv::interrupt::enable();
-    }
 
     loop {}
 }

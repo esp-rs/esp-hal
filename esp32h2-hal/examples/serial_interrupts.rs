@@ -13,7 +13,6 @@ use esp32h2_hal::{
     interrupt,
     peripherals::{self, Peripherals, UART0},
     prelude::*,
-    riscv,
     timer::TimerGroup,
     uart::config::AtCmdConfig,
     Cpu,
@@ -53,10 +52,6 @@ fn main() -> ! {
         interrupt::CpuInterrupt::Interrupt1, // Interrupt 1 handles priority one interrupts
         interrupt::InterruptKind::Edge,
     );
-
-    unsafe {
-        riscv::interrupt::enable();
-    }
 
     loop {
         critical_section::with(|cs| {

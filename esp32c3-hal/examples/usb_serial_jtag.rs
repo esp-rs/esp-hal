@@ -14,7 +14,6 @@ use esp32c3_hal::{
     interrupt,
     peripherals::{self, Peripherals},
     prelude::*,
-    riscv,
     timer::TimerGroup,
     Cpu,
     UsbSerialJtag,
@@ -52,10 +51,6 @@ fn main() -> ! {
         interrupt::CpuInterrupt::Interrupt1,
         interrupt::InterruptKind::Edge,
     );
-
-    unsafe {
-        riscv::interrupt::enable();
-    }
 
     loop {
         critical_section::with(|cs| {
