@@ -20,6 +20,7 @@
 use esp32c6_hal::{
     clock::ClockControl,
     dma::DmaPriority,
+    dma_buffers,
     gdma::Gdma,
     gpio::IO,
     peripherals::Peripherals,
@@ -51,8 +52,7 @@ fn main() -> ! {
     let dma = Gdma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
 
-    let mut descriptors = [0u32; 8 * 3];
-    let mut rx_descriptors = [0u32; 8 * 3];
+    let (tx_buffer, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(256, 320);
 
     let mut spi = Spi::new_half_duplex(peripherals.SPI2, 100u32.kHz(), SpiMode::Mode0, &clocks)
         .with_pins(
@@ -65,7 +65,7 @@ fn main() -> ! {
         )
         .with_dma(dma_channel.configure(
             false,
-            &mut descriptors,
+            &mut tx_descriptors,
             &mut rx_descriptors,
             DmaPriority::Priority0,
         ));
@@ -73,9 +73,9 @@ fn main() -> ! {
     let mut delay = Delay::new(&clocks);
 
     // DMA buffer require a static life-time
-    let send = send_buffer();
-    let mut receive = receive_buffer();
     let mut zero_buf = zero_buffer();
+    let send = tx_buffer;
+    let mut receive = rx_buffer;
 
     // write enable
     let transfer = spi
@@ -164,15 +164,5 @@ fn main() -> ! {
 
 fn zero_buffer() -> &'static mut [u8; 0] {
     static mut BUFFER: [u8; 0] = [0u8; 0];
-    unsafe { &mut BUFFER }
-}
-
-fn send_buffer() -> &'static mut [u8; 256] {
-    static mut BUFFER: [u8; 256] = [0u8; 256];
-    unsafe { &mut BUFFER }
-}
-
-fn receive_buffer() -> &'static mut [u8; 320] {
-    static mut BUFFER: [u8; 320] = [0u8; 320];
     unsafe { &mut BUFFER }
 }

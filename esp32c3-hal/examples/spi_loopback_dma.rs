@@ -19,6 +19,7 @@
 use esp32c3_hal::{
     clock::ClockControl,
     dma::DmaPriority,
+    dma_buffers,
     gdma::Gdma,
     gpio::IO,
     peripherals::Peripherals,
@@ -47,14 +48,13 @@ fn main() -> ! {
     let dma = Gdma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
 
-    let mut descriptors = [0u32; 8 * 3];
-    let mut rx_descriptors = [0u32; 8 * 3];
+    let (tx_buffer, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(32000, 32000);
 
     let mut spi = Spi::new(peripherals.SPI2, 100u32.kHz(), SpiMode::Mode0, &clocks)
         .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
         .with_dma(dma_channel.configure(
             false,
-            &mut descriptors,
+            &mut tx_descriptors,
             &mut rx_descriptors,
             DmaPriority::Priority0,
         ));
@@ -62,8 +62,8 @@ fn main() -> ! {
     let mut delay = Delay::new(&clocks);
 
     // DMA buffer require a static life-time
-    let mut send = buffer1();
-    let mut receive = buffer2();
+    let mut send = tx_buffer;
+    let mut receive = rx_buffer;
     let mut i = 0;
 
     for (i, v) in send.iter_mut().enumerate() {
@@ -95,14 +95,4 @@ fn main() -> ! {
 
         delay.delay_ms(250u32);
     }
-}
-
-fn buffer1() -> &'static mut [u8; 32000] {
-    static mut BUFFER: [u8; 32000] = [0u8; 32000];
-    unsafe { &mut BUFFER }
-}
-
-fn buffer2() -> &'static mut [u8; 32000] {
-    static mut BUFFER: [u8; 32000] = [0u8; 32000];
-    unsafe { &mut BUFFER }
 }

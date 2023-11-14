@@ -17,6 +17,7 @@
 use esp32s3_hal::{
     clock::ClockControl,
     dma::DmaPriority,
+    dma_buffers,
     gdma::Gdma,
     i2s::{DataFormat, I2s, I2sReadDma, Standard},
     peripherals::Peripherals,
@@ -37,8 +38,7 @@ fn main() -> ! {
     let dma = Gdma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
 
-    let mut tx_descriptors = [0u32; 8 * 3];
-    let mut rx_descriptors = [0u32; 8 * 3];
+    let (_, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(0, 4 * 4092);
 
     // Here we test that the type is
     // 1) reasonably simple (or at least this will flag changes that may make it
@@ -66,7 +66,7 @@ fn main() -> ! {
         .with_din(io.pins.gpio5)
         .build();
 
-    let buffer = dma_buffer();
+    let buffer = rx_buffer;
 
     let mut transfer = i2s_rx.read_dma_circular(buffer).unwrap();
     println!("Started transfer");
@@ -80,9 +80,4 @@ fn main() -> ! {
             println!("Received {:x?}...", &rcv[..30]);
         }
     }
-}
-
-fn dma_buffer() -> &'static mut [u8; 4092 * 4] {
-    static mut BUFFER: [u8; 4092 * 4] = [0u8; 4092 * 4];
-    unsafe { &mut BUFFER }
 }

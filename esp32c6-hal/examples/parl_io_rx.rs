@@ -9,6 +9,7 @@
 use esp32c6_hal::{
     clock::ClockControl,
     dma::DmaPriority,
+    dma_buffers,
     gdma::Gdma,
     gpio::IO,
     parl_io::{BitPackOrder, NoClkPin, ParlIoRxOnly, RxFourBits},
@@ -41,8 +42,7 @@ fn main() -> ! {
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let mut tx_descriptors = [0u32; 8 * 3];
-    let mut rx_descriptors = [0u32; 8 * 3];
+    let (_, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(0, 32000);
 
     let dma = Gdma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
@@ -67,7 +67,7 @@ fn main() -> ! {
         .with_config(rx_pins, NoClkPin, BitPackOrder::Msb, Some(0xfff))
         .unwrap();
 
-    let mut buffer = dma_buffer();
+    let mut buffer = rx_buffer;
     buffer.fill(0u8);
 
     let mut delay = Delay::new(&clocks);
@@ -82,9 +82,4 @@ fn main() -> ! {
 
         delay.delay_ms(500u32);
     }
-}
-
-fn dma_buffer() -> &'static mut [u8; 4092 * 4] {
-    static mut BUFFER: [u8; 4092 * 4] = [0u8; 4092 * 4];
-    unsafe { &mut BUFFER }
 }
