@@ -2710,22 +2710,14 @@ pub trait Instance {
     // esp32c3 varaints. The reason for this is unknown.
     fn read_bytes_from_fifo(&mut self, words: &mut [u8]) -> Result<(), Error> {
         let reg_block = self.register_block();
-
         for chunk in words.chunks_mut(FIFO_SIZE) {
             self.configure_datalen(chunk.len() as u32 * 8);
 
-            let mut fifo_ptr = reg_block.w0.as_ptr();
-            for index in (0..chunk.len()).step_by(4) {
-                let reg_val = unsafe { *fifo_ptr };
-                let bytes = reg_val.to_le_bytes();
+            let fifo_slice = unsafe {
+                core::slice::from_raw_parts::<u8>(reg_block.w0.as_ptr().cast(), FIFO_SIZE)
+            };
 
-                let len = usize::min(chunk.len(), index + 4) - index;
-                chunk[index..(index + len)].clone_from_slice(&bytes[0..len]);
-
-                unsafe {
-                    fifo_ptr = fifo_ptr.offset(1);
-                };
-            }
+            chunk.copy_from_slice(fifo_slice);
         }
 
         Ok(())
