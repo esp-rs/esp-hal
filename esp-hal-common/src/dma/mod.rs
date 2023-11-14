@@ -94,14 +94,14 @@ macro_rules! dma_buffers {
         static mut RX_BUFFER: [u8; $rx_size] = [0u8; $rx_size];
         let tx_descriptors = [0u32; (($tx_size + 4091) / 4092) * 3];
         let rx_descriptors = [0u32; (($rx_size + 4091) / 4092) * 3];
-        (unsafe {
+        unsafe {
             (
                 &mut TX_BUFFER,
                 tx_descriptors,
                 &mut RX_BUFFER,
                 rx_descriptors,
             )
-        })
+        }
     }};
 }
 
@@ -117,7 +117,7 @@ macro_rules! dma_descriptors {
     ($tx_size:expr, $rx_size:expr) => {{
         let tx_descriptors = [0u32; (($tx_size + 4091) / 4092) * 3];
         let rx_descriptors = [0u32; (($rx_size + 4091) / 4092) * 3];
-        (unsafe { (tx_descriptors, rx_descriptors) })
+        (tx_descriptors, rx_descriptors)
     }};
 }
 
