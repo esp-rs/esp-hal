@@ -2723,9 +2723,10 @@ pub trait Instance {
                 if index + 4 > chunk.len() {
                     let len = usize::min(chunk.len(), index + 4) - index;
                     chunk[index..(index + len)].copy_from_slice(&bytes[0..len]);
-                } else {
-                    chunk[index..(index + 4)].copy_from_slice(&bytes);
+                    break;
                 }
+
+                chunk[index..(index + 4)].copy_from_slice(&bytes);
             }
         }
 
