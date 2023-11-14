@@ -15,7 +15,6 @@ use esp32c6_hal::{
     interrupt,
     peripherals::{self, Peripherals},
     prelude::*,
-    riscv,
     Delay,
 };
 use esp_backtrace as _;
@@ -39,10 +38,6 @@ fn main() -> ! {
     critical_section::with(|cs| BUTTON.borrow_ref_mut(cs).replace(button));
 
     interrupt::enable(peripherals::Interrupt::GPIO, interrupt::Priority::Priority3).unwrap();
-
-    unsafe {
-        riscv::interrupt::enable();
-    }
 
     let mut delay = Delay::new(&clocks);
     loop {

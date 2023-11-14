@@ -14,7 +14,6 @@ use esp32h2_hal::{
     interrupt,
     peripherals::{self, Peripherals},
     prelude::*,
-    riscv,
 };
 use esp_backtrace as _;
 use esp_println::println;
@@ -29,19 +28,28 @@ fn main() -> ! {
 
     let mut da = DebugAssist::new(peripherals.ASSIST_DEBUG);
 
-    // Uncomment the functionality you want to test
-    // We use a 0x1200 wide SP and 0x100 regions, and RAM ends at 0x40850000
+    extern "C" {
+        // top of stack
+        static mut _stack_start: u32;
+        // bottom of stack
+        static mut _stack_end: u32;
+    }
+
+    let stack_top = unsafe { &mut _stack_start } as *mut _ as u32;
+    let stack_bottom = unsafe { &mut _stack_end } as *mut _ as u32;
+
+    // uncomment the functionality you want to test
 
     // Monitor the SP so as to prevent stack overflow or erroneous push/pop. When
     // the SP exceeds the minimum or maximum threshold, the module will record the
     // PC pointer and generate an interrupt
-    // da.enable_sp_monitor(0x4084ee00, 0x40850000);
+    da.enable_sp_monitor(stack_bottom + 4096, stack_top);
 
     // Monitor reads/writes performed by the CPU over data bus and peripheral bus
     // in a certain address space, i.e., memory region. Whenever the bus reads or
     // writes in the specified address space, an interrupt will be triggered
-    // da.enable_region0_monitor(0x4084ee00, 0x4084ef00, true, true);
-    da.enable_region1_monitor(0x4084ee00, 0x4084ef00, true, true);
+    // da.enable_region0_monitor(stack_bottom, stack_bottom + 4096, true, true);
+    // da.enable_region1_monitor(stack_bottom, stack_bottom + 4096, true, true);
 
     critical_section::with(|cs| DA.borrow_ref_mut(cs).replace(da));
 
@@ -50,10 +58,6 @@ fn main() -> ! {
         interrupt::Priority::Priority3,
     )
     .unwrap();
-
-    unsafe {
-        riscv::interrupt::enable();
-    }
 
     eat_up_stack(0);
 

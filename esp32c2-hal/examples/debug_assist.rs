@@ -12,7 +12,6 @@ use esp32c2_hal::{
     interrupt,
     peripherals::{self, Peripherals},
     prelude::*,
-    riscv,
 };
 use esp_backtrace as _;
 use esp_println::println;
@@ -27,7 +26,17 @@ fn main() -> ! {
 
     let mut da = DebugAssist::new(peripherals.ASSIST_DEBUG);
 
-    da.enable_sp_monitor(0x3fccee00, 0x3fcd0000);
+    extern "C" {
+        // top of stack
+        static mut _stack_start: u32;
+        // bottom of stack
+        static mut _stack_end: u32;
+    }
+
+    let stack_top = unsafe { &mut _stack_start } as *mut _ as u32;
+    let stack_bottom = unsafe { &mut _stack_end } as *mut _ as u32;
+
+    da.enable_sp_monitor(stack_bottom + 4096, stack_top);
 
     critical_section::with(|cs| DA.borrow_ref_mut(cs).replace(da));
 
@@ -36,10 +45,6 @@ fn main() -> ! {
         interrupt::Priority::Priority3,
     )
     .unwrap();
-
-    unsafe {
-        riscv::interrupt::enable();
-    }
 
     eat_up_stack(0);
 
