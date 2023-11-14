@@ -2713,11 +2713,15 @@ pub trait Instance {
         for chunk in words.chunks_mut(FIFO_SIZE) {
             self.configure_datalen(chunk.len() as u32 * 8);
 
-            let fifo_slice = unsafe {
-                core::slice::from_raw_parts::<u8>(reg_block.w0.as_ptr().cast(), FIFO_SIZE)
-            };
+            let fifo_slice =
+                unsafe { core::slice::from_raw_parts(reg_block.w0.as_ptr(), FIFO_SIZE) };
+            for (blk, index) in (0..chunk.len()).step_by(4).enumerate() {
+                let reg_val = fifo_slice[blk];
+                let bytes = reg_val.to_le_bytes();
 
-            chunk.copy_from_slice(fifo_slice[0..chunk.len()].as_ref());
+                let len = usize::min(chunk.len(), index + 4) - index;
+                chunk[index..(index + len)].clone_from_slice(&bytes[0..len]);
+            }
         }
 
         Ok(())
