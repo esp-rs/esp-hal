@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed short wait times in embassy causing hangs (#906)
 - Make sure to clear LP/RTC RAM before loading code (#916)
 - Async RMT channels can be used concurrently (#925)
+- Xtensa: Allow using `embassy-executor`'s thread-mode executor if neither `embassy-executor-thread`, nor `embassy-executor-interrupt` is enabled. (#937)
 
 ### Removed
 
