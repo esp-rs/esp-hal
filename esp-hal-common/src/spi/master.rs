@@ -2720,7 +2720,7 @@ pub trait Instance {
                 let bytes = reg_val.to_le_bytes();
 
                 let len = usize::min(chunk.len(), index + 4) - index;
-                chunk[index..(index + len)].clone_from_slice(&bytes[0..len]);
+                chunk[index..(index + len)].copy_from_slice(&bytes[0..len]);
             }
         }
 
