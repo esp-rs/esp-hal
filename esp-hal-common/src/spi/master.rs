@@ -2717,7 +2717,7 @@ pub trait Instance {
                 core::slice::from_raw_parts::<u8>(reg_block.w0.as_ptr().cast(), FIFO_SIZE)
             };
 
-            chunk.copy_from_slice(fifo_slice);
+            chunk.copy_from_slice(fifo_slice[0..chunk.len()].as_ref());
         }
 
         Ok(())
