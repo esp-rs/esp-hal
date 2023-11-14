@@ -2708,6 +2708,7 @@ pub trait Instance {
     // FIXME: Using something like `core::slice::from_raw_parts` and
     // `copy_from_slice` on the receive registers works only for the esp32 and
     // esp32c3 varaints. The reason for this is unknown.
+    #[inline]
     fn read_bytes_from_fifo(&mut self, words: &mut [u8]) -> Result<(), Error> {
         let reg_block = self.register_block();
         for chunk in words.chunks_mut(FIFO_SIZE) {
@@ -2719,8 +2720,12 @@ pub trait Instance {
                 let reg_val = fifo_slice[blk];
                 let bytes = reg_val.to_le_bytes();
 
-                let len = usize::min(chunk.len(), index + 4) - index;
-                chunk[index..(index + len)].copy_from_slice(&bytes[0..len]);
+                if index + 4 > chunk.len() {
+                    let len = usize::min(chunk.len(), index + 4) - index;
+                    chunk[index..(index + len)].copy_from_slice(&bytes[0..len]);
+                } else {
+                    chunk[index..(index + 4)].copy_from_slice(&bytes);
+                }
             }
         }
 
