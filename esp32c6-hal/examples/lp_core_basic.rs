@@ -9,12 +9,8 @@
 #![no_main]
 
 use esp32c6_hal::{
-    clock::ClockControl,
-    gpio::lp_gpio::IntoLowPowerPin,
-    lp_core,
-    peripherals::Peripherals,
-    prelude::*,
-    IO,
+    clock::ClockControl, gpio::lp_gpio::IntoLowPowerPin, i2c::I2C, lp_core,
+    peripherals::Peripherals, prelude::*, IO,
 };
 use esp_backtrace as _;
 use esp_hal_common::system::PeripheralClockControl;
@@ -24,26 +20,14 @@ use esp_println::{print, println};
 fn main() -> ! {
     let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();
-    let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
     // configure GPIO 1 as LP output pin
-    let lp_pin_sda = io
-        .pins
-        .gpio6
-        .into_low_power()
-        .into_push_pull_output()
-        .into_pull_up_input();
+    let lp_pin_sda = io.pins.gpio6.into_low_power().into_puinput_ppoutput();
 
-    let lp_pin_scl = io
-        .pins
-        .gpio7
-        .into_low_power()
-        .into_push_pull_output()
-        .into_pull_up_input();
-
-    // PeripheralClockControl::enable(esp_hal_common::system::Peripheral::I2cExt0);
+    let lp_pin_scl = io.pins.gpio7.into_low_power().into_puinput_ppoutput();
 
     let mut lp_core = esp32c6_hal::lp_core::LpCore::new(peripherals.LP_CORE);
     lp_core.stop();
@@ -57,12 +41,12 @@ fn main() -> ! {
     lp_core_code.run(
         &mut lp_core,
         lp_core::LpCoreWakeupSource::HpCpu,
-        //  lp_pin_sda,
-        // lp_pin_scl,
+        lp_pin_sda,
+        lp_pin_scl,
     );
     println!("lpcore run");
 
-    let data = (0x600B2800 + 0x4) as *mut u32;
+    let data = (0x5000_2000) as *mut u32;
     loop {
         print!("Current {:x}           \u{000d}", unsafe {
             data.read_volatile()
