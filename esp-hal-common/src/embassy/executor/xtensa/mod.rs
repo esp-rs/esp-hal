@@ -12,6 +12,10 @@ pub mod thread;
 #[cfg(feature = "embassy-executor-thread")]
 pub use thread::*;
 
+#[cfg(any(
+    feature = "embassy-executor-thread",
+    feature = "embassy-executor-interrupt",
+))]
 #[export_name = "__pender"]
 fn __pender(context: *mut ()) {
     let context = (context as usize).to_le_bytes();
