@@ -33,7 +33,7 @@ embassy-time   = { version = "0.1.5",  features = ["nightly"], optional = true }
 aes                = "0.8.3"
 critical-section   = "1.1.2"
 crypto-bigint      = { version = "0.5.3", default-features = false }
-embassy-executor   = { version = "0.3.2", features = ["nightly", "integrated-timers", "arch-riscv32", "executor-thread"] }
+embassy-executor   = { version = "0.3.2", features = ["nightly"] }
 embedded-graphics  = "0.8.1"
 embedded-hal-1     = { version = "=1.0.0-rc.1", package = "embedded-hal" }
 embedded-hal-async = "=1.0.0-rc.1"
@@ -49,10 +49,10 @@ sha2               = { version = "0.10.8", default-features = false}
 smart-leds         = "0.3.0"
 ssd1306            = "0.8.4"
 static_cell        = { version = "2.0.0", features = ["nightly"] }
-hex-literal       = "0.4.1"
-elliptic-curve    = {version = "0.13.6", default-features = false, features = ["sec1"] }
-p192              = {version = "0.13.0", default-features = false, features = ["arithmetic"] }
-p256              = {version = "0.13.2", default-features = false, features = ["arithmetic"] }
+hex-literal        = "0.4.1"
+elliptic-curve     = { version = "0.13.6", default-features = false, features = ["sec1"] }
+p192               = { version = "0.13.0", default-features = false, features = ["arithmetic"] }
+p256               = { version = "0.13.2", default-features = false, features = ["arithmetic"] }
 embassy-sync       = "0.4.0"
 
 [features]
@@ -74,9 +74,11 @@ init-data            = ["esp-hal-common/rv-init-data"]
 init-rtc-data        = ["esp-hal-common/rv-init-rtc-data"]
 
 # Embassy support
-embassy              = ["esp-hal-common/embassy"]
-embassy-time-systick = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-hz-16_000_000"]
-embassy-time-timg0   = ["esp-hal-common/embassy-time-timg0",   "embassy-time/tick-hz-1_000_000"]
+embassy                    = ["esp-hal-common/embassy"]
+embassy-time-systick       = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-hz-16_000_000"]
+embassy-time-timg0         = ["esp-hal-common/embassy-time-timg0",   "embassy-time/tick-hz-1_000_000"]
+embassy-executor-interrupt = ["esp-hal-common/embassy-executor-interrupt"]
+embassy-executor-thread    = ["esp-hal-common/embassy-executor-thread"]
 
 [profile.release]
 debug = true
@@ -91,31 +93,31 @@ required-features = ["eh1"]
 
 [[example]]
 name              = "embassy_hello_world"
-required-features = ["embassy"]
+required-features = ["embassy", "embassy-executor-thread"]
 
 [[example]]
 name              = "embassy_i2c"
-required-features = ["async", "embassy", "embassy-time-systick"]
+required-features = ["async", "embassy", "embassy-time-systick", "embassy-executor-thread"]
 
 [[example]]
 name              = "embassy_serial"
-required-features = ["async", "embassy"]
+required-features = ["async", "embassy", "embassy-executor-thread"]
 
 [[example]]
 name              = "embassy_spi"
-required-features = ["async", "embassy"]
+required-features = ["async", "embassy", "embassy-executor-thread"]
 
 [[example]]
 name              = "embassy_wait"
-required-features = ["async", "embassy"]
+required-features = ["async", "embassy", "embassy-executor-thread"]
 
 [[example]]
 name              = "embassy_rmt_tx"
-required-features = ["embassy", "async"]
+required-features = ["embassy", "async", "embassy-executor-thread"]
 
 [[example]]
 name              = "embassy_rmt_rx"
-required-features = ["embassy", "async"]
+required-features = ["embassy", "async", "embassy-executor-thread"]
 
 [[example]]
 name              = "interrupt_preemption"
@@ -127,20 +129,20 @@ required-features = ["direct-vectoring"]
 
 [[example]]
 name              = "embassy_i2s_sound"
-required-features = ["embassy", "async"]
+required-features = ["embassy", "async", "embassy-executor-thread"]
 
 [[example]]
 name              = "embassy_i2s_read"
-required-features = ["embassy", "async"]
+required-features = ["embassy", "async", "embassy-executor-thread"]
 
 [[example]]
 name              = "embassy_parl_io_tx"
-required-features = ["embassy", "async"]
+required-features = ["embassy", "async", "embassy-executor-thread"]
 
 [[example]]
 name              = "embassy_parl_io_rx"
-required-features = ["embassy", "async"]
+required-features = ["embassy", "async", "embassy-executor-thread"]
 
 [[example]]
 name              = "embassy_usb_serial_jtag"
-required-features = ["embassy", "async"]
+required-features = ["embassy", "async", "embassy-executor-thread"]
