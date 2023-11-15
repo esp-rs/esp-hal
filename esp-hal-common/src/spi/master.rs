@@ -2690,6 +2690,7 @@ pub trait Instance {
     /// Sends out a stuffing byte for every byte to read. This function doesn't
     /// perform flushing. If you want to read the response to something you
     /// have written before, consider using [`Self::transfer`] instead.
+    #[ram]
     fn read_bytes(&mut self, words: &mut [u8]) -> Result<(), Error> {
         let empty_array = [EMPTY_WRITE_PAD; FIFO_SIZE];
 
@@ -2735,6 +2736,7 @@ pub trait Instance {
         Ok(())
     }
 
+    #[inline(always)]
     fn busy(&self) -> bool {
         let reg_block = self.register_block();
         reg_block.cmd.read().usr().bit_is_set()
@@ -2749,6 +2751,7 @@ pub trait Instance {
         Ok(())
     }
 
+    #[ram]
     fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Error> {
         for chunk in words.chunks_mut(FIFO_SIZE) {
             self.write_bytes(chunk)?;
@@ -2963,6 +2966,7 @@ pub trait Instance {
         // not need/available on ESP32/ESP32S2
     }
 
+    #[inline(always)]
     fn configure_datalen(&self, len: u32) {
         let reg_block = self.register_block();
         let len = if len > 0 { len - 1 } else { 0 };
