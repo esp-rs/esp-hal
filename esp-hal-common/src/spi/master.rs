@@ -2628,6 +2628,7 @@ pub trait Instance {
     /// you must ensure that the whole messages was written correctly, use
     /// [`Self::flush`].
     // FIXME: See below.
+    #[ram]
     fn write_bytes(&mut self, words: &[u8]) -> Result<(), Error> {
         let num_chunks = words.len() / FIFO_SIZE;
 
@@ -2708,7 +2709,7 @@ pub trait Instance {
     // FIXME: Using something like `core::slice::from_raw_parts` and
     // `copy_from_slice` on the receive registers works only for the esp32 and
     // esp32c3 varaints. The reason for this is unknown.
-    #[inline]
+    #[ram]
     fn read_bytes_from_fifo(&mut self, words: &mut [u8]) -> Result<(), Error> {
         let reg_block = self.register_block();
         for chunk in words.chunks_mut(FIFO_SIZE) {
@@ -2739,6 +2740,7 @@ pub trait Instance {
     }
 
     // Check if the bus is busy and if it is wait for it to be idle
+    #[inline(always)]
     fn flush(&mut self) -> Result<(), Error> {
         while self.busy() {
             // wait for bus to be clear
