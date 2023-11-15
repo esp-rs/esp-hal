@@ -50,6 +50,7 @@
 use core::marker::PhantomData;
 
 use fugit::HertzU32;
+use procmacros::ram;
 
 use super::{
     DuplexMode,
