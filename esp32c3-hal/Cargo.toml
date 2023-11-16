@@ -98,6 +98,10 @@ name              = "embassy_hello_world"
 required-features = ["embassy", "embassy-executor-thread"]
 
 [[example]]
+name              = "embassy_multiprio"
+required-features = ["embassy", "embassy-executor-thread", "embassy-executor-interrupt", "embassy-time-systick"] # FIXME the example needs multiple alarms which only systick can provide at this point
+
+[[example]]
 name              = "embassy_wait"
 required-features = ["embassy", "async", "embassy-executor-thread"]
 

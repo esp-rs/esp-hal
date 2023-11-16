@@ -46,7 +46,7 @@ macro_rules! from_cpu {
                     }
 
                     // unsafe block because of direct-vectoring
-                    #[allow(unsafe_code)]
+                    #[allow(unused_unsafe)]
                     unsafe {
                         unwrap!(interrupt::enable(peripherals::Interrupt::[<FROM_CPU_INTR $irq>], priority));
                     }
