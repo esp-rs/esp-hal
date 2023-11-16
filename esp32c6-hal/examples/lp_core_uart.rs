@@ -51,6 +51,7 @@ fn main() -> ! {
 
     // Set up (LP) UART:
 
+    // TODO: hardcoded open_drain bool !!!!
     let lp_tx = io.pins.gpio5.into_low_power().into_push_pull_output();
     let lp_rx = io.pins.gpio4.into_low_power().into_floating_input();
 

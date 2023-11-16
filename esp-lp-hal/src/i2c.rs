@@ -1,6 +1,6 @@
 //! Low-power I2C driver
 
-use esp32c6_lp::{LP_AON, LP_CLKRST, LP_I2C, LP_IO};
+use esp32c6_lp::{LP_AON, LP_CLKRST, LP_I2C, LP_IO, LP_PERI};
 use fugit::HertzU32;
 
 use crate::{gpio::GpioPin, CPU_CLOCK};
@@ -23,6 +23,13 @@ const I2C_LL_INTR_MASK: u32 = (1 << LP_I2C_TRANS_COMPLETE_INT_ST_S)
 
 const LP_I2C_FIFO_LEN: u32 = 16; // TX RX FIFO depth on esp32c6
 
+#[doc(hidden)]
+pub unsafe fn conjour() -> Option<LpI2c> {
+    Some(LpI2c {
+        i2c: LP_I2C::steal(),
+    })
+}
+
 /// I2C-specific transmission errors
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -36,10 +43,11 @@ pub enum Error {
     InvalidResponse,
 }
 
+ 
 #[allow(unused)]
 enum OperationType {
     Write = 0,
-    Read = 1,
+    Read  = 1,
 }
 
 #[allow(unused)]
@@ -52,10 +60,10 @@ enum Ack {
 #[allow(unused)]
 enum Opcode {
     RStart = 6,
-    Write = 1,
-    Read = 3,
-    Stop = 2,
-    End = 4,
+    Write  = 1,
+    Read   = 3,
+    Stop   = 2,
+    End    = 4,
 }
 
 #[derive(PartialEq)]
@@ -235,249 +243,27 @@ impl CommandRegister {
 // Configure LP_EXT_I2C_CK_EN high to enable the clock source of I2C_SCLK.
 // Adjust the timing registers accordingly when the clock frequency changes.
 
-pub struct I2C {
+
+pub struct LpI2c {
     i2c: LP_I2C,
 }
-
-impl<'d> I2C {
-    pub fn new(i2c: LP_I2C, frequency: HertzU32) -> Self {
-        let mut me = Self { i2c };
-        let data = (0x5000_2000) as *mut u32;
-        // peripheral_clock_control.enable(crate::system::Peripheral::I2cExt0);  ???
-
-        // Configure LP I2C GPIOs
-        let sel_mask = unsafe { &*LP_AON::PTR }.gpio_mux.read().sel().bits();
-        // Initialize IO Pins
-        unsafe {
-            (&*LP_AON::PTR)
-                .gpio_mux
-                .modify(|_, w| w.sel().bits(sel_mask | (1 << 6)));
-            (&*LP_AON::PTR)
-                .gpio_mux
-                .modify(|_, w| w.sel().bits(sel_mask | (1 << 7)));
-        }
-
-        unsafe {
-            // Set output mode to Normal
-            (&*LP_IO::PTR).pin[6].modify(|_, w| w.pad_driver().bit(false));
-            // Enable output (writing to write-1-to-set register, then internally the
-            // `GPIO_OUT_REG` will be set)
-            (&*LP_IO::PTR)
-                .enable_w1ts
-                .write(|w| w.enable_w1ts().bits(1 << 6));
-            // Enable input
-            (&*LP_IO::PTR).gpio[6].modify(|_, w| w.fun_ie().set_bit());
-            // Disable pulldown (enable internal weak pull-down)
-            (&*LP_IO::PTR).gpio[6].modify(|_, w| w.fun_wpd().bit(false));
-            // Enable pullup
-            (&*LP_IO::PTR).gpio[6].modify(|_, w| w.fun_wpu().set_bit());
-
-            (&*LP_IO::PTR).gpio[6].modify(|_, w| w.mcu_sel().bits(1));
-
-            // Same process for SCL pin
-            (&*LP_IO::PTR).pin[7].modify(|_, w| w.pad_driver().bit(false));
-            // Enable output (writing to write-1-to-set register, then internally the
-            // `GPIO_OUT_REG` will be set)
-            (&*LP_IO::PTR)
-                .enable_w1ts
-                .write(|w| w.enable_w1ts().bits(1 << 7));
-            // Enable input
-            (&*LP_IO::PTR).gpio[7].modify(|_, w| w.fun_ie().set_bit());
-            // Disable pulldown (enable internal weak pull-down)
-            (&*LP_IO::PTR).gpio[7].modify(|_, w| w.fun_wpd().bit(false));
-            // Enable pullup
-            (&*LP_IO::PTR).gpio[7].modify(|_, w| w.fun_wpu().set_bit());
-
-            // Select LP I2C function for the SDA and SCL pins
-            (&*LP_IO::PTR).gpio[7].modify(|_, w| w.mcu_sel().bits(1));
-        }
-
-        // Initialize LP I2C HAL */
-        me.i2c.clk_conf.modify(|_, w| w.sclk_active().set_bit());
-
-        // Enable LP I2C controller clock
-        set_peri_reg_mask(LPPERI_CLK_EN_REG, LPPERI_LP_EXT_I2C_CK_EN);
-        clear_peri_reg_mask(LPPERI_RESET_EN_REG, LPPERI_LP_EXT_I2C_RESET_EN);
-
-        // Initialize LP I2C Master mode
-        me.i2c.ctr.modify(|_, w| unsafe {
-            // Clear register
-            w.bits(0)
-                // Use open drain output for SDA and SCL
-                .sda_force_out()
-                .set_bit()
-                .scl_force_out()
-                .set_bit()
-                // Ensure that clock is enabled
-                .clk_en()
-                .set_bit()
-        });
-
-        // First, reset the fifo buffers
-        me.i2c.fifo_conf.modify(|_, w| {
-            w.nonfifo_en()
-                .clear_bit()
-                .tx_fifo_rst()
-                .set_bit()
-                .rx_fifo_rst()
-                .set_bit()
-                .fifo_prt_en()
-                .set_bit()
-        });
-
-        me.i2c
-            .ctr
-            .modify(|_, w| unsafe { w.tx_lsb_first().clear_bit().rx_lsb_first().clear_bit() });
-
-        me.reset_fifo();
-
-        // Set LP I2C source clock
-        unsafe { &*LP_CLKRST::PTR }
-            .lpperi
-            .modify(|_, w| w.lp_i2c_clk_sel().clear_bit());
-
-        // Configure LP I2C timing paramters. source_clk is ignored for LP_I2C in this
-        // call
-
-        let source_clk = read_peri_reg(RTC_XTAL_FREQ_REG);
-        let bus_freq = frequency.raw();
-
-        let clkm_div: u32 = 17500000 / (bus_freq * 1024) + 1;
-        let sclk_freq: u32 = source_clk / clkm_div;
-        let half_cycle: u32 = sclk_freq / bus_freq / 2;
-        // SCL
-        let clkm_div = clkm_div;
-        let scl_low = half_cycle;
-        // default, scl_wait_high < scl_high
-        // Make 80KHz as a boundary here, because when working at lower frequency, too
-        // much scl_wait_high will faster the frequency according to some
-        // hardware behaviors.
-        let scl_wait_high = if bus_freq >= 80 * 1000 {
-            half_cycle / 2 - 2
-        } else {
-            half_cycle / 4
-        };
-        let scl_high = half_cycle - scl_wait_high;
-        let sda_hold = half_cycle / 4;
-        let sda_sample = half_cycle / 2 + scl_wait_high;
-        let setup = half_cycle;
-        let hold = half_cycle;
-        // default we set the timeout value to about 10 bus cycles
-        // log(20*half_cycle)/log(2) = log(half_cycle)/log(2) +  log(20)/log(2)
-        let tout = (4 * 8 - (5 * half_cycle).leading_zeros()) + 2;
-
-        // According to the Technical Reference Manual, the following timings must be
-        // subtracted by 1. However, according to the practical measurement and
-        // some hardware behaviour, if wait_high_period and scl_high minus one.
-        // The SCL frequency would be a little higher than expected. Therefore, the
-        // solution here is not to minus scl_high as well as scl_wait high, and
-        // the frequency will be absolutely accurate to all frequency
-        // to some extent.
-        let scl_low_period = scl_low - 1;
-        let scl_high_period = scl_high;
-        let scl_wait_high_period = scl_wait_high;
-        // sda sample
-        let sda_hold_time = sda_hold - 1;
-        let sda_sample_time = sda_sample - 1;
-        // setup
-        let scl_rstart_setup_time = setup - 1;
-        let scl_stop_setup_time = setup - 1;
-        // hold
-        let scl_start_hold_time = hold - 1;
-        let scl_stop_hold_time = hold - 1;
-        let time_out_value = tout;
-        let time_out_en = true;
-
-        // Write data to registers
-        unsafe {
-            me.i2c.clk_conf.modify(|_, w| {
-                w.sclk_sel()
-                    .clear_bit()
-                    .sclk_div_num()
-                    .bits((clkm_div - 1) as u8)
-            });
-
-            // scl period
-            me.i2c
-                .scl_low_period
-                .write(|w| w.scl_low_period().bits(scl_low_period as u16));
-
-            me.i2c.scl_high_period.write(|w| {
-                w.scl_high_period()
-                    .bits(scl_high_period as u16)
-                    .scl_wait_high_period()
-                    .bits(scl_wait_high_period as u8)
-            });
-            // sda sample
-            me.i2c
-                .sda_hold
-                .write(|w| w.time().bits(sda_hold_time as u16));
-            me.i2c
-                .sda_sample
-                .write(|w| w.time().bits(sda_sample_time as u16));
-
-            // setup
-            me.i2c
-                .scl_rstart_setup
-                .write(|w| w.time().bits(scl_rstart_setup_time as u16));
-            me.i2c
-                .scl_stop_setup
-                .write(|w| w.time().bits(scl_stop_setup_time as u16));
-
-            // hold
-            me.i2c
-                .scl_start_hold
-                .write(|w| w.time().bits(scl_start_hold_time as u16));
-            me.i2c
-                .scl_stop_hold
-                .write(|w| w.time().bits(scl_stop_hold_time as u16));
-
-            me.i2c.to.write(|w| {
-                w.time_out_en()
-                    .bit(time_out_en)
-                    .time_out_value()
-                    .variant(time_out_value.try_into().unwrap())
-            });
-        }
-
-        // Enable SDA and SCL filtering. This configuration matches the HP I2C filter
-        // config
-
-        me.i2c
-            .filter_cfg
-            .modify(|_, w| unsafe { w.sda_filter_thres().bits(LP_I2C_FILTER_CYC_NUM_DEF) });
-        me.i2c.filter_cfg.modify(|_, w| w.sda_filter_en().set_bit());
-
-        me.i2c
-            .filter_cfg
-            .modify(|_, w| unsafe { w.scl_filter_thres().bits(LP_I2C_FILTER_CYC_NUM_DEF) });
-        me.i2c.filter_cfg.modify(|_, w| w.scl_filter_en().set_bit());
-
-        // Configure the I2C master to send a NACK when the Rx FIFO count is full
-        me.i2c.ctr.modify(|_, w| w.rx_full_ack_level().set_bit());
-
-        // Synchronize the config register values to the LP I2C peripheral clock
-        me.lp_i2c_update();
-
-        me
-    }
-
-    #[allow(unused)]
+ 
+impl<'d> LpI2c {
     /// Send data bytes from the `bytes` array to a target slave with the
     /// address `addr`
     fn master_write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Error> {
         let mut cmd_iterator = CommandRegister::COMD0;
 
-        let data = (0x5000_2000) as *mut u32;
-
         // If SCL is busy, reset the Master FSM
-        // if self.i2c.sr.read().bus_busy().bit_is_set() {
-        //     self.i2c.ctr.modify(|_, w| unsafe { w.fsm_rst().set_bit() });
-        // }
+        if self.i2c.sr().read().bus_busy().bit_is_set() {
+            self.i2c
+                .ctr()
+                .modify(|_, w| unsafe { w.fsm_rst().set_bit() });
+        }
 
-        // if bytes.len() > 255 {
-        //     return Err(Error::ExceedingFifo);
-        // }
+        if bytes.len() > 255 {
+            return Err(Error::ExceedingFifo);
+        }
 
         // Reset FIFO and command list
         self.reset_fifo();
@@ -485,19 +271,18 @@ impl<'d> I2C {
         self.add_cmd_lp(&mut cmd_iterator, Command::Start)?;
 
         // Load device address and R/W bit into FIFO
-        self.write_fifo(0x01);
-        self.write_fifo(0x10);
+        self.write_fifo(((addr & 0xFF) << 1) | ((OperationType::Write as u8) << 0));
+
         self.add_cmd_lp(
             &mut cmd_iterator,
             Command::Write {
-                ack_exp: Ack::Ack,
+                ack_exp: Ack::Ack, // TODO Nack???
                 ack_check_en: true,
                 length: 1 as u8,
             },
-        );
-        self.write_fifo(0x20);
+        )?;
 
-        self.enable_interrupts();
+        self.enable_interrupts(I2C_LL_INTR_MASK);
 
         let mut data_idx = 0;
         let mut remaining_bytes = bytes.len() as u32;
@@ -521,14 +306,11 @@ impl<'d> I2C {
             self.add_cmd_lp(
                 &mut cmd_iterator,
                 Command::Write {
-                    ack_exp: Ack::Ack,
+                    ack_exp: Ack::Ack, //TODO Nack???
                     ack_check_en: true,
                     length: fifo_size as u8,
                 },
             )?;
-
-            // Update the index for the next data chunk
-            data_idx += fifo_size;
 
             // Check if this is the last chunk
             let cmd = if remaining_bytes == 0 {
@@ -540,16 +322,15 @@ impl<'d> I2C {
             // Add the Stop/End command
             self.add_cmd_lp(&mut cmd_iterator, cmd)?;
 
-            // if cmd == Command::End {
-            //     cmd_iterator = CommandRegister::COMD0;
-            // }
-
             // Start the I2C transaction
             self.lp_i2c_update();
-            self.i2c.ctr.modify(|_, w| w.trans_start().set_bit());
+            self.i2c.ctr().modify(|_, w| w.trans_start().set_bit());
 
             // Wait for the transaction to complete
             self.wait_for_completion()?;
+
+            // Update the index for the next data chunk
+            data_idx += fifo_size;
 
             fifo_available = LP_I2C_FIFO_LEN;
         }
@@ -569,15 +350,33 @@ impl<'d> I2C {
         self.add_cmd_lp(&mut cmd_iterator, Command::Start)?;
 
         // Load device address
-        self.write_fifo(addr << 1 | OperationType::Read as u8);
+        // self.write_fifo(addr << 1 | OperationType::Read as u8);
+        self.write_fifo(((addr & 0xFF) << 1) | ((OperationType::Read as u8) << 0));
 
-        self.enable_interrupts();
+        self.add_cmd_lp(
+            &mut cmd_iterator,
+            Command::Write {
+                ack_exp: Ack::Ack, // TODO Nack???
+                ack_check_en: true,
+                length: 1 as u8,
+            },
+        )?;
 
+        self.enable_interrupts(1 << 7 | 1 << 3);
+
+        let mut fifo_size = 0;
         let mut data_idx: usize = 0;
-        let buffer_len = buffer.len();
+        let mut remaining_bytes = buffer.len();
 
-        for chunk in buffer.chunks_mut(LP_I2C_FIFO_LEN as usize) {
-            let fifo_size = chunk.len();
+        // for chunk in buffer.chunks_mut(LP_I2C_FIFO_LEN as usize) {
+            // let fifo_size = chunk.len();
+        while remaining_bytes > 0 {
+            let fifo_size = if remaining_bytes < LP_I2C_FIFO_LEN as usize{
+                remaining_bytes
+            } else {
+                LP_I2C_FIFO_LEN as usize
+            };
+            remaining_bytes -= fifo_size;
 
             if fifo_size == 1 {
                 // Read one byte and send NACK
@@ -590,7 +389,7 @@ impl<'d> I2C {
                 )?;
                 // Send STOP command after reading
                 self.add_cmd_lp(&mut cmd_iterator, Command::Stop)?;
-            } else if fifo_size > 1 && fifo_size == buffer_len - data_idx {
+            } else if fifo_size > 1 && remaining_bytes == 0 {
                 // This means it is the last transaction
                 // Read all but the last byte and send ACKs
                 self.add_cmd_lp(
@@ -627,15 +426,18 @@ impl<'d> I2C {
             self.lp_i2c_update();
 
             // Initiate I2C transfer
-            self.i2c.ctr.modify(|_, w| w.trans_start().set_bit());
+            self.i2c.ctr().modify(|_, w| w.trans_start().set_bit());
 
             // Await for completion (This function or mechanism should handle waiting for
             // the I2C transfer to complete)
             self.wait_for_completion()?;
 
             // Read from FIFO into the current chunk
-            for byte in chunk.iter_mut() {
-                *byte = self.i2c.data.read().fifo_rdata().bits();
+            // for byte in chunk.iter_mut() {
+            //     *byte = self.i2c.data().read().fifo_rdata().bits();
+            // }
+            for byte in buffer.iter_mut() {
+                *byte = self.read_fifo();
             }
 
             data_idx += fifo_size;
@@ -660,23 +462,27 @@ impl<'d> I2C {
 
     /// Update I2C configuration
     fn lp_i2c_update(&self) {
-        self.i2c.ctr.modify(|_, w| w.conf_upgate().set_bit());
+        self.i2c.ctr().modify(|_, w| w.conf_upgate().set_bit());
     }
 
     fn reset_fifo(&self) {
-        self.i2c.fifo_conf.modify(|_, w| w.tx_fifo_rst().set_bit());
+        self.i2c
+            .fifo_conf()
+            .modify(|_, w| w.tx_fifo_rst().set_bit());
 
         self.i2c
-            .fifo_conf
+            .fifo_conf()
             .modify(|_, w| w.tx_fifo_rst().clear_bit());
 
-        self.i2c.fifo_conf.modify(|_, w| w.rx_fifo_rst().set_bit());
+        self.i2c
+            .fifo_conf()
+            .modify(|_, w| w.rx_fifo_rst().set_bit());
 
         self.i2c
-            .fifo_conf
+            .fifo_conf()
             .modify(|_, w| w.rx_fifo_rst().clear_bit());
 
-        // self.i2c.int_clr.write(|w| {
+        // self.i2c.int_clr().write(|w| {
         //     w.rxfifo_wm_int_clr()
         //         .set_bit()
         //         .txfifo_wm_int_clr()
@@ -688,25 +494,25 @@ impl<'d> I2C {
 
     fn wait_for_completion(&self) -> Result<(), Error> {
         loop {
-            let interrupts = self.i2c.int_status.read();
+            let interrupts = self.i2c.int_status().read();
 
             // Handle completion cases
             // A full transmission was completed
             if interrupts.nack_int_st().bit_is_set() {
                 self.i2c
-                    .int_clr
+                    .int_clr()
                     .write(|w| unsafe { w.bits(I2C_LL_INTR_MASK) });
                 return Err(Error::InvalidResponse);
             } else if interrupts.trans_complete_int_st().bit_is_set() {
                 self.disable_interrupts();
 
                 self.i2c
-                    .int_clr
+                    .int_clr()
                     .write(|w| unsafe { w.bits(I2C_LL_INTR_MASK) });
                 break;
             } else if interrupts.end_detect_int_st().bit_is_set() {
                 self.i2c
-                    .int_clr
+                    .int_clr()
                     .write(|w| unsafe { w.bits(I2C_LL_INTR_MASK) });
                 break;
             }
@@ -728,7 +534,7 @@ impl<'d> I2C {
     }
 
     fn check_errors(&self) -> Result<(), Error> {
-        let interrupts = self.i2c.int_raw.read();
+        let interrupts = self.i2c.int_raw().read();
         // Handle error cases
         if interrupts.time_out_int_raw().bit_is_set() {
             self.reset();
@@ -748,10 +554,10 @@ impl<'d> I2C {
     fn reset(&self) {
         // Reset interrupts
         // Disable all I2C interrupts
-        self.i2c.int_ena.write(|w| unsafe { w.bits(0) });
+        self.i2c.int_ena().write(|w| unsafe { w.bits(0) });
         // Clear all I2C interrupts
         self.i2c
-            .int_clr
+            .int_clr()
             .write(|w| unsafe { w.bits(I2C_LL_INTR_MASK) });
 
         // Reset fifo
@@ -761,34 +567,38 @@ impl<'d> I2C {
         self.reset_command_list();
 
         // Reset the FSM
-        self.i2c.ctr.modify(|_, w| w.fsm_rst().set_bit());
+        self.i2c.ctr().modify(|_, w| w.fsm_rst().set_bit());
     }
 
-    fn enable_interrupts(&self) {
+    fn enable_interrupts(&self, mask: u32) {
         self.i2c
-            .int_ena
-            .write(|w| unsafe { w.bits(I2C_LL_INTR_MASK) });
+            .int_ena()
+            .write(|w| unsafe { w.bits(mask) });
     }
 
     fn disable_interrupts(&self) {
-        self.i2c.int_ena.write(|w| unsafe { w.bits(0) });
+        self.i2c.int_ena().write(|w| unsafe { w.bits(0) });
     }
 
     fn reset_command_list(&self) {
-        self.i2c.comd0.reset();
-        self.i2c.comd1.reset();
-        self.i2c.comd2.reset();
-        self.i2c.comd3.reset();
-        self.i2c.comd4.reset();
-        self.i2c.comd5.reset();
-        self.i2c.comd6.reset();
-        self.i2c.comd7.reset();
+        self.i2c.comd0().reset();
+        self.i2c.comd1().reset();
+        self.i2c.comd2().reset();
+        self.i2c.comd3().reset();
+        self.i2c.comd4().reset();
+        self.i2c.comd5().reset();
+        self.i2c.comd6().reset();
+        self.i2c.comd7().reset();
     }
 
     fn write_fifo(&self, data: u8) {
         self.i2c
-            .data
-            .modify(|_, w| unsafe { w.fifo_rdata().bits(data.into()) });
+            .data()
+            .write(|w| unsafe { w.fifo_rdata().bits(data) });
+    }
+
+    fn read_fifo(&self) -> u8 {
+        self.i2c.data().read().fifo_rdata().bits()
     }
 
     fn add_cmd_lp(
@@ -799,42 +609,42 @@ impl<'d> I2C {
         match *command_register {
             CommandRegister::COMD0 => {
                 self.i2c
-                    .comd0
+                    .comd0()
                     .write(|w| unsafe { w.command0().bits(command.into()) });
             }
             CommandRegister::COMD1 => {
                 self.i2c
-                    .comd1
+                    .comd1()
                     .write(|w| unsafe { w.command1().bits(command.into()) });
             }
             CommandRegister::COMD2 => {
                 self.i2c
-                    .comd2
+                    .comd2()
                     .write(|w| unsafe { w.command2().bits(command.into()) });
             }
             CommandRegister::COMD3 => {
                 self.i2c
-                    .comd3
+                    .comd3()
                     .write(|w| unsafe { w.command3().bits(command.into()) });
             }
             CommandRegister::COMD4 => {
                 self.i2c
-                    .comd4
+                    .comd4()
                     .write(|w| unsafe { w.command4().bits(command.into()) });
             }
             CommandRegister::COMD5 => {
                 self.i2c
-                    .comd5
+                    .comd5()
                     .write(|w| unsafe { w.command5().bits(command.into()) });
             }
             CommandRegister::COMD6 => {
                 self.i2c
-                    .comd6
+                    .comd6()
                     .write(|w| unsafe { w.command6().bits(command.into()) });
             }
             CommandRegister::COMD7 => {
                 self.i2c
-                    .comd7
+                    .comd7()
                     .write(|w| unsafe { w.command7().bits(command.into()) });
             }
         }
@@ -843,7 +653,7 @@ impl<'d> I2C {
     }
 }
 
-impl embedded_hal::blocking::i2c::Read for I2C {
+impl embedded_hal::blocking::i2c::Read for LpI2c {
     type Error = Error;
 
     fn read(&mut self, address: u8, buffer: &mut [u8]) -> Result<(), Self::Error> {
@@ -851,7 +661,7 @@ impl embedded_hal::blocking::i2c::Read for I2C {
     }
 }
 
-impl embedded_hal::blocking::i2c::Write for I2C {
+impl embedded_hal::blocking::i2c::Write for LpI2c {
     type Error = Error;
 
     fn write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Self::Error> {
@@ -859,7 +669,7 @@ impl embedded_hal::blocking::i2c::Write for I2C {
     }
 }
 
-impl embedded_hal::blocking::i2c::WriteRead for I2C {
+impl embedded_hal::blocking::i2c::WriteRead for LpI2c {
     type Error = Error;
 
     fn write_read(

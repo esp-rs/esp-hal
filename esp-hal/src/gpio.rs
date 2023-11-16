@@ -40,11 +40,11 @@ pub const NO_PIN: Option<NoPinType> = None;
 
 #[derive(Copy, Clone)]
 pub enum Event {
-    RisingEdge = 1,
+    RisingEdge  = 1,
     FallingEdge = 2,
-    AnyEdge = 3,
-    LowLevel = 4,
-    HighLevel = 5,
+    AnyEdge     = 3,
+    LowLevel    = 4,
+    HighLevel   = 5,
 }
 
 pub struct Unknown {}
@@ -137,7 +137,7 @@ pub struct AF1;
 pub struct AF2;
 
 pub enum DriveStrength {
-    I5mA = 0,
+    I5mA  = 0,
     I10mA = 1,
     I20mA = 2,
     I40mA = 3,
@@ -155,7 +155,7 @@ pub enum AlternateFunction {
 
 #[derive(PartialEq)]
 pub enum RtcFunction {
-    Rtc = 0,
+    Rtc     = 0,
     Digital = 1,
 }
 
@@ -1170,7 +1170,7 @@ where
 
     /// Configures the pin to operate as an push pull output pin
     pub fn into_push_pull_output(self) -> GpioPin<Output<PushPull>, GPIONUM> {
-        self.init_output(GPIO_FUNCTION, false);
+        self.init_output(GPIO_FUNCTION, true); // TODO: hardcoded open_drain bool !!!!
         GpioPin { _mode: PhantomData }
     }
 
@@ -2741,10 +2741,25 @@ pub mod rtc_io {
         pub fn into_puinput_ppoutput(self) -> LowPowerPin<InOut, PIN> {
             self.into_pull_up_input();
             self.into_push_pull_output();
+            use crate::peripherals::GPIO;
+
+            let gpio = unsafe { &*GPIO::PTR };
+
+            gpio.pin(PIN).modify(|_, w| w.pad_driver().bit(true));
+            self.pulldown_enable(false);
+
             LowPowerPin {
                 private: PhantomData::default(),
             }
         }
+
+        // pub fn into_odinput_odoutput(self) -> LowPowerPin<InOut<OpenDrain>, PIN> {
+        //     self.into_open_drain_input();
+        //     self.into_open_drain_output();
+        //     LowPowerPin {
+        //         private: PhantomData::default(),
+        //     }
+        // }
     }
 
     #[cfg(esp32s3)]
@@ -2797,7 +2812,7 @@ pub mod lp_gpio {
 
     use core::marker::PhantomData;
 
-    use super::{Floating, InOut, Input, Output, PullDown, PullUp, PushPull, Unknown};
+    use super::{Floating, InOut, Input, OpenDrain, Output, PullDown, PullUp, PushPull, Unknown};
 
     /// A GPIO pin configured for low power operation
     pub struct LowPowerPin<MODE, const PIN: u8> {
@@ -2892,11 +2907,27 @@ pub mod lp_gpio {
         }
 
         pub fn into_puinput_ppoutput(self) -> LowPowerPin<InOut, PIN> {
+            use crate::peripherals::GPIO;
+
+            let gpio = unsafe { &*GPIO::PTR };
+
+            gpio.pin(PIN as usize)
+                .modify(|_, w| w.pad_driver().bit(true));
+            self.pulldown_enable(false);
             self.into_pull_up_input().into_push_pull_output();
+
             LowPowerPin {
                 private: PhantomData::default(),
             }
         }
+
+        // pub fn into_odinput_odoutput(self) -> LowPowerPin<InOut<OpenDrain>, PIN> {
+        //     self.into_open_drain_input();
+        //     self.into_open_drain_output();
+        //     LowPowerPin {
+        //         private: PhantomData::default(),
+        //     }
+        // }
     }
 
     pub(crate) fn init_low_power_pin(pin: u8) {
