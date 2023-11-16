@@ -95,7 +95,7 @@ fn main() -> Result<(), String> {
             .next()
             .unwrap();
 
-        let mut version = version.split('.');
+        let mut version = version.trim_start_matches('v').split('.');
 
         let major = version.next().unwrap().parse::<u32>().unwrap();
         let minor = version.next().unwrap().parse::<u32>().unwrap();
