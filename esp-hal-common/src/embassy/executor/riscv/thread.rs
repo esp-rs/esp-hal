@@ -17,7 +17,7 @@ static SIGNAL_WORK_THREAD_MODE: [AtomicBool; 1] = [AtomicBool::new(false)];
 #[cfg(multi_core)]
 compile_error!("Multi-core RISCV is not supported yet");
 
-pub(super) fn pend_thread_mode(core: usize) {
+pub(crate) fn pend_thread_mode(core: usize) {
     SIGNAL_WORK_THREAD_MODE[core].store(true, Ordering::SeqCst);
 }
 

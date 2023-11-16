@@ -36,7 +36,7 @@ fn FROM_CPU_INTR0() {
     }
 }
 
-pub(super) fn pend_thread_mode(core: usize) {
+pub(crate) fn pend_thread_mode(core: usize) {
     // Signal that there is work to be done.
     SIGNAL_WORK_THREAD_MODE[core].store(true, Ordering::SeqCst);
 
