@@ -146,6 +146,8 @@ jobs:
         run: cd esp32c2-hal/ && cargo +nightly check --example=embassy_hello_world --features=embassy,embassy-time-timg0,embassy-executor-thread
       - name: check esp32c2-hal (async, gpio)
         run: cd esp32c2-hal/ && cargo +nightly check --example=embassy_wait --features=embassy,embassy-time-systick,embassy-executor-thread,async
+      - name: check esp32c2-hal (async, multiprio)
+        run: cd esp32c2-hal/ && cargo +nightly check --example=embassy_multiprio --features=embassy,embassy-time-systick,embassy-executor-thread,embassy-executor-interrupt
       - name: check esp32c2-hal (async, spi)
         run: cd esp32c2-hal/ && cargo +nightly check --example=embassy_spi --features=embassy,embassy-time-systick,embassy-executor-thread,async
       - name: check esp32c2-hal (async, serial)
@@ -194,6 +196,8 @@ jobs:
         run: cd esp32c3-hal/ && cargo +nightly check --example=embassy_hello_world --features=embassy,embassy-time-timg0,embassy-executor-thread
       - name: check esp32c3-hal (async, gpio)
         run: cd esp32c3-hal/ && cargo +nightly check --example=embassy_wait --features=embassy,embassy-time-systick,embassy-executor-thread,async
+      - name: check esp32c3-hal (async, multiprio)
+        run: cd esp32c3-hal/ && cargo +nightly check --example=embassy_multiprio --features=embassy,embassy-time-systick,embassy-executor-thread,embassy-executor-interrupt
       - name: check esp32c3-hal (async, spi)
         run: cd esp32c3-hal/ && cargo +nightly check --example=embassy_spi --features=embassy,embassy-time-systick,embassy-executor-thread,async
       - name: check esp32c3-hal (async, serial)
@@ -251,6 +255,8 @@ jobs:
         run: cd esp32c6-hal/ && cargo +nightly check --example=embassy_hello_world --features=embassy,embassy-time-timg0,embassy-executor-thread
       - name: check esp32c6-hal (async, gpio)
         run: cd esp32c6-hal/ && cargo +nightly check --example=embassy_wait --features=embassy,embassy-time-systick,embassy-executor-thread,async
+      - name: check esp32c6-hal (async, multiprio)
+        run: cd esp32c6-hal/ && cargo +nightly check --example=embassy_multiprio --features=embassy,embassy-time-systick,embassy-executor-thread,embassy-executor-interrupt
       - name: check esp32c6-hal (async, spi)
         run: cd esp32c6-hal/ && cargo +nightly check --example=embassy_spi --features=embassy,embassy-time-systick,embassy-executor-thread,async
       - name: check esp32c6-hal (async, serial)
@@ -321,6 +327,8 @@ jobs:
         run: cd esp32h2-hal/ && cargo +nightly check --example=embassy_hello_world --features=embassy,embassy-time-timg0,embassy-executor-thread
       - name: check esp32h2-hal (async, gpio)
         run: cd esp32h2-hal/ && cargo +nightly check --example=embassy_wait --features=embassy,embassy-time-systick,embassy-executor-thread,async
+      - name: check esp32h2-hal (async, multiprio)
+        run: cd esp32h2-hal/ && cargo +nightly check --example=embassy_multiprio --features=embassy,embassy-time-systick,embassy-executor-thread,embassy-executor-interrupt
       - name: check esp32h2-hal (async, spi)
         run: cd esp32h2-hal/ && cargo +nightly check --example=embassy_spi --features=embassy,embassy-time-systick,embassy-executor-thread,async
       - name: check esp32h2-hal (async, serial)
