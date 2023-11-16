@@ -56,7 +56,7 @@ p256               = { version = "0.13.2", default-features = false, features = 
 embassy-sync       = "0.4.0"
 
 [features]
-default              = ["rt", "vectored", "zero-rtc-bss"]
+default              = ["rt", "vectored", "zero-rtc-bss", "embassy-integrated-timers"]
 async                = ["esp-hal-common/async"]
 debug                = ["esp-hal-common/debug"]
 defmt                = ["esp-hal-common/defmt", "esp-println/defmt"]
@@ -80,6 +80,14 @@ embassy-time-timg0         = ["esp-hal-common/embassy-time-timg0",   "embassy-ti
 embassy-executor-interrupt = ["esp-hal-common/embassy-executor-interrupt"]
 embassy-executor-thread    = ["esp-hal-common/embassy-executor-thread"]
 
+# prefer integrated timers, but allow using the generic queue if needed
+embassy-integrated-timers = ["esp-hal-common/embassy-integrated-timers"]
+embassy-generic-queue-8   = ["esp-hal-common/embassy-generic-queue-8"]
+embassy-generic-queue-16  = ["esp-hal-common/embassy-generic-queue-16"]
+embassy-generic-queue-32  = ["esp-hal-common/embassy-generic-queue-32"]
+embassy-generic-queue-64  = ["esp-hal-common/embassy-generic-queue-64"]
+embassy-generic-queue-128 = ["esp-hal-common/embassy-generic-queue-128"]
+
 [profile.release]
 debug = true
 
@@ -97,7 +105,7 @@ required-features = ["embassy", "embassy-executor-thread"]
 
 [[example]]
 name              = "embassy_multiprio"
-required-features = ["embassy", "embassy-executor-thread", "embassy-executor-interrupt", "embassy-time-systick"] # FIXME the example needs multiple alarms which only systick can provide at this point
+required-features = ["embassy", "embassy-executor-thread", "embassy-executor-interrupt"]
 
 [[example]]
 name              = "embassy_wait"

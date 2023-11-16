@@ -50,7 +50,7 @@ ssd1306            = "0.8.4"
 static_cell        = { version = "2.0.0", features = ["nightly"] }
 
 [features]
-default            = ["rt", "vectored", "xtal-40mhz"]
+default            = ["rt", "vectored", "xtal-40mhz", "embassy-integrated-timers"]
 async              = ["esp-hal-common/async"]
 bluetooth          = []
 debug              = ["esp-hal-common/debug"]
@@ -68,6 +68,14 @@ embassy                    = ["esp-hal-common/embassy"]
 embassy-time-timg0         = ["esp-hal-common/embassy-time-timg0", "embassy-time/tick-hz-1_000_000"]
 embassy-executor-thread    = ["esp-hal-common/embassy-executor-thread"]
 embassy-executor-interrupt = ["esp-hal-common/embassy-executor-interrupt"]
+
+# prefer integrated timers, but allow using the generic queue if needed
+embassy-integrated-timers = ["esp-hal-common/embassy-integrated-timers"]
+embassy-generic-queue-8   = ["esp-hal-common/embassy-generic-queue-8"]
+embassy-generic-queue-16  = ["esp-hal-common/embassy-generic-queue-16"]
+embassy-generic-queue-32  = ["esp-hal-common/embassy-generic-queue-32"]
+embassy-generic-queue-64  = ["esp-hal-common/embassy-generic-queue-64"]
+embassy-generic-queue-128 = ["esp-hal-common/embassy-generic-queue-128"]
 
 # PSRAM support
 psram     = []
