@@ -1,13 +1,8 @@
-#[cfg(riscv)]
-pub use riscv::*;
-#[cfg(xtensa)]
-pub use xtensa::*;
+#[cfg(feature = "embassy-executor-thread")]
+pub mod thread;
 
-#[cfg(riscv)]
-mod riscv;
-
-#[cfg(xtensa)]
-mod xtensa;
+#[cfg(feature = "embassy-executor-thread")]
+pub use thread::*;
 
 #[cfg(feature = "embassy-executor-interrupt")]
 pub mod interrupt;
