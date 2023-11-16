@@ -25,10 +25,9 @@ fn __pender(context: *mut ()) {
             match context[0] {
                 #[cfg(feature = "embassy-executor-thread")]
                 0 => pend_thread_mode(context[1] as usize),
-                1 => FromCpu0::pend(),
-                2 => FromCpu1::pend(),
-                3 => FromCpu2::pend(),
-                4 => FromCpu3::pend(),
+                1 => FromCpu1::pend(),
+                2 => FromCpu2::pend(),
+                3 => FromCpu3::pend(),
                 _ => {}
             }
         } else {

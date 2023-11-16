@@ -53,7 +53,7 @@ macro_rules! from_cpu {
                 }
 
                 fn number() -> usize {
-                    $swi as usize + 1
+                    $swi as usize
                 }
 
                 fn pend() {
@@ -68,7 +68,8 @@ macro_rules! from_cpu {
     };
 }
 
-from_cpu!(0, SoftwareInterrupt::SoftwareInterrupt0);
+// from_cpu!(0, SoftwareInterrupt::SoftwareInterrupt0); // reserve SI0 for
+// thread mode & multi-core
 from_cpu!(1, SoftwareInterrupt::SoftwareInterrupt1);
 from_cpu!(2, SoftwareInterrupt::SoftwareInterrupt2);
 from_cpu!(3, SoftwareInterrupt::SoftwareInterrupt3);
