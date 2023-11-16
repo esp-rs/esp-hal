@@ -310,7 +310,7 @@ pub enum InternalWifiError {
     EspErrWifiTxDisallow = 0x3016,
 }
 
-#[cfg(all(coex, any(esp32, esp32c3, esp32c6, esp32s3)))]
+#[cfg(all(coex, any(esp32, esp32c2, esp32c3, esp32c6, esp32s3)))]
 static mut G_COEX_ADAPTER_FUNCS: coex_adapter_funcs_t = coex_adapter_funcs_t {
     _version: include::COEX_ADAPTER_VERSION as i32,
     _task_yield_from_isr: Some(task_yield_from_isr),
@@ -339,6 +339,9 @@ static mut G_COEX_ADAPTER_FUNCS: coex_adapter_funcs_t = coex_adapter_funcs_t {
     _int_disable: Some(wifi_int_disable),
     #[cfg(esp32)]
     _int_enable: Some(wifi_int_restore),
+
+    #[cfg(esp32c2)]
+    _slowclk_cal_get: Some(slowclk_cal_get),
 };
 
 #[cfg(coex)]

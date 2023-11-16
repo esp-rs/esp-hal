@@ -25,6 +25,7 @@ pub(crate) unsafe extern "C" fn malloc(size: u32) -> *mut crate::binary::c_types
     crate::compat::malloc::malloc(size as usize).cast()
 }
 
+#[cfg(any(esp32, esp32c3, esp32s3))]
 pub(crate) unsafe extern "C" fn malloc_internal(size: u32) -> *mut crate::binary::c_types::c_void {
     crate::compat::malloc::malloc(size as usize).cast()
 }

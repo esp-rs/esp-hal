@@ -20,12 +20,12 @@ use esp_wifi::{
 
 use embedded_io::*;
 use embedded_svc::ipv4::Interface;
-use embedded_svc::wifi::{AccessPointInfo, ClientConfiguration, Configuration, Wifi};
+use embedded_svc::wifi::{ClientConfiguration, Configuration, Wifi};
 
 use esp_backtrace as _;
 use esp_println::{print, println};
 use esp_wifi::initialize;
-use esp_wifi::wifi::{utils::create_network_interface, WifiError};
+use esp_wifi::wifi::utils::create_network_interface;
 use hal::{clock::ClockControl, Rng};
 use hal::{peripherals::Peripherals, prelude::*};
 use smoltcp::{iface::SocketStorage, wire::IpAddress, wire::Ipv4Address};
@@ -59,7 +59,7 @@ fn main() -> ! {
     let wifi = peripherals.WIFI;
     let bluetooth = peripherals.BT;
 
-    let mut socket_set_entries: [SocketStorage; 3] = Default::default();
+    let mut socket_set_entries: [SocketStorage; 2] = Default::default();
     let (iface, device, mut controller, sockets) =
         create_network_interface(&init, wifi, WifiStaDevice, &mut socket_set_entries).unwrap();
     let wifi_stack = WifiStack::new(iface, device, sockets, current_millis);
@@ -74,15 +74,6 @@ fn main() -> ! {
 
     controller.start().unwrap();
     println!("is wifi started: {:?}", controller.is_started());
-
-    println!("Start Wifi Scan");
-    let res: Result<(heapless::Vec<AccessPointInfo, 10>, usize), WifiError> = controller.scan_n();
-    if let Ok((res, _count)) = res {
-        for ap in res {
-            println!("{:?}", ap);
-        }
-    }
-
     println!("{:?}", controller.get_capabilities());
     println!("wifi_connect {:?}", controller.connect());
 
@@ -138,8 +129,8 @@ fn main() -> ! {
 
     println!("Start busy loop on main");
 
-    let mut rx_buffer = [0u8; 1536];
-    let mut tx_buffer = [0u8; 1536];
+    let mut rx_buffer = [0u8; 128];
+    let mut tx_buffer = [0u8; 128];
     let mut socket = wifi_stack.get_socket(&mut rx_buffer, &mut tx_buffer);
 
     loop {
@@ -157,7 +148,7 @@ fn main() -> ! {
 
         let wait_end = current_millis() + 20 * 1000;
         loop {
-            let mut buffer = [0u8; 512];
+            let mut buffer = [0u8; 128];
             if let Ok(len) = socket.read(&mut buffer) {
                 let to_print = unsafe { core::str::from_utf8_unchecked(&buffer[..len]) };
                 print!("{}", to_print);
