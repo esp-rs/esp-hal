@@ -17,16 +17,14 @@ impl RadioClockController for RadioClockControl {
     fn enable(&mut self, peripheral: RadioPeripherals) {
         match peripheral {
             RadioPeripherals::Phy => enable_phy(),
-            RadioPeripherals::Bt => todo!("BLE not yet supported"),
-            RadioPeripherals::Ieee802154 => ieee802154_clock_enable(),
+            RadioPeripherals::Bt | RadioPeripherals::Ieee802154 => ble_ieee802154_clock_enable(),
         }
     }
 
     fn disable(&mut self, peripheral: RadioPeripherals) {
         match peripheral {
             RadioPeripherals::Phy => disable_phy(),
-            RadioPeripherals::Bt => todo!("BLE not yet supported"),
-            RadioPeripherals::Ieee802154 => ieee802154_clock_disable(),
+            RadioPeripherals::Bt | RadioPeripherals::Ieee802154 => ble_ieee802154_clock_disable(),
         }
     }
 
@@ -59,7 +57,7 @@ fn disable_phy() {
         .modify(|_, w| w.clk_i2c_mst_en().clear_bit());
 }
 
-fn ieee802154_clock_enable() {
+fn ble_ieee802154_clock_enable() {
     let modem_lpcon = unsafe { &*esp32h2::MODEM_LPCON::PTR };
     let modem_syscon = unsafe { &*esp32h2::MODEM_SYSCON::PTR };
 
@@ -89,7 +87,7 @@ fn ieee802154_clock_enable() {
         .modify(|_, w| w.clk_coex_en().set_bit());
 }
 
-fn ieee802154_clock_disable() {
+fn ble_ieee802154_clock_disable() {
     let modem_lpcon = unsafe { &*esp32h2::MODEM_LPCON::PTR };
     let modem_syscon = unsafe { &*esp32h2::MODEM_SYSCON::PTR };
 
