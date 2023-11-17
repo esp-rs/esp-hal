@@ -1,7 +1,6 @@
 //! This shows how to read and write text via USB Serial/JTAG using embassy.
 //! You need to connect via the Serial/JTAG interface to see any output.
 //! Most dev-kits use a USB-UART-bridge - in that case you won't see any output.
-//! This will work with the ESP32-C3-DevKit-RUST-1
 
 #![no_std]
 #![no_main]
@@ -9,7 +8,7 @@
 
 use embassy_executor::Spawner;
 use embedded_io_async::{Read as AsyncRead, Write as AsyncWrite};
-use esp32c3_hal::{
+use esp32c6_hal::{
     clock::ClockControl,
     embassy,
     interrupt,
@@ -29,13 +28,13 @@ async fn main(_spawner: Spawner) -> ! {
     #[cfg(feature = "embassy-time-systick")]
     embassy::init(
         &clocks,
-        esp32c3_hal::systimer::SystemTimer::new(peripherals.SYSTIMER),
+        esp32c6_hal::systimer::SystemTimer::new(peripherals.SYSTIMER),
     );
 
     #[cfg(feature = "embassy-time-timg0")]
     embassy::init(
         &clocks,
-        esp32c3_hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks).timer0,
+        esp32c6_hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks).timer0,
     );
 
     interrupt::enable(
