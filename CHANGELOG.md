@@ -87,6 +87,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A macro to make it easier to create DMA buffers and descriptors (#935)
 - I2C timeout is configurable (#1011)
 - ESP32-C6/ESP32-H2: `flip-link` feature gives zero-cost stack overflow protection (#1008)
+- Added async support for TWAI
 
 ### Changed
 
@@ -101,6 +102,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated to latest release candidate (`1.0.0-rc.2`) for `embedded-hal{-async,-nb}` (#994)
 - Explicit panic when hitting the `DefaultHandler` (#1005)
 - Relevant interrupts are now auto enabled in `embassy::init` (#1014).
+- Set up interrupts for the DMA and async enabled peripherals only when `async` feature is provided (#1042)
+- S2 / S3: Don't require GPIO 18 to create a USB peripheral driver instance (#990)
+- Added inherent implementations for TWAI transmit and receive
 
 ### Fixed
 
