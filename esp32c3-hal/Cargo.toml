@@ -132,5 +132,9 @@ name              = "embassy_i2s_read"
 required-features = ["embassy", "async"]
 
 [[example]]
+name              = "embassy_usb_serial_jtag"
+required-features = ["embassy", "async"]
+
+[[example]]
 name = "direct-vectoring"
 required-features = ["direct-vectoring"]

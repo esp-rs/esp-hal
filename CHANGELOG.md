@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Derive `Clone` and `Copy` for `EspTwaiFrame` (#914)
 - A way to configure inverted pins (#912)
 - Added API to check a GPIO-pin's interrupt status bit (#929)
+- A `embedded_io_async::Read` implementation for `UsbSerialJtag` (#889)
 
 ### Changed
 
