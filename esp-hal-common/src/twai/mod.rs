@@ -269,7 +269,7 @@ pub struct TwaiConfiguration<'d, T> {
 
 impl<'d, T> TwaiConfiguration<'d, T>
 where
-    T: ConfigurationInstance,
+    T: Instance,
 {
     pub fn new<TX: OutputPin, RX: InputPin>(
         _peripheral: impl Peripheral<P = T> + 'd,
@@ -636,9 +636,7 @@ pub trait Instance {
     const OUTPUT_SIGNAL: OutputSignal;
 
     fn register_block() -> &'static RegisterBlock;
-}
 
-pub trait ConfigurationInstance: Instance {
     fn enable_peripheral();
 }
 
@@ -799,10 +797,7 @@ impl Instance for crate::peripherals::TWAI0 {
     fn register_block() -> &'static RegisterBlock {
         unsafe { &*crate::peripherals::TWAI0::PTR }
     }
-}
 
-#[cfg(any(esp32c3, esp32s3))]
-impl ConfigurationInstance for crate::peripherals::TWAI0 {
     fn enable_peripheral() {
         PeripheralClockControl::enable(crate::system::Peripheral::Twai0);
     }
@@ -823,10 +818,7 @@ impl Instance for crate::peripherals::TWAI0 {
     fn register_block() -> &'static RegisterBlock {
         unsafe { &*crate::peripherals::TWAI0::PTR }
     }
-}
 
-#[cfg(esp32c6)]
-impl ConfigurationInstance for crate::peripherals::TWAI0 {
     fn enable_peripheral() {
         PeripheralClockControl::enable(crate::system::Peripheral::Twai0);
     }
@@ -848,13 +840,6 @@ impl Instance for crate::peripherals::TWAI1 {
         unsafe { &*crate::peripherals::TWAI1::PTR }
     }
 
-    fn enable_peripheral() {
-        PeripheralClockControl::enable(crate::system::Peripheral::Twai1);
-    }
-}
-
-#[cfg(esp32c6)]
-impl ConfigurationInstance for crate::peripherals::TWAI1 {
     fn enable_peripheral() {
         PeripheralClockControl::enable(crate::system::Peripheral::Twai1);
     }
