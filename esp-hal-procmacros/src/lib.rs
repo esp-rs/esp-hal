@@ -51,7 +51,7 @@
 //!
 //! ```no_run
 //! #[main]
-//! async fn main(spawner: Spawner) -> ! {
+//! async fn main(spawner: Spawner) {
 //!     // Your application's entry point
 //! }
 //! ```
