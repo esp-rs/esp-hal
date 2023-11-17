@@ -88,6 +88,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - I2C timeout is configurable (#1011)
 - ESP32-C6/ESP32-H2: `flip-link` feature gives zero-cost stack overflow protection (#1008)
 - Added async support for TWAI
+- Added async support for TWAI (#951)
 
 ### Changed
 
@@ -105,6 +106,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Set up interrupts for the DMA and async enabled peripherals only when `async` feature is provided (#1042)
 - S2 / S3: Don't require GPIO 18 to create a USB peripheral driver instance (#990)
 - Added inherent implementations for TWAI transmit and receive
+- Added inherent `transmit` and `receive` methods for `Twai`. `embedded-hal` `Can` trait is no longer needed in scope. (#951)
 
 ### Fixed
 
