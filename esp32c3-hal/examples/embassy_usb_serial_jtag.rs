@@ -50,12 +50,13 @@ async fn main(_spawner: Spawner) -> ! {
 
         match AsyncRead::read(&mut usb_serial, &mut read_buf).await {
             Ok(n) => {
-                AsyncWrite::write(&mut usb_serial, "echo: ".as_bytes())
+                AsyncWrite::write_all(&mut usb_serial, b"echo: ")
                     .await
                     .unwrap();
-                AsyncWrite::write(&mut usb_serial, &read_buf[..n])
+                AsyncWrite::write_all(&mut usb_serial, &read_buf[..n])
                     .await
                     .unwrap();
+                AsyncWrite::write_all(&mut usb_serial, b"\n").await.unwrap();
             }
             Err(e) => esp_println::println!("error: {e}"),
         }
