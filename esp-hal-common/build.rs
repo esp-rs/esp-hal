@@ -26,10 +26,15 @@ macro_rules! assert_unique_features {
 
 // Given some features, assert that AT LEAST one of the features is enabled.
 macro_rules! assert_used_features {
-    ( $($all:tt),* ) => {
+    ( $all:tt ) => {
+        #[cfg(not(feature = $all))]
+        compile_error!(concat!("The feature flag must be provided: ", $all));
+    };
+
+    ( $($all:tt),+ ) => {
         #[cfg(not(any($(feature = $all),*)))]
         compile_error!(concat!("One of the feature flags must be provided: ", $($all, ", "),*));
-    }
+    };
 }
 
 // Given some features, assert that EXACTLY one of the features is enabled.
@@ -113,6 +118,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     // is available:
     #[cfg(feature = "embassy")]
     {
+        #[cfg(feature = "esp32")]
+        assert_unique_used_features!("embassy-time-timg0");
+
+        #[cfg(not(feature = "esp32"))]
         assert_unique_used_features!("embassy-time-systick", "embassy-time-timg0");
     }
 
