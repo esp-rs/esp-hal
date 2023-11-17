@@ -92,7 +92,7 @@ jobs:
           cargo check --example=embassy_hello_world --features=embassy,embassy-time-timg0,embassy-executor-thread
           cargo check --example=embassy_multicore --features=embassy,embassy-time-timg0,embassy-executor-thread
           cargo check --example=embassy_multicore_interrupt --features=embassy,embassy-time-timg0,embassy-executor-interrupt
-          cargo check --example=embassy_multiprio --features=embassy,embassy-time-timg0,embassy-executor-interrupt
+          cargo check --example=embassy_multiprio --features=embassy,embassy-time-timg0,embassy-executor-thread,embassy-executor-interrupt
       - name: check esp32-hal (embassy, async)
         run: |
           cd esp32-hal/
@@ -408,12 +408,12 @@ jobs:
         run: |
           cd esp32s2-hal/
           cargo +esp check --example=embassy_hello_world --features=embassy,embassy-time-timg0,embassy-executor-thread
-          cargo +esp check --example=embassy_multiprio --features=embassy,embassy-time-timg0,embassy-executor-interrupt
+          cargo +esp check --example=embassy_multiprio --features=embassy,embassy-time-timg0,embassy-executor-thread,embassy-executor-interrupt
       - name: check esp32s2-hal (embassy, systick)
         run: |
           cd esp32s2-hal/
           cargo +esp check --example=embassy_hello_world --features=embassy,embassy-time-systick,embassy-executor-thread
-          cargo +esp check --example=embassy_multiprio --features=embassy,embassy-time-systick,embassy-executor-interrupt
+          cargo +esp check --example=embassy_multiprio --features=embassy,embassy-time-systick,embassy-executor-thread,embassy-executor-interrupt
       - name: check esp32s2-hal (embassy, timg0, async)
         run: |
           cd esp32s2-hal/
@@ -484,14 +484,14 @@ jobs:
           cargo +esp check --example=embassy_hello_world --features=embassy,embassy-time-timg0,embassy-executor-thread
           cargo +esp check --example=embassy_multicore --features=embassy,embassy-time-timg0,embassy-executor-thread
           cargo +esp check --example=embassy_multicore_interrupt --features=embassy,embassy-time-timg0,embassy-executor-interrupt
-          cargo +esp check --example=embassy_multiprio --features=embassy,embassy-time-timg0,embassy-executor-interrupt
+          cargo +esp check --example=embassy_multiprio --features=embassy,embassy-time-timg0,embassy-executor-thread,embassy-executor-interrupt
       - name: check esp32s3-hal (embassy, systick)
         run: |
           cd esp32s3-hal/
           cargo +esp check --example=embassy_hello_world --features=embassy,embassy-time-systick,embassy-executor-thread
           cargo +esp check --example=embassy_multicore --features=embassy,embassy-time-systick,embassy-executor-thread
           cargo +esp check --example=embassy_multicore_interrupt --features=embassy,embassy-time-systick,embassy-executor-interrupt
-          cargo +esp check --example=embassy_multiprio --features=embassy,embassy-time-systick,embassy-executor-interrupt
+          cargo +esp check --example=embassy_multiprio --features=embassy,embassy-time-systick,embassy-executor-thread,embassy-executor-interrupt
       - name: check esp32s3-hal (embassy, timg0, async)
         run: |
           cd esp32s3-hal/
