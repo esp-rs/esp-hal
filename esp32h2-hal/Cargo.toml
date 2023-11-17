@@ -140,3 +140,7 @@ required-features = ["embassy", "async"]
 [[example]]
 name              = "embassy_parl_io_rx"
 required-features = ["embassy", "async"]
+
+[[example]]
+name              = "embassy_usb_serial_jtag"
+required-features = ["embassy", "async"]
