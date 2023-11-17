@@ -57,7 +57,7 @@ embassy-sync       = "0.4.0"
 icm42670 = "0.1.1"
 
 [features]
-default              = ["rt", "vectored", "esp-hal-common/rv-zero-rtc-bss"]
+default              = ["rt", "vectored", "zero-rtc-bss"]
 async                = ["esp-hal-common/async"]
 debug                = ["esp-hal-common/debug"]
 defmt                = ["esp-hal-common/defmt", "esp-println/defmt"]
@@ -65,10 +65,14 @@ direct-vectoring     = ["esp-hal-common/direct-vectoring"]
 eh1                  = ["esp-hal-common/eh1"]
 interrupt-preemption = ["esp-hal-common/interrupt-preemption"]
 log                  = ["esp-hal-common/log", "esp-println/log"]
-mcu-boot             = []
 rt                   = []
 ufmt                 = ["esp-hal-common/ufmt"]
 vectored             = ["esp-hal-common/vectored"]
+
+# Initialize / clear data sections and RTC memory
+zero-rtc-bss         = ["esp-hal-common/rv-zero-rtc-bss"]
+init-data            = ["esp-hal-common/rv-init-data"]
+init-rtc-data        = ["esp-hal-common/rv-init-rtc-data"]
 
 # Embassy support
 embassy              = ["esp-hal-common/embassy"]
@@ -127,6 +131,10 @@ required-features = ["embassy", "async"]
 
 [[example]]
 name              = "embassy_i2s_read"
+required-features = ["embassy", "async"]
+
+[[example]]
+name              = "embassy_usb_serial_jtag"
 required-features = ["embassy", "async"]
 
 [[example]]

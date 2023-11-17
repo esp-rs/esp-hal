@@ -2,13 +2,14 @@ name: CI
 
 on:
   pull_request:
-    branches:
-      - main
     paths-ignore:
       - "**/README.md"
   push:
+    branches-ignore:
+      - "gh-readonly-queue/**"
     paths-ignore:
       - "**/README.md"
+  merge_group:
   workflow_dispatch:
 
 env:
@@ -177,12 +178,8 @@ jobs:
 
       # Perform a full build initially to verify that the examples not only
       # build, but also link successfully.
-      # We also use this as an opportunity to verify that the examples link
-      # for each supported image format.
       - name: build esp32c3-hal (no features)
         run: cd esp32c3-hal/ && cargo +nightly build --examples
-      - name: build esp32c3-hal (mcu-boot)
-        run: cd esp32c3-hal/ && cargo +nightly build --examples --features=mcu-boot
       # Subsequent steps can just check the examples instead, as we're already
       # confident that they link.
       - name: check esp32c3-hal (common features)
@@ -202,6 +199,8 @@ jobs:
         run: cd esp32c3-hal/ && cargo +nightly check --example=embassy_serial --features=embassy,embassy-time-systick,async
       - name: check esp32c3-hal (async, i2c)
         run: cd esp32c3-hal/ && cargo +nightly check --example=embassy_i2c --features=embassy,embassy-time-systick,async
+      - name: check esp32c3-hal (async, usb_serial_jtag)
+        run: cd esp32c3-hal/ && cargo +nightly check --example=embassy_usb_serial_jtag --features=embassy,embassy-time-systick,async
       - name: check esp32c3-hal (interrupt-preemption)
         run: cd esp32c3-hal/ && cargo +nightly check --example=interrupt_preemption --features=interrupt-preemption
       - name: check esp32c3-hal (direct-vectoring)

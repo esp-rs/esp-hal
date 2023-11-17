@@ -13,7 +13,6 @@ use esp32c3_hal::{
     interrupt,
     peripherals::{self, Peripherals, TIMG0, TIMG1},
     prelude::*,
-    riscv,
     timer::{Timer, Timer0, TimerGroup},
 };
 use esp_backtrace as _;
@@ -52,10 +51,6 @@ fn main() -> ! {
         TIMER0.borrow_ref_mut(cs).replace(timer0);
         TIMER1.borrow_ref_mut(cs).replace(timer1);
     });
-
-    unsafe {
-        riscv::interrupt::enable();
-    }
 
     loop {}
 }

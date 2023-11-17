@@ -12,7 +12,6 @@ use esp32c2_hal::{
     interrupt,
     peripherals::{self, Peripherals, TIMG0},
     prelude::*,
-    riscv,
     timer::{Timer, Timer0, TimerGroup},
 };
 use esp_backtrace as _;
@@ -39,10 +38,6 @@ fn main() -> ! {
     critical_section::with(|cs| {
         TIMER0.borrow_ref_mut(cs).replace(timer0);
     });
-
-    unsafe {
-        riscv::interrupt::enable();
-    }
 
     loop {}
 }

@@ -13,11 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-C6: LP core clock is configurable (#907)
 - Derive `Clone` and `Copy` for `EspTwaiFrame` (#914)
 - A way to configure inverted pins (#912)
+- Added API to check a GPIO-pin's interrupt status bit (#929)
+- A `embedded_io_async::Read` implementation for `UsbSerialJtag` (#889)
 
 ### Changed
 
 - C2, C3: atomic emulation trap is now opt-in (#904)
 - Improve DMA documentation & clean up module (#915)
+- Only allow a single version of `esp-hal-common` to be present in an application (#934)
+- C3, C6 and H2 can now use the `zero-rtc-bss` feature to enable `esp-hal-common/rv-zero-rtc-bss` (#867)
+- Reuse `ieee802154_clock_enable/disable()` functions for BLE and rename `ble_ieee802154_clock_enable()` (#953)
 
 ### Fixed
 
@@ -25,8 +30,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-S3: Fix GPIO interrupt handler crashing when using GPIO48. (#898)
 - Fixed short wait times in embassy causing hangs (#906)
 - Make sure to clear LP/RTC RAM before loading code (#916)
+- Async RMT channels can be used concurrently (#925)
+- Xtensa: Allow using `embassy-executor`'s thread-mode executor if neither `embassy-executor-thread`, nor `embassy-executor-interrupt` is enabled. (#937)
 
 ### Removed
+
+- Removed the `mcu-boot` feature from `esp32c3-hal` (#938)
 
 ### Breaking
 - Direct boot support has been removed (#903).

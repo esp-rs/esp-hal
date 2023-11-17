@@ -11,6 +11,13 @@ description  = "HAL implementations for peripherals common among Espressif devic
 repository   = "https://github.com/esp-rs/esp-hal"
 license      = "MIT OR Apache-2.0"
 
+# Prevent multiple copies of this crate in the same binary.
+# Needed because different copies might get different features, causing
+# confusing build errors due to expected features not getting enabled
+# on the unintentional copy.
+# This is especially common when mixing crates from crates.io and git.
+links = "esp-hal-common"
+
 [dependencies]
 bitflags             = "2.4.1"
 bitfield             = "0.14.0"

@@ -1,8 +1,6 @@
 //! This shows how to output text via USB Serial/JTAG.
 //! You need to connect via the Serial/JTAG interface to see any output.
 //! Most dev-kits use a USB-UART-bridge - in that case you won't see any output.
-//! PLEASE NOTE: USB Serial input on ESP32-S3 is not currently working
-//! See https://github.com/esp-rs/esp-hal/issues/269 for details
 
 #![no_std]
 #![no_main]

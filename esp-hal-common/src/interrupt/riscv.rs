@@ -535,7 +535,7 @@ unsafe fn handle_exception(_pc: usize, trap_frame: *mut TrapFrame) {
             (*trap_frame).t4 = frame[29];
             (*trap_frame).t5 = frame[30];
             (*trap_frame).t6 = frame[31];
-            (*trap_frame).pc = pc + 4;
+            (*trap_frame).pc = _pc + 4;
 
             return;
         }

@@ -14,7 +14,6 @@ use esp32c6_hal::{
     interrupt,
     peripherals::{self, Peripherals},
     prelude::*,
-    riscv,
 };
 use esp_backtrace as _;
 use esp_println::println;
@@ -29,11 +28,21 @@ fn main() -> ! {
 
     let mut da = DebugAssist::new(peripherals.ASSIST_DEBUG);
 
+    extern "C" {
+        // top of stack
+        static mut _stack_start: u32;
+        // bottom of stack
+        static mut _stack_end: u32;
+    }
+
+    let stack_top = unsafe { &mut _stack_start } as *mut _ as u32;
+    let stack_bottom = unsafe { &mut _stack_end } as *mut _ as u32;
+
     // uncomment the functionality you want to test
 
-    // da.enable_sp_monitor(0x4087ee00, 0x40880000);
-    // da.enable_region0_monitor(0x4087ee00, 0x4087ef00, true, true);
-    da.enable_region1_monitor(0x4087ee00, 0x4087ef00, true, true);
+    da.enable_sp_monitor(stack_bottom + 4096, stack_top);
+    // da.enable_region0_monitor(stack_bottom, stack_bottom + 4096, true, true);
+    // da.enable_region1_monitor(stack_bottom, stack_bottom + 4096, true, true);
 
     critical_section::with(|cs| DA.borrow_ref_mut(cs).replace(da));
 
@@ -42,10 +51,6 @@ fn main() -> ! {
         interrupt::Priority::Priority3,
     )
     .unwrap();
-
-    unsafe {
-        riscv::interrupt::enable();
-    }
 
     eat_up_stack(0);
 

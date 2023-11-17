@@ -13,7 +13,6 @@ use esp32c2_hal::{
     interrupt,
     peripherals::{self, Peripherals},
     prelude::*,
-    riscv,
     Rtc,
 };
 use esp_backtrace as _;
@@ -45,10 +44,6 @@ fn main() -> ! {
     critical_section::with(|cs| {
         RTC.borrow_ref_mut(cs).replace(rtc);
     });
-
-    unsafe {
-        riscv::interrupt::enable();
-    }
 
     loop {}
 }
