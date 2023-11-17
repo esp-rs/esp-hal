@@ -305,26 +305,31 @@ _abs_start:
     r#"
     la a0, _bss_start
     la a1, _bss_end
+    bge a0, a1, 2f
     mv a3, x0
     1:
     sw a3, 0(a0)
     addi a0, a0, 4
     blt a0, a1, 1b
+    2:
 "#,
 #[cfg(feature = "zero-rtc-fast-bss")]
     r#"
     la a0, _rtc_fast_bss_start
     la a1, _rtc_fast_bss_end
+    bge a0, a1, 2f
     mv a3, x0
     1:
     sw a3, 0(a0)
     addi a0, a0, 4
     blt a0, a1, 1b
+    2:
 "#,
 #[cfg(feature = "init-data")]
     r#"
     la a0, _data_start
     la a1, _data_end
+    bge a0, a1, 2f
     la a2, _sidata
     1:
     lw a3, 0(a2)
@@ -332,11 +337,13 @@ _abs_start:
     addi a0, a0, 4
     addi a2, a2, 4
     blt a0, a1, 1b
+    2:
 "#,
 #[cfg(feature = "init-rw-text")]
     r#"
     la a0, _srwtext
     la a1, _erwtext
+    bge a0, a1, 2f
     la a2, _irwtext
     1:
     lw a3, 0(a2)
@@ -344,11 +351,13 @@ _abs_start:
     addi a0, a0, 4
     addi a2, a2, 4
     blt a0, a1, 1b
+    2:
 "#,
 #[cfg(feature = "init-rtc-fast-data")]
     r#"
     la a0, _rtc_fast_data_start
     la a1, _rtc_fast_data_end
+    bge a0, a1, 2f
     la a2, _irtc_fast_data
     1:
     lw a3, 0(a2)
@@ -356,11 +365,13 @@ _abs_start:
     addi a0, a0, 4
     addi a2, a2, 4
     blt a0, a1, 1b
+    2:
 "#,
 #[cfg(feature = "init-rtc-fast-text")]
     r#"
     la a0, _srtc_fast_text
     la a1, _ertc_fast_text
+    bge a0, a1, 2f
     la a2, _irtc_fast_text
     1:
     lw a3, 0(a2)
@@ -368,6 +379,7 @@ _abs_start:
     addi a0, a0, 4
     addi a2, a2, 4
     blt a0, a1, 1b
+    2:
 "#,
     r#"
     li  x1, 0

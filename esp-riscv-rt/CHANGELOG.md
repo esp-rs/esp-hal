@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 ### Fixed
+- Fix overwriting rtc-uninit-data when there is no rtc-bss data (#952)
 
 ### Removed
 
