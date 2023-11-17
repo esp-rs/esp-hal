@@ -188,3 +188,7 @@ required-features = ["embassy", "async"]
 [[example]]
 name              = "embassy_usb_serial_jtag"
 required-features = ["embassy", "async"]
+
+[[example]]
+name              = "embassy_twai"
+required-features = ["embassy", "async"]

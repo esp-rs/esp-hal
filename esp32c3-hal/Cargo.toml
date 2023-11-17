@@ -167,3 +167,7 @@ required-features = ["embassy", "async", "embassy-executor-thread"]
 [[example]]
 name              = "direct-vectoring"
 required-features = ["direct-vectoring"]
+
+[[example]]
+name              = "embassy_twai"
+required-features = ["embassy", "async"]
