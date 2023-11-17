@@ -20,11 +20,11 @@ const IS_FIRST_SENDER: bool = true;
 // embedded-hal-0.2.7. embedded-can was split off from embedded-hal before it's
 // upgrade to 1.0.0. cargo run --example twai --features eh1 --release
 #[cfg(feature = "eh1")]
-use embedded_can::{nb::Can, Frame, StandardId};
+use embedded_can::{Frame, StandardId};
 // Run this example without the eh1 flag to use the embedded-hal 0.2.7 CAN traits.
 // cargo run --example twai --release
 #[cfg(not(feature = "eh1"))]
-use embedded_hal::can::{Can, Frame, StandardId};
+use embedded_hal::can::{Frame, StandardId};
 use esp32s3_hal::{clock::ClockControl, gpio::IO, peripherals::Peripherals, prelude::*, twai};
 use esp_backtrace as _;
 use esp_println::println;
