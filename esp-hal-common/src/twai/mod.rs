@@ -1028,7 +1028,7 @@ mod asynch {
                 let _ = rx_queue.try_send(Err(EspTwaiError::EmbeddedHAL(ErrorKind::Overrun)));
             }
 
-            let frame = unsafe { read_frame(register_block) };
+            let frame = TWAI0::read_frame();
 
             let _ = rx_queue.try_send(Ok(frame));
 
@@ -1073,7 +1073,7 @@ mod asynch {
                 let _ = rx_queue.try_send(Err(EspTwaiError::EmbeddedHAL(ErrorKind::Overrun)));
             }
 
-            let frame = unsafe { read_frame(register_block) };
+            let frame = TWAI1::read_frame();
 
             let _ = rx_queue.try_send(Ok(frame));
 
