@@ -18,19 +18,19 @@
 //!
 //! * The **ESP32** has 8 channels, each of them can be either receiver or
 //!   transmitter
-//! * The **ESP32-C3** has 4 channels, `Channel0` and `Channel1` hardcoded for
-//!   transmitting signals and `Channel2` and `Channel3` hardcoded for receiving
-//!   signals.
-//! * The **ESP32-C6** has 4 channels, `Channel0` and `Channel1` hardcoded for
-//!   transmitting signals and `Channel2` and `Channel3` hardcoded for receiving
-//!   signals.
-//! * The **ESP32-H2** has 4 channels, `Channel0` and `Channel1` hardcoded for
-//!   transmitting signals and `Channel2` and `Channel3` hardcoded for receiving
-//!   signals.
+//! * The **ESP32-C3** has 4 channels, `Channel<0>` and `Channel<1>` hardcoded
+//!   for transmitting signals and `Channel<2>` and `Channel<3>` hardcoded for
+//!   receiving signals.
+//! * The **ESP32-C6** has 4 channels, `Channel<0>` and `Channel<1>` hardcoded
+//!   for transmitting signals and `Channel<2>` and `Channel<3>` hardcoded for
+//!   receiving signals.
+//! * The **ESP32-H2** has 4 channels, `Channel<0>` and `Channel<1>` hardcoded
+//!   for transmitting signals and `Channel<2>` and `Channel<3>` hardcoded for
+//!   receiving signals.
 //! * The **ESP32-S2** has 4 channels, each of them can be either receiver or
 //!   transmitter.
-//! * The **ESP32-S3** has 8 channels, `Channel0`-`Channel3` hardcoded for
-//!   transmitting signals and `Channel4`-`Channel7` hardcoded for receiving
+//! * The **ESP32-S3** has 8 channels, `Channel<0>`-`Channel<3>` hardcoded for
+//!   transmitting signals and `Channel<4>`-`Channel<7>` hardcoded for receiving
 //!   signals.
 //!
 //! For more information, please refer to the ESP-IDF documentation:
@@ -453,38 +453,34 @@ where
 
 macro_rules! impl_tx_channel_creator {
     ($channel:literal) => {
-        paste::paste! {
-            impl<'d, P, const CHANNEL: u8> $crate::rmt::TxChannelCreator<'d, $crate::rmt::[< Channel $channel >] <CHANNEL>, P, CHANNEL>
-            for [< Channel $channel Creator >]<CHANNEL>
-            where
-                P: $crate::gpio::OutputPin,
-            {
-            }
-
-            impl<const CHANNEL: u8> $crate::rmt::TxChannel<CHANNEL> for $crate::rmt::[< Channel $channel >]<CHANNEL> {}
-
-            #[cfg(feature = "async")]
-            impl<const CHANNEL: u8> $crate::rmt::asynch::TxChannelAsync<CHANNEL> for $crate::rmt::[< Channel $channel >]<CHANNEL> {}
+        impl<'d, P> $crate::rmt::TxChannelCreator<'d, $crate::rmt::Channel<$channel>, P, $channel>
+            for ChannelCreator<$channel>
+        where
+            P: $crate::gpio::OutputPin,
+        {
         }
-    }
+
+        impl $crate::rmt::TxChannel<$channel> for $crate::rmt::Channel<$channel> {}
+
+        #[cfg(feature = "async")]
+        impl $crate::rmt::asynch::TxChannelAsync<$channel> for $crate::rmt::Channel<$channel> {}
+    };
 }
 
 macro_rules! impl_rx_channel_creator {
     ($channel:literal) => {
-        paste::paste! {
-            impl<'d, P, const CHANNEL: u8> $crate::rmt::RxChannelCreator<'d, $crate::rmt::[< Channel $channel >] <CHANNEL>, P, CHANNEL>
-            for [< Channel $channel Creator >]<CHANNEL>
-            where
-                P: $crate::gpio::InputPin,
-            {
-            }
-
-            impl<const CHANNEL: u8> $crate::rmt::RxChannel<CHANNEL> for $crate::rmt::[< Channel $channel >]<CHANNEL> {}
-
-            #[cfg(feature = "async")]
-            impl<const CHANNEL: u8> $crate::rmt::asynch::RxChannelAsync<CHANNEL> for $crate::rmt::[< Channel $channel >]<CHANNEL> {}
+        impl<'d, P> $crate::rmt::RxChannelCreator<'d, $crate::rmt::Channel<$channel>, P, $channel>
+            for ChannelCreator<$channel>
+        where
+            P: $crate::gpio::InputPin,
+        {
         }
-    }
+
+        impl $crate::rmt::RxChannel<$channel> for $crate::rmt::Channel<$channel> {}
+
+        #[cfg(feature = "async")]
+        impl $crate::rmt::asynch::RxChannelAsync<$channel> for $crate::rmt::Channel<$channel> {}
+    };
 }
 
 #[cfg(not(any(esp32, esp32s2, esp32s3)))]
@@ -495,10 +491,10 @@ mod impl_for_chip {
     /// RMT Instance
     pub struct Rmt<'d> {
         _peripheral: PeripheralRef<'d, crate::peripherals::RMT>,
-        pub channel0: Channel0Creator<0>,
-        pub channel1: Channel1Creator<1>,
-        pub channel2: Channel2Creator<2>,
-        pub channel3: Channel3Creator<3>,
+        pub channel0: ChannelCreator<0>,
+        pub channel1: ChannelCreator<1>,
+        pub channel2: ChannelCreator<2>,
+        pub channel3: ChannelCreator<3>,
     }
 
     impl<'d> CreateInstance<'d> for Rmt<'d> {
@@ -507,21 +503,15 @@ mod impl_for_chip {
 
             Self {
                 _peripheral: peripheral,
-                channel0: Channel0Creator {},
-                channel1: Channel1Creator {},
-                channel2: Channel2Creator {},
-                channel3: Channel3Creator {},
+                channel0: ChannelCreator {},
+                channel1: ChannelCreator {},
+                channel2: ChannelCreator {},
+                channel3: ChannelCreator {},
             }
         }
     }
 
-    pub struct Channel0Creator<const CHANNEL: u8> {}
-
-    pub struct Channel1Creator<const CHANNEL: u8> {}
-
-    pub struct Channel2Creator<const CHANNEL: u8> {}
-
-    pub struct Channel3Creator<const CHANNEL: u8> {}
+    pub struct ChannelCreator<const CHANNEL: u8> {}
 
     impl_tx_channel_creator!(0);
     impl_tx_channel_creator!(1);
@@ -529,11 +519,11 @@ mod impl_for_chip {
     impl_rx_channel_creator!(2);
     impl_rx_channel_creator!(3);
 
-    super::chip_specific::impl_tx_channel!(Channel0, RMT_SIG_0, 0);
-    super::chip_specific::impl_tx_channel!(Channel1, RMT_SIG_1, 1);
+    super::chip_specific::impl_tx_channel!(Channel, RMT_SIG_0, 0);
+    super::chip_specific::impl_tx_channel!(Channel, RMT_SIG_1, 1);
 
-    super::chip_specific::impl_rx_channel!(Channel2, RMT_SIG_0, 2, 0);
-    super::chip_specific::impl_rx_channel!(Channel3, RMT_SIG_1, 3, 1);
+    super::chip_specific::impl_rx_channel!(Channel, RMT_SIG_0, 2, 0);
+    super::chip_specific::impl_rx_channel!(Channel, RMT_SIG_1, 3, 1);
 }
 
 #[cfg(any(esp32))]
@@ -544,14 +534,14 @@ mod impl_for_chip {
     /// RMT Instance
     pub struct Rmt<'d> {
         _peripheral: PeripheralRef<'d, crate::peripherals::RMT>,
-        pub channel0: Channel0Creator<0>,
-        pub channel1: Channel1Creator<1>,
-        pub channel2: Channel2Creator<2>,
-        pub channel3: Channel3Creator<3>,
-        pub channel4: Channel4Creator<4>,
-        pub channel5: Channel5Creator<5>,
-        pub channel6: Channel6Creator<6>,
-        pub channel7: Channel7Creator<7>,
+        pub channel0: ChannelCreator<0>,
+        pub channel1: ChannelCreator<1>,
+        pub channel2: ChannelCreator<2>,
+        pub channel3: ChannelCreator<3>,
+        pub channel4: ChannelCreator<4>,
+        pub channel5: ChannelCreator<5>,
+        pub channel6: ChannelCreator<6>,
+        pub channel7: ChannelCreator<7>,
     }
 
     impl<'d> CreateInstance<'d> for Rmt<'d> {
@@ -560,33 +550,19 @@ mod impl_for_chip {
 
             Self {
                 _peripheral: peripheral,
-                channel0: Channel0Creator {},
-                channel1: Channel1Creator {},
-                channel2: Channel2Creator {},
-                channel3: Channel3Creator {},
-                channel4: Channel4Creator {},
-                channel5: Channel5Creator {},
-                channel6: Channel6Creator {},
-                channel7: Channel7Creator {},
+                channel0: ChannelCreator {},
+                channel1: ChannelCreator {},
+                channel2: ChannelCreator {},
+                channel3: ChannelCreator {},
+                channel4: ChannelCreator {},
+                channel5: ChannelCreator {},
+                channel6: ChannelCreator {},
+                channel7: ChannelCreator {},
             }
         }
     }
 
-    pub struct Channel0Creator<const CHANNEL: u8> {}
-
-    pub struct Channel1Creator<const CHANNEL: u8> {}
-
-    pub struct Channel2Creator<const CHANNEL: u8> {}
-
-    pub struct Channel3Creator<const CHANNEL: u8> {}
-
-    pub struct Channel4Creator<const CHANNEL: u8> {}
-
-    pub struct Channel5Creator<const CHANNEL: u8> {}
-
-    pub struct Channel6Creator<const CHANNEL: u8> {}
-
-    pub struct Channel7Creator<const CHANNEL: u8> {}
+    pub struct ChannelCreator<const CHANNEL: u8> {}
 
     impl_tx_channel_creator!(0);
     impl_tx_channel_creator!(1);
@@ -606,23 +582,23 @@ mod impl_for_chip {
     impl_rx_channel_creator!(6);
     impl_rx_channel_creator!(7);
 
-    super::chip_specific::impl_tx_channel!(Channel0, RMT_SIG_0, 0);
-    super::chip_specific::impl_tx_channel!(Channel1, RMT_SIG_1, 1);
-    super::chip_specific::impl_tx_channel!(Channel2, RMT_SIG_2, 2);
-    super::chip_specific::impl_tx_channel!(Channel3, RMT_SIG_3, 3);
-    super::chip_specific::impl_tx_channel!(Channel4, RMT_SIG_4, 4);
-    super::chip_specific::impl_tx_channel!(Channel5, RMT_SIG_5, 5);
-    super::chip_specific::impl_tx_channel!(Channel6, RMT_SIG_6, 6);
-    super::chip_specific::impl_tx_channel!(Channel7, RMT_SIG_7, 7);
+    super::chip_specific::impl_tx_channel!(Channel, RMT_SIG_0, 0);
+    super::chip_specific::impl_tx_channel!(Channel, RMT_SIG_1, 1);
+    super::chip_specific::impl_tx_channel!(Channel, RMT_SIG_2, 2);
+    super::chip_specific::impl_tx_channel!(Channel, RMT_SIG_3, 3);
+    super::chip_specific::impl_tx_channel!(Channel, RMT_SIG_4, 4);
+    super::chip_specific::impl_tx_channel!(Channel, RMT_SIG_5, 5);
+    super::chip_specific::impl_tx_channel!(Channel, RMT_SIG_6, 6);
+    super::chip_specific::impl_tx_channel!(Channel, RMT_SIG_7, 7);
 
-    super::chip_specific::impl_rx_channel!(Channel0, RMT_SIG_0, 0);
-    super::chip_specific::impl_rx_channel!(Channel1, RMT_SIG_1, 1);
-    super::chip_specific::impl_rx_channel!(Channel2, RMT_SIG_2, 2);
-    super::chip_specific::impl_rx_channel!(Channel3, RMT_SIG_3, 3);
-    super::chip_specific::impl_rx_channel!(Channel4, RMT_SIG_4, 4);
-    super::chip_specific::impl_rx_channel!(Channel5, RMT_SIG_5, 5);
-    super::chip_specific::impl_rx_channel!(Channel6, RMT_SIG_6, 6);
-    super::chip_specific::impl_rx_channel!(Channel7, RMT_SIG_7, 7);
+    super::chip_specific::impl_rx_channel!(Channel, RMT_SIG_0, 0);
+    super::chip_specific::impl_rx_channel!(Channel, RMT_SIG_1, 1);
+    super::chip_specific::impl_rx_channel!(Channel, RMT_SIG_2, 2);
+    super::chip_specific::impl_rx_channel!(Channel, RMT_SIG_3, 3);
+    super::chip_specific::impl_rx_channel!(Channel, RMT_SIG_4, 4);
+    super::chip_specific::impl_rx_channel!(Channel, RMT_SIG_5, 5);
+    super::chip_specific::impl_rx_channel!(Channel, RMT_SIG_6, 6);
+    super::chip_specific::impl_rx_channel!(Channel, RMT_SIG_7, 7);
 }
 
 #[cfg(any(esp32s2))]
@@ -633,10 +609,10 @@ mod impl_for_chip {
     /// RMT Instance
     pub struct Rmt<'d> {
         _peripheral: PeripheralRef<'d, crate::peripherals::RMT>,
-        pub channel0: Channel0Creator<0>,
-        pub channel1: Channel1Creator<1>,
-        pub channel2: Channel2Creator<2>,
-        pub channel3: Channel3Creator<3>,
+        pub channel0: ChannelCreator<0>,
+        pub channel1: ChannelCreator<1>,
+        pub channel2: ChannelCreator<2>,
+        pub channel3: ChannelCreator<3>,
     }
 
     impl<'d> CreateInstance<'d> for Rmt<'d> {
@@ -645,21 +621,15 @@ mod impl_for_chip {
 
             Self {
                 _peripheral: peripheral,
-                channel0: Channel0Creator {},
-                channel1: Channel1Creator {},
-                channel2: Channel2Creator {},
-                channel3: Channel3Creator {},
+                channel0: ChannelCreator {},
+                channel1: ChannelCreator {},
+                channel2: ChannelCreator {},
+                channel3: ChannelCreator {},
             }
         }
     }
 
-    pub struct Channel0Creator<const CHANNEL: u8> {}
-
-    pub struct Channel1Creator<const CHANNEL: u8> {}
-
-    pub struct Channel2Creator<const CHANNEL: u8> {}
-
-    pub struct Channel3Creator<const CHANNEL: u8> {}
+    pub struct ChannelCreator<const CHANNEL: u8> {}
 
     impl_tx_channel_creator!(0);
     impl_tx_channel_creator!(1);
@@ -671,15 +641,15 @@ mod impl_for_chip {
     impl_rx_channel_creator!(2);
     impl_rx_channel_creator!(3);
 
-    super::chip_specific::impl_tx_channel!(Channel0, RMT_SIG_0, 0);
-    super::chip_specific::impl_tx_channel!(Channel1, RMT_SIG_1, 1);
-    super::chip_specific::impl_tx_channel!(Channel2, RMT_SIG_2, 2);
-    super::chip_specific::impl_tx_channel!(Channel3, RMT_SIG_3, 3);
+    super::chip_specific::impl_tx_channel!(Channel, RMT_SIG_0, 0);
+    super::chip_specific::impl_tx_channel!(Channel, RMT_SIG_1, 1);
+    super::chip_specific::impl_tx_channel!(Channel, RMT_SIG_2, 2);
+    super::chip_specific::impl_tx_channel!(Channel, RMT_SIG_3, 3);
 
-    super::chip_specific::impl_rx_channel!(Channel0, RMT_SIG_0, 0);
-    super::chip_specific::impl_rx_channel!(Channel1, RMT_SIG_1, 1);
-    super::chip_specific::impl_rx_channel!(Channel2, RMT_SIG_2, 2);
-    super::chip_specific::impl_rx_channel!(Channel3, RMT_SIG_3, 3);
+    super::chip_specific::impl_rx_channel!(Channel, RMT_SIG_0, 0);
+    super::chip_specific::impl_rx_channel!(Channel, RMT_SIG_1, 1);
+    super::chip_specific::impl_rx_channel!(Channel, RMT_SIG_2, 2);
+    super::chip_specific::impl_rx_channel!(Channel, RMT_SIG_3, 3);
 }
 
 #[cfg(any(esp32s3))]
@@ -690,14 +660,14 @@ mod impl_for_chip {
     /// RMT Instance
     pub struct Rmt<'d> {
         _peripheral: PeripheralRef<'d, crate::peripherals::RMT>,
-        pub channel0: Channel0Creator<0>,
-        pub channel1: Channel1Creator<1>,
-        pub channel2: Channel2Creator<2>,
-        pub channel3: Channel3Creator<3>,
-        pub channel4: Channel4Creator<4>,
-        pub channel5: Channel5Creator<5>,
-        pub channel6: Channel6Creator<6>,
-        pub channel7: Channel7Creator<7>,
+        pub channel0: ChannelCreator<0>,
+        pub channel1: ChannelCreator<1>,
+        pub channel2: ChannelCreator<2>,
+        pub channel3: ChannelCreator<3>,
+        pub channel4: ChannelCreator<4>,
+        pub channel5: ChannelCreator<5>,
+        pub channel6: ChannelCreator<6>,
+        pub channel7: ChannelCreator<7>,
     }
 
     impl<'d> CreateInstance<'d> for Rmt<'d> {
@@ -706,33 +676,19 @@ mod impl_for_chip {
 
             Self {
                 _peripheral: peripheral,
-                channel0: Channel0Creator {},
-                channel1: Channel1Creator {},
-                channel2: Channel2Creator {},
-                channel3: Channel3Creator {},
-                channel4: Channel4Creator {},
-                channel5: Channel5Creator {},
-                channel6: Channel6Creator {},
-                channel7: Channel7Creator {},
+                channel0: ChannelCreator {},
+                channel1: ChannelCreator {},
+                channel2: ChannelCreator {},
+                channel3: ChannelCreator {},
+                channel4: ChannelCreator {},
+                channel5: ChannelCreator {},
+                channel6: ChannelCreator {},
+                channel7: ChannelCreator {},
             }
         }
     }
 
-    pub struct Channel0Creator<const CHANNEL: u8> {}
-
-    pub struct Channel1Creator<const CHANNEL: u8> {}
-
-    pub struct Channel2Creator<const CHANNEL: u8> {}
-
-    pub struct Channel3Creator<const CHANNEL: u8> {}
-
-    pub struct Channel4Creator<const CHANNEL: u8> {}
-
-    pub struct Channel5Creator<const CHANNEL: u8> {}
-
-    pub struct Channel6Creator<const CHANNEL: u8> {}
-
-    pub struct Channel7Creator<const CHANNEL: u8> {}
+    pub struct ChannelCreator<const CHANNEL: u8> {}
 
     impl_tx_channel_creator!(0);
     impl_tx_channel_creator!(1);
@@ -744,60 +700,21 @@ mod impl_for_chip {
     impl_rx_channel_creator!(6);
     impl_rx_channel_creator!(7);
 
-    super::chip_specific::impl_tx_channel!(Channel0, RMT_SIG_0, 0);
-    super::chip_specific::impl_tx_channel!(Channel1, RMT_SIG_1, 1);
-    super::chip_specific::impl_tx_channel!(Channel2, RMT_SIG_2, 2);
-    super::chip_specific::impl_tx_channel!(Channel3, RMT_SIG_3, 3);
+    super::chip_specific::impl_tx_channel!(Channel, RMT_SIG_0, 0);
+    super::chip_specific::impl_tx_channel!(Channel, RMT_SIG_1, 1);
+    super::chip_specific::impl_tx_channel!(Channel, RMT_SIG_2, 2);
+    super::chip_specific::impl_tx_channel!(Channel, RMT_SIG_3, 3);
 
-    super::chip_specific::impl_rx_channel!(Channel4, RMT_SIG_0, 4, 0);
-    super::chip_specific::impl_rx_channel!(Channel5, RMT_SIG_1, 5, 1);
-    super::chip_specific::impl_rx_channel!(Channel6, RMT_SIG_2, 6, 2);
-    super::chip_specific::impl_rx_channel!(Channel7, RMT_SIG_3, 7, 3);
+    super::chip_specific::impl_rx_channel!(Channel, RMT_SIG_0, 4, 0);
+    super::chip_specific::impl_rx_channel!(Channel, RMT_SIG_1, 5, 1);
+    super::chip_specific::impl_rx_channel!(Channel, RMT_SIG_2, 6, 2);
+    super::chip_specific::impl_rx_channel!(Channel, RMT_SIG_3, 7, 3);
 }
 
-/// RMT Channel 0
+/// RMT Channel
 #[non_exhaustive]
 #[derive(Debug)]
-pub struct Channel0<const CHANNEL: u8> {}
-
-/// RMT Channel 1
-#[non_exhaustive]
-#[derive(Debug)]
-pub struct Channel1<const CHANNEL: u8> {}
-
-/// RMT Channel 2
-#[non_exhaustive]
-#[derive(Debug)]
-pub struct Channel2<const CHANNEL: u8> {}
-
-/// RMT Channel 3
-#[non_exhaustive]
-#[derive(Debug)]
-pub struct Channel3<const CHANNEL: u8> {}
-
-/// RMT Channel 4
-#[cfg(any(esp32, esp32s3))]
-#[non_exhaustive]
-#[derive(Debug)]
-pub struct Channel4<const CHANNEL: u8> {}
-
-/// RMT Channel 5
-#[cfg(any(esp32, esp32s3))]
-#[non_exhaustive]
-#[derive(Debug)]
-pub struct Channel5<const CHANNEL: u8> {}
-
-/// RMT Channel 6
-#[cfg(any(esp32, esp32s3))]
-#[non_exhaustive]
-#[derive(Debug)]
-pub struct Channel6<const CHANNEL: u8> {}
-
-/// RMT Channel 7
-#[cfg(any(esp32, esp32s3))]
-#[non_exhaustive]
-#[derive(Debug)]
-pub struct Channel7<const CHANNEL: u8> {}
+pub struct Channel<const CHANNEL: u8> {}
 
 pub trait TxChannel<const CHANNEL: u8>: private::TxChannelInternal<CHANNEL> {
     /// Start transmitting the given pulse code sequence.
@@ -1082,42 +999,42 @@ pub mod asynch {
 
             match channel {
                 0 => {
-                    super::Channel0::<0>::unlisten_interrupt(Event::End);
-                    super::Channel0::<0>::unlisten_interrupt(Event::Error);
+                    super::Channel::<0>::unlisten_interrupt(Event::End);
+                    super::Channel::<0>::unlisten_interrupt(Event::Error);
                 }
                 1 => {
-                    super::Channel1::<1>::unlisten_interrupt(Event::End);
-                    super::Channel1::<1>::unlisten_interrupt(Event::Error);
+                    super::Channel::<1>::unlisten_interrupt(Event::End);
+                    super::Channel::<1>::unlisten_interrupt(Event::Error);
                 }
                 2 => {
-                    super::Channel2::<2>::unlisten_interrupt(Event::End);
-                    super::Channel2::<2>::unlisten_interrupt(Event::Error);
+                    super::Channel::<2>::unlisten_interrupt(Event::End);
+                    super::Channel::<2>::unlisten_interrupt(Event::Error);
                 }
                 3 => {
-                    super::Channel3::<3>::unlisten_interrupt(Event::End);
-                    super::Channel3::<3>::unlisten_interrupt(Event::Error);
+                    super::Channel::<3>::unlisten_interrupt(Event::End);
+                    super::Channel::<3>::unlisten_interrupt(Event::Error);
                 }
 
                 // TODO ... how to handle chips which can use a channel for tx AND rx?
                 #[cfg(any(esp32, esp32s3))]
                 4 => {
-                    super::Channel4::<4>::unlisten_interrupt(Event::End);
-                    super::Channel4::<4>::unlisten_interrupt(Event::Error);
+                    super::Channel::<4>::unlisten_interrupt(Event::End);
+                    super::Channel::<4>::unlisten_interrupt(Event::Error);
                 }
                 #[cfg(any(esp32, esp32s3))]
                 5 => {
-                    super::Channel5::<5>::unlisten_interrupt(Event::End);
-                    super::Channel5::<5>::unlisten_interrupt(Event::Error);
+                    super::Channel::<5>::unlisten_interrupt(Event::End);
+                    super::Channel::<5>::unlisten_interrupt(Event::Error);
                 }
                 #[cfg(any(esp32, esp32s3))]
                 6 => {
-                    super::Channel6::<6>::unlisten_interrupt(Event::End);
-                    super::Channel6::<6>::unlisten_interrupt(Event::Error);
+                    super::Channel::<6>::unlisten_interrupt(Event::End);
+                    super::Channel::<6>::unlisten_interrupt(Event::Error);
                 }
                 #[cfg(any(esp32, esp32s3))]
                 7 => {
-                    super::Channel7::<7>::unlisten_interrupt(Event::End);
-                    super::Channel7::<7>::unlisten_interrupt(Event::Error);
+                    super::Channel::<7>::unlisten_interrupt(Event::End);
+                    super::Channel::<7>::unlisten_interrupt(Event::Error);
                 }
 
                 _ => unreachable!(),
@@ -1133,118 +1050,118 @@ pub mod asynch {
         if let Some(channel) = super::chip_specific::pending_interrupt_for_channel() {
             match channel {
                 0 => {
-                    <Channel0<0> as super::private::TxChannelInternal<0>>::unlisten_interrupt(
+                    <Channel<0> as super::private::TxChannelInternal<0>>::unlisten_interrupt(
                         Event::End,
                     );
-                    <Channel0<0> as super::private::TxChannelInternal<0>>::unlisten_interrupt(
+                    <Channel<0> as super::private::TxChannelInternal<0>>::unlisten_interrupt(
                         Event::Error,
                     );
-                    <Channel0<0> as super::private::RxChannelInternal<0>>::unlisten_interrupt(
+                    <Channel<0> as super::private::RxChannelInternal<0>>::unlisten_interrupt(
                         Event::End,
                     );
-                    <Channel0<0> as super::private::RxChannelInternal<0>>::unlisten_interrupt(
+                    <Channel<0> as super::private::RxChannelInternal<0>>::unlisten_interrupt(
                         Event::Error,
                     );
                 }
                 1 => {
-                    <Channel1<1> as super::private::TxChannelInternal<1>>::unlisten_interrupt(
+                    <Channel<1> as super::private::TxChannelInternal<1>>::unlisten_interrupt(
                         Event::End,
                     );
-                    <Channel1<1> as super::private::TxChannelInternal<1>>::unlisten_interrupt(
+                    <Channel<1> as super::private::TxChannelInternal<1>>::unlisten_interrupt(
                         Event::Error,
                     );
-                    <Channel1<1> as super::private::RxChannelInternal<1>>::unlisten_interrupt(
+                    <Channel<1> as super::private::RxChannelInternal<1>>::unlisten_interrupt(
                         Event::End,
                     );
-                    <Channel1<1> as super::private::RxChannelInternal<1>>::unlisten_interrupt(
+                    <Channel<1> as super::private::RxChannelInternal<1>>::unlisten_interrupt(
                         Event::Error,
                     );
                 }
                 2 => {
-                    <Channel2<2> as super::private::TxChannelInternal<2>>::unlisten_interrupt(
+                    <Channel<2> as super::private::TxChannelInternal<2>>::unlisten_interrupt(
                         Event::End,
                     );
-                    <Channel2<2> as super::private::TxChannelInternal<2>>::unlisten_interrupt(
+                    <Channel<2> as super::private::TxChannelInternal<2>>::unlisten_interrupt(
                         Event::Error,
                     );
-                    <Channel2<2> as super::private::RxChannelInternal<2>>::unlisten_interrupt(
+                    <Channel<2> as super::private::RxChannelInternal<2>>::unlisten_interrupt(
                         Event::End,
                     );
-                    <Channel2<2> as super::private::RxChannelInternal<2>>::unlisten_interrupt(
+                    <Channel<2> as super::private::RxChannelInternal<2>>::unlisten_interrupt(
                         Event::Error,
                     );
                 }
                 3 => {
-                    <Channel3<3> as super::private::TxChannelInternal<3>>::unlisten_interrupt(
+                    <Channel<3> as super::private::TxChannelInternal<3>>::unlisten_interrupt(
                         Event::End,
                     );
-                    <Channel3<3> as super::private::TxChannelInternal<3>>::unlisten_interrupt(
+                    <Channel<3> as super::private::TxChannelInternal<3>>::unlisten_interrupt(
                         Event::Error,
                     );
-                    <Channel3<3> as super::private::RxChannelInternal<3>>::unlisten_interrupt(
+                    <Channel<3> as super::private::RxChannelInternal<3>>::unlisten_interrupt(
                         Event::End,
                     );
-                    <Channel3<3> as super::private::RxChannelInternal<3>>::unlisten_interrupt(
+                    <Channel<3> as super::private::RxChannelInternal<3>>::unlisten_interrupt(
                         Event::Error,
                     );
                 }
                 #[cfg(any(esp32))]
                 4 => {
-                    <Channel4<4> as super::private::TxChannelInternal<4>>::unlisten_interrupt(
+                    <Channel<4> as super::private::TxChannelInternal<4>>::unlisten_interrupt(
                         Event::End,
                     );
-                    <Channel4<4> as super::private::TxChannelInternal<4>>::unlisten_interrupt(
+                    <Channel<4> as super::private::TxChannelInternal<4>>::unlisten_interrupt(
                         Event::Error,
                     );
-                    <Channel4<4> as super::private::RxChannelInternal<4>>::unlisten_interrupt(
+                    <Channel<4> as super::private::RxChannelInternal<4>>::unlisten_interrupt(
                         Event::End,
                     );
-                    <Channel4<4> as super::private::RxChannelInternal<4>>::unlisten_interrupt(
+                    <Channel<4> as super::private::RxChannelInternal<4>>::unlisten_interrupt(
                         Event::Error,
                     );
                 }
                 #[cfg(any(esp32, esp32s3))]
                 5 => {
-                    <Channel5<5> as super::private::TxChannelInternal<5>>::unlisten_interrupt(
+                    <Channel<5> as super::private::TxChannelInternal<5>>::unlisten_interrupt(
                         Event::End,
                     );
-                    <Channel5<5> as super::private::TxChannelInternal<5>>::unlisten_interrupt(
+                    <Channel<5> as super::private::TxChannelInternal<5>>::unlisten_interrupt(
                         Event::Error,
                     );
-                    <Channel5<5> as super::private::RxChannelInternal<5>>::unlisten_interrupt(
+                    <Channel<5> as super::private::RxChannelInternal<5>>::unlisten_interrupt(
                         Event::End,
                     );
-                    <Channel5<5> as super::private::RxChannelInternal<5>>::unlisten_interrupt(
+                    <Channel<5> as super::private::RxChannelInternal<5>>::unlisten_interrupt(
                         Event::Error,
                     );
                 }
                 #[cfg(any(esp32, esp32s3))]
                 6 => {
-                    <Channel6<6> as super::private::TxChannelInternal<6>>::unlisten_interrupt(
+                    <Channel<6> as super::private::TxChannelInternal<6>>::unlisten_interrupt(
                         Event::End,
                     );
-                    <Channel6<6> as super::private::TxChannelInternal<6>>::unlisten_interrupt(
+                    <Channel<6> as super::private::TxChannelInternal<6>>::unlisten_interrupt(
                         Event::Error,
                     );
-                    <Channel6<6> as super::private::RxChannelInternal<6>>::unlisten_interrupt(
+                    <Channel<6> as super::private::RxChannelInternal<6>>::unlisten_interrupt(
                         Event::End,
                     );
-                    <Channel6<6> as super::private::RxChannelInternal<6>>::unlisten_interrupt(
+                    <Channel<6> as super::private::RxChannelInternal<6>>::unlisten_interrupt(
                         Event::Error,
                     );
                 }
                 #[cfg(any(esp32, esp32s3))]
                 7 => {
-                    <Channel7<7> as super::private::TxChannelInternal<7>>::unlisten_interrupt(
+                    <Channel<7> as super::private::TxChannelInternal<7>>::unlisten_interrupt(
                         Event::End,
                     );
-                    <Channel7<7> as super::private::TxChannelInternal<7>>::unlisten_interrupt(
+                    <Channel<7> as super::private::TxChannelInternal<7>>::unlisten_interrupt(
                         Event::Error,
                     );
-                    <Channel7<7> as super::private::RxChannelInternal<7>>::unlisten_interrupt(
+                    <Channel<7> as super::private::RxChannelInternal<7>>::unlisten_interrupt(
                         Event::End,
                     );
-                    <Channel7<7> as super::private::RxChannelInternal<7>>::unlisten_interrupt(
+                    <Channel<7> as super::private::RxChannelInternal<7>>::unlisten_interrupt(
                         Event::Error,
                     );
                 }
@@ -1479,7 +1396,7 @@ mod chip_specific {
     macro_rules! impl_tx_channel {
         ($channel:ident, $signal:ident, $ch_num:literal) => {
             paste::paste! {
-                impl<const CHANNEL: u8> $crate::rmt::private::TxChannelInternal<CHANNEL> for $crate::rmt:: $channel <CHANNEL> {
+                impl $crate::rmt::private::TxChannelInternal<$ch_num> for $crate::rmt::$channel<$ch_num> {
                     fn new() -> Self {
                         Self {}
                     }
@@ -1580,7 +1497,7 @@ mod chip_specific {
                     fn start_tx() {
                         let rmt = unsafe { &*crate::peripherals::RMT::PTR };
 
-                        rmt.ref_cnt_rst.write(|w| unsafe { w.bits(1 << CHANNEL) });
+                        rmt.ref_cnt_rst.write(|w| unsafe { w.bits(1 << $ch_num) });
                         Self::update();
 
                         rmt.ch_tx_conf0[$ch_num].modify(|_, w| {
@@ -1668,7 +1585,7 @@ mod chip_specific {
     macro_rules! impl_rx_channel {
         ($channel:ident, $signal:ident, $ch_num:literal, $ch_index:literal) => {
             paste::paste! {
-                impl<const CHANNEL: u8> $crate::rmt::private::RxChannelInternal<CHANNEL> for $crate::rmt:: $channel <CHANNEL> {
+                impl $crate::rmt::private::RxChannelInternal<$ch_num> for $crate::rmt::$channel<$ch_num> {
                     fn new() -> Self {
                         Self {}
                     }
