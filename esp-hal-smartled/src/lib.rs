@@ -91,27 +91,27 @@ macro_rules! smartLedBuffer {
 
 /// Adapter taking an RMT channel and a specific pin and providing RGB LED
 /// interaction functionality using the `smart-leds` crate
-pub struct SmartLedsAdapter<TX, const CHANNEL: u8, const BUFFER_SIZE: usize>
+pub struct SmartLedsAdapter<TX, const BUFFER_SIZE: usize>
 where
-    TX: TxChannel<CHANNEL>,
+    TX: TxChannel,
 {
     channel: Option<TX>,
     rmt_buffer: [u32; BUFFER_SIZE],
 }
 
-impl<'d, TX, const CHANNEL: u8, const BUFFER_SIZE: usize> SmartLedsAdapter<TX, CHANNEL, BUFFER_SIZE>
+impl<'d, TX, const BUFFER_SIZE: usize> SmartLedsAdapter<TX, BUFFER_SIZE>
 where
-    TX: TxChannel<CHANNEL>,
+    TX: TxChannel,
 {
     /// Create a new adapter object that drives the pin using the RMT channel.
     pub fn new<C, O>(
         channel: C,
         pin: impl Peripheral<P = O> + 'd,
         rmt_buffer: [u32; BUFFER_SIZE],
-    ) -> SmartLedsAdapter<TX, CHANNEL, BUFFER_SIZE>
+    ) -> SmartLedsAdapter<TX, BUFFER_SIZE>
     where
         O: OutputPin + 'd,
-        C: TxChannelCreator<'d, TX, O, CHANNEL>,
+        C: TxChannelCreator<'d, TX, O>,
     {
         let config = TxChannelConfig {
             clk_divider: 1,
@@ -169,10 +169,9 @@ where
     }
 }
 
-impl<TX, const CHANNEL: u8, const BUFFER_SIZE: usize> SmartLedsWrite
-    for SmartLedsAdapter<TX, CHANNEL, BUFFER_SIZE>
+impl<TX, const BUFFER_SIZE: usize> SmartLedsWrite for SmartLedsAdapter<TX, BUFFER_SIZE>
 where
-    TX: TxChannel<CHANNEL>,
+    TX: TxChannel,
 {
     type Error = LedAdapterError;
     type Color = RGB8;
