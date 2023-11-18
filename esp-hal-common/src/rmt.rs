@@ -1797,7 +1797,7 @@ mod chip_specific {
     macro_rules! impl_tx_channel {
         ($channel:ident, $signal:ident, $ch_num:literal) => {
             paste::paste! {
-                impl<const CHANNEL: u8> super::private::TxChannelInternal<CHANNEL> for super::$channel<CHANNEL> {
+                impl super::private::TxChannelInternal<$ch_num> for super::$channel<$ch_num> {
                     fn new() -> Self {
                         Self {}
                     }
@@ -1966,7 +1966,7 @@ mod chip_specific {
     macro_rules! impl_rx_channel {
         ($channel:ident, $signal:ident, $ch_num:literal) => {
             paste::paste! {
-                impl<const CHANNEL: u8> super::private::RxChannelInternal<CHANNEL> for super::$channel<CHANNEL> {
+                impl super::private::RxChannelInternal<$ch_num> for super::$channel<$ch_num> {
                     fn new() -> Self {
                         Self {}
                     }
