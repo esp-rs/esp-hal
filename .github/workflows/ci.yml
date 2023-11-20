@@ -624,64 +624,64 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@v1
         with:
-          target: riscv32imc-unknown-none-elf, riscv32imac-unknown-none-elf
-          toolchain: stable
-          components: clippy
+          toolchain: nightly
+          targets: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          components: clippy,rust-src
       - uses: Swatinem/rust-cache@v2
 
-      # Run clippy on all packages targeting RISC-V.
+      # Run 'cargo clippy' on all packages targeting RISC-V:
       - name: clippy (esp-riscv-rt)
-        run: cd esp-riscv-rt && cargo +stable clippy -- -D warnings
+        run: cd esp-riscv-rt && cargo clippy --target=riscv32imc-unknown-none-elf -- -D warnings
+      - name: clippy (esp-ulp-riscv-hal, esp32s2)
+        run: cd esp-ulp-riscv-hal && cargo clippy --features=esp32s2 -- -D warnings
+      - name: clippy (esp-ulp-riscv-hal, esp32s3)
+        run: cd esp-ulp-riscv-hal && cargo clippy --features=esp32s3 -- -D warnings
       - name: clippy (esp32c2-hal)
-        run: cd esp32c2-hal && cargo +stable clippy -- -D warnings
+        run: cd esp32c2-hal && cargo clippy -- -D warnings
       - name: clippy (esp32c3-hal)
-        run: cd esp32c3-hal && cargo +stable clippy -- -D warnings
+        run: cd esp32c3-hal && cargo clippy -- -D warnings
       - name: clippy (esp32c6-hal)
-        run: cd esp32c6-hal && cargo +stable clippy -- -D warnings
+        run: cd esp32c6-hal && cargo clippy -- -D warnings
       - name: clippy (esp32c6-lp-hal)
-        run: cd esp32c6-lp-hal && cargo +stable clippy -- -D warnings -A asm-sub-register
+        run: cd esp32c6-lp-hal && cargo clippy -- -D warnings
       - name: clippy (esp32h2-hal)
-        run: cd esp32h2-hal && cargo +stable clippy -- -D warnings
-      - name: clippy (esp-ulp-riscv-hal)
-        run: cd esp-ulp-riscv-hal && cargo +stable clippy --features=esp32s3 -- -D warnings -A asm-sub-register
+        run: cd esp32h2-hal && cargo clippy -- -D warnings
 
   clippy-xtensa:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: esp-rs/xtensa-toolchain@v1.5
         with:
           ldproxy: false
       - uses: Swatinem/rust-cache@v2
 
-      # Run clippy on all packages targeting Xtensa.
+      # Run 'cargo clippy' on all packages targeting Xtensa:
       - name: clippy (esp32-hal)
-        run: cargo +esp clippy --manifest-path=esp32-hal/Cargo.toml -- -D warnings
+        run: cd esp32-hal && cargo clippy -- -D warnings
       - name: clippy (esp32s2-hal)
-        run: cargo +esp clippy --manifest-path=esp32s2-hal/Cargo.toml -- -D warnings
+        run: cd esp32s2-hal && cargo clippy -- -D warnings
       - name: clippy (esp32s3-hal)
-        run: cargo +esp clippy --manifest-path=esp32s3-hal/Cargo.toml -- -D warnings
+        run: cd esp32s3-hal && cargo clippy -- -D warnings
 
   rustfmt:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
-
-      # Some of the items in 'rustfmt.toml' require the nightly release
-      # channel, so we must use this channel for the formatting checks
-      # to succeed.
+      - uses: actions/checkout@v4
+      # Some of the configuration items in 'rustfmt.toml' require the 'nightly'
+      # release channel:
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: nightly
           components: rustfmt
       - uses: Swatinem/rust-cache@v2
 
-      # Check the formatting of all packages.
+      # Check the formatting of all packages:
       - name: rustfmt (esp-hal-common)
         run: cargo fmt --all --manifest-path=esp-hal-common/Cargo.toml -- --check
       - name: rustfmt (esp-hal-procmacros)
@@ -690,6 +690,8 @@ jobs:
         run: cargo fmt --all --manifest-path=esp-hal-smartled/Cargo.toml -- --check
       - name: rustfmt (esp-riscv-rt)
         run: cargo fmt --all --manifest-path=esp-riscv-rt/Cargo.toml -- --check
+      - name: rustfmt (esp-ulp-riscv-hal)
+        run: cargo fmt --all --manifest-path=esp-ulp-riscv-hal/Cargo.toml -- --check
       - name: rustfmt (esp32-hal)
         run: cargo fmt --all --manifest-path=esp32-hal/Cargo.toml -- --check
       - name: rustfmt (esp32c2-hal)
@@ -706,5 +708,3 @@ jobs:
         run: cargo fmt --all --manifest-path=esp32s2-hal/Cargo.toml -- --check
       - name: rustfmt (esp32s3-hal)
         run: cargo fmt --all --manifest-path=esp32s3-hal/Cargo.toml -- --check
-      - name: rustfmt (esp-ulp-riscv-hal)
-        run: cargo fmt --all --manifest-path=esp-ulp-riscv-hal/Cargo.toml -- --check
