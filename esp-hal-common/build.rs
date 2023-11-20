@@ -204,12 +204,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rustc-link-search={}", out.display());
 
     if cfg!(feature = "esp32") || cfg!(feature = "esp32s2") || cfg!(feature = "esp32s3") {
-        fs::copy("ld/xtensa/hal-defaults.x", out.join("hal-defaults.x")).unwrap();
+        fs::copy("ld/xtensa/hal-defaults.x", out.join("hal-defaults.x"))?;
+
         let (irtc, drtc) = if cfg!(feature = "esp32s3") {
             ("rtc_fast_seg", "rtc_fast_seg")
         } else {
             ("rtc_fast_iram_seg", "rtc_fast_dram_seg")
         };
+
         let alias = format!(
             r#"
             REGION_ALIAS("ROTEXT", irom_seg);
@@ -221,7 +223,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         "#,
             irtc, drtc
         );
-        fs::write(out.join("alias.x"), alias).unwrap();
+
+        fs::write(out.join("alias.x"), alias)?;
     } else {
         fs::copy("ld/riscv/hal-defaults.x", out.join("hal-defaults.x"))?;
         fs::copy("ld/riscv/asserts.x", out.join("asserts.x"))?;
@@ -229,6 +232,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     copy_dir_all("ld/sections", &out)?;
+    copy_dir_all(format!("ld/{device_name}"), &out)?;
 
     // Generate the eFuse table from the selected device's CSV file:
     gen_efuse_table(device_name, out)?;
