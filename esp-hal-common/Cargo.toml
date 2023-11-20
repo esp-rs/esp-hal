@@ -29,7 +29,7 @@ embedded-dma         = "0.2.0"
 embedded-hal         = { version = "0.2.7", features = ["unproven"] }
 embedded-hal-1       = { version = "=1.0.0-rc.1", optional = true, package = "embedded-hal" }
 embedded-hal-nb      = { version = "=1.0.0-rc.1", optional = true }
-embedded-io          = "0.6.1"
+embedded-io          = { version = "0.6.1", optional = true }
 esp-synopsys-usb-otg = { version = "0.3.2", optional = true, features = ["fs", "esp32sx"] }
 fugit                = "0.3.7"
 log                  = { version = "0.4.20", optional = true }
@@ -117,16 +117,25 @@ log = ["dep:log"]
 
 # Trait implementation features:
 #  - Implement the `embedded-hal@1.0.0-rc.x` traits (and friends)
+#  - Implement the `embedded-io` traits where able
 #  - Implement the `ufmt_write::Write` trait where able
-eh1  = ["embedded-hal-1", "embedded-hal-nb", "embedded-can"]
-ufmt = ["ufmt-write"]
+eh1         = ["embedded-hal-1", "embedded-hal-nb", "embedded-can"]
+embedded-io = ["dep:embedded-io"]
+ufmt        = ["ufmt-write"]
 
 # Support for asynchronous operation, implementing traits from
 # `embedded-hal-async` and `embedded-io-async`
-async = ["embedded-hal-async", "eh1", "embassy-sync", "embassy-futures", "embedded-io-async"]
+async = [
+    "embedded-hal-async",
+    "eh1",
+    "embassy-sync",
+    "embassy-futures",
+    "embedded-io",
+    "embedded-io-async",
+]
 
 # Embassy support
-embassy = ["embassy-time","procmacros/embassy"]
+embassy = ["embassy-time", "procmacros/embassy"]
 
 embassy-executor-interrupt = ["embassy", "embassy-executor"]
 embassy-executor-thread    = ["embassy", "embassy-executor"]
