@@ -145,10 +145,10 @@ impl Clock for RtcFastClock {
 }
 
 #[cfg(not(any(esp32c6, esp32h2)))]
-#[allow(unused)]
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 /// RTC SLOW_CLK frequency values
-pub(crate) enum RtcSlowClock {
+pub enum RtcSlowClock {
     /// Internal slow RC oscillator
     RtcSlowClockRtc     = 0,
     /// External 32 KHz XTAL
@@ -369,7 +369,7 @@ impl RtcClock {
     /// Get main XTAL frequency
     /// This is the value stored in RTC register RTC_XTAL_FREQ_REG by the
     /// bootloader, as passed to rtc_clk_init function.
-    fn get_xtal_freq() -> XtalClock {
+    pub fn get_xtal_freq() -> XtalClock {
         let xtal_freq_reg = unsafe { &*RTC_CNTL::PTR }.store4.read().bits();
 
         // Values of RTC_XTAL_FREQ_REG and RTC_APB_FREQ_REG are stored as two copies in
@@ -398,7 +398,7 @@ impl RtcClock {
 
     /// Get the RTC_SLOW_CLK source
     #[cfg(not(any(esp32c6, esp32h2)))]
-    fn get_slow_freq() -> RtcSlowClock {
+    pub fn get_slow_freq() -> RtcSlowClock {
         let rtc_cntl = unsafe { &*RTC_CNTL::PTR };
         let slow_freq = rtc_cntl.clk_conf.read().ana_clk_rtc_sel().bits();
         match slow_freq {
