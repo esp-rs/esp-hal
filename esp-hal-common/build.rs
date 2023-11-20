@@ -156,6 +156,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let atomic_emulation_enabled = cfg!(feature = "atomic-emulation");
     let portable_atomic_enabled = cfg!(feature = "portable-atomic");
 
+    if !atomic_emulation_enabled && detect_atomic_extension("a") {
+        panic!("Atomic emulation flags detected in `.cargo/config.toml` but `atomic-emulation` feature is not enabled!");
+    }
+
     if atomic_emulation_enabled && portable_atomic_enabled {
         panic!("The `atomic-emulation` and `portable-atomic` features cannot be used together");
     }
@@ -313,4 +317,34 @@ fn gen_efuse_table(device_name: &str, out_dir: impl AsRef<Path>) -> Result<(), B
     }
 
     Ok(())
+}
+
+fn detect_atomic_extension(ext: &str) -> bool {
+    let rustflags = env::var_os("CARGO_ENCODED_RUSTFLAGS")
+        .unwrap()
+        .into_string()
+        .unwrap();
+
+    // Users can pass -Ctarget-feature to the compiler multiple times, so we have to
+    // handle that
+    let target_flags = rustflags
+        .split(0x1f as char)
+        .filter(|s| s.starts_with("target-feature="))
+        .map(|s| s.strip_prefix("target-feature="))
+        .flatten();
+    for tf in target_flags {
+        let tf = tf
+            .split(",")
+            .map(|s| s.trim())
+            .filter(|s| s.starts_with('+'))
+            .map(|s| s.strip_prefix('+'))
+            .flatten();
+        for tf in tf {
+            if tf == ext {
+                return true;
+            }
+        }
+    }
+
+    false
 }
