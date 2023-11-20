@@ -296,10 +296,12 @@ impl embedded_hal_nb::serial::Write for UsbSerialJtag<'_> {
     }
 }
 
+#[cfg(feature = "embedded-io")]
 impl embedded_io::ErrorType for UsbSerialJtag<'_> {
     type Error = Error;
 }
 
+#[cfg(feature = "embedded-io")]
 impl embedded_io::Read for UsbSerialJtag<'_> {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
         let mut count = 0;
@@ -327,6 +329,7 @@ impl embedded_io::Read for UsbSerialJtag<'_> {
     }
 }
 
+#[cfg(feature = "embedded-io")]
 impl embedded_io::Write for UsbSerialJtag<'_> {
     fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
         self.write_bytes(buf)?;
