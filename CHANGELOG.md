@@ -19,7 +19,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- C2, C3: atomic emulation trap is now opt-in (#904)
 - Improve DMA documentation & clean up module (#915)
 - Only allow a single version of `esp-hal-common` to be present in an application (#934)
 - C3, C6 and H2 can now use the `zero-rtc-bss` feature to enable `esp-hal-common/rv-zero-rtc-bss` (#867)
@@ -41,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Breaking
 - Direct boot support has been removed (#903).
 - `Spi::new`/`Spi::new_half_duplex` takes no gpio pin now, instead you need to call `with_pins` to setup those (#901).
+- ESP32C2, ESP32C3: atomic emulation trap is now opt-in. When upgrading you must either remove [these lines](https://github.com/esp-rs/riscv-atomic-emulation-trap#usage) from your `.cargo/config.toml` or opt back in by enabling the feature. (#904)
 
 ## [0.13.1] - 2023-11-02
 
