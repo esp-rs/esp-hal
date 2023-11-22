@@ -5,6 +5,8 @@ use core::arch::global_asm;
 
 pub mod delay;
 pub mod gpio;
+pub mod prelude;
+pub mod uart;
 
 pub mod riscv {
     //! Low level access to RISC-V processors.
@@ -13,7 +15,6 @@ pub mod riscv {
 
     pub use riscv::*;
 }
-pub mod prelude;
 
 // LP_FAST_CLK is not very accurate, for now use a rough estimate
 const LP_FAST_CLK_HZ: u32 = 16_000_000;
