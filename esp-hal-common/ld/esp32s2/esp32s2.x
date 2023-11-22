@@ -34,8 +34,8 @@ INCLUDE "rtc_slow.x"
 _stack_region_top = ABSOLUTE(ORIGIN(dram_seg))+LENGTH(dram_seg);
 _stack_region_bottom = _stack_end;
 
-_stack_end_cpu0 = _stack_region_top;
-_stack_start_cpu0 = _stack_region_bottom;
+_stack_start_cpu0 = _stack_region_top;
+_stack_end_cpu0 = _stack_region_bottom;
 
 EXTERN(DefaultHandler);
 
