@@ -22,6 +22,18 @@
 //!   `SYSTIMER` peripheral
 //! - `embassy-time-timg0` - Enable the [embassy] time driver using the `TIMG0`
 //!   peripheral
+//! - `embassy-time-systick` - Enable the [embassy] time driver using the
+//!   `SYSTIMER` peripheral. The `SYSTIMER` peripheral has three alarms
+//!   available for use
+//! - `embassy-time-timg0` - Enable the [embassy] time driver using the `TIMG0`
+//!   peripheral. The `TIMG0` peripheral has two alarms available for use
+//! - `embassy-integrated-timers` - Uses hardware timers as alarms for the
+//!   executors. Using this feature limits the number of executors to the number
+//!   of hardware alarms provided by the time driver
+//! - `embassy-generic-queue-N` (where `N` can be `8`, `16`, `32`, `64` or
+//!   `128`) - Use a generic timer queue of size `N` for the executors' timer
+//!   queues. Using this feature can expand the number of executors you can use
+//!   to `N`
 //! - `log` - enable log output using the `log` crate
 //! - `psram-2m` - Use externally connected PSRAM (2MB)
 //! - `psram-4m` - Use externally connected PSRAM (4MB)
@@ -32,7 +44,8 @@
 //!
 //! #### Default Features
 //!
-//! The `rt` and `vectored` features are enabled by default.
+//! The `rt`, `vectored` and `embassy-integrated-timers` features are enabled by
+//! default.
 //!
 //! [embedded-hal-async]: https://github.com/rust-embedded/embedded-hal/tree/master/embedded-hal-async
 //! [embedded-io-async]: https://github.com/rust-embedded/embedded-hal/tree/master/embedded-io-async

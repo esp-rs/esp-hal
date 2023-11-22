@@ -37,7 +37,7 @@ async fn signal_task(mut pin: Gpio15<Output<PushPull>>) {
 }
 
 #[main]
-async fn main(spawner: Spawner) -> ! {
+async fn main(spawner: Spawner) {
     #[cfg(feature = "log")]
     esp_println::logger::init_logger_from_env();
     println!("Init!");

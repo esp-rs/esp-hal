@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A `embedded_io_async::Read` implementation for `UsbSerialJtag` (#889)
 - `RtcClock::get_xtal_freq`, `RtcClock::get_slow_freq` (#957)
 - Added Rx Timeout functionality to async Uart (#911)
+- RISC-V: Thread-mode and interrupt-mode executors, `#[main]` macro (#947)
 
 ### Changed
 
