@@ -36,8 +36,8 @@ _stack_region_bottom = _stack_end;
 /*
  use the whole remaining memory as core-0's stack
 */
-_stack_end_cpu0 = _stack_region_top;
-_stack_start_cpu0 = _stack_region_bottom;
+_stack_start_cpu0 = _stack_region_top;
+_stack_end_cpu0 = _stack_region_bottom;
 
 EXTERN(DefaultHandler);
 

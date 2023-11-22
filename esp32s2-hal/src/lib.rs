@@ -67,11 +67,11 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
         static mut _rtc_slow_bss_start: u32;
         static mut _rtc_slow_bss_end: u32;
 
-        static mut _stack_end_cpu0: u32;
+        static mut _stack_start_cpu0: u32;
     }
 
     // set stack pointer to end of memory: no need to retain stack up to this point
-    esp_hal_common::xtensa_lx::set_stack_pointer(&mut _stack_end_cpu0);
+    esp_hal_common::xtensa_lx::set_stack_pointer(&mut _stack_start_cpu0);
 
     // copying data from flash to various data segments is done by the bootloader
     // initialization to zero needs to be done by the application
