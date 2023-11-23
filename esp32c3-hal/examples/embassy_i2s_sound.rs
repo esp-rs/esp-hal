@@ -44,6 +44,7 @@ use esp32c3_hal::{
     IO,
 };
 use esp_backtrace as _;
+use esp_hal_embassy_procmacros::main;
 use esp_println::println;
 
 const SINE: [i16; 64] = [
@@ -64,13 +65,13 @@ async fn main(_spawner: Spawner) {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     #[cfg(feature = "embassy-time-systick")]
-    embassy::init(
+    esp_hal_embassy::init(
         &clocks,
         esp32c3_hal::systimer::SystemTimer::new(peripherals.SYSTIMER),
     );
 
     #[cfg(feature = "embassy-time-timg0")]
-    embassy::init(
+    esp_hal_embassy::init(
         &clocks,
         esp32c3_hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks).timer0,
     );
