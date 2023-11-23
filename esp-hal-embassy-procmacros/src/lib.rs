@@ -1,12 +1,45 @@
 use darling::ast::NestedMeta;
+use proc_macro::TokenStream;
 use syn::{
     parse::{Parse, ParseBuffer},
+    parse_macro_input,
     punctuated::Punctuated,
     Token,
 };
 
-pub(crate) struct Args {
-    pub(crate) meta: Vec<NestedMeta>,
+/// Creates a new `executor` instance and declares an application entry point
+/// spawning the corresponding function body as an async task.
+///
+/// The following restrictions apply:
+///
+/// * The function must accept exactly 1 parameter, an
+///   `embassy_executor::Spawner` handle that it can use to spawn additional
+///   tasks.
+/// * The function must be declared `async`.
+/// * The function must not use generics.
+/// * Only a single `main` task may be declared.
+///
+/// ## Examples
+/// Spawning a task:
+///
+/// ``` rust
+/// #[main]
+/// async fn main(_s: embassy_executor::Spawner) {
+///     // Function body
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
+    let args = parse_macro_input!(args as Args);
+    let f = parse_macro_input!(item as syn::ItemFn);
+
+    main::run(&args.meta, f, main::main())
+        .unwrap_or_else(|x| x)
+        .into()
+}
+
+struct Args {
+    meta: Vec<NestedMeta>,
 }
 
 impl Parse for Args {
@@ -18,12 +51,11 @@ impl Parse for Args {
     }
 }
 
-pub(crate) mod main {
+mod main {
     use std::{cell::RefCell, fmt::Display, thread};
 
     use darling::{export::NestedMeta, FromMeta};
-    use proc_macro2::{Ident, Span, TokenStream};
-    use proc_macro_crate::FoundCrate;
+    use proc_macro2::TokenStream;
     use quote::{quote, ToTokens};
     use syn::{ReturnType, Type};
 
@@ -162,25 +194,10 @@ pub(crate) mod main {
     }
 
     pub fn main() -> TokenStream {
-        let (hal_crate, hal_crate_name) = crate::get_hal_crate();
-
-        let executor = match hal_crate {
-            Ok(FoundCrate::Itself) => {
-                quote!( #hal_crate_name::embassy::executor::Executor )
-            }
-            Ok(FoundCrate::Name(ref name)) => {
-                let ident = Ident::new(&name, Span::call_site().into());
-                quote!( #ident::embassy::executor::Executor )
-            }
-            Err(_) => {
-                quote!(crate::embassy::executor::Executor)
-            }
-        };
-
         quote! {
             #[entry]
             fn main() -> ! {
-                let mut executor = #executor::new();
+                let mut executor = esp_hal_embassy::executor::Executor::new();
                 let executor = unsafe { __make_static(&mut executor) };
                 executor.run(|spawner| {
                     spawner.must_spawn(__embassy_main(spawner));
