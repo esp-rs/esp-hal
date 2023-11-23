@@ -24,9 +24,8 @@ use esp32_hal::{
     clock::ClockControl,
     dma::DmaPriority,
     dma_descriptors,
-    embassy::{self},
     pdma::*,
-    peripherals::Peripherals,
+    peripherals::{Interrupt, Peripherals},
     prelude::*,
     spi::{
         master::{prelude::*, Spi},
@@ -36,6 +35,7 @@ use esp32_hal::{
     IO,
 };
 use esp_backtrace as _;
+use esp_hal_embassy_procmacros::main;
 
 #[main]
 async fn main(_spawner: Spawner) {
@@ -45,13 +45,9 @@ async fn main(_spawner: Spawner) {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    embassy::init(&clocks, timer_group0.timer0);
+    esp_hal_embassy::init(&clocks, timer_group0.timer0);
 
-    esp32_hal::interrupt::enable(
-        esp32_hal::peripherals::Interrupt::SPI2_DMA,
-        esp32_hal::interrupt::Priority::Priority1,
-    )
-    .unwrap();
+    interrupt::enable(Interrupt::SPI2_DMA, Priority::Priority1).unwrap();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let sclk = io.pins.gpio19;

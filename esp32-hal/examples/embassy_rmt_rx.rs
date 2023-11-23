@@ -9,7 +9,6 @@ use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp32_hal::{
     clock::ClockControl,
-    embassy::{self},
     peripherals::Peripherals,
     prelude::*,
     rmt::{asynch::RxChannelAsync, PulseCode, RxChannelConfig, RxChannelCreator},
@@ -18,6 +17,7 @@ use esp32_hal::{
 };
 use esp_backtrace as _;
 use esp_hal_common::gpio::{Gpio15, Output, PushPull};
+use esp_hal_embassy_procmacros::main;
 use esp_println::{print, println};
 
 const WIDTH: usize = 80;
@@ -45,11 +45,8 @@ async fn main(spawner: Spawner) {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    #[cfg(feature = "embassy-time-timg0")]
-    {
-        let timer_group0 = esp32_hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks);
-        embassy::init(&clocks, timer_group0.timer0);
-    }
+    let timer_group0 = esp32_hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks);
+    esp_hal_embassy::init(&clocks, timer_group0.timer0);
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 

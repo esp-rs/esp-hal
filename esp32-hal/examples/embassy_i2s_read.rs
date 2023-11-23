@@ -19,7 +19,6 @@ use esp32_hal::{
     clock::ClockControl,
     dma::DmaPriority,
     dma_buffers,
-    embassy::{self},
     i2s::{asynch::*, DataFormat, I2s, Standard},
     pdma::Dma,
     peripherals::Peripherals,
@@ -28,6 +27,7 @@ use esp32_hal::{
     IO,
 };
 use esp_backtrace as _;
+use esp_hal_embassy_procmacros::main;
 use esp_println::println;
 
 #[main]
@@ -40,7 +40,7 @@ async fn main(_spawner: Spawner) {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    embassy::init(&clocks, timer_group0.timer0);
+    esp_hal_embassy::init(&clocks, timer_group0.timer0);
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 

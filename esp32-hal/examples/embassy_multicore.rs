@@ -12,7 +12,6 @@ use embassy_time::{Duration, Ticker};
 use esp32_hal::{
     clock::ClockControl,
     cpu_control::{CpuControl, Stack},
-    embassy::{self, executor::Executor},
     gpio::{GpioPin, Output, PushPull, IO},
     peripherals::Peripherals,
     prelude::*,
@@ -20,6 +19,8 @@ use esp32_hal::{
 };
 use esp_backtrace as _;
 use esp_hal_common::get_core;
+use esp_hal_embassy::executor::Executor;
+use esp_hal_embassy_procmacros::main;
 use esp_println::println;
 use static_cell::make_static;
 
@@ -51,7 +52,7 @@ async fn main(_spawner: Spawner) {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    embassy::init(&clocks, timer_group0.timer0);
+    esp_hal_embassy::init(&clocks, timer_group0.timer0);
 
     // Set GPIO2 as an output, and set its state high initially.
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);

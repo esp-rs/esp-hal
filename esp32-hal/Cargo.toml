@@ -41,6 +41,8 @@ embedded-io-async  = "0.6.0"
 embedded-hal-bus   = "0.1.0-rc.1"
 esp-alloc          = "0.3.0"
 esp-backtrace      = { version = "0.9.0", features = ["esp32", "panic-handler", "exception-handler", "print-uart"] }
+esp-hal-embassy    = { version = "0.1.0", features = ["esp32"], path = "../esp-hal-embassy" }
+esp-hal-embassy-procmacros = { version = "0.1.0", path = "../esp-hal-embassy-procmacros" }
 esp-hal-smartled   = { version = "0.6.0", features = ["esp32"], path = "../esp-hal-smartled" }
 esp-println        = { version = "0.7.0", features = ["esp32"] }
 heapless           = "0.7.16"
@@ -55,7 +57,7 @@ default            = ["rt", "vectored", "xtal-40mhz", "embassy-integrated-timers
 async              = ["esp-hal-common/async"]
 bluetooth          = []
 debug              = ["esp-hal-common/debug"]
-defmt              = ["esp-hal-common/defmt", "esp-println/defmt"]
+defmt              = ["esp-hal-common/defmt", "esp-hal-embassy/defmt", "esp-println/defmt"]
 eh1                = ["esp-hal-common/eh1"]
 log                = ["esp-hal-common/log", "esp-println/log"]
 rt                 = []
@@ -65,18 +67,17 @@ xtal-26mhz         = ["esp-hal-common/xtal-26mhz"]
 xtal-40mhz         = ["esp-hal-common/xtal-40mhz"]
 
 # Embassy support
-embassy                    = ["esp-hal-common/embassy"]
-embassy-time-timg0         = ["esp-hal-common/embassy-time-timg0", "embassy-time/tick-hz-1_000_000"]
-embassy-executor-thread    = ["esp-hal-common/embassy-executor-thread"]
-embassy-executor-interrupt = ["esp-hal-common/embassy-executor-interrupt"]
+embassy-time-timg0         = ["esp-hal-embassy/time-timg0", "embassy-time/tick-hz-1_000_000"]
+embassy-executor-thread    = ["esp-hal-embassy/executor-thread"]
+embassy-executor-interrupt = ["esp-hal-embassy/executor-interrupt"]
 
 # prefer integrated timers, but allow using the generic queue if needed
-embassy-integrated-timers = ["esp-hal-common/embassy-integrated-timers"]
-embassy-generic-queue-8   = ["esp-hal-common/embassy-generic-queue-8"]
-embassy-generic-queue-16  = ["esp-hal-common/embassy-generic-queue-16"]
-embassy-generic-queue-32  = ["esp-hal-common/embassy-generic-queue-32"]
-embassy-generic-queue-64  = ["esp-hal-common/embassy-generic-queue-64"]
-embassy-generic-queue-128 = ["esp-hal-common/embassy-generic-queue-128"]
+embassy-integrated-timers = ["esp-hal-embassy/integrated-timers"]
+embassy-generic-queue-8   = ["esp-hal-embassy/generic-queue-8"]
+embassy-generic-queue-16  = ["esp-hal-embassy/generic-queue-16"]
+embassy-generic-queue-32  = ["esp-hal-embassy/generic-queue-32"]
+embassy-generic-queue-64  = ["esp-hal-embassy/generic-queue-64"]
+embassy-generic-queue-128 = ["esp-hal-embassy/generic-queue-128"]
 
 # PSRAM support
 psram     = []
@@ -97,27 +98,27 @@ required-features = ["eh1"]
 
 [[example]]
 name              = "embassy_hello_world"
-required-features = ["embassy", "embassy-executor-thread"]
+required-features = ["embassy-executor-thread"]
 
 [[example]]
 name              = "embassy_multicore"
-required-features = ["embassy", "embassy-executor-thread"]
+required-features = ["embassy-executor-thread"]
 
 [[example]]
 name              = "embassy_multicore_interrupt"
-required-features = ["embassy", "embassy-executor-interrupt"]
+required-features = ["embassy-executor-interrupt"]
 
 [[example]]
 name              = "embassy_multiprio"
-required-features = ["embassy", "embassy-executor-interrupt"]
+required-features = ["embassy-executor-interrupt"]
 
 [[example]]
 name              = "embassy_wait"
-required-features = ["embassy", "embassy-executor-thread", "async"]
+required-features = ["embassy-executor-thread", "async"]
 
 [[example]]
 name              = "embassy_spi"
-required-features = ["embassy", "embassy-executor-thread", "async"]
+required-features = ["embassy-executor-thread", "async"]
 
 [[example]]
 name              = "psram"
@@ -125,24 +126,24 @@ required-features = ["psram-2m"]
 
 [[example]]
 name              = "embassy_serial"
-required-features = ["embassy", "embassy-executor-thread", "async"]
+required-features = ["embassy-executor-thread", "async"]
 
 [[example]]
 name              = "embassy_i2c"
-required-features = ["embassy", "embassy-executor-thread", "async"]
+required-features = ["embassy-executor-thread", "async"]
 
 [[example]]
 name              = "embassy_rmt_tx"
-required-features = ["embassy", "async"]
+required-features = ["async"]
 
 [[example]]
 name              = "embassy_rmt_rx"
-required-features = ["embassy", "async"]
+required-features = ["async"]
 
 [[example]]
 name              = "embassy_i2s_sound"
-required-features = ["embassy", "async"]
+required-features = ["async"]
 
 [[example]]
 name              = "embassy_i2s_read"
-required-features = ["embassy", "async"]
+required-features = ["async"]

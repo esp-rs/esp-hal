@@ -19,17 +19,10 @@ use embassy_executor::Spawner;
 use embassy_time::{Duration, Instant, Ticker, Timer};
 use esp32_hal as hal;
 use esp_backtrace as _;
+use esp_hal_embassy::executor::{FromCpu1, InterruptExecutor};
+use esp_hal_embassy_procmacros::main;
 use esp_println::println;
-use hal::{
-    clock::ClockControl,
-    embassy::{
-        self,
-        executor::{FromCpu1, InterruptExecutor},
-    },
-    interrupt::Priority,
-    peripherals::Peripherals,
-    prelude::*,
-};
+use hal::{clock::ClockControl, interrupt::Priority, peripherals::Peripherals, prelude::*};
 
 static INT_EXECUTOR_0: InterruptExecutor<FromCpu1> = InterruptExecutor::new();
 
@@ -80,11 +73,8 @@ async fn main(low_prio_spawner: Spawner) {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    #[cfg(feature = "embassy-time-timg0")]
-    {
-        let timer_group0 = hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks);
-        embassy::init(&clocks, timer_group0.timer0);
-    }
+    let timer_group0 = hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks);
+    esp_hal_embassy::init(&clocks, timer_group0.timer0);
 
     let spawner = INT_EXECUTOR_0.start(Priority::Priority2);
     spawner.must_spawn(high_prio());
