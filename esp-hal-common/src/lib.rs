@@ -92,8 +92,6 @@ pub mod delay;
 pub mod dma;
 #[cfg(ecc)]
 pub mod ecc;
-#[cfg(feature = "embassy")]
-pub mod embassy;
 #[cfg(soc_etm)]
 pub mod etm;
 #[cfg(gpio)]
@@ -161,8 +159,8 @@ pub mod trapframe {
 // be directly exposed.
 mod soc;
 
-#[allow(unused_imports)]
-mod atomic {
+#[doc(hidden)]
+pub mod atomic {
     #[cfg(any(has_native_atomic_support, feature = "atomic-emulation"))]
     pub use core::sync::atomic::*;
 

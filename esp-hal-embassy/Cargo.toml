@@ -1,0 +1,62 @@
+[package]
+name    = "esp-hal-embassy"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+cfg-if           = "1.0.0"
+critical-section = "1.1.2"
+defmt            = { version = "=0.3.5", optional = true }
+embassy-executor = "0.3.3"
+embassy-time     = { version = "0.1.5",  features = ["nightly"] }
+paste            = "1.0.14"
+
+[dependencies.esp-hal-common]
+features = ["vectored"]
+path     = "../esp-hal-common"
+version  = "0.13.0"
+
+[features]
+default = ["integrated-timers"]
+
+# Device selection:
+esp32   = ["esp-hal-common/esp32"]
+esp32c2 = ["esp-hal-common/esp32c2"]
+esp32c3 = ["esp-hal-common/esp32c3"]
+esp32c6 = ["esp-hal-common/esp32c6"]
+esp32h2 = ["esp-hal-common/esp32h2"]
+esp32s2 = ["esp-hal-common/esp32s2"]
+esp32s3 = ["esp-hal-common/esp32s3"]
+
+# Required for ESP32 and ESP32-C2 only:
+xtal-26mhz = ["esp-hal-common/xtal-26mhz"]
+xtal-40mhz = ["esp-hal-common/xtal-40mhz"]
+
+# Embassy executor:
+executor-interrupt = []
+executor-thread    = []
+
+# Embassy time driver:
+time-systimer = []
+time-timg0    = []
+
+# Prefer integrated timers, but allow using the generic queue if needed:
+integrated-timers = ["embassy-executor/integrated-timers"]
+generic-queue-8   = ["embassy-time/generic-queue-8"]
+generic-queue-16  = ["embassy-time/generic-queue-16"]
+generic-queue-32  = ["embassy-time/generic-queue-32"]
+generic-queue-64  = ["embassy-time/generic-queue-64"]
+generic-queue-128 = ["embassy-time/generic-queue-128"]
+
+# `defmt` support:
+defmt = [
+    "dep:defmt",
+    "embassy-executor/defmt",
+    "embassy-time/defmt",
+    "esp-hal-common/defmt",
+]
+
+# Atomics nightmare:
+atomic-emulation = ["esp-hal-common/atomic-emulation"]
+portable-atomic  = ["esp-hal-common/portable-atomic"]

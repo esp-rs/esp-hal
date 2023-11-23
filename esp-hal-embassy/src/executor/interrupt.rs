@@ -1,17 +1,17 @@
 //! Interrupt-mode executor.
+
 use core::{cell::UnsafeCell, marker::PhantomData, mem::MaybeUninit};
 
 use embassy_executor::{raw, SendSpawner};
-#[cfg(any(esp32c6, esp32h2))]
-use peripherals::INTPRI as SystemPeripheral;
-#[cfg(not(any(esp32c6, esp32h2)))]
-use peripherals::SYSTEM as SystemPeripheral;
-
-use crate::{
+#[cfg(any(feature = "esp32c6", feature = "esp32h2"))]
+use esp_hal_common::peripherals::INTPRI as SystemPeripheral;
+#[cfg(not(any(feature = "esp32c6", feature = "esp32h2")))]
+use esp_hal_common::peripherals::SYSTEM as SystemPeripheral;
+use esp_hal_common::{
     atomic::{AtomicUsize, Ordering},
     get_core,
     interrupt,
-    peripherals,
+    peripherals::Interrupt,
 };
 
 static FROM_CPU_IRQ_USED: AtomicUsize = AtomicUsize::new(0);
@@ -49,7 +49,7 @@ macro_rules! from_cpu {
                     // unsafe block because of direct-vectoring on riscv
                     #[allow(unused_unsafe)]
                     unsafe {
-                        unwrap!(interrupt::enable(peripherals::Interrupt::[<FROM_CPU_INTR $irq>], priority));
+                        unwrap!(interrupt::enable(Interrupt::[<FROM_CPU_INTR $irq>], priority));
                     }
                 }
 

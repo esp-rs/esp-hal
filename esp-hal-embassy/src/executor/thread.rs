@@ -2,28 +2,27 @@
 use core::marker::PhantomData;
 
 use embassy_executor::{raw, Spawner};
-
-use crate::{
+use esp_hal_common::{
     atomic::{AtomicBool, Ordering},
     get_core,
     prelude::interrupt,
 };
-#[cfg(multi_core)]
-use crate::{
+#[cfg(any(feature = "esp32", feature = "esp32s3"))]
+use esp_hal_common::{
     interrupt,
     peripherals::{self, SYSTEM},
 };
 
 /// global atomic used to keep track of whether there is work to do since sev()
 /// is not available on either Xtensa or RISC-V
-#[cfg(not(multi_core))]
+#[cfg(not(any(feature = "esp32", feature = "esp32s3")))]
 static SIGNAL_WORK_THREAD_MODE: [AtomicBool; 1] = [AtomicBool::new(false)];
-#[cfg(multi_core)]
+#[cfg(any(feature = "esp32", feature = "esp32s3"))]
 static SIGNAL_WORK_THREAD_MODE: [AtomicBool; 2] = [AtomicBool::new(false), AtomicBool::new(false)];
 
 #[interrupt]
 fn FROM_CPU_INTR0() {
-    #[cfg(multi_core)]
+    #[cfg(any(feature = "esp32", feature = "esp32s3"))]
     {
         // This interrupt is fired when the thread-mode executor's core needs to be
         // woken. It doesn't matter which core handles this interrupt first, the
@@ -42,8 +41,8 @@ pub(crate) fn pend_thread_mode(core: usize) {
 
     // If we are pending a task on the current core, we're done. Otherwise, we
     // need to make sure the other core wakes up.
-    #[cfg(multi_core)]
-    if core != crate::get_core() as usize {
+    #[cfg(any(feature = "esp32", feature = "esp32s3"))]
+    if core != get_core() as usize {
         // We need to clear the interrupt from software. We don't actually
         // need it to trigger and run the interrupt handler, we just need to
         // kick waiti to return.
@@ -64,7 +63,7 @@ pub struct Executor {
 impl Executor {
     /// Create a new Executor.
     pub fn new() -> Self {
-        #[cfg(multi_core)]
+        #[cfg(any(feature = "esp32", feature = "esp32s3"))]
         unwrap!(interrupt::enable(
             peripherals::Interrupt::FROM_CPU_INTR0,
             interrupt::Priority::Priority1,
@@ -110,7 +109,7 @@ impl Executor {
         }
     }
 
-    #[cfg(xtensa)]
+    #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
     pub fn wait_impl(cpu: usize) {
         // Manual critical section implementation that only masks interrupts handlers.
         // We must not acquire the cross-core on dual-core systems because that would
@@ -141,7 +140,7 @@ impl Executor {
         }
     }
 
-    #[cfg(riscv)]
+    #[cfg(not(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3")))]
     pub fn wait_impl(cpu: usize) {
         // we do not care about race conditions between the load and store operations,
         // interrupts will only set this value to true.

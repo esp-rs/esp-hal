@@ -304,8 +304,7 @@ impl<TG> Timer0<TG>
 where
     TG: TimerGroupInstance,
 {
-    #[allow(unused)]
-    pub(crate) unsafe fn steal() -> Self {
+    pub unsafe fn steal() -> Self {
         Self {
             phantom: PhantomData,
         }
@@ -473,8 +472,7 @@ impl<TG> Timer1<TG>
 where
     TG: TimerGroupInstance,
 {
-    #[allow(unused)]
-    pub(crate) unsafe fn steal() -> Self {
+    pub unsafe fn steal() -> Self {
         Self {
             phantom: PhantomData,
         }

@@ -1,11 +1,11 @@
 use critical_section::{CriticalSection, Mutex};
-
-use super::AlarmState;
-use crate::{
+use esp_hal_common::{
     clock::Clocks,
-    peripherals,
+    peripherals::Interrupt,
     systimer::{Alarm, SystemTimer, Target},
 };
+
+use crate::AlarmState;
 
 pub const ALARM_COUNT: usize = 3;
 
@@ -40,7 +40,7 @@ impl EmbassyTimer {
         }
     }
 
-    pub(super) fn on_alarm_allocated(&self, n: usize) {
+    pub(crate) fn on_alarm_allocated(&self, n: usize) {
         match n {
             0 => self.alarm0.enable_interrupt(true),
             1 => self.alarm1.enable_interrupt(true),
@@ -57,18 +57,21 @@ impl EmbassyTimer {
     }
 
     pub fn init(_clocks: &Clocks, _systimer: TimerType) {
-        use crate::{interrupt, interrupt::Priority, macros::interrupt};
+        use esp_hal_common::{
+            interrupt::{self, Priority},
+            macros::interrupt,
+        };
 
         unwrap!(interrupt::enable(
-            peripherals::Interrupt::SYSTIMER_TARGET0,
+            Interrupt::SYSTIMER_TARGET0,
             Priority::max()
         ));
         unwrap!(interrupt::enable(
-            peripherals::Interrupt::SYSTIMER_TARGET1,
+            Interrupt::SYSTIMER_TARGET1,
             Priority::max()
         ));
         unwrap!(interrupt::enable(
-            peripherals::Interrupt::SYSTIMER_TARGET2,
+            Interrupt::SYSTIMER_TARGET2,
             Priority::max()
         ));
 

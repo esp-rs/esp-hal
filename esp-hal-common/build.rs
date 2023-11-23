@@ -114,17 +114,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         assert_unique_used_features!("xtal-26mhz", "xtal-40mhz");
     }
 
-    // If the `embassy` feature is enabled, ensure that a time driver implementation
-    // is available:
-    #[cfg(feature = "embassy")]
-    {
-        #[cfg(feature = "esp32")]
-        assert_unique_used_features!("embassy-time-timg0");
-
-        #[cfg(not(feature = "esp32"))]
-        assert_unique_used_features!("embassy-time-systick", "embassy-time-timg0");
-    }
-
     // NOTE: update when adding new device support!
     // Determine the name of the configured device:
     let device_name = if cfg!(feature = "esp32") {
