@@ -45,6 +45,8 @@ ssd1306            = "0.8.4"
 portable-atomic    = "1.5.1"
 static_cell        = { version = "2.0.0", features = ["nightly"] }
 esp-hal-common     = { features = ["portable-atomic"], path = "../esp-hal-common" } # enable portable-atomic by default for examples
+esp-hal-embassy    = { version = "0.1.0", features = ["esp32c2"], path = "../esp-hal-embassy" }
+esp-hal-embassy-procmacros = { version = "0.1.0", path = "../esp-hal-embassy-procmacros" }
 hex-literal        = "0.4.1"
 crypto-bigint      = { version = "0.5.3", default-features = false }
 elliptic-curve     = { version = "0.13.6", default-features = false, features = ["sec1"] }
@@ -56,7 +58,7 @@ embassy-sync       = "0.4.0"
 default              = ["rt", "vectored", "xtal-40mhz", "embassy-integrated-timers"]
 async                = ["esp-hal-common/async"]
 debug                = ["esp-hal-common/debug"]
-defmt                = ["esp-hal-common/defmt", "esp-println/defmt"]
+defmt                = ["esp-hal-common/defmt", "esp-hal-embassy/defmt", "esp-println/defmt"]
 direct-vectoring     = ["esp-hal-common/direct-vectoring"]
 eh1                  = ["esp-hal-common/eh1"]
 interrupt-preemption = ["esp-hal-common/interrupt-preemption"]
@@ -68,19 +70,18 @@ xtal-26mhz           = ["esp-hal-common/xtal-26mhz"]
 xtal-40mhz           = ["esp-hal-common/xtal-40mhz"]
 
 # Embassy support
-embassy                    = ["esp-hal-common/embassy"]
-embassy-time-systick       = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-hz-16_000_000"]
-embassy-time-timg0         = ["esp-hal-common/embassy-time-timg0",   "embassy-time/tick-hz-1_000_000"]
-embassy-executor-interrupt = ["esp-hal-common/embassy-executor-interrupt"]
-embassy-executor-thread    = ["esp-hal-common/embassy-executor-thread"]
+embassy-time-systick       = ["esp-hal-embassy/time-systimer", "embassy-time/tick-hz-16_000_000"]
+embassy-time-timg0         = ["esp-hal-embassy/time-timg0",   "embassy-time/tick-hz-1_000_000"]
+embassy-executor-interrupt = ["esp-hal-embassy/executor-interrupt"]
+embassy-executor-thread    = ["esp-hal-embassy/executor-thread"]
 
 # prefer integrated timers, but allow using the generic queue if needed
-embassy-integrated-timers = ["esp-hal-common/embassy-integrated-timers"]
-embassy-generic-queue-8   = ["esp-hal-common/embassy-generic-queue-8"]
-embassy-generic-queue-16  = ["esp-hal-common/embassy-generic-queue-16"]
-embassy-generic-queue-32  = ["esp-hal-common/embassy-generic-queue-32"]
-embassy-generic-queue-64  = ["esp-hal-common/embassy-generic-queue-64"]
-embassy-generic-queue-128 = ["esp-hal-common/embassy-generic-queue-128"]
+embassy-integrated-timers = ["esp-hal-embassy/integrated-timers"]
+embassy-generic-queue-8   = ["esp-hal-embassy/generic-queue-8"]
+embassy-generic-queue-16  = ["esp-hal-embassy/generic-queue-16"]
+embassy-generic-queue-32  = ["esp-hal-embassy/generic-queue-32"]
+embassy-generic-queue-64  = ["esp-hal-embassy/generic-queue-64"]
+embassy-generic-queue-128 = ["esp-hal-embassy/generic-queue-128"]
 
 portable-atomic  = ["esp-hal-common/portable-atomic"]
 atomic-emulation = ["esp-hal-common/riscv-atomic-emulation"]
@@ -98,19 +99,19 @@ required-features = ["eh1"]
 
 [[example]]
 name              = "embassy_hello_world"
-required-features = ["embassy", "embassy-executor-thread"]
+required-features = ["embassy-executor-thread"]
 
 [[example]]
 name              = "embassy_multiprio"
-required-features = ["embassy", "embassy-executor-thread", "embassy-executor-interrupt"]
+required-features = ["embassy-executor-thread", "embassy-executor-interrupt"]
 
 [[example]]
 name              = "embassy_wait"
-required-features = ["embassy", "async", "embassy-executor-thread"]
+required-features = ["async", "embassy-executor-thread"]
 
 [[example]]
 name              = "embassy_spi"
-required-features = ["embassy", "async", "embassy-executor-thread"]
+required-features = ["async", "embassy-executor-thread"]
 
 [[example]]
 name              = "interrupt_preemption"
@@ -118,11 +119,11 @@ required-features = ["interrupt-preemption"]
 
 [[example]]
 name              = "embassy_serial"
-required-features = ["embassy", "async", "embassy-executor-thread"]
+required-features = ["async", "embassy-executor-thread"]
 
 [[example]]
 name              = "embassy_i2c"
-required-features = ["embassy", "async", "embassy-executor-thread"]
+required-features = ["async", "embassy-executor-thread"]
 
 [[example]]
 name              = "direct-vectoring"
