@@ -9,8 +9,9 @@
 
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
-use esp32c6_hal::{clock::ClockControl, embassy, peripherals::Peripherals, prelude::*};
+use esp32c6_hal::{clock::ClockControl, peripherals::Peripherals, prelude::*};
 use esp_backtrace as _;
+use esp_hal_embassy_procmacros::main;
 
 #[embassy_executor::task]
 async fn run() {
@@ -28,7 +29,7 @@ async fn main(spawner: Spawner) {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     #[cfg(feature = "embassy-time-systick")]
-    embassy::init(
+    esp_hal_embassy::init(
         &clocks,
         esp32c6_hal::systimer::SystemTimer::new(peripherals.SYSTIMER),
     );
@@ -36,7 +37,7 @@ async fn main(spawner: Spawner) {
     #[cfg(feature = "embassy-time-timg0")]
     {
         let timer_group0 = esp32c6_hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks);
-        embassy::init(&clocks, timer_group0.timer0);
+        esp_hal_embassy::init(&clocks, timer_group0.timer0);
     }
 
     spawner.spawn(run()).ok();
