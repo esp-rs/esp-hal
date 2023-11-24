@@ -18,7 +18,6 @@ use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp32s3_hal::{
     clock::ClockControl,
-    embassy::{self},
     i2c::I2C,
     interrupt,
     peripherals::{Interrupt, Peripherals},
@@ -26,6 +25,7 @@ use esp32s3_hal::{
     IO,
 };
 use esp_backtrace as _;
+use esp_hal_embassy_procmacros::main;
 use lis3dh_async::{Lis3dh, Range, SlaveAddr};
 
 #[main]
@@ -35,7 +35,7 @@ async fn main(_spawner: Spawner) {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     #[cfg(feature = "embassy-time-systick")]
-    embassy::init(
+    esp_hal_embassy::init(
         &clocks,
         esp32s3_hal::systimer::SystemTimer::new(peripherals.SYSTIMER),
     );
@@ -43,7 +43,7 @@ async fn main(_spawner: Spawner) {
     #[cfg(feature = "embassy-time-timg0")]
     {
         let timer_group0 = esp32s3_hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks);
-        embassy::init(&clocks, timer_group0.timer0);
+        esp_hal_embassy::init(&clocks, timer_group0.timer0);
     }
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);

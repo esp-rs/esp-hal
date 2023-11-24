@@ -12,13 +12,14 @@ use embassy_time::{Duration, Ticker};
 use esp32s3_hal::{
     clock::ClockControl,
     cpu_control::{CpuControl, Stack},
-    embassy::{self, executor::Executor},
     gpio::{GpioPin, Output, PushPull, IO},
     peripherals::Peripherals,
     prelude::*,
 };
 use esp_backtrace as _;
 use esp_hal_common::get_core;
+use esp_hal_embassy::executor::Executor;
+use esp_hal_embassy_procmacros::main;
 use esp_println::println;
 use static_cell::make_static;
 
@@ -53,7 +54,7 @@ async fn main(_spawner: Spawner) {
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
     #[cfg(feature = "embassy-time-systick")]
-    embassy::init(
+    esp_hal_embassy::init(
         &clocks,
         esp32s3_hal::systimer::SystemTimer::new(peripherals.SYSTIMER),
     );
@@ -61,7 +62,7 @@ async fn main(_spawner: Spawner) {
     #[cfg(feature = "embassy-time-timg0")]
     {
         let timer_group0 = esp32s3_hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks);
-        embassy::init(&clocks, timer_group0.timer0);
+        esp_hal_embassy::init(&clocks, timer_group0.timer0);
     }
 
     let mut cpu_control = CpuControl::new(system.cpu_control);
