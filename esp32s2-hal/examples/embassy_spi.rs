@@ -24,7 +24,6 @@ use esp32s2_hal::{
     clock::ClockControl,
     dma::DmaPriority,
     dma_descriptors,
-    embassy::{self},
     pdma::*,
     peripherals::Peripherals,
     prelude::*,
@@ -35,6 +34,7 @@ use esp32s2_hal::{
     IO,
 };
 use esp_backtrace as _;
+use esp_hal_embassy_procmacros::main;
 
 #[main]
 async fn main(_spawner: Spawner) {
@@ -44,7 +44,7 @@ async fn main(_spawner: Spawner) {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     #[cfg(feature = "embassy-time-systick")]
-    embassy::init(
+    esp_hal_embassy::init(
         &clocks,
         esp32s2_hal::systimer::SystemTimer::new(peripherals.SYSTIMER),
     );
@@ -52,7 +52,7 @@ async fn main(_spawner: Spawner) {
     #[cfg(feature = "embassy-time-timg0")]
     {
         let timer_group0 = esp32s2_hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks);
-        embassy::init(&clocks, timer_group0.timer0);
+        esp_hal_embassy::init(&clocks, timer_group0.timer0);
     }
 
     esp32s2_hal::interrupt::enable(
