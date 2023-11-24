@@ -7,6 +7,11 @@
 
 use core::cell::Cell;
 
+#[cfg(any(
+    feature = "executor-thread",
+    feature = "time-systimer",
+    feature = "time-timg0"
+))]
 use esp_hal_common::{clock::Clocks, peripherals, trapframe};
 
 // MUST be the first module
