@@ -1,3 +1,4 @@
+use esp32c6::modem_syscon;
 use fugit::HertzU32;
 use strum::FromRepr;
 
@@ -1428,26 +1429,28 @@ pub(crate) fn configure_clock() {
 
 fn modem_clk_domain_active_state_icg_map_preinit() {
     unsafe {
-        pmu()
-            .hp_active_icg_modem()
-            .modify(|_, w| w.hp_active_dig_icg_modem_code().bits(2));
+        const PMU_HP_ICG_MODEM_CODE_ACTIVE: u32 = 2;
 
-        // TODO: clean this up
-        const MODEM_SYSCON_CLK_CONF_POWER_ST: u32 = 0x600A9800 + 0xc;
-        const MODEM_LPCON_CLK_CONF_POWER_ST: u32 = 0x600A9800 + 0x20;
+        // Configure modem ICG code in PMU_ACTIVE state
+        pmu().hp_active_icg_modem().modify(|_, w| {
+            w.hp_active_dig_icg_modem_code()
+                .bits(PMU_HP_ICG_MODEM_CODE_ACTIVE)
+        });
 
-        (MODEM_SYSCON_CLK_CONF_POWER_ST as *mut u32).write_volatile(
-            (MODEM_SYSCON_CLK_CONF_POWER_ST as *mut u32).read_volatile() & !(3 << 28) | 2 << 28,
-        );
+        // Disable clock gating for MODEM_APB, I2C_MST and LP_APB clock domains in
+        // PMU_ACTIVE state
+        modem_syscon().clk_conf_power_st().modify(|_, w| {
+            w.clk_modem_apb_st_map()
+                .bits(1 << PMU_HP_ICG_MODEM_CODE_ACTIVE)
+        });
+        modem_lpcon().clk_conf_power_st().modify(|_, w| {
+            w.clk_i2c_mst_st_map()
+                .bits(1 << PMU_HP_ICG_MODEM_CODE_ACTIVE)
+                .clk_lp_apb_st_map()
+                .bits(1 << PMU_HP_ICG_MODEM_CODE_ACTIVE)
+        });
 
-        (MODEM_LPCON_CLK_CONF_POWER_ST as *mut u32).write_volatile(
-            (MODEM_LPCON_CLK_CONF_POWER_ST as *mut u32).read_volatile() & !(3 << 28) | 2 << 28,
-        );
-
-        (MODEM_LPCON_CLK_CONF_POWER_ST as *mut u32).write_volatile(
-            (MODEM_LPCON_CLK_CONF_POWER_ST as *mut u32).read_volatile() & !(3 << 28) | 2 << 28,
-        );
-
+        // Software trigger force update modem ICG code and ICG switch
         pmu()
             .imm_modem_icg()
             .write(|w| w.update_dig_icg_modem_en().set_bit());
@@ -1455,7 +1458,7 @@ fn modem_clk_domain_active_state_icg_map_preinit() {
             .imm_sleep_sysclk()
             .write(|w| w.update_dig_icg_switch().set_bit());
 
-        lp_clkrst
+        lp_clkrst()
             .fosc_cntl()
             .modify(|_, w| w.fosc_dfreq().bits(100));
         regi2c_write_mask(
@@ -1471,6 +1474,7 @@ fn modem_clk_domain_active_state_icg_map_preinit() {
             .modify(|_, w| w.rc32k_dfreq().bits(100));
 
         // https://github.com/espressif/esp-idf/commit/e3148369f32fdc6de62c35a67f7adb6f4faef4e3#diff-cc84d279f2f3d77fe252aa40a64d4813f271a52b5a4055e876efd012d888e135R810-R815
+        // clk_ll_rc_fast_tick_conf
         pcr()
             .ctrl_tick_conf()
             .modify(|_, w| w.fosc_tick_num().bits(255 as u8));
