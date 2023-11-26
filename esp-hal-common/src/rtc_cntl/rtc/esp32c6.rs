@@ -30,6 +30,1298 @@ const I2C_DIG_REG_SCK_DCAP: u8 = 14;
 const I2C_DIG_REG_SCK_DCAP_MSB: u8 = 7;
 const I2C_DIG_REG_SCK_DCAP_LSB: u8 = 0;
 
+unsafe fn pmu<'a>() -> &'a esp32c6::pmu::RegisterBlock {
+    &*esp32c6::PMU::ptr()
+}
+
+unsafe fn modem_lpcon<'a>() -> &'a esp32c6::modem_lpcon::RegisterBlock {
+    &*esp32c6::MODEM_LPCON::ptr()
+}
+
+unsafe fn modem_syscon<'a>() -> &'a esp32c6::modem_syscon::RegisterBlock {
+    &*esp32c6::MODEM_SYSCON::ptr()
+}
+
+struct MachineConstants;
+impl MachineConstants {
+    const LP_MIN_SLP_TIME_US: u32 = 450;
+    const LP_WAKEUP_WAIT_CYCLE: u32 = 4;
+    const LP_ANALOG_WAIT_TIME_US: u32 = 154;
+    const LP_XTAL_WAIT_STABLE_TIME_US: u32 = 250;
+    const LP_CLK_SWITCH_CYCLE: u32 = 1;
+    const LP_CLK_POWER_ON_WAIT_CYCLE: u32 = 1;
+    const LP_POWER_SUPPLY_WAIT_TIME_US: u32 = 2;
+    const LP_POWER_UP_WAIT_TIME_US: u32 = 2;
+
+    const HP_MIN_SLP_TIME_US: u32 = 450;
+    const HP_CLOCK_DOMAIN_SYNC_TIME_US: u32 = 150;
+    const HP_SYSTEM_DFS_UP_WORK_TIME_US: u32 = 124;
+    const HP_ANALOG_WAIT_TIME_US: u32 = 154;
+    const HP_POWER_SUPPLY_WAIT_TIME_US: u32 = 2;
+    const HP_POWER_UP_WAIT_TIME_US: u32 = 2;
+    const HP_REGDMA_S2M_WORK_TIME_US: u32 = 172;
+    const HP_REGDMA_S2A_WORK_TIME_US: u32 = 480;
+    const HP_REGDMA_M2A_WORK_TIME_US: u32 = 278;
+    // const HP_REGDMA_A2S_WORK_TIME_US: u32 = 382;
+    const HP_REGDMA_RF_ON_WORK_TIME_US: u32 = 70;
+    // const HP_REGDMA_RF_OFF_WORK_TIME_US: u32 = 23;
+    const HP_XTAL_WAIT_STABLE_TIME_US: u32 = 250;
+    const HP_PLL_WAIT_STABLE_TIME_US: u32 = 1;
+
+    const MODEM_STATE_SKIP_TIME_US: u32 = Self::HP_REGDMA_M2A_WORK_TIME_US
+        + Self::HP_SYSTEM_DFS_UP_WORK_TIME_US
+        + Self::LP_MIN_SLP_TIME_US;
+}
+
+fn pmu_power_domain_force_default() {
+    unsafe {
+        // for bypass reserved power domain
+
+        // PMU_HP_PD_TOP
+        pmu().power_pd_top_cntl().modify(|_, w| {
+            w.force_top_reset() // pmu_ll_hp_set_power_force_reset
+                .bit(false)
+                .force_top_iso() // pmu_ll_hp_set_power_force_isolate
+                .bit(false)
+                .force_top_pu() // pmu_ll_hp_set_power_force_power_up
+                .bit(false)
+                .force_top_no_reset() // pmu_ll_hp_set_power_force_no_reset
+                .bit(false)
+                .force_top_no_iso() // pmu_ll_hp_set_power_force_no_isolate
+                .bit(false)
+                .force_top_pd() // pmu_ll_hp_set_power_force_power_down
+                .bit(false)
+        });
+
+        // PMU_HP_PD_HP_AON
+        pmu().power_pd_hpaon_cntl().modify(|_, w| {
+            w.force_hp_aon_reset() // pmu_ll_hp_set_power_force_reset
+                .bit(false)
+                .force_hp_aon_iso() // pmu_ll_hp_set_power_force_isolate
+                .bit(false)
+                .force_hp_aon_pu() // pmu_ll_hp_set_power_force_power_up
+                .bit(false)
+                .force_hp_aon_no_reset() // pmu_ll_hp_set_power_force_no_reset
+                .bit(false)
+                .force_hp_aon_no_iso() // pmu_ll_hp_set_power_force_no_isolate
+                .bit(false)
+                .force_hp_aon_pd() // pmu_ll_hp_set_power_force_power_down
+                .bit(false)
+        });
+
+        // PMU_HP_PD_CPU
+        pmu().power_pd_hpcpu_cntl().modify(|_, w| {
+            w.force_hp_cpu_reset() // pmu_ll_hp_set_power_force_reset
+                .bit(false)
+                .force_hp_cpu_iso() // pmu_ll_hp_set_power_force_isolate
+                .bit(false)
+                .force_hp_cpu_pu() // pmu_ll_hp_set_power_force_power_up
+                .bit(false)
+                .force_hp_cpu_no_reset() // pmu_ll_hp_set_power_force_no_reset
+                .bit(false)
+                .force_hp_cpu_no_iso() // pmu_ll_hp_set_power_force_no_isolate
+                .bit(false)
+                .force_hp_cpu_pd() // pmu_ll_hp_set_power_force_power_down
+                .bit(false)
+        });
+
+        // PMU_HP_PD_WIFI
+        pmu().power_pd_hpwifi_cntl().modify(|_, w| {
+            w.force_hp_wifi_reset() // pmu_ll_hp_set_power_force_reset
+                .bit(false)
+                .force_hp_wifi_iso() // pmu_ll_hp_set_power_force_isolate
+                .bit(false)
+                .force_hp_wifi_pu() // pmu_ll_hp_set_power_force_power_up
+                .bit(false)
+                .force_hp_wifi_no_reset() // pmu_ll_hp_set_power_force_no_reset
+                .bit(false)
+                .force_hp_wifi_no_iso() // pmu_ll_hp_set_power_force_no_isolate
+                .bit(false)
+                .force_hp_wifi_pd() // pmu_ll_hp_set_power_force_power_down
+                .bit(false)
+        });
+
+        // Isolate all memory banks while sleeping, avoid memory leakage current
+
+        pmu().power_pd_mem_cntl().modify(|_, w| {
+            w.force_hp_mem_no_iso() // pmu_ll_hp_set_memory_no_isolate
+                .bits(0)
+        });
+
+        pmu().power_pd_lpperi_cntl().modify(|_, w| {
+            w.force_lp_peri_reset() // pmu_ll_lp_set_power_force_reset
+                .bit(false)
+                .force_lp_peri_iso() // pmu_ll_lp_set_power_force_isolate
+                .bit(false)
+                .force_lp_peri_pu() // pmu_ll_lp_set_power_force_power_up
+                .bit(false)
+                .force_lp_peri_no_reset() // pmu_ll_lp_set_power_force_no_reset
+                .bit(false)
+                .force_lp_peri_no_iso() // pmu_ll_lp_set_power_force_no_isolate
+                .bit(false)
+                .force_lp_peri_pd() // pmu_ll_lp_set_power_force_power_down
+                .bit(false)
+        });
+    };
+}
+
+fn modem_clock_domain_power_state_icg_map_init() {
+    // C6 has SOC_PM_SUPPORT_PMU_MODEM_STATE defined
+
+    // const ICG_NOGATING_SLEEP: u8 = 1 << 0; // unused
+    const ICG_NOGATING_MODEM: u8 = 1 << 1;
+    const ICG_NOGATING_ACTIVE: u8 = 1 << 2;
+
+    // the ICG code's bit 0, 1 and 2 indicates the ICG state
+    // of pmu SLEEP, MODEM and ACTIVE mode respectively
+    unsafe {
+        modem_syscon().clk_conf_power_st().modify(|_, w| {
+            w.clk_modem_apb_st_map() // modem_syscon_ll_set_modem_apb_icg_bitmap
+                .bits(ICG_NOGATING_ACTIVE | ICG_NOGATING_MODEM)
+                .clk_modem_peri_st_map() // modem_syscon_ll_set_modem_periph_icg_bitmap
+                .bits(ICG_NOGATING_ACTIVE)
+                .clk_wifi_st_map() // modem_syscon_ll_set_wifi_icg_bitmap
+                .bits(ICG_NOGATING_ACTIVE | ICG_NOGATING_MODEM)
+                .clk_bt_st_map() // modem_syscon_ll_set_bt_icg_bitmap
+                .bits(ICG_NOGATING_ACTIVE | ICG_NOGATING_MODEM)
+                .clk_fe_st_map() // modem_syscon_ll_set_fe_icg_bitmap
+                .bits(ICG_NOGATING_ACTIVE | ICG_NOGATING_MODEM)
+                .clk_zb_st_map() // modem_syscon_ll_set_ieee802154_icg_bitmap
+                .bits(ICG_NOGATING_ACTIVE | ICG_NOGATING_MODEM)
+        });
+
+        modem_lpcon().clk_conf_power_st().modify(|_, w| {
+            w.clk_lp_apb_st_map() // modem_lpcon_ll_set_lp_apb_icg_bitmap
+                .bits(ICG_NOGATING_ACTIVE | ICG_NOGATING_MODEM)
+                .clk_i2c_mst_st_map() // modem_lpcon_ll_set_i2c_master_icg_bitmap
+                .bits(ICG_NOGATING_ACTIVE | ICG_NOGATING_MODEM)
+                .clk_coex_st_map() // modem_lpcon_ll_set_coex_icg_bitmap
+                .bits(ICG_NOGATING_ACTIVE | ICG_NOGATING_MODEM)
+                .clk_wifipwr_st_map() // modem_lpcon_ll_set_wifipwr_icg_bitmap
+                .bits(ICG_NOGATING_ACTIVE | ICG_NOGATING_MODEM)
+        });
+    }
+}
+
+enum RtcSlowClockSource {
+    /// Select RC_SLOW_CLK as RTC_SLOW_CLK source
+    RcSlow  = 0,
+
+    /// Select XTAL32K_CLK as RTC_SLOW_CLK source
+    XTAL32K = 1,
+
+    /// Select RC32K_CLK as RTC_SLOW_CLK source
+    RC32K   = 2,
+
+    /// Select OSC_SLOW_CLK (external slow clock) as RTC_SLOW_CLK source
+    OscSlow = 3,
+
+    /// Invalid RTC_SLOW_CLK source
+    Invalid,
+}
+
+impl RtcSlowClockSource {
+    fn current() -> Self {
+        // clk_ll_rtc_slow_get_src()
+        let lp_clkrst = unsafe { &*esp32c6::LP_CLKRST::ptr() };
+        match lp_clkrst.lp_clk_conf().read().slow_clk_sel().bits() {
+            0 => Self::RcSlow,
+            1 => Self::XTAL32K,
+            2 => Self::RC32K,
+            3 => Self::OscSlow,
+            _ => Self::Invalid,
+        }
+    }
+}
+
+#[allow(unused)]
+enum ModemClockLpclkSource {
+    RcSlow = 0,
+    RcFast,
+    MainXtal,
+    RC32K,
+    XTAL32K,
+    EXT32K,
+}
+
+impl From<RtcSlowClockSource> for ModemClockLpclkSource {
+    fn from(src: RtcSlowClockSource) -> Self {
+        match src {
+            RtcSlowClockSource::RcSlow => Self::RcSlow,
+            RtcSlowClockSource::XTAL32K => Self::XTAL32K,
+            RtcSlowClockSource::RC32K => Self::RC32K,
+            RtcSlowClockSource::OscSlow => Self::EXT32K,
+            _ => Self::RcSlow,
+        }
+    }
+}
+
+fn modem_clock_hal_deselect_all_wifi_lpclk_source() {
+    unsafe {
+        modem_lpcon().wifi_lp_clk_conf().modify(|_, w| {
+            w.clk_wifipwr_lp_sel_osc_slow()
+                .clear_bit()
+                .clk_wifipwr_lp_sel_osc_fast()
+                .clear_bit()
+                .clk_wifipwr_lp_sel_xtal32k()
+                .clear_bit()
+                .clk_wifipwr_lp_sel_xtal()
+                .clear_bit()
+        })
+    }
+}
+
+fn modem_clock_hal_select_wifi_lpclk_source(src: ModemClockLpclkSource) {
+    unsafe {
+        modem_lpcon().coex_lp_clk_conf().modify(|_, w| match src {
+            ModemClockLpclkSource::RcSlow => w.clk_coex_lp_sel_osc_slow().set_bit(),
+            ModemClockLpclkSource::RcFast => w.clk_coex_lp_sel_osc_fast().set_bit(),
+            ModemClockLpclkSource::MainXtal => w.clk_coex_lp_sel_xtal().set_bit(),
+
+            ModemClockLpclkSource::RC32K
+            | ModemClockLpclkSource::XTAL32K
+            | ModemClockLpclkSource::EXT32K => w.clk_coex_lp_sel_xtal32k().set_bit(),
+        });
+
+        modem_lpcon().modem_32k_clk_conf().modify(|_, w| match src {
+            ModemClockLpclkSource::RcSlow
+            | ModemClockLpclkSource::RcFast
+            | ModemClockLpclkSource::MainXtal => w,
+
+            ModemClockLpclkSource::RC32K => w.clk_modem_32k_sel().variant(1),
+            ModemClockLpclkSource::XTAL32K => w.clk_modem_32k_sel().variant(0),
+            ModemClockLpclkSource::EXT32K => w.clk_modem_32k_sel().variant(2),
+        });
+    }
+}
+
+fn modem_lpcon_ll_set_wifi_lpclk_divisor_value(divider: u16) {
+    unsafe {
+        modem_lpcon()
+            .wifi_lp_clk_conf()
+            .modify(|_, w| w.clk_wifipwr_lp_div_num().bits(divider))
+    }
+}
+
+fn modem_clock_hal_enable_wifipwr_clock(enable: bool) {
+    // FIXME: esp-idf uses refcounting here for later revisions.
+    unsafe {
+        modem_lpcon()
+            .clk_conf()
+            .modify(|_, w| w.clk_wifipwr_en().bit(enable));
+    }
+}
+
+fn modem_clock_select_lp_clock_source(
+    periph: RadioPeripherals,
+    src: ModemClockLpclkSource,
+    divider: u16,
+) {
+    match periph {
+        RadioPeripherals::Wifi => {
+            modem_clock_hal_deselect_all_wifi_lpclk_source();
+            modem_clock_hal_select_wifi_lpclk_source(src);
+            modem_lpcon_ll_set_wifi_lpclk_divisor_value(divider);
+            modem_clock_hal_enable_wifipwr_clock(true);
+        }
+        RadioPeripherals::Phy | RadioPeripherals::Bt | RadioPeripherals::Ieee802154 => {
+            todo!("unused by setup code")
+        }
+    }
+}
+
+const fn hp_retention_regdma_config(dir: u32, entry: u32) -> u32 {
+    (((dir) << 2) | (entry & 0x3)) & 0x7
+}
+
+const HP_CALI_DBIAS: u32 = 25;
+
+const ICG_MODEM_CODE_SLEEP: u32 = 0;
+const ICG_MODEM_CODE_MODEM: u32 = 1;
+const ICG_MODEM_CODE_ACTIVE: u32 = 2;
+
+const HP_SYSCLK_XTAL: u32 = 0;
+const HP_SYSCLK_PLL: u32 = 1;
+
+bitfield::bitfield! {
+    #[derive(Clone, Copy, Default)]
+    // pmu_hp_power_t.0
+    pub struct HpDigPower(u32);
+
+    pub u32, reserved0    , set_reserved0    : 20, 0;
+    pub u32, vdd_spi_pd_en, set_vdd_spi_pd_en: 21;
+    pub u32, mem_dslp     , set_mem_dslp     : 22;
+    pub u32, mem_pd_en    , set_mem_pd_en    : 26, 23;
+    pub u32, wifi_pd_en   , set_wifi_pd_en   : 27;
+    pub u32, reserved1    , set_reserved1    : 28;
+    pub u32, cpu_pd_en    , set_cpu_pd_en    : 29;
+    pub u32, aon_pd_en    , set_aon_pd_en    : 30;
+    pub u32, top_pd_en    , set_top_pd_en    : 31;
+}
+
+bitfield::bitfield! {
+    #[derive(Clone, Copy, Default)]
+    // pmu_hp_power_t.1
+    pub struct HpClkPower(u32);
+
+    pub u32, reserved2    , set_reserved2    : 25, 0;
+    pub u32, i2c_iso_en   , set_i2c_iso_en   : 26;
+    pub u32, i2c_retention, set_i2c_retention: 27;
+    pub u32, xpd_bb_i2c   , set_xpd_bb_i2c   : 28;
+    pub u32, xpd_bbpll_i2c, set_xpd_bbpll_i2c: 29;
+    pub u32, xpd_bbpll    , set_xpd_bbpll    : 30;
+    pub u32, reserved3    , set_reserved3    : 31;
+}
+
+bitfield::bitfield! {
+    #[derive(Clone, Copy, Default)]
+    // pmu_hp_power_t.2
+    pub struct HpXtalPower(u32);
+
+    pub u32, reserved4    , set_reserved4    : 30, 0;
+    pub u32, xpd_xtal     , set_xpd_xtal     : 31;
+}
+
+#[derive(Clone, Copy, Default)]
+// pmu_sleep_power_config_t.0
+pub struct HpSysPower {
+    // This is a best-guess assignment of the variants in the union `pmu_hp_power_t` union
+    // In esp-idf, all three fields are `pmu_hp_power_t`
+    pub dig_power: HpDigPower,
+    pub clk: HpClkPower,
+    pub xtal: HpXtalPower,
+}
+
+bitfield::bitfield! {
+    #[derive(Clone, Copy, Default)]
+    // pmu_hp_sys_cntl_reg_t
+    pub struct HpSysCntlReg(u32);
+
+    pub u32, reserved0      , set_reserved0      : 23, 0;
+    pub u32, uart_wakeup_en , set_uart_wakeup_en : 24;
+    pub u32, lp_pad_hold_all, set_lp_pad_hold_all: 25;
+    pub u32, hp_pad_hold_all, set_hp_pad_hold_all: 26;
+    pub u32, dig_pad_slp_sel, set_dig_pad_slp_sel: 27;
+    pub u32, dig_pause_wdt  , set_dig_pause_wdt  : 28;
+    pub u32, dig_cpu_stall  , set_dig_cpu_stall  : 29;
+    pub u32, reserved1      , set_reserved1      : 31, 30;
+}
+
+bitfield::bitfield! {
+    #[derive(Clone, Copy, Default)]
+    // pmu_hp_icg_modem_reg_t
+    pub struct HpIcgModem(u32);
+
+    pub u32, reserved     , set_reserved : 29, 0;
+    pub u32, code         , set_code     : 31, 30;
+}
+
+bitfield::bitfield! {
+    #[derive(Clone, Copy, Default)]
+    // pmu_hp_sysclk_reg_t
+    pub struct HpSysclk(u32);
+
+    pub u32, reserved         , set_reserved         : 25, 0;
+    pub u32, dig_sysclk_nodiv , set_dig_sysclk_nodiv : 26;
+    pub u32, icg_sysclk_en    , set_icg_sysclk_en    : 27;
+    pub u32, sysclk_slp_sel   , set_sysclk_slp_sel   : 28;
+    pub u32, icg_slp_sel      , set_icg_slp_sel      : 29;
+    pub u32, dig_sysclk_sel   , set_dig_sysclk_sel   : 31, 30;
+}
+
+// pmu_hp_system_clock_param_t
+#[derive(Clone, Copy, Default)]
+struct SystemClockParam {
+    icg_func: u32,
+    icg_apb: u32,
+    icg_modem: HpIcgModem,
+    sysclk: HpSysclk,
+}
+
+bitfield::bitfield! {
+    #[derive(Clone, Copy, Default)]
+    // pmu_hp_analog_t.0
+    pub struct HpAnalogBias(u32);
+
+    pub u32, reserved0 , set_reserved0 : 24, 0;
+    pub u32, xpd_bias  , set_xpd_bias  : 25;
+    pub u32, dbg_atten , set_dbg_atten : 29, 26;
+    pub u32, pd_cur    , set_pd_cur    : 30;
+    pub u32, bias_sleep, set_bias_sleep: 31;
+}
+
+bitfield::bitfield! {
+    #[derive(Clone, Copy, Default)]
+    // pmu_hp_analog_t.1
+    pub struct HpAnalogRegulator0(u32);
+
+    pub u32, reserved1      , set_reserved1      : 3, 0;
+    // Only HP_ACTIVE modem under hp system is valid
+    pub u32, lp_dbias_vol   , set_lp_dbias_vol   : 8, 4;
+    // Only HP_ACTIVE modem under hp system is valid
+    pub u32, hp_dbias_vol   , set_hp_dbias_vol   : 13, 9;
+    // Only HP_ACTIVE modem under hp system is valid
+    pub u32, dbias_sel      , set_dbias_sel      : 14;
+    // Only HP_ACTIVE modem under hp system is valid
+    pub u32, dbias_init     , set_dbias_init     : 15;
+
+    pub u32, slp_mem_xpd    , set_slp_mem_xpd    : 16;
+    pub u32, slp_logic_xpd  , set_slp_logic_xpd  : 17;
+    pub u32, xpd            , set_xpd            : 18;
+    pub u32, slp_mem_dbias  , set_slp_mem_dbias  : 22, 19;
+    pub u32, slp_logic_dbias, set_slp_logic_dbias: 26, 23;
+    pub u32, dbias          , set_dbias          : 31, 27;
+}
+
+bitfield::bitfield! {
+    #[derive(Clone, Copy, Default)]
+    // pmu_hp_analog_t.2
+    pub struct HpAnalogRegulator1(u32);
+
+    pub u32, reserved2      , set_reserved2      : 7, 0;
+    pub u32, drv_b          , set_drv_b          : 31, 8;
+}
+
+#[derive(Clone, Copy, Default)]
+// pmu_hp_analog_t
+pub struct HpAnalog {
+    pub bias: HpAnalogBias,
+    pub regulator0: HpAnalogRegulator0,
+    pub regulator1: HpAnalogRegulator1,
+}
+
+bitfield::bitfield! {
+    #[derive(Clone, Copy, Default)]
+    // pmu_hp_backup_reg_t/active
+    pub struct HpActiveBackup(u32);
+
+    pub u32, reserved0                            , set_reserved0                            : 3, 0;
+    pub u32, hp_sleep2active_backup_modem_clk_code, set_hp_sleep2active_backup_modem_clk_code: 5, 4;
+    pub u32, hp_modem2active_backup_modem_clk_code, set_hp_modem2active_backup_modem_clk_code: 7, 6;
+    pub u32, reserved1                            , set_reserved1                            : 9, 8;
+    pub u32, hp_active_retention_mode             , set_hp_active_retention_mode             : 10;
+    pub u32, hp_sleep2active_retention_en         , set_hp_sleep2active_retention_en         : 11;
+    pub u32, hp_modem2active_retention_en         , set_hp_modem2active_retention_en         : 12;
+    pub u32, reserved2                            , set_reserved2                            : 13;
+    pub u32, hp_sleep2active_backup_clk_sel       , set_hp_sleep2active_backup_clk_sel       : 15, 14;
+    pub u32, hp_modem2active_backup_clk_sel       , set_hp_modem2active_backup_clk_sel       : 17, 16;
+    pub u32, reserved3                            , set_reserved3                            : 19, 18;
+    pub u32, hp_sleep2active_backup_mode          , set_hp_sleep2active_backup_mode          : 22, 20;
+    pub u32, hp_modem2active_backup_mode          , set_hp_modem2active_backup_mode          : 25, 23;
+    pub u32, reserved4                            , set_reserved4                            : 28, 26;
+    pub u32, hp_sleep2active_backup_en            , set_hp_sleep2active_backup_en            : 29;
+    pub u32, hp_modem2active_backup_en            , set_hp_modem2active_backup_en            : 30;
+    pub u32, reserved5                            , set_reserved5                            : 31;
+}
+
+bitfield::bitfield! {
+    #[derive(Clone, Copy, Default)]
+    // pmu_hp_backup_reg_t/modem
+    pub struct HpModemBackup(u32);
+
+    pub u32, reserved6                            , set_reserved6                            : 3, 0;
+    pub u32, hp_sleep2modem_backup_modem_clk_code , set_hp_sleep2modem_backup_modem_clk_code : 5, 4;
+    pub u32, reserved7                            , set_reserved7                            : 9, 6;
+    pub u32, hp_modem_retention_mode              , set_hp_modem_retention_mode              : 10;
+    pub u32, hp_sleep2modem_retention_en          , set_hp_sleep2modem_retention_en          : 11;
+    pub u32, reserved8                            , set_reserved8                            : 13, 12;
+    pub u32, hp_sleep2modem_backup_clk_sel        , set_hp_sleep2modem_backup_clk_sel        : 15, 14;
+    pub u32, reserved9                            , set_reserved9                            : 19, 16;
+    pub u32, hp_sleep2modem_backup_mode           , set_hp_sleep2modem_backup_mode           : 22, 20;
+    pub u32, reserved10                           , set_reserved10                           : 28, 23;
+    pub u32, hp_sleep2modem_backup_en             , set_hp_sleep2modem_backup_en             : 29;
+    pub u32, reserved11                           , set_reserved11                           : 31, 30;
+}
+
+bitfield::bitfield! {
+    #[derive(Clone, Copy, Default)]
+    // pmu_hp_backup_reg_t/sleep
+    pub struct HpSleepBackup(u32);
+
+    pub u32, reserved12                           , set_reserved12                           : 5, 0;
+    pub u32, hp_modem2sleep_backup_modem_clk_code , set_hp_modem2sleep_backup_modem_clk_code : 7, 6;
+    pub u32, hp_active2sleep_backup_modem_clk_code, set_hp_active2sleep_backup_modem_clk_code: 9, 8;
+    pub u32, hp_sleep_retention_mode              , set_hp_sleep_retention_mode              : 10;
+    pub u32, reserved13                           , set_reserved13                           : 11;
+    pub u32, hp_modem2sleep_retention_en          , set_hp_modem2sleep_retention_en          : 12;
+    pub u32, hp_active2sleep_retention_en         , set_hp_active2sleep_retention_en         : 13;
+    pub u32, reserved14                           , set_reserved14                           : 15, 14;
+    pub u32, hp_modem2sleep_backup_clk_sel        , set_hp_modem2sleep_backup_clk_sel        : 17, 16;
+    pub u32, hp_active2sleep_backup_clk_sel       , set_hp_active2sleep_backup_clk_sel       : 19, 18;
+    pub u32, reserved15                           , set_reserved15                           : 22, 20;
+    pub u32, hp_modem2sleep_backup_mode           , set_hp_modem2sleep_backup_mode           : 25, 23;
+    pub u32, hp_active2sleep_backup_mode          , set_hp_active2sleep_backup_mode          : 28, 26;
+    pub u32, reserved16                           , set_reserved16                           : 29;
+    pub u32, hp_modem2sleep_backup_en             , set_hp_modem2sleep_backup_en             : 30;
+    pub u32, hp_active2sleep_backup_en            , set_hp_active2sleep_backup_en            : 31;
+}
+
+bitfield::bitfield! {
+    #[derive(Clone, Copy, Default)]
+    // custom based on `PMU_ICG_FUNC_ENA_*` bitflag constants
+    pub struct HpBackupClk(u32);
+
+    pub u32, gdma        , set_gdma         : 0;
+    pub u32, spi2        , set_spi2         : 1;
+    pub u32, i2s_rx      , set_i2s_rx       : 2;
+    pub u32, uart0       , set_uart0        : 3;
+    pub u32, uart1       , set_uart1        : 4;
+    pub u32, uhci        , set_uhci         : 5;
+    pub u32, usb_device  , set_usb_device   : 6;
+    pub u32, i2s_tx      , set_i2s_tx       : 7;
+    pub u32, regdma      , set_regdma       : 8;
+    pub u32, retention   , set_retention    : 9;
+    pub u32, mem_monitor , set_mem_monitor  : 10;
+    pub u32, sdio_slave  , set_sdio_slave   : 11;
+    pub u32, tsens       , set_tsens        : 12;
+    pub u32, tg1         , set_tg1          : 13;
+    pub u32, tg0         , set_tg0          : 14;
+    pub u32, hpbus       , set_hpbus        : 15;
+    pub u32, soc_etm     , set_soc_etm      : 16;
+    pub u32, hpcore      , set_hpcore       : 17;
+    pub u32, systimer    , set_systimer     : 18;
+    pub u32, sec         , set_sec          : 19;
+    pub u32, saradc      , set_saradc       : 20;
+    pub u32, rmt         , set_rmt          : 21;
+    pub u32, pwm         , set_pwm          : 22;
+    pub u32, pvt_monitor , set_pvt_monitor  : 23;
+    pub u32, parl_tx     , set_parl_tx      : 24;
+    pub u32, parl_rx     , set_parl_rx      : 25;
+    pub u32, mspi        , set_mspi         : 26;
+    pub u32, ledc        , set_ledc         : 27;
+    pub u32, iomux       , set_iomux        : 28;
+    pub u32, i2c         , set_i2c          : 29;
+    pub u32, can1        , set_can1         : 30;
+    pub u32, can0        , set_can0         : 31;
+}
+
+struct HpSystemInit;
+impl HpSystemInit {
+    fn active() {
+        // pmu_hp_system_init_default
+
+        let mut power = HpSysPower::default();
+        power.dig_power.set_vdd_spi_pd_en(false);
+        power.dig_power.set_wifi_pd_en(false);
+        power.dig_power.set_cpu_pd_en(false);
+        power.dig_power.set_aon_pd_en(false);
+        power.dig_power.set_top_pd_en(false);
+        power.dig_power.set_mem_pd_en(0);
+        power.dig_power.set_mem_dslp(false);
+
+        power.clk.set_i2c_iso_en(false);
+        power.clk.set_i2c_retention(false);
+        power.clk.set_xpd_bb_i2c(true);
+        power.clk.set_xpd_bbpll_i2c(true);
+        power.clk.set_xpd_bbpll(true);
+
+        power.xtal.set_xpd_xtal(true);
+
+        let mut clock = SystemClockParam::default();
+        clock.icg_func = 0xffffffff;
+        clock.icg_apb = 0xffffffff;
+        clock.icg_modem.set_code(ICG_MODEM_CODE_ACTIVE);
+        clock.sysclk.set_dig_sysclk_nodiv(false);
+        clock.sysclk.set_icg_sysclk_en(true);
+        clock.sysclk.set_sysclk_slp_sel(false);
+        clock.sysclk.set_icg_slp_sel(false);
+        clock.sysclk.set_dig_sysclk_sel(HP_SYSCLK_XTAL);
+
+        let mut syscntl = HpSysCntlReg::default();
+        syscntl.set_uart_wakeup_en(false);
+        syscntl.set_lp_pad_hold_all(false);
+        syscntl.set_hp_pad_hold_all(false);
+        syscntl.set_dig_pad_slp_sel(false);
+        syscntl.set_dig_pause_wdt(false);
+        syscntl.set_dig_cpu_stall(false);
+
+        // PMU_HP_ACTIVE_ANALOG_CONFIG_DEFAULT
+        let mut anlg = HpAnalog::default();
+        anlg.bias.set_xpd_bias(true);
+        anlg.bias.set_dbg_atten(0x0);
+        anlg.bias.set_pd_cur(false);
+        anlg.bias.set_bias_sleep(false);
+
+        // TODO: These 4 aren't applied currently?
+        anlg.regulator0.set_lp_dbias_vol(0xD);
+        anlg.regulator0.set_hp_dbias_vol(0x1C);
+        anlg.regulator0.set_dbias_sel(true);
+        anlg.regulator0.set_dbias_init(true);
+
+        anlg.regulator0.set_slp_mem_xpd(false);
+        anlg.regulator0.set_slp_logic_xpd(false);
+        anlg.regulator0.set_xpd(true);
+        anlg.regulator0.set_slp_mem_dbias(0);
+        anlg.regulator0.set_slp_logic_dbias(0);
+        anlg.regulator0.set_dbias(HP_CALI_DBIAS);
+
+        anlg.regulator1.set_drv_b(0);
+
+        let mut retention = HpActiveBackup::default();
+        retention.set_hp_sleep2active_backup_modem_clk_code(2);
+        retention.set_hp_modem2active_backup_modem_clk_code(2);
+        retention.set_hp_active_retention_mode(false);
+        retention.set_hp_sleep2active_retention_en(false);
+        retention.set_hp_modem2active_retention_en(false);
+        retention.set_hp_sleep2active_backup_clk_sel(0);
+        retention.set_hp_modem2active_backup_clk_sel(1);
+        retention.set_hp_sleep2active_backup_mode(hp_retention_regdma_config(0, 0));
+        retention.set_hp_modem2active_backup_mode(hp_retention_regdma_config(0, 2));
+        retention.set_hp_sleep2active_backup_en(false);
+        retention.set_hp_modem2active_backup_en(false);
+
+        let mut backup_clk = HpBackupClk::default();
+        backup_clk.set_regdma(true);
+        backup_clk.set_tg0(true);
+        backup_clk.set_tg1(true);
+        backup_clk.set_hpbus(true);
+        backup_clk.set_mspi(true);
+        backup_clk.set_iomux(true);
+        backup_clk.set_spi2(true);
+        backup_clk.set_uart0(true);
+        backup_clk.set_systimer(true);
+
+        unsafe {
+            // Default configuration of hp-system power in active, modem and sleep modes
+            pmu()
+                .hp_active_dig_power()
+                .modify(|_, w| w.bits(power.dig_power.0));
+            pmu()
+                .hp_active_hp_ck_power()
+                .modify(|_, w| w.bits(power.clk.0));
+            pmu()
+                .hp_active_xtal()
+                .modify(|_, w| w.hp_active_xpd_xtal().bit(power.xtal.xpd_xtal()));
+
+            // Default configuration of hp-system clock in active, modem and sleep modes
+            pmu()
+                .hp_active_icg_hp_func()
+                .write(|w| w.bits(clock.icg_func));
+            pmu()
+                .hp_active_icg_hp_apb()
+                .write(|w| w.bits(clock.icg_apb));
+            pmu().hp_active_icg_modem().write(|w| {
+                w.hp_active_dig_icg_modem_code()
+                    .bits(clock.icg_modem.code() as u8)
+            });
+            pmu().hp_active_sysclk().modify(|_, w| {
+                w.hp_active_dig_sys_clk_no_div()
+                    .bit(clock.sysclk.dig_sysclk_nodiv())
+                    .hp_active_icg_sys_clock_en()
+                    .bit(clock.sysclk.icg_sysclk_en())
+                    .hp_active_sys_clk_slp_sel()
+                    .bit(clock.sysclk.sysclk_slp_sel())
+                    .hp_active_icg_slp_sel()
+                    .bit(clock.sysclk.icg_slp_sel())
+                    .hp_active_dig_sys_clk_sel()
+                    .bits(clock.sysclk.dig_sysclk_sel() as u8)
+            });
+
+            // Default configuration of hp-system digital sub-system in active, modem
+            // and sleep modes
+            pmu().hp_active_hp_sys_cntl().modify(|_, w| {
+                w.hp_active_uart_wakeup_en()
+                    .bit(syscntl.uart_wakeup_en())
+                    .hp_active_lp_pad_hold_all()
+                    .bit(syscntl.lp_pad_hold_all())
+                    .hp_active_hp_pad_hold_all()
+                    .bit(syscntl.hp_pad_hold_all())
+                    .hp_active_dig_pad_slp_sel()
+                    .bit(syscntl.dig_pad_slp_sel())
+                    .hp_active_dig_pause_wdt()
+                    .bit(syscntl.dig_pause_wdt())
+                    .hp_active_dig_cpu_stall()
+                    .bit(syscntl.dig_cpu_stall())
+            });
+
+            // Default configuration of hp-system analog sub-system in active, modem and
+            // sleep modes
+            pmu().hp_active_bias().modify(|_, w| {
+                w.hp_active_xpd_bias()
+                    .bit(anlg.bias.xpd_bias())
+                    .hp_active_dbg_atten()
+                    .bits(anlg.bias.dbg_atten() as u8)
+                    .hp_active_pd_cur()
+                    .bit(anlg.bias.pd_cur())
+                    .sleep()
+                    .bit(anlg.bias.bias_sleep())
+            });
+
+            pmu().hp_active_hp_regulator0().modify(|_, w| {
+                w.hp_active_hp_regulator_slp_mem_xpd()
+                    .bit(anlg.regulator0.slp_mem_xpd())
+                    .hp_active_hp_regulator_slp_logic_xpd()
+                    .bit(anlg.regulator0.slp_logic_xpd())
+                    .hp_active_hp_regulator_xpd()
+                    .bit(anlg.regulator0.xpd())
+                    .hp_active_hp_regulator_slp_mem_dbias()
+                    .bits(anlg.regulator0.slp_mem_dbias() as u8)
+                    .hp_active_hp_regulator_slp_logic_dbias()
+                    .bits(anlg.regulator0.slp_logic_dbias() as u8)
+                    .hp_active_hp_regulator_dbias()
+                    .bits(anlg.regulator0.dbias() as u8)
+            });
+
+            pmu().hp_active_hp_regulator1().modify(|_, w| {
+                w.hp_active_hp_regulator_drv_b()
+                    .bits(anlg.regulator1.drv_b())
+            });
+
+            // Default configuration of hp-system retention sub-system in active, modem
+            // and sleep modes
+            pmu().hp_active_backup().write(|w| w.bits(retention.0));
+            pmu().hp_active_backup_clk().write(|w| w.bits(backup_clk.0));
+        }
+    }
+
+    fn modem() {
+        let mut power = HpSysPower::default();
+        power.dig_power.set_vdd_spi_pd_en(false);
+        power.dig_power.set_wifi_pd_en(false);
+        power.dig_power.set_cpu_pd_en(true);
+        power.dig_power.set_aon_pd_en(false);
+        power.dig_power.set_top_pd_en(false);
+        power.dig_power.set_mem_pd_en(0);
+        power.dig_power.set_mem_dslp(false);
+
+        power.clk.set_xpd_bb_i2c(true);
+        power.clk.set_xpd_bbpll_i2c(true);
+        power.clk.set_xpd_bbpll(true);
+        power.clk.set_i2c_iso_en(false);
+        power.clk.set_i2c_retention(false);
+
+        power.xtal.set_xpd_xtal(true);
+
+        let mut clock = SystemClockParam::default();
+        clock.icg_func = 0;
+        clock.icg_apb = 0;
+        clock.icg_modem.set_code(ICG_MODEM_CODE_MODEM);
+        clock.sysclk.set_dig_sysclk_nodiv(false);
+        clock.sysclk.set_icg_sysclk_en(true);
+        clock.sysclk.set_sysclk_slp_sel(true);
+        clock.sysclk.set_icg_slp_sel(true);
+        clock.sysclk.set_dig_sysclk_sel(HP_SYSCLK_PLL);
+
+        let mut syscntl = HpSysCntlReg::default();
+        syscntl.set_uart_wakeup_en(true);
+        syscntl.set_lp_pad_hold_all(false);
+        syscntl.set_hp_pad_hold_all(false);
+        syscntl.set_dig_pad_slp_sel(false);
+        syscntl.set_dig_pause_wdt(true);
+        syscntl.set_dig_cpu_stall(true);
+
+        let mut anlg = HpAnalog::default();
+        anlg.bias.set_xpd_bias(false);
+        anlg.bias.set_dbg_atten(0x0);
+        anlg.bias.set_pd_cur(false);
+        anlg.bias.set_bias_sleep(false);
+
+        anlg.regulator0.set_slp_mem_xpd(false);
+        anlg.regulator0.set_slp_logic_xpd(false);
+        anlg.regulator0.set_xpd(true);
+        anlg.regulator0.set_slp_mem_dbias(0);
+        anlg.regulator0.set_slp_logic_dbias(0);
+        anlg.regulator0.set_dbias(HP_CALI_DBIAS);
+
+        anlg.regulator1.set_drv_b(0);
+
+        let mut retention = HpModemBackup::default();
+        retention.set_hp_sleep2modem_backup_modem_clk_code(1);
+        retention.set_hp_modem_retention_mode(false);
+        retention.set_hp_sleep2modem_retention_en(false);
+        retention.set_hp_sleep2modem_backup_clk_sel(0);
+        retention.set_hp_sleep2modem_backup_mode(hp_retention_regdma_config(0, 1));
+        retention.set_hp_sleep2modem_backup_en(false);
+
+        let mut backup_clk = HpBackupClk::default();
+        backup_clk.set_regdma(true);
+        backup_clk.set_tg0(true);
+        backup_clk.set_tg1(true);
+        backup_clk.set_hpbus(true);
+        backup_clk.set_mspi(true);
+        backup_clk.set_iomux(true);
+        backup_clk.set_spi2(true);
+        backup_clk.set_uart0(true);
+        backup_clk.set_systimer(true);
+
+        unsafe {
+            // Default configuration of hp-system power in active, modem and sleep modes
+            pmu()
+                .hp_modem_dig_power()
+                .modify(|_, w| w.bits(power.dig_power.0));
+            pmu()
+                .hp_modem_hp_ck_power()
+                .modify(|_, w| w.bits(power.clk.0));
+            pmu()
+                .hp_modem_xtal()
+                .modify(|_, w| w.hp_modem_xpd_xtal().bit(power.xtal.xpd_xtal()));
+
+            // Default configuration of hp-system clock in active, modem and sleep modes
+            pmu()
+                .hp_modem_icg_hp_func()
+                .write(|w| w.bits(clock.icg_func));
+            pmu().hp_modem_icg_hp_apb().write(|w| w.bits(clock.icg_apb));
+            pmu().hp_modem_icg_modem().write(|w| {
+                w.hp_modem_dig_icg_modem_code()
+                    .bits(clock.icg_modem.code() as u8)
+            });
+            pmu().hp_modem_sysclk().modify(|_, w| {
+                w.hp_modem_dig_sys_clk_no_div()
+                    .bit(clock.sysclk.dig_sysclk_nodiv())
+                    .hp_modem_icg_sys_clock_en()
+                    .bit(clock.sysclk.icg_sysclk_en())
+                    .hp_modem_sys_clk_slp_sel()
+                    .bit(clock.sysclk.sysclk_slp_sel())
+                    .hp_modem_icg_slp_sel()
+                    .bit(clock.sysclk.icg_slp_sel())
+                    .hp_modem_dig_sys_clk_sel()
+                    .bits(clock.sysclk.dig_sysclk_sel() as u8)
+            });
+
+            // Default configuration of hp-system digital sub-system in active, modem
+            // and sleep modes
+            pmu().hp_modem_hp_sys_cntl().modify(|_, w| {
+                w.hp_modem_uart_wakeup_en()
+                    .bit(syscntl.uart_wakeup_en())
+                    .hp_modem_lp_pad_hold_all()
+                    .bit(syscntl.lp_pad_hold_all())
+                    .hp_modem_hp_pad_hold_all()
+                    .bit(syscntl.hp_pad_hold_all())
+                    .hp_modem_dig_pad_slp_sel()
+                    .bit(syscntl.dig_pad_slp_sel())
+                    .hp_modem_dig_pause_wdt()
+                    .bit(syscntl.dig_pause_wdt())
+                    .hp_modem_dig_cpu_stall()
+                    .bit(syscntl.dig_cpu_stall())
+            });
+
+            // Default configuration of hp-system analog sub-system in active, modem and
+            // sleep modes
+            pmu().hp_modem_bias().modify(|_, w| {
+                w.hp_modem_xpd_bias()
+                    .bit(anlg.bias.xpd_bias())
+                    .hp_modem_dbg_atten()
+                    .bits(anlg.bias.dbg_atten() as u8)
+                    .hp_modem_pd_cur()
+                    .bit(anlg.bias.pd_cur())
+                    .sleep()
+                    .bit(anlg.bias.bias_sleep())
+            });
+
+            pmu().hp_modem_hp_regulator0().modify(|_, w| {
+                w.hp_modem_hp_regulator_slp_mem_xpd()
+                    .bit(anlg.regulator0.slp_mem_xpd())
+                    .hp_modem_hp_regulator_slp_logic_xpd()
+                    .bit(anlg.regulator0.slp_logic_xpd())
+                    .hp_modem_hp_regulator_xpd()
+                    .bit(anlg.regulator0.xpd())
+                    .hp_modem_hp_regulator_slp_mem_dbias()
+                    .bits(anlg.regulator0.slp_mem_dbias() as u8)
+                    .hp_modem_hp_regulator_slp_logic_dbias()
+                    .bits(anlg.regulator0.slp_logic_dbias() as u8)
+                    .hp_modem_hp_regulator_dbias()
+                    .bits(anlg.regulator0.dbias() as u8)
+            });
+
+            pmu().hp_modem_hp_regulator1().modify(|_, w| {
+                w.hp_modem_hp_regulator_drv_b()
+                    .bits(anlg.regulator1.drv_b())
+            });
+
+            // Default configuration of hp-system retention sub-system in active, modem
+            // and sleep modes
+            pmu().hp_modem_backup().write(|w| w.bits(retention.0));
+            pmu().hp_modem_backup_clk().write(|w| w.bits(backup_clk.0));
+        }
+    }
+    fn sleep() {
+        let mut power = HpSysPower::default();
+        power.dig_power.set_vdd_spi_pd_en(true);
+        power.dig_power.set_mem_dslp(false);
+        power.dig_power.set_mem_pd_en(0);
+        power.dig_power.set_wifi_pd_en(true);
+        power.dig_power.set_cpu_pd_en(false);
+        power.dig_power.set_aon_pd_en(false);
+        power.dig_power.set_top_pd_en(false);
+
+        power.clk.set_i2c_iso_en(true);
+        power.clk.set_i2c_retention(true);
+        power.clk.set_xpd_bb_i2c(true);
+        power.clk.set_xpd_bbpll_i2c(false);
+        power.clk.set_xpd_bbpll(false);
+
+        power.xtal.set_xpd_xtal(false);
+
+        let mut clock = SystemClockParam::default();
+        clock.icg_func = 0;
+        clock.icg_apb = 0;
+        clock.icg_modem.set_code(ICG_MODEM_CODE_SLEEP);
+        clock.sysclk.set_dig_sysclk_nodiv(false);
+        clock.sysclk.set_icg_sysclk_en(false);
+        clock.sysclk.set_sysclk_slp_sel(true);
+        clock.sysclk.set_icg_slp_sel(true);
+        clock.sysclk.set_dig_sysclk_sel(HP_SYSCLK_XTAL);
+
+        let mut anlg = HpAnalog::default();
+        anlg.bias.set_xpd_bias(false);
+        anlg.bias.set_dbg_atten(0x0);
+        anlg.bias.set_pd_cur(false);
+        anlg.bias.set_bias_sleep(false);
+
+        anlg.regulator0.set_slp_mem_xpd(false);
+        anlg.regulator0.set_slp_logic_xpd(false);
+        anlg.regulator0.set_xpd(true);
+        anlg.regulator0.set_slp_mem_dbias(0);
+        anlg.regulator0.set_slp_logic_dbias(0);
+        anlg.regulator0.set_dbias(1);
+
+        anlg.regulator1.set_drv_b(0);
+
+        let mut retention = HpSleepBackup::default();
+        retention.set_hp_modem2sleep_backup_modem_clk_code(0);
+        retention.set_hp_active2sleep_backup_modem_clk_code(2);
+        retention.set_hp_sleep_retention_mode(false);
+        retention.set_hp_modem2sleep_retention_en(false);
+        retention.set_hp_active2sleep_retention_en(false);
+        retention.set_hp_modem2sleep_backup_clk_sel(0);
+        retention.set_hp_active2sleep_backup_clk_sel(0);
+        retention.set_hp_modem2sleep_backup_mode(hp_retention_regdma_config(1, 1));
+        retention.set_hp_active2sleep_backup_mode(hp_retention_regdma_config(1, 0));
+        retention.set_hp_modem2sleep_backup_en(false);
+        retention.set_hp_active2sleep_backup_en(false);
+
+        let mut backup_clk = HpBackupClk::default();
+        backup_clk.set_regdma(true);
+        backup_clk.set_tg0(true);
+        backup_clk.set_tg1(true);
+        backup_clk.set_hpbus(true);
+        backup_clk.set_mspi(true);
+        backup_clk.set_iomux(true);
+        backup_clk.set_spi2(true);
+        backup_clk.set_uart0(true);
+        backup_clk.set_systimer(true);
+
+        let mut syscntl = HpSysCntlReg::default();
+        syscntl.set_uart_wakeup_en(true);
+        syscntl.set_lp_pad_hold_all(false);
+        syscntl.set_hp_pad_hold_all(false);
+        syscntl.set_dig_pad_slp_sel(true);
+        syscntl.set_dig_pause_wdt(true);
+        syscntl.set_dig_cpu_stall(true);
+
+        unsafe {
+            // Default configuration of hp-system power in active, modem and sleep modes
+            pmu()
+                .hp_sleep_dig_power()
+                .modify(|_, w| w.bits(power.dig_power.0));
+            pmu()
+                .hp_sleep_hp_ck_power()
+                .modify(|_, w| w.bits(power.clk.0));
+            pmu()
+                .hp_sleep_xtal()
+                .modify(|_, w| w.hp_sleep_xpd_xtal().bit(power.xtal.xpd_xtal()));
+
+            // Default configuration of hp-system clock in active, modem and sleep modes
+            pmu()
+                .hp_sleep_icg_hp_func()
+                .write(|w| w.bits(clock.icg_func));
+            pmu().hp_sleep_icg_hp_apb().write(|w| w.bits(clock.icg_apb));
+            pmu().hp_sleep_icg_modem().write(|w| {
+                w.hp_sleep_dig_icg_modem_code()
+                    .bits(clock.icg_modem.code() as u8)
+            });
+            pmu().hp_sleep_sysclk().modify(|_, w| {
+                w.hp_sleep_dig_sys_clk_no_div()
+                    .bit(clock.sysclk.dig_sysclk_nodiv())
+                    .hp_sleep_icg_sys_clock_en()
+                    .bit(clock.sysclk.icg_sysclk_en())
+                    .hp_sleep_sys_clk_slp_sel()
+                    .bit(clock.sysclk.sysclk_slp_sel())
+                    .hp_sleep_icg_slp_sel()
+                    .bit(clock.sysclk.icg_slp_sel())
+                    .hp_sleep_dig_sys_clk_sel()
+                    .bits(clock.sysclk.dig_sysclk_sel() as u8)
+            });
+
+            // Default configuration of hp-system digital sub-system in active, modem
+            // and sleep modes
+            pmu().hp_sleep_hp_sys_cntl().modify(|_, w| {
+                w.hp_sleep_uart_wakeup_en()
+                    .bit(syscntl.uart_wakeup_en())
+                    .hp_sleep_lp_pad_hold_all()
+                    .bit(syscntl.lp_pad_hold_all())
+                    .hp_sleep_hp_pad_hold_all()
+                    .bit(syscntl.hp_pad_hold_all())
+                    .hp_sleep_dig_pad_slp_sel()
+                    .bit(syscntl.dig_pad_slp_sel())
+                    .hp_sleep_dig_pause_wdt()
+                    .bit(syscntl.dig_pause_wdt())
+                    .hp_sleep_dig_cpu_stall()
+                    .bit(syscntl.dig_cpu_stall())
+            });
+
+            // Default configuration of hp-system analog sub-system in active, modem and
+            // sleep modes
+            pmu().hp_sleep_bias().modify(|_, w| {
+                w.hp_sleep_xpd_bias()
+                    .bit(anlg.bias.xpd_bias())
+                    .hp_sleep_dbg_atten()
+                    .bits(anlg.bias.dbg_atten() as u8)
+                    .hp_sleep_pd_cur()
+                    .bit(anlg.bias.pd_cur())
+                    .sleep()
+                    .bit(anlg.bias.bias_sleep())
+            });
+
+            pmu().hp_sleep_hp_regulator0().modify(|_, w| {
+                w.hp_sleep_hp_regulator_slp_mem_xpd()
+                    .bit(anlg.regulator0.slp_mem_xpd())
+                    .hp_sleep_hp_regulator_slp_logic_xpd()
+                    .bit(anlg.regulator0.slp_logic_xpd())
+                    .hp_sleep_hp_regulator_xpd()
+                    .bit(anlg.regulator0.xpd())
+                    .hp_sleep_hp_regulator_slp_mem_dbias()
+                    .bits(anlg.regulator0.slp_mem_dbias() as u8)
+                    .hp_sleep_hp_regulator_slp_logic_dbias()
+                    .bits(anlg.regulator0.slp_logic_dbias() as u8)
+                    .hp_sleep_hp_regulator_dbias()
+                    .bits(anlg.regulator0.dbias() as u8)
+            });
+
+            pmu().hp_sleep_hp_regulator1().modify(|_, w| {
+                w.hp_sleep_hp_regulator_drv_b()
+                    .bits(anlg.regulator1.drv_b())
+            });
+
+            // Default configuration of hp-system retention sub-system in active, modem
+            // and sleep modes
+            pmu().hp_sleep_backup().write(|w| w.bits(retention.0));
+            pmu().hp_sleep_backup_clk().write(|w| w.bits(backup_clk.0));
+        }
+    }
+
+    fn init_default() {
+        Self::active();
+        Self::modem();
+        Self::sleep();
+
+        unsafe {
+            // Some PMU initial parameter configuration
+            pmu()
+                .imm_modem_icg()
+                .write(|w| w.update_dig_icg_modem_en().bit(true));
+            pmu()
+                .imm_sleep_sysclk()
+                .write(|w| w.update_dig_icg_switch().bit(true));
+
+            const PMU_SLEEP_PROTECT_HP_LP_SLEEP: u8 = 2;
+            pmu()
+                .slp_wakeup_cntl3()
+                .modify(|_, w| w.sleep_prt_sel().bits(PMU_SLEEP_PROTECT_HP_LP_SLEEP));
+        }
+    }
+}
+
+bitfield::bitfield! {
+    #[derive(Clone, Copy, Default)]
+    // pmu_lp_power_t.0
+    pub struct LpDigPower(u32);
+
+    pub u32, reserved0 , set_reserved0 : 29, 0;
+    pub u32, mem_dslp  , set_mem_dslp  : 30;
+    pub u32, peri_pd_en, set_peri_pd_en: 31;
+
+}
+
+bitfield::bitfield! {
+    #[derive(Clone, Copy, Default)]
+    // pmu_lp_power_t.1
+    pub struct LpClkPower(u32);
+
+    pub u32, reserved1  , set_reserved1  : 27, 0;
+    pub u32, xpd_xtal32k, set_xpd_xtal32k: 28;
+    pub u32, xpd_rc32k  , set_xpd_rc32k  : 29;
+    pub u32, xpd_fosc   , set_xpd_fosc   : 30;
+    pub u32, pd_osc     , set_pd_osc     : 31;
+}
+
+bitfield::bitfield! {
+    #[derive(Clone, Copy, Default)]
+    // pmu_lp_power_t.2
+    pub struct LpXtalPower(u32);
+
+    pub u32, reserved2    , set_reserved2    : 30, 0;
+    pub u32, xpd_xtal     , set_xpd_xtal     : 31;
+}
+
+bitfield::bitfield! {
+    #[derive(Clone, Copy, Default)]
+    // pmu_lp_analog_t.0
+    pub struct LpAnalogBias(u32);
+
+    pub u32, reserved0 , set_reserved0 : 24, 0;
+    pub u32, xpd_bias  , set_xpd_bias  : 25;
+    pub u32, dbg_atten , set_dbg_atten : 29, 26;
+    pub u32, pd_cur    , set_pd_cur    : 30;
+    pub u32, bias_sleep, set_bias_sleep: 31;
+}
+
+bitfield::bitfield! {
+    #[derive(Clone, Copy, Default)]
+    // pmu_lp_analog_t.1
+    pub struct LpAnalogRegulator0(u32);
+
+    pub u32, reserved1, set_reserved1: 20, 0;
+    pub u32, slp_xpd  , set_slp_xpd  : 21;
+    pub u32, xpd      , set_xpd      : 22;
+    pub u32, slp_dbias, set_slp_dbias: 26, 23;
+    pub u32, dbias    , set_dbias    : 31, 27;
+}
+
+bitfield::bitfield! {
+    #[derive(Clone, Copy, Default)]
+    // pmu_lp_analog_t.2
+    pub struct LpAnalogRegulator1(u32);
+
+    pub u32, reserved2, set_reserved2: 27, 0;
+    pub u32, drv_b    , set_drv_b    : 31, 28;
+}
+
+#[derive(Clone, Copy, Default)]
+// pmu_lp_analog_t
+pub struct LpAnalog {
+    pub bias: LpAnalogBias,
+    pub regulator0: LpAnalogRegulator0,
+    pub regulator1: LpAnalogRegulator1,
+}
+
+struct LpSystemInit;
+impl LpSystemInit {
+    fn active() {
+        let mut dig_power = LpDigPower::default();
+        dig_power.set_peri_pd_en(false);
+        dig_power.set_mem_dslp(false);
+
+        let mut clk_power = LpClkPower::default();
+        clk_power.set_xpd_xtal32k(true);
+        clk_power.set_xpd_rc32k(true);
+        clk_power.set_xpd_fosc(true);
+
+        let mut analog_regulator0 = LpAnalogRegulator0::default();
+        analog_regulator0.set_slp_xpd(false);
+        analog_regulator0.set_xpd(true);
+        analog_regulator0.set_slp_dbias(0);
+        analog_regulator0.set_dbias(26);
+
+        let mut analog_regulator1 = LpAnalogRegulator1::default();
+        analog_regulator1.set_drv_b(0);
+
+        unsafe {
+            // Default configuration of lp-system power in active and sleep modes
+            pmu()
+                .hp_sleep_lp_dig_power()
+                .modify(|_, w| w.bits(dig_power.0));
+            pmu()
+                .hp_sleep_lp_ck_power()
+                .modify(|_, w| w.bits(clk_power.0));
+
+            pmu().hp_sleep_lp_regulator0().modify(|_, w| {
+                w.hp_sleep_lp_regulator_slp_xpd() // pmu_ll_hp_set_regulator_slp_xpd
+                    .bit(analog_regulator0.slp_xpd())
+                    .hp_sleep_lp_regulator_xpd() // pmu_ll_hp_set_regulator_xpd
+                    .bit(analog_regulator0.xpd())
+                    .hp_sleep_lp_regulator_slp_dbias() // pmu_ll_hp_set_regulator_sleep_dbias
+                    .bits(analog_regulator0.slp_dbias() as u8)
+                    .hp_sleep_lp_regulator_dbias() // pmu_ll_hp_set_regulator_dbias
+                    .bits(analog_regulator0.dbias() as u8)
+            });
+
+            pmu().hp_sleep_lp_regulator1().modify(|_, w| {
+                w.hp_sleep_lp_regulator_drv_b() // pmu_ll_hp_set_regulator_driver_bar
+                    .bits(analog_regulator1.drv_b() as u8)
+            });
+        }
+    }
+
+    fn sleep() {
+        let mut dig_power = LpDigPower::default();
+        dig_power.set_mem_dslp(true);
+        dig_power.set_peri_pd_en(false);
+
+        let mut clk_power = LpClkPower::default();
+        clk_power.set_xpd_xtal32k(false);
+        clk_power.set_xpd_rc32k(false);
+        clk_power.set_xpd_fosc(false);
+        clk_power.set_pd_osc(false);
+
+        let mut xtal = LpXtalPower::default();
+        xtal.set_xpd_xtal(false);
+
+        let mut analog_bias = LpAnalogBias::default();
+        analog_bias.set_xpd_bias(false);
+        analog_bias.set_dbg_atten(0);
+        analog_bias.set_pd_cur(true);
+        analog_bias.set_bias_sleep(true);
+
+        let mut analog_regulator0 = LpAnalogRegulator0::default();
+        analog_regulator0.set_slp_xpd(false);
+        analog_regulator0.set_xpd(true);
+        analog_regulator0.set_slp_dbias(0);
+        analog_regulator0.set_dbias(12);
+
+        let mut analog_regulator1 = LpAnalogRegulator1::default();
+        analog_regulator1.set_drv_b(0);
+
+        unsafe {
+            // Default configuration of lp-system power in active and sleep modes
+            pmu()
+                .lp_sleep_lp_dig_power()
+                .modify(|_, w| w.bits(dig_power.0));
+            pmu()
+                .lp_sleep_lp_ck_power()
+                .modify(|_, w| w.bits(clk_power.0));
+            pmu()
+                .lp_sleep_xtal()
+                .modify(|_, w| w.lp_sleep_xpd_xtal().bit(xtal.xpd_xtal()));
+
+            // Default configuration of lp-system analog sub-system in active and sleep
+            // modes
+
+            pmu().lp_sleep_bias().modify(|_, w| {
+                w.lp_sleep_xpd_bias() // pmu_ll_lp_set_bias_xpd
+                    .bit(analog_bias.xpd_bias())
+                    .lp_sleep_dbg_atten() // pmu_ll_lp_set_bias_dbg_atten
+                    .bits(analog_bias.dbg_atten() as u8)
+                    .lp_sleep_pd_cur() // pmu_ll_lp_set_bias_pd_cur
+                    .bit(analog_bias.pd_cur())
+                    .sleep() // pmu_ll_lp_set_bias_sleep
+                    .bit(analog_bias.bias_sleep())
+            });
+
+            pmu().lp_sleep_lp_regulator0().modify(|_, w| {
+                w.lp_sleep_lp_regulator_slp_xpd() // pmu_ll_lp_set_regulator_slp_xpd
+                    .bit(analog_regulator0.slp_xpd())
+                    .lp_sleep_lp_regulator_xpd() // pmu_ll_lp_set_regulator_xpd
+                    .bit(analog_regulator0.xpd())
+                    .lp_sleep_lp_regulator_slp_dbias() // pmu_ll_lp_set_regulator_sleep_dbias
+                    .bits(analog_regulator0.slp_dbias() as u8)
+                    .lp_sleep_lp_regulator_dbias() // pmu_ll_lp_set_regulator_dbias
+                    .bits(analog_regulator0.dbias() as u8)
+            });
+
+            pmu().lp_sleep_lp_regulator1().modify(|_, w| {
+                w.lp_sleep_lp_regulator_drv_b() // pmu_ll_lp_set_regulator_driver_bar
+                    .bits(analog_regulator1.drv_b() as u8)
+            });
+        }
+    }
+
+    fn init_default() {
+        Self::active();
+        Self::sleep();
+    }
+}
+
 pub(crate) fn init() {
     let pmu = unsafe { &*PMU::ptr() };
 
@@ -76,6 +1368,26 @@ pub(crate) fn init() {
         pmu.hp_sleep_lp_regulator0()
             .modify(|_, w| w.hp_sleep_lp_regulator_dbias().bits(26));
     }
+
+    // Complete setup done by `pmu_init()`
+    HpSystemInit::init_default();
+    LpSystemInit::init_default();
+    pmu_power_domain_force_default();
+
+    // Follow the implementation of `esp_perip_clk_init()`
+    modem_clock_domain_power_state_icg_map_init();
+
+    //  During system initialization, the low-power clock source of the modem
+    //  (WiFi, BLE or Coexist) follows the configuration of the slow clock source
+    //  of the system. If the WiFi, BLE or Coexist module needs a higher
+    //  precision sleep clock (for example, the BLE needs to use the main XTAL
+    //  oscillator (40 MHz) to provide the clock during the sleep process in some
+    //  scenarios), the module needs to switch to the required clock source by
+    //  itself.
+    // TODO - WIFI-5233
+    let modem_lpclk_src = ModemClockLpclkSource::from(RtcSlowClockSource::current());
+
+    modem_clock_select_lp_clock_source(RadioPeripherals::Wifi, modem_lpclk_src, 0);
 }
 
 pub(crate) fn configure_clock() {
@@ -112,6 +1424,7 @@ fn modem_clk_domain_active_state_icg_map_preinit() {
         pmu.hp_active_icg_modem()
             .modify(|_, w| w.hp_active_dig_icg_modem_code().bits(2));
 
+        // TODO: clean this up
         const MODEM_SYSCON_CLK_CONF_POWER_ST: u32 = 0x600A9800 + 0xc;
         const MODEM_LPCON_CLK_CONF_POWER_ST: u32 = 0x600A9800 + 0x20;
 
