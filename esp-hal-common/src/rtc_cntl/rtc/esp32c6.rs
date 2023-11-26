@@ -316,34 +316,32 @@ fn modem_clock_select_lp_clock_source(
     }
 }
 
-const fn hp_retention_regdma_config(dir: u32, entry: u32) -> u32 {
+const fn hp_retention_regdma_config(dir: u8, entry: u8) -> u8 {
     (((dir) << 2) | (entry & 0x3)) & 0x7
 }
 
-const HP_CALI_DBIAS: u32 = 25;
-const LP_CALI_DBIAS: u32 = 26;
+const HP_CALI_DBIAS: u8 = 25;
+const LP_CALI_DBIAS: u8 = 26;
 
-const ICG_MODEM_CODE_SLEEP: u32 = 0;
-const ICG_MODEM_CODE_MODEM: u32 = 1;
-const ICG_MODEM_CODE_ACTIVE: u32 = 2;
+const ICG_MODEM_CODE_SLEEP: u8 = 0;
+const ICG_MODEM_CODE_MODEM: u8 = 1;
+const ICG_MODEM_CODE_ACTIVE: u8 = 2;
 
-const HP_SYSCLK_XTAL: u32 = 0;
-const HP_SYSCLK_PLL: u32 = 1;
+const HP_SYSCLK_XTAL: u8 = 0;
+const HP_SYSCLK_PLL: u8 = 1;
 
 bitfield::bitfield! {
     #[derive(Clone, Copy, Default)]
     // pmu_hp_power_t.0
     pub struct HpDigPower(u32);
 
-    pub u32, reserved0    , set_reserved0    : 20, 0;
-    pub u32, vdd_spi_pd_en, set_vdd_spi_pd_en: 21;
-    pub u32, mem_dslp     , set_mem_dslp     : 22;
-    pub u32, mem_pd_en    , set_mem_pd_en    : 26, 23;
-    pub u32, wifi_pd_en   , set_wifi_pd_en   : 27;
-    pub u32, reserved1    , set_reserved1    : 28;
-    pub u32, cpu_pd_en    , set_cpu_pd_en    : 29;
-    pub u32, aon_pd_en    , set_aon_pd_en    : 30;
-    pub u32, top_pd_en    , set_top_pd_en    : 31;
+    pub bool, vdd_spi_pd_en, set_vdd_spi_pd_en: 21;
+    pub bool, mem_dslp     , set_mem_dslp     : 22;
+    pub u8,   mem_pd_en    , set_mem_pd_en    : 26, 23;
+    pub bool, wifi_pd_en   , set_wifi_pd_en   : 27;
+    pub bool, cpu_pd_en    , set_cpu_pd_en    : 29;
+    pub bool, aon_pd_en    , set_aon_pd_en    : 30;
+    pub bool, top_pd_en    , set_top_pd_en    : 31;
 }
 
 bitfield::bitfield! {
@@ -351,13 +349,11 @@ bitfield::bitfield! {
     // pmu_hp_power_t.1
     pub struct HpClkPower(u32);
 
-    pub u32, reserved2    , set_reserved2    : 25, 0;
-    pub u32, i2c_iso_en   , set_i2c_iso_en   : 26;
-    pub u32, i2c_retention, set_i2c_retention: 27;
-    pub u32, xpd_bb_i2c   , set_xpd_bb_i2c   : 28;
-    pub u32, xpd_bbpll_i2c, set_xpd_bbpll_i2c: 29;
-    pub u32, xpd_bbpll    , set_xpd_bbpll    : 30;
-    pub u32, reserved3    , set_reserved3    : 31;
+    pub bool, i2c_iso_en   , set_i2c_iso_en   : 26;
+    pub bool, i2c_retention, set_i2c_retention: 27;
+    pub bool, xpd_bb_i2c   , set_xpd_bb_i2c   : 28;
+    pub bool, xpd_bbpll_i2c, set_xpd_bbpll_i2c: 29;
+    pub bool, xpd_bbpll    , set_xpd_bbpll    : 30;
 }
 
 bitfield::bitfield! {
@@ -365,8 +361,7 @@ bitfield::bitfield! {
     // pmu_hp_power_t.2
     pub struct HpXtalPower(u32);
 
-    pub u32, reserved4    , set_reserved4    : 30, 0;
-    pub u32, xpd_xtal     , set_xpd_xtal     : 31;
+    pub bool, xpd_xtal     , set_xpd_xtal     : 31;
 }
 
 #[derive(Clone, Copy, Default)]
@@ -384,14 +379,12 @@ bitfield::bitfield! {
     // pmu_hp_sys_cntl_reg_t
     pub struct HpSysCntlReg(u32);
 
-    pub u32, reserved0      , set_reserved0      : 23, 0;
-    pub u32, uart_wakeup_en , set_uart_wakeup_en : 24;
-    pub u32, lp_pad_hold_all, set_lp_pad_hold_all: 25;
-    pub u32, hp_pad_hold_all, set_hp_pad_hold_all: 26;
-    pub u32, dig_pad_slp_sel, set_dig_pad_slp_sel: 27;
-    pub u32, dig_pause_wdt  , set_dig_pause_wdt  : 28;
-    pub u32, dig_cpu_stall  , set_dig_cpu_stall  : 29;
-    pub u32, reserved1      , set_reserved1      : 31, 30;
+    pub bool, uart_wakeup_en , set_uart_wakeup_en : 24;
+    pub bool, lp_pad_hold_all, set_lp_pad_hold_all: 25;
+    pub bool, hp_pad_hold_all, set_hp_pad_hold_all: 26;
+    pub bool, dig_pad_slp_sel, set_dig_pad_slp_sel: 27;
+    pub bool, dig_pause_wdt  , set_dig_pause_wdt  : 28;
+    pub bool, dig_cpu_stall  , set_dig_cpu_stall  : 29;
 }
 
 bitfield::bitfield! {
@@ -399,8 +392,7 @@ bitfield::bitfield! {
     // pmu_hp_icg_modem_reg_t
     pub struct HpIcgModem(u32);
 
-    pub u32, reserved     , set_reserved : 29, 0;
-    pub u32, code         , set_code     : 31, 30;
+    pub u8, code, set_code: 31, 30;
 }
 
 bitfield::bitfield! {
@@ -408,12 +400,11 @@ bitfield::bitfield! {
     // pmu_hp_sysclk_reg_t
     pub struct HpSysclk(u32);
 
-    pub u32, reserved         , set_reserved         : 25, 0;
-    pub u32, dig_sysclk_nodiv , set_dig_sysclk_nodiv : 26;
-    pub u32, icg_sysclk_en    , set_icg_sysclk_en    : 27;
-    pub u32, sysclk_slp_sel   , set_sysclk_slp_sel   : 28;
-    pub u32, icg_slp_sel      , set_icg_slp_sel      : 29;
-    pub u32, dig_sysclk_sel   , set_dig_sysclk_sel   : 31, 30;
+    pub bool, dig_sysclk_nodiv , set_dig_sysclk_nodiv : 26;
+    pub bool, icg_sysclk_en    , set_icg_sysclk_en    : 27;
+    pub bool, sysclk_slp_sel   , set_sysclk_slp_sel   : 28;
+    pub bool, icg_slp_sel      , set_icg_slp_sel      : 29;
+    pub u8,   dig_sysclk_sel   , set_dig_sysclk_sel   : 31, 30;
 }
 
 // pmu_hp_system_clock_param_t
@@ -430,11 +421,10 @@ bitfield::bitfield! {
     // pmu_hp_analog_t.0
     pub struct HpAnalogBias(u32);
 
-    pub u32, reserved0 , set_reserved0 : 24, 0;
-    pub u32, xpd_bias  , set_xpd_bias  : 25;
-    pub u32, dbg_atten , set_dbg_atten : 29, 26;
-    pub u32, pd_cur    , set_pd_cur    : 30;
-    pub u32, bias_sleep, set_bias_sleep: 31;
+    pub bool, xpd_bias  , set_xpd_bias  : 25;
+    pub u8,   dbg_atten , set_dbg_atten : 29, 26;
+    pub bool, pd_cur    , set_pd_cur    : 30;
+    pub bool, bias_sleep, set_bias_sleep: 31;
 }
 
 bitfield::bitfield! {
@@ -442,22 +432,21 @@ bitfield::bitfield! {
     // pmu_hp_analog_t.1
     pub struct HpAnalogRegulator0(u32);
 
-    pub u32, reserved1      , set_reserved1      : 3, 0;
     // Only HP_ACTIVE modem under hp system is valid
-    pub u32, lp_dbias_vol   , set_lp_dbias_vol   : 8, 4;
+    pub u8,   lp_dbias_vol   , set_lp_dbias_vol   : 8, 4;
     // Only HP_ACTIVE modem under hp system is valid
-    pub u32, hp_dbias_vol   , set_hp_dbias_vol   : 13, 9;
+    pub u8,   hp_dbias_vol   , set_hp_dbias_vol   : 13, 9;
     // Only HP_ACTIVE modem under hp system is valid
-    pub u32, dbias_sel      , set_dbias_sel      : 14;
+    pub bool, dbias_sel      , set_dbias_sel      : 14;
     // Only HP_ACTIVE modem under hp system is valid
-    pub u32, dbias_init     , set_dbias_init     : 15;
+    pub bool, dbias_init     , set_dbias_init     : 15;
 
-    pub u32, slp_mem_xpd    , set_slp_mem_xpd    : 16;
-    pub u32, slp_logic_xpd  , set_slp_logic_xpd  : 17;
-    pub u32, xpd            , set_xpd            : 18;
-    pub u32, slp_mem_dbias  , set_slp_mem_dbias  : 22, 19;
-    pub u32, slp_logic_dbias, set_slp_logic_dbias: 26, 23;
-    pub u32, dbias          , set_dbias          : 31, 27;
+    pub bool, slp_mem_xpd    , set_slp_mem_xpd    : 16;
+    pub bool, slp_logic_xpd  , set_slp_logic_xpd  : 17;
+    pub bool, xpd            , set_xpd            : 18;
+    pub u8,   slp_mem_dbias  , set_slp_mem_dbias  : 22, 19;
+    pub u8,   slp_logic_dbias, set_slp_logic_dbias: 26, 23;
+    pub u8,   dbias          , set_dbias          : 31, 27;
 }
 
 bitfield::bitfield! {
@@ -465,7 +454,6 @@ bitfield::bitfield! {
     // pmu_hp_analog_t.2
     pub struct HpAnalogRegulator1(u32);
 
-    pub u32, reserved2      , set_reserved2      : 7, 0;
     pub u32, drv_b          , set_drv_b          : 31, 8;
 }
 
@@ -482,23 +470,17 @@ bitfield::bitfield! {
     // pmu_hp_backup_reg_t/active
     pub struct HpActiveBackup(u32);
 
-    pub u32, reserved0                            , set_reserved0                            : 3, 0;
-    pub u32, hp_sleep2active_backup_modem_clk_code, set_hp_sleep2active_backup_modem_clk_code: 5, 4;
-    pub u32, hp_modem2active_backup_modem_clk_code, set_hp_modem2active_backup_modem_clk_code: 7, 6;
-    pub u32, reserved1                            , set_reserved1                            : 9, 8;
-    pub u32, hp_active_retention_mode             , set_hp_active_retention_mode             : 10;
-    pub u32, hp_sleep2active_retention_en         , set_hp_sleep2active_retention_en         : 11;
-    pub u32, hp_modem2active_retention_en         , set_hp_modem2active_retention_en         : 12;
-    pub u32, reserved2                            , set_reserved2                            : 13;
-    pub u32, hp_sleep2active_backup_clk_sel       , set_hp_sleep2active_backup_clk_sel       : 15, 14;
-    pub u32, hp_modem2active_backup_clk_sel       , set_hp_modem2active_backup_clk_sel       : 17, 16;
-    pub u32, reserved3                            , set_reserved3                            : 19, 18;
-    pub u32, hp_sleep2active_backup_mode          , set_hp_sleep2active_backup_mode          : 22, 20;
-    pub u32, hp_modem2active_backup_mode          , set_hp_modem2active_backup_mode          : 25, 23;
-    pub u32, reserved4                            , set_reserved4                            : 28, 26;
-    pub u32, hp_sleep2active_backup_en            , set_hp_sleep2active_backup_en            : 29;
-    pub u32, hp_modem2active_backup_en            , set_hp_modem2active_backup_en            : 30;
-    pub u32, reserved5                            , set_reserved5                            : 31;
+    pub u8,   hp_sleep2active_backup_modem_clk_code, set_hp_sleep2active_backup_modem_clk_code: 5, 4;
+    pub u8,   hp_modem2active_backup_modem_clk_code, set_hp_modem2active_backup_modem_clk_code: 7, 6;
+    pub bool, hp_active_retention_mode             , set_hp_active_retention_mode             : 10;
+    pub bool, hp_sleep2active_retention_en         , set_hp_sleep2active_retention_en         : 11;
+    pub bool, hp_modem2active_retention_en         , set_hp_modem2active_retention_en         : 12;
+    pub u8,   hp_sleep2active_backup_clk_sel       , set_hp_sleep2active_backup_clk_sel       : 15, 14;
+    pub u8,   hp_modem2active_backup_clk_sel       , set_hp_modem2active_backup_clk_sel       : 17, 16;
+    pub u8,   hp_sleep2active_backup_mode          , set_hp_sleep2active_backup_mode          : 22, 20;
+    pub u8,   hp_modem2active_backup_mode          , set_hp_modem2active_backup_mode          : 25, 23;
+    pub bool, hp_sleep2active_backup_en            , set_hp_sleep2active_backup_en            : 29;
+    pub bool, hp_modem2active_backup_en            , set_hp_modem2active_backup_en            : 30;
 }
 
 bitfield::bitfield! {
@@ -506,18 +488,12 @@ bitfield::bitfield! {
     // pmu_hp_backup_reg_t/modem
     pub struct HpModemBackup(u32);
 
-    pub u32, reserved6                            , set_reserved6                            : 3, 0;
-    pub u32, hp_sleep2modem_backup_modem_clk_code , set_hp_sleep2modem_backup_modem_clk_code : 5, 4;
-    pub u32, reserved7                            , set_reserved7                            : 9, 6;
-    pub u32, hp_modem_retention_mode              , set_hp_modem_retention_mode              : 10;
-    pub u32, hp_sleep2modem_retention_en          , set_hp_sleep2modem_retention_en          : 11;
-    pub u32, reserved8                            , set_reserved8                            : 13, 12;
-    pub u32, hp_sleep2modem_backup_clk_sel        , set_hp_sleep2modem_backup_clk_sel        : 15, 14;
-    pub u32, reserved9                            , set_reserved9                            : 19, 16;
-    pub u32, hp_sleep2modem_backup_mode           , set_hp_sleep2modem_backup_mode           : 22, 20;
-    pub u32, reserved10                           , set_reserved10                           : 28, 23;
-    pub u32, hp_sleep2modem_backup_en             , set_hp_sleep2modem_backup_en             : 29;
-    pub u32, reserved11                           , set_reserved11                           : 31, 30;
+    pub u8,   hp_sleep2modem_backup_modem_clk_code , set_hp_sleep2modem_backup_modem_clk_code : 5, 4;
+    pub bool, hp_modem_retention_mode              , set_hp_modem_retention_mode              : 10;
+    pub bool, hp_sleep2modem_retention_en          , set_hp_sleep2modem_retention_en          : 11;
+    pub u8,   hp_sleep2modem_backup_clk_sel        , set_hp_sleep2modem_backup_clk_sel        : 15, 14;
+    pub u8,   hp_sleep2modem_backup_mode           , set_hp_sleep2modem_backup_mode           : 22, 20;
+    pub bool, hp_sleep2modem_backup_en             , set_hp_sleep2modem_backup_en             : 29;
 }
 
 bitfield::bitfield! {
@@ -525,22 +501,17 @@ bitfield::bitfield! {
     // pmu_hp_backup_reg_t/sleep
     pub struct HpSleepBackup(u32);
 
-    pub u32, reserved12                           , set_reserved12                           : 5, 0;
-    pub u32, hp_modem2sleep_backup_modem_clk_code , set_hp_modem2sleep_backup_modem_clk_code : 7, 6;
-    pub u32, hp_active2sleep_backup_modem_clk_code, set_hp_active2sleep_backup_modem_clk_code: 9, 8;
-    pub u32, hp_sleep_retention_mode              , set_hp_sleep_retention_mode              : 10;
-    pub u32, reserved13                           , set_reserved13                           : 11;
-    pub u32, hp_modem2sleep_retention_en          , set_hp_modem2sleep_retention_en          : 12;
-    pub u32, hp_active2sleep_retention_en         , set_hp_active2sleep_retention_en         : 13;
-    pub u32, reserved14                           , set_reserved14                           : 15, 14;
-    pub u32, hp_modem2sleep_backup_clk_sel        , set_hp_modem2sleep_backup_clk_sel        : 17, 16;
-    pub u32, hp_active2sleep_backup_clk_sel       , set_hp_active2sleep_backup_clk_sel       : 19, 18;
-    pub u32, reserved15                           , set_reserved15                           : 22, 20;
-    pub u32, hp_modem2sleep_backup_mode           , set_hp_modem2sleep_backup_mode           : 25, 23;
-    pub u32, hp_active2sleep_backup_mode          , set_hp_active2sleep_backup_mode          : 28, 26;
-    pub u32, reserved16                           , set_reserved16                           : 29;
-    pub u32, hp_modem2sleep_backup_en             , set_hp_modem2sleep_backup_en             : 30;
-    pub u32, hp_active2sleep_backup_en            , set_hp_active2sleep_backup_en            : 31;
+    pub u8,   hp_modem2sleep_backup_modem_clk_code , set_hp_modem2sleep_backup_modem_clk_code : 7, 6;
+    pub u8,   hp_active2sleep_backup_modem_clk_code, set_hp_active2sleep_backup_modem_clk_code: 9, 8;
+    pub bool, hp_sleep_retention_mode              , set_hp_sleep_retention_mode              : 10;
+    pub bool, hp_modem2sleep_retention_en          , set_hp_modem2sleep_retention_en          : 12;
+    pub bool, hp_active2sleep_retention_en         , set_hp_active2sleep_retention_en         : 13;
+    pub u8,   hp_modem2sleep_backup_clk_sel        , set_hp_modem2sleep_backup_clk_sel        : 17, 16;
+    pub u8,   hp_active2sleep_backup_clk_sel       , set_hp_active2sleep_backup_clk_sel       : 19, 18;
+    pub u8,   hp_modem2sleep_backup_mode           , set_hp_modem2sleep_backup_mode           : 25, 23;
+    pub u8,   hp_active2sleep_backup_mode          , set_hp_active2sleep_backup_mode          : 28, 26;
+    pub bool, hp_modem2sleep_backup_en             , set_hp_modem2sleep_backup_en             : 30;
+    pub bool, hp_active2sleep_backup_en            , set_hp_active2sleep_backup_en            : 31;
 }
 
 bitfield::bitfield! {
@@ -548,38 +519,38 @@ bitfield::bitfield! {
     // custom based on `PMU_ICG_FUNC_ENA_*` bitflag constants
     pub struct HpBackupClk(u32);
 
-    pub u32, gdma        , set_gdma         : 0;
-    pub u32, spi2        , set_spi2         : 1;
-    pub u32, i2s_rx      , set_i2s_rx       : 2;
-    pub u32, uart0       , set_uart0        : 3;
-    pub u32, uart1       , set_uart1        : 4;
-    pub u32, uhci        , set_uhci         : 5;
-    pub u32, usb_device  , set_usb_device   : 6;
-    pub u32, i2s_tx      , set_i2s_tx       : 7;
-    pub u32, regdma      , set_regdma       : 8;
-    pub u32, retention   , set_retention    : 9;
-    pub u32, mem_monitor , set_mem_monitor  : 10;
-    pub u32, sdio_slave  , set_sdio_slave   : 11;
-    pub u32, tsens       , set_tsens        : 12;
-    pub u32, tg1         , set_tg1          : 13;
-    pub u32, tg0         , set_tg0          : 14;
-    pub u32, hpbus       , set_hpbus        : 15;
-    pub u32, soc_etm     , set_soc_etm      : 16;
-    pub u32, hpcore      , set_hpcore       : 17;
-    pub u32, systimer    , set_systimer     : 18;
-    pub u32, sec         , set_sec          : 19;
-    pub u32, saradc      , set_saradc       : 20;
-    pub u32, rmt         , set_rmt          : 21;
-    pub u32, pwm         , set_pwm          : 22;
-    pub u32, pvt_monitor , set_pvt_monitor  : 23;
-    pub u32, parl_tx     , set_parl_tx      : 24;
-    pub u32, parl_rx     , set_parl_rx      : 25;
-    pub u32, mspi        , set_mspi         : 26;
-    pub u32, ledc        , set_ledc         : 27;
-    pub u32, iomux       , set_iomux        : 28;
-    pub u32, i2c         , set_i2c          : 29;
-    pub u32, can1        , set_can1         : 30;
-    pub u32, can0        , set_can0         : 31;
+    pub bool, gdma        , set_gdma         : 0;
+    pub bool, spi2        , set_spi2         : 1;
+    pub bool, i2s_rx      , set_i2s_rx       : 2;
+    pub bool, uart0       , set_uart0        : 3;
+    pub bool, uart1       , set_uart1        : 4;
+    pub bool, uhci        , set_uhci         : 5;
+    pub bool, usb_device  , set_usb_device   : 6;
+    pub bool, i2s_tx      , set_i2s_tx       : 7;
+    pub bool, regdma      , set_regdma       : 8;
+    pub bool, retention   , set_retention    : 9;
+    pub bool, mem_monitor , set_mem_monitor  : 10;
+    pub bool, sdio_slave  , set_sdio_slave   : 11;
+    pub bool, tsens       , set_tsens        : 12;
+    pub bool, tg1         , set_tg1          : 13;
+    pub bool, tg0         , set_tg0          : 14;
+    pub bool, hpbus       , set_hpbus        : 15;
+    pub bool, soc_etm     , set_soc_etm      : 16;
+    pub bool, hpcore      , set_hpcore       : 17;
+    pub bool, systimer    , set_systimer     : 18;
+    pub bool, sec         , set_sec          : 19;
+    pub bool, saradc      , set_saradc       : 20;
+    pub bool, rmt         , set_rmt          : 21;
+    pub bool, pwm         , set_pwm          : 22;
+    pub bool, pvt_monitor , set_pvt_monitor  : 23;
+    pub bool, parl_tx     , set_parl_tx      : 24;
+    pub bool, parl_rx     , set_parl_rx      : 25;
+    pub bool, mspi        , set_mspi         : 26;
+    pub bool, ledc        , set_ledc         : 27;
+    pub bool, iomux       , set_iomux        : 28;
+    pub bool, i2c         , set_i2c          : 29;
+    pub bool, can1        , set_can1         : 30;
+    pub bool, can0        , set_can0         : 31;
 }
 
 macro_rules! hp_system_init {
@@ -597,14 +568,14 @@ macro_rules! hp_system_init {
                 pmu().[<$state _icg_hp_func >]().write(|w| w.bits($s.clock.icg_func));
                 pmu().[<$state _icg_hp_apb >]().write(|w| w.bits($s.clock.icg_apb));
                 pmu().[<$state _icg_modem >]().write(|w| w
-                    .[<$state _dig_icg_modem_code >]().bits($s.clock.icg_modem.code() as u8)
+                    .[<$state _dig_icg_modem_code >]().bits($s.clock.icg_modem.code())
                 );
                 pmu().[<$state _sysclk >]().modify(|_, w| w
                     .[<$state _dig_sys_clk_no_div >]().bit($s.clock.sysclk.dig_sysclk_nodiv())
                     .[<$state _icg_sys_clock_en >]().bit($s.clock.sysclk.icg_sysclk_en())
                     .[<$state _sys_clk_slp_sel >]().bit($s.clock.sysclk.sysclk_slp_sel())
                     .[<$state _icg_slp_sel >]().bit($s.clock.sysclk.icg_slp_sel())
-                    .[<$state _dig_sys_clk_sel >]().bits($s.clock.sysclk.dig_sysclk_sel() as u8)
+                    .[<$state _dig_sys_clk_sel >]().bits($s.clock.sysclk.dig_sysclk_sel())
                 );
 
                 // Default configuration of hp-system digital sub-system in active, modem
@@ -622,7 +593,7 @@ macro_rules! hp_system_init {
                 // sleep modes
                 pmu().[<$state _bias >]().modify(|_, w| w
                     .[<$state _xpd_bias >]().bit($s.anlg.bias.xpd_bias())
-                    .[<$state _dbg_atten >]().bits($s.anlg.bias.dbg_atten() as u8)
+                    .[<$state _dbg_atten >]().bits($s.anlg.bias.dbg_atten())
                     .[<$state _pd_cur >]().bit($s.anlg.bias.pd_cur())
                     .sleep().bit($s.anlg.bias.bias_sleep())
                 );
@@ -631,9 +602,9 @@ macro_rules! hp_system_init {
                     .[<$state _hp_regulator_slp_mem_xpd >]().bit($s.anlg.regulator0.slp_mem_xpd())
                     .[<$state _hp_regulator_slp_logic_xpd >]().bit($s.anlg.regulator0.slp_logic_xpd())
                     .[<$state _hp_regulator_xpd >]().bit($s.anlg.regulator0.xpd())
-                    .[<$state _hp_regulator_slp_mem_dbias >]().bits($s.anlg.regulator0.slp_mem_dbias() as u8)
-                    .[<$state _hp_regulator_slp_logic_dbias >]().bits($s.anlg.regulator0.slp_logic_dbias() as u8)
-                    .[<$state _hp_regulator_dbias >]().bits($s.anlg.regulator0.dbias() as u8)
+                    .[<$state _hp_regulator_slp_mem_dbias >]().bits($s.anlg.regulator0.slp_mem_dbias())
+                    .[<$state _hp_regulator_slp_logic_dbias >]().bits($s.anlg.regulator0.slp_logic_dbias())
+                    .[<$state _hp_regulator_dbias >]().bits($s.anlg.regulator0.dbias())
                 );
 
                 pmu().[<$state _hp_regulator1 >]().modify(|_, w| w
@@ -948,7 +919,6 @@ bitfield::bitfield! {
     // pmu_lp_power_t.0
     pub struct LpDigPower(u32);
 
-    pub u32, reserved0 , set_reserved0 : 29, 0;
     pub u32, mem_dslp  , set_mem_dslp  : 30;
     pub u32, peri_pd_en, set_peri_pd_en: 31;
 
@@ -959,7 +929,6 @@ bitfield::bitfield! {
     // pmu_lp_power_t.1
     pub struct LpClkPower(u32);
 
-    pub u32, reserved1  , set_reserved1  : 27, 0;
     pub u32, xpd_xtal32k, set_xpd_xtal32k: 28;
     pub u32, xpd_rc32k  , set_xpd_rc32k  : 29;
     pub u32, xpd_fosc   , set_xpd_fosc   : 30;
@@ -971,8 +940,7 @@ bitfield::bitfield! {
     // pmu_lp_power_t.2
     pub struct LpXtalPower(u32);
 
-    pub u32, reserved2    , set_reserved2    : 30, 0;
-    pub u32, xpd_xtal     , set_xpd_xtal     : 31;
+    pub bool, xpd_xtal     , set_xpd_xtal     : 31;
 }
 
 bitfield::bitfield! {
@@ -980,11 +948,10 @@ bitfield::bitfield! {
     // pmu_lp_analog_t.0
     pub struct LpAnalogBias(u32);
 
-    pub u32, reserved0 , set_reserved0 : 24, 0;
-    pub u32, xpd_bias  , set_xpd_bias  : 25;
-    pub u32, dbg_atten , set_dbg_atten : 29, 26;
-    pub u32, pd_cur    , set_pd_cur    : 30;
-    pub u32, bias_sleep, set_bias_sleep: 31;
+    pub bool, xpd_bias  , set_xpd_bias  : 25;
+    pub u8,   dbg_atten , set_dbg_atten : 29, 26;
+    pub bool, pd_cur    , set_pd_cur    : 30;
+    pub bool, bias_sleep, set_bias_sleep: 31;
 }
 
 bitfield::bitfield! {
@@ -992,11 +959,10 @@ bitfield::bitfield! {
     // pmu_lp_analog_t.1
     pub struct LpAnalogRegulator0(u32);
 
-    pub u32, reserved1, set_reserved1: 20, 0;
-    pub u32, slp_xpd  , set_slp_xpd  : 21;
-    pub u32, xpd      , set_xpd      : 22;
-    pub u32, slp_dbias, set_slp_dbias: 26, 23;
-    pub u32, dbias    , set_dbias    : 31, 27;
+    pub bool, slp_xpd  , set_slp_xpd  : 21;
+    pub bool, xpd      , set_xpd      : 22;
+    pub u8,   slp_dbias, set_slp_dbias: 26, 23;
+    pub u8,   dbias    , set_dbias    : 31, 27;
 }
 
 bitfield::bitfield! {
@@ -1004,8 +970,7 @@ bitfield::bitfield! {
     // pmu_lp_analog_t.2
     pub struct LpAnalogRegulator1(u32);
 
-    pub u32, reserved2, set_reserved2: 27, 0;
-    pub u32, drv_b    , set_drv_b    : 31, 28;
+    pub u8, drv_b    , set_drv_b    : 31, 28;
 }
 
 #[derive(Clone, Copy, Default)]
@@ -1028,12 +993,12 @@ macro_rules! lp_system_init {
                 pmu().[< $state _regulator0 >]().modify(|_, w| w
                     .[< $state _regulator_slp_xpd >]().bit($s.analog_regulator0.slp_xpd())
                     .[< $state _regulator_xpd >]().bit($s.analog_regulator0.xpd())
-                    .[< $state _regulator_slp_dbias >]().bits($s.analog_regulator0.slp_dbias() as u8)
-                    .[< $state _regulator_dbias >]().bits($s.analog_regulator0.dbias() as u8)
+                    .[< $state _regulator_slp_dbias >]().bits($s.analog_regulator0.slp_dbias())
+                    .[< $state _regulator_dbias >]().bits($s.analog_regulator0.dbias())
                 );
 
                 pmu().[< $state _regulator1 >]().modify(|_, w| w
-                    .[< $state _regulator_drv_b >]().bits($s.analog_regulator1.drv_b() as u8)
+                    .[< $state _regulator_drv_b >]().bits($s.analog_regulator1.drv_b())
                 );
             }
         }
@@ -1133,7 +1098,7 @@ impl LpSystemInit {
                 w.lp_sleep_xpd_bias() // pmu_ll_lp_set_bias_xpd
                     .bit(sleep.bias.xpd_bias())
                     .lp_sleep_dbg_atten() // pmu_ll_lp_set_bias_dbg_atten
-                    .bits(sleep.bias.dbg_atten() as u8)
+                    .bits(sleep.bias.dbg_atten())
                     .lp_sleep_pd_cur() // pmu_ll_lp_set_bias_pd_cur
                     .bit(sleep.bias.pd_cur())
                     .sleep() // pmu_ll_lp_set_bias_sleep
@@ -1144,58 +1109,52 @@ impl LpSystemInit {
 }
 
 pub(crate) fn init() {
+    // pmu_init()
     let pmu = unsafe { pmu() };
 
     pmu.rf_pwc()
         .modify(|_, w| w.perif_i2c_rstb().set_bit().xpd_perif_i2c().set_bit());
 
-    unsafe {
-        regi2c_write_mask(
-            I2C_DIG_REG,
-            I2C_DIG_REG_HOSTID,
-            I2C_DIG_REG_ENIF_RTC_DREG,
-            I2C_DIG_REG_ENIF_RTC_DREG_MSB,
-            I2C_DIG_REG_ENIF_RTC_DREG_LSB,
-            1,
-        );
-        regi2c_write_mask(
-            I2C_DIG_REG,
-            I2C_DIG_REG_HOSTID,
-            I2C_DIG_REG_ENIF_DIG_DREG,
-            I2C_DIG_REG_ENIF_DIG_DREG_MSB,
-            I2C_DIG_REG_ENIF_DIG_DREG_LSB,
-            1,
-        );
+    regi2c_write_mask(
+        I2C_DIG_REG,
+        I2C_DIG_REG_HOSTID,
+        I2C_DIG_REG_ENIF_RTC_DREG,
+        I2C_DIG_REG_ENIF_RTC_DREG_MSB,
+        I2C_DIG_REG_ENIF_RTC_DREG_LSB,
+        1,
+    );
+    regi2c_write_mask(
+        I2C_DIG_REG,
+        I2C_DIG_REG_HOSTID,
+        I2C_DIG_REG_ENIF_DIG_DREG,
+        I2C_DIG_REG_ENIF_DIG_DREG_MSB,
+        I2C_DIG_REG_ENIF_DIG_DREG_LSB,
+        1,
+    );
 
-        regi2c_write_mask(
-            I2C_DIG_REG,
-            I2C_DIG_REG_HOSTID,
-            I2C_DIG_REG_XPD_RTC_REG,
-            I2C_DIG_REG_XPD_RTC_REG_MSB,
-            I2C_DIG_REG_XPD_RTC_REG_LSB,
-            0,
-        );
-        regi2c_write_mask(
-            I2C_DIG_REG,
-            I2C_DIG_REG_HOSTID,
-            I2C_DIG_REG_XPD_DIG_REG,
-            I2C_DIG_REG_XPD_DIG_REG_MSB,
-            I2C_DIG_REG_XPD_DIG_REG_LSB,
-            0,
-        );
+    regi2c_write_mask(
+        I2C_DIG_REG,
+        I2C_DIG_REG_HOSTID,
+        I2C_DIG_REG_XPD_RTC_REG,
+        I2C_DIG_REG_XPD_RTC_REG_MSB,
+        I2C_DIG_REG_XPD_RTC_REG_LSB,
+        0,
+    );
+    regi2c_write_mask(
+        I2C_DIG_REG,
+        I2C_DIG_REG_HOSTID,
+        I2C_DIG_REG_XPD_DIG_REG,
+        I2C_DIG_REG_XPD_DIG_REG_MSB,
+        I2C_DIG_REG_XPD_DIG_REG_LSB,
+        0,
+    );
 
-        pmu.hp_active_hp_regulator0()
-            .modify(|_, w| w.hp_active_hp_regulator_dbias().bits(25));
-        pmu.hp_sleep_lp_regulator0()
-            .modify(|_, w| w.hp_sleep_lp_regulator_dbias().bits(26));
-    }
-
-    // Complete setup done by `pmu_init()`
     HpSystemInit::init_default();
     LpSystemInit::init_default();
+
     pmu_power_domain_force_default();
 
-    // Follow the implementation of `esp_perip_clk_init()`
+    // esp_perip_clk_init()
     modem_clock_domain_power_state_icg_map_init();
 
     //  During system initialization, the low-power clock source of the modem
@@ -1237,25 +1196,21 @@ pub(crate) fn configure_clock() {
 
 fn modem_clk_domain_active_state_icg_map_preinit() {
     unsafe {
-        const PMU_HP_ICG_MODEM_CODE_ACTIVE: u32 = 2;
-
         // Configure modem ICG code in PMU_ACTIVE state
-        pmu().hp_active_icg_modem().modify(|_, w| {
-            w.hp_active_dig_icg_modem_code()
-                .bits(PMU_HP_ICG_MODEM_CODE_ACTIVE as u8)
-        });
+        pmu()
+            .hp_active_icg_modem()
+            .modify(|_, w| w.hp_active_dig_icg_modem_code().bits(ICG_MODEM_CODE_ACTIVE));
 
         // Disable clock gating for MODEM_APB, I2C_MST and LP_APB clock domains in
         // PMU_ACTIVE state
-        modem_syscon().clk_conf_power_st().modify(|_, w| {
-            w.clk_modem_apb_st_map()
-                .bits(1 << PMU_HP_ICG_MODEM_CODE_ACTIVE)
-        });
+        modem_syscon()
+            .clk_conf_power_st()
+            .modify(|_, w| w.clk_modem_apb_st_map().bits(1 << ICG_MODEM_CODE_ACTIVE));
         modem_lpcon().clk_conf_power_st().modify(|_, w| {
             w.clk_i2c_mst_st_map()
-                .bits(1 << PMU_HP_ICG_MODEM_CODE_ACTIVE)
+                .bits(1 << ICG_MODEM_CODE_ACTIVE)
                 .clk_lp_apb_st_map()
-                .bits(1 << PMU_HP_ICG_MODEM_CODE_ACTIVE)
+                .bits(1 << ICG_MODEM_CODE_ACTIVE)
         });
 
         // Software trigger force update modem ICG code and ICG switch
@@ -1265,6 +1220,8 @@ fn modem_clk_domain_active_state_icg_map_preinit() {
         pmu()
             .imm_sleep_sysclk()
             .write(|w| w.update_dig_icg_switch().set_bit());
+
+        // The following is part of rtc_clk_init
 
         lp_clkrst()
             .fosc_cntl()
@@ -1300,15 +1257,15 @@ fn modem_clk_domain_active_state_icg_map_preinit() {
 
         pmu()
             .hp_active_hp_regulator0()
-            .modify(|_, w| w.hp_active_hp_regulator_dbias().bits(HP_CALI_DBIAS as u8));
+            .modify(|_, w| w.hp_active_hp_regulator_dbias().bits(HP_CALI_DBIAS));
         pmu()
             .hp_sleep_lp_regulator0()
-            .modify(|_, w| w.hp_sleep_lp_regulator_dbias().bits(LP_CALI_DBIAS as u8));
+            .modify(|_, w| w.hp_sleep_lp_regulator_dbias().bits(LP_CALI_DBIAS));
 
         // clk_ll_rc_fast_tick_conf
         pcr()
             .ctrl_tick_conf()
-            .modify(|_, w| w.fosc_tick_num().bits(255 as u8));
+            .modify(|_, w| w.fosc_tick_num().bits(255));
     }
 }
 
