@@ -3,7 +3,7 @@ use strum::FromRepr;
 
 use crate::{
     clock::{clocks_ll::regi2c_write_mask, Clock, XtalClock},
-    peripherals::{LP_AON, LP_CLKRST, PCR, PMU, TIMG0},
+    peripherals::TIMG0,
     soc::efuse::{Efuse, WAFER_VERSION_MAJOR, WAFER_VERSION_MINOR},
 };
 
@@ -40,6 +40,18 @@ unsafe fn modem_lpcon<'a>() -> &'a esp32c6::modem_lpcon::RegisterBlock {
 
 unsafe fn modem_syscon<'a>() -> &'a esp32c6::modem_syscon::RegisterBlock {
     &*esp32c6::MODEM_SYSCON::ptr()
+}
+
+unsafe fn lp_clkrst<'a>() -> &'a esp32c6::lp_clkrst::RegisterBlock {
+    &*esp32c6::LP_CLKRST::ptr()
+}
+
+unsafe fn pcr<'a>() -> &'a esp32c6::pcr::RegisterBlock {
+    &*esp32c6::PCR::ptr()
+}
+
+unsafe fn lp_aon<'a>() -> &'a esp32c6::lp_aon::RegisterBlock {
+    &*esp32c6::LP_AON::ptr()
 }
 
 struct MachineConstants;
@@ -223,7 +235,7 @@ enum RtcSlowClockSource {
 impl RtcSlowClockSource {
     fn current() -> Self {
         // clk_ll_rtc_slow_get_src()
-        let lp_clkrst = unsafe { &*esp32c6::LP_CLKRST::ptr() };
+        let lp_clkrst = unsafe { lp_clkrst() };
         match lp_clkrst.lp_clk_conf().read().slow_clk_sel().bits() {
             0 => Self::RcSlow,
             1 => Self::XTAL32K,
@@ -1323,7 +1335,7 @@ impl LpSystemInit {
 }
 
 pub(crate) fn init() {
-    let pmu = unsafe { &*PMU::ptr() };
+    let pmu = unsafe { pmu() };
 
     pmu.rf_pwc()
         .modify(|_, w| w.perif_i2c_rstb().set_bit().xpd_perif_i2c().set_bit());
@@ -1408,8 +1420,7 @@ pub(crate) fn configure_clock() {
     };
 
     unsafe {
-        let lp_aon = &*LP_AON::ptr();
-        lp_aon.store1().modify(|_, w| w.bits(cal_val));
+        lp_aon().store1().modify(|_, w| w.bits(cal_val));
     }
 
     modem_clk_domain_active_state_icg_map_preinit();
@@ -1417,11 +1428,8 @@ pub(crate) fn configure_clock() {
 
 fn modem_clk_domain_active_state_icg_map_preinit() {
     unsafe {
-        let pmu = &*PMU::PTR;
-        let lp_clkrst = &*LP_CLKRST::PTR;
-        let pcr = &*PCR::PTR;
-
-        pmu.hp_active_icg_modem()
+        pmu()
+            .hp_active_icg_modem()
             .modify(|_, w| w.hp_active_dig_icg_modem_code().bits(2));
 
         // TODO: clean this up
@@ -1440,9 +1448,11 @@ fn modem_clk_domain_active_state_icg_map_preinit() {
             (MODEM_LPCON_CLK_CONF_POWER_ST as *mut u32).read_volatile() & !(3 << 28) | 2 << 28,
         );
 
-        pmu.imm_modem_icg()
+        pmu()
+            .imm_modem_icg()
             .write(|w| w.update_dig_icg_modem_en().set_bit());
-        pmu.imm_sleep_sysclk()
+        pmu()
+            .imm_sleep_sysclk()
             .write(|w| w.update_dig_icg_switch().set_bit());
 
         lp_clkrst
@@ -1456,12 +1466,13 @@ fn modem_clk_domain_active_state_icg_map_preinit() {
             I2C_DIG_REG_SCK_DCAP_LSB,
             128,
         );
-        lp_clkrst
+        lp_clkrst()
             .rc32k_cntl()
             .modify(|_, w| w.rc32k_dfreq().bits(100));
 
         // https://github.com/espressif/esp-idf/commit/e3148369f32fdc6de62c35a67f7adb6f4faef4e3#diff-cc84d279f2f3d77fe252aa40a64d4813f271a52b5a4055e876efd012d888e135R810-R815
-        pcr.ctrl_tick_conf()
+        pcr()
+            .ctrl_tick_conf()
             .modify(|_, w| w.fosc_tick_num().bits(255 as u8));
     }
 }
@@ -1622,7 +1633,7 @@ impl RtcClock {
 
     /// Get the RTC_SLOW_CLK source
     pub(crate) fn get_slow_freq() -> RtcSlowClock {
-        let lp_clrst = unsafe { &*LP_CLKRST::ptr() };
+        let lp_clrst = unsafe { lp_clkrst() };
 
         let slow_freq = lp_clrst.lp_clk_conf().read().slow_clk_sel().bits();
         match slow_freq {
@@ -1636,12 +1647,10 @@ impl RtcClock {
 
     fn set_slow_freq(slow_freq: RtcSlowClock) {
         unsafe {
-            let lp_clkrst = &*LP_CLKRST::PTR;
-
-            lp_clkrst
+            lp_clkrst()
                 .lp_clk_conf()
                 .modify(|_, w| w.slow_clk_sel().bits(slow_freq as u8));
-            lp_clkrst.clk_to_hp().modify(|_, w| {
+            lp_clkrst().clk_to_hp().modify(|_, w| {
                 w.icg_hp_xtal32k()
                     .bit(match slow_freq {
                         RtcSlowClock::RtcSlowClock32kXtal => true,
@@ -1661,8 +1670,7 @@ impl RtcClock {
     // stage bootloader https://github.com/espressif/esp-idf/blob/master/components/bootloader_support/src/bootloader_clock_init.c#L65-L67
     fn set_fast_freq(fast_freq: RtcFastClock) {
         unsafe {
-            let lp_clkrst = &*LP_CLKRST::PTR;
-            lp_clkrst.lp_clk_conf().modify(|_, w| {
+            lp_clkrst().lp_clk_conf().modify(|_, w| {
                 w.fast_clk_sel().bit(match fast_freq {
                     RtcFastClock::RtcFastClockRcFast => false,
                     RtcFastClock::RtcFastClockXtalD2 => true,
@@ -1692,9 +1700,9 @@ impl RtcClock {
             };
         }
 
-        let lp_clkrst = unsafe { &*LP_CLKRST::ptr() };
-        let pcr = unsafe { &*PCR::ptr() };
-        let pmu = unsafe { &*PMU::ptr() };
+        let lp_clkrst = unsafe { lp_clkrst() };
+        let pcr = unsafe { pcr() };
+        let pmu = unsafe { pmu() };
 
         let clk_src = RtcClock::get_slow_freq();
 
