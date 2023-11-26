@@ -5,7 +5,7 @@ use strum::FromRepr;
 use crate::{
     clock::{clocks_ll::regi2c_write_mask, Clock, XtalClock},
     peripherals::TIMG0,
-    soc::efuse::{Efuse, WAFER_VERSION_MAJOR, WAFER_VERSION_MINOR},
+    soc::efuse::Efuse,
 };
 
 const I2C_DIG_REG: u8 = 0x6d;
@@ -1917,17 +1917,12 @@ impl RtcClock {
 
         let cal_val = loop {
             if timg0.rtccalicfg().read().rtc_cali_rdy().bit_is_set() {
-                let minor: u8 = Efuse::read_field_le(WAFER_VERSION_MINOR);
-                let major: u8 = Efuse::read_field_le(WAFER_VERSION_MAJOR);
-
                 // The Fosc CLK of calibration circuit is divided by 32 for ECO1.
                 // So we need to multiply the frequency of the Fosc for ECO1 and above chips by
                 // 32 times. And ensure that this modification will not affect
-                // ECO0. PS: For ESP32C6 ECO0 chip version is v0.0 only, which
-                // means that both MAJOR and MINOR are 0. The chip version is
-                // calculated using the following formula: MAJOR * 100 + MINOR. (if the result
-                // is 1, then version is v0.1) https://github.com/espressif/esp-idf/commit/e3148369f32fdc6de62c35a67f7adb6f4faef4e3
-                if (major * 100 + minor) > 0 {
+                // ECO0.
+                // https://github.com/espressif/esp-idf/commit/e3148369f32fdc6de62c35a67f7adb6f4faef4e3
+                if Efuse::chip_revision() > 0 {
                     if cal_clk == RtcCalSel::RtcCalRcFast {
                         break timg0.rtccalicfg1().read().rtc_cali_value().bits() >> 5;
                     }
@@ -2000,18 +1995,12 @@ impl RtcClock {
     fn calibrate(cal_clk: RtcCalSel, slowclk_cycles: u32) -> u32 {
         let xtal_freq = RtcClock::get_xtal_freq();
 
-        let minor: u8 = Efuse::read_field_le(WAFER_VERSION_MINOR);
-        let major: u8 = Efuse::read_field_le(WAFER_VERSION_MAJOR);
-
         let mut slowclk_cycles = slowclk_cycles;
 
         // The Fosc CLK of calibration circuit is divided by 32 for ECO1.
         // So we need to divide the calibrate cycles of the FOSC for ECO1 and above
-        // chips by 32 to avoid excessive calibration time.*/
-        // PS: For ESP32C6 ECO0 chip version is v0.0 only, which means that both MAJOR
-        // and MINOR are 0. The chip version is calculated using the following
-        // formula: MAJOR * 100 + MINOR. (if the result is 1, then version is v0.1)
-        if (major * 100 + minor) > 0 {
+        // chips by 32 to avoid excessive calibration time.
+        if Efuse::chip_revision() > 0 {
             if cal_clk == RtcCalSel::RtcCalRcFast {
                 slowclk_cycles >>= 5;
             }
