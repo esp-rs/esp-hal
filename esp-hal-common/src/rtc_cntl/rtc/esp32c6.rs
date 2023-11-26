@@ -582,9 +582,83 @@ bitfield::bitfield! {
     pub u32, can0        , set_can0         : 31;
 }
 
-struct HpSystemInit;
+macro_rules! hp_system_init {
+    ($state:ident => $s:ident) => {
+        paste::paste! {
+            unsafe {
+                // Default configuration of hp-system power in active, modem and sleep modes
+                pmu().[<$state _dig_power >]().modify(|_, w| w.bits($s.power.dig_power.0));
+                pmu().[<$state _hp_ck_power >]().modify(|_, w| w.bits($s.power.clk.0));
+                pmu().[<$state _xtal >]().modify(|_, w| w
+                    .[<$state _xpd_xtal >]().bit($s.power.xtal.xpd_xtal())
+                );
+
+                // Default configuration of hp-system clock in active, modem and sleep modes
+                pmu().[<$state _icg_hp_func >]().write(|w| w.bits($s.clock.icg_func));
+                pmu().[<$state _icg_hp_apb >]().write(|w| w.bits($s.clock.icg_apb));
+                pmu().[<$state _icg_modem >]().write(|w| w
+                    .[<$state _dig_icg_modem_code >]().bits($s.clock.icg_modem.code() as u8)
+                );
+                pmu().[<$state _sysclk >]().modify(|_, w| w
+                    .[<$state _dig_sys_clk_no_div >]().bit($s.clock.sysclk.dig_sysclk_nodiv())
+                    .[<$state _icg_sys_clock_en >]().bit($s.clock.sysclk.icg_sysclk_en())
+                    .[<$state _sys_clk_slp_sel >]().bit($s.clock.sysclk.sysclk_slp_sel())
+                    .[<$state _icg_slp_sel >]().bit($s.clock.sysclk.icg_slp_sel())
+                    .[<$state _dig_sys_clk_sel >]().bits($s.clock.sysclk.dig_sysclk_sel() as u8)
+                );
+
+                // Default configuration of hp-system digital sub-system in active, modem
+                // and sleep modes
+                pmu().[<$state _hp_sys_cntl >]().modify(|_, w| w
+                    .[<$state _uart_wakeup_en >]().bit($s.syscntl.uart_wakeup_en())
+                    .[<$state _lp_pad_hold_all >]().bit($s.syscntl.lp_pad_hold_all())
+                    .[<$state _hp_pad_hold_all >]().bit($s.syscntl.hp_pad_hold_all())
+                    .[<$state _dig_pad_slp_sel >]().bit($s.syscntl.dig_pad_slp_sel())
+                    .[<$state _dig_pause_wdt >]().bit($s.syscntl.dig_pause_wdt())
+                    .[<$state _dig_cpu_stall >]().bit($s.syscntl.dig_cpu_stall())
+                );
+
+                // Default configuration of hp-system analog sub-system in active, modem and
+                // sleep modes
+                pmu().[<$state _bias >]().modify(|_, w| w
+                    .[<$state _xpd_bias >]().bit($s.anlg.bias.xpd_bias())
+                    .[<$state _dbg_atten >]().bits($s.anlg.bias.dbg_atten() as u8)
+                    .[<$state _pd_cur >]().bit($s.anlg.bias.pd_cur())
+                    .sleep().bit($s.anlg.bias.bias_sleep())
+                );
+
+                pmu().[<$state _hp_regulator0 >]().modify(|_, w| w
+                    .[<$state _hp_regulator_slp_mem_xpd >]().bit($s.anlg.regulator0.slp_mem_xpd())
+                    .[<$state _hp_regulator_slp_logic_xpd >]().bit($s.anlg.regulator0.slp_logic_xpd())
+                    .[<$state _hp_regulator_xpd >]().bit($s.anlg.regulator0.xpd())
+                    .[<$state _hp_regulator_slp_mem_dbias >]().bits($s.anlg.regulator0.slp_mem_dbias() as u8)
+                    .[<$state _hp_regulator_slp_logic_dbias >]().bits($s.anlg.regulator0.slp_logic_dbias() as u8)
+                    .[<$state _hp_regulator_dbias >]().bits($s.anlg.regulator0.dbias() as u8)
+                );
+
+                pmu().[<$state _hp_regulator1 >]().modify(|_, w| w
+                    .[<$state _hp_regulator_drv_b >]().bits($s.anlg.regulator1.drv_b())
+                );
+
+                // Default configuration of hp-system retention sub-system in active, modem
+                // and sleep modes
+                pmu().[<$state _backup >]().write(|w| w.bits($s.retention));
+                pmu().[<$state _backup_clk >]().write(|w| w.bits($s.backup_clk));
+            }
+        }
+    };
+}
+
+struct HpSystemInit {
+    power: HpSysPower,
+    clock: SystemClockParam,
+    syscntl: HpSysCntlReg,
+    anlg: HpAnalog,
+    retention: u32,
+    backup_clk: u32,
+}
 impl HpSystemInit {
-    fn active() {
+    fn active() -> Self {
         // pmu_hp_system_init_default
 
         let mut power = HpSysPower::default();
@@ -668,100 +742,17 @@ impl HpSystemInit {
         backup_clk.set_uart0(true);
         backup_clk.set_systimer(true);
 
-        unsafe {
-            // Default configuration of hp-system power in active, modem and sleep modes
-            pmu()
-                .hp_active_dig_power()
-                .modify(|_, w| w.bits(power.dig_power.0));
-            pmu()
-                .hp_active_hp_ck_power()
-                .modify(|_, w| w.bits(power.clk.0));
-            pmu()
-                .hp_active_xtal()
-                .modify(|_, w| w.hp_active_xpd_xtal().bit(power.xtal.xpd_xtal()));
-
-            // Default configuration of hp-system clock in active, modem and sleep modes
-            pmu()
-                .hp_active_icg_hp_func()
-                .write(|w| w.bits(clock.icg_func));
-            pmu()
-                .hp_active_icg_hp_apb()
-                .write(|w| w.bits(clock.icg_apb));
-            pmu().hp_active_icg_modem().write(|w| {
-                w.hp_active_dig_icg_modem_code()
-                    .bits(clock.icg_modem.code() as u8)
-            });
-            pmu().hp_active_sysclk().modify(|_, w| {
-                w.hp_active_dig_sys_clk_no_div()
-                    .bit(clock.sysclk.dig_sysclk_nodiv())
-                    .hp_active_icg_sys_clock_en()
-                    .bit(clock.sysclk.icg_sysclk_en())
-                    .hp_active_sys_clk_slp_sel()
-                    .bit(clock.sysclk.sysclk_slp_sel())
-                    .hp_active_icg_slp_sel()
-                    .bit(clock.sysclk.icg_slp_sel())
-                    .hp_active_dig_sys_clk_sel()
-                    .bits(clock.sysclk.dig_sysclk_sel() as u8)
-            });
-
-            // Default configuration of hp-system digital sub-system in active, modem
-            // and sleep modes
-            pmu().hp_active_hp_sys_cntl().modify(|_, w| {
-                w.hp_active_uart_wakeup_en()
-                    .bit(syscntl.uart_wakeup_en())
-                    .hp_active_lp_pad_hold_all()
-                    .bit(syscntl.lp_pad_hold_all())
-                    .hp_active_hp_pad_hold_all()
-                    .bit(syscntl.hp_pad_hold_all())
-                    .hp_active_dig_pad_slp_sel()
-                    .bit(syscntl.dig_pad_slp_sel())
-                    .hp_active_dig_pause_wdt()
-                    .bit(syscntl.dig_pause_wdt())
-                    .hp_active_dig_cpu_stall()
-                    .bit(syscntl.dig_cpu_stall())
-            });
-
-            // Default configuration of hp-system analog sub-system in active, modem and
-            // sleep modes
-            pmu().hp_active_bias().modify(|_, w| {
-                w.hp_active_xpd_bias()
-                    .bit(anlg.bias.xpd_bias())
-                    .hp_active_dbg_atten()
-                    .bits(anlg.bias.dbg_atten() as u8)
-                    .hp_active_pd_cur()
-                    .bit(anlg.bias.pd_cur())
-                    .sleep()
-                    .bit(anlg.bias.bias_sleep())
-            });
-
-            pmu().hp_active_hp_regulator0().modify(|_, w| {
-                w.hp_active_hp_regulator_slp_mem_xpd()
-                    .bit(anlg.regulator0.slp_mem_xpd())
-                    .hp_active_hp_regulator_slp_logic_xpd()
-                    .bit(anlg.regulator0.slp_logic_xpd())
-                    .hp_active_hp_regulator_xpd()
-                    .bit(anlg.regulator0.xpd())
-                    .hp_active_hp_regulator_slp_mem_dbias()
-                    .bits(anlg.regulator0.slp_mem_dbias() as u8)
-                    .hp_active_hp_regulator_slp_logic_dbias()
-                    .bits(anlg.regulator0.slp_logic_dbias() as u8)
-                    .hp_active_hp_regulator_dbias()
-                    .bits(anlg.regulator0.dbias() as u8)
-            });
-
-            pmu().hp_active_hp_regulator1().modify(|_, w| {
-                w.hp_active_hp_regulator_drv_b()
-                    .bits(anlg.regulator1.drv_b())
-            });
-
-            // Default configuration of hp-system retention sub-system in active, modem
-            // and sleep modes
-            pmu().hp_active_backup().write(|w| w.bits(retention.0));
-            pmu().hp_active_backup_clk().write(|w| w.bits(backup_clk.0));
+        Self {
+            power,
+            clock,
+            syscntl,
+            anlg,
+            retention: retention.0,
+            backup_clk: backup_clk.0,
         }
     }
 
-    fn modem() {
+    fn modem() -> Self {
         let mut power = HpSysPower::default();
         power.dig_power.set_vdd_spi_pd_en(false);
         power.dig_power.set_wifi_pd_en(false);
@@ -831,97 +822,17 @@ impl HpSystemInit {
         backup_clk.set_uart0(true);
         backup_clk.set_systimer(true);
 
-        unsafe {
-            // Default configuration of hp-system power in active, modem and sleep modes
-            pmu()
-                .hp_modem_dig_power()
-                .modify(|_, w| w.bits(power.dig_power.0));
-            pmu()
-                .hp_modem_hp_ck_power()
-                .modify(|_, w| w.bits(power.clk.0));
-            pmu()
-                .hp_modem_xtal()
-                .modify(|_, w| w.hp_modem_xpd_xtal().bit(power.xtal.xpd_xtal()));
-
-            // Default configuration of hp-system clock in active, modem and sleep modes
-            pmu()
-                .hp_modem_icg_hp_func()
-                .write(|w| w.bits(clock.icg_func));
-            pmu().hp_modem_icg_hp_apb().write(|w| w.bits(clock.icg_apb));
-            pmu().hp_modem_icg_modem().write(|w| {
-                w.hp_modem_dig_icg_modem_code()
-                    .bits(clock.icg_modem.code() as u8)
-            });
-            pmu().hp_modem_sysclk().modify(|_, w| {
-                w.hp_modem_dig_sys_clk_no_div()
-                    .bit(clock.sysclk.dig_sysclk_nodiv())
-                    .hp_modem_icg_sys_clock_en()
-                    .bit(clock.sysclk.icg_sysclk_en())
-                    .hp_modem_sys_clk_slp_sel()
-                    .bit(clock.sysclk.sysclk_slp_sel())
-                    .hp_modem_icg_slp_sel()
-                    .bit(clock.sysclk.icg_slp_sel())
-                    .hp_modem_dig_sys_clk_sel()
-                    .bits(clock.sysclk.dig_sysclk_sel() as u8)
-            });
-
-            // Default configuration of hp-system digital sub-system in active, modem
-            // and sleep modes
-            pmu().hp_modem_hp_sys_cntl().modify(|_, w| {
-                w.hp_modem_uart_wakeup_en()
-                    .bit(syscntl.uart_wakeup_en())
-                    .hp_modem_lp_pad_hold_all()
-                    .bit(syscntl.lp_pad_hold_all())
-                    .hp_modem_hp_pad_hold_all()
-                    .bit(syscntl.hp_pad_hold_all())
-                    .hp_modem_dig_pad_slp_sel()
-                    .bit(syscntl.dig_pad_slp_sel())
-                    .hp_modem_dig_pause_wdt()
-                    .bit(syscntl.dig_pause_wdt())
-                    .hp_modem_dig_cpu_stall()
-                    .bit(syscntl.dig_cpu_stall())
-            });
-
-            // Default configuration of hp-system analog sub-system in active, modem and
-            // sleep modes
-            pmu().hp_modem_bias().modify(|_, w| {
-                w.hp_modem_xpd_bias()
-                    .bit(anlg.bias.xpd_bias())
-                    .hp_modem_dbg_atten()
-                    .bits(anlg.bias.dbg_atten() as u8)
-                    .hp_modem_pd_cur()
-                    .bit(anlg.bias.pd_cur())
-                    .sleep()
-                    .bit(anlg.bias.bias_sleep())
-            });
-
-            pmu().hp_modem_hp_regulator0().modify(|_, w| {
-                w.hp_modem_hp_regulator_slp_mem_xpd()
-                    .bit(anlg.regulator0.slp_mem_xpd())
-                    .hp_modem_hp_regulator_slp_logic_xpd()
-                    .bit(anlg.regulator0.slp_logic_xpd())
-                    .hp_modem_hp_regulator_xpd()
-                    .bit(anlg.regulator0.xpd())
-                    .hp_modem_hp_regulator_slp_mem_dbias()
-                    .bits(anlg.regulator0.slp_mem_dbias() as u8)
-                    .hp_modem_hp_regulator_slp_logic_dbias()
-                    .bits(anlg.regulator0.slp_logic_dbias() as u8)
-                    .hp_modem_hp_regulator_dbias()
-                    .bits(anlg.regulator0.dbias() as u8)
-            });
-
-            pmu().hp_modem_hp_regulator1().modify(|_, w| {
-                w.hp_modem_hp_regulator_drv_b()
-                    .bits(anlg.regulator1.drv_b())
-            });
-
-            // Default configuration of hp-system retention sub-system in active, modem
-            // and sleep modes
-            pmu().hp_modem_backup().write(|w| w.bits(retention.0));
-            pmu().hp_modem_backup_clk().write(|w| w.bits(backup_clk.0));
+        Self {
+            power,
+            clock,
+            syscntl,
+            anlg,
+            retention: retention.0,
+            backup_clk: backup_clk.0,
         }
     }
-    fn sleep() {
+
+    fn sleep() -> Self {
         let mut power = HpSysPower::default();
         power.dig_power.set_vdd_spi_pd_en(true);
         power.dig_power.set_mem_dslp(false);
@@ -996,101 +907,24 @@ impl HpSystemInit {
         syscntl.set_dig_pause_wdt(true);
         syscntl.set_dig_cpu_stall(true);
 
-        unsafe {
-            // Default configuration of hp-system power in active, modem and sleep modes
-            pmu()
-                .hp_sleep_dig_power()
-                .modify(|_, w| w.bits(power.dig_power.0));
-            pmu()
-                .hp_sleep_hp_ck_power()
-                .modify(|_, w| w.bits(power.clk.0));
-            pmu()
-                .hp_sleep_xtal()
-                .modify(|_, w| w.hp_sleep_xpd_xtal().bit(power.xtal.xpd_xtal()));
-
-            // Default configuration of hp-system clock in active, modem and sleep modes
-            pmu()
-                .hp_sleep_icg_hp_func()
-                .write(|w| w.bits(clock.icg_func));
-            pmu().hp_sleep_icg_hp_apb().write(|w| w.bits(clock.icg_apb));
-            pmu().hp_sleep_icg_modem().write(|w| {
-                w.hp_sleep_dig_icg_modem_code()
-                    .bits(clock.icg_modem.code() as u8)
-            });
-            pmu().hp_sleep_sysclk().modify(|_, w| {
-                w.hp_sleep_dig_sys_clk_no_div()
-                    .bit(clock.sysclk.dig_sysclk_nodiv())
-                    .hp_sleep_icg_sys_clock_en()
-                    .bit(clock.sysclk.icg_sysclk_en())
-                    .hp_sleep_sys_clk_slp_sel()
-                    .bit(clock.sysclk.sysclk_slp_sel())
-                    .hp_sleep_icg_slp_sel()
-                    .bit(clock.sysclk.icg_slp_sel())
-                    .hp_sleep_dig_sys_clk_sel()
-                    .bits(clock.sysclk.dig_sysclk_sel() as u8)
-            });
-
-            // Default configuration of hp-system digital sub-system in active, modem
-            // and sleep modes
-            pmu().hp_sleep_hp_sys_cntl().modify(|_, w| {
-                w.hp_sleep_uart_wakeup_en()
-                    .bit(syscntl.uart_wakeup_en())
-                    .hp_sleep_lp_pad_hold_all()
-                    .bit(syscntl.lp_pad_hold_all())
-                    .hp_sleep_hp_pad_hold_all()
-                    .bit(syscntl.hp_pad_hold_all())
-                    .hp_sleep_dig_pad_slp_sel()
-                    .bit(syscntl.dig_pad_slp_sel())
-                    .hp_sleep_dig_pause_wdt()
-                    .bit(syscntl.dig_pause_wdt())
-                    .hp_sleep_dig_cpu_stall()
-                    .bit(syscntl.dig_cpu_stall())
-            });
-
-            // Default configuration of hp-system analog sub-system in active, modem and
-            // sleep modes
-            pmu().hp_sleep_bias().modify(|_, w| {
-                w.hp_sleep_xpd_bias()
-                    .bit(anlg.bias.xpd_bias())
-                    .hp_sleep_dbg_atten()
-                    .bits(anlg.bias.dbg_atten() as u8)
-                    .hp_sleep_pd_cur()
-                    .bit(anlg.bias.pd_cur())
-                    .sleep()
-                    .bit(anlg.bias.bias_sleep())
-            });
-
-            pmu().hp_sleep_hp_regulator0().modify(|_, w| {
-                w.hp_sleep_hp_regulator_slp_mem_xpd()
-                    .bit(anlg.regulator0.slp_mem_xpd())
-                    .hp_sleep_hp_regulator_slp_logic_xpd()
-                    .bit(anlg.regulator0.slp_logic_xpd())
-                    .hp_sleep_hp_regulator_xpd()
-                    .bit(anlg.regulator0.xpd())
-                    .hp_sleep_hp_regulator_slp_mem_dbias()
-                    .bits(anlg.regulator0.slp_mem_dbias() as u8)
-                    .hp_sleep_hp_regulator_slp_logic_dbias()
-                    .bits(anlg.regulator0.slp_logic_dbias() as u8)
-                    .hp_sleep_hp_regulator_dbias()
-                    .bits(anlg.regulator0.dbias() as u8)
-            });
-
-            pmu().hp_sleep_hp_regulator1().modify(|_, w| {
-                w.hp_sleep_hp_regulator_drv_b()
-                    .bits(anlg.regulator1.drv_b())
-            });
-
-            // Default configuration of hp-system retention sub-system in active, modem
-            // and sleep modes
-            pmu().hp_sleep_backup().write(|w| w.bits(retention.0));
-            pmu().hp_sleep_backup_clk().write(|w| w.bits(backup_clk.0));
+        Self {
+            power,
+            clock,
+            syscntl,
+            anlg,
+            retention: retention.0,
+            backup_clk: backup_clk.0,
         }
     }
 
     fn init_default() {
-        Self::active();
-        Self::modem();
-        Self::sleep();
+        let active = Self::active();
+        let modem = Self::modem();
+        let sleep = Self::sleep();
+
+        hp_system_init!(hp_active => active);
+        hp_system_init!(hp_modem => modem);
+        hp_system_init!(hp_sleep => sleep);
 
         unsafe {
             // Some PMU initial parameter configuration
@@ -1182,9 +1016,40 @@ pub struct LpAnalog {
     pub regulator1: LpAnalogRegulator1,
 }
 
-struct LpSystemInit;
+macro_rules! lp_system_init {
+    ($state:ident => $s:ident) => {
+        paste::paste! {
+            unsafe {
+                // Default configuration of lp-system power in active and sleep modes
+                pmu().[< $state _dig_power >]().modify(|_, w| w.bits($s.dig_power.0));
+                pmu().[< $state _ck_power >]().modify(|_, w| w.bits($s.clk_power.0));
+
+                // Default configuration of lp-system analog sub-system in active and sleep modes
+                pmu().[< $state _regulator0 >]().modify(|_, w| w
+                    .[< $state _regulator_slp_xpd >]().bit($s.analog_regulator0.slp_xpd())
+                    .[< $state _regulator_xpd >]().bit($s.analog_regulator0.xpd())
+                    .[< $state _regulator_slp_dbias >]().bits($s.analog_regulator0.slp_dbias() as u8)
+                    .[< $state _regulator_dbias >]().bits($s.analog_regulator0.dbias() as u8)
+                );
+
+                pmu().[< $state _regulator1 >]().modify(|_, w| w
+                    .[< $state _regulator_drv_b >]().bits($s.analog_regulator1.drv_b() as u8)
+                );
+            }
+        }
+    };
+}
+
+struct LpSystemInit {
+    dig_power: LpDigPower,
+    clk_power: LpClkPower,
+    xtal: LpXtalPower,
+    bias: LpAnalogBias,
+    analog_regulator0: LpAnalogRegulator0,
+    analog_regulator1: LpAnalogRegulator1,
+}
 impl LpSystemInit {
-    fn active() {
+    fn active() -> Self {
         let mut dig_power = LpDigPower::default();
         dig_power.set_peri_pd_en(false);
         dig_power.set_mem_dslp(false);
@@ -1203,34 +1068,17 @@ impl LpSystemInit {
         let mut analog_regulator1 = LpAnalogRegulator1::default();
         analog_regulator1.set_drv_b(0);
 
-        unsafe {
-            // Default configuration of lp-system power in active and sleep modes
-            pmu()
-                .hp_sleep_lp_dig_power()
-                .modify(|_, w| w.bits(dig_power.0));
-            pmu()
-                .hp_sleep_lp_ck_power()
-                .modify(|_, w| w.bits(clk_power.0));
-
-            pmu().hp_sleep_lp_regulator0().modify(|_, w| {
-                w.hp_sleep_lp_regulator_slp_xpd() // pmu_ll_hp_set_regulator_slp_xpd
-                    .bit(analog_regulator0.slp_xpd())
-                    .hp_sleep_lp_regulator_xpd() // pmu_ll_hp_set_regulator_xpd
-                    .bit(analog_regulator0.xpd())
-                    .hp_sleep_lp_regulator_slp_dbias() // pmu_ll_hp_set_regulator_sleep_dbias
-                    .bits(analog_regulator0.slp_dbias() as u8)
-                    .hp_sleep_lp_regulator_dbias() // pmu_ll_hp_set_regulator_dbias
-                    .bits(analog_regulator0.dbias() as u8)
-            });
-
-            pmu().hp_sleep_lp_regulator1().modify(|_, w| {
-                w.hp_sleep_lp_regulator_drv_b() // pmu_ll_hp_set_regulator_driver_bar
-                    .bits(analog_regulator1.drv_b() as u8)
-            });
+        Self {
+            dig_power,
+            clk_power,
+            xtal: LpXtalPower::default(),
+            bias: LpAnalogBias::default(),
+            analog_regulator0,
+            analog_regulator1,
         }
     }
 
-    fn sleep() {
+    fn sleep() -> Self {
         let mut dig_power = LpDigPower::default();
         dig_power.set_mem_dslp(true);
         dig_power.set_peri_pd_en(false);
@@ -1259,53 +1107,39 @@ impl LpSystemInit {
         let mut analog_regulator1 = LpAnalogRegulator1::default();
         analog_regulator1.set_drv_b(0);
 
-        unsafe {
-            // Default configuration of lp-system power in active and sleep modes
-            pmu()
-                .lp_sleep_lp_dig_power()
-                .modify(|_, w| w.bits(dig_power.0));
-            pmu()
-                .lp_sleep_lp_ck_power()
-                .modify(|_, w| w.bits(clk_power.0));
-            pmu()
-                .lp_sleep_xtal()
-                .modify(|_, w| w.lp_sleep_xpd_xtal().bit(xtal.xpd_xtal()));
-
-            // Default configuration of lp-system analog sub-system in active and sleep
-            // modes
-
-            pmu().lp_sleep_bias().modify(|_, w| {
-                w.lp_sleep_xpd_bias() // pmu_ll_lp_set_bias_xpd
-                    .bit(analog_bias.xpd_bias())
-                    .lp_sleep_dbg_atten() // pmu_ll_lp_set_bias_dbg_atten
-                    .bits(analog_bias.dbg_atten() as u8)
-                    .lp_sleep_pd_cur() // pmu_ll_lp_set_bias_pd_cur
-                    .bit(analog_bias.pd_cur())
-                    .sleep() // pmu_ll_lp_set_bias_sleep
-                    .bit(analog_bias.bias_sleep())
-            });
-
-            pmu().lp_sleep_lp_regulator0().modify(|_, w| {
-                w.lp_sleep_lp_regulator_slp_xpd() // pmu_ll_lp_set_regulator_slp_xpd
-                    .bit(analog_regulator0.slp_xpd())
-                    .lp_sleep_lp_regulator_xpd() // pmu_ll_lp_set_regulator_xpd
-                    .bit(analog_regulator0.xpd())
-                    .lp_sleep_lp_regulator_slp_dbias() // pmu_ll_lp_set_regulator_sleep_dbias
-                    .bits(analog_regulator0.slp_dbias() as u8)
-                    .lp_sleep_lp_regulator_dbias() // pmu_ll_lp_set_regulator_dbias
-                    .bits(analog_regulator0.dbias() as u8)
-            });
-
-            pmu().lp_sleep_lp_regulator1().modify(|_, w| {
-                w.lp_sleep_lp_regulator_drv_b() // pmu_ll_lp_set_regulator_driver_bar
-                    .bits(analog_regulator1.drv_b() as u8)
-            });
+        Self {
+            dig_power,
+            clk_power,
+            xtal,
+            bias: analog_bias,
+            analog_regulator0,
+            analog_regulator1,
         }
     }
 
     fn init_default() {
-        Self::active();
-        Self::sleep();
+        let active = Self::active();
+        let sleep = Self::sleep();
+
+        lp_system_init!(hp_sleep_lp => active);
+        lp_system_init!(lp_sleep_lp => sleep);
+
+        unsafe {
+            pmu()
+                .lp_sleep_xtal()
+                .modify(|_, w| w.lp_sleep_xpd_xtal().bit(sleep.xtal.xpd_xtal()));
+
+            pmu().lp_sleep_bias().modify(|_, w| {
+                w.lp_sleep_xpd_bias() // pmu_ll_lp_set_bias_xpd
+                    .bit(sleep.bias.xpd_bias())
+                    .lp_sleep_dbg_atten() // pmu_ll_lp_set_bias_dbg_atten
+                    .bits(sleep.bias.dbg_atten() as u8)
+                    .lp_sleep_pd_cur() // pmu_ll_lp_set_bias_pd_cur
+                    .bit(sleep.bias.pd_cur())
+                    .sleep() // pmu_ll_lp_set_bias_sleep
+                    .bit(sleep.bias.bias_sleep())
+            });
+        }
     }
 }
 
