@@ -348,6 +348,7 @@ const fn hp_retention_regdma_config(dir: u32, entry: u32) -> u32 {
 }
 
 const HP_CALI_DBIAS: u32 = 25;
+const LP_CALI_DBIAS: u32 = 26;
 
 const ICG_MODEM_CODE_SLEEP: u32 = 0;
 const ICG_MODEM_CODE_MODEM: u32 = 1;
@@ -1471,9 +1472,32 @@ fn modem_clk_domain_active_state_icg_map_preinit() {
         );
         lp_clkrst()
             .rc32k_cntl()
-            .modify(|_, w| w.rc32k_dfreq().bits(100));
+            .modify(|_, w| w.rc32k_dfreq().bits(700));
 
-        // https://github.com/espressif/esp-idf/commit/e3148369f32fdc6de62c35a67f7adb6f4faef4e3#diff-cc84d279f2f3d77fe252aa40a64d4813f271a52b5a4055e876efd012d888e135R810-R815
+        regi2c_write_mask(
+            I2C_DIG_REG,
+            I2C_DIG_REG_HOSTID,
+            I2C_DIG_REG_ENIF_RTC_DREG,
+            I2C_DIG_REG_ENIF_RTC_DREG_MSB,
+            I2C_DIG_REG_ENIF_RTC_DREG_LSB,
+            1,
+        );
+        regi2c_write_mask(
+            I2C_DIG_REG,
+            I2C_DIG_REG_HOSTID,
+            I2C_DIG_REG_ENIF_DIG_DREG,
+            I2C_DIG_REG_ENIF_DIG_DREG_MSB,
+            I2C_DIG_REG_ENIF_DIG_DREG_LSB,
+            1,
+        );
+
+        pmu()
+            .hp_active_hp_regulator0()
+            .modify(|_, w| w.hp_active_hp_regulator_dbias().bits(HP_CALI_DBIAS));
+        pmu()
+            .hp_sleep_lp_regulator0()
+            .modify(|_, w| w.hp_sleep_lp_regulator_dbias().bits(LP_CALI_DBIAS));
+
         // clk_ll_rc_fast_tick_conf
         pcr()
             .ctrl_tick_conf()
