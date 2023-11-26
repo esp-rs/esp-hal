@@ -1,4 +1,3 @@
-use esp32c6::modem_syscon;
 use fugit::HertzU32;
 use strum::FromRepr;
 
@@ -6,6 +5,7 @@ use crate::{
     clock::{clocks_ll::regi2c_write_mask, Clock, XtalClock},
     peripherals::TIMG0,
     soc::efuse::Efuse,
+    system::RadioPeripherals,
 };
 
 const I2C_DIG_REG: u8 = 0x6d;
@@ -53,37 +53,6 @@ unsafe fn pcr<'a>() -> &'a esp32c6::pcr::RegisterBlock {
 
 unsafe fn lp_aon<'a>() -> &'a esp32c6::lp_aon::RegisterBlock {
     &*esp32c6::LP_AON::ptr()
-}
-
-struct MachineConstants;
-impl MachineConstants {
-    const LP_MIN_SLP_TIME_US: u32 = 450;
-    const LP_WAKEUP_WAIT_CYCLE: u32 = 4;
-    const LP_ANALOG_WAIT_TIME_US: u32 = 154;
-    const LP_XTAL_WAIT_STABLE_TIME_US: u32 = 250;
-    const LP_CLK_SWITCH_CYCLE: u32 = 1;
-    const LP_CLK_POWER_ON_WAIT_CYCLE: u32 = 1;
-    const LP_POWER_SUPPLY_WAIT_TIME_US: u32 = 2;
-    const LP_POWER_UP_WAIT_TIME_US: u32 = 2;
-
-    const HP_MIN_SLP_TIME_US: u32 = 450;
-    const HP_CLOCK_DOMAIN_SYNC_TIME_US: u32 = 150;
-    const HP_SYSTEM_DFS_UP_WORK_TIME_US: u32 = 124;
-    const HP_ANALOG_WAIT_TIME_US: u32 = 154;
-    const HP_POWER_SUPPLY_WAIT_TIME_US: u32 = 2;
-    const HP_POWER_UP_WAIT_TIME_US: u32 = 2;
-    const HP_REGDMA_S2M_WORK_TIME_US: u32 = 172;
-    const HP_REGDMA_S2A_WORK_TIME_US: u32 = 480;
-    const HP_REGDMA_M2A_WORK_TIME_US: u32 = 278;
-    // const HP_REGDMA_A2S_WORK_TIME_US: u32 = 382;
-    const HP_REGDMA_RF_ON_WORK_TIME_US: u32 = 70;
-    // const HP_REGDMA_RF_OFF_WORK_TIME_US: u32 = 23;
-    const HP_XTAL_WAIT_STABLE_TIME_US: u32 = 250;
-    const HP_PLL_WAIT_STABLE_TIME_US: u32 = 1;
-
-    const MODEM_STATE_SKIP_TIME_US: u32 = Self::HP_REGDMA_M2A_WORK_TIME_US
-        + Self::HP_SYSTEM_DFS_UP_WORK_TIME_US
-        + Self::LP_MIN_SLP_TIME_US;
 }
 
 fn pmu_power_domain_force_default() {
@@ -1435,7 +1404,7 @@ fn modem_clk_domain_active_state_icg_map_preinit() {
         // Configure modem ICG code in PMU_ACTIVE state
         pmu().hp_active_icg_modem().modify(|_, w| {
             w.hp_active_dig_icg_modem_code()
-                .bits(PMU_HP_ICG_MODEM_CODE_ACTIVE)
+                .bits(PMU_HP_ICG_MODEM_CODE_ACTIVE as u8)
         });
 
         // Disable clock gating for MODEM_APB, I2C_MST and LP_APB clock domains in
@@ -1493,10 +1462,10 @@ fn modem_clk_domain_active_state_icg_map_preinit() {
 
         pmu()
             .hp_active_hp_regulator0()
-            .modify(|_, w| w.hp_active_hp_regulator_dbias().bits(HP_CALI_DBIAS));
+            .modify(|_, w| w.hp_active_hp_regulator_dbias().bits(HP_CALI_DBIAS as u8));
         pmu()
             .hp_sleep_lp_regulator0()
-            .modify(|_, w| w.hp_sleep_lp_regulator_dbias().bits(LP_CALI_DBIAS));
+            .modify(|_, w| w.hp_sleep_lp_regulator_dbias().bits(LP_CALI_DBIAS as u8));
 
         // clk_ll_rc_fast_tick_conf
         pcr()
@@ -1639,7 +1608,7 @@ impl RtcClock {
     /// This is the value stored in RTC register RTC_XTAL_FREQ_REG by the
     /// bootloader, as passed to rtc_clk_init function.
     fn get_xtal_freq() -> XtalClock {
-        let xtal_freq_reg = unsafe { &*LP_AON::PTR }.store4().read().bits();
+        let xtal_freq_reg = unsafe { lp_aon().store4().read().bits() };
 
         // Values of RTC_XTAL_FREQ_REG and RTC_APB_FREQ_REG are stored as two copies in
         // lower and upper 16-bit halves. These are the routines to work with such a
