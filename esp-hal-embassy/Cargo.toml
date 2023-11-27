@@ -53,7 +53,3 @@ defmt = [
     "embassy-time/defmt",
     "esp-hal-common/defmt",
 ]
-
-# Atomics nightmare:
-atomic-emulation = ["esp-hal-common/atomic-emulation"]
-portable-atomic  = ["esp-hal-common/portable-atomic"]
