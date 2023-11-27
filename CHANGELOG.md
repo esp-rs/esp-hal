@@ -52,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Spi::new`/`Spi::new_half_duplex` takes no gpio pin now, instead you need to call `with_pins` to setup those (#901).
 - ESP32C2, ESP32C3: atomic emulation trap is now opt-in. When upgrading you must either remove [these lines](https://github.com/esp-rs/riscv-atomic-emulation-trap#usage) from your `.cargo/config.toml` or opt back in by enabling the feature. (#904)
 - RSA driver now takes u32 words instead of u8 bytes. The expected slice length is now 4 times shorter. (#981)
+- Extracted Embassy support from `esp-hal-common`/`esp-hal-procmacros` into separate `esp-hal-embassy`/`esp-hal-embassy-procmacros` packages. (#976)
 
 ## [0.13.1] - 2023-11-02
 
