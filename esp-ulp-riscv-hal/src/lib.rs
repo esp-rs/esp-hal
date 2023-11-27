@@ -1,4 +1,5 @@
 #![no_std]
+#![allow(asm_sub_register)]
 
 use core::arch::global_asm;
 

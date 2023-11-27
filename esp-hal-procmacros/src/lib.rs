@@ -51,7 +51,7 @@
 //!
 //! ```no_run
 //! #[main]
-//! async fn main(spawner: Spawner) -> ! {
+//! async fn main(spawner: Spawner) {
 //!     // Your application's entry point
 //! }
 //! ```
@@ -81,11 +81,8 @@ use proc_macro_error::proc_macro_error;
 use quote::quote;
 use syn::parse_macro_input;
 
-#[cfg(all(
-    feature = "embassy",
-    any(feature = "esp32", feature = "esp32s2", feature = "esp32s3")
-))]
-mod embassy_xtensa;
+#[cfg(feature = "embassy")]
+mod embassy;
 #[cfg(feature = "enum-dispatch")]
 mod enum_dispatch;
 #[cfg(feature = "interrupt")]
@@ -776,60 +773,15 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
 /// Spawning a task:
 ///
 /// ``` rust
-/// #[embassy_executor::main]
+/// #[main]
 /// async fn main(_s: embassy_executor::Spawner) {
 ///     // Function body
 /// }
 /// ```
-#[cfg(all(
-    feature = "embassy",
-    not(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))
-))]
-#[proc_macro_attribute]
-pub fn main(_args: TokenStream, input: TokenStream) -> TokenStream {
-    let f = parse_macro_input!(input as syn::ItemFn);
-
-    let asyncness = f.sig.asyncness;
-    let args = f.sig.inputs;
-    let stmts = f.block.stmts;
-
-    quote!(
-        #[embassy_executor::main(entry = "entry")]
-        #asyncness fn main(#args) {
-             #(#stmts)*
-        }
-    )
-    .into()
-}
-
-/// Creates a new `executor` instance and declares an application entry point
-/// spawning the corresponding function body as an async task.
-///
-/// The following restrictions apply:
-///
-/// * The function must accept exactly 1 parameter, an
-///   `embassy_executor::Spawner` handle that it can use to spawn additional
-///   tasks.
-/// * The function must be declared `async`.
-/// * The function must not use generics.
-/// * Only a single `main` task may be declared.
-///
-/// ## Examples
-/// Spawning a task:
-///
-/// ``` rust
-/// #[embassy_executor::main]
-/// async fn main(_s: embassy_executor::Spawner) {
-///     // Function body
-/// }
-/// ```
-#[cfg(all(
-    feature = "embassy",
-    any(feature = "esp32", feature = "esp32s2", feature = "esp32s3")
-))]
+#[cfg(all(feature = "embassy"))]
 #[proc_macro_attribute]
 pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
-    use self::embassy_xtensa::{
+    use self::embassy::{
         main::{main, run},
         Args,
     };

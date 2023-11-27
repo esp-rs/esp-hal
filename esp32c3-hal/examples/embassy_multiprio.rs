@@ -17,7 +17,7 @@
 
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Instant, Ticker, Timer};
-use esp32_hal as hal;
+use esp32c3_hal as hal;
 use esp_backtrace as _;
 use esp_println::println;
 use hal::{
@@ -79,6 +79,12 @@ async fn main(low_prio_spawner: Spawner) {
     let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+
+    #[cfg(feature = "embassy-time-systick")]
+    embassy::init(
+        &clocks,
+        hal::systimer::SystemTimer::new(peripherals.SYSTIMER),
+    );
 
     #[cfg(feature = "embassy-time-timg0")]
     {

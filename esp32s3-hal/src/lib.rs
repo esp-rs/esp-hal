@@ -21,9 +21,17 @@
 //! - `embassy-executor-thread` - Use the multicore-aware thread-mode embassy
 //!   executor
 //! - `embassy-time-systick` - Enable the [embassy] time driver using the
-//!   `SYSTIMER` peripheral
+//!   `SYSTIMER` peripheral. The `SYSTIMER` peripheral has three alarms
+//!   available for use
 //! - `embassy-time-timg0` - Enable the [embassy] time driver using the `TIMG0`
-//!   peripheral
+//!   peripheral. The `TIMG0` peripheral has two alarms available for use
+//! - `embassy-integrated-timers` - Uses hardware timers as alarms for the
+//!   executors. Using this feature limits the number of executors to the number
+//!   of hardware alarms provided by the time driver
+//! - `embassy-generic-queue-N` (where `N` can be `8`, `16`, `32`, `64` or
+//!   `128`) - Use a generic timer queue of size `N` for the executors' timer
+//!   queues. Using this feature can expand the number of executors you can use
+//!   to `N`
 //! - `log` - enable log output using the `log` crate
 //! - `opsram-2m` - Use externally connected Octal PSRAM (2MB)
 //! - `opsram-4m` - Use externally connected Octal PSRAM (4MB)
@@ -38,7 +46,8 @@
 //!
 //! #### Default Features
 //!
-//! The `rt` and `vectored` features are enabled by default.
+//! The `rt`, `vectored` and `embassy-integrated-timers` features are enabled by
+//! default.
 //!
 //! [embedded-hal-async]: https://github.com/rust-embedded/embedded-hal/tree/master/embedded-hal-async
 //! [embedded-io-async]: https://github.com/rust-embedded/embedded-hal/tree/master/embedded-io-async
@@ -120,11 +129,11 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
         static mut _rtc_slow_bss_start: u32;
         static mut _rtc_slow_bss_end: u32;
 
-        static mut _stack_end_cpu0: u32;
+        static mut _stack_start_cpu0: u32;
     }
 
     // set stack pointer to end of memory: no need to retain stack up to this point
-    esp_hal_common::xtensa_lx::set_stack_pointer(&mut _stack_end_cpu0);
+    esp_hal_common::xtensa_lx::set_stack_pointer(&mut _stack_start_cpu0);
 
     // copying data from flash to various data segments is done by the bootloader
     // initialization to zero needs to be done by the application

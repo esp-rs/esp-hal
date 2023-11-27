@@ -25,9 +25,8 @@ categories = [
 embedded-hal      = { version = "0.2.7", features = ["unproven"] }
 procmacros        = { package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 paste             = "1.0.14"
-esp32s2-ulp       = { git = "https://github.com/esp-rs/esp-pacs", package = "esp32s2-ulp", optional = true }
-esp32s3-ulp       = { git = "https://github.com/esp-rs/esp-pacs", package = "esp32s3-ulp", optional = true }
-
+esp32s2-ulp       = { git = "https://github.com/esp-rs/esp-pacs", rev = "a7066cf", package = "esp32s2-ulp", optional = true }
+esp32s3-ulp       = { git = "https://github.com/esp-rs/esp-pacs", rev = "a7066cf", package = "esp32s3-ulp", optional = true }
 
 [dev-dependencies]
 panic-halt       = "0.2.0"

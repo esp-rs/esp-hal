@@ -21,7 +21,7 @@ async fn run() {
 }
 
 #[main]
-async fn main(spawner: Spawner) -> ! {
+async fn main(spawner: Spawner) {
     esp_println::println!("Init!");
     let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();
