@@ -1432,7 +1432,7 @@ mod asynch {
     }
 
     impl<'d, T: Instance> core::future::Future for UartRxFuture<'d, T> {
-        type Output = &'d Vec<RxEvent, 4>;
+        type Output = ();
 
         fn poll(
             mut self: core::pin::Pin<&mut Self>,
@@ -1454,7 +1454,7 @@ mod asynch {
                 self.registered = true;
             }
             if self.event_bit_is_clear() {
-                Poll::Ready(self.events)
+                Poll::Ready(())
             } else {
                 Poll::Pending
             }
@@ -1509,7 +1509,7 @@ mod asynch {
     }
 
     impl<'d, T: Instance> core::future::Future for UartTxFuture<'d, T> {
-        type Output = &'d Vec<TxEvent, 2>;
+        type Output = ();
 
         fn poll(
             mut self: core::pin::Pin<&mut Self>,
@@ -1530,7 +1530,7 @@ mod asynch {
             }
 
             if self.event_bit_is_clear() {
-                Poll::Ready(self.events)
+                Poll::Ready(())
             } else {
                 Poll::Pending
             }
@@ -1654,8 +1654,7 @@ mod asynch {
                 if self.rx_timeout_config.is_some() {
                     events.push(RxEvent::RxFifoTout).unwrap();
                 }
-                let hej = UartRxFuture::<T>::new(&events);
-                hej.await;
+                UartRxFuture::<T>::new(&events).await;
 
                 let read_bytes = self.drain_fifo(buf);
                 if read_bytes > 0 {
