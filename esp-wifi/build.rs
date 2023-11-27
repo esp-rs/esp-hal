@@ -86,6 +86,7 @@ fn main() -> Result<(), String> {
     // HACK: we detect the xtensa-enabled compiler by existence of the second version string in parens
     // - upstream output format: rustc 1.75.0-nightly (cae0791da 2023-10-05)
     // - xtensa output format: rustc 1.73.0-nightly (9163a2087 2023-10-03) (1.73.0.0)
+    // - gentoo format (non-xtensa): rustc 1.73.0-nightly (cc66ad468 2023-10-03) (gentoo)
     if version_string.chars().filter(|&c| c == '(').count() == 2 {
         let version = version_string
             .split('(')
@@ -94,22 +95,25 @@ fn main() -> Result<(), String> {
             .split(')')
             .next()
             .unwrap();
-
-        let mut version = version.trim_start_matches('v').split('.');
-
-        let major = version.next().unwrap().parse::<u32>().unwrap();
-        let minor = version.next().unwrap().parse::<u32>().unwrap();
-        let patch = version.next().unwrap().parse::<u32>().unwrap();
-        let release = version.next().unwrap().parse::<u32>().unwrap();
-
-        let version = Version4(major, minor, patch, release);
-
-        if version >= Version4(1, 73, 0, 1) {
-            println!("cargo:rustc-cfg=xtensa_has_vaarg");
+        if let Some(version) = try_read_xtensa_rustc_version(version) {
+            if version >= Version4(1, 73, 0, 1) {
+                println!("cargo:rustc-cfg=xtensa_has_vaarg");
+            }
         }
     }
 
     Ok(())
+}
+
+fn try_read_xtensa_rustc_version(version: &str) -> Option<Version4> {
+    let mut version = version.trim_start_matches('v').split('.');
+
+    let major = version.next()?.parse::<u32>().ok()?;
+    let minor = version.next()?.parse::<u32>().ok()?;
+    let patch = version.next()?.parse::<u32>().ok()?;
+    let release = version.next()?.parse::<u32>().ok()?;
+
+    Some(Version4(major, minor, patch, release))
 }
 
 #[cfg(not(any(
