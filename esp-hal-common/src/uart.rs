@@ -1739,8 +1739,7 @@ mod asynch {
             || interrupts.at_cmd_char_det_int_st().bit_is_set();
         let tx_wake = interrupts.tx_done_int_st().bit_is_set()
             || interrupts.txfifo_empty_int_st().bit_is_set();
-        uart.int_clr
-            .write(|w| unsafe { w.bits(interrupt_bits) });
+        uart.int_clr.write(|w| unsafe { w.bits(interrupt_bits) });
         uart.int_ena
             .modify(|r, w| unsafe { w.bits(r.bits() & !interrupt_bits) });
 
