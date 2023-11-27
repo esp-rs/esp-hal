@@ -4,7 +4,7 @@
 #![feature(linkage)]
 #![cfg_attr(feature = "async", feature(async_fn_in_trait))]
 #![cfg_attr(feature = "async", allow(incomplete_features))]
-#![doc = include_str!("../../README.md")]
+#![doc = include_str!("../README.md")]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 
 // MUST be the first module
