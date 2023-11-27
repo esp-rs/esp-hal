@@ -18,16 +18,16 @@
 #![no_std]
 #![no_main]
 
+use core::cell::RefCell;
+
 use embedded_hal_1::spi::SpiDevice;
+use embedded_hal_bus::spi::RefCellDevice;
 use esp32s3_hal::{
     clock::ClockControl,
     gpio::{self, IO},
     peripherals::Peripherals,
     prelude::*,
-    spi::{
-        master::{Spi, SpiBusController},
-        SpiMode,
-    },
+    spi::{master::Spi, SpiMode},
     Delay,
 };
 use esp_backtrace as _;
@@ -44,17 +44,19 @@ fn main() -> ! {
     let miso = io.pins.gpio11;
     let mosi = io.pins.gpio13;
 
-    let spi_controller = SpiBusController::from_spi(
-        Spi::new(peripherals.SPI2, 1000u32.kHz(), SpiMode::Mode0, &clocks).with_pins(
-            Some(sclk),
-            Some(mosi),
-            Some(miso),
-            gpio::NO_PIN,
-        ),
+    let spi_bus = Spi::new(peripherals.SPI2, 1000u32.kHz(), SpiMode::Mode0, &clocks).with_pins(
+        Some(sclk),
+        Some(mosi),
+        Some(miso),
+        gpio::NO_PIN,
     );
-    let mut spi_device_1 = spi_controller.add_device(io.pins.gpio4);
-    let mut spi_device_2 = spi_controller.add_device(io.pins.gpio5);
-    let mut spi_device_3 = spi_controller.add_device(io.pins.gpio6);
+    let spi_bus = RefCell::new(spi_bus);
+    let mut spi_device_1 =
+        RefCellDevice::new_no_delay(&spi_bus, io.pins.gpio4.into_push_pull_output());
+    let mut spi_device_2 =
+        RefCellDevice::new_no_delay(&spi_bus, io.pins.gpio5.into_push_pull_output());
+    let mut spi_device_3 =
+        RefCellDevice::new_no_delay(&spi_bus, io.pins.gpio6.into_push_pull_output());
 
     let mut delay = Delay::new(&clocks);
     println!("=== SPI example with embedded-hal-1 traits ===");
