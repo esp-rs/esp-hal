@@ -42,24 +42,24 @@ pub struct GpioPin<MODE, const PIN: u8> {
 
 impl<MODE, const PIN: u8> GpioPin<Input<MODE>, PIN> {
     fn input_state(&self) -> bool {
-        unsafe { &*LP_IO::PTR }.in_.read().bits() >> PIN & 0x1 != 0
+        unsafe { &*LP_IO::PTR }.in_().read().bits() >> PIN & 0x1 != 0
     }
 }
 
 impl<MODE, const PIN: u8> GpioPin<Output<MODE>, PIN> {
     fn output_state(&self) -> bool {
-        unsafe { &*LP_IO::PTR }.out.read().bits() >> PIN & 0x1 != 0
+        unsafe { &*LP_IO::PTR }.out().read().bits() >> PIN & 0x1 != 0
     }
 
     fn set_output_low(&mut self) {
         unsafe { &*LP_IO::PTR }
-            .out_w1tc
+            .out_w1tc()
             .write(|w| w.out_data_w1tc().variant(1 << PIN));
     }
 
     fn set_output_high(&mut self) {
         unsafe { &*LP_IO::PTR }
-            .out_w1ts
+            .out_w1ts()
             .write(|w| w.out_data_w1ts().variant(1 << PIN));
     }
 }
