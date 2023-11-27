@@ -2,7 +2,24 @@
 name = "esp-wifi"
 version = "0.1.0"
 edition = "2021"
+authors = [
+    "The ESP-RS team",
+]
+description  = "A WiFi, Bluetooth and ESP-NOW driver for use with Espressif chips and bare-metal Rust"
+repository   = "https://github.com/esp-rs/esp-wifi"
 license = "MIT OR Apache-2.0"
+
+keywords = [
+    "wifi",
+    "bluetooth",
+    "esp",
+    "no-std",
+]
+categories = [
+    "embedded",
+    "hardware-support",
+    "no-std",
+]
 
 [dependencies]
 defmt = { workspace = true, optional = true }
@@ -44,7 +61,7 @@ embedded-svc.workspace = true
 embassy-executor.workspace = true
 embassy-time.workspace = true
 futures-util.workspace = true
-bleps.workspace = true
+bleps = { workspace = true, features = ["async"] }
 embedded-hal-async.workspace = true
 log.workspace = true
 smoltcp.workspace = true
@@ -78,7 +95,6 @@ async = [
   "esp32-hal?/async",
   "esp32s2-hal?/async",
   "esp32s3-hal?/async",
-  "bleps/async"
 ]
 
 embassy-net = ["dep:embassy-net", "async"]
@@ -125,6 +141,10 @@ log = [
   "esp32s2-hal?/log",
   "esp32s3-hal?/log",
 ]
+
+[package.metadata.docs.rs]
+features = ["esp32c3", "wifi", "ble", "async", "embassy-net", "esp32c3-hal/embassy-time-systick", "esp32c3-hal/default"]
+default-target = "riscv32imc-unknown-none-elf"
 
 # These examples are used in test automation
 [[example]]
