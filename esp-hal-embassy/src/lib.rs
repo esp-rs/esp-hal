@@ -13,6 +13,7 @@ use core::cell::Cell;
     feature = "time-timg0"
 ))]
 use esp_hal_common::{clock::Clocks, peripherals, trapframe};
+pub use procmacros::main;
 
 // MUST be the first module
 mod fmt;

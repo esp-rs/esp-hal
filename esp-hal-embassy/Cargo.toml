@@ -10,12 +10,9 @@ critical-section = "1.1.2"
 defmt            = { version = "=0.3.5", optional = true }
 embassy-executor = "0.3.3"
 embassy-time     = { version = "0.1.5",  features = ["nightly"] }
+esp-hal-common   = { version = "0.13.0", features = ["vectored"], path = "../esp-hal-common" }
 paste            = "1.0.14"
-
-[dependencies.esp-hal-common]
-features = ["vectored"]
-path     = "../esp-hal-common"
-version  = "0.13.0"
+procmacros       = { version = "0.1.0", package = "esp-hal-embassy-procmacros", path = "../esp-hal-embassy-procmacros" }
 
 [features]
 default = ["integrated-timers"]

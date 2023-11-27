@@ -19,8 +19,10 @@ use esp32_hal::{
 };
 use esp_backtrace as _;
 use esp_hal_common::get_core;
-use esp_hal_embassy::executor::{FromCpu1, FromCpu2, InterruptExecutor};
-use esp_hal_embassy_procmacros::main;
+use esp_hal_embassy::{
+    executor::{FromCpu1, FromCpu2, InterruptExecutor},
+    main,
+};
 use esp_println::println;
 use static_cell::make_static;
 

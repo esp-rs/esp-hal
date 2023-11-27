@@ -17,7 +17,7 @@ use esp32_hal::{
 };
 use esp_backtrace as _;
 use esp_hal_common::gpio::{Gpio15, Output, PushPull};
-use esp_hal_embassy_procmacros::main;
+use esp_hal_embassy::main;
 use esp_println::{print, println};
 
 const WIDTH: usize = 80;

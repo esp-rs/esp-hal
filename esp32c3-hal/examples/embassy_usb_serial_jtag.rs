@@ -17,7 +17,7 @@ use esp32c3_hal::{
     UsbSerialJtag,
 };
 use esp_backtrace as _;
-use esp_hal_embassy_procmacros::main;
+use esp_hal_embassy::main;
 
 #[main]
 async fn main(_spawner: Spawner) -> ! {

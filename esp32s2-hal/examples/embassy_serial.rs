@@ -18,7 +18,7 @@ use esp32s2_hal::{
     Uart,
 };
 use esp_backtrace as _;
-use esp_hal_embassy_procmacros::main;
+use esp_hal_embassy::main;
 use static_cell::make_static;
 
 // rx_fifo_full_threshold

@@ -19,8 +19,10 @@ use embassy_executor::Spawner;
 use embassy_time::{Duration, Instant, Ticker, Timer};
 use esp32s2_hal as hal;
 use esp_backtrace as _;
-use esp_hal_embassy::executor::{FromCpu1, InterruptExecutor};
-use esp_hal_embassy_procmacros::main;
+use esp_hal_embassy::{
+    executor::{FromCpu1, InterruptExecutor},
+    main,
+};
 use esp_println::println;
 use hal::{clock::ClockControl, interrupt::Priority, peripherals::Peripherals, prelude::*};
 

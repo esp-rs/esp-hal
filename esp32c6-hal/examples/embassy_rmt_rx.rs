@@ -17,7 +17,7 @@ use esp32c6_hal::{
     IO,
 };
 use esp_backtrace as _;
-use esp_hal_embassy_procmacros::main;
+use esp_hal_embassy::main;
 use esp_println::{print, println};
 
 const WIDTH: usize = 80;

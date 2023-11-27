@@ -18,8 +18,7 @@ use esp32s3_hal::{
 };
 use esp_backtrace as _;
 use esp_hal_common::get_core;
-use esp_hal_embassy::executor::Executor;
-use esp_hal_embassy_procmacros::main;
+use esp_hal_embassy::{executor::Executor, main};
 use esp_println::println;
 use static_cell::make_static;
 

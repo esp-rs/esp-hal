@@ -25,7 +25,7 @@ use esp32s3_hal::{
     IO,
 };
 use esp_backtrace as _;
-use esp_hal_embassy_procmacros::main;
+use esp_hal_embassy::main;
 use lis3dh_async::{Lis3dh, Range, SlaveAddr};
 
 #[main]

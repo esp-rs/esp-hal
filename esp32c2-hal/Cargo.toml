@@ -46,7 +46,6 @@ portable-atomic    = "1.5.1"
 static_cell        = { version = "2.0.0", features = ["nightly"] }
 esp-hal-common     = { features = ["portable-atomic"], path = "../esp-hal-common" } # enable portable-atomic by default for examples
 esp-hal-embassy    = { version = "0.1.0", features = ["esp32c2"], path = "../esp-hal-embassy" }
-esp-hal-embassy-procmacros = { version = "0.1.0", path = "../esp-hal-embassy-procmacros" }
 hex-literal        = "0.4.1"
 crypto-bigint      = { version = "0.5.3", default-features = false }
 elliptic-curve     = { version = "0.13.6", default-features = false, features = ["sec1"] }
