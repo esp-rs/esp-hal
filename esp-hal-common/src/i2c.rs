@@ -572,8 +572,35 @@ mod asynch {
             write: &[u8],
             read: &mut [u8],
         ) -> Result<(), Self::Error> {
-            self.master_write(address, write).await?;
-            self.master_read(address, read).await?;
+            // Reset FIFO and command list
+            self.peripheral.reset_fifo();
+            self.peripheral.reset_command_list();
+
+            let reg_block = self.peripheral.register_block();
+            let comd = &mut reg_block.comd.iter();
+
+            self.peripheral.setup_write(address, write, comd)?;
+            self.peripheral.setup_read(address, read, comd)?;
+            let index = self.peripheral.fill_tx_fifo(write);
+            self.peripheral.start_transmission();
+
+            let tx = async {
+                // Fill the FIFO with the remaining bytes:
+                self.write_remaining_tx_fifo(index, write).await?;
+                self.wait_for_completion().await?;
+
+                Result::<_, Error>::Ok(())
+            };
+
+            let rx = async {
+                self.read_all_from_fifo(read).await?;
+                self.wait_for_completion().await?;
+
+                Result::<_, Error>::Ok(())
+            };
+
+            let write_read = embassy_futures::join::join(tx, rx).await;
+            write_read.0.and(write_read.1)?;
 
             Ok(())
         }
