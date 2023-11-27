@@ -1335,6 +1335,19 @@ impl<'d> WifiController<'d> {
         WifiMode::try_from(&self.config).map(|m| m.is_ap())
     }
 
+    /// A blocking wifi network scan with caller-provided scanning options.
+    pub fn scan_with_config_sync<const N: usize>(
+        &mut self,
+        config: ScanConfig<'_>,
+    ) -> Result<(heapless::Vec<AccessPointInfo, N>, usize), WifiError> {
+        esp_wifi_result!(crate::wifi::wifi_start_scan(true, config))?;
+
+        let count = self.scan_result_count()?;
+        let result = self.scan_results()?;
+
+        Ok((result, count))
+    }
+
     fn scan_result_count(&mut self) -> Result<usize, WifiError> {
         let mut bss_total: u16 = 0;
 
@@ -1597,16 +1610,11 @@ impl Wifi for WifiController<'_> {
         Ok(caps)
     }
 
-    /// A blocking wifi network scan.
+    /// A blocking wifi network scan with default scanning options.
     fn scan_n<const N: usize>(
         &mut self,
     ) -> Result<(heapless::Vec<AccessPointInfo, N>, usize), Self::Error> {
-        esp_wifi_result!(crate::wifi::wifi_start_scan(true, Default::default()))?;
-
-        let count = self.scan_result_count()?;
-        let result = self.scan_results()?;
-
-        Ok((result, count))
+        self.scan_with_config_sync(Default::default())
     }
 
     /// Get the currently used configuration.
