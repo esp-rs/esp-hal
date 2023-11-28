@@ -267,7 +267,7 @@ extern "C" {
 
     pub(crate) fn r_ble_hci_trans_buf_free(buf: *const u8);
 
-    pub(crate) fn ets_delay_us(us: u32);
+    static mut ble_hci_trans_env_p: u32;
 }
 
 #[repr(C)]
@@ -1098,9 +1098,17 @@ pub(crate) fn ble_init() {
                 self::ble_os_adapter_chip_specific::ble_ll_random_override as *const u32 as u32;
         }
 
-        // this is a workaround for an unclear problem
-        // (ASSERT r_ble_hci_ram_hs_cmd_tx:34 0 0)
-        ets_delay_us(10_000);
+        // this is to avoid (ASSERT r_ble_hci_ram_hs_cmd_tx:34 0 0)
+        // r_ble_hci_trans_cfg_ll initializes ble_hci_trans_env_p + 0x34
+        // it's called by r_ble_ll_task which is run in another task
+        // in r_ble_hci_ram_hs_cmd_tx this is checked for non-null
+        while (ble_hci_trans_env_p as *const u32)
+            .add(0x34 / 4)
+            .read_volatile()
+            == 0
+        {
+            // wait
+        }
 
         debug!("The ble_controller_init was initialized");
     }
