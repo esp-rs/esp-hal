@@ -286,11 +286,11 @@ impl RegisterAccess for ADC1 {
         let sensors = unsafe { &*SENS::ptr() };
 
         // Configure for RTC control
-        sensors.sar_meas1_mux.modify(|_r, w| {
+        sensors.sar_meas1_mux().modify(|_r, w| {
             w.sar1_dig_force().clear_bit() // 1: Select digital control;
                                            // 0: Select RTC control.
         });
-        sensors.sar_meas1_ctrl2.modify(|_r, w| {
+        sensors.sar_meas1_ctrl2().modify(|_r, w| {
             w.meas1_start_force()
                 .set_bit() // 1: SW control RTC ADC start;     0: ULP control RTC ADC start.
                 .sar1_en_pad_force()
@@ -303,7 +303,7 @@ impl RegisterAccess for ADC1 {
 
     fn set_attenuation(channel: usize, attenuation: u8) {
         let sensors = unsafe { &*SENS::ptr() };
-        sensors.sar_atten1.modify(|r, w| {
+        sensors.sar_atten1().modify(|r, w| {
             let new_value = (r.bits() & !(0b11 << (channel * 2)))
                 | (((attenuation as u8 & 0b11) as u32) << (channel * 2));
 
@@ -314,53 +314,57 @@ impl RegisterAccess for ADC1 {
     fn clear_dig_force() {
         let sensors = unsafe { &*SENS::ptr() };
         sensors
-            .sar_meas1_mux
+            .sar_meas1_mux()
             .modify(|_, w| w.sar1_dig_force().clear_bit());
     }
 
     fn set_start_force() {
         let sensors = unsafe { &*SENS::ptr() };
         sensors
-            .sar_meas1_ctrl2
+            .sar_meas1_ctrl2()
             .modify(|_, w| w.meas1_start_force().set_bit());
     }
 
     fn set_en_pad_force() {
         let sensors = unsafe { &*SENS::ptr() };
         sensors
-            .sar_meas1_ctrl2
+            .sar_meas1_ctrl2()
             .modify(|_, w| w.sar1_en_pad_force().set_bit());
     }
 
     fn set_en_pad(channel: u8) {
         let sensors = unsafe { &*SENS::ptr() };
         sensors
-            .sar_meas1_ctrl2
+            .sar_meas1_ctrl2()
             .modify(|_, w| unsafe { w.sar1_en_pad().bits(1 << channel) });
     }
 
     fn clear_start_sample() {
         let sensors = unsafe { &*SENS::ptr() };
         sensors
-            .sar_meas1_ctrl2
+            .sar_meas1_ctrl2()
             .modify(|_, w| w.meas1_start_sar().clear_bit());
     }
 
     fn start_sample() {
         let sensors = unsafe { &*SENS::ptr() };
         sensors
-            .sar_meas1_ctrl2
+            .sar_meas1_ctrl2()
             .modify(|_, w| w.meas1_start_sar().set_bit());
     }
 
     fn is_done() -> bool {
         let sensors = unsafe { &*SENS::ptr() };
-        sensors.sar_meas1_ctrl2.read().meas1_done_sar().bit_is_set()
+        sensors
+            .sar_meas1_ctrl2()
+            .read()
+            .meas1_done_sar()
+            .bit_is_set()
     }
 
     fn read_data() -> u16 {
         let sensors = unsafe { &*SENS::ptr() };
-        sensors.sar_meas1_ctrl2.read().meas1_data_sar().bits() as u16
+        sensors.sar_meas1_ctrl2().read().meas1_data_sar().bits() as u16
     }
 
     fn set_init_code(data: u16) {
@@ -376,7 +380,7 @@ impl RegisterAccess for ADC1 {
 
         cfg_if::cfg_if! {
             if #[cfg(esp32s2)] {
-                adc.int_clr
+                adc.int_clr()
                     .write(|w| w.adc1_done_int_clr().set_bit());
             } else {
                 adc.int_clr
@@ -385,7 +389,7 @@ impl RegisterAccess for ADC1 {
         }
 
         sensors
-            .sar_meas1_ctrl2
+            .sar_meas1_ctrl2()
             .modify(|_, w| w.meas1_start_sar().clear_bit());
     }
 }
@@ -417,7 +421,7 @@ impl RegisterAccess for ADC2 {
         let sensors = unsafe { &*SENS::ptr() };
 
         // Configure for RTC control
-        sensors.sar_meas2_ctrl2.modify(|_r, w| {
+        sensors.sar_meas2_ctrl2().modify(|_r, w| {
             w.meas2_start_force()
                 .set_bit() // 1: SW control RTC ADC start;     0: ULP control RTC ADC start.
                 .sar2_en_pad_force()
@@ -430,7 +434,7 @@ impl RegisterAccess for ADC2 {
 
     fn set_attenuation(channel: usize, attenuation: u8) {
         let sensors = unsafe { &*SENS::ptr() };
-        sensors.sar_atten2.modify(|r, w| {
+        sensors.sar_atten2().modify(|r, w| {
             let new_value = (r.bits() & !(0b11 << (channel * 2)))
                 | (((attenuation as u8 & 0b11) as u32) << (channel * 2));
 
@@ -441,58 +445,62 @@ impl RegisterAccess for ADC2 {
     fn clear_dig_force() {
         let sensors = unsafe { &*SENS::ptr() };
         sensors
-            .sar_meas2_mux
+            .sar_meas2_mux()
             .modify(|_, w| w.sar2_rtc_force().set_bit());
 
         let sar_apb = unsafe { &*APB_SARADC::ptr() };
         sar_apb
-            .arb_ctrl
+            .arb_ctrl()
             .modify(|_, w| w.adc_arb_rtc_force().set_bit());
     }
 
     fn set_start_force() {
         let sensors = unsafe { &*SENS::ptr() };
         sensors
-            .sar_meas2_ctrl2
+            .sar_meas2_ctrl2()
             .modify(|_, w| w.meas2_start_force().set_bit());
     }
 
     fn set_en_pad_force() {
         let sensors = unsafe { &*SENS::ptr() };
         sensors
-            .sar_meas2_ctrl2
+            .sar_meas2_ctrl2()
             .modify(|_, w| w.sar2_en_pad_force().set_bit());
     }
 
     fn set_en_pad(channel: u8) {
         let sensors = unsafe { &*SENS::ptr() };
         sensors
-            .sar_meas2_ctrl2
+            .sar_meas2_ctrl2()
             .modify(|_, w| unsafe { w.sar2_en_pad().bits(1 << channel) });
     }
 
     fn clear_start_sample() {
         let sensors = unsafe { &*SENS::ptr() };
         sensors
-            .sar_meas2_ctrl2
+            .sar_meas2_ctrl2()
             .modify(|_, w| w.meas2_start_sar().clear_bit());
     }
 
     fn start_sample() {
         let sensors = unsafe { &*SENS::ptr() };
         sensors
-            .sar_meas2_ctrl2
+            .sar_meas2_ctrl2()
             .modify(|_, w| w.meas2_start_sar().set_bit());
     }
 
     fn is_done() -> bool {
         let sensors = unsafe { &*SENS::ptr() };
-        sensors.sar_meas2_ctrl2.read().meas2_done_sar().bit_is_set()
+        sensors
+            .sar_meas2_ctrl2()
+            .read()
+            .meas2_done_sar()
+            .bit_is_set()
     }
 
     fn read_data() -> u16 {
         let sensors = unsafe { &*SENS::ptr() };
-        sensors.sar_meas2_ctrl2.read().meas2_data_sar().bits() as u16
+        sensors.sar_meas2_ctrl2().read().meas2_data_sar().bits() as u16
     }
 
     fn set_init_code(data: u16) {
@@ -508,16 +516,16 @@ impl RegisterAccess for ADC2 {
 
         cfg_if::cfg_if! {
             if #[cfg(esp32s2)] {
-                adc.int_clr
+                adc.int_clr()
                     .write(|w| w.adc2_done_int_clr().set_bit());
             } else {
-                adc.int_clr
+                adc.int_clr()
                     .write(|w| w.apb_saradc2_done_int_clr().set_bit());
             }
         }
 
         sensors
-            .sar_meas2_ctrl2
+            .sar_meas2_ctrl2()
             .modify(|_, w| w.meas2_start_sar().clear_bit());
     }
 }
@@ -574,16 +582,16 @@ where
         ADCI::set_start_force();
         ADCI::set_en_pad_force();
         sensors
-            .sar_hall_ctrl
+            .sar_hall_ctrl()
             .modify(|_, w| w.xpd_hall_force().set_bit());
         sensors
-            .sar_hall_ctrl
+            .sar_hall_ctrl()
             .modify(|_, w| w.hall_phase_force().set_bit());
 
         // Set power to SW power on
         #[cfg(esp32s2)]
         sensors
-            .sar_meas1_ctrl1
+            .sar_meas1_ctrl1()
             .modify(|_, w| w.rtc_saradc_clkgate_en().set_bit());
 
         #[cfg(esp32s3)]
@@ -592,34 +600,34 @@ where
             .modify(|_, w| w.saradc_clk_en().set_bit());
 
         sensors
-            .sar_power_xpd_sar
+            .sar_power_xpd_sar()
             .modify(|_, w| w.sarclk_en().set_bit());
 
         sensors
-            .sar_power_xpd_sar
+            .sar_power_xpd_sar()
             .modify(|_, w| unsafe { w.force_xpd_sar().bits(0b11) });
 
         // disable AMP
         sensors
-            .sar_meas1_ctrl1
+            .sar_meas1_ctrl1()
             .modify(|_, w| unsafe { w.force_xpd_amp().bits(0b11) });
         sensors
-            .sar_amp_ctrl3
+            .sar_amp_ctrl3()
             .modify(|_, w| unsafe { w.amp_rst_fb_fsm().bits(0) });
         sensors
-            .sar_amp_ctrl3
+            .sar_amp_ctrl3()
             .modify(|_, w| unsafe { w.amp_short_ref_fsm().bits(0) });
         sensors
-            .sar_amp_ctrl3
+            .sar_amp_ctrl3()
             .modify(|_, w| unsafe { w.amp_short_ref_gnd_fsm().bits(0) });
         sensors
-            .sar_amp_ctrl1
+            .sar_amp_ctrl1()
             .modify(|_, w| unsafe { w.sar_amp_wait1().bits(1) });
         sensors
-            .sar_amp_ctrl1
+            .sar_amp_ctrl1()
             .modify(|_, w| unsafe { w.sar_amp_wait2().bits(1) });
         sensors
-            .sar_amp_ctrl2
+            .sar_amp_ctrl2()
             .modify(|_, w| unsafe { w.sar_amp_wait3().bits(1) });
 
         let adc = ADC {

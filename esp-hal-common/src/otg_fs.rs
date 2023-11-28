@@ -105,7 +105,7 @@ where
     fn enable() {
         unsafe {
             let usb_wrap = &*peripherals::USB_WRAP::PTR;
-            usb_wrap.otg_conf.modify(|_, w| {
+            usb_wrap.otg_conf().modify(|_, w| {
                 w.usb_pad_enable()
                     .set_bit()
                     .phy_sel()
@@ -130,7 +130,7 @@ where
             crate::gpio::connect_high_to_peripheral(InputSignal::USB_OTG_VBUSVALID); // receiving a valid Vbus from device
             crate::gpio::connect_low_to_peripheral(InputSignal::USB_OTG_AVALID);
 
-            usb_wrap.otg_conf.modify(|_, w| {
+            usb_wrap.otg_conf().modify(|_, w| {
                 w.pad_pull_override()
                     .set_bit()
                     .dp_pullup()

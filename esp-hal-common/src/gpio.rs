@@ -419,43 +419,43 @@ impl BankGpioRegisterAccess for Bank0GpioRegisterAccess {
 impl BankGpioRegisterAccess for Bank1GpioRegisterAccess {
     fn write_out_en_clear(word: u32) {
         unsafe { &*GPIO::PTR }
-            .enable1_w1tc
+            .enable1_w1tc()
             .write(|w| unsafe { w.bits(word) });
     }
 
     fn write_out_en_set(word: u32) {
         unsafe { &*GPIO::PTR }
-            .enable1_w1ts
+            .enable1_w1ts()
             .write(|w| unsafe { w.bits(word) });
     }
 
     fn read_input() -> u32 {
-        unsafe { &*GPIO::PTR }.in1.read().bits()
+        unsafe { &*GPIO::PTR }.in1().read().bits()
     }
 
     fn read_output() -> u32 {
-        unsafe { &*GPIO::PTR }.out1.read().bits()
+        unsafe { &*GPIO::PTR }.out1().read().bits()
     }
 
     fn read_interrupt_status() -> u32 {
-        unsafe { &*GPIO::PTR }.status1.read().bits()
+        unsafe { &*GPIO::PTR }.status1().read().bits()
     }
 
     fn write_interrupt_status_clear(word: u32) {
         unsafe { &*GPIO::PTR }
-            .status1_w1tc
+            .status1_w1tc()
             .write(|w| unsafe { w.bits(word) });
     }
 
     fn write_output_set(word: u32) {
         unsafe { &*GPIO::PTR }
-            .out1_w1ts
+            .out1_w1ts()
             .write(|w| unsafe { w.bits(word) });
     }
 
     fn write_output_clear(word: u32) {
         unsafe { &*GPIO::PTR }
-            .out1_w1tc
+            .out1_w1tc()
             .write(|w| unsafe { w.bits(word) });
     }
 }
@@ -1797,7 +1797,7 @@ pub fn enable_iomux_clk_gate() {
         use crate::peripherals::SENS;
         let sensors = unsafe { &*SENS::ptr() };
         sensors
-            .sar_io_mux_conf
+            .sar_io_mux_conf()
             .modify(|_, w| w.iomux_clk_gate_en().set_bit());
     }
 }
@@ -2272,7 +2272,7 @@ pub mod rtc_io {
                 // TODO align PAC
                 #[cfg(esp32s2)]
                 rtc_io
-                    .rtc_gpio_enable_w1ts
+                    .rtc_gpio_enable_w1ts()
                     .write(|w| w.reg_rtcio_reg_gpio_enable_w1ts().variant(1 << PIN));
 
                 #[cfg(esp32s3)]
@@ -2281,7 +2281,7 @@ pub mod rtc_io {
                     .write(|w| w.rtc_gpio_enable_w1ts().variant(1 << PIN));
             } else {
                 rtc_io
-                    .enable_w1tc
+                    .enable_w1tc()
                     .write(|w| w.enable_w1tc().variant(1 << PIN));
             }
         }
@@ -2306,11 +2306,11 @@ pub mod rtc_io {
             #[cfg(esp32s2)]
             if level {
                 rtc_io
-                    .rtc_gpio_out_w1ts
+                    .rtc_gpio_out_w1ts()
                     .write(|w| w.gpio_out_data_w1ts().variant(1 << PIN));
             } else {
                 rtc_io
-                    .rtc_gpio_out_w1tc
+                    .rtc_gpio_out_w1tc()
                     .write(|w| w.gpio_out_data_w1tc().variant(1 << PIN));
             }
 
@@ -2329,7 +2329,7 @@ pub mod rtc_io {
         #[doc(hidden)]
         pub fn get_level(&self) -> bool {
             let rtc_io = unsafe { &*crate::peripherals::RTC_IO::PTR };
-            (rtc_io.rtc_gpio_in.read().bits() & 1 << PIN) != 0
+            (rtc_io.rtc_gpio_in().read().bits() & 1 << PIN) != 0
         }
 
         /// Configures the pin as an input with the internal pull-up resistor
@@ -2384,7 +2384,7 @@ pub mod rtc_io {
     #[inline(always)]
     fn get_pin_reg(pin: u8) -> &'static crate::peripherals::rtc_io::TOUCH_PAD {
         let rtc_io = unsafe { &*crate::peripherals::RTC_IO::PTR };
-        unsafe { core::mem::transmute((rtc_io.touch_pad[0].as_ptr()).add(pin as usize)) }
+        unsafe { core::mem::transmute((rtc_io.touch_pad(0).as_ptr()).add(pin as usize)) }
     }
 }
 

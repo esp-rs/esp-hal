@@ -26,13 +26,13 @@ trait DAC1Impl {
         {
             let sensors = unsafe { &*SENS::ptr() };
             sensors
-                .sar_dac_ctrl1
+                .sar_dac_ctrl1()
                 .modify(|_, w| w.dac_clkgate_en().set_bit());
         }
 
         let rtcio = unsafe { &*RTC_IO::ptr() };
 
-        rtcio.pad_dac1.modify(|_, w| {
+        rtcio.pad_dac1().modify(|_, w| {
             w.pdac1_dac_xpd_force().set_bit();
             w.pdac1_xpd_dac().set_bit()
         });
@@ -45,11 +45,11 @@ trait DAC1Impl {
 
         let sensors = unsafe { &*SENS::ptr() };
         sensors
-            .sar_dac_ctrl2
+            .sar_dac_ctrl2()
             .modify(|_, w| w.dac_cw_en1().clear_bit());
 
         rtcio
-            .pad_dac1
+            .pad_dac1()
             .modify(|_, w| unsafe { w.pdac1_dac().bits(value) });
     }
 }
@@ -63,13 +63,13 @@ trait DAC2Impl {
         {
             let sensors = unsafe { &*SENS::ptr() };
             sensors
-                .sar_dac_ctrl1
+                .sar_dac_ctrl1()
                 .modify(|_, w| w.dac_clkgate_en().set_bit());
         }
 
         let rtcio = unsafe { &*RTC_IO::ptr() };
 
-        rtcio.pad_dac2.modify(|_, w| {
+        rtcio.pad_dac2().modify(|_, w| {
             w.pdac2_dac_xpd_force().set_bit();
             w.pdac2_xpd_dac().set_bit()
         });
@@ -82,11 +82,11 @@ trait DAC2Impl {
 
         let sensors = unsafe { &*SENS::ptr() };
         sensors
-            .sar_dac_ctrl2
+            .sar_dac_ctrl2()
             .modify(|_, w| w.dac_cw_en2().clear_bit());
 
         rtcio
-            .pad_dac2
+            .pad_dac2()
             .modify(|_, w| unsafe { w.pdac2_dac().bits(value) });
     }
 }

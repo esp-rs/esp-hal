@@ -1952,7 +1952,7 @@ where
     #[cfg(any(esp32, esp32s2))]
     fn clear_dma_interrupts(&self) {
         let reg_block = self.register_block();
-        reg_block.dma_int_clr.write(|w| {
+        reg_block.dma_int_clr().write(|w| {
             w.inlink_dscr_empty_int_clr()
                 .set_bit()
                 .outlink_dscr_error_int_clr()
@@ -1995,7 +1995,7 @@ fn reset_dma_before_load_dma_dscr(_reg_block: &RegisterBlock) {}
 
 #[cfg(any(esp32, esp32s2))]
 fn reset_dma_before_load_dma_dscr(reg_block: &RegisterBlock) {
-    reg_block.dma_conf.modify(|_, w| {
+    reg_block.dma_conf().modify(|_, w| {
         w.out_rst()
             .set_bit()
             .in_rst()
@@ -2006,7 +2006,7 @@ fn reset_dma_before_load_dma_dscr(reg_block: &RegisterBlock) {
             .set_bit()
     });
 
-    reg_block.dma_conf.modify(|_, w| {
+    reg_block.dma_conf().modify(|_, w| {
         w.out_rst()
             .clear_bit()
             .in_rst()

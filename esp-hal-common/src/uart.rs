@@ -894,12 +894,12 @@ where
         let clk = clocks.apb_clock.to_Hz();
 
         T::register_block()
-            .conf0
+            .conf0()
             .modify(|_, w| w.tick_ref_always_on().bit(true));
         let divider = clk / baudrate;
 
         T::register_block()
-            .clkdiv
+            .clkdiv()
             .write(|w| unsafe { w.clkdiv().bits(divider).frag().bits(0) });
     }
 

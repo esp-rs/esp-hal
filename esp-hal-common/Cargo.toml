@@ -72,7 +72,7 @@ esp32c2 = { path = "/Users/jesse/Work/esp-pacs/esp32c2", features = ["critical-s
 esp32c3 = { path = "/Users/jesse/Work/esp-pacs/esp32c3", features = ["critical-section"], optional = true }
 esp32c6 = { path = "/Users/jesse/Work/esp-pacs/esp32c6", features = ["critical-section"], optional = true }
 esp32h2 = { path = "/Users/jesse/Work/esp-pacs/esp32h2", features = ["critical-section"], optional = true }
-esp32s2 = { version = "0.18.0", features = ["critical-section"], optional = true }
+esp32s2 = { path = "/Users/jesse/Work/esp-pacs/esp32s2", features = ["critical-section"], optional = true }
 esp32s3 = { version = "0.22.0", features = ["critical-section"], optional = true }
 
 [build-dependencies]

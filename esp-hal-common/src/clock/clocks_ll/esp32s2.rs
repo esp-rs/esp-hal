@@ -16,9 +16,9 @@ pub(crate) fn set_cpu_clock(cpu_clock_speed: CpuClock) {
 
     unsafe {
         system_control
-            .sysclk_conf
+            .sysclk_conf()
             .modify(|_, w| w.soc_clk_sel().bits(1));
-        system_control.cpu_per_conf.modify(|_, w| {
+        system_control.cpu_per_conf().modify(|_, w| {
             w.pll_freq_sel()
                 .set_bit()
                 .cpuperiod_sel()
@@ -29,7 +29,7 @@ pub(crate) fn set_cpu_clock(cpu_clock_speed: CpuClock) {
                 })
         });
 
-        rtc_cntl.reg.modify(|_, w| {
+        rtc_cntl.reg().modify(|_, w| {
             w.dig_reg_dbias_wak().bits(match cpu_clock_speed {
                 CpuClock::Clock80MHz => DIG_DBIAS_80M_160M,
                 CpuClock::Clock160MHz => DIG_DBIAS_80M_160M,
@@ -39,7 +39,7 @@ pub(crate) fn set_cpu_clock(cpu_clock_speed: CpuClock) {
 
         let value = (((80 * MHZ) >> 12) & UINT16_MAX) | ((((80 * MHZ) >> 12) & UINT16_MAX) << 16);
         rtc_cntl
-            .store5
+            .store5()
             .modify(|_, w| w.scratch5().bits(value as u32));
     }
 }

@@ -174,7 +174,7 @@ impl<T, const CHANNEL: u8> Alarm<T, CHANNEL> {
             };
 
             #[cfg(esp32s2)]
-            systimer.step.write(|w| w.timer_xtal_step().bits(0x1)); // run at XTAL freq, not 80 * XTAL freq
+            systimer.step().write(|w| w.timer_xtal_step().bits(0x1)); // run at XTAL freq, not 80 * XTAL freq
 
             #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
             {

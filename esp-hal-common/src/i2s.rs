@@ -1046,7 +1046,7 @@ mod private {
         fn set_clock(clock_settings: I2sClockDividers) {
             let i2s = Self::register_block();
 
-            i2s.clkm_conf.modify(|r, w| unsafe {
+            i2s.clkm_conf().modify(|r, w| unsafe {
                 w.bits(r.bits() | (crate::soc::constants::I2S_DEFAULT_CLK_SRC << 21))
                 // select PLL_160M
             });
@@ -1054,21 +1054,21 @@ mod private {
             #[cfg(esp32)]
             i2s.clkm_conf.modify(|_, w| w.clka_ena().clear_bit());
 
-            i2s.clkm_conf.modify(|_, w| {
+            i2s.clkm_conf().modify(|_, w| {
                 w.clk_en()
                     .set_bit()
                     .clkm_div_num()
                     .variant(clock_settings.mclk_divider as u8)
             });
 
-            i2s.clkm_conf.modify(|_, w| {
+            i2s.clkm_conf().modify(|_, w| {
                 w.clkm_div_a()
                     .variant(clock_settings.denominator as u8)
                     .clkm_div_b()
                     .variant(clock_settings.numerator as u8)
             });
 
-            i2s.sample_rate_conf.modify(|_, w| {
+            i2s.sample_rate_conf().modify(|_, w| {
                 w.tx_bck_div_num()
                     .variant(clock_settings.bclk_divider as u8)
                     .rx_bck_div_num()
@@ -1084,12 +1084,12 @@ mod private {
                 DataFormat::Data16Channel16 => 0,
             };
 
-            i2s.sample_rate_conf
+            i2s.sample_rate_conf()
                 .modify(|_, w| w.tx_bits_mod().variant(data_format.channel_bits()));
-            i2s.sample_rate_conf
+            i2s.sample_rate_conf()
                 .modify(|_, w| w.rx_bits_mod().variant(data_format.channel_bits()));
 
-            i2s.conf.modify(|_, w| {
+            i2s.conf().modify(|_, w| {
                 w.tx_slave_mod()
                     .clear_bit()
                     .rx_slave_mod()
@@ -1118,7 +1118,7 @@ mod private {
                     .clear_bit()
             });
 
-            i2s.fifo_conf.modify(|_, w| {
+            i2s.fifo_conf().modify(|_, w| {
                 w.tx_fifo_mod()
                     .variant(fifo_mod)
                     .tx_fifo_mod_force_en()
@@ -1131,22 +1131,22 @@ mod private {
                     .set_bit()
             });
 
-            i2s.conf_chan
+            i2s.conf_chan()
                 .modify(|_, w| w.tx_chan_mod().variant(0).rx_chan_mod().variant(0)); // for now only stereo
 
-            i2s.conf1
+            i2s.conf1()
                 .modify(|_, w| w.tx_pcm_bypass().set_bit().rx_pcm_bypass().set_bit());
 
-            i2s.pd_conf
+            i2s.pd_conf()
                 .modify(|_, w| w.fifo_force_pu().set_bit().fifo_force_pd().clear_bit());
 
-            i2s.conf2
+            i2s.conf2()
                 .modify(|_, w| w.camera_en().clear_bit().lcd_en().clear_bit());
         }
 
         fn set_master() {
             let i2s = Self::register_block();
-            i2s.conf
+            i2s.conf()
                 .modify(|_, w| w.rx_slave_mod().clear_bit().tx_slave_mod().clear_bit());
         }
 
@@ -1156,15 +1156,15 @@ mod private {
 
         fn reset_tx() {
             let i2s = Self::register_block();
-            i2s.conf
+            i2s.conf()
                 .modify(|_, w| w.tx_reset().set_bit().tx_fifo_reset().set_bit());
-            i2s.conf
+            i2s.conf()
                 .modify(|_, w| w.tx_reset().clear_bit().tx_fifo_reset().clear_bit());
 
-            i2s.lc_conf.modify(|_, w| w.out_rst().set_bit());
-            i2s.lc_conf.modify(|_, w| w.out_rst().clear_bit());
+            i2s.lc_conf().modify(|_, w| w.out_rst().set_bit());
+            i2s.lc_conf().modify(|_, w| w.out_rst().clear_bit());
 
-            i2s.int_clr.write(|w| {
+            i2s.int_clr().write(|w| {
                 w.out_done_int_clr()
                     .set_bit()
                     .out_total_eof_int_clr()
@@ -1174,61 +1174,61 @@ mod private {
 
         fn tx_start() {
             let i2s = Self::register_block();
-            i2s.conf.modify(|_, w| w.tx_start().set_bit());
+            i2s.conf().modify(|_, w| w.tx_start().set_bit());
         }
 
         fn tx_stop() {
             let i2s = Self::register_block();
-            i2s.conf.modify(|_, w| w.tx_start().clear_bit());
+            i2s.conf().modify(|_, w| w.tx_start().clear_bit());
         }
 
         fn wait_for_tx_done() {
             let i2s = Self::register_block();
-            while i2s.state.read().tx_idle().bit_is_clear() {
+            while i2s.state().read().tx_idle().bit_is_clear() {
                 // wait
             }
 
-            i2s.conf.modify(|_, w| w.tx_start().clear_bit());
+            i2s.conf().modify(|_, w| w.tx_start().clear_bit());
         }
 
         fn reset_rx() {
             let i2s = Self::register_block();
-            i2s.conf
+            i2s.conf()
                 .modify(|_, w| w.rx_reset().set_bit().rx_fifo_reset().set_bit());
-            i2s.conf
+            i2s.conf()
                 .modify(|_, w| w.rx_reset().clear_bit().rx_fifo_reset().clear_bit());
 
-            i2s.lc_conf.modify(|_, w| w.in_rst().set_bit());
-            i2s.lc_conf.modify(|_, w| w.in_rst().clear_bit());
+            i2s.lc_conf().modify(|_, w| w.in_rst().set_bit());
+            i2s.lc_conf().modify(|_, w| w.in_rst().clear_bit());
 
-            i2s.int_clr
+            i2s.int_clr()
                 .write(|w| w.in_done_int_clr().set_bit().in_suc_eof_int_clr().set_bit());
         }
 
         fn rx_start(len: usize) {
             let i2s = Self::register_block();
 
-            i2s.int_clr.write(|w| w.in_suc_eof_int_clr().set_bit());
+            i2s.int_clr().write(|w| w.in_suc_eof_int_clr().set_bit());
 
             #[cfg(not(esp32))]
-            i2s.rxeof_num
+            i2s.rxeof_num()
                 .modify(|_, w| w.rx_eof_num().variant(len as u32));
 
             // On ESP32, the eof_num count in words.
             #[cfg(esp32)]
-            i2s.rxeof_num
+            i2s.rxeof_num()
                 .modify(|_, w| w.rx_eof_num().variant((len / 4) as u32));
 
-            i2s.conf.modify(|_, w| w.rx_start().set_bit());
+            i2s.conf().modify(|_, w| w.rx_start().set_bit());
         }
 
         fn wait_for_rx_done() {
             let i2s = Self::register_block();
-            while i2s.int_raw.read().in_suc_eof_int_raw().bit_is_clear() {
+            while i2s.int_raw().read().in_suc_eof_int_raw().bit_is_clear() {
                 // wait
             }
 
-            i2s.int_clr.write(|w| w.in_suc_eof_int_clr().set_bit());
+            i2s.int_clr().write(|w| w.in_suc_eof_int_clr().set_bit());
         }
     }
 
