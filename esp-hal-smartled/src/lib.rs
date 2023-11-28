@@ -14,7 +14,8 @@
 //! let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 //! let rmt = Rmt::new(peripherals.RMT, 80u32.MHz(), &clocks).unwrap();
 //!
-//! let led = <smartLedAdapter!(0, 1)>::new(rmt.channel0, io.pins.gpio0);
+//! let mut rmt_buffer = smartLedBuffer!(1);
+//! let mut led = SmartLedsAdapter::new(rmt.channel0, io.pins.gpio2, &mut rmt_buffer);
 //! ```
 
 #![no_std]
@@ -70,35 +71,35 @@ pub enum LedAdapterError {
     TransmissionError(RmtError),
 }
 
-/// Macro to generate adapters with an arbitrary buffer size fitting for a
-/// specific number of `$buffer_size` LEDs to be addressed.
+/// Macro to allocate a buffer sized for a specific number of LEDs to be
+/// addressed.
 ///
 /// Attempting to use more LEDs that the buffer is configured for will result in
 /// an `LedAdapterError:BufferSizeExceeded` error.
 #[macro_export]
-macro_rules! smartLedAdapter {
-    ( $channel: literal, $buffer_size: literal ) => {
+macro_rules! smartLedBuffer {
+    ( $buffer_size: literal ) => {
         // The size we're assigning here is calculated as following
         //  (
         //   Nr. of LEDs
         //   * channels (r,g,b -> 3)
         //   * pulses per channel 8)
         //  ) + 1 additional pulse for the end delimiter
-        SmartLedsAdapter::<_, $channel, { $buffer_size * 24 + 1 }>
+        [0u32; $buffer_size * 24 + 1]
     };
 }
 
 /// Adapter taking an RMT channel and a specific pin and providing RGB LED
 /// interaction functionality using the `smart-leds` crate
-pub struct SmartLedsAdapter<TX, const CHANNEL: u8, const BUFFER_SIZE: usize>
+pub struct SmartLedsAdapter<'d, TX, const CHANNEL: u8>
 where
     TX: TxChannel<CHANNEL>,
 {
     channel: Option<TX>,
-    rmt_buffer: [u32; BUFFER_SIZE],
+    rmt_buffer: &'d mut [u32],
 }
 
-impl<'d, TX, const CHANNEL: u8, const BUFFER_SIZE: usize> SmartLedsAdapter<TX, CHANNEL, BUFFER_SIZE>
+impl<'d, TX, const CHANNEL: u8> SmartLedsAdapter<'d, TX, CHANNEL>
 where
     TX: TxChannel<CHANNEL>,
 {
@@ -106,7 +107,8 @@ where
     pub fn new<C, O>(
         channel: C,
         pin: impl Peripheral<P = O> + 'd,
-    ) -> SmartLedsAdapter<TX, CHANNEL, BUFFER_SIZE>
+        rmt_buffer: &'d mut [u32],
+    ) -> SmartLedsAdapter<TX, CHANNEL>
     where
         O: OutputPin + 'd,
         C: TxChannelCreator<'d, TX, O, CHANNEL>,
@@ -124,7 +126,7 @@ where
 
         Self {
             channel: Some(channel),
-            rmt_buffer: [0; BUFFER_SIZE],
+            rmt_buffer,
         }
     }
 
@@ -167,8 +169,7 @@ where
     }
 }
 
-impl<TX, const CHANNEL: u8, const BUFFER_SIZE: usize> SmartLedsWrite
-    for SmartLedsAdapter<TX, CHANNEL, BUFFER_SIZE>
+impl<'d, TX, const CHANNEL: u8> SmartLedsWrite for SmartLedsAdapter<'d, TX, CHANNEL>
 where
     TX: TxChannel<CHANNEL>,
 {

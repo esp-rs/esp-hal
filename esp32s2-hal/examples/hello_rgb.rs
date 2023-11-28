@@ -13,7 +13,7 @@
 
 use esp32s2_hal::{clock::ClockControl, peripherals::Peripherals, prelude::*, rmt::Rmt, Delay, IO};
 use esp_backtrace as _;
-use esp_hal_smartled::{smartLedAdapter, SmartLedsAdapter};
+use esp_hal_smartled::{smartLedBuffer, SmartLedsAdapter};
 use smart_leds::{
     brightness,
     gamma,
@@ -34,7 +34,8 @@ fn main() -> ! {
 
     // We use one of the RMT channels to instantiate a `SmartLedsAdapter` which can
     // be used directly with all `smart_led` implementations
-    let mut led = <smartLedAdapter!(0, 1)>::new(rmt.channel0, io.pins.gpio18);
+    let mut rmt_buffer = smartLedBuffer!(1);
+    let mut led = SmartLedsAdapter::new(rmt.channel0, io.pins.gpio18, &mut rmt_buffer);
 
     // Initialize the Delay peripheral, and use it to toggle the LED state in a
     // loop.
