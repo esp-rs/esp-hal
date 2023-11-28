@@ -91,19 +91,19 @@ Don't use this feature if your are _not_ using USB-SERIAL-JTAG since it might re
 | defmt          | Add `defmt::Format` implementation                                                                   |
 
 When using the `dump-packets` feature you can use the extcap in `extras/esp-wifishark` to analyze the frames in Wireshark.
-For more information see [extras/esp-wifishark/README.md](extras/esp-wifishark/README.md)
+For more information see [extras/esp-wifishark/README.md](../extras/esp-wifishark/README.md)
 
 ## Tuning
 
 The defaults used by `esp-wifi` and the examples are rather conservative. It is possible to change a few of the important settings.
 
-See [Tuning](https://github.com/esp-rs/esp-wifi/esp-wifi/blob/main/docs/tuning.md) for details
+See [Tuning](https://github.com/esp-rs/esp-wifi/blob/main/esp-wifi/docs/tuning.md) for details
 
 ## Examples
 
 See [Examples] for details.
 
-[Examples]: https://github.com/esp-rs/esp-wifi/esp-wifi/blob/main/docs/examples.md
+[Examples]: https://github.com/esp-rs/esp-wifi/blob/main/esp-wifi/docs/examples.md
 
 ## Missing / To be done
 
