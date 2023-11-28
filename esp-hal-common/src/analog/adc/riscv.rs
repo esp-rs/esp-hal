@@ -310,7 +310,7 @@ impl RegisterAccess for ADC1 {
     fn config_onetime_sample(channel: u8, attenuation: u8) {
         let sar_adc = unsafe { &*APB_SARADC::PTR };
 
-        sar_adc.onetime_sample.modify(|_, w| unsafe {
+        sar_adc.onetime_sample().modify(|_, w| unsafe {
             w.saradc1_onetime_sample()
                 .set_bit()
                 .saradc_onetime_channel()
@@ -324,20 +324,20 @@ impl RegisterAccess for ADC1 {
         let sar_adc = unsafe { &*APB_SARADC::PTR };
 
         sar_adc
-            .onetime_sample
+            .onetime_sample()
             .modify(|_, w| w.saradc_onetime_start().set_bit());
     }
 
     fn is_done() -> bool {
         let sar_adc = unsafe { &*APB_SARADC::PTR };
 
-        sar_adc.int_raw.read().apb_saradc1_done_int_raw().bit()
+        sar_adc.int_raw().read().apb_saradc1_done_int_raw().bit()
     }
 
     fn read_data() -> u16 {
         let sar_adc = unsafe { &*APB_SARADC::PTR };
 
-        (sar_adc.sar1data_status.read().apb_saradc1_data().bits() as u16) & 0xfff
+        (sar_adc.sar1data_status().read().apb_saradc1_data().bits() as u16) & 0xfff
     }
 
     fn reset() {
@@ -345,12 +345,12 @@ impl RegisterAccess for ADC1 {
 
         // Clear ADC1 sampling done interrupt bit
         sar_adc
-            .int_clr
+            .int_clr()
             .write(|w| w.apb_saradc1_done_int_clr().set_bit());
 
         // Disable ADC sampling
         sar_adc
-            .onetime_sample
+            .onetime_sample()
             .modify(|_, w| w.saradc_onetime_start().clear_bit());
     }
 
@@ -421,7 +421,7 @@ impl RegisterAccess for ADC2 {
     fn config_onetime_sample(channel: u8, attenuation: u8) {
         let sar_adc = unsafe { &*APB_SARADC::PTR };
 
-        sar_adc.onetime_sample.modify(|_, w| unsafe {
+        sar_adc.onetime_sample().modify(|_, w| unsafe {
             w.saradc2_onetime_sample()
                 .set_bit()
                 .saradc_onetime_channel()
@@ -435,31 +435,31 @@ impl RegisterAccess for ADC2 {
         let sar_adc = unsafe { &*APB_SARADC::PTR };
 
         sar_adc
-            .onetime_sample
+            .onetime_sample()
             .modify(|_, w| w.saradc_onetime_start().set_bit());
     }
 
     fn is_done() -> bool {
         let sar_adc = unsafe { &*APB_SARADC::PTR };
 
-        sar_adc.int_raw.read().apb_saradc2_done_int_raw().bit()
+        sar_adc.int_raw().read().apb_saradc2_done_int_raw().bit()
     }
 
     fn read_data() -> u16 {
         let sar_adc = unsafe { &*APB_SARADC::PTR };
 
-        (sar_adc.sar2data_status.read().apb_saradc2_data().bits() as u16) & 0xfff
+        (sar_adc.sar2data_status().read().apb_saradc2_data().bits() as u16) & 0xfff
     }
 
     fn reset() {
         let sar_adc = unsafe { &*APB_SARADC::PTR };
 
         sar_adc
-            .int_clr
+            .int_clr()
             .write(|w| w.apb_saradc2_done_int_clr().set_bit());
 
         sar_adc
-            .onetime_sample
+            .onetime_sample()
             .modify(|_, w| w.saradc_onetime_start().clear_bit());
     }
 
@@ -543,7 +543,7 @@ where
         PeripheralClockControl::enable(Peripheral::ApbSarAdc);
 
         let sar_adc = unsafe { &*APB_SARADC::PTR };
-        sar_adc.ctrl.modify(|_, w| unsafe {
+        sar_adc.ctrl().modify(|_, w| unsafe {
             w.saradc_start_force()
                 .set_bit()
                 .saradc_start()

@@ -57,7 +57,7 @@ fn enable_phy() {
     // `periph_ll_wifi_bt_module_enable_clk_clear_rst`
     let syscon = unsafe { &*esp32c3::APB_CTRL::PTR };
     syscon
-        .wifi_clk_en
+        .wifi_clk_en()
         .modify(|r, w| unsafe { w.bits(r.bits() | SYSTEM_WIFI_CLK_WIFI_BT_COMMON_M) });
 }
 
@@ -65,7 +65,7 @@ fn disable_phy() {
     // `periph_ll_wifi_bt_module_disable_clk_set_rst`
     let syscon = unsafe { &*esp32c3::APB_CTRL::PTR };
     syscon
-        .wifi_clk_en
+        .wifi_clk_en()
         .modify(|r, w| unsafe { w.bits(r.bits() & !SYSTEM_WIFI_CLK_WIFI_BT_COMMON_M) });
 }
 
@@ -81,10 +81,10 @@ fn reset_mac() {
     const SYSTEM_MAC_RST: u32 = 1 << 2;
     let syscon = unsafe { &*esp32c3::APB_CTRL::PTR };
     syscon
-        .wifi_rst_en
+        .wifi_rst_en()
         .modify(|r, w| unsafe { w.wifi_rst().bits(r.wifi_rst().bits() | SYSTEM_MAC_RST) });
     syscon
-        .wifi_rst_en
+        .wifi_rst_en()
         .modify(|r, w| unsafe { w.wifi_rst().bits(r.wifi_rst().bits() & !SYSTEM_MAC_RST) });
 }
 
@@ -92,11 +92,11 @@ fn init_clocks() {
     // undo the power down in base_settings (esp32c3_sleep)
     let rtc_cntl = unsafe { crate::peripherals::RTC_CNTL::steal() };
     rtc_cntl
-        .dig_iso
+        .dig_iso()
         .modify(|_, w| w.wifi_force_iso().clear_bit().bt_force_iso().clear_bit());
 
     rtc_cntl
-        .dig_pwc
+        .dig_pwc()
         .modify(|_, w| w.wifi_force_pd().clear_bit().bt_force_pd().clear_bit());
 
     // from `esp_perip_clk_init`
@@ -106,6 +106,6 @@ fn init_clocks() {
 
     let syscon = unsafe { &*esp32c3::APB_CTRL::PTR };
     syscon
-        .wifi_clk_en
+        .wifi_clk_en()
         .modify(|r, w| unsafe { w.bits(r.bits() & !WIFI_BT_SDIO_CLK | SYSTEM_WIFI_CLK_EN) });
 }

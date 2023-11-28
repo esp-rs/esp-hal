@@ -102,7 +102,7 @@ impl TimerGroupInstance for TIMG0 {
     fn configure_src_clk() {
         unsafe {
             (*Self::register_block())
-                .t0config
+                .t0config()
                 .modify(|_, w| w.use_xtal().clear_bit())
         };
     }
@@ -116,7 +116,7 @@ impl TimerGroupInstance for TIMG0 {
     fn configure_wdt_src_clk() {
         unsafe {
             (*Self::register_block())
-                .wdtconfig0
+                .wdtconfig0()
                 .modify(|_, w| w.wdt_use_xtal().clear_bit())
         };
     }
@@ -320,30 +320,34 @@ where
     fn reset_counter(&mut self) {
         let reg_block = unsafe { &*TG::register_block() };
 
-        reg_block.t0loadlo.write(|w| unsafe { w.load_lo().bits(0) });
+        reg_block
+            .t0loadlo()
+            .write(|w| unsafe { w.load_lo().bits(0) });
 
-        reg_block.t0loadhi.write(|w| unsafe { w.load_hi().bits(0) });
+        reg_block
+            .t0loadhi()
+            .write(|w| unsafe { w.load_hi().bits(0) });
 
-        reg_block.t0load.write(|w| unsafe { w.load().bits(1) });
+        reg_block.t0load().write(|w| unsafe { w.load().bits(1) });
     }
 
     fn set_counter_active(&mut self, state: bool) {
         let reg_block = unsafe { &*TG::register_block() };
 
-        reg_block.t0config.modify(|_, w| w.en().bit(state));
+        reg_block.t0config().modify(|_, w| w.en().bit(state));
     }
 
     fn is_counter_active(&self) -> bool {
         let reg_block = unsafe { &*TG::register_block() };
 
-        reg_block.t0config.read().en().bit_is_set()
+        reg_block.t0config().read().en().bit_is_set()
     }
 
     fn set_counter_decrementing(&mut self, decrementing: bool) {
         let reg_block = unsafe { &*TG::register_block() };
 
         reg_block
-            .t0config
+            .t0config()
             .modify(|_, w| w.increase().bit(!decrementing));
     }
 
@@ -351,20 +355,20 @@ where
         let reg_block = unsafe { &*TG::register_block() };
 
         reg_block
-            .t0config
+            .t0config()
             .modify(|_, w| w.autoreload().bit(auto_reload));
     }
 
     fn set_alarm_active(&mut self, state: bool) {
         let reg_block = unsafe { &*TG::register_block() };
 
-        reg_block.t0config.modify(|_, w| w.alarm_en().bit(state));
+        reg_block.t0config().modify(|_, w| w.alarm_en().bit(state));
     }
 
     fn is_alarm_active(&self) -> bool {
         let reg_block = unsafe { &*TG::register_block() };
 
-        reg_block.t0config.read().alarm_en().bit_is_set()
+        reg_block.t0config().read().alarm_en().bit_is_set()
     }
 
     fn load_alarm_value(&mut self, value: u64) {
@@ -375,11 +379,11 @@ where
         let reg_block = unsafe { &*TG::register_block() };
 
         reg_block
-            .t0alarmlo
+            .t0alarmlo()
             .write(|w| unsafe { w.alarm_lo().bits(low) });
 
         reg_block
-            .t0alarmhi
+            .t0alarmhi()
             .write(|w| unsafe { w.alarm_hi().bits(high) });
     }
 
@@ -391,7 +395,7 @@ where
         reg_block.t0config.modify(|_, w| w.level_int_en().set_bit());
 
         reg_block
-            .int_ena_timers
+            .int_ena_timers()
             .modify(|_, w| w.t0_int_ena().set_bit());
     }
 
@@ -399,23 +403,25 @@ where
         let reg_block = unsafe { &*TG::register_block() };
 
         reg_block
-            .int_ena_timers
+            .int_ena_timers()
             .modify(|_, w| w.t0_int_ena().clear_bit());
     }
 
     fn clear_interrupt(&mut self) {
         let reg_block = unsafe { &*TG::register_block() };
 
-        reg_block.int_clr_timers.write(|w| w.t0_int_clr().set_bit());
+        reg_block
+            .int_clr_timers()
+            .write(|w| w.t0_int_clr().set_bit());
     }
 
     fn now(&self) -> u64 {
         let reg_block = unsafe { &*TG::register_block() };
 
-        reg_block.t0update.write(|w| unsafe { w.bits(0) });
+        reg_block.t0update().write(|w| unsafe { w.bits(0) });
 
-        let value_lo = reg_block.t0lo.read().bits() as u64;
-        let value_hi = (reg_block.t0hi.read().bits() as u64) << 32;
+        let value_lo = reg_block.t0lo().read().bits() as u64;
+        let value_hi = (reg_block.t0hi().read().bits() as u64) << 32;
 
         (value_lo | value_hi) as u64
     }
@@ -429,7 +435,7 @@ where
         // Specifically, when TIMGn_Tx_DIVIDER is either 1 or 2, the clock divisor is 2;
         // when TIMGn_Tx_DIVIDER is 0, the clock divisor is 65536. Any other value will
         // cause the clock to be divided by exactly that value."
-        match reg_block.t0config.read().divider().bits() {
+        match reg_block.t0config().read().divider().bits() {
             0 => 65536,
             1 | 2 => 2,
             n => n as u32,
@@ -439,14 +445,14 @@ where
     fn is_interrupt_set(&self) -> bool {
         let reg_block = unsafe { &*TG::register_block() };
 
-        reg_block.int_raw_timers.read().t0_int_raw().bit_is_set()
+        reg_block.int_raw_timers().read().t0_int_raw().bit_is_set()
     }
 
     fn set_divider(&mut self, divider: u16) {
         let reg_block = unsafe { &*TG::register_block() };
 
         reg_block
-            .t0config
+            .t0config()
             .modify(|_, w| unsafe { w.divider().bits(divider) })
     }
 
@@ -737,17 +743,17 @@ where
         let reg_block = unsafe { &*TG::register_block() };
 
         reg_block
-            .wdtwprotect
+            .wdtwprotect()
             .write(|w| unsafe { w.wdt_wkey().bits(0x50D8_3AA1u32) });
 
         if !enabled {
-            reg_block.wdtconfig0.write(|w| unsafe { w.bits(0) });
+            reg_block.wdtconfig0().write(|w| unsafe { w.bits(0) });
         } else {
-            reg_block.wdtconfig0.write(|w| w.wdt_en().bit(true));
+            reg_block.wdtconfig0().write(|w| w.wdt_en().bit(true));
         }
 
         reg_block
-            .wdtwprotect
+            .wdtwprotect()
             .write(|w| unsafe { w.wdt_wkey().bits(0u32) });
     }
 
@@ -755,13 +761,13 @@ where
         let reg_block = unsafe { &*TG::register_block() };
 
         reg_block
-            .wdtwprotect
+            .wdtwprotect()
             .write(|w| unsafe { w.wdt_wkey().bits(0x50D8_3AA1u32) });
 
-        reg_block.wdtfeed.write(|w| unsafe { w.bits(1) });
+        reg_block.wdtfeed().write(|w| unsafe { w.bits(1) });
 
         reg_block
-            .wdtwprotect
+            .wdtwprotect()
             .write(|w| unsafe { w.wdt_wkey().bits(0u32) });
     }
 
@@ -771,19 +777,19 @@ where
         let reg_block = unsafe { &*TG::register_block() };
 
         reg_block
-            .wdtwprotect
+            .wdtwprotect()
             .write(|w| unsafe { w.wdt_wkey().bits(0x50D8_3AA1u32) });
 
         reg_block
-            .wdtconfig1
+            .wdtconfig1()
             .write(|w| unsafe { w.wdt_clk_prescale().bits(1) });
 
         reg_block
-            .wdtconfig2
+            .wdtconfig2()
             .write(|w| unsafe { w.wdt_stg0_hold().bits(timeout_raw) });
 
         #[cfg_attr(esp32, allow(unused_unsafe))]
-        reg_block.wdtconfig0.write(|w| unsafe {
+        reg_block.wdtconfig0().write(|w| unsafe {
             w.wdt_en()
                 .bit(true)
                 .wdt_stg0()
@@ -802,11 +808,11 @@ where
 
         #[cfg(any(esp32c2, esp32c3, esp32c6))]
         reg_block
-            .wdtconfig0
+            .wdtconfig0()
             .modify(|_, w| w.wdt_conf_update_en().set_bit());
 
         reg_block
-            .wdtwprotect
+            .wdtwprotect()
             .write(|w| unsafe { w.wdt_wkey().bits(0u32) });
     }
 }

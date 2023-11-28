@@ -318,7 +318,7 @@ where
         // Set up the prescaler and sync jump width.
         self.peripheral
             .register_block()
-            .bus_timing_0
+            .bus_timing_0()
             .modify(|_, w| {
                 w.baud_presc()
                     .variant(prescale)
@@ -329,7 +329,7 @@ where
         // Set up the time segment 1, time segment 2, and triple sample.
         self.peripheral
             .register_block()
-            .bus_timing_1
+            .bus_timing_1()
             .modify(|_, w| {
                 w.time_seg1()
                     .variant(tseg_1)
@@ -353,7 +353,7 @@ where
         let filter_mode_bit = filter.filter_type() == FilterType::Single;
         self.peripheral
             .register_block()
-            .mode
+            .mode()
             .modify(|_, w| w.rx_filter_mode().bit(filter_mode_bit));
 
         // Convert the filter into values for the registers and store them to the
@@ -362,7 +362,10 @@ where
 
         // Copy the filter to the peripheral.
         unsafe {
-            copy_to_data_register(self.peripheral.register_block().data_0.as_ptr(), &registers);
+            copy_to_data_register(
+                self.peripheral.register_block().data_0().as_ptr(),
+                &registers,
+            );
         }
     }
 
@@ -375,7 +378,7 @@ where
     pub fn set_error_warning_limit(&mut self, limit: u8) {
         self.peripheral
             .register_block()
-            .err_warning_limit
+            .err_warning_limit()
             .write(|w| w.err_warning_limit().variant(limit));
     }
 
@@ -385,7 +388,7 @@ where
         // Put the peripheral into operation mode by clearing the reset mode bit.
         self.peripheral
             .register_block()
-            .mode
+            .mode()
             .modify(|_, w| w.reset_mode().clear_bit());
 
         Twai {
@@ -413,7 +416,7 @@ where
         // bit.
         self.peripheral
             .register_block()
-            .mode
+            .mode()
             .modify(|_, w| w.reset_mode().set_bit());
 
         TwaiConfiguration {
@@ -424,7 +427,7 @@ where
     pub fn receive_error_count(&self) -> u8 {
         self.peripheral
             .register_block()
-            .rx_err_cnt
+            .rx_err_cnt()
             .read()
             .rx_err_cnt()
             .bits()
@@ -433,7 +436,7 @@ where
     pub fn transmit_error_count(&self) -> u8 {
         self.peripheral
             .register_block()
-            .tx_err_cnt
+            .tx_err_cnt()
             .read()
             .tx_err_cnt()
             .bits()
@@ -443,7 +446,7 @@ where
     pub fn is_bus_off(&self) -> bool {
         self.peripheral
             .register_block()
-            .status
+            .status()
             .read()
             .bus_off_st()
             .bit_is_set()
@@ -457,7 +460,7 @@ where
     pub fn num_available_messages(&self) -> u8 {
         self.peripheral
             .register_block()
-            .rx_message_cnt
+            .rx_message_cnt()
             .read()
             .rx_message_counter()
             .bits()
@@ -482,7 +485,7 @@ where
     fn release_receive_fifo(&self) {
         self.peripheral
             .register_block()
-            .cmd
+            .cmd()
             .write(|w| w.release_buf().set_bit());
     }
 }
@@ -553,7 +556,7 @@ where
     /// functionality. See notes 1 and 2 in the "Frame Identifier" section
     /// of the reference manual.
     fn transmit(&mut self, frame: &Self::Frame) -> nb::Result<Option<Self::Frame>, Self::Error> {
-        let status = self.peripheral.register_block().status.read();
+        let status = self.peripheral.register_block().status().read();
 
         // Check that the peripheral is not in a bus off state.
         if status.bus_off_st().bit_is_set() {
@@ -573,7 +576,7 @@ where
 
         self.peripheral
             .register_block()
-            .data_0
+            .data_0()
             .write(|w| w.tx_byte_0().variant(data_0));
 
         // Assemble the identifier information of the packet.
@@ -583,12 +586,12 @@ where
 
                 self.peripheral
                     .register_block()
-                    .data_1
+                    .data_1()
                     .write(|w| w.tx_byte_1().variant((id >> 3) as u8));
 
                 self.peripheral
                     .register_block()
-                    .data_2
+                    .data_2()
                     .write(|w| w.tx_byte_2().variant((id << 5) as u8));
             }
             Id::Extended(id) => {
@@ -596,19 +599,19 @@ where
 
                 self.peripheral
                     .register_block()
-                    .data_1
+                    .data_1()
                     .write(|w| w.tx_byte_1().variant((id >> 21) as u8));
                 self.peripheral
                     .register_block()
-                    .data_2
+                    .data_2()
                     .write(|w| w.tx_byte_2().variant((id >> 13) as u8));
                 self.peripheral
                     .register_block()
-                    .data_3
+                    .data_3()
                     .write(|w| w.tx_byte_3().variant((id >> 5) as u8));
                 self.peripheral
                     .register_block()
-                    .data_4
+                    .data_4()
                     .write(|w| w.tx_byte_4().variant((id << 3) as u8));
             }
         }
@@ -618,13 +621,13 @@ where
             match frame.id() {
                 Id::Standard(_) => unsafe {
                     copy_to_data_register(
-                        self.peripheral.register_block().data_3.as_ptr(),
+                        self.peripheral.register_block().data_3().as_ptr(),
                         frame.data(),
                     )
                 },
                 Id::Extended(_) => unsafe {
                     copy_to_data_register(
-                        self.peripheral.register_block().data_5.as_ptr(),
+                        self.peripheral.register_block().data_5().as_ptr(),
                         frame.data(),
                     )
                 },
@@ -637,7 +640,7 @@ where
         // the transmission is complete or aborted.
         self.peripheral
             .register_block()
-            .cmd
+            .cmd()
             .write(|w| w.tx_req().set_bit());
 
         // Success in readying packet for transmit. No packets can be replaced in the
@@ -648,7 +651,7 @@ where
 
     /// Return a received frame if there are any available.
     fn receive(&mut self) -> nb::Result<Self::Frame, Self::Error> {
-        let status = self.peripheral.register_block().status.read();
+        let status = self.peripheral.register_block().status().read();
 
         // Check that the peripheral is not in a bus off state.
         if status.bus_off_st().bit_is_set() {
@@ -671,7 +674,7 @@ where
         let data_0 = self
             .peripheral
             .register_block()
-            .data_0
+            .data_0()
             .read()
             .tx_byte_0()
             .bits();
@@ -686,7 +689,7 @@ where
             let data_1 = self
                 .peripheral
                 .register_block()
-                .data_1
+                .data_1()
                 .read()
                 .tx_byte_1()
                 .bits();
@@ -694,7 +697,7 @@ where
             let data_2 = self
                 .peripheral
                 .register_block()
-                .data_2
+                .data_2()
                 .read()
                 .tx_byte_2()
                 .bits();
@@ -709,7 +712,7 @@ where
                 unsafe {
                     EspTwaiFrame::new_from_data_registers(
                         id,
-                        self.peripheral.register_block().data_3.as_ptr(),
+                        self.peripheral.register_block().data_3().as_ptr(),
                         dlc,
                     )
                 }
@@ -721,7 +724,7 @@ where
             let data_1 = self
                 .peripheral
                 .register_block()
-                .data_1
+                .data_1()
                 .read()
                 .tx_byte_1()
                 .bits();
@@ -729,7 +732,7 @@ where
             let data_2 = self
                 .peripheral
                 .register_block()
-                .data_2
+                .data_2()
                 .read()
                 .tx_byte_2()
                 .bits();
@@ -737,7 +740,7 @@ where
             let data_3 = self
                 .peripheral
                 .register_block()
-                .data_3
+                .data_3()
                 .read()
                 .tx_byte_3()
                 .bits();
@@ -745,7 +748,7 @@ where
             let data_4 = self
                 .peripheral
                 .register_block()
-                .data_4
+                .data_4()
                 .read()
                 .tx_byte_4()
                 .bits();
@@ -761,7 +764,7 @@ where
                 unsafe {
                     EspTwaiFrame::new_from_data_registers(
                         id,
-                        self.peripheral.register_block().data_5.as_ptr(),
+                        self.peripheral.register_block().data_5().as_ptr(),
                         dlc,
                     )
                 }

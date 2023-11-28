@@ -1279,7 +1279,7 @@ mod private {
                 }
             }
 
-            i2s.tx_clkm_div_conf.modify(|_, w| {
+            i2s.tx_clkm_div_conf().modify(|_, w| {
                 w.tx_clkm_div_x()
                     .variant(clkm_div_x as u16)
                     .tx_clkm_div_y()
@@ -1290,7 +1290,7 @@ mod private {
                     .variant(clkm_div_z as u16)
             });
 
-            i2s.tx_clkm_conf.modify(|_, w| {
+            i2s.tx_clkm_conf().modify(|_, w| {
                 w.clk_en()
                     .set_bit()
                     .tx_clk_active()
@@ -1301,12 +1301,12 @@ mod private {
                     .variant(clock_settings.mclk_divider as u8)
             });
 
-            i2s.tx_conf1.modify(|_, w| {
+            i2s.tx_conf1().modify(|_, w| {
                 w.tx_bck_div_num()
                     .variant((clock_settings.bclk_divider - 1) as u8)
             });
 
-            i2s.rx_clkm_div_conf.modify(|_, w| {
+            i2s.rx_clkm_div_conf().modify(|_, w| {
                 w.rx_clkm_div_x()
                     .variant(clkm_div_x as u16)
                     .rx_clkm_div_y()
@@ -1317,7 +1317,7 @@ mod private {
                     .variant(clkm_div_z as u16)
             });
 
-            i2s.rx_clkm_conf.modify(|_, w| {
+            i2s.rx_clkm_conf().modify(|_, w| {
                 w.rx_clk_active()
                     .set_bit()
                     .rx_clk_sel()
@@ -1328,7 +1328,7 @@ mod private {
                     .variant(true)
             });
 
-            i2s.rx_conf1.modify(|_, w| {
+            i2s.rx_conf1().modify(|_, w| {
                 w.rx_bck_div_num()
                     .variant((clock_settings.bclk_divider - 1) as u8)
             });
@@ -1446,7 +1446,7 @@ mod private {
 
         fn configure(_standard: &Standard, data_format: &DataFormat) {
             let i2s = Self::register_block();
-            i2s.tx_conf1.modify(|_, w| {
+            i2s.tx_conf1().modify(|_, w| {
                 w.tx_tdm_ws_width()
                     .variant((data_format.channel_bits() - 1).into())
                     .tx_bits_mod()
@@ -1457,10 +1457,10 @@ mod private {
                     .variant(data_format.channel_bits() - 1)
             });
             #[cfg(not(esp32h2))]
-            i2s.tx_conf1.modify(|_, w| w.tx_msb_shift().set_bit());
+            i2s.tx_conf1().modify(|_, w| w.tx_msb_shift().set_bit());
             #[cfg(esp32h2)]
-            i2s.tx_conf.modify(|_, w| w.tx_msb_shift().set_bit());
-            i2s.tx_conf.modify(|_, w| {
+            i2s.tx_conf().modify(|_, w| w.tx_msb_shift().set_bit());
+            i2s.tx_conf().modify(|_, w| {
                 w.tx_mono()
                     .clear_bit()
                     .tx_mono_fst_vld()
@@ -1483,7 +1483,7 @@ mod private {
                     .variant(0)
             });
 
-            i2s.tx_tdm_ctrl.modify(|_, w| {
+            i2s.tx_tdm_ctrl().modify(|_, w| {
                 w.tx_tdm_tot_chan_num()
                     .variant(1)
                     .tx_tdm_chan0_en()
@@ -1520,7 +1520,7 @@ mod private {
                     .clear_bit()
             });
 
-            i2s.rx_conf1.modify(|_, w| {
+            i2s.rx_conf1().modify(|_, w| {
                 w.rx_tdm_ws_width()
                     .variant((data_format.channel_bits() - 1).into())
                     .rx_bits_mod()
@@ -1531,11 +1531,11 @@ mod private {
                     .variant(data_format.channel_bits() - 1)
             });
             #[cfg(not(esp32h2))]
-            i2s.rx_conf1.modify(|_, w| w.rx_msb_shift().set_bit());
+            i2s.rx_conf1().modify(|_, w| w.rx_msb_shift().set_bit());
             #[cfg(esp32h2)]
-            i2s.rx_conf.modify(|_, w| w.rx_msb_shift().set_bit());
+            i2s.rx_conf().modify(|_, w| w.rx_msb_shift().set_bit());
 
-            i2s.rx_conf.modify(|_, w| {
+            i2s.rx_conf().modify(|_, w| {
                 w.rx_mono()
                     .clear_bit()
                     .rx_mono_fst_vld()
@@ -1554,7 +1554,7 @@ mod private {
                     .clear_bit()
             });
 
-            i2s.rx_tdm_ctrl.modify(|_, w| {
+            i2s.rx_tdm_ctrl().modify(|_, w| {
                 w.rx_tdm_tot_chan_num()
                     .variant(1)
                     .rx_tdm_pdm_chan0_en()
@@ -1594,73 +1594,73 @@ mod private {
 
         fn set_master() {
             let i2s = Self::register_block();
-            i2s.tx_conf.modify(|_, w| w.tx_slave_mod().clear_bit());
-            i2s.rx_conf.modify(|_, w| w.rx_slave_mod().clear_bit());
+            i2s.tx_conf().modify(|_, w| w.tx_slave_mod().clear_bit());
+            i2s.rx_conf().modify(|_, w| w.rx_slave_mod().clear_bit());
         }
 
         fn update() {
             let i2s = Self::register_block();
-            i2s.tx_conf.modify(|_, w| w.tx_update().clear_bit());
-            i2s.tx_conf.modify(|_, w| w.tx_update().set_bit());
+            i2s.tx_conf().modify(|_, w| w.tx_update().clear_bit());
+            i2s.tx_conf().modify(|_, w| w.tx_update().set_bit());
 
-            i2s.rx_conf.modify(|_, w| w.rx_update().clear_bit());
-            i2s.rx_conf.modify(|_, w| w.rx_update().set_bit());
+            i2s.rx_conf().modify(|_, w| w.rx_update().clear_bit());
+            i2s.rx_conf().modify(|_, w| w.rx_update().set_bit());
         }
 
         fn reset_tx() {
             let i2s = Self::register_block();
-            i2s.tx_conf
+            i2s.tx_conf()
                 .modify(|_, w| w.tx_reset().set_bit().tx_fifo_reset().set_bit());
-            i2s.tx_conf
+            i2s.tx_conf()
                 .modify(|_, w| w.tx_reset().clear_bit().tx_fifo_reset().clear_bit());
 
-            i2s.int_clr
+            i2s.int_clr()
                 .write(|w| w.tx_done_int_clr().set_bit().tx_hung_int_clr().set_bit());
         }
 
         fn tx_start() {
             let i2s = Self::register_block();
-            i2s.tx_conf.modify(|_, w| w.tx_start().set_bit());
+            i2s.tx_conf().modify(|_, w| w.tx_start().set_bit());
         }
 
         fn tx_stop() {
             let i2s = Self::register_block();
-            i2s.tx_conf.modify(|_, w| w.tx_start().clear_bit());
+            i2s.tx_conf().modify(|_, w| w.tx_start().clear_bit());
         }
 
         fn wait_for_tx_done() {
             let i2s = Self::register_block();
-            while i2s.state.read().tx_idle().bit_is_clear() {
+            while i2s.state().read().tx_idle().bit_is_clear() {
                 // wait
             }
 
-            i2s.tx_conf.modify(|_, w| w.tx_start().clear_bit());
+            i2s.tx_conf().modify(|_, w| w.tx_start().clear_bit());
         }
 
         fn reset_rx() {
             let i2s = Self::register_block();
-            i2s.rx_conf
+            i2s.rx_conf()
                 .modify(|_, w| w.rx_reset().set_bit().rx_fifo_reset().set_bit());
-            i2s.rx_conf
+            i2s.rx_conf()
                 .modify(|_, w| w.rx_reset().clear_bit().rx_fifo_reset().clear_bit());
 
-            i2s.int_clr
+            i2s.int_clr()
                 .write(|w| w.rx_done_int_clr().set_bit().rx_hung_int_clr().set_bit());
         }
 
         fn rx_start(len: usize) {
             let i2s = Self::register_block();
-            i2s.rxeof_num.write(|w| w.rx_eof_num().variant(len as u16));
-            i2s.rx_conf.modify(|_, w| w.rx_start().set_bit());
+            i2s.rxeof_num().write(|w| w.rx_eof_num().variant(len as u16));
+            i2s.rx_conf().modify(|_, w| w.rx_start().set_bit());
         }
 
         fn wait_for_rx_done() {
             let i2s = Self::register_block();
-            while i2s.int_raw.read().rx_done_int_raw().bit_is_clear() {
+            while i2s.int_raw().read().rx_done_int_raw().bit_is_clear() {
                 // wait
             }
 
-            i2s.int_clr.write(|w| w.rx_done_int_clr().set_bit());
+            i2s.int_clr().write(|w| w.rx_done_int_clr().set_bit());
         }
     }
 

@@ -528,7 +528,7 @@ where
         // single).
         #[cfg(not(esp32))]
         reg_block
-            .dma_conf
+            .dma_conf()
             .modify(|_, w| w.dma_slv_seg_trans_en().clear_bit());
 
         tx.start_transfer()?;
@@ -558,7 +558,7 @@ where
         // single).
         #[cfg(not(esp32))]
         reg_block
-            .dma_conf
+            .dma_conf()
             .modify(|_, w| w.dma_slv_seg_trans_en().clear_bit());
 
         Ok(tx.start_transfer()?)
@@ -582,7 +582,7 @@ where
         // single).
         #[cfg(not(esp32))]
         reg_block
-            .dma_conf
+            .dma_conf()
             .modify(|_, w| w.dma_slv_seg_trans_en().clear_bit());
 
         Ok(rx.start_transfer()?)
@@ -600,7 +600,7 @@ where
     #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
     fn enable_dma(&self) {
         let reg_block = self.register_block();
-        reg_block.dma_conf.modify(|_, w| {
+        reg_block.dma_conf().modify(|_, w| {
             w.dma_tx_ena()
                 .set_bit()
                 .dma_rx_ena()
@@ -618,7 +618,7 @@ where
     #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
     fn clear_dma_interrupts(&self) {
         let reg_block = self.register_block();
-        reg_block.dma_int_clr.write(|w| {
+        reg_block.dma_int_clr().write(|w| {
             w.dma_infifo_full_err_int_clr()
                 .set_bit()
                 .dma_outfifo_empty_err_int_clr()
@@ -660,7 +660,7 @@ where
 
 #[cfg(not(any(esp32, esp32s2)))]
 fn reset_dma_before_usr_cmd(reg_block: &RegisterBlock) {
-    reg_block.dma_conf.modify(|_, w| {
+    reg_block.dma_conf().modify(|_, w| {
         w.rx_afifo_rst()
             .set_bit()
             .buf_afifo_rst()
@@ -723,9 +723,9 @@ pub trait Instance {
     /// Initialize for full-duplex 1 bit mode
     fn init(&mut self) {
         let reg_block = self.register_block();
-        reg_block.slave.write(|w| w.mode().set_bit());
+        reg_block.slave().write(|w| w.mode().set_bit());
 
-        reg_block.user.modify(|_, w| {
+        reg_block.user().modify(|_, w| {
             w.usr_miso_highpart()
                 .clear_bit()
                 .doutdin()
@@ -743,7 +743,7 @@ pub trait Instance {
         });
 
         #[cfg(not(any(esp32, esp32s2)))]
-        reg_block.clk_gate.modify(|_, w| {
+        reg_block.clk_gate().modify(|_, w| {
             w.clk_en()
                 .clear_bit()
                 .mst_clk_active()
@@ -753,7 +753,7 @@ pub trait Instance {
         });
 
         #[cfg(not(any(esp32, esp32s2)))]
-        reg_block.ctrl.modify(|_, w| {
+        reg_block.ctrl().modify(|_, w| {
             w.q_pol()
                 .clear_bit()
                 .d_pol()
@@ -764,14 +764,14 @@ pub trait Instance {
 
         #[cfg(esp32s2)]
         reg_block
-            .ctrl
+            .ctrl()
             .modify(|_, w| w.q_pol().clear_bit().d_pol().clear_bit().wp().clear_bit());
 
         #[cfg(esp32)]
-        reg_block.ctrl.modify(|_, w| w.wp().clear_bit());
+        reg_block.ctrl().modify(|_, w| w.wp().clear_bit());
 
         #[cfg(not(esp32))]
-        reg_block.misc.write(|w| unsafe { w.bits(0) });
+        reg_block.misc().write(|w| unsafe { w.bits(0) });
     }
 
     #[cfg(not(esp32))]
@@ -781,39 +781,39 @@ pub trait Instance {
         match data_mode {
             SpiMode::Mode0 => {
                 reg_block
-                    .user
+                    .user()
                     .modify(|_, w| w.tsck_i_edge().clear_bit().rsck_i_edge().clear_bit());
                 #[cfg(esp32s2)]
                 reg_block.ctrl1.modify(|_, w| w.clk_mode_13().clear_bit());
                 #[cfg(not(esp32s2))]
-                reg_block.slave.modify(|_, w| w.clk_mode_13().clear_bit());
+                reg_block.slave().modify(|_, w| w.clk_mode_13().clear_bit());
             }
             SpiMode::Mode1 => {
                 reg_block
-                    .user
+                    .user()
                     .modify(|_, w| w.tsck_i_edge().set_bit().rsck_i_edge().set_bit());
                 #[cfg(esp32s2)]
-                reg_block.ctrl1.modify(|_, w| w.clk_mode_13().set_bit());
+                reg_block.ctrl1().modify(|_, w| w.clk_mode_13().set_bit());
                 #[cfg(not(esp32s2))]
-                reg_block.slave.modify(|_, w| w.clk_mode_13().set_bit());
+                reg_block.slave().modify(|_, w| w.clk_mode_13().set_bit());
             }
             SpiMode::Mode2 => {
                 reg_block
-                    .user
+                    .user()
                     .modify(|_, w| w.tsck_i_edge().set_bit().rsck_i_edge().set_bit());
                 #[cfg(esp32s2)]
-                reg_block.ctrl1.modify(|_, w| w.clk_mode_13().clear_bit());
+                reg_block.ctrl1().modify(|_, w| w.clk_mode_13().clear_bit());
                 #[cfg(not(esp32s2))]
-                reg_block.slave.modify(|_, w| w.clk_mode_13().clear_bit());
+                reg_block.slave().modify(|_, w| w.clk_mode_13().clear_bit());
             }
             SpiMode::Mode3 => {
                 reg_block
-                    .user
+                    .user()
                     .modify(|_, w| w.tsck_i_edge().clear_bit().rsck_i_edge().clear_bit());
                 #[cfg(esp32s2)]
-                reg_block.ctrl1.modify(|_, w| w.clk_mode_13().set_bit());
+                reg_block.ctrl1().modify(|_, w| w.clk_mode_13().set_bit());
                 #[cfg(not(esp32s2))]
-                reg_block.slave.modify(|_, w| w.clk_mode_13().set_bit());
+                reg_block.slave().modify(|_, w| w.clk_mode_13().set_bit());
             }
         }
         self
@@ -868,7 +868,7 @@ pub trait Instance {
         #[cfg(not(any(esp32, esp32s2)))]
         {
             reg_block
-                .dma_int_raw
+                .dma_int_raw()
                 .read()
                 .trans_done_int_raw()
                 .bit_is_clear()
@@ -888,11 +888,11 @@ pub trait Instance {
     fn setup_for_flush(&self) {
         #[cfg(any(esp32, esp32s2))]
         self.register_block()
-            .slave
+            .slave()
             .modify(|_, w| w.trans_done().clear_bit());
         #[cfg(not(any(esp32, esp32s2)))]
         self.register_block()
-            .dma_int_clr
+            .dma_int_clr()
             .write(|w| w.trans_done_int_clr().set_bit());
     }
 }

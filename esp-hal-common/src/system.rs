@@ -122,22 +122,22 @@ impl SoftwareInterruptControl {
         match interrupt {
             SoftwareInterrupt::SoftwareInterrupt0 => {
                 system
-                    .cpu_intr_from_cpu_0
+                    .cpu_intr_from_cpu_0()
                     .write(|w| w.cpu_intr_from_cpu_0().bit(true));
             }
             SoftwareInterrupt::SoftwareInterrupt1 => {
                 system
-                    .cpu_intr_from_cpu_1
+                    .cpu_intr_from_cpu_1()
                     .write(|w| w.cpu_intr_from_cpu_1().bit(true));
             }
             SoftwareInterrupt::SoftwareInterrupt2 => {
                 system
-                    .cpu_intr_from_cpu_2
+                    .cpu_intr_from_cpu_2()
                     .write(|w| w.cpu_intr_from_cpu_2().bit(true));
             }
             SoftwareInterrupt::SoftwareInterrupt3 => {
                 system
-                    .cpu_intr_from_cpu_3
+                    .cpu_intr_from_cpu_3()
                     .write(|w| w.cpu_intr_from_cpu_3().bit(true));
             }
         }
@@ -152,22 +152,22 @@ impl SoftwareInterruptControl {
         match interrupt {
             SoftwareInterrupt::SoftwareInterrupt0 => {
                 system
-                    .cpu_intr_from_cpu_0
+                    .cpu_intr_from_cpu_0()
                     .write(|w| w.cpu_intr_from_cpu_0().bit(false));
             }
             SoftwareInterrupt::SoftwareInterrupt1 => {
                 system
-                    .cpu_intr_from_cpu_1
+                    .cpu_intr_from_cpu_1()
                     .write(|w| w.cpu_intr_from_cpu_1().bit(false));
             }
             SoftwareInterrupt::SoftwareInterrupt2 => {
                 system
-                    .cpu_intr_from_cpu_2
+                    .cpu_intr_from_cpu_2()
                     .write(|w| w.cpu_intr_from_cpu_2().bit(false));
             }
             SoftwareInterrupt::SoftwareInterrupt3 => {
                 system
-                    .cpu_intr_from_cpu_3
+                    .cpu_intr_from_cpu_3()
                     .write(|w| w.cpu_intr_from_cpu_3().bit(false));
             }
         }
@@ -184,7 +184,7 @@ impl PeripheralClockControl {
         let system = unsafe { &*SYSTEM::PTR };
 
         #[cfg(not(esp32))]
-        let (perip_clk_en0, perip_rst_en0) = { (&system.perip_clk_en0, &system.perip_rst_en0) };
+        let (perip_clk_en0, perip_rst_en0) = { (&system.perip_clk_en0(), &system.perip_rst_en0()) };
         #[cfg(esp32)]
         let (perip_clk_en0, perip_rst_en0, peri_clk_en, peri_rst_en) = {
             (
@@ -196,7 +196,7 @@ impl PeripheralClockControl {
         };
 
         #[cfg(any(esp32c2, esp32c3, esp32s2, esp32s3))]
-        let (perip_clk_en1, perip_rst_en1) = { (&system.perip_clk_en1, &system.perip_rst_en1) };
+        let (perip_clk_en1, perip_rst_en1) = { (&system.perip_clk_en1(), &system.perip_rst_en1()) };
 
         critical_section::with(|_cs| match peripheral {
             #[cfg(spi2)]
@@ -369,7 +369,9 @@ impl PeripheralClockControl {
             Peripheral::Rsa => {
                 perip_clk_en1.modify(|_, w| w.crypto_rsa_clk_en().set_bit());
                 perip_rst_en1.modify(|_, w| w.crypto_rsa_rst().clear_bit());
-                system.rsa_pd_ctrl.modify(|_, w| w.rsa_mem_pd().clear_bit());
+                system
+                    .rsa_pd_ctrl()
+                    .modify(|_, w| w.rsa_mem_pd().clear_bit());
             }
             #[cfg(hmac)]
             Peripheral::Hmac => {

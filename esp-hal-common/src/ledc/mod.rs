@@ -139,7 +139,9 @@ impl<'d> LEDC<'d> {
         match clock_source {
             LSGlobalClkSource::APBClk => {
                 #[cfg(not(any(esp32c6, esp32h2)))]
-                self.ledc.conf.write(|w| unsafe { w.apb_clk_sel().bits(1) });
+                self.ledc
+                    .conf()
+                    .write(|w| unsafe { w.apb_clk_sel().bits(1) });
                 #[cfg(esp32c6)]
                 pcr.ledc_sclk_conf
                     .write(|w| unsafe { w.ledc_sclk_sel().bits(1) });
@@ -148,7 +150,7 @@ impl<'d> LEDC<'d> {
                     .write(|w| unsafe { w.ledc_sclk_sel().bits(0) });
             }
         }
-        self.ledc.timer0_conf.modify(|_, w| w.para_up().set_bit());
+        self.ledc.timer0_conf().modify(|_, w| w.para_up().set_bit());
     }
 
     /// Return a new timer

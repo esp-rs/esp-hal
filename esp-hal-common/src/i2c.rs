@@ -639,7 +639,7 @@ pub trait Instance {
     fn i2c_number(&self) -> usize;
 
     fn setup(&mut self, frequency: HertzU32, clocks: &Clocks) {
-        self.register_block().ctr.modify(|_, w| unsafe {
+        self.register_block().ctr().modify(|_, w| unsafe {
             // Clear register
             w.bits(0)
                 // Set I2C controller to master mode
@@ -686,11 +686,11 @@ pub trait Instance {
         // Reset interrupts
         // Disable all I2C interrupts
         self.register_block()
-            .int_ena
+            .int_ena()
             .write(|w| unsafe { w.bits(0) });
         // Clear all I2C interrupts
         self.register_block()
-            .int_clr
+            .int_clr()
             .write(|w| unsafe { w.bits(I2C_LL_INTR_MASK) });
 
         // Reset fifo
@@ -704,14 +704,14 @@ pub trait Instance {
         // for the ESP32)
         #[cfg(not(esp32))]
         self.register_block()
-            .ctr
+            .ctr()
             .modify(|_, w| w.fsm_rst().set_bit());
     }
 
     /// Resets the I2C peripheral's command registers
     fn reset_command_list(&self) {
         // Confirm that all commands that were configured were actually executed
-        for cmd in self.register_block().comd.iter() {
+        for cmd in self.register_block().comd().iter() {
             cmd.reset();
         }
     }
@@ -724,8 +724,8 @@ pub trait Instance {
                 let sda_register = &self.register_block().sda_filter_cfg;
                 let scl_register = &self.register_block().scl_filter_cfg;
             } else {
-                let sda_register = &self.register_block().filter_cfg;
-                let scl_register = &self.register_block().filter_cfg;
+                let sda_register = &self.register_block().filter_cfg();
+                let scl_register = &self.register_block().filter_cfg();
             }
         }
 
@@ -962,7 +962,7 @@ pub trait Instance {
         unsafe {
             // divider
             #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
-            self.register_block().clk_conf.modify(|_, w| {
+            self.register_block().clk_conf().modify(|_, w| {
                 w.sclk_sel()
                     .clear_bit()
                     .sclk_div_num()
@@ -971,14 +971,14 @@ pub trait Instance {
 
             // scl period
             self.register_block()
-                .scl_low_period
+                .scl_low_period()
                 .write(|w| w.scl_low_period().bits(scl_low_period as u16));
 
             // for high/wait_high we have to differentiate between the chips
             // as the EPS32 does not have a wait_high field
             cfg_if::cfg_if! {
                 if #[cfg(not(esp32))] {
-                    self.register_block().scl_high_period.write(|w| {
+                    self.register_block().scl_high_period().write(|w| {
                         w.scl_high_period()
                             .bits(scl_high_period as u16)
                             .scl_wait_high_period()
@@ -986,7 +986,7 @@ pub trait Instance {
                     });
                 }
                 else {
-                    self.register_block().scl_high_period.write(|w| {
+                    self.register_block().scl_high_period().write(|w| {
                         w.scl_high_period()
                             .bits(scl_high_period as u16)
                     });
@@ -995,7 +995,7 @@ pub trait Instance {
 
             // we already did that above but on S2 we need this to make it work
             #[cfg(esp32s2)]
-            self.register_block().scl_high_period.write(|w| {
+            self.register_block().scl_high_period().write(|w| {
                 w.scl_wait_high_period()
                     .bits(scl_wait_high_period as u16)
                     .scl_high_period()
@@ -1004,26 +1004,26 @@ pub trait Instance {
 
             // sda sample
             self.register_block()
-                .sda_hold
+                .sda_hold()
                 .write(|w| w.time().bits(sda_hold_time as u16));
             self.register_block()
-                .sda_sample
+                .sda_sample()
                 .write(|w| w.time().bits(sda_sample_time as u16));
 
             // setup
             self.register_block()
-                .scl_rstart_setup
+                .scl_rstart_setup()
                 .write(|w| w.time().bits(scl_rstart_setup_time as u16));
             self.register_block()
-                .scl_stop_setup
+                .scl_stop_setup()
                 .write(|w| w.time().bits(scl_stop_setup_time as u16));
 
             // hold
             self.register_block()
-                .scl_start_hold
+                .scl_start_hold()
                 .write(|w| w.time().bits(scl_start_hold_time as u16));
             self.register_block()
-                .scl_stop_hold
+                .scl_stop_hold()
                 .write(|w| w.time().bits(scl_stop_hold_time as u16));
 
             // The ESP32 variant does not have an enable flag for the
@@ -1032,14 +1032,14 @@ pub trait Instance {
                 if #[cfg(esp32)] {
                     // timeout
                     self.register_block()
-                        .to
+                        .to()
                         .write(|w| w.time_out().bits(time_out_value));
                 }
                 else {
                     // timeout
                     // FIXME: Enable timout for other chips!
                     self.register_block()
-                        .to
+                        .to()
                         .write(|w| w.time_out_en().bit(time_out_en)
                         .time_out_value()
                         .variant(time_out_value.try_into().unwrap())
@@ -1193,7 +1193,7 @@ pub trait Instance {
             loop {
                 self.check_errors()?;
 
-                let reg = self.register_block().fifo_st.read();
+                let reg = self.register_block().fifo_st().read();
                 if reg.rxfifo_raddr().bits() != reg.rxfifo_waddr().bits() {
                     break;
                 }
@@ -1232,13 +1232,13 @@ pub trait Instance {
 
     fn clear_all_interrupts(&self) {
         self.register_block()
-            .int_clr
+            .int_clr()
             .write(|w| unsafe { w.bits(I2C_LL_INTR_MASK) });
     }
 
     fn wait_for_completion(&self) -> Result<(), Error> {
         loop {
-            let interrupts = self.register_block().int_raw.read();
+            let interrupts = self.register_block().int_raw().read();
 
             self.check_errors()?;
 
@@ -1250,7 +1250,7 @@ pub trait Instance {
                 break;
             }
         }
-        for cmd in self.register_block().comd.iter() {
+        for cmd in self.register_block().comd().iter() {
             if cmd.read().command().bits() != 0x0 && cmd.read().command_done().bit_is_clear() {
                 return Err(Error::ExecIncomplete);
             }
@@ -1260,7 +1260,7 @@ pub trait Instance {
     }
 
     fn check_errors(&self) -> Result<(), Error> {
-        let interrupts = self.register_block().int_raw.read();
+        let interrupts = self.register_block().int_raw().read();
 
         // The ESP32 variant has a slightly different interrupt naming
         // scheme!
@@ -1301,14 +1301,14 @@ pub trait Instance {
         // (only necessary for C2, C3, C6, H2 and S3 variant)
         #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
         self.register_block()
-            .ctr
+            .ctr()
             .modify(|_, w| w.conf_upgate().set_bit());
     }
 
     fn start_transmission(&self) {
         // Start transmission
         self.register_block()
-            .ctr
+            .ctr()
             .modify(|_, w| w.trans_start().set_bit());
     }
 
@@ -1318,7 +1318,7 @@ pub trait Instance {
         while index < bytes.len()
             && !self
                 .register_block()
-                .int_raw
+                .int_raw()
                 .read()
                 .txfifo_ovf_int_raw()
                 .bit_is_set()
@@ -1328,14 +1328,14 @@ pub trait Instance {
         }
         if self
             .register_block()
-            .int_raw
+            .int_raw()
             .read()
             .txfifo_ovf_int_raw()
             .bit_is_set()
         {
             index -= 1;
             self.register_block()
-                .int_clr
+                .int_clr()
                 .write(|w| w.txfifo_ovf_int_clr().set_bit());
         }
         index
@@ -1349,19 +1349,19 @@ pub trait Instance {
 
             while !self
                 .register_block()
-                .int_raw
+                .int_raw()
                 .read()
                 .txfifo_wm_int_raw()
                 .bit_is_set()
             {}
 
             self.register_block()
-                .int_clr
+                .int_clr()
                 .write(|w| w.txfifo_wm_int_clr().set_bit());
 
             while !self
                 .register_block()
-                .int_raw
+                .int_raw()
                 .read()
                 .txfifo_wm_int_raw()
                 .bit_is_set()
@@ -1417,7 +1417,7 @@ pub trait Instance {
     #[cfg(not(esp32))]
     fn reset_fifo(&self) {
         // First, reset the fifo buffers
-        self.register_block().fifo_conf.modify(|_, w| {
+        self.register_block().fifo_conf().modify(|_, w| {
             w.tx_fifo_rst()
                 .set_bit()
                 .rx_fifo_rst()
@@ -1433,10 +1433,10 @@ pub trait Instance {
         });
 
         self.register_block()
-            .fifo_conf
+            .fifo_conf()
             .modify(|_, w| w.tx_fifo_rst().clear_bit().rx_fifo_rst().clear_bit());
 
-        self.register_block().int_clr.write(|w| {
+        self.register_block().int_clr().write(|w| {
             w.rxfifo_wm_int_clr()
                 .set_bit()
                 .txfifo_wm_int_clr()
@@ -1478,7 +1478,7 @@ pub trait Instance {
         // Reset FIFO and command list
         self.reset_fifo();
         self.reset_command_list();
-        self.perform_write(addr, bytes, &mut self.register_block().comd.iter())?;
+        self.perform_write(addr, bytes, &mut self.register_block().comd().iter())?;
         Ok(())
     }
 
@@ -1489,7 +1489,7 @@ pub trait Instance {
         // Reset FIFO and command list
         self.reset_fifo();
         self.reset_command_list();
-        self.perform_read(addr, buffer, &mut self.register_block().comd.iter())?;
+        self.perform_read(addr, buffer, &mut self.register_block().comd().iter())?;
         Ok(())
     }
 
@@ -1522,13 +1522,13 @@ where
 
 #[cfg(not(any(esp32, esp32s2)))]
 fn read_fifo(register_block: &RegisterBlock) -> u8 {
-    register_block.data.read().fifo_rdata().bits()
+    register_block.data().read().fifo_rdata().bits()
 }
 
 #[cfg(not(esp32))]
 fn write_fifo(register_block: &RegisterBlock, data: u8) {
     register_block
-        .data
+        .data()
         .write(|w| unsafe { w.fifo_rdata().bits(data) });
 }
 

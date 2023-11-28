@@ -616,11 +616,11 @@ pub fn get_status(_core: Cpu) -> u128 {
     #[cfg(not(large_intr_status))]
     unsafe {
         ((*crate::peripherals::INTERRUPT_CORE0::PTR)
-            .intr_status_reg_0
+            .intr_status_reg_0()
             .read()
             .bits() as u128)
             | ((*crate::peripherals::INTERRUPT_CORE0::PTR)
-                .intr_status_reg_1
+                .intr_status_reg_1()
                 .read()
                 .bits() as u128)
                 << 32
@@ -666,7 +666,7 @@ mod classic {
     pub unsafe fn enable_cpu_interrupt(which: CpuInterrupt) {
         let cpu_interrupt_number = which as isize;
         let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
-        intr.cpu_int_enable
+        intr.cpu_int_enable()
             .modify(|r, w| w.bits((1 << cpu_interrupt_number) | r.bits()));
     }
 
@@ -684,7 +684,7 @@ mod classic {
                 InterruptKind::Level => 0,
                 InterruptKind::Edge => 1,
             };
-            intr.cpu_int_type.modify(|r, w| {
+            intr.cpu_int_type().modify(|r, w| {
                 w.bits(
                     r.bits() & !(1 << cpu_interrupt_number)
                         | (interrupt_type << cpu_interrupt_number),
@@ -701,7 +701,7 @@ mod classic {
     pub unsafe fn set_priority(_core: Cpu, which: CpuInterrupt, priority: Priority) {
         let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
         let cpu_interrupt_number = which as isize;
-        let intr_prio_base = intr.cpu_int_pri_0.as_ptr();
+        let intr_prio_base = intr.cpu_int_pri_0().as_ptr();
 
         intr_prio_base
             .offset(cpu_interrupt_number)
@@ -714,7 +714,7 @@ mod classic {
         unsafe {
             let cpu_interrupt_number = which as isize;
             let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
-            intr.cpu_int_clear
+            intr.cpu_int_clear()
                 .write(|w| w.bits(1 << cpu_interrupt_number));
         }
     }
@@ -723,7 +723,7 @@ mod classic {
     #[inline]
     pub(super) unsafe extern "C" fn get_priority(cpu_interrupt: CpuInterrupt) -> Priority {
         let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
-        let intr_prio_base = intr.cpu_int_pri_0.as_ptr();
+        let intr_prio_base = intr.cpu_int_pri_0().as_ptr();
 
         let prio = intr_prio_base
             .offset(cpu_interrupt as isize)

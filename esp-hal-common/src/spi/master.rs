@@ -1159,7 +1159,7 @@ pub mod dma {
             // set cmd, address, dummy cycles
             let reg_block = self.spi.register_block();
             if !cmd.is_none() {
-                reg_block.user2.modify(|_, w| {
+                reg_block.user2().modify(|_, w| {
                     w.usr_command_bitlen()
                         .variant((cmd.width() - 1) as u8)
                         .usr_command_value()
@@ -1170,11 +1170,11 @@ pub mod dma {
             #[cfg(not(esp32))]
             if !address.is_none() {
                 reg_block
-                    .user1
+                    .user1()
                     .modify(|_, w| w.usr_addr_bitlen().variant((address.width() - 1) as u8));
 
                 let addr = address.value() << (32 - address.width());
-                reg_block.addr.write(|w| w.usr_addr_value().variant(addr));
+                reg_block.addr().write(|w| w.usr_addr_value().variant(addr));
             }
 
             #[cfg(esp32)]
@@ -1189,7 +1189,7 @@ pub mod dma {
 
             if dummy > 0 {
                 reg_block
-                    .user1
+                    .user1()
                     .modify(|_, w| w.usr_dummy_cyclelen().variant(dummy - 1));
             }
 
@@ -1197,7 +1197,7 @@ pub mod dma {
                 .start_read_bytes_dma(ptr, len, &mut self.channel.rx, false)?;
             Ok(SpiDmaTransfer {
                 spi_dma: self,
-                buffer: buffer,
+                buffer,
             })
         }
 
@@ -1232,7 +1232,7 @@ pub mod dma {
             // set cmd, address, dummy cycles
             let reg_block = self.spi.register_block();
             if !cmd.is_none() {
-                reg_block.user2.modify(|_, w| {
+                reg_block.user2().modify(|_, w| {
                     w.usr_command_bitlen()
                         .variant((cmd.width() - 1) as u8)
                         .usr_command_value()
@@ -1243,11 +1243,11 @@ pub mod dma {
             #[cfg(not(esp32))]
             if !address.is_none() {
                 reg_block
-                    .user1
+                    .user1()
                     .modify(|_, w| w.usr_addr_bitlen().variant((address.width() - 1) as u8));
 
                 let addr = address.value() << (32 - address.width());
-                reg_block.addr.write(|w| w.usr_addr_value().variant(addr));
+                reg_block.addr().write(|w| w.usr_addr_value().variant(addr));
             }
 
             #[cfg(esp32)]
@@ -1262,7 +1262,7 @@ pub mod dma {
 
             if dummy > 0 {
                 reg_block
-                    .user1
+                    .user1()
                     .modify(|_, w| w.usr_dummy_cyclelen().variant(dummy - 1));
             }
 
@@ -1270,7 +1270,7 @@ pub mod dma {
                 .start_write_bytes_dma(ptr, len, &mut self.channel.tx, false)?;
             Ok(SpiDmaTransfer {
                 spi_dma: self,
-                buffer: buffer,
+                buffer,
             })
         }
     }
@@ -1835,7 +1835,7 @@ where
             tx.listen_eof();
             rx.listen_eof();
         }
-        reg_block.cmd.modify(|_, w| w.usr().set_bit());
+        reg_block.cmd().modify(|_, w| w.usr().set_bit());
 
         Ok(())
     }
@@ -1876,7 +1876,7 @@ where
         if listen {
             tx.listen_eof();
         }
-        reg_block.cmd.modify(|_, w| w.usr().set_bit());
+        reg_block.cmd().modify(|_, w| w.usr().set_bit());
 
         Ok(())
     }
@@ -1906,7 +1906,7 @@ where
         if listen {
             rx.listen_eof();
         }
-        reg_block.cmd.modify(|_, w| w.usr().set_bit());
+        reg_block.cmd().modify(|_, w| w.usr().set_bit());
 
         Ok(())
     }
@@ -1923,8 +1923,8 @@ where
     #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
     fn enable_dma(&self) {
         let reg_block = self.register_block();
-        reg_block.dma_conf.modify(|_, w| w.dma_tx_ena().set_bit());
-        reg_block.dma_conf.modify(|_, w| w.dma_rx_ena().set_bit());
+        reg_block.dma_conf().modify(|_, w| w.dma_tx_ena().set_bit());
+        reg_block.dma_conf().modify(|_, w| w.dma_rx_ena().set_bit());
     }
 
     #[cfg(any(esp32, esp32s2))]
@@ -1935,7 +1935,7 @@ where
     #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
     fn clear_dma_interrupts(&self) {
         let reg_block = self.register_block();
-        reg_block.dma_int_clr.write(|w| {
+        reg_block.dma_int_clr().write(|w| {
             w.dma_infifo_full_err_int_clr()
                 .set_bit()
                 .dma_outfifo_empty_err_int_clr()
@@ -1977,7 +1977,7 @@ where
 
 #[cfg(not(any(esp32, esp32s2)))]
 fn reset_dma_before_usr_cmd(reg_block: &RegisterBlock) {
-    reg_block.dma_conf.modify(|_, w| {
+    reg_block.dma_conf().modify(|_, w| {
         w.rx_afifo_rst()
             .set_bit()
             .buf_afifo_rst()
@@ -2065,7 +2065,7 @@ pub trait Instance {
     /// Initialize for full-duplex 1 bit mode
     fn init(&mut self) {
         let reg_block = self.register_block();
-        reg_block.user.modify(|_, w| {
+        reg_block.user().modify(|_, w| {
             w.usr_miso_highpart()
                 .clear_bit()
                 .usr_miso_highpart()
@@ -2087,7 +2087,7 @@ pub trait Instance {
         });
 
         #[cfg(not(any(esp32, esp32s2)))]
-        reg_block.clk_gate.modify(|_, w| {
+        reg_block.clk_gate().modify(|_, w| {
             w.clk_en()
                 .set_bit()
                 .mst_clk_active()
@@ -2101,12 +2101,12 @@ pub trait Instance {
             // use default clock source PLL_F80M_CLK (ESP32-C6) and
             // PLL_F48M_CLK (ESP32-H2)
             (&*crate::peripherals::PCR::PTR)
-                .spi2_clkm_conf
+                .spi2_clkm_conf()
                 .modify(|_, w| w.spi2_clkm_sel().bits(1));
         }
 
         #[cfg(not(any(esp32, esp32s2)))]
-        reg_block.ctrl.modify(|_, w| {
+        reg_block.ctrl().modify(|_, w| {
             w.q_pol()
                 .clear_bit()
                 .d_pol()
@@ -2117,16 +2117,16 @@ pub trait Instance {
 
         #[cfg(esp32s2)]
         reg_block
-            .ctrl
+            .ctrl()
             .modify(|_, w| w.q_pol().clear_bit().d_pol().clear_bit().wp().clear_bit());
 
         #[cfg(esp32)]
-        reg_block.ctrl.modify(|_, w| w.wp().clear_bit());
+        reg_block.ctrl().modify(|_, w| w.wp().clear_bit());
 
         #[cfg(not(esp32))]
-        reg_block.misc.write(|w| unsafe { w.bits(0) });
+        reg_block.misc().write(|w| unsafe { w.bits(0) });
 
-        reg_block.slave.write(|w| unsafe { w.bits(0) });
+        reg_block.slave().write(|w| unsafe { w.bits(0) });
     }
 
     #[cfg(not(esp32))]
@@ -2139,51 +2139,51 @@ pub trait Instance {
         let reg_block = self.register_block();
         match cmd_mode {
             SpiDataMode::Single => reg_block
-                .ctrl
+                .ctrl()
                 .modify(|_, w| w.fcmd_dual().clear_bit().fcmd_quad().clear_bit()),
             SpiDataMode::Dual => reg_block
-                .ctrl
+                .ctrl()
                 .modify(|_, w| w.fcmd_dual().set_bit().fcmd_quad().clear_bit()),
             SpiDataMode::Quad => reg_block
-                .ctrl
+                .ctrl()
                 .modify(|_, w| w.fcmd_dual().clear_bit().fcmd_quad().set_bit()),
         }
 
         match address_mode {
             SpiDataMode::Single => reg_block
-                .ctrl
+                .ctrl()
                 .modify(|_, w| w.faddr_dual().clear_bit().faddr_quad().clear_bit()),
             SpiDataMode::Dual => reg_block
-                .ctrl
+                .ctrl()
                 .modify(|_, w| w.faddr_dual().set_bit().faddr_quad().clear_bit()),
             SpiDataMode::Quad => reg_block
-                .ctrl
+                .ctrl()
                 .modify(|_, w| w.faddr_dual().clear_bit().faddr_quad().set_bit()),
         }
 
         match data_mode {
             SpiDataMode::Single => {
                 reg_block
-                    .ctrl
+                    .ctrl()
                     .modify(|_, w| w.fread_dual().clear_bit().fread_quad().clear_bit());
                 reg_block
-                    .user
+                    .user()
                     .modify(|_, w| w.fwrite_dual().clear_bit().fwrite_quad().clear_bit());
             }
             SpiDataMode::Dual => {
                 reg_block
-                    .ctrl
+                    .ctrl()
                     .modify(|_, w| w.fread_dual().set_bit().fread_quad().clear_bit());
                 reg_block
-                    .user
+                    .user()
                     .modify(|_, w| w.fwrite_dual().set_bit().fwrite_quad().clear_bit());
             }
             SpiDataMode::Quad => {
                 reg_block
-                    .ctrl
+                    .ctrl()
                     .modify(|_, w| w.fread_quad().set_bit().fread_dual().clear_bit());
                 reg_block
-                    .user
+                    .user()
                     .modify(|_, w| w.fwrite_quad().set_bit().fwrite_dual().clear_bit());
             }
         }
@@ -2416,7 +2416,7 @@ pub trait Instance {
         }
 
         self.register_block()
-            .clock
+            .clock()
             .write(|w| unsafe { w.bits(reg_val) });
     }
 
@@ -2426,20 +2426,20 @@ pub trait Instance {
 
         match data_mode {
             SpiMode::Mode0 => {
-                reg_block.misc.modify(|_, w| w.ck_idle_edge().clear_bit());
-                reg_block.user.modify(|_, w| w.ck_out_edge().clear_bit());
+                reg_block.misc().modify(|_, w| w.ck_idle_edge().clear_bit());
+                reg_block.user().modify(|_, w| w.ck_out_edge().clear_bit());
             }
             SpiMode::Mode1 => {
-                reg_block.misc.modify(|_, w| w.ck_idle_edge().clear_bit());
-                reg_block.user.modify(|_, w| w.ck_out_edge().set_bit());
+                reg_block.misc().modify(|_, w| w.ck_idle_edge().clear_bit());
+                reg_block.user().modify(|_, w| w.ck_out_edge().set_bit());
             }
             SpiMode::Mode2 => {
-                reg_block.misc.modify(|_, w| w.ck_idle_edge().set_bit());
-                reg_block.user.modify(|_, w| w.ck_out_edge().set_bit());
+                reg_block.misc().modify(|_, w| w.ck_idle_edge().set_bit());
+                reg_block.user().modify(|_, w| w.ck_out_edge().set_bit());
             }
             SpiMode::Mode3 => {
-                reg_block.misc.modify(|_, w| w.ck_idle_edge().set_bit());
-                reg_block.user.modify(|_, w| w.ck_out_edge().clear_bit());
+                reg_block.misc().modify(|_, w| w.ck_idle_edge().set_bit());
+                reg_block.user().modify(|_, w| w.ck_out_edge().clear_bit());
             }
         }
         self
@@ -2473,7 +2473,7 @@ pub trait Instance {
     fn ch_bus_freq(&mut self, frequency: HertzU32, clocks: &Clocks) {
         // Disable clock source
         #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
-        self.register_block().clk_gate.modify(|_, w| {
+        self.register_block().clk_gate().modify(|_, w| {
             w.clk_en()
                 .clear_bit()
                 .mst_clk_active()
@@ -2487,7 +2487,7 @@ pub trait Instance {
 
         // Enable clock source
         #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
-        self.register_block().clk_gate.modify(|_, w| {
+        self.register_block().clk_gate().modify(|_, w| {
             w.clk_en()
                 .set_bit()
                 .mst_clk_active()
@@ -2503,7 +2503,7 @@ pub trait Instance {
         }
 
         let reg_block = self.register_block();
-        Ok(u32::try_into(reg_block.w0.read().bits()).unwrap_or_default())
+        Ok(u32::try_into(reg_block.w0().read().bits()).unwrap_or_default())
     }
 
     fn write_byte(&mut self, word: u8) -> nb::Result<(), Error> {
@@ -2514,11 +2514,11 @@ pub trait Instance {
         self.configure_datalen(8);
 
         let reg_block = self.register_block();
-        reg_block.w0.write(|w| unsafe { w.bits(word.into()) });
+        reg_block.w0().write(|w| unsafe { w.bits(word.into()) });
 
         self.update();
 
-        reg_block.cmd.modify(|_, w| w.usr().set_bit());
+        reg_block.cmd().modify(|_, w| w.usr().set_bit());
 
         Ok(())
     }
@@ -2540,7 +2540,7 @@ pub trait Instance {
         for (i, chunk) in words.chunks(FIFO_SIZE).enumerate() {
             self.configure_datalen(chunk.len() as u32 * 8);
 
-            let fifo_ptr = self.register_block().w0.as_ptr();
+            let fifo_ptr = self.register_block().w0().as_ptr();
             for i in (0..chunk.len()).step_by(4) {
                 let state = if chunk.len() - i < 4 {
                     chunk.len() % 4
@@ -2572,7 +2572,7 @@ pub trait Instance {
 
             self.update();
 
-            self.register_block().cmd.modify(|_, w| w.usr().set_bit());
+            self.register_block().cmd().modify(|_, w| w.usr().set_bit());
 
             // Wait for all chunks to complete except the last one.
             // The function is allowed to return before the bus is idle.
@@ -2618,7 +2618,7 @@ pub trait Instance {
         for chunk in words.chunks_mut(FIFO_SIZE) {
             self.configure_datalen(chunk.len() as u32 * 8);
 
-            let mut fifo_ptr = reg_block.w0.as_ptr();
+            let mut fifo_ptr = reg_block.w0().as_ptr();
             for index in (0..chunk.len()).step_by(4) {
                 let reg_val = unsafe { *fifo_ptr };
                 let bytes = reg_val.to_le_bytes();
@@ -2637,7 +2637,7 @@ pub trait Instance {
 
     fn busy(&self) -> bool {
         let reg_block = self.register_block();
-        reg_block.cmd.read().usr().bit_is_set()
+        reg_block.cmd().read().usr().bit_is_set()
     }
 
     // Check if the bus is busy and if it is wait for it to be idle
@@ -2661,7 +2661,7 @@ pub trait Instance {
     fn start_operation(&self) {
         let reg_block = self.register_block();
         self.update();
-        reg_block.cmd.modify(|_, w| w.usr().set_bit());
+        reg_block.cmd().modify(|_, w| w.usr().set_bit());
     }
 
     fn init_half_duplex(
@@ -2674,7 +2674,7 @@ pub trait Instance {
         no_mosi_miso: bool,
     ) {
         let reg_block = self.register_block();
-        reg_block.user.modify(|_, w| {
+        reg_block.user().modify(|_, w| {
             w.usr_miso_highpart()
                 .clear_bit()
                 .usr_miso_highpart()
@@ -2698,7 +2698,7 @@ pub trait Instance {
         });
 
         #[cfg(not(any(esp32, esp32s2)))]
-        reg_block.clk_gate.modify(|_, w| {
+        reg_block.clk_gate().modify(|_, w| {
             w.clk_en()
                 .set_bit()
                 .mst_clk_active()
@@ -2712,13 +2712,14 @@ pub trait Instance {
             let pcr = &*crate::peripherals::PCR::PTR;
 
             // use default clock source PLL_F80M_CLK
-            pcr.spi2_clkm_conf.modify(|_, w| w.spi2_clkm_sel().bits(1));
+            pcr.spi2_clkm_conf()
+                .modify(|_, w| w.spi2_clkm_sel().bits(1));
         }
 
         #[cfg(not(esp32))]
-        reg_block.misc.write(|w| unsafe { w.bits(0) });
+        reg_block.misc().write(|w| unsafe { w.bits(0) });
 
-        reg_block.slave.write(|w| unsafe { w.bits(0) });
+        reg_block.slave().write(|w| unsafe { w.bits(0) });
 
         self.update();
     }
@@ -2742,7 +2743,7 @@ pub trait Instance {
         // set cmd, address, dummy cycles
         let reg_block = self.register_block();
         if !cmd.is_none() {
-            reg_block.user2.modify(|_, w| {
+            reg_block.user2().modify(|_, w| {
                 w.usr_command_bitlen()
                     .variant((cmd.width() - 1) as u8)
                     .usr_command_value()
@@ -2753,11 +2754,11 @@ pub trait Instance {
         #[cfg(not(esp32))]
         if !address.is_none() {
             reg_block
-                .user1
+                .user1()
                 .modify(|_, w| w.usr_addr_bitlen().variant((address.width() - 1) as u8));
 
             let addr = address.value() << (32 - address.width());
-            reg_block.addr.write(|w| w.usr_addr_value().variant(addr));
+            reg_block.addr().write(|w| w.usr_addr_value().variant(addr));
         }
 
         #[cfg(esp32)]
@@ -2772,7 +2773,7 @@ pub trait Instance {
 
         if dummy > 0 {
             reg_block
-                .user1
+                .user1()
                 .modify(|_, w| w.usr_dummy_cyclelen().variant(dummy - 1));
         }
 
@@ -2805,7 +2806,7 @@ pub trait Instance {
         // set cmd, address, dummy cycles
         let reg_block = self.register_block();
         if !cmd.is_none() {
-            reg_block.user2.modify(|_, w| {
+            reg_block.user2().modify(|_, w| {
                 w.usr_command_bitlen()
                     .variant((cmd.width() - 1) as u8)
                     .usr_command_value()
@@ -2816,11 +2817,11 @@ pub trait Instance {
         #[cfg(not(esp32))]
         if !address.is_none() {
             reg_block
-                .user1
+                .user1()
                 .modify(|_, w| w.usr_addr_bitlen().variant((address.width() - 1) as u8));
 
             let addr = address.value() << (32 - address.width());
-            reg_block.addr.write(|w| w.usr_addr_value().variant(addr));
+            reg_block.addr().write(|w| w.usr_addr_value().variant(addr));
         }
 
         #[cfg(esp32)]
@@ -2835,13 +2836,13 @@ pub trait Instance {
 
         if dummy > 0 {
             reg_block
-                .user1
+                .user1()
                 .modify(|_, w| w.usr_dummy_cyclelen().variant(dummy - 1));
         }
 
         self.configure_datalen(buffer.len() as u32 * 8);
         self.update();
-        reg_block.cmd.modify(|_, w| w.usr().set_bit());
+        reg_block.cmd().modify(|_, w| w.usr().set_bit());
         self.flush()?;
         self.read_bytes_from_fifo(buffer)
     }
@@ -2850,9 +2851,9 @@ pub trait Instance {
     fn update(&self) {
         let reg_block = self.register_block();
 
-        reg_block.cmd.modify(|_, w| w.update().set_bit());
+        reg_block.cmd().modify(|_, w| w.update().set_bit());
 
-        while reg_block.cmd.read().update().bit_is_set() {
+        while reg_block.cmd().read().update().bit_is_set() {
             // wait
         }
     }
@@ -2868,17 +2869,17 @@ pub trait Instance {
 
         #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
         reg_block
-            .ms_dlen
+            .ms_dlen()
             .write(|w| unsafe { w.ms_data_bitlen().bits(len) });
 
         #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3)))]
         {
             reg_block
-                .mosi_dlen
+                .mosi_dlen()
                 .write(|w| unsafe { w.usr_mosi_dbitlen().bits(len) });
 
             reg_block
-                .miso_dlen
+                .miso_dlen()
                 .write(|w| unsafe { w.usr_miso_dbitlen().bits(len) });
         }
     }

@@ -152,7 +152,7 @@ impl<'d> Sha<'d> {
 
         // Setup SHA Mode
         #[cfg(not(esp32))]
-        sha.mode
+        sha.mode()
             .write(|w| unsafe { w.mode().bits(mode_as_bits(mode)) });
 
         Self {
@@ -177,11 +177,11 @@ impl<'d> Sha<'d> {
     fn process_buffer(&mut self) {
         if self.first_run {
             // Set SHA_START_REG
-            self.sha.start.write(|w| unsafe { w.bits(1) });
+            self.sha.start().write(|w| unsafe { w.bits(1) });
             self.first_run = false;
         } else {
             // SET SHA_CONTINUE_REG
-            self.sha.continue_.write(|w| unsafe { w.bits(1) });
+            self.sha.continue_().write(|w| unsafe { w.bits(1) });
         }
     }
 
@@ -227,7 +227,7 @@ impl<'d> Sha<'d> {
 
     #[cfg(not(esp32))]
     fn is_busy(&self) -> bool {
-        self.sha.busy.read().bits() != 0
+        self.sha.busy().read().bits() != 0
     }
 
     pub fn digest_length(&self) -> usize {
@@ -402,7 +402,7 @@ impl<'d> Sha<'d> {
             #[cfg(esp32)]
             &self.sha.text[0],
             #[cfg(not(esp32))]
-            &self.sha.h_mem[0],
+            &self.sha.h_mem(0),
             output,
             core::cmp::min(output.len(), 32) / self.alignment_helper.align_size(),
         );

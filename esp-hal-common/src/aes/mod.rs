@@ -329,7 +329,7 @@ pub mod dma {
         {
             // Waiting for the DMA transfer is not enough. We need to wait for the
             // peripheral to finish flushing its buffers, too.
-            while self.aes_dma.aes.aes.state.read().state().bits() != 2 // DMA status DONE == 2
+            while self.aes_dma.aes.aes.state().read().state().bits() != 2 // DMA status DONE == 2
                 && !self.aes_dma.channel.tx.is_done()
             {
                 // wait until done
@@ -375,7 +375,7 @@ pub mod dma {
             self.aes_dma
                 .aes
                 .aes
-                .dma_exit
+                .dma_exit()
                 .write(|w| w.dma_exit().set_bit());
         }
     }
@@ -495,8 +495,9 @@ pub mod dma {
         pub fn reset_aes(&self) {
             unsafe {
                 let s = crate::peripherals::SYSTEM::steal();
-                s.perip_rst_en1.modify(|_, w| w.crypto_aes_rst().set_bit());
-                s.perip_rst_en1
+                s.perip_rst_en1()
+                    .modify(|_, w| w.crypto_aes_rst().set_bit());
+                s.perip_rst_en1()
                     .modify(|_, w| w.crypto_aes_rst().clear_bit());
             }
         }
@@ -517,45 +518,48 @@ pub mod dma {
         fn enable_dma(&self, enable: bool) {
             self.aes
                 .aes
-                .dma_enable
+                .dma_enable()
                 .write(|w| w.dma_enable().bit(enable));
         }
 
         fn enable_interrupt(&self) {
-            self.aes.aes.int_ena.write(|w| w.int_ena().set_bit());
+            self.aes.aes.int_ena().write(|w| w.int_ena().set_bit());
         }
 
         pub fn set_cipher_mode(&self, mode: CipherMode) {
             self.aes
                 .aes
-                .block_mode
+                .block_mode()
                 .modify(|_, w| unsafe { w.bits(mode as u32) });
 
-            if self.aes.aes.block_mode.read().block_mode().bits() == CipherMode::Ctr as u8 {
-                self.aes.aes.inc_sel.modify(|_, w| w.inc_sel().clear_bit());
+            if self.aes.aes.block_mode().read().block_mode().bits() == CipherMode::Ctr as u8 {
+                self.aes
+                    .aes
+                    .inc_sel()
+                    .modify(|_, w| w.inc_sel().clear_bit());
             }
         }
 
         pub fn set_mode(&self, mode: Mode) {
             self.aes
                 .aes
-                .mode
+                .mode()
                 .modify(|_, w| w.mode().variant(mode as u8));
         }
 
         fn start_transform(&self) {
-            self.aes.aes.trigger.write(|w| w.trigger().set_bit());
+            self.aes.aes.trigger().write(|w| w.trigger().set_bit());
         }
 
         pub fn finish_transform(&self) {
-            self.aes.aes.dma_exit.write(|w| w.dma_exit().set_bit());
+            self.aes.aes.dma_exit().write(|w| w.dma_exit().set_bit());
             self.enable_dma(false);
         }
 
         fn set_num_block(&self, block: u32) {
             self.aes
                 .aes
-                .block_num
+                .block_num()
                 .modify(|_, w| unsafe { w.block_num().bits(block) });
         }
     }

@@ -93,7 +93,7 @@ impl<'d> Ecc<'d> {
     }
 
     pub fn reset(&mut self) {
-        self.ecc.mult_conf.reset()
+        self.ecc.mult_conf().reset()
     }
 
     /// # Base point multiplication
@@ -133,15 +133,15 @@ impl<'d> Ecc<'d> {
         let mut tmp = [0_u8; 32];
         self.reverse_words(k, &mut tmp);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.k_mem[0], tmp.as_ref(), 8);
+            .volatile_write_regset(&mut self.ecc.k_mem(0), tmp.as_ref(), 8);
         self.reverse_words(x, &mut tmp);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.px_mem[0], tmp.as_ref(), 8);
+            .volatile_write_regset(&mut self.ecc.px_mem(0), tmp.as_ref(), 8);
         self.reverse_words(y, &mut tmp);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.py_mem[0], tmp.as_ref(), 8);
+            .volatile_write_regset(&mut self.ecc.py_mem(0), tmp.as_ref(), 8);
 
-        self.ecc.mult_conf.write(|w| unsafe {
+        self.ecc.mult_conf().write(|w| unsafe {
             w.work_mode()
                 .bits(mode as u8)
                 .key_length()
@@ -154,10 +154,10 @@ impl<'d> Ecc<'d> {
         while self.is_busy() {}
 
         self.alignment_helper
-            .volatile_read_regset(&self.ecc.px_mem[0], &mut tmp, 8);
+            .volatile_read_regset(&self.ecc.px_mem(0), &mut tmp, 8);
         self.reverse_words(tmp.as_ref(), x);
         self.alignment_helper
-            .volatile_read_regset(&self.ecc.py_mem[0], &mut tmp, 8);
+            .volatile_read_regset(&self.ecc.py_mem(0), &mut tmp, 8);
         self.reverse_words(tmp.as_ref(), y);
 
         Ok(())
@@ -200,12 +200,12 @@ impl<'d> Ecc<'d> {
         let mut tmp = [0_u8; 32];
         self.reverse_words(k, &mut tmp);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.k_mem[0], tmp.as_ref(), 8);
+            .volatile_write_regset(&mut self.ecc.k_mem(0), tmp.as_ref(), 8);
         self.reverse_words(y, &mut tmp);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.py_mem[0], tmp.as_ref(), 8);
+            .volatile_write_regset(&mut self.ecc.py_mem(0), tmp.as_ref(), 8);
 
-        self.ecc.mult_conf.write(|w| unsafe {
+        self.ecc.mult_conf().write(|w| unsafe {
             w.work_mode()
                 .bits(mode as u8)
                 .key_length()
@@ -218,7 +218,7 @@ impl<'d> Ecc<'d> {
         while self.is_busy() {}
 
         self.alignment_helper
-            .volatile_read_regset(&self.ecc.py_mem[0], &mut tmp, 8);
+            .volatile_read_regset(&self.ecc.py_mem(0), &mut tmp, 8);
         self.reverse_words(tmp.as_ref(), y);
 
         Ok(())
@@ -261,12 +261,12 @@ impl<'d> Ecc<'d> {
         let mut tmp = [0_u8; 32];
         self.reverse_words(x, &mut tmp);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.px_mem[0], tmp.as_ref(), 8);
+            .volatile_write_regset(&mut self.ecc.px_mem(0), tmp.as_ref(), 8);
         self.reverse_words(y, &mut tmp);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.py_mem[0], tmp.as_ref(), 8);
+            .volatile_write_regset(&mut self.ecc.py_mem(0), tmp.as_ref(), 8);
 
-        self.ecc.mult_conf.write(|w| unsafe {
+        self.ecc.mult_conf().write(|w| unsafe {
             w.work_mode()
                 .bits(mode as u8)
                 .key_length()
@@ -278,8 +278,8 @@ impl<'d> Ecc<'d> {
         // wait for interrupt
         while self.is_busy() {}
 
-        if !self.ecc.mult_conf.read().verification_result().bit() {
-            self.ecc.mult_conf.reset();
+        if !self.ecc.mult_conf().read().verification_result().bit() {
+            self.ecc.mult_conf().reset();
             return Err(Error::PointNotOnSelectedCurve);
         }
 
@@ -328,15 +328,15 @@ impl<'d> Ecc<'d> {
         let mut tmp = [0_u8; 32];
         self.reverse_words(k, &mut tmp);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.k_mem[0], tmp.as_ref(), 8);
+            .volatile_write_regset(&mut self.ecc.k_mem(0), tmp.as_ref(), 8);
         self.reverse_words(x, &mut tmp);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.px_mem[0], tmp.as_ref(), 8);
+            .volatile_write_regset(&mut self.ecc.px_mem(0), tmp.as_ref(), 8);
         self.reverse_words(y, &mut tmp);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.py_mem[0], tmp.as_ref(), 8);
+            .volatile_write_regset(&mut self.ecc.py_mem(0), tmp.as_ref(), 8);
 
-        self.ecc.mult_conf.write(|w| unsafe {
+        self.ecc.mult_conf().write(|w| unsafe {
             w.work_mode()
                 .bits(mode as u8)
                 .key_length()
@@ -348,16 +348,16 @@ impl<'d> Ecc<'d> {
         // wait for interrupt
         while self.is_busy() {}
 
-        if !self.ecc.mult_conf.read().verification_result().bit() {
-            self.ecc.mult_conf.reset();
+        if !self.ecc.mult_conf().read().verification_result().bit() {
+            self.ecc.mult_conf().reset();
             return Err(Error::PointNotOnSelectedCurve);
         }
 
         self.alignment_helper
-            .volatile_read_regset(&self.ecc.px_mem[0], &mut tmp, 8);
+            .volatile_read_regset(&self.ecc.px_mem(0), &mut tmp, 8);
         self.reverse_words(tmp.as_ref(), x);
         self.alignment_helper
-            .volatile_read_regset(&self.ecc.py_mem[0], &mut tmp, 8);
+            .volatile_read_regset(&self.ecc.py_mem(0), &mut tmp, 8);
         self.reverse_words(tmp.as_ref(), y);
 
         Ok(())
@@ -491,15 +491,15 @@ impl<'d> Ecc<'d> {
         let mut tmp = [0_u8; 32];
         self.reverse_words(k, &mut tmp);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.k_mem[0], tmp.as_ref(), 8);
+            .volatile_write_regset(&mut self.ecc.k_mem(0), tmp.as_ref(), 8);
         self.reverse_words(x, &mut tmp);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.px_mem[0], tmp.as_ref(), 8);
+            .volatile_write_regset(&mut self.ecc.px_mem(0), tmp.as_ref(), 8);
         self.reverse_words(y, &mut tmp);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.py_mem[0], tmp.as_ref(), 8);
+            .volatile_write_regset(&mut self.ecc.py_mem(0), tmp.as_ref(), 8);
 
-        self.ecc.mult_conf.write(|w| unsafe {
+        self.ecc.mult_conf().write(|w| unsafe {
             w.work_mode()
                 .bits(mode as u8)
                 .key_length()
@@ -513,13 +513,13 @@ impl<'d> Ecc<'d> {
         cfg_if::cfg_if! {
             if #[cfg(not(esp32h2))] {
             self.alignment_helper
-                .volatile_read_regset(&self.ecc.px_mem[0], &mut tmp, 8);
+                .volatile_read_regset(&self.ecc.px_mem(0), &mut tmp, 8);
             self.reverse_words(tmp.as_ref(), x);
             self.alignment_helper
-                .volatile_read_regset(&self.ecc.py_mem[0], &mut tmp, 8);
+                .volatile_read_regset(&self.ecc.py_mem(0), &mut tmp, 8);
             self.reverse_words(tmp.as_ref(), y);
             self.alignment_helper
-                .volatile_read_regset(&self.ecc.k_mem[0], &mut tmp, 8);
+                .volatile_read_regset(&self.ecc.k_mem(0), &mut tmp, 8);
             self.reverse_words(tmp.as_ref(), k);
             } else {
             self.alignment_helper
@@ -578,13 +578,13 @@ impl<'d> Ecc<'d> {
         cfg_if::cfg_if! {
             if #[cfg(not(esp32h2))] {
                 self.alignment_helper
-                    .volatile_write_regset(&mut self.ecc.px_mem[0], tmp.as_ref(), 8);
+                    .volatile_write_regset(&mut self.ecc.px_mem(0), tmp.as_ref(), 8);
                 self.reverse_words(y, &mut tmp);
                 self.alignment_helper
-                    .volatile_write_regset(&mut self.ecc.py_mem[0], tmp.as_ref(), 8);
+                    .volatile_write_regset(&mut self.ecc.py_mem(0), tmp.as_ref(), 8);
                 self.reverse_words(z, &mut tmp);
                 self.alignment_helper
-                    .volatile_write_regset(&mut self.ecc.k_mem[0], tmp.as_ref(), 8);
+                    .volatile_write_regset(&mut self.ecc.k_mem(0), tmp.as_ref(), 8);
             } else {
                 self.alignment_helper
                     .volatile_write_regset(&mut self.ecc.qx_mem[0], tmp.as_ref(), 8);
@@ -597,7 +597,7 @@ impl<'d> Ecc<'d> {
             }
         }
 
-        self.ecc.mult_conf.write(|w| unsafe {
+        self.ecc.mult_conf().write(|w| unsafe {
             w.work_mode()
                 .bits(mode as u8)
                 .key_length()
@@ -609,8 +609,8 @@ impl<'d> Ecc<'d> {
         // wait for interrupt
         while self.is_busy() {}
 
-        if !self.ecc.mult_conf.read().verification_result().bit() {
-            self.ecc.mult_conf.reset();
+        if !self.ecc.mult_conf().read().verification_result().bit() {
+            self.ecc.mult_conf().reset();
             return Err(Error::PointNotOnSelectedCurve);
         }
 
@@ -658,15 +658,15 @@ impl<'d> Ecc<'d> {
         let mut tmp = [0_u8; 32];
         self.reverse_words(k, &mut tmp);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.k_mem[0], tmp.as_ref(), 8);
+            .volatile_write_regset(&mut self.ecc.k_mem(0), tmp.as_ref(), 8);
         self.reverse_words(x, &mut tmp);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.px_mem[0], tmp.as_ref(), 8);
+            .volatile_write_regset(&mut self.ecc.px_mem(0), tmp.as_ref(), 8);
         self.reverse_words(y, &mut tmp);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.py_mem[0], tmp.as_ref(), 8);
+            .volatile_write_regset(&mut self.ecc.py_mem(0), tmp.as_ref(), 8);
 
-        self.ecc.mult_conf.write(|w| unsafe {
+        self.ecc.mult_conf().write(|w| unsafe {
             w.work_mode()
                 .bits(mode as u8)
                 .key_length()
@@ -678,26 +678,26 @@ impl<'d> Ecc<'d> {
         // wait for interrupt
         while self.is_busy() {}
 
-        if !self.ecc.mult_conf.read().verification_result().bit() {
-            self.ecc.mult_conf.reset();
+        if !self.ecc.mult_conf().read().verification_result().bit() {
+            self.ecc.mult_conf().reset();
             return Err(Error::PointNotOnSelectedCurve);
         }
 
-        if !self.ecc.mult_conf.read().verification_result().bit() {
-            self.ecc.mult_conf.reset();
+        if !self.ecc.mult_conf().read().verification_result().bit() {
+            self.ecc.mult_conf().reset();
             return Err(Error::PointNotOnSelectedCurve);
         }
 
         cfg_if::cfg_if! {
             if #[cfg(not(esp32h2))] {
                 self.alignment_helper
-                    .volatile_read_regset(&self.ecc.px_mem[0], &mut tmp, 8);
+                    .volatile_read_regset(&self.ecc.px_mem(0), &mut tmp, 8);
                 self.reverse_words(tmp.as_ref(), x);
                 self.alignment_helper
-                    .volatile_read_regset(&self.ecc.py_mem[0], &mut tmp, 8);
+                    .volatile_read_regset(&self.ecc.py_mem(0), &mut tmp, 8);
                 self.reverse_words(tmp.as_ref(), y);
                 self.alignment_helper
-                    .volatile_read_regset(&self.ecc.k_mem[0], &mut tmp, 8);
+                    .volatile_read_regset(&self.ecc.k_mem(0), &mut tmp, 8);
                 self.reverse_words(tmp.as_ref(), k);
             } else {
                 self.alignment_helper
@@ -902,7 +902,7 @@ impl<'d> Ecc<'d> {
     }
 
     fn is_busy(&self) -> bool {
-        self.ecc.mult_conf.read().start().bit_is_set()
+        self.ecc.mult_conf().read().start().bit_is_set()
     }
 
     fn reverse_words(&self, src: &[u8], dst: &mut [u8]) {

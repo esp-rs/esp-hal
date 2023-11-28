@@ -68,8 +68,8 @@ ufmt-write = { version = "0.1.0", optional = true }
 # Each supported device MUST have its PAC included below along with a
 # corresponding feature.
 esp32   = { version = "0.27.0", features = ["critical-section"], optional = true }
-esp32c2 = { version = "0.15.0", features = ["critical-section"], optional = true }
-esp32c3 = { version = "0.18.0", features = ["critical-section"], optional = true }
+esp32c2 = { path = "/Users/jesse/Work/esp-pacs/esp32c2", features = ["critical-section"], optional = true }
+esp32c3 = { path = "/Users/jesse/Work/esp-pacs/esp32c3", features = ["critical-section"], optional = true }
 esp32c6 = { version = "0.8.0",  features = ["critical-section"], optional = true }
 esp32h2 = { version = "0.4.0",  features = ["critical-section"], optional = true }
 esp32s2 = { version = "0.18.0", features = ["critical-section"], optional = true }

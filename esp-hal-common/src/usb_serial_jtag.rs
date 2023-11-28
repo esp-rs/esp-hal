@@ -52,12 +52,12 @@ impl<'d> UsbSerialJtag<'d> {
         for chunk in data.chunks(64) {
             for byte in chunk {
                 reg_block
-                    .ep1
+                    .ep1()
                     .write(|w| unsafe { w.rdwr_byte().bits(*byte) });
             }
-            reg_block.ep1_conf.write(|w| w.wr_done().set_bit());
+            reg_block.ep1_conf().write(|w| w.wr_done().set_bit());
 
-            while reg_block.ep1_conf.read().bits() & 0b011 == 0b000 {
+            while reg_block.ep1_conf().read().bits() & 0b011 == 0b000 {
                 // wait
             }
         }
@@ -71,14 +71,14 @@ impl<'d> UsbSerialJtag<'d> {
         let reg_block = self.usb_serial.register_block();
 
         if reg_block
-            .ep1_conf
+            .ep1_conf()
             .read()
             .serial_in_ep_data_free()
             .bit_is_set()
         {
             // the FIFO is not full
             unsafe {
-                reg_block.ep1.write(|w| w.rdwr_byte().bits(word.into()));
+                reg_block.ep1().write(|w| w.rdwr_byte().bits(word.into()));
             }
 
             Ok(())
@@ -90,9 +90,9 @@ impl<'d> UsbSerialJtag<'d> {
     /// Flush the output FIFO and block until it has been sent
     pub fn flush_tx(&mut self) -> Result<(), Error> {
         let reg_block = self.usb_serial.register_block();
-        reg_block.ep1_conf.write(|w| w.wr_done().set_bit());
+        reg_block.ep1_conf().write(|w| w.wr_done().set_bit());
 
-        while reg_block.ep1_conf.read().bits() & 0b011 == 0b000 {
+        while reg_block.ep1_conf().read().bits() & 0b011 == 0b000 {
             // wait
         }
 
@@ -102,9 +102,9 @@ impl<'d> UsbSerialJtag<'d> {
     /// Flush the output FIFO but don't block if it isn't ready immediately
     pub fn flush_tx_nb(&mut self) -> nb::Result<(), Error> {
         let reg_block = self.usb_serial.register_block();
-        reg_block.ep1_conf.write(|w| w.wr_done().set_bit());
+        reg_block.ep1_conf().write(|w| w.wr_done().set_bit());
 
-        if reg_block.ep1_conf.read().bits() & 0b011 == 0b000 {
+        if reg_block.ep1_conf().read().bits() & 0b011 == 0b000 {
             Err(nb::Error::WouldBlock)
         } else {
             Ok(())
@@ -116,12 +116,12 @@ impl<'d> UsbSerialJtag<'d> {
 
         // Check if there are any bytes to read
         if reg_block
-            .ep1_conf
+            .ep1_conf()
             .read()
             .serial_out_ep_data_avail()
             .bit_is_set()
         {
-            let value = reg_block.ep1.read().rdwr_byte().bits();
+            let value = reg_block.ep1().read().rdwr_byte().bits();
 
             Ok(value)
         } else {
@@ -133,7 +133,7 @@ impl<'d> UsbSerialJtag<'d> {
     pub fn listen_rx_packet_recv_interrupt(&mut self) {
         let reg_block = self.usb_serial.register_block();
         reg_block
-            .int_ena
+            .int_ena()
             .modify(|_, w| w.serial_out_recv_pkt_int_ena().set_bit());
     }
 
@@ -141,7 +141,7 @@ impl<'d> UsbSerialJtag<'d> {
     pub fn unlisten_rx_packet_recv_interrupt(&mut self) {
         let reg_block = self.usb_serial.register_block();
         reg_block
-            .int_ena
+            .int_ena()
             .modify(|_, w| w.serial_out_recv_pkt_int_ena().clear_bit());
     }
 
@@ -149,7 +149,7 @@ impl<'d> UsbSerialJtag<'d> {
     pub fn rx_packet_recv_interrupt_set(&mut self) -> bool {
         let reg_block = unsafe { &*USB_DEVICE::PTR };
         reg_block
-            .int_st
+            .int_st()
             .read()
             .serial_out_recv_pkt_int_st()
             .bit_is_set()
@@ -160,7 +160,7 @@ impl<'d> UsbSerialJtag<'d> {
         let reg_block = unsafe { &*USB_DEVICE::PTR };
 
         reg_block
-            .int_clr
+            .int_clr()
             .write(|w| w.serial_out_recv_pkt_int_clr().set_bit())
     }
 
@@ -176,26 +176,26 @@ pub trait Instance {
 
     fn disable_tx_interrupts(&mut self) {
         self.register_block()
-            .int_ena
+            .int_ena()
             .write(|w| w.serial_in_empty_int_ena().clear_bit());
 
         self.register_block()
-            .int_clr
+            .int_clr()
             .write(|w| w.serial_in_empty_int_clr().set_bit())
     }
 
     fn disable_rx_interrupts(&mut self) {
         self.register_block()
-            .int_ena
+            .int_ena()
             .write(|w| w.serial_out_recv_pkt_int_ena().clear_bit());
 
         self.register_block()
-            .int_clr
+            .int_clr()
             .write(|w| w.serial_out_recv_pkt_int_clr().set_bit())
     }
 
     fn get_rx_fifo_count(&self) -> u16 {
-        let ep0_state = self.register_block().in_ep0_st.read();
+        let ep0_state = self.register_block().in_ep0_st().read();
         let wr_addr = ep0_state.in_ep0_wr_addr().bits();
         let rd_addr = ep0_state.in_ep0_rd_addr().bits();
 
@@ -203,7 +203,7 @@ pub trait Instance {
     }
 
     fn get_tx_fifo_count(&self) -> u16 {
-        let ep1_state = self.register_block().in_ep1_st.read();
+        let ep1_state = self.register_block().in_ep1_st().read();
         let wr_addr = ep1_state.in_ep1_wr_addr().bits();
         let rd_addr = ep1_state.in_ep1_rd_addr().bits();
 
@@ -212,7 +212,7 @@ pub trait Instance {
 
     fn txfifo_empty(&self) -> bool {
         self.register_block()
-            .jfifo_st
+            .jfifo_st()
             .read()
             .out_fifo_empty()
             .bit_is_clear()
