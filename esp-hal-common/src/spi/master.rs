@@ -34,18 +34,18 @@
 //! - Use the [`SpiBus`](embedded_hal_1::spi::SpiBus) trait (requires the "eh1"
 //!   feature) and its associated functions to initiate transactions with
 //!   simultaneous reads and writes, or
-// TODO async moved to embedded-hal-bus:
-//! - Use the `ExclusiveDevice` struct from `embedded-hal-bus` or
-//!   `embedded-hal-async` (recommended).
+//! - Use the `ExclusiveDevice` struct from [`embedded-hal-bus`] or `SpiDevice`
+//!   from [`embassy-embedded-hal`].
 //!
 //!
 //! ## Shared SPI access
 //!
 //! If you have multiple devices on the same SPI bus that each have their own CS
-//! line, you may want to have a look at the [`ehal1::SpiBusController`] and
-//! [`ehal1::SpiBusDevice`] implemented here. These give exclusive access to the
-//! underlying SPI bus by means of a Mutex. This ensures that device
-//! transactions do not interfere with each other.
+//! line, you may want to have a look at the implementations provided by
+//! [`embedded-hal-bus`] and [`embassy-embedded-hal`].
+//!
+//! [`embedded-hal-bus`]: https://docs.rs/embedded-hal-bus/latest/embedded_hal_bus/spi/index.html
+//! [`embassy-embedded-hal`]: https://docs.embassy.dev/embassy-embedded-hal/git/default/shared_bus/index.html
 
 use core::marker::PhantomData;
 
@@ -1629,7 +1629,7 @@ pub use ehal1::*;
 mod ehal1 {
     use core::cell::RefCell;
 
-    use embedded_hal_1::spi::{self, ErrorType, Operation, SpiBus, SpiDevice};
+    use embedded_hal_1::spi::{self, ErrorType, Operation, SpiBus};
     use embedded_hal_nb::spi::FullDuplex;
 
     use super::*;
@@ -1723,102 +1723,6 @@ mod ehal1 {
 
         fn flush(&mut self) -> Result<(), Self::Error> {
             self.spi.flush()
-        }
-    }
-
-    /// SPI bus controller.
-    ///
-    /// Has exclusive access to an SPI bus, which is managed via a `Mutex`. Used
-    /// as basis for the [`SpiBusDevice`] implementation. Note that the
-    /// wrapped [`RefCell`] is used solely to achieve interior mutability.
-    pub struct SpiBusController<'d, I: Instance, M: IsFullDuplex> {
-        lock: critical_section::Mutex<RefCell<Spi<'d, I, M>>>,
-    }
-
-    impl<'d, I: Instance, M: IsFullDuplex> SpiBusController<'d, I, M> {
-        /// Create a new controller from an SPI bus instance.
-        ///
-        /// Takes ownership of the SPI bus in the process. Afterwards, the SPI
-        /// bus can only be accessed via instances of [`SpiBusDevice`].
-        pub fn from_spi(bus: Spi<'d, I, M>) -> Self {
-            SpiBusController {
-                lock: critical_section::Mutex::new(RefCell::new(bus)),
-            }
-        }
-
-        pub fn add_device<'a, CS: OutputPin>(&'a self, cs: CS) -> SpiBusDevice<'a, 'd, I, CS, M> {
-            SpiBusDevice::new(self, cs)
-        }
-    }
-
-    impl<'d, I: Instance, M: IsFullDuplex> ErrorType for SpiBusController<'d, I, M> {
-        type Error = spi::ErrorKind;
-    }
-
-    /// An SPI device on a shared SPI bus.
-    ///
-    /// Provides device specific access on a shared SPI bus. Enables attaching
-    /// multiple SPI devices to the same bus, each with its own CS line, and
-    /// performing safe transfers on them.
-    pub struct SpiBusDevice<'a, 'd, I, CS, M>
-    where
-        I: Instance,
-        CS: OutputPin,
-        M: IsFullDuplex,
-    {
-        bus: &'a SpiBusController<'d, I, M>,
-        cs: CS,
-    }
-
-    impl<'a, 'd, I, CS, M> SpiBusDevice<'a, 'd, I, CS, M>
-    where
-        I: Instance,
-        CS: OutputPin,
-        M: IsFullDuplex,
-    {
-        pub fn new(bus: &'a SpiBusController<'d, I, M>, mut cs: CS) -> Self {
-            cs.set_to_push_pull_output().set_output_high(true);
-            SpiBusDevice { bus, cs }
-        }
-    }
-
-    impl<'a, 'd, I, CS, M> ErrorType for SpiBusDevice<'a, 'd, I, CS, M>
-    where
-        I: Instance,
-        CS: OutputPin,
-        M: IsFullDuplex,
-    {
-        type Error = spi::ErrorKind;
-    }
-
-    impl<'a, 'd, I, CS, M> SpiDevice<u8> for SpiBusDevice<'a, 'd, I, CS, M>
-    where
-        I: Instance,
-        CS: OutputPin,
-        M: IsFullDuplex,
-    {
-        fn transaction(&mut self, operations: &mut [Operation<'_, u8>]) -> Result<(), Self::Error> {
-            critical_section::with(|cs| {
-                let mut bus = self.bus.lock.borrow_ref_mut(cs);
-                self.cs.connect_peripheral_to_output(bus.spi.cs_signal());
-
-                let op_res = operations.iter_mut().try_for_each(|op| match op {
-                    Operation::Read(buf) => SpiBus::read(&mut (*bus), buf),
-                    Operation::Write(buf) => SpiBus::write(&mut (*bus), buf),
-                    Operation::Transfer(read, write) => bus.transfer(read, write),
-                    Operation::TransferInPlace(buf) => bus.transfer_in_place(buf),
-                    Operation::DelayUs(_delay) => unimplemented!(),
-                });
-
-                // On failure, it's important to still flush and de-assert CS.
-                let flush_res = bus.flush();
-                self.cs.disconnect_peripheral_from_output();
-
-                op_res.map_err(|_| spi::ErrorKind::Other)?;
-                flush_res.map_err(|_| spi::ErrorKind::Other)?;
-
-                Ok(())
-            })
         }
     }
 }
