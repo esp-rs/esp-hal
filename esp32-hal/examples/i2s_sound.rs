@@ -32,7 +32,7 @@
 use esp32_hal::{
     clock::ClockControl,
     dma::DmaPriority,
-    i2s::{DataFormat, I2s, I2s0New, I2sWriteDma, NoMclk, PinsBclkWsDout, Standard},
+    i2s::{DataFormat, I2s, I2sWriteDma, Standard},
     pdma::Dma,
     peripherals::Peripherals,
     prelude::*,
@@ -64,7 +64,6 @@ fn main() -> ! {
 
     let i2s = I2s::new(
         peripherals.I2S0,
-        NoMclk {},
         Standard::Philips,
         DataFormat::Data16Channel16,
         44100u32.Hz(),
@@ -77,11 +76,12 @@ fn main() -> ! {
         &clocks,
     );
 
-    let i2s_tx = i2s.i2s_tx.with_pins(PinsBclkWsDout::new(
-        io.pins.gpio12,
-        io.pins.gpio13,
-        io.pins.gpio14,
-    ));
+    let i2s_tx = i2s
+        .i2s_tx
+        .with_bclk(io.pins.gpio12)
+        .with_ws(io.pins.gpio13)
+        .with_dout(io.pins.gpio14)
+        .build();
 
     let data =
         unsafe { core::slice::from_raw_parts(&SINE as *const _ as *const u8, SINE.len() * 2) };
