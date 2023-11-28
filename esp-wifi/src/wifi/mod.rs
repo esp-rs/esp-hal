@@ -21,7 +21,6 @@ use crate::EspWifiInitialization;
 
 use critical_section::{CriticalSection, Mutex};
 
-#[cfg(feature = "embedded-svc")]
 use embedded_svc::wifi::{
     AccessPointConfiguration, AccessPointInfo, AuthMethod, ClientConfiguration, Configuration,
     Protocol, SecondaryChannel, Wifi,

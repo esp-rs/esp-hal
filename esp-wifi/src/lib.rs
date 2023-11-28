@@ -73,11 +73,7 @@ pub(crate) mod memory_fence;
 use critical_section;
 use timer::{get_systimer_count, ticks_to_millis};
 
-#[cfg(all(
-    feature = "embedded-svc",
-    feature = "wifi",
-    any(feature = "tcp", feature = "udp")
-))]
+#[cfg(all(feature = "wifi", any(feature = "tcp", feature = "udp")))]
 pub mod wifi_interface;
 
 /// Return the current systimer time in milliseconds
