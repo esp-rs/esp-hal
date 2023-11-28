@@ -45,8 +45,6 @@ At time of writing, you will already have the linkall flag if you used `cargo ge
 
 ### Optimization Level
 
-Link time optimization is not yet recommended for use, please ensure `lto = "off"` is in your `Cargo.toml` for both release and debug profiles.
-
 It is necessary to build with optimization level 2 or 3 since otherwise it might not even be able to connect or advertise.
 
 To make it work also for your debug builds add this to your `Cargo.toml`
@@ -54,12 +52,6 @@ To make it work also for your debug builds add this to your `Cargo.toml`
 ```toml
 [profile.dev.package.esp-wifi]
 opt-level = 3
-
-[profile.dev]
-lto = "off"
-[profile.release]
-lto = "off"
-
 ```
 
 ### Xtensa considerations
