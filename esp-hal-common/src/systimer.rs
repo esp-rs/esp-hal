@@ -435,6 +435,6 @@ pub mod etm {
 
     pub(super) fn enable_etm() {
         let syst = unsafe { crate::peripherals::SYSTIMER::steal() };
-        syst.conf.modify(|_, w| w.etm_en().set_bit());
+        syst.conf().modify(|_, w| w.etm_en().set_bit());
     }
 }

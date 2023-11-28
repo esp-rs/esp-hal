@@ -2200,7 +2200,7 @@ pub mod etm {
 
     fn enable_task_channel(channel: u8, pin: u8) {
         let gpio_sd = unsafe { crate::peripherals::GPIO_SD::steal() };
-        let ptr = unsafe { gpio_sd.etm_task_p0_cfg.as_ptr().add(pin as usize / 4) };
+        let ptr = unsafe { gpio_sd.etm_task_p0_cfg().as_ptr().add(pin as usize / 4) };
         let shift = 8 * (pin as usize % 4);
         // bit 0 = en, bit 1-3 = channel
         unsafe {
@@ -2214,10 +2214,15 @@ pub mod etm {
 
     fn enable_event_channel(channel: u8, pin: u8) {
         let gpio_sd = unsafe { crate::peripherals::GPIO_SD::steal() };
-        gpio_sd.etm_event_ch_cfg[channel as usize].modify(|_, w| w.etm_ch0_event_en().clear_bit());
-        gpio_sd.etm_event_ch_cfg[channel as usize]
+        gpio_sd
+            .etm_event_ch_cfg(channel as usize)
+            .modify(|_, w| w.etm_ch0_event_en().clear_bit());
+        gpio_sd
+            .etm_event_ch_cfg(channel as usize)
             .modify(|_, w| w.etm_ch0_event_sel().variant(pin));
-        gpio_sd.etm_event_ch_cfg[channel as usize].modify(|_, w| w.etm_ch0_event_en().set_bit());
+        gpio_sd
+            .etm_event_ch_cfg(channel as usize)
+            .modify(|_, w| w.etm_ch0_event_en().set_bit());
     }
 }
 
@@ -2422,11 +2427,11 @@ pub mod lp_gpio {
             let lp_io = unsafe { &*crate::peripherals::LP_IO::PTR };
             if enable {
                 lp_io
-                    .out_enable_w1ts
+                    .out_enable_w1ts()
                     .write(|w| w.lp_gpio_enable_w1ts().variant(1 << PIN));
             } else {
                 lp_io
-                    .out_enable_w1tc
+                    .out_enable_w1tc()
                     .write(|w| w.lp_gpio_enable_w1tc().variant(1 << PIN));
             }
         }
@@ -2448,11 +2453,11 @@ pub mod lp_gpio {
             let lp_io = unsafe { &*crate::peripherals::LP_IO::PTR };
             if level {
                 lp_io
-                    .out_data_w1ts
+                    .out_data_w1ts()
                     .write(|w| w.lp_gpio_out_data_w1ts().variant(1 << PIN));
             } else {
                 lp_io
-                    .out_data_w1tc
+                    .out_data_w1tc()
                     .write(|w| w.lp_gpio_out_data_w1tc().variant(1 << PIN));
             }
         }
@@ -2460,7 +2465,7 @@ pub mod lp_gpio {
         #[doc(hidden)]
         pub fn get_level(&self) -> bool {
             let lp_io = unsafe { &*crate::peripherals::LP_IO::PTR };
-            (lp_io.in_.read().lp_gpio_in_data_next().bits() & 1 << PIN) != 0
+            (lp_io.in_().read().lp_gpio_in_data_next().bits() & 1 << PIN) != 0
         }
 
         /// Configures the pin as an input with the internal pull-up resistor
@@ -2508,7 +2513,7 @@ pub mod lp_gpio {
         let lp_aon = unsafe { &*crate::peripherals::LP_AON::PTR };
 
         lp_aon
-            .gpio_mux
+            .gpio_mux()
             .modify(|r, w| w.sel().variant(r.sel().bits() | 1 << pin));
 
         get_pin_reg(pin).modify(|_, w| w.lp_gpio0_mcu_sel().variant(0));
@@ -2520,7 +2525,7 @@ pub mod lp_gpio {
 
         // ideally we should change the SVD and make the GPIOx registers into an
         // array
-        unsafe { core::mem::transmute((lp_io.gpio0.as_ptr()).add(pin as usize)) }
+        unsafe { core::mem::transmute((lp_io.gpio0().as_ptr()).add(pin as usize)) }
     }
 
     /// Configures a pin for use as a low power pin

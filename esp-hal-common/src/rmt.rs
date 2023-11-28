@@ -1331,7 +1331,7 @@ mod chip_specific {
         #[cfg(pcr)]
         {
             let pcr = unsafe { &*crate::peripherals::PCR::PTR };
-            pcr.rmt_sclk_conf.modify(|_, w| {
+            pcr.rmt_sclk_conf().modify(|_, w| {
                 w.sclk_sel()
                     .variant(crate::soc::constants::RMT_CLOCK_SRC)
                     .sclk_div_num()
@@ -1343,7 +1343,7 @@ mod chip_specific {
             });
 
             let rmt = unsafe { &*crate::peripherals::RMT::PTR };
-            rmt.sys_conf.modify(|_, w| w.apb_fifo_mask().set_bit());
+            rmt.sys_conf().modify(|_, w| w.apb_fifo_mask().set_bit());
         }
     }
 

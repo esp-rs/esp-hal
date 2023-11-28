@@ -94,7 +94,7 @@ impl TimerGroupInstance for TIMG0 {
     #[cfg(any(esp32c6, esp32h2))]
     fn configure_src_clk() {
         unsafe { &*crate::peripherals::PCR::PTR }
-            .timergroup0_timer_clk_conf
+            .timergroup0_timer_clk_conf()
             .modify(|_, w| unsafe { w.tg0_timer_clk_sel().bits(TIMG_DEFAULT_CLK_SRC) });
     }
     #[inline(always)]
@@ -124,7 +124,7 @@ impl TimerGroupInstance for TIMG0 {
     #[cfg(any(esp32c6, esp32h2))]
     fn configure_wdt_src_clk() {
         unsafe { &*crate::peripherals::PCR::PTR }
-            .timergroup0_wdt_clk_conf
+            .timergroup0_wdt_clk_conf()
             .modify(|_, w| unsafe { w.tg0_wdt_clk_sel().bits(1) });
     }
     #[inline(always)]
@@ -144,7 +144,7 @@ impl TimerGroupInstance for TIMG1 {
     #[cfg(any(esp32c6, esp32h2))]
     fn configure_src_clk() {
         unsafe { &*crate::peripherals::PCR::PTR }
-            .timergroup1_timer_clk_conf
+            .timergroup1_timer_clk_conf()
             .modify(|_, w| unsafe { w.tg1_timer_clk_sel().bits(TIMG_DEFAULT_CLK_SRC) });
     }
     #[inline(always)]
@@ -166,7 +166,7 @@ impl TimerGroupInstance for TIMG1 {
     #[cfg(any(esp32c6, esp32h2))]
     fn configure_wdt_src_clk() {
         unsafe { &*crate::peripherals::PCR::PTR }
-            .timergroup1_wdt_clk_conf
+            .timergroup1_wdt_clk_conf()
             .modify(|_, w| unsafe { w.tg1_wdt_clk_sel().bits(1) });
     }
     #[inline(always)]

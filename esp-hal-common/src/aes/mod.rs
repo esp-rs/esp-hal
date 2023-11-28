@@ -506,8 +506,8 @@ pub mod dma {
         pub fn reset_aes(&self) {
             unsafe {
                 let s = crate::peripherals::PCR::steal();
-                s.aes_conf.modify(|_, w| w.aes_rst_en().set_bit());
-                s.aes_conf.modify(|_, w| w.aes_rst_en().clear_bit());
+                s.aes_conf().modify(|_, w| w.aes_rst_en().set_bit());
+                s.aes_conf().modify(|_, w| w.aes_rst_en().clear_bit());
             }
         }
 

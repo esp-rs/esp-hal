@@ -571,12 +571,12 @@ where
         #[cfg(esp32)]
         let reg_thrhd = &T::register_block().conf1;
         #[cfg(any(esp32c6, esp32h2))]
-        let reg_thrhd = &T::register_block().tout_conf;
+        let reg_thrhd = &T::register_block().tout_conf();
         #[cfg(any(esp32c2, esp32c3, esp32s2, esp32s3))]
         let reg_thrhd = &T::register_block().mem_conf();
 
         #[cfg(any(esp32c6, esp32h2))]
-        let reg_en = &T::register_block().tout_conf;
+        let reg_en = &T::register_block().tout_conf();
         #[cfg(any(esp32, esp32c2, esp32c3, esp32s2, esp32s3))]
         let reg_en = &T::register_block().conf1();
 
@@ -840,10 +840,10 @@ where
 
         match T::uart_number() {
             0 => {
-                pcr.uart0_conf
+                pcr.uart0_conf()
                     .modify(|_, w| w.uart0_rst_en().clear_bit().uart0_clk_en().set_bit());
 
-                pcr.uart0_sclk_conf.modify(|_, w| unsafe {
+                pcr.uart0_sclk_conf().modify(|_, w| unsafe {
                     w.uart0_sclk_div_a()
                         .bits(0)
                         .uart0_sclk_div_b()
@@ -857,10 +857,10 @@ where
                 });
             }
             1 => {
-                pcr.uart1_conf
+                pcr.uart1_conf()
                     .modify(|_, w| w.uart1_rst_en().clear_bit().uart1_clk_en().set_bit());
 
-                pcr.uart1_sclk_conf.modify(|_, w| unsafe {
+                pcr.uart1_sclk_conf().modify(|_, w| unsafe {
                     w.uart1_sclk_div_a()
                         .bits(0)
                         .uart1_sclk_div_b()
@@ -881,7 +881,7 @@ where
         let divider = divider as u16;
 
         T::register_block()
-            .clkdiv
+            .clkdiv()
             .write(|w| unsafe { w.clkdiv().bits(divider).frag().bits(0) });
 
         self.sync_regs();
@@ -907,11 +907,11 @@ where
     #[inline(always)]
     fn sync_regs(&self) {
         T::register_block()
-            .reg_update
+            .reg_update()
             .modify(|_, w| w.reg_update().set_bit());
 
         while T::register_block()
-            .reg_update
+            .reg_update()
             .read()
             .reg_update()
             .bit_is_set()

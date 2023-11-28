@@ -347,11 +347,11 @@ macro_rules! start_duty_without_fading {
 macro_rules! start_duty_without_fading {
     ($self: ident, $num: literal) => {
         paste! {
-            $self.ledc.[<ch $num _conf1>].write(|w|
+            $self.ledc.[<ch $num _conf1>]().write(|w|
                 w.[<duty_start>]()
                     .set_bit()
             );
-            $self.ledc.[<ch $num _gamma_wr>].write(|w| unsafe {
+            $self.ledc.[<ch $num _gamma_wr>]().write(|w| unsafe {
                 w.[<ch_gamma_duty_inc>]()
                     .set_bit()
                     .[<ch_gamma_duty_num>]()
@@ -412,11 +412,11 @@ macro_rules! start_duty_fade {
 macro_rules! start_duty_fade {
     ($self: ident, $num: literal, $duty_inc: ident, $duty_steps: ident, $cycles_per_step: ident, $duty_per_cycle: ident) => {
         paste! {
-            $self.ledc.[<ch $num _conf1>].write(|w|
+            $self.ledc.[<ch $num _conf1>]().write(|w|
                 w.[<duty_start>]()
                     .set_bit()
             );
-            $self.ledc.[<ch $num _gamma_wr>].write(|w| unsafe {
+            $self.ledc.[<ch $num _gamma_wr>]().write(|w| unsafe {
                 w.[<ch_gamma_duty_inc>]()
                     .variant($duty_inc)
                     .[<ch_gamma_duty_num>]()  /* count of incs before stopping */
@@ -426,11 +426,11 @@ macro_rules! start_duty_fade {
                     .[<ch_gamma_scale>]()
                     .bits($duty_per_cycle)
                 });
-            $self.ledc.[<ch $num _gamma_wr_addr>].write(|w| unsafe {
+            $self.ledc.[<ch $num _gamma_wr_addr>]().write(|w| unsafe {
                 w.[<ch_gamma_wr_addr>]()
                     .bits(0)
             });
-            $self.ledc.[<ch_gamma_conf>][$num].write(|w| unsafe {
+            $self.ledc.[<ch_gamma_conf>]($num).write(|w| unsafe {
                 w.[<ch_gamma_entry_num>]()
                     .bits(0x1)
             });

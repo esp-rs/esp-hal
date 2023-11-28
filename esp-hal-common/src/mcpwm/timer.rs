@@ -78,8 +78,8 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
 
         match TIM {
             0 => {
-                let sw = block.timer0_sync.read().sw().bit_is_set();
-                block.timer0_sync.write(|w| {
+                let sw = block.timer0_sync().read().sw().bit_is_set();
+                block.timer0_sync().write(|w| {
                     w.timer0_phase_direction()
                         .variant(direction as u8 != 0)
                         .timer0_phase()
@@ -89,8 +89,8 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
                 });
             }
             1 => {
-                let sw = block.timer1_sync.read().sw().bit_is_set();
-                block.timer1_sync.write(|w| {
+                let sw = block.timer1_sync().read().sw().bit_is_set();
+                block.timer1_sync().write(|w| {
                     w.timer1_phase_direction()
                         .variant(direction as u8 != 0)
                         .timer1_phase()
@@ -100,8 +100,8 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
                 });
             }
             2 => {
-                let sw = block.timer2_sync.read().sw().bit_is_set();
-                block.timer2_sync.write(|w| {
+                let sw = block.timer2_sync().read().sw().bit_is_set();
+                block.timer2_sync().write(|w| {
                     w.timer2_phase_direction()
                         .variant(direction as u8 != 0)
                         .timer2_phase()
@@ -122,21 +122,21 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
 
         match TIM {
             0 => {
-                let reg = block.timer0_status.read();
+                let reg = block.timer0_status().read();
                 (
                     reg.timer0_value().bits(),
                     reg.timer0_direction().bit_is_set().into(),
                 )
             }
             1 => {
-                let reg = block.timer1_status.read();
+                let reg = block.timer1_status().read();
                 (
                     reg.timer1_value().bits(),
                     reg.timer1_direction().bit_is_set().into(),
                 )
             }
             2 => {
-                let reg = block.timer2_status.read();
+                let reg = block.timer2_status().read();
                 (
                     reg.timer2_value().bits(),
                     reg.timer2_direction().bit_is_set().into(),
@@ -155,9 +155,9 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
         // The CFG0 registers are identical for all timers so we can pretend they're
         // TIMER0_CFG0
         match TIM {
-            0 => &block.timer0_cfg0,
-            1 => unsafe { &*(&block.timer1_cfg0 as *const _ as *const _) },
-            2 => unsafe { &*(&block.timer2_cfg0 as *const _ as *const _) },
+            0 => &block.timer0_cfg0(),
+            1 => unsafe { &*(&block.timer1_cfg0() as *const _ as *const _) },
+            2 => unsafe { &*(&block.timer2_cfg0() as *const _ as *const _) },
             _ => unreachable!(),
         }
     }
@@ -171,9 +171,9 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
         // The CFG1 registers are identical for all timers so we can pretend they're
         // TIMER0_CFG1
         match TIM {
-            0 => &block.timer0_cfg1,
-            1 => unsafe { &*(&block.timer1_cfg1 as *const _ as *const _) },
-            2 => unsafe { &*(&block.timer2_cfg1 as *const _ as *const _) },
+            0 => &block.timer0_cfg1(),
+            1 => unsafe { &*(&block.timer1_cfg1() as *const _ as *const _) },
+            2 => unsafe { &*(&block.timer2_cfg1() as *const _ as *const _) },
             _ => unreachable!(),
         }
     }

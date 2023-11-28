@@ -598,16 +598,16 @@ pub fn get_status(_core: Cpu) -> u128 {
     #[cfg(large_intr_status)]
     unsafe {
         ((*crate::peripherals::INTERRUPT_CORE0::PTR)
-            .intr_status_reg_0
+            .intr_status_reg_0()
             .read()
             .bits() as u128)
             | ((*crate::peripherals::INTERRUPT_CORE0::PTR)
-                .intr_status_reg_1
+                .intr_status_reg_1()
                 .read()
                 .bits() as u128)
                 << 32
             | ((*crate::peripherals::INTERRUPT_CORE0::PTR)
-                .int_status_reg_2
+                .int_status_reg_2()
                 .read()
                 .bits() as u128)
                 << 64

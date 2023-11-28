@@ -253,9 +253,13 @@ impl<'d> Rtc<'d> {
         };
         #[cfg(any(esp32c6, esp32h2))]
         let (l, h) = {
-            rtc_cntl.update.write(|w| w.main_timer_update().set_bit());
-            let h = rtc_cntl.main_buf0_high.read().main_timer_buf0_high().bits();
-            let l = rtc_cntl.main_buf0_low.read().main_timer_buf0_low().bits();
+            rtc_cntl.update().write(|w| w.main_timer_update().set_bit());
+            let h = rtc_cntl
+                .main_buf0_high()
+                .read()
+                .main_timer_buf0_high()
+                .bits();
+            let l = rtc_cntl.main_buf0_low().read().main_timer_buf0_low().bits();
             (l, h)
         };
         ((h as u64) << 32) | (l as u64)
@@ -847,7 +851,7 @@ impl Rwdt {
                 .modify(|_, w| w.wdt_stg0_hold().bits(timeout_raw));
 
             #[cfg(any(esp32c6, esp32h2))]
-            rtc_cntl.config1.modify(|_, w| {
+            rtc_cntl.config1().modify(|_, w| {
                 w.wdt_stg0_hold()
                     .bits(timeout_raw >> (1 + Efuse::get_rwdt_multiplier()))
             });
@@ -973,7 +977,7 @@ pub fn get_wakeup_cause() -> SleepSource {
     #[cfg(any(esp32c6, esp32h2))]
     let wakeup_cause = WakeupReason::from_bits_retain(unsafe {
         (&*crate::peripherals::PMU::PTR)
-            .slp_wakeup_status0
+            .slp_wakeup_status0()
             .read()
             .wakeup_cause()
             .bits()

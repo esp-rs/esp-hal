@@ -107,17 +107,17 @@ impl<'d, PWM: PwmPeripheral> MCPWM<'d, PWM> {
         {
             // set prescaler
             peripheral
-                .clk_cfg
+                .clk_cfg()
                 .write(|w| w.clk_prescale().variant(peripheral_clock.prescaler));
 
             // enable clock
-            peripheral.clk.write(|w| w.en().set_bit());
+            peripheral.clk().write(|w| w.en().set_bit());
         }
 
         #[cfg(esp32c6)]
         {
             unsafe { &*crate::peripherals::PCR::PTR }
-                .pwm_clk_conf
+                .pwm_clk_conf()
                 .modify(|_, w| unsafe {
                     w.pwm_div_num()
                         .variant(peripheral_clock.prescaler)
@@ -133,7 +133,7 @@ impl<'d, PWM: PwmPeripheral> MCPWM<'d, PWM> {
         #[cfg(esp32h2)]
         {
             unsafe { &*crate::peripherals::PCR::PTR }
-                .pwm_clk_conf
+                .pwm_clk_conf()
                 .modify(|_, w| unsafe {
                     w.pwm_div_num()
                         .variant(peripheral_clock.prescaler)

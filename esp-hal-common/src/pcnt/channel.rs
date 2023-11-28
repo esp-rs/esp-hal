@@ -97,18 +97,18 @@ impl Channel {
     pub fn configure(&mut self, ctrl_signal: PcntSource, edge_signal: PcntSource, config: Config) {
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
         let conf0 = match self.unit {
-            unit::Number::Unit0 => &pcnt.u0_conf0,
-            unit::Number::Unit1 => &pcnt.u1_conf0,
-            unit::Number::Unit2 => &pcnt.u2_conf0,
-            unit::Number::Unit3 => &pcnt.u3_conf0,
+            unit::Number::Unit0 => &pcnt.u0_conf0(),
+            unit::Number::Unit1 => &pcnt.u1_conf0(),
+            unit::Number::Unit2 => &pcnt.u2_conf0(),
+            unit::Number::Unit3 => &pcnt.u3_conf0(),
             #[cfg(esp32)]
-            unit::Number::Unit4 => &pcnt.u4_conf0,
+            unit::Number::Unit4 => &pcnt.u4_conf0(),
             #[cfg(esp32)]
-            unit::Number::Unit5 => &pcnt.u5_conf0,
+            unit::Number::Unit5 => &pcnt.u5_conf0(),
             #[cfg(esp32)]
-            unit::Number::Unit6 => &pcnt.u6_conf0,
+            unit::Number::Unit6 => &pcnt.u6_conf0(),
             #[cfg(esp32)]
-            unit::Number::Unit7 => &pcnt.u7_conf0,
+            unit::Number::Unit7 => &pcnt.u7_conf0(),
         };
         match self.channel {
             Number::Channel0 => {
@@ -182,14 +182,16 @@ impl Channel {
         };
 
         if (signal as usize) <= crate::gpio::INPUT_SIGNAL_MAX as usize {
-            unsafe { &*GPIO::PTR }.func_in_sel_cfg[signal as usize].modify(|_, w| unsafe {
-                w.sel()
-                    .set_bit()
-                    .in_inv_sel()
-                    .bit(invert)
-                    .in_sel()
-                    .bits(source.source)
-            });
+            unsafe { &*GPIO::PTR }
+                .func_in_sel_cfg(signal as usize)
+                .modify(|_, w| unsafe {
+                    w.sel()
+                        .set_bit()
+                        .in_inv_sel()
+                        .bit(invert)
+                        .in_sel()
+                        .bits(source.source)
+                });
         }
         self
     }
@@ -236,14 +238,16 @@ impl Channel {
         };
 
         if (signal as usize) <= crate::gpio::INPUT_SIGNAL_MAX as usize {
-            unsafe { &*GPIO::PTR }.func_in_sel_cfg[signal as usize].modify(|_, w| unsafe {
-                w.sel()
-                    .set_bit()
-                    .in_inv_sel()
-                    .bit(invert)
-                    .in_sel()
-                    .bits(source.source)
-            });
+            unsafe { &*GPIO::PTR }
+                .func_in_sel_cfg(signal as usize)
+                .modify(|_, w| unsafe {
+                    w.sel()
+                        .set_bit()
+                        .in_inv_sel()
+                        .bit(invert)
+                        .in_sel()
+                        .bits(source.source)
+                });
         }
         self
     }

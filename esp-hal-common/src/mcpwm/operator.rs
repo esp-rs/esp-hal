@@ -178,9 +178,9 @@ fn dt_red<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mc
 fn dt_cfg<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mcpwm0::DT0_CFG {
     let block = unsafe { &*PWM::block() };
     match OP {
-        0 => &block.dt0_cfg,
-        1 => unsafe { &*(&block.dt1_cfg as *const _ as *const _) },
-        2 => unsafe { &*(&block.dt2_cfg as *const _ as *const _) },
+        0 => &block.dt0_cfg(),
+        1 => unsafe { &*(&block.dt1_cfg() as *const _ as *const _) },
+        2 => unsafe { &*(&block.dt2_cfg() as *const _ as *const _) },
         _ => unreachable!(),
     }
 }
@@ -189,9 +189,9 @@ fn dt_cfg<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mc
 fn dt_fed<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mcpwm0::DT0_FED_CFG {
     let block = unsafe { &*PWM::block() };
     match OP {
-        0 => &block.dt0_fed_cfg,
-        1 => unsafe { &*(&block.dt1_fed_cfg as *const _ as *const _) },
-        2 => unsafe { &*(&block.dt2_fed_cfg as *const _ as *const _) },
+        0 => &block.dt0_fed_cfg(),
+        1 => unsafe { &*(&block.dt1_fed_cfg() as *const _ as *const _) },
+        2 => unsafe { &*(&block.dt2_fed_cfg() as *const _ as *const _) },
         _ => unreachable!(),
     }
 }
@@ -199,9 +199,9 @@ fn dt_fed<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mc
 fn dt_red<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mcpwm0::DT0_RED_CFG {
     let block = unsafe { &*PWM::block() };
     match OP {
-        0 => &block.dt0_red_cfg,
-        1 => unsafe { &*(&block.dt1_red_cfg as *const _ as *const _) },
-        2 => unsafe { &*(&block.dt2_red_cfg as *const _ as *const _) },
+        0 => &block.dt0_red_cfg(),
+        1 => unsafe { &*(&block.dt1_red_cfg() as *const _ as *const _) },
+        2 => unsafe { &*(&block.dt2_red_cfg() as *const _ as *const _) },
         _ => unreachable!(),
     }
 }
@@ -242,7 +242,7 @@ impl<const OP: u8, PWM: PwmPeripheral> Operator<OP, PWM> {
         // SAFETY:
         // We only write to our OPERATORx_TIMERSEL register
         let block = unsafe { &*PWM::block() };
-        block.operator_timersel.modify(|_, w| match OP {
+        block.operator_timersel().modify(|_, w| match OP {
             0 => w.operator0_timersel().variant(TIM),
             1 => w.operator1_timersel().variant(TIM),
             2 => w.operator2_timersel().variant(TIM),
@@ -373,12 +373,12 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
         // `bits` is a valid bit pattern
         unsafe {
             match (OP, IS_A) {
-                (0, true) => block.gen0_a.write(|w| w.bits(bits)),
-                (1, true) => block.gen1_a.write(|w| w.bits(bits)),
-                (2, true) => block.gen2_a.write(|w| w.bits(bits)),
-                (0, false) => block.gen0_b.write(|w| w.bits(bits)),
-                (1, false) => block.gen1_b.write(|w| w.bits(bits)),
-                (2, false) => block.gen2_b.write(|w| w.bits(bits)),
+                (0, true) => block.gen0_a().write(|w| w.bits(bits)),
+                (1, true) => block.gen1_a().write(|w| w.bits(bits)),
+                (2, true) => block.gen2_a().write(|w| w.bits(bits)),
+                (0, false) => block.gen0_b().write(|w| w.bits(bits)),
+                (1, false) => block.gen1_b().write(|w| w.bits(bits)),
+                (2, false) => block.gen2_b().write(|w| w.bits(bits)),
                 _ => unreachable!(),
             }
         }
@@ -457,22 +457,22 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
         let bits = update_method.0;
         match (OP, IS_A) {
             (0, true) => block
-                .gen0_stmp_cfg
+                .gen0_stmp_cfg()
                 .modify(|_, w| w.cmpr0_a_upmethod().variant(bits)),
             (1, true) => block
-                .gen1_stmp_cfg
+                .gen1_stmp_cfg()
                 .modify(|_, w| w.cmpr1_a_upmethod().variant(bits)),
             (2, true) => block
-                .gen2_stmp_cfg
+                .gen2_stmp_cfg()
                 .modify(|_, w| w.cmpr2_a_upmethod().variant(bits)),
             (0, false) => block
-                .gen0_stmp_cfg
+                .gen0_stmp_cfg()
                 .modify(|_, w| w.cmpr0_b_upmethod().variant(bits)),
             (1, false) => block
-                .gen1_stmp_cfg
+                .gen1_stmp_cfg()
                 .modify(|_, w| w.cmpr1_b_upmethod().variant(bits)),
             (2, false) => block
-                .gen2_stmp_cfg
+                .gen2_stmp_cfg()
                 .modify(|_, w| w.cmpr2_b_upmethod().variant(bits)),
             _ => {
                 unreachable!()
@@ -573,12 +573,12 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
         // We only write to our GENx_TSTMP_x register
         let block = unsafe { &*PWM::block() };
         match (OP, IS_A) {
-            (0, true) => block.gen0_tstmp_a.write(|w| w.cmpr0_a().variant(value)),
-            (1, true) => block.gen1_tstmp_a.write(|w| w.cmpr1_a().variant(value)),
-            (2, true) => block.gen2_tstmp_a.write(|w| w.cmpr2_a().variant(value)),
-            (0, false) => block.gen0_tstmp_b.write(|w| w.cmpr0_b().variant(value)),
-            (1, false) => block.gen1_tstmp_b.write(|w| w.cmpr1_b().variant(value)),
-            (2, false) => block.gen2_tstmp_b.write(|w| w.cmpr2_b().variant(value)),
+            (0, true) => block.gen0_tstmp_a().write(|w| w.cmpr0_a().variant(value)),
+            (1, true) => block.gen1_tstmp_a().write(|w| w.cmpr1_a().variant(value)),
+            (2, true) => block.gen2_tstmp_a().write(|w| w.cmpr2_a().variant(value)),
+            (0, false) => block.gen0_tstmp_b().write(|w| w.cmpr0_b().variant(value)),
+            (1, false) => block.gen1_tstmp_b().write(|w| w.cmpr1_b().variant(value)),
+            (2, false) => block.gen2_tstmp_b().write(|w| w.cmpr2_b().variant(value)),
             _ => {
                 unreachable!()
             }
@@ -594,12 +594,12 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
         // We only read to our GENx_TSTMP_x register
         let block = unsafe { &*PWM::block() };
         match (OP, IS_A) {
-            (0, true) => block.gen0_tstmp_a.read().cmpr0_a().bits(),
-            (1, true) => block.gen1_tstmp_a.read().cmpr1_a().bits(),
-            (2, true) => block.gen2_tstmp_a.read().cmpr2_a().bits(),
-            (0, false) => block.gen0_tstmp_b.read().cmpr0_b().bits(),
-            (1, false) => block.gen1_tstmp_b.read().cmpr1_b().bits(),
-            (2, false) => block.gen2_tstmp_b.read().cmpr2_b().bits(),
+            (0, true) => block.gen0_tstmp_a().read().cmpr0_a().bits(),
+            (1, true) => block.gen1_tstmp_a().read().cmpr1_a().bits(),
+            (2, true) => block.gen2_tstmp_a().read().cmpr2_a().bits(),
+            (0, false) => block.gen0_tstmp_b().read().cmpr0_b().bits(),
+            (1, false) => block.gen1_tstmp_b().read().cmpr1_b().bits(),
+            (2, false) => block.gen2_tstmp_b().read().cmpr2_b().bits(),
             _ => {
                 unreachable!()
             }
@@ -612,7 +612,7 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
         // We only grant access to our CFG0 register with the lifetime of &mut self
         let block = unsafe { &*PWM::block() };
 
-        let tim_select = block.operator_timersel.read();
+        let tim_select = block.operator_timersel().read();
         let tim = match OP {
             0 => tim_select.operator0_timersel().bits(),
             1 => tim_select.operator1_timersel().bits(),
@@ -626,9 +626,9 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
         // The CFG0 registers are identical for all timers so we can pretend they're
         // TIMER0_CFG0
         let timer0_cfg = match tim {
-            0 => &block.timer0_cfg0,
-            1 => unsafe { &*(&block.timer1_cfg0 as *const _ as *const _) },
-            2 => unsafe { &*(&block.timer2_cfg0 as *const _ as *const _) },
+            0 => &block.timer0_cfg0(),
+            1 => unsafe { &*(&block.timer1_cfg0() as *const _ as *const _) },
+            2 => unsafe { &*(&block.timer2_cfg0() as *const _ as *const _) },
             _ => unreachable!(),
         };
         timer0_cfg.read().timer0_period().bits()

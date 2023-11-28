@@ -1380,7 +1380,7 @@ mod private {
                 }
             }
 
-            pcr.i2s_tx_clkm_div_conf.modify(|_, w| {
+            pcr.i2s_tx_clkm_div_conf().modify(|_, w| {
                 w.i2s_tx_clkm_div_x()
                     .variant(clkm_div_x as u16)
                     .i2s_tx_clkm_div_y()
@@ -1391,7 +1391,7 @@ mod private {
                     .variant(clkm_div_z as u16)
             });
 
-            pcr.i2s_tx_clkm_conf.modify(|_, w| {
+            pcr.i2s_tx_clkm_conf().modify(|_, w| {
                 w.i2s_tx_clkm_en()
                     .set_bit()
                     .i2s_tx_clkm_sel()
@@ -1401,17 +1401,17 @@ mod private {
             });
 
             #[cfg(not(esp32h2))]
-            i2s.tx_conf1.modify(|_, w| {
+            i2s.tx_conf1().modify(|_, w| {
                 w.tx_bck_div_num()
                     .variant((clock_settings.bclk_divider - 1) as u8)
             });
             #[cfg(esp32h2)]
-            i2s.tx_conf.modify(|_, w| {
+            i2s.tx_conf().modify(|_, w| {
                 w.tx_bck_div_num()
                     .variant((clock_settings.bclk_divider - 1) as u8)
             });
 
-            pcr.i2s_rx_clkm_div_conf.modify(|_, w| {
+            pcr.i2s_rx_clkm_div_conf().modify(|_, w| {
                 w.i2s_rx_clkm_div_x()
                     .variant(clkm_div_x as u16)
                     .i2s_rx_clkm_div_y()
@@ -1422,7 +1422,7 @@ mod private {
                     .variant(clkm_div_z as u16)
             });
 
-            pcr.i2s_rx_clkm_conf.modify(|_, w| {
+            pcr.i2s_rx_clkm_conf().modify(|_, w| {
                 w.i2s_rx_clkm_en()
                     .set_bit()
                     .i2s_rx_clkm_sel()
@@ -1433,12 +1433,12 @@ mod private {
                     .variant(true)
             });
             #[cfg(not(esp32h2))]
-            i2s.rx_conf1.modify(|_, w| {
+            i2s.rx_conf1().modify(|_, w| {
                 w.rx_bck_div_num()
                     .variant((clock_settings.bclk_divider - 1) as u8)
             });
             #[cfg(esp32h2)]
-            i2s.rx_conf.modify(|_, w| {
+            i2s.rx_conf().modify(|_, w| {
                 w.rx_bck_div_num()
                     .variant((clock_settings.bclk_divider - 1) as u8)
             });
