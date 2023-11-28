@@ -569,7 +569,7 @@ where
         const MAX_THRHD: u16 = 0x3FF; // 10 bits
 
         #[cfg(esp32)]
-        let reg_thrhd = &T::register_block().conf1;
+        let reg_thrhd = &T::register_block().conf1();
         #[cfg(any(esp32c6, esp32h2))]
         let reg_thrhd = &T::register_block().tout_conf();
         #[cfg(any(esp32c2, esp32c3, esp32s2, esp32s3))]
@@ -751,19 +751,19 @@ where
         #[cfg(esp32)]
         if stop_bits == config::StopBits::STOP2 {
             T::register_block()
-                .rs485_conf
+                .rs485_conf()
                 .modify(|_, w| w.dl1_en().bit(true));
 
             T::register_block()
-                .conf0
+                .conf0()
                 .modify(|_, w| unsafe { w.stop_bit_num().bits(1) });
         } else {
             T::register_block()
-                .rs485_conf
+                .rs485_conf()
                 .modify(|_, w| w.dl1_en().bit(false));
 
             T::register_block()
-                .conf0
+                .conf0()
                 .modify(|_, w| unsafe { w.stop_bit_num().bits(stop_bits as u8) });
         }
 
@@ -1001,13 +1001,13 @@ pub trait Instance {
         #[cfg(esp32)]
         {
             let rd_addr: u16 = Self::register_block()
-                .mem_rx_status
+                .mem_rx_status()
                 .read()
                 .mem_rx_rd_addr()
                 .bits()
                 .into();
             let wr_addr: u16 = Self::register_block()
-                .mem_rx_status
+                .mem_rx_status()
                 .read()
                 .mem_rx_wr_addr()
                 .bits()
@@ -1032,7 +1032,7 @@ pub trait Instance {
 
     fn is_tx_idle() -> bool {
         #[cfg(esp32)]
-        let idle = Self::register_block().status.read().st_utx_out().bits() == 0x0u8;
+        let idle = Self::register_block().status().read().st_utx_out().bits() == 0x0u8;
         #[cfg(not(esp32))]
         let idle = Self::register_block()
             .fsm_status()
@@ -1046,7 +1046,7 @@ pub trait Instance {
 
     fn is_rx_idle() -> bool {
         #[cfg(esp32)]
-        let idle = Self::register_block().status.read().st_urx_out().bits() == 0x0u8;
+        let idle = Self::register_block().status().read().st_urx_out().bits() == 0x0u8;
         #[cfg(not(esp32))]
         let idle = Self::register_block()
             .fsm_status()

@@ -383,7 +383,7 @@ impl RegisterAccess for ADC1 {
                 adc.int_clr()
                     .write(|w| w.adc1_done_int_clr().set_bit());
             } else {
-                adc.int_clr
+                adc.int_clr()
                     .write(|w| w.apb_saradc1_done_int_clr().set_bit());
             }
         }
@@ -596,7 +596,7 @@ where
 
         #[cfg(esp32s3)]
         sensors
-            .sar_peri_clk_gate_conf
+            .sar_peri_clk_gate_conf()
             .modify(|_, w| w.saradc_clk_en().set_bit());
 
         sensors

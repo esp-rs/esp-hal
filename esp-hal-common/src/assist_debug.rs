@@ -347,14 +347,14 @@ impl<'d> DebugAssist<'d> {
         writes: bool,
     ) {
         self.debug_assist
-            .core_1_area_dram0_0_min
+            .core_1_area_dram0_0_min()
             .write(|w| w.core_1_area_dram0_0_min().variant(lower_bound));
 
         self.debug_assist
-            .core_1_area_dram0_0_max
+            .core_1_area_dram0_0_max()
             .write(|w| w.core_1_area_dram0_0_max().variant(upper_bound));
 
-        self.debug_assist.core_1_montr_ena.modify(|_, w| {
+        self.debug_assist.core_1_montr_ena().modify(|_, w| {
             w.core_1_area_dram0_0_rd_ena()
                 .bit(reads)
                 .core_1_area_dram0_0_wr_ena()
@@ -363,7 +363,7 @@ impl<'d> DebugAssist<'d> {
 
         self.clear_core1_region0_monitor_interrupt();
 
-        self.debug_assist.core_1_intr_ena.modify(|_, w| {
+        self.debug_assist.core_1_intr_ena().modify(|_, w| {
             w.core_1_area_dram0_0_rd_intr_ena()
                 .set_bit()
                 .core_1_area_dram0_0_wr_intr_ena()
@@ -372,14 +372,14 @@ impl<'d> DebugAssist<'d> {
     }
 
     pub fn disable_core1_region0_monitor(&mut self) {
-        self.debug_assist.core_1_intr_ena.modify(|_, w| {
+        self.debug_assist.core_1_intr_ena().modify(|_, w| {
             w.core_1_area_dram0_0_rd_intr_ena()
                 .clear_bit()
                 .core_1_area_dram0_0_wr_intr_ena()
                 .clear_bit()
         });
 
-        self.debug_assist.core_1_montr_ena.modify(|_, w| {
+        self.debug_assist.core_1_montr_ena().modify(|_, w| {
             w.core_1_area_dram0_0_rd_ena()
                 .clear_bit()
                 .core_1_area_dram0_0_wr_ena()
@@ -388,7 +388,7 @@ impl<'d> DebugAssist<'d> {
     }
 
     pub fn clear_core1_region0_monitor_interrupt(&mut self) {
-        self.debug_assist.core_1_intr_clr.write(|w| {
+        self.debug_assist.core_1_intr_clr().write(|w| {
             w.core_1_area_dram0_0_rd_clr()
                 .set_bit()
                 .core_1_area_dram0_0_wr_clr()
@@ -398,13 +398,13 @@ impl<'d> DebugAssist<'d> {
 
     pub fn is_core1_region0_monitor_interrupt_set(&self) -> bool {
         self.debug_assist
-            .core_1_intr_raw
+            .core_1_intr_raw()
             .read()
             .core_1_area_dram0_0_rd_raw()
             .bit_is_set()
             || self
                 .debug_assist
-                .core_1_intr_raw
+                .core_1_intr_raw()
                 .read()
                 .core_1_area_dram0_0_wr_raw()
                 .bit_is_set()
@@ -418,14 +418,14 @@ impl<'d> DebugAssist<'d> {
         writes: bool,
     ) {
         self.debug_assist
-            .core_1_area_dram0_1_min
+            .core_1_area_dram0_1_min()
             .write(|w| w.core_1_area_dram0_1_min().variant(lower_bound));
 
         self.debug_assist
-            .core_1_area_dram0_1_max
+            .core_1_area_dram0_1_max()
             .write(|w| w.core_1_area_dram0_1_max().variant(upper_bound));
 
-        self.debug_assist.core_1_montr_ena.modify(|_, w| {
+        self.debug_assist.core_1_montr_ena().modify(|_, w| {
             w.core_1_area_dram0_1_rd_ena()
                 .bit(reads)
                 .core_1_area_dram0_1_wr_ena()
@@ -434,7 +434,7 @@ impl<'d> DebugAssist<'d> {
 
         self.clear_core1_region1_monitor_interrupt();
 
-        self.debug_assist.core_1_intr_ena.modify(|_, w| {
+        self.debug_assist.core_1_intr_ena().modify(|_, w| {
             w.core_1_area_dram0_1_rd_intr_ena()
                 .set_bit()
                 .core_1_area_dram0_1_wr_intr_ena()
@@ -443,14 +443,14 @@ impl<'d> DebugAssist<'d> {
     }
 
     pub fn disable_core1_region1_monitor(&mut self) {
-        self.debug_assist.core_1_intr_ena.modify(|_, w| {
+        self.debug_assist.core_1_intr_ena().modify(|_, w| {
             w.core_1_area_dram0_1_rd_intr_ena()
                 .clear_bit()
                 .core_1_area_dram0_1_wr_intr_ena()
                 .clear_bit()
         });
 
-        self.debug_assist.core_1_montr_ena.modify(|_, w| {
+        self.debug_assist.core_1_montr_ena().modify(|_, w| {
             w.core_1_area_dram0_1_rd_ena()
                 .clear_bit()
                 .core_1_area_dram0_1_wr_ena()
@@ -459,7 +459,7 @@ impl<'d> DebugAssist<'d> {
     }
 
     pub fn clear_core1_region1_monitor_interrupt(&mut self) {
-        self.debug_assist.core_1_intr_clr.write(|w| {
+        self.debug_assist.core_1_intr_clr().write(|w| {
             w.core_1_area_dram0_1_rd_clr()
                 .set_bit()
                 .core_1_area_dram0_1_wr_clr()
@@ -469,13 +469,13 @@ impl<'d> DebugAssist<'d> {
 
     pub fn is_core1_region1_monitor_interrupt_set(&self) -> bool {
         self.debug_assist
-            .core_1_intr_raw
+            .core_1_intr_raw()
             .read()
             .core_1_area_dram0_1_rd_raw()
             .bit_is_set()
             || self
                 .debug_assist
-                .core_1_intr_raw
+                .core_1_intr_raw()
                 .read()
                 .core_1_area_dram0_1_wr_raw()
                 .bit_is_set()
@@ -483,7 +483,7 @@ impl<'d> DebugAssist<'d> {
 
     pub fn get_core1_region_monitor_pc(&self) -> u32 {
         self.debug_assist
-            .core_1_area_pc
+            .core_1_area_pc()
             .read()
             .core_1_area_pc()
             .bits()

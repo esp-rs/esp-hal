@@ -121,7 +121,7 @@ where
             #[cfg(esp32s3)]
             {
                 let rtc = &*peripherals::RTC_CNTL::PTR;
-                rtc.usb_conf
+                rtc.usb_conf()
                     .modify(|_, w| w.sw_hw_usb_phy_sel().set_bit().sw_usb_phy_sel().set_bit());
             }
 

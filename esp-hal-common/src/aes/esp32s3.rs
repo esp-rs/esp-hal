@@ -11,8 +11,8 @@ impl<'d> Aes<'d> {
 
     fn write_dma(&mut self, enable_dma: bool) {
         match enable_dma {
-            true => self.aes.dma_enable.write(|w| w.dma_enable().set_bit()),
-            false => self.aes.dma_enable.write(|w| w.dma_enable().clear_bit()),
+            true => self.aes.dma_enable().write(|w| w.dma_enable().set_bit()),
+            false => self.aes.dma_enable().write(|w| w.dma_enable().clear_bit()),
         }
     }
 

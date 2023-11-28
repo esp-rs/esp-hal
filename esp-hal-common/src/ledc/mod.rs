@@ -123,8 +123,10 @@ impl<'d> LEDC<'d> {
     /// Set global slow clock source
     #[cfg(esp32)]
     pub fn set_global_slow_clock(&mut self, _clock_source: LSGlobalClkSource) {
-        self.ledc.conf.write(|w| w.apb_clk_sel().set_bit());
-        self.ledc.lstimer0_conf.modify(|_, w| w.para_up().set_bit());
+        self.ledc.conf().write(|w| w.apb_clk_sel().set_bit());
+        self.ledc
+            .lstimer0_conf()
+            .modify(|_, w| w.para_up().set_bit());
     }
 
     #[cfg(not(esp32))]

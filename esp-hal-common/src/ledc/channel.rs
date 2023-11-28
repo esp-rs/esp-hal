@@ -290,9 +290,9 @@ where
 macro_rules! set_channel {
     ($self: ident, $speed: ident, $num: literal, $timer_number: ident) => {{
         paste! {
-            $self.ledc.[<$speed sch $num _hpoint>]
+            $self.ledc.[<$speed sch $num _hpoint>]()
                 .write(|w| unsafe { w.[<hpoint>]().bits(0x0) });
-            $self.ledc.[<$speed sch $num _conf0>].modify(|_, w| unsafe {
+            $self.ledc.[<$speed sch $num _conf0>]().modify(|_, w| unsafe {
                 w.[<sig_out_en>]()
                     .set_bit()
                     .[<timer_sel>]()
@@ -326,7 +326,7 @@ macro_rules! set_channel {
 macro_rules! start_duty_without_fading {
     ($self: ident, $speed: ident, $num: literal) => {
         paste! {
-            $self.ledc.[<$speed sch $num _conf1>].write(|w| unsafe {
+            $self.ledc.[<$speed sch $num _conf1>]().write(|w| unsafe {
                 w.[<duty_start>]()
                     .set_bit()
                     .[<duty_inc>]()
@@ -391,7 +391,7 @@ macro_rules! start_duty_without_fading {
 macro_rules! start_duty_fade {
     ($self: ident, $speed: ident, $num: literal, $duty_inc: ident, $duty_steps: ident, $cycles_per_step: ident, $duty_per_cycle: ident) => {
         paste! {
-            $self.ledc.[<$speed sch $num _conf1>].write(|w| unsafe {
+            $self.ledc.[<$speed sch $num _conf1>]().write(|w| unsafe {
                 w.[<duty_start>]()
                     .set_bit()
                     .[<duty_inc>]()
@@ -465,7 +465,7 @@ macro_rules! set_duty {
     ($self: ident, $speed: ident, $num: literal, $duty: ident) => {{
         paste! {
             $self.ledc
-                .[<$speed sch $num _duty>]
+                .[<$speed sch $num _duty>]()
                 .write(|w| unsafe { w.[<duty>]().bits($duty << 4) });
         }
         start_duty_without_fading!($self, $speed, $num);
@@ -493,10 +493,10 @@ macro_rules! set_duty_fade {
     ($self: ident, $speed: ident, $num: literal, $start_duty: ident, $duty_inc: ident, $duty_steps: ident, $cycles_per_step: ident, $duty_per_cycle: ident) => {{
         paste! {
             $self.ledc
-                .[<$speed sch $num _duty>]
+                .[<$speed sch $num _duty>]()
                 .write(|w| unsafe { w.[<duty>]().bits($start_duty << 4) });
             $self.ledc
-                .[<int_clr>]
+                .[<int_clr>]()
                 .write(|w| { w.[<duty_chng_end_ $speed sch $num _int_clr>]().set_bit() });
         }
         start_duty_fade!(
@@ -593,7 +593,7 @@ macro_rules! update_channel {
     ($self: ident, l, $num: literal) => {
         paste! {
             $self.ledc
-                .[<lsch $num _conf0>]
+                .[<lsch $num _conf0>]()
                 .modify(|_, w| w.[<para_up>]().set_bit());
         }
     };

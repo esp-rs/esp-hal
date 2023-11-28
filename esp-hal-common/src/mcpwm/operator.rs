@@ -393,22 +393,22 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
         let bits = update_method.0;
         match (OP, IS_A) {
             (0, true) => block
-                .gen0_stmp_cfg
+                .gen0_stmp_cfg()
                 .modify(|_, w| w.gen0_a_upmethod().variant(bits)),
             (1, true) => block
-                .gen1_stmp_cfg
+                .gen1_stmp_cfg()
                 .modify(|_, w| w.gen1_a_upmethod().variant(bits)),
             (2, true) => block
-                .gen2_stmp_cfg
+                .gen2_stmp_cfg()
                 .modify(|_, w| w.gen2_a_upmethod().variant(bits)),
             (0, false) => block
-                .gen0_stmp_cfg
+                .gen0_stmp_cfg()
                 .modify(|_, w| w.gen0_b_upmethod().variant(bits)),
             (1, false) => block
-                .gen1_stmp_cfg
+                .gen1_stmp_cfg()
                 .modify(|_, w| w.gen1_b_upmethod().variant(bits)),
             (2, false) => block
-                .gen2_stmp_cfg
+                .gen2_stmp_cfg()
                 .modify(|_, w| w.gen2_b_upmethod().variant(bits)),
             _ => {
                 unreachable!()
@@ -489,12 +489,12 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
         // We only write to our GENx_TSTMP_x register
         let block = unsafe { &*PWM::block() };
         match (OP, IS_A) {
-            (0, true) => block.gen0_tstmp_a.write(|w| w.gen0_a().variant(value)),
-            (1, true) => block.gen1_tstmp_a.write(|w| w.gen1_a().variant(value)),
-            (2, true) => block.gen2_tstmp_a.write(|w| w.gen2_a().variant(value)),
-            (0, false) => block.gen0_tstmp_b.write(|w| w.gen0_b().variant(value)),
-            (1, false) => block.gen1_tstmp_b.write(|w| w.gen1_b().variant(value)),
-            (2, false) => block.gen2_tstmp_b.write(|w| w.gen2_b().variant(value)),
+            (0, true) => block.gen0_tstmp_a().write(|w| w.gen0_a().variant(value)),
+            (1, true) => block.gen1_tstmp_a().write(|w| w.gen1_a().variant(value)),
+            (2, true) => block.gen2_tstmp_a().write(|w| w.gen2_a().variant(value)),
+            (0, false) => block.gen0_tstmp_b().write(|w| w.gen0_b().variant(value)),
+            (1, false) => block.gen1_tstmp_b().write(|w| w.gen1_b().variant(value)),
+            (2, false) => block.gen2_tstmp_b().write(|w| w.gen2_b().variant(value)),
             _ => {
                 unreachable!()
             }
@@ -510,12 +510,12 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
         // We only read to our GENx_TSTMP_x register
         let block = unsafe { &*PWM::block() };
         match (OP, IS_A) {
-            (0, true) => block.gen0_tstmp_a.read().gen0_a().bits(),
-            (1, true) => block.gen1_tstmp_a.read().gen1_a().bits(),
-            (2, true) => block.gen2_tstmp_a.read().gen2_a().bits(),
-            (0, false) => block.gen0_tstmp_b.read().gen0_b().bits(),
-            (1, false) => block.gen1_tstmp_b.read().gen1_b().bits(),
-            (2, false) => block.gen2_tstmp_b.read().gen2_b().bits(),
+            (0, true) => block.gen0_tstmp_a().read().gen0_a().bits(),
+            (1, true) => block.gen1_tstmp_a().read().gen1_a().bits(),
+            (2, true) => block.gen2_tstmp_a().read().gen2_a().bits(),
+            (0, false) => block.gen0_tstmp_b().read().gen0_b().bits(),
+            (1, false) => block.gen1_tstmp_b().read().gen1_b().bits(),
+            (2, false) => block.gen2_tstmp_b().read().gen2_b().bits(),
             _ => {
                 unreachable!()
             }

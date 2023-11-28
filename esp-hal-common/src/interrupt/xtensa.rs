@@ -68,7 +68,7 @@ pub unsafe fn map(core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
     let intr_map_base = match core {
         Cpu::ProCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map().as_ptr(),
         #[cfg(multi_core)]
-        Cpu::AppCpu => (*core1_interrupt_peripheral()).app_mac_intr_map.as_ptr(),
+        Cpu::AppCpu => (*core1_interrupt_peripheral()).app_mac_intr_map().as_ptr(),
     };
     intr_map_base
         .offset(interrupt_number)
@@ -82,7 +82,7 @@ pub fn disable(core: Cpu, interrupt: Interrupt) {
         let intr_map_base = match core {
             Cpu::ProCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map().as_ptr(),
             #[cfg(multi_core)]
-            Cpu::AppCpu => (*core1_interrupt_peripheral()).app_mac_intr_map.as_ptr(),
+            Cpu::AppCpu => (*core1_interrupt_peripheral()).app_mac_intr_map().as_ptr(),
         };
         // To disable an interrupt, map it to a CPU peripheral interrupt
         intr_map_base
@@ -122,16 +122,16 @@ pub fn get_status(core: Cpu) -> u128 {
             #[cfg(multi_core)]
             Cpu::AppCpu => {
                 ((*core1_interrupt_peripheral())
-                    .app_intr_status_0
+                    .app_intr_status_0()
                     .read()
                     .bits() as u128)
                     | ((*core1_interrupt_peripheral())
-                        .app_intr_status_1
+                        .app_intr_status_1()
                         .read()
                         .bits() as u128)
                         << 32
                     | ((*core1_interrupt_peripheral())
-                        .app_intr_status_2
+                        .app_intr_status_2()
                         .read()
                         .bits() as u128)
                         << 64
@@ -272,7 +272,7 @@ mod vectored {
             let intr_map_base = match core {
                 Cpu::ProCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map().as_ptr(),
                 #[cfg(multi_core)]
-                Cpu::AppCpu => (*core1_interrupt_peripheral()).app_mac_intr_map.as_ptr(),
+                Cpu::AppCpu => (*core1_interrupt_peripheral()).app_mac_intr_map().as_ptr(),
             };
 
             let mut levels = [0u128; 8];

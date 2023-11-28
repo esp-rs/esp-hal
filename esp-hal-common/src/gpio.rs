@@ -622,7 +622,7 @@ where
         #[cfg(esp32s3)]
         if GPIONUM == 19 || GPIONUM == 20 {
             unsafe { &*crate::peripherals::USB_DEVICE::PTR }
-                .conf0
+                .conf0()
                 .modify(|_, w| w.usb_pad_enable().clear_bit());
         }
 
@@ -1141,7 +1141,7 @@ where
         #[cfg(esp32s3)]
         if GPIONUM == 19 || GPIONUM == 20 {
             unsafe { &*crate::peripherals::USB_DEVICE::PTR }
-                .conf0
+                .conf0()
                 .modify(|_, w| w.usb_pad_enable().clear_bit());
         }
 
@@ -1676,13 +1676,13 @@ macro_rules! rtc_pins {
                 let rtcio = unsafe{ &*RTC_IO::ptr() };
 
                 #[cfg(esp32s3)]
-                unsafe { crate::peripherals::SENS::steal() }.sar_peri_clk_gate_conf.modify(|_,w| w.iomux_clk_en().set_bit());
+                unsafe { crate::peripherals::SENS::steal() }.sar_peri_clk_gate_conf().modify(|_,w| w.iomux_clk_en().set_bit());
                 #[cfg(esp32s2)]
-                unsafe { crate::peripherals::SENS::steal() }.sar_io_mux_conf.modify(|_,w| w.iomux_clk_gate_en().set_bit());
+                unsafe { crate::peripherals::SENS::steal() }.sar_io_mux_conf().modify(|_,w| w.iomux_clk_gate_en().set_bit());
 
                 // disable input
                 paste::paste!{
-                    rtcio.$pin_reg.modify(|_,w| unsafe {w
+                    rtcio.$pin_reg().modify(|_,w| unsafe {w
                         .[<$prefix fun_ie>]().bit(input_enable)
                         .[<$prefix mux_sel>]().bit(mux)
                         .[<$prefix fun_sel>]().bits(func as u8)
@@ -1694,10 +1694,10 @@ macro_rules! rtc_pins {
                 let rtc_ctrl = unsafe { &*crate::peripherals::RTC_CNTL::PTR };
 
                 #[cfg(esp32)]
-                rtc_ctrl.hold_force.modify(|_, w| w.$hold().bit(enable));
+                rtc_ctrl.hold_force().modify(|_, w| w.$hold().bit(enable));
 
                 #[cfg(not(esp32))]
-                rtc_ctrl.pad_hold.modify(|_, w| w.$hold().bit(enable));
+                rtc_ctrl.pad_hold().modify(|_, w| w.$hold().bit(enable));
             }
         }
 
@@ -1708,7 +1708,7 @@ macro_rules! rtc_pins {
                     let rtcio = unsafe { &*crate::peripherals::RTC_IO::PTR };
 
                     paste::paste! {
-                        rtcio.$pin_reg.modify(|_, w| w.$rue().bit([< enable >]));
+                        rtcio.$pin_reg().modify(|_, w| w.$rue().bit([< enable >]));
                     }
                 }
 
@@ -1716,7 +1716,7 @@ macro_rules! rtc_pins {
                     let rtcio = unsafe { &*crate::peripherals::RTC_IO::PTR };
 
                     paste::paste! {
-                        rtcio.$pin_reg.modify(|_, w| w.$rde().bit([< enable >]));
+                        rtcio.$pin_reg().modify(|_, w| w.$rde().bit([< enable >]));
                     }
                 }
             }
@@ -1826,15 +1826,15 @@ macro_rules! analog {
                         // handle indexed pins.
                         paste::paste! {
                             // disable input
-                            rtcio.$pin_reg.modify(|_,w| w.$fun_ie().bit([< false >]));
+                            rtcio.$pin_reg().modify(|_,w| w.$fun_ie().bit([< false >]));
 
                             // disable output
-                            rtcio.enable_w1tc.write(|w| unsafe { w.enable_w1tc().bits(1 << $rtc_pin) });
+                            rtcio.enable_w1tc().write(|w| unsafe { w.enable_w1tc().bits(1 << $rtc_pin) });
 
                             // disable open drain
-                            rtcio.pin[$rtc_pin].modify(|_,w| w.pad_driver().bit(false));
+                            rtcio.pin($rtc_pin).modify(|_,w| w.pad_driver().bit(false));
 
-                            rtcio.$pin_reg.modify(|_,w| {
+                            rtcio.$pin_reg().modify(|_,w| {
                                 w.$fun_ie().clear_bit();
 
                                 // Connect pin to analog / RTC module instead of standard GPIO
@@ -1846,7 +1846,7 @@ macro_rules! analog {
 
                             // Disable pull-up and pull-down resistors on the pin, if it has them
                             $(
-                                rtcio.$pin_reg.modify(|_,w| {
+                                rtcio.$pin_reg().modify(|_,w| {
                                     w
                                     .$rue().bit(false)
                                     .$rde().bit(false)
@@ -2277,7 +2277,7 @@ pub mod rtc_io {
 
                 #[cfg(esp32s3)]
                 rtc_io
-                    .rtc_gpio_enable_w1ts
+                    .rtc_gpio_enable_w1ts()
                     .write(|w| w.rtc_gpio_enable_w1ts().variant(1 << PIN));
             } else {
                 rtc_io
@@ -2317,11 +2317,11 @@ pub mod rtc_io {
             #[cfg(esp32s3)]
             if level {
                 rtc_io
-                    .rtc_gpio_out_w1ts
+                    .rtc_gpio_out_w1ts()
                     .write(|w| w.rtc_gpio_out_data_w1ts().variant(1 << PIN));
             } else {
                 rtc_io
-                    .rtc_gpio_out_w1tc
+                    .rtc_gpio_out_w1tc()
                     .write(|w| w.rtc_gpio_out_data_w1tc().variant(1 << PIN));
             }
         }
@@ -2377,7 +2377,7 @@ pub mod rtc_io {
     #[inline(always)]
     fn get_pin_reg(pin: u8) -> &'static crate::peripherals::rtc_io::TOUCH_PAD0 {
         let rtc_io = unsafe { &*crate::peripherals::RTC_IO::PTR };
-        unsafe { core::mem::transmute((rtc_io.touch_pad0.as_ptr()).add(pin as usize)) }
+        unsafe { core::mem::transmute((rtc_io.touch_pad0().as_ptr()).add(pin as usize)) }
     }
 
     #[cfg(esp32s2)]

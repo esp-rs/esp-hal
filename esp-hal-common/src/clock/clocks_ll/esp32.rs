@@ -44,7 +44,7 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock
 
     unsafe {
         let rtc_cntl_dbias_hp_volt: u32 =
-            RTC_CNTL_DBIAS_1V25 - efuse.blk0_rdata5.read().rd_vol_level_hp_inv().bits() as u32;
+            RTC_CNTL_DBIAS_1V25 - efuse.blk0_rdata5().read().rd_vol_level_hp_inv().bits() as u32;
         let dig_dbias_240_m: u32 = rtc_cntl_dbias_hp_volt;
 
         let div_ref: u32;
@@ -60,7 +60,7 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock
         if matches!(pll_freq, PllClock::Pll320MHz) {
             // Raise the voltage, if needed
             rtc_cntl
-                .reg
+                .reg()
                 .modify(|_, w| w.dig_dbias_wak().variant(DIG_DBIAS_80M_160M as u8));
 
             // Configure 320M PLL
@@ -117,7 +117,7 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock
         } else {
             // Raise the voltage
             rtc_cntl
-                .reg
+                .reg()
                 .modify(|_, w| w.dig_dbias_wak().variant(dig_dbias_240_m as u8));
 
             // Configure 480M PLL
@@ -204,7 +204,7 @@ pub(crate) fn esp32_rtc_bbpll_enable() {
     let rtc_cntl = unsafe { &*crate::peripherals::RTC_CNTL::ptr() };
 
     unsafe {
-        rtc_cntl.options0.modify(|_, w| {
+        rtc_cntl.options0().modify(|_, w| {
             w.bias_i2c_force_pd()
                 .clear_bit()
                 .bb_i2c_force_pd()
@@ -268,25 +268,25 @@ pub(crate) fn esp32_rtc_update_to_xtal(freq: XtalClock, _div: u32) {
         let value = (((freq.hz()) >> 12) & UINT16_MAX) | ((((freq.hz()) >> 12) & UINT16_MAX) << 16);
         esp32_update_cpu_freq(freq.hz());
         // set divider from XTAL to APB clock
-        apb_cntl.sysclk_conf.modify(|_, w| {
+        apb_cntl.sysclk_conf().modify(|_, w| {
             w.pre_div_cnt()
                 .bits(((freq.hz()) / REF_CLK_FREQ - 1) as u16)
         });
 
         // adjust ref_tick
-        apb_cntl.xtal_tick_conf.as_ptr().write_volatile(
-            ((freq.hz()) / REF_CLK_FREQ - 1) | apb_cntl.xtal_tick_conf.as_ptr().read_volatile(),
+        apb_cntl.xtal_tick_conf().as_ptr().write_volatile(
+            ((freq.hz()) / REF_CLK_FREQ - 1) | apb_cntl.xtal_tick_conf().as_ptr().read_volatile(),
         ); // TODO make it RW in SVD
 
         // switch clock source
-        rtc_cntl.clk_conf.modify(|_, w| w.soc_clk_sel().xtal());
+        rtc_cntl.clk_conf().modify(|_, w| w.soc_clk_sel().xtal());
         rtc_cntl
-            .store5
+            .store5()
             .modify(|_, w| w.scratch5().bits(value as u32));
 
         // lower the voltage
         rtc_cntl
-            .reg
+            .reg()
             .modify(|_, w| w.dig_dbias_wak().variant(DIG_DBIAS_XTAL as u8));
     }
 }
@@ -300,7 +300,7 @@ pub(crate) fn set_cpu_freq(cpu_freq_mhz: crate::clock::CpuClock) {
         const RTC_CNTL_DBIAS_1V25: u32 = 7;
 
         let rtc_cntl_dbias_hp_volt: u32 =
-            RTC_CNTL_DBIAS_1V25 - efuse.blk0_rdata5.read().rd_vol_level_hp_inv().bits() as u32;
+            RTC_CNTL_DBIAS_1V25 - efuse.blk0_rdata5().read().rd_vol_level_hp_inv().bits() as u32;
         let dig_dbias_240_m: u32 = rtc_cntl_dbias_hp_volt;
 
         const CPU_80M: u32 = 0;
@@ -325,14 +325,14 @@ pub(crate) fn set_cpu_freq(cpu_freq_mhz: crate::clock::CpuClock) {
 
         let value = (((80 * MHZ) >> 12) & UINT16_MAX) | ((((80 * MHZ) >> 12) & UINT16_MAX) << 16);
         dport
-            .cpu_per_conf
+            .cpu_per_conf()
             .write(|w| w.cpuperiod_sel().bits(per_conf as u8));
         rtc_cntl
-            .reg
+            .reg()
             .modify(|_, w| w.dig_dbias_wak().variant(dbias as u8));
-        rtc_cntl.clk_conf.modify(|_, w| w.soc_clk_sel().pll());
+        rtc_cntl.clk_conf().modify(|_, w| w.soc_clk_sel().pll());
         rtc_cntl
-            .store5
+            .store5()
             .modify(|_, w| w.scratch5().bits(value as u32));
 
         esp32_update_cpu_freq(cpu_freq_mhz.mhz());

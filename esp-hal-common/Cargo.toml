@@ -67,13 +67,13 @@ ufmt-write = { version = "0.1.0", optional = true }
 # IMPORTANT:
 # Each supported device MUST have its PAC included below along with a
 # corresponding feature.
-esp32   = { version = "0.27.0", features = ["critical-section"], optional = true }
+esp32   = { path = "/Users/jesse/Work/esp-pacs/esp32",   features = ["critical-section"], optional = true }
 esp32c2 = { path = "/Users/jesse/Work/esp-pacs/esp32c2", features = ["critical-section"], optional = true }
 esp32c3 = { path = "/Users/jesse/Work/esp-pacs/esp32c3", features = ["critical-section"], optional = true }
 esp32c6 = { path = "/Users/jesse/Work/esp-pacs/esp32c6", features = ["critical-section"], optional = true }
 esp32h2 = { path = "/Users/jesse/Work/esp-pacs/esp32h2", features = ["critical-section"], optional = true }
 esp32s2 = { path = "/Users/jesse/Work/esp-pacs/esp32s2", features = ["critical-section"], optional = true }
-esp32s3 = { version = "0.22.0", features = ["critical-section"], optional = true }
+esp32s3 = { path = "/Users/jesse/Work/esp-pacs/esp32s3", features = ["critical-section"], optional = true }
 
 [build-dependencies]
 basic-toml = "0.1.7"

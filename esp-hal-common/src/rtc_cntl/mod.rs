@@ -233,15 +233,15 @@ impl<'d> Rtc<'d> {
 
         #[cfg(esp32)]
         let (l, h) = {
-            rtc_cntl.time_update.write(|w| w.time_update().set_bit());
-            while rtc_cntl.time_update.read().time_valid().bit_is_clear() {
+            rtc_cntl.time_update().write(|w| w.time_update().set_bit());
+            while rtc_cntl.time_update().read().time_valid().bit_is_clear() {
                 unsafe {
                     // might take 1 RTC slowclk period, don't flood RTC bus
                     ets_delay_us(1);
                 }
             }
-            let h = rtc_cntl.time1.read().time_hi().bits();
-            let l = rtc_cntl.time0.read().time_lo().bits();
+            let h = rtc_cntl.time1().read().time_hi().bits();
+            let l = rtc_cntl.time0().read().time_lo().bits();
             (l, h)
         };
         #[cfg(any(esp32c2, esp32c3, esp32s3, esp32s2))]
@@ -733,7 +733,7 @@ impl Rwdt {
             .modify(|_, w| unsafe { w.wdt_stg0().bits(self.stg0_action as u8) });
 
         #[cfg(esp32)]
-        rtc_cntl.int_ena.modify(|_, w| w.wdt_int_ena().set_bit());
+        rtc_cntl.int_ena().modify(|_, w| w.wdt_int_ena().set_bit());
         #[cfg(not(esp32))]
         rtc_cntl
             .int_ena_rtc()
@@ -758,7 +758,9 @@ impl Rwdt {
             .modify(|_, w| unsafe { w.wdt_stg0().bits(self.stg0_action as u8) });
 
         #[cfg(esp32)]
-        rtc_cntl.int_ena.modify(|_, w| w.wdt_int_ena().clear_bit());
+        rtc_cntl
+            .int_ena()
+            .modify(|_, w| w.wdt_int_ena().clear_bit());
         #[cfg(not(esp32))]
         rtc_cntl
             .int_ena_rtc()
@@ -776,7 +778,7 @@ impl Rwdt {
         self.set_write_protection(false);
 
         #[cfg(esp32)]
-        rtc_cntl.int_clr.write(|w| w.wdt_int_clr().set_bit());
+        rtc_cntl.int_clr().write(|w| w.wdt_int_clr().set_bit());
         #[cfg(not(esp32))]
         rtc_cntl.int_clr_rtc().write(|w| w.wdt_int_clr().set_bit());
 
@@ -847,7 +849,7 @@ impl Rwdt {
         unsafe {
             #[cfg(esp32)]
             rtc_cntl
-                .wdtconfig1
+                .wdtconfig1()
                 .modify(|_, w| w.wdt_stg0_hold().bits(timeout_raw));
 
             #[cfg(any(esp32c6, esp32h2))]
@@ -992,7 +994,11 @@ pub fn get_wakeup_cause() -> SleepSource {
     });
     #[cfg(esp32)]
     let wakeup_cause = WakeupReason::from_bits_retain(unsafe {
-        (&*RTC_CNTL::PTR).wakeup_state.read().wakeup_cause().bits() as u32
+        (&*RTC_CNTL::PTR)
+            .wakeup_state()
+            .read()
+            .wakeup_cause()
+            .bits() as u32
     });
 
     if wakeup_cause.contains(WakeupReason::TimerTrigEn) {

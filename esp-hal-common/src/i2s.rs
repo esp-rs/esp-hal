@@ -1052,7 +1052,7 @@ mod private {
             });
 
             #[cfg(esp32)]
-            i2s.clkm_conf.modify(|_, w| w.clka_ena().clear_bit());
+            i2s.clkm_conf().modify(|_, w| w.clka_ena().clear_bit());
 
             i2s.clkm_conf().modify(|_, w| {
                 w.clk_en()

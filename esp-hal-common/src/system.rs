@@ -188,10 +188,10 @@ impl PeripheralClockControl {
         #[cfg(esp32)]
         let (perip_clk_en0, perip_rst_en0, peri_clk_en, peri_rst_en) = {
             (
-                &system.perip_clk_en,
-                &system.perip_rst_en,
-                &system.peri_clk_en,
-                &system.peri_rst_en,
+                &system.perip_clk_en(),
+                &system.perip_rst_en(),
+                &system.peri_clk_en(),
+                &system.peri_rst_en(),
             )
         };
 

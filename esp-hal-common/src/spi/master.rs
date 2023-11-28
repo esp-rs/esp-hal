@@ -1179,12 +1179,12 @@ pub mod dma {
 
             #[cfg(esp32)]
             if !address.is_none() {
-                reg_block.user1.modify(|r, w| unsafe {
+                reg_block.user1().modify(|r, w| unsafe {
                     w.bits(r.bits() & !(0x3f << 26) | (((address.width() - 1) as u32) & 0x3f) << 26)
                 });
 
                 let addr = address.value() << (32 - address.width());
-                reg_block.addr.write(|w| unsafe { w.bits(addr) });
+                reg_block.addr().write(|w| unsafe { w.bits(addr) });
             }
 
             if dummy > 0 {
@@ -1252,12 +1252,12 @@ pub mod dma {
 
             #[cfg(esp32)]
             if !address.is_none() {
-                reg_block.user1.modify(|r, w| unsafe {
+                reg_block.user1().modify(|r, w| unsafe {
                     w.bits(r.bits() & !(0x3f << 26) | (((address.width() - 1) as u32) & 0x3f) << 26)
                 });
 
                 let addr = address.value() << (32 - address.width());
-                reg_block.addr.write(|w| unsafe { w.bits(addr) });
+                reg_block.addr().write(|w| unsafe { w.bits(addr) });
             }
 
             if dummy > 0 {
@@ -2204,7 +2204,7 @@ pub trait Instance {
 
         match (address_mode, data_mode) {
             (SpiDataMode::Single, SpiDataMode::Single) => {
-                reg_block.ctrl.modify(|_, w| {
+                reg_block.ctrl().modify(|_, w| {
                     w.fread_dio()
                         .clear_bit()
                         .fread_qio()
@@ -2215,7 +2215,7 @@ pub trait Instance {
                         .clear_bit()
                 });
 
-                reg_block.user.modify(|_, w| {
+                reg_block.user().modify(|_, w| {
                     w.fwrite_dio()
                         .clear_bit()
                         .fwrite_qio()
@@ -2227,7 +2227,7 @@ pub trait Instance {
                 });
             }
             (SpiDataMode::Single, SpiDataMode::Dual) => {
-                reg_block.ctrl.modify(|_, w| {
+                reg_block.ctrl().modify(|_, w| {
                     w.fread_dio()
                         .clear_bit()
                         .fread_qio()
@@ -2238,7 +2238,7 @@ pub trait Instance {
                         .clear_bit()
                 });
 
-                reg_block.user.modify(|_, w| {
+                reg_block.user().modify(|_, w| {
                     w.fwrite_dio()
                         .clear_bit()
                         .fwrite_qio()
@@ -2250,7 +2250,7 @@ pub trait Instance {
                 });
             }
             (SpiDataMode::Single, SpiDataMode::Quad) => {
-                reg_block.ctrl.modify(|_, w| {
+                reg_block.ctrl().modify(|_, w| {
                     w.fread_dio()
                         .clear_bit()
                         .fread_qio()
@@ -2261,7 +2261,7 @@ pub trait Instance {
                         .set_bit()
                 });
 
-                reg_block.user.modify(|_, w| {
+                reg_block.user().modify(|_, w| {
                     w.fwrite_dio()
                         .clear_bit()
                         .fwrite_qio()
@@ -2276,7 +2276,7 @@ pub trait Instance {
                 panic!("Unsupported combination of data-modes")
             }
             (SpiDataMode::Dual, SpiDataMode::Dual) => {
-                reg_block.ctrl.modify(|_, w| {
+                reg_block.ctrl().modify(|_, w| {
                     w.fread_dio()
                         .set_bit()
                         .fread_qio()
@@ -2287,7 +2287,7 @@ pub trait Instance {
                         .clear_bit()
                 });
 
-                reg_block.user.modify(|_, w| {
+                reg_block.user().modify(|_, w| {
                     w.fwrite_dio()
                         .set_bit()
                         .fwrite_qio()
@@ -2308,7 +2308,7 @@ pub trait Instance {
                 panic!("Unsupported combination of data-modes")
             }
             (SpiDataMode::Quad, SpiDataMode::Quad) => {
-                reg_block.ctrl.modify(|_, w| {
+                reg_block.ctrl().modify(|_, w| {
                     w.fread_dio()
                         .clear_bit()
                         .fread_qio()
@@ -2319,7 +2319,7 @@ pub trait Instance {
                         .clear_bit()
                 });
 
-                reg_block.user.modify(|_, w| {
+                reg_block.user().modify(|_, w| {
                     w.fwrite_dio()
                         .clear_bit()
                         .fwrite_qio()
@@ -2451,20 +2451,20 @@ pub trait Instance {
 
         match data_mode {
             SpiMode::Mode0 => {
-                reg_block.pin.modify(|_, w| w.ck_idle_edge().clear_bit());
-                reg_block.user.modify(|_, w| w.ck_out_edge().clear_bit());
+                reg_block.pin().modify(|_, w| w.ck_idle_edge().clear_bit());
+                reg_block.user().modify(|_, w| w.ck_out_edge().clear_bit());
             }
             SpiMode::Mode1 => {
-                reg_block.pin.modify(|_, w| w.ck_idle_edge().clear_bit());
-                reg_block.user.modify(|_, w| w.ck_out_edge().set_bit());
+                reg_block.pin().modify(|_, w| w.ck_idle_edge().clear_bit());
+                reg_block.user().modify(|_, w| w.ck_out_edge().set_bit());
             }
             SpiMode::Mode2 => {
-                reg_block.pin.modify(|_, w| w.ck_idle_edge().set_bit());
-                reg_block.user.modify(|_, w| w.ck_out_edge().set_bit());
+                reg_block.pin().modify(|_, w| w.ck_idle_edge().set_bit());
+                reg_block.user().modify(|_, w| w.ck_out_edge().set_bit());
             }
             SpiMode::Mode3 => {
-                reg_block.pin.modify(|_, w| w.ck_idle_edge().set_bit());
-                reg_block.user.modify(|_, w| w.ck_out_edge().clear_bit());
+                reg_block.pin().modify(|_, w| w.ck_idle_edge().set_bit());
+                reg_block.user().modify(|_, w| w.ck_out_edge().clear_bit());
             }
         }
         self
@@ -2763,12 +2763,12 @@ pub trait Instance {
 
         #[cfg(esp32)]
         if !address.is_none() {
-            reg_block.user1.modify(|r, w| unsafe {
+            reg_block.user1().modify(|r, w| unsafe {
                 w.bits(r.bits() & !(0x3f << 26) | (((address.width() - 1) as u32) & 0x3f) << 26)
             });
 
             let addr = address.value() << (32 - address.width());
-            reg_block.addr.write(|w| unsafe { w.bits(addr) });
+            reg_block.addr().write(|w| unsafe { w.bits(addr) });
         }
 
         if dummy > 0 {
@@ -2826,12 +2826,12 @@ pub trait Instance {
 
         #[cfg(esp32)]
         if !address.is_none() {
-            reg_block.user1.modify(|r, w| unsafe {
+            reg_block.user1().modify(|r, w| unsafe {
                 w.bits(r.bits() & !(0x3f << 26) | (((address.width() - 1) as u32) & 0x3f) << 26)
             });
 
             let addr = address.value() << (32 - address.width());
-            reg_block.addr.write(|w| unsafe { w.bits(addr) });
+            reg_block.addr().write(|w| unsafe { w.bits(addr) });
         }
 
         if dummy > 0 {

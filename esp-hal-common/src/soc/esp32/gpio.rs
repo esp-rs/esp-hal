@@ -74,42 +74,42 @@ pub(crate) fn get_io_mux_reg(gpio_num: u8) -> &'static crate::peripherals::io_mu
         let iomux = &*crate::peripherals::IO_MUX::PTR;
 
         match gpio_num {
-            0 => core::mem::transmute(&(iomux.gpio0)),
-            1 => core::mem::transmute(&(iomux.gpio1)),
-            2 => core::mem::transmute(&(iomux.gpio2)),
-            3 => core::mem::transmute(&(iomux.gpio3)),
-            4 => core::mem::transmute(&(iomux.gpio4)),
-            5 => core::mem::transmute(&(iomux.gpio5)),
-            6 => core::mem::transmute(&(iomux.gpio6)),
-            7 => core::mem::transmute(&(iomux.gpio7)),
-            8 => core::mem::transmute(&(iomux.gpio8)),
-            9 => core::mem::transmute(&(iomux.gpio9)),
-            10 => core::mem::transmute(&(iomux.gpio10)),
-            11 => core::mem::transmute(&(iomux.gpio11)),
-            12 => core::mem::transmute(&(iomux.gpio12)),
-            13 => core::mem::transmute(&(iomux.gpio13)),
-            14 => core::mem::transmute(&(iomux.gpio14)),
-            15 => core::mem::transmute(&(iomux.gpio15)),
-            16 => core::mem::transmute(&(iomux.gpio16)),
-            17 => core::mem::transmute(&(iomux.gpio17)),
-            18 => core::mem::transmute(&(iomux.gpio18)),
-            19 => core::mem::transmute(&(iomux.gpio19)),
-            20 => core::mem::transmute(&(iomux.gpio20)),
-            21 => core::mem::transmute(&(iomux.gpio21)),
-            22 => core::mem::transmute(&(iomux.gpio22)),
-            23 => core::mem::transmute(&(iomux.gpio23)),
-            24 => core::mem::transmute(&(iomux.gpio24)),
-            25 => core::mem::transmute(&(iomux.gpio25)),
-            26 => core::mem::transmute(&(iomux.gpio26)),
-            27 => core::mem::transmute(&(iomux.gpio27)),
-            32 => core::mem::transmute(&(iomux.gpio32)),
-            33 => core::mem::transmute(&(iomux.gpio33)),
-            34 => core::mem::transmute(&(iomux.gpio34)),
-            35 => core::mem::transmute(&(iomux.gpio35)),
-            36 => core::mem::transmute(&(iomux.gpio36)),
-            37 => core::mem::transmute(&(iomux.gpio37)),
-            38 => core::mem::transmute(&(iomux.gpio38)),
-            39 => core::mem::transmute(&(iomux.gpio39)),
+            0 => core::mem::transmute(&(iomux.gpio0())),
+            1 => core::mem::transmute(&(iomux.gpio1())),
+            2 => core::mem::transmute(&(iomux.gpio2())),
+            3 => core::mem::transmute(&(iomux.gpio3())),
+            4 => core::mem::transmute(&(iomux.gpio4())),
+            5 => core::mem::transmute(&(iomux.gpio5())),
+            6 => core::mem::transmute(&(iomux.gpio6())),
+            7 => core::mem::transmute(&(iomux.gpio7())),
+            8 => core::mem::transmute(&(iomux.gpio8())),
+            9 => core::mem::transmute(&(iomux.gpio9())),
+            10 => core::mem::transmute(&(iomux.gpio10())),
+            11 => core::mem::transmute(&(iomux.gpio11())),
+            12 => core::mem::transmute(&(iomux.gpio12())),
+            13 => core::mem::transmute(&(iomux.gpio13())),
+            14 => core::mem::transmute(&(iomux.gpio14())),
+            15 => core::mem::transmute(&(iomux.gpio15())),
+            16 => core::mem::transmute(&(iomux.gpio16())),
+            17 => core::mem::transmute(&(iomux.gpio17())),
+            18 => core::mem::transmute(&(iomux.gpio18())),
+            19 => core::mem::transmute(&(iomux.gpio19())),
+            20 => core::mem::transmute(&(iomux.gpio20())),
+            21 => core::mem::transmute(&(iomux.gpio21())),
+            22 => core::mem::transmute(&(iomux.gpio22())),
+            23 => core::mem::transmute(&(iomux.gpio23())),
+            24 => core::mem::transmute(&(iomux.gpio24())),
+            25 => core::mem::transmute(&(iomux.gpio25())),
+            26 => core::mem::transmute(&(iomux.gpio26())),
+            27 => core::mem::transmute(&(iomux.gpio27())),
+            32 => core::mem::transmute(&(iomux.gpio32())),
+            33 => core::mem::transmute(&(iomux.gpio33())),
+            34 => core::mem::transmute(&(iomux.gpio34())),
+            35 => core::mem::transmute(&(iomux.gpio35())),
+            36 => core::mem::transmute(&(iomux.gpio36())),
+            37 => core::mem::transmute(&(iomux.gpio37())),
+            38 => core::mem::transmute(&(iomux.gpio38())),
+            39 => core::mem::transmute(&(iomux.gpio39())),
             _ => panic!(),
         }
     }
@@ -624,41 +624,41 @@ pub(crate) fn errata36(pin_num: u8, pull_up: bool, pull_down: bool) {
     match pin_num {
         0 => {
             rtcio
-                .touch_pad1
+                .touch_pad1()
                 .modify(|r, w| unsafe { w.bits(r.bits()).rue().bit(pull_up).rde().bit(pull_down) });
         }
         2 => {
             rtcio
-                .touch_pad2
+                .touch_pad2()
                 .modify(|r, w| unsafe { w.bits(r.bits()).rue().bit(pull_up).rde().bit(pull_down) });
         }
         4 => {
             rtcio
-                .touch_pad0
+                .touch_pad0()
                 .modify(|r, w| unsafe { w.bits(r.bits()).rue().bit(pull_up).rde().bit(pull_down) });
         }
         12 => {
             rtcio
-                .touch_pad5
+                .touch_pad5()
                 .modify(|r, w| unsafe { w.bits(r.bits()).rue().bit(pull_up).rde().bit(pull_down) });
         }
         13 => {
             rtcio
-                .touch_pad4
+                .touch_pad4()
                 .modify(|r, w| unsafe { w.bits(r.bits()).rue().bit(pull_up).rde().bit(pull_down) });
         }
         14 => {
             rtcio
-                .touch_pad6
+                .touch_pad6()
                 .modify(|r, w| unsafe { w.bits(r.bits()).rue().bit(pull_up).rde().bit(pull_down) });
         }
         15 => {
             rtcio
-                .touch_pad3
+                .touch_pad3()
                 .modify(|r, w| unsafe { w.bits(r.bits()).rue().bit(pull_up).rde().bit(pull_down) });
         }
         25 => {
-            rtcio.pad_dac1.modify(|r, w| unsafe {
+            rtcio.pad_dac1().modify(|r, w| unsafe {
                 w.bits(r.bits())
                     .pdac1_rue()
                     .bit(pull_up)
@@ -667,7 +667,7 @@ pub(crate) fn errata36(pin_num: u8, pull_up: bool, pull_down: bool) {
             });
         }
         26 => {
-            rtcio.pad_dac2.modify(|r, w| unsafe {
+            rtcio.pad_dac2().modify(|r, w| unsafe {
                 w.bits(r.bits())
                     .pdac2_rue()
                     .bit(pull_up)
@@ -677,11 +677,11 @@ pub(crate) fn errata36(pin_num: u8, pull_up: bool, pull_down: bool) {
         }
         27 => {
             rtcio
-                .touch_pad7
+                .touch_pad7()
                 .modify(|r, w| unsafe { w.bits(r.bits()).rue().bit(pull_up).rde().bit(pull_down) });
         }
         32 => {
-            rtcio.xtal_32k_pad.modify(|r, w| unsafe {
+            rtcio.xtal_32k_pad().modify(|r, w| unsafe {
                 w.bits(r.bits())
                     .x32n_rue()
                     .bit(pull_up)
@@ -690,7 +690,7 @@ pub(crate) fn errata36(pin_num: u8, pull_up: bool, pull_down: bool) {
             });
         }
         33 => {
-            rtcio.xtal_32k_pad.modify(|r, w| unsafe {
+            rtcio.xtal_32k_pad().modify(|r, w| unsafe {
                 w.bits(r.bits())
                     .x32p_rue()
                     .bit(pull_up)
@@ -785,36 +785,36 @@ crate::gpio::rtc_pins! {
 
 impl InterruptStatusRegisterAccess for InterruptStatusRegisterAccessBank0 {
     fn pro_cpu_interrupt_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_int.read().bits()
+        unsafe { &*GPIO::PTR }.pcpu_int().read().bits()
     }
 
     fn pro_cpu_nmi_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_nmi_int.read().bits()
+        unsafe { &*GPIO::PTR }.pcpu_nmi_int().read().bits()
     }
 
     fn app_cpu_interrupt_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.acpu_int.read().bits()
+        unsafe { &*GPIO::PTR }.acpu_int().read().bits()
     }
 
     fn app_cpu_nmi_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.acpu_nmi_int.read().bits()
+        unsafe { &*GPIO::PTR }.acpu_nmi_int().read().bits()
     }
 }
 
 impl InterruptStatusRegisterAccess for InterruptStatusRegisterAccessBank1 {
     fn pro_cpu_interrupt_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_int1.read().bits()
+        unsafe { &*GPIO::PTR }.pcpu_int1().read().bits()
     }
 
     fn pro_cpu_nmi_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_nmi_int1.read().bits()
+        unsafe { &*GPIO::PTR }.pcpu_nmi_int1().read().bits()
     }
 
     fn app_cpu_interrupt_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.acpu_int1.read().bits()
+        unsafe { &*GPIO::PTR }.acpu_int1().read().bits()
     }
 
     fn app_cpu_nmi_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.acpu_nmi_int1.read().bits()
+        unsafe { &*GPIO::PTR }.acpu_nmi_int1().read().bits()
     }
 }
