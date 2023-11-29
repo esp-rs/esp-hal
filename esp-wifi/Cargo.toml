@@ -63,7 +63,6 @@ futures-util.workspace = true
 bleps = { workspace = true, features = ["async"] }
 embedded-hal-async.workspace = true
 log.workspace = true
-smoltcp.workspace = true
 static_cell.workspace = true
 
 [features]
@@ -111,13 +110,13 @@ phy-enable-usb = []
 ps-min-modem = []
 ps-max-modem = []
 esp-now = [ "wifi" ]
-ipv6 = ["wifi", "utils", "smoltcp?/proto-ipv6"]
-ipv4 = ["wifi", "utils", "smoltcp?/proto-ipv4"]
-tcp = ["ipv4", "smoltcp?/socket-tcp"]
-udp = ["ipv4", "smoltcp?/socket-udp"]
-icmp = ["ipv4", "smoltcp?/socket-icmp"]
-igmp = ["ipv4", "smoltcp?/proto-igmp"]
-dns = ["udp", "smoltcp?/proto-dns", "smoltcp?/socket-dns"]
+ipv6   = ["wifi", "utils", "smoltcp?/proto-ipv6"]
+ipv4   = ["wifi", "utils", "smoltcp?/proto-ipv4"]
+tcp    = ["ipv4", "smoltcp?/socket-tcp"]
+udp    = ["ipv4", "smoltcp?/socket-udp"]
+icmp   = ["ipv4", "smoltcp?/socket-icmp"]
+igmp   = ["ipv4", "smoltcp?/proto-igmp"]
+dns    = ["udp",  "smoltcp?/proto-dns", "smoltcp?/socket-dns"]
 dhcpv4 = ["wifi", "utils", "smoltcp?/proto-dhcpv4", "smoltcp?/socket-dhcpv4"]
 defmt = [
   "dep:defmt",

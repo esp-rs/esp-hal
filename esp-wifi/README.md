@@ -70,6 +70,7 @@ Don't use this feature if your are _not_ using USB-SERIAL-JTAG since it might re
 | -------------- | ---------------------------------------------------------------------------------------------------- |
 | wifi-logs      | logs the WiFi logs from the driver at log level info                                                 |
 | dump-packets   | dumps packet info at log level info                                                                  |
+| smoltcp        | Provide implementations of `smoltcp` traits                                                          |
 | utils          | Provide utilities for smoltcp initialization; adds `smoltcp` dependency                              |
 | ble            | Enable BLE support                                                                                   |
 | wifi           | Enable WiFi support                                                                                  |
