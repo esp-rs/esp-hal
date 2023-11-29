@@ -150,7 +150,7 @@ pub fn init_psram(_peripheral: impl crate::peripheral::Peripheral<P = crate::per
         }
 
         let extmem = &*esp32s3::EXTMEM::PTR;
-        extmem.dcache_ctrl1.modify(|_, w| {
+        extmem.dcache_ctrl1().modify(|_, w| {
             w.dcache_shut_core0_bus()
                 .clear_bit()
                 .dcache_shut_core1_bus()
@@ -568,10 +568,10 @@ pub(crate) mod utils {
 
         unsafe {
             let spi1 = &*esp32s3::SPI1::PTR;
-            let backup_usr = spi1.user.read().bits();
-            let backup_usr1 = spi1.user1.read().bits();
-            let backup_usr2 = spi1.user2.read().bits();
-            let backup_ctrl = spi1.ctrl.read().bits();
+            let backup_usr = spi1.user().read().bits();
+            let backup_usr1 = spi1.user1().read().bits();
+            let backup_usr2 = spi1.user2().read().bits();
+            let backup_ctrl = spi1.ctrl().read().bits();
             psram_set_op_mode(mode);
             _psram_exec_cmd(
                 cmd,
@@ -592,10 +592,10 @@ pub(crate) mod utils {
                 is_write_erase_operation,
             );
 
-            spi1.user.write(|w| w.bits(backup_usr));
-            spi1.user1.write(|w| w.bits(backup_usr1));
-            spi1.user2.write(|w| w.bits(backup_usr2));
-            spi1.ctrl.write(|w| w.bits(backup_ctrl));
+            spi1.user().write(|w| w.bits(backup_usr));
+            spi1.user1().write(|w| w.bits(backup_usr1));
+            spi1.user2().write(|w| w.bits(backup_usr2));
+            spi1.ctrl().write(|w| w.bits(backup_ctrl));
         }
     }
 
@@ -662,7 +662,7 @@ pub(crate) mod utils {
                 CommandMode::PsramCmdQpi => {
                     esp_rom_spi_set_op_mode(1, ESP_ROM_SPIFLASH_QIO_MODE);
                     let spi1 = &*esp32s3::SPI1::PTR;
-                    spi1.ctrl.modify(|_, w| w.fcmd_quad().set_bit());
+                    spi1.ctrl().modify(|_, w| w.fcmd_quad().set_bit());
                 }
                 CommandMode::PsramCmdSpi => {
                     esp_rom_spi_set_op_mode(1, ESP_ROM_SPIFLASH_SLOWRD_MODE);
@@ -722,14 +722,18 @@ pub(crate) mod utils {
         if cs1_io == SPI_CS1_GPIO_NUM {
             unsafe {
                 let iomux = &*esp32s3::IO_MUX::PTR;
-                iomux.gpio[cs1_io as usize].modify(|_, w| w.mcu_sel().variant(FUNC_SPICS1_SPICS1))
+                iomux
+                    .gpio(cs1_io as usize)
+                    .modify(|_, w| w.mcu_sel().variant(FUNC_SPICS1_SPICS1))
             }
         } else {
             unsafe {
                 esp_rom_gpio_connect_out_signal(cs1_io, SPICS1_OUT_IDX, false, false);
 
                 let iomux = &*esp32s3::IO_MUX::PTR;
-                iomux.gpio[cs1_io as usize].modify(|_, w| w.mcu_sel().variant(PIN_FUNC_GPIO))
+                iomux
+                    .gpio(cs1_io as usize)
+                    .modify(|_, w| w.mcu_sel().variant(PIN_FUNC_GPIO))
             }
         }
 
@@ -1357,7 +1361,7 @@ pub(crate) mod utils {
         for pin in pins {
             unsafe {
                 let iomux = &*esp32s3::IO_MUX::PTR;
-                iomux.gpio[*pin].modify(|_, w| w.fun_drv().variant(3))
+                iomux.gpio(*pin).modify(|_, w| w.fun_drv().variant(3))
             }
         }
     }
@@ -1454,14 +1458,17 @@ pub(crate) mod utils {
         // Set cs1 pin function
         unsafe {
             let iomux = &*esp32s3::IO_MUX::PTR;
-            iomux.gpio[OCT_PSRAM_CS1_IO as usize]
+            iomux
+                .gpio(OCT_PSRAM_CS1_IO as usize)
                 .modify(|_, w| w.mcu_sel().variant(FUNC_SPICS1_SPICS1))
         }
 
         // Set mspi cs1 drive strength
         unsafe {
             let iomux = &*esp32s3::IO_MUX::PTR;
-            iomux.gpio[OCT_PSRAM_CS1_IO as usize].modify(|_, w| w.fun_drv().variant(3))
+            iomux
+                .gpio(OCT_PSRAM_CS1_IO as usize)
+                .modify(|_, w| w.fun_drv().variant(3))
         }
 
         // Set psram clock pin drive strength

@@ -142,7 +142,7 @@ pub fn get_status(core: Cpu) -> u128 {
         match core {
             Cpu::ProCpu => {
                 status |= ((*core0_interrupt_peripheral())
-                    .pro_intr_status_3
+                    .pro_intr_status_3()
                     .read()
                     .bits() as u128)
                     << 96;
@@ -150,7 +150,7 @@ pub fn get_status(core: Cpu) -> u128 {
             #[cfg(multi_core)]
             Cpu::AppCpu => {
                 status |= ((*core1_interrupt_peripheral())
-                    .app_intr_status_3
+                    .app_intr_status_3()
                     .read()
                     .bits() as u128)
                     << 96;

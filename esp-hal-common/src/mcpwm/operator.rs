@@ -145,9 +145,9 @@ impl DeadTimeCfg {
 fn dt_cfg<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mcpwm0::DB0_CFG {
     let block = unsafe { &*PWM::block() };
     match OP {
-        0 => &block.db0_cfg,
-        1 => unsafe { &*(&block.db1_cfg as *const _ as *const _) },
-        2 => unsafe { &*(&block.db2_cfg as *const _ as *const _) },
+        0 => &block.db0_cfg(),
+        1 => unsafe { &*(&block.db1_cfg() as *const _ as *const _) },
+        2 => unsafe { &*(&block.db2_cfg() as *const _ as *const _) },
         _ => unreachable!(),
     }
 }
@@ -155,9 +155,9 @@ fn dt_cfg<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mc
 fn dt_fed<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mcpwm0::DB0_FED_CFG {
     let block = unsafe { &*PWM::block() };
     match OP {
-        0 => &block.db0_fed_cfg,
-        1 => unsafe { &*(&block.db1_fed_cfg as *const _ as *const _) },
-        2 => unsafe { &*(&block.db2_fed_cfg as *const _ as *const _) },
+        0 => &block.db0_fed_cfg(),
+        1 => unsafe { &*(&block.db1_fed_cfg() as *const _ as *const _) },
+        2 => unsafe { &*(&block.db2_fed_cfg() as *const _ as *const _) },
         _ => unreachable!(),
     }
 }
@@ -165,9 +165,9 @@ fn dt_fed<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mc
 fn dt_red<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mcpwm0::DB0_RED_CFG {
     let block = unsafe { &*PWM::block() };
     match OP {
-        0 => &block.db0_red_cfg,
-        1 => unsafe { &*(&block.db1_red_cfg as *const _ as *const _) },
-        2 => unsafe { &*(&block.db2_red_cfg as *const _ as *const _) },
+        0 => &block.db0_red_cfg(),
+        1 => unsafe { &*(&block.db1_red_cfg() as *const _ as *const _) },
+        2 => unsafe { &*(&block.db2_red_cfg() as *const _ as *const _) },
         _ => unreachable!(),
     }
 }
@@ -425,22 +425,22 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
         let bits = update_method.0;
         match (OP, IS_A) {
             (0, true) => block
-                .cmpr0_cfg
+                .cmpr0_cfg()
                 .modify(|_, w| w.cmpr0_a_upmethod().variant(bits)),
             (1, true) => block
-                .cmpr1_cfg
+                .cmpr1_cfg()
                 .modify(|_, w| w.cmpr1_a_upmethod().variant(bits)),
             (2, true) => block
-                .cmpr2_cfg
+                .cmpr2_cfg()
                 .modify(|_, w| w.cmpr2_a_upmethod().variant(bits)),
             (0, false) => block
-                .cmpr0_cfg
+                .cmpr0_cfg()
                 .modify(|_, w| w.cmpr0_b_upmethod().variant(bits)),
             (1, false) => block
-                .cmpr1_cfg
+                .cmpr1_cfg()
                 .modify(|_, w| w.cmpr1_b_upmethod().variant(bits)),
             (2, false) => block
-                .cmpr2_cfg
+                .cmpr2_cfg()
                 .modify(|_, w| w.cmpr2_b_upmethod().variant(bits)),
             _ => {
                 unreachable!()
@@ -531,12 +531,12 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
         // We only write to our CMPRx_VALUEx register
         let block = unsafe { &*PWM::block() };
         match (OP, IS_A) {
-            (0, true) => block.cmpr0_value0.write(|w| w.cmpr0_a().variant(value)),
-            (1, true) => block.cmpr1_value0.write(|w| w.cmpr1_a().variant(value)),
-            (2, true) => block.cmpr2_value0.write(|w| w.cmpr2_a().variant(value)),
-            (0, false) => block.cmpr0_value1.write(|w| w.cmpr0_b().variant(value)),
-            (1, false) => block.cmpr1_value1.write(|w| w.cmpr1_b().variant(value)),
-            (2, false) => block.cmpr2_value1.write(|w| w.cmpr2_b().variant(value)),
+            (0, true) => block.cmpr0_value0().write(|w| w.cmpr0_a().variant(value)),
+            (1, true) => block.cmpr1_value0().write(|w| w.cmpr1_a().variant(value)),
+            (2, true) => block.cmpr2_value0().write(|w| w.cmpr2_a().variant(value)),
+            (0, false) => block.cmpr0_value1().write(|w| w.cmpr0_b().variant(value)),
+            (1, false) => block.cmpr1_value1().write(|w| w.cmpr1_b().variant(value)),
+            (2, false) => block.cmpr2_value1().write(|w| w.cmpr2_b().variant(value)),
             _ => {
                 unreachable!()
             }
@@ -552,12 +552,12 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
         // We only read to our GENx_TSTMP_x register
         let block = unsafe { &*PWM::block() };
         match (OP, IS_A) {
-            (0, true) => block.cmpr0_value0.read().cmpr0_a().bits(),
-            (1, true) => block.cmpr1_value0.read().cmpr1_a().bits(),
-            (2, true) => block.cmpr2_value0.read().cmpr2_a().bits(),
-            (0, false) => block.cmpr0_value1.read().cmpr0_b().bits(),
-            (1, false) => block.cmpr1_value1.read().cmpr1_b().bits(),
-            (2, false) => block.cmpr2_value1.read().cmpr2_b().bits(),
+            (0, true) => block.cmpr0_value0().read().cmpr0_a().bits(),
+            (1, true) => block.cmpr1_value0().read().cmpr1_a().bits(),
+            (2, true) => block.cmpr2_value0().read().cmpr2_a().bits(),
+            (0, false) => block.cmpr0_value1().read().cmpr0_b().bits(),
+            (1, false) => block.cmpr1_value1().read().cmpr1_b().bits(),
+            (2, false) => block.cmpr2_value1().read().cmpr2_b().bits(),
             _ => {
                 unreachable!()
             }

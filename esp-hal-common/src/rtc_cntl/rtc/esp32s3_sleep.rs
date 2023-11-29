@@ -642,7 +642,7 @@ impl RtcSleepConfig {
             });
 
             rtc_cntl
-                .dig_pwcv
+                .dig_pwc()
                 .modify(|_, w| w.cpu_top_force_pu().clear_bit());
 
             rtc_cntl.dig_iso().modify(|_, w| {

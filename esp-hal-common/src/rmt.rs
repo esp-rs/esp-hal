@@ -1370,7 +1370,7 @@ mod chip_specific {
     #[cfg(esp32s3)]
     pub fn pending_interrupt_for_channel() -> Option<usize> {
         let rmt = unsafe { &*crate::peripherals::RMT::PTR };
-        let st = rmt.int_st.read();
+        let st = rmt.int_st().read();
 
         if st.ch0_tx_end().bit() || st.ch0_tx_err().bit() {
             Some(0)
