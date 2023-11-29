@@ -40,6 +40,7 @@ procmacros           = { version = "0.7.0", features = ["enum-dispatch", "ram"],
 strum                = { version = "0.25.0", default-features = false, features = ["derive"] }
 void                 = { version = "1.0.2", default-features = false }
 usb-device           = { version = "0.2.9", optional = true }
+enumset              = "1.1.3"
 
 # atomic polyfill options
 portable-atomic              = { version = "1.5.1", default-features = false, optional = true }

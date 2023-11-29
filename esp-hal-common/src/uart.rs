@@ -1349,9 +1349,8 @@ mod asynch {
     use core::{marker::PhantomData, task::Poll};
 
     use cfg_if::cfg_if;
-    use embassy_futures::select::select_slice;
     use embassy_sync::waitqueue::AtomicWaker;
-    use heapless::Vec;
+    use enumset::{EnumSet, EnumSetType};
     use procmacros::interrupt;
 
     use super::{Error, Instance};
@@ -1373,12 +1372,16 @@ mod asynch {
     }
 
     const INIT: AtomicWaker = AtomicWaker::new();
-    static WAKERS: [AtomicWaker; NUM_UART] = [INIT; NUM_UART];
+    static TX_WAKERS: [AtomicWaker; NUM_UART] = [INIT; NUM_UART];
+    static RX_WAKERS: [AtomicWaker; NUM_UART] = [INIT; NUM_UART];
 
-    #[derive(Copy, Clone, PartialEq, Eq)]
-    pub(crate) enum Event {
+    #[derive(EnumSetType, Debug)]
+    pub(crate) enum TxEvent {
         TxDone,
         TxFiFoEmpty,
+    }
+    #[derive(EnumSetType, Debug)]
+    pub(crate) enum RxEvent {
         RxFifoFull,
         RxCmdCharDetected,
         RxFifoOvf,
@@ -1390,116 +1393,163 @@ mod asynch {
     /// Upon construction the future enables the passed interrupt and when it
     /// is dropped it disables the interrupt again. The future returns the event
     /// that was initially passed, when it resolves.
-    pub(crate) struct UartFuture<'d, T: Instance> {
-        event: Event,
+    pub(crate) struct UartRxFuture<'d, T: Instance> {
+        events: EnumSet<RxEvent>,
         phantom: PhantomData<&'d mut T>,
+        registered: bool,
+    }
+    pub(crate) struct UartTxFuture<'d, T: Instance> {
+        events: EnumSet<TxEvent>,
+        phantom: PhantomData<&'d mut T>,
+        registered: bool,
     }
 
-    impl<'d, T: Instance> UartFuture<'d, T> {
-        pub fn new(event: Event) -> Self {
-            match event {
-                Event::TxDone => T::register_block()
-                    .int_ena
-                    .modify(|_, w| w.tx_done_int_ena().set_bit()),
-                Event::TxFiFoEmpty => T::register_block()
-                    .int_ena
-                    .modify(|_, w| w.txfifo_empty_int_ena().set_bit()),
-                Event::RxFifoFull => T::register_block()
-                    .int_ena
-                    .modify(|_, w| w.rxfifo_full_int_ena().set_bit()),
-                Event::RxCmdCharDetected => T::register_block()
-                    .int_ena
-                    .modify(|_, w| w.at_cmd_char_det_int_ena().set_bit()),
-                Event::RxFifoOvf => T::register_block()
-                    .int_ena
-                    .modify(|_, w| w.rxfifo_ovf_int_ena().set_bit()),
-                Event::RxFifoTout => T::register_block()
-                    .int_ena
-                    .modify(|_, w| w.rxfifo_tout_int_ena().set_bit()),
-            }
-
+    impl<'d, T: Instance> UartRxFuture<'d, T> {
+        pub fn new(events: EnumSet<RxEvent>) -> Self {
             Self {
-                event,
+                events,
                 phantom: PhantomData,
+                registered: false,
             }
         }
 
         fn event_bit_is_clear(&self) -> bool {
-            match self.event {
-                Event::TxDone => T::register_block()
-                    .int_ena
-                    .read()
-                    .tx_done_int_ena()
-                    .bit_is_clear(),
-                Event::TxFiFoEmpty => T::register_block()
-                    .int_ena
-                    .read()
-                    .txfifo_empty_int_ena()
-                    .bit_is_clear(),
-                Event::RxFifoFull => T::register_block()
-                    .int_ena
-                    .read()
-                    .rxfifo_full_int_ena()
-                    .bit_is_clear(),
-                Event::RxCmdCharDetected => T::register_block()
-                    .int_ena
-                    .read()
-                    .at_cmd_char_det_int_ena()
-                    .bit_is_clear(),
-                Event::RxFifoOvf => T::register_block()
-                    .int_ena
-                    .read()
-                    .rxfifo_ovf_int_ena()
-                    .bit_is_clear(),
-                Event::RxFifoTout => T::register_block()
-                    .int_ena
-                    .read()
-                    .rxfifo_tout_int_ena()
-                    .bit_is_clear(),
+            let interrupts_enabled = T::register_block().int_ena.read();
+            let mut event_triggered = false;
+            for event in self.events {
+                event_triggered |= match event {
+                    RxEvent::RxFifoFull => interrupts_enabled.rxfifo_full_int_ena().bit_is_clear(),
+                    RxEvent::RxCmdCharDetected => {
+                        interrupts_enabled.at_cmd_char_det_int_ena().bit_is_clear()
+                    }
+
+                    RxEvent::RxFifoOvf => interrupts_enabled.rxfifo_ovf_int_ena().bit_is_clear(),
+                    RxEvent::RxFifoTout => interrupts_enabled.rxfifo_tout_int_ena().bit_is_clear(),
+                }
             }
+            event_triggered
         }
     }
 
-    impl<'d, T: Instance> core::future::Future for UartFuture<'d, T> {
-        type Output = Event;
+    impl<'d, T: Instance> core::future::Future for UartRxFuture<'d, T> {
+        type Output = ();
 
         fn poll(
-            self: core::pin::Pin<&mut Self>,
+            mut self: core::pin::Pin<&mut Self>,
             cx: &mut core::task::Context<'_>,
         ) -> core::task::Poll<Self::Output> {
-            WAKERS[T::uart_number()].register(cx.waker());
+            if !self.registered {
+                RX_WAKERS[T::uart_number()].register(cx.waker());
+                T::register_block().int_ena.modify(|_, w| {
+                    for event in self.events {
+                        match event {
+                            RxEvent::RxFifoFull => w.rxfifo_full_int_ena().set_bit(),
+                            RxEvent::RxCmdCharDetected => w.at_cmd_char_det_int_ena().set_bit(),
+                            RxEvent::RxFifoOvf => w.rxfifo_ovf_int_ena().set_bit(),
+                            RxEvent::RxFifoTout => w.rxfifo_tout_int_ena().set_bit(),
+                        };
+                    }
+                    w
+                });
+                self.registered = true;
+            }
             if self.event_bit_is_clear() {
-                Poll::Ready(self.event)
+                Poll::Ready(())
             } else {
                 Poll::Pending
             }
         }
     }
 
-    impl<'d, T: Instance> Drop for UartFuture<'d, T> {
+    impl<'d, T: Instance> Drop for UartRxFuture<'d, T> {
         fn drop(&mut self) {
             // Although the isr disables the interrupt that occured directly, we need to
             // disable the other interrupts (= the ones that did not occur), as
             // soon as this future goes out of scope.
-            match self.event {
-                Event::TxDone => T::register_block()
-                    .int_ena
-                    .modify(|_, w| w.tx_done_int_ena().clear_bit()),
-                Event::TxFiFoEmpty => T::register_block()
-                    .int_ena
-                    .modify(|_, w| w.txfifo_empty_int_ena().clear_bit()),
-                Event::RxFifoFull => T::register_block()
-                    .int_ena
-                    .modify(|_, w| w.rxfifo_full_int_ena().clear_bit()),
-                Event::RxCmdCharDetected => T::register_block()
-                    .int_ena
-                    .modify(|_, w| w.at_cmd_char_det_int_ena().clear_bit()),
-                Event::RxFifoOvf => T::register_block()
-                    .int_ena
-                    .modify(|_, w| w.rxfifo_ovf_int_ena().clear_bit()),
-                Event::RxFifoTout => T::register_block()
-                    .int_ena
-                    .modify(|_, w| w.rxfifo_tout_int_ena().clear_bit()),
+            let int_ena = &T::register_block().int_ena;
+            for event in self.events {
+                match event {
+                    RxEvent::RxFifoFull => {
+                        int_ena.modify(|_, w| w.rxfifo_full_int_ena().clear_bit())
+                    }
+                    RxEvent::RxCmdCharDetected => {
+                        int_ena.modify(|_, w| w.at_cmd_char_det_int_ena().clear_bit())
+                    }
+                    RxEvent::RxFifoOvf => int_ena.modify(|_, w| w.rxfifo_ovf_int_ena().clear_bit()),
+                    RxEvent::RxFifoTout => {
+                        int_ena.modify(|_, w| w.rxfifo_tout_int_ena().clear_bit())
+                    }
+                }
+            }
+        }
+    }
+
+    impl<'d, T: Instance> UartTxFuture<'d, T> {
+        pub fn new(events: EnumSet<TxEvent>) -> Self {
+            Self {
+                events,
+                phantom: PhantomData,
+                registered: false,
+            }
+        }
+
+        fn event_bit_is_clear(&self) -> bool {
+            let interrupts_enabled = T::register_block().int_ena.read();
+            let mut event_triggered = false;
+            for event in self.events {
+                event_triggered |= match event {
+                    TxEvent::TxDone => interrupts_enabled.tx_done_int_ena().bit_is_clear(),
+                    TxEvent::TxFiFoEmpty => {
+                        interrupts_enabled.txfifo_empty_int_ena().bit_is_clear()
+                    }
+                }
+            }
+            event_triggered
+        }
+    }
+
+    impl<'d, T: Instance> core::future::Future for UartTxFuture<'d, T> {
+        type Output = ();
+
+        fn poll(
+            mut self: core::pin::Pin<&mut Self>,
+            cx: &mut core::task::Context<'_>,
+        ) -> core::task::Poll<Self::Output> {
+            if !self.registered {
+                TX_WAKERS[T::uart_number()].register(cx.waker());
+                T::register_block().int_ena.modify(|_, w| {
+                    for event in self.events {
+                        match event {
+                            TxEvent::TxDone => w.tx_done_int_ena().set_bit(),
+                            TxEvent::TxFiFoEmpty => w.txfifo_empty_int_ena().set_bit(),
+                        };
+                    }
+                    w
+                });
+                self.registered = true;
+            }
+
+            if self.event_bit_is_clear() {
+                Poll::Ready(())
+            } else {
+                Poll::Pending
+            }
+        }
+    }
+
+    impl<'d, T: Instance> Drop for UartTxFuture<'d, T> {
+        fn drop(&mut self) {
+            // Although the isr disables the interrupt that occurred directly, we need to
+            // disable the other interrupts (= the ones that did not occur), as
+            // soon as this future goes out of scope.
+            let int_ena = &T::register_block().int_ena;
+            for event in self.events {
+                match event {
+                    TxEvent::TxDone => int_ena.modify(|_, w| w.tx_done_int_ena().clear_bit()),
+                    TxEvent::TxFiFoEmpty => {
+                        int_ena.modify(|_, w| w.txfifo_empty_int_ena().clear_bit())
+                    }
+                }
             }
         }
     }
@@ -1545,7 +1595,7 @@ mod asynch {
                 }
 
                 offset = next_offset;
-                UartFuture::<T>::new(Event::TxFiFoEmpty).await;
+                UartTxFuture::<T>::new(TxEvent::TxFiFoEmpty.into()).await;
             }
 
             Ok(count)
@@ -1554,7 +1604,7 @@ mod asynch {
         async fn flush_async(&mut self) -> Result<(), Error> {
             let count = T::get_tx_fifo_count();
             if count > 0 {
-                UartFuture::<T>::new(Event::TxDone).await;
+                UartTxFuture::<T>::new(TxEvent::TxDone.into()).await;
             }
 
             Ok(())
@@ -1581,12 +1631,9 @@ mod asynch {
         /// # Params
         /// - `buf` buffer slice to write the bytes into
         ///
-        /// # Errors
-        /// - `Err(RxFifoOvf)` when MCU Rx Fifo Overflow interrupt is triggered.
-        ///   To avoid this error, call this function more often.
         ///
         /// # Ok
-        /// When succesfull, returns the number of bytes written to buf.
+        /// When successful, returns the number of bytes written to buf.
         /// This method will never return Ok(0), unless buf.len() == 0.
         async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
             if buf.len() == 0 {
@@ -1594,33 +1641,16 @@ mod asynch {
             }
 
             loop {
-                let mut futures: Vec<_, 4> = Vec::new();
-                futures
-                    .push(UartFuture::<T>::new(Event::RxFifoFull))
-                    .map_err(|_| ())
-                    .unwrap();
-                futures
-                    .push(UartFuture::<T>::new(Event::RxFifoOvf))
-                    .map_err(|_| ())
-                    .unwrap();
+                let mut events = RxEvent::RxFifoFull | RxEvent::RxFifoOvf;
 
                 if self.at_cmd_config.is_some() {
-                    futures
-                        .push(UartFuture::<T>::new(Event::RxCmdCharDetected))
-                        .map_err(|_| ())
-                        .unwrap();
+                    events |= RxEvent::RxCmdCharDetected;
                 }
 
                 if self.rx_timeout_config.is_some() {
-                    futures
-                        .push(UartFuture::<T>::new(Event::RxFifoTout))
-                        .map_err(|_| ())
-                        .unwrap();
+                    events |= RxEvent::RxFifoTout;
                 }
-
-                if select_slice(&mut futures).await.0 == Event::RxFifoOvf {
-                    return Err(Error::RxFifoOvf);
-                }
+                UartRxFuture::<T>::new(events).await;
 
                 let read_bytes = self.drain_fifo(buf);
                 if read_bytes > 0 {
@@ -1689,27 +1719,38 @@ mod asynch {
     }
 
     /// Interrupt handler for all UART instances
-    /// Clears and disables interrupts that have occured and have their enable
+    /// Clears and disables interrupts that have occurred and have their enable
     /// bit set. The fact that an interrupt has been disabled is used by the
     /// futures to detect that they should indeed resolve after being woken up
-    fn intr_handler(uart: &RegisterBlock) -> bool {
-        let relevant_interrupts = uart.int_st.read().bits(); // = int_raw & int_ena
-        if relevant_interrupts == 0 {
-            return false;
+    fn intr_handler(uart: &RegisterBlock) -> (bool, bool) {
+        let interrupts = uart.int_st.read();
+        let interrupt_bits = interrupts.bits(); // = int_raw & int_ena
+        if interrupt_bits == 0 {
+            return (false, false);
         }
-        uart.int_clr
-            .write(|w| unsafe { w.bits(relevant_interrupts) });
+        let rx_wake = interrupts.rxfifo_full_int_st().bit_is_set()
+            || interrupts.rxfifo_ovf_int_st().bit_is_set()
+            || interrupts.rxfifo_tout_int_st().bit_is_set()
+            || interrupts.at_cmd_char_det_int_st().bit_is_set();
+        let tx_wake = interrupts.tx_done_int_st().bit_is_set()
+            || interrupts.txfifo_empty_int_st().bit_is_set();
+        uart.int_clr.write(|w| unsafe { w.bits(interrupt_bits) });
         uart.int_ena
-            .modify(|r, w| unsafe { w.bits(r.bits() & !relevant_interrupts) });
-        true
+            .modify(|r, w| unsafe { w.bits(r.bits() & !interrupt_bits) });
+
+        (rx_wake, tx_wake)
     }
 
     #[cfg(uart0)]
     #[interrupt]
     fn UART0() {
         let uart = unsafe { &*crate::peripherals::UART0::ptr() };
-        if intr_handler(uart) {
-            WAKERS[0].wake();
+        let (rx, tx) = intr_handler(uart);
+        if rx {
+            RX_WAKERS[0].wake();
+        }
+        if tx {
+            TX_WAKERS[0].wake();
         }
     }
 
@@ -1717,8 +1758,12 @@ mod asynch {
     #[interrupt]
     fn UART1() {
         let uart = unsafe { &*crate::peripherals::UART1::ptr() };
-        if intr_handler(uart) {
-            WAKERS[1].wake();
+        let (rx, tx) = intr_handler(uart);
+        if rx {
+            RX_WAKERS[1].wake();
+        }
+        if tx {
+            TX_WAKERS[1].wake();
         }
     }
 
@@ -1726,8 +1771,12 @@ mod asynch {
     #[interrupt]
     fn UART2() {
         let uart = unsafe { &*crate::peripherals::UART2::ptr() };
-        if intr_handler(uart) {
-            WAKERS[2].wake();
+        let (rx, tx) = intr_handler(uart);
+        if rx {
+            RX_WAKERS[2].wake();
+        }
+        if tx {
+            TX_WAKERS[2].wake();
         }
     }
 }
