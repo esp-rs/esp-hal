@@ -1350,7 +1350,7 @@ mod asynch {
 
     use cfg_if::cfg_if;
     use embassy_sync::waitqueue::AtomicWaker;
-    use heapless::Vec;
+    use enumset::{EnumSet, EnumSetType};
     use procmacros::interrupt;
 
     use super::{Error, Instance};
@@ -1375,12 +1375,12 @@ mod asynch {
     static TX_WAKERS: [AtomicWaker; NUM_UART] = [INIT; NUM_UART];
     static RX_WAKERS: [AtomicWaker; NUM_UART] = [INIT; NUM_UART];
 
-    #[derive(Copy, Clone, PartialEq, Eq, Debug)]
+    #[derive(EnumSetType, Debug)]
     pub(crate) enum TxEvent {
         TxDone,
         TxFiFoEmpty,
     }
-    #[derive(Copy, Clone, PartialEq, Eq, Debug)]
+    #[derive(EnumSetType, Debug)]
     pub(crate) enum RxEvent {
         RxFifoFull,
         RxCmdCharDetected,
@@ -1394,18 +1394,18 @@ mod asynch {
     /// is dropped it disables the interrupt again. The future returns the event
     /// that was initially passed, when it resolves.
     pub(crate) struct UartRxFuture<'d, T: Instance> {
-        events: &'d Vec<RxEvent, 4>,
+        events: EnumSet<RxEvent>,
         phantom: PhantomData<&'d mut T>,
         registered: bool,
     }
     pub(crate) struct UartTxFuture<'d, T: Instance> {
-        events: &'d Vec<TxEvent, 2>,
+        events: EnumSet<TxEvent>,
         phantom: PhantomData<&'d mut T>,
         registered: bool,
     }
 
     impl<'d, T: Instance> UartRxFuture<'d, T> {
-        pub fn new(events: &'d Vec<RxEvent, 4>) -> Self {
+        pub fn new(events: EnumSet<RxEvent>) -> Self {
             Self {
                 events,
                 phantom: PhantomData,
@@ -1485,7 +1485,7 @@ mod asynch {
     }
 
     impl<'d, T: Instance> UartTxFuture<'d, T> {
-        pub fn new(events: &'d Vec<TxEvent, 2>) -> Self {
+        pub fn new(events: EnumSet<TxEvent>) -> Self {
             Self {
                 events,
                 phantom: PhantomData,
@@ -1595,7 +1595,7 @@ mod asynch {
                 }
 
                 offset = next_offset;
-                UartTxFuture::<T>::new(&Vec::from_slice(&[TxEvent::TxFiFoEmpty]).unwrap()).await;
+                UartTxFuture::<T>::new(TxEvent::TxFiFoEmpty.into()).await;
             }
 
             Ok(count)
@@ -1604,7 +1604,7 @@ mod asynch {
         async fn flush_async(&mut self) -> Result<(), Error> {
             let count = T::get_tx_fifo_count();
             if count > 0 {
-                UartTxFuture::<T>::new(&Vec::from_slice(&[TxEvent::TxDone]).unwrap()).await;
+                UartTxFuture::<T>::new(TxEvent::TxDone.into()).await;
             }
 
             Ok(())
@@ -1631,9 +1631,6 @@ mod asynch {
         /// # Params
         /// - `buf` buffer slice to write the bytes into
         ///
-        /// # Errors
-        /// - `Err(RxFifoOvf)` when MCU Rx Fifo Overflow interrupt is triggered.
-        ///   To avoid this error, call this function more often.
         ///
         /// # Ok
         /// When successful, returns the number of bytes written to buf.
@@ -1644,17 +1641,16 @@ mod asynch {
             }
 
             loop {
-                let mut events: Vec<RxEvent, 4> =
-                    Vec::from_slice(&[RxEvent::RxFifoFull, RxEvent::RxFifoOvf]).unwrap();
+                let mut events = RxEvent::RxFifoFull | RxEvent::RxFifoOvf;
 
                 if self.at_cmd_config.is_some() {
-                    events.push(RxEvent::RxCmdCharDetected).unwrap();
+                    events |= RxEvent::RxCmdCharDetected;
                 }
 
                 if self.rx_timeout_config.is_some() {
-                    events.push(RxEvent::RxFifoTout).unwrap();
+                    events |= RxEvent::RxFifoTout;
                 }
-                UartRxFuture::<T>::new(&events).await;
+                UartRxFuture::<T>::new(events).await;
 
                 let read_bytes = self.drain_fifo(buf);
                 if read_bytes > 0 {
@@ -1723,7 +1719,7 @@ mod asynch {
     }
 
     /// Interrupt handler for all UART instances
-    /// Clears and disables interrupts that have occured and have their enable
+    /// Clears and disables interrupts that have occurred and have their enable
     /// bit set. The fact that an interrupt has been disabled is used by the
     /// futures to detect that they should indeed resolve after being woken up
     fn intr_handler(uart: &RegisterBlock) -> (bool, bool) {
