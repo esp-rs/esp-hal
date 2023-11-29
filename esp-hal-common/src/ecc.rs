@@ -410,15 +410,15 @@ impl<'d> Ecc<'d> {
         let mut tmp = [0_u8; 32];
         self.reverse_words(k, &mut tmp);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.k_mem[0], tmp.as_ref(), 8);
+            .volatile_write_regset(self.ecc.k_mem(0).as_ptr(), tmp.as_ref(), 8);
         self.reverse_words(px, &mut tmp);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.px_mem[0], tmp.as_ref(), 8);
+            .volatile_write_regset(self.ecc.px_mem(0).as_ptr(), tmp.as_ref(), 8);
         self.reverse_words(py, &mut tmp);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.py_mem[0], tmp.as_ref(), 8);
+            .volatile_write_regset(self.ecc.py_mem(0).as_ptr(), tmp.as_ref(), 8);
 
-        self.ecc.mult_conf.write(|w| unsafe {
+        self.ecc.mult_conf().write(|w| unsafe {
             w.work_mode()
                 .bits(mode as u8)
                 .key_length()
@@ -430,25 +430,25 @@ impl<'d> Ecc<'d> {
         // wait for interrupt
         while self.is_busy() {}
 
-        if !self.ecc.mult_conf.read().verification_result().bit() {
-            self.ecc.mult_conf.reset();
+        if !self.ecc.mult_conf().read().verification_result().bit() {
+            self.ecc.mult_conf().reset();
             return Err(Error::PointNotOnSelectedCurve);
         }
 
         self.alignment_helper
-            .volatile_read_regset(&self.ecc.px_mem[0], &mut tmp, 8);
+            .volatile_read_regset(self.ecc.px_mem(0).as_ptr(), &mut tmp, 8);
         self.reverse_words(tmp.as_ref(), px);
         self.alignment_helper
-            .volatile_read_regset(&self.ecc.py_mem[0], &mut tmp, 8);
+            .volatile_read_regset(self.ecc.py_mem(0).as_ptr(), &mut tmp, 8);
         self.reverse_words(tmp.as_ref(), py);
         self.alignment_helper
-            .volatile_read_regset(&self.ecc.qx_mem[0], &mut tmp, 8);
+            .volatile_read_regset(self.ecc.qx_mem(0).as_ptr(), &mut tmp, 8);
         self.reverse_words(tmp.as_ref(), qx);
         self.alignment_helper
-            .volatile_read_regset(&self.ecc.qy_mem[0], &mut tmp, 8);
+            .volatile_read_regset(self.ecc.qy_mem(0).as_ptr(), &mut tmp, 8);
         self.reverse_words(tmp.as_ref(), qy);
         self.alignment_helper
-            .volatile_read_regset(&self.ecc.qz_mem[0], &mut tmp, 8);
+            .volatile_read_regset(self.ecc.qz_mem(0).as_ptr(), &mut tmp, 8);
         self.reverse_words(tmp.as_ref(), qz);
 
         Ok(())
@@ -523,13 +523,13 @@ impl<'d> Ecc<'d> {
             self.reverse_words(tmp.as_ref(), k);
             } else {
             self.alignment_helper
-                .volatile_read_regset(self.ecc.qx_mem[0].as_ptr(), &mut tmp, 8);
+                .volatile_read_regset(self.ecc.qx_mem(0).as_ptr(), &mut tmp, 8);
             self.reverse_words(tmp.as_ref(), x);
             self.alignment_helper
-                .volatile_read_regset(self.ecc.qy_mem[0].as_ptr(), &mut tmp, 8);
+                .volatile_read_regset(self.ecc.qy_mem(0).as_ptr(), &mut tmp, 8);
             self.reverse_words(tmp.as_ref(), y);
             self.alignment_helper
-                .volatile_read_regset(self.ecc.qz_mem[0].as_ptr(), &mut tmp, 8);
+                .volatile_read_regset(self.ecc.qz_mem(0).as_ptr(), &mut tmp, 8);
             self.reverse_words(tmp.as_ref(), k);
             }
         }
@@ -773,21 +773,21 @@ impl<'d> Ecc<'d> {
 
         tmp[0..px.len()].copy_from_slice(&px);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.px_mem[0], &mut tmp, 8);
+            .volatile_write_regset(self.ecc.px_mem(0).as_ptr(), &mut tmp, 8);
         tmp[0..py.len()].copy_from_slice(&py);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.py_mem[0], &mut tmp, 8);
+            .volatile_write_regset(self.ecc.py_mem(0).as_ptr(), &mut tmp, 8);
         tmp[0..qx.len()].copy_from_slice(&qx);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.qx_mem[0], &mut tmp, 8);
+            .volatile_write_regset(self.ecc.qx_mem(0).as_ptr(), &mut tmp, 8);
         tmp[0..qy.len()].copy_from_slice(&qy);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.qy_mem[0], &mut tmp, 8);
+            .volatile_write_regset(self.ecc.qy_mem(0).as_ptr(), &mut tmp, 8);
         tmp[0..qz.len()].copy_from_slice(&qz);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.qz_mem[0], &mut tmp, 8);
+            .volatile_write_regset(self.ecc.qz_mem(0).as_ptr(), &mut tmp, 8);
 
-        self.ecc.mult_conf.write(|w| unsafe {
+        self.ecc.mult_conf().write(|w| unsafe {
             w.work_mode()
                 .bits(mode as u8)
                 .key_length()
@@ -800,23 +800,23 @@ impl<'d> Ecc<'d> {
         while self.is_busy() {}
 
         self.alignment_helper
-            .volatile_read_regset(&self.ecc.px_mem[0], &mut tmp, 8);
+            .volatile_read_regset(self.ecc.px_mem(0).as_ptr(), &mut tmp, 8);
         let mut tmp_len = px.len();
         px[..].copy_from_slice(&tmp[..tmp_len]);
         self.alignment_helper
-            .volatile_read_regset(&self.ecc.py_mem[0], &mut tmp, 8);
+            .volatile_read_regset(self.ecc.py_mem(0).as_ptr(), &mut tmp, 8);
         tmp_len = py.len();
         py[..].copy_from_slice(&tmp[..tmp_len]);
         self.alignment_helper
-            .volatile_read_regset(&self.ecc.qx_mem[0], &mut tmp, 8);
+            .volatile_read_regset(self.ecc.qx_mem(0).as_ptr(), &mut tmp, 8);
         tmp_len = qx.len();
         qx[..].copy_from_slice(&tmp[..tmp_len]);
         self.alignment_helper
-            .volatile_read_regset(&self.ecc.qy_mem[0], &mut tmp, 8);
+            .volatile_read_regset(self.ecc.qy_mem(0).as_ptr(), &mut tmp, 8);
         tmp_len = qy.len();
         qy[..].copy_from_slice(&tmp[..tmp_len]);
         self.alignment_helper
-            .volatile_read_regset(&self.ecc.qz_mem[0], &mut tmp, 8);
+            .volatile_read_regset(self.ecc.qz_mem(0).as_ptr(), &mut tmp, 8);
         tmp_len = qz.len();
         qz[..].copy_from_slice(&tmp[..tmp_len]);
 
@@ -865,12 +865,12 @@ impl<'d> Ecc<'d> {
         let mut tmp = [0_u8; 32];
         tmp[0..a.len()].copy_from_slice(&a);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.px_mem[0], &mut tmp, 8);
+            .volatile_write_regset(self.ecc.px_mem(0).as_ptr(), &mut tmp, 8);
         tmp[0..b.len()].copy_from_slice(&b);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.py_mem[0], &mut tmp, 8);
+            .volatile_write_regset(self.ecc.py_mem(0).as_ptr(), &mut tmp, 8);
 
-        self.ecc.mult_conf.write(|w| unsafe {
+        self.ecc.mult_conf().write(|w| unsafe {
             w.work_mode()
                 .bits(work_mode.clone() as u8)
                 .key_length()
@@ -884,14 +884,20 @@ impl<'d> Ecc<'d> {
 
         match work_mode {
             WorkMode::ModAdd | WorkMode::ModSub => {
-                self.alignment_helper
-                    .volatile_read_regset(&self.ecc.px_mem[0], &mut tmp, 8);
+                self.alignment_helper.volatile_read_regset(
+                    self.ecc.px_mem(0).as_ptr(),
+                    &mut tmp,
+                    8,
+                );
                 let tmp_len = a.len();
                 a[..].copy_from_slice(&tmp[..tmp_len]);
             }
             WorkMode::ModMulti | WorkMode::ModDiv => {
-                self.alignment_helper
-                    .volatile_read_regset(&self.ecc.py_mem[0], &mut tmp, 8);
+                self.alignment_helper.volatile_read_regset(
+                    self.ecc.py_mem(0).as_ptr(),
+                    &mut tmp,
+                    8,
+                );
                 let tmp_len = b.len();
                 b[..].copy_from_slice(&tmp[..tmp_len]);
             }

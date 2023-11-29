@@ -1827,7 +1827,7 @@ mod private {
                 unsafe { crate::peripherals::PARL_IO::steal() };
 
             reg_block
-                .int_ena
+                .int_ena()
                 .modify(|_, w| w.tx_eof_int_ena().set_bit());
         }
 
@@ -1837,7 +1837,7 @@ mod private {
                 unsafe { crate::peripherals::PARL_IO::steal() };
 
             reg_block
-                .int_ena
+                .int_ena()
                 .modify(|_, w| w.tx_eof_int_ena().clear_bit());
         }
 
@@ -1846,7 +1846,7 @@ mod private {
             let reg_block: crate::peripherals::PARL_IO =
                 unsafe { crate::peripherals::PARL_IO::steal() };
 
-            reg_block.int_ena.read().tx_eof_int_ena().bit()
+            reg_block.int_ena().read().tx_eof_int_ena().bit()
         }
 
         #[cfg(feature = "async")]
@@ -1854,7 +1854,7 @@ mod private {
             let reg_block: crate::peripherals::PARL_IO =
                 unsafe { crate::peripherals::PARL_IO::steal() };
 
-            reg_block.int_raw.read().tx_eof_int_raw().bit()
+            reg_block.int_raw().read().tx_eof_int_raw().bit()
         }
 
         #[cfg(feature = "async")]
@@ -1862,7 +1862,7 @@ mod private {
             let reg_block: crate::peripherals::PARL_IO =
                 unsafe { crate::peripherals::PARL_IO::steal() };
 
-            reg_block.int_clr.write(|w| w.tx_eof_int_clr().set_bit());
+            reg_block.int_clr().write(|w| w.tx_eof_int_clr().set_bit());
         }
     }
 
@@ -2125,7 +2125,7 @@ mod private {
             let reg_block: crate::peripherals::PARL_IO =
                 unsafe { crate::peripherals::PARL_IO::steal() };
 
-            reg_block.int_raw.read().tx_eof_int_raw().bit()
+            reg_block.int_raw().read().tx_eof_int_raw().bit()
         }
 
         #[cfg(feature = "async")]
@@ -2133,7 +2133,7 @@ mod private {
             let reg_block: crate::peripherals::PARL_IO =
                 unsafe { crate::peripherals::PARL_IO::steal() };
 
-            reg_block.int_clr.write(|w| w.tx_eof_int_clr().set_bit());
+            reg_block.int_clr().write(|w| w.tx_eof_int_clr().set_bit());
         }
     }
 }
