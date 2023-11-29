@@ -2550,36 +2550,10 @@ mod asynch {
     const NEW_AW: AtomicWaker = AtomicWaker::new();
     static PIN_WAKERS: [AtomicWaker; NUM_PINS] = [NEW_AW; NUM_PINS];
 
-    impl<MODE, const GPIONUM: u8> Wait for GpioPin<Input<MODE>, GPIONUM>
+    impl<MODE, const GPIONUM: u8> Wait for GpioPin<MODE, GPIONUM>
     where
-        Self: GpioProperties,
+        Self: GpioProperties + embedded_hal_1::digital::ErrorType,
         <Self as GpioProperties>::PinType: IsInputPin,
-    {
-        async fn wait_for_high(&mut self) -> Result<(), Self::Error> {
-            PinFuture::new(self, Event::HighLevel).await
-        }
-
-        async fn wait_for_low(&mut self) -> Result<(), Self::Error> {
-            PinFuture::new(self, Event::LowLevel).await
-        }
-
-        async fn wait_for_rising_edge(&mut self) -> Result<(), Self::Error> {
-            PinFuture::new(self, Event::RisingEdge).await
-        }
-
-        async fn wait_for_falling_edge(&mut self) -> Result<(), Self::Error> {
-            PinFuture::new(self, Event::FallingEdge).await
-        }
-
-        async fn wait_for_any_edge(&mut self) -> Result<(), Self::Error> {
-            PinFuture::new(self, Event::AnyEdge).await
-        }
-    }
-
-    impl<const GPIONUM: u8> Wait for GpioPin<Output<OpenDrain>, GPIONUM>
-    where
-        Self: GpioProperties,
-        <Self as GpioProperties>::PinType: IsInputPin + IsOutputPin,
     {
         async fn wait_for_high(&mut self) -> Result<(), Self::Error> {
             PinFuture::new(self, Event::HighLevel).await
