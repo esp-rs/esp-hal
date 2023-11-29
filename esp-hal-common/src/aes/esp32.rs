@@ -3,6 +3,9 @@ use crate::{
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
 };
 
+const KEY_LEN: usize = 8;
+const TEXT_LEN: usize = 4;
+
 impl<'d> Aes<'d> {
     pub(super) fn init(&mut self) {
         PeripheralClockControl::enable(PeripheralEnable::Aes);
@@ -17,18 +20,18 @@ impl<'d> Aes<'d> {
     }
 
     pub(super) fn write_key(&mut self, key: &[u8]) {
-        debug_assert!(key.len() <= self.aes.key_.len() * ALIGN_SIZE);
+        debug_assert!(key.len() <= KEY_LEN * ALIGN_SIZE);
         debug_assert_eq!(key.len() % ALIGN_SIZE, 0);
-        Self::write_to_regset(key, self.aes.key_.len(), &mut self.aes.key_[0]);
+        Self::write_to_regset(key, KEY_LEN, self.aes.key(0).as_ptr());
     }
 
     pub(super) fn write_block(&mut self, block: &[u8]) {
-        debug_assert_eq!(block.len(), self.aes.text_.len() * ALIGN_SIZE);
-        Self::write_to_regset(block, self.aes.text_.len(), &mut self.aes.text_[0]);
+        debug_assert_eq!(block.len(), TEXT_LEN * ALIGN_SIZE);
+        Self::write_to_regset(block, TEXT_LEN, self.aes.text(0).as_ptr());
     }
 
     pub(super) fn write_mode(&mut self, mode: u32) {
-        self.aes.mode.write(|w| unsafe { w.bits(mode) });
+        self.aes.mode().write(|w| unsafe { w.bits(mode) });
     }
 
     /// Configures how the state matrix would be laid out
@@ -48,20 +51,20 @@ impl<'d> Aes<'d> {
         to_write |= (input_text_word_endianess as u32) << 3;
         to_write |= (output_text_byte_endianess as u32) << 4;
         to_write |= (output_text_word_endianess as u32) << 5;
-        self.aes.endian.write(|w| unsafe { w.bits(to_write) });
+        self.aes.endian().write(|w| unsafe { w.bits(to_write) });
     }
 
     pub(super) fn write_start(&mut self) {
-        self.aes.start.write(|w| w.start().set_bit())
+        self.aes.start().write(|w| w.start().set_bit())
     }
 
     pub(super) fn read_idle(&mut self) -> bool {
-        self.aes.idle.read().idle().bit_is_set()
+        self.aes.idle().read().idle().bit_is_set()
     }
 
     pub(super) fn read_block(&self, block: &mut [u8]) {
-        debug_assert_eq!(block.len(), self.aes.text_.len() * ALIGN_SIZE);
-        Self::read_from_regset(block, self.aes.text_.len(), &self.aes.text_[0]);
+        debug_assert_eq!(block.len(), TEXT_LEN * ALIGN_SIZE);
+        Self::read_from_regset(block, TEXT_LEN, &self.aes.text(0));
     }
 }
 

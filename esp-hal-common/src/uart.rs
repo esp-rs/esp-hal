@@ -1669,7 +1669,7 @@ mod asynch {
                     // cleared. Since we do not drain the fifo in the interrupt handler, we need to
                     // reset the counter here, after draining the fifo.
                     T::register_block()
-                        .int_clr
+                        .int_clr()
                         .write(|w| w.rxfifo_tout_int_clr().set_bit());
 
                     return Ok(read_bytes);
@@ -1733,7 +1733,7 @@ mod asynch {
     /// bit set. The fact that an interrupt has been disabled is used by the
     /// futures to detect that they should indeed resolve after being woken up
     fn intr_handler(uart: &RegisterBlock) -> (bool, bool) {
-        let interrupts = uart.int_st.read();
+        let interrupts = uart.int_st().read();
         let interrupt_bits = interrupts.bits(); // = int_raw & int_ena
         if interrupt_bits == 0 {
             return (false, false);
@@ -1744,8 +1744,8 @@ mod asynch {
             || interrupts.at_cmd_char_det_int_st().bit_is_set();
         let tx_wake = interrupts.tx_done_int_st().bit_is_set()
             || interrupts.txfifo_empty_int_st().bit_is_set();
-        uart.int_clr.write(|w| unsafe { w.bits(interrupt_bits) });
-        uart.int_ena
+        uart.int_clr().write(|w| unsafe { w.bits(interrupt_bits) });
+        uart.int_ena()
             .modify(|r, w| unsafe { w.bits(r.bits() & !interrupt_bits) });
 
         (rx_wake, tx_wake)

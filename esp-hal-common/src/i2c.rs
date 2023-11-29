@@ -361,7 +361,7 @@ mod asynch {
         pub fn new(event: Event, instance: &'a T) -> Self {
             instance
                 .register_block()
-                .int_ena
+                .int_ena()
                 .modify(|_, w| match event {
                     Event::EndDetect => w.end_detect_int_ena().set_bit(),
                     Event::TxComplete => w.trans_complete_int_ena().set_bit(),
@@ -373,7 +373,7 @@ mod asynch {
         }
 
         fn event_bit_is_clear(&self) -> bool {
-            let r = self.instance.register_block().int_ena.read();
+            let r = self.instance.register_block().int_ena().read();
 
             match self.event {
                 Event::EndDetect => r.end_detect_int_ena().bit_is_clear(),
@@ -413,7 +413,7 @@ mod asynch {
             self.perform_read(
                 addr,
                 buffer,
-                &mut self.peripheral.register_block().comd.iter(),
+                &mut self.peripheral.register_block().comd_iter(),
             )
             .await
         }
@@ -464,7 +464,7 @@ mod asynch {
             self.perform_write(
                 addr,
                 bytes,
-                &mut self.peripheral.register_block().comd.iter(),
+                &mut self.peripheral.register_block().comd_iter(),
             )
             .await
         }
@@ -544,7 +544,7 @@ mod asynch {
             )
             .await;
 
-            for cmd in self.peripheral.register_block().comd.iter() {
+            for cmd in self.peripheral.register_block().comd_iter() {
                 if cmd.read().command().bits() != 0x0 && cmd.read().command_done().bit_is_clear() {
                     return Err(Error::ExecIncomplete);
                 }
@@ -590,7 +590,7 @@ mod asynch {
     #[interrupt]
     fn I2C_EXT0() {
         unsafe { &*crate::peripherals::I2C0::PTR }
-            .int_ena
+            .int_ena()
             .modify(|_, w| {
                 w.end_detect_int_ena()
                     .clear_bit()
@@ -600,7 +600,7 @@ mod asynch {
 
         #[cfg(not(any(esp32, esp32s2)))]
         unsafe { &*crate::peripherals::I2C0::PTR }
-            .int_ena
+            .int_ena()
             .modify(|_, w| w.txfifo_wm_int_ena().clear_bit());
 
         WAKERS[0].wake();
@@ -610,7 +610,7 @@ mod asynch {
     #[interrupt]
     fn I2C_EXT1() {
         unsafe { &*crate::peripherals::I2C1::PTR }
-            .int_ena
+            .int_ena()
             .modify(|_, w| {
                 w.end_detect_int_ena()
                     .clear_bit()
@@ -620,7 +620,7 @@ mod asynch {
 
         #[cfg(not(any(esp32, esp32s2)))]
         unsafe { &*crate::peripherals::I2C0::PTR }
-            .int_ena
+            .int_ena()
             .modify(|_, w| w.txfifo_wm_int_ena().clear_bit());
 
         WAKERS[1].wake();
@@ -711,7 +711,7 @@ pub trait Instance {
     /// Resets the I2C peripheral's command registers
     fn reset_command_list(&self) {
         // Confirm that all commands that were configured were actually executed
-        for cmd in self.register_block().comd().iter() {
+        for cmd in self.register_block().comd_iter() {
             cmd.reset();
         }
     }
@@ -721,8 +721,8 @@ pub trait Instance {
     fn set_filter(&mut self, sda_threshold: Option<u8>, scl_threshold: Option<u8>) {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32, esp32s2))] {
-                let sda_register = &self.register_block().sda_filter_cfg;
-                let scl_register = &self.register_block().scl_filter_cfg;
+                let sda_register = &self.register_block().sda_filter_cfg();
+                let scl_register = &self.register_block().scl_filter_cfg();
             } else {
                 let sda_register = &self.register_block().filter_cfg();
                 let scl_register = &self.register_block().filter_cfg();
@@ -1250,7 +1250,7 @@ pub trait Instance {
                 break;
             }
         }
-        for cmd in self.register_block().comd().iter() {
+        for cmd in self.register_block().comd_iter() {
             if cmd.read().command().bits() != 0x0 && cmd.read().command_done().bit_is_clear() {
                 return Err(Error::ExecIncomplete);
             }
@@ -1450,7 +1450,7 @@ pub trait Instance {
     #[cfg(esp32)]
     fn reset_fifo(&self) {
         // First, reset the fifo buffers
-        self.register_block().fifo_conf.modify(|_, w| {
+        self.register_block().fifo_conf().modify(|_, w| {
             w.tx_fifo_rst()
                 .set_bit()
                 .rx_fifo_rst()
@@ -1464,11 +1464,11 @@ pub trait Instance {
         });
 
         self.register_block()
-            .fifo_conf
+            .fifo_conf()
             .modify(|_, w| w.tx_fifo_rst().clear_bit().rx_fifo_rst().clear_bit());
 
         self.register_block()
-            .int_clr
+            .int_clr()
             .write(|w| w.rxfifo_full_int_clr().set_bit());
     }
 
@@ -1478,7 +1478,7 @@ pub trait Instance {
         // Reset FIFO and command list
         self.reset_fifo();
         self.reset_command_list();
-        self.perform_write(addr, bytes, &mut self.register_block().comd().iter())?;
+        self.perform_write(addr, bytes, &mut self.register_block().comd_iter())?;
         Ok(())
     }
 
@@ -1489,7 +1489,7 @@ pub trait Instance {
         // Reset FIFO and command list
         self.reset_fifo();
         self.reset_command_list();
-        self.perform_read(addr, buffer, &mut self.register_block().comd().iter())?;
+        self.perform_read(addr, buffer, &mut self.register_block().comd_iter())?;
         Ok(())
     }
 
@@ -1545,12 +1545,12 @@ fn read_fifo(register_block: &RegisterBlock) -> u8 {
 
 #[cfg(esp32)]
 fn read_fifo(register_block: &RegisterBlock) -> u8 {
-    register_block.data.read().fifo_rdata().bits()
+    register_block.data().read().fifo_rdata().bits()
 }
 
 #[cfg(esp32)]
 fn write_fifo(register_block: &RegisterBlock, data: u8) {
-    let base_addr = register_block.scl_low_period.as_ptr();
+    let base_addr = register_block.scl_low_period().as_ptr();
     let fifo_ptr = (if base_addr as u32 == 0x3FF53000 {
         0x6001301c
     } else {

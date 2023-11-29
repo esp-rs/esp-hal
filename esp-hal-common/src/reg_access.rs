@@ -4,8 +4,6 @@
 //!
 //! Collection of struct which helps you write to registers.
 
-use crate::peripherals::generic::{Readable, Reg, RegisterSpec, Resettable, Writable};
-
 const U32_ALIGN_SIZE: usize = core::mem::size_of::<u32>();
 
 // ESP32 does reversed order
@@ -54,22 +52,19 @@ impl AlignmentHelper {
     // amount of *bytes* written (0 means no write). If the buffer is not
     // aligned to the size of the register destination, it will append the '0'
     // value.
-    pub fn flush_to<T, Ux>(&mut self, dst: &mut [Reg<T>], offset: usize) -> usize
-    where
-        T: RegisterSpec<Ux = Ux> + Resettable + Writable,
-    {
+    pub fn flush_to(&mut self, dst_ptr: *mut u32, offset: usize) -> usize {
         if self.buf_fill != 0 {
             for i in self.buf_fill..U32_ALIGN_SIZE {
                 self.buf[i] = 0;
             }
 
-            let dst_ptr = unsafe { (dst[0].as_ptr() as *mut u32).add(offset) };
             unsafe {
-                dst_ptr.write_volatile(U32_FROM_BYTES(self.buf));
+                dst_ptr.add(offset).write_volatile(U32_FROM_BYTES(self.buf));
             }
 
             let ret = self.align_size() - self.buf_fill;
             self.buf_fill = 0;
+
             ret
         } else {
             0
@@ -78,27 +73,24 @@ impl AlignmentHelper {
 
     // This function is similar to `volatile_set_memory` but will prepend data that
     // was previously ingested and ensure aligned (u32) writes.
-    pub fn volatile_write_bytes<T, Ux>(
+    pub fn volatile_write_bytes(
         &mut self,
-        dst: &mut [Reg<T>],
+        dst_ptr: *mut u32,
         val: u8,
         count: usize,
         offset: usize,
-    ) where
-        T: RegisterSpec<Ux = Ux> + Resettable + Writable,
-    {
-        let dst_ptr = unsafe { (dst[0].as_ptr() as *mut u32).add(offset) };
-
+    ) {
         let mut cursor = if self.buf_fill != 0 {
             for i in self.buf_fill..U32_ALIGN_SIZE {
                 self.buf[i] = val;
             }
 
             unsafe {
-                dst_ptr.write_volatile(U32_FROM_BYTES(self.buf));
+                dst_ptr.add(offset).write_volatile(U32_FROM_BYTES(self.buf));
             }
 
             self.buf_fill = 0;
+
             1
         } else {
             0
@@ -120,27 +112,24 @@ impl AlignmentHelper {
     // the register (defined by `dst_bound` relative to `dst`) and returns the
     // remaining data (if not possible to write everything), and if it wrote
     // till dst_bound or exited early (due to lack of data).
-    pub fn aligned_volatile_copy<'a, T, Ux>(
+    pub fn aligned_volatile_copy<'a>(
         &mut self,
-        dst: &mut [Reg<T>],
+        dst_ptr: *mut u32,
         src: &'a [u8],
         dst_bound: usize,
         offset: usize,
-    ) -> (&'a [u8], bool)
-    where
-        T: RegisterSpec<Ux = Ux> + Resettable + Writable,
-    {
+    ) -> (&'a [u8], bool) {
         assert!(dst_bound > 0);
-
-        let dst_ptr = unsafe { (dst[0].as_ptr() as *mut u32).add(offset) };
 
         let mut nsrc = src;
         let mut cursor = 0;
+
         if self.buf_fill != 0 {
             // First prepend existing data
             let max_fill = U32_ALIGN_SIZE - self.buf_fill;
             let (nbuf, src) = src.split_at(core::cmp::min(src.len(), max_fill));
             nsrc = src;
+
             for i in 0..max_fill {
                 match nbuf.get(i) {
                     Some(v) => {
@@ -196,14 +185,9 @@ impl AlignmentHelper {
     }
 
     #[allow(dead_code)]
-    pub fn volatile_write_regset<T, Ux>(&mut self, dst: &mut Reg<T>, src: &[u8], dst_bound: usize)
-    where
-        T: RegisterSpec<Ux = Ux> + Resettable + Writable,
-    {
+    pub fn volatile_write_regset(&mut self, dst_ptr: *mut u32, src: &[u8], dst_bound: usize) {
         assert!(dst_bound > 0);
         assert!(src.len() <= dst_bound * 4);
-
-        let dst_ptr = dst.as_ptr() as *mut u32;
 
         if src.len() > 0 {
             for (i, v) in src.chunks_exact(U32_ALIGN_SIZE).enumerate() {
@@ -216,13 +200,8 @@ impl AlignmentHelper {
         }
     }
 
-    pub fn volatile_read_regset<T, Ux>(&self, src: &Reg<T>, dst: &mut [u8], dst_bound: usize)
-    where
-        T: RegisterSpec<Ux = Ux> + Readable,
-    {
+    pub fn volatile_read_regset(&self, src_ptr: *const u32, dst: &mut [u8], dst_bound: usize) {
         assert!(dst.len() >= dst_bound * 4);
-
-        let src_ptr = src.as_ptr() as *const u32;
 
         let chunks = dst.chunks_exact_mut(U32_ALIGN_SIZE);
         for (i, chunk) in chunks.enumerate() {

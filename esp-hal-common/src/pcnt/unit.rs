@@ -101,18 +101,18 @@ impl Unit {
     pub(super) fn new(number: Number) -> Self {
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
         let conf0 = match number {
-            Number::Unit0 => &pcnt.u0_conf0(),
-            Number::Unit1 => &pcnt.u1_conf0(),
-            Number::Unit2 => &pcnt.u2_conf0(),
-            Number::Unit3 => &pcnt.u3_conf0(),
+            Number::Unit0 => pcnt.u0_conf0(),
+            Number::Unit1 => pcnt.u1_conf0(),
+            Number::Unit2 => pcnt.u2_conf0(),
+            Number::Unit3 => pcnt.u3_conf0(),
             #[cfg(esp32)]
-            Number::Unit4 => &pcnt.u4_conf0(),
+            Number::Unit4 => pcnt.u4_conf0(),
             #[cfg(esp32)]
-            Number::Unit5 => &pcnt.u5_conf0(),
+            Number::Unit5 => pcnt.u5_conf0(),
             #[cfg(esp32)]
-            Number::Unit6 => &pcnt.u6_conf0(),
+            Number::Unit6 => pcnt.u6_conf0(),
             #[cfg(esp32)]
-            Number::Unit7 => &pcnt.u7_conf0(),
+            Number::Unit7 => pcnt.u7_conf0(),
         };
         // disable filter and all events
         conf0.modify(|_, w| unsafe {
@@ -155,18 +155,18 @@ impl Unit {
 
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
         let (conf0, conf1, conf2) = match self.number {
-            Number::Unit0 => (&pcnt.u0_conf0(), &pcnt.u0_conf1(), &pcnt.u0_conf2()),
-            Number::Unit1 => (&pcnt.u1_conf0(), &pcnt.u1_conf1(), &pcnt.u1_conf2()),
-            Number::Unit2 => (&pcnt.u2_conf0(), &pcnt.u2_conf1(), &pcnt.u2_conf2()),
-            Number::Unit3 => (&pcnt.u3_conf0(), &pcnt.u3_conf1(), &pcnt.u3_conf2()),
+            Number::Unit0 => (pcnt.u0_conf0(), pcnt.u0_conf1(), pcnt.u0_conf2()),
+            Number::Unit1 => (pcnt.u1_conf0(), pcnt.u1_conf1(), pcnt.u1_conf2()),
+            Number::Unit2 => (pcnt.u2_conf0(), pcnt.u2_conf1(), pcnt.u2_conf2()),
+            Number::Unit3 => (pcnt.u3_conf0(), pcnt.u3_conf1(), pcnt.u3_conf2()),
             #[cfg(esp32)]
-            Number::Unit4 => (&pcnt.u4_conf0(), &pcnt.u4_conf1(), &pcnt.u4_conf2()),
+            Number::Unit4 => (pcnt.u4_conf0(), pcnt.u4_conf1(), pcnt.u4_conf2()),
             #[cfg(esp32)]
-            Number::Unit5 => (&pcnt.u5_conf0(), &pcnt.u5_conf1(), &pcnt.u5_conf2()),
+            Number::Unit5 => (pcnt.u5_conf0(), pcnt.u5_conf1(), pcnt.u5_conf2()),
             #[cfg(esp32)]
-            Number::Unit6 => (&pcnt.u6_conf0(), &pcnt.u6_conf1(), &pcnt.u6_conf2()),
+            Number::Unit6 => (pcnt.u6_conf0(), pcnt.u6_conf1(), pcnt.u6_conf2()),
             #[cfg(esp32)]
-            Number::Unit7 => (&pcnt.u7_conf0(), &pcnt.u7_conf1(), &pcnt.u7_conf2()),
+            Number::Unit7 => (pcnt.u7_conf0(), pcnt.u7_conf1(), pcnt.u7_conf2()),
         };
         conf2.write(|w| unsafe {
             w.cnt_l_lim()
@@ -267,18 +267,18 @@ impl Unit {
     pub fn events(&self, events: Events) {
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
         let conf0 = match self.number {
-            Number::Unit0 => &pcnt.u0_conf0(),
-            Number::Unit1 => &pcnt.u1_conf0(),
-            Number::Unit2 => &pcnt.u2_conf0(),
-            Number::Unit3 => &pcnt.u3_conf0(),
+            Number::Unit0 => pcnt.u0_conf0(),
+            Number::Unit1 => pcnt.u1_conf0(),
+            Number::Unit2 => pcnt.u2_conf0(),
+            Number::Unit3 => pcnt.u3_conf0(),
             #[cfg(esp32)]
-            Number::Unit4 => &pcnt.u4_conf0(),
+            Number::Unit4 => pcnt.u4_conf0(),
             #[cfg(esp32)]
-            Number::Unit5 => &pcnt.u5_conf0(),
+            Number::Unit5 => pcnt.u5_conf0(),
             #[cfg(esp32)]
-            Number::Unit6 => &pcnt.u6_conf0(),
+            Number::Unit6 => pcnt.u6_conf0(),
             #[cfg(esp32)]
-            Number::Unit7 => &pcnt.u7_conf0(),
+            Number::Unit7 => pcnt.u7_conf0(),
         };
         conf0.modify(|_, w| {
             w.thr_l_lim_en()

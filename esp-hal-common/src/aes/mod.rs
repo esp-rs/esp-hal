@@ -104,7 +104,7 @@
 //! ```
 
 #[cfg(esp32)]
-use crate::peripherals::generic::{Readable, Reg, RegisterSpec, Resettable, Writable};
+use crate::peripherals::generic::{Readable, Reg, RegisterSpec};
 #[cfg(not(esp32))]
 use crate::reg_access::AlignmentHelper;
 use crate::{
@@ -182,15 +182,12 @@ impl<'d> Aes<'d> {
     // TODO: for some reason, the `volatile read/write` helpers from `reg_access`
     // don't work for ESP32
     #[cfg(esp32)]
-    fn write_to_regset<T>(input: &[u8], n_offset: usize, reg_0: &mut Reg<T>)
-    where
-        T: RegisterSpec<Ux = u32> + Resettable + Writable,
-    {
+    fn write_to_regset(input: &[u8], n_offset: usize, reg_0: *mut u32) {
         let chunks = input.chunks_exact(ALIGN_SIZE);
         for (offset, chunk) in (0..n_offset).zip(chunks) {
             let to_write = u32::from_ne_bytes(chunk.try_into().unwrap());
             unsafe {
-                let p = reg_0.as_ptr().add(offset);
+                let p = reg_0.add(offset);
                 p.write_volatile(to_write);
             }
         }

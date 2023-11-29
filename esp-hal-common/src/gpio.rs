@@ -2663,7 +2663,7 @@ mod asynch {
         wake_up_from_light_sleep: bool,
     ) {
         let gpio = unsafe { &*crate::peripherals::GPIO::PTR };
-        gpio.pin[gpio_num as usize].modify(|_, w| unsafe {
+        gpio.pin(gpio_num as usize).modify(|_, w| unsafe {
             w.int_ena()
                 .bits(int_ena)
                 .int_type()

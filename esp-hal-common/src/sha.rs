@@ -189,18 +189,18 @@ impl<'d> Sha<'d> {
     fn process_buffer(&mut self) {
         if self.first_run {
             match self.mode {
-                ShaMode::SHA1 => self.sha.sha1_start.write(|w| unsafe { w.bits(1) }),
-                ShaMode::SHA256 => self.sha.sha256_start.write(|w| unsafe { w.bits(1) }),
-                ShaMode::SHA384 => self.sha.sha384_start.write(|w| unsafe { w.bits(1) }),
-                ShaMode::SHA512 => self.sha.sha512_start.write(|w| unsafe { w.bits(1) }),
+                ShaMode::SHA1 => self.sha.sha1_start().write(|w| unsafe { w.bits(1) }),
+                ShaMode::SHA256 => self.sha.sha256_start().write(|w| unsafe { w.bits(1) }),
+                ShaMode::SHA384 => self.sha.sha384_start().write(|w| unsafe { w.bits(1) }),
+                ShaMode::SHA512 => self.sha.sha512_start().write(|w| unsafe { w.bits(1) }),
             }
             self.first_run = false;
         } else {
             match self.mode {
-                ShaMode::SHA1 => self.sha.sha1_continue.write(|w| unsafe { w.bits(1) }),
-                ShaMode::SHA256 => self.sha.sha256_continue.write(|w| unsafe { w.bits(1) }),
-                ShaMode::SHA384 => self.sha.sha384_continue.write(|w| unsafe { w.bits(1) }),
-                ShaMode::SHA512 => self.sha.sha512_continue.write(|w| unsafe { w.bits(1) }),
+                ShaMode::SHA1 => self.sha.sha1_continue().write(|w| unsafe { w.bits(1) }),
+                ShaMode::SHA256 => self.sha.sha256_continue().write(|w| unsafe { w.bits(1) }),
+                ShaMode::SHA384 => self.sha.sha384_continue().write(|w| unsafe { w.bits(1) }),
+                ShaMode::SHA512 => self.sha.sha512_continue().write(|w| unsafe { w.bits(1) }),
             }
         }
     }
@@ -218,10 +218,10 @@ impl<'d> Sha<'d> {
     #[cfg(esp32)]
     fn is_busy(&self) -> bool {
         match self.mode {
-            ShaMode::SHA1 => self.sha.sha1_busy.read().sha1_busy().bit_is_set(),
-            ShaMode::SHA256 => self.sha.sha256_busy.read().sha256_busy().bit_is_set(),
-            ShaMode::SHA384 => self.sha.sha384_busy.read().sha384_busy().bit_is_set(),
-            ShaMode::SHA512 => self.sha.sha512_busy.read().sha512_busy().bit_is_set(),
+            ShaMode::SHA1 => self.sha.sha1_busy().read().sha1_busy().bit_is_set(),
+            ShaMode::SHA256 => self.sha.sha256_busy().read().sha256_busy().bit_is_set(),
+            ShaMode::SHA384 => self.sha.sha384_busy().read().sha384_busy().bit_is_set(),
+            ShaMode::SHA512 => self.sha.sha512_busy().read().sha512_busy().bit_is_set(),
         }
     }
 
@@ -256,9 +256,9 @@ impl<'d> Sha<'d> {
 
         let flushed = self.alignment_helper.flush_to(
             #[cfg(esp32)]
-            &mut self.sha.text,
+            self.sha.text(0).as_ptr(),
             #[cfg(not(esp32))]
-            &mut self.sha.m_mem,
+            self.sha.m_mem(0).as_ptr(),
             (self.cursor % chunk_len) / self.alignment_helper.align_size(),
         );
 
@@ -280,9 +280,9 @@ impl<'d> Sha<'d> {
 
         let (remaining, bound_reached) = self.alignment_helper.aligned_volatile_copy(
             #[cfg(esp32)]
-            &mut self.sha.text,
+            self.sha.text(0).as_ptr(),
             #[cfg(not(esp32))]
-            &mut self.sha.m_mem,
+            self.sha.m_mem(0).as_ptr(),
             incoming,
             chunk_len / self.alignment_helper.align_size(),
             mod_cursor / self.alignment_helper.align_size(),
@@ -341,9 +341,9 @@ impl<'d> Sha<'d> {
             let pad_len = chunk_len - mod_cursor;
             self.alignment_helper.volatile_write_bytes(
                 #[cfg(esp32)]
-                &mut self.sha.text,
+                self.sha.text(0).as_ptr(),
                 #[cfg(not(esp32))]
-                &mut self.sha.m_mem,
+                self.sha.m_mem(0).as_ptr(),
                 0_u8,
                 pad_len / self.alignment_helper.align_size(),
                 mod_cursor / self.alignment_helper.align_size(),
@@ -362,9 +362,9 @@ impl<'d> Sha<'d> {
 
         self.alignment_helper.volatile_write_bytes(
             #[cfg(esp32)]
-            &mut self.sha.text,
+            self.sha.text(0).as_ptr(),
             #[cfg(not(esp32))]
-            &mut self.sha.m_mem,
+            self.sha.m_mem(0).as_ptr(),
             0_u8,
             pad_len / self.alignment_helper.align_size(),
             mod_cursor / self.alignment_helper.align_size(),
@@ -372,9 +372,9 @@ impl<'d> Sha<'d> {
 
         self.alignment_helper.aligned_volatile_copy(
             #[cfg(esp32)]
-            &mut self.sha.text,
+            self.sha.text(0).as_ptr(),
             #[cfg(not(esp32))]
-            &mut self.sha.m_mem,
+            self.sha.m_mem(0).as_ptr(),
             &length,
             chunk_len / self.alignment_helper.align_size(),
             (chunk_len - core::mem::size_of::<u64>()) / self.alignment_helper.align_size(),
@@ -388,10 +388,10 @@ impl<'d> Sha<'d> {
         #[cfg(esp32)]
         {
             match self.mode {
-                ShaMode::SHA1 => unsafe { self.sha.sha1_load.write(|w| w.bits(1)) },
-                ShaMode::SHA256 => unsafe { self.sha.sha256_load.write(|w| w.bits(1)) },
-                ShaMode::SHA384 => unsafe { self.sha.sha384_load.write(|w| w.bits(1)) },
-                ShaMode::SHA512 => unsafe { self.sha.sha512_load.write(|w| w.bits(1)) },
+                ShaMode::SHA1 => unsafe { self.sha.sha1_load().write(|w| w.bits(1)) },
+                ShaMode::SHA256 => unsafe { self.sha.sha256_load().write(|w| w.bits(1)) },
+                ShaMode::SHA384 => unsafe { self.sha.sha384_load().write(|w| w.bits(1)) },
+                ShaMode::SHA512 => unsafe { self.sha.sha512_load().write(|w| w.bits(1)) },
             }
 
             // Spin wait for result, 8-20 clock cycles according to manual
@@ -400,9 +400,9 @@ impl<'d> Sha<'d> {
 
         self.alignment_helper.volatile_read_regset(
             #[cfg(esp32)]
-            &self.sha.text[0],
+            self.sha.text(0).as_ptr(),
             #[cfg(not(esp32))]
-            &self.sha.h_mem(0),
+            self.sha.h_mem(0).as_ptr(),
             output,
             core::cmp::min(output.len(), 32) / self.alignment_helper.align_size(),
         );

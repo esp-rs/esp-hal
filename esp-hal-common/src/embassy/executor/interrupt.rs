@@ -33,7 +33,7 @@ macro_rules! from_cpu {
                     let system = unsafe { &*SystemPeripheral::PTR };
 
                     system
-                        .[<cpu_intr_from_cpu_ $irq>]
+                        .[<cpu_intr_from_cpu_ $irq>]()
                         .write(|w| w.[<cpu_intr_from_cpu_ $irq>]().bit(value));
                 }
             }

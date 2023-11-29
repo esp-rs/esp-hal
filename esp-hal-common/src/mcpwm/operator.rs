@@ -625,12 +625,14 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
         // SAFETY:
         // The CFG0 registers are identical for all timers so we can pretend they're
         // TIMER0_CFG0
+        let timer0_cfg = &block.timer0_cfg0();
         let timer0_cfg = match tim {
-            0 => &block.timer0_cfg0(),
+            0 => timer0_cfg,
             1 => unsafe { &*(&block.timer1_cfg0() as *const _ as *const _) },
             2 => unsafe { &*(&block.timer2_cfg0() as *const _ as *const _) },
             _ => unreachable!(),
         };
+
         timer0_cfg.read().timer0_period().bits()
     }
 }
