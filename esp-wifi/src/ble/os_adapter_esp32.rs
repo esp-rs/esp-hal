@@ -467,11 +467,9 @@ pub(crate) unsafe extern "C" fn coex_schm_interval_get() -> u32 {
 
 pub(crate) unsafe extern "C" fn coex_schm_curr_period_get() -> u8 {
     debug!("coex_schm_curr_period_get");
-    // BEWARE: One might expect to call coex_schm_curr_period_get
-    //crate::binary::include::coex_schm_curr_period_get()
 
     #[cfg(coex)]
-    return crate::binary::include::coex_schm_interval_get() as u8;
+    return crate::binary::include::coex_schm_curr_period_get() as u8;
 
     #[cfg(not(coex))]
     0
