@@ -49,20 +49,20 @@ impl<'d> Rsa<'d> {
         self.rsa.interrupt.read().bits() == 1
     }
 
-    unsafe fn write_multi_operand_a<const N: usize>(&mut self, operand_a: &[u8; N]) {
+    unsafe fn write_multi_operand_a<const N: usize>(&mut self, operand_a: &[u32; N]) {
         copy_nonoverlapping(
             operand_a.as_ptr(),
-            self.rsa.x_mem.as_mut_ptr() as *mut u8,
+            self.rsa.x_mem.as_mut_ptr() as *mut u32,
             N,
         );
-        write_bytes(self.rsa.x_mem.as_mut_ptr().add(N), 0, N);
+        write_bytes(self.rsa.x_mem.as_mut_ptr().add(N * 4), 0, N * 4);
     }
 
-    unsafe fn write_multi_operand_b<const N: usize>(&mut self, operand_b: &[u8; N]) {
-        write_bytes(self.rsa.z_mem.as_mut_ptr(), 0, N);
+    unsafe fn write_multi_operand_b<const N: usize>(&mut self, operand_b: &[u32; N]) {
+        write_bytes(self.rsa.z_mem.as_mut_ptr(), 0, N * 4);
         copy_nonoverlapping(
             operand_b.as_ptr(),
-            self.rsa.z_mem.as_mut_ptr().add(N) as *mut u8,
+            self.rsa.z_mem.as_mut_ptr().add(N * 4) as *mut u32,
             N,
         );
     }
@@ -88,7 +88,7 @@ pub mod operand_sizes {
 
 impl<'a, 'd, T: RsaMode, const N: usize> RsaModularMultiplication<'a, 'd, T>
 where
-    T: RsaMode<InputType = [u8; N]>,
+    T: RsaMode<InputType = [u32; N]>,
 {
     /// Creates an Instance of `RsaMultiplication`.  
     /// `m_prime` could be calculated using `-(modular multiplicative inverse of
@@ -108,7 +108,7 @@ where
     }
 
     fn set_mode(rsa: &mut Rsa) {
-        rsa.write_multi_mode((N / 64 - 1) as u32)
+        rsa.write_multi_mode((N / 16 - 1) as u32)
     }
 
     /// Starts the first step of modular multiplication operation. `r` could be
@@ -147,7 +147,7 @@ where
 
 impl<'a, 'd, T: RsaMode, const N: usize> RsaModularExponentiation<'a, 'd, T>
 where
-    T: RsaMode<InputType = [u8; N]>,
+    T: RsaMode<InputType = [u32; N]>,
 {
     /// Creates an Instance of `RsaModularExponentiation`.  
     /// `m_prime` could be calculated using `-(modular multiplicative inverse of
@@ -172,7 +172,7 @@ where
     }
 
     pub(super) fn set_mode(rsa: &mut Rsa) {
-        rsa.write_modexp_mode((N / 64 - 1) as u32)
+        rsa.write_modexp_mode((N / 16 - 1) as u32)
     }
 
     pub(super) fn set_start(&mut self) {
@@ -182,7 +182,7 @@ where
 
 impl<'a, 'd, T: RsaMode + Multi, const N: usize> RsaMultiplication<'a, 'd, T>
 where
-    T: RsaMode<InputType = [u8; N]>,
+    T: RsaMode<InputType = [u32; N]>,
 {
     /// Creates an Instance of `RsaMultiplication`.
     pub fn new(rsa: &'a mut Rsa<'d>) -> Self {
@@ -203,7 +203,7 @@ where
     }
 
     pub(super) fn set_mode(rsa: &mut Rsa) {
-        rsa.write_multi_mode((N / 32 - 1 + 8) as u32)
+        rsa.write_multi_mode(((N * 2) / 16 + 7) as u32)
     }
 
     pub(super) fn set_start(&mut self) {
