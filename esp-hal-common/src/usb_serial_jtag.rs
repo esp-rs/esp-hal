@@ -365,7 +365,7 @@ mod asynch {
             // interrupt
             instance
                 .register_block()
-                .int_ena
+                .int_ena()
                 .modify(|_, w| w.serial_in_empty_int_ena().set_bit());
 
             Self { instance }
@@ -374,7 +374,7 @@ mod asynch {
         fn event_bit_is_clear(&self) -> bool {
             self.instance
                 .register_block()
-                .int_ena
+                .int_ena()
                 .read()
                 .serial_in_empty_int_ena()
                 .bit_is_clear()
@@ -407,7 +407,7 @@ mod asynch {
             // interrupt
             instance
                 .register_block()
-                .int_ena
+                .int_ena()
                 .modify(|_, w| w.serial_out_recv_pkt_int_ena().set_bit());
 
             Self { instance }
@@ -416,7 +416,7 @@ mod asynch {
         fn event_bit_is_clear(&self) -> bool {
             self.instance
                 .register_block()
-                .int_ena
+                .int_ena()
                 .read()
                 .serial_out_recv_pkt_int_ena()
                 .bit_is_clear()
@@ -446,10 +446,10 @@ mod asynch {
             for chunk in words.chunks(64) {
                 for byte in chunk {
                     reg_block
-                        .ep1
+                        .ep1()
                         .write(|w| unsafe { w.rdwr_byte().bits(*byte) });
                 }
-                reg_block.ep1_conf.write(|w| w.wr_done().set_bit());
+                reg_block.ep1_conf().write(|w| w.wr_done().set_bit());
 
                 UsbSerialJtagWriteFuture::new(self.inner()).await;
             }
@@ -527,18 +527,22 @@ mod asynch {
     #[interrupt]
     fn USB_DEVICE() {
         let usb = unsafe { &*crate::peripherals::USB_DEVICE::ptr() };
-        let in_empty = usb.int_st.read().serial_in_empty_int_st().bit_is_set();
-        let out_recv = usb.int_st.read().serial_out_recv_pkt_int_st().bit_is_set();
+        let in_empty = usb.int_st().read().serial_in_empty_int_st().bit_is_set();
+        let out_recv = usb
+            .int_st()
+            .read()
+            .serial_out_recv_pkt_int_st()
+            .bit_is_set();
 
         if in_empty {
-            usb.int_ena
+            usb.int_ena()
                 .write(|w| w.serial_in_empty_int_ena().clear_bit());
         }
         if out_recv {
-            usb.int_ena
+            usb.int_ena()
                 .write(|w| w.serial_out_recv_pkt_int_ena().clear_bit());
         }
-        usb.int_clr.write(|w| {
+        usb.int_clr().write(|w| {
             w.serial_in_empty_int_clr()
                 .set_bit()
                 .serial_out_recv_pkt_int_clr()

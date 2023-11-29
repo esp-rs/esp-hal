@@ -521,7 +521,7 @@ mod asynch {
 
                 self.peripheral
                     .register_block()
-                    .int_clr
+                    .int_clr()
                     .write(|w| w.txfifo_wm_int_clr().set_bit());
 
                 I2cFuture::new(Event::TxFifoWatermark, self.inner()).await;

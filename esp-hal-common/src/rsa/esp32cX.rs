@@ -108,7 +108,7 @@ impl<'d> Rsa<'d> {
     unsafe fn write_multi_operand_b<const N: usize>(&mut self, operand_b: &[u32; N]) {
         copy_nonoverlapping(
             operand_b.as_ptr(),
-            self.rsa.z_mem.as_mut_ptr().add(N * 4) as *mut u32,
+            self.rsa.z_mem(0).as_ptr().add(N * 4) as *mut u32,
             N,
         );
     }

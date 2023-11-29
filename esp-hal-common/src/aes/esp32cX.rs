@@ -20,13 +20,13 @@ impl<'d> Aes<'d> {
         debug_assert!(key.len() <= 8 * ALIGN_SIZE);
         debug_assert_eq!(key.len() % ALIGN_SIZE, 0);
         self.alignment_helper
-            .volatile_write_regset(&mut self.aes.key_0(), key, 8);
+            .volatile_write_regset(self.aes.key_0().as_ptr(), key, 8);
     }
 
     pub(super) fn write_block(&mut self, block: &[u8]) {
         debug_assert_eq!(block.len(), 4 * ALIGN_SIZE);
         self.alignment_helper
-            .volatile_write_regset(&mut self.aes.text_in_0(), block, 4);
+            .volatile_write_regset(self.aes.text_in_0().as_ptr(), block, 4);
     }
 
     pub(super) fn write_mode(&mut self, mode: u32) {
@@ -44,7 +44,7 @@ impl<'d> Aes<'d> {
     pub(super) fn read_block(&self, block: &mut [u8]) {
         debug_assert_eq!(block.len(), 4 * ALIGN_SIZE);
         self.alignment_helper
-            .volatile_read_regset(&self.aes.text_out_0(), block, 4);
+            .volatile_read_regset(self.aes.text_out_0().as_ptr(), block, 4);
     }
 }
 

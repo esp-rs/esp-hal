@@ -739,15 +739,15 @@ mod classic {
         let interrupt_id: usize = mcause::read().code(); // MSB is whether its exception or interrupt.
         let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
         let interrupt_priority = intr
-            .cpu_int_pri_0
+            .cpu_int_pri_0()
             .as_ptr()
             .offset(interrupt_id as isize)
             .read_volatile();
 
-        let prev_interrupt_priority = intr.cpu_int_thresh.read().bits();
+        let prev_interrupt_priority = intr.cpu_int_thresh().read().bits();
         if interrupt_priority < 15 {
             // leave interrupts disabled if interrupt is of max priority.
-            intr.cpu_int_thresh
+            intr.cpu_int_thresh()
                 .write(|w| w.bits(interrupt_priority + 1)); // set the prio threshold to 1 more than current interrupt prio
             unsafe {
                 riscv::interrupt::enable();
@@ -764,7 +764,7 @@ mod classic {
             riscv::interrupt::disable();
         }
         let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
-        intr.cpu_int_thresh.write(|w| w.bits(stored_prio));
+        intr.cpu_int_thresh().write(|w| w.bits(stored_prio));
     }
 }
 

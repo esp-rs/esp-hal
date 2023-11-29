@@ -182,9 +182,9 @@ impl<'d> Hmac<'d> {
 
         self.alignment_helper.volatile_read_regset(
             #[cfg(esp32s2)]
-            &self.hmac.rd_result_[0],
+            self.hmac.rd_result_(0).as_ptr(),
             #[cfg(not(esp32s2))]
-            &self.hmac.rd_result_mem[0],
+            self.hmac.rd_result_mem(0).as_ptr(),
             output,
             core::cmp::min(output.len(), 32) / self.alignment_helper.align_size(),
         );
@@ -223,9 +223,9 @@ impl<'d> Hmac<'d> {
 
         let (remaining, bound_reached) = self.alignment_helper.aligned_volatile_copy(
             #[cfg(esp32s2)]
-            &mut self.hmac.wr_message_,
+            self.hmac.wr_message_().as_ptr(),
             #[cfg(not(esp32s2))]
-            &mut self.hmac.wr_message_mem,
+            self.hmac.wr_message_mem(0).as_ptr(),
             incoming,
             64 / self.alignment_helper.align_size(),
             mod_length / self.alignment_helper.align_size(),
@@ -257,9 +257,9 @@ impl<'d> Hmac<'d> {
 
         let flushed = self.alignment_helper.flush_to(
             #[cfg(esp32s2)]
-            &mut self.hmac.wr_message_,
+            self.hmac.wr_message_().as_ptr(),
             #[cfg(not(esp32s2))]
-            &mut self.hmac.wr_message_mem,
+            self.hmac.wr_message_mem(0).as_ptr(),
             (self.byte_written % 64) / self.alignment_helper.align_size(),
         );
 
@@ -283,9 +283,9 @@ impl<'d> Hmac<'d> {
             let pad_len = 64 - mod_cursor;
             self.alignment_helper.volatile_write_bytes(
                 #[cfg(esp32s2)]
-                &mut self.hmac.wr_message_,
+                self.hmac.wr_message_().as_ptr(),
                 #[cfg(not(esp32s2))]
-                &mut self.hmac.wr_message_mem,
+                self.hmac.wr_message_mem(0).as_ptr(),
                 0_u8,
                 pad_len / self.alignment_helper.align_size(),
                 mod_cursor / self.alignment_helper.align_size(),
@@ -305,9 +305,9 @@ impl<'d> Hmac<'d> {
 
         self.alignment_helper.volatile_write_bytes(
             #[cfg(esp32s2)]
-            &mut self.hmac.wr_message_,
+            self.hmac.wr_message_().as_ptr(),
             #[cfg(not(esp32s2))]
-            &mut self.hmac.wr_message_mem,
+            self.hmac.wr_message_mem(0).as_ptr(),
             0_u8,
             pad_len / self.alignment_helper.align_size(),
             mod_cursor / self.alignment_helper.align_size(),
@@ -322,9 +322,9 @@ impl<'d> Hmac<'d> {
 
         self.alignment_helper.aligned_volatile_copy(
             #[cfg(esp32s2)]
-            &mut self.hmac.wr_message_,
+            self.hmac.wr_message_().as_ptr(),
             #[cfg(not(esp32s2))]
-            &mut self.hmac.wr_message_mem,
+            self.hmac.wr_message_mem(0).as_ptr(),
             &len_mem,
             64 / self.alignment_helper.align_size(),
             (64 - core::mem::size_of::<u64>()) / self.alignment_helper.align_size(),

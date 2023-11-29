@@ -133,13 +133,13 @@ impl<'d> Ecc<'d> {
         let mut tmp = [0_u8; 32];
         self.reverse_words(k, &mut tmp);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.k_mem(0), tmp.as_ref(), 8);
+            .volatile_write_regset(self.ecc.k_mem(0).as_ptr(), tmp.as_ref(), 8);
         self.reverse_words(x, &mut tmp);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.px_mem(0), tmp.as_ref(), 8);
+            .volatile_write_regset(self.ecc.px_mem(0).as_ptr(), tmp.as_ref(), 8);
         self.reverse_words(y, &mut tmp);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.py_mem(0), tmp.as_ref(), 8);
+            .volatile_write_regset(self.ecc.py_mem(0).as_ptr(), tmp.as_ref(), 8);
 
         self.ecc.mult_conf().write(|w| unsafe {
             w.work_mode()
@@ -154,10 +154,10 @@ impl<'d> Ecc<'d> {
         while self.is_busy() {}
 
         self.alignment_helper
-            .volatile_read_regset(&self.ecc.px_mem(0), &mut tmp, 8);
+            .volatile_read_regset(self.ecc.px_mem(0).as_ptr(), &mut tmp, 8);
         self.reverse_words(tmp.as_ref(), x);
         self.alignment_helper
-            .volatile_read_regset(&self.ecc.py_mem(0), &mut tmp, 8);
+            .volatile_read_regset(self.ecc.py_mem(0).as_ptr(), &mut tmp, 8);
         self.reverse_words(tmp.as_ref(), y);
 
         Ok(())
@@ -200,10 +200,10 @@ impl<'d> Ecc<'d> {
         let mut tmp = [0_u8; 32];
         self.reverse_words(k, &mut tmp);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.k_mem(0), tmp.as_ref(), 8);
+            .volatile_write_regset(self.ecc.k_mem(0).as_ptr(), tmp.as_ref(), 8);
         self.reverse_words(y, &mut tmp);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.py_mem(0), tmp.as_ref(), 8);
+            .volatile_write_regset(self.ecc.py_mem(0).as_ptr(), tmp.as_ref(), 8);
 
         self.ecc.mult_conf().write(|w| unsafe {
             w.work_mode()
@@ -218,7 +218,7 @@ impl<'d> Ecc<'d> {
         while self.is_busy() {}
 
         self.alignment_helper
-            .volatile_read_regset(&self.ecc.py_mem(0), &mut tmp, 8);
+            .volatile_read_regset(self.ecc.py_mem(0).as_ptr(), &mut tmp, 8);
         self.reverse_words(tmp.as_ref(), y);
 
         Ok(())
@@ -261,10 +261,10 @@ impl<'d> Ecc<'d> {
         let mut tmp = [0_u8; 32];
         self.reverse_words(x, &mut tmp);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.px_mem(0), tmp.as_ref(), 8);
+            .volatile_write_regset(self.ecc.px_mem(0).as_ptr(), tmp.as_ref(), 8);
         self.reverse_words(y, &mut tmp);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.py_mem(0), tmp.as_ref(), 8);
+            .volatile_write_regset(self.ecc.py_mem(0).as_ptr(), tmp.as_ref(), 8);
 
         self.ecc.mult_conf().write(|w| unsafe {
             w.work_mode()
@@ -328,13 +328,13 @@ impl<'d> Ecc<'d> {
         let mut tmp = [0_u8; 32];
         self.reverse_words(k, &mut tmp);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.k_mem(0), tmp.as_ref(), 8);
+            .volatile_write_regset(self.ecc.k_mem(0).as_ptr(), tmp.as_ref(), 8);
         self.reverse_words(x, &mut tmp);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.px_mem(0), tmp.as_ref(), 8);
+            .volatile_write_regset(self.ecc.px_mem(0).as_ptr(), tmp.as_ref(), 8);
         self.reverse_words(y, &mut tmp);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.py_mem(0), tmp.as_ref(), 8);
+            .volatile_write_regset(self.ecc.py_mem(0).as_ptr(), tmp.as_ref(), 8);
 
         self.ecc.mult_conf().write(|w| unsafe {
             w.work_mode()
@@ -354,10 +354,10 @@ impl<'d> Ecc<'d> {
         }
 
         self.alignment_helper
-            .volatile_read_regset(&self.ecc.px_mem(0), &mut tmp, 8);
+            .volatile_read_regset(self.ecc.px_mem(0).as_ptr(), &mut tmp, 8);
         self.reverse_words(tmp.as_ref(), x);
         self.alignment_helper
-            .volatile_read_regset(&self.ecc.py_mem(0), &mut tmp, 8);
+            .volatile_read_regset(self.ecc.py_mem(0).as_ptr(), &mut tmp, 8);
         self.reverse_words(tmp.as_ref(), y);
 
         Ok(())
@@ -491,13 +491,13 @@ impl<'d> Ecc<'d> {
         let mut tmp = [0_u8; 32];
         self.reverse_words(k, &mut tmp);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.k_mem(0), tmp.as_ref(), 8);
+            .volatile_write_regset(self.ecc.k_mem(0).as_ptr(), tmp.as_ref(), 8);
         self.reverse_words(x, &mut tmp);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.px_mem(0), tmp.as_ref(), 8);
+            .volatile_write_regset(self.ecc.px_mem(0).as_ptr(), tmp.as_ref(), 8);
         self.reverse_words(y, &mut tmp);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.py_mem(0), tmp.as_ref(), 8);
+            .volatile_write_regset(self.ecc.py_mem(0).as_ptr(), tmp.as_ref(), 8);
 
         self.ecc.mult_conf().write(|w| unsafe {
             w.work_mode()
@@ -513,23 +513,23 @@ impl<'d> Ecc<'d> {
         cfg_if::cfg_if! {
             if #[cfg(not(esp32h2))] {
             self.alignment_helper
-                .volatile_read_regset(&self.ecc.px_mem(0), &mut tmp, 8);
+                .volatile_read_regset(self.ecc.px_mem(0).as_ptr(), &mut tmp, 8);
             self.reverse_words(tmp.as_ref(), x);
             self.alignment_helper
-                .volatile_read_regset(&self.ecc.py_mem(0), &mut tmp, 8);
+                .volatile_read_regset(self.ecc.py_mem(0).as_ptr(), &mut tmp, 8);
             self.reverse_words(tmp.as_ref(), y);
             self.alignment_helper
-                .volatile_read_regset(&self.ecc.k_mem(0), &mut tmp, 8);
+                .volatile_read_regset(self.ecc.k_mem(0).as_ptr(), &mut tmp, 8);
             self.reverse_words(tmp.as_ref(), k);
             } else {
             self.alignment_helper
-                .volatile_read_regset(&self.ecc.qx_mem[0], &mut tmp, 8);
+                .volatile_read_regset(self.ecc.qx_mem[0].as_ptr(), &mut tmp, 8);
             self.reverse_words(tmp.as_ref(), x);
             self.alignment_helper
-                .volatile_read_regset(&self.ecc.qy_mem[0], &mut tmp, 8);
+                .volatile_read_regset(self.ecc.qy_mem[0].as_ptr(), &mut tmp, 8);
             self.reverse_words(tmp.as_ref(), y);
             self.alignment_helper
-                .volatile_read_regset(&self.ecc.qz_mem[0], &mut tmp, 8);
+                .volatile_read_regset(self.ecc.qz_mem[0].as_ptr(), &mut tmp, 8);
             self.reverse_words(tmp.as_ref(), k);
             }
         }
@@ -578,22 +578,22 @@ impl<'d> Ecc<'d> {
         cfg_if::cfg_if! {
             if #[cfg(not(esp32h2))] {
                 self.alignment_helper
-                    .volatile_write_regset(&mut self.ecc.px_mem(0), tmp.as_ref(), 8);
+                    .volatile_write_regset(self.ecc.px_mem(0).as_ptr(), tmp.as_ref(), 8);
                 self.reverse_words(y, &mut tmp);
                 self.alignment_helper
-                    .volatile_write_regset(&mut self.ecc.py_mem(0), tmp.as_ref(), 8);
+                    .volatile_write_regset(self.ecc.py_mem(0).as_ptr(), tmp.as_ref(), 8);
                 self.reverse_words(z, &mut tmp);
                 self.alignment_helper
-                    .volatile_write_regset(&mut self.ecc.k_mem(0), tmp.as_ref(), 8);
+                    .volatile_write_regset(self.ecc.k_mem(0).as_ptr(), tmp.as_ref(), 8);
             } else {
                 self.alignment_helper
-                    .volatile_write_regset(&mut self.ecc.qx_mem[0], tmp.as_ref(), 8);
+                    .volatile_write_regset(self.ecc.qx_mem(0).as_ptr(), tmp.as_ref(), 8);
                 self.reverse_words(y, &mut tmp);
                 self.alignment_helper
-                    .volatile_write_regset(&mut self.ecc.qy_mem[0], tmp.as_ref(), 8);
+                    .volatile_write_regset(self.ecc.qy_mem(0).as_ptr(), tmp.as_ref(), 8);
                 self.reverse_words(z, &mut tmp);
                 self.alignment_helper
-                    .volatile_write_regset(&mut self.ecc.qz_mem[0], tmp.as_ref(), 8);
+                    .volatile_write_regset(self.ecc.qz_mem(0).as_ptr(), tmp.as_ref(), 8);
             }
         }
 
@@ -658,13 +658,13 @@ impl<'d> Ecc<'d> {
         let mut tmp = [0_u8; 32];
         self.reverse_words(k, &mut tmp);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.k_mem(0), tmp.as_ref(), 8);
+            .volatile_write_regset(self.ecc.k_mem(0).as_ptr(), tmp.as_ref(), 8);
         self.reverse_words(x, &mut tmp);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.px_mem(0), tmp.as_ref(), 8);
+            .volatile_write_regset(self.ecc.px_mem(0).as_ptr(), tmp.as_ref(), 8);
         self.reverse_words(y, &mut tmp);
         self.alignment_helper
-            .volatile_write_regset(&mut self.ecc.py_mem(0), tmp.as_ref(), 8);
+            .volatile_write_regset(self.ecc.py_mem(0).as_ptr(), tmp.as_ref(), 8);
 
         self.ecc.mult_conf().write(|w| unsafe {
             w.work_mode()
@@ -691,23 +691,23 @@ impl<'d> Ecc<'d> {
         cfg_if::cfg_if! {
             if #[cfg(not(esp32h2))] {
                 self.alignment_helper
-                    .volatile_read_regset(&self.ecc.px_mem(0), &mut tmp, 8);
+                    .volatile_read_regset(self.ecc.px_mem(0).as_ptr(), &mut tmp, 8);
                 self.reverse_words(tmp.as_ref(), x);
                 self.alignment_helper
-                    .volatile_read_regset(&self.ecc.py_mem(0), &mut tmp, 8);
+                    .volatile_read_regset(self.ecc.py_mem(0).as_ptr(), &mut tmp, 8);
                 self.reverse_words(tmp.as_ref(), y);
                 self.alignment_helper
-                    .volatile_read_regset(&self.ecc.k_mem(0), &mut tmp, 8);
+                    .volatile_read_regset(self.ecc.k_mem(0).as_ptr(), &mut tmp, 8);
                 self.reverse_words(tmp.as_ref(), k);
             } else {
                 self.alignment_helper
-                    .volatile_read_regset(&self.ecc.qx_mem[0], &mut tmp, 8);
+                    .volatile_read_regset(self.ecc.qx_mem(0).as_ptr(), &mut tmp, 8);
                 self.reverse_words(tmp.as_ref(), x);
                 self.alignment_helper
-                    .volatile_read_regset(&self.ecc.qy_mem[0], &mut tmp, 8);
+                    .volatile_read_regset(self.ecc.qy_mem(0).as_ptr(), &mut tmp, 8);
                 self.reverse_words(tmp.as_ref(), y);
                 self.alignment_helper
-                    .volatile_read_regset(&self.ecc.qz_mem[0], &mut tmp, 8);
+                    .volatile_read_regset(self.ecc.qz_mem(0).as_ptr(), &mut tmp, 8);
                 self.reverse_words(tmp.as_ref(), k);
             }
         }
