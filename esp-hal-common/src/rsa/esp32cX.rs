@@ -105,10 +105,10 @@ impl<'d> Rsa<'d> {
         self.rsa.query_idle.read().query_idle().bit_is_set()
     }
 
-    unsafe fn write_multi_operand_b<const N: usize>(&mut self, operand_b: &[u8; N]) {
+    unsafe fn write_multi_operand_b<const N: usize>(&mut self, operand_b: &[u32; N]) {
         copy_nonoverlapping(
             operand_b.as_ptr(),
-            self.rsa.z_mem.as_mut_ptr().add(N) as *mut u8,
+            self.rsa.z_mem.as_mut_ptr().add(N * 4) as *mut u32,
             N,
         );
     }
@@ -222,7 +222,7 @@ pub mod operand_sizes {
 
 impl<'a, 'd, T: RsaMode, const N: usize> RsaModularExponentiation<'a, 'd, T>
 where
-    T: RsaMode<InputType = [u8; N]>,
+    T: RsaMode<InputType = [u32; N]>,
 {
     /// Creates an Instance of `RsaModularExponentiation`.  
     /// `m_prime` could be calculated using `-(modular multiplicative inverse of
@@ -254,13 +254,13 @@ where
             if *byte == 0 {
                 continue;
             }
-            return (exponent.len() * 8) as u32 - (byte.leading_zeros() + i as u32 * 8) - 1;
+            return (exponent.len() * 32) as u32 - (byte.leading_zeros() + i as u32 * 32) - 1;
         }
         0
     }
 
     pub(super) fn set_mode(rsa: &mut Rsa) {
-        rsa.write_mode((N / 4 - 1) as u32)
+        rsa.write_mode((N - 1) as u32)
     }
 
     pub(super) fn set_start(&mut self) {
@@ -270,10 +270,10 @@ where
 
 impl<'a, 'd, T: RsaMode, const N: usize> RsaModularMultiplication<'a, 'd, T>
 where
-    T: RsaMode<InputType = [u8; N]>,
+    T: RsaMode<InputType = [u32; N]>,
 {
     fn write_mode(rsa: &mut Rsa) {
-        rsa.write_mode((N / 4 - 1) as u32)
+        rsa.write_mode((N - 1) as u32)
     }
 
     /// Creates an Instance of `RsaModularMultiplication`.  
@@ -317,7 +317,7 @@ where
 
 impl<'a, 'd, T: RsaMode + Multi, const N: usize> RsaMultiplication<'a, 'd, T>
 where
-    T: RsaMode<InputType = [u8; N]>,
+    T: RsaMode<InputType = [u32; N]>,
 {
     /// Creates an Instance of `RsaMultiplication`.
     pub fn new(rsa: &'a mut Rsa<'d>, operand_a: &T::InputType) -> Self {
@@ -340,7 +340,7 @@ where
     }
 
     pub(super) fn set_mode(rsa: &mut Rsa) {
-        rsa.write_mode((N / 2 - 1) as u32)
+        rsa.write_mode((N * 2 - 1) as u32)
     }
 
     pub(super) fn set_start(&mut self) {
