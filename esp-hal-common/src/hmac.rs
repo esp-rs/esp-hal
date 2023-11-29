@@ -223,7 +223,7 @@ impl<'d> Hmac<'d> {
 
         let (remaining, bound_reached) = self.alignment_helper.aligned_volatile_copy(
             #[cfg(esp32s2)]
-            self.hmac.wr_message_().as_ptr(),
+            self.hmac.wr_message_(0).as_ptr(),
             #[cfg(not(esp32s2))]
             self.hmac.wr_message_mem(0).as_ptr(),
             incoming,
@@ -257,7 +257,7 @@ impl<'d> Hmac<'d> {
 
         let flushed = self.alignment_helper.flush_to(
             #[cfg(esp32s2)]
-            self.hmac.wr_message_().as_ptr(),
+            self.hmac.wr_message_(0).as_ptr(),
             #[cfg(not(esp32s2))]
             self.hmac.wr_message_mem(0).as_ptr(),
             (self.byte_written % 64) / self.alignment_helper.align_size(),
@@ -283,7 +283,7 @@ impl<'d> Hmac<'d> {
             let pad_len = 64 - mod_cursor;
             self.alignment_helper.volatile_write_bytes(
                 #[cfg(esp32s2)]
-                self.hmac.wr_message_().as_ptr(),
+                self.hmac.wr_message_(0).as_ptr(),
                 #[cfg(not(esp32s2))]
                 self.hmac.wr_message_mem(0).as_ptr(),
                 0_u8,
@@ -305,7 +305,7 @@ impl<'d> Hmac<'d> {
 
         self.alignment_helper.volatile_write_bytes(
             #[cfg(esp32s2)]
-            self.hmac.wr_message_().as_ptr(),
+            self.hmac.wr_message_(0).as_ptr(),
             #[cfg(not(esp32s2))]
             self.hmac.wr_message_mem(0).as_ptr(),
             0_u8,
@@ -322,7 +322,7 @@ impl<'d> Hmac<'d> {
 
         self.alignment_helper.aligned_volatile_copy(
             #[cfg(esp32s2)]
-            self.hmac.wr_message_().as_ptr(),
+            self.hmac.wr_message_(0).as_ptr(),
             #[cfg(not(esp32s2))]
             self.hmac.wr_message_mem(0).as_ptr(),
             &len_mem,

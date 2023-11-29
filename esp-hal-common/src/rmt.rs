@@ -1925,7 +1925,7 @@ mod chip_specific {
                         #[cfg(esp32s2)]
                         {
                             let rmt = unsafe { &*crate::peripherals::RMT::PTR };
-                            rmt.[< ch $ch_num conf1 >].modify(|_, w| w.tx_stop().set_bit());
+                            rmt.[< ch $ch_num conf1 >]().modify(|_, w| w.tx_stop().set_bit());
                         }
                     }
 

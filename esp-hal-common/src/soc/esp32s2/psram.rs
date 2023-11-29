@@ -125,7 +125,7 @@ pub fn init_psram(_peripheral: impl crate::peripheral::Peripheral<P = crate::per
         }
 
         let extmem = &*esp32s2::EXTMEM::PTR;
-        extmem.pro_dcache_ctrl1.modify(|_, w| {
+        extmem.pro_dcache_ctrl1().modify(|_, w| {
             w.pro_dcache_mask_bus0()
                 .clear_bit()
                 .pro_dcache_mask_bus1()
@@ -253,10 +253,10 @@ pub(crate) mod utils {
 
         unsafe {
             let spi1 = &*esp32s2::SPI1::PTR;
-            let backup_usr = spi1.user.read().bits();
-            let backup_usr1 = spi1.user1.read().bits();
-            let backup_usr2 = spi1.user2.read().bits();
-            let backup_ctrl = spi1.ctrl.read().bits();
+            let backup_usr = spi1.user().read().bits();
+            let backup_usr1 = spi1.user1().read().bits();
+            let backup_usr2 = spi1.user2().read().bits();
+            let backup_ctrl = spi1.ctrl().read().bits();
             psram_set_op_mode(mode);
             _psram_exec_cmd(
                 cmd,
@@ -277,10 +277,10 @@ pub(crate) mod utils {
                 is_write_erase_operation,
             );
 
-            spi1.user.write(|w| w.bits(backup_usr));
-            spi1.user1.write(|w| w.bits(backup_usr1));
-            spi1.user2.write(|w| w.bits(backup_usr2));
-            spi1.ctrl.write(|w| w.bits(backup_ctrl));
+            spi1.user().write(|w| w.bits(backup_usr));
+            spi1.user1().write(|w| w.bits(backup_usr1));
+            spi1.user2().write(|w| w.bits(backup_usr2));
+            spi1.ctrl().write(|w| w.bits(backup_ctrl));
         }
     }
 
@@ -345,7 +345,7 @@ pub(crate) mod utils {
                 CommandMode::PsramCmdQpi => {
                     esp_rom_spi_set_op_mode(1, ESP_ROM_SPIFLASH_QIO_MODE);
                     let spi1 = &*esp32s2::SPI1::PTR;
-                    spi1.ctrl.modify(|_, w| w.fcmd_quad().set_bit());
+                    spi1.ctrl().modify(|_, w| w.fcmd_quad().set_bit());
                 }
                 CommandMode::PsramCmdSpi => {
                     esp_rom_spi_set_op_mode(1, ESP_ROM_SPIFLASH_SLOWRD_MODE);

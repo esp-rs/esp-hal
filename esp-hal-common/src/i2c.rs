@@ -662,7 +662,7 @@ pub trait Instance {
 
         #[cfg(esp32s2)]
         self.register_block()
-            .ctr
+            .ctr()
             .modify(|_, w| w.ref_always_on().set_bit());
 
         // Configure filter
@@ -1534,7 +1534,7 @@ fn write_fifo(register_block: &RegisterBlock, data: u8) {
 
 #[cfg(esp32s2)]
 fn read_fifo(register_block: &RegisterBlock) -> u8 {
-    let base_addr = register_block.scl_low_period.as_ptr();
+    let base_addr = register_block.scl_low_period().as_ptr();
     let fifo_ptr = (if base_addr as u32 == 0x3f413000 {
         0x6001301c
     } else {

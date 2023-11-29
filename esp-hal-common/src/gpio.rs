@@ -1682,7 +1682,7 @@ macro_rules! rtc_pins {
 
                 // disable input
                 paste::paste!{
-                    rtcio.$pin_reg().modify(|_,w| unsafe {w
+                    rtcio.$pin_reg.modify(|_,w| unsafe {w
                         .[<$prefix fun_ie>]().bit(input_enable)
                         .[<$prefix mux_sel>]().bit(mux)
                         .[<$prefix fun_sel>]().bits(func as u8)
@@ -1708,7 +1708,7 @@ macro_rules! rtc_pins {
                     let rtcio = unsafe { &*crate::peripherals::RTC_IO::PTR };
 
                     paste::paste! {
-                        rtcio.$pin_reg().modify(|_, w| w.$rue().bit([< enable >]));
+                        rtcio.$pin_reg.modify(|_, w| w.$rue().bit([< enable >]));
                     }
                 }
 
@@ -1716,7 +1716,7 @@ macro_rules! rtc_pins {
                     let rtcio = unsafe { &*crate::peripherals::RTC_IO::PTR };
 
                     paste::paste! {
-                        rtcio.$pin_reg().modify(|_, w| w.$rde().bit([< enable >]));
+                        rtcio.$pin_reg.modify(|_, w| w.$rde().bit([< enable >]));
                     }
                 }
             }
@@ -1826,7 +1826,7 @@ macro_rules! analog {
                         // handle indexed pins.
                         paste::paste! {
                             // disable input
-                            rtcio.$pin_reg().modify(|_,w| w.$fun_ie().bit([< false >]));
+                            rtcio.$pin_reg.modify(|_,w| w.$fun_ie().bit([< false >]));
 
                             // disable output
                             rtcio.enable_w1tc().write(|w| unsafe { w.enable_w1tc().bits(1 << $rtc_pin) });
@@ -1834,7 +1834,7 @@ macro_rules! analog {
                             // disable open drain
                             rtcio.pin($rtc_pin).modify(|_,w| w.pad_driver().bit(false));
 
-                            rtcio.$pin_reg().modify(|_,w| {
+                            rtcio.$pin_reg.modify(|_,w| {
                                 w.$fun_ie().clear_bit();
 
                                 // Connect pin to analog / RTC module instead of standard GPIO
@@ -1846,7 +1846,7 @@ macro_rules! analog {
 
                             // Disable pull-up and pull-down resistors on the pin, if it has them
                             $(
-                                rtcio.$pin_reg().modify(|_,w| {
+                                rtcio.$pin_reg.modify(|_,w| {
                                     w
                                     .$rue().bit(false)
                                     .$rde().bit(false)
