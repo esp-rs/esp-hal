@@ -75,7 +75,6 @@ Don't use this feature if your are _not_ using USB-SERIAL-JTAG since it might re
 | wifi           | Enable WiFi support                                                                                  |
 | esp-now        | Enable esp-now support                                                                               |
 | coex           | Enable coex support                                                                                  |
-| big-heap       | Reserve more heap memory for the drivers                                                             |
 | ipv4           | IPv4 support: includes `utils` feature                                                               |
 | ipv6           | IPv6 support: includes `utils` feature                                                               |
 | tcp            | TCP socket support: includes `ipv4` feature                                                          |

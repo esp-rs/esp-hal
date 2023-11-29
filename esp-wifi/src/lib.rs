@@ -82,20 +82,6 @@ pub fn current_millis() -> u64 {
 }
 
 #[allow(unused)]
-#[cfg(all(not(feature = "big-heap")))]
-const DEFAULT_HEAP_SIZE: usize = 64 * 1024;
-
-#[allow(unused)]
-#[cfg(all(not(esp32s2), feature = "big-heap"))]
-const DEFAULT_HEAP_SIZE: usize = 110 * 1024;
-
-#[allow(unused)]
-#[cfg(all(esp32s2, feature = "big-heap"))]
-const DEFAULT_HEAP_SIZE: usize = 72 * 1024;
-
-const HEAP_SIZE: usize = crate::CONFIG.heap_size;
-
-#[allow(unused)]
 #[cfg(debug_assertions)]
 const DEFAULT_TICK_RATE_HZ: u32 = 50;
 
@@ -136,7 +122,7 @@ struct Config {
     country_code_operating_class: u8,
     #[default(1492)]
     mtu: usize,
-    #[default(DEFAULT_HEAP_SIZE)]
+    #[default(65536)]
     heap_size: usize,
     #[default(DEFAULT_TICK_RATE_HZ)]
     tick_rate_hz: u32,
@@ -151,6 +137,8 @@ struct Config {
     #[default(0)]
     scan_method: u32,
 }
+
+const HEAP_SIZE: usize = crate::CONFIG.heap_size;
 
 #[cfg_attr(esp32, link_section = ".dram2_uninit")]
 static mut HEAP_DATA: [MaybeUninit<u8>; HEAP_SIZE] = [MaybeUninit::uninit(); HEAP_SIZE];
