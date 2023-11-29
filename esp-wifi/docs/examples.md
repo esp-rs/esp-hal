@@ -15,7 +15,7 @@ cargo esp32c3 --release ...
 - gets an ip address via DHCP
 - performs an HTTP get request to some "random" server
 
-`cargo $CHIP --example dhcp --release --features "embedded-svc,wifi"`
+`cargo $CHIP --example dhcp --release --features "wifi"`
 
 ### static_ip
 
@@ -25,7 +25,7 @@ cargo esp32c3 --release ...
 - uses the given static IP
 - responds with some HTML content when connecting to port 8080
 
-`cargo $CHIP --example static_ip --release --features "embedded-svc,wifi"`
+`cargo $CHIP --example static_ip --release --features "wifi"`
 
 ### ble
 
@@ -54,7 +54,7 @@ cargo esp32c3 --release ...
 - does BLE advertising
 - coex support is still somewhat flaky
 
-`cargo $CHIP --example coex --release --features "embedded-svc,wifi,ble"`
+`cargo $CHIP --example coex --release --features "wifi,ble"`
 
 **NOTE:** Not currently available for the ESP32, ESP32-C2, ESP32-C6 or ESP32-S2
 
@@ -80,7 +80,7 @@ cargo esp32c3 --release ...
 
 - Read and Write to sockets over WiFi asyncronously using embassy-executor.
 
-`cargo $CHIP --example embassy_dhcp --release --features "async,embedded-svc,wifi,embassy-net"`
+`cargo $CHIP --example embassy_dhcp --release --features "async,wifi,embassy-net"`
 
 ### access_point
 
@@ -89,7 +89,7 @@ cargo esp32c3 --release ...
 - open http://192.168.2.1:8080/ in your browser
 - on Android you might need to choose _Keep Accesspoint_ when it tells you the WiFi has no internet connection, Chrome might not want to load the URL - you can use a shell and try `curl` and `ping`
 
-`cargo $CHIP --example access_point --release --features "embedded-svc,wifi"`
+`cargo $CHIP --example access_point --release --features "wifi"`
 
 ### access_point_with_sta
 
@@ -100,7 +100,7 @@ cargo esp32c3 --release ...
 - open http://192.168.2.1:8080/ in your browser - the example will perform an HTTP get request to some "random" server
 - on Android you might need to choose _Keep Accesspoint_ when it tells you the WiFi has no internet connection, Chrome might not want to load the URL - you can use a shell and try `curl` and `ping`
 
-`cargo $CHIP --example access_point_with_sta --release --features "embedded-svc,wifi"`
+`cargo $CHIP --example access_point_with_sta --release --features "wifi"`
 
 ### embassy_access_point
 
@@ -109,7 +109,7 @@ cargo esp32c3 --release ...
 - open http://192.168.2.1:8080/ in your browser
 - on Android you might need to choose _Keep Accesspoint_ when it tells you the WiFi has no internet connection, Chrome might not want to load the URL - you can use a shell and try `curl` and `ping`
 
-`cargo $CHIP --example embassy_access_point --release --features "async,embedded-svc,wifi,embassy-net"`
+`cargo $CHIP --example embassy_access_point --release --features "async,wifi,embassy-net"`
 
 ### embassy_access_point_with_sta
 
@@ -120,7 +120,7 @@ cargo esp32c3 --release ...
 - open http://192.168.2.1:8080/ in your browser - the example will perform an HTTP get request to some "random" server
 - on Android you might need to choose _Keep Accesspoint_ when it tells you the WiFi has no internet connection, Chrome might not want to load the URL - you can use a shell and try `curl` and `ping`
 
-`cargo $CHIP --example embassy_access_point_with_sta --release --features "async,embedded-svc,wifi,embassy-net"`
+`cargo $CHIP --example embassy_access_point_with_sta --release --features "async,wifi,embassy-net"`
 
 ## Benchmarking
 
