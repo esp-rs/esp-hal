@@ -1424,7 +1424,7 @@ mod asynch {
         }
 
         fn event_bit_is_clear(&self) -> bool {
-            let interrupts_enabled = T::register_block().int_ena.read();
+            let interrupts_enabled = T::register_block().int_ena().read();
             let mut event_triggered = false;
             for event in self.events {
                 event_triggered |= match event {
@@ -1450,7 +1450,7 @@ mod asynch {
         ) -> core::task::Poll<Self::Output> {
             if !self.registered {
                 RX_WAKERS[T::uart_number()].register(cx.waker());
-                T::register_block().int_ena.modify(|_, w| {
+                T::register_block().int_ena().modify(|_, w| {
                     for event in self.events {
                         match event {
                             RxEvent::RxFifoFull => w.rxfifo_full_int_ena().set_bit(),
@@ -1476,7 +1476,7 @@ mod asynch {
             // Although the isr disables the interrupt that occured directly, we need to
             // disable the other interrupts (= the ones that did not occur), as
             // soon as this future goes out of scope.
-            let int_ena = &T::register_block().int_ena;
+            let int_ena = &T::register_block().int_ena();
             for event in self.events {
                 match event {
                     RxEvent::RxFifoFull => {
@@ -1504,7 +1504,7 @@ mod asynch {
         }
 
         fn event_bit_is_clear(&self) -> bool {
-            let interrupts_enabled = T::register_block().int_ena.read();
+            let interrupts_enabled = T::register_block().int_ena().read();
             let mut event_triggered = false;
             for event in self.events {
                 event_triggered |= match event {
@@ -1527,7 +1527,7 @@ mod asynch {
         ) -> core::task::Poll<Self::Output> {
             if !self.registered {
                 TX_WAKERS[T::uart_number()].register(cx.waker());
-                T::register_block().int_ena.modify(|_, w| {
+                T::register_block().int_ena().modify(|_, w| {
                     for event in self.events {
                         match event {
                             TxEvent::TxDone => w.tx_done_int_ena().set_bit(),
@@ -1552,7 +1552,7 @@ mod asynch {
             // Although the isr disables the interrupt that occurred directly, we need to
             // disable the other interrupts (= the ones that did not occur), as
             // soon as this future goes out of scope.
-            let int_ena = &T::register_block().int_ena;
+            let int_ena = &T::register_block().int_ena();
             for event in self.events {
                 match event {
                     TxEvent::TxDone => int_ena.modify(|_, w| w.tx_done_int_ena().clear_bit()),

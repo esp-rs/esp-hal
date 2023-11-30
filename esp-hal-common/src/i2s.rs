@@ -1650,7 +1650,8 @@ mod private {
 
         fn rx_start(len: usize) {
             let i2s = Self::register_block();
-            i2s.rxeof_num().write(|w| w.rx_eof_num().variant(len as u16));
+            i2s.rxeof_num()
+                .write(|w| w.rx_eof_num().variant(len as u16));
             i2s.rx_conf().modify(|_, w| w.rx_start().set_bit());
         }
 
