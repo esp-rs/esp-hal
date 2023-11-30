@@ -67,7 +67,7 @@ pub(crate) fn esp32c2_rtc_bbpll_configure(xtal_freq: XtalClock, _pll_freq: PllCl
 
     // Set this register to let the digital part know 480M PLL is used
     system
-        .cpu_per_conf
+        .cpu_per_conf()
         .modify(|_, w| w.pll_freq_sel().set_bit());
 
     // Configure 480M PLL
@@ -114,7 +114,7 @@ pub(crate) fn esp32c2_rtc_bbpll_configure(xtal_freq: XtalClock, _pll_freq: PllCl
 pub(crate) fn esp32c2_rtc_bbpll_enable() {
     let rtc_cntl = unsafe { &*crate::peripherals::RTC_CNTL::ptr() };
 
-    rtc_cntl.options0.modify(|_, w| {
+    rtc_cntl.options0().modify(|_, w| {
         w.bb_i2c_force_pd()
             .clear_bit()
             .bbpll_force_pd()
@@ -131,7 +131,7 @@ pub(crate) fn esp32c2_rtc_update_to_xtal(freq: XtalClock, _div: u32) {
         ets_update_cpu_frequency_rom(freq.mhz());
         // Set divider from XTAL to APB clock. Need to set divider to 1 (reg. value 0)
         // first.
-        system_control.sysclk_conf.modify(|_, w| {
+        system_control.sysclk_conf().modify(|_, w| {
             w.pre_div_cnt()
                 .bits(0)
                 .pre_div_cnt()
@@ -142,7 +142,7 @@ pub(crate) fn esp32c2_rtc_update_to_xtal(freq: XtalClock, _div: u32) {
 
         // Switch clock source
         system_control
-            .sysclk_conf
+            .sysclk_conf()
             .modify(|_, w| w.soc_clk_sel().bits(0));
     }
 }
@@ -152,9 +152,9 @@ pub(crate) fn esp32c2_rtc_freq_to_pll_mhz(cpu_clock_speed: CpuClock) {
 
     unsafe {
         system_control
-            .sysclk_conf
+            .sysclk_conf()
             .modify(|_, w| w.pre_div_cnt().bits(0).soc_clk_sel().bits(1));
-        system_control.cpu_per_conf.modify(|_, w| {
+        system_control.cpu_per_conf().modify(|_, w| {
             w.cpuperiod_sel().bits(match cpu_clock_speed {
                 CpuClock::Clock80MHz => 0,
                 CpuClock::Clock120MHz => 1,
@@ -171,6 +171,6 @@ pub(crate) fn esp32c2_rtc_apb_freq_update(apb_freq: ApbClock) {
         | (((apb_freq.hz() >> 12) & u16::MAX as u32) << 16);
 
     rtc_cntl
-        .store5
+        .store5()
         .modify(|_, w| unsafe { w.scratch5().bits(value) });
 }

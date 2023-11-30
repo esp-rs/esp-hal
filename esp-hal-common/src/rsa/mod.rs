@@ -97,35 +97,35 @@ impl<'d> Rsa<'d> {
     unsafe fn write_operand_b<const N: usize>(&mut self, operand_b: &[u32; N]) {
         copy_nonoverlapping(
             operand_b.as_ptr(),
-            self.rsa.y_mem.as_mut_ptr() as *mut u32,
+            self.rsa.y_mem(0).as_ptr() as *mut u32,
             N,
         );
     }
 
     unsafe fn write_modulus<const N: usize>(&mut self, modulus: &[u32; N]) {
-        copy_nonoverlapping(modulus.as_ptr(), self.rsa.m_mem.as_mut_ptr() as *mut u32, N);
+        copy_nonoverlapping(modulus.as_ptr(), self.rsa.m_mem(0).as_ptr() as *mut u32, N);
     }
 
     fn write_mprime(&mut self, m_prime: u32) {
-        self.rsa.m_prime.write(|w| unsafe { w.bits(m_prime) });
+        self.rsa.m_prime().write(|w| unsafe { w.bits(m_prime) });
     }
 
     unsafe fn write_operand_a<const N: usize>(&mut self, operand_a: &[u32; N]) {
         copy_nonoverlapping(
             operand_a.as_ptr(),
-            self.rsa.x_mem.as_mut_ptr() as *mut u32,
+            self.rsa.x_mem(0).as_ptr() as *mut u32,
             N,
         );
     }
 
     unsafe fn write_r<const N: usize>(&mut self, r: &[u32; N]) {
-        copy_nonoverlapping(r.as_ptr(), self.rsa.z_mem.as_mut_ptr() as *mut u32, N);
+        copy_nonoverlapping(r.as_ptr(), self.rsa.z_mem(0).as_ptr() as *mut u32, N);
     }
 
     unsafe fn read_out<const N: usize>(&mut self, outbuf: &mut [u32; N]) {
         copy_nonoverlapping(
-            self.rsa.z_mem.as_ptr() as *const u32,
-            outbuf.as_mut_ptr(),
+            self.rsa.z_mem(0).as_ptr() as *const u32,
+            outbuf.as_ptr() as *mut u32,
             N,
         );
     }
@@ -299,33 +299,33 @@ pub(crate) mod asynch {
     impl<'d> RsaFuture<'d> {
         pub async fn new(instance: &'d crate::peripherals::RSA) -> Self {
             #[cfg(not(any(esp32, esp32s2, esp32s3)))]
-            instance.int_ena.modify(|_, w| w.int_ena().set_bit());
+            instance.int_ena().modify(|_, w| w.int_ena().set_bit());
 
             #[cfg(any(esp32s2, esp32s3))]
             instance
-                .interrupt_ena
+                .interrupt_ena()
                 .modify(|_, w| w.interrupt_ena().set_bit());
 
             #[cfg(esp32)]
-            instance.interrupt.modify(|_, w| w.interrupt().set_bit());
+            instance.interrupt().modify(|_, w| w.interrupt().set_bit());
 
             Self { instance }
         }
 
         fn event_bit_is_clear(&self) -> bool {
             #[cfg(not(any(esp32, esp32s2, esp32s3)))]
-            return self.instance.int_ena.read().int_ena().bit_is_clear();
+            return self.instance.int_ena().read().int_ena().bit_is_clear();
 
             #[cfg(any(esp32s2, esp32s3))]
             return self
                 .instance
-                .interrupt_ena
+                .interrupt_ena()
                 .read()
                 .interrupt_ena()
                 .bit_is_clear();
 
             #[cfg(esp32)]
-            return self.instance.interrupt.read().interrupt().bit_is_clear();
+            return self.instance.interrupt().read().interrupt().bit_is_clear();
         }
     }
 
@@ -427,17 +427,17 @@ pub(crate) mod asynch {
     fn RSA() {
         #[cfg(not(any(esp32, esp32s2, esp32s3)))]
         unsafe { &*crate::peripherals::RSA::ptr() }
-            .int_ena
+            .int_ena()
             .modify(|_, w| w.int_ena().clear_bit());
 
         #[cfg(esp32)]
         unsafe { &*crate::peripherals::RSA::ptr() }
-            .interrupt
+            .interrupt()
             .modify(|_, w| w.interrupt().clear_bit());
 
         #[cfg(any(esp32s2, esp32s3))]
         unsafe { &*crate::peripherals::RSA::ptr() }
-            .interrupt_ena
+            .interrupt_ena()
             .modify(|_, w| w.interrupt_ena().clear_bit());
 
         WAKER.wake();

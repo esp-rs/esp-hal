@@ -32,16 +32,16 @@ pub(crate) fn init() {
 
     regi2c_write_mask!(I2C_DIG_REG, I2C_DIG_REG_XPD_RTC_REG, 0);
 
-    rtc_cntl.ana_conf.modify(|_, w| w.pvtmon_pu().clear_bit());
+    rtc_cntl.ana_conf().modify(|_, w| w.pvtmon_pu().clear_bit());
 
     unsafe {
         rtc_cntl
-            .timer1
+            .timer1()
             .modify(|_, w| w.pll_buf_wait().bits(20u8).ck8m_wait().bits(20u8));
-        rtc_cntl.timer5.modify(|_, w| w.min_slp_val().bits(2u8));
+        rtc_cntl.timer5().modify(|_, w| w.min_slp_val().bits(2u8));
 
         // Set default powerup & wait time
-        rtc_cntl.timer3.modify(|_, w| {
+        rtc_cntl.timer3().modify(|_, w| {
             w.wifi_powerup_timer()
                 .bits(1u8)
                 .wifi_wait_timer()
@@ -51,7 +51,7 @@ pub(crate) fn init() {
                 .bt_wait_timer()
                 .bits(1u16)
         });
-        rtc_cntl.timer4.modify(|_, w| {
+        rtc_cntl.timer4().modify(|_, w| {
             w.cpu_top_powerup_timer()
                 .bits(1u8)
                 .cpu_top_wait_timer()
@@ -61,7 +61,7 @@ pub(crate) fn init() {
                 .dg_wrap_wait_timer()
                 .bits(1u16)
         });
-        rtc_cntl.timer6.modify(|_, w| {
+        rtc_cntl.timer6().modify(|_, w| {
             w.dg_peri_powerup_timer()
                 .bits(1u8)
                 .dg_peri_wait_timer()
@@ -78,8 +78,8 @@ pub(crate) fn init() {
     power_control_init();
 
     unsafe {
-        rtc_cntl.int_ena_rtc.write(|w| w.bits(0));
-        rtc_cntl.int_clr_rtc.write(|w| w.bits(u32::MAX));
+        rtc_cntl.int_ena_rtc().write(|w| w.bits(0));
+        rtc_cntl.int_clr_rtc().write(|w| w.bits(u32::MAX));
     }
 
     regi2c_write_mask!(I2C_ULP, I2C_ULP_IR_FORCE_XPD_CK, 0);
@@ -104,7 +104,7 @@ pub(crate) fn configure_clock() {
 
     unsafe {
         let rtc_cntl = &*RTC_CNTL::ptr();
-        rtc_cntl.store1.write(|w| w.bits(cal_val));
+        rtc_cntl.store1().write(|w| w.bits(cal_val));
     }
 }
 
@@ -120,17 +120,17 @@ fn clock_control_init() {
 
     // Clear CMMU clock force on
     extmem
-        .cache_mmu_power_ctrl
+        .cache_mmu_power_ctrl()
         .modify(|_, w| w.cache_mmu_mem_force_on().clear_bit());
 
     // Clear tag clock force on
     extmem
-        .icache_tag_power_ctrl
+        .icache_tag_power_ctrl()
         .modify(|_, w| w.icache_tag_mem_force_on().clear_bit());
 
     // Clear register clock force on
-    spi_mem_0.clock_gate.modify(|_, w| w.clk_en().clear_bit());
-    spi_mem_1.clock_gate.modify(|_, w| w.clk_en().clear_bit());
+    spi_mem_0.clock_gate().modify(|_, w| w.clk_en().clear_bit());
+    spi_mem_1.clock_gate().modify(|_, w| w.clk_en().clear_bit());
 }
 
 /// Perform power control related initialization
@@ -138,17 +138,17 @@ fn power_control_init() {
     let rtc_cntl = unsafe { &*RTC_CNTL::ptr() };
     let system = unsafe { &*SYSTEM::ptr() };
     rtc_cntl
-        .clk_conf
+        .clk_conf()
         .modify(|_, w| w.ck8m_force_pu().clear_bit());
 
     // Cancel XTAL force PU if no need to force power up
     // Cannot cancel XTAL force PU if PLL is force power on
     rtc_cntl
-        .options0
+        .options0()
         .modify(|_, w| w.xtl_force_pu().clear_bit());
 
     // Force PD APLL
-    rtc_cntl.ana_conf.modify(|_, w| {
+    rtc_cntl.ana_conf().modify(|_, w| {
         w.plla_force_pu()
             .clear_bit()
             .plla_force_pd()
@@ -160,7 +160,7 @@ fn power_control_init() {
     });
 
     // Cancel BBPLL force PU if setting no force power up
-    rtc_cntl.options0.modify(|_, w| {
+    rtc_cntl.options0().modify(|_, w| {
         w.bbpll_force_pu()
             .clear_bit()
             .bbpll_i2c_force_pu()
@@ -168,7 +168,7 @@ fn power_control_init() {
             .bb_i2c_force_pu()
             .clear_bit()
     });
-    rtc_cntl.rtc_cntl.modify(|_, w| {
+    rtc_cntl.rtc_cntl().modify(|_, w| {
         w.regulator_force_pu()
             .clear_bit()
             .dboost_force_pu()
@@ -181,12 +181,12 @@ fn power_control_init() {
     // We should control soc memory power down mode from RTC,
     // so we will not touch this register any more.
     system
-        .mem_pd_mask
+        .mem_pd_mask()
         .modify(|_, w| w.lslp_mem_pd_mask().clear_bit());
 
     rtc_sleep_pu();
 
-    rtc_cntl.dig_pwc.modify(|_, w| {
+    rtc_cntl.dig_pwc().modify(|_, w| {
         w.dg_wrap_force_pu()
             .clear_bit()
             .wifi_force_pu()
@@ -198,7 +198,7 @@ fn power_control_init() {
             .dg_peri_force_pu()
             .clear_bit()
     });
-    rtc_cntl.dig_iso.modify(|_, w| {
+    rtc_cntl.dig_iso().modify(|_, w| {
         w.dg_wrap_force_noiso()
             .clear_bit()
             .wifi_force_noiso()
@@ -213,12 +213,12 @@ fn power_control_init() {
 
     // Cancel digital PADS force no iso
     system
-        .cpu_per_conf
+        .cpu_per_conf()
         .modify(|_, w| w.cpu_wait_mode_force_on().clear_bit());
 
     // If SYSTEM_CPU_WAIT_MODE_FORCE_ON == 0,
     // the CPU clock will be closed when CPU enter WAITI mode.
-    rtc_cntl.dig_iso.modify(|_, w| {
+    rtc_cntl.dig_iso().modify(|_, w| {
         w.dg_pad_force_unhold()
             .clear_bit()
             .dg_pad_force_noiso()
@@ -231,14 +231,14 @@ fn rtc_sleep_pu() {
     let rtc_cntl = unsafe { &*RTC_CNTL::ptr() };
     let apb_ctrl = unsafe { &*APB_CTRL::ptr() };
 
-    rtc_cntl.dig_pwc.modify(|_, w| {
+    rtc_cntl.dig_pwc().modify(|_, w| {
         w.lslp_mem_force_pu()
             .clear_bit()
             .fastmem_force_lpu()
             .clear_bit()
     });
 
-    apb_ctrl.front_end_mem_pd.modify(|_, w| {
+    apb_ctrl.front_end_mem_pd().modify(|_, w| {
         w.dc_mem_force_pu()
             .clear_bit()
             .pbus_mem_force_pu()
@@ -247,7 +247,7 @@ fn rtc_sleep_pu() {
             .clear_bit()
     });
     apb_ctrl
-        .mem_power_up
+        .mem_power_up()
         .modify(|_, w| unsafe { w.sram_power_up().bits(0u8).rom_power_up().bits(0u8) });
 }
 

@@ -257,7 +257,7 @@ impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
         let use_apb = !self.use_ref_tick;
 
         match self.number {
-            Number::Timer0 => self.ledc.lstimer0_conf.modify(|_, w| unsafe {
+            Number::Timer0 => self.ledc.lstimer0_conf().modify(|_, w| unsafe {
                 w.tick_sel()
                     .bit(use_apb)
                     .rst()
@@ -269,7 +269,7 @@ impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
                     .duty_res()
                     .bits(duty)
             }),
-            Number::Timer1 => self.ledc.lstimer1_conf.modify(|_, w| unsafe {
+            Number::Timer1 => self.ledc.lstimer1_conf().modify(|_, w| unsafe {
                 w.tick_sel()
                     .bit(use_apb)
                     .rst()
@@ -281,7 +281,7 @@ impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
                     .duty_res()
                     .bits(duty)
             }),
-            Number::Timer2 => self.ledc.lstimer2_conf.modify(|_, w| unsafe {
+            Number::Timer2 => self.ledc.lstimer2_conf().modify(|_, w| unsafe {
                 w.tick_sel()
                     .bit(use_apb)
                     .rst()
@@ -293,7 +293,7 @@ impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
                     .duty_res()
                     .bits(duty)
             }),
-            Number::Timer3 => self.ledc.lstimer3_conf.modify(|_, w| unsafe {
+            Number::Timer3 => self.ledc.lstimer3_conf().modify(|_, w| unsafe {
                 w.tick_sel()
                     .bit(use_apb)
                     .rst()
@@ -315,7 +315,7 @@ impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
         let use_ref_tick = self.use_ref_tick;
 
         match self.number {
-            Number::Timer0 => self.ledc.timer0_conf.modify(|_, w| unsafe {
+            Number::Timer0 => self.ledc.timer0_conf().modify(|_, w| unsafe {
                 w.tick_sel()
                     .bit(use_ref_tick)
                     .rst()
@@ -327,7 +327,7 @@ impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
                     .duty_res()
                     .bits(duty)
             }),
-            Number::Timer1 => self.ledc.timer1_conf.modify(|_, w| unsafe {
+            Number::Timer1 => self.ledc.timer1_conf().modify(|_, w| unsafe {
                 w.tick_sel()
                     .bit(use_ref_tick)
                     .rst()
@@ -339,7 +339,7 @@ impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
                     .duty_res()
                     .bits(duty)
             }),
-            Number::Timer2 => self.ledc.timer2_conf.modify(|_, w| unsafe {
+            Number::Timer2 => self.ledc.timer2_conf().modify(|_, w| unsafe {
                 w.tick_sel()
                     .bit(use_ref_tick)
                     .rst()
@@ -351,7 +351,7 @@ impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
                     .duty_res()
                     .bits(duty)
             }),
-            Number::Timer3 => self.ledc.timer3_conf.modify(|_, w| unsafe {
+            Number::Timer3 => self.ledc.timer3_conf().modify(|_, w| unsafe {
                 w.tick_sel()
                     .bit(use_ref_tick)
                     .rst()
@@ -370,10 +370,22 @@ impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
     /// Update the timer in HW
     fn update_hw(&self) {
         match self.number {
-            Number::Timer0 => self.ledc.lstimer0_conf.modify(|_, w| w.para_up().set_bit()),
-            Number::Timer1 => self.ledc.lstimer1_conf.modify(|_, w| w.para_up().set_bit()),
-            Number::Timer2 => self.ledc.lstimer2_conf.modify(|_, w| w.para_up().set_bit()),
-            Number::Timer3 => self.ledc.lstimer3_conf.modify(|_, w| w.para_up().set_bit()),
+            Number::Timer0 => self
+                .ledc
+                .lstimer0_conf()
+                .modify(|_, w| w.para_up().set_bit()),
+            Number::Timer1 => self
+                .ledc
+                .lstimer1_conf()
+                .modify(|_, w| w.para_up().set_bit()),
+            Number::Timer2 => self
+                .ledc
+                .lstimer2_conf()
+                .modify(|_, w| w.para_up().set_bit()),
+            Number::Timer3 => self
+                .ledc
+                .lstimer3_conf()
+                .modify(|_, w| w.para_up().set_bit()),
         };
     }
 
@@ -381,10 +393,10 @@ impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
     /// Update the timer in HW
     fn update_hw(&self) {
         match self.number {
-            Number::Timer0 => self.ledc.timer0_conf.modify(|_, w| w.para_up().set_bit()),
-            Number::Timer1 => self.ledc.timer1_conf.modify(|_, w| w.para_up().set_bit()),
-            Number::Timer2 => self.ledc.timer2_conf.modify(|_, w| w.para_up().set_bit()),
-            Number::Timer3 => self.ledc.timer3_conf.modify(|_, w| w.para_up().set_bit()),
+            Number::Timer0 => self.ledc.timer0_conf().modify(|_, w| w.para_up().set_bit()),
+            Number::Timer1 => self.ledc.timer1_conf().modify(|_, w| w.para_up().set_bit()),
+            Number::Timer2 => self.ledc.timer2_conf().modify(|_, w| w.para_up().set_bit()),
+            Number::Timer3 => self.ledc.timer3_conf().modify(|_, w| w.para_up().set_bit()),
         };
     }
 }
@@ -406,7 +418,7 @@ impl<'a> TimerHW<HighSpeed> for Timer<'a, HighSpeed> {
         let sel_hstimer = self.clock_source == Some(HSClockSource::APBClk);
 
         match self.number {
-            Number::Timer0 => self.ledc.hstimer0_conf.modify(|_, w| unsafe {
+            Number::Timer0 => self.ledc.hstimer0_conf().modify(|_, w| unsafe {
                 w.tick_sel()
                     .bit(sel_hstimer)
                     .rst()
@@ -418,7 +430,7 @@ impl<'a> TimerHW<HighSpeed> for Timer<'a, HighSpeed> {
                     .duty_res()
                     .bits(duty)
             }),
-            Number::Timer1 => self.ledc.hstimer1_conf.modify(|_, w| unsafe {
+            Number::Timer1 => self.ledc.hstimer1_conf().modify(|_, w| unsafe {
                 w.tick_sel()
                     .bit(sel_hstimer)
                     .rst()
@@ -430,7 +442,7 @@ impl<'a> TimerHW<HighSpeed> for Timer<'a, HighSpeed> {
                     .duty_res()
                     .bits(duty)
             }),
-            Number::Timer2 => self.ledc.hstimer2_conf.modify(|_, w| unsafe {
+            Number::Timer2 => self.ledc.hstimer2_conf().modify(|_, w| unsafe {
                 w.tick_sel()
                     .bit(sel_hstimer)
                     .rst()
@@ -442,7 +454,7 @@ impl<'a> TimerHW<HighSpeed> for Timer<'a, HighSpeed> {
                     .duty_res()
                     .bits(duty)
             }),
-            Number::Timer3 => self.ledc.hstimer3_conf.modify(|_, w| unsafe {
+            Number::Timer3 => self.ledc.hstimer3_conf().modify(|_, w| unsafe {
                 w.tick_sel()
                     .bit(sel_hstimer)
                     .rst()

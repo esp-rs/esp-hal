@@ -31,7 +31,7 @@ fn FROM_CPU_INTR0() {
         // `waiti`.
         let system = unsafe { &*SYSTEM::PTR };
         system
-            .cpu_intr_from_cpu_0
+            .cpu_intr_from_cpu_0()
             .write(|w| w.cpu_intr_from_cpu_0().bit(false));
     }
 }
@@ -50,7 +50,7 @@ pub(crate) fn pend_thread_mode(core: usize) {
 
         let system = unsafe { &*SYSTEM::PTR };
         system
-            .cpu_intr_from_cpu_0
+            .cpu_intr_from_cpu_0()
             .write(|w| w.cpu_intr_from_cpu_0().bit(true));
     }
 }

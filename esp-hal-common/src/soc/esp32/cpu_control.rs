@@ -140,18 +140,18 @@ unsafe fn internal_park_core(core: Cpu) {
     match core {
         Cpu::ProCpu => {
             rtc_control
-                .sw_cpu_stall
+                .sw_cpu_stall()
                 .modify(|_, w| w.sw_stall_procpu_c1().bits(0x21));
             rtc_control
-                .options0
+                .options0()
                 .modify(|_, w| w.sw_stall_procpu_c0().bits(0x02));
         }
         Cpu::AppCpu => {
             rtc_control
-                .sw_cpu_stall
+                .sw_cpu_stall()
                 .modify(|_, w| w.sw_stall_appcpu_c1().bits(0x21));
             rtc_control
-                .options0
+                .options0()
                 .modify(|_, w| w.sw_stall_appcpu_c0().bits(0x02));
         }
     }
@@ -177,18 +177,18 @@ impl CpuControl {
         match core {
             Cpu::ProCpu => {
                 rtc_control
-                    .sw_cpu_stall
+                    .sw_cpu_stall()
                     .modify(|_, w| unsafe { w.sw_stall_procpu_c1().bits(0) });
                 rtc_control
-                    .options0
+                    .options0()
                     .modify(|_, w| unsafe { w.sw_stall_procpu_c0().bits(0) });
             }
             Cpu::AppCpu => {
                 rtc_control
-                    .sw_cpu_stall
+                    .sw_cpu_stall()
                     .modify(|_, w| unsafe { w.sw_stall_appcpu_c1().bits(0) });
                 rtc_control
-                    .options0
+                    .options0()
                     .modify(|_, w| unsafe { w.sw_stall_appcpu_c0().bits(0) });
             }
         }
@@ -201,37 +201,37 @@ impl CpuControl {
         match core {
             Cpu::ProCpu => {
                 dport_control
-                    .pro_cache_ctrl
+                    .pro_cache_ctrl()
                     .modify(|_, w| w.pro_cache_flush_ena().clear_bit());
                 dport_control
-                    .pro_cache_ctrl
+                    .pro_cache_ctrl()
                     .modify(|_, w| w.pro_cache_flush_ena().set_bit());
                 while dport_control
-                    .pro_cache_ctrl
+                    .pro_cache_ctrl()
                     .read()
                     .pro_cache_flush_done()
                     .bit_is_clear()
                 {}
 
                 dport_control
-                    .pro_cache_ctrl
+                    .pro_cache_ctrl()
                     .modify(|_, w| w.pro_cache_flush_ena().clear_bit());
             }
             Cpu::AppCpu => {
                 dport_control
-                    .app_cache_ctrl
+                    .app_cache_ctrl()
                     .modify(|_, w| w.app_cache_flush_ena().clear_bit());
                 dport_control
-                    .app_cache_ctrl
+                    .app_cache_ctrl()
                     .modify(|_, w| w.app_cache_flush_ena().set_bit());
                 while dport_control
-                    .app_cache_ctrl
+                    .app_cache_ctrl()
                     .read()
                     .app_cache_flush_done()
                     .bit_is_clear()
                 {}
                 dport_control
-                    .app_cache_ctrl
+                    .app_cache_ctrl()
                     .modify(|_, w| w.app_cache_flush_ena().clear_bit());
             }
         };
@@ -243,15 +243,15 @@ impl CpuControl {
 
         match core {
             Cpu::ProCpu => {
-                spi0.cache_fctrl.modify(|_, w| w.cache_req_en().set_bit());
+                spi0.cache_fctrl().modify(|_, w| w.cache_req_en().set_bit());
                 dport_control
-                    .pro_cache_ctrl
+                    .pro_cache_ctrl()
                     .modify(|_, w| w.pro_cache_enable().set_bit());
             }
             Cpu::AppCpu => {
-                spi0.cache_fctrl.modify(|_, w| w.cache_req_en().set_bit());
+                spi0.cache_fctrl().modify(|_, w| w.cache_req_en().set_bit());
                 dport_control
-                    .app_cache_ctrl
+                    .app_cache_ctrl()
                     .modify(|_, w| w.app_cache_enable().set_bit());
             }
         };
@@ -313,7 +313,7 @@ impl CpuControl {
 
         if !xtensa_lx::is_debugger_attached()
             && dport_control
-                .appcpu_ctrl_b
+                .appcpu_ctrl_b()
                 .read()
                 .appcpu_clkgate_en()
                 .bit_is_set()
@@ -342,22 +342,22 @@ impl CpuControl {
             APP_CORE_STACK_TOP = Some(stack.top());
         }
 
-        dport_control.appcpu_ctrl_d.write(|w| unsafe {
+        dport_control.appcpu_ctrl_d().write(|w| unsafe {
             w.appcpu_boot_addr()
                 .bits(Self::start_core1_init::<F> as *const u32 as u32)
         });
 
         dport_control
-            .appcpu_ctrl_b
+            .appcpu_ctrl_b()
             .modify(|_, w| w.appcpu_clkgate_en().set_bit());
         dport_control
-            .appcpu_ctrl_c
+            .appcpu_ctrl_c()
             .modify(|_, w| w.appcpu_runstall().clear_bit());
         dport_control
-            .appcpu_ctrl_a
+            .appcpu_ctrl_a()
             .modify(|_, w| w.appcpu_resetting().set_bit());
         dport_control
-            .appcpu_ctrl_a
+            .appcpu_ctrl_a()
             .modify(|_, w| w.appcpu_resetting().clear_bit());
 
         self.unpark_core(Cpu::AppCpu);

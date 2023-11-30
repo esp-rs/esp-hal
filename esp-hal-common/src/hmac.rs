@@ -117,7 +117,7 @@ impl<'d> Hmac<'d> {
     /// HMAC and SHA peripherals and clear the corresponding peripheral
     /// reset bits.
     pub fn init(&mut self) {
-        self.hmac.set_start.write(|w| w.set_start().set_bit());
+        self.hmac.set_start().write(|w| w.set_start().set_bit());
         self.alignment_helper.reset();
         self.byte_written = 64;
         self.next_command = NextCommand::None;
@@ -126,16 +126,16 @@ impl<'d> Hmac<'d> {
     /// Step 2. Configure HMAC keys and key purposes.
     pub fn configure(&mut self, m: HmacPurpose, key_id: KeyId) -> nb::Result<(), Error> {
         self.hmac
-            .set_para_purpose
+            .set_para_purpose()
             .write(|w| unsafe { w.purpose_set().bits(m as u8) });
         self.hmac
-            .set_para_key
+            .set_para_key()
             .write(|w| unsafe { w.key_set().bits(key_id as u8) });
         self.hmac
-            .set_para_finish
+            .set_para_finish()
             .write(|w| w.set_para_end().set_bit());
 
-        if self.hmac.query_error.read().query_check().bit_is_set() {
+        if self.hmac.query_error().read().query_check().bit_is_set() {
             return Err(nb::Error::Other(Error::KeyPurposeMismatch));
         }
 
@@ -175,22 +175,22 @@ impl<'d> Hmac<'d> {
 
         // Checking if the message is one block including padding
         if msg_len < 64 + 56 {
-            self.hmac.one_block.write(|w| w.set_one_block().set_bit());
+            self.hmac.one_block().write(|w| w.set_one_block().set_bit());
 
             while self.is_busy() {}
         }
 
         self.alignment_helper.volatile_read_regset(
             #[cfg(esp32s2)]
-            &self.hmac.rd_result_[0],
+            self.hmac.rd_result_(0).as_ptr(),
             #[cfg(not(esp32s2))]
-            &self.hmac.rd_result_mem[0],
+            self.hmac.rd_result_mem(0).as_ptr(),
             output,
             core::cmp::min(output.len(), 32) / self.alignment_helper.align_size(),
         );
 
         self.hmac
-            .set_result_finish
+            .set_result_finish()
             .write(|w| w.set_result_end().set_bit());
         self.byte_written = 64;
         self.next_command = NextCommand::None;
@@ -198,19 +198,19 @@ impl<'d> Hmac<'d> {
     }
 
     fn is_busy(&mut self) -> bool {
-        self.hmac.query_busy.read().busy_state().bit_is_set()
+        self.hmac.query_busy().read().busy_state().bit_is_set()
     }
 
     fn next_command(&mut self) {
         match self.next_command {
             NextCommand::MessageIng => {
                 self.hmac
-                    .set_message_ing
+                    .set_message_ing()
                     .write(|w| w.set_text_ing().set_bit());
             }
             NextCommand::MessagePad => {
                 self.hmac
-                    .set_message_pad
+                    .set_message_pad()
                     .write(|w| w.set_text_pad().set_bit());
             }
             NextCommand::None => {}
@@ -223,9 +223,9 @@ impl<'d> Hmac<'d> {
 
         let (remaining, bound_reached) = self.alignment_helper.aligned_volatile_copy(
             #[cfg(esp32s2)]
-            &mut self.hmac.wr_message_,
+            self.hmac.wr_message_(0).as_ptr(),
             #[cfg(not(esp32s2))]
-            &mut self.hmac.wr_message_mem,
+            self.hmac.wr_message_mem(0).as_ptr(),
             incoming,
             64 / self.alignment_helper.align_size(),
             mod_length / self.alignment_helper.align_size(),
@@ -237,7 +237,7 @@ impl<'d> Hmac<'d> {
 
         if bound_reached {
             self.hmac
-                .set_message_one
+                .set_message_one()
                 .write(|w| w.set_text_one().set_bit());
 
             if remaining.len() >= 56 {
@@ -257,16 +257,16 @@ impl<'d> Hmac<'d> {
 
         let flushed = self.alignment_helper.flush_to(
             #[cfg(esp32s2)]
-            &mut self.hmac.wr_message_,
+            self.hmac.wr_message_(0).as_ptr(),
             #[cfg(not(esp32s2))]
-            &mut self.hmac.wr_message_mem,
+            self.hmac.wr_message_mem(0).as_ptr(),
             (self.byte_written % 64) / self.alignment_helper.align_size(),
         );
 
         self.byte_written = self.byte_written.wrapping_add(flushed);
         if flushed > 0 && self.byte_written % 64 == 0 {
             self.hmac
-                .set_message_one
+                .set_message_one()
                 .write(|w| w.set_text_one().set_bit());
             while self.is_busy() {}
             self.next_command = NextCommand::MessagePad;
@@ -283,15 +283,15 @@ impl<'d> Hmac<'d> {
             let pad_len = 64 - mod_cursor;
             self.alignment_helper.volatile_write_bytes(
                 #[cfg(esp32s2)]
-                &mut self.hmac.wr_message_,
+                self.hmac.wr_message_(0).as_ptr(),
                 #[cfg(not(esp32s2))]
-                &mut self.hmac.wr_message_mem,
+                self.hmac.wr_message_mem(0).as_ptr(),
                 0_u8,
                 pad_len / self.alignment_helper.align_size(),
                 mod_cursor / self.alignment_helper.align_size(),
             );
             self.hmac
-                .set_message_one
+                .set_message_one()
                 .write(|w| w.set_text_one().set_bit());
             self.byte_written = self.byte_written.wrapping_add(pad_len);
             debug_assert!(self.byte_written % 64 == 0);
@@ -305,9 +305,9 @@ impl<'d> Hmac<'d> {
 
         self.alignment_helper.volatile_write_bytes(
             #[cfg(esp32s2)]
-            &mut self.hmac.wr_message_,
+            self.hmac.wr_message_(0).as_ptr(),
             #[cfg(not(esp32s2))]
-            &mut self.hmac.wr_message_mem,
+            self.hmac.wr_message_mem(0).as_ptr(),
             0_u8,
             pad_len / self.alignment_helper.align_size(),
             mod_cursor / self.alignment_helper.align_size(),
@@ -322,16 +322,16 @@ impl<'d> Hmac<'d> {
 
         self.alignment_helper.aligned_volatile_copy(
             #[cfg(esp32s2)]
-            &mut self.hmac.wr_message_,
+            self.hmac.wr_message_(0).as_ptr(),
             #[cfg(not(esp32s2))]
-            &mut self.hmac.wr_message_mem,
+            self.hmac.wr_message_mem(0).as_ptr(),
             &len_mem,
             64 / self.alignment_helper.align_size(),
             (64 - core::mem::size_of::<u64>()) / self.alignment_helper.align_size(),
         );
 
         self.hmac
-            .set_message_one
+            .set_message_one()
             .write(|w| w.set_text_one().set_bit());
 
         while self.is_busy() {}

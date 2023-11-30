@@ -164,10 +164,10 @@ impl EfuseBlock {
         use EfuseBlock::*;
         let efuse = unsafe { &*EFUSE::ptr() };
         match self {
-            Block0 => efuse.rd_wr_dis.as_ptr(),
-            Block1 => efuse.rd_blk1_data0.as_ptr(),
-            Block2 => efuse.rd_blk2_data0.as_ptr(),
-            Block3 => efuse.rd_blk3_data0.as_ptr(),
+            Block0 => efuse.rd_wr_dis().as_ptr(),
+            Block1 => efuse.rd_blk1_data0().as_ptr(),
+            Block2 => efuse.rd_blk2_data0().as_ptr(),
+            Block3 => efuse.rd_blk3_data0().as_ptr(),
         }
     }
 }

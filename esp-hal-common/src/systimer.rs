@@ -84,18 +84,18 @@ impl<'d> SystemTimer<'d> {
         // an older time stamp
         let systimer = unsafe { &*SYSTIMER::ptr() };
         systimer
-            .unit0_op
+            .unit0_op()
             .modify(|_, w| w.timer_unit0_update().set_bit());
 
         while !systimer
-            .unit0_op
+            .unit0_op()
             .read()
             .timer_unit0_value_valid()
             .bit_is_set()
         {}
 
-        let value_lo = systimer.unit0_value_lo.read().bits();
-        let value_hi = systimer.unit0_value_hi.read().bits();
+        let value_lo = systimer.unit0_value_lo().read().bits();
+        let value_hi = systimer.unit0_value_hi().read().bits();
 
         ((value_hi as u64) << 32) | value_lo as u64
     }
@@ -121,9 +121,15 @@ impl<T, const CHANNEL: u8> Alarm<T, CHANNEL> {
     pub fn enable_interrupt(&self, val: bool) {
         let systimer = unsafe { &*SYSTIMER::ptr() };
         match CHANNEL {
-            0 => systimer.int_ena.modify(|_, w| w.target0_int_ena().bit(val)),
-            1 => systimer.int_ena.modify(|_, w| w.target1_int_ena().bit(val)),
-            2 => systimer.int_ena.modify(|_, w| w.target2_int_ena().bit(val)),
+            0 => systimer
+                .int_ena()
+                .modify(|_, w| w.target0_int_ena().bit(val)),
+            1 => systimer
+                .int_ena()
+                .modify(|_, w| w.target1_int_ena().bit(val)),
+            2 => systimer
+                .int_ena()
+                .modify(|_, w| w.target2_int_ena().bit(val)),
             _ => unreachable!(),
         }
     }
@@ -131,9 +137,9 @@ impl<T, const CHANNEL: u8> Alarm<T, CHANNEL> {
     pub fn clear_interrupt(&self) {
         let systimer = unsafe { &*SYSTIMER::ptr() };
         match CHANNEL {
-            0 => systimer.int_clr.write(|w| w.target0_int_clr().set_bit()),
-            1 => systimer.int_clr.write(|w| w.target1_int_clr().set_bit()),
-            2 => systimer.int_clr.write(|w| w.target2_int_clr().set_bit()),
+            0 => systimer.int_clr().write(|w| w.target0_int_clr().set_bit()),
+            1 => systimer.int_clr().write(|w| w.target1_int_clr().set_bit()),
+            2 => systimer.int_clr().write(|w| w.target2_int_clr().set_bit()),
             _ => unreachable!(),
         }
     }
@@ -150,31 +156,31 @@ impl<T, const CHANNEL: u8> Alarm<T, CHANNEL> {
                 &Reg<TARGET0_LO_SPEC>,
             ) = match CHANNEL {
                 0 => (
-                    &systimer.target0_conf,
-                    &systimer.target0_hi,
-                    &systimer.target0_lo,
+                    &systimer.target0_conf(),
+                    &systimer.target0_hi(),
+                    &systimer.target0_lo(),
                 ),
                 1 => (
-                    transmute(&systimer.target1_conf),
-                    transmute(&systimer.target1_hi),
-                    transmute(&systimer.target1_lo),
+                    transmute(&systimer.target1_conf()),
+                    transmute(&systimer.target1_hi()),
+                    transmute(&systimer.target1_lo()),
                 ),
                 2 => (
-                    transmute(&systimer.target2_conf),
-                    transmute(&systimer.target2_hi),
-                    transmute(&systimer.target2_lo),
+                    transmute(&systimer.target2_conf()),
+                    transmute(&systimer.target2_hi()),
+                    transmute(&systimer.target2_lo()),
                 ),
                 _ => unreachable!(),
             };
 
             #[cfg(esp32s2)]
-            systimer.step.write(|w| w.timer_xtal_step().bits(0x1)); // run at XTAL freq, not 80 * XTAL freq
+            systimer.step().write(|w| w.timer_xtal_step().bits(0x1)); // run at XTAL freq, not 80 * XTAL freq
 
             #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
             {
                 tconf.write(|w| w.target0_timer_unit_sel().clear_bit()); // default, use unit 0
                 systimer
-                    .conf
+                    .conf()
                     .modify(|_, w| w.timer_unit0_core0_stall_en().clear_bit());
             }
 
@@ -184,18 +190,18 @@ impl<T, const CHANNEL: u8> Alarm<T, CHANNEL> {
             {
                 match CHANNEL {
                     0 => systimer
-                        .comp0_load
+                        .comp0_load()
                         .write(|w| w.timer_comp0_load().set_bit()),
                     1 => systimer
-                        .comp1_load
+                        .comp1_load()
                         .write(|w| w.timer_comp1_load().set_bit()),
                     2 => systimer
-                        .comp2_load
+                        .comp2_load()
                         .write(|w| w.timer_comp2_load().set_bit()),
                     _ => unreachable!(),
                 }
 
-                systimer.conf.modify(|_r, w| match CHANNEL {
+                systimer.conf().modify(|_r, w| match CHANNEL {
                     0 => w.target0_work_en().set_bit(),
                     1 => w.target1_work_en().set_bit(),
                     2 => w.target2_work_en().set_bit(),
@@ -429,6 +435,6 @@ pub mod etm {
 
     pub(super) fn enable_etm() {
         let syst = unsafe { crate::peripherals::SYSTIMER::steal() };
-        syst.conf.modify(|_, w| w.etm_en().set_bit());
+        syst.conf().modify(|_, w| w.etm_en().set_bit());
     }
 }

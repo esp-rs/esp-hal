@@ -15,7 +15,7 @@ impl<'d> Rsa<'d> {
     /// needs to be initialized, only after that peripheral should be used.
     /// This function would return without an error if the memory is initialized
     pub fn ready(&mut self) -> nb::Result<(), Infallible> {
-        if self.rsa.clean.read().clean().bit_is_clear() {
+        if self.rsa.clean().read().clean().bit_is_clear() {
             return Err(nb::Error::WouldBlock);
         }
         Ok(())
@@ -27,17 +27,17 @@ impl<'d> Rsa<'d> {
         match enable {
             true => self
                 .rsa
-                .interrupt_ena
+                .interrupt_ena()
                 .write(|w| w.interrupt_ena().set_bit()),
             false => self
                 .rsa
-                .interrupt_ena
+                .interrupt_ena()
                 .write(|w| w.interrupt_ena().clear_bit()),
         }
     }
 
     fn write_mode(&mut self, mode: u32) {
-        self.rsa.mode.write(|w| unsafe { w.bits(mode as u32) });
+        self.rsa.mode().write(|w| unsafe { w.bits(mode as u32) });
     }
 
     /// Enables/disables search acceleration, when enabled it would increases
@@ -48,22 +48,22 @@ impl<'d> Rsa<'d> {
         match enable {
             true => self
                 .rsa
-                .search_enable
+                .search_enable()
                 .write(|w| w.search_enable().set_bit()),
             false => self
                 .rsa
-                .search_enable
+                .search_enable()
                 .write(|w| w.search_enable().clear_bit()),
         }
     }
 
     pub(super) fn is_search_enabled(&mut self) -> bool {
-        self.rsa.search_enable.read().search_enable().bit_is_set()
+        self.rsa.search_enable().read().search_enable().bit_is_set()
     }
 
     pub(super) fn write_search_position(&mut self, search_position: u32) {
         self.rsa
-            .search_pos
+            .search_pos()
             .write(|w| unsafe { w.bits(search_position) });
     }
 
@@ -76,43 +76,45 @@ impl<'d> Rsa<'d> {
         match enable {
             true => self
                 .rsa
-                .constant_time
+                .constant_time()
                 .write(|w| w.constant_time().clear_bit()),
             false => self
                 .rsa
-                .constant_time
+                .constant_time()
                 .write(|w| w.constant_time().set_bit()),
         }
     }
 
     pub(super) fn write_modexp_start(&mut self) {
-        self.rsa.modexp_start.write(|w| w.modexp_start().set_bit());
+        self.rsa
+            .modexp_start()
+            .write(|w| w.modexp_start().set_bit());
     }
 
     pub(super) fn write_multi_start(&mut self) {
-        self.rsa.mult_start.write(|w| w.mult_start().set_bit());
+        self.rsa.mult_start().write(|w| w.mult_start().set_bit());
     }
 
     fn write_modmulti_start(&mut self) {
         self.rsa
-            .modmult_start
+            .modmult_start()
             .write(|w| w.modmult_start().set_bit());
     }
 
     pub(super) fn clear_interrupt(&mut self) {
         self.rsa
-            .clear_interrupt
+            .clear_interrupt()
             .write(|w| w.clear_interrupt().set_bit());
     }
 
     pub(super) fn is_idle(&mut self) -> bool {
-        self.rsa.idle.read().idle().bit_is_set()
+        self.rsa.idle().read().idle().bit_is_set()
     }
 
     unsafe fn write_multi_operand_b<const N: usize>(&mut self, operand_b: &[u32; N]) {
         copy_nonoverlapping(
             operand_b.as_ptr(),
-            self.rsa.z_mem.as_mut_ptr().add(N * 4) as *mut u32,
+            self.rsa.z_mem(0).as_ptr().add(N) as *mut u32,
             N,
         );
     }

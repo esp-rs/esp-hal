@@ -99,12 +99,12 @@ impl<'d> LpCore<'d> {
         match clk_src {
             LpCoreClockSource::RcFastClk => unsafe {
                 (&*crate::soc::peripherals::LP_CLKRST::PTR)
-                    .lp_clk_conf
+                    .lp_clk_conf()
                     .modify(|_, w| w.fast_clk_sel().clear_bit())
             },
             LpCoreClockSource::XtalD2Clk => unsafe {
                 (&*crate::soc::peripherals::LP_CLKRST::PTR)
-                    .lp_clk_conf
+                    .lp_clk_conf()
                     .modify(|_, w| w.fast_clk_sel().set_bit())
             },
         }
@@ -133,9 +133,9 @@ impl<'d> LpCore<'d> {
 
 fn ulp_lp_core_stop() {
     let pmu = unsafe { &*pac::PMU::PTR };
-    pmu.lp_cpu_pwr1
+    pmu.lp_cpu_pwr1()
         .modify(|_, w| unsafe { w.lp_cpu_wakeup_en().bits(0) });
-    pmu.lp_cpu_pwr1
+    pmu.lp_cpu_pwr1()
         .modify(|_, w| w.lp_cpu_sleep_req().set_bit());
 }
 
@@ -145,38 +145,40 @@ fn ulp_lp_core_run(wakeup_src: LpCoreWakeupSource) {
     let lp_peri = unsafe { &*pac::LP_PERI::PTR };
 
     // Enable LP-Core
-    lp_aon.lpcore.modify(|_, w| w.disable().clear_bit());
+    lp_aon.lpcore().modify(|_, w| w.disable().clear_bit());
 
     // Allow LP core to access LP memory during sleep
-    lp_aon.lpbus.modify(|_, w| w.fast_mem_mux_sel().clear_bit());
     lp_aon
-        .lpbus
+        .lpbus()
+        .modify(|_, w| w.fast_mem_mux_sel().clear_bit());
+    lp_aon
+        .lpbus()
         .modify(|_, w| w.fast_mem_mux_sel_update().set_bit());
 
     // Enable stall at sleep request
-    pmu.lp_cpu_pwr0
+    pmu.lp_cpu_pwr0()
         .modify(|_, w| w.lp_cpu_slp_stall_en().set_bit());
 
     // Enable reset after wake-up
-    pmu.lp_cpu_pwr0
+    pmu.lp_cpu_pwr0()
         .modify(|_, w| w.lp_cpu_slp_reset_en().set_bit());
 
     // Set wake-up sources
     let src = match wakeup_src {
         LpCoreWakeupSource::HpCpu => 0x01,
     };
-    pmu.lp_cpu_pwr1
+    pmu.lp_cpu_pwr1()
         .modify(|_, w| w.lp_cpu_wakeup_en().variant(src));
 
     // Enable JTAG debugging
     lp_peri
-        .cpu
+        .cpu()
         .modify(|_, w| w.lpcore_dbgm_unavaliable().clear_bit());
 
     // wake up
     match wakeup_src {
         LpCoreWakeupSource::HpCpu => {
-            pmu.hp_lp_cpu_comm.write(|w| w.hp_trigger_lp().set_bit());
+            pmu.hp_lp_cpu_comm().write(|w| w.hp_trigger_lp().set_bit());
         }
     }
 }

@@ -364,7 +364,7 @@ where
     fn write_byte(&mut self, word: u8) -> nb::Result<(), Error> {
         if T::get_tx_fifo_count() < UART_FIFO_SIZE {
             T::register_block()
-                .fifo
+                .fifo()
                 .write(|w| unsafe { w.rxfifo_rd_byte().bits(word) });
 
             Ok(())
@@ -410,7 +410,7 @@ where
 
         if T::get_rx_fifo_count() > 0 {
             let value = unsafe {
-                let fifo = (T::register_block().fifo.as_ptr() as *mut u8).offset(offset)
+                let fifo = (T::register_block().fifo().as_ptr() as *mut u8).offset(offset)
                     as *mut crate::peripherals::generic::Reg<FIFO_SPEC>;
                 (*fifo).read().rxfifo_rd_byte().bits()
             };
@@ -434,7 +434,7 @@ where
         let mut count = 0;
         while T::get_rx_fifo_count() > 0 && count < buf.len() {
             let value = unsafe {
-                let fifo = (T::register_block().fifo.as_ptr() as *mut u8).offset(offset)
+                let fifo = (T::register_block().fifo().as_ptr() as *mut u8).offset(offset)
                     as *mut crate::peripherals::generic::Reg<FIFO_SPEC>;
                 (*fifo).read().rxfifo_rd_byte().bits()
             };
@@ -511,10 +511,10 @@ where
     pub fn set_at_cmd(&mut self, config: config::AtCmdConfig) {
         #[cfg(not(any(esp32, esp32s2)))]
         T::register_block()
-            .clk_conf
+            .clk_conf()
             .modify(|_, w| w.sclk_en().clear_bit());
 
-        T::register_block().at_cmd_char.write(|w| unsafe {
+        T::register_block().at_cmd_char().write(|w| unsafe {
             w.at_cmd_char()
                 .bits(config.cmd_char)
                 .char_num()
@@ -523,25 +523,25 @@ where
 
         if let Some(pre_idle_count) = config.pre_idle_count {
             T::register_block()
-                .at_cmd_precnt
+                .at_cmd_precnt()
                 .write(|w| unsafe { w.pre_idle_num().bits(pre_idle_count.into()) });
         }
 
         if let Some(post_idle_count) = config.post_idle_count {
             T::register_block()
-                .at_cmd_postcnt
+                .at_cmd_postcnt()
                 .write(|w| unsafe { w.post_idle_num().bits(post_idle_count.into()) });
         }
 
         if let Some(gap_timeout) = config.gap_timeout {
             T::register_block()
-                .at_cmd_gaptout
+                .at_cmd_gaptout()
                 .write(|w| unsafe { w.rx_gap_tout().bits(gap_timeout.into()) });
         }
 
         #[cfg(not(any(esp32, esp32s2)))]
         T::register_block()
-            .clk_conf
+            .clk_conf()
             .modify(|_, w| w.sclk_en().set_bit());
 
         self.sync_regs();
@@ -569,16 +569,16 @@ where
         const MAX_THRHD: u16 = 0x3FF; // 10 bits
 
         #[cfg(esp32)]
-        let reg_thrhd = &T::register_block().conf1;
+        let reg_thrhd = &T::register_block().conf1();
         #[cfg(any(esp32c6, esp32h2))]
-        let reg_thrhd = &T::register_block().tout_conf;
+        let reg_thrhd = &T::register_block().tout_conf();
         #[cfg(any(esp32c2, esp32c3, esp32s2, esp32s3))]
-        let reg_thrhd = &T::register_block().mem_conf;
+        let reg_thrhd = &T::register_block().mem_conf();
 
         #[cfg(any(esp32c6, esp32h2))]
-        let reg_en = &T::register_block().tout_conf;
+        let reg_en = &T::register_block().tout_conf();
         #[cfg(any(esp32, esp32c2, esp32c3, esp32s2, esp32s3))]
-        let reg_en = &T::register_block().conf1;
+        let reg_en = &T::register_block().conf1();
 
         match timeout {
             None => {
@@ -634,7 +634,7 @@ where
         let threshold: u8 = threshold as u8;
 
         T::register_block()
-            .conf1
+            .conf1()
             .modify(|_, w| unsafe { w.rxfifo_full_thrhd().bits(threshold) });
 
         Ok(())
@@ -643,49 +643,49 @@ where
     /// Listen for AT-CMD interrupts
     pub fn listen_at_cmd(&mut self) {
         T::register_block()
-            .int_ena
+            .int_ena()
             .modify(|_, w| w.at_cmd_char_det_int_ena().set_bit());
     }
 
     /// Stop listening for AT-CMD interrupts
     pub fn unlisten_at_cmd(&mut self) {
         T::register_block()
-            .int_ena
+            .int_ena()
             .modify(|_, w| w.at_cmd_char_det_int_ena().clear_bit());
     }
 
     /// Listen for TX-DONE interrupts
     pub fn listen_tx_done(&mut self) {
         T::register_block()
-            .int_ena
+            .int_ena()
             .modify(|_, w| w.tx_done_int_ena().set_bit());
     }
 
     /// Stop listening for TX-DONE interrupts
     pub fn unlisten_tx_done(&mut self) {
         T::register_block()
-            .int_ena
+            .int_ena()
             .modify(|_, w| w.tx_done_int_ena().clear_bit());
     }
 
     /// Listen for RX-FIFO-FULL interrupts
     pub fn listen_rx_fifo_full(&mut self) {
         T::register_block()
-            .int_ena
+            .int_ena()
             .modify(|_, w| w.rxfifo_full_int_ena().set_bit());
     }
 
     /// Stop listening for RX-FIFO-FULL interrupts
     pub fn unlisten_rx_fifo_full(&mut self) {
         T::register_block()
-            .int_ena
+            .int_ena()
             .modify(|_, w| w.rxfifo_full_int_ena().clear_bit());
     }
 
     /// Checks if AT-CMD interrupt is set
     pub fn at_cmd_interrupt_set(&self) -> bool {
         T::register_block()
-            .int_raw
+            .int_raw()
             .read()
             .at_cmd_char_det_int_raw()
             .bit_is_set()
@@ -694,7 +694,7 @@ where
     /// Checks if TX-DONE interrupt is set
     pub fn tx_done_interrupt_set(&self) -> bool {
         T::register_block()
-            .int_raw
+            .int_raw()
             .read()
             .tx_done_int_raw()
             .bit_is_set()
@@ -703,7 +703,7 @@ where
     /// Checks if RX-FIFO-FULL interrupt is set
     pub fn rx_fifo_full_interrupt_set(&self) -> bool {
         T::register_block()
-            .int_raw
+            .int_raw()
             .read()
             .rxfifo_full_int_raw()
             .bit_is_set()
@@ -712,21 +712,21 @@ where
     /// Reset AT-CMD interrupt
     pub fn reset_at_cmd_interrupt(&self) {
         T::register_block()
-            .int_clr
+            .int_clr()
             .write(|w| w.at_cmd_char_det_int_clr().set_bit());
     }
 
     /// Reset TX-DONE interrupt
     pub fn reset_tx_done_interrupt(&self) {
         T::register_block()
-            .int_clr
+            .int_clr()
             .write(|w| w.tx_done_int_clr().set_bit());
     }
 
     /// Reset RX-FIFO-FULL interrupt
     pub fn reset_rx_fifo_full_interrupt(&self) {
         T::register_block()
-            .int_clr
+            .int_clr()
             .write(|w| w.rxfifo_full_int_clr().set_bit());
     }
 
@@ -751,25 +751,25 @@ where
         #[cfg(esp32)]
         if stop_bits == config::StopBits::STOP2 {
             T::register_block()
-                .rs485_conf
+                .rs485_conf()
                 .modify(|_, w| w.dl1_en().bit(true));
 
             T::register_block()
-                .conf0
+                .conf0()
                 .modify(|_, w| unsafe { w.stop_bit_num().bits(1) });
         } else {
             T::register_block()
-                .rs485_conf
+                .rs485_conf()
                 .modify(|_, w| w.dl1_en().bit(false));
 
             T::register_block()
-                .conf0
+                .conf0()
                 .modify(|_, w| unsafe { w.stop_bit_num().bits(stop_bits as u8) });
         }
 
         #[cfg(not(esp32))]
         T::register_block()
-            .conf0
+            .conf0()
             .modify(|_, w| unsafe { w.stop_bit_num().bits(stop_bits as u8) });
 
         self
@@ -778,7 +778,7 @@ where
     /// Change the number of data bits
     fn change_data_bits(&mut self, data_bits: config::DataBits) -> &mut Self {
         T::register_block()
-            .conf0
+            .conf0()
             .modify(|_, w| unsafe { w.bit_num().bits(data_bits as u8) });
 
         self
@@ -786,7 +786,7 @@ where
 
     /// Change the type of parity checking
     fn change_parity(&mut self, parity: config::Parity) -> &mut Self {
-        T::register_block().conf0.modify(|_, w| match parity {
+        T::register_block().conf0().modify(|_, w| match parity {
             config::Parity::ParityNone => w.parity_en().clear_bit(),
             config::Parity::ParityEven => w.parity_en().set_bit().parity().clear_bit(),
             config::Parity::ParityOdd => w.parity_en().set_bit().parity().set_bit(),
@@ -803,7 +803,7 @@ where
         let max_div = 0b1111_1111_1111 - 1;
         let clk_div = ((clk) + (max_div * baudrate) - 1) / (max_div * baudrate);
 
-        T::register_block().clk_conf.write(|w| unsafe {
+        T::register_block().clk_conf().write(|w| unsafe {
             w.sclk_sel()
                 .bits(1) // APB
                 .sclk_div_a()
@@ -823,7 +823,7 @@ where
         let divider = divider as u16;
 
         T::register_block()
-            .clkdiv
+            .clkdiv()
             .write(|w| unsafe { w.clkdiv().bits(divider).frag().bits(0) });
     }
 
@@ -840,10 +840,10 @@ where
 
         match T::uart_number() {
             0 => {
-                pcr.uart0_conf
+                pcr.uart0_conf()
                     .modify(|_, w| w.uart0_rst_en().clear_bit().uart0_clk_en().set_bit());
 
-                pcr.uart0_sclk_conf.modify(|_, w| unsafe {
+                pcr.uart0_sclk_conf().modify(|_, w| unsafe {
                     w.uart0_sclk_div_a()
                         .bits(0)
                         .uart0_sclk_div_b()
@@ -857,10 +857,10 @@ where
                 });
             }
             1 => {
-                pcr.uart1_conf
+                pcr.uart1_conf()
                     .modify(|_, w| w.uart1_rst_en().clear_bit().uart1_clk_en().set_bit());
 
-                pcr.uart1_sclk_conf.modify(|_, w| unsafe {
+                pcr.uart1_sclk_conf().modify(|_, w| unsafe {
                     w.uart1_sclk_div_a()
                         .bits(0)
                         .uart1_sclk_div_b()
@@ -881,7 +881,7 @@ where
         let divider = divider as u16;
 
         T::register_block()
-            .clkdiv
+            .clkdiv()
             .write(|w| unsafe { w.clkdiv().bits(divider).frag().bits(0) });
 
         self.sync_regs();
@@ -894,12 +894,12 @@ where
         let clk = clocks.apb_clock.to_Hz();
 
         T::register_block()
-            .conf0
+            .conf0()
             .modify(|_, w| w.tick_ref_always_on().bit(true));
         let divider = clk / baudrate;
 
         T::register_block()
-            .clkdiv
+            .clkdiv()
             .write(|w| unsafe { w.clkdiv().bits(divider).frag().bits(0) });
     }
 
@@ -907,11 +907,11 @@ where
     #[inline(always)]
     fn sync_regs(&self) {
         T::register_block()
-            .reg_update
+            .reg_update()
             .modify(|_, w| w.reg_update().set_bit());
 
         while T::register_block()
-            .reg_update
+            .reg_update()
             .read()
             .reg_update()
             .bit_is_set()
@@ -931,7 +931,7 @@ pub trait Instance {
     fn uart_number() -> usize;
 
     fn disable_tx_interrupts() {
-        Self::register_block().int_clr.write(|w| {
+        Self::register_block().int_clr().write(|w| {
             w.txfifo_empty_int_clr()
                 .set_bit()
                 .tx_brk_done_int_clr()
@@ -942,7 +942,7 @@ pub trait Instance {
                 .set_bit()
         });
 
-        Self::register_block().int_ena.write(|w| {
+        Self::register_block().int_ena().write(|w| {
             w.txfifo_empty_int_ena()
                 .clear_bit()
                 .tx_brk_done_int_ena()
@@ -955,7 +955,7 @@ pub trait Instance {
     }
 
     fn disable_rx_interrupts() {
-        Self::register_block().int_clr.write(|w| {
+        Self::register_block().int_clr().write(|w| {
             w.rxfifo_full_int_clr()
                 .set_bit()
                 .rxfifo_ovf_int_clr()
@@ -966,7 +966,7 @@ pub trait Instance {
                 .set_bit()
         });
 
-        Self::register_block().int_ena.write(|w| {
+        Self::register_block().int_ena().write(|w| {
             w.rxfifo_full_int_ena()
                 .clear_bit()
                 .rxfifo_ovf_int_ena()
@@ -980,7 +980,7 @@ pub trait Instance {
 
     fn get_tx_fifo_count() -> u16 {
         Self::register_block()
-            .status
+            .status()
             .read()
             .txfifo_cnt()
             .bits()
@@ -989,7 +989,7 @@ pub trait Instance {
 
     fn get_rx_fifo_count() -> u16 {
         let fifo_cnt: u16 = Self::register_block()
-            .status
+            .status()
             .read()
             .rxfifo_cnt()
             .bits()
@@ -1001,13 +1001,13 @@ pub trait Instance {
         #[cfg(esp32)]
         {
             let rd_addr: u16 = Self::register_block()
-                .mem_rx_status
+                .mem_rx_status()
                 .read()
                 .mem_rx_rd_addr()
                 .bits()
                 .into();
             let wr_addr: u16 = Self::register_block()
-                .mem_rx_status
+                .mem_rx_status()
                 .read()
                 .mem_rx_wr_addr()
                 .bits()
@@ -1032,18 +1032,28 @@ pub trait Instance {
 
     fn is_tx_idle() -> bool {
         #[cfg(esp32)]
-        let idle = Self::register_block().status.read().st_utx_out().bits() == 0x0u8;
+        let idle = Self::register_block().status().read().st_utx_out().bits() == 0x0u8;
         #[cfg(not(esp32))]
-        let idle = Self::register_block().fsm_status.read().st_utx_out().bits() == 0x0u8;
+        let idle = Self::register_block()
+            .fsm_status()
+            .read()
+            .st_utx_out()
+            .bits()
+            == 0x0u8;
 
         idle
     }
 
     fn is_rx_idle() -> bool {
         #[cfg(esp32)]
-        let idle = Self::register_block().status.read().st_urx_out().bits() == 0x0u8;
+        let idle = Self::register_block().status().read().st_urx_out().bits() == 0x0u8;
         #[cfg(not(esp32))]
-        let idle = Self::register_block().fsm_status.read().st_urx_out().bits() == 0x0u8;
+        let idle = Self::register_block()
+            .fsm_status()
+            .read()
+            .st_urx_out()
+            .bits()
+            == 0x0u8;
 
         idle
     }
@@ -1414,7 +1424,7 @@ mod asynch {
         }
 
         fn event_bit_is_clear(&self) -> bool {
-            let interrupts_enabled = T::register_block().int_ena.read();
+            let interrupts_enabled = T::register_block().int_ena().read();
             let mut event_triggered = false;
             for event in self.events {
                 event_triggered |= match event {
@@ -1440,7 +1450,7 @@ mod asynch {
         ) -> core::task::Poll<Self::Output> {
             if !self.registered {
                 RX_WAKERS[T::uart_number()].register(cx.waker());
-                T::register_block().int_ena.modify(|_, w| {
+                T::register_block().int_ena().modify(|_, w| {
                     for event in self.events {
                         match event {
                             RxEvent::RxFifoFull => w.rxfifo_full_int_ena().set_bit(),
@@ -1466,7 +1476,7 @@ mod asynch {
             // Although the isr disables the interrupt that occured directly, we need to
             // disable the other interrupts (= the ones that did not occur), as
             // soon as this future goes out of scope.
-            let int_ena = &T::register_block().int_ena;
+            let int_ena = &T::register_block().int_ena();
             for event in self.events {
                 match event {
                     RxEvent::RxFifoFull => {
@@ -1494,7 +1504,7 @@ mod asynch {
         }
 
         fn event_bit_is_clear(&self) -> bool {
-            let interrupts_enabled = T::register_block().int_ena.read();
+            let interrupts_enabled = T::register_block().int_ena().read();
             let mut event_triggered = false;
             for event in self.events {
                 event_triggered |= match event {
@@ -1517,7 +1527,7 @@ mod asynch {
         ) -> core::task::Poll<Self::Output> {
             if !self.registered {
                 TX_WAKERS[T::uart_number()].register(cx.waker());
-                T::register_block().int_ena.modify(|_, w| {
+                T::register_block().int_ena().modify(|_, w| {
                     for event in self.events {
                         match event {
                             TxEvent::TxDone => w.tx_done_int_ena().set_bit(),
@@ -1542,7 +1552,7 @@ mod asynch {
             // Although the isr disables the interrupt that occurred directly, we need to
             // disable the other interrupts (= the ones that did not occur), as
             // soon as this future goes out of scope.
-            let int_ena = &T::register_block().int_ena;
+            let int_ena = &T::register_block().int_ena();
             for event in self.events {
                 match event {
                     TxEvent::TxDone => int_ena.modify(|_, w| w.tx_done_int_ena().clear_bit()),
@@ -1659,7 +1669,7 @@ mod asynch {
                     // cleared. Since we do not drain the fifo in the interrupt handler, we need to
                     // reset the counter here, after draining the fifo.
                     T::register_block()
-                        .int_clr
+                        .int_clr()
                         .write(|w| w.rxfifo_tout_int_clr().set_bit());
 
                     return Ok(read_bytes);
@@ -1723,7 +1733,7 @@ mod asynch {
     /// bit set. The fact that an interrupt has been disabled is used by the
     /// futures to detect that they should indeed resolve after being woken up
     fn intr_handler(uart: &RegisterBlock) -> (bool, bool) {
-        let interrupts = uart.int_st.read();
+        let interrupts = uart.int_st().read();
         let interrupt_bits = interrupts.bits(); // = int_raw & int_ena
         if interrupt_bits == 0 {
             return (false, false);
@@ -1734,8 +1744,8 @@ mod asynch {
             || interrupts.at_cmd_char_det_int_st().bit_is_set();
         let tx_wake = interrupts.tx_done_int_st().bit_is_set()
             || interrupts.txfifo_empty_int_st().bit_is_set();
-        uart.int_clr.write(|w| unsafe { w.bits(interrupt_bits) });
-        uart.int_ena
+        uart.int_clr().write(|w| unsafe { w.bits(interrupt_bits) });
+        uart.int_ena()
             .modify(|r, w| unsafe { w.bits(r.bits() & !interrupt_bits) });
 
         (rx_wake, tx_wake)

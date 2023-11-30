@@ -55,7 +55,7 @@ fn enable_phy() {
     // `periph_ll_wifi_bt_module_enable_clk_clear_rst`
     let dport = unsafe { &*esp32::DPORT::PTR };
     dport
-        .wifi_clk_en
+        .wifi_clk_en()
         .modify(|r, w| unsafe { w.bits(r.bits() | DPORT_WIFI_CLK_WIFI_BT_COMMON_M) });
 }
 
@@ -63,21 +63,21 @@ fn disable_phy() {
     // `periph_ll_wifi_bt_module_disable_clk_set_rst`
     let dport = unsafe { &*esp32::DPORT::PTR };
     dport
-        .wifi_clk_en
+        .wifi_clk_en()
         .modify(|r, w| unsafe { w.bits(r.bits() & !DPORT_WIFI_CLK_WIFI_BT_COMMON_M) });
 }
 
 fn bt_clock_enable() {
     let dport = unsafe { &*esp32::DPORT::PTR };
     dport
-        .wifi_clk_en
+        .wifi_clk_en()
         .modify(|r, w| unsafe { w.bits(r.bits() | DPORT_WIFI_CLK_BT_EN_M) });
 }
 
 fn bt_clock_disable() {
     let dport = unsafe { &*esp32::DPORT::PTR };
     dport
-        .wifi_clk_en
+        .wifi_clk_en()
         .modify(|r, w| unsafe { w.bits(r.bits() & !DPORT_WIFI_CLK_BT_EN_M) });
 }
 
@@ -85,7 +85,7 @@ fn wifi_clock_enable() {
     // `periph_ll_wifi_module_enable_clk_clear_rst`
     let dport = unsafe { &*esp32::DPORT::PTR };
     dport
-        .wifi_clk_en
+        .wifi_clk_en()
         .modify(|r, w| unsafe { w.bits(r.bits() | DPORT_WIFI_CLK_WIFI_EN_M) });
 }
 
@@ -93,7 +93,7 @@ fn wifi_clock_disable() {
     // `periph_ll_wifi_module_disable_clk_set_rst`
     let dport = unsafe { &*esp32::DPORT::PTR };
     dport
-        .wifi_clk_en
+        .wifi_clk_en()
         .modify(|r, w| unsafe { w.bits(r.bits() & !DPORT_WIFI_CLK_WIFI_EN_M) });
 }
 
@@ -101,10 +101,10 @@ fn reset_mac() {
     const SYSTEM_MAC_RST: u8 = 1 << 2;
     let dport = unsafe { &*esp32::DPORT::PTR };
     dport
-        .core_rst_en
+        .core_rst_en()
         .modify(|r, w| unsafe { w.core_rst().bits(r.core_rst().bits() | SYSTEM_MAC_RST) });
     dport
-        .core_rst_en
+        .core_rst_en()
         .modify(|r, w| unsafe { w.core_rst().bits(r.core_rst().bits() & !SYSTEM_MAC_RST) });
 }
 
@@ -134,5 +134,5 @@ fn init_clocks() {
     // different, and disabling some bits, or not enabling them makes the BT
     // stack crash.
 
-    dport.wifi_clk_en.write(|w| unsafe { w.bits(u32::MAX) });
+    dport.wifi_clk_en().write(|w| unsafe { w.bits(u32::MAX) });
 }

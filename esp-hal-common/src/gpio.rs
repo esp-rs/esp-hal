@@ -374,43 +374,43 @@ pub trait BankGpioRegisterAccess {
 impl BankGpioRegisterAccess for Bank0GpioRegisterAccess {
     fn write_out_en_clear(word: u32) {
         unsafe { &*GPIO::PTR }
-            .enable_w1tc
+            .enable_w1tc()
             .write(|w| unsafe { w.bits(word) });
     }
 
     fn write_out_en_set(word: u32) {
         unsafe { &*GPIO::PTR }
-            .enable_w1ts
+            .enable_w1ts()
             .write(|w| unsafe { w.bits(word) });
     }
 
     fn read_input() -> u32 {
-        unsafe { &*GPIO::PTR }.in_.read().bits()
+        unsafe { &*GPIO::PTR }.in_().read().bits()
     }
 
     fn read_output() -> u32 {
-        unsafe { &*GPIO::PTR }.out.read().bits()
+        unsafe { &*GPIO::PTR }.out().read().bits()
     }
 
     fn read_interrupt_status() -> u32 {
-        unsafe { &*GPIO::PTR }.status.read().bits()
+        unsafe { &*GPIO::PTR }.status().read().bits()
     }
 
     fn write_interrupt_status_clear(word: u32) {
         unsafe { &*GPIO::PTR }
-            .status_w1tc
+            .status_w1tc()
             .write(|w| unsafe { w.bits(word) });
     }
 
     fn write_output_set(word: u32) {
         unsafe { &*GPIO::PTR }
-            .out_w1ts
+            .out_w1ts()
             .write(|w| unsafe { w.bits(word) });
     }
 
     fn write_output_clear(word: u32) {
         unsafe { &*GPIO::PTR }
-            .out_w1tc
+            .out_w1tc()
             .write(|w| unsafe { w.bits(word) });
     }
 }
@@ -419,67 +419,71 @@ impl BankGpioRegisterAccess for Bank0GpioRegisterAccess {
 impl BankGpioRegisterAccess for Bank1GpioRegisterAccess {
     fn write_out_en_clear(word: u32) {
         unsafe { &*GPIO::PTR }
-            .enable1_w1tc
+            .enable1_w1tc()
             .write(|w| unsafe { w.bits(word) });
     }
 
     fn write_out_en_set(word: u32) {
         unsafe { &*GPIO::PTR }
-            .enable1_w1ts
+            .enable1_w1ts()
             .write(|w| unsafe { w.bits(word) });
     }
 
     fn read_input() -> u32 {
-        unsafe { &*GPIO::PTR }.in1.read().bits()
+        unsafe { &*GPIO::PTR }.in1().read().bits()
     }
 
     fn read_output() -> u32 {
-        unsafe { &*GPIO::PTR }.out1.read().bits()
+        unsafe { &*GPIO::PTR }.out1().read().bits()
     }
 
     fn read_interrupt_status() -> u32 {
-        unsafe { &*GPIO::PTR }.status1.read().bits()
+        unsafe { &*GPIO::PTR }.status1().read().bits()
     }
 
     fn write_interrupt_status_clear(word: u32) {
         unsafe { &*GPIO::PTR }
-            .status1_w1tc
+            .status1_w1tc()
             .write(|w| unsafe { w.bits(word) });
     }
 
     fn write_output_set(word: u32) {
         unsafe { &*GPIO::PTR }
-            .out1_w1ts
+            .out1_w1ts()
             .write(|w| unsafe { w.bits(word) });
     }
 
     fn write_output_clear(word: u32) {
         unsafe { &*GPIO::PTR }
-            .out1_w1tc
+            .out1_w1tc()
             .write(|w| unsafe { w.bits(word) });
     }
 }
 
 pub fn connect_low_to_peripheral(signal: InputSignal) {
-    unsafe { &*GPIO::PTR }.func_in_sel_cfg[signal as usize].modify(|_, w| unsafe {
-        w.sel()
-            .set_bit()
-            .in_inv_sel()
-            .bit(false)
-            .in_sel()
-            .bits(ZERO_INPUT)
-    });
+    unsafe { &*GPIO::PTR }
+        .func_in_sel_cfg(signal as usize)
+        .modify(|_, w| unsafe {
+            w.sel()
+                .set_bit()
+                .in_inv_sel()
+                .bit(false)
+                .in_sel()
+                .bits(ZERO_INPUT)
+        });
 }
 
 pub fn connect_high_to_peripheral(signal: InputSignal) {
-    unsafe { &*GPIO::PTR }.func_in_sel_cfg[signal as usize].modify(|_, w| unsafe {
-        w.sel()
-            .set_bit()
-            .in_inv_sel()
-            .bit(false)
-            .in_sel()
-            .bits(ONE_INPUT)
-    });
+    unsafe { &*GPIO::PTR }
+        .func_in_sel_cfg(signal as usize)
+        .modify(|_, w| unsafe {
+            w.sel()
+                .set_bit()
+                .in_inv_sel()
+                .bit(false)
+                .in_sel()
+                .bits(ONE_INPUT)
+        });
 }
 
 #[doc(hidden)]
@@ -599,7 +603,7 @@ where
         let gpio = unsafe { &*GPIO::PTR };
 
         <Self as GpioProperties>::Bank::write_out_en_clear(1 << (GPIONUM % 32));
-        gpio.func_out_sel_cfg[GPIONUM as usize]
+        gpio.func_out_sel_cfg(GPIONUM as usize)
             .modify(|_, w| unsafe { w.out_sel().bits(OutputSignal::GPIO as OutputSignalType) });
 
         #[cfg(esp32)]
@@ -610,7 +614,7 @@ where
         #[cfg(esp32c3)]
         if GPIONUM == 18 || GPIONUM == 19 {
             unsafe { &*crate::peripherals::USB_DEVICE::PTR }
-                .conf0
+                .conf0()
                 .modify(|_, w| w.usb_pad_enable().clear_bit());
         }
 
@@ -618,7 +622,7 @@ where
         #[cfg(esp32s3)]
         if GPIONUM == 19 || GPIONUM == 20 {
             unsafe { &*crate::peripherals::USB_DEVICE::PTR }
-                .conf0
+                .conf0()
                 .modify(|_, w| w.usb_pad_enable().clear_bit());
         }
 
@@ -741,14 +745,16 @@ where
         }
         self.set_alternate_function(af);
         if (signal as usize) <= INPUT_SIGNAL_MAX as usize {
-            unsafe { &*GPIO::PTR }.func_in_sel_cfg[signal as usize].modify(|_, w| unsafe {
-                w.sel()
-                    .set_bit()
-                    .in_inv_sel()
-                    .bit(invert)
-                    .in_sel()
-                    .bits(GPIONUM)
-            });
+            unsafe { &*GPIO::PTR }
+                .func_in_sel_cfg(signal as usize)
+                .modify(|_, w| unsafe {
+                    w.sel()
+                        .set_bit()
+                        .in_inv_sel()
+                        .bit(invert)
+                        .in_sel()
+                        .bits(GPIONUM)
+                });
         }
         self
     }
@@ -756,7 +762,9 @@ where
     fn disconnect_input_from_peripheral(&mut self, signal: InputSignal) -> &mut Self {
         self.set_alternate_function(GPIO_FUNCTION);
 
-        unsafe { &*GPIO::PTR }.func_in_sel_cfg[signal as usize].modify(|_, w| w.sel().clear_bit());
+        unsafe { &*GPIO::PTR }
+            .func_in_sel_cfg(signal as usize)
+            .modify(|_, w| w.sel().clear_bit());
         self
     }
 }
@@ -793,7 +801,7 @@ where
             }
         }
         unsafe {
-            (&*GPIO::PTR).pin[GPIONUM as usize].modify(|_, w| {
+            (&*GPIO::PTR).pin(GPIONUM as usize).modify(|_, w| {
                 w.int_ena()
                     .bits(gpio_intr_enable(int_enable, nmi_enable))
                     .int_type()
@@ -805,7 +813,8 @@ where
     }
 
     fn is_listening(&self) -> bool {
-        let bits = unsafe { &*GPIO::PTR }.pin[GPIONUM as usize]
+        let bits = unsafe { &*GPIO::PTR }
+            .pin(GPIONUM as usize)
             .read()
             .int_ena()
             .bits();
@@ -814,7 +823,8 @@ where
 
     fn unlisten(&mut self) {
         unsafe {
-            (&*GPIO::PTR).pin[GPIONUM as usize]
+            (&*GPIO::PTR)
+                .pin(GPIONUM as usize)
                 .modify(|_, w| w.int_ena().bits(0).int_type().bits(0).int_ena().bits(0));
         }
     }
@@ -1112,9 +1122,10 @@ where
         let gpio = unsafe { &*GPIO::PTR };
 
         <Self as GpioProperties>::Bank::write_out_en_set(1 << (GPIONUM % 32));
-        gpio.pin[GPIONUM as usize].modify(|_, w| w.pad_driver().bit(open_drain));
+        gpio.pin(GPIONUM as usize)
+            .modify(|_, w| w.pad_driver().bit(open_drain));
 
-        gpio.func_out_sel_cfg[GPIONUM as usize]
+        gpio.func_out_sel_cfg(GPIONUM as usize)
             .modify(|_, w| unsafe { w.out_sel().bits(OutputSignal::GPIO as OutputSignalType) });
 
         // NOTE: Workaround to make GPIO18 and GPIO19 work on the ESP32-C3, which by
@@ -1122,7 +1133,7 @@ where
         #[cfg(esp32c3)]
         if GPIONUM == 18 || GPIONUM == 19 {
             unsafe { &*crate::peripherals::USB_DEVICE::PTR }
-                .conf0
+                .conf0()
                 .modify(|_, w| w.usb_pad_enable().clear_bit());
         }
 
@@ -1130,7 +1141,7 @@ where
         #[cfg(esp32s3)]
         if GPIONUM == 19 || GPIONUM == 20 {
             unsafe { &*crate::peripherals::USB_DEVICE::PTR }
-                .conf0
+                .conf0()
                 .modify(|_, w| w.usb_pad_enable().clear_bit());
         }
 
@@ -1228,7 +1239,9 @@ where
     }
 
     fn enable_open_drain(&mut self, on: bool) -> &mut Self {
-        unsafe { &*GPIO::PTR }.pin[GPIONUM as usize].modify(|_, w| w.pad_driver().bit(on));
+        unsafe { &*GPIO::PTR }
+            .pin(GPIONUM as usize)
+            .modify(|_, w| w.pad_driver().bit(on));
         self
     }
 
@@ -1306,22 +1319,25 @@ where
         } else {
             OUTPUT_SIGNAL_MAX
         };
-        unsafe { &*GPIO::PTR }.func_out_sel_cfg[GPIONUM as usize].modify(|_, w| unsafe {
-            w.out_sel()
-                .bits(clipped_signal)
-                .inv_sel()
-                .bit(invert)
-                .oen_sel()
-                .bit(enable_from_gpio)
-                .oen_inv_sel()
-                .bit(invert_enable)
-        });
+        unsafe { &*GPIO::PTR }
+            .func_out_sel_cfg(GPIONUM as usize)
+            .modify(|_, w| unsafe {
+                w.out_sel()
+                    .bits(clipped_signal)
+                    .inv_sel()
+                    .bit(invert)
+                    .oen_sel()
+                    .bit(enable_from_gpio)
+                    .oen_inv_sel()
+                    .bit(invert_enable)
+            });
         self
     }
 
     fn disconnect_peripheral_from_output(&mut self) -> &mut Self {
         self.set_alternate_function(GPIO_FUNCTION);
-        unsafe { &*GPIO::PTR }.func_out_sel_cfg[GPIONUM as usize]
+        unsafe { &*GPIO::PTR }
+            .func_out_sel_cfg(GPIONUM as usize)
             .modify(|_, w| unsafe { w.out_sel().bits(OutputSignal::GPIO as OutputSignalType) });
         self
     }
@@ -1660,9 +1676,9 @@ macro_rules! rtc_pins {
                 let rtcio = unsafe{ &*RTC_IO::ptr() };
 
                 #[cfg(esp32s3)]
-                unsafe { crate::peripherals::SENS::steal() }.sar_peri_clk_gate_conf.modify(|_,w| w.iomux_clk_en().set_bit());
+                unsafe { crate::peripherals::SENS::steal() }.sar_peri_clk_gate_conf().modify(|_,w| w.iomux_clk_en().set_bit());
                 #[cfg(esp32s2)]
-                unsafe { crate::peripherals::SENS::steal() }.sar_io_mux_conf.modify(|_,w| w.iomux_clk_gate_en().set_bit());
+                unsafe { crate::peripherals::SENS::steal() }.sar_io_mux_conf().modify(|_,w| w.iomux_clk_gate_en().set_bit());
 
                 // disable input
                 paste::paste!{
@@ -1678,10 +1694,10 @@ macro_rules! rtc_pins {
                 let rtc_ctrl = unsafe { &*crate::peripherals::RTC_CNTL::PTR };
 
                 #[cfg(esp32)]
-                rtc_ctrl.hold_force.modify(|_, w| w.$hold().bit(enable));
+                rtc_ctrl.hold_force().modify(|_, w| w.$hold().bit(enable));
 
                 #[cfg(not(esp32))]
-                rtc_ctrl.pad_hold.modify(|_, w| w.$hold().bit(enable));
+                rtc_ctrl.pad_hold().modify(|_, w| w.$hold().bit(enable));
             }
         }
 
@@ -1742,15 +1758,15 @@ macro_rules! rtc_pins {
             unsafe fn apply_wakeup(&mut self, wakeup: bool, level: u8) {
                 let rtc_cntl = unsafe { &*crate::peripherals::RTC_CNTL::ptr() };
                 paste::paste! {
-                    rtc_cntl.gpio_wakeup.modify(|_, w| w.[< gpio_pin $pin_num _wakeup_enable >]().bit(wakeup));
-                    rtc_cntl.gpio_wakeup.modify(|_, w| w.[< gpio_pin $pin_num _int_type >]().bits(level));
+                    rtc_cntl.gpio_wakeup().modify(|_, w| w.[< gpio_pin $pin_num _wakeup_enable >]().bit(wakeup));
+                    rtc_cntl.gpio_wakeup().modify(|_, w| w.[< gpio_pin $pin_num _int_type >]().bits(level));
                 }
             }
 
             fn rtcio_pad_hold(&mut self, enable: bool) {
                 let rtc_cntl = unsafe { &*crate::peripherals::RTC_CNTL::ptr() };
                 paste::paste! {
-                    rtc_cntl.pad_hold.modify(|_, w| w.[< gpio_pin $pin_num _hold >]().bit(enable));
+                    rtc_cntl.pad_hold().modify(|_, w| w.[< gpio_pin $pin_num _hold >]().bit(enable));
                 }
             }
         }
@@ -1758,12 +1774,12 @@ macro_rules! rtc_pins {
         impl<MODE> crate::gpio::RTCPinWithResistors for GpioPin<MODE, $pin_num> {
             fn rtcio_pullup(&mut self, enable: bool) {
                 let io_mux = unsafe { &*crate::peripherals::IO_MUX::ptr() };
-                io_mux.gpio[$pin_num].modify(|_, w| w.fun_wpu().bit(enable));
+                io_mux.gpio($pin_num).modify(|_, w| w.fun_wpu().bit(enable));
             }
 
             fn rtcio_pulldown(&mut self, enable: bool) {
                 let io_mux = unsafe { &*crate::peripherals::IO_MUX::ptr() };
-                io_mux.gpio[$pin_num].modify(|_, w| w.fun_wpd().bit(enable));
+                io_mux.gpio($pin_num).modify(|_, w| w.fun_wpd().bit(enable));
             }
         }
 
@@ -1781,7 +1797,7 @@ pub fn enable_iomux_clk_gate() {
         use crate::peripherals::SENS;
         let sensors = unsafe { &*SENS::ptr() };
         sensors
-            .sar_io_mux_conf
+            .sar_io_mux_conf()
             .modify(|_, w| w.iomux_clk_gate_en().set_bit());
     }
 }
@@ -1813,10 +1829,10 @@ macro_rules! analog {
                             rtcio.$pin_reg.modify(|_,w| w.$fun_ie().bit([< false >]));
 
                             // disable output
-                            rtcio.enable_w1tc.write(|w| unsafe { w.enable_w1tc().bits(1 << $rtc_pin) });
+                            rtcio.enable_w1tc().write(|w| unsafe { w.enable_w1tc().bits(1 << $rtc_pin) });
 
                             // disable open drain
-                            rtcio.pin[$rtc_pin].modify(|_,w| w.pad_driver().bit(false));
+                            rtcio.pin($rtc_pin).modify(|_,w| w.pad_driver().bit(false));
 
                             rtcio.$pin_reg.modify(|_,w| {
                                 w.$fun_ie().clear_bit();
@@ -1862,14 +1878,14 @@ macro_rules! analog {
             match pin {
                 $(
                     $pin_num => {
-                        io_mux.gpio[$pin_num].modify(|_,w| unsafe {
+                        io_mux.gpio($pin_num).modify(|_,w| unsafe {
                             w.mcu_sel().bits(1)
                                 .fun_ie().clear_bit()
                                 .fun_wpu().clear_bit()
                                 .fun_wpd().clear_bit()
                         });
 
-                        gpio.enable_w1tc.write(|w| unsafe { w.bits(1 << $pin_num) });
+                        gpio.enable_w1tc().write(|w| unsafe { w.bits(1 << $pin_num) });
                     }
                 )+
                 _ => unreachable!()
@@ -2184,7 +2200,7 @@ pub mod etm {
 
     fn enable_task_channel(channel: u8, pin: u8) {
         let gpio_sd = unsafe { crate::peripherals::GPIO_SD::steal() };
-        let ptr = unsafe { gpio_sd.etm_task_p0_cfg.as_ptr().add(pin as usize / 4) };
+        let ptr = unsafe { gpio_sd.etm_task_p0_cfg().as_ptr().add(pin as usize / 4) };
         let shift = 8 * (pin as usize % 4);
         // bit 0 = en, bit 1-3 = channel
         unsafe {
@@ -2198,10 +2214,15 @@ pub mod etm {
 
     fn enable_event_channel(channel: u8, pin: u8) {
         let gpio_sd = unsafe { crate::peripherals::GPIO_SD::steal() };
-        gpio_sd.etm_event_ch_cfg[channel as usize].modify(|_, w| w.etm_ch0_event_en().clear_bit());
-        gpio_sd.etm_event_ch_cfg[channel as usize]
+        gpio_sd
+            .etm_event_ch_cfg(channel as usize)
+            .modify(|_, w| w.etm_ch0_event_en().clear_bit());
+        gpio_sd
+            .etm_event_ch_cfg(channel as usize)
             .modify(|_, w| w.etm_ch0_event_sel().variant(pin));
-        gpio_sd.etm_event_ch_cfg[channel as usize].modify(|_, w| w.etm_ch0_event_en().set_bit());
+        gpio_sd
+            .etm_event_ch_cfg(channel as usize)
+            .modify(|_, w| w.etm_ch0_event_en().set_bit());
     }
 }
 
@@ -2251,16 +2272,16 @@ pub mod rtc_io {
                 // TODO align PAC
                 #[cfg(esp32s2)]
                 rtc_io
-                    .rtc_gpio_enable_w1ts
+                    .rtc_gpio_enable_w1ts()
                     .write(|w| w.reg_rtcio_reg_gpio_enable_w1ts().variant(1 << PIN));
 
                 #[cfg(esp32s3)]
                 rtc_io
-                    .rtc_gpio_enable_w1ts
+                    .rtc_gpio_enable_w1ts()
                     .write(|w| w.rtc_gpio_enable_w1ts().variant(1 << PIN));
             } else {
                 rtc_io
-                    .enable_w1tc
+                    .enable_w1tc()
                     .write(|w| w.enable_w1tc().variant(1 << PIN));
             }
         }
@@ -2285,22 +2306,22 @@ pub mod rtc_io {
             #[cfg(esp32s2)]
             if level {
                 rtc_io
-                    .rtc_gpio_out_w1ts
+                    .rtc_gpio_out_w1ts()
                     .write(|w| w.gpio_out_data_w1ts().variant(1 << PIN));
             } else {
                 rtc_io
-                    .rtc_gpio_out_w1tc
+                    .rtc_gpio_out_w1tc()
                     .write(|w| w.gpio_out_data_w1tc().variant(1 << PIN));
             }
 
             #[cfg(esp32s3)]
             if level {
                 rtc_io
-                    .rtc_gpio_out_w1ts
+                    .rtc_gpio_out_w1ts()
                     .write(|w| w.rtc_gpio_out_data_w1ts().variant(1 << PIN));
             } else {
                 rtc_io
-                    .rtc_gpio_out_w1tc
+                    .rtc_gpio_out_w1tc()
                     .write(|w| w.rtc_gpio_out_data_w1tc().variant(1 << PIN));
             }
         }
@@ -2308,7 +2329,7 @@ pub mod rtc_io {
         #[doc(hidden)]
         pub fn get_level(&self) -> bool {
             let rtc_io = unsafe { &*crate::peripherals::RTC_IO::PTR };
-            (rtc_io.rtc_gpio_in.read().bits() & 1 << PIN) != 0
+            (rtc_io.rtc_gpio_in().read().bits() & 1 << PIN) != 0
         }
 
         /// Configures the pin as an input with the internal pull-up resistor
@@ -2356,14 +2377,14 @@ pub mod rtc_io {
     #[inline(always)]
     fn get_pin_reg(pin: u8) -> &'static crate::peripherals::rtc_io::TOUCH_PAD0 {
         let rtc_io = unsafe { &*crate::peripherals::RTC_IO::PTR };
-        unsafe { core::mem::transmute((rtc_io.touch_pad0.as_ptr()).add(pin as usize)) }
+        unsafe { core::mem::transmute((rtc_io.touch_pad0().as_ptr()).add(pin as usize)) }
     }
 
     #[cfg(esp32s2)]
     #[inline(always)]
     fn get_pin_reg(pin: u8) -> &'static crate::peripherals::rtc_io::TOUCH_PAD {
         let rtc_io = unsafe { &*crate::peripherals::RTC_IO::PTR };
-        unsafe { core::mem::transmute((rtc_io.touch_pad[0].as_ptr()).add(pin as usize)) }
+        unsafe { core::mem::transmute((rtc_io.touch_pad(0).as_ptr()).add(pin as usize)) }
     }
 }
 
@@ -2406,11 +2427,11 @@ pub mod lp_gpio {
             let lp_io = unsafe { &*crate::peripherals::LP_IO::PTR };
             if enable {
                 lp_io
-                    .out_enable_w1ts
+                    .out_enable_w1ts()
                     .write(|w| w.lp_gpio_enable_w1ts().variant(1 << PIN));
             } else {
                 lp_io
-                    .out_enable_w1tc
+                    .out_enable_w1tc()
                     .write(|w| w.lp_gpio_enable_w1tc().variant(1 << PIN));
             }
         }
@@ -2432,11 +2453,11 @@ pub mod lp_gpio {
             let lp_io = unsafe { &*crate::peripherals::LP_IO::PTR };
             if level {
                 lp_io
-                    .out_data_w1ts
+                    .out_data_w1ts()
                     .write(|w| w.lp_gpio_out_data_w1ts().variant(1 << PIN));
             } else {
                 lp_io
-                    .out_data_w1tc
+                    .out_data_w1tc()
                     .write(|w| w.lp_gpio_out_data_w1tc().variant(1 << PIN));
             }
         }
@@ -2444,7 +2465,7 @@ pub mod lp_gpio {
         #[doc(hidden)]
         pub fn get_level(&self) -> bool {
             let lp_io = unsafe { &*crate::peripherals::LP_IO::PTR };
-            (lp_io.in_.read().lp_gpio_in_data_next().bits() & 1 << PIN) != 0
+            (lp_io.in_().read().lp_gpio_in_data_next().bits() & 1 << PIN) != 0
         }
 
         /// Configures the pin as an input with the internal pull-up resistor
@@ -2492,7 +2513,7 @@ pub mod lp_gpio {
         let lp_aon = unsafe { &*crate::peripherals::LP_AON::PTR };
 
         lp_aon
-            .gpio_mux
+            .gpio_mux()
             .modify(|r, w| w.sel().variant(r.sel().bits() | 1 << pin));
 
         get_pin_reg(pin).modify(|_, w| w.lp_gpio0_mcu_sel().variant(0));
@@ -2504,7 +2525,7 @@ pub mod lp_gpio {
 
         // ideally we should change the SVD and make the GPIOx registers into an
         // array
-        unsafe { core::mem::transmute((lp_io.gpio0.as_ptr()).add(pin as usize)) }
+        unsafe { core::mem::transmute((lp_io.gpio0().as_ptr()).add(pin as usize)) }
     }
 
     /// Configures a pin for use as a low power pin
@@ -2642,7 +2663,7 @@ mod asynch {
         wake_up_from_light_sleep: bool,
     ) {
         let gpio = unsafe { &*crate::peripherals::GPIO::PTR };
-        gpio.pin[gpio_num as usize].modify(|_, w| unsafe {
+        gpio.pin(gpio_num as usize).modify(|_, w| unsafe {
             w.int_ena()
                 .bits(int_ena)
                 .int_type()

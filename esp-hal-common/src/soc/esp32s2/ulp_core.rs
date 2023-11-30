@@ -81,15 +81,17 @@ impl<'d> UlpCore<'d> {
 fn ulp_stop() {
     let rtc_cntl = unsafe { &*pac::RTC_CNTL::PTR };
     rtc_cntl
-        .ulp_cp_timer
+        .ulp_cp_timer()
         .modify(|_, w| w.ulp_cp_slp_timer_en().clear_bit());
 
     // suspends the ulp operation
-    rtc_cntl.cocpu_ctrl.modify(|_, w| w.cocpu_done().set_bit());
+    rtc_cntl
+        .cocpu_ctrl()
+        .modify(|_, w| w.cocpu_done().set_bit());
 
     // Resets the processor
     rtc_cntl
-        .cocpu_ctrl
+        .cocpu_ctrl()
         .modify(|_, w| w.cocpu_shut_reset_en().set_bit());
 }
 
@@ -98,12 +100,12 @@ fn ulp_run(wakeup_src: UlpCoreWakeupSource) {
 
     // Reset COCPU when power on
     rtc_cntl
-        .cocpu_ctrl
+        .cocpu_ctrl()
         .modify(|_, w| w.cocpu_shut_reset_en().set_bit());
 
     // Disable ULP timer
     rtc_cntl
-        .ulp_cp_timer
+        .ulp_cp_timer()
         .modify(|_, w| w.ulp_cp_slp_timer_en().clear_bit());
 
     // wait for at least 1 RTC_SLOW_CLK cycle
@@ -113,20 +115,22 @@ fn ulp_run(wakeup_src: UlpCoreWakeupSource) {
 
     // Select ULP-RISC-V to send the DONE signal
     rtc_cntl
-        .cocpu_ctrl
+        .cocpu_ctrl()
         .modify(|_, w| w.cocpu_done_force().set_bit());
 
     ulp_config_wakeup_source(wakeup_src);
 
     // Select RISC-V as the ULP_TIMER trigger target
-    rtc_cntl.cocpu_ctrl.modify(|_, w| w.cocpu_sel().clear_bit());
+    rtc_cntl
+        .cocpu_ctrl()
+        .modify(|_, w| w.cocpu_sel().clear_bit());
 
     // Clear any spurious wakeup trigger interrupts upon ULP startup
     unsafe {
         ets_delay_us(20);
     }
 
-    rtc_cntl.int_clr_rtc.write(|w| {
+    rtc_cntl.int_clr_rtc().write(|w| {
         w.cocpu_int_clr()
             .set_bit()
             .cocpu_trap_int_clr()
@@ -142,10 +146,10 @@ fn ulp_config_wakeup_source(wakeup_src: UlpCoreWakeupSource) {
             // use timer to wake up
             let rtc_cntl = unsafe { &*pac::RTC_CNTL::PTR };
             rtc_cntl
-                .ulp_cp_ctrl
+                .ulp_cp_ctrl()
                 .modify(|_, w| w.ulp_cp_force_start_top().clear_bit());
             rtc_cntl
-                .ulp_cp_timer
+                .ulp_cp_timer()
                 .modify(|_, w| w.ulp_cp_slp_timer_en().set_bit());
         }
     }

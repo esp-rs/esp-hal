@@ -19,50 +19,54 @@ impl<'d> Rsa<'d> {
     /// needs to be initialized, only after that peripheral should be used.
     /// This function would return without an error if the memory is initialized
     pub fn ready(&mut self) -> nb::Result<(), Infallible> {
-        if self.rsa.clean.read().clean().bit_is_clear() {
+        if self.rsa.clean().read().clean().bit_is_clear() {
             return Err(nb::Error::WouldBlock);
         }
         Ok(())
     }
 
     pub(super) fn write_multi_mode(&mut self, mode: u32) {
-        self.rsa.mult_mode.write(|w| unsafe { w.bits(mode as u32) });
+        self.rsa
+            .mult_mode()
+            .write(|w| unsafe { w.bits(mode as u32) });
     }
 
     pub(super) fn write_modexp_mode(&mut self, mode: u32) {
-        self.rsa.modexp_mode.write(|w| unsafe { w.bits(mode) });
+        self.rsa.modexp_mode().write(|w| unsafe { w.bits(mode) });
     }
 
     pub(super) fn write_modexp_start(&mut self) {
-        self.rsa.modexp_start.write(|w| w.modexp_start().set_bit());
+        self.rsa
+            .modexp_start()
+            .write(|w| w.modexp_start().set_bit());
     }
 
     pub(super) fn write_multi_start(&mut self) {
-        self.rsa.mult_start.write(|w| w.mult_start().set_bit());
+        self.rsa.mult_start().write(|w| w.mult_start().set_bit());
     }
 
     pub(super) fn clear_interrupt(&mut self) {
-        self.rsa.interrupt.write(|w| w.interrupt().set_bit());
+        self.rsa.interrupt().write(|w| w.interrupt().set_bit());
     }
 
     pub(super) fn is_idle(&mut self) -> bool {
-        self.rsa.interrupt.read().bits() == 1
+        self.rsa.interrupt().read().bits() == 1
     }
 
     unsafe fn write_multi_operand_a<const N: usize>(&mut self, operand_a: &[u32; N]) {
         copy_nonoverlapping(
             operand_a.as_ptr(),
-            self.rsa.x_mem.as_mut_ptr() as *mut u32,
+            self.rsa.x_mem(0).as_ptr() as *mut u32,
             N,
         );
-        write_bytes(self.rsa.x_mem.as_mut_ptr().add(N * 4), 0, N * 4);
+        write_bytes(self.rsa.x_mem(0).as_ptr().add(N), 0, N);
     }
 
     unsafe fn write_multi_operand_b<const N: usize>(&mut self, operand_b: &[u32; N]) {
-        write_bytes(self.rsa.z_mem.as_mut_ptr(), 0, N * 4);
+        write_bytes(self.rsa.z_mem(0).as_ptr(), 0, N);
         copy_nonoverlapping(
             operand_b.as_ptr(),
-            self.rsa.z_mem.as_mut_ptr().add(N * 4) as *mut u32,
+            self.rsa.z_mem(0).as_ptr().add(N) as *mut u32,
             N,
         );
     }

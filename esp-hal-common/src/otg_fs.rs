@@ -105,7 +105,7 @@ where
     fn enable() {
         unsafe {
             let usb_wrap = &*peripherals::USB_WRAP::PTR;
-            usb_wrap.otg_conf.modify(|_, w| {
+            usb_wrap.otg_conf().modify(|_, w| {
                 w.usb_pad_enable()
                     .set_bit()
                     .phy_sel()
@@ -121,7 +121,7 @@ where
             #[cfg(esp32s3)]
             {
                 let rtc = &*peripherals::RTC_CNTL::PTR;
-                rtc.usb_conf
+                rtc.usb_conf()
                     .modify(|_, w| w.sw_hw_usb_phy_sel().set_bit().sw_usb_phy_sel().set_bit());
             }
 
@@ -130,7 +130,7 @@ where
             crate::gpio::connect_high_to_peripheral(InputSignal::USB_OTG_VBUSVALID); // receiving a valid Vbus from device
             crate::gpio::connect_low_to_peripheral(InputSignal::USB_OTG_AVALID);
 
-            usb_wrap.otg_conf.modify(|_, w| {
+            usb_wrap.otg_conf().modify(|_, w| {
                 w.pad_pull_override()
                     .set_bit()
                     .dp_pullup()
