@@ -18,7 +18,7 @@ use esp32h2_hal::{
     clock::ClockControl,
     dma::DmaPriority,
     gdma::Gdma,
-    i2s::{DataFormat, I2s, I2s0New, I2sReadDma, MclkPin, PinsBclkWsDin, Standard},
+    i2s::{DataFormat, I2s, I2sReadDma, Standard},
     peripherals::Peripherals,
     prelude::*,
     IO,
@@ -42,7 +42,6 @@ fn main() -> ! {
 
     let i2s = I2s::new(
         peripherals.I2S0,
-        MclkPin::new(io.pins.gpio4),
         Standard::Philips,
         DataFormat::Data16Channel16,
         44100u32.Hz(),
@@ -53,13 +52,15 @@ fn main() -> ! {
             DmaPriority::Priority0,
         ),
         &clocks,
-    );
+    )
+    .with_mclk(io.pins.gpio4);
 
-    let i2s_rx = i2s.i2s_rx.with_pins(PinsBclkWsDin::new(
-        io.pins.gpio1,
-        io.pins.gpio2,
-        io.pins.gpio5,
-    ));
+    let i2s_rx = i2s
+        .i2s_rx
+        .with_bclk(io.pins.gpio1)
+        .with_ws(io.pins.gpio2)
+        .with_din(io.pins.gpio5)
+        .build();
 
     let buffer = dma_buffer();
 

@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reuse `ieee802154_clock_enable/disable()` functions for BLE and rename `ble_ieee802154_clock_enable()` (#953)
 - The `embedded-io` trait implementations are now gated behind the `embedded-io` feature (#964)
 - Simplifed RMT channels and channel creators (#958)
+- Reworked construction of I2S driver instances (#983)
 
 ### Fixed
 

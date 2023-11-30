@@ -37,7 +37,7 @@ use esp32s3_hal::{
     dma::DmaPriority,
     embassy::{self},
     gdma::Gdma,
-    i2s::{asynch::*, DataFormat, I2s, I2s0New, MclkPin, PinsBclkWsDout, Standard},
+    i2s::{asynch::*, DataFormat, I2s, Standard},
     peripherals::Peripherals,
     prelude::*,
     IO,
@@ -84,7 +84,6 @@ async fn main(_spawner: Spawner) {
 
     let i2s = I2s::new(
         peripherals.I2S0,
-        MclkPin::new(io.pins.gpio4),
         Standard::Philips,
         DataFormat::Data16Channel16,
         44100u32.Hz(),
@@ -95,13 +94,15 @@ async fn main(_spawner: Spawner) {
             DmaPriority::Priority0,
         ),
         &clocks,
-    );
+    )
+    .with_mclk(io.pins.gpio4);
 
-    let i2s_tx = i2s.i2s_tx.with_pins(PinsBclkWsDout::new(
-        io.pins.gpio1,
-        io.pins.gpio2,
-        io.pins.gpio3,
-    ));
+    let i2s_tx = i2s
+        .i2s_tx
+        .with_bclk(io.pins.gpio1)
+        .with_ws(io.pins.gpio2)
+        .with_dout(io.pins.gpio3)
+        .build();
 
     // you need to manually enable the DMA channel's interrupt!
     esp32s3_hal::interrupt::enable(
