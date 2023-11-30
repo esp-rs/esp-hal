@@ -61,7 +61,7 @@ jobs:
         run: cd esp-hal-smartled/ && cargo +esp build -Zbuild-std=core --target=xtensa-esp32s3-none-elf --features=esp32s3
       # Ensure documentation can be built (requires a chip feature!)
       - name: rustdoc
-        run: cd esp-hal-smartled/ && cargo doc --features=esp32c3
+        run: cd esp-hal-smartled/ && cargo doc -Zbuild-std=core --target=riscv32imc-unknown-none-elf --features=esp32c3
 
   esp32-hal:
     runs-on: ubuntu-latest
