@@ -8,7 +8,7 @@ If a cell contains am em dash (&mdash;) this means that the particular feature i
 
 |          | [Wifi](https://github.com/esp-rs/esp-wifi/issues/94) | [BLE](https://github.com/esp-rs/esp-wifi/issues/93) | [Coex](https://github.com/esp-rs/esp-wifi/issues/92) | ESP-NOW |
 | :------: | :--------------------------------------------------: | :-------------------------------------------------: | :--------------------------------------------------: | :-----: |
-|  ESP32   |                          ✓                           |                          ✓                          |                       &tilde;                        |    ✓    |
+|  ESP32   |                          ✓                           |                          ✓                          |                          ✓                           |    ✓    |
 | ESP32-S2 |                          ✓                           |                       &mdash;                       |                       &mdash;                        |    ✓    |
 | ESP32-S3 |                          ✓                           |                          ✓                          |                          ✓                           |    ✓    |
 | ESP32-C3 |                          ✓                           |                          ✓                          |                          ✓                           |    ✓    |
@@ -108,7 +108,6 @@ See [Examples] for details.
 
 ## Missing / To be done
 
-- Make CoEx work on ESP32 (it kind of works when commenting out setting the country in wifi_start, probably some mis-compilation since it then crashes in a totally different code path)
 - Support for non-open SoftAP
 
 ## Directory Structure
