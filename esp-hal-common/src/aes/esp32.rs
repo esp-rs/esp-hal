@@ -3,9 +3,6 @@ use crate::{
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
 };
 
-const KEY_LEN: usize = 8;
-const TEXT_LEN: usize = 4;
-
 impl<'d> Aes<'d> {
     pub(super) fn init(&mut self) {
         PeripheralClockControl::enable(PeripheralEnable::Aes);
@@ -20,14 +17,16 @@ impl<'d> Aes<'d> {
     }
 
     pub(super) fn write_key(&mut self, key: &[u8]) {
-        debug_assert!(key.len() <= KEY_LEN * ALIGN_SIZE);
+        let key_len = self.aes.key_iter().count();
+        debug_assert!(key.len() <= key_len * ALIGN_SIZE);
         debug_assert_eq!(key.len() % ALIGN_SIZE, 0);
-        Self::write_to_regset(key, KEY_LEN, self.aes.key(0).as_ptr());
+        Self::write_to_regset(key, key_len, self.aes.key(0).as_ptr());
     }
 
     pub(super) fn write_block(&mut self, block: &[u8]) {
-        debug_assert_eq!(block.len(), TEXT_LEN * ALIGN_SIZE);
-        Self::write_to_regset(block, TEXT_LEN, self.aes.text(0).as_ptr());
+        let text_len = self.aes.text_iter().count();
+        debug_assert_eq!(block.len(), text_len * ALIGN_SIZE);
+        Self::write_to_regset(block, text_len, self.aes.text(0).as_ptr());
     }
 
     pub(super) fn write_mode(&mut self, mode: u32) {
@@ -63,8 +62,9 @@ impl<'d> Aes<'d> {
     }
 
     pub(super) fn read_block(&self, block: &mut [u8]) {
-        debug_assert_eq!(block.len(), TEXT_LEN * ALIGN_SIZE);
-        Self::read_from_regset(block, TEXT_LEN, &self.aes.text(0));
+        let text_len = self.aes.text_iter().count();
+        debug_assert_eq!(block.len(), text_len * ALIGN_SIZE);
+        Self::read_from_regset(block, text_len, &self.aes.text(0));
     }
 }
 
