@@ -59,14 +59,14 @@ impl<'d> Rsa<'d> {
             self.rsa.x_mem(0).as_ptr() as *mut u32,
             N,
         );
-        write_bytes(self.rsa.x_mem(0).as_ptr().add(N * 4), 0, N * 4);
+        write_bytes(self.rsa.x_mem(0).as_ptr().add(N), 0, N);
     }
 
     unsafe fn write_multi_operand_b<const N: usize>(&mut self, operand_b: &[u32; N]) {
-        write_bytes(self.rsa.z_mem(0).as_ptr(), 0, N * 4);
+        write_bytes(self.rsa.z_mem(0).as_ptr(), 0, N);
         copy_nonoverlapping(
             operand_b.as_ptr(),
-            self.rsa.z_mem(0).as_ptr().add(N * 4) as *mut u32,
+            self.rsa.z_mem(0).as_ptr().add(N) as *mut u32,
             N,
         );
     }
