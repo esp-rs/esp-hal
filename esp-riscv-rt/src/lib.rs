@@ -427,8 +427,9 @@ _abs_start:
 
     // Allocate stack
     la sp, _stack_start
-    lui t0, 16
+    li t0, 4 // make sure stack start is in RAM
     sub sp, sp, t0
+    andi sp, sp, -16 // Force 16-byte alignment
 
     // Set frame pointer
     add s0, sp, zero
