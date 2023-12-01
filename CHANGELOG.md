@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `embedded-io` trait implementations are now gated behind the `embedded-io` feature (#964)
 - Simplifed RMT channels and channel creators (#958)
 - Reworked construction of I2S driver instances (#983)
+- S2 / S3: Don't require GPIO 18 to create a USB peripheral driver instance (#990)
 
 ### Fixed
 
