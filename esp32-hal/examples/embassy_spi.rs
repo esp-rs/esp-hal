@@ -24,6 +24,7 @@ use esp32_hal::{
     clock::ClockControl,
     dma::DmaPriority,
     dma_descriptors,
+    interrupt::{self, Priority},
     pdma::*,
     peripherals::{Interrupt, Peripherals},
     prelude::*,
