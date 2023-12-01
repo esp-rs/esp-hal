@@ -9,7 +9,7 @@
 //!
 //! The driver enables you to configure and utilize the TWAI module on ESP
 //! chips. It offers functions for initializing the TWAI peripheral, setting up
-//! the ti1ming parameters, configuring acceptance filters, handling interrupts,
+//! the timing parameters, configuring acceptance filters, handling interrupts,
 //! and transmitting/receiving messages on the TWAI bus.
 //!
 //! This driver manages the ISO 11898-1 (CAN Specification 2.0) compatible TWAI
