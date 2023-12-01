@@ -13,6 +13,7 @@
 use esp32h2_hal::{
     clock::ClockControl,
     dma::DmaPriority,
+    dma_buffers,
     gdma::Gdma,
     gpio::IO,
     parl_io::{
@@ -38,8 +39,7 @@ fn main() -> ! {
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let mut tx_descriptors = [0u32; 8 * 3];
-    let mut rx_descriptors = [0u32; 8 * 3];
+    let (tx_buffer, mut tx_descriptors, _, mut rx_descriptors) = dma_buffers!(32000, 0);
 
     let dma = Gdma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
@@ -74,7 +74,7 @@ fn main() -> ! {
         )
         .unwrap();
 
-    let mut buffer = dma_buffer();
+    let mut buffer = tx_buffer;
     for i in 0..buffer.len() {
         buffer[i] = (i % 255) as u8;
     }
@@ -91,9 +91,4 @@ fn main() -> ! {
 
         delay.delay_ms(500u32);
     }
-}
-
-fn dma_buffer() -> &'static mut [u8; 4092 * 4] {
-    static mut BUFFER: [u8; 4092 * 4] = [0u8; 4092 * 4];
-    unsafe { &mut BUFFER }
 }

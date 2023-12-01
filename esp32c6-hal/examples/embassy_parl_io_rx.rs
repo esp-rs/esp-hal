@@ -12,6 +12,7 @@ use embassy_time::{Duration, Timer};
 use esp32c6_hal::{
     clock::ClockControl,
     dma::DmaPriority,
+    dma_buffers,
     embassy,
     gdma::Gdma,
     gpio::IO,
@@ -45,8 +46,7 @@ async fn main(_spawner: Spawner) {
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let mut tx_descriptors = [0u32; 8 * 3];
-    let mut rx_descriptors = [0u32; 8 * 3];
+    let (_, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(0, 32000);
 
     let dma = Gdma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
@@ -78,16 +78,11 @@ async fn main(_spawner: Spawner) {
     )
     .unwrap();
 
-    let buffer = dma_buffer();
+    let buffer = rx_buffer;
     loop {
         parl_io_rx.read_dma_async(buffer).await.unwrap();
         println!("Received: {:02x?} ...", &buffer[..30]);
 
         Timer::after(Duration::from_millis(500)).await;
     }
-}
-
-fn dma_buffer() -> &'static mut [u8; 4092 * 4] {
-    static mut BUFFER: [u8; 4092 * 4] = [0u8; 4092 * 4];
-    unsafe { &mut BUFFER }
 }

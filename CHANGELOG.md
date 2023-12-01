@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `RtcClock::get_xtal_freq`, `RtcClock::get_slow_freq` (#957)
 - Added Rx Timeout functionality to async Uart (#911)
 - RISC-V: Thread-mode and interrupt-mode executors, `#[main]` macro (#947)
+- A macro to make it easier to create DMA buffers and descriptors (#935)
 
 ### Changed
 

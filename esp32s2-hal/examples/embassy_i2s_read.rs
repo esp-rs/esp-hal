@@ -18,6 +18,7 @@ use embassy_executor::Spawner;
 use esp32s2_hal::{
     clock::ClockControl,
     dma::DmaPriority,
+    dma_buffers,
     embassy::{self},
     i2s::{asynch::*, DataFormat, I2s, Standard},
     pdma::Dma,
@@ -54,8 +55,7 @@ async fn main(_spawner: Spawner) {
     let dma = Dma::new(system.dma);
     let dma_channel = dma.i2s0channel;
 
-    let mut tx_descriptors = [0u32; 20 * 3];
-    let mut rx_descriptors = [0u32; 8 * 3];
+    let (_, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(0, 4092 * 4);
 
     let i2s = I2s::new(
         peripherals.I2S0,
@@ -85,7 +85,7 @@ async fn main(_spawner: Spawner) {
     )
     .unwrap();
 
-    let buffer = dma_buffer();
+    let buffer = rx_buffer;
     println!("Start");
 
     let mut data = [0u8; 5000];
@@ -102,9 +102,4 @@ async fn main(_spawner: Spawner) {
             &data[count - 10..count]
         );
     }
-}
-
-fn dma_buffer() -> &'static mut [u8; 4092 * 4] {
-    static mut BUFFER: [u8; 4092 * 4] = [0u8; 4092 * 4];
-    unsafe { &mut BUFFER }
 }
