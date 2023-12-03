@@ -906,7 +906,7 @@ mod asynch {
                 T::async_state().tx_waker.register(cx.waker());
 
                 let register_block = T::register_block();
-                let status = register_block.status.read();
+                let status = register_block.status().read();
 
                 // Check that the peripheral is not in a bus off state.
                 if status.bus_off_st().bit_is_set() {
@@ -937,7 +937,7 @@ mod asynch {
                     return Poll::Ready(result);
                 } else {
                     let register_block = T::register_block();
-                    let status = register_block.status.read();
+                    let status = register_block.status().read();
 
                     // Check that the peripheral is not in a bus off state.
                     if status.bus_off_st().bit_is_set() {
@@ -961,8 +961,8 @@ mod asynch {
     fn TWAI0() {
         let register_block = TWAI0::register_block();
 
-        let intr_enable = register_block.int_ena.read();
-        let intr_status = register_block.int_raw.read();
+        let intr_enable = register_block.int_ena().read();
+        let intr_status = register_block.int_raw().read();
 
         let async_state = TWAI0::async_state();
 
@@ -971,7 +971,7 @@ mod asynch {
         }
 
         if intr_status.rx_int_st().bit_is_set() {
-            let status = register_block.status.read();
+            let status = register_block.status().read();
 
             let rx_queue = &async_state.rx_queue;
 
@@ -987,7 +987,7 @@ mod asynch {
 
             let _ = rx_queue.try_send(Ok(frame));
 
-            register_block.cmd.write(|w| w.release_buf().set_bit());
+            register_block.cmd().write(|w| w.release_buf().set_bit());
         }
 
         if intr_status.bits() & 0b11111100 > 0 {
@@ -996,7 +996,7 @@ mod asynch {
 
         unsafe {
             register_block
-                .int_ena
+                .int_ena()
                 .modify(|_, w| w.bits(intr_enable.bits() & (!intr_status.bits() | 1)));
         }
     }
@@ -1006,8 +1006,8 @@ mod asynch {
     fn TWAI0() {
         let register_block = TWAI0::register_block();
 
-        let intr_enable = register_block.interrupt_enable.read();
-        let intr_status = register_block.interrupt.read();
+        let intr_enable = register_block.interrupt_enable().read();
+        let intr_status = register_block.interrupt().read();
 
         let async_state = TWAI0::async_state();
 
@@ -1016,7 +1016,7 @@ mod asynch {
         }
 
         if intr_status.receive_int_st().bit_is_set() {
-            let status = register_block.status.read();
+            let status = register_block.status().read();
 
             let rx_queue = &async_state.rx_queue;
 
@@ -1032,7 +1032,7 @@ mod asynch {
 
             let _ = rx_queue.try_send(Ok(frame));
 
-            register_block.cmd.write(|w| w.release_buf().set_bit());
+            register_block.cmd().write(|w| w.release_buf().set_bit());
         }
 
         if intr_status.bits() & 0b11111100 > 0 {
@@ -1041,7 +1041,7 @@ mod asynch {
 
         unsafe {
             register_block
-                .interrupt_enable
+                .interrupt_enable()
                 .modify(|_, w| w.bits(intr_enable.bits() & (!intr_status.bits() | 1)));
         }
     }
@@ -1051,8 +1051,8 @@ mod asynch {
     fn TWAI1() {
         let register_block = TWAI1::register_block();
 
-        let intr_enable = register_block.interrupt_enable.read();
-        let intr_status = register_block.interrupt.read();
+        let intr_enable = register_block.interrupt_enable().read();
+        let intr_status = register_block.interrupt().read();
 
         let async_state = TWAI1::async_state();
 
@@ -1061,7 +1061,7 @@ mod asynch {
         }
 
         if intr_status.receive_int_st().bit_is_set() {
-            let status = register_block.status.read();
+            let status = register_block.status().read();
 
             let rx_queue = &async_state.rx_queue;
 
@@ -1077,7 +1077,7 @@ mod asynch {
 
             let _ = rx_queue.try_send(Ok(frame));
 
-            register_block.cmd.write(|w| w.release_buf().set_bit());
+            register_block.cmd().write(|w| w.release_buf().set_bit());
         }
 
         if intr_status.bits() & 0b11111100 > 0 {
@@ -1086,7 +1086,7 @@ mod asynch {
 
         unsafe {
             register_block
-                .interrupt_enable
+                .interrupt_enable()
                 .modify(|_, w| w.bits(intr_enable.bits() & (!intr_status.bits() | 1)));
         }
     }
