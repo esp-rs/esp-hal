@@ -499,7 +499,7 @@ where
     /// NOTE: TODO: This may not work if using the self reception/self test
     /// functionality. See notes 1 and 2 in the "Frame Identifier" section
     /// of the reference manual.
-    fn transmit(&mut self, frame: &EspTwaiFrame) -> nb::Result<(), EspTwaiError> {
+    pub fn transmit(&mut self, frame: &EspTwaiFrame) -> nb::Result<(), EspTwaiError> {
         let register_block = T::register_block();
         let status = register_block.status().read();
 
@@ -528,7 +528,7 @@ where
     T: OperationInstance,
 {
     // Receive a frame
-    fn receive(&mut self) -> nb::Result<EspTwaiFrame, EspTwaiError> {
+    pub fn receive(&mut self) -> nb::Result<EspTwaiFrame, EspTwaiError> {
         let register_block = T::register_block();
         let status = register_block.status().read();
 
