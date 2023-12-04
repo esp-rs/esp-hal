@@ -96,7 +96,10 @@ fn main() -> Result<(), String> {
             .next()
             .unwrap();
         if let Some(version) = try_read_xtensa_rustc_version(version) {
-            if version >= Version4(1, 73, 0, 1) {
+            if version >= Version4(1, 73, 0, 1)
+                // Patch accidentally missing from 1.74.0.0
+                && version != Version4(1, 74, 0, 0)
+            {
                 println!("cargo:rustc-cfg=xtensa_has_vaarg");
             }
         }
