@@ -43,7 +43,7 @@ embedded-hal-bus   = "0.1.0-rc.1"
 esp-backtrace      = { version = "0.9.0", features = ["esp32c6", "panic-handler", "exception-handler", "print-uart"] }
 esp-hal-smartled   = { version = "0.6.0", features = ["esp32c6"], path = "../esp-hal-smartled" }
 esp-println        = { version = "0.7.0", features = ["esp32c6"] }
-heapless           = "0.7.16"
+heapless           = "0.8.0"
 hmac               = { version = "0.12.1", default-features = false }
 lis3dh-async       = "0.8.0"
 sha2               = { version = "0.10.8", default-features = false}
