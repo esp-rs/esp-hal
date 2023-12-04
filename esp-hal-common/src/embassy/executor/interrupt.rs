@@ -6,13 +6,9 @@ use embassy_executor::{raw, SendSpawner};
 use peripherals::INTPRI as SystemPeripheral;
 #[cfg(not(any(esp32c6, esp32h2)))]
 use peripherals::SYSTEM as SystemPeripheral;
+use portable_atomic::{AtomicUsize, Ordering};
 
-use crate::{
-    atomic::{AtomicUsize, Ordering},
-    get_core,
-    interrupt,
-    peripherals,
-};
+use crate::{get_core, interrupt, peripherals};
 
 static FROM_CPU_IRQ_USED: AtomicUsize = AtomicUsize::new(0);
 

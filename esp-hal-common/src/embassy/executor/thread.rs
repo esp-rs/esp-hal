@@ -2,12 +2,9 @@
 use core::marker::PhantomData;
 
 use embassy_executor::{raw, Spawner};
+use portable_atomic::{AtomicBool, Ordering};
 
-use crate::{
-    atomic::{AtomicBool, Ordering},
-    get_core,
-    prelude::interrupt,
-};
+use crate::{get_core, prelude::interrupt};
 #[cfg(multi_core)]
 use crate::{
     interrupt,
