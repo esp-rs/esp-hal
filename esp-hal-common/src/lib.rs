@@ -163,10 +163,6 @@ mod soc;
 
 #[allow(unused_imports)]
 mod atomic {
-    #[cfg(any(has_native_atomic_support, feature = "atomic-emulation"))]
-    pub use core::sync::atomic::*;
-
-    #[cfg(feature = "portable-atomic")]
     pub use portable_atomic::*;
 }
 

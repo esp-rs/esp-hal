@@ -12,7 +12,7 @@
 //! interrupt15() => Priority::Priority15
 //! ```
 
-use esp_riscv_rt::riscv::register::{mcause, mepc, mtvec};
+use esp_riscv_rt::riscv::register::{mcause, mtvec};
 pub use esp_riscv_rt::TrapFrame;
 
 #[cfg(not(plic))]
@@ -408,8 +408,10 @@ pub unsafe extern "C" fn start_trap_rust_hal(trap_frame: *mut TrapFrame) {
 
     let cause = mcause::read();
     if cause.is_exception() {
-        let pc = mepc::read();
-        handle_exception(pc, trap_frame);
+        extern "C" {
+            fn ExceptionHandler(tf: *mut TrapFrame);
+        }
+        ExceptionHandler(trap_frame);
     } else {
         #[cfg(feature = "interrupt-preemption")]
         let interrupt_priority = _handle_priority();
@@ -453,98 +455,6 @@ pub unsafe extern "C" fn start_trap_rust_hal(trap_frame: *mut TrapFrame) {
         #[cfg(feature = "interrupt-preemption")]
         _restore_priority(interrupt_priority);
     }
-}
-
-/// Apply atomic emulation if needed. Call the default exception handler
-/// otherwise.
-///
-/// # Safety
-///
-/// This function is called from an trap handler.
-unsafe fn handle_exception(_pc: usize, trap_frame: *mut TrapFrame) {
-    #[cfg(feature = "atomic-emulation")]
-    {
-        let insn: usize = *(_pc as *const _);
-        let needs_atomic_emulation = (insn & 0b1111111) == 0b0101111;
-        if needs_atomic_emulation {
-            let mut frame = [
-                0,
-                (*trap_frame).ra,
-                (*trap_frame).sp,
-                (*trap_frame).gp,
-                (*trap_frame).tp,
-                (*trap_frame).t0,
-                (*trap_frame).t1,
-                (*trap_frame).t2,
-                (*trap_frame).s0,
-                (*trap_frame).s1,
-                (*trap_frame).a0,
-                (*trap_frame).a1,
-                (*trap_frame).a2,
-                (*trap_frame).a3,
-                (*trap_frame).a4,
-                (*trap_frame).a5,
-                (*trap_frame).a6,
-                (*trap_frame).a7,
-                (*trap_frame).s2,
-                (*trap_frame).s3,
-                (*trap_frame).s4,
-                (*trap_frame).s5,
-                (*trap_frame).s6,
-                (*trap_frame).s7,
-                (*trap_frame).s8,
-                (*trap_frame).s9,
-                (*trap_frame).s10,
-                (*trap_frame).s11,
-                (*trap_frame).t3,
-                (*trap_frame).t4,
-                (*trap_frame).t5,
-                (*trap_frame).t6,
-            ];
-
-            riscv_atomic_emulation_trap::atomic_emulation((*trap_frame).pc, &mut frame);
-
-            (*trap_frame).ra = frame[1];
-            (*trap_frame).sp = frame[2];
-            (*trap_frame).gp = frame[3];
-            (*trap_frame).tp = frame[4];
-            (*trap_frame).t0 = frame[5];
-            (*trap_frame).t1 = frame[6];
-            (*trap_frame).t2 = frame[7];
-            (*trap_frame).s0 = frame[8];
-            (*trap_frame).s1 = frame[9];
-            (*trap_frame).a0 = frame[10];
-            (*trap_frame).a1 = frame[11];
-            (*trap_frame).a2 = frame[12];
-            (*trap_frame).a3 = frame[13];
-            (*trap_frame).a4 = frame[14];
-            (*trap_frame).a5 = frame[15];
-            (*trap_frame).a6 = frame[16];
-            (*trap_frame).a7 = frame[17];
-            (*trap_frame).s2 = frame[18];
-            (*trap_frame).s3 = frame[19];
-            (*trap_frame).s4 = frame[20];
-            (*trap_frame).s5 = frame[21];
-            (*trap_frame).s6 = frame[22];
-            (*trap_frame).s7 = frame[23];
-            (*trap_frame).s8 = frame[24];
-            (*trap_frame).s9 = frame[25];
-            (*trap_frame).s10 = frame[26];
-            (*trap_frame).s11 = frame[27];
-            (*trap_frame).t3 = frame[28];
-            (*trap_frame).t4 = frame[29];
-            (*trap_frame).t5 = frame[30];
-            (*trap_frame).t6 = frame[31];
-            (*trap_frame).pc = _pc + 4;
-
-            return;
-        }
-    }
-
-    extern "C" {
-        fn ExceptionHandler(tf: *mut TrapFrame);
-    }
-    ExceptionHandler(trap_frame);
 }
 
 #[doc(hidden)]

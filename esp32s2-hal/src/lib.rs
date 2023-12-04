@@ -59,7 +59,6 @@
 #![no_std]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 
-use esp_hal_common::xtensa_lx_rt::exception::ExceptionCause;
 pub use esp_hal_common::*;
 
 /// Function initializes ESP32 specific memories (RTC slow and fast) and
@@ -104,63 +103,6 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
 #[rustfmt::skip]
 pub extern "Rust" fn __init_data() -> bool {
     false
-}
-
-/// Atomic Emulation is always enabled on ESP32-S2
-#[doc(hidden)]
-#[no_mangle]
-#[export_name = "__exception"] // this overrides the exception handler in xtensa_lx_rt
-#[link_section = ".rwtext"]
-unsafe fn exception(cause: ExceptionCause, save_frame: &mut trapframe::TrapFrame) {
-    if let ExceptionCause::Illegal = cause {
-        let mut regs = [
-            save_frame.A0,
-            save_frame.A1,
-            save_frame.A2,
-            save_frame.A3,
-            save_frame.A4,
-            save_frame.A5,
-            save_frame.A6,
-            save_frame.A7,
-            save_frame.A8,
-            save_frame.A9,
-            save_frame.A10,
-            save_frame.A11,
-            save_frame.A12,
-            save_frame.A13,
-            save_frame.A14,
-            save_frame.A15,
-        ];
-
-        if xtensa_atomic_emulation_trap::atomic_emulation(save_frame.PC, &mut regs) {
-            save_frame.PC += 3; // 24bit instruction
-
-            save_frame.A0 = regs[0];
-            save_frame.A1 = regs[1];
-            save_frame.A2 = regs[2];
-            save_frame.A3 = regs[3];
-            save_frame.A4 = regs[4];
-            save_frame.A5 = regs[5];
-            save_frame.A6 = regs[6];
-            save_frame.A7 = regs[7];
-            save_frame.A8 = regs[8];
-            save_frame.A9 = regs[9];
-            save_frame.A10 = regs[10];
-            save_frame.A11 = regs[11];
-            save_frame.A12 = regs[12];
-            save_frame.A13 = regs[13];
-            save_frame.A14 = regs[14];
-            save_frame.A15 = regs[15];
-
-            return;
-        }
-    }
-
-    extern "C" {
-        fn __user_exception(cause: ExceptionCause, save_frame: &mut trapframe::TrapFrame);
-    }
-
-    __user_exception(cause, save_frame);
 }
 
 #[export_name = "__post_init"]

@@ -50,7 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Breaking
 - Direct boot support has been removed (#903).
 - `Spi::new`/`Spi::new_half_duplex` takes no gpio pin now, instead you need to call `with_pins` to setup those (#901).
-- ESP32C2, ESP32C3: atomic emulation trap is now opt-in. When upgrading you must either remove [these lines](https://github.com/esp-rs/riscv-atomic-emulation-trap#usage) from your `.cargo/config.toml` or opt back in by enabling the feature. (#904)
+- ESP32C2, ESP32C3, ESP32S2: atomic emulation trap has been removed. When upgrading you must either remove [these lines](https://github.com/esp-rs/riscv-atomic-emulation-trap#usage) from your `.cargo/config.toml`. Usage of `core::sync::atomic::*` in dependent crates should be replaced with [portable-atomic](https://github.com/taiki-e/portable-atomic). (#904) (#985)
 - RSA driver now takes u32 words instead of u8 bytes. The expected slice length is now 4 times shorter. (#981)
 
 ## [0.13.1] - 2023-11-02

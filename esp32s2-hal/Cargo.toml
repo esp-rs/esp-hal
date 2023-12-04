@@ -27,7 +27,6 @@ categories = [
 [dependencies]
 esp-hal-common               = { version = "0.13.0", features = ["esp32s2"], path = "../esp-hal-common" }
 embassy-time                 = { version = "0.1.5",  features = ["nightly"], optional = true }
-xtensa-atomic-emulation-trap = "0.4.0"
 
 [dev-dependencies]
 aes                = "0.8.3"
@@ -44,7 +43,10 @@ esp-alloc          = "0.3.0"
 esp-backtrace      = { version = "0.9.0", features = ["esp32s2", "panic-handler", "print-uart", "exception-handler"] }
 esp-hal-smartled   = { version = "0.6.0", features = ["esp32s2"], path = "../esp-hal-smartled" }
 esp-println        = { version = "0.7.0", features = ["esp32s2"] }
-heapless           = "0.8.0"
+heapless           = { version = "0.8", features = ["portable-atomic"] }
+# xtensa targets are not auto detected to need atomic emulation in the futures-* crates.
+# see https://github.com/rust-lang/futures-rs/pull/2805 as to how to remove this dep for good
+futures-util = { version = "0.3.17", default-features = false, features = ["portable-atomic"] }
 hmac               = { version = "0.12.1", default-features = false }
 lis3dh-async       = "0.8.0"
 sha2               = { version = "0.10.8", default-features = false }
@@ -64,8 +66,6 @@ log       = ["esp-hal-common/log", "esp-println/log"]
 rt        = []
 ufmt      = ["esp-hal-common/ufmt"]
 vectored  = ["esp-hal-common/vectored"]
-
-portable-atomic  = ["esp-hal-common/portable-atomic"]
 
 # Embassy support
 embassy = ["esp-hal-common/embassy"]

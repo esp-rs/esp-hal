@@ -145,30 +145,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         unreachable!() // We've confirmed exactly one known device was selected
     };
 
-    // The C6 has an "atomic" peripheral but it's an exception, not the rule
-    // For S2, we just keep lying for now. The target has emulation support
-    // force-enabled.
-    let has_native_atomic_support = matches!(
-        device_name,
-        "esp32" | "esp32s2" | "esp32s3" | "esp32c6" | "esp32h2"
-    );
-
-    let atomic_emulation_enabled = cfg!(feature = "atomic-emulation");
-    let portable_atomic_enabled = cfg!(feature = "portable-atomic");
-
-    if !atomic_emulation_enabled && detect_atomic_extension("a") {
-        panic!("Atomic emulation flags detected in `.cargo/config.toml` but `atomic-emulation` feature is not enabled!");
-    }
-
-    if atomic_emulation_enabled && portable_atomic_enabled {
-        panic!("The `atomic-emulation` and `portable-atomic` features cannot be used together");
-    }
-
-    if has_native_atomic_support {
-        if atomic_emulation_enabled {
-            println!("cargo:warning={} has native atomic instructions, the `atomic-emulation` feature is not needed", device_name);
-        }
-        println!("cargo:rustc-cfg=has_native_atomic_support");
+    if detect_atomic_extension("a") || detect_atomic_extension("s32c1i") {
+        panic!(
+            "Atomic emulation flags detected in `.cargo/config.toml`, this is no longer supported!"
+        );
     }
 
     // Load the configuration file for the configured device:
