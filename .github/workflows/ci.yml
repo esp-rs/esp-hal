@@ -33,10 +33,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@v1
         with:
-          target: riscv32imc-unknown-none-elf
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
           toolchain: nightly
           components: rust-src
       - uses: esp-rs/xtensa-toolchain@v1.5
@@ -45,23 +45,23 @@ jobs:
           override: false
       - uses: Swatinem/rust-cache@v2
 
-      # Check all RISC-V targets:
-      - name: check (esp32c3)
-        run: cd esp-hal-smartled/ && cargo +nightly check --features=esp32c3
-      - name: check (esp32c6)
-        run: cd esp-hal-smartled/ && cargo +nightly check --features=esp32c6
-      - name: check (esp32h2)
-        run: cd esp-hal-smartled/ && cargo +nightly check --features=esp32h2
-      # Check all Xtensa targets:
-      - name: check (esp32)
-        run: cd esp-hal-smartled/ && cargo +esp check --features=esp32,xtal-40mhz
-      - name: check (esp32s2)
-        run: cd esp-hal-smartled/ && cargo +esp check --features=esp32s2
-      - name: check (esp32s3)
-        run: cd esp-hal-smartled/ && cargo +esp check --features=esp32s3
+      # Build all RISC-V targets:
+      - name: build (esp32c3)
+        run: cd esp-hal-smartled/ && cargo +nightly build -Zbuild-std=core --target=riscv32imc-unknown-none-elf --features=esp32c3
+      - name: build (esp32c6)
+        run: cd esp-hal-smartled/ && cargo +nightly build -Zbuild-std=core --target=riscv32imac-unknown-none-elf --features=esp32c6
+      - name: build (esp32h2)
+        run: cd esp-hal-smartled/ && cargo +nightly build -Zbuild-std=core --target=riscv32imac-unknown-none-elf --features=esp32h2
+      # Build all Xtensa targets:
+      - name: build (esp32)
+        run: cd esp-hal-smartled/ && cargo +esp build -Zbuild-std=core --target=xtensa-esp32-none-elf --features=esp32,xtal-40mhz
+      - name: build (esp32s2)
+        run: cd esp-hal-smartled/ && cargo +esp build -Zbuild-std=core --target=xtensa-esp32s2-none-elf --features=esp32s2
+      - name: build (esp32s3)
+        run: cd esp-hal-smartled/ && cargo +esp build -Zbuild-std=core --target=xtensa-esp32s3-none-elf --features=esp32s3
       # Ensure documentation can be built (requires a chip feature!)
       - name: rustdoc
-        run: cd esp-hal-smartled/ && cargo doc --features=esp32c3,esp-hal-common/eh1
+        run: cd esp-hal-smartled/ && cargo doc --features=esp32c3
 
   esp32-hal:
     runs-on: ubuntu-latest

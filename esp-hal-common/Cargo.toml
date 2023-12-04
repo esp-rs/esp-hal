@@ -32,7 +32,7 @@ embedded-hal-nb      = { version = "=1.0.0-rc.1", optional = true }
 embedded-io          = { version = "0.6.1", optional = true }
 esp-synopsys-usb-otg = { version = "0.3.2", optional = true, features = ["fs", "esp32sx"] }
 fugit                = "0.3.7"
-heapless             = "0.7.16"
+heapless             = "0.8.0"
 log                  = { version = "0.4.20", optional = true }
 nb                   = "1.1.0"
 paste                = "1.0.14"
