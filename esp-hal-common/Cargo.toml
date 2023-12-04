@@ -41,7 +41,7 @@ portable-atomic      = { version = "1.5.1", default-features = false }
 procmacros           = { version = "0.7.0", features = ["enum-dispatch", "ram"], package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 strum                = { version = "0.25.0", default-features = false, features = ["derive"] }
 void                 = { version = "1.0.2", default-features = false }
-usb-device           = { version = "0.2.9", optional = true }
+usb-device           = { version = "0.3.1", optional = true }
 
 # async
 embedded-hal-async = { version = "=1.0.0-rc.2", optional = true }
