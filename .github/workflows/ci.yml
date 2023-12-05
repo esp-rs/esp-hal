@@ -80,17 +80,9 @@ jobs:
       - name: Build esp-riscv-rt (riscv32imac, no features)
         run: cd esp-riscv-rt/ && cargo build -Zbuild-std=core --target=riscv32imac-unknown-none-elf
       - name: Build esp-riscv-rt (riscv32imc, all features)
-        run: |
-          cd esp-riscv-rt/
-          cargo build -Zbuild-std=core \
-            --target=riscv32imc-unknown-none-elf \
-            --features=direct-vectoring,interrupt-preemption,has-mie-mip,zero-bss,zero-rtc-fast-bss,init-data,init-rw-text,init-rtc-fast-data,init-rtc-fast-text
+        run: cd esp-riscv-rt/ && cargo build -Zbuild-std=core --target=riscv32imc-unknown-none-elf --features=ci
       - name: Build esp-riscv-rt (riscv32imac, all features)
-        run: |
-          cd esp-riscv-rt/
-          cargo build -Zbuild-std=core \
-            --target=riscv32imac-unknown-none-elf \
-            --features=direct-vectoring,interrupt-preemption,has-mie-mip,zero-bss,zero-rtc-fast-bss,init-data,init-rw-text,init-rtc-fast-data,init-rtc-fast-text
+        run: cd esp-riscv-rt/ && cargo build -Zbuild-std=core --target=riscv32imac-unknown-none-elf --features=ci
       # Ensure documentation can be built
       - name: rustdoc
         run: cd esp-riscv-rt/ && cargo doc
