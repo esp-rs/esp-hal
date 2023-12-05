@@ -16,8 +16,11 @@ MEMORY
 
     /* 512K of on soc RAM, 32K reserved for cache */
     ICACHE : ORIGIN = 0x40800000,  LENGTH = 32K
-    /* Instruction and Data RAM */
-    RAM : ORIGIN = 0x40800000 + 32K, LENGTH = 512K - 32K
+    /* Instruction and Data RAM 
+    0x4086E610 = 2nd stage bootloader iram_loader_seg start address
+    see https://github.com/espressif/esp-idf/blob/03414a15508036c8fc0f51642aed7a264e9527df/components/esp_system/ld/esp32c6/memory.ld.in#L26
+    */
+    RAM : ORIGIN = 0x40800000 + 32K, LENGTH = 0x6E610 - 32K
 
     /* External flash */
     /* Instruction and Data ROM */

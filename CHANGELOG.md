@@ -41,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Xtensa: Allow using `embassy-executor`'s thread-mode executor if neither `embassy-executor-thread`, nor `embassy-executor-interrupt` is enabled. (#937)
 - Uart Async: Improve interrupt handling and irq <--> future communication (#977)
 - RISC-V: Fix stack allocation (#988)
+- ESP32-C6: Fix used RAM (#997)
 
 ### Removed
 
