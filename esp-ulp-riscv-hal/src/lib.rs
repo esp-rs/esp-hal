@@ -1,4 +1,5 @@
 #![no_std]
+#![allow(asm_sub_register)]
 
 use core::arch::global_asm;
 
@@ -59,11 +60,11 @@ unsafe extern "C" fn ulp_riscv_rescue_from_monitor() {
     // TODO align naming in PACs
     #[cfg(feature = "esp32s2")]
     rtc_cntl
-        .cocpu_ctrl
+        .cocpu_ctrl()
         .modify(|_, w| w.cocpu_done().clear_bit().cocpu_shut_reset_en().clear_bit());
     #[cfg(feature = "esp32s3")]
     rtc_cntl
-        .rtc_cocpu_ctrl
+        .rtc_cocpu_ctrl()
         .modify(|_, w| w.cocpu_done().clear_bit().cocpu_shut_reset_en().clear_bit());
 }
 
@@ -76,19 +77,21 @@ unsafe extern "C" fn ulp_riscv_halt() {
     #[cfg(feature = "esp32s2")]
     {
         rtc_cntl
-            .cocpu_ctrl
+            .cocpu_ctrl()
             .modify(|_, w| w.cocpu_shut_2_clk_dis().variant(0x3f));
 
-        rtc_cntl.cocpu_ctrl.modify(|_, w| w.cocpu_done().set_bit());
+        rtc_cntl
+            .cocpu_ctrl()
+            .modify(|_, w| w.cocpu_done().set_bit());
     }
     #[cfg(feature = "esp32s3")]
     {
         rtc_cntl
-            .rtc_cocpu_ctrl
+            .rtc_cocpu_ctrl()
             .modify(|_, w| w.cocpu_shut_2_clk_dis().variant(0x3f));
 
         rtc_cntl
-            .rtc_cocpu_ctrl
+            .rtc_cocpu_ctrl()
             .modify(|_, w| w.cocpu_done().set_bit());
     }
 

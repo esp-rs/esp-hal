@@ -32,20 +32,22 @@
 //! ```no_run
 //! #[embassy_executor::task]
 //! async fn mod_exp_example(mut rsa: Rsa<'static>) {
-//!     let mut outbuf = [0_u8; U512::BYTES];
+//!     let mut outbuf = [0_u32; U512::LIMBS];
 //!     let mut mod_exp = RsaModularExponentiation::<operand_sizes::Op512>::new(
 //!         &mut rsa,
-//!         &BIGNUM_2.to_le_bytes(),
-//!         &BIGNUM_3.to_le_bytes(),
+//!         BIGNUM_2.as_words(),
+//!         BIGNUM_3.as_words(),
 //!         compute_mprime(&BIGNUM_3),
 //!     );
-//!     let r = compute_r(&BIGNUM_3).to_le_bytes();
-//!     let base = &BIGNUM_1.to_le_bytes();
-//!     mod_exp.exponentiation(&base, &r, &mut outbuf).await;
+//!     let r = compute_r(&BIGNUM_3);
+//!     let base = &BIGNUM_1.as_words();
+//!     mod_exp
+//!         .exponentiation(base, r.as_words(), &mut outbuf)
+//!         .await;
 //!     let residue_params = DynResidueParams::new(&BIGNUM_3);
 //!     let residue = DynResidue::new(&BIGNUM_1, residue_params);
 //!     let sw_out = residue.pow(&BIGNUM_2);
-//!     assert_eq!(U512::from_le_bytes(outbuf), sw_out.retrieve());
+//!     assert_eq!(U512::from_words(outbuf), sw_out.retrieve());
 //!     println!("modular exponentiation done");
 //! }
 //! ```
@@ -92,36 +94,40 @@ impl<'d> Rsa<'d> {
         Self { rsa }
     }
 
-    unsafe fn write_operand_b<const N: usize>(&mut self, operand_b: &[u8; N]) {
+    unsafe fn write_operand_b<const N: usize>(&mut self, operand_b: &[u32; N]) {
         copy_nonoverlapping(
             operand_b.as_ptr(),
-            self.rsa.y_mem.as_mut_ptr() as *mut u8,
+            self.rsa.y_mem(0).as_ptr() as *mut u32,
             N,
         );
     }
 
-    unsafe fn write_modulus<const N: usize>(&mut self, modulus: &[u8; N]) {
-        copy_nonoverlapping(modulus.as_ptr(), self.rsa.m_mem.as_mut_ptr() as *mut u8, N);
+    unsafe fn write_modulus<const N: usize>(&mut self, modulus: &[u32; N]) {
+        copy_nonoverlapping(modulus.as_ptr(), self.rsa.m_mem(0).as_ptr() as *mut u32, N);
     }
 
     fn write_mprime(&mut self, m_prime: u32) {
-        self.rsa.m_prime.write(|w| unsafe { w.bits(m_prime) });
+        self.rsa.m_prime().write(|w| unsafe { w.bits(m_prime) });
     }
 
-    unsafe fn write_operand_a<const N: usize>(&mut self, operand_a: &[u8; N]) {
+    unsafe fn write_operand_a<const N: usize>(&mut self, operand_a: &[u32; N]) {
         copy_nonoverlapping(
             operand_a.as_ptr(),
-            self.rsa.x_mem.as_mut_ptr() as *mut u8,
+            self.rsa.x_mem(0).as_ptr() as *mut u32,
             N,
         );
     }
 
-    unsafe fn write_r<const N: usize>(&mut self, r: &[u8; N]) {
-        copy_nonoverlapping(r.as_ptr(), self.rsa.z_mem.as_mut_ptr() as *mut u8, N);
+    unsafe fn write_r<const N: usize>(&mut self, r: &[u32; N]) {
+        copy_nonoverlapping(r.as_ptr(), self.rsa.z_mem(0).as_ptr() as *mut u32, N);
     }
 
-    unsafe fn read_out<const N: usize>(&mut self, outbuf: &mut [u8; N]) {
-        copy_nonoverlapping(self.rsa.z_mem.as_ptr() as *const u8, outbuf.as_mut_ptr(), N);
+    unsafe fn read_out<const N: usize>(&mut self, outbuf: &mut [u32; N]) {
+        copy_nonoverlapping(
+            self.rsa.z_mem(0).as_ptr() as *const u32,
+            outbuf.as_ptr() as *mut u32,
+            N,
+        );
     }
 }
 
@@ -142,11 +148,11 @@ macro_rules! implement_op {
     paste! {pub struct [<Op $x>];}
     paste! {
         impl Multi for [<Op $x>] {
-        type OutputType = [u8; $x*2 / 8];
+        type OutputType = [u32; $x*2 / 32];
     }}
     paste!{
     impl RsaMode for [<Op $x>] {
-        type InputType = [u8; $x / 8];
+        type InputType = [u32; $x / 32];
     }}
     };
 
@@ -154,7 +160,7 @@ macro_rules! implement_op {
         paste! {pub struct [<Op $x>];}
     paste!{
     impl RsaMode for [<Op $x>] {
-        type InputType =  [u8; $x / 8];
+        type InputType =  [u32; $x / 32];
     }}
      };
 
@@ -177,7 +183,7 @@ pub struct RsaModularExponentiation<'a, 'd, T: RsaMode> {
 
 impl<'a, 'd, T: RsaMode, const N: usize> RsaModularExponentiation<'a, 'd, T>
 where
-    T: RsaMode<InputType = [u8; N]>,
+    T: RsaMode<InputType = [u32; N]>,
 {
     /// starts the modular exponentiation operation. `r` could be calculated
     /// using `2 ^ ( bitlength * 2 ) mod modulus`, for more information
@@ -218,7 +224,7 @@ pub struct RsaModularMultiplication<'a, 'd, T: RsaMode> {
 
 impl<'a, 'd, T: RsaMode, const N: usize> RsaModularMultiplication<'a, 'd, T>
 where
-    T: RsaMode<InputType = [u8; N]>,
+    T: RsaMode<InputType = [u32; N]>,
 {
     /// Reads the result to the given buffer.
     /// This is a non blocking function that returns without an error if
@@ -247,7 +253,7 @@ pub struct RsaMultiplication<'a, 'd, T: RsaMode + Multi> {
 
 impl<'a, 'd, T: RsaMode + Multi, const N: usize> RsaMultiplication<'a, 'd, T>
 where
-    T: RsaMode<InputType = [u8; N]>,
+    T: RsaMode<InputType = [u32; N]>,
 {
     /// Reads the result to the given buffer.
     /// This is a non blocking function that returns without an error if
@@ -255,7 +261,7 @@ where
     /// called before calling this function.
     pub fn read_results<'b, const O: usize>(&mut self, outbuf: &mut T::OutputType)
     where
-        T: Multi<OutputType = [u8; O]>,
+        T: Multi<OutputType = [u32; O]>,
     {
         loop {
             if self.rsa.is_idle() {
@@ -293,33 +299,33 @@ pub(crate) mod asynch {
     impl<'d> RsaFuture<'d> {
         pub async fn new(instance: &'d crate::peripherals::RSA) -> Self {
             #[cfg(not(any(esp32, esp32s2, esp32s3)))]
-            instance.int_ena.modify(|_, w| w.int_ena().set_bit());
+            instance.int_ena().modify(|_, w| w.int_ena().set_bit());
 
             #[cfg(any(esp32s2, esp32s3))]
             instance
-                .interrupt_ena
+                .interrupt_ena()
                 .modify(|_, w| w.interrupt_ena().set_bit());
 
             #[cfg(esp32)]
-            instance.interrupt.modify(|_, w| w.interrupt().set_bit());
+            instance.interrupt().modify(|_, w| w.interrupt().set_bit());
 
             Self { instance }
         }
 
         fn event_bit_is_clear(&self) -> bool {
             #[cfg(not(any(esp32, esp32s2, esp32s3)))]
-            return self.instance.int_ena.read().int_ena().bit_is_clear();
+            return self.instance.int_ena().read().int_ena().bit_is_clear();
 
             #[cfg(any(esp32s2, esp32s3))]
             return self
                 .instance
-                .interrupt_ena
+                .interrupt_ena()
                 .read()
                 .interrupt_ena()
                 .bit_is_clear();
 
             #[cfg(esp32)]
-            return self.instance.interrupt.read().interrupt().bit_is_clear();
+            return self.instance.interrupt().read().interrupt().bit_is_clear();
         }
     }
 
@@ -341,7 +347,7 @@ pub(crate) mod asynch {
 
     impl<'a, 'd, T: RsaMode, const N: usize> RsaModularExponentiation<'a, 'd, T>
     where
-        T: RsaMode<InputType = [u8; N]>,
+        T: RsaMode<InputType = [u32; N]>,
     {
         pub async fn exponentiation(
             &mut self,
@@ -357,7 +363,7 @@ pub(crate) mod asynch {
 
     impl<'a, 'd, T: RsaMode, const N: usize> RsaModularMultiplication<'a, 'd, T>
     where
-        T: RsaMode<InputType = [u8; N]>,
+        T: RsaMode<InputType = [u32; N]>,
     {
         #[cfg(not(esp32))]
         pub async fn modular_multiplication(
@@ -387,7 +393,7 @@ pub(crate) mod asynch {
 
     impl<'a, 'd, T: RsaMode + Multi, const N: usize> RsaMultiplication<'a, 'd, T>
     where
-        T: RsaMode<InputType = [u8; N]>,
+        T: RsaMode<InputType = [u32; N]>,
     {
         #[cfg(not(esp32))]
         pub async fn multiplication<'b, const O: usize>(
@@ -395,7 +401,7 @@ pub(crate) mod asynch {
             operand_b: &T::InputType,
             outbuf: &mut T::OutputType,
         ) where
-            T: Multi<OutputType = [u8; O]>,
+            T: Multi<OutputType = [u32; O]>,
         {
             self.start_multiplication(operand_b);
             RsaFuture::new(&self.rsa.rsa).await;
@@ -409,7 +415,7 @@ pub(crate) mod asynch {
             operand_b: &T::InputType,
             outbuf: &mut T::OutputType,
         ) where
-            T: Multi<OutputType = [u8; O]>,
+            T: Multi<OutputType = [u32; O]>,
         {
             self.start_multiplication(operand_a, operand_b);
             RsaFuture::new(&self.rsa.rsa).await;
@@ -421,17 +427,17 @@ pub(crate) mod asynch {
     fn RSA() {
         #[cfg(not(any(esp32, esp32s2, esp32s3)))]
         unsafe { &*crate::peripherals::RSA::ptr() }
-            .int_ena
+            .int_ena()
             .modify(|_, w| w.int_ena().clear_bit());
 
         #[cfg(esp32)]
         unsafe { &*crate::peripherals::RSA::ptr() }
-            .interrupt
+            .interrupt()
             .modify(|_, w| w.interrupt().clear_bit());
 
         #[cfg(any(esp32s2, esp32s3))]
         unsafe { &*crate::peripherals::RSA::ptr() }
-            .interrupt_ena
+            .interrupt_ena()
             .modify(|_, w| w.interrupt_ena().clear_bit());
 
         WAKER.wake();

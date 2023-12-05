@@ -32,7 +32,8 @@
 use esp32_hal::{
     clock::ClockControl,
     dma::DmaPriority,
-    i2s::{DataFormat, I2s, I2s0New, I2sWriteDma, NoMclk, PinsBclkWsDout, Standard},
+    dma_buffers,
+    i2s::{DataFormat, I2s, I2sWriteDma, Standard},
     pdma::Dma,
     peripherals::Peripherals,
     prelude::*,
@@ -59,12 +60,10 @@ fn main() -> ! {
     let dma = Dma::new(system.dma);
     let dma_channel = dma.i2s0channel;
 
-    let mut tx_descriptors = [0u32; 20 * 3];
-    let mut rx_descriptors = [0u32; 8 * 3];
+    let (tx_buffer, mut tx_descriptors, _, mut rx_descriptors) = dma_buffers!(32000, 0);
 
     let i2s = I2s::new(
         peripherals.I2S0,
-        NoMclk {},
         Standard::Philips,
         DataFormat::Data16Channel16,
         44100u32.Hz(),
@@ -77,16 +76,17 @@ fn main() -> ! {
         &clocks,
     );
 
-    let i2s_tx = i2s.i2s_tx.with_pins(PinsBclkWsDout::new(
-        io.pins.gpio12,
-        io.pins.gpio13,
-        io.pins.gpio14,
-    ));
+    let i2s_tx = i2s
+        .i2s_tx
+        .with_bclk(io.pins.gpio12)
+        .with_ws(io.pins.gpio13)
+        .with_dout(io.pins.gpio14)
+        .build();
 
     let data =
         unsafe { core::slice::from_raw_parts(&SINE as *const _ as *const u8, SINE.len() * 2) };
 
-    let buffer = dma_buffer();
+    let buffer = tx_buffer;
     let mut idx = 0;
     for i in 0..usize::min(data.len(), buffer.len()) {
         buffer[i] = data[idx];
@@ -116,9 +116,4 @@ fn main() -> ! {
             transfer.push(&filler[0..avail]).unwrap();
         }
     }
-}
-
-fn dma_buffer() -> &'static mut [u8; 32000] {
-    static mut BUFFER: [u8; 32000] = [0u8; 32000];
-    unsafe { &mut BUFFER }
 }

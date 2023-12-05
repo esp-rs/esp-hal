@@ -57,7 +57,7 @@ fn enable_phy() {
     // `periph_ll_wifi_bt_module_enable_clk_clear_rst`
     let syscon = unsafe { &*esp32c2::APB_CTRL::PTR };
     syscon
-        .wifi_clk_en
+        .wifi_clk_en()
         .modify(|r, w| unsafe { w.bits(r.bits() | SYSTEM_WIFI_CLK_WIFI_BT_COMMON_M) });
 }
 
@@ -65,7 +65,7 @@ fn disable_phy() {
     // `periph_ll_wifi_bt_module_disable_clk_set_rst`
     let syscon = unsafe { &*esp32c2::APB_CTRL::PTR };
     syscon
-        .wifi_clk_en
+        .wifi_clk_en()
         .modify(|r, w| unsafe { w.bits(r.bits() & !SYSTEM_WIFI_CLK_WIFI_BT_COMMON_M) });
 }
 
@@ -81,10 +81,10 @@ fn reset_mac() {
     const SYSTEM_MAC_RST: u32 = 1 << 2;
     let syscon = unsafe { &*esp32c2::APB_CTRL::PTR };
     syscon
-        .wifi_rst_en
+        .wifi_rst_en()
         .modify(|r, w| unsafe { w.wifi_rst().bits(r.wifi_rst().bits() | SYSTEM_MAC_RST) });
     syscon
-        .wifi_rst_en
+        .wifi_rst_en()
         .modify(|r, w| unsafe { w.wifi_rst().bits(r.wifi_rst().bits() & !SYSTEM_MAC_RST) });
 }
 
@@ -96,35 +96,35 @@ fn init_clocks() {
 
     let syscon = unsafe { &*esp32c2::APB_CTRL::PTR };
     syscon
-        .wifi_clk_en
+        .wifi_clk_en()
         .modify(|r, w| unsafe { w.bits(r.bits() & !WIFI_BT_SDIO_CLK | SYSTEM_WIFI_CLK_EN) });
 }
 
 fn ble_rtc_clk_init() {
     let modem_clkrst = unsafe { &*esp32c2::MODEM_CLKRST::PTR };
     modem_clkrst
-        .modem_lp_timer_conf
+        .modem_lp_timer_conf()
         .modify(|_, w| w.lp_timer_sel_xtal32k().clear_bit());
     modem_clkrst
-        .modem_lp_timer_conf
+        .modem_lp_timer_conf()
         .modify(|_, w| w.lp_timer_sel_xtal().set_bit());
     modem_clkrst
-        .modem_lp_timer_conf
+        .modem_lp_timer_conf()
         .modify(|_, w| w.lp_timer_sel_8m().clear_bit());
     modem_clkrst
-        .modem_lp_timer_conf
+        .modem_lp_timer_conf()
         .modify(|_, w| w.lp_timer_sel_rtc_slow().clear_bit());
 
     // assume 40MHz xtal
     modem_clkrst
-        .modem_lp_timer_conf
+        .modem_lp_timer_conf()
         .modify(|_, w| w.lp_timer_clk_div_num().variant(249));
 
     modem_clkrst
-        .etm_clk_conf
+        .etm_clk_conf()
         .modify(|_, w| w.etm_clk_active().set_bit());
     modem_clkrst
-        .etm_clk_conf
+        .etm_clk_conf()
         .modify(|_, w| w.etm_clk_sel().clear_bit());
 }
 
@@ -132,9 +132,9 @@ fn reset_rpa() {
     const BLE_RPA_REST_BIT: u32 = 1 << 27;
     let syscon = unsafe { &*esp32c2::APB_CTRL::PTR };
     syscon
-        .wifi_rst_en
+        .wifi_rst_en()
         .modify(|r, w| unsafe { w.bits(r.bits() | BLE_RPA_REST_BIT) });
     syscon
-        .wifi_rst_en
+        .wifi_rst_en()
         .modify(|r, w| unsafe { w.bits(r.bits() & !BLE_RPA_REST_BIT) });
 }

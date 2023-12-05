@@ -161,15 +161,6 @@ pub mod trapframe {
 // be directly exposed.
 mod soc;
 
-#[allow(unused_imports)]
-mod atomic {
-    #[cfg(any(has_native_atomic_support, feature = "atomic-emulation"))]
-    pub use core::sync::atomic::*;
-
-    #[cfg(feature = "portable-atomic")]
-    pub use portable_atomic::*;
-}
-
 #[no_mangle]
 extern "C" fn EspDefaultHandler(_level: u32, _interrupt: peripherals::Interrupt) {
     #[cfg(feature = "log")]
@@ -326,7 +317,7 @@ mod critical_section_impl {
 
     #[cfg(multi_core)]
     mod multicore {
-        use crate::atomic::{AtomicUsize, Ordering};
+        use portable_atomic::{AtomicUsize, Ordering};
 
         // We're using a value that we know get_raw_core() will never return. This
         // avoids an unnecessary increment of the core ID.

@@ -80,6 +80,68 @@ pub mod pdma;
 
 const CHUNK_SIZE: usize = 4092;
 
+/// Convenience macro to create DMA buffers and descriptors
+///
+/// ## Usage
+/// ```rust,no_run
+/// // TX and RX buffers are 32000 bytes - passing only one parameter makes TX and RX the same size
+/// let (tx_buffer, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(32000, 32000);
+/// ```
+#[macro_export]
+macro_rules! dma_buffers {
+    ($tx_size:expr, $rx_size:expr) => {{
+        static mut TX_BUFFER: [u8; $tx_size] = [0u8; $tx_size];
+        static mut RX_BUFFER: [u8; $rx_size] = [0u8; $rx_size];
+        let tx_descriptors = [0u32; (($tx_size + 4091) / 4092) * 3];
+        let rx_descriptors = [0u32; (($rx_size + 4091) / 4092) * 3];
+        unsafe {
+            (
+                &mut TX_BUFFER,
+                tx_descriptors,
+                &mut RX_BUFFER,
+                rx_descriptors,
+            )
+        }
+    }};
+
+    ($size:expr) => {{
+        static mut TX_BUFFER: [u8; $size] = [0u8; $size];
+        static mut RX_BUFFER: [u8; $size] = [0u8; $size];
+        let tx_descriptors = [0u32; (($size + 4091) / 4092) * 3];
+        let rx_descriptors = [0u32; (($size + 4091) / 4092) * 3];
+        unsafe {
+            (
+                &mut TX_BUFFER,
+                tx_descriptors,
+                &mut RX_BUFFER,
+                rx_descriptors,
+            )
+        }
+    }};
+}
+
+/// Convenience macro to create DMA descriptors
+///
+/// ## Usage
+/// ```rust,no_run
+/// // Create TX and RX descriptors for transactions up to 32000 bytes - passing only one parameter assumes TX and RX are the same size
+/// let (mut tx_descriptors, mut rx_descriptors) = dma_descriptors!(32000, 32000);
+/// ```
+#[macro_export]
+macro_rules! dma_descriptors {
+    ($tx_size:expr, $rx_size:expr) => {{
+        let tx_descriptors = [0u32; (($tx_size + 4091) / 4092) * 3];
+        let rx_descriptors = [0u32; (($rx_size + 4091) / 4092) * 3];
+        (tx_descriptors, rx_descriptors)
+    }};
+
+    ($size:expr) => {{
+        let tx_descriptors = [0u32; (($size + 4091) / 4092) * 3];
+        let rx_descriptors = [0u32; (($size + 4091) / 4092) * 3];
+        (tx_descriptors, rx_descriptors)
+    }};
+}
+
 /// DMA Errors
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]

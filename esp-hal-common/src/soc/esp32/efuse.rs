@@ -123,10 +123,10 @@ impl EfuseBlock {
         use EfuseBlock::*;
         let efuse = unsafe { &*EFUSE::ptr() };
         match self {
-            Block0 => efuse.blk0_rdata0.as_ptr(),
-            Block1 => efuse.blk1_rdata0.as_ptr(),
-            Block2 => efuse.blk2_rdata0.as_ptr(),
-            Block3 => efuse.blk3_rdata0.as_ptr(),
+            Block0 => efuse.blk0_rdata0().as_ptr(),
+            Block1 => efuse.blk1_rdata0().as_ptr(),
+            Block2 => efuse.blk2_rdata0().as_ptr(),
+            Block3 => efuse.blk3_rdata0().as_ptr(),
         }
     }
 }

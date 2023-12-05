@@ -23,6 +23,7 @@ use embassy_time::{Duration, Timer};
 use esp32s2_hal::{
     clock::ClockControl,
     dma::DmaPriority,
+    dma_descriptors,
     embassy::{self},
     pdma::*,
     peripherals::Peripherals,
@@ -36,7 +37,7 @@ use esp32s2_hal::{
 use esp_backtrace as _;
 
 #[main]
-async fn main(_spawner: Spawner) -> ! {
+async fn main(_spawner: Spawner) {
     esp_println::println!("Init!");
     let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();
@@ -69,8 +70,7 @@ async fn main(_spawner: Spawner) -> ! {
     let dma = Dma::new(system.dma);
     let dma_channel = dma.spi2channel;
 
-    let mut descriptors = [0u32; 8 * 3];
-    let mut rx_descriptors = [0u32; 8 * 3];
+    let (mut descriptors, mut rx_descriptors) = dma_descriptors!(32000);
 
     let mut spi = Spi::new(peripherals.SPI2, 100u32.kHz(), SpiMode::Mode0, &clocks)
         .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))

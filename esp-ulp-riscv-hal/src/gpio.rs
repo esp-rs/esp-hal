@@ -42,13 +42,13 @@ pub struct GpioPin<MODE, const PIN: u8> {
 
 impl<MODE, const PIN: u8> GpioPin<Input<MODE>, PIN> {
     fn input_state(&self) -> bool {
-        unsafe { &*RTC_IO::PTR }.rtc_gpio_in.read().bits() >> PIN & 0x1 != 0
+        unsafe { &*RTC_IO::PTR }.rtc_gpio_in().read().bits() >> PIN & 0x1 != 0
     }
 }
 
 impl<MODE, const PIN: u8> GpioPin<Output<MODE>, PIN> {
     fn output_state(&self) -> bool {
-        unsafe { &*RTC_IO::PTR }.rtc_gpio_out.read().bits() >> PIN & 0x1 != 0
+        unsafe { &*RTC_IO::PTR }.rtc_gpio_out().read().bits() >> PIN & 0x1 != 0
     }
 
     fn set_output_low(&mut self) {
@@ -56,24 +56,24 @@ impl<MODE, const PIN: u8> GpioPin<Output<MODE>, PIN> {
 
         #[cfg(feature = "esp32s2")]
         unsafe { &*RTC_IO::PTR }
-            .rtc_gpio_out_w1tc
+            .rtc_gpio_out_w1tc()
             .write(|w| w.gpio_out_data_w1tc().variant(1 << PIN));
 
         #[cfg(feature = "esp32s3")]
         unsafe { &*RTC_IO::PTR }
-            .rtc_gpio_out_w1tc
+            .rtc_gpio_out_w1tc()
             .write(|w| w.rtc_gpio_out_data_w1tc().variant(1 << PIN));
     }
 
     fn set_output_high(&mut self) {
         #[cfg(feature = "esp32s2")]
         unsafe { &*RTC_IO::PTR }
-            .rtc_gpio_out_w1ts
+            .rtc_gpio_out_w1ts()
             .write(|w| w.gpio_out_data_w1ts().variant(1 << PIN));
 
         #[cfg(feature = "esp32s3")]
         unsafe { &*RTC_IO::PTR }
-            .rtc_gpio_out_w1ts
+            .rtc_gpio_out_w1ts()
             .write(|w| w.rtc_gpio_out_data_w1ts().variant(1 << PIN));
     }
 }

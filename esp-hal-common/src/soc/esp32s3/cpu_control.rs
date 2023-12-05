@@ -140,18 +140,18 @@ unsafe fn internal_park_core(core: Cpu) {
     match core {
         Cpu::ProCpu => {
             rtc_control
-                .sw_cpu_stall
+                .sw_cpu_stall()
                 .modify(|_, w| w.sw_stall_procpu_c1().bits(0x21));
             rtc_control
-                .options0
+                .options0()
                 .modify(|_, w| w.sw_stall_procpu_c0().bits(0x02));
         }
         Cpu::AppCpu => {
             rtc_control
-                .sw_cpu_stall
+                .sw_cpu_stall()
                 .modify(|_, w| w.sw_stall_appcpu_c1().bits(0x21));
             rtc_control
-                .options0
+                .options0()
                 .modify(|_, w| w.sw_stall_appcpu_c0().bits(0x02));
         }
     }
@@ -176,18 +176,18 @@ impl CpuControl {
         match core {
             Cpu::ProCpu => {
                 rtc_control
-                    .sw_cpu_stall
+                    .sw_cpu_stall()
                     .modify(|_, w| unsafe { w.sw_stall_procpu_c1().bits(0) });
                 rtc_control
-                    .options0
+                    .options0()
                     .modify(|_, w| unsafe { w.sw_stall_procpu_c0().bits(0) });
             }
             Cpu::AppCpu => {
                 rtc_control
-                    .sw_cpu_stall
+                    .sw_cpu_stall()
                     .modify(|_, w| unsafe { w.sw_stall_appcpu_c1().bits(0) });
                 rtc_control
-                    .options0
+                    .options0()
                     .modify(|_, w| unsafe { w.sw_stall_appcpu_c0().bits(0) });
             }
         }
@@ -249,7 +249,7 @@ impl CpuControl {
 
         if !xtensa_lx::is_debugger_attached()
             && system_control
-                .core_1_control_0
+                .core_1_control_0()
                 .read()
                 .control_core_1_clkgate_en()
                 .bit_is_set()
@@ -285,16 +285,16 @@ impl CpuControl {
         };
 
         system_control
-            .core_1_control_0
+            .core_1_control_0()
             .modify(|_, w| w.control_core_1_clkgate_en().set_bit());
         system_control
-            .core_1_control_0
+            .core_1_control_0()
             .modify(|_, w| w.control_core_1_runstall().clear_bit());
         system_control
-            .core_1_control_0
+            .core_1_control_0()
             .modify(|_, w| w.control_core_1_reseting().set_bit());
         system_control
-            .core_1_control_0
+            .core_1_control_0()
             .modify(|_, w| w.control_core_1_reseting().clear_bit());
 
         self.unpark_core(Cpu::AppCpu);

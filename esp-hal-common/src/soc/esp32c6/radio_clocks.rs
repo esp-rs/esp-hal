@@ -52,20 +52,20 @@ impl RadioClockController for RadioClockControl {
 fn enable_phy() {
     let modem_lpcon = unsafe { &*esp32c6::MODEM_LPCON::PTR };
     modem_lpcon
-        .clk_conf
+        .clk_conf()
         .modify(|_, w| w.clk_i2c_mst_en().set_bit());
     modem_lpcon
-        .i2c_mst_clk_conf
+        .i2c_mst_clk_conf()
         .modify(|_, w| w.clk_i2c_mst_sel_160m().set_bit());
 }
 
 fn disable_phy() {
     let modem_lpcon = unsafe { &*esp32c6::MODEM_LPCON::PTR };
     modem_lpcon
-        .clk_conf
+        .clk_conf()
         .modify(|_, w| w.clk_i2c_mst_en().clear_bit());
     modem_lpcon
-        .i2c_mst_clk_conf
+        .i2c_mst_clk_conf()
         .modify(|_, w| w.clk_i2c_mst_sel_160m().clear_bit());
 }
 
@@ -73,7 +73,7 @@ fn wifi_clock_enable() {
     let modem_syscon = unsafe { &*esp32c6::MODEM_SYSCON::PTR };
     let modem_lpcon = unsafe { &*esp32c6::MODEM_LPCON::PTR };
 
-    modem_syscon.clk_conf1.modify(|_, w| {
+    modem_syscon.clk_conf1().modify(|_, w| {
         w.clk_wifi_apb_en()
             .set_bit()
             .clk_wifimac_en()
@@ -107,7 +107,7 @@ fn wifi_clock_enable() {
     });
 
     modem_lpcon
-        .clk_conf
+        .clk_conf()
         .modify(|_, w| w.clk_wifipwr_en().set_bit().clk_coex_en().set_bit());
 }
 
@@ -115,7 +115,7 @@ fn wifi_clock_disable() {
     let modem_syscon = unsafe { &*esp32c6::MODEM_SYSCON::PTR };
     let modem_lpcon = unsafe { &*esp32c6::MODEM_LPCON::PTR };
 
-    modem_syscon.clk_conf1.modify(|_, w| {
+    modem_syscon.clk_conf1().modify(|_, w| {
         w.clk_wifi_apb_en()
             .clear_bit()
             .clk_wifimac_en()
@@ -149,7 +149,7 @@ fn wifi_clock_disable() {
     });
 
     modem_lpcon
-        .clk_conf
+        .clk_conf()
         .modify(|_, w| w.clk_wifipwr_en().clear_bit().clk_coex_en().clear_bit());
 }
 
@@ -158,10 +158,10 @@ fn ieee802154_clock_enable() {
     let modem_lpcon = unsafe { &*esp32c6::MODEM_LPCON::PTR };
 
     modem_syscon
-        .clk_conf
+        .clk_conf()
         .modify(|_, w| w.clk_zb_apb_en().set_bit().clk_zb_mac_en().set_bit());
 
-    modem_syscon.clk_conf1.modify(|_, w| {
+    modem_syscon.clk_conf1().modify(|_, w| {
         w.clk_fe_apb_en()
             .set_bit()
             .clk_fe_cal_160m_en()
@@ -195,7 +195,7 @@ fn ieee802154_clock_enable() {
     });
 
     modem_lpcon
-        .clk_conf
+        .clk_conf()
         .modify(|_, w| w.clk_coex_en().set_bit());
 }
 
@@ -204,10 +204,10 @@ fn ieee802154_clock_disable() {
     let modem_lpcon = unsafe { &*esp32c6::MODEM_LPCON::PTR };
 
     modem_syscon
-        .clk_conf
+        .clk_conf()
         .modify(|_, w| w.clk_zb_apb_en().clear_bit().clk_zb_mac_en().clear_bit());
 
-    modem_syscon.clk_conf1.modify(|_, w| {
+    modem_syscon.clk_conf1().modify(|_, w| {
         w.clk_fe_apb_en()
             .clear_bit()
             .clk_fe_cal_160m_en()
@@ -241,7 +241,7 @@ fn ieee802154_clock_disable() {
     });
 
     modem_lpcon
-        .clk_conf
+        .clk_conf()
         .modify(|_, w| w.clk_coex_en().clear_bit());
 }
 
@@ -249,7 +249,7 @@ fn ble_clock_enable() {
     let modem_syscon = unsafe { &*esp32c6::MODEM_SYSCON::PTR };
     let modem_lpcon = unsafe { &*esp32c6::MODEM_LPCON::PTR };
 
-    modem_syscon.clk_conf.modify(|_, w| {
+    modem_syscon.clk_conf().modify(|_, w| {
         w.clk_etm_en()
             .set_bit()
             .clk_modem_sec_en()
@@ -266,7 +266,7 @@ fn ble_clock_enable() {
             .set_bit()
     });
 
-    modem_syscon.clk_conf1.modify(|_, w| {
+    modem_syscon.clk_conf1().modify(|_, w| {
         w.clk_fe_apb_en()
             .set_bit()
             .clk_fe_cal_160m_en()
@@ -282,7 +282,7 @@ fn ble_clock_enable() {
     });
 
     modem_lpcon
-        .clk_conf
+        .clk_conf()
         .modify(|_, w| w.clk_coex_en().set_bit());
 }
 
@@ -290,7 +290,7 @@ fn ble_clock_disable() {
     let modem_syscon = unsafe { &*esp32c6::MODEM_SYSCON::PTR };
     let modem_lpcon = unsafe { &*esp32c6::MODEM_LPCON::PTR };
 
-    modem_syscon.clk_conf.modify(|_, w| {
+    modem_syscon.clk_conf().modify(|_, w| {
         w.clk_etm_en()
             .clear_bit()
             .clk_modem_sec_en()
@@ -307,7 +307,7 @@ fn ble_clock_disable() {
             .clear_bit()
     });
 
-    modem_syscon.clk_conf1.modify(|_, w| {
+    modem_syscon.clk_conf1().modify(|_, w| {
         w.clk_fe_apb_en()
             .clear_bit()
             .clk_fe_cal_160m_en()
@@ -323,7 +323,7 @@ fn ble_clock_disable() {
     });
 
     modem_lpcon
-        .clk_conf
+        .clk_conf()
         .modify(|_, w| w.clk_coex_en().set_bit());
 }
 
@@ -335,21 +335,21 @@ fn init_clocks() {
     unsafe {
         let pmu = &*esp32c6::PMU::PTR;
 
-        pmu.hp_sleep_icg_modem
+        pmu.hp_sleep_icg_modem()
             .modify(|_, w| w.hp_sleep_dig_icg_modem_code().variant(0));
-        pmu.hp_modem_icg_modem
+        pmu.hp_modem_icg_modem()
             .modify(|_, w| w.hp_modem_dig_icg_modem_code().variant(1));
-        pmu.hp_active_icg_modem
+        pmu.hp_active_icg_modem()
             .modify(|_, w| w.hp_active_dig_icg_modem_code().variant(2));
-        pmu.imm_modem_icg
+        pmu.imm_modem_icg()
             .as_ptr()
-            .write_volatile(pmu.imm_modem_icg.as_ptr().read_volatile() | 1 << 31);
-        pmu.imm_sleep_sysclk
+            .write_volatile(pmu.imm_modem_icg().as_ptr().read_volatile() | 1 << 31);
+        pmu.imm_sleep_sysclk()
             .as_ptr()
-            .write_volatile(pmu.imm_sleep_sysclk.as_ptr().read_volatile() | 1 << 28);
+            .write_volatile(pmu.imm_sleep_sysclk().as_ptr().read_volatile() | 1 << 28);
 
         let modem_syscon = &*esp32c6::MODEM_SYSCON::PTR;
-        modem_syscon.clk_conf_power_st.modify(|_, w| {
+        modem_syscon.clk_conf_power_st().modify(|_, w| {
             w.clk_modem_apb_st_map()
                 .variant(6)
                 .clk_modem_peri_st_map()
@@ -365,7 +365,7 @@ fn init_clocks() {
         });
 
         let modem_lpcon = &*esp32c6::MODEM_LPCON::PTR;
-        modem_lpcon.clk_conf_power_st.modify(|_, w| {
+        modem_lpcon.clk_conf_power_st().modify(|_, w| {
             w.clk_lp_apb_st_map()
                 .variant(6)
                 .clk_i2c_mst_st_map()
@@ -376,7 +376,7 @@ fn init_clocks() {
                 .variant(6)
         });
 
-        modem_lpcon.wifi_lp_clk_conf.modify(|_, w| {
+        modem_lpcon.wifi_lp_clk_conf().modify(|_, w| {
             w.clk_wifipwr_lp_sel_osc_slow()
                 .set_bit()
                 .clk_wifipwr_lp_sel_osc_fast()
@@ -388,11 +388,11 @@ fn init_clocks() {
         });
 
         modem_lpcon
-            .wifi_lp_clk_conf
+            .wifi_lp_clk_conf()
             .modify(|_, w| w.clk_wifipwr_lp_div_num().variant(0));
 
         modem_lpcon
-            .clk_conf
+            .clk_conf()
             .modify(|_, w| w.clk_wifipwr_en().set_bit());
     }
 }

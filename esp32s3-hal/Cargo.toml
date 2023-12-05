@@ -41,11 +41,12 @@ embedded-hal-1     = { version = "=1.0.0-rc.1", package = "embedded-hal" }
 embedded-hal-async = "=1.0.0-rc.1"
 embedded-can       = "0.4.1"
 embedded-io-async  = "0.6.0"
+embedded-hal-bus   = "0.1.0-rc.1"
 esp-alloc          = "0.3.0"
 esp-backtrace      = { version = "0.9.0", features = ["esp32s3", "panic-handler", "exception-handler", "print-uart"] }
 esp-hal-smartled   = { version = "0.6.0", features = ["esp32s3"], path = "../esp-hal-smartled" }
 esp-println        = { version = "0.7.0", features = ["esp32s3"] }
-heapless           = "0.7.16"
+heapless           = "0.8"
 hmac               = { version = "0.12.1", default-features = false }
 lis3dh-async       = "0.8.0"
 sha2               = { version = "0.10.8", default-features = false }
@@ -56,7 +57,7 @@ usb-device         = "0.2.9"
 usbd-serial        = "0.1.1"
 
 [features]
-default              = ["rt", "vectored"]
+default              = ["rt", "vectored", "embassy-integrated-timers"]
 async                = ["esp-hal-common/async"]
 debug                = ["esp-hal-common/debug"]
 defmt                = ["esp-hal-common/defmt", "esp-println/defmt"]
@@ -72,6 +73,14 @@ embassy-time-systick       = ["esp-hal-common/embassy-time-systick", "embassy-ti
 embassy-time-timg0         = ["esp-hal-common/embassy-time-timg0", "embassy-time/tick-hz-1_000_000"]
 embassy-executor-interrupt = ["esp-hal-common/embassy-executor-interrupt"]
 embassy-executor-thread    = ["esp-hal-common/embassy-executor-thread"]
+
+# prefer integrated timers, but allow using the generic queue if needed
+embassy-integrated-timers = ["esp-hal-common/embassy-integrated-timers"]
+embassy-generic-queue-8   = ["esp-hal-common/embassy-generic-queue-8"]
+embassy-generic-queue-16  = ["esp-hal-common/embassy-generic-queue-16"]
+embassy-generic-queue-32  = ["esp-hal-common/embassy-generic-queue-32"]
+embassy-generic-queue-64  = ["esp-hal-common/embassy-generic-queue-64"]
+embassy-generic-queue-128 = ["esp-hal-common/embassy-generic-queue-128"]
 
 # PSRAM support
 psram     = []
@@ -150,4 +159,8 @@ required-features = ["embassy", "async"]
 
 [[example]]
 name              = "embassy_i2s_read"
+required-features = ["embassy", "async"]
+
+[[example]]
+name              = "embassy_usb_serial_jtag"
 required-features = ["embassy", "async"]

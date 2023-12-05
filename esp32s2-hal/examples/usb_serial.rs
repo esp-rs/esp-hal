@@ -25,12 +25,7 @@ fn main() -> ! {
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let usb = USB::new(
-        peripherals.USB0,
-        io.pins.gpio18,
-        io.pins.gpio19,
-        io.pins.gpio20,
-    );
+    let usb = USB::new(peripherals.USB0, io.pins.gpio19, io.pins.gpio20);
 
     let usb_bus = UsbBus::new(usb, unsafe { &mut EP_MEMORY });
 

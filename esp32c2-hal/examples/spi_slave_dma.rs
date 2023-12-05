@@ -28,6 +28,7 @@
 use esp32c2_hal::{
     clock::ClockControl,
     dma::DmaPriority,
+    dma_buffers,
     gdma::Gdma,
     gpio::IO,
     peripherals::Peripherals,
@@ -36,9 +37,7 @@ use esp32c2_hal::{
         slave::{prelude::*, Spi},
         SpiMode,
     },
-    timer::TimerGroup,
     Delay,
-    Rtc,
 };
 use esp_backtrace as _;
 use esp_println::println;
@@ -48,16 +47,6 @@ fn main() -> ! {
     let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-
-    // Disable the watchdog timers. For the ESP32-C2, this includes the Super WDT,
-    // the RTC WDT, and the TIMG WDT.
-    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    let mut wdt0 = timer_group0.wdt;
-
-    rtc.swd.disable();
-    rtc.rwdt.disable();
-    wdt0.disable();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let slave_sclk = io.pins.gpio6;
@@ -75,8 +64,7 @@ fn main() -> ! {
     let dma = Gdma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
 
-    let mut descriptors = [0u32; 8 * 3];
-    let mut rx_descriptors = [0u32; 8 * 3];
+    let (tx_buffer, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(3200);
 
     let mut spi = Spi::new(
         peripherals.SPI2,
@@ -88,7 +76,7 @@ fn main() -> ! {
     )
     .with_dma(dma_channel.configure(
         false,
-        &mut descriptors,
+        &mut tx_descriptors,
         &mut rx_descriptors,
         DmaPriority::Priority0,
     ));
@@ -98,8 +86,8 @@ fn main() -> ! {
     // DMA buffer require a static life-time
     let master_send = &mut [0u8; 3200];
     let master_receive = &mut [0u8; 3200];
-    let mut slave_send = buffer1();
-    let mut slave_receive = buffer2();
+    let mut slave_send = tx_buffer;
+    let mut slave_receive = rx_buffer;
     let mut i = 0;
 
     for (i, v) in master_send.iter_mut().enumerate() {
@@ -160,14 +148,4 @@ fn main() -> ! {
 
         delay.delay_ms(250u32);
     }
-}
-
-fn buffer1() -> &'static mut [u8; 3200] {
-    static mut BUFFER: [u8; 3200] = [0u8; 3200];
-    unsafe { &mut BUFFER }
-}
-
-fn buffer2() -> &'static mut [u8; 3200] {
-    static mut BUFFER: [u8; 3200] = [0u8; 3200];
-    unsafe { &mut BUFFER }
 }

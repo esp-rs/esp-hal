@@ -145,10 +145,10 @@ impl Clock for RtcFastClock {
 }
 
 #[cfg(not(any(esp32c6, esp32h2)))]
-#[allow(unused)]
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 /// RTC SLOW_CLK frequency values
-pub(crate) enum RtcSlowClock {
+pub enum RtcSlowClock {
     /// Internal slow RC oscillator
     RtcSlowClockRtc     = 0,
     /// External 32 KHz XTAL
@@ -233,29 +233,33 @@ impl<'d> Rtc<'d> {
 
         #[cfg(esp32)]
         let (l, h) = {
-            rtc_cntl.time_update.write(|w| w.time_update().set_bit());
-            while rtc_cntl.time_update.read().time_valid().bit_is_clear() {
+            rtc_cntl.time_update().write(|w| w.time_update().set_bit());
+            while rtc_cntl.time_update().read().time_valid().bit_is_clear() {
                 unsafe {
                     // might take 1 RTC slowclk period, don't flood RTC bus
                     ets_delay_us(1);
                 }
             }
-            let h = rtc_cntl.time1.read().time_hi().bits();
-            let l = rtc_cntl.time0.read().time_lo().bits();
+            let h = rtc_cntl.time1().read().time_hi().bits();
+            let l = rtc_cntl.time0().read().time_lo().bits();
             (l, h)
         };
         #[cfg(any(esp32c2, esp32c3, esp32s3, esp32s2))]
         let (l, h) = {
-            rtc_cntl.time_update.write(|w| w.time_update().set_bit());
-            let h = rtc_cntl.time_high0.read().timer_value0_high().bits();
-            let l = rtc_cntl.time_low0.read().timer_value0_low().bits();
+            rtc_cntl.time_update().write(|w| w.time_update().set_bit());
+            let h = rtc_cntl.time_high0().read().timer_value0_high().bits();
+            let l = rtc_cntl.time_low0().read().timer_value0_low().bits();
             (l, h)
         };
         #[cfg(any(esp32c6, esp32h2))]
         let (l, h) = {
-            rtc_cntl.update.write(|w| w.main_timer_update().set_bit());
-            let h = rtc_cntl.main_buf0_high.read().main_timer_buf0_high().bits();
-            let l = rtc_cntl.main_buf0_low.read().main_timer_buf0_low().bits();
+            rtc_cntl.update().write(|w| w.main_timer_update().set_bit());
+            let h = rtc_cntl
+                .main_buf0_high()
+                .read()
+                .main_timer_buf0_high()
+                .bits();
+            let l = rtc_cntl.main_buf0_low().read().main_timer_buf0_low().bits();
             (l, h)
         };
         ((h as u64) << 32) | (l as u64)
@@ -345,32 +349,34 @@ impl RtcClock {
         let rtc_cntl = unsafe { &*RTC_CNTL::PTR };
 
         if clk_8m_en {
-            rtc_cntl.clk_conf.modify(|_, w| w.enb_ck8m().clear_bit());
+            rtc_cntl.clk_conf().modify(|_, w| w.enb_ck8m().clear_bit());
             unsafe {
-                rtc_cntl.timer1.modify(|_, w| w.ck8m_wait().bits(5));
+                rtc_cntl.timer1().modify(|_, w| w.ck8m_wait().bits(5));
                 ets_delay_us(50);
             }
         } else {
-            rtc_cntl.clk_conf.modify(|_, w| w.enb_ck8m().set_bit());
+            rtc_cntl.clk_conf().modify(|_, w| w.enb_ck8m().set_bit());
             rtc_cntl
-                .timer1
+                .timer1()
                 .modify(|_, w| unsafe { w.ck8m_wait().bits(20) });
         }
 
         if d256_en {
             rtc_cntl
-                .clk_conf
+                .clk_conf()
                 .modify(|_, w| w.enb_ck8m_div().clear_bit());
         } else {
-            rtc_cntl.clk_conf.modify(|_, w| w.enb_ck8m_div().set_bit());
+            rtc_cntl
+                .clk_conf()
+                .modify(|_, w| w.enb_ck8m_div().set_bit());
         }
     }
 
     /// Get main XTAL frequency
     /// This is the value stored in RTC register RTC_XTAL_FREQ_REG by the
     /// bootloader, as passed to rtc_clk_init function.
-    fn get_xtal_freq() -> XtalClock {
-        let xtal_freq_reg = unsafe { &*RTC_CNTL::PTR }.store4.read().bits();
+    pub fn get_xtal_freq() -> XtalClock {
+        let xtal_freq_reg = unsafe { &*RTC_CNTL::PTR }.store4().read().bits();
 
         // Values of RTC_XTAL_FREQ_REG and RTC_APB_FREQ_REG are stored as two copies in
         // lower and upper 16-bit halves. These are the routines to work with such a
@@ -398,9 +404,9 @@ impl RtcClock {
 
     /// Get the RTC_SLOW_CLK source
     #[cfg(not(any(esp32c6, esp32h2)))]
-    fn get_slow_freq() -> RtcSlowClock {
+    pub fn get_slow_freq() -> RtcSlowClock {
         let rtc_cntl = unsafe { &*RTC_CNTL::PTR };
-        let slow_freq = rtc_cntl.clk_conf.read().ana_clk_rtc_sel().bits();
+        let slow_freq = rtc_cntl.clk_conf().read().ana_clk_rtc_sel().bits();
         match slow_freq {
             0 => RtcSlowClock::RtcSlowClockRtc,
             1 => RtcSlowClock::RtcSlowClock32kXtal,
@@ -414,7 +420,7 @@ impl RtcClock {
     fn set_slow_freq(slow_freq: RtcSlowClock) {
         unsafe {
             let rtc_cntl = &*RTC_CNTL::PTR;
-            rtc_cntl.clk_conf.modify(|_, w| {
+            rtc_cntl.clk_conf().modify(|_, w| {
                 w.ana_clk_rtc_sel()
                     .bits(slow_freq as u8)
                     // Why we need to connect this clock to digital?
@@ -443,7 +449,7 @@ impl RtcClock {
     fn set_fast_freq(fast_freq: RtcFastClock) {
         unsafe {
             let rtc_cntl = &*RTC_CNTL::PTR;
-            rtc_cntl.clk_conf.modify(|_, w| {
+            rtc_cntl.clk_conf().modify(|_, w| {
                 w.fast_clk_rtc_sel().bit(match fast_freq {
                     RtcFastClock::RtcFastClock8m => true,
                     RtcFastClock::RtcFastClockXtalD4 => false,
@@ -477,17 +483,17 @@ impl RtcClock {
         let timg0 = unsafe { &*TIMG0::PTR };
 
         // Enable requested clock (150k clock is always on)
-        let dig_32k_xtal_enabled = rtc_cntl.clk_conf.read().dig_xtal32k_en().bit_is_set();
+        let dig_32k_xtal_enabled = rtc_cntl.clk_conf().read().dig_xtal32k_en().bit_is_set();
 
         if matches!(cal_clk, RtcCalSel::RtcCal32kXtal) && !dig_32k_xtal_enabled {
             rtc_cntl
-                .clk_conf
+                .clk_conf()
                 .modify(|_, w| w.dig_xtal32k_en().set_bit());
         }
 
         if matches!(cal_clk, RtcCalSel::RtcCal8mD256) {
             rtc_cntl
-                .clk_conf
+                .clk_conf()
                 .modify(|_, w| w.dig_clk8m_d256_en().set_bit());
         }
 
@@ -495,7 +501,7 @@ impl RtcClock {
         // call this function, so we should wait the last process is done.
         #[cfg(not(esp32))]
         if timg0
-            .rtccalicfg
+            .rtccalicfg()
             .read()
             .rtc_cali_start_cycling()
             .bit_is_set()
@@ -504,16 +510,16 @@ impl RtcClock {
             // The internal circuit will be reset when the timeout occurs and will not
             // affect the next calibration.
             timg0
-                .rtccalicfg2
+                .rtccalicfg2()
                 .modify(|_, w| unsafe { w.rtc_cali_timeout_thres().bits(1) });
 
-            while timg0.rtccalicfg.read().rtc_cali_rdy().bit_is_clear()
-                && timg0.rtccalicfg2.read().rtc_cali_timeout().bit_is_clear()
+            while timg0.rtccalicfg().read().rtc_cali_rdy().bit_is_clear()
+                && timg0.rtccalicfg2().read().rtc_cali_timeout().bit_is_clear()
             {}
         }
 
         // Prepare calibration
-        timg0.rtccalicfg.modify(|_, w| unsafe {
+        timg0.rtccalicfg().modify(|_, w| unsafe {
             w.rtc_cali_clk_sel()
                 .bits(cal_clk as u8)
                 .rtc_cali_start_cycling()
@@ -527,21 +533,21 @@ impl RtcClock {
         let expected_freq = match cal_clk {
             RtcCalSel::RtcCal32kXtal => {
                 #[cfg(not(esp32))]
-                timg0.rtccalicfg2.modify(|_, w| unsafe {
+                timg0.rtccalicfg2().modify(|_, w| unsafe {
                     w.rtc_cali_timeout_thres().bits(slowclk_cycles << 12)
                 });
                 RtcSlowClock::RtcSlowClock32kXtal
             }
             RtcCalSel::RtcCal8mD256 => {
                 #[cfg(not(esp32))]
-                timg0.rtccalicfg2.modify(|_, w| unsafe {
+                timg0.rtccalicfg2().modify(|_, w| unsafe {
                     w.rtc_cali_timeout_thres().bits(slowclk_cycles << 12)
                 });
                 RtcSlowClock::RtcSlowClock8mD256
             }
             _ => {
                 #[cfg(not(esp32))]
-                timg0.rtccalicfg2.modify(|_, w| unsafe {
+                timg0.rtccalicfg2().modify(|_, w| unsafe {
                     w.rtc_cali_timeout_thres().bits(slowclk_cycles << 10)
                 });
                 RtcSlowClock::RtcSlowClockRtc
@@ -552,7 +558,7 @@ impl RtcClock {
 
         // Start calibration
         timg0
-            .rtccalicfg
+            .rtccalicfg()
             .modify(|_, w| w.rtc_cali_start().clear_bit().rtc_cali_start().set_bit());
 
         // Wait for calibration to finish up to another us_time_estimate
@@ -564,12 +570,12 @@ impl RtcClock {
         let mut timeout_us = us_time_estimate;
 
         let cal_val = loop {
-            if timg0.rtccalicfg.read().rtc_cali_rdy().bit_is_set() {
-                break timg0.rtccalicfg1.read().rtc_cali_value().bits();
+            if timg0.rtccalicfg().read().rtc_cali_rdy().bit_is_set() {
+                break timg0.rtccalicfg1().read().rtc_cali_value().bits();
             }
 
             #[cfg(not(esp32))]
-            if timg0.rtccalicfg2.read().rtc_cali_timeout().bit_is_set() {
+            if timg0.rtccalicfg2().read().rtc_cali_timeout().bit_is_set() {
                 // Timed out waiting for calibration
                 break 0;
             }
@@ -587,15 +593,15 @@ impl RtcClock {
         };
 
         timg0
-            .rtccalicfg
+            .rtccalicfg()
             .modify(|_, w| w.rtc_cali_start().clear_bit());
         rtc_cntl
-            .clk_conf
+            .clk_conf()
             .modify(|_, w| w.dig_xtal32k_en().bit(dig_32k_xtal_enabled));
 
         if matches!(cal_clk, RtcCalSel::RtcCal8mD256) {
             rtc_cntl
-                .clk_conf
+                .clk_conf()
                 .modify(|_, w| w.dig_clk8m_d256_en().clear_bit());
         }
 
@@ -651,8 +657,8 @@ impl RtcClock {
         const XTAL_FREQ_EST_CYCLES: u32 = 10;
 
         let rtc_cntl = unsafe { &*RTC_CNTL::PTR };
-        let clk_8m_enabled = rtc_cntl.clk_conf.read().enb_ck8m().bit_is_clear();
-        let clk_8md256_enabled = rtc_cntl.clk_conf.read().enb_ck8m_div().bit_is_clear();
+        let clk_8m_enabled = rtc_cntl.clk_conf().read().enb_ck8m().bit_is_clear();
+        let clk_8md256_enabled = rtc_cntl.clk_conf().read().enb_ck8m_div().bit_is_clear();
 
         if !clk_8md256_enabled {
             RtcClock::enable_8m(true, true);
@@ -723,14 +729,14 @@ impl Rwdt {
 
         // Configure STAGE0 to trigger an interrupt upon expiration
         rtc_cntl
-            .wdtconfig0
+            .wdtconfig0()
             .modify(|_, w| unsafe { w.wdt_stg0().bits(self.stg0_action as u8) });
 
         #[cfg(esp32)]
-        rtc_cntl.int_ena.modify(|_, w| w.wdt_int_ena().set_bit());
+        rtc_cntl.int_ena().modify(|_, w| w.wdt_int_ena().set_bit());
         #[cfg(not(esp32))]
         rtc_cntl
-            .int_ena_rtc
+            .int_ena_rtc()
             .modify(|_, w| w.wdt_int_ena().set_bit());
 
         self.set_write_protection(true);
@@ -748,14 +754,16 @@ impl Rwdt {
 
         // Configure STAGE0 to reset the main system and the RTC upon expiration.
         rtc_cntl
-            .wdtconfig0
+            .wdtconfig0()
             .modify(|_, w| unsafe { w.wdt_stg0().bits(self.stg0_action as u8) });
 
         #[cfg(esp32)]
-        rtc_cntl.int_ena.modify(|_, w| w.wdt_int_ena().clear_bit());
+        rtc_cntl
+            .int_ena()
+            .modify(|_, w| w.wdt_int_ena().clear_bit());
         #[cfg(not(esp32))]
         rtc_cntl
-            .int_ena_rtc
+            .int_ena_rtc()
             .modify(|_, w| w.wdt_int_ena().clear_bit());
 
         self.set_write_protection(true);
@@ -770,9 +778,9 @@ impl Rwdt {
         self.set_write_protection(false);
 
         #[cfg(esp32)]
-        rtc_cntl.int_clr.write(|w| w.wdt_int_clr().set_bit());
+        rtc_cntl.int_clr().write(|w| w.wdt_int_clr().set_bit());
         #[cfg(not(esp32))]
-        rtc_cntl.int_clr_rtc.write(|w| w.wdt_int_clr().set_bit());
+        rtc_cntl.int_clr_rtc().write(|w| w.wdt_int_clr().set_bit());
 
         self.set_write_protection(true);
     }
@@ -785,9 +793,9 @@ impl Rwdt {
 
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
-                rtc_cntl.int_st.read().wdt_int_st().bit_is_set()
+                rtc_cntl.int_st().read().wdt_int_st().bit_is_set()
             } else {
-                rtc_cntl.int_st_rtc.read().wdt_int_st().bit_is_set()
+                rtc_cntl.int_st_rtc().read().wdt_int_st().bit_is_set()
             }
         }
     }
@@ -799,7 +807,7 @@ impl Rwdt {
         let rtc_cntl = unsafe { &*LP_WDT::PTR };
 
         self.set_write_protection(false);
-        rtc_cntl.wdtfeed.write(|w| unsafe { w.bits(1) });
+        rtc_cntl.wdtfeed().write(|w| unsafe { w.bits(1) });
         self.set_write_protection(true);
     }
 
@@ -811,7 +819,7 @@ impl Rwdt {
 
         let wkey = if enable { 0u32 } else { 0x50D8_3AA1 };
 
-        rtc_cntl.wdtwprotect.write(|w| unsafe { w.bits(wkey) });
+        rtc_cntl.wdtwprotect().write(|w| unsafe { w.bits(wkey) });
     }
 
     fn set_enabled(&mut self, enable: bool) {
@@ -823,7 +831,7 @@ impl Rwdt {
         self.set_write_protection(false);
 
         rtc_cntl
-            .wdtconfig0
+            .wdtconfig0()
             .modify(|_, w| w.wdt_en().bit(enable).wdt_flashboot_mod_en().bit(enable));
 
         self.set_write_protection(true);
@@ -841,22 +849,22 @@ impl Rwdt {
         unsafe {
             #[cfg(esp32)]
             rtc_cntl
-                .wdtconfig1
+                .wdtconfig1()
                 .modify(|_, w| w.wdt_stg0_hold().bits(timeout_raw));
 
             #[cfg(any(esp32c6, esp32h2))]
-            rtc_cntl.config1.modify(|_, w| {
+            rtc_cntl.config1().modify(|_, w| {
                 w.wdt_stg0_hold()
                     .bits(timeout_raw >> (1 + Efuse::get_rwdt_multiplier()))
             });
 
             #[cfg(not(any(esp32, esp32c6, esp32h2)))]
-            rtc_cntl.wdtconfig1.modify(|_, w| {
+            rtc_cntl.wdtconfig1().modify(|_, w| {
                 w.wdt_stg0_hold()
                     .bits(timeout_raw >> (1 + Efuse::get_rwdt_multiplier()))
             });
 
-            rtc_cntl.wdtconfig0.modify(|_, w| {
+            rtc_cntl.wdtconfig0().modify(|_, w| {
                 w.wdt_stg0()
                     .bits(self.stg0_action as u8)
                     .wdt_cpu_reset_length()
@@ -931,7 +939,7 @@ impl Swd {
         let wkey = if enable { 0u32 } else { 0x50D8_3AA1 };
 
         rtc_cntl
-            .swd_wprotect
+            .swd_wprotect()
             .write(|w| unsafe { w.swd_wkey().bits(wkey) });
     }
 
@@ -943,7 +951,7 @@ impl Swd {
 
         self.set_write_protection(false);
         rtc_cntl
-            .swd_conf
+            .swd_conf()
             .write(|w| w.swd_auto_feed_en().bit(!enable));
         self.set_write_protection(true);
     }
@@ -971,7 +979,7 @@ pub fn get_wakeup_cause() -> SleepSource {
     #[cfg(any(esp32c6, esp32h2))]
     let wakeup_cause = WakeupReason::from_bits_retain(unsafe {
         (&*crate::peripherals::PMU::PTR)
-            .slp_wakeup_status0
+            .slp_wakeup_status0()
             .read()
             .wakeup_cause()
             .bits()
@@ -979,14 +987,18 @@ pub fn get_wakeup_cause() -> SleepSource {
     #[cfg(not(any(esp32, esp32c6, esp32h2)))]
     let wakeup_cause = WakeupReason::from_bits_retain(unsafe {
         (&*RTC_CNTL::PTR)
-            .slp_wakeup_cause
+            .slp_wakeup_cause()
             .read()
             .wakeup_cause()
             .bits()
     });
     #[cfg(esp32)]
     let wakeup_cause = WakeupReason::from_bits_retain(unsafe {
-        (&*RTC_CNTL::PTR).wakeup_state.read().wakeup_cause().bits() as u32
+        (&*RTC_CNTL::PTR)
+            .wakeup_state()
+            .read()
+            .wakeup_cause()
+            .bits() as u32
     });
 
     if wakeup_cause.contains(WakeupReason::TimerTrigEn) {

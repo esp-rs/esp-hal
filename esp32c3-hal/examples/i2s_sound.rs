@@ -33,8 +33,9 @@
 use esp32c3_hal::{
     clock::ClockControl,
     dma::DmaPriority,
+    dma_buffers,
     gdma::Gdma,
-    i2s::{DataFormat, I2s, I2s0New, I2sWriteDma, MclkPin, PinsBclkWsDout, Standard},
+    i2s::{DataFormat, I2s, I2sWriteDma, Standard},
     peripherals::Peripherals,
     prelude::*,
     IO,
@@ -60,12 +61,10 @@ fn main() -> ! {
     let dma = Gdma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
 
-    let mut tx_descriptors = [0u32; 20 * 3];
-    let mut rx_descriptors = [0u32; 8 * 3];
+    let (tx_buffer, mut tx_descriptors, _, mut rx_descriptors) = dma_buffers!(32000, 0);
 
     let i2s = I2s::new(
         peripherals.I2S0,
-        MclkPin::new(io.pins.gpio4),
         Standard::Philips,
         DataFormat::Data16Channel16,
         44100u32.Hz(),
@@ -76,18 +75,20 @@ fn main() -> ! {
             DmaPriority::Priority0,
         ),
         &clocks,
-    );
+    )
+    .with_mclk(io.pins.gpio4);
 
-    let i2s_tx = i2s.i2s_tx.with_pins(PinsBclkWsDout::new(
-        io.pins.gpio1,
-        io.pins.gpio2,
-        io.pins.gpio3,
-    ));
+    let i2s_tx = i2s
+        .i2s_tx
+        .with_bclk(io.pins.gpio1)
+        .with_ws(io.pins.gpio2)
+        .with_dout(io.pins.gpio3)
+        .build();
 
     let data =
         unsafe { core::slice::from_raw_parts(&SINE as *const _ as *const u8, SINE.len() * 2) };
 
-    let buffer = dma_buffer();
+    let buffer = tx_buffer;
     let mut idx = 0;
     for i in 0..usize::min(data.len(), buffer.len()) {
         buffer[i] = data[idx];
@@ -117,9 +118,4 @@ fn main() -> ! {
             transfer.push(&filler[0..avail]).unwrap();
         }
     }
-}
-
-fn dma_buffer() -> &'static mut [u8; 32000] {
-    static mut BUFFER: [u8; 32000] = [0u8; 32000];
-    unsafe { &mut BUFFER }
 }

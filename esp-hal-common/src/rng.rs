@@ -85,7 +85,10 @@ impl Rng {
     /// Reads currently available `u32` integer from `RNG`
     pub fn random(&mut self) -> u32 {
         // SAFETY: read-only register access
-        unsafe { &*crate::peripherals::RNG::PTR }.data.read().bits()
+        unsafe { &*crate::peripherals::RNG::PTR }
+            .data()
+            .read()
+            .bits()
     }
 }
 

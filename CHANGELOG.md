@@ -14,12 +14,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Derive `Clone` and `Copy` for `EspTwaiFrame` (#914)
 - A way to configure inverted pins (#912)
 - Added API to check a GPIO-pin's interrupt status bit (#929)
+- A `embedded_io_async::Read` implementation for `UsbSerialJtag` (#889)
+- `RtcClock::get_xtal_freq`, `RtcClock::get_slow_freq` (#957)
+- Added Rx Timeout functionality to async Uart (#911)
+- RISC-V: Thread-mode and interrupt-mode executors, `#[main]` macro (#947)
+- A macro to make it easier to create DMA buffers and descriptors (#935)
 
 ### Changed
 
-- C2, C3: atomic emulation trap is now opt-in (#904)
 - Improve DMA documentation & clean up module (#915)
 - Only allow a single version of `esp-hal-common` to be present in an application (#934)
+- C3, C6 and H2 can now use the `zero-rtc-bss` feature to enable `esp-hal-common/rv-zero-rtc-bss` (#867)
+- Reuse `ieee802154_clock_enable/disable()` functions for BLE and rename `ble_ieee802154_clock_enable()` (#953)
+- The `embedded-io` trait implementations are now gated behind the `embedded-io` feature (#964)
+- Simplifed RMT channels and channel creators (#958)
+- Reworked construction of I2S driver instances (#983)
+- S2 / S3: Don't require GPIO 18 to create a USB peripheral driver instance (#990)
 
 ### Fixed
 
@@ -28,14 +38,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed short wait times in embassy causing hangs (#906)
 - Make sure to clear LP/RTC RAM before loading code (#916)
 - Async RMT channels can be used concurrently (#925)
+- Xtensa: Allow using `embassy-executor`'s thread-mode executor if neither `embassy-executor-thread`, nor `embassy-executor-interrupt` is enabled. (#937)
+- Uart Async: Improve interrupt handling and irq <--> future communication (#977)
+- RISC-V: Fix stack allocation (#988)
 
 ### Removed
 
 - Removed the `mcu-boot` feature from `esp32c3-hal` (#938)
+- Removed SpiBusController and SpiBusDevice in favour of embedded-hal-bus and embassy-embedded-hal implementataions. (#978)
 
 ### Breaking
 - Direct boot support has been removed (#903).
 - `Spi::new`/`Spi::new_half_duplex` takes no gpio pin now, instead you need to call `with_pins` to setup those (#901).
+- ESP32C2, ESP32C3, ESP32S2: atomic emulation trap has been removed. When upgrading you must either remove [these lines](https://github.com/esp-rs/riscv-atomic-emulation-trap#usage) from your `.cargo/config.toml`. Usage of `core::sync::atomic::*` in dependent crates should be replaced with [portable-atomic](https://github.com/taiki-e/portable-atomic). (#904) (#985)
+- RSA driver now takes u32 words instead of u8 bytes. The expected slice length is now 4 times shorter. (#981)
 
 ## [0.13.1] - 2023-11-02
 

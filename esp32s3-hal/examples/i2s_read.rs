@@ -17,15 +17,14 @@
 use esp32s3_hal::{
     clock::ClockControl,
     dma::DmaPriority,
-    gdma::{Channel0, Gdma},
-    gpio::Unknown,
-    i2s::{DataFormat, I2s, I2s0New, I2sReadDma, MclkPin, PinsBclkWsDin, Standard},
-    peripherals::{Peripherals, I2S0},
+    dma_buffers,
+    gdma::Gdma,
+    i2s::{DataFormat, I2s, I2sReadDma, Standard},
+    peripherals::Peripherals,
     prelude::*,
     IO,
 };
 use esp_backtrace as _;
-use esp_hal_common::gpio::GpioPin;
 use esp_println::println;
 
 #[entry]
@@ -39,16 +38,14 @@ fn main() -> ! {
     let dma = Gdma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
 
-    let mut tx_descriptors = [0u32; 8 * 3];
-    let mut rx_descriptors = [0u32; 8 * 3];
+    let (_, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(0, 4 * 4092);
 
     // Here we test that the type is
     // 1) reasonably simple (or at least this will flag changes that may make it
     // more complex)
     // 2) can be spelled out by the user
-    let i2s: I2s<'_, I2S0, MclkPin<'_, GpioPin<Unknown, 4>>, Channel0> = I2s::new(
+    let i2s = I2s::new(
         peripherals.I2S0,
-        MclkPin::new(io.pins.gpio4),
         Standard::Philips,
         DataFormat::Data16Channel16,
         44100u32.Hz(),
@@ -59,15 +56,17 @@ fn main() -> ! {
             DmaPriority::Priority0,
         ),
         &clocks,
-    );
+    )
+    .with_mclk(io.pins.gpio4);
 
-    let i2s_rx = i2s.i2s_rx.with_pins(PinsBclkWsDin::new(
-        io.pins.gpio1,
-        io.pins.gpio2,
-        io.pins.gpio5,
-    ));
+    let i2s_rx = i2s
+        .i2s_rx
+        .with_bclk(io.pins.gpio1)
+        .with_ws(io.pins.gpio2)
+        .with_din(io.pins.gpio5)
+        .build();
 
-    let buffer = dma_buffer();
+    let buffer = rx_buffer;
 
     let mut transfer = i2s_rx.read_dma_circular(buffer).unwrap();
     println!("Started transfer");
@@ -81,9 +80,4 @@ fn main() -> ! {
             println!("Received {:x?}...", &rcv[..30]);
         }
     }
-}
-
-fn dma_buffer() -> &'static mut [u8; 4092 * 4] {
-    static mut BUFFER: [u8; 4092 * 4] = [0u8; 4092 * 4];
-    unsafe { &mut BUFFER }
 }

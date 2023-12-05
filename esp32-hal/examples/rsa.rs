@@ -6,7 +6,6 @@
 
 use crypto_bigint::{
     modular::runtime_mod::{DynResidue, DynResidueParams},
-    Encoding,
     Uint,
     U1024,
     U512,
@@ -68,16 +67,16 @@ fn main() -> ! {
 }
 
 fn mod_multi_example(rsa: &mut Rsa) {
-    let mut outbuf = [0_u8; U512::BYTES];
+    let mut outbuf = [0_u32; U512::LIMBS];
     let mut mod_multi = RsaModularMultiplication::<operand_sizes::Op512>::new(
         rsa,
-        &BIGNUM_3.to_le_bytes(),
+        BIGNUM_3.as_words(),
         compute_mprime(&BIGNUM_3),
     );
-    let r = compute_r(&BIGNUM_3).to_le_bytes();
+    let r = compute_r(&BIGNUM_3);
     let pre_hw_modmul = xtensa_lx::timer::get_cycle_count();
-    mod_multi.start_step1(&BIGNUM_1.to_le_bytes(), &r);
-    mod_multi.start_step2(&BIGNUM_2.to_le_bytes());
+    mod_multi.start_step1(BIGNUM_1.as_words(), r.as_words());
+    mod_multi.start_step2(BIGNUM_2.as_words());
     mod_multi.read_results(&mut outbuf);
     let post_hw_modmul = xtensa_lx::timer::get_cycle_count();
     println!(
@@ -95,22 +94,22 @@ fn mod_multi_example(rsa: &mut Rsa) {
         "it took {} cycles for sw modular multiplication",
         post_sw_exp - pre_sw_exp
     );
-    assert_eq!(U512::from_le_bytes(outbuf), sw_out.retrieve());
+    assert_eq!(U512::from_words(outbuf), sw_out.retrieve());
     println!("modular multiplication done");
 }
 
 fn mod_exp_example(rsa: &mut Rsa) {
-    let mut outbuf = [0_u8; U512::BYTES];
+    let mut outbuf = [0_u32; U512::LIMBS];
     let mut mod_exp = RsaModularExponentiation::<operand_sizes::Op512>::new(
         rsa,
-        &BIGNUM_2.to_le_bytes(),
-        &BIGNUM_3.to_le_bytes(),
+        BIGNUM_2.as_words(),
+        BIGNUM_3.as_words(),
         compute_mprime(&BIGNUM_3),
     );
-    let r = compute_r(&BIGNUM_3).to_le_bytes();
-    let base = &BIGNUM_1.to_le_bytes();
+    let r = compute_r(&BIGNUM_3);
+    let base = &BIGNUM_1.as_words();
     let pre_hw_exp = xtensa_lx::timer::get_cycle_count();
-    mod_exp.start_exponentiation(base, &r);
+    mod_exp.start_exponentiation(base, r.as_words());
     mod_exp.read_results(&mut outbuf);
     let post_hw_exp = xtensa_lx::timer::get_cycle_count();
     println!(
@@ -126,17 +125,17 @@ fn mod_exp_example(rsa: &mut Rsa) {
         "it took {} cycles for sw modular exponentiation",
         post_sw_exp - pre_sw_exp
     );
-    assert_eq!(U512::from_le_bytes(outbuf), sw_out.retrieve());
+    assert_eq!(U512::from_words(outbuf), sw_out.retrieve());
     println!("modular exponentiation done");
 }
 
 fn multiplication_example(rsa: &mut Rsa) {
-    let mut out = [0_u8; U1024::BYTES];
+    let mut out = [0_u32; U1024::LIMBS];
     let mut rsamulti = RsaMultiplication::<operand_sizes::Op512>::new(rsa);
-    let operand_a = &BIGNUM_1.to_le_bytes();
-    let operand_b = &BIGNUM_2.to_le_bytes();
+    let operand_a = BIGNUM_1.as_words();
+    let operand_b = BIGNUM_2.as_words();
     let pre_hw_mul = xtensa_lx::timer::get_cycle_count();
-    rsamulti.start_multiplication(&operand_a, &operand_b);
+    rsamulti.start_multiplication(operand_a, operand_b);
     rsamulti.read_results(&mut out);
     let post_hw_mul = xtensa_lx::timer::get_cycle_count();
     println!(
@@ -150,6 +149,6 @@ fn multiplication_example(rsa: &mut Rsa) {
         "it took {} cycles for sw multiplication",
         post_sw_mul - pre_sw_mul
     );
-    assert_eq!(U1024::from_le_bytes(out), sw_out.1.concat(&sw_out.0));
+    assert_eq!(U1024::from_words(out), sw_out.1.concat(&sw_out.0));
     println!("multiplication done");
 }

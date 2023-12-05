@@ -1,5 +1,5 @@
 INCLUDE "memory.x"
 INCLUDE "alias.x"
-INCLUDE "link-esp32.x"
+INCLUDE "esp32s2.x"
 INCLUDE "hal-defaults.x"
 INCLUDE "rom-functions.x"

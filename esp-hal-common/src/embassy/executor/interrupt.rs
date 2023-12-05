@@ -1,14 +1,14 @@
-//! Multicore-aware interrupt-mode executor.
+//! Interrupt-mode executor.
 use core::{cell::UnsafeCell, marker::PhantomData, mem::MaybeUninit};
 
 use embassy_executor::{raw, SendSpawner};
+#[cfg(any(esp32c6, esp32h2))]
+use peripherals::INTPRI as SystemPeripheral;
+#[cfg(not(any(esp32c6, esp32h2)))]
+use peripherals::SYSTEM as SystemPeripheral;
+use portable_atomic::{AtomicUsize, Ordering};
 
-use crate::{
-    atomic::{AtomicUsize, Ordering},
-    get_core,
-    interrupt,
-    peripherals::{self, SYSTEM},
-};
+use crate::{get_core, interrupt, peripherals};
 
 static FROM_CPU_IRQ_USED: AtomicUsize = AtomicUsize::new(0);
 
@@ -24,13 +24,12 @@ macro_rules! from_cpu {
         paste::paste! {
             pub struct [<FromCpu $irq>];
 
-            /// We don't allow using the same interrupt for multiple executors.
-
             impl [<FromCpu $irq>] {
                 fn set_bit(value: bool) {
-                    let system = unsafe { &*SYSTEM::PTR };
+                    let system = unsafe { &*SystemPeripheral::PTR };
+
                     system
-                        .[<cpu_intr_from_cpu_ $irq>]
+                        .[<cpu_intr_from_cpu_ $irq>]()
                         .write(|w| w.[<cpu_intr_from_cpu_ $irq>]().bit(value));
                 }
             }
@@ -38,11 +37,16 @@ macro_rules! from_cpu {
             impl SwPendableInterrupt for [<FromCpu $irq>] {
                 fn enable(priority: interrupt::Priority) {
                     let mask = 1 << $irq;
+                    // We don't allow using the same interrupt for multiple executors.
                     if FROM_CPU_IRQ_USED.fetch_or(mask, Ordering::SeqCst) & mask != 0 {
                         panic!("FROM_CPU_{} is already used by a different executor.", $irq);
                     }
 
-                    unwrap!(interrupt::enable(peripherals::Interrupt::[<FROM_CPU_INTR $irq>], priority));
+                    // unsafe block because of direct-vectoring on riscv
+                    #[allow(unused_unsafe)]
+                    unsafe {
+                        unwrap!(interrupt::enable(peripherals::Interrupt::[<FROM_CPU_INTR $irq>], priority));
+                    }
                 }
 
                 fn number() -> usize {
@@ -61,6 +65,7 @@ macro_rules! from_cpu {
     };
 }
 
+// from_cpu!(0); // reserve 0 for thread mode & multi-core
 from_cpu!(1);
 from_cpu!(2);
 from_cpu!(3);

@@ -65,9 +65,9 @@ macro_rules! impl_etm_channel {
                 {
                     let etm = unsafe { crate::peripherals::SOC_ETM::steal() };
 
-                    etm.[< ch $channel _evt_id >].modify(|_, w| w.[< ch $channel _evt_id >]().variant(event.id()));
-                    etm.[< ch $channel _task_id >].modify(|_, w| w.[< ch $channel _task_id >]().variant(task.id()));
-                    etm.[< ch_ena_ad $bank _set >].write(|w| w.[< ch_set $channel >]().set_bit());
+                    etm.[< ch $channel _evt_id >]().modify(|_, w| w.[< ch $channel _evt_id >]().variant(event.id()));
+                    etm.[< ch $channel _task_id >]().modify(|_, w| w.[< ch $channel _task_id >]().variant(task.id()));
+                    etm.[< ch_ena_ad $bank _set >]().write(|w| w.[< ch_set $channel >]().set_bit());
 
                     EtmConfiguredChannel {
                         _event: event,
@@ -137,7 +137,7 @@ macro_rules! impl_disable_helper {
                 let etm = unsafe { crate::peripherals::SOC_ETM::steal() };
                 match channel {
                     $(
-                        $channel => {etm.[< ch_ena_ad $bank _clr>].write(|w| w.[< ch_clr $channel >]().set_bit());},
+                        $channel => {etm.[< ch_ena_ad $bank _clr>]().write(|w| w.[< ch_clr $channel >]().set_bit());},
                     )+
                     _ => panic!("Unknown channel {}", channel),
                 }
@@ -146,6 +146,7 @@ macro_rules! impl_disable_helper {
         }
     };
 }
+
 impl_disable_helper!(
     (0, 0),
     (1, 0),

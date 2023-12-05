@@ -58,7 +58,7 @@ fn enable_phy() {
     // `periph_ll_wifi_bt_module_enable_clk_clear_rst`
     let syscon = unsafe { &*esp32s3::APB_CTRL::PTR };
     syscon
-        .wifi_clk_en
+        .wifi_clk_en()
         .modify(|r, w| unsafe { w.bits(r.bits() | SYSTEM_WIFI_CLK_WIFI_BT_COMMON_M) });
 }
 
@@ -66,7 +66,7 @@ fn disable_phy() {
     // `periph_ll_wifi_bt_module_disable_clk_set_rst`
     let syscon = unsafe { &*esp32s3::APB_CTRL::PTR };
     syscon
-        .wifi_clk_en
+        .wifi_clk_en()
         .modify(|r, w| unsafe { w.bits(r.bits() & !SYSTEM_WIFI_CLK_WIFI_BT_COMMON_M) });
 }
 
@@ -82,10 +82,10 @@ fn reset_mac() {
     const SYSTEM_MAC_RST: u32 = 1 << 2;
     let syscon = unsafe { &*esp32s3::APB_CTRL::PTR };
     syscon
-        .wifi_rst_en
+        .wifi_rst_en()
         .modify(|r, w| unsafe { w.bits(r.bits() | SYSTEM_MAC_RST) });
     syscon
-        .wifi_rst_en
+        .wifi_rst_en()
         .modify(|r, w| unsafe { w.bits(r.bits() & !SYSTEM_MAC_RST) });
 }
 
@@ -100,6 +100,6 @@ fn init_clocks() {
         SYSTEM_WIFI_CLK_I2C_CLK_EN | SYSTEM_WIFI_CLK_UNUSED_BIT12 | SYSTEM_WIFI_CLK_SDIO_HOST_EN;
 
     syscon
-        .wifi_clk_en
+        .wifi_clk_en()
         .modify(|r, w| unsafe { w.bits(r.bits() & !WIFI_BT_SDIO_CLK | SYSTEM_WIFI_CLK_EN) });
 }

@@ -16,6 +16,7 @@ use embassy_time::{Duration, Timer};
 use esp32c6_hal::{
     clock::ClockControl,
     dma::DmaPriority,
+    dma_buffers,
     embassy,
     gdma::Gdma,
     gpio::IO,
@@ -36,7 +37,7 @@ use esp_backtrace as _;
 use esp_println::println;
 
 #[main]
-async fn main(_spawner: Spawner) -> ! {
+async fn main(_spawner: Spawner) {
     esp_println::println!("Init!");
     let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();
@@ -56,8 +57,7 @@ async fn main(_spawner: Spawner) -> ! {
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let mut tx_descriptors = [0u32; 8 * 3];
-    let mut rx_descriptors = [0u32; 8 * 3];
+    let (tx_buffer, mut tx_descriptors, _, mut rx_descriptors) = dma_buffers!(32000, 0);
 
     let dma = Gdma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
@@ -99,7 +99,7 @@ async fn main(_spawner: Spawner) -> ! {
     )
     .unwrap();
 
-    let buffer = dma_buffer();
+    let buffer = tx_buffer;
     for i in 0..buffer.len() {
         buffer[i] = (i % 255) as u8;
     }
@@ -110,9 +110,4 @@ async fn main(_spawner: Spawner) -> ! {
 
         Timer::after(Duration::from_millis(500)).await;
     }
-}
-
-fn dma_buffer() -> &'static mut [u8; 4092 * 4] {
-    static mut BUFFER: [u8; 4092 * 4] = [0u8; 4092 * 4];
-    unsafe { &mut BUFFER }
 }

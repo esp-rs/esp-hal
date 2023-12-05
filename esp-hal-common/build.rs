@@ -26,10 +26,15 @@ macro_rules! assert_unique_features {
 
 // Given some features, assert that AT LEAST one of the features is enabled.
 macro_rules! assert_used_features {
-    ( $($all:tt),* ) => {
+    ( $all:tt ) => {
+        #[cfg(not(feature = $all))]
+        compile_error!(concat!("The feature flag must be provided: ", $all));
+    };
+
+    ( $($all:tt),+ ) => {
         #[cfg(not(any($(feature = $all),*)))]
         compile_error!(concat!("One of the feature flags must be provided: ", $($all, ", "),*));
-    }
+    };
 }
 
 // Given some features, assert that EXACTLY one of the features is enabled.
@@ -113,6 +118,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     // is available:
     #[cfg(feature = "embassy")]
     {
+        #[cfg(feature = "esp32")]
+        assert_unique_used_features!("embassy-time-timg0");
+
+        #[cfg(not(feature = "esp32"))]
         assert_unique_used_features!("embassy-time-systick", "embassy-time-timg0");
     }
 
@@ -136,26 +145,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         unreachable!() // We've confirmed exactly one known device was selected
     };
 
-    // The C6 has an "atomic" peripheral but it's an exception, not the rule
-    // For S2, we just keep lying for now. The target has emulation support
-    // force-enabled.
-    let has_native_atomic_support = matches!(
-        device_name,
-        "esp32" | "esp32s2" | "esp32s3" | "esp32c6" | "esp32h2"
-    );
-
-    let atomic_emulation_enabled = cfg!(feature = "atomic-emulation");
-    let portable_atomic_enabled = cfg!(feature = "portable-atomic");
-
-    if atomic_emulation_enabled && portable_atomic_enabled {
-        panic!("The `atomic-emulation` and `portable-atomic` features cannot be used together");
-    }
-
-    if has_native_atomic_support {
-        if atomic_emulation_enabled {
-            println!("cargo:warning={} has native atomic instructions, the `atomic-emulation` feature is not needed", device_name);
-        }
-        println!("cargo:rustc-cfg=has_native_atomic_support");
+    if detect_atomic_extension("a") || detect_atomic_extension("s32c1i") {
+        panic!(
+            "Atomic emulation flags detected in `.cargo/config.toml`, this is no longer supported!"
+        );
     }
 
     // Load the configuration file for the configured device:
@@ -195,12 +188,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rustc-link-search={}", out.display());
 
     if cfg!(feature = "esp32") || cfg!(feature = "esp32s2") || cfg!(feature = "esp32s3") {
-        fs::copy("ld/xtensa/hal-defaults.x", out.join("hal-defaults.x")).unwrap();
+        fs::copy("ld/xtensa/hal-defaults.x", out.join("hal-defaults.x"))?;
+
         let (irtc, drtc) = if cfg!(feature = "esp32s3") {
             ("rtc_fast_seg", "rtc_fast_seg")
         } else {
             ("rtc_fast_iram_seg", "rtc_fast_dram_seg")
         };
+
         let alias = format!(
             r#"
             REGION_ALIAS("ROTEXT", irom_seg);
@@ -212,7 +207,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         "#,
             irtc, drtc
         );
-        fs::write(out.join("alias.x"), alias).unwrap();
+
+        fs::write(out.join("alias.x"), alias)?;
     } else {
         fs::copy("ld/riscv/hal-defaults.x", out.join("hal-defaults.x"))?;
         fs::copy("ld/riscv/asserts.x", out.join("asserts.x"))?;
@@ -220,6 +216,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     copy_dir_all("ld/sections", &out)?;
+    copy_dir_all(format!("ld/{device_name}"), &out)?;
 
     // Generate the eFuse table from the selected device's CSV file:
     gen_efuse_table(device_name, out)?;
@@ -304,4 +301,34 @@ fn gen_efuse_table(device_name: &str, out_dir: impl AsRef<Path>) -> Result<(), B
     }
 
     Ok(())
+}
+
+fn detect_atomic_extension(ext: &str) -> bool {
+    let rustflags = env::var_os("CARGO_ENCODED_RUSTFLAGS")
+        .unwrap()
+        .into_string()
+        .unwrap();
+
+    // Users can pass -Ctarget-feature to the compiler multiple times, so we have to
+    // handle that
+    let target_flags = rustflags
+        .split(0x1f as char)
+        .filter(|s| s.starts_with("target-feature="))
+        .map(|s| s.strip_prefix("target-feature="))
+        .flatten();
+    for tf in target_flags {
+        let tf = tf
+            .split(",")
+            .map(|s| s.trim())
+            .filter(|s| s.starts_with('+'))
+            .map(|s| s.strip_prefix('+'))
+            .flatten();
+        for tf in tf {
+            if tf == ext {
+                return true;
+            }
+        }
+    }
+
+    false
 }

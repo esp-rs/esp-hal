@@ -74,42 +74,42 @@ pub(crate) fn get_io_mux_reg(gpio_num: u8) -> &'static crate::peripherals::io_mu
         let iomux = &*crate::peripherals::IO_MUX::PTR;
 
         match gpio_num {
-            0 => core::mem::transmute(&(iomux.gpio0)),
-            1 => core::mem::transmute(&(iomux.gpio1)),
-            2 => core::mem::transmute(&(iomux.gpio2)),
-            3 => core::mem::transmute(&(iomux.gpio3)),
-            4 => core::mem::transmute(&(iomux.gpio4)),
-            5 => core::mem::transmute(&(iomux.gpio5)),
-            6 => core::mem::transmute(&(iomux.gpio6)),
-            7 => core::mem::transmute(&(iomux.gpio7)),
-            8 => core::mem::transmute(&(iomux.gpio8)),
-            9 => core::mem::transmute(&(iomux.gpio9)),
-            10 => core::mem::transmute(&(iomux.gpio10)),
-            11 => core::mem::transmute(&(iomux.gpio11)),
-            12 => core::mem::transmute(&(iomux.gpio12)),
-            13 => core::mem::transmute(&(iomux.gpio13)),
-            14 => core::mem::transmute(&(iomux.gpio14)),
-            15 => core::mem::transmute(&(iomux.gpio15)),
-            16 => core::mem::transmute(&(iomux.gpio16)),
-            17 => core::mem::transmute(&(iomux.gpio17)),
-            18 => core::mem::transmute(&(iomux.gpio18)),
-            19 => core::mem::transmute(&(iomux.gpio19)),
-            20 => core::mem::transmute(&(iomux.gpio20)),
-            21 => core::mem::transmute(&(iomux.gpio21)),
-            22 => core::mem::transmute(&(iomux.gpio22)),
-            23 => core::mem::transmute(&(iomux.gpio23)),
-            24 => core::mem::transmute(&(iomux.gpio24)),
-            25 => core::mem::transmute(&(iomux.gpio25)),
-            26 => core::mem::transmute(&(iomux.gpio26)),
-            27 => core::mem::transmute(&(iomux.gpio27)),
-            32 => core::mem::transmute(&(iomux.gpio32)),
-            33 => core::mem::transmute(&(iomux.gpio33)),
-            34 => core::mem::transmute(&(iomux.gpio34)),
-            35 => core::mem::transmute(&(iomux.gpio35)),
-            36 => core::mem::transmute(&(iomux.gpio36)),
-            37 => core::mem::transmute(&(iomux.gpio37)),
-            38 => core::mem::transmute(&(iomux.gpio38)),
-            39 => core::mem::transmute(&(iomux.gpio39)),
+            0 => core::mem::transmute(&(iomux.gpio0())),
+            1 => core::mem::transmute(&(iomux.gpio1())),
+            2 => core::mem::transmute(&(iomux.gpio2())),
+            3 => core::mem::transmute(&(iomux.gpio3())),
+            4 => core::mem::transmute(&(iomux.gpio4())),
+            5 => core::mem::transmute(&(iomux.gpio5())),
+            6 => core::mem::transmute(&(iomux.gpio6())),
+            7 => core::mem::transmute(&(iomux.gpio7())),
+            8 => core::mem::transmute(&(iomux.gpio8())),
+            9 => core::mem::transmute(&(iomux.gpio9())),
+            10 => core::mem::transmute(&(iomux.gpio10())),
+            11 => core::mem::transmute(&(iomux.gpio11())),
+            12 => core::mem::transmute(&(iomux.gpio12())),
+            13 => core::mem::transmute(&(iomux.gpio13())),
+            14 => core::mem::transmute(&(iomux.gpio14())),
+            15 => core::mem::transmute(&(iomux.gpio15())),
+            16 => core::mem::transmute(&(iomux.gpio16())),
+            17 => core::mem::transmute(&(iomux.gpio17())),
+            18 => core::mem::transmute(&(iomux.gpio18())),
+            19 => core::mem::transmute(&(iomux.gpio19())),
+            20 => core::mem::transmute(&(iomux.gpio20())),
+            21 => core::mem::transmute(&(iomux.gpio21())),
+            22 => core::mem::transmute(&(iomux.gpio22())),
+            23 => core::mem::transmute(&(iomux.gpio23())),
+            24 => core::mem::transmute(&(iomux.gpio24())),
+            25 => core::mem::transmute(&(iomux.gpio25())),
+            26 => core::mem::transmute(&(iomux.gpio26())),
+            27 => core::mem::transmute(&(iomux.gpio27())),
+            32 => core::mem::transmute(&(iomux.gpio32())),
+            33 => core::mem::transmute(&(iomux.gpio33())),
+            34 => core::mem::transmute(&(iomux.gpio34())),
+            35 => core::mem::transmute(&(iomux.gpio35())),
+            36 => core::mem::transmute(&(iomux.gpio36())),
+            37 => core::mem::transmute(&(iomux.gpio37())),
+            38 => core::mem::transmute(&(iomux.gpio38())),
+            39 => core::mem::transmute(&(iomux.gpio39())),
             _ => panic!(),
         }
     }
@@ -624,41 +624,41 @@ pub(crate) fn errata36(pin_num: u8, pull_up: bool, pull_down: bool) {
     match pin_num {
         0 => {
             rtcio
-                .touch_pad1
+                .touch_pad1()
                 .modify(|r, w| unsafe { w.bits(r.bits()).rue().bit(pull_up).rde().bit(pull_down) });
         }
         2 => {
             rtcio
-                .touch_pad2
+                .touch_pad2()
                 .modify(|r, w| unsafe { w.bits(r.bits()).rue().bit(pull_up).rde().bit(pull_down) });
         }
         4 => {
             rtcio
-                .touch_pad0
+                .touch_pad0()
                 .modify(|r, w| unsafe { w.bits(r.bits()).rue().bit(pull_up).rde().bit(pull_down) });
         }
         12 => {
             rtcio
-                .touch_pad5
+                .touch_pad5()
                 .modify(|r, w| unsafe { w.bits(r.bits()).rue().bit(pull_up).rde().bit(pull_down) });
         }
         13 => {
             rtcio
-                .touch_pad4
+                .touch_pad4()
                 .modify(|r, w| unsafe { w.bits(r.bits()).rue().bit(pull_up).rde().bit(pull_down) });
         }
         14 => {
             rtcio
-                .touch_pad6
+                .touch_pad6()
                 .modify(|r, w| unsafe { w.bits(r.bits()).rue().bit(pull_up).rde().bit(pull_down) });
         }
         15 => {
             rtcio
-                .touch_pad3
+                .touch_pad3()
                 .modify(|r, w| unsafe { w.bits(r.bits()).rue().bit(pull_up).rde().bit(pull_down) });
         }
         25 => {
-            rtcio.pad_dac1.modify(|r, w| unsafe {
+            rtcio.pad_dac1().modify(|r, w| unsafe {
                 w.bits(r.bits())
                     .pdac1_rue()
                     .bit(pull_up)
@@ -667,7 +667,7 @@ pub(crate) fn errata36(pin_num: u8, pull_up: bool, pull_down: bool) {
             });
         }
         26 => {
-            rtcio.pad_dac2.modify(|r, w| unsafe {
+            rtcio.pad_dac2().modify(|r, w| unsafe {
                 w.bits(r.bits())
                     .pdac2_rue()
                     .bit(pull_up)
@@ -677,11 +677,11 @@ pub(crate) fn errata36(pin_num: u8, pull_up: bool, pull_down: bool) {
         }
         27 => {
             rtcio
-                .touch_pad7
+                .touch_pad7()
                 .modify(|r, w| unsafe { w.bits(r.bits()).rue().bit(pull_up).rde().bit(pull_down) });
         }
         32 => {
-            rtcio.xtal_32k_pad.modify(|r, w| unsafe {
+            rtcio.xtal_32k_pad().modify(|r, w| unsafe {
                 w.bits(r.bits())
                     .x32n_rue()
                     .bit(pull_up)
@@ -690,7 +690,7 @@ pub(crate) fn errata36(pin_num: u8, pull_up: bool, pull_down: bool) {
             });
         }
         33 => {
-            rtcio.xtal_32k_pad.modify(|r, w| unsafe {
+            rtcio.xtal_32k_pad().modify(|r, w| unsafe {
                 w.bits(r.bits())
                     .x32p_rue()
                     .bit(pull_up)
@@ -742,79 +742,79 @@ crate::gpio::gpio! {
 }
 
 crate::gpio::analog! {
-     (36, 0,  sensor_pads,   sense1_mux_sel, sense1_fun_sel, sense1_fun_ie)
-     (37, 1,  sensor_pads,   sense2_mux_sel, sense2_fun_sel, sense2_fun_ie)
-     (38, 2,  sensor_pads,   sense3_mux_sel, sense3_fun_sel, sense3_fun_ie)
-     (39, 3,  sensor_pads,   sense4_mux_sel, sense4_fun_sel, sense4_fun_ie)
-     (34, 4,  adc_pad,         adc1_mux_sel,   adc1_fun_sel,   adc1_fun_ie)
-     (35, 5,  adc_pad,         adc2_mux_sel,   adc2_fun_sel,   adc1_fun_ie)
-     (25, 6,  pad_dac1,       pdac1_mux_sel,  pdac1_fun_sel,  pdac1_fun_ie, pdac1_rue, pdac1_rde)
-     (26, 7,  pad_dac2,       pdac2_mux_sel,  pdac2_fun_sel,  pdac2_fun_ie, pdac2_rue, pdac2_rde)
-     (33, 8,  xtal_32k_pad,    x32n_mux_sel,   x32n_fun_sel,   x32n_fun_ie, x32n_rue,  x32n_rde )
-     (32, 9,  xtal_32k_pad,    x32p_mux_sel,   x32p_fun_sel,   x32p_fun_ie, x32p_rue,  x32p_rde )
-     (4,  10, touch_pad0,           mux_sel,        fun_sel,        fun_ie, rue,       rde      )
-     (0,  11, touch_pad1,           mux_sel,        fun_sel,        fun_ie, rue,       rde      )
-     (2,  12, touch_pad2,           mux_sel,        fun_sel,        fun_ie, rue,       rde      )
-     (15, 13, touch_pad3,           mux_sel,        fun_sel,        fun_ie, rue,       rde      )
-     (13, 14, touch_pad4,           mux_sel,        fun_sel,        fun_ie, rue,       rde      )
-     (12, 15, touch_pad5,           mux_sel,        fun_sel,        fun_ie, rue,       rde      )
-     (14, 16, touch_pad6,           mux_sel,        fun_sel,        fun_ie, rue,       rde      )
-     (27, 17, touch_pad7,           mux_sel,        fun_sel,        fun_ie, rue,       rde      )
+     (36, 0,  sensor_pads(),   sense1_mux_sel, sense1_fun_sel, sense1_fun_ie)
+     (37, 1,  sensor_pads(),   sense2_mux_sel, sense2_fun_sel, sense2_fun_ie)
+     (38, 2,  sensor_pads(),   sense3_mux_sel, sense3_fun_sel, sense3_fun_ie)
+     (39, 3,  sensor_pads(),   sense4_mux_sel, sense4_fun_sel, sense4_fun_ie)
+     (34, 4,  adc_pad(),         adc1_mux_sel,   adc1_fun_sel,   adc1_fun_ie)
+     (35, 5,  adc_pad(),         adc2_mux_sel,   adc2_fun_sel,   adc1_fun_ie)
+     (25, 6,  pad_dac1(),       pdac1_mux_sel,  pdac1_fun_sel,  pdac1_fun_ie, pdac1_rue, pdac1_rde)
+     (26, 7,  pad_dac2(),       pdac2_mux_sel,  pdac2_fun_sel,  pdac2_fun_ie, pdac2_rue, pdac2_rde)
+     (33, 8,  xtal_32k_pad(),    x32n_mux_sel,   x32n_fun_sel,   x32n_fun_ie, x32n_rue,  x32n_rde )
+     (32, 9,  xtal_32k_pad(),    x32p_mux_sel,   x32p_fun_sel,   x32p_fun_ie, x32p_rue,  x32p_rde )
+     (4,  10, touch_pad0(),           mux_sel,        fun_sel,        fun_ie, rue,       rde      )
+     (0,  11, touch_pad1(),           mux_sel,        fun_sel,        fun_ie, rue,       rde      )
+     (2,  12, touch_pad2(),           mux_sel,        fun_sel,        fun_ie, rue,       rde      )
+     (15, 13, touch_pad3(),           mux_sel,        fun_sel,        fun_ie, rue,       rde      )
+     (13, 14, touch_pad4(),           mux_sel,        fun_sel,        fun_ie, rue,       rde      )
+     (12, 15, touch_pad5(),           mux_sel,        fun_sel,        fun_ie, rue,       rde      )
+     (14, 16, touch_pad6(),           mux_sel,        fun_sel,        fun_ie, rue,       rde      )
+     (27, 17, touch_pad7(),           mux_sel,        fun_sel,        fun_ie, rue,       rde      )
 }
 
 crate::gpio::rtc_pins! {
-        (36, 0,  sensor_pads,  sense1_, sense1_hold_force )
-        (37, 1,  sensor_pads,  sense2_, sense2_hold_force )
-        (38, 2,  sensor_pads,  sense3_, sense3_hold_force )
-        (39, 3,  sensor_pads,  sense4_, sense4_hold_force )
-        (34, 4,  adc_pad,        adc1_, adc1_hold_force )
-        (35, 5,  adc_pad,        adc2_, adc2_hold_force )
-        (25, 6,  pad_dac1,      pdac1_, pdac1_hold_force,      pdac1_rue, pdac1_rde )
-        (26, 7,  pad_dac2,      pdac2_, pdac2_hold_force,      pdac2_rue, pdac2_rde )
-        (33, 8,  xtal_32k_pad,   x32n_, x32n_hold_force,       x32n_rue,  x32n_rde  )
-        (32, 9,  xtal_32k_pad,   x32p_, x32p_hold_force,       x32p_rue,  x32p_rde  )
-        (4,  10, touch_pad0,     "",    touch_pad0_hold_force, rue,       rde       )
-        (0,  11, touch_pad1,     "",    touch_pad1_hold_force, rue,       rde       )
-        (2,  12, touch_pad2,     "",    touch_pad2_hold_force, rue,       rde       )
-        (15, 13, touch_pad3,     "",    touch_pad3_hold_force, rue,       rde       )
-        (13, 14, touch_pad4,     "",    touch_pad4_hold_force, rue,       rde       )
-        (12, 15, touch_pad5,     "",    touch_pad5_hold_force, rue,       rde       )
-        (14, 16, touch_pad6,     "",    touch_pad6_hold_force, rue,       rde       )
-        (27, 17, touch_pad7,     "",    touch_pad7_hold_force, rue,       rde       )
+        (36, 0,  sensor_pads(),    sense1_, sense1_hold_force )
+        (37, 1,  sensor_pads(),    sense2_, sense2_hold_force )
+        (38, 2,  sensor_pads(),    sense3_, sense3_hold_force )
+        (39, 3,  sensor_pads(),    sense4_, sense4_hold_force )
+        (34, 4,  adc_pad(),        adc1_,   adc1_hold_force )
+        (35, 5,  adc_pad(),        adc2_,   adc2_hold_force )
+        (25, 6,  pad_dac1(),       pdac1_,  pdac1_hold_force,      pdac1_rue, pdac1_rde )
+        (26, 7,  pad_dac2(),       pdac2_,  pdac2_hold_force,      pdac2_rue, pdac2_rde )
+        (33, 8,  xtal_32k_pad(),   x32n_,   x32n_hold_force,       x32n_rue,  x32n_rde  )
+        (32, 9,  xtal_32k_pad(),   x32p_,   x32p_hold_force,       x32p_rue,  x32p_rde  )
+        (4,  10, touch_pad0(),     "",      touch_pad0_hold_force, rue,       rde       )
+        (0,  11, touch_pad1(),     "",      touch_pad1_hold_force, rue,       rde       )
+        (2,  12, touch_pad2(),     "",      touch_pad2_hold_force, rue,       rde       )
+        (15, 13, touch_pad3(),     "",      touch_pad3_hold_force, rue,       rde       )
+        (13, 14, touch_pad4(),     "",      touch_pad4_hold_force, rue,       rde       )
+        (12, 15, touch_pad5(),     "",      touch_pad5_hold_force, rue,       rde       )
+        (14, 16, touch_pad6(),     "",      touch_pad6_hold_force, rue,       rde       )
+        (27, 17, touch_pad7(),     "",      touch_pad7_hold_force, rue,       rde       )
 }
 
 impl InterruptStatusRegisterAccess for InterruptStatusRegisterAccessBank0 {
     fn pro_cpu_interrupt_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_int.read().bits()
+        unsafe { &*GPIO::PTR }.pcpu_int().read().bits()
     }
 
     fn pro_cpu_nmi_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_nmi_int.read().bits()
+        unsafe { &*GPIO::PTR }.pcpu_nmi_int().read().bits()
     }
 
     fn app_cpu_interrupt_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.acpu_int.read().bits()
+        unsafe { &*GPIO::PTR }.acpu_int().read().bits()
     }
 
     fn app_cpu_nmi_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.acpu_nmi_int.read().bits()
+        unsafe { &*GPIO::PTR }.acpu_nmi_int().read().bits()
     }
 }
 
 impl InterruptStatusRegisterAccess for InterruptStatusRegisterAccessBank1 {
     fn pro_cpu_interrupt_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_int1.read().bits()
+        unsafe { &*GPIO::PTR }.pcpu_int1().read().bits()
     }
 
     fn pro_cpu_nmi_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_nmi_int1.read().bits()
+        unsafe { &*GPIO::PTR }.pcpu_nmi_int1().read().bits()
     }
 
     fn app_cpu_interrupt_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.acpu_int1.read().bits()
+        unsafe { &*GPIO::PTR }.acpu_int1().read().bits()
     }
 
     fn app_cpu_nmi_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.acpu_nmi_int1.read().bits()
+        unsafe { &*GPIO::PTR }.acpu_nmi_int1().read().bits()
     }
 }

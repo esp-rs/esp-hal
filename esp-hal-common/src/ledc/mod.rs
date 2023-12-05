@@ -123,8 +123,10 @@ impl<'d> LEDC<'d> {
     /// Set global slow clock source
     #[cfg(esp32)]
     pub fn set_global_slow_clock(&mut self, _clock_source: LSGlobalClkSource) {
-        self.ledc.conf.write(|w| w.apb_clk_sel().set_bit());
-        self.ledc.lstimer0_conf.modify(|_, w| w.para_up().set_bit());
+        self.ledc.conf().write(|w| w.apb_clk_sel().set_bit());
+        self.ledc
+            .lstimer0_conf()
+            .modify(|_, w| w.para_up().set_bit());
     }
 
     #[cfg(not(esp32))]
@@ -134,21 +136,23 @@ impl<'d> LEDC<'d> {
         let pcr = unsafe { &*crate::peripherals::PCR::ptr() };
 
         #[cfg(any(esp32c6, esp32h2))]
-        pcr.ledc_sclk_conf.write(|w| w.ledc_sclk_en().set_bit());
+        pcr.ledc_sclk_conf().write(|w| w.ledc_sclk_en().set_bit());
 
         match clock_source {
             LSGlobalClkSource::APBClk => {
                 #[cfg(not(any(esp32c6, esp32h2)))]
-                self.ledc.conf.write(|w| unsafe { w.apb_clk_sel().bits(1) });
+                self.ledc
+                    .conf()
+                    .write(|w| unsafe { w.apb_clk_sel().bits(1) });
                 #[cfg(esp32c6)]
-                pcr.ledc_sclk_conf
+                pcr.ledc_sclk_conf()
                     .write(|w| unsafe { w.ledc_sclk_sel().bits(1) });
                 #[cfg(esp32h2)]
-                pcr.ledc_sclk_conf
+                pcr.ledc_sclk_conf()
                     .write(|w| unsafe { w.ledc_sclk_sel().bits(0) });
             }
         }
-        self.ledc.timer0_conf.modify(|_, w| w.para_up().set_bit());
+        self.ledc.timer0_conf().modify(|_, w| w.para_up().set_bit());
     }
 
     /// Return a new timer

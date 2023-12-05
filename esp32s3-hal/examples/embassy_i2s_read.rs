@@ -19,9 +19,10 @@ use embassy_executor::Spawner;
 use esp32s3_hal::{
     clock::ClockControl,
     dma::DmaPriority,
+    dma_buffers,
     embassy::{self},
     gdma::Gdma,
-    i2s::{asynch::*, DataFormat, I2s, I2s0New, MclkPin, PinsBclkWsDin, Standard},
+    i2s::{asynch::*, DataFormat, I2s, Standard},
     peripherals::Peripherals,
     prelude::*,
     IO,
@@ -30,7 +31,7 @@ use esp_backtrace as _;
 use esp_println::println;
 
 #[main]
-async fn main(_spawner: Spawner) -> ! {
+async fn main(_spawner: Spawner) {
     #[cfg(feature = "log")]
     esp_println::logger::init_logger_from_env();
     println!("Init!");
@@ -55,12 +56,10 @@ async fn main(_spawner: Spawner) -> ! {
     let dma = Gdma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
 
-    let mut tx_descriptors = [0u32; 20 * 3];
-    let mut rx_descriptors = [0u32; 8 * 3];
+    let (_, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(0, 4092 * 4);
 
     let i2s = I2s::new(
         peripherals.I2S0,
-        MclkPin::new(io.pins.gpio4),
         Standard::Philips,
         DataFormat::Data16Channel16,
         44100u32.Hz(),
@@ -71,13 +70,15 @@ async fn main(_spawner: Spawner) -> ! {
             DmaPriority::Priority0,
         ),
         &clocks,
-    );
+    )
+    .with_mclk(io.pins.gpio4);
 
-    let i2s_rx = i2s.i2s_rx.with_pins(PinsBclkWsDin::new(
-        io.pins.gpio1,
-        io.pins.gpio2,
-        io.pins.gpio3,
-    ));
+    let i2s_rx = i2s
+        .i2s_rx
+        .with_bclk(io.pins.gpio1)
+        .with_ws(io.pins.gpio2)
+        .with_din(io.pins.gpio5)
+        .build();
 
     // you need to manually enable the DMA channel's interrupt!
     esp32s3_hal::interrupt::enable(
@@ -86,7 +87,7 @@ async fn main(_spawner: Spawner) -> ! {
     )
     .unwrap();
 
-    let buffer = dma_buffer();
+    let buffer = rx_buffer;
     println!("Start");
 
     let mut data = [0u8; 5000];
@@ -103,9 +104,4 @@ async fn main(_spawner: Spawner) -> ! {
             &data[count - 10..count]
         );
     }
-}
-
-fn dma_buffer() -> &'static mut [u8; 4092 * 4] {
-    static mut BUFFER: [u8; 4092 * 4] = [0u8; 4092 * 4];
-    unsafe { &mut BUFFER }
 }

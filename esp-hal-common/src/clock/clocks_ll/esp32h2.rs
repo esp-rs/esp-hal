@@ -149,7 +149,7 @@ pub(crate) fn esp32h2_rtc_bbpll_configure(_xtal_freq: XtalClock, _pll_freq: PllC
 pub(crate) fn esp32h2_rtc_bbpll_enable() {
     let pmu = unsafe { &*crate::peripherals::PMU::PTR };
 
-    pmu.imm_hp_ck_power.modify(|_, w| {
+    pmu.imm_hp_ck_power().modify(|_, w| {
         w.tie_high_xpd_bb_i2c()
             .set_bit()
             .tie_high_xpd_bbpll()
@@ -158,7 +158,7 @@ pub(crate) fn esp32h2_rtc_bbpll_enable() {
             .set_bit()
     });
 
-    pmu.imm_hp_ck_power
+    pmu.imm_hp_ck_power()
         .modify(|_, w| w.tie_high_global_bbpll_icg().set_bit());
 }
 
@@ -170,10 +170,10 @@ pub(crate) fn esp32h2_rtc_update_to_xtal(freq: XtalClock, _div: u8) {
         // first.
         clk_ll_ahb_set_divider(_div as u32);
 
-        pcr.cpu_freq_conf
+        pcr.cpu_freq_conf()
             .modify(|_, w| w.cpu_div_num().bits(_div - 1));
         // Switch clock source
-        pcr.sysclk_conf.modify(|_, w| w.soc_clk_sel().bits(0));
+        pcr.sysclk_conf().modify(|_, w| w.soc_clk_sel().bits(0));
 
         clk_ll_bus_update();
     }
@@ -192,7 +192,7 @@ pub(crate) fn esp32h2_rtc_freq_to_pll_mhz(cpu_clock_speed: CpuClock) {
     let pcr = unsafe { &*crate::peripherals::PCR::PTR };
 
     unsafe {
-        pcr.sysclk_conf.modify(|_, w| w.soc_clk_sel().bits(1));
+        pcr.sysclk_conf().modify(|_, w| w.soc_clk_sel().bits(1));
 
         clk_ll_bus_update();
 
@@ -206,7 +206,7 @@ pub(crate) fn esp32h2_rtc_apb_freq_update(apb_freq: ApbClock) {
         | (((apb_freq.hz() >> 12) & u16::MAX as u32) << 16);
 
     lp_aon
-        .store5
+        .store5()
         .modify(|_, w| unsafe { w.lp_aon_store5().bits(value) });
 }
 
@@ -215,7 +215,7 @@ fn clk_ll_cpu_set_divider(divider: u32) {
 
     unsafe {
         let pcr = &*crate::peripherals::PCR::PTR;
-        pcr.cpu_freq_conf
+        pcr.cpu_freq_conf()
             .modify(|_, w| w.cpu_div_num().bits((divider - 1) as u8));
     }
 }
@@ -225,7 +225,7 @@ fn clk_ll_ahb_set_divider(divider: u32) {
 
     unsafe {
         let pcr = &*crate::peripherals::PCR::PTR;
-        pcr.ahb_freq_conf
+        pcr.ahb_freq_conf()
             .modify(|_, w| w.ahb_div_num().bits((divider - 1) as u8));
     }
 }
@@ -234,11 +234,11 @@ fn clk_ll_bus_update() {
     unsafe {
         let pcr = &*crate::peripherals::PCR::PTR;
 
-        pcr.bus_clk_update
+        pcr.bus_clk_update()
             .modify(|_, w| w.bus_clock_update().bit(true));
 
         // reg_get_bit
-        while pcr.bus_clk_update.read().bus_clock_update().bit_is_set() {}
+        while pcr.bus_clk_update().read().bus_clock_update().bit_is_set() {}
     }
 }
 

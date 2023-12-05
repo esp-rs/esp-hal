@@ -114,9 +114,9 @@ impl Clock for CpuClock {
     }
 }
 
-#[allow(unused)]
 #[derive(Debug, Clone, Copy)]
-pub(crate) enum XtalClock {
+#[non_exhaustive]
+pub enum XtalClock {
     #[cfg(esp32)]
     RtcXtalFreq24M,
     #[cfg(any(esp32, esp32c2))]

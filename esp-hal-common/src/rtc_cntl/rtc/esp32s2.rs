@@ -27,7 +27,7 @@ pub(crate) fn configure_clock() {
 
     unsafe {
         let rtc_cntl = &*RTC_CNTL::ptr();
-        rtc_cntl.store1.write(|w| w.bits(cal_val));
+        rtc_cntl.store1().write(|w| w.bits(cal_val));
     }
 }
 

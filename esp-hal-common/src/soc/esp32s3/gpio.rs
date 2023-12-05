@@ -64,7 +64,7 @@ pub const ZERO_INPUT: u8 = 0x3c;
 pub(crate) const GPIO_FUNCTION: AlternateFunction = AlternateFunction::Function1;
 
 pub(crate) const fn get_io_mux_reg(gpio_num: u8) -> &'static crate::peripherals::io_mux::GPIO {
-    unsafe { &(&*crate::peripherals::IO_MUX::PTR).gpio[gpio_num as usize] }
+    unsafe { &(&*crate::peripherals::IO_MUX::PTR).gpio(gpio_num as usize) }
 }
 
 pub(crate) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
@@ -351,64 +351,64 @@ crate::gpio::gpio! {
 }
 
 crate::gpio::analog! {
-     ( 0,  0,  touch_pad0,     mux_sel,      fun_sel,      fun_ie,              rue,       rde)
-     ( 1,  1,  touch_pad1,     mux_sel,      fun_sel,      fun_ie,              rue,       rde)
-     ( 2,  2,  touch_pad2,     mux_sel,      fun_sel,      fun_ie,              rue,       rde)
-     ( 3,  3,  touch_pad3,     mux_sel,      fun_sel,      fun_ie,              rue,       rde)
-     ( 4,  4,  touch_pad4,     mux_sel,      fun_sel,      fun_ie,              rue,       rde)
-     ( 5,  5,  touch_pad5,     mux_sel,      fun_sel,      fun_ie,              rue,       rde)
-     ( 6,  6,  touch_pad6,     mux_sel,      fun_sel,      fun_ie,              rue,       rde)
-     ( 7,  7,  touch_pad7,     mux_sel,      fun_sel,      fun_ie,              rue,       rde)
-     ( 8,  8,  touch_pad8,     mux_sel,      fun_sel,      fun_ie,              rue,       rde)
-     ( 9,  9,  touch_pad9,     mux_sel,      fun_sel,      fun_ie,              rue,       rde)
-     (10, 10,  touch_pad10,    mux_sel,      fun_sel,      fun_ie,              rue,       rde)
-     (11, 11,  touch_pad11,    mux_sel,      fun_sel,      fun_ie,              rue,       rde)
-     (12, 12,  touch_pad12,    mux_sel,      fun_sel,      fun_ie,              rue,       rde)
-     (13, 13,  touch_pad13,    mux_sel,      fun_sel,      fun_ie,              rue,       rde)
-     (14, 14,  touch_pad14,    mux_sel,      fun_sel,      fun_ie,              rue,       rde)
-     (15, 15,  xtal_32p_pad,   x32p_mux_sel, x32p_fun_sel, x32p_fun_ie,    x32p_rue,  x32p_rde)
-     (16, 16,  xtal_32n_pad,   x32n_mux_sel, x32n_fun_sel, x32n_fun_ie,    x32n_rue,  x32n_rde)
-     (17, 17,  pad_dac1,       pdac1_mux_sel,pdac1_fun_sel,pdac1_fun_ie,  pdac1_rue, pdac1_rde)
-     (18, 18,  pad_dac2,       pdac2_mux_sel,pdac2_fun_sel,pdac2_fun_ie,  pdac2_rue, pdac2_rde)
-     (19, 19,  rtc_pad19,      mux_sel,      fun_sel,      fun_ie,              rue,       rde)
-     (20, 20,  rtc_pad20,      mux_sel,      fun_sel,      fun_ie,              rue,       rde)
-     (21, 21,  rtc_pad21,      mux_sel,      fun_sel,      fun_ie,              rue,       rde)
+     ( 0,  0,  touch_pad0(),     mux_sel,      fun_sel,      fun_ie,              rue,       rde)
+     ( 1,  1,  touch_pad1(),     mux_sel,      fun_sel,      fun_ie,              rue,       rde)
+     ( 2,  2,  touch_pad2(),     mux_sel,      fun_sel,      fun_ie,              rue,       rde)
+     ( 3,  3,  touch_pad3(),     mux_sel,      fun_sel,      fun_ie,              rue,       rde)
+     ( 4,  4,  touch_pad4(),     mux_sel,      fun_sel,      fun_ie,              rue,       rde)
+     ( 5,  5,  touch_pad5(),     mux_sel,      fun_sel,      fun_ie,              rue,       rde)
+     ( 6,  6,  touch_pad6(),     mux_sel,      fun_sel,      fun_ie,              rue,       rde)
+     ( 7,  7,  touch_pad7(),     mux_sel,      fun_sel,      fun_ie,              rue,       rde)
+     ( 8,  8,  touch_pad8(),     mux_sel,      fun_sel,      fun_ie,              rue,       rde)
+     ( 9,  9,  touch_pad9(),     mux_sel,      fun_sel,      fun_ie,              rue,       rde)
+     (10, 10,  touch_pad10(),    mux_sel,      fun_sel,      fun_ie,              rue,       rde)
+     (11, 11,  touch_pad11(),    mux_sel,      fun_sel,      fun_ie,              rue,       rde)
+     (12, 12,  touch_pad12(),    mux_sel,      fun_sel,      fun_ie,              rue,       rde)
+     (13, 13,  touch_pad13(),    mux_sel,      fun_sel,      fun_ie,              rue,       rde)
+     (14, 14,  touch_pad14(),    mux_sel,      fun_sel,      fun_ie,              rue,       rde)
+     (15, 15,  xtal_32p_pad(),   x32p_mux_sel, x32p_fun_sel, x32p_fun_ie,    x32p_rue,  x32p_rde)
+     (16, 16,  xtal_32n_pad(),   x32n_mux_sel, x32n_fun_sel, x32n_fun_ie,    x32n_rue,  x32n_rde)
+     (17, 17,  pad_dac1(),       pdac1_mux_sel,pdac1_fun_sel,pdac1_fun_ie,  pdac1_rue, pdac1_rde)
+     (18, 18,  pad_dac2(),       pdac2_mux_sel,pdac2_fun_sel,pdac2_fun_ie,  pdac2_rue, pdac2_rde)
+     (19, 19,  rtc_pad19(),      mux_sel,      fun_sel,      fun_ie,              rue,       rde)
+     (20, 20,  rtc_pad20(),      mux_sel,      fun_sel,      fun_ie,              rue,       rde)
+     (21, 21,  rtc_pad21(),      mux_sel,      fun_sel,      fun_ie,              rue,       rde)
 }
 
 crate::gpio::rtc_pins! {
-    ( 0,  0,  touch_pad0,   "",     touch_pad0_hold,        rue,       rde)
-    ( 1,  1,  touch_pad1,   "",     touch_pad1_hold,        rue,       rde)
-    ( 2,  2,  touch_pad2,   "",     touch_pad2_hold,        rue,       rde)
-    ( 3,  3,  touch_pad3,   "",     touch_pad3_hold,        rue,       rde)
-    ( 4,  4,  touch_pad4,   "",     touch_pad4_hold,        rue,       rde)
-    ( 5,  5,  touch_pad5,   "",     touch_pad5_hold,        rue,       rde)
-    ( 6,  6,  touch_pad6,   "",     touch_pad6_hold,        rue,       rde)
-    ( 7,  7,  touch_pad7,   "",     touch_pad7_hold,        rue,       rde)
-    ( 8,  8,  touch_pad8,   "",     touch_pad8_hold,        rue,       rde)
-    ( 9,  9,  touch_pad9,   "",     touch_pad9_hold,        rue,       rde)
-    (10, 10,  touch_pad10,  "",     touch_pad10_hold,       rue,       rde)
-    (11, 11,  touch_pad11,  "",     touch_pad11_hold,       rue,       rde)
-    (12, 12,  touch_pad12,  "",     touch_pad12_hold,       rue,       rde)
-    (13, 13,  touch_pad13,  "",     touch_pad13_hold,       rue,       rde)
-    (14, 14,  touch_pad14,  "",     touch_pad14_hold,       rue,       rde)
-    (15, 15,  xtal_32p_pad, x32p_,  x32p_hold,         x32p_rue,  x32p_rde)
-    (16, 16,  xtal_32n_pad, x32n_,  x32n_hold,         x32n_rue,  x32n_rde)
-    (17, 17,  pad_dac1,     pdac1_, pdac1_hold,       pdac1_rue, pdac1_rde)
-    (18, 18,  pad_dac2,     pdac2_, pdac2_hold,       pdac2_rue, pdac2_rde)
-    (19, 19,  rtc_pad19,    "",     pad19_hold,             rue,       rde)
-    (20, 20,  rtc_pad20,    "",     pad20_hold,             rue,       rde)
-    (21, 21,  rtc_pad21,    "",     pad21_hold,             rue,       rde)
+    ( 0,  0,  touch_pad0(),   "",     touch_pad0_hold,        rue,       rde)
+    ( 1,  1,  touch_pad1(),   "",     touch_pad1_hold,        rue,       rde)
+    ( 2,  2,  touch_pad2(),   "",     touch_pad2_hold,        rue,       rde)
+    ( 3,  3,  touch_pad3(),   "",     touch_pad3_hold,        rue,       rde)
+    ( 4,  4,  touch_pad4(),   "",     touch_pad4_hold,        rue,       rde)
+    ( 5,  5,  touch_pad5(),   "",     touch_pad5_hold,        rue,       rde)
+    ( 6,  6,  touch_pad6(),   "",     touch_pad6_hold,        rue,       rde)
+    ( 7,  7,  touch_pad7(),   "",     touch_pad7_hold,        rue,       rde)
+    ( 8,  8,  touch_pad8(),   "",     touch_pad8_hold,        rue,       rde)
+    ( 9,  9,  touch_pad9(),   "",     touch_pad9_hold,        rue,       rde)
+    (10, 10,  touch_pad10(),  "",     touch_pad10_hold,       rue,       rde)
+    (11, 11,  touch_pad11(),  "",     touch_pad11_hold,       rue,       rde)
+    (12, 12,  touch_pad12(),  "",     touch_pad12_hold,       rue,       rde)
+    (13, 13,  touch_pad13(),  "",     touch_pad13_hold,       rue,       rde)
+    (14, 14,  touch_pad14(),  "",     touch_pad14_hold,       rue,       rde)
+    (15, 15,  xtal_32p_pad(), x32p_,  x32p_hold,         x32p_rue,  x32p_rde)
+    (16, 16,  xtal_32n_pad(), x32n_,  x32n_hold,         x32n_rue,  x32n_rde)
+    (17, 17,  pad_dac1(),     pdac1_, pdac1_hold,       pdac1_rue, pdac1_rde)
+    (18, 18,  pad_dac2(),     pdac2_, pdac2_hold,       pdac2_rue, pdac2_rde)
+    (19, 19,  rtc_pad19(),    "",     pad19_hold,             rue,       rde)
+    (20, 20,  rtc_pad20(),    "",     pad20_hold,             rue,       rde)
+    (21, 21,  rtc_pad21(),    "",     pad21_hold,             rue,       rde)
 }
 
 // Whilst the S3 is a dual core chip, it shares the enable registers between
 // cores so treat it as a single core device
 impl InterruptStatusRegisterAccess for InterruptStatusRegisterAccessBank0 {
     fn pro_cpu_interrupt_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_int.read().bits()
+        unsafe { &*GPIO::PTR }.pcpu_int().read().bits()
     }
 
     fn pro_cpu_nmi_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_nmi_int.read().bits()
+        unsafe { &*GPIO::PTR }.pcpu_nmi_int().read().bits()
     }
 
     fn interrupt_status_read() -> u32 {
@@ -422,11 +422,11 @@ impl InterruptStatusRegisterAccess for InterruptStatusRegisterAccessBank0 {
 
 impl InterruptStatusRegisterAccess for InterruptStatusRegisterAccessBank1 {
     fn pro_cpu_interrupt_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_int1.read().bits()
+        unsafe { &*GPIO::PTR }.pcpu_int1().read().bits()
     }
 
     fn pro_cpu_nmi_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_nmi_int1.read().bits()
+        unsafe { &*GPIO::PTR }.pcpu_nmi_int1().read().bits()
     }
 
     fn interrupt_status_read() -> u32 {
@@ -439,6 +439,5 @@ impl InterruptStatusRegisterAccess for InterruptStatusRegisterAccessBank1 {
 }
 
 // implement marker traits on USB pins
-impl<T> crate::otg_fs::UsbSel for Gpio18<T> {}
 impl<T> crate::otg_fs::UsbDp for Gpio19<T> {}
 impl<T> crate::otg_fs::UsbDm for Gpio20<T> {}

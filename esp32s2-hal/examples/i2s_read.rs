@@ -16,7 +16,8 @@
 use esp32s2_hal::{
     clock::ClockControl,
     dma::DmaPriority,
-    i2s::{DataFormat, I2s, I2s0New, I2sReadDma, NoMclk, PinsBclkWsDin, Standard},
+    dma_buffers,
+    i2s::{DataFormat, I2s, I2sReadDma, Standard},
     pdma::Dma,
     peripherals::Peripherals,
     prelude::*,
@@ -36,12 +37,10 @@ fn main() -> ! {
     let dma = Dma::new(system.dma);
     let dma_channel = dma.i2s0channel;
 
-    let mut tx_descriptors = [0u32; 8 * 3];
-    let mut rx_descriptors = [0u32; 8 * 3];
+    let (_, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(0, 4092 * 4);
 
     let i2s = I2s::new(
         peripherals.I2S0,
-        NoMclk {},
         Standard::Philips,
         DataFormat::Data16Channel16,
         44100u32.Hz(),
@@ -54,13 +53,14 @@ fn main() -> ! {
         &clocks,
     );
 
-    let i2s_rx = i2s.i2s_rx.with_pins(PinsBclkWsDin::new(
-        io.pins.gpio1,
-        io.pins.gpio2,
-        io.pins.gpio5,
-    ));
+    let i2s_rx = i2s
+        .i2s_rx
+        .with_bclk(io.pins.gpio1)
+        .with_ws(io.pins.gpio2)
+        .with_din(io.pins.gpio5)
+        .build();
 
-    let buffer = dma_buffer();
+    let buffer = rx_buffer;
 
     let mut transfer = i2s_rx.read_dma_circular(buffer).unwrap();
     println!("Started transfer");
@@ -74,9 +74,4 @@ fn main() -> ! {
             println!("Received {:x?}...", &rcv[..30]);
         }
     }
-}
-
-fn dma_buffer() -> &'static mut [u8; 4092 * 4] {
-    static mut BUFFER: [u8; 4092 * 4] = [0u8; 4092 * 4];
-    unsafe { &mut BUFFER }
 }

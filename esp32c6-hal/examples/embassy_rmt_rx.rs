@@ -23,7 +23,7 @@ use esp_println::{print, println};
 const WIDTH: usize = 80;
 
 #[main]
-async fn main(_spawner: Spawner) -> ! {
+async fn main(_spawner: Spawner) {
     #[cfg(feature = "log")]
     esp_println::logger::init_logger_from_env();
     println!("Init!");

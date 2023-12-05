@@ -9,6 +9,6 @@ REGION_ALIAS("RWDATA", RAM);
 REGION_ALIAS("RTC_FAST_RWTEXT", RTC_FAST);
 REGION_ALIAS("RTC_FAST_RWDATA", RTC_FAST);
 
-INCLUDE "bl-riscv-link.x"
+INCLUDE "esp32h2.x"
 INCLUDE "hal-defaults.x"
 INCLUDE "rom-functions.x"

@@ -20,7 +20,7 @@ use esp32_hal::{
 use esp_backtrace as _;
 
 #[main]
-async fn main(_spawner: Spawner) -> ! {
+async fn main(_spawner: Spawner) {
     esp_println::println!("Init!");
     let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();

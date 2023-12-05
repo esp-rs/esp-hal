@@ -70,29 +70,29 @@ impl<'d> Trace<'d> {
 
     /// Start tracing, writing data into the `buffer`
     pub fn start_trace(&mut self, buffer: &'d mut [u8]) {
-        self.peripheral.mem_start_addr.modify(|_, w| {
+        self.peripheral.mem_start_addr().modify(|_, w| {
             w.mem_staet_addr()
                 .variant(buffer.as_ptr() as *const _ as u32)
         });
-        self.peripheral.mem_end_addr.modify(|_, w| {
+        self.peripheral.mem_end_addr().modify(|_, w| {
             w.mem_end_addr()
                 .variant((buffer.as_ptr() as *const _ as u32) + (buffer.len() as u32))
         });
         self.peripheral
-            .mem_addr_update
+            .mem_addr_update()
             .write(|w| w.mem_current_addr_update().set_bit());
 
         // won't set bit in int-raw without enabling
         self.peripheral
-            .intr_ena
+            .intr_ena()
             .modify(|_, w| w.mem_full_intr_ena().set_bit());
 
         // for now always use looping mode
         self.peripheral
-            .trigger
+            .trigger()
             .write(|w| w.mem_loop().set_bit().restart_ena().set_bit());
 
-        self.peripheral.intr_clr.write(|w| {
+        self.peripheral.intr_clr().write(|w| {
             w.fifo_overflow_intr_clr()
                 .set_bit()
                 .mem_full_intr_clr()
@@ -100,7 +100,7 @@ impl<'d> Trace<'d> {
         });
 
         self.buffer.replace(buffer);
-        self.peripheral.trigger.write(|w| w.on().set_bit());
+        self.peripheral.trigger().write(|w| w.on().set_bit());
     }
 
     /// Stop tracing
@@ -109,7 +109,7 @@ impl<'d> Trace<'d> {
     /// account for wrapping when reading the data.
     pub fn stop_trace(&mut self) -> Result<TraceResult, Error> {
         self.peripheral
-            .trigger
+            .trigger()
             .write(|w| w.off().set_bit().restart_ena().clear_bit());
 
         if self.buffer.is_none() {
@@ -119,15 +119,21 @@ impl<'d> Trace<'d> {
         let buffer = self.buffer.take().unwrap();
 
         loop {
-            if self.peripheral.fifo_status.read().fifo_empty().bit_is_set() {
+            if self
+                .peripheral
+                .fifo_status()
+                .read()
+                .fifo_empty()
+                .bit_is_set()
+            {
                 break;
             }
         }
 
-        let overflow = self.peripheral.intr_raw.read().mem_full_intr_raw().bit();
+        let overflow = self.peripheral.intr_raw().read().mem_full_intr_raw().bit();
         let idx = if overflow {
             self.peripheral
-                .mem_current_addr
+                .mem_current_addr()
                 .read()
                 .mem_current_addr()
                 .bits()
@@ -140,7 +146,7 @@ impl<'d> Trace<'d> {
             buffer.len()
         } else {
             self.peripheral
-                .mem_current_addr
+                .mem_current_addr()
                 .read()
                 .mem_current_addr()
                 .bits() as usize

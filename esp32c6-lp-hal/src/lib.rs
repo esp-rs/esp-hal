@@ -1,4 +1,5 @@
 #![no_std]
+#![allow(asm_sub_register)]
 
 use core::arch::global_asm;
 
@@ -65,7 +66,7 @@ unsafe extern "C" fn lp_core_startup() -> ! {
     }
 
     let clkrst = &*esp32c6_lp::LP_CLKRST::PTR;
-    if clkrst.lp_clk_conf.read().fast_clk_sel().bit_is_set() {
+    if clkrst.lp_clk_conf().read().fast_clk_sel().bit_is_set() {
         CPU_CLOCK = XTAL_D2_CLK_HZ;
     }
 

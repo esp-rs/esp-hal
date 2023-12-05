@@ -29,7 +29,7 @@ use esp_backtrace as _;
 use lis3dh_async::{Lis3dh, Range, SlaveAddr};
 
 #[main]
-async fn main(_spawner: Spawner) -> ! {
+async fn main(_spawner: Spawner) {
     let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();

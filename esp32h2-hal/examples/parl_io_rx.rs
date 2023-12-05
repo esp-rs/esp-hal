@@ -9,14 +9,13 @@
 use esp32h2_hal::{
     clock::ClockControl,
     dma::DmaPriority,
+    dma_buffers,
     gdma::Gdma,
     gpio::IO,
     parl_io::{BitPackOrder, NoClkPin, ParlIoRxOnly, RxFourBits},
     peripherals::Peripherals,
     prelude::*,
-    timer::TimerGroup,
     Delay,
-    Rtc,
 };
 use esp_backtrace as _;
 use esp_println::println;
@@ -27,22 +26,9 @@ fn main() -> ! {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    // Disable the watchdog timers.
-    let mut rtc = Rtc::new(peripherals.LP_CLKRST);
-    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    let mut wdt0 = timer_group0.wdt;
-    let timer_group1 = TimerGroup::new(peripherals.TIMG1, &clocks);
-    let mut wdt1 = timer_group1.wdt;
-
-    rtc.swd.disable();
-    rtc.rwdt.disable();
-    wdt0.disable();
-    wdt1.disable();
-
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let mut tx_descriptors = [0u32; 8 * 3];
-    let mut rx_descriptors = [0u32; 8 * 3];
+    let (_, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(0, 32000);
 
     let dma = Gdma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
@@ -67,7 +53,7 @@ fn main() -> ! {
         .with_config(rx_pins, NoClkPin, BitPackOrder::Msb, Some(0xfff))
         .unwrap();
 
-    let mut buffer = dma_buffer();
+    let mut buffer = rx_buffer;
     buffer.fill(0u8);
 
     let mut delay = Delay::new(&clocks);
@@ -82,9 +68,4 @@ fn main() -> ! {
 
         delay.delay_ms(500u32);
     }
-}
-
-fn dma_buffer() -> &'static mut [u8; 4092 * 4] {
-    static mut BUFFER: [u8; 4092 * 4] = [0u8; 4092 * 4];
-    unsafe { &mut BUFFER }
 }
