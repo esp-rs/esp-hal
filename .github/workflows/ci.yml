@@ -109,8 +109,10 @@ jobs:
 
       # Perform a full build initially to verify that the examples not only
       # build, but also link successfully.
+      - name: build esp-ulp-riscv-hal (esp32s2)
+        run: cd esp-ulp-riscv-hal/ && cargo build --release --features=esp32s2 --examples
       - name: build esp-ulp-riscv-hal (esp32s3)
-        run: cd esp-ulp-riscv-hal/ && cargo +nightly build --release --features=esp32s3 --examples
+        run: cd esp-ulp-riscv-hal/ && cargo build --release --features=esp32s3 --examples
       # Ensure documentation can be built
       - name: rustdoc
         run: cd esp-ulp-riscv-hal/ && cargo doc --features=esp32s3
