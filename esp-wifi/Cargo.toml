@@ -39,7 +39,7 @@ embedded-io.workspace = true
 embedded-io-async = { workspace = true, optional = true }
 fugit.workspace = true
 heapless = { workspace = true, default-features = false }
-num-derive = { workspace = true, features = ["full-syntax"] }
+num-derive = { workspace = true }
 num-traits = { workspace = true, default-features = false }
 esp-wifi-sys = { version = "0.1.0", path = "../esp-wifi-sys" }
 embassy-sync = { workspace = true, optional = true }
@@ -48,8 +48,12 @@ embassy-net = { workspace = true, optional = true }
 toml-cfg.workspace = true
 libm.workspace = true
 cfg-if.workspace = true
-atomic-polyfill.workspace = true
-atomic_enum.workspace = true
+portable-atomic.workspace = true
+portable_atomic_enum.workspace = true
+
+# We don't use these directly but we need to enable portable-atomic on them
+futures-util.workspace = true
+atomic-waker.workspace = true
 
 [build-dependencies]
 toml-cfg.workspace = true
@@ -59,7 +63,6 @@ esp-println = { workspace = true, features = ["log"] }
 esp-backtrace.workspace = true
 embassy-executor.workspace = true
 embassy-time.workspace = true
-futures-util.workspace = true
 bleps = { workspace = true, features = ["async"] }
 embedded-hal-async.workspace = true
 log.workspace = true
@@ -69,9 +72,9 @@ static_cell.workspace = true
 default = [ "log", "ipv4", "tcp", "udp", "icmp", "igmp", "dns", "dhcpv4" ]
 
 # chip features
-esp32c2 = [ "esp32c2-hal", "esp-wifi-sys/esp32c2", "esp-println/esp32c2", "esp-backtrace/esp32c2", "embassy-executor/arch-riscv32" ]
-esp32c3 = [ "esp32c3-hal", "esp-wifi-sys/esp32c3", "esp-println/esp32c3", "esp-backtrace/esp32c3", "embassy-executor/arch-riscv32" ]
-esp32c6 = [ "esp32c6-hal", "esp-wifi-sys/esp32c6", "esp-println/esp32c6", "esp-backtrace/esp32c6", "embassy-executor/arch-riscv32" ]
+esp32c2 = [ "esp32c2-hal", "esp-wifi-sys/esp32c2", "esp-println/esp32c2", "esp-backtrace/esp32c2" ]
+esp32c3 = [ "esp32c3-hal", "esp-wifi-sys/esp32c3", "esp-println/esp32c3", "esp-backtrace/esp32c3" ]
+esp32c6 = [ "esp32c6-hal", "esp-wifi-sys/esp32c6", "esp-println/esp32c6", "esp-backtrace/esp32c6" ]
 esp32   = [ "esp32-hal",   "esp-wifi-sys/esp32",   "esp-println/esp32",   "esp-backtrace/esp32" ]
 esp32s2 = [ "esp32s2-hal", "esp-wifi-sys/esp32s2", "esp-println/esp32s2", "esp-backtrace/esp32s2" ]
 esp32s3 = [ "esp32s3-hal", "esp-wifi-sys/esp32s3", "esp-println/esp32s3", "esp-backtrace/esp32s3" ]

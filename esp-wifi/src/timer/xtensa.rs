@@ -1,6 +1,6 @@
-use atomic_polyfill::AtomicU32;
 use core::cell::RefCell;
-use core::sync::atomic::Ordering;
+
+use portable_atomic::{AtomicU32, Ordering};
 
 use critical_section::Mutex;
 

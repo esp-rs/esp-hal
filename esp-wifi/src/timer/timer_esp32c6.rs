@@ -23,10 +23,10 @@ pub fn setup_radio_isr() {
     // for some reason for this interrupt, mapping it to 0 doesn't deactivate it
     let interrupt_core0 = unsafe { &*peripherals::INTERRUPT_CORE0::PTR };
     interrupt_core0
-        .wifi_bb_intr_map
+        .wifi_bb_intr_map()
         .write(|w| w.wifi_bb_intr_map().variant(31));
     interrupt_core0
-        .modem_peri_timeout_intr_map
+        .modem_peri_timeout_intr_map()
         .write(|w| w.modem_peri_timeout_intr_map().variant(31));
 
     #[cfg(feature = "ble")]

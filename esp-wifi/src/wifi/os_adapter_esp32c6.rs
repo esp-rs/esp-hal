@@ -3,7 +3,7 @@ use crate::hal::{peripherals, riscv};
 pub(crate) fn chip_ints_on(mask: u32) {
     unsafe {
         (*peripherals::INTPRI::PTR)
-            .cpu_int_enable
+            .cpu_int_enable()
             .modify(|r, w| w.bits(r.bits() | mask));
     }
 }
@@ -11,7 +11,7 @@ pub(crate) fn chip_ints_on(mask: u32) {
 pub(crate) fn chip_ints_off(mask: u32) {
     unsafe {
         (*peripherals::INTPRI::PTR)
-            .cpu_int_enable
+            .cpu_int_enable()
             .modify(|r, w| w.bits(r.bits() & !mask));
     }
 }

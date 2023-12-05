@@ -52,7 +52,7 @@ fn main() -> ! {
     let mut wifi_stack = WifiStack::new(iface, device, sockets, current_millis);
 
     let client_config = Configuration::AccessPoint(AccessPointConfiguration {
-        ssid: "esp-wifi".into(),
+        ssid: "esp-wifi".try_into().unwrap(),
         ..Default::default()
     });
     let res = controller.set_configuration(&client_config);

@@ -7,10 +7,9 @@
 //! For more information see https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_now.html
 
 use core::marker::PhantomData;
-use core::sync::atomic::Ordering;
 use core::{cell::RefCell, fmt::Debug};
 
-use atomic_polyfill::{AtomicBool, AtomicU8};
+use portable_atomic::{AtomicBool, AtomicU8, Ordering};
 
 use critical_section::Mutex;
 

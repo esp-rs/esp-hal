@@ -72,7 +72,7 @@ impl<'a, MODE: WifiDeviceMode> WifiStack<'a, MODE> {
             network_config: RefCell::new(ipv4::Configuration::Client(
                 ipv4::ClientConfiguration::DHCP(ipv4::DHCPClientSettings {
                     //FIXME: smoltcp currently doesn't have a way of giving a hostname through DHCP
-                    hostname: Some("Espressif".into()),
+                    hostname: Some(unwrap!("Espressif".try_into().ok())),
                 }),
             )),
             ip_info: RefCell::new(None),

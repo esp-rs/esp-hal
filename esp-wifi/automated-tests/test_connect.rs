@@ -65,7 +65,7 @@ fn main() -> ! {
     let mut wifi_stack = WifiStack::new(iface, device, sockets, current_millis);
 
     let client_config = Configuration::Client(ClientConfiguration {
-        ssid: SSID.into(),
+        ssid: SSID.try_into().unwrap(),
         auth_method: AuthMethod::None,
         ..Default::default()
     });

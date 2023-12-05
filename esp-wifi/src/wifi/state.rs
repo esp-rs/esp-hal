@@ -1,11 +1,11 @@
 use super::WifiEvent;
 
-use atomic_enum::atomic_enum;
 use core::sync::atomic::Ordering;
+use portable_atomic_enum::atomic_enum;
 
 /// Wifi interface state
 #[atomic_enum]
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum WifiState {
     StaStarted,

@@ -82,12 +82,12 @@ async fn main(spawner: Spawner) -> ! {
 
     let client_config = Configuration::Mixed(
         ClientConfiguration {
-            ssid: SSID.into(),
-            password: PASSWORD.into(),
+            ssid: SSID.try_into().unwrap(),
+            password: PASSWORD.try_into().unwrap(),
             ..Default::default()
         },
         AccessPointConfiguration {
-            ssid: "esp-wifi".into(),
+            ssid: "esp-wifi".try_into().unwrap(),
             ..Default::default()
         },
     );

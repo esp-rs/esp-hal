@@ -5,8 +5,7 @@ use crate::compat::common::str_from_c;
 use crate::hal::system::RadioClockController;
 use crate::hal::system::RadioPeripherals;
 
-use atomic_polyfill::AtomicU32;
-use core::sync::atomic::Ordering;
+use portable_atomic::{AtomicU32, Ordering};
 
 const SOC_PHY_DIG_REGS_MEM_SIZE: usize = 21 * 4;
 
@@ -139,6 +138,7 @@ pub(crate) unsafe fn phy_disable_clock() {
 
 #[no_mangle]
 pub extern "C" fn rtc_clk_xtal_freq_get() -> i32 {
-    // JUST SUPPORT 40MHz XTAL for now
-    40
+    use crate::hal::clock::Clock;
+    let xtal = crate::hal::rtc_cntl::RtcClock::get_xtal_freq();
+    xtal.mhz() as i32
 }

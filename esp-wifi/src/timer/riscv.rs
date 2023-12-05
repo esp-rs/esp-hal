@@ -72,7 +72,7 @@ fn FROM_CPU_INTR3(trap_frame: &mut TrapFrame) {
     unsafe {
         // clear FROM_CPU_INTR3
         (&*SystemPeripheral::PTR)
-            .cpu_intr_from_cpu_3
+            .cpu_intr_from_cpu_3()
             .modify(|_, w| w.cpu_intr_from_cpu_3().clear_bit());
     }
 
@@ -90,7 +90,7 @@ fn FROM_CPU_INTR3(trap_frame: &mut TrapFrame) {
 pub fn yield_task() {
     unsafe {
         (&*SystemPeripheral::PTR)
-            .cpu_intr_from_cpu_3
+            .cpu_intr_from_cpu_3()
             .modify(|_, w| w.cpu_intr_from_cpu_3().set_bit());
     }
 }

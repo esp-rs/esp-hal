@@ -7,40 +7,23 @@
 esp32 =   "run --features   esp32 --target xtensa-esp32-none-elf        --features esp32-hal/default,esp32-hal/embassy-time-timg0,esp32-hal/embassy-executor-thread"
 esp32s2 = "run --features esp32s2 --target xtensa-esp32s2-none-elf      --features esp32s2-hal/default,esp32s2-hal/embassy-time-timg0,esp32s2-hal/embassy-executor-thread"
 esp32s3 = "run --features esp32s3 --target xtensa-esp32s3-none-elf      --features esp32s3-hal/default,esp32s3-hal/embassy-time-timg0,esp32s3-hal/embassy-executor-thread"
-esp32c2 = "run --features esp32c2 --target riscv32imc-unknown-none-elf  --features esp32c2-hal/default,esp32c2-hal/embassy-time-timg0"
-esp32c3 = "run --features esp32c3 --target riscv32imc-unknown-none-elf  --features esp32c3-hal/default,esp32c3-hal/embassy-time-timg0"
-esp32c6 = "run --features esp32c6 --target riscv32imac-unknown-none-elf --features esp32c6-hal/default,esp32c6-hal/embassy-time-timg0"
+esp32c2 = "run --features esp32c2 --target riscv32imc-unknown-none-elf  --features esp32c2-hal/default,esp32c2-hal/embassy-time-timg0,esp32c2-hal/embassy-executor-thread"
+esp32c3 = "run --features esp32c3 --target riscv32imc-unknown-none-elf  --features esp32c3-hal/default,esp32c3-hal/embassy-time-timg0,esp32c3-hal/embassy-executor-thread"
+esp32c6 = "run --features esp32c6 --target riscv32imac-unknown-none-elf --features esp32c6-hal/default,esp32c6-hal/embassy-time-timg0,esp32c6-hal/embassy-executor-thread"
 
 besp32 =   "build --features   esp32 --target xtensa-esp32-none-elf        --features esp32-hal/default,esp32-hal/embassy-time-timg0,esp32-hal/embassy-executor-thread"
 besp32s2 = "build --features esp32s2 --target xtensa-esp32s2-none-elf      --features esp32s2-hal/default,esp32s2-hal/embassy-time-timg0,esp32s2-hal/embassy-executor-thread"
 besp32s3 = "build --features esp32s3 --target xtensa-esp32s3-none-elf      --features esp32s3-hal/default,esp32s3-hal/embassy-time-timg0,esp32s3-hal/embassy-executor-thread"
-besp32c2 = "build --features esp32c2 --target riscv32imc-unknown-none-elf  --features esp32c2-hal/default,esp32c2-hal/embassy-time-timg0"
-besp32c3 = "build --features esp32c3 --target riscv32imc-unknown-none-elf  --features esp32c3-hal/default,esp32c3-hal/embassy-time-timg0"
-besp32c6 = "build --features esp32c6 --target riscv32imac-unknown-none-elf --features esp32c6-hal/default,esp32c6-hal/embassy-time-timg0"
+besp32c2 = "build --features esp32c2 --target riscv32imc-unknown-none-elf  --features esp32c2-hal/default,esp32c2-hal/embassy-time-timg0,esp32c2-hal/embassy-executor-thread"
+besp32c3 = "build --features esp32c3 --target riscv32imc-unknown-none-elf  --features esp32c3-hal/default,esp32c3-hal/embassy-time-timg0,esp32c3-hal/embassy-executor-thread"
+besp32c6 = "build --features esp32c6 --target riscv32imac-unknown-none-elf --features esp32c6-hal/default,esp32c6-hal/embassy-time-timg0,esp32c6-hal/embassy-executor-thread"
 
 [target.riscv32imc-unknown-none-elf]
 runner = "espflash flash --monitor"
 rustflags = [
     "-C", "link-arg=-Tlinkall.x",
     "-C", "link-arg=-Trom_functions.x",
-
     "-C", "force-frame-pointers",
-
-    # Enable the atomic codegen option for RISCV
-    "-C", "target-feature=+a",
-
-    # tell the core library have atomics even though it's not specified in the target definition
-    "--cfg", "target_has_atomic_load_store",
-    "--cfg", 'target_has_atomic_load_store="8"',
-    "--cfg", 'target_has_atomic_load_store="16"',
-    "--cfg", 'target_has_atomic_load_store="32"',
-    "--cfg", 'target_has_atomic_load_store="ptr"',
-    # enable cas
-    "--cfg", "target_has_atomic",
-    "--cfg", 'target_has_atomic="8"',
-    "--cfg", 'target_has_atomic="16"',
-    "--cfg", 'target_has_atomic="32"',
-    "--cfg", 'target_has_atomic="ptr"',
 ]
 
 [target.riscv32imac-unknown-none-elf]
@@ -70,23 +53,7 @@ runner = "espflash flash --monitor"
 rustflags = [
     "-C", "link-arg=-Tlinkall.x",
     "-C", "link-arg=-Trom_functions.x",
-
-    # Enable the atomic codegen option for Xtensa
-    "-C", "target-feature=+s32c1i",
-
-    # tell the core library have atomics even though it's not specified in the target definition
-    "--cfg", "target_has_atomic_load_store",
-    "--cfg", 'target_has_atomic_load_store="8"',
-    "--cfg", 'target_has_atomic_load_store="16"',
-    "--cfg", 'target_has_atomic_load_store="32"',
-    "--cfg", 'target_has_atomic_load_store="ptr"',
-    # Tell the `core` library that we have atomics, even though it's not
-    # specified in the target definition
-    "--cfg", 'target_has_atomic',
-    "--cfg", 'target_has_atomic="8"',
-    "--cfg", 'target_has_atomic="16"',
-    "--cfg", 'target_has_atomic="32"',
-    "--cfg", 'target_has_atomic="ptr"',
+    "-C", "force-frame-pointers",
 ]
 
 [unstable]

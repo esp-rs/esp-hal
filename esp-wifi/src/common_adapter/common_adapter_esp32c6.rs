@@ -5,8 +5,7 @@ use crate::compat::common::str_from_c;
 use crate::hal::system::RadioClockController;
 use crate::hal::system::RadioPeripherals;
 
-use atomic_polyfill::AtomicU32;
-use core::sync::atomic::Ordering;
+use portable_atomic::{AtomicU32, Ordering};
 
 const SOC_PHY_DIG_REGS_MEM_SIZE: usize = 21 * 4;
 
