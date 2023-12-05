@@ -33,7 +33,7 @@ embassy-time   = { version = "0.2.0", optional = true }
 aes                = "0.8.3"
 critical-section   = "1.1.2"
 crypto-bigint      = { version = "0.5.3", default-features = false }
-embassy-executor   = { version = "0.3.2", features = ["nightly"] }
+embassy-executor   = { version = "0.4.0", features = ["nightly"] }
 embedded-graphics  = "0.8.1"
 embedded-hal-1     = { version = "=1.0.0-rc.2", package = "embedded-hal" }
 embedded-hal-async = "=1.0.0-rc.2"
@@ -159,9 +159,3 @@ required-features = ["embassy", "async", "embassy-executor-thread"]
 [[example]]
 name              = "embassy_usb_serial_jtag"
 required-features = ["embassy", "async", "embassy-executor-thread"]
-
-[patch.crates-io]
-embassy-executor = { git = "https:/github.com/embassy-rs/embassy", rev = "3349007" }
-embassy-futures  = { git = "https:/github.com/embassy-rs/embassy", rev = "3349007" }
-embassy-sync     = { git = "https:/github.com/embassy-rs/embassy", rev = "3349007" }
-embassy-time     = { git = "https:/github.com/embassy-rs/embassy", rev = "3349007" }
