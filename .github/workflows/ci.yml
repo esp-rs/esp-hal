@@ -63,11 +63,57 @@ jobs:
       - name: rustdoc
         run: cd esp-hal-smartled/ && cargo doc -Zbuild-std=core --target=riscv32imc-unknown-none-elf --features=esp32c3
 
+  esp-riscv-rt:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          toolchain: nightly
+          components: rust-src
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build esp-riscv-rt (riscv32imc, no features)
+        run: cd esp-riscv-rt/ && cargo build -Zbuild-std=core --target=riscv32imc-unknown-none-elf
+      - name: Build esp-riscv-rt (riscv32imac, no features)
+        run: cd esp-riscv-rt/ && cargo build -Zbuild-std=core --target=riscv32imac-unknown-none-elf
+      - name: Build esp-riscv-rt (riscv32imc, all features)
+        run: cd esp-riscv-rt/ && cargo build -Zbuild-std=core --target=riscv32imc-unknown-none-elf --features=ci
+      - name: Build esp-riscv-rt (riscv32imac, all features)
+        run: cd esp-riscv-rt/ && cargo build -Zbuild-std=core --target=riscv32imac-unknown-none-elf --features=ci
+      # Ensure documentation can be built
+      - name: rustdoc
+        run: cd esp-riscv-rt/ && cargo doc
+
+  esp-ulp-riscv-hal:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          target: riscv32imc-unknown-none-elf
+          toolchain: nightly
+          components: rust-src
+      - uses: Swatinem/rust-cache@v2
+
+      # Perform a full build initially to verify that the examples not only
+      # build, but also link successfully.
+      - name: build esp-ulp-riscv-hal (esp32s2)
+        run: cd esp-ulp-riscv-hal/ && cargo build --release --features=esp32s2 --examples
+      - name: build esp-ulp-riscv-hal (esp32s3)
+        run: cd esp-ulp-riscv-hal/ && cargo build --release --features=esp32s3 --examples
+      # Ensure documentation can be built
+      - name: rustdoc
+        run: cd esp-ulp-riscv-hal/ && cargo doc --features=esp32s3
+
   esp32-hal:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: esp-rs/xtensa-toolchain@v1.5
         with:
           default: true
@@ -119,7 +165,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@v1
         with:
           target: riscv32imc-unknown-none-elf
@@ -171,7 +217,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@v1
         with:
           target: riscv32imc-unknown-none-elf
@@ -223,7 +269,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@v1
         with:
           target: riscv32imac-unknown-none-elf
@@ -280,7 +326,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@v1
         with:
           target: riscv32imac-unknown-none-elf
@@ -300,7 +346,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@v1
         with:
           target: riscv32imac-unknown-none-elf
@@ -348,31 +394,11 @@ jobs:
       - name: rustdoc
         run: cd esp32h2-hal/ && cargo doc --features=eh1
 
-  esp-ulp-riscv-hal:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          target: riscv32imc-unknown-none-elf
-          toolchain: nightly
-          components: rust-src
-      - uses: Swatinem/rust-cache@v2
-
-      # Perform a full build initially to verify that the examples not only
-      # build, but also link successfully.
-      - name: build esp-ulp-riscv-hal (esp32s3)
-        run: cd esp-ulp-riscv-hal/ && cargo +nightly build --release --features=esp32s3 --examples
-      # Ensure documentation can be built
-      - name: rustdoc
-        run: cd esp-ulp-riscv-hal/ && cargo doc --features=esp32s3
-
   esp32s2-hal:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: esp-rs/xtensa-toolchain@v1.5
         with:
           default: true
@@ -447,7 +473,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: esp-rs/xtensa-toolchain@v1.5
         with:
           default: true
@@ -523,26 +549,6 @@ jobs:
       # Ensure documentation can be built
       - name: rustdoc
         run: cd esp32s3-hal/ && cargo doc --features=eh1
-
-  esp-riscv-rt:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          target: riscv32imac-unknown-none-elf, riscv32imc-unknown-none-elf
-          toolchain: nightly
-          components: rust-src
-      - uses: Swatinem/rust-cache@v2
-
-      - name: Check esp-riscv-rt (imc)
-        run: cd esp-riscv-rt/ && cargo check --target=riscv32imc-unknown-none-elf -Zbuild-std=core
-      - name: Check esp-riscv-rt (imac)
-        run: cd esp-riscv-rt/ && cargo check --target=riscv32imac-unknown-none-elf -Zbuild-std=core
-      # Ensure documentation can be built
-      - name: rustdoc
-        run: cd esp-riscv-rt/ && cargo doc
 
   # --------------------------------------------------------------------------
   # MSRV

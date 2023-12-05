@@ -26,3 +26,16 @@ init-data = []
 init-rw-text = []
 init-rtc-fast-data = []
 init-rtc-fast-text = []
+
+# This feature is intended for testing; you probably don't want to enable it:
+ci = [
+    "direct-vectoring",
+    "interrupt-preemption",
+    "has-mie-mip",
+    "zero-bss",
+    "zero-rtc-fast-bss",
+    "init-data",
+    "init-rw-text",
+    "init-rtc-fast-data",
+    "init-rtc-fast-text",
+]
