@@ -1,3 +1,5 @@
+PROVIDE(DefaultHandler = EspDefaultHandler);
+
 PROVIDE(level1_interrupt = DefaultHandler);
 PROVIDE(level2_interrupt = DefaultHandler);
 PROVIDE(level3_interrupt = DefaultHandler);
