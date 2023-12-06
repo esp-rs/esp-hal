@@ -716,6 +716,9 @@ where
         let converted_value = ADCI::read_data();
         ADCI::reset();
 
+        // Postprocess converted value according to calibration scheme used for pin
+        let converted_value = pin.cal_scheme.adc_val(converted_value);
+
         // Mark that no conversions are currently in progress
         self.active_channel = None;
 

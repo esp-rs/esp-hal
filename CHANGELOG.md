@@ -103,6 +103,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed async uart serial, and updated the embassy_serial examples (#871).
 - Fix ESP32-S3 direct-boot (#873)
 - Fix ESP32-C6 ADC (#876)
+- Fix ADC Calibration not being used on ESP32-S2 and ESP32-S3 (#1000)
 
 ### Removed
 
