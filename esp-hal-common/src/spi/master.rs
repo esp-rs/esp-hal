@@ -1623,17 +1623,11 @@ pub mod dma {
 }
 
 #[cfg(feature = "eh1")]
-pub use ehal1::*;
-
-#[cfg(feature = "eh1")]
 mod ehal1 {
-    use core::cell::RefCell;
-
-    use embedded_hal_1::spi::{self, ErrorType, Operation, SpiBus};
+    use embedded_hal_1::spi::SpiBus;
     use embedded_hal_nb::spi::FullDuplex;
 
     use super::*;
-    use crate::gpio::OutputPin;
 
     impl<T, M> embedded_hal_1::spi::ErrorType for Spi<'_, T, M> {
         type Error = super::Error;
