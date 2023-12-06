@@ -174,9 +174,10 @@ extern "C" fn EspDefaultHandler(_level: u32, _interrupt: peripherals::Interrupt)
     );
 }
 
-#[cfg(xtensa)]
 #[no_mangle]
-extern "C" fn DefaultHandler() {}
+extern "C" fn DefaultHandler() {
+    panic!("DefaultHandler invoked");
+}
 
 /// Available CPU cores
 ///
