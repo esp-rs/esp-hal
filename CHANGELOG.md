@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reworked construction of I2S driver instances (#983)
 - S2 / S3: Don't require GPIO 18 to create a USB peripheral driver instance (#990)
 - Updated to latest release candidate (`1.0.0-rc.2`) for `embedded-hal{-async,-nb}` (#994)
+- Explicit panic when hitting the `DefaultHandler` (#1005)
 
 ### Fixed
 
