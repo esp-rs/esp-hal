@@ -42,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Uart Async: Improve interrupt handling and irq <--> future communication (#977)
 - RISC-V: Fix stack allocation (#988)
 - ESP32-C6: Fix used RAM (#997)
+- ESP32-H2: Fix used RAM (#1003)
 
 ### Removed
 
