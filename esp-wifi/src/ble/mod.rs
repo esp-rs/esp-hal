@@ -3,7 +3,7 @@
 #[cfg(any(esp32, esp32c3, esp32s3))]
 pub(crate) mod btdm;
 
-#[cfg(any(esp32c2, esp32c6))]
+#[cfg(any(esp32c2, esp32c6, esp32h2))]
 pub(crate) mod npl;
 
 use core::mem::MaybeUninit;
@@ -11,7 +11,7 @@ use core::mem::MaybeUninit;
 #[cfg(any(esp32, esp32c3, esp32s3))]
 use self::btdm as ble;
 
-#[cfg(any(esp32c2, esp32c6))]
+#[cfg(any(esp32c2, esp32c6, esp32h2))]
 use self::npl as ble;
 
 pub(crate) use ble::ble_init;

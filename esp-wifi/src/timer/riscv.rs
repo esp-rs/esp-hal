@@ -13,9 +13,9 @@ use crate::{
     preempt::preempt::task_switch,
 };
 
-#[cfg(feature = "esp32c6")]
+#[cfg(any(feature = "esp32c6", feature = "esp32h2"))]
 use peripherals::INTPRI as SystemPeripheral;
-#[cfg(not(feature = "esp32c6"))]
+#[cfg(not(any(feature = "esp32c6", feature = "esp32h2")))]
 use peripherals::SYSTEM as SystemPeripheral;
 
 /// The timer responsible for time slicing.

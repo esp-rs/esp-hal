@@ -14,7 +14,7 @@ use esp_backtrace as _;
 use esp_println::println;
 use esp_wifi::{ble::controller::BleConnector, initialize, EspWifiInitFor};
 use examples_util::hal;
-use hal::{clock::ClockControl, peripherals::*, prelude::*, Rng, IO};
+use hal::{clock::ClockControl, peripherals::*, prelude::*, Rng};
 #[path = "../../examples-util/util.rs"]
 mod examples_util;
 

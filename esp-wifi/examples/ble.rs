@@ -42,7 +42,12 @@ fn main() -> ! {
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
     let button = io.pins.gpio0.into_pull_down_input();
-    #[cfg(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32c6"))]
+    #[cfg(any(
+        feature = "esp32c2",
+        feature = "esp32c3",
+        feature = "esp32c6",
+        feature = "esp32h2"
+    ))]
     let button = io.pins.gpio9.into_pull_down_input();
 
     let mut debounce_cnt = 500;

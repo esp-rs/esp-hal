@@ -24,12 +24,14 @@ use esp32c2_hal as hal;
 use esp32c3_hal as hal;
 #[cfg(esp32c6)]
 use esp32c6_hal as hal;
+#[cfg(esp32h2)]
+use esp32h2_hal as hal;
 #[cfg(esp32s2)]
 use esp32s2_hal as hal;
 #[cfg(esp32s3)]
 use esp32s3_hal as hal;
 
-#[cfg(any(esp32c2, esp32c3, esp32c6))]
+#[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
 use hal::systimer::{Alarm, Target};
 
 use common_adapter::init_radio_clock_control;
@@ -152,7 +154,7 @@ fn init_heap() {
     });
 }
 
-#[cfg(any(esp32c3, esp32c2, esp32c6))]
+#[cfg(any(esp32c3, esp32c2, esp32c6, esp32h2))]
 pub(crate) type EspWifiTimer = Alarm<Target, 0>;
 
 #[cfg(any(esp32, esp32s3, esp32s2))]
@@ -244,6 +246,9 @@ pub fn initialize(
 
     #[cfg(esp32c2)]
     const MAX_CLOCK: u32 = 120;
+
+    #[cfg(esp32h2)]
+    const MAX_CLOCK: u32 = 96;
 
     if clocks.cpu_clock != MegahertzU32::MHz(MAX_CLOCK) {
         return Err(InitializationError::WrongClockConfig);

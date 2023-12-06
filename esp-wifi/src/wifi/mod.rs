@@ -508,7 +508,7 @@ static g_wifi_osi_funcs: wifi_osi_funcs_t = wifi_osi_funcs_t {
     _coex_schm_interval_get: Some(coex_schm_interval_get),
     _coex_schm_curr_period_get: Some(coex_schm_curr_period_get),
     _coex_schm_curr_phase_get: Some(coex_schm_curr_phase_get),
-    #[cfg(any(esp32c3, esp32c2, esp32c6, esp32s3, esp32s2,))]
+    #[cfg(any(esp32c3, esp32c2, esp32c6, esp32h2, esp32s3, esp32s2))]
     _slowclk_cal_get: Some(slowclk_cal_get),
     #[cfg(any(esp32, esp32s2))]
     _phy_common_clock_disable: Some(os_adapter_chip_specific::phy_common_clock_disable),

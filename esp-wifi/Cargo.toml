@@ -26,6 +26,7 @@ defmt = { workspace = true, optional = true }
 esp32c3-hal = { workspace = true, optional = true }
 esp32c2-hal = { workspace = true, optional = true }
 esp32c6-hal = { workspace = true, optional = true }
+esp32h2-hal = { workspace = true, optional = true }
 esp32-hal = { workspace = true, optional = true }
 esp32s3-hal = { workspace = true, optional = true }
 esp32s2-hal = { workspace = true, optional = true }
@@ -75,6 +76,7 @@ default = [ "log", "ipv4", "tcp", "udp", "icmp", "igmp", "dns", "dhcpv4" ]
 esp32c2 = [ "esp32c2-hal", "esp-wifi-sys/esp32c2", "esp-println/esp32c2", "esp-backtrace/esp32c2" ]
 esp32c3 = [ "esp32c3-hal", "esp-wifi-sys/esp32c3", "esp-println/esp32c3", "esp-backtrace/esp32c3" ]
 esp32c6 = [ "esp32c6-hal", "esp-wifi-sys/esp32c6", "esp-println/esp32c6", "esp-backtrace/esp32c6" ]
+esp32h2 = [ "esp32h2-hal", "esp-wifi-sys/esp32h2", "esp-println/esp32h2", "esp-backtrace/esp32h2" ]
 esp32   = [ "esp32-hal",   "esp-wifi-sys/esp32",   "esp-println/esp32",   "esp-backtrace/esp32" ]
 esp32s2 = [ "esp32s2-hal", "esp-wifi-sys/esp32s2", "esp-println/esp32s2", "esp-backtrace/esp32s2" ]
 esp32s3 = [ "esp32s3-hal", "esp-wifi-sys/esp32s3", "esp-println/esp32s3", "esp-backtrace/esp32s3" ]
@@ -87,12 +89,14 @@ async = [
   "esp32c3-hal?/embassy",
   "esp32c2-hal?/embassy",
   "esp32c6-hal?/embassy",
+  "esp32h2-hal?/embassy",
   "esp32-hal?/embassy",
   "esp32s2-hal?/embassy",
   "esp32s3-hal?/embassy",
   "esp32c3-hal?/async",
   "esp32c2-hal?/async",
   "esp32c6-hal?/async",
+  "esp32h2-hal?/async",
   "esp32-hal?/async",
   "esp32s2-hal?/async",
   "esp32s3-hal?/async",
@@ -127,6 +131,7 @@ defmt = [
   "esp32c3-hal?/defmt",
   "esp32c2-hal?/defmt",
   "esp32c6-hal?/defmt",
+  "esp32h2-hal?/defmt",
   "esp32-hal?/defmt",
   "esp32s2-hal?/defmt",
   "esp32s3-hal?/defmt",
@@ -136,6 +141,7 @@ log = [
   "esp32c3-hal?/log",
   "esp32c2-hal?/log",
   "esp32c6-hal?/log",
+  "esp32h2-hal?/log",
   "esp32-hal?/log",
   "esp32s2-hal?/log",
   "esp32s3-hal?/log",

@@ -16,6 +16,7 @@ use crate::timer::yield_task;
 
 #[cfg_attr(esp32c2, path = "os_adapter_esp32c2.rs")]
 #[cfg_attr(esp32c6, path = "os_adapter_esp32c6.rs")]
+#[cfg_attr(esp32h2, path = "os_adapter_esp32h2.rs")]
 pub(crate) mod ble_os_adapter_chip_specific;
 
 const TIME_FOREVER: u32 = u32::MAX;
