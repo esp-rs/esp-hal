@@ -39,7 +39,7 @@ where
 {
     fn delay_ms(&mut self, ms: T) {
         for _ in 0..ms.into() {
-            self.delay(1000u32);
+            self.delay_micros(1000u32);
         }
     }
 }
@@ -49,14 +49,14 @@ where
     T: Into<u32>,
 {
     fn delay_us(&mut self, us: T) {
-        self.delay(us.into());
+        self.delay_micros(us.into());
     }
 }
 
 #[cfg(feature = "eh1")]
-impl embedded_hal_1::delay::DelayUs for Delay {
-    fn delay_us(&mut self, us: u32) {
-        self.delay(us);
+impl embedded_hal_1::delay::DelayNs for Delay {
+    fn delay_ns(&mut self, ns: u32) {
+        self.delay_nanos(ns);
     }
 }
 
@@ -77,9 +77,17 @@ mod delay {
         }
 
         /// Delay for the specified number of microseconds
-        pub fn delay(&self, us: u32) {
+        pub fn delay_micros(&self, us: u32) {
             let t0 = SystemTimer::now();
             let clocks = us as u64 * (self.freq / HertzU64::MHz(1));
+
+            while SystemTimer::now().wrapping_sub(t0) & SystemTimer::BIT_MASK <= clocks {}
+        }
+
+        /// Delay for the specified number of nanoseconds
+        pub fn delay_nanos(&self, ns: u32) {
+            let t0 = SystemTimer::now();
+            let clocks = ns as u64 * (self.freq / HertzU64::MHz(1)) / 1000;
 
             while SystemTimer::now().wrapping_sub(t0) & SystemTimer::BIT_MASK <= clocks {}
         }
@@ -100,8 +108,14 @@ mod delay {
         }
 
         /// Delay for the specified number of microseconds
-        pub fn delay(&self, us: u32) {
+        pub fn delay_micros(&self, us: u32) {
             let clocks = us as u64 * (self.freq / HertzU64::MHz(1));
+            xtensa_lx::timer::delay(clocks as u32);
+        }
+
+        /// Delay for the specified number of nanoseconds
+        pub fn delay_nanos(&self, ns: u32) {
+            let clocks = ns as u64 * (self.freq / HertzU64::MHz(1)) / 1000;
             xtensa_lx::timer::delay(clocks as u32);
         }
     }
