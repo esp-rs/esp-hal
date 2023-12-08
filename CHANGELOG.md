@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simplifed RMT channels and channel creators (#958)
 - Reworked construction of I2S driver instances (#983)
 - S2 / S3: Don't require GPIO 18 to create a USB peripheral driver instance (#990)
+- Updated to latest release candidate (`1.0.0-rc.2`) for `embedded-hal{-async,-nb}` (#994)
 
 ### Fixed
 
@@ -41,6 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Xtensa: Allow using `embassy-executor`'s thread-mode executor if neither `embassy-executor-thread`, nor `embassy-executor-interrupt` is enabled. (#937)
 - Uart Async: Improve interrupt handling and irq <--> future communication (#977)
 - RISC-V: Fix stack allocation (#988)
+- ESP32-C6: Fix used RAM (#997)
+- ESP32-H2: Fix used RAM (#1003)
 
 ### Removed
 
@@ -102,6 +105,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed async uart serial, and updated the embassy_serial examples (#871).
 - Fix ESP32-S3 direct-boot (#873)
 - Fix ESP32-C6 ADC (#876)
+- Fix ADC Calibration not being used on ESP32-S2 and ESP32-S3 (#1000)
 
 ### Removed
 

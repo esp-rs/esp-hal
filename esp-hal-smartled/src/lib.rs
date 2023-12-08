@@ -14,8 +14,8 @@
 //! let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 //! let rmt = Rmt::new(peripherals.RMT, 80u32.MHz(), &clocks).unwrap();
 //!
-//! let mut rmt_buffer = smartLedBuffer!(1);
-//! let mut led = SmartLedsAdapter::new(rmt.channel0, io.pins.gpio2, &mut rmt_buffer);
+//! let rmt_buffer = smartLedBuffer!(1);
+//! let mut led = SmartLedsAdapter::new(rmt.channel0, io.pins.gpio2, rmt_buffer);
 //! ```
 
 #![no_std]
@@ -91,15 +91,15 @@ macro_rules! smartLedBuffer {
 
 /// Adapter taking an RMT channel and a specific pin and providing RGB LED
 /// interaction functionality using the `smart-leds` crate
-pub struct SmartLedsAdapter<'d, TX, const CHANNEL: u8>
+pub struct SmartLedsAdapter<TX, const CHANNEL: u8, const BUFFER_SIZE: usize>
 where
     TX: TxChannel<CHANNEL>,
 {
     channel: Option<TX>,
-    rmt_buffer: &'d mut [u32],
+    rmt_buffer: [u32; BUFFER_SIZE],
 }
 
-impl<'d, TX, const CHANNEL: u8> SmartLedsAdapter<'d, TX, CHANNEL>
+impl<'d, TX, const CHANNEL: u8, const BUFFER_SIZE: usize> SmartLedsAdapter<TX, CHANNEL, BUFFER_SIZE>
 where
     TX: TxChannel<CHANNEL>,
 {
@@ -107,8 +107,8 @@ where
     pub fn new<C, O>(
         channel: C,
         pin: impl Peripheral<P = O> + 'd,
-        rmt_buffer: &'d mut [u32],
-    ) -> SmartLedsAdapter<TX, CHANNEL>
+        rmt_buffer: [u32; BUFFER_SIZE],
+    ) -> SmartLedsAdapter<TX, CHANNEL, BUFFER_SIZE>
     where
         O: OutputPin + 'd,
         C: TxChannelCreator<'d, TX, O, CHANNEL>,
@@ -169,7 +169,8 @@ where
     }
 }
 
-impl<'d, TX, const CHANNEL: u8> SmartLedsWrite for SmartLedsAdapter<'d, TX, CHANNEL>
+impl<TX, const CHANNEL: u8, const BUFFER_SIZE: usize> SmartLedsWrite
+    for SmartLedsAdapter<TX, CHANNEL, BUFFER_SIZE>
 where
     TX: TxChannel<CHANNEL>,
 {

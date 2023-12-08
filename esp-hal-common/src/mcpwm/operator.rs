@@ -684,9 +684,10 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
     embedded_hal_1::pwm::SetDutyCycle for &mut PwmPin<'d, Pin, PWM, OP, IS_A>
 {
     /// Get the max duty of the PwmPin
-    fn get_max_duty_cycle(&self) -> u16 {
+    fn max_duty_cycle(&self) -> u16 {
         self.get_period()
     }
+
     /// Set the max duty of the PwmPin
     fn set_duty_cycle(&mut self, duty: u16) -> Result<(), core::convert::Infallible> {
         self.set_timestamp(duty);

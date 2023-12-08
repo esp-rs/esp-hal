@@ -323,7 +323,7 @@ pub(crate) mod utils {
 
         fn esp_rom_spiflash_config_clk(freqdiv: u8, spi: u8) -> i32;
 
-        static g_rom_spiflash_dummy_len_plus: u8;
+        static mut g_rom_spiflash_dummy_len_plus: u8;
 
         static g_rom_flashchip: EspRomSpiflashChip;
 
@@ -1060,7 +1060,7 @@ pub(crate) mod utils {
     // psram gpio init , different working frequency we have different solutions
     fn psram_gpio_config(psram_io: &PsramIo, mode: PsramCacheSpeed) -> u32 {
         let g_rom_spiflash_dummy_len_plus_ptr: *mut u8 =
-            unsafe { core::mem::transmute(&g_rom_spiflash_dummy_len_plus) };
+            unsafe { &mut g_rom_spiflash_dummy_len_plus };
 
         fn gpio_pin_mux_reg(gpio: u8) -> u32 {
             crate::gpio::get_io_mux_reg(gpio).as_ptr() as u32
