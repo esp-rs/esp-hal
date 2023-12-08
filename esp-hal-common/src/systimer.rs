@@ -26,7 +26,7 @@
 //! println!("SYSTIMER Current value = {}", SystemTimer::now());
 //! ```
 
-use core::{intrinsics::transmute, marker::PhantomData};
+use core::{marker::PhantomData, mem::transmute};
 
 use fugit::MicrosDurationU32;
 
@@ -156,19 +156,19 @@ impl<T, const CHANNEL: u8> Alarm<T, CHANNEL> {
                 &Reg<TARGET0_LO_SPEC>,
             ) = match CHANNEL {
                 0 => (
-                    &systimer.target0_conf(),
-                    &systimer.target0_hi(),
-                    &systimer.target0_lo(),
+                    systimer.target0_conf(),
+                    systimer.target0_hi(),
+                    systimer.target0_lo(),
                 ),
                 1 => (
-                    transmute(&systimer.target1_conf()),
-                    transmute(&systimer.target1_hi()),
-                    transmute(&systimer.target1_lo()),
+                    transmute(systimer.target1_conf()),
+                    transmute(systimer.target1_hi()),
+                    transmute(systimer.target1_lo()),
                 ),
                 2 => (
-                    transmute(&systimer.target2_conf()),
-                    transmute(&systimer.target2_hi()),
-                    transmute(&systimer.target2_lo()),
+                    transmute(systimer.target2_conf()),
+                    transmute(systimer.target2_hi()),
+                    transmute(systimer.target2_lo()),
                 ),
                 _ => unreachable!(),
             };

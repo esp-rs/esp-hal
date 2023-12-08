@@ -909,7 +909,7 @@ mod private {
     // on ESP32-S3 I2S1 doesn't support all features - use that to avoid using those features
     // by accident
     #[cfg(any(esp32, esp32s3))]
-    use crate::peripherals::i2s1::RegisterBlock;
+    use crate::peripherals::{i2s1::RegisterBlock, I2S1};
     use crate::{
         clock::Clocks,
         dma::{ChannelTypes, DmaPeripheral},
@@ -1899,35 +1899,35 @@ mod private {
         }
     }
 
-    impl RegBlock for crate::peripherals::I2S0 {
+    impl RegBlock for I2S0 {
         fn register_block() -> &'static RegisterBlock {
-            unsafe { core::mem::transmute(I2S0::PTR) }
+            unsafe { &*I2S0::PTR.cast::<RegisterBlock>() }
         }
     }
 
     #[cfg(any(esp32s3, esp32))]
-    impl RegBlock for crate::peripherals::I2S1 {
+    impl RegBlock for I2S1 {
         fn register_block() -> &'static RegisterBlock {
-            unsafe { core::mem::transmute(crate::peripherals::I2S1::PTR) }
+            unsafe { &*I2S1::PTR.cast::<RegisterBlock>() }
         }
     }
 
-    impl RegisterAccessPrivate for crate::peripherals::I2S0 {}
-    impl super::RegisterAccess for crate::peripherals::I2S0 {}
+    impl RegisterAccessPrivate for I2S0 {}
+    impl super::RegisterAccess for I2S0 {}
 
     #[cfg(any(esp32s3, esp32))]
-    impl RegisterAccessPrivate for crate::peripherals::I2S1 {}
+    impl RegisterAccessPrivate for I2S1 {}
     #[cfg(any(esp32s3, esp32))]
-    impl super::RegisterAccess for crate::peripherals::I2S1 {}
+    impl super::RegisterAccess for I2S1 {}
 
     pub trait I2s0Instance {}
 
     pub trait I2s1Instance {}
 
-    impl I2s0Instance for crate::peripherals::I2S0 {}
+    impl I2s0Instance for I2S0 {}
 
     #[cfg(any(esp32s3, esp32))]
-    impl I2s1Instance for crate::peripherals::I2S1 {}
+    impl I2s1Instance for I2S1 {}
 
     pub struct I2sClockDividers {
         mclk_divider: u32,
