@@ -2620,13 +2620,12 @@ pub trait Instance {
                 let reg_val = unsafe { *fifo_ptr };
                 let bytes = reg_val.to_le_bytes();
 
-                if index + 4 > chunk.len() {
-                    let len = usize::min(chunk.len(), index + 4) - index;
-                    chunk[index..(index + len)].copy_from_slice(&bytes[0..len]);
-                    break;
-                }
+                let len = usize::min(chunk.len(), index + 4) - index;
+                chunk[index..(index + len)].clone_from_slice(&bytes[0..len]);
 
-                chunk[index..(index + 4)].copy_from_slice(&bytes);
+                unsafe {
+                    fifo_ptr = fifo_ptr.offset(1);
+                };
             }
         }
 
