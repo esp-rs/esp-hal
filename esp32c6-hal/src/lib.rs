@@ -35,6 +35,8 @@
 //! - `ufmt` - Implement the [`ufmt_write::uWrite`] trait for the UART and USB
 //!   Serial JTAG drivers
 //! - `vectored` - Enable interrupt vectoring
+//! - `flip-link` - move the stack to the start of RAM to get zero-cost stack
+//!   overflow protection
 //!
 //! #### Default Features
 //!

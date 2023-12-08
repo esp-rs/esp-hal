@@ -1,0 +1,36 @@
+#IF flip-link
+/* no Xtensa chip is supported - so we can assume RISC-V */
+SECTIONS {
+  /* must be last segment using RWDATA */
+  .stack (NOLOAD) : ALIGN(4)
+  {
+    _stack_end = ABSOLUTE(.);
+    _stack_end_cpu0 = ABSOLUTE(.);
+
+    /* Since we cannot know how much the alignment padding of the sections will add we shrink the stack for "the worst case"
+    */
+    . = . + LENGTH(RWDATA) -  (SIZEOF(.trap) + SIZEOF(.rwtext) + SIZEOF(.rwtext.wifi) + SIZEOF(.data) + SIZEOF(.bss) + SIZEOF(.noinit) + SIZEOF(.data.wifi)) - 304;
+
+    . = ALIGN (4);
+    _stack_start = ABSOLUTE(.);
+    _stack_start_cpu0 = ABSOLUTE(.);
+  } > RWDATA
+}
+INSERT BEFORE .trap;
+
+#ELSE
+
+SECTIONS {
+  /* must be last segment using RWDATA */
+  .stack (NOLOAD) : ALIGN(4)
+  {
+    . = ALIGN (4);
+    _stack_end = ABSOLUTE(.);
+    _stack_end_cpu0 = ABSOLUTE(.);
+  } > RWDATA
+}
+
+PROVIDE(_stack_start = ORIGIN(RWDATA) + LENGTH(RWDATA));
+PROVIDE(_stack_start_cpu0 = ORIGIN(RWDATA) + LENGTH(RWDATA));
+
+#ENDIF

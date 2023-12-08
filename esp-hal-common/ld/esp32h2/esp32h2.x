@@ -1,7 +1,6 @@
 ENTRY(_start)
 
 PROVIDE(_stext = ORIGIN(ROTEXT));
-PROVIDE(_stack_start = ORIGIN(RWDATA) + LENGTH(RWDATA));
 PROVIDE(_max_hart_id = 0);
 
 PROVIDE(UserSoft = DefaultHandler);
@@ -82,6 +81,7 @@ INCLUDE "rwtext.x"
 INCLUDE "rodata.x"
 INCLUDE "rwdata.x"
 INCLUDE "rtc_fast.x"
+INCLUDE "stack.x"
 /* End of Shared sections */
 
 INCLUDE "debug.x"

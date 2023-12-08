@@ -672,7 +672,27 @@ _start_trap31:
 
 "#,
 r#"
-_start_trap: 
+_start_trap:
+"#,
+#[cfg(feature="fix-sp")]
+r#"
+    // move SP to some save place if it's pointing below the RAM
+    // most probably we will just print something and halt in this case
+    // we actually can't do anything else
+    csrw mscratch, t0
+    la t0, _stack_end
+    bge sp, t0, 1f
+
+    la sp, _stack_start
+    li t0, 4 // make sure stack start is in RAM
+    sub sp, sp, t0
+    andi sp, sp, -16 // Force 16-byte alignment
+
+    1:
+    csrr t0, mscratch
+    // now SP is probably in RAM - continue
+"#,
+r#"
     addi sp, sp, -40*4
     sw ra, 0*4(sp)"#,
 #[cfg(feature="direct-vectoring")] //for the directly vectored handlers the above is stacked beforehand

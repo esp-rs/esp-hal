@@ -26,6 +26,7 @@ init-data = []
 init-rw-text = []
 init-rtc-fast-data = []
 init-rtc-fast-text = []
+fix-sp = []
 
 # This feature is intended for testing; you probably don't want to enable it:
 ci = [
@@ -38,4 +39,5 @@ ci = [
     "init-rw-text",
     "init-rtc-fast-data",
     "init-rtc-fast-text",
+    "fix-sp",
 ]
