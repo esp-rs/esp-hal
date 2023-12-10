@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added Rx Timeout functionality to async Uart (#911)
 - RISC-V: Thread-mode and interrupt-mode executors, `#[main]` macro (#947)
 - A macro to make it easier to create DMA buffers and descriptors (#935)
+- I2C timeout is configurable (#1011)
 
 ### Changed
 
