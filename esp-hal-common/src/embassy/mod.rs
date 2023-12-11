@@ -135,8 +135,7 @@ pub fn init(clocks: &Clocks, td: time_driver::TimerType) {
     #[cfg(esp32s2)]
     crate::interrupt::enable(Interrupt::SPI4_DMA, Priority::max()).unwrap();
 
-    // see https://github.com/esp-rs/esp-pacs/issues/175
-    #[cfg(all(i2s0, not(any(esp32h2, esp32c6))))]
+    #[cfg(i2s0)]
     crate::interrupt::enable(Interrupt::I2S0, Priority::min()).unwrap();
     #[cfg(i2s1)]
     crate::interrupt::enable(Interrupt::I2S1, Priority::min()).unwrap();
@@ -147,11 +146,11 @@ pub fn init(clocks: &Clocks, td: time_driver::TimerType) {
     #[cfg(usb_device)]
     crate::interrupt::enable(Interrupt::USB_DEVICE, Priority::min()).unwrap();
 
-    #[cfg(any(parl_io, not(esp32h2)))]
+    #[cfg(all(parl_io, not(esp32h2)))]
     crate::interrupt::enable(Interrupt::PARL_IO, Priority::min()).unwrap();
-    #[cfg(any(parl_io, esp32h2))]
+    #[cfg(all(parl_io, esp32h2))]
     crate::interrupt::enable(Interrupt::PARL_IO_RX, Priority::min()).unwrap();
-    #[cfg(any(parl_io, esp32h2))]
+    #[cfg(all(parl_io, esp32h2))]
     crate::interrupt::enable(Interrupt::PARL_IO_TX, Priority::min()).unwrap();
 
     #[cfg(uart0)]
