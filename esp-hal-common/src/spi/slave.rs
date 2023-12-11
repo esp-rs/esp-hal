@@ -295,7 +295,7 @@ pub mod dma {
 
     pub struct SpiDmaTransferRx<'d, T, C, BUFFER>
     where
-        T: InstanceDma<C::Tx<'d>, C::Rx<'d>>, 
+        T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
         C: ChannelTypes,
         C::P: SpiPeripheral,
     {
@@ -303,13 +303,12 @@ pub mod dma {
         buffer: BUFFER,
     }
 
-    impl <'d, T, C, BUFFER> DmaTransfer<BUFFER, SpiDma<'d, T, C>> for SpiDmaTransferRx<'d, T, C, BUFFER>
+    impl<'d, T, C, BUFFER> DmaTransfer<BUFFER, SpiDma<'d, T, C>> for SpiDmaTransferRx<'d, T, C, BUFFER>
     where
         T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
         C: ChannelTypes,
         C::P: SpiPeripheral,
     {
-
         /// Wait for the DMA transfer to complete and return the buffers and the
         /// SPI instance.
         fn wait(
@@ -455,8 +454,8 @@ pub mod dma {
     {
         /// Register a buffer for a DMA write.
         ///
-        /// This will return a [SpiDmaTransferTx] owning the buffer(s) and the SPI
-        /// instance. The maximum amount of data to be sent is 32736
+        /// This will return a [SpiDmaTransferTx] owning the buffer(s) and the
+        /// SPI instance. The maximum amount of data to be sent is 32736
         /// bytes.
         ///
         /// The write is driven by the SPI master's sclk signal and cs line.
@@ -483,9 +482,9 @@ pub mod dma {
 
         /// Register a buffer for a DMA read.
         ///
-        /// This will return a [SpiDmaTransferRx] owning the buffer(s) and the SPI
-        /// instance. The maximum amount of data to be received is 32736
-        /// bytes.
+        /// This will return a [SpiDmaTransferRx] owning the buffer(s) and the
+        /// SPI instance. The maximum amount of data to be received is
+        /// 32736 bytes.
         ///
         /// The read is driven by the SPI master's sclk signal and cs line.
         pub fn dma_read<RXBUF>(
@@ -511,9 +510,9 @@ pub mod dma {
 
         /// Register buffers for a DMA transfer.
         ///
-        /// This will return a [SpiDmaTransferRxTx] owning the buffer(s) and the SPI
-        /// instance. The maximum amount of data to be sent/received is
-        /// 32736 bytes.
+        /// This will return a [SpiDmaTransferRxTx] owning the buffer(s) and the
+        /// SPI instance. The maximum amount of data to be sent/received
+        /// is 32736 bytes.
         ///
         /// The data transfer is driven by the SPI master's sclk signal and cs
         /// line.
