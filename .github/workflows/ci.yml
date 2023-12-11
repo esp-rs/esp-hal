@@ -288,6 +288,8 @@ jobs:
       # for each supported image format.
       - name: build esp32c6-hal (no features)
         run: cd esp32c6-hal/ && cargo +nightly build --examples
+      - name: build esp32c6-hal (flip-link feature)
+        run: cd esp32c6-hal/ && cargo +nightly build --examples --features=flip-link
       # Subsequent steps can just check the examples instead, as we're already
       # confident that they link.
       - name: check esp32c6-hal (common features)
@@ -360,6 +362,8 @@ jobs:
       # for each supported image format.
       - name: build esp32h2-hal (no features)
         run: cd esp32h2-hal/ && cargo +nightly build --examples
+      - name: build esp32h2-hal (flip-link feature)
+        run: cd esp32h2-hal/ && cargo +nightly build --examples --features=flip-link
       # Subsequent steps can just check the examples instead, as we're already
       # confident that they link.
       - name: check esp32h2-hal (common features)
