@@ -55,13 +55,6 @@ async fn main(_spawner: Spawner) {
         )
         .unwrap();
 
-    // you have to enable the interrupt for async to work
-    esp32s2_hal::interrupt::enable(
-        esp32s2_hal::peripherals::Interrupt::RMT,
-        esp32s2_hal::interrupt::Priority::Priority1,
-    )
-    .unwrap();
-
     let mut data = [PulseCode {
         level1: true,
         length1: 200,

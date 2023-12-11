@@ -73,13 +73,6 @@ async fn main(spawner: Spawner) {
         )
         .unwrap();
 
-    // you have to enable the interrupt for async to work
-    esp32s2_hal::interrupt::enable(
-        esp32s2_hal::peripherals::Interrupt::RMT,
-        esp32s2_hal::interrupt::Priority::Priority1,
-    )
-    .unwrap();
-
     spawner
         .spawn(signal_task(io.pins.gpio15.into_push_pull_output()))
         .ok();

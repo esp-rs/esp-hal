@@ -103,13 +103,6 @@ async fn main(_spawner: Spawner) {
         .with_dout(io.pins.gpio3)
         .build();
 
-    // you need to manually enable the DMA channel's interrupt!
-    esp32s2_hal::interrupt::enable(
-        esp32s2_hal::peripherals::Interrupt::I2S0,
-        esp32s2_hal::interrupt::Priority::Priority1,
-    )
-    .unwrap();
-
     let data =
         unsafe { core::slice::from_raw_parts(&SINE as *const _ as *const u8, SINE.len() * 2) };
 

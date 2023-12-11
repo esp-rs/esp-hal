@@ -90,8 +90,6 @@ async fn main(spawner: Spawner) {
         .unwrap();
     let (tx, rx) = uart0.split();
 
-    interrupt::enable(Interrupt::UART0, interrupt::Priority::Priority1).unwrap();
-
     let signal = &*make_static!(Signal::new());
 
     spawner.spawn(reader(rx, &signal)).ok();

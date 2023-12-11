@@ -55,12 +55,6 @@ async fn main(_spawner: Spawner) {
         esp32c2_hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks).timer0,
     );
 
-    esp32c2_hal::interrupt::enable(
-        esp32c2_hal::peripherals::Interrupt::DMA_CH0,
-        esp32c2_hal::interrupt::Priority::Priority1,
-    )
-    .unwrap();
-
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let sclk = io.pins.gpio6;
     let miso = io.pins.gpio2;

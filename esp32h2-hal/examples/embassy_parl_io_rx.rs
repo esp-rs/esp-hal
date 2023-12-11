@@ -71,13 +71,6 @@ async fn main(_spawner: Spawner) {
         .with_config(rx_pins, NoClkPin, BitPackOrder::Msb, Some(0xfff))
         .unwrap();
 
-    // you need to manually enable the DMA channel's interrupt!
-    interrupt::enable(
-        peripherals::Interrupt::DMA_IN_CH0,
-        interrupt::Priority::Priority1,
-    )
-    .unwrap();
-
     let buffer = rx_buffer;
     loop {
         parl_io_rx.read_dma_async(buffer).await.unwrap();

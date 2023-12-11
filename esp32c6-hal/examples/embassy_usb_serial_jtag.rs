@@ -37,12 +37,6 @@ async fn main(_spawner: Spawner) -> ! {
         esp32c6_hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks).timer0,
     );
 
-    interrupt::enable(
-        peripherals::Interrupt::USB_DEVICE,
-        interrupt::Priority::Priority1,
-    )
-    .unwrap();
-
     let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE);
 
     loop {

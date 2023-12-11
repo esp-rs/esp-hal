@@ -80,13 +80,6 @@ async fn main(_spawner: Spawner) {
         .with_din(io.pins.gpio5)
         .build();
 
-    // you need to manually enable the DMA channel's interrupt!
-    esp32h2_hal::interrupt::enable(
-        esp32h2_hal::peripherals::Interrupt::DMA_IN_CH0,
-        esp32h2_hal::interrupt::Priority::Priority1,
-    )
-    .unwrap();
-
     let buffer = rx_buffer;
     println!("Start");
 
