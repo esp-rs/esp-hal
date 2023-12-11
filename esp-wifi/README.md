@@ -63,7 +63,7 @@ Within this crate, `CCOMPARE0` CPU timer is used for timing, ensure that in your
 
 When using USB-SERIAL-JTAG (for example by selecting `jtag-serial` in [`esp-println`](https://crates.io/crates/esp-println)) you have to activate the feature `phy-enable-usb`.
 
-Don't use this feature if you are _not__ using USB-SERIAL-JTAG as it might reduce WiFi performance.
+Don't use this feature if you are _not_ using USB-SERIAL-JTAG as it might reduce WiFi performance.
 
 ## Features
 
