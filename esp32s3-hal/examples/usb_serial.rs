@@ -32,9 +32,6 @@ fn main() -> ! {
     let mut serial = usbd_serial::SerialPort::new(&usb_bus);
 
     let mut usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0x16c0, 0x27dd))
-        .manufacturer("esp-hal")
-        .product("esp-hal")
-        .serial_number("12345678")
         .device_class(usbd_serial::USB_CLASS_CDC)
         .build();
 
