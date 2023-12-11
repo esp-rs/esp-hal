@@ -293,8 +293,74 @@ pub mod dma {
         }
     }
 
+    pub struct SpiDmaTransferRx<'d, T, C, BUFFER>
+    where
+        T: InstanceDma<C::Tx<'d>, C::Rx<'d>>, 
+        C: ChannelTypes,
+        C::P: SpiPeripheral,
+    {
+        spi_dma: SpiDma<'d, T, C>,
+        buffer: BUFFER,
+    }
+
+    impl <'d, T, C, BUFFER> DmaTransfer<BUFFER, SpiDma<'d, T, C>> for SpiDmaTransferRx<'d, T, C, BUFFER>
+    where
+        T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
+        C: ChannelTypes,
+        C::P: SpiPeripheral,
+    {
+
+        /// Wait for the DMA transfer to complete and return the buffers and the
+        /// SPI instance.
+        fn wait(
+            mut self,
+        ) -> Result<(BUFFER, SpiDma<'d, T, C>), (DmaError, BUFFER, SpiDma<'d, T, C>)> {
+            while !self.is_done() {}
+            self.spi_dma.spi.flush().ok(); // waiting for the DMA transfer is not enough
+
+            // `DmaTransfer` needs to have a `Drop` implementation, because we accept
+            // managed buffers that can free their memory on drop. Because of that
+            // we can't move out of the `DmaTransfer`'s fields, so we use `ptr::read`
+            // and `mem::forget`.
+            //
+            // NOTE(unsafe) There is no panic branch between getting the resources
+            // and forgetting `self`.
+            unsafe {
+                let buffer = core::ptr::read(&self.buffer);
+                let payload = core::ptr::read(&self.spi_dma);
+                let err = (&self).spi_dma.channel.rx.has_error()
+                    || (&self).spi_dma.channel.tx.has_error();
+                mem::forget(self);
+                if err {
+                    Err((DmaError::DescriptorError, buffer, payload))
+                } else {
+                    Ok((buffer, payload))
+                }
+            }
+        }
+
+        /// Check if the DMA transfer is complete
+        fn is_done(&self) -> bool {
+            let ch = &self.spi_dma.channel;
+            ch.rx.is_done()
+        }
+    }
+
+    impl<'d, T, C, BUFFER> Drop for SpiDmaTransferRx<'d, T, C, BUFFER>
+    where
+        T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
+        C: ChannelTypes,
+        C::P: SpiPeripheral,
+    {
+        fn drop(&mut self) {
+            while !self.is_done() {}
+            self.spi_dma.spi.flush().ok(); // waiting for the DMA transfer is
+                                           // not enough
+        }
+    }
+
     /// An in-progress DMA transfer.
-    pub struct SpiDmaTransfer<'d, T, C, BUFFER>
+    pub struct SpiDmaTransferTx<'d, T, C, BUFFER>
     where
         T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
         C: ChannelTypes,
@@ -304,7 +370,7 @@ pub mod dma {
         buffer: BUFFER,
     }
 
-    impl<'d, T, C, BUFFER> DmaTransfer<BUFFER, SpiDma<'d, T, C>> for SpiDmaTransfer<'d, T, C, BUFFER>
+    impl<'d, T, C, BUFFER> DmaTransfer<BUFFER, SpiDma<'d, T, C>> for SpiDmaTransferTx<'d, T, C, BUFFER>
     where
         T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
         C: ChannelTypes,
@@ -344,11 +410,11 @@ pub mod dma {
         /// Check if the DMA transfer is complete
         fn is_done(&self) -> bool {
             let ch = &self.spi_dma.channel;
-            ch.tx.is_done() && ch.rx.is_done()
+            ch.tx.is_done()
         }
     }
 
-    impl<'d, T, C, BUFFER> Drop for SpiDmaTransfer<'d, T, C, BUFFER>
+    impl<'d, T, C, BUFFER> Drop for SpiDmaTransferTx<'d, T, C, BUFFER>
     where
         T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
         C: ChannelTypes,
@@ -389,7 +455,7 @@ pub mod dma {
     {
         /// Register a buffer for a DMA write.
         ///
-        /// This will return a [SpiDmaTransfer] owning the buffer(s) and the SPI
+        /// This will return a [SpiDmaTransferTx] owning the buffer(s) and the SPI
         /// instance. The maximum amount of data to be sent is 32736
         /// bytes.
         ///
@@ -397,7 +463,7 @@ pub mod dma {
         pub fn dma_write<TXBUF>(
             mut self,
             words: TXBUF,
-        ) -> Result<SpiDmaTransfer<'d, T, C, TXBUF>, Error>
+        ) -> Result<SpiDmaTransferTx<'d, T, C, TXBUF>, Error>
         where
             TXBUF: ReadBuffer<Word = u8>,
         {
@@ -409,7 +475,7 @@ pub mod dma {
 
             self.spi
                 .start_write_bytes_dma(ptr, len, &mut self.channel.tx)
-                .map(move |_| SpiDmaTransfer {
+                .map(move |_| SpiDmaTransferTx {
                     spi_dma: self,
                     buffer: words,
                 })
@@ -417,7 +483,7 @@ pub mod dma {
 
         /// Register a buffer for a DMA read.
         ///
-        /// This will return a [SpiDmaTransfer] owning the buffer(s) and the SPI
+        /// This will return a [SpiDmaTransferRx] owning the buffer(s) and the SPI
         /// instance. The maximum amount of data to be received is 32736
         /// bytes.
         ///
@@ -425,7 +491,7 @@ pub mod dma {
         pub fn dma_read<RXBUF>(
             mut self,
             mut words: RXBUF,
-        ) -> Result<SpiDmaTransfer<'d, T, C, RXBUF>, Error>
+        ) -> Result<SpiDmaTransferRx<'d, T, C, RXBUF>, Error>
         where
             RXBUF: WriteBuffer<Word = u8>,
         {
@@ -437,7 +503,7 @@ pub mod dma {
 
             self.spi
                 .start_read_bytes_dma(ptr, len, &mut self.channel.rx)
-                .map(move |_| SpiDmaTransfer {
+                .map(move |_| SpiDmaTransferRx {
                     spi_dma: self,
                     buffer: words,
                 })
@@ -445,7 +511,7 @@ pub mod dma {
 
         /// Register buffers for a DMA transfer.
         ///
-        /// This will return a [SpiDmaTransfer] owning the buffer(s) and the SPI
+        /// This will return a [SpiDmaTransferRxTx] owning the buffer(s) and the SPI
         /// instance. The maximum amount of data to be sent/received is
         /// 32736 bytes.
         ///
