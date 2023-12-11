@@ -49,11 +49,4 @@ SECTIONS {
     *( .dram1 .dram1.*)
     . = ALIGN(4);
   } > RWDATA AT > RODATA
-
-  /* must be last segment using RWDATA */
-  .stack_end (NOLOAD) : ALIGN(4)
-  {
-    . = ALIGN (4);
-    _stack_end = ABSOLUTE(.);
-  } > RWDATA
 }

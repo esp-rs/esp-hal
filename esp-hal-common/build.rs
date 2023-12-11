@@ -125,6 +125,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         assert_unique_used_features!("embassy-time-systick", "embassy-time-timg0");
     }
 
+    #[cfg(feature = "flip-link")]
+    {
+        #[cfg(not(any(feature = "esp32c6", feature = "esp32h2")))]
+        panic!("flip-link is only available on ESP32-C6/ESP32-H2");
+    }
+
     // NOTE: update when adding new device support!
     // Determine the name of the configured device:
     let device_name = if cfg!(feature = "esp32") {
@@ -160,7 +166,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let config = fs::read_to_string(chip_toml_path)?;
     let config: Config = basic_toml::from_str(&config)?;
-    let device = config.device;
+    let device = &config.device;
 
     // Check PSRAM features are only given if the target supports PSRAM:
     if !&device.symbols.contains(&String::from("psram"))
@@ -181,6 +187,24 @@ fn main() -> Result<(), Box<dyn Error>> {
     for symbol in &device.symbols {
         println!("cargo:rustc-cfg={symbol}");
     }
+
+    let mut config_symbols = Vec::new();
+    let arch = device.arch.to_string();
+    let cores = device.cores.to_string();
+    config_symbols.push(device_name);
+    config_symbols.push(&arch);
+    config_symbols.push(&cores);
+
+    for peripheral in &device.peripherals {
+        config_symbols.push(peripheral);
+    }
+
+    for symbol in &device.symbols {
+        config_symbols.push(symbol);
+    }
+
+    #[cfg(feature = "flip-link")]
+    config_symbols.push("flip-link");
 
     // Place all linker scripts in `OUT_DIR`, and instruct Cargo how to find these
     // files:
@@ -210,13 +234,17 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         fs::write(out.join("alias.x"), alias)?;
     } else {
-        fs::copy("ld/riscv/hal-defaults.x", out.join("hal-defaults.x"))?;
-        fs::copy("ld/riscv/asserts.x", out.join("asserts.x"))?;
-        fs::copy("ld/riscv/debug.x", out.join("debug.x"))?;
+        preprocess_file(
+            &config_symbols,
+            "ld/riscv/hal-defaults.x",
+            out.join("hal-defaults.x"),
+        )?;
+        preprocess_file(&config_symbols, "ld/riscv/asserts.x", out.join("asserts.x"))?;
+        preprocess_file(&config_symbols, "ld/riscv/debug.x", out.join("debug.x"))?;
     }
 
-    copy_dir_all("ld/sections", &out)?;
-    copy_dir_all(format!("ld/{device_name}"), &out)?;
+    copy_dir_all(&config_symbols, "ld/sections", &out)?;
+    copy_dir_all(&config_symbols, format!("ld/{device_name}"), &out)?;
 
     // Generate the eFuse table from the selected device's CSV file:
     gen_efuse_table(device_name, out)?;
@@ -224,15 +252,69 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> std::io::Result<()> {
+fn copy_dir_all(
+    config_symbols: &Vec<&str>,
+    src: impl AsRef<Path>,
+    dst: impl AsRef<Path>,
+) -> std::io::Result<()> {
     fs::create_dir_all(&dst)?;
     for entry in fs::read_dir(src)? {
         let entry = entry?;
         let ty = entry.file_type()?;
         if ty.is_dir() {
-            copy_dir_all(entry.path(), dst.as_ref().join(entry.file_name()))?;
+            copy_dir_all(
+                config_symbols,
+                entry.path(),
+                dst.as_ref().join(entry.file_name()),
+            )?;
         } else {
-            fs::copy(entry.path(), dst.as_ref().join(entry.file_name()))?;
+            preprocess_file(
+                config_symbols,
+                entry.path(),
+                dst.as_ref().join(entry.file_name()),
+            )?;
+        }
+    }
+    Ok(())
+}
+
+/// A naive pre-processor for linker scripts
+fn preprocess_file(
+    config: &Vec<&str>,
+    src: impl AsRef<Path>,
+    dst: impl AsRef<Path>,
+) -> std::io::Result<()> {
+    let file = File::open(src)?;
+    let mut out_file = File::create(dst)?;
+
+    let mut take = Vec::new();
+    take.push(true);
+
+    for line in std::io::BufReader::new(file).lines() {
+        let line = line?;
+        println!("{} >> {}", *take.last().unwrap(), line);
+        let trimmed = line.trim();
+
+        if trimmed.starts_with("#IF ") {
+            let condition = &trimmed[4..];
+            let should_take = take.iter().all(|v| *v == true);
+            let should_take = should_take && config.contains(&condition);
+            take.push(should_take);
+            continue;
+        } else if trimmed == "#ELSE" {
+            let taken = take.pop().unwrap();
+            let should_take = take.iter().all(|v| *v == true);
+            let should_take = should_take && !taken;
+            take.push(should_take);
+            continue;
+        } else if trimmed == "#ENDIF" {
+            take.pop();
+            continue;
+        }
+
+        if *take.last().unwrap() {
+            out_file.write(line.as_bytes())?;
+            out_file.write(b"\n")?;
         }
     }
     Ok(())

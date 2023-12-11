@@ -89,6 +89,9 @@ esp32s3 = ["xtensa", "esp32s3/rt", "procmacros/esp32s3", "xtensa-lx/esp32s3", "x
 xtal-26mhz = []
 xtal-40mhz = []
 
+# Only certain chips support flip-link
+flip-link = ["esp-riscv-rt/fix-sp"]
+
 # PSRAM support
 psram-2m = []
 psram-4m = []

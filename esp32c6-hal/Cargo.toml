@@ -68,6 +68,7 @@ log                  = ["esp-hal-common/log", "esp-println/log"]
 rt                   = []
 ufmt                 = ["esp-hal-common/ufmt"]
 vectored             = ["esp-hal-common/vectored"]
+flip-link            = ["esp-hal-common/flip-link"]
 
 # Initialize / clear data sections and RTC memory
 zero-rtc-bss         = ["esp-hal-common/rv-zero-rtc-bss"]
