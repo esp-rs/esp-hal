@@ -4,16 +4,17 @@ A WiFi, BLE and ESP-NOW driver for Espressif microcontrollers.
 
 ## Current support
 
-If a cell contains am em dash (&mdash;) this means that the particular feature is not present for a chip. A check mark (✓) means that some driver implementation exists. A Tilde (&tilde;) means its implemented but buggy. An empty cell means that the feature is present in the chip but not implemented yet.
+If a cell contains an em dash (&mdash;) this means that the particular feature is not present for a chip. A check mark (✓) means that some driver implementation exists. A Tilde (&tilde;) means it is implemented but buggy. An empty cell means that the feature is present in the chip but not implemented yet.
 
 |          | [Wifi](https://github.com/esp-rs/esp-wifi/issues/94) | [BLE](https://github.com/esp-rs/esp-wifi/issues/93) | [Coex](https://github.com/esp-rs/esp-wifi/issues/92) | ESP-NOW |
 | :------: | :--------------------------------------------------: | :-------------------------------------------------: | :--------------------------------------------------: | :-----: |
 |  ESP32   |                          ✓                           |                          ✓                          |                          ✓                           |    ✓    |
+| ESP32-C2 |                          ✓                           |                          ✓                          |                          ✓                           |    ✓    |
+| ESP32-C3 |                          ✓                           |                          ✓                          |                          ✓                           |    ✓    |
+| ESP32-C6 |                          ✓                           |                          ✓                          |                          ✓                           |    ✓    |
+| ESP32-H2 |                       &mdash;                        |                          ✓                          |                       &mdash;                        | &mdash; |
 | ESP32-S2 |                          ✓                           |                       &mdash;                       |                       &mdash;                        |    ✓    |
 | ESP32-S3 |                          ✓                           |                          ✓                          |                          ✓                           |    ✓    |
-| ESP32-C3 |                          ✓                           |                          ✓                          |                          ✓                           |    ✓    |
-| ESP32-C2 |                          ✓                           |                          ✓                          |                          ✓                           |    ✓    |
-| ESP32-C6 |                          ✓                           |                          ✓                          |                          ✓                           |    ✓    |
 
 Minimum supported Rust compiler version: 1.72.0.0
 
@@ -40,12 +41,12 @@ rustflags = [
     "-C", "link-arg=-Trom_functions.x",
 ]
 ```
-At time of writing, you will already have the linkall flag if you used `cargo generate`. Generating from a template does not include the `rom_functions` flag.
+At the time of writing, you will already have the `linkall` flag if you used `cargo generate`. Generating from a template does not include the `rom_functions` flag.
 
 
 ### Optimization Level
 
-It is necessary to build with optimization level 2 or 3 since otherwise it might not even be able to connect or advertise.
+It is necessary to build with optimization level 2 or 3 since otherwise, it might not even be able to connect or advertise.
 
 To make it work also for your debug builds add this to your `Cargo.toml`
 
@@ -62,7 +63,7 @@ Within this crate, `CCOMPARE0` CPU timer is used for timing, ensure that in your
 
 When using USB-SERIAL-JTAG (for example by selecting `jtag-serial` in [`esp-println`](https://crates.io/crates/esp-println)) you have to activate the feature `phy-enable-usb`.
 
-Don't use this feature if your are _not_ using USB-SERIAL-JTAG as it might reduce WiFi performance.
+Don't use this feature if you are _not__ using USB-SERIAL-JTAG as it might reduce WiFi performance.
 
 ## Features
 
