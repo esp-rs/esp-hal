@@ -275,6 +275,20 @@ where
         frequency: HertzU32,
         clocks: &Clocks,
     ) -> Self {
+        Self::new_with_timeout(i2c, sda, scl, frequency, clocks, None)
+    }
+
+    /// Create a new I2C instance with a custom timeout value.
+    /// This will enable the peripheral but the peripheral won't get
+    /// automatically disabled when this gets dropped.
+    pub fn new_with_timeout<SDA: OutputPin + InputPin, SCL: OutputPin + InputPin>(
+        i2c: impl Peripheral<P = T> + 'd,
+        sda: impl Peripheral<P = SDA> + 'd,
+        scl: impl Peripheral<P = SCL> + 'd,
+        frequency: HertzU32,
+        clocks: &Clocks,
+        timeout: Option<u32>,
+    ) -> Self {
         crate::into_ref!(i2c, sda, scl);
 
         PeripheralClockControl::enable(match i2c.i2c_number() {
@@ -302,7 +316,7 @@ where
             .connect_peripheral_to_output(i2c.peripheral.sda_output_signal())
             .connect_input_to_peripheral(i2c.peripheral.sda_input_signal());
 
-        i2c.peripheral.setup(frequency, clocks);
+        i2c.peripheral.setup(frequency, clocks, timeout);
 
         i2c
     }
@@ -638,7 +652,7 @@ pub trait Instance {
 
     fn i2c_number(&self) -> usize;
 
-    fn setup(&mut self, frequency: HertzU32, clocks: &Clocks) {
+    fn setup(&mut self, frequency: HertzU32, clocks: &Clocks, timeout: Option<u32>) {
         self.register_block().ctr().modify(|_, w| unsafe {
             // Clear register
             w.bits(0)
@@ -671,9 +685,9 @@ pub trait Instance {
 
         // Configure frequency
         #[cfg(esp32)]
-        self.set_frequency(clocks.i2c_clock.convert(), frequency);
+        self.set_frequency(clocks.i2c_clock.convert(), frequency, timeout);
         #[cfg(not(esp32))]
-        self.set_frequency(clocks.xtal_clock.convert(), frequency);
+        self.set_frequency(clocks.xtal_clock.convert(), frequency, timeout);
 
         self.update_config();
 
@@ -750,7 +764,7 @@ pub trait Instance {
     /// Sets the frequency of the I2C interface by calculating and applying the
     /// associated timings - corresponds to i2c_ll_cal_bus_clk and
     /// i2c_ll_set_bus_timing in ESP-IDF
-    fn set_frequency(&mut self, source_clk: HertzU32, bus_freq: HertzU32) {
+    fn set_frequency(&mut self, source_clk: HertzU32, bus_freq: HertzU32, timeout: Option<u32>) {
         let source_clk = source_clk.raw();
         let bus_freq = bus_freq.raw();
 
@@ -761,7 +775,12 @@ pub trait Instance {
         let sda_sample = scl_high / 2;
         let setup = half_cycle;
         let hold = half_cycle;
-        let tout = half_cycle * 20; // default we set the timeout value to 10 bus cycles.
+        let tout = if let Some(timeout) = timeout {
+            timeout
+        } else {
+            // default we set the timeout value to 10 bus cycles
+            half_cycle * 20
+        };
 
         // SCL period. According to the TRM, we should always subtract 1 to SCL low
         // period
@@ -823,7 +842,7 @@ pub trait Instance {
     /// Sets the frequency of the I2C interface by calculating and applying the
     /// associated timings - corresponds to i2c_ll_cal_bus_clk and
     /// i2c_ll_set_bus_timing in ESP-IDF
-    fn set_frequency(&mut self, source_clk: HertzU32, bus_freq: HertzU32) {
+    fn set_frequency(&mut self, source_clk: HertzU32, bus_freq: HertzU32, timeout: Option<u32>) {
         let source_clk = source_clk.raw();
         let bus_freq = bus_freq.raw();
 
@@ -838,8 +857,12 @@ pub trait Instance {
         let sda_sample = half_cycle / 2 - 1;
         let setup = half_cycle;
         let hold = half_cycle;
-        // default we set the timeout value to 10 bus cycles
-        let tout = half_cycle * 20;
+        let tout = if let Some(timeout) = timeout {
+            timeout
+        } else {
+            // default we set the timeout value to 10 bus cycles
+            half_cycle * 20
+        };
 
         // scl period
         let scl_low_period = scl_low - 1;
@@ -877,7 +900,7 @@ pub trait Instance {
     /// Sets the frequency of the I2C interface by calculating and applying the
     /// associated timings - corresponds to i2c_ll_cal_bus_clk and
     /// i2c_ll_set_bus_timing in ESP-IDF
-    fn set_frequency(&mut self, source_clk: HertzU32, bus_freq: HertzU32) {
+    fn set_frequency(&mut self, source_clk: HertzU32, bus_freq: HertzU32, timeout: Option<u32>) {
         let source_clk = source_clk.raw();
         let bus_freq = bus_freq.raw();
 
@@ -901,9 +924,14 @@ pub trait Instance {
         let sda_sample = half_cycle / 2 + scl_wait_high;
         let setup = half_cycle;
         let hold = half_cycle;
-        // default we set the timeout value to about 10 bus cycles
-        // log(20*half_cycle)/log(2) = log(half_cycle)/log(2) +  log(20)/log(2)
-        let tout = (4 * 8 - (5 * half_cycle).leading_zeros()) + 2;
+
+        let tout = if let Some(timeout) = timeout {
+            timeout
+        } else {
+            // default we set the timeout value to about 10 bus cycles
+            // log(20*half_cycle)/log(2) = log(half_cycle)/log(2) +  log(20)/log(2)
+            (4 * 8 - (5 * half_cycle).leading_zeros()) + 2
+        };
 
         // According to the Technical Reference Manual, the following timings must be
         // subtracted by 1. However, according to the practical measurement and
