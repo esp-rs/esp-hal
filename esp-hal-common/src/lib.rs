@@ -161,22 +161,32 @@ pub mod trapframe {
 // be directly exposed.
 mod soc;
 
+#[cfg(xtensa)]
 #[no_mangle]
 extern "C" fn EspDefaultHandler(_level: u32, _interrupt: peripherals::Interrupt) {
-    #[cfg(feature = "log")]
-    warn!("Unhandled level {} interrupt: {:?}", _level, _interrupt);
+    #[cfg(not(feature = "defmt"))]
+    panic!("Unhandled level {} interrupt: {:?}", _level, _interrupt);
 
     #[cfg(feature = "defmt")]
-    warn!(
+    panic!(
         "Unhandled level {} interrupt: {:?}",
         _level,
         defmt::Debug2Format(&_interrupt)
     );
 }
 
-#[cfg(xtensa)]
+#[cfg(riscv)]
 #[no_mangle]
-extern "C" fn DefaultHandler() {}
+extern "C" fn EspDefaultHandler(_interrupt: peripherals::Interrupt) {
+    #[cfg(not(feature = "defmt"))]
+    panic!("Unhandled interrupt: {:?}", _interrupt);
+
+    #[cfg(feature = "defmt")]
+    panic!(
+        "Unhandled interrupt: {:?}",
+        defmt::Debug2Format(&_interrupt)
+    );
+}
 
 /// Available CPU cores
 ///

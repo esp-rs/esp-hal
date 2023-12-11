@@ -14,7 +14,6 @@ PROVIDE(UserExternal = DefaultHandler);
 PROVIDE(SupervisorExternal = DefaultHandler);
 PROVIDE(MachineExternal = DefaultHandler);
 
-PROVIDE(DefaultHandler = DefaultInterruptHandler);
 PROVIDE(ExceptionHandler = DefaultExceptionHandler);
 
 PROVIDE(__post_init = default_post_init);
