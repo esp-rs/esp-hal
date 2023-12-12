@@ -146,5 +146,59 @@ fn main() -> ! {
         );
 
         delay.delay_ms(250u32);
+
+        slave_receive.fill(0xff);
+        let transfer = spi.dma_read(slave_receive).unwrap();
+        master_cs.set_high().unwrap();
+
+        master_cs.set_low().unwrap();
+        for v in master_send.iter() {
+            let mut b = *v;
+            for _ in 0..8 {
+                if b & 128 != 0 {
+                    master_mosi.set_high().unwrap();
+                } else {
+                    master_mosi.set_low().unwrap();
+                }
+                b <<= 1;
+                master_sclk.set_low().unwrap();
+                master_sclk.set_high().unwrap();
+            }
+        }
+        master_cs.set_high().unwrap();
+        (slave_receive, spi) = transfer.wait().unwrap();
+        println!(
+            "slave got {:x?} .. {:x?}",
+            &slave_receive[..10],
+            &slave_receive[slave_receive.len() - 10..],
+        );
+
+        delay.delay_ms(250u32);
+        let transfer = spi.dma_write(slave_send).unwrap();
+
+        master_receive.fill(0);
+
+        master_cs.set_low().unwrap();
+        for (j, _) in master_send.iter().enumerate() {
+            let mut rb = 0u8;
+            for _ in 0..8 {
+                master_sclk.set_low().unwrap();
+                rb <<= 1;
+                master_sclk.set_high().unwrap();
+                if master_miso.is_high().unwrap() {
+                    rb |= 1;
+                }
+            }
+            master_receive[j] = rb;
+        }
+        master_cs.set_high().unwrap();
+        (slave_send, spi) = transfer.wait().unwrap();
+
+        println!(
+            "master got {:x?} .. {:x?}",
+            &master_receive[..10],
+            &master_receive[master_receive.len() - 10..],
+        );
+        println!();
     }
 }
