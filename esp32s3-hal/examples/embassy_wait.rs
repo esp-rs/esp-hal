@@ -41,13 +41,6 @@ async fn main(_spawner: Spawner) {
     // GPIO 0 as input
     let mut input = io.pins.gpio0.into_pull_down_input();
 
-    // Async requires the GPIO interrupt to wake futures
-    esp32s3_hal::interrupt::enable(
-        esp32s3_hal::peripherals::Interrupt::GPIO,
-        esp32s3_hal::interrupt::Priority::Priority1,
-    )
-    .unwrap();
-
     loop {
         esp_println::println!("Waiting...");
         input.wait_for_rising_edge().await.unwrap();

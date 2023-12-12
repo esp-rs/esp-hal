@@ -92,13 +92,6 @@ async fn main(_spawner: Spawner) {
         )
         .unwrap();
 
-    // you need to manually enable the DMA channel's interrupt!
-    interrupt::enable(
-        peripherals::Interrupt::PARL_IO,
-        interrupt::Priority::Priority1,
-    )
-    .unwrap();
-
     let buffer = tx_buffer;
     for i in 0..buffer.len() {
         buffer[i] = (i % 255) as u8;

@@ -55,17 +55,6 @@ async fn main(_spawner: Spawner) {
         embassy::init(&clocks, timer_group0.timer0);
     }
 
-    esp32s3_hal::interrupt::enable(
-        esp32s3_hal::peripherals::Interrupt::DMA_IN_CH0,
-        esp32s3_hal::interrupt::Priority::Priority1,
-    )
-    .unwrap();
-    esp32s3_hal::interrupt::enable(
-        esp32s3_hal::peripherals::Interrupt::DMA_OUT_CH0,
-        esp32s3_hal::interrupt::Priority::Priority1,
-    )
-    .unwrap();
-
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let sclk = io.pins.gpio6;
     let miso = io.pins.gpio2;

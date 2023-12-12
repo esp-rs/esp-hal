@@ -48,8 +48,6 @@ async fn main(_spawner: Spawner) {
         &clocks,
     );
 
-    interrupt::enable(Interrupt::I2C_EXT0, interrupt::Priority::Priority1).unwrap();
-
     let mut lis3dh = Lis3dh::new_i2c(i2c0, SlaveAddr::Alternate).await.unwrap();
     lis3dh.set_range(Range::G8).await.unwrap();
 
