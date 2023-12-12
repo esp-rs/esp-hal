@@ -7,9 +7,10 @@ Please note that only changes to the `esp-hal-common` package are tracked in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.14.0] - 2023-12-12
 
 ### Added
+
 - ESP32-C6: LP core clock is configurable (#907)
 - Derive `Clone` and `Copy` for `EspTwaiFrame` (#914)
 - A way to configure inverted pins (#912)
@@ -26,12 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Improve DMA documentation & clean up module (#915)
 - Only allow a single version of `esp-hal-common` to be present in an application (#934)
-- C3, C6 and H2 can now use the `zero-rtc-bss` feature to enable `esp-hal-common/rv-zero-rtc-bss` (#867)
+- ESP32-C3/C6 and ESP32-H2 can now use the `zero-rtc-bss` feature to enable `esp-hal-common/rv-zero-rtc-bss` (#867)
 - Reuse `ieee802154_clock_enable/disable()` functions for BLE and rename `ble_ieee802154_clock_enable()` (#953)
 - The `embedded-io` trait implementations are now gated behind the `embedded-io` feature (#964)
 - Simplifed RMT channels and channel creators (#958)
 - Reworked construction of I2S driver instances (#983)
-- S2 / S3: Don't require GPIO 18 to create a USB peripheral driver instance (#990)
+- ESP32-S2/S3: Don't require GPIO 18 to create a USB peripheral driver instance (#990)
 - Updated to latest release candidate (`1.0.0-rc.2`) for `embedded-hal{-async,-nb}` (#994)
 - Explicit panic when hitting the `DefaultHandler` (#1005)
 - Relevant interrupts are now auto enabled in `embassy::init` (#1014).
@@ -52,14 +53,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- Direct boot support has been removed (#903).
 - Removed the `mcu-boot` feature from `esp32c3-hal` (#938)
 - Removed SpiBusController and SpiBusDevice in favour of embedded-hal-bus and embassy-embedded-hal implementataions. (#978)
 
 ### Breaking
-- Direct boot support has been removed (#903).
+
 - `Spi::new`/`Spi::new_half_duplex` takes no gpio pin now, instead you need to call `with_pins` to setup those (#901).
-- ESP32C2, ESP32C3, ESP32S2: atomic emulation trap has been removed. When upgrading you must either remove [these lines](https://github.com/esp-rs/riscv-atomic-emulation-trap#usage) from your `.cargo/config.toml`. Usage of `core::sync::atomic::*` in dependent crates should be replaced with [portable-atomic](https://github.com/taiki-e/portable-atomic). (#904) (#985)
-- RSA driver now takes u32 words instead of u8 bytes. The expected slice length is now 4 times shorter. (#981)
+- ESP32-C2, ESP32-C3, ESP32-S2: atomic emulation trap has been removed. (#904) (#985)
+    - When upgrading you must either remove [these lines](https://github.com/esp-rs/riscv-atomic-emulation-trap#usage) from your `.cargo/config.toml`.
+    - Usage of `core::sync::atomic::*` in dependent crates should be replaced with [portable-atomic](https://github.com/taiki-e/portable-atomic).
+- RSA driver now takes `u32` words instead of `u8` bytes. The expected slice length is now 4 times shorter. (#981)
 
 ## [0.13.1] - 2023-11-02
 
@@ -337,7 +341,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2022-08-05
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.13.1...HEAD
+[0.14.0]: https://github.com/esp-rs/esp-hal/compare/v0.13.1...v0.14.0
 [0.13.1]: https://github.com/esp-rs/esp-hal/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/esp-rs/esp-hal/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/esp-rs/esp-hal/compare/v0.11.0...v0.12.0

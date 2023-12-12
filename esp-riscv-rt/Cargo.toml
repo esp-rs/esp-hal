@@ -1,6 +1,6 @@
 [package]
 name         = "esp-riscv-rt"
-version      = "0.5.0"
+version      = "0.6.0"
 edition      = "2021"
 rust-version = "1.65"
 description  = "Minimal runtime / startup for RISC-V CPUs from Espressif"
@@ -13,31 +13,28 @@ categories   = ["embedded", "no-std"]
 riscv           = "0.10.1"
 riscv-rt-macros = "0.2.0"
 
-[dev-dependencies]
-panic-halt = "0.2.0"
-
 [features]
-direct-vectoring = []
+direct-vectoring     = []
+fix-sp               = []
+has-mie-mip          = []
+init-data            = []
+init-rtc-fast-data   = []
+init-rtc-fast-text   = []
+init-rw-text         = []
 interrupt-preemption = []
-has-mie-mip = []
-zero-bss = []
-zero-rtc-fast-bss = []
-init-data = []
-init-rw-text = []
-init-rtc-fast-data = []
-init-rtc-fast-text = []
-fix-sp = []
+zero-bss             = []
+zero-rtc-fast-bss    = []
 
 # This feature is intended for testing; you probably don't want to enable it:
 ci = [
     "direct-vectoring",
-    "interrupt-preemption",
+    "fix-sp",
     "has-mie-mip",
-    "zero-bss",
-    "zero-rtc-fast-bss",
     "init-data",
-    "init-rw-text",
     "init-rtc-fast-data",
     "init-rtc-fast-text",
-    "fix-sp",
+    "init-rw-text",
+    "interrupt-preemption",
+    "zero-bss",
+    "zero-rtc-fast-bss",
 ]
