@@ -49,30 +49,6 @@
 //! [embassy]: https://github.com/embassy-rs/embassy
 //! [`ufmt_write::uWrite`]: https://docs.rs/ufmt-write/latest/ufmt_write/trait.uWrite.html
 //! [`defmt::Format`]: https://docs.rs/defmt/0.3.5/defmt/trait.Format.html
-//!
-//! ### Supported Image Formats
-//!
-//! This HAL supports building multiple different application image formats. You
-//! can read about each below.
-//!
-//! The ESP-IDF Bootloader format is used unless some other format is specified
-//! via its feature.
-//!
-//! #### ESP-IDF Bootloader
-//!
-//! Use the second-stage bootloader from [ESP-IDF] and its associated
-//! application image format. See the [App Image Format] documentation for more
-//! information about this format.
-//!
-//! [ESP-IDF]: https://github.com/espressif/esp-idf
-//! [App Image Format]: https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/app_image_format.html
-//!
-//! #### MCUboot
-//!
-//! Use the MCUBoot bootloader and its associated image format. See the [MCUBoot
-//! design document] for more information about this format.
-//!
-//! [MCUBoot design document]: https://docs.mcuboot.com/design.html
 
 #![no_std]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
