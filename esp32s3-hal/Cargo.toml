@@ -1,10 +1,6 @@
 [package]
-name    = "esp32s3-hal"
-version = "0.13.0"
-authors = [
-    "Jesse Braham <jesse@beta7.io>",
-    "Björn Quentin <bjoern.quentin@mobile-j.de>",
-]
+name         = "esp32s3-hal"
+version      = "0.13.0"
 edition      = "2021"
 rust-version = "1.67.0"
 description  = "HAL for ESP32-S3 microcontrollers"
@@ -25,14 +21,14 @@ categories = [
 ]
 
 [dependencies]
-esp-hal-common = { version = "0.13.0", features = ["esp32s3"], path = "../esp-hal-common" }
-embassy-time   = { version = "0.2.0", optional = true }
+esp-hal-common = { version = "0.14.0", features = ["esp32s3"], path = "../esp-hal-common" }
+embassy-time   = { version = "0.2.0",  optional = true }
 r0             = { version = "1.0.0",  optional = true }
 
 [dev-dependencies]
 aes                = "0.8.3"
 critical-section   = "1.1.2"
-crypto-bigint      = { version = "0.5.3", default-features = false }
+crypto-bigint      = { version = "0.5.5", default-features = false }
 embassy-executor   = { version = "0.4.0", features = ["nightly"] }
 embassy-sync       = "0.5.0"
 embedded-graphics  = "0.8.1"
@@ -40,13 +36,13 @@ embedded-hal       = { version = "0.2.7",  features = ["unproven"] }
 embedded-hal-1     = { version = "=1.0.0-rc.2", package = "embedded-hal" }
 embedded-hal-async = "=1.0.0-rc.2"
 embedded-can       = "0.4.1"
-embedded-io-async  = "0.6.0"
+embedded-io-async  = "0.6.1"
 embedded-hal-bus   = "0.1.0-rc.2"
 esp-alloc          = "0.3.0"
 esp-backtrace      = { version = "0.9.0", features = ["esp32s3", "panic-handler", "exception-handler", "print-uart"] }
-esp-hal-smartled   = { version = "0.6.0", features = ["esp32s3"], path = "../esp-hal-smartled" }
-esp-println        = { version = "0.7.0", features = ["esp32s3"] }
-heapless           = "0.8"
+esp-hal-smartled   = { version = "0.7.0", features = ["esp32s3"], path = "../esp-hal-smartled" }
+esp-println        = { version = "0.7.1", features = ["esp32s3"] }
+heapless           = "0.8.0"
 hmac               = { version = "0.12.1", default-features = false }
 lis3dh-async       = "0.8.0"
 sha2               = { version = "0.10.8", default-features = false }
@@ -83,10 +79,10 @@ embassy-generic-queue-64  = ["esp-hal-common/embassy-generic-queue-64"]
 embassy-generic-queue-128 = ["esp-hal-common/embassy-generic-queue-128"]
 
 # PSRAM support
-psram     = []
-psram-2m  = ["esp-hal-common/psram-2m", "psram"]
-psram-4m  = ["esp-hal-common/psram-4m", "psram"]
-psram-8m  = ["esp-hal-common/psram-8m", "psram"]
+psram    = []
+psram-2m = ["esp-hal-common/psram-2m", "psram"]
+psram-4m = ["esp-hal-common/psram-4m", "psram"]
+psram-8m = ["esp-hal-common/psram-8m", "psram"]
 
 # Octal RAM support
 opsram-2m  = ["esp-hal-common/opsram-2m", "psram"]

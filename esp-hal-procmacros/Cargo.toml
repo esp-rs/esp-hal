@@ -1,6 +1,6 @@
 [package]
 name         = "esp-hal-procmacros"
-version      = "0.7.0"
+version      = "0.8.0"
 edition      = "2021"
 rust-version = "1.67.0"
 description  = "Procedural macros for ESP-HAL"
@@ -17,11 +17,11 @@ proc-macro = true
 darling          = "0.20.3"
 litrs            = "0.4.1"
 object           = { version = "0.32.1", optional = true }
-proc-macro-crate = "2.0.0"
+proc-macro-crate = "2.0.1"
 proc-macro-error = "1.0.4"
-proc-macro2      = "1.0.69"
+proc-macro2      = "1.0.70"
 quote            = "1.0.33"
-syn              = { version = "2.0.38", features = ["extra-traits", "full"] }
+syn              = { version = "2.0.40", features = ["extra-traits", "full"] }
 
 [features]
 # Select a target device:

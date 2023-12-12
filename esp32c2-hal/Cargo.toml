@@ -1,10 +1,6 @@
 [package]
-name    = "esp32c2-hal"
-version = "0.11.0"
-authors = [
-    "Jesse Braham <jesse@beta7.io>",
-    "Björn Quentin <bjoern.quentin@mobile-j.de>",
-]
+name         = "esp32c2-hal"
+version      = "0.12.0"
 edition      = "2021"
 rust-version = "1.67.0"
 description  = "HAL for ESP32-C2 microcontrollers"
@@ -25,30 +21,30 @@ categories = [
 ]
 
 [dependencies]
-esp-hal-common = { version = "0.13.0", features = ["esp32c2"], path = "../esp-hal-common" }
-embassy-time   = { version = "0.2.0", optional = true }
+esp-hal-common = { version = "0.14.0", features = ["esp32c2"], path = "../esp-hal-common" }
+embassy-time   = { version = "0.2.0",  optional = true }
 
 [dev-dependencies]
 critical-section   = "1.1.2"
-embassy-executor   = { version = "0.4.0", features = ["nightly"] }
+crypto-bigint      = { version = "0.5.5",  default-features = false }
+elliptic-curve     = { version = "0.13.8", default-features = false, features = ["sec1"] }
+embassy-executor   = { version = "0.4.0",  features = ["nightly"] }
+embassy-sync       = "0.5.0"
 embedded-graphics  = "0.8.1"
 embedded-hal-1     = { version = "=1.0.0-rc.2", package = "embedded-hal" }
 embedded-hal-async = "=1.0.0-rc.2"
-embedded-io-async  = "0.6.0"
+embedded-io-async  = "0.6.1"
 embedded-hal-bus   = "0.1.0-rc.2"
 esp-backtrace      = { version = "0.9.0", features = ["esp32c2", "panic-handler", "exception-handler", "print-uart"] }
-esp-println        = { version = "0.7.0", features = ["esp32c2"] }
-heapless           = "0.8"
+esp-println        = { version = "0.7.1", features = ["esp32c2"] }
+heapless           = "0.8.0"
+hex-literal        = "0.4.1"
 lis3dh-async       = "0.8.0"
+p192               = { version = "0.13.0", default-features = false, features = ["arithmetic"] }
+p256               = { version = "0.13.2", default-features = false, features = ["arithmetic"] }
 sha2               = { version = "0.10.8", default-features = false}
 ssd1306            = "0.8.4"
 static_cell        = { version = "2.0.0", features = ["nightly"] }
-hex-literal        = "0.4.1"
-crypto-bigint      = { version = "0.5.3", default-features = false }
-elliptic-curve     = { version = "0.13.6", default-features = false, features = ["sec1"] }
-p192               = { version = "0.13.0", default-features = false, features = ["arithmetic"] }
-p256               = { version = "0.13.2", default-features = false, features = ["arithmetic"] }
-embassy-sync       = "0.5.0"
 
 [features]
 default              = ["rt", "vectored", "xtal-40mhz", "embassy-integrated-timers"]
