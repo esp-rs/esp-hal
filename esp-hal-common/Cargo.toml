@@ -1,6 +1,6 @@
 [package]
 name         = "esp-hal-common"
-version      = "0.14.0"
+version      = "0.14.1"
 edition      = "2021"
 rust-version = "1.67.0"
 description  = "HAL implementations for peripherals common among Espressif devices; should not be used directly"
