@@ -120,18 +120,18 @@ fn main() -> ! {
     let mut tx_buffer = [0u8; TX_BUFFER_SIZE];
     let mut socket = wifi_stack.get_socket(&mut rx_buffer, &mut tx_buffer);
 
-    let delay = hal::Delay::new(&clocks);
+    let mut delay = hal::Delay::new(&clocks);
 
     loop {
         test_download(server_address, &mut socket);
-        delay.delay(3_000_000);
+        delay.delay_ms(3_000u32);
         socket.work();
         test_upload(server_address, &mut socket);
         socket.work();
-        delay.delay(3_000_000);
+        delay.delay_ms(3_000u32);
         test_upload_download(server_address, &mut socket);
         socket.work();
-        delay.delay(3_000_000);
+        delay.delay_ms(3_000u32);
     }
 }
 
