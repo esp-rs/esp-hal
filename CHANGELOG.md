@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Allow for splitting of the USB Serial JTAG peripheral into tx/rx components (#1024)
+
 ### Fixed
 
 ### Removed
