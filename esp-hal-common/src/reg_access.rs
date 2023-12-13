@@ -80,13 +80,15 @@ impl AlignmentHelper {
         count: usize,
         offset: usize,
     ) {
+        let dst_ptr = unsafe { dst_ptr.add(offset) };
+
         let mut cursor = if self.buf_fill != 0 {
             for i in self.buf_fill..U32_ALIGN_SIZE {
                 self.buf[i] = val;
             }
 
             unsafe {
-                dst_ptr.add(offset).write_volatile(U32_FROM_BYTES(self.buf));
+                dst_ptr.write_volatile(U32_FROM_BYTES(self.buf));
             }
 
             self.buf_fill = 0;
@@ -120,6 +122,8 @@ impl AlignmentHelper {
         offset: usize,
     ) -> (&'a [u8], bool) {
         assert!(dst_bound > 0);
+
+        let dst_ptr = unsafe { dst_ptr.add(offset) };
 
         let mut nsrc = src;
         let mut cursor = 0;
