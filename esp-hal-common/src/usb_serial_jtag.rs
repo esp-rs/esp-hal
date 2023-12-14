@@ -526,8 +526,9 @@ mod asynch {
     use super::{Error, UsbSerialJtag, UsbSerialJtagRx, UsbSerialJtagTx};
     use crate::peripherals::USB_DEVICE;
 
-    // Single static instance of the waker
-    static WAKER: AtomicWaker = AtomicWaker::new();
+    // Static instance of the waker for each component of the peripheral:
+    static WAKER_TX: AtomicWaker = AtomicWaker::new();
+    static WAKER_RX: AtomicWaker = AtomicWaker::new();
 
     pub(crate) struct UsbSerialJtagWriteFuture<'d> {
         phantom: PhantomData<&'d mut USB_DEVICE>,
@@ -562,7 +563,7 @@ mod asynch {
             self: core::pin::Pin<&mut Self>,
             cx: &mut core::task::Context<'_>,
         ) -> core::task::Poll<Self::Output> {
-            WAKER.register(cx.waker());
+            WAKER_TX.register(cx.waker());
             if self.event_bit_is_clear() {
                 Poll::Ready(())
             } else {
@@ -604,7 +605,7 @@ mod asynch {
             self: core::pin::Pin<&mut Self>,
             cx: &mut core::task::Context<'_>,
         ) -> core::task::Poll<Self::Output> {
-            WAKER.register(cx.waker());
+            WAKER_RX.register(cx.waker());
             if self.event_bit_is_clear() {
                 Poll::Ready(())
             } else {
@@ -748,6 +749,11 @@ mod asynch {
                 .set_bit()
         });
 
-        WAKER.wake();
+        if in_empty {
+            WAKER_RX.wake();
+        }
+        if out_recv {
+            WAKER_TX.wake();
+        }
     }
 }
