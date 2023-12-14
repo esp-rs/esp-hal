@@ -1,0 +1,141 @@
+[package]
+name    = "hil-test"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[lib]
+harness = false
+
+[dependencies]
+defmt         = "0.3.5"
+defmt-rtt     = "0.4.0"
+embedded-test = "0.2.1"
+panic-probe   = "0.4.0"
+semihosting   = "0.1.4"
+
+# HAL packages:
+esp32-hal   = { path = "../esp32-hal",   features = ["defmt", "eh1"], optional = true }
+esp32c2-hal = { path = "../esp32c2-hal", features = ["defmt", "eh1"], optional = true }
+esp32c3-hal = { path = "../esp32c3-hal", features = ["defmt", "eh1"], optional = true }
+esp32c6-hal = { path = "../esp32c6-hal", features = ["defmt", "eh1"], optional = true }
+esp32h2-hal = { path = "../esp32h2-hal", features = ["defmt", "eh1"], optional = true }
+esp32s2-hal = { path = "../esp32s2-hal", features = ["defmt", "eh1"], optional = true }
+esp32s3-hal = { path = "../esp32s3-hal", features = ["defmt", "eh1"], optional = true }
+
+# Traits:
+embedded-hal       = { version = "0.2.7",      features = ["unproven"] }
+embedded-hal-async = { version = "1.0.0-rc.2", optional = true }
+embedded-hal-1     = { version = "1.0.0-rc.2", package  = "embedded-hal" }
+
+[features]
+# Device support (required!):
+esp32   = ["dep:esp32-hal"]
+esp32c2 = ["dep:esp32c2-hal"]
+esp32c3 = ["dep:esp32c3-hal"]
+esp32c6 = ["dep:esp32c6-hal"]
+esp32h2 = ["dep:esp32h2-hal"]
+esp32s2 = ["dep:esp32s2-hal"]
+esp32s3 = ["dep:esp32s3-hal"]
+
+# Async & Embassy:
+async = [
+    "dep:embedded-hal-async",
+    "esp32-hal?/async",
+    "esp32c2-hal?/async",
+    "esp32c3-hal?/async",
+    "esp32c6-hal?/async",
+    "esp32h2-hal?/async",
+    "esp32s2-hal?/async",
+    "esp32s3-hal?/async",
+]
+
+embassy = [
+    "esp32-hal?/embassy",
+    "esp32c2-hal?/embassy",
+    "esp32c3-hal?/embassy",
+    "esp32c6-hal?/embassy",
+    "esp32h2-hal?/embassy",
+    "esp32s2-hal?/embassy",
+    "esp32s3-hal?/embassy",
+]
+
+embassy-executor-interrupt = [
+    "esp32-hal?/embassy-executor-interrupt",
+    "esp32c2-hal?/embassy-executor-interrupt",
+    "esp32c3-hal?/embassy-executor-interrupt",
+    "esp32c6-hal?/embassy-executor-interrupt",
+    "esp32h2-hal?/embassy-executor-interrupt",
+    "esp32s2-hal?/embassy-executor-interrupt",
+    "esp32s3-hal?/embassy-executor-interrupt",
+]
+embassy-executor-thread = [
+    "esp32-hal?/embassy-executor-thread",
+    "esp32c2-hal?/embassy-executor-thread",
+    "esp32c3-hal?/embassy-executor-thread",
+    "esp32c6-hal?/embassy-executor-thread",
+    "esp32h2-hal?/embassy-executor-thread",
+    "esp32s2-hal?/embassy-executor-thread",
+    "esp32s3-hal?/embassy-executor-thread",
+]
+
+embassy-time-systick = [
+    "esp32c2-hal?/embassy-time-systick",
+    "esp32c3-hal?/embassy-time-systick",
+    "esp32c6-hal?/embassy-time-systick",
+    "esp32h2-hal?/embassy-time-systick",
+    "esp32s2-hal?/embassy-time-systick",
+    "esp32s3-hal?/embassy-time-systick",
+]
+embassy-time-timg0 = [
+    "esp32-hal?/embassy-time-timg0",
+    "esp32c2-hal?/embassy-time-timg0",
+    "esp32c3-hal?/embassy-time-timg0",
+    "esp32c6-hal?/embassy-time-timg0",
+    "esp32h2-hal?/embassy-time-timg0",
+    "esp32s2-hal?/embassy-time-timg0",
+    "esp32s3-hal?/embassy-time-timg0",
+]
+
+# cargo build/run
+[profile.dev]
+codegen-units = 1
+debug = 2
+debug-assertions = true # <-
+incremental = false
+opt-level = 'z'         # <-
+overflow-checks = true  # <-
+
+# cargo test
+[profile.test]
+codegen-units = 1
+debug = 2
+debug-assertions = true # <-
+incremental = false
+opt-level = 3           # <-
+overflow-checks = true  # <-
+
+# cargo build/run --release
+[profile.release]
+codegen-units = 1
+debug = 2
+debug-assertions = false # <-
+incremental = false
+lto = 'fat'
+opt-level = 3            # <-
+overflow-checks = false  # <-
+
+# cargo test --release
+[profile.bench]
+codegen-units = 1
+debug = 2
+debug-assertions = false # <-
+incremental = false
+lto = 'fat'
+opt-level = 3            # <-
+overflow-checks = false  # <-
+
+# TODO: remove when able
+[patch.crates-io]
+defmt       = { git = "https://github.com/jessebraham/defmt", branch = "features/defmt_test_riscv" }
+panic-probe = { git = "https://github.com/jessebraham/defmt", branch = "features/defmt_test_riscv" }

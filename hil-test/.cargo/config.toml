@@ -1,0 +1,18 @@
+[env]
+DEFMT_LOG="debug"
+
+[target.'cfg(target_arch = "riscv32")']
+runner    = "probe-rs test --"
+rustflags = [
+    "-C", "link-arg=-Tlinkall.x",
+    "-C", "link-arg=-Tdefmt.x",
+]
+
+[target.'cfg(target_arch = "xtensa")']
+# TODO: Xtensa not yet fully supported by `probe-rs`
+# runner    = "probe-rs test --"
+rustflags = [
+    "-C", "link-arg=-nostartfiles",
+    "-C", "link-arg=-Wl,-Tlinkall.x",
+    "-C", "link-arg=-Tdefmt.x",
+]
