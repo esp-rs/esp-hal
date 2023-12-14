@@ -5,12 +5,10 @@
 
 use core::time::Duration;
 
-use esp32s3_hal as hal;
-use esp_backtrace as _;
-use esp_println::println;
-use hal::{
+use esp32s3_hal::{
     clock::ClockControl,
     entry,
+    gpio::{RTCPin, IO},
     peripherals::Peripherals,
     prelude::*,
     rtc_cntl::{
@@ -19,10 +17,12 @@ use hal::{
         sleep::{Ext1WakeupSource, TimerWakeupSource, WakeupLevel},
         SocResetReason,
     },
+    Cpu,
     Delay,
     Rtc,
-    IO,
 };
+use esp_backtrace as _;
+use esp_println::println;
 
 #[entry]
 fn main() -> ! {
@@ -37,7 +37,7 @@ fn main() -> ! {
     let mut pin19 = io.pins.gpio19;
 
     println!("up and runnning!");
-    let reason = get_reset_reason(hal::Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
+    let reason = get_reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
     println!("reset reason: {:?}", reason);
     let wake_reason = get_wakeup_cause();
     println!("wake reason: {:?}", wake_reason);
@@ -45,7 +45,7 @@ fn main() -> ! {
     let mut delay = Delay::new(&clocks);
 
     let timer = TimerWakeupSource::new(Duration::from_secs(30));
-    let mut wakeup_pins: [&mut dyn hal::gpio::RTCPin; 2] = [&mut pin18, &mut pin19];
+    let mut wakeup_pins: [&mut dyn RTCPin; 2] = [&mut pin18, &mut pin19];
     let ext1 = Ext1WakeupSource::new(&mut wakeup_pins, WakeupLevel::High);
     println!("sleeping!");
     delay.delay_ms(100u32);

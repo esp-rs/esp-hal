@@ -14,14 +14,13 @@ use crypto_bigint::{
 };
 use elliptic_curve::sec1::ToEncodedPoint;
 use esp32h2_hal::{
-    ecc::{Ecc, EllipticCurve, Error},
+    ecc::{Ecc, EllipticCurve, Error, WorkMode},
     peripherals::Peripherals,
     prelude::*,
     systimer::SystemTimer,
     Rng,
 };
 use esp_backtrace as _;
-use esp_hal_common::ecc::WorkMode;
 use esp_println::{print, println};
 use hex_literal::hex;
 

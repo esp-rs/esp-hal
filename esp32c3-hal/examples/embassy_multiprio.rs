@@ -17,10 +17,7 @@
 
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Instant, Ticker, Timer};
-use esp32c3_hal as hal;
-use esp_backtrace as _;
-use esp_println::println;
-use hal::{
+use esp32c3_hal::{
     clock::ClockControl,
     embassy::{
         self,
@@ -30,6 +27,8 @@ use hal::{
     peripherals::Peripherals,
     prelude::*,
 };
+use esp_backtrace as _;
+use esp_println::println;
 
 static INT_EXECUTOR_0: InterruptExecutor<FromCpu1> = InterruptExecutor::new();
 
@@ -83,12 +82,12 @@ async fn main(low_prio_spawner: Spawner) {
     #[cfg(feature = "embassy-time-systick")]
     embassy::init(
         &clocks,
-        hal::systimer::SystemTimer::new(peripherals.SYSTIMER),
+        esp32c3_hal::systimer::SystemTimer::new(peripherals.SYSTIMER),
     );
 
     #[cfg(feature = "embassy-time-timg0")]
     {
-        let timer_group0 = hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks);
+        let timer_group0 = esp32c3_hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks);
         embassy::init(&clocks, timer_group0.timer0);
     }
 
