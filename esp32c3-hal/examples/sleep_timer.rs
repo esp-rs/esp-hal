@@ -5,18 +5,18 @@
 
 use core::time::Duration;
 
-use esp32c3_hal as hal;
-use esp_backtrace as _;
-use esp_println::println;
-use hal::{
+use esp32c3_hal::{
     clock::ClockControl,
     entry,
     peripherals::Peripherals,
     prelude::*,
     rtc_cntl::{get_reset_reason, get_wakeup_cause, sleep::TimerWakeupSource, SocResetReason},
+    Cpu,
     Delay,
     Rtc,
 };
+use esp_backtrace as _;
+use esp_println::println;
 
 #[entry]
 fn main() -> ! {
@@ -27,7 +27,7 @@ fn main() -> ! {
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
 
     println!("up and runnning!");
-    let reason = get_reset_reason(hal::Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
+    let reason = get_reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
     println!("reset reason: {:?}", reason);
     let wake_reason = get_wakeup_cause();
     println!("wake reason: {:?}", wake_reason);

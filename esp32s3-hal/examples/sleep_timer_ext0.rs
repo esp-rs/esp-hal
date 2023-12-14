@@ -5,10 +5,7 @@
 
 use core::time::Duration;
 
-use esp32s3_hal as hal;
-use esp_backtrace as _;
-use esp_println::println;
-use hal::{
+use esp32s3_hal::{
     clock::ClockControl,
     entry,
     peripherals::Peripherals,
@@ -19,10 +16,13 @@ use hal::{
         sleep::{Ext0WakeupSource, TimerWakeupSource, WakeupLevel},
         SocResetReason,
     },
+    Cpu,
     Delay,
     Rtc,
     IO,
 };
+use esp_backtrace as _;
+use esp_println::println;
 
 #[entry]
 fn main() -> ! {
@@ -36,7 +36,7 @@ fn main() -> ! {
     let mut ext0_pin = io.pins.gpio18;
 
     println!("up and runnning!");
-    let reason = get_reset_reason(hal::Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
+    let reason = get_reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
     println!("reset reason: {:?}", reason);
     let wake_reason = get_wakeup_cause();
     println!("wake reason: {:?}", wake_reason);

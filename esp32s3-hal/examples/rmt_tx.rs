@@ -4,12 +4,16 @@
 #![no_std]
 #![no_main]
 
-use esp32s3_hal::{clock::ClockControl, gpio::IO, peripherals::Peripherals, prelude::*, Delay};
-use esp_backtrace as _;
-use esp_hal_common::{
+use esp32s3_hal::{
+    clock::ClockControl,
+    gpio::IO,
+    peripherals::Peripherals,
+    prelude::*,
     rmt::{PulseCode, TxChannel, TxChannelConfig, TxChannelCreator},
+    Delay,
     Rmt,
 };
+use esp_backtrace as _;
 
 #[entry]
 fn main() -> ! {
