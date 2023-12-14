@@ -7,6 +7,10 @@ publish = false
 [lib]
 harness = false
 
+[[test]]
+name    = "gpio"
+harness = false
+
 [dependencies]
 defmt         = "0.3.5"
 defmt-rtt     = "0.4.0"
