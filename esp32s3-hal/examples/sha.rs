@@ -65,6 +65,7 @@ fn main() -> ! {
     println!("Took {} cycles", soft_time);
     println!("SHA512 Hash output {:02x?}", soft_result);
 
+    assert_eq!(output, soft_result[..]);
     println!("HW SHA is {}x faster", soft_time / hw_time);
 
     loop {}
