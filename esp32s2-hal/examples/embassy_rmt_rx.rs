@@ -10,6 +10,7 @@ use embassy_time::{Duration, Timer};
 use esp32s2_hal::{
     clock::ClockControl,
     embassy::{self},
+    gpio::{Gpio15, Output, PushPull},
     peripherals::Peripherals,
     prelude::*,
     rmt::{asynch::RxChannelAsync, PulseCode, RxChannelConfig, RxChannelCreator},
@@ -17,7 +18,6 @@ use esp32s2_hal::{
     IO,
 };
 use esp_backtrace as _;
-use esp_hal_common::gpio::{Gpio15, Output, PushPull};
 use esp_println::{print, println};
 
 const WIDTH: usize = 80;

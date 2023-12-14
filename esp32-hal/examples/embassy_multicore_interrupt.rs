@@ -15,6 +15,7 @@ use esp32_hal::{
         self,
         executor::{FromCpu1, FromCpu2, InterruptExecutor},
     },
+    get_core,
     gpio::{GpioPin, Output, PushPull, IO},
     interrupt::Priority,
     peripherals::Peripherals,
@@ -22,7 +23,6 @@ use esp32_hal::{
     timer::TimerGroup,
 };
 use esp_backtrace as _;
-use esp_hal_common::get_core;
 use esp_println::println;
 use static_cell::make_static;
 

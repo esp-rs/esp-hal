@@ -15,10 +15,10 @@ use esp32c3_hal::{
     interrupt,
     peripherals::{Interrupt, Peripherals, UART0},
     prelude::*,
+    uart::{config::AtCmdConfig, UartRx, UartTx},
     Uart,
 };
 use esp_backtrace as _;
-use esp_hal_common::uart::{config::AtCmdConfig, UartRx, UartTx};
 use static_cell::make_static;
 
 // rx_fifo_full_threshold

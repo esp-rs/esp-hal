@@ -13,12 +13,12 @@ use esp32s3_hal::{
     clock::ClockControl,
     cpu_control::{CpuControl, Stack},
     embassy::{self, executor::Executor},
+    get_core,
     gpio::{GpioPin, Output, PushPull, IO},
     peripherals::Peripherals,
     prelude::*,
 };
 use esp_backtrace as _;
-use esp_hal_common::get_core;
 use esp_println::println;
 use static_cell::make_static;
 
