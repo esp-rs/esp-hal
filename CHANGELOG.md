@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fix SHA for all targets (#1021)
+- Fix double &mut for the `SetDutyCycle` impl on `PwmPin` (#1033)
 
 ## [0.14.0] - 2023-12-12
 
