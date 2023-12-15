@@ -259,14 +259,14 @@ fn modem_clock_hal_deselect_all_wifi_lpclk_source() {
 
 fn modem_clock_hal_select_wifi_lpclk_source(src: ModemClockLpclkSource) {
     unsafe {
-        modem_lpcon().coex_lp_clk_conf().modify(|_, w| match src {
-            ModemClockLpclkSource::RcSlow => w.clk_coex_lp_sel_osc_slow().set_bit(),
-            ModemClockLpclkSource::RcFast => w.clk_coex_lp_sel_osc_fast().set_bit(),
-            ModemClockLpclkSource::MainXtal => w.clk_coex_lp_sel_xtal().set_bit(),
+        modem_lpcon().wifi_lp_clk_conf().modify(|_, w| match src {
+            ModemClockLpclkSource::RcSlow => w.clk_wifipwr_lp_sel_osc_slow().set_bit(),
+            ModemClockLpclkSource::RcFast => w.clk_wifipwr_lp_sel_osc_fast().set_bit(),
+            ModemClockLpclkSource::MainXtal => w.clk_wifipwr_lp_sel_xtal().set_bit(),
 
             ModemClockLpclkSource::RC32K
             | ModemClockLpclkSource::XTAL32K
-            | ModemClockLpclkSource::EXT32K => w.clk_coex_lp_sel_xtal32k().set_bit(),
+            | ModemClockLpclkSource::EXT32K => w.clk_wifipwr_lp_sel_xtal32k().set_bit(),
         });
 
         modem_lpcon().modem_32k_clk_conf().modify(|_, w| match src {
