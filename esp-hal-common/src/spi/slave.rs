@@ -369,6 +369,46 @@ pub mod dma {
         buffer: BUFFER,
     }
 
+    impl<'d, T, C, BUFFER> SpiDmaTransferRx<'d, T, C, BUFFER>
+    where
+        T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
+        C: ChannelTypes,
+        C::P: SpiPeripheral,
+    {
+        pub fn wait_with_len(
+            mut self,
+        ) -> Result<(usize, BUFFER, SpiDma<'d, T, C>), (DmaError, BUFFER, SpiDma<'d, T, C>)>
+        {
+            // Waiting for the DMA transfer is not enough. We need to wait for the
+            // peripheral to finish flushing its buffers, too.
+            while !self.is_done() {}
+            self.spi_dma.spi.flush().ok();
+
+            let err = self.spi_dma.channel.rx.has_error() || self.spi_dma.channel.tx.has_error();
+
+            let reg_block = self.spi_dma.spi.register_block();
+            let bitlen = reg_block.slave1().read().slv_data_bitlen().bits() as usize;
+
+            // `DmaTransfer` needs to have a `Drop` implementation, because we accept
+            // managed buffers that can free their memory on drop. Because of that
+            // we can't move out of the `DmaTransfer`'s fields, so we use `ptr::read`
+            // and `mem::forget`.
+            //
+            // NOTE(unsafe) There is no panic branch between getting the resources
+            // and forgetting `self`.
+            unsafe {
+                let buffer = core::ptr::read(&self.buffer);
+                let payload = core::ptr::read(&self.spi_dma);
+                mem::forget(self);
+                if err {
+                    Err((DmaError::DescriptorError, buffer, payload))
+                } else {
+                    Ok((bitlen, buffer, payload))
+                }
+            }
+        }
+    }
+
     impl<'d, T, C, BUFFER> DmaTransfer<BUFFER, SpiDma<'d, T, C>> for SpiDmaTransferTx<'d, T, C, BUFFER>
     where
         T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
