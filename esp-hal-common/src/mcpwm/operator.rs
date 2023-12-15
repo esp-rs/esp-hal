@@ -673,7 +673,7 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> emb
 /// Implement no error type for the PwmPin because the method are infallible
 #[cfg(feature = "eh1")]
 impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
-    embedded_hal_1::pwm::ErrorType for &mut PwmPin<'d, Pin, PWM, OP, IS_A>
+    embedded_hal_1::pwm::ErrorType for PwmPin<'d, Pin, PWM, OP, IS_A>
 {
     type Error = core::convert::Infallible;
 }
@@ -681,7 +681,7 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
 /// Implement the trait SetDutyCycle for PwmPin
 #[cfg(feature = "eh1")]
 impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
-    embedded_hal_1::pwm::SetDutyCycle for &mut PwmPin<'d, Pin, PWM, OP, IS_A>
+    embedded_hal_1::pwm::SetDutyCycle for PwmPin<'d, Pin, PWM, OP, IS_A>
 {
     /// Get the max duty of the PwmPin
     fn max_duty_cycle(&self) -> u16 {
