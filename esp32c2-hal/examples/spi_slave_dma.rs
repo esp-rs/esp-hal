@@ -149,7 +149,7 @@ fn main() -> ! {
         delay.delay_ms(250u32);
 
         slave_receive.fill(0xff);
-        let transfer = spi.dma_read(slave_receive).unwrap();
+        let transfer = spi.dma_read_all(slave_receive).unwrap();
         master_cs.set_high().unwrap();
 
         master_cs.set_low().unwrap();
@@ -175,7 +175,7 @@ fn main() -> ! {
         );
 
         delay.delay_ms(250u32);
-        let transfer = spi.dma_write(slave_send).unwrap();
+        let transfer = spi.dma_write_all(slave_send).unwrap();
 
         master_receive.fill(0);
 

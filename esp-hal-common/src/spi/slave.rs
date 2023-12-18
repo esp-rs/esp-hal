@@ -377,7 +377,8 @@ pub mod dma {
         len: Option<&'l mut usize>,
     }
 
-    impl<'d, 'l, T, C, BUFFER> DmaTransfer<BUFFER, SpiDma<'d, T, C>> for SpiDmaTransferTx<'d, 'l, T, C, BUFFER>
+    impl<'d, 'l, T, C, BUFFER> DmaTransfer<BUFFER, SpiDma<'d, T, C>>
+        for SpiDmaTransferTx<'d, 'l, T, C, BUFFER>
     where
         T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
         C: ChannelTypes,
