@@ -43,17 +43,6 @@ SECTIONS {
     . = ABSOLUTE(_stext);
   } > ROTEXT
 }
-INSERT BEFORE .text_init;
-
-SECTIONS {
-  /* These symbols/functions need to be near eachother, group them together at the start of text */
-  .text_init _stext : ALIGN(4) 
-  {
-    KEEP(*(.init));
-    KEEP(*(.init.rust));
-    KEEP(*(.text.abort));
-  } > ROTEXT
-}
 INSERT BEFORE .text;
 
 SECTIONS {
@@ -75,7 +64,7 @@ SECTIONS {
     /* Start at the same alignement constraint than .text */
     . = ALIGN(4);
     /* Create an empty gap as big as .text section */
-    . = . + SIZEOF(.text) + SIZEOF(.text_init);
+    . = . + SIZEOF(.text);
     /* Prepare the alignement of the section above. Few bytes (0x20) must be
      * added for the mapping header. */
     . = ALIGN(0x10000) + 0x20;

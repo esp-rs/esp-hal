@@ -50,17 +50,6 @@ PROVIDE(interrupt0 = DefaultHandler);
 PROVIDE(__global_pointer$ = _data_start + 0x800);
 
 SECTIONS {
-  /* These symbols/functions need to be near eachother, group them together at the start of text */
-  .text_init _stext : ALIGN(4)
-  {
-    KEEP(*(.init));
-    KEEP(*(.init.rust));
-    KEEP(*(.text.abort));
-  } > ROTEXT
-}
-INSERT BEFORE .text;
-
-SECTIONS {
   .trap : ALIGN(4)
   {
     KEEP(*(.trap));
