@@ -1839,7 +1839,8 @@ where
             self.start_write_bytes_dma(chunk.as_ptr(), chunk.len(), tx, false)?;
 
             while !tx.is_completed() {}
-            self.flush().unwrap(); // seems "is_completed" doesn't work as intended?
+            self.flush().unwrap(); // seems "is_completed" doesn't work as
+                                   // intended?
         }
 
         Ok(words)

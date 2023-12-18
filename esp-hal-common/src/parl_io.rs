@@ -1206,7 +1206,7 @@ where
         Instance::clear_tx_interrupts();
         Instance::set_tx_bytes(len as u16);
 
-        self.tx_channel.is_done();
+        self.tx_channel.is_completed();
 
         self.tx_channel
             .prepare_transfer_without_start(DmaPeripheral::ParlIo, false, ptr, len)
@@ -1396,7 +1396,7 @@ where
     /// Check if the DMA transfer is complete
     pub fn is_done(&self) -> bool {
         let ch = &self.instance.rx_channel;
-        ch.is_done()
+        ch.is_completed()
     }
 
     /// Check if the DMA transfer is completed by buffer full or source EOF
