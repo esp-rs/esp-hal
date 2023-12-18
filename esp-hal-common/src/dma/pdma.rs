@@ -137,10 +137,15 @@ macro_rules! ImplSpiChannel {
                     spi.dma_int_ena().read().out_done_int_ena().bit()
                 }
 
-                fn is_out_done() -> bool {
+                fn is_out_completed() -> bool {
                     let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
                     // FIXME this should be out_total_eof_int_raw? but on esp32 this interrupt doesn't seem to fire
                     spi.dma_int_raw().read().out_eof_int_raw().bit()
+                }
+
+                fn is_out_done() -> bool {
+                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
+                    spi.dma_int_raw().read().out_done_int_raw().bit()
                 }
 
                 fn last_out_dscr_address() -> usize {
@@ -460,9 +465,15 @@ macro_rules! ImplI2sChannel {
                     reg_block.int_ena().read().out_done_int_ena().bit()
                 }
 
+                fn is_out_completed() -> bool {
+                    let spi = unsafe { &*crate::peripherals::[<SPI $num>]::PTR };
+                    // FIXME this should be out_total_eof_int_raw? but on esp32 this interrupt doesn't seem to fire
+                    spi.dma_int_raw().read().out_eof_int_raw().bit()
+                }
+
                 fn is_out_done() -> bool {
                     let reg_block = unsafe { &*crate::peripherals::[<$peripheral>]::PTR };
-                    reg_block.int_raw().read().out_eof_int_raw().bit()
+                    reg_block.int_raw().read().out_done_int_raw().bit()
                 }
 
                 fn last_out_dscr_address() -> usize {

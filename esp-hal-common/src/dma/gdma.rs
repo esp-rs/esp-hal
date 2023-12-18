@@ -219,11 +219,22 @@ macro_rules! impl_channel {
                     }
                 }
 
-                fn is_out_done() -> bool {
+                fn is_out_completed() -> bool {
                     let dma = unsafe { &*crate::peripherals::DMA::PTR };
 
                     #[cfg(not(any(esp32c6, esp32h2, esp32s3)))]
                     let ret = dma.int_raw_ch($num).read().out_total_eof().bit();
+                    #[cfg(any(esp32c6, esp32h2, esp32s3))]
+                    let ret = dma.out_int_raw_ch($num).read().out_total_eof().bit();
+
+                    ret
+                }
+
+                fn is_out_done() -> bool {
+                    let dma = unsafe { &*crate::peripherals::DMA::PTR };
+
+                    #[cfg(not(any(esp32c6, esp32h2, esp32s3)))]
+                    let ret = dma.int_raw_ch($num).read().out_done().bit();
                     #[cfg(any(esp32c6, esp32h2, esp32s3))]
                     let ret = dma.out_int_raw_ch($num).read().out_done().bit();
 

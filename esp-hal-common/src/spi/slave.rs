@@ -277,7 +277,7 @@ pub mod dma {
         /// Check if the DMA transfer is complete
         fn is_done(&self) -> bool {
             let ch = &self.spi_dma.channel;
-            ch.tx.is_done() && ch.rx.is_done() && !self.spi_dma.spi.is_bus_busy()
+            ch.tx.is_done() && ch.rx.is_completed() && !self.spi_dma.spi.is_bus_busy()
         }
     }
 
@@ -341,7 +341,7 @@ pub mod dma {
         /// Check if the DMA transfer is complete
         fn is_done(&self) -> bool {
             let ch = &self.spi_dma.channel;
-            ch.rx.is_done()
+            ch.rx.is_completed()
         }
     }
 
@@ -607,7 +607,7 @@ where
         let reg_block = self.register_block();
 
         tx.is_done();
-        rx.is_done();
+        rx.is_completed();
 
         self.enable_dma();
 
@@ -672,7 +672,7 @@ where
     fn start_read_bytes_dma(&mut self, ptr: *mut u8, len: usize, rx: &mut RX) -> Result<(), Error> {
         let reg_block = self.register_block();
 
-        rx.is_done();
+        rx.is_completed();
 
         self.enable_dma();
 

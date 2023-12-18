@@ -286,7 +286,7 @@ where
 
     /// Check if the DMA transfer is complete
     fn is_done(&self) -> bool {
-        self.i2s_tx.tx_channel.is_done()
+        self.i2s_tx.tx_channel.is_completed()
     }
 }
 
@@ -422,7 +422,7 @@ where
 
     /// Check if the DMA transfer is complete
     fn is_done(&self) -> bool {
-        self.i2s_rx.rx_channel.is_done()
+        self.i2s_rx.rx_channel.is_completed()
     }
 }
 

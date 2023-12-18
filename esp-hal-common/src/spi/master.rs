@@ -904,7 +904,7 @@ pub mod dma {
         /// Check if the DMA transfer is complete
         fn is_done(&self) -> bool {
             let ch = &self.spi_dma.channel;
-            ch.tx.is_done() && ch.rx.is_done()
+            ch.tx.is_completed() && ch.rx.is_completed()
         }
     }
 
@@ -973,7 +973,7 @@ pub mod dma {
         /// Check if the DMA transfer is complete
         fn is_done(&self) -> bool {
             let ch = &self.spi_dma.channel;
-            ch.tx.is_done() && ch.rx.is_done()
+            ch.tx.is_completed() && ch.rx.is_completed()
         }
     }
 
@@ -1743,7 +1743,7 @@ where
                 false,
             )?;
 
-            while !tx.is_done() && !rx.is_done() {}
+            while !tx.is_completed() && !rx.is_completed() {}
             self.flush().unwrap();
         }
 
@@ -1775,7 +1775,7 @@ where
                 false,
             )?;
 
-            while !tx.is_done() && !rx.is_done() {}
+            while !tx.is_completed() && !rx.is_completed() {}
             self.flush().unwrap();
 
             idx += MAX_DMA_SIZE as isize;
@@ -1800,8 +1800,8 @@ where
         let reg_block = self.register_block();
         self.configure_datalen(usize::max(read_buffer_len, write_buffer_len) as u32 * 8);
 
-        tx.is_done();
-        rx.is_done();
+        tx.is_completed();
+        rx.is_completed();
 
         self.enable_dma();
         self.update();
@@ -1838,8 +1838,8 @@ where
         for chunk in words.chunks(MAX_DMA_SIZE) {
             self.start_write_bytes_dma(chunk.as_ptr(), chunk.len(), tx, false)?;
 
-            while !tx.is_done() {}
-            self.flush().unwrap(); // seems "is_done" doesn't work as intended?
+            while !tx.is_completed() {}
+            self.flush().unwrap(); // seems "is_completed" doesn't work as intended?
         }
 
         Ok(words)
@@ -1855,7 +1855,7 @@ where
         let reg_block = self.register_block();
         self.configure_datalen(len as u32 * 8);
 
-        tx.is_done();
+        tx.is_completed();
 
         self.enable_dma();
         self.update();
@@ -1885,7 +1885,7 @@ where
         let reg_block = self.register_block();
         self.configure_datalen(len as u32 * 8);
 
-        rx.is_done();
+        rx.is_completed();
 
         self.enable_dma();
         self.update();
