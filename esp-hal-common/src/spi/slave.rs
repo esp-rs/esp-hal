@@ -304,6 +304,29 @@ pub mod dma {
         len: Option<&'l mut usize>,
     }
 
+    impl<'d, 'l, T, C, BUFFER> SpiDmaTransferRx<'d, 'l, T, C, BUFFER>
+    where
+        T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
+        C: ChannelTypes,
+        C::P: SpiPeripheral,
+    {
+        pub fn cancel(
+            self,
+        ) -> Result<(BUFFER, SpiDma<'d, T, C>), (DmaError, BUFFER, SpiDma<'d, T, C>)> {
+            let err = self.spi_dma.channel.rx.has_error() || self.spi_dma.channel.tx.has_error();
+            unsafe {
+                let buffer = core::ptr::read(&self.buffer);
+                let payload = core::ptr::read(&self.spi_dma);
+                mem::forget(self);
+                if err {
+                    Err((DmaError::DescriptorError, buffer, payload))
+                } else {
+                    Ok((buffer, payload))
+                }
+            }
+        }
+    }
+
     impl<'d, 'l, T, C, BUFFER> DmaTransfer<BUFFER, SpiDma<'d, T, C>>
         for SpiDmaTransferRx<'d, 'l, T, C, BUFFER>
     where
@@ -375,6 +398,29 @@ pub mod dma {
         spi_dma: SpiDma<'d, T, C>,
         buffer: BUFFER,
         len: Option<&'l mut usize>,
+    }
+
+    impl<'d, 'l, T, C, BUFFER> SpiDmaTransferTx<'d, 'l, T, C, BUFFER>
+    where
+        T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
+        C: ChannelTypes,
+        C::P: SpiPeripheral,
+    {
+        pub fn cancel(
+            self,
+        ) -> Result<(BUFFER, SpiDma<'d, T, C>), (DmaError, BUFFER, SpiDma<'d, T, C>)> {
+            let err = self.spi_dma.channel.rx.has_error() || self.spi_dma.channel.tx.has_error();
+            unsafe {
+                let buffer = core::ptr::read(&self.buffer);
+                let payload = core::ptr::read(&self.spi_dma);
+                mem::forget(self);
+                if err {
+                    Err((DmaError::DescriptorError, buffer, payload))
+                } else {
+                    Ok((buffer, payload))
+                }
+            }
+        }
     }
 
     impl<'d, 'l, T, C, BUFFER> DmaTransfer<BUFFER, SpiDma<'d, T, C>>
