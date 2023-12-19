@@ -16,9 +16,7 @@ use esp32c6_hal::{
     embassy,
     gdma::Gdma,
     gpio::IO,
-    interrupt,
     parl_io::{BitPackOrder, NoClkPin, ParlIoRxOnly, RxFourBits},
-    peripherals,
     peripherals::Peripherals,
     prelude::*,
 };

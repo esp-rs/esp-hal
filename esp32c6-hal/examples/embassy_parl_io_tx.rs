@@ -20,7 +20,6 @@ use esp32c6_hal::{
     embassy,
     gdma::Gdma,
     gpio::IO,
-    interrupt,
     parl_io::{
         BitPackOrder,
         ClkOutPin,
@@ -29,7 +28,6 @@ use esp32c6_hal::{
         TxFourBits,
         TxPinConfigWithValidPin,
     },
-    peripherals,
     peripherals::Peripherals,
     prelude::*,
 };

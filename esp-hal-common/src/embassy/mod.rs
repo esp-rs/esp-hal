@@ -102,6 +102,7 @@ use crate::clock::Clocks;
 /// Initialise embassy, including setting up interrupts for the DMA and async
 /// enabled peripherals.
 pub fn init(clocks: &Clocks, td: time_driver::TimerType) {
+    // only enable interrupts if the async feature is present
     #[cfg(feature = "async")]
     {
         #[cfg(any(esp32s3, esp32c6, esp32h2))]

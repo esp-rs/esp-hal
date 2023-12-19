@@ -20,8 +20,7 @@ use esp32s2_hal::{
     clock::ClockControl,
     embassy::{self},
     i2c::I2C,
-    interrupt,
-    peripherals::{Interrupt, Peripherals},
+    peripherals::Peripherals,
     prelude::*,
     IO,
 };

@@ -12,8 +12,7 @@ use embassy_sync::{blocking_mutex::raw::NoopRawMutex, signal::Signal};
 use esp32c3_hal::{
     clock::ClockControl,
     embassy,
-    interrupt,
-    peripherals::{Interrupt, Peripherals, UART0},
+    peripherals::{Peripherals, UART0},
     prelude::*,
     uart::{config::AtCmdConfig, UartRx, UartTx},
     Uart,

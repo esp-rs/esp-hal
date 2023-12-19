@@ -12,8 +12,7 @@ use embedded_io_async::{Read as AsyncRead, Write as AsyncWrite};
 use esp32c3_hal::{
     clock::ClockControl,
     embassy,
-    interrupt,
-    peripherals::{self, Peripherals},
+    peripherals::Peripherals,
     prelude::*,
     UsbSerialJtag,
 };
