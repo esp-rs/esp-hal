@@ -51,7 +51,7 @@ pub enum ChipType {
 }
 
 impl Efuse {
-    pub fn get_mac_address() -> [u8; 6] {
+    pub fn read_base_mac_address() -> [u8; 6] {
         Self::read_field_be(MAC_FACTORY)
     }
 
