@@ -69,6 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-C6: Fix used RAM (#997)
 - ESP32-H2: Fix used RAM (#1003)
 - Fix SPI slave DMA dma\_read and dma\_write (#1013)
+- ESP32-C6/H2: Fix disabling of interrupts (#1040)
 
 ### Removed
 

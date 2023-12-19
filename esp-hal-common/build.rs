@@ -292,7 +292,6 @@ fn preprocess_file(
 
     for line in std::io::BufReader::new(file).lines() {
         let line = line?;
-        println!("{} >> {}", *take.last().unwrap(), line);
         let trimmed = line.trim();
 
         if trimmed.starts_with("#IF ") {

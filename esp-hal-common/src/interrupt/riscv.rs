@@ -497,8 +497,11 @@ pub fn disable(_core: Cpu, interrupt: Interrupt) {
         let interrupt_number = interrupt as isize;
         let intr_map_base = crate::soc::registers::INTERRUPT_MAP_BASE as *mut u32;
 
-        // set to 0 to disable the peripheral interrupt
-        intr_map_base.offset(interrupt_number).write_volatile(0);
+        // set to 0 to disable the peripheral interrupt on chips before ESP32-C6
+        // use the disabled interrupt 31 on later chips
+        intr_map_base
+            .offset(interrupt_number)
+            .write_volatile(DISABLED_CPU_INTERRUPT);
     }
 }
 
@@ -565,6 +568,8 @@ unsafe fn get_assigned_cpu_interrupt(interrupt: Interrupt) -> CpuInterrupt {
 mod classic {
     use super::{CpuInterrupt, InterruptKind, Priority};
     use crate::Cpu;
+
+    pub(super) const DISABLED_CPU_INTERRUPT: u32 = 0;
 
     pub(super) const PRIORITY_TO_INTERRUPT: [usize; 15] =
         [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
@@ -682,6 +687,8 @@ mod classic {
 mod plic {
     use super::{CpuInterrupt, InterruptKind, Priority};
     use crate::Cpu;
+
+    pub(super) const DISABLED_CPU_INTERRUPT: u32 = 31;
 
     // don't use interrupts reserved for CLIC (0,3,4,7)
     // for some reason also CPU interrupt 8 doesn't work by default since it's
