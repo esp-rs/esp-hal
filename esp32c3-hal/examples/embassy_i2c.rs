@@ -20,8 +20,7 @@ use esp32c3_hal::{
     clock::ClockControl,
     embassy,
     i2c::I2C,
-    interrupt,
-    peripherals::{Interrupt, Peripherals},
+    peripherals::Peripherals,
     prelude::*,
     IO,
 };
