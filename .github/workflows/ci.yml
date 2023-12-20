@@ -236,7 +236,6 @@ jobs:
           cd esp32c3-hal/
           cargo +nightly build --examples --features=eh1,ufmt,log
           cargo +nightly build --examples --features=eh1,ufmt,defmt
-
       - name: check esp32c3-hal (embassy)
         run: |
           cd esp32c3-hal/
