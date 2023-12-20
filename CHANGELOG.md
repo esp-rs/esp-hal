@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - ESP32-C6: Properly initialize PMU (#974)
+- Implement overriding base mac address (#1044)
 
 ### Changed
 
