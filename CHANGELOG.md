@@ -56,6 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Explicit panic when hitting the `DefaultHandler` (#1005)
 - Relevant interrupts are now auto enabled in `embassy::init` (#1014).
 - Set up interrupts for the DMA and async enabled peripherals only when `async` feature is provided (#1042)
+- It's now possible to override interrupt handlers defined by the HAL (#1047)
 
 ### Fixed
 
