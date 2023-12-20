@@ -338,7 +338,7 @@ mod asynch {
     use embassy_futures::select::select;
     use embassy_sync::waitqueue::AtomicWaker;
     use embedded_hal_1::i2c::Operation;
-    use procmacros::interrupt;
+    use procmacros::interrupt_internal;
 
     use super::*;
 
@@ -601,7 +601,7 @@ mod asynch {
         }
     }
 
-    #[interrupt]
+    #[interrupt_internal]
     fn I2C_EXT0() {
         unsafe { &*crate::peripherals::I2C0::PTR }
             .int_ena()
@@ -621,7 +621,7 @@ mod asynch {
     }
 
     #[cfg(i2c1)]
-    #[interrupt]
+    #[interrupt_internal]
     fn I2C_EXT1() {
         unsafe { &*crate::peripherals::I2C1::PTR }
             .int_ena()

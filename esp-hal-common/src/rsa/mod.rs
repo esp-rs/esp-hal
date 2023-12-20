@@ -280,7 +280,7 @@ pub(crate) mod asynch {
     use core::task::Poll;
 
     use embassy_sync::waitqueue::AtomicWaker;
-    use procmacros::interrupt;
+    use procmacros::interrupt_internal;
 
     use crate::rsa::{
         Multi,
@@ -423,7 +423,7 @@ pub(crate) mod asynch {
         }
     }
 
-    #[interrupt]
+    #[interrupt_internal]
     fn RSA() {
         #[cfg(not(any(esp32, esp32s2, esp32s3)))]
         unsafe { &*crate::peripherals::RSA::ptr() }

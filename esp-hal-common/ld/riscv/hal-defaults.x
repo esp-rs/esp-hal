@@ -1,3 +1,5 @@
+INCLUDE "weak_isrs.x"
+
 PROVIDE(DefaultHandler = EspDefaultHandler);
 
 PROVIDE(interrupt1 = DefaultHandler);

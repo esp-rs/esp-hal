@@ -243,6 +243,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         preprocess_file(&config_symbols, "ld/riscv/debug.x", out.join("debug.x"))?;
     }
 
+    preprocess_file(&config_symbols, "ld/weak_isrs.x", out.join("weak_isrs.x"))?;
     copy_dir_all(&config_symbols, "ld/sections", &out)?;
     copy_dir_all(&config_symbols, format!("ld/{device_name}"), &out)?;
 

@@ -70,14 +70,14 @@ impl EmbassyTimer {
             Priority::max()
         ));
 
-        #[interrupt]
+        #[interrupt_internal]
         fn TG0_T0_LEVEL() {
             let timer = unsafe { Timer0::<TIMG0>::steal() };
             DRIVER.on_interrupt(0, timer);
         }
 
         #[cfg(any(esp32, esp32s2, esp32s3))]
-        #[interrupt]
+        #[interrupt_internal]
         fn TG0_T1_LEVEL() {
             let timer = unsafe { Timer1::<TIMG0>::steal() };
             DRIVER.on_interrupt(1, timer);

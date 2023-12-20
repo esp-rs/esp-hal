@@ -48,4 +48,5 @@ INCLUDE "stack.x"
 
 EXTERN(DefaultHandler);
 
+INCLUDE "weak_isrs.x"
 INCLUDE "device.x"

@@ -1361,7 +1361,7 @@ mod asynch {
     use cfg_if::cfg_if;
     use embassy_sync::waitqueue::AtomicWaker;
     use enumset::{EnumSet, EnumSetType};
-    use procmacros::interrupt;
+    use procmacros::interrupt_internal;
 
     use super::{Error, Instance};
     use crate::{
@@ -1752,7 +1752,7 @@ mod asynch {
     }
 
     #[cfg(uart0)]
-    #[interrupt]
+    #[interrupt_internal]
     fn UART0() {
         let uart = unsafe { &*crate::peripherals::UART0::ptr() };
         let (rx, tx) = intr_handler(uart);
@@ -1765,7 +1765,7 @@ mod asynch {
     }
 
     #[cfg(uart1)]
-    #[interrupt]
+    #[interrupt_internal]
     fn UART1() {
         let uart = unsafe { &*crate::peripherals::UART1::ptr() };
         let (rx, tx) = intr_handler(uart);
@@ -1778,7 +1778,7 @@ mod asynch {
     }
 
     #[cfg(uart2)]
-    #[interrupt]
+    #[interrupt_internal]
     fn UART2() {
         let uart = unsafe { &*crate::peripherals::UART2::ptr() };
         let (rx, tx) = intr_handler(uart);

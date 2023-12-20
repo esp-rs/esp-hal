@@ -347,7 +347,7 @@ mod asynch {
     use core::task::Poll;
 
     use embassy_sync::waitqueue::AtomicWaker;
-    use procmacros::interrupt;
+    use procmacros::interrupt_internal;
 
     use super::{Error, Instance};
     use crate::UsbSerialJtag;
@@ -524,7 +524,7 @@ mod asynch {
         }
     }
 
-    #[interrupt]
+    #[interrupt_internal]
     fn USB_DEVICE() {
         let usb = unsafe { &*crate::peripherals::USB_DEVICE::ptr() };
         let in_empty = usb.int_st().read().serial_in_empty_int_st().bit_is_set();

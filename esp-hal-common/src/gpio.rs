@@ -2673,7 +2673,7 @@ mod asynch {
         });
     }
 
-    #[interrupt]
+    #[interrupt_internal]
     unsafe fn GPIO() {
         let intrs_bank0 = InterruptStatusRegisterAccessBank0::interrupt_status_read();
 

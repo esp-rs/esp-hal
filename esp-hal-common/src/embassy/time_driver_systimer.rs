@@ -57,7 +57,7 @@ impl EmbassyTimer {
     }
 
     pub fn init(_clocks: &Clocks, _systimer: TimerType) {
-        use crate::{interrupt, interrupt::Priority, macros::interrupt};
+        use crate::{interrupt, interrupt::Priority, macros::interrupt_internal};
 
         unwrap!(interrupt::enable(
             peripherals::Interrupt::SYSTIMER_TARGET0,
@@ -72,15 +72,15 @@ impl EmbassyTimer {
             Priority::max()
         ));
 
-        #[interrupt]
+        #[interrupt_internal]
         fn SYSTIMER_TARGET0() {
             DRIVER.on_interrupt(0);
         }
-        #[interrupt]
+        #[interrupt_internal]
         fn SYSTIMER_TARGET1() {
             DRIVER.on_interrupt(1);
         }
-        #[interrupt]
+        #[interrupt_internal]
         fn SYSTIMER_TARGET2() {
             DRIVER.on_interrupt(2);
         }

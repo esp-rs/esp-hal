@@ -1157,8 +1157,9 @@ pub trait DmaTransferRxTx<BR, BT, T>: Drop {
 pub(crate) mod asynch {
     use core::task::Poll;
 
+    use procmacros::interrupt_internal;
+
     use super::*;
-    use crate::macros::interrupt;
 
     pub struct DmaTxFuture<'a, TX> {
         pub(crate) tx: &'a mut TX,
@@ -1304,7 +1305,7 @@ pub(crate) mod asynch {
     mod interrupt {
         use super::*;
 
-        #[interrupt]
+        #[interrupt_internal]
         fn DMA_CH0() {
             use crate::dma::gdma::{
                 Channel0 as Channel,
@@ -1336,7 +1337,7 @@ pub(crate) mod asynch {
     mod interrupt {
         use super::*;
 
-        #[interrupt]
+        #[interrupt_internal]
         fn DMA_CH0() {
             use crate::dma::gdma::{
                 Channel0 as Channel,
@@ -1369,7 +1370,7 @@ pub(crate) mod asynch {
             }
         }
 
-        #[interrupt]
+        #[interrupt_internal]
         fn DMA_CH1() {
             use crate::dma::gdma::{
                 Channel1 as Channel,
@@ -1402,7 +1403,7 @@ pub(crate) mod asynch {
             }
         }
 
-        #[interrupt]
+        #[interrupt_internal]
         fn DMA_CH2() {
             use crate::dma::gdma::{
                 Channel2 as Channel,
@@ -1440,7 +1441,7 @@ pub(crate) mod asynch {
     mod interrupt {
         use super::*;
 
-        #[interrupt]
+        #[interrupt_internal]
         fn DMA_IN_CH0() {
             use crate::dma::gdma::{Channel0 as Channel, Channel0RxImpl as ChannelRxImpl};
 
@@ -1457,7 +1458,7 @@ pub(crate) mod asynch {
             }
         }
 
-        #[interrupt]
+        #[interrupt_internal]
         fn DMA_OUT_CH0() {
             use crate::dma::gdma::{Channel0 as Channel, Channel0TxImpl as ChannelTxImpl};
 
@@ -1474,7 +1475,7 @@ pub(crate) mod asynch {
             }
         }
 
-        #[interrupt]
+        #[interrupt_internal]
         fn DMA_IN_CH1() {
             use crate::dma::gdma::{Channel1 as Channel, Channel1RxImpl as ChannelRxImpl};
 
@@ -1491,7 +1492,7 @@ pub(crate) mod asynch {
             }
         }
 
-        #[interrupt]
+        #[interrupt_internal]
         fn DMA_OUT_CH1() {
             use crate::dma::gdma::{Channel1 as Channel, Channel1TxImpl as ChannelTxImpl};
 
@@ -1508,7 +1509,7 @@ pub(crate) mod asynch {
             }
         }
 
-        #[interrupt]
+        #[interrupt_internal]
         fn DMA_IN_CH2() {
             use crate::dma::gdma::{Channel2 as Channel, Channel2RxImpl as ChannelRxImpl};
 
@@ -1525,7 +1526,7 @@ pub(crate) mod asynch {
             }
         }
 
-        #[interrupt]
+        #[interrupt_internal]
         fn DMA_OUT_CH2() {
             use crate::dma::gdma::{Channel2 as Channel, Channel2TxImpl as ChannelTxImpl};
 
@@ -1547,7 +1548,7 @@ pub(crate) mod asynch {
     mod interrupt {
         use super::*;
 
-        #[interrupt]
+        #[interrupt_internal]
         fn DMA_IN_CH0() {
             use crate::dma::gdma::{Channel0 as Channel, Channel0RxImpl as ChannelRxImpl};
 
@@ -1564,7 +1565,7 @@ pub(crate) mod asynch {
             }
         }
 
-        #[interrupt]
+        #[interrupt_internal]
         fn DMA_OUT_CH0() {
             use crate::dma::gdma::{Channel0 as Channel, Channel0TxImpl as ChannelTxImpl};
 
@@ -1581,7 +1582,7 @@ pub(crate) mod asynch {
             }
         }
 
-        #[interrupt]
+        #[interrupt_internal]
         fn DMA_IN_CH1() {
             use crate::dma::gdma::{Channel1 as Channel, Channel1RxImpl as ChannelRxImpl};
 
@@ -1598,7 +1599,7 @@ pub(crate) mod asynch {
             }
         }
 
-        #[interrupt]
+        #[interrupt_internal]
         fn DMA_OUT_CH1() {
             use crate::dma::gdma::{Channel1 as Channel, Channel1TxImpl as ChannelTxImpl};
 
@@ -1615,7 +1616,7 @@ pub(crate) mod asynch {
             }
         }
 
-        #[interrupt]
+        #[interrupt_internal]
         fn DMA_IN_CH3() {
             use crate::dma::gdma::{Channel3 as Channel, Channel3RxImpl as ChannelRxImpl};
 
@@ -1632,7 +1633,7 @@ pub(crate) mod asynch {
             }
         }
 
-        #[interrupt]
+        #[interrupt_internal]
         fn DMA_OUT_CH3() {
             use crate::dma::gdma::{Channel3 as Channel, Channel3TxImpl as ChannelTxImpl};
 
@@ -1649,7 +1650,7 @@ pub(crate) mod asynch {
             }
         }
 
-        #[interrupt]
+        #[interrupt_internal]
         fn DMA_IN_CH4() {
             use crate::dma::gdma::{Channel4 as Channel, Channel4RxImpl as ChannelRxImpl};
 
@@ -1666,7 +1667,7 @@ pub(crate) mod asynch {
             }
         }
 
-        #[interrupt]
+        #[interrupt_internal]
         fn DMA_OUT_CH4() {
             use crate::dma::gdma::{Channel4 as Channel, Channel4TxImpl as ChannelTxImpl};
 
@@ -1688,7 +1689,7 @@ pub(crate) mod asynch {
     mod interrupt {
         use super::*;
 
-        #[interrupt]
+        #[interrupt_internal]
         fn SPI2_DMA() {
             use crate::dma::pdma::{
                 Spi2DmaChannel as Channel,
@@ -1721,7 +1722,7 @@ pub(crate) mod asynch {
             }
         }
 
-        #[interrupt]
+        #[interrupt_internal]
         fn SPI3_DMA() {
             use crate::dma::pdma::{
                 Spi3DmaChannel as Channel,
@@ -1754,7 +1755,7 @@ pub(crate) mod asynch {
             }
         }
 
-        #[interrupt]
+        #[interrupt_internal]
         fn I2S0() {
             use crate::dma::pdma::{
                 I2s0DmaChannel as Channel,
@@ -1788,7 +1789,7 @@ pub(crate) mod asynch {
         }
 
         #[cfg(esp32)]
-        #[interrupt]
+        #[interrupt_internal]
         fn I2S1() {
             use crate::dma::pdma::{
                 I2s1DmaChannel as Channel,

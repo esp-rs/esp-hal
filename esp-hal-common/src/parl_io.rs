@@ -1422,7 +1422,7 @@ pub mod asynch {
     };
     use crate::{
         dma::{asynch::DmaRxDoneChFuture, ChannelTypes, ParlIoPeripheral},
-        macros::interrupt,
+        macros::interrupt_internal,
     };
 
     static TX_WAKER: AtomicWaker = AtomicWaker::new();
@@ -1453,7 +1453,7 @@ pub mod asynch {
     }
 
     #[cfg(esp32c6)]
-    #[interrupt]
+    #[interrupt_internal]
     fn PARL_IO() {
         if Instance::is_tx_done_set() {
             Instance::clear_is_tx_done();
@@ -1463,7 +1463,7 @@ pub mod asynch {
     }
 
     #[cfg(esp32h2)]
-    #[interrupt]
+    #[interrupt_internal]
     fn PARL_IO_TX() {
         if Instance::is_tx_done_set() {
             Instance::clear_is_tx_done();

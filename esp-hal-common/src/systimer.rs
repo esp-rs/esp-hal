@@ -288,7 +288,7 @@ mod asynch {
     };
 
     use embassy_sync::waitqueue::AtomicWaker;
-    use procmacros::interrupt;
+    use procmacros::interrupt_internal;
 
     use super::*;
 
@@ -354,7 +354,7 @@ mod asynch {
         }
     }
 
-    #[interrupt]
+    #[interrupt_internal]
     fn SYSTIMER_TARGET0() {
         unsafe { &*crate::peripherals::SYSTIMER::PTR }
             .int_ena
@@ -363,7 +363,7 @@ mod asynch {
         WAKERS[0].wake();
     }
 
-    #[interrupt]
+    #[interrupt_internal]
     fn SYSTIMER_TARGET1() {
         unsafe { &*crate::peripherals::SYSTIMER::PTR }
             .int_ena
@@ -372,7 +372,7 @@ mod asynch {
         WAKERS[1].wake();
     }
 
-    #[interrupt]
+    #[interrupt_internal]
     fn SYSTIMER_TARGET2() {
         unsafe { &*crate::peripherals::SYSTIMER::PTR }
             .int_ena

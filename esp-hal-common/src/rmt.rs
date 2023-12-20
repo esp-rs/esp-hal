@@ -844,7 +844,7 @@ pub mod asynch {
     };
 
     use embassy_sync::waitqueue::AtomicWaker;
-    use procmacros::interrupt;
+    use procmacros::interrupt_internal;
 
     use super::{private::Event, *};
 
@@ -992,7 +992,7 @@ pub mod asynch {
     }
 
     #[cfg(not(any(esp32, esp32s2)))]
-    #[interrupt]
+    #[interrupt_internal]
     fn RMT() {
         if let Some(channel) = super::chip_specific::pending_interrupt_for_channel() {
             use crate::rmt::private::{RxChannelInternal, TxChannelInternal};
@@ -1045,7 +1045,7 @@ pub mod asynch {
     }
 
     #[cfg(any(esp32, esp32s2))]
-    #[interrupt]
+    #[interrupt_internal]
     fn RMT() {
         if let Some(channel) = super::chip_specific::pending_interrupt_for_channel() {
             match channel {

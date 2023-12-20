@@ -35,4 +35,5 @@ EXTERN(DefaultHandler);
 
 EXTERN(WIFI_EVENT); /* Force inclusion of WiFi libraries */
 
+INCLUDE "weak_isrs.x"
 INCLUDE "device.x"

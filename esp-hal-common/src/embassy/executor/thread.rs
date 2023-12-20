@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 use embassy_executor::{raw, Spawner};
 use portable_atomic::{AtomicBool, Ordering};
 
-use crate::{get_core, prelude::interrupt};
+use crate::{get_core, prelude::interrupt_internal};
 #[cfg(multi_core)]
 use crate::{
     interrupt,
@@ -18,7 +18,7 @@ static SIGNAL_WORK_THREAD_MODE: [AtomicBool; 1] = [AtomicBool::new(false)];
 #[cfg(multi_core)]
 static SIGNAL_WORK_THREAD_MODE: [AtomicBool; 2] = [AtomicBool::new(false), AtomicBool::new(false)];
 
-#[interrupt]
+#[interrupt_internal]
 fn FROM_CPU_INTR0() {
     #[cfg(multi_core)]
     {
