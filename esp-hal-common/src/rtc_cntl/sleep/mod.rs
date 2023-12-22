@@ -117,12 +117,12 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 /// RTC_IO wakeup allows configuring any combination of RTC_IO pins with
 /// arbitrary wakeup levels to wake up the chip from sleep. This wakeup source
 /// can be used to wake up from both light and deep sleep.
-#[cfg(any(esp32, esp32c3, esp32s3))]
+#[cfg(any(esp32c3, esp32s3))]
 pub struct RtcioWakeupSource<'a, 'b> {
     pins: RefCell<&'a mut [(&'b mut dyn RtcIoWakeupPinType, WakeupLevel)]>,
 }
 
-#[cfg(any(esp32, esp32c3, esp32s3))]
+#[cfg(any(esp32c3, esp32s3))]
 impl<'a, 'b> RtcioWakeupSource<'a, 'b> {
     pub fn new(pins: &'a mut [(&'b mut dyn RtcIoWakeupPinType, WakeupLevel)]) -> Self {
         Self {
