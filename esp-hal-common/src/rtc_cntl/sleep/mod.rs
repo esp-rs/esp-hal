@@ -186,7 +186,6 @@ bitfield::bitfield! {
     pub sdio, set_sdio: 8;
     /// BT wakeup
     pub bt, set_bt: 10;
-
     /// LP core wakeup
     pub lp_core, set_lp_core: 11;
     /// USB wakeup
