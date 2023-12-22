@@ -10,6 +10,9 @@
 //!    * I2S_DEFAULT_CLK_SRC: 1 - I2S clock source
 //!    * I2S_SCLK: 96_000_000 - I2S clock frequency
 
+use self::peripherals::{LP_CLKRST, TIMG0, TIMG1};
+use crate::{timer::Wdt, Rtc};
+
 pub mod efuse;
 pub mod gpio;
 pub mod peripherals;
@@ -34,4 +37,15 @@ pub(crate) mod constants {
 
     pub const SOC_DRAM_LOW: u32 = 0x4080_0000;
     pub const SOC_DRAM_HIGH: u32 = 0x4085_0000;
+}
+
+#[export_name = "__post_init"]
+unsafe fn post_init() {
+    // RTC domain must be enabled before we try to disable
+    let mut rtc = Rtc::new(LP_CLKRST::steal());
+    rtc.swd.disable();
+    rtc.rwdt.disable();
+
+    Wdt::<TIMG0>::set_wdt_enabled(false);
+    Wdt::<TIMG1>::set_wdt_enabled(false);
 }
