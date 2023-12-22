@@ -743,6 +743,7 @@ impl PowerDownFlags {
     }
 }
 
+// Constants defined in `PMU_SLEEP_MC_DEFAULT()`
 struct MachineConstants;
 impl MachineConstants {
     const LP_MIN_SLP_TIME_US: u32 = 450;
@@ -763,8 +764,10 @@ impl MachineConstants {
     const HP_REGDMA_S2M_WORK_TIME_US: u32 = 172;
     const HP_REGDMA_S2A_WORK_TIME_US: u32 = 480;
     const HP_REGDMA_M2A_WORK_TIME_US: u32 = 278;
+    // Unused, but defined in esp-idf. May be needed later.
     // const HP_REGDMA_A2S_WORK_TIME_US: u32 = 382;
     const HP_REGDMA_RF_ON_WORK_TIME_US: u32 = 70;
+    // Unused, but defined in esp-idf. May be needed later.
     // const HP_REGDMA_RF_OFF_WORK_TIME_US: u32 = 23;
     const HP_XTAL_WAIT_STABLE_TIME_US: u32 = 250;
     const HP_PLL_WAIT_STABLE_TIME_US: u32 = 1;
