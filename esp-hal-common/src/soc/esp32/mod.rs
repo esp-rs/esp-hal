@@ -49,17 +49,17 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
     }
 
     // set stack pointer to end of memory: no need to retain stack up to this point
-    esp_hal_common::xtensa_lx::set_stack_pointer(&mut _stack_start_cpu0);
+    xtensa_lx::set_stack_pointer(&mut _stack_start_cpu0);
 
     // copying data from flash to various data segments is done by the bootloader
     // initialization to zero needs to be done by the application
 
     // Initialize RTC RAM
-    esp_hal_common::xtensa_lx_rt::zero_bss(&mut _rtc_fast_bss_start, &mut _rtc_fast_bss_end);
-    esp_hal_common::xtensa_lx_rt::zero_bss(&mut _rtc_slow_bss_start, &mut _rtc_slow_bss_end);
+    xtensa_lx_rt::zero_bss(&mut _rtc_fast_bss_start, &mut _rtc_fast_bss_end);
+    xtensa_lx_rt::zero_bss(&mut _rtc_slow_bss_start, &mut _rtc_slow_bss_end);
 
     // continue with default reset handler
-    esp_hal_common::xtensa_lx_rt::Reset();
+    xtensa_lx_rt::Reset();
 }
 
 /// The ESP32 has a first stage bootloader that handles loading program data
