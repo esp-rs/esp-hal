@@ -26,7 +26,6 @@ type TwaiOutbox = Channel<NoopRawMutex, EspTwaiFrame, 16>;
 #[embassy_executor::task]
 async fn receiver(mut rx: TwaiRx<'static, TWAI0>, channel: &'static TwaiOutbox) -> ! {
     loop {
-        // let frame = nb::block!(can.receive());
         let frame = rx.receive_async().await;
 
         match frame {
@@ -68,12 +67,12 @@ async fn main(spawner: Spawner) {
     #[cfg(feature = "embassy-time-systick")]
     embassy::init(
         &clocks,
-        esp32c3_hal::systimer::SystemTimer::new(peripherals.SYSTIMER),
+        esp32s3_hal::systimer::SystemTimer::new(peripherals.SYSTIMER),
     );
 
     #[cfg(feature = "embassy-time-timg0")]
     {
-        let timer_group0 = esp32c3_hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks);
+        let timer_group0 = esp32s3_hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks);
         embassy::init(&clocks, timer_group0.timer0);
     }
 
