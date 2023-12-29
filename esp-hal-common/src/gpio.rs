@@ -1377,12 +1377,12 @@ impl<MODE> embedded_hal_1::digital::ErrorType for AnyPin<Input<MODE>> {
 #[cfg(feature = "eh1")]
 impl<MODE> embedded_hal_1::digital::InputPin for AnyPin<Input<MODE>> {
     fn is_high(&mut self) -> Result<bool, Self::Error> {
-        let inner = &self.inner;
+        let inner = &mut self.inner;
         handle_gpio_input!(inner, target, { target.is_high() })
     }
 
     fn is_low(&mut self) -> Result<bool, Self::Error> {
-        let inner = &self.inner;
+        let inner = &mut self.inner;
         handle_gpio_input!(inner, target, { target.is_low() })
     }
 }
@@ -1443,12 +1443,12 @@ impl<MODE> embedded_hal_1::digital::OutputPin for AnyPin<Output<MODE>> {
 #[cfg(feature = "eh1")]
 impl<MODE> embedded_hal_1::digital::StatefulOutputPin for AnyPin<Output<MODE>> {
     fn is_set_high(&mut self) -> Result<bool, Self::Error> {
-        let inner = &self.inner;
+        let inner = &mut self.inner;
         handle_gpio_output!(inner, target, { target.is_set_high() })
     }
 
     fn is_set_low(&mut self) -> Result<bool, Self::Error> {
-        let inner = &self.inner;
+        let inner = &mut self.inner;
         handle_gpio_output!(inner, target, { target.is_set_low() })
     }
 }
