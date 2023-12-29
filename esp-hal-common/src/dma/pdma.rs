@@ -19,16 +19,6 @@ use crate::{
     system::{Peripheral, PeripheralClockControl},
 };
 
-#[cold]
-fn on_tx_descriptor_not_divisible_by_3() {
-    panic!("The number of tx descriptors must be a multiple of 3");
-}
-
-#[cold]
-fn on_rx_descriptor_not_divisible_by_3() {
-    panic!("The number of rx descriptors must be a multiple of 3");
-}
-
 macro_rules! ImplSpiChannel {
     ($num: literal) => {
         paste::paste! {
@@ -313,57 +303,24 @@ macro_rules! ImplSpiChannel {
             impl [<Spi $num DmaChannelCreator>] {
                 /// Configure the channel for use
                 ///
-                /// Descriptors should be sized as `((CHUNK_SIZE + 4091) / 4092) * 3`. I.e., to
-                /// transfer buffers of size `1..=4092`, you need 3 descriptors. The number of
-                /// descriptors must be a multiple of 3.
+                /// Descriptors should be sized as `(CHUNK_SIZE + 4091) / 4092`. I.e., to
+                /// transfer buffers of size `1..=4092`, you need 1 descriptor.
                 pub fn configure<'a>(
                     self,
                     burst_mode: bool,
-                    tx_descriptors: &'a mut [u32],
-                    rx_descriptors: &'a mut [u32],
+                    tx_descriptors: &'a mut [DmaDescriptor],
+                    rx_descriptors: &'a mut [DmaDescriptor],
                     priority: DmaPriority,
                 ) -> Channel<'a, [<Spi $num DmaChannel>]> {
-                    if tx_descriptors.len() % 3 != 0 {
-                        on_tx_descriptor_not_divisible_by_3();
-                    }
-
-                    if rx_descriptors.len() % 3 != 0 {
-                        on_rx_descriptor_not_divisible_by_3();
-                    }
-
                     let mut tx_impl = [<Spi $num DmaChannelTxImpl>] {};
                     tx_impl.init(burst_mode, priority);
-
-                    let tx_channel = ChannelTx {
-                        descriptors: tx_descriptors,
-                        burst_mode,
-                        tx_impl: tx_impl,
-                        write_offset: 0,
-                        write_descr_ptr: core::ptr::null(),
-                        available: 0,
-                        last_seen_handled_descriptor_ptr: core::ptr::null(),
-                        buffer_start: core::ptr::null(),
-                        buffer_len: 0,
-                        _phantom: PhantomData::default(),
-                    };
 
                     let mut rx_impl = [<Spi $num DmaChannelRxImpl>] {};
                     rx_impl.init(burst_mode, priority);
 
-                    let rx_channel = ChannelRx {
-                        descriptors: rx_descriptors,
-                        burst_mode,
-                        rx_impl: rx_impl,
-                        read_descr_ptr: core::ptr::null(),
-                        available: 0,
-                        last_seen_handled_descriptor_ptr: core::ptr::null(),
-                        read_buffer_start: core::ptr::null(),
-                        _phantom: PhantomData::default(),
-                    };
-
                     Channel {
-                        tx: tx_channel,
-                        rx: rx_channel,
+                        tx: ChannelTx::new(tx_descriptors, tx_impl, burst_mode),
+                        rx: ChannelRx::new(rx_descriptors, rx_impl, burst_mode),
                     }
                 }
             }
@@ -632,48 +589,24 @@ macro_rules! ImplI2sChannel {
             impl [<I2s $num DmaChannelCreator>] {
                 /// Configure the channel for use
                 ///
-                /// Descriptors should be sized as `((CHUNK_SIZE + 4091) / 4092) * 3`. I.e., to
-                /// transfer buffers of size `1..=4092`, you need 3 descriptors.
+                /// Descriptors should be sized as `(CHUNK_SIZE + 4091) / 4092`. I.e., to
+                /// transfer buffers of size `1..=4092`, you need 1 descriptor.
                 pub fn configure<'a>(
                     self,
                     burst_mode: bool,
-                    tx_descriptors: &'a mut [u32],
-                    rx_descriptors: &'a mut [u32],
+                    tx_descriptors: &'a mut [DmaDescriptor],
+                    rx_descriptors: &'a mut [DmaDescriptor],
                     priority: DmaPriority,
                 ) -> Channel<'a, [<I2s $num DmaChannel>]> {
                     let mut tx_impl = [<I2s $num DmaChannelTxImpl>] {};
                     tx_impl.init(burst_mode, priority);
 
-                    let tx_channel = ChannelTx {
-                        descriptors: tx_descriptors,
-                        burst_mode,
-                        tx_impl: tx_impl,
-                        write_offset: 0,
-                        write_descr_ptr: core::ptr::null(),
-                        available: 0,
-                        last_seen_handled_descriptor_ptr: core::ptr::null(),
-                        buffer_start: core::ptr::null(),
-                        buffer_len: 0,
-                        _phantom: PhantomData::default(),
-                    };
-
                     let mut rx_impl = [<I2s $num DmaChannelRxImpl>] {};
                     rx_impl.init(burst_mode, priority);
 
-                    let rx_channel = ChannelRx {
-                        descriptors: rx_descriptors,
-                        burst_mode,
-                        rx_impl: rx_impl,
-                        read_descr_ptr: core::ptr::null(),
-                        available: 0,
-                        last_seen_handled_descriptor_ptr: core::ptr::null(),
-                        read_buffer_start: core::ptr::null(),
-                        _phantom: PhantomData::default(),
-                    };
-
                     Channel {
-                        tx: tx_channel,
-                        rx: rx_channel,
+                        tx: ChannelTx::new(tx_descriptors, tx_impl, burst_mode),
+                        rx: ChannelRx::new(rx_descriptors, rx_impl, burst_mode),
                     }
                 }
             }

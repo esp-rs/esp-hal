@@ -46,8 +46,8 @@
 //! // let dma = Dma::new(system.dma);
 //! // let dma_channel = dma.spi2channel;
 //!
-//! let mut descriptors = [0u32; 8 * 3];
-//! let mut rx_descriptors = [0u32; 8 * 3];
+//! let mut descriptors = [DmaDescriptor::EMPTY; 8];
+//! let mut rx_descriptors = [DmaDescriptor::EMPTY; 8];
 //!
 //! let mut spi = Spi::new(
 //!     peripherals.SPI2,
@@ -67,11 +67,73 @@
 //! ));
 //! ```
 //!
-//! ⚠️ Note: Descriptors should be sized as `((CHUNK_SIZE + 4091) / 4092) * 3`.
-//! I.e., to transfer buffers of size `1..=4092`, you need 3 descriptors. The
-//! number of descriptors must be a multiple of 3.
+//! ⚠️ Note: Descriptors should be sized as `(CHUNK_SIZE + 4091) / 4092`.
+//! I.e., to transfer buffers of size `1..=4092`, you need 1 descriptor.
 
-use core::{marker::PhantomData, ptr::addr_of, sync::atomic::compiler_fence};
+use core::{marker::PhantomData, ptr::addr_of_mut, sync::atomic::compiler_fence};
+
+bitfield::bitfield! {
+    #[derive(Clone, Copy)]
+    pub struct DmaDescriptorFlags(u32);
+
+    u16;
+    size, set_size: 11, 0;
+    length, set_length: 23, 12;
+    suc_eof, set_suc_eof: 30;
+    owner, set_owner: 31;
+}
+
+/// A DMA transfer descriptor.
+#[derive(Clone, Copy)]
+pub struct DmaDescriptor {
+    flags: DmaDescriptorFlags,
+    buffer: *mut u8,
+    next: *mut DmaDescriptor,
+}
+
+impl DmaDescriptor {
+    /// An empty DMA descriptor used to initialize the descriptor list.
+    pub const EMPTY: Self = Self {
+        flags: DmaDescriptorFlags(0),
+        buffer: core::ptr::null_mut(),
+        next: core::ptr::null_mut(),
+    };
+
+    fn set_size(&mut self, len: usize) {
+        self.flags.set_size(len as u16)
+    }
+
+    fn set_length(&mut self, len: usize) {
+        self.flags.set_length(len as u16)
+    }
+
+    fn len(&self) -> usize {
+        self.flags.length() as usize
+    }
+
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    fn set_suc_eof(&mut self, suc_eof: bool) {
+        self.flags.set_suc_eof(suc_eof)
+    }
+
+    fn set_owner(&mut self, owner: Owner) {
+        let owner = match owner {
+            Owner::Cpu => false,
+            Owner::Dma => true,
+        };
+        self.flags.set_owner(owner)
+    }
+
+    fn owner(&self) -> Owner {
+        match self.flags.owner() {
+            false => Owner::Cpu,
+            true => Owner::Dma,
+        }
+    }
+}
 
 #[cfg(gdma)]
 pub mod gdma;
@@ -92,8 +154,8 @@ macro_rules! dma_buffers {
     ($tx_size:expr, $rx_size:expr) => {{
         static mut TX_BUFFER: [u8; $tx_size] = [0u8; $tx_size];
         static mut RX_BUFFER: [u8; $rx_size] = [0u8; $rx_size];
-        let tx_descriptors = [0u32; (($tx_size + 4091) / 4092) * 3];
-        let rx_descriptors = [0u32; (($rx_size + 4091) / 4092) * 3];
+        let tx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; ($tx_size + 4091) / 4092];
+        let rx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; ($rx_size + 4091) / 4092];
         unsafe {
             (
                 &mut TX_BUFFER,
@@ -107,8 +169,8 @@ macro_rules! dma_buffers {
     ($size:expr) => {{
         static mut TX_BUFFER: [u8; $size] = [0u8; $size];
         static mut RX_BUFFER: [u8; $size] = [0u8; $size];
-        let tx_descriptors = [0u32; (($size + 4091) / 4092) * 3];
-        let rx_descriptors = [0u32; (($size + 4091) / 4092) * 3];
+        let tx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; ($size + 4091) / 4092];
+        let rx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; ($size + 4091) / 4092];
         unsafe {
             (
                 &mut TX_BUFFER,
@@ -130,14 +192,14 @@ macro_rules! dma_buffers {
 #[macro_export]
 macro_rules! dma_descriptors {
     ($tx_size:expr, $rx_size:expr) => {{
-        let tx_descriptors = [0u32; (($tx_size + 4091) / 4092) * 3];
-        let rx_descriptors = [0u32; (($rx_size + 4091) / 4092) * 3];
+        let tx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; ($tx_size + 4091) / 4092];
+        let rx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; ($rx_size + 4091) / 4092];
         (tx_descriptors, rx_descriptors)
     }};
 
     ($size:expr) => {{
-        let tx_descriptors = [0u32; (($size + 4091) / 4092) * 3];
-        let rx_descriptors = [0u32; (($size + 4091) / 4092) * 3];
+        let tx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; ($size + 4091) / 4092];
+        let rx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; ($size + 4091) / 4092];
         (tx_descriptors, rx_descriptors)
     }};
 }
@@ -225,83 +287,6 @@ impl From<u32> for Owner {
             0 => Owner::Cpu,
             _ => Owner::Dma,
         }
-    }
-}
-
-trait DmaLinkedListDw0 {
-    fn set_size(&mut self, len: u16);
-    fn get_size(&self) -> u16;
-    fn set_length(&mut self, len: u16);
-    fn get_length(&self) -> usize;
-    fn set_err_eof(&mut self, err_eof: bool);
-    #[cfg(not(esp32))]
-    fn get_err_eof(&self) -> bool;
-    fn set_suc_eof(&mut self, suc_eof: bool);
-    fn get_suc_eof(&self) -> bool;
-    fn set_owner(&mut self, owner: Owner);
-    fn get_owner(&self) -> Owner;
-}
-
-impl DmaLinkedListDw0 for u32 {
-    fn set_size(&mut self, len: u16) {
-        let mask = 0b1111_1111_1111;
-        let bit_s = 0;
-        *self = (*self & !(mask << bit_s)) | (len as u32) << bit_s;
-    }
-
-    fn get_size(&self) -> u16 {
-        let mask = 0b1111_1111_1111;
-        let bit_s = 0;
-        ((*self & (mask << bit_s)) >> bit_s) as u16
-    }
-
-    fn set_length(&mut self, len: u16) {
-        let mask = 0b1111_1111_1111;
-        let bit_s = 12;
-        *self = (*self & !(mask << bit_s)) | (len as u32) << bit_s;
-    }
-
-    fn get_length(&self) -> usize {
-        let mask = 0b1111_1111_1111;
-        let bit_s = 12;
-        ((*self & (mask << bit_s)) >> bit_s) as usize
-    }
-
-    fn set_err_eof(&mut self, err_eof: bool) {
-        let mask = 0b1;
-        let bit_s = 28;
-        *self = (*self & !(mask << bit_s)) | (err_eof as u32) << bit_s;
-    }
-
-    #[cfg(not(esp32))]
-    fn get_err_eof(&self) -> bool {
-        let mask = 0b1;
-        let bit_s = 28;
-        ((*self & (mask << bit_s)) >> bit_s) != 0
-    }
-
-    fn set_suc_eof(&mut self, suc_eof: bool) {
-        let mask = 0b1;
-        let bit_s = 30;
-        *self = (*self & !(mask << bit_s)) | (suc_eof as u32) << bit_s;
-    }
-
-    fn get_suc_eof(&self) -> bool {
-        let mask = 0b1;
-        let bit_s = 30;
-        ((*self & (mask << bit_s)) >> bit_s) != 0
-    }
-
-    fn set_owner(&mut self, owner: Owner) {
-        let mask = 0b1;
-        let bit_s = 31;
-        *self = (*self & !(mask << bit_s)) | (owner as u32) << bit_s;
-    }
-
-    fn get_owner(&self) -> Owner {
-        let mask = 0b1;
-        let bit_s = 31;
-        ((*self & (mask << bit_s)) >> bit_s).into()
     }
 }
 
@@ -403,13 +388,13 @@ where
 
     fn prepare_transfer_without_start(
         &mut self,
-        descriptors: &mut [u32],
+        descriptors: &mut [DmaDescriptor],
         circular: bool,
         peri: DmaPeripheral,
         data: *mut u8,
         len: usize,
     ) -> Result<(), DmaError> {
-        descriptors.fill(0);
+        descriptors.fill(DmaDescriptor::EMPTY);
 
         compiler_fence(core::sync::atomic::Ordering::SeqCst);
 
@@ -419,34 +404,36 @@ where
             let chunk_size = usize::min(CHUNK_SIZE, len - processed);
             let last = processed + chunk_size >= len;
 
+            let next = if last {
+                if circular {
+                    addr_of_mut!(descriptors[0])
+                } else {
+                    core::ptr::null_mut()
+                }
+            } else {
+                addr_of_mut!(descriptors[descr + 1])
+            };
+
             // buffer flags
             let dw0 = &mut descriptors[descr];
 
             dw0.set_suc_eof(false);
             dw0.set_owner(Owner::Dma);
-            dw0.set_size(chunk_size as u16); // align to 32 bits?
+            dw0.set_size(chunk_size); // align to 32 bits?
             dw0.set_length(0); // hardware will fill in the received number of bytes
 
             // pointer to current data
-            descriptors[descr + 1] = data as u32 + processed as u32;
+            dw0.buffer = unsafe { data.add(processed) };
 
             // pointer to next descriptor
-            descriptors[descr + 2] = if last {
-                if circular {
-                    addr_of!(descriptors[0]) as u32
-                } else {
-                    0
-                }
-            } else {
-                addr_of!(descriptors[descr + 3]) as u32
-            };
+            dw0.next = next;
 
             if last {
                 break;
             }
 
             processed += chunk_size;
-            descr += 3;
+            descr += 1;
         }
 
         R::clear_in_interrupts();
@@ -485,14 +472,33 @@ where
     T: RxChannel<R>,
     R: RegisterAccess,
 {
-    pub descriptors: &'a mut [u32],
+    pub descriptors: &'a mut [DmaDescriptor],
     pub burst_mode: bool,
     pub rx_impl: T,
-    pub read_descr_ptr: *const u32,
+    pub read_descr_ptr: *mut DmaDescriptor,
     pub available: usize,
-    pub last_seen_handled_descriptor_ptr: *const u32,
-    pub read_buffer_start: *const u8,
+    pub last_seen_handled_descriptor_ptr: *mut DmaDescriptor,
+    pub read_buffer_start: *mut u8,
     pub _phantom: PhantomData<R>,
+}
+
+impl<'a, T, R> ChannelRx<'a, T, R>
+where
+    T: RxChannel<R>,
+    R: RegisterAccess,
+{
+    fn new(descriptors: &'a mut [DmaDescriptor], rx_impl: T, burst_mode: bool) -> Self {
+        Self {
+            descriptors,
+            burst_mode,
+            rx_impl,
+            read_descr_ptr: core::ptr::null_mut(),
+            available: 0,
+            last_seen_handled_descriptor_ptr: core::ptr::null_mut(),
+            read_buffer_start: core::ptr::null_mut(),
+            _phantom: PhantomData::default(),
+        }
+    }
 }
 
 impl<'a, T, R> Rx for ChannelRx<'a, T, R>
@@ -518,7 +524,7 @@ where
         data: *mut u8,
         len: usize,
     ) -> Result<(), DmaError> {
-        if self.descriptors.len() < (len + CHUNK_SIZE - 1) / CHUNK_SIZE * 3 {
+        if self.descriptors.len() < (len + CHUNK_SIZE - 1) / CHUNK_SIZE {
             return Err(DmaError::OutOfDescriptors);
         }
 
@@ -531,8 +537,8 @@ where
         }
 
         self.available = 0;
-        self.read_descr_ptr = self.descriptors.as_ptr();
-        self.last_seen_handled_descriptor_ptr = core::ptr::null();
+        self.read_descr_ptr = self.descriptors.as_mut_ptr();
+        self.last_seen_handled_descriptor_ptr = core::ptr::null_mut();
         self.read_buffer_start = data;
 
         self.rx_impl
@@ -581,17 +587,15 @@ where
             return self.available;
         }
 
-        let descr_address = self.last_seen_handled_descriptor_ptr.cast_mut();
+        let descr_address = self.last_seen_handled_descriptor_ptr;
         let mut dw0 = unsafe { descr_address.read_volatile() };
 
-        if dw0.get_owner() == Owner::Cpu && dw0.get_length() != 0 {
-            let descriptor_buffer =
-                unsafe { descr_address.offset(1).cast::<*const u8>().read_volatile() };
-            let next_descriptor =
-                unsafe { descr_address.offset(2).cast::<*const u32>().read_volatile() };
+        if dw0.owner() == Owner::Cpu && !dw0.is_empty() {
+            let descriptor_buffer = dw0.buffer;
+            let next_descriptor = dw0.next;
 
             self.read_buffer_start = descriptor_buffer;
-            self.available = dw0.get_length();
+            self.available = dw0.len();
 
             dw0.set_owner(Owner::Dma);
             dw0.set_length(0);
@@ -602,7 +606,7 @@ where
             }
 
             self.last_seen_handled_descriptor_ptr = if next_descriptor.is_null() {
-                self.descriptors.as_ptr()
+                self.descriptors.as_mut_ptr()
             } else {
                 next_descriptor
             };
@@ -633,13 +637,13 @@ where
         let mut len = 0;
         let mut idx = 0;
         loop {
-            let chunk_len = dst.len().min(self.descriptors[idx].get_length());
+            let chunk_len = dst.len().min(self.descriptors[idx].len());
             if chunk_len == 0 {
                 break;
             }
 
-            let buffer_ptr = addr_of!(self.descriptors[idx + 1]).cast::<u8>();
-            let next_dscr = addr_of!(self.descriptors[idx + 2]).cast::<u8>();
+            let buffer_ptr = self.descriptors[idx].buffer;
+            let next_dscr = self.descriptors[idx].next;
 
             // Copy data to desination
             let (dst_chunk, dst_remaining) = dst.split_at_mut(chunk_len);
@@ -745,13 +749,13 @@ where
 
     fn prepare_transfer_without_start(
         &mut self,
-        descriptors: &mut [u32],
+        descriptors: &mut [DmaDescriptor],
         circular: bool,
         peri: DmaPeripheral,
         data: *const u8,
         len: usize,
     ) -> Result<(), DmaError> {
-        descriptors.fill(0);
+        descriptors.fill(DmaDescriptor::EMPTY);
 
         compiler_fence(core::sync::atomic::Ordering::SeqCst);
 
@@ -760,6 +764,16 @@ where
         loop {
             let chunk_size = usize::min(CHUNK_SIZE, len - processed);
             let last = processed + chunk_size >= len;
+
+            let next = if last {
+                if circular {
+                    addr_of_mut!(descriptors[0])
+                } else {
+                    core::ptr::null_mut()
+                }
+            } else {
+                addr_of_mut!(descriptors[descr + 1])
+            };
 
             // buffer flags
             let dw0 = &mut descriptors[descr];
@@ -770,34 +784,26 @@ where
             // I2S to track progress of a transfer by checking OUTLINK_DSCR_ADDR.
             dw0.set_suc_eof(circular || last);
             dw0.set_owner(Owner::Dma);
-            dw0.set_size(chunk_size as u16); // align to 32 bits?
-            dw0.set_length(chunk_size as u16); // the hardware will transmit this many bytes
+            dw0.set_size(chunk_size); // align to 32 bits?
+            dw0.set_length(chunk_size); // the hardware will transmit this many bytes
 
             // pointer to current data
-            descriptors[descr + 1] = data as u32 + processed as u32;
+            dw0.buffer = unsafe { data.cast_mut().add(processed) };
 
             // pointer to next descriptor
-            descriptors[descr + 2] = if last {
-                if circular {
-                    addr_of!(descriptors[0]) as u32
-                } else {
-                    0
-                }
-            } else {
-                addr_of!(descriptors[descr + 3]) as u32
-            };
+            dw0.next = next;
 
             if last {
                 break;
             }
 
             processed += chunk_size;
-            descr += 3;
+            descr += 1;
         }
 
         R::clear_out_interrupts();
         R::reset_out();
-        R::set_out_descriptors(addr_of!(descriptors[0]) as u32);
+        R::set_out_descriptors(addr_of_mut!(descriptors[0]) as u32);
         R::set_out_peripheral(peri as u8);
 
         Ok(())
@@ -859,17 +865,38 @@ where
     T: TxChannel<R>,
     R: RegisterAccess,
 {
-    pub descriptors: &'a mut [u32],
+    pub descriptors: &'a mut [DmaDescriptor],
     #[allow(unused)]
     pub burst_mode: bool,
     pub tx_impl: T,
     pub write_offset: usize,
-    pub write_descr_ptr: *const u32,
+    pub write_descr_ptr: *mut DmaDescriptor,
     pub available: usize,
-    pub last_seen_handled_descriptor_ptr: *const u32,
+    pub last_seen_handled_descriptor_ptr: *mut DmaDescriptor,
     pub buffer_start: *const u8,
     pub buffer_len: usize,
     pub _phantom: PhantomData<R>,
+}
+
+impl<'a, T, R> ChannelTx<'a, T, R>
+where
+    T: TxChannel<R>,
+    R: RegisterAccess,
+{
+    fn new(descriptors: &'a mut [DmaDescriptor], tx_impl: T, burst_mode: bool) -> Self {
+        Self {
+            descriptors,
+            burst_mode,
+            tx_impl,
+            write_offset: 0,
+            write_descr_ptr: core::ptr::null_mut(),
+            available: 0,
+            last_seen_handled_descriptor_ptr: core::ptr::null_mut(),
+            buffer_start: core::ptr::null_mut(),
+            buffer_len: 0,
+            _phantom: PhantomData::default(),
+        }
+    }
 }
 
 impl<'a, T, R> Tx for ChannelTx<'a, T, R>
@@ -899,7 +926,7 @@ where
         data: *const u8,
         len: usize,
     ) -> Result<(), DmaError> {
-        if self.descriptors.len() < (len + CHUNK_SIZE - 1) / CHUNK_SIZE * 3 {
+        if self.descriptors.len() < (len + CHUNK_SIZE - 1) / CHUNK_SIZE {
             return Err(DmaError::OutOfDescriptors);
         }
 
@@ -909,8 +936,8 @@ where
 
         self.write_offset = 0;
         self.available = 0;
-        self.write_descr_ptr = self.descriptors.as_ptr();
-        self.last_seen_handled_descriptor_ptr = self.descriptors.as_ptr();
+        self.write_descr_ptr = self.descriptors.as_mut_ptr();
+        self.last_seen_handled_descriptor_ptr = self.descriptors.as_mut_ptr();
         self.buffer_start = data;
         self.buffer_len = len;
 
@@ -949,43 +976,37 @@ where
     fn available(&mut self) -> usize {
         if self.tx_impl.descriptors_handled() {
             self.tx_impl.reset_descriptors_handled();
-            let descr_address = self.tx_impl.last_out_dscr_address() as *const u32;
+            let descr_address = self.tx_impl.last_out_dscr_address() as *mut DmaDescriptor;
 
+            let mut ptr = self.last_seen_handled_descriptor_ptr;
             if descr_address >= self.last_seen_handled_descriptor_ptr {
-                let mut ptr = self.last_seen_handled_descriptor_ptr;
-
                 unsafe {
                     while ptr < descr_address {
                         let dw0 = ptr.read_volatile();
-                        self.available += dw0.get_length();
-                        ptr = ptr.offset(3);
+                        self.available += dw0.len();
+                        ptr = ptr.offset(1);
                     }
                 }
             } else {
-                let mut ptr = self.last_seen_handled_descriptor_ptr;
-
                 unsafe {
-                    while ptr.offset(2).read_volatile() != 0 {
+                    while !(*ptr).next.is_null() {
                         let dw0 = ptr.read_volatile();
-                        self.available += dw0.get_length();
-                        ptr = ptr.offset(3);
+                        self.available += dw0.len();
+                        ptr = ptr.offset(1);
                     }
                 }
             }
 
             if self.available >= self.buffer_len {
                 unsafe {
-                    let segment_len = self.write_descr_ptr.read_volatile().get_length();
+                    let dw0 = self.write_descr_ptr.read_volatile();
+                    let segment_len = dw0.len();
+                    let next_descriptor = dw0.next;
                     self.available -= segment_len;
                     self.write_offset = (self.write_offset + segment_len) % self.buffer_len;
-                    let next_descriptor = self
-                        .write_descr_ptr
-                        .offset(2)
-                        .cast::<*const u32>()
-                        .read_volatile();
 
                     self.write_descr_ptr = if next_descriptor.is_null() {
-                        self.descriptors.as_ptr()
+                        self.descriptors.as_mut_ptr()
                     } else {
                         next_descriptor
                     }
@@ -1024,16 +1045,12 @@ where
         let mut forward = data.len();
         loop {
             unsafe {
-                let next_descriptor = self
-                    .write_descr_ptr
-                    .offset(2)
-                    .cast::<*const u32>()
-                    .read_volatile();
-                let segment_len = self.write_descr_ptr.read_volatile().get_length();
-                self.write_descr_ptr = if next_descriptor.is_null() {
-                    self.descriptors.as_ptr()
+                let dw0 = self.write_descr_ptr.read_volatile();
+                let segment_len = dw0.len();
+                self.write_descr_ptr = if dw0.next.is_null() {
+                    self.descriptors.as_mut_ptr()
                 } else {
-                    next_descriptor
+                    dw0.next
                 };
 
                 if forward <= segment_len {
