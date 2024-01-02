@@ -40,15 +40,18 @@ For information about the HAL and how to use it in your own projects, please ref
 
 ### High-Power Cores
 
-|     Crate     |                   Documentation                    | Technical Reference Manual |             Target             |
-| :-----------: | :------------------------------------------------: | :------------------------: | :----------------------------: |
-|  [esp32-hal]  |   [![esp32-hal-docs]](https://docs.rs/esp32-hal)   |          [ESP32]           |    `xtensa-esp32-none-elf`     |
-| [esp32c2-hal] | [![esp32c2-hal-docs]](https://docs.rs/esp32c2-hal) |         [ESP32-C2]         | `riscv32imc-unknown-none-elf`  |
-| [esp32c3-hal] | [![esp32c3-hal-docs]](https://docs.rs/esp32c3-hal) |         [ESP32-C3]         | `riscv32imc-unknown-none-elf`  |
-| [esp32c6-hal] | [![esp32c6-hal-docs]](https://docs.rs/esp32c6-hal) |         [ESP32-C6]         | `riscv32imac-unknown-none-elf` |
-| [esp32h2-hal] | [![esp32h2-hal-docs]](https://docs.rs/esp32h2-hal) |         [ESP32-H2]         | `riscv32imac-unknown-none-elf` |
-| [esp32s2-hal] | [![esp32s2-hal-docs]](https://docs.rs/esp32s2-hal) |         [ESP32-S2]         |   `xtensa-esp32s2-none-elf`    |
-| [esp32s3-hal] | [![esp32s3-hal-docs]](https://docs.rs/esp32s3-hal) |         [ESP32-S3]         |   `xtensa-esp32s3-none-elf`    |
+|     Crate     |                   Documentation                    | Technical Reference Manual |             Target             |     MSRV    |
+| :-----------: | :------------------------------------------------: | :------------------------: | :----------------------------: | :---------: |
+|  [esp32-hal]  |   [![esp32-hal-docs]](https://docs.rs/esp32-hal)   |          [ESP32]           |    `xtensa-esp32-none-elf`     |   ![esp]    |
+| [esp32c2-hal] | [![esp32c2-hal-docs]](https://docs.rs/esp32c2-hal) |         [ESP32-C2]         | `riscv32imc-unknown-none-elf`  |  ![nightly] |
+| [esp32c3-hal] | [![esp32c3-hal-docs]](https://docs.rs/esp32c3-hal) |         [ESP32-C3]         | `riscv32imc-unknown-none-elf`  |  ![nightly] |
+| [esp32c6-hal] | [![esp32c6-hal-docs]](https://docs.rs/esp32c6-hal) |         [ESP32-C6]         | `riscv32imac-unknown-none-elf` |  ![nightly] |
+| [esp32h2-hal] | [![esp32h2-hal-docs]](https://docs.rs/esp32h2-hal) |         [ESP32-H2]         | `riscv32imac-unknown-none-elf` |  ![nightly] |
+| [esp32s2-hal] | [![esp32s2-hal-docs]](https://docs.rs/esp32s2-hal) |         [ESP32-S2]         |   `xtensa-esp32s2-none-elf`    |   ![esp]    |
+| [esp32s3-hal] | [![esp32s3-hal-docs]](https://docs.rs/esp32s3-hal) |         [ESP32-S3]         |   `xtensa-esp32s3-none-elf`    |   ![esp]    |
+
+[esp]: https://img.shields.io/badge/rustc-esp%201.74+-red.svg
+[nightly]: https://img.shields.io/badge/rustc-nightly%202023/11/30+-red.svg 
 
 [esp32-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32-hal
 [esp32c2-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32c2-hal
@@ -117,17 +120,6 @@ cp pre-commit .git/hooks/pre-commit
 ```
 
 When using this hook, you can choose to ignore its failure on a per-commit basis by committing with the `--no-verify` flag; however, you will need to be sure that all packages are formatted when submitting a pull request.
-
-## MSRV
-
-The **M**inimum **S**upported **R**ust **V**ersion is `1.67.0` for all packages.
-
-RISC-V is officially supported by the official Rust compiler, however, it should be noted that targeting the Xtensa ISA currently requires the use of the [esp-rs/rust] compiler fork. Our recommend method of installation is [espup].
-
-When targetting the RISC-V architecture _and_ using a `stable` Rust release, it is necessary to set `RUSTC_BOOTSTRAP=1` in order to build successfully; this is not required when using a `nightly` release or when targeting Xtensa.
-
-[esp-rs/rust]: https://github.com/esp-rs/rust
-[espup]: https://github.com/esp-rs/espup
 
 ## License
 
