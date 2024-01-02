@@ -1,6 +1,7 @@
 use core::{cell::RefCell, ptr::addr_of};
 
 use critical_section::Mutex;
+use portable_atomic::{AtomicBool, Ordering};
 
 use crate::ble::btdm::ble_os_adapter_chip_specific::{osi_funcs_s, G_OSI_FUNCS};
 use crate::ble::HciOutCollector;
@@ -30,6 +31,8 @@ pub struct ReceivedPacket {
 
 static BT_INTERNAL_QUEUE: Mutex<RefCell<SimpleQueue<[u8; 8], 10>>> =
     Mutex::new(RefCell::new(SimpleQueue::new()));
+
+static PACKET_SENT: AtomicBool = AtomicBool::new(true);
 
 #[repr(C)]
 struct vhci_host_callback_s {
@@ -64,6 +67,8 @@ static VHCI_HOST_CALLBACK: vhci_host_callback_s = vhci_host_callback_s {
 
 extern "C" fn notify_host_send_available() {
     trace!("notify_host_send_available");
+
+    PACKET_SENT.store(true, Ordering::Relaxed);
 }
 
 extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
@@ -581,6 +586,7 @@ pub fn send_hci(data: &[u8]) {
                     continue;
                 }
 
+                PACKET_SENT.store(false, Ordering::Relaxed);
                 API_vhci_host_send_packet(packet.as_ptr() as *const u8, packet.len() as u16);
                 trace!("sent vhci host packet");
 
@@ -588,6 +594,9 @@ pub fn send_hci(data: &[u8]) {
 
                 break;
             }
+
+            // make sure the packet buffer doesn't get touched until sent
+            while !PACKET_SENT.load(Ordering::Relaxed) {}
         }
 
         hci_out.reset();
