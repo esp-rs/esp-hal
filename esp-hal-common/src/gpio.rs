@@ -158,14 +158,14 @@ pub enum RtcFunction {
 pub trait RTCPin: Pin {
     #[cfg(xtensa)]
     fn rtc_number(&self) -> u8;
-    #[cfg(xtensa)]
+    #[cfg(any(xtensa, esp32c6))]
     fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: RtcFunction);
 
     fn rtcio_pad_hold(&mut self, enable: bool);
 
     // Unsafe because `level` needs to be a valid setting for the
     // rtc_cntl.gpio_wakeup.gpio_pinX_int_type
-    #[cfg(esp32c3)]
+    #[cfg(any(esp32c3, esp32c6))]
     unsafe fn apply_wakeup(&mut self, wakeup: bool, level: u8);
 }
 
@@ -2547,6 +2547,72 @@ pub mod lp_gpio {
                             crate::gpio::lp_gpio::LowPowerPin {
                                 private: core::marker::PhantomData::default(),
                             }
+                        }
+                    }
+
+                    impl<MODE> crate::gpio::RTCPin for GpioPin<MODE, $gpionum> {
+                        unsafe fn apply_wakeup(&mut self, wakeup: bool, level: u8) {
+                            let lp_io = &*crate::peripherals::LP_IO::ptr();
+                            lp_io.[< pin $gpionum >]().modify(|_, w| {
+                                w
+                                    .[< lp_gpio $gpionum _wakeup_enable >]().bit(wakeup)
+                                    .[< lp_gpio $gpionum _int_type >]().bits(level)
+                            });
+                        }
+
+                        fn rtcio_pad_hold(&mut self, enable: bool) {
+                            let mask = 1 << $gpionum;
+                            unsafe {
+                                let lp_aon =  &*crate::peripherals::LP_AON::ptr();
+
+                                lp_aon.gpio_hold0().modify(|r, w| {
+                                    if enable {
+                                        w.gpio_hold0().bits(r.gpio_hold0().bits() | mask)
+                                    } else {
+                                        w.gpio_hold0().bits(r.gpio_hold0().bits() & !mask)
+                                    }
+                                });
+                            }
+                        }
+
+                        /// Set the LP properties of the pin. If `mux` is true then then pin is
+                        /// routed to LP_IO, when false it is routed to IO_MUX.
+                        fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: crate::gpio::RtcFunction) {
+                            let mask = 1 << $gpionum;
+                            unsafe {
+                                // Select LP_IO
+                                let lp_aon = &*crate::peripherals::LP_AON::ptr();
+                                lp_aon
+                                    .gpio_mux()
+                                    .modify(|r, w| {
+                                        if mux {
+                                            w.sel().bits(r.sel().bits() | mask)
+                                        } else {
+                                            w.sel().bits(r.sel().bits() & !mask)
+                                        }
+                                    });
+
+                                // Configure input, function and select normal operation registers
+                                let lp_io = &*crate::peripherals::LP_IO::ptr();
+                                lp_io.[< gpio $gpionum >]().modify(|_, w| {
+                                    w
+                                        .[< lp_gpio $gpionum _slp_sel >]().bit(false)
+                                        .[< lp_gpio $gpionum _fun_ie >]().bit(input_enable)
+                                        .[< lp_gpio $gpionum _mcu_sel >]().bits(func as u8)
+                                });
+                            }
+                        }
+                    }
+
+                    impl<MODE> crate::gpio::RTCPinWithResistors for GpioPin<MODE, $gpionum> {
+                        fn rtcio_pullup(&mut self, enable: bool) {
+                            let lp_io = unsafe { &*crate::peripherals::LP_IO::ptr() };
+                            lp_io.[< gpio $gpionum >]().modify(|_, w| w.[< lp_gpio $gpionum _fun_wpu >]().bit(enable));
+                        }
+
+                        fn rtcio_pulldown(&mut self, enable: bool) {
+                            let lp_io = unsafe { &*crate::peripherals::LP_IO::ptr() };
+                            lp_io.[< gpio $gpionum >]().modify(|_, w| w.[< lp_gpio $gpionum _fun_wpd >]().bit(enable));
                         }
                     }
                 )+

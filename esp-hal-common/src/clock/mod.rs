@@ -145,7 +145,7 @@ impl Clock for XtalClock {
 }
 
 #[allow(unused)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) enum PllClock {
     #[cfg(esp32h2)]
     Pll8MHz,
@@ -167,6 +167,33 @@ pub(crate) enum PllClock {
     Pll320MHz,
     #[cfg(not(esp32h2))]
     Pll480MHz,
+}
+
+impl Clock for PllClock {
+    fn frequency(&self) -> HertzU32 {
+        match self {
+            #[cfg(esp32h2)]
+            Self::Pll8MHz => HertzU32::MHz(8),
+            #[cfg(any(esp32c6, esp32h2))]
+            Self::Pll48MHz => HertzU32::MHz(48),
+            #[cfg(esp32h2)]
+            Self::Pll64MHz => HertzU32::MHz(64),
+            #[cfg(esp32c6)]
+            Self::Pll80MHz => HertzU32::MHz(80),
+            #[cfg(esp32h2)]
+            Self::Pll96MHz => HertzU32::MHz(96),
+            #[cfg(esp32c6)]
+            Self::Pll120MHz => HertzU32::MHz(120),
+            #[cfg(esp32c6)]
+            Self::Pll160MHz => HertzU32::MHz(160),
+            #[cfg(esp32c6)]
+            Self::Pll240MHz => HertzU32::MHz(240),
+            #[cfg(not(any(esp32c2, esp32c6, esp32h2)))]
+            Self::Pll320MHz => HertzU32::MHz(320),
+            #[cfg(not(esp32h2))]
+            Self::Pll480MHz => HertzU32::MHz(480),
+        }
+    }
 }
 
 #[allow(unused)]

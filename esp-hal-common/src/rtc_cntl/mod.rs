@@ -83,7 +83,7 @@ use crate::efuse::Efuse;
 use crate::peripherals::{LP_TIMER, LP_WDT};
 #[cfg(not(any(esp32c6, esp32h2)))]
 use crate::peripherals::{RTC_CNTL, TIMG0};
-#[cfg(any(esp32, esp32s3, esp32c3))]
+#[cfg(any(esp32, esp32s3, esp32c3, esp32c6))]
 use crate::rtc_cntl::sleep::{RtcSleepConfig, WakeSource, WakeTriggers};
 use crate::{
     clock::Clock,
@@ -92,7 +92,7 @@ use crate::{
     Cpu,
 };
 // only include sleep where its been implemented
-#[cfg(any(esp32, esp32s3, esp32c3))]
+#[cfg(any(esp32, esp32s3, esp32c3, esp32c6))]
 pub mod sleep;
 
 #[cfg(any(esp32c6, esp32h2))]
@@ -107,7 +107,7 @@ type RtcCntl = crate::peripherals::RTC_CNTL;
 #[cfg_attr(esp32h2, path = "rtc/esp32h2.rs")]
 #[cfg_attr(esp32s2, path = "rtc/esp32s2.rs")]
 #[cfg_attr(esp32s3, path = "rtc/esp32s3.rs")]
-mod rtc;
+pub(crate) mod rtc;
 
 #[cfg(any(esp32c6, esp32h2))]
 pub use rtc::RtcClock;
@@ -212,7 +212,7 @@ impl<'d> Rtc<'d> {
             swd: Swd::new(),
         };
 
-        #[cfg(any(esp32, esp32s3, esp32c3))]
+        #[cfg(any(esp32, esp32s3, esp32c3, esp32c6))]
         RtcSleepConfig::base_settings(&this);
 
         this
@@ -276,7 +276,7 @@ impl<'d> Rtc<'d> {
     }
 
     /// enter deep sleep and wake with the provided `wake_sources`
-    #[cfg(any(esp32, esp32s3, esp32c3))]
+    #[cfg(any(esp32, esp32s3, esp32c3, esp32c6))]
     pub fn sleep_deep<'a>(
         &mut self,
         wake_sources: &[&'a dyn WakeSource],
@@ -288,7 +288,7 @@ impl<'d> Rtc<'d> {
     }
 
     /// enter light sleep and wake with the provided `wake_sources`
-    #[cfg(any(esp32, esp32s3, esp32c3))]
+    #[cfg(any(esp32, esp32s3, esp32c3, esp32c6))]
     pub fn sleep_light<'a>(
         &mut self,
         wake_sources: &[&'a dyn WakeSource],
@@ -300,7 +300,7 @@ impl<'d> Rtc<'d> {
 
     /// enter sleep with the provided `config` and wake with the provided
     /// `wake_sources`
-    #[cfg(any(esp32, esp32s3, esp32c3))]
+    #[cfg(any(esp32, esp32s3, esp32c3, esp32c6))]
     pub fn sleep<'a>(
         &mut self,
         config: &RtcSleepConfig,

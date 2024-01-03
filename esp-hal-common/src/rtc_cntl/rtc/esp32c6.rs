@@ -6,7 +6,20 @@ use fugit::HertzU32;
 use strum::FromRepr;
 
 use crate::{
-    clock::{clocks_ll::regi2c_write_mask, Clock, XtalClock},
+    clock::{
+        clocks_ll::{
+            esp32c6_bbpll_get_freq_mhz,
+            esp32c6_cpu_get_hs_divider,
+            esp32c6_cpu_get_ls_divider,
+            esp32c6_rtc_bbpll_configure_raw,
+            esp32c6_rtc_freq_to_pll_mhz_raw,
+            esp32c6_rtc_update_to_8m,
+            esp32c6_rtc_update_to_xtal_raw,
+            regi2c_write_mask,
+        },
+        Clock,
+        XtalClock,
+    },
     peripherals::TIMG0,
     soc::efuse::Efuse,
     system::RadioPeripherals,
@@ -943,6 +956,16 @@ bitfield::bitfield! {
     pub bool, xpd_xtal     , set_xpd_xtal     : 31;
 }
 
+#[derive(Clone, Copy, Default)]
+// pmu_sleep_power_config_t.1
+pub struct LpSysPower {
+    // This is a best-guess assignment of the variants in the union `pmu_lp_power_t` union
+    // In esp-idf, all three fields are `pmu_lp_power_t`
+    pub dig_power: LpDigPower,
+    pub clk_power: LpClkPower,
+    pub xtal: LpXtalPower,
+}
+
 bitfield::bitfield! {
     #[derive(Clone, Copy, Default)]
     // pmu_lp_analog_t.0
@@ -1399,10 +1422,8 @@ pub struct RtcClock;
 impl RtcClock {
     const CAL_FRACT: u32 = 19;
 
-    /// Get main XTAL frequency
-    /// This is the value stored in RTC register RTC_XTAL_FREQ_REG by the
-    /// bootloader, as passed to rtc_clk_init function.
-    fn get_xtal_freq() -> XtalClock {
+    // rtc_clk_xtal_freq_get
+    fn get_xtal_freq_mhz() -> u32 {
         let xtal_freq_reg = unsafe { lp_aon().store4().read().bits() };
 
         // Values of RTC_XTAL_FREQ_REG and RTC_APB_FREQ_REG are stored as two copies in
@@ -1414,10 +1435,17 @@ impl RtcClock {
         let reg_val_to_clk_val = |val| val & u16::MAX as u32;
 
         if !clk_val_is_valid(xtal_freq_reg) {
-            return XtalClock::RtcXtalFreq40M;
+            return 40;
         }
 
-        match reg_val_to_clk_val(xtal_freq_reg) {
+        reg_val_to_clk_val(xtal_freq_reg)
+    }
+
+    /// Get main XTAL frequency
+    /// This is the value stored in RTC register RTC_XTAL_FREQ_REG by the
+    /// bootloader, as passed to rtc_clk_init function.
+    fn get_xtal_freq() -> XtalClock {
+        match Self::get_xtal_freq_mhz() {
             40 => XtalClock::RtcXtalFreq40M,
             other => XtalClock::RtcXtalFreqOther(other),
         }
@@ -1475,7 +1503,7 @@ impl RtcClock {
     /// Calibration of RTC_SLOW_CLK is performed using a special feature of
     /// TIMG0. This feature counts the number of XTAL clock cycles within a
     /// given number of RTC_SLOW_CLK cycles.
-    fn calibrate_internal(mut cal_clk: RtcCalSel, slowclk_cycles: u32) -> u32 {
+    pub(crate) fn calibrate_internal(mut cal_clk: RtcCalSel, slowclk_cycles: u32) -> u32 {
         const SOC_CLK_RC_FAST_FREQ_APPROX: u32 = 17_500_000;
         const SOC_CLK_RC_SLOW_FREQ_APPROX: u32 = 136_000;
         const SOC_CLK_XTAL32K_FREQ_APPROX: u32 = 32768;
@@ -1794,5 +1822,157 @@ impl RtcClock {
         let period = (100_000_000 * period_13q19 as u64) / (1 << RtcClock::CAL_FRACT);
 
         (100_000_000 * 1000 / period) as u16
+    }
+}
+
+pub(crate) fn rtc_clk_cpu_freq_set_xtal() {
+    // rtc_clk_cpu_set_to_default_config
+    let freq = RtcClock::get_xtal_freq_mhz();
+
+    esp32c6_rtc_update_to_xtal_raw(freq, 1);
+
+    // TODO: don't turn off the bbpll if some consumers depend on bbpll
+    // if !s_bbpll_digi_consumers_ref_count {
+    rtc_clk_bbpll_disable();
+    //}
+}
+
+#[derive(Clone, Copy, PartialEq, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub(crate) struct UnsupportedClockSource;
+
+#[derive(Clone, Copy, PartialEq, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub(crate) enum CpuClockSource {
+    Xtal,
+    PLL,
+    RcFast,
+}
+
+impl CpuClockSource {
+    pub(crate) fn current() -> Result<Self, UnsupportedClockSource> {
+        let source = match unsafe { pcr().sysclk_conf().read().soc_clk_sel().bits() } {
+            0 => CpuClockSource::Xtal,
+            1 => CpuClockSource::PLL,
+            2 => CpuClockSource::RcFast,
+            _ => return Err(UnsupportedClockSource),
+        };
+
+        Ok(source)
+    }
+
+    pub(crate) fn select(self) {
+        unsafe {
+            pcr().sysclk_conf().modify(|_, w| {
+                w.soc_clk_sel().bits(match self {
+                    CpuClockSource::Xtal => 0,
+                    CpuClockSource::PLL => 1,
+                    CpuClockSource::RcFast => 2,
+                })
+            });
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct SavedClockConfig {
+    /// The clock from which CPU clock is derived
+    pub source: CpuClockSource,
+
+    /// Source clock frequency
+    pub source_freq_mhz: u32,
+
+    /// Divider, freq_mhz = SOC_ROOT_CLK freq_mhz / div
+    pub div: u8,
+}
+
+impl SavedClockConfig {
+    pub(crate) fn save() -> Self {
+        let source = unwrap!(CpuClockSource::current());
+
+        let div;
+        let source_freq_mhz;
+        match source {
+            CpuClockSource::Xtal => {
+                div = esp32c6_cpu_get_ls_divider();
+                source_freq_mhz = RtcClock::get_xtal_freq_mhz();
+            }
+            CpuClockSource::PLL => {
+                div = esp32c6_cpu_get_hs_divider();
+                source_freq_mhz = esp32c6_bbpll_get_freq_mhz();
+            }
+            CpuClockSource::RcFast => {
+                div = esp32c6_cpu_get_ls_divider();
+                source_freq_mhz = 20;
+            }
+        }
+
+        SavedClockConfig {
+            source,
+            source_freq_mhz,
+            div,
+        }
+    }
+
+    fn freq_mhz(&self) -> u32 {
+        self.source_freq_mhz / self.div as u32
+    }
+
+    // rtc_clk_cpu_freq_set_config
+    pub(crate) fn restore(self) {
+        let old_source = unwrap!(CpuClockSource::current());
+
+        match self.source {
+            CpuClockSource::Xtal => esp32c6_rtc_update_to_xtal_raw(self.freq_mhz(), self.div),
+            CpuClockSource::RcFast => esp32c6_rtc_update_to_8m(),
+            CpuClockSource::PLL => {
+                if old_source != CpuClockSource::PLL {
+                    rtc_clk_bbpll_enable();
+                    esp32c6_rtc_bbpll_configure_raw(
+                        RtcClock::get_xtal_freq_mhz(),
+                        self.source_freq_mhz,
+                    );
+                }
+                esp32c6_rtc_freq_to_pll_mhz_raw(self.freq_mhz());
+            }
+        }
+
+        if old_source == CpuClockSource::PLL && self.source != CpuClockSource::PLL
+        // && !s_bbpll_digi_consumers_ref_count
+        {
+            // We don't turn off the bbpll if some consumers depend on bbpll
+            rtc_clk_bbpll_disable();
+        }
+    }
+}
+
+fn rtc_clk_bbpll_enable() {
+    unsafe {
+        pmu().imm_hp_ck_power().modify(|_, w| {
+            w.tie_high_xpd_bb_i2c()
+                .set_bit()
+                .tie_high_xpd_bbpll()
+                .set_bit()
+                .tie_high_xpd_bbpll_i2c()
+                .set_bit()
+        });
+        pmu()
+            .imm_hp_ck_power()
+            .modify(|_, w| w.tie_high_global_bbpll_icg().set_bit());
+    }
+}
+
+fn rtc_clk_bbpll_disable() {
+    unsafe {
+        pmu()
+            .imm_hp_ck_power()
+            .modify(|_, w| w.tie_low_global_bbpll_icg().set_bit());
+
+        pmu().imm_hp_ck_power().modify(|_, w| {
+            w.tie_low_xpd_bbpll()
+                .set_bit()
+                .tie_low_xpd_bbpll_i2c()
+                .set_bit()
+        });
     }
 }
