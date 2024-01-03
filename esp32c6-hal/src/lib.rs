@@ -55,19 +55,3 @@
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 
 pub use esp_hal_common::*;
-
-#[export_name = "__post_init"]
-unsafe fn post_init() {
-    use esp_hal_common::{
-        peripherals::{LP_CLKRST, TIMG0, TIMG1},
-        timer::Wdt,
-    };
-
-    // RTC domain must be enabled before we try to disable
-    let mut rtc = Rtc::new(LP_CLKRST::steal());
-    rtc.swd.disable();
-    rtc.rwdt.disable();
-
-    Wdt::<TIMG0>::set_wdt_enabled(false);
-    Wdt::<TIMG1>::set_wdt_enabled(false);
-}
