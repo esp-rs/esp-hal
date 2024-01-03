@@ -1,4 +1,8 @@
-use crate::hal::{peripherals, riscv};
+use crate::hal::{
+    interrupt,
+    peripherals::{self, Interrupt},
+    riscv,
+};
 
 pub(crate) fn chip_ints_on(mask: u32) {
     unsafe {
@@ -63,4 +67,49 @@ pub(crate) unsafe extern "C" fn set_intr(
     // we do nothing here since all the interrupts are already
     // configured in `setup_timer_isr` and messing with the interrupts will
     // get us into trouble
+}
+
+/****************************************************************************
+ * Name: esp_set_isr
+ *
+ * Description:
+ *   Register interrupt function
+ *
+ * Input Parameters:
+ *   n   - Interrupt ID
+ *   f   - Interrupt function
+ *   arg - Function private data
+ *
+ * Returned Value:
+ *   None
+ *
+ ****************************************************************************/
+pub unsafe extern "C" fn set_isr(
+    n: i32,
+    f: *mut crate::binary::c_types::c_void,
+    arg: *mut crate::binary::c_types::c_void,
+) {
+    trace!("set_isr - interrupt {} function {:?} arg {:?}", n, f, arg);
+
+    match n {
+        0 => {
+            crate::wifi::ISR_INTERRUPT_1 = (f, arg);
+        }
+        1 => {
+            crate::wifi::ISR_INTERRUPT_1 = (f, arg);
+        }
+        _ => panic!("set_isr - unsupported interrupt number {}", n),
+    }
+
+    #[cfg(feature = "wifi")]
+    {
+        unwrap!(interrupt::enable(
+            Interrupt::WIFI_MAC,
+            interrupt::Priority::Priority1
+        ));
+        unwrap!(interrupt::enable(
+            Interrupt::WIFI_PWR,
+            interrupt::Priority::Priority1
+        ));
+    }
 }

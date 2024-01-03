@@ -101,39 +101,6 @@ pub static mut ISR_INTERRUPT_1: (
 ) = (core::ptr::null_mut(), core::ptr::null_mut());
 
 /****************************************************************************
- * Name: esp_set_isr
- *
- * Description:
- *   Register interrupt function
- *
- * Input Parameters:
- *   n   - Interrupt ID
- *   f   - Interrupt function
- *   arg - Function private data
- *
- * Returned Value:
- *   None
- *
- ****************************************************************************/
-pub unsafe extern "C" fn set_isr(
-    n: i32,
-    f: *mut crate::binary::c_types::c_void,
-    arg: *mut crate::binary::c_types::c_void,
-) {
-    trace!("set_isr - interrupt {} function {:?} arg {:?}", n, f, arg);
-
-    match n {
-        0 => {
-            ISR_INTERRUPT_1 = (f, arg);
-        }
-        1 => {
-            ISR_INTERRUPT_1 = (f, arg);
-        }
-        _ => panic!("set_isr - unsupported interrupt number {}", n),
-    }
-}
-
-/****************************************************************************
  * Name: esp32c3_ints_on
  *
  * Description:

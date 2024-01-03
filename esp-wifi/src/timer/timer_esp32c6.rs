@@ -1,4 +1,5 @@
 #[cfg(any(feature = "wifi", feature = "ble"))]
+#[allow(unused_imports)]
 use crate::{
     binary,
     hal::{interrupt, macros::interrupt, peripherals::Interrupt},
@@ -7,17 +8,7 @@ use crate::{
 use crate::hal::peripherals;
 
 pub fn setup_radio_isr() {
-    #[cfg(feature = "wifi")]
-    {
-        unwrap!(interrupt::enable(
-            Interrupt::WIFI_MAC,
-            interrupt::Priority::Priority1
-        ));
-        unwrap!(interrupt::enable(
-            Interrupt::WIFI_PWR,
-            interrupt::Priority::Priority1
-        ));
-    }
+    // wifi enabled in set_isr
 
     // make sure to disable WIFI_BB/MODEM_PERI_TIMEOUT by mapping it to CPU interrupt 31 which is masked by default
     // for some reason for this interrupt, mapping it to 0 doesn't deactivate it

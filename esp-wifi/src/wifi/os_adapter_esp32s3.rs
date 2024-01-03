@@ -2,6 +2,8 @@
 #![allow(dead_code)]
 #![allow(non_snake_case)]
 
+use crate::hal::{interrupt, peripherals};
+
 pub(crate) fn chip_ints_on(mask: u32) {
     unsafe { crate::hal::xtensa_lx::interrupt::enable_mask(mask) };
 }
@@ -34,4 +36,48 @@ pub(crate) unsafe extern "C" fn set_intr(
     }
     // Force to bind WiFi interrupt to CPU0
     intr_matrix_set(0, intr_source, intr_num);
+}
+
+/****************************************************************************
+ * Name: esp_set_isr
+ *
+ * Description:
+ *   Register interrupt function
+ *
+ * Input Parameters:
+ *   n   - Interrupt ID
+ *   f   - Interrupt function
+ *   arg - Function private data
+ *
+ * Returned Value:
+ *   None
+ *
+ ****************************************************************************/
+pub unsafe extern "C" fn set_isr(
+    n: i32,
+    f: *mut crate::binary::c_types::c_void,
+    arg: *mut crate::binary::c_types::c_void,
+) {
+    trace!("set_isr - interrupt {} function {:?} arg {:?}", n, f, arg);
+
+    match n {
+        0 => {
+            crate::wifi::ISR_INTERRUPT_1 = (f, arg);
+        }
+        1 => {
+            crate::wifi::ISR_INTERRUPT_1 = (f, arg);
+        }
+        _ => panic!("set_isr - unsupported interrupt number {}", n),
+    }
+    #[cfg(feature = "wifi")]
+    {
+        unwrap!(interrupt::enable(
+            peripherals::Interrupt::WIFI_MAC,
+            interrupt::Priority::Priority1,
+        ));
+        unwrap!(interrupt::enable(
+            peripherals::Interrupt::WIFI_PWR,
+            interrupt::Priority::Priority1,
+        ));
+    }
 }

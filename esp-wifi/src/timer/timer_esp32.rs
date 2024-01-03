@@ -2,12 +2,7 @@
 use crate::hal::{interrupt, macros::interrupt, peripherals};
 
 pub fn setup_radio_isr() {
-    #[cfg(feature = "wifi")]
-    unwrap!(interrupt::enable(
-        peripherals::Interrupt::WIFI_MAC,
-        interrupt::Priority::Priority1,
-    ));
-
+    // wifi enabled in set_isr
     #[cfg(feature = "ble")]
     {
         unwrap!(interrupt::enable(

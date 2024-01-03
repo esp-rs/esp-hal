@@ -400,7 +400,7 @@ static g_wifi_osi_funcs: wifi_osi_funcs_t = wifi_osi_funcs_t {
     _env_is_chip: Some(env_is_chip),
     _set_intr: Some(set_intr),
     _clear_intr: Some(clear_intr),
-    _set_isr: Some(set_isr),
+    _set_isr: Some(os_adapter_chip_specific::set_isr),
     _ints_on: Some(ints_on),
     _ints_off: Some(ints_off),
     _is_from_isr: Some(is_from_isr),

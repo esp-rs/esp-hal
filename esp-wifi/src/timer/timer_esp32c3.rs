@@ -1,22 +1,12 @@
 #[cfg(any(feature = "wifi", feature = "ble"))]
+#[allow(unused_imports)]
 use crate::{
     binary,
     hal::{interrupt, macros::interrupt, peripherals::Interrupt},
 };
 
 pub fn setup_radio_isr() {
-    #[cfg(feature = "wifi")]
-    {
-        unwrap!(interrupt::enable(
-            Interrupt::WIFI_MAC,
-            interrupt::Priority::Priority1
-        ));
-        unwrap!(interrupt::enable(
-            Interrupt::WIFI_PWR,
-            interrupt::Priority::Priority1
-        ));
-    }
-
+    // wifi enabled in set_isr
     #[cfg(feature = "ble")]
     {
         unwrap!(interrupt::enable(
