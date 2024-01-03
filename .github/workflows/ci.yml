@@ -157,6 +157,9 @@ jobs:
           cargo check --examples --features=embassy,embassy-time-timg0,embassy-executor-interrupt,embassy-executor-thread,log
       - name: check esp32-hal (psram)
         run: cd esp32-hal/ && cargo check --example=psram --features=psram-2m --release # This example requires release!
+      # Make sure we can build without default features enabled, too!
+      - name: check esp32-hal (no default features)
+        run: cd esp32-hal/ && cargo build --no-default-features --features=xtal-40mhz
       # Ensure documentation can be built
       - name: rustdoc
         run: cd esp32-hal/ && cargo doc --features=eh1
@@ -209,6 +212,9 @@ jobs:
           cd esp32c2-hal/
           cargo +nightly check --examples --features=embassy,embassy-time-timg0,embassy-executor-thread,defmt
           cargo +nightly check --examples --features=embassy,embassy-time-timg0,embassy-executor-thread,log
+      # Make sure we can build without default features enabled, too!
+      - name: check esp32c2-hal (no default features)
+        run: cd esp32c2-hal/ && cargo build --no-default-features --features=xtal-40mhz
       # Ensure documentation can be built
       - name: rustdoc
         run: cd esp32c2-hal/ && cargo doc --features=eh1
@@ -263,6 +269,9 @@ jobs:
           cd esp32c3-hal/
           cargo +nightly check --examples --features=embassy,embassy-time-timg0,embassy-executor-thread,defmt
           cargo +nightly check --examples --features=embassy,embassy-time-timg0,embassy-executor-thread,log
+      # Make sure we can build without default features enabled, too!
+      - name: check esp32c3-hal (no default features)
+        run: cd esp32c3-hal/ && cargo build --no-default-features
       # Ensure documentation can be built
       - name: rustdoc
         run: cd esp32c3-hal/ && cargo doc --features=eh1
@@ -328,6 +337,9 @@ jobs:
           cd esp32c6-hal/
           cargo +nightly check --examples --features=embassy,embassy-time-timg0,embassy-executor-thread,defmt
           cargo +nightly check --examples --features=embassy,embassy-time-timg0,embassy-executor-thread,log
+      # Make sure we can build without default features enabled, too!
+      - name: check esp32c6-hal (no default features)
+        run: cd esp32c6-hal/ && cargo build --no-default-features
       # Ensure documentation can be built
       - name: rustdoc
         run: cd esp32c6-hal/ && cargo doc --features=eh1
@@ -408,6 +420,9 @@ jobs:
           cd esp32h2-hal/
           cargo +nightly check --examples --features=embassy,embassy-time-timg0,embassy-executor-thread,defmt
           cargo +nightly check --examples --features=embassy,embassy-time-timg0,embassy-executor-thread,log
+      # Make sure we can build without default features enabled, too!
+      - name: check esp32h2-hal (no default features)
+        run: cd esp32h2-hal/ && cargo build --no-default-features
       # Ensure documentation can be built
       - name: rustdoc
         run: cd esp32h2-hal/ && cargo doc --features=eh1
@@ -483,6 +498,9 @@ jobs:
           cargo +esp check --examples --features=embassy,embassy-time-timg0,embassy-executor-interrupt,embassy-executor-thread,log
       - name: check esp32s2-hal (psram)
         run: cd esp32s2-hal/ && cargo +esp check --example=psram --features=psram-2m --release # This example requires release!
+      # Make sure we can build without default features enabled, too!
+      - name: check esp32s2-hal (no default features)
+        run: cd esp32s2-hal/ && cargo build --no-default-features
       # Ensure documentation can be built
       - name: rustdoc
         run: cd esp32s2-hal/ && cargo +esp doc --features=eh1
@@ -565,6 +583,9 @@ jobs:
           cd esp32s3-hal/
           cargo +esp check --examples --features=embassy,embassy-time-timg0,embassy-executor-interrupt,embassy-executor-thread,defmt
           cargo +esp check --examples --features=embassy,embassy-time-timg0,embassy-executor-interrupt,embassy-executor-thread,log
+      # Make sure we can build without default features enabled, too!
+      - name: check esp32s3-hal (no default features)
+        run: cd esp32s3-hal/ && cargo build --no-default-features
       # Ensure documentation can be built
       - name: rustdoc
         run: cd esp32s3-hal/ && cargo doc --features=eh1

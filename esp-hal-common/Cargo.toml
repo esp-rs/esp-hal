@@ -48,7 +48,8 @@ embassy-sync       = { version = "0.5.0", optional = true }
 embassy-time       = { version = "0.2.0", optional = true }
 
 # RISC-V
-esp-riscv-rt = { version = "0.6.0", optional = true, path = "../esp-riscv-rt" }
+riscv        = { version = "0.10.1", optional = true }
+esp-riscv-rt = { version = "0.6.0",  optional = true, path = "../esp-riscv-rt" }
 
 # Xtensa
 xtensa-lx    = { version = "0.8.0",  optional = true }
@@ -73,17 +74,21 @@ basic-toml = "0.1.7"
 serde      = { version = "1.0.193", features = ["derive"] }
 
 [features]
-esp32   = ["xtensa", "esp32/rt",   "procmacros/esp32",   "xtensa-lx/esp32",   "xtensa-lx-rt/esp32"]
-esp32c2 = ["riscv",  "esp32c2/rt", "procmacros/esp32c2", "portable-atomic/unsafe-assume-single-core"]
-esp32c3 = ["riscv",  "esp32c3/rt", "procmacros/esp32c3", "portable-atomic/unsafe-assume-single-core"]
-esp32c6 = ["riscv",  "esp32c6/rt", "procmacros/esp32c6"]
-esp32h2 = ["riscv",  "esp32h2/rt", "procmacros/esp32h2"]
-esp32s2 = ["xtensa", "esp32s2/rt", "procmacros/esp32s2", "xtensa-lx/esp32s2", "xtensa-lx-rt/esp32s2", "usb-otg", "portable-atomic/critical-section"]
-esp32s3 = ["xtensa", "esp32s3/rt", "procmacros/esp32s3", "xtensa-lx/esp32s3", "xtensa-lx-rt/esp32s3", "usb-otg"]
+esp32   = ["dep:esp32",   "xtensa", "procmacros/esp32",   "xtensa-lx/esp32",   "xtensa-lx-rt?/esp32"]
+esp32c2 = ["dep:esp32c2", "riscv",  "procmacros/esp32c2", "portable-atomic/unsafe-assume-single-core"]
+esp32c3 = ["dep:esp32c3", "riscv",  "procmacros/esp32c3", "portable-atomic/unsafe-assume-single-core"]
+esp32c6 = ["dep:esp32c6", "riscv",  "procmacros/esp32c6"]
+esp32h2 = ["dep:esp32h2", "riscv",  "procmacros/esp32h2"]
+esp32s2 = ["dep:esp32s2", "xtensa", "procmacros/esp32s2", "xtensa-lx/esp32s2", "xtensa-lx-rt?/esp32s2", "usb-otg", "portable-atomic/critical-section"]
+esp32s3 = ["dep:esp32s3", "xtensa", "procmacros/esp32s3", "xtensa-lx/esp32s3", "xtensa-lx-rt?/esp32s3", "usb-otg"]
 
 # Crystal frequency selection (ESP32 and ESP32-C2 only!)
 xtal-26mhz = []
 xtal-40mhz = []
+
+# Runetime support
+rt-riscv  = ["esp-riscv-rt/zero-bss", "esp32c2?/rt", "esp32c3?/rt", "esp32c6?/rt", "esp32h2?/rt"]
+rt-xtensa = ["dep:xtensa-lx-rt", "esp32?/rt", "esp32s2?/rt", "esp32s3?/rt"]
 
 # Only certain chips support flip-link (ESP32-C6 and ESPS32-H2)
 flip-link = ["esp-riscv-rt/fix-sp"]
@@ -150,7 +155,7 @@ embassy-generic-queue-64  = ["embassy-time/generic-queue-64"]
 embassy-generic-queue-128 = ["embassy-time/generic-queue-128"]
 
 # Architecture-specific features (intended for internal use)
-riscv  = ["critical-section/restore-state-u8", "esp-riscv-rt", "esp-riscv-rt/zero-bss"]
+riscv  = ["dep:riscv", "critical-section/restore-state-u8"]
 xtensa = ["critical-section/restore-state-u32"]
 
 # Initialize / clear data sections and RTC memory

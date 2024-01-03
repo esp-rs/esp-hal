@@ -683,18 +683,18 @@ pub(crate) fn errata36(pin_num: u8, pull_up: bool, pull_down: bool) {
         32 => {
             rtcio.xtal_32k_pad().modify(|r, w| unsafe {
                 w.bits(r.bits())
-                    .x32n_rue()
+                    .x32p_rue()
                     .bit(pull_up)
-                    .x32n_rde()
+                    .x32p_rde()
                     .bit(pull_down)
             });
         }
         33 => {
             rtcio.xtal_32k_pad().modify(|r, w| unsafe {
                 w.bits(r.bits())
-                    .x32p_rue()
+                    .x32n_rue()
                     .bit(pull_up)
-                    .x32p_rde()
+                    .x32n_rde()
                     .bit(pull_down)
             });
         }

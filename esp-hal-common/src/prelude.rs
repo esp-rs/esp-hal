@@ -34,6 +34,8 @@ pub use crate::dma::{
     DmaTransfer as _esp_hal_dma_DmaTransfer,
     DmaTransferRxTx as _esp_hal_dma_DmaTransferRxTx,
 };
+#[cfg(any(feature = "rt-riscv", feature = "rt-xtensa"))]
+pub use crate::entry;
 #[cfg(gpio)]
 pub use crate::gpio::{
     InputPin as _esp_hal_gpio_InputPin,
@@ -59,4 +61,4 @@ pub use crate::timer::{
 };
 #[cfg(any(uart0, uart1, uart2))]
 pub use crate::uart::{Instance as _esp_hal_uart_Instance, UartPins as _esp_hal_uart_UartPins};
-pub use crate::{clock::Clock as _esp_hal_clock_Clock, entry, macros::*};
+pub use crate::{clock::Clock as _esp_hal_clock_Clock, macros::*};
