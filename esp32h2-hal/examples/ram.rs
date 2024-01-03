@@ -9,12 +9,7 @@
 #![no_main]
 
 use esp32h2_hal::{
-    clock::ClockControl,
-    macros::ram,
-    peripherals::Peripherals,
-    prelude::*,
-    timer::TimerGroup,
-    Rtc,
+    clock::ClockControl, macros::ram, peripherals::Peripherals, prelude::*, timer::TimerGroup, Rtc,
 };
 use esp_backtrace as _;
 use esp_println::println;
@@ -40,7 +35,7 @@ fn main() -> ! {
 
     // The RWDT flash boot protection must be enabled, as it is triggered as part of
     // the example.
-    let mut rtc = Rtc::new(peripherals.LP_CLKRST);
+    let mut rtc = Rtc::new(peripherals.LPWR);
     rtc.rwdt.enable();
 
     timer0.start(1u64.secs());

@@ -11,9 +11,7 @@ use esp32c3_hal::{
     peripherals::Peripherals,
     prelude::*,
     rtc_cntl::{get_reset_reason, get_wakeup_cause, sleep::TimerWakeupSource, SocResetReason},
-    Cpu,
-    Delay,
-    Rtc,
+    Cpu, Delay, Rtc,
 };
 use esp_backtrace as _;
 use esp_println::println;
@@ -24,7 +22,7 @@ fn main() -> ! {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
+    let mut rtc = Rtc::new(peripherals.LPWR);
 
     println!("up and runnning!");
     let reason = get_reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);

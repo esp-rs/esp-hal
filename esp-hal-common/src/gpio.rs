@@ -1691,7 +1691,7 @@ macro_rules! rtc_pins {
             }
 
             fn rtcio_pad_hold(&mut self, enable: bool) {
-                let rtc_ctrl = unsafe { &*crate::peripherals::RTC_CNTL::PTR };
+                let rtc_ctrl = unsafe { &*crate::peripherals::LPWR::PTR };
 
                 #[cfg(esp32)]
                 rtc_ctrl.hold_force().modify(|_, w| w.$hold().bit(enable));

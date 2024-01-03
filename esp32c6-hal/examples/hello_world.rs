@@ -7,11 +7,7 @@
 use core::fmt::Write;
 
 use esp32c6_hal::{
-    clock::ClockControl,
-    peripherals::Peripherals,
-    prelude::*,
-    timer::TimerGroup,
-    Uart,
+    clock::ClockControl, peripherals::Peripherals, prelude::*, timer::TimerGroup, Uart,
 };
 use esp_backtrace as _;
 use nb::block;
@@ -27,6 +23,8 @@ fn main() -> ! {
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let mut timer0 = timer_group0.timer0;
     timer0.start(1u64.secs());
+
+    panic!("pizda");
 
     loop {
         writeln!(uart0, "Hello world!").unwrap();

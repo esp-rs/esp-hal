@@ -12,7 +12,7 @@ fn main() -> ! {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let rtc = Rtc::new(peripherals.LP_CLKRST);
+    let rtc = Rtc::new(peripherals.LPWR);
     let mut delay = Delay::new(&clocks);
 
     loop {
