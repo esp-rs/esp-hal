@@ -53,9 +53,9 @@
 //! ```
 
 #[cfg(riscv)]
-pub use riscv::*;
+pub use self::riscv::*;
 #[cfg(xtensa)]
-pub use xtensa::*;
+pub use self::xtensa::*;
 
 #[cfg(riscv)]
 mod riscv;
