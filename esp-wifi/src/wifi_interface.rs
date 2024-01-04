@@ -39,6 +39,8 @@ pub struct WifiStack<'a, MODE: WifiDeviceMode> {
     pub(crate) ip_info: RefCell<Option<ipv4::IpInfo>>,
     #[cfg(feature = "dhcpv4")]
     pub(crate) dhcp_socket_handle: RefCell<Option<SocketHandle>>,
+    #[cfg(feature = "dhcpv4")]
+    pub(crate) old_connected: RefCell<bool>,
     #[cfg(feature = "dns")]
     dns_socket_handle: RefCell<Option<SocketHandle>>,
 }
@@ -78,6 +80,8 @@ impl<'a, MODE: WifiDeviceMode> WifiStack<'a, MODE> {
             ip_info: RefCell::new(None),
             #[cfg(feature = "dhcpv4")]
             dhcp_socket_handle: RefCell::new(dhcp_socket_handle),
+            #[cfg(feature = "dhcpv4")]
+            old_connected: RefCell::new(false),
             sockets: RefCell::new(sockets),
             current_millis_fn,
             #[cfg(feature = "tcp")]
@@ -215,6 +219,18 @@ impl<'a, MODE: WifiDeviceMode> WifiStack<'a, MODE> {
         let dhcp_socket_handle_ref = self.dhcp_socket_handle.borrow_mut();
         if let Some(dhcp_handle) = *dhcp_socket_handle_ref {
             let dhcp_socket = sockets.get_mut::<Dhcpv4Socket>(dhcp_handle);
+
+            let connected = match crate::wifi::get_sta_state() {
+                crate::wifi::WifiState::StaConnected => true,
+                _ => false,
+            };
+
+            if connected && !*self.old_connected.borrow() {
+                dhcp_socket.reset();
+            }
+
+            *self.old_connected.borrow_mut() = connected;
+
             let event = dhcp_socket.poll();
             if let Some(event) = event {
                 match event {
