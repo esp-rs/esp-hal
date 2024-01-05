@@ -45,14 +45,13 @@ num-traits = { workspace = true, default-features = false }
 esp-wifi-sys = { version = "0.1.0", path = "../esp-wifi-sys" }
 embassy-sync = { workspace = true, optional = true }
 embassy-futures = { workspace = true, optional = true }
-embassy-net = { workspace = true, optional = true }
+embassy-net-driver = { workspace = true, optional = true }
 toml-cfg.workspace = true
 libm.workspace = true
 cfg-if.workspace = true
 portable-atomic.workspace = true
 portable_atomic_enum.workspace = true
 
-# We don't use these directly but we need to enable portable-atomic on them
 futures-util.workspace = true
 atomic-waker.workspace = true
 
@@ -64,6 +63,7 @@ esp-println = { workspace = true, features = ["log"] }
 esp-backtrace.workspace = true
 embassy-executor.workspace = true
 embassy-time.workspace = true
+embassy-net.workspace = true
 bleps = { workspace = true, features = ["async"] }
 embedded-hal-async.workspace = true
 log.workspace = true
@@ -102,7 +102,7 @@ async = [
   "esp32s3-hal?/async",
 ]
 
-embassy-net = ["dep:embassy-net", "async"]
+embassy-net = ["dep:embassy-net-driver", "async"]
 
 # misc features
 coex = []

@@ -1086,7 +1086,7 @@ mod sealed {
         fn register_link_state_waker(self, cx: &mut core::task::Context);
 
         #[cfg(feature = "embassy-net")]
-        fn link_state(self) -> embassy_net::driver::LinkState;
+        fn link_state(self) -> embassy_net_driver::LinkState;
     }
 
     impl Sealed for WifiStaDevice {
@@ -1122,11 +1122,11 @@ mod sealed {
         }
 
         #[cfg(feature = "embassy-net")]
-        fn link_state(self) -> embassy_net::driver::LinkState {
+        fn link_state(self) -> embassy_net_driver::LinkState {
             if matches!(get_sta_state(), WifiState::StaConnected) {
-                embassy_net::driver::LinkState::Up
+                embassy_net_driver::LinkState::Up
             } else {
-                embassy_net::driver::LinkState::Down
+                embassy_net_driver::LinkState::Down
             }
         }
     }
@@ -1164,11 +1164,11 @@ mod sealed {
         }
 
         #[cfg(feature = "embassy-net")]
-        fn link_state(self) -> embassy_net::driver::LinkState {
+        fn link_state(self) -> embassy_net_driver::LinkState {
             if matches!(get_ap_state(), WifiState::ApStarted) {
-                embassy_net::driver::LinkState::Up
+                embassy_net_driver::LinkState::Up
             } else {
-                embassy_net::driver::LinkState::Down
+                embassy_net_driver::LinkState::Down
             }
         }
     }
@@ -1738,7 +1738,7 @@ macro_rules! esp_wifi_result {
 #[cfg(feature = "embassy-net")]
 pub(crate) mod embassy {
     use super::*;
-    use embassy_net::driver::{Capabilities, Driver, HardwareAddress, RxToken, TxToken};
+    use embassy_net_driver::{Capabilities, Driver, HardwareAddress, RxToken, TxToken};
     use embassy_sync::waitqueue::AtomicWaker;
 
     // We can get away with a single tx waker because the transmit queue is shared
@@ -1787,7 +1787,7 @@ pub(crate) mod embassy {
             self.mode.tx_token()
         }
 
-        fn link_state(&mut self, cx: &mut core::task::Context) -> embassy_net::driver::LinkState {
+        fn link_state(&mut self, cx: &mut core::task::Context) -> embassy_net_driver::LinkState {
             self.mode.register_link_state_waker(cx);
             self.mode.link_state()
         }
