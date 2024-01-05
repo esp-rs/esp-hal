@@ -28,8 +28,6 @@ fn main() -> ! {
     let mut timer0 = timer_group0.timer0;
     timer0.start(1u64.secs());
 
-    panic!("pizda");
-
     loop {
         writeln!(uart0, "Hello world!").unwrap();
         block!(timer0.wait()).unwrap();
