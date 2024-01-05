@@ -13,11 +13,15 @@ use esp32c3_hal::{
     peripherals::Peripherals,
     prelude::*,
     rtc_cntl::{
-        get_reset_reason, get_wakeup_cause,
+        get_reset_reason,
+        get_wakeup_cause,
         sleep::{RtcioWakeupSource, TimerWakeupSource, WakeupLevel},
         SocResetReason,
     },
-    Cpu, Delay, Rtc, IO,
+    Cpu,
+    Delay,
+    Rtc,
+    IO,
 };
 use esp_backtrace as _;
 use esp_println::println;

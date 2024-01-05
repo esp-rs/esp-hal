@@ -14,7 +14,8 @@ use esp32c6_hal::{
     interrupt,
     peripherals::{self, Peripherals},
     prelude::*,
-    Rtc, Rwdt,
+    Rtc,
+    Rwdt,
 };
 use esp_backtrace as _;
 

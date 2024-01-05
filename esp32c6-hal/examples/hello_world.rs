@@ -7,7 +7,11 @@
 use core::fmt::Write;
 
 use esp32c6_hal::{
-    clock::ClockControl, peripherals::Peripherals, prelude::*, timer::TimerGroup, Uart,
+    clock::ClockControl,
+    peripherals::Peripherals,
+    prelude::*,
+    timer::TimerGroup,
+    Uart,
 };
 use esp_backtrace as _;
 use nb::block;

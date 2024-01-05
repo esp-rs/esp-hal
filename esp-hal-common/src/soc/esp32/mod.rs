@@ -5,7 +5,7 @@
 //! The `SOC` module provides access, functions and structures that are useful
 //! for interacting with various system-related peripherals on `ESP32` chip.
 
-use self::peripherals::{RTC_CNTL, TIMG0, TIMG1};
+use self::peripherals::{LPWR, TIMG0, TIMG1};
 use crate::{timer::Wdt, Rtc};
 
 pub mod cpu_control;
@@ -74,7 +74,7 @@ pub extern "Rust" fn __init_data() -> bool {
 #[export_name = "__post_init"]
 unsafe fn post_init() {
     // RTC domain must be enabled before we try to disable
-    let mut rtc = Rtc::new(RTC_CNTL::steal());
+    let mut rtc = Rtc::new(LPWR::steal());
     rtc.rwdt.disable();
 
     Wdt::<TIMG0>::set_wdt_enabled(false);
