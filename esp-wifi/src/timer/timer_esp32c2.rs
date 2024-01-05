@@ -1,5 +1,5 @@
-#[allow(unused_imports)]
 #[cfg(any(feature = "wifi", feature = "ble"))]
+#[allow(unused_imports)]
 use crate::{
     binary,
     hal::{interrupt, macros::interrupt, peripherals::Interrupt},

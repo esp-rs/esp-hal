@@ -1,6 +1,6 @@
 [package]
 name = "esp-wifi"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 authors = [
     "The ESP-RS team",
@@ -42,7 +42,7 @@ fugit.workspace = true
 heapless = { workspace = true, default-features = false }
 num-derive = { workspace = true }
 num-traits = { workspace = true, default-features = false }
-esp-wifi-sys = { version = "0.1.0", path = "../esp-wifi-sys" }
+esp-wifi-sys = { version = "0.2.0", path = "../esp-wifi-sys" }
 embassy-sync = { workspace = true, optional = true }
 embassy-futures = { workspace = true, optional = true }
 embassy-net-driver = { workspace = true, optional = true }

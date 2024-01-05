@@ -1,3 +1,4 @@
+#[cfg(any(feature = "ble"))]
 use crate::{
     binary,
     hal::{interrupt, macros::interrupt, peripherals::Interrupt},
