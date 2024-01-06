@@ -191,4 +191,4 @@ required-features = ["embassy", "async"]
 
 [[example]]
 name              = "embassy_twai"
-required-features = ["embassy", "async"]
+required-features = ["embassy", "embassy-executor-thread", "async"]
