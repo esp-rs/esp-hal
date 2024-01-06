@@ -46,6 +46,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added async support for TWAI (#951)
 
 ### Changed
+- Added inherent implementations for TWAI transmit and receive
+- Added inherent `transmit` and `receive` methods for `Twai`. `embedded-hal` `Can` trait is no longer needed in scope. (#951)
 
 - Set up interrupts for the DMA and async enabled peripherals only when `async` feature is provided (#1042)
 - Update to `1.0.0` releases of the `embedded-hal-*` packages (#1068)
@@ -105,8 +107,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Relevant interrupts are now auto enabled in `embassy::init` (#1014).
 - Set up interrupts for the DMA and async enabled peripherals only when `async` feature is provided (#1042)
 - S2 / S3: Don't require GPIO 18 to create a USB peripheral driver instance (#990)
-- Added inherent implementations for TWAI transmit and receive
-- Added inherent `transmit` and `receive` methods for `Twai`. `embedded-hal` `Can` trait is no longer needed in scope. (#951)
 
 ### Fixed
 
