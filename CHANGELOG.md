@@ -43,6 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-S3: Added support for 80Mhz PSRAM (#1069)
 - ESP32-C3/S3: Add workaround for USB pin exchange on usb-serial-jtag (#1104).
 - ESP32C6: Added LP_UART initialization (#1113)
+- Added async support for TWAI (#951)
+
 ### Changed
 
 - Set up interrupts for the DMA and async enabled peripherals only when `async` feature is provided (#1042)
@@ -87,8 +89,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A macro to make it easier to create DMA buffers and descriptors (#935)
 - I2C timeout is configurable (#1011)
 - ESP32-C6/ESP32-H2: `flip-link` feature gives zero-cost stack overflow protection (#1008)
-- Added async support for TWAI
-- Added async support for TWAI (#951)
 
 ### Changed
 
