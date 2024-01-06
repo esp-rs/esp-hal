@@ -106,7 +106,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Explicit panic when hitting the `DefaultHandler` (#1005)
 - Relevant interrupts are now auto enabled in `embassy::init` (#1014).
 - Set up interrupts for the DMA and async enabled peripherals only when `async` feature is provided (#1042)
-- S2 / S3: Don't require GPIO 18 to create a USB peripheral driver instance (#990)
 
 ### Fixed
 
