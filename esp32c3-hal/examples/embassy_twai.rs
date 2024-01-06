@@ -1,7 +1,14 @@
-// ! embassy twai
-// !
-// ! This is an example of running the embassy executor and asynchronously
-// ! receiving and transmitting twai frames.
+//! This example demonstrates use of the twai peripheral running the embassy
+//! executor and asynchronously receiving and transmitting twai frames.
+//!
+//! The `receiver` task waits to receive a frame and puts it into a channel
+//! which will be picked up by the `transmitter` task.
+//!
+//! The `transmitter` task waits for a channel to receive a frame and transmits
+//! it.
+//!
+//! This example should work with another ESP board running the `twai` example
+//! with `IS_SENDER` set to `true`.
 
 #![no_std]
 #![no_main]
@@ -9,6 +16,7 @@
 
 use embassy_executor::Spawner;
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, channel::Channel};
+use embedded_can::{Frame, Id};
 use esp32c3_hal::{
     clock::ClockControl,
     embassy,
@@ -19,6 +27,7 @@ use esp32c3_hal::{
     IO,
 };
 use esp_backtrace as _;
+use esp_println::println;
 use static_cell::make_static;
 
 type TwaiOutbox = Channel<NoopRawMutex, EspTwaiFrame, 16>;
@@ -26,17 +35,18 @@ type TwaiOutbox = Channel<NoopRawMutex, EspTwaiFrame, 16>;
 #[embassy_executor::task]
 async fn receiver(mut rx: TwaiRx<'static, TWAI0>, channel: &'static TwaiOutbox) -> ! {
     loop {
-        // let frame = nb::block!(can.receive());
         let frame = rx.receive_async().await;
 
         match frame {
             Ok(frame) => {
-                esp_println::println!("Received frame: {:?}", frame);
+                println!("Received a frame:");
+                print_frame(&frame);
+
                 // repeat the frame back
                 channel.send(frame).await;
             }
             Err(e) => {
-                esp_println::println!("Receive error: {:?}", e);
+                println!("Receive error: {:?}", e);
             }
         }
     }
@@ -50,10 +60,11 @@ async fn transmitter(mut tx: TwaiTx<'static, TWAI0>, channel: &'static TwaiOutbo
 
         match result {
             Ok(()) => {
-                esp_println::println!("Transmitted frame: {:?}", frame);
+                println!("Transmitted a frame:");
+                print_frame(&frame);
             }
             Err(e) => {
-                esp_println::println!("Transmit error: {:?}", e);
+                println!("Transmit error: {:?}", e);
             }
         }
     }
@@ -125,4 +136,24 @@ async fn main(spawner: Spawner) {
 
     spawner.spawn(receiver(rx, channel)).ok();
     spawner.spawn(transmitter(tx, channel)).ok();
+}
+
+fn print_frame(frame: &EspTwaiFrame) {
+    // Print different messages based on the frame id type.
+    match frame.id() {
+        Id::Standard(id) => {
+            println!("\tStandard Id: {:?}", id);
+        }
+        Id::Extended(id) => {
+            println!("\tExtended Id: {:?}", id);
+        }
+    }
+
+    // Print out the frame data or the requested data length code for a remote
+    // transmission request frame.
+    if frame.is_data_frame() {
+        println!("\tData: {:?}", frame.data());
+    } else {
+        println!("\tRemote Frame. Data Length Code: {}", frame.dlc());
+    }
 }
