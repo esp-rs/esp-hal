@@ -46,7 +46,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added async support for TWAI (#951)
 
 ### Changed
-- Added inherent implementations for TWAI transmit and receive
 - Added inherent `transmit` and `receive` methods for `Twai`. `embedded-hal` `Can` trait is no longer needed in scope. (#951)
 
 - Set up interrupts for the DMA and async enabled peripherals only when `async` feature is provided (#1042)
