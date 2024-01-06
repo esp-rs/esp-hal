@@ -16,7 +16,7 @@ const DELAY_MS: u32 = 1000;
 // embedded-hal-0.2.7. embedded-can was split off from embedded-hal before it's
 // upgrade to 1.0.0. cargo run --example twai --features eh1 --release
 #[cfg(feature = "eh1")]
-use embedded_can::{Frame, Id};
+use embedded_can::{Frame, Id, StandardId};
 // Run this example without the eh1 flag to use the embedded-hal 0.2.7 CAN traits.
 // cargo run --example twai --release
 #[cfg(not(feature = "eh1"))]
