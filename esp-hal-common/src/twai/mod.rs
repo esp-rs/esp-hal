@@ -264,7 +264,7 @@ impl BaudRate {
 
 /// An inactive TWAI peripheral in the "Reset"/configuration state.
 pub struct TwaiConfiguration<'d, T> {
-    peripheral: PhantomData<&'d mut PeripheralRef<'d, T>>,
+    peripheral: PhantomData<&'d PeripheralRef<'d, T>>,
 }
 
 impl<'d, T> TwaiConfiguration<'d, T>
@@ -480,7 +480,7 @@ where
 
 /// Interface to the CAN transmitter part.
 pub struct TwaiTx<'d, T> {
-    _peripheral: PhantomData<&'d mut T>,
+    _peripheral: PhantomData<&'d T>,
 }
 
 impl<'d, T> TwaiTx<'d, T>
@@ -520,7 +520,7 @@ where
 
 /// Interface to the CAN receiver part.
 pub struct TwaiRx<'d, T> {
-    _peripheral: PhantomData<&'d mut T>,
+    _peripheral: PhantomData<&'d T>,
 }
 
 impl<'d, T> TwaiRx<'d, T>
