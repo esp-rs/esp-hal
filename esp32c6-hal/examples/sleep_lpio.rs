@@ -29,7 +29,7 @@ fn main() -> ! {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let mut rtc = Rtc::new(peripherals.LP_CLKRST);
+    let mut rtc = Rtc::new(peripherals.LPWR);
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let mut pin2 = io.pins.gpio2;

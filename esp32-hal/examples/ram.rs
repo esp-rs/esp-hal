@@ -40,7 +40,7 @@ fn main() -> ! {
 
     // The RWDT flash boot protection must be enabled, as it is triggered as part of
     // the example.
-    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
+    let mut rtc = Rtc::new(peripherals.LPWR);
     rtc.rwdt.enable();
 
     timer0.start(1u64.secs());

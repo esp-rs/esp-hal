@@ -9,7 +9,7 @@
 //!    * I2S_SCLK: 160_000_000 - I2S clock frequency
 //!    * I2S_DEFAULT_CLK_SRC: 2 - I2S clock source
 
-use self::peripherals::{RTC_CNTL, TIMG0, TIMG1};
+use self::peripherals::{LPWR, TIMG0, TIMG1};
 use crate::{timer::Wdt, Rtc};
 
 pub mod cpu_control;
@@ -113,7 +113,7 @@ pub extern "Rust" fn __init_data() -> bool {
 #[export_name = "__post_init"]
 unsafe fn post_init() {
     // RTC domain must be enabled before we try to disable
-    let mut rtc = Rtc::new(RTC_CNTL::steal());
+    let mut rtc = Rtc::new(LPWR::steal());
     rtc.rwdt.disable();
 
     Wdt::<TIMG0>::set_wdt_enabled(false);

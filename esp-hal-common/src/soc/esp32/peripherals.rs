@@ -51,7 +51,7 @@ crate::peripherals! {
     RMT <= RMT,
     RNG <= RNG,
     RSA <= RSA,
-    RTC_CNTL <= RTC_CNTL,
+    LPWR <= RTC_CNTL,
     RTC_IO <= RTC_IO,
     RTC_I2C <= RTC_I2C,
     SDHOST <= SDHOST,

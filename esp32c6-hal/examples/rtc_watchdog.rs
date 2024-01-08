@@ -27,7 +27,7 @@ fn main() -> ! {
     let system = peripherals.SYSTEM.split();
     let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let mut rtc = Rtc::new(peripherals.LP_CLKRST);
+    let mut rtc = Rtc::new(peripherals.LPWR);
     rtc.rwdt.start(2000u64.millis());
     rtc.rwdt.listen();
 

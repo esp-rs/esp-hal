@@ -3,7 +3,7 @@ use strum::FromRepr;
 
 use crate::{
     clock::{clocks_ll::regi2c_write_mask, Clock, XtalClock},
-    peripherals::{LP_AON, LP_CLKRST, PCR, PMU, TIMG0},
+    peripherals::{LPWR, LP_AON, PCR, PMU, TIMG0},
 };
 
 const I2C_PMU: u8 = 0x6d;
@@ -306,7 +306,7 @@ impl RtcClock {
     fn set_fast_freq(fast_freq: RtcFastClock) {
         // components/hal/esp32s2/include/hal/clk_tree_ll.h
         unsafe {
-            let lp_clkrst = &*LP_CLKRST::PTR;
+            let lp_clkrst = &*LPWR::PTR;
             lp_clkrst.lp_clk_conf().modify(|_, w| {
                 w.fast_clk_sel().bits(match fast_freq {
                     RtcFastClock::RtcFastClockRcFast => 0b00,
@@ -319,7 +319,7 @@ impl RtcClock {
 
     fn set_slow_freq(slow_freq: RtcSlowClock) {
         unsafe {
-            let lp_clkrst = &*LP_CLKRST::PTR;
+            let lp_clkrst = &*LPWR::PTR;
 
             lp_clkrst
                 .lp_clk_conf()
@@ -341,7 +341,7 @@ impl RtcClock {
 
     /// Get the RTC_SLOW_CLK source
     pub(crate) fn get_slow_freq() -> RtcSlowClock {
-        let lp_clrst = unsafe { &*LP_CLKRST::ptr() };
+        let lp_clrst = unsafe { &*LPWR::ptr() };
 
         let slow_freq = lp_clrst.lp_clk_conf().read().slow_clk_sel().bits();
         match slow_freq {
@@ -382,7 +382,7 @@ impl RtcClock {
             };
         }
 
-        let lp_clkrst = unsafe { &*LP_CLKRST::ptr() };
+        let lp_clkrst = unsafe { &*LPWR::ptr() };
         let pcr = unsafe { &*PCR::ptr() };
         let pmu = unsafe { &*PMU::ptr() };
 

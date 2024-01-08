@@ -18,7 +18,7 @@
 //! ## Example
 //!
 //! ```no_run
-//! let mut rtc = Rtc::new(peripherals.RTC_CNTL);
+//! let mut rtc = Rtc::new(peripherals.LPWR);
 //!
 //! // Create timer groups
 //! let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
