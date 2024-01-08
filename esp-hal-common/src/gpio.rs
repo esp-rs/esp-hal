@@ -38,11 +38,11 @@ pub const NO_PIN: Option<NoPinType> = None;
 
 #[derive(Copy, Clone)]
 pub enum Event {
-    RisingEdge  = 1,
+    RisingEdge = 1,
     FallingEdge = 2,
-    AnyEdge     = 3,
-    LowLevel    = 4,
-    HighLevel   = 5,
+    AnyEdge = 3,
+    LowLevel = 4,
+    HighLevel = 5,
 }
 
 pub struct Unknown {}
@@ -133,7 +133,7 @@ pub struct AF1;
 pub struct AF2;
 
 pub enum DriveStrength {
-    I5mA  = 0,
+    I5mA = 0,
     I10mA = 1,
     I20mA = 2,
     I40mA = 3,
@@ -151,7 +151,7 @@ pub enum AlternateFunction {
 
 #[derive(PartialEq)]
 pub enum RtcFunction {
-    Rtc     = 0,
+    Rtc = 0,
     Digital = 1,
 }
 
@@ -1355,7 +1355,359 @@ where
     }
 }
 
-impl<MODE> embedded_hal::digital::v2::InputPin for AnyPin<Input<MODE>> {
+impl<MODE, TYPE> From<AnyPin<MODE, TYPE>> for AnyPin<MODE>
+where
+    TYPE: PinType,
+{
+    fn from(pin: AnyPin<MODE, TYPE>) -> Self {
+        Self {
+            inner: pin.inner,
+            _type: core::marker::PhantomData::default(),
+        }
+    }
+}
+
+impl<MODE, TYPE> crate::peripheral::Peripheral for AnyPin<MODE, TYPE>
+where
+    TYPE: PinType,
+{
+    type P = Self;
+
+    unsafe fn clone_unchecked(&mut self) -> Self::P {
+        let inner = &mut self.inner;
+        let this: AnyPin<MODE> = handle_gpio_input!(inner, target, {
+            crate::peripheral::Peripheral::clone_unchecked(target).into()
+        });
+        Self {
+            inner: this.inner,
+            _type: core::marker::PhantomData::default(),
+        }
+    }
+}
+
+impl<MODE, TYPE> crate::peripheral::sealed::Sealed for AnyPin<MODE, TYPE> where TYPE: PinType {}
+
+impl<MODE, TYPE> AnyPin<MODE, TYPE>
+where
+    TYPE: PinType,
+{
+    pub fn degrade(self) -> AnyPin<MODE> {
+        AnyPin {
+            inner: self.inner,
+            _type: core::marker::PhantomData::default(),
+        }
+    }
+}
+
+impl<MODE> AnyPin<MODE, InputOutputPinType> {
+    pub fn into_input_type(self) -> AnyPin<MODE, InputOnlyPinType> {
+        AnyPin {
+            inner: self.inner,
+            _type: core::marker::PhantomData::default(),
+        }
+    }
+}
+
+impl<MODE> AnyPin<MODE, InputOutputAnalogPinType> {
+    pub fn into_input_type(self) -> AnyPin<MODE, InputOnlyPinType> {
+        AnyPin {
+            inner: self.inner,
+            _type: core::marker::PhantomData::default(),
+        }
+    }
+
+    pub fn into_input_output_type(self) -> AnyPin<MODE, InputOutputPinType> {
+        AnyPin {
+            inner: self.inner,
+            _type: core::marker::PhantomData::default(),
+        }
+    }
+
+    pub fn into_input_only_analog_type(self) -> AnyPin<MODE, InputOnlyAnalogPinType> {
+        AnyPin {
+            inner: self.inner,
+            _type: core::marker::PhantomData::default(),
+        }
+    }
+}
+
+impl<MODE> AnyPin<MODE, InputOnlyAnalogPinType> {
+    pub fn into_input_type(self) -> AnyPin<MODE, InputOnlyPinType> {
+        AnyPin {
+            inner: self.inner,
+            _type: core::marker::PhantomData::default(),
+        }
+    }
+}
+
+impl<MODE, TYPE> Pin for AnyPin<MODE, TYPE>
+where
+    TYPE: PinType,
+{
+    fn number(&self) -> u8 {
+        let inner = &self.inner;
+        handle_gpio_input!(inner, target, { Pin::number(target) })
+    }
+
+    fn sleep_mode(&mut self, on: bool) {
+        let inner = &mut self.inner;
+        handle_gpio_input!(inner, target, { Pin::sleep_mode(target, on) })
+    }
+
+    fn set_alternate_function(&mut self, alternate: AlternateFunction) {
+        let inner = &mut self.inner;
+        handle_gpio_input!(inner, target, {
+            Pin::set_alternate_function(target, alternate)
+        })
+    }
+
+    fn is_listening(&self) -> bool {
+        let inner = &self.inner;
+        handle_gpio_input!(inner, target, { Pin::is_listening(target) })
+    }
+
+    fn listen_with_options(
+        &mut self,
+        event: Event,
+        int_enable: bool,
+        nmi_enable: bool,
+        wake_up_from_light_sleep: bool,
+    ) {
+        let inner = &mut self.inner;
+        handle_gpio_input!(inner, target, {
+            Pin::listen_with_options(
+                target,
+                event,
+                int_enable,
+                nmi_enable,
+                wake_up_from_light_sleep,
+            )
+        })
+    }
+
+    fn listen(&mut self, event: Event) {
+        let inner = &mut self.inner;
+        handle_gpio_input!(inner, target, { Pin::listen(target, event) })
+    }
+
+    fn unlisten(&mut self) {
+        let inner = &mut self.inner;
+        handle_gpio_input!(inner, target, { Pin::unlisten(target) })
+    }
+
+    fn is_interrupt_set(&self) -> bool {
+        let inner = &self.inner;
+        handle_gpio_input!(inner, target, { Pin::is_interrupt_set(target) })
+    }
+
+    fn clear_interrupt(&mut self) {
+        let inner = &mut self.inner;
+        handle_gpio_input!(inner, target, { Pin::clear_interrupt(target) })
+    }
+}
+
+impl<MODE, TYPE> InputPin for AnyPin<MODE, TYPE>
+where
+    MODE: InputMode,
+    TYPE: IsInputPin,
+{
+    fn set_to_input(&mut self) -> &mut Self {
+        let inner = &mut self.inner;
+        handle_gpio_input!(inner, target, {
+            InputPin::set_to_input(target);
+        });
+        self
+    }
+
+    fn enable_input(&mut self, on: bool) -> &mut Self {
+        let inner = &mut self.inner;
+        handle_gpio_input!(inner, target, {
+            InputPin::enable_input(target, on);
+        });
+        self
+    }
+
+    fn enable_input_in_sleep_mode(&mut self, on: bool) -> &mut Self {
+        let inner = &mut self.inner;
+        handle_gpio_input!(inner, target, {
+            InputPin::enable_input_in_sleep_mode(target, on);
+        });
+        self
+    }
+
+    fn is_input_high(&self) -> bool {
+        let inner = &self.inner;
+        handle_gpio_input!(inner, target, { InputPin::is_input_high(target) })
+    }
+
+    fn connect_input_to_peripheral(&mut self, signal: InputSignal) -> &mut Self {
+        let inner = &mut self.inner;
+        handle_gpio_input!(inner, target, {
+            InputPin::connect_input_to_peripheral(target, signal);
+        });
+        self
+    }
+
+    fn connect_input_to_peripheral_with_options(
+        &mut self,
+        signal: InputSignal,
+        invert: bool,
+        force_via_gpio_mux: bool,
+    ) -> &mut Self {
+        let inner = &mut self.inner;
+        handle_gpio_input!(inner, target, {
+            InputPin::connect_input_to_peripheral_with_options(
+                target,
+                signal,
+                invert,
+                force_via_gpio_mux,
+            );
+        });
+        self
+    }
+
+    fn disconnect_input_from_peripheral(&mut self, signal: InputSignal) -> &mut Self {
+        let inner = &mut self.inner;
+        handle_gpio_input!(inner, target, {
+            InputPin::disconnect_input_from_peripheral(target, signal);
+        });
+        self
+    }
+}
+
+impl<MODE, TYPE> OutputPin for AnyPin<MODE, TYPE>
+where
+    MODE: OutputMode,
+    TYPE: IsOutputPin,
+{
+    fn set_to_open_drain_output(&mut self) -> &mut Self {
+        let inner = &mut self.inner;
+        handle_gpio_output!(inner, target, {
+            OutputPin::set_to_open_drain_output(target);
+        });
+        self
+    }
+
+    fn set_to_push_pull_output(&mut self) -> &mut Self {
+        let inner = &mut self.inner;
+        handle_gpio_output!(inner, target, {
+            OutputPin::set_to_push_pull_output(target);
+        });
+        self
+    }
+
+    fn enable_output(&mut self, on: bool) -> &mut Self {
+        let inner = &mut self.inner;
+        handle_gpio_output!(inner, target, {
+            OutputPin::enable_output(target, on);
+        });
+        self
+    }
+
+    fn set_output_high(&mut self, on: bool) -> &mut Self {
+        let inner = &mut self.inner;
+        handle_gpio_output!(inner, target, {
+            OutputPin::set_output_high(target, on);
+        });
+        self
+    }
+
+    fn set_drive_strength(&mut self, strength: DriveStrength) -> &mut Self {
+        let inner = &mut self.inner;
+        handle_gpio_output!(inner, target, {
+            OutputPin::set_drive_strength(target, strength);
+        });
+        self
+    }
+
+    fn enable_open_drain(&mut self, on: bool) -> &mut Self {
+        let inner = &mut self.inner;
+        handle_gpio_output!(inner, target, {
+            OutputPin::enable_open_drain(target, on);
+        });
+        self
+    }
+
+    fn enable_output_in_sleep_mode(&mut self, on: bool) -> &mut Self {
+        let inner = &mut self.inner;
+        handle_gpio_output!(inner, target, {
+            OutputPin::enable_output_in_sleep_mode(target, on);
+        });
+        self
+    }
+
+    fn internal_pull_up_in_sleep_mode(&mut self, on: bool) -> &mut Self {
+        let inner = &mut self.inner;
+        handle_gpio_output!(inner, target, {
+            OutputPin::internal_pull_up_in_sleep_mode(target, on);
+        });
+        self
+    }
+
+    fn internal_pull_down_in_sleep_mode(&mut self, on: bool) -> &mut Self {
+        let inner = &mut self.inner;
+        handle_gpio_output!(inner, target, {
+            OutputPin::internal_pull_down_in_sleep_mode(target, on);
+        });
+        self
+    }
+
+    fn internal_pull_up(&mut self, on: bool) -> &mut Self {
+        let inner = &mut self.inner;
+        handle_gpio_output!(inner, target, {
+            OutputPin::internal_pull_up(target, on);
+        });
+        self
+    }
+
+    fn internal_pull_down(&mut self, on: bool) -> &mut Self {
+        let inner = &mut self.inner;
+        handle_gpio_output!(inner, target, {
+            OutputPin::internal_pull_down(target, on);
+        });
+        self
+    }
+
+    fn connect_peripheral_to_output(&mut self, signal: OutputSignal) -> &mut Self {
+        let inner = &mut self.inner;
+        handle_gpio_output!(inner, target, {
+            OutputPin::connect_peripheral_to_output(target, signal);
+        });
+        self
+    }
+
+    fn connect_peripheral_to_output_with_options(
+        &mut self,
+        signal: OutputSignal,
+        invert: bool,
+        invert_enable: bool,
+        enable_from_gpio: bool,
+        force_via_gpio_mux: bool,
+    ) -> &mut Self {
+        let inner = &mut self.inner;
+        handle_gpio_output!(inner, target, {
+            OutputPin::connect_peripheral_to_output_with_options(
+                target,
+                signal,
+                invert,
+                invert_enable,
+                enable_from_gpio,
+                force_via_gpio_mux,
+            );
+        });
+        self
+    }
+
+    fn disconnect_peripheral_from_output(&mut self) -> &mut Self {
+        let inner = &mut self.inner;
+        handle_gpio_output!(inner, target, {
+            OutputPin::disconnect_peripheral_from_output(target);
+        });
+        self
+    }
+}
+
+impl<MODE, TYPE> embedded_hal::digital::v2::InputPin for AnyPin<Input<MODE>, TYPE> {
     type Error = core::convert::Infallible;
 
     fn is_high(&self) -> Result<bool, Self::Error> {
@@ -1370,12 +1722,12 @@ impl<MODE> embedded_hal::digital::v2::InputPin for AnyPin<Input<MODE>> {
 }
 
 #[cfg(feature = "eh1")]
-impl<MODE> embedded_hal_1::digital::ErrorType for AnyPin<Input<MODE>> {
+impl<MODE, TYPE> embedded_hal_1::digital::ErrorType for AnyPin<Input<MODE>, TYPE> {
     type Error = Infallible;
 }
 
 #[cfg(feature = "eh1")]
-impl<MODE> embedded_hal_1::digital::InputPin for AnyPin<Input<MODE>> {
+impl<MODE, TYPE> embedded_hal_1::digital::InputPin for AnyPin<Input<MODE>, TYPE> {
     fn is_high(&self) -> Result<bool, Self::Error> {
         let inner = &self.inner;
         handle_gpio_input!(inner, target, { target.is_high() })
@@ -1387,7 +1739,7 @@ impl<MODE> embedded_hal_1::digital::InputPin for AnyPin<Input<MODE>> {
     }
 }
 
-impl<MODE> embedded_hal::digital::v2::OutputPin for AnyPin<Output<MODE>> {
+impl<MODE, TYPE> embedded_hal::digital::v2::OutputPin for AnyPin<Output<MODE>, TYPE> {
     type Error = Infallible;
 
     fn set_low(&mut self) -> Result<(), Self::Error> {
@@ -1401,7 +1753,7 @@ impl<MODE> embedded_hal::digital::v2::OutputPin for AnyPin<Output<MODE>> {
     }
 }
 
-impl<MODE> embedded_hal::digital::v2::StatefulOutputPin for AnyPin<Output<MODE>> {
+impl<MODE, TYPE> embedded_hal::digital::v2::StatefulOutputPin for AnyPin<Output<MODE>, TYPE> {
     fn is_set_high(&self) -> Result<bool, Self::Error> {
         let inner = &self.inner;
         handle_gpio_output!(inner, target, { target.is_set_high() })
@@ -1413,7 +1765,7 @@ impl<MODE> embedded_hal::digital::v2::StatefulOutputPin for AnyPin<Output<MODE>>
     }
 }
 
-impl<MODE> embedded_hal::digital::v2::ToggleableOutputPin for AnyPin<Output<MODE>> {
+impl<MODE, TYPE> embedded_hal::digital::v2::ToggleableOutputPin for AnyPin<Output<MODE>, TYPE> {
     type Error = Infallible;
 
     fn toggle(&mut self) -> Result<(), Self::Error> {
@@ -1423,12 +1775,12 @@ impl<MODE> embedded_hal::digital::v2::ToggleableOutputPin for AnyPin<Output<MODE
 }
 
 #[cfg(feature = "eh1")]
-impl<MODE> embedded_hal_1::digital::ErrorType for AnyPin<Output<MODE>> {
+impl<MODE, TYPE> embedded_hal_1::digital::ErrorType for AnyPin<Output<MODE>, TYPE> {
     type Error = Infallible;
 }
 
 #[cfg(feature = "eh1")]
-impl<MODE> embedded_hal_1::digital::OutputPin for AnyPin<Output<MODE>> {
+impl<MODE, TYPE> embedded_hal_1::digital::OutputPin for AnyPin<Output<MODE>, TYPE> {
     fn set_low(&mut self) -> Result<(), Self::Error> {
         let inner = &mut self.inner;
         handle_gpio_output!(inner, target, { target.set_low() })
@@ -1441,7 +1793,7 @@ impl<MODE> embedded_hal_1::digital::OutputPin for AnyPin<Output<MODE>> {
 }
 
 #[cfg(feature = "eh1")]
-impl<MODE> embedded_hal_1::digital::StatefulOutputPin for AnyPin<Output<MODE>> {
+impl<MODE, TYPE> embedded_hal_1::digital::StatefulOutputPin for AnyPin<Output<MODE>, TYPE> {
     fn is_set_high(&self) -> Result<bool, Self::Error> {
         let inner = &self.inner;
         handle_gpio_output!(inner, target, { target.is_set_high() })
@@ -1454,7 +1806,7 @@ impl<MODE> embedded_hal_1::digital::StatefulOutputPin for AnyPin<Output<MODE>> {
 }
 
 #[cfg(feature = "eh1")]
-impl<MODE> embedded_hal_1::digital::ToggleableOutputPin for AnyPin<Output<MODE>> {
+impl<MODE, TYPE> embedded_hal_1::digital::ToggleableOutputPin for AnyPin<Output<MODE>, TYPE> {
     fn toggle(&mut self) -> Result<(), Self::Error> {
         let inner = &mut self.inner;
         handle_gpio_output!(inner, target, { target.toggle() })
@@ -1462,7 +1814,7 @@ impl<MODE> embedded_hal_1::digital::ToggleableOutputPin for AnyPin<Output<MODE>>
 }
 
 #[cfg(feature = "async")]
-impl<MODE> embedded_hal_async::digital::Wait for AnyPin<Input<MODE>> {
+impl<MODE, TYPE> embedded_hal_async::digital::Wait for AnyPin<Input<MODE>, TYPE> {
     async fn wait_for_high(&mut self) -> Result<(), Self::Error> {
         let inner = &mut self.inner;
         handle_gpio_input!(inner, target, { target.wait_for_high().await })
@@ -1600,28 +1952,40 @@ macro_rules! gpio {
                 )+
             }
 
-            pub struct AnyPin<MODE> {
-                pub(crate) inner: ErasedPin<MODE>
+            pub struct AnyPin<MODE, TYPE = ()> {
+                pub(crate) inner: ErasedPin<MODE>,
+                pub(crate) _type: core::marker::PhantomData<TYPE>,
             }
 
             $(
+            impl<MODE> From< [<Gpio $gpionum >]<MODE> > for AnyPin<MODE, crate::gpio::[<$type PinType>]> {
+                fn from(value: [<Gpio $gpionum >]<MODE>) -> Self {
+                    AnyPin {
+                        inner: ErasedPin::[<Gpio $gpionum >](value),
+                        _type: core::marker::PhantomData::default(),
+                    }
+                }
+            }
+
             impl<MODE> From< [<Gpio $gpionum >]<MODE> > for AnyPin<MODE> {
                 fn from(value: [<Gpio $gpionum >]<MODE>) -> Self {
                     AnyPin {
-                        inner: ErasedPin::[<Gpio $gpionum >](value)
+                        inner: ErasedPin::[<Gpio $gpionum >](value),
+                        _type: core::marker::PhantomData::default(),
                     }
                 }
             }
 
             impl<MODE> [<Gpio $gpionum >]<MODE> {
-                pub fn degrade(self) -> AnyPin<MODE> {
+                pub fn degrade(self) -> AnyPin<MODE, crate::gpio::[<$type PinType>]> {
                     AnyPin {
-                        inner: ErasedPin::[<Gpio $gpionum >](self)
+                        inner: ErasedPin::[<Gpio $gpionum >](self),
+                        _type: core::marker::PhantomData::default(),
                     }
                 }
             }
 
-            impl<MODE> TryInto<[<Gpio $gpionum >]<MODE>> for AnyPin<MODE> {
+            impl<MODE, TYPE> TryInto<[<Gpio $gpionum >]<MODE>> for AnyPin<MODE, TYPE> {
                 type Error = ();
 
                 fn try_into(self) -> Result<[<Gpio $gpionum >]<MODE>, Self::Error> {
