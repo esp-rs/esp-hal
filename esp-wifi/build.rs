@@ -83,7 +83,7 @@ fn main() -> Result<(), String> {
         println!("cargo:warning=coex is enabled but wifi is not");
 
         #[cfg(not(feature = "ble"))]
-        println!("cargo:warning=coex is enabled but wifi is not");
+        println!("cargo:warning=coex is enabled but ble is not");
     }
 
     validate_config();
