@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Update to `1.0.0` releases of the `embedded-hal-*` packages (#1068)
+
 ### Fixed
 
 - ESP32: correct gpio 32/33 in errata36() (#1053)
@@ -26,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 ### Breaking
+
 - Unify the low-power peripheral names (`RTC_CNTL` and `LP_CLKRST` to `LPWR`) (#1064)
 
 ## [0.14.1] - 2023-12-13
