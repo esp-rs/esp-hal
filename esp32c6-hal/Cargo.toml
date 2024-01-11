@@ -32,14 +32,14 @@ elliptic-curve     = { version = "0.13.8", default-features = false, features = 
 embassy-executor   = { version = "0.4.0",  features = ["nightly"] }
 embassy-sync       = "0.5.0"
 embedded-graphics  = "0.8.1"
-embedded-hal-1     = { version = "=1.0.0-rc.2", package = "embedded-hal" }
-embedded-hal-async = "=1.0.0-rc.2"
+embedded-hal-1     = { version = "1.0.0", package = "embedded-hal" }
+embedded-hal-async = "1.0.0"
 embedded-can       = "0.4.1"
 embedded-io-async  = "0.6.1"
 embedded-hal-bus   = "0.1.0-rc.2"
-esp-backtrace      = { version = "0.9.0", features = ["esp32c6", "panic-handler", "exception-handler", "print-uart"] }
+esp-backtrace      = { version = "0.10.0", features = ["esp32c6", "panic-handler", "exception-handler", "print-uart"] }
 esp-hal-smartled   = { version = "0.7.0", features = ["esp32c6"], path = "../esp-hal-smartled" }
-esp-println        = { version = "0.7.1", features = ["esp32c6"] }
+esp-println        = { version = "0.8.0", features = ["esp32c6"] }
 heapless           = "0.8.0"
 hex-literal        = "0.4.1"
 hmac               = { version = "0.12.1", default-features = false }
@@ -55,7 +55,7 @@ static_cell        = { version = "2.0.0", features = ["nightly"] }
 default              = ["rt", "vectored", "zero-rtc-bss", "embassy-integrated-timers"]
 async                = ["esp-hal-common/async"]
 debug                = ["esp-hal-common/debug"]
-defmt                = ["esp-hal-common/defmt", "esp-println/defmt"]
+defmt                = ["esp-hal-common/defmt", "esp-println/defmt-espflash"]
 direct-vectoring     = ["esp-hal-common/direct-vectoring"]
 eh1                  = ["esp-hal-common/eh1"]
 embedded-io          = ["esp-hal-common/embedded-io"]
@@ -156,3 +156,8 @@ required-features = ["embassy", "async", "embassy-executor-thread"]
 [[example]]
 name              = "embassy_usb_serial_jtag"
 required-features = ["embassy", "async", "embassy-executor-thread"]
+
+[patch.crates-io]
+embassy-executor = { git = "https://github.com/embassy-rs/embassy", rev = "0027a76" }
+embassy-sync     = { git = "https://github.com/embassy-rs/embassy", rev = "0027a76" }
+embassy-time     = { git = "https://github.com/embassy-rs/embassy", rev = "0027a76" }
