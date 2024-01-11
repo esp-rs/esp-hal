@@ -18,6 +18,7 @@ SECTIONS {
     *( .phyiram  .phyiram.*)
     *( .iram1  .iram1.*)
     *( .wifiextrairam.* )
+    *( .coexiram.* )
     . = ALIGN(4);
   } > RWTEXT AT > RODATA
 }
