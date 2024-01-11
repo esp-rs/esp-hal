@@ -569,10 +569,10 @@ impl<MODE, const GPIONUM: u8> embedded_hal_1::digital::InputPin for GpioPin<Inpu
 where
     Self: GpioProperties,
 {
-    fn is_high(&self) -> Result<bool, Self::Error> {
+    fn is_high(&mut self) -> Result<bool, Self::Error> {
         Ok(<Self as GpioProperties>::Bank::read_input() & (1 << (GPIONUM % 32)) != 0)
     }
-    fn is_low(&self) -> Result<bool, Self::Error> {
+    fn is_low(&mut self) -> Result<bool, Self::Error> {
         Ok(!self.is_high()?)
     }
 }
@@ -583,10 +583,10 @@ where
     Self: GpioProperties,
     <Self as GpioProperties>::PinType: IsOutputPin,
 {
-    fn is_high(&self) -> Result<bool, Self::Error> {
+    fn is_high(&mut self) -> Result<bool, Self::Error> {
         Ok(<Self as GpioProperties>::Bank::read_input() & (1 << (GPIONUM % 32)) != 0)
     }
-    fn is_low(&self) -> Result<bool, Self::Error> {
+    fn is_low(&mut self) -> Result<bool, Self::Error> {
         Ok(!self.is_high()?)
     }
 }
@@ -918,28 +918,11 @@ where
     Self: GpioProperties,
     <Self as GpioProperties>::PinType: IsOutputPin,
 {
-    fn is_set_high(&self) -> Result<bool, Self::Error> {
+    fn is_set_high(&mut self) -> Result<bool, Self::Error> {
         Ok(<Self as GpioProperties>::Bank::read_output() & (1 << (GPIONUM % 32)) != 0)
     }
-    fn is_set_low(&self) -> Result<bool, Self::Error> {
+    fn is_set_low(&mut self) -> Result<bool, Self::Error> {
         Ok(!self.is_set_high()?)
-    }
-}
-
-#[cfg(feature = "eh1")]
-impl<MODE, const GPIONUM: u8> embedded_hal_1::digital::ToggleableOutputPin
-    for GpioPin<Output<MODE>, GPIONUM>
-where
-    Self: GpioProperties,
-    <Self as GpioProperties>::PinType: IsOutputPin,
-{
-    fn toggle(&mut self) -> Result<(), Self::Error> {
-        use embedded_hal_1::digital::{OutputPin as _, StatefulOutputPin as _};
-        if self.is_set_high()? {
-            Ok(self.set_low()?)
-        } else {
-            Ok(self.set_high()?)
-        }
     }
 }
 
@@ -1376,13 +1359,13 @@ impl<MODE> embedded_hal_1::digital::ErrorType for AnyPin<Input<MODE>> {
 
 #[cfg(feature = "eh1")]
 impl<MODE> embedded_hal_1::digital::InputPin for AnyPin<Input<MODE>> {
-    fn is_high(&self) -> Result<bool, Self::Error> {
-        let inner = &self.inner;
+    fn is_high(&mut self) -> Result<bool, Self::Error> {
+        let inner = &mut self.inner;
         handle_gpio_input!(inner, target, { target.is_high() })
     }
 
-    fn is_low(&self) -> Result<bool, Self::Error> {
-        let inner = &self.inner;
+    fn is_low(&mut self) -> Result<bool, Self::Error> {
+        let inner = &mut self.inner;
         handle_gpio_input!(inner, target, { target.is_low() })
     }
 }
@@ -1442,22 +1425,14 @@ impl<MODE> embedded_hal_1::digital::OutputPin for AnyPin<Output<MODE>> {
 
 #[cfg(feature = "eh1")]
 impl<MODE> embedded_hal_1::digital::StatefulOutputPin for AnyPin<Output<MODE>> {
-    fn is_set_high(&self) -> Result<bool, Self::Error> {
-        let inner = &self.inner;
+    fn is_set_high(&mut self) -> Result<bool, Self::Error> {
+        let inner = &mut self.inner;
         handle_gpio_output!(inner, target, { target.is_set_high() })
     }
 
-    fn is_set_low(&self) -> Result<bool, Self::Error> {
-        let inner = &self.inner;
-        handle_gpio_output!(inner, target, { target.is_set_low() })
-    }
-}
-
-#[cfg(feature = "eh1")]
-impl<MODE> embedded_hal_1::digital::ToggleableOutputPin for AnyPin<Output<MODE>> {
-    fn toggle(&mut self) -> Result<(), Self::Error> {
+    fn is_set_low(&mut self) -> Result<bool, Self::Error> {
         let inner = &mut self.inner;
-        handle_gpio_output!(inner, target, { target.toggle() })
+        handle_gpio_output!(inner, target, { target.is_set_low() })
     }
 }
 
