@@ -32,7 +32,7 @@ pub(crate) fn enable_wifi_power_domain() {
         | DPORT_RW_BTMAC_RST;
 
     unsafe {
-        let rtc_cntl = &*crate::hal::peripherals::RTC_CNTL::ptr();
+        let rtc_cntl = &*crate::hal::peripherals::LPWR::ptr();
 
         let syscon = &*crate::hal::peripherals::SYSCON::ptr();
 

@@ -21,11 +21,17 @@ pub(crate) mod ble_os_adapter_chip_specific;
 
 const TIME_FOREVER: u32 = u32::MAX;
 
+#[cfg(esp32c2)]
 const OS_MSYS_1_BLOCK_COUNT: i32 = 24;
+#[cfg(esp32c2)]
 const SYSINIT_MSYS_1_MEMPOOL_SIZE: usize = 768;
+#[cfg(esp32c2)]
 const SYSINIT_MSYS_1_MEMBLOCK_SIZE: i32 = 128;
+#[cfg(esp32c2)]
 const OS_MSYS_2_BLOCK_COUNT: i32 = 24;
+#[cfg(esp32c2)]
 const SYSINIT_MSYS_2_MEMPOOL_SIZE: usize = 1920;
+#[cfg(esp32c2)]
 const SYSINIT_MSYS_2_MEMBLOCK_SIZE: i32 = 320;
 
 const BLE_HCI_TRANS_BUF_CMD: i32 = 3;
@@ -41,7 +47,7 @@ struct Callout {
     events: ble_npl_event,
 }
 
-static mut CALLOUTS: [Option<Callout>; 12] = [None; 12];
+static mut CALLOUTS: [Option<Callout>; 18] = [None; 18];
 
 #[derive(Copy, Clone)]
 struct Event {
@@ -58,6 +64,7 @@ static mut EVENT_QUEUE: SimpleQueue<usize, 10> = SimpleQueue::new();
 static BT_RECEIVE_QUEUE: Mutex<RefCell<SimpleQueue<ReceivedPacket, 10>>> =
     Mutex::new(RefCell::new(SimpleQueue::new()));
 
+#[cfg(esp32c2)]
 type OsMembufT = u32;
 
 #[derive(Debug, Clone, Copy)]
@@ -95,6 +102,7 @@ pub(crate) struct OsMempool {
     name: *const u8,
 }
 
+#[cfg(esp32c2)]
 impl OsMempool {
     const fn zeroed() -> Self {
         Self {
@@ -134,6 +142,7 @@ pub(crate) struct OsMbufPool {
     next: *const OsMbufPool,
 }
 
+#[cfg(esp32c2)]
 impl OsMbufPool {
     const fn zeroed() -> Self {
         Self {
@@ -204,12 +213,18 @@ pub struct BleHciTransFuncsT {
         Option<unsafe extern "C" fn(cb: OsMempoolPutFn, arg: *const c_void) -> i32>,
 }
 
+#[cfg(esp32c2)]
 pub(crate) static mut OS_MSYS_INIT_1_DATA: *mut OsMembufT = core::ptr::null_mut();
+#[cfg(esp32c2)]
 pub(crate) static mut OS_MSYS_INIT_1_MBUF_POOL: OsMbufPool = OsMbufPool::zeroed();
+#[cfg(esp32c2)]
 pub(crate) static mut OS_MSYS_INIT_1_MEMPOOL: OsMempool = OsMempool::zeroed();
 
+#[cfg(esp32c2)]
 pub(crate) static mut OS_MSYS_INIT_2_DATA: *mut OsMembufT = core::ptr::null_mut();
+#[cfg(esp32c2)]
 pub(crate) static mut OS_MSYS_INIT_2_MBUF_POOL: OsMbufPool = OsMbufPool::zeroed();
+#[cfg(esp32c2)]
 pub(crate) static mut OS_MSYS_INIT_2_MEMPOOL: OsMempool = OsMempool::zeroed();
 
 extern "C" {
@@ -242,6 +257,7 @@ extern "C" {
 
     pub(crate) fn esp_ble_ll_set_public_addr(addr: *const u8);
 
+    #[cfg(esp32c2)]
     pub(crate) fn r_mem_init_mbuf_pool(
         mem: *const c_void,
         mempool: *const OsMempool,
@@ -251,8 +267,10 @@ extern "C" {
         name: *const u8,
     ) -> i32;
 
+    #[cfg(esp32c2)]
     pub(crate) fn r_os_msys_reset();
 
+    #[cfg(esp32c2)]
     pub(crate) fn r_os_msys_register(mbuf_pool: *const OsMbufPool) -> i32;
 
     #[allow(unused)]
@@ -1043,13 +1061,16 @@ pub(crate) fn ble_init() {
         }
         // not really using npl_info here ... remove it?
 
-        /* Initialize the global memory pool */
-        let ret = os_msys_buf_alloc();
-        if !ret {
-            panic!("os_msys_buf_alloc failed");
-        }
+        #[cfg(esp32c2)]
+        {
+            // Initialize the global memory pool
+            let ret = os_msys_buf_alloc();
+            if !ret {
+                panic!("os_msys_buf_alloc failed");
+            }
 
-        os_msys_init();
+            os_msys_init();
+        }
 
         crate::common_adapter::chip_specific::phy_enable();
 
@@ -1068,6 +1089,24 @@ pub(crate) fn ble_init() {
 
         if res != 0 {
             panic!("ble_controller_init returned {}", res);
+        }
+
+        #[cfg(not(esp32c2))]
+        {
+            extern "C" {
+                fn esp_ble_msys_init(
+                    msys_size1: u16,
+                    msys_size2: u16,
+                    msys_cnt1: u16,
+                    msys_cnt2: u16,
+                    from_heap: u8,
+                ) -> i32;
+            }
+
+            let res = esp_ble_msys_init(256, 320, 12, 24, 1);
+            if res != 0 {
+                panic!("esp_ble_msys_init returned {}", res);
+            }
         }
 
         #[cfg(coex)]
@@ -1115,6 +1154,7 @@ pub(crate) fn ble_init() {
     }
 }
 
+#[cfg(esp32c2)]
 fn os_msys_buf_alloc() -> bool {
     unsafe {
         OS_MSYS_INIT_1_DATA = crate::compat::malloc::calloc(
@@ -1130,6 +1170,7 @@ fn os_msys_buf_alloc() -> bool {
     }
 }
 
+#[cfg(esp32c2)]
 fn os_msys_init() {
     static MSYS1: &[u8] = b"msys_1\0";
     static MSYS2: &[u8] = b"msys_2\0";

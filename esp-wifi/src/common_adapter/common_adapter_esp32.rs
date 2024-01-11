@@ -18,7 +18,7 @@ static mut PHY_CLOCK_ENABLE_REF: AtomicU32 = AtomicU32::new(0);
 
 pub(crate) fn enable_wifi_power_domain() {
     unsafe {
-        let rtc_cntl = &*crate::hal::peripherals::RTC_CNTL::ptr();
+        let rtc_cntl = &*crate::hal::peripherals::LPWR::ptr();
 
         rtc_cntl
             .dig_pwc()

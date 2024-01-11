@@ -1730,21 +1730,6 @@ pub unsafe extern "C" fn coex_status_get() -> u32 {
 }
 
 /****************************************************************************
- * Name: esp_coex_condition_set
- *
- * Description:
- *   Don't support
- *
- ****************************************************************************/
-#[cfg_attr(not(coex), allow(unused_variables))]
-pub unsafe extern "C" fn coex_condition_set(type_: u32, dissatisfy: bool) {
-    trace!("coex_condition_set");
-
-    #[cfg(coex)]
-    crate::binary::include::coex_condition_set(type_, dissatisfy);
-}
-
-/****************************************************************************
  * Name: esp_coex_wifi_request
  *
  * Description:

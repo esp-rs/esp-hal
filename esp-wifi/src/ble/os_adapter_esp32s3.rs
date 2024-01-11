@@ -75,11 +75,13 @@ pub(super) struct osi_funcs_s {
     esp_hw_power_down: Option<unsafe extern "C" fn()>,
     esp_hw_power_up: Option<unsafe extern "C" fn()>,
     ets_backup_dma_copy: Option<unsafe extern "C" fn(u32, u32, u32, i32)>,
+    ets_delay_us: Option<unsafe extern "C" fn(u32)>,
+    btdm_rom_table_ready: Option<unsafe extern "C" fn()>,
 }
 
 pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     magic: 0xfadebead,
-    version: 0x00010006,
+    version: 0x00010007,
     interrupt_set: Some(ble_os_adapter_chip_specific::interrupt_set),
     interrupt_clear: Some(ble_os_adapter_chip_specific::interrupt_clear),
     interrupt_handler_set: Some(ble_os_adapter_chip_specific::interrupt_handler_set),
@@ -132,7 +134,27 @@ pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     esp_hw_power_down: Some(ble_os_adapter_chip_specific::esp_hw_power_down),
     esp_hw_power_up: Some(ble_os_adapter_chip_specific::esp_hw_power_up),
     ets_backup_dma_copy: Some(ble_os_adapter_chip_specific::ets_backup_dma_copy),
+    ets_delay_us: Some(ets_delay_us_wrapper),
+    btdm_rom_table_ready: Some(btdm_rom_table_ready_wrapper),
 };
+
+extern "C" fn ets_delay_us_wrapper(us: u32) {
+    extern "C" {
+        fn ets_delay_us(us: u32);
+    }
+
+    unsafe {
+        ets_delay_us(us);
+    }
+}
+
+extern "C" fn btdm_rom_table_ready_wrapper() {
+    debug!("btdm_rom_table_ready_wrapper is NOT implemented");
+
+    // #if BT_BLE_CCA_MODE == 2
+    // btdm_cca_feature_enable();
+    // #endif
+}
 
 extern "C" {
     fn btdm_controller_rom_data_init() -> i32;
@@ -141,7 +163,7 @@ extern "C" {
 pub(crate) fn create_ble_config() -> esp_bt_controller_config_t {
     esp_bt_controller_config_t {
         magic: 0x5a5aa5a5,
-        version: 0x02302140,
+        version: 0x02307120,
         controller_task_stack_size: 8192,
         controller_task_prio: 200,
         controller_task_run_cpu: 0,
@@ -173,6 +195,7 @@ pub(crate) fn create_ble_config() -> esp_bt_controller_config_t {
         dup_list_refresh_period: 0,
         scan_backoff_upperlimitmax: 0,
         ble_50_feat_supp: true, // BT_CTRL_50_FEATURE_SUPPORT
+        ble_cca_mode: 0,
     }
 }
 

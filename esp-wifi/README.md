@@ -124,9 +124,9 @@ See [Examples] for details.
 
 This uses the WiFi drivers from https://github.com/esp-rs/esp-wireless-drivers-3rdparty
 
-v5.1-rc2-4-gc570f67461 commit c570f674610479fc5e070c8db6d181b73ddf60a8
+v5.1.2-602-gdb1e54a0c5-dirty commit db1e54a0c537d8b2cc2bd109ee88b50e1ca0ea80
 
-https://github.com/esp-rs/esp-wireless-drivers-3rdparty/ (commit 976e9cc6c0725e8325a7e3a362d113559238c45c)
+https://github.com/esp-rs/esp-wireless-drivers-3rdparty/ (commit ca2809144cf6d2f89d413f1d415f1c4454ee6249)
 
 ## License
 

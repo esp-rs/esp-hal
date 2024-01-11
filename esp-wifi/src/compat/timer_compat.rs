@@ -41,7 +41,7 @@ impl Timer {
     }
 }
 #[cfg(coex)]
-pub(crate) static mut TIMERS: heapless::Vec<Timer, 30> = heapless::Vec::new();
+pub(crate) static mut TIMERS: heapless::Vec<Timer, 34> = heapless::Vec::new();
 #[cfg(not(coex))]
 pub(crate) static mut TIMERS: heapless::Vec<Timer, 20> = heapless::Vec::new();
 

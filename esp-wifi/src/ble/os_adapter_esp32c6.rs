@@ -14,7 +14,7 @@ pub(crate) static mut ISR_INTERRUPT_7: (
 ) = (core::ptr::null_mut(), core::ptr::null_mut());
 
 pub(crate) static BLE_CONFIG: esp_bt_controller_config_t = esp_bt_controller_config_t {
-    config_version: 0x20230113,
+    config_version: 0x20231124,
     ble_ll_resolv_list_size: 4,
     ble_hci_evt_hi_buf_count: 30,
     ble_hci_evt_lo_buf_count: 8,
@@ -58,7 +58,7 @@ pub(crate) static BLE_CONFIG: esp_bt_controller_config_t = esp_bt_controller_con
     sleep_en: 0,
     coex_phy_coded_tx_rx_time_limit: 0,
     dis_scan_backoff: 0,
-    ble_scan_classify_filter_enable: 0,
+    ble_scan_classify_filter_enable: 1,
     cca_drop_mode: 0,  //???
     cca_low_tx_pwr: 0, //???
     main_xtal_freq: 40,
@@ -68,6 +68,7 @@ pub(crate) static BLE_CONFIG: esp_bt_controller_config_t = esp_bt_controller_con
     cpu_freq_mhz: 160,
     enable_pcl: 0, // CONFIG_BT_LE_POWER_CONTROL_ENABLED
     version_num: 0,
+    csa2_select: 1,
 };
 
 pub(crate) fn bt_periph_module_enable() {

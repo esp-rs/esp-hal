@@ -88,7 +88,7 @@ pub(crate) unsafe fn phy_disable() {
             phy_xpd_tsens();
 
             // #if CONFIG_IDF_TARGET_ESP32
-            //         // Update WiFi MAC time before disalbe WiFi/BT common peripheral clock
+            //         // Update WiFi MAC time before disable WiFi/BT common peripheral clock
             //         phy_update_wifi_mac_time(true, esp_timer_get_time());
             // #endif
 

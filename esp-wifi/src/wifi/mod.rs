@@ -496,7 +496,7 @@ static g_wifi_osi_funcs: wifi_osi_funcs_t = wifi_osi_funcs_t {
     _coex_enable: Some(coex_enable),
     _coex_disable: Some(coex_disable),
     _coex_status_get: Some(coex_status_get),
-    _coex_condition_set: Some(coex_condition_set),
+    _coex_condition_set: None,
     _coex_wifi_request: Some(coex_wifi_request),
     _coex_wifi_release: Some(coex_wifi_release),
     _coex_wifi_channel_set: Some(coex_wifi_channel_set),
@@ -586,6 +586,8 @@ static mut G_CONFIG: wifi_init_config_t = wifi_init_config_t {
     tx_buf_type: 1,
     static_tx_buf_num: crate::CONFIG.static_tx_buf_num as i32,
     dynamic_tx_buf_num: crate::CONFIG.dynamic_tx_buf_num as i32,
+    rx_mgmt_buf_type: 0 as i32,
+    rx_mgmt_buf_num: 0 as i32,
     cache_tx_buf_num: 0,
     csi_enable: 1,
     ampdu_rx_enable: crate::CONFIG.ampdu_rx_enable as i32,
@@ -917,6 +919,7 @@ pub(crate) fn wifi_start_scan(
         show_hidden,
         scan_type,
         scan_time,
+        home_chan_dwell_time: 0,
     };
 
     unsafe { esp_wifi_scan_start(&scan_config, block) }
