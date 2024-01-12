@@ -707,7 +707,7 @@ crate::gpio::gpio! {
     (1, 0, InputOutput (5 => EMAC_RXD2) (0 => U0TXD 1 => CLK_OUT3))
     (2, 0, InputOutputAnalog (1 => HSPIWP 3 => HS2_DATA0 4 => SD_DATA0) (3 => HS2_DATA0 4 => SD_DATA0))
     (3, 0, InputOutput (0 => U0RXD) (1 => CLK_OUT2))
-    (4, 0, InputOutput (1 => HSPIHD 3 => HS2_DATA1 4 => SD_DATA1 5 => EMAC_TX_ER) (3 => HS2_DATA1 4 => SD_DATA1))
+    (4, 0, InputOutputAnalog (1 => HSPIHD 3 => HS2_DATA1 4 => SD_DATA1 5 => EMAC_TX_ER) (3 => HS2_DATA1 4 => SD_DATA1))
     (5, 0, InputOutput (1 => VSPICS0 3 => HS1_DATA6 5 => EMAC_RX_CLK) (3 => HS1_DATA6))
     (6, 0, InputOutput (4 => U1CTS) (0 => SD_CLK 1 => SPICLK 3 => HS1_CLK))
     (7, 0, InputOutput (0 => SD_DATA0 1 => SPIQ 3 => HS1_DATA0) (0 => SD_DATA0 1 => SPIQ 3 => HS1_DATA0 4 => U2RTS))
