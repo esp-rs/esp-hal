@@ -40,6 +40,7 @@
 //! - `psram-2m` - Use externally connected PSRAM (2MB)
 //! - `psram-4m` - Use externally connected PSRAM (4MB)
 //! - `psram-8m` - Use externally connected PSRAM (8MB)
+//! - `psram-80mhz` - Use faster 80Mhz PSRAM frequencty instead of default 40Mhz
 //! - `rt` - Runtime support
 //! - `ufmt` - Implement the [`ufmt_write::uWrite`] trait for the UART driver
 //! - `vectored` - Enable interrupt vectoring
