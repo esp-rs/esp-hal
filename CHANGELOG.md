@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - ESP32: correct gpio 32/33 in errata36() (#1053)
+- ESP32: make gpio 4 usable as analog pin (#1078)
 
 ### Removed
 
