@@ -807,7 +807,14 @@ pub(crate) mod utils {
     const SPI_TIMING_CORE_CLOCK: SpiTimingConfigCoreClock =
         SpiTimingConfigCoreClock::SpiTimingConfigCoreClock80m;
     const FLASH_FREQ: FlashFreq = FlashFreq::FlashFreq80m;
-    const SPIRAM_SPEED: SpiRamFreq = SpiRamFreq::Freq40m;
+
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "psram-80mhz")] {
+            const SPIRAM_SPEED: SpiRamFreq = SpiRamFreq::Freq80m;
+        } else {
+            const SPIRAM_SPEED: SpiRamFreq = SpiRamFreq::Freq40m;
+        }
+    }
 
     #[allow(unused)]
     enum FlashFreq {
