@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `rt-riscv` and `rt-xtensa` features to enable/disable runtime support (#1057)
 - ESP32-C6: Implement deep sleep (#918)
 - Add `embedded-io` feature to each chip-specific HAL (#1072)
+- ESP32-S3: Added support for 80Mhz PSRAM (#1069)
 
 ### Changed
 
