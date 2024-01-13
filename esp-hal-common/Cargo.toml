@@ -105,6 +105,9 @@ opsram-4m  = []
 opsram-8m  = []
 opsram-16m = []
 
+# PSRAM 80Mhz frequency support
+psram-80mhz  = []
+
 # USB OTG support (ESP32-S2 and ESP32-S3 only! Enabled by default)
 usb-otg = ["esp-synopsys-usb-otg", "usb-device"]
 

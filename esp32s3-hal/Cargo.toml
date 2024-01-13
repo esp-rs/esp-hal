@@ -91,6 +91,9 @@ opsram-4m  = ["esp-hal-common/opsram-4m", "psram"]
 opsram-8m  = ["esp-hal-common/opsram-8m", "psram"]
 opsram-16m = ["esp-hal-common/opsram-16m", "psram"]
 
+# PSRAM 80Mhz frequency support
+psram-80mhz  = ["esp-hal-common/psram-80mhz"]
+
 [profile.release]
 debug = true
 

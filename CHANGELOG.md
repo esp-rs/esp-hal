@@ -16,7 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `rt-riscv` and `rt-xtensa` features to enable/disable runtime support (#1057)
 - ESP32-C6: Implement deep sleep (#918)
 - Add `embedded-io` feature to each chip-specific HAL (#1072)
-- add `embassy-time-driver` to `esp-hal-common` due to updating `embassy-time` to `v0.3.0` (#1075)
+- Add `embassy-time-driver` to `esp-hal-common` due to updating `embassy-time` to `v0.3.0` (#1075)
+- ESP32-S3: Added support for 80Mhz PSRAM (#1069)
 
 ### Changed
 
@@ -26,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - ESP32: correct gpio 32/33 in errata36() (#1053)
+- ESP32: make gpio 4 usable as analog pin (#1078)
 
 ### Removed
 
