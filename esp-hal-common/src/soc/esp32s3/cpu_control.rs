@@ -98,7 +98,7 @@ impl<const SIZE: usize> Stack<SIZE> {
     }
 
     pub fn top(&mut self) -> *mut u32 {
-        unsafe { self.bottom().add(SIZE) }
+        unsafe { self.bottom().add(SIZE / 4) }
     }
 }
 
