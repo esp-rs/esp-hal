@@ -24,7 +24,7 @@ pub struct EmbassyTimer {
 
 const ALARM_STATE_NONE: AlarmState = AlarmState::new();
 
-embassy_time::time_driver_impl!(static DRIVER: EmbassyTimer = EmbassyTimer {
+embassy_time_driver::time_driver_impl!(static DRIVER: EmbassyTimer = EmbassyTimer {
     alarms: Mutex::new([ALARM_STATE_NONE; ALARM_COUNT]),
 });
 
@@ -86,7 +86,7 @@ impl EmbassyTimer {
 
     pub(crate) fn set_alarm(
         &self,
-        _alarm: embassy_time::driver::AlarmHandle,
+        _alarm: embassy_time_driver::AlarmHandle,
         timestamp: u64,
     ) -> bool {
         critical_section::with(|_cs| {

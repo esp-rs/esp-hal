@@ -423,8 +423,6 @@ macro_rules! impl_adc_interface {
     }
 }
 
-pub use implementation::*;
-
 mod implementation {
     //! # Analog to digital (ADC) conversion support.
     //!
