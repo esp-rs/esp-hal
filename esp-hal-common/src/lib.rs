@@ -109,6 +109,8 @@ pub mod i2s;
     any(feature = "rt-riscv", feature = "rt-xtensa")
 ))]
 pub mod interrupt;
+#[cfg(lcd_cam)]
+pub mod lcd_cam;
 #[cfg(ledc)]
 pub mod ledc;
 #[cfg(any(mcpwm0, mcpwm1))]

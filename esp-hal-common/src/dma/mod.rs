@@ -1131,7 +1131,7 @@ pub struct Channel<'d, C>
 where
     C: ChannelTypes,
 {
-    pub(crate) tx: C::Tx<'d>,
+    pub tx: C::Tx<'d>,
     pub(crate) rx: C::Rx<'d>,
 }
 
