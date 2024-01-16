@@ -6,6 +6,7 @@
 #![no_main]
 
 use core::array;
+
 use esp32s3_hal::{
     clock::ClockControl,
     dma::DmaPriority,
@@ -97,46 +98,56 @@ fn main() -> ! {
         i8080.send(CMD_CSCON, &[0xC3]).unwrap(); // Enable extension command 2 part I
         i8080.send(CMD_CSCON, &[0x96]).unwrap(); // Enable extension command 2 part II
         i8080.send(CMD_INVCTR, &[0x01]).unwrap(); // 1-dot inversion
-        i8080.send(
-            CMD_DFUNCTR,
-            &[
-                0x80, // Display Function Control //Bypass
-                0x22, /* Source Output Scan from S1 to S960, Gate Output scan from G1 to G480,
-                       * scan cycle=2 */
-                0x3B,
-            ],
-        ).unwrap(); // LCD Drive Line=8*(59+1)
-        i8080.send(
-            CMD_DOCA,
-            &[
-                0x40, 0x8A, 0x00, 0x00, 0x29, // Source eqaulizing period time= 22.5 us
-                0x19, // Timing for "Gate start"=25 (Tclk)
-                0xA5, // Timing for "Gate End"=37 (Tclk), Gate driver EQ function ON
-                0x33,
-            ],
-        ).unwrap();
+        i8080
+            .send(
+                CMD_DFUNCTR,
+                &[
+                    0x80, // Display Function Control //Bypass
+                    0x22, /* Source Output Scan from S1 to S960, Gate Output scan from G1 to
+                           * G480, scan cycle=2 */
+                    0x3B,
+                ],
+            )
+            .unwrap(); // LCD Drive Line=8*(59+1)
+        i8080
+            .send(
+                CMD_DOCA,
+                &[
+                    0x40, 0x8A, 0x00, 0x00, 0x29, // Source eqaulizing period time= 22.5 us
+                    0x19, // Timing for "Gate start"=25 (Tclk)
+                    0xA5, // Timing for "Gate End"=37 (Tclk), Gate driver EQ function ON
+                    0x33,
+                ],
+            )
+            .unwrap();
         i8080.send(CMD_PWCTR2, &[0x06]).unwrap(); // Power control2   //VAP(GVDD)=3.85+( vcom+vcom offset), VAN(GVCL)=-3.85+(
-                                          // vcom+vcom offset)
+                                                  // vcom+vcom offset)
         i8080.send(CMD_PWCTR3, &[0xA7]).unwrap(); // Power control 3  //Source driving current level=low, Gamma driving current
-                                          // level=High
+                                                  // level=High
         i8080.send(CMD_VMCTR, &[0x18]).unwrap(); // VCOM Control    //VCOM=0.9
         delay.delay_us(120_000u32);
-        i8080.send(
-            CMD_GMCTRP1,
-            &[
-                0xF0, 0x09, 0x0B, 0x06, 0x04, 0x15, 0x2F, 0x54, 0x42, 0x3C, 0x17, 0x14, 0x18, 0x1B,
-            ],
-        ).unwrap();
-        i8080.send(
-            CMD_GMCTRN1,
-            &[
-                0xE0, 0x09, 0x0B, 0x06, 0x04, 0x03, 0x2B, 0x43, 0x42, 0x3B, 0x16, 0x14, 0x17, 0x1B,
-            ],
-        ).unwrap();
+        i8080
+            .send(
+                CMD_GMCTRP1,
+                &[
+                    0xF0, 0x09, 0x0B, 0x06, 0x04, 0x15, 0x2F, 0x54, 0x42, 0x3C, 0x17, 0x14, 0x18,
+                    0x1B,
+                ],
+            )
+            .unwrap();
+        i8080
+            .send(
+                CMD_GMCTRN1,
+                &[
+                    0xE0, 0x09, 0x0B, 0x06, 0x04, 0x03, 0x2B, 0x43, 0x42, 0x3B, 0x16, 0x14, 0x17,
+                    0x1B,
+                ],
+            )
+            .unwrap();
         delay.delay_us(120_000u32);
         i8080.send(CMD_CSCON, &[0x3C]).unwrap(); // Command Set control // Disable extension command 2 partI
         i8080.send(CMD_CSCON, &[0x69]).unwrap(); // Command Set control // Disable
-                                         // extension command 2 partII
+                                                 // extension command 2 partII
 
         i8080.send(0x11, &[]).unwrap(); // ExitSleepMode
         delay.delay_us(130_000u32);
