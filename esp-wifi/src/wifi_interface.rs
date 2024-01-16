@@ -25,6 +25,11 @@ use crate::wifi::{WifiDevice, WifiDeviceMode};
 
 use core::borrow::BorrowMut;
 
+#[cfg(feature = "tcp")]
+const LOCAL_PORT_MIN: u16 = 41000;
+#[cfg(feature = "tcp")]
+const LOCAL_PORT_MAX: u16 = 65535;
+
 /// Non-async TCP/IP network stack
 ///
 /// Mostly a convenience wrapper for `smoltcp`
@@ -85,7 +90,11 @@ impl<'a, MODE: WifiDeviceMode> WifiStack<'a, MODE> {
             sockets: RefCell::new(sockets),
             current_millis_fn,
             #[cfg(feature = "tcp")]
-            local_port: RefCell::new(41000),
+            local_port: RefCell::new(
+                (unsafe { crate::common_adapter::random() }
+                    % (LOCAL_PORT_MAX - LOCAL_PORT_MIN) as u32) as u16
+                    + LOCAL_PORT_MIN,
+            ),
             #[cfg(feature = "dns")]
             dns_socket_handle: RefCell::new(dns_socket_handle),
         };
@@ -450,12 +459,14 @@ impl<'a, MODE: WifiDeviceMode> WifiStack<'a, MODE> {
 
     #[cfg(feature = "tcp")]
     fn next_local_port(&self) -> u16 {
-        let mut local_port = self.local_port.borrow_mut();
-        *local_port += 1;
-        if *local_port == 65535 {
-            *local_port = 41000;
-        }
-        *local_port
+        self.local_port.replace_with(|local_port| {
+            if *local_port >= LOCAL_PORT_MAX {
+                LOCAL_PORT_MIN
+            } else {
+                *local_port + 1
+            }
+        });
+        *self.local_port.borrow()
     }
 
     #[allow(unused)]
