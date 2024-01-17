@@ -88,6 +88,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix SPI slave DMA dma\_read and dma\_write (#1013)
 - ESP32-C6/H2: Fix disabling of interrupts (#1040)
 - ESP32/ESP32-S3: Fix stack-top calculation for app-core (#1081)
+- ESP32/ESP32-S2/ESP32-S3: Fix embassy-time-timg0 driver (#1091)
 
 ### Removed
 
