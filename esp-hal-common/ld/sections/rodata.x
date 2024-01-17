@@ -15,6 +15,7 @@ SECTIONS {
   {
     . = ALIGN(4);
     *( .rodata_wlog_*.* )
+    _rodata_reserved_end = ABSOLUTE(.);
     . = ALIGN(4);
   } > RODATA
 }

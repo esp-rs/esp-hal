@@ -22,6 +22,17 @@ pub fn psram_vaddr_start() -> usize {
     unsafe { PSRAM_VADDR as usize }
 }
 
+pub fn psram_vaddr_heap_start() -> usize {
+    extern "C" {
+        static mut _external_heap_start: u32;
+    }
+    unsafe { (&_external_heap_start as *const u32) as usize }
+}
+
+pub fn psram_heap_size() -> usize {
+    PSRAM_BYTES - (psram_vaddr_heap_start() - psram_vaddr_start())
+}
+
 cfg_if::cfg_if! {
     if #[cfg(feature = "psram-2m")] {
         const PSRAM_SIZE: u32 = 2;
@@ -57,6 +68,8 @@ pub const PSRAM_BYTES: usize = PSRAM_SIZE as usize * 1024 * 1024;
     feature = "opsram-16m"
 ))]
 pub fn init_psram(_peripheral: impl crate::peripheral::Peripheral<P = crate::peripherals::PSRAM>) {
+    use procmacros::ram;
+
     const CONFIG_ESP32S3_INSTRUCTION_CACHE_SIZE: u32 = 0x4000;
     const CONFIG_ESP32S3_ICACHE_ASSOCIATED_WAYS: u8 = 8;
     const CONFIG_ESP32S3_INSTRUCTION_CACHE_LINE_SIZE: u8 = 32;
@@ -67,6 +80,11 @@ pub fn init_psram(_peripheral: impl crate::peripheral::Peripheral<P = crate::per
     const START_PAGE: u32 = 0;
 
     extern "C" {
+        static mut _external_no_heap_start: u32;
+
+        static mut _external_bss_start: u32;
+        static mut _external_bss_end: u32;
+
         fn rom_config_instruction_cache_mode(
             cfg_cache_size: u32,
             cfg_cache_ways: u8,
@@ -101,24 +119,9 @@ pub fn init_psram(_peripheral: impl crate::peripheral::Peripheral<P = crate::per
         ) -> i32;
     }
     unsafe {
-        const MMU_PAGE_SIZE: u32 = 0x10000;
-        const ICACHE_MMU_SIZE: usize = 0x800;
-        const FLASH_MMU_TABLE_SIZE: usize = ICACHE_MMU_SIZE / core::mem::size_of::<u32>();
-        const MMU_INVALID: u32 = 1 << 14;
-        const DR_REG_MMU_TABLE: u32 = 0x600C5000;
-
         // calculate the PSRAM start address to map
-        let mut start = PSRAM_VADDR;
-        let mmu_table_ptr = DR_REG_MMU_TABLE as *const u32;
-        for i in 0..FLASH_MMU_TABLE_SIZE {
-            if mmu_table_ptr.add(i).read_volatile() != MMU_INVALID {
-                start += MMU_PAGE_SIZE;
-            } else {
-                break;
-            }
-        }
-        debug!("PSRAM start address = {:x}", start);
-        PSRAM_VADDR = start;
+        PSRAM_VADDR = (&_external_no_heap_start as *const u32) as u32;
+        debug!("PSRAM start address = {:x}", PSRAM_VADDR);
 
         // Configure the mode of instruction cache : cache size, cache line size.
         rom_config_instruction_cache_mode(
@@ -161,6 +164,19 @@ pub fn init_psram(_peripheral: impl crate::peripheral::Peripheral<P = crate::per
     }
 
     utils::psram_init();
+    zero_bss();
+
+    #[ram]
+    fn zero_bss() {
+        extern "Rust" {
+            fn __zero_bss() -> bool;
+        }
+        unsafe {
+            if __zero_bss() {
+                crate::xtensa_lx_rt::zero_bss(&mut _external_bss_start, &mut _external_bss_end);
+            }
+        }
+    }
 }
 
 #[cfg(any(feature = "psram-2m", feature = "psram-4m", feature = "psram-8m"))]

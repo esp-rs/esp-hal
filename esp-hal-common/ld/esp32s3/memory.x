@@ -36,8 +36,11 @@ MEMORY
 
 
   /* RTC fast memory (executable). Persists over deep sleep. Only for core 0 (PRO_CPU) */
-  rtc_fast_seg(RWX) : ORIGIN = 0x600fe000, len = 8k
+  rtc_fast_seg(RWX)      : ORIGIN = 0x600fe000, len = 8k
 
   /* RTC slow memory (data accessible). Persists over deep sleep. */
   rtc_slow_seg(RW)       : ORIGIN = 0x50000000, len = 8k
+
+  /* external memory, including data and text */
+  psram_seg(RWX)         : ORIGIN =  0x3C000020, len = 32M - 0x20
 }

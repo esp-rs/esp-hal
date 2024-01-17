@@ -8,6 +8,7 @@ SECTIONS {
      * Thus, it must have its alignment and (at least) its size.
      */
 
+    _rodata_dummy_start = ABSOLUTE(.);
     /* Start at the same alignment constraint than .flash.text */
 
     . = ALIGN(ALIGNOF(.text));

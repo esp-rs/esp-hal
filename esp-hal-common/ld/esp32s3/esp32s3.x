@@ -34,6 +34,7 @@ SECTIONS {
 INSERT BEFORE .data;
 
 INCLUDE "fixups/rodata_dummy.x"
+INCLUDE "fixups/external_ram_dummy.x"
 /* End of ESP32S3 fixups */
 
 /* Shared sections - ordering matters */
@@ -44,6 +45,7 @@ INCLUDE "rwdata.x"
 INCLUDE "rtc_fast.x"
 INCLUDE "rtc_slow.x"
 INCLUDE "stack.x"
+INCLUDE "external.x"
 /* End of Shared sections */
 
 EXTERN(DefaultHandler);
