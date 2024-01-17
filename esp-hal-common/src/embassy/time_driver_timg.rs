@@ -8,7 +8,7 @@ use crate::{
     clock::Clocks,
     peripherals,
     prelude::*,
-    timer::{Instance, Timer, Timer0},
+    timer::{Instance, Timer0, TimerGroup},
 };
 
 #[cfg(not(any(esp32, esp32s2, esp32s3)))]
@@ -16,7 +16,7 @@ pub const ALARM_COUNT: usize = 1;
 #[cfg(any(esp32, esp32s2, esp32s3))]
 pub const ALARM_COUNT: usize = 2;
 
-pub type TimerType = Timer<Timer0<TIMG0>>;
+pub type TimerType = TimerGroup<'static, TIMG0>;
 
 pub struct EmbassyTimer {
     pub(crate) alarms: Mutex<[AlarmState; ALARM_COUNT]>,
@@ -56,9 +56,14 @@ impl EmbassyTimer {
         // set divider to get a 1mhz clock. APB (80mhz) / 80 = 1mhz...
         // TODO: assert APB clock is the source and its at the correct speed for the
         // divider
-        timer.set_divider(clocks.apb_clock.to_MHz() as u16);
+        timer.timer0.set_divider(clocks.apb_clock.to_MHz() as u16);
+        timer.timer0.set_counter_active(true);
 
-        timer.set_counter_active(true);
+        #[cfg(any(esp32, esp32s2, esp32s3))]
+        {
+            timer.timer1.set_divider(clocks.apb_clock.to_MHz() as u16);
+            timer.timer1.set_counter_active(true);
+        }
 
         unwrap!(interrupt::enable(
             peripherals::Interrupt::TG0_T0_LEVEL,
