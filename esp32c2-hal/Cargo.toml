@@ -29,6 +29,7 @@ crypto-bigint      = { version = "0.5.5",  default-features = false }
 elliptic-curve     = { version = "0.13.8", default-features = false, features = ["sec1"] }
 embassy-executor   = { version = "0.5.0",  features = ["nightly"] }
 embassy-sync       = "0.5.0"
+embassy-time       = "0.3.0"
 embedded-graphics  = "0.8.1"
 embedded-hal-1     = { version = "1.0.0", package = "embedded-hal" }
 embedded-hal-async = "1.0.0"
@@ -44,7 +45,6 @@ p256               = { version = "0.13.2", default-features = false, features = 
 sha2               = { version = "0.10.8", default-features = false}
 ssd1306            = "0.8.4"
 static_cell        = { version = "2.0.0", features = ["nightly"] }
-embassy-time       = { version = "0.3.0" }
 
 [features]
 default              = ["rt", "vectored", "xtal-40mhz", "embassy-integrated-timers"]
@@ -64,18 +64,11 @@ xtal-40mhz           = ["esp-hal-common/xtal-40mhz"]
 
 # Embassy support
 embassy                    = ["esp-hal-common/embassy"]
-embassy-time-systick       = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-hz-16_000_000"]
-embassy-time-timg0         = ["esp-hal-common/embassy-time-timg0",   "embassy-time/tick-hz-1_000_000"]
 embassy-executor-interrupt = ["esp-hal-common/embassy-executor-interrupt"]
 embassy-executor-thread    = ["esp-hal-common/embassy-executor-thread"]
-
-# prefer integrated timers, but allow using the generic queue if needed
-embassy-integrated-timers = ["esp-hal-common/embassy-integrated-timers"]
-embassy-generic-queue-8   = ["esp-hal-common/embassy-generic-queue-8"]
-embassy-generic-queue-16  = ["esp-hal-common/embassy-generic-queue-16"]
-embassy-generic-queue-32  = ["esp-hal-common/embassy-generic-queue-32"]
-embassy-generic-queue-64  = ["esp-hal-common/embassy-generic-queue-64"]
-embassy-generic-queue-128 = ["esp-hal-common/embassy-generic-queue-128"]
+embassy-integrated-timers  = ["esp-hal-common/embassy-integrated-timers"]
+embassy-time-systick       = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-hz-16_000_000"]
+embassy-time-timg0         = ["esp-hal-common/embassy-time-timg0",   "embassy-time/tick-hz-1_000_000"]
 
 [profile.release]
 debug = true

@@ -46,7 +46,6 @@ embassy-executor     = { version = "0.5.0", optional = true }
 embassy-futures      = { version = "0.1.1", optional = true }
 embassy-sync         = { version = "0.5.0", optional = true }
 embassy-time-driver  = { version = "0.1.0", optional = true }
-embassy-time         = { version = "0.3.0", optional = true }
 
 # RISC-V
 riscv        = { version = "0.10.1", optional = true }
@@ -142,21 +141,15 @@ async = [
 ]
 
 # Embassy support
-embassy = ["embassy-time", "embassy-time-driver", "procmacros/embassy"]
+embassy = ["embassy-time-driver", "procmacros/embassy"]
 
 embassy-executor-interrupt = ["embassy", "embassy-executor"]
 embassy-executor-thread    = ["embassy", "embassy-executor"]
 
+embassy-integrated-timers = ["embassy-executor?/integrated-timers"]
+
 embassy-time-systick = []
 embassy-time-timg0   = []
-
-# Prefer integrated timers, but allow using the generic queue if needed
-embassy-integrated-timers = ["embassy-executor?/integrated-timers"]
-embassy-generic-queue-8   = ["embassy-time/generic-queue-8"]
-embassy-generic-queue-16  = ["embassy-time/generic-queue-16"]
-embassy-generic-queue-32  = ["embassy-time/generic-queue-32"]
-embassy-generic-queue-64  = ["embassy-time/generic-queue-64"]
-embassy-generic-queue-128 = ["embassy-time/generic-queue-128"]
 
 # Architecture-specific features (intended for internal use)
 riscv  = ["dep:riscv", "critical-section/restore-state-u8"]
@@ -184,7 +177,6 @@ defmt = [
     "embassy-executor?/defmt",
     "embassy-futures?/defmt",
     "embassy-sync?/defmt",
-    # "embassy-time?/defmt",
     "embedded-hal-1?/defmt-03",
     "embedded-io/defmt-03",
     "embedded-io-async?/defmt-03",
