@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Set up interrupts for the DMA and async enabled peripherals only when `async` feature is provided (#1042)
 - Update to `1.0.0` releases of the `embedded-hal-*` packages (#1068)
 - Update `embassy-time` to `0.3.0` and embassy-executor to `0.5.0` release due to the release of the `embedded-hal-*` packages (#1075)
 
@@ -28,6 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - ESP32: correct gpio 32/33 in errata36() (#1053)
 - ESP32: make gpio 4 usable as analog pin (#1078)
+- Fix double &mut for the `SetDutyCycle` impl on `PwmPin` (#1033)
+- ESP32/ESP32-S3: Fix stack-top calculation for app-core (#1081)
+- ESP32/ESP32-S2/ESP32-S3: Fix embassy-time-timg0 driver (#1091)
 
 ### Removed
 
@@ -40,7 +44,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fix SHA for all targets (#1021)
-- Fix double &mut for the `SetDutyCycle` impl on `PwmPin` (#1033)
 
 ## [0.14.0] - 2023-12-12
 
@@ -71,7 +74,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated to latest release candidate (`1.0.0-rc.2`) for `embedded-hal{-async,-nb}` (#994)
 - Explicit panic when hitting the `DefaultHandler` (#1005)
 - Relevant interrupts are now auto enabled in `embassy::init` (#1014).
-- Set up interrupts for the DMA and async enabled peripherals only when `async` feature is provided (#1042)
 
 ### Fixed
 
@@ -87,8 +89,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-H2: Fix used RAM (#1003)
 - Fix SPI slave DMA dma\_read and dma\_write (#1013)
 - ESP32-C6/H2: Fix disabling of interrupts (#1040)
-- ESP32/ESP32-S3: Fix stack-top calculation for app-core (#1081)
-- ESP32/ESP32-S2/ESP32-S3: Fix embassy-time-timg0 driver (#1091)
 
 ### Removed
 
