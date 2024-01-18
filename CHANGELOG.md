@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix double &mut for the `SetDutyCycle` impl on `PwmPin` (#1033)
 - ESP32/ESP32-S3: Fix stack-top calculation for app-core (#1081)
 - ESP32/ESP32-S2/ESP32-S3: Fix embassy-time-timg0 driver (#1091)
+- ESP32: ADC readings are no longer inverted (#1093)
 
 ### Removed
 
