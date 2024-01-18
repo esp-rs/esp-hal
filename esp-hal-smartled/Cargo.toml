@@ -14,7 +14,7 @@ features = ["esp32c3"]
 defmt            = { version = "=0.3.5", optional = true }
 esp-hal-common   = { version = "0.14.1", path = "../esp-hal-common" }
 fugit            = "0.3.7"
-smart-leds-trait = "0.2.1"
+smart-leds-trait = "0.3.0"
 
 [features]
 esp32   = ["esp-hal-common/esp32"]
