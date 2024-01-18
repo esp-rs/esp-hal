@@ -4,7 +4,7 @@ use crate::{
     clock::Clocks,
     dma::{DmaError, DmaPeripheral, Tx},
     gpio::{OutputPin, OutputSignal},
-    lcd_cam::{private::calculate_clkm, Lcd},
+    lcd_cam::{private::calculate_clkm, BitOrder, ByteOrder, Lcd},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::LCD_CAM,
 };
@@ -135,6 +135,13 @@ impl<'d, TX: Tx> I8080<'d, TX> {
         }
     }
 
+    pub fn set_bit_order(&mut self, bit_order: BitOrder) -> &mut Self {
+        self.lcd_cam
+            .lcd_user()
+            .modify(|_, w| w.lcd_bit_order().bit(bit_order != BitOrder::default()));
+        self
+    }
+
     pub fn with_cs<CS: OutputPin>(self, cs: impl Peripheral<P = CS> + 'd) -> Self {
         crate::into_ref!(cs);
         cs.set_to_push_pull_output()
@@ -211,6 +218,13 @@ impl<'d, TX: Tx> I8080<'d, TX> {
 }
 
 impl<'d, TX: Tx> I8080<'d, TX> {
+    pub fn set_byte_order(&mut self, byte_order: ByteOrder) -> &mut Self {
+        self.lcd_cam
+            .lcd_user()
+            .modify(|_, w| w.lcd_8bits_order().bit(byte_order != ByteOrder::default()));
+        self
+    }
+
     pub fn send(&mut self, cmd: u8, data: &[u8]) -> Result<(), DmaError> {
         // Reset LCD control unit and Async Tx FIFO
         self.lcd_cam

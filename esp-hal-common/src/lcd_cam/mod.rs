@@ -33,6 +33,28 @@ impl<'d> LcdCam<'d> {
     }
 }
 
+/// LCD_CAM bit order
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum BitOrder {
+    /// Do not change bit order.
+    #[default]
+    Native   = 0,
+    /// Invert bit order.
+    Inverted = 1,
+}
+
+/// LCD_CAM byte order
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum ByteOrder {
+    /// Do not change bit order.
+    #[default]
+    Native   = 0,
+    /// Invert byte order.
+    Inverted = 1,
+}
+
 mod private {
     pub struct ClockDivider {
         // Integral LCD clock divider value. (8 bits)
