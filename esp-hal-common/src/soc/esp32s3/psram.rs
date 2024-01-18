@@ -16,13 +16,25 @@
 //! during the compilation process. The available `PSRAM` sizes are `2MB`,
 //! `4MB`, and `8MB`.
 
-static mut PSRAM_VADDR: u32 = 0x3C000000;
+#[cfg(any(
+    feature = "psram-2m",
+    feature = "psram-4m",
+    feature = "psram-8m",
+    feature = "opsram-2m",
+    feature = "opsram-4m",
+    feature = "opsram-8m",
+    feature = "opsram-16m"
+))]
+static mut INFO: Option<utils::PsramInfo> = None;
 
-pub fn psram_vaddr_start() -> usize {
-    unsafe { PSRAM_VADDR as usize }
+fn psram_vaddr_start() -> u32 {
+    extern "C" {
+        static mut _external_no_heap_start: u32;
+    }
+    unsafe { (&_external_no_heap_start as *const u32) as u32 }
 }
 
-pub fn psram_vaddr_heap_start() -> usize {
+pub fn psram_heap_bottom() -> usize {
     extern "C" {
         static mut _external_heap_start: u32;
     }
@@ -30,7 +42,7 @@ pub fn psram_vaddr_heap_start() -> usize {
 }
 
 pub fn psram_heap_size() -> usize {
-    PSRAM_BYTES - (psram_vaddr_heap_start() - psram_vaddr_start())
+    PSRAM_BYTES - (psram_heap_bottom() - psram_vaddr_start() as usize)
 }
 
 cfg_if::cfg_if! {
@@ -53,7 +65,24 @@ cfg_if::cfg_if! {
     }
 }
 
-pub const PSRAM_BYTES: usize = PSRAM_SIZE as usize * 1024 * 1024;
+const PSRAM_BYTES: usize = PSRAM_SIZE as usize * 1024 * 1024;
+
+#[cfg(any(
+    feature = "psram-2m",
+    feature = "psram-4m",
+    feature = "psram-8m",
+    feature = "opsram-2m",
+    feature = "opsram-4m",
+    feature = "opsram-8m",
+    feature = "opsram-16m"
+))]
+pub fn print_psram_info() {
+    let info = unsafe { INFO.as_ref().expect("psram not initialized") };
+
+    utils::print_psram_info(info);
+
+    info!("{} bytes of PSRAM", PSRAM_BYTES);
+}
 
 /// Initialize PSRAM to be used for data.
 ///
@@ -67,7 +96,7 @@ pub const PSRAM_BYTES: usize = PSRAM_SIZE as usize * 1024 * 1024;
     feature = "opsram-8m",
     feature = "opsram-16m"
 ))]
-pub fn init_psram(_peripheral: impl crate::peripheral::Peripheral<P = crate::peripherals::PSRAM>) {
+pub fn init_psram() {
     use procmacros::ram;
 
     const CONFIG_ESP32S3_INSTRUCTION_CACHE_SIZE: u32 = 0x4000;
@@ -118,10 +147,16 @@ pub fn init_psram(_peripheral: impl crate::peripheral::Peripheral<P = crate::per
             fixed: u32,
         ) -> i32;
     }
+
+    #[ram]
+    unsafe fn zero_bss() {
+        crate::xtensa_lx_rt::zero_bss(&mut _external_bss_start, &mut _external_bss_end);
+    }
+
     unsafe {
-        // calculate the PSRAM start address to map
-        PSRAM_VADDR = (&_external_no_heap_start as *const u32) as u32;
-        debug!("PSRAM start address = {:x}", PSRAM_VADDR);
+        if INFO.is_some() {
+            panic!("psram already initialized")
+        }
 
         // Configure the mode of instruction cache : cache size, cache line size.
         rom_config_instruction_cache_mode(
@@ -142,7 +177,7 @@ pub fn init_psram(_peripheral: impl crate::peripheral::Peripheral<P = crate::per
 
         if cache_dbus_mmu_set(
             MMU_ACCESS_SPIRAM,
-            PSRAM_VADDR,
+            psram_vaddr_start(),
             START_PAGE << 16,
             64,
             PSRAM_SIZE * 1024 / 64, // number of pages to map
@@ -161,26 +196,16 @@ pub fn init_psram(_peripheral: impl crate::peripheral::Peripheral<P = crate::per
         });
 
         Cache_Resume_DCache(0);
-    }
 
-    utils::psram_init();
-    zero_bss();
+        let info = utils::psram_init();
+        INFO = Some(info);
 
-    #[ram]
-    fn zero_bss() {
-        extern "Rust" {
-            fn __zero_bss() -> bool;
-        }
-        unsafe {
-            if __zero_bss() {
-                crate::xtensa_lx_rt::zero_bss(&mut _external_bss_start, &mut _external_bss_end);
-            }
-        }
+        zero_bss();
     }
 }
 
 #[cfg(any(feature = "psram-2m", feature = "psram-4m", feature = "psram-8m"))]
-pub(crate) mod utils {
+mod utils {
     use procmacros::ram;
 
     // these should probably be configurable, relates to https://github.com/esp-rs/esp-hal/issues/42
@@ -189,6 +214,12 @@ pub(crate) mod utils {
         SpiTimingConfigCoreClock::SpiTimingConfigCoreClock80m;
     const FLASH_FREQ: FlashFreq = FlashFreq::FlashFreq80m;
     const SPIRAM_SPEED: SpiRamFreq = SpiRamFreq::Freq40m;
+
+    pub(super) struct PsramInfo {
+        core_clock: SpiTimingConfigCoreClock,
+        flash_div: u32,
+        psram_div: u32,
+    }
 
     #[allow(unused)]
     enum FlashFreq {
@@ -206,7 +237,7 @@ pub(crate) mod utils {
     }
 
     #[allow(unused)]
-    #[derive(Debug)]
+    #[derive(Debug, Clone, Copy)]
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     enum SpiTimingConfigCoreClock {
         SpiTimingConfigCoreClock80m,
@@ -227,7 +258,7 @@ pub(crate) mod utils {
     }
 
     #[ram]
-    pub(crate) fn psram_init() {
+    pub(super) fn psram_init() -> PsramInfo {
         psram_gpio_config();
         psram_set_cs_timing();
 
@@ -244,7 +275,15 @@ pub(crate) mod utils {
         config_psram_spi_phases();
         // Back to the high speed mode. Flash/PSRAM clocks are set to the clock that
         // user selected. SPI0/1 registers are all set correctly
-        mspi_timing_enter_high_speed_mode(true);
+        mspi_timing_enter_high_speed_mode(true)
+    }
+
+    pub(super) fn print_psram_info(info: &PsramInfo) {
+        debug!("PSRAM start address = {:x}", super::psram_vaddr_start());
+        info!(
+            "PSRAM core_clock {:?}, flash_div = {}, psram_div = {}",
+            info.core_clock, info.flash_div, info.psram_div
+        );
     }
 
     const PSRAM_CS_IO: u8 = 26;
@@ -406,15 +445,10 @@ pub(crate) mod utils {
     /// This function should always be called after `mspi_timing_flash_tuning`
     /// or `calculate_best_flash_tuning_config`
     #[ram]
-    fn mspi_timing_enter_high_speed_mode(control_spi1: bool) {
+    fn mspi_timing_enter_high_speed_mode(control_spi1: bool) -> PsramInfo {
         let core_clock: SpiTimingConfigCoreClock = get_mspi_core_clock();
         let flash_div: u32 = get_flash_clock_divider();
         let psram_div: u32 = get_psram_clock_divider();
-
-        info!(
-            "PSRAM core_clock {:?}, flash_div = {}, psram_div = {}",
-            core_clock, flash_div, psram_div
-        );
 
         // Set SPI01 core clock
         // SPI0 and SPI1 share the register for core clock. So we only set SPI0 here.
@@ -431,6 +465,12 @@ pub(crate) mod utils {
         // #if SPI_TIMING_FLASH_NEEDS_TUNING || SPI_TIMING_PSRAM_NEEDS_TUNING
         //     set_timing_tuning_regs_as_required(true);
         // #endif
+
+        PsramInfo {
+            core_clock,
+            flash_div,
+            psram_div,
+        }
     }
 
     #[ram]
@@ -808,7 +848,7 @@ pub(crate) mod utils {
     feature = "opsram-8m",
     feature = "opsram-16m"
 ))]
-pub(crate) mod utils {
+mod utils {
     use procmacros::ram;
 
     // these should probably be configurable, relates to https://github.com/esp-rs/esp-hal/issues/42
@@ -817,6 +857,8 @@ pub(crate) mod utils {
         SpiTimingConfigCoreClock::SpiTimingConfigCoreClock80m;
     const FLASH_FREQ: FlashFreq = FlashFreq::FlashFreq80m;
     const SPIRAM_SPEED: SpiRamFreq = SpiRamFreq::Freq40m;
+
+    pub(super) type PsramInfo = OpiPsramModeReg;
 
     #[allow(unused)]
     enum FlashFreq {
@@ -869,12 +911,6 @@ pub(crate) mod utils {
     const OCT_PSRAM_CS_SETUP_TIME: u8 = 3;
     const OCT_PSRAM_CS_HOLD_TIME: u8 = 3;
     const OCT_PSRAM_CS_HOLD_DELAY: u8 = 2;
-
-    const PSRAM_SIZE_2MB: usize = 2 * 1024 * 1024;
-    const PSRAM_SIZE_4MB: usize = 4 * 1024 * 1024;
-    const PSRAM_SIZE_8MB: usize = 8 * 1024 * 1024;
-    const PSRAM_SIZE_16MB: usize = 16 * 1024 * 1024;
-    const PSRAM_SIZE_32MB: usize = 32 * 1024 * 1024;
 
     const SPI_CS1_GPIO_NUM: u8 = 26;
     const FUNC_SPICS1_SPICS1: u8 = 0;
@@ -989,13 +1025,13 @@ pub(crate) mod utils {
 
     #[derive(Default)]
     #[repr(C)]
-    struct OpiPsramModeReg {
-        pub mr0: u8,
-        pub mr1: u8,
-        pub mr2: u8,
-        pub mr3: u8,
-        pub mr4: u8,
-        pub mr8: u8,
+    pub(super) struct OpiPsramModeReg {
+        mr0: u8,
+        mr1: u8,
+        mr2: u8,
+        mr3: u8,
+        mr4: u8,
+        mr8: u8,
     }
 
     #[allow(unused)]
@@ -1191,7 +1227,7 @@ pub(crate) mod utils {
     }
 
     #[ram]
-    pub(crate) fn psram_init() {
+    pub(super) fn psram_init() -> OpiPsramModeReg {
         mspi_pin_init();
         init_psram_pins();
         set_psram_cs_timing();
@@ -1217,25 +1253,12 @@ pub(crate) mod utils {
         mode_reg.set_bt(0);
 
         init_psram_mode_reg(1, &mode_reg);
-        // Print PSRAM info
+
         get_psram_mode_reg(1, &mut mode_reg);
 
-        print_psram_info(&mode_reg);
-
         if mode_reg.vendor_id() != OCT_PSRAM_VENDOR_ID {
-            warn!("PSRAM ID read error: {:x}, PSRAM chip not found or not supported, or wrong PSRAM line mode", mode_reg.vendor_id());
-            return;
+            panic!("PSRAM ID read error: {:x}, PSRAM chip not found or not supported, or wrong PSRAM line mode", mode_reg.vendor_id());
         }
-
-        let psram_size = match mode_reg.density() {
-            0x0 => PSRAM_SIZE_2MB,
-            0x1 => PSRAM_SIZE_4MB,
-            0x3 => PSRAM_SIZE_8MB,
-            0x5 => PSRAM_SIZE_16MB,
-            0x7 => PSRAM_SIZE_32MB,
-            _ => 0,
-        };
-        info!("{} bytes of PSRAM", psram_size);
 
         // Do PSRAM timing tuning, we use SPI1 to do the tuning, and set the
         // SPI0 PSRAM timing related registers accordingly
@@ -1255,6 +1278,8 @@ pub(crate) mod utils {
         // spi_flash_set_vendor_required_regs();
 
         config_psram_spi_phases();
+
+        mode_reg
     }
 
     // Configure PSRAM SPI0 phase related registers here according to the PSRAM chip
@@ -1628,11 +1653,12 @@ pub(crate) mod utils {
         // CONFIG_SPIRAM_ECC_ENABLE not yet supported
     }
 
-    fn print_psram_info(reg_val: &OpiPsramModeReg) {
+    pub(super) fn print_psram_info(info: &OpiPsramModeReg) {
+        debug!("PSRAM start address = {:x}", super::psram_vaddr_start());
         info!(
             "vendor id    : {:02x} ({})",
-            reg_val.vendor_id(),
-            if reg_val.vendor_id() == 0x0d {
+            info.vendor_id(),
+            if info.vendor_id() == 0x0d {
                 "AP"
             } else {
                 "UNKNOWN"
@@ -1640,19 +1666,19 @@ pub(crate) mod utils {
         );
         info!(
             "dev id       : {:02x} (generation {})",
-            reg_val.dev_id(),
-            reg_val.dev_id() + 1
+            info.dev_id(),
+            info.dev_id() + 1
         );
         info!(
             "density      : {:02x} ({} Mbit)",
-            reg_val.density(),
-            if reg_val.density() == 0x1 {
+            info.density(),
+            if info.density() == 0x1 {
                 32
-            } else if reg_val.density() == 0x3 {
+            } else if info.density() == 0x3 {
                 64
-            } else if reg_val.density() == 0x5 {
+            } else if info.density() == 0x5 {
                 128
-            } else if reg_val.density() == 0x7 {
+            } else if info.density() == 0x7 {
                 256
             } else {
                 0
@@ -1660,32 +1686,28 @@ pub(crate) mod utils {
         );
         info!(
             "good-die     : {:02x} ({})",
-            reg_val.gb(),
-            if reg_val.gb() == 1 { "Pass" } else { "Fail" }
+            info.gb(),
+            if info.gb() == 1 { "Pass" } else { "Fail" }
         );
         info!(
             "Latency      : {:02x} ({})",
-            reg_val.lt(),
-            if reg_val.lt() == 1 {
-                "Fixed"
-            } else {
-                "Variable"
-            }
+            info.lt(),
+            if info.lt() == 1 { "Fixed" } else { "Variable" }
         );
         info!(
             "VCC          : {:02x} ({})",
-            reg_val.vcc(),
-            if reg_val.vcc() == 1 { "3V" } else { "1.8V" }
+            info.vcc(),
+            if info.vcc() == 1 { "3V" } else { "1.8V" }
         );
         info!(
             "SRF          : {:02x} ({} Refresh)",
-            reg_val.srf(),
-            if reg_val.srf() == 0x1 { "Fast" } else { "Slow" }
+            info.srf(),
+            if info.srf() == 0x1 { "Fast" } else { "Slow" }
         );
         info!(
             "BurstType    : {:02x} ({} Wrap)",
-            reg_val.bt(),
-            if reg_val.bt() == 1 && reg_val.bl() != 3 {
+            info.bt(),
+            if info.bt() == 1 && info.bl() != 3 {
                 "Hybrid"
             } else {
                 ""
@@ -1693,12 +1715,12 @@ pub(crate) mod utils {
         );
         info!(
             "BurstLen     : {:02x} ({} Byte)",
-            reg_val.bl(),
-            if reg_val.bl() == 0x00 {
+            info.bl(),
+            if info.bl() == 0x00 {
                 16
-            } else if reg_val.bl() == 0x01 {
+            } else if info.bl() == 0x01 {
                 32
-            } else if reg_val.bl() == 0x10 {
+            } else if info.bl() == 0x10 {
                 64
             } else {
                 1024
@@ -1706,22 +1728,18 @@ pub(crate) mod utils {
         );
         info!(
             "Readlatency  : {:02x} ({} cycles@{})",
-            reg_val.read_latency(),
-            reg_val.read_latency() * 2 + 6,
-            if reg_val.lt() == 1 {
-                "Fixed"
-            } else {
-                "Variable"
-            }
+            info.read_latency(),
+            info.read_latency() * 2 + 6,
+            if info.lt() == 1 { "Fixed" } else { "Variable" }
         );
         info!(
             "DriveStrength: {:02x} (1/{})",
-            reg_val.drive_str(),
-            if reg_val.drive_str() == 0x00 {
+            info.drive_str(),
+            if info.drive_str() == 0x00 {
                 1
-            } else if reg_val.drive_str() == 0x01 {
+            } else if info.drive_str() == 0x01 {
                 2
-            } else if reg_val.drive_str() == 0x02 {
+            } else if info.drive_str() == 0x02 {
                 4
             } else {
                 8

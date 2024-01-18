@@ -84,7 +84,6 @@ crate::peripherals! {
 
     // Virtual peripherals:
     BT <= virtual,
-    PSRAM <= virtual,
     ULP_RISCV_CORE <= virtual,
     WIFI <= virtual,
 }
