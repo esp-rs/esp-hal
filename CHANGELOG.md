@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update to `1.0.0` releases of the `embedded-hal-*` packages (#1068)
 - Update `embassy-time` to `0.3.0` and embassy-executor to `0.5.0` release due to the release of the `embedded-hal-*` packages (#1075)
 - No longer depend on `embassy-time` (#1092)
+- Update to latest `smart-leds-trait` and `smart-leds` packages (#1094)
 
 ### Fixed
 
