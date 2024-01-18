@@ -4,7 +4,7 @@ use crate::{
     clock::Clocks,
     dma::{DmaError, DmaPeripheral, Tx},
     gpio::{OutputPin, OutputSignal},
-    lcd_cam::Lcd,
+    lcd_cam::{private::calculate_clkm, Lcd},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::LCD_CAM,
 };
@@ -15,33 +15,42 @@ pub struct I8080<'d, TX> {
 }
 
 impl<'d, TX: Tx> I8080<'d, TX> {
-    pub fn new(lcd: Lcd<'d>, mut channel: TX, _frequency: HertzU32, _clocks: &Clocks) -> Self {
+    pub fn new(lcd: Lcd<'d>, mut channel: TX, frequency: HertzU32, clocks: &Clocks) -> Self {
         let lcd_cam = lcd.lcd_cam;
 
-        // clocks.apb_clock;
+        // Due to https://www.espressif.com/sites/default/files/documentation/esp32-s3_errata_en.pdf
+        // the LCD_PCLK divider must be at least 2. To make up for this the user
+        // provided frequency is doubled to match.
+
+        let (i, divider) = calculate_clkm(
+            (frequency.to_Hz() * 2) as _,
+            &[
+                clocks.xtal_clock.to_Hz() as _,
+                clocks.cpu_clock.to_Hz() as _,
+                clocks.crypto_pwm_clock.to_Hz() as _,
+            ],
+        );
 
         lcd_cam.lcd_clock().modify(|_, w| {
             // Force enable the clock for all configuration register
             w.clk_en().set_bit();
 
-            // LCD_CLK = 80MHz
-            w.lcd_clk_sel().variant(3);
-            w.lcd_clkm_div_num().variant(2);
-            w.lcd_clkm_div_b().variant(0);
-            w.lcd_clkm_div_a().variant(0);
+            w.lcd_clk_sel().variant((i + 1) as _);
+            w.lcd_clkm_div_num().variant(divider.div_num as _);
+            w.lcd_clkm_div_b().variant(divider.div_b as _);
+            w.lcd_clkm_div_a().variant(divider.div_a as _);
+
+            // LCD_PCLK = LCD_CLK / 2
+            w.lcd_clk_equ_sysclk().clear_bit();
+            w.lcd_clkcnt_n().variant(2 - 1); // Must not be 0.
 
             w
         });
         lcd_cam.lcd_user().modify(|_, w| w.lcd_reset().set_bit());
         lcd_cam.lcd_clock().modify(|_, w| {
-            // LCD_PCLK = 20MHz
-            w.lcd_clk_equ_sysclk().clear_bit();
-            w.lcd_clkcnt_n().variant(4 - 1); // Must not be 0.
-
             // TODO: Expose as config.
             w.lcd_ck_idle_edge().clear_bit();
             w.lcd_ck_out_edge().clear_bit();
-
             w
         });
 
