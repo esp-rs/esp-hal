@@ -429,6 +429,38 @@ jobs:
       - name: rustdoc
         run: cd esp32h2-hal/ && cargo doc --features=eh1
 
+  esp32p4-hal:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          target: riscv32imafc-unknown-none-elf
+          toolchain: nightly
+          components: rust-src
+      - uses: Swatinem/rust-cache@v2
+
+      # Perform a full build initially to verify that the examples not only
+      # build, but also link successfully.
+      # We also use this as an opportunity to verify that the examples link
+      # for each supported image format.
+      - name: build esp32p4-hal (no features)
+        run: cd esp32p4-hal/ && cargo +nightly build --examples
+      # Subsequent steps can just check the examples instead, as we're already
+      # confident that they link.
+      - name: check esp32p4-hal (common features)
+        run: |
+          cd esp32p4-hal/
+          cargo +nightly build --examples --features=eh1,ufmt,log
+          cargo +nightly build --examples --features=eh1,ufmt,defmt
+      # Make sure we can build without default features enabled, too!
+      - name: check esp32p4-hal (no default features)
+        run: cd esp32p4-hal/ && cargo build --no-default-features
+      # Ensure documentation can be built
+      - name: rustdoc
+        run: cd esp32p4-hal/ && cargo doc --features=eh1
+
   esp32s2-hal:
     runs-on: ubuntu-latest
 
@@ -604,7 +636,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@v1
         with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf #,riscv32imafc-unknown-none-elf
           toolchain: ${{ env.MSRV }}
           components: rust-src
       - uses: Swatinem/rust-cache@v2
@@ -639,6 +671,11 @@ jobs:
           cd esp32h2-hal/
           cargo build --features=eh1,ufmt,log
           cargo build --features=defmt
+      # - name: msrv (esp32p4-hal)
+      #   run: |
+      #     cd esp32p4-hal/
+      #     cargo build --features=eh1,ufmt,log
+      #     cargo build --features=defmt
 
   msrv-xtensa:
     runs-on: ubuntu-latest
@@ -712,6 +749,8 @@ jobs:
         run: cd esp32c6-lp-hal && cargo clippy -- -D warnings
       - name: clippy (esp32h2-hal)
         run: cd esp32h2-hal && cargo clippy -- -D warnings
+      - name: clippy (esp32p4-hal)
+        run: cd esp32p4-hal && cargo clippy -- -D warnings
 
   clippy-xtensa:
     runs-on: ubuntu-latest
@@ -767,6 +806,8 @@ jobs:
         run: cargo fmt --all --manifest-path=esp32c6-lp-hal/Cargo.toml -- --check
       - name: rustfmt (esp32h2-hal)
         run: cargo fmt --all --manifest-path=esp32h2-hal/Cargo.toml -- --check
+      - name: rustfmt (esp32p4-hal)
+        run: cargo fmt --all --manifest-path=esp32p4-hal/Cargo.toml -- --check
       - name: rustfmt (esp32s2-hal)
         run: cargo fmt --all --manifest-path=esp32s2-hal/Cargo.toml -- --check
       - name: rustfmt (esp32s3-hal)
