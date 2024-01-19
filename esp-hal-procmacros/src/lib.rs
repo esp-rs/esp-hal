@@ -76,7 +76,6 @@
 #[cfg(feature = "ram")]
 use darling::{ast::NestedMeta, Error as DarlingError, FromMeta};
 use proc_macro::TokenStream;
-use proc_macro_crate::FoundCrate;
 use proc_macro_error::proc_macro_error;
 use quote::quote;
 use syn::parse_macro_input;
@@ -101,7 +100,7 @@ mod lp_core;
     feature = "interrupt"
 ))]
 fn get_hal_crate() -> (
-    Result<FoundCrate, proc_macro_crate::Error>,
+    Result<proc_macro_crate::FoundCrate, proc_macro_crate::Error>,
     proc_macro2::Ident,
 ) {
     use proc_macro::Span;
@@ -121,6 +120,8 @@ fn get_hal_crate() -> (
     let hal_crate = crate_name("esp32c6-lp-hal");
     #[cfg(feature = "esp32h2")]
     let hal_crate = crate_name("esp32h2-hal");
+    #[cfg(feature = "esp32p4")]
+    let hal_crate = crate_name("esp32p4-hal");
     #[cfg(feature = "esp32s2")]
     let hal_crate = crate_name("esp32s2-hal");
     #[cfg(feature = "esp32s2-ulp")]
@@ -143,6 +144,8 @@ fn get_hal_crate() -> (
     let hal_crate_name = Ident::new("esp32c6_lp_hal", Span::call_site().into());
     #[cfg(feature = "esp32h2")]
     let hal_crate_name = Ident::new("esp32h2_hal", Span::call_site().into());
+    #[cfg(feature = "esp32p4")]
+    let hal_crate_name = Ident::new("esp32p4_hal", Span::call_site().into());
     #[cfg(feature = "esp32s2")]
     let hal_crate_name = Ident::new("esp32s2_hal", Span::call_site().into());
     #[cfg(feature = "esp32s2-ulp")]
@@ -282,6 +285,7 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
 
     use proc_macro::Span;
     use proc_macro2::Ident;
+    use proc_macro_crate::FoundCrate;
     use proc_macro_error::abort;
     use syn::{
         parse::Error as ParseError,
@@ -498,6 +502,7 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
 
     use object::{Object, ObjectSection, ObjectSymbol};
     use proc_macro::Span;
+    use proc_macro_crate::FoundCrate;
     use syn::{parse, Ident};
 
     let (hal_crate, hal_crate_name) = get_hal_crate();
@@ -667,7 +672,7 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
     use proc_macro2::{Ident, Span};
-    use proc_macro_crate::crate_name;
+    use proc_macro_crate::{crate_name, FoundCrate};
     use quote::{format_ident, quote};
     use syn::{parse, parse_macro_input, spanned::Spanned, FnArg, ItemFn};
 
