@@ -1,3 +1,6 @@
+use core::fmt::Formatter;
+
+use embedded_dma::ReadBuffer;
 use fugit::HertzU32;
 
 use crate::{
@@ -223,12 +226,7 @@ impl<'d, TX: Tx> I8080<'d, TX> {
         self
     }
 
-    pub fn send(
-        &mut self,
-        cmd: impl Into<Command>,
-        dummy: u8,
-        data: &[u8],
-    ) -> Result<(), DmaError> {
+    fn setup_send(&mut self, cmd: impl Into<Command>, dummy: u8) {
         // Reset LCD control unit and Async Tx FIFO
         self.lcd_cam
             .lcd_user()
@@ -268,6 +266,7 @@ impl<'d, TX: Tx> I8080<'d, TX> {
             }
         }
 
+        // Set dummy length
         self.lcd_cam.lcd_user().modify(|_, w| {
             if dummy > 0 {
                 // Enable DUMMY phase in LCD sequence when LCD starts.
@@ -279,30 +278,9 @@ impl<'d, TX: Tx> I8080<'d, TX> {
             }
             w
         });
+    }
 
-        if data.is_empty() {
-            // Set transfer length.
-            self.lcd_cam
-                .lcd_user()
-                .modify(|_, w| w.lcd_dout().clear_bit());
-        } else {
-            // Set transfer length.
-            self.lcd_cam.lcd_user().modify(|_, w| {
-                w.lcd_dout()
-                    .set_bit()
-                    .lcd_dout_cyclelen()
-                    .variant((data.len() - 1) as _)
-            });
-
-            self.tx_channel.prepare_transfer_without_start(
-                DmaPeripheral::LcdCam,
-                false,
-                data.as_ptr(),
-                data.len(),
-            )?;
-            self.tx_channel.start_transfer()?;
-        }
-
+    fn start_send(&mut self) {
         // Setup interrupts.
         self.lcd_cam
             .lc_dma_int_clr()
@@ -314,15 +292,9 @@ impl<'d, TX: Tx> I8080<'d, TX> {
         self.lcd_cam
             .lcd_user()
             .modify(|_, w| w.lcd_update().set_bit().lcd_start().set_bit());
+    }
 
-        while self
-            .lcd_cam
-            .lc_dma_int_st()
-            .read()
-            .lcd_trans_done_int_st()
-            .bit_is_clear()
-        {}
-
+    fn tear_down_send(&mut self) {
         self.lcd_cam
             .lcd_user()
             .modify(|_, w| w.lcd_start().clear_bit());
@@ -333,8 +305,145 @@ impl<'d, TX: Tx> I8080<'d, TX> {
         self.lcd_cam
             .lc_dma_int_clr()
             .write(|w| w.lcd_trans_done_int_clr().set_bit());
+    }
+
+    fn start_write_bytes_dma<'w>(&mut self, ptr: *const u8, len: usize) -> Result<(), DmaError> {
+        if len == 0 {
+            // Set transfer length.
+            self.lcd_cam
+                .lcd_user()
+                .modify(|_, w| w.lcd_dout().clear_bit());
+        } else {
+            // TODO: Return an error instead.
+            assert!(len <= 8192);
+
+            // Set transfer length.
+            self.lcd_cam.lcd_user().modify(|_, w| {
+                w.lcd_dout()
+                    .set_bit()
+                    .lcd_dout_cyclelen()
+                    .variant((len - 1) as _)
+            });
+
+            self.tx_channel.prepare_transfer_without_start(
+                DmaPeripheral::LcdCam,
+                false,
+                ptr,
+                len,
+            )?;
+            self.tx_channel.start_transfer()?;
+        }
+        Ok(())
+    }
+
+    pub fn send(
+        &mut self,
+        cmd: impl Into<Command>,
+        dummy: u8,
+        data: &[u8],
+    ) -> Result<(), DmaError> {
+        self.setup_send(cmd, dummy);
+
+        self.start_write_bytes_dma(data.as_ptr(), data.len())?;
+
+        self.start_send();
+
+        while self
+            .lcd_cam
+            .lc_dma_int_st()
+            .read()
+            .lcd_trans_done_int_st()
+            .bit_is_clear()
+        {}
+
+        self.tear_down_send();
 
         Ok(())
+    }
+
+    pub fn send_dma<TXBUF>(
+        mut self,
+        cmd: impl Into<Command>,
+        dummy: u8,
+        data: TXBUF,
+    ) -> Result<Transfer<'d, TX, TXBUF>, DmaError>
+    where
+        TXBUF: ReadBuffer<Word = u8>,
+    {
+        self.setup_send(cmd, dummy);
+
+        let (ptr, len) = unsafe { data.read_buffer() };
+
+        self.start_write_bytes_dma(ptr, len)?;
+
+        self.start_send();
+
+        Ok(Transfer {
+            instance: Some(self),
+            buffer: Some(data),
+        })
+    }
+}
+
+impl<'d, TX> core::fmt::Debug for I8080<'d, TX> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("I8080").finish()
+    }
+}
+
+/// An in-progress transfer
+pub struct Transfer<'d, TX: Tx, BUFFER> {
+    instance: Option<I8080<'d, TX>>,
+    buffer: Option<BUFFER>,
+}
+
+impl<'d, TX: Tx, BUFFER> Transfer<'d, TX, BUFFER> {
+    pub fn wait(mut self) -> Result<(BUFFER, I8080<'d, TX>), (DmaError, BUFFER, I8080<'d, TX>)> {
+        let mut instance = self
+            .instance
+            .take()
+            .expect("instance must be available throughout object lifetime");
+
+        {
+            let int_st = instance.lcd_cam.lc_dma_int_st();
+            while int_st.read().lcd_trans_done_int_st().bit_is_clear() {
+                // Wait until LCD_TRANS_DONE is set.
+            }
+            instance.tear_down_send();
+        }
+
+        let buffer = self
+            .buffer
+            .take()
+            .expect("buffer must be available throughout object lifetime");
+
+        if instance.tx_channel.has_error() {
+            Err((DmaError::DescriptorError, buffer, instance))
+        } else {
+            Ok((buffer, instance))
+        }
+    }
+
+    pub fn is_done(&self) -> bool {
+        // let ch = &self.instance.tx_channel;
+        // ch.is_done()
+
+        let int_st = self
+            .instance
+            .as_ref()
+            .expect("instance must be available throughout object lifetime")
+            .lcd_cam
+            .lc_dma_int_st();
+        int_st.read().lcd_trans_done_int_st().bit_is_set()
+    }
+}
+
+impl<'d, TX: Tx, BUFFER> Drop for Transfer<'d, TX, BUFFER> {
+    fn drop(&mut self) {
+        if let Some(instance) = self.instance.as_mut() {
+            // This will cancel the transfer.
+            instance.tear_down_send();
+        }
     }
 }
 

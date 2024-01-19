@@ -5,12 +5,9 @@
 #![no_std]
 #![no_main]
 
-use core::array;
-
 use esp32s3_hal::{
     clock::ClockControl,
     dma::DmaPriority,
-    dma_descriptors,
     gdma::Gdma,
     gpio::IO,
     lcd_cam::{
@@ -22,6 +19,7 @@ use esp32s3_hal::{
     Delay,
 };
 use esp_backtrace as _;
+use esp_hal_common::dma_buffers;
 use esp_println::println;
 
 #[entry]
@@ -51,7 +49,7 @@ fn main() -> ! {
     let dma = Gdma::new(peripherals.DMA);
     let channel = dma.channel0;
 
-    let (mut tx_descriptors, mut rx_descriptors) = dma_descriptors!(32000, 0);
+    let (tx_buffer, mut tx_descriptors, _, mut rx_descriptors) = dma_buffers!(8192, 0);
 
     let channel = channel.configure(
         false,
@@ -194,10 +192,16 @@ fn main() -> ! {
         let color = 0b00000_000000_11111u16; // RED
         let color = color.to_be_bytes();
 
-        let data: [u8; 200] = array::from_fn(|i| color[i % 2]);
-        i8080.send(0x2C, 0, &data).unwrap();
+        let mut buffer = tx_buffer;
+        for chunk in buffer.chunks_mut(2) {
+            chunk.copy_from_slice(&color);
+        }
 
-        i8080.send(0x3C, 0, &data).unwrap();
+        let transfer = i8080.send_dma(0x2C, 0, buffer).unwrap();
+        (buffer, i8080) = transfer.wait().unwrap();
+
+        let transfer = i8080.send_dma(0x3C, 0, buffer).unwrap();
+        transfer.wait().unwrap();
     }
 
     backlight.set_high().unwrap();
