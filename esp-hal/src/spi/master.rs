@@ -2519,7 +2519,7 @@ pub trait Instance {
     /// you must ensure that the whole messages was written correctly, use
     /// [`Self::flush`].
     // FIXME: See below.
-    #[ram]
+    #[cfg_attr(feature = "optimize-spi-in-iram", ram)]
     fn write_bytes(&mut self, words: &[u8]) -> Result<(), Error> {
         let num_chunks = words.len() / FIFO_SIZE;
 
@@ -2580,7 +2580,7 @@ pub trait Instance {
     /// Sends out a stuffing byte for every byte to read. This function doesn't
     /// perform flushing. If you want to read the response to something you
     /// have written before, consider using [`Self::transfer`] instead.
-    #[ram]
+    #[cfg_attr(feature = "optimize-spi-in-iram", ram)]
     fn read_bytes(&mut self, words: &mut [u8]) -> Result<(), Error> {
         let empty_array = [EMPTY_WRITE_PAD; FIFO_SIZE];
 
@@ -2601,7 +2601,7 @@ pub trait Instance {
     // FIXME: Using something like `core::slice::from_raw_parts` and
     // `copy_from_slice` on the receive registers works only for the esp32 and
     // esp32c3 varaints. The reason for this is unknown.
-    #[ram]
+    #[cfg_attr(feature = "optimize-spi-in-iram", ram)]
     fn read_bytes_from_fifo(&mut self, words: &mut [u8]) -> Result<(), Error> {
         let reg_block = self.register_block();
 
@@ -2638,7 +2638,7 @@ pub trait Instance {
         Ok(())
     }
 
-    #[ram]
+    #[cfg_attr(feature = "optimize-spi-in-iram", ram)]
     fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Error> {
         for chunk in words.chunks_mut(FIFO_SIZE) {
             self.write_bytes(chunk)?;
