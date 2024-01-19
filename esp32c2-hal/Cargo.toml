@@ -48,28 +48,56 @@ ssd1306            = "0.8.4"
 static_cell        = { version = "2.0.0", features = ["nightly"] }
 
 [features]
-default              = ["rt", "vectored", "xtal-40mhz", "embassy-integrated-timers"]
-async                = ["esp-hal-common/async"]
-debug                = ["esp-hal-common/debug"]
-defmt                = ["esp-hal-common/defmt", "esp-println/defmt-espflash"]
-direct-vectoring     = ["esp-hal-common/direct-vectoring"]
-eh1                  = ["esp-hal-common/eh1"]
-embedded-io          = ["esp-hal-common/embedded-io"]
-interrupt-preemption = ["esp-hal-common/interrupt-preemption"]
-log                  = ["esp-hal-common/log", "esp-println/log"]
-rt                   = ["esp-hal-common/rt-riscv"]
-ufmt                 = ["esp-hal-common/ufmt"]
-vectored             = ["esp-hal-common/vectored"]
-xtal-26mhz           = ["esp-hal-common/xtal-26mhz"]
-xtal-40mhz           = ["esp-hal-common/xtal-40mhz"]
+default = ["embassy-integrated-timers", "rt", "vectored", "xtal-40mhz"]
 
-# Embassy support
-embassy                    = ["esp-hal-common/embassy"]
+## Enable debug features in the HAL (used for development).
+debug = ["esp-hal-common/debug"]
+## Enable direct interrupt vectoring.
+direct-vectoring = ["esp-hal-common/direct-vectoring"]
+## Enable interrupt preemption.
+interrupt-preemption = ["esp-hal-common/interrupt-preemption"]
+## Enable logging output using the `log` crate.
+log = ["esp-hal-common/log", "esp-println/log"]
+## Enable runtime support.
+rt = ["esp-hal-common/rt-riscv"]
+## Enable interrupt vectoring.
+vectored = ["esp-hal-common/vectored"]
+## Target device has a 26MHz crystal.
+xtal-26mhz = ["esp-hal-common/xtal-26mhz"]
+## Target device has a 40MHz crystal.
+xtal-40mhz = ["esp-hal-common/xtal-40mhz"]
+
+#! ### Trait Implementation Feature Flags
+## Enable support for asynchronous operation, with interfaces provided by
+## `embedded-hal-async` and `embedded-io-async`.
+async = ["esp-hal-common/async"]
+## Implement `defmt::Format` on certain types.
+defmt = ["esp-hal-common/defmt", "esp-println/defmt-espflash"]
+## Implement the traits defined in the `1.0.0` releases of `embedded-hal` and
+## `embedded-hal-nb` for the relevant peripherals.
+eh1 = ["esp-hal-common/eh1"]
+## Implement the traits defined in `embedded-io` for certain peripherals.
+embedded-io = ["esp-hal-common/embedded-io"]
+## Implement the `ufmt_write::uWrite` trait for certain peripherals.
+ufmt = ["esp-hal-common/ufmt"]
+
+#! ### Embassy Feature Flags
+## Enable support for `embassy`, a modern asynchronous embedded framework.
+embassy = ["esp-hal-common/embassy"]
+## Use the interrupt-mode embassy executor.
 embassy-executor-interrupt = ["esp-hal-common/embassy-executor-interrupt"]
-embassy-executor-thread    = ["esp-hal-common/embassy-executor-thread"]
-embassy-integrated-timers  = ["esp-hal-common/embassy-integrated-timers"]
-embassy-time-systick       = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-hz-16_000_000"]
-embassy-time-timg0         = ["esp-hal-common/embassy-time-timg0",   "embassy-time/tick-hz-1_000_000"]
+## Use the thread-mode embassy executor.
+embassy-executor-thread = ["esp-hal-common/embassy-executor-thread"]
+## Uses hardware timers as alarms for the executors. Using this feature
+## limits the number of executors to the number of hardware alarms provided
+## by the time driver.
+embassy-integrated-timers = ["esp-hal-common/embassy-integrated-timers"]
+## Enable the embassy time driver using the `SYSTIMER` peripheral. The
+## `SYSTIMER` peripheral has three alarams available for use.
+embassy-time-systick = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-hz-16_000_000"]
+## Enable the embassy time driver using the `TIMG0` peripheral. The `TIMG0`
+## peripheral has two alarms available for use.
+embassy-time-timg0 = ["esp-hal-common/embassy-time-timg0", "embassy-time/tick-hz-1_000_000"]
 
 [profile.release]
 debug = true
