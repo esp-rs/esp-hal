@@ -21,7 +21,8 @@ categories = [
 ]
 
 [dependencies]
-esp-hal-common = { version = "0.15.0", features = ["esp32p4"], path = "../esp-hal-common" }
+document-features = "0.2.7"
+esp-hal-common    = { version = "0.15.0", features = ["esp32p4"], path = "../esp-hal-common" }
 
 [dev-dependencies]
 embassy-time  = "0.3.0"

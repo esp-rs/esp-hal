@@ -21,8 +21,9 @@ categories = [
 ]
 
 [dependencies]
-esp-hal-common = { version = "0.15.0", features = ["esp32s3"], path = "../esp-hal-common" }
-r0             = { version = "1.0.0",  optional = true }
+document-features = "0.2.7"
+esp-hal-common    = { version = "0.15.0", features = ["esp32s3"], path = "../esp-hal-common" }
+r0                = { version = "1.0.0",  optional = true }
 
 [dev-dependencies]
 aes                = "0.8.3"
