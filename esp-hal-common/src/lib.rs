@@ -10,6 +10,7 @@
 //! - [esp32c3-hal]
 //! - [esp32c6-hal]
 //! - [esp32h2-hal]
+//! - [esp32p4-hal]
 //! - [esp32s2-hal]
 //! - [esp32s3-hal]
 //!
@@ -19,6 +20,7 @@
 //! [esp32c3-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32c3-hal
 //! [esp32c6-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32c6-hal
 //! [esp32h2-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32h2-hal
+//! [esp32p4-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32p4-hal
 //! [esp32s2-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32s2-hal
 //! [esp32s3-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32s3-hal
 
@@ -85,6 +87,7 @@ pub mod aes;
 pub mod analog;
 #[cfg(assist_debug)]
 pub mod assist_debug;
+#[cfg(any(dport, hp_sys, pcr, system))]
 pub mod clock;
 #[cfg(any(xtensa, all(riscv, systimer)))]
 pub mod delay;
@@ -123,6 +126,7 @@ pub mod peripheral;
 pub mod prelude;
 #[cfg(any(hmac, sha))]
 mod reg_access;
+#[cfg(any(lp_clkrst, rtc_cntl))]
 pub mod reset;
 #[cfg(rmt)]
 pub mod rmt;
@@ -137,7 +141,7 @@ pub mod rtc_cntl;
 pub mod sha;
 #[cfg(any(spi0, spi1, spi2, spi3))]
 pub mod spi;
-#[cfg(any(dport, pcr, system))]
+#[cfg(any(dport, hp_sys, pcr, system))]
 pub mod system;
 #[cfg(systimer)]
 pub mod systimer;
@@ -195,34 +199,29 @@ extern "C" fn EspDefaultHandler(_interrupt: peripherals::Interrupt) {
 /// Available CPU cores
 ///
 /// The actual number of available cores depends on the target.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, strum::FromRepr)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Cpu {
     /// The first core
     ProCpu = 0,
     /// The second core
     #[cfg(multi_core)]
-    AppCpu,
-}
-
-#[cfg(all(xtensa, multi_core))]
-fn get_raw_core() -> u32 {
-    xtensa_lx::get_processor_id() & 0x2000
+    AppCpu = 1,
 }
 
 /// Which core the application is currently executing on
-#[cfg(all(xtensa, multi_core))]
 pub fn get_core() -> Cpu {
-    match get_raw_core() {
-        0 => Cpu::ProCpu,
-        _ => Cpu::AppCpu,
-    }
+    Cpu::from_repr(get_raw_core()).unwrap()
 }
 
-/// Which core the application is currently executing on
-#[cfg(not(all(xtensa, multi_core)))]
-pub fn get_core() -> Cpu {
-    Cpu::ProCpu
+#[cfg(riscv)]
+fn get_raw_core() -> usize {
+    riscv::register::mhartid::read()
+}
+
+#[cfg(xtensa)]
+fn get_raw_core() -> usize {
+    xtensa_lx::get_processor_id() as usize & 0x2000
 }
 
 mod critical_section_impl {
@@ -282,16 +281,18 @@ mod critical_section_impl {
 
     #[cfg(riscv)]
     mod riscv {
-        #[cfg(multi_core)]
         // The restore state is a u8 that is casted from a bool, so it has a value of
         // 0x00 or 0x01 before we add the reentry flag to it.
+        #[cfg(multi_core)]
         const REENTRY_FLAG: u8 = 1 << 7;
 
         unsafe impl critical_section::Impl for super::CriticalSection {
             unsafe fn acquire() -> critical_section::RawRestoreState {
                 let mut mstatus = 0u32;
                 core::arch::asm!("csrrci {0}, mstatus, 8", inout(reg) mstatus);
-                let tkn = ((mstatus & 0b1000) != 0) as critical_section::RawRestoreState;
+
+                #[cfg_attr(single_core, allow(unused_mut))]
+                let mut tkn = ((mstatus & 0b1000) != 0) as critical_section::RawRestoreState;
 
                 #[cfg(multi_core)]
                 {
@@ -333,8 +334,9 @@ mod critical_section_impl {
 
         // We're using a value that we know get_raw_core() will never return. This
         // avoids an unnecessary increment of the core ID.
-        #[cfg(xtensa)] // TODO: first multi-core RISC-V target will show if this value is OK
-                       // globally or only for Xtensa
+        //
+        // TODO: First multi-core RISC-V target will show if this value is OK globally
+        //       or only for Xtensa...
         const UNUSED_THREAD_ID_VALUE: usize = 0x0001;
 
         fn thread_id() -> usize {
@@ -424,6 +426,7 @@ mod critical_section_impl {
 /// ```
 pub struct FlashSafeDma<T, const SIZE: usize> {
     inner: T,
+    #[allow(unused)]
     buffer: [u8; SIZE],
 }
 

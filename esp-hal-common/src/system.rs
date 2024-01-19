@@ -30,9 +30,6 @@
 
 use crate::{peripheral::PeripheralRef, peripherals::SYSTEM};
 
-#[cfg(any(esp32c6, esp32h2))]
-type IntPri = crate::peripherals::INTPRI;
-
 pub enum SoftwareInterrupt {
     SoftwareInterrupt0,
     SoftwareInterrupt1,
@@ -117,28 +114,28 @@ impl SoftwareInterruptControl {
         #[cfg(not(any(esp32c6, esp32h2)))]
         let system = unsafe { &*SYSTEM::PTR };
         #[cfg(any(esp32c6, esp32h2))]
-        let system = unsafe { &*IntPri::PTR };
+        let system = unsafe { &*crate::peripherals::INTPRI::PTR };
 
         match interrupt {
             SoftwareInterrupt::SoftwareInterrupt0 => {
                 system
                     .cpu_intr_from_cpu_0()
-                    .write(|w| w.cpu_intr_from_cpu_0().bit(true));
+                    .write(|w| w.cpu_intr_from_cpu_0().set_bit());
             }
             SoftwareInterrupt::SoftwareInterrupt1 => {
                 system
                     .cpu_intr_from_cpu_1()
-                    .write(|w| w.cpu_intr_from_cpu_1().bit(true));
+                    .write(|w| w.cpu_intr_from_cpu_1().set_bit());
             }
             SoftwareInterrupt::SoftwareInterrupt2 => {
                 system
                     .cpu_intr_from_cpu_2()
-                    .write(|w| w.cpu_intr_from_cpu_2().bit(true));
+                    .write(|w| w.cpu_intr_from_cpu_2().set_bit());
             }
             SoftwareInterrupt::SoftwareInterrupt3 => {
                 system
                     .cpu_intr_from_cpu_3()
-                    .write(|w| w.cpu_intr_from_cpu_3().bit(true));
+                    .write(|w| w.cpu_intr_from_cpu_3().set_bit());
             }
         }
     }
@@ -147,28 +144,28 @@ impl SoftwareInterruptControl {
         #[cfg(not(any(esp32c6, esp32h2)))]
         let system = unsafe { &*SYSTEM::PTR };
         #[cfg(any(esp32c6, esp32h2))]
-        let system = unsafe { &*IntPri::PTR };
+        let system = unsafe { &*crate::peripherals::INTPRI::PTR };
 
         match interrupt {
             SoftwareInterrupt::SoftwareInterrupt0 => {
                 system
                     .cpu_intr_from_cpu_0()
-                    .write(|w| w.cpu_intr_from_cpu_0().bit(false));
+                    .write(|w| w.cpu_intr_from_cpu_0().clear_bit());
             }
             SoftwareInterrupt::SoftwareInterrupt1 => {
                 system
                     .cpu_intr_from_cpu_1()
-                    .write(|w| w.cpu_intr_from_cpu_1().bit(false));
+                    .write(|w| w.cpu_intr_from_cpu_1().clear_bit());
             }
             SoftwareInterrupt::SoftwareInterrupt2 => {
                 system
                     .cpu_intr_from_cpu_2()
-                    .write(|w| w.cpu_intr_from_cpu_2().bit(false));
+                    .write(|w| w.cpu_intr_from_cpu_2().clear_bit());
             }
             SoftwareInterrupt::SoftwareInterrupt3 => {
                 system
                     .cpu_intr_from_cpu_3()
-                    .write(|w| w.cpu_intr_from_cpu_3().bit(false));
+                    .write(|w| w.cpu_intr_from_cpu_3().clear_bit());
             }
         }
     }
@@ -183,8 +180,6 @@ impl PeripheralClockControl {
     pub(crate) fn enable(peripheral: Peripheral) {
         let system = unsafe { &*SYSTEM::PTR };
 
-        #[cfg(not(esp32))]
-        let (perip_clk_en0, perip_rst_en0) = { (&system.perip_clk_en0(), &system.perip_rst_en0()) };
         #[cfg(esp32)]
         let (perip_clk_en0, perip_rst_en0, peri_clk_en, peri_rst_en) = {
             (
@@ -194,6 +189,8 @@ impl PeripheralClockControl {
                 &system.peri_rst_en(),
             )
         };
+        #[cfg(not(any(esp32, esp32p4)))]
+        let (perip_clk_en0, perip_rst_en0) = { (&system.perip_clk_en0(), &system.perip_rst_en0()) };
 
         #[cfg(any(esp32c2, esp32c3, esp32s2, esp32s3))]
         let (perip_clk_en1, perip_rst_en1) = { (&system.perip_clk_en1(), &system.perip_rst_en1()) };
@@ -209,12 +206,12 @@ impl PeripheralClockControl {
                 perip_clk_en0.modify(|_, w| w.spi3_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.spi3_rst().clear_bit());
             }
-            #[cfg(esp32)]
+            #[cfg(all(i2c0, esp32))]
             Peripheral::I2cExt0 => {
                 perip_clk_en0.modify(|_, w| w.i2c0_ext0_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.i2c0_ext0_rst().clear_bit());
             }
-            #[cfg(not(esp32))]
+            #[cfg(all(i2c0, not(esp32)))]
             Peripheral::I2cExt0 => {
                 perip_clk_en0.modify(|_, w| w.i2c_ext0_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.i2c_ext0_rst().clear_bit());
@@ -229,6 +226,7 @@ impl PeripheralClockControl {
                 perip_clk_en0.modify(|_, w| w.rmt_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.rmt_rst().clear_bit());
             }
+            #[cfg(ledc)]
             Peripheral::Ledc => {
                 perip_clk_en0.modify(|_, w| w.ledc_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.ledc_rst().clear_bit());
@@ -326,6 +324,7 @@ impl PeripheralClockControl {
                 perip_rst_en0.modify(|_, w| w.timers_rst().clear_bit());
                 perip_rst_en0.modify(|_, w| w.timergroup1_rst().clear_bit());
             }
+            #[cfg(sha)]
             Peripheral::Sha => {
                 #[cfg(not(esp32))]
                 perip_clk_en1.modify(|_, w| w.crypto_sha_clk_en().set_bit());
@@ -342,10 +341,12 @@ impl PeripheralClockControl {
                 perip_clk_en1.modify(|_, w| w.usb_device_clk_en().set_bit());
                 perip_rst_en1.modify(|_, w| w.usb_device_rst().clear_bit());
             }
+            #[cfg(uart0)]
             Peripheral::Uart0 => {
                 perip_clk_en0.modify(|_, w| w.uart_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.uart_rst().clear_bit());
             }
+            #[cfg(uart1)]
             Peripheral::Uart1 => {
                 perip_clk_en0.modify(|_, w| w.uart1_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.uart1_rst().clear_bit());
@@ -360,12 +361,12 @@ impl PeripheralClockControl {
                 perip_clk_en0.modify(|_, w| w.uart2_clk_en().set_bit());
                 perip_rst_en0.modify(|_, w| w.uart2_rst().clear_bit());
             }
-            #[cfg(esp32)]
+            #[cfg(all(rsa, esp32))]
             Peripheral::Rsa => {
                 peri_clk_en.modify(|r, w| unsafe { w.bits(r.bits() | 1 << 2) });
                 peri_rst_en.modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 2)) });
             }
-            #[cfg(any(esp32c3, esp32s2, esp32s3))]
+            #[cfg(all(rsa, any(esp32c3, esp32s2, esp32s3)))]
             Peripheral::Rsa => {
                 perip_clk_en1.modify(|_, w| w.crypto_rsa_clk_en().set_bit());
                 perip_rst_en1.modify(|_, w| w.crypto_rsa_rst().clear_bit());

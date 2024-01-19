@@ -29,6 +29,8 @@ pub use nb;
 
 #[cfg(any(apb_saradc, sens))]
 pub use crate::analog::AnalogExt as _esp_hal_analog_AnalogExt;
+#[cfg(any(dport, pcr, system))]
+pub use crate::clock::Clock as _esp_hal_clock_Clock;
 #[cfg(any(gdma, pdma))]
 pub use crate::dma::{
     DmaTransfer as _esp_hal_dma_DmaTransfer,
@@ -52,6 +54,7 @@ pub use crate::ledc::{
     },
     timer::{TimerHW as _esp_hal_ledc_timer_TimerHW, TimerIFace as _esp_hal_ledc_timer_TimerIFace},
 };
+pub use crate::macros::*;
 #[cfg(any(dport, pcr, system))]
 pub use crate::system::SystemExt as _esp_hal_system_SystemExt;
 #[cfg(any(timg0, timg1))]
@@ -61,4 +64,3 @@ pub use crate::timer::{
 };
 #[cfg(any(uart0, uart1, uart2))]
 pub use crate::uart::{Instance as _esp_hal_uart_Instance, UartPins as _esp_hal_uart_UartPins};
-pub use crate::{clock::Clock as _esp_hal_clock_Clock, macros::*};
