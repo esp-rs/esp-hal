@@ -2,7 +2,10 @@ use core::marker::PhantomData;
 
 use embedded_hal::adc::{Channel, OneShot};
 
-pub use crate::analog::{ADC1, ADC2};
+pub use self::calibration::*;
+#[cfg(esp32s3)]
+use super::AdcCalEfuse;
+use super::{AdcCalScheme, AdcCalSource, Attenuation};
 #[cfg(esp32s3)]
 use crate::efuse::Efuse;
 use crate::{
@@ -10,21 +13,7 @@ use crate::{
     peripherals::{APB_SARADC, SENS},
 };
 
-#[cfg(esp32s3)]
-mod cal_basic;
-#[cfg(esp32s3)]
-mod cal_curve;
-#[cfg(esp32s3)]
-mod cal_line;
-
-#[cfg(esp32s3)]
-pub use cal_basic::AdcCalBasic;
-#[cfg(esp32s3)]
-pub use cal_curve::{AdcCalCurve, AdcHasCurveCal};
-#[cfg(esp32s3)]
-pub use cal_line::{AdcCalLine, AdcHasLineCal};
-
-pub use crate::analog::{AdcCalEfuse, AdcCalScheme};
+mod calibration;
 
 // Constants taken from:
 // https://github.com/espressif/esp-idf/blob/903af13e8/components/soc/esp32s2/include/soc/regi2c_saradc.h
@@ -85,35 +74,13 @@ cfg_if::cfg_if! {
     }
 }
 
-/// The sampling/readout resolution of the ADC
+/// The sampling/readout resolution of the ADC.
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum Resolution {
     Resolution13Bit,
 }
 
-/// The attenuation of the ADC pin
-#[derive(PartialEq, Eq, Clone, Copy)]
-pub enum Attenuation {
-    /// 0 dB attenuation, measurement range: 0 - 800 mV
-    Attenuation0dB   = 0b00,
-    /// 2.5 dB attenuation, measurement range: 0 - 1100 mV
-    Attenuation2p5dB = 0b01,
-    /// 6 dB attenuation, measurement range: 0 - 1350 mV
-    Attenuation6dB   = 0b10,
-    /// 11 dB attenuation, measurement range: 0 - 2600 mV
-    Attenuation11dB  = 0b11,
-}
-
-impl Attenuation {
-    /// List of all supported attenuations
-    pub const ALL: &'static [Attenuation] = &[
-        Attenuation::Attenuation0dB,
-        Attenuation::Attenuation2p5dB,
-        Attenuation::Attenuation6dB,
-        Attenuation::Attenuation11dB,
-    ];
-}
-
+/// An I/O pin which can be read using the ADC.
 pub struct AdcPin<PIN, ADCI, CS = ()> {
     pub pin: PIN,
     pub cal_scheme: CS,
@@ -131,6 +98,7 @@ where
     }
 }
 
+/// Configuration for the ADC.
 pub struct AdcConfig<ADCI> {
     pub resolution: Resolution,
     pub attenuations: [Option<Attenuation>; 10],
@@ -233,12 +201,6 @@ impl<ADCI> Default for AdcConfig<ADCI> {
     }
 }
 
-#[derive(Clone, Copy)]
-pub enum AdcCalSource {
-    Gnd,
-    Ref,
-}
-
 #[doc(hidden)]
 pub trait RegisterAccess {
     fn adc_samplecfg(channel: u16);
@@ -270,6 +232,7 @@ pub trait RegisterAccess {
     fn reset();
 }
 
+#[doc(hidden)]
 pub trait CalibrationAccess: RegisterAccess {
     const ADC_CAL_CNT_MAX: u16;
     const ADC_CAL_CHANNEL: u16;
@@ -281,7 +244,7 @@ pub trait CalibrationAccess: RegisterAccess {
     fn connect_cal(source: AdcCalSource, enable: bool);
 }
 
-impl RegisterAccess for ADC1 {
+impl RegisterAccess for crate::peripherals::ADC1 {
     fn adc_samplecfg(channel: u16) {
         let sensors = unsafe { &*SENS::ptr() };
 
@@ -395,7 +358,7 @@ impl RegisterAccess for ADC1 {
 }
 
 #[cfg(esp32s3)]
-impl CalibrationAccess for ADC1 {
+impl CalibrationAccess for crate::peripherals::ADC1 {
     const ADC_CAL_CNT_MAX: u16 = ADC_CAL_CNT_MAX;
     const ADC_CAL_CHANNEL: u16 = ADC_CAL_CHANNEL;
     const ADC_VAL_MASK: u16 = ADC_VAL_MASK;
@@ -416,7 +379,7 @@ impl CalibrationAccess for ADC1 {
     }
 }
 
-impl RegisterAccess for ADC2 {
+impl RegisterAccess for crate::peripherals::ADC2 {
     fn adc_samplecfg(channel: u16) {
         let sensors = unsafe { &*SENS::ptr() };
 
@@ -531,7 +494,7 @@ impl RegisterAccess for ADC2 {
 }
 
 #[cfg(esp32s3)]
-impl CalibrationAccess for ADC2 {
+impl CalibrationAccess for crate::peripherals::ADC2 {
     const ADC_CAL_CNT_MAX: u16 = ADC_CAL_CNT_MAX;
     const ADC_CAL_CHANNEL: u16 = ADC_CAL_CHANNEL;
     const ADC_VAL_MASK: u16 = ADC_VAL_MASK;
@@ -552,6 +515,7 @@ impl CalibrationAccess for ADC2 {
     }
 }
 
+/// Analog-to-Digital Converter peripheral driver.
 pub struct ADC<'d, ADC> {
     _adc: PeripheralRef<'d, ADC>,
     attenuations: [Option<Attenuation>; 10],
@@ -641,7 +605,7 @@ where
 }
 
 #[cfg(esp32s3)]
-impl AdcCalEfuse for ADC1 {
+impl AdcCalEfuse for crate::peripherals::ADC1 {
     fn get_init_code(atten: Attenuation) -> Option<u16> {
         Efuse::get_rtc_calib_init_code(1, atten)
     }
@@ -656,7 +620,7 @@ impl AdcCalEfuse for ADC1 {
 }
 
 #[cfg(esp32s3)]
-impl AdcCalEfuse for ADC2 {
+impl AdcCalEfuse for crate::peripherals::ADC2 {
     fn get_init_code(atten: Attenuation) -> Option<u16> {
         Efuse::get_rtc_calib_init_code(2, atten)
     }
@@ -741,125 +705,21 @@ macro_rules! impl_adc_interface {
     }
 }
 
-pub use implementation::*;
-
-#[cfg(esp32s3)]
 mod implementation {
-    //! # Analog to digital (ADC) conversion support.
-    //!
-    //! ## Overview
-    //! The `ADC` module in the `analog` driver enables users to perform
-    //! analog-to-digital conversions, allowing them to measure real-world
-    //! analog signals with high accuracy.
-    //!
-    //! This module provides functions for reading analog values from the
-    //! analog to digital converter available on the ESP32-S3: `ADC1` and
-    //! `ADC2`.
-    //!
-    //! ## Example
-    //! #### ADC on Xtensa architecture
-    //! ```no_run
-    //! // Create ADC instances
-    //! let analog = peripherals.SENS.split();
-    //!
-    //! let mut adc1_config = AdcConfig::new();
-    //!
-    //! let mut pin3 =
-    //!     adc1_config.enable_pin(io.pins.gpio3.into_analog(), Attenuation::Attenuation11dB);
-    //!
-    //! let mut adc1 = ADC::<ADC1>::adc(analog.adc1, adc1_config).unwrap();
-    //!
-    //! let mut delay = Delay::new(&clocks);
-    //!
-    //! loop {
-    //!     let pin3_value: u16 = nb::block!(adc1.read(&mut pin3)).unwrap();
-    //!     println!("PIN3 ADC reading = {}", pin3_value);
-    //!     delay.delay_ms(1500u32);
-    //! }
-    //! ```
-
-    use crate::analog::{ADC1, ADC2};
+    use crate::peripherals::{ADC1, ADC2};
 
     impl_adc_interface! {
         ADC1 [
-            (Gpio1, 0),
-            (Gpio2, 1),
-            (Gpio3, 2),
-            (Gpio4, 3),
-            (Gpio5, 4),
-            (Gpio6, 5),
-            (Gpio7, 6),
-            (Gpio8, 7),
-            (Gpio9, 8),
-            (Gpio10,9),
-        ]
-    }
-
-    impl_adc_interface! {
-        ADC2 [
-            (Gpio11, 0),
-            (Gpio12, 1),
-            (Gpio13, 2),
-            (Gpio14, 3),
-            (Gpio15, 4),
-            (Gpio16, 5),
-            (Gpio17, 6),
-            (Gpio18, 7),
-            (Gpio19, 8),
-            (Gpio20, 9),
-        ]
-    }
-}
-
-#[cfg(esp32s2)]
-mod implementation {
-    //! # Analog to digital (ADC) conversion support.
-    //!
-    //! ## Overview
-    //! The `ADC` module in the `analog` driver enables users to perform
-    //! analog-to-digital conversions, allowing them to measure real-world
-    //! analog signals with high accuracy.
-    //!
-    //! This module provides functions for reading analog values from the
-    //! analog to digital converter available on the ESP32-S2: `ADC1` and
-    //! `ADC2`.
-    //!
-    //! ## Example
-    //! #### ADC on Xtensa architecture
-    //! ```no_run
-    //! // Create ADC instances
-    //! let analog = peripherals.SENS.split();
-    //!
-    //! let mut adc1_config = AdcConfig::new();
-    //!
-    //! let mut pin3 =
-    //!     adc1_config.enable_pin(io.pins.gpio3.into_analog(), Attenuation::Attenuation11dB);
-    //!
-    //! let mut adc1 = ADC::<ADC1>::adc(analog.adc1, adc1_config).unwrap();
-    //!
-    //! let mut delay = Delay::new(&clocks);
-    //!
-    //! loop {
-    //!     let pin3_value: u16 = nb::block!(adc1.read(&mut pin3)).unwrap();
-    //!     println!("PIN3 ADC reading = {}", pin3_value);
-    //!     delay.delay_ms(1500u32);
-    //! }
-    //! ```
-
-    use crate::analog::{ADC1, ADC2};
-
-    impl_adc_interface! {
-        ADC1 [
-            (Gpio1, 0),
-            (Gpio2, 1),
-            (Gpio3, 2),
-            (Gpio4, 3),
-            (Gpio5, 4),
-            (Gpio6, 5),
-            (Gpio7, 6),
-            (Gpio8, 7),
-            (Gpio9, 8),
-            (Gpio10,9),
+            (Gpio1,  0),
+            (Gpio2,  1),
+            (Gpio3,  2),
+            (Gpio4,  3),
+            (Gpio5,  4),
+            (Gpio6,  5),
+            (Gpio7,  6),
+            (Gpio8,  7),
+            (Gpio9,  8),
+            (Gpio10, 9),
         ]
     }
 

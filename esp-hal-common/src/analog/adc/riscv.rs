@@ -2,9 +2,8 @@ use core::marker::PhantomData;
 
 use embedded_hal::adc::{Channel, OneShot};
 
-pub use crate::analog::ADC1;
-#[cfg(esp32c3)]
-pub use crate::analog::ADC2;
+pub use self::calibration::*;
+use super::{AdcCalEfuse, AdcCalScheme, AdcCalSource, Attenuation};
 #[cfg(any(esp32c6, esp32h2))]
 use crate::clock::clocks_ll::regi2c_write_mask;
 #[cfg(any(esp32c2, esp32c3, esp32c6))]
@@ -15,21 +14,7 @@ use crate::{
     system::{Peripheral, PeripheralClockControl},
 };
 
-#[cfg(any(esp32c2, esp32c3, esp32c6))]
-mod cal_basic;
-#[cfg(any(esp32c3, esp32c6))]
-mod cal_curve;
-#[cfg(any(esp32c2, esp32c3, esp32c6))]
-mod cal_line;
-
-#[cfg(any(esp32c2, esp32c3, esp32c6))]
-pub use cal_basic::AdcCalBasic;
-#[cfg(any(esp32c3, esp32c6))]
-pub use cal_curve::{AdcCalCurve, AdcHasCurveCal};
-#[cfg(any(esp32c2, esp32c3, esp32c6))]
-pub use cal_line::{AdcCalLine, AdcHasLineCal};
-
-pub use crate::analog::{AdcCalEfuse, AdcCalScheme};
+mod calibration;
 
 // polyfill for c2 and c3
 #[cfg(any(esp32c2, esp32c3))]
@@ -118,39 +103,13 @@ cfg_if::cfg_if! {
     }
 }
 
-/// The sampling/readout resolution of the ADC
+/// The sampling/readout resolution of the ADC.
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum Resolution {
     Resolution12Bit,
 }
 
-/// The attenuation of the ADC pin
-#[derive(PartialEq, Eq, Clone, Copy)]
-pub enum Attenuation {
-    /// 0 dB attenuation, measurement range: 0 - 800 mV
-    Attenuation0dB   = 0b00,
-    /// 2.5 dB attenuation, measurement range: 0 - 1100 mV
-    #[cfg(not(esp32c2))]
-    Attenuation2p5dB = 0b01,
-    /// 6 dB attenuation, measurement range: 0 - 1350 mV
-    #[cfg(not(esp32c2))]
-    Attenuation6dB   = 0b10,
-    /// 11 dB attenuation, measurement range: 0 - 2600 mV
-    Attenuation11dB  = 0b11,
-}
-
-impl Attenuation {
-    /// List of all supported attenuations
-    pub const ALL: &'static [Attenuation] = &[
-        Attenuation::Attenuation0dB,
-        #[cfg(not(esp32c2))]
-        Attenuation::Attenuation2p5dB,
-        #[cfg(not(esp32c2))]
-        Attenuation::Attenuation6dB,
-        Attenuation::Attenuation11dB,
-    ];
-}
-
+/// An I/O pin which can be read using the ADC.
 pub struct AdcPin<PIN, ADCI, CS = ()> {
     pub pin: PIN,
     pub cal_scheme: CS,
@@ -168,6 +127,7 @@ where
     }
 }
 
+/// Configuration for the ADC.
 pub struct AdcConfig<ADCI> {
     pub resolution: Resolution,
     pub attenuations: [Option<Attenuation>; NUM_ATTENS],
@@ -268,12 +228,6 @@ impl<ADCI> Default for AdcConfig<ADCI> {
     }
 }
 
-#[derive(Clone, Copy)]
-pub enum AdcCalSource {
-    Gnd,
-    Ref,
-}
-
 #[doc(hidden)]
 pub trait RegisterAccess {
     /// Configure onetime sampling parameters
@@ -295,6 +249,7 @@ pub trait RegisterAccess {
     fn set_init_code(data: u16);
 }
 
+#[doc(hidden)]
 pub trait CalibrationAccess: RegisterAccess {
     const ADC_CAL_CNT_MAX: u16;
     const ADC_CAL_CHANNEL: u16;
@@ -306,7 +261,7 @@ pub trait CalibrationAccess: RegisterAccess {
     fn connect_cal(source: AdcCalSource, enable: bool);
 }
 
-impl RegisterAccess for ADC1 {
+impl RegisterAccess for crate::peripherals::ADC1 {
     fn config_onetime_sample(channel: u8, attenuation: u8) {
         let sar_adc = unsafe { &*APB_SARADC::PTR };
 
@@ -376,7 +331,7 @@ impl RegisterAccess for ADC1 {
     }
 }
 
-impl CalibrationAccess for ADC1 {
+impl CalibrationAccess for crate::peripherals::ADC1 {
     const ADC_CAL_CNT_MAX: u16 = ADC_CAL_CNT_MAX;
     const ADC_CAL_CHANNEL: u16 = ADC_CAL_CHANNEL;
     const ADC_VAL_MASK: u16 = ADC_VAL_MASK;
@@ -417,7 +372,7 @@ impl CalibrationAccess for ADC1 {
 }
 
 #[cfg(esp32c3)]
-impl RegisterAccess for ADC2 {
+impl RegisterAccess for crate::peripherals::ADC2 {
     fn config_onetime_sample(channel: u8, attenuation: u8) {
         let sar_adc = unsafe { &*APB_SARADC::PTR };
 
@@ -486,7 +441,7 @@ impl RegisterAccess for ADC2 {
 }
 
 #[cfg(esp32c3)]
-impl CalibrationAccess for ADC2 {
+impl CalibrationAccess for crate::peripherals::ADC2 {
     const ADC_CAL_CNT_MAX: u16 = ADC_CAL_CNT_MAX;
     const ADC_CAL_CHANNEL: u16 = ADC_CAL_CHANNEL;
     const ADC_VAL_MASK: u16 = ADC_VAL_MASK;
@@ -526,6 +481,7 @@ impl CalibrationAccess for ADC2 {
     }
 }
 
+/// Analog-to-Digital Converter peripheral driver.
 pub struct ADC<'d, ADCI> {
     _adc: PeripheralRef<'d, ADCI>,
     attenuations: [Option<Attenuation>; NUM_ATTENS],
@@ -564,7 +520,7 @@ where
 }
 
 #[cfg(any(esp32c2, esp32c3, esp32c6))]
-impl AdcCalEfuse for ADC1 {
+impl AdcCalEfuse for crate::peripherals::ADC1 {
     fn get_init_code(atten: Attenuation) -> Option<u16> {
         Efuse::get_rtc_calib_init_code(1, atten)
     }
@@ -579,7 +535,7 @@ impl AdcCalEfuse for ADC1 {
 }
 
 #[cfg(esp32c3)]
-impl AdcCalEfuse for ADC2 {
+impl AdcCalEfuse for crate::peripherals::ADC2 {
     fn get_init_code(atten: Attenuation) -> Option<u16> {
         Efuse::get_rtc_calib_init_code(2, atten)
     }
@@ -676,7 +632,6 @@ macro_rules! impl_adc_interface {
     ($adc:ident [
         $( ($pin:ident, $channel:expr) ,)+
     ]) => {
-
         $(
             impl embedded_hal::adc::Channel<$adc> for crate::gpio::$pin<crate::gpio::Analog> {
                 type ID = u8;
@@ -689,38 +644,7 @@ macro_rules! impl_adc_interface {
 
 #[cfg(esp32c2)]
 mod implementation {
-    //! # Analog to digital (ADC) conversion support.
-    //!
-    //! ## Overview
-    //! The `ADC` module in the `analog` driver enables users to perform
-    //! analog-to-digital conversions, allowing them to measure real-world
-    //! analog signals with high accuracy.
-    //!
-    //! This module provides functions for reading analog values from the
-    //! analog to digital converter available on the ESP32-C2: `ADC1`.
-    //!
-    //! ## Example
-    //! #### ADC on Risc-V architecture
-    //! ```no_run
-    //! // Create ADC instances
-    //! let analog = peripherals.APB_SARADC.split();
-    //!
-    //! let mut adc1_config = AdcConfig::new();
-    //!
-    //! let mut pin = adc1_config.enable_pin(io.pins.gpio2.into_analog(), Attenuation::Attenuation11dB);
-    //!
-    //! let mut adc1 = ADC::<ADC1>::adc(analog.adc1, adc1_config).unwrap();
-    //!
-    //! let mut delay = Delay::new(&clocks);
-    //!
-    //! loop {
-    //!     let pin_value: u16 = nb::block!(adc1.read(&mut pin)).unwrap();
-    //!     println!("PIN2 ADC reading = {}", pin_value);
-    //!     delay.delay_ms(1500u32);
-    //! }
-    //! ```
-
-    use crate::analog::ADC1;
+    use crate::peripherals::ADC1;
 
     impl_adc_interface! {
         ADC1 [
@@ -735,39 +659,7 @@ mod implementation {
 
 #[cfg(esp32c3)]
 mod implementation {
-    //! # Analog to digital (ADC) conversion support.
-    //!
-    //! ## Overview
-    //! The `ADC` module in the `analog` driver enables users to perform
-    //! analog-to-digital conversions, allowing them to measure real-world
-    //! analog signals with high accuracy.
-    //!
-    //! This module provides functions for reading analog values from the
-    //! analog to digital converter available on the ESP32-C3: `ADC1` and
-    //! `ADC2`.
-    //!
-    //! ## Example
-    //! #### ADC on Risc-V architecture
-    //! ```no_run
-    //! // Create ADC instances
-    //! let analog = peripherals.APB_SARADC.split();
-    //!
-    //! let mut adc1_config = AdcConfig::new();
-    //!
-    //! let mut pin = adc1_config.enable_pin(io.pins.gpio2.into_analog(), Attenuation::Attenuation11dB);
-    //!
-    //! let mut adc1 = ADC::<ADC1>::adc(analog.adc1, adc1_config).unwrap();
-    //!
-    //! let mut delay = Delay::new(&clocks);
-    //!
-    //! loop {
-    //!     let pin_value: u16 = nb::block!(adc1.read(&mut pin)).unwrap();
-    //!     println!("PIN2 ADC reading = {}", pin_value);
-    //!     delay.delay_ms(1500u32);
-    //! }
-    //! ```
-
-    use crate::analog::{ADC1, ADC2};
+    use crate::peripherals::{ADC1, ADC2};
 
     impl_adc_interface! {
         ADC1 [
@@ -788,38 +680,7 @@ mod implementation {
 
 #[cfg(esp32c6)]
 mod implementation {
-    //! # Analog to digital (ADC) conversion support.
-    //!
-    //! ## Overview
-    //! The `ADC` module in the `analog` driver enables users to perform
-    //! analog-to-digital conversions, allowing them to measure real-world
-    //! analog signals with high accuracy.
-    //!
-    //! This module provides functions for reading analog values from the
-    //! analog to digital converter available on the ESP32-C6: `ADC1`.
-    //!
-    //! ## Example
-    //! #### ADC on Risc-V architecture
-    //! ```no_run
-    //! // Create ADC instances
-    //! let analog = peripherals.APB_SARADC.split();
-    //!
-    //! let mut adc1_config = AdcConfig::new();
-    //!
-    //! let mut pin = adc1_config.enable_pin(io.pins.gpio2.into_analog(), Attenuation::Attenuation11dB);
-    //!
-    //! let mut adc1 = ADC::<ADC1>::adc(analog.adc1, adc1_config).unwrap();
-    //!
-    //! let mut delay = Delay::new(&clocks);
-    //!
-    //! loop {
-    //!     let pin_value: u16 = nb::block!(adc1.read(&mut pin)).unwrap();
-    //!     println!("PIN2 ADC reading = {}", pin_value);
-    //!     delay.delay_ms(1500u32);
-    //! }
-    //! ```
-
-    use crate::analog::ADC1;
+    use crate::peripherals::ADC1;
 
     impl_adc_interface! {
         ADC1 [
@@ -836,38 +697,7 @@ mod implementation {
 
 #[cfg(esp32h2)]
 mod implementation {
-    //! # Analog to digital (ADC) conversion support.
-    //!
-    //! ## Overview
-    //! The `ADC` module in the `analog` driver enables users to perform
-    //! analog-to-digital conversions, allowing them to measure real-world
-    //! analog signals with high accuracy.
-    //!
-    //! This module provides functions for reading analog values from the
-    //! analog to digital converter available on the  ESP32-H2: `ADC1`.
-    //!
-    //! ## Example
-    //! #### ADC on Risc-V architecture
-    //! ```no_run
-    //! // Create ADC instances
-    //! let analog = peripherals.APB_SARADC.split();
-    //!
-    //! let mut adc1_config = AdcConfig::new();
-    //!
-    //! let mut pin = adc1_config.enable_pin(io.pins.gpio2.into_analog(), Attenuation::Attenuation11dB);
-    //!
-    //! let mut adc1 = ADC::<ADC1>::adc(analog.adc1, adc1_config).unwrap();
-    //!
-    //! let mut delay = Delay::new(&clocks);
-    //!
-    //! loop {
-    //!     let pin_value: u16 = nb::block!(adc1.read(&mut pin)).unwrap();
-    //!     println!("PIN2 ADC reading = {}", pin_value);
-    //!     delay.delay_ms(1500u32);
-    //! }
-    //! ```
-
-    use crate::analog::ADC1;
+    use crate::peripherals::ADC1;
 
     impl_adc_interface! {
         ADC1 [

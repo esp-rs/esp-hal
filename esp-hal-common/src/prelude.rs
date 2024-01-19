@@ -27,8 +27,6 @@ pub use fugit::{
 };
 pub use nb;
 
-#[cfg(any(apb_saradc, sens))]
-pub use crate::analog::AnalogExt as _esp_hal_analog_AnalogExt;
 #[cfg(any(dport, pcr, system))]
 pub use crate::clock::Clock as _esp_hal_clock_Clock;
 #[cfg(any(gdma, pdma))]
