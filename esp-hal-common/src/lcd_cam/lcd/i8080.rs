@@ -67,16 +67,6 @@ impl<'d, TX: Tx> I8080<'d, TX> {
             w.lcd_byte_order().bit(false);
             w.lcd_2byte_en().bit(false);
 
-            // Be able to send command in LCD sequence when LCD starts.
-            w.lcd_cmd().set_bit();
-            // The cycle length of command phase. 1: 2 cycles. 0: 1 cycle
-            w.lcd_cmd_2_cycle_en().clear_bit();
-
-            // Enable DUMMY phase in LCD sequence when LCD starts.
-            w.lcd_dummy().clear_bit();
-            // Configure DUMMY cycles. DUMMY cycles = this value + 1. (2 bits)
-            w.lcd_dummy_cyclelen().variant(1);
-
             // Be able to send data out in LCD sequence when LCD starts.
             w.lcd_dout().set_bit();
             // Data length in fixed mode. (13 bits)
@@ -225,7 +215,12 @@ impl<'d, TX: Tx> I8080<'d, TX> {
         self
     }
 
-    pub fn send(&mut self, cmd: u8, data: &[u8]) -> Result<(), DmaError> {
+    pub fn send(
+        &mut self,
+        cmd: impl Into<Command>,
+        dummy: u8,
+        data: &[u8],
+    ) -> Result<(), DmaError> {
         // Reset LCD control unit and Async Tx FIFO
         self.lcd_cam
             .lcd_user()
@@ -233,6 +228,49 @@ impl<'d, TX: Tx> I8080<'d, TX> {
         self.lcd_cam
             .lcd_misc()
             .modify(|_, w| w.lcd_afifo_reset().set_bit());
+
+        // Set cmd value
+        let cmd = cmd.into();
+        match cmd {
+            Command::None => {
+                self.lcd_cam
+                    .lcd_user()
+                    .modify(|_, w| w.lcd_cmd().clear_bit());
+            }
+            Command::One(value) => {
+                self.lcd_cam.lcd_user().modify(|_, w| {
+                    w.lcd_cmd().set_bit();
+                    w.lcd_cmd_2_cycle_en().clear_bit();
+                    w
+                });
+                self.lcd_cam
+                    .lcd_cmd_val()
+                    .write(|w| w.lcd_cmd_value().variant(value as _));
+            }
+            Command::Two(first, second) => {
+                self.lcd_cam.lcd_user().modify(|_, w| {
+                    w.lcd_cmd().set_bit();
+                    w.lcd_cmd_2_cycle_en().set_bit();
+                    w
+                });
+                let cmd = first as u32 | (second as u32) << 16;
+                self.lcd_cam
+                    .lcd_cmd_val()
+                    .write(|w| w.lcd_cmd_value().variant(cmd));
+            }
+        }
+
+        self.lcd_cam.lcd_user().modify(|_, w| {
+            if dummy > 0 {
+                // Enable DUMMY phase in LCD sequence when LCD starts.
+                w.lcd_dummy().set_bit();
+                // Configure DUMMY cycles. DUMMY cycles = this value + 1. (2 bits)
+                w.lcd_dummy_cyclelen().variant((dummy - 1) as _);
+            } else {
+                w.lcd_dummy().clear_bit();
+            }
+            w
+        });
 
         if data.is_empty() {
             // Set transfer length.
@@ -256,11 +294,6 @@ impl<'d, TX: Tx> I8080<'d, TX> {
             )?;
             self.tx_channel.start_transfer()?;
         }
-
-        // Set cmd value
-        self.lcd_cam
-            .lcd_cmd_val()
-            .write(|w| w.lcd_cmd_value().variant(cmd as _));
 
         // Setup interrupts.
         self.lcd_cam
@@ -294,5 +327,22 @@ impl<'d, TX: Tx> I8080<'d, TX> {
             .write(|w| w.lcd_trans_done_int_clr().set_bit());
 
         Ok(())
+    }
+}
+
+/// LCD_CAM I8080 command.
+///
+/// Can be [Command::None] if command phase should be suppressed.
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum Command {
+    None,
+    One(u8),
+    Two(u8, u8),
+}
+
+impl From<u8> for Command {
+    fn from(value: u8) -> Self {
+        Command::One(value)
     }
 }

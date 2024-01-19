@@ -95,12 +95,13 @@ fn main() -> ! {
         const CMD_DOCA: u8 = 0xE8; // Display Output Ctrl Adjust
         const CMD_CSCON: u8 = 0xF0; // Command Set Control
 
-        i8080.send(CMD_CSCON, &[0xC3]).unwrap(); // Enable extension command 2 part I
-        i8080.send(CMD_CSCON, &[0x96]).unwrap(); // Enable extension command 2 part II
-        i8080.send(CMD_INVCTR, &[0x01]).unwrap(); // 1-dot inversion
+        i8080.send(CMD_CSCON, 0, &[0xC3]).unwrap(); // Enable extension command 2 part I
+        i8080.send(CMD_CSCON, 0, &[0x96]).unwrap(); // Enable extension command 2 part II
+        i8080.send(CMD_INVCTR, 0, &[0x01]).unwrap(); // 1-dot inversion
         i8080
             .send(
                 CMD_DFUNCTR,
+                0,
                 &[
                     0x80, // Display Function Control //Bypass
                     0x22, /* Source Output Scan from S1 to S960, Gate Output scan from G1 to
@@ -112,6 +113,7 @@ fn main() -> ! {
         i8080
             .send(
                 CMD_DOCA,
+                0,
                 &[
                     0x40, 0x8A, 0x00, 0x00, 0x29, // Source eqaulizing period time= 22.5 us
                     0x19, // Timing for "Gate start"=25 (Tclk)
@@ -120,15 +122,16 @@ fn main() -> ! {
                 ],
             )
             .unwrap();
-        i8080.send(CMD_PWCTR2, &[0x06]).unwrap(); // Power control2   //VAP(GVDD)=3.85+( vcom+vcom offset), VAN(GVCL)=-3.85+(
-                                                  // vcom+vcom offset)
-        i8080.send(CMD_PWCTR3, &[0xA7]).unwrap(); // Power control 3  //Source driving current level=low, Gamma driving current
-                                                  // level=High
-        i8080.send(CMD_VMCTR, &[0x18]).unwrap(); // VCOM Control    //VCOM=0.9
+        i8080.send(CMD_PWCTR2, 0, &[0x06]).unwrap(); // Power control2   //VAP(GVDD)=3.85+( vcom+vcom offset), VAN(GVCL)=-3.85+(
+                                                     // vcom+vcom offset)
+        i8080.send(CMD_PWCTR3, 0, &[0xA7]).unwrap(); // Power control 3  //Source driving current level=low, Gamma driving current
+                                                     // level=High
+        i8080.send(CMD_VMCTR, 0, &[0x18]).unwrap(); // VCOM Control    //VCOM=0.9
         delay.delay_us(120_000u32);
         i8080
             .send(
                 CMD_GMCTRP1,
+                0,
                 &[
                     0xF0, 0x09, 0x0B, 0x06, 0x04, 0x15, 0x2F, 0x54, 0x42, 0x3C, 0x17, 0x14, 0x18,
                     0x1B,
@@ -138,6 +141,7 @@ fn main() -> ! {
         i8080
             .send(
                 CMD_GMCTRN1,
+                0,
                 &[
                     0xE0, 0x09, 0x0B, 0x06, 0x04, 0x03, 0x2B, 0x43, 0x42, 0x3B, 0x16, 0x14, 0x17,
                     0x1B,
@@ -145,21 +149,21 @@ fn main() -> ! {
             )
             .unwrap();
         delay.delay_us(120_000u32);
-        i8080.send(CMD_CSCON, &[0x3C]).unwrap(); // Command Set control // Disable extension command 2 partI
-        i8080.send(CMD_CSCON, &[0x69]).unwrap(); // Command Set control // Disable
-                                                 // extension command 2 partII
+        i8080.send(CMD_CSCON, 0, &[0x3C]).unwrap(); // Command Set control // Disable extension command 2 partI
+        i8080.send(CMD_CSCON, 0, &[0x69]).unwrap(); // Command Set control // Disable
+                                                    // extension command 2 partII
 
-        i8080.send(0x11, &[]).unwrap(); // ExitSleepMode
+        i8080.send(0x11, 0, &[]).unwrap(); // ExitSleepMode
         delay.delay_us(130_000u32);
-        i8080.send(0x38, &[]).unwrap(); // ExitIdleMode
-        i8080.send(0x29, &[]).unwrap(); // SetDisplayOn
+        i8080.send(0x38, 0, &[]).unwrap(); // ExitIdleMode
+        i8080.send(0x29, 0, &[]).unwrap(); // SetDisplayOn
 
-        i8080.send(0x21, &[]).unwrap(); // SetInvertMode(ColorInversion::Inverted)
+        i8080.send(0x21, 0, &[]).unwrap(); // SetInvertMode(ColorInversion::Inverted)
 
         // let madctl = SetAddressMode::from(options);
         // i8080.send(madctl)?;
 
-        i8080.send(0x3A, &[0x55]).unwrap(); // RGB565
+        i8080.send(0x3A, 0, &[0x55]).unwrap(); // RGB565
     }
 
     {
@@ -169,8 +173,12 @@ fn main() -> ! {
 
         let width_b = width.to_be_bytes();
         let height_b = height.to_be_bytes();
-        i8080.send(0x2A, &[0, 0, width_b[0], width_b[1]]).unwrap(); // CASET
-        i8080.send(0x2B, &[0, 0, height_b[0], height_b[1]]).unwrap(); // PASET
+        i8080
+            .send(0x2A, 0, &[0, 0, width_b[0], width_b[1]])
+            .unwrap(); // CASET
+        i8080
+            .send(0x2B, 0, &[0, 0, height_b[0], height_b[1]])
+            .unwrap(); // PASET
         println!("Drawing");
 
         // let color = 0b11111_000000_00000u16; // BLUE
@@ -178,12 +186,12 @@ fn main() -> ! {
         let color = color.to_be_bytes();
 
         let data: [u8; 200] = array::from_fn(|i| color[i % 2]);
-        i8080.send(0x2C, &data).unwrap();
+        i8080.send(0x2C, 0, &data).unwrap();
 
-        i8080.send(0x3C, &data).unwrap();
+        i8080.send(0x3C, 0, &data).unwrap();
     }
 
-    backlight.toggle().unwrap();
+    backlight.set_high().unwrap();
 
     loop {
         delay.delay_ms(1_000u32);
