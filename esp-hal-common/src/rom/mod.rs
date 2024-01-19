@@ -23,7 +23,7 @@
 //! [CRC (Cyclic Redundancy Check)]: ./crc/index.html
 //! [MD5 (Message Digest 5)]: ./md5/index.html
 
-#[cfg(any(rom_crc_be, rom_crc_be))]
+#[cfg(any(rom_crc_be, rom_crc_le))]
 pub mod crc;
 #[cfg(any(rom_md5_bsd, rom_md5_mbedtls))]
 pub mod md5;
