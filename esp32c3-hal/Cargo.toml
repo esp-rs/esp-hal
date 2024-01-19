@@ -1,6 +1,6 @@
 [package]
 name         = "esp32c3-hal"
-version      = "0.14.0"
+version      = "0.15.0"
 edition      = "2021"
 rust-version = "1.67.0"
 description  = "HAL for ESP32-C3 microcontrollers"
@@ -21,8 +21,7 @@ categories = [
 ]
 
 [dependencies]
-cfg-if         = "1.0.0"
-esp-hal-common = { version = "0.14.0", features = ["esp32c3"], path = "../esp-hal-common" }
+esp-hal-common = { version = "0.15.0", features = ["esp32c3"], path = "../esp-hal-common" }
 
 [dev-dependencies]
 aes                = "0.8.3"
@@ -37,9 +36,9 @@ embedded-hal       = { version = "0.2.7", features = ["unproven"] }
 embedded-hal-1     = { version = "1.0.0", package = "embedded-hal" }
 embedded-hal-async = "1.0.0"
 embedded-io-async  = "0.6.1"
-embedded-hal-bus   = "0.1.0-rc.2"
+embedded-hal-bus   = "0.1.0"
 esp-backtrace      = { version = "0.10.0", features = ["esp32c3", "panic-handler", "exception-handler", "print-uart"] }
-esp-hal-smartled   = { version = "0.7.0", features = ["esp32c3"], path = "../esp-hal-smartled" }
+esp-hal-smartled   = { version = "0.8.0", features = ["esp32c3"], path = "../esp-hal-smartled" }
 esp-println        = { version = "0.8.0", features = ["esp32c3"] }
 heapless           = "0.8.0"
 hmac               = { version = "0.12.1", default-features = false }
@@ -48,7 +47,6 @@ sha2               = { version = "0.10.8", default-features = false }
 smart-leds         = "0.4.0"
 ssd1306            = "0.8.4"
 static_cell        = { version = "2.0.0", features = ["nightly"] }
-
 
 [features]
 default              = ["rt", "vectored", "zero-rtc-bss", "embassy-integrated-timers"]
