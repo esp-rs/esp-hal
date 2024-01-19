@@ -13,7 +13,10 @@ use esp32s3_hal::{
     dma_descriptors,
     gdma::Gdma,
     gpio::IO,
-    lcd_cam::{lcd::i8080::I8080, LcdCam},
+    lcd_cam::{
+        lcd::{i8080::I8080, ClockMode},
+        LcdCam,
+    },
     peripherals::Peripherals,
     prelude::*,
     Delay,
@@ -63,11 +66,17 @@ fn main() -> ! {
     let mut reset = lcd_reset.into_push_pull_output();
 
     let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
-    let mut i8080 = I8080::new(lcd_cam.lcd, channel.tx, 20u32.MHz(), &clocks)
-        .with_ctrl_pins(lcd_rs, lcd_wr)
-        .with_data_pins(
-            lcd_db0, lcd_db1, lcd_db2, lcd_db3, lcd_db4, lcd_db5, lcd_db6, lcd_db7,
-        );
+    let mut i8080 = I8080::new(
+        lcd_cam.lcd,
+        channel.tx,
+        20u32.MHz(),
+        ClockMode::default(),
+        &clocks,
+    )
+    .with_ctrl_pins(lcd_rs, lcd_wr)
+    .with_data_pins(
+        lcd_db0, lcd_db1, lcd_db2, lcd_db3, lcd_db4, lcd_db5, lcd_db6, lcd_db7,
+    );
 
     {
         // https://gist.github.com/sukesh-ak/610508bc84779a26efdcf969bf51a2d1

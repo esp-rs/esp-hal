@@ -4,7 +4,13 @@ use crate::{
     clock::Clocks,
     dma::{DmaError, DmaPeripheral, Tx},
     gpio::{OutputPin, OutputSignal},
-    lcd_cam::{private::calculate_clkm, BitOrder, ByteOrder, Lcd},
+    lcd_cam::{
+        lcd::{ClockMode, Phase, Polarity},
+        private::calculate_clkm,
+        BitOrder,
+        ByteOrder,
+        Lcd,
+    },
     peripheral::{Peripheral, PeripheralRef},
     peripherals::LCD_CAM,
 };
@@ -15,7 +21,13 @@ pub struct I8080<'d, TX> {
 }
 
 impl<'d, TX: Tx> I8080<'d, TX> {
-    pub fn new(lcd: Lcd<'d>, mut channel: TX, frequency: HertzU32, clocks: &Clocks) -> Self {
+    pub fn new(
+        lcd: Lcd<'d>,
+        mut channel: TX,
+        frequency: HertzU32,
+        mode: ClockMode,
+        clocks: &Clocks,
+    ) -> Self {
         let lcd_cam = lcd.lcd_cam;
 
         // Due to https://www.espressif.com/sites/default/files/documentation/esp32-s3_errata_en.pdf
@@ -31,8 +43,8 @@ impl<'d, TX: Tx> I8080<'d, TX> {
             ],
         );
 
-        lcd_cam.lcd_clock().modify(|_, w| {
-            // Force enable the clock for all configuration register
+        lcd_cam.lcd_clock().write(|w| {
+            // Force enable the clock for all configuration registers.
             w.clk_en().set_bit();
 
             w.lcd_clk_sel().variant((i + 1) as _);
@@ -44,13 +56,9 @@ impl<'d, TX: Tx> I8080<'d, TX> {
             w.lcd_clk_equ_sysclk().clear_bit();
             w.lcd_clkcnt_n().variant(2 - 1); // Must not be 0.
 
-            w
-        });
-        lcd_cam.lcd_user().modify(|_, w| w.lcd_reset().set_bit());
-        lcd_cam.lcd_clock().modify(|_, w| {
-            // TODO: Expose as config.
-            w.lcd_ck_idle_edge().clear_bit();
-            w.lcd_ck_out_edge().clear_bit();
+            w.lcd_ck_idle_edge()
+                .bit(mode.polarity == Polarity::IdleHigh);
+            w.lcd_ck_out_edge().bit(mode.phase == Phase::ShiftHigh);
             w
         });
 
