@@ -1,6 +1,6 @@
 [package]
 name         = "esp32c2-hal"
-version      = "0.12.0"
+version      = "0.13.0"
 edition      = "2021"
 rust-version = "1.67.0"
 description  = "HAL for ESP32-C2 microcontrollers"
@@ -21,7 +21,7 @@ categories = [
 ]
 
 [dependencies]
-esp-hal-common = { version = "0.14.0", features = ["esp32c2"], path = "../esp-hal-common" }
+esp-hal-common = { version = "0.15.0", features = ["esp32c2"], path = "../esp-hal-common" }
 
 [dev-dependencies]
 critical-section   = "1.1.2"
@@ -34,7 +34,7 @@ embedded-graphics  = "0.8.1"
 embedded-hal-1     = { version = "1.0.0", package = "embedded-hal" }
 embedded-hal-async = "1.0.0"
 embedded-io-async  = "0.6.1"
-embedded-hal-bus   = "0.1.0-rc.2"
+embedded-hal-bus   = "0.1.0"
 esp-backtrace      = { version = "0.10.0", features = ["esp32c2", "panic-handler", "exception-handler", "print-uart"] }
 esp-println        = { version = "0.8.0", features = ["esp32c2"] }
 heapless           = "0.8.0"
