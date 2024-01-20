@@ -119,19 +119,6 @@ where
             crate::gpio::connect_high_to_peripheral(InputSignal::USB_SRP_BVALID); // HIGH to force USB device mode
             crate::gpio::connect_high_to_peripheral(InputSignal::USB_OTG_VBUSVALID); // receiving a valid Vbus from device
             crate::gpio::connect_low_to_peripheral(InputSignal::USB_OTG_AVALID);
-
-            usb_wrap.otg_conf().modify(|_, w| {
-                w.pad_pull_override()
-                    .set_bit()
-                    .dp_pullup()
-                    .set_bit()
-                    .dp_pulldown()
-                    .clear_bit()
-                    .dm_pullup()
-                    .clear_bit()
-                    .dm_pulldown()
-                    .clear_bit()
-            });
         }
     }
 

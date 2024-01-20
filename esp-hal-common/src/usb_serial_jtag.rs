@@ -42,6 +42,24 @@ impl<'d> UsbSerialJtag<'d> {
         dev.usb_serial.disable_rx_interrupts();
         dev.usb_serial.disable_tx_interrupts();
 
+        #[cfg(any(esp32c3, esp32s3))]
+        {
+            use crate::soc::efuse::*;
+
+            // On the esp32c3, and esp32s3 the USB_EXCHG_PINS efuse is bugged and
+            // doesn't swap the pullups too, this works around that.
+            if Efuse::read_field_le(USB_EXCHG_PINS) {
+                dev.usb_serial.conf0().modify(|_, w| {
+                    w.pad_pull_override()
+                        .set_bit()
+                        .dm_pullup()
+                        .clear_bit()
+                        .dp_pullup()
+                        .set_bit()
+                });
+            }
+        }
+
         dev
     }
 
