@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `embedded-io` feature to each chip-specific HAL (#1072)
 - Add `embassy-time-driver` to `esp-hal-common` due to updating `embassy-time` to `v0.3.0` (#1075)
 - ESP32-S3: Added support for 80Mhz PSRAM (#1069)
+- ESP32-C3/S3: Add workaround for USB pin exchange on usb-serial-jtag (#1104).
 
 ### Changed
 
