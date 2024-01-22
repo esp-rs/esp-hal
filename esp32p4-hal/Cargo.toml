@@ -1,0 +1,63 @@
+[package]
+name         = "esp32p4-hal"
+version      = "0.1.0"
+edition      = "2021"
+rust-version = "1.67.0"
+description  = "HAL for ESP32-P4 microcontrollers"
+repository   = "https://github.com/esp-rs/esp-hal"
+license      = "MIT OR Apache-2.0"
+
+keywords = [
+    "embedded",
+    "embedded-hal",
+    "esp",
+    "esp32p4",
+    "no-std",
+]
+categories = [
+    "embedded",
+    "hardware-support",
+    "no-std",
+]
+
+[dependencies]
+esp-hal-common = { version = "0.15.0", features = ["esp32p4"], path = "../esp-hal-common" }
+
+[dev-dependencies]
+embassy-time  = "0.3.0"
+esp-backtrace = { version = "0.10.0", features = ["esp32p4", "exception-handler", "panic-handler", "print-uart"] }
+esp-println   = { version = "0.8.0",  features = ["esp32p4"] }
+
+[features]
+default              = ["rt", "vectored", "zero-rtc-bss"]
+async                = ["esp-hal-common/async"]
+debug                = ["esp-hal-common/debug"]
+defmt                = ["esp-hal-common/defmt", "esp-println/defmt-espflash"]
+direct-vectoring     = ["esp-hal-common/direct-vectoring"]
+eh1                  = ["esp-hal-common/eh1"]
+embedded-io          = ["esp-hal-common/embedded-io"]
+interrupt-preemption = ["esp-hal-common/interrupt-preemption"]
+log                  = ["esp-hal-common/log", "esp-println/log"]
+rt                   = ["esp-hal-common/rt-riscv"]
+ufmt                 = ["esp-hal-common/ufmt"]
+vectored             = ["esp-hal-common/vectored"]
+
+# Initialize / clear data sections and RTC memory
+zero-rtc-bss  = ["esp-hal-common/rv-zero-rtc-bss"]
+init-data     = ["esp-hal-common/rv-init-data"]
+init-rtc-data = ["esp-hal-common/rv-init-rtc-data"]
+
+# Embassy support
+embassy                    = ["esp-hal-common/embassy"]
+embassy-executor-interrupt = ["esp-hal-common/embassy-executor-interrupt"]
+embassy-executor-thread    = ["esp-hal-common/embassy-executor-thread"]
+embassy-integrated-timers  = ["esp-hal-common/embassy-integrated-timers"]
+embassy-time-systick       = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-hz-16_000_000"]
+embassy-time-timg0         = ["esp-hal-common/embassy-time-timg0",   "embassy-time/tick-hz-1_000_000"]
+
+[profile.release]
+debug = true
+
+[patch.crates-io]
+esp-backtrace = { git = "https://github.com/jessebraham/esp-backtrace", branch = "feature/esp32p4" }
+esp-println   = { git = "https://github.com/esp-rs/esp-println", rev = "1f628e3" }
