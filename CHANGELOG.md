@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Add initial support for the ESP32-P4 (#1101)
+- Implement `embedded_hal::pwm::SetDutyCycle` trait for `ledc::channel::Channel` (#1097) 
 
 ### Fixed
 
@@ -23,7 +24,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Implement `embedded_hal::pwm::SetDutyCycle` trait for `ledc::channel::Channel` (#1097) 
 - ESP32-C6: Properly initialize PMU (#974)
 - Implement overriding base mac address (#1044)
 - Add `rt-riscv` and `rt-xtensa` features to enable/disable runtime support (#1057)
