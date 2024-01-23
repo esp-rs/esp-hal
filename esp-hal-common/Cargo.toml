@@ -66,7 +66,7 @@ esp32c2 = { version = "0.17.0", features = ["critical-section"], optional = true
 esp32c3 = { version = "0.20.0", features = ["critical-section"], optional = true }
 esp32c6 = { version = "0.11.0", features = ["critical-section"], optional = true }
 esp32h2 = { version = "0.7.0",  features = ["critical-section"], optional = true }
-esp32p4 = { git = "https://github.com/esp-rs/esp-pacs", rev = "4c0dfd5", optional = true }
+esp32p4 = { git = "https://github.com/esp-rs/esp-pacs", rev = "c801d10", optional = true }
 esp32s2 = { version = "0.19.0", features = ["critical-section"], optional = true }
 esp32s3 = { version = "0.23.0", features = ["critical-section"], optional = true }
 

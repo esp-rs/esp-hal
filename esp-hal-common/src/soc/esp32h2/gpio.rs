@@ -54,6 +54,8 @@ use crate::{
 // https://github.com/espressif/esp-idf/blob/df9310a/components/soc/esp32h2/gpio_periph.c#L42
 pub const NUM_PINS: usize = 27;
 
+pub(crate) const FUNC_IN_SEL_OFFSET: usize = 0;
+
 pub type OutputSignalType = u8;
 pub const OUTPUT_SIGNAL_MAX: u8 = 128;
 pub const INPUT_SIGNAL_MAX: u8 = 124;
