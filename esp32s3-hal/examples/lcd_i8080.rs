@@ -8,10 +8,14 @@
 use esp32s3_hal::{
     clock::ClockControl,
     dma::DmaPriority,
+    dma_buffers,
     gdma::Gdma,
     gpio::IO,
     lcd_cam::{
-        lcd::{i8080::I8080, ClockMode},
+        lcd::{
+            i8080::{TxEightBits, I8080},
+            ClockMode,
+        },
         LcdCam,
     },
     peripherals::Peripherals,
@@ -19,7 +23,6 @@ use esp32s3_hal::{
     Delay,
 };
 use esp_backtrace as _;
-use esp_hal_common::dma_buffers;
 use esp_println::println;
 
 #[entry]
@@ -37,14 +40,6 @@ fn main() -> ! {
     let _lcd_te = io.pins.gpio48; // Frame sync
 
     // LCD data interface, 8 bit MCU (8080)
-    let lcd_db0 = io.pins.gpio9;
-    let lcd_db1 = io.pins.gpio46;
-    let lcd_db2 = io.pins.gpio3;
-    let lcd_db3 = io.pins.gpio8;
-    let lcd_db4 = io.pins.gpio18;
-    let lcd_db5 = io.pins.gpio17;
-    let lcd_db6 = io.pins.gpio16;
-    let lcd_db7 = io.pins.gpio15;
 
     let dma = Gdma::new(peripherals.DMA);
     let channel = dma.channel0;
@@ -63,18 +58,27 @@ fn main() -> ! {
     let mut backlight = lcd_backlight.into_push_pull_output();
     let mut reset = lcd_reset.into_push_pull_output();
 
+    let tx_pins = TxEightBits::new(
+        io.pins.gpio9,
+        io.pins.gpio46,
+        io.pins.gpio3,
+        io.pins.gpio8,
+        io.pins.gpio18,
+        io.pins.gpio17,
+        io.pins.gpio16,
+        io.pins.gpio15,
+    );
+
     let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
     let mut i8080 = I8080::new(
         lcd_cam.lcd,
         channel.tx,
+        tx_pins,
         20u32.MHz(),
         ClockMode::default(),
         &clocks,
     )
-    .with_ctrl_pins(lcd_rs, lcd_wr)
-    .with_data_pins(
-        lcd_db0, lcd_db1, lcd_db2, lcd_db3, lcd_db4, lcd_db5, lcd_db6, lcd_db7,
-    );
+    .with_ctrl_pins(lcd_rs, lcd_wr);
 
     {
         // https://gist.github.com/sukesh-ak/610508bc84779a26efdcf969bf51a2d1

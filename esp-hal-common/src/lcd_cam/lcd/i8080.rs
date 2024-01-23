@@ -1,4 +1,4 @@
-use core::fmt::Formatter;
+use core::{fmt::Formatter, mem::size_of};
 
 use embedded_dma::ReadBuffer;
 use fugit::HertzU32;
@@ -8,7 +8,7 @@ use crate::{
     dma::{DmaError, DmaPeripheral, Tx},
     gpio::{OutputPin, OutputSignal},
     lcd_cam::{
-        lcd::{ClockMode, Phase, Polarity},
+        lcd::{i8080::private::TxPins, ClockMode, Phase, Polarity},
         private::calculate_clkm,
         BitOrder,
         ByteOrder,
@@ -18,19 +18,26 @@ use crate::{
     peripherals::LCD_CAM,
 };
 
-pub struct I8080<'d, TX> {
+pub struct I8080<'d, TX, P> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
     tx_channel: TX,
+    _pins: P,
 }
 
-impl<'d, TX: Tx> I8080<'d, TX> {
+impl<'d, TX: Tx, P: TxPins> I8080<'d, TX, P>
+where
+    P::Word: Into<u16>,
+{
     pub fn new(
         lcd: Lcd<'d>,
         mut channel: TX,
+        mut pins: P,
         frequency: HertzU32,
         mode: ClockMode,
         clocks: &Clocks,
     ) -> Self {
+        let is_2byte_mode = size_of::<P::Word>() == 2;
+
         let lcd_cam = lcd.lcd_cam;
 
         // Due to https://www.espressif.com/sites/default/files/documentation/esp32-s3_errata_en.pdf
@@ -76,7 +83,7 @@ impl<'d, TX: Tx> I8080<'d, TX> {
             w.lcd_8bits_order().bit(false);
             w.lcd_bit_order().bit(false);
             w.lcd_byte_order().bit(false);
-            w.lcd_2byte_en().bit(false);
+            w.lcd_2byte_en().bit(is_2byte_mode);
 
             // Be able to send data out in LCD sequence when LCD starts.
             w.lcd_dout().set_bit();
@@ -129,11 +136,25 @@ impl<'d, TX: Tx> I8080<'d, TX> {
         lcd_cam.lcd_user().modify(|_, w| w.lcd_update().set_bit());
 
         channel.init_channel();
+        pins.configure();
 
         Self {
             lcd_cam,
             tx_channel: channel,
+            _pins: pins,
         }
+    }
+
+    pub fn set_byte_order(&mut self, byte_order: ByteOrder) -> &mut Self {
+        let is_inverted = byte_order != ByteOrder::default();
+        self.lcd_cam.lcd_user().modify(|_, w| {
+            if size_of::<P::Word>() == 2 {
+                w.lcd_byte_order().bit(is_inverted)
+            } else {
+                w.lcd_8bits_order().bit(is_inverted)
+            }
+        });
+        self
     }
 
     pub fn set_bit_order(&mut self, bit_order: BitOrder) -> &mut Self {
@@ -168,65 +189,53 @@ impl<'d, TX: Tx> I8080<'d, TX> {
         self
     }
 
-    pub fn with_data_pins<
-        D0: OutputPin,
-        D1: OutputPin,
-        D2: OutputPin,
-        D3: OutputPin,
-        D4: OutputPin,
-        D5: OutputPin,
-        D6: OutputPin,
-        D7: OutputPin,
-    >(
-        self,
-        d0: impl Peripheral<P = D0> + 'd,
-        d1: impl Peripheral<P = D1> + 'd,
-        d2: impl Peripheral<P = D2> + 'd,
-        d3: impl Peripheral<P = D3> + 'd,
-        d4: impl Peripheral<P = D4> + 'd,
-        d5: impl Peripheral<P = D5> + 'd,
-        d6: impl Peripheral<P = D6> + 'd,
-        d7: impl Peripheral<P = D7> + 'd,
-    ) -> Self {
-        crate::into_ref!(d0);
-        crate::into_ref!(d1);
-        crate::into_ref!(d2);
-        crate::into_ref!(d3);
-        crate::into_ref!(d4);
-        crate::into_ref!(d5);
-        crate::into_ref!(d6);
-        crate::into_ref!(d7);
+    pub fn send(
+        &mut self,
+        cmd: impl Into<Command<P::Word>>,
+        dummy: u8,
+        data: &[P::Word],
+    ) -> Result<(), DmaError> {
+        self.setup_send(cmd.into(), dummy);
+        self.start_write_bytes_dma(data.as_ptr() as _, data.len() * size_of::<P::Word>())?;
+        self.start_send();
 
-        d0.set_to_push_pull_output()
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_0);
-        d1.set_to_push_pull_output()
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_1);
-        d2.set_to_push_pull_output()
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_2);
-        d3.set_to_push_pull_output()
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_3);
-        d4.set_to_push_pull_output()
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_4);
-        d5.set_to_push_pull_output()
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_5);
-        d6.set_to_push_pull_output()
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_6);
-        d7.set_to_push_pull_output()
-            .connect_peripheral_to_output(OutputSignal::LCD_DATA_7);
+        while self
+            .lcd_cam
+            .lc_dma_int_st()
+            .read()
+            .lcd_trans_done_int_st()
+            .bit_is_clear()
+        {}
 
-        self
+        self.tear_down_send();
+
+        Ok(())
+    }
+
+    pub fn send_dma<TXBUF>(
+        mut self,
+        cmd: impl Into<Command<P::Word>>,
+        dummy: u8,
+        data: TXBUF,
+    ) -> Result<Transfer<'d, TX, TXBUF, P>, DmaError>
+    where
+        TXBUF: ReadBuffer<Word = P::Word>,
+    {
+        let (ptr, len) = unsafe { data.read_buffer() };
+
+        self.setup_send(cmd.into(), dummy);
+        self.start_write_bytes_dma(ptr as _, len * size_of::<P::Word>())?;
+        self.start_send();
+
+        Ok(Transfer {
+            instance: Some(self),
+            buffer: Some(data),
+        })
     }
 }
 
-impl<'d, TX: Tx> I8080<'d, TX> {
-    pub fn set_byte_order(&mut self, byte_order: ByteOrder) -> &mut Self {
-        self.lcd_cam
-            .lcd_user()
-            .modify(|_, w| w.lcd_8bits_order().bit(byte_order != ByteOrder::default()));
-        self
-    }
-
-    fn setup_send(&mut self, cmd: impl Into<Command>, dummy: u8) {
+impl<'d, TX: Tx, P> I8080<'d, TX, P> {
+    fn setup_send<T: Copy + Into<u16>>(&mut self, cmd: Command<T>, dummy: u8) {
         // Reset LCD control unit and Async Tx FIFO
         self.lcd_cam
             .lcd_user()
@@ -236,7 +245,6 @@ impl<'d, TX: Tx> I8080<'d, TX> {
             .modify(|_, w| w.lcd_afifo_reset().set_bit());
 
         // Set cmd value
-        let cmd = cmd.into();
         match cmd {
             Command::None => {
                 self.lcd_cam
@@ -251,7 +259,7 @@ impl<'d, TX: Tx> I8080<'d, TX> {
                 });
                 self.lcd_cam
                     .lcd_cmd_val()
-                    .write(|w| w.lcd_cmd_value().variant(value as _));
+                    .write(|w| w.lcd_cmd_value().variant(value.into() as _));
             }
             Command::Two(first, second) => {
                 self.lcd_cam.lcd_user().modify(|_, w| {
@@ -259,7 +267,7 @@ impl<'d, TX: Tx> I8080<'d, TX> {
                     w.lcd_cmd_2_cycle_en().set_bit();
                     w
                 });
-                let cmd = first as u32 | (second as u32) << 16;
+                let cmd = first.into() as u32 | (second.into() as u32) << 16;
                 self.lcd_cam
                     .lcd_cmd_val()
                     .write(|w| w.lcd_cmd_value().variant(cmd));
@@ -307,7 +315,7 @@ impl<'d, TX: Tx> I8080<'d, TX> {
             .write(|w| w.lcd_trans_done_int_clr().set_bit());
     }
 
-    fn start_write_bytes_dma<'w>(&mut self, ptr: *const u8, len: usize) -> Result<(), DmaError> {
+    fn start_write_bytes_dma(&mut self, ptr: *const u8, len: usize) -> Result<(), DmaError> {
         if len == 0 {
             // Set transfer length.
             self.lcd_cam
@@ -335,70 +343,24 @@ impl<'d, TX: Tx> I8080<'d, TX> {
         }
         Ok(())
     }
-
-    pub fn send(
-        &mut self,
-        cmd: impl Into<Command>,
-        dummy: u8,
-        data: &[u8],
-    ) -> Result<(), DmaError> {
-        self.setup_send(cmd, dummy);
-
-        self.start_write_bytes_dma(data.as_ptr(), data.len())?;
-
-        self.start_send();
-
-        while self
-            .lcd_cam
-            .lc_dma_int_st()
-            .read()
-            .lcd_trans_done_int_st()
-            .bit_is_clear()
-        {}
-
-        self.tear_down_send();
-
-        Ok(())
-    }
-
-    pub fn send_dma<TXBUF>(
-        mut self,
-        cmd: impl Into<Command>,
-        dummy: u8,
-        data: TXBUF,
-    ) -> Result<Transfer<'d, TX, TXBUF>, DmaError>
-    where
-        TXBUF: ReadBuffer<Word = u8>,
-    {
-        self.setup_send(cmd, dummy);
-
-        let (ptr, len) = unsafe { data.read_buffer() };
-
-        self.start_write_bytes_dma(ptr, len)?;
-
-        self.start_send();
-
-        Ok(Transfer {
-            instance: Some(self),
-            buffer: Some(data),
-        })
-    }
 }
 
-impl<'d, TX> core::fmt::Debug for I8080<'d, TX> {
+impl<'d, TX, P> core::fmt::Debug for I8080<'d, TX, P> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("I8080").finish()
     }
 }
 
 /// An in-progress transfer
-pub struct Transfer<'d, TX: Tx, BUFFER> {
-    instance: Option<I8080<'d, TX>>,
+pub struct Transfer<'d, TX: Tx, BUFFER, P> {
+    instance: Option<I8080<'d, TX, P>>,
     buffer: Option<BUFFER>,
 }
 
-impl<'d, TX: Tx, BUFFER> Transfer<'d, TX, BUFFER> {
-    pub fn wait(mut self) -> Result<(BUFFER, I8080<'d, TX>), (DmaError, BUFFER, I8080<'d, TX>)> {
+impl<'d, TX: Tx, BUFFER, P> Transfer<'d, TX, BUFFER, P> {
+    pub fn wait(
+        mut self,
+    ) -> Result<(BUFFER, I8080<'d, TX, P>), (DmaError, BUFFER, I8080<'d, TX, P>)> {
         let mut instance = self
             .instance
             .take()
@@ -438,7 +400,7 @@ impl<'d, TX: Tx, BUFFER> Transfer<'d, TX, BUFFER> {
     }
 }
 
-impl<'d, TX: Tx, BUFFER> Drop for Transfer<'d, TX, BUFFER> {
+impl<'d, TX: Tx, BUFFER, P> Drop for Transfer<'d, TX, BUFFER, P> {
     fn drop(&mut self) {
         if let Some(instance) = self.instance.as_mut() {
             // This will cancel the transfer.
@@ -452,14 +414,284 @@ impl<'d, TX: Tx, BUFFER> Drop for Transfer<'d, TX, BUFFER> {
 /// Can be [Command::None] if command phase should be suppressed.
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum Command {
+pub enum Command<T> {
     None,
-    One(u8),
-    Two(u8, u8),
+    One(T),
+    Two(T, T),
 }
 
-impl From<u8> for Command {
-    fn from(value: u8) -> Self {
+impl<T> From<T> for Command<T> {
+    fn from(value: T) -> Self {
         Command::One(value)
+    }
+}
+
+pub struct TxEightBits<'d, P0, P1, P2, P3, P4, P5, P6, P7> {
+    pin_0: PeripheralRef<'d, P0>,
+    pin_1: PeripheralRef<'d, P1>,
+    pin_2: PeripheralRef<'d, P2>,
+    pin_3: PeripheralRef<'d, P3>,
+    pin_4: PeripheralRef<'d, P4>,
+    pin_5: PeripheralRef<'d, P5>,
+    pin_6: PeripheralRef<'d, P6>,
+    pin_7: PeripheralRef<'d, P7>,
+}
+
+impl<'d, P0, P1, P2, P3, P4, P5, P6, P7> TxEightBits<'d, P0, P1, P2, P3, P4, P5, P6, P7>
+where
+    P0: OutputPin,
+    P1: OutputPin,
+    P2: OutputPin,
+    P3: OutputPin,
+    P4: OutputPin,
+    P5: OutputPin,
+    P6: OutputPin,
+    P7: OutputPin,
+{
+    pub fn new(
+        pin_0: impl Peripheral<P = P0> + 'd,
+        pin_1: impl Peripheral<P = P1> + 'd,
+        pin_2: impl Peripheral<P = P2> + 'd,
+        pin_3: impl Peripheral<P = P3> + 'd,
+        pin_4: impl Peripheral<P = P4> + 'd,
+        pin_5: impl Peripheral<P = P5> + 'd,
+        pin_6: impl Peripheral<P = P6> + 'd,
+        pin_7: impl Peripheral<P = P7> + 'd,
+    ) -> Self {
+        crate::into_ref!(pin_0);
+        crate::into_ref!(pin_1);
+        crate::into_ref!(pin_2);
+        crate::into_ref!(pin_3);
+        crate::into_ref!(pin_4);
+        crate::into_ref!(pin_5);
+        crate::into_ref!(pin_6);
+        crate::into_ref!(pin_7);
+
+        Self {
+            pin_0,
+            pin_1,
+            pin_2,
+            pin_3,
+            pin_4,
+            pin_5,
+            pin_6,
+            pin_7,
+        }
+    }
+}
+
+impl<'d, P0, P1, P2, P3, P4, P5, P6, P7> TxPins for TxEightBits<'d, P0, P1, P2, P3, P4, P5, P6, P7>
+where
+    P0: OutputPin,
+    P1: OutputPin,
+    P2: OutputPin,
+    P3: OutputPin,
+    P4: OutputPin,
+    P5: OutputPin,
+    P6: OutputPin,
+    P7: OutputPin,
+{
+    type Word = u8;
+
+    fn configure(&mut self) {
+        self.pin_0
+            .set_to_push_pull_output()
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_0);
+        self.pin_1
+            .set_to_push_pull_output()
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_1);
+        self.pin_2
+            .set_to_push_pull_output()
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_2);
+        self.pin_3
+            .set_to_push_pull_output()
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_3);
+        self.pin_4
+            .set_to_push_pull_output()
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_4);
+        self.pin_5
+            .set_to_push_pull_output()
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_5);
+        self.pin_6
+            .set_to_push_pull_output()
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_6);
+        self.pin_7
+            .set_to_push_pull_output()
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_7);
+    }
+}
+
+pub struct TxSixteenBits<'d, P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15> {
+    pin_0: PeripheralRef<'d, P0>,
+    pin_1: PeripheralRef<'d, P1>,
+    pin_2: PeripheralRef<'d, P2>,
+    pin_3: PeripheralRef<'d, P3>,
+    pin_4: PeripheralRef<'d, P4>,
+    pin_5: PeripheralRef<'d, P5>,
+    pin_6: PeripheralRef<'d, P6>,
+    pin_7: PeripheralRef<'d, P7>,
+    pin_8: PeripheralRef<'d, P8>,
+    pin_9: PeripheralRef<'d, P9>,
+    pin_10: PeripheralRef<'d, P10>,
+    pin_11: PeripheralRef<'d, P11>,
+    pin_12: PeripheralRef<'d, P12>,
+    pin_13: PeripheralRef<'d, P13>,
+    pin_14: PeripheralRef<'d, P14>,
+    pin_15: PeripheralRef<'d, P15>,
+}
+
+impl<'d, P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15>
+    TxSixteenBits<'d, P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15>
+where
+    P0: OutputPin,
+    P1: OutputPin,
+    P2: OutputPin,
+    P3: OutputPin,
+    P4: OutputPin,
+    P5: OutputPin,
+    P6: OutputPin,
+    P7: OutputPin,
+    P8: OutputPin,
+    P9: OutputPin,
+    P10: OutputPin,
+    P11: OutputPin,
+    P12: OutputPin,
+    P13: OutputPin,
+    P14: OutputPin,
+    P15: OutputPin,
+{
+    pub fn new(
+        pin_0: impl Peripheral<P = P0> + 'd,
+        pin_1: impl Peripheral<P = P1> + 'd,
+        pin_2: impl Peripheral<P = P2> + 'd,
+        pin_3: impl Peripheral<P = P3> + 'd,
+        pin_4: impl Peripheral<P = P4> + 'd,
+        pin_5: impl Peripheral<P = P5> + 'd,
+        pin_6: impl Peripheral<P = P6> + 'd,
+        pin_7: impl Peripheral<P = P7> + 'd,
+        pin_8: impl Peripheral<P = P8> + 'd,
+        pin_9: impl Peripheral<P = P9> + 'd,
+        pin_10: impl Peripheral<P = P10> + 'd,
+        pin_11: impl Peripheral<P = P11> + 'd,
+        pin_12: impl Peripheral<P = P12> + 'd,
+        pin_13: impl Peripheral<P = P13> + 'd,
+        pin_14: impl Peripheral<P = P14> + 'd,
+        pin_15: impl Peripheral<P = P15> + 'd,
+    ) -> Self {
+        crate::into_ref!(pin_0);
+        crate::into_ref!(pin_1);
+        crate::into_ref!(pin_2);
+        crate::into_ref!(pin_3);
+        crate::into_ref!(pin_4);
+        crate::into_ref!(pin_5);
+        crate::into_ref!(pin_6);
+        crate::into_ref!(pin_7);
+        crate::into_ref!(pin_8);
+        crate::into_ref!(pin_9);
+        crate::into_ref!(pin_10);
+        crate::into_ref!(pin_11);
+        crate::into_ref!(pin_12);
+        crate::into_ref!(pin_13);
+        crate::into_ref!(pin_14);
+        crate::into_ref!(pin_15);
+
+        Self {
+            pin_0,
+            pin_1,
+            pin_2,
+            pin_3,
+            pin_4,
+            pin_5,
+            pin_6,
+            pin_7,
+            pin_8,
+            pin_9,
+            pin_10,
+            pin_11,
+            pin_12,
+            pin_13,
+            pin_14,
+            pin_15,
+        }
+    }
+}
+
+impl<'d, P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15> TxPins
+    for TxSixteenBits<'d, P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15>
+where
+    P0: OutputPin,
+    P1: OutputPin,
+    P2: OutputPin,
+    P3: OutputPin,
+    P4: OutputPin,
+    P5: OutputPin,
+    P6: OutputPin,
+    P7: OutputPin,
+    P8: OutputPin,
+    P9: OutputPin,
+    P10: OutputPin,
+    P11: OutputPin,
+    P12: OutputPin,
+    P13: OutputPin,
+    P14: OutputPin,
+    P15: OutputPin,
+{
+    type Word = u16;
+    fn configure(&mut self) {
+        self.pin_0
+            .set_to_push_pull_output()
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_0);
+        self.pin_1
+            .set_to_push_pull_output()
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_1);
+        self.pin_2
+            .set_to_push_pull_output()
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_2);
+        self.pin_3
+            .set_to_push_pull_output()
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_3);
+        self.pin_4
+            .set_to_push_pull_output()
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_4);
+        self.pin_5
+            .set_to_push_pull_output()
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_5);
+        self.pin_6
+            .set_to_push_pull_output()
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_6);
+        self.pin_7
+            .set_to_push_pull_output()
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_7);
+        self.pin_8
+            .set_to_push_pull_output()
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_8);
+        self.pin_9
+            .set_to_push_pull_output()
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_9);
+        self.pin_10
+            .set_to_push_pull_output()
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_10);
+        self.pin_11
+            .set_to_push_pull_output()
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_11);
+        self.pin_12
+            .set_to_push_pull_output()
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_12);
+        self.pin_13
+            .set_to_push_pull_output()
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_13);
+        self.pin_14
+            .set_to_push_pull_output()
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_14);
+        self.pin_15
+            .set_to_push_pull_output()
+            .connect_peripheral_to_output(OutputSignal::LCD_DATA_15);
+    }
+}
+
+mod private {
+    pub trait TxPins {
+        type Word: Copy;
+        fn configure(&mut self);
     }
 }
