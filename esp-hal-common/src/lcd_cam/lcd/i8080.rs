@@ -199,13 +199,8 @@ where
         self.start_write_bytes_dma(data.as_ptr() as _, data.len() * size_of::<P::Word>())?;
         self.start_send();
 
-        while self
-            .lcd_cam
-            .lc_dma_int_st()
-            .read()
-            .lcd_trans_done_int_st()
-            .bit_is_clear()
-        {}
+        let lcd_user = self.lcd_cam.lcd_user();
+        while lcd_user.read().lcd_start().bit_is_set() {}
 
         self.tear_down_send();
 
@@ -289,14 +284,6 @@ impl<'d, TX: Tx, P> I8080<'d, TX, P> {
     }
 
     fn start_send(&mut self) {
-        // Setup interrupts.
-        self.lcd_cam
-            .lc_dma_int_clr()
-            .write(|w| w.lcd_trans_done_int_clr().set_bit());
-        self.lcd_cam
-            .lc_dma_int_ena()
-            .modify(|_, w| w.lcd_trans_done_int_ena().set_bit());
-
         self.lcd_cam
             .lcd_user()
             .modify(|_, w| w.lcd_update().set_bit().lcd_start().set_bit());
@@ -306,13 +293,6 @@ impl<'d, TX: Tx, P> I8080<'d, TX, P> {
         self.lcd_cam
             .lcd_user()
             .modify(|_, w| w.lcd_start().clear_bit());
-
-        self.lcd_cam
-            .lc_dma_int_ena()
-            .modify(|_, w| w.lcd_trans_done_int_ena().clear_bit());
-        self.lcd_cam
-            .lc_dma_int_clr()
-            .write(|w| w.lcd_trans_done_int_clr().set_bit());
     }
 
     fn start_write_bytes_dma(&mut self, ptr: *const u8, len: usize) -> Result<(), DmaError> {
@@ -367,10 +347,8 @@ impl<'d, TX: Tx, BUFFER, P> Transfer<'d, TX, BUFFER, P> {
             .expect("instance must be available throughout object lifetime");
 
         {
-            let int_st = instance.lcd_cam.lc_dma_int_st();
-            while int_st.read().lcd_trans_done_int_st().bit_is_clear() {
-                // Wait until LCD_TRANS_DONE is set.
-            }
+            let lcd_user = instance.lcd_cam.lcd_user();
+            while lcd_user.read().lcd_start().bit_is_set() {}
             instance.tear_down_send();
         }
 
