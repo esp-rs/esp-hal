@@ -66,6 +66,8 @@ use crate::{
 
 pub const NUM_PINS: usize = 46;
 
+pub(crate) const FUNC_IN_SEL_OFFSET: usize = 0;
+
 pub type OutputSignalType = u16;
 pub const OUTPUT_SIGNAL_MAX: u16 = 256;
 pub const INPUT_SIGNAL_MAX: u16 = 204;

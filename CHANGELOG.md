@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add initial support for the ESP32-P4 (#1101)
 - Implement `embedded_hal::pwm::SetDutyCycle` trait for `ledc::channel::Channel` (#1097) 
+- ESP32-P4: Add initial GPIO support (#1109)
 
 ### Fixed
 
