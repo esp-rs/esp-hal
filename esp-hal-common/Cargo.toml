@@ -1,6 +1,6 @@
 [package]
 name         = "esp-hal-common"
-version      = "0.14.1"
+version      = "0.15.0"
 edition      = "2021"
 rust-version = "1.67.0"
 description  = "HAL implementations for peripherals common among Espressif devices; should not be used directly"
@@ -15,7 +15,7 @@ license      = "MIT OR Apache-2.0"
 links = "esp-hal-common"
 
 [dependencies]
-bitflags             = "2.4.1"
+bitflags             = "2.4.2"
 bitfield             = "0.14.0"
 cfg-if               = "1.0.0"
 critical-section     = "1.1.2"
@@ -40,16 +40,16 @@ void                 = { version = "1.0.2", default-features = false }
 usb-device           = { version = "0.3.1", optional = true }
 
 # async
-embedded-hal-async = { version = "1.0.0", optional = true }
-embedded-io-async  = { version = "0.6.1", optional = true }
-embassy-executor   = { version = "0.4.0", optional = true }
-embassy-futures    = { version = "0.1.1", optional = true }
-embassy-sync       = { version = "0.5.0", optional = true }
-embassy-time       = { version = "0.2.0", optional = true }
+embedded-hal-async   = { version = "1.0.0", optional = true }
+embedded-io-async    = { version = "0.6.1", optional = true }
+embassy-executor     = { version = "0.5.0", optional = true }
+embassy-futures      = { version = "0.1.1", optional = true }
+embassy-sync         = { version = "0.5.0", optional = true }
+embassy-time-driver  = { version = "0.1.0", optional = true }
 
 # RISC-V
-riscv        = { version = "0.10.1", optional = true }
-esp-riscv-rt = { version = "0.6.0",  optional = true, path = "../esp-riscv-rt" }
+riscv        = { version = "0.11.0", optional = true }
+esp-riscv-rt = { version = "0.6.1",  optional = true, path = "../esp-riscv-rt" }
 
 # Xtensa
 xtensa-lx    = { version = "0.8.0",  optional = true }
@@ -66,12 +66,13 @@ esp32c2 = { version = "0.17.0", features = ["critical-section"], optional = true
 esp32c3 = { version = "0.20.0", features = ["critical-section"], optional = true }
 esp32c6 = { version = "0.11.0", features = ["critical-section"], optional = true }
 esp32h2 = { version = "0.7.0",  features = ["critical-section"], optional = true }
+esp32p4 = { git = "https://github.com/esp-rs/esp-pacs", rev = "c801d10", optional = true }
 esp32s2 = { version = "0.19.0", features = ["critical-section"], optional = true }
 esp32s3 = { version = "0.23.0", features = ["critical-section"], optional = true }
 
 [build-dependencies]
-basic-toml = "0.1.7"
-serde      = { version = "1.0.193", features = ["derive"] }
+basic-toml = "0.1.8"
+serde      = { version = "1.0.195", features = ["derive"] }
 
 [features]
 esp32   = ["dep:esp32",   "xtensa", "procmacros/esp32",   "xtensa-lx/esp32",   "xtensa-lx-rt?/esp32"]
@@ -79,6 +80,7 @@ esp32c2 = ["dep:esp32c2", "riscv",  "procmacros/esp32c2", "portable-atomic/unsaf
 esp32c3 = ["dep:esp32c3", "riscv",  "procmacros/esp32c3", "portable-atomic/unsafe-assume-single-core"]
 esp32c6 = ["dep:esp32c6", "riscv",  "procmacros/esp32c6"]
 esp32h2 = ["dep:esp32h2", "riscv",  "procmacros/esp32h2"]
+esp32p4 = ["dep:esp32p4", "riscv",  "procmacros/esp32p4"]
 esp32s2 = ["dep:esp32s2", "xtensa", "procmacros/esp32s2", "xtensa-lx/esp32s2", "xtensa-lx-rt?/esp32s2", "usb-otg", "portable-atomic/critical-section"]
 esp32s3 = ["dep:esp32s3", "xtensa", "procmacros/esp32s3", "xtensa-lx/esp32s3", "xtensa-lx-rt?/esp32s3", "usb-otg"]
 
@@ -87,7 +89,7 @@ xtal-26mhz = []
 xtal-40mhz = []
 
 # Runetime support
-rt-riscv  = ["esp-riscv-rt/zero-bss", "esp32c2?/rt", "esp32c3?/rt", "esp32c6?/rt", "esp32h2?/rt"]
+rt-riscv  = ["esp-riscv-rt/zero-bss", "esp32c2?/rt", "esp32c3?/rt", "esp32c6?/rt", "esp32h2?/rt", "esp32p4?/rt"]
 rt-xtensa = ["dep:xtensa-lx-rt", "esp32?/rt", "esp32s2?/rt", "esp32s3?/rt"]
 
 # Only certain chips support flip-link (ESP32-C6 and ESPS32-H2)
@@ -141,21 +143,15 @@ async = [
 ]
 
 # Embassy support
-embassy = ["embassy-time", "procmacros/embassy"]
+embassy = ["embassy-time-driver", "procmacros/embassy"]
 
 embassy-executor-interrupt = ["embassy", "embassy-executor"]
 embassy-executor-thread    = ["embassy", "embassy-executor"]
 
+embassy-integrated-timers = ["embassy-executor?/integrated-timers"]
+
 embassy-time-systick = []
 embassy-time-timg0   = []
-
-# Prefer integrated timers, but allow using the generic queue if needed
-embassy-integrated-timers = ["embassy-executor?/integrated-timers"]
-embassy-generic-queue-8   = ["embassy-time/generic-queue-8"]
-embassy-generic-queue-16  = ["embassy-time/generic-queue-16"]
-embassy-generic-queue-32  = ["embassy-time/generic-queue-32"]
-embassy-generic-queue-64  = ["embassy-time/generic-queue-64"]
-embassy-generic-queue-128 = ["embassy-time/generic-queue-128"]
 
 # Architecture-specific features (intended for internal use)
 riscv  = ["dep:riscv", "critical-section/restore-state-u8"]
@@ -173,6 +169,7 @@ debug = [
     "esp32c3?/impl-register-debug",
     "esp32c6?/impl-register-debug",
     "esp32h2?/impl-register-debug",
+    "esp32p4?/impl-register-debug",
     "esp32s2?/impl-register-debug",
     "esp32s3?/impl-register-debug",
 ]
@@ -183,14 +180,7 @@ defmt = [
     "embassy-executor?/defmt",
     "embassy-futures?/defmt",
     "embassy-sync?/defmt",
-    "embassy-time?/defmt",
     "embedded-hal-1?/defmt-03",
     "embedded-io/defmt-03",
     "embedded-io-async?/defmt-03",
 ]
-
-[patch.crates-io]
-embassy-executor = { git = "https://github.com/embassy-rs/embassy", rev = "0027a76" }
-embassy-futures  = { git = "https://github.com/embassy-rs/embassy", rev = "0027a76" }
-embassy-sync     = { git = "https://github.com/embassy-rs/embassy", rev = "0027a76" }
-embassy-time     = { git = "https://github.com/embassy-rs/embassy", rev = "0027a76" }

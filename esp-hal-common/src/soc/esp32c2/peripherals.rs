@@ -1,24 +1,12 @@
-//! # Peripheral instance singletons (ESP32-C2)
+//! # Peripheral Instances
 //!
-//! ## Overview
+//! This module creates singleton instances for each of the various peripherals,
+//! and re-exports them to allow users to access and use them in their
+//! applications.
 //!
-//! The `Peripherals` module provides singleton instances of various peripherals
-//! and allows users to access and use them in their applications.
-//!
-//! These peripherals provide various functionalities and interfaces for
-//! interacting with different hardware components on the `ESP32-C2` chip, such
-//! as timers, `GPIO` pins, `I2C`, `SPI`, `UART`, and more. Users can access and
-//! utilize these peripherals by importing the respective singleton instances
-//! from this module.
-//!
-//! It's important to note that the module also exports the `Interrupt` enum
-//! from the `ESP32-C2` `PAC (Peripheral Access Crate)` for users to handle
-//! interrupts associated with these peripherals.
-//!
-//! ⚠️ NOTE: notice that `radio` is marked with `false` in the `peripherals!`
-//! macro. Basically, that means that there's no real peripheral (no `RADIO`
-//! peripheral in the PACs) but we're creating "virtual peripherals" for it in
-//! order to ensure the uniqueness of the instance (Singleton).
+//! Should be noted that that the module also re-exports the [Interrupt] enum
+//! from the PAC, allowing users to handle interrupts associated with these
+//! peripherals.
 
 use esp32c2 as pac;
 // We need to export this for users to use
@@ -27,6 +15,10 @@ pub use pac::Interrupt;
 // We need to export this in the hal for the drivers to use
 pub(crate) use self::peripherals::*;
 
+// Note that certain are marked with `virtual` in the invocation of the
+// `peripherals!` macro below. Basically, this indicates there's no physical
+// peripheral (no `PSRAM`, `RADIO`, etc. peripheral in the PACs), so we're
+// creating "virtual peripherals" for them.
 crate::peripherals! {
     APB_CTRL <= APB_CTRL,
     APB_SARADC <= APB_SARADC,

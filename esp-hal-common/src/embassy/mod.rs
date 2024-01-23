@@ -80,7 +80,7 @@ pub mod executor;
 
 use core::cell::Cell;
 
-use embassy_time::driver::{AlarmHandle, Driver};
+use embassy_time_driver::{AlarmHandle, Driver};
 
 #[cfg(feature = "async")]
 use crate::{interrupt::Priority, peripherals::Interrupt};
@@ -206,7 +206,7 @@ impl Driver for EmbassyTimer {
 
     fn set_alarm_callback(
         &self,
-        alarm: embassy_time::driver::AlarmHandle,
+        alarm: embassy_time_driver::AlarmHandle,
         callback: fn(*mut ()),
         ctx: *mut (),
     ) {
@@ -217,7 +217,7 @@ impl Driver for EmbassyTimer {
         })
     }
 
-    fn set_alarm(&self, alarm: embassy_time::driver::AlarmHandle, timestamp: u64) -> bool {
+    fn set_alarm(&self, alarm: embassy_time_driver::AlarmHandle, timestamp: u64) -> bool {
         self.set_alarm(alarm, timestamp)
     }
 }

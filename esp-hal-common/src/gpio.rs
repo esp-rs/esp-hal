@@ -24,11 +24,13 @@
 
 use core::{convert::Infallible, marker::PhantomData};
 
+#[cfg(any(adc, dac))]
+pub(crate) use crate::analog;
+pub(crate) use crate::gpio;
 use crate::peripherals::{GPIO, IO_MUX};
 #[cfg(any(xtensa, esp32c3))]
 pub(crate) use crate::rtc_pins;
 pub use crate::soc::gpio::*;
-pub(crate) use crate::{analog, gpio};
 
 /// Convenience type-alias for a no-pin / don't care - pin
 pub type NoPinType = Gpio0<Unknown>;
@@ -462,7 +464,7 @@ impl BankGpioRegisterAccess for Bank1GpioRegisterAccess {
 
 pub fn connect_low_to_peripheral(signal: InputSignal) {
     unsafe { &*GPIO::PTR }
-        .func_in_sel_cfg(signal as usize)
+        .func_in_sel_cfg(signal as usize - FUNC_IN_SEL_OFFSET)
         .modify(|_, w| unsafe {
             w.sel()
                 .set_bit()
@@ -475,7 +477,7 @@ pub fn connect_low_to_peripheral(signal: InputSignal) {
 
 pub fn connect_high_to_peripheral(signal: InputSignal) {
     unsafe { &*GPIO::PTR }
-        .func_in_sel_cfg(signal as usize)
+        .func_in_sel_cfg(signal as usize - FUNC_IN_SEL_OFFSET)
         .modify(|_, w| unsafe {
             w.sel()
                 .set_bit()
@@ -746,7 +748,7 @@ where
         self.set_alternate_function(af);
         if (signal as usize) <= INPUT_SIGNAL_MAX as usize {
             unsafe { &*GPIO::PTR }
-                .func_in_sel_cfg(signal as usize)
+                .func_in_sel_cfg(signal as usize - FUNC_IN_SEL_OFFSET)
                 .modify(|_, w| unsafe {
                     w.sel()
                         .set_bit()
@@ -763,7 +765,7 @@ where
         self.set_alternate_function(GPIO_FUNCTION);
 
         unsafe { &*GPIO::PTR }
-            .func_in_sel_cfg(signal as usize)
+            .func_in_sel_cfg(signal as usize - FUNC_IN_SEL_OFFSET)
             .modify(|_, w| w.sel().clear_bit());
         self
     }
@@ -800,7 +802,23 @@ where
                 _ => {}
             }
         }
+
+        #[cfg(not(any(esp32p4)))]
         unsafe {
+            (&*GPIO::PTR).pin(GPIONUM as usize).modify(|_, w| {
+                w.int_ena()
+                    .bits(gpio_intr_enable(int_enable, nmi_enable))
+                    .int_type()
+                    .bits(event as u8)
+                    .wakeup_enable()
+                    .bit(wake_up_from_light_sleep)
+            });
+        }
+
+        #[cfg(any(esp32p4))]
+        unsafe {
+            // there is no NMI_ENABLE but P4 could trigger 4 interrupts
+            // we'll only support GPIO_INT0 for now
             (&*GPIO::PTR).pin(GPIONUM as usize).modify(|_, w| {
                 w.int_ena()
                     .bits(gpio_intr_enable(int_enable, nmi_enable))
@@ -1035,6 +1053,7 @@ where
     }
 }
 
+#[cfg(any(adc, dac))]
 impl<const GPIONUM: u8> From<GpioPin<Unknown, GPIONUM>> for GpioPin<Analog, GPIONUM>
 where
     Self: GpioProperties,
@@ -1326,6 +1345,7 @@ where
     }
 }
 
+#[cfg(any(adc, dac))]
 impl<MODE, const GPIONUM: u8> GpioPin<MODE, GPIONUM>
 where
     Self: GpioProperties,
@@ -2714,11 +2734,22 @@ mod asynch {
         });
     }
 
+    #[cfg(not(any(esp32p4)))]
     #[interrupt]
     unsafe fn GPIO() {
+        handle_gpio_interrupt();
+    }
+
+    #[cfg(any(esp32p4))]
+    #[interrupt]
+    unsafe fn GPIO_INT0() {
+        handle_gpio_interrupt();
+    }
+
+    fn handle_gpio_interrupt() {
         let intrs_bank0 = InterruptStatusRegisterAccessBank0::interrupt_status_read();
 
-        #[cfg(any(esp32, esp32s2, esp32s3))]
+        #[cfg(any(esp32, esp32s2, esp32s3, esp32p4))]
         let intrs_bank1 = InterruptStatusRegisterAccessBank1::interrupt_status_read();
 
         let mut intr_bits = intrs_bank0;
@@ -2732,7 +2763,7 @@ mod asynch {
         // clear interrupt bits
         Bank0GpioRegisterAccess::write_interrupt_status_clear(intrs_bank0);
 
-        #[cfg(any(esp32, esp32s2, esp32s3))]
+        #[cfg(any(esp32, esp32s2, esp32s3, esp32p4))]
         {
             let mut intr_bits = intrs_bank1;
             while intr_bits != 0 {

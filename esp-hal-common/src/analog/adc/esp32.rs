@@ -336,6 +336,12 @@ where
             .sar_meas_wait2()
             .modify(|_, w| unsafe { w.sar_amp_wait3().bits(1) });
 
+        // Do *not* invert the output
+        // NOTE: This seems backwards, but was verified experimentally.
+        sensors
+            .sar_read_ctrl2()
+            .modify(|_, w| w.sar2_data_inv().set_bit());
+
         let adc = ADC {
             _adc: adc_instance.into_ref(),
             attenuations: config.attenuations,
@@ -422,8 +428,6 @@ macro_rules! impl_adc_interface {
         )+
     }
 }
-
-pub use implementation::*;
 
 mod implementation {
     //! # Analog to digital (ADC) conversion support.

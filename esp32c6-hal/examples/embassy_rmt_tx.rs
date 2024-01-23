@@ -37,7 +37,7 @@ async fn main(_spawner: Spawner) {
     #[cfg(feature = "embassy-time-timg0")]
     embassy::init(
         &clocks,
-        esp32c6_hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks).timer0,
+        esp32c6_hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks),
     );
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);

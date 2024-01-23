@@ -65,6 +65,7 @@ use crate::{
 #[cfg_attr(esp32c3, path = "clocks_ll/esp32c3.rs")]
 #[cfg_attr(esp32c6, path = "clocks_ll/esp32c6.rs")]
 #[cfg_attr(esp32h2, path = "clocks_ll/esp32h2.rs")]
+#[cfg_attr(esp32p4, path = "clocks_ll/esp32p4.rs")]
 #[cfg_attr(esp32s2, path = "clocks_ll/esp32s2.rs")]
 #[cfg_attr(esp32s3, path = "clocks_ll/esp32s3.rs")]
 pub(crate) mod clocks_ll;

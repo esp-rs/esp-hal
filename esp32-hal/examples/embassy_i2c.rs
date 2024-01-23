@@ -35,7 +35,7 @@ async fn main(_spawner: Spawner) {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    embassy::init(&clocks, timer_group0.timer0);
+    embassy::init(&clocks, timer_group0);
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
