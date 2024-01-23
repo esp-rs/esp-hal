@@ -28,3 +28,15 @@ pub enum Phase {
     ShiftLow,
     ShiftHigh,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum DelayMode {
+    /// Output without delay.
+    #[default]
+    None        = 0,
+    /// Delayed by the rising edge of LCD_CLK.
+    RaisingEdge = 1,
+    /// Delayed by the falling edge of LCD_CLK.
+    FallingEdge = 2,
+}

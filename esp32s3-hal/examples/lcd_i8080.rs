@@ -12,10 +12,7 @@ use esp32s3_hal::{
     gdma::Gdma,
     gpio::IO,
     lcd_cam::{
-        lcd::{
-            i8080::{TxEightBits, I8080},
-            ClockMode,
-        },
+        lcd::i8080::{Config, TxEightBits, I8080},
         LcdCam,
     },
     peripherals::Peripherals,
@@ -38,8 +35,6 @@ fn main() -> ! {
     let lcd_rs = io.pins.gpio0; // Command/Data selection
     let lcd_wr = io.pins.gpio47; // Write clock
     let _lcd_te = io.pins.gpio48; // Frame sync
-
-    // LCD data interface, 8 bit MCU (8080)
 
     let dma = Gdma::new(peripherals.DMA);
     let channel = dma.channel0;
@@ -75,7 +70,7 @@ fn main() -> ! {
         channel.tx,
         tx_pins,
         20u32.MHz(),
-        ClockMode::default(),
+        Config::default(),
         &clocks,
     )
     .with_ctrl_pins(lcd_rs, lcd_wr);

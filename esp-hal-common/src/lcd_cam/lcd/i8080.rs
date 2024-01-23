@@ -8,7 +8,7 @@ use crate::{
     dma::{DmaError, DmaPeripheral, Tx},
     gpio::{OutputPin, OutputSignal},
     lcd_cam::{
-        lcd::{i8080::private::TxPins, ClockMode, Phase, Polarity},
+        lcd::{i8080::private::TxPins, ClockMode, DelayMode, Phase, Polarity},
         private::calculate_clkm,
         BitOrder,
         ByteOrder,
@@ -33,7 +33,7 @@ where
         mut channel: TX,
         mut pins: P,
         frequency: HertzU32,
-        mode: ClockMode,
+        config: Config,
         clocks: &Clocks,
     ) -> Self {
         let is_2byte_mode = size_of::<P::Word>() == 2;
@@ -67,8 +67,9 @@ where
             w.lcd_clkcnt_n().variant(2 - 1); // Must not be 0.
 
             w.lcd_ck_idle_edge()
-                .bit(mode.polarity == Polarity::IdleHigh);
-            w.lcd_ck_out_edge().bit(mode.phase == Phase::ShiftHigh);
+                .bit(config.clock_mode.polarity == Polarity::IdleHigh);
+            w.lcd_ck_out_edge()
+                .bit(config.clock_mode.phase == Phase::ShiftHigh);
             w
         });
 
@@ -103,11 +104,13 @@ where
 
             // Configure the setup cycles in LCD non-RGB mode. Setup cycles
             // expected = this value + 1. (6 bit)
-            w.lcd_vfk_cyclelen().variant(0);
+            w.lcd_vfk_cyclelen()
+                .variant(config.setup_cycles.saturating_sub(1) as _);
 
             // Configure the hold time cycles in LCD non-RGB mode. Hold
             // cycles expected = this value + 1.
-            w.lcd_vbk_cyclelen().variant(0);
+            w.lcd_vbk_cyclelen()
+                .variant(config.hold_cycles.saturating_sub(1) as _);
 
             // 1: Send the next frame data when the current frame is sent out.
             // 0: LCD stops when the current frame is sent out.
@@ -118,18 +121,43 @@ where
 
             // 1: LCD_CD = !LCD_CAM_LCD_CD_IDLE_EDGE when LCD is in DOUT phase.
             // 0: LCD_CD = LCD_CAM_LCD_CD_IDLE_EDGE.
-            w.lcd_cd_data_set().set_bit();
+            w.lcd_cd_data_set()
+                .bit(config.cd_data_edge != config.cd_idle_edge);
             // 1: LCD_CD = !LCD_CAM_LCD_CD_IDLE_EDGE when LCD is in DUMMY phase.
             // 0: LCD_CD = LCD_CAM_LCD_CD_IDLE_EDGE.
-            w.lcd_cd_dummy_set().clear_bit();
+            w.lcd_cd_dummy_set()
+                .bit(config.cd_dummy_edge != config.cd_idle_edge);
             // 1: LCD_CD = !LCD_CAM_LCD_CD_IDLE_EDGE when LCD is in CMD phase.
             // 0: LCD_CD = LCD_CAM_LCD_CD_IDLE_EDGE.
-            w.lcd_cd_cmd_set().clear_bit();
+            w.lcd_cd_cmd_set()
+                .bit(config.cd_cmd_edge != config.cd_idle_edge);
 
             // The default value of LCD_CD
-            w.lcd_cd_idle_edge().clear_bit();
+            w.lcd_cd_idle_edge().bit(config.cd_idle_edge);
 
             // w.lcd_afifo_reset().set_bit();
+            w
+        });
+        lcd_cam
+            .lcd_dly_mode()
+            .write(|w| w.lcd_cd_mode().variant(config.cd_mode as u8));
+        lcd_cam.lcd_data_dout_mode().write(|w| {
+            w.dout0_mode().variant(config.output_bit_mode as u8);
+            w.dout1_mode().variant(config.output_bit_mode as u8);
+            w.dout2_mode().variant(config.output_bit_mode as u8);
+            w.dout3_mode().variant(config.output_bit_mode as u8);
+            w.dout4_mode().variant(config.output_bit_mode as u8);
+            w.dout5_mode().variant(config.output_bit_mode as u8);
+            w.dout6_mode().variant(config.output_bit_mode as u8);
+            w.dout7_mode().variant(config.output_bit_mode as u8);
+            w.dout8_mode().variant(config.output_bit_mode as u8);
+            w.dout9_mode().variant(config.output_bit_mode as u8);
+            w.dout10_mode().variant(config.output_bit_mode as u8);
+            w.dout11_mode().variant(config.output_bit_mode as u8);
+            w.dout12_mode().variant(config.output_bit_mode as u8);
+            w.dout13_mode().variant(config.output_bit_mode as u8);
+            w.dout14_mode().variant(config.output_bit_mode as u8);
+            w.dout15_mode().variant(config.output_bit_mode as u8);
             w
         });
 
@@ -383,6 +411,48 @@ impl<'d, TX: Tx, BUFFER, P> Drop for Transfer<'d, TX, BUFFER, P> {
         if let Some(instance) = self.instance.as_mut() {
             // This will cancel the transfer.
             instance.tear_down_send();
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct Config {
+    pub clock_mode: ClockMode,
+
+    /// Setup cycles expected, must be at least 1. (6 bits)
+    pub setup_cycles: usize,
+
+    /// Hold cycles expected, must be at least 1. (13 bits)
+    pub hold_cycles: usize,
+
+    /// The default value of LCD_CD.
+    pub cd_idle_edge: bool,
+    /// The value of LCD_CD during CMD phase.
+    pub cd_cmd_edge: bool,
+    /// The value of LCD_CD during dummy phase.
+    pub cd_dummy_edge: bool,
+    /// The value of LCD_CD during data phase.
+    pub cd_data_edge: bool,
+
+    /// The output LCD_CD is delayed by module clock LCD_CLK.
+    pub cd_mode: DelayMode,
+    /// The output data bits are delayed by module clock LCD_CLK.
+    pub output_bit_mode: DelayMode,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            clock_mode: Default::default(),
+            setup_cycles: 1,
+            hold_cycles: 1,
+            cd_idle_edge: false,
+            cd_cmd_edge: false,
+            cd_dummy_edge: false,
+            cd_data_edge: true,
+            cd_mode: Default::default(),
+            output_bit_mode: Default::default(),
         }
     }
 }
