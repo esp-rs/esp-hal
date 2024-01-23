@@ -70,7 +70,7 @@ log.workspace = true
 static_cell.workspace = true
 
 [features]
-default = [ "log", "ipv4", "tcp", "udp", "icmp", "igmp", "dns", "dhcpv4" ]
+default = [ "log" ]
 
 # chip features
 esp32c2 = [ "esp32c2-hal", "esp-wifi-sys/esp32c2", "esp-println/esp32c2", "esp-backtrace/esp32c2" ]
@@ -125,6 +125,7 @@ icmp   = ["ipv4", "smoltcp?/socket-icmp"]
 igmp   = ["ipv4", "smoltcp?/proto-igmp"]
 dns    = ["udp",  "smoltcp?/proto-dns", "smoltcp?/socket-dns"]
 dhcpv4 = ["wifi", "utils", "smoltcp?/proto-dhcpv4", "smoltcp?/socket-dhcpv4"]
+wifi-default = ["ipv4", "tcp", "udp", "icmp", "igmp", "dns", "dhcpv4"]
 defmt = [
   "dep:defmt",
   "smoltcp?/defmt",
