@@ -31,7 +31,7 @@
 //!      - `rtc_slow` - Use RTC slow RAM (not all targets support slow RTC RAM)
 //!      - `uninitialized` - Skip initialization of the memory
 //!      - `zeroed` - Initialize the memory to zero
-//!  
+//!
 //! ## Examples
 //!
 //! #### `interrupt` macro
@@ -715,7 +715,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
                     .into();
             }
             FnArg::Typed(t) => {
-                if get_simplename(&t.ty) != "GpioPin" {
+                if get_simplename(&t.ty) != "GpioPin" && get_simplename(&t.ty) != "LpUart" {
                     return parse::Error::new(arg.span(), "invalid argument to main")
                         .to_compile_error()
                         .into();
@@ -752,7 +752,8 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
 
             use #hal_crate as the_hal;
             #(
-                let mut #param_names = unsafe { the_hal::gpio::conjour().unwrap() };
+                // let mut #param_names = unsafe { the_hal::gpio::conjour().unwrap() };
+                let mut #param_names = unsafe { the_hal::uart::uart().unwrap() };
             )*
 
             main(#(#param_names),*);

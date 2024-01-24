@@ -2,9 +2,14 @@
 
 use esp32c6_lp::LP_UART;
 
-use self::config::Config;
+const UART_FIFO_SIZE: u16 = 128;
 
-const UART_FIFO_SIZE: u16 = 20;
+#[doc(hidden)]
+pub unsafe fn uart() -> Option<LpUart> {
+    Some(LpUart {
+        uart: LP_UART::steal(),
+    })
+}
 
 #[derive(Debug)]
 pub enum Error {}
@@ -83,7 +88,7 @@ pub mod config {
     impl Default for Config {
         fn default() -> Config {
             Config {
-                baudrate: 115_200,
+                baudrate: 115200,
                 data_bits: DataBits::DataBits8,
                 parity: Parity::ParityNone,
                 stop_bits: StopBits::STOP1,
@@ -92,149 +97,15 @@ pub mod config {
     }
 }
 
-/// UART driver
-pub struct Uart {
+/// LP-UART driver
+pub struct LpUart {
     uart: LP_UART,
 }
 
-impl Uart {
-    /// Initialize the UART driver using the default configuration
-    pub fn new(uart: LP_UART) -> Self {
-        Self::new_with_config(uart, Config::default())
-    }
-
-    /// Initialize the UART driver using the provided configuration
-    pub fn new_with_config(uart: LP_UART, config: Config) -> Self {
-        let mut me = Self { uart };
-
-        // begin: lp_core_uart_param_config
-
-        // Set UART mode.
-        // uart_ll_set_mode(hal->dev, UART_MODE_UART);
-
-        // Disable UART parity
-        // 8-bit world
-        // 1-bit stop bit
-        me.uart.conf0_sync.modify(|_, w| unsafe {
-            w.parity()
-                .clear_bit()
-                .parity_en()
-                .clear_bit()
-                .bit_num()
-                .bits(0x3)
-                .stop_bit_num()
-                .bits(0x1)
-        });
-        // Set tx idle
-        me.uart
-            .idle_conf_sync
-            .modify(|_, w| unsafe { w.tx_idle_num().bits(0) });
-        // Disable hw-flow control
-        me.uart
-            .hwfc_conf_sync
-            .modify(|_, w| unsafe { w.rx_flow_en().clear_bit() });
-
-        //
-
-        // Override protocol parameters from the configuration
-        // uart_hal_set_baudrate(&hal, cfg->uart_proto_cfg.baud_rate, sclk_freq);
-        // uart_hal_set_parity(&hal, cfg->uart_proto_cfg.parity);
-        // uart_hal_set_data_bit_num(&hal, cfg->uart_proto_cfg.data_bits);
-        // uart_hal_set_stop_bits(&hal, cfg->uart_proto_cfg.stop_bits);
-        // uart_hal_set_tx_idle_num(&hal, LP_UART_TX_IDLE_NUM_DEFAULT);
-        // uart_hal_set_hw_flow_ctrl(
-        //     &hal,
-        //     cfg->uart_proto_cfg.flow_ctrl,
-        //     cfg->uart_proto_cfg.rx_flow_ctrl_thresh
-        // );
-
-        //
-
-        // Reset Tx/Rx FIFOs
-        me.rxfifo_reset();
-        me.txfifo_reset();
-
-        // end: lp_core_uart_param_config
-
-        // begin: lp_core_uart_set_pin
-
-        // static esp_err_t
-        // lp_uart_config_io(gpio_num_t pin, rtc_gpio_mode_t direction)
-        // {
-        //     /* Initialize LP_IO */
-        //     esp_err_t ret = rtc_gpio_init(pin);
-        //     if (ret != ESP_OK) {
-        //         return ESP_FAIL;
-        //     }
-        //
-        //     /* Set LP_IO direction */
-        //     ret = rtc_gpio_set_direction(pin, direction);
-        //     if (ret != ESP_OK) {
-        //         return ESP_FAIL;
-        //     }
-        //
-        //     /* Set LP_IO function */
-        //     ret = rtc_gpio_iomux_func_sel(pin, 1);
-        //
-        //     return ret;
-        // }
-
-        // Configure Tx Pin
-        // ret = lp_uart_config_io(
-        //     cfg->uart_pin_cfg.tx_io_num, RTC_GPIO_MODE_OUTPUT_ONLY
-        // );
-        // Configure Rx Pin
-        // ret = lp_uart_config_io(
-        //     cfg->uart_pin_cfg.rx_io_num, RTC_GPIO_MODE_INPUT_ONLY
-        // );
-        // Configure RTS Pin
-        // ret = lp_uart_config_io(
-        //     cfg->uart_pin_cfg.rts_io_num, RTC_GPIO_MODE_OUTPUT_ONLY
-        // );
-        // Configure CTS Pin
-        // ret = lp_uart_config_io(
-        //     cfg->uart_pin_cfg.cts_io_num, RTC_GPIO_MODE_INPUT_ONLY
-        // );
-
-        // end: lp_core_uart_set_pin
-
-        me
-    }
-
-    // ---
-
-    fn rxfifo_reset(&mut self) {
-        self.uart.conf0_sync.modify(|_, w| w.rxfifo_rst().set_bit());
-        self.update();
-
-        self.uart
-            .conf0_sync
-            .modify(|_, w| w.rxfifo_rst().clear_bit());
-        self.update();
-    }
-
-    fn txfifo_reset(&mut self) {
-        self.uart.conf0_sync.modify(|_, w| w.txfifo_rst().set_bit());
-        self.update();
-
-        self.uart
-            .conf0_sync
-            .modify(|_, w| w.txfifo_rst().clear_bit());
-        self.update();
-    }
-
-    fn update(&mut self) {
-        self.uart.reg_update.modify(|_, w| w.reg_update().set_bit());
-        while self.uart.reg_update.read().reg_update().bit_is_set() {
-            // wait
-        }
-    }
-
-    // ---
-
+impl LpUart {
     fn read_byte(&mut self) -> nb::Result<u8, Error> {
         if self.get_rx_fifo_count() > 0 {
-            let byte = self.uart.fifo.read().rxfifo_rd_byte().bits();
+            let byte = self.uart.fifo().read().rxfifo_rd_byte().bits();
             Ok(byte)
         } else {
             Err(nb::Error::WouldBlock)
@@ -244,7 +115,7 @@ impl Uart {
     fn write_byte(&mut self, byte: u8) -> nb::Result<(), Error> {
         if self.get_tx_fifo_count() < UART_FIFO_SIZE {
             self.uart
-                .fifo
+                .fifo()
                 .write(|w| unsafe { w.rxfifo_rd_byte().bits(byte) });
             Ok(())
         } else {
@@ -265,25 +136,25 @@ impl Uart {
     }
 
     fn get_rx_fifo_count(&mut self) -> u16 {
-        self.uart.status.read().rxfifo_cnt().bits().into()
+        self.uart.status().read().rxfifo_cnt().bits().into()
     }
 
     fn get_tx_fifo_count(&mut self) -> u16 {
-        self.uart.status.read().txfifo_cnt().bits().into()
+        self.uart.status().read().txfifo_cnt().bits().into()
     }
 
     fn is_tx_idle(&self) -> bool {
-        self.uart.fsm_status.read().st_utx_out().bits() == 0
+        self.uart.fsm_status().read().st_utx_out().bits() == 0
     }
 }
 
-impl core::fmt::Write for Uart {
+impl core::fmt::Write for LpUart {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
         self.write_bytes(s.as_bytes()).map_err(|_| core::fmt::Error)
     }
 }
 
-impl embedded_hal::serial::Read<u8> for Uart {
+impl embedded_hal::serial::Read<u8> for LpUart {
     type Error = Error;
 
     fn read(&mut self) -> nb::Result<u8, Self::Error> {
@@ -291,7 +162,7 @@ impl embedded_hal::serial::Read<u8> for Uart {
     }
 }
 
-impl embedded_hal::serial::Write<u8> for Uart {
+impl embedded_hal::serial::Write<u8> for LpUart {
     type Error = Error;
 
     fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
