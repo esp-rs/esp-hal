@@ -16,13 +16,14 @@ use esp32c6_hal::{
     prelude::*,
     uart::{
         config::{Config, DataBits, Parity, StopBits},
+        lp_uart::LpUart,
         TxRxPins,
     },
     Uart,
     IO,
 };
 use esp_backtrace as _;
-use esp_println::{print, println};
+use esp_println::println;
 
 #[entry]
 fn main() -> ! {
@@ -53,6 +54,8 @@ fn main() -> ! {
     let lp_tx = io.pins.gpio5.into_low_power().into_push_pull_output();
     let lp_rx = io.pins.gpio4.into_low_power().into_floating_input();
 
+    let lp_uart = LpUart::new(peripherals.LP_UART, lp_tx, lp_rx);
+
     let mut lp_core = esp32c6_hal::lp_core::LpCore::new(peripherals.LP_CORE);
     lp_core.stop();
     println!("lp core stopped");
@@ -63,12 +66,7 @@ fn main() -> ! {
     );
 
     // start LP core
-    lp_core_code.run(
-        &mut lp_core,
-        lp_core::LpCoreWakeupSource::HpCpu,
-        lp_tx,
-        lp_rx,
-    );
+    lp_core_code.run(&mut lp_core, lp_core::LpCoreWakeupSource::HpCpu, lp_uart);
     println!("lpcore run");
 
     loop {
