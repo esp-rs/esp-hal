@@ -1,9 +1,7 @@
 use core::marker::PhantomData;
 
-use embedded_hal::adc::{Channel, OneShot};
-
 pub use self::calibration::*;
-use super::{AdcCalEfuse, AdcCalScheme, AdcCalSource, Attenuation};
+use super::{AdcCalEfuse, AdcCalScheme, AdcCalSource, AdcChannel, Attenuation};
 #[cfg(any(esp32c6, esp32h2))]
 use crate::clock::clocks_ll::regi2c_write_mask;
 #[cfg(any(esp32c2, esp32c3, esp32c6))]
@@ -116,9 +114,9 @@ pub struct AdcPin<PIN, ADCI, CS = ()> {
     _phantom: PhantomData<ADCI>,
 }
 
-impl<PIN, ADCI, CS> Channel<ADCI> for AdcPin<PIN, ADCI, CS>
+impl<PIN, ADCI, CS> embedded_hal::adc::Channel<ADCI> for AdcPin<PIN, ADCI, CS>
 where
-    PIN: Channel<ADCI, ID = u8>,
+    PIN: embedded_hal::adc::Channel<ADCI, ID = u8>,
 {
     type ID = u8;
 
@@ -144,9 +142,9 @@ where
 
     pub fn enable_pin<PIN>(&mut self, pin: PIN, attenuation: Attenuation) -> AdcPin<PIN, ADCI>
     where
-        PIN: Channel<ADCI, ID = u8>,
+        PIN: AdcChannel,
     {
-        self.attenuations[PIN::channel() as usize] = Some(attenuation);
+        self.attenuations[PIN::CHANNEL as usize] = Some(attenuation);
 
         AdcPin {
             pin,
@@ -162,10 +160,10 @@ where
     ) -> AdcPin<PIN, ADCI, CS>
     where
         ADCI: CalibrationAccess,
-        PIN: Channel<ADCI, ID = u8>,
+        PIN: AdcChannel,
         CS: AdcCalScheme<ADCI>,
     {
-        self.attenuations[PIN::channel() as usize] = Some(attenuation);
+        self.attenuations[PIN::CHANNEL as usize] = Some(attenuation);
 
         AdcPin {
             pin,
@@ -549,15 +547,18 @@ impl AdcCalEfuse for crate::peripherals::ADC2 {
     }
 }
 
-impl<'d, ADCI, PIN, CS> OneShot<ADCI, u16, AdcPin<PIN, ADCI, CS>> for ADC<'d, ADCI>
+impl<'d, ADCI, PIN, CS> embedded_hal::adc::OneShot<ADCI, u16, AdcPin<PIN, ADCI, CS>>
+    for ADC<'d, ADCI>
 where
-    PIN: Channel<ADCI, ID = u8>,
+    PIN: embedded_hal::adc::Channel<ADCI, ID = u8>,
     ADCI: RegisterAccess,
     CS: AdcCalScheme<ADCI>,
 {
     type Error = ();
 
     fn read(&mut self, pin: &mut AdcPin<PIN, ADCI, CS>) -> nb::Result<u16, Self::Error> {
+        use embedded_hal::adc::Channel;
+
         if self.attenuations[AdcPin::<PIN, ADCI>::channel() as usize] == None {
             panic!(
                 "Channel {} is not configured reading!",
@@ -633,6 +634,10 @@ macro_rules! impl_adc_interface {
         $( ($pin:ident, $channel:expr) ,)+
     ]) => {
         $(
+            impl $crate::analog::adc::AdcChannel for crate::gpio::$pin<crate::gpio::Analog> {
+                const CHANNEL: u8 = $channel;
+            }
+
             impl embedded_hal::adc::Channel<$adc> for crate::gpio::$pin<crate::gpio::Analog> {
                 type ID = u8;
 

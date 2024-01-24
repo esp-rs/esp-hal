@@ -50,6 +50,11 @@ pub enum AdcCalSource {
     Ref,
 }
 
+/// A helper trait to get the ADC channel of a compatible GPIO pin.
+pub trait AdcChannel {
+    const CHANNEL: u8;
+}
+
 /// A trait abstracting over calibration methods.
 ///
 /// The methods in this trait are mostly for internal use. To get

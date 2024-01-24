@@ -1,8 +1,6 @@
 use core::marker::PhantomData;
 
-use embedded_hal::adc::{Channel, OneShot};
-
-use super::Attenuation;
+use super::{AdcChannel, Attenuation};
 use crate::{
     peripheral::PeripheralRef,
     peripherals::{ADC1, ADC2, RTC_IO, SENS},
@@ -23,7 +21,10 @@ pub struct AdcPin<PIN, ADCI> {
     _phantom: PhantomData<ADCI>,
 }
 
-impl<PIN: Channel<ADCI, ID = u8>, ADCI> Channel<ADCI> for AdcPin<PIN, ADCI> {
+impl<PIN, ADCI> embedded_hal::adc::Channel<ADCI> for AdcPin<PIN, ADCI>
+where
+    PIN: embedded_hal::adc::Channel<ADCI, ID = u8>,
+{
     type ID = u8;
 
     fn channel() -> Self::ID {
@@ -43,16 +44,14 @@ where
     ADCI: RegisterAccess,
 {
     pub fn new() -> AdcConfig<ADCI> {
-        crate::into_ref!();
         Self::default()
     }
 
-    pub fn enable_pin<PIN: Channel<ADCI, ID = u8>>(
-        &mut self,
-        pin: PIN,
-        attenuation: Attenuation,
-    ) -> AdcPin<PIN, ADCI> {
-        self.attenuations[PIN::channel() as usize] = Some(attenuation);
+    pub fn enable_pin<PIN>(&mut self, pin: PIN, attenuation: Attenuation) -> AdcPin<PIN, ADCI>
+    where
+        PIN: AdcChannel,
+    {
+        self.attenuations[PIN::CHANNEL as usize] = Some(attenuation);
 
         AdcPin {
             pin,
@@ -349,14 +348,16 @@ impl<'d, ADC1> ADC<'d, ADC1> {
     }
 }
 
-impl<'d, ADCI, PIN> OneShot<ADCI, u16, AdcPin<PIN, ADCI>> for ADC<'d, ADCI>
+impl<'d, ADCI, PIN> embedded_hal::adc::OneShot<ADCI, u16, AdcPin<PIN, ADCI>> for ADC<'d, ADCI>
 where
-    PIN: Channel<ADCI, ID = u8>,
+    PIN: embedded_hal::adc::Channel<ADCI, ID = u8>,
     ADCI: RegisterAccess,
 {
     type Error = ();
 
     fn read(&mut self, _pin: &mut AdcPin<PIN, ADCI>) -> nb::Result<u16, Self::Error> {
+        use embedded_hal::adc::Channel;
+
         if self.attenuations[AdcPin::<PIN, ADCI>::channel() as usize] == None {
             panic!(
                 "Channel {} is not configured reading!",
@@ -402,6 +403,10 @@ macro_rules! impl_adc_interface {
         $( ($pin:ident, $channel:expr) ,)+
     ]) => {
         $(
+            impl $crate::analog::adc::AdcChannel for crate::gpio::$pin<crate::gpio::Analog> {
+                const CHANNEL: u8 = $channel;
+            }
+
             impl embedded_hal::adc::Channel<$adc> for crate::gpio::$pin<crate::gpio::Analog> {
                 type ID = u8;
 
