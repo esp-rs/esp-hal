@@ -3,7 +3,6 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#include "sdkconfig.h"
 
 ENTRY(reset_vector)
 
@@ -17,6 +16,7 @@ MEMORY
 SECTIONS
 {
     . = ORIGIN(ram);
+
     .text :
     {
         *(.text.vectors) /* Default reset vector must link to offset 0x0 */

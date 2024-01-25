@@ -108,6 +108,12 @@ fn get_hal_crate() -> (
     use proc_macro_crate::crate_name;
 
     // Package name:
+    #[cfg(any(
+        feature = "esp32c6-lp",
+        feature = "esp32s2-ulp",
+        feature = "esp32s3-ulp"
+    ))]
+    let hal_crate = crate_name("esp-lp-hal");
     #[cfg(feature = "esp32")]
     let hal_crate = crate_name("esp32-hal");
     #[cfg(feature = "esp32c2")]
@@ -116,22 +122,22 @@ fn get_hal_crate() -> (
     let hal_crate = crate_name("esp32c3-hal");
     #[cfg(feature = "esp32c6")]
     let hal_crate = crate_name("esp32c6-hal");
-    #[cfg(feature = "esp32c6-lp")]
-    let hal_crate = crate_name("esp32c6-lp-hal");
     #[cfg(feature = "esp32h2")]
     let hal_crate = crate_name("esp32h2-hal");
     #[cfg(feature = "esp32p4")]
     let hal_crate = crate_name("esp32p4-hal");
     #[cfg(feature = "esp32s2")]
     let hal_crate = crate_name("esp32s2-hal");
-    #[cfg(feature = "esp32s2-ulp")]
-    let hal_crate = crate_name("esp-ulp-riscv-hal");
     #[cfg(feature = "esp32s3")]
     let hal_crate = crate_name("esp32s3-hal");
-    #[cfg(feature = "esp32s3-ulp")]
-    let hal_crate = crate_name("esp-ulp-riscv-hal");
 
     // Crate name:
+    #[cfg(any(
+        feature = "esp32c6-lp",
+        feature = "esp32s2-ulp",
+        feature = "esp32s3-ulp"
+    ))]
+    let hal_crate_name = Ident::new("esp_lp_hal", Span::call_site().into());
     #[cfg(feature = "esp32")]
     let hal_crate_name = Ident::new("esp32_hal", Span::call_site().into());
     #[cfg(feature = "esp32c2")]
@@ -140,20 +146,14 @@ fn get_hal_crate() -> (
     let hal_crate_name = Ident::new("esp32c3_hal", Span::call_site().into());
     #[cfg(feature = "esp32c6")]
     let hal_crate_name = Ident::new("esp32c6_hal", Span::call_site().into());
-    #[cfg(feature = "esp32c6-lp")]
-    let hal_crate_name = Ident::new("esp32c6_lp_hal", Span::call_site().into());
     #[cfg(feature = "esp32h2")]
     let hal_crate_name = Ident::new("esp32h2_hal", Span::call_site().into());
     #[cfg(feature = "esp32p4")]
     let hal_crate_name = Ident::new("esp32p4_hal", Span::call_site().into());
     #[cfg(feature = "esp32s2")]
     let hal_crate_name = Ident::new("esp32s2_hal", Span::call_site().into());
-    #[cfg(feature = "esp32s2-ulp")]
-    let hal_crate_name = Ident::new("esp_ulp_riscv_hal", Span::call_site().into());
     #[cfg(feature = "esp32s3")]
     let hal_crate_name = Ident::new("esp32s3_hal", Span::call_site().into());
-    #[cfg(feature = "esp32s3-ulp")]
-    let hal_crate_name = Ident::new("esp_ulp_riscv_hal", Span::call_site().into());
 
     (hal_crate, hal_crate_name)
 }
@@ -679,18 +679,9 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
 
     use self::lp_core::{extract_pin, get_simplename, make_magic_symbol_name};
 
-    #[cfg(feature = "esp32c6-lp")]
-    let found_crate =
-        crate_name("esp32c6-lp-hal").expect("esp32c6_lp_hal is present in `Cargo.toml`");
-    #[cfg(any(feature = "esp32s2-ulp", feature = "esp32s3-ulp"))]
-    let found_crate =
-        crate_name("esp-ulp-riscv-hal").expect("esp-ulp-riscv-hal is present in `Cargo.toml`");
-
+    let found_crate = crate_name("esp-lp-hal").expect("esp-lp-hal is present in `Cargo.toml`");
     let hal_crate = match found_crate {
-        #[cfg(feature = "esp32c6-lp")]
-        FoundCrate::Itself => quote!(esp32c6_lp_hal),
-        #[cfg(any(feature = "esp32s2-ulp", feature = "esp32s3-ulp"))]
-        FoundCrate::Itself => quote!(esp_ulp_riscv_hal),
+        FoundCrate::Itself => quote!(esp_lp_hal),
         FoundCrate::Name(name) => {
             let ident = Ident::new(&name, Span::call_site());
             quote!( #ident::Something )
@@ -729,12 +720,12 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
                         }
                         used_pins.push(pin);
                         create_peripheral.push(quote!(
-                            let mut #param_name = unsafe { the_hal::gpio::conjour().unwrap() };
+                            let mut #param_name = unsafe { the_hal::gpio::conjure().unwrap() };
                         ));
                     }
                     "LpUart" => {
                         create_peripheral.push(quote!(
-                            let mut #param_name = unsafe { the_hal::uart::conjour().unwrap() };
+                            let mut #param_name = unsafe { the_hal::uart::conjure().unwrap() };
                         ));
                     }
                     _ => {
@@ -772,6 +763,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
 
             main(#(#param_names),*);
         }
+
         #f
     )
     .into()
