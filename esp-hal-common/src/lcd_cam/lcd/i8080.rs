@@ -55,110 +55,124 @@ where
 
         lcd_cam.lcd_clock().write(|w| {
             // Force enable the clock for all configuration registers.
-            w.clk_en().set_bit();
-
-            w.lcd_clk_sel().variant((i + 1) as _);
-            w.lcd_clkm_div_num().variant(divider.div_num as _);
-            w.lcd_clkm_div_b().variant(divider.div_b as _);
-            w.lcd_clkm_div_a().variant(divider.div_a as _);
-
-            // LCD_PCLK = LCD_CLK / 2
-            w.lcd_clk_equ_sysclk().clear_bit();
-            w.lcd_clkcnt_n().variant(2 - 1); // Must not be 0.
-
-            w.lcd_ck_idle_edge()
-                .bit(config.clock_mode.polarity == Polarity::IdleHigh);
-            w.lcd_ck_out_edge()
-                .bit(config.clock_mode.phase == Phase::ShiftHigh);
-            w
+            w.clk_en()
+                .set_bit()
+                .lcd_clk_sel()
+                .variant((i + 1) as _)
+                .lcd_clkm_div_num()
+                .variant(divider.div_num as _)
+                .lcd_clkm_div_b()
+                .variant(divider.div_b as _)
+                .lcd_clkm_div_a()
+                .variant(divider.div_a as _)
+                // LCD_PCLK = LCD_CLK / 2
+                .lcd_clk_equ_sysclk()
+                .clear_bit()
+                .lcd_clkcnt_n()
+                .variant(2 - 1) // Must not be 0.
+                .lcd_ck_idle_edge()
+                .bit(config.clock_mode.polarity == Polarity::IdleHigh)
+                .lcd_ck_out_edge()
+                .bit(config.clock_mode.phase == Phase::ShiftHigh)
         });
 
         lcd_cam
             .lcd_ctrl()
-            .modify(|_, w| w.lcd_rgb_mode_en().clear_bit());
+            .write(|w| w.lcd_rgb_mode_en().clear_bit());
         lcd_cam
             .lcd_rgb_yuv()
-            .modify(|_, w| w.lcd_conv_bypass().clear_bit());
+            .write(|w| w.lcd_conv_bypass().clear_bit());
 
         lcd_cam.lcd_user().modify(|_, w| {
-            w.lcd_8bits_order().bit(false);
-            w.lcd_bit_order().bit(false);
-            w.lcd_byte_order().bit(false);
-            w.lcd_2byte_en().bit(is_2byte_mode);
-
-            // Be able to send data out in LCD sequence when LCD starts.
-            w.lcd_dout().set_bit();
-            // Data length in fixed mode. (13 bits)
-            w.lcd_dout_cyclelen().variant(0);
-            // Disable continuous output.
-            w.lcd_always_out_en().clear_bit();
-
-            // w.lcd_update().set_bit();
-            // w.lcd_start().set_bit();
-            // w.lcd_reset().set_bit();
-            w
+            w.lcd_8bits_order()
+                .bit(false)
+                .lcd_bit_order()
+                .bit(false)
+                .lcd_byte_order()
+                .bit(false)
+                .lcd_2byte_en()
+                .bit(is_2byte_mode)
+                // Be able to send data out in LCD sequence when LCD starts.
+                .lcd_dout()
+                .set_bit()
+                // Data length in fixed mode. (13 bits)
+                .lcd_dout_cyclelen()
+                .variant(0)
+                // Disable continuous output.
+                .lcd_always_out_en()
+                .clear_bit()
         });
-        lcd_cam.lcd_misc().modify(|_, w| {
+        lcd_cam.lcd_misc().write(|w| {
             // Set the threshold for Async Tx FIFO full event. (5 bits)
-            w.lcd_afifo_threshold_num().variant(0);
-
-            // Configure the setup cycles in LCD non-RGB mode. Setup cycles
-            // expected = this value + 1. (6 bit)
-            w.lcd_vfk_cyclelen()
-                .variant(config.setup_cycles.saturating_sub(1) as _);
-
-            // Configure the hold time cycles in LCD non-RGB mode. Hold
-            // cycles expected = this value + 1.
-            w.lcd_vbk_cyclelen()
-                .variant(config.hold_cycles.saturating_sub(1) as _);
-
-            // 1: Send the next frame data when the current frame is sent out.
-            // 0: LCD stops when the current frame is sent out.
-            w.lcd_next_frame_en().clear_bit();
-
-            // Enable blank region when LCD sends data out.
-            w.lcd_bk_en().set_bit();
-
-            // 1: LCD_CD = !LCD_CAM_LCD_CD_IDLE_EDGE when LCD is in DOUT phase.
-            // 0: LCD_CD = LCD_CAM_LCD_CD_IDLE_EDGE.
-            w.lcd_cd_data_set()
-                .bit(config.cd_data_edge != config.cd_idle_edge);
-            // 1: LCD_CD = !LCD_CAM_LCD_CD_IDLE_EDGE when LCD is in DUMMY phase.
-            // 0: LCD_CD = LCD_CAM_LCD_CD_IDLE_EDGE.
-            w.lcd_cd_dummy_set()
-                .bit(config.cd_dummy_edge != config.cd_idle_edge);
-            // 1: LCD_CD = !LCD_CAM_LCD_CD_IDLE_EDGE when LCD is in CMD phase.
-            // 0: LCD_CD = LCD_CAM_LCD_CD_IDLE_EDGE.
-            w.lcd_cd_cmd_set()
-                .bit(config.cd_cmd_edge != config.cd_idle_edge);
-
-            // The default value of LCD_CD
-            w.lcd_cd_idle_edge().bit(config.cd_idle_edge);
-
-            // w.lcd_afifo_reset().set_bit();
-            w
+            w.lcd_afifo_threshold_num()
+                .variant(0)
+                // Configure the setup cycles in LCD non-RGB mode. Setup cycles
+                // expected = this value + 1. (6 bit)
+                .lcd_vfk_cyclelen()
+                .variant(config.setup_cycles.saturating_sub(1) as _)
+                // Configure the hold time cycles in LCD non-RGB mode. Hold
+                // cycles expected = this value + 1.
+                .lcd_vbk_cyclelen()
+                .variant(config.hold_cycles.saturating_sub(1) as _)
+                // 1: Send the next frame data when the current frame is sent out.
+                // 0: LCD stops when the current frame is sent out.
+                .lcd_next_frame_en()
+                .clear_bit()
+                // Enable blank region when LCD sends data out.
+                .lcd_bk_en()
+                .set_bit()
+                // 1: LCD_CD = !LCD_CAM_LCD_CD_IDLE_EDGE when LCD is in DOUT phase.
+                // 0: LCD_CD = LCD_CAM_LCD_CD_IDLE_EDGE.
+                .lcd_cd_data_set()
+                .bit(config.cd_data_edge != config.cd_idle_edge)
+                // 1: LCD_CD = !LCD_CAM_LCD_CD_IDLE_EDGE when LCD is in DUMMY phase.
+                // 0: LCD_CD = LCD_CAM_LCD_CD_IDLE_EDGE.
+                .lcd_cd_dummy_set()
+                .bit(config.cd_dummy_edge != config.cd_idle_edge)
+                // 1: LCD_CD = !LCD_CAM_LCD_CD_IDLE_EDGE when LCD is in CMD phase.
+                // 0: LCD_CD = LCD_CAM_LCD_CD_IDLE_EDGE.
+                .lcd_cd_cmd_set()
+                .bit(config.cd_cmd_edge != config.cd_idle_edge)
+                // The default value of LCD_CD
+                .lcd_cd_idle_edge()
+                .bit(config.cd_idle_edge)
         });
         lcd_cam
             .lcd_dly_mode()
             .write(|w| w.lcd_cd_mode().variant(config.cd_mode as u8));
         lcd_cam.lcd_data_dout_mode().write(|w| {
-            w.dout0_mode().variant(config.output_bit_mode as u8);
-            w.dout1_mode().variant(config.output_bit_mode as u8);
-            w.dout2_mode().variant(config.output_bit_mode as u8);
-            w.dout3_mode().variant(config.output_bit_mode as u8);
-            w.dout4_mode().variant(config.output_bit_mode as u8);
-            w.dout5_mode().variant(config.output_bit_mode as u8);
-            w.dout6_mode().variant(config.output_bit_mode as u8);
-            w.dout7_mode().variant(config.output_bit_mode as u8);
-            w.dout8_mode().variant(config.output_bit_mode as u8);
-            w.dout9_mode().variant(config.output_bit_mode as u8);
-            w.dout10_mode().variant(config.output_bit_mode as u8);
-            w.dout11_mode().variant(config.output_bit_mode as u8);
-            w.dout12_mode().variant(config.output_bit_mode as u8);
-            w.dout13_mode().variant(config.output_bit_mode as u8);
-            w.dout14_mode().variant(config.output_bit_mode as u8);
-            w.dout15_mode().variant(config.output_bit_mode as u8);
-            w
+            w.dout0_mode()
+                .variant(config.output_bit_mode as u8)
+                .dout1_mode()
+                .variant(config.output_bit_mode as u8)
+                .dout2_mode()
+                .variant(config.output_bit_mode as u8)
+                .dout3_mode()
+                .variant(config.output_bit_mode as u8)
+                .dout4_mode()
+                .variant(config.output_bit_mode as u8)
+                .dout5_mode()
+                .variant(config.output_bit_mode as u8)
+                .dout6_mode()
+                .variant(config.output_bit_mode as u8)
+                .dout7_mode()
+                .variant(config.output_bit_mode as u8)
+                .dout8_mode()
+                .variant(config.output_bit_mode as u8)
+                .dout9_mode()
+                .variant(config.output_bit_mode as u8)
+                .dout10_mode()
+                .variant(config.output_bit_mode as u8)
+                .dout11_mode()
+                .variant(config.output_bit_mode as u8)
+                .dout12_mode()
+                .variant(config.output_bit_mode as u8)
+                .dout13_mode()
+                .variant(config.output_bit_mode as u8)
+                .dout14_mode()
+                .variant(config.output_bit_mode as u8)
+                .dout15_mode()
+                .variant(config.output_bit_mode as u8)
         });
 
         lcd_cam.lcd_user().modify(|_, w| w.lcd_update().set_bit());
@@ -275,21 +289,17 @@ impl<'d, TX: Tx, P> I8080<'d, TX, P> {
                     .modify(|_, w| w.lcd_cmd().clear_bit());
             }
             Command::One(value) => {
-                self.lcd_cam.lcd_user().modify(|_, w| {
-                    w.lcd_cmd().set_bit();
-                    w.lcd_cmd_2_cycle_en().clear_bit();
-                    w
-                });
+                self.lcd_cam
+                    .lcd_user()
+                    .modify(|_, w| w.lcd_cmd().set_bit().lcd_cmd_2_cycle_en().clear_bit());
                 self.lcd_cam
                     .lcd_cmd_val()
                     .write(|w| w.lcd_cmd_value().variant(value.into() as _));
             }
             Command::Two(first, second) => {
-                self.lcd_cam.lcd_user().modify(|_, w| {
-                    w.lcd_cmd().set_bit();
-                    w.lcd_cmd_2_cycle_en().set_bit();
-                    w
-                });
+                self.lcd_cam
+                    .lcd_user()
+                    .modify(|_, w| w.lcd_cmd().set_bit().lcd_cmd_2_cycle_en().set_bit());
                 let cmd = first.into() as u32 | (second.into() as u32) << 16;
                 self.lcd_cam
                     .lcd_cmd_val()
@@ -301,13 +311,14 @@ impl<'d, TX: Tx, P> I8080<'d, TX, P> {
         self.lcd_cam.lcd_user().modify(|_, w| {
             if dummy > 0 {
                 // Enable DUMMY phase in LCD sequence when LCD starts.
-                w.lcd_dummy().set_bit();
-                // Configure DUMMY cycles. DUMMY cycles = this value + 1. (2 bits)
-                w.lcd_dummy_cyclelen().variant((dummy - 1) as _);
+                w.lcd_dummy()
+                    .set_bit()
+                    // Configure DUMMY cycles. DUMMY cycles = this value + 1. (2 bits)
+                    .lcd_dummy_cyclelen()
+                    .variant((dummy - 1) as _)
             } else {
-                w.lcd_dummy().clear_bit();
+                w.lcd_dummy().clear_bit()
             }
-            w
         });
     }
 
