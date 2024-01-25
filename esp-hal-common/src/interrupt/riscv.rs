@@ -436,8 +436,34 @@ pub unsafe extern "C" fn start_trap_rust_hal(trap_frame: *mut TrapFrame) {
 
         let code = mcause::read().code();
 
+        // with CLIC the MCAUSE register changed
+        // 31:      Interrupt flag (same as before)
+        //
+        // 30:      MINHV: Used to indicate whether the processor is fetching the vector
+        // interrupt entry address. This bit will be set high when the processor
+        // responds to the vector interrupt. Cleared to 0 after successfully obtaining
+        // the vector interrupt service routine entry address
+        //
+        // 29-28:   MPP: This bit is the mirror image of MSTATUS.MPP[1:0], that is,
+        // reading and writing MCAUSE.MPP will produce the same result as
+        // reading and writing MSTATUS.MPP.
+        //
+        // 27:      MPIE: This bit mirrors MSTATUS.MPIE
+        //
+        // 23-16:   MPIL: This bit saves the interrupt priority level before the
+        // processor enters the interrupt service routine, that is, the MINTSTATUS.MIL
+        // bit is copied to this bit. When executing the MRET instruction and returning
+        // from an interrupt, the processor copies the MPIL bit to the MIL bit in the
+        // MINTSTATUS register.
+        //
+        // 11-0:    Exception code: When the processor is configured in CLIC mode, this
+        // bit field is expanded to 12 bits, supporting up to 4096 interrupt ID number
+        // records.
+        //
+        // So we need to mask out bits other than > 12. We currently only support
+        // external interrupts so we subtract EXTERNAL_INTERRUPT_OFFSET
         #[cfg(clic)]
-        let code = (code & 0b1111_1111_1111) - 16;
+        let code = (code & 0b1111_1111_1111) - EXTERNAL_INTERRUPT_OFFSET as usize;
 
         match code {
             1 => interrupt1(trap_frame.as_mut().unwrap()),
