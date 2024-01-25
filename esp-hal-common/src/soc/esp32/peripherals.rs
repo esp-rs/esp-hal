@@ -52,7 +52,6 @@ crate::peripherals! {
     RTC_IO <= RTC_IO,
     RTC_I2C <= RTC_I2C,
     SDHOST <= SDHOST,
-    SENS <= SENS,
     SHA <= SHA,
     SLC <= SLC,
     SLCHOST <= SLCHOST,

@@ -24,7 +24,6 @@ crate::peripherals! {
     ADC2 <= virtual,
     AES <= AES,
     APB_CTRL <= APB_CTRL,
-    APB_SARADC <= APB_SARADC,
     ASSIST_DEBUG <= ASSIST_DEBUG,
     BT <= virtual,
     DMA <= DMA,

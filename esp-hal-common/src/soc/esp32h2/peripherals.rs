@@ -22,7 +22,6 @@ pub(crate) use self::peripherals::*;
 crate::peripherals! {
     ADC1 <= virtual,
     AES <= AES,
-    APB_SARADC <= APB_SARADC,
     ASSIST_DEBUG <= ASSIST_DEBUG,
     BT <= virtual,
     DMA <= DMA,
