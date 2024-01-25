@@ -1,6 +1,7 @@
 use core::marker::PhantomData;
 
 use crate::adc::{
+    private,
     AdcCalEfuse,
     AdcCalScheme,
     AdcCalSource,
@@ -26,6 +27,8 @@ pub struct AdcCalBasic<ADCI> {
 
     _phantom: PhantomData<ADCI>,
 }
+
+impl<ADCI> private::Sealed for AdcCalBasic<ADCI> {}
 
 impl<ADCI> AdcCalScheme<ADCI> for AdcCalBasic<ADCI>
 where
