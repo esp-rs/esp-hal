@@ -29,9 +29,8 @@ fn main() -> ! {
     let mut ulp_core = ulp_core::UlpCore::new(peripherals.ULP_RISCV_CORE);
 
     // load code to LP core
-    let lp_core_code = load_lp_code!(
-        "../esp-ulp-riscv-hal/target/riscv32imc-unknown-none-elf/release/examples/blinky"
-    );
+    let lp_core_code =
+        load_lp_code!("../esp-lp-hal/target/riscv32imc-unknown-none-elf/release/examples/blinky");
 
     // start LP core
     lp_core_code.run(&mut ulp_core, ulp_core::UlpCoreWakeupSource::HpCpu, pin);
