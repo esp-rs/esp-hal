@@ -7,10 +7,10 @@
 
 use esp32c2_hal::{
     adc,
-    adc::{AdcConfig, Attenuation, ADC, ADC1},
+    adc::{AdcConfig, Attenuation, ADC},
     clock::ClockControl,
     gpio::IO,
-    peripherals::Peripherals,
+    peripherals::{Peripherals, ADC1},
     prelude::*,
     Delay,
 };
@@ -26,12 +26,6 @@ fn main() -> ! {
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
     // Create ADC instances
-    let analog = peripherals.APB_SARADC.split();
-
-    let mut adc1_config = AdcConfig::new();
-
-    let atten = Attenuation::Attenuation11dB;
-
     // You can try any of the following calibration methods by uncommenting
     // them. Note that only AdcCalLine returns readings in mV; the other two
     // return raw readings in some unspecified scale.
@@ -40,9 +34,12 @@ fn main() -> ! {
     // type AdcCal = adc::AdcCalBasic<ADC1>;
     type AdcCal = adc::AdcCalLine<ADC1>;
 
-    let mut pin = adc1_config.enable_pin_with_cal::<_, AdcCal>(io.pins.gpio2.into_analog(), atten);
-
-    let mut adc1 = ADC::<ADC1>::adc(analog.adc1, adc1_config).unwrap();
+    let mut adc1_config = AdcConfig::new();
+    let mut pin = adc1_config.enable_pin_with_cal::<_, AdcCal>(
+        io.pins.gpio2.into_analog(),
+        Attenuation::Attenuation11dB,
+    );
+    let mut adc1 = ADC::<ADC1>::adc(peripherals.ADC1, adc1_config).unwrap();
 
     let mut delay = Delay::new(&clocks);
 

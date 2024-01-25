@@ -15,7 +15,7 @@ peripherals = [
     # "ds",
     # "ecc",
     # "ecdsa",
-    # "efuse",
+    "efuse",
     # "gpio_sd",
     "gpio",
     # "h264_dma",
@@ -92,5 +92,6 @@ peripherals = [
 
 symbols = [
     # Additional peripherals defined by us (the developers):
-    "plic",
+    "clic",
+    "very_large_intr_status",
 ]

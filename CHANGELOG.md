@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add initial support for the ESP32-P4 (#1101)
 - Implement `embedded_hal::pwm::SetDutyCycle` trait for `ledc::channel::Channel` (#1097) 
 - ESP32-P4: Add initial GPIO support (#1109)
+- ESP32-P4: Add initial support for interrupts (#1112)
+- ESP32-P4: Add efuse reading support (#1114)
 - ESP32-S3: Added LCD_CAM I8080 driver (#1086)
 
 ### Fixed
@@ -21,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 ### Removed
+
+### Breaking
+
+- `ADC` and `DAC` drivers now take virtual peripherals in their constructors, instead of splitting `APB_SARADC`/`SENS` (#1100)
+- The `DAC` driver's constructor is now `new` instead of `dac`, to be more consistent with other APIs (#1100)
 
 ## [0.15.0] - 2024-01-19
 
@@ -34,7 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `embassy-time-driver` to `esp-hal-common` due to updating `embassy-time` to `v0.3.0` (#1075)
 - ESP32-S3: Added support for 80Mhz PSRAM (#1069)
 - ESP32-C3/S3: Add workaround for USB pin exchange on usb-serial-jtag (#1104).
-
+- ESP32C6: Added LP_UART initialization (#1113)
 ### Changed
 
 - Set up interrupts for the DMA and async enabled peripherals only when `async` feature is provided (#1042)

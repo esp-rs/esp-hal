@@ -45,7 +45,7 @@ macro_rules! assert_unique_used_features {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq)]
 enum Arch {
     #[serde(rename = "riscv")]
     RiscV,
@@ -175,6 +175,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         && (cfg!(feature = "psram-2m") || cfg!(feature = "psram-4m") || cfg!(feature = "psram-8m"))
     {
         panic!("The target does not support PSRAM");
+    }
+
+    // Don't support "interrupt-preemption" and "direct-vectoring" on Xtensa and
+    // RISCV-clic
+    if (*&device.symbols.contains(&String::from("clic")) || device.arch == Arch::Xtensa)
+        && (cfg!(feature = "direct-vectoring") || cfg!(feature = "interrupt-preemption"))
+    {
+        panic!("The target does not support interrupt-preemption and direct-vectoring");
     }
 
     // Define all necessary configuration symbols for the configured device:

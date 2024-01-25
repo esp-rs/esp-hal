@@ -1790,3 +1790,197 @@ mod asynch {
         }
     }
 }
+
+#[cfg(lp_uart)]
+pub mod lp_uart {
+    use crate::{
+        gpio::{lp_gpio::LowPowerPin, Floating, Input, Output, PushPull},
+        peripherals::{LP_CLKRST, LP_UART},
+        uart::{config, config::Config},
+    };
+    /// UART driver
+    pub struct LpUart {
+        uart: LP_UART,
+    }
+
+    impl LpUart {
+        /// Initialize the UART driver using the default configuration
+        // TODO: CTS and RTS pins
+        pub fn new(
+            uart: LP_UART,
+            _tx: LowPowerPin<Output<PushPull>, 5>,
+            _rx: LowPowerPin<Input<Floating>, 4>,
+        ) -> Self {
+            let lp_io = unsafe { &*crate::peripherals::LP_IO::PTR };
+            let lp_aon = unsafe { &*crate::peripherals::LP_AON::PTR };
+
+            lp_aon
+                .gpio_mux()
+                .modify(|r, w| w.sel().variant(r.sel().bits() | 1 << 4));
+            lp_aon
+                .gpio_mux()
+                .modify(|r, w| w.sel().variant(r.sel().bits() | 1 << 5));
+
+            lp_io.gpio4().modify(|_, w| w.lp_gpio4_mcu_sel().variant(1));
+            lp_io.gpio5().modify(|_, w| w.lp_gpio5_mcu_sel().variant(1));
+
+            Self::new_with_config(uart, Config::default())
+        }
+
+        /// Initialize the UART driver using the provided configuration
+        pub fn new_with_config(uart: LP_UART, config: Config) -> Self {
+            let mut me = Self { uart };
+
+            // Set UART mode - do nothing for LP
+
+            // Disable UART parity
+            // 8-bit world
+            // 1-bit stop bit
+            me.uart.conf0().modify(|_, w| unsafe {
+                w.parity()
+                    .clear_bit()
+                    .parity_en()
+                    .clear_bit()
+                    .bit_num()
+                    .bits(0x3)
+                    .stop_bit_num()
+                    .bits(0x1)
+            });
+            // Set tx idle
+            me.uart
+                .idle_conf()
+                .modify(|_, w| unsafe { w.tx_idle_num().bits(0) });
+            // Disable hw-flow control
+            me.uart
+                .hwfc_conf()
+                .modify(|_, w| w.rx_flow_en().clear_bit());
+
+            // Get source clock frequency
+            // default == SOC_MOD_CLK_RTC_FAST == 2
+
+            // LP_CLKRST.lpperi.lp_uart_clk_sel = 0;
+            unsafe { &*LP_CLKRST::PTR }
+                .lpperi()
+                .modify(|_, w| w.lp_uart_clk_sel().clear_bit());
+
+            // Override protocol parameters from the configuration
+            // uart_hal_set_baudrate(&hal, cfg->uart_proto_cfg.baud_rate, sclk_freq);
+            me.change_baud(config.baudrate);
+            // uart_hal_set_parity(&hal, cfg->uart_proto_cfg.parity);
+            me.change_parity(config.parity);
+            // uart_hal_set_data_bit_num(&hal, cfg->uart_proto_cfg.data_bits);
+            me.change_data_bits(config.data_bits);
+            // uart_hal_set_stop_bits(&hal, cfg->uart_proto_cfg.stop_bits);
+            me.change_stop_bits(config.stop_bits);
+            // uart_hal_set_tx_idle_num(&hal, LP_UART_TX_IDLE_NUM_DEFAULT);
+            me.change_tx_idle(0); // LP_UART_TX_IDLE_NUM_DEFAULT == 0
+
+            // Reset Tx/Rx FIFOs
+            me.rxfifo_reset();
+            me.txfifo_reset();
+
+            me
+        }
+
+        fn rxfifo_reset(&mut self) {
+            self.uart.conf0().modify(|_, w| w.rxfifo_rst().set_bit());
+            self.update();
+
+            self.uart.conf0().modify(|_, w| w.rxfifo_rst().clear_bit());
+            self.update();
+        }
+
+        fn txfifo_reset(&mut self) {
+            self.uart.conf0().modify(|_, w| w.txfifo_rst().set_bit());
+            self.update();
+
+            self.uart.conf0().modify(|_, w| w.txfifo_rst().clear_bit());
+            self.update();
+        }
+
+        fn update(&mut self) {
+            self.uart
+                .reg_update()
+                .modify(|_, w| w.reg_update().set_bit());
+            while self.uart.reg_update().read().reg_update().bit_is_set() {
+                // wait
+            }
+        }
+
+        fn change_baud(&mut self, baudrate: u32) {
+            // we force the clock source to be XTAL and don't use the decimal part of
+            // the divider
+            // TODO: Currently it's not possible to use XtalD2Clk
+            let clk = 16_000_000;
+            let max_div = 0b1111_1111_1111 - 1;
+            let clk_div = ((clk) + (max_div * baudrate) - 1) / (max_div * baudrate);
+
+            self.uart.clk_conf().modify(|_, w| unsafe {
+                w.sclk_div_a()
+                    .bits(0)
+                    .sclk_div_b()
+                    .bits(0)
+                    .sclk_div_num()
+                    .bits(clk_div as u8 - 1)
+                    .sclk_sel()
+                    .bits(0x3) // TODO: this probably shouldn't be hard-coded
+                    .sclk_en()
+                    .set_bit()
+            });
+
+            let clk = clk / clk_div;
+            let divider = clk / baudrate;
+            let divider = divider as u16;
+
+            self.uart
+                .clkdiv()
+                .write(|w| unsafe { w.clkdiv().bits(divider).frag().bits(0) });
+
+            self.update();
+        }
+
+        fn change_parity(&mut self, parity: config::Parity) -> &mut Self {
+            if parity != config::Parity::ParityNone {
+                self.uart
+                    .conf0()
+                    .modify(|_, w| w.parity().bit((parity as u8 & 0x1) != 0));
+            }
+
+            self.uart.conf0().modify(|_, w| match parity {
+                config::Parity::ParityNone => w.parity_en().clear_bit(),
+                config::Parity::ParityEven => w.parity_en().set_bit().parity().clear_bit(),
+                config::Parity::ParityOdd => w.parity_en().set_bit().parity().set_bit(),
+            });
+
+            self
+        }
+
+        fn change_data_bits(&mut self, data_bits: config::DataBits) -> &mut Self {
+            self.uart
+                .conf0()
+                .modify(|_, w| unsafe { w.bit_num().bits(data_bits as u8) });
+
+            self.update();
+
+            self
+        }
+
+        fn change_stop_bits(&mut self, stop_bits: config::StopBits) -> &mut Self {
+            self.uart
+                .conf0()
+                .modify(|_, w| unsafe { w.stop_bit_num().bits(stop_bits as u8) });
+
+            self.update();
+            self
+        }
+
+        fn change_tx_idle(&mut self, idle_num: u16) -> &mut Self {
+            self.uart
+                .idle_conf()
+                .modify(|_, w| unsafe { w.tx_idle_num().bits(idle_num) });
+
+            self.update();
+            self
+        }
+    }
+}

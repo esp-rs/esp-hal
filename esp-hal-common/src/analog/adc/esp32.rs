@@ -1,14 +1,12 @@
 use core::marker::PhantomData;
 
-use embedded_hal::adc::{Channel, OneShot};
-
-pub use crate::analog::{ADC1, ADC2};
+use super::{AdcChannel, Attenuation};
 use crate::{
     peripheral::PeripheralRef,
-    peripherals::{RTC_IO, SENS},
+    peripherals::{ADC1, ADC2, RTC_IO, SENS},
 };
 
-/// The sampling/readout resolution of the ADC
+/// The sampling/readout resolution of the ADC.
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum Resolution {
     Resolution9Bit  = 0b00,
@@ -17,20 +15,16 @@ pub enum Resolution {
     Resolution12Bit = 0b11,
 }
 
-#[derive(PartialEq, Eq, Clone, Copy)]
-pub enum Attenuation {
-    Attenuation0dB   = 0b00,
-    Attenuation2p5dB = 0b01,
-    Attenuation6dB   = 0b10,
-    Attenuation11dB  = 0b11,
-}
-
+/// An I/O pin which can be read using the ADC.
 pub struct AdcPin<PIN, ADCI> {
     pub pin: PIN,
     _phantom: PhantomData<ADCI>,
 }
 
-impl<PIN: Channel<ADCI, ID = u8>, ADCI> Channel<ADCI> for AdcPin<PIN, ADCI> {
+impl<PIN, ADCI> embedded_hal::adc::Channel<ADCI> for AdcPin<PIN, ADCI>
+where
+    PIN: embedded_hal::adc::Channel<ADCI, ID = u8>,
+{
     type ID = u8;
 
     fn channel() -> Self::ID {
@@ -38,6 +32,7 @@ impl<PIN: Channel<ADCI, ID = u8>, ADCI> Channel<ADCI> for AdcPin<PIN, ADCI> {
     }
 }
 
+/// Configuration for the ADC.
 pub struct AdcConfig<ADCI> {
     pub resolution: Resolution,
     pub attenuations: [Option<Attenuation>; 10],
@@ -49,16 +44,14 @@ where
     ADCI: RegisterAccess,
 {
     pub fn new() -> AdcConfig<ADCI> {
-        crate::into_ref!();
         Self::default()
     }
 
-    pub fn enable_pin<PIN: Channel<ADCI, ID = u8>>(
-        &mut self,
-        pin: PIN,
-        attenuation: Attenuation,
-    ) -> AdcPin<PIN, ADCI> {
-        self.attenuations[PIN::channel() as usize] = Some(attenuation);
+    pub fn enable_pin<PIN>(&mut self, pin: PIN, attenuation: Attenuation) -> AdcPin<PIN, ADCI>
+    where
+        PIN: AdcChannel,
+    {
+        self.attenuations[PIN::CHANNEL as usize] = Some(attenuation);
 
         AdcPin {
             pin,
@@ -77,6 +70,7 @@ impl<ADCI> Default for AdcConfig<ADCI> {
     }
 }
 
+#[doc(hidden)]
 pub trait RegisterAccess {
     fn set_bit_width(resolution: u8);
 
@@ -101,25 +95,21 @@ pub trait RegisterAccess {
     fn read_data_sar() -> u16;
 }
 
-#[doc(hidden)]
 impl RegisterAccess for ADC1 {
     fn set_bit_width(resolution: u8) {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors
+        unsafe { &*SENS::ptr() }
             .sar_start_force()
             .modify(|_, w| unsafe { w.sar1_bit_width().bits(resolution) });
     }
 
     fn set_sample_bit(resolution: u8) {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors
+        unsafe { &*SENS::ptr() }
             .sar_read_ctrl()
             .modify(|_, w| unsafe { w.sar1_sample_bit().bits(resolution) });
     }
 
     fn set_attenuation(channel: usize, attenuation: u8) {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors.sar_atten1().modify(|r, w| {
+        unsafe { &*SENS::ptr() }.sar_atten1().modify(|r, w| {
             let new_value = (r.bits() & !(0b11 << (channel * 2)))
                 | (((attenuation as u8 & 0b11) as u32) << (channel * 2));
 
@@ -128,50 +118,43 @@ impl RegisterAccess for ADC1 {
     }
 
     fn clear_dig_force() {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors
+        unsafe { &*SENS::ptr() }
             .sar_read_ctrl()
             .modify(|_, w| w.sar1_dig_force().clear_bit());
     }
 
     fn set_start_force() {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors
+        unsafe { &*SENS::ptr() }
             .sar_meas_start1()
             .modify(|_, w| w.meas1_start_force().set_bit());
     }
 
     fn set_en_pad_force() {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors
+        unsafe { &*SENS::ptr() }
             .sar_meas_start1()
             .modify(|_, w| w.sar1_en_pad_force().set_bit());
     }
 
     fn set_en_pad(channel: u8) {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors
+        unsafe { &*SENS::ptr() }
             .sar_meas_start1()
             .modify(|_, w| unsafe { w.sar1_en_pad().bits(1 << channel) });
     }
 
     fn clear_start_sar() {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors
+        unsafe { &*SENS::ptr() }
             .sar_meas_start1()
             .modify(|_, w| w.meas1_start_sar().clear_bit());
     }
 
     fn set_start_sar() {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors
+        unsafe { &*SENS::ptr() }
             .sar_meas_start1()
             .modify(|_, w| w.meas1_start_sar().set_bit());
     }
 
     fn read_done_sar() -> bool {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors
+        unsafe { &*SENS::ptr() }
             .sar_meas_start1()
             .read()
             .meas1_done_sar()
@@ -179,29 +162,29 @@ impl RegisterAccess for ADC1 {
     }
 
     fn read_data_sar() -> u16 {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors.sar_meas_start1().read().meas1_data_sar().bits() as u16
+        unsafe { &*SENS::ptr() }
+            .sar_meas_start1()
+            .read()
+            .meas1_data_sar()
+            .bits() as u16
     }
 }
 
 impl RegisterAccess for ADC2 {
     fn set_bit_width(resolution: u8) {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors
+        unsafe { &*SENS::ptr() }
             .sar_start_force()
             .modify(|_, w| unsafe { w.sar2_bit_width().bits(resolution) });
     }
 
     fn set_sample_bit(resolution: u8) {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors
+        unsafe { &*SENS::ptr() }
             .sar_read_ctrl2()
             .modify(|_, w| unsafe { w.sar2_sample_bit().bits(resolution) });
     }
 
     fn set_attenuation(channel: usize, attenuation: u8) {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors.sar_atten2().modify(|r, w| {
+        unsafe { &*SENS::ptr() }.sar_atten2().modify(|r, w| {
             let new_value = (r.bits() & !(0b11 << (channel * 2)))
                 | (((attenuation as u8 & 0b11) as u32) << (channel * 2));
 
@@ -210,50 +193,43 @@ impl RegisterAccess for ADC2 {
     }
 
     fn clear_dig_force() {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors
+        unsafe { &*SENS::ptr() }
             .sar_read_ctrl2()
             .modify(|_, w| w.sar2_dig_force().clear_bit());
     }
 
     fn set_start_force() {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors
+        unsafe { &*SENS::ptr() }
             .sar_meas_start2()
             .modify(|_, w| w.meas2_start_force().set_bit());
     }
 
     fn set_en_pad_force() {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors
+        unsafe { &*SENS::ptr() }
             .sar_meas_start2()
             .modify(|_, w| w.sar2_en_pad_force().set_bit());
     }
 
     fn set_en_pad(channel: u8) {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors
+        unsafe { &*SENS::ptr() }
             .sar_meas_start2()
             .modify(|_, w| unsafe { w.sar2_en_pad().bits(1 << channel) });
     }
 
     fn clear_start_sar() {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors
+        unsafe { &*SENS::ptr() }
             .sar_meas_start2()
             .modify(|_, w| w.meas2_start_sar().clear_bit());
     }
 
     fn set_start_sar() {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors
+        unsafe { &*SENS::ptr() }
             .sar_meas_start2()
             .modify(|_, w| w.meas2_start_sar().set_bit());
     }
 
     fn read_done_sar() -> bool {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors
+        unsafe { &*SENS::ptr() }
             .sar_meas_start2()
             .read()
             .meas2_done_sar()
@@ -261,11 +237,15 @@ impl RegisterAccess for ADC2 {
     }
 
     fn read_data_sar() -> u16 {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors.sar_meas_start2().read().meas2_data_sar().bits() as u16
+        unsafe { &*SENS::ptr() }
+            .sar_meas_start2()
+            .read()
+            .meas2_data_sar()
+            .bits() as u16
     }
 }
 
+/// Analog-to-Digital Converter peripheral driver.
 pub struct ADC<'d, ADC> {
     _adc: PeripheralRef<'d, ADC>,
     attenuations: [Option<Attenuation>; 10],
@@ -355,25 +335,29 @@ where
 impl<'d, ADC1> ADC<'d, ADC1> {
     pub fn enable_hall_sensor() {
         // Connect hall sensor
-        let rtcio = unsafe { &*RTC_IO::ptr() };
-        rtcio.hall_sens().modify(|_, w| w.xpd_hall().set_bit());
+        unsafe { &*RTC_IO::ptr() }
+            .hall_sens()
+            .modify(|_, w| w.xpd_hall().set_bit());
     }
 
     pub fn disable_hall_sensor() {
         // Disconnect hall sensor
-        let rtcio = unsafe { &*RTC_IO::ptr() };
-        rtcio.hall_sens().modify(|_, w| w.xpd_hall().clear_bit());
+        unsafe { &*RTC_IO::ptr() }
+            .hall_sens()
+            .modify(|_, w| w.xpd_hall().clear_bit());
     }
 }
 
-impl<'d, ADCI, PIN> OneShot<ADCI, u16, AdcPin<PIN, ADCI>> for ADC<'d, ADCI>
+impl<'d, ADCI, PIN> embedded_hal::adc::OneShot<ADCI, u16, AdcPin<PIN, ADCI>> for ADC<'d, ADCI>
 where
-    PIN: Channel<ADCI, ID = u8>,
+    PIN: embedded_hal::adc::Channel<ADCI, ID = u8>,
     ADCI: RegisterAccess,
 {
     type Error = ();
 
     fn read(&mut self, _pin: &mut AdcPin<PIN, ADCI>) -> nb::Result<u16, Self::Error> {
+        use embedded_hal::adc::Channel;
+
         if self.attenuations[AdcPin::<PIN, ADCI>::channel() as usize] == None {
             panic!(
                 "Channel {} is not configured reading!",
@@ -418,8 +402,11 @@ macro_rules! impl_adc_interface {
     ($adc:ident [
         $( ($pin:ident, $channel:expr) ,)+
     ]) => {
-
         $(
+            impl $crate::analog::adc::AdcChannel for crate::gpio::$pin<crate::gpio::Analog> {
+                const CHANNEL: u8 = $channel;
+            }
+
             impl embedded_hal::adc::Channel<$adc> for crate::gpio::$pin<crate::gpio::Analog> {
                 type ID = u8;
 
@@ -430,54 +417,7 @@ macro_rules! impl_adc_interface {
 }
 
 mod implementation {
-    //! # Analog to digital (ADC) conversion support.
-    //!
-    //! ## Overview
-    //! The `ADC` module in the `analog` driver enables users to perform
-    //! analog-to-digital conversions, allowing them to measure real-world
-    //! analog signals with high accuracy.
-    //!
-    //! This module provides functions for reading analog values from the
-    //! analog to digital converter available on the ESP32: `ADC1` and `ADC2`.
-    //!
-    //! The following pins can be configured for analog readout:
-    //!
-    //! | Channel | ADC1                 | ADC2          |
-    //! |---------|----------------------|---------------|
-    //! | 0       | GPIO36 (SENSOR_VP)   | GPIO4         |
-    //! | 1       | GPIO37 (SENSOR_CAPP) | GPIO0         |
-    //! | 2       | GPIO38 (SENSOR_CAPN) | GPIO2         |
-    //! | 3       | GPIO39 (SENSOR_VN)   | GPIO15 (MTDO) |
-    //! | 4       | GPIO33 (32K_XP)      | GPIO13 (MTCK) |
-    //! | 5       | GPIO32 (32K_XN)      | GPIO12 (MTDI) |
-    //! | 6       | GPIO34 (VDET_1)      | GPIO14 (MTMS) |
-    //! | 7       | GPIO35 (VDET_2)      | GPIO27        |
-    //! | 8       |                      | GPIO25        |
-    //! | 9       |                      | GPIO26        |
-    //!
-    //! ## Example
-    //! #### ADC on Xtensa architecture
-    //! ```no_run
-    //! // Create ADC instances
-    //! let analog = peripherals.SENS.split();
-    //!
-    //! let mut adc1_config = AdcConfig::new();
-    //!
-    //! let mut pin3 =
-    //!     adc1_config.enable_pin(io.pins.gpio3.into_analog(), Attenuation::Attenuation11dB);
-    //!
-    //! let mut adc1 = ADC::<ADC1>::adc(analog.adc1, adc1_config).unwrap();
-    //!
-    //! let mut delay = Delay::new(&clocks);
-    //!
-    //! loop {
-    //!     let pin3_value: u16 = nb::block!(adc1.read(&mut pin3)).unwrap();
-    //!     println!("PIN3 ADC reading = {}", pin3_value);
-    //!     delay.delay_ms(1500u32);
-    //! }
-    //! ```
-
-    use crate::analog::{ADC1, ADC2};
+    use crate::peripherals::{ADC1, ADC2};
 
     impl_adc_interface! {
         ADC1 [
@@ -494,9 +434,9 @@ mod implementation {
 
     impl_adc_interface! {
         ADC2 [
-            (Gpio4, 0),
-            (Gpio0, 1),
-            (Gpio2, 2),
+            (Gpio4,  0),
+            (Gpio0,  1),
+            (Gpio2,  2),
             (Gpio15, 3), // Alt. name: MTDO
             (Gpio13, 4), // Alt. name: MTCK
             (Gpio12, 5), // Alt. name: MTDI

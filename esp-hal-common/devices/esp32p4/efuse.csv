@@ -105,14 +105,8 @@ HP_PWR_SRC_SEL,                                  EFUSE_BLK0, 178,   1, [] HP sys
 DCDC_VSET_EN,                                    EFUSE_BLK0, 179,   1, [] Select dcdc vset use efuse_dcdc_vset
 DIS_WDT,                                         EFUSE_BLK0, 180,   1, [] Set this bit to disable watch dog
 DIS_SWD,                                         EFUSE_BLK0, 181,   1, [] Set this bit to disable super-watchdog
-MAC,                                             EFUSE_BLK1,  40,   8, [MAC_FACTORY] MAC address
-# ,                                                EFUSE_BLK1,  32,   8, [MAC_FACTORY] MAC address
-# ,                                                EFUSE_BLK1,  24,   8, [MAC_FACTORY] MAC address
-# ,                                                EFUSE_BLK1,  16,   8, [MAC_FACTORY] MAC address
-# ,                                                EFUSE_BLK1,   8,   8, [MAC_FACTORY] MAC address
-# ,                                                EFUSE_BLK1,   0,   8, [MAC_FACTORY] MAC address
-MAC_EXT,                                         EFUSE_BLK1,  48,   8, [] Stores the extended bits of MAC address [0]
-# ,                                                EFUSE_BLK1,  56,   8, [] Stores the extended bits of MAC address [1]
+MAC,                                             EFUSE_BLK1,   0,  48, [MAC_FACTORY] MAC address
+MAC_EXT,                                         EFUSE_BLK1,  48,  16, [] Stores the extended bits of MAC address [0]
 BLOCK_SYS_DATA1,                                 EFUSE_BLK2,   0, 256, [SYS_DATA_PART1] System data part 1
 USER_DATA,                                       EFUSE_BLK3,   0, 256, [BLOCK_USR_DATA] User data
 USER_DATA.MAC_CUSTOM,                            EFUSE_BLK3, 200,  48, [MAC_CUSTOM CUSTOM_MAC] Custom MAC (TODO, not defined yet)

@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add the `esp32c6-lp-hal` package (#714)
 - Add GPIO (output) and delay functionality to `esp32c6-lp-hal` (#715)
 - Add GPIO input support and implement additional `embedded-hal` output traits for the C6's LP core [#720]
+- Add LP_UART basic driver (#1113)
 
 ### Changed
 

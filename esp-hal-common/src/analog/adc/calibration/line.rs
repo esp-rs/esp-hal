@@ -1,6 +1,7 @@
 use core::marker::PhantomData;
 
 use crate::adc::{
+    private,
     AdcCalBasic,
     AdcCalEfuse,
     AdcCalScheme,
@@ -47,6 +48,8 @@ pub struct AdcCalLine<ADCI> {
 
     _phantom: PhantomData<ADCI>,
 }
+
+impl<ADCI> private::Sealed for AdcCalLine<ADCI> {}
 
 impl<ADCI> AdcCalScheme<ADCI> for AdcCalLine<ADCI>
 where
@@ -96,7 +99,7 @@ where
 }
 
 #[cfg(any(esp32c2, esp32c3, esp32c6, esp32s3))]
-impl AdcHasLineCal for crate::adc::ADC1 {}
+impl AdcHasLineCal for crate::peripherals::ADC1 {}
 
 #[cfg(any(esp32c3, esp32s3))]
-impl AdcHasLineCal for crate::adc::ADC2 {}
+impl AdcHasLineCal for crate::peripherals::ADC2 {}

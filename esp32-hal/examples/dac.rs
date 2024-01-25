@@ -5,7 +5,14 @@
 #![no_std]
 #![no_main]
 
-use esp32_hal::{clock::ClockControl, dac, gpio::IO, peripherals::Peripherals, prelude::*, Delay};
+use esp32_hal::{
+    clock::ClockControl,
+    dac::{DAC1, DAC2},
+    gpio::IO,
+    peripherals::Peripherals,
+    prelude::*,
+    Delay,
+};
 use esp_backtrace as _;
 
 #[entry]
@@ -19,9 +26,8 @@ fn main() -> ! {
     let pin26 = io.pins.gpio26.into_analog();
 
     // Create DAC instances
-    let analog = peripherals.SENS.split();
-    let mut dac1 = dac::DAC1::dac(analog.dac1, pin25).unwrap();
-    let mut dac2 = dac::DAC2::dac(analog.dac2, pin26).unwrap();
+    let mut dac1 = DAC1::new(peripherals.DAC1, pin25);
+    let mut dac2 = DAC2::new(peripherals.DAC2, pin26);
 
     let mut delay = Delay::new(&clocks);
 
