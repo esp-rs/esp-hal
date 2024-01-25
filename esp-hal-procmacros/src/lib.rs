@@ -31,7 +31,7 @@
 //!      - `rtc_slow` - Use RTC slow RAM (not all targets support slow RTC RAM)
 //!      - `uninitialized` - Skip initialization of the memory
 //!      - `zeroed` - Initialize the memory to zero
-//!  
+//!
 //! ## Examples
 //!
 //! #### `interrupt` macro
@@ -615,6 +615,7 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
         use #hal_crate::lp_core::LpCoreWakeupSource;
         use #hal_crate::gpio::lp_gpio::LowPowerPin;
         use #hal_crate::gpio::*;
+        use #hal_crate::uart::lp_uart::LpUart;
     };
     #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
     let imports = quote! {
@@ -705,9 +706,12 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
     let f = parse_macro_input!(input as ItemFn);
 
     let mut argument_types = Vec::new();
+    let mut create_peripheral = Vec::new();
 
     let mut used_pins: Vec<u8> = Vec::new();
-    for arg in &f.sig.inputs {
+
+    for (num, arg) in f.sig.inputs.iter().enumerate() {
+        let param_name = format_ident!("param{}", num);
         match arg {
             FnArg::Receiver(_) => {
                 return parse::Error::new(arg.span(), "invalid argument")
@@ -715,19 +719,30 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
                     .into();
             }
             FnArg::Typed(t) => {
-                if get_simplename(&t.ty) != "GpioPin" {
-                    return parse::Error::new(arg.span(), "invalid argument to main")
-                        .to_compile_error()
-                        .into();
+                match get_simplename(&t.ty).as_str() {
+                    "GpioPin" => {
+                        let pin = extract_pin(&t.ty);
+                        if used_pins.contains(&pin) {
+                            return parse::Error::new(arg.span(), "duplicate pin")
+                                .to_compile_error()
+                                .into();
+                        }
+                        used_pins.push(pin);
+                        create_peripheral.push(quote!(
+                            let mut #param_name = unsafe { the_hal::gpio::conjour().unwrap() };
+                        ));
+                    }
+                    "LpUart" => {
+                        create_peripheral.push(quote!(
+                            let mut #param_name = unsafe { the_hal::uart::conjour().unwrap() };
+                        ));
+                    }
+                    _ => {
+                        return parse::Error::new(arg.span(), "invalid argument to main")
+                            .to_compile_error()
+                            .into();
+                    }
                 }
-                let pin = extract_pin(&t.ty);
-                if used_pins.contains(&pin) {
-                    return parse::Error::new(arg.span(), "duplicate pin")
-                        .to_compile_error()
-                        .into();
-                }
-                used_pins.push(pin);
-
                 argument_types.push(t);
             }
         }
@@ -752,7 +767,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
 
             use #hal_crate as the_hal;
             #(
-                let mut #param_names = unsafe { the_hal::gpio::conjour().unwrap() };
+                #create_peripheral;
             )*
 
             main(#(#param_names),*);
