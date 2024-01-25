@@ -1,8 +1,7 @@
 //! This shows a very basic example of running code on the LP core.
 //!
-//! Code on LP core increments a counter and continuously toggles GPIO1. The
-//! current value is printed by the HP core.
-//!
+//! Code on LP core uses LP_UART initialized on HP core. For more information
+//! check `lp_core_uart` example in the `esp32c6-lp-hal.
 //! Make sure to first compile the `esp32c6-lp-hal/examples/uart.rs` example
 
 #![no_std]
@@ -12,7 +11,6 @@ use esp32c6_hal::{
     clock::ClockControl,
     gpio::lp_gpio::IntoLowPowerPin,
     lp_core,
-    lp_core::{LpCore, LpCoreClockSource},
     peripherals::Peripherals,
     prelude::*,
     uart::{
