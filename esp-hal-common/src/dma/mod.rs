@@ -330,6 +330,9 @@ pub trait ParlIoPeripheral: PeripheralMarker {}
 /// Marks channels as useable for AES
 pub trait AesPeripheral: PeripheralMarker {}
 
+/// Marks channels as usable for LCD_CAM
+pub trait LcdCamPeripheral: PeripheralMarker {}
+
 /// DMA Rx
 pub trait Rx: RxPrivate {}
 
