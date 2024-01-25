@@ -92,15 +92,6 @@ where
                 .bit(false)
                 .lcd_2byte_en()
                 .bit(is_2byte_mode)
-                // Be able to send data out in LCD sequence when LCD starts.
-                .lcd_dout()
-                .set_bit()
-                // Data length in fixed mode. (13 bits)
-                .lcd_dout_cyclelen()
-                .variant(0)
-                // Disable continuous output.
-                .lcd_always_out_en()
-                .clear_bit()
         });
         lcd_cam.lcd_misc().write(|w| {
             // Set the threshold for Async Tx FIFO full event. (5 bits)
@@ -341,15 +332,20 @@ impl<'d, TX: Tx, P> I8080<'d, TX, P> {
                 .lcd_user()
                 .modify(|_, w| w.lcd_dout().clear_bit());
         } else {
-            // TODO: Return an error instead.
-            assert!(len <= 8192);
-
             // Set transfer length.
             self.lcd_cam.lcd_user().modify(|_, w| {
-                w.lcd_dout()
-                    .set_bit()
-                    .lcd_dout_cyclelen()
-                    .variant((len - 1) as _)
+                if len <= 8192 {
+                    // Data length in fixed mode. (13 bits)
+                    w.lcd_always_out_en()
+                        .clear_bit()
+                        .lcd_dout_cyclelen()
+                        .variant((len - 1) as _)
+                } else {
+                    // Enable continuous output.
+                    w.lcd_always_out_en().set_bit()
+                }
+                .lcd_dout()
+                .set_bit()
             });
 
             self.tx_channel.prepare_transfer_without_start(

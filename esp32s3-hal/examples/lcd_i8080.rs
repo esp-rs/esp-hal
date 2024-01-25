@@ -39,7 +39,7 @@ fn main() -> ! {
     let dma = Gdma::new(peripherals.DMA);
     let channel = dma.channel0;
 
-    let (tx_buffer, mut tx_descriptors, _, mut rx_descriptors) = dma_buffers!(16384, 0);
+    let (tx_buffer, mut tx_descriptors, _, mut rx_descriptors) = dma_buffers!(32678, 0);
 
     let channel = channel.configure(
         false,
