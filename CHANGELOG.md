@@ -33,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `embassy-time-driver` to `esp-hal-common` due to updating `embassy-time` to `v0.3.0` (#1075)
 - ESP32-S3: Added support for 80Mhz PSRAM (#1069)
 - ESP32-C3/S3: Add workaround for USB pin exchange on usb-serial-jtag (#1104).
-
+- ESP32C6: Added LP_UART initialization (#1113)
 ### Changed
 
 - Set up interrupts for the DMA and async enabled peripherals only when `async` feature is provided (#1042)
