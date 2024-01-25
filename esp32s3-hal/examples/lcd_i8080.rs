@@ -172,10 +172,10 @@ fn main() -> ! {
         i8080.send(0x3A, 0, &[0x55]).unwrap(); // RGB565
     }
 
+    let width = 320u16;
+    let height = 480u16;
     {
         println!("Set addresses");
-        let width = 320u16;
-        let height = 480u16;
 
         let width_b = width.to_be_bytes();
         let height_b = height.to_be_bytes();
@@ -185,25 +185,46 @@ fn main() -> ! {
         i8080
             .send(0x2B, 0, &[0, 0, height_b[0], height_b[1]])
             .unwrap(); // PASET
-        println!("Drawing");
+    }
 
-        // let color = 0b11111_000000_00000u16; // BLUE
-        let color = 0b00000_000000_11111u16; // RED
+    println!("Drawing");
+
+    const RED: u16 = 0b00000_000000_11111;
+    const BLUE: u16 = 0b11111_000000_00000;
+
+    backlight.set_high().unwrap();
+
+    let total_pixels = width as usize * height as usize;
+    let total_bytes = total_pixels * 2;
+
+    let mut buffer = tx_buffer;
+
+    for color in [RED, BLUE].iter().cycle() {
         let color = color.to_be_bytes();
-
-        let mut buffer = tx_buffer;
         for chunk in buffer.chunks_mut(2) {
             chunk.copy_from_slice(&color);
         }
 
+        let mut bytes_left_to_write = total_bytes;
+
         let transfer = i8080.send_dma(0x2C, 0, buffer).unwrap();
         (buffer, i8080) = transfer.wait().unwrap();
 
-        let transfer = i8080.send_dma(0x3C, 0, buffer).unwrap();
-        transfer.wait().unwrap();
-    }
+        bytes_left_to_write -= buffer.len();
 
-    backlight.set_high().unwrap();
+        while bytes_left_to_write >= buffer.len() {
+            let transfer = i8080.send_dma(0x3C, 0, buffer).unwrap();
+            (buffer, i8080) = transfer.wait().unwrap();
+
+            bytes_left_to_write -= buffer.len();
+        }
+        if bytes_left_to_write > 0 {
+            let transfer = i8080.send_dma(0x3C, 0, buffer).unwrap();
+            (buffer, i8080) = transfer.wait().unwrap();
+        }
+
+        delay.delay_ms(1_000u32);
+    }
 
     loop {
         delay.delay_ms(1_000u32);
