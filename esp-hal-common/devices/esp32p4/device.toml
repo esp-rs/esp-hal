@@ -15,7 +15,7 @@ peripherals = [
     # "ds",
     # "ecc",
     # "ecdsa",
-    # "efuse",
+    "efuse",
     # "gpio_sd",
     "gpio",
     # "h264_dma",
