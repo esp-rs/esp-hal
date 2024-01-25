@@ -20,9 +20,10 @@ pub(crate) use self::peripherals::*;
 // peripheral (no `PSRAM`, `RADIO`, etc. peripheral in the PACs), so we're
 // creating "virtual peripherals" for them.
 crate::peripherals! {
+    ADC1 <= virtual,
     AES <= AES,
-    APB_SARADC <= APB_SARADC,
     ASSIST_DEBUG <= ASSIST_DEBUG,
+    BT <= virtual,
     DMA <= DMA,
     DS <= DS,
     ECC <= ECC,
@@ -35,6 +36,7 @@ crate::peripherals! {
     I2C0 <= I2C0,
     I2C1 <= I2C1,
     I2S0 <= I2S0,
+    IEEE802154 <= virtual,
     INTERRUPT_CORE0 <= INTERRUPT_CORE0,
     INTPRI <= INTPRI,
     IO_MUX <= IO_MUX,
@@ -63,7 +65,6 @@ crate::peripherals! {
     SPI0 <= SPI0,
     SPI1 <= SPI1,
     SPI2 <= SPI2,
-    // SYSTEM is derived from PCR:
     SYSTEM <= PCR,
     SYSTIMER <= SYSTIMER,
     TEE <= TEE,
@@ -75,8 +76,4 @@ crate::peripherals! {
     UART1 <= UART1,
     UHCI0 <= UHCI0,
     USB_DEVICE <= USB_DEVICE,
-
-    // Virtual peripherals:
-    BT <= virtual,
-    IEEE802154 <= virtual,
 }

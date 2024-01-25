@@ -1,6 +1,7 @@
 use core::marker::PhantomData;
 
 use crate::adc::{
+    private,
     AdcCalEfuse,
     AdcCalLine,
     AdcCalScheme,
@@ -59,6 +60,8 @@ pub struct AdcCalCurve<ADCI> {
 
     _phantom: PhantomData<ADCI>,
 }
+
+impl<ADCI> private::Sealed for AdcCalCurve<ADCI> {}
 
 impl<ADCI> AdcCalScheme<ADCI> for AdcCalCurve<ADCI>
 where
@@ -126,17 +129,17 @@ macro_rules! coeff_tables {
 mod impls {
     use super::*;
 
-    impl AdcHasCurveCal for crate::adc::ADC1 {
+    impl AdcHasCurveCal for crate::peripherals::ADC1 {
         const CURVES_COEFFS: CurvesCoeffs = CURVES_COEFFS1;
     }
 
     #[cfg(esp32c3)]
-    impl AdcHasCurveCal for crate::adc::ADC2 {
+    impl AdcHasCurveCal for crate::peripherals::ADC2 {
         const CURVES_COEFFS: CurvesCoeffs = CURVES_COEFFS1;
     }
 
     #[cfg(esp32s3)]
-    impl AdcHasCurveCal for crate::adc::ADC2 {
+    impl AdcHasCurveCal for crate::peripherals::ADC2 {
         const CURVES_COEFFS: CurvesCoeffs = CURVES_COEFFS2;
     }
 

@@ -1,159 +1,127 @@
-//! # Analog peripherals - Digital to Analog Converter
+//! # Digital to Analog Converter (DAC)
 //!
-//! ## Overview
-//! The `DAC` module is part of the `Analog` driver designed for ESP
-//! microcontrollers, providing functionalities for `digital-to-analog`
-//! conversion.
+//! The `dac` module enables users to generate analog output signals with
+//! precise control over voltage levels using one of the onboard
+//! digital-to-analog converters (DAC).
 //!
-//! This module simplifies digital-to-analog conversion on ESP microcontrollers,
-//! enabling precise control over analog output signals. Developers can choose
-//! the `DAC` channel they want to use based on the GPIO pin assignments for
-//! each channel. By providing a unified interface for DAC control, the module
-//! makes it easier for users to generate accurate analog voltages in their
-//! applications, such as audio generation, sensor calibration, and analog
-//! signal synthesis.
-use crate::peripherals::{RTC_IO, SENS};
-pub trait DAC {
-    fn write(&mut self, value: u8);
+//! Two 8-bit DAC channels are available. Each DAC channel can convert the
+//! digital value 0-255 to the analog voltage 0-3.3v. Developers can choose the
+//! DAC channel they want to use based on the GPIO pin assignments for each
+//! channel.
+//!
+//! ## Example
+//!
+//! ```no_run
+//! let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+//! let gpio25 = io.pins.gpio25.into_analog();
+//! let gpio26 = io.pins.gpio26.into_analog();
+//!
+//! let mut dac1 = DAC1::new(peripherals.DAC1, gpio25);
+//! let mut dac2 = DAC2::new(peripherals.DAC2, gpio26);
+//!
+//! let mut delay = Delay::new(&clocks);
+//!
+//! let mut voltage_dac1 = 200u8;
+//! let mut voltage_dac2 = 255u8;
+//!
+//! // Change voltage on the pins using write function:
+//! loop {
+//!     voltage_dac1 = voltage_dac1.wrapping_add(1);
+//!     dac1.write(voltage_dac1);
+//!
+//!     voltage_dac2 = voltage_dac2.wrapping_sub(1);
+//!     dac2.write(voltage_dac2);
+//!
+//!     delay.delay_ms(50u32);
+//! }
+//! ```
+
+use crate::{
+    gpio,
+    peripheral::{Peripheral, PeripheralRef},
+    peripherals,
+};
+
+cfg_if::cfg_if! {
+    if #[cfg(esp32)] {
+        type Dac1Gpio = gpio::Gpio25<gpio::Analog>;
+        type Dac2Gpio = gpio::Gpio26<gpio::Analog>;
+    } else if #[cfg(esp32s2)] {
+        type Dac1Gpio = gpio::Gpio17<gpio::Analog>;
+        type Dac2Gpio = gpio::Gpio18<gpio::Analog>;
+    }
 }
 
-trait DAC1Impl {
-    fn set_power(self) -> Self
-    where
-        Self: Sized,
-    {
+/// Digital-to-Analog Converter (DAC) Channel 1
+pub struct DAC1<'d> {
+    _inner: PeripheralRef<'d, peripherals::DAC1>,
+}
+
+impl<'d> DAC1<'d> {
+    /// Constructs a new DAC instance.
+    pub fn new(dac: impl Peripheral<P = peripherals::DAC1> + 'd, _pin: Dac1Gpio) -> Self {
+        crate::into_ref!(dac);
+
         #[cfg(esp32s2)]
-        {
-            let sensors = unsafe { &*SENS::ptr() };
-            sensors
-                .sar_dac_ctrl1()
-                .modify(|_, w| w.dac_clkgate_en().set_bit());
-        }
+        unsafe { &*peripherals::SENS::PTR }
+            .sar_dac_ctrl1()
+            .modify(|_, w| w.dac_clkgate_en().set_bit());
 
-        let rtcio = unsafe { &*RTC_IO::ptr() };
+        unsafe { &*peripherals::RTC_IO::PTR }
+            .pad_dac1()
+            .modify(|_, w| w.pdac1_dac_xpd_force().set_bit().pdac1_xpd_dac().set_bit());
 
-        rtcio.pad_dac1().modify(|_, w| {
-            w.pdac1_dac_xpd_force().set_bit();
-            w.pdac1_xpd_dac().set_bit()
-        });
-
-        self
+        Self { _inner: dac }
     }
 
-    fn write(&mut self, value: u8) {
-        let rtcio = unsafe { &*RTC_IO::ptr() };
-
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors
+    /// Writes the given value.
+    ///
+    /// For each DAC channel, the output analog voltage can be calculated as
+    /// follows: DACn_OUT = VDD3P3_RTC * PDACn_DAC/256
+    pub fn write(&mut self, value: u8) {
+        unsafe { &*crate::peripherals::SENS::PTR }
             .sar_dac_ctrl2()
             .modify(|_, w| w.dac_cw_en1().clear_bit());
 
-        rtcio
+        unsafe { &*crate::peripherals::RTC_IO::PTR }
             .pad_dac1()
             .modify(|_, w| unsafe { w.pdac1_dac().bits(value) });
     }
 }
 
-trait DAC2Impl {
-    fn set_power(self) -> Self
-    where
-        Self: Sized,
-    {
+/// Digital-to-Analog Converter (DAC) Channel 2
+pub struct DAC2<'d> {
+    _inner: PeripheralRef<'d, peripherals::DAC2>,
+}
+
+impl<'d> DAC2<'d> {
+    /// Constructs a new DAC instance.
+    pub fn new(dac: impl Peripheral<P = peripherals::DAC2> + 'd, _pin: Dac2Gpio) -> Self {
+        crate::into_ref!(dac);
+
         #[cfg(esp32s2)]
-        {
-            let sensors = unsafe { &*SENS::ptr() };
-            sensors
-                .sar_dac_ctrl1()
-                .modify(|_, w| w.dac_clkgate_en().set_bit());
-        }
+        unsafe { &*peripherals::SENS::PTR }
+            .sar_dac_ctrl1()
+            .modify(|_, w| w.dac_clkgate_en().set_bit());
 
-        let rtcio = unsafe { &*RTC_IO::ptr() };
+        unsafe { &*peripherals::RTC_IO::PTR }
+            .pad_dac2()
+            .modify(|_, w| w.pdac2_dac_xpd_force().set_bit().pdac2_xpd_dac().set_bit());
 
-        rtcio.pad_dac2().modify(|_, w| {
-            w.pdac2_dac_xpd_force().set_bit();
-            w.pdac2_xpd_dac().set_bit()
-        });
-
-        self
+        Self { _inner: dac }
     }
 
-    fn write(&mut self, value: u8) {
-        let rtcio = unsafe { &*RTC_IO::ptr() };
-
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors
+    /// Writes the given value.
+    ///
+    /// For each DAC channel, the output analog voltage can be calculated as
+    /// follows: DACn_OUT = VDD3P3_RTC * PDACn_DAC/256
+    pub fn write(&mut self, value: u8) {
+        unsafe { &*crate::peripherals::SENS::PTR }
             .sar_dac_ctrl2()
             .modify(|_, w| w.dac_cw_en2().clear_bit());
 
-        rtcio
+        unsafe { &*crate::peripherals::RTC_IO::PTR }
             .pad_dac2()
             .modify(|_, w| unsafe { w.pdac2_dac().bits(value) });
     }
-}
-
-macro_rules! impl_dac {
-    ($($number:literal => $gpio:ident),+) => {
-        $(
-            paste::paste! {
-                use $crate::analog::dac::[<DAC $number Impl>];
-
-                #[doc = "DAC channel " $number]
-                pub struct [<DAC $number>]<'d, DAC> {
-                    _dac: $crate::peripheral::PeripheralRef<'d, DAC>,
-                    _private: ::core::marker::PhantomData<()>,
-                }
-
-                impl<'d, DAC> [<DAC $number Impl>] for [<DAC $number>]<'d, DAC> {}
-
-                impl<'d, DAC> [<DAC $number>]<'d, DAC> {
-                    /// Constructs a new DAC instance
-                    pub fn dac(
-                        dac: impl $crate::peripheral::Peripheral<P = DAC> +'d,
-                        _pin: $crate::gpio::$gpio<$crate::gpio::Analog>,
-                    ) -> Result<Self, ()> {
-                        let dac = Self {
-                            _dac: dac.into_ref(),
-                            _private: ::core::marker::PhantomData,
-                        }
-                        .set_power();
-                        Ok(dac)
-                    }
-
-                    /// Writes the given value
-                    ///
-                    /// For each DAC channel, the output analog voltage can be calculated as follows:
-                    /// DACn_OUT = VDD3P3_RTC * PDACn_DAC/256
-                    pub fn write(&mut self, value: u8) {
-                        [<DAC $number Impl>]::write(self, value)
-                    }
-                }
-            }
-        )+
-    };
-}
-
-pub use implementation::*;
-
-#[cfg(esp32)]
-mod implementation {
-    //! Digital to analog (DAC) conversion.
-    //!
-    //! This module provides functions for controlling two digital to
-    //! analog converters, available on ESP32: `DAC1` and `DAC2`.
-    //!
-    //! The DAC1 is available on the GPIO pin 25, and DAC2 on pin 26.
-
-    impl_dac!(1 => Gpio25, 2 => Gpio26);
-}
-
-#[cfg(esp32s2)]
-mod implementation {
-    //! Digital to analog (DAC) conversion.
-    //!
-    //! This module provides functions for controlling two digital to
-    //! analog converters, available on ESP32-S2: `DAC1` and `DAC2`.
-    //!
-    //! The DAC1 is available on the GPIO pin 17, and DAC2 on pin 18.
-
-    impl_dac!(1 => Gpio17, 2 => Gpio18);
 }
