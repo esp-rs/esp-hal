@@ -92,5 +92,6 @@ peripherals = [
 
 symbols = [
     # Additional peripherals defined by us (the developers):
-    "plic",
+    "clic",
+    "very_large_intr_status",
 ]
