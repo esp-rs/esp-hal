@@ -14,47 +14,21 @@ use esp32c6_hal::{
     lp_core,
     peripherals::Peripherals,
     prelude::*,
-    uart::{
-        config::{Config, DataBits, Parity, StopBits},
-        lp_uart::LpUart,
-        TxRxPins,
-    },
-    Uart,
     IO,
 };
 use esp_backtrace as _;
-use esp_println::println;
+use esp_println::{print, println};
 
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    // Set up (HP) UART1:
-
-    let config = Config {
-        baudrate: 115_200,
-        data_bits: DataBits::DataBits8,
-        parity: Parity::ParityNone,
-        stop_bits: StopBits::STOP1,
-    };
-
-    let pins = TxRxPins::new_tx_rx(
-        io.pins.gpio6.into_push_pull_output(),
-        io.pins.gpio7.into_floating_input(),
-    );
-
-    let mut uart1 = Uart::new_with_config(peripherals.UART1, config, Some(pins), &clocks);
-
-    // Set up (LP) UART:
-
-    let lp_tx = io.pins.gpio5.into_low_power().into_push_pull_output();
-    let lp_rx = io.pins.gpio4.into_low_power().into_floating_input();
-
-    let lp_uart = LpUart::new(peripherals.LP_UART, lp_tx, lp_rx);
+    // configure GPIO 1 as LP output pin
+    let lp_pin = io.pins.gpio1.into_low_power().into_push_pull_output();
 
     let mut lp_core = esp32c6_hal::lp_core::LpCore::new(peripherals.LP_CORE);
     lp_core.stop();
@@ -62,19 +36,17 @@ fn main() -> ! {
 
     // load code to LP core
     let lp_core_code = load_lp_code!(
-        "../esp32c6-lp-hal/target/riscv32imac-unknown-none-elf/release/examples/uart"
+        "../esp32c6-lp-hal/target/riscv32imac-unknown-none-elf/release/examples/blinky"
     );
 
     // start LP core
-    lp_core_code.run(&mut lp_core, lp_core::LpCoreWakeupSource::HpCpu, lp_uart);
+    lp_core_code.run(&mut lp_core, lp_core::LpCoreWakeupSource::HpCpu, lp_pin);
     println!("lpcore run");
 
+    let data = (0x5000_2000) as *mut u32;
     loop {
-        let read = nb::block!(uart1.read());
-
-        match read {
-            Ok(read) => println!("Read 0x{:02x}", read),
-            Err(err) => println!("Error {:?}", err),
-        }
+        print!("Current {:x}           \u{000d}", unsafe {
+            data.read_volatile()
+        });
     }
 }
