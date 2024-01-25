@@ -705,9 +705,14 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
     let f = parse_macro_input!(input as ItemFn);
 
     let mut argument_types = Vec::new();
+    let mut create_peripheral = Vec::new();
 
     let mut used_pins: Vec<u8> = Vec::new();
+    let mut num: u32 = 0;
+
     for arg in &f.sig.inputs {
+        let param_name = format_ident!("param{}", num);
+        num += 1;
         match arg {
             FnArg::Receiver(_) => {
                 return parse::Error::new(arg.span(), "invalid argument")
@@ -715,18 +720,30 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
                     .into();
             }
             FnArg::Typed(t) => {
-                if get_simplename(&t.ty) != "GpioPin" && get_simplename(&t.ty) != "LpUart" {
-                    return parse::Error::new(arg.span(), "invalid argument to main")
-                        .to_compile_error()
-                        .into();
+                if get_simplename(&t.ty) == "GpioPin" {
+                    let pin = extract_pin(&t.ty);
+                    if used_pins.contains(&pin) {
+                        return parse::Error::new(arg.span(), "duplicate pin")
+                            .to_compile_error()
+                            .into();
+                    }
+                    used_pins.push(pin);
+                    create_peripheral.push(quote!(
+                        let mut #param_name = unsafe { the_hal::gpio::conjour().unwrap() };
+                    ));
+                } else if get_simplename(&t.ty) == "LpUart" {
+                    create_peripheral.push(quote!(
+                        let mut #param_name = unsafe { the_hal::uart::conjour().unwrap() };
+                    ));
+                } else {
+                    return parse::Error::new(
+                        arg.span(),
+                        "invalid argument to
+                main",
+                    )
+                    .to_compile_error()
+                    .into();
                 }
-                let pin = extract_pin(&t.ty);
-                if used_pins.contains(&pin) {
-                    return parse::Error::new(arg.span(), "duplicate pin")
-                        .to_compile_error()
-                        .into();
-                }
-                used_pins.push(pin);
 
                 argument_types.push(t);
             }
@@ -752,8 +769,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
 
             use #hal_crate as the_hal;
             #(
-                // let mut #param_names = unsafe { the_hal::gpio::conjour().unwrap() };
-                let mut #param_names = unsafe { the_hal::uart::uart().unwrap() };
+                #create_peripheral;
             )*
 
             main(#(#param_names),*);

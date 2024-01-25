@@ -5,7 +5,7 @@ use esp32c6_lp::LP_UART;
 const UART_FIFO_SIZE: u16 = 128;
 
 #[doc(hidden)]
-pub unsafe fn uart() -> Option<LpUart> {
+pub unsafe fn conjour() -> Option<LpUart> {
     Some(LpUart {
         uart: LP_UART::steal(),
     })
