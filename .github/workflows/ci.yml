@@ -65,6 +65,34 @@ jobs:
       - name: rustdoc
         run: cd esp-hal-smartled/ && cargo doc -Zbuild-std=core --target=riscv32imc-unknown-none-elf --features=esp32c3
 
+  esp-lp-hal:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          toolchain: nightly
+          components: rust-src
+      - uses: Swatinem/rust-cache@v2
+
+      # Perform a full build initially to verify that the examples not only
+      # build, but also link successfully.
+      - name: build esp-lp-hal (esp32c6)
+        run: cd esp-lp-hal/ && cargo build --release --target=riscv32imac-unknown-none-elf --features=esp32c6 --examples
+      - name: build esp-lp-hal (esp32s2)
+        run: cd esp-lp-hal/ && cargo build --release --target=riscv32imc-unknown-none-elf --features=esp32s2 --examples
+      - name: build esp-lp-hal (esp32s3)
+        run: cd esp-lp-hal/ && cargo build --release --target=riscv32imc-unknown-none-elf --features=esp32s3 --examples
+      # Ensure documentation can be built
+      - name: rustdoc
+        run: |
+          cd esp-lp-hal/
+          cargo doc --features=esp32c6
+          cargo doc --features=esp32s2
+          cargo doc --features=esp32s3
+
   esp-riscv-rt:
     runs-on: ubuntu-latest
 
@@ -88,28 +116,6 @@ jobs:
       # Ensure documentation can be built
       - name: rustdoc
         run: cd esp-riscv-rt/ && cargo doc
-
-  esp-ulp-riscv-hal:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          target: riscv32imc-unknown-none-elf
-          toolchain: nightly
-          components: rust-src
-      - uses: Swatinem/rust-cache@v2
-
-      # Perform a full build initially to verify that the examples not only
-      # build, but also link successfully.
-      - name: build esp-ulp-riscv-hal (esp32s2)
-        run: cd esp-ulp-riscv-hal/ && cargo build --release --features=esp32s2 --examples
-      - name: build esp-ulp-riscv-hal (esp32s3)
-        run: cd esp-ulp-riscv-hal/ && cargo build --release --features=esp32s3 --examples
-      # Ensure documentation can be built
-      - name: rustdoc
-        run: cd esp-ulp-riscv-hal/ && cargo doc --features=esp32s3
 
   esp32-hal:
     runs-on: ubuntu-latest
@@ -290,10 +296,12 @@ jobs:
           components: rust-src
       - uses: Swatinem/rust-cache@v2
 
-      # build the lp-hal examples first to make sure the examples which expect
-      # the ELF files to be present will compile
-      - name: build esp32c6-lp-hal prerequisites
-        run: cd esp32c6-lp-hal/ && cargo +nightly build --release --examples
+      # Build the `esp-lp-hal` examples first to make sure the examples which
+      # expect these ELF files to be present will compile.
+      - name: build prerequisites
+        run: |
+          cd esp-lp-hal/
+          cargo build --release --features=esp32c6 --target=riscv32imac-unknown-none-elf --examples
 
       # Perform a full build initially to verify that the examples not only
       # build, but also link successfully.
@@ -345,26 +353,6 @@ jobs:
       # Ensure documentation can be built
       - name: rustdoc
         run: cd esp32c6-hal/ && cargo doc --features=eh1
-
-  esp32c6-lp-hal:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          target: riscv32imac-unknown-none-elf
-          toolchain: nightly
-          components: rust-src
-      - uses: Swatinem/rust-cache@v2
-
-      # Perform a full build initially to verify that the examples not only
-      # build, but also link successfully.
-      - name: build esp32c6-lp-hal (no features)
-        run: cd esp32c6-lp-hal/ && cargo +nightly build --release --examples
-      # Ensure documentation can be built
-      - name: rustdoc
-        run: cd esp32c6-lp-hal/ && cargo doc
 
   esp32h2-hal:
     runs-on: ubuntu-latest
@@ -478,10 +466,12 @@ jobs:
           components: rust-src
       - uses: Swatinem/rust-cache@v2
 
-      # build the esp-ulp-riscv-hal examples first to make sure the examples which expect
-      # the ELF files to be present will compile
-      - name: build esp-ulp-riscv-hal prerequisites
-        run: cd esp-ulp-riscv-hal/ && cargo +nightly build --release --features=esp32s2 --examples
+      # Build the `esp-lp-hal` examples first to make sure the examples which
+      # expect these ELF files to be present will compile.
+      - name: build prerequisites
+        run: |
+          cd esp-lp-hal/
+          cargo +nightly build --release --features=esp32s2 --target=riscv32imc-unknown-none-elf --examples
 
       # Perform a full build initially to verify that the examples not only
       # build, but also link successfully.
@@ -494,9 +484,6 @@ jobs:
           cd esp32s2-hal/
           cargo +esp build --examples --features=eh1,ufmt,log
           cargo +esp build --examples --features=eh1,ufmt,defmt
-      # FIXME: `time-systick` feature disabled for now, see 'esp32s2-hal/Cargo.toml'.
-      # - name: check esp32s2-hal (async, systick)
-      #   run: cd esp32s2-hal/ && cargo check --example=embassy_hello_world --features=embassy,embassy-time-systick,executor
       - name: check esp32s2-hal (embassy, timg0)
         run: |
           cd esp32s2-hal/
@@ -556,10 +543,12 @@ jobs:
           components: rust-src
       - uses: Swatinem/rust-cache@v2
 
-      # build the esp-ulp-riscv-hal examples first to make sure the examples which expect
-      # the ELF files to be present will compile
-      - name: build esp-ulp-riscv-hal prerequisites
-        run: cd esp-ulp-riscv-hal/ && cargo +nightly build --release --features=esp32s3 --examples
+      # Build the `esp-lp-hal` examples first to make sure the examples which
+      # expect these ELF files to be present will compile.
+      - name: build prerequisites
+        run: |
+          cd esp-lp-hal/
+          cargo build --release --features=esp32s3 --target=riscv32imc-unknown-none-elf --examples
 
       # Perform a full build initially to verify that the examples not only
       # build, but also link successfully.
@@ -641,12 +630,13 @@ jobs:
           components: rust-src
       - uses: Swatinem/rust-cache@v2
 
-      # Build the esp32c6-lp-hal examples first. This is done to ensure the
-      # examples which expect the ELF files to be present will compile:
-      - name: build esp32c6-lp-hal prerequisites
-        run: cd esp32c6-lp-hal && cargo build --release --examples
-
       # Verify the MSRV for all RISC-V chips.
+      - name: msrv (esp-lp-hal)
+        run: |
+          cd esp-lp-hal/
+          cargo build --features=esp32c6 --target=riscv32imac-unknown-none-elf
+          cargo build --features=esp32s2 --target=riscv32imc-unknown-none-elf
+          cargo build --features=esp32s3 --target=riscv32imc-unknown-none-elf
       - name: msrv (esp32c2-hal)
         run: |
           cd esp32c2-hal/
@@ -662,10 +652,6 @@ jobs:
           cd esp32c6-hal/
           cargo build --features=eh1,ufmt,log
           cargo build --features=defmt
-      - name: msrv (esp32c6-lp-hal)
-        run: |
-          cd esp32c6-lp-hal/
-          cargo build
       - name: msrv (esp32h2-hal)
         run: |
           cd esp32h2-hal/
@@ -694,11 +680,6 @@ jobs:
           ldproxy: false
           version: ${{ env.MSRV }}
       - uses: Swatinem/rust-cache@v2
-
-      # Build the `esp-ulp-riscv-hal` examples first. This is done to ensure
-      # the examples which expect the ELF files to be present will compile:
-      - name: build esp-ulp-riscv-hal prerequisites
-        run: cd esp-ulp-riscv-hal && cargo build --release --features=esp32s3 --examples
 
       # Verify the MSRV for all Xtensa chips:
       - name: msrv (esp32-hal)
@@ -733,20 +714,20 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       # Run 'cargo clippy' on all packages targeting RISC-V:
+      - name: clippy (esp-lp-hal, esp32c6)
+        run: cd esp-lp-hal && cargo clippy --features=esp32c6 -- -D warnings
+      - name: clippy (esp-lp-hal, esp32s2)
+        run: cd esp-lp-hal && cargo clippy --features=esp32s2 -- -D warnings
+      - name: clippy (esp-lp-hal, esp32s3)
+        run: cd esp-lp-hal && cargo clippy --features=esp32s3 -- -D warnings
       - name: clippy (esp-riscv-rt)
         run: cd esp-riscv-rt && cargo clippy --target=riscv32imc-unknown-none-elf -- -D warnings
-      - name: clippy (esp-ulp-riscv-hal, esp32s2)
-        run: cd esp-ulp-riscv-hal && cargo clippy --features=esp32s2 -- -D warnings
-      - name: clippy (esp-ulp-riscv-hal, esp32s3)
-        run: cd esp-ulp-riscv-hal && cargo clippy --features=esp32s3 -- -D warnings
       - name: clippy (esp32c2-hal)
         run: cd esp32c2-hal && cargo clippy -- -D warnings
       - name: clippy (esp32c3-hal)
         run: cd esp32c3-hal && cargo clippy -- -D warnings
       - name: clippy (esp32c6-hal)
         run: cd esp32c6-hal && cargo clippy -- -D warnings
-      - name: clippy (esp32c6-lp-hal)
-        run: cd esp32c6-lp-hal && cargo clippy -- -D warnings
       - name: clippy (esp32h2-hal)
         run: cd esp32h2-hal && cargo clippy -- -D warnings
       - name: clippy (esp32p4-hal)
@@ -790,10 +771,10 @@ jobs:
         run: cargo fmt --all --manifest-path=esp-hal-procmacros/Cargo.toml -- --check
       - name: rustfmt (esp-hal-smartled)
         run: cargo fmt --all --manifest-path=esp-hal-smartled/Cargo.toml -- --check
+      - name: rustfmt (esp-lp-hal)
+        run: cargo fmt --all --manifest-path=esp-lp-hal/Cargo.toml -- --check
       - name: rustfmt (esp-riscv-rt)
         run: cargo fmt --all --manifest-path=esp-riscv-rt/Cargo.toml -- --check
-      - name: rustfmt (esp-ulp-riscv-hal)
-        run: cargo fmt --all --manifest-path=esp-ulp-riscv-hal/Cargo.toml -- --check
       - name: rustfmt (esp32-hal)
         run: cargo fmt --all --manifest-path=esp32-hal/Cargo.toml -- --check
       - name: rustfmt (esp32c2-hal)
@@ -802,8 +783,6 @@ jobs:
         run: cargo fmt --all --manifest-path=esp32c3-hal/Cargo.toml -- --check
       - name: rustfmt (esp32c6-hal)
         run: cargo fmt --all --manifest-path=esp32c6-hal/Cargo.toml -- --check
-      - name: rustfmt (esp32c6-lp-hal)
-        run: cargo fmt --all --manifest-path=esp32c6-lp-hal/Cargo.toml -- --check
       - name: rustfmt (esp32h2-hal)
         run: cargo fmt --all --manifest-path=esp32h2-hal/Cargo.toml -- --check
       - name: rustfmt (esp32p4-hal)
