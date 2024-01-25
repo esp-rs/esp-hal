@@ -51,6 +51,14 @@ debug = [
     "esp32s3-ulp?/impl-register-debug",
 ]
 
+[[example]]
+name              = "blinky"
+required-features = ["embedded-hal-02"]
+
+[[example]]
+name              = "uart"
+required-features = ["embedded-hal-02", "esp32c6"]
+
 [patch.crates-io]
 esp32s2-ulp = { git = "https://github.com/esp-rs/esp-pacs", rev = "bcab40a" }
 esp32s3-ulp = { git = "https://github.com/esp-rs/esp-pacs", rev = "bcab40a" }

@@ -8,15 +8,14 @@
 
 use core::fmt::Write;
 
+use embedded_hal_02::blocking::delay::DelayMs;
 use esp_lp_hal::{delay::Delay, prelude::*, uart::LpUart};
 use panic_halt as _;
 
 #[entry]
 fn main(mut uart: LpUart) -> ! {
-    let mut delay = Delay::new();
-
     loop {
         writeln!(uart, "Hello World from LP Core").unwrap();
-        delay.delay_ms(1000);
+        Delay.delay_ms(1000);
     }
 }

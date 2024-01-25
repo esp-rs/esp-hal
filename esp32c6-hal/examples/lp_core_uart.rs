@@ -1,8 +1,9 @@
 //! This shows a very basic example of running code on the LP core.
 //!
 //! Code on LP core uses LP_UART initialized on HP core. For more information
-//! check `lp_core_uart` example in the `esp32c6-lp-hal.
-//! Make sure to first compile the `esp32c6-lp-hal/examples/uart.rs` example
+//! check `lp_core_uart` example in the `esp-lp-hal.
+//!
+//! Make sure to first compile the `esp-lp-hal/examples/uart.rs` example
 
 #![no_std]
 #![no_main]
@@ -60,9 +61,8 @@ fn main() -> ! {
     println!("lp core stopped");
 
     // load code to LP core
-    let lp_core_code = load_lp_code!(
-        "../esp32c6-lp-hal/target/riscv32imac-unknown-none-elf/release/examples/uart"
-    );
+    let lp_core_code =
+        load_lp_code!("../esp-lp-hal/target/riscv32imac-unknown-none-elf/release/examples/uart");
 
     // start LP core
     lp_core_code.run(&mut lp_core, lp_core::LpCoreWakeupSource::HpCpu, lp_uart);
