@@ -81,13 +81,12 @@ For information about the HAL and how to use it in your own projects, please ref
 
 ### Low-Power Cores
 
-|        Crate        |       Documentation       |             Target             |
-| :-----------------: | :-----------------------: | :----------------------------: |
-| [esp-ulp-riscv-hal] | N/A (_Not yet published_) | `riscv32imc-unknown-none-elf`  |
-|  [esp32c6-lp-hal]   | N/A (_Not yet published_) | `riscv32imac-unknown-none-elf` |
+|    Crate     |       Documentation       |                            Targets                            |
+| :----------: | :-----------------------: | :-----------------------------------------------------------: |
+| [esp-lp-hal] | N/A (_Not yet published_) | `riscv32imc-unknown-none-elf`, `riscv32imac-unknown-none-elf` |
 
-[esp-ulp-riscv-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp-ulp-riscv-hal
-[esp32c6-lp-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32c6-lp-hal
+
+[esp-lp-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp-lp-hal
 
 ## Ancillary Crates
 
