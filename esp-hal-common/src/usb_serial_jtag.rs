@@ -57,7 +57,7 @@ impl<'d> UsbSerialJtagTx<'d> {
 
     /// Write data to the serial output in chunks of up to 64 bytes
     pub fn write_bytes(&mut self, data: &[u8]) -> Result<(), Error> {
-        let reg_block = unsafe { &*USB_DEVICE::PTR };
+        let reg_block = USB_DEVICE::register_block();
 
         for chunk in data.chunks(64) {
             for byte in chunk {
@@ -78,7 +78,7 @@ impl<'d> UsbSerialJtagTx<'d> {
     /// Write data to the serial output in a non-blocking manner
     /// Requires manual flushing (automatically flushed every 64 bytes)
     pub fn write_byte_nb(&mut self, word: u8) -> nb::Result<(), Error> {
-        let reg_block = unsafe { &*USB_DEVICE::PTR };
+        let reg_block = USB_DEVICE::register_block();
 
         if reg_block
             .ep1_conf()
@@ -99,7 +99,7 @@ impl<'d> UsbSerialJtagTx<'d> {
 
     /// Flush the output FIFO and block until it has been sent
     pub fn flush_tx(&mut self) -> Result<(), Error> {
-        let reg_block = unsafe { &*USB_DEVICE::PTR };
+        let reg_block = USB_DEVICE::register_block();
         reg_block.ep1_conf().write(|w| w.wr_done().set_bit());
 
         while reg_block.ep1_conf().read().bits() & 0b011 == 0b000 {
@@ -111,7 +111,7 @@ impl<'d> UsbSerialJtagTx<'d> {
 
     /// Flush the output FIFO but don't block if it isn't ready immediately
     pub fn flush_tx_nb(&mut self) -> nb::Result<(), Error> {
-        let reg_block = unsafe { &*USB_DEVICE::PTR };
+        let reg_block = USB_DEVICE::register_block();
         reg_block.ep1_conf().write(|w| w.wr_done().set_bit());
 
         if reg_block.ep1_conf().read().bits() & 0b011 == 0b000 {
@@ -136,7 +136,7 @@ impl<'d> UsbSerialJtagRx<'d> {
     }
 
     pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
-        let reg_block = unsafe { &*USB_DEVICE::PTR };
+        let reg_block = USB_DEVICE::register_block();
 
         // Check if there are any bytes to read
         if reg_block
@@ -153,23 +153,38 @@ impl<'d> UsbSerialJtagRx<'d> {
         }
     }
 
+    /// Read all available bytes from the RX FIFO into the provided buffer and
+    /// returns the number of read bytes. Never blocks. May stop early if the
+    /// number of bytes in the FIFO is larger than `buf`.
+    pub fn drain_rx_fifo(&mut self, buf: &mut [u8]) -> usize {
+        let mut count = 0;
+        while let Ok(value) = self.read_byte() {
+            buf[count] = value;
+            count += 1;
+            if count == buf.len() {
+                break;
+            }
+        }
+        count
+    }
+
     /// Listen for RX-PACKET-RECV interrupts
     pub fn listen_rx_packet_recv_interrupt(&mut self) {
-        unsafe { &*USB_DEVICE::PTR }
+        USB_DEVICE::register_block()
             .int_ena()
             .modify(|_, w| w.serial_out_recv_pkt_int_ena().set_bit());
     }
 
     /// Stop listening for RX-PACKET-RECV interrupts
     pub fn unlisten_rx_packet_recv_interrupt(&mut self) {
-        unsafe { &*USB_DEVICE::PTR }
+        USB_DEVICE::register_block()
             .int_ena()
             .modify(|_, w| w.serial_out_recv_pkt_int_ena().clear_bit());
     }
 
     /// Checks if RX-PACKET-RECV interrupt is set
     pub fn rx_packet_recv_interrupt_set(&mut self) -> bool {
-        unsafe { &*USB_DEVICE::PTR }
+        USB_DEVICE::register_block()
             .int_st()
             .read()
             .serial_out_recv_pkt_int_st()
@@ -178,7 +193,7 @@ impl<'d> UsbSerialJtagRx<'d> {
 
     /// Reset RX-PACKET-RECV interrupt
     pub fn reset_rx_packet_recv_interrupt(&mut self) {
-        unsafe { &*USB_DEVICE::PTR }
+        USB_DEVICE::register_block()
             .int_clr()
             .write(|w| w.serial_out_recv_pkt_int_clr().set_bit())
     }
@@ -191,8 +206,8 @@ impl<'d> UsbSerialJtag<'d> {
 
         PeripheralClockControl::enable(crate::system::Peripheral::UsbDevice);
 
-        usb_device.disable_tx_interrupts();
-        usb_device.disable_rx_interrupts();
+        USB_DEVICE::disable_tx_interrupts();
+        USB_DEVICE::disable_rx_interrupts();
 
         #[cfg(any(esp32c3, esp32s3))]
         {
@@ -201,7 +216,7 @@ impl<'d> UsbSerialJtag<'d> {
             // On the esp32c3, and esp32s3 the USB_EXCHG_PINS efuse is bugged and
             // doesn't swap the pullups too, this works around that.
             if Efuse::read_field_le(USB_EXCHG_PINS) {
-                dev.usb_serial.conf0().modify(|_, w| {
+                USB_DEVICE::register_block().conf0().modify(|_, w| {
                     w.pad_pull_override()
                         .set_bit()
                         .dm_pullup()
@@ -273,24 +288,24 @@ impl<'d> UsbSerialJtag<'d> {
 
 /// USB Serial JTAG peripheral instance
 pub trait Instance {
-    fn register_block(&self) -> &RegisterBlock;
+    fn register_block() -> &'static RegisterBlock;
 
-    fn disable_tx_interrupts(&mut self) {
-        self.register_block()
+    fn disable_tx_interrupts() {
+        Self::register_block()
             .int_ena()
             .write(|w| w.serial_in_empty_int_ena().clear_bit());
 
-        self.register_block()
+        Self::register_block()
             .int_clr()
             .write(|w| w.serial_in_empty_int_clr().set_bit())
     }
 
-    fn disable_rx_interrupts(&mut self) {
-        self.register_block()
+    fn disable_rx_interrupts() {
+        Self::register_block()
             .int_ena()
             .write(|w| w.serial_out_recv_pkt_int_ena().clear_bit());
 
-        self.register_block()
+        Self::register_block()
             .int_clr()
             .write(|w| w.serial_out_recv_pkt_int_clr().set_bit())
     }
@@ -298,8 +313,8 @@ pub trait Instance {
 
 impl Instance for USB_DEVICE {
     #[inline(always)]
-    fn register_block(&self) -> &RegisterBlock {
-        self
+    fn register_block() -> &'static RegisterBlock {
+        unsafe { &*USB_DEVICE::ptr() }
     }
 }
 
@@ -467,28 +482,12 @@ impl embedded_io::Read for UsbSerialJtag<'_> {
 #[cfg(feature = "embedded-io")]
 impl embedded_io::Read for UsbSerialJtagRx<'_> {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        let mut count = 0;
         loop {
-            if count >= buf.len() {
-                break;
-            }
-
-            match self.read_byte() {
-                Ok(byte) => {
-                    buf[count] = byte;
-                    count += 1;
-                }
-                Err(nb::Error::WouldBlock) => {
-                    // Block until we have read at least one byte
-                    if count > 0 {
-                        break;
-                    }
-                }
-                Err(nb::Error::Other(e)) => return Err(e),
+            let count = self.drain_rx_fifo(buf);
+            if count > 0 {
+                return Ok(count);
             }
         }
-
-        Ok(count)
     }
 }
 
@@ -523,7 +522,7 @@ mod asynch {
     use embassy_sync::waitqueue::AtomicWaker;
     use procmacros::interrupt;
 
-    use super::{Error, UsbSerialJtag, UsbSerialJtagRx, UsbSerialJtagTx};
+    use super::{Error, Instance, UsbSerialJtag, UsbSerialJtagRx, UsbSerialJtagTx};
     use crate::peripherals::USB_DEVICE;
 
     // Static instance of the waker for each component of the peripheral:
@@ -538,7 +537,7 @@ mod asynch {
         pub fn new() -> Self {
             // Set the interrupt enable bit for the USB_SERIAL_JTAG_SERIAL_IN_EMPTY_INT
             // interrupt
-            unsafe { &*USB_DEVICE::PTR }
+            USB_DEVICE::register_block()
                 .int_ena()
                 .modify(|_, w| w.serial_in_empty_int_ena().set_bit());
 
@@ -548,7 +547,7 @@ mod asynch {
         }
 
         fn event_bit_is_clear(&self) -> bool {
-            unsafe { &*USB_DEVICE::PTR }
+            USB_DEVICE::register_block()
                 .int_ena()
                 .read()
                 .serial_in_empty_int_ena()
@@ -580,7 +579,7 @@ mod asynch {
         pub fn new() -> Self {
             // Set the interrupt enable bit for the USB_SERIAL_JTAG_SERIAL_OUT_RECV_PKT
             // interrupt
-            unsafe { &*USB_DEVICE::PTR }
+            USB_DEVICE::register_block()
                 .int_ena()
                 .modify(|_, w| w.serial_out_recv_pkt_int_ena().set_bit());
 
@@ -590,7 +589,7 @@ mod asynch {
         }
 
         fn event_bit_is_clear(&self) -> bool {
-            unsafe { &*USB_DEVICE::PTR }
+            USB_DEVICE::register_block()
                 .int_ena()
                 .read()
                 .serial_out_recv_pkt_int_ena()
@@ -616,7 +615,7 @@ mod asynch {
 
     impl UsbSerialJtagTx<'_> {
         async fn write_bytes_async(&mut self, words: &[u8]) -> Result<(), Error> {
-            let reg_block = unsafe { &*USB_DEVICE::PTR };
+            let reg_block = USB_DEVICE::register_block();
 
             for chunk in words.chunks(64) {
                 for byte in chunk {
@@ -633,7 +632,7 @@ mod asynch {
         }
 
         async fn flush_tx_async(&mut self) -> Result<(), Error> {
-            if unsafe { &*USB_DEVICE::PTR }
+            if USB_DEVICE::register_block()
                 .jfifo_st()
                 .read()
                 .out_fifo_empty()
@@ -648,42 +647,16 @@ mod asynch {
 
     impl UsbSerialJtagRx<'_> {
         async fn read_bytes_async(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
-            fn read_nb<'d>(
-                usb: &'d mut UsbSerialJtagRx,
-                buf: &mut [u8],
-            ) -> Result<Result<usize, Error>, UsbSerialJtagReadFuture<'d>> {
-                let mut count = 0;
-                loop {
-                    if count >= buf.len() {
-                        return Ok(Ok(count));
-                    }
-
-                    match usb.read_byte() {
-                        Ok(byte) => {
-                            buf[count] = byte;
-                            count += 1;
-                        }
-                        Err(nb::Error::WouldBlock) => {
-                            if count > 0 {
-                                return Ok(Ok(count));
-                            } else {
-                                return Err(UsbSerialJtagReadFuture::new());
-                            }
-                        }
-                        Err(nb::Error::Other(e)) => return Ok(Err(e)),
-                    }
-                }
+            if buf.len() == 0 {
+                return Ok(0);
             }
 
             loop {
-                match critical_section::with(|_cs| read_nb(self, buf)) {
-                    Ok(result) => {
-                        return result;
-                    }
-                    Err(fut) => {
-                        fut.await;
-                    }
+                let read_bytes = self.drain_rx_fifo(buf);
+                if read_bytes > 0 {
+                    return Ok(read_bytes);
                 }
+                UsbSerialJtagReadFuture::new().await;
             }
         }
     }
@@ -724,20 +697,17 @@ mod asynch {
 
     #[interrupt]
     fn USB_DEVICE() {
-        let usb = unsafe { &*USB_DEVICE::PTR };
+        let usb = USB_DEVICE::register_block();
+        let interrupts = usb.int_st().read();
 
-        let in_empty = usb.int_st().read().serial_in_empty_int_st().bit_is_set();
-        let out_recv = usb
-            .int_st()
-            .read()
-            .serial_out_recv_pkt_int_st()
-            .bit_is_set();
+        let tx = interrupts.serial_in_empty_int_st().bit_is_set();
+        let rx = interrupts.serial_out_recv_pkt_int_st().bit_is_set();
 
-        if in_empty {
+        if tx {
             usb.int_ena()
                 .write(|w| w.serial_in_empty_int_ena().clear_bit());
         }
-        if out_recv {
+        if rx {
             usb.int_ena()
                 .write(|w| w.serial_out_recv_pkt_int_ena().clear_bit());
         }
@@ -749,10 +719,10 @@ mod asynch {
                 .set_bit()
         });
 
-        if in_empty {
+        if rx {
             WAKER_RX.wake();
         }
-        if out_recv {
+        if tx {
             WAKER_TX.wake();
         }
     }
