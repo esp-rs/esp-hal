@@ -28,7 +28,9 @@ fn main() -> ! {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     // Set GPIO5 as an output
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let mut io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    io.set_interrupt_handler(handler);
+
     let mut led = io.pins.gpio5.into_push_pull_output();
 
     // Set GPIO9 as an input
@@ -46,8 +48,8 @@ fn main() -> ! {
     }
 }
 
-#[interrupt]
-fn GPIO() {
+#[handler]
+fn handler() {
     critical_section::with(|cs| {
         esp_println::println!("GPIO interrupt");
         BUTTON

@@ -437,6 +437,66 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
     .into()
 }
 
+#[cfg(feature = "interrupt")]
+#[proc_macro_attribute]
+pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
+    use proc_macro::Span;
+    use proc_macro_error::abort;
+    use syn::{parse::Error as ParseError, spanned::Spanned, ItemFn, ReturnType, Type};
+
+    use self::interrupt::{check_attr_whitelist, WhiteListCaller};
+
+    let mut f: ItemFn = syn::parse(input).expect("`#[handler]` must be applied to a function");
+
+    let attr_args = match NestedMeta::parse_meta_list(args.into()) {
+        Ok(v) => v,
+        Err(e) => {
+            return TokenStream::from(darling::Error::from(e).write_errors());
+        }
+    };
+
+    if attr_args.len() > 0 {
+        abort!(Span::call_site(), "This attribute accepts no arguments")
+    }
+
+    // XXX should we blacklist other attributes?
+
+    if let Err(error) = check_attr_whitelist(&f.attrs, WhiteListCaller::Interrupt) {
+        return error;
+    }
+
+    let valid_signature = f.sig.constness.is_none()
+        && f.sig.abi.is_none()
+        && f.sig.generics.params.is_empty()
+        && f.sig.generics.where_clause.is_none()
+        && f.sig.variadic.is_none()
+        && match f.sig.output {
+            ReturnType::Default => true,
+            ReturnType::Type(_, ref ty) => match **ty {
+                Type::Tuple(ref tuple) => tuple.elems.is_empty(),
+                Type::Never(..) => true,
+                _ => false,
+            },
+        }
+        && f.sig.inputs.len() <= 1;
+
+    if !valid_signature {
+        return ParseError::new(
+            f.span(),
+            "`#[handler]` handlers must have signature `[unsafe] fn([&mut Context]) [-> !]`",
+        )
+        .to_compile_error()
+        .into();
+    }
+
+    f.sig.abi = syn::parse_quote!(extern "C");
+
+    quote!(
+        #f
+    )
+    .into()
+}
+
 /// Create an enum for erased GPIO pins, using the enum-dispatch pattern
 ///
 /// Only used internally

@@ -37,7 +37,7 @@ async fn main(_spawner: Spawner) {
         embassy::init(&clocks, timer_group0);
     }
 
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = IO::new_async(peripherals.GPIO, peripherals.IO_MUX);
     // GPIO 0 as input
     let mut input = io.pins.gpio0.into_pull_down_input();
 

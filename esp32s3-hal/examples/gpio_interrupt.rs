@@ -13,7 +13,6 @@ use esp32s3_hal::{
     clock::ClockControl,
     gpio::{Event, Gpio0, Input, PullDown, IO},
     interrupt,
-    macros::ram,
     peripherals::{self, Peripherals},
     prelude::*,
     xtensa_lx,
@@ -30,7 +29,9 @@ fn main() -> ! {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     // Set GPIO15 as an output, and set its state high initially.
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let mut io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    io.set_interrupt_handler(handler);
+
     let mut led = io.pins.gpio15.into_push_pull_output();
     let mut button = io.pins.gpio0.into_pull_down_input();
     button.listen(Event::FallingEdge);
@@ -51,9 +52,8 @@ fn main() -> ! {
     }
 }
 
-#[ram]
-#[interrupt]
-fn GPIO() {
+#[handler]
+fn handler() {
     esp_println::println!(
         "GPIO Interrupt with priority {}",
         xtensa_lx::interrupt::get_level()

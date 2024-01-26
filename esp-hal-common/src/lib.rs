@@ -450,3 +450,11 @@ impl<T, const SIZE: usize> FlashSafeDma<T, SIZE> {
         self.inner
     }
 }
+
+/// Driver mode async
+#[non_exhaustive]
+pub struct AsyncMode;
+
+/// Driver mode non-async
+#[non_exhaustive]
+pub struct BlockingMode;

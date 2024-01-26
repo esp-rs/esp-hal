@@ -31,7 +31,7 @@ async fn main(_spawner: Spawner) {
         esp32c3_hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks),
     );
 
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = IO::new_async(peripherals.GPIO, peripherals.IO_MUX);
     // GPIO 9 as input
     let mut input = io.pins.gpio9.into_pull_down_input();
 

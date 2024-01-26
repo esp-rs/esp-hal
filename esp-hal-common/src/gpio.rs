@@ -27,10 +27,15 @@ use core::{convert::Infallible, marker::PhantomData};
 #[cfg(any(adc, dac))]
 pub(crate) use crate::analog;
 pub(crate) use crate::gpio;
-use crate::peripherals::{GPIO, IO_MUX};
 #[cfg(any(xtensa, esp32c3))]
 pub(crate) use crate::rtc_pins;
 pub use crate::soc::gpio::*;
+#[cfg(feature = "async")]
+use crate::AsyncMode;
+use crate::{
+    peripherals::{GPIO, IO_MUX},
+    BlockingMode,
+};
 
 /// Convenience type-alias for a no-pin / don't care - pin
 pub type NoPinType = Gpio0<Unknown>;
@@ -1485,19 +1490,38 @@ impl<MODE> embedded_hal_async::digital::Wait for AnyPin<Input<MODE>> {
 }
 
 /// General Purpose Input/Output driver
-pub struct IO {
+pub struct IO<MODE> {
     _io_mux: IO_MUX,
     pub pins: Pins,
+    _mode: PhantomData<MODE>,
 }
 
-impl IO {
-    pub fn new(gpio: GPIO, io_mux: IO_MUX) -> Self {
+#[cfg(feature = "async")]
+impl IO<AsyncMode> {
+    pub fn new_async(mut gpio: GPIO, io_mux: IO_MUX) -> IO<AsyncMode> {
+        crate::peripherals::bind_gpio_interrupt(&mut gpio, asynch::handle_gpio_interrupt);
         let pins = gpio.split();
-        let io = IO {
+        IO {
             _io_mux: io_mux,
             pins,
-        };
-        io
+            _mode: PhantomData::default(),
+        }
+    }
+}
+
+impl IO<BlockingMode> {
+    pub fn new(gpio: GPIO, io_mux: IO_MUX) -> IO<BlockingMode> {
+        let pins = gpio.split();
+        IO {
+            _io_mux: io_mux,
+            pins,
+            _mode: PhantomData::default(),
+        }
+    }
+
+    pub fn set_interrupt_handler(&mut self, handler: unsafe extern "C" fn() -> ()) {
+        let mut gpio = unsafe { crate::peripherals::GPIO::steal() };
+        crate::peripherals::bind_gpio_interrupt(&mut gpio, handler);
     }
 }
 
@@ -2734,19 +2758,8 @@ mod asynch {
         });
     }
 
-    #[cfg(not(any(esp32p4)))]
-    #[interrupt]
-    unsafe fn GPIO() {
-        handle_gpio_interrupt();
-    }
-
-    #[cfg(any(esp32p4))]
-    #[interrupt]
-    unsafe fn GPIO_INT0() {
-        handle_gpio_interrupt();
-    }
-
-    fn handle_gpio_interrupt() {
+    #[handler]
+    pub(super) fn handle_gpio_interrupt() {
         let intrs_bank0 = InterruptStatusRegisterAccessBank0::interrupt_status_read();
 
         #[cfg(any(esp32, esp32s2, esp32s3, esp32p4))]

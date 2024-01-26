@@ -225,7 +225,7 @@ mod peripheral_macros {
     #[doc(hidden)]
     #[macro_export]
     macro_rules! peripherals {
-        ($($(#[$cfg:meta])? $name:ident <= $from_pac:tt),*$(,)?) => {
+        ($($(#[$cfg:meta])? $name:ident <= $from_pac:tt $(($($interrupt:ident),*))?  ),*$(,)?) => {
 
             /// Contains the generated peripherals which implement [`Peripheral`]
             mod peripherals {
@@ -281,6 +281,18 @@ mod peripheral_macros {
             // expose the new structs
             $(
                 pub use peripherals::$name;
+            )*
+
+            $(
+                $(
+                    $(
+                        paste::paste!{
+                            pub fn [<bind_ $interrupt:lower _interrupt >](_peripheral: &mut peripherals::$name, handler: unsafe extern "C" fn() -> ()) {
+                                unsafe { $crate::interrupt::bind_interrupt($crate::peripherals::Interrupt::$interrupt, handler); }
+                            }
+                        }
+                    )*
+                )*
             )*
         }
     }
