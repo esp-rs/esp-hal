@@ -7,7 +7,7 @@
 #![feature(type_alias_impl_trait)]
 
 use embassy_executor::Spawner;
-use embedded_io_async::{Read as AsyncRead, Write as AsyncWrite};
+use embassy_sync::{blocking_mutex::raw::NoopRawMutex, signal::Signal};
 use esp32c6_hal::{
     clock::ClockControl,
     embassy,
@@ -16,9 +16,52 @@ use esp32c6_hal::{
     UsbSerialJtag,
 };
 use esp_backtrace as _;
+use esp_hal_common::usb_serial_jtag::{UsbSerialJtagRx, UsbSerialJtagTx};
+use static_cell::make_static;
+
+const MAX_BUFFER_SIZE: usize = 512;
+
+#[embassy_executor::task]
+async fn writer(
+    mut tx: UsbSerialJtagTx<'static>,
+    signal: &'static Signal<NoopRawMutex, heapless::String<MAX_BUFFER_SIZE>>,
+) {
+    use core::fmt::Write;
+    embedded_io_async::Write::write_all(
+        &mut tx,
+        b"Hello async USB Serial JTAG. Type something.\r\n",
+    )
+    .await
+    .unwrap();
+    loop {
+        let message = signal.wait().await;
+        signal.reset();
+        write!(&mut tx, "-- received '{}' --\r\n", message).unwrap();
+        embedded_io_async::Write::flush(&mut tx).await.unwrap();
+    }
+}
+
+#[embassy_executor::task]
+async fn reader(
+    mut rx: UsbSerialJtagRx<'static>,
+    signal: &'static Signal<NoopRawMutex, heapless::String<MAX_BUFFER_SIZE>>,
+) {
+    let mut rbuf = [0u8; MAX_BUFFER_SIZE];
+    loop {
+        let r = embedded_io_async::Read::read(&mut rx, &mut rbuf).await;
+        match r {
+            Ok(len) => {
+                let mut string_buffer: heapless::Vec<_, MAX_BUFFER_SIZE> = heapless::Vec::new();
+                string_buffer.extend_from_slice(&rbuf[..len]).unwrap();
+                signal.signal(heapless::String::from_utf8(string_buffer).unwrap());
+            }
+            Err(e) => esp_println::println!("RX Error: {:?}", e),
+        }
+    }
+}
 
 #[main]
-async fn main(_spawner: Spawner) -> ! {
+async fn main(spawner: Spawner) -> () {
     esp_println::println!("Init!");
     let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();
@@ -36,22 +79,10 @@ async fn main(_spawner: Spawner) -> ! {
         esp32c6_hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks),
     );
 
-    let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE);
+    let (tx, rx) = UsbSerialJtag::new(peripherals.USB_DEVICE).split();
 
-    loop {
-        let mut read_buf = [0; 64];
+    let signal = &*make_static!(Signal::new());
 
-        match AsyncRead::read(&mut usb_serial, &mut read_buf).await {
-            Ok(n) => {
-                AsyncWrite::write_all(&mut usb_serial, b"echo: ")
-                    .await
-                    .unwrap();
-                AsyncWrite::write_all(&mut usb_serial, &read_buf[..n])
-                    .await
-                    .unwrap();
-                AsyncWrite::write_all(&mut usb_serial, b"\n").await.unwrap();
-            }
-            Err(e) => esp_println::println!("error: {e}"),
-        }
-    }
+    spawner.spawn(reader(rx, &signal)).unwrap();
+    spawner.spawn(writer(tx, &signal)).unwrap();
 }
