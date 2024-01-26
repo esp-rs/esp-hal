@@ -1028,6 +1028,7 @@ pub mod dma {
         /// This will return a [SpiDmaTransfer] owning the buffer(s) and the SPI
         /// instance. The maximum amount of data to be sent is 32736
         /// bytes.
+        #[cfg_attr(feature = "optimize-spi-in-iram", ram)]
         pub fn dma_write<TXBUF>(
             mut self,
             words: TXBUF,
@@ -1054,6 +1055,7 @@ pub mod dma {
         /// This will return a [SpiDmaTransfer] owning the buffer(s) and the SPI
         /// instance. The maximum amount of data to be received is 32736
         /// bytes.
+        #[cfg_attr(feature = "optimize-spi-in-iram", ram)]
         pub fn dma_read<RXBUF>(
             mut self,
             mut words: RXBUF,
@@ -1120,6 +1122,7 @@ pub mod dma {
         C::P: SpiPeripheral,
         M: IsHalfDuplex,
     {
+        #[cfg_attr(feature = "optimize-spi-in-iram", ram)]
         pub fn read<RXBUF>(
             mut self,
             data_mode: SpiDataMode,
@@ -1193,6 +1196,7 @@ pub mod dma {
             })
         }
 
+        #[cfg_attr(feature = "optimize-spi-in-iram", ram)]
         pub fn write<TXBUF>(
             mut self,
             data_mode: SpiDataMode,
@@ -1838,6 +1842,7 @@ where
         Ok(words)
     }
 
+    #[cfg_attr(feature = "optimize-spi-in-iram", ram)]
     fn start_write_bytes_dma(
         &mut self,
         ptr: *const u8,
@@ -1868,6 +1873,7 @@ where
         Ok(())
     }
 
+    #[cfg_attr(feature = "optimize-spi-in-iram", ram)]
     fn start_read_bytes_dma(
         &mut self,
         ptr: *mut u8,
