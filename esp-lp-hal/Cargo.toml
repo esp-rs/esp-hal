@@ -1,0 +1,64 @@
+[package]
+name         = "esp-lp-hal"
+version      = "0.1.0"
+edition      = "2021"
+rust-version = "1.67.0"
+description  = "HAL for low-power RISC-V coprocessors found in ESP32 devices"
+repository   = "https://github.com/esp-rs/esp-hal"
+license      = "MIT OR Apache-2.0"
+
+keywords = [
+    "embedded",
+    "embedded-hal",
+    "esp",
+    "esp32",
+    "no-std",
+]
+categories = [
+    "embedded",
+    "hardware-support",
+    "no-std",
+]
+
+[dependencies]
+cfg-if          = "1.0.0"
+embedded-hal-02 = { version = "0.2.7", package = "embedded-hal", optional = true, features = ["unproven"] }
+embedded-hal-1  = { version = "1.0.0", package = "embedded-hal", optional = true }
+esp32c6-lp      = { version = "0.1.0", features = ["critical-section"], optional = true }
+esp32s2-ulp     = { version = "0.1.0", features = ["critical-section"], optional = true }
+esp32s3-ulp     = { version = "0.1.0", features = ["critical-section"], optional = true }
+nb              = { version = "1.1.0",  optional = true }
+paste           = { version = "1.0.14", optional = true }
+procmacros      = { package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
+riscv           = { version = "0.11.0", features = ["critical-section-single-hart"] }
+
+[dev-dependencies]
+panic-halt = "0.2.0"
+
+[features]
+default = ["embedded-hal-02"]
+
+embedded-hal-02 = ["dep:embedded-hal-02"]
+embedded-hal-1  = ["dep:embedded-hal-1"]
+
+esp32c6 = ["dep:esp32c6-lp",  "procmacros/esp32c6-lp", "dep:nb", "dep:paste"]
+esp32s2 = ["dep:esp32s2-ulp", "procmacros/esp32s2-ulp"]
+esp32s3 = ["dep:esp32s3-ulp", "procmacros/esp32s3-ulp"]
+
+debug = [
+    "esp32c6-lp?/impl-register-debug",
+    "esp32s2-ulp?/impl-register-debug",
+    "esp32s3-ulp?/impl-register-debug",
+]
+
+[[example]]
+name              = "blinky"
+required-features = ["embedded-hal-02"]
+
+[[example]]
+name              = "uart"
+required-features = ["embedded-hal-02", "esp32c6"]
+
+[patch.crates-io]
+esp32s2-ulp = { git = "https://github.com/esp-rs/esp-pacs", rev = "bcab40a" }
+esp32s3-ulp = { git = "https://github.com/esp-rs/esp-pacs", rev = "bcab40a" }

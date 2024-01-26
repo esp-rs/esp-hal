@@ -12,11 +12,11 @@
   // Uncomment ONE line for the chip you want to work on.
   // This makes rust-analyzer work on the HAL crate and all its dependencies.
   "rust-analyzer.linkedProjects": [
+    // "esp-lp-hal/Cargo.toml"
     "esp32-hal/Cargo.toml"
     // "esp32c2-hal/Cargo.toml"
     // "esp32c3-hal/Cargo.toml"
     // "esp32c6-hal/Cargo.toml"
-    // "esp32c6-lp-hal/Cargo.toml"
     // "esp32h2-hal/Cargo.toml"
     // "esp32p4-hal/Cargo.toml"
     // "esp32s2-hal/Cargo.toml"

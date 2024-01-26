@@ -6,21 +6,23 @@
 
 ENTRY(reset_vector)
 
+VECTOR_TABLE_LENGTH = 0x80;
 CONFIG_ULP_COPROC_RESERVE_MEM = 1024 * 16;
 CONFIG_ULP_SHARED_MEM = 0;
+RAM_LENGTH = CONFIG_ULP_COPROC_RESERVE_MEM - VECTOR_TABLE_LENGTH - CONFIG_ULP_SHARED_MEM;
 
 MEMORY
 {
     /*first 128byte for exception/interrupt vectors*/
-    vector_table(RX) :   ORIGIN = 0x50000000, LENGTH = 0x80
-    ram(RWX) :           ORIGIN = 0x50000080, LENGTH = CONFIG_ULP_COPROC_RESERVE_MEM - 0x80 - CONFIG_ULP_SHARED_MEM
+    vector_table(RX)  : ORIGIN = 0x50000000, LENGTH = VECTOR_TABLE_LENGTH
+             ram(RWX) : ORIGIN = 0x50000080, LENGTH = RAM_LENGTH
 }
 
 SECTIONS
 {
     .vector.text :
     {
-        /*exception/interrupt vectors*/
+        /* Exception/interrupt vectors */
         __mtvec_base = .;
         KEEP (*(.init.vector))
         __mtvec_end = .;

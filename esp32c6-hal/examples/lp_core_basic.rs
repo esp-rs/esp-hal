@@ -3,7 +3,7 @@
 //! Code on LP core increments a counter and continuously toggles GPIO1. The
 //! current value is printed by the HP core.
 //!
-//! Make sure to first compile the `esp32c6-lp-hal/examples/blinky.rs` example
+//! Make sure to first compile the `esp-lp-hal/examples/blinky.rs` example
 
 #![no_std]
 #![no_main]
@@ -35,9 +35,8 @@ fn main() -> ! {
     println!("lp core stopped");
 
     // load code to LP core
-    let lp_core_code = load_lp_code!(
-        "../esp32c6-lp-hal/target/riscv32imac-unknown-none-elf/release/examples/blinky"
-    );
+    let lp_core_code =
+        load_lp_code!("../esp-lp-hal/target/riscv32imac-unknown-none-elf/release/examples/blinky");
 
     // start LP core
     lp_core_code.run(&mut lp_core, lp_core::LpCoreWakeupSource::HpCpu, lp_pin);

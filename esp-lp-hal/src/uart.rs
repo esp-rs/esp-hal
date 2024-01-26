@@ -1,11 +1,11 @@
 //! Low-power UART driver
 
-use esp32c6_lp::LP_UART;
+use crate::pac::LP_UART;
 
 const UART_FIFO_SIZE: u16 = 128;
 
 #[doc(hidden)]
-pub unsafe fn conjour() -> Option<LpUart> {
+pub unsafe fn conjure() -> Option<LpUart> {
     Some(LpUart {
         uart: LP_UART::steal(),
     })
@@ -154,7 +154,8 @@ impl core::fmt::Write for LpUart {
     }
 }
 
-impl embedded_hal::serial::Read<u8> for LpUart {
+#[cfg(feature = "embedded-hal-02")]
+impl embedded_hal_02::serial::Read<u8> for LpUart {
     type Error = Error;
 
     fn read(&mut self) -> nb::Result<u8, Self::Error> {
@@ -162,7 +163,8 @@ impl embedded_hal::serial::Read<u8> for LpUart {
     }
 }
 
-impl embedded_hal::serial::Write<u8> for LpUart {
+#[cfg(feature = "embedded-hal-02")]
+impl embedded_hal_02::serial::Write<u8> for LpUart {
     type Error = Error;
 
     fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
