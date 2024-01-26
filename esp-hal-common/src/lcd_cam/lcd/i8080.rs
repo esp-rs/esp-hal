@@ -5,7 +5,17 @@ use fugit::HertzU32;
 
 use crate::{
     clock::Clocks,
-    dma::{DmaError, DmaPeripheral, Tx},
+    dma::{
+        ChannelTx,
+        ChannelTypes,
+        DmaError,
+        DmaPeripheral,
+        LcdCamPeripheral,
+        RegisterAccess,
+        Tx,
+        TxChannel,
+        TxPrivate,
+    },
     gpio::{OutputPin, OutputSignal},
     lcd_cam::{
         lcd::{i8080::private::TxPins, ClockMode, DelayMode, Phase, Polarity},
@@ -24,13 +34,16 @@ pub struct I8080<'d, TX, P> {
     _pins: P,
 }
 
-impl<'d, TX: Tx, P: TxPins> I8080<'d, TX, P>
+impl<'d, T, R, P: TxPins> I8080<'d, ChannelTx<'d, T, R>, P>
 where
+    T: TxChannel<R>,
+    R: ChannelTypes + RegisterAccess,
+    R::P: LcdCamPeripheral,
     P::Word: Into<u16>,
 {
     pub fn new(
         lcd: Lcd<'d>,
-        mut channel: TX,
+        mut channel: ChannelTx<'d, T, R>,
         mut pins: P,
         frequency: HertzU32,
         config: Config,
@@ -177,7 +190,12 @@ where
             _pins: pins,
         }
     }
+}
 
+impl<'d, TX: Tx, P: TxPins> I8080<'d, TX, P>
+where
+    P::Word: Into<u16>,
+{
     pub fn set_byte_order(&mut self, byte_order: ByteOrder) -> &mut Self {
         let is_inverted = byte_order != ByteOrder::default();
         self.lcd_cam.lcd_user().modify(|_, w| {
