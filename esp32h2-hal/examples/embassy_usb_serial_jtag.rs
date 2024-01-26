@@ -9,7 +9,11 @@
 use embassy_executor::Spawner;
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, signal::Signal};
 use esp32h2_hal::{
-    clock::ClockControl, embassy, peripherals::Peripherals, prelude::*, UsbSerialJtag,
+    clock::ClockControl,
+    embassy,
+    peripherals::Peripherals,
+    prelude::*,
+    UsbSerialJtag,
 };
 use esp_backtrace as _;
 use esp_hal_common::usb_serial_jtag::{UsbSerialJtagRx, UsbSerialJtagTx};
