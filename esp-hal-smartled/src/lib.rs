@@ -27,40 +27,18 @@
 use core::{fmt::Debug, slice::IterMut};
 
 use esp_hal::{
+    clock::Clocks,
     gpio::OutputPin,
     peripheral::Peripheral,
     rmt::{Error as RmtError, PulseCode, TxChannel, TxChannelConfig, TxChannelCreator},
 };
 use smart_leds_trait::{SmartLedsWrite, RGB8};
 
-// Specifies what clock frequency we're using for the RMT peripheral (if
-// properly configured)
-//
-// TODO: Factor in clock configuration, this needs to be revisited once #24 and
-// #44 have been addressed.
-#[cfg(feature = "esp32")]
-const SOURCE_CLK_FREQ: u32 = 40_000_000;
-#[cfg(feature = "esp32c3")]
-const SOURCE_CLK_FREQ: u32 = 40_000_000;
-#[cfg(feature = "esp32c6")]
-const SOURCE_CLK_FREQ: u32 = 40_000_000;
-#[cfg(feature = "esp32h2")]
-const SOURCE_CLK_FREQ: u32 = 16_000_000;
-#[cfg(feature = "esp32s2")]
-const SOURCE_CLK_FREQ: u32 = 40_000_000;
-#[cfg(feature = "esp32s3")]
-const SOURCE_CLK_FREQ: u32 = 40_000_000;
-
 const SK68XX_CODE_PERIOD: u32 = 1200;
 const SK68XX_T0H_NS: u32 = 320;
 const SK68XX_T0L_NS: u32 = SK68XX_CODE_PERIOD - SK68XX_T0H_NS;
 const SK68XX_T1H_NS: u32 = 640;
 const SK68XX_T1L_NS: u32 = SK68XX_CODE_PERIOD - SK68XX_T1H_NS;
-
-const SK68XX_T0H_CYCLES: u16 = ((SK68XX_T0H_NS * (SOURCE_CLK_FREQ / 1_000_000)) / 500) as u16;
-const SK68XX_T0L_CYCLES: u16 = ((SK68XX_T0L_NS * (SOURCE_CLK_FREQ / 1_000_000)) / 500) as u16;
-const SK68XX_T1H_CYCLES: u16 = ((SK68XX_T1H_NS * (SOURCE_CLK_FREQ / 1_000_000)) / 500) as u16;
-const SK68XX_T1L_CYCLES: u16 = ((SK68XX_T1L_NS * (SOURCE_CLK_FREQ / 1_000_000)) / 500) as u16;
 
 /// All types of errors that can happen during the conversion and transmission
 /// of LED commands
@@ -99,6 +77,7 @@ where
 {
     channel: Option<TX>,
     rmt_buffer: [u32; BUFFER_SIZE],
+    pulses: (u32, u32),
 }
 
 impl<'d, TX, const BUFFER_SIZE: usize> SmartLedsAdapter<TX, BUFFER_SIZE>
@@ -110,6 +89,7 @@ where
         channel: C,
         pin: impl Peripheral<P = O> + 'd,
         rmt_buffer: [u32; BUFFER_SIZE],
+        clocks: &Clocks,
     ) -> SmartLedsAdapter<TX, BUFFER_SIZE>
     where
         O: OutputPin + 'd,
@@ -126,19 +106,37 @@ where
 
         let channel = channel.configure(pin, config).unwrap();
 
+        // Assume the RMT peripheral is set up to use the APB clock
+        let src_clock = clocks.apb_clock.to_MHz();
+
         Self {
             channel: Some(channel),
             rmt_buffer,
+            pulses: (
+                u32::from(PulseCode {
+                    level1: true,
+                    length1: ((SK68XX_T0H_NS * src_clock) / 1000) as u16,
+                    level2: false,
+                    length2: ((SK68XX_T0L_NS * src_clock) / 1000) as u16,
+                }),
+                u32::from(PulseCode {
+                    level1: true,
+                    length1: ((SK68XX_T1H_NS * src_clock) / 1000) as u16,
+                    level2: false,
+                    length2: ((SK68XX_T1L_NS * src_clock) / 1000) as u16,
+                }),
+            ),
         }
     }
 
     fn convert_rgb_to_pulse(
         value: RGB8,
         mut_iter: &mut IterMut<u32>,
+        pulses: (u32, u32),
     ) -> Result<(), LedAdapterError> {
-        Self::convert_rgb_channel_to_pulses(value.g, mut_iter)?;
-        Self::convert_rgb_channel_to_pulses(value.r, mut_iter)?;
-        Self::convert_rgb_channel_to_pulses(value.b, mut_iter)?;
+        Self::convert_rgb_channel_to_pulses(value.g, mut_iter, pulses)?;
+        Self::convert_rgb_channel_to_pulses(value.r, mut_iter, pulses)?;
+        Self::convert_rgb_channel_to_pulses(value.b, mut_iter, pulses)?;
 
         Ok(())
     }
@@ -146,24 +144,13 @@ where
     fn convert_rgb_channel_to_pulses(
         channel_value: u8,
         mut_iter: &mut IterMut<u32>,
+        pulses: (u32, u32),
     ) -> Result<(), LedAdapterError> {
         for position in [128, 64, 32, 16, 8, 4, 2, 1] {
             *mut_iter.next().ok_or(LedAdapterError::BufferSizeExceeded)? =
                 match channel_value & position {
-                    0 => PulseCode {
-                        level1: true,
-                        length1: SK68XX_T0H_CYCLES,
-                        level2: false,
-                        length2: SK68XX_T0L_CYCLES,
-                    }
-                    .into(),
-                    _ => PulseCode {
-                        level1: true,
-                        length1: SK68XX_T1H_CYCLES,
-                        level2: false,
-                        length2: SK68XX_T1L_CYCLES,
-                    }
-                    .into(),
+                    0 => pulses.0,
+                    _ => pulses.1,
                 }
         }
 
@@ -193,7 +180,7 @@ where
         // This will result in an `BufferSizeExceeded` error in case
         // the iterator provides more elements than the buffer can take.
         for item in iterator {
-            Self::convert_rgb_to_pulse(item.into(), &mut seq_iter)?;
+            Self::convert_rgb_to_pulse(item.into(), &mut seq_iter, self.pulses)?;
         }
 
         // Finally, add an end element.
