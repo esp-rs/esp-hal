@@ -19,10 +19,9 @@
 
 use esp32_hal::{
     clock::ClockControl,
-    dma::DmaPriority,
+    dma::{Dma, DmaPriority},
     dma_buffers,
     gpio::IO,
-    pdma::Dma,
     peripherals::Peripherals,
     prelude::*,
     spi::{
@@ -49,7 +48,7 @@ fn main() -> ! {
     let sio3 = io.pins.gpio16;
     let cs = io.pins.gpio4;
 
-    let dma = Dma::new(system.dma);
+    let dma = Dma::new(peripherals.DMA);
     let dma_channel = dma.spi2channel;
 
     let (tx_buffer, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(256, 320);
