@@ -176,7 +176,7 @@ impl SoftwareInterruptControl {
 /// Controls the enablement of peripheral clocks.
 pub(crate) struct PeripheralClockControl;
 
-#[cfg(not(any(esp32c6, esp32h2)))]
+#[cfg(not(any(esp32c6, esp32h2, esp32p4)))]
 impl PeripheralClockControl {
     /// Enables and resets the given peripheral
     pub(crate) fn enable(peripheral: Peripheral) {
@@ -603,6 +603,12 @@ impl PeripheralClockControl {
             }
         }
     }
+}
+
+#[cfg(esp32p4)]
+impl PeripheralClockControl {
+    /// Enables and resets the given peripheral
+    pub(crate) fn enable(_peripheral: Peripheral) {}
 }
 
 /// Controls the configuration of the chip's clocks.

@@ -85,32 +85,36 @@ pub trait Clock {
 /// CPU clock speed
 #[derive(Debug, Clone, Copy)]
 pub enum CpuClock {
-    #[cfg(not(esp32h2))]
+    #[cfg(not(any(esp32h2, esp32p4)))]
     Clock80MHz,
     #[cfg(esp32h2)]
     Clock96MHz,
     #[cfg(esp32c2)]
     Clock120MHz,
-    #[cfg(not(any(esp32c2, esp32h2)))]
+    #[cfg(not(any(esp32c2, esp32h2, esp32p4)))]
     Clock160MHz,
-    #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
+    #[cfg(xtensa)]
     Clock240MHz,
+    #[cfg(esp32p4)]
+    Clock400MHz,
 }
 
 #[allow(dead_code)]
 impl Clock for CpuClock {
     fn frequency(&self) -> HertzU32 {
         match self {
-            #[cfg(not(esp32h2))]
+            #[cfg(not(any(esp32h2, esp32p4)))]
             CpuClock::Clock80MHz => HertzU32::MHz(80),
             #[cfg(esp32h2)]
             CpuClock::Clock96MHz => HertzU32::MHz(96),
             #[cfg(esp32c2)]
             CpuClock::Clock120MHz => HertzU32::MHz(120),
-            #[cfg(not(any(esp32c2, esp32h2)))]
+            #[cfg(not(any(esp32c2, esp32h2, esp32p4)))]
             CpuClock::Clock160MHz => HertzU32::MHz(160),
-            #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
+            #[cfg(xtensa)]
             CpuClock::Clock240MHz => HertzU32::MHz(240),
+            #[cfg(esp32p4)]
+            CpuClock::Clock400MHz => HertzU32::MHz(400),
         }
     }
 }
@@ -164,10 +168,14 @@ pub(crate) enum PllClock {
     Pll160MHz,
     #[cfg(esp32c6)]
     Pll240MHz,
-    #[cfg(not(any(esp32c2, esp32c6, esp32h2)))]
+    #[cfg(not(any(esp32c2, esp32c6, esp32h2, esp32p4)))]
     Pll320MHz,
+    #[cfg(esp32p4)]
+    Pll400MHz,
     #[cfg(not(esp32h2))]
     Pll480MHz,
+    #[cfg(esp32p4)]
+    Pll500MHz,
 }
 
 impl Clock for PllClock {
@@ -189,10 +197,14 @@ impl Clock for PllClock {
             Self::Pll160MHz => HertzU32::MHz(160),
             #[cfg(esp32c6)]
             Self::Pll240MHz => HertzU32::MHz(240),
-            #[cfg(not(any(esp32c2, esp32c6, esp32h2)))]
+            #[cfg(not(any(esp32c2, esp32c6, esp32h2, esp32p4)))]
             Self::Pll320MHz => HertzU32::MHz(320),
+            #[cfg(esp32p4)]
+            Self::Pll400MHz => HertzU32::MHz(400),
             #[cfg(not(esp32h2))]
             Self::Pll480MHz => HertzU32::MHz(480),
+            #[cfg(esp32p4)]
+            Self::Pll500MHz => HertzU32::MHz(500),
         }
     }
 }
@@ -202,10 +214,12 @@ impl Clock for PllClock {
 pub(crate) enum ApbClock {
     #[cfg(esp32h2)]
     ApbFreq32MHz,
-    #[cfg(not(esp32h2))]
+    #[cfg(not(any(esp32h2, esp32p4)))]
     ApbFreq40MHz,
-    #[cfg(not(esp32h2))]
+    #[cfg(not(any(esp32h2, esp32p4)))]
     ApbFreq80MHz,
+    #[cfg(esp32p4)]
+    ApbFreq100MHz,
     ApbFreqOther(u32),
 }
 
@@ -214,10 +228,12 @@ impl Clock for ApbClock {
         match self {
             #[cfg(esp32h2)]
             ApbClock::ApbFreq32MHz => HertzU32::MHz(32),
-            #[cfg(not(esp32h2))]
+            #[cfg(not(any(esp32h2, esp32p4)))]
             ApbClock::ApbFreq40MHz => HertzU32::MHz(40),
-            #[cfg(not(esp32h2))]
+            #[cfg(not(any(esp32h2, esp32p4)))]
             ApbClock::ApbFreq80MHz => HertzU32::MHz(80),
+            #[cfg(esp32p4)]
+            ApbClock::ApbFreq100MHz => HertzU32::MHz(100),
             ApbClock::ApbFreqOther(mhz) => HertzU32::MHz(*mhz),
         }
     }
@@ -621,6 +637,59 @@ impl<'d> ClockControl<'d> {
     /// Use the highest possible frequency for a particular chip
     pub fn max(clock_control: impl Peripheral<P = SystemClockControl> + 'd) -> ClockControl<'d> {
         Self::configure(clock_control, CpuClock::Clock96MHz)
+    }
+}
+
+#[cfg(esp32p4)]
+impl<'d> ClockControl<'d> {
+    /// Use what is considered the default settings after boot.
+    pub fn boot_defaults(
+        clock_control: impl Peripheral<P = SystemClockControl> + 'd,
+    ) -> ClockControl<'d> {
+        ClockControl {
+            _private: clock_control.into_ref(),
+            desired_rates: RawClocks {
+                cpu_clock: HertzU32::MHz(400),
+                apb_clock: HertzU32::MHz(100),
+                xtal_clock: HertzU32::MHz(40),
+            },
+        }
+    }
+
+    /// Configure the CPU clock speed.
+    pub fn configure(
+        clock_control: impl Peripheral<P = SystemClockControl> + 'd,
+        cpu_clock_speed: CpuClock,
+    ) -> ClockControl<'d> {
+        let apb_freq;
+        let xtal_freq = XtalClock::RtcXtalFreq40M;
+        let pll_freq = PllClock::Pll480MHz;
+
+        if cpu_clock_speed.mhz() <= xtal_freq.mhz() {
+            apb_freq = ApbClock::ApbFreqOther(cpu_clock_speed.mhz());
+            // clocks_ll::esp32p4_rtc_update_to_xtal(xtal_freq, 1);
+            // clocks_ll::esp32p4_rtc_apb_freq_update(apb_freq);
+        } else {
+            apb_freq = ApbClock::ApbFreq100MHz;
+            // clocks_ll::esp32p4_rtc_bbpll_enable();
+            // clocks_ll::esp32p4_rtc_bbpll_configure(xtal_freq, pll_freq);
+            // clocks_ll::esp32p4_rtc_freq_to_pll_mhz(cpu_clock_speed);
+            // clocks_ll::esp32p4_rtc_apb_freq_update(apb_freq);
+        }
+
+        ClockControl {
+            _private: clock_control.into_ref(),
+            desired_rates: RawClocks {
+                cpu_clock: cpu_clock_speed.frequency(),
+                apb_clock: apb_freq.frequency(),
+                xtal_clock: xtal_freq.frequency(),
+            },
+        }
+    }
+
+    /// Use the highest possible frequency for a particular chip
+    pub fn max(clock_control: impl Peripheral<P = SystemClockControl> + 'd) -> ClockControl<'d> {
+        Self::configure(clock_control, CpuClock::Clock400MHz)
     }
 }
 
