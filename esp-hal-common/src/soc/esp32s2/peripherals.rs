@@ -25,6 +25,7 @@ crate::peripherals! {
     AES <= AES,
     DAC1 <= virtual,
     DAC2 <= virtual,
+    DMA <= virtual,
     DEDICATED_GPIO <= DEDICATED_GPIO,
     DS <= DS,
     EFUSE <= EFUSE,

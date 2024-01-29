@@ -650,7 +650,7 @@ ImplI2sChannel!(1, "I2S1");
 ///
 /// This offers the available DMA channels.
 pub struct Dma<'d> {
-    _inner: PeripheralRef<'d, crate::system::Dma>,
+    _inner: PeripheralRef<'d, crate::peripherals::DMA>,
     pub spi2channel: Spi2DmaChannelCreator,
     pub spi3channel: Spi3DmaChannelCreator,
     pub i2s0channel: I2s0DmaChannelCreator,
@@ -660,7 +660,9 @@ pub struct Dma<'d> {
 
 impl<'d> Dma<'d> {
     /// Create a DMA instance.
-    pub fn new(dma: impl crate::peripheral::Peripheral<P = crate::system::Dma> + 'd) -> Dma<'d> {
+    pub fn new(
+        dma: impl crate::peripheral::Peripheral<P = crate::peripherals::DMA> + 'd,
+    ) -> Dma<'d> {
         PeripheralClockControl::enable(Peripheral::Dma);
 
         Dma {

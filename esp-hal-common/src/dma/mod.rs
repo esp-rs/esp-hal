@@ -39,12 +39,8 @@
 //! ### Initialize and utilize DMA controller in `SPI`
 //!
 //! ```no_run
-//! let dma = Gdma::new(peripherals.DMA);
+//! let dma = Dma::new(peripherals.DMA);
 //! let dma_channel = dma.channel0;
-//!
-//! // For `ESP32` and `ESP32-S2` chips use `pdma::Dma` instead:
-//! // let dma = Dma::new(system.dma);
-//! // let dma_channel = dma.spi2channel;
 //!
 //! let mut descriptors = [DmaDescriptor::EMPTY; 8];
 //! let mut rx_descriptors = [DmaDescriptor::EMPTY; 8];
@@ -136,9 +132,14 @@ impl DmaDescriptor {
 }
 
 #[cfg(gdma)]
-pub mod gdma;
+pub use self::gdma::*;
 #[cfg(pdma)]
-pub mod pdma;
+pub use self::pdma::*;
+
+#[cfg(gdma)]
+mod gdma;
+#[cfg(pdma)]
+mod pdma;
 
 const CHUNK_SIZE: usize = 4092;
 

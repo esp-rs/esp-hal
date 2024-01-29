@@ -609,7 +609,7 @@ impl_channel!(4);
 /// GDMA Peripheral
 ///
 /// This offers the available DMA channels.
-pub struct Gdma<'d> {
+pub struct Dma<'d> {
     _inner: PeripheralRef<'d, crate::peripherals::DMA>,
     pub channel0: ChannelCreator0,
     #[cfg(not(esp32c2))]
@@ -622,11 +622,11 @@ pub struct Gdma<'d> {
     pub channel4: ChannelCreator4,
 }
 
-impl<'d> Gdma<'d> {
+impl<'d> Dma<'d> {
     /// Create a DMA instance.
     pub fn new(
         dma: impl crate::peripheral::Peripheral<P = crate::peripherals::DMA> + 'd,
-    ) -> Gdma<'d> {
+    ) -> Dma<'d> {
         crate::into_ref!(dma);
 
         PeripheralClockControl::enable(Peripheral::Gdma);
@@ -635,7 +635,7 @@ impl<'d> Gdma<'d> {
             .modify(|_, w| w.ahbm_rst_inter().clear_bit());
         dma.misc_conf().modify(|_, w| w.clk_en().set_bit());
 
-        Gdma {
+        Dma {
             _inner: dma,
             channel0: ChannelCreator0 {},
             #[cfg(not(esp32c2))]
