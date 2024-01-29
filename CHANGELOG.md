@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-P4: Add efuse reading support (#1114)
 
 - Allow for splitting of the USB Serial JTAG peripheral into tx/rx components (#1024)
+- `RngCore` trait is implemented (#1122)
 
 ### Fixed
 

@@ -65,9 +65,9 @@
 
 use core::{convert::Infallible, marker::PhantomData};
 
-use crate::{peripheral::Peripheral, peripherals::RNG};
+use rand_core::RngCore;
 
-use rand_core::{CryptoRng, Error, RngCore};
+use crate::{peripheral::Peripheral, peripherals::RNG};
 
 /// Random number generator driver
 #[derive(Clone, Copy)]
@@ -92,60 +92,6 @@ impl Rng {
             .read()
             .bits()
     }
-
-    pub fn ensure_randomness(&self) {
-        unsafe {
-            #[cfg(feature = "esp32c6")]
-            if (&*crate::soc::peripherals::LPWR::PTR)
-                .lp_clk_conf()
-                .read()
-                .fast_clk_sel()
-                .bit_is_set()
-            {
-                (&*crate::soc::peripherals::LPWR::PTR)
-                    .lp_clk_conf()
-                    .modify(|_, w| w.fast_clk_sel().clear_bit())
-            }
-
-            #[cfg(feature = "esp32h2")]
-            if (&*crate::soc::peripherals::LPWR::PTR)
-                .lp_clk_conf()
-                .read()
-                .fast_clk_sel()
-                .bits()
-                != 0b00
-            {
-                (&*crate::soc::peripherals::LPWR::PTR)
-                    .lp_clk_conf()
-                    .modify(|_, w| w.fast_clk_sel().bits(0b00))
-            }
-
-            #[cfg(feature = "esp32p4")]
-            if (&*crate::soc::peripherals::LP_AON_CLKRST::PTR)
-                .lp_aon_clkrst_lp_clk_conf()
-                .read()
-                .lp_aonclkrst_fast_clk_sel()
-                .bits()
-                != 0b00
-            {
-                (&*crate::soc::peripherals::LPWR::PTR)
-                    .lp_aon_clkrst_lp_clk_conf()
-                    .modify(|_, w| w.lp_aonclkrst_fast_clk_sel().bits(0b00))
-            }
-
-            #[cfg(not(any(feature = "esp32c6", feature = "esp32h2", feature = "esp32p4")))]
-            if (&*crate::soc::peripherals::LPWR::PTR)
-                .clk_conf()
-                .read()
-                .fast_clk_rtc_sel()
-                .bit_is_set()
-            {
-                (&*crate::soc::peripherals::LPWR::PTR)
-                    .clk_conf()
-                    .modify(|_, w| w.fast_clk_rtc_sel().clear_bit())
-            }
-        }
-    }
 }
 
 impl embedded_hal::blocking::rng::Read for Rng {
@@ -161,18 +107,16 @@ impl embedded_hal::blocking::rng::Read for Rng {
     }
 }
 
-// Marker trait. `ensure_randomness` function helps to be sure that RNG generates really random numbers
-impl CryptoRng for Rng {}
+// TODO: CryptoRng trait will be implemented when true randomness of RNG is
+// ensured
 
 impl RngCore for Rng {
     fn next_u32(&mut self) -> u32 {
-        self.ensure_randomness();
         // Directly use the existing random method to get a u32 random number
         self.random()
     }
 
     fn next_u64(&mut self) -> u64 {
-        self.ensure_randomness();
         // Call random() twice to generate a u64 random number (сombine two u32)
         let upper = self.random() as u64;
         let lower = self.random() as u64;
@@ -180,7 +124,6 @@ impl RngCore for Rng {
     }
 
     fn fill_bytes(&mut self, dest: &mut [u8]) {
-        self.ensure_randomness();
         // Fill the destination buffer with random bytes
         for chunk in dest.chunks_mut(4) {
             let rand_bytes = self.random().to_le_bytes();
@@ -191,9 +134,7 @@ impl RngCore for Rng {
     }
 
     fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core::Error> {
-        self.ensure_randomness();
         // Similar implementation as fill_bytes, but encapsulated in a Result
-        self.fill_bytes(dest);
-        Ok(())
+        Ok(self.fill_bytes(dest))
     }
 }
