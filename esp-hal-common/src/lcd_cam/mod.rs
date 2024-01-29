@@ -1,4 +1,8 @@
-//! LCD_CAM
+//! LCD and Camera
+//!
+//! This peripheral consists of an LCD module and a Camera module, which can be
+//! used simultaneously. For more information on these modules, please refer to
+//! the documentation in their respective modules.
 
 pub mod cam;
 pub mod lcd;

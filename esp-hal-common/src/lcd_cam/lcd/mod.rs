@@ -1,3 +1,9 @@
+//! LCD
+//!
+//! This module is capable of operating in either RGB (not yet implemented),
+//! MOTO6800 or I8080 mode. For more information on these modes, please refer
+//! to the documentation in their respective modules.
+
 use crate::{peripheral::PeripheralRef, peripherals::LCD_CAM};
 
 pub mod i8080;

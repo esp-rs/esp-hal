@@ -1,3 +1,40 @@
+//! # LCD - I8080/MOTO6800 Mode.
+//!
+//! ## Overview
+//! The LCD_CAM peripheral I8080 driver provides support for the I8080
+//! format/timing. The driver mandates DMA for DMA (Direct Memory Access) for
+//! efficient data transfer.
+//!
+//! ## Examples
+//! Following code show how to send a command to a MIPI-DSI display over I8080
+//! protocol.
+//!
+//! ```no_run
+//! let tx_pins = TxEightBits::new(
+//!     io.pins.gpio9,
+//!     io.pins.gpio46,
+//!     io.pins.gpio3,
+//!     io.pins.gpio8,
+//!     io.pins.gpio18,
+//!     io.pins.gpio17,
+//!     io.pins.gpio16,
+//!     io.pins.gpio15,
+//! );
+//! let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
+//!
+//! let mut i8080 = I8080::new(
+//!     lcd_cam.lcd,
+//!     channel.tx,
+//!     tx_pins,
+//!     20u32.MHz(),
+//!     Config::default(),
+//!     &clocks,
+//! )
+//! .with_ctrl_pins(io.pins.gpio0, io.pins.gpio47);
+//!
+//! i8080.send(0x3A, 0, &[0x55]).unwrap(); // RGB565
+//! ```
+
 use core::{fmt::Formatter, mem::size_of};
 
 use embedded_dma::ReadBuffer;
