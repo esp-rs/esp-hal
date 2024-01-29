@@ -8,9 +8,8 @@
 
 use esp32c6_hal::{
     clock::ClockControl,
-    dma::DmaPriority,
+    dma::{Dma, DmaPriority},
     dma_buffers,
-    gdma::Gdma,
     gpio::IO,
     parl_io::{BitPackOrder, NoClkPin, ParlIoRxOnly, RxFourBits},
     peripherals::Peripherals,
@@ -30,7 +29,7 @@ fn main() -> ! {
 
     let (_, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(0, 32000);
 
-    let dma = Gdma::new(peripherals.DMA);
+    let dma = Dma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
 
     let rx_pins = RxFourBits::new(io.pins.gpio1, io.pins.gpio2, io.pins.gpio3, io.pins.gpio4);
