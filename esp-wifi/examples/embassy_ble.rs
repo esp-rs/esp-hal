@@ -66,7 +66,7 @@ async fn main(_spawner: Spawner) -> ! {
     .unwrap();
 
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    embassy::init(&clocks, timer_group0.timer0);
+    embassy::init(&clocks, timer_group0);
 
     let mut bluetooth = peripherals.BT;
 

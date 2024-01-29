@@ -60,7 +60,11 @@ toml-cfg.workspace = true
 
 [dev-dependencies]
 esp-println = { workspace = true, features = ["log"] }
-esp-backtrace.workspace = true
+esp-backtrace = { workspace = true, features = [
+    "panic-handler",
+    "exception-handler",
+    "print-uart",
+] }
 embassy-executor.workspace = true
 embassy-time.workspace = true
 embassy-net.workspace = true

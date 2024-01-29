@@ -1269,7 +1269,7 @@ fn convert_ap_info(record: &include::wifi_ap_record_t) -> AccessPointInfo {
         },
         signal_strength: record.rssi,
         protocols: EnumSet::empty(), // TODO
-        auth_method: AuthMethod::from_raw(record.authmode),
+        auth_method: Some(AuthMethod::from_raw(record.authmode)),
     }
 }
 

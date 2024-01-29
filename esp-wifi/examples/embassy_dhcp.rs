@@ -51,7 +51,7 @@ async fn main(spawner: Spawner) -> ! {
         esp_wifi::wifi::new_with_mode(&init, wifi, WifiStaDevice).unwrap();
 
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    embassy::init(&clocks, timer_group0.timer0);
+    embassy::init(&clocks, timer_group0);
 
     let config = Config::dhcpv4(Default::default());
 

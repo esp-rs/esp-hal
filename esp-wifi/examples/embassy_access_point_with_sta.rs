@@ -55,7 +55,7 @@ async fn main(spawner: Spawner) -> ! {
         esp_wifi::wifi::new_ap_sta(&init, wifi).unwrap();
 
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    embassy::init(&clocks, timer_group0.timer0);
+    embassy::init(&clocks, timer_group0);
 
     let ap_config = Config::ipv4_static(StaticConfigV4 {
         address: Ipv4Cidr::new(Ipv4Address::new(192, 168, 2, 1), 24),

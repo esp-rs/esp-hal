@@ -48,7 +48,7 @@ async fn main(spawner: Spawner) -> ! {
     println!("esp-now version {}", esp_now.get_version().unwrap());
 
     let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    embassy::init(&clocks, timer_group0.timer0);
+    embassy::init(&clocks, timer_group0);
 
     let (manager, sender, receiver) = esp_now.split();
     let manager = make_static!(manager);
