@@ -250,8 +250,9 @@ where
         self.start_write_bytes_dma(data.as_ptr() as _, data.len() * size_of::<P::Word>())?;
         self.start_send();
 
-        let lcd_user = self.lcd_cam.lcd_user();
-        while lcd_user.read().lcd_start().bit_is_set() {}
+        let dma_int_raw = self.lcd_cam.lc_dma_int_raw();
+        // Wait until LCD_TRANS_DONE is set.
+        while dma_int_raw.read().lcd_trans_done_int_raw().bit_is_clear() {}
 
         self.tear_down_send();
 
@@ -332,6 +333,11 @@ impl<'d, TX: Tx, P> I8080<'d, TX, P> {
     }
 
     fn start_send(&mut self) {
+        // Setup interrupts.
+        self.lcd_cam
+            .lc_dma_int_clr()
+            .write(|w| w.lcd_trans_done_int_clr().set_bit());
+
         self.lcd_cam
             .lcd_user()
             .modify(|_, w| w.lcd_update().set_bit().lcd_start().set_bit());
@@ -341,6 +347,10 @@ impl<'d, TX: Tx, P> I8080<'d, TX, P> {
         self.lcd_cam
             .lcd_user()
             .modify(|_, w| w.lcd_start().clear_bit());
+
+        self.lcd_cam
+            .lc_dma_int_clr()
+            .write(|w| w.lcd_trans_done_int_clr().clear_bit());
     }
 
     fn start_write_bytes_dma(&mut self, ptr: *const u8, len: usize) -> Result<(), DmaError> {
@@ -400,8 +410,9 @@ impl<'d, TX: Tx, BUFFER, P> Transfer<'d, TX, BUFFER, P> {
             .expect("instance must be available throughout object lifetime");
 
         {
-            let lcd_user = instance.lcd_cam.lcd_user();
-            while lcd_user.read().lcd_start().bit_is_set() {}
+            let dma_int_raw = instance.lcd_cam.lc_dma_int_raw();
+            // Wait until LCD_TRANS_DONE is set.
+            while dma_int_raw.read().lcd_trans_done_int_raw().bit_is_clear() {}
             instance.tear_down_send();
         }
 
@@ -418,16 +429,13 @@ impl<'d, TX: Tx, BUFFER, P> Transfer<'d, TX, BUFFER, P> {
     }
 
     pub fn is_done(&self) -> bool {
-        // let ch = &self.instance.tx_channel;
-        // ch.is_done()
-
-        let int_st = self
+        let int_raw = self
             .instance
             .as_ref()
             .expect("instance must be available throughout object lifetime")
             .lcd_cam
-            .lc_dma_int_st();
-        int_st.read().lcd_trans_done_int_st().bit_is_set()
+            .lc_dma_int_raw();
+        int_raw.read().lcd_trans_done_int_raw().bit_is_set()
     }
 }
 
