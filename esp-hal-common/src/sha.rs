@@ -87,6 +87,14 @@ pub struct Sha<'d> {
     finished: bool,
 }
 
+#[derive(Debug, Clone)]
+pub struct DigestState<const N: usize> {
+    mode: ShaMode,
+    alignment_helper: AlignmentHelper,
+    cursor: usize,
+    digest: [u8; N]
+}
+
 #[derive(Debug, Clone, Copy)]
 pub enum ShaMode {
     SHA1,
@@ -171,6 +179,49 @@ impl<'d> Sha<'d> {
 
     pub fn finished(&self) -> bool {
         self.finished
+    }
+
+    /// Save digest to resume hashing operation later.
+    pub fn save_digest<const N: usize>(&self) -> DigestState<N> {
+        let mut state = DigestState {
+            mode: self.mode,
+            alignment_helper: self.alignment_helper.clone(),
+            cursor: self.cursor,
+            digest: [0u8; N]
+        };
+
+        self.alignment_helper.volatile_read_regset(
+            #[cfg(esp32)]
+            &self.sha.text[0],
+            #[cfg(not(esp32))]
+            &self.sha.h_mem[0],
+            &mut state.digest,
+            core::cmp::min(N, 32) / self.alignment_helper.align_size(),
+        );
+        state
+    }
+
+    pub fn restore_digest<const N: usize>(&mut self, digest: DigestState<N>) {
+        // Restore cursor and alignment_helper
+        self.mode = digest.mode;
+        self.cursor = digest.cursor;
+        self.alignment_helper = digest.alignment_helper;
+
+        self.finished = false;
+        self.first_run = false;
+
+        #[cfg(esp32)]
+        let len = self.sha.text.len();
+        #[cfg(not(esp32))]
+        let len = self.sha.h_mem.len();
+        self.alignment_helper.volatile_write_regset(
+            #[cfg(esp32)]
+            &mut self.sha.text[0],
+            #[cfg(not(esp32))]
+            &mut self.sha.h_mem[0],
+            &digest.digest,
+            len
+        );
     }
 
     #[cfg(not(esp32))]
