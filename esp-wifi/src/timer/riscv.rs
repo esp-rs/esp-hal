@@ -29,9 +29,7 @@ pub const TICKS_PER_SECOND: u64 = 16_000_000;
 
 pub fn setup_timer(systimer: TimeBase) {
     // make sure the scheduling won't start before everything is setup
-    unsafe {
-        riscv::interrupt::disable();
-    }
+    riscv::interrupt::disable();
 
     let alarm0 = systimer.into_periodic();
     alarm0.set_period(TIMESLICE_FREQUENCY.into_duration());
