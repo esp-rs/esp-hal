@@ -65,6 +65,8 @@
 
 use core::{convert::Infallible, marker::PhantomData};
 
+use rand_core::RngCore;
+
 use crate::{peripheral::Peripheral, peripherals::RNG};
 
 /// Random number generator driver
@@ -102,5 +104,37 @@ impl embedded_hal::blocking::rng::Read for Rng {
         }
 
         Ok(())
+    }
+}
+
+// TODO: CryptoRng trait will be implemented when true randomness of RNG is
+// ensured
+
+impl RngCore for Rng {
+    fn next_u32(&mut self) -> u32 {
+        // Directly use the existing random method to get a u32 random number
+        self.random()
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        // Call random() twice to generate a u64 random number (сombine two u32)
+        let upper = self.random() as u64;
+        let lower = self.random() as u64;
+        (upper << 32) | lower
+    }
+
+    fn fill_bytes(&mut self, dest: &mut [u8]) {
+        // Fill the destination buffer with random bytes
+        for chunk in dest.chunks_mut(4) {
+            let rand_bytes = self.random().to_le_bytes();
+            for (dest_byte, rand_byte) in chunk.iter_mut().zip(&rand_bytes) {
+                *dest_byte = *rand_byte;
+            }
+        }
+    }
+
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core::Error> {
+        // Similar implementation as fill_bytes, but encapsulated in a Result
+        Ok(self.fill_bytes(dest))
     }
 }
