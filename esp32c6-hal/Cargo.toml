@@ -21,8 +21,9 @@ categories = [
 ]
 
 [dependencies]
-document-features = "0.2.7"
-esp-hal-common    = { version = "0.15.0", features = ["esp32c6"], path = "../esp-hal-common" }
+document-features   = "0.2.7"
+esp-hal-common      = { version = "0.15.0", features = ["esp32c6"], path = "../esp-hal-common" }
+embassy-time-driver = { version = "0.1.0",  optional = true }
 
 [dev-dependencies]
 aes                = "0.8.3"
@@ -105,10 +106,10 @@ embassy-executor-thread = ["esp-hal-common/embassy-executor-thread"]
 embassy-integrated-timers = ["esp-hal-common/embassy-integrated-timers"]
 ## Enable the embassy time driver using the `SYSTIMER` peripheral. The
 ## `SYSTIMER` peripheral has three alarams available for use.
-embassy-time-systick = ["esp-hal-common/embassy-time-systick", "embassy-time/tick-hz-16_000_000"]
+embassy-time-systick = ["esp-hal-common/embassy-time-systick", "embassy-time-driver/tick-hz-16_000_000"]
 ## Enable the embassy time driver using the `TIMG0` peripheral. The `TIMG0`
 ## peripheral has two alarms available for use.
-embassy-time-timg0 = ["esp-hal-common/embassy-time-timg0", "embassy-time/tick-hz-1_000_000"]
+embassy-time-timg0 = ["esp-hal-common/embassy-time-timg0", "embassy-time-driver/tick-hz-1_000_000"]
 
 [profile.release]
 debug = true
