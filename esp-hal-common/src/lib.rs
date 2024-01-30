@@ -221,7 +221,7 @@ fn get_raw_core() -> usize {
 
 #[cfg(xtensa)]
 fn get_raw_core() -> usize {
-    xtensa_lx::get_processor_id() as usize & 0x2000
+    ((xtensa_lx::get_processor_id() as usize & 0x2000) != 0) as usize
 }
 
 mod critical_section_impl {
