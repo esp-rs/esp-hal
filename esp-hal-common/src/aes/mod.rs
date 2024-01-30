@@ -327,7 +327,7 @@ pub mod dma {
             // Waiting for the DMA transfer is not enough. We need to wait for the
             // peripheral to finish flushing its buffers, too.
             while self.aes_dma.aes.aes.state().read().state().bits() != 2 // DMA status DONE == 2
-                && !self.aes_dma.channel.tx.is_done()
+                && !self.aes_dma.channel.tx.is_completed()
             {
                 // wait until done
             }
@@ -359,7 +359,7 @@ pub mod dma {
         /// Check if the DMA transfer is complete
         fn is_done(&self) -> bool {
             let ch = &self.aes_dma.channel;
-            ch.tx.is_done() && ch.rx.is_done()
+            ch.tx.is_completed() && ch.rx.is_completed()
         }
     }
 
@@ -453,8 +453,8 @@ pub mod dma {
             // AES has to be restarted after each calculation
             self.reset_aes();
 
-            self.channel.tx.is_done();
-            self.channel.rx.is_done();
+            self.channel.tx.is_completed();
+            self.channel.rx.is_completed();
 
             self.channel
                 .tx

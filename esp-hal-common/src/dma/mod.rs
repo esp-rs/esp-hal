@@ -354,7 +354,7 @@ pub trait RxPrivate {
 
     fn is_listening_ch_in_done(&self) -> bool;
 
-    fn is_done(&self) -> bool;
+    fn is_completed(&self) -> bool;
 
     fn is_listening_eof(&self) -> bool;
 
@@ -458,7 +458,7 @@ where
         }
     }
 
-    fn is_done(&self) -> bool {
+    fn is_completed(&self) -> bool {
         R::is_in_done()
     }
 
@@ -573,8 +573,8 @@ where
         R::is_listening_ch_in_done()
     }
 
-    fn is_done(&self) -> bool {
-        self.rx_impl.is_done()
+    fn is_completed(&self) -> bool {
+        self.rx_impl.is_completed()
     }
 
     fn init_channel(&mut self) {
@@ -724,6 +724,8 @@ pub trait TxPrivate {
 
     fn is_listening_ch_out_done(&self) -> bool;
 
+    fn is_completed(&self) -> bool;
+
     fn is_done(&self) -> bool;
 
     fn is_listening_eof(&self) -> bool;
@@ -841,6 +843,10 @@ where
 
     fn is_listening_ch_out_done(&self) -> bool {
         R::is_listening_ch_out_done()
+    }
+
+    fn is_completed(&self) -> bool {
+        R::is_out_completed()
     }
 
     fn is_done(&self) -> bool {
@@ -971,6 +977,10 @@ where
 
     fn is_listening_ch_out_done(&self) -> bool {
         self.tx_impl.is_listening_ch_out_done()
+    }
+
+    fn is_completed(&self) -> bool {
+        self.tx_impl.is_completed()
     }
 
     fn is_done(&self) -> bool {
@@ -1109,6 +1119,7 @@ pub trait RegisterAccess {
     fn unlisten_ch_out_done();
     fn is_listening_ch_out_done() -> bool;
     fn is_out_done() -> bool;
+    fn is_out_completed() -> bool;
     fn is_out_eof_interrupt_set() -> bool;
     fn reset_out_eof_interrupt();
     fn last_out_dscr_address() -> usize;
@@ -1339,7 +1350,7 @@ pub(crate) mod asynch {
                 ChannelRxImpl::waker().wake()
             }
 
-            if Channel::is_out_done() {
+            if Channel::is_out_completed() {
                 Channel::clear_out_interrupts();
                 Channel::unlisten_out_eof();
                 ChannelTxImpl::waker().wake()
@@ -1371,7 +1382,7 @@ pub(crate) mod asynch {
                 ChannelRxImpl::waker().wake()
             }
 
-            if Channel::is_out_done() {
+            if Channel::is_out_completed() {
                 Channel::clear_out_interrupts();
                 Channel::unlisten_out_eof();
                 ChannelTxImpl::waker().wake()
@@ -1404,7 +1415,7 @@ pub(crate) mod asynch {
                 ChannelRxImpl::waker().wake()
             }
 
-            if Channel::is_out_done() {
+            if Channel::is_out_completed() {
                 Channel::clear_out_interrupts();
                 Channel::unlisten_out_eof();
                 ChannelTxImpl::waker().wake()
@@ -1437,7 +1448,7 @@ pub(crate) mod asynch {
                 ChannelRxImpl::waker().wake()
             }
 
-            if Channel::is_out_done() {
+            if Channel::is_out_completed() {
                 Channel::clear_out_interrupts();
                 Channel::unlisten_out_eof();
                 ChannelTxImpl::waker().wake()
@@ -1482,7 +1493,7 @@ pub(crate) mod asynch {
         fn DMA_OUT_CH0() {
             use crate::dma::gdma::{Channel0 as Channel, Channel0TxImpl as ChannelTxImpl};
 
-            if Channel::is_out_done() {
+            if Channel::is_out_completed() {
                 Channel::clear_out_interrupts();
                 Channel::unlisten_out_eof();
                 ChannelTxImpl::waker().wake()
@@ -1516,7 +1527,7 @@ pub(crate) mod asynch {
         fn DMA_OUT_CH1() {
             use crate::dma::gdma::{Channel1 as Channel, Channel1TxImpl as ChannelTxImpl};
 
-            if Channel::is_out_done() {
+            if Channel::is_out_completed() {
                 Channel::clear_out_interrupts();
                 Channel::unlisten_out_eof();
                 ChannelTxImpl::waker().wake()
@@ -1550,7 +1561,7 @@ pub(crate) mod asynch {
         fn DMA_OUT_CH2() {
             use crate::dma::gdma::{Channel2 as Channel, Channel2TxImpl as ChannelTxImpl};
 
-            if Channel::is_out_done() {
+            if Channel::is_out_completed() {
                 Channel::clear_out_interrupts();
                 Channel::unlisten_out_eof();
                 ChannelTxImpl::waker().wake()
@@ -1589,7 +1600,7 @@ pub(crate) mod asynch {
         fn DMA_OUT_CH0() {
             use crate::dma::gdma::{Channel0 as Channel, Channel0TxImpl as ChannelTxImpl};
 
-            if Channel::is_out_done() {
+            if Channel::is_out_completed() {
                 Channel::clear_out_interrupts();
                 Channel::unlisten_out_eof();
                 ChannelTxImpl::waker().wake()
@@ -1623,7 +1634,7 @@ pub(crate) mod asynch {
         fn DMA_OUT_CH1() {
             use crate::dma::gdma::{Channel1 as Channel, Channel1TxImpl as ChannelTxImpl};
 
-            if Channel::is_out_done() {
+            if Channel::is_out_completed() {
                 Channel::clear_out_interrupts();
                 Channel::unlisten_out_eof();
                 ChannelTxImpl::waker().wake()
@@ -1657,7 +1668,7 @@ pub(crate) mod asynch {
         fn DMA_OUT_CH3() {
             use crate::dma::gdma::{Channel3 as Channel, Channel3TxImpl as ChannelTxImpl};
 
-            if Channel::is_out_done() {
+            if Channel::is_out_completed() {
                 Channel::clear_out_interrupts();
                 Channel::unlisten_out_eof();
                 ChannelTxImpl::waker().wake()
@@ -1691,7 +1702,7 @@ pub(crate) mod asynch {
         fn DMA_OUT_CH4() {
             use crate::dma::gdma::{Channel4 as Channel, Channel4TxImpl as ChannelTxImpl};
 
-            if Channel::is_out_done() {
+            if Channel::is_out_completed() {
                 Channel::clear_out_interrupts();
                 Channel::unlisten_out_eof();
                 ChannelTxImpl::waker().wake()
@@ -1723,7 +1734,7 @@ pub(crate) mod asynch {
                 ChannelRxImpl::waker().wake()
             }
 
-            if Channel::is_out_done() {
+            if Channel::is_out_completed() {
                 Channel::clear_out_interrupts();
                 Channel::unlisten_out_eof();
                 ChannelTxImpl::waker().wake()
@@ -1756,7 +1767,7 @@ pub(crate) mod asynch {
                 ChannelRxImpl::waker().wake()
             }
 
-            if Channel::is_out_done() {
+            if Channel::is_out_completed() {
                 Channel::clear_out_interrupts();
                 Channel::unlisten_out_eof();
                 ChannelTxImpl::waker().wake()
@@ -1789,7 +1800,7 @@ pub(crate) mod asynch {
                 ChannelRxImpl::waker().wake()
             }
 
-            if Channel::is_out_done() && Channel::is_listening_out_eof() {
+            if Channel::is_out_completed() && Channel::is_listening_out_eof() {
                 Channel::clear_out_interrupts();
                 Channel::unlisten_out_eof();
                 ChannelTxImpl::waker().wake()
@@ -1823,7 +1834,7 @@ pub(crate) mod asynch {
                 ChannelRxImpl::waker().wake()
             }
 
-            if Channel::is_out_done() && Channel::is_listening_out_eof() {
+            if Channel::is_out_completed() && Channel::is_listening_out_eof() {
                 Channel::clear_out_interrupts();
                 Channel::unlisten_out_eof();
                 ChannelTxImpl::waker().wake()
