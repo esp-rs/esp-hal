@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fix embassy-time tick rate not set when using systick as the embassy timebase (#1124)
 - Fix `get_raw_core` on Xtensa (#1126)
+- Fix docs.rs documentation builds (#1129)
 
 ### Changed
 
