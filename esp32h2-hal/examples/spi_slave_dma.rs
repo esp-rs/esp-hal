@@ -27,9 +27,8 @@
 
 use esp32h2_hal::{
     clock::ClockControl,
-    dma::DmaPriority,
+    dma::{Dma, DmaPriority},
     dma_buffers,
-    gdma::Gdma,
     gpio::IO,
     peripherals::Peripherals,
     prelude::*,
@@ -61,7 +60,7 @@ fn main() -> ! {
     master_sclk.set_low().unwrap();
     master_mosi.set_low().unwrap();
 
-    let dma = Gdma::new(peripherals.DMA);
+    let dma = Dma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
 
     let (tx_buffer, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(32000);

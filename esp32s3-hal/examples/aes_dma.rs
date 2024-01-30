@@ -13,8 +13,7 @@ use esp32s3_hal::{
         Mode,
     },
     clock::ClockControl,
-    dma::{DmaDescriptor, DmaPriority},
-    gdma::Gdma,
+    dma::{Dma, DmaDescriptor, DmaPriority},
     peripherals::Peripherals,
     prelude::*,
     systimer::SystemTimer,
@@ -28,7 +27,7 @@ fn main() -> ! {
     let system = peripherals.SYSTEM.split();
     let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let dma = Gdma::new(peripherals.DMA);
+    let dma = Dma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
 
     let mut descriptors = [DmaDescriptor::EMPTY; 1];

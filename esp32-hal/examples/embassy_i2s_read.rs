@@ -17,11 +17,10 @@
 use embassy_executor::Spawner;
 use esp32_hal::{
     clock::ClockControl,
-    dma::DmaPriority,
+    dma::{Dma, DmaPriority},
     dma_buffers,
     embassy::{self},
     i2s::{asynch::*, DataFormat, I2s, Standard},
-    pdma::Dma,
     peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
@@ -44,7 +43,7 @@ async fn main(_spawner: Spawner) {
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let dma = Dma::new(system.dma);
+    let dma = Dma::new(peripherals.DMA);
     let dma_channel = dma.i2s0channel;
 
     let (_, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(0, 4092 * 4);

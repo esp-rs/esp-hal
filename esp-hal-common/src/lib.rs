@@ -51,10 +51,6 @@ pub use self::analog::adc;
 pub use self::analog::dac;
 #[cfg(any(xtensa, all(riscv, systimer)))]
 pub use self::delay::Delay;
-#[cfg(gdma)]
-pub use self::dma::gdma;
-#[cfg(pdma)]
-pub use self::dma::pdma;
 #[cfg(gpio)]
 pub use self::gpio::IO;
 #[cfg(rmt)]

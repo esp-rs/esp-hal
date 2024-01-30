@@ -615,12 +615,6 @@ pub struct CpuControl {
     _private: (),
 }
 
-/// Dummy DMA peripheral.
-#[cfg(pdma)]
-pub struct Dma {
-    _private: (),
-}
-
 pub enum RadioPeripherals {
     #[cfg(phy)]
     Phy,
@@ -661,8 +655,6 @@ pub struct SystemParts<'d> {
     _private: PeripheralRef<'d, SYSTEM>,
     pub clock_control: SystemClockControl,
     pub cpu_control: CpuControl,
-    #[cfg(pdma)]
-    pub dma: Dma,
     pub radio_clock_control: RadioClockControl,
     pub software_interrupt_control: SoftwareInterruptControl,
 }
@@ -684,8 +676,6 @@ impl<'d, T: crate::peripheral::Peripheral<P = SYSTEM> + 'd> SystemExt<'d> for T 
             _private: self.into_ref(),
             clock_control: SystemClockControl { _private: () },
             cpu_control: CpuControl { _private: () },
-            #[cfg(pdma)]
-            dma: Dma { _private: () },
             radio_clock_control: RadioClockControl { _private: () },
             software_interrupt_control: SoftwareInterruptControl { _private: () },
         }
@@ -702,18 +692,3 @@ impl crate::peripheral::Peripheral for SystemClockControl {
 }
 
 impl crate::peripheral::sealed::Sealed for SystemClockControl {}
-
-#[cfg(pdma)]
-mod dma_peripheral {
-    use super::Dma;
-
-    impl crate::peripheral::Peripheral for Dma {
-        type P = Dma;
-        #[inline]
-        unsafe fn clone_unchecked(&mut self) -> Self::P {
-            Dma { _private: () }
-        }
-    }
-
-    impl crate::peripheral::sealed::Sealed for Dma {}
-}

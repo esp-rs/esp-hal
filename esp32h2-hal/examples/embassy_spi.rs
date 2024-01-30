@@ -22,10 +22,9 @@ use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp32h2_hal::{
     clock::ClockControl,
-    dma::DmaPriority,
+    dma::{DmaPriority, *},
     dma_descriptors,
     embassy,
-    gdma::*,
     peripherals::Peripherals,
     prelude::*,
     spi::{
@@ -61,7 +60,7 @@ async fn main(_spawner: Spawner) {
     let mosi = io.pins.gpio3;
     let cs = io.pins.gpio11;
 
-    let dma = Gdma::new(peripherals.DMA);
+    let dma = Dma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
 
     let (mut descriptors, mut rx_descriptors) = dma_descriptors!(32000);

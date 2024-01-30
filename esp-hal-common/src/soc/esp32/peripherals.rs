@@ -28,6 +28,7 @@ crate::peripherals! {
     BT <= virtual,
     DAC1 <= virtual,
     DAC2 <= virtual,
+    DMA <= virtual,
     EFUSE <= EFUSE,
     FLASH_ENCRYPTION <= FLASH_ENCRYPTION,
     FRC_TIMER <= FRC_TIMER,

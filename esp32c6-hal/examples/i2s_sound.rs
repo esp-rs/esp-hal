@@ -32,9 +32,8 @@
 
 use esp32c6_hal::{
     clock::ClockControl,
-    dma::DmaPriority,
+    dma::{Dma, DmaPriority},
     dma_buffers,
-    gdma::Gdma,
     i2s::{DataFormat, I2s, I2sWriteDma, Standard},
     peripherals::Peripherals,
     prelude::*,
@@ -58,7 +57,7 @@ fn main() -> ! {
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let dma = Gdma::new(peripherals.DMA);
+    let dma = Dma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
 
     let (tx_buffer, mut tx_descriptors, _, mut rx_descriptors) = dma_buffers!(32000, 0);

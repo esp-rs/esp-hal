@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `ADC` and `DAC` drivers now take virtual peripherals in their constructors, instead of splitting `APB_SARADC`/`SENS` (#1100)
 - The `DAC` driver's constructor is now `new` instead of `dac`, to be more consistent with other APIs (#1100)
+- The DMA peripheral is now called `Dma` for devices with both PDMA and GDMA controllers (#1125)
 
 ## [0.15.0] - 2024-01-19
 
