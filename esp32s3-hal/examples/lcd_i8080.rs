@@ -21,9 +21,8 @@
 
 use esp32s3_hal::{
     clock::ClockControl,
-    dma::DmaPriority,
+    dma::{Dma, DmaPriority},
     dma_buffers,
-    gdma::Gdma,
     gpio::IO,
     lcd_cam::{
         lcd::i8080::{Config, TxEightBits, I8080},
@@ -50,7 +49,7 @@ fn main() -> ! {
     let lcd_wr = io.pins.gpio47; // Write clock
     let _lcd_te = io.pins.gpio48; // Frame sync
 
-    let dma = Gdma::new(peripherals.DMA);
+    let dma = Dma::new(peripherals.DMA);
     let channel = dma.channel0;
 
     let (tx_buffer, mut tx_descriptors, _, mut rx_descriptors) = dma_buffers!(32678, 0);
