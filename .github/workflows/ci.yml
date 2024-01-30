@@ -165,6 +165,11 @@ jobs:
           cargo check --examples --features=embassy,embassy-time-timg0,embassy-executor-interrupt,embassy-executor-thread,log
       - name: check esp32-hal (psram)
         run: cd esp32-hal/ && cargo check --example=psram --features=psram-2m --release # This example requires release!
+      # Check if all examples are checked by checking the target directory for corresponding build artifacts
+      - name: check all examples are checked
+        run: |
+          cd esp32-hal/
+          for example in examples/*.rs; do base_name=$(basename $example .rs); echo $base_name; base_name=${base_name//[-]/_}; fail1="n"; fail2="n"; ls target/xtensa-esp32-none-elf/debug/examples/$base_name-*.d >/dev/null 2>&1 || fail1=""; ls target/xtensa-esp32-none-elf/release/examples/$base_name-*.d >/dev/null 2>&1 || fail2=""; [[ -n $fail1$fail2 ]] || exit 1; done
       # Make sure we can build without default features enabled, too!
       - name: check esp32-hal (no default features)
         run: cd esp32-hal/ && cargo build --no-default-features --features=xtal-40mhz
@@ -220,6 +225,11 @@ jobs:
           cd esp32c2-hal/
           cargo +nightly check --examples --features=embassy,embassy-time-timg0,embassy-executor-thread,defmt
           cargo +nightly check --examples --features=embassy,embassy-time-timg0,embassy-executor-thread,log
+      # Check if all examples are checked by checking the target directory for corresponding build artifacts
+      - name: check all examples are checked
+        run: |
+          cd esp32c2-hal/
+          for example in examples/*.rs; do base_name=$(basename $example .rs); echo $base_name; base_name=${base_name//[-]/_}; fail1="n"; fail2="n"; ls target/riscv32imc-unknown-none-elf/debug/examples/$base_name-*.d >/dev/null 2>&1 || fail1=""; ls target/riscv32imc-unknown-none-elf/release/examples/$base_name-*.d >/dev/null 2>&1 || fail2=""; [[ -n $fail1$fail2 ]] || exit 1; done
       # Make sure we can build without default features enabled, too!
       - name: check esp32c2-hal (no default features)
         run: cd esp32c2-hal/ && cargo build --no-default-features --features=xtal-40mhz
@@ -277,6 +287,11 @@ jobs:
           cd esp32c3-hal/
           cargo +nightly check --examples --features=embassy,embassy-time-timg0,embassy-executor-thread,defmt
           cargo +nightly check --examples --features=embassy,embassy-time-timg0,embassy-executor-thread,log
+      # Check if all examples are checked by checking the target directory for corresponding build artifacts
+      - name: check all examples are checked
+        run: |
+          cd esp32c3-hal/
+          for example in examples/*.rs; do base_name=$(basename $example .rs); echo $base_name; base_name=${base_name//[-]/_}; fail1="n"; fail2="n"; ls target/riscv32imc-unknown-none-elf/debug/examples/$base_name-*.d >/dev/null 2>&1 || fail1=""; ls target/riscv32imc-unknown-none-elf/release/examples/$base_name-*.d >/dev/null 2>&1 || fail2=""; [[ -n $fail1$fail2 ]] || exit 1; done
       # Make sure we can build without default features enabled, too!
       - name: check esp32c3-hal (no default features)
         run: cd esp32c3-hal/ && cargo build --no-default-features
@@ -347,6 +362,11 @@ jobs:
           cd esp32c6-hal/
           cargo +nightly check --examples --features=embassy,embassy-time-timg0,embassy-executor-thread,defmt
           cargo +nightly check --examples --features=embassy,embassy-time-timg0,embassy-executor-thread,log
+      # Check if all examples are checked by checking the target directory for corresponding build artifacts
+      - name: check all examples are checked
+        run: |
+          cd esp32c6-hal/
+          for example in examples/*.rs; do base_name=$(basename $example .rs); echo $base_name; base_name=${base_name//[-]/_}; fail1="n"; fail2="n"; ls target/riscv32imac-unknown-none-elf/debug/examples/$base_name-*.d >/dev/null 2>&1 || fail1=""; ls target/riscv32imac-unknown-none-elf/release/examples/$base_name-*.d >/dev/null 2>&1 || fail2=""; [[ -n $fail1$fail2 ]] || exit 1; done
       # Make sure we can build without default features enabled, too!
       - name: check esp32c6-hal (no default features)
         run: cd esp32c6-hal/ && cargo build --no-default-features
@@ -410,6 +430,11 @@ jobs:
           cd esp32h2-hal/
           cargo +nightly check --examples --features=embassy,embassy-time-timg0,embassy-executor-thread,defmt
           cargo +nightly check --examples --features=embassy,embassy-time-timg0,embassy-executor-thread,log
+      # Check if all examples are checked by checking the target directory for corresponding build artifacts
+      - name: check all examples are checked
+        run: |
+          cd esp32h2-hal/
+          for example in examples/*.rs; do base_name=$(basename $example .rs); echo $base_name; base_name=${base_name//[-]/_}; fail1="n"; fail2="n"; ls target/riscv32imac-unknown-none-elf/debug/examples/$base_name-*.d >/dev/null 2>&1 || fail1=""; ls target/riscv32imac-unknown-none-elf/release/examples/$base_name-*.d >/dev/null 2>&1 || fail2=""; [[ -n $fail1$fail2 ]] || exit 1; done
       # Make sure we can build without default features enabled, too!
       - name: check esp32h2-hal (no default features)
         run: cd esp32h2-hal/ && cargo build --no-default-features
@@ -442,6 +467,11 @@ jobs:
           cd esp32p4-hal/
           cargo +nightly build --examples --features=eh1,ufmt,log
           cargo +nightly build --examples --features=eh1,ufmt,defmt
+      # Check if all examples are checked by checking the target directory for corresponding build artifacts
+      - name: check all examples are checked
+        run: |
+          cd esp32p4-hal/
+          for example in examples/*.rs; do base_name=$(basename $example .rs); echo $base_name; base_name=${base_name//[-]/_}; fail1="n"; fail2="n"; ls target/riscv32imafc-unknown-none-elf/debug/examples/$base_name-*.d >/dev/null 2>&1 || fail1=""; ls target/riscv32imafc-unknown-none-elf/release/examples/$base_name-*.d >/dev/null 2>&1 || fail2=""; [[ -n $fail1$fail2 ]] || exit 1; done
       # Make sure we can build without default features enabled, too!
       - name: check esp32p4-hal (no default features)
         run: cd esp32p4-hal/ && cargo build --no-default-features
@@ -519,6 +549,11 @@ jobs:
           cargo +esp check --examples --features=embassy,embassy-time-timg0,embassy-executor-interrupt,embassy-executor-thread,log
       - name: check esp32s2-hal (psram)
         run: cd esp32s2-hal/ && cargo +esp check --example=psram --features=psram-2m --release # This example requires release!
+      # Check if all examples are checked by checking the target directory for corresponding build artifacts
+      - name: check all examples are checked
+        run: |
+          cd esp32s2-hal/
+          for example in examples/*.rs; do base_name=$(basename $example .rs); echo $base_name; base_name=${base_name//[-]/_}; fail1="n"; fail2="n"; ls target/xtensa-esp32s2-none-elf/debug/examples/$base_name-*.d >/dev/null 2>&1 || fail1=""; ls target/xtensa-esp32s2-none-elf/release/examples/$base_name-*.d >/dev/null 2>&1 || fail2=""; [[ -n $fail1$fail2 ]] || exit 1; done
       # Make sure we can build without default features enabled, too!
       - name: check esp32s2-hal (no default features)
         run: cd esp32s2-hal/ && cargo build --no-default-features
@@ -606,6 +641,11 @@ jobs:
           cd esp32s3-hal/
           cargo +esp check --examples --features=embassy,embassy-time-timg0,embassy-executor-interrupt,embassy-executor-thread,defmt
           cargo +esp check --examples --features=embassy,embassy-time-timg0,embassy-executor-interrupt,embassy-executor-thread,log
+      # Check if all examples are checked by checking the target directory for corresponding build artifacts
+      - name: check all examples are checked
+        run: |
+          cd esp32s3-hal/
+          for example in examples/*.rs; do base_name=$(basename $example .rs); echo $base_name; base_name=${base_name//[-]/_}; fail1="n"; fail2="n"; ls target/xtensa-esp32s3-none-elf/debug/examples/$base_name-*.d >/dev/null 2>&1 || fail1=""; ls target/xtensa-esp32s3-none-elf/release/examples/$base_name-*.d >/dev/null 2>&1 || fail2=""; [[ -n $fail1$fail2 ]] || exit 1; done
       # Make sure we can build without default features enabled, too!
       - name: check esp32s3-hal (no default features)
         run: cd esp32s3-hal/ && cargo build --no-default-features
