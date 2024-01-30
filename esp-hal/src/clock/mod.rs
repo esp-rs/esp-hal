@@ -171,6 +171,8 @@ pub(crate) enum PllClock {
     #[cfg(not(any(esp32c2, esp32c6, esp32h2, esp32p4)))]
     Pll320MHz,
     #[cfg(esp32p4)]
+    Pll360MHz,
+    #[cfg(esp32p4)]
     Pll400MHz,
     #[cfg(not(esp32h2))]
     Pll480MHz,
