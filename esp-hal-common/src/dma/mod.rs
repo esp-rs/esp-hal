@@ -315,6 +315,9 @@ pub trait ParlIoPeripheral: PeripheralMarker {}
 /// Marks channels as useable for AES
 pub trait AesPeripheral: PeripheralMarker {}
 
+/// Marks channels as usable for LCD_CAM
+pub trait LcdCamPeripheral: PeripheralMarker {}
+
 /// DMA Rx
 pub trait Rx: RxPrivate {}
 
@@ -1148,7 +1151,7 @@ pub struct Channel<'d, C>
 where
     C: ChannelTypes,
 {
-    pub(crate) tx: C::Tx<'d>,
+    pub tx: C::Tx<'d>,
     pub(crate) rx: C::Rx<'d>,
 }
 

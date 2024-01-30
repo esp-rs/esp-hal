@@ -103,6 +103,8 @@ pub enum Peripheral {
     Etm,
     #[cfg(trace)]
     Trace,
+    #[cfg(lcd_cam)]
+    LcdCam,
 }
 
 pub struct SoftwareInterruptControl {
@@ -383,6 +385,11 @@ impl PeripheralClockControl {
             Peripheral::Ecc => {
                 perip_clk_en1.modify(|_, w| w.crypto_ecc_clk_en().set_bit());
                 perip_rst_en1.modify(|_, w| w.crypto_ecc_rst().clear_bit());
+            }
+            #[cfg(lcd_cam)]
+            Peripheral::LcdCam => {
+                perip_clk_en1.modify(|_, w| w.lcd_cam_clk_en().set_bit());
+                perip_rst_en1.modify(|_, w| w.lcd_cam_rst().clear_bit());
             }
         });
     }

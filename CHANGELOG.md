@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-P4: Add initial GPIO support (#1109)
 - ESP32-P4: Add initial support for interrupts (#1112)
 - ESP32-P4: Add efuse reading support (#1114)
+- ESP32-S3: Added LCD_CAM I8080 driver (#1086)
 
 - Allow for splitting of the USB Serial JTAG peripheral into tx/rx components (#1024)
 - `RngCore` trait is implemented (#1122)
