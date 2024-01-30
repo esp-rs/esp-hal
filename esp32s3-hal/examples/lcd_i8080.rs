@@ -1,6 +1,20 @@
-//! Drives a display
+//! Drives the 8-bit parallel display on a WT32-SC01 Plus
 //!
-//! This assumes that pins are......
+//! This example clears the screen with red and then blue every second.
+//!
+//! Pins used
+//! Backlight GPIO45
+//! Reset     GPIO4
+//! CD        GPIO0
+//! WR        GPIO47
+//! D0        GPIO9
+//! D1        GPIO46
+//! D2        GPIO3
+//! D3        GPIO8
+//! D4        GPIO18
+//! D5        GPIO17
+//! D6        GPIO16
+//! D7        GPIO15
 
 #![no_std]
 #![no_main]
