@@ -13,7 +13,7 @@ use esp32c6_hal::{
         Mode,
     },
     clock::ClockControl,
-    dma::DmaPriority,
+    dma::{DmaDescriptor, DmaPriority},
     gdma::Gdma,
     peripherals::Peripherals,
     prelude::*,
@@ -31,8 +31,8 @@ fn main() -> ! {
     let dma = Gdma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
 
-    let mut descriptors = [0u32; 8 * 3];
-    let mut rx_descriptors = [0u32; 8 * 3];
+    let mut descriptors = [DmaDescriptor::EMPTY; 1];
+    let mut rx_descriptors = [DmaDescriptor::EMPTY; 1];
 
     let aes = Aes::new(peripherals.AES).with_dma(dma_channel.configure(
         false,

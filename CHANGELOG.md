@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- DmaDescriptor struct to better model the hardware (#1054)
+- DMA descriptor count no longer needs to be multiplied by 3 (#1054)
+
 ### Removed
 
 ### Breaking

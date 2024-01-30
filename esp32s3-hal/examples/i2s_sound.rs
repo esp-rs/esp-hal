@@ -32,7 +32,7 @@
 
 use esp32s3_hal::{
     clock::ClockControl,
-    dma::DmaPriority,
+    dma::{DmaDescriptor, DmaPriority},
     gdma::Gdma,
     i2s::{DataFormat, I2s, I2sWriteDma, Standard},
     peripherals::Peripherals,
@@ -60,8 +60,8 @@ fn main() -> ! {
     let dma = Gdma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
 
-    let mut tx_descriptors = [0u32; 20 * 3];
-    let mut rx_descriptors = [0u32; 8 * 3];
+    let mut tx_descriptors = [DmaDescriptor::EMPTY; 20];
+    let mut rx_descriptors = [DmaDescriptor::EMPTY; 8];
 
     let i2s = I2s::new(
         peripherals.I2S0,
