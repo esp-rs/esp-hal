@@ -30,7 +30,7 @@ embassy-time-driver = { version = "0.1.0",  optional = true }
 
 [dev-dependencies]
 embassy-time  = "0.3.0"
-esp-backtrace = { version = "0.10.0", features = ["esp32p4", "exception-handler", "panic-handler", "print-uart"] }
+esp-backtrace = { version = "0.10.0", features = ["esp32p4", "exception-handler", "panic-handler", "println"] }
 esp-println   = { version = "0.8.0",  features = ["esp32p4"] }
 
 [features]
@@ -93,5 +93,5 @@ embassy-time-timg0 = ["esp-hal/embassy-time-timg0", "embassy-time-driver/tick-hz
 debug = true
 
 [patch.crates-io]
-esp-backtrace = { git = "https://github.com/jessebraham/esp-backtrace", branch = "feature/esp32p4" }
-esp-println   = { git = "https://github.com/esp-rs/esp-println", rev = "1f628e3" }
+esp-backtrace = { git = "https://github.com/esp-rs/esp-backtrace", rev = "edf2387" }
+esp-println   = { git = "https://github.com/esp-rs/esp-println",   rev = "1f628e3" }
