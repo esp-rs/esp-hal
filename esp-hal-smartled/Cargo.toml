@@ -12,19 +12,19 @@ features = ["esp32c3"]
 
 [dependencies]
 defmt            = { version = "=0.3.5", optional = true }
-esp-hal-common   = { version = "0.15.0", path = "../esp-hal-common" }
+esp-hal          = { version = "0.15.0", path = "../esp-hal" }
 fugit            = "0.3.7"
 smart-leds-trait = "0.3.0"
 
 [features]
-esp32   = ["esp-hal-common/esp32"]
-esp32c3 = ["esp-hal-common/esp32c3"]
-esp32c6 = ["esp-hal-common/esp32c6"]
-esp32h2 = ["esp-hal-common/esp32h2"]
-esp32s2 = ["esp-hal-common/esp32s2"]
-esp32s3 = ["esp-hal-common/esp32s3"]
+esp32   = ["esp-hal/esp32"]
+esp32c3 = ["esp-hal/esp32c3"]
+esp32c6 = ["esp-hal/esp32c6"]
+esp32h2 = ["esp-hal/esp32h2"]
+esp32s2 = ["esp-hal/esp32s2"]
+esp32s3 = ["esp-hal/esp32s3"]
 
-xtal-26mhz = ["esp-hal-common/xtal-26mhz"]
-xtal-40mhz = ["esp-hal-common/xtal-40mhz"]
+xtal-26mhz = ["esp-hal/xtal-26mhz"]
+xtal-40mhz = ["esp-hal/xtal-40mhz"]
 
-defmt = ["dep:defmt", "esp-hal-common/defmt"]
+defmt = ["dep:defmt", "esp-hal/defmt"]

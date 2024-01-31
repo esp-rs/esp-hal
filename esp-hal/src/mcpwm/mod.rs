@@ -28,7 +28,7 @@
 //! signal at 20 kHz. The signal will be output to the pin assigned to `pin`.
 //!
 //! ```no_run
-//! # use esp_hal_common::{mcpwm, prelude::*};
+//! # use esp_hal::{mcpwm, prelude::*};
 //! use mcpwm::{operator::PwmPinConfig, timer::PwmWorkingMode, PeripheralClockConfig, MCPWM};
 //!
 //! // initialize peripheral

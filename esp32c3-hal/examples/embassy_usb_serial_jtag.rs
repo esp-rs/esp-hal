@@ -17,7 +17,7 @@ use esp32c3_hal::{
     UsbSerialJtag,
 };
 use esp_backtrace as _;
-use esp_hal_common::usb_serial_jtag::{UsbSerialJtagRx, UsbSerialJtagTx};
+use esp_hal::usb_serial_jtag::{UsbSerialJtagRx, UsbSerialJtagTx};
 use static_cell::make_static;
 
 const MAX_BUFFER_SIZE: usize = 512;

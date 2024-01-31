@@ -6,4 +6,4 @@
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![no_std]
 
-pub use esp_hal_common::*;
+pub use esp_hal::*;

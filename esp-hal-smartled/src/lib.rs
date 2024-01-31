@@ -24,7 +24,7 @@
 
 use core::{fmt::Debug, slice::IterMut};
 
-use esp_hal_common::{
+use esp_hal::{
     gpio::OutputPin,
     peripheral::Peripheral,
     rmt::{Error as RmtError, PulseCode, TxChannel, TxChannelConfig, TxChannelCreator},

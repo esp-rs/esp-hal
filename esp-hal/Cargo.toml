@@ -1,5 +1,5 @@
 [package]
-name         = "esp-hal-common"
+name         = "esp-hal"
 version      = "0.15.0"
 edition      = "2021"
 rust-version = "1.67.0"
@@ -12,7 +12,7 @@ license      = "MIT OR Apache-2.0"
 # confusing build errors due to expected features not getting enabled
 # on the unintentional copy.
 # This is especially common when mixing crates from crates.io and git.
-links = "esp-hal-common"
+links = "esp-hal"
 
 [dependencies]
 bitflags             = "2.4.2"
@@ -175,7 +175,7 @@ debug = [
     "esp32s3?/impl-register-debug",
 ]
 
-# Enable support for `defmt`, for `esp-hal-common` and also for all our dependencies
+# Enable support for `defmt`, for `esp-hal` and also for all our dependencies
 defmt = [
     "dep:defmt",
     "embassy-executor?/defmt",
