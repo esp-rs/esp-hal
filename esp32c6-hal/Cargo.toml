@@ -20,6 +20,9 @@ categories = [
     "no-std",
 ]
 
+[package.metadata.docs.rs]
+targets = ["riscv32imac-unknown-none-elf"]
+
 [dependencies]
 document-features   = "0.2.7"
 esp-hal-common      = { version = "0.15.0", features = ["esp32c6"], path = "../esp-hal-common" }
