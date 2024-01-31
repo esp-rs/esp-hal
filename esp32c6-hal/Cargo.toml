@@ -21,7 +21,7 @@ categories = [
 ]
 
 [package.metadata.docs.rs]
-targets = ["riscv32imc-unknown-none-elf"]
+targets = ["riscv32imac-unknown-none-elf"]
 
 [dependencies]
 document-features   = "0.2.7"
