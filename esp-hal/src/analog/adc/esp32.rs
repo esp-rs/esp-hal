@@ -256,10 +256,10 @@ impl<'d, ADCI> ADC<'d, ADCI>
 where
     ADCI: RegisterAccess,
 {
-    pub fn adc(
+    pub fn new(
         adc_instance: impl crate::peripheral::Peripheral<P = ADCI> + 'd,
         config: AdcConfig<ADCI>,
-    ) -> Result<Self, ()> {
+    ) -> Self {
         let sensors = unsafe { &*SENS::ptr() };
 
         // Set reading and sampling resolution
@@ -322,13 +322,11 @@ where
             .sar_read_ctrl2()
             .modify(|_, w| w.sar2_data_inv().set_bit());
 
-        let adc = ADC {
+        ADC {
             _adc: adc_instance.into_ref(),
             attenuations: config.attenuations,
             active_channel: None,
-        };
-
-        Ok(adc)
+        }
     }
 }
 

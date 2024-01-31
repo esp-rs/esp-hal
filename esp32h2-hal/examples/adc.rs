@@ -27,7 +27,7 @@ fn main() -> ! {
     // Create ADC instances
     let mut adc1_config = AdcConfig::new();
     let mut pin = adc1_config.enable_pin(io.pins.gpio2.into_analog(), Attenuation::Attenuation11dB);
-    let mut adc1 = ADC::<ADC1>::adc(peripherals.ADC1, adc1_config).unwrap();
+    let mut adc1 = ADC::<ADC1>::new(peripherals.ADC1, adc1_config);
 
     let mut delay = Delay::new(&clocks);
 
