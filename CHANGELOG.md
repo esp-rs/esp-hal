@@ -17,7 +17,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-P4: Add initial support for interrupts (#1112)
 - ESP32-P4: Add efuse reading support (#1114)
 - ESP32-S3: Added LCD_CAM I8080 driver (#1086)
-
 - Allow for splitting of the USB Serial JTAG peripheral into tx/rx components (#1024)
 - `RngCore` trait is implemented (#1122)
 
@@ -32,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - DmaDescriptor struct to better model the hardware (#1054)
 - DMA descriptor count no longer needs to be multiplied by 3 (#1054)
 - RMT channels no longer take the channel number as a generic param (#959)
+- The `esp-hal-common` package is now called `esp-hal` (#1131)
 
 ### Removed
 
