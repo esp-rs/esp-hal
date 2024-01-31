@@ -25,7 +25,7 @@ targets = ["riscv32imafc-unknown-none-elf"]
 
 [dependencies]
 document-features   = "0.2.7"
-esp-hal-common      = { version = "0.15.0", features = ["esp32p4"], path = "../esp-hal-common" }
+esp-hal             = { version = "0.15.0", features = ["esp32p4"], path = "../esp-hal" }
 embassy-time-driver = { version = "0.1.0",  optional = true }
 
 [dev-dependencies]
@@ -37,57 +37,57 @@ esp-println   = { version = "0.8.0",  features = ["esp32p4"] }
 default = ["embassy-integrated-timers", "rt", "vectored", "zero-rtc-bss"]
 
 ## Enable debug features in the HAL (used for development).
-debug = ["esp-hal-common/debug"]
+debug = ["esp-hal/debug"]
 ## Enable direct interrupt vectoring.
-direct-vectoring = ["esp-hal-common/direct-vectoring"]
+direct-vectoring = ["esp-hal/direct-vectoring"]
 ## Enable interrupt preemption.
-interrupt-preemption = ["esp-hal-common/interrupt-preemption"]
+interrupt-preemption = ["esp-hal/interrupt-preemption"]
 ## Enable logging output using the `log` crate.
-log = ["esp-hal-common/log", "esp-println/log"]
+log = ["esp-hal/log", "esp-println/log"]
 ## Enable runtime support.
-rt = ["esp-hal-common/rt-riscv"]
+rt = ["esp-hal/rt-riscv"]
 ## Enable interrupt vectoring.
-vectored = ["esp-hal-common/vectored"]
+vectored = ["esp-hal/vectored"]
 
 #! ### Trait Implementation Feature Flags
 ## Enable support for asynchronous operation, with interfaces provided by
 ## `embedded-hal-async` and `embedded-io-async`.
-async = ["esp-hal-common/async"]
+async = ["esp-hal/async"]
 ## Implement `defmt::Format` on certain types.
-defmt = ["esp-hal-common/defmt", "esp-println/defmt-espflash"]
+defmt = ["esp-hal/defmt", "esp-println/defmt-espflash"]
 ## Implement the traits defined in the `1.0.0` releases of `embedded-hal` and
 ## `embedded-hal-nb` for the relevant peripherals.
-eh1 = ["esp-hal-common/eh1"]
+eh1 = ["esp-hal/eh1"]
 ## Implement the traits defined in `embedded-io` for certain peripherals.
-embedded-io = ["esp-hal-common/embedded-io"]
+embedded-io = ["esp-hal/embedded-io"]
 ## Implement the `ufmt_write::uWrite` trait for certain peripherals.
-ufmt = ["esp-hal-common/ufmt"]
+ufmt = ["esp-hal/ufmt"]
 
 #! ### Memory Initialization Feature Flags
 ## Zero the `.bss` section of low-power memory.
-zero-rtc-bss = ["esp-hal-common/rv-zero-rtc-bss"]
+zero-rtc-bss = ["esp-hal/rv-zero-rtc-bss"]
 ## Initialize the `.data` section of memory.
-init-data = ["esp-hal-common/rv-init-data"]
+init-data = ["esp-hal/rv-init-data"]
 ## Initialize the `.data` section of low-power memory.
-init-rtc-data = ["esp-hal-common/rv-init-rtc-data"]
+init-rtc-data = ["esp-hal/rv-init-rtc-data"]
 
 #! ### Embassy Feature Flags
 ## Enable support for `embassy`, a modern asynchronous embedded framework.
-embassy = ["esp-hal-common/embassy"]
+embassy = ["esp-hal/embassy"]
 ## Use the interrupt-mode embassy executor.
-embassy-executor-interrupt = ["esp-hal-common/embassy-executor-interrupt"]
+embassy-executor-interrupt = ["esp-hal/embassy-executor-interrupt"]
 ## Use the thread-mode embassy executor.
-embassy-executor-thread = ["esp-hal-common/embassy-executor-thread"]
+embassy-executor-thread = ["esp-hal/embassy-executor-thread"]
 ## Uses hardware timers as alarms for the executors. Using this feature
 ## limits the number of executors to the number of hardware alarms provided
 ## by the time driver.
-embassy-integrated-timers = ["esp-hal-common/embassy-integrated-timers"]
+embassy-integrated-timers = ["esp-hal/embassy-integrated-timers"]
 ## Enable the embassy time driver using the `SYSTIMER` peripheral. The
 ## `SYSTIMER` peripheral has three alarams available for use.
-embassy-time-systick = ["esp-hal-common/embassy-time-systick", "embassy-time-driver/tick-hz-16_000_000"]
+embassy-time-systick = ["esp-hal/embassy-time-systick", "embassy-time-driver/tick-hz-16_000_000"]
 ## Enable the embassy time driver using the `TIMG0` peripheral. The `TIMG0`
 ## peripheral has two alarms available for use.
-embassy-time-timg0 = ["esp-hal-common/embassy-time-timg0", "embassy-time-driver/tick-hz-1_000_000"]
+embassy-time-timg0 = ["esp-hal/embassy-time-timg0", "embassy-time-driver/tick-hz-1_000_000"]
 
 [profile.release]
 debug = true

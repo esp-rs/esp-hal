@@ -22,7 +22,7 @@ categories = [
 
 [dependencies]
 document-features   = "0.2.7"
-esp-hal-common      = { version = "0.15.0", features = ["esp32s3"], path = "../esp-hal-common" }
+esp-hal             = { version = "0.15.0", features = ["esp32s3"], path = "../esp-hal" }
 r0                  = { version = "1.0.0",  optional = true }
 embassy-time-driver = { version = "0.1.0",  optional = true }
 
@@ -58,66 +58,66 @@ usbd-serial        = "0.2.0"
 default = ["embassy-integrated-timers", "rt", "vectored"]
 
 ## Enable debug features in the HAL (used for development).
-debug = ["esp-hal-common/debug"]
+debug = ["esp-hal/debug"]
 ## Enable logging output using the `log` crate.
-log = ["esp-hal-common/log", "esp-println/log"]
+log = ["esp-hal/log", "esp-println/log"]
 ## Enable runtime support.
-rt = ["esp-hal-common/rt-xtensa"]
+rt = ["esp-hal/rt-xtensa"]
 ## Enable interrupt vectoring.
-vectored = ["esp-hal-common/vectored"]
+vectored = ["esp-hal/vectored"]
 
 #! ### Trait Implementation Feature Flags
 ## Enable support for asynchronous operation, with interfaces provided by
 ## `embedded-hal-async` and `embedded-io-async`.
-async = ["esp-hal-common/async"]
+async = ["esp-hal/async"]
 ## Implement `defmt::Format` on certain types.
-defmt = ["esp-hal-common/defmt", "esp-println/defmt-espflash"]
+defmt = ["esp-hal/defmt", "esp-println/defmt-espflash"]
 ## Implement the traits defined in the `1.0.0` releases of `embedded-hal` and
 ## `embedded-hal-nb` for the relevant peripherals.
-eh1 = ["esp-hal-common/eh1"]
+eh1 = ["esp-hal/eh1"]
 ## Implement the traits defined in `embedded-io` for certain peripherals.
-embedded-io = ["esp-hal-common/embedded-io"]
+embedded-io = ["esp-hal/embedded-io"]
 ## Implement the `ufmt_write::uWrite` trait for certain peripherals.
-ufmt = ["esp-hal-common/ufmt"]
+ufmt = ["esp-hal/ufmt"]
 
 #! ### PSRAM Feature Flags
 psram = []
 ## Use externally connected PSRAM (2MB).
-psram-2m = ["esp-hal-common/psram-2m", "psram"]
+psram-2m = ["esp-hal/psram-2m", "psram"]
 ## Use externally connected PSRAM (4MB).
-psram-4m = ["esp-hal-common/psram-4m", "psram"]
+psram-4m = ["esp-hal/psram-4m", "psram"]
 ## Use externally connected PSRAM (8MB).
-psram-8m = ["esp-hal-common/psram-8m", "psram"]
+psram-8m = ["esp-hal/psram-8m", "psram"]
 ## Connected PSRAM has 80MHz frequency.
-psram-80mhz  = ["esp-hal-common/psram-80mhz"]
+psram-80mhz  = ["esp-hal/psram-80mhz"]
 
 #! ### Octal RAM Feature Flags
 ## Use externally connected Octal RAM (2MB).
-opsram-2m  = ["esp-hal-common/opsram-2m", "psram"]
+opsram-2m  = ["esp-hal/opsram-2m", "psram"]
 ## Use externally connected Octal RAM (4MB).
-opsram-4m  = ["esp-hal-common/opsram-4m", "psram"]
+opsram-4m  = ["esp-hal/opsram-4m", "psram"]
 ## Use externally connected Octal RAM (8MB).
-opsram-8m  = ["esp-hal-common/opsram-8m", "psram"]
+opsram-8m  = ["esp-hal/opsram-8m", "psram"]
 ## Use externally connected Octal RAM (16MB).
-opsram-16m = ["esp-hal-common/opsram-16m", "psram"]
+opsram-16m = ["esp-hal/opsram-16m", "psram"]
 
 #! ### Embassy Feature Flags
 ## Enable support for `embassy`, a modern asynchronous embedded framework.
-embassy = ["esp-hal-common/embassy"]
+embassy = ["esp-hal/embassy"]
 ## Use the interrupt-mode embassy executor.
-embassy-executor-interrupt = ["esp-hal-common/embassy-executor-interrupt"]
+embassy-executor-interrupt = ["esp-hal/embassy-executor-interrupt"]
 ## Use the thread-mode embassy executor.
-embassy-executor-thread = ["esp-hal-common/embassy-executor-thread"]
+embassy-executor-thread = ["esp-hal/embassy-executor-thread"]
 ## Uses hardware timers as alarms for the executors. Using this feature
 ## limits the number of executors to the number of hardware alarms provided
 ## by the time driver.
-embassy-integrated-timers = ["esp-hal-common/embassy-integrated-timers"]
+embassy-integrated-timers = ["esp-hal/embassy-integrated-timers"]
 ## Enable the embassy time driver using the `SYSTIMER` peripheral. The
 ## `SYSTIMER` peripheral has three alarams available for use.
-embassy-time-systick = ["esp-hal-common/embassy-time-systick", "embassy-time-driver/tick-hz-16_000_000"]
+embassy-time-systick = ["esp-hal/embassy-time-systick", "embassy-time-driver/tick-hz-16_000_000"]
 ## Enable the embassy time driver using the `TIMG0` peripheral. The `TIMG0`
 ## peripheral has two alarms available for use.
-embassy-time-timg0 = ["esp-hal-common/embassy-time-timg0", "embassy-time-driver/tick-hz-1_000_000"]
+embassy-time-timg0 = ["esp-hal/embassy-time-timg0", "embassy-time-driver/tick-hz-1_000_000"]
 
 [profile.release]
 debug = true
