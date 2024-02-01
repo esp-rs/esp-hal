@@ -490,14 +490,13 @@ impl<'d, ADCI> ADC<'d, ADCI>
 where
     ADCI: RegisterAccess + 'd,
 {
-    pub fn adc(
+    pub fn new(
         adc_instance: impl crate::peripheral::Peripheral<P = ADCI> + 'd,
         config: AdcConfig<ADCI>,
-    ) -> Result<Self, ()> {
+    ) -> Self {
         PeripheralClockControl::enable(Peripheral::ApbSarAdc);
 
-        let sar_adc = unsafe { &*APB_SARADC::PTR };
-        sar_adc.ctrl().modify(|_, w| unsafe {
+        unsafe { &*APB_SARADC::PTR }.ctrl().modify(|_, w| unsafe {
             w.saradc_start_force()
                 .set_bit()
                 .saradc_start()
@@ -507,13 +506,12 @@ where
                 .saradc_xpd_sar_force()
                 .bits(0b11)
         });
-        let adc = ADC {
+
+        ADC {
             _adc: adc_instance.into_ref(),
             attenuations: config.attenuations,
             active_channel: None,
-        };
-
-        Ok(adc)
+        }
     }
 }
 

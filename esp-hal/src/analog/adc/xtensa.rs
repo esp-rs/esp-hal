@@ -524,10 +524,10 @@ impl<'d, ADCI> ADC<'d, ADCI>
 where
     ADCI: RegisterAccess,
 {
-    pub fn adc(
+    pub fn new(
         adc_instance: impl crate::peripheral::Peripheral<P = ADCI> + 'd,
         config: AdcConfig<ADCI>,
-    ) -> Result<Self, ()> {
+    ) -> Self {
         let sensors = unsafe { &*SENS::ptr() };
 
         // Set attenuation for pins
@@ -592,13 +592,11 @@ where
             .sar_amp_ctrl2()
             .modify(|_, w| unsafe { w.sar_amp_wait3().bits(1) });
 
-        let adc = ADC {
+        ADC {
             _adc: adc_instance.into_ref(),
             attenuations: config.attenuations,
             active_channel: None,
-        };
-
-        Ok(adc)
+        }
     }
 }
 
