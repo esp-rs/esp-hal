@@ -508,6 +508,7 @@ where
     }
 
     /// Configures the AT-CMD detection settings.
+    #[allow(clippy::useless_conversion)]
     pub fn set_at_cmd(&mut self, config: config::AtCmdConfig) {
         #[cfg(not(any(esp32, esp32s2)))]
         T::register_block()
@@ -978,6 +979,7 @@ pub trait Instance {
         });
     }
 
+    #[allow(clippy::useless_conversion)]
     fn get_tx_fifo_count() -> u16 {
         Self::register_block()
             .status()
@@ -987,6 +989,7 @@ pub trait Instance {
             .into()
     }
 
+    #[allow(clippy::useless_conversion)]
     fn get_rx_fifo_count() -> u16 {
         let fifo_cnt: u16 = Self::register_block()
             .status()

@@ -88,7 +88,7 @@ impl<'d> UsbSerialJtagTx<'d> {
         {
             // the FIFO is not full
             unsafe {
-                reg_block.ep1().write(|w| w.rdwr_byte().bits(word.into()));
+                reg_block.ep1().write(|w| w.rdwr_byte().bits(word));
             }
 
             Ok(())
@@ -201,9 +201,7 @@ impl<'d> UsbSerialJtagRx<'d> {
 
 impl<'d> UsbSerialJtag<'d> {
     /// Create a new USB serial/JTAG instance with defaults
-    pub fn new(usb_device: impl Peripheral<P = USB_DEVICE> + 'd) -> Self {
-        crate::into_ref!(usb_device);
-
+    pub fn new(_usb_device: impl Peripheral<P = USB_DEVICE> + 'd) -> Self {
         PeripheralClockControl::enable(crate::system::Peripheral::UsbDevice);
 
         USB_DEVICE::disable_tx_interrupts();

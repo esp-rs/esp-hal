@@ -1,5 +1,6 @@
 use core::marker::PhantomData;
 
+#[cfg(esp32s3)]
 pub use self::calibration::*;
 #[cfg(esp32s3)]
 use super::AdcCalEfuse;
@@ -266,7 +267,7 @@ impl RegisterAccess for crate::peripherals::ADC1 {
         let sensors = unsafe { &*SENS::ptr() };
         sensors.sar_atten1().modify(|r, w| {
             let new_value = (r.bits() & !(0b11 << (channel * 2)))
-                | (((attenuation as u8 & 0b11) as u32) << (channel * 2));
+                | (((attenuation & 0b11) as u32) << (channel * 2));
 
             unsafe { w.sar1_atten().bits(new_value) }
         });
@@ -324,8 +325,11 @@ impl RegisterAccess for crate::peripherals::ADC1 {
     }
 
     fn read_data() -> u16 {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors.sar_meas1_ctrl2().read().meas1_data_sar().bits() as u16
+        unsafe { &*SENS::ptr() }
+            .sar_meas1_ctrl2()
+            .read()
+            .meas1_data_sar()
+            .bits()
     }
 
     fn set_init_code(data: u16) {
@@ -397,7 +401,7 @@ impl RegisterAccess for crate::peripherals::ADC2 {
         let sensors = unsafe { &*SENS::ptr() };
         sensors.sar_atten2().modify(|r, w| {
             let new_value = (r.bits() & !(0b11 << (channel * 2)))
-                | (((attenuation as u8 & 0b11) as u32) << (channel * 2));
+                | (((attenuation & 0b11) as u32) << (channel * 2));
 
             unsafe { w.sar2_atten().bits(new_value) }
         });
@@ -460,8 +464,11 @@ impl RegisterAccess for crate::peripherals::ADC2 {
     }
 
     fn read_data() -> u16 {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors.sar_meas2_ctrl2().read().meas2_data_sar().bits() as u16
+        unsafe { &*SENS::ptr() }
+            .sar_meas2_ctrl2()
+            .read()
+            .meas2_data_sar()
+            .bits()
     }
 
     fn set_init_code(data: u16) {
@@ -533,9 +540,9 @@ where
         // Set attenuation for pins
         let attenuations = config.attenuations;
 
-        for channel in 0..attenuations.len() {
-            if let Some(attenuation) = attenuations[channel] {
-                ADCI::set_attenuation(channel, attenuation as u8);
+        for (channel, attenuation) in attenuations.iter().enumerate() {
+            if let Some(attenuation) = attenuation {
+                ADCI::set_attenuation(channel, *attenuation as u8);
             }
         }
 
@@ -642,7 +649,7 @@ where
     fn read(&mut self, pin: &mut AdcPin<PIN, ADCI, CS>) -> nb::Result<u16, Self::Error> {
         use embedded_hal::adc::Channel;
 
-        if self.attenuations[AdcPin::<PIN, ADCI>::channel() as usize] == None {
+        if self.attenuations[AdcPin::<PIN, ADCI>::channel() as usize].is_none() {
             panic!(
                 "Channel {} is not configured reading!",
                 AdcPin::<PIN, ADCI>::channel()
@@ -663,7 +670,7 @@ where
             // Set ADC unit calibration according used scheme for pin
             ADCI::set_init_code(pin.cal_scheme.adc_cal());
 
-            ADCI::set_en_pad(AdcPin::<PIN, ADCI>::channel() as u8);
+            ADCI::set_en_pad(AdcPin::<PIN, ADCI>::channel());
 
             ADCI::clear_start_sample();
             ADCI::start_sample();

@@ -327,8 +327,8 @@ pub mod dma {
             unsafe {
                 let buffer = core::ptr::read(&self.buffer);
                 let payload = core::ptr::read(&self.spi_dma);
-                let err = (&self).spi_dma.channel.rx.has_error()
-                    || (&self).spi_dma.channel.tx.has_error();
+                let err =
+                    self.spi_dma.channel.rx.has_error() || self.spi_dma.channel.tx.has_error();
                 mem::forget(self);
                 if err {
                     Err((DmaError::DescriptorError, buffer, payload))

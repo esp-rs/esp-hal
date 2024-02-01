@@ -146,7 +146,7 @@ impl DeadTimeCfg {
 fn dt_cfg<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mcpwm0::DB0_CFG {
     let block = unsafe { &*PWM::block() };
     match OP {
-        0 => &block.db0_cfg(),
+        0 => block.db0_cfg(),
         1 => unsafe { &*(&block.db1_cfg() as *const _ as *const _) },
         2 => unsafe { &*(&block.db2_cfg() as *const _ as *const _) },
         _ => unreachable!(),
@@ -156,7 +156,7 @@ fn dt_cfg<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mc
 fn dt_fed<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mcpwm0::DB0_FED_CFG {
     let block = unsafe { &*PWM::block() };
     match OP {
-        0 => &block.db0_fed_cfg(),
+        0 => block.db0_fed_cfg(),
         1 => unsafe { &*(&block.db1_fed_cfg() as *const _ as *const _) },
         2 => unsafe { &*(&block.db2_fed_cfg() as *const _ as *const _) },
         _ => unreachable!(),
@@ -166,7 +166,7 @@ fn dt_fed<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mc
 fn dt_red<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mcpwm0::DB0_RED_CFG {
     let block = unsafe { &*PWM::block() };
     match OP {
-        0 => &block.db0_red_cfg(),
+        0 => block.db0_red_cfg(),
         1 => unsafe { &*(&block.db1_red_cfg() as *const _ as *const _) },
         2 => unsafe { &*(&block.db2_red_cfg() as *const _ as *const _) },
         _ => unreachable!(),

@@ -95,11 +95,11 @@ where
         } else {
             // err = coeff[0] + coeff[1] * val + coeff[2] * val^2 + ... + coeff[n] * val^n
             let mut var = 1i64;
-            let mut err = (var * self.coeff[0] as i64 / COEFF_MUL) as i32;
+            let mut err = (var * self.coeff[0] / COEFF_MUL) as i32;
 
             for coeff in &self.coeff[1..] {
-                var = var * val as i64;
-                err += (var * *coeff as i64 / COEFF_MUL) as i32;
+                var *= val as i64;
+                err += (var * *coeff / COEFF_MUL) as i32;
             }
 
             err
@@ -215,7 +215,7 @@ mod impls {
                 0.0000208385525314,
             ],
             Attenuation11dB => [
-                -0.6444034182694780,
+                -0.644403418269478,
                 -0.0644334888647536,
                 0.0001297891447611,
                 -0.0000000707697180,

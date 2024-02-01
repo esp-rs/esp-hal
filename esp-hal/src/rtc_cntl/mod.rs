@@ -939,6 +939,13 @@ impl Swd {
 }
 
 #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
+impl Default for Swd {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
 impl WatchdogDisable for Swd {
     fn disable(&mut self) {
         self.disable();
@@ -966,11 +973,7 @@ pub fn get_wakeup_cause() -> SleepSource {
     });
     #[cfg(not(any(esp32, esp32c6, esp32h2)))]
     let wakeup_cause = WakeupReason::from_bits_retain(unsafe {
-        (&*LPWR::PTR)
-            .slp_wakeup_cause()
-            .read()
-            .wakeup_cause()
-            .bits()
+        (*LPWR::PTR).slp_wakeup_cause().read().wakeup_cause().bits()
     });
     #[cfg(esp32)]
     let wakeup_cause = WakeupReason::from_bits_retain(unsafe {

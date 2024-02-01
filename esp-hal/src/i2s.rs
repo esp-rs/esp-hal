@@ -1248,35 +1248,33 @@ mod private {
                 clkm_div_y = 0;
                 clkm_div_z = 0;
                 clkm_div_yn1 = 1;
-            } else {
-                if clock_settings.numerator > clock_settings.denominator / 2 {
-                    clkm_div_x = clock_settings
-                        .denominator
-                        .overflowing_div(
-                            clock_settings
-                                .denominator
-                                .overflowing_sub(clock_settings.numerator)
-                                .0,
-                        )
-                        .0
-                        .overflowing_sub(1)
-                        .0;
-                    clkm_div_y = clock_settings.denominator
-                        % (clock_settings
+            } else if clock_settings.numerator > clock_settings.denominator / 2 {
+                clkm_div_x = clock_settings
+                    .denominator
+                    .overflowing_div(
+                        clock_settings
                             .denominator
                             .overflowing_sub(clock_settings.numerator)
-                            .0);
-                    clkm_div_z = clock_settings
+                            .0,
+                    )
+                    .0
+                    .overflowing_sub(1)
+                    .0;
+                clkm_div_y = clock_settings.denominator
+                    % (clock_settings
                         .denominator
                         .overflowing_sub(clock_settings.numerator)
-                        .0;
-                    clkm_div_yn1 = 1;
-                } else {
-                    clkm_div_x = clock_settings.denominator / clock_settings.numerator - 1;
-                    clkm_div_y = clock_settings.denominator % clock_settings.numerator;
-                    clkm_div_z = clock_settings.numerator;
-                    clkm_div_yn1 = 0;
-                }
+                        .0);
+                clkm_div_z = clock_settings
+                    .denominator
+                    .overflowing_sub(clock_settings.numerator)
+                    .0;
+                clkm_div_yn1 = 1;
+            } else {
+                clkm_div_x = clock_settings.denominator / clock_settings.numerator - 1;
+                clkm_div_y = clock_settings.denominator % clock_settings.numerator;
+                clkm_div_z = clock_settings.numerator;
+                clkm_div_yn1 = 0;
             }
 
             i2s.tx_clkm_div_conf().modify(|_, w| {
@@ -1285,7 +1283,7 @@ mod private {
                     .tx_clkm_div_y()
                     .variant(clkm_div_y as u16)
                     .tx_clkm_div_yn1()
-                    .variant(if clkm_div_yn1 != 0 { true } else { false })
+                    .variant(clkm_div_yn1 != 0)
                     .tx_clkm_div_z()
                     .variant(clkm_div_z as u16)
             });
@@ -1312,7 +1310,7 @@ mod private {
                     .rx_clkm_div_y()
                     .variant(clkm_div_y as u16)
                     .rx_clkm_div_yn1()
-                    .variant(if clkm_div_yn1 != 0 { true } else { false })
+                    .variant(clkm_div_yn1 != 0)
                     .rx_clkm_div_z()
                     .variant(clkm_div_z as u16)
             });
@@ -1446,6 +1444,8 @@ mod private {
 
         fn configure(_standard: &Standard, data_format: &DataFormat) {
             let i2s = Self::register_block();
+
+            #[allow(clippy::useless_conversion)]
             i2s.tx_conf1().modify(|_, w| {
                 w.tx_tdm_ws_width()
                     .variant((data_format.channel_bits() - 1).into())
@@ -1520,6 +1520,7 @@ mod private {
                     .clear_bit()
             });
 
+            #[allow(clippy::useless_conversion)]
             i2s.rx_conf1().modify(|_, w| {
                 w.rx_tdm_ws_width()
                     .variant((data_format.channel_bits() - 1).into())
