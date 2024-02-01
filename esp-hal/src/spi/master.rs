@@ -184,10 +184,7 @@ impl Command {
     }
 
     fn is_none(&self) -> bool {
-        match self {
-            Command::None => true,
-            _ => false,
-        }
+        matches!(self, Command::None)
     }
 }
 
@@ -308,10 +305,7 @@ impl Address {
     }
 
     fn is_none(&self) -> bool {
-        match self {
-            Address::None => true,
-            _ => false,
-        }
+        matches!(self, Address::None)
     }
 
     fn mode(&self) -> SpiDataMode {
@@ -482,7 +476,7 @@ where
 
         let mut spi = Spi {
             spi,
-            _mode: PhantomData::default(),
+            _mode: PhantomData,
         };
         spi.spi.setup(frequency, clocks);
         spi.spi.init();
@@ -659,7 +653,7 @@ where
 
         let mut spi = Spi {
             spi,
-            _mode: PhantomData::default(),
+            _mode: PhantomData,
         };
         spi.spi.setup(frequency, clocks);
         spi.spi.init();
@@ -692,7 +686,7 @@ where
             return Err(Error::FifoSizeExeeded);
         }
 
-        if buffer.len() == 0 {
+        if buffer.is_empty() {
             return Err(Error::Unsupported);
         }
 
@@ -822,7 +816,7 @@ pub mod dma {
             SpiDma {
                 spi: self.spi,
                 channel,
-                _mode: PhantomData::default(),
+                _mode: PhantomData,
             }
         }
     }
@@ -1322,16 +1316,16 @@ pub mod dma {
         type Error = T::Error;
 
         fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-            Ok(
-                if !crate::soc::is_valid_ram_address(&words[0] as *const _ as u32) {
-                    for chunk in words.chunks(SIZE) {
-                        self.buffer[..chunk.len()].copy_from_slice(chunk);
-                        self.inner.write(&self.buffer[..chunk.len()])?;
-                    }
-                } else {
-                    self.inner.write(words)?;
-                },
-            )
+            if !crate::soc::is_valid_ram_address(&words[0] as *const _ as u32) {
+                for chunk in words.chunks(SIZE) {
+                    self.buffer[..chunk.len()].copy_from_slice(chunk);
+                    self.inner.write(&self.buffer[..chunk.len()])?;
+                }
+            } else {
+                self.inner.write(words)?;
+            };
+
+            Ok(())
         }
     }
 
@@ -1787,7 +1781,7 @@ where
         Ok(read_buffer)
     }
 
-    fn start_transfer_dma<'w>(
+    fn start_transfer_dma(
         &mut self,
         write_buffer_ptr: *const u8,
         write_buffer_len: usize,
@@ -1845,7 +1839,7 @@ where
         Ok(words)
     }
 
-    fn start_write_bytes_dma<'w>(
+    fn start_write_bytes_dma(
         &mut self,
         ptr: *const u8,
         len: usize,
@@ -1875,7 +1869,7 @@ where
         Ok(())
     }
 
-    fn start_read_bytes_dma<'w>(
+    fn start_read_bytes_dma(
         &mut self,
         ptr: *mut u8,
         len: usize,
@@ -2380,18 +2374,18 @@ pub trait Instance {
                     pre = 16;
                 }
 
-                errval = (apb_clk_freq.raw() as i32 / (pre as i32 * n as i32)
+                errval = (apb_clk_freq.raw() as i32 / (pre * n)
                     - frequency.raw() as i32)
                     .abs();
                 if bestn == -1 || errval <= besterr {
                     besterr = errval;
-                    bestn = n as i32;
-                    bestpre = pre as i32;
+                    bestn = n;
+                    bestpre = pre;
                 }
             }
 
             let n: i32 = bestn;
-            pre = bestpre as i32;
+            pre = bestpre;
             let l: i32 = n;
 
             /* Effectively, this does:
@@ -2731,7 +2725,7 @@ pub trait Instance {
             !address.is_none(),
             false,
             dummy != 0,
-            buffer.len() == 0,
+            buffer.is_empty(),
         );
 
         // set cmd, address, dummy cycles
@@ -2771,7 +2765,7 @@ pub trait Instance {
                 .modify(|_, w| w.usr_dummy_cyclelen().variant(dummy - 1));
         }
 
-        if buffer.len() > 0 {
+        if !buffer.is_empty() {
             // re-using the full-duplex write here
             self.write_bytes(buffer)?;
         } else {
@@ -2794,7 +2788,7 @@ pub trait Instance {
             !address.is_none(),
             false,
             dummy != 0,
-            buffer.len() == 0,
+            buffer.is_empty(),
         );
 
         // set cmd, address, dummy cycles
@@ -2950,7 +2944,7 @@ impl ExtendedInstance for crate::peripherals::SPI2 {
     }
 }
 
-#[cfg(any(esp32))]
+#[cfg(esp32)]
 impl Instance for crate::peripherals::SPI2 {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
@@ -2988,7 +2982,7 @@ impl Instance for crate::peripherals::SPI2 {
     }
 }
 
-#[cfg(any(esp32))]
+#[cfg(esp32)]
 impl ExtendedInstance for crate::peripherals::SPI2 {
     fn sio0_input_signal(&self) -> InputSignal {
         InputSignal::HSPID
@@ -3015,7 +3009,7 @@ impl ExtendedInstance for crate::peripherals::SPI2 {
     }
 }
 
-#[cfg(any(esp32))]
+#[cfg(esp32)]
 impl Instance for crate::peripherals::SPI3 {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {

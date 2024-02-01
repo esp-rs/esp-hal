@@ -84,9 +84,7 @@ pub trait AdcCalScheme<ADCI>: Sized + private::Sealed {
 impl private::Sealed for () {}
 
 impl<ADCI> AdcCalScheme<ADCI> for () {
-    fn new_cal(_atten: Attenuation) -> Self {
-        ()
-    }
+    fn new_cal(_atten: Attenuation) -> Self {}
 }
 
 /// A helper trait to get access to ADC calibration efuses.

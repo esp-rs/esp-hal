@@ -206,13 +206,13 @@ impl<'d> Sha<'d> {
     }
 
     fn chunk_length(&self) -> usize {
-        return match self.mode {
+        match self.mode {
             ShaMode::SHA1 | ShaMode::SHA256 => 64,
             #[cfg(not(esp32))]
             ShaMode::SHA224 => 64,
             #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
             _ => 128,
-        };
+        }
     }
 
     #[cfg(esp32)]

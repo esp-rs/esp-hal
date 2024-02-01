@@ -76,13 +76,11 @@ pub struct Stack<const SIZE: usize> {
     pub mem: MaybeUninit<[u8; SIZE]>,
 }
 
+#[allow(clippy::len_without_is_empty)]
 impl<const SIZE: usize> Stack<SIZE> {
-    const _ALIGNED: () = ::core::assert!(SIZE % 16 == 0); // Make sure stack top is aligned, too.
-
     /// Construct a stack of length SIZE, uninitialized
-    #[allow(path_statements)]
     pub const fn new() -> Stack<SIZE> {
-        Self::_ALIGNED;
+        ::core::assert!(SIZE % 16 == 0); // Make sure stack top is aligned, too.
 
         Stack {
             mem: MaybeUninit::uninit(),
@@ -278,7 +276,7 @@ impl CpuControl {
 
         unsafe {
             // move vec table
-            let base = &_init_start as *const u32;
+            let base = core::ptr::addr_of!(_init_start);
             core::arch::asm!("wsr.vecbase {0}", in(reg) base, options(nostack));
         }
 
@@ -363,7 +361,7 @@ impl CpuControl {
         self.unpark_core(Cpu::AppCpu);
 
         Ok(AppCoreGuard {
-            phantom: PhantomData::default(),
+            phantom: PhantomData,
         })
     }
 }

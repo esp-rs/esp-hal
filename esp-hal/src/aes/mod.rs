@@ -140,7 +140,7 @@ impl<'d> Aes<'d> {
     pub fn new(aes: impl Peripheral<P = AES> + 'd) -> Self {
         crate::into_ref!(aes);
         let mut ret = Self {
-            aes: aes,
+            aes,
             #[cfg(not(esp32))]
             alignment_helper: AlignmentHelper::default(),
         };

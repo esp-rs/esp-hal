@@ -184,7 +184,7 @@ where
         }
 
         let duty_range = 2u32.pow(duty_exp);
-        let duty_value = (duty_range * duty_pct as u32) as u32 / 100;
+        let duty_value = (duty_range * duty_pct as u32) / 100;
 
         if duty_pct > 100u8 {
             // duty_pct greater than 100%
@@ -238,8 +238,8 @@ where
         }
 
         let duty_range = (1u32 << duty_exp) - 1;
-        let start_duty_value = (duty_range * start_duty_pct as u32) as u32 / 100;
-        let end_duty_value = (duty_range * end_duty_pct as u32) as u32 / 100;
+        let start_duty_value = (duty_range * start_duty_pct as u32) / 100;
+        let end_duty_value = (duty_range * end_duty_pct as u32) / 100;
 
         // NB: since we do the multiplication first here, there's no loss of
         // precision from using milliseconds instead of (e.g.) nanoseconds.

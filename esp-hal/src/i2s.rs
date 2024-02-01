@@ -503,11 +503,11 @@ where
 
         Self {
             i2s_tx: TxCreator {
-                register_access: PhantomData::default(),
+                register_access: PhantomData,
                 tx_channel: channel.tx,
             },
             i2s_rx: RxCreator {
-                register_access: PhantomData::default(),
+                register_access: PhantomData,
                 rx_channel: channel.rx,
             },
         }
@@ -589,7 +589,7 @@ where
 {
     fn new(tx_channel: CH::Tx<'d>) -> Self {
         Self {
-            register_access: PhantomData::default(),
+            register_access: PhantomData,
             tx_channel,
         }
     }
@@ -692,7 +692,7 @@ where
         self.write_bytes(unsafe {
             core::slice::from_raw_parts(
                 words as *const _ as *const u8,
-                words.len() * core::mem::size_of::<W>(),
+                core::mem::size_of_val(words),
             )
         })
     }
@@ -748,7 +748,7 @@ where
 {
     fn new(rx_channel: CH::Rx<'d>) -> Self {
         Self {
-            register_access: PhantomData::default(),
+            register_access: PhantomData,
             rx_channel,
         }
     }
@@ -863,14 +863,14 @@ where
     W: AcceptedWord,
 {
     fn read(&mut self, words: &mut [W]) -> Result<(), Error> {
-        if words.len() * core::mem::size_of::<W>() > 4096 || words.len() == 0 {
+        if core::mem::size_of_val(words) > 4096 || words.is_empty() {
             return Err(Error::IllegalArgument);
         }
 
         self.read_bytes(unsafe {
             core::slice::from_raw_parts_mut(
                 words as *mut _ as *mut u8,
-                words.len() * core::mem::size_of::<W>(),
+                core::mem::size_of_val(words),
             )
         })
     }

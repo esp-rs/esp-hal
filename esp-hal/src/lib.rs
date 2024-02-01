@@ -25,6 +25,7 @@
 //! [esp32s3-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32s3-hal
 
 #![no_std]
+#![allow(asm_sub_register)]
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
 #![cfg_attr(
     feature = "async",
@@ -338,7 +339,7 @@ mod critical_section_impl {
         const UNUSED_THREAD_ID_VALUE: usize = 0x0001;
 
         fn thread_id() -> usize {
-            crate::get_raw_core() as usize
+            crate::get_raw_core()
         }
 
         pub(super) static MULTICORE_LOCK: ReentrantMutex = ReentrantMutex::new();

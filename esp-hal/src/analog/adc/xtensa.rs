@@ -120,7 +120,7 @@ where
         AdcPin {
             pin,
             cal_scheme: AdcCalScheme::<()>::new_cal(attenuation),
-            _phantom: PhantomData::default(),
+            _phantom: PhantomData,
         }
     }
 
@@ -139,7 +139,7 @@ where
         AdcPin {
             pin,
             cal_scheme: CS::new_cal(attenuation),
-            _phantom: PhantomData::default(),
+            _phantom: PhantomData,
         }
     }
 
@@ -194,7 +194,7 @@ impl<ADCI> Default for AdcConfig<ADCI> {
         AdcConfig {
             resolution: Resolution::Resolution13Bit,
             attenuations: [None; 10],
-            _phantom: PhantomData::default(),
+            _phantom: PhantomData,
         }
     }
 }

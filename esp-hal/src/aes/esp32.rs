@@ -64,7 +64,7 @@ impl<'d> Aes<'d> {
     pub(super) fn read_block(&self, block: &mut [u8]) {
         let text_len = self.aes.text_iter().count();
         debug_assert_eq!(block.len(), text_len * ALIGN_SIZE);
-        Self::read_from_regset(block, text_len, &self.aes.text(0));
+        Self::read_from_regset(block, text_len, self.aes.text(0));
     }
 }
 

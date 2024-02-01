@@ -161,7 +161,7 @@ impl AlignmentHelper {
             (nsrc.len() / U32_ALIGN_SIZE) * U32_ALIGN_SIZE,
         ));
 
-        if to_write.len() > 0 {
+        if !to_write.is_empty() {
             for (i, v) in to_write.chunks_exact(U32_ALIGN_SIZE).enumerate() {
                 unsafe {
                     dst_ptr
@@ -175,17 +175,14 @@ impl AlignmentHelper {
         // next write Generally this applies when (src/4*4) != src
         let was_bounded = (offset + cursor + to_write.len() / U32_ALIGN_SIZE) == dst_bound;
 
-        if remaining.len() > 0 && remaining.len() < 4 {
-            for i in 0..remaining.len() {
-                self.buf[i] = remaining[i];
-            }
-
+        if !remaining.is_empty() && remaining.len() < 4 {
+            self.buf[..remaining.len()].copy_from_slice(remaining);
             self.buf_fill = remaining.len();
 
             return (&[], was_bounded);
         }
 
-        return (remaining, was_bounded);
+        (remaining, was_bounded)
     }
 
     #[allow(dead_code)]
@@ -193,7 +190,7 @@ impl AlignmentHelper {
         assert!(dst_bound > 0);
         assert!(src.len() <= dst_bound * 4);
 
-        if src.len() > 0 {
+        if !src.is_empty() {
             for (i, v) in src.chunks_exact(U32_ALIGN_SIZE).enumerate() {
                 unsafe {
                     dst_ptr

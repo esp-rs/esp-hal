@@ -805,7 +805,7 @@ where
 
         #[cfg(not(any(esp32p4)))]
         unsafe {
-            (&*GPIO::PTR).pin(GPIONUM as usize).modify(|_, w| {
+            (*GPIO::PTR).pin(GPIONUM as usize).modify(|_, w| {
                 w.int_ena()
                     .bits(gpio_intr_enable(int_enable, nmi_enable))
                     .int_type()
@@ -815,7 +815,7 @@ where
             });
         }
 
-        #[cfg(any(esp32p4))]
+        #[cfg(esp32p4)]
         unsafe {
             // there is no NMI_ENABLE but P4 could trigger 4 interrupts
             // we'll only support GPIO_INT0 for now
@@ -841,7 +841,7 @@ where
 
     fn unlisten(&mut self) {
         unsafe {
-            (&*GPIO::PTR)
+            (*GPIO::PTR)
                 .pin(GPIONUM as usize)
                 .modify(|_, w| w.int_ena().bits(0).int_type().bits(0).int_ena().bits(0));
         }
@@ -1493,11 +1493,11 @@ pub struct IO {
 impl IO {
     pub fn new(gpio: GPIO, io_mux: IO_MUX) -> Self {
         let pins = gpio.split();
-        let io = IO {
+
+        IO {
             _io_mux: io_mux,
             pins,
-        };
-        io
+        }
     }
 }
 
@@ -1542,16 +1542,16 @@ macro_rules! gpio {
             }
 
             $(
-                impl<MODE> crate::gpio::GpioProperties for GpioPin<MODE,  $gpionum> {
-                    type Bank = crate::gpio::[< Bank $bank GpioRegisterAccess >];
-                    type InterruptStatus = crate::gpio::[< InterruptStatusRegisterAccessBank $bank >];
+                impl<MODE> $crate::gpio::GpioProperties for GpioPin<MODE,  $gpionum> {
+                    type Bank = $crate::gpio::[< Bank $bank GpioRegisterAccess >];
+                    type InterruptStatus = $crate::gpio::[< InterruptStatusRegisterAccessBank $bank >];
                     type Signals = [< Gpio $gpionum Signals >];
-                    type PinType = crate::gpio::[<$type PinType>];
+                    type PinType = $crate::gpio::[<$type PinType>];
                 }
 
                 pub struct [<Gpio $gpionum Signals>] {}
 
-                impl crate::gpio::GpioSignal for [<Gpio $gpionum Signals>] {
+                impl $crate::gpio::GpioSignal for [<Gpio $gpionum Signals>] {
                     fn output_signals() -> [Option<OutputSignal>; 6]{
                         #[allow(unused_mut)]
                         let mut output_signals = [None,None,None,None,None,None];
@@ -1658,7 +1658,7 @@ macro_rules! rtc_pins {
     (
         $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat, $hold:ident $(, $rue:ident, $rde:ident)?
     ) => {
-        impl<MODE> crate::gpio::RTCPin for GpioPin<MODE, $pin_num>
+        impl<MODE> $crate::gpio::RTCPin for GpioPin<MODE, $pin_num>
         {
             fn rtc_number(&self) -> u8 {
                 $rtc_pin
@@ -1666,14 +1666,15 @@ macro_rules! rtc_pins {
 
             /// Set the RTC properties of the pin. If `mux` is true then then pin is
             /// routed to RTC, when false it is routed to IO_MUX.
-            fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: crate::gpio::RtcFunction) {
-                use crate::peripherals::RTC_IO;
+            fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: $crate::gpio::RtcFunction) {
+                use $crate::peripherals::RTC_IO;
+
                 let rtcio = unsafe{ &*RTC_IO::ptr() };
 
                 #[cfg(esp32s3)]
-                unsafe { crate::peripherals::SENS::steal() }.sar_peri_clk_gate_conf().modify(|_,w| w.iomux_clk_en().set_bit());
+                unsafe { $crate::peripherals::SENS::steal() }.sar_peri_clk_gate_conf().modify(|_,w| w.iomux_clk_en().set_bit());
                 #[cfg(esp32s2)]
-                unsafe { crate::peripherals::SENS::steal() }.sar_io_mux_conf().modify(|_,w| w.iomux_clk_gate_en().set_bit());
+                unsafe { $crate::peripherals::SENS::steal() }.sar_io_mux_conf().modify(|_,w| w.iomux_clk_gate_en().set_bit());
 
                 // disable input
                 paste::paste!{
@@ -1686,7 +1687,7 @@ macro_rules! rtc_pins {
             }
 
             fn rtcio_pad_hold(&mut self, enable: bool) {
-                let rtc_ctrl = unsafe { &*crate::peripherals::LPWR::PTR };
+                let rtc_ctrl = unsafe { &*$crate::peripherals::LPWR::PTR };
 
                 #[cfg(esp32)]
                 rtc_ctrl.hold_force().modify(|_, w| w.$hold().bit(enable));
@@ -1697,10 +1698,10 @@ macro_rules! rtc_pins {
         }
 
         $(
-            impl<MODE> crate::gpio::RTCPinWithResistors for GpioPin<MODE, $pin_num>
+            impl<MODE> $crate::gpio::RTCPinWithResistors for GpioPin<MODE, $pin_num>
             {
                 fn rtcio_pullup(&mut self, enable: bool) {
-                    let rtcio = unsafe { &*crate::peripherals::RTC_IO::PTR };
+                    let rtcio = unsafe { &*$crate::peripherals::RTC_IO::PTR };
 
                     paste::paste! {
                         rtcio.$pin_reg.modify(|_, w| w.$rue().bit([< enable >]));
@@ -1708,7 +1709,7 @@ macro_rules! rtc_pins {
                 }
 
                 fn rtcio_pulldown(&mut self, enable: bool) {
-                    let rtcio = unsafe { &*crate::peripherals::RTC_IO::PTR };
+                    let rtcio = unsafe { &*$crate::peripherals::RTC_IO::PTR };
 
                     paste::paste! {
                         rtcio.$pin_reg.modify(|_, w| w.$rde().bit([< enable >]));
@@ -1718,14 +1719,14 @@ macro_rules! rtc_pins {
 
             #[cfg(not(esp32))]
             paste::paste!{
-                impl<MODE> crate::gpio::rtc_io::IntoLowPowerPin<$pin_num> for GpioPin<MODE, $pin_num> {
-                    fn into_low_power(mut self) -> crate::gpio::rtc_io::LowPowerPin<Unknown, $pin_num> {
-                        use crate::gpio::RTCPin;
+                impl<MODE> $crate::gpio::rtc_io::IntoLowPowerPin<$pin_num> for GpioPin<MODE, $pin_num> {
+                    fn into_low_power(mut self) -> $crate::gpio::rtc_io::LowPowerPin<Unknown, $pin_num> {
+                        use $crate::gpio::RTCPin;
 
-                        self.rtc_set_config(false, true, crate::gpio::RtcFunction::Rtc);
+                        self.rtc_set_config(false, true, $crate::gpio::RtcFunction::Rtc);
 
-                        crate::gpio::rtc_io::LowPowerPin {
-                            private: core::marker::PhantomData::default(),
+                        $crate::gpio::rtc_io::LowPowerPin {
+                            private: core::marker::PhantomData,
                         }
                     }
                 }
@@ -1737,7 +1738,7 @@ macro_rules! rtc_pins {
         $( ( $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat, $hold:ident $(, $rue:ident, $rde:ident)? ) )+
     ) => {
         $(
-            crate::gpio::rtc_pins!($pin_num, $rtc_pin, $pin_reg, $prefix, $hold $(, $rue, $rde)?);
+            $crate::gpio::rtc_pins!($pin_num, $rtc_pin, $pin_reg, $prefix, $hold $(, $rue, $rde)?);
         )+
     };
 }
@@ -1810,7 +1811,8 @@ macro_rules! analog {
         )+
     ) => {
         pub(crate) fn internal_into_analog(pin: u8) {
-            use crate::peripherals::RTC_IO;
+            use $crate::peripherals::RTC_IO;
+
             let rtcio = unsafe{ &*RTC_IO::ptr() };
             $crate::gpio::enable_iomux_clk_gate();
 
@@ -2334,7 +2336,7 @@ pub mod rtc_io {
             self.pullup_enable(true);
             self.pulldown_enable(false);
             LowPowerPin {
-                private: PhantomData::default(),
+                private: PhantomData,
             }
         }
 
@@ -2345,7 +2347,7 @@ pub mod rtc_io {
             self.pullup_enable(false);
             self.pulldown_enable(true);
             LowPowerPin {
-                private: PhantomData::default(),
+                private: PhantomData,
             }
         }
 
@@ -2355,7 +2357,7 @@ pub mod rtc_io {
             self.pullup_enable(false);
             self.pulldown_enable(false);
             LowPowerPin {
-                private: PhantomData::default(),
+                private: PhantomData,
             }
         }
 
@@ -2363,7 +2365,7 @@ pub mod rtc_io {
         pub fn into_push_pull_output(self) -> LowPowerPin<Output<PushPull>, PIN> {
             self.output_enable(true);
             LowPowerPin {
-                private: PhantomData::default(),
+                private: PhantomData,
             }
         }
     }
@@ -2470,7 +2472,7 @@ pub mod lp_gpio {
             self.pullup_enable(true);
             self.pulldown_enable(false);
             LowPowerPin {
-                private: PhantomData::default(),
+                private: PhantomData,
             }
         }
 
@@ -2481,7 +2483,7 @@ pub mod lp_gpio {
             self.pullup_enable(false);
             self.pulldown_enable(true);
             LowPowerPin {
-                private: PhantomData::default(),
+                private: PhantomData,
             }
         }
 
@@ -2491,7 +2493,7 @@ pub mod lp_gpio {
             self.pullup_enable(false);
             self.pulldown_enable(false);
             LowPowerPin {
-                private: PhantomData::default(),
+                private: PhantomData,
             }
         }
 
@@ -2499,7 +2501,7 @@ pub mod lp_gpio {
         pub fn into_push_pull_output(self) -> LowPowerPin<Output<PushPull>, PIN> {
             self.output_enable(true);
             LowPowerPin {
-                private: PhantomData::default(),
+                private: PhantomData,
             }
         }
     }
@@ -2540,7 +2542,7 @@ pub mod lp_gpio {
                         fn into_low_power(self) -> crate::gpio::lp_gpio::LowPowerPin<Unknown, $gpionum> {
                             crate::gpio::lp_gpio::init_low_power_pin($gpionum);
                             crate::gpio::lp_gpio::LowPowerPin {
-                                private: core::marker::PhantomData::default(),
+                                private: core::marker::PhantomData,
                             }
                         }
                     }
@@ -2740,7 +2742,7 @@ mod asynch {
         handle_gpio_interrupt();
     }
 
-    #[cfg(any(esp32p4))]
+    #[cfg(esp32p4)]
     #[interrupt]
     unsafe fn GPIO_INT0() {
         handle_gpio_interrupt();

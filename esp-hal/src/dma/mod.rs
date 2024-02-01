@@ -500,7 +500,7 @@ where
             available: 0,
             last_seen_handled_descriptor_ptr: core::ptr::null_mut(),
             read_buffer_start: core::ptr::null_mut(),
-            _phantom: PhantomData::default(),
+            _phantom: PhantomData,
         }
     }
 }
@@ -898,7 +898,7 @@ where
             last_seen_handled_descriptor_ptr: core::ptr::null_mut(),
             buffer_start: core::ptr::null_mut(),
             buffer_len: 0,
-            _phantom: PhantomData::default(),
+            _phantom: PhantomData,
         }
     }
 }

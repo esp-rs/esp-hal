@@ -95,15 +95,11 @@ impl<'d> Rsa<'d> {
     }
 
     unsafe fn write_operand_b<const N: usize>(&mut self, operand_b: &[u32; N]) {
-        copy_nonoverlapping(
-            operand_b.as_ptr(),
-            self.rsa.y_mem(0).as_ptr() as *mut u32,
-            N,
-        );
+        copy_nonoverlapping(operand_b.as_ptr(), self.rsa.y_mem(0).as_ptr(), N);
     }
 
     unsafe fn write_modulus<const N: usize>(&mut self, modulus: &[u32; N]) {
-        copy_nonoverlapping(modulus.as_ptr(), self.rsa.m_mem(0).as_ptr() as *mut u32, N);
+        copy_nonoverlapping(modulus.as_ptr(), self.rsa.m_mem(0).as_ptr(), N);
     }
 
     fn write_mprime(&mut self, m_prime: u32) {
@@ -111,15 +107,11 @@ impl<'d> Rsa<'d> {
     }
 
     unsafe fn write_operand_a<const N: usize>(&mut self, operand_a: &[u32; N]) {
-        copy_nonoverlapping(
-            operand_a.as_ptr(),
-            self.rsa.x_mem(0).as_ptr() as *mut u32,
-            N,
-        );
+        copy_nonoverlapping(operand_a.as_ptr(), self.rsa.x_mem(0).as_ptr(), N);
     }
 
     unsafe fn write_r<const N: usize>(&mut self, r: &[u32; N]) {
-        copy_nonoverlapping(r.as_ptr(), self.rsa.z_mem(0).as_ptr() as *mut u32, N);
+        copy_nonoverlapping(r.as_ptr(), self.rsa.z_mem(0).as_ptr(), N);
     }
 
     unsafe fn read_out<const N: usize>(&mut self, outbuf: &mut [u32; N]) {
@@ -140,10 +132,9 @@ mod sealed {
     }
 }
 
-pub(self) use sealed::*;
+use sealed::*;
 
 macro_rules! implement_op {
-
     (($x:literal, multi)) => {
     paste! {pub struct [<Op $x>];}
     paste! {
@@ -170,7 +161,7 @@ macro_rules! implement_op {
     };
 }
 
-pub(self) use implement_op;
+use implement_op;
 
 /// Support for RSA peripheral's modular exponentiation feature that could be
 /// used to find the `(base ^ exponent) mod modulus`.
@@ -259,7 +250,7 @@ where
     /// This is a non blocking function that returns without an error if
     /// operation is completed successfully. `start_multiplication` must be
     /// called before calling this function.
-    pub fn read_results<'b, const O: usize>(&mut self, outbuf: &mut T::OutputType)
+    pub fn read_results<const O: usize>(&mut self, outbuf: &mut T::OutputType)
     where
         T: Multi<OutputType = [u32; O]>,
     {

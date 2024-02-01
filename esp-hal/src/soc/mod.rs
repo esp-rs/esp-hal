@@ -69,9 +69,5 @@ impl soc::efuse::Efuse {
 }
 
 pub fn is_valid_ram_address(address: u32) -> bool {
-    if (soc::constants::SOC_DRAM_LOW..=soc::constants::SOC_DRAM_HIGH).contains(&address) {
-        true
-    } else {
-        false
-    }
+    (soc::constants::SOC_DRAM_LOW..=soc::constants::SOC_DRAM_HIGH).contains(&address)
 }

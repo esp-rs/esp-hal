@@ -300,7 +300,7 @@ impl CpuControl {
         self.unpark_core(Cpu::AppCpu);
 
         Ok(AppCoreGuard {
-            phantom: PhantomData::default(),
+            phantom: PhantomData,
         })
     }
 }

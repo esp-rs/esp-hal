@@ -154,6 +154,12 @@ impl Context {
     }
 }
 
+impl Default for Context {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Compute a full digest from a single buffer
 #[inline]
 pub fn compute<T: AsRef<[u8]>>(data: T) -> Digest {

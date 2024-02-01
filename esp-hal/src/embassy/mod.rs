@@ -130,7 +130,7 @@ pub fn init(clocks: &Clocks, td: time_driver::TimerType) {
         #[cfg(esp32c3)]
         crate::interrupt::enable(Interrupt::DMA_CH2, Priority::max()).unwrap();
 
-        #[cfg(any(esp32))]
+        #[cfg(esp32)]
         crate::interrupt::enable(Interrupt::SPI1_DMA, Priority::max()).unwrap();
         #[cfg(any(esp32, esp32s2))]
         crate::interrupt::enable(Interrupt::SPI2_DMA, Priority::max()).unwrap();

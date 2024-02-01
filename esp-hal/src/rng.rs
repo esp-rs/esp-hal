@@ -135,6 +135,7 @@ impl RngCore for Rng {
 
     fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core::Error> {
         // Similar implementation as fill_bytes, but encapsulated in a Result
-        Ok(self.fill_bytes(dest))
+        self.fill_bytes(dest);
+        Ok(())
     }
 }

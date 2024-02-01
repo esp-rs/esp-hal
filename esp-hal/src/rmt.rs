@@ -370,7 +370,7 @@ where
                     }
                 }
 
-                self.index = self.index + constants::RMT_CHANNEL_RAM_SIZE / 2;
+                self.index += constants::RMT_CHANNEL_RAM_SIZE / 2;
             } else {
                 break;
             }
@@ -527,7 +527,7 @@ mod impl_for_chip {
     super::chip_specific::impl_rx_channel!(Channel, RMT_SIG_1, 3, 1);
 }
 
-#[cfg(any(esp32))]
+#[cfg(esp32)]
 mod impl_for_chip {
     use super::private::CreateInstance;
     use crate::peripheral::{Peripheral, PeripheralRef};
@@ -602,7 +602,7 @@ mod impl_for_chip {
     super::chip_specific::impl_rx_channel!(Channel, RMT_SIG_7, 7);
 }
 
-#[cfg(any(esp32s2))]
+#[cfg(esp32s2)]
 mod impl_for_chip {
     use super::private::CreateInstance;
     use crate::peripheral::{Peripheral, PeripheralRef};
@@ -653,7 +653,7 @@ mod impl_for_chip {
     super::chip_specific::impl_rx_channel!(Channel, RMT_SIG_3, 3);
 }
 
-#[cfg(any(esp32s3))]
+#[cfg(esp32s3)]
 mod impl_for_chip {
     use super::private::CreateInstance;
     use crate::peripheral::{Peripheral, PeripheralRef};
@@ -722,10 +722,7 @@ pub trait TxChannel: private::TxChannelInternal {
     /// This returns a [`SingleShotTxTransaction`] which can be used to wait for
     /// the transaction to complete and get back the channel for further
     /// use.
-    fn transmit<'a, T: Into<u32> + Copy>(
-        self,
-        data: &'a [T],
-    ) -> SingleShotTxTransaction<'a, Self, T>
+    fn transmit<T: Into<u32> + Copy>(self, data: &[T]) -> SingleShotTxTransaction<Self, T>
     where
         Self: Sized,
     {
@@ -741,9 +738,9 @@ pub trait TxChannel: private::TxChannelInternal {
     /// This returns a [`ContinuousTxTransaction`] which can be used to stop the
     /// ongoing transmission and get back the channel for further use.
     /// The length of sequence cannot exceed the size of the allocated RMT RAM.
-    fn transmit_continuously<'a, T: Into<u32> + Copy>(
+    fn transmit_continuously<T: Into<u32> + Copy>(
         self,
-        data: &'a [T],
+        data: &[T],
     ) -> Result<ContinuousTxTransaction<Self>, Error>
     where
         Self: Sized,
@@ -754,10 +751,10 @@ pub trait TxChannel: private::TxChannelInternal {
     /// Like [`Self::transmit_continuously`] but also sets a loop count.
     /// [`ContinuousTxTransaction`] can be used to check if the loop count is
     /// reached.
-    fn transmit_continuously_with_loopcount<'a, T: Into<u32> + Copy>(
+    fn transmit_continuously_with_loopcount<T: Into<u32> + Copy>(
         self,
         loopcount: u16,
-        data: &'a [T],
+        data: &[T],
     ) -> Result<ContinuousTxTransaction<Self>, Error>
     where
         Self: Sized,
@@ -817,10 +814,7 @@ pub trait RxChannel: private::RxChannelInternal {
     /// This returns a [RxTransaction] which can be used to wait for receive to
     /// complete and get back the channel for further use.
     /// The length of the received data cannot exceed the allocated RMT RAM.
-    fn receive<'a, T: From<u32> + Copy>(
-        self,
-        data: &'a mut [T],
-    ) -> Result<RxTransaction<'a, Self, T>, Error>
+    fn receive<T: From<u32> + Copy>(self, data: &mut [T]) -> Result<RxTransaction<Self, T>, Error>
     where
         Self: Sized,
     {
@@ -1107,7 +1101,7 @@ pub mod asynch {
                         Event::Error,
                     );
                 }
-                #[cfg(any(esp32))]
+                #[cfg(esp32)]
                 4 => {
                     <Channel<4> as super::private::TxChannelInternal>::unlisten_interrupt(
                         Event::End,

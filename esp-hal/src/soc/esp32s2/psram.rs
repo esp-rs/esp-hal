@@ -18,7 +18,7 @@
 const PSRAM_VADDR: u32 = 0x3f500000;
 
 pub fn psram_vaddr_start() -> usize {
-    PSRAM_VADDR_START as usize
+    PSRAM_VADDR_START
 }
 
 cfg_if::cfg_if! {

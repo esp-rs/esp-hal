@@ -518,7 +518,7 @@ where
             w.at_cmd_char()
                 .bits(config.cmd_char)
                 .char_num()
-                .bits(config.char_num.or(Some(1)).unwrap())
+                .bits(config.char_num.unwrap_or(1))
         });
 
         if let Some(pre_idle_count) = config.pre_idle_count {
@@ -1000,29 +1000,25 @@ pub trait Instance {
         // section 3.17
         #[cfg(esp32)]
         {
-            let rd_addr: u16 = Self::register_block()
+            let rd_addr = Self::register_block()
                 .mem_rx_status()
                 .read()
                 .mem_rx_rd_addr()
-                .bits()
-                .into();
-            let wr_addr: u16 = Self::register_block()
+                .bits();
+            let wr_addr = Self::register_block()
                 .mem_rx_status()
                 .read()
                 .mem_rx_wr_addr()
-                .bits()
-                .into();
+                .bits();
 
             if wr_addr > rd_addr {
                 wr_addr - rd_addr
             } else if wr_addr < rd_addr {
                 (wr_addr + UART_FIFO_SIZE) - rd_addr
+            } else if fifo_cnt > 0 {
+                UART_FIFO_SIZE
             } else {
-                if fifo_cnt > 0 {
-                    UART_FIFO_SIZE
-                } else {
-                    0
-                }
+                0
             }
         }
 
