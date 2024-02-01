@@ -49,9 +49,6 @@ pub(crate) fn esp32c2_rtc_bbpll_configure(xtal_freq: XtalClock, _pll_freq: PllCl
     let dchgp: u32;
     let dcur: u32;
     let dbias: u32;
-    let i2c_bbpll_lref: u32;
-    let i2c_bbpll_div_7_0: u32;
-    let i2c_bbpll_dcur: u32;
 
     unsafe {
         let clear_reg_mask = |reg, mask: u32| {
@@ -94,9 +91,10 @@ pub(crate) fn esp32c2_rtc_bbpll_configure(xtal_freq: XtalClock, _pll_freq: PllCl
 
     regi2c_write!(I2C_BBPLL, I2C_BBPLL_MODE_HF, 0x6b);
 
-    i2c_bbpll_lref = (dchgp << I2C_BBPLL_OC_DCHGP_LSB) | div_ref;
-    i2c_bbpll_div_7_0 = div7_0;
-    i2c_bbpll_dcur = (1 << I2C_BBPLL_OC_DLREF_SEL_LSB) | (3 << I2C_BBPLL_OC_DHREF_SEL_LSB) | dcur;
+    let i2c_bbpll_lref = (dchgp << I2C_BBPLL_OC_DCHGP_LSB) | div_ref;
+    let i2c_bbpll_div_7_0 = div7_0;
+    let i2c_bbpll_dcur =
+        (1 << I2C_BBPLL_OC_DLREF_SEL_LSB) | (3 << I2C_BBPLL_OC_DHREF_SEL_LSB) | dcur;
 
     regi2c_write!(I2C_BBPLL, I2C_BBPLL_OC_REF_DIV, i2c_bbpll_lref);
 

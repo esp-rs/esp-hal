@@ -31,7 +31,7 @@ impl<'d> Rsa<'d> {
     }
 
     fn write_mode(&mut self, mode: u32) {
-        self.rsa.mode().write(|w| unsafe { w.bits(mode as u32) });
+        self.rsa.mode().write(|w| unsafe { w.bits(mode) });
     }
 
     /// Enables/disables search acceleration, when enabled it would increases
@@ -106,11 +106,7 @@ impl<'d> Rsa<'d> {
     }
 
     unsafe fn write_multi_operand_b<const N: usize>(&mut self, operand_b: &[u32; N]) {
-        copy_nonoverlapping(
-            operand_b.as_ptr(),
-            self.rsa.z_mem(0).as_ptr().add(N) as *mut u32,
-            N,
-        );
+        copy_nonoverlapping(operand_b.as_ptr(), self.rsa.z_mem(0).as_ptr().add(N), N);
     }
 }
 

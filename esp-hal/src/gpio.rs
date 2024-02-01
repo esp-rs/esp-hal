@@ -1750,9 +1750,9 @@ macro_rules! rtc_pins {
     (
         $pin_num:expr
     ) => {
-        impl<MODE> crate::gpio::RTCPin for GpioPin<MODE, $pin_num> {
+        impl<MODE> $crate::gpio::RTCPin for GpioPin<MODE, $pin_num> {
             unsafe fn apply_wakeup(&mut self, wakeup: bool, level: u8) {
-                let rtc_cntl = unsafe { &*crate::peripherals::RTC_CNTL::ptr() };
+                let rtc_cntl = unsafe { &*$crate::peripherals::RTC_CNTL::ptr() };
                 paste::paste! {
                     rtc_cntl.gpio_wakeup().modify(|_, w| w.[< gpio_pin $pin_num _wakeup_enable >]().bit(wakeup));
                     rtc_cntl.gpio_wakeup().modify(|_, w| w.[< gpio_pin $pin_num _int_type >]().bits(level));
@@ -1760,28 +1760,28 @@ macro_rules! rtc_pins {
             }
 
             fn rtcio_pad_hold(&mut self, enable: bool) {
-                let rtc_cntl = unsafe { &*crate::peripherals::RTC_CNTL::ptr() };
+                let rtc_cntl = unsafe { &*$crate::peripherals::RTC_CNTL::ptr() };
                 paste::paste! {
                     rtc_cntl.pad_hold().modify(|_, w| w.[< gpio_pin $pin_num _hold >]().bit(enable));
                 }
             }
         }
 
-        impl<MODE> crate::gpio::RTCPinWithResistors for GpioPin<MODE, $pin_num> {
+        impl<MODE> $crate::gpio::RTCPinWithResistors for GpioPin<MODE, $pin_num> {
             fn rtcio_pullup(&mut self, enable: bool) {
-                let io_mux = unsafe { &*crate::peripherals::IO_MUX::ptr() };
+                let io_mux = unsafe { &*$crate::peripherals::IO_MUX::ptr() };
                 io_mux.gpio($pin_num).modify(|_, w| w.fun_wpu().bit(enable));
             }
 
             fn rtcio_pulldown(&mut self, enable: bool) {
-                let io_mux = unsafe { &*crate::peripherals::IO_MUX::ptr() };
+                let io_mux = unsafe { &*$crate::peripherals::IO_MUX::ptr() };
                 io_mux.gpio($pin_num).modify(|_, w| w.fun_wpd().bit(enable));
             }
         }
 
     };
 
-    ( $( $pin_num:expr )+ ) => { $( crate::gpio::rtc_pins!($pin_num); )+ };
+    ( $( $pin_num:expr )+ ) => { $( $crate::gpio::rtc_pins!($pin_num); )+ };
 }
 
 // Following code enables `into_analog`
@@ -1866,8 +1866,8 @@ macro_rules! analog {
         $($pin_num:literal)+
     ) => {
         pub(crate) fn internal_into_analog(pin: u8) {
-            use crate::peripherals::IO_MUX;
-            use crate::peripherals::GPIO;
+            use $crate::peripherals::IO_MUX;
+            use $crate::peripherals::GPIO;
 
             let io_mux = unsafe{ &*IO_MUX::PTR };
             let gpio = unsafe{ &*GPIO::PTR };

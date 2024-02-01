@@ -557,7 +557,7 @@ where
     fn read(&mut self, pin: &mut AdcPin<PIN, ADCI, CS>) -> nb::Result<u16, Self::Error> {
         use embedded_hal::adc::Channel;
 
-        if self.attenuations[AdcPin::<PIN, ADCI>::channel() as usize] == None {
+        if self.attenuations[AdcPin::<PIN, ADCI>::channel() as usize].is_none() {
             panic!(
                 "Channel {} is not configured reading!",
                 AdcPin::<PIN, ADCI>::channel()
