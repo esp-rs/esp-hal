@@ -414,7 +414,7 @@ macro_rules! impl_adc_interface {
     }
 }
 
-mod implementation {
+mod adc_implementation {
     use crate::peripherals::{ADC1, ADC2};
 
     impl_adc_interface! {

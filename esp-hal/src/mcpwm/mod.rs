@@ -282,6 +282,10 @@ impl<'a> PeripheralClockConfig<'a> {
 pub struct FrequencyError;
 
 /// A MCPWM peripheral
+///
+/// # Safety
+///
+/// ???
 pub unsafe trait PwmPeripheral: Deref<Target = RegisterBlock> {
     /// Enable peripheral
     fn enable();

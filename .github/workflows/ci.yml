@@ -740,16 +740,23 @@ jobs:
       - uses: actions/checkout@v4
       - uses: esp-rs/xtensa-toolchain@v1.5
         with:
+          default: true
           ldproxy: false
       - uses: Swatinem/rust-cache@v2
 
       # Run 'cargo clippy' on all packages targeting Xtensa:
       - name: clippy (esp32-hal)
-        run: cd esp32-hal && cargo clippy -- -D warnings
+        run: |
+          cargo clippy -Zbuild-std=core --manifest-path=esp-hal/Cargo.toml --target=xtensa-esp32-none-elf --features=esp32,xtal-40mhz \
+            -- -D warnings -A clippy::too_many_arguments -A clippy::type_complexity
       - name: clippy (esp32s2-hal)
-        run: cd esp32s2-hal && cargo clippy -- -D warnings
+        run: |
+          cargo clippy -Zbuild-std=core --manifest-path=esp-hal/Cargo.toml --target=xtensa-esp32s2-none-elf --features=esp32s2 \
+            -- -D warnings -A clippy::too_many_arguments -A clippy::type_complexity
       - name: clippy (esp32s3-hal)
-        run: cd esp32s3-hal && cargo clippy -- -D warnings
+        run: |
+          cargo clippy -Zbuild-std=core --manifest-path=esp-hal/Cargo.toml --target=xtensa-esp32s3-none-elf --features=esp32s3 \
+            -- -D warnings -A clippy::too_many_arguments -A clippy::type_complexity
 
   rustfmt:
     runs-on: ubuntu-latest

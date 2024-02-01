@@ -163,6 +163,11 @@ impl CpuControl {
     }
 
     /// Park the given core
+    ///
+    /// # Safety
+    ///
+    /// The user must ensure that the core being parked is not the core which is
+    /// currently executing their code.
     pub unsafe fn park_core(&mut self, core: Cpu) {
         internal_park_core(core);
     }

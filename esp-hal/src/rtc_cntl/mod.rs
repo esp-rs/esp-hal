@@ -965,7 +965,7 @@ pub fn get_wakeup_cause() -> SleepSource {
 
     #[cfg(any(esp32c6, esp32h2))]
     let wakeup_cause = WakeupReason::from_bits_retain(unsafe {
-        (&*crate::peripherals::PMU::PTR)
+        (*crate::peripherals::PMU::PTR)
             .slp_wakeup_status0()
             .read()
             .wakeup_cause()

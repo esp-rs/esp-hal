@@ -1347,35 +1347,33 @@ mod private {
                 clkm_div_y = 0;
                 clkm_div_z = 0;
                 clkm_div_yn1 = 1;
-            } else {
-                if clock_settings.numerator > clock_settings.denominator / 2 {
-                    clkm_div_x = clock_settings
-                        .denominator
-                        .overflowing_div(
-                            clock_settings
-                                .denominator
-                                .overflowing_sub(clock_settings.numerator)
-                                .0,
-                        )
-                        .0
-                        .overflowing_sub(1)
-                        .0;
-                    clkm_div_y = clock_settings.denominator
-                        % (clock_settings
+            } else if clock_settings.numerator > clock_settings.denominator / 2 {
+                clkm_div_x = clock_settings
+                    .denominator
+                    .overflowing_div(
+                        clock_settings
                             .denominator
                             .overflowing_sub(clock_settings.numerator)
-                            .0);
-                    clkm_div_z = clock_settings
+                            .0,
+                    )
+                    .0
+                    .overflowing_sub(1)
+                    .0;
+                clkm_div_y = clock_settings.denominator
+                    % (clock_settings
                         .denominator
                         .overflowing_sub(clock_settings.numerator)
-                        .0;
-                    clkm_div_yn1 = 1;
-                } else {
-                    clkm_div_x = clock_settings.denominator / clock_settings.numerator - 1;
-                    clkm_div_y = clock_settings.denominator % clock_settings.numerator;
-                    clkm_div_z = clock_settings.numerator;
-                    clkm_div_yn1 = 0;
-                }
+                        .0);
+                clkm_div_z = clock_settings
+                    .denominator
+                    .overflowing_sub(clock_settings.numerator)
+                    .0;
+                clkm_div_yn1 = 1;
+            } else {
+                clkm_div_x = clock_settings.denominator / clock_settings.numerator - 1;
+                clkm_div_y = clock_settings.denominator % clock_settings.numerator;
+                clkm_div_z = clock_settings.numerator;
+                clkm_div_yn1 = 0;
             }
 
             pcr.i2s_tx_clkm_div_conf().modify(|_, w| {
@@ -1384,7 +1382,7 @@ mod private {
                     .i2s_tx_clkm_div_y()
                     .variant(clkm_div_y as u16)
                     .i2s_tx_clkm_div_yn1()
-                    .variant(if clkm_div_yn1 != 0 { true } else { false })
+                    .variant(clkm_div_yn1 != 0)
                     .i2s_tx_clkm_div_z()
                     .variant(clkm_div_z as u16)
             });
@@ -1415,7 +1413,7 @@ mod private {
                     .i2s_rx_clkm_div_y()
                     .variant(clkm_div_y as u16)
                     .i2s_rx_clkm_div_yn1()
-                    .variant(if clkm_div_yn1 != 0 { true } else { false })
+                    .variant(clkm_div_yn1 != 0)
                     .i2s_rx_clkm_div_z()
                     .variant(clkm_div_z as u16)
             });

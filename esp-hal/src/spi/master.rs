@@ -2088,7 +2088,7 @@ pub trait Instance {
         unsafe {
             // use default clock source PLL_F80M_CLK (ESP32-C6) and
             // PLL_F48M_CLK (ESP32-H2)
-            (&*crate::peripherals::PCR::PTR)
+            (*crate::peripherals::PCR::PTR)
                 .spi2_clkm_conf()
                 .modify(|_, w| w.spi2_clkm_sel().bits(1));
         }

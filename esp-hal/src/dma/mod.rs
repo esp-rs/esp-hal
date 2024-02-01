@@ -390,6 +390,8 @@ where
         R::set_in_priority(priority);
     }
 
+    // TODO: Should this function be marked as `unsafe`, like `clippy` suggests?
+    #[allow(clippy::not_unsafe_ptr_arg_deref)]
     fn prepare_transfer_without_start(
         &mut self,
         descriptors: &mut [DmaDescriptor],

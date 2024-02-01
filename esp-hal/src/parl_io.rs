@@ -1115,10 +1115,7 @@ where
     }
 }
 
-fn internal_init<'d, CH>(
-    dma_channel: &mut Channel<'d, CH>,
-    frequency: HertzU32,
-) -> Result<(), Error>
+fn internal_init<CH>(dma_channel: &mut Channel<'_, CH>, frequency: HertzU32) -> Result<(), Error>
 where
     CH: ChannelTypes,
     CH::P: ParlIoPeripheral,
@@ -1196,7 +1193,7 @@ where
         })
     }
 
-    fn start_write_bytes_dma<'w>(&mut self, ptr: *const u8, len: usize) -> Result<(), Error> {
+    fn start_write_bytes_dma(&mut self, ptr: *const u8, len: usize) -> Result<(), Error> {
         let pcr = unsafe { &*crate::peripherals::PCR::PTR };
         pcr.parl_clk_tx_conf()
             .modify(|_, w| w.parl_tx_rst_en().set_bit());
@@ -1306,10 +1303,8 @@ where
     {
         let (ptr, len) = unsafe { words.write_buffer() };
 
-        if !Instance::is_suc_eof_generated_externally() {
-            if len > MAX_DMA_SIZE {
-                return Err(Error::MaxDmaTransferSizeExceeded);
-            }
+        if !Instance::is_suc_eof_generated_externally() && len > MAX_DMA_SIZE {
+            return Err(Error::MaxDmaTransferSizeExceeded);
         }
 
         self.start_receive_bytes_dma(ptr, len)?;
@@ -1320,7 +1315,7 @@ where
         })
     }
 
-    fn start_receive_bytes_dma<'w>(&mut self, ptr: *mut u8, len: usize) -> Result<(), Error> {
+    fn start_receive_bytes_dma(&mut self, ptr: *mut u8, len: usize) -> Result<(), Error> {
         let pcr = unsafe { &*crate::peripherals::PCR::PTR };
         pcr.parl_clk_rx_conf()
             .modify(|_, w| w.parl_rx_rst_en().set_bit());
@@ -1383,7 +1378,7 @@ where
         unsafe {
             let buffer = core::ptr::read(&self.buffer);
             let payload = core::ptr::read(&self.instance);
-            let err = (&self).instance.rx_channel.has_error();
+            let err = self.instance.rx_channel.has_error();
             mem::forget(self);
             if err {
                 Err((DmaError::DescriptorError, buffer, payload))
@@ -1659,7 +1654,7 @@ mod private {
 
             reg_block
                 .tx_cfg0()
-                .modify(|_, w| w.tx_bytelen().variant(len as u16));
+                .modify(|_, w| w.tx_bytelen().variant(len));
         }
 
         pub fn is_tx_ready() -> bool {
@@ -1731,7 +1726,7 @@ mod private {
 
             reg_block
                 .rx_cfg0()
-                .modify(|_, w| w.rx_data_bytelen().variant(len as u16));
+                .modify(|_, w| w.rx_data_bytelen().variant(len));
         }
 
         pub fn set_rx_sample_mode(sample_mode: SampleMode) {

@@ -288,7 +288,7 @@ pub(crate) fn esp32c6_rtc_freq_to_pll_mhz_raw(cpu_clock_speed_mhz: u32) {
         pcr.cpu_freq_conf()
             .modify(|_, w| w.cpu_hs_120m_force().clear_bit());
 
-        CpuClockSource::PLL.select();
+        CpuClockSource::Pll.select();
 
         ets_update_cpu_frequency(cpu_clock_speed_mhz);
     }
@@ -378,7 +378,7 @@ const REGI2C_RTC_WR_CNTL_S: u8 = 24;
 const REGI2C_RTC_DATA_V: u8 = 0xFF;
 const REGI2C_RTC_DATA_S: u8 = 16;
 
-const LP_I2C_ANA_MST_I2C0_CTRL_REG: u32 = DR_REG_LP_I2C_ANA_MST_BASE + 0x0;
+const LP_I2C_ANA_MST_I2C0_CTRL_REG: u32 = DR_REG_LP_I2C_ANA_MST_BASE;
 const LP_I2C_ANA_MST_I2C0_BUSY: u32 = 1 << 25;
 
 const LP_I2C_ANA_MST_I2C0_DATA_REG: u32 = DR_REG_LP_I2C_ANA_MST_BASE + 0x8;
@@ -463,8 +463,7 @@ pub(crate) fn regi2c_write_mask(block: u8, _host_id: u8, reg_add: u8, msb: u8, l
     );
     // Write the i2c bus register
     temp &= (!(0xFFFFFFFF << lsb)) | (0xFFFFFFFF << (msb + 1));
-    temp =
-        ((data as u32 & (!(0xFFFFFFFF << (msb as u32 - lsb as u32 + 1)))) << (lsb as u32)) | temp;
+    temp |= (data as u32 & (!(0xFFFFFFFF << (msb as u32 - lsb as u32 + 1)))) << (lsb as u32);
     temp = ((block as u32 & REGI2C_RTC_SLAVE_ID_V as u32) << REGI2C_RTC_SLAVE_ID_S as u32)
         | ((reg_add as u32 & REGI2C_RTC_ADDR_V as u32) << REGI2C_RTC_ADDR_S as u32)
         | ((0x1 & REGI2C_RTC_WR_CNTL_V as u32) << REGI2C_RTC_WR_CNTL_S as u32)

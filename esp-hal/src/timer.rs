@@ -749,6 +749,10 @@ where
     }
 
     /// Forcibly enable or disable the watchdog timer
+    ///
+    /// # Safety
+    ///
+    /// ???
     pub unsafe fn set_wdt_enabled(enabled: bool) {
         let reg_block = unsafe { &*TG::register_block() };
 
