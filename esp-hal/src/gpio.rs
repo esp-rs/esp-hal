@@ -160,13 +160,16 @@ pub enum RtcFunction {
 pub trait RTCPin: Pin {
     #[cfg(xtensa)]
     fn rtc_number(&self) -> u8;
+
     #[cfg(any(xtensa, esp32c6))]
     fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: RtcFunction);
 
     fn rtcio_pad_hold(&mut self, enable: bool);
 
-    // Unsafe because `level` needs to be a valid setting for the
-    // rtc_cntl.gpio_wakeup.gpio_pinX_int_type
+    /// # Safety
+    ///
+    /// The `level` argument needs to be a valid setting for the
+    /// `rtc_cntl.gpio_wakeup.gpio_pinX_int_type`.
     #[cfg(any(esp32c3, esp32c6))]
     unsafe fn apply_wakeup(&mut self, wakeup: bool, level: u8);
 }
@@ -819,7 +822,7 @@ where
         unsafe {
             // there is no NMI_ENABLE but P4 could trigger 4 interrupts
             // we'll only support GPIO_INT0 for now
-            (&*GPIO::PTR).pin(GPIONUM as usize).modify(|_, w| {
+            (*GPIO::PTR).pin(GPIONUM as usize).modify(|_, w| {
                 w.int_ena()
                     .bits(gpio_intr_enable(int_enable, nmi_enable))
                     .int_type()

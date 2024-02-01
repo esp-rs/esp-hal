@@ -771,21 +771,21 @@ impl<'d> Ecc<'d> {
 
         let mut tmp = [0_u8; 32];
 
-        tmp[0..px.len()].copy_from_slice(&px);
+        tmp[0..px.len()].copy_from_slice(px);
         self.alignment_helper
-            .volatile_write_regset(self.ecc.px_mem(0).as_ptr(), &mut tmp, 8);
-        tmp[0..py.len()].copy_from_slice(&py);
+            .volatile_write_regset(self.ecc.px_mem(0).as_ptr(), &tmp, 8);
+        tmp[0..py.len()].copy_from_slice(py);
         self.alignment_helper
-            .volatile_write_regset(self.ecc.py_mem(0).as_ptr(), &mut tmp, 8);
-        tmp[0..qx.len()].copy_from_slice(&qx);
+            .volatile_write_regset(self.ecc.py_mem(0).as_ptr(), &tmp, 8);
+        tmp[0..qx.len()].copy_from_slice(qx);
         self.alignment_helper
-            .volatile_write_regset(self.ecc.qx_mem(0).as_ptr(), &mut tmp, 8);
-        tmp[0..qy.len()].copy_from_slice(&qy);
+            .volatile_write_regset(self.ecc.qx_mem(0).as_ptr(), &tmp, 8);
+        tmp[0..qy.len()].copy_from_slice(qy);
         self.alignment_helper
-            .volatile_write_regset(self.ecc.qy_mem(0).as_ptr(), &mut tmp, 8);
-        tmp[0..qz.len()].copy_from_slice(&qz);
+            .volatile_write_regset(self.ecc.qy_mem(0).as_ptr(), &tmp, 8);
+        tmp[0..qz.len()].copy_from_slice(qz);
         self.alignment_helper
-            .volatile_write_regset(self.ecc.qz_mem(0).as_ptr(), &mut tmp, 8);
+            .volatile_write_regset(self.ecc.qz_mem(0).as_ptr(), &tmp, 8);
 
         self.ecc.mult_conf().write(|w| unsafe {
             w.work_mode()
@@ -863,12 +863,12 @@ impl<'d> Ecc<'d> {
         };
 
         let mut tmp = [0_u8; 32];
-        tmp[0..a.len()].copy_from_slice(&a);
+        tmp[0..a.len()].copy_from_slice(a);
         self.alignment_helper
-            .volatile_write_regset(self.ecc.px_mem(0).as_ptr(), &mut tmp, 8);
-        tmp[0..b.len()].copy_from_slice(&b);
+            .volatile_write_regset(self.ecc.px_mem(0).as_ptr(), &tmp, 8);
+        tmp[0..b.len()].copy_from_slice(b);
         self.alignment_helper
-            .volatile_write_regset(self.ecc.py_mem(0).as_ptr(), &mut tmp, 8);
+            .volatile_write_regset(self.ecc.py_mem(0).as_ptr(), &tmp, 8);
 
         self.ecc.mult_conf().write(|w| unsafe {
             w.work_mode()

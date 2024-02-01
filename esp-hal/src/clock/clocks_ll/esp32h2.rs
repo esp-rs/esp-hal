@@ -65,7 +65,7 @@ const REGI2C_RTC_WR_CNTL_S: u8 = 24;
 const REGI2C_RTC_DATA_V: u8 = 0xFF;
 const REGI2C_RTC_DATA_S: u8 = 16;
 
-const I2C_MST_I2C0_CTRL_REG: u32 = DR_REG_I2C_ANA_MST_BASE + 0x0;
+const I2C_MST_I2C0_CTRL_REG: u32 = DR_REG_I2C_ANA_MST_BASE;
 const REGI2C_RTC_BUSY: u32 = 1 << 25;
 
 pub(crate) fn esp32h2_rtc_bbpll_configure(_xtal_freq: XtalClock, _pll_freq: PllClock) {
@@ -250,7 +250,7 @@ fn regi2c_enable_block(block: u8) {
     unsafe {
         (I2C_MST_ANA_CONF2_REG as *mut u32).write_volatile(
             // (1 << 18)
-            (I2C_MST_ANA_CONF2_REG as *mut u32).read_volatile() & !(I2C_MST_ANA_CONF2 as u32),
+            (I2C_MST_ANA_CONF2_REG as *mut u32).read_volatile() & !I2C_MST_ANA_CONF2,
         );
     }
 
@@ -339,8 +339,7 @@ pub(crate) fn regi2c_write_mask(block: u8, _host_id: u8, reg_add: u8, msb: u8, l
     );
     // Write the i2c bus register
     temp &= (!(0xFFFFFFFF << lsb)) | (0xFFFFFFFF << (msb + 1));
-    temp =
-        ((data as u32 & (!(0xFFFFFFFF << (msb as u32 - lsb as u32 + 1)))) << (lsb as u32)) | temp;
+    temp |= (data as u32 & (!(0xFFFFFFFF << (msb as u32 - lsb as u32 + 1)))) << (lsb as u32);
     temp = ((block as u32 & REGI2C_RTC_SLAVE_ID_V as u32) << REGI2C_RTC_SLAVE_ID_S as u32)
         | ((reg_add as u32 & REGI2C_RTC_ADDR_V as u32) << REGI2C_RTC_ADDR_S as u32)
         | ((0x1 & REGI2C_RTC_WR_CNTL_V as u32) << REGI2C_RTC_WR_CNTL_S as u32)

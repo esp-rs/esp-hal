@@ -1,7 +1,10 @@
 use core::marker::PhantomData;
 
+#[cfg(not(esp32h2))]
 pub use self::calibration::*;
-use super::{AdcCalEfuse, AdcCalScheme, AdcCalSource, AdcChannel, Attenuation};
+#[cfg(not(esp32h2))]
+use super::AdcCalEfuse;
+use super::{AdcCalScheme, AdcCalSource, AdcChannel, Attenuation};
 #[cfg(any(esp32c6, esp32h2))]
 use crate::clock::clocks_ll::regi2c_write_mask;
 #[cfg(any(esp32c2, esp32c3, esp32c6))]
@@ -646,7 +649,7 @@ macro_rules! impl_adc_interface {
 }
 
 #[cfg(esp32c2)]
-mod implementation {
+mod adc_implementation {
     use crate::peripherals::ADC1;
 
     impl_adc_interface! {
@@ -661,7 +664,7 @@ mod implementation {
 }
 
 #[cfg(esp32c3)]
-mod implementation {
+mod adc_implementation {
     use crate::peripherals::{ADC1, ADC2};
 
     impl_adc_interface! {
@@ -682,7 +685,7 @@ mod implementation {
 }
 
 #[cfg(esp32c6)]
-mod implementation {
+mod adc_implementation {
     use crate::peripherals::ADC1;
 
     impl_adc_interface! {
@@ -699,7 +702,7 @@ mod implementation {
 }
 
 #[cfg(esp32h2)]
-mod implementation {
+mod adc_implementation {
     use crate::peripherals::ADC1;
 
     impl_adc_interface! {

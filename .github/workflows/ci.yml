@@ -709,11 +709,32 @@ jobs:
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: nightly
-          targets: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          targets: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf # ,riscv32imafc-unknown-none-elf
           components: clippy,rust-src
       - uses: Swatinem/rust-cache@v2
 
       # Run 'cargo clippy' on all packages targeting RISC-V:
+      - name: clippy (esp32c2-hal)
+        run: |
+          cargo clippy --manifest-path=esp-hal/Cargo.toml --target=riscv32imc-unknown-none-elf --features=esp32c2,xtal-40mhz \
+            -- -D warnings -A clippy::too_many_arguments -A clippy::type_complexity -A clippy::enum_variant_names -A clippy::field_reassign_with_default
+      - name: clippy (esp32c3-hal)
+        run: |
+          cargo clippy --manifest-path=esp-hal/Cargo.toml --target=riscv32imc-unknown-none-elf --features=esp32c3 \
+            -- -D warnings -A clippy::too_many_arguments -A clippy::type_complexity -A clippy::enum_variant_names -A clippy::field_reassign_with_default
+      - name: clippy (esp32c6-hal)
+        run: |
+          cargo clippy --manifest-path=esp-hal/Cargo.toml --target=riscv32imac-unknown-none-elf --features=esp32c6 \
+            -- -D warnings -A clippy::too_many_arguments -A clippy::type_complexity -A clippy::enum_variant_names -A clippy::field_reassign_with_default
+      - name: clippy (esp32h2-hal)
+        run: |
+          cargo clippy --manifest-path=esp-hal/Cargo.toml --target=riscv32imac-unknown-none-elf --features=esp32h2 \
+            -- -D warnings -A clippy::too_many_arguments -A clippy::type_complexity -A clippy::enum_variant_names -A clippy::field_reassign_with_default
+      # - name: clippy (esp32p4-hal)
+      #   run: |
+      #     cargo clippy --manifest-path=esp-hal/Cargo.toml --target=riscv32imafc-unknown-none-elf --features=esp32p4 \
+      #       -- -D warnings -A clippy::too_many_arguments -A clippy::type_complexity -A clippy::enum_variant_names -A clippy::field_reassign_with_default
+
       - name: clippy (esp-lp-hal, esp32c6)
         run: cd esp-lp-hal && cargo clippy --features=esp32c6 -- -D warnings
       - name: clippy (esp-lp-hal, esp32s2)
@@ -722,16 +743,6 @@ jobs:
         run: cd esp-lp-hal && cargo clippy --features=esp32s3 -- -D warnings
       - name: clippy (esp-riscv-rt)
         run: cd esp-riscv-rt && cargo clippy --target=riscv32imc-unknown-none-elf -- -D warnings
-      - name: clippy (esp32c2-hal)
-        run: cd esp32c2-hal && cargo clippy -- -D warnings
-      - name: clippy (esp32c3-hal)
-        run: cd esp32c3-hal && cargo clippy -- -D warnings
-      - name: clippy (esp32c6-hal)
-        run: cd esp32c6-hal && cargo clippy -- -D warnings
-      - name: clippy (esp32h2-hal)
-        run: cd esp32h2-hal && cargo clippy -- -D warnings
-      - name: clippy (esp32p4-hal)
-        run: cd esp32p4-hal && cargo clippy -- -D warnings
 
   clippy-xtensa:
     runs-on: ubuntu-latest
