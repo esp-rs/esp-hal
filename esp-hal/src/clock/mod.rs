@@ -87,14 +87,20 @@ pub trait Clock {
 pub enum CpuClock {
     #[cfg(not(any(esp32h2, esp32p4)))]
     Clock80MHz,
+    #[cfg(esp32p4)]
+    Clock90MHz,
     #[cfg(esp32h2)]
     Clock96MHz,
     #[cfg(esp32c2)]
     Clock120MHz,
     #[cfg(not(any(esp32c2, esp32h2, esp32p4)))]
     Clock160MHz,
+    #[cfg(esp32p4)]
+    Clock180MHz,
     #[cfg(xtensa)]
     Clock240MHz,
+    #[cfg(esp32p4)]
+    Clock360MHz,
     #[cfg(esp32p4)]
     Clock400MHz,
 }
@@ -669,14 +675,16 @@ impl<'d> ClockControl<'d> {
 
         if cpu_clock_speed.mhz() <= xtal_freq.mhz() {
             apb_freq = ApbClock::ApbFreqOther(cpu_clock_speed.mhz());
-            // clocks_ll::esp32p4_rtc_update_to_xtal(xtal_freq, 1);
+            clocks_ll::esp32p4_rtc_update_to_xtal(xtal_freq, 1, true);
             // clocks_ll::esp32p4_rtc_apb_freq_update(apb_freq);
         } else {
-            apb_freq = ApbClock::ApbFreq100MHz;
-            // clocks_ll::esp32p4_rtc_bbpll_enable();
-            // clocks_ll::esp32p4_rtc_bbpll_configure(xtal_freq, pll_freq);
-            // clocks_ll::esp32p4_rtc_freq_to_pll_mhz(cpu_clock_speed);
-            // clocks_ll::esp32p4_rtc_apb_freq_update(apb_freq);
+            // apb_freq = ApbClock::ApbFreq100MHz;
+            clocks_ll::esp32p4_rtc_cpll_enable();
+            // Calibrate CPLL freq to a new value requires to switch CPU clock source to XTAL first
+            clocks_ll::esp32h2_rtc_update_to_xtal(xtal_freq, 1, false);
+            clocks_ll::esp32p4_rtc_cpll_configure(xtal_freq, pll_freq);
+            clocks_ll::esp32p4_rtc_freq_to_cpll_mhz(cpu_clock_speed); // rtc_clk_cpu_freq_mhz_to_config blocking
+                                                                      // clocks_ll::esp32p4_rtc_apb_freq_update(apb_freq);
         }
 
         ClockControl {
