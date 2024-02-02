@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- `start_rust` calls `hal_main` instead of calling user's `main` directly
+- `start_rust` calls `hal_main` instead of calling user's `main` directly (#1135)
 
 ### Removed
 

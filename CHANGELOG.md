@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-S3: Added LCD_CAM I8080 driver (#1086)
 - Allow for splitting of the USB Serial JTAG peripheral into tx/rx components (#1024)
 - `RngCore` trait is implemented (#1122)
-- Support Rust's `stack-protector` feature
+- Support Rust's `stack-protector` feature (#1135)
 
 ### Fixed
 
