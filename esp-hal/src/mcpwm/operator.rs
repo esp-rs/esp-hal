@@ -34,6 +34,7 @@ pub struct DeadTimeCfg {
     falling_edge_delay: u16,
 }
 
+#[allow(clippy::unusual_byte_groupings)]
 impl DeadTimeCfg {
     // NOTE: it's a bit difficult to make this typestate
     // due to the different interconnections (FED/RED vs PWMxA/PWMxB) and
@@ -145,7 +146,7 @@ impl DeadTimeCfg {
 fn dt_cfg<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mcpwm0::DB0_CFG {
     let block = unsafe { &*PWM::block() };
     match OP {
-        0 => &block.db0_cfg(),
+        0 => block.db0_cfg(),
         1 => unsafe { &*(&block.db1_cfg() as *const _ as *const _) },
         2 => unsafe { &*(&block.db2_cfg() as *const _ as *const _) },
         _ => unreachable!(),
@@ -155,7 +156,7 @@ fn dt_cfg<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mc
 fn dt_fed<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mcpwm0::DB0_FED_CFG {
     let block = unsafe { &*PWM::block() };
     match OP {
-        0 => &block.db0_fed_cfg(),
+        0 => block.db0_fed_cfg(),
         1 => unsafe { &*(&block.db1_fed_cfg() as *const _ as *const _) },
         2 => unsafe { &*(&block.db2_fed_cfg() as *const _ as *const _) },
         _ => unreachable!(),
@@ -165,7 +166,7 @@ fn dt_fed<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mc
 fn dt_red<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mcpwm0::DB0_RED_CFG {
     let block = unsafe { &*PWM::block() };
     match OP {
-        0 => &block.db0_red_cfg(),
+        0 => block.db0_red_cfg(),
         1 => unsafe { &*(&block.db1_red_cfg() as *const _ as *const _) },
         2 => unsafe { &*(&block.db2_red_cfg() as *const _ as *const _) },
         _ => unreachable!(),
@@ -178,7 +179,7 @@ fn dt_red<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mc
 fn dt_cfg<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mcpwm0::DT0_CFG {
     let block = unsafe { &*PWM::block() };
     match OP {
-        0 => &block.dt0_cfg(),
+        0 => block.dt0_cfg(),
         1 => unsafe { &*(&block.dt1_cfg() as *const _ as *const _) },
         2 => unsafe { &*(&block.dt2_cfg() as *const _ as *const _) },
         _ => unreachable!(),
@@ -189,7 +190,7 @@ fn dt_cfg<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mc
 fn dt_fed<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mcpwm0::DT0_FED_CFG {
     let block = unsafe { &*PWM::block() };
     match OP {
-        0 => &block.dt0_fed_cfg(),
+        0 => block.dt0_fed_cfg(),
         1 => unsafe { &*(&block.dt1_fed_cfg() as *const _ as *const _) },
         2 => unsafe { &*(&block.dt2_fed_cfg() as *const _ as *const _) },
         _ => unreachable!(),
@@ -199,7 +200,7 @@ fn dt_fed<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mc
 fn dt_red<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mcpwm0::DT0_RED_CFG {
     let block = unsafe { &*PWM::block() };
     match OP {
-        0 => &block.dt0_red_cfg(),
+        0 => block.dt0_red_cfg(),
         1 => unsafe { &*(&block.dt1_red_cfg() as *const _ as *const _) },
         2 => unsafe { &*(&block.dt2_red_cfg() as *const _ as *const _) },
         _ => unreachable!(),

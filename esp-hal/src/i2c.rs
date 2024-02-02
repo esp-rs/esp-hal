@@ -908,7 +908,6 @@ pub trait Instance {
         let sclk_freq: u32 = source_clk / clkm_div;
         let half_cycle: u32 = sclk_freq / bus_freq / 2;
         // SCL
-        let clkm_div = clkm_div;
         let scl_low = half_cycle;
         // default, scl_wait_high < scl_high
         // Make 80KHz as a boundary here, because when working at lower frequency, too
@@ -1066,6 +1065,7 @@ pub trait Instance {
                 else {
                     // timeout
                     // FIXME: Enable timout for other chips!
+                    #[allow(clippy::useless_conversion)]
                     self.register_block()
                         .to()
                         .write(|w| w.time_out_en().bit(time_out_en)

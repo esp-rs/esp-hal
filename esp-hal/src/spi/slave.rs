@@ -127,7 +127,7 @@ where
         let mut spi = Spi {
             spi,
             data_mode: mode,
-            _mode: PhantomData::default(),
+            _mode: PhantomData,
         };
         spi.spi.init();
         spi.spi.set_data_mode(mode);
@@ -327,8 +327,8 @@ pub mod dma {
             unsafe {
                 let buffer = core::ptr::read(&self.buffer);
                 let payload = core::ptr::read(&self.spi_dma);
-                let err = (&self).spi_dma.channel.rx.has_error()
-                    || (&self).spi_dma.channel.tx.has_error();
+                let err =
+                    self.spi_dma.channel.rx.has_error() || self.spi_dma.channel.tx.has_error();
                 mem::forget(self);
                 if err {
                     Err((DmaError::DescriptorError, buffer, payload))
@@ -1000,7 +1000,7 @@ impl Instance for crate::peripherals::SPI2 {
     }
 }
 
-#[cfg(any(esp32))]
+#[cfg(esp32)]
 impl Instance for crate::peripherals::SPI2 {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
@@ -1038,7 +1038,7 @@ impl Instance for crate::peripherals::SPI2 {
     }
 }
 
-#[cfg(any(esp32))]
+#[cfg(esp32)]
 impl Instance for crate::peripherals::SPI3 {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {

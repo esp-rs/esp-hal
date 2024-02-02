@@ -326,15 +326,9 @@ impl RtcClock {
                 .modify(|_, w| w.slow_clk_sel().bits(slow_freq as u8));
             lp_clkrst.clk_to_hp().modify(|_, w| {
                 w.icg_hp_xtal32k()
-                    .bit(match slow_freq {
-                        RtcSlowClock::RtcSlowClock32kXtal => true,
-                        _ => false,
-                    })
+                    .bit(matches!(slow_freq, RtcSlowClock::RtcSlowClock32kXtal))
                     .icg_hp_xtal32k()
-                    .bit(match slow_freq {
-                        RtcSlowClock::RtcSlowClock32kXtal => true,
-                        _ => false,
-                    })
+                    .bit(matches!(slow_freq, RtcSlowClock::RtcSlowClock32kXtal))
             });
         }
     }

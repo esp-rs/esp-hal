@@ -189,7 +189,7 @@ where
         // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
         let timer0 = Timer::new(
             Timer0 {
-                phantom: PhantomData::default(),
+                phantom: PhantomData,
             },
             #[cfg(not(esp32h2))]
             clocks.apb_clock,
@@ -200,7 +200,7 @@ where
         #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
         let timer1 = Timer::new(
             Timer1 {
-                phantom: PhantomData::default(),
+                phantom: PhantomData,
             },
             clocks.apb_clock,
         );
@@ -425,7 +425,7 @@ where
         let value_lo = reg_block.t0lo().read().bits() as u64;
         let value_hi = (reg_block.t0hi().read().bits() as u64) << 32;
 
-        (value_lo | value_hi) as u64
+        value_lo | value_hi
     }
 
     fn divider(&self) -> u32 {
@@ -595,7 +595,7 @@ where
         let value_lo = reg_block.t1lo().read().bits() as u64;
         let value_hi = (reg_block.t1hi().read().bits() as u64) << 32;
 
-        (value_lo | value_hi) as u64
+        value_lo | value_hi
     }
 
     fn divider(&self) -> u32 {
@@ -730,7 +730,7 @@ where
         TG::configure_wdt_src_clk();
 
         Self {
-            phantom: PhantomData::default(),
+            phantom: PhantomData,
         }
     }
 
@@ -749,6 +749,12 @@ where
     }
 
     /// Forcibly enable or disable the watchdog timer
+    ///
+    /// # Safety
+    ///
+    /// This bypasses the usual ownership rules for the peripheral, so users
+    /// must take care to ensure that no driver instance is active for the
+    /// timer.
     pub unsafe fn set_wdt_enabled(enabled: bool) {
         let reg_block = unsafe { &*TG::register_block() };
 
@@ -824,6 +830,15 @@ where
         reg_block
             .wdtwprotect()
             .write(|w| unsafe { w.wdt_wkey().bits(0u32) });
+    }
+}
+
+impl<TG> Default for Wdt<TG>
+where
+    TG: TimerGroupInstance,
+{
+    fn default() -> Self {
+        Self::new()
     }
 }
 

@@ -383,19 +383,19 @@ impl RtcSleepConfig {
 
                 // esp-idf also clears these:
 
-                (&*esp32::DPORT::ptr())
+                (*esp32::DPORT::ptr())
                     .mem_pd_mask()
                     .modify(|_, w| w.lslp_mem_pd_mask().clear_bit());
 
-                (&*esp32::I2S0::ptr())
+                (*esp32::I2S0::ptr())
                     .pd_conf()
                     .modify(|_, w| w.plc_mem_force_pu().clear_bit().fifo_force_pu().clear_bit());
 
-                (&*esp32::BB::ptr())
+                (*esp32::BB::ptr())
                     .bbpd_ctrl()
                     .modify(|_, w| w.fft_force_pu().clear_bit().dc_est_force_pu().clear_bit());
 
-                (&*esp32::NRX::ptr()).nrxpd_ctrl().modify(|_, w| {
+                (*esp32::NRX::ptr()).nrxpd_ctrl().modify(|_, w| {
                     w.rx_rot_force_pu()
                         .clear_bit()
                         .vit_force_pu()
@@ -537,7 +537,7 @@ impl RtcSleepConfig {
             // set bits for what can wake us up
             rtc_cntl
                 .wakeup_state()
-                .modify(|_, w| w.wakeup_ena().bits(wakeup_triggers.0.into()));
+                .modify(|_, w| w.wakeup_ena().bits(wakeup_triggers.0));
 
             rtc_cntl
                 .state0()

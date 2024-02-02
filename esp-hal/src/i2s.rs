@@ -503,11 +503,11 @@ where
 
         Self {
             i2s_tx: TxCreator {
-                register_access: PhantomData::default(),
+                register_access: PhantomData,
                 tx_channel: channel.tx,
             },
             i2s_rx: RxCreator {
-                register_access: PhantomData::default(),
+                register_access: PhantomData,
                 rx_channel: channel.rx,
             },
         }
@@ -589,7 +589,7 @@ where
 {
     fn new(tx_channel: CH::Tx<'d>) -> Self {
         Self {
-            register_access: PhantomData::default(),
+            register_access: PhantomData,
             tx_channel,
         }
     }
@@ -692,7 +692,7 @@ where
         self.write_bytes(unsafe {
             core::slice::from_raw_parts(
                 words as *const _ as *const u8,
-                words.len() * core::mem::size_of::<W>(),
+                core::mem::size_of_val(words),
             )
         })
     }
@@ -748,7 +748,7 @@ where
 {
     fn new(rx_channel: CH::Rx<'d>) -> Self {
         Self {
-            register_access: PhantomData::default(),
+            register_access: PhantomData,
             rx_channel,
         }
     }
@@ -863,14 +863,14 @@ where
     W: AcceptedWord,
 {
     fn read(&mut self, words: &mut [W]) -> Result<(), Error> {
-        if words.len() * core::mem::size_of::<W>() > 4096 || words.len() == 0 {
+        if core::mem::size_of_val(words) > 4096 || words.is_empty() {
             return Err(Error::IllegalArgument);
         }
 
         self.read_bytes(unsafe {
             core::slice::from_raw_parts_mut(
                 words as *mut _ as *mut u8,
-                words.len() * core::mem::size_of::<W>(),
+                core::mem::size_of_val(words),
             )
         })
     }
@@ -1248,35 +1248,33 @@ mod private {
                 clkm_div_y = 0;
                 clkm_div_z = 0;
                 clkm_div_yn1 = 1;
-            } else {
-                if clock_settings.numerator > clock_settings.denominator / 2 {
-                    clkm_div_x = clock_settings
-                        .denominator
-                        .overflowing_div(
-                            clock_settings
-                                .denominator
-                                .overflowing_sub(clock_settings.numerator)
-                                .0,
-                        )
-                        .0
-                        .overflowing_sub(1)
-                        .0;
-                    clkm_div_y = clock_settings.denominator
-                        % (clock_settings
+            } else if clock_settings.numerator > clock_settings.denominator / 2 {
+                clkm_div_x = clock_settings
+                    .denominator
+                    .overflowing_div(
+                        clock_settings
                             .denominator
                             .overflowing_sub(clock_settings.numerator)
-                            .0);
-                    clkm_div_z = clock_settings
+                            .0,
+                    )
+                    .0
+                    .overflowing_sub(1)
+                    .0;
+                clkm_div_y = clock_settings.denominator
+                    % (clock_settings
                         .denominator
                         .overflowing_sub(clock_settings.numerator)
-                        .0;
-                    clkm_div_yn1 = 1;
-                } else {
-                    clkm_div_x = clock_settings.denominator / clock_settings.numerator - 1;
-                    clkm_div_y = clock_settings.denominator % clock_settings.numerator;
-                    clkm_div_z = clock_settings.numerator;
-                    clkm_div_yn1 = 0;
-                }
+                        .0);
+                clkm_div_z = clock_settings
+                    .denominator
+                    .overflowing_sub(clock_settings.numerator)
+                    .0;
+                clkm_div_yn1 = 1;
+            } else {
+                clkm_div_x = clock_settings.denominator / clock_settings.numerator - 1;
+                clkm_div_y = clock_settings.denominator % clock_settings.numerator;
+                clkm_div_z = clock_settings.numerator;
+                clkm_div_yn1 = 0;
             }
 
             i2s.tx_clkm_div_conf().modify(|_, w| {
@@ -1285,7 +1283,7 @@ mod private {
                     .tx_clkm_div_y()
                     .variant(clkm_div_y as u16)
                     .tx_clkm_div_yn1()
-                    .variant(if clkm_div_yn1 != 0 { true } else { false })
+                    .variant(clkm_div_yn1 != 0)
                     .tx_clkm_div_z()
                     .variant(clkm_div_z as u16)
             });
@@ -1312,7 +1310,7 @@ mod private {
                     .rx_clkm_div_y()
                     .variant(clkm_div_y as u16)
                     .rx_clkm_div_yn1()
-                    .variant(if clkm_div_yn1 != 0 { true } else { false })
+                    .variant(clkm_div_yn1 != 0)
                     .rx_clkm_div_z()
                     .variant(clkm_div_z as u16)
             });
@@ -1349,35 +1347,33 @@ mod private {
                 clkm_div_y = 0;
                 clkm_div_z = 0;
                 clkm_div_yn1 = 1;
-            } else {
-                if clock_settings.numerator > clock_settings.denominator / 2 {
-                    clkm_div_x = clock_settings
-                        .denominator
-                        .overflowing_div(
-                            clock_settings
-                                .denominator
-                                .overflowing_sub(clock_settings.numerator)
-                                .0,
-                        )
-                        .0
-                        .overflowing_sub(1)
-                        .0;
-                    clkm_div_y = clock_settings.denominator
-                        % (clock_settings
+            } else if clock_settings.numerator > clock_settings.denominator / 2 {
+                clkm_div_x = clock_settings
+                    .denominator
+                    .overflowing_div(
+                        clock_settings
                             .denominator
                             .overflowing_sub(clock_settings.numerator)
-                            .0);
-                    clkm_div_z = clock_settings
+                            .0,
+                    )
+                    .0
+                    .overflowing_sub(1)
+                    .0;
+                clkm_div_y = clock_settings.denominator
+                    % (clock_settings
                         .denominator
                         .overflowing_sub(clock_settings.numerator)
-                        .0;
-                    clkm_div_yn1 = 1;
-                } else {
-                    clkm_div_x = clock_settings.denominator / clock_settings.numerator - 1;
-                    clkm_div_y = clock_settings.denominator % clock_settings.numerator;
-                    clkm_div_z = clock_settings.numerator;
-                    clkm_div_yn1 = 0;
-                }
+                        .0);
+                clkm_div_z = clock_settings
+                    .denominator
+                    .overflowing_sub(clock_settings.numerator)
+                    .0;
+                clkm_div_yn1 = 1;
+            } else {
+                clkm_div_x = clock_settings.denominator / clock_settings.numerator - 1;
+                clkm_div_y = clock_settings.denominator % clock_settings.numerator;
+                clkm_div_z = clock_settings.numerator;
+                clkm_div_yn1 = 0;
             }
 
             pcr.i2s_tx_clkm_div_conf().modify(|_, w| {
@@ -1386,7 +1382,7 @@ mod private {
                     .i2s_tx_clkm_div_y()
                     .variant(clkm_div_y as u16)
                     .i2s_tx_clkm_div_yn1()
-                    .variant(if clkm_div_yn1 != 0 { true } else { false })
+                    .variant(clkm_div_yn1 != 0)
                     .i2s_tx_clkm_div_z()
                     .variant(clkm_div_z as u16)
             });
@@ -1417,7 +1413,7 @@ mod private {
                     .i2s_rx_clkm_div_y()
                     .variant(clkm_div_y as u16)
                     .i2s_rx_clkm_div_yn1()
-                    .variant(if clkm_div_yn1 != 0 { true } else { false })
+                    .variant(clkm_div_yn1 != 0)
                     .i2s_rx_clkm_div_z()
                     .variant(clkm_div_z as u16)
             });
@@ -1446,6 +1442,8 @@ mod private {
 
         fn configure(_standard: &Standard, data_format: &DataFormat) {
             let i2s = Self::register_block();
+
+            #[allow(clippy::useless_conversion)]
             i2s.tx_conf1().modify(|_, w| {
                 w.tx_tdm_ws_width()
                     .variant((data_format.channel_bits() - 1).into())
@@ -1520,6 +1518,7 @@ mod private {
                     .clear_bit()
             });
 
+            #[allow(clippy::useless_conversion)]
             i2s.rx_conf1().modify(|_, w| {
                 w.rx_tdm_ws_width()
                     .variant((data_format.channel_bits() - 1).into())

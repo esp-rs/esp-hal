@@ -49,7 +49,7 @@ macro_rules! regi2c_write {
         paste::paste! {
             #[allow(unused_unsafe)]
             unsafe {
-                crate::rom::rom_i2c_writeReg(
+                $crate::rom::rom_i2c_writeReg(
                     $block as u32,
                     [<$block _HOSTID>] as u32,
                     $reg_add as u32,
@@ -67,7 +67,7 @@ macro_rules! regi2c_write_mask {
         paste::paste! {
             #[allow(unused_unsafe)]
             unsafe {
-                crate::rom::rom_i2c_writeReg_Mask(
+                $crate::rom::rom_i2c_writeReg_Mask(
                     $block as u32,
                     [<$block _HOSTID>] as u32,
                     $reg_add as u32,

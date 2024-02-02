@@ -1,6 +1,6 @@
 use portable_atomic::{AtomicU8, Ordering};
 
-pub use self::soc::*;
+pub use self::implementation::*;
 
 #[cfg_attr(esp32, path = "esp32/mod.rs")]
 #[cfg_attr(esp32c2, path = "esp32c2/mod.rs")]
@@ -10,7 +10,7 @@ pub use self::soc::*;
 #[cfg_attr(esp32p4, path = "esp32p4/mod.rs")]
 #[cfg_attr(esp32s2, path = "esp32s2/mod.rs")]
 #[cfg_attr(esp32s3, path = "esp32s3/mod.rs")]
-mod soc;
+mod implementation;
 
 mod efuse_field;
 
@@ -30,7 +30,7 @@ pub enum SetMacError {
     AlreadySet,
 }
 
-impl soc::efuse::Efuse {
+impl self::efuse::Efuse {
     /// Set the base mac address
     ///
     /// The new value will be returned by `read_mac_address` instead of the one
@@ -69,9 +69,5 @@ impl soc::efuse::Efuse {
 }
 
 pub fn is_valid_ram_address(address: u32) -> bool {
-    if (soc::constants::SOC_DRAM_LOW..=soc::constants::SOC_DRAM_HIGH).contains(&address) {
-        true
-    } else {
-        false
-    }
+    (self::constants::SOC_DRAM_LOW..=self::constants::SOC_DRAM_HIGH).contains(&address)
 }

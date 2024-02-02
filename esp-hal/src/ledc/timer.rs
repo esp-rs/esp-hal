@@ -185,10 +185,10 @@ where
             // APB_CLK results in divisor which too high. Try using REF_TICK as clock
             // source.
             self.use_ref_tick = true;
-            divisor = ((1_000_000 as u64) << 8) / frequency as u64 / precision as u64;
+            divisor = (1_000_000u64 << 8) / frequency as u64 / precision as u64;
         }
 
-        if divisor >= LEDC_TIMER_DIV_NUM_MAX || divisor < 256 {
+        if !(256..LEDC_TIMER_DIV_NUM_MAX).contains(&divisor) {
             return Err(Error::Divisor);
         }
 

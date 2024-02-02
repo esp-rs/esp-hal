@@ -120,7 +120,7 @@ impl EspTwaiFrame {
         Self {
             id: id.into(),
             data,
-            dlc: dlc,
+            dlc,
             is_remote: false,
         }
     }

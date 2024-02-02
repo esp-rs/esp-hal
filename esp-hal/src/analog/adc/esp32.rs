@@ -55,7 +55,7 @@ where
 
         AdcPin {
             pin,
-            _phantom: PhantomData::default(),
+            _phantom: PhantomData,
         }
     }
 }
@@ -65,7 +65,7 @@ impl<ADCI> Default for AdcConfig<ADCI> {
         AdcConfig {
             resolution: Resolution::Resolution12Bit,
             attenuations: [None; 10],
-            _phantom: PhantomData::default(),
+            _phantom: PhantomData,
         }
     }
 }
@@ -111,7 +111,7 @@ impl RegisterAccess for ADC1 {
     fn set_attenuation(channel: usize, attenuation: u8) {
         unsafe { &*SENS::ptr() }.sar_atten1().modify(|r, w| {
             let new_value = (r.bits() & !(0b11 << (channel * 2)))
-                | (((attenuation as u8 & 0b11) as u32) << (channel * 2));
+                | (((attenuation & 0b11) as u32) << (channel * 2));
 
             unsafe { w.sar1_atten().bits(new_value) }
         });
@@ -166,7 +166,7 @@ impl RegisterAccess for ADC1 {
             .sar_meas_start1()
             .read()
             .meas1_data_sar()
-            .bits() as u16
+            .bits()
     }
 }
 
@@ -186,7 +186,7 @@ impl RegisterAccess for ADC2 {
     fn set_attenuation(channel: usize, attenuation: u8) {
         unsafe { &*SENS::ptr() }.sar_atten2().modify(|r, w| {
             let new_value = (r.bits() & !(0b11 << (channel * 2)))
-                | (((attenuation as u8 & 0b11) as u32) << (channel * 2));
+                | (((attenuation & 0b11) as u32) << (channel * 2));
 
             unsafe { w.sar2_atten().bits(new_value) }
         });
@@ -241,7 +241,7 @@ impl RegisterAccess for ADC2 {
             .sar_meas_start2()
             .read()
             .meas2_data_sar()
-            .bits() as u16
+            .bits()
     }
 }
 
@@ -271,9 +271,9 @@ where
         // Set attenuation for pins
         let attenuations = config.attenuations;
 
-        for channel in 0..attenuations.len() {
-            if let Some(attenuation) = attenuations[channel] {
-                ADC1::set_attenuation(channel, attenuation as u8);
+        for (channel, attentuation) in attenuations.iter().enumerate() {
+            if let Some(attenuation) = attentuation {
+                ADC1::set_attenuation(channel, *attenuation as u8);
             }
         }
 
@@ -356,7 +356,7 @@ where
     fn read(&mut self, _pin: &mut AdcPin<PIN, ADCI>) -> nb::Result<u16, Self::Error> {
         use embedded_hal::adc::Channel;
 
-        if self.attenuations[AdcPin::<PIN, ADCI>::channel() as usize] == None {
+        if self.attenuations[AdcPin::<PIN, ADCI>::channel() as usize].is_none() {
             panic!(
                 "Channel {} is not configured reading!",
                 AdcPin::<PIN, ADCI>::channel()
@@ -374,7 +374,7 @@ where
             // If no conversions are in progress, start a new one for given channel
             self.active_channel = Some(AdcPin::<PIN, ADCI>::channel());
 
-            ADCI::set_en_pad(AdcPin::<PIN, ADCI>::channel() as u8);
+            ADCI::set_en_pad(AdcPin::<PIN, ADCI>::channel());
 
             ADCI::clear_start_sar();
             ADCI::set_start_sar();
@@ -414,7 +414,7 @@ macro_rules! impl_adc_interface {
     }
 }
 
-mod implementation {
+mod adc_implementation {
     use crate::peripherals::{ADC1, ADC2};
 
     impl_adc_interface! {

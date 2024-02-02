@@ -585,10 +585,10 @@ impl RtcSleepConfig {
                     .modify(|_, w| w.icache_tag_mem_force_on().clear_bit());
                 // clear register clock force on
                 // clear register clock force on
-                (&*esp32c3::SPI0::ptr())
+                (*esp32c3::SPI0::ptr())
                     .clock_gate()
                     .modify(|_, w| w.clk_en().clear_bit());
-                (&*esp32c3::SPI1::ptr())
+                (*esp32c3::SPI1::ptr())
                     .clock_gate()
                     .modify(|_, w| w.clk_en().clear_bit());
             }

@@ -178,8 +178,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     // Don't support "interrupt-preemption" and "direct-vectoring" on Xtensa and
-    // RISCV-clic
-    if (*&device.symbols.contains(&String::from("clic")) || device.arch == Arch::Xtensa)
+    // RISC-V with CLIC:
+    if (device.symbols.contains(&String::from("clic")) || device.arch == Arch::Xtensa)
         && (cfg!(feature = "direct-vectoring") || cfg!(feature = "interrupt-preemption"))
     {
         panic!("The target does not support interrupt-preemption and direct-vectoring");
@@ -290,7 +290,7 @@ fn copy_dir_all(
 
 /// A naive pre-processor for linker scripts
 fn preprocess_file(
-    config: &Vec<&str>,
+    config: &[&str],
     src: impl AsRef<Path>,
     dst: impl AsRef<Path>,
 ) -> std::io::Result<()> {
@@ -304,15 +304,15 @@ fn preprocess_file(
         let line = line?;
         let trimmed = line.trim();
 
-        if trimmed.starts_with("#IF ") {
-            let condition = &trimmed[4..];
-            let should_take = take.iter().all(|v| *v == true);
+        if let Some(stripped) = trimmed.strip_prefix("#IF ") {
+            let condition = stripped;
+            let should_take = take.iter().all(|v| *v);
             let should_take = should_take && config.contains(&condition);
             take.push(should_take);
             continue;
         } else if trimmed == "#ELSE" {
             let taken = take.pop().unwrap();
-            let should_take = take.iter().all(|v| *v == true);
+            let should_take = take.iter().all(|v| *v);
             let should_take = should_take && !taken;
             take.push(should_take);
             continue;
@@ -322,8 +322,8 @@ fn preprocess_file(
         }
 
         if *take.last().unwrap() {
-            out_file.write(line.as_bytes())?;
-            out_file.write(b"\n")?;
+            out_file.write_all(line.as_bytes())?;
+            let _ = out_file.write(b"\n")?;
         }
     }
     Ok(())
@@ -340,15 +340,15 @@ fn gen_efuse_table(device_name: &str, out_dir: impl AsRef<Path>) -> Result<(), B
     let mut line = String::with_capacity(128);
 
     while reader.read_line(&mut line)? > 0 {
-        if line.ends_with("\n") {
+        if line.ends_with('\n') {
             line.pop();
-            if line.ends_with("\r") {
+            if line.ends_with('\r') {
                 line.pop();
             }
         }
         // drop comment and trim
         line.truncate(
-            if let Some((pfx, _cmt)) = line.split_once("#") {
+            if let Some((pfx, _cmt)) = line.split_once('#') {
                 pfx
             } else {
                 &line
@@ -361,9 +361,9 @@ fn gen_efuse_table(device_name: &str, out_dir: impl AsRef<Path>) -> Result<(), B
             continue;
         }
 
-        let mut fields = line.split(",");
+        let mut fields = line.split(',');
         match (
-            fields.next().map(|s| s.trim().replace(".", "_")),
+            fields.next().map(|s| s.trim().replace('.', "_")),
             fields
                 .next()
                 .map(|s| s.trim().replace(|c: char| !c.is_ascii_digit(), "")),
@@ -404,16 +404,12 @@ fn detect_atomic_extension(ext: &str) -> bool {
     // handle that
     let target_flags = rustflags
         .split(0x1f as char)
-        .filter(|s| s.starts_with("target-feature="))
-        .map(|s| s.strip_prefix("target-feature="))
-        .flatten();
+        .filter_map(|s| s.strip_prefix("target-feature="));
     for tf in target_flags {
         let tf = tf
-            .split(",")
+            .split(',')
             .map(|s| s.trim())
-            .filter(|s| s.starts_with('+'))
-            .map(|s| s.strip_prefix('+'))
-            .flatten();
+            .filter_map(|s| s.strip_prefix('+'));
         for tf in tf {
             if tf == ext {
                 return true;

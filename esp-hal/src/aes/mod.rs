@@ -140,7 +140,7 @@ impl<'d> Aes<'d> {
     pub fn new(aes: impl Peripheral<P = AES> + 'd) -> Self {
         crate::into_ref!(aes);
         let mut ret = Self {
-            aes: aes,
+            aes,
             #[cfg(not(esp32))]
             alignment_helper: AlignmentHelper::default(),
         };
@@ -440,7 +440,7 @@ pub mod dma {
             })
         }
 
-        fn start_transfer_dma<'w>(
+        fn start_transfer_dma(
             &mut self,
             write_buffer_ptr: *const u8,
             write_buffer_len: usize,

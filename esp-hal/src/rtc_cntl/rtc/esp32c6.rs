@@ -1470,17 +1470,12 @@ impl RtcClock {
             lp_clkrst()
                 .lp_clk_conf()
                 .modify(|_, w| w.slow_clk_sel().bits(slow_freq as u8));
+
             lp_clkrst().clk_to_hp().modify(|_, w| {
                 w.icg_hp_xtal32k()
-                    .bit(match slow_freq {
-                        RtcSlowClock::RtcSlowClock32kXtal => true,
-                        _ => false,
-                    })
+                    .bit(matches!(slow_freq, RtcSlowClock::RtcSlowClock32kXtal))
                     .icg_hp_xtal32k()
-                    .bit(match slow_freq {
-                        RtcSlowClock::RtcSlowClock32kXtal => true,
-                        _ => false,
-                    })
+                    .bit(matches!(slow_freq, RtcSlowClock::RtcSlowClock32kXtal))
             });
         }
     }
@@ -1792,10 +1787,8 @@ impl RtcClock {
         // The Fosc CLK of calibration circuit is divided by 32 for ECO1.
         // So we need to divide the calibrate cycles of the FOSC for ECO1 and above
         // chips by 32 to avoid excessive calibration time.
-        if Efuse::chip_revision() > 0 {
-            if cal_clk == RtcCalSel::RtcCalRcFast {
-                slowclk_cycles >>= 5;
-            }
+        if Efuse::chip_revision() > 0 && cal_clk == RtcCalSel::RtcCalRcFast {
+            slowclk_cycles >>= 5;
         }
 
         let xtal_cycles = RtcClock::calibrate_internal(cal_clk, slowclk_cycles) as u64;
@@ -1845,7 +1838,7 @@ pub(crate) struct UnsupportedClockSource;
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(crate) enum CpuClockSource {
     Xtal,
-    PLL,
+    Pll,
     RcFast,
 }
 
@@ -1853,7 +1846,7 @@ impl CpuClockSource {
     pub(crate) fn current() -> Result<Self, UnsupportedClockSource> {
         let source = match unsafe { pcr().sysclk_conf().read().soc_clk_sel().bits() } {
             0 => CpuClockSource::Xtal,
-            1 => CpuClockSource::PLL,
+            1 => CpuClockSource::Pll,
             2 => CpuClockSource::RcFast,
             _ => return Err(UnsupportedClockSource),
         };
@@ -1866,7 +1859,7 @@ impl CpuClockSource {
             pcr().sysclk_conf().modify(|_, w| {
                 w.soc_clk_sel().bits(match self {
                     CpuClockSource::Xtal => 0,
-                    CpuClockSource::PLL => 1,
+                    CpuClockSource::Pll => 1,
                     CpuClockSource::RcFast => 2,
                 })
             });
@@ -1897,7 +1890,7 @@ impl SavedClockConfig {
                 div = esp32c6_cpu_get_ls_divider();
                 source_freq_mhz = RtcClock::get_xtal_freq_mhz();
             }
-            CpuClockSource::PLL => {
+            CpuClockSource::Pll => {
                 div = esp32c6_cpu_get_hs_divider();
                 source_freq_mhz = esp32c6_bbpll_get_freq_mhz();
             }
@@ -1925,8 +1918,8 @@ impl SavedClockConfig {
         match self.source {
             CpuClockSource::Xtal => esp32c6_rtc_update_to_xtal_raw(self.freq_mhz(), self.div),
             CpuClockSource::RcFast => esp32c6_rtc_update_to_8m(),
-            CpuClockSource::PLL => {
-                if old_source != CpuClockSource::PLL {
+            CpuClockSource::Pll => {
+                if old_source != CpuClockSource::Pll {
                     rtc_clk_bbpll_enable();
                     esp32c6_rtc_bbpll_configure_raw(
                         RtcClock::get_xtal_freq_mhz(),
@@ -1937,7 +1930,7 @@ impl SavedClockConfig {
             }
         }
 
-        if old_source == CpuClockSource::PLL && self.source != CpuClockSource::PLL
+        if old_source == CpuClockSource::Pll && self.source != CpuClockSource::Pll
         // && !s_bbpll_digi_consumers_ref_count
         {
             // We don't turn off the bbpll if some consumers depend on bbpll

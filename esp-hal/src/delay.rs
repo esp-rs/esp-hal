@@ -61,7 +61,7 @@ impl embedded_hal_1::delay::DelayNs for Delay {
 }
 
 #[cfg(riscv)]
-mod delay {
+mod implementation {
     use super::*;
     use crate::{clock::Clocks, systimer::SystemTimer};
 
@@ -95,7 +95,7 @@ mod delay {
 }
 
 #[cfg(xtensa)]
-mod delay {
+mod implementation {
     use super::*;
     use crate::clock::Clocks;
 

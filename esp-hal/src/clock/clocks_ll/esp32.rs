@@ -53,9 +53,6 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock
         let lref: u32;
         let dcur: u32;
         let bw: u32;
-        let i2c_bbpll_lref: u32;
-        let i2c_bbpll_div_7_0: u32;
-        let i2c_bbpll_dcur: u32;
 
         if matches!(pll_freq, PllClock::Pll320MHz) {
             // Raise the voltage, if needed
@@ -174,9 +171,9 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock
             );
         }
 
-        i2c_bbpll_lref = (lref << 7) | (div10_8 << 4) | (div_ref);
-        i2c_bbpll_div_7_0 = div7_0;
-        i2c_bbpll_dcur = (bw << 6) | dcur;
+        let i2c_bbpll_lref = (lref << 7) | (div10_8 << 4) | (div_ref);
+        let i2c_bbpll_div_7_0 = div7_0;
+        let i2c_bbpll_dcur = (bw << 6) | dcur;
         i2c_writereg_rtc(
             I2C_BBPLL,
             I2C_BBPLL_HOSTID,
@@ -280,9 +277,7 @@ pub(crate) fn esp32_rtc_update_to_xtal(freq: XtalClock, _div: u32) {
 
         // switch clock source
         rtc_cntl.clk_conf().modify(|_, w| w.soc_clk_sel().xtal());
-        rtc_cntl
-            .store5()
-            .modify(|_, w| w.scratch5().bits(value as u32));
+        rtc_cntl.store5().modify(|_, w| w.scratch5().bits(value));
 
         // lower the voltage
         rtc_cntl
@@ -331,9 +326,7 @@ pub(crate) fn set_cpu_freq(cpu_freq_mhz: crate::clock::CpuClock) {
             .reg()
             .modify(|_, w| w.dig_dbias_wak().variant(dbias as u8));
         rtc_cntl.clk_conf().modify(|_, w| w.soc_clk_sel().pll());
-        rtc_cntl
-            .store5()
-            .modify(|_, w| w.scratch5().bits(value as u32));
+        rtc_cntl.store5().modify(|_, w| w.scratch5().bits(value));
 
         esp32_update_cpu_freq(cpu_freq_mhz.mhz());
     }

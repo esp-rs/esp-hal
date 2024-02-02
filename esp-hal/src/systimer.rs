@@ -257,18 +257,36 @@ impl<const CHANNEL: u8> Alarm<Periodic, CHANNEL> {
 }
 
 impl<T> Alarm<T, 0> {
+    /// Conjure an alarm out of thin air.
+    ///
+    /// # Safety
+    ///
+    /// Users must take care to ensure that only one reference to the timer is
+    /// in scope at any given time.
     pub const unsafe fn conjure() -> Self {
         Self { _pd: PhantomData }
     }
 }
 
 impl<T> Alarm<T, 1> {
+    /// Conjure an alarm out of thin air.
+    ///
+    /// # Safety
+    ///
+    /// Users must take care to ensure that only one reference to the timer is
+    /// in scope at any given time.
     pub const unsafe fn conjure() -> Self {
         Self { _pd: PhantomData }
     }
 }
 
 impl<T> Alarm<T, 2> {
+    /// Conjure an alarm out of thin air.
+    ///
+    /// # Safety
+    ///
+    /// Users must take care to ensure that only one reference to the timer is
+    /// in scope at any given time.
     pub const unsafe fn conjure() -> Self {
         Self { _pd: PhantomData }
     }

@@ -26,9 +26,7 @@ impl<'d> Rsa<'d> {
     }
 
     pub(super) fn write_multi_mode(&mut self, mode: u32) {
-        self.rsa
-            .mult_mode()
-            .write(|w| unsafe { w.bits(mode as u32) });
+        self.rsa.mult_mode().write(|w| unsafe { w.bits(mode) });
     }
 
     pub(super) fn write_modexp_mode(&mut self, mode: u32) {
@@ -54,21 +52,13 @@ impl<'d> Rsa<'d> {
     }
 
     unsafe fn write_multi_operand_a<const N: usize>(&mut self, operand_a: &[u32; N]) {
-        copy_nonoverlapping(
-            operand_a.as_ptr(),
-            self.rsa.x_mem(0).as_ptr() as *mut u32,
-            N,
-        );
+        copy_nonoverlapping(operand_a.as_ptr(), self.rsa.x_mem(0).as_ptr(), N);
         write_bytes(self.rsa.x_mem(0).as_ptr().add(N), 0, N);
     }
 
     unsafe fn write_multi_operand_b<const N: usize>(&mut self, operand_b: &[u32; N]) {
         write_bytes(self.rsa.z_mem(0).as_ptr(), 0, N);
-        copy_nonoverlapping(
-            operand_b.as_ptr(),
-            self.rsa.z_mem(0).as_ptr().add(N) as *mut u32,
-            N,
-        );
+        copy_nonoverlapping(operand_b.as_ptr(), self.rsa.z_mem(0).as_ptr().add(N), N);
     }
 }
 

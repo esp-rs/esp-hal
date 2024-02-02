@@ -282,7 +282,7 @@ impl<'a> PeripheralClockConfig<'a> {
 pub struct FrequencyError;
 
 /// A MCPWM peripheral
-pub unsafe trait PwmPeripheral: Deref<Target = RegisterBlock> {
+pub trait PwmPeripheral: Deref<Target = RegisterBlock> + private::Sealed {
     /// Enable peripheral
     fn enable();
     /// Get a pointer to the peripheral RegisterBlock
@@ -292,7 +292,7 @@ pub unsafe trait PwmPeripheral: Deref<Target = RegisterBlock> {
 }
 
 #[cfg(mcpwm0)]
-unsafe impl PwmPeripheral for crate::peripherals::MCPWM0 {
+impl PwmPeripheral for crate::peripherals::MCPWM0 {
     fn enable() {
         PeripheralClockControl::enable(PeripheralEnable::Mcpwm0)
     }
@@ -315,7 +315,7 @@ unsafe impl PwmPeripheral for crate::peripherals::MCPWM0 {
 }
 
 #[cfg(mcpwm1)]
-unsafe impl PwmPeripheral for crate::peripherals::MCPWM1 {
+impl PwmPeripheral for crate::peripherals::MCPWM1 {
     fn enable() {
         PeripheralClockControl::enable(PeripheralEnable::Mcpwm1)
     }
@@ -336,3 +336,13 @@ unsafe impl PwmPeripheral for crate::peripherals::MCPWM1 {
         }
     }
 }
+
+mod private {
+    pub trait Sealed {}
+}
+
+#[cfg(mcpwm0)]
+impl private::Sealed for crate::peripherals::MCPWM0 {}
+
+#[cfg(mcpwm1)]
+impl private::Sealed for crate::peripherals::MCPWM1 {}

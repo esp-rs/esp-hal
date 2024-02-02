@@ -284,7 +284,7 @@ where
         data: &[P::Word],
     ) -> Result<(), DmaError> {
         self.setup_send(cmd.into(), dummy);
-        self.start_write_bytes_dma(data.as_ptr() as _, data.len() * size_of::<P::Word>())?;
+        self.start_write_bytes_dma(data.as_ptr() as _, core::mem::size_of_val(data))?;
         self.start_send();
 
         let dma_int_raw = self.lcd_cam.lc_dma_int_raw();

@@ -58,7 +58,6 @@ fn disable_phy() {
 }
 
 fn ble_ieee802154_clock_enable() {
-    let modem_lpcon = unsafe { &*esp32h2::MODEM_LPCON::PTR };
     let modem_syscon = unsafe { &*esp32h2::MODEM_SYSCON::PTR };
 
     modem_syscon
@@ -82,7 +81,7 @@ fn ble_ieee802154_clock_enable() {
             .set_bit()
     });
 
-    modem_lpcon
+    unsafe { &*esp32h2::MODEM_LPCON::PTR }
         .clk_conf()
         .modify(|_, w| w.clk_coex_en().set_bit());
 }
@@ -138,7 +137,7 @@ fn init_clocks() {
             .as_ptr()
             .write_volatile(pmu.imm_sleep_sysclk().as_ptr().read_volatile() | 1 << 28);
 
-        (&*esp32h2::MODEM_LPCON::PTR).clk_conf().modify(|_, w| {
+        (*esp32h2::MODEM_LPCON::PTR).clk_conf().modify(|_, w| {
             w.clk_i2c_mst_en()
                 .set_bit()
                 .clk_coex_en()

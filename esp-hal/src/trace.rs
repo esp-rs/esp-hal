@@ -161,7 +161,8 @@ impl<'d> Trace<'d> {
             let mut i = 0;
             loop {
                 let b = unsafe {
-                    (buffer.as_ptr() as *const _ as *const u8)
+                    buffer
+                        .as_ptr()
                         .add((i + idx as usize) % buffer.len())
                         .read_volatile()
                 };

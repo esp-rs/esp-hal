@@ -66,7 +66,7 @@ pub const ZERO_INPUT: u8 = 0x1f;
 pub(crate) const GPIO_FUNCTION: AlternateFunction = AlternateFunction::Function1;
 
 pub(crate) const fn get_io_mux_reg(gpio_num: u8) -> &'static crate::peripherals::io_mux::GPIO {
-    unsafe { &(&*crate::peripherals::IO_MUX::PTR).gpio(gpio_num as usize) }
+    unsafe { (*crate::peripherals::IO_MUX::PTR).gpio(gpio_num as usize) }
 }
 
 pub(crate) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {

@@ -272,11 +272,7 @@ impl<'d> Rtc<'d> {
 
     /// enter deep sleep and wake with the provided `wake_sources`
     #[cfg(any(esp32, esp32s3, esp32c3, esp32c6))]
-    pub fn sleep_deep<'a>(
-        &mut self,
-        wake_sources: &[&'a dyn WakeSource],
-        delay: &mut crate::Delay,
-    ) -> ! {
+    pub fn sleep_deep(&mut self, wake_sources: &[&dyn WakeSource], delay: &mut crate::Delay) -> ! {
         let config = RtcSleepConfig::deep();
         self.sleep(&config, wake_sources, delay);
         unreachable!();
@@ -284,11 +280,7 @@ impl<'d> Rtc<'d> {
 
     /// enter light sleep and wake with the provided `wake_sources`
     #[cfg(any(esp32, esp32s3, esp32c3, esp32c6))]
-    pub fn sleep_light<'a>(
-        &mut self,
-        wake_sources: &[&'a dyn WakeSource],
-        delay: &mut crate::Delay,
-    ) {
+    pub fn sleep_light(&mut self, wake_sources: &[&dyn WakeSource], delay: &mut crate::Delay) {
         let config = RtcSleepConfig::default();
         self.sleep(&config, wake_sources, delay);
     }
@@ -296,13 +288,13 @@ impl<'d> Rtc<'d> {
     /// enter sleep with the provided `config` and wake with the provided
     /// `wake_sources`
     #[cfg(any(esp32, esp32s3, esp32c3, esp32c6))]
-    pub fn sleep<'a>(
+    pub fn sleep(
         &mut self,
         config: &RtcSleepConfig,
-        wake_sources: &[&'a dyn WakeSource],
+        wake_sources: &[&dyn WakeSource],
         delay: &mut crate::Delay,
     ) {
-        let mut config = config.clone();
+        let mut config = *config;
         let mut wakeup_triggers = WakeTriggers::default();
         for wake_source in wake_sources {
             wake_source.apply(self, &mut wakeup_triggers, &mut config)
@@ -422,17 +414,11 @@ impl RtcClock {
                     // Or maybe this clock should be connected to digital when
                     // XTAL 32k clock is enabled instead?
                     .dig_xtal32k_en()
-                    .bit(match slow_freq {
-                        RtcSlowClock::RtcSlowClock32kXtal => true,
-                        _ => false,
-                    })
+                    .bit(matches!(slow_freq, RtcSlowClock::RtcSlowClock32kXtal))
                     // The clk_8m_d256 will be closed when rtc_state in SLEEP,
                     // so if the slow_clk is 8md256, clk_8m must be force power on
                     .ck8m_force_pu()
-                    .bit(match slow_freq {
-                        RtcSlowClock::RtcSlowClock8mD256 => true,
-                        _ => false,
-                    })
+                    .bit(matches!(slow_freq, RtcSlowClock::RtcSlowClock8mD256))
             });
 
             ets_delay_us(300u32);
@@ -674,11 +660,11 @@ impl RtcClock {
 #[allow(unused)]
 #[derive(Debug, Clone, Copy)]
 enum RwdtStageAction {
-    RwdtStageActionOff         = 0,
-    RwdtStageActionInterrupt   = 1,
-    RwdtStageActionResetCpu    = 2,
-    RwdtStageActionResetSystem = 3,
-    RwdtStageActionResetRtc    = 4,
+    Off         = 0,
+    Interrupt   = 1,
+    ResetCpu    = 2,
+    ResetSystem = 3,
+    ResetRtc    = 4,
 }
 
 /// RTC Watchdog Timer
@@ -692,10 +678,10 @@ pub struct Rwdt {
 impl Default for Rwdt {
     fn default() -> Self {
         Self {
-            stg0_action: RwdtStageAction::RwdtStageActionResetRtc,
-            stg1_action: RwdtStageAction::RwdtStageActionOff,
-            stg2_action: RwdtStageAction::RwdtStageActionOff,
-            stg3_action: RwdtStageAction::RwdtStageActionOff,
+            stg0_action: RwdtStageAction::ResetRtc,
+            stg1_action: RwdtStageAction::Off,
+            stg2_action: RwdtStageAction::Off,
+            stg3_action: RwdtStageAction::Off,
         }
     }
 }
@@ -718,7 +704,7 @@ impl Rwdt {
         #[cfg(any(esp32c6, esp32h2))]
         let rtc_cntl = unsafe { &*LP_WDT::PTR };
 
-        self.stg0_action = RwdtStageAction::RwdtStageActionInterrupt;
+        self.stg0_action = RwdtStageAction::Interrupt;
 
         self.set_write_protection(false);
 
@@ -743,7 +729,7 @@ impl Rwdt {
         #[cfg(any(esp32c6, esp32h2))]
         let rtc_cntl = unsafe { &*LP_WDT::PTR };
 
-        self.stg0_action = RwdtStageAction::RwdtStageActionResetRtc;
+        self.stg0_action = RwdtStageAction::ResetRtc;
 
         self.set_write_protection(false);
 
@@ -953,6 +939,13 @@ impl Swd {
 }
 
 #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
+impl Default for Swd {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
 impl WatchdogDisable for Swd {
     fn disable(&mut self) {
         self.disable();
@@ -961,9 +954,8 @@ impl WatchdogDisable for Swd {
 
 pub fn get_reset_reason(cpu: Cpu) -> Option<SocResetReason> {
     let reason = unsafe { rtc_get_reset_reason(cpu as u32) };
-    let reason = SocResetReason::from_repr(reason as usize);
 
-    reason
+    SocResetReason::from_repr(reason as usize)
 }
 
 pub fn get_wakeup_cause() -> SleepSource {
@@ -973,7 +965,7 @@ pub fn get_wakeup_cause() -> SleepSource {
 
     #[cfg(any(esp32c6, esp32h2))]
     let wakeup_cause = WakeupReason::from_bits_retain(unsafe {
-        (&*crate::peripherals::PMU::PTR)
+        (*crate::peripherals::PMU::PTR)
             .slp_wakeup_status0()
             .read()
             .wakeup_cause()
@@ -981,15 +973,11 @@ pub fn get_wakeup_cause() -> SleepSource {
     });
     #[cfg(not(any(esp32, esp32c6, esp32h2)))]
     let wakeup_cause = WakeupReason::from_bits_retain(unsafe {
-        (&*LPWR::PTR)
-            .slp_wakeup_cause()
-            .read()
-            .wakeup_cause()
-            .bits()
+        (*LPWR::PTR).slp_wakeup_cause().read().wakeup_cause().bits()
     });
     #[cfg(esp32)]
     let wakeup_cause = WakeupReason::from_bits_retain(unsafe {
-        (&*LPWR::PTR).wakeup_state().read().wakeup_cause().bits() as u32
+        (*LPWR::PTR).wakeup_state().read().wakeup_cause().bits() as u32
     });
 
     if wakeup_cause.contains(WakeupReason::TimerTrigEn) {
@@ -1038,5 +1026,5 @@ pub fn get_wakeup_cause() -> SleepSource {
         return SleepSource::CocpuTrapTrig;
     }
 
-    return SleepSource::Undefined;
+    SleepSource::Undefined
 }

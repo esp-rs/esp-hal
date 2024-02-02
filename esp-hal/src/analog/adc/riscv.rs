@@ -1,7 +1,10 @@
 use core::marker::PhantomData;
 
+#[cfg(not(esp32h2))]
 pub use self::calibration::*;
-use super::{AdcCalEfuse, AdcCalScheme, AdcCalSource, AdcChannel, Attenuation};
+#[cfg(not(esp32h2))]
+use super::AdcCalEfuse;
+use super::{AdcCalScheme, AdcCalSource, AdcChannel, Attenuation};
 #[cfg(any(esp32c6, esp32h2))]
 use crate::clock::clocks_ll::regi2c_write_mask;
 #[cfg(any(esp32c2, esp32c3, esp32c6))]
@@ -149,7 +152,7 @@ where
         AdcPin {
             pin,
             cal_scheme: AdcCalScheme::<()>::new_cal(attenuation),
-            _phantom: PhantomData::default(),
+            _phantom: PhantomData,
         }
     }
 
@@ -168,7 +171,7 @@ where
         AdcPin {
             pin,
             cal_scheme: CS::new_cal(attenuation),
-            _phantom: PhantomData::default(),
+            _phantom: PhantomData,
         }
     }
 
@@ -221,7 +224,7 @@ impl<ADCI> Default for AdcConfig<ADCI> {
         AdcConfig {
             resolution: Resolution::Resolution12Bit,
             attenuations: [None; NUM_ATTENS],
-            _phantom: PhantomData::default(),
+            _phantom: PhantomData,
         }
     }
 }
@@ -557,7 +560,7 @@ where
     fn read(&mut self, pin: &mut AdcPin<PIN, ADCI, CS>) -> nb::Result<u16, Self::Error> {
         use embedded_hal::adc::Channel;
 
-        if self.attenuations[AdcPin::<PIN, ADCI>::channel() as usize] == None {
+        if self.attenuations[AdcPin::<PIN, ADCI>::channel() as usize].is_none() {
             panic!(
                 "Channel {} is not configured reading!",
                 AdcPin::<PIN, ADCI>::channel()
@@ -646,7 +649,7 @@ macro_rules! impl_adc_interface {
 }
 
 #[cfg(esp32c2)]
-mod implementation {
+mod adc_implementation {
     use crate::peripherals::ADC1;
 
     impl_adc_interface! {
@@ -661,7 +664,7 @@ mod implementation {
 }
 
 #[cfg(esp32c3)]
-mod implementation {
+mod adc_implementation {
     use crate::peripherals::{ADC1, ADC2};
 
     impl_adc_interface! {
@@ -682,7 +685,7 @@ mod implementation {
 }
 
 #[cfg(esp32c6)]
-mod implementation {
+mod adc_implementation {
     use crate::peripherals::ADC1;
 
     impl_adc_interface! {
@@ -699,7 +702,7 @@ mod implementation {
 }
 
 #[cfg(esp32h2)]
-mod implementation {
+mod adc_implementation {
     use crate::peripherals::ADC1;
 
     impl_adc_interface! {

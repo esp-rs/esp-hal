@@ -231,7 +231,7 @@ mod peripheral_macros {
             mod peripherals {
                 pub use super::pac::*;
                 $(
-                    crate::create_peripheral!($(#[$cfg])? $name <= $from_pac);
+                    $crate::create_peripheral!($(#[$cfg])? $name <= $from_pac);
                 )*
             }
 
@@ -318,7 +318,7 @@ mod peripheral_macros {
                 }
             }
 
-            impl crate::peripheral::Peripheral for $name {
+            impl $crate::peripheral::Peripheral for $name {
                 type P = $name;
 
                 #[inline]
@@ -327,7 +327,7 @@ mod peripheral_macros {
                 }
             }
 
-            impl crate::peripheral::sealed::Sealed for $name {}
+            impl $crate::peripheral::sealed::Sealed for $name {}
         };
         ($(#[$cfg:meta])? $name:ident <= $base:ident) => {
             $(#[$cfg])?
@@ -372,7 +372,7 @@ mod peripheral_macros {
                 }
             }
 
-            impl crate::peripheral::Peripheral for $name {
+            impl $crate::peripheral::Peripheral for $name {
                 type P = $name;
 
                 #[inline]
@@ -381,7 +381,7 @@ mod peripheral_macros {
                 }
             }
 
-            impl crate::peripheral::sealed::Sealed for $name {}
+            impl $crate::peripheral::sealed::Sealed for $name {}
         };
     }
 }

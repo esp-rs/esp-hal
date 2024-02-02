@@ -190,7 +190,7 @@ impl AnalogSleepConfig {
             // HP SLEEP (hp_sleep_*)
             pmu().hp_sleep_bias().modify(|_, w| {
                 w.hp_sleep_dbg_atten() // pmu_ll_hp_set_dbg_atten
-                    .bits(self.hp_sys.bias.dbg_atten() as u8)
+                    .bits(self.hp_sys.bias.dbg_atten())
                     .hp_sleep_pd_cur() // pmu_ll_hp_set_current_power_off
                     .bit(self.hp_sys.bias.pd_cur())
                     .sleep() // pmu_ll_hp_set_bias_sleep_enable
@@ -200,7 +200,7 @@ impl AnalogSleepConfig {
                 w.hp_sleep_hp_regulator_xpd() // pmu_ll_hp_set_regulator_xpd
                     .bit(self.hp_sys.regulator0.xpd())
                     .hp_sleep_hp_regulator_dbias() // pmu_ll_hp_set_regulator_dbias
-                    .bits(self.hp_sys.regulator0.dbias() as u8)
+                    .bits(self.hp_sys.regulator0.dbias())
             });
             pmu().hp_sleep_hp_regulator1().modify(|_, w| {
                 w.hp_sleep_hp_regulator_drv_b() // pmu_ll_hp_set_regulator_driver_bar
@@ -210,7 +210,7 @@ impl AnalogSleepConfig {
             // LP SLEEP (lp_sleep_*)
             pmu().lp_sleep_bias().modify(|_, w| {
                 w.lp_sleep_dbg_atten() // pmu_ll_lp_set_dbg_atten
-                    .bits(self.lp_sys_sleep.bias.dbg_atten() as u8)
+                    .bits(self.lp_sys_sleep.bias.dbg_atten())
                     .lp_sleep_pd_cur() // pmu_ll_lp_set_current_power_off
                     .bit(self.lp_sys_sleep.bias.pd_cur())
                     .sleep() // pmu_ll_lp_set_bias_sleep_enable
@@ -223,14 +223,14 @@ impl AnalogSleepConfig {
                     .lp_sleep_lp_regulator_xpd() // pmu_ll_lp_set_regulator_xpd
                     .bit(self.lp_sys_sleep.regulator0.xpd())
                     .lp_sleep_lp_regulator_slp_dbias() // pmu_ll_lp_set_regulator_sleep_dbias
-                    .bits(self.lp_sys_sleep.regulator0.slp_dbias() as u8)
+                    .bits(self.lp_sys_sleep.regulator0.slp_dbias())
                     .lp_sleep_lp_regulator_dbias() // pmu_ll_lp_set_regulator_dbias
-                    .bits(self.lp_sys_sleep.regulator0.dbias() as u8)
+                    .bits(self.lp_sys_sleep.regulator0.dbias())
             });
 
             pmu().lp_sleep_lp_regulator1().modify(|_, w| {
                 w.lp_sleep_lp_regulator_drv_b() // pmu_ll_lp_set_regulator_driver_bar
-                    .bits(self.lp_sys_sleep.regulator1.drv_b() as u8)
+                    .bits(self.lp_sys_sleep.regulator1.drv_b())
             });
         }
     }
@@ -537,7 +537,7 @@ impl SleepTimeConfig {
         // So we need to divide the calibrate cycles of the FOSC for ECO1 and above
         // chips by 32 to avoid excessive calibration time.
         if Efuse::chip_revision() >= 1 {
-            slowclk_cycles = slowclk_cycles / 32;
+            slowclk_cycles /= 32;
         }
 
         let xtal_cycles =

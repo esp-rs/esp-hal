@@ -255,8 +255,8 @@ impl SingleExtendedFilter {
         let mut acceptance_mask: u32 = 0;
 
         // Pack the id into the full layout.
-        acceptance_code |= (id_code.as_raw() as u32) << 3;
-        acceptance_mask |= (id_mask.as_raw() as u32) << 3;
+        acceptance_code |= id_code.as_raw() << 3;
+        acceptance_mask |= id_mask.as_raw() << 3;
 
         // Pack the rtr bit into the full layout.
         acceptance_code |= (rtr_code as u32) << 2;
