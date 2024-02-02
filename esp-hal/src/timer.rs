@@ -752,7 +752,9 @@ where
     ///
     /// # Safety
     ///
-    /// ???
+    /// This bypasses the usual ownership rules for the peripheral, so users
+    /// must take care to ensure that no driver instance is active for the
+    /// timer.
     pub unsafe fn set_wdt_enabled(enabled: bool) {
         let reg_block = unsafe { &*TG::register_block() };
 

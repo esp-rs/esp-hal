@@ -261,7 +261,8 @@ impl<T> Alarm<T, 0> {
     ///
     /// # Safety
     ///
-    /// ???
+    /// Users must take care to ensure that only one reference to the timer is
+    /// in scope at any given time.
     pub const unsafe fn conjure() -> Self {
         Self { _pd: PhantomData }
     }
@@ -272,7 +273,8 @@ impl<T> Alarm<T, 1> {
     ///
     /// # Safety
     ///
-    /// ???
+    /// Users must take care to ensure that only one reference to the timer is
+    /// in scope at any given time.
     pub const unsafe fn conjure() -> Self {
         Self { _pd: PhantomData }
     }
@@ -283,7 +285,8 @@ impl<T> Alarm<T, 2> {
     ///
     /// # Safety
     ///
-    /// ???
+    /// Users must take care to ensure that only one reference to the timer is
+    /// in scope at any given time.
     pub const unsafe fn conjure() -> Self {
         Self { _pd: PhantomData }
     }
