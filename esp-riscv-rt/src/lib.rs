@@ -52,8 +52,7 @@ extern "C" {
 #[export_name = "_start_rust"]
 pub unsafe extern "C" fn start_rust(a0: usize, a1: usize, a2: usize) -> ! {
     extern "Rust" {
-        // This symbol will be provided by the user via `#[entry]`
-        fn main(a0: usize, a1: usize, a2: usize) -> !;
+        fn hal_main(a0: usize, a1: usize, a2: usize) -> !;
 
         fn __post_init();
 
@@ -65,7 +64,7 @@ pub unsafe extern "C" fn start_rust(a0: usize, a1: usize, a2: usize) -> ! {
 
     _setup_interrupts();
 
-    main(a0, a1, a2);
+    hal_main(a0, a1, a2);
 }
 
 /// Registers saved in trap handler
