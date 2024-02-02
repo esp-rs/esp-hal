@@ -1,14 +1,17 @@
-//! Minimal startup / runtime for RISC-V CPUs from Espressif
+//! Minimal startup/runtime for RISC-V CPUs from Espressif.
 //!
-//! # Features
+//! ## Features
 //!
 //! This crate provides:
 //!
 //! - Before main initialization of the `.bss` and `.data` sections controlled
 //!   by features
 //! - `#[entry]` to declare the entry point of the program
-
-// NOTE: Adapted from riscv-rt/src/lib.rs
+//!
+//! ## Feature Flags
+#![doc = document_features::document_features!()]
+#![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
+#![deny(missing_docs)]
 #![no_std]
 
 use core::arch::global_asm;
