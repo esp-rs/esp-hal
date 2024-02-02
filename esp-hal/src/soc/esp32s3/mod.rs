@@ -85,6 +85,8 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
         static mut _rtc_slow_bss_end: u32;
 
         static mut _stack_start_cpu0: u32;
+
+        static mut __stack_chk_guard: u32;
     }
 
     // set stack pointer to end of memory: no need to retain stack up to this point
@@ -96,6 +98,13 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
     // Initialize RTC RAM
     xtensa_lx_rt::zero_bss(&mut _rtc_fast_bss_start, &mut _rtc_fast_bss_end);
     xtensa_lx_rt::zero_bss(&mut _rtc_slow_bss_start, &mut _rtc_slow_bss_end);
+
+    unsafe {
+        let stack_chk_guard = core::ptr::addr_of_mut!(__stack_chk_guard);
+        // we _should_ use a random value but we don't have a good source for random
+        // numbers here
+        stack_chk_guard.write_volatile(0xdeadbabe);
+    }
 
     // continue with default reset handler
     xtensa_lx_rt::Reset();

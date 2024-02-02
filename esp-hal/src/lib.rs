@@ -448,3 +448,30 @@ impl<T, const SIZE: usize> FlashSafeDma<T, SIZE> {
         self.inner
     }
 }
+
+#[cfg(riscv)]
+#[export_name = "hal_main"]
+fn hal_main(a0: usize, a1: usize, a2: usize) -> ! {
+    extern "Rust" {
+        // This symbol will be provided by the user via `#[entry]`
+        fn main(a0: usize, a1: usize, a2: usize) -> !;
+    }
+
+    extern "C" {
+        static mut __stack_chk_guard: u32;
+    }
+
+    unsafe {
+        let stack_chk_guard = core::ptr::addr_of_mut!(__stack_chk_guard);
+        // we _should_ use a random value but we don't have a good source for random
+        // numbers here
+        stack_chk_guard.write_volatile(0xdeadbabe);
+
+        main(a0, a1, a2);
+    }
+}
+
+#[export_name = "__stack_chk_fail"]
+unsafe extern "C" fn stack_chk_fail() {
+    panic!("Stack corruption detected");
+}
