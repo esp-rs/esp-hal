@@ -9,22 +9,35 @@ license      = "MIT OR Apache-2.0"
 
 [package.metadata.docs.rs]
 features = ["esp32c3"]
+targets  = ["riscv32imc-unknown-none-elf"]
 
 [dependencies]
-defmt            = { version = "=0.3.5", optional = true }
-esp-hal          = { version = "0.15.0", path = "../esp-hal" }
-fugit            = "0.3.7"
-smart-leds-trait = "0.3.0"
+defmt             = { version = "=0.3.5", optional = true }
+document-features = "0.2.7"
+esp-hal           = { version = "0.15.0", path = "../esp-hal" }
+fugit             = "0.3.7"
+smart-leds-trait  = "0.3.0"
 
 [features]
+## Implement `defmt::Format` on certain types.
+defmt = ["dep:defmt", "esp-hal/defmt"]
+
+#! ### Chip Support Feature Flags
+## Target the ESP32.
 esp32   = ["esp-hal/esp32"]
+## Target the ESP32-C3.
 esp32c3 = ["esp-hal/esp32c3"]
+## Target the ESP32-C6.
 esp32c6 = ["esp-hal/esp32c6"]
+## Target the ESP32-H2.
 esp32h2 = ["esp-hal/esp32h2"]
+## Target the ESP32-S2.
 esp32s2 = ["esp-hal/esp32s2"]
+## Target the ESP32-S3.
 esp32s3 = ["esp-hal/esp32s3"]
 
+#! ### Crystal Frequency Feature Flags
+## Target device has a 26MHz crystal.
 xtal-26mhz = ["esp-hal/xtal-26mhz"]
+## Target device has a 40MHz crystal.
 xtal-40mhz = ["esp-hal/xtal-40mhz"]
-
-defmt = ["dep:defmt", "esp-hal/defmt"]
