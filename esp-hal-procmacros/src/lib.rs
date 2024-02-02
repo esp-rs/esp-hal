@@ -70,7 +70,9 @@
 //! #[ram(rtc_fast, zeroed)]
 //! static mut SOME_ZEROED_DATA: [u8; 8] = [0; 8];
 //! ```
-
+//!
+//! ## Feature Flags
+#![doc = document_features::document_features!()]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 
 #[cfg(feature = "ram")]

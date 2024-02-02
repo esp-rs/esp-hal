@@ -14,32 +14,48 @@ features = ["esp32c3", "embassy", "interrupt", "ram"]
 proc-macro = true
 
 [dependencies]
-darling          = "0.20.3"
-litrs            = "0.4.1"
-object           = { version = "0.32.1", optional = true }
-proc-macro-crate = "2.0.1"
-proc-macro-error = "1.0.4"
-proc-macro2      = "1.0.70"
-quote            = "1.0.33"
-syn              = { version = "2.0.40", features = ["extra-traits", "full"] }
+darling           = "0.20.3"
+document-features = "0.2.7"
+litrs             = "0.4.1"
+object            = { version = "0.32.1", optional = true }
+proc-macro-crate  = "2.0.1"
+proc-macro-error  = "1.0.4"
+proc-macro2       = "1.0.70"
+quote             = "1.0.33"
+syn               = { version = "2.0.40", features = ["extra-traits", "full"] }
 
 [features]
-# Select a target device:
-esp32       = []
-esp32c2     = []
-esp32c3     = []
-esp32c6     = ["dep:object"]
-esp32c6-lp  = []
-esp32h2     = []
-esp32p4     = []
-esp32s2     = ["dep:object"]
-esp32s2-ulp = []
-esp32s3     = ["dep:object"]
-esp32s3-ulp = []
-
-# Gated features:
-embassy       = []
+## Provide a `#[main]` procmacro to mark the entry point for Embassy applications.
+embassy = []
+## Provide enum dispatch helpers.
 enum-dispatch = []
-interrupt     = []
-ram           = []
-rtc_slow      = []
+## Provide an `#[interrupt]` procmacro for defining interrupt service routines.
+interrupt = []
+## Provide a `#[ram]` procmacro to place functions in RAM instead of flash.
+ram = []
+## Indicates the target devices has RTC slow memory available.
+rtc_slow = []
+
+#! ### Chip Support Feature Flags
+## Target the ESP32.
+esp32 = []
+## Target the ESP32-C2.
+esp32c2 = []
+## Target the ESP32-C3.
+esp32c3 = []
+## Target the ESP32-C6.
+esp32c6 = ["dep:object"]
+## Target the ESP32-C6's low-power core.
+esp32c6-lp = []
+## Target the ESP32-H2.
+esp32h2 = []
+## Target the ESP32-P4.
+esp32p4 = []
+## Target the ESP32-S2.
+esp32s2 = ["dep:object"]
+## Target the ESP32-S2's ultra-low-power core.
+esp32s2-ulp = []
+## Target the ESP32-S3.
+esp32s3 = ["dep:object"]
+## Target the ESP32-S3's ultra-low-power core.
+esp32s3-ulp = []
