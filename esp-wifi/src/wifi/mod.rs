@@ -1059,7 +1059,6 @@ mod sealed {
             if self.can_send() {
                 Some(WifiTxToken { mode: self })
             } else {
-                warn!("no Tx token available");
                 None
             }
         }
@@ -1070,7 +1069,6 @@ mod sealed {
             if !is_empty {
                 self.tx_token().map(|tx| (WifiRxToken { mode: self }, tx))
             } else {
-                trace!("no Rx token available");
                 None
             }
         }
