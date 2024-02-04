@@ -157,7 +157,7 @@ impl From<Command> for u16 {
 
 enum OperationType {
     Write = 0,
-    Read  = 1,
+    Read = 1,
 }
 
 #[derive(Eq, PartialEq, Copy, Clone)]
@@ -169,17 +169,17 @@ enum Ack {
 #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
 enum Opcode {
     RStart = 6,
-    Write  = 1,
-    Read   = 3,
-    Stop   = 2,
+    Write = 1,
+    Read = 3,
+    Stop = 2,
 }
 
 #[cfg(any(esp32, esp32s2))]
 enum Opcode {
     RStart = 0,
-    Write  = 1,
-    Read   = 2,
-    Stop   = 3,
+    Write = 1,
+    Read = 2,
+    Stop = 3,
 }
 
 /// I2C peripheral container (I2C)
@@ -225,6 +225,23 @@ where
     }
 }
 
+impl<T> embedded_hal::blocking::i2c::Transactional for I2C<'_, T>
+where
+    T: Instance,
+{
+    type Error = Error;
+
+    fn exec<'a>(
+        &mut self,
+        address: u8,
+        operations: &mut [embedded_hal::blocking::i2c::Operation<'a>],
+    ) -> Result<(), Self::Error> {
+        let cmd_iter = &mut self.peripheral.register_block().comd_iter();
+        transaction_impl!(self, address, operations, Hal02Operation, cmd_iter);
+        Ok(())
+    }
+}
+
 #[cfg(feature = "eh1")]
 impl<T> embedded_hal_1::i2c::ErrorType for I2C<'_, T> {
     type Error = Error;
@@ -254,10 +271,12 @@ where
 
     fn transaction<'a>(
         &mut self,
-        _address: u8,
-        _operations: &mut [embedded_hal_1::i2c::Operation<'a>],
+        address: u8,
+        operations: &mut [embedded_hal_1::i2c::Operation<'a>],
     ) -> Result<(), Self::Error> {
-        todo!()
+        let cmd_iter = &mut self.peripheral.register_block().comd_iter();
+        transaction_impl!(self, address, operations, Hal1Operation, cmd_iter);
+        Ok(())
     }
 }
 
@@ -1651,3 +1670,108 @@ impl Instance for crate::peripherals::I2C1 {
         1
     }
 }
+
+macro_rules! transaction_impl {
+    ($self:ident, $addr:ident, $ops_slice:ident, $Operation:ident, $cmd_iter:ident) => {
+        let addr = $addr;
+        if $ops_slice.len() == 0 {
+            return Ok(());
+        }
+
+        $self.peripheral.reset_fifo();
+        $self.peripheral.reset_command_list();
+        let mut ops = $ops_slice.iter().peekable();
+
+        // 1. Generate Start for operation
+        add_cmd($cmd_iter, Command::Start)?;
+
+        while let Some(op) = ops.next() {
+            // 2. Execute previous operations.
+            match &op {
+                $Operation::Read(rb) => {
+                    add_cmd(
+                        $cmd_iter,
+                        Command::Write {
+                            ack_exp: Ack::Ack,
+                            ack_check_en: true,
+                            length: 1,
+                        },
+                    )?;
+                    if rb.len() > 1 {
+                        // READ command (N - 1)
+                        add_cmd(
+                            $cmd_iter,
+                            Command::Read {
+                                ack_value: Ack::Ack,
+                                length: rb.len() as u8 - 1,
+                            },
+                        )?;
+                    }
+                    add_cmd(
+                        $cmd_iter,
+                        Command::Read {
+                            ack_value: Ack::Nack,
+                            length: 1,
+                        },
+                    )?;
+                }
+                $Operation::Write(wb) => add_cmd(
+                    $cmd_iter,
+                    Command::Write {
+                        ack_exp: Ack::Ack,
+                        ack_check_en: true,
+                        length: 1 + wb.len() as u8,
+                    },
+                )?,
+            };
+
+            // - Now, last command will generate stop
+            if ops.peek().is_none() {
+                add_cmd($cmd_iter, Command::Stop)?;
+                break;
+            }
+
+            // 3. If operation changes type we must generate new start
+            match (&ops.peek().unwrap(), &op) {
+                ($Operation::Read(_), $Operation::Write(_))
+                | ($Operation::Write(_), $Operation::Read(_)) => {
+                    add_cmd($cmd_iter, Command::Start)?;
+                }
+                _ => {} // No changes if operation have not changed
+            }
+        }
+
+        $self.peripheral.update_config();
+        $self.peripheral.start_transmission();
+
+        let ops = $ops_slice.iter_mut();
+        let mut last_opflag = 255u8;
+        for op in ops {
+            // Fill/empty FIFO for the different commands
+            match op {
+                $Operation::Read(rb) => {
+                    let opflag = OperationType::Read as u8;
+                    if last_opflag != opflag {
+                        write_fifo($self.peripheral.register_block(), addr << 1 | opflag);
+                        last_opflag = opflag;
+                    }
+                    $self.peripheral.read_all_from_fifo(rb)?;
+                }
+                $Operation::Write(wb) => {
+                    let opflag = OperationType::Write as u8;
+                    if last_opflag != opflag {
+                        write_fifo($self.peripheral.register_block(), addr << 1 | opflag);
+                        last_opflag = opflag;
+                    }
+                    $self.peripheral.write_remaining_tx_fifo(0, wb)?;
+                }
+            }
+        }
+        $self.peripheral.wait_for_completion()?;
+    };
+}
+use transaction_impl;
+
+#[cfg(feature = "eh1")]
+type Hal1Operation<'a> = embedded_hal_1::i2c::Operation<'a>;
+type Hal02Operation<'a> = embedded_hal::blocking::i2c::Operation<'a>;
