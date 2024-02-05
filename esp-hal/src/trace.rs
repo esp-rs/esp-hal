@@ -21,7 +21,7 @@
 //!
 //! ## Example
 //! ```no_run
-//! let mut trace = Trace::new(peripherals.TRACE);
+//! let mut trace = Trace::new(peripherals.TRACE0);
 //! let buffer = unsafe { &mut BUFFER[..] };
 //! trace.start_trace(buffer);
 //! // traced code
