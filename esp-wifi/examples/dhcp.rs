@@ -6,8 +6,7 @@ mod examples_util;
 use examples_util::hal;
 
 use embedded_io::*;
-use embedded_svc::ipv4::Interface;
-use embedded_svc::wifi::{AccessPointInfo, ClientConfiguration, Configuration, Wifi};
+use esp_wifi::wifi::{AccessPointInfo, ClientConfiguration, Configuration};
 
 use esp_backtrace as _;
 use esp_println::{print, println};

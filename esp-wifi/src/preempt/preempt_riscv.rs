@@ -1,6 +1,7 @@
 use super::*;
 
 use crate::hal::interrupt::TrapFrame;
+use core::ptr::addr_of;
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Context {
@@ -58,7 +59,7 @@ pub fn task_create(task: extern "C" fn()) {
         let task_stack_size = TASK_STACK_SIZE[i];
 
         // stack must be aligned by 16
-        let task_stack_ptr = &TASK_STACK as *const _ as usize
+        let task_stack_ptr = addr_of!(TASK_STACK) as usize
             + (task_stack_size as usize * i as usize)
             + task_stack_size as usize
             - 4;

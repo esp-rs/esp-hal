@@ -266,7 +266,9 @@ pub fn enable_esp_now_with_wifi(
     (device, EspNowWithWifiCreateToken { _private: () })
 }
 
-pub struct EspNowManager<'d>(EspNowRc<'d>);
+pub struct EspNowManager<'d> {
+    _rc: EspNowRc<'d>,
+}
 
 impl<'d> EspNowManager<'d> {
     /// Set primary WiFi channel
@@ -416,7 +418,9 @@ impl<'d> EspNowManager<'d> {
 /// **DO NOT USE** a lock implementation that disables interrupts since the
 /// completion of a sending requires waiting for a callback invoked in an
 /// interrupt.
-pub struct EspNowSender<'d>(EspNowRc<'d>);
+pub struct EspNowSender<'d> {
+    _rc: EspNowRc<'d>,
+}
 
 impl<'d> EspNowSender<'d> {
     /// Send data to peer
@@ -471,7 +475,9 @@ impl<'s> Drop for SendWaiter<'s> {
 
 /// This is the sender part of ESP-NOW. You can get this sender by splitting
 /// a `EspNow` instance.
-pub struct EspNowReceiver<'d>(EspNowRc<'d>);
+pub struct EspNowReceiver<'d> {
+    _rc: EspNowRc<'d>,
+}
 
 impl<'d> EspNowReceiver<'d> {
     pub fn receive(&self) -> Option<ReceivedData> {
@@ -568,9 +574,13 @@ impl<'d> EspNow<'d> {
         let espnow_rc = EspNowRc::new()?;
         let esp_now = EspNow {
             _device: device,
-            manager: EspNowManager(espnow_rc.clone()),
-            sender: EspNowSender(espnow_rc.clone()),
-            receiver: EspNowReceiver(espnow_rc),
+            manager: EspNowManager {
+                _rc: espnow_rc.clone(),
+            },
+            sender: EspNowSender {
+                _rc: espnow_rc.clone(),
+            },
+            receiver: EspNowReceiver { _rc: espnow_rc },
         };
         check_error!({ esp_wifi_set_mode(wifi_mode_t_WIFI_MODE_STA) })?;
         check_error!({ esp_wifi_start() })?;

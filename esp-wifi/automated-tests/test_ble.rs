@@ -85,7 +85,8 @@ fn main() -> ! {
             },],
         },]);
 
-        let mut srv = AttributeServer::new(&mut ble, &mut gatt_attributes);
+        let mut rng = bleps::no_rng::NoRng;
+        let mut srv = AttributeServer::new(&mut ble, &mut gatt_attributes, &mut rng);
 
         loop {
             match srv.do_work_with_notification(None) {

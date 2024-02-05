@@ -19,8 +19,7 @@ use esp_wifi::{
 };
 
 use embedded_io::*;
-use embedded_svc::ipv4::Interface;
-use embedded_svc::wifi::{ClientConfiguration, Configuration, Wifi};
+use esp_wifi::wifi::{ClientConfiguration, Configuration};
 
 use esp_backtrace as _;
 use esp_println::{print, println};

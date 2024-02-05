@@ -6,8 +6,7 @@ mod examples_util;
 use examples_util::hal;
 
 use embedded_io::*;
-use embedded_svc::ipv4::Interface;
-use embedded_svc::wifi::{AccessPointConfiguration, Configuration, Wifi};
+use esp_wifi::wifi::{AccessPointConfiguration, Configuration};
 
 use esp_backtrace as _;
 use esp_println::{print, println};
@@ -64,16 +63,18 @@ fn main() -> ! {
     println!("{:?}", controller.get_capabilities());
 
     wifi_stack
-        .set_iface_configuration(&embedded_svc::ipv4::Configuration::Client(
-            embedded_svc::ipv4::ClientConfiguration::Fixed(embedded_svc::ipv4::ClientSettings {
-                ip: embedded_svc::ipv4::Ipv4Addr::from(parse_ip("192.168.2.1")),
-                subnet: embedded_svc::ipv4::Subnet {
-                    gateway: embedded_svc::ipv4::Ipv4Addr::from(parse_ip("192.168.2.1")),
-                    mask: embedded_svc::ipv4::Mask(24),
+        .set_iface_configuration(&esp_wifi::wifi::ipv4::Configuration::Client(
+            esp_wifi::wifi::ipv4::ClientConfiguration::Fixed(
+                esp_wifi::wifi::ipv4::ClientSettings {
+                    ip: esp_wifi::wifi::ipv4::Ipv4Addr::from(parse_ip("192.168.2.1")),
+                    subnet: esp_wifi::wifi::ipv4::Subnet {
+                        gateway: esp_wifi::wifi::ipv4::Ipv4Addr::from(parse_ip("192.168.2.1")),
+                        mask: esp_wifi::wifi::ipv4::Mask(24),
+                    },
+                    dns: None,
+                    secondary_dns: None,
                 },
-                dns: None,
-                secondary_dns: None,
-            }),
+            ),
         ))
         .unwrap();
 

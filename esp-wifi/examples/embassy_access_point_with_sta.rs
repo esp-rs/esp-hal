@@ -12,9 +12,9 @@ use examples_util::hal;
 
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
-use embedded_svc::wifi::{AccessPointConfiguration, ClientConfiguration, Configuration, Wifi};
 use esp_backtrace as _;
 use esp_println::{print, println};
+use esp_wifi::wifi::{AccessPointConfiguration, ClientConfiguration, Configuration};
 use esp_wifi::wifi::{
     WifiApDevice, WifiController, WifiDevice, WifiEvent, WifiStaDevice, WifiState,
 };

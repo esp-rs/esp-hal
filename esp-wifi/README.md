@@ -90,6 +90,7 @@ Don't use this feature if you are _not_ using USB-SERIAL-JTAG as it might reduce
 | ps-max-modem   | Enable maximum modem sleep. Only affects STA mode                                                    |
 | log            | Route log output to the `log` crate                                                                  |
 | defmt          | Add `defmt::Format` implementation and output logs via `defmt`                                       |
+| embedded-svc   | Implement the embedded-svc Wifi trait                                                                |
 
 Note that not all features are available on every MCU. For example, `ble` (and thus, `coex`) is not available on ESP32-S2.
 

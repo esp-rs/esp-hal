@@ -1,3 +1,5 @@
+use core::ptr::addr_of;
+
 use crate::binary::include::esp_event_base_t;
 use crate::binary::include::esp_timer_create_args_t;
 use crate::binary::include::esp_timer_get_time;
@@ -266,7 +268,7 @@ pub unsafe extern "C" fn pp_printf(s: *const u8, args: ...) {
 // #define ESP_EVENT_DEFINE_BASE(id) esp_event_base_t id = #id
 static mut EVT: i8 = 0;
 #[no_mangle]
-static mut WIFI_EVENT: esp_event_base_t = unsafe { &EVT };
+static mut WIFI_EVENT: esp_event_base_t = unsafe { addr_of!(EVT) };
 
 // stuff needed by wpa-supplicant
 #[no_mangle]

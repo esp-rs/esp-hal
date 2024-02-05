@@ -21,15 +21,14 @@ use crate::EspWifiInitialization;
 
 use critical_section::{CriticalSection, Mutex};
 
-use embedded_svc::wifi::{
-    AccessPointConfiguration, AccessPointInfo, AuthMethod, ClientConfiguration, Configuration,
-    Protocol, SecondaryChannel, Wifi,
-};
-
 use enumset::EnumSet;
 use enumset::EnumSetType;
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
+
+use core::convert::TryInto;
+use core::fmt::Debug;
+use core::mem;
 
 #[doc(hidden)]
 pub use os_adapter::*;
@@ -73,6 +72,445 @@ use crate::{
     },
     compat::queue::SimpleQueue,
 };
+
+#[derive(EnumSetType, Debug, PartialOrd)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Default)]
+pub enum AuthMethod {
+    None,
+    WEP,
+    WPA,
+    #[default]
+    WPA2Personal,
+    WPAWPA2Personal,
+    WPA2Enterprise,
+    WPA3Personal,
+    WPA2WPA3Personal,
+    WAPIPersonal,
+}
+
+#[derive(EnumSetType, Debug, PartialOrd)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Default)]
+pub enum Protocol {
+    P802D11B,
+    P802D11BG,
+    #[default]
+    P802D11BGN,
+    P802D11BGNLR,
+    P802D11LR,
+}
+
+#[derive(EnumSetType, Debug, PartialOrd)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Default)]
+pub enum SecondaryChannel {
+    // TODO: Need to extend that for 5GHz
+    #[default]
+    None,
+    Above,
+    Below,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct AccessPointInfo {
+    pub ssid: heapless::String<32>,
+    pub bssid: [u8; 6],
+    pub channel: u8,
+    pub secondary_channel: SecondaryChannel,
+    pub signal_strength: i8,
+    #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
+    pub protocols: EnumSet<Protocol>,
+    pub auth_method: Option<AuthMethod>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct AccessPointConfiguration {
+    pub ssid: heapless::String<32>,
+    pub ssid_hidden: bool,
+    pub channel: u8,
+    pub secondary_channel: Option<u8>,
+    #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
+    pub protocols: EnumSet<Protocol>,
+    pub auth_method: AuthMethod,
+    pub password: heapless::String<64>,
+    pub max_connections: u16,
+}
+
+impl Default for AccessPointConfiguration {
+    fn default() -> Self {
+        Self {
+            ssid: "iot-device".try_into().unwrap(),
+            ssid_hidden: false,
+            channel: 1,
+            secondary_channel: None,
+            protocols: Protocol::P802D11B | Protocol::P802D11BG | Protocol::P802D11BGN,
+            auth_method: AuthMethod::None,
+            password: heapless::String::new(),
+            max_connections: 255,
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
+pub struct ClientConfiguration {
+    pub ssid: heapless::String<32>,
+    pub bssid: Option<[u8; 6]>,
+    //pub protocol: Protocol,
+    pub auth_method: AuthMethod,
+    pub password: heapless::String<64>,
+    pub channel: Option<u8>,
+}
+
+impl Debug for ClientConfiguration {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("ClientConfiguration")
+            .field("ssid", &self.ssid)
+            .field("bssid", &self.bssid)
+            .field("auth_method", &self.auth_method)
+            .field("channel", &self.channel)
+            .finish()
+    }
+}
+
+impl Default for ClientConfiguration {
+    fn default() -> Self {
+        ClientConfiguration {
+            ssid: heapless::String::new(),
+            bssid: None,
+            auth_method: Default::default(),
+            password: heapless::String::new(),
+            channel: None,
+        }
+    }
+}
+
+#[derive(EnumSetType, Debug, PartialOrd)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum Capability {
+    Client,
+    AccessPoint,
+    Mixed,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Default)]
+pub enum Configuration {
+    #[default]
+    None,
+    Client(ClientConfiguration),
+    AccessPoint(AccessPointConfiguration),
+    Mixed(ClientConfiguration, AccessPointConfiguration),
+}
+
+impl Configuration {
+    pub fn as_client_conf_ref(&self) -> Option<&ClientConfiguration> {
+        match self {
+            Self::Client(client_conf) | Self::Mixed(client_conf, _) => Some(client_conf),
+            _ => None,
+        }
+    }
+
+    pub fn as_ap_conf_ref(&self) -> Option<&AccessPointConfiguration> {
+        match self {
+            Self::AccessPoint(ap_conf) | Self::Mixed(_, ap_conf) => Some(ap_conf),
+            _ => None,
+        }
+    }
+
+    pub fn as_client_conf_mut(&mut self) -> &mut ClientConfiguration {
+        match self {
+            Self::Client(client_conf) => client_conf,
+            Self::Mixed(_, _) => {
+                let prev = mem::replace(self, Self::None);
+                match prev {
+                    Self::Mixed(client_conf, _) => {
+                        *self = Self::Client(client_conf);
+                        self.as_client_conf_mut()
+                    }
+                    _ => unreachable!(),
+                }
+            }
+            _ => {
+                *self = Self::Client(Default::default());
+                self.as_client_conf_mut()
+            }
+        }
+    }
+
+    pub fn as_ap_conf_mut(&mut self) -> &mut AccessPointConfiguration {
+        match self {
+            Self::AccessPoint(ap_conf) => ap_conf,
+            Self::Mixed(_, _) => {
+                let prev = mem::replace(self, Self::None);
+                match prev {
+                    Self::Mixed(_, ap_conf) => {
+                        *self = Self::AccessPoint(ap_conf);
+                        self.as_ap_conf_mut()
+                    }
+                    _ => unreachable!(),
+                }
+            }
+            _ => {
+                *self = Self::AccessPoint(Default::default());
+                self.as_ap_conf_mut()
+            }
+        }
+    }
+
+    pub fn as_mixed_conf_mut(
+        &mut self,
+    ) -> (&mut ClientConfiguration, &mut AccessPointConfiguration) {
+        match self {
+            Self::Mixed(client_conf, ref mut ap_conf) => (client_conf, ap_conf),
+            Self::AccessPoint(_) => {
+                let prev = mem::replace(self, Self::None);
+                match prev {
+                    Self::AccessPoint(ap_conf) => {
+                        *self = Self::Mixed(Default::default(), ap_conf);
+                        self.as_mixed_conf_mut()
+                    }
+                    _ => unreachable!(),
+                }
+            }
+            Self::Client(_) => {
+                let prev = mem::replace(self, Self::None);
+                match prev {
+                    Self::Client(client_conf) => {
+                        *self = Self::Mixed(client_conf, Default::default());
+                        self.as_mixed_conf_mut()
+                    }
+                    _ => unreachable!(),
+                }
+            }
+            _ => {
+                *self = Self::Mixed(Default::default(), Default::default());
+                self.as_mixed_conf_mut()
+            }
+        }
+    }
+}
+
+pub mod ipv4 {
+    use core::convert::TryFrom;
+    use core::fmt::Display;
+    use core::str::FromStr;
+
+    pub use no_std_net::*;
+
+    #[derive(Copy, Clone, Debug, Eq, PartialEq)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    pub struct Mask(pub u8);
+
+    impl FromStr for Mask {
+        type Err = &'static str;
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            s.parse::<u8>()
+                .map_err(|_| "Invalid subnet mask")
+                .map_or_else(Err, |mask| {
+                    if (1..=32).contains(&mask) {
+                        Ok(Mask(mask))
+                    } else {
+                        Err("Mask should be a number between 1 and 32")
+                    }
+                })
+        }
+    }
+
+    impl Display for Mask {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            write!(f, "{}", self.0)
+        }
+    }
+
+    impl TryFrom<Ipv4Addr> for Mask {
+        type Error = ();
+
+        fn try_from(ip: Ipv4Addr) -> Result<Self, Self::Error> {
+            let octets = ip.octets();
+            let addr: u32 = ((octets[0] as u32 & 0xff) << 24)
+                | ((octets[1] as u32 & 0xff) << 16)
+                | ((octets[2] as u32 & 0xff) << 8)
+                | (octets[3] as u32 & 0xff);
+
+            if addr.leading_ones() + addr.trailing_zeros() == 32 {
+                Ok(Mask(addr.leading_ones() as u8))
+            } else {
+                Err(())
+            }
+        }
+    }
+
+    impl From<Mask> for Ipv4Addr {
+        fn from(mask: Mask) -> Self {
+            let addr: u32 = ((1 << (32 - mask.0)) - 1) ^ 0xffffffffu32;
+
+            let (a, b, c, d) = (
+                ((addr >> 24) & 0xff) as u8,
+                ((addr >> 16) & 0xff) as u8,
+                ((addr >> 8) & 0xff) as u8,
+                (addr & 0xff) as u8,
+            );
+
+            Ipv4Addr::new(a, b, c, d)
+        }
+    }
+
+    #[derive(Copy, Clone, Debug, Eq, PartialEq)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    pub struct Subnet {
+        #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
+        pub gateway: Ipv4Addr,
+        pub mask: Mask,
+    }
+
+    impl Display for Subnet {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            write!(f, "{}/{}", self.gateway, self.mask)
+        }
+    }
+
+    impl FromStr for Subnet {
+        type Err = &'static str;
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            let mut split = s.split('/');
+            if let Some(gateway_str) = split.next() {
+                if let Some(mask_str) = split.next() {
+                    if split.next().is_none() {
+                        if let Ok(gateway) = gateway_str.parse::<Ipv4Addr>() {
+                            return mask_str.parse::<Mask>().map(|mask| Self { gateway, mask });
+                        } else {
+                            return Err("Invalid IP address format, expected XXX.XXX.XXX.XXX");
+                        }
+                    }
+                }
+            }
+
+            Err("Expected <gateway-ip-address>/<mask>")
+        }
+    }
+
+    #[derive(Copy, Clone, Debug, Eq, PartialEq)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    pub struct ClientSettings {
+        #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
+        pub ip: Ipv4Addr,
+        pub subnet: Subnet,
+        #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
+        pub dns: Option<Ipv4Addr>,
+        #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
+        pub secondary_dns: Option<Ipv4Addr>,
+    }
+
+    impl Default for ClientSettings {
+        fn default() -> ClientSettings {
+            ClientSettings {
+                ip: Ipv4Addr::new(192, 168, 71, 200),
+                subnet: Subnet {
+                    gateway: Ipv4Addr::new(192, 168, 71, 1),
+                    mask: Mask(24),
+                },
+                dns: Some(Ipv4Addr::new(8, 8, 8, 8)),
+                secondary_dns: Some(Ipv4Addr::new(8, 8, 4, 4)),
+            }
+        }
+    }
+
+    #[derive(Default, Clone, Debug, PartialEq, Eq)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    pub struct DHCPClientSettings {
+        pub hostname: Option<heapless::String<30>>,
+    }
+
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    pub enum ClientConfiguration {
+        DHCP(DHCPClientSettings),
+        Fixed(ClientSettings),
+    }
+
+    impl ClientConfiguration {
+        pub fn as_fixed_settings_ref(&self) -> Option<&ClientSettings> {
+            match self {
+                Self::Fixed(client_settings) => Some(client_settings),
+                _ => None,
+            }
+        }
+
+        pub fn as_fixed_settings_mut(&mut self) -> &mut ClientSettings {
+            match self {
+                Self::Fixed(client_settings) => client_settings,
+                _ => {
+                    *self = ClientConfiguration::Fixed(Default::default());
+                    self.as_fixed_settings_mut()
+                }
+            }
+        }
+    }
+
+    impl Default for ClientConfiguration {
+        fn default() -> ClientConfiguration {
+            ClientConfiguration::DHCP(Default::default())
+        }
+    }
+
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    pub struct RouterConfiguration {
+        pub subnet: Subnet,
+        pub dhcp_enabled: bool,
+        #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
+        pub dns: Option<Ipv4Addr>,
+        #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
+        pub secondary_dns: Option<Ipv4Addr>,
+    }
+
+    impl Default for RouterConfiguration {
+        fn default() -> RouterConfiguration {
+            RouterConfiguration {
+                subnet: Subnet {
+                    gateway: Ipv4Addr::new(192, 168, 71, 1),
+                    mask: Mask(24),
+                },
+                dhcp_enabled: true,
+                dns: Some(Ipv4Addr::new(8, 8, 8, 8)),
+                secondary_dns: Some(Ipv4Addr::new(8, 8, 4, 4)),
+            }
+        }
+    }
+
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    pub enum Configuration {
+        Client(ClientConfiguration),
+        Router(RouterConfiguration),
+    }
+
+    impl Default for Configuration {
+        fn default() -> Self {
+            Self::Client(Default::default())
+        }
+    }
+
+    #[derive(Copy, Clone, Debug, Eq, PartialEq)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    pub struct IpInfo {
+        #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
+        pub ip: Ipv4Addr,
+        pub subnet: Subnet,
+        #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
+        pub dns: Option<Ipv4Addr>,
+        #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
+        pub secondary_dns: Option<Ipv4Addr>,
+    }
+}
 
 trait AuthMethodExt {
     fn to_raw(&self) -> wifi_auth_mode_t;
@@ -627,7 +1065,7 @@ pub(crate) fn wifi_init() -> Result<(), WifiError> {
         #[cfg(coex)]
         esp_wifi_result!(coex_init())?;
 
-        esp_wifi_result!(esp_wifi_init_internal(&G_CONFIG))?;
+        esp_wifi_result!(esp_wifi_init_internal(addr_of!(G_CONFIG)))?;
         esp_wifi_result!(esp_wifi_set_mode(wifi_mode_t_WIFI_MODE_NULL))?;
 
         esp_wifi_result!(esp_supplicant_init())?;
@@ -929,7 +1367,7 @@ pub(crate) fn wifi_start_scan(
 /// configuration.
 ///
 /// This function will panic if the configuration is not
-/// [`Configuration::Client`] or [`Configuration::Station`].
+/// [`Configuration::Client`] or [`Configuration::AccessPoint`].
 ///
 /// If you want to use AP-STA mode, use `[new_ap_sta]`.
 pub fn new_with_config<'d, MODE: WifiDeviceMode>(
@@ -981,8 +1419,8 @@ pub fn new_ap_sta<'d>(
 pub fn new_ap_sta_with_config<'d>(
     inited: &EspWifiInitialization,
     device: impl Peripheral<P = crate::hal::peripherals::WIFI> + 'd,
-    sta_config: embedded_svc::wifi::ClientConfiguration,
-    ap_config: embedded_svc::wifi::AccessPointConfiguration,
+    sta_config: crate::wifi::ClientConfiguration,
+    ap_config: crate::wifi::AccessPointConfiguration,
 ) -> Result<
     (
         WifiDevice<'d, WifiApDevice>,
@@ -1271,7 +1709,7 @@ fn convert_ap_info(record: &include::wifi_ap_record_t) -> AccessPointInfo {
     }
 }
 
-/// A wifi controller implementing embedded_svc::Wifi traits
+/// A wifi controller
 pub struct WifiController<'d> {
     _device: PeripheralRef<'d, crate::hal::peripherals::WIFI>,
     config: Configuration,
@@ -1315,7 +1753,7 @@ impl<'d> WifiController<'d> {
     /// # Example:
     ///
     /// ```
-    /// use embedded_svc::wifi::Protocol;
+    /// use esp_wifi::wifi::Protocol;
     /// use esp_wifi::wifi::WifiController;
     /// let mut wifi = WifiController::new();
     /// wifi.set_mode(Protocol::P802D11BGNLR);
@@ -1591,13 +2029,9 @@ fn apply_sta_config(config: &ClientConfiguration) -> Result<(), WifiError> {
     }
 }
 
-impl Wifi for WifiController<'_> {
-    type Error = WifiError;
-
-    /// This currently only supports the `Client` and `AccessPoint` capability.
-    fn get_capabilities(&self) -> Result<EnumSet<embedded_svc::wifi::Capability>, Self::Error> {
-        use embedded_svc::wifi::Capability;
-
+impl WifiController<'_> {
+    /// Get the supported capabilities of the controller.
+    pub fn get_capabilities(&self) -> Result<EnumSet<crate::wifi::Capability>, WifiError> {
         let caps = match self.config {
             Configuration::None => unreachable!(),
             Configuration::Client(_) => enumset::enum_set! { Capability::Client },
@@ -1610,21 +2044,13 @@ impl Wifi for WifiController<'_> {
         Ok(caps)
     }
 
-    /// A blocking wifi network scan with default scanning options.
-    fn scan_n<const N: usize>(
-        &mut self,
-    ) -> Result<(heapless::Vec<AccessPointInfo, N>, usize), Self::Error> {
-        self.scan_with_config_sync(Default::default())
-    }
-
     /// Get the currently used configuration.
-    fn get_configuration(&self) -> Result<Configuration, Self::Error> {
+    pub fn get_configuration(&self) -> Result<Configuration, WifiError> {
         Ok(self.config.clone())
     }
 
     /// Set the configuration, you need to use Wifi::connect() for connecting to an AP
-    /// Trying anything but `Configuration::Client` or `Configuration::AccessPoint` will result in a panic!
-    fn set_configuration(&mut self, conf: &Configuration) -> Result<(), Self::Error> {
+    pub fn set_configuration(&mut self, conf: &Configuration) -> Result<(), WifiError> {
         match self.config {
             Configuration::None => self.config = conf.clone(), // initial config
             Configuration::Client(ref mut client) => {
@@ -1674,23 +2100,19 @@ impl Wifi for WifiController<'_> {
         Ok(())
     }
 
-    fn start(&mut self) -> Result<(), Self::Error> {
-        crate::wifi::wifi_start()
-    }
-
-    fn stop(&mut self) -> Result<(), Self::Error> {
+    pub(crate) fn stop_impl(&mut self) -> Result<(), WifiError> {
         esp_wifi_result!(unsafe { esp_wifi_stop() })
     }
 
-    fn connect(&mut self) -> Result<(), Self::Error> {
+    pub(crate) fn connect_impl(&mut self) -> Result<(), WifiError> {
         esp_wifi_result!(unsafe { esp_wifi_connect() })
     }
 
-    fn disconnect(&mut self) -> Result<(), Self::Error> {
+    pub(crate) fn disconnect_impl(&mut self) -> Result<(), WifiError> {
         esp_wifi_result!(unsafe { esp_wifi_disconnect() })
     }
 
-    fn is_started(&self) -> Result<bool, Self::Error> {
+    pub fn is_started(&self) -> Result<bool, WifiError> {
         if matches!(
             crate::wifi::get_sta_state(),
             WifiState::StaStarted | WifiState::StaConnected | WifiState::StaDisconnected
@@ -1703,13 +2125,39 @@ impl Wifi for WifiController<'_> {
         Ok(false)
     }
 
-    fn is_connected(&self) -> Result<bool, Self::Error> {
+    pub fn is_connected(&self) -> Result<bool, WifiError> {
         match crate::wifi::get_sta_state() {
             crate::wifi::WifiState::StaConnected => Ok(true),
             crate::wifi::WifiState::StaDisconnected => Err(WifiError::Disconnected),
             //FIXME: Should any other enum value trigger an error instead of returning false?
             _ => Ok(false),
         }
+    }
+}
+
+#[cfg(not(feature = "async"))]
+impl WifiController<'_> {
+    /// A blocking wifi network scan with default scanning options.
+    pub fn scan_n<const N: usize>(
+        &mut self,
+    ) -> Result<(heapless::Vec<AccessPointInfo, N>, usize), WifiError> {
+        self.scan_with_config_sync(Default::default())
+    }
+
+    pub fn start(&mut self) -> Result<(), WifiError> {
+        crate::wifi::wifi_start()
+    }
+
+    pub fn stop(&mut self) -> Result<(), WifiError> {
+        self.stop_impl()
+    }
+
+    pub fn connect(&mut self) -> Result<(), WifiError> {
+        self.connect_impl()
+    }
+
+    pub fn disconnect(&mut self) -> Result<(), WifiError> {
+        self.disconnect_impl()
     }
 }
 
@@ -1821,7 +2269,7 @@ mod asynch {
 
     // TODO assumes STA mode only
     impl<'d> WifiController<'d> {
-        /// Async version of [`embedded_svc::wifi::Wifi`]'s `scan_n` method
+        /// Async version of [`crate::wifi::WifiController`]'s `scan_n` method
         pub async fn scan_n<const N: usize>(
             &mut self,
         ) -> Result<(heapless::Vec<AccessPointInfo, N>, usize), WifiError> {
@@ -1847,7 +2295,7 @@ mod asynch {
             Ok((result, count))
         }
 
-        /// Async version of [`embedded_svc::wifi::Wifi`]'s `start` method
+        /// Async version of [`crate::wifi::WifiController`]'s `start` method
         pub async fn start(&mut self) -> Result<(), WifiError> {
             let mode = WifiMode::try_from(&self.config)?;
 
@@ -1868,7 +2316,7 @@ mod asynch {
             Ok(())
         }
 
-        /// Async version of [`embedded_svc::wifi::Wifi`]'s `stop` method
+        /// Async version of [`crate::wifi::WifiController`]'s `stop` method
         pub async fn stop(&mut self) -> Result<(), WifiError> {
             let mode = WifiMode::try_from(&self.config)?;
 
@@ -1882,7 +2330,7 @@ mod asynch {
 
             Self::clear_events(events);
 
-            embedded_svc::wifi::Wifi::stop(self)?;
+            crate::wifi::WifiController::stop_impl(self)?;
 
             self.wait_for_all_events(events, false).await;
 
@@ -1892,11 +2340,11 @@ mod asynch {
             Ok(())
         }
 
-        /// Async version of [`embedded_svc::wifi::Wifi`]'s `connect` method
+        /// Async version of [`crate::wifi::WifiController`]'s `connect` method
         pub async fn connect(&mut self) -> Result<(), WifiError> {
             Self::clear_events(WifiEvent::StaConnected | WifiEvent::StaDisconnected);
 
-            let err = embedded_svc::wifi::Wifi::connect(self).err();
+            let err = crate::wifi::WifiController::connect_impl(self).err();
 
             if MultiWifiEventFuture::new(WifiEvent::StaConnected | WifiEvent::StaDisconnected)
                 .await
@@ -1908,10 +2356,10 @@ mod asynch {
             }
         }
 
-        /// Async version of [`embedded_svc::wifi::Wifi`]'s `Disconnect` method
+        /// Async version of [`crate::wifi::WifiController`]'s `Disconnect` method
         pub async fn disconnect(&mut self) -> Result<(), WifiError> {
             Self::clear_events(WifiEvent::StaDisconnected);
-            embedded_svc::wifi::Wifi::disconnect(self)?;
+            crate::wifi::WifiController::disconnect_impl(self)?;
             WifiEventFuture::new(WifiEvent::StaDisconnected).await;
 
             Ok(())
@@ -2124,6 +2572,508 @@ impl Drop for FreeApListOnDrop {
     fn drop(&mut self) {
         unsafe {
             include::esp_wifi_clear_ap_list();
+        }
+    }
+}
+
+#[cfg(feature = "embedded-svc")]
+mod embedded_svc_compat {
+    use super::*;
+
+    impl Into<embedded_svc::wifi::Capability> for Capability {
+        fn into(self) -> embedded_svc::wifi::Capability {
+            match self {
+                Capability::Client => embedded_svc::wifi::Capability::Client,
+                Capability::AccessPoint => embedded_svc::wifi::Capability::AccessPoint,
+                Capability::Mixed => embedded_svc::wifi::Capability::Mixed,
+            }
+        }
+    }
+
+    impl Into<embedded_svc::wifi::AuthMethod> for AuthMethod {
+        fn into(self) -> embedded_svc::wifi::AuthMethod {
+            match self {
+                AuthMethod::None => embedded_svc::wifi::AuthMethod::None,
+                AuthMethod::WEP => embedded_svc::wifi::AuthMethod::WEP,
+                AuthMethod::WPA => embedded_svc::wifi::AuthMethod::WPA,
+                AuthMethod::WPA2Personal => embedded_svc::wifi::AuthMethod::WPA2Personal,
+                AuthMethod::WPAWPA2Personal => embedded_svc::wifi::AuthMethod::WPAWPA2Personal,
+                AuthMethod::WPA2Enterprise => embedded_svc::wifi::AuthMethod::WPA2Enterprise,
+                AuthMethod::WPA3Personal => embedded_svc::wifi::AuthMethod::WPA3Personal,
+                AuthMethod::WPA2WPA3Personal => embedded_svc::wifi::AuthMethod::WPA2WPA3Personal,
+                AuthMethod::WAPIPersonal => embedded_svc::wifi::AuthMethod::WAPIPersonal,
+            }
+        }
+    }
+
+    impl From<embedded_svc::wifi::AuthMethod> for AuthMethod {
+        fn from(value: embedded_svc::wifi::AuthMethod) -> Self {
+            match value {
+                embedded_svc::wifi::AuthMethod::None => AuthMethod::None,
+                embedded_svc::wifi::AuthMethod::WEP => AuthMethod::WEP,
+                embedded_svc::wifi::AuthMethod::WPA => AuthMethod::WPA,
+                embedded_svc::wifi::AuthMethod::WPA2Personal => AuthMethod::WPA2Personal,
+                embedded_svc::wifi::AuthMethod::WPAWPA2Personal => AuthMethod::WPAWPA2Personal,
+                embedded_svc::wifi::AuthMethod::WPA2Enterprise => AuthMethod::WPA2Enterprise,
+                embedded_svc::wifi::AuthMethod::WPA3Personal => AuthMethod::WPA3Personal,
+                embedded_svc::wifi::AuthMethod::WPA2WPA3Personal => AuthMethod::WPA2WPA3Personal,
+                embedded_svc::wifi::AuthMethod::WAPIPersonal => AuthMethod::WAPIPersonal,
+            }
+        }
+    }
+
+    impl Into<embedded_svc::wifi::Protocol> for Protocol {
+        fn into(self) -> embedded_svc::wifi::Protocol {
+            match self {
+                Protocol::P802D11B => embedded_svc::wifi::Protocol::P802D11B,
+                Protocol::P802D11BG => embedded_svc::wifi::Protocol::P802D11BG,
+                Protocol::P802D11BGN => embedded_svc::wifi::Protocol::P802D11BGN,
+                Protocol::P802D11BGNLR => embedded_svc::wifi::Protocol::P802D11BGNLR,
+                Protocol::P802D11LR => embedded_svc::wifi::Protocol::P802D11LR,
+            }
+        }
+    }
+
+    impl From<embedded_svc::wifi::Protocol> for Protocol {
+        fn from(value: embedded_svc::wifi::Protocol) -> Self {
+            match value {
+                embedded_svc::wifi::Protocol::P802D11B => Protocol::P802D11B,
+                embedded_svc::wifi::Protocol::P802D11BG => Protocol::P802D11BG,
+                embedded_svc::wifi::Protocol::P802D11BGN => Protocol::P802D11BGN,
+                embedded_svc::wifi::Protocol::P802D11BGNLR => Protocol::P802D11BGNLR,
+                embedded_svc::wifi::Protocol::P802D11LR => Protocol::P802D11LR,
+            }
+        }
+    }
+
+    impl Into<embedded_svc::wifi::Configuration> for Configuration {
+        fn into(self) -> embedded_svc::wifi::Configuration {
+            match self {
+                Configuration::None => embedded_svc::wifi::Configuration::None,
+                Configuration::Client(conf) => embedded_svc::wifi::Configuration::Client(
+                    embedded_svc::wifi::ClientConfiguration {
+                        ssid: conf.ssid,
+                        bssid: conf.bssid,
+                        auth_method: conf.auth_method.into(),
+                        password: conf.password,
+                        channel: conf.channel,
+                    },
+                ),
+                Configuration::AccessPoint(conf) => embedded_svc::wifi::Configuration::AccessPoint(
+                    embedded_svc::wifi::AccessPointConfiguration {
+                        ssid: conf.ssid,
+                        ssid_hidden: conf.ssid_hidden,
+                        channel: conf.channel,
+                        secondary_channel: conf.secondary_channel,
+                        protocols: {
+                            let mut res = EnumSet::<embedded_svc::wifi::Protocol>::new();
+                            conf.protocols.into_iter().for_each(|v| {
+                                res.insert(v.into());
+                            });
+                            res
+                        },
+                        auth_method: conf.auth_method.into(),
+                        password: conf.password,
+                        max_connections: conf.max_connections,
+                    },
+                ),
+                Configuration::Mixed(client, ap) => embedded_svc::wifi::Configuration::Mixed(
+                    embedded_svc::wifi::ClientConfiguration {
+                        ssid: client.ssid,
+                        bssid: client.bssid,
+                        auth_method: client.auth_method.into(),
+                        password: client.password,
+                        channel: client.channel,
+                    },
+                    embedded_svc::wifi::AccessPointConfiguration {
+                        ssid: ap.ssid,
+                        ssid_hidden: ap.ssid_hidden,
+                        channel: ap.channel,
+                        secondary_channel: ap.secondary_channel,
+                        protocols: {
+                            let mut res = EnumSet::<embedded_svc::wifi::Protocol>::new();
+                            ap.protocols.into_iter().for_each(|v| {
+                                res.insert(v.into());
+                            });
+                            res
+                        },
+
+                        auth_method: ap.auth_method.into(),
+                        password: ap.password,
+                        max_connections: ap.max_connections,
+                    },
+                ),
+            }
+        }
+    }
+
+    impl From<&embedded_svc::wifi::Configuration> for Configuration {
+        fn from(value: &embedded_svc::wifi::Configuration) -> Self {
+            match value {
+                embedded_svc::wifi::Configuration::None => Configuration::None,
+                embedded_svc::wifi::Configuration::Client(conf) => {
+                    Configuration::Client(ClientConfiguration {
+                        ssid: conf.ssid.clone(),
+                        bssid: conf.bssid.clone(),
+                        auth_method: conf.auth_method.into(),
+                        password: conf.password.clone(),
+                        channel: conf.channel.clone(),
+                    })
+                }
+                embedded_svc::wifi::Configuration::AccessPoint(conf) => {
+                    Configuration::AccessPoint(AccessPointConfiguration {
+                        ssid: conf.ssid.clone(),
+                        ssid_hidden: conf.ssid_hidden,
+                        channel: conf.channel,
+                        secondary_channel: conf.secondary_channel,
+                        protocols: {
+                            let mut res = EnumSet::<Protocol>::new();
+                            conf.protocols.into_iter().for_each(|v| {
+                                res.insert(v.into());
+                            });
+                            res
+                        },
+                        auth_method: conf.auth_method.into(),
+                        password: conf.password.clone(),
+                        max_connections: conf.max_connections,
+                    })
+                }
+                embedded_svc::wifi::Configuration::Mixed(client, ap) => Configuration::Mixed(
+                    ClientConfiguration {
+                        ssid: client.ssid.clone(),
+                        bssid: client.bssid.clone(),
+                        auth_method: client.auth_method.into(),
+                        password: client.password.clone(),
+                        channel: client.channel,
+                    },
+                    AccessPointConfiguration {
+                        ssid: ap.ssid.clone(),
+                        ssid_hidden: ap.ssid_hidden.clone(),
+                        channel: ap.channel,
+                        secondary_channel: ap.secondary_channel,
+                        protocols: {
+                            let mut res = EnumSet::<Protocol>::new();
+                            ap.protocols.into_iter().for_each(|v| {
+                                res.insert(v.into());
+                            });
+                            res
+                        },
+                        auth_method: ap.auth_method.into(),
+                        password: ap.password.clone(),
+                        max_connections: ap.max_connections,
+                    },
+                ),
+            }
+        }
+    }
+
+    impl Into<embedded_svc::wifi::AccessPointInfo> for AccessPointInfo {
+        fn into(self) -> embedded_svc::wifi::AccessPointInfo {
+            embedded_svc::wifi::AccessPointInfo {
+                ssid: self.ssid.clone(),
+                bssid: self.bssid.clone(),
+                channel: self.channel,
+                secondary_channel: self.secondary_channel.into(),
+                signal_strength: self.signal_strength,
+                protocols: {
+                    let mut res = EnumSet::<embedded_svc::wifi::Protocol>::new();
+                    self.protocols.into_iter().for_each(|v| {
+                        res.insert(v.into());
+                    });
+                    res
+                },
+                auth_method: self.auth_method.map(|v| v.into()),
+            }
+        }
+    }
+
+    impl Into<embedded_svc::wifi::SecondaryChannel> for SecondaryChannel {
+        fn into(self) -> embedded_svc::wifi::SecondaryChannel {
+            match self {
+                SecondaryChannel::None => embedded_svc::wifi::SecondaryChannel::None,
+                SecondaryChannel::Above => embedded_svc::wifi::SecondaryChannel::Above,
+                SecondaryChannel::Below => embedded_svc::wifi::SecondaryChannel::Below,
+            }
+        }
+    }
+
+    impl Into<embedded_svc::ipv4::Subnet> for crate::wifi::ipv4::Subnet {
+        fn into(self) -> embedded_svc::ipv4::Subnet {
+            embedded_svc::ipv4::Subnet {
+                gateway: embedded_svc::ipv4::Ipv4Addr::from(self.gateway.octets()),
+                mask: embedded_svc::ipv4::Mask(self.mask.0),
+            }
+        }
+    }
+
+    impl From<embedded_svc::ipv4::Subnet> for crate::wifi::ipv4::Subnet {
+        fn from(value: embedded_svc::ipv4::Subnet) -> Self {
+            Self {
+                gateway: super::ipv4::Ipv4Addr::from(value.gateway.octets()),
+                mask: super::ipv4::Mask(value.mask.0),
+            }
+        }
+    }
+
+    impl Into<embedded_svc::ipv4::IpInfo> for super::ipv4::IpInfo {
+        fn into(self) -> embedded_svc::ipv4::IpInfo {
+            embedded_svc::ipv4::IpInfo {
+                ip: embedded_svc::ipv4::Ipv4Addr::from(self.ip.octets()),
+                subnet: self.subnet.into(),
+                dns: self
+                    .dns
+                    .map(|v| embedded_svc::ipv4::Ipv4Addr::from(v.octets())),
+                secondary_dns: self
+                    .secondary_dns
+                    .map(|v| embedded_svc::ipv4::Ipv4Addr::from(v.octets())),
+            }
+        }
+    }
+
+    impl From<&embedded_svc::ipv4::Configuration> for super::ipv4::Configuration {
+        fn from(value: &embedded_svc::ipv4::Configuration) -> Self {
+            match value {
+                embedded_svc::ipv4::Configuration::Client(client) => {
+                    let config = match client {
+                        embedded_svc::ipv4::ClientConfiguration::DHCP(dhcp) => {
+                            super::ipv4::ClientConfiguration::DHCP(
+                                super::ipv4::DHCPClientSettings {
+                                    hostname: dhcp.hostname.clone(),
+                                },
+                            )
+                        }
+                        embedded_svc::ipv4::ClientConfiguration::Fixed(fixed) => {
+                            super::ipv4::ClientConfiguration::Fixed(super::ipv4::ClientSettings {
+                                ip: super::ipv4::Ipv4Addr::from(fixed.ip.octets()),
+                                subnet: fixed.subnet.into(),
+                                dns: fixed.dns.map(|v| super::ipv4::Ipv4Addr::from(v.octets())),
+                                secondary_dns: fixed
+                                    .secondary_dns
+                                    .map(|v| super::ipv4::Ipv4Addr::from(v.octets())),
+                            })
+                        }
+                    };
+                    super::ipv4::Configuration::Client(config)
+                }
+                embedded_svc::ipv4::Configuration::Router(router) => {
+                    let config = super::ipv4::RouterConfiguration {
+                        subnet: router.subnet.into(),
+                        dhcp_enabled: router.dhcp_enabled,
+                        dns: router.dns.map(|v| super::ipv4::Ipv4Addr::from(v.octets())),
+                        secondary_dns: router
+                            .secondary_dns
+                            .map(|v| super::ipv4::Ipv4Addr::from(v.octets())),
+                    };
+                    super::ipv4::Configuration::Router(config)
+                }
+            }
+        }
+    }
+
+    impl Into<embedded_svc::ipv4::Configuration> for super::ipv4::Configuration {
+        fn into(self) -> embedded_svc::ipv4::Configuration {
+            match self {
+                super::ipv4::Configuration::Client(client) => {
+                    let config = match client {
+                        super::ipv4::ClientConfiguration::DHCP(dhcp) => {
+                            embedded_svc::ipv4::ClientConfiguration::DHCP(
+                                embedded_svc::ipv4::DHCPClientSettings {
+                                    hostname: dhcp.hostname.clone(),
+                                },
+                            )
+                        }
+                        super::ipv4::ClientConfiguration::Fixed(fixed) => {
+                            embedded_svc::ipv4::ClientConfiguration::Fixed(
+                                embedded_svc::ipv4::ClientSettings {
+                                    ip: embedded_svc::ipv4::Ipv4Addr::from(fixed.ip.octets()),
+                                    subnet: fixed.subnet.into(),
+                                    dns: fixed
+                                        .dns
+                                        .map(|v| embedded_svc::ipv4::Ipv4Addr::from(v.octets())),
+                                    secondary_dns: fixed
+                                        .secondary_dns
+                                        .map(|v| embedded_svc::ipv4::Ipv4Addr::from(v.octets())),
+                                },
+                            )
+                        }
+                    };
+                    embedded_svc::ipv4::Configuration::Client(config)
+                }
+                super::ipv4::Configuration::Router(router) => {
+                    let config = embedded_svc::ipv4::RouterConfiguration {
+                        subnet: router.subnet.into(),
+                        dhcp_enabled: router.dhcp_enabled,
+                        dns: router
+                            .dns
+                            .map(|v| embedded_svc::ipv4::Ipv4Addr::from(v.octets())),
+                        secondary_dns: router
+                            .secondary_dns
+                            .map(|v| embedded_svc::ipv4::Ipv4Addr::from(v.octets())),
+                    };
+                    embedded_svc::ipv4::Configuration::Router(config)
+                }
+            }
+        }
+    }
+
+    #[cfg(not(feature = "async"))]
+    impl embedded_svc::wifi::Wifi for WifiController<'_> {
+        type Error = WifiError;
+
+        fn get_capabilities(&self) -> Result<EnumSet<embedded_svc::wifi::Capability>, Self::Error> {
+            self.get_capabilities().map(|v| {
+                let mut res = EnumSet::<embedded_svc::wifi::Capability>::new();
+                v.into_iter().for_each(|v| {
+                    res.insert(v.into());
+                });
+                res
+            })
+        }
+
+        fn get_configuration(&self) -> Result<embedded_svc::wifi::Configuration, Self::Error> {
+            self.get_configuration().map(|v| v.into())
+        }
+
+        fn set_configuration(
+            &mut self,
+            conf: &embedded_svc::wifi::Configuration,
+        ) -> Result<(), Self::Error> {
+            let conf = conf.into();
+            self.set_configuration(&conf)
+        }
+
+        fn start(&mut self) -> Result<(), Self::Error> {
+            self.start()
+        }
+
+        fn stop(&mut self) -> Result<(), Self::Error> {
+            self.stop()
+        }
+
+        fn connect(&mut self) -> Result<(), Self::Error> {
+            self.connect()
+        }
+
+        fn disconnect(&mut self) -> Result<(), Self::Error> {
+            self.disconnect()
+        }
+
+        fn is_started(&self) -> Result<bool, Self::Error> {
+            self.is_started()
+        }
+
+        fn is_connected(&self) -> Result<bool, Self::Error> {
+            self.is_connected()
+        }
+
+        fn scan_n<const N: usize>(
+            &mut self,
+        ) -> Result<(heapless::Vec<embedded_svc::wifi::AccessPointInfo, N>, usize), Self::Error>
+        {
+            self.scan_n::<N>().map(|(v, l)| {
+                let mut res: heapless::Vec<embedded_svc::wifi::AccessPointInfo, N> =
+                    heapless::Vec::new();
+                for ap in v {
+                    res.push(ap.into()).ok();
+                }
+                (res, l)
+            })
+        }
+    }
+
+    #[cfg(feature = "async")]
+    impl embedded_svc::wifi::asynch::Wifi for WifiController<'_> {
+        type Error = WifiError;
+
+        async fn get_capabilities(
+            &self,
+        ) -> Result<EnumSet<embedded_svc::wifi::Capability>, Self::Error> {
+            self.get_capabilities().map(|v| {
+                let mut res = EnumSet::<embedded_svc::wifi::Capability>::new();
+                v.into_iter().for_each(|v| {
+                    res.insert(v.into());
+                });
+                res
+            })
+        }
+
+        async fn get_configuration(
+            &self,
+        ) -> Result<embedded_svc::wifi::Configuration, Self::Error> {
+            WifiController::get_configuration(self).map(|v| v.into())
+        }
+
+        async fn set_configuration(
+            &mut self,
+            conf: &embedded_svc::wifi::Configuration,
+        ) -> Result<(), Self::Error> {
+            let conf = conf.into();
+            self.set_configuration(&conf)
+        }
+
+        async fn start(&mut self) -> Result<(), Self::Error> {
+            self.start().await
+        }
+
+        async fn stop(&mut self) -> Result<(), Self::Error> {
+            self.stop().await
+        }
+
+        async fn connect(&mut self) -> Result<(), Self::Error> {
+            self.connect().await
+        }
+
+        async fn disconnect(&mut self) -> Result<(), Self::Error> {
+            self.disconnect().await
+        }
+
+        async fn is_started(&self) -> Result<bool, Self::Error> {
+            self.is_started()
+        }
+
+        async fn is_connected(&self) -> Result<bool, Self::Error> {
+            self.is_connected()
+        }
+
+        async fn scan_n<const N: usize>(
+            &mut self,
+        ) -> Result<(heapless::Vec<embedded_svc::wifi::AccessPointInfo, N>, usize), Self::Error>
+        {
+            self.scan_n::<N>().await.map(|(v, l)| {
+                let mut res: heapless::Vec<embedded_svc::wifi::AccessPointInfo, N> =
+                    heapless::Vec::new();
+                for ap in v {
+                    res.push(ap.into()).ok();
+                }
+                (res, l)
+            })
+        }
+    }
+
+    impl<'a, MODE: WifiDeviceMode> embedded_svc::ipv4::Interface
+        for crate::wifi_interface::WifiStack<'a, MODE>
+    {
+        type Error = crate::wifi_interface::WifiStackError;
+
+        fn get_iface_configuration(
+            &self,
+        ) -> Result<embedded_svc::ipv4::Configuration, Self::Error> {
+            self.get_iface_configuration().map(|v| v.into())
+        }
+
+        fn set_iface_configuration(
+            &mut self,
+            conf: &embedded_svc::ipv4::Configuration,
+        ) -> Result<(), Self::Error> {
+            self.set_iface_configuration(&super::ipv4::Configuration::from(conf))
+        }
+
+        fn is_iface_up(&self) -> bool {
+            self.is_iface_up()
+        }
+
+        fn get_ip_info(&self) -> Result<embedded_svc::ipv4::IpInfo, Self::Error> {
+            self.get_ip_info().map(|v| v.into())
         }
     }
 }

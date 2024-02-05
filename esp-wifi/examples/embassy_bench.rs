@@ -11,9 +11,9 @@ mod examples_util;
 use examples_util::hal;
 
 use embassy_time::{with_timeout, Duration, Timer};
-use embedded_svc::wifi::{ClientConfiguration, Configuration, Wifi};
 use esp_backtrace as _;
 use esp_println::println;
+use esp_wifi::wifi::{ClientConfiguration, Configuration};
 use esp_wifi::wifi::{WifiApDevice, WifiController, WifiDevice, WifiEvent, WifiState};
 use esp_wifi::{initialize, EspWifiInitFor};
 use hal::clock::ClockControl;

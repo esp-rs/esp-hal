@@ -7,7 +7,7 @@
 #[cfg_attr(esp32s2, path = "os_adapter_esp32s2.rs")]
 pub(crate) mod os_adapter_chip_specific;
 
-use core::cell::RefCell;
+use core::{cell::RefCell, ptr::addr_of_mut};
 
 use critical_section::Mutex;
 use enumset::EnumSet;
@@ -171,9 +171,9 @@ pub unsafe extern "C" fn is_from_isr() -> bool {
 static mut FAKE_SPIN_LOCK: u8 = 1;
 pub unsafe extern "C" fn spin_lock_create() -> *mut crate::binary::c_types::c_void {
     // original: return (void *)1;
-    let ptr = &mut FAKE_SPIN_LOCK as *mut _ as *mut crate::binary::c_types::c_void;
+    let ptr = addr_of_mut!(FAKE_SPIN_LOCK);
     trace!("spin_lock_create {:?}", ptr);
-    ptr
+    ptr as *mut crate::binary::c_types::c_void
 }
 
 /****************************************************************************

@@ -1,16 +1,19 @@
 #![no_std]
+#![allow(async_fn_in_trait)]
 #![cfg_attr(target_arch = "xtensa", feature(asm_experimental_arch))]
 #![feature(c_variadic)]
 #![feature(linkage)]
 #![cfg_attr(feature = "async", allow(incomplete_features))]
 #![doc = include_str!("../README.md")]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
+#![allow(rustdoc::bare_urls)]
 
 // MUST be the first module
 mod fmt;
 
 use core::cell::RefCell;
 use core::mem::MaybeUninit;
+use core::ptr::addr_of_mut;
 
 use common_adapter::RADIO_CLOCKS;
 use critical_section::Mutex;
@@ -149,7 +152,7 @@ pub(crate) static HEAP: Mutex<RefCell<Heap>> = Mutex::new(RefCell::new(Heap::emp
 fn init_heap() {
     critical_section::with(|cs| {
         HEAP.borrow_ref_mut(cs)
-            .init_from_slice(unsafe { &mut HEAP_DATA })
+            .init_from_slice(unsafe { &mut *addr_of_mut!(HEAP_DATA) as &mut [MaybeUninit<u8>] })
     });
 }
 

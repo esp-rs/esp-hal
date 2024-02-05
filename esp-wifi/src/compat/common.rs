@@ -1,6 +1,10 @@
 #![allow(unused)]
 
-use core::{ffi::VaListImpl, fmt::Write, ptr::addr_of_mut};
+use core::{
+    ffi::VaListImpl,
+    fmt::Write,
+    ptr::{addr_of, addr_of_mut},
+};
 
 use super::queue::SimpleQueue;
 use crate::{
@@ -34,7 +38,7 @@ static mut MUTEXES: [Mutex; 10] = [Mutex {
 }; 10];
 static mut MUTEX_IDX_CURRENT: usize = 0;
 
-static mut FAKE_WIFI_QUEUE: &SimpleQueue<[u8; 8], 200> = unsafe { &REAL_WIFI_QUEUE };
+static mut FAKE_WIFI_QUEUE: *const SimpleQueue<[u8; 8], 200> = unsafe { addr_of!(REAL_WIFI_QUEUE) };
 static mut REAL_WIFI_QUEUE: SimpleQueue<[u8; 8], 200> = SimpleQueue::new(); // first there is a ptr to the real queue - driver checks it's not null
 
 pub unsafe fn str_from_c<'a>(s: *const u8) -> &'a str {

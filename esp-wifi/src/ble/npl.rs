@@ -1040,7 +1040,7 @@ pub(crate) fn ble_init() {
 
         ble_os_adapter_chip_specific::disable_sleep_mode();
 
-        let res = esp_register_npl_funcs(&G_NPL_FUNCS as *const npl_funcs_t);
+        let res = esp_register_npl_funcs(core::ptr::addr_of!(G_NPL_FUNCS));
         if res != 0 {
             panic!("esp_register_npl_funcs returned {}", res);
         }
@@ -1180,8 +1180,8 @@ fn os_msys_init() {
 
         let rc = r_mem_init_mbuf_pool(
             OS_MSYS_INIT_1_DATA as *const c_void,
-            &OS_MSYS_INIT_1_MEMPOOL,
-            &OS_MSYS_INIT_1_MBUF_POOL,
+            addr_of!(OS_MSYS_INIT_1_MEMPOOL),
+            addr_of!(OS_MSYS_INIT_1_MBUF_POOL),
             OS_MSYS_1_BLOCK_COUNT,
             SYSINIT_MSYS_1_MEMBLOCK_SIZE,
             MSYS1 as *const _ as *const u8,
@@ -1190,15 +1190,15 @@ fn os_msys_init() {
             panic!("r_mem_init_mbuf_pool failed");
         }
 
-        let rc = r_os_msys_register(&OS_MSYS_INIT_1_MBUF_POOL);
+        let rc = r_os_msys_register(addr_of!(OS_MSYS_INIT_1_MBUF_POOL));
         if rc != 0 {
             panic!("r_os_msys_register failed");
         }
 
         let rc = r_mem_init_mbuf_pool(
             OS_MSYS_INIT_2_DATA as *const c_void,
-            &OS_MSYS_INIT_2_MEMPOOL,
-            &OS_MSYS_INIT_2_MBUF_POOL,
+            addr_of!(OS_MSYS_INIT_2_MEMPOOL),
+            addr_of!(OS_MSYS_INIT_2_MBUF_POOL),
             OS_MSYS_2_BLOCK_COUNT,
             SYSINIT_MSYS_2_MEMBLOCK_SIZE,
             MSYS2 as *const _ as *const u8,
@@ -1207,7 +1207,7 @@ fn os_msys_init() {
             panic!("r_mem_init_mbuf_pool failed");
         }
 
-        let rc = r_os_msys_register(&OS_MSYS_INIT_2_MBUF_POOL);
+        let rc = r_os_msys_register(addr_of!(OS_MSYS_INIT_2_MBUF_POOL));
         if rc != 0 {
             panic!("r_os_msys_register failed");
         }

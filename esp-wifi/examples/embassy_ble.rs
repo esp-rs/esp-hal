@@ -75,6 +75,7 @@ async fn main(_spawner: Spawner) -> ! {
     println!("Connector created");
 
     let pin_ref = RefCell::new(button);
+    let pin_ref = &pin_ref;
 
     loop {
         println!("{:?}", ble.init().await);
@@ -137,9 +138,12 @@ async fn main(_spawner: Spawner) -> ! {
             ],
         },]);
 
-        let mut srv = AttributeServer::new(&mut ble, &mut gatt_attributes);
+        let mut rng = bleps::no_rng::NoRng;
+        let mut srv = AttributeServer::new(&mut ble, &mut gatt_attributes, &mut rng);
 
         let counter = RefCell::new(0u8);
+        let counter = &counter;
+
         let mut notifier = async || {
             // TODO how to check if notifications are enabled for the characteristic?
             // maybe pass something into the closure which just can query the characterisic value

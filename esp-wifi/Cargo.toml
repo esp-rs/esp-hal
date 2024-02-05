@@ -42,6 +42,7 @@ fugit.workspace = true
 heapless = { workspace = true, default-features = false }
 num-derive = { workspace = true }
 num-traits = { workspace = true, default-features = false }
+no-std-net = { workspace = true, optional = true }
 esp-wifi-sys = { version = "0.3.0", path = "../esp-wifi-sys" }
 embassy-sync = { workspace = true, optional = true }
 embassy-futures = { workspace = true, optional = true }
@@ -115,7 +116,8 @@ dump-packets = []
 smoltcp = [ "dep:smoltcp" ]
 utils = [ "smoltcp" ]
 enumset = []
-wifi = [ "dep:enumset", "dep:embedded-svc" ]
+wifi = [ "dep:enumset", "dep:no-std-net" ]
+embedded-svc = [ "dep:embedded-svc" ]
 ble = [ "esp32-hal?/bluetooth" ]
 phy-enable-usb = []
 ps-min-modem = []

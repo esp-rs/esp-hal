@@ -7,7 +7,7 @@ use embedded_io::ErrorType;
 #[cfg(feature = "tcp")]
 use embedded_io::{Read, Write};
 
-use embedded_svc::ipv4;
+use crate::wifi::ipv4;
 use smoltcp::iface::{Interface, SocketHandle, SocketSet};
 #[cfg(feature = "dhcpv4")]
 use smoltcp::socket::dhcpv4::Socket as Dhcpv4Socket;
@@ -517,22 +517,23 @@ pub fn timestamp() -> Instant {
     Instant::from_millis(current_millis() as i64)
 }
 
-impl<MODE: WifiDeviceMode> ipv4::Interface for WifiStack<'_, MODE> {
-    type Error = WifiStackError;
-
-    fn get_iface_configuration(&self) -> Result<ipv4::Configuration, Self::Error> {
+impl<MODE: WifiDeviceMode> WifiStack<'_, MODE> {
+    pub fn get_iface_configuration(&self) -> Result<ipv4::Configuration, WifiStackError> {
         Ok(self.network_config.borrow().clone())
     }
 
-    fn set_iface_configuration(&mut self, conf: &ipv4::Configuration) -> Result<(), Self::Error> {
+    pub fn set_iface_configuration(
+        &mut self,
+        conf: &ipv4::Configuration,
+    ) -> Result<(), WifiStackError> {
         self.update_iface_configuration(conf)
     }
 
-    fn is_iface_up(&self) -> bool {
+    pub fn is_iface_up(&self) -> bool {
         self.ip_info.borrow().is_some()
     }
 
-    fn get_ip_info(&self) -> Result<ipv4::IpInfo, Self::Error> {
+    pub fn get_ip_info(&self) -> Result<ipv4::IpInfo, WifiStackError> {
         self.ip_info.borrow().ok_or(WifiStackError::MissingIp)
     }
 }
