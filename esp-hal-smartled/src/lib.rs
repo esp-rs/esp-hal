@@ -2,11 +2,11 @@
 //! with RGB LEDs and use the convenience functions of the
 //! [`smart-leds`](https://crates.io/crates/smart-leds) crate.
 //!
-//! _This is a simple implementation where every LED is adressed in an
+//! This is a simple implementation where every LED is adressed in an
 //! individual RMT operation. This is working perfectly fine in blocking mode,
 //! but in case this is used in combination with interrupts that might disturb
 //! the sequential sending, an alternative implementation (addressing the LEDs
-//! in a sequence in a single RMT send operation) might be required!_
+//! in a sequence in a single RMT send operation) might be required!
 //!
 //! ## Example
 //!
@@ -17,10 +17,12 @@
 //! let rmt_buffer = smartLedBuffer!(1);
 //! let mut led = SmartLedsAdapter::new(rmt.channel0, io.pins.gpio2, rmt_buffer);
 //! ```
-
-#![no_std]
-#![deny(missing_docs)]
+//!
+//! ## Feature Flags
+#![doc = document_features::document_features!()]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
+#![deny(missing_docs)]
+#![no_std]
 
 use core::{fmt::Debug, slice::IterMut};
 
