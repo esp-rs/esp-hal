@@ -101,8 +101,8 @@ pub enum Peripheral {
     Ecc,
     #[cfg(soc_etm)]
     Etm,
-    #[cfg(trace)]
-    Trace,
+    #[cfg(trace0)]
+    Trace0,
     #[cfg(lcd_cam)]
     LcdCam,
 }
@@ -592,8 +592,8 @@ impl PeripheralClockControl {
                 system.etm_conf().modify(|_, w| w.etm_clk_en().set_bit());
                 system.etm_conf().modify(|_, w| w.etm_rst_en().clear_bit());
             }
-            #[cfg(trace)]
-            Peripheral::Trace => {
+            #[cfg(trace0)]
+            Peripheral::Trace0 => {
                 system
                     .trace_conf()
                     .modify(|_, w| w.trace_clk_en().set_bit());

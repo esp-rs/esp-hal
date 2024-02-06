@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - DMA descriptor count no longer needs to be multiplied by 3 (#1054)
 - RMT channels no longer take the channel number as a generic param (#959)
 - The `esp-hal-common` package is now called `esp-hal` (#1131)
+- Refactor the `Trace` driver to be generic around its peripheral (#1140)
 
 ### Removed
 

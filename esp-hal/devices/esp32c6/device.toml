@@ -59,7 +59,7 @@ peripherals = [
     "tee",
     "timg0",
     "timg1",
-    "trace",
+    "trace0",
     "twai0",
     "twai1",
     "uart0",

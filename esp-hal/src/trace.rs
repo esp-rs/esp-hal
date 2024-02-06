@@ -21,7 +21,7 @@
 //!
 //! ## Example
 //! ```no_run
-//! let mut trace = Trace::new(peripherals.TRACE);
+//! let mut trace = Trace::new(peripherals.TRACE0);
 //! let buffer = unsafe { &mut BUFFER[..] };
 //! trace.start_trace(buffer);
 //! // traced code
@@ -33,6 +33,7 @@
 
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
+    peripherals::trace::RegisterBlock,
     system::PeripheralClockControl,
 };
 
@@ -50,17 +51,20 @@ pub struct TraceResult {
 }
 
 /// TRACE Encoder Instance
-pub struct Trace<'d> {
-    peripheral: PeripheralRef<'d, crate::peripherals::TRACE>,
+pub struct Trace<'d, T> {
+    peripheral: PeripheralRef<'d, T>,
     buffer: Option<&'d mut [u8]>,
 }
 
-impl<'d> Trace<'d> {
+impl<'d, T> Trace<'d, T>
+where
+    T: Instance,
+{
     /// Construct a new instance
-    pub fn new(peripheral: impl Peripheral<P = crate::peripherals::TRACE> + 'd) -> Self {
+    pub fn new(peripheral: impl Peripheral<P = T> + 'd) -> Self {
         crate::into_ref!(peripheral);
 
-        PeripheralClockControl::enable(crate::system::Peripheral::Trace);
+        PeripheralClockControl::enable(crate::system::Peripheral::Trace0);
 
         Self {
             peripheral,
@@ -70,29 +74,31 @@ impl<'d> Trace<'d> {
 
     /// Start tracing, writing data into the `buffer`
     pub fn start_trace(&mut self, buffer: &'d mut [u8]) {
-        self.peripheral.mem_start_addr().modify(|_, w| {
-            w.mem_staet_addr()
+        let reg_block = self.peripheral.register_block();
+
+        reg_block.mem_start_addr().modify(|_, w| {
+            w.mem_start_addr()
                 .variant(buffer.as_ptr() as *const _ as u32)
         });
-        self.peripheral.mem_end_addr().modify(|_, w| {
+        reg_block.mem_end_addr().modify(|_, w| {
             w.mem_end_addr()
                 .variant((buffer.as_ptr() as *const _ as u32) + (buffer.len() as u32))
         });
-        self.peripheral
+        reg_block
             .mem_addr_update()
             .write(|w| w.mem_current_addr_update().set_bit());
 
         // won't set bit in int-raw without enabling
-        self.peripheral
+        reg_block
             .intr_ena()
             .modify(|_, w| w.mem_full_intr_ena().set_bit());
 
         // for now always use looping mode
-        self.peripheral
+        reg_block
             .trigger()
             .write(|w| w.mem_loop().set_bit().restart_ena().set_bit());
 
-        self.peripheral.intr_clr().write(|w| {
+        reg_block.intr_clr().write(|w| {
             w.fifo_overflow_intr_clr()
                 .set_bit()
                 .mem_full_intr_clr()
@@ -100,7 +106,7 @@ impl<'d> Trace<'d> {
         });
 
         self.buffer.replace(buffer);
-        self.peripheral.trigger().write(|w| w.on().set_bit());
+        reg_block.trigger().write(|w| w.on().set_bit());
     }
 
     /// Stop tracing
@@ -108,7 +114,9 @@ impl<'d> Trace<'d> {
     /// Be aware that valid data might not start at index 0 and you need to
     /// account for wrapping when reading the data.
     pub fn stop_trace(&mut self) -> Result<TraceResult, Error> {
-        self.peripheral
+        let reg_block = self.peripheral.register_block();
+
+        reg_block
             .trigger()
             .write(|w| w.off().set_bit().restart_ena().clear_bit());
 
@@ -118,21 +126,11 @@ impl<'d> Trace<'d> {
 
         let buffer = self.buffer.take().unwrap();
 
-        loop {
-            if self
-                .peripheral
-                .fifo_status()
-                .read()
-                .fifo_empty()
-                .bit_is_set()
-            {
-                break;
-            }
-        }
+        while !reg_block.fifo_status().read().fifo_empty().bit_is_set() {}
 
-        let overflow = self.peripheral.intr_raw().read().mem_full_intr_raw().bit();
+        let overflow = reg_block.intr_raw().read().mem_full_intr_raw().bit();
         let idx = if overflow {
-            self.peripheral
+            reg_block
                 .mem_current_addr()
                 .read()
                 .mem_current_addr()
@@ -145,7 +143,7 @@ impl<'d> Trace<'d> {
         let len = if overflow {
             buffer.len()
         } else {
-            self.peripheral
+            reg_block
                 .mem_current_addr()
                 .read()
                 .mem_current_addr()
@@ -197,5 +195,15 @@ impl<'d> Trace<'d> {
             valid_start_index: start_index,
             valid_length: len,
         })
+    }
+}
+
+pub trait Instance {
+    fn register_block(&self) -> &RegisterBlock;
+}
+
+impl Instance for crate::peripherals::TRACE0 {
+    fn register_block(&self) -> &RegisterBlock {
+        self
     }
 }
