@@ -111,14 +111,20 @@ impl Clock for CpuClock {
         match self {
             #[cfg(not(any(esp32h2, esp32p4)))]
             CpuClock::Clock80MHz => HertzU32::MHz(80),
+            #[cfg(esp32p4)]
+            CpuClock::Clock90MHz => HertzU32::MHz(90),
             #[cfg(esp32h2)]
             CpuClock::Clock96MHz => HertzU32::MHz(96),
             #[cfg(esp32c2)]
             CpuClock::Clock120MHz => HertzU32::MHz(120),
             #[cfg(not(any(esp32c2, esp32h2, esp32p4)))]
             CpuClock::Clock160MHz => HertzU32::MHz(160),
+            #[cfg(esp32p4)]
+            CpuClock::Clock180MHz => HertzU32::MHz(180),
             #[cfg(xtensa)]
             CpuClock::Clock240MHz => HertzU32::MHz(240),
+            #[cfg(esp32p4)]
+            CpuClock::Clock360MHz => HertzU32::MHz(360),
             #[cfg(esp32p4)]
             CpuClock::Clock400MHz => HertzU32::MHz(400),
         }
@@ -207,6 +213,8 @@ impl Clock for PllClock {
             Self::Pll240MHz => HertzU32::MHz(240),
             #[cfg(not(any(esp32c2, esp32c6, esp32h2, esp32p4)))]
             Self::Pll320MHz => HertzU32::MHz(320),
+            #[cfg(esp32p4)]
+            Self::Pll360MHz => HertzU32::MHz(360),
             #[cfg(esp32p4)]
             Self::Pll400MHz => HertzU32::MHz(400),
             #[cfg(not(esp32h2))]
@@ -678,10 +686,10 @@ impl<'d> ClockControl<'d> {
             clocks_ll::esp32p4_rtc_update_to_xtal(xtal_freq, 1, true);
             // clocks_ll::esp32p4_rtc_apb_freq_update(apb_freq);
         } else {
-            // apb_freq = ApbClock::ApbFreq100MHz;
+            apb_freq = ApbClock::ApbFreq100MHz;
             clocks_ll::esp32p4_rtc_cpll_enable();
             // Calibrate CPLL freq to a new value requires to switch CPU clock source to XTAL first
-            clocks_ll::esp32h2_rtc_update_to_xtal(xtal_freq, 1, false);
+            clocks_ll::esp32p4_rtc_update_to_xtal(xtal_freq, 1, false);
             clocks_ll::esp32p4_rtc_cpll_configure(xtal_freq, pll_freq);
             clocks_ll::esp32p4_rtc_freq_to_cpll_mhz(cpu_clock_speed); // rtc_clk_cpu_freq_mhz_to_config blocking
                                                                       // clocks_ll::esp32p4_rtc_apb_freq_update(apb_freq);

@@ -1,4 +1,4 @@
-use crate::clock::{PllClock, XtalClock};
+use crate::clock::{Clock, CpuClock, PllClock, XtalClock};
 
 extern "C" {
     fn ets_update_cpu_frequency(ticks_per_us: u32);
@@ -47,7 +47,7 @@ const REGI2C_RTC_BUSY: u32 = 1 << 25;
 
 const I2C_ANA_MST_I2C0_CTRL_REG: u32 = DR_REG_I2C_ANA_MST_BASE + 0x0;
 
-const DR_REG_PMU_BASE: u32 = DR_REG_LPAON_BASE = 0x5000;
+const DR_REG_PMU_BASE: u32 = DR_REG_LPAON_BASE + 0x5000;
 const PMU_IMM_HP_CK_POWER: u32 = DR_REG_PMU_BASE + 0xcc;
 const PMU_TIE_HIGH_XPD_CPLL: u32 = 1 << 27;
 const PMU_TIE_HIGH_XPD_CPLL_I2C: u32 = 1 << 23;
@@ -79,51 +79,56 @@ const REGI2C_PLLA_MST_SEL: u32 = 1 << 8;
 const REGI2C_SAR_I2C_MST_SEL: u32 = 1 << 7;
 
 const RTC_XTAL_FREQ_REG: u32 = DR_REG_LP_SYS_BASE + 0x3c;
-const RTC_DISABLE_ROM_LOG: u32 = ((1 << 0) | (1 << 16));
+const RTC_DISABLE_ROM_LOG: u32 = (1 << 0) | (1 << 16);
 
 // rtc_clk.c (L125) -> clk_tree_ll.h
 pub(crate) fn esp32p4_rtc_cpll_enable() {
-    (PMU_IMM_HP_CK_POWER as *mut u32).write_volatile(
-        (PMU_IMM_HP_CK_POWER as *mut u32).read_volatile()
-            | (PMU_TIE_HIGH_XPD_CPLL | PMU_TIE_HIGH_XPD_CPLL_I2C),
-    );
+    unsafe {
+        (PMU_IMM_HP_CK_POWER as *mut u32).write_volatile(
+            (PMU_IMM_HP_CK_POWER as *mut u32).read_volatile()
+                | (PMU_TIE_HIGH_XPD_CPLL | PMU_TIE_HIGH_XPD_CPLL_I2C),
+        );
 
-    (PMU_IMM_HP_CK_POWER as *mut u32).write_volatile(
-        (PMU_IMM_HP_CK_POWER as *mut u32).read_volatile() | PMU_TIE_HIGH_GLOBAL_CPLL_ICG,
-    )
+        (PMU_IMM_HP_CK_POWER as *mut u32).write_volatile(
+            (PMU_IMM_HP_CK_POWER as *mut u32).read_volatile() | PMU_TIE_HIGH_GLOBAL_CPLL_ICG,
+        )
+    }
 }
 
 // rtc_clk.c (L136)
-pub(crate) fn esp32p4_rtc_cpll_configure(_xtal_freq: XtalClock, _cpll_freq: PllClock) {
+pub(crate) fn esp32p4_rtc_cpll_configure(xtal_freq: XtalClock, cpll_freq: PllClock) {
     // CPLL CALIBRATION START
-    (HP_SYS_CLKRST_ANA_PLL_CTRL0 as *mut u32).write_volatile(
-        (HP_SYS_CLKRST_ANA_PLL_CTRL0 as *mut u32).read_volatile()
-            | !HP_SYS_CLKRST_REG_CPU_PLL_CAL_STOP,
-    );
+    unsafe {
+        (HP_SYS_CLKRST_ANA_PLL_CTRL0 as *mut u32).write_volatile(
+            (HP_SYS_CLKRST_ANA_PLL_CTRL0 as *mut u32).read_volatile()
+                | !HP_SYS_CLKRST_REG_CPU_PLL_CAL_STOP,
+        );
+    }
 
     // Set configuration
-    let oc_div_ref = 0u32;
-    let div = 1u32;
+    let mut oc_div_ref = 0u32;
+    let mut div = 1u32;
     let dcur = 3u32;
     let dchgp = 5u32;
     let enb_fcal = 0u32;
 
     // Currently only supporting 40MHz XTAL
-    assert!(xtal_freq == XtalClock::RtcXtalFreq40M);
+    assert!(xtal_freq.mhz() == XtalClock::RtcXtalFreq40M.mhz());
 
     match cpll_freq {
         PllClock::Pll400MHz => {
             div = 6u32;
-            dif_ref = 0u32;
+            oc_div_ref = 0u32;
         }
         PllClock::Pll360MHz => {
             div = 5u32;
-            div_ref = 0u32;
+            oc_div_ref = 0u32;
         }
+        _ => (),
     }
 
     let i2c_cpll_lref =
-        (oc_enb_fcal << I2C_CPLL_OC_ENB_FCAL_LSB) | (dchgp << I2C_CPLL_OC_DCHGP_LSB) | (dif_ref);
+        (enb_fcal << I2C_CPLL_OC_ENB_FCAL_LSB) | (dchgp << I2C_CPLL_OC_DCHGP_LSB) | (oc_div_ref);
 
     let i2c_cpll_dcur = (1 << I2C_CPLL_OC_DLREF_SEL_LSB) | (3 << I2C_CPLL_OC_DHREF_SEL_LSB) | dcur;
 
@@ -131,18 +136,24 @@ pub(crate) fn esp32p4_rtc_cpll_configure(_xtal_freq: XtalClock, _cpll_freq: PllC
         I2C_CPLL,
         I2C_CPLL_HOSTID,
         I2C_CPLL_OC_REF_DIV,
-        i2c_cpll_lref,
+        i2c_cpll_lref as u8,
     );
 
-    regi2c_write(I2C_CPLL, I2C_CPLL_HOSTID, I2C_CPLL_OC_DIV_7_0, div);
+    regi2c_write(I2C_CPLL, I2C_CPLL_HOSTID, I2C_CPLL_OC_DIV_7_0, div as u8);
 
-    regi2c_write(I2C_CPLL, I2C_CPLL_HOSTID, I2C_CPLL_OC_DCUR, i2c_cpll_dcur);
+    regi2c_write(
+        I2C_CPLL,
+        I2C_CPLL_HOSTID,
+        I2C_CPLL_OC_DCUR,
+        i2c_cpll_dcur as u8,
+    );
 
     // Wait calibration done
     while !reg_get_bit(
         HP_SYS_CLKRST_ANA_PLL_CTRL0,
         HP_SYS_CLKRST_REG_CPU_PLL_CAL_END,
-    ) {}
+    ) == 1
+    {}
 
     // TODO requires sleep
 
@@ -154,9 +165,9 @@ pub(crate) fn esp32p4_rtc_cpll_configure(_xtal_freq: XtalClock, _cpll_freq: PllC
 }
 
 // rtc_clk.c (L161)
-fn esp32p4_rtc_update_to_xtal(freq: XtalClock, _div: u8, default: bool) {
-    let mem_divider = 1u32;
-    let sys_divider = 1u32;
+pub(crate) fn esp32p4_rtc_update_to_xtal(freq: XtalClock, div: u8, default: bool) {
+    let mut mem_divider = 1u32;
+    let mut sys_divider = 1u32;
     let apb_divider = 1u32;
 
     if default {
@@ -167,49 +178,49 @@ fn esp32p4_rtc_update_to_xtal(freq: XtalClock, _div: u8, default: bool) {
     //clk_ll_cpu_set_src(SOC_CPU_CLK_SRC_XTAL -> 0)
     unsafe {
         (&*crate::soc::peripherals::LP_AON_CLKRST::PTR)
-            .lp_aonclkrst_hp_clk_ctrl
+            .lp_aonclkrst_hp_clk_ctrl()
             .modify(|_, w| w.lp_aonclkrst_hp_root_clk_src_sel().bits(0b00))
     }
 
     // clk_ll_cpu_set_divider(div, 0, 0) -> clk_tree_ll.h(comp/hal/p4/include/hal/L407)
-    assert(div >= 1 && div < HP_SYS_CLKRST_REG_CPU_CLK_DIV_NUM_V);
+    assert!(div >= 1 && (div as u32) < HP_SYS_CLKRST_REG_CPU_CLK_DIV_NUM_V);
 
     // Set CPU divider
     unsafe {
         (&*crate::soc::peripherals::HP_SYS_CLKRST::PTR)
-            .root_clk_ctrl0
+            .root_clk_ctrl0()
             .modify(|_, w| w.reg_cpu_clk_div_num().bits(div - 1));
 
         (&*crate::soc::peripherals::HP_SYS_CLKRST::PTR)
-            .root_clk_ctrl0
+            .root_clk_ctrl0()
             .modify(|_, w| w.reg_cpu_clk_div_numerator().bits(0));
 
         (&*crate::soc::peripherals::HP_SYS_CLKRST::PTR)
-            .root_clk_ctrl0
+            .root_clk_ctrl0()
             .modify(|_, w| w.reg_cpu_clk_div_denominator().bits(0));
 
         // Set memory divider
         (&*crate::soc::peripherals::HP_SYS_CLKRST::PTR)
-            .root_clk_ctrl1
-            .modify(|_, w| w.reg_mem_clk_div_num().bits(mem_divider - 1));
+            .root_clk_ctrl1()
+            .modify(|_, w| w.reg_mem_clk_div_num().bits((mem_divider - 1) as u8));
 
         // Set system divider
         (&*crate::soc::peripherals::HP_SYS_CLKRST::PTR)
-            .root_clk_ctrl1
-            .modify(|_, w| w.reg_sys_clk_div_num().bits(sys_divider - 1));
+            .root_clk_ctrl1()
+            .modify(|_, w| w.reg_sys_clk_div_num().bits((sys_divider - 1) as u8));
 
         // Set APB divider
         (&*crate::soc::peripherals::HP_SYS_CLKRST::PTR)
-            .root_clk_ctrl1
-            .modify(|_, w| w.reg_apb_clk_div_num().bits(apb_divider - 1));
+            .root_clk_ctrl2()
+            .modify(|_, w| w.reg_apb_clk_div_num().bits((apb_divider - 1) as u8));
 
         // Bus update
         (&*crate::soc::peripherals::HP_SYS_CLKRST::PTR)
-            .root_clk_ctrl0
+            .root_clk_ctrl0()
             .modify(|_, w| w.reg_soc_clk_div_update().set_bit());
 
         while (&*crate::soc::peripherals::HP_SYS_CLKRST::PTR)
-            .root_clk_ctrl0
+            .root_clk_ctrl0()
             .read()
             .reg_soc_clk_div_update()
             .bit_is_set()
@@ -267,7 +278,7 @@ fn regi2c_enable_block(block: u8) {
     }
 }
 
-fn esp32p4_rtc_freq_to_cpll_mhz(cpu_clock_speed: CpuClock) {
+pub(crate) fn esp32p4_rtc_freq_to_cpll_mhz(cpu_clock_speed: CpuClock) {
     // CPLL -> CPU_CLK -> MEM_CLK -> SYS_CLK -> APB_CLK
     // Constraint: MEM_CLK <= 200MHz, APB_CLK <= 100MHz
     // This implies that when clock source is CPLL,
@@ -282,35 +293,35 @@ fn esp32p4_rtc_freq_to_cpll_mhz(cpu_clock_speed: CpuClock) {
 
     // rtc_clk_xtal_freq_get() -> xtal_load_freq_mhz()
     let xtal_freq_reg = unsafe { (RTC_XTAL_FREQ_REG as *mut u32).read_volatile() as u32 };
-    let xtal_freq = 0u32;
+    let mut xtal_freq = 0u32;
 
-    let real_freq = 0u32;
+    let mut real_freq = 0u32;
 
-    let div_integer = 0u32;
+    let mut div_integer = 0u32;
     let div_denominator = 0u32;
-    let div_numerator = 0u32;
+    let mut div_numerator = 0u32;
 
-    if ((xtal_freq_reg & 0xFFFF) == ((xtal_freq_reg >> 16) & 0xFFFF)
+    if (xtal_freq_reg & 0xFFFF) == ((xtal_freq_reg >> 16) & 0xFFFF)
         && xtal_freq_reg != 0
-        && xtal_freq_reg != u32::MAX)
+        && xtal_freq_reg != u32::MAX
     {
-        xtal_freq = xtal_freq_reg & !RTC_DISABLE_ROM_LOG & u16::MAX;
+        xtal_freq = xtal_freq_reg & !RTC_DISABLE_ROM_LOG & u16::MAX as u32;
     }
 
     // Keep default CPLL at 360 MHz
-    if cpu_clock_speed <= xtal_freq && cpu_clock_speed != 0 {
-        div_integer = xtal_freq / cpu_divider;
+    if cpu_clock_speed.mhz() <= xtal_freq {
+        div_integer = xtal_freq / cpu_clock_speed.mhz();
         real_freq = (xtal_freq + div_integer / 2) / div_integer; // round
 
         // Check whether divider is suitable
-        assert!(real_freq == freq_mhz);
+        assert!(real_freq == cpu_clock_speed.mhz());
     } else {
         div_integer = 1;
     }
 
-    let mem_div = 0u32;
-    let sys_div = 0u32;
-    let apb_div = 0u32;
+    let mut mem_div = 0u32;
+    let mut sys_div = 0u32;
+    let mut apb_div = 0u32;
 
     match cpu_clock_speed {
         CpuClock::Clock360MHz => {
@@ -322,7 +333,7 @@ fn esp32p4_rtc_freq_to_cpll_mhz(cpu_clock_speed: CpuClock) {
             apb_div = 2;
         }
         CpuClock::Clock90MHz => {
-            mem_divider = 1;
+            mem_div = 1;
             apb_div = 1;
         }
         _ => {
@@ -333,42 +344,42 @@ fn esp32p4_rtc_freq_to_cpll_mhz(cpu_clock_speed: CpuClock) {
     // clk_ll_cpu_set_src(SOC_CPU_CLK_SRC_PLL); (rtc_clk.c L242)
     unsafe {
         (&*crate::soc::peripherals::LP_AON_CLKRST::PTR)
-            .lp_aonclkrst_hp_clk_ctrl
+            .lp_aonclkrst_hp_clk_ctrl()
             .modify(|_, w| w.lp_aonclkrst_hp_root_clk_src_sel().bits(0b01));
 
         (&*crate::soc::peripherals::HP_SYS_CLKRST::PTR)
-            .root_clk_ctrl0
-            .modify(|_, w| w.reg_cpu_clk_div_num().bits(div - 1));
+            .root_clk_ctrl0()
+            .modify(|_, w| w.reg_cpu_clk_div_num().bits((div_integer - 1) as u8));
 
         (&*crate::soc::peripherals::HP_SYS_CLKRST::PTR)
-            .root_clk_ctrl0
+            .root_clk_ctrl0()
             .modify(|_, w| w.reg_cpu_clk_div_numerator().bits(0));
 
         (&*crate::soc::peripherals::HP_SYS_CLKRST::PTR)
-            .root_clk_ctrl0
+            .root_clk_ctrl0()
             .modify(|_, w| w.reg_cpu_clk_div_denominator().bits(0));
 
         // Set memory divider
         (&*crate::soc::peripherals::HP_SYS_CLKRST::PTR)
-            .root_clk_ctrl1
-            .modify(|_, w| w.reg_mem_clk_div_num().bits(mem_divider - 1));
+            .root_clk_ctrl1()
+            .modify(|_, w| w.reg_mem_clk_div_num().bits((mem_div - 1) as u8));
 
         // Set system divider
         (&*crate::soc::peripherals::HP_SYS_CLKRST::PTR)
-            .root_clk_ctrl1
-            .modify(|_, w| w.reg_sys_clk_div_num().bits(sys_divider - 1));
+            .root_clk_ctrl1()
+            .modify(|_, w| w.reg_sys_clk_div_num().bits((sys_div - 1) as u8));
 
         // Set APB divider
         (&*crate::soc::peripherals::HP_SYS_CLKRST::PTR)
-            .root_clk_ctrl1
-            .modify(|_, w| w.reg_apb_clk_div_num().bits(apb_divider - 1));
+            .root_clk_ctrl2()
+            .modify(|_, w| w.reg_apb_clk_div_num().bits((apb_div - 1) as u8));
 
         // Bus update
         (&*crate::soc::peripherals::HP_SYS_CLKRST::PTR)
-            .root_clk_ctrl0
+            .root_clk_ctrl0()
             .modify(|_, w| w.reg_soc_clk_div_update().set_bit());
 
-        ets_update_cpu_frequency(cpu_clock_speed);
+        ets_update_cpu_frequency(cpu_clock_speed.mhz());
     }
 }
 
@@ -409,23 +420,35 @@ pub(crate) fn regi2c_write(block: u8, _host_id: u8, reg_add: u8, data: u8) {
     | ((reg_add as u32 & REGI2C_RTC_ADDR_V as u32) << REGI2C_RTC_ADDR_S as u32)
     | ((0x1 & REGI2C_RTC_WR_CNTL_V as u32) << REGI2C_RTC_WR_CNTL_S as u32) // 0: READ I2C register; 1: Write I2C register;
     | (((data as u32) & REGI2C_RTC_DATA_V as u32) << REGI2C_RTC_DATA_S as u32);
-    reg_write(LP_I2C_ANA_MST_I2C0_CTRL_REG, temp);
+    reg_write(I2C_ANA_MST_I2C0_CTRL_REG, temp);
     while reg_get_bit(I2C_ANA_MST_I2C0_CTRL_REG, REGI2C_RTC_BUSY) != 0 {}
 
     regi2c_disable_block(block);
 }
 
 fn reg_set_field(reg: u32, field_v: u32, field_s: u32, value: u32) {
-    (reg as *mut u32).write_volatile(
-        ((reg as *mut u32).read_volatile() & !(field_v << field_s))
-            | ((value & field_v) << field_s),
-    )
+    unsafe {
+        (reg as *mut u32).write_volatile(
+            ((reg as *mut u32).read_volatile() & !(field_v << field_s))
+                | ((value & field_v) << field_s),
+        )
+    }
 }
 
 fn reg_set_bit(reg: u32, bit: u32) {
     unsafe {
         (reg as *mut u32).write_volatile((reg as *mut u32).read_volatile() | bit);
     }
+}
+
+fn reg_write(reg: u32, v: u32) {
+    unsafe {
+        (reg as *mut u32).write_volatile(v);
+    }
+}
+
+fn reg_get_bit(reg: u32, b: u32) -> u32 {
+    unsafe { (reg as *mut u32).read_volatile() & b }
 }
 
 fn reg_clr_bit(reg: u32, bit: u32) {
