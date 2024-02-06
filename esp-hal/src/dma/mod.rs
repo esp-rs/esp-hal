@@ -995,7 +995,9 @@ where
                 }
             } else {
                 unsafe {
-                    while !(*ptr).next.is_null() {
+                    while !((*ptr).next.is_null()
+                        || (*ptr).next == self.descriptors as *mut _ as *mut DmaDescriptor)
+                    {
                         let dw0 = ptr.read_volatile();
                         self.available += dw0.len();
                         ptr = ptr.offset(1);
