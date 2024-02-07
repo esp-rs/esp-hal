@@ -27,10 +27,10 @@ fn main() -> ! {
     let led3 = io.pins.gpio5.into_push_pull_output();
 
     // Set GPIO9 as an input.
-    let button = io.pins.gpio9.into_pull_down_input().degrade();
+    let button = io.pins.gpio9.into_pull_down_input().into();
 
     // You can use `into` or `degrade`
-    let mut pins = [led1.into(), led2.into(), led3.degrade()];
+    let mut pins = [led1.into(), led2.into(), led3.degrade().into()];
 
     // Initialize the Delay peripheral, and use it to toggle the LED state in a
     // loop.
