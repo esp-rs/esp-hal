@@ -175,14 +175,15 @@ pub(crate) fn esp32p4_rtc_update_to_xtal(freq: XtalClock, div: u8, default: bool
         sys_divider = 2u32;
     }
 
-    //clk_ll_cpu_set_src(SOC_CPU_CLK_SRC_XTAL -> 0)
+    // clk_ll_cpu_set_src(SOC_CPU_CLK_SRC_XTAL -> 0)
     unsafe {
         (&*crate::soc::peripherals::LP_AON_CLKRST::PTR)
             .lp_aonclkrst_hp_clk_ctrl()
             .modify(|_, w| w.lp_aonclkrst_hp_root_clk_src_sel().bits(0b00))
     }
 
-    // clk_ll_cpu_set_divider(div, 0, 0) -> clk_tree_ll.h(comp/hal/p4/include/hal/L407)
+    // clk_ll_cpu_set_divider(div, 0, 0) ->
+    // clk_tree_ll.h(comp/hal/p4/include/hal/L407)
     assert!(div >= 1 && (div as u32) < HP_SYS_CLKRST_REG_CPU_CLK_DIV_NUM_V);
 
     // Set CPU divider
@@ -282,14 +283,14 @@ pub(crate) fn esp32p4_rtc_freq_to_cpll_mhz(cpu_clock_speed: CpuClock) {
     // CPLL -> CPU_CLK -> MEM_CLK -> SYS_CLK -> APB_CLK
     // Constraint: MEM_CLK <= 200MHz, APB_CLK <= 100MHz
     // This implies that when clock source is CPLL,
-    //                   If cpu_divider < 2, mem_divider must be larger or equal to 2
-    //                   If cpu_divider < 2, mem_divider = 2, sys_divider < 2, apb_divider must be larger or equal to 2
-    // Current available configurations:
-    // 360  -   360   -    180    -    180   -    90
+    //                   If cpu_divider < 2, mem_divider must be larger or equal to
+    // 2                   If cpu_divider < 2, mem_divider = 2, sys_divider < 2,
+    // apb_divider must be larger or equal to 2 Current available
+    // configurations: 360  -   360   -    180    -    180   -    90
     // 360  -   180   -    180    -    180   -    90
     // 360  -   90    -    90     -    90    -    90
 
-    //freq_mhz_to_config part (rtc_clk.c L251)
+    // freq_mhz_to_config part (rtc_clk.c L251)
 
     // rtc_clk_xtal_freq_get() -> xtal_load_freq_mhz()
     let xtal_freq_reg = unsafe { (RTC_XTAL_FREQ_REG as *mut u32).read_volatile() as u32 };

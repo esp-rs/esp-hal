@@ -684,15 +684,14 @@ impl<'d> ClockControl<'d> {
         if cpu_clock_speed.mhz() <= xtal_freq.mhz() {
             apb_freq = ApbClock::ApbFreqOther(cpu_clock_speed.mhz());
             clocks_ll::esp32p4_rtc_update_to_xtal(xtal_freq, 1, true);
-            // clocks_ll::esp32p4_rtc_apb_freq_update(apb_freq);
         } else {
             apb_freq = ApbClock::ApbFreq100MHz;
             clocks_ll::esp32p4_rtc_cpll_enable();
-            // Calibrate CPLL freq to a new value requires to switch CPU clock source to XTAL first
+            // Calibrate CPLL freq to a new value requires to switch CPU clock source to
+            // XTAL first
             clocks_ll::esp32p4_rtc_update_to_xtal(xtal_freq, 1, false);
             clocks_ll::esp32p4_rtc_cpll_configure(xtal_freq, pll_freq);
-            clocks_ll::esp32p4_rtc_freq_to_cpll_mhz(cpu_clock_speed); // rtc_clk_cpu_freq_mhz_to_config blocking
-                                                                      // clocks_ll::esp32p4_rtc_apb_freq_update(apb_freq);
+            clocks_ll::esp32p4_rtc_freq_to_cpll_mhz(cpu_clock_speed);
         }
 
         ClockControl {

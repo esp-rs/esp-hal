@@ -10,12 +10,8 @@ use esp_backtrace as _;
 fn main() -> ! {
     let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let clocks = ClockControl::configure(system.clock_control, CpuClock::Clock360MHz).freeze();
 
-    let mut delay = Delay::new(&clocks);
-
-    loop {
-        esp_println::println!("Hello, world!");
-        delay.delay_ms(1000 as u32);
-    }
+    esp_println::println!("Hello, world!");
+    loop {}
 }
