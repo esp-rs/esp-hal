@@ -91,6 +91,10 @@ pub enum Peripheral {
     Uart1,
     #[cfg(uart2)]
     Uart2,
+    #[cfg(uart3)]
+    Uart3,
+    #[cfg(uart4)]
+    Uart4,
     #[cfg(rsa)]
     Rsa,
     #[cfg(parl_io)]
@@ -608,7 +612,67 @@ impl PeripheralClockControl {
 #[cfg(esp32p4)]
 impl PeripheralClockControl {
     /// Enables and resets the given peripheral
-    pub(crate) fn enable(_peripheral: Peripheral) {}
+    pub(crate) fn enable(peripheral: Peripheral) {
+        let hp_sys_clkrst = unsafe { &*crate::peripherals::HP_SYS_CLKRST::PTR };
+
+        match peripheral {
+            Peripheral::Uart0 => {
+                hp_sys_clkrst
+                    .peri_clk_ctrl110()
+                    .modify(|_, w| w.uart0_clk_en().set_bit());
+                hp_sys_clkrst.hp_rst_en1().modify(|_, w| {
+                    w.rst_en_uart0_apb()
+                        .clear_bit()
+                        .rst_en_uart0_core()
+                        .clear_bit()
+                });
+            }
+            Peripheral::Uart1 => {
+                hp_sys_clkrst
+                    .peri_clk_ctrl111()
+                    .modify(|_, w| w.uart1_clk_en().set_bit());
+                hp_sys_clkrst.hp_rst_en1().modify(|_, w| {
+                    w.rst_en_uart1_apb()
+                        .clear_bit()
+                        .rst_en_uart1_core()
+                        .clear_bit()
+                });
+            }
+            Peripheral::Uart2 => {
+                hp_sys_clkrst
+                    .peri_clk_ctrl112()
+                    .modify(|_, w| w.uart2_clk_en().set_bit());
+                hp_sys_clkrst.hp_rst_en1().modify(|_, w| {
+                    w.rst_en_uart2_apb()
+                        .clear_bit()
+                        .rst_en_uart2_core()
+                        .clear_bit()
+                });
+            }
+            Peripheral::Uart3 => {
+                hp_sys_clkrst
+                    .peri_clk_ctrl113()
+                    .modify(|_, w| w.uart3_clk_en().set_bit());
+                hp_sys_clkrst.hp_rst_en1().modify(|_, w| {
+                    w.rst_en_uart3_apb()
+                        .clear_bit()
+                        .rst_en_uart3_core()
+                        .clear_bit()
+                });
+            }
+            Peripheral::Uart4 => {
+                hp_sys_clkrst
+                    .peri_clk_ctrl114()
+                    .modify(|_, w| w.uart4_clk_en().set_bit());
+                hp_sys_clkrst.hp_rst_en1().modify(|_, w| {
+                    w.rst_en_uart4_apb()
+                        .clear_bit()
+                        .rst_en_uart4_core()
+                        .clear_bit()
+                });
+            }
+        }
+    }
 }
 
 /// Controls the configuration of the chip's clocks.

@@ -73,7 +73,7 @@ pub use self::soc::psram;
 pub use self::soc::ulp_core;
 #[cfg(any(timg0, timg1))]
 pub use self::timer::Timer;
-#[cfg(any(uart0, uart1, uart2))]
+#[cfg(any(uart0, uart1, uart2, uart3, uart4))]
 pub use self::uart::{Uart, UartRx, UartTx};
 #[cfg(usb_device)]
 pub use self::usb_serial_jtag::UsbSerialJtag;
@@ -140,7 +140,7 @@ pub mod rtc_cntl;
 pub mod sha;
 #[cfg(any(spi0, spi1, spi2, spi3))]
 pub mod spi;
-#[cfg(any(dport, hp_sys, pcr, system))]
+#[cfg(any(dport, hp_sys, hp_sys_clkrst, pcr, system))]
 pub mod system;
 #[cfg(systimer)]
 pub mod systimer;
@@ -150,7 +150,7 @@ pub mod timer;
 pub mod trace;
 #[cfg(any(twai0, twai1))]
 pub mod twai;
-#[cfg(any(uart0, uart1, uart2))]
+#[cfg(any(uart0, uart1, uart2, uart3, uart4))]
 pub mod uart;
 #[cfg(usb_device)]
 pub mod usb_serial_jtag;

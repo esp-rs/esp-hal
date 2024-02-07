@@ -87,20 +87,20 @@ pub enum InputSignal {
     SD_CARD_CDATA5_2_PAD    = 7,
     SD_CARD_CDATA6_2_PAD    = 8,
     SD_CARD_CDATA7_2_PAD    = 9,
-    UART0_RXD_PAD           = 10,
-    UART0_CTS_PAD           = 11,
-    UART0_DSR_PAD           = 12,
-    UART1_RXD_PAD           = 13,
-    UART1_CTS_PAD           = 14,
-    UART1_DSR_PAD           = 15,
-    UART2_RXD_PAD           = 16,
-    UART2_CTS_PAD           = 17,
-    UART2_DSR_PAD           = 18,
-    UART3_RXD_PAD           = 19,
-    UART3_CTS_PAD           = 20,
-    UART3_DSR_PAD           = 21,
-    UART4_RXD_PAD           = 22,
-    UART4_CTS_PAD           = 23,
+    U0RXD                   = 10,
+    U0CTS                   = 11,
+    U0DSR                   = 12,
+    U1RXD                   = 13,
+    U1CTS                   = 14,
+    U1DSR                   = 15,
+    U2RXD                   = 16,
+    U2CTS                   = 17,
+    U2DSR                   = 18,
+    U3RXD                   = 19,
+    U3CTS                   = 20,
+    U3DSR                   = 21,
+    U4RXD                   = 22,
+    U4CTS                   = 23,
     UART4_DSR_PAD           = 24,
     I2S0_O_BCK_PAD          = 25,
     I2S0_MCLK_PAD           = 26,
@@ -240,21 +240,21 @@ pub enum OutputSignal {
     SD_CARD_CDATA5_2_PAD       = 7,
     SD_CARD_CDATA6_2_PAD       = 8,
     SD_CARD_CDATA7_2_PAD       = 9,
-    UART0_TXD_PAD              = 10,
-    UART0_RTS_PAD              = 11,
-    UART0_DTR_PAD              = 12,
-    UART1_TXD_PAD              = 13,
-    UART1_RTS_PAD              = 14,
-    UART1_DTR_PAD              = 15,
-    UART2_TXD_PAD              = 16,
-    UART2_RTS_PAD              = 17,
-    UART2_DTR_PAD              = 18,
-    UART3_TXD_PAD              = 19,
-    UART3_RTS_PAD              = 20,
-    UART3_DTR_PAD              = 21,
-    UART4_TXD_PAD              = 22,
-    UART4_RTS_PAD              = 23,
-    UART4_DTR_PAD              = 24,
+    U0TXD                      = 10,
+    U0RTS                      = 11,
+    U0DTR                      = 12,
+    U1TXD                      = 13,
+    U1RTS                      = 14,
+    U1DTR                      = 15,
+    U2TXD                      = 16,
+    U2RTS                      = 17,
+    U2DTR                      = 18,
+    U3TXD                      = 19,
+    U3RTS                      = 20,
+    U3DTR                      = 21,
+    U4TXD                      = 22,
+    U4RTS                      = 23,
+    U4DTR                      = 24,
     I2S0_O_BCK_PAD             = 25,
     I2S0_MCLK_PAD              = 26,
     I2S0_O_WS_PAD              = 27,
@@ -406,12 +406,12 @@ crate::gpio::gpio! {
     (5, 0, InputOutput)
     (6, 0, InputOutput (3 => SPI2_HOLD_PAD) (3 => SPI2_HOLD_PAD))
     (7, 0, InputOutput (3 => SPI2_CS_PAD) (3 => SPI2_CS_PAD))
-    (8, 0, InputOutput (3 => SPI2_D_PAD) (2 => UART0_RTS_PAD 3 => SPI2_D_PAD))
-    (9, 0, InputOutput (2 => UART0_CTS_PAD) (3 => SPI2_CK_PAD))
-    (10, 0, InputOutput (3 => SPI2_Q_PAD) (2 => UART1_TXD_PAD))
-    (11, 0, InputOutput (2 => UART1_RXD_PAD 3 => SPI2_WP_PAD) (3 => SPI2_WP_PAD))
-    (12, 0, InputOutput () (2 => UART1_RTS_PAD))
-    (13, 0, InputOutput (2 => UART1_CTS_PAD) ())
+    (8, 0, InputOutput (3 => SPI2_D_PAD) (2 => U0RTS 3 => SPI2_D_PAD))
+    (9, 0, InputOutput (2 => U0CTS) (3 => SPI2_CK_PAD))
+    (10, 0, InputOutput (3 => SPI2_Q_PAD) (2 => U1TXD))
+    (11, 0, InputOutput (2 => U1RXD 3 => SPI2_WP_PAD) (3 => SPI2_WP_PAD))
+    (12, 0, InputOutput () (2 => U1RTS))
+    (13, 0, InputOutput (2 => U1CTS) ())
     (14, 0, InputOutput)
     (15, 0, InputOutput)
     (16, 0, InputOutput)

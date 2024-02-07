@@ -510,10 +510,15 @@ where
     /// Configures the AT-CMD detection settings.
     #[allow(clippy::useless_conversion)]
     pub fn set_at_cmd(&mut self, config: config::AtCmdConfig) {
-        #[cfg(not(any(esp32, esp32s2)))]
+        #[cfg(not(any(esp32, esp32p4, esp32s2)))]
         T::register_block()
             .clk_conf()
             .modify(|_, w| w.sclk_en().clear_bit());
+
+        #[cfg(esp32p4)]
+        T::register_block()
+            .clk_conf()
+            .modify(|_, w| w.rx_sclk_en().clear_bit().tx_sclk_en().clear_bit());
 
         T::register_block().at_cmd_char().write(|w| unsafe {
             w.at_cmd_char()
@@ -540,10 +545,15 @@ where
                 .write(|w| unsafe { w.rx_gap_tout().bits(gap_timeout.into()) });
         }
 
-        #[cfg(not(any(esp32, esp32s2)))]
+        #[cfg(not(any(esp32, esp32p4, esp32s2)))]
         T::register_block()
             .clk_conf()
             .modify(|_, w| w.sclk_en().set_bit());
+
+        #[cfg(esp32p4)]
+        T::register_block()
+            .clk_conf()
+            .modify(|_, w| w.rx_sclk_en().set_bit().tx_sclk_en().set_bit());
 
         self.sync_regs();
         self.rx.at_cmd_config = Some(config);
@@ -566,17 +576,17 @@ where
     pub fn set_rx_timeout(&mut self, timeout: Option<u8>) -> Result<(), Error> {
         #[cfg(esp32)]
         const MAX_THRHD: u8 = 0x7F; // 7 bits
-        #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s2, esp32s3))]
+        #[cfg(not(esp32))]
         const MAX_THRHD: u16 = 0x3FF; // 10 bits
 
         #[cfg(esp32)]
         let reg_thrhd = &T::register_block().conf1();
-        #[cfg(any(esp32c6, esp32h2))]
+        #[cfg(any(esp32c6, esp32h2, esp32p4))]
         let reg_thrhd = &T::register_block().tout_conf();
         #[cfg(any(esp32c2, esp32c3, esp32s2, esp32s3))]
         let reg_thrhd = &T::register_block().mem_conf();
 
-        #[cfg(any(esp32c6, esp32h2))]
+        #[cfg(any(esp32c6, esp32h2, esp32p4))]
         let reg_en = &T::register_block().tout_conf();
         #[cfg(any(esp32, esp32c2, esp32c3, esp32s2, esp32s3))]
         let reg_en = &T::register_block().conf1();
@@ -603,8 +613,8 @@ where
         }
 
         self.rx.rx_timeout_config = timeout;
-
         self.sync_regs();
+
         Ok(())
     }
 
@@ -624,15 +634,15 @@ where
         const MAX_THRHD: u16 = 0xFF;
         #[cfg(any(esp32c3, esp32c2, esp32s2))]
         const MAX_THRHD: u16 = 0x1FF;
-        #[cfg(esp32s3)]
+        #[cfg(any(esp32p4, esp32s3))]
         const MAX_THRHD: u16 = 0x3FF;
 
         if threshold > MAX_THRHD {
             return Err(Error::InvalidArgument);
         }
 
-        #[cfg(any(esp32, esp32c6, esp32h2))]
-        let threshold: u8 = threshold as u8;
+        #[cfg(any(esp32, esp32c6, esp32h2, esp32p4))]
+        let threshold = threshold as u8;
 
         T::register_block()
             .conf1()
@@ -796,6 +806,22 @@ where
         self
     }
 
+    #[cfg(any(esp32, esp32s2))]
+    fn change_baud(&self, baudrate: u32, clocks: &Clocks) {
+        // we force the clock source to be APB and don't use the decimal part of the
+        // divider
+        let clk = clocks.apb_clock.to_Hz();
+
+        T::register_block()
+            .conf0()
+            .modify(|_, w| w.tick_ref_always_on().bit(true));
+        let divider = clk / baudrate;
+
+        T::register_block()
+            .clkdiv()
+            .write(|w| unsafe { w.clkdiv().bits(divider).frag().bits(0) });
+    }
+
     #[cfg(any(esp32c2, esp32c3, esp32s3))]
     fn change_baud(&self, baudrate: u32, clocks: &Clocks) {
         // we force the clock source to be APB and don't use the decimal part of the
@@ -888,23 +914,52 @@ where
         self.sync_regs();
     }
 
-    #[cfg(any(esp32, esp32s2))]
+    #[cfg(esp32p4)]
     fn change_baud(&self, baudrate: u32, clocks: &Clocks) {
-        // we force the clock source to be APB and don't use the decimal part of the
-        // divider
-        let clk = clocks.apb_clock.to_Hz();
+        // we force the clock source to be XTAL and don't use the decimal part of
+        // the divider
+        let clk = clocks.xtal_clock.to_Hz();
+        let max_div = 0b1111_1111_1111 - 1;
+        let clk_div = (clk + (max_div * baudrate) - 1) / (max_div * baudrate);
 
-        T::register_block()
-            .conf0()
-            .modify(|_, w| w.tick_ref_always_on().bit(true));
-        let divider = clk / baudrate;
+        let clk_div = (clk << 4) / (baudrate * clk_div);
 
-        T::register_block()
-            .clkdiv()
-            .write(|w| unsafe { w.clkdiv().bits(divider).frag().bits(0) });
+        // UART clocks are configured via HP_SYS_CLKRST
+        let hp_sys_clkrst = unsafe { &*crate::peripherals::HP_SYS_CLKRST::PTR };
+
+        match T::uart_number() {
+            0 => {
+                hp_sys_clkrst
+                    .peri_clk_ctrl111()
+                    .modify(|_, w| unsafe { w.uart0_sclk_div_num().bits(clk_div as u8 - 1) });
+            }
+            1 => {
+                hp_sys_clkrst
+                    .peri_clk_ctrl112()
+                    .modify(|_, w| unsafe { w.uart1_sclk_div_num().bits(clk_div as u8 - 1) });
+            }
+            2 => {
+                hp_sys_clkrst
+                    .peri_clk_ctrl113()
+                    .modify(|_, w| unsafe { w.uart2_sclk_div_num().bits(clk_div as u8 - 1) });
+            }
+            3 => {
+                hp_sys_clkrst
+                    .peri_clk_ctrl114()
+                    .modify(|_, w| unsafe { w.uart3_sclk_div_num().bits(clk_div as u8 - 1) });
+            }
+            4 => {
+                hp_sys_clkrst
+                    .peri_clk_ctrl115()
+                    .modify(|_, w| unsafe { w.uart4_sclk_div_num().bits(clk_div as u8 - 1) });
+            }
+            _ => unreachable!(), // ESP32-P4 only has 5 UART instances
+        }
+
+        self.sync_regs();
     }
 
-    #[cfg(any(esp32c6, esp32h2))] // TODO introduce a cfg symbol for this
+    #[cfg(any(esp32c6, esp32h2, esp32p4))] // TODO introduce a cfg symbol for this
     #[inline(always)]
     fn sync_regs(&self) {
         T::register_block()
@@ -921,7 +976,7 @@ where
         }
     }
 
-    #[cfg(not(any(esp32c6, esp32h2)))]
+    #[cfg(not(any(esp32c6, esp32h2, esp32p4)))]
     #[inline(always)]
     fn sync_regs(&mut self) {}
 }
@@ -1104,6 +1159,10 @@ impl_instance!(UART0, 0, U0TXD, U0RXD, U0CTS, U0RTS, Uart0);
 impl_instance!(UART1, 1, U1TXD, U1RXD, U1CTS, U1RTS, Uart1);
 #[cfg(uart2)]
 impl_instance!(UART2, 2, U2TXD, U2RXD, U2CTS, U2RTS, Uart2);
+#[cfg(uart3)]
+impl_instance!(UART3, 3, U3TXD, U3RXD, U3CTS, U3RTS, Uart3);
+#[cfg(uart4)]
+impl_instance!(UART4, 4, U4TXD, U4RXD, U4CTS, U4RTS, Uart4);
 
 #[cfg(feature = "ufmt")]
 impl<T> ufmt_write::uWrite for Uart<'_, T>
@@ -1371,7 +1430,9 @@ mod asynch {
     };
 
     cfg_if! {
-        if #[cfg(all(uart0, uart1, uart2))] {
+        if #[cfg(all(uart0, uart1, uart2, uart3, uart4))] {
+            const NUM_UART: usize = 5;
+        } else if #[cfg(all(uart0, uart1, uart2))] {
             const NUM_UART: usize = 3;
         } else if #[cfg(all(uart0, uart1))] {
             const NUM_UART: usize = 2;
@@ -1786,6 +1847,32 @@ mod asynch {
         }
         if tx {
             TX_WAKERS[2].wake();
+        }
+    }
+
+    #[cfg(uart3)]
+    #[interrupt]
+    fn UART3() {
+        let uart = unsafe { &*crate::peripherals::UART3::ptr() };
+        let (rx, tx) = intr_handler(uart);
+        if rx {
+            RX_WAKERS[3].wake();
+        }
+        if tx {
+            TX_WAKERS[3].wake();
+        }
+    }
+
+    #[cfg(uart4)]
+    #[interrupt]
+    fn UART4() {
+        let uart = unsafe { &*crate::peripherals::UART4::ptr() };
+        let (rx, tx) = intr_handler(uart);
+        if rx {
+            RX_WAKERS[4].wake();
+        }
+        if tx {
+            TX_WAKERS[4].wake();
         }
     }
 }
