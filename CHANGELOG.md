@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Allow for splitting of the USB Serial JTAG peripheral into tx/rx components (#1024)
 - `RngCore` trait is implemented (#1122)
 - Support Rust's `stack-protector` feature (#1135)
+- Adding clock support for `ESP32-P4` (#1145)
 
 ### Fixed
 

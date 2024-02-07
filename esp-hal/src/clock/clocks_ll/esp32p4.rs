@@ -2,6 +2,8 @@ use crate::clock::{Clock, CpuClock, PllClock, XtalClock};
 
 extern "C" {
     fn ets_update_cpu_frequency(ticks_per_us: u32);
+    fn ets_delay_us(delay: u32);
+
 }
 
 const DR_REG_LPAON_BASE: u32 = 0x50110000;
@@ -155,7 +157,9 @@ pub(crate) fn esp32p4_rtc_cpll_configure(xtal_freq: XtalClock, cpll_freq: PllClo
     ) == 1
     {}
 
-    // TODO requires sleep
+    unsafe {
+        ets_delay_us(10);
+    }
 
     // CPLL calibration stop
     set_peri_reg_mask(
