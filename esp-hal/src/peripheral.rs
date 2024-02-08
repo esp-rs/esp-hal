@@ -174,7 +174,7 @@ impl<'a, T> DerefMut for PeripheralRef<'a, T> {
 ///
 /// `.into_ref()` on an owned `T` yields a `PeripheralRef<'static, T>`.
 /// `.into_ref()` on an `&'a mut T` yields a `PeripheralRef<'a, T>`.
-pub trait Peripheral: Sized + sealed::Sealed {
+pub trait Peripheral: Sized + crate::private::Sealed {
     /// Peripheral singleton type
     type P;
 
@@ -215,11 +215,7 @@ where
     }
 }
 
-impl<T> sealed::Sealed for &mut T where T: sealed::Sealed {}
-
-pub(crate) mod sealed {
-    pub trait Sealed {}
-}
+impl<T> crate::private::Sealed for &mut T where T: crate::private::Sealed {}
 
 mod peripheral_macros {
     #[doc(hidden)]
@@ -327,7 +323,7 @@ mod peripheral_macros {
                 }
             }
 
-            impl $crate::peripheral::sealed::Sealed for $name {}
+            impl $crate::private::Sealed for $name {}
         };
         ($(#[$cfg:meta])? $name:ident <= $base:ident) => {
             $(#[$cfg])?
@@ -381,7 +377,7 @@ mod peripheral_macros {
                 }
             }
 
-            impl $crate::peripheral::sealed::Sealed for $name {}
+            impl $crate::private::Sealed for $name {}
         };
     }
 }

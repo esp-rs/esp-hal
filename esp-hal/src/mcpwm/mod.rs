@@ -282,7 +282,7 @@ impl<'a> PeripheralClockConfig<'a> {
 pub struct FrequencyError;
 
 /// A MCPWM peripheral
-pub trait PwmPeripheral: Deref<Target = RegisterBlock> + private::Sealed {
+pub trait PwmPeripheral: Deref<Target = RegisterBlock> + crate::private::Sealed {
     /// Enable peripheral
     fn enable();
     /// Get a pointer to the peripheral RegisterBlock
@@ -336,13 +336,3 @@ impl PwmPeripheral for crate::peripherals::MCPWM1 {
         }
     }
 }
-
-mod private {
-    pub trait Sealed {}
-}
-
-#[cfg(mcpwm0)]
-impl private::Sealed for crate::peripherals::MCPWM0 {}
-
-#[cfg(mcpwm1)]
-impl private::Sealed for crate::peripherals::MCPWM1 {}

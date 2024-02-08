@@ -1921,6 +1921,7 @@ mod private {
 
     pub trait I2s0Instance {}
 
+    #[cfg(any(esp32s3, esp32))]
     pub trait I2s1Instance {}
 
     impl I2s0Instance for I2S0 {}
