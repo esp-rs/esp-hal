@@ -220,7 +220,7 @@ mod sealed {
     }
 }
 
-use sealed::AesFlavour;
+pub use sealed::AesFlavour;
 
 /// Marker type for AES-128
 pub struct Aes128;

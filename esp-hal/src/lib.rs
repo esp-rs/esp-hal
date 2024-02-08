@@ -200,6 +200,7 @@ extern "C" fn EspDefaultHandler(_interrupt: peripherals::Interrupt) {
 /// The actual number of available cores depends on the target.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, strum::FromRepr)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[repr(C)]
 pub enum Cpu {
     /// The first core
     ProCpu = 0,
