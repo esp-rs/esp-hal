@@ -28,10 +28,6 @@ pub use self::implementation::*;
 #[cfg_attr(any(esp32s2, esp32s3), path = "xtensa.rs")]
 mod implementation;
 
-mod private {
-    pub trait Sealed {}
-}
-
 /// The attenuation of the ADC pin.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Attenuation {
@@ -65,7 +61,7 @@ pub trait AdcChannel {
 /// The methods in this trait are mostly for internal use. To get
 /// calibrated ADC reads, all you need to do is call `enable_pin_with_cal`
 /// and specify some implementor of this trait.
-pub trait AdcCalScheme<ADCI>: Sized + private::Sealed {
+pub trait AdcCalScheme<ADCI>: Sized + crate::private::Sealed {
     /// Create a new calibration scheme for the given attenuation.
     fn new_cal(atten: Attenuation) -> Self;
 
@@ -81,7 +77,7 @@ pub trait AdcCalScheme<ADCI>: Sized + private::Sealed {
     }
 }
 
-impl private::Sealed for () {}
+impl crate::private::Sealed for () {}
 
 impl<ADCI> AdcCalScheme<ADCI> for () {
     fn new_cal(_atten: Attenuation) -> Self {}

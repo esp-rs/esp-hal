@@ -958,7 +958,7 @@ where
     }
 }
 
-impl<MODE, const GPIONUM: u8> crate::peripheral::sealed::Sealed for GpioPin<MODE, GPIONUM> where
+impl<MODE, const GPIONUM: u8> crate::private::Sealed for GpioPin<MODE, GPIONUM> where
     Self: GpioProperties
 {
 }
@@ -2029,7 +2029,7 @@ pub mod etm {
         _pin: PeripheralRef<'d, PIN>,
     }
 
-    impl<'d, PIN, const C: u8> crate::etm::private::Sealed for GpioEtmEventChannelRising<'d, PIN, C> where
+    impl<'d, PIN, const C: u8> crate::private::Sealed for GpioEtmEventChannelRising<'d, PIN, C> where
         PIN: super::Pin
     {
     }
@@ -2052,7 +2052,7 @@ pub mod etm {
         _pin: PeripheralRef<'d, PIN>,
     }
 
-    impl<'d, PIN, const C: u8> crate::etm::private::Sealed for GpioEtmEventChannelFalling<'d, PIN, C> where
+    impl<'d, PIN, const C: u8> crate::private::Sealed for GpioEtmEventChannelFalling<'d, PIN, C> where
         PIN: super::Pin
     {
     }
@@ -2075,7 +2075,7 @@ pub mod etm {
         _pin: PeripheralRef<'d, PIN>,
     }
 
-    impl<'d, PIN, const C: u8> crate::etm::private::Sealed for GpioEtmEventChannelAny<'d, PIN, C> where
+    impl<'d, PIN, const C: u8> crate::private::Sealed for GpioEtmEventChannelAny<'d, PIN, C> where
         PIN: super::Pin
     {
     }
@@ -2144,7 +2144,7 @@ pub mod etm {
         _pin: PeripheralRef<'d, PIN>,
     }
 
-    impl<'d, PIN, const C: u8> crate::etm::private::Sealed for GpioEtmTaskSet<'d, PIN, C> where
+    impl<'d, PIN, const C: u8> crate::private::Sealed for GpioEtmTaskSet<'d, PIN, C> where
         PIN: super::Pin
     {
     }
@@ -2164,7 +2164,7 @@ pub mod etm {
         _pin: PeripheralRef<'d, PIN>,
     }
 
-    impl<'d, PIN, const C: u8> crate::etm::private::Sealed for GpioEtmTaskClear<'d, PIN, C> where
+    impl<'d, PIN, const C: u8> crate::private::Sealed for GpioEtmTaskClear<'d, PIN, C> where
         PIN: super::Pin
     {
     }
@@ -2184,7 +2184,7 @@ pub mod etm {
         _pin: PeripheralRef<'d, PIN>,
     }
 
-    impl<'d, PIN, const C: u8> crate::etm::private::Sealed for GpioEtmTaskToggle<'d, PIN, C> where
+    impl<'d, PIN, const C: u8> crate::private::Sealed for GpioEtmTaskToggle<'d, PIN, C> where
         PIN: super::Pin
     {
     }

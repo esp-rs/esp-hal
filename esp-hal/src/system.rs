@@ -691,4 +691,4 @@ impl crate::peripheral::Peripheral for SystemClockControl {
     }
 }
 
-impl crate::peripheral::sealed::Sealed for SystemClockControl {}
+impl crate::private::Sealed for SystemClockControl {}

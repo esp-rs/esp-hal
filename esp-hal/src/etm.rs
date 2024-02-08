@@ -268,15 +268,11 @@ create_etm_constructor!(
 );
 
 #[doc(hidden)]
-pub trait EtmEvent: private::Sealed {
+pub trait EtmEvent: crate::private::Sealed {
     fn id(&self) -> u8;
 }
 
 #[doc(hidden)]
-pub trait EtmTask: private::Sealed {
+pub trait EtmTask: crate::private::Sealed {
     fn id(&self) -> u8;
-}
-
-pub(crate) mod private {
-    pub trait Sealed {}
 }
