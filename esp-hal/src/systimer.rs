@@ -443,7 +443,7 @@ pub mod etm {
         }
     }
 
-    impl<'a, M, const N: u8> crate::etm::private::Sealed for SysTimerEtmEvent<'a, M, N> {}
+    impl<'a, M, const N: u8> crate::private::Sealed for SysTimerEtmEvent<'a, M, N> {}
 
     impl<'a, M, const N: u8> crate::etm::EtmEvent for SysTimerEtmEvent<'a, M, N> {
         fn id(&self) -> u8 {

@@ -195,6 +195,10 @@ extern "C" fn EspDefaultHandler(_interrupt: peripherals::Interrupt) {
     );
 }
 
+pub(crate) mod private {
+    pub trait Sealed {}
+}
+
 /// Available CPU cores
 ///
 /// The actual number of available cores depends on the target.
