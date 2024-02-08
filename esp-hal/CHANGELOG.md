@@ -57,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ensuring that the random number generator is TRNG. (#1200)
 - ESP32-C6: Add timer wakeup source for deepsleep (#1201)
 - Introduce `InterruptExecutor::spawner()` (#1211)
+- Add Uart Line invert option (#1151)
 
 ### Fixed
 
