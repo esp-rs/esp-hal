@@ -1909,7 +1909,7 @@ macro_rules! gpio {
                 impl $crate::gpio::GpioSignal for [<Gpio $gpionum Signals>] {
                     fn output_signals() -> [Option<OutputSignal>; 6]{
                         #[allow(unused_mut)]
-                        let mut output_signals = [None,None,None,None,None,None];
+                        let mut output_signals = [None, None, None, None, None, None];
 
                         $(
                             $(
@@ -1921,7 +1921,7 @@ macro_rules! gpio {
                     }
                     fn input_signals() -> [Option<InputSignal>; 6] {
                         #[allow(unused_mut)]
-                        let mut input_signals = [None,None,None,None,None,None];
+                        let mut input_signals = [None, None, None, None, None, None];
 
                         $(
                             $(
@@ -2801,24 +2801,24 @@ pub mod lp_gpio {
             if enable {
                 lp_io
                     .out_enable_w1ts()
-                    .write(|w| w.lp_gpio_enable_w1ts().variant(1 << PIN));
+                    .write(|w| w.enable_w1ts().variant(1 << PIN));
             } else {
                 lp_io
                     .out_enable_w1tc()
-                    .write(|w| w.lp_gpio_enable_w1tc().variant(1 << PIN));
+                    .write(|w| w.enable_w1tc().variant(1 << PIN));
             }
         }
 
         fn input_enable(&self, enable: bool) {
-            get_pin_reg(PIN).modify(|_, w| w.lp_gpio0_fun_ie().bit(enable));
+            get_pin_reg(PIN).modify(|_, w| w.fun_ie().bit(enable));
         }
 
         fn pullup_enable(&self, enable: bool) {
-            get_pin_reg(PIN).modify(|_, w| w.lp_gpio0_fun_wpu().bit(enable));
+            get_pin_reg(PIN).modify(|_, w| w.fun_wpu().bit(enable));
         }
 
         fn pulldown_enable(&self, enable: bool) {
-            get_pin_reg(PIN).modify(|_, w| w.lp_gpio0_fun_wpd().bit(enable));
+            get_pin_reg(PIN).modify(|_, w| w.fun_wpd().bit(enable));
         }
 
         #[doc(hidden)]
@@ -2827,18 +2827,18 @@ pub mod lp_gpio {
             if level {
                 lp_io
                     .out_data_w1ts()
-                    .write(|w| w.lp_gpio_out_data_w1ts().variant(1 << PIN));
+                    .write(|w| w.out_data_w1ts().variant(1 << PIN));
             } else {
                 lp_io
                     .out_data_w1tc()
-                    .write(|w| w.lp_gpio_out_data_w1tc().variant(1 << PIN));
+                    .write(|w| w.out_data_w1tc().variant(1 << PIN));
             }
         }
 
         #[doc(hidden)]
         pub fn get_level(&self) -> bool {
             let lp_io = unsafe { &*crate::peripherals::LP_IO::PTR };
-            (lp_io.in_().read().lp_gpio_in_data_next().bits() & 1 << PIN) != 0
+            (lp_io.in_().read().data_next().bits() & 1 << PIN) != 0
         }
 
         /// Configures the pin as an input with the internal pull-up resistor
@@ -2889,7 +2889,7 @@ pub mod lp_gpio {
             .gpio_mux()
             .modify(|r, w| w.sel().variant(r.sel().bits() | 1 << pin));
 
-        get_pin_reg(pin).modify(|_, w| w.lp_gpio0_mcu_sel().variant(0));
+        get_pin_reg(pin).modify(|_, w| w.mcu_sel().variant(0));
     }
 
     #[inline(always)]
@@ -2930,9 +2930,7 @@ pub mod lp_gpio {
                         unsafe fn apply_wakeup(&mut self, wakeup: bool, level: u8) {
                             let lp_io = &*$crate::peripherals::LP_IO::ptr();
                             lp_io.[< pin $gpionum >]().modify(|_, w| {
-                                w
-                                    .[< lp_gpio $gpionum _wakeup_enable >]().bit(wakeup)
-                                    .[< lp_gpio $gpionum _int_type >]().bits(level)
+                                w.wakeup_enable().bit(wakeup).int_type().bits(level)
                             });
                         }
 
@@ -2972,9 +2970,9 @@ pub mod lp_gpio {
                                 let lp_io = &*$crate::peripherals::LP_IO::ptr();
                                 lp_io.[< gpio $gpionum >]().modify(|_, w| {
                                     w
-                                        .[< lp_gpio $gpionum _slp_sel >]().bit(false)
-                                        .[< lp_gpio $gpionum _fun_ie >]().bit(input_enable)
-                                        .[< lp_gpio $gpionum _mcu_sel >]().bits(func as u8)
+                                        .slp_sel().bit(false)
+                                        .fun_ie().bit(input_enable)
+                                        .mcu_sel().bits(func as u8)
                                 });
                             }
                         }
@@ -2983,12 +2981,12 @@ pub mod lp_gpio {
                     impl<MODE> $crate::gpio::RTCPinWithResistors for GpioPin<MODE, $gpionum> {
                         fn rtcio_pullup(&mut self, enable: bool) {
                             let lp_io = unsafe { &*$crate::peripherals::LP_IO::ptr() };
-                            lp_io.[< gpio $gpionum >]().modify(|_, w| w.[< lp_gpio $gpionum _fun_wpu >]().bit(enable));
+                            lp_io.[< gpio $gpionum >]().modify(|_, w| w.fun_wpu().bit(enable));
                         }
 
                         fn rtcio_pulldown(&mut self, enable: bool) {
                             let lp_io = unsafe { &*$crate::peripherals::LP_IO::ptr() };
-                            lp_io.[< gpio $gpionum >]().modify(|_, w| w.[< lp_gpio $gpionum _fun_wpd >]().bit(enable));
+                            lp_io.[< gpio $gpionum >]().modify(|_, w| w.fun_wpd().bit(enable));
                         }
                     }
                 )+
