@@ -132,7 +132,7 @@ mod sealed {
     }
 }
 
-use sealed::*;
+pub use sealed::*;
 
 macro_rules! implement_op {
     (($x:literal, multi)) => {
