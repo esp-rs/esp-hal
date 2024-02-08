@@ -1391,7 +1391,7 @@ where
     }
 }
 
-impl<MODE, TYPE> crate::peripheral::sealed::Sealed for AnyPin<MODE, TYPE> where TYPE: PinType {}
+impl<MODE, TYPE> crate::private::Sealed for AnyPin<MODE, TYPE> where TYPE: PinType {}
 
 impl<MODE, TYPE> AnyPin<MODE, TYPE>
 where
