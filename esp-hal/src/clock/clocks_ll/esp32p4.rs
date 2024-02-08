@@ -194,40 +194,40 @@ pub(crate) fn esp32p4_rtc_update_to_xtal(freq: XtalClock, div: u8, default: bool
     unsafe {
         (&*crate::soc::peripherals::HP_SYS_CLKRST::PTR)
             .root_clk_ctrl0()
-            .modify(|_, w| w.reg_cpu_clk_div_num().bits(div - 1));
+            .modify(|_, w| w.cpu_clk_div_num().bits(div - 1));
 
         (&*crate::soc::peripherals::HP_SYS_CLKRST::PTR)
             .root_clk_ctrl0()
-            .modify(|_, w| w.reg_cpu_clk_div_numerator().bits(0));
+            .modify(|_, w| w.cpu_clk_div_numerator().bits(0));
 
         (&*crate::soc::peripherals::HP_SYS_CLKRST::PTR)
             .root_clk_ctrl0()
-            .modify(|_, w| w.reg_cpu_clk_div_denominator().bits(0));
+            .modify(|_, w| w.cpu_clk_div_denominator().bits(0));
 
         // Set memory divider
         (&*crate::soc::peripherals::HP_SYS_CLKRST::PTR)
             .root_clk_ctrl1()
-            .modify(|_, w| w.reg_mem_clk_div_num().bits((mem_divider - 1) as u8));
+            .modify(|_, w| w.mem_clk_div_num().bits((mem_divider - 1) as u8));
 
         // Set system divider
         (&*crate::soc::peripherals::HP_SYS_CLKRST::PTR)
             .root_clk_ctrl1()
-            .modify(|_, w| w.reg_sys_clk_div_num().bits((sys_divider - 1) as u8));
+            .modify(|_, w| w.sys_clk_div_num().bits((sys_divider - 1) as u8));
 
         // Set APB divider
         (&*crate::soc::peripherals::HP_SYS_CLKRST::PTR)
             .root_clk_ctrl2()
-            .modify(|_, w| w.reg_apb_clk_div_num().bits((apb_divider - 1) as u8));
+            .modify(|_, w| w.apb_clk_div_num().bits((apb_divider - 1) as u8));
 
         // Bus update
         (&*crate::soc::peripherals::HP_SYS_CLKRST::PTR)
             .root_clk_ctrl0()
-            .modify(|_, w| w.reg_soc_clk_div_update().set_bit());
+            .modify(|_, w| w.soc_clk_div_update().set_bit());
 
         while (&*crate::soc::peripherals::HP_SYS_CLKRST::PTR)
             .root_clk_ctrl0()
             .read()
-            .reg_soc_clk_div_update()
+            .soc_clk_div_update()
             .bit_is_set()
         {}
 
@@ -354,35 +354,35 @@ pub(crate) fn esp32p4_rtc_freq_to_cpll_mhz(cpu_clock_speed: CpuClock) {
 
         (&*crate::soc::peripherals::HP_SYS_CLKRST::PTR)
             .root_clk_ctrl0()
-            .modify(|_, w| w.reg_cpu_clk_div_num().bits((div_integer - 1) as u8));
+            .modify(|_, w| w.cpu_clk_div_num().bits((div_integer - 1) as u8));
 
         (&*crate::soc::peripherals::HP_SYS_CLKRST::PTR)
             .root_clk_ctrl0()
-            .modify(|_, w| w.reg_cpu_clk_div_numerator().bits(0));
+            .modify(|_, w| w.cpu_clk_div_numerator().bits(0));
 
         (&*crate::soc::peripherals::HP_SYS_CLKRST::PTR)
             .root_clk_ctrl0()
-            .modify(|_, w| w.reg_cpu_clk_div_denominator().bits(0));
+            .modify(|_, w| w.cpu_clk_div_denominator().bits(0));
 
         // Set memory divider
         (&*crate::soc::peripherals::HP_SYS_CLKRST::PTR)
             .root_clk_ctrl1()
-            .modify(|_, w| w.reg_mem_clk_div_num().bits((mem_div - 1) as u8));
+            .modify(|_, w| w.mem_clk_div_num().bits((mem_div - 1) as u8));
 
         // Set system divider
         (&*crate::soc::peripherals::HP_SYS_CLKRST::PTR)
             .root_clk_ctrl1()
-            .modify(|_, w| w.reg_sys_clk_div_num().bits((sys_div - 1) as u8));
+            .modify(|_, w| w.sys_clk_div_num().bits((sys_div - 1) as u8));
 
         // Set APB divider
         (&*crate::soc::peripherals::HP_SYS_CLKRST::PTR)
             .root_clk_ctrl2()
-            .modify(|_, w| w.reg_apb_clk_div_num().bits((apb_div - 1) as u8));
+            .modify(|_, w| w.apb_clk_div_num().bits((apb_div - 1) as u8));
 
         // Bus update
         (&*crate::soc::peripherals::HP_SYS_CLKRST::PTR)
             .root_clk_ctrl0()
-            .modify(|_, w| w.reg_soc_clk_div_update().set_bit());
+            .modify(|_, w| w.soc_clk_div_update().set_bit());
 
         ets_update_cpu_frequency(cpu_clock_speed.mhz());
     }

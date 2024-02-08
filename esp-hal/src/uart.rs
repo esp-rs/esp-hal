@@ -1820,8 +1820,8 @@ pub mod lp_uart {
                 .gpio_mux()
                 .modify(|r, w| w.sel().variant(r.sel().bits() | 1 << 5));
 
-            lp_io.gpio4().modify(|_, w| w.lp_gpio4_mcu_sel().variant(1));
-            lp_io.gpio5().modify(|_, w| w.lp_gpio5_mcu_sel().variant(1));
+            lp_io.gpio4().modify(|_, w| w.mcu_sel().variant(1));
+            lp_io.gpio5().modify(|_, w| w.mcu_sel().variant(1));
 
             Self::new_with_config(uart, Config::default())
         }
