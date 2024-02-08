@@ -81,10 +81,14 @@ impl embedded_io::Error for Error {
 
 pub enum UartLine {
     Rxd,
-    Cts,
-    Dsr,
     Txd,
+    #[cfg(not(any(esp32c6, esp32h2)))]
+    Cts,
+    #[cfg(not(any(esp32c6, esp32h2)))]
+    Dsr,
+    #[cfg(not(any(esp32c6, esp32h2)))]
     Rts,
+    #[cfg(not(any(esp32c6, esp32h2)))]
     Dtr,
 }
 
@@ -520,9 +524,13 @@ where
         T::register_block().conf0().write(|w| match line {
             UartLine::Rxd => w.rxd_inv().bit(invert),
             UartLine::Txd => w.txd_inv().bit(invert),
+            #[cfg(not(any(esp32c6, esp32h2)))]
             UartLine::Cts => w.cts_inv().bit(invert),
+            #[cfg(not(any(esp32c6, esp32h2)))]
             UartLine::Dsr => w.dsr_inv().bit(invert),
+            #[cfg(not(any(esp32c6, esp32h2)))]
             UartLine::Rts => w.rts_inv().bit(invert),
+            #[cfg(not(any(esp32c6, esp32h2)))]
             UartLine::Dtr => w.dtr_inv().bit(invert),
         });
     }
