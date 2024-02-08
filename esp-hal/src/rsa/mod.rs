@@ -123,16 +123,12 @@ impl<'d> Rsa<'d> {
     }
 }
 
-mod sealed {
-    pub trait RsaMode {
-        type InputType;
-    }
-    pub trait Multi: RsaMode {
-        type OutputType;
-    }
+pub trait RsaMode: crate::private::Sealed {
+    type InputType;
 }
-
-pub use sealed::*;
+pub trait Multi: RsaMode {
+    type OutputType;
+}
 
 macro_rules! implement_op {
     (($x:literal, multi)) => {
@@ -141,7 +137,10 @@ macro_rules! implement_op {
         impl Multi for [<Op $x>] {
         type OutputType = [u32; $x*2 / 32];
     }}
-    paste!{
+    paste! {
+        impl crate::private::Sealed for [<Op $x>] {}
+    }
+    paste! {
     impl RsaMode for [<Op $x>] {
         type InputType = [u32; $x / 32];
     }}
@@ -149,11 +148,14 @@ macro_rules! implement_op {
 
     (($x:literal)) => {
         paste! {pub struct [<Op $x>];}
-    paste!{
-    impl RsaMode for [<Op $x>] {
-        type InputType =  [u32; $x / 32];
-    }}
-     };
+        paste! {
+            impl crate::private::Sealed for [<Op $x>] {}
+        }
+        paste!{
+        impl RsaMode for [<Op $x>] {
+            type InputType =  [u32; $x / 32];
+        }}
+    };
 
     ($x:tt, $($y:tt),+) => {
         implement_op!($x);

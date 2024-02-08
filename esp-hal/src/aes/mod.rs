@@ -211,16 +211,12 @@ impl<'d> Aes<'d> {
     }
 }
 
-mod sealed {
-    /// Specifications for AES flavours
-    pub trait AesFlavour {
-        type KeyType<'b>;
-        const ENCRYPT_MODE: u32;
-        const DECRYPT_MODE: u32;
-    }
+/// Specifications for AES flavours
+pub trait AesFlavour: crate::private::Sealed {
+    type KeyType<'b>;
+    const ENCRYPT_MODE: u32;
+    const DECRYPT_MODE: u32;
 }
-
-pub use sealed::AesFlavour;
 
 /// Marker type for AES-128
 pub struct Aes128;
@@ -231,6 +227,11 @@ pub struct Aes192;
 
 /// Marker type for AES-256
 pub struct Aes256;
+
+impl crate::private::Sealed for Aes128 {}
+#[cfg(any(esp32, esp32s2))]
+impl crate::private::Sealed for Aes192 {}
+impl crate::private::Sealed for Aes256 {}
 
 /// State matrix endianness
 #[cfg(any(esp32, esp32s2))]
