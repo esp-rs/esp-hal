@@ -9,8 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Implementation OutputPin and InputPin for AnyPin (#1067)
-
 ### Added
 
 - Add initial support for the ESP32-P4 (#1101)
@@ -23,12 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `RngCore` trait is implemented (#1122)
 - Support Rust's `stack-protector` feature (#1135)
 - Adding clock support for `ESP32-P4` (#1145)
+- Implementation OutputPin and InputPin for AnyPin (#1067)
 
 ### Fixed
 
 - Fix embassy-time tick rate not set when using systick as the embassy timebase (#1124)
 - Fix `get_raw_core` on Xtensa (#1126)
 - Fix docs.rs documentation builds (#1129)
+- Fix circular DMA (#1144)
 
 ### Changed
 
