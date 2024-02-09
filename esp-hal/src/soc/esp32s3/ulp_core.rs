@@ -14,7 +14,7 @@
 //!
 //! ## Example
 //! ```no_run
-//! let mut ulp_core = esp32s3_hal::ulp_core::UlpCore::new(peripherals.ULP_RISCV_CORE);
+//! let mut ulp_core = esp_hal::ulp_core::UlpCore::new(peripherals.ULP_RISCV_CORE);
 //! ulp_core.stop();
 //! println!("ulp core stopped");
 //!
@@ -26,7 +26,7 @@
 //! println!("copied code (len {})", CODE.len());
 //!
 //! // start ULP core
-//! ulp_core.run(esp32s3_hal::ulp_core::UlpCoreWakeupSource::HpCpu);
+//! ulp_core.run(esp_hal::ulp_core::UlpCoreWakeupSource::HpCpu);
 //! println!("ulpcore run");
 //!
 //! unsafe {

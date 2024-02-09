@@ -249,6 +249,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     copy_dir_all(&config_symbols, "ld/sections", &out)?;
     copy_dir_all(&config_symbols, format!("ld/{device_name}"), &out)?;
 
+    #[cfg(any(feature = "esp32", feature = "esp32s2"))]
+    File::create(out.join("memory_extras.x"))?.write_all(&generate_memory_extras())?;
+
     // Generate the eFuse table from the selected device's CSV file:
     gen_efuse_table(device_name, out)?;
 
@@ -411,4 +414,40 @@ fn detect_atomic_extension(ext: &str) -> bool {
     }
 
     false
+}
+
+#[cfg(feature = "esp32")]
+fn generate_memory_extras() -> Vec<u8> {
+    let reserve_dram = if cfg!(feature = "bluetooth") {
+        "0x10000"
+    } else {
+        "0x0"
+    };
+
+    format!(
+        "
+    /* reserved at the start of DRAM for e.g. the BT stack */
+    RESERVE_DRAM = {reserve_dram};
+        "
+    )
+    .as_bytes()
+    .to_vec()
+}
+
+#[cfg(feature = "esp32s2")]
+fn generate_memory_extras() -> Vec<u8> {
+    let reserved_cache = if cfg!(feature = "psram") {
+        "0x4000"
+    } else {
+        "0x2000"
+    };
+
+    format!(
+        "
+        /* reserved at the start of DRAM/IRAM */
+        RESERVE_CACHES = {reserved_cache};
+        "
+    )
+    .as_bytes()
+    .to_vec()
 }

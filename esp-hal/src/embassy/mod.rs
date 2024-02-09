@@ -35,7 +35,7 @@
 //! #[cfg(feature = "embassy-time-systick")]
 //! embassy::init(
 //!     &clocks,
-//!     esp32c6_hal::systimer::SystemTimer::new(peripherals.SYSTIMER),
+//!     esp_hal::systimer::SystemTimer::new(peripherals.SYSTIMER),
 //! );
 //!
 //! #[cfg(feature = "embassy-time-timg0")]
@@ -46,9 +46,9 @@
 //! let input = io.pins.gpio9.into_pull_down_input();
 //!
 //! // Async requires the GPIO interrupt to wake futures
-//! esp32c6_hal::interrupt::enable(
-//!     esp32c6_hal::peripherals::Interrupt::GPIO,
-//!     esp32c6_hal::interrupt::Priority::Priority1,
+//! esp_hal::interrupt::enable(
+//!     esp_hal::peripherals::Interrupt::GPIO,
+//!     esp_hal::interrupt::Priority::Priority1,
 //! )
 //! .unwrap();
 //!
