@@ -459,9 +459,7 @@ where
     where
         P: UartPins,
     {
-        T::enable_peripheral();
-        T::disable_rx_interrupts();
-        T::disable_tx_interrupts();
+        Self::init();
 
         if let Some(ref mut pins) = pins {
             pins.configure_pins(
@@ -479,10 +477,10 @@ where
             symbol_len: config.symbol_length(),
         };
 
+        serial.change_baud(config.baudrate, clocks);
         serial.change_data_bits(config.data_bits);
         serial.change_parity(config.parity);
         serial.change_stop_bits(config.stop_bits);
-        serial.change_baud(config.baudrate, clocks);
 
         serial
     }
@@ -904,24 +902,70 @@ where
             .write(|w| unsafe { w.clkdiv().bits(divider).frag().bits(0) });
     }
 
-    #[cfg(any(esp32c6, esp32h2))] // TODO introduce a cfg symbol for this
+    #[cfg(esp32c3)]
+    #[inline(always)]
+    fn init() {
+        let system = unsafe { crate::peripherals::SYSTEM::steal() };
+        if !system.perip_clk_en0().read().uart_mem_clk_en().bit() {
+            system
+                .perip_clk_en0()
+                .modify(|_, w| w.uart_mem_clk_en().set_bit());
+        }
+
+        // initialize peripheral by setting clk_enable and clearing uart_reset bits
+        T::enable_peripheral();
+
+        T::register_block()
+            .clk_conf()
+            .modify(|_, w| w.rst_core().set_bit());
+
+        // TODO use T::reset_peripheral() as soon as it is present in esp-hal
+        system
+            .perip_rst_en0()
+            .modify(|_, w| match T::uart_number() {
+                0 => w.uart_rst().set_bit(),
+                1 => w.uart1_rst().set_bit(),
+                _ => panic!("Unknown Uart Device!"),
+            });
+        system
+            .perip_rst_en0()
+            .modify(|_, w| match T::uart_number() {
+                0 => w.uart_rst().clear_bit(),
+                1 => w.uart1_rst().clear_bit(),
+                _ => panic!("Unknown Uart Device!"),
+            });
+        T::register_block()
+            .clk_conf()
+            .modify(|_, w| w.rst_core().clear_bit());
+        T::disable_rx_interrupts();
+        T::disable_tx_interrupts();
+    }
+
+    #[cfg(not(esp32c3))]
+    #[inline(always)]
+    fn init() {
+        T::enable_peripheral();
+        T::disable_rx_interrupts();
+        T::disable_tx_interrupts();
+    }
+
+    #[cfg(any(esp32c3, esp32c6, esp32h2))] // TODO introduce a cfg symbol for this
     #[inline(always)]
     fn sync_regs(&self) {
-        T::register_block()
-            .reg_update()
-            .modify(|_, w| w.reg_update().set_bit());
+        #[cfg(any(esp32c6, esp32h2))]
+        let update_reg = T::register_block().reg_update();
 
-        while T::register_block()
-            .reg_update()
-            .read()
-            .reg_update()
-            .bit_is_set()
-        {
+        #[cfg(esp32c3)]
+        let update_reg = T::register_block().id();
+
+        update_reg.modify(|_, w| w.reg_update().set_bit());
+
+        while update_reg.read().reg_update().bit_is_set() {
             // wait
         }
     }
 
-    #[cfg(not(any(esp32c6, esp32h2)))]
+    #[cfg(not(any(esp32c3, esp32c6, esp32h2)))]
     #[inline(always)]
     fn sync_regs(&mut self) {}
 }
