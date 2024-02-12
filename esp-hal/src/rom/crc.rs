@@ -26,7 +26,7 @@
 //!
 //! ```
 //! // CRC-32/MPEG-2
-//! const CRC_INITIAL = 0xffffffff; // "init" or "xorin" of all ones
+//! const CRC_INITIAL: _ = 0xffffffff; // "init" or "xorin" of all ones
 //! let mut crc = crc32_be(!CRC_INITIAL, &data0); // start
 //! crc = crc32_be(crc, &data1);
 //! crc = !crc32_be(crc, &data2); // finish
