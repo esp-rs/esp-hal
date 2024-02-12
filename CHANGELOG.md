@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Adding clock support for `ESP32-P4` (#1145)
 - Implementation OutputPin and InputPin for AnyPin (#1067)
 - Implement `estimate_xtal_frequency` for ESP32-C6 / ESP32-H2 (#1174)
+- Async uart now reports interrupt errors(overflow, glitch, frame error, parity) back to user of read/write. uart clock decimal part configured for c2,c3,s3 (#1168)
 
 ### Fixed
 
