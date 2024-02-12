@@ -1,7 +1,10 @@
-name: Change log check
+name: Changelog check
 
 on:
   pull_request:
+    # We will not track changes for the `xtask` package.
+    paths-ignore:
+      - "/xtask/"
     # Run on labeled/unlabeled in addition to defaults to detect
     # adding/removing skip-changelog labels.
     types: [opened, reopened, labeled, unlabeled, synchronize]
