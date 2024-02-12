@@ -40,7 +40,7 @@ impl Chip {
         use Chip::*;
 
         match self {
-            Esp32 | Esp32s2 | Esp32s3 => "xtensa",
+            Esp32 | Esp32s2 | Esp32s3 => "esp",
             _ => "nightly",
         }
     }
