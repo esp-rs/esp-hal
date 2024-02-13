@@ -227,14 +227,20 @@ pub fn build_example(
         format!("--example={}", example.name())
     };
 
-    let args = vec![
+    // If targeting an Xtensa device, we must use the '+esp' toolchain modifier:
+    let mut args = vec![];
+    if target.starts_with("xtensa") {
+        args.push("+esp".into());
+    }
+
+    args.extend(vec![
         "build".into(),
         "-Zbuild-std=alloc,core".into(),
         "--release".into(),
         format!("--target={target}"),
         format!("--features={},{}", chip, example.features().join(",")),
         bin,
-    ];
+    ]);
     log::debug!("{args:#?}");
 
     cargo(&args, package_path)?;
