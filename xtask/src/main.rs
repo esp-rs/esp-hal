@@ -9,8 +9,23 @@ use xtask::{Chip, Package};
 
 #[derive(Debug, Parser)]
 enum Cli {
+    /// Build documentation for the specified chip.
+    BuildDocumentation(BuildDocumentationArgs),
     /// Build all examples for the specified chip.
     BuildExamples(BuildExamplesArgs),
+}
+
+#[derive(Debug, Args)]
+struct BuildDocumentationArgs {
+    /// Package to build documentation for.
+    #[arg(value_enum)]
+    package: Package,
+    /// Which chip to build the documentation for.
+    #[arg(value_enum)]
+    chip: Chip,
+    /// Open the documentation in the default browser once built.
+    #[arg(long)]
+    open: bool,
 }
 
 #[derive(Debug, Args)]
@@ -35,12 +50,25 @@ fn main() -> Result<()> {
     let workspace = workspace.parent().unwrap().canonicalize()?;
 
     match Cli::parse() {
+        Cli::BuildDocumentation(args) => build_documentation(&workspace, args),
         Cli::BuildExamples(args) => build_examples(&workspace, args),
     }
 }
 
 // ----------------------------------------------------------------------------
 // Subcommands
+
+fn build_documentation(workspace: &Path, args: BuildDocumentationArgs) -> Result<()> {
+    // Ensure that the package/chip combination provided are valid:
+    validate_package_chip(&args.package, &args.chip)?;
+
+    // Determine the appropriate build target for the given package and chip:
+    let target = target_triple(&args.package, &args.chip)?;
+
+    // Simply build the documentation for the specified package, targeting the
+    // specified chip:
+    xtask::build_documentation(workspace, args.package, args.chip, target, args.open)
+}
 
 fn build_examples(workspace: &Path, mut args: BuildExamplesArgs) -> Result<()> {
     // Ensure that the package/chip combination provided are valid:

@@ -111,6 +111,47 @@ impl Metadata {
     }
 }
 
+/// Build the documentation for the specified package and device.
+pub fn build_documentation(
+    workspace: &Path,
+    package: Package,
+    chip: Chip,
+    target: &str,
+    open: bool,
+) -> Result<()> {
+    let package_name = package.to_string();
+    let package_path = workspace.join(&package_name);
+
+    log::info!("Building '{package_name}' documentation targeting '{chip}'");
+
+    let mut features = vec![chip.to_string()];
+
+    // The ESP32 and ESP32-C2 must have their Xtal frequencies explicitly stated
+    // when using `esp-hal` or `esp-hal-smartled`:
+    use Chip::*;
+    use Package::*;
+    if matches!(chip, Esp32 | Esp32c2) && matches!(package, EspHal | EspHalSmartled) {
+        features.push("xtal-40mhz".into());
+    }
+
+    // Build up an array of command-line arguments to pass to `cargo doc`:
+    let mut args = vec![
+        "doc".into(),
+        "-Zbuild-std=core".into(), // Required for Xtensa, for some reason
+        format!("--target={target}"),
+        format!("--features={}", features.join(",")),
+    ];
+    if open {
+        args.push("--open".into());
+    }
+    log::debug!("{args:#?}");
+
+    // Execute `cargo doc` from the package root:
+    cargo(&args, &package_path)?;
+
+    Ok(())
+}
+
 /// Load all examples at the given path, and parse their metadata.
 pub fn load_examples(path: &Path) -> Result<Vec<Metadata>> {
     let mut examples = Vec::new();
