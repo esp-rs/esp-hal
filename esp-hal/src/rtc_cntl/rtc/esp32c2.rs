@@ -1,7 +1,6 @@
 use strum::FromRepr;
 
 use crate::{
-    clock::XtalClock,
     peripherals::{APB_CTRL, EXTMEM, RTC_CNTL, SPI0, SPI1, SYSTEM},
     regi2c_write_mask,
     rtc_cntl::{RtcCalSel, RtcClock, RtcFastClock, RtcSlowClock},
@@ -56,17 +55,6 @@ pub(crate) fn init() {
 }
 
 pub(crate) fn configure_clock() {
-    #[cfg(feature = "xtal-40mhz")]
-    assert!(matches!(
-        RtcClock::get_xtal_freq(),
-        XtalClock::RtcXtalFreq40M
-    ));
-    #[cfg(feature = "xtal-26mhz")]
-    assert!(
-        matches!(RtcClock::get_xtal_freq(), XtalClock::RtcXtalFreq26M),
-        "Did you flash the right bootloader configured for 26MHz xtal?"
-    );
-
     RtcClock::set_fast_freq(RtcFastClock::RtcFastClock8m);
 
     let cal_val = loop {

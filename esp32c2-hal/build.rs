@@ -1,8 +1,6 @@
 use std::{env, error::Error, path::PathBuf};
 
 fn main() -> Result<(), Box<dyn Error>> {
-    check_features();
-
     // Put the linker script somewhere the linker can find it
     let out = &PathBuf::from(env::var_os("OUT_DIR").unwrap());
     println!("cargo:rustc-link-search={}", out.display());
@@ -15,10 +13,4 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rustc-link-arg=-Tdefmt.x");
 
     Ok(())
-}
-
-fn check_features() {
-    if cfg!(feature = "xtal-40mhz") && cfg!(feature = "xtal-26mhz") {
-        panic!("Only one xtal speed feature can be selected");
-    }
 }

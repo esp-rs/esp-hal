@@ -56,7 +56,7 @@ jobs:
         run: cd esp-hal-smartled/ && cargo +nightly build -Zbuild-std=core --target=riscv32imac-unknown-none-elf --features=esp32h2
       # Build all Xtensa targets:
       - name: build (esp32)
-        run: cd esp-hal-smartled/ && cargo +esp build -Zbuild-std=core --target=xtensa-esp32-none-elf --features=esp32,xtal-40mhz
+        run: cd esp-hal-smartled/ && cargo +esp build -Zbuild-std=core --target=xtensa-esp32-none-elf --features=esp32
       - name: build (esp32s2)
         run: cd esp-hal-smartled/ && cargo +esp build -Zbuild-std=core --target=xtensa-esp32s2-none-elf --features=esp32s2
       - name: build (esp32s3)
@@ -167,7 +167,7 @@ jobs:
         run: cd esp32-hal/ && cargo check --example=psram --features=psram-2m --release # This example requires release!
       # Make sure we can build without default features enabled, too!
       - name: check esp32-hal (no default features)
-        run: cd esp32-hal/ && cargo build --no-default-features --features=xtal-40mhz
+        run: cd esp32-hal/ && cargo build --no-default-features
       # Ensure documentation can be built
       - name: rustdoc
         run: cd esp32-hal/ && cargo doc --features=eh1
@@ -222,7 +222,7 @@ jobs:
           cargo +nightly check --examples --features=embassy,embassy-time-timg0,embassy-executor-thread,log
       # Make sure we can build without default features enabled, too!
       - name: check esp32c2-hal (no default features)
-        run: cd esp32c2-hal/ && cargo build --no-default-features --features=xtal-40mhz
+        run: cd esp32c2-hal/ && cargo build --no-default-features
       # Ensure documentation can be built
       - name: rustdoc
         run: cd esp32c2-hal/ && cargo doc --features=eh1
@@ -715,7 +715,7 @@ jobs:
 
       # Run 'cargo clippy' on all packages targeting RISC-V:
       - name: clippy (esp32c2-hal)
-        run: cargo clippy --manifest-path=esp-hal/Cargo.toml --target=riscv32imc-unknown-none-elf --features=esp32c2,xtal-40mhz -- -D warnings
+        run: cargo clippy --manifest-path=esp-hal/Cargo.toml --target=riscv32imc-unknown-none-elf --features=esp32c2 -- -D warnings
       - name: clippy (esp32c3-hal)
         run: cargo clippy --manifest-path=esp-hal/Cargo.toml --target=riscv32imc-unknown-none-elf --features=esp32c3 -- -D warnings
       - name: clippy (esp32c6-hal)
@@ -747,7 +747,7 @@ jobs:
 
       # Run 'cargo clippy' on all packages targeting Xtensa:
       - name: clippy (esp32-hal)
-        run: cargo clippy -Zbuild-std=core --manifest-path=esp-hal/Cargo.toml --target=xtensa-esp32-none-elf --features=esp32,xtal-40mhz -- -D warnings
+        run: cargo clippy -Zbuild-std=core --manifest-path=esp-hal/Cargo.toml --target=xtensa-esp32-none-elf --features=esp32 -- -D warnings
       - name: clippy (esp32s2-hal)
         run: cargo clippy -Zbuild-std=core --manifest-path=esp-hal/Cargo.toml --target=xtensa-esp32s2-none-elf --features=esp32s2 -- -D warnings
       - name: clippy (esp32s3-hal)

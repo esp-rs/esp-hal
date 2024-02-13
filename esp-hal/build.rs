@@ -107,13 +107,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         "esp32", "esp32c2", "esp32c3", "esp32c6", "esp32h2", "esp32p4", "esp32s2", "esp32s3"
     );
 
-    // Handle the features for the ESP32's and ESP32-C2's different crystal
-    // frequencies:
-    #[cfg(any(feature = "esp32", feature = "esp32c2"))]
-    {
-        assert_unique_used_features!("xtal-26mhz", "xtal-40mhz");
-    }
-
     // If the `embassy` feature is enabled, ensure that a time driver implementation
     // is available:
     #[cfg(feature = "embassy")]

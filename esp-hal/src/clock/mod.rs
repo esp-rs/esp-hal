@@ -57,6 +57,7 @@ use fugit::HertzU32;
 
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
+    rtc_cntl::RtcClock,
     system::SystemClockControl,
 };
 
@@ -354,29 +355,19 @@ impl<'d> ClockControl<'d> {
     pub fn boot_defaults(
         clock_control: impl Peripheral<P = SystemClockControl> + 'd,
     ) -> ClockControl<'d> {
-        #[cfg(feature = "xtal-40mhz")]
-        return ClockControl {
-            _private: clock_control.into_ref(),
-            desired_rates: RawClocks {
-                cpu_clock: HertzU32::MHz(80),
-                apb_clock: HertzU32::MHz(80),
-                xtal_clock: HertzU32::MHz(40),
-                i2c_clock: HertzU32::MHz(80),
-                pwm_clock: HertzU32::MHz(160),
-            },
-        };
+        let extimated_xtal_freq = RtcClock::estimate_xtal_frequency();
+        let xtal_freq = if extimated_xtal_freq > 33 { 40 } else { 26 };
 
-        #[cfg(feature = "xtal-26mhz")]
-        return ClockControl {
+        ClockControl {
             _private: clock_control.into_ref(),
             desired_rates: RawClocks {
                 cpu_clock: HertzU32::MHz(80),
                 apb_clock: HertzU32::MHz(80),
-                xtal_clock: HertzU32::MHz(26),
+                xtal_clock: HertzU32::MHz(xtal_freq),
                 i2c_clock: HertzU32::MHz(80),
                 pwm_clock: HertzU32::MHz(160),
             },
-        };
+        }
     }
 
     /// Configure the CPU clock speed.
@@ -386,10 +377,12 @@ impl<'d> ClockControl<'d> {
     ) -> ClockControl<'d> {
         // like NuttX use 40M hardcoded - if it turns out to be a problem
         // we will take care then
-        #[cfg(feature = "xtal-40mhz")]
-        let xtal_freq = XtalClock::RtcXtalFreq40M;
-        #[cfg(feature = "xtal-26mhz")]
-        let xtal_freq = XtalClock::RtcXtalFreq26M;
+        let xtal_freq = if RtcClock::estimate_xtal_frequency() > 33 {
+            XtalClock::RtcXtalFreq40M
+        } else {
+            XtalClock::RtcXtalFreq26M
+        };
+
         let pll_freq = match cpu_clock_speed {
             CpuClock::Clock80MHz => PllClock::Pll320MHz,
             CpuClock::Clock160MHz => PllClock::Pll320MHz,
@@ -428,25 +421,17 @@ impl<'d> ClockControl<'d> {
     pub fn boot_defaults(
         clock_control: impl Peripheral<P = SystemClockControl> + 'd,
     ) -> ClockControl<'d> {
-        #[cfg(feature = "xtal-40mhz")]
-        return ClockControl {
-            _private: clock_control.into_ref(),
-            desired_rates: RawClocks {
-                cpu_clock: HertzU32::MHz(80),
-                apb_clock: HertzU32::MHz(40),
-                xtal_clock: HertzU32::MHz(40),
-            },
-        };
+        let extimated_xtal_freq = RtcClock::estimate_xtal_frequency();
+        let xtal_freq = if extimated_xtal_freq > 33 { 40 } else { 26 };
 
-        #[cfg(feature = "xtal-26mhz")]
-        return ClockControl {
+        ClockControl {
             _private: clock_control.into_ref(),
             desired_rates: RawClocks {
                 cpu_clock: HertzU32::MHz(80),
                 apb_clock: HertzU32::MHz(40),
-                xtal_clock: HertzU32::MHz(26),
+                xtal_clock: HertzU32::MHz(xtal_freq),
             },
-        };
+        }
     }
 
     /// Configure the CPU clock speed.
@@ -455,10 +440,13 @@ impl<'d> ClockControl<'d> {
         cpu_clock_speed: CpuClock,
     ) -> ClockControl<'d> {
         let apb_freq;
-        #[cfg(feature = "xtal-40mhz")]
-        let xtal_freq = XtalClock::RtcXtalFreq40M;
-        #[cfg(feature = "xtal-26mhz")]
-        let xtal_freq = XtalClock::RtcXtalFreq26M;
+
+        let xtal_freq = if RtcClock::estimate_xtal_frequency() > 33 {
+            XtalClock::RtcXtalFreq40M
+        } else {
+            XtalClock::RtcXtalFreq26M
+        };
+
         let pll_freq = PllClock::Pll480MHz;
 
         if cpu_clock_speed.mhz() <= xtal_freq.mhz() {

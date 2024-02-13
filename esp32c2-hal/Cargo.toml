@@ -52,7 +52,7 @@ ssd1306            = "0.8.4"
 static_cell        = { version = "2.0.0", features = ["nightly"] }
 
 [features]
-default = ["embassy-integrated-timers", "rt", "vectored", "xtal-40mhz"]
+default = ["embassy-integrated-timers", "rt", "vectored"]
 
 ## Enable debug features in the HAL (used for development).
 debug = ["esp-hal/debug"]
@@ -66,10 +66,6 @@ log = ["esp-hal/log", "esp-println/log"]
 rt = ["esp-hal/rt-riscv"]
 ## Enable interrupt vectoring.
 vectored = ["esp-hal/vectored"]
-## Target device has a 26MHz crystal.
-xtal-26mhz = ["esp-hal/xtal-26mhz"]
-## Target device has a 40MHz crystal.
-xtal-40mhz = ["esp-hal/xtal-40mhz"]
 
 #! ### Trait Implementation Feature Flags
 ## Enable support for asynchronous operation, with interfaces provided by
