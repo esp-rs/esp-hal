@@ -1,7 +1,6 @@
 use strum::FromRepr;
 
 use crate::{
-    clock::XtalClock,
     peripherals::RTC_CNTL,
     rtc_cntl::{RtcCalSel, RtcClock, RtcFastClock, RtcSlowClock},
 };

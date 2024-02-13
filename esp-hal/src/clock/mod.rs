@@ -55,9 +55,10 @@
 //! ```
 use fugit::HertzU32;
 
+#[cfg(any(esp32, esp32c2))]
+use crate::rtc_cntl::RtcClock;
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
-    rtc_cntl::RtcClock,
     system::SystemClockControl,
 };
 
@@ -355,8 +356,11 @@ impl<'d> ClockControl<'d> {
     pub fn boot_defaults(
         clock_control: impl Peripheral<P = SystemClockControl> + 'd,
     ) -> ClockControl<'d> {
-        let extimated_xtal_freq = RtcClock::estimate_xtal_frequency();
-        let xtal_freq = if extimated_xtal_freq > 33 { 40 } else { 26 };
+        let xtal_freq = if RtcClock::estimate_xtal_frequency() > 33 {
+            40
+        } else {
+            26
+        };
 
         ClockControl {
             _private: clock_control.into_ref(),
@@ -421,8 +425,11 @@ impl<'d> ClockControl<'d> {
     pub fn boot_defaults(
         clock_control: impl Peripheral<P = SystemClockControl> + 'd,
     ) -> ClockControl<'d> {
-        let extimated_xtal_freq = RtcClock::estimate_xtal_frequency();
-        let xtal_freq = if extimated_xtal_freq > 33 { 40 } else { 26 };
+        let xtal_freq = if RtcClock::estimate_xtal_frequency() > 33 {
+            40
+        } else {
+            26
+        };
 
         ClockControl {
             _private: clock_control.into_ref(),
