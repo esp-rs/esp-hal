@@ -161,7 +161,7 @@ impl Clock for XtalClock {
     }
 }
 
-#[allow(unused)]
+#[allow(clippy::enum_variant_names, unused)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) enum PllClock {
     #[cfg(esp32h2)]

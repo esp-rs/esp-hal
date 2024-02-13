@@ -380,6 +380,7 @@ impl<'d> Ecc<'d> {
     ///
     /// This function will return an error if the point is not on the selected
     /// elliptic curve.
+    #[allow(clippy::too_many_arguments)]
     #[cfg(esp32h2)]
     pub fn affine_point_verification_multiplication(
         &mut self,

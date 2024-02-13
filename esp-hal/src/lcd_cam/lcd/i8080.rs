@@ -438,6 +438,7 @@ pub struct Transfer<'d, TX: Tx, BUFFER, P> {
 }
 
 impl<'d, TX: Tx, BUFFER, P> Transfer<'d, TX, BUFFER, P> {
+    #[allow(clippy::type_complexity)]
     pub fn wait(
         mut self,
     ) -> Result<(BUFFER, I8080<'d, TX, P>), (DmaError, BUFFER, I8080<'d, TX, P>)> {
@@ -566,6 +567,7 @@ where
     P6: OutputPin,
     P7: OutputPin,
 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         pin_0: impl Peripheral<P = P0> + 'd,
         pin_1: impl Peripheral<P = P1> + 'd,
@@ -678,6 +680,7 @@ where
     P14: OutputPin,
     P15: OutputPin,
 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         pin_0: impl Peripheral<P = P0> + 'd,
         pin_1: impl Peripheral<P = P1> + 'd,

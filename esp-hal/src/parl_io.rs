@@ -488,11 +488,12 @@ macro_rules! tx_pins {
             where
                 $($pin: OutputPin),+
             {
+                #[allow(clippy::too_many_arguments)]
                 pub fn new(
                     $(
                         [< pin_ $pin:lower >] : impl Peripheral<P = $pin> + 'd,
                     )+
-                    ) -> Self {
+                ) -> Self {
                     crate::into_ref!($( [< pin_ $pin:lower >] ),+);
                     Self { $( [< pin_ $pin:lower >] ),+ }
                 }
@@ -731,11 +732,12 @@ macro_rules! rx_pins {
             where
                 $($pin: InputPin),+
             {
+                #[allow(clippy::too_many_arguments)]
                 pub fn new(
                     $(
                         [< pin_ $pin:lower >] : impl Peripheral<P = $pin> + 'd,
                     )+
-                    ) -> Self {
+                ) -> Self {
                     crate::into_ref!($( [< pin_ $pin:lower >] ),+);
                     Self { $( [< pin_ $pin:lower >] ),+ }
                 }
@@ -1239,6 +1241,7 @@ where
 {
     /// Wait for the DMA transfer to complete and return the buffers and the
     /// SPI instance.
+    #[allow(clippy::type_complexity)]
     pub fn wait(
         self,
     ) -> Result<(BUFFER, ParlIoTx<'d, C, P, CP>), (DmaError, BUFFER, ParlIoTx<'d, C, P, CP>)> {
@@ -1355,6 +1358,7 @@ where
 {
     /// Wait for the DMA transfer to complete and return the buffers and the
     /// SPI instance.
+    #[allow(clippy::type_complexity)]
     pub fn wait(
         self,
     ) -> Result<(BUFFER, ParlIoRx<'d, C, P, CP>), (DmaError, BUFFER, ParlIoRx<'d, C, P, CP>)> {

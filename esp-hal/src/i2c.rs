@@ -970,7 +970,7 @@ pub trait Instance {
         );
     }
 
-    #[allow(unused)]
+    #[allow(clippy::too_many_arguments, unused)]
     fn configure_clock(
         &mut self,
         sclk_div: u32,

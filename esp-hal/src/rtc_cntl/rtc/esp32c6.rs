@@ -662,9 +662,11 @@ impl HpSystemInit {
 
         power.xtal.set_xpd_xtal(true);
 
-        let mut clock = SystemClockParam::default();
-        clock.icg_func = 0xffffffff;
-        clock.icg_apb = 0xffffffff;
+        let mut clock = SystemClockParam {
+            icg_func: 0xffffffff,
+            icg_apb: 0xffffffff,
+            ..SystemClockParam::default()
+        };
         clock.icg_modem.set_code(ICG_MODEM_CODE_ACTIVE);
         clock.sysclk.set_dig_sysclk_nodiv(false);
         clock.sysclk.set_icg_sysclk_en(true);
@@ -754,9 +756,11 @@ impl HpSystemInit {
 
         power.xtal.set_xpd_xtal(true);
 
-        let mut clock = SystemClockParam::default();
-        clock.icg_func = 0;
-        clock.icg_apb = 0;
+        let mut clock = SystemClockParam {
+            icg_func: 0,
+            icg_apb: 0,
+            ..SystemClockParam::default()
+        };
         clock.icg_modem.set_code(ICG_MODEM_CODE_MODEM);
         clock.sysclk.set_dig_sysclk_nodiv(false);
         clock.sysclk.set_icg_sysclk_en(true);
@@ -834,9 +838,11 @@ impl HpSystemInit {
 
         power.xtal.set_xpd_xtal(false);
 
-        let mut clock = SystemClockParam::default();
-        clock.icg_func = 0;
-        clock.icg_apb = 0;
+        let mut clock = SystemClockParam {
+            icg_func: 0,
+            icg_apb: 0,
+            ..SystemClockParam::default()
+        };
         clock.icg_modem.set_code(ICG_MODEM_CODE_SLEEP);
         clock.sysclk.set_dig_sysclk_nodiv(false);
         clock.sysclk.set_icg_sysclk_en(false);
@@ -1367,6 +1373,7 @@ impl Clock for RtcFastClock {
     }
 }
 
+#[allow(clippy::enum_variant_names)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 /// RTC SLOW_CLK frequency values
 pub(crate) enum RtcSlowClock {

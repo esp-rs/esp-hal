@@ -226,6 +226,7 @@ extern "C" {
 }
 
 /// RTC SLOW_CLK frequency values
+#[allow(clippy::enum_variant_names)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) enum RtcSlowClock {
     /// Select RC_SLOW_CLK as RTC_SLOW_CLK source
