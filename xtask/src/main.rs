@@ -1,8 +1,8 @@
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use clap::{Args, Parser};
-use xtask::Chip;
+use xtask::{Chip, Package};
 
 // ----------------------------------------------------------------------------
 // Command-line Interface
@@ -15,8 +15,11 @@ enum Cli {
 
 #[derive(Debug, Args)]
 struct BuildExamplesArgs {
+    /// Package to build examples for.
+    #[arg(value_enum)]
+    package: Package,
     /// Which chip to build the examples for.
-    #[clap(value_enum)]
+    #[arg(value_enum)]
     chip: Chip,
 }
 
@@ -39,12 +42,62 @@ fn main() -> Result<()> {
 // ----------------------------------------------------------------------------
 // Subcommands
 
-fn build_examples(workspace: &Path, args: BuildExamplesArgs) -> Result<()> {
-    // Load all examples and parse their metadata. Filter down the examples to only
-    // those for which our chip is supported, and then attempt to build each
-    // remaining example, with the required features enabled:
-    xtask::load_examples(workspace)?
+fn build_examples(workspace: &Path, mut args: BuildExamplesArgs) -> Result<()> {
+    // Ensure that the package/chip combination provided are valid:
+    validate_package_chip(&args.package, &args.chip)?;
+
+    // If the 'esp-hal' package is specified, what we *really* want is the
+    // 'examples' package instead:
+    if args.package == Package::EspHal {
+        log::warn!(
+            "Package '{}' specified, using '{}' instead",
+            Package::EspHal,
+            Package::Examples
+        );
+        args.package = Package::Examples;
+    }
+
+    // Absolute path of the package's root:
+    let package_path = workspace.join(args.package.to_string());
+
+    // Absolute path to the directory containing the examples:
+    let example_path = if args.package == Package::Examples {
+        package_path.join("src").join("bin")
+    } else {
+        package_path.join("examples")
+    };
+
+    // Determine the appropriate build target for the given package and chip:
+    let target = target_triple(&args.package, &args.chip)?;
+
+    // Load all examples and parse their metadata:
+    xtask::load_examples(&example_path)?
         .iter()
+        // Filter down the examples to only those for which the specified chip is supported:
         .filter(|example| example.supports_chip(args.chip))
-        .try_for_each(|example| xtask::build_example(workspace, args.chip, example))
+        // Attempt to build each supported example, with all required features enabled:
+        .try_for_each(|example| xtask::build_example(&package_path, args.chip, target, example))
+}
+
+// ----------------------------------------------------------------------------
+// Helper Functions
+
+fn target_triple<'a>(package: &'a Package, chip: &'a Chip) -> Result<&'a str> {
+    if *package == Package::EspLpHal {
+        chip.lp_target()
+    } else {
+        Ok(chip.target())
+    }
+}
+
+fn validate_package_chip(package: &Package, chip: &Chip) -> Result<()> {
+    if *package == Package::EspLpHal && !chip.has_lp_core() {
+        bail!(
+            "Invalid chip provided for package '{}': '{}'",
+            package,
+            chip
+        );
+    }
+
+    Ok(())
 }
