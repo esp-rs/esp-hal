@@ -441,6 +441,7 @@ pub mod dma {
             })
         }
 
+        #[allow(clippy::too_many_arguments)]
         fn start_transfer_dma(
             &mut self,
             write_buffer_ptr: *const u8,

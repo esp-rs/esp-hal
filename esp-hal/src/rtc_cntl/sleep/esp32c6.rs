@@ -784,11 +784,10 @@ impl RtcSleepConfig {
 
     pub fn deep() -> Self {
         // Set up for ultra-low power sleep. Wakeup sources may modify these settings.
-        let mut cfg = Self::default();
-
-        cfg.deep = true;
-
-        cfg
+        Self {
+            deep: true,
+            ..Self::default()
+        }
     }
 
     pub(crate) fn base_settings(_rtc: &Rtc) {

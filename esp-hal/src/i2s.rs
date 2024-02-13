@@ -226,6 +226,7 @@ where
 
     /// Stop for the DMA transfer and return the buffer and the
     /// I2sTx instance.
+    #[allow(clippy::type_complexity)]
     pub fn stop(self) -> Result<(BUFFER, I2sTx<'d, T, CH>), (DmaError, BUFFER, I2sTx<'d, T, CH>)> {
         T::tx_stop();
 
@@ -356,6 +357,7 @@ where
     /// I2sTx instance after copying the read data to the given buffer.
     /// Length of the received data is returned at the third element of the
     /// tuple.
+    #[allow(clippy::type_complexity)]
     pub fn wait_receive(
         mut self,
         dst: &mut [u8],

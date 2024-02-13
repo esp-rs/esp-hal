@@ -1170,7 +1170,7 @@ pub trait DmaTransfer<B, T>: Drop {
 }
 
 /// Trait to be implemented for an in progress dma transfer.
-#[allow(drop_bounds)]
+#[allow(clippy::type_complexity, drop_bounds)]
 pub trait DmaTransferRxTx<BR, BT, T>: Drop {
     /// Wait for the transfer to finish.
     fn wait(self) -> Result<(BR, BT, T), (DmaError, BR, BT, T)>;

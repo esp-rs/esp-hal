@@ -715,25 +715,15 @@ jobs:
 
       # Run 'cargo clippy' on all packages targeting RISC-V:
       - name: clippy (esp32c2-hal)
-        run: |
-          cargo clippy --manifest-path=esp-hal/Cargo.toml --target=riscv32imc-unknown-none-elf --features=esp32c2,xtal-40mhz \
-            -- -D warnings -A clippy::too_many_arguments -A clippy::type_complexity -A clippy::enum_variant_names -A clippy::field_reassign_with_default
+        run: cargo clippy --manifest-path=esp-hal/Cargo.toml --target=riscv32imc-unknown-none-elf --features=esp32c2,xtal-40mhz -- -D warnings
       - name: clippy (esp32c3-hal)
-        run: |
-          cargo clippy --manifest-path=esp-hal/Cargo.toml --target=riscv32imc-unknown-none-elf --features=esp32c3 \
-            -- -D warnings -A clippy::too_many_arguments -A clippy::type_complexity -A clippy::enum_variant_names -A clippy::field_reassign_with_default
+        run: cargo clippy --manifest-path=esp-hal/Cargo.toml --target=riscv32imc-unknown-none-elf --features=esp32c3 -- -D warnings
       - name: clippy (esp32c6-hal)
-        run: |
-          cargo clippy --manifest-path=esp-hal/Cargo.toml --target=riscv32imac-unknown-none-elf --features=esp32c6 \
-            -- -D warnings -A clippy::too_many_arguments -A clippy::type_complexity -A clippy::enum_variant_names -A clippy::field_reassign_with_default
+        run: cargo clippy --manifest-path=esp-hal/Cargo.toml --target=riscv32imac-unknown-none-elf --features=esp32c6 -- -D warnings
       - name: clippy (esp32h2-hal)
-        run: |
-          cargo clippy --manifest-path=esp-hal/Cargo.toml --target=riscv32imac-unknown-none-elf --features=esp32h2 \
-            -- -D warnings -A clippy::too_many_arguments -A clippy::type_complexity -A clippy::enum_variant_names -A clippy::field_reassign_with_default
+        run: cargo clippy --manifest-path=esp-hal/Cargo.toml --target=riscv32imac-unknown-none-elf --features=esp32h2 -- -D warnings
       # - name: clippy (esp32p4-hal)
-      #   run: |
-      #     cargo clippy --manifest-path=esp-hal/Cargo.toml --target=riscv32imafc-unknown-none-elf --features=esp32p4 \
-      #       -- -D warnings -A clippy::too_many_arguments -A clippy::type_complexity -A clippy::enum_variant_names -A clippy::field_reassign_with_default
+      #   run: cargo clippy --manifest-path=esp-hal/Cargo.toml --target=riscv32imafc-unknown-none-elf --features=esp32p4 -- -D warnings
 
       - name: clippy (esp-lp-hal, esp32c6)
         run: cd esp-lp-hal && cargo clippy --features=esp32c6 -- -D warnings
@@ -757,17 +747,11 @@ jobs:
 
       # Run 'cargo clippy' on all packages targeting Xtensa:
       - name: clippy (esp32-hal)
-        run: |
-          cargo clippy -Zbuild-std=core --manifest-path=esp-hal/Cargo.toml --target=xtensa-esp32-none-elf --features=esp32,xtal-40mhz \
-            -- -D warnings -A clippy::too_many_arguments -A clippy::type_complexity
+        run: cargo clippy -Zbuild-std=core --manifest-path=esp-hal/Cargo.toml --target=xtensa-esp32-none-elf --features=esp32,xtal-40mhz -- -D warnings
       - name: clippy (esp32s2-hal)
-        run: |
-          cargo clippy -Zbuild-std=core --manifest-path=esp-hal/Cargo.toml --target=xtensa-esp32s2-none-elf --features=esp32s2 \
-            -- -D warnings -A clippy::too_many_arguments -A clippy::type_complexity
+        run: cargo clippy -Zbuild-std=core --manifest-path=esp-hal/Cargo.toml --target=xtensa-esp32s2-none-elf --features=esp32s2 -- -D warnings
       - name: clippy (esp32s3-hal)
-        run: |
-          cargo clippy -Zbuild-std=core --manifest-path=esp-hal/Cargo.toml --target=xtensa-esp32s3-none-elf --features=esp32s3 \
-            -- -D warnings -A clippy::too_many_arguments -A clippy::type_complexity
+        run: cargo clippy -Zbuild-std=core --manifest-path=esp-hal/Cargo.toml --target=xtensa-esp32s3-none-elf --features=esp32s3 -- -D warnings
 
   rustfmt:
     runs-on: ubuntu-latest
