@@ -5,9 +5,20 @@ use std::{
     process::{Command, Stdio},
 };
 
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
 use clap::ValueEnum;
 use strum::{Display, EnumIter, IntoEnumIterator};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Display, ValueEnum)]
+#[strum(serialize_all = "kebab-case")]
+pub enum Package {
+    EspHal,
+    EspHalProcmacros,
+    EspHalSmartled,
+    EspLpHal,
+    EspRiscvRt,
+    Examples,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Display, EnumIter, ValueEnum)]
 #[strum(serialize_all = "kebab-case")]
@@ -36,25 +47,32 @@ impl Chip {
         }
     }
 
-    pub fn toolchain(&self) -> &str {
+    pub fn has_lp_core(&self) -> bool {
+        use Chip::*;
+
+        matches!(self, Esp32c6 | Esp32p4 | Esp32s2 | Esp32s3)
+    }
+
+    pub fn lp_target(&self) -> Result<&str> {
         use Chip::*;
 
         match self {
-            Esp32 | Esp32s2 | Esp32s3 => "xtensa",
-            _ => "nightly",
+            Esp32c6 => Ok("riscv32imac-unknown-none-elf"),
+            Esp32s2 | Esp32s3 => Ok("riscv32imc-unknown-none-elf"),
+            _ => bail!("Chip does not contain an LP core: '{}'", self),
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default, Clone)]
 pub struct Metadata {
-    path: PathBuf,
+    example_path: PathBuf,
     chips: Vec<Chip>,
     features: Vec<String>,
 }
 
 impl Metadata {
-    pub fn new(path: PathBuf, chips: Vec<Chip>, features: Vec<String>) -> Self {
+    pub fn new(example_path: &Path, chips: Vec<Chip>, features: Vec<String>) -> Self {
         let chips = if chips.is_empty() {
             Chip::iter().collect()
         } else {
@@ -62,15 +80,24 @@ impl Metadata {
         };
 
         Self {
-            path,
+            example_path: example_path.to_path_buf(),
             chips,
             features,
         }
     }
 
     /// Absolute path to the example.
-    pub fn path(&self) -> &Path {
-        &self.path
+    pub fn example_path(&self) -> &Path {
+        &self.example_path
+    }
+
+    /// Name of the example.
+    pub fn name(&self) -> String {
+        self.example_path()
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .replace(".rs", "")
     }
 
     /// A list of all features required for building a given examples.
@@ -84,16 +111,52 @@ impl Metadata {
     }
 }
 
-pub fn load_examples(workspace: &Path) -> Result<Vec<Metadata>> {
-    let bin_path = workspace
-        .join("examples")
-        .join("src")
-        .join("bin")
-        .canonicalize()?;
+/// Build the documentation for the specified package and device.
+pub fn build_documentation(
+    workspace: &Path,
+    package: Package,
+    chip: Chip,
+    target: &str,
+    open: bool,
+) -> Result<()> {
+    let package_name = package.to_string();
+    let package_path = workspace.join(&package_name);
 
+    log::info!("Building '{package_name}' documentation targeting '{chip}'");
+
+    let mut features = vec![chip.to_string()];
+
+    // The ESP32 and ESP32-C2 must have their Xtal frequencies explicitly stated
+    // when using `esp-hal` or `esp-hal-smartled`:
+    use Chip::*;
+    use Package::*;
+    if matches!(chip, Esp32 | Esp32c2) && matches!(package, EspHal | EspHalSmartled) {
+        features.push("xtal-40mhz".into());
+    }
+
+    // Build up an array of command-line arguments to pass to `cargo doc`:
+    let mut args = vec![
+        "doc".into(),
+        "-Zbuild-std=core".into(), // Required for Xtensa, for some reason
+        format!("--target={target}"),
+        format!("--features={}", features.join(",")),
+    ];
+    if open {
+        args.push("--open".into());
+    }
+    log::debug!("{args:#?}");
+
+    // Execute `cargo doc` from the package root:
+    cargo(&args, &package_path)?;
+
+    Ok(())
+}
+
+/// Load all examples at the given path, and parse their metadata.
+pub fn load_examples(path: &Path) -> Result<Vec<Metadata>> {
     let mut examples = Vec::new();
 
-    for entry in fs::read_dir(bin_path)? {
+    for entry in fs::read_dir(path)? {
         let path = entry?.path();
         let text = fs::read_to_string(&path)?;
 
@@ -101,12 +164,7 @@ pub fn load_examples(workspace: &Path) -> Result<Vec<Metadata>> {
         let mut features = Vec::new();
 
         // We will indicate metadata lines using the `//%` prefix:
-        let lines = text
-            .lines()
-            .filter(|line| line.starts_with("//%"))
-            .collect::<Vec<_>>();
-
-        for line in lines {
+        for line in text.lines().filter(|line| line.starts_with("//%")) {
             let mut split = line
                 .trim_start_matches("//%")
                 .trim()
@@ -137,45 +195,72 @@ pub fn load_examples(workspace: &Path) -> Result<Vec<Metadata>> {
             }
         }
 
-        let meta = Metadata::new(path, chips, features);
-        examples.push(meta);
+        examples.push(Metadata::new(&path, chips, features));
     }
 
     Ok(examples)
 }
 
-pub fn build_example(workspace: &Path, chip: Chip, example: &Metadata) -> Result<()> {
-    let path = example.path();
-    let features = example.features();
-
-    log::info!("Building example '{}' for '{}'", path.display(), chip);
-    if !features.is_empty() {
-        log::info!("  Features: {}", features.join(","));
+/// Build the specified example for the specified chip.
+pub fn build_example(
+    package_path: &Path,
+    chip: Chip,
+    target: &str,
+    example: &Metadata,
+) -> Result<()> {
+    log::info!(
+        "Building example '{}' for '{}'",
+        example.example_path().display(),
+        chip
+    );
+    if !example.features().is_empty() {
+        log::info!("  Features: {}", example.features().join(","));
     }
 
-    let bin_name = example
-        .path()
-        .file_name()
-        .unwrap()
-        .to_string_lossy()
-        .replace(".rs", "");
+    let bin = if example
+        .example_path()
+        .strip_prefix(package_path)?
+        .starts_with("src/bin")
+    {
+        format!("--bin={}", example.name())
+    } else {
+        format!("--example={}", example.name())
+    };
 
-    let args = &[
-        &format!("+{}", chip.toolchain()),
-        "build",
-        "--release",
-        &format!("--target={}", chip.target()),
-        &format!("--features={},{}", chip, features.join(",")),
-        &format!("--bin={bin_name}"),
-    ];
+    // If targeting an Xtensa device, we must use the '+esp' toolchain modifier:
+    let mut args = vec![];
+    if target.starts_with("xtensa") {
+        args.push("+esp".into());
+    }
+
+    args.extend(vec![
+        "build".into(),
+        "-Zbuild-std=alloc,core".into(),
+        "--release".into(),
+        format!("--target={target}"),
+        format!("--features={},{}", chip, example.features().join(",")),
+        bin,
+    ]);
     log::debug!("{args:#?}");
 
-    Command::new("cargo")
-        .args(args)
-        .current_dir(workspace.join("examples"))
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .output()?;
+    cargo(&args, package_path)?;
 
     Ok(())
+}
+
+fn cargo(args: &[String], cwd: &Path) -> Result<()> {
+    let status = Command::new("cargo")
+        .args(args)
+        .current_dir(cwd)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .status()?;
+
+    // Make sure that we return an appropriate exit code here, as Github Actions
+    // requires this in order to function correctly:
+    if status.success() {
+        Ok(())
+    } else {
+        Err(anyhow!("Failed to execute cargo subcommand"))
+    }
 }
