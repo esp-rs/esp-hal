@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `esp-hal-common` package is now called `esp-hal` (#1131)
 - Refactor the `Trace` driver to be generic around its peripheral (#1140)
 - Auto detect crystal frequency based on `RtcClock::estimate_xtal_frequency()` (#1165)
+- ESP32-S3: Configure 32k ICACHE (#1169)
 
 ### Removed
 - Remove `xtal-26mhz` and `xtal-40mhz` features (#1165)
