@@ -35,9 +35,3 @@ esp32h2 = ["esp-hal/esp32h2"]
 esp32s2 = ["esp-hal/esp32s2"]
 ## Target the ESP32-S3.
 esp32s3 = ["esp-hal/esp32s3"]
-
-#! ### Crystal Frequency Feature Flags
-## Target device has a 26MHz crystal.
-xtal-26mhz = ["esp-hal/xtal-26mhz"]
-## Target device has a 40MHz crystal.
-xtal-40mhz = ["esp-hal/xtal-40mhz"]

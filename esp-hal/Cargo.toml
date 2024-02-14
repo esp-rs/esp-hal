@@ -84,10 +84,6 @@ esp32p4 = ["dep:esp32p4", "riscv",  "procmacros/esp32p4"]
 esp32s2 = ["dep:esp32s2", "xtensa", "procmacros/esp32s2", "xtensa-lx/esp32s2", "xtensa-lx-rt?/esp32s2", "usb-otg", "portable-atomic/critical-section"]
 esp32s3 = ["dep:esp32s3", "xtensa", "procmacros/esp32s3", "xtensa-lx/esp32s3", "xtensa-lx-rt?/esp32s3", "usb-otg"]
 
-# Crystal frequency selection (ESP32 and ESP32-C2 only!)
-xtal-26mhz = []
-xtal-40mhz = []
-
 # Runetime support
 rt-riscv  = ["esp-riscv-rt/zero-bss", "esp32c2?/rt", "esp32c3?/rt", "esp32c6?/rt", "esp32h2?/rt", "esp32p4?/rt"]
 rt-xtensa = ["dep:xtensa-lx-rt", "esp32?/rt", "esp32s2?/rt", "esp32s3?/rt"]

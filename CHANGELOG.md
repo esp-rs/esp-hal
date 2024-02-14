@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Add initial support for the ESP32-P4 (#1101)
-- Implement `embedded_hal::pwm::SetDutyCycle` trait for `ledc::channel::Channel` (#1097) 
+- Implement `embedded_hal::pwm::SetDutyCycle` trait for `ledc::channel::Channel` (#1097)
 - ESP32-P4: Add initial GPIO support (#1109)
 - ESP32-P4: Add initial support for interrupts (#1112)
 - ESP32-P4: Add efuse reading support (#1114)
@@ -37,8 +37,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - RMT channels no longer take the channel number as a generic param (#959)
 - The `esp-hal-common` package is now called `esp-hal` (#1131)
 - Refactor the `Trace` driver to be generic around its peripheral (#1140)
+- Auto detect crystal frequency based on `RtcClock::estimate_xtal_frequency()` (#1165)
 
 ### Removed
+- Remove `xtal-26mhz` and `xtal-40mhz` features (#1165)
 
 ### Breaking
 

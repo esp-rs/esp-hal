@@ -80,15 +80,6 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock
                     bw = 1;
                 }
 
-                XtalClock::RtcXtalFreq24M => {
-                    div_ref = 11;
-                    div7_0 = 224;
-                    div10_8 = 4;
-                    lref = 1;
-                    dcur = 0;
-                    bw = 1;
-                }
-
                 XtalClock::RtcXtalFreqOther(_) => {
                     div_ref = 12;
                     div7_0 = 224;
@@ -130,15 +121,6 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock
 
                 XtalClock::RtcXtalFreq26M => {
                     div_ref = 12;
-                    div7_0 = 144;
-                    div10_8 = 4;
-                    lref = 1;
-                    dcur = 0;
-                    bw = 1;
-                }
-
-                XtalClock::RtcXtalFreq24M => {
-                    div_ref = 11;
                     div7_0 = 144;
                     div10_8 = 4;
                     lref = 1;

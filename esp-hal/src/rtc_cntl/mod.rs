@@ -383,8 +383,6 @@ impl RtcClock {
             32 => XtalClock::RtcXtalFreq32M,
             #[cfg(any(esp32, esp32c2))]
             26 => XtalClock::RtcXtalFreq26M,
-            #[cfg(esp32)]
-            24 => XtalClock::RtcXtalFreq24M,
             other => XtalClock::RtcXtalFreqOther(other),
         }
     }
@@ -631,9 +629,9 @@ impl RtcClock {
         (100_000_000 * 1000 / period) as u16
     }
 
-    // TODO: implement for ESP32-C6
+    // TODO: implement for ESP32-C6, and H2
     #[cfg(not(any(esp32c6, esp32h2)))]
-    fn estimate_xtal_frequency() -> u32 {
+    pub(crate) fn estimate_xtal_frequency() -> u32 {
         // Number of 8M/256 clock cycles to use for XTAL frequency estimation.
         const XTAL_FREQ_EST_CYCLES: u32 = 10;
 
