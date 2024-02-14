@@ -114,6 +114,14 @@ impl Metadata {
     }
 }
 
+#[derive(Debug, Clone, Copy, Display, ValueEnum)]
+#[strum(serialize_all = "lowercase")]
+pub enum Version {
+    Major,
+    Minor,
+    Patch,
+}
+
 /// Build the documentation for the specified package and device.
 pub fn build_documentation(
     workspace: &Path,
@@ -287,3 +295,40 @@ pub fn build_package(
     Ok(())
 }
 
+/// Bump the version of the specified package by the specified amount.
+pub fn bump_version(workspace: &Path, package: Package, amount: Version) -> Result<()> {
+    let manifest_path = workspace.join(package.to_string()).join("Cargo.toml");
+    let manifest = fs::read_to_string(&manifest_path)?;
+
+    let mut manifest = manifest.parse::<toml_edit::Document>()?;
+
+    let version = manifest["package"]["version"]
+        .to_string()
+        .trim()
+        .trim_matches('"')
+        .to_string();
+    let prev_version = &version;
+
+    let mut version = semver::Version::parse(&version)?;
+    match amount {
+        Version::Major => {
+            version.major += 1;
+            version.minor = 0;
+            version.patch = 0;
+        }
+        Version::Minor => {
+            version.minor += 1;
+            version.patch = 0;
+        }
+        Version::Patch => {
+            version.patch += 1;
+        }
+    }
+
+    log::info!("Bumping version for package: {package} ({prev_version} -> {version})");
+
+    manifest["package"]["version"] = toml_edit::value(version.to_string());
+    fs::write(manifest_path, manifest.to_string())?;
+
+    Ok(())
+}

@@ -2,7 +2,8 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Result};
 use clap::{Args, Parser};
-use xtask::{Chip, Package};
+use strum::IntoEnumIterator;
+use xtask::{Chip, Package, Version};
 
 // ----------------------------------------------------------------------------
 // Command-line Interface
@@ -15,6 +16,8 @@ enum Cli {
     BuildExamples(BuildExamplesArgs),
     /// Build the specified package with the given options.
     BuildPackage(BuildPackageArgs),
+    /// Bump the version of the specified package(s)
+    BumpVersion(BumpVersionArgs),
 }
 
 #[derive(Debug, Args)]
@@ -56,6 +59,16 @@ struct BuildPackageArgs {
     toolchain: Option<String>,
 }
 
+#[derive(Debug, Args)]
+struct BumpVersionArgs {
+    /// How much to bump the version by.
+    #[arg(value_enum)]
+    amount: Version,
+    /// Package(s) to target.
+    #[arg(value_enum, default_values_t = Package::iter())]
+    packages: Vec<Package>,
+}
+
 // ----------------------------------------------------------------------------
 // Application
 
@@ -71,6 +84,7 @@ fn main() -> Result<()> {
         Cli::BuildDocumentation(args) => build_documentation(&workspace, args),
         Cli::BuildExamples(args) => build_examples(&workspace, args),
         Cli::BuildPackage(args) => build_package(&workspace, args),
+        Cli::BumpVersion(args) => bump_version(&workspace, args),
     }
 }
 
@@ -132,6 +146,15 @@ fn build_package(workspace: &Path, args: BuildPackageArgs) -> Result<()> {
 
     // Build the package using the provided features and/or target, if any:
     xtask::build_package(&package_path, args.features, args.toolchain, args.target)
+}
+
+fn bump_version(workspace: &Path, args: BumpVersionArgs) -> Result<()> {
+    // Bump the version by the specified amount for each given package:
+    for package in args.packages {
+        xtask::bump_version(workspace, package, args.amount)?;
+    }
+
+    Ok(())
 }
 
 // ----------------------------------------------------------------------------
