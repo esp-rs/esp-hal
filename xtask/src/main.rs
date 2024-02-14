@@ -13,6 +13,8 @@ enum Cli {
     BuildDocumentation(BuildDocumentationArgs),
     /// Build all examples for the specified chip.
     BuildExamples(BuildExamplesArgs),
+    /// Build the specified package with the given options.
+    BuildPackage(BuildPackageArgs),
 }
 
 #[derive(Debug, Args)]
@@ -38,6 +40,22 @@ struct BuildExamplesArgs {
     chip: Chip,
 }
 
+#[derive(Debug, Args)]
+struct BuildPackageArgs {
+    /// Package to build.
+    #[arg(value_enum)]
+    package: Package,
+    /// Target to build for.
+    #[arg(long)]
+    target: Option<String>,
+    /// Features to build with.
+    #[arg(long, value_delimiter = ',')]
+    features: Vec<String>,
+    /// Toolchain to build with.
+    #[arg(long)]
+    toolchain: Option<String>,
+}
+
 // ----------------------------------------------------------------------------
 // Application
 
@@ -52,6 +70,7 @@ fn main() -> Result<()> {
     match Cli::parse() {
         Cli::BuildDocumentation(args) => build_documentation(&workspace, args),
         Cli::BuildExamples(args) => build_examples(&workspace, args),
+        Cli::BuildPackage(args) => build_package(&workspace, args),
     }
 }
 
@@ -105,6 +124,14 @@ fn build_examples(workspace: &Path, mut args: BuildExamplesArgs) -> Result<()> {
         .filter(|example| example.supports_chip(args.chip))
         // Attempt to build each supported example, with all required features enabled:
         .try_for_each(|example| xtask::build_example(&package_path, args.chip, target, example))
+}
+
+fn build_package(workspace: &Path, args: BuildPackageArgs) -> Result<()> {
+    // Absolute path of the package's root:
+    let package_path = workspace.join(args.package.to_string());
+
+    // Build the package using the provided features and/or target, if any:
+    xtask::build_package(&package_path, args.features, args.toolchain, args.target)
 }
 
 // ----------------------------------------------------------------------------

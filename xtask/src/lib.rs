@@ -245,3 +245,45 @@ pub fn build_example(
 
     Ok(())
 }
+
+/// Build the specified package, using the given toolchain/target/features if
+/// provided.
+pub fn build_package(
+    package_path: &Path,
+    features: Vec<String>,
+    toolchain: Option<String>,
+    target: Option<String>,
+) -> Result<()> {
+    log::info!("Building package '{}'", package_path.display());
+    if !features.is_empty() {
+        log::info!("  Features: {}", features.join(","));
+    }
+    if let Some(ref target) = target {
+        log::info!("  Target:   {}", target);
+    }
+
+    let mut builder = CargoArgsBuilder::default()
+        .subcommand("build")
+        .arg("-Zbuild-std=core")
+        .arg("--release");
+
+    if let Some(toolchain) = toolchain {
+        builder = builder.toolchain(toolchain);
+    }
+
+    if let Some(target) = target {
+        builder = builder.target(target);
+    }
+
+    if !features.is_empty() {
+        builder = builder.features(&features);
+    }
+
+    let args = builder.build();
+    log::debug!("{args:#?}");
+
+    cargo::run(&args, package_path)?;
+
+    Ok(())
+}
+
