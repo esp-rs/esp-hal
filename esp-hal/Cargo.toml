@@ -20,6 +20,7 @@ bitfield             = "0.14.0"
 cfg-if               = "1.0.0"
 critical-section     = "1.1.2"
 defmt                = { version = "=0.3.5", optional = true }
+document-features    = "0.2.8"
 embedded-can         = { version = "0.4.1", optional = true }
 embedded-dma         = "0.2.0"
 embedded-hal         = { version = "0.2.7", features = ["unproven"] }
@@ -47,11 +48,9 @@ embassy-futures      = { version = "0.1.1", optional = true }
 embassy-sync         = { version = "0.5.0", optional = true }
 embassy-time-driver  = { version = "0.1.0", optional = true }
 
-# RISC-V
-riscv        = { version = "0.11.0", optional = true }
+# Architecture/runtime
 esp-riscv-rt = { version = "0.6.1",  optional = true, path = "../esp-riscv-rt" }
-
-# Xtensa
+riscv        = { version = "0.11.0", optional = true }
 xtensa-lx    = { version = "0.8.0",  optional = true }
 xtensa-lx-rt = { version = "0.16.0", optional = true }
 
@@ -75,14 +74,23 @@ basic-toml = "0.1.8"
 serde      = { version = "1.0.195", features = ["derive"] }
 
 [features]
-esp32   = ["dep:esp32",   "xtensa", "procmacros/esp32",   "xtensa-lx/esp32",   "xtensa-lx-rt?/esp32"]
-esp32c2 = ["dep:esp32c2", "riscv",  "procmacros/esp32c2", "portable-atomic/unsafe-assume-single-core"]
-esp32c3 = ["dep:esp32c3", "riscv",  "procmacros/esp32c3", "portable-atomic/unsafe-assume-single-core"]
-esp32c6 = ["dep:esp32c6", "riscv",  "procmacros/esp32c6"]
-esp32h2 = ["dep:esp32h2", "riscv",  "procmacros/esp32h2"]
-esp32p4 = ["dep:esp32p4", "riscv",  "procmacros/esp32p4"]
-esp32s2 = ["dep:esp32s2", "xtensa", "procmacros/esp32s2", "xtensa-lx/esp32s2", "xtensa-lx-rt?/esp32s2", "usb-otg", "portable-atomic/critical-section"]
-esp32s3 = ["dep:esp32s3", "xtensa", "procmacros/esp32s3", "xtensa-lx/esp32s3", "xtensa-lx-rt?/esp32s3", "usb-otg"]
+#! ### Chip Support Feature Flags
+## Target the ESP32.
+esp32   = ["dep:esp32",   "xtensa", "xtensa-lx/esp32", "xtensa-lx-rt?/esp32"]
+## Target the ESP32-C2.
+esp32c2 = ["dep:esp32c2", "riscv",  "portable-atomic/unsafe-assume-single-core"]
+## Target the ESP32-C3.
+esp32c3 = ["dep:esp32c3", "riscv",  "portable-atomic/unsafe-assume-single-core"]
+## Target the ESP32-C6.
+esp32c6 = ["dep:esp32c6", "riscv",  "procmacros/has-lp-core"]
+## Target the ESP32-H2.
+esp32h2 = ["dep:esp32h2", "riscv"]
+## Target the ESP32-P4.
+esp32p4 = ["dep:esp32p4", "riscv",  "procmacros/has-lp-core"]
+## Target the ESP32-S2.
+esp32s2 = ["dep:esp32s2", "xtensa", "portable-atomic/critical-section", "procmacros/has-ulp-core", "xtensa-lx/esp32s2", "xtensa-lx-rt?/esp32s2", "usb-otg"]
+## Target the ESP32-S3.
+esp32s3 = ["dep:esp32s3", "xtensa", "procmacros/has-ulp-core", "xtensa-lx/esp32s3", "xtensa-lx-rt?/esp32s3", "usb-otg"]
 
 # Runetime support
 rt-riscv  = ["esp-riscv-rt/zero-bss", "esp32c2?/rt", "esp32c3?/rt", "esp32c6?/rt", "esp32h2?/rt", "esp32p4?/rt"]

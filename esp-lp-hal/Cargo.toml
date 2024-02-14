@@ -41,9 +41,9 @@ default = ["embedded-hal-02"]
 embedded-hal-02 = ["dep:embedded-hal-02"]
 embedded-hal-1  = ["dep:embedded-hal-1"]
 
-esp32c6 = ["dep:esp32c6-lp",  "procmacros/esp32c6-lp", "dep:nb", "dep:paste"]
-esp32s2 = ["dep:esp32s2-ulp", "procmacros/esp32s2-ulp"]
-esp32s3 = ["dep:esp32s3-ulp", "procmacros/esp32s3-ulp"]
+esp32c6 = ["dep:esp32c6-lp",  "procmacros/is-lp-core", "dep:nb", "dep:paste"]
+esp32s2 = ["dep:esp32s2-ulp", "procmacros/is-ulp-core"]
+esp32s3 = ["dep:esp32s3-ulp", "procmacros/is-ulp-core"]
 
 debug = [
     "esp32c6-lp?/impl-register-debug",

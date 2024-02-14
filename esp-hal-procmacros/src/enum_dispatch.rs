@@ -1,4 +1,5 @@
-use proc_macro2::{Group, TokenTree};
+use proc_macro2::{Group, TokenStream, TokenTree};
+use quote::{format_ident, quote};
 use syn::{
     parse::{Parse, ParseStream, Result},
     Ident,
@@ -53,4 +54,27 @@ impl Parse for MakeGpioEnumDispatchMacro {
             elements,
         })
     }
+}
+
+pub(crate) fn build_match_arms(input: MakeGpioEnumDispatchMacro) -> Vec<TokenStream> {
+    let mut arms = Vec::new();
+    for (gpio_type, num) in input.elements {
+        let enum_name = format_ident!("ErasedPin");
+        let variant_name = format_ident!("Gpio{}", num);
+
+        if input.filter.contains(&gpio_type) {
+            arms.push({
+                quote! { #enum_name::#variant_name($target) => $body }
+            });
+        } else {
+            arms.push({
+                quote! {
+                    #[allow(unused)]
+                    #enum_name::#variant_name($target) => { panic!("Unsupported") }
+                }
+            });
+        }
+    }
+
+    arms
 }

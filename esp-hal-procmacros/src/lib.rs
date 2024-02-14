@@ -75,12 +75,8 @@
 #![doc = document_features::document_features!()]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 
-#[cfg(feature = "ram")]
-use darling::{ast::NestedMeta, Error as DarlingError, FromMeta};
+#[allow(unused)]
 use proc_macro::TokenStream;
-use proc_macro_error::proc_macro_error;
-use quote::quote;
-use syn::parse_macro_input;
 
 #[cfg(feature = "embassy")]
 mod embassy;
@@ -88,80 +84,11 @@ mod embassy;
 mod enum_dispatch;
 #[cfg(feature = "interrupt")]
 mod interrupt;
-#[cfg(any(
-    feature = "esp32c6-lp",
-    feature = "esp32s2-ulp",
-    feature = "esp32s3-ulp"
-))]
+#[cfg(any(feature = "is-lp-core", feature = "is-ulp-core"))]
 mod lp_core;
 
-#[cfg(any(
-    feature = "esp32c6",
-    feature = "esp32s2",
-    feature = "esp32s3",
-    feature = "interrupt"
-))]
-fn get_hal_crate() -> (
-    Result<proc_macro_crate::FoundCrate, proc_macro_crate::Error>,
-    proc_macro2::Ident,
-) {
-    use proc_macro::Span;
-    use proc_macro2::Ident;
-    use proc_macro_crate::crate_name;
-
-    // Package name:
-    #[cfg(any(
-        feature = "esp32c6-lp",
-        feature = "esp32s2-ulp",
-        feature = "esp32s3-ulp"
-    ))]
-    let hal_crate = crate_name("esp-lp-hal");
-    #[cfg(feature = "esp32")]
-    let hal_crate = crate_name("esp32-hal");
-    #[cfg(feature = "esp32c2")]
-    let hal_crate = crate_name("esp32c2-hal");
-    #[cfg(feature = "esp32c3")]
-    let hal_crate = crate_name("esp32c3-hal");
-    #[cfg(feature = "esp32c6")]
-    let hal_crate = crate_name("esp32c6-hal");
-    #[cfg(feature = "esp32h2")]
-    let hal_crate = crate_name("esp32h2-hal");
-    #[cfg(feature = "esp32p4")]
-    let hal_crate = crate_name("esp32p4-hal");
-    #[cfg(feature = "esp32s2")]
-    let hal_crate = crate_name("esp32s2-hal");
-    #[cfg(feature = "esp32s3")]
-    let hal_crate = crate_name("esp32s3-hal");
-
-    // Crate name:
-    #[cfg(any(
-        feature = "esp32c6-lp",
-        feature = "esp32s2-ulp",
-        feature = "esp32s3-ulp"
-    ))]
-    let hal_crate_name = Ident::new("esp_lp_hal", Span::call_site().into());
-    #[cfg(feature = "esp32")]
-    let hal_crate_name = Ident::new("esp32_hal", Span::call_site().into());
-    #[cfg(feature = "esp32c2")]
-    let hal_crate_name = Ident::new("esp32c2_hal", Span::call_site().into());
-    #[cfg(feature = "esp32c3")]
-    let hal_crate_name = Ident::new("esp32c3_hal", Span::call_site().into());
-    #[cfg(feature = "esp32c6")]
-    let hal_crate_name = Ident::new("esp32c6_hal", Span::call_site().into());
-    #[cfg(feature = "esp32h2")]
-    let hal_crate_name = Ident::new("esp32h2_hal", Span::call_site().into());
-    #[cfg(feature = "esp32p4")]
-    let hal_crate_name = Ident::new("esp32p4_hal", Span::call_site().into());
-    #[cfg(feature = "esp32s2")]
-    let hal_crate_name = Ident::new("esp32s2_hal", Span::call_site().into());
-    #[cfg(feature = "esp32s3")]
-    let hal_crate_name = Ident::new("esp32s3_hal", Span::call_site().into());
-
-    (hal_crate, hal_crate_name)
-}
-
 #[cfg(feature = "ram")]
-#[derive(Debug, Default, FromMeta)]
+#[derive(Debug, Default, darling::FromMeta)]
 #[darling(default)]
 struct RamArgs {
     rtc_fast: bool,
@@ -181,15 +108,17 @@ struct RamArgs {
 /// Not all targets support RTC slow ram.
 #[cfg(feature = "ram")]
 #[proc_macro_attribute]
-#[proc_macro_error]
+#[proc_macro_error::proc_macro_error]
 pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
+    use darling::{ast::NestedMeta, Error, FromMeta};
     use proc_macro::Span;
     use proc_macro_error::abort;
+    use syn::{parse, Item};
 
     let attr_args = match NestedMeta::parse_meta_list(args.into()) {
         Ok(v) => v,
         Err(e) => {
-            return TokenStream::from(DarlingError::from(e).write_errors());
+            return TokenStream::from(Error::from(e).write_errors());
         }
     };
 
@@ -205,7 +134,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
         }
     };
 
-    let item: syn::Item = syn::parse(input).expect("failed to parse input");
+    let item: Item = parse(input).expect("failed to parse input");
 
     #[cfg(not(feature = "rtc_slow"))]
     if rtc_slow {
@@ -215,7 +144,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
         );
     }
 
-    let is_fn = matches!(item, syn::Item::Fn(_));
+    let is_fn = matches!(item, Item::Fn(_));
     let section_name = match (is_fn, rtc_fast, rtc_slow, uninitialized, zeroed) {
         (true, false, false, false, false) => Ok(".rwtext"),
         (true, true, false, false, false) => Ok(".rtc_fast.text"),
@@ -235,11 +164,11 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
     };
 
     let section = match (is_fn, section_name) {
-        (true, Ok(section_name)) => quote! {
+        (true, Ok(section_name)) => quote::quote! {
             #[link_section = #section_name]
             #[inline(never)] // make certain function is not inlined
         },
-        (false, Ok(section_name)) => quote! {
+        (false, Ok(section_name)) => quote::quote! {
             #[link_section = #section_name]
         },
         (_, Err(_)) => {
@@ -247,7 +176,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
         }
     };
 
-    let output = quote! {
+    let output = quote::quote! {
         #section
         #item
     };
@@ -285,10 +214,12 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
 pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
     use std::iter;
 
+    use darling::{ast::NestedMeta, Error};
     use proc_macro::Span;
     use proc_macro2::Ident;
-    use proc_macro_crate::FoundCrate;
+    use proc_macro_crate::{crate_name, FoundCrate};
     use proc_macro_error::abort;
+    use quote::quote;
     use syn::{
         parse::Error as ParseError,
         spanned::Spanned,
@@ -306,7 +237,7 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
     let attr_args = match NestedMeta::parse_meta_list(args.into()) {
         Ok(v) => v,
         Err(e) => {
-            return TokenStream::from(darling::Error::from(e).write_errors());
+            return TokenStream::from(Error::from(e).write_errors());
         }
     };
 
@@ -321,19 +252,16 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
     let mut ident_s = &ident.clone();
 
     if attr_args.len() == 1 {
-        match &attr_args[0] {
-            NestedMeta::Meta(Meta::Path(x)) => {
-                ident_s = x.get_ident().unwrap();
-            }
-            _ => {
-                abort!(
-                    Span::call_site(),
-                    format!(
-                        "This attribute accepts a string attribute {:?}",
-                        attr_args[0]
-                    )
+        if let NestedMeta::Meta(Meta::Path(x)) = &attr_args[0] {
+            ident_s = x.get_ident().unwrap();
+        } else {
+            abort!(
+                Span::call_site(),
+                format!(
+                    "This attribute accepts a string attribute {:?}",
+                    attr_args[0]
                 )
-            }
+            )
         }
     }
 
@@ -373,19 +301,17 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
         proc_macro2::Span::call_site(),
     );
 
-    let (hal_crate, hal_crate_name) = get_hal_crate();
+    let hal_crate = if cfg!(any(feature = "is-lp-core", feature = "is-ulp-core")) {
+        crate_name("esp-lp-hal")
+    } else {
+        crate_name("esp-hal")
+    };
 
-    let interrupt_in_hal_crate = match hal_crate {
-        Ok(FoundCrate::Itself) => {
-            quote!( #hal_crate_name::peripherals::Interrupt::#ident_s )
-        }
-        Ok(FoundCrate::Name(ref name)) => {
-            let ident = Ident::new(&name, Span::call_site().into());
-            quote!( #ident::peripherals::Interrupt::#ident_s )
-        }
-        Err(_) => {
-            quote!( crate::peripherals::Interrupt::#ident_s )
-        }
+    let interrupt_in_hal_crate = if let Ok(FoundCrate::Name(ref name)) = hal_crate {
+        let ident = Ident::new(&name, Span::call_site().into());
+        quote!( #ident::peripherals::Interrupt::#ident_s )
+    } else {
+        quote!( crate::peripherals::Interrupt::#ident_s )
     };
 
     f.block.stmts.extend(iter::once(
@@ -406,17 +332,11 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
 
     let export_name = ident_s.to_string();
 
-    let trap_frame_in_hal_crate = match hal_crate {
-        Ok(FoundCrate::Itself) => {
-            quote!(#hal_crate_name::trapframe::TrapFrame)
-        }
-        Ok(FoundCrate::Name(ref name)) => {
-            let ident = Ident::new(&name, Span::call_site().into());
-            quote!( #ident::trapframe::TrapFrame )
-        }
-        Err(_) => {
-            quote!(crate::trapframe::TrapFrame)
-        }
+    let trap_frame_in_hal_crate = if let Ok(FoundCrate::Name(ref name)) = hal_crate {
+        let ident = Ident::new(&name, Span::call_site().into());
+        quote!( #ident::trapframe::TrapFrame )
+    } else {
+        quote!(crate::trapframe::TrapFrame)
     };
 
     let context_call =
@@ -445,34 +365,14 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
 #[cfg(feature = "enum-dispatch")]
 #[proc_macro]
 pub fn make_gpio_enum_dispatch_macro(input: TokenStream) -> TokenStream {
-    use quote::format_ident;
+    use quote::{format_ident, quote};
 
-    use self::enum_dispatch::MakeGpioEnumDispatchMacro;
+    use self::enum_dispatch::{build_match_arms, MakeGpioEnumDispatchMacro};
 
-    let input = parse_macro_input!(input as MakeGpioEnumDispatchMacro);
-
-    let mut arms = Vec::new();
-    for (gpio_type, num) in input.elements {
-        let enum_name = format_ident!("ErasedPin");
-        let variant_name = format_ident!("Gpio{}", num);
-
-        if input.filter.contains(&gpio_type) {
-            let arm = {
-                quote! { #enum_name::#variant_name($target) => $body }
-            };
-            arms.push(arm);
-        } else {
-            let arm = {
-                quote! {
-                    #[allow(unused)]
-                    #enum_name::#variant_name($target) => { panic!("Unsupported") }
-                }
-            };
-            arms.push(arm);
-        }
-    }
+    let input = syn::parse_macro_input!(input as MakeGpioEnumDispatchMacro);
 
     let macro_name = format_ident!("{}", input.name);
+    let arms = build_match_arms(input);
 
     quote! {
         #[doc(hidden)]
@@ -497,35 +397,36 @@ pub fn make_gpio_enum_dispatch_macro(input: TokenStream) -> TokenStream {
 /// let lp_core_code = load_lp_code!("path.elf");
 /// lp_core_code.run(&mut lp_core, lp_core::LpCoreWakeupSource::HpCpu, lp_pin);
 /// ````
-#[cfg(any(feature = "esp32c6", feature = "esp32s2", feature = "esp32s3"))]
+#[cfg(any(feature = "has-lp-core", feature = "has-ulp-core"))]
 #[proc_macro]
 pub fn load_lp_code(input: TokenStream) -> TokenStream {
-    use std::{fs, path};
+    use std::{fs, path::Path};
 
-    use object::{Object, ObjectSection, ObjectSymbol};
+    use litrs::StringLit;
+    use object::{File, Object, ObjectSection, ObjectSymbol, Section, SectionKind};
+    use parse::Error;
     use proc_macro::Span;
-    use proc_macro_crate::FoundCrate;
+    use proc_macro_crate::{crate_name, FoundCrate};
+    use quote::quote;
     use syn::{parse, Ident};
 
-    let (hal_crate, hal_crate_name) = get_hal_crate();
+    let hal_crate = if cfg!(any(feature = "is-lp-core", feature = "is-ulp-core")) {
+        crate_name("esp-lp-hal")
+    } else {
+        crate_name("esp-hal")
+    };
 
-    let hal_crate = match hal_crate {
-        Ok(FoundCrate::Itself) => {
-            quote!( #hal_crate_name )
-        }
-        Ok(FoundCrate::Name(ref name)) => {
-            let ident = Ident::new(&name, Span::call_site().into());
-            quote!( #ident )
-        }
-        Err(_) => {
-            quote!(crate)
-        }
+    let hal_crate = if let Ok(FoundCrate::Name(ref name)) = hal_crate {
+        let ident = Ident::new(&name, Span::call_site().into());
+        quote!( #ident )
+    } else {
+        quote!(crate)
     };
 
     let first_token = match input.into_iter().next() {
         Some(token) => token,
         None => {
-            return parse::Error::new(
+            return Error::new(
                 Span::call_site().into(),
                 "You need to give the path to an ELF file",
             )
@@ -533,10 +434,10 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
             .into();
         }
     };
-    let arg = match litrs::StringLit::try_from(&first_token) {
+    let arg = match StringLit::try_from(&first_token) {
         Ok(arg) => arg,
         Err(_) => {
-            return parse::Error::new(
+            return Error::new(
                 Span::call_site().into(),
                 "You need to give the path to an ELF file",
             )
@@ -546,33 +447,34 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
     };
     let elf_file = arg.value();
 
-    if !path::Path::new(elf_file).exists() {
-        return parse::Error::new(Span::call_site().into(), "File not found")
+    if !Path::new(elf_file).exists() {
+        return Error::new(Span::call_site().into(), "File not found")
             .to_compile_error()
             .into();
     }
 
     let bin_data = fs::read(elf_file).unwrap();
-    let obj_file = object::File::parse(&*bin_data).unwrap();
+    let obj_file = File::parse(&*bin_data).unwrap();
     let sections = obj_file.sections();
 
-    let mut sections: Vec<object::Section> = sections
+    let mut sections: Vec<Section> = sections
         .into_iter()
         .filter(|section| match section.kind() {
-            object::SectionKind::Text
-            | object::SectionKind::ReadOnlyData
-            | object::SectionKind::Data
-            | object::SectionKind::UninitializedData => true,
+            SectionKind::Text
+            | SectionKind::ReadOnlyData
+            | SectionKind::Data
+            | SectionKind::UninitializedData => true,
             _ => false,
         })
         .collect();
     sections.sort_by(|a, b| a.address().partial_cmp(&b.address()).unwrap());
 
     let mut binary: Vec<u8> = Vec::new();
-    #[cfg(feature = "esp32c6")]
-    let mut last_address = 0x50_000_000;
-    #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
-    let mut last_address = 0x0;
+    let mut last_address = if cfg!(feature = "has-lp-core") {
+        0x5000_0000
+    } else {
+        0x0
+    };
 
     for section in sections {
         if section.address() > last_address {
@@ -590,7 +492,7 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
         .find(|s| s.name().unwrap().starts_with("__ULP_MAGIC_"));
 
     if let None = magic_symbol {
-        return parse::Error::new(
+        return Error::new(
             Span::call_site().into(),
             "Given file doesn't seem to be an LP/ULP core application.",
         )
@@ -611,7 +513,7 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
         .filter(|v: &proc_macro2::TokenStream| !v.is_empty())
         .collect();
 
-    #[cfg(feature = "esp32c6")]
+    #[cfg(feature = "has-lp-core")]
     let imports = quote! {
         use #hal_crate::lp_core::LpCore;
         use #hal_crate::lp_core::LpCoreWakeupSource;
@@ -620,24 +522,23 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
         use #hal_crate::uart::lp_uart::LpUart;
         use #hal_crate::i2c::lp_i2c::LpI2c;
     };
-    #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
+    #[cfg(feature = "has-ulp-core")]
     let imports = quote! {
         use #hal_crate::ulp_core::UlpCore as LpCore;
         use #hal_crate::ulp_core::UlpCoreWakeupSource as LpCoreWakeupSource;
         use #hal_crate::gpio::*;
     };
 
-    #[cfg(feature = "esp32c6")]
+    #[cfg(feature = "has-lp-core")]
     let rtc_code_start = quote! { _rtc_fast_data_start };
-    #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
+    #[cfg(feature = "has-ulp-core")]
     let rtc_code_start = quote! { _rtc_slow_data_start };
 
     quote! {
         {
             #imports
 
-            struct LpCoreCode {
-            }
+            struct LpCoreCode {}
 
             static LP_CODE: &[u8] = &[#(#binary),*];
 
@@ -651,34 +552,35 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
 
             impl LpCoreCode {
                 pub fn run(
-                        &self,
-                        lp_core: &mut LpCore,
-                        wakeup_source: LpCoreWakeupSource,
-                        #(_: #args),*
-                    ) {
+                    &self,
+                    lp_core: &mut LpCore,
+                    wakeup_source: LpCoreWakeupSource,
+                    #(_: #args),*
+                ) {
                     lp_core.run(wakeup_source);
                 }
             }
 
-            LpCoreCode {
-            }
+            LpCoreCode {}
         }
     }
     .into()
 }
 
-#[cfg(any(
-    feature = "esp32c6-lp",
-    feature = "esp32s2-ulp",
-    feature = "esp32s3-ulp"
-))]
-#[proc_macro_error]
+#[cfg(any(feature = "is-lp-core", feature = "is-ulp-core"))]
+#[proc_macro_error::proc_macro_error]
 #[proc_macro_attribute]
 pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
     use proc_macro2::{Ident, Span};
     use proc_macro_crate::{crate_name, FoundCrate};
     use quote::{format_ident, quote};
-    use syn::{parse, parse_macro_input, spanned::Spanned, FnArg, ItemFn};
+    use syn::{
+        parse::{self, Error},
+        parse_macro_input,
+        spanned::Spanned,
+        FnArg,
+        ItemFn,
+    };
 
     use self::lp_core::{extract_pin, get_simplename, make_magic_symbol_name};
 
@@ -692,7 +594,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
     };
 
     if !args.is_empty() {
-        return parse::Error::new(Span::call_site(), "This attribute accepts no arguments")
+        return Error::new(Span::call_site(), "This attribute accepts no arguments")
             .to_compile_error()
             .into();
     }
@@ -708,7 +610,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
         let param_name = format_ident!("param{}", num);
         match arg {
             FnArg::Receiver(_) => {
-                return parse::Error::new(arg.span(), "invalid argument")
+                return Error::new(arg.span(), "invalid argument")
                     .to_compile_error()
                     .into();
             }
@@ -717,7 +619,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
                     "GpioPin" => {
                         let pin = extract_pin(&t.ty);
                         if used_pins.contains(&pin) {
-                            return parse::Error::new(arg.span(), "duplicate pin")
+                            return Error::new(arg.span(), "duplicate pin")
                                 .to_compile_error()
                                 .into();
                         }
@@ -737,7 +639,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
                         ));
                     }
                     _ => {
-                        return parse::Error::new(arg.span(), "invalid argument to main")
+                        return Error::new(arg.span(), "invalid argument to main")
                             .to_compile_error()
                             .into();
                     }
@@ -798,7 +700,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
 ///     // Function body
 /// }
 /// ```
-#[cfg(all(feature = "embassy"))]
+#[cfg(feature = "embassy")]
 #[proc_macro_attribute]
 pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
     use self::embassy::{
@@ -806,8 +708,8 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
         Args,
     };
 
-    let args = parse_macro_input!(args as Args);
-    let f = parse_macro_input!(item as syn::ItemFn);
+    let args = syn::parse_macro_input!(args as Args);
+    let f = syn::parse_macro_input!(item as syn::ItemFn);
 
     run(&args.meta, f, main()).unwrap_or_else(|x| x).into()
 }

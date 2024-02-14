@@ -3,26 +3,26 @@ name         = "esp-hal-procmacros"
 version      = "0.8.0"
 edition      = "2021"
 rust-version = "1.67.0"
-description  = "Procedural macros for ESP-HAL"
+description  = "Procedural macros for esp-hal"
 repository   = "https://github.com/esp-rs/esp-hal"
 license      = "MIT OR Apache-2.0"
 
 [package.metadata.docs.rs]
-features = ["esp32c3", "embassy", "interrupt", "ram"]
+features = ["embassy", "has-ulp-core", "interrupt", "ram", "is-ulp-core"]
 
 [lib]
 proc-macro = true
 
 [dependencies]
-darling           = "0.20.3"
-document-features = "0.2.7"
+darling           = "0.20.5"
+document-features = "0.2.8"
 litrs             = "0.4.1"
-object            = { version = "0.32.1", optional = true }
-proc-macro-crate  = "2.0.1"
+object            = { version = "0.32.2", optional = true }
+proc-macro-crate  = "3.1.0"
 proc-macro-error  = "1.0.4"
-proc-macro2       = "1.0.70"
-quote             = "1.0.33"
-syn               = { version = "2.0.40", features = ["extra-traits", "full"] }
+proc-macro2       = "1.0.78"
+quote             = "1.0.35"
+syn               = { version = "2.0.48", features = ["extra-traits", "full"] }
 
 [features]
 ## Provide a `#[main]` procmacro to mark the entry point for Embassy applications.
@@ -36,26 +36,14 @@ ram = []
 ## Indicates the target devices has RTC slow memory available.
 rtc_slow = []
 
-#! ### Chip Support Feature Flags
-## Target the ESP32.
-esp32 = []
-## Target the ESP32-C2.
-esp32c2 = []
-## Target the ESP32-C3.
-esp32c3 = []
-## Target the ESP32-C6.
-esp32c6 = ["dep:object"]
-## Target the ESP32-C6's low-power core.
-esp32c6-lp = []
-## Target the ESP32-H2.
-esp32h2 = []
-## Target the ESP32-P4.
-esp32p4 = []
-## Target the ESP32-S2.
-esp32s2 = ["dep:object"]
-## Target the ESP32-S2's ultra-low-power core.
-esp32s2-ulp = []
-## Target the ESP32-S3.
-esp32s3 = ["dep:object"]
-## Target the ESP32-S3's ultra-low-power core.
-esp32s3-ulp = []
+#! ### Low-power Core Feature Flags
+## Indicate that the SoC contains an LP core.
+has-lp-core = ["dep:object"]
+## Indicate that the SoC contains a ULP core.
+has-ulp-core = ["dep:object"]
+## Provide an `#[entry]` macro for running applications on the ESP32-C6/P4's
+## LP core.
+is-lp-core = []
+## Provide an `#[entry]` macro for running applications on the ESP32-S2/S3's
+## ULP core.
+is-ulp-core = []

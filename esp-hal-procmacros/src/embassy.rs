@@ -23,7 +23,7 @@ pub(crate) mod main {
 
     use darling::{export::NestedMeta, FromMeta};
     use proc_macro2::{Ident, Span, TokenStream};
-    use proc_macro_crate::FoundCrate;
+    use proc_macro_crate::{crate_name, FoundCrate};
     use quote::{quote, ToTokens};
     use syn::{ReturnType, Type};
 
@@ -162,19 +162,17 @@ pub(crate) mod main {
     }
 
     pub fn main() -> TokenStream {
-        let (hal_crate, hal_crate_name) = crate::get_hal_crate();
+        let hal_crate = if cfg!(any(feature = "is-lp-core", feature = "is-ulp-core")) {
+            crate_name("esp-lp-hal")
+        } else {
+            crate_name("esp-hal")
+        };
 
-        let executor = match hal_crate {
-            Ok(FoundCrate::Itself) => {
-                quote!( #hal_crate_name::embassy::executor::Executor )
-            }
-            Ok(FoundCrate::Name(ref name)) => {
-                let ident = Ident::new(&name, Span::call_site().into());
-                quote!( #ident::embassy::executor::Executor )
-            }
-            Err(_) => {
-                quote!(crate::embassy::executor::Executor)
-            }
+        let executor = if let Ok(FoundCrate::Name(ref name)) = hal_crate {
+            let ident = Ident::new(&name, Span::call_site().into());
+            quote!( #ident::embassy::executor::Executor )
+        } else {
+            quote!(crate::embassy::executor::Executor)
         };
 
         quote! {
