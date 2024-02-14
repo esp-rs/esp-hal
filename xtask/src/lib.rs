@@ -124,22 +124,12 @@ pub fn build_documentation(
 
     log::info!("Building '{package_name}' documentation targeting '{chip}'");
 
-    let mut features = vec![chip.to_string()];
-
-    // The ESP32 and ESP32-C2 must have their Xtal frequencies explicitly stated
-    // when using `esp-hal` or `esp-hal-smartled`:
-    use Chip::*;
-    use Package::*;
-    if matches!(chip, Esp32 | Esp32c2) && matches!(package, EspHal | EspHalSmartled) {
-        features.push("xtal-40mhz".into());
-    }
-
     // Build up an array of command-line arguments to pass to `cargo doc`:
     let mut args = vec![
         "doc".into(),
         "-Zbuild-std=core".into(), // Required for Xtensa, for some reason
         format!("--target={target}"),
-        format!("--features={}", features.join(",")),
+        format!("--features={}", chip.to_string()),
     ];
     if open {
         args.push("--open".into());
