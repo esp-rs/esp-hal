@@ -383,8 +383,6 @@ impl RtcClock {
             32 => XtalClock::RtcXtalFreq32M,
             #[cfg(any(esp32, esp32c2))]
             26 => XtalClock::RtcXtalFreq26M,
-            #[cfg(esp32)]
-            24 => XtalClock::RtcXtalFreq24M,
             other => XtalClock::RtcXtalFreqOther(other),
         }
     }

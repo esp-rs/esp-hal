@@ -136,8 +136,6 @@ impl Clock for CpuClock {
 #[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
 pub enum XtalClock {
-    #[cfg(esp32)]
-    RtcXtalFreq24M,
     #[cfg(any(esp32, esp32c2))]
     RtcXtalFreq26M,
     #[cfg(any(esp32c3, esp32h2, esp32s3))]
@@ -150,8 +148,6 @@ pub enum XtalClock {
 impl Clock for XtalClock {
     fn frequency(&self) -> HertzU32 {
         match self {
-            #[cfg(esp32)]
-            XtalClock::RtcXtalFreq24M => HertzU32::MHz(24),
             #[cfg(any(esp32, esp32c2))]
             XtalClock::RtcXtalFreq26M => HertzU32::MHz(26),
             #[cfg(any(esp32c3, esp32h2, esp32s3))]
@@ -379,8 +375,6 @@ impl<'d> ClockControl<'d> {
         clock_control: impl Peripheral<P = SystemClockControl> + 'd,
         cpu_clock_speed: CpuClock,
     ) -> ClockControl<'d> {
-        // like NuttX use 40M hardcoded - if it turns out to be a problem
-        // we will take care then
         let xtal_freq = if RtcClock::estimate_xtal_frequency() > 33 {
             XtalClock::RtcXtalFreq40M
         } else {
