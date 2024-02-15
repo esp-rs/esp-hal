@@ -65,9 +65,19 @@
 
 use core::{convert::Infallible, marker::PhantomData};
 
-use rand_core::RngCore;
+use rand_core::{CryptoRng, RngCore};
 
 use crate::{peripheral::Peripheral, peripherals::RNG};
+
+#[cfg_attr(esp32, path = "trng/esp32.rs")]
+#[cfg_attr(esp32c2, path = "trng/esp32c2.rs")]
+#[cfg_attr(esp32c3, path = "trng/esp32c3.rs")]
+#[cfg_attr(esp32c6, path = "trng/esp32c6.rs")]
+#[cfg_attr(esp32h2, path = "trng/esp32h2.rs")]
+#[cfg_attr(esp32p4, path = "trng/esp32p4.rs")]
+#[cfg_attr(esp32s2, path = "trng/esp32s2.rs")]
+#[cfg_attr(esp32s3, path = "trng/esp32s3.rs")]
+pub(crate) mod trng;
 
 /// Random number generator driver
 #[derive(Clone, Copy)]
@@ -78,6 +88,11 @@ pub struct Rng {
 impl Rng {
     /// Create a new random number generator instance
     pub fn new(_rng: impl Peripheral<P = RNG>) -> Self {
+        #[cfg(esp32c6)]
+        trng::esp32c6_ensure_randomness();
+        #[cfg(esp32h2)]
+        trng::esp32h2_ensure_randomness();
+
         Self {
             _phantom: PhantomData,
         }
@@ -106,9 +121,6 @@ impl embedded_hal::blocking::rng::Read for Rng {
         Ok(())
     }
 }
-
-// TODO: CryptoRng trait will be implemented when true randomness of RNG is
-// ensured
 
 impl RngCore for Rng {
     fn next_u32(&mut self) -> u32 {
@@ -139,3 +151,5 @@ impl RngCore for Rng {
         Ok(())
     }
 }
+
+impl CryptoRng for Rng {}
