@@ -221,15 +221,17 @@ pub fn get_core() -> Cpu {
     // in the case of Xtensa.
     match get_raw_core() {
         0 => Cpu::ProCpu,
-        #[cfg(all(multicore, riscv))]
+        #[cfg(all(multi_core, riscv))]
         1 => Cpu::AppCpu,
-        #[cfg(all(multicore, xtensa))]
+        #[cfg(all(multi_core, xtensa))]
         0x2000 => Cpu::AppCpu,
         _ => unreachable!(),
     }
 }
 
 /// Returns the raw value of the mhartid register.
+///
+/// Safety: This method should never return UNUSED_THREAD_ID_VALUE
 #[cfg(riscv)]
 fn get_raw_core() -> usize {
     riscv::register::mhartid::read()
@@ -240,6 +242,8 @@ fn get_raw_core() -> usize {
 /// determine the core id.
 ///
 /// Returns either 0 or 0x2000
+///
+/// Safety: This method should never return UNUSED_THREAD_ID_VALUE
 #[cfg(xtensa)]
 fn get_raw_core() -> usize {
     (xtensa_lx::get_processor_id() & 0x2000) as usize
