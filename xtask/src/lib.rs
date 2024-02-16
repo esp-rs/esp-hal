@@ -2,14 +2,17 @@ use std::{
     collections::VecDeque,
     fs,
     path::{Path, PathBuf},
-    process::{Command, Stdio},
 };
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{bail, Result};
 use clap::ValueEnum;
 use strum::{Display, EnumIter, IntoEnumIterator};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Display, ValueEnum)]
+use self::cargo::CargoArgsBuilder;
+
+mod cargo;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Display, EnumIter, ValueEnum)]
 #[strum(serialize_all = "kebab-case")]
 pub enum Package {
     EspHal,
@@ -111,6 +114,14 @@ impl Metadata {
     }
 }
 
+#[derive(Debug, Clone, Copy, Display, ValueEnum)]
+#[strum(serialize_all = "lowercase")]
+pub enum Version {
+    Major,
+    Minor,
+    Patch,
+}
+
 /// Build the documentation for the specified package and device.
 pub fn build_documentation(
     workspace: &Path,
@@ -124,20 +135,22 @@ pub fn build_documentation(
 
     log::info!("Building '{package_name}' documentation targeting '{chip}'");
 
-    // Build up an array of command-line arguments to pass to `cargo doc`:
-    let mut args = vec![
-        "doc".into(),
-        "-Zbuild-std=core".into(), // Required for Xtensa, for some reason
-        format!("--target={target}"),
-        format!("--features={}", chip.to_string()),
-    ];
+    // Build up an array of command-line arguments to pass to `cargo`:
+    let mut builder = CargoArgsBuilder::default()
+        .subcommand("doc")
+        .arg("-Zbuild-std=core") // Required for Xtensa, for some reason
+        .target(target)
+        .features(&[chip.to_string()]);
+
     if open {
-        args.push("--open".into());
+        builder = builder.arg("--open");
     }
+
+    let args = builder.build();
     log::debug!("{args:#?}");
 
     // Execute `cargo doc` from the package root:
-    cargo(&args, &package_path)?;
+    cargo::run(&args, &package_path)?;
 
     Ok(())
 }
@@ -217,40 +230,105 @@ pub fn build_example(
         format!("--example={}", example.name())
     };
 
+    let mut features = example.features().to_vec();
+    features.push(chip.to_string());
+
+    let mut builder = CargoArgsBuilder::default()
+        .subcommand("build")
+        .arg("-Zbuild-std=alloc,core")
+        .arg("--release")
+        .target(target)
+        .features(&features)
+        .arg(bin);
+
     // If targeting an Xtensa device, we must use the '+esp' toolchain modifier:
-    let mut args = vec![];
     if target.starts_with("xtensa") {
-        args.push("+esp".into());
+        builder = builder.toolchain("esp");
     }
 
-    args.extend(vec![
-        "build".into(),
-        "-Zbuild-std=alloc,core".into(),
-        "--release".into(),
-        format!("--target={target}"),
-        format!("--features={},{}", chip, example.features().join(",")),
-        bin,
-    ]);
+    let args = builder.build();
     log::debug!("{args:#?}");
 
-    cargo(&args, package_path)?;
+    cargo::run(&args, package_path)?;
 
     Ok(())
 }
 
-fn cargo(args: &[String], cwd: &Path) -> Result<()> {
-    let status = Command::new("cargo")
-        .args(args)
-        .current_dir(cwd)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .status()?;
-
-    // Make sure that we return an appropriate exit code here, as Github Actions
-    // requires this in order to function correctly:
-    if status.success() {
-        Ok(())
-    } else {
-        Err(anyhow!("Failed to execute cargo subcommand"))
+/// Build the specified package, using the given toolchain/target/features if
+/// provided.
+pub fn build_package(
+    package_path: &Path,
+    features: Vec<String>,
+    toolchain: Option<String>,
+    target: Option<String>,
+) -> Result<()> {
+    log::info!("Building package '{}'", package_path.display());
+    if !features.is_empty() {
+        log::info!("  Features: {}", features.join(","));
     }
+    if let Some(ref target) = target {
+        log::info!("  Target:   {}", target);
+    }
+
+    let mut builder = CargoArgsBuilder::default()
+        .subcommand("build")
+        .arg("-Zbuild-std=core")
+        .arg("--release");
+
+    if let Some(toolchain) = toolchain {
+        builder = builder.toolchain(toolchain);
+    }
+
+    if let Some(target) = target {
+        builder = builder.target(target);
+    }
+
+    if !features.is_empty() {
+        builder = builder.features(&features);
+    }
+
+    let args = builder.build();
+    log::debug!("{args:#?}");
+
+    cargo::run(&args, package_path)?;
+
+    Ok(())
+}
+
+/// Bump the version of the specified package by the specified amount.
+pub fn bump_version(workspace: &Path, package: Package, amount: Version) -> Result<()> {
+    let manifest_path = workspace.join(package.to_string()).join("Cargo.toml");
+    let manifest = fs::read_to_string(&manifest_path)?;
+
+    let mut manifest = manifest.parse::<toml_edit::Document>()?;
+
+    let version = manifest["package"]["version"]
+        .to_string()
+        .trim()
+        .trim_matches('"')
+        .to_string();
+    let prev_version = &version;
+
+    let mut version = semver::Version::parse(&version)?;
+    match amount {
+        Version::Major => {
+            version.major += 1;
+            version.minor = 0;
+            version.patch = 0;
+        }
+        Version::Minor => {
+            version.minor += 1;
+            version.patch = 0;
+        }
+        Version::Patch => {
+            version.patch += 1;
+        }
+    }
+
+    log::info!("Bumping version for package: {package} ({prev_version} -> {version})");
+
+    manifest["package"]["version"] = toml_edit::value(version.to_string());
+    fs::write(manifest_path, manifest.to_string())?;
+
+    Ok(())
 }
