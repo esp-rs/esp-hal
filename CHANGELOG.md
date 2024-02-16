@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix `get_raw_core` on Xtensa (#1126)
 - Fix docs.rs documentation builds (#1129)
 - Fix circular DMA (#1144)
+- Fix `hello_rgb` example for ESP32 (#1173)
 
 ### Changed
 

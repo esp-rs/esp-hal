@@ -39,7 +39,7 @@ fn main() -> ! {
     // -> We need to use the macro `smartLedBuffer!` with the number of addressed
     // LEDs here to initialize the internal LED pulse buffer to the correct
     // size!
-    let rmt_buffer = smartLedBuffer!(1);
+    let rmt_buffer = smartLedBuffer!(12);
     let mut led = SmartLedsAdapter::new(rmt.channel0, io.pins.gpio33, rmt_buffer, &clocks);
 
     // Initialize the Delay peripheral, and use it to toggle the LED state in a
