@@ -350,10 +350,10 @@ mod critical_section_impl {
 
         // We're using a value that we know get_raw_core() will never return. This
         // avoids an unnecessary increment of the core ID.
-        //
-        // TODO: First multi-core RISC-V target will show if this value is OK globally
-        //       or only for Xtensa...
-        const UNUSED_THREAD_ID_VALUE: usize = 0x0001;
+        // 
+        // Safety: Ensure that when adding new chips get_raw_core doesn't return this value.
+        // TODO when we have HIL tests ensure this is the case!
+        const UNUSED_THREAD_ID_VALUE: usize = 0x100;
 
         fn thread_id() -> usize {
             crate::get_raw_core()
