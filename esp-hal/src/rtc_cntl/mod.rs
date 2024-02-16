@@ -213,8 +213,6 @@ impl<'d> Rtc<'d> {
         this
     }
 
-    // TODO: implement for ESP32-C6
-    #[cfg(not(any(esp32c6, esp32h2)))]
     pub fn estimate_xtal_frequency(&mut self) -> u32 {
         RtcClock::estimate_xtal_frequency()
     }
