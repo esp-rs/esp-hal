@@ -221,7 +221,11 @@ pub fn get_core() -> Cpu {
     // in the case of Xtensa.
     match get_raw_core() {
         0 => Cpu::ProCpu,
-        _ => Cpu::AppCpu,
+        #[cfg(all(multicore, riscv))]
+        1 => Cpu::AppCpu,
+        #[cfg(all(multicore, xtensa))]
+        0x2000 => Cpu::AppCpu,
+        _ => unreachable!(),
     }
 }
 
@@ -231,9 +235,10 @@ fn get_raw_core() -> usize {
     riscv::register::mhartid::read()
 }
 
-/// Returns the result of reading the PRID register logically ANDed with 0x2000, the 13th bit in the register.
-/// Espressif Xtensa chips use this bit to determine the core id.
-/// 
+/// Returns the result of reading the PRID register logically ANDed with 0x2000,
+/// the 13th bit in the register. Espressif Xtensa chips use this bit to
+/// determine the core id.
+///
 /// Returns either 0 or 0x2000
 #[cfg(xtensa)]
 fn get_raw_core() -> usize {
@@ -350,9 +355,9 @@ mod critical_section_impl {
 
         // We're using a value that we know get_raw_core() will never return. This
         // avoids an unnecessary increment of the core ID.
-        // 
-        // Safety: Ensure that when adding new chips get_raw_core doesn't return this value.
-        // TODO when we have HIL tests ensure this is the case!
+        //
+        // Safety: Ensure that when adding new chips get_raw_core doesn't return this
+        // value. TODO when we have HIL tests ensure this is the case!
         const UNUSED_THREAD_ID_VALUE: usize = 0x100;
 
         fn thread_id() -> usize {
