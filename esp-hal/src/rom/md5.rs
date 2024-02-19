@@ -48,7 +48,6 @@
 #[allow(unused)]
 use core::ffi::{c_int, c_uchar, c_void};
 use core::{
-    convert::From,
     fmt,
     mem::MaybeUninit,
     ops::{Deref, DerefMut},

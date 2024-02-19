@@ -144,19 +144,16 @@ pub mod dma {
     use super::*;
     #[cfg(spi3)]
     use crate::dma::Spi3Peripheral;
-    use crate::{
-        dma::{
-            Channel,
-            ChannelTypes,
-            DmaError,
-            DmaTransfer,
-            DmaTransferRxTx,
-            RxPrivate,
-            Spi2Peripheral,
-            SpiPeripheral,
-            TxPrivate,
-        },
-        peripheral::PeripheralRef,
+    use crate::dma::{
+        Channel,
+        ChannelTypes,
+        DmaError,
+        DmaTransfer,
+        DmaTransferRxTx,
+        RxPrivate,
+        Spi2Peripheral,
+        SpiPeripheral,
+        TxPrivate,
     };
 
     pub trait WithDmaSpi2<'d, C>
