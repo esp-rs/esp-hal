@@ -1,7 +1,7 @@
 //! This shows a very basic example of running code on the LP core.
 //!
 //! Code on LP core uses LP_UART initialized on HP core. For more information
-//! check `lp_core_uart` example in the `esp-lp-hal.
+//! check `lp_core_uart` example in the `esp-lp-hal`.
 //!
 //! Make sure to first compile the `esp-lp-hal/examples/uart.rs` example
 
@@ -50,8 +50,6 @@ fn main() -> ! {
     let mut uart1 = Uart::new_with_config(peripherals.UART1, config, Some(pins), &clocks);
 
     // Set up (LP) UART:
-
-    // TODO: hardcoded open_drain bool !!!!
     let lp_tx = io.pins.gpio5.into_low_power().into_push_pull_output();
     let lp_rx = io.pins.gpio4.into_low_power().into_floating_input();
 

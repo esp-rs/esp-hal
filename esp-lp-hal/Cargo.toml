@@ -24,7 +24,7 @@ categories = [
 cfg-if          = "1.0.0"
 embedded-hal-02 = { version = "0.2.7", package = "embedded-hal", optional = true, features = ["unproven"] }
 embedded-hal-1  = { version = "1.0.0", package = "embedded-hal", optional = true }
-esp32c6-lp      = { version = "0.1.0", features = ["critical-section"], optional = true }
+esp32c6-lp      = { git = "https://github.com/esp-rs/esp-pacs", rev = "ef39b1c", features = ["critical-section"], optional = true }
 esp32s2-ulp     = { version = "0.1.0", features = ["critical-section"], optional = true }
 esp32s3-ulp     = { version = "0.1.0", features = ["critical-section"], optional = true }
 nb              = { version = "1.1.0",  optional = true }
@@ -57,6 +57,10 @@ required-features = ["embedded-hal-02"]
 
 [[example]]
 name              = "uart"
+required-features = ["embedded-hal-02", "esp32c6"]
+
+[[example]]
+name              = "i2c"
 required-features = ["embedded-hal-02", "esp32c6"]
 
 [patch.crates-io]

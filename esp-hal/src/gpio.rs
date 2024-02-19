@@ -1170,7 +1170,7 @@ where
 
     /// Configures the pin to operate as an push pull output pin
     pub fn into_push_pull_output(self) -> GpioPin<Output<PushPull>, GPIONUM> {
-        self.init_output(GPIO_FUNCTION, true); // TODO: hardcoded open_drain bool !!!!
+        self.init_output(GPIO_FUNCTION, false);
         GpioPin { _mode: PhantomData }
     }
 
@@ -2618,7 +2618,9 @@ pub mod rtc_io {
 
     use core::marker::PhantomData;
 
-    use super::{Floating, InOut, Input, Output, PullDown, PullUp, PushPull, Unknown};
+    #[cfg(esp32c6)]
+    use super::InOut;
+    use super::{Floating, Input, Output, PullDown, PullUp, PushPull, Unknown};
 
     /// A GPIO pin configured for low power operation
     pub struct LowPowerPin<MODE, const PIN: u8> {
@@ -2738,6 +2740,8 @@ pub mod rtc_io {
             }
         }
 
+        #[cfg(esp32c6)]
+        /// Configures the pin as an pullup input and a push pull output pin.
         pub fn into_puinput_ppoutput(self) -> LowPowerPin<InOut, PIN> {
             self.into_pull_up_input();
             self.into_push_pull_output();
@@ -2749,17 +2753,9 @@ pub mod rtc_io {
             self.pulldown_enable(false);
 
             LowPowerPin {
-                private: PhantomData::default(),
+                private: PhantomData,
             }
         }
-
-        // pub fn into_odinput_odoutput(self) -> LowPowerPin<InOut<OpenDrain>, PIN> {
-        //     self.into_open_drain_input();
-        //     self.into_open_drain_output();
-        //     LowPowerPin {
-        //         private: PhantomData::default(),
-        //     }
-        // }
     }
 
     #[cfg(esp32s3)]
@@ -2812,7 +2808,9 @@ pub mod lp_gpio {
 
     use core::marker::PhantomData;
 
-    use super::{Floating, InOut, Input, OpenDrain, Output, PullDown, PullUp, PushPull, Unknown};
+    #[cfg(esp32c6)]
+    use super::InOut;
+    use super::{Floating, Input, Output, PullDown, PullUp, PushPull, Unknown};
 
     /// A GPIO pin configured for low power operation
     pub struct LowPowerPin<MODE, const PIN: u8> {
@@ -2917,17 +2915,9 @@ pub mod lp_gpio {
             self.into_pull_up_input().into_push_pull_output();
 
             LowPowerPin {
-                private: PhantomData::default(),
+                private: PhantomData,
             }
         }
-
-        // pub fn into_odinput_odoutput(self) -> LowPowerPin<InOut<OpenDrain>, PIN> {
-        //     self.into_open_drain_input();
-        //     self.into_open_drain_output();
-        //     LowPowerPin {
-        //         private: PhantomData::default(),
-        //     }
-        // }
     }
 
     pub(crate) fn init_low_power_pin(pin: u8) {

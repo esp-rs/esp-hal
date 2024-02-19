@@ -37,9 +37,7 @@ procmacros           = { version = "0.8.0", features = ["enum-dispatch", "ram"],
 strum                = { version = "0.25.0", default-features = false, features = ["derive"] }
 void                 = { version = "1.0.2", default-features = false }
 usb-device           = { version = "0.3.1", optional = true }
-# temporary
-esp-println        = { version = "0.8.0", features = ["esp32c6"] }
-
+rand_core            = { version = "0.6.4" }
 
 # async
 embedded-hal-async   = { version = "1.0.0", optional = true }
@@ -63,14 +61,14 @@ ufmt-write = { version = "0.1.0", optional = true }
 # IMPORTANT:
 # Each supported device MUST have its PAC included below along with a
 # corresponding feature.
-esp32   = { git = "https://github.com/esp-rs/esp-pacs", rev = "8231fea", features = ["critical-section"], optional = true }
-esp32c2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "8231fea", features = ["critical-section"], optional = true }
-esp32c3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "8231fea", features = ["critical-section"], optional = true }
-esp32c6 = { git = "https://github.com/esp-rs/esp-pacs", rev = "8231fea", features = ["critical-section"], optional = true }
-esp32h2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "8231fea", features = ["critical-section"], optional = true }
-esp32p4 = { git = "https://github.com/esp-rs/esp-pacs", rev = "8231fea", features = ["critical-section"], optional = true }
-esp32s2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "8231fea", features = ["critical-section"], optional = true }
-esp32s3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "8231fea", features = ["critical-section"], optional = true }
+esp32   = { git = "https://github.com/esp-rs/esp-pacs", rev = "ef39b1c", features = ["critical-section"], optional = true }
+esp32c2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "ef39b1c", features = ["critical-section"], optional = true }
+esp32c3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "ef39b1c", features = ["critical-section"], optional = true }
+esp32c6 = { git = "https://github.com/esp-rs/esp-pacs", rev = "ef39b1c", features = ["critical-section"], optional = true }
+esp32h2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "ef39b1c", features = ["critical-section"], optional = true }
+esp32p4 = { git = "https://github.com/esp-rs/esp-pacs", rev = "ef39b1c", features = ["critical-section"], optional = true }
+esp32s2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "ef39b1c", features = ["critical-section"], optional = true }
+esp32s3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "ef39b1c", features = ["critical-section"], optional = true }
 
 [build-dependencies]
 basic-toml = "0.1.8"
