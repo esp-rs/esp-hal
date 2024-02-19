@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix docs.rs documentation builds (#1129)
 - Fix circular DMA (#1144)
 - Fix `hello_rgb` example for ESP32 (#1173)
+- Fix timer `now` for esp32c3 and esp32c6
 
 ### Changed
 
