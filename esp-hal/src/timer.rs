@@ -420,10 +420,10 @@ where
     fn now(&self) -> u64 {
         let reg_block = unsafe { &*TG::register_block() };
 
-        #[cfg(not(any(esp32c3, esp32c6)))]
+        #[cfg(esp32)]
         reg_block.t0update().write(|w| unsafe { w.bits(0) });
 
-        #[cfg(any(esp32c3, esp32c6))]
+        #[cfg(not(esp32))]
         {
             reg_block.t0update().write(|w| w.update().set_bit());
             while reg_block.t0update().read().update().bit_is_set() {}
@@ -597,7 +597,14 @@ where
     fn now(&self) -> u64 {
         let reg_block = unsafe { &*TG::register_block() };
 
+        #[cfg(esp32)]
         reg_block.t1update().write(|w| unsafe { w.bits(0) });
+
+        #[cfg(not(esp32))]
+        {
+            reg_block.t1update().write(|w| w.update().set_bit());
+            while reg_block.t1update().read().update().bit_is_set() {}
+        }
 
         let value_lo = reg_block.t1lo().read().bits() as u64;
         let value_hi = (reg_block.t1hi().read().bits() as u64) << 32;
