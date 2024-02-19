@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed the multicore critical section on Xtensa (#1175)
 - Fix timer `now` for esp32c3 and esp32c6 (#1178)
 - Wait for registers to get synced before reading the timer count for all chips (#1183)
+- Fix I2C error handling (#1184)
 
 ### Changed
 
