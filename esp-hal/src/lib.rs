@@ -215,17 +215,38 @@ pub enum Cpu {
 
 /// Which core the application is currently executing on
 pub fn get_core() -> Cpu {
-    Cpu::from_repr(get_raw_core()).unwrap()
+    // This works for both RISCV and Xtensa because both
+    // get_raw_core functions return zero, _or_ something
+    // greater than zero; 1 in the case of RISCV and 0x2000
+    // in the case of Xtensa.
+    match get_raw_core() {
+        0 => Cpu::ProCpu,
+        #[cfg(all(multi_core, riscv))]
+        1 => Cpu::AppCpu,
+        #[cfg(all(multi_core, xtensa))]
+        0x2000 => Cpu::AppCpu,
+        _ => unreachable!(),
+    }
 }
 
+/// Returns the raw value of the mhartid register.
+///
+/// Safety: This method should never return UNUSED_THREAD_ID_VALUE
 #[cfg(riscv)]
 fn get_raw_core() -> usize {
     riscv::register::mhartid::read()
 }
 
+/// Returns the result of reading the PRID register logically ANDed with 0x2000,
+/// the 13th bit in the register. Espressif Xtensa chips use this bit to
+/// determine the core id.
+///
+/// Returns either 0 or 0x2000
+///
+/// Safety: This method should never return UNUSED_THREAD_ID_VALUE
 #[cfg(xtensa)]
 fn get_raw_core() -> usize {
-    ((xtensa_lx::get_processor_id() as usize & 0x2000) != 0) as usize
+    (xtensa_lx::get_processor_id() & 0x2000) as usize
 }
 
 mod critical_section_impl {
@@ -339,9 +360,9 @@ mod critical_section_impl {
         // We're using a value that we know get_raw_core() will never return. This
         // avoids an unnecessary increment of the core ID.
         //
-        // TODO: First multi-core RISC-V target will show if this value is OK globally
-        //       or only for Xtensa...
-        const UNUSED_THREAD_ID_VALUE: usize = 0x0001;
+        // Safety: Ensure that when adding new chips get_raw_core doesn't return this
+        // value. TODO when we have HIL tests ensure this is the case!
+        const UNUSED_THREAD_ID_VALUE: usize = 0x100;
 
         fn thread_id() -> usize {
             crate::get_raw_core()
