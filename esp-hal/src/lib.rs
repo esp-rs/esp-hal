@@ -27,12 +27,7 @@
 #![no_std]
 #![allow(asm_sub_register)]
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
-#![cfg_attr(
-    feature = "async",
-    allow(incomplete_features, stable_features, unknown_lints, async_fn_in_trait),
-    feature(async_fn_in_trait),
-    feature(impl_trait_projections)
-)]
+#![cfg_attr(feature = "async", allow(stable_features, async_fn_in_trait))]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 
 // MUST be the first module
