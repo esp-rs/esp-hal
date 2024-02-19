@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix `hello_rgb` example for ESP32 (#1173)
 - Fix timer `now` for esp32c3 and esp32c6
 - Fixed the multicore critical section on Xtensa (#1175)
+- Fix timer `now` for esp32c3 and esp32c6 (#1178)
+- Wait for registers to get synced before reading the timer count for all chips except ESP32 (for now) (#1183)
 
 ### Changed
 
