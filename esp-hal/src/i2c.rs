@@ -697,11 +697,14 @@ pub trait Instance {
 
     /// Resets the I2C controller (FIFO + FSM + command list)
     fn reset(&self) {
-        // Reset interrupts
-        // Disable all I2C interrupts
+        // Reset the FSM
+        // (the option to reset the FSM is not available
+        // for the ESP32)
+        #[cfg(not(esp32))]
         self.register_block()
-            .int_ena()
-            .write(|w| unsafe { w.bits(0) });
+            .ctr()
+            .modify(|_, w| w.fsm_rst().set_bit());
+
         // Clear all I2C interrupts
         self.register_block()
             .int_clr()
@@ -712,14 +715,6 @@ pub trait Instance {
 
         // Reset the command list
         self.reset_command_list();
-
-        // Reset the FSM
-        // (the option to reset the FSM is not available
-        // for the ESP32)
-        #[cfg(not(esp32))]
-        self.register_block()
-            .ctr()
-            .modify(|_, w| w.fsm_rst().set_bit());
     }
 
     /// Resets the I2C peripheral's command registers
@@ -1317,6 +1312,9 @@ pub trait Instance {
                 } else if interrupts.arbitration_lost_int_raw().bit_is_set() {
                     self.reset();
                     return Err(Error::ArbitrationLost);
+                } else if  interrupts.trans_complete_int_raw().bit_is_set() && self.register_block().sr().read().resp_rec().bit_is_clear() {
+                    self.reset();
+                    return Err(Error::AckCheckFailed);
                 }
             }
         }
