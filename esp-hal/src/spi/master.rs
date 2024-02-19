@@ -757,16 +757,14 @@ where
 }
 
 pub mod dma {
-    use core::{marker::PhantomData, mem};
+    use core::mem;
 
     use embedded_dma::{ReadBuffer, WriteBuffer};
-    use fugit::HertzU32;
 
     use super::*;
     #[cfg(spi3)]
     use crate::dma::Spi3Peripheral;
     use crate::{
-        clock::Clocks,
         dma::{
             Channel,
             ChannelTypes,
@@ -778,7 +776,6 @@ pub mod dma {
             SpiPeripheral,
             TxPrivate,
         },
-        peripheral::PeripheralRef,
         FlashSafeDma,
     };
 
