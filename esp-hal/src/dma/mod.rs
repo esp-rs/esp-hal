@@ -404,10 +404,16 @@ where
 
         compiler_fence(core::sync::atomic::Ordering::SeqCst);
 
+        let max_chunk_size = if !circular || len > CHUNK_SIZE * 2 {
+            CHUNK_SIZE
+        } else {
+            len / 3
+        };
+
         let mut processed = 0;
         let mut descr = 0;
         loop {
-            let chunk_size = usize::min(CHUNK_SIZE, len - processed);
+            let chunk_size = usize::min(max_chunk_size, len - processed);
             let last = processed + chunk_size >= len;
 
             let next = if last {
@@ -538,7 +544,7 @@ where
             return Err(DmaError::InvalidAlignment);
         }
 
-        if circular && len < CHUNK_SIZE * 2 {
+        if circular && len <= 3 {
             return Err(DmaError::BufferTooSmall);
         }
 
@@ -651,7 +657,7 @@ where
             let buffer_ptr = self.descriptors[idx].buffer;
             let next_dscr = self.descriptors[idx].next;
 
-            // Copy data to desination
+            // Copy data to destination
             let (dst_chunk, dst_remaining) = dst.split_at_mut(chunk_len);
             dst = dst_remaining;
 
@@ -765,10 +771,16 @@ where
 
         compiler_fence(core::sync::atomic::Ordering::SeqCst);
 
+        let max_chunk_size = if !circular || len > CHUNK_SIZE * 2 {
+            CHUNK_SIZE
+        } else {
+            len / 3
+        };
+
         let mut processed = 0;
         let mut descr = 0;
         loop {
-            let chunk_size = usize::min(CHUNK_SIZE, len - processed);
+            let chunk_size = usize::min(max_chunk_size, len - processed);
             let last = processed + chunk_size >= len;
 
             let next = if last {
@@ -936,7 +948,7 @@ where
             return Err(DmaError::OutOfDescriptors);
         }
 
-        if circular && len < CHUNK_SIZE * 2 {
+        if circular && len <= 3 {
             return Err(DmaError::BufferTooSmall);
         }
 
