@@ -508,7 +508,7 @@ where
         let max_chunk_size = if !circular || len > CHUNK_SIZE * 2 {
             CHUNK_SIZE
         } else {
-            len / 3
+            len / 3 + len % 3
         };
 
         let mut processed = 0;
@@ -847,6 +847,8 @@ pub trait TxPrivate {
 
     fn push(&mut self, data: &[u8]) -> Result<usize, DmaError>;
 
+    fn push_with(&mut self, f: impl FnOnce(&mut [u8]) -> usize) -> Result<usize, DmaError>;
+
     #[cfg(feature = "async")]
     fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker;
 }
@@ -875,7 +877,7 @@ where
         let max_chunk_size = if !circular || len > CHUNK_SIZE * 2 {
             CHUNK_SIZE
         } else {
-            len / 3
+            len / 3 + len % 3
         };
 
         let mut processed = 0;
@@ -1161,23 +1163,30 @@ where
             return Err(DmaError::Overflow);
         }
 
-        unsafe {
-            let src = data.as_ptr();
+        let mut remaining = data.len();
+        let mut offset = 0;
+        while self.available() >= remaining && remaining > 0 {
+            let written = self.push_with(|buffer| {
+                let len = usize::min(buffer.len(), data.len() - offset);
+                buffer[..len].copy_from_slice(&data[offset..][..len]);
+                len
+            })?;
+            offset += written;
+            remaining -= written;
+        }
+
+        Ok(data.len())
+    }
+
+    fn push_with(&mut self, f: impl FnOnce(&mut [u8]) -> usize) -> Result<usize, DmaError> {
+        let written = unsafe {
             let dst = self.buffer_start.add(self.write_offset).cast_mut();
-            let count = usize::min(data.len(), self.buffer_len - self.write_offset);
-            core::ptr::copy_nonoverlapping(src, dst, count);
-        }
+            let block_size = usize::min(self.available(), self.buffer_len - self.write_offset);
+            let buffer = core::slice::from_raw_parts_mut(dst, block_size);
+            f(buffer)
+        };
 
-        if self.write_offset + data.len() >= self.buffer_len {
-            let remainder = (self.write_offset + data.len()) % self.buffer_len;
-            let dst = self.buffer_start.cast_mut();
-            unsafe {
-                let src = data.as_ptr().add(data.len() - remainder);
-                core::ptr::copy_nonoverlapping(src, dst, remainder);
-            }
-        }
-
-        let mut forward = data.len();
+        let mut forward = written;
         loop {
             unsafe {
                 let dw0 = self.write_descr_ptr.read_volatile();
@@ -1196,10 +1205,10 @@ where
             }
         }
 
-        self.write_offset = (self.write_offset + data.len()) % self.buffer_len;
-        self.available -= data.len();
+        self.write_offset = (self.write_offset + written) % self.buffer_len;
+        self.available -= written;
 
-        Ok(data.len())
+        Ok(written)
     }
 
     fn is_listening_eof(&self) -> bool {

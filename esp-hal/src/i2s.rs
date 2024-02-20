@@ -224,6 +224,14 @@ where
         Ok(self.i2s_tx.tx_channel.push(data)?)
     }
 
+    /// Push bytes into the DMA buffer via the given closure.
+    /// The closure *must* return the actual number of bytes written.
+    /// The closure *might* get called with a slice which is smaller than the
+    /// total available buffer. Only useful for circular DMA transfers
+    pub fn push_with(&mut self, f: impl FnOnce(&mut [u8]) -> usize) -> Result<usize, Error> {
+        Ok(self.i2s_tx.tx_channel.push_with(f)?)
+    }
+
     /// Stop for the DMA transfer and return the buffer and the
     /// I2sTx instance.
     #[allow(clippy::type_complexity)]
@@ -2111,6 +2119,19 @@ pub mod asynch {
             let avail = self.available().await;
             let to_send = usize::min(avail, data.len());
             Ok(self.i2s_tx.tx_channel.push(&data[..to_send])?)
+        }
+
+        /// Push bytes into the DMA buffer via the given closure.
+        /// The closure *must* return the actual number of bytes written.
+        /// The closure *might* get called with a slice which is smaller than
+        /// the total available buffer. Only useful for circular DMA
+        /// transfers
+        pub async fn push_with(
+            &mut self,
+            f: impl FnOnce(&mut [u8]) -> usize,
+        ) -> Result<usize, Error> {
+            let avail = self.available().await;
+            Ok(self.i2s_tx.tx_channel.push_with(f)?)
         }
     }
 
