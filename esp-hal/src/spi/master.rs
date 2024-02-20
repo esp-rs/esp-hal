@@ -1028,7 +1028,7 @@ pub mod dma {
         /// This will return a [SpiDmaTransfer] owning the buffer(s) and the SPI
         /// instance. The maximum amount of data to be sent is 32736
         /// bytes.
-        #[cfg_attr(feature = "optimize-spi-in-iram", ram)]
+        #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
         pub fn dma_write<TXBUF>(
             mut self,
             words: TXBUF,
@@ -1055,7 +1055,7 @@ pub mod dma {
         /// This will return a [SpiDmaTransfer] owning the buffer(s) and the SPI
         /// instance. The maximum amount of data to be received is 32736
         /// bytes.
-        #[cfg_attr(feature = "optimize-spi-in-iram", ram)]
+        #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
         pub fn dma_read<RXBUF>(
             mut self,
             mut words: RXBUF,
@@ -1122,7 +1122,7 @@ pub mod dma {
         C::P: SpiPeripheral,
         M: IsHalfDuplex,
     {
-        #[cfg_attr(feature = "optimize-spi-in-iram", ram)]
+        #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
         pub fn read<RXBUF>(
             mut self,
             data_mode: SpiDataMode,
@@ -1196,7 +1196,7 @@ pub mod dma {
             })
         }
 
-        #[cfg_attr(feature = "optimize-spi-in-iram", ram)]
+        #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
         pub fn write<TXBUF>(
             mut self,
             data_mode: SpiDataMode,
@@ -1842,7 +1842,7 @@ where
         Ok(words)
     }
 
-    #[cfg_attr(feature = "optimize-spi-in-iram", ram)]
+    #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
     fn start_write_bytes_dma(
         &mut self,
         ptr: *const u8,
@@ -1873,7 +1873,7 @@ where
         Ok(())
     }
 
-    #[cfg_attr(feature = "optimize-spi-in-iram", ram)]
+    #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
     fn start_read_bytes_dma(
         &mut self,
         ptr: *mut u8,
@@ -2525,7 +2525,7 @@ pub trait Instance {
     /// you must ensure that the whole messages was written correctly, use
     /// [`Self::flush`].
     // FIXME: See below.
-    #[cfg_attr(feature = "optimize-spi-in-iram", ram)]
+    #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
     fn write_bytes(&mut self, words: &[u8]) -> Result<(), Error> {
         let num_chunks = words.len() / FIFO_SIZE;
 
@@ -2586,7 +2586,7 @@ pub trait Instance {
     /// Sends out a stuffing byte for every byte to read. This function doesn't
     /// perform flushing. If you want to read the response to something you
     /// have written before, consider using [`Self::transfer`] instead.
-    #[cfg_attr(feature = "optimize-spi-in-iram", ram)]
+    #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
     fn read_bytes(&mut self, words: &mut [u8]) -> Result<(), Error> {
         let empty_array = [EMPTY_WRITE_PAD; FIFO_SIZE];
 
@@ -2607,7 +2607,7 @@ pub trait Instance {
     // FIXME: Using something like `core::slice::from_raw_parts` and
     // `copy_from_slice` on the receive registers works only for the esp32 and
     // esp32c3 varaints. The reason for this is unknown.
-    #[cfg_attr(feature = "optimize-spi-in-iram", ram)]
+    #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
     fn read_bytes_from_fifo(&mut self, words: &mut [u8]) -> Result<(), Error> {
         let reg_block = self.register_block();
 
@@ -2644,7 +2644,7 @@ pub trait Instance {
         Ok(())
     }
 
-    #[cfg_attr(feature = "optimize-spi-in-iram", ram)]
+    #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
     fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Error> {
         for chunk in words.chunks_mut(FIFO_SIZE) {
             self.write_bytes(chunk)?;
