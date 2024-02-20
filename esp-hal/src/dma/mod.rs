@@ -1002,6 +1002,20 @@ where
                         self.available += dw0.len();
                         ptr = ptr.offset(1);
                     }
+
+                    // add bytes pointed to by the last descriptor
+                    let dw0 = ptr.read_volatile();
+                    self.available += dw0.len();
+
+                    // in circular mode we need to honor the now available bytes at start
+                    if (*ptr).next == self.descriptors as *mut _ as *mut DmaDescriptor {
+                        ptr = self.descriptors as *mut _ as *mut DmaDescriptor;
+                        while ptr < descr_address {
+                            let dw0 = ptr.read_volatile();
+                            self.available += dw0.len();
+                            ptr = ptr.offset(1);
+                        }
+                    }
                 }
             }
 
