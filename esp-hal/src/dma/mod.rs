@@ -1109,7 +1109,7 @@ where
             } else {
                 unsafe {
                     while !((*ptr).next.is_null()
-                        || (*ptr).next == self.descriptors as *mut _ as *mut DmaDescriptor)
+                        || (*ptr).next == addr_of_mut!(self.descriptors[0]))
                     {
                         let dw0 = ptr.read_volatile();
                         self.available += dw0.len();
@@ -1121,8 +1121,8 @@ where
                     self.available += dw0.len();
 
                     // in circular mode we need to honor the now available bytes at start
-                    if (*ptr).next == self.descriptors as *mut _ as *mut DmaDescriptor {
-                        ptr = self.descriptors as *mut _ as *mut DmaDescriptor;
+                    if (*ptr).next == addr_of_mut!(self.descriptors[0]) {
+                        ptr = addr_of_mut!(self.descriptors[0]);
                         while ptr < descr_address {
                             let dw0 = ptr.read_volatile();
                             self.available += dw0.len();
