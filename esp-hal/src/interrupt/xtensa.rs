@@ -1,4 +1,3 @@
-use procmacros::ram;
 use xtensa_lx::interrupt::{self, InterruptNumber};
 use xtensa_lx_rt::exception::Context;
 
@@ -100,7 +99,6 @@ pub fn clear(_core: Cpu, which: CpuInterrupt) {
 }
 
 /// Get status of peripheral interrupts
-#[inline(always)]
 pub fn get_status(core: Cpu) -> u128 {
     unsafe {
         #[allow(unused_mut)]
@@ -190,6 +188,8 @@ pub use vectored::*;
 
 #[cfg(feature = "vectored")]
 mod vectored {
+    use procmacros::ram;
+
     use super::*;
     use crate::get_core;
 
