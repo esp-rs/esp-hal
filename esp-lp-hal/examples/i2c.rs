@@ -1,6 +1,7 @@
 //! Uses `LP_I2C` and reads calibration data from BMP180 sensor.
 //!
-//! This example dumps the calibration data from a BMP180 sensor
+//! This example dumps the calibration data from a BMP180 sensor, to view them,
+//! logic analyzer or oscilloscope is required.
 //!
 //! The following wiring is assumed:
 //! - SDA => GPIO6
