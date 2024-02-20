@@ -183,6 +183,67 @@ macro_rules! dma_buffers {
     }};
 }
 
+/// Convenience macro to create circular DMA buffers and descriptors
+///
+/// ## Usage
+/// ```rust,no_run
+/// // TX and RX buffers are 32000 bytes - passing only one parameter makes TX and RX the same size
+/// let (tx_buffer, mut tx_descriptors, rx_buffer, mut rx_descriptors) =
+///     dma_circular_buffers!(32000, 32000);
+/// ```
+#[macro_export]
+macro_rules! dma_circular_buffers {
+    ($tx_size:expr, $rx_size:expr) => {{
+        static mut TX_BUFFER: [u8; $tx_size] = [0u8; $tx_size];
+        static mut RX_BUFFER: [u8; $rx_size] = [0u8; $rx_size];
+
+        const tx_descriptor_len: usize = if $tx_size > 4092 * 2 {
+            ($tx_size + 4091) / 4092
+        } else {
+            3
+        };
+
+        const rx_descriptor_len: usize = if $rx_size > 4092 * 2 {
+            ($rx_size + 4091) / 4092
+        } else {
+            3
+        };
+
+        let tx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; tx_descriptor_len];
+        let rx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; rx_descriptor_len];
+        unsafe {
+            (
+                &mut TX_BUFFER,
+                tx_descriptors,
+                &mut RX_BUFFER,
+                rx_descriptors,
+            )
+        }
+    }};
+
+    ($size:expr) => {{
+        static mut TX_BUFFER: [u8; $size] = [0u8; $size];
+        static mut RX_BUFFER: [u8; $size] = [0u8; $size];
+
+        const descriptor_len: usize = if $size > 4092 * 2 {
+            ($size + 4091) / 4092
+        } else {
+            3
+        };
+
+        let tx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; descriptor_len];
+        let rx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; descriptor_len];
+        unsafe {
+            (
+                &mut TX_BUFFER,
+                tx_descriptors,
+                &mut RX_BUFFER,
+                rx_descriptors,
+            )
+        }
+    }};
+}
+
 /// Convenience macro to create DMA descriptors
 ///
 /// ## Usage
@@ -201,6 +262,46 @@ macro_rules! dma_descriptors {
     ($size:expr) => {{
         let tx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; ($size + 4091) / 4092];
         let rx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; ($size + 4091) / 4092];
+        (tx_descriptors, rx_descriptors)
+    }};
+}
+
+/// Convenience macro to create circular DMA descriptors
+///
+/// ## Usage
+/// ```rust,no_run
+/// // Create TX and RX descriptors for transactions up to 32000 bytes - passing only one parameter assumes TX and RX are the same size
+/// let (mut tx_descriptors, mut rx_descriptors) = dma_circular_descriptors!(32000, 32000);
+/// ```
+#[macro_export]
+macro_rules! dma_circular_descriptors {
+    ($tx_size:expr, $rx_size:expr) => {{
+        const tx_descriptor_len: usize = if $tx_size > 4092 * 2 {
+            ($tx_size + 4091) / 4092
+        } else {
+            3
+        };
+
+        const rx_descriptor_len: usize = if $rx_size > 4092 * 2 {
+            ($rx_size + 4091) / 4092
+        } else {
+            3
+        };
+
+        let tx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; tx_descriptor_len];
+        let rx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; rx_descriptor_len];
+        (tx_descriptors, rx_descriptors)
+    }};
+
+    ($size:expr) => {{
+        const descriptor_len: usize = if $size > 4092 * 2 {
+            ($size + 4091) / 4092
+        } else {
+            3
+        };
+
+        let tx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; descriptor_len];
+        let rx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; descriptor_len];
         (tx_descriptors, rx_descriptors)
     }};
 }
