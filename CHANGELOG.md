@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Adding clock support for `ESP32-P4` (#1145)
 - Implementation OutputPin and InputPin for AnyPin (#1067)
 - Implement `estimate_xtal_frequency` for ESP32-C6 / ESP32-H2 (#1174)
+- A way to push into I2S DMA buffer via a closure (#1189)
 
 ### Fixed
 
@@ -35,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix timer `now` for esp32c3 and esp32c6 (#1178)
 - Wait for registers to get synced before reading the timer count for all chips (#1183)
 - Fix I2C error handling (#1184)
+- Fix circular DMA (#1189)
 
 ### Changed
 
@@ -45,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refactor the `Trace` driver to be generic around its peripheral (#1140)
 - Auto detect crystal frequency based on `RtcClock::estimate_xtal_frequency()` (#1165)
 - ESP32-S3: Configure 32k ICACHE (#1169)
+- Lift the minimal buffer size requirement for I2S (#1189)
 
 ### Removed
 - Remove `xtal-26mhz` and `xtal-40mhz` features (#1165)
