@@ -85,8 +85,6 @@ pub struct PullDown;
 
 pub struct PullUp;
 
-pub struct InOut;
-
 pub struct Output<MODE> {
     _mode: PhantomData<MODE>,
 }
@@ -2619,7 +2617,7 @@ pub mod rtc_io {
     use core::marker::PhantomData;
 
     #[cfg(esp32c6)]
-    use super::InOut;
+    use super::OpenDrain;
     use super::{Floating, Input, Output, PullDown, PullUp, PushPull, Unknown};
 
     /// A GPIO pin configured for low power operation
@@ -2742,7 +2740,7 @@ pub mod rtc_io {
 
         #[cfg(esp32c6)]
         /// Configures the pin as an pullup input and a push pull output pin.
-        pub fn into_puinput_ppoutput(self) -> LowPowerPin<InOut, PIN> {
+        pub fn into_open_drain_output(self) -> LowPowerPin<OpenDrain, PIN> {
             self.into_pull_up_input();
             self.into_push_pull_output();
             use crate::peripherals::GPIO;
@@ -2809,7 +2807,7 @@ pub mod lp_gpio {
     use core::marker::PhantomData;
 
     #[cfg(esp32c6)]
-    use super::InOut;
+    use super::OpenDrain;
     use super::{Floating, Input, Output, PullDown, PullUp, PushPull, Unknown};
 
     /// A GPIO pin configured for low power operation
@@ -2904,7 +2902,7 @@ pub mod lp_gpio {
             }
         }
 
-        pub fn into_puinput_ppoutput(self) -> LowPowerPin<InOut, PIN> {
+        pub fn into_open_drain_output(self) -> LowPowerPin<OpenDrain, PIN> {
             use crate::peripherals::GPIO;
 
             let gpio = unsafe { &*GPIO::PTR };

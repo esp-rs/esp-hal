@@ -733,7 +733,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
                     }
                     "LpI2c" => {
                         create_peripheral.push(quote!(
-                            let mut #param_name = unsafe { the_hal::i2c::conjour().unwrap() };
+                            let mut #param_name = unsafe { the_hal::i2c::conjure().unwrap() };
                         ));
                     }
                     _ => {

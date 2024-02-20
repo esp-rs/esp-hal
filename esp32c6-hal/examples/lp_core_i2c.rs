@@ -25,8 +25,8 @@ fn main() -> ! {
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let lp_sda = io.pins.gpio6.into_low_power().into_puinput_ppoutput();
-    let lp_scl = io.pins.gpio7.into_low_power().into_puinput_ppoutput();
+    let lp_sda = io.pins.gpio6.into_low_power().into_open_drain_output();
+    let lp_scl = io.pins.gpio7.into_low_power().into_open_drain_output();
 
     let lp_i2c = LpI2c::new(peripherals.LP_I2C0, lp_sda, lp_scl, 100u32.kHz());
 

@@ -1657,7 +1657,7 @@ pub mod lp_i2c {
     use fugit::HertzU32;
 
     use crate::{
-        gpio::{lp_gpio::LowPowerPin, InOut},
+        gpio::{lp_gpio::LowPowerPin, OpenDrain},
         peripherals::{LP_CLKRST, LP_I2C0},
     };
 
@@ -1857,8 +1857,8 @@ pub mod lp_i2c {
     impl LpI2c {
         pub fn new(
             i2c: LP_I2C0,
-            _sda: LowPowerPin<InOut, 6>,
-            _scl: LowPowerPin<InOut, 7>,
+            _sda: LowPowerPin<OpenDrain, 6>,
+            _scl: LowPowerPin<OpenDrain, 7>,
             frequency: HertzU32,
         ) -> Self {
             let me = Self { i2c };
