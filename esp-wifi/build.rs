@@ -86,8 +86,6 @@ fn main() -> Result<(), String> {
         println!("cargo:warning=coex is enabled but ble is not");
     }
 
-    validate_config();
-
     let version_output = std::process::Command::new(
         std::env::var_os("RUSTC").unwrap_or_else(|| std::ffi::OsString::from("rustc")),
     )
@@ -171,63 +169,4 @@ impl PartialOrd for Version4 {
 
 fn print_warning(message: impl core::fmt::Display) {
     println!("cargo:warning={}", message);
-}
-
-#[toml_cfg::toml_config]
-/// Tunable parameters for the WiFi driver
-struct Config {
-    #[default(5)]
-    rx_queue_size: usize,
-    #[default(3)]
-    tx_queue_size: usize,
-    #[default(10)]
-    static_rx_buf_num: usize,
-    #[default(32)]
-    dynamic_rx_buf_num: usize,
-    #[default(0)]
-    static_tx_buf_num: usize,
-    #[default(32)]
-    dynamic_tx_buf_num: usize,
-    #[default(0)]
-    ampdu_rx_enable: usize,
-    #[default(0)]
-    ampdu_tx_enable: usize,
-    #[default(0)]
-    amsdu_tx_enable: usize,
-    #[default(6)]
-    rx_ba_win: usize,
-    #[default(1)]
-    max_burst_size: usize,
-    #[default("CN")]
-    country_code: &'static str,
-    #[default(0)]
-    country_code_operating_class: u8,
-    #[default(1492)]
-    mtu: usize,
-    #[default(65536)]
-    heap_size: usize,
-    #[default(200)]
-    tick_rate_hz: u32,
-    #[default(3)]
-    listen_interval: u16,
-    #[default(6)]
-    beacon_timeout: u16,
-    #[default(300)]
-    ap_beacon_timeout: u16,
-    #[default(1)]
-    failure_retry_cnt: u8,
-    #[default(0)]
-    scan_method: u32,
-}
-
-fn validate_config() {
-    if CONFIG.rx_ba_win > CONFIG.dynamic_rx_buf_num {
-        print_warning(
-            "WiFi configuration check: rx_ba_win should not be larger than dynamic_rx_buf_num!",
-        );
-    }
-
-    if CONFIG.rx_ba_win > (CONFIG.static_rx_buf_num * 2) {
-        print_warning("WiFi configuration check: rx_ba_win should not be larger than double of the static_rx_buf_num!");
-    }
 }

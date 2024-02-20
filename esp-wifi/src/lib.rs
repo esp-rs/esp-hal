@@ -142,6 +142,16 @@ struct Config {
     scan_method: u32,
 }
 
+// Validate the configuration at compile time
+const _: () = {
+    // We explicitely use `core` assert here because this evaluation happens at compile time and won't bloat the binary
+    core::assert!(
+        CONFIG.rx_ba_win < CONFIG.dynamic_rx_buf_num,
+        "WiFi configuration check: rx_ba_win should not be larger than dynamic_rx_buf_num!"
+    );
+    core::assert!(CONFIG.rx_ba_win < (CONFIG.static_rx_buf_num * 2), "WiFi configuration check: rx_ba_win should not be larger than double of the static_rx_buf_num!");
+};
+
 const HEAP_SIZE: usize = crate::CONFIG.heap_size;
 
 #[cfg_attr(esp32, link_section = ".dram2_uninit")]
