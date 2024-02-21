@@ -1,0 +1,52 @@
+//! Connect a potentiometer to an IO pin and see the read values change when
+//! rotating the shaft.
+//!
+//! Alternatively, you could also connect the IO pin to GND or 3V3 to see the
+//! maximum and minimum raw values read.
+
+//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+
+#![no_std]
+#![no_main]
+
+use esp_backtrace as _;
+use esp_hal::{
+    adc::{AdcConfig, Attenuation, ADC},
+    clock::ClockControl,
+    gpio::IO,
+    peripherals::{Peripherals, ADC1},
+    prelude::*,
+    Delay,
+};
+use esp_println::println;
+
+#[entry]
+fn main() -> ! {
+    let peripherals = Peripherals::take();
+    let system = peripherals.SYSTEM.split();
+    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+
+    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "esp32")] {
+            let analog_pin = io.pins.gpio32.into_analog();
+        } else if #[cfg(any(feature = "esp32s2", feature = "esp32s3"))] {
+            let analog_pin = io.pins.gpio3.into_analog();
+        } else {
+            let analog_pin = io.pins.gpio2.into_analog();
+        }
+    }
+
+    // Create ADC instances
+    let mut adc1_config = AdcConfig::new();
+    let mut adc1_pin = adc1_config.enable_pin(analog_pin, Attenuation::Attenuation11dB);
+    let mut adc1 = ADC::<ADC1>::new(peripherals.ADC1, adc1_config);
+
+    let mut delay = Delay::new(&clocks);
+
+    loop {
+        let pin_value: u16 = nb::block!(adc1.read(&mut adc1_pin)).unwrap();
+        println!("ADC reading = {}", pin_value);
+        delay.delay_ms(1500u32);
+    }
+}
