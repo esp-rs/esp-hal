@@ -2616,6 +2616,8 @@ pub mod rtc_io {
 
     use core::marker::PhantomData;
 
+    #[cfg(esp32c6)]
+    use super::OpenDrain;
     use super::{Floating, Input, Output, PullDown, PullUp, PushPull, Unknown};
 
     /// A GPIO pin configured for low power operation
@@ -2735,6 +2737,23 @@ pub mod rtc_io {
                 private: PhantomData,
             }
         }
+
+        #[cfg(esp32c6)]
+        /// Configures the pin as an pullup input and a push pull output pin.
+        pub fn into_open_drain_output(self) -> LowPowerPin<OpenDrain, PIN> {
+            self.into_pull_up_input();
+            self.into_push_pull_output();
+            use crate::peripherals::GPIO;
+
+            let gpio = unsafe { &*GPIO::PTR };
+
+            gpio.pin(PIN).modify(|_, w| w.pad_driver().bit(true));
+            self.pulldown_enable(false);
+
+            LowPowerPin {
+                private: PhantomData,
+            }
+        }
     }
 
     #[cfg(esp32s3)]
@@ -2787,6 +2806,8 @@ pub mod lp_gpio {
 
     use core::marker::PhantomData;
 
+    #[cfg(esp32c6)]
+    use super::OpenDrain;
     use super::{Floating, Input, Output, PullDown, PullUp, PushPull, Unknown};
 
     /// A GPIO pin configured for low power operation
@@ -2876,6 +2897,21 @@ pub mod lp_gpio {
         /// Configures the pin as an output pin.
         pub fn into_push_pull_output(self) -> LowPowerPin<Output<PushPull>, PIN> {
             self.output_enable(true);
+            LowPowerPin {
+                private: PhantomData,
+            }
+        }
+
+        pub fn into_open_drain_output(self) -> LowPowerPin<OpenDrain, PIN> {
+            use crate::peripherals::GPIO;
+
+            let gpio = unsafe { &*GPIO::PTR };
+
+            gpio.pin(PIN as usize)
+                .modify(|_, w| w.pad_driver().bit(true));
+            self.pulldown_enable(false);
+            self.into_pull_up_input().into_push_pull_output();
+
             LowPowerPin {
                 private: PhantomData,
             }

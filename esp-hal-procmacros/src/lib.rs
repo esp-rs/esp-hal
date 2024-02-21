@@ -618,6 +618,7 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
         use #hal_crate::gpio::lp_gpio::LowPowerPin;
         use #hal_crate::gpio::*;
         use #hal_crate::uart::lp_uart::LpUart;
+        use #hal_crate::i2c::lp_i2c::LpI2c;
     };
     #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
     let imports = quote! {
@@ -727,7 +728,12 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
                     }
                     "LpUart" => {
                         create_peripheral.push(quote!(
-                            let mut #param_name = unsafe { the_hal::uart::conjure().unwrap() };
+                            let mut #param_name = unsafe { the_hal::uart::conjure() };
+                        ));
+                    }
+                    "LpI2c" => {
+                        create_peripheral.push(quote!(
+                            let mut #param_name = unsafe { the_hal::i2c::conjure() };
                         ));
                     }
                     _ => {

@@ -6,6 +6,8 @@ use core::arch::global_asm;
 pub mod delay;
 pub mod gpio;
 #[cfg(esp32c6)]
+pub mod i2c;
+#[cfg(esp32c6)]
 pub mod uart;
 
 pub mod pac {
