@@ -158,6 +158,9 @@ rv-init-data     = ["esp-riscv-rt/init-data", "esp-riscv-rt/init-rw-text"]
 rv-zero-rtc-bss  = ["esp-riscv-rt/zero-rtc-fast-bss"]
 rv-init-rtc-data = ["esp-riscv-rt/init-rtc-fast-data", "esp-riscv-rt/init-rtc-fast-text"]
 
+# Configuration for placing device drivers in the IRAM for faster access
+place-spi-driver-in-ram = []
+
 # Enable the `impl-register-debug` feature for the selected PAC
 debug = [
     "esp32?/impl-register-debug",
