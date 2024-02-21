@@ -12,8 +12,8 @@
 //! interrupt15() => Priority::Priority15
 //! ```
 
-use esp_riscv_rt::riscv::register::{mcause, mtvec};
 pub use esp_riscv_rt::TrapFrame;
+use riscv::register::{mcause, mtvec};
 
 #[cfg(not(any(plic, clic)))]
 pub use self::classic::*;
@@ -739,7 +739,6 @@ mod classic {
     #[link_section = ".trap"]
     pub(super) unsafe extern "C" fn _handle_priority() -> u32 {
         use super::mcause;
-        use crate::riscv;
         let interrupt_id: usize = mcause::read().code(); // MSB is whether its exception or interrupt.
         let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
         let interrupt_priority = intr
@@ -763,7 +762,6 @@ mod classic {
     #[no_mangle]
     #[link_section = ".trap"]
     pub(super) unsafe extern "C" fn _restore_priority(stored_prio: u32) {
-        use crate::riscv;
         unsafe {
             riscv::interrupt::disable();
         }
@@ -877,7 +875,6 @@ mod plic {
     #[link_section = ".trap"]
     pub(super) unsafe extern "C" fn _handle_priority() -> u32 {
         use super::mcause;
-        use crate::riscv;
         let plic_mxint_pri_ptr = PLIC_MXINT0_PRI_REG as *mut u32;
         let interrupt_id: isize = mcause::read().code().try_into().unwrap(); // MSB is whether its exception or interrupt.
         let interrupt_priority = plic_mxint_pri_ptr.offset(interrupt_id).read_volatile();
@@ -898,7 +895,6 @@ mod plic {
     #[no_mangle]
     #[link_section = ".trap"]
     pub(super) unsafe extern "C" fn _restore_priority(stored_prio: u32) {
-        use crate::riscv;
         unsafe {
             riscv::interrupt::disable();
         }
