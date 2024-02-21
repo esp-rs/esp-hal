@@ -50,7 +50,7 @@
 use core::marker::PhantomData;
 
 use fugit::HertzU32;
-#[cfg(feature = "optimize-spi-in-iram")]
+#[cfg(feature = "place-spi-driver-in-ram")]
 use procmacros::ram;
 
 use super::{
