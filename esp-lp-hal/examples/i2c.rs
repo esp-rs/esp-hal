@@ -7,6 +7,8 @@
 //! - SDA => GPIO6
 //! - SCL => GPIO7
 
+//% CHIPS: esp32c6
+
 #![no_std]
 #![no_main]
 

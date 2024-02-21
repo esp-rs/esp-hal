@@ -1,6 +1,7 @@
 [workspace]
-members = ["xtask"]
-exclude = [
+resolver = "2"
+members  = ["xtask"]
+exclude  = [
     "esp-hal",
     "esp-hal-procmacros",
     "esp-hal-smartled",
@@ -14,4 +15,5 @@ exclude = [
     "esp32p4-hal",
     "esp32s2-hal",
     "esp32s3-hal",
+    "examples",
 ]

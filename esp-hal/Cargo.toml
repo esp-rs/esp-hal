@@ -3,16 +3,10 @@ name         = "esp-hal"
 version      = "0.15.0"
 edition      = "2021"
 rust-version = "1.67.0"
-description  = "HAL implementations for peripherals common among Espressif devices; should not be used directly"
+description  = "Bare-metal HAL for Espressif devices"
 repository   = "https://github.com/esp-rs/esp-hal"
 license      = "MIT OR Apache-2.0"
-
-# Prevent multiple copies of this crate in the same binary.
-# Needed because different copies might get different features, causing
-# confusing build errors due to expected features not getting enabled
-# on the unintentional copy.
-# This is especially common when mixing crates from crates.io and git.
-links = "esp-hal"
+links        = "esp-hal"
 
 [dependencies]
 bitflags             = "2.4.2"
@@ -51,7 +45,7 @@ embassy-time-driver  = { version = "0.1.0", optional = true }
 # Architecture/runtime
 esp-riscv-rt = { version = "0.6.1",  optional = true, path = "../esp-riscv-rt" }
 riscv        = { version = "0.11.0", optional = true }
-xtensa-lx    = { version = "0.8.0",  optional = true }
+xtensa-lx    = { version = "0.9.0",  optional = true }
 xtensa-lx-rt = { version = "0.16.0", optional = true }
 
 # Part of `ufmt` containing only `uWrite` trait
@@ -60,14 +54,14 @@ ufmt-write = { version = "0.1.0", optional = true }
 # IMPORTANT:
 # Each supported device MUST have its PAC included below along with a
 # corresponding feature.
-esp32   = { git = "https://github.com/esp-rs/esp-pacs", rev = "ef39b1c", features = ["critical-section"], optional = true }
-esp32c2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "ef39b1c", features = ["critical-section"], optional = true }
-esp32c3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "ef39b1c", features = ["critical-section"], optional = true }
-esp32c6 = { git = "https://github.com/esp-rs/esp-pacs", rev = "ef39b1c", features = ["critical-section"], optional = true }
-esp32h2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "ef39b1c", features = ["critical-section"], optional = true }
-esp32p4 = { git = "https://github.com/esp-rs/esp-pacs", rev = "ef39b1c", features = ["critical-section"], optional = true }
-esp32s2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "ef39b1c", features = ["critical-section"], optional = true }
-esp32s3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "ef39b1c", features = ["critical-section"], optional = true }
+esp32   = { git = "https://github.com/esp-rs/esp-pacs", rev = "bbf7d5a", features = ["critical-section"], optional = true }
+esp32c2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "bbf7d5a", features = ["critical-section"], optional = true }
+esp32c3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "bbf7d5a", features = ["critical-section"], optional = true }
+esp32c6 = { git = "https://github.com/esp-rs/esp-pacs", rev = "bbf7d5a", features = ["critical-section"], optional = true }
+esp32h2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "bbf7d5a", features = ["critical-section"], optional = true }
+esp32p4 = { git = "https://github.com/esp-rs/esp-pacs", rev = "bbf7d5a", features = ["critical-section"], optional = true }
+esp32s2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "bbf7d5a", features = ["critical-section"], optional = true }
+esp32s3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "bbf7d5a", features = ["critical-section"], optional = true }
 
 [build-dependencies]
 basic-toml = "0.1.8"
@@ -76,7 +70,7 @@ serde      = { version = "1.0.195", features = ["derive"] }
 [features]
 #! ### Chip Support Feature Flags
 ## Target the ESP32.
-esp32   = ["dep:esp32",   "xtensa", "xtensa-lx/esp32", "xtensa-lx-rt?/esp32"]
+esp32   = ["dep:esp32",   "xtensa", "xtensa-lx/spin", "xtensa-lx-rt?/esp32"]
 ## Target the ESP32-C2.
 esp32c2 = ["dep:esp32c2", "riscv",  "portable-atomic/unsafe-assume-single-core"]
 ## Target the ESP32-C3.
@@ -88,9 +82,9 @@ esp32h2 = ["dep:esp32h2", "riscv"]
 ## Target the ESP32-P4.
 esp32p4 = ["dep:esp32p4", "riscv",  "procmacros/has-lp-core"]
 ## Target the ESP32-S2.
-esp32s2 = ["dep:esp32s2", "xtensa", "portable-atomic/critical-section", "procmacros/has-ulp-core", "xtensa-lx/esp32s2", "xtensa-lx-rt?/esp32s2", "usb-otg"]
+esp32s2 = ["dep:esp32s2", "xtensa", "portable-atomic/critical-section", "procmacros/has-ulp-core", "xtensa-lx-rt?/esp32s2", "usb-otg"]
 ## Target the ESP32-S3.
-esp32s3 = ["dep:esp32s3", "xtensa", "procmacros/has-ulp-core", "xtensa-lx/esp32s3", "xtensa-lx-rt?/esp32s3", "usb-otg"]
+esp32s3 = ["dep:esp32s3", "xtensa", "procmacros/has-ulp-core", "xtensa-lx/spin", "xtensa-lx-rt?/esp32s3", "usb-otg"]
 
 # Runetime support
 rt-riscv  = ["esp-riscv-rt/zero-bss", "esp32c2?/rt", "esp32c3?/rt", "esp32c6?/rt", "esp32h2?/rt", "esp32p4?/rt"]
@@ -158,8 +152,8 @@ embassy-time-systick = []
 embassy-time-timg0   = []
 
 # Architecture-specific features (intended for internal use)
-riscv  = ["dep:riscv", "critical-section/restore-state-u8"]
-xtensa = ["critical-section/restore-state-u32"]
+riscv  = ["dep:riscv",     "critical-section/restore-state-u8"]
+xtensa = ["dep:xtensa-lx", "critical-section/restore-state-u32"]
 
 # Initialize / clear data sections and RTC memory
 rv-init-data     = ["esp-riscv-rt/init-data", "esp-riscv-rt/init-rw-text"]
