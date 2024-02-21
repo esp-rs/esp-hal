@@ -15,12 +15,18 @@ cfg-if               = "1.0.0"
 critical-section     = "1.1.2"
 defmt                = { version = "=0.3.5", optional = true }
 document-features    = "0.2.8"
+embassy-executor     = { version = "0.5.0", optional = true }
+embassy-futures      = { version = "0.1.1", optional = true }
+embassy-sync         = { version = "0.5.0", optional = true }
+embassy-time-driver  = { version = "0.1.0", optional = true }
 embedded-can         = { version = "0.4.1", optional = true }
 embedded-dma         = "0.2.0"
 embedded-hal         = { version = "0.2.7", features = ["unproven"] }
 embedded-hal-1       = { version = "1.0.0", optional = true, package = "embedded-hal" }
+embedded-hal-async   = { version = "1.0.0", optional = true }
 embedded-hal-nb      = { version = "1.0.0", optional = true }
 embedded-io          = { version = "0.6.1", optional = true }
+embedded-io-async    = { version = "0.6.1", optional = true }
 enumset              = "1.1.3"
 esp-synopsys-usb-otg = { version = "0.4.0", optional = true, features = ["fs", "esp32sx"] }
 fugit                = "0.3.7"
@@ -29,25 +35,13 @@ nb                   = "1.1.0"
 paste                = "1.0.14"
 portable-atomic      = { version = "1.6.0", default-features = false }
 procmacros           = { version = "0.8.0", features = ["enum-dispatch", "ram"], package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
+riscv                = { version = "0.11.0", optional = true }
 strum                = { version = "0.25.0", default-features = false, features = ["derive"] }
 void                 = { version = "1.0.2", default-features = false }
 usb-device           = { version = "0.3.1", optional = true }
-rand_core            = { version = "0.6.4" }
-
-# async
-embedded-hal-async   = { version = "1.0.0", optional = true }
-embedded-io-async    = { version = "0.6.1", optional = true }
-embassy-executor     = { version = "0.5.0", optional = true }
-embassy-futures      = { version = "0.1.1", optional = true }
-embassy-sync         = { version = "0.5.0", optional = true }
-embassy-time-driver  = { version = "0.1.0", optional = true }
-
-# Architecture
-riscv     = { version = "0.11.0", optional = true }
-xtensa-lx = { version = "0.9.0",  optional = true }
-
-# Part of `ufmt` containing only `uWrite` trait
-ufmt-write = { version = "0.1.0", optional = true }
+rand_core            = "0.6.4"
+ufmt-write           = { version = "0.1.0", optional = true }
+xtensa-lx            = { version = "0.9.0", optional = true }
 
 # IMPORTANT:
 # Each supported device MUST have its PAC included below along with a
@@ -74,6 +68,40 @@ serde      = { version = "1.0.195", features = ["derive"] }
 [features]
 default = ["embassy-integrated-timers", "rt", "vectored"]
 
+riscv  = ["dep:riscv",     "critical-section/restore-state-u8"]
+xtensa = ["dep:xtensa-lx", "critical-section/restore-state-u32"]
+
+usb-otg = ["esp-synopsys-usb-otg", "usb-device"]
+
+## Enable debug features in the HAL (used for development).
+debug = [
+    "esp32?/impl-register-debug",
+    "esp32c2?/impl-register-debug",
+    "esp32c3?/impl-register-debug",
+    "esp32c6?/impl-register-debug",
+    "esp32h2?/impl-register-debug",
+    "esp32p4?/impl-register-debug",
+    "esp32s2?/impl-register-debug",
+    "esp32s3?/impl-register-debug",
+]
+## Enable logging output using the `log` crate.
+log = ["dep:log"]
+## Enable runtime support.
+rt = [
+    "dep:esp-riscv-rt",
+    "dep:xtensa-lx-rt",
+    "esp32?/rt",
+    "esp32c2?/rt",
+    "esp32c3?/rt",
+    "esp32c6?/rt",
+    "esp32h2?/rt",
+    "esp32p4?/rt",
+    "esp32s2?/rt",
+    "esp32s3?/rt",
+]
+## Enable interrupt vectoring.
+vectored = ["procmacros/interrupt"]
+
 #! ### Chip Support Feature Flags
 ## Target the ESP32.
 esp32   = ["dep:esp32",   "xtensa", "xtensa-lx/spin", "xtensa-lx-rt?/esp32"]
@@ -92,61 +120,26 @@ esp32s2 = ["dep:esp32s2", "xtensa", "portable-atomic/critical-section", "procmac
 ## Target the ESP32-S3.
 esp32s3 = ["dep:esp32s3", "xtensa", "procmacros/has-ulp-core", "xtensa-lx/spin", "xtensa-lx-rt?/esp32s3", "usb-otg"]
 
-# Runtime support
-rt = [
-    "dep:esp-riscv-rt",
-    "dep:xtensa-lx-rt",
-    "esp32?/rt",
-    "esp32c2?/rt",
-    "esp32c3?/rt",
-    "esp32c6?/rt",
-    "esp32h2?/rt",
-    "esp32p4?/rt",
-    "esp32s2?/rt",
-    "esp32s3?/rt",
-]
-
-# Only certain chips support flip-link (ESP32-C6 and ESPS32-H2)
+#! ### RISC-V Exclusive Feature Flags
+## Enable direct interrupt vectoring.
+direct-vectoring = ["esp-riscv-rt/direct-vectoring"]
+## Move the stack to start of RAM to get zero-cost stack overflow protection
+## (ESP32-C6 and ESPS32-H2 only!).
 flip-link = ["esp-riscv-rt/fix-sp"]
-
-# PSRAM support
-psram-2m = []
-psram-4m = []
-psram-8m = []
-
-# Octal RAM support
-opsram-2m  = []
-opsram-4m  = []
-opsram-8m  = []
-opsram-16m = []
-
-# PSRAM 80Mhz frequency support
-psram-80mhz  = []
-
-# USB OTG support (ESP32-S2 and ESP32-S3 only! Enabled by default)
-usb-otg = ["esp-synopsys-usb-otg", "usb-device"]
-
-# Interrupt-related feature:
-#  - Use direct interrupt vectoring (RISC-V only!)
-#  - Use interrupt preemption (RISC-V only!)
-#  - Use vectored interrupts (calling the handlers defined in the PAC)
-direct-vectoring     = ["esp-riscv-rt/direct-vectoring"]
+## Enable interrupt preemption.
 interrupt-preemption = ["esp-riscv-rt/interrupt-preemption"]
-vectored             = ["procmacros/interrupt"]
+## Configuration for placing device drivers in the IRAM for faster access.
+place-spi-driver-in-ram = []
+## Initialize the `.data` section of memory.
+rv-init-data = ["esp-riscv-rt?/init-data", "esp-riscv-rt?/init-rw-text"]
+## Zero the `.bss` section of low-power memory.
+rv-zero-rtc-bss = ["esp-riscv-rt?/zero-rtc-fast-bss"]
+## Initialize the `.data` section of low-power memory.
+rv-init-rtc-data = ["esp-riscv-rt?/init-rtc-fast-data", "esp-riscv-rt?/init-rtc-fast-text"]
 
-# Enable logging
-log = ["dep:log"]
-
-# Trait implementation features:
-#  - Implement the `embedded-hal@1.0.0-rc.x` traits (and friends)
-#  - Implement the `embedded-io` traits where able
-#  - Implement the `ufmt_write::Write` trait where able
-eh1         = ["embedded-hal-1", "embedded-hal-nb", "embedded-can"]
-embedded-io = ["dep:embedded-io"]
-ufmt        = ["ufmt-write"]
-
-# Support for asynchronous operation, implementing traits from
-# `embedded-hal-async` and `embedded-io-async`
+#! ### Trait Implementation Feature Flags
+## Enable support for asynchronous operation, with interfaces provided by
+## `embedded-hal-async` and `embedded-io-async`.
 async = [
     "embedded-hal-async",
     "eh1",
@@ -155,43 +148,7 @@ async = [
     "embedded-io",
     "embedded-io-async",
 ]
-
-# Embassy support
-embassy = ["embassy-time-driver", "procmacros/embassy"]
-
-embassy-executor-interrupt = ["embassy", "embassy-executor"]
-embassy-executor-thread    = ["embassy", "embassy-executor"]
-
-embassy-integrated-timers = ["embassy-executor?/integrated-timers"]
-
-embassy-time-systick = []
-embassy-time-timg0   = []
-
-# Architecture-specific features (intended for internal use)
-riscv  = ["dep:riscv",     "critical-section/restore-state-u8"]
-xtensa = ["dep:xtensa-lx", "critical-section/restore-state-u32"]
-
-# Initialize / clear data sections and RTC memory
-rv-init-data     = ["esp-riscv-rt?/init-data", "esp-riscv-rt?/init-rw-text"]
-rv-zero-rtc-bss  = ["esp-riscv-rt?/zero-rtc-fast-bss"]
-rv-init-rtc-data = ["esp-riscv-rt?/init-rtc-fast-data", "esp-riscv-rt?/init-rtc-fast-text"]
-
-# Configuration for placing device drivers in the IRAM for faster access
-place-spi-driver-in-ram = []
-
-# Enable the `impl-register-debug` feature for the selected PAC
-debug = [
-    "esp32?/impl-register-debug",
-    "esp32c2?/impl-register-debug",
-    "esp32c3?/impl-register-debug",
-    "esp32c6?/impl-register-debug",
-    "esp32h2?/impl-register-debug",
-    "esp32p4?/impl-register-debug",
-    "esp32s2?/impl-register-debug",
-    "esp32s3?/impl-register-debug",
-]
-
-# Enable support for `defmt`, for `esp-hal` and also for all our dependencies
+## Implement `defmt::Format` on certain types.
 defmt = [
     "dep:defmt",
     "embassy-executor?/defmt",
@@ -201,3 +158,48 @@ defmt = [
     "embedded-io/defmt-03",
     "embedded-io-async?/defmt-03",
 ]
+## Implement the traits defined in the `1.0.0` releases of `embedded-hal` and
+## `embedded-hal-nb` for the relevant peripherals.
+eh1 = ["embedded-hal-1", "embedded-hal-nb", "embedded-can"]
+## Implement the traits defined in `embedded-io` for certain peripherals.
+embedded-io = ["dep:embedded-io"]
+## Implement the `ufmt_write::uWrite` trait for certain peripherals.
+ufmt = ["dep:ufmt-write"]
+
+#! ### Embassy Feature Flags
+## Enable support for `embassy`, a modern asynchronous embedded framework.
+embassy = ["embassy-time-driver", "procmacros/embassy"]
+## Use the interrupt-mode embassy executor.
+embassy-executor-interrupt = ["embassy", "embassy-executor"]
+## Use the thread-mode embassy executor.
+embassy-executor-thread = ["embassy", "embassy-executor"]
+## Uses hardware timers as alarms for the executors. Using this feature
+## limits the number of executors to the number of hardware alarms provided
+## by the time driver.
+embassy-integrated-timers = ["embassy-executor?/integrated-timers"]
+## Enable the embassy time driver using the `SYSTIMER` peripheral. The
+## `SYSTIMER` peripheral has three alarams available for use.
+embassy-time-systick = []
+## Enable the embassy time driver using the `TIMG0` peripheral. The `TIMG0`
+## peripheral has two alarms available for use.
+embassy-time-timg0 = []
+
+#! ### PSRAM Feature Flags
+## Use externally connected PSRAM (2MB).
+psram-2m = []
+## Use externally connected PSRAM (4MB).
+psram-4m = []
+## Use externally connected PSRAM (8MB).
+psram-8m = []
+## PSRAM 80Mhz frequency support
+psram-80mhz = []
+
+#! ### Octal RAM Feature Flags
+## Use externally connected Octal RAM (2MB).
+opsram-2m  = []
+## Use externally connected Octal RAM (4MB).
+opsram-4m  = []
+## Use externally connected Octal RAM (8MB).
+opsram-8m  = []
+## Use externally connected Octal RAM (16MB).
+opsram-16m = []

@@ -2,33 +2,13 @@
 //! Espressif devices. Implements a number of the traits defined by
 //! [embedded-hal].
 //!
-//! This crate should not be used directly; you should use one of the
-//! device-specific HAL crates instead:
-//!
-//! - [esp32-hal]
-//! - [esp32c2-hal]
-//! - [esp32c3-hal]
-//! - [esp32c6-hal]
-//! - [esp32h2-hal]
-//! - [esp32p4-hal]
-//! - [esp32s2-hal]
-//! - [esp32s3-hal]
-//!
-//! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
-//! [esp32-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32-hal
-//! [esp32c2-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32c2-hal
-//! [esp32c3-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32c3-hal
-//! [esp32c6-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32c6-hal
-//! [esp32h2-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32h2-hal
-//! [esp32p4-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32p4-hal
-//! [esp32s2-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32s2-hal
-//! [esp32s3-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp32s3-hal
-
-#![no_std]
-#![allow(asm_sub_register)]
-#![cfg_attr(xtensa, feature(asm_experimental_arch))]
-#![cfg_attr(feature = "async", allow(stable_features, async_fn_in_trait))]
+//! ## Feature Flags
+#![doc = document_features::document_features!()]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
+#![allow(asm_sub_register)]
+#![cfg_attr(feature = "async", allow(stable_features, async_fn_in_trait))]
+#![cfg_attr(xtensa, feature(asm_experimental_arch))]
+#![no_std]
 
 // MUST be the first module
 mod fmt;
