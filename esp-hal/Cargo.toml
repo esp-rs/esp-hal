@@ -42,11 +42,9 @@ embassy-futures      = { version = "0.1.1", optional = true }
 embassy-sync         = { version = "0.5.0", optional = true }
 embassy-time-driver  = { version = "0.1.0", optional = true }
 
-# Architecture/runtime
-esp-riscv-rt = { version = "0.6.1",  optional = true, path = "../esp-riscv-rt" }
-riscv        = { version = "0.11.0", optional = true }
-xtensa-lx    = { version = "0.9.0",  optional = true }
-xtensa-lx-rt = { version = "0.16.0", optional = true }
+# Architecture
+riscv     = { version = "0.11.0", optional = true }
+xtensa-lx = { version = "0.9.0",  optional = true }
 
 # Part of `ufmt` containing only `uWrite` trait
 ufmt-write = { version = "0.1.0", optional = true }
@@ -63,32 +61,50 @@ esp32p4 = { git = "https://github.com/esp-rs/esp-pacs", rev = "bbf7d5a", feature
 esp32s2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "bbf7d5a", features = ["critical-section"], optional = true }
 esp32s3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "bbf7d5a", features = ["critical-section"], optional = true }
 
+[target.'cfg(target_arch = "riscv32")'.dependencies]
+esp-riscv-rt = { version = "0.6.1", optional = true }
+
+[target.'cfg(target_arch = "xtensa")'.dependencies]
+xtensa-lx-rt = { version = "0.16.0", optional = true }
+
 [build-dependencies]
 basic-toml = "0.1.8"
 serde      = { version = "1.0.195", features = ["derive"] }
 
 [features]
+default = ["embassy-integrated-timers", "rt", "vectored"]
+
 #! ### Chip Support Feature Flags
 ## Target the ESP32.
 esp32   = ["dep:esp32",   "xtensa", "xtensa-lx/spin", "xtensa-lx-rt?/esp32"]
 ## Target the ESP32-C2.
 esp32c2 = ["dep:esp32c2", "riscv",  "portable-atomic/unsafe-assume-single-core"]
 ## Target the ESP32-C3.
-esp32c3 = ["dep:esp32c3", "riscv",  "portable-atomic/unsafe-assume-single-core"]
+esp32c3 = ["dep:esp32c3", "riscv",  "portable-atomic/unsafe-assume-single-core", "rv-zero-rtc-bss"]
 ## Target the ESP32-C6.
-esp32c6 = ["dep:esp32c6", "riscv",  "procmacros/has-lp-core"]
+esp32c6 = ["dep:esp32c6", "riscv",  "procmacros/has-lp-core", "rv-zero-rtc-bss"]
 ## Target the ESP32-H2.
-esp32h2 = ["dep:esp32h2", "riscv"]
+esp32h2 = ["dep:esp32h2", "riscv", "rv-zero-rtc-bss"]
 ## Target the ESP32-P4.
-esp32p4 = ["dep:esp32p4", "riscv",  "procmacros/has-lp-core"]
+esp32p4 = ["dep:esp32p4", "riscv",  "procmacros/has-lp-core", "rv-zero-rtc-bss"]
 ## Target the ESP32-S2.
 esp32s2 = ["dep:esp32s2", "xtensa", "portable-atomic/critical-section", "procmacros/has-ulp-core", "xtensa-lx-rt?/esp32s2", "usb-otg"]
 ## Target the ESP32-S3.
 esp32s3 = ["dep:esp32s3", "xtensa", "procmacros/has-ulp-core", "xtensa-lx/spin", "xtensa-lx-rt?/esp32s3", "usb-otg"]
 
-# Runetime support
-rt-riscv  = ["esp-riscv-rt/zero-bss", "esp32c2?/rt", "esp32c3?/rt", "esp32c6?/rt", "esp32h2?/rt", "esp32p4?/rt"]
-rt-xtensa = ["dep:xtensa-lx-rt", "esp32?/rt", "esp32s2?/rt", "esp32s3?/rt"]
+# Runtime support
+rt = [
+    "dep:esp-riscv-rt",
+    "dep:xtensa-lx-rt",
+    "esp32?/rt",
+    "esp32c2?/rt",
+    "esp32c3?/rt",
+    "esp32c6?/rt",
+    "esp32h2?/rt",
+    "esp32p4?/rt",
+    "esp32s2?/rt",
+    "esp32s3?/rt",
+]
 
 # Only certain chips support flip-link (ESP32-C6 and ESPS32-H2)
 flip-link = ["esp-riscv-rt/fix-sp"]
@@ -156,9 +172,9 @@ riscv  = ["dep:riscv",     "critical-section/restore-state-u8"]
 xtensa = ["dep:xtensa-lx", "critical-section/restore-state-u32"]
 
 # Initialize / clear data sections and RTC memory
-rv-init-data     = ["esp-riscv-rt/init-data", "esp-riscv-rt/init-rw-text"]
-rv-zero-rtc-bss  = ["esp-riscv-rt/zero-rtc-fast-bss"]
-rv-init-rtc-data = ["esp-riscv-rt/init-rtc-fast-data", "esp-riscv-rt/init-rtc-fast-text"]
+rv-init-data     = ["esp-riscv-rt?/init-data", "esp-riscv-rt?/init-rw-text"]
+rv-zero-rtc-bss  = ["esp-riscv-rt?/zero-rtc-fast-bss"]
+rv-init-rtc-data = ["esp-riscv-rt?/init-rtc-fast-data", "esp-riscv-rt?/init-rtc-fast-text"]
 
 # Configuration for placing device drivers in the IRAM for faster access
 place-spi-driver-in-ram = []

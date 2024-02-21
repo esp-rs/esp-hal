@@ -34,7 +34,7 @@ pub use crate::dma::{
     DmaTransfer as _esp_hal_dma_DmaTransfer,
     DmaTransferRxTx as _esp_hal_dma_DmaTransferRxTx,
 };
-#[cfg(any(feature = "rt-riscv", feature = "rt-xtensa"))]
+#[cfg(feature = "rt")]
 pub use crate::entry;
 #[cfg(gpio)]
 pub use crate::gpio::{
