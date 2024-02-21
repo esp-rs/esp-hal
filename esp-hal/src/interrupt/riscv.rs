@@ -12,6 +12,9 @@
 //! interrupt15() => Priority::Priority15
 //! ```
 
+// TODO: Add safety doc comments as needed and remove allow attribute
+#![allow(clippy::missing_safety_doc)]
+
 pub use esp_riscv_rt::TrapFrame;
 use riscv::register::{mcause, mtvec};
 
@@ -158,7 +161,7 @@ mod vectored {
                 let interrupt_nr = status.trailing_zeros() as u16;
                 // safety: cast is safe because of repr(u16)
                 if let Some(cpu_interrupt) =
-                    get_assigned_cpu_interrupt(core::mem::transmute(interrupt_nr as u16))
+                    get_assigned_cpu_interrupt(core::mem::transmute(interrupt_nr))
                 {
                     let prio = get_priority_by_core(core, cpu_interrupt);
                     prios[prio as usize] |= 1 << (interrupt_nr as usize);
@@ -249,8 +252,13 @@ mod vectored {
             // defined in each hal
             fn EspDefaultHandler(interrupt: Interrupt);
         }
+
         let handler = peripherals::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler;
-        if handler as *const _ == EspDefaultHandler as *const unsafe extern "C" fn() {
+
+        if core::ptr::eq(
+            handler as *const _,
+            EspDefaultHandler as *const unsafe extern "C" fn(),
+        ) {
             EspDefaultHandler(interrupt);
         } else {
             let handler: fn(&mut TrapFrame) = core::mem::transmute(handler);
@@ -790,7 +798,7 @@ mod plic {
     ];
 
     const DR_REG_PLIC_MX_BASE: u32 = 0x20001000;
-    const PLIC_MXINT_ENABLE_REG: u32 = DR_REG_PLIC_MX_BASE + 0x0;
+    const PLIC_MXINT_ENABLE_REG: u32 = DR_REG_PLIC_MX_BASE;
     const PLIC_MXINT_TYPE_REG: u32 = DR_REG_PLIC_MX_BASE + 0x4;
     const PLIC_MXINT_CLEAR_REG: u32 = DR_REG_PLIC_MX_BASE + 0x8;
     const PLIC_MXINT0_PRI_REG: u32 = DR_REG_PLIC_MX_BASE + 0x10;

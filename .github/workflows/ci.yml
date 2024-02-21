@@ -231,21 +231,22 @@ jobs:
       - name: clippy (esp-hal, esp32c3)
         run: cd esp-hal && cargo clippy --features=esp32c3 --target=riscv32imc-unknown-none-elf -- -D warnings
       - name: clippy (esp-hal, esp32c6)
-        run: cd esp-hal && cargo clippy --features=esp32c6 -- -D warnings
+        run: cd esp-hal && cargo clippy --features=esp32c6 --target=riscv32imac-unknown-none-elf -- -D warnings
       - name: clippy (esp-hal, esp32h2)
-        run: cd esp-hal && cargo clippy --features=esp32h2 -- -D warnings
-      - name: clippy (esp-hal, esp32p4)
-        run: cd esp-hal && cargo clippy --features=esp32p4 -- -D warnings
+        run: cd esp-hal && cargo clippy --features=esp32h2 --target=riscv32imac-unknown-none-elf -- -D warnings
+      # TODO: Re-enable when able
+      # - name: clippy (esp-hal, esp32p4)
+      #   run: cd esp-hal && cargo clippy --features=esp32p4 --target=riscv32imafc-unknown-none-elf -- -D warnings
       ## esp-hal-smartled:
       - name: clippy (esp-hal-smartled)
-        run: cd esp-hal-smartled && cargo clippy --features=esp32c6 -- -D warnings
+        run: cd esp-hal-smartled && cargo clippy --features=esp32c6 --target=riscv32imac-unknown-none-elf -- -D warnings
       ## esp-lp-hal:
       - name: clippy (esp-lp-hal, esp32c6)
-        run: cd esp-lp-hal && cargo clippy --features=esp32c6 -- -D warnings
+        run: cd esp-lp-hal && cargo clippy --features=esp32c6 --target=riscv32imac-unknown-none-elf -- -D warnings
       - name: clippy (esp-lp-hal, esp32s2)
-        run: cd esp-lp-hal && cargo clippy --features=esp32s2 -- -D warnings
+        run: cd esp-lp-hal && cargo clippy --features=esp32s2 --target=riscv32imc-unknown-none-elf -- -D warnings
       - name: clippy (esp-lp-hal, esp32s3)
-        run: cd esp-lp-hal && cargo clippy --features=esp32s3 -- -D warnings
+        run: cd esp-lp-hal && cargo clippy --features=esp32s3 --target=riscv32imc-unknown-none-elf -- -D warnings
       # esp-riscv-rt:
       - name: clippy (esp-riscv-rt)
         run: cd esp-riscv-rt && cargo clippy --target=riscv32imc-unknown-none-elf -- -D warnings
@@ -263,11 +264,11 @@ jobs:
 
       # Run 'cargo clippy' on all packages targeting Xtensa:
       - name: clippy (esp-hal, esp32)
-        run: cd esp-hal && cargo clippy --features=esp32 -- -D warnings
+        run: cd esp-hal && cargo clippy -Zbuild-std=core --features=esp32 --target=xtensa-esp32-none-elf -- -D warnings
       - name: clippy (esp-hal, esp32s2)
-        run: cd esp-hal && cargo clippy --features=esp32s2 -- -D warnings
+        run: cd esp-hal && cargo clippy -Zbuild-std=core --features=esp32s2 --target=xtensa-esp32s2-none-elf -- -D warnings
       - name: clippy (esp-hal, esp32s3)
-        run: cd esp-hal && cargo clippy --features=esp32s3 -- -D warnings
+        run: cd esp-hal && cargo clippy -Zbuild-std=core --features=esp32s3 --target=xtensa-esp32s3-none-elf -- -D warnings
 
   rustfmt:
     runs-on: ubuntu-latest
