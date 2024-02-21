@@ -183,6 +183,67 @@ macro_rules! dma_buffers {
     }};
 }
 
+/// Convenience macro to create circular DMA buffers and descriptors
+///
+/// ## Usage
+/// ```rust,no_run
+/// // TX and RX buffers are 32000 bytes - passing only one parameter makes TX and RX the same size
+/// let (tx_buffer, mut tx_descriptors, rx_buffer, mut rx_descriptors) =
+///     dma_circular_buffers!(32000, 32000);
+/// ```
+#[macro_export]
+macro_rules! dma_circular_buffers {
+    ($tx_size:expr, $rx_size:expr) => {{
+        static mut TX_BUFFER: [u8; $tx_size] = [0u8; $tx_size];
+        static mut RX_BUFFER: [u8; $rx_size] = [0u8; $rx_size];
+
+        const tx_descriptor_len: usize = if $tx_size > 4092 * 2 {
+            ($tx_size + 4091) / 4092
+        } else {
+            3
+        };
+
+        const rx_descriptor_len: usize = if $rx_size > 4092 * 2 {
+            ($rx_size + 4091) / 4092
+        } else {
+            3
+        };
+
+        let tx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; tx_descriptor_len];
+        let rx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; rx_descriptor_len];
+        unsafe {
+            (
+                &mut TX_BUFFER,
+                tx_descriptors,
+                &mut RX_BUFFER,
+                rx_descriptors,
+            )
+        }
+    }};
+
+    ($size:expr) => {{
+        static mut TX_BUFFER: [u8; $size] = [0u8; $size];
+        static mut RX_BUFFER: [u8; $size] = [0u8; $size];
+
+        const descriptor_len: usize = if $size > 4092 * 2 {
+            ($size + 4091) / 4092
+        } else {
+            3
+        };
+
+        let tx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; descriptor_len];
+        let rx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; descriptor_len];
+        unsafe {
+            (
+                &mut TX_BUFFER,
+                tx_descriptors,
+                &mut RX_BUFFER,
+                rx_descriptors,
+            )
+        }
+    }};
+}
+
 /// Convenience macro to create DMA descriptors
 ///
 /// ## Usage
@@ -201,6 +262,46 @@ macro_rules! dma_descriptors {
     ($size:expr) => {{
         let tx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; ($size + 4091) / 4092];
         let rx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; ($size + 4091) / 4092];
+        (tx_descriptors, rx_descriptors)
+    }};
+}
+
+/// Convenience macro to create circular DMA descriptors
+///
+/// ## Usage
+/// ```rust,no_run
+/// // Create TX and RX descriptors for transactions up to 32000 bytes - passing only one parameter assumes TX and RX are the same size
+/// let (mut tx_descriptors, mut rx_descriptors) = dma_circular_descriptors!(32000, 32000);
+/// ```
+#[macro_export]
+macro_rules! dma_circular_descriptors {
+    ($tx_size:expr, $rx_size:expr) => {{
+        const tx_descriptor_len: usize = if $tx_size > 4092 * 2 {
+            ($tx_size + 4091) / 4092
+        } else {
+            3
+        };
+
+        const rx_descriptor_len: usize = if $rx_size > 4092 * 2 {
+            ($rx_size + 4091) / 4092
+        } else {
+            3
+        };
+
+        let tx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; tx_descriptor_len];
+        let rx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; rx_descriptor_len];
+        (tx_descriptors, rx_descriptors)
+    }};
+
+    ($size:expr) => {{
+        const descriptor_len: usize = if $size > 4092 * 2 {
+            ($size + 4091) / 4092
+        } else {
+            3
+        };
+
+        let tx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; descriptor_len];
+        let rx_descriptors = [$crate::dma::DmaDescriptor::EMPTY; descriptor_len];
         (tx_descriptors, rx_descriptors)
     }};
 }
@@ -404,10 +505,16 @@ where
 
         compiler_fence(core::sync::atomic::Ordering::SeqCst);
 
+        let max_chunk_size = if !circular || len > CHUNK_SIZE * 2 {
+            CHUNK_SIZE
+        } else {
+            len / 3 + len % 3
+        };
+
         let mut processed = 0;
         let mut descr = 0;
         loop {
-            let chunk_size = usize::min(CHUNK_SIZE, len - processed);
+            let chunk_size = usize::min(max_chunk_size, len - processed);
             let last = processed + chunk_size >= len;
 
             let next = if last {
@@ -538,7 +645,7 @@ where
             return Err(DmaError::InvalidAlignment);
         }
 
-        if circular && len < CHUNK_SIZE * 2 {
+        if circular && len <= 3 {
             return Err(DmaError::BufferTooSmall);
         }
 
@@ -651,7 +758,7 @@ where
             let buffer_ptr = self.descriptors[idx].buffer;
             let next_dscr = self.descriptors[idx].next;
 
-            // Copy data to desination
+            // Copy data to destination
             let (dst_chunk, dst_remaining) = dst.split_at_mut(chunk_len);
             dst = dst_remaining;
 
@@ -740,6 +847,8 @@ pub trait TxPrivate {
 
     fn push(&mut self, data: &[u8]) -> Result<usize, DmaError>;
 
+    fn push_with(&mut self, f: impl FnOnce(&mut [u8]) -> usize) -> Result<usize, DmaError>;
+
     #[cfg(feature = "async")]
     fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker;
 }
@@ -765,10 +874,16 @@ where
 
         compiler_fence(core::sync::atomic::Ordering::SeqCst);
 
+        let max_chunk_size = if !circular || len > CHUNK_SIZE * 2 {
+            CHUNK_SIZE
+        } else {
+            len / 3 + len % 3
+        };
+
         let mut processed = 0;
         let mut descr = 0;
         loop {
-            let chunk_size = usize::min(CHUNK_SIZE, len - processed);
+            let chunk_size = usize::min(max_chunk_size, len - processed);
             let last = processed + chunk_size >= len;
 
             let next = if last {
@@ -936,7 +1051,7 @@ where
             return Err(DmaError::OutOfDescriptors);
         }
 
-        if circular && len < CHUNK_SIZE * 2 {
+        if circular && len <= 3 {
             return Err(DmaError::BufferTooSmall);
         }
 
@@ -996,11 +1111,25 @@ where
             } else {
                 unsafe {
                     while !((*ptr).next.is_null()
-                        || (*ptr).next == self.descriptors as *mut _ as *mut DmaDescriptor)
+                        || (*ptr).next == addr_of_mut!(self.descriptors[0]))
                     {
                         let dw0 = ptr.read_volatile();
                         self.available += dw0.len();
                         ptr = ptr.offset(1);
+                    }
+
+                    // add bytes pointed to by the last descriptor
+                    let dw0 = ptr.read_volatile();
+                    self.available += dw0.len();
+
+                    // in circular mode we need to honor the now available bytes at start
+                    if (*ptr).next == addr_of_mut!(self.descriptors[0]) {
+                        ptr = addr_of_mut!(self.descriptors[0]);
+                        while ptr < descr_address {
+                            let dw0 = ptr.read_volatile();
+                            self.available += dw0.len();
+                            ptr = ptr.offset(1);
+                        }
                     }
                 }
             }
@@ -1034,23 +1163,30 @@ where
             return Err(DmaError::Overflow);
         }
 
-        unsafe {
-            let src = data.as_ptr();
+        let mut remaining = data.len();
+        let mut offset = 0;
+        while self.available() >= remaining && remaining > 0 {
+            let written = self.push_with(|buffer| {
+                let len = usize::min(buffer.len(), data.len() - offset);
+                buffer[..len].copy_from_slice(&data[offset..][..len]);
+                len
+            })?;
+            offset += written;
+            remaining -= written;
+        }
+
+        Ok(data.len())
+    }
+
+    fn push_with(&mut self, f: impl FnOnce(&mut [u8]) -> usize) -> Result<usize, DmaError> {
+        let written = unsafe {
             let dst = self.buffer_start.add(self.write_offset).cast_mut();
-            let count = usize::min(data.len(), self.buffer_len - self.write_offset);
-            core::ptr::copy_nonoverlapping(src, dst, count);
-        }
+            let block_size = usize::min(self.available(), self.buffer_len - self.write_offset);
+            let buffer = core::slice::from_raw_parts_mut(dst, block_size);
+            f(buffer)
+        };
 
-        if self.write_offset + data.len() >= self.buffer_len {
-            let remainder = (self.write_offset + data.len()) % self.buffer_len;
-            let dst = self.buffer_start.cast_mut();
-            unsafe {
-                let src = data.as_ptr().add(data.len() - remainder);
-                core::ptr::copy_nonoverlapping(src, dst, remainder);
-            }
-        }
-
-        let mut forward = data.len();
+        let mut forward = written;
         loop {
             unsafe {
                 let dw0 = self.write_descr_ptr.read_volatile();
@@ -1069,10 +1205,10 @@ where
             }
         }
 
-        self.write_offset = (self.write_offset + data.len()) % self.buffer_len;
-        self.available -= data.len();
+        self.write_offset = (self.write_offset + written) % self.buffer_len;
+        self.available -= written;
 
-        Ok(data.len())
+        Ok(written)
     }
 
     fn is_listening_eof(&self) -> bool {
