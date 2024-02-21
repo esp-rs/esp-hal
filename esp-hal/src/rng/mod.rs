@@ -88,6 +88,12 @@ pub struct Rng {
 impl Rng {
     /// Create a new random number generator instance
     pub fn new(_rng: impl Peripheral<P = RNG>) -> Self {
+        #[cfg(esp32)]
+        trng::esp32_ensure_randomness();
+        #[cfg(esp32c2)]
+        trng::esp32c2_ensure_randomness();
+        #[cfg(esp32c3)]
+        trng::esp32c3_ensure_randomness();
         #[cfg(esp32c6)]
         trng::esp32c6_ensure_randomness();
         #[cfg(esp32h2)]
