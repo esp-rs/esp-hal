@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Wait for registers to get synced before reading the timer count for all chips (#1183)
 - Fix I2C error handling (#1184)
 - Fix circular DMA (#1189)
+- Fix esp32c3 uart initialization (#1156)
 
 ### Changed
 
