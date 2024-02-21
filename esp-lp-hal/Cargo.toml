@@ -2,7 +2,7 @@
 name         = "esp-lp-hal"
 version      = "0.1.0"
 edition      = "2021"
-rust-version = "1.67.0"
+rust-version = "1.76.0"
 description  = "HAL for low-power RISC-V coprocessors found in ESP32 devices"
 repository   = "https://github.com/esp-rs/esp-hal"
 license      = "MIT OR Apache-2.0"
