@@ -2,7 +2,7 @@
 //!
 //! Folowing pins are used:
 //! SCLK            GPIO0
-//! MISOI/IO0       GPIO1
+//! MISO/IO0        GPIO1
 //! MOSI/IO1        GPIO2
 //! IO2             GPIO3
 //! IO3             GPIO4

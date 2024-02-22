@@ -37,7 +37,7 @@ fn main() -> ! {
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    // Set up a pulse couter:
+    // Set up a pulse counter:
     println!("setup pulse counter unit 0");
     let pcnt = PCNT::new(peripherals.PCNT);
     let mut u0 = pcnt.get_unit(unit::Number::Unit1);

@@ -71,6 +71,8 @@ default = ["embassy-integrated-timers", "rt", "vectored"]
 riscv  = ["dep:riscv",     "critical-section/restore-state-u8",  "esp-riscv-rt?/zero-bss"]
 xtensa = ["dep:xtensa-lx", "critical-section/restore-state-u32"]
 
+bluetooth = []
+
 usb-otg = ["esp-synopsys-usb-otg", "usb-device"]
 
 ## Enable debug features in the HAL (used for development).

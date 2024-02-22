@@ -27,7 +27,11 @@ fn main() -> ! {
     let pin = io.pins.gpio0;
 
     // initialize peripheral
+    #[cfg(feature = "esp32h2")]
     let clock_cfg = PeripheralClockConfig::with_frequency(&clocks, 40u32.MHz()).unwrap();
+    #[cfg(not(feature = "esp32h2"))]
+    let clock_cfg = PeripheralClockConfig::with_frequency(&clocks, 32u32.MHz()).unwrap();
+
     let mut mcpwm = MCPWM::new(peripherals.MCPWM0, clock_cfg);
 
     // connect operator0 to timer0

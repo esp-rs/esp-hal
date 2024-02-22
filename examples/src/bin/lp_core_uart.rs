@@ -60,7 +60,7 @@ fn main() -> ! {
     lp_core.stop();
     println!("lp core stopped");
 
-    // Load code to LP core::
+    // Load code to LP core:
     let lp_core_code =
         load_lp_code!("../esp-lp-hal/target/riscv32imac-unknown-none-elf/release/examples/uart");
 

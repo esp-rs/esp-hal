@@ -41,7 +41,7 @@ fn main() -> ! {
     init_psram_heap();
 
     let system = peripherals.SYSTEM.split();
-    let _clocks = ClockControl::configure(system.clock_control, CpuClock::Clock240MHz).freeze();
+    let _clocks = ClockControl::max(system.clock_control).freeze();
 
     println!("Going to access PSRAM");
     let mut large_vec = Vec::<u32>::with_capacity(500 * 1024 / 4);

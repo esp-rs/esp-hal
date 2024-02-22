@@ -1,4 +1,5 @@
-//! Demonstrates deep sleep with timer and rtcio wakeup
+//! Demonstrates deep sleep with timer, using GPIO2 (low) and GPIO3 (high) as
+//! wakeup.
 
 //% CHIPS: esp32c3 esp32s3
 

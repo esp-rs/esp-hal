@@ -16,6 +16,8 @@ mod fmt;
 #[cfg(all(riscv, feature = "rt"))]
 pub use esp_riscv_rt::{self, entry};
 pub use procmacros as macros;
+#[cfg(riscv)]
+pub use riscv;
 #[cfg(xtensa)]
 pub use xtensa_lx;
 #[cfg(all(xtensa, feature = "rt"))]

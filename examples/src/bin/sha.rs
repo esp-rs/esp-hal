@@ -27,7 +27,7 @@ fn main() -> ! {
 
     // Short hashes can be created by decreasing the output buffer to the desired
     // length
-    let mut output = [0u8; 64];
+    let mut output = [0u8; 32];
 
     let pre_calc = cycles();
     // The hardware implementation takes a subslice of the input, and returns the
