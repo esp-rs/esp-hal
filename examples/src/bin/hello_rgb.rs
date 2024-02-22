@@ -37,7 +37,7 @@ fn main() -> ! {
         if #[cfg(feature = "esp32")] {
             let led_pin = io.pins.gpio33;
         } else if #[cfg(feature = "esp32c3")] {
-            let led_pin = io.pins.gpio2;
+            let led_pin = io.pins.gpio8;
         } else if #[cfg(any(feature = "esp32c6", feature = "esp32h2"))] {
             let led_pin = io.pins.gpio8;
         } else if #[cfg(feature = "esp32s2")] {
