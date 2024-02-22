@@ -35,7 +35,7 @@ fn main() -> ! {
     let wake_reason = get_wakeup_cause();
     println!("wake reason: {:?}", wake_reason);
 
-    let timer = TimerWakeupSource::new(Duration::from_secs(30));
+    let timer = TimerWakeupSource::new(Duration::from_secs(5));
     println!("sleeping!");
     delay.delay_ms(100u32);
     rtc.sleep_deep(&[&timer], &mut delay);
