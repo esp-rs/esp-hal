@@ -68,7 +68,7 @@ serde      = { version = "1.0.195", features = ["derive"] }
 [features]
 default = ["embassy-integrated-timers", "rt", "vectored"]
 
-riscv  = ["dep:riscv",     "critical-section/restore-state-u8"]
+riscv  = ["dep:riscv",     "critical-section/restore-state-u8",  "esp-riscv-rt?/zero-bss"]
 xtensa = ["dep:xtensa-lx", "critical-section/restore-state-u32"]
 
 usb-otg = ["esp-synopsys-usb-otg", "usb-device"]
