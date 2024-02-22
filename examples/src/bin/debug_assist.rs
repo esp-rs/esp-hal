@@ -50,8 +50,6 @@ fn main() -> ! {
         }
     }
 
-    // uncomment the functionality you want to test
-
     // Monitor the SP so as to prevent stack overflow or erroneous push/pop.
     // When the SP exceeds the minimum or maximum threshold, the module will
     // record the PC pointer and generate an interrupt.

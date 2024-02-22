@@ -1,6 +1,9 @@
-//! Blinks an LED
+//! Blinks 3 LEDs
 //!
 //! This assumes that LEDs are connected to GPIO3, 4 and 5.
+//!
+//! GPIO1 is treated as an input, and will print a message when pressed. This
+//! Additionally demonstrates passing GPIO to a function in a generic way.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
@@ -51,6 +54,6 @@ fn toggle_pins(leds: &mut [AnyPin<Output<PushPull>>], button: &AnyPin<Input<Pull
     }
 
     if button.is_low().unwrap() {
-        esp_println::println!("Button");
+        esp_println::println!("Button pressed");
     }
 }
