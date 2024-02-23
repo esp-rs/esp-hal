@@ -53,7 +53,7 @@ const SENS_FORCE_XPD_SAR_S: u32 = 18;
 const SENS_SAR1_DIG_FORCE: u32 = 1 << 27;
 const SENS_SAR2_DIG_FORCE: u32 = 1 << 28;
 
-pub fn esp32_ensure_randomness() {
+pub fn ensure_randomness() {
     set_peri_reg_bits(
         RTC_CNTL_TEST_MUX_REG,
         RTC_CNTL_DTEST_RTC,
@@ -64,7 +64,7 @@ pub fn esp32_ensure_randomness() {
     set_peri_reg_mask(RTC_CNTL_TEST_MUX_REG, RTC_CNTL_ENT_RTC);
     set_peri_reg_mask(SENS_SAR_START_FORCE_REG, SENS_SAR2_EN_TEST);
 
-    //periph_module_enable(PERIPH_I2S0_MODULE);
+    // periph_module_enable(PERIPH_I2S0_MODULE);
     set_peri_reg_mask(DPORT_PERIP_CLK_EN_REG, DPORT_I2C_EXT0_CLK_EN);
     clear_peri_reg_mask(DPORT_PERIP_RST_EN_REG, DPORT_I2C_EXT0_RST);
 

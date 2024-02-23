@@ -64,8 +64,8 @@ const SYSTEM_APB_SARADC_CLK_EN_M: u32 = 1 << 28;
 
 use crate::regi2c_write_mask;
 
-pub(crate) fn esp32c3_ensure_randomness() {
-    /* RNG module is always clock enabled */
+pub(crate) fn ensure_randomness() {
+    // RNG module is always clock enabled
     reg_set_field(
         RTC_CNTL_SENSOR_CTRL_REG,
         RTC_CNTL_FORCE_XPD_SAR_V,
@@ -84,7 +84,8 @@ pub(crate) fn esp32c3_ensure_randomness() {
 
     regi2c_write_mask!(I2C_SAR_ADC, ADC_SARADC_ENT_TSENS_ADDR, 0);
 
-    // Enable SAR ADC2 internal channel to read adc2 ref voltage for additional entropy
+    // Enable SAR ADC2 internal channel to read adc2 ref voltage for additional
+    // entropy
     set_peri_reg_mask(SYSTEM_PERIP_CLK_EN0_REG, SYSTEM_APB_SARADC_CLK_EN_M);
     clear_peri_reg_mask(SYSTEM_PERIP_RST_EN0_REG, SYSTEM_APB_SARADC_RST_M);
     reg_set_field(
@@ -159,8 +160,8 @@ pub(crate) fn esp32c3_ensure_randomness() {
     );
     reg_set_field(
         APB_SARADC_APB_ADC_CLKM_CONF_REG,
-        APB_SARADC_REG_CLKM_DIV_NUM_V,
-        APB_SARADC_REG_CLKM_DIV_NUM_S,
+        APB_SARADC_CLKM_DIV_NUM_V,
+        APB_SARADC_CLKM_DIV_NUM_S,
         15,
     );
     clear_peri_reg_mask(APB_SARADC_CTRL2_REG, APB_SARADC_MEAS_NUM_LIMIT);

@@ -95,7 +95,7 @@ const LP_I2C_ANA_MST_I2C0_DATA_REG: u32 = DR_REG_LP_I2C_ANA_MST_BASE + 0x8;
 const LP_I2C_ANA_MST_I2C0_RDATA_V: u32 = 0x000000FF;
 const LP_I2C_ANA_MST_I2C0_RDATA_S: u32 = 0;
 
-pub(crate) fn esp32h2_ensure_randomness() {
+pub(crate) fn ensure_randomness() {
     // Pull SAR ADC out of reset
     reg_set_bit(PCR_SARADC_CONF_REG, PCR_SARADC_RST_EN);
     reg_clr_bit(PCR_SARADC_CONF_REG, PCR_SARADC_RST_EN);
@@ -114,7 +114,8 @@ pub(crate) fn esp32h2_ensure_randomness() {
         0,
     );
 
-    // Set the clock divider for ADC_CTRL_CLK to default value (in case it has been changed)
+    // Set the clock divider for ADC_CTRL_CLK to default value (in case it has been
+    // changed)
     reg_set_field(
         PCR_SARADC_CLKM_CONF_REG,
         PCR_SARADC_CLKM_DIV_NUM_V,
@@ -122,10 +123,12 @@ pub(crate) fn esp32h2_ensure_randomness() {
         0,
     );
 
-    // some ADC sensor registers are in power group PERIF_I2C and need to be enabled via PMU
+    // some ADC sensor registers are in power group PERIF_I2C and need to be enabled
+    // via PMU
     set_peri_reg_mask(PMU_RF_PWC_REG, PMU_XPD_PERIF_I2C);
 
-    // Config ADC circuit (Analog part) with I2C(HOST ID 0x69) and chose internal voltage as sampling source
+    // Config ADC circuit (Analog part) with I2C(HOST ID 0x69) and chose internal
+    // voltage as sampling source
     regi2c_write_mask(
         I2C_SAR_ADC,
         I2C_SAR_ADC_HOSTID,

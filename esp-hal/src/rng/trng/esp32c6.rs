@@ -3,8 +3,6 @@ const PCR_SARADC_RST_EN: u32 = 1 << 1;
 const PCR_SARADC_REG_CLK_EN: u32 = 1 << 2;
 const PCR_SARADC_CLKM_CONF_REG: u32 = 0x60096000 + 0x84;
 const PCR_SARADC_CLKM_EN: u32 = 1 << 22;
-const PCR_SARADC_CLKM_SEL: u32 = 0x00000003;
-const PCR_SARADC_CLKM_DIV_NUM: u32 = 0x000000FF;
 const PMU_RF_PWC_REG: u32 = 0x600B0000 + 0x154;
 const I2C_SAR_ADC: u8 = 0x69;
 const I2C_SAR_ADC_HOSTID: u8 = 0;
@@ -60,28 +58,74 @@ const LP_I2C_ANA_MST_I2C0_DATA_REG: u32 = DR_REG_LP_I2C_ANA_MST_BASE + 0x8;
 const LP_I2C_ANA_MST_I2C0_RDATA_V: u32 = 0x000000FF;
 const LP_I2C_ANA_MST_I2C0_RDATA_S: u32 = 0;
 
-pub(crate) fn esp32c6_ensure_randomness() {
+const PCR_SARADC_CLKM_SEL_V: u32 = 0x00000003;
+const PCR_SARADC_CLKM_SEL_S: u32 = 20;
+
+const PCR_SARADC_CLKM_DIV_NUM_V: u32 = 0x000000FF;
+const PCR_SARADC_CLKM_DIV_NUM_S: u32 = 12;
+
+const PMU_PERIF_I2C_RSTB: u32 = 1 << 26;
+const PMU_XPD_PERIF_I2C: u32 = 1 << 27;
+
+const ADC_SARADC_DTEST_RTC_ADDR: u8 = 0x4;
+const ADC_SARADC_DTEST_RTC_ADDR_MSB: u8 = 0x3;
+const ADC_SARADC_DTEST_RTC_ADDR_LSB: u8 = 0x0;
+
+const ADC_SARADC_ENT_RTC_ADDR: u8 = 0x3;
+const ADC_SARADC_ENT_RTC_ADDR_MSB: u8 = 0x7;
+const ADC_SARADC_ENT_RTC_ADDR_LSB: u8 = 0x0;
+
+const ADC_SARADC1_ENCAL_REF_ADDR: u8 = 0x1;
+const ADC_SARADC1_ENCAL_REF_ADDR_MSB: u8 = 0x3;
+const ADC_SARADC1_ENCAL_REF_ADDR_LSB: u8 = 0x0;
+
+const ADC_SARADC2_ENCAL_REF_ADDR: u8 = 0x0;
+const ADC_SARADC2_ENCAL_REF_ADDR_MSB: u8 = 0x7;
+const ADC_SARADC2_ENCAL_REF_ADDR_LSB: u8 = 0x0;
+
+const APB_SARADC_SARADC_SAR_PATT_LEN_V: u32 = 0x00000007;
+const APB_SARADC_SARADC_SAR_PATT_LEN_S: u32 = 15;
+const APB_SARADC_SARADC_SAR_CLK_DIV_V: u32 = 0x000000FF;
+const APB_SARADC_SARADC_SAR_CLK_DIV_S: u32 = 7;
+const APB_SARADC_SARADC_TIMER_TARGET_V: u32 = 0x00000FFF;
+const APB_SARADC_SARADC_TIMER_TARGET_S: u32 = 12;
+const APB_SARADC_SARADC_TIMER_EN: u32 = 1 << 24;
+
+pub(crate) fn ensure_randomness() {
     // Pull SAR ADC out of reset
-    reg_set_bit(PCR_SARADC_CONF_REG, (1 << 1) as u32);
-    reg_clr_bit(PCR_SARADC_CONF_REG, (1 << 1) as u32);
+    reg_set_bit(PCR_SARADC_CONF_REG, PCR_SARADC_RST_EN);
+    reg_clr_bit(PCR_SARADC_CONF_REG, PCR_SARADC_RST_EN);
 
     // Enable SAR ADC APB clock
-    reg_set_bit(PCR_SARADC_CONF_REG, (1 << 2) as u32);
+    reg_set_bit(PCR_SARADC_CONF_REG, PCR_SARADC_REG_CLK_EN);
 
     // Enable ADC_CTRL_CLK (SAR ADC function clock)
-    reg_set_bit(PCR_SARADC_CLKM_CONF_REG, (1 << 22) as u32);
+    reg_set_bit(PCR_SARADC_CLKM_CONF_REG, PCR_SARADC_CLKM_EN);
 
     // Select XTAL clock (40 MHz) source for ADC_CTRL_CLK
-    reg_set_field(PCR_SARADC_CLKM_CONF_REG, 0x00000003, 20, 0); //PCR_SARADC_CLKM_SEL_V = 0x00000003 and PCR_SARADC_CLKM_SEL_S = 20;
+    reg_set_field(
+        PCR_SARADC_CLKM_CONF_REG,
+        PCR_SARADC_CLKM_SEL_V,
+        PCR_SARADC_CLKM_SEL_S,
+        0,
+    );
 
-    // Set the clock divider for ADC_CTRL_CLK to default value (in case it has been changed)
-    reg_set_field(PCR_SARADC_CLKM_CONF_REG, 0x000000FF, 12, 0);
+    // Set the clock divider for ADC_CTRL_CLK to default value (in case it has been
+    // changed)
+    reg_set_field(
+        PCR_SARADC_CLKM_CONF_REG,
+        PCR_SARADC_CLKM_DIV_NUM_V,
+        PCR_SARADC_CLKM_DIV_NUM_S,
+        0,
+    );
 
-    // some ADC sensor registers are in power group PERIF_I2C and need to be enabled via PMU
-    set_peri_reg_mask(PMU_RF_PWC_REG, (1 << 26) as u32);
-    set_peri_reg_mask(PMU_RF_PWC_REG, (1 << 27) as u32);
+    // some ADC sensor registers are in power group PERIF_I2C and need to be enabled
+    // via PMU
+    set_peri_reg_mask(PMU_RF_PWC_REG, PMU_PERIF_I2C_RSTB);
+    set_peri_reg_mask(PMU_RF_PWC_REG, PMU_XPD_PERIF_I2C);
 
-    // Config ADC circuit (Analog part) with I2C(HOST ID 0x69) and chose internal voltage as sampling source
+    // Config ADC circuit (Analog part) with I2C(HOST ID 0x69) and chose internal
+    // voltage as sampling source
     regi2c_write_mask(
         I2C_SAR_ADC,
         I2C_SAR_ADC_HOSTID,
@@ -116,13 +160,41 @@ pub(crate) fn esp32c6_ensure_randomness() {
     );
 
     // SAR2 High ADDR
-    regi2c_write_mask(I2C_SAR_ADC, I2C_SAR_ADC_HOSTID, 0x4, 0x3, 0x0, 0x08);
+    regi2c_write_mask(
+        I2C_SAR_ADC,
+        I2C_SAR_ADC_HOSTID,
+        ADC_SARADC_DTEST_RTC_ADDR,
+        ADC_SARADC_DTEST_RTC_ADDR_MSB,
+        ADC_SARADC_DTEST_RTC_ADDR_LSB,
+        0x08,
+    );
     // SAR2 Low ADDR
-    regi2c_write_mask(I2C_SAR_ADC, I2C_SAR_ADC_HOSTID, 0x3, 0x7, 0x0, 0x66);
+    regi2c_write_mask(
+        I2C_SAR_ADC,
+        I2C_SAR_ADC_HOSTID,
+        ADC_SARADC_ENT_RTC_ADDR,
+        ADC_SARADC_ENT_RTC_ADDR_MSB,
+        ADC_SARADC_ENT_RTC_ADDR_LSB,
+        0x66,
+    );
     // SAR1 High ADDR
-    regi2c_write_mask(I2C_SAR_ADC, I2C_SAR_ADC_HOSTID, 0x1, 0x3, 0x0, 0x08);
+    regi2c_write_mask(
+        I2C_SAR_ADC,
+        I2C_SAR_ADC_HOSTID,
+        ADC_SARADC1_ENCAL_REF_ADDR,
+        ADC_SARADC1_ENCAL_REF_ADDR_MSB,
+        ADC_SARADC1_ENCAL_REF_ADDR_LSB,
+        0x08,
+    );
     // SAR1 Low ADDR
-    regi2c_write_mask(I2C_SAR_ADC, I2C_SAR_ADC_HOSTID, 0x0, 0x7, 0x0, 0x66);
+    regi2c_write_mask(
+        I2C_SAR_ADC,
+        I2C_SAR_ADC_HOSTID,
+        ADC_SARADC2_ENCAL_REF_ADDR,
+        ADC_SARADC2_ENCAL_REF_ADDR_MSB,
+        ADC_SARADC2_ENCAL_REF_ADDR_LSB,
+        0x66,
+    );
 
     // create patterns and set them in pattern table
     let pattern_one: u32 = (SAR2_CHANNEL << 2) | SAR2_ATTEN; // we want channel 9 with max attenuation
@@ -133,16 +205,31 @@ pub(crate) fn esp32c6_ensure_randomness() {
     reg_write(APB_SARADC_SAR_PATT_TAB1_REG, pattern_table);
 
     // set pattern length to 2 (APB_SARADC_SAR_PATT_LEN counts from 0)
-    reg_set_field(APB_SARADC_CTRL_REG, 0x00000007, 15, 1);
+    reg_set_field(
+        APB_SARADC_CTRL_REG,
+        APB_SARADC_SARADC_SAR_PATT_LEN_V,
+        APB_SARADC_SARADC_SAR_PATT_LEN_S,
+        1,
+    );
 
     // Same as in C3
-    reg_set_field(APB_SARADC_CTRL_REG, 0x000000FF, 7, 15);
+    reg_set_field(
+        APB_SARADC_CTRL_REG,
+        APB_SARADC_SARADC_SAR_CLK_DIV_V,
+        APB_SARADC_SARADC_SAR_CLK_DIV_S,
+        15,
+    );
 
     // set timer expiry (timer is ADC_CTRL_CLK)
-    reg_set_field(APB_SARADC_CTRL2_REG, 0x00000FFF, 12, 200);
+    reg_set_field(
+        APB_SARADC_CTRL2_REG,
+        APB_SARADC_SARADC_TIMER_TARGET_V,
+        APB_SARADC_SARADC_TIMER_TARGET_S,
+        200,
+    );
 
     // enable timer
-    reg_set_bit(APB_SARADC_CTRL2_REG, (1 << 24) as u32);
+    reg_set_bit(APB_SARADC_CTRL2_REG, APB_SARADC_SARADC_TIMER_EN);
 }
 
 fn reg_set_bit(reg: u32, bit: u32) {
