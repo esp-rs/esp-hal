@@ -1,9 +1,9 @@
 //! This shows how to transmit data continously via I2S.
 //!
 //! Pins used:
-//! BCLK    GPIO0
-//! WS      GPIO1
-//! DOUT    GPIO2
+//! BCLK    GPIO2
+//! WS      GPIO4
+//! DOUT    GPIO5
 //!
 //! Without an additional I2S sink device you can inspect the MCLK, BCLK, WS
 //!  andDOUT with a logic analyzer.
@@ -82,9 +82,9 @@ fn main() -> ! {
 
     let i2s_tx = i2s
         .i2s_tx
-        .with_bclk(io.pins.gpio0)
-        .with_ws(io.pins.gpio1)
-        .with_dout(io.pins.gpio2)
+        .with_bclk(io.pins.gpio2)
+        .with_ws(io.pins.gpio4)
+        .with_dout(io.pins.gpio5)
         .build();
 
     let data =
