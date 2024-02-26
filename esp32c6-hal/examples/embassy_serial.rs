@@ -87,7 +87,8 @@ async fn main(spawner: Spawner) {
     uart0
         .set_rx_fifo_full_threshold(READ_BUF_SIZE as u16)
         .unwrap();
-    let (tx, rx) = uart0.split();
+    let (tx, mut rx) = uart0.split();
+    rx.set_buffer(make_static!(heapless::Deque::<u8, 1024>::new()));
 
     let signal = &*make_static!(Signal::new());
 

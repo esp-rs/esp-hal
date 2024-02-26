@@ -423,7 +423,7 @@ where
 
     /// Read all available bytes from the RX FIFO into the provided buffer and
     /// returns the number of read bytes. Never blocks
-    pub fn drain_fifo(&mut self, buf: &mut [u8]) -> usize {
+    pub fn drain_hw_fifo(&mut self, buf: &mut [u8]) -> usize {
         #[allow(unused_variables)]
         let offset = 0;
 
@@ -1357,7 +1357,7 @@ where
             // Block until we received at least one byte
         }
 
-        Ok(self.drain_fifo(buf))
+        Ok(self.drain_hw_fifo(buf))
     }
 }
 
@@ -1424,9 +1424,58 @@ mod asynch {
         }
     }
 
-    const INIT: AtomicWaker = AtomicWaker::new();
-    static TX_WAKERS: [AtomicWaker; NUM_UART] = [INIT; NUM_UART];
-    static RX_WAKERS: [AtomicWaker; NUM_UART] = [INIT; NUM_UART];
+    const WAKER_INIT: AtomicWaker = AtomicWaker::new();
+    static TX_WAKERS: [AtomicWaker; NUM_UART] = [WAKER_INIT; NUM_UART];
+    static RX_WAKERS: [AtomicWaker; NUM_UART] = [WAKER_INIT; NUM_UART];
+
+    const BUFFER_INIT: Option<&mut dyn RxBuffer> = None;
+    static mut RX_BUFFERS: [Option<&mut dyn RxBuffer>; NUM_UART] = [BUFFER_INIT; NUM_UART];
+
+    pub (crate) trait RxBuffer {
+        /// Drains the uart rx buffer into the provided buffer and returns the number of bytes written
+        fn drain(&mut self, buf: &mut [u8]) -> usize;
+
+        /// Populates the buffer from the uart rx fifo
+        fn populate_from_uart(&mut self, uart: &RegisterBlock);
+
+        /// Whether or not the buffer is full
+        fn is_full(&self) -> bool;
+    }
+
+    impl <const N: usize> RxBuffer for heapless::Deque<u8, N> {
+        fn drain(&mut self, buf: &mut [u8]) -> usize
+        {
+            let mut count = 0;
+            while count < buf.len() {
+                if let Some(value) = self.pop_front() {
+                    buf[count] = value;
+                    count += 1;
+                } else {
+                    break;
+                }
+            }
+            count
+        }
+        fn populate_from_uart(&mut self, uart: &RegisterBlock) {
+            let mut fifo_cnt: u16 = uart
+                .status()
+                .read()
+                .rxfifo_cnt()
+                .bits()
+                .into(); // TODO: fix for esp32
+
+
+            while fifo_cnt > 0 && !self.is_full() {
+                let value = uart.fifo().read().rxfifo_rd_byte().bits();
+                self.push_back(value).unwrap();
+                fifo_cnt -= 1;
+            }
+        }
+
+        fn is_full(&self) -> bool {
+            heapless::Deque::is_full(self)
+        }
+    }
 
     #[derive(EnumSetType, Debug)]
     pub(crate) enum TxEvent {
@@ -1705,7 +1754,21 @@ mod asynch {
                 }
                 UartRxFuture::<T>::new(events).await;
 
-                let read_bytes = self.drain_fifo(buf);
+                // We either are using the hw-fifo only or the hw-fifo and a buffer
+
+                // First try to read from the additional buffer
+                if let Some(read_bytes) = critical_section::with(|_| {
+                    if let Some(buffer) = unsafe { &mut RX_BUFFERS[T::uart_number()] } {
+                        return Some(buffer.drain(buf));
+                    }
+                    None
+                })
+                {
+                    return Ok(read_bytes);
+                }
+
+                // If we reach this point we have no additional buffer and need to read from the hw-fifo directly
+                let read_bytes = self.drain_hw_fifo(buf);
                 if read_bytes > 0 {
                     // Unfortunately, the uart's rx-timeout counter counts up whenever there is
                     // data in the fifo, even if the interrupt is disabled and the status bit
@@ -1718,6 +1781,16 @@ mod asynch {
                     return Ok(read_bytes);
                 }
             }
+        }
+
+        /// Sets the buffer to be used for async reads.
+        pub fn set_buffer<const N: usize>(&mut self, buffer: &'static mut heapless::Deque<u8, N>)
+        {
+            critical_section::with(|_| {
+                unsafe {
+                    RX_BUFFERS[T::uart_number()] = Some(buffer);
+                }
+            });
         }
     }
 
@@ -1775,18 +1848,26 @@ mod asynch {
     /// Clears and disables interrupts that have occurred and have their enable
     /// bit set. The fact that an interrupt has been disabled is used by the
     /// futures to detect that they should indeed resolve after being woken up
-    fn intr_handler(uart: &RegisterBlock) -> (bool, bool) {
+    fn intr_handler(uart: &RegisterBlock, buffer: &mut Option<&mut dyn RxBuffer>) -> (bool, bool) {
         let interrupts = uart.int_st().read();
         let interrupt_bits = interrupts.bits(); // = int_raw & int_ena
         if interrupt_bits == 0 {
             return (false, false);
         }
-        let rx_wake = interrupts.rxfifo_full_int_st().bit_is_set()
+        let mut rx_wake = interrupts.rxfifo_full_int_st().bit_is_set()
             || interrupts.rxfifo_ovf_int_st().bit_is_set()
             || interrupts.rxfifo_tout_int_st().bit_is_set()
             || interrupts.at_cmd_char_det_int_st().bit_is_set();
         let tx_wake = interrupts.tx_done_int_st().bit_is_set()
             || interrupts.txfifo_empty_int_st().bit_is_set();
+
+        if rx_wake {
+            if let Some(buffer) = buffer {
+                buffer.populate_from_uart(uart);
+                rx_wake = buffer.is_full() || interrupts.rxfifo_tout_int_st().bit_is_set() || interrupts.at_cmd_char_det_int_st().bit_is_set();
+            }
+        }
+
         uart.int_clr().write(|w| unsafe { w.bits(interrupt_bits) });
         uart.int_ena()
             .modify(|r, w| unsafe { w.bits(r.bits() & !interrupt_bits) });
@@ -1798,7 +1879,7 @@ mod asynch {
     #[interrupt]
     fn UART0() {
         let uart = unsafe { &*crate::peripherals::UART0::ptr() };
-        let (rx, tx) = intr_handler(uart);
+        let (rx, tx) = intr_handler(uart, unsafe {&mut RX_BUFFERS[0]});
         if rx {
             RX_WAKERS[0].wake();
         }
@@ -1811,7 +1892,7 @@ mod asynch {
     #[interrupt]
     fn UART1() {
         let uart = unsafe { &*crate::peripherals::UART1::ptr() };
-        let (rx, tx) = intr_handler(uart);
+        let (rx, tx) = intr_handler(uart, unsafe {&mut RX_BUFFERS[1]});
         if rx {
             RX_WAKERS[1].wake();
         }
@@ -1824,7 +1905,7 @@ mod asynch {
     #[interrupt]
     fn UART2() {
         let uart = unsafe { &*crate::peripherals::UART2::ptr() };
-        let (rx, tx) = intr_handler(uart);
+        let (rx, tx) = intr_handler(uart, unsafe{&mut RX_BUFFERS[2]});
         if rx {
             RX_WAKERS[2].wake();
         }
