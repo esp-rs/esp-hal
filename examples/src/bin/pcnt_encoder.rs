@@ -51,8 +51,8 @@ fn main() -> ! {
 
     println!("setup channel 0");
     let mut ch0 = u0.get_channel(channel::Number::Channel0);
-    let mut pin_a = io.pins.gpio0.into_pull_up_input();
-    let mut pin_b = io.pins.gpio1.into_pull_up_input();
+    let mut pin_a = io.pins.gpio4.into_pull_up_input();
+    let mut pin_b = io.pins.gpio5.into_pull_up_input();
 
     ch0.configure(
         PcntSource::from_pin(&mut pin_a),
