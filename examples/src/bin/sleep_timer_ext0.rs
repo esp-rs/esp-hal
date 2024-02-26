@@ -1,4 +1,4 @@
-//! Demonstrates deep sleep with timer and ext0 (using gpio0) wakeup
+//! Demonstrates deep sleep with timer and ext0 (using gpio4) wakeup
 
 //% CHIPS: esp32 esp32s3
 
@@ -35,7 +35,7 @@ fn main() -> ! {
     let mut rtc = Rtc::new(peripherals.LPWR);
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-    let mut ext0_pin = io.pins.gpio0;
+    let mut ext0_pin = io.pins.gpio4;
 
     println!("up and runnning!");
     let reason = get_reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);

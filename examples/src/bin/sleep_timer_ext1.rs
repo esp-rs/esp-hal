@@ -1,4 +1,4 @@
-//! Demonstrates deep sleep with timer and ext1 (using gpio0 & gpio2) wakeup
+//! Demonstrates deep sleep with timer and ext1 (using gpio4 & gpio2) wakeup
 
 //% CHIPS: esp32 esp32s3
 
@@ -35,7 +35,7 @@ fn main() -> ! {
     let mut rtc = Rtc::new(peripherals.LPWR);
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-    let mut pin_0 = io.pins.gpio0;
+    let mut pin_0 = io.pins.gpio4;
     let mut pin_2 = io.pins.gpio2;
 
     println!("up and runnning!");

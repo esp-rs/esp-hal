@@ -43,8 +43,8 @@ fn main() -> ! {
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let pins = TxRxPins::new_tx_rx(
-        io.pins.gpio1.into_push_pull_output(),
-        io.pins.gpio2.into_floating_input(),
+        io.pins.gpio4.into_push_pull_output(),
+        io.pins.gpio5.into_floating_input(),
     );
 
     let mut serial1 = Uart::new_with_config(peripherals.UART1, config, Some(pins), &clocks);

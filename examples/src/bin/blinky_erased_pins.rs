@@ -1,6 +1,6 @@
 //! Blinks 3 LEDs
 //!
-//! This assumes that LEDs are connected to GPIO3, 4 and 5.
+//! This assumes that LEDs are connected to GPIO8, 9 and 10.
 //!
 //! GPIO1 is treated as an input, and will print a message when pressed. This
 //! Additionally demonstrates passing GPIO to a function in a generic way.
@@ -28,9 +28,9 @@ fn main() -> ! {
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
     // Set LED GPIOs as an output:
-    let led1 = io.pins.gpio3.into_push_pull_output();
-    let led2 = io.pins.gpio4.into_push_pull_output();
-    let led3 = io.pins.gpio5.into_push_pull_output();
+    let led1 = io.pins.gpio8.into_push_pull_output();
+    let led2 = io.pins.gpio9.into_push_pull_output();
+    let led3 = io.pins.gpio10.into_push_pull_output();
 
     // Set GPIO0 as an input:
     let button = io.pins.gpio0.into_pull_down_input().into();

@@ -48,8 +48,8 @@ fn main() -> ! {
     // and standard I2C clock speed
     let i2c = I2C::new(
         peripherals.I2C0,
-        io.pins.gpio1,
-        io.pins.gpio2,
+        io.pins.gpio4,
+        io.pins.gpio5,
         100u32.kHz(),
         &clocks,
     );
