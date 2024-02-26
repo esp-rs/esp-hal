@@ -1,6 +1,6 @@
 //! Demonstrates generating pulse sequences with RMT
 //!
-//! Connect a logic analyzer to GPIO0 to see the generated pulses.
+//! Connect a logic analyzer to GPIO4 to see the generated pulses.
 
 //% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
@@ -26,13 +26,22 @@ fn main() -> ! {
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let rmt = Rmt::new(peripherals.RMT, 8u32.MHz(), &clocks).unwrap();
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "esp32h2")] {
+            let freq = 32u32.MHz();
+        } else {
+            let freq = 80u32.MHz();
+        }
+    };
+
+    let rmt = Rmt::new(peripherals.RMT, freq, &clocks).unwrap();
+
     let tx_config = TxChannelConfig {
         clk_divider: 255,
         ..TxChannelConfig::default()
     };
 
-    let mut channel = rmt.channel0.configure(io.pins.gpio0, tx_config).unwrap();
+    let mut channel = rmt.channel0.configure(io.pins.gpio4, tx_config).unwrap();
 
     let mut delay = Delay::new(&clocks);
 

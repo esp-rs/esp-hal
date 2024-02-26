@@ -1,8 +1,5 @@
 //! Demonstrates decoding pulse sequences with RMT
-//!
-//! This uses the boot button as input - press the button a couple of
-//! times to generate a pulse sequence and then wait for the idle timeout to see
-//! the recorded pulse sequence
+//! Connect GPIO5 to GPIO4
 
 //% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
@@ -30,21 +27,31 @@ fn main() -> ! {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let mut out = io.pins.gpio5.into_push_pull_output();
 
-    let rmt = Rmt::new(peripherals.RMT, 1u32.MHz(), &clocks).unwrap();
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "esp32h2")] {
+            let freq = 32u32.MHz();
+        } else {
+            let freq = 80u32.MHz();
+        }
+    };
+
+    let rmt = Rmt::new(peripherals.RMT, freq, &clocks).unwrap();
+
     let rx_config = RxChannelConfig {
-        clk_divider: 255,
+        clk_divider: 1,
         idle_threshold: 10000,
         ..RxChannelConfig::default()
     };
 
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
-            let mut channel = rmt.channel0.configure(io.pins.gpio0, rx_config).unwrap();
+            let mut channel = rmt.channel0.configure(io.pins.gpio4, rx_config).unwrap();
         } else if #[cfg(feature = "esp32s3")] {
-            let mut channel = rmt.channel7.configure(io.pins.gpio0, rx_config).unwrap();
+            let mut channel = rmt.channel7.configure(io.pins.gpio4, rx_config).unwrap();
         } else {
-            let mut channel = rmt.channel2.configure(io.pins.gpio0, rx_config).unwrap();
+            let mut channel = rmt.channel2.configure(io.pins.gpio4, rx_config).unwrap();
         }
     }
 
@@ -58,48 +65,67 @@ fn main() -> ! {
     }; 48];
 
     loop {
+        for x in data.iter_mut() {
+            x.length1 = 0;
+            x.length2 = 0;
+        }
+
         let transaction = channel.receive(&mut data).unwrap();
-        channel = transaction.wait().unwrap();
 
-        let mut total = 0usize;
-        for entry in &data[..data.len()] {
-            if entry.length1 == 0 {
-                break;
-            }
-            total += entry.length1 as usize;
-
-            if entry.length2 == 0 {
-                break;
-            }
-            total += entry.length2 as usize;
+        // simulate input
+        for i in 0u32..5u32 {
+            out.set_high().unwrap();
+            delay.delay_us(i * 10 + 20);
+            out.set_low().unwrap();
+            delay.delay_us(i * 20 + 20);
         }
 
-        for entry in &data[..data.len()] {
-            if entry.length1 == 0 {
-                break;
-            }
+        match transaction.wait() {
+            Ok(channel_res) => {
+                channel = channel_res;
+                let mut total = 0usize;
+                for entry in &data[..data.len()] {
+                    if entry.length1 == 0 {
+                        break;
+                    }
+                    total += entry.length1 as usize;
 
-            let count = WIDTH / (total / entry.length1 as usize);
-            let c = if entry.level1 { '-' } else { '_' };
-            for _ in 0..count + 1 {
-                print!("{}", c);
-            }
+                    if entry.length2 == 0 {
+                        break;
+                    }
+                    total += entry.length2 as usize;
+                }
 
-            if entry.length2 == 0 {
-                break;
-            }
+                for entry in &data[..data.len()] {
+                    if entry.length1 == 0 {
+                        break;
+                    }
 
-            let count = WIDTH / (total / entry.length2 as usize);
-            let c = if entry.level2 { '-' } else { '_' };
-            for _ in 0..count + 1 {
-                print!("{}", c);
+                    let count = WIDTH / (total / entry.length1 as usize);
+                    let c = if entry.level1 { '-' } else { '_' };
+                    for _ in 0..count + 1 {
+                        print!("{}", c);
+                    }
+
+                    if entry.length2 == 0 {
+                        break;
+                    }
+
+                    let count = WIDTH / (total / entry.length2 as usize);
+                    let c = if entry.level2 { '-' } else { '_' };
+                    for _ in 0..count + 1 {
+                        print!("{}", c);
+                    }
+                }
+
+                println!();
+            }
+            Err((_err, channel_res)) => {
+                channel = channel_res;
+                println!("Error");
             }
         }
 
-        println!();
-        println!();
-        println!();
-
-        delay.delay_ms(500u32);
+        delay.delay_ms(1500u32);
     }
 }
