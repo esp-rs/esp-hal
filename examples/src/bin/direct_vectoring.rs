@@ -1,6 +1,5 @@
 #![no_main]
 #![no_std]
-#![feature(naked_functions)]
 
 //% CHIPS: esp32c2 esp32c3 esp32c6 esp32h2
 //% FEATURES: direct-vectoring
@@ -21,6 +20,15 @@ static SWINT: Mutex<RefCell<Option<SoftwareInterruptControl>>> = Mutex::new(RefC
 #[entry]
 fn main() -> ! {
     let peripherals = Peripherals::take();
+    cfg_if::cfg_if! {
+        if #[cfg(any(feature = "esp32c6", feature = "esp32h2"))] {
+            let cpu_intr = &peripherals.INTPRI;
+        } else {
+            let cpu_intr = &peripherals.SYSTEM;
+        }
+    }
+    let sw0_trigger_addr = cpu_intr.cpu_intr_from_cpu_0() as *const _ as u32;
+
     let system = peripherals.SYSTEM.split();
     let sw_int = system.software_interrupt_control;
 
@@ -42,17 +50,17 @@ fn main() -> ! {
         );
     }
 
-    esp_println::println!("MPC:{}", unsafe { fetch_performance_timer() });
-
     // interrupt is raised from assembly for max timer granularity.
     unsafe {
         asm!(
             "
-        li t0, 0x600C5090 #FROM_CPU_INTR0 address
-        li t1, 1    #Flip flag
-        csrrwi x0, 0x7e1, 1 #enable timer
-        sw t1, 0(t0) #trigger FROM_CPU_INTR0
-        "
+        li {bit}, 1                   # Flip flag (bit 0)
+        csrrwi x0, 0x7e1, 1           # enable timer
+        sw {bit}, 0({addr})           # trigger FROM_CPU_INTR0
+        ",
+        options(nostack),
+        addr = in(reg) sw0_trigger_addr,
+        bit = out(reg) _,
         )
     }
     esp_println::println!("Returned");
@@ -70,17 +78,16 @@ fn cpu_int_1_handler() {
             .unwrap()
             .reset(SoftwareInterrupt::SoftwareInterrupt0);
     });
-    esp_println::println!("Performance counter:{}", unsafe {
-        fetch_performance_timer()
-    });
-}
-#[naked]
-unsafe extern "C" fn fetch_performance_timer() -> i32 {
-    asm!(
-        "
-    csrr a0, 0x7e2
-    jr ra
-    ",
-        options(noreturn)
-    );
+
+    let mut perf_counter: u32 = 0;
+    unsafe {
+        asm!(
+            "
+            csrr {x}, 0x7e2
+            ",
+            options(nostack),
+            x = inout(reg) perf_counter,
+        )
+    };
+    esp_println::println!("Performance counter:{}", perf_counter);
 }

@@ -770,9 +770,7 @@ mod classic {
     #[no_mangle]
     #[link_section = ".trap"]
     pub(super) unsafe extern "C" fn _restore_priority(stored_prio: u32) {
-        unsafe {
-            riscv::interrupt::disable();
-        }
+        riscv::interrupt::disable();
         let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
         intr.cpu_int_thresh().write(|w| w.bits(stored_prio));
     }
@@ -903,9 +901,7 @@ mod plic {
     #[no_mangle]
     #[link_section = ".trap"]
     pub(super) unsafe extern "C" fn _restore_priority(stored_prio: u32) {
-        unsafe {
-            riscv::interrupt::disable();
-        }
+        riscv::interrupt::disable();
         let thresh_reg = PLIC_MXINT_THRESH_REG as *mut u32;
         thresh_reg.write_volatile(stored_prio);
     }
