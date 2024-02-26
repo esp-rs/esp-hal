@@ -1,10 +1,10 @@
 //! This shows how to continously receive data via I2S.
 //!
 //! Pins used:
-//! MCLK    GPIO0
-//! BCLK    GPIO1
-//! WS      GPIO2
-//! DIN     GPIO3
+//! MCLK    GPIO0 (not ESP32)
+//! BCLK    GPIO2
+//! WS      GPIO4
+//! DIN     GPIO5
 //!
 //! Without an additional I2S source device you can connect 3V3 or GND to DIN
 //! to read 0 or 0xFF or connect DIN to WS to read two different values.
@@ -35,8 +35,6 @@ use esp_println::println;
 
 #[main]
 async fn main(_spawner: Spawner) {
-    #[cfg(feature = "log")]
-    esp_println::logger::init_logger_from_env();
     println!("Init!");
     let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();
@@ -67,14 +65,18 @@ async fn main(_spawner: Spawner) {
             DmaPriority::Priority0,
         ),
         &clocks,
-    )
-    .with_mclk(io.pins.gpio0);
+    );
+
+    #[cfg(esp32)]
+    {
+        i2s.with_mclk(io.pins.gpio0);
+    }
 
     let i2s_rx = i2s
         .i2s_rx
-        .with_bclk(io.pins.gpio1)
-        .with_ws(io.pins.gpio2)
-        .with_din(io.pins.gpio3)
+        .with_bclk(io.pins.gpio2)
+        .with_ws(io.pins.gpio4)
+        .with_din(io.pins.gpio5)
         .build();
 
     let buffer = rx_buffer;

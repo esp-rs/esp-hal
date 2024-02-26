@@ -1,12 +1,11 @@
 //! This shows how to transmit data continously via I2S.
 //!
 //! Pins used:
-//! MCLK    GPIO0
-//! BCLK    GPIO1
-//! WS      GPIO2
-//! DOUT    GPIO3
+//! BCLK    GPIO2
+//! WS      GPIO4
+//! DOUT    GPIO5
 //!
-//! Without an additional I2S sink device you can inspect the MCLK, BCLK, WS
+//! Without an additional I2S sink device you can inspect the BCLK, WS
 //! and DOUT with a logic analyzer.
 //!
 //! You can also connect e.g. a PCM510x to hear an annoying loud sine tone (full
@@ -59,8 +58,6 @@ const SINE: [i16; 64] = [
 
 #[main]
 async fn main(_spawner: Spawner) {
-    #[cfg(feature = "log")]
-    esp_println::logger::init_logger_from_env();
     println!("Init!");
     let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();
@@ -91,14 +88,13 @@ async fn main(_spawner: Spawner) {
             DmaPriority::Priority0,
         ),
         &clocks,
-    )
-    .with_mclk(io.pins.gpio0);
+    );
 
     let i2s_tx = i2s
         .i2s_tx
-        .with_bclk(io.pins.gpio1)
-        .with_ws(io.pins.gpio2)
-        .with_dout(io.pins.gpio3)
+        .with_bclk(io.pins.gpio2)
+        .with_ws(io.pins.gpio4)
+        .with_dout(io.pins.gpio5)
         .build();
 
     let data =
