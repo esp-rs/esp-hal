@@ -62,6 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `DAC` driver's constructor is now `new` instead of `dac`, to be more consistent with other APIs (#1100)
 - The DMA peripheral is now called `Dma` for devices with both PDMA and GDMA controllers (#1125)
 - The `ADC` driver's constructor is now `new` instead of `adc`, to be more consistent with other APIs (#1133)
+- `embassy-executor`'s `integrated-timers` is no longer enabled by default.
 
 ## [0.15.0] - 2024-01-19
 

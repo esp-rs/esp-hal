@@ -3,7 +3,7 @@
 //! This is an example of asynchronously `Wait`ing for a pin state to change.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: async embassy embassy-executor-thread embassy-time-timg0
+//% FEATURES: async embassy embassy-executor-thread embassy-time-timg0 embassy-generic-timers
 
 #![no_std]
 #![no_main]
