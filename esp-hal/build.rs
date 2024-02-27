@@ -436,7 +436,11 @@ fn generate_memory_extras() -> Vec<u8> {
 
 #[cfg(feature = "esp32s2")]
 fn generate_memory_extras() -> Vec<u8> {
-    let reserved_cache = if cfg!(feature = "psram") {
+    let reserved_cache = if cfg!(any(
+        feature = "psram-2m",
+        feature = "psram-4m",
+        feature = "psram-8m"
+    )) {
         "0x4000"
     } else {
         "0x2000"
