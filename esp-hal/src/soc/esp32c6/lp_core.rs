@@ -36,7 +36,7 @@
 //! let mut lp_pin = io.pins.gpio1.into_low_power();
 //! lp_pin.output_enable(true);
 //!
-//! let mut lp_core = esp32c6_hal::lp_core::LpCore::new(peripherals.LP_CORE);
+//! let mut lp_core = esp_hal::lp_core::LpCore::new(peripherals.LP_CORE);
 //! lp_core.stop();
 //! println!("lp core stopped");
 //!

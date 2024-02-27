@@ -1,3 +1,6 @@
+// TODO: Add safety doc comments as needed and remove allow attribute
+#![allow(clippy::missing_safety_doc)]
+
 use xtensa_lx::interrupt::{self, InterruptNumber};
 use xtensa_lx_rt::exception::Context;
 
@@ -394,41 +397,39 @@ mod vectored {
             if let Some(handler) = cpu_interrupt_nr_to_cpu_interrupt_handler(cpu_interrupt_nr) {
                 handler(level, save_frame);
             }
-        } else {
-            if (cpu_interrupt_mask & CPU_INTERRUPT_EDGE) != 0 {
-                let cpu_interrupt_mask = cpu_interrupt_mask & CPU_INTERRUPT_EDGE;
-                let cpu_interrupt_nr = cpu_interrupt_mask.trailing_zeros();
-                interrupt::clear(1 << cpu_interrupt_nr);
+        } else if (cpu_interrupt_mask & CPU_INTERRUPT_EDGE) != 0 {
+            let cpu_interrupt_mask = cpu_interrupt_mask & CPU_INTERRUPT_EDGE;
+            let cpu_interrupt_nr = cpu_interrupt_mask.trailing_zeros();
+            interrupt::clear(1 << cpu_interrupt_nr);
 
-                // for edge interrupts cannot rely on the interrupt status
-                // register, therefore call all registered
-                // handlers for current level
-                let interrupt_levels =
-                    get_configured_interrupts(crate::get_core(), chip_specific::INTERRUPT_EDGE);
-                let interrupt_mask = interrupt_levels[level as usize];
-                let mut interrupt_mask = interrupt_mask & chip_specific::INTERRUPT_EDGE;
-                loop {
-                    let interrupt_nr = interrupt_mask.trailing_zeros();
-                    if let Ok(interrupt) = peripherals::Interrupt::try_from(interrupt_nr as u16) {
-                        handle_interrupt(level, interrupt, save_frame)
-                    } else {
-                        break;
-                    }
-                    interrupt_mask &= !(1u128 << interrupt_nr);
-                }
-            } else {
-                // finally check periperal sources and fire of handlers from pac
-                // peripheral mapped interrupts are cleared by the peripheral
-                let status = get_status(crate::get_core());
-                let interrupt_levels = get_configured_interrupts(crate::get_core(), status);
-                let interrupt_mask = status & interrupt_levels[level as usize];
+            // for edge interrupts cannot rely on the interrupt status
+            // register, therefore call all registered
+            // handlers for current level
+            let interrupt_levels =
+                get_configured_interrupts(crate::get_core(), chip_specific::INTERRUPT_EDGE);
+            let interrupt_mask = interrupt_levels[level as usize];
+            let mut interrupt_mask = interrupt_mask & chip_specific::INTERRUPT_EDGE;
+            loop {
                 let interrupt_nr = interrupt_mask.trailing_zeros();
-
-                // Interrupt::try_from can fail if interrupt already de-asserted:
-                // silently ignore
                 if let Ok(interrupt) = peripherals::Interrupt::try_from(interrupt_nr as u16) {
-                    handle_interrupt(level, interrupt, save_frame);
+                    handle_interrupt(level, interrupt, save_frame)
+                } else {
+                    break;
                 }
+                interrupt_mask &= !(1u128 << interrupt_nr);
+            }
+        } else {
+            // finally check periperal sources and fire of handlers from pac
+            // peripheral mapped interrupts are cleared by the peripheral
+            let status = get_status(crate::get_core());
+            let interrupt_levels = get_configured_interrupts(crate::get_core(), status);
+            let interrupt_mask = status & interrupt_levels[level as usize];
+            let interrupt_nr = interrupt_mask.trailing_zeros();
+
+            // Interrupt::try_from can fail if interrupt already de-asserted:
+            // silently ignore
+            if let Ok(interrupt) = peripherals::Interrupt::try_from(interrupt_nr as u16) {
+                handle_interrupt(level, interrupt, save_frame);
             }
         }
     }
@@ -441,7 +442,10 @@ mod vectored {
         }
 
         let handler = peripherals::__INTERRUPTS[interrupt.number() as usize]._handler;
-        if handler as *const _ == EspDefaultHandler as *const unsafe extern "C" fn() {
+        if core::ptr::eq(
+            handler as *const _,
+            EspDefaultHandler as *const unsafe extern "C" fn(),
+        ) {
             EspDefaultHandler(level, interrupt);
         } else {
             let handler: fn(&mut Context) = core::mem::transmute(handler);
@@ -449,6 +453,7 @@ mod vectored {
         }
     }
 
+    #[allow(clippy::unusual_byte_groupings)]
     #[cfg(esp32)]
     mod chip_specific {
         use super::*;
@@ -471,6 +476,7 @@ mod vectored {
         }
     }
 
+    #[allow(clippy::unusual_byte_groupings)]
     #[cfg(esp32s2)]
     mod chip_specific {
         use super::*;

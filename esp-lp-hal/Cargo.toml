@@ -2,7 +2,7 @@
 name         = "esp-lp-hal"
 version      = "0.1.0"
 edition      = "2021"
-rust-version = "1.67.0"
+rust-version = "1.76.0"
 description  = "HAL for low-power RISC-V coprocessors found in ESP32 devices"
 repository   = "https://github.com/esp-rs/esp-hal"
 license      = "MIT OR Apache-2.0"
@@ -41,9 +41,9 @@ default = ["embedded-hal-02"]
 embedded-hal-02 = ["dep:embedded-hal-02"]
 embedded-hal-1  = ["dep:embedded-hal-1"]
 
-esp32c6 = ["dep:esp32c6-lp",  "procmacros/esp32c6-lp", "dep:nb", "dep:paste"]
-esp32s2 = ["dep:esp32s2-ulp", "procmacros/esp32s2-ulp"]
-esp32s3 = ["dep:esp32s3-ulp", "procmacros/esp32s3-ulp"]
+esp32c6 = ["dep:esp32c6-lp",  "procmacros/is-lp-core", "dep:nb", "dep:paste"]
+esp32s2 = ["dep:esp32s2-ulp", "procmacros/is-ulp-core"]
+esp32s3 = ["dep:esp32s3-ulp", "procmacros/is-ulp-core"]
 
 debug = [
     "esp32c6-lp?/impl-register-debug",

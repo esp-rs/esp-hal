@@ -1,3 +1,16 @@
+# NOTE:
+#
+# When adding support for a new chip to `esp-hal`, there are a number of
+# updates which must be made to the CI workflow in order to reflect this; the
+# changes are:
+#
+# 1.) In the 'esp-hal' job, add the name of the chip to the `matrix.soc` array.
+# 1a.) If the device has a low-power core (which is supported in
+#      `esp-lp-hal`), then update the `if` condition to build prerequisites.
+# 2.) In the 'msrv-riscv' job, add checks as needed for the new chip.
+# 3.) In the 'clippy-riscv' job, add checks as needed for the new chip.
+# 3.) In the 'rustfmt' job, add checks as needed for the new chip.
+
 name: CI
 
 on:
@@ -17,7 +30,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  MSRV: "1.67.0"
+  MSRV: "1.76.0"
 
 # Cancel any currently running workflows from the same PR, branch, or
 # tag when a new workflow is triggered.
@@ -29,69 +42,85 @@ concurrency:
 
 jobs:
   # --------------------------------------------------------------------------
-  # Check Packages
+  # Build Packages
 
-  esp-hal-smartled:
+  esp-hal:
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        soc: [
+            # RISC-V devices:
+            "esp32c2",
+            "esp32c3",
+            "esp32c6",
+            "esp32h2",
+            "esp32p4",
+            # Xtensa devices:
+            "esp32",
+            "esp32s2",
+            "esp32s3",
+          ]
 
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@v1
+
+      # Install the Rust toolchain for RISC-V devices:
+      - if: ${{ !contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.soc) }}
+        uses: dtolnay/rust-toolchain@v1
         with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
           toolchain: nightly
           components: rust-src
-      - uses: esp-rs/xtensa-toolchain@v1.5
+      # Install the Rust toolchain for Xtensa devices:
+      - if: contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.soc)
+        uses: esp-rs/xtensa-toolchain@v1.5
         with:
+          buildtargets: ${{ matrix.soc }}
+          default: true
           ldproxy: false
-          override: false
+
       - uses: Swatinem/rust-cache@v2
 
-      # Build all RISC-V targets:
-      - name: build (esp32c3)
-        run: cd esp-hal-smartled/ && cargo +nightly build -Zbuild-std=core --target=riscv32imc-unknown-none-elf --features=esp32c3
-      - name: build (esp32c6)
-        run: cd esp-hal-smartled/ && cargo +nightly build -Zbuild-std=core --target=riscv32imac-unknown-none-elf --features=esp32c6
-      - name: build (esp32h2)
-        run: cd esp-hal-smartled/ && cargo +nightly build -Zbuild-std=core --target=riscv32imac-unknown-none-elf --features=esp32h2
-      # Build all Xtensa targets:
-      - name: build (esp32)
-        run: cd esp-hal-smartled/ && cargo +esp build -Zbuild-std=core --target=xtensa-esp32-none-elf --features=esp32
-      - name: build (esp32s2)
-        run: cd esp-hal-smartled/ && cargo +esp build -Zbuild-std=core --target=xtensa-esp32s2-none-elf --features=esp32s2
-      - name: build (esp32s3)
-        run: cd esp-hal-smartled/ && cargo +esp build -Zbuild-std=core --target=xtensa-esp32s3-none-elf --features=esp32s3
-      # Ensure documentation can be built (requires a chip feature!)
-      - name: rustdoc
-        run: cd esp-hal-smartled/ && cargo doc -Zbuild-std=core --target=riscv32imc-unknown-none-elf --features=esp32c3
+      # Build all supported examples for the low-power core first (if present):
+      - if: contains(fromJson('["esp32c6", "esp32s2", "esp32s3"]'), matrix.soc)
+        name: Build prerequisites (esp-lp-hal)
+        run: cargo xtask build-examples esp-lp-hal ${{ matrix.soc }}
+
+      # Build all supported examples for the specified device:
+      - name: Build examples
+        run: cargo xtask build-examples esp-hal ${{ matrix.soc }}
+      # Ensure we can build the documentation for the specified device:
+      - name: Build documentation
+        run: cargo xtask build-documentation esp-hal ${{ matrix.soc }}
 
   esp-lp-hal:
     runs-on: ubuntu-latest
 
+    strategy:
+      fail-fast: false
+      matrix:
+        soc: ["esp32c6", "esp32s2", "esp32s3"]
+
     steps:
       - uses: actions/checkout@v4
+
+      # Install the Rust toolchain for RISC-V devices:
       - uses: dtolnay/rust-toolchain@v1
         with:
           target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
           toolchain: nightly
           components: rust-src
+
       - uses: Swatinem/rust-cache@v2
 
-      # Perform a full build initially to verify that the examples not only
-      # build, but also link successfully.
-      - name: build esp-lp-hal (esp32c6)
-        run: cd esp-lp-hal/ && cargo build --release --target=riscv32imac-unknown-none-elf --features=esp32c6 --examples
-      - name: build esp-lp-hal (esp32s2)
-        run: cd esp-lp-hal/ && cargo build --release --target=riscv32imc-unknown-none-elf --features=esp32s2 --examples
-      - name: build esp-lp-hal (esp32s3)
-        run: cd esp-lp-hal/ && cargo build --release --target=riscv32imc-unknown-none-elf --features=esp32s3 --examples
-      # Ensure documentation can be built
-      - name: rustdoc
-        run: |
-          cd esp-lp-hal/
-          cargo doc --features=esp32c6
-          cargo doc --features=esp32s2
-          cargo doc --features=esp32s3
+      # Build all supported examples for the specified device:
+      - name: Build examples
+        run: cargo xtask build-examples esp-lp-hal ${{ matrix.soc }}
+      # Ensure we can build the documentation for the specified device:
+      - name: Build documentation
+        run: cargo xtask build-documentation esp-lp-hal ${{ matrix.soc }}
 
   esp-riscv-rt:
     runs-on: ubuntu-latest
@@ -100,518 +129,28 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@v1
         with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
           toolchain: nightly
           components: rust-src
       - uses: Swatinem/rust-cache@v2
 
+      # Build for all RISC-V targets (no features):
       - name: Build esp-riscv-rt (riscv32imc, no features)
         run: cd esp-riscv-rt/ && cargo build -Zbuild-std=core --target=riscv32imc-unknown-none-elf
       - name: Build esp-riscv-rt (riscv32imac, no features)
         run: cd esp-riscv-rt/ && cargo build -Zbuild-std=core --target=riscv32imac-unknown-none-elf
+      - name: Build esp-riscv-rt (riscv32imafc, no features)
+        run: cd esp-riscv-rt/ && cargo build -Zbuild-std=core --target=riscv32imafc-unknown-none-elf
+      # Build for all RISC-V targets (all features):
       - name: Build esp-riscv-rt (riscv32imc, all features)
         run: cd esp-riscv-rt/ && cargo build -Zbuild-std=core --target=riscv32imc-unknown-none-elf --features=ci
       - name: Build esp-riscv-rt (riscv32imac, all features)
         run: cd esp-riscv-rt/ && cargo build -Zbuild-std=core --target=riscv32imac-unknown-none-elf --features=ci
+      - name: Build esp-riscv-rt (riscv32imafc, all features)
+        run: cd esp-riscv-rt/ && cargo build -Zbuild-std=core --target=riscv32imafc-unknown-none-elf --features=ci
       # Ensure documentation can be built
       - name: rustdoc
         run: cd esp-riscv-rt/ && cargo doc
-
-  esp32-hal:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: esp-rs/xtensa-toolchain@v1.5
-        with:
-          default: true
-          buildtargets: esp32
-          ldproxy: false
-      - uses: Swatinem/rust-cache@v2
-
-      # Perform a full build initially to verify that the examples not only
-      # build, but also link successfully.
-      - name: build esp32-hal (no features)
-        run: cd esp32-hal/ && cargo build --examples
-      # Subsequent steps can just check the examples instead, as we're already
-      # confident that they link.
-      - name: check esp32-hal (common features)
-        run: |
-          cd esp32-hal/
-          cargo build --examples --features=eh1,ufmt,log
-          cargo build --examples --features=eh1,ufmt,defmt
-      - name: check esp32-hal (embassy)
-        run: |
-          cd esp32-hal/
-          cargo check --example=embassy_hello_world --features=embassy,embassy-time-timg0,embassy-executor-thread
-          cargo check --example=embassy_multicore --features=embassy,embassy-time-timg0,embassy-executor-thread
-          cargo check --example=embassy_multicore_interrupt --features=embassy,embassy-time-timg0,embassy-executor-interrupt
-          cargo check --example=embassy_multiprio --features=embassy,embassy-time-timg0,embassy-executor-thread,embassy-executor-interrupt
-      - name: check esp32-hal (embassy, async)
-        run: |
-          cd esp32-hal/
-          cargo check --example=embassy_wait --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo check --example=embassy_spi --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo check --example=embassy_serial --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo check --example=embassy_i2c --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo check --example=embassy_i2s_read --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo check --example=embassy_i2s_sound --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo check --example=embassy_rmt_rx --features=embassy,embassy-time-timg0,async,embassy-executor-thread --release
-          cargo check --example=embassy_rmt_tx --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-      - name: check esp32-hal (embassy, log/defmt)
-        run: |
-          cd esp32-hal/
-          cargo check --examples --features=embassy,embassy-time-timg0,embassy-executor-interrupt,embassy-executor-thread,defmt
-          cargo check --examples --features=embassy,embassy-time-timg0,embassy-executor-interrupt,embassy-executor-thread,log
-      - name: check esp32-hal (psram)
-        run: cd esp32-hal/ && cargo check --example=psram --features=psram-2m --release # This example requires release!
-      # Make sure we can build without default features enabled, too!
-      - name: check esp32-hal (no default features)
-        run: cd esp32-hal/ && cargo build --no-default-features
-      # Ensure documentation can be built
-      - name: rustdoc
-        run: cd esp32-hal/ && cargo doc --features=eh1
-
-  esp32c2-hal:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          target: riscv32imc-unknown-none-elf
-          toolchain: nightly
-          components: rust-src
-      - uses: Swatinem/rust-cache@v2
-
-      # Perform a full build initially to verify that the examples not only
-      # build, but also link successfully.
-      # We also use this as an opportunity to verify that the examples link
-      # for each supported image format.
-      - name: build esp32c2-hal (no features)
-        run: cd esp32c2-hal/ && cargo build --examples
-      # Subsequent steps can just check the examples instead, as we're already
-      # confident that they link.
-      - name: check esp32c2-hal (common features)
-        run: |
-          cd esp32c2-hal/
-          cargo +nightly build --examples --features=eh1,ufmt,log
-          cargo +nightly build --examples --features=eh1,ufmt,defmt
-      - name: check esp32c2-hal (async, systick)
-        run: cd esp32c2-hal/ && cargo +nightly check --example=embassy_hello_world --features=embassy,embassy-time-systick,embassy-executor-thread
-      - name: check esp32c2-hal (async, timg0)
-        run: cd esp32c2-hal/ && cargo +nightly check --example=embassy_hello_world --features=embassy,embassy-time-timg0,embassy-executor-thread
-      - name: check esp32c2-hal (async, gpio)
-        run: cd esp32c2-hal/ && cargo +nightly check --example=embassy_wait --features=embassy,embassy-time-systick,embassy-executor-thread,async
-      - name: check esp32c2-hal (async, multiprio)
-        run: cd esp32c2-hal/ && cargo +nightly check --example=embassy_multiprio --features=embassy,embassy-time-systick,embassy-executor-thread,embassy-executor-interrupt
-      - name: check esp32c2-hal (async, spi)
-        run: cd esp32c2-hal/ && cargo +nightly check --example=embassy_spi --features=embassy,embassy-time-systick,embassy-executor-thread,async
-      - name: check esp32c2-hal (async, serial)
-        run: cd esp32c2-hal/ && cargo +nightly check --example=embassy_serial --features=embassy,embassy-time-systick,embassy-executor-thread,async
-      - name: check esp32c2-hal (async, i2c)
-        run: cd esp32c2-hal/ && cargo +nightly check --example=embassy_i2c --features=embassy,embassy-time-systick,embassy-executor-thread,async
-      - name: check esp32c2-hal (interrupt-preemption)
-        run: cd esp32c2-hal/ && cargo +nightly check --example=interrupt_preemption --features=interrupt-preemption
-      - name: check esp32c2-hal (direct-vectoring)
-        run: cd esp32c2-hal/ && cargo +nightly check --example=direct-vectoring --features=direct-vectoring
-      - name: check esp32c2-hal (embassy, log/defmt)
-        run: |
-          cd esp32c2-hal/
-          cargo +nightly check --examples --features=embassy,embassy-time-timg0,embassy-executor-thread,defmt
-          cargo +nightly check --examples --features=embassy,embassy-time-timg0,embassy-executor-thread,log
-      # Make sure we can build without default features enabled, too!
-      - name: check esp32c2-hal (no default features)
-        run: cd esp32c2-hal/ && cargo build --no-default-features
-      # Ensure documentation can be built
-      - name: rustdoc
-        run: cd esp32c2-hal/ && cargo doc --features=eh1
-
-  esp32c3-hal:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          target: riscv32imc-unknown-none-elf
-          toolchain: nightly
-          components: rust-src
-      - uses: Swatinem/rust-cache@v2
-
-      # Perform a full build initially to verify that the examples not only
-      # build, but also link successfully.
-      - name: build esp32c3-hal (no features)
-        run: cd esp32c3-hal/ && cargo +nightly build --examples
-      # Subsequent steps can just check the examples instead, as we're already
-      # confident that they link.
-      - name: check esp32c3-hal (common features)
-        run: |
-          cd esp32c3-hal/
-          cargo +nightly build --examples --features=eh1,ufmt,log
-          cargo +nightly build --examples --features=eh1,ufmt,defmt
-      - name: check esp32c3-hal (embassy)
-        run: |
-          cd esp32c3-hal/
-          cargo +nightly check --example=embassy_hello_world --features=embassy,embassy-time-timg0,embassy-executor-thread
-          cargo +nightly check --example=embassy_hello_world --features=embassy,embassy-time-systick,embassy-executor-thread
-          cargo +nightly check --example=embassy_multiprio --features=embassy,embassy-time-timg0,embassy-executor-thread,embassy-executor-interrupt
-      - name: check esp32c3-hal (embassy, async)
-        run: |
-          cd esp32c3-hal/
-          cargo +nightly check --example=embassy_wait --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo +nightly check --example=embassy_spi --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo +nightly check --example=embassy_serial --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo +nightly check --example=embassy_i2c --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo +nightly check --example=embassy_i2s_read --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo +nightly check --example=embassy_i2s_sound --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo +nightly check --example=embassy_rmt_rx --features=embassy,embassy-time-timg0,async,embassy-executor-thread --release
-          cargo +nightly check --example=embassy_rmt_tx --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo +nightly check --example=embassy_usb_serial_jtag --features=embassy,embassy-time-systick,async,embassy-executor-thread
-      - name: check esp32c3-hal (interrupt-preemption)
-        run: cd esp32c3-hal/ && cargo +nightly check --example=interrupt_preemption --features=interrupt-preemption
-      - name: check esp32c3-hal (direct-vectoring)
-        run: cd esp32c3-hal/ && cargo +nightly check --example=direct-vectoring --features=direct-vectoring
-      - name: check esp32c3-hal (embassy, log/defmt)
-        run: |
-          cd esp32c3-hal/
-          cargo +nightly check --examples --features=embassy,embassy-time-timg0,embassy-executor-thread,defmt
-          cargo +nightly check --examples --features=embassy,embassy-time-timg0,embassy-executor-thread,log
-      # Make sure we can build without default features enabled, too!
-      - name: check esp32c3-hal (no default features)
-        run: cd esp32c3-hal/ && cargo build --no-default-features
-      # Ensure documentation can be built
-      - name: rustdoc
-        run: cd esp32c3-hal/ && cargo doc --features=eh1
-
-  esp32c6-hal:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          target: riscv32imac-unknown-none-elf
-          toolchain: nightly
-          components: rust-src
-      - uses: Swatinem/rust-cache@v2
-
-      # Build the `esp-lp-hal` examples first to make sure the examples which
-      # expect these ELF files to be present will compile.
-      - name: build prerequisites
-        run: |
-          cd esp-lp-hal/
-          cargo build --release --features=esp32c6 --target=riscv32imac-unknown-none-elf --examples
-
-      # Perform a full build initially to verify that the examples not only
-      # build, but also link successfully.
-      # We also use this as an opportunity to verify that the examples link
-      # for each supported image format.
-      - name: build esp32c6-hal (no features)
-        run: cd esp32c6-hal/ && cargo +nightly build --examples
-      - name: build esp32c6-hal (flip-link feature)
-        run: cd esp32c6-hal/ && cargo +nightly build --examples --features=flip-link
-      # Subsequent steps can just check the examples instead, as we're already
-      # confident that they link.
-      - name: check esp32c6-hal (common features)
-        run: |
-          cd esp32c6-hal/
-          cargo +nightly build --examples --features=eh1,ufmt,log
-          cargo +nightly build --examples --features=eh1,ufmt,defmt
-      - name: check esp32c6-hal (embassy)
-        run: |
-          cd esp32c6-hal/
-          cargo +nightly check --example=embassy_hello_world --features=embassy,embassy-time-timg0,embassy-executor-thread
-          cargo +nightly check --example=embassy_hello_world --features=embassy,embassy-time-systick,embassy-executor-thread
-          cargo +nightly check --example=embassy_multiprio --features=embassy,embassy-time-timg0,embassy-executor-thread,embassy-executor-interrupt
-      - name: check esp32c6-hal (embassy, async)
-        run: |
-          cd esp32c6-hal/
-          cargo +nightly check --example=embassy_wait --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo +nightly check --example=embassy_spi --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo +nightly check --example=embassy_serial --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo +nightly check --example=embassy_i2c --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo +nightly check --example=embassy_i2s_read --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo +nightly check --example=embassy_i2s_sound --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo +nightly check --example=embassy_rmt_rx --features=embassy,embassy-time-timg0,async,embassy-executor-thread --release
-          cargo +nightly check --example=embassy_rmt_tx --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo +nightly check --example=embassy_usb_serial_jtag --features=embassy,embassy-time-systick,async,embassy-executor-thread
-          cargo +nightly check --example=embassy_parl_io_tx --features=embassy,embassy-time-systick,async,embassy-executor-thread
-          cargo +nightly check --example=embassy_parl_io_rx --features=embassy,embassy-time-systick,async,embassy-executor-thread
-      - name: check esp32c6-hal (interrupt-preemption)
-        run: cd esp32c6-hal/ && cargo +nightly check --example=interrupt_preemption --features=interrupt-preemption
-      - name: check esp32c6-hal (direct-vectoring)
-        run: cd esp32c6-hal/ && cargo +nightly check --example=direct-vectoring --features=direct-vectoring
-      - name: check esp32c6-hal (embassy, log/defmt)
-        run: |
-          cd esp32c6-hal/
-          cargo +nightly check --examples --features=embassy,embassy-time-timg0,embassy-executor-thread,defmt
-          cargo +nightly check --examples --features=embassy,embassy-time-timg0,embassy-executor-thread,log
-      # Make sure we can build without default features enabled, too!
-      - name: check esp32c6-hal (no default features)
-        run: cd esp32c6-hal/ && cargo build --no-default-features
-      # Ensure documentation can be built
-      - name: rustdoc
-        run: cd esp32c6-hal/ && cargo doc --features=eh1
-
-  esp32h2-hal:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          target: riscv32imac-unknown-none-elf
-          toolchain: nightly
-          components: rust-src
-      - uses: Swatinem/rust-cache@v2
-
-      # Perform a full build initially to verify that the examples not only
-      # build, but also link successfully.
-      # We also use this as an opportunity to verify that the examples link
-      # for each supported image format.
-      - name: build esp32h2-hal (no features)
-        run: cd esp32h2-hal/ && cargo +nightly build --examples
-      - name: build esp32h2-hal (flip-link feature)
-        run: cd esp32h2-hal/ && cargo +nightly build --examples --features=flip-link
-      # Subsequent steps can just check the examples instead, as we're already
-      # confident that they link.
-      - name: check esp32h2-hal (common features)
-        run: |
-          cd esp32h2-hal/
-          cargo +nightly build --examples --features=eh1,ufmt,log
-          cargo +nightly build --examples --features=eh1,ufmt,defmt
-      - name: check esp32h2-hal (embassy)
-        run: |
-          cd esp32h2-hal/
-          cargo +nightly check --example=embassy_hello_world --features=embassy,embassy-time-timg0,embassy-executor-thread
-          cargo +nightly check --example=embassy_hello_world --features=embassy,embassy-time-systick,embassy-executor-thread
-          cargo +nightly check --example=embassy_multiprio --features=embassy,embassy-time-timg0,embassy-executor-thread,embassy-executor-interrupt
-      - name: check esp32h2-hal (embassy, async)
-        run: |
-          cd esp32h2-hal/
-          cargo +nightly check --example=embassy_wait --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo +nightly check --example=embassy_spi --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo +nightly check --example=embassy_serial --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo +nightly check --example=embassy_i2c --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo +nightly check --example=embassy_i2s_read --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo +nightly check --example=embassy_i2s_sound --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo +nightly check --example=embassy_rmt_rx --features=embassy,embassy-time-timg0,async,embassy-executor-thread --release
-          cargo +nightly check --example=embassy_rmt_tx --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo +nightly check --example=embassy_usb_serial_jtag --features=embassy,embassy-time-systick,async,embassy-executor-thread
-          cargo +nightly check --example=embassy_parl_io_tx --features=embassy,embassy-time-systick,async,embassy-executor-thread
-          cargo +nightly check --example=embassy_parl_io_rx --features=embassy,embassy-time-systick,async,embassy-executor-thread
-      - name: check esp32h2-hal (interrupt-preemption)
-        run: cd esp32h2-hal/ && cargo +nightly check --example=interrupt_preemption --features=interrupt-preemption
-      - name: check esp32h2-hal (direct-vectoring)
-        run: cd esp32h2-hal/ && cargo +nightly check --example=direct-vectoring --features=direct-vectoring
-      - name: check esp32h2-hal (embassy, log/defmt)
-        run: |
-          cd esp32h2-hal/
-          cargo +nightly check --examples --features=embassy,embassy-time-timg0,embassy-executor-thread,defmt
-          cargo +nightly check --examples --features=embassy,embassy-time-timg0,embassy-executor-thread,log
-      # Make sure we can build without default features enabled, too!
-      - name: check esp32h2-hal (no default features)
-        run: cd esp32h2-hal/ && cargo build --no-default-features
-      # Ensure documentation can be built
-      - name: rustdoc
-        run: cd esp32h2-hal/ && cargo doc --features=eh1
-
-  esp32p4-hal:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          target: riscv32imafc-unknown-none-elf
-          toolchain: nightly
-          components: rust-src
-      - uses: Swatinem/rust-cache@v2
-
-      # Perform a full build initially to verify that the examples not only
-      # build, but also link successfully.
-      # We also use this as an opportunity to verify that the examples link
-      # for each supported image format.
-      - name: build esp32p4-hal (no features)
-        run: cd esp32p4-hal/ && cargo +nightly build --examples
-      # Subsequent steps can just check the examples instead, as we're already
-      # confident that they link.
-      - name: check esp32p4-hal (common features)
-        run: |
-          cd esp32p4-hal/
-          cargo +nightly build --examples --features=eh1,ufmt,log
-          cargo +nightly build --examples --features=eh1,ufmt,defmt
-      # Make sure we can build without default features enabled, too!
-      - name: check esp32p4-hal (no default features)
-        run: cd esp32p4-hal/ && cargo build --no-default-features
-      # Ensure documentation can be built
-      - name: rustdoc
-        run: cd esp32p4-hal/ && cargo doc --features=eh1
-
-  esp32s2-hal:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: esp-rs/xtensa-toolchain@v1.5
-        with:
-          default: true
-          buildtargets: esp32s2
-          ldproxy: false
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          target: riscv32imc-unknown-none-elf
-          toolchain: nightly
-          components: rust-src
-      - uses: Swatinem/rust-cache@v2
-
-      # Build the `esp-lp-hal` examples first to make sure the examples which
-      # expect these ELF files to be present will compile.
-      - name: build prerequisites
-        run: |
-          cd esp-lp-hal/
-          cargo +nightly build --release --features=esp32s2 --target=riscv32imc-unknown-none-elf --examples
-
-      # Perform a full build initially to verify that the examples not only
-      # build, but also link successfully.
-      - name: check esp32s2-hal (no features)
-        run: cd esp32s2-hal/ && cargo +esp build --examples
-      # Subsequent steps can just check the examples instead, as we're already
-      # confident that they link.
-      - name: check esp32s2-hal (common features)
-        run: |
-          cd esp32s2-hal/
-          cargo +esp build --examples --features=eh1,ufmt,log
-          cargo +esp build --examples --features=eh1,ufmt,defmt
-      - name: check esp32s2-hal (embassy, timg0)
-        run: |
-          cd esp32s2-hal/
-          cargo +esp check --example=embassy_hello_world --features=embassy,embassy-time-timg0,embassy-executor-thread
-          cargo +esp check --example=embassy_multiprio --features=embassy,embassy-time-timg0,embassy-executor-thread,embassy-executor-interrupt
-      - name: check esp32s2-hal (embassy, systick)
-        run: |
-          cd esp32s2-hal/
-          cargo +esp check --example=embassy_hello_world --features=embassy,embassy-time-systick,embassy-executor-thread
-          cargo +esp check --example=embassy_multiprio --features=embassy,embassy-time-systick,embassy-executor-thread,embassy-executor-interrupt
-      - name: check esp32s2-hal (embassy, timg0, async)
-        run: |
-          cd esp32s2-hal/
-          cargo +esp check --example=embassy_wait --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo +esp check --example=embassy_spi --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo +esp check --example=embassy_serial --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo +esp check --example=embassy_i2c --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo +esp check --example=embassy_i2s_read --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo +esp check --example=embassy_i2s_sound --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo +esp check --example=embassy_rmt_rx --features=embassy,embassy-time-timg0,async,embassy-executor-thread --release
-          cargo +esp check --example=embassy_rmt_tx --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-      - name: check esp32s2-hal (embassy, systick, async)
-        run: |
-          cd esp32s2-hal/
-          cargo +esp check --example=embassy_wait --features=embassy,embassy-time-systick,async,embassy-executor-thread
-          cargo +esp check --example=embassy_spi --features=embassy,embassy-time-systick,async,embassy-executor-thread
-          cargo +esp check --example=embassy_serial --features=embassy,embassy-time-systick,async,embassy-executor-thread
-          cargo +esp check --example=embassy_i2c --features=embassy,embassy-time-systick,async,embassy-executor-thread
-      - name: check esp32s2-hal (embassy, log/defmt)
-        run: |
-          cd esp32s2-hal/
-          cargo +esp check --examples --features=embassy,embassy-time-timg0,embassy-executor-interrupt,embassy-executor-thread,defmt
-          cargo +esp check --examples --features=embassy,embassy-time-timg0,embassy-executor-interrupt,embassy-executor-thread,log
-      - name: check esp32s2-hal (psram)
-        run: cd esp32s2-hal/ && cargo +esp check --example=psram --features=psram-2m --release # This example requires release!
-      # Make sure we can build without default features enabled, too!
-      - name: check esp32s2-hal (no default features)
-        run: cd esp32s2-hal/ && cargo build --no-default-features
-      # Ensure documentation can be built
-      - name: rustdoc
-        run: cd esp32s2-hal/ && cargo +esp doc --features=eh1
-
-  esp32s3-hal:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: esp-rs/xtensa-toolchain@v1.5
-        with:
-          default: true
-          buildtargets: esp32s3
-          ldproxy: false
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          target: riscv32imc-unknown-none-elf
-          toolchain: nightly
-          components: rust-src
-      - uses: Swatinem/rust-cache@v2
-
-      # Build the `esp-lp-hal` examples first to make sure the examples which
-      # expect these ELF files to be present will compile.
-      - name: build prerequisites
-        run: |
-          cd esp-lp-hal/
-          cargo build --release --features=esp32s3 --target=riscv32imc-unknown-none-elf --examples
-
-      # Perform a full build initially to verify that the examples not only
-      # build, but also link successfully.
-      # We also use this as an opportunity to verify that the examples link
-      # for each supported image format.
-      - name: build esp32s3-hal (no features)
-        run: cd esp32s3-hal/ && cargo +esp build --examples
-      # Subsequent steps can just check the examples instead, as we're already
-      # confident that they link.
-      - name: check esp32s3-hal (common features)
-        run: |
-          cd esp32s3-hal/
-          cargo +esp build --examples --features=eh1,ufmt,log
-          cargo +esp build --examples --features=eh1,ufmt,defmt
-      - name: check esp32s3-hal (embassy, timg0)
-        run: |
-          cd esp32s3-hal/
-          cargo +esp check --example=embassy_hello_world --features=embassy,embassy-time-timg0,embassy-executor-thread
-          cargo +esp check --example=embassy_multicore --features=embassy,embassy-time-timg0,embassy-executor-thread
-          cargo +esp check --example=embassy_multicore_interrupt --features=embassy,embassy-time-timg0,embassy-executor-interrupt
-          cargo +esp check --example=embassy_multiprio --features=embassy,embassy-time-timg0,embassy-executor-thread,embassy-executor-interrupt
-      - name: check esp32s3-hal (embassy, systick)
-        run: |
-          cd esp32s3-hal/
-          cargo +esp check --example=embassy_hello_world --features=embassy,embassy-time-systick,embassy-executor-thread
-          cargo +esp check --example=embassy_multicore --features=embassy,embassy-time-systick,embassy-executor-thread
-          cargo +esp check --example=embassy_multicore_interrupt --features=embassy,embassy-time-systick,embassy-executor-interrupt
-          cargo +esp check --example=embassy_multiprio --features=embassy,embassy-time-systick,embassy-executor-thread,embassy-executor-interrupt
-      - name: check esp32s3-hal (embassy, timg0, async)
-        run: |
-          cd esp32s3-hal/
-          cargo +esp check --example=embassy_wait --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo +esp check --example=embassy_spi --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo +esp check --example=embassy_serial --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo +esp check --example=embassy_i2c --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo +esp check --example=embassy_i2s_read --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo +esp check --example=embassy_i2s_sound --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo +esp check --example=embassy_rmt_rx --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-          cargo +esp check --example=embassy_rmt_tx --features=embassy,embassy-time-timg0,async,embassy-executor-thread
-      - name: check esp32s3-hal (embassy, systick, async)
-        run: |
-          cd esp32s3-hal/
-          cargo +esp check --example=embassy_wait --features=embassy,embassy-time-systick,async,embassy-executor-thread
-          cargo +esp check --example=embassy_spi --features=embassy,embassy-time-systick,async,embassy-executor-thread
-          cargo +esp check --example=embassy_serial --features=embassy,embassy-time-systick,async,embassy-executor-thread
-          cargo +esp check --example=embassy_i2c --features=embassy,embassy-time-systick,async,embassy-executor-thread
-          cargo +esp check --example=embassy_usb_serial_jtag --features=embassy,embassy-time-systick,async,embassy-executor-thread
-      - name: check esp32s3-hal (octal psram and psram)
-        run: | # This examples require release!
-          cd esp32s3-hal/
-          cargo +esp check --example=octal_psram --features=opsram-2m --release
-          cargo +esp check --example=psram --features=psram-2m --release
-      - name: check esp32s3-hal (embassy, log/defmt)
-        run: |
-          cd esp32s3-hal/
-          cargo +esp check --examples --features=embassy,embassy-time-timg0,embassy-executor-interrupt,embassy-executor-thread,defmt
-          cargo +esp check --examples --features=embassy,embassy-time-timg0,embassy-executor-interrupt,embassy-executor-thread,log
-      # Make sure we can build without default features enabled, too!
-      - name: check esp32s3-hal (no default features)
-        run: cd esp32s3-hal/ && cargo build --no-default-features
-      # Ensure documentation can be built
-      - name: rustdoc
-        run: cd esp32s3-hal/ && cargo doc --features=eh1
 
   # --------------------------------------------------------------------------
   # MSRV
@@ -625,56 +164,38 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@v1
         with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf #,riscv32imafc-unknown-none-elf
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
           toolchain: ${{ env.MSRV }}
           components: rust-src
       - uses: Swatinem/rust-cache@v2
 
+      # TODO:
+      #  - Enable additional (all?) features for MSRV check
+
       # Verify the MSRV for all RISC-V chips.
+      - name: msrv (esp-hal)
+        run: |
+          cargo xtask build-package --features=esp32c2 --target=riscv32imc-unknown-none-elf   esp-hal
+          cargo xtask build-package --features=esp32c3 --target=riscv32imc-unknown-none-elf   esp-hal
+          cargo xtask build-package --features=esp32c6 --target=riscv32imac-unknown-none-elf  esp-hal
+          cargo xtask build-package --features=esp32h2 --target=riscv32imac-unknown-none-elf  esp-hal
+          cargo xtask build-package --features=esp32p4 --target=riscv32imafc-unknown-none-elf esp-hal
       - name: msrv (esp-lp-hal)
         run: |
-          cd esp-lp-hal/
-          cargo build --features=esp32c6 --target=riscv32imac-unknown-none-elf
-          cargo build --features=esp32s2 --target=riscv32imc-unknown-none-elf
-          cargo build --features=esp32s3 --target=riscv32imc-unknown-none-elf
-      - name: msrv (esp32c2-hal)
-        run: |
-          cd esp32c2-hal/
-          cargo build --features=eh1,ufmt,log
-          cargo build --features=defmt
-      - name: msrv (esp32c3-hal)
-        run: |
-          cd esp32c3-hal/
-          cargo build --features=eh1,ufmt,log
-          cargo build --features=defmt
-      - name: msrv (esp32c6-hal)
-        run: |
-          cd esp32c6-hal/
-          cargo build --features=eh1,ufmt,log
-          cargo build --features=defmt
-      - name: msrv (esp32h2-hal)
-        run: |
-          cd esp32h2-hal/
-          cargo build --features=eh1,ufmt,log
-          cargo build --features=defmt
-      # - name: msrv (esp32p4-hal)
-      #   run: |
-      #     cd esp32p4-hal/
-      #     cargo build --features=eh1,ufmt,log
-      #     cargo build --features=defmt
+          cargo xtask build-package --features=esp32c6 --target=riscv32imac-unknown-none-elf esp-lp-hal
+          cargo xtask build-package --features=esp32s2 --target=riscv32imc-unknown-none-elf  esp-lp-hal
+          cargo xtask build-package --features=esp32s3 --target=riscv32imc-unknown-none-elf  esp-lp-hal
 
   msrv-xtensa:
     runs-on: ubuntu-latest
     env:
       RUSTC_BOOTSTRAP: 1
 
+      # TODO:
+      #  - Enable additional (all?) features for MSRV check
+
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          target: riscv32imc-unknown-none-elf
-          toolchain: ${{ env.MSRV }}
-          components: rust-src
       - uses: esp-rs/xtensa-toolchain@v1.5
         with:
           ldproxy: false
@@ -682,21 +203,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       # Verify the MSRV for all Xtensa chips:
-      - name: msrv (esp32-hal)
+      - name: msrv (esp-hal)
         run: |
-          cd esp32-hal/
-          cargo build --features=eh1,ufmt,log
-          cargo build --features=defmt
-      - name: msrv (esp32s2-hal)
-        run: |
-          cd esp32s2-hal/
-          cargo build --features=eh1,ufmt,log
-          cargo build --features=defmt
-      - name: msrv (esp32s3-hal)
-        run: |
-          cd esp32s3-hal/
-          cargo build --features=eh1,ufmt,log
-          cargo build --features=defmt
+          cargo xtask build-package --toolchain=esp --features=esp32   --target=xtensa-esp32-none-elf   esp-hal
+          cargo xtask build-package --toolchain=esp --features=esp32s2 --target=xtensa-esp32s2-none-elf esp-hal
+          cargo xtask build-package --toolchain=esp --features=esp32s3 --target=xtensa-esp32s3-none-elf esp-hal
 
   # --------------------------------------------------------------------------
   # Lint
@@ -709,28 +220,34 @@ jobs:
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: nightly
-          targets: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf # ,riscv32imafc-unknown-none-elf
+          targets: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
           components: clippy,rust-src
       - uses: Swatinem/rust-cache@v2
 
       # Run 'cargo clippy' on all packages targeting RISC-V:
-      - name: clippy (esp32c2-hal)
-        run: cargo clippy --manifest-path=esp-hal/Cargo.toml --target=riscv32imc-unknown-none-elf --features=esp32c2 -- -D warnings
-      - name: clippy (esp32c3-hal)
-        run: cargo clippy --manifest-path=esp-hal/Cargo.toml --target=riscv32imc-unknown-none-elf --features=esp32c3 -- -D warnings
-      - name: clippy (esp32c6-hal)
-        run: cargo clippy --manifest-path=esp-hal/Cargo.toml --target=riscv32imac-unknown-none-elf --features=esp32c6 -- -D warnings
-      - name: clippy (esp32h2-hal)
-        run: cargo clippy --manifest-path=esp-hal/Cargo.toml --target=riscv32imac-unknown-none-elf --features=esp32h2 -- -D warnings
-      # - name: clippy (esp32p4-hal)
-      #   run: cargo clippy --manifest-path=esp-hal/Cargo.toml --target=riscv32imafc-unknown-none-elf --features=esp32p4 -- -D warnings
-
+      ## esp-hal:
+      - name: clippy (esp-hal, esp32c2)
+        run: cd esp-hal && cargo clippy --features=esp32c2 --target=riscv32imc-unknown-none-elf -- -D warnings
+      - name: clippy (esp-hal, esp32c3)
+        run: cd esp-hal && cargo clippy --features=esp32c3 --target=riscv32imc-unknown-none-elf -- -D warnings
+      - name: clippy (esp-hal, esp32c6)
+        run: cd esp-hal && cargo clippy --features=esp32c6 --target=riscv32imac-unknown-none-elf -- -D warnings
+      - name: clippy (esp-hal, esp32h2)
+        run: cd esp-hal && cargo clippy --features=esp32h2 --target=riscv32imac-unknown-none-elf -- -D warnings
+      # TODO: Re-enable when able
+      # - name: clippy (esp-hal, esp32p4)
+      #   run: cd esp-hal && cargo clippy --features=esp32p4 --target=riscv32imafc-unknown-none-elf -- -D warnings
+      ## esp-hal-smartled:
+      - name: clippy (esp-hal-smartled)
+        run: cd esp-hal-smartled && cargo clippy --features=esp32c6 --target=riscv32imac-unknown-none-elf -- -D warnings
+      ## esp-lp-hal:
       - name: clippy (esp-lp-hal, esp32c6)
-        run: cd esp-lp-hal && cargo clippy --features=esp32c6 -- -D warnings
+        run: cd esp-lp-hal && cargo clippy --features=esp32c6 --target=riscv32imac-unknown-none-elf -- -D warnings
       - name: clippy (esp-lp-hal, esp32s2)
-        run: cd esp-lp-hal && cargo clippy --features=esp32s2 -- -D warnings
+        run: cd esp-lp-hal && cargo clippy --features=esp32s2 --target=riscv32imc-unknown-none-elf -- -D warnings
       - name: clippy (esp-lp-hal, esp32s3)
-        run: cd esp-lp-hal && cargo clippy --features=esp32s3 -- -D warnings
+        run: cd esp-lp-hal && cargo clippy --features=esp32s3 --target=riscv32imc-unknown-none-elf -- -D warnings
+      # esp-riscv-rt:
       - name: clippy (esp-riscv-rt)
         run: cd esp-riscv-rt && cargo clippy --target=riscv32imc-unknown-none-elf -- -D warnings
 
@@ -746,12 +263,12 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       # Run 'cargo clippy' on all packages targeting Xtensa:
-      - name: clippy (esp32-hal)
-        run: cargo clippy -Zbuild-std=core --manifest-path=esp-hal/Cargo.toml --target=xtensa-esp32-none-elf --features=esp32 -- -D warnings
-      - name: clippy (esp32s2-hal)
-        run: cargo clippy -Zbuild-std=core --manifest-path=esp-hal/Cargo.toml --target=xtensa-esp32s2-none-elf --features=esp32s2 -- -D warnings
-      - name: clippy (esp32s3-hal)
-        run: cargo clippy -Zbuild-std=core --manifest-path=esp-hal/Cargo.toml --target=xtensa-esp32s3-none-elf --features=esp32s3 -- -D warnings
+      - name: clippy (esp-hal, esp32)
+        run: cd esp-hal && cargo clippy -Zbuild-std=core --features=esp32 --target=xtensa-esp32-none-elf -- -D warnings
+      - name: clippy (esp-hal, esp32s2)
+        run: cd esp-hal && cargo clippy -Zbuild-std=core --features=esp32s2 --target=xtensa-esp32s2-none-elf -- -D warnings
+      - name: clippy (esp-hal, esp32s3)
+        run: cd esp-hal && cargo clippy -Zbuild-std=core --features=esp32s3 --target=xtensa-esp32s3-none-elf -- -D warnings
 
   rustfmt:
     runs-on: ubuntu-latest
@@ -777,19 +294,5 @@ jobs:
         run: cargo fmt --all --manifest-path=esp-lp-hal/Cargo.toml -- --check
       - name: rustfmt (esp-riscv-rt)
         run: cargo fmt --all --manifest-path=esp-riscv-rt/Cargo.toml -- --check
-      - name: rustfmt (esp32-hal)
-        run: cargo fmt --all --manifest-path=esp32-hal/Cargo.toml -- --check
-      - name: rustfmt (esp32c2-hal)
-        run: cargo fmt --all --manifest-path=esp32c2-hal/Cargo.toml -- --check
-      - name: rustfmt (esp32c3-hal)
-        run: cargo fmt --all --manifest-path=esp32c3-hal/Cargo.toml -- --check
-      - name: rustfmt (esp32c6-hal)
-        run: cargo fmt --all --manifest-path=esp32c6-hal/Cargo.toml -- --check
-      - name: rustfmt (esp32h2-hal)
-        run: cargo fmt --all --manifest-path=esp32h2-hal/Cargo.toml -- --check
-      - name: rustfmt (esp32p4-hal)
-        run: cargo fmt --all --manifest-path=esp32p4-hal/Cargo.toml -- --check
-      - name: rustfmt (esp32s2-hal)
-        run: cargo fmt --all --manifest-path=esp32s2-hal/Cargo.toml -- --check
-      - name: rustfmt (esp32s3-hal)
-        run: cargo fmt --all --manifest-path=esp32s3-hal/Cargo.toml -- --check
+      - name: rustfmt (examples)
+        run: cargo fmt --all --manifest-path=examples/Cargo.toml -- --check

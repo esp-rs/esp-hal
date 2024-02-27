@@ -34,7 +34,7 @@ pub(crate) mod constants {
     pub const SOC_DRAM_HIGH: u32 = 0x3FD0_0000;
 }
 
-#[cfg(feature = "rt-xtensa")]
+#[cfg(feature = "rt")]
 #[doc(hidden)]
 #[link_section = ".rwtext"]
 pub unsafe fn configure_cpu_caches() {
@@ -69,7 +69,7 @@ pub unsafe fn configure_cpu_caches() {
 /// ENTRY point is defined in memory.x
 /// *Note: the pre_init function is called in the original reset handler
 /// after the initializations done in this function*
-#[cfg(feature = "rt-xtensa")]
+#[cfg(feature = "rt")]
 #[doc(hidden)]
 #[no_mangle]
 #[link_section = ".rwtext"]

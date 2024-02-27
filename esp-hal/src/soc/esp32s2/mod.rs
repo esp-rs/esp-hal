@@ -37,7 +37,7 @@ pub(crate) mod constants {
 /// ENTRY point is defined in memory.x
 /// *Note: the pre_init function is called in the original reset handler
 /// after the initializations done in this function*
-#[cfg(feature = "rt-xtensa")]
+#[cfg(feature = "rt")]
 #[doc(hidden)]
 #[no_mangle]
 pub unsafe extern "C" fn ESP32Reset() -> ! {

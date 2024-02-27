@@ -52,7 +52,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Lift the minimal buffer size requirement for I2S (#1189)
 
 ### Removed
+
 - Remove `xtal-26mhz` and `xtal-40mhz` features (#1165)
+- All chip-specific HAL packages have been removed (#1196)
 
 ### Breaking
 
@@ -60,6 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `DAC` driver's constructor is now `new` instead of `dac`, to be more consistent with other APIs (#1100)
 - The DMA peripheral is now called `Dma` for devices with both PDMA and GDMA controllers (#1125)
 - The `ADC` driver's constructor is now `new` instead of `adc`, to be more consistent with other APIs (#1133)
+- `embassy-executor`'s `integrated-timers` is no longer enabled by default.
 
 ## [0.15.0] - 2024-01-19
 
@@ -147,7 +150,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - RISC-V: Fix stack allocation (#988)
 - ESP32-C6: Fix used RAM (#997)
 - ESP32-H2: Fix used RAM (#1003)
-- Fix SPI slave DMA dma\_read and dma\_write (#1013)
+- Fix SPI slave DMA dma_read and dma_write (#1013)
 - ESP32-C6/H2: Fix disabling of interrupts (#1040)
 
 ### Removed
@@ -160,8 +163,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `Spi::new`/`Spi::new_half_duplex` takes no gpio pin now, instead you need to call `with_pins` to setup those (#901).
 - ESP32-C2, ESP32-C3, ESP32-S2: atomic emulation trap has been removed. (#904) (#985)
-    - When upgrading you must either remove [these lines](https://github.com/esp-rs/riscv-atomic-emulation-trap#usage) from your `.cargo/config.toml`.
-    - Usage of `core::sync::atomic::*` in dependent crates should be replaced with [portable-atomic](https://github.com/taiki-e/portable-atomic).
+  - When upgrading you must either remove [these lines](https://github.com/esp-rs/riscv-atomic-emulation-trap#usage) from your `.cargo/config.toml`.
+  - Usage of `core::sync::atomic::*` in dependent crates should be replaced with [portable-atomic](https://github.com/taiki-e/portable-atomic).
 - RSA driver now takes `u32` words instead of `u8` bytes. The expected slice length is now 4 times shorter. (#981)
 
 ## [0.13.1] - 2023-11-02

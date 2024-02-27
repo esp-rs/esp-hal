@@ -1,0 +1,122 @@
+//! SPI read manufacturer id from flash chip
+//!
+//! Folowing pins are used:
+//! SCLK            GPIO0
+//! MISO/IO0        GPIO1
+//! MOSI/IO1        GPIO2
+//! IO2             GPIO3
+//! IO3             GPIO4
+//! CS              GPIO5
+//!
+//! Folowing pins are used for ESP32:
+//! SCLK            GPIO0
+//! MISO/IO0        GPIO2
+//! MOSI/IO1        GPIO4
+//! IO2             GPIO5
+//! IO3             GPIO13
+//! CS              GPIO14
+//!
+//! Depending on your target and the board you are using you have to change the
+//! pins.
+//!
+//! Connect a flash chip (GD25Q64C was used) and make sure QE in the status
+//! register is set.
+
+//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+
+#![no_std]
+#![no_main]
+
+use esp_backtrace as _;
+use esp_hal::{
+    clock::ClockControl,
+    gpio::IO,
+    peripherals::Peripherals,
+    prelude::*,
+    spi::{
+        master::{Address, Command, HalfDuplexReadWrite, Spi},
+        SpiDataMode,
+        SpiMode,
+    },
+    Delay,
+};
+use esp_println::println;
+
+#[entry]
+fn main() -> ! {
+    let peripherals = Peripherals::take();
+    let system = peripherals.SYSTEM.split();
+    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+
+    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "esp32")] {
+            let sclk = io.pins.gpio0;
+            let miso = io.pins.gpio2;
+            let mosi = io.pins.gpio4;
+            let sio2 = io.pins.gpio5;
+            let sio3 = io.pins.gpio13;
+            let cs = io.pins.gpio14;
+        } else {
+            let sclk = io.pins.gpio0;
+            let miso = io.pins.gpio1;
+            let mosi = io.pins.gpio2;
+            let sio2 = io.pins.gpio3;
+            let sio3 = io.pins.gpio4;
+            let cs = io.pins.gpio5;
+        }
+    }
+
+    let mut spi = Spi::new_half_duplex(peripherals.SPI2, 100u32.kHz(), SpiMode::Mode0, &clocks)
+        .with_pins(
+            Some(sclk),
+            Some(mosi),
+            Some(miso),
+            Some(sio2),
+            Some(sio3),
+            Some(cs),
+        );
+
+    let mut delay = Delay::new(&clocks);
+
+    loop {
+        // READ MANUFACTURER ID FROM FLASH CHIP
+        let mut data = [0u8; 2];
+        spi.read(
+            SpiDataMode::Single,
+            Command::Command8(0x90, SpiDataMode::Single),
+            Address::Address24(0x000000, SpiDataMode::Single),
+            0,
+            &mut data,
+        )
+        .unwrap();
+        println!("Single {:x?}", data);
+        delay.delay_ms(250u32);
+
+        // READ MANUFACTURER ID FROM FLASH CHIP
+        let mut data = [0u8; 2];
+        spi.read(
+            SpiDataMode::Dual,
+            Command::Command8(0x92, SpiDataMode::Single),
+            Address::Address32(0x000000_00, SpiDataMode::Dual),
+            0,
+            &mut data,
+        )
+        .unwrap();
+        println!("Dual {:x?}", data);
+        delay.delay_ms(250u32);
+
+        // READ MANUFACTURER ID FROM FLASH CHIP
+        let mut data = [0u8; 2];
+        spi.read(
+            SpiDataMode::Quad,
+            Command::Command8(0x94, SpiDataMode::Single),
+            Address::Address32(0x000000_00, SpiDataMode::Quad),
+            4,
+            &mut data,
+        )
+        .unwrap();
+        println!("Quad {:x?}", data);
+        delay.delay_ms(1500u32);
+    }
+}
