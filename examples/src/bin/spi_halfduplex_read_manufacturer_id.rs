@@ -8,6 +8,14 @@
 //! IO3             GPIO4
 //! CS              GPIO5
 //!
+//! Folowing pins are used for ESP32:
+//! SCLK            GPIO0
+//! MISO/IO0        GPIO2
+//! MOSI/IO1        GPIO4
+//! IO2             GPIO5
+//! IO3             GPIO13
+//! CS              GPIO14
+//!
 //! Depending on your target and the board you are using you have to change the
 //! pins.
 //!
@@ -41,12 +49,23 @@ fn main() -> ! {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-    let sclk = io.pins.gpio0;
-    let miso = io.pins.gpio1;
-    let mosi = io.pins.gpio2;
-    let sio2 = io.pins.gpio3;
-    let sio3 = io.pins.gpio4;
-    let cs = io.pins.gpio5;
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "esp32")] {
+            let sclk = io.pins.gpio0;
+            let miso = io.pins.gpio2;
+            let mosi = io.pins.gpio4;
+            let sio2 = io.pins.gpio5;
+            let sio3 = io.pins.gpio13;
+            let cs = io.pins.gpio14;
+        } else {
+            let sclk = io.pins.gpio0;
+            let miso = io.pins.gpio1;
+            let mosi = io.pins.gpio2;
+            let sio2 = io.pins.gpio3;
+            let sio3 = io.pins.gpio4;
+            let cs = io.pins.gpio5;
+        }
+    }
 
     let mut spi = Spi::new_half_duplex(peripherals.SPI2, 100u32.kHz(), SpiMode::Mode0, &clocks)
         .with_pins(

@@ -3,8 +3,8 @@
 //! This example dumps the calibration data from a BMP180 sensor
 //!
 //! The following wiring is assumed:
-//! - SDA => GPIO1
-//! - SCL => GPIO2
+//! - SDA => GPIO4
+//! - SCL => GPIO5
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
@@ -27,8 +27,8 @@ fn main() -> ! {
     // I2C clock speed:
     let mut i2c = I2C::new(
         peripherals.I2C0,
-        io.pins.gpio1,
-        io.pins.gpio2,
+        io.pins.gpio4,
+        io.pins.gpio5,
         100u32.kHz(),
         &clocks,
     );

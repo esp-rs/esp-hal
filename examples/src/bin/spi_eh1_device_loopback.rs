@@ -2,11 +2,19 @@
 //!
 //! Folowing pins are used:
 //! SCLK    GPIO0
-//! MISO    GPIO1
-//! MOSI    GPIO2
-//! CS 1    GPIO3
-//! CS 2    GPIO4
-//! CS 3    GPIO5
+//! MISO    GPIO2
+//! MOSI    GPIO4
+//! CS 1    GPIO5
+//! CS 2    GPIO6
+//! CS 3    GPIO7
+//!
+//! Folowing pins are used for ESP32:
+//! SCLK    GPIO0
+//! MISO    GPIO2
+//! MOSI    GPIO4
+//! CS 1    GPIO5
+//! CS 2    GPIO13
+//! CS 3    GPIO14
 //!
 //! Depending on your target and the board you are using you have to change the
 //! pins.
@@ -44,8 +52,8 @@ fn main() -> ! {
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let sclk = io.pins.gpio0;
-    let miso = io.pins.gpio1;
-    let mosi = io.pins.gpio2;
+    let miso = io.pins.gpio2;
+    let mosi = io.pins.gpio4;
 
     let spi_bus = Spi::new(peripherals.SPI2, 1000u32.kHz(), SpiMode::Mode0, &clocks).with_pins(
         Some(sclk),
@@ -55,11 +63,21 @@ fn main() -> ! {
     );
     let spi_bus = RefCell::new(spi_bus);
     let mut spi_device_1 =
-        RefCellDevice::new_no_delay(&spi_bus, io.pins.gpio3.into_push_pull_output());
-    let mut spi_device_2 =
-        RefCellDevice::new_no_delay(&spi_bus, io.pins.gpio4.into_push_pull_output());
-    let mut spi_device_3 =
         RefCellDevice::new_no_delay(&spi_bus, io.pins.gpio5.into_push_pull_output());
+
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "esp32")] {
+            let mut spi_device_2 =
+                RefCellDevice::new_no_delay(&spi_bus, io.pins.gpio13.into_push_pull_output());
+            let mut spi_device_3 =
+                RefCellDevice::new_no_delay(&spi_bus, io.pins.gpio14.into_push_pull_output());
+        } else {
+            let mut spi_device_2 =
+                RefCellDevice::new_no_delay(&spi_bus, io.pins.gpio6.into_push_pull_output());
+            let mut spi_device_3 =
+                RefCellDevice::new_no_delay(&spi_bus, io.pins.gpio7.into_push_pull_output());
+        }
+    }
 
     let mut delay = Delay::new(&clocks);
     println!("=== SPI example with embedded-hal-1 traits ===");

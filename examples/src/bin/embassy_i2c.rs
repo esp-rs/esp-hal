@@ -1,8 +1,8 @@
 //! Embassy I2C
 //!
 //! Folowing pins are used:
-//! SDA    GPIO1
-//! SCL    GPIO2
+//! SDA    GPIO4
+//! SCL    GPIO5
 //!
 //! Depending on your target and the board you are using you have to change the
 //! pins.
@@ -44,8 +44,8 @@ async fn main(_spawner: Spawner) {
 
     let i2c0 = I2C::new(
         peripherals.I2C0,
-        io.pins.gpio1,
-        io.pins.gpio2,
+        io.pins.gpio4,
+        io.pins.gpio5,
         400u32.kHz(),
         &clocks,
     );

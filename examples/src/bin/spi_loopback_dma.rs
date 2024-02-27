@@ -2,9 +2,9 @@
 //!
 //! Folowing pins are used:
 //! SCLK    GPIO0
-//! MISO    GPIO1
-//! MOSI    GPIO2
-//! CS      GPIO3
+//! MISO    GPIO2
+//! MOSI    GPIO4
+//! CS      GPIO5
 //!
 //! Depending on your target and the board you are using you have to change the
 //! pins.
@@ -42,9 +42,9 @@ fn main() -> ! {
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let sclk = io.pins.gpio0;
-    let miso = io.pins.gpio1;
-    let mosi = io.pins.gpio2;
-    let cs = io.pins.gpio3;
+    let miso = io.pins.gpio2;
+    let mosi = io.pins.gpio4;
+    let cs = io.pins.gpio5;
 
     let dma = Dma::new(peripherals.DMA);
 

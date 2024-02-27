@@ -35,9 +35,9 @@ fn main() -> ! {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    // Set GPIO1 as an output, and set its state high initially.
+    // Set GPIO2 as an output, and set its state high initially.
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-    let mut led = io.pins.gpio1.into_push_pull_output();
+    let mut led = io.pins.gpio2.into_push_pull_output();
 
     #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
     let mut button = io.pins.gpio0.into_pull_down_input();
