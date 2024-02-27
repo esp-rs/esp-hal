@@ -902,7 +902,7 @@ where
             .write(|w| unsafe { w.clkdiv().bits(divider).frag().bits(0) });
     }
 
-    #[cfg(esp32c3)]
+    #[cfg(any(esp32c2, esp32c3, esp32s3))]
     #[inline(always)]
     fn init() {
         let system = unsafe { crate::peripherals::SYSTEM::steal() };
@@ -919,21 +919,9 @@ where
             .clk_conf()
             .modify(|_, w| w.rst_core().set_bit());
 
-        // TODO use T::reset_peripheral() as soon as it is present in esp-hal
-        system
-            .perip_rst_en0()
-            .modify(|_, w| match T::uart_number() {
-                0 => w.uart_rst().set_bit(),
-                1 => w.uart1_rst().set_bit(),
-                _ => panic!("Unknown Uart Device!"),
-            });
-        system
-            .perip_rst_en0()
-            .modify(|_, w| match T::uart_number() {
-                0 => w.uart_rst().clear_bit(),
-                1 => w.uart1_rst().clear_bit(),
-                _ => panic!("Unknown Uart Device!"),
-            });
+        // reset peripheral
+        T::reset_peripheral();
+
         T::register_block()
             .clk_conf()
             .modify(|_, w| w.rst_core().clear_bit());
@@ -941,10 +929,35 @@ where
         T::disable_tx_interrupts();
     }
 
-    #[cfg(not(esp32c3))]
+    #[cfg(any(esp32c6, esp32h2))]
+    #[inline(always)]
+    fn init() {
+        T::register_block()
+            .conf0()
+            .modify(|_, w| w.mem_clk_en().set_bit());
+
+        // initialize peripheral by setting clk_enable and clearing uart_reset bits
+        T::enable_peripheral();
+
+        T::register_block()
+            .clk_conf()
+            .modify(|_, w| w.rst_core().set_bit());
+
+        // reset peripheral
+        T::reset_peripheral();
+
+        T::register_block()
+            .clk_conf()
+            .modify(|_, w| w.rst_core().clear_bit());
+        T::disable_rx_interrupts();
+        T::disable_tx_interrupts();
+    }
+
+    #[cfg(any(esp32, esp32s2))]
     #[inline(always)]
     fn init() {
         T::enable_peripheral();
+        T::reset_peripheral();
         T::disable_rx_interrupts();
         T::disable_tx_interrupts();
     }
@@ -1106,6 +1119,7 @@ pub trait Instance {
     fn cts_signal() -> InputSignal;
     fn rts_signal() -> OutputSignal;
     fn enable_peripheral();
+    fn reset_peripheral();
 }
 
 macro_rules! impl_instance {
@@ -1139,6 +1153,10 @@ macro_rules! impl_instance {
 
             fn enable_peripheral() {
                 PeripheralClockControl::enable(crate::system::Peripheral::$peri);
+            }
+
+            fn reset_peripheral() {
+                PeripheralClockControl::reset(crate::system::Peripheral::$peri);
             }
         }
     };
