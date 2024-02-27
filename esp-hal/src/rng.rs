@@ -67,17 +67,9 @@ use core::{convert::Infallible, marker::PhantomData};
 
 use rand_core::{CryptoRng, RngCore};
 
+#[cfg(not(esp32p4))]
+use crate::soc::trng::ensure_randomness;
 use crate::{peripheral::Peripheral, peripherals::RNG};
-
-#[cfg_attr(esp32, path = "trng/esp32.rs")]
-#[cfg_attr(esp32c2, path = "trng/esp32c2.rs")]
-#[cfg_attr(esp32c3, path = "trng/esp32c3.rs")]
-#[cfg_attr(esp32c6, path = "trng/esp32c6.rs")]
-#[cfg_attr(esp32h2, path = "trng/esp32h2.rs")]
-#[cfg_attr(esp32p4, path = "trng/esp32p4.rs")]
-#[cfg_attr(esp32s2, path = "trng/esp32s2.rs")]
-#[cfg_attr(esp32s3, path = "trng/esp32s3.rs")]
-pub(crate) mod trng;
 
 /// Random number generator driver
 #[derive(Clone, Copy)]
@@ -88,7 +80,8 @@ pub struct Rng {
 impl Rng {
     /// Create a new random number generator instance
     pub fn new(_rng: impl Peripheral<P = RNG>) -> Self {
-        trng::ensure_randomness();
+        #[cfg(not(esp32p4))]
+        ensure_randomness();
 
         Self {
             _phantom: PhantomData,

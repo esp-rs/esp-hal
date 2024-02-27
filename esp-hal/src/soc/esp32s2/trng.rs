@@ -31,7 +31,7 @@ const ADC_SARADC_ENT_TSENS_ADDR_LSB: u8 = 2;
 const ADC_SARADC_ENT_RTC_ADDR: u8 = 0x7;
 const ADC_SARADC_ENT_RTC_ADDR_MSB: u8 = 3;
 const ADC_SARADC_ENT_RTC_ADDR_LSB: u8 = 3;
-const APB_SARADC_CTRL_REG: u32 = DR_REG_APB_SARADC_BASE + 0x000;
+const APB_SARADC_CTRL_REG: u32 = DR_REG_APB_SARADC_BASE;
 const APB_SARADC_SAR1_PATT_LEN_V: u32 = 0xF;
 const APB_SARADC_SAR1_PATT_LEN_S: u32 = 15;
 const APB_SARADC_SAR1_PATT_TAB1_REG: u32 = DR_REG_APB_SARADC_BASE + 0x018;
@@ -289,7 +289,7 @@ pub(crate) fn regi2c_write_mask(block: u8, _host_id: u8, reg_add: u8, msb: u8, l
     temp = ((block as u32 & I2C_RTC_SLAVE_ID_V as u32) << I2C_RTC_SLAVE_ID_S as u32)
         | ((reg_add as u32 & I2C_RTC_ADDR_V as u32) << I2C_RTC_ADDR_S as u32)
         | ((0x1 & I2C_RTC_WR_CNTL_V as u32) << I2C_RTC_WR_CNTL_S as u32)
-        | ((temp & I2C_RTC_DATA_V as u32) << I2C_RTC_DATA_S as u32);
+        | ((temp & I2C_RTC_DATA_V) << I2C_RTC_DATA_S);
     reg_write(I2C_RTC_CONFIG2, temp);
     while reg_get_bit(I2C_RTC_CONFIG2, I2C_RTC_BUSY) != 0 {}
 
