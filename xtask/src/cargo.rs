@@ -1,7 +1,6 @@
 //! Tools for working with Cargo.
 
 use std::{
-    env,
     path::Path,
     process::{Command, Stdio},
 };
@@ -49,14 +48,15 @@ pub fn run_with_input(args: &[String], cwd: &Path) -> Result<()> {
 
 fn get_cargo() -> String {
     #[cfg(target_os = "windows")]
-    let cargo = if let Ok(cargo) = env::var("CARGO_HOME") {
+    let cargo = if let Ok(cargo) = std::env::var("CARGO_HOME") {
         format!("{cargo}/bin/cargo")
     } else {
         String::from("cargo")
     };
 
     #[cfg(not(target_os = "windows"))]
-    let cargo = "cargo";
+    let cargo = String::from("cargo");
+
     cargo
 }
 
