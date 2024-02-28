@@ -65,7 +65,7 @@
 
 use core::{convert::Infallible, marker::PhantomData};
 
-use rand_core::RngCore;
+use rand_core::{CryptoRng, RngCore};
 
 use crate::{peripheral::Peripheral, peripherals::RNG};
 
@@ -78,6 +78,9 @@ pub struct Rng {
 impl Rng {
     /// Create a new random number generator instance
     pub fn new(_rng: impl Peripheral<P = RNG>) -> Self {
+        #[cfg(not(esp32p4))]
+        crate::soc::trng::ensure_randomness();
+
         Self {
             _phantom: PhantomData,
         }
@@ -106,9 +109,6 @@ impl embedded_hal::blocking::rng::Read for Rng {
         Ok(())
     }
 }
-
-// TODO: CryptoRng trait will be implemented when true randomness of RNG is
-// ensured
 
 impl RngCore for Rng {
     fn next_u32(&mut self) -> u32 {
@@ -139,3 +139,5 @@ impl RngCore for Rng {
         Ok(())
     }
 }
+
+impl CryptoRng for Rng {}
