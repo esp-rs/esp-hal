@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A way to push into I2S DMA buffer via a closure (#1189)
 - Added basic `LP-I2C` driver for C6 (#1185)
 - Ensuring that the random number generator is TRNG. (#1200)
+- ESP32-C6: Add timer wakeup source for deepsleep (#1201)
 
 ### Fixed
 

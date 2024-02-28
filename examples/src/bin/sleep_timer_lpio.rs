@@ -1,9 +1,11 @@
-//! Demonstrates deep sleep with gpio2 (low) and gpio3 (high) as wakeup sources.
+//! Demonstrates deep sleep with timer, using gpio2 (low) and gpio3 (high) as wakeup sources.
 
 //% CHIPS: esp32c6
 
 #![no_std]
 #![no_main]
+
+use core::time::Duration;
 
 use esp_backtrace as _;
 use esp_hal::{
@@ -15,7 +17,7 @@ use esp_hal::{
     rtc_cntl::{
         get_reset_reason,
         get_wakeup_cause,
-        sleep::{Ext1WakeupSource, WakeupLevel},
+        sleep::{Ext1WakeupSource, TimerWakeupSource, WakeupLevel},
         SocResetReason,
     },
     Cpu,
@@ -44,6 +46,8 @@ fn main() -> ! {
     println!("wake reason: {:?}", wake_reason);
 
     let mut delay = Delay::new(&clocks);
+    let timer = TimerWakeupSource::new(Duration::from_secs(10));
+
     let wakeup_pins: &mut [(&mut dyn RTCPinWithResistors, WakeupLevel)] = &mut [
         (&mut pin2, WakeupLevel::Low),
         (&mut pin3, WakeupLevel::High),
@@ -52,5 +56,5 @@ fn main() -> ! {
     let rtcio = Ext1WakeupSource::new(wakeup_pins);
     println!("sleeping!");
     delay.delay_ms(100u32);
-    rtc.sleep_deep(&[&rtcio], &mut delay);
+    rtc.sleep_deep(&[&timer, &rtcio], &mut delay);
 }
