@@ -16,6 +16,8 @@ enum Cli {
     BuildExamples(BuildExamplesArgs),
     /// Build the specified package with the given options.
     BuildPackage(BuildPackageArgs),
+    /// Run the given example for the specified chip.
+    RunExample(RunExampleArgs),
     /// Bump the version of the specified package(s)
     BumpVersion(BumpVersionArgs),
 }
@@ -60,6 +62,18 @@ struct BuildPackageArgs {
 }
 
 #[derive(Debug, Args)]
+struct RunExampleArgs {
+    /// Package to run example from.
+    #[arg(value_enum)]
+    package: Package,
+    /// Which chip to run the examples for.
+    #[arg(value_enum)]
+    chip: Chip,
+    /// Which example to run
+    example: String,
+}
+
+#[derive(Debug, Args)]
 struct BumpVersionArgs {
     /// How much to bump the version by.
     #[arg(value_enum)]
@@ -84,6 +98,7 @@ fn main() -> Result<()> {
         Cli::BuildDocumentation(args) => build_documentation(&workspace, args),
         Cli::BuildExamples(args) => build_examples(&workspace, args),
         Cli::BuildPackage(args) => build_package(&workspace, args),
+        Cli::RunExample(args) => run_example(&workspace, args),
         Cli::BumpVersion(args) => bump_version(&workspace, args),
     }
 }
@@ -119,7 +134,7 @@ fn build_examples(workspace: &Path, mut args: BuildExamplesArgs) -> Result<()> {
     }
 
     // Absolute path of the package's root:
-    let package_path = workspace.join(args.package.to_string());
+    let package_path = xtask::windows_safe_path(&workspace.join(args.package.to_string()));
 
     // Absolute path to the directory containing the examples:
     let example_path = if args.package == Package::Examples {
@@ -142,10 +157,60 @@ fn build_examples(workspace: &Path, mut args: BuildExamplesArgs) -> Result<()> {
 
 fn build_package(workspace: &Path, args: BuildPackageArgs) -> Result<()> {
     // Absolute path of the package's root:
-    let package_path = workspace.join(args.package.to_string());
+    let package_path = xtask::windows_safe_path(&workspace.join(args.package.to_string()));
 
     // Build the package using the provided features and/or target, if any:
     xtask::build_package(&package_path, args.features, args.toolchain, args.target)
+}
+
+fn run_example(workspace: &Path, mut args: RunExampleArgs) -> Result<()> {
+    // Ensure that the package/chip combination provided are valid:
+    validate_package_chip(&args.package, &args.chip)?;
+
+    // If the 'esp-hal' package is specified, what we *really* want is the
+    // 'examples' package instead:
+    if args.package == Package::EspHal {
+        log::warn!(
+            "Package '{}' specified, using '{}' instead",
+            Package::EspHal,
+            Package::Examples
+        );
+        args.package = Package::Examples;
+    }
+
+    // Absolute path of the package's root:
+    let package_path = xtask::windows_safe_path(&workspace.join(args.package.to_string()));
+
+    // Absolute path to the directory containing the examples:
+    let example_path = if args.package == Package::Examples {
+        package_path.join("src").join("bin")
+    } else {
+        package_path.join("examples")
+    };
+
+    // Determine the appropriate build target for the given package and chip:
+    let target = target_triple(&args.package, &args.chip)?;
+
+    // Load all examples and parse their metadata:
+    let example = xtask::load_examples(&example_path)?
+        .iter()
+        // Filter down the examples to only those for which the specified chip is supported:
+        .filter(|example| example.supports_chip(args.chip))
+        .find_map(|example| {
+            if example.name() == args.example {
+                Some(example.clone())
+            } else {
+                None
+            }
+        });
+
+    if let Some(example) = example {
+        xtask::run_example(&package_path, args.chip, target, &example)?;
+    } else {
+        log::error!("Example not found or unsupported for the given chip");
+    }
+
+    Ok(())
 }
 
 fn bump_version(workspace: &Path, args: BumpVersionArgs) -> Result<()> {
