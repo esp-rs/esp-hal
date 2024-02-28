@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix circular DMA (#1189)
 - Fix esp32c3 uart initialization (#1156)
 - Fix ESP32-S2 I2C read (#1214)
+- Reset/init UART if it's not the console UART (#1213)
 
 ### Changed
 
