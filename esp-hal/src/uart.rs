@@ -53,6 +53,7 @@ use crate::{
     system::PeripheralClockControl,
 };
 
+const CONSOLE_UART_NUM: usize = 0;
 const UART_FIFO_SIZE: u16 = 128;
 
 /// Custom serial error type
@@ -447,7 +448,7 @@ where
 
 impl<'d, T> Uart<'d, T>
 where
-    T: Instance,
+    T: Instance + 'd,
 {
     /// Create a new UART instance with defaults
     pub fn new_with_config<P>(
@@ -494,7 +495,7 @@ where
     }
 
     /// Split the Uart into a transmitter and receiver, which is
-    /// particuarly useful when having two tasks correlating to
+    /// particularly useful when having two tasks correlating to
     /// transmitting and receiving.
     pub fn split(self) -> (UartTx<'d, T>, UartRx<'d, T>) {
         (self.tx, self.rx)
@@ -902,7 +903,7 @@ where
             .write(|w| unsafe { w.clkdiv().bits(divider).frag().bits(0) });
     }
 
-    #[cfg(esp32c3)]
+    #[cfg(any(esp32c2, esp32c3, esp32s3))]
     #[inline(always)]
     fn init() {
         let system = unsafe { crate::peripherals::SYSTEM::steal() };
@@ -914,48 +915,69 @@ where
 
         // initialize peripheral by setting clk_enable and clearing uart_reset bits
         T::enable_peripheral();
-
-        T::register_block()
-            .clk_conf()
-            .modify(|_, w| w.rst_core().set_bit());
-
-        // TODO use T::reset_peripheral() as soon as it is present in esp-hal
-        system
-            .perip_rst_en0()
-            .modify(|_, w| match T::uart_number() {
-                0 => w.uart_rst().set_bit(),
-                1 => w.uart1_rst().set_bit(),
-                _ => panic!("Unknown Uart Device!"),
-            });
-        system
-            .perip_rst_en0()
-            .modify(|_, w| match T::uart_number() {
-                0 => w.uart_rst().clear_bit(),
-                1 => w.uart1_rst().clear_bit(),
-                _ => panic!("Unknown Uart Device!"),
-            });
-        T::register_block()
-            .clk_conf()
-            .modify(|_, w| w.rst_core().clear_bit());
+        Self::uart_peripheral_reset();
         T::disable_rx_interrupts();
         T::disable_tx_interrupts();
     }
 
-    #[cfg(not(esp32c3))]
+    #[cfg(any(esp32c6, esp32h2))]
+    #[inline(always)]
+    fn init() {
+        T::register_block()
+            .conf0()
+            .modify(|_, w| w.mem_clk_en().set_bit());
+
+        // initialize peripheral by setting clk_enable and clearing uart_reset bits
+        T::enable_peripheral();
+        Self::uart_peripheral_reset();
+        T::disable_rx_interrupts();
+        T::disable_tx_interrupts();
+    }
+
+    #[cfg(any(esp32, esp32s2))]
     #[inline(always)]
     fn init() {
         T::enable_peripheral();
+        Self::uart_peripheral_reset();
         T::disable_rx_interrupts();
         T::disable_tx_interrupts();
     }
 
-    #[cfg(any(esp32c3, esp32c6, esp32h2))] // TODO introduce a cfg symbol for this
+    #[inline(always)]
+    fn uart_peripheral_reset() {
+        // don't reset the console UART - this will cause trouble (i.e. the UART will
+        // start to transmit garbage)
+        //
+        // We should only reset the console UART if it was absolutely unused before.
+        // Apparently the bootloader (and maybe the ROM code) writing to the UART is
+        // already enough to make this a no-go. (i.e. one needs to mute the ROM
+        // code via efuse / strapping pin AND use a silent bootloader)
+        //
+        // Ideally this should be configurable once we have a solution for https://github.com/esp-rs/esp-hal/issues/1111
+        // see https://github.com/espressif/esp-idf/blob/5f4249357372f209fdd57288265741aaba21a2b1/components/esp_driver_uart/src/uart.c#L179
+        if T::uart_number() != CONSOLE_UART_NUM {
+            #[cfg(not(any(esp32, esp32s2)))]
+            T::register_block()
+                .clk_conf()
+                .modify(|_, w| w.rst_core().set_bit());
+
+            // reset peripheral
+            T::reset_peripheral();
+
+            #[cfg(not(any(esp32, esp32s2)))]
+            T::register_block()
+                .clk_conf()
+                .modify(|_, w| w.rst_core().clear_bit());
+        }
+    }
+
+    #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))] // TODO introduce a cfg symbol for this
     #[inline(always)]
     fn sync_regs(&self) {
         #[cfg(any(esp32c6, esp32h2))]
         let update_reg = T::register_block().reg_update();
 
-        #[cfg(esp32c3)]
+        #[cfg(any(esp32c3, esp32s3))]
         let update_reg = T::register_block().id();
 
         update_reg.modify(|_, w| w.reg_update().set_bit());
@@ -965,7 +987,7 @@ where
         }
     }
 
-    #[cfg(not(any(esp32c3, esp32c6, esp32h2)))]
+    #[cfg(not(any(esp32c3, esp32c6, esp32h2, esp32s3)))]
     #[inline(always)]
     fn sync_regs(&mut self) {}
 }
@@ -1106,6 +1128,7 @@ pub trait Instance {
     fn cts_signal() -> InputSignal;
     fn rts_signal() -> OutputSignal;
     fn enable_peripheral();
+    fn reset_peripheral();
 }
 
 macro_rules! impl_instance {
@@ -1139,6 +1162,10 @@ macro_rules! impl_instance {
 
             fn enable_peripheral() {
                 PeripheralClockControl::enable(crate::system::Peripheral::$peri);
+            }
+
+            fn reset_peripheral() {
+                PeripheralClockControl::reset(crate::system::Peripheral::$peri);
             }
         }
     };
@@ -1516,7 +1543,7 @@ mod asynch {
 
     impl<'d, T: Instance> Drop for UartRxFuture<'d, T> {
         fn drop(&mut self) {
-            // Although the isr disables the interrupt that occured directly, we need to
+            // Although the isr disables the interrupt that occurred directly, we need to
             // disable the other interrupts (= the ones that did not occur), as
             // soon as this future goes out of scope.
             let int_ena = &T::register_block().int_ena();
@@ -1678,7 +1705,7 @@ mod asynch {
         ///
         /// The interrupts in question are enabled during the body of this
         /// function. The method immediately returns when the interrupt
-        /// has already occured before calling this method (e.g. status
+        /// has already occurred before calling this method (e.g. status
         /// bit set, but interrupt not enabled)
         ///
         /// # Params
