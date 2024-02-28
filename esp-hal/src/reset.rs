@@ -73,8 +73,12 @@ bitflags::bitflags! {
         const ExtEvent1Trig   = 1 << 1;
         /// GPIO wakeup (light sleep only)
         const GpioTrigEn      = 1 << 2;
+        #[cfg(not(any(esp32c6, esp32h2)))]
         /// Timer wakeup
         const TimerTrigEn     = 1 << 3;
+        #[cfg(any(esp32c6, esp32h2))]
+        /// Timer wakeup
+        const TimerTrigEn     = 1 << 4;
         #[cfg(pm_support_wifi_wakeup)]
         /// MAC wakeup (light sleep only)
         const WifiTrigEn      = 1 << 5;

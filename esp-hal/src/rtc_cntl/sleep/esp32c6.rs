@@ -1,6 +1,7 @@
 use core::ops::Not;
 
 use crate::{
+    clock::Clock,
     efuse::Efuse,
     gpio::{Pins, RtcFunction},
     peripherals::Peripherals,
@@ -15,11 +16,43 @@ use crate::{
             RtcCalSel,
             SavedClockConfig,
         },
-        sleep::{Ext1WakeupSource, WakeSource, WakeTriggers, WakeupLevel},
+        sleep::{Ext1WakeupSource, TimerWakeupSource, WakeSource, WakeTriggers, WakeupLevel},
         RtcClock,
     },
     Rtc,
 };
+
+impl WakeSource for TimerWakeupSource {
+    fn apply(&self, rtc: &Rtc, triggers: &mut WakeTriggers, _sleep_config: &mut RtcSleepConfig) {
+        triggers.set_timer(true);
+
+        let lp_timer = unsafe { &*esp32c6::LP_TIMER::ptr() };
+        let clock_freq = RtcClock::get_slow_freq();
+        // TODO: maybe add sleep time adjustlemnt like idf
+        // TODO: maybe add check to prevent overflow?
+        let clock_hz = clock_freq.frequency().to_Hz() as u64;
+        let ticks = self.duration.as_micros() as u64 * clock_hz / 1_000_000u64;
+        // "alarm" time in slow rtc ticks
+        let now = rtc.get_time_raw();
+        let time_in_ticks = now + ticks;
+        unsafe {
+            lp_timer.tar0_high().write(|w| {
+                w.main_timer_tar_high0()
+                    .bits(((time_in_ticks >> 32) & 0xffff) as u16)
+            });
+            lp_timer.tar0_low().write(|w| {
+                w.main_timer_tar_low0()
+                    .bits((time_in_ticks & 0xffffffff) as u32)
+            });
+            lp_timer
+                .int_clr()
+                .write(|w| w.soc_wakeup_int_clr().set_bit());
+            lp_timer
+                .tar0_high()
+                .modify(|_, w| w.main_timer_tar_en0().set_bit());
+        }
+    }
+}
 
 impl Ext1WakeupSource<'_, '_> {
     /// Returns the currently configured wakeup pins.

@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Implement `estimate_xtal_frequency` for ESP32-C6 / ESP32-H2 (#1174)
 - A way to push into I2S DMA buffer via a closure (#1189)
 - Added basic `LP-I2C` driver for C6 (#1185)
+- Ensuring that the random number generator is TRNG. (#1200)
+- ESP32-C6: Add timer wakeup source for deepsleep (#1201)
 - Introduce `InterruptExecutor::spawner()` (#1211)
 
 ### Fixed
@@ -40,6 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix I2C error handling (#1184)
 - Fix circular DMA (#1189)
 - Fix esp32c3 uart initialization (#1156)
+- Fix ESP32-S2 I2C read (#1214)
+- Reset/init UART if it's not the console UART (#1213)
 
 ### Changed
 

@@ -13,7 +13,7 @@ pub fn run(args: &[String], cwd: &Path) -> Result<()> {
         bail!("The `cwd` argument MUST be a directory");
     }
 
-    let status = Command::new("cargo")
+    let status = Command::new(get_cargo())
         .args(args)
         .current_dir(cwd)
         .stdout(Stdio::piped())
@@ -27,6 +27,37 @@ pub fn run(args: &[String], cwd: &Path) -> Result<()> {
     } else {
         bail!("Failed to execute cargo subcommand")
     }
+}
+
+/// Execute cargo with the given arguments and from the specified directory.
+pub fn run_with_input(args: &[String], cwd: &Path) -> Result<()> {
+    if !cwd.is_dir() {
+        bail!("The `cwd` argument MUST be a directory");
+    }
+
+    let _status = Command::new(get_cargo())
+        .args(args)
+        .current_dir(cwd)
+        .stdout(std::process::Stdio::inherit())
+        .stderr(std::process::Stdio::inherit())
+        .stdin(std::process::Stdio::inherit())
+        .status()?;
+
+    Ok(())
+}
+
+fn get_cargo() -> String {
+    #[cfg(target_os = "windows")]
+    let cargo = if let Ok(cargo) = std::env::var("CARGO_HOME") {
+        format!("{cargo}/bin/cargo")
+    } else {
+        String::from("cargo")
+    };
+
+    #[cfg(not(target_os = "windows"))]
+    let cargo = String::from("cargo");
+
+    cargo
 }
 
 #[derive(Debug, Default)]
