@@ -67,8 +67,6 @@ use core::{convert::Infallible, marker::PhantomData};
 
 use rand_core::{CryptoRng, RngCore};
 
-#[cfg(not(esp32p4))]
-use crate::soc::trng::ensure_randomness;
 use crate::{peripheral::Peripheral, peripherals::RNG};
 
 /// Random number generator driver
@@ -81,7 +79,7 @@ impl Rng {
     /// Create a new random number generator instance
     pub fn new(_rng: impl Peripheral<P = RNG>) -> Self {
         #[cfg(not(esp32p4))]
-        ensure_randomness();
+        crate::soc::trng::ensure_randomness();
 
         Self {
             _phantom: PhantomData,
