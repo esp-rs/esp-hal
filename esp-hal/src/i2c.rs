@@ -1566,7 +1566,7 @@ fn read_fifo(register_block: &RegisterBlock) -> u8 {
     } else {
         0x6002701c
     }) as *mut u32;
-    unsafe { (fifo_ptr.read() & 0xff) as u8 }
+    unsafe { (fifo_ptr.read_volatile() & 0xff) as u8 }
 }
 
 #[cfg(esp32)]
