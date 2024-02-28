@@ -40,22 +40,22 @@ For information about the HAL and how to use it in your own projects, please ref
 
 ### [esp-hal]
 
-Implements number of the traits defined in [embedded-hal](https://github.com/rust-embedded/embedded-hal) for varius ESP devices. Full list of currently supported devices with basic information is in the table below.
+Implements number of the traits defined in [embedded-hal](https://github.com/rust-embedded/embedded-hal) for various ESP devices. Full list of currently supported devices with basic information is in the table below.
 
 |   Feature     | Technical Reference Manual |             Target              |    MSRV    |
 | :-----------: | :------------------------: | :-----------------------------: | :--------: |
 | `esp32`       |           [ESP32]          |     `xtensa-esp32-none-elf`     |   ![esp]   |
-| `esp32c2`     |         [ESP32-C2]         |  `riscv32imc-unknown-none-elf`  | ![nightly] |
-| `esp32c3`     |         [ESP32-C3]         |  `riscv32imc-unknown-none-elf`  | ![nightly] |
-| `esp32c6`     |         [ESP32-C6]         | `riscv32imac-unknown-none-elf`  | ![nightly] |
-| `esp32h2`     |         [ESP32-H2]         | `riscv32imac-unknown-none-elf`  | ![nightly] |
-| `esp32p4`     |         [ESP32-P4]         | `riscv32imafc-unknown-none-elf` | ![nightly] |
+| `esp32c2`     |         [ESP32-C2]         |  `riscv32imc-unknown-none-elf`  | ![stable] |
+| `esp32c3`     |         [ESP32-C3]         |  `riscv32imc-unknown-none-elf`  | ![stable] |
+| `esp32c6`     |         [ESP32-C6]         | `riscv32imac-unknown-none-elf`  | ![stable] |
+| `esp32h2`     |         [ESP32-H2]         | `riscv32imac-unknown-none-elf`  | ![stable] |
+| `esp32p4`     |         [ESP32-P4]         | `riscv32imafc-unknown-none-elf` | ![stable] |
 | `esp32s2`     |         [ESP32-S2]         |    `xtensa-esp32s2-none-elf`    |   ![esp]   |
 | `esp32s3`     |         [ESP32-S3]         |    `xtensa-esp32s3-none-elf`    |   ![esp]   |
 
 [esp-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp-hal
 [esp]: https://img.shields.io/badge/rustc-esp%201.74+-red.svg
-[nightly]: https://img.shields.io/badge/rustc-nightly%202023/11/30+-red.svg
+[stable]: https://img.shields.io/badge/rustc-stable%201.76+-red.svg
 [esp32]: https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf
 [esp32-c2]: https://www.espressif.com/sites/default/files/documentation/esp8684_technical_reference_manual_en.pdf
 [esp32-c3]: https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf
@@ -67,7 +67,7 @@ Implements number of the traits defined in [embedded-hal](https://github.com/rus
 
 ### [esp-lp-hal]
 
-Implements a number of the traits defined in [embedded-hal](https://github.com/rust-embedded/embedded-hal) for the low-power RISC-V coprocessors found on the ESP32-C6, ESP32-S2, and ESP32-S3 from Espressif.
+Implements a number of the traits defined in [embedded-hal](https://github.com/rust-embedded/embedded-hal) for the low-power (lp) RISC-V coprocessors found on the ESP32-C6, ESP32-S2, and ESP32-S3 from Espressif. The main idea is to have code running on lp core and putting the main core into sleep, making it more power-effecient.
 
 
 |    Crate     |       Documentation       |                            Targets                            |
