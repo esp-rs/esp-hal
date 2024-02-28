@@ -131,7 +131,7 @@ pub fn build_documentation(
     open: bool,
 ) -> Result<()> {
     let package_name = package.to_string();
-    let package_path = workspace.join(&package_name);
+    let package_path = windows_safe_path(&workspace.join(&package_name));
 
     log::info!("Building '{package_name}' documentation targeting '{chip}'");
 
@@ -144,6 +144,11 @@ pub fn build_documentation(
 
     if open {
         builder = builder.arg("--open");
+    }
+
+    // If targeting an Xtensa device, we must use the '+esp' toolchain modifier:
+    if target.starts_with("xtensa") {
+        builder = builder.toolchain("esp");
     }
 
     let args = builder.build();
@@ -160,7 +165,7 @@ pub fn load_examples(path: &Path) -> Result<Vec<Metadata>> {
     let mut examples = Vec::new();
 
     for entry in fs::read_dir(path)? {
-        let path = entry?.path();
+        let path = windows_safe_path(&entry?.path());
         let text = fs::read_to_string(&path)?;
 
         let mut chips = Vec::new();
@@ -254,6 +259,55 @@ pub fn build_example(
     Ok(())
 }
 
+/// Run the specified example for the specified chip.
+pub fn run_example(
+    package_path: &Path,
+    chip: Chip,
+    target: &str,
+    example: &Metadata,
+) -> Result<()> {
+    log::info!(
+        "Building example '{}' for '{}'",
+        example.example_path().display(),
+        chip
+    );
+    if !example.features().is_empty() {
+        log::info!("  Features: {}", example.features().join(","));
+    }
+
+    let bin = if example
+        .example_path()
+        .strip_prefix(package_path)?
+        .starts_with("src/bin")
+    {
+        format!("--bin={}", example.name())
+    } else {
+        format!("--example={}", example.name())
+    };
+
+    let mut features = example.features().to_vec();
+    features.push(chip.to_string());
+
+    let mut builder = CargoArgsBuilder::default()
+        .subcommand("run")
+        .arg("-Zbuild-std=alloc,core")
+        .arg("--release")
+        .target(target)
+        .features(&features)
+        .arg(bin);
+
+    // If targeting an Xtensa device, we must use the '+esp' toolchain modifier:
+    if target.starts_with("xtensa") {
+        builder = builder.toolchain("esp");
+    }
+
+    let args = builder.build();
+    log::debug!("{args:#?}");
+
+    cargo::run_with_input(&args, package_path)?;
+    Ok(())
+}
+
 /// Build the specified package, using the given toolchain/target/features if
 /// provided.
 pub fn build_package(
@@ -331,4 +385,9 @@ pub fn bump_version(workspace: &Path, package: Package, amount: Version) -> Resu
     fs::write(manifest_path, manifest.to_string())?;
 
     Ok(())
+}
+
+/// Make the path "Windows"-safe
+pub fn windows_safe_path(path: &Path) -> PathBuf {
+    PathBuf::from(path.to_str().unwrap().to_string().replace("\\\\?\\", ""))
 }
