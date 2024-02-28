@@ -448,7 +448,7 @@ where
 
 impl<'d, T> Uart<'d, T>
 where
-    T: Instance,
+    T: Instance + 'd,
 {
     /// Create a new UART instance with defaults
     pub fn new_with_config<P>(
@@ -915,22 +915,7 @@ where
 
         // initialize peripheral by setting clk_enable and clearing uart_reset bits
         T::enable_peripheral();
-
-        // don't reset the console UART - this will cause trouble at least on ESP32-S3
-        // ideally this should be configurable once we have a solution for https://github.com/esp-rs/esp-hal/issues/1111
-        // see https://github.com/espressif/esp-idf/blob/5f4249357372f209fdd57288265741aaba21a2b1/components/esp_driver_uart/src/uart.c#L179
-        if T::uart_number() != CONSOLE_UART_NUM {
-            T::register_block()
-                .clk_conf()
-                .modify(|_, w| w.rst_core().set_bit());
-
-            // reset peripheral
-            T::reset_peripheral();
-
-            T::register_block()
-                .clk_conf()
-                .modify(|_, w| w.rst_core().clear_bit());
-        }
+        Self::uart_peripheral_reset();
         T::disable_rx_interrupts();
         T::disable_tx_interrupts();
     }
@@ -944,23 +929,7 @@ where
 
         // initialize peripheral by setting clk_enable and clearing uart_reset bits
         T::enable_peripheral();
-
-        // don't reset the console UART - this will cause trouble at least on ESP32-S3
-        // ideally this should be configurable once we have a solution for https://github.com/esp-rs/esp-hal/issues/1111
-        // see https://github.com/espressif/esp-idf/blob/5f4249357372f209fdd57288265741aaba21a2b1/components/esp_driver_uart/src/uart.c#L179
-        if T::uart_number() != CONSOLE_UART_NUM {
-            T::register_block()
-                .clk_conf()
-                .modify(|_, w| w.rst_core().set_bit());
-
-            // reset peripheral
-            T::reset_peripheral();
-
-            T::register_block()
-                .clk_conf()
-                .modify(|_, w| w.rst_core().clear_bit());
-        }
-
+        Self::uart_peripheral_reset();
         T::disable_rx_interrupts();
         T::disable_tx_interrupts();
     }
@@ -969,16 +938,37 @@ where
     #[inline(always)]
     fn init() {
         T::enable_peripheral();
-
-        // don't reset the console UART - this will cause trouble at least on ESP32-S3
-        // ideally this should be configurable once we have a solution for https://github.com/esp-rs/esp-hal/issues/1111
-        // see https://github.com/espressif/esp-idf/blob/5f4249357372f209fdd57288265741aaba21a2b1/components/esp_driver_uart/src/uart.c#L179
-        if T::uart_number() != CONSOLE_UART_NUM {
-            T::reset_peripheral();
-        }
-
+        Self::uart_peripheral_reset();
         T::disable_rx_interrupts();
         T::disable_tx_interrupts();
+    }
+
+    #[inline(always)]
+    fn uart_peripheral_reset() {
+        // don't reset the console UART - this will cause trouble (i.e. the UART will
+        // start to transmit garbage)
+        //
+        // We should only reset the console UART if it was absolutely unused before.
+        // Apparently the bootloader (and maybe the ROM code) writing to the UART is
+        // already enough to make this a no-go. (i.e. one needs to mute the ROM
+        // code via efuse / strapping pin AND use a silent bootloader)
+        //
+        // Ideally this should be configurable once we have a solution for https://github.com/esp-rs/esp-hal/issues/1111
+        // see https://github.com/espressif/esp-idf/blob/5f4249357372f209fdd57288265741aaba21a2b1/components/esp_driver_uart/src/uart.c#L179
+        if T::uart_number() != CONSOLE_UART_NUM {
+            #[cfg(not(any(esp32, esp32s2)))]
+            T::register_block()
+                .clk_conf()
+                .modify(|_, w| w.rst_core().set_bit());
+
+            // reset peripheral
+            T::reset_peripheral();
+
+            #[cfg(not(any(esp32, esp32s2)))]
+            T::register_block()
+                .clk_conf()
+                .modify(|_, w| w.rst_core().clear_bit());
+        }
     }
 
     #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))] // TODO introduce a cfg symbol for this
