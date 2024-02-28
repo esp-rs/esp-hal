@@ -67,7 +67,7 @@ Implements number of the traits defined in [embedded-hal](https://github.com/rus
 
 ### [esp-lp-hal]
 
-Implements a number of the traits defined in [embedded-hal](https://github.com/rust-embedded/embedded-hal) for the low-power (lp) RISC-V coprocessors found on the ESP32-C6, ESP32-S2, and ESP32-S3 from Espressif. The main idea is to have code running on lp core and putting the main core into sleep, making it more power-effecient.
+Implements a number of the traits defined in [embedded-hal](https://github.com/rust-embedded/embedded-hal) for the low-power (lp) RISC-V coprocessors found on the ESP32-C6, ESP32-S2, and ESP32-S3 from Espressif. The main idea is to have code running on lp core and putting the main core into sleep, making it more power-efficient.
 
 
 |    Crate     |       Documentation       |                            Targets                            |
