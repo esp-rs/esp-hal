@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix I2C error handling (#1184)
 - Fix circular DMA (#1189)
 - Fix esp32c3 uart initialization (#1156)
+- Fix ESP32-S2 I2C read (#1214)
 
 ### Changed
 
