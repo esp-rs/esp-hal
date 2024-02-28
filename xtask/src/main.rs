@@ -196,8 +196,13 @@ fn run_example(workspace: &Path, mut args: RunExampleArgs) -> Result<()> {
         .iter()
         // Filter down the examples to only those for which the specified chip is supported:
         .filter(|example| example.supports_chip(args.chip))
-        .find(|example| example.name() == args.example)
-        .map(|example| example.clone());
+        .find_map(|example| {
+            if example.name() == args.example {
+                Some(example.clone())
+            } else {
+                None
+            }
+        });
 
     if let Some(example) = example {
         xtask::run_example(&package_path, args.chip, target, &example)?;
