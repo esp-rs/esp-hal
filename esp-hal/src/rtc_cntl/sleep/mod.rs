@@ -21,7 +21,7 @@
 //!    * `BT (Bluetooth) wake` - light sleep only
 
 use core::cell::RefCell;
-#[cfg(any(esp32, esp32c3, esp32s3))]
+#[cfg(any(esp32, esp32c3, esp32s3, esp32c6))]
 use core::time::Duration;
 
 #[cfg(any(esp32, esp32s3))]
@@ -46,12 +46,12 @@ pub enum WakeupLevel {
 }
 
 #[derive(Debug, Default, Clone, Copy)]
-#[cfg(any(esp32, esp32c3, esp32s3))]
+#[cfg(any(esp32, esp32c3, esp32s3, esp32c6))]
 pub struct TimerWakeupSource {
     duration: Duration,
 }
 
-#[cfg(any(esp32, esp32c3, esp32s3))]
+#[cfg(any(esp32, esp32c3, esp32s3, esp32c6))]
 impl TimerWakeupSource {
     pub fn new(duration: Duration) -> Self {
         Self { duration }
