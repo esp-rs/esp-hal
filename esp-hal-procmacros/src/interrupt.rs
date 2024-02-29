@@ -1,4 +1,4 @@
-use proc_macro::{self, TokenStream};
+use proc_macro::TokenStream;
 use syn::{parse::Error, spanned::Spanned, AttrStyle, Attribute};
 
 pub(crate) enum WhiteListCaller {
