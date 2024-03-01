@@ -22,7 +22,12 @@
 //!
 //! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
 
+#[cfg(feature = "async")]
+use core::cell::RefCell;
 use core::{convert::Infallible, marker::PhantomData};
+
+#[cfg(feature = "async")]
+use critical_section::Mutex;
 
 #[cfg(any(adc, dac))]
 pub(crate) use crate::analog;
@@ -37,6 +42,10 @@ pub type NoPinType = Gpio0<Unknown>;
 
 /// Convenience constant for `Option::None` pin
 pub const NO_PIN: Option<NoPinType> = None;
+
+#[cfg(feature = "async")]
+static USER_INTERRUPT_HANDLER: Mutex<RefCell<Option<unsafe extern "C" fn()>>> =
+    Mutex::new(RefCell::new(None));
 
 #[derive(Copy, Clone)]
 pub enum Event {
@@ -1854,6 +1863,29 @@ impl IO {
             pins,
         }
     }
+
+    /// Install the given interrupt handler replacing any previously set
+    /// handler.
+    ///
+    /// When the async feature is enabled the handler will be called first and
+    /// the internal async handler will run after. In that case it's
+    /// important to not reset the interrupt status when mixing sync and
+    /// async (i.e. using async wait) interrupt handling.
+    pub fn set_interrupt_handler(&mut self, handler: unsafe extern "C" fn() -> ()) {
+        critical_section::with(|_cs| {
+            #[cfg(feature = "async")]
+            USER_INTERRUPT_HANDLER.replace(_cs, Some(handler));
+
+            #[cfg(not(feature = "async"))]
+            {
+                let mut gpio = unsafe { crate::peripherals::GPIO::steal() };
+                #[cfg(not(esp32p4))]
+                gpio.bind_gpio_interrupt(handler);
+                #[cfg(esp32p4)]
+                gpio.bind_gpio_int0_interrupt(handler);
+            }
+        });
+    }
 }
 
 pub trait GpioProperties {
@@ -3153,6 +3185,14 @@ mod asynch {
     #[interrupt]
     unsafe fn GPIO() {
         handle_gpio_interrupt();
+
+        if let Some(user_handler) = critical_section::with(|cs| {
+            USER_INTERRUPT_HANDLER.borrow_ref(cs).clone();
+        }) {
+            unsafe {
+                user_handler();
+            }
+        }
     }
 
     #[cfg(esp32p4)]
