@@ -36,14 +36,6 @@ const I2C_SARADC_SAR1_INIT_CODE_LSB: u8 = 3;
 const I2C_SARADC_SAR1_INIT_CODE_LSB_MSB: u8 = 7;
 const I2C_SARADC_SAR1_INIT_CODE_LSB_LSB: u8 = 0;
 
-const DTEST_RTC_MSB: u8 = 1;
-const DTEST_RTC_LSB: u8 = 0;
-const ENT_RTC_MSB: u8 = 3;
-const ENT_RTC_LSB: u8 = 3;
-const SARADC1_ENCAL_REF_MSB: u8 = 4;
-const SARADC1_ENCAL_REF_LSB: u8 = 4;
-const SARADC2_ENCAL_REF_MSB: u8 = 6;
-const SARADC2_ENCAL_REF_LSB: u8 = 6;
 const SAR2_CHANNEL: u32 = 9;
 const SAR2_ATTEN: u32 = 1;
 const SAR1_ATTEN: u32 = 1;
@@ -195,7 +187,7 @@ pub(crate) fn ensure_randomness() {
     let pattern_one: u32 = (SAR2_CHANNEL << 2) | SAR2_ATTEN; // we want channel 9 with max attenuation
     let pattern_two: u32 = SAR1_ATTEN; // we want channel 0 with max attenuation, channel doesn't really matter here
     let pattern_table: u32 =
-        0 | (pattern_two << 3 * PATTERN_BIT_WIDTH) | pattern_one << 2 * PATTERN_BIT_WIDTH;
+        (pattern_two << (3 * PATTERN_BIT_WIDTH)) | (pattern_one << (2 * PATTERN_BIT_WIDTH));
     reg_write(APB_SARADC_SAR_PATT_TAB1_REG, pattern_table);
 
     // set pattern length to 2 (APB_SARADC_SAR_PATT_LEN counts from 0)

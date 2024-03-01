@@ -200,7 +200,7 @@ pub(crate) fn ensure_randomness() {
     let pattern_one: u32 = (SAR2_CHANNEL << 2) | SAR2_ATTEN; // we want channel 9 with max attenuation
     let pattern_two: u32 = SAR1_ATTEN; // we want channel 0 with max attenuation, channel doesn't really matter here
     let pattern_table: u32 =
-        0 | (pattern_two << 3 * PATTERN_BIT_WIDTH) | pattern_one << 2 * PATTERN_BIT_WIDTH;
+        (pattern_two << (3 * PATTERN_BIT_WIDTH)) | (pattern_one << (2 * PATTERN_BIT_WIDTH));
 
     reg_write(APB_SARADC_SAR_PATT_TAB1_REG, pattern_table);
 

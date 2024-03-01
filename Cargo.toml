@@ -7,13 +7,5 @@ exclude  = [
     "esp-hal-smartled",
     "esp-lp-hal",
     "esp-riscv-rt",
-    "esp32-hal",
-    "esp32c2-hal",
-    "esp32c3-hal",
-    "esp32c6-hal",
-    "esp32h2-hal",
-    "esp32p4-hal",
-    "esp32s2-hal",
-    "esp32s3-hal",
     "examples",
 ]
