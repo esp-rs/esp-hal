@@ -3,10 +3,10 @@
 //! These are acceptance filters that limit which packets are received by the
 //! TWAI peripheral.
 
-#[cfg(feature = "eh1")]
+#[cfg(feature = "embedded-hal")]
 use embedded_can::{ExtendedId, StandardId};
-#[cfg(not(feature = "eh1"))]
-use embedded_hal::can::{ExtendedId, StandardId};
+#[cfg(not(feature = "embedded-hal"))] // FIXME
+use embedded_hal_02::can::{ExtendedId, StandardId};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum FilterType {

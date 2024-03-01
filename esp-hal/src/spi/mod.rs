@@ -27,10 +27,10 @@ impl From<DmaError> for Error {
     }
 }
 
-#[cfg(feature = "eh1")]
-impl embedded_hal_1::spi::Error for Error {
-    fn kind(&self) -> embedded_hal_1::spi::ErrorKind {
-        embedded_hal_1::spi::ErrorKind::Other
+#[cfg(feature = "embedded-hal")]
+impl embedded_hal::spi::Error for Error {
+    fn kind(&self) -> embedded_hal::spi::ErrorKind {
+        embedded_hal::spi::ErrorKind::Other
     }
 }
 

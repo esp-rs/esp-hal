@@ -65,7 +65,7 @@ pub enum Error {
     RxFifoOvf,
 }
 
-#[cfg(feature = "eh1")]
+#[cfg(feature = "embedded-hal")]
 impl embedded_hal_nb::serial::Error for Error {
     fn kind(&self) -> embedded_hal_nb::serial::ErrorKind {
         embedded_hal_nb::serial::ErrorKind::Other
@@ -730,17 +730,17 @@ where
             .write(|w| w.rxfifo_full_int_clr().set_bit());
     }
 
-    #[cfg(feature = "eh1")]
+    #[cfg(feature = "embedded-hal")]
     fn write_byte(&mut self, word: u8) -> nb::Result<(), Error> {
         self.tx.write_byte(word)
     }
 
-    #[cfg(feature = "eh1")]
+    #[cfg(feature = "embedded-hal")]
     fn flush_tx(&self) -> nb::Result<(), Error> {
         self.tx.flush_tx()
     }
 
-    #[cfg(feature = "eh1")]
+    #[cfg(feature = "embedded-hal")]
     fn read_byte(&mut self) -> nb::Result<u8, Error> {
         self.rx.read_byte()
     }
@@ -1230,7 +1230,8 @@ where
     }
 }
 
-impl<T> embedded_hal::serial::Write<u8> for Uart<'_, T>
+#[cfg(feature = "embedded-hal-02")]
+impl<T> embedded_hal_02::serial::Write<u8> for Uart<'_, T>
 where
     T: Instance,
 {
@@ -1245,7 +1246,8 @@ where
     }
 }
 
-impl<T> embedded_hal::serial::Write<u8> for UartTx<'_, T>
+#[cfg(feature = "embedded-hal-02")]
+impl<T> embedded_hal_02::serial::Write<u8> for UartTx<'_, T>
 where
     T: Instance,
 {
@@ -1260,7 +1262,8 @@ where
     }
 }
 
-impl<T> embedded_hal::serial::Read<u8> for Uart<'_, T>
+#[cfg(feature = "embedded-hal-02")]
+impl<T> embedded_hal_02::serial::Read<u8> for Uart<'_, T>
 where
     T: Instance,
 {
@@ -1271,7 +1274,8 @@ where
     }
 }
 
-impl<T> embedded_hal::serial::Read<u8> for UartRx<'_, T>
+#[cfg(feature = "embedded-hal-02")]
+impl<T> embedded_hal_02::serial::Read<u8> for UartRx<'_, T>
 where
     T: Instance,
 {
@@ -1282,22 +1286,22 @@ where
     }
 }
 
-#[cfg(feature = "eh1")]
+#[cfg(feature = "embedded-hal")]
 impl<T> embedded_hal_nb::serial::ErrorType for Uart<'_, T> {
     type Error = Error;
 }
 
-#[cfg(feature = "eh1")]
+#[cfg(feature = "embedded-hal")]
 impl<T> embedded_hal_nb::serial::ErrorType for UartTx<'_, T> {
     type Error = Error;
 }
 
-#[cfg(feature = "eh1")]
+#[cfg(feature = "embedded-hal")]
 impl<T> embedded_hal_nb::serial::ErrorType for UartRx<'_, T> {
     type Error = Error;
 }
 
-#[cfg(feature = "eh1")]
+#[cfg(feature = "embedded-hal")]
 impl<T> embedded_hal_nb::serial::Read for Uart<'_, T>
 where
     T: Instance,
@@ -1307,7 +1311,7 @@ where
     }
 }
 
-#[cfg(feature = "eh1")]
+#[cfg(feature = "embedded-hal")]
 impl<T> embedded_hal_nb::serial::Read for UartRx<'_, T>
 where
     T: Instance,
@@ -1317,7 +1321,7 @@ where
     }
 }
 
-#[cfg(feature = "eh1")]
+#[cfg(feature = "embedded-hal")]
 impl<T> embedded_hal_nb::serial::Write for Uart<'_, T>
 where
     T: Instance,
@@ -1331,7 +1335,7 @@ where
     }
 }
 
-#[cfg(feature = "eh1")]
+#[cfg(feature = "embedded-hal")]
 impl<T> embedded_hal_nb::serial::Write for UartTx<'_, T>
 where
     T: Instance,

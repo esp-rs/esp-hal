@@ -18,9 +18,9 @@
 //! delay.delay_ms(1000 as u32);
 //! ```
 //!
-//! [DelayMs]: embedded_hal::blocking::delay::DelayMs
-//! [DelayUs]: embedded_hal::blocking::delay::DelayUs
-//! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
+//! [DelayMs]: embedded_hal_02::blocking::delay::DelayMs
+//! [DelayUs]: embedded_hal_02::blocking::delay::DelayUs
+//! [embedded-hal]: https://docs.rs/embedded-hal/0.2.7/embedded_hal/index.html
 
 use fugit::HertzU64;
 
@@ -33,7 +33,17 @@ pub struct Delay {
     freq: HertzU64,
 }
 
-impl<T> embedded_hal::blocking::delay::DelayMs<T> for Delay
+impl Delay {
+    /// Delay for the specified number of milliseconds
+    pub fn delay_millis(&self, ms: u32) {
+        for _ in 0..ms {
+            self.delay_micros(1000u32);
+        }
+    }
+}
+
+#[cfg(feature = "embedded-hal-02")]
+impl<T> embedded_hal_02::blocking::delay::DelayMs<T> for Delay
 where
     T: Into<u32>,
 {
@@ -44,7 +54,8 @@ where
     }
 }
 
-impl<T> embedded_hal::blocking::delay::DelayUs<T> for Delay
+#[cfg(feature = "embedded-hal-02")]
+impl<T> embedded_hal_02::blocking::delay::DelayUs<T> for Delay
 where
     T: Into<u32>,
 {
@@ -53,8 +64,8 @@ where
     }
 }
 
-#[cfg(feature = "eh1")]
-impl embedded_hal_1::delay::DelayNs for Delay {
+#[cfg(feature = "embedded-hal")]
+impl embedded_hal::delay::DelayNs for Delay {
     fn delay_ns(&mut self, ns: u32) {
         self.delay_nanos(ns);
     }
