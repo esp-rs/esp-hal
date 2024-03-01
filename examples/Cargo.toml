@@ -70,3 +70,13 @@ psram-2m  = ["esp-hal/psram-2m"]
 
 [profile.release]
 debug = true
+
+[patch.crates-io]
+esp32 =   { git = "https://github.com/esp-rs/esp-pacs", rev = "35de99f1843abe2b7eaaa2c9246bd49f82f18d0f" }
+esp32s2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "35de99f1843abe2b7eaaa2c9246bd49f82f18d0f" }
+esp32s3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "35de99f1843abe2b7eaaa2c9246bd49f82f18d0f" }
+esp32c2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "35de99f1843abe2b7eaaa2c9246bd49f82f18d0f" }
+esp32c3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "35de99f1843abe2b7eaaa2c9246bd49f82f18d0f" }
+esp32c6 = { git = "https://github.com/esp-rs/esp-pacs", rev = "35de99f1843abe2b7eaaa2c9246bd49f82f18d0f" }
+esp32h2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "35de99f1843abe2b7eaaa2c9246bd49f82f18d0f" }
+esp32p4 = { git = "https://github.com/esp-rs/esp-pacs", rev = "35de99f1843abe2b7eaaa2c9246bd49f82f18d0f" }
