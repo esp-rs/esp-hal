@@ -3186,9 +3186,9 @@ mod asynch {
     unsafe fn GPIO() {
         handle_gpio_interrupt();
 
-        if let Some(user_handler) = critical_section::with(|cs| {
-            USER_INTERRUPT_HANDLER.borrow_ref(cs).clone();
-        }) {
+        if let Some(user_handler) =
+            critical_section::with(|cs| USER_INTERRUPT_HANDLER.borrow_ref(cs).clone())
+        {
             unsafe {
                 user_handler();
             }
