@@ -40,6 +40,7 @@ use core::{fmt::Formatter, mem::size_of};
 use embedded_dma::ReadBuffer;
 use fugit::HertzU32;
 
+use super::BusWidth;
 use crate::{
     clock::Clocks,
     dma::{
@@ -62,13 +63,21 @@ use crate::{
         Lcd,
     },
     peripheral::{Peripheral, PeripheralRef},
-    peripherals::LCD_CAM,
 };
 
 pub struct I8080<'d, TX, P> {
-    lcd_cam: PeripheralRef<'d, LCD_CAM>,
+    lcd: Lcd<'d>,
     tx_channel: TX,
     _pins: P,
+}
+
+impl<'d, TX, P: TxPins> I8080<'d, TX, P> {
+    const fn bus_width() -> BusWidth {
+        match size_of::<P::Word>() {
+            2 => BusWidth::Bit16,
+            _ => BusWidth::Bit8,
+        }
+    }
 }
 
 impl<'d, T, R, P: TxPins> I8080<'d, ChannelTx<'d, T, R>, P>
@@ -86,10 +95,6 @@ where
         config: Config,
         clocks: &Clocks,
     ) -> Self {
-        let is_2byte_mode = size_of::<P::Word>() == 2;
-
-        let lcd_cam = lcd.lcd_cam;
-
         // Due to https://www.espressif.com/sites/default/files/documentation/esp32-s3_errata_en.pdf
         // the LCD_PCLK divider must be at least 2. To make up for this the user
         // provided frequency is doubled to match.
@@ -103,7 +108,7 @@ where
             ],
         );
 
-        lcd_cam.lcd_clock().write(|w| {
+        lcd.lcd_cam.lcd_clock().write(|w| {
             // Force enable the clock for all configuration registers.
             w.clk_en()
                 .set_bit()
@@ -126,24 +131,12 @@ where
                 .bit(config.clock_mode.phase == Phase::ShiftHigh)
         });
 
-        lcd_cam
-            .lcd_ctrl()
-            .write(|w| w.lcd_rgb_mode_en().clear_bit());
-        lcd_cam
-            .lcd_rgb_yuv()
-            .write(|w| w.lcd_conv_bypass().clear_bit());
+        lcd.set_bus_mode(super::BusMode::I8080);
+        lcd.enable_rgb_yuv_converter(false);
+        lcd.set_bit_order(BitOrder::default());
+        lcd.set_width_and_byte_order(Self::bus_width(), Default::default());
 
-        lcd_cam.lcd_user().modify(|_, w| {
-            w.lcd_8bits_order()
-                .bit(false)
-                .lcd_bit_order()
-                .bit(false)
-                .lcd_byte_order()
-                .bit(false)
-                .lcd_2byte_en()
-                .bit(is_2byte_mode)
-        });
-        lcd_cam.lcd_misc().write(|w| {
+        lcd.lcd_cam.lcd_misc().write(|w| {
             // Set the threshold for Async Tx FIFO full event. (5 bits)
             w.lcd_afifo_threshold_num()
                 .variant(0)
@@ -178,10 +171,8 @@ where
                 .lcd_cd_idle_edge()
                 .bit(config.cd_idle_edge)
         });
-        lcd_cam
-            .lcd_dly_mode()
-            .write(|w| w.lcd_cd_mode().variant(config.cd_mode as u8));
-        lcd_cam.lcd_data_dout_mode().write(|w| {
+        lcd.set_dc_delay_ticks(config.cd_mode);
+        lcd.lcd_cam.lcd_data_dout_mode().write(|w| {
             w.dout0_mode()
                 .variant(config.output_bit_mode as u8)
                 .dout1_mode()
@@ -216,13 +207,15 @@ where
                 .variant(config.output_bit_mode as u8)
         });
 
-        lcd_cam.lcd_user().modify(|_, w| w.lcd_update().set_bit());
+        lcd.lcd_cam
+            .lcd_user()
+            .modify(|_, w| w.lcd_update().set_bit());
 
         channel.init_channel();
         pins.configure();
 
         Self {
-            lcd_cam,
+            lcd,
             tx_channel: channel,
             _pins: pins,
         }
@@ -233,22 +226,13 @@ impl<'d, TX: Tx, P: TxPins> I8080<'d, TX, P>
 where
     P::Word: Into<u16>,
 {
-    pub fn set_byte_order(&mut self, byte_order: ByteOrder) -> &mut Self {
-        let is_inverted = byte_order != ByteOrder::default();
-        self.lcd_cam.lcd_user().modify(|_, w| {
-            if size_of::<P::Word>() == 2 {
-                w.lcd_byte_order().bit(is_inverted)
-            } else {
-                w.lcd_8bits_order().bit(is_inverted)
-            }
-        });
+    pub fn set_byte_order(&mut self, order: ByteOrder) -> &mut Self {
+        self.lcd.set_width_and_byte_order(Self::bus_width(), order);
         self
     }
 
-    pub fn set_bit_order(&mut self, bit_order: BitOrder) -> &mut Self {
-        self.lcd_cam
-            .lcd_user()
-            .modify(|_, w| w.lcd_bit_order().bit(bit_order != BitOrder::default()));
+    pub fn set_bit_order(&mut self, order: BitOrder) -> &mut Self {
+        self.lcd.set_bit_order(order);
         self
     }
 
@@ -287,7 +271,7 @@ where
         self.start_write_bytes_dma(data.as_ptr() as _, core::mem::size_of_val(data))?;
         self.start_send();
 
-        let dma_int_raw = self.lcd_cam.lc_dma_int_raw();
+        let dma_int_raw = self.lcd.lcd_cam.lc_dma_int_raw();
         // Wait until LCD_TRANS_DONE is set.
         while dma_int_raw.read().lcd_trans_done_int_raw().bit_is_clear() {}
 
@@ -321,71 +305,36 @@ where
 impl<'d, TX: Tx, P> I8080<'d, TX, P> {
     fn setup_send<T: Copy + Into<u16>>(&mut self, cmd: Command<T>, dummy: u8) {
         // Reset LCD control unit and Async Tx FIFO
-        self.lcd_cam
-            .lcd_user()
-            .modify(|_, w| w.lcd_reset().set_bit());
-        self.lcd_cam
-            .lcd_misc()
-            .modify(|_, w| w.lcd_afifo_reset().set_bit());
+        self.lcd.reset();
+        self.lcd.fifo_reset();
 
-        // Set cmd value
-        match cmd {
-            Command::None => {
-                self.lcd_cam
-                    .lcd_user()
-                    .modify(|_, w| w.lcd_cmd().clear_bit());
-            }
-            Command::One(value) => {
-                self.lcd_cam
-                    .lcd_user()
-                    .modify(|_, w| w.lcd_cmd().set_bit().lcd_cmd_2_cycle_en().clear_bit());
-                self.lcd_cam
-                    .lcd_cmd_val()
-                    .write(|w| w.lcd_cmd_value().variant(value.into() as _));
-            }
-            Command::Two(first, second) => {
-                self.lcd_cam
-                    .lcd_user()
-                    .modify(|_, w| w.lcd_cmd().set_bit().lcd_cmd_2_cycle_en().set_bit());
-                let cmd = first.into() as u32 | (second.into() as u32) << 16;
-                self.lcd_cam
-                    .lcd_cmd_val()
-                    .write(|w| w.lcd_cmd_value().variant(cmd));
-            }
-        }
+        // specify cmd value and new phase cycle configuration
+        let (cmd_value, cmd_cycles) = match cmd {
+            Command::None => (0, 0),
+            Command::One(value) => (value.into() as u32, 1),
+            Command::Two(first, second) => (first.into() as u32 | (second.into() as u32) << 16, 2),
+        };
 
-        // Set dummy length
-        self.lcd_cam.lcd_user().modify(|_, w| {
-            if dummy > 0 {
-                // Enable DUMMY phase in LCD sequence when LCD starts.
-                w.lcd_dummy()
-                    .set_bit()
-                    // Configure DUMMY cycles. DUMMY cycles = this value + 1. (2 bits)
-                    .lcd_dummy_cyclelen()
-                    .variant((dummy - 1) as _)
-            } else {
-                w.lcd_dummy().clear_bit()
-            }
-        });
+        self.lcd.set_command_raw(cmd_value);
+        self.lcd
+            .set_phase_cycles(Some(cmd_cycles), Some(dummy as u32), None);
     }
 
     fn start_send(&mut self) {
         // Setup interrupts.
-        self.lcd_cam
+        self.lcd
+            .lcd_cam
             .lc_dma_int_clr()
             .write(|w| w.lcd_trans_done_int_clr().set_bit());
 
-        self.lcd_cam
-            .lcd_user()
-            .modify(|_, w| w.lcd_update().set_bit().lcd_start().set_bit());
+        self.lcd.start();
     }
 
     fn tear_down_send(&mut self) {
-        self.lcd_cam
-            .lcd_user()
-            .modify(|_, w| w.lcd_start().clear_bit());
+        self.lcd.stop();
 
-        self.lcd_cam
+        self.lcd
+            .lcd_cam
             .lc_dma_int_clr()
             .write(|w| w.lcd_trans_done_int_clr().clear_bit());
     }
@@ -393,12 +342,13 @@ impl<'d, TX: Tx, P> I8080<'d, TX, P> {
     fn start_write_bytes_dma(&mut self, ptr: *const u8, len: usize) -> Result<(), DmaError> {
         if len == 0 {
             // Set transfer length.
-            self.lcd_cam
+            self.lcd
+                .lcd_cam
                 .lcd_user()
                 .modify(|_, w| w.lcd_dout().clear_bit());
         } else {
             // Set transfer length.
-            self.lcd_cam.lcd_user().modify(|_, w| {
+            self.lcd.lcd_cam.lcd_user().modify(|_, w| {
                 if len <= 8192 {
                     // Data length in fixed mode. (13 bits)
                     w.lcd_always_out_en()
@@ -448,7 +398,7 @@ impl<'d, TX: Tx, BUFFER, P> Transfer<'d, TX, BUFFER, P> {
             .expect("instance must be available throughout object lifetime");
 
         {
-            let dma_int_raw = instance.lcd_cam.lc_dma_int_raw();
+            let dma_int_raw = instance.lcd.lcd_cam.lc_dma_int_raw();
             // Wait until LCD_TRANS_DONE is set.
             while dma_int_raw.read().lcd_trans_done_int_raw().bit_is_clear() {}
             instance.tear_down_send();
@@ -471,6 +421,7 @@ impl<'d, TX: Tx, BUFFER, P> Transfer<'d, TX, BUFFER, P> {
             .instance
             .as_ref()
             .expect("instance must be available throughout object lifetime")
+            .lcd
             .lcd_cam
             .lc_dma_int_raw();
         int_raw.read().lcd_trans_done_int_raw().bit_is_set()
