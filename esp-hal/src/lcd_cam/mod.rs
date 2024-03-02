@@ -59,6 +59,17 @@ pub enum ByteOrder {
     Inverted = 1,
 }
 
+/// LCD_CAM possible clock sources to drive the peripheral
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[repr(u32)]
+pub enum LcdClockSource {
+    #[default]
+    PLL160M = 3,
+    PLL240M = 2,
+    XTAL = 1
+}
+
 mod private {
     pub struct ClockDivider {
         // Integral LCD clock divider value. (8 bits)
