@@ -1,4 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use anyhow::{bail, Result};
 use clap::{Args, Parser};
@@ -33,6 +36,9 @@ struct BuildDocumentationArgs {
     /// Open the documentation in the default browser once built.
     #[arg(long)]
     open: bool,
+    /// Directory in which to place the built documentation.
+    #[arg(long)]
+    output_path: Option<PathBuf>,
 }
 
 #[derive(Debug, Args)]
@@ -115,7 +121,27 @@ fn build_documentation(workspace: &Path, args: BuildDocumentationArgs) -> Result
 
     // Simply build the documentation for the specified package, targeting the
     // specified chip:
-    xtask::build_documentation(workspace, args.package, args.chip, target, args.open)
+    xtask::build_documentation(workspace, args.package, args.chip, target, args.open)?;
+
+    // If an output path was specified, once the documentation has been built we
+    // will copy it to the provided path, creating any required directories in the
+    // process:
+    if let Some(output_path) = args.output_path {
+        let docs_path = xtask::windows_safe_path(
+            &workspace
+                .join(args.package.to_string())
+                .join("target")
+                .join(target)
+                .join("doc"),
+        );
+
+        let output_path = xtask::windows_safe_path(&output_path);
+        fs::create_dir_all(&output_path)?;
+
+        copy_dir_all(&docs_path, &output_path)?;
+    }
+
+    Ok(())
 }
 
 fn build_examples(workspace: &Path, mut args: BuildExamplesArgs) -> Result<()> {
@@ -240,6 +266,24 @@ fn validate_package_chip(package: &Package, chip: &Chip) -> Result<()> {
             package,
             chip
         );
+    }
+
+    Ok(())
+}
+
+// https://stackoverflow.com/a/65192210
+fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> Result<()> {
+    fs::create_dir_all(&dst)?;
+
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+
+        if ty.is_dir() {
+            copy_dir_all(entry.path(), dst.as_ref().join(entry.file_name()))?;
+        } else {
+            fs::copy(entry.path(), dst.as_ref().join(entry.file_name()))?;
+        }
     }
 
     Ok(())
