@@ -28,6 +28,8 @@ We **highly recommend** to use our [esp-template] that does all the basic config
 >
 > Please note, not all chips support the same set of peripherals.
 
+For more information about examples, see [examples].
+
 [Embassy]: https://github.com/embassy-rs/embassy
 [esp-lp-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp-lp-hal
 [ESP-HAL]: https://github.com/esp-rs/esp-hal
@@ -41,6 +43,7 @@ We **highly recommend** to use our [esp-template] that does all the basic config
 [ld]: https://github.com/esp-rs/esp-hal/tree/main/esp-hal/ld
 [src]: https://github.com/esp-rs/esp-hal/tree/main/esp-hal/src
 [xtask]: https://github.com/esp-rs/esp-hal/tree/main/xtask
+[examples]: https://github.com/esp-rs/esp-hal/tree/main/examples#examples
 
 ## [Documentation]
 
