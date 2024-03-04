@@ -84,9 +84,6 @@ fn main() -> ! {
 
     loop {
         let transfer = parl_io_tx.write_dma(&mut buffer).unwrap();
-
-        // the buffer and driver is moved into the transfer and we can get it back via
-        // `wait`
         transfer.wait().unwrap();
         println!("Transferred {} bytes", buffer.len());
 

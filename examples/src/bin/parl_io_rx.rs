@@ -61,9 +61,6 @@ fn main() -> ! {
 
     loop {
         let transfer = parl_io_rx.read_dma(&mut buffer).unwrap();
-
-        // the buffer and driver is moved into the transfer and we can get it back via
-        // `wait`
         transfer.wait().unwrap();
         println!("Received: {:02x?} ...", &buffer[..30]);
 

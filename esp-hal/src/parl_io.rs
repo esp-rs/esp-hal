@@ -43,11 +43,9 @@
 //!
 //! ### Start TX transfer
 //! ```no_run
-//! let transfer = parl_io_tx.write_dma(buffer).unwrap();
+//! let mut transfer = parl_io_tx.write_dma(buffer).unwrap();
 //!
-//! // the buffer and driver is moved into the transfer and we can get it back via
-//! // `wait`
-//! (buffer, parl_io_tx) = transfer.wait().unwrap();
+//! transfer.wait().unwrap();
 //! ```
 //!
 //! ### Initialization for RX
@@ -75,11 +73,8 @@
 //!
 //! ### Start RX transfer
 //! ```no_run
-//! let transfer = parl_io_rx.read_dma(buffer).unwrap();
-//!
-//! // the buffer and driver is moved into the transfer and we can get it back via
-//! // `wait`
-//! (buffer, parl_io_rx) = transfer.wait().unwrap();
+//! let mut transfer = parl_io_rx.read_dma(buffer).unwrap();
+//! transfer.wait().unwrap();
 //! ```
 
 use embedded_dma::{ReadBuffer, WriteBuffer};
@@ -1233,8 +1228,7 @@ where
     P: TxPins + ConfigurePins,
     CP: TxClkPin,
 {
-    /// Wait for the DMA transfer to complete and return the buffers and the
-    /// SPI instance.
+    /// Wait for the DMA transfer to complete
     #[allow(clippy::type_complexity)]
     pub fn wait(self) -> Result<(), DmaError> {
         // Waiting for the DMA transfer is not enough. We need to wait for the
@@ -1330,8 +1324,7 @@ where
     P: RxPins + ConfigurePins,
     CP: RxClkPin,
 {
-    /// Wait for the DMA transfer to complete and return the buffers and the
-    /// SPI instance.
+    /// Wait for the DMA transfer to complete
     #[allow(clippy::type_complexity)]
     pub fn wait(self) -> Result<(), DmaError> {
         loop {

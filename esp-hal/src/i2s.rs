@@ -250,8 +250,7 @@ where
     T: RegisterAccess,
     CH: ChannelTypes,
 {
-    /// Wait for the DMA transfer to complete and return the buffers and the
-    /// I2sTx instance.
+    /// Wait for the DMA transfer to complete
     fn wait(self) -> Result<(), DmaError> {
         // Waiting for the DMA transfer is not enough. We need to wait for the
         // peripheral to finish flushing its buffers, too.
@@ -334,10 +333,8 @@ where
         Ok(self.i2s_rx.rx_channel.pop(data)?)
     }
 
-    /// Wait for the DMA transfer to complete and return the buffers and the
-    /// I2sTx instance after copying the read data to the given buffer.
-    /// Length of the received data is returned at the third element of the
-    /// tuple.
+    /// Wait for the DMA transfer to complete.
+    /// Length of the received data is returned
     #[allow(clippy::type_complexity)]
     pub fn wait_receive(self, dst: &mut [u8]) -> Result<usize, (DmaError, usize)> {
         // Waiting for the DMA transfer is not enough. We need to wait for the
@@ -358,8 +355,7 @@ where
     T: RegisterAccess,
     CH: ChannelTypes,
 {
-    /// Wait for the DMA transfer to complete and return the buffers and the
-    /// I2sTx instance.
+    /// Wait for the DMA transfer to complete
     fn wait(self) -> Result<(), DmaError> {
         // Waiting for the DMA transfer is not enough. We need to wait for the
         // peripheral to finish flushing its buffers, too.

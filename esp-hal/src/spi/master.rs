@@ -856,8 +856,7 @@ pub mod dma {
         C::P: SpiPeripheral,
         M: DuplexMode,
     {
-        /// Wait for the DMA transfer to complete and return the buffers and the
-        /// SPI instance.
+        /// Wait for the DMA transfer to complete
         fn wait(self) -> Result<(), DmaError> {
             // Waiting for the DMA transfer is not enough. We need to wait for the
             // peripheral to finish flushing its buffers, too.
@@ -907,8 +906,7 @@ pub mod dma {
         C::P: SpiPeripheral,
         M: DuplexMode,
     {
-        /// Wait for the DMA transfer to complete and return the buffers and the
-        /// SPI instance.
+        /// Wait for the DMA transfer to complete
         fn wait(self) -> Result<(), DmaError> {
             // Waiting for the DMA transfer is not enough. We need to wait for the
             // peripheral to finish flushing its buffers, too.
