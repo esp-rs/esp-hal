@@ -15,7 +15,7 @@ By default, the code uses `blocking` API. If you want to use [Embassy] `async` A
 `esp-hal` is closely associated with different crates as well. [esp-lp-hal] is HAL for the low-power RISC-V coprocessors found on the ESP32-C6, ESP32-S2, and ESP32-S3 and is part of the [ESP-HAL] package. Another crates, supporting not only WiFi and BLE that are not part of the [ESP-HAL] package could be found [here](https://github.com/esp-rs/esp-hal?tab=readme-ov-file#ancillary-crates).
 
 The package tree is as follows:
-- [devices] holds the information about which `peripherals` are supported by the chip HW, `symbols` created by the maintainers to simplify writing drivers for multiple chips, and `efuse` description.
+- [devices] holds the information about which `peripherals` are supported by the chip's hardware, `symbols` created by the maintainers to simplify writing drivers for multiple chips, and `efuse` description.
 - [ld] contains `linker-scripts` defining the layout of the chip's memory sections, specify the location of various symbols (such as ROM functions, for example).
 - [src] is a place, where _all_ peripheral drivers for main (high-power) core are placed. Each peripheral is separated into its own source file(s).
 
