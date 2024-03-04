@@ -5,21 +5,51 @@
 ![Crates.io](https://img.shields.io/crates/l/esp-hal?labelColor=1C2C2E&style=flat-square)
 [![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&labelColor=1C2C2E&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
 
-`no_std` HAL implementations for the peripherals which are common among Espressif devices. Implements a number of the traits defined by [embedded-hal](https://github.com/rust-embedded/embedded-hal).
+The `esp-hal` package aims to provide a safe, idiomatic Hardware Abstraction Layer (HAL) for the entire family of ESP32 devices from Espressif.
 
-This crate should not be used directly; you should use one of the device-specific HAL crates instead:
+This package implements both blocking and, when able, asynchronous drivers for the various peripherals. At this time the blocking APIs are used by default, with all asynchronous functionality gated behind the `async` feature. See the package documentation for more information on its features.
 
-- [esp32-hal](../esp32-hal/README.md)
-- [esp32c2-hal](../esp32c2-hal/README.md)
-- [esp32c3-hal](../esp32c3-hal/README.md)
-- [esp32c6-hal](../esp32c6-hal/README.md)
-- [esp32h2-hal](../esp32h2-hal/README.md)
-- [esp32s2-hal](../esp32s2-hal/README.md)
-- [esp32s3-hal](../esp32s3-hal/README.md)
+Most traits defined by the [embedded-hal] family of packages are implemented as applicable.
+
+[embedded-hal]: https://github.com/rust-embedded/embedded-hal
 
 ## [Documentation]
 
 [documentation]: https://docs.rs/esp-hal/
+
+## Usage
+
+Before using `esp-hal`, ensure that you have configured your [development environment] correctly, and the [required tooling] has been installed.
+
+When starting a new project using `esp-hal`, we strongly recommend you generate a project skeleton using [cargo-generate] and [esp-template]. This will take much of the guesswork out of the process and give you a starting point to build an application from.
+
+Much of the functionality available is feature-gated, so be sure to refer to the documentation to read about all available Cargo features.
+
+[development environment]: https://esp-rs.github.io/book/installation/index.html
+[required tooling]: https://esp-rs.github.io/book/tooling/espflash.html
+[cargo-generate]: https://github.com/cargo-generate/cargo-generate/
+[esp-template]: https://github.com/esp-rs/esp-template/
+
+### Supporting Packages
+
+A number of additional packages are available which add additional functionality beyond the HAL.
+
+Within this repository, the [esp-lp-hal] package provides support for the (ultra-)low-power RISC-V coprocessors found aboard the ESP32-C6, ESP32-S2, and ESP32-S3.
+
+There is also the [esp-wifi] package, which provides support for Bluetooth and Wi-Fi.
+
+For additional libraries, you can check the [list of repositories] in the [esp-rs organization].
+
+[esp-lp-hal]: ../esp-lp-hal/
+[esp-wifi]: https://github.com/esp-rs/esp-wifi
+[list of repositories]: https://github.com/orgs/esp-rs/repositories
+[esp-rs organization]: https://github.com/esp-rs
+
+## Examples
+
+Examples demonstrating the use of various peripherals and features of the HAL are available in the [examples] package.
+
+[examples]: ../examples/
 
 ## License
 
