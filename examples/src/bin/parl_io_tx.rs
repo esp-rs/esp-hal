@@ -83,11 +83,11 @@ fn main() -> ! {
     let mut delay = Delay::new(&clocks);
 
     loop {
-        let transfer = parl_io_tx.write_dma(buffer).unwrap();
+        let transfer = parl_io_tx.write_dma(&mut buffer).unwrap();
 
         // the buffer and driver is moved into the transfer and we can get it back via
         // `wait`
-        (buffer, parl_io_tx) = transfer.wait().unwrap();
+        transfer.wait().unwrap();
         println!("Transferred {} bytes", buffer.len());
 
         delay.delay_ms(500u32);
