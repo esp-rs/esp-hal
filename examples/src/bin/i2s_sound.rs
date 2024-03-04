@@ -64,7 +64,7 @@ fn main() -> ! {
     #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
     let dma_channel = dma.channel0;
 
-    let (tx_buffer, mut tx_descriptors, _, mut rx_descriptors) = dma_buffers!(32000, 0);
+    let (mut tx_buffer, mut tx_descriptors, _, mut rx_descriptors) = dma_buffers!(32000, 0);
 
     let i2s = I2s::new(
         peripherals.I2S0,
@@ -80,7 +80,7 @@ fn main() -> ! {
         &clocks,
     );
 
-    let i2s_tx = i2s
+    let mut i2s_tx = i2s
         .i2s_tx
         .with_bclk(io.pins.gpio2)
         .with_ws(io.pins.gpio4)
@@ -90,10 +90,9 @@ fn main() -> ! {
     let data =
         unsafe { core::slice::from_raw_parts(&SINE as *const _ as *const u8, SINE.len() * 2) };
 
-    let buffer = tx_buffer;
     let mut idx = 0;
-    for i in 0..usize::min(data.len(), buffer.len()) {
-        buffer[i] = data[idx];
+    for i in 0..usize::min(data.len(), tx_buffer.len()) {
+        tx_buffer[i] = data[idx];
 
         idx += 1;
 
@@ -103,7 +102,7 @@ fn main() -> ! {
     }
 
     let mut filler = [0u8; 10000];
-    let mut transfer = i2s_tx.write_dma_circular(buffer).unwrap();
+    let mut transfer = i2s_tx.write_dma_circular(&mut tx_buffer).unwrap();
 
     loop {
         let avail = transfer.available();

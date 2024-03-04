@@ -107,7 +107,9 @@ fn main() -> ! {
         slave_receive.fill(0xff);
         i = i.wrapping_add(1);
 
-        let transfer = spi.dma_transfer(slave_send, slave_receive).unwrap();
+        let transfer = spi
+            .dma_transfer(&mut slave_send, &mut slave_receive)
+            .unwrap();
         // Bit-bang out the contents of master_send and read into master_receive
         // as quickly as manageable. MSB first. Mode 0, so sampled on the rising
         // edge and set on the falling edge.
@@ -138,7 +140,7 @@ fn main() -> ! {
         master_sclk.set_low().unwrap();
         // the buffers and spi is moved into the transfer and we can get it back via
         // `wait`
-        (slave_receive, slave_send, spi) = transfer.wait().unwrap();
+        transfer.wait().unwrap();
         println!(
             "slave got {:x?} .. {:x?}, master got {:x?} .. {:x?}",
             &slave_receive[..10],
@@ -150,7 +152,7 @@ fn main() -> ! {
         delay.delay_ms(250u32);
 
         slave_receive.fill(0xff);
-        let transfer = spi.dma_read(slave_receive).unwrap();
+        let transfer = spi.dma_read(&mut slave_receive).unwrap();
         master_cs.set_high().unwrap();
 
         master_cs.set_low().unwrap();
@@ -168,7 +170,7 @@ fn main() -> ! {
             }
         }
         master_cs.set_high().unwrap();
-        (slave_receive, spi) = transfer.wait().unwrap();
+        transfer.wait().unwrap();
         println!(
             "slave got {:x?} .. {:x?}",
             &slave_receive[..10],
@@ -176,7 +178,7 @@ fn main() -> ! {
         );
 
         delay.delay_ms(250u32);
-        let transfer = spi.dma_write(slave_send).unwrap();
+        let transfer = spi.dma_write(&mut slave_send).unwrap();
 
         master_receive.fill(0);
 
@@ -194,7 +196,7 @@ fn main() -> ! {
             master_receive[j] = rb;
         }
         master_cs.set_high().unwrap();
-        (slave_send, spi) = transfer.wait().unwrap();
+        transfer.wait().unwrap();
 
         println!(
             "master got {:x?} .. {:x?}",

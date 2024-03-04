@@ -16,7 +16,8 @@ use esp_hal::{
         Aes,
         Mode,
     },
-    dma::{Dma, DmaDescriptor, DmaPriority},
+    dma::{Dma, DmaPriority},
+    dma_buffers,
     peripherals::Peripherals,
     prelude::*,
 };
@@ -30,73 +31,66 @@ fn main() -> ! {
     let dma = Dma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
 
-    let mut descriptors = [DmaDescriptor::EMPTY; 1];
-    let mut rx_descriptors = [DmaDescriptor::EMPTY; 1];
+    let (mut tx_buffer, mut tx_descriptors, mut rx_buffer, mut rx_descriptors) =
+        dma_buffers!(16, 16);
 
-    let aes = Aes::new(peripherals.AES).with_dma(dma_channel.configure(
+    let mut aes = Aes::new(peripherals.AES).with_dma(dma_channel.configure(
         false,
-        &mut descriptors,
+        &mut tx_descriptors,
         &mut rx_descriptors,
         DmaPriority::Priority0,
     ));
 
-    let keytext = buffer1();
-    let plaintext = buffer2();
-    plaintext.copy_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
-    keytext.copy_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
+    let keytext = [1u8, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+    rx_buffer.copy_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
 
-    // create an array with aes128 key size
-    let mut keybuf = [0_u8; 16];
-    keybuf[..keytext.len()].copy_from_slice(keytext);
-
-    // create an array with aes block size
-    let mut block_buf = [0_u8; 16];
-    block_buf[..plaintext.len()].copy_from_slice(plaintext);
-
-    let hw_encrypted = buffer3();
     let pre_hw_encrypt = cycles();
     let transfer = aes
         .process(
-            plaintext,
-            hw_encrypted,
+            &mut rx_buffer,
+            &mut tx_buffer,
             Mode::Encryption128,
             CipherMode::Ecb,
-            keybuf,
+            keytext,
         )
         .unwrap();
-    let (hw_encrypted, plaintext, aes) = transfer.wait().unwrap();
+    transfer.wait().unwrap();
     let post_hw_encrypt = cycles();
     println!(
         "it took {} cycles for hw encrypt",
         post_hw_encrypt - pre_hw_encrypt
     );
 
-    let keytext = buffer4();
-    plaintext.copy_from_slice(hw_encrypted);
-    keytext.copy_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
+    let mut hw_encrypted = [0u8; 16];
+    (&mut hw_encrypted[..]).copy_from_slice(tx_buffer);
 
-    let mut keybuf = [0_u8; 16];
-    keybuf[..keytext.len()].copy_from_slice(keytext);
+    rx_buffer.copy_from_slice(tx_buffer);
 
-    let hw_decrypted = buffer5();
     let pre_hw_decrypt = cycles();
     let transfer = aes
         .process(
-            plaintext,
-            hw_decrypted,
+            &mut rx_buffer,
+            &mut tx_buffer,
             Mode::Decryption128,
             CipherMode::Ecb,
-            keybuf,
+            keytext,
         )
         .unwrap();
-    let (hw_decrypted, _, _) = transfer.wait().unwrap();
+    transfer.wait().unwrap();
     let post_hw_decrypt = cycles();
     println!(
         "it took {} cycles for hw decrypt",
         post_hw_decrypt - pre_hw_decrypt
     );
 
-    let key = GenericArray::from(keybuf);
+    let mut hw_decrypted = [0u8; 16];
+    (&mut hw_decrypted[..]).copy_from_slice(tx_buffer);
+
+    // create an array with aes block size
+    let mut block_buf = [0_u8; 16];
+    block_buf[..].copy_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
+
+    let key = GenericArray::from(keytext);
     let mut block = GenericArray::from(block_buf);
     let cipher = Aes128SW::new(&key);
     let pre_sw_encrypt = cycles();
@@ -121,31 +115,6 @@ fn main() -> ! {
 
     println!("done");
     loop {}
-}
-
-fn buffer1() -> &'static mut [u8; 16] {
-    static mut BUFFER: [u8; 16] = [0u8; 16];
-    unsafe { &mut BUFFER }
-}
-
-fn buffer2() -> &'static mut [u8; 16] {
-    static mut BUFFER: [u8; 16] = [0u8; 16];
-    unsafe { &mut BUFFER }
-}
-
-fn buffer3() -> &'static mut [u8; 16] {
-    static mut BUFFER: [u8; 16] = [0u8; 16];
-    unsafe { &mut BUFFER }
-}
-
-fn buffer4() -> &'static mut [u8; 16] {
-    static mut BUFFER: [u8; 16] = [0u8; 16];
-    unsafe { &mut BUFFER }
-}
-
-fn buffer5() -> &'static mut [u8; 16] {
-    static mut BUFFER: [u8; 16] = [0u8; 16];
-    unsafe { &mut BUFFER }
 }
 
 fn eq(slice1: &[u8; 16], slice2: &[u8; 16]) -> bool {

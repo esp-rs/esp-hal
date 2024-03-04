@@ -7,7 +7,7 @@
 #![no_std]
 #![no_main]
 
-use core::cell::RefCell;
+use core::{cell::RefCell, ptr::addr_of_mut};
 
 use critical_section::Mutex;
 use esp_backtrace as _;
@@ -39,8 +39,8 @@ fn main() -> ! {
                 static mut _stack_end: u32;
             }
 
-            let stack_top = unsafe { &mut _stack_start } as *mut _ as u32;
-            let stack_bottom = unsafe { &mut _stack_end } as *mut _ as u32;
+            let stack_top = unsafe { addr_of_mut!(_stack_start) } as *mut _ as u32;
+            let stack_bottom = unsafe { addr_of_mut!(_stack_end) } as *mut _ as u32;
 
             let size = 4096;
         } else {

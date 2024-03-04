@@ -198,16 +198,15 @@ impl DataFormat {
 }
 
 /// An in-progress DMA write transfer.
-pub struct I2sWriteDmaTransfer<'d, T, CH, BUFFER>
+pub struct I2sWriteDmaTransfer<'t, 'd, T, CH>
 where
     T: RegisterAccess,
     CH: ChannelTypes,
 {
-    i2s_tx: I2sTx<'d, T, CH>,
-    buffer: BUFFER,
+    i2s_tx: &'t mut I2sTx<'d, T, CH>,
 }
 
-impl<'d, T, CH, BUFFER> I2sWriteDmaTransfer<'d, T, CH, BUFFER>
+impl<'t, 'd, T, CH> I2sWriteDmaTransfer<'t, 'd, T, CH>
 where
     T: RegisterAccess,
     CH: ChannelTypes,
@@ -235,61 +234,33 @@ where
     /// Stop for the DMA transfer and return the buffer and the
     /// I2sTx instance.
     #[allow(clippy::type_complexity)]
-    pub fn stop(self) -> Result<(BUFFER, I2sTx<'d, T, CH>), (DmaError, BUFFER, I2sTx<'d, T, CH>)> {
+    pub fn stop(self) -> Result<(), DmaError> {
         T::tx_stop();
 
-        let err = self.i2s_tx.tx_channel.has_error();
-
-        // `DmaTransfer` needs to have a `Drop` implementation, because we accept
-        // managed buffers that can free their memory on drop. Because of that
-        // we can't move out of the `DmaTransfer`'s fields, so we use `ptr::read`
-        // and `mem::forget`.
-        //
-        // NOTE(unsafe) There is no panic branch between getting the resources
-        // and forgetting `self`.
-        unsafe {
-            let buffer = core::ptr::read(&self.buffer);
-            let payload = core::ptr::read(&self.i2s_tx);
-            core::mem::forget(self);
-            if err {
-                Err((DmaError::DescriptorError, buffer, payload))
-            } else {
-                Ok((buffer, payload))
-            }
+        if self.i2s_tx.tx_channel.has_error() {
+            Err(DmaError::DescriptorError)
+        } else {
+            Ok(())
         }
     }
 }
 
-impl<'d, T, CH, BUFFER> DmaTransfer<BUFFER, I2sTx<'d, T, CH>>
-    for I2sWriteDmaTransfer<'d, T, CH, BUFFER>
+impl<'t, 'd, T, CH> DmaTransfer for I2sWriteDmaTransfer<'t, 'd, T, CH>
 where
     T: RegisterAccess,
     CH: ChannelTypes,
 {
     /// Wait for the DMA transfer to complete and return the buffers and the
     /// I2sTx instance.
-    fn wait(self) -> Result<(BUFFER, I2sTx<'d, T, CH>), (DmaError, BUFFER, I2sTx<'d, T, CH>)> {
+    fn wait(self) -> Result<(), DmaError> {
         // Waiting for the DMA transfer is not enough. We need to wait for the
         // peripheral to finish flushing its buffers, too.
         self.i2s_tx.wait_tx_dma_done().ok();
-        let err = self.i2s_tx.tx_channel.has_error();
 
-        // `DmaTransfer` needs to have a `Drop` implementation, because we accept
-        // managed buffers that can free their memory on drop. Because of that
-        // we can't move out of the `DmaTransfer`'s fields, so we use `ptr::read`
-        // and `mem::forget`.
-        //
-        // NOTE(unsafe) There is no panic branch between getting the resources
-        // and forgetting `self`.
-        unsafe {
-            let buffer = core::ptr::read(&self.buffer);
-            let payload = core::ptr::read(&self.i2s_tx);
-            core::mem::forget(self);
-            if err {
-                Err((DmaError::DescriptorError, buffer, payload))
-            } else {
-                Ok((buffer, payload))
-            }
+        if self.i2s_tx.tx_channel.has_error() {
+            Err(DmaError::DescriptorError)
+        } else {
+            Ok(())
         }
     }
 
@@ -299,7 +270,7 @@ where
     }
 }
 
-impl<'d, T, CH, BUFFER> Drop for I2sWriteDmaTransfer<'d, T, CH, BUFFER>
+impl<'t, 'd, T, CH> Drop for I2sWriteDmaTransfer<'t, 'd, T, CH>
 where
     T: RegisterAccess,
     CH: ChannelTypes,
@@ -323,31 +294,33 @@ where
     /// Write I2S.
     /// Returns [I2sWriteDmaTransfer] which represents the in-progress DMA
     /// transfer
-    fn write_dma(self, words: TXBUF) -> Result<I2sWriteDmaTransfer<'d, T, CH, TXBUF>, Error>
+    fn write_dma<'t>(
+        &'t mut self,
+        words: &'t mut TXBUF,
+    ) -> Result<I2sWriteDmaTransfer<'t, 'd, T, CH>, Error>
     where
         TXBUF: ReadBuffer<Word = u8>;
 
     /// Continuously write to I2S. Returns [I2sWriteDmaTransfer] which
     /// represents the in-progress DMA transfer
-    fn write_dma_circular(
-        self,
-        words: TXBUF,
-    ) -> Result<I2sWriteDmaTransfer<'d, T, CH, TXBUF>, Error>
+    fn write_dma_circular<'t>(
+        &'t mut self,
+        words: &'t mut TXBUF,
+    ) -> Result<I2sWriteDmaTransfer<'t, 'd, T, CH>, Error>
     where
         TXBUF: ReadBuffer<Word = u8>;
 }
 
 /// An in-progress DMA read transfer.
-pub struct I2sReadDmaTransfer<'d, T, CH, BUFFER>
+pub struct I2sReadDmaTransfer<'t, 'd, T, CH>
 where
     T: RegisterAccess,
     CH: ChannelTypes,
 {
-    i2s_rx: I2sRx<'d, T, CH>,
-    buffer: BUFFER,
+    i2s_rx: &'t mut I2sRx<'d, T, CH>,
 }
 
-impl<'d, T, CH, BUFFER> I2sReadDmaTransfer<'d, T, CH, BUFFER>
+impl<'t, 'd, T, CH> I2sReadDmaTransfer<'t, 'd, T, CH>
 where
     T: RegisterAccess,
     CH: ChannelTypes,
@@ -366,67 +339,36 @@ where
     /// Length of the received data is returned at the third element of the
     /// tuple.
     #[allow(clippy::type_complexity)]
-    pub fn wait_receive(
-        mut self,
-        dst: &mut [u8],
-    ) -> Result<(BUFFER, I2sRx<'d, T, CH>, usize), (DmaError, BUFFER, I2sRx<'d, T, CH>, usize)>
-    {
+    pub fn wait_receive(self, dst: &mut [u8]) -> Result<usize, (DmaError, usize)> {
         // Waiting for the DMA transfer is not enough. We need to wait for the
         // peripheral to finish flushing its buffers, too.
         self.i2s_rx.wait_rx_dma_done().ok();
         let len = self.i2s_rx.rx_channel.drain_buffer(dst).unwrap();
-        let err = self.i2s_rx.rx_channel.has_error();
 
-        // `DmaTransfer` needs to have a `Drop` implementation, because we accept
-        // managed buffers that can free their memory on drop. Because of that
-        // we can't move out of the `DmaTransfer`'s fields, so we use `ptr::read`
-        // and `mem::forget`.
-        //
-        // NOTE(unsafe) There is no panic branch between getting the resources
-        // and forgetting `self`.
-        unsafe {
-            let buffer = core::ptr::read(&self.buffer);
-            let payload = core::ptr::read(&self.i2s_rx);
-            core::mem::forget(self);
-            if err {
-                Err((DmaError::DescriptorError, buffer, payload, len))
-            } else {
-                Ok((buffer, payload, len))
-            }
+        if self.i2s_rx.rx_channel.has_error() {
+            Err((DmaError::DescriptorError, len))
+        } else {
+            Ok(len)
         }
     }
 }
 
-impl<'d, T, CH, BUFFER> DmaTransfer<BUFFER, I2sRx<'d, T, CH>>
-    for I2sReadDmaTransfer<'d, T, CH, BUFFER>
+impl<'t, 'd, T, CH> DmaTransfer for I2sReadDmaTransfer<'t, 'd, T, CH>
 where
     T: RegisterAccess,
     CH: ChannelTypes,
 {
     /// Wait for the DMA transfer to complete and return the buffers and the
     /// I2sTx instance.
-    fn wait(self) -> Result<(BUFFER, I2sRx<'d, T, CH>), (DmaError, BUFFER, I2sRx<'d, T, CH>)> {
+    fn wait(self) -> Result<(), DmaError> {
         // Waiting for the DMA transfer is not enough. We need to wait for the
         // peripheral to finish flushing its buffers, too.
         self.i2s_rx.wait_rx_dma_done().ok();
-        let err = self.i2s_rx.rx_channel.has_error();
 
-        // `DmaTransfer` needs to have a `Drop` implementation, because we accept
-        // managed buffers that can free their memory on drop. Because of that
-        // we can't move out of the `DmaTransfer`'s fields, so we use `ptr::read`
-        // and `mem::forget`.
-        //
-        // NOTE(unsafe) There is no panic branch between getting the resources
-        // and forgetting `self`.
-        unsafe {
-            let buffer = core::ptr::read(&self.buffer);
-            let payload = core::ptr::read(&self.i2s_rx);
-            core::mem::forget(self);
-            if err {
-                Err((DmaError::DescriptorError, buffer, payload))
-            } else {
-                Ok((buffer, payload))
-            }
+        if self.i2s_rx.rx_channel.has_error() {
+            Err(DmaError::DescriptorError)
+        } else {
+            Ok(())
         }
     }
 
@@ -436,7 +378,7 @@ where
     }
 }
 
-impl<T, CH, BUFFER> Drop for I2sReadDmaTransfer<'_, T, CH, BUFFER>
+impl<'t, T, CH> Drop for I2sReadDmaTransfer<'t, '_, T, CH>
 where
     T: RegisterAccess,
     CH: ChannelTypes,
@@ -460,14 +402,20 @@ where
     /// Read I2S.
     /// Returns [I2sReadDmaTransfer] which represents the in-progress DMA
     /// transfer
-    fn read_dma(self, words: RXBUF) -> Result<I2sReadDmaTransfer<'d, T, CH, RXBUF>, Error>
+    fn read_dma<'t>(
+        &'t mut self,
+        words: &'t mut RXBUF,
+    ) -> Result<I2sReadDmaTransfer<'t, 'd, T, CH>, Error>
     where
         RXBUF: WriteBuffer<Word = u8>;
 
     /// Continuously read from I2S.
     /// Returns [I2sReadDmaTransfer] which represents the in-progress DMA
     /// transfer
-    fn read_dma_circular(self, words: RXBUF) -> Result<I2sReadDmaTransfer<'d, T, CH, RXBUF>, Error>
+    fn read_dma_circular<'t>(
+        &'t mut self,
+        words: &'t mut RXBUF,
+    ) -> Result<I2sReadDmaTransfer<'t, 'd, T, CH>, Error>
     where
         RXBUF: WriteBuffer<Word = u8>;
 }
@@ -628,11 +576,11 @@ where
         Ok(())
     }
 
-    fn start_tx_transfer<TXBUF>(
-        mut self,
-        words: TXBUF,
+    fn start_tx_transfer<'t, TXBUF>(
+        &'t mut self,
+        words: &'t mut TXBUF,
         circular: bool,
-    ) -> Result<I2sWriteDmaTransfer<'d, T, CH, TXBUF>, Error>
+    ) -> Result<I2sWriteDmaTransfer<'t, 'd, T, CH>, Error>
     where
         TXBUF: ReadBuffer<Word = u8>,
     {
@@ -653,10 +601,7 @@ where
         // start: set I2S_TX_START
         T::tx_start();
 
-        Ok(I2sWriteDmaTransfer {
-            i2s_tx: self,
-            buffer: words,
-        })
+        Ok(I2sWriteDmaTransfer { i2s_tx: self })
     }
 
     fn wait_tx_dma_done(&self) -> Result<(), Error> {
@@ -713,17 +658,20 @@ where
     T: RegisterAccess,
     CH: ChannelTypes,
 {
-    fn write_dma(self, words: TXBUF) -> Result<I2sWriteDmaTransfer<'d, T, CH, TXBUF>, Error>
+    fn write_dma<'t>(
+        &'t mut self,
+        words: &'t mut TXBUF,
+    ) -> Result<I2sWriteDmaTransfer<'t, 'd, T, CH>, Error>
     where
         TXBUF: ReadBuffer<Word = u8>,
     {
         self.start_tx_transfer(words, false)
     }
 
-    fn write_dma_circular(
-        self,
-        words: TXBUF,
-    ) -> Result<I2sWriteDmaTransfer<'d, T, CH, TXBUF>, Error>
+    fn write_dma_circular<'t>(
+        &'t mut self,
+        words: &'t mut TXBUF,
+    ) -> Result<I2sWriteDmaTransfer<'t, 'd, T, CH>, Error>
     where
         TXBUF: ReadBuffer<Word = u8>,
     {
@@ -787,11 +735,11 @@ where
         Ok(())
     }
 
-    fn start_rx_transfer<RXBUF>(
-        mut self,
-        mut words: RXBUF,
+    fn start_rx_transfer<'t, RXBUF>(
+        &'t mut self,
+        words: &'t mut RXBUF,
         circular: bool,
-    ) -> Result<I2sReadDmaTransfer<'d, T, CH, RXBUF>, Error>
+    ) -> Result<I2sReadDmaTransfer<'t, 'd, T, CH>, Error>
     where
         RXBUF: WriteBuffer<Word = u8>,
     {
@@ -820,10 +768,7 @@ where
         #[cfg(esp32)]
         T::rx_start(len);
 
-        Ok(I2sReadDmaTransfer {
-            i2s_rx: self,
-            buffer: words,
-        })
+        Ok(I2sReadDmaTransfer { i2s_rx: self })
     }
 
     fn wait_rx_dma_done(&self) -> Result<(), Error> {
@@ -891,14 +836,20 @@ where
     T: RegisterAccess,
     CH: ChannelTypes,
 {
-    fn read_dma(self, words: RXBUF) -> Result<I2sReadDmaTransfer<'d, T, CH, RXBUF>, Error>
+    fn read_dma<'t>(
+        &'t mut self,
+        words: &'t mut RXBUF,
+    ) -> Result<I2sReadDmaTransfer<'t, 'd, T, CH>, Error>
     where
         RXBUF: WriteBuffer<Word = u8>,
     {
         self.start_rx_transfer(words, false)
     }
 
-    fn read_dma_circular(self, words: RXBUF) -> Result<I2sReadDmaTransfer<'d, T, CH, RXBUF>, Error>
+    fn read_dma_circular<'t>(
+        &'t mut self,
+        words: &'t mut RXBUF,
+    ) -> Result<I2sReadDmaTransfer<'t, 'd, T, CH>, Error>
     where
         RXBUF: WriteBuffer<Word = u8>,
     {
@@ -2130,7 +2081,7 @@ pub mod asynch {
             &mut self,
             f: impl FnOnce(&mut [u8]) -> usize,
         ) -> Result<usize, Error> {
-            let avail = self.available().await;
+            let _avail = self.available().await;
             Ok(self.i2s_tx.tx_channel.push_with(f)?)
         }
     }
