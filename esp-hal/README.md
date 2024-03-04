@@ -7,12 +7,10 @@
 
 ### Quickstart
 
-[esp-hal] encompasses the hardware abstraction layer across multiple Espressif devices atop peripheral access crate. Implements a number of the traits defined by [embedded-hal](https://github.com/rust-embedded/embedded-hal) for both, `blocking` and `async` APIs.
+[esp-hal] encompasses the hardware abstraction layer across multiple Espressif devices atop peripheral access crate. Implements a number of the traits defined by [embedded-hal](https://github.com/rust-embedded/embedded-hal) for both, blocking and async APIs. Blocking API is avalaible by default.
 To select a chip, the correct chip feature has to be used. The current list of chip features is `esp32`, `esp32c2`, `esp32c3`, `esp32c6`, `esp32h2`, `esp32p4`, `esp32s2`, and `esp32s3`.
 
-By default, the code uses `blocking` API. If you want to use [Embassy] `async` API, the `async` feature has to be used.
-
-`esp-hal` is closely associated with different crates as well. [esp-lp-hal] is HAL for the low-power RISC-V coprocessors found on the ESP32-C6, ESP32-S2, and ESP32-S3 and is part of the [ESP-HAL] package. Another crates, supporting not only WiFi and BLE that are not part of the [ESP-HAL] package could be found [here](https://github.com/esp-rs/esp-hal?tab=readme-ov-file#ancillary-crates).
+`esp-hal` is associated with different crates as well. [esp-lp-hal] is HAL for the low-power RISC-V coprocessors found on the ESP32-C6, ESP32-S2, and ESP32-S3 and is part of the [esp-hal](https://github.com/esp-rs/esp-hal) package. Another crates, supporting not only Wi-Fi and BLE that are not part of the [esp-hal](https://github.com/esp-rs/esp-hal) package could be found [here](https://github.com/esp-rs/esp-hal?tab=readme-ov-file#ancillary-crates).
 
 The package tree is as follows:
 - [devices] holds the information about which `peripherals` are supported by the chip's hardware, `symbols` created by the maintainers to simplify writing drivers for multiple chips, and `efuse` description.
