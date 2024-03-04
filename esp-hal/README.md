@@ -17,7 +17,7 @@ By default, the code uses `blocking` API. If you want to use [Embassy] `async` A
 The package tree is as follows:
 - [devices] holds the information about which `peripherals` are supported by the chip HW, `symbols` created by the maintainers to simplify writing drivers for multiple chips, and `efuse` description.
 - [ld] contains `linker-scripts` defining the layout of the chip's memory sections, specify the location of various symbols (such as ROM functions, for example).
-- [src] is a place, where _all_ peripheral drivers for main (high-power) core are placed. Each peripheral is separated into it's own source file(s).
+- [src] is a place, where _all_ peripheral drivers for main (high-power) core are placed. Each peripheral is separated into its own source file(s).
 
 ## Usage
 
