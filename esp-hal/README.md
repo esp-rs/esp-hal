@@ -8,7 +8,7 @@
 ### Quickstart
 
 [esp-hal] encompasses the hardware abstraction layer across multiple Espressif devices atop peripheral access crate. Implements a number of the traits defined by [embedded-hal](https://github.com/rust-embedded/embedded-hal) for both, `blocking` and `async` APIs.
-To select a concrete chip, correct chip feature has to be used. The current list of chip features is `esp32`, `esp32c2`, `esp32c3`, `esp32c6`, `esp32h2`, `esp32p4`, `esp32s2`, and `esp32s3`.
+To select a chip, the correct chip feature has to be used. The current list of chip features is `esp32`, `esp32c2`, `esp32c3`, `esp32c6`, `esp32h2`, `esp32p4`, `esp32s2`, and `esp32s3`.
 
 By default, the code uses `blocking` API. If you want to use [Embassy] `async` API, the `async` feature has to be used.
 
