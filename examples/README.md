@@ -12,7 +12,7 @@ As previously stated, we use the [cargo-xtask] pattern for automation. Commands 
 
 ## Building Examples
 
-You can build all examples for a given devices using the `build-examples` subcommand:
+You can build all examples for a given device using the `build-examples` subcommand:
 
 ```shell
 cargo xtask build-examples esp-hal esp32
@@ -43,9 +43,9 @@ To demonstrated, in `src/bin/embassy_hello_world.rs` you will see the following:
 //% FEATURES: embassy embassy-generic-timers embassy-time-timg0 embassy-executor-thread
 ```
 
-Another thing to be aware of is the GPIO pins being used. We have tried to use pins available on all of the DevKit-C boards from Espressif, however this is being done on a best-effort basis.
+Another thing to be aware of is the GPIO pins being used. We have tried to use pins available the DevKit-C boards from Espressif, however this is being done on a best-effort basis.
 
-In general, the following GPIO are recommended for use, though be conscious of whether or not certain pins are used for UART, strapping pins, etc. on some devices:
+In general, the following GPIO are recommended for use, though be conscious of whether certain pins are used for UART, strapping pins, etc. on some devices:
 
 - GPIO0
 - GPIO1
