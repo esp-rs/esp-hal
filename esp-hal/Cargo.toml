@@ -220,3 +220,13 @@ opsram-16m = []
 
 [lints.clippy]
 mixed_attributes_style = "allow"
+
+[patch.crates-io]
+esp32 =   { git = "https://github.com/esp-rs/esp-pacs", rev = "e394c25fea52d7796955da4192e30e5ba5178e3c" }
+esp32s2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "e394c25fea52d7796955da4192e30e5ba5178e3c" }
+esp32s3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "e394c25fea52d7796955da4192e30e5ba5178e3c" }
+esp32c2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "e394c25fea52d7796955da4192e30e5ba5178e3c" }
+esp32c3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "e394c25fea52d7796955da4192e30e5ba5178e3c" }
+esp32c6 = { git = "https://github.com/esp-rs/esp-pacs", rev = "e394c25fea52d7796955da4192e30e5ba5178e3c" }
+esp32h2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "e394c25fea52d7796955da4192e30e5ba5178e3c" }
+esp32p4 = { git = "https://github.com/esp-rs/esp-pacs", rev = "e394c25fea52d7796955da4192e30e5ba5178e3c" }
