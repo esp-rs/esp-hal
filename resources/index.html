@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>esp-rs docs</title>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,400;0,600;1,400;1,600&display=swap" rel="stylesheet">
+<style>
+    body {
+        background-color: rgb(53, 53, 53);
+        font-family: 'Fira Sans', sans-serif;
+        color: white;
+        margin: 0;
+        padding: 40px 20px;
+        display: flex;
+        height: 100vh;
+        width:  100vw;
+        justify-content: center;
+        box-sizing: border-box;
+    }
+    .logo {
+        text-align: center;
+        margin-bottom: 50px;
+        font-size: 2em;
+        font-weight: 500;
+    }
+    .logo img {
+        width: 100px;
+        height: auto;
+        margin-bottom: 20px;
+    }
+    .content {
+        width: 900px;
+    }
+    .crate {
+        display: flex;
+        align-items: center;
+        padding: 10px;
+        border-bottom: 2px solid #454444;
+    }
+    .crate-description {
+        flex: 1;
+        font-family: 'Source Serif 4', serif;
+        color: #C0C0C0;
+        text-align: center;
+    }
+    .crate-name {
+        color: #D6991D;
+        width: 120px;
+    }
+    /* Ensure the link color does not change after being clicked */
+    .crate-name a:link,
+    .crate-name a:visited,
+    .crate-name a:hover,
+    .crate-name a:active,
+    .crate-name a:focus {
+        color: #D6991D;
+    }
+    .crate-version {
+        color: #C0C0C0;
+        text-align: center;
+        width: 120px;
+    }
+
+    @media screen and (min-height: 650px) {
+        body {
+            align-items: center;
+        }
+    }
+</style>
+</head>
+<body>
+
+
+
+<div class="content">
+    <div class="logo">
+        <img src="esp-rs.svg" alt="esp-rs logo">
+        <div>esp-rs docs</div>
+    </div>
+    <!-- Crate entry -->
+    <div class="crate">
+        <span class="crate-name"><a href="docs/esp32/esp_hal/index.html">esp32</a></span>
+        <span class="crate-description">Crate esp-hal (targeting ESP32)</span>
+        <span class="crate-version">0.18.0</span> 
+    </div>
+
+    <div class="crate">
+        <span class="crate-name"><a href="docs/esp32c2/esp_hal/index.html">esp32c2</a></span>
+        <span class="crate-description">Crate esp-hal (targeting ESP32-C2)</span>
+        <span class="crate-version">0.13.0</span> 
+    </div>
+
+    <div class="crate">
+        <span class="crate-name"><a href="docs/esp32c3/esp_hal/index.html">esp32c3</a></span>
+        <span class="crate-description">Crate esp-hal (targeting ESP32-C3)</span>
+        <span class="crate-version">0.15.0</span> 
+    </div>
+
+    <div class="crate">
+        <span class="crate-name"><a href="docs/esp32c6/esp_hal/index.html">esp32c6</a></span>
+        <span class="crate-description">Crate esp-hal (targeting ESP32-C6)</span>
+        <span class="crate-version">0.8.0</span> 
+    </div>
+
+    <div class="crate">
+        <span class="crate-name"><a href="docs/esp32h2/esp_hal/index.html">esp32h2</a></span>
+        <span class="crate-description">Crate esp-hal (targeting ESP32-H2)</span>
+        <span class="crate-version">0.6.0</span> 
+    </div>
+
+    <div class="crate">
+        <span class="crate-name"><a href="docs/esp32p4/esp_hal/index.html">esp32p4</a></span>
+        <span class="crate-description">Work in progress...</span>
+        <span class="crate-version">-</span> 
+    </div>
+    <div class="crate">
+        <span class="crate-name"><a href="docs/esp32s2/esp_hal/index.html">esp32s2</a></span>
+        <span class="crate-description">Crate esp-hal (targeting ESP32-S2)</span>
+        <span class="crate-version">0.15.0</span> 
+    </div>
+
+    <div class="crate">
+        <span class="crate-name"><a href="docs/esp32s3/esp_hal/index.html">esp32s3</a></span>
+        <span class="crate-description">Crate esp-hal (targeting ESP32-S3)</span>
+        <span class="crate-version">0.15.0</span> 
+    </div>
+</div>
+
+</body>
+</html>
