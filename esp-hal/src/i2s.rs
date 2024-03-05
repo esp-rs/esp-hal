@@ -198,6 +198,7 @@ impl DataFormat {
 }
 
 /// An in-progress DMA write transfer.
+#[must_use]
 pub struct I2sWriteDmaTransfer<'t, 'd, T, CH>
 where
     T: RegisterAccess,
@@ -311,6 +312,7 @@ where
 }
 
 /// An in-progress DMA read transfer.
+#[must_use]
 pub struct I2sReadDmaTransfer<'t, 'd, T, CH>
 where
     T: RegisterAccess,

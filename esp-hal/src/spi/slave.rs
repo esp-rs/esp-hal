@@ -218,6 +218,7 @@ pub mod dma {
         }
     }
     /// An in-progress DMA transfer
+    #[must_use]
     pub struct SpiDmaTransferRxTx<'t, 'd, T, C>
     where
         T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
@@ -266,6 +267,8 @@ pub mod dma {
         }
     }
 
+    /// An in-progress DMA transfer.
+    #[must_use]
     pub struct SpiDmaTransferRx<'t, 'd, T, C>
     where
         T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
@@ -314,6 +317,7 @@ pub mod dma {
     }
 
     /// An in-progress DMA transfer.
+    #[must_use]
     pub struct SpiDmaTransferTx<'t, 'd, T, C>
     where
         T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,

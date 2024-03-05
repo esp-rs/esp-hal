@@ -1211,6 +1211,7 @@ where
 }
 
 /// An in-progress DMA transfer.
+#[must_use]
 pub struct DmaTransfer<'t, 'd, C, P, CP>
 where
     C: ChannelTypes,

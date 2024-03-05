@@ -431,6 +431,7 @@ impl<'d, TX, P> core::fmt::Debug for I8080<'d, TX, P> {
 }
 
 /// An in-progress transfer
+#[must_use]
 pub struct Transfer<'t, 'd, TX: Tx, P> {
     instance: Option<&'t mut I8080<'d, TX, P>>,
 }

@@ -301,6 +301,7 @@ pub mod dma {
     }
 
     /// An in-progress DMA transfer
+    #[must_use]
     pub struct AesDmaTransferRxTx<'t, 'd, C>
     where
         C: ChannelTypes,
