@@ -1167,7 +1167,7 @@ where
     /// The maximum amount of data to be sent is 32736 bytes.
     pub fn write_dma<'t, TXBUF>(
         &'t mut self,
-        words: &'t mut TXBUF,
+        words: &'t TXBUF,
     ) -> Result<DmaTransfer<'t, 'd, CH, P, CP>, Error>
     where
         TXBUF: ReadBuffer<Word = u8>,

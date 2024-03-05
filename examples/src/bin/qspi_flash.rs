@@ -96,8 +96,8 @@ fn main() -> ! {
     let mut delay = Delay::new(&clocks);
 
     // DMA buffer require a static life-time
-    let (mut zero_buf, _, _, _) = dma_buffers!(0);
-    let mut send = tx_buffer;
+    let (zero_buf, _, _, _) = dma_buffers!(0);
+    let send = tx_buffer;
     let mut receive = rx_buffer;
 
     // write enable
@@ -107,7 +107,7 @@ fn main() -> ! {
             Command::Command8(0x06, SpiDataMode::Single),
             Address::None,
             0,
-            &mut zero_buf,
+            &zero_buf,
         )
         .unwrap();
     transfer.wait().unwrap();
@@ -120,7 +120,7 @@ fn main() -> ! {
             Command::Command8(0x20, SpiDataMode::Single),
             Address::Address24(0x000000, SpiDataMode::Single),
             0,
-            &mut zero_buf,
+            &zero_buf,
         )
         .unwrap();
     transfer.wait().unwrap();
@@ -133,7 +133,7 @@ fn main() -> ! {
             Command::Command8(0x06, SpiDataMode::Single),
             Address::None,
             0,
-            &mut zero_buf,
+            &zero_buf,
         )
         .unwrap();
     transfer.wait().unwrap();
@@ -148,7 +148,7 @@ fn main() -> ! {
             Command::Command8(0x32, SpiDataMode::Single),
             Address::Address24(0x000000, SpiDataMode::Single),
             0,
-            &mut send,
+            &send,
         )
         .unwrap();
     transfer.wait().unwrap();

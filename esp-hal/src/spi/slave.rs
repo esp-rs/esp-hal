@@ -398,7 +398,7 @@ pub mod dma {
         /// The write is driven by the SPI master's sclk signal and cs line.
         pub fn dma_write<'t, TXBUF>(
             &'t mut self,
-            words: &'t mut TXBUF,
+            words: &'t TXBUF,
         ) -> Result<SpiDmaTransferTx<'t, 'd, T, C>, Error>
         where
             TXBUF: ReadBuffer<Word = u8>,
@@ -449,7 +449,7 @@ pub mod dma {
         /// line.
         pub fn dma_transfer<'t, TXBUF, RXBUF>(
             &'t mut self,
-            words: &'t mut TXBUF,
+            words: &'t TXBUF,
             read_buffer: &'t mut RXBUF,
         ) -> Result<SpiDmaTransferRxTx<'t, 'd, T, C>, Error>
         where

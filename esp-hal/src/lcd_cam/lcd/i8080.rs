@@ -300,7 +300,7 @@ where
         &'t mut self,
         cmd: impl Into<Command<P::Word>>,
         dummy: u8,
-        data: &mut TXBUF,
+        data: &'t TXBUF,
     ) -> Result<Transfer<'t, 'd, TX, P>, DmaError>
     where
         TXBUF: ReadBuffer<Word = P::Word>,

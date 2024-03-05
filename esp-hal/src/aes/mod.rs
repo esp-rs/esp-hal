@@ -387,7 +387,7 @@ pub mod dma {
         /// is 32736 bytes.
         pub fn process<'t, TXBUF, RXBUF>(
             &'t mut self,
-            words: &'t mut TXBUF,
+            words: &'t TXBUF,
             read_buffer: &'t mut RXBUF,
             mode: Mode,
             cipher_mode: CipherMode,

@@ -64,7 +64,7 @@ fn main() -> ! {
     #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
     let dma_channel = dma.channel0;
 
-    let (mut tx_buffer, mut tx_descriptors, _, mut rx_descriptors) = dma_buffers!(32000, 0);
+    let (tx_buffer, mut tx_descriptors, _, mut rx_descriptors) = dma_buffers!(32000, 0);
 
     let i2s = I2s::new(
         peripherals.I2S0,
@@ -102,7 +102,7 @@ fn main() -> ! {
     }
 
     let mut filler = [0u8; 10000];
-    let mut transfer = i2s_tx.write_dma_circular(&mut tx_buffer).unwrap();
+    let mut transfer = i2s_tx.write_dma_circular(&tx_buffer).unwrap();
 
     loop {
         let avail = transfer.available();

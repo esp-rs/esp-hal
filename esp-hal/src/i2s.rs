@@ -295,7 +295,7 @@ where
     /// transfer
     fn write_dma<'t>(
         &'t mut self,
-        words: &'t mut TXBUF,
+        words: &'t TXBUF,
     ) -> Result<I2sWriteDmaTransfer<'t, 'd, T, CH>, Error>
     where
         TXBUF: ReadBuffer<Word = u8>;
@@ -304,7 +304,7 @@ where
     /// represents the in-progress DMA transfer
     fn write_dma_circular<'t>(
         &'t mut self,
-        words: &'t mut TXBUF,
+        words: &'t TXBUF,
     ) -> Result<I2sWriteDmaTransfer<'t, 'd, T, CH>, Error>
     where
         TXBUF: ReadBuffer<Word = u8>;
@@ -574,7 +574,7 @@ where
 
     fn start_tx_transfer<'t, TXBUF>(
         &'t mut self,
-        words: &'t mut TXBUF,
+        words: &'t TXBUF,
         circular: bool,
     ) -> Result<I2sWriteDmaTransfer<'t, 'd, T, CH>, Error>
     where
@@ -656,7 +656,7 @@ where
 {
     fn write_dma<'t>(
         &'t mut self,
-        words: &'t mut TXBUF,
+        words: &'t TXBUF,
     ) -> Result<I2sWriteDmaTransfer<'t, 'd, T, CH>, Error>
     where
         TXBUF: ReadBuffer<Word = u8>,
@@ -666,7 +666,7 @@ where
 
     fn write_dma_circular<'t>(
         &'t mut self,
-        words: &'t mut TXBUF,
+        words: &'t TXBUF,
     ) -> Result<I2sWriteDmaTransfer<'t, 'd, T, CH>, Error>
     where
         TXBUF: ReadBuffer<Word = u8>,

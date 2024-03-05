@@ -213,7 +213,7 @@ fn main() -> ! {
     let total_pixels = width as usize * height as usize;
     let total_bytes = total_pixels * 2;
 
-    let mut buffer = tx_buffer;
+    let buffer = tx_buffer;
 
     for color in [RED, BLUE].iter().cycle() {
         let color = color.to_be_bytes();
@@ -223,19 +223,19 @@ fn main() -> ! {
 
         let mut bytes_left_to_write = total_bytes;
 
-        let transfer = i8080.send_dma(0x2C, 0, &mut buffer).unwrap();
+        let transfer = i8080.send_dma(0x2C, 0, &buffer).unwrap();
         transfer.wait().unwrap();
 
         bytes_left_to_write -= buffer.len();
 
         while bytes_left_to_write >= buffer.len() {
-            let transfer = i8080.send_dma(0x3C, 0, &mut buffer).unwrap();
+            let transfer = i8080.send_dma(0x3C, 0, &buffer).unwrap();
             transfer.wait().unwrap();
 
             bytes_left_to_write -= buffer.len();
         }
         if bytes_left_to_write > 0 {
-            let transfer = i8080.send_dma(0x3C, 0, &mut buffer).unwrap();
+            let transfer = i8080.send_dma(0x3C, 0, &buffer).unwrap();
             transfer.wait().unwrap();
         }
 

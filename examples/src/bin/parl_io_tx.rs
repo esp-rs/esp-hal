@@ -75,7 +75,7 @@ fn main() -> ! {
         )
         .unwrap();
 
-    let mut buffer = tx_buffer;
+    let buffer = tx_buffer;
     for i in 0..buffer.len() {
         buffer[i] = (i % 255) as u8;
     }
@@ -83,7 +83,7 @@ fn main() -> ! {
     let mut delay = Delay::new(&clocks);
 
     loop {
-        let transfer = parl_io_tx.write_dma(&mut buffer).unwrap();
+        let transfer = parl_io_tx.write_dma(&buffer).unwrap();
         transfer.wait().unwrap();
         println!("Transferred {} bytes", buffer.len());
 

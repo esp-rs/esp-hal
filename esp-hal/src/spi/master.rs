@@ -988,7 +988,7 @@ pub mod dma {
         #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
         pub fn dma_write<'t, TXBUF>(
             &'t mut self,
-            words: &'t mut TXBUF,
+            words: &'t TXBUF,
         ) -> Result<SpiDmaTransfer<'t, 'd, T, C, M>, super::Error>
         where
             TXBUF: ReadBuffer<Word = u8>,
@@ -1035,7 +1035,7 @@ pub mod dma {
         /// 32736 bytes.
         pub fn dma_transfer<'t, TXBUF, RXBUF>(
             &'t mut self,
-            words: &'t mut TXBUF,
+            words: &'t TXBUF,
             read_buffer: &'t mut RXBUF,
         ) -> Result<SpiDmaTransferRxTx<'t, 'd, T, C, M>, super::Error>
         where
@@ -1147,7 +1147,7 @@ pub mod dma {
             cmd: Command,
             address: Address,
             dummy: u8,
-            buffer: &'t mut TXBUF,
+            buffer: &'t TXBUF,
         ) -> Result<SpiDmaTransfer<'t, 'd, T, C, M>, super::Error>
         where
             TXBUF: ReadBuffer<Word = u8>,

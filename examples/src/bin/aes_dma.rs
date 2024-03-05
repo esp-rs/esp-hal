@@ -31,8 +31,7 @@ fn main() -> ! {
     let dma = Dma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
 
-    let (mut tx_buffer, mut tx_descriptors, mut rx_buffer, mut rx_descriptors) =
-        dma_buffers!(16, 16);
+    let (input, mut tx_descriptors, mut output, mut rx_descriptors) = dma_buffers!(16, 16);
 
     let mut aes = Aes::new(peripherals.AES).with_dma(dma_channel.configure(
         false,
@@ -42,13 +41,13 @@ fn main() -> ! {
     ));
 
     let keytext = [1u8, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
-    rx_buffer.copy_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
+    input.copy_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
 
     let pre_hw_encrypt = cycles();
     let transfer = aes
         .process(
-            &mut rx_buffer,
-            &mut tx_buffer,
+            &input,
+            &mut output,
             Mode::Encryption128,
             CipherMode::Ecb,
             keytext,
@@ -62,15 +61,15 @@ fn main() -> ! {
     );
 
     let mut hw_encrypted = [0u8; 16];
-    (&mut hw_encrypted[..]).copy_from_slice(tx_buffer);
+    (&mut hw_encrypted[..]).copy_from_slice(output);
 
-    rx_buffer.copy_from_slice(tx_buffer);
+    input.copy_from_slice(output);
 
     let pre_hw_decrypt = cycles();
     let transfer = aes
         .process(
-            &mut rx_buffer,
-            &mut tx_buffer,
+            &input,
+            &mut output,
             Mode::Decryption128,
             CipherMode::Ecb,
             keytext,
@@ -84,7 +83,7 @@ fn main() -> ! {
     );
 
     let mut hw_decrypted = [0u8; 16];
-    (&mut hw_decrypted[..]).copy_from_slice(tx_buffer);
+    (&mut hw_decrypted[..]).copy_from_slice(output);
 
     // create an array with aes block size
     let mut block_buf = [0_u8; 16];
