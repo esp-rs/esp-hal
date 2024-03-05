@@ -1877,8 +1877,7 @@ impl IO {
 
 #[interrupt]
 unsafe fn GPIO() {
-    if let Some(user_handler) =
-        critical_section::with(|cs| USER_INTERRUPT_HANDLER.borrow(cs).get().clone())
+    if let Some(user_handler) = critical_section::with(|cs| USER_INTERRUPT_HANDLER.borrow(cs).get())
     {
         unsafe {
             user_handler();
