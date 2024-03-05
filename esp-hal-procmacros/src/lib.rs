@@ -374,6 +374,7 @@ pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
     use self::interrupt::{check_attr_whitelist, WhiteListCaller};
 
     let mut f: ItemFn = syn::parse(input).expect("`#[handler]` must be applied to a function");
+    let original_span = f.span();
 
     let attr_args = match NestedMeta::parse_meta_list(args.into()) {
         Ok(v) => v,
@@ -416,9 +417,9 @@ pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
         .into();
     }
 
-    f.sig.abi = syn::parse_quote!(extern "C");
+    f.sig.abi = syn::parse_quote_spanned!(original_span => extern "C");
 
-    quote::quote!(
+    quote::quote_spanned!( original_span =>
         #f
     )
     .into()
