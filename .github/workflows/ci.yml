@@ -296,28 +296,3 @@ jobs:
         run: cargo fmt --all --manifest-path=esp-riscv-rt/Cargo.toml -- --check
       - name: rustfmt (examples)
         run: cargo fmt --all --manifest-path=examples/Cargo.toml -- --check
-
-  build-docs:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf, riscv32imafc-unknown-none-elf
-          toolchain: ${{ env.MSRV }}
-          components: rust-src
-
-      - uses: esp-rs/xtensa-toolchain@v1.5
-        with:
-          default: true
-          ldproxy: false
-          
-      - name: Build and Clone Documentation
-        run: ./.github/build_docs.sh
-          
-      - name: Deploy 🚀
-        uses: JamesIves/github-pages-deploy-action@4.1.4
-        with:
-            token: ${{ secrets.GITHUB_TOKEN }}
-            branch: gh-pages
-            folder: .
