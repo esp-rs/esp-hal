@@ -86,7 +86,13 @@ use embassy_time_driver::{AlarmHandle, Driver};
 use crate::{interrupt::Priority, peripherals::Interrupt};
 
 #[cfg_attr(
-    all(systimer, feature = "embassy-time-systick"),
+    all(
+        systimer,
+        any(
+            feature = "embassy-time-systick-16mhz",
+            feature = "embassy-time-systick-80mhz"
+        )
+    ),
     path = "time_driver_systimer.rs"
 )]
 #[cfg_attr(
