@@ -2,7 +2,8 @@
 DEFMT_LOG="debug"
 
 [target.'cfg(target_arch = "riscv32")']
-runner    = "probe-rs test --"
+# FIXME: Remove the `--chip` argument when my PR is merged
+runner    = "probe-rs test --chip=esp32c6 --"
 rustflags = [
     "-C", "link-arg=-Tlinkall.x",
     "-C", "link-arg=-Tdefmt.x",
