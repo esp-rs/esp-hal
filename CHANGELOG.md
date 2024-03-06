@@ -68,6 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The DMA peripheral is now called `Dma` for devices with both PDMA and GDMA controllers (#1125)
 - The `ADC` driver's constructor is now `new` instead of `adc`, to be more consistent with other APIs (#1133)
 - `embassy-executor`'s `integrated-timers` is no longer enabled by default.
+- Renamed `embassy-time-systick` to `embassy-time-systick-16mhz` for use with all chips with a systimer, except `esp32s2`. Added `embassy-time-systick-80mhz` specifically for the `esp32s2`. (#1247)
 
 ## [0.15.0] - 2024-01-19
 

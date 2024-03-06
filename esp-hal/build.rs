@@ -111,11 +111,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     // is available:
     #[cfg(feature = "embassy")]
     {
-        #[cfg(feature = "esp32")]
-        assert_unique_used_features!("embassy-time-timg0");
-
-        #[cfg(not(feature = "esp32"))]
-        assert_unique_used_features!("embassy-time-systick", "embassy-time-timg0");
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "esp32")] {
+                assert_unique_used_features!("embassy-time-timg0");
+            } else if #[cfg(feature = "esp32s2")] {
+                assert_unique_used_features!("embassy-time-systick-80mhz", "embassy-time-timg0");
+            } else {
+                assert_unique_used_features!("embassy-time-systick-16mhz", "embassy-time-timg0");
+            }
+        }
     }
 
     #[cfg(feature = "flip-link")]
