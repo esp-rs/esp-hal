@@ -14,7 +14,7 @@ CHIPS=("esp32" "esp32c2" "esp32c3" "esp32c6" "esp32h2" "esp32p4" "esp32s2" "esp3
 
 for CHIP in "${CHIPS[@]}"; do
   cargo xtask build-documentation \
-    --output-path="docs/$PKG_VERSION"/"$CHIP"/ \
+    --output-path="docs/esp-hal/$PKG_VERSION"/"$CHIP"/ \
     esp-hal \
     "$CHIP"
 done
