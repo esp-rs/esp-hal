@@ -1,6 +1,7 @@
 use std::{
     collections::VecDeque,
-    fs,
+    fs::{self, File},
+    io::{BufRead as _, BufReader, Write as _},
     path::{Path, PathBuf},
 };
 
@@ -10,7 +11,7 @@ use strum::{Display, EnumIter, IntoEnumIterator};
 
 use self::cargo::CargoArgsBuilder;
 
-mod cargo;
+pub mod cargo;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Display, EnumIter, ValueEnum)]
 #[strum(serialize_all = "kebab-case")]
@@ -63,6 +64,19 @@ impl Chip {
             Esp32c6 => Ok("riscv32imac-unknown-none-elf"),
             Esp32s2 | Esp32s3 => Ok("riscv32imc-unknown-none-elf"),
             _ => bail!("Chip does not contain an LP core: '{}'", self),
+        }
+    }
+
+    pub fn pretty_name(&self) -> &str {
+        match self {
+            Chip::Esp32 => "ESP32",
+            Chip::Esp32c2 => "ESP32-C2",
+            Chip::Esp32c3 => "ESP32-C3",
+            Chip::Esp32c6 => "ESP32-C6",
+            Chip::Esp32h2 => "ESP32-H2",
+            Chip::Esp32p4 => "ESP32-P4",
+            Chip::Esp32s2 => "ESP32-S2",
+            Chip::Esp32s3 => "ESP32-S3",
         }
     }
 }
@@ -383,6 +397,100 @@ pub fn bump_version(workspace: &Path, package: Package, amount: Version) -> Resu
 
     manifest["package"]["version"] = toml_edit::value(version.to_string());
     fs::write(manifest_path, manifest.to_string())?;
+
+    Ok(())
+}
+
+// File header for the generated eFuse fields.
+const EFUSE_FIELDS_RS_HEADER: &str = r#"
+//! eFuse fields for the $CHIP.
+//!
+//! This file was automatically generated, please do not edit it manually!
+//!
+//! For information on how to regenerate these files, please refer to the
+//! `xtask` package's `README.md` file.
+
+use super::EfuseBlock;
+use crate::soc::efuse_field::EfuseField;
+"#;
+
+/// Generate Rust constants for each eFuse field defined in the given CSV file.
+pub fn generate_efuse_table(
+    chip: &Chip,
+    csv_path: impl AsRef<Path>,
+    out_path: impl AsRef<Path>,
+) -> Result<()> {
+    let csv_path = csv_path.as_ref();
+    let out_path = out_path.as_ref();
+
+    // Create the reader and writer from our source and destination file paths:
+    let mut reader = BufReader::new(File::open(csv_path)?);
+    let mut writer = File::create(out_path)?;
+
+    // Write the header to the destination file:
+    writeln!(
+        writer,
+        "{}",
+        EFUSE_FIELDS_RS_HEADER
+            .trim_start()
+            .replace("$CHIP", chip.pretty_name())
+    )?;
+
+    // Generate constants from the CSV eFuse table, and write them out to
+    // the destination file:
+    let mut line = String::with_capacity(128);
+    while reader.read_line(&mut line)? > 0 {
+        line = line
+            .trim_end_matches('\n')
+            .trim_end_matches('\r')
+            .to_string();
+
+        // Drop comment and trim:
+        line.truncate(
+            if let Some((prefix, _comment)) = line.split_once('#') {
+                prefix
+            } else {
+                &line
+            }
+            .trim()
+            .len(),
+        );
+
+        // Skip empty lines (and in turn, comments):
+        if line.is_empty() {
+            continue;
+        }
+
+        let mut fields = line.split(',');
+
+        match (
+            fields.next().map(|s| s.trim().replace('.', "_")),
+            fields
+                .next()
+                .map(|s| s.trim().replace(|c: char| !c.is_ascii_digit(), "")),
+            fields
+                .next()
+                .map(|s| s.trim())
+                .and_then(|s| s.parse::<u32>().ok()),
+            fields
+                .next()
+                .map(|s| s.trim())
+                .and_then(|s| s.parse::<u32>().ok()),
+            fields.next().map(|s| s.trim()),
+        ) {
+            (Some(name), Some(block), Some(bit_off), Some(bit_len), Some(desc)) => {
+                let desc = desc.replace('[', "`[").replace(']', "]`");
+                writeln!(writer, "/// {desc}")?;
+                writeln!(
+                    writer,
+                    "pub const {name}: EfuseField = EfuseField::new(EfuseBlock::Block{block}, {bit_off}, {bit_len});"
+                )?;
+            }
+            other => eprintln!("Invalid data: {other:?}"),
+        }
+
+        line.clear();
+    }
 
     Ok(())
 }

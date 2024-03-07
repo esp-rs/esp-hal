@@ -2,7 +2,7 @@ use std::{
     env,
     error::Error,
     fs::{self, File},
-    io::{BufRead, BufReader, Write},
+    io::{BufRead, Write},
     path::{Path, PathBuf},
 };
 
@@ -256,9 +256,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     #[cfg(any(feature = "esp32", feature = "esp32s2"))]
     File::create(out.join("memory_extras.x"))?.write_all(&generate_memory_extras())?;
 
-    // Generate the eFuse table from the selected device's CSV file:
-    gen_efuse_table(device_name, out)?;
-
     Ok(())
 }
 
@@ -326,71 +323,6 @@ fn preprocess_file(
             let _ = out_file.write(b"\n")?;
         }
     }
-    Ok(())
-}
-
-fn gen_efuse_table(device_name: &str, out_dir: impl AsRef<Path>) -> Result<(), Box<dyn Error>> {
-    let src_path = PathBuf::from(format!("devices/{device_name}/efuse.csv"));
-    let out_path = out_dir.as_ref().join("efuse_fields.rs");
-
-    println!("cargo:rerun-if-changed={}", src_path.display());
-
-    let mut writer = File::create(out_path)?;
-    let mut reader = BufReader::new(File::open(src_path)?);
-    let mut line = String::with_capacity(128);
-
-    while reader.read_line(&mut line)? > 0 {
-        if line.ends_with('\n') {
-            line.pop();
-            if line.ends_with('\r') {
-                line.pop();
-            }
-        }
-        // drop comment and trim
-        line.truncate(
-            if let Some((pfx, _cmt)) = line.split_once('#') {
-                pfx
-            } else {
-                &line
-            }
-            .trim()
-            .len(),
-        );
-        // skip empty
-        if line.is_empty() {
-            continue;
-        }
-
-        let mut fields = line.split(',');
-        match (
-            fields.next().map(|s| s.trim().replace('.', "_")),
-            fields
-                .next()
-                .map(|s| s.trim().replace(|c: char| !c.is_ascii_digit(), "")),
-            fields
-                .next()
-                .map(|s| s.trim())
-                .and_then(|s| s.parse::<u32>().ok()),
-            fields
-                .next()
-                .map(|s| s.trim())
-                .and_then(|s| s.parse::<u32>().ok()),
-            fields.next().map(|s| s.trim()),
-        ) {
-            (Some(name), Some(block), Some(bit_off), Some(bit_len), Some(desc)) => {
-                let desc = desc.replace('[', "`[").replace(']', "]`");
-                writeln!(writer, "/// {desc}")?;
-                writeln!(
-                    writer,
-                    "pub const {name}: EfuseField = EfuseField::new(EfuseBlock::Block{block}, {bit_off}, {bit_len});"
-                )?;
-            }
-            other => eprintln!("Invalid data: {other:?}"),
-        }
-
-        line.clear();
-    }
-
     Ok(())
 }
 

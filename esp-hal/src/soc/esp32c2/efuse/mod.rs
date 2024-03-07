@@ -33,8 +33,10 @@
 //! );
 //! ```
 
-pub use crate::soc::efuse_field::*;
+pub use self::fields::*;
 use crate::{adc::Attenuation, peripherals::EFUSE};
+
+mod fields;
 
 pub struct Efuse;
 

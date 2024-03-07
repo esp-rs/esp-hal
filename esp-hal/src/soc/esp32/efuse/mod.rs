@@ -35,8 +35,10 @@
 
 use fugit::{HertzU32, RateExtU32};
 
+pub use self::fields::*;
 use crate::peripherals::EFUSE;
-pub use crate::soc::efuse_field::*;
+
+mod fields;
 
 pub struct Efuse;
 
