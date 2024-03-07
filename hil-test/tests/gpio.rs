@@ -1,12 +1,7 @@
 #![no_std]
 #![no_main]
 
-use embedded_hal_1::digital::{
-    InputPin as _,
-    OutputPin as _,
-    StatefulOutputPin as _,
-    ToggleableOutputPin as _,
-};
+use embedded_hal_1::digital::{InputPin as _, OutputPin as _, StatefulOutputPin as _};
 use hil_test::esp_hal::{
     gpio::{GpioPin, Input, Output, PullDown, PushPull, IO},
     peripherals::Peripherals,
@@ -41,7 +36,7 @@ mod tests {
     }
 
     #[test]
-    fn test_gpio_input(ctx: Context) {
+    fn test_gpio_input(mut ctx: Context) {
         // `InputPin`:
         assert_eq!(ctx.io0.is_low(), Ok(true));
         assert_eq!(ctx.io0.is_high(), Ok(false));

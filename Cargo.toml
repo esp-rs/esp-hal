@@ -9,4 +9,5 @@ exclude  = [
     "esp-metadata",
     "esp-riscv-rt",
     "examples",
+    "hil-test",
 ]
