@@ -1,7 +1,6 @@
 # esp-hal
 
 [![Crates.io](https://img.shields.io/crates/v/esp-hal?labelColor=1C2C2E&color=C96329&logo=Rust&style=flat-square)](https://crates.io/crates/esp-hal)
-[![docs.rs](https://img.shields.io/docsrs/esp-hal?labelColor=1C2C2E&color=C96329&logo=rust&style=flat-square)](https://docs.rs/esp-hal)
 ![Crates.io](https://img.shields.io/crates/l/esp-hal?labelColor=1C2C2E&style=flat-square)
 [![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&labelColor=1C2C2E&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
 
@@ -15,7 +14,7 @@ Most traits defined by the [embedded-hal] family of packages are implemented as 
 
 ## [Documentation]
 
-[documentation]: https://docs.rs/esp-hal/
+[documentation]: https://docs.esp-rs.org/
 
 ## Usage
 
