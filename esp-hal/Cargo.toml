@@ -68,9 +68,10 @@ esp-riscv-rt = { version = "0.7.0", optional = true, path = "../esp-riscv-rt" }
 xtensa-lx-rt = { version = "0.16.0", optional = true }
 
 [build-dependencies]
-basic-toml = "0.1.8"
-cfg-if     = "1.0.0"
-serde      = { version = "1.0.197", features = ["derive"] }
+basic-toml   = "0.1.8"
+cfg-if       = "1.0.0"
+esp-metadata = { version = "0.1.0", path = "../esp-metadata" }
+serde        = { version = "1.0.197", features = ["derive"] }
 
 [features]
 default = ["rt", "vectored"]
