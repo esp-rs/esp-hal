@@ -2,8 +2,7 @@
 DEFMT_LOG="debug"
 
 [target.'cfg(target_arch = "riscv32")']
-# FIXME: Remove the `--chip` argument when my PR is merged
-runner    = "probe-rs test --chip=esp32c6 --"
+runner    = "probe-rs test  --"
 rustflags = [
     "-C", "link-arg=-Tlinkall.x",
     "-C", "link-arg=-Tdefmt.x",
@@ -11,7 +10,7 @@ rustflags = [
 
 [target.'cfg(target_arch = "xtensa")']
 # TODO: Xtensa not yet fully supported by `probe-rs`
-# runner    = "probe-rs test --"
+runner    = "probe-rs test --"
 rustflags = [
     "-C", "link-arg=-nostartfiles",
     "-C", "link-arg=-Wl,-Tlinkall.x",
