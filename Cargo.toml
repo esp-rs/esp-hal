@@ -8,4 +8,5 @@ exclude  = [
     "esp-lp-hal",
     "esp-riscv-rt",
     "examples",
+    "hil-test",
 ]

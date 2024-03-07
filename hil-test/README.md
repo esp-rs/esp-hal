@@ -16,13 +16,13 @@ We use [embedded-test] as our testing framework, which relies on [defmt] interna
 
 ### Running Tests Locally
 
-We use [probe-rs] for flashing and runnings the tests on a target device, however this **MUST** be installed from the correct branch, and with the correct features enabled:
+We use [probe-rs] for flashing and running the tests on a target device, however this **MUST** be installed from the correct branch, and with the correct features enabled:
 
 ```text
 cargo install probe-rs \
   --git=https://github.com/probe-rs/probe-rs \
   --branch=feature/testing \
-  --features=cli,ftdi \
+  --features=cli \
   --bin=probe-rs
 ```
 
