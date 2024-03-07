@@ -58,5 +58,7 @@ mod tests {
         unwrap!(ctx.io1.toggle());
         assert_eq!(ctx.io1.is_set_low(), Ok(false));
         assert_eq!(ctx.io1.is_set_high(), Ok(true));
+        // Leave in initial state for next test
+        unwrap!(ctx.io1.toggle());
     }
 }
