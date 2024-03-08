@@ -54,7 +54,7 @@ pub enum ChipType {
 
 impl Efuse {
     pub fn read_base_mac_address() -> [u8; 6] {
-        Self::read_field_be(MAC_FACTORY)
+        Self::read_field_be(MAC)
     }
 
     /// Returns the number of CPUs available on the chip.

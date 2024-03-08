@@ -38,12 +38,41 @@ pub const WR_DIS_SECURE_BOOT_EN: EfuseField = EfuseField::new(EfuseBlock::Block0
 pub const WR_DIS_BLK1: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
 /// `[WR_DIS.MAC_FACTORY]` wr_dis of MAC
 pub const WR_DIS_MAC: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
-/// `[]` wr_dis of MAC_EXT
-pub const WR_DIS_MAC_EXT: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
-/// `[WR_DIS.SYS_DATA_PART1]` wr_dis of BLOCK_SYS_DATA1
-pub const WR_DIS_BLOCK_SYS_DATA1: EfuseField = EfuseField::new(EfuseBlock::Block0, 21, 1);
+/// `[]` wr_dis of WAFER_VERSION_MINOR
+pub const WR_DIS_WAFER_VERSION_MINOR: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
+/// `[]` wr_dis of WAFER_VERSION_MAJOR
+pub const WR_DIS_WAFER_VERSION_MAJOR: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
+/// `[]` wr_dis of DISABLE_WAFER_VERSION_MAJOR
+pub const WR_DIS_DISABLE_WAFER_VERSION_MAJOR: EfuseField =
+    EfuseField::new(EfuseBlock::Block0, 20, 1);
+/// `[]` wr_dis of DISABLE_BLK_VERSION_MAJOR
+pub const WR_DIS_DISABLE_BLK_VERSION_MAJOR: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
+/// `[]` wr_dis of BLK_VERSION_MINOR
+pub const WR_DIS_BLK_VERSION_MINOR: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
+/// `[]` wr_dis of BLK_VERSION_MAJOR
+pub const WR_DIS_BLK_VERSION_MAJOR: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
+/// `[]` wr_dis of FLASH_CAP
+pub const WR_DIS_FLASH_CAP: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
+/// `[]` wr_dis of FLASH_TEMP
+pub const WR_DIS_FLASH_TEMP: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
+/// `[]` wr_dis of FLASH_VENDOR
+pub const WR_DIS_FLASH_VENDOR: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
+/// `[]` wr_dis of PSRAM_CAP
+pub const WR_DIS_PSRAM_CAP: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
+/// `[]` wr_dis of PSRAM_TEMP
+pub const WR_DIS_PSRAM_TEMP: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
+/// `[]` wr_dis of PSRAM_VENDOR
+pub const WR_DIS_PSRAM_VENDOR: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
+/// `[]` wr_dis of PKG_VERSION
+pub const WR_DIS_PKG_VERSION: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
+/// `[]` wr_dis of BLOCK2
+pub const WR_DIS_SYS_DATA_PART1: EfuseField = EfuseField::new(EfuseBlock::Block0, 21, 1);
+/// `[]` wr_dis of OPTIONAL_UNIQUE_ID
+pub const WR_DIS_OPTIONAL_UNIQUE_ID: EfuseField = EfuseField::new(EfuseBlock::Block0, 21, 1);
 /// `[WR_DIS.USER_DATA]` wr_dis of BLOCK_USR_DATA
 pub const WR_DIS_BLOCK_USR_DATA: EfuseField = EfuseField::new(EfuseBlock::Block0, 22, 1);
+/// `[WR_DIS.MAC_CUSTOM WR_DIS.USER_DATA_MAC_CUSTOM]` wr_dis of CUSTOM_MAC
+pub const WR_DIS_CUSTOM_MAC: EfuseField = EfuseField::new(EfuseBlock::Block0, 22, 1);
 /// `[WR_DIS.KEY0]` wr_dis of BLOCK_KEY0
 pub const WR_DIS_BLOCK_KEY0: EfuseField = EfuseField::new(EfuseBlock::Block0, 23, 1);
 /// `[WR_DIS.KEY1]` wr_dis of BLOCK_KEY1
@@ -110,10 +139,7 @@ pub const DIS_DOWNLOAD_MANUAL_ENCRYPT: EfuseField = EfuseField::new(EfuseBlock::
 pub const USB_PHY_SEL: EfuseField = EfuseField::new(EfuseBlock::Block0, 57, 1);
 /// `[]` Set this bit to control validation of HUK generate mode. Odd of 1 is
 /// invalid; even of 1 is valid
-pub const KM_HUK_GEN_STATE_LOW: EfuseField = EfuseField::new(EfuseBlock::Block0, 58, 6);
-/// `[]` Set this bit to control validation of HUK generate mode. Odd of 1 is
-/// invalid; even of 1 is valid
-pub const KM_HUK_GEN_STATE_HIGH: EfuseField = EfuseField::new(EfuseBlock::Block0, 64, 3);
+pub const KM_HUK_GEN_STATE: EfuseField = EfuseField::new(EfuseBlock::Block0, 58, 9);
 /// `[]` Set bits to control key manager random number switch cycle. 0: control
 /// by register. 1: 8 km clk cycles. 2: 16 km cycles. 3: 32 km cycles
 pub const KM_RND_SWITCH_CYCLE: EfuseField = EfuseField::new(EfuseBlock::Block0, 67, 2);
@@ -235,13 +261,37 @@ pub const DIS_WDT: EfuseField = EfuseField::new(EfuseBlock::Block0, 180, 1);
 pub const DIS_SWD: EfuseField = EfuseField::new(EfuseBlock::Block0, 181, 1);
 /// `[MAC_FACTORY]` MAC address
 pub const MAC: EfuseField = EfuseField::new(EfuseBlock::Block1, 0, 48);
-/// `[]` Stores the extended bits of MAC address `[0]`
-pub const MAC_EXT: EfuseField = EfuseField::new(EfuseBlock::Block1, 48, 16);
-/// `[SYS_DATA_PART1]` System data part 1
-pub const BLOCK_SYS_DATA1: EfuseField = EfuseField::new(EfuseBlock::Block2, 0, 256);
+/// `[]` Minor chip version
+pub const WAFER_VERSION_MINOR: EfuseField = EfuseField::new(EfuseBlock::Block1, 64, 4);
+/// `[]` Major chip version
+pub const WAFER_VERSION_MAJOR: EfuseField = EfuseField::new(EfuseBlock::Block1, 68, 2);
+/// `[]` Disables check of wafer version major
+pub const DISABLE_WAFER_VERSION_MAJOR: EfuseField = EfuseField::new(EfuseBlock::Block1, 70, 1);
+/// `[]` Disables check of blk version major
+pub const DISABLE_BLK_VERSION_MAJOR: EfuseField = EfuseField::new(EfuseBlock::Block1, 71, 1);
+/// `[]` BLK_VERSION_MINOR of BLOCK2
+pub const BLK_VERSION_MINOR: EfuseField = EfuseField::new(EfuseBlock::Block1, 72, 3);
+/// `[]` BLK_VERSION_MAJOR of BLOCK2
+pub const BLK_VERSION_MAJOR: EfuseField = EfuseField::new(EfuseBlock::Block1, 75, 2);
+/// `[]` Flash capacity
+pub const FLASH_CAP: EfuseField = EfuseField::new(EfuseBlock::Block1, 77, 3);
+/// `[]` Flash temperature
+pub const FLASH_TEMP: EfuseField = EfuseField::new(EfuseBlock::Block1, 80, 2);
+/// `[]` Flash vendor
+pub const FLASH_VENDOR: EfuseField = EfuseField::new(EfuseBlock::Block1, 82, 3);
+/// `[]` PSRAM capacity
+pub const PSRAM_CAP: EfuseField = EfuseField::new(EfuseBlock::Block1, 85, 2);
+/// `[]` PSRAM temperature
+pub const PSRAM_TEMP: EfuseField = EfuseField::new(EfuseBlock::Block1, 87, 2);
+/// `[]` PSRAM vendor
+pub const PSRAM_VENDOR: EfuseField = EfuseField::new(EfuseBlock::Block1, 89, 2);
+/// `[]` Package version
+pub const PKG_VERSION: EfuseField = EfuseField::new(EfuseBlock::Block1, 91, 3);
+/// `[]` Optional unique 128-bit ID
+pub const OPTIONAL_UNIQUE_ID: EfuseField = EfuseField::new(EfuseBlock::Block2, 0, 128);
 /// `[BLOCK_USR_DATA]` User data
 pub const USER_DATA: EfuseField = EfuseField::new(EfuseBlock::Block3, 0, 256);
-/// `[MAC_CUSTOM CUSTOM_MAC]` Custom MAC (TODO
+/// `[MAC_CUSTOM CUSTOM_MAC]` Custom MAC
 pub const USER_DATA_MAC_CUSTOM: EfuseField = EfuseField::new(EfuseBlock::Block3, 200, 48);
 /// `[BLOCK_KEY0]` Key0 or user data
 pub const KEY0: EfuseField = EfuseField::new(EfuseBlock::Block4, 0, 256);

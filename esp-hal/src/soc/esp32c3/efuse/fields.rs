@@ -117,6 +117,12 @@ pub const WR_DIS_WAFER_VERSION_MINOR_LO: EfuseField = EfuseField::new(EfuseBlock
 pub const WR_DIS_PKG_VERSION: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
 /// `[]` wr_dis of BLK_VERSION_MINOR
 pub const WR_DIS_BLK_VERSION_MINOR: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
+/// `[]` wr_dis of FLASH_CAP
+pub const WR_DIS_FLASH_CAP: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
+/// `[]` wr_dis of FLASH_TEMP
+pub const WR_DIS_FLASH_TEMP: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
+/// `[]` wr_dis of FLASH_VENDOR
+pub const WR_DIS_FLASH_VENDOR: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
 /// `[]` wr_dis of K_RTC_LDO
 pub const WR_DIS_K_RTC_LDO: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
 /// `[]` wr_dis of K_DIG_LDO
@@ -290,7 +296,7 @@ pub const DISABLE_WAFER_VERSION_MAJOR: EfuseField = EfuseField::new(EfuseBlock::
 /// `[]` Disables check of blk version major
 pub const DISABLE_BLK_VERSION_MAJOR: EfuseField = EfuseField::new(EfuseBlock::Block0, 161, 1);
 /// `[MAC_FACTORY]` MAC address
-pub const MAC_FACTORY: EfuseField = EfuseField::new(EfuseBlock::Block1, 0, 48);
+pub const MAC: EfuseField = EfuseField::new(EfuseBlock::Block1, 0, 48);
 /// `[]` SPI PAD CLK
 pub const SPI_PAD_CONFIG_CLK: EfuseField = EfuseField::new(EfuseBlock::Block1, 48, 6);
 /// `[]` SPI PAD Q(D1)
@@ -319,6 +325,13 @@ pub const WAFER_VERSION_MINOR_LO: EfuseField = EfuseField::new(EfuseBlock::Block
 pub const PKG_VERSION: EfuseField = EfuseField::new(EfuseBlock::Block1, 117, 3);
 /// `[]` BLK_VERSION_MINOR
 pub const BLK_VERSION_MINOR: EfuseField = EfuseField::new(EfuseBlock::Block1, 120, 3);
+/// `[]` Flash capacity {0: "None"; 1: "4M"; 2: "2M"; 3: "1M"; 4: "8M"}
+pub const FLASH_CAP: EfuseField = EfuseField::new(EfuseBlock::Block1, 123, 3);
+/// `[]` Flash temperature {0: "None"; 1: "105C"; 2: "85C"}
+pub const FLASH_TEMP: EfuseField = EfuseField::new(EfuseBlock::Block1, 126, 2);
+/// `[]` Flash vendor {0: "None"; 1: "XMC"; 2: "GD"; 3: "FM"; 4: "TT"; 5:
+/// "ZBIT"}
+pub const FLASH_VENDOR: EfuseField = EfuseField::new(EfuseBlock::Block1, 128, 3);
 /// `[]` BLOCK1 K_RTC_LDO
 pub const K_RTC_LDO: EfuseField = EfuseField::new(EfuseBlock::Block1, 135, 7);
 /// `[]` BLOCK1 K_DIG_LDO

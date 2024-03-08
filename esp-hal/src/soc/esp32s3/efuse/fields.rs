@@ -143,6 +143,18 @@ pub const WR_DIS_WAFER_VERSION_MINOR_LO: EfuseField = EfuseField::new(EfuseBlock
 pub const WR_DIS_PKG_VERSION: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
 /// `[]` wr_dis of BLK_VERSION_MINOR
 pub const WR_DIS_BLK_VERSION_MINOR: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
+/// `[]` wr_dis of FLASH_CAP
+pub const WR_DIS_FLASH_CAP: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
+/// `[]` wr_dis of FLASH_TEMP
+pub const WR_DIS_FLASH_TEMP: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
+/// `[]` wr_dis of FLASH_VENDOR
+pub const WR_DIS_FLASH_VENDOR: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
+/// `[]` wr_dis of PSRAM_CAP
+pub const WR_DIS_PSRAM_CAP: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
+/// `[]` wr_dis of PSRAM_TEMP
+pub const WR_DIS_PSRAM_TEMP: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
+/// `[]` wr_dis of PSRAM_VENDOR
+pub const WR_DIS_PSRAM_VENDOR: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
 /// `[]` wr_dis of K_RTC_LDO
 pub const WR_DIS_K_RTC_LDO: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
 /// `[]` wr_dis of K_DIG_LDO
@@ -361,7 +373,7 @@ pub const DISABLE_WAFER_VERSION_MAJOR: EfuseField = EfuseField::new(EfuseBlock::
 /// `[]` Disables check of blk version major
 pub const DISABLE_BLK_VERSION_MAJOR: EfuseField = EfuseField::new(EfuseBlock::Block0, 161, 1);
 /// `[MAC_FACTORY]` MAC address
-pub const MAC_FACTORY: EfuseField = EfuseField::new(EfuseBlock::Block1, 0, 48);
+pub const MAC: EfuseField = EfuseField::new(EfuseBlock::Block1, 0, 48);
 /// `[]` SPI_PAD_configure CLK
 pub const SPI_PAD_CONFIG_CLK: EfuseField = EfuseField::new(EfuseBlock::Block1, 48, 6);
 /// `[]` SPI_PAD_configure Q(D1)
@@ -390,6 +402,18 @@ pub const WAFER_VERSION_MINOR_LO: EfuseField = EfuseField::new(EfuseBlock::Block
 pub const PKG_VERSION: EfuseField = EfuseField::new(EfuseBlock::Block1, 117, 3);
 /// `[]` BLK_VERSION_MINOR
 pub const BLK_VERSION_MINOR: EfuseField = EfuseField::new(EfuseBlock::Block1, 120, 3);
+/// `[]` Flash capacity {0: "None"; 1: "8M"; 2: "4M"}
+pub const FLASH_CAP: EfuseField = EfuseField::new(EfuseBlock::Block1, 123, 3);
+/// `[]` Flash temperature {0: "None"; 1: "105C"; 2: "85C"}
+pub const FLASH_TEMP: EfuseField = EfuseField::new(EfuseBlock::Block1, 126, 2);
+/// `[]` Flash vendor {0: "None"; 1: "XMC"; 2: "GD"; 3: "FM"; 4: "TT"; 5: "BY"}
+pub const FLASH_VENDOR: EfuseField = EfuseField::new(EfuseBlock::Block1, 128, 3);
+/// `[]` PSRAM capacity {0: "None"; 1: "8M"; 2: "2M"}
+pub const PSRAM_CAP: EfuseField = EfuseField::new(EfuseBlock::Block1, 131, 2);
+/// `[]` PSRAM temperature {0: "None"; 1: "105C"; 2: "85C"}
+pub const PSRAM_TEMP: EfuseField = EfuseField::new(EfuseBlock::Block1, 133, 2);
+/// `[]` PSRAM vendor {0: "None"; 1: "AP_3v3"; 2: "AP_1v8"}
+pub const PSRAM_VENDOR: EfuseField = EfuseField::new(EfuseBlock::Block1, 135, 2);
 /// `[]` BLOCK1 K_RTC_LDO
 pub const K_RTC_LDO: EfuseField = EfuseField::new(EfuseBlock::Block1, 141, 7);
 /// `[]` BLOCK1 K_DIG_LDO

@@ -59,7 +59,7 @@ impl Efuse {
     /// );
     /// ```
     pub fn read_base_mac_address() -> [u8; 6] {
-        Self::read_field_be(MAC_FACTORY)
+        Self::read_field_be(MAC)
     }
 
     /// Get status of SPI boot encryption.

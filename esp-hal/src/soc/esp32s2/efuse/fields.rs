@@ -315,7 +315,7 @@ pub const DISABLE_WAFER_VERSION_MAJOR: EfuseField = EfuseField::new(EfuseBlock::
 /// `[]` Disables check of blk version major
 pub const DISABLE_BLK_VERSION_MAJOR: EfuseField = EfuseField::new(EfuseBlock::Block0, 161, 1);
 /// `[MAC_FACTORY]` MAC address
-pub const MAC_FACTORY: EfuseField = EfuseField::new(EfuseBlock::Block1, 0, 48);
+pub const MAC: EfuseField = EfuseField::new(EfuseBlock::Block1, 0, 48);
 /// `[]` SPI_PAD_configure CLK
 pub const SPI_PAD_CONFIG_CLK: EfuseField = EfuseField::new(EfuseBlock::Block1, 48, 6);
 /// `[]` SPI_PAD_configure Q(D1)

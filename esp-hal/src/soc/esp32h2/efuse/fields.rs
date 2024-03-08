@@ -104,6 +104,14 @@ pub const WR_DIS_RXIQ_VERSION: EfuseField = EfuseField::new(EfuseBlock::Block0, 
 pub const WR_DIS_RXIQ_0: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
 /// `[]` wr_dis of RXIQ_1
 pub const WR_DIS_RXIQ_1: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
+/// `[]` wr_dis of ACTIVE_HP_DBIAS
+pub const WR_DIS_ACTIVE_HP_DBIAS: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
+/// `[]` wr_dis of ACTIVE_LP_DBIAS
+pub const WR_DIS_ACTIVE_LP_DBIAS: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
+/// `[]` wr_dis of DSLP_DBIAS
+pub const WR_DIS_DSLP_DBIAS: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
+/// `[]` wr_dis of DBIAS_VOL_GAP
+pub const WR_DIS_DBIAS_VOL_GAP: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
 /// `[]` wr_dis of WAFER_VERSION_MINOR
 pub const WR_DIS_WAFER_VERSION_MINOR: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
 /// `[]` wr_dis of WAFER_VERSION_MAJOR
@@ -129,6 +137,39 @@ pub const WR_DIS_BLK_VERSION_MINOR: EfuseField = EfuseField::new(EfuseBlock::Blo
 pub const WR_DIS_BLK_VERSION_MAJOR: EfuseField = EfuseField::new(EfuseBlock::Block0, 21, 1);
 /// `[]` wr_dis of DISABLE_BLK_VERSION_MAJOR
 pub const WR_DIS_DISABLE_BLK_VERSION_MAJOR: EfuseField = EfuseField::new(EfuseBlock::Block0, 21, 1);
+/// `[]` wr_dis of TEMP_CALIB
+pub const WR_DIS_TEMP_CALIB: EfuseField = EfuseField::new(EfuseBlock::Block0, 21, 1);
+/// `[]` wr_dis of ADC1_AVE_INITCODE_ATTEN0
+pub const WR_DIS_ADC1_AVE_INITCODE_ATTEN0: EfuseField = EfuseField::new(EfuseBlock::Block0, 21, 1);
+/// `[]` wr_dis of ADC1_AVE_INITCODE_ATTEN1
+pub const WR_DIS_ADC1_AVE_INITCODE_ATTEN1: EfuseField = EfuseField::new(EfuseBlock::Block0, 21, 1);
+/// `[]` wr_dis of ADC1_AVE_INITCODE_ATTEN2
+pub const WR_DIS_ADC1_AVE_INITCODE_ATTEN2: EfuseField = EfuseField::new(EfuseBlock::Block0, 21, 1);
+/// `[]` wr_dis of ADC1_AVE_INITCODE_ATTEN3
+pub const WR_DIS_ADC1_AVE_INITCODE_ATTEN3: EfuseField = EfuseField::new(EfuseBlock::Block0, 21, 1);
+/// `[]` wr_dis of ADC1_HI_DOUT_ATTEN0
+pub const WR_DIS_ADC1_HI_DOUT_ATTEN0: EfuseField = EfuseField::new(EfuseBlock::Block0, 21, 1);
+/// `[]` wr_dis of ADC1_HI_DOUT_ATTEN1
+pub const WR_DIS_ADC1_HI_DOUT_ATTEN1: EfuseField = EfuseField::new(EfuseBlock::Block0, 21, 1);
+/// `[]` wr_dis of ADC1_HI_DOUT_ATTEN2
+pub const WR_DIS_ADC1_HI_DOUT_ATTEN2: EfuseField = EfuseField::new(EfuseBlock::Block0, 21, 1);
+/// `[]` wr_dis of ADC1_HI_DOUT_ATTEN3
+pub const WR_DIS_ADC1_HI_DOUT_ATTEN3: EfuseField = EfuseField::new(EfuseBlock::Block0, 21, 1);
+/// `[]` wr_dis of ADC1_CH0_ATTEN0_INITCODE_DIFF
+pub const WR_DIS_ADC1_CH0_ATTEN0_INITCODE_DIFF: EfuseField =
+    EfuseField::new(EfuseBlock::Block0, 21, 1);
+/// `[]` wr_dis of ADC1_CH1_ATTEN0_INITCODE_DIFF
+pub const WR_DIS_ADC1_CH1_ATTEN0_INITCODE_DIFF: EfuseField =
+    EfuseField::new(EfuseBlock::Block0, 21, 1);
+/// `[]` wr_dis of ADC1_CH2_ATTEN0_INITCODE_DIFF
+pub const WR_DIS_ADC1_CH2_ATTEN0_INITCODE_DIFF: EfuseField =
+    EfuseField::new(EfuseBlock::Block0, 21, 1);
+/// `[]` wr_dis of ADC1_CH3_ATTEN0_INITCODE_DIFF
+pub const WR_DIS_ADC1_CH3_ATTEN0_INITCODE_DIFF: EfuseField =
+    EfuseField::new(EfuseBlock::Block0, 21, 1);
+/// `[]` wr_dis of ADC1_CH4_ATTEN0_INITCODE_DIFF
+pub const WR_DIS_ADC1_CH4_ATTEN0_INITCODE_DIFF: EfuseField =
+    EfuseField::new(EfuseBlock::Block0, 21, 1);
 /// `[WR_DIS.USER_DATA]` wr_dis of BLOCK_USR_DATA
 pub const WR_DIS_BLOCK_USR_DATA: EfuseField = EfuseField::new(EfuseBlock::Block0, 22, 1);
 /// `[WR_DIS.MAC_CUSTOM WR_DIS.USER_DATA_MAC_CUSTOM]` wr_dis of CUSTOM_MAC
@@ -281,26 +322,34 @@ pub const HYS_EN_PAD0: EfuseField = EfuseField::new(EfuseBlock::Block0, 154, 6);
 /// `[]` Set bits to enable hysteresis function of PAD6~27
 pub const HYS_EN_PAD1: EfuseField = EfuseField::new(EfuseBlock::Block0, 160, 22);
 /// `[MAC_FACTORY]` MAC address
-pub const MAC_FACTORY: EfuseField = EfuseField::new(EfuseBlock::Block1, 0, 48);
+pub const MAC: EfuseField = EfuseField::new(EfuseBlock::Block1, 0, 48);
 /// `[]` Stores the extended bits of MAC address
 pub const MAC_EXT: EfuseField = EfuseField::new(EfuseBlock::Block1, 48, 16);
-/// `[]` RF Calibration data. RXIQ version
+/// `[]` Stores RF Calibration data. RXIQ version
 pub const RXIQ_VERSION: EfuseField = EfuseField::new(EfuseBlock::Block1, 64, 3);
-/// `[]` RF Calibration data. RXIQ data 0
+/// `[]` Stores RF Calibration data. RXIQ data 0
 pub const RXIQ_0: EfuseField = EfuseField::new(EfuseBlock::Block1, 67, 7);
-/// `[]` RF Calibration data. RXIQ data 1
+/// `[]` Stores RF Calibration data. RXIQ data 1
 pub const RXIQ_1: EfuseField = EfuseField::new(EfuseBlock::Block1, 74, 7);
-/// `[]`
+/// `[]` Stores the PMU active hp dbias
+pub const ACTIVE_HP_DBIAS: EfuseField = EfuseField::new(EfuseBlock::Block1, 81, 5);
+/// `[]` Stores the PMU active lp dbias
+pub const ACTIVE_LP_DBIAS: EfuseField = EfuseField::new(EfuseBlock::Block1, 86, 5);
+/// `[]` Stores the PMU sleep dbias
+pub const DSLP_DBIAS: EfuseField = EfuseField::new(EfuseBlock::Block1, 91, 4);
+/// `[]` Stores the low 1 bit of dbias_vol_gap
+pub const DBIAS_VOL_GAP: EfuseField = EfuseField::new(EfuseBlock::Block1, 95, 5);
+/// `[]` Stores the wafer version minor
 pub const WAFER_VERSION_MINOR: EfuseField = EfuseField::new(EfuseBlock::Block1, 114, 3);
-/// `[]`
+/// `[]` Stores the wafer version major
 pub const WAFER_VERSION_MAJOR: EfuseField = EfuseField::new(EfuseBlock::Block1, 117, 2);
 /// `[]` Disables check of wafer version major
 pub const DISABLE_WAFER_VERSION_MAJOR: EfuseField = EfuseField::new(EfuseBlock::Block1, 119, 1);
-/// `[]`
+/// `[]` Stores the flash cap
 pub const FLASH_CAP: EfuseField = EfuseField::new(EfuseBlock::Block1, 120, 3);
-/// `[]`
+/// `[]` Stores the flash temp
 pub const FLASH_TEMP: EfuseField = EfuseField::new(EfuseBlock::Block1, 123, 2);
-/// `[]`
+/// `[]` Stores the flash vendor
 pub const FLASH_VENDOR: EfuseField = EfuseField::new(EfuseBlock::Block1, 125, 3);
 /// `[]` Package version
 pub const PKG_VERSION: EfuseField = EfuseField::new(EfuseBlock::Block1, 128, 3);
@@ -312,6 +361,34 @@ pub const BLK_VERSION_MINOR: EfuseField = EfuseField::new(EfuseBlock::Block2, 13
 pub const BLK_VERSION_MAJOR: EfuseField = EfuseField::new(EfuseBlock::Block2, 133, 2);
 /// `[]` Disables check of blk version major
 pub const DISABLE_BLK_VERSION_MAJOR: EfuseField = EfuseField::new(EfuseBlock::Block2, 135, 1);
+/// `[]` Temperature calibration data
+pub const TEMP_CALIB: EfuseField = EfuseField::new(EfuseBlock::Block2, 136, 9);
+/// `[]` ADC1 calibration data
+pub const ADC1_AVE_INITCODE_ATTEN0: EfuseField = EfuseField::new(EfuseBlock::Block2, 145, 10);
+/// `[]` ADC1 calibration data
+pub const ADC1_AVE_INITCODE_ATTEN1: EfuseField = EfuseField::new(EfuseBlock::Block2, 155, 10);
+/// `[]` ADC1 calibration data
+pub const ADC1_AVE_INITCODE_ATTEN2: EfuseField = EfuseField::new(EfuseBlock::Block2, 165, 10);
+/// `[]` ADC1 calibration data
+pub const ADC1_AVE_INITCODE_ATTEN3: EfuseField = EfuseField::new(EfuseBlock::Block2, 175, 10);
+/// `[]` ADC1 calibration data
+pub const ADC1_HI_DOUT_ATTEN0: EfuseField = EfuseField::new(EfuseBlock::Block2, 185, 10);
+/// `[]` ADC1 calibration data
+pub const ADC1_HI_DOUT_ATTEN1: EfuseField = EfuseField::new(EfuseBlock::Block2, 195, 10);
+/// `[]` ADC1 calibration data
+pub const ADC1_HI_DOUT_ATTEN2: EfuseField = EfuseField::new(EfuseBlock::Block2, 205, 10);
+/// `[]` ADC1 calibration data
+pub const ADC1_HI_DOUT_ATTEN3: EfuseField = EfuseField::new(EfuseBlock::Block2, 215, 10);
+/// `[]` ADC1 calibration data
+pub const ADC1_CH0_ATTEN0_INITCODE_DIFF: EfuseField = EfuseField::new(EfuseBlock::Block2, 225, 4);
+/// `[]` ADC1 calibration data
+pub const ADC1_CH1_ATTEN0_INITCODE_DIFF: EfuseField = EfuseField::new(EfuseBlock::Block2, 229, 4);
+/// `[]` ADC1 calibration data
+pub const ADC1_CH2_ATTEN0_INITCODE_DIFF: EfuseField = EfuseField::new(EfuseBlock::Block2, 233, 4);
+/// `[]` ADC1 calibration data
+pub const ADC1_CH3_ATTEN0_INITCODE_DIFF: EfuseField = EfuseField::new(EfuseBlock::Block2, 237, 4);
+/// `[]` ADC1 calibration data
+pub const ADC1_CH4_ATTEN0_INITCODE_DIFF: EfuseField = EfuseField::new(EfuseBlock::Block2, 241, 4);
 /// `[BLOCK_USR_DATA]` User data
 pub const USER_DATA: EfuseField = EfuseField::new(EfuseBlock::Block3, 0, 256);
 /// `[MAC_CUSTOM CUSTOM_MAC]` Custom MAC

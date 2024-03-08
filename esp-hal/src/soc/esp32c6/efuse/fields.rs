@@ -100,6 +100,20 @@ pub const WR_DIS_BLK1: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
 pub const WR_DIS_MAC: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
 /// `[]` wr_dis of MAC_EXT
 pub const WR_DIS_MAC_EXT: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
+/// `[]` wr_dis of ACTIVE_HP_DBIAS
+pub const WR_DIS_ACTIVE_HP_DBIAS: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
+/// `[]` wr_dis of ACTIVE_LP_DBIAS
+pub const WR_DIS_ACTIVE_LP_DBIAS: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
+/// `[]` wr_dis of LSLP_HP_DBG
+pub const WR_DIS_LSLP_HP_DBG: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
+/// `[]` wr_dis of LSLP_HP_DBIAS
+pub const WR_DIS_LSLP_HP_DBIAS: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
+/// `[]` wr_dis of DSLP_LP_DBG
+pub const WR_DIS_DSLP_LP_DBG: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
+/// `[]` wr_dis of DSLP_LP_DBIAS
+pub const WR_DIS_DSLP_LP_DBIAS: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
+/// `[]` wr_dis of DBIAS_VOL_GAP
+pub const WR_DIS_DBIAS_VOL_GAP: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
 /// `[]` wr_dis of WAFER_VERSION_MINOR
 pub const WR_DIS_WAFER_VERSION_MINOR: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 1);
 /// `[]` wr_dis of WAFER_VERSION_MAJOR
@@ -309,9 +323,23 @@ pub const DISABLE_WAFER_VERSION_MAJOR: EfuseField = EfuseField::new(EfuseBlock::
 /// `[]` Disables check of blk version major
 pub const DISABLE_BLK_VERSION_MAJOR: EfuseField = EfuseField::new(EfuseBlock::Block0, 161, 1);
 /// `[MAC_FACTORY]` MAC address
-pub const MAC_FACTORY: EfuseField = EfuseField::new(EfuseBlock::Block1, 0, 48);
+pub const MAC: EfuseField = EfuseField::new(EfuseBlock::Block1, 0, 48);
 /// `[]` Stores the extended bits of MAC address
 pub const MAC_EXT: EfuseField = EfuseField::new(EfuseBlock::Block1, 48, 16);
+/// `[]` Stores the active hp dbias
+pub const ACTIVE_HP_DBIAS: EfuseField = EfuseField::new(EfuseBlock::Block1, 64, 5);
+/// `[]` Stores the active lp dbias
+pub const ACTIVE_LP_DBIAS: EfuseField = EfuseField::new(EfuseBlock::Block1, 69, 5);
+/// `[]` Stores the lslp hp dbg
+pub const LSLP_HP_DBG: EfuseField = EfuseField::new(EfuseBlock::Block1, 74, 2);
+/// `[]` Stores the lslp hp dbias
+pub const LSLP_HP_DBIAS: EfuseField = EfuseField::new(EfuseBlock::Block1, 76, 4);
+/// `[]` Stores the dslp lp dbg
+pub const DSLP_LP_DBG: EfuseField = EfuseField::new(EfuseBlock::Block1, 80, 3);
+/// `[]` Stores the dslp lp dbias
+pub const DSLP_LP_DBIAS: EfuseField = EfuseField::new(EfuseBlock::Block1, 83, 4);
+/// `[]` Stores the hp and lp dbias vol gap
+pub const DBIAS_VOL_GAP: EfuseField = EfuseField::new(EfuseBlock::Block1, 87, 5);
 /// `[]`
 pub const WAFER_VERSION_MINOR: EfuseField = EfuseField::new(EfuseBlock::Block1, 114, 4);
 /// `[]`

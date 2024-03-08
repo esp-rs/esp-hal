@@ -152,7 +152,7 @@ pub const USER_DATA: EfuseField = EfuseField::new(EfuseBlock::Block1, 0, 88);
 /// `[MAC_CUSTOM CUSTOM_MAC]` Custom MAC address
 pub const USER_DATA_MAC_CUSTOM: EfuseField = EfuseField::new(EfuseBlock::Block1, 0, 48);
 /// `[MAC_FACTORY]` MAC address
-pub const MAC_FACTORY: EfuseField = EfuseField::new(EfuseBlock::Block2, 0, 48);
+pub const MAC: EfuseField = EfuseField::new(EfuseBlock::Block2, 0, 48);
 /// `[]` WAFER_VERSION_MINOR
 pub const WAFER_VERSION_MINOR: EfuseField = EfuseField::new(EfuseBlock::Block2, 48, 4);
 /// `[]` WAFER_VERSION_MAJOR

@@ -129,7 +129,7 @@ pub const FLASH_CRYPT_CNT: EfuseField = EfuseField::new(EfuseBlock::Block0, 20, 
 /// `[]` Disable UART download mode. Valid for ESP32 V3 and newer; only
 pub const UART_DOWNLOAD_DIS: EfuseField = EfuseField::new(EfuseBlock::Block0, 27, 1);
 /// `[MAC_FACTORY]` MAC address
-pub const MAC_FACTORY: EfuseField = EfuseField::new(EfuseBlock::Block0, 32, 48);
+pub const MAC: EfuseField = EfuseField::new(EfuseBlock::Block0, 32, 48);
 /// `[MAC_FACTORY_CRC]` CRC8 for MAC address
 pub const MAC_CRC: EfuseField = EfuseField::new(EfuseBlock::Block0, 80, 8);
 /// `[CHIP_VER_DIS_APP_CPU]` Disables APP CPU
