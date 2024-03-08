@@ -212,3 +212,6 @@ opsram-4m  = []
 opsram-8m  = []
 ## Use externally connected Octal RAM (16MB).
 opsram-16m = []
+
+[lints.clippy]
+mixed_attributes_style = "allow"
