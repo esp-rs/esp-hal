@@ -1,6 +1,6 @@
 [package]
 name         = "esp-hal-smartled"
-version      = "0.8.0"
+version      = "0.9.0"
 edition      = "2021"
 rust-version = "1.76.0"
 description  = "RMT adapter for smartleds"
@@ -12,9 +12,9 @@ features = ["esp32c3"]
 targets  = ["riscv32imc-unknown-none-elf"]
 
 [dependencies]
-defmt             = { version = "=0.3.5", optional = true }
-document-features = "0.2.7"
-esp-hal           = { version = "0.15.0", path = "../esp-hal" }
+defmt             = { version = "=0.3.6", optional = true }
+document-features = "0.2.8"
+esp-hal           = { version = "0.16.0", path = "../esp-hal" }
 fugit             = "0.3.7"
 smart-leds-trait  = "0.3.0"
 
