@@ -40,7 +40,7 @@ jobs:
     # Deploy to the github-pages environment:
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.change-page-url.outputs.new_page_url }}
 
     # Specify runner + deployment step:
     runs-on: ubuntu-latest
@@ -48,3 +48,8 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+      # Work around the fact that the path cannot be specified with deploy-pages
+      # https://github.com/orgs/community/discussions/37267#discussioncomment-4012060
+      - name: Override page_url
+        id: change-page-url
+        run: echo "new_page_url=${{ steps.deployment.outputs.page_url }}esp-hal/" >> $GITHUB_OUTPUT
