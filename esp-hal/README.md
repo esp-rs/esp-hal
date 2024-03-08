@@ -14,7 +14,7 @@ Most traits defined by the [embedded-hal] family of packages are implemented as 
 
 ## [Documentation]
 
-[documentation]: https://docs.esp-rs.org/
+[documentation]: https://docs.esp-rs.org/esp-hal/
 
 ## Usage
 
