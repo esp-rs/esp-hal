@@ -9,50 +9,9 @@ env:
   CARGO_BUILD_TARGET: riscv32imac-unknown-none-elf
   PROBE_RS_CHIP: esp32c6
 jobs:
-  build-tests:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: 'feat/hil-testing'
-
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          target: ${{ env.CARGO_BUILD_TARGET }}
-          toolchain: nightly
-          components: rust-src
-
-      - uses: Swatinem/rust-cache@v2
-
-      - name: Build test binaries
-        run: |
-          cd hil-test/
-          cargo test --release --features=${{ env.PROBE_RS_CHIP }} --test=gpio --no-run
-
-      # - name: Build probe-rs
-      #   run: |
-      #     cargo install probe-rs \
-      #     --git=https://github.com/probe-rs/probe-rs \
-      #     --branch=feature/testing \
-      #     --features=cli \
-      #     --bin=probe-rs \
-      #     --locked
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: target
-          path: hil-test/target
-          if-no-files-found: error
-
-      # - uses: actions/upload-artifact@v4
-      #   with:
-      #     name: probe-rs
-      #     path: ~/.cargo/bin/probe-rs
-      #     if-no-files-found: error
 
   test-esp32c6:
-    needs: build-tests
+    name: HIL GPIO Test | ESP32-C6
     runs-on: [self-hosted, linux, x64, esp32c6-usb]
 
     steps:
@@ -65,23 +24,7 @@ jobs:
           target: ${{ env.CARGO_BUILD_TARGET }}
           toolchain: nightly
 
-      - uses: actions/download-artifact@v4
-        with:
-          name: target
-          path: hil-test/target
-
-      # - uses: actions/download-artifact@v4
-      #   with:
-      #     name: probe-rs
-      #     path: ~/.cargo/bin/probe-rs
-
-      # To be removed when tested
-      - run: ls -R hil-test/target
-
       - name: Run tests on-device
         run: |
-          # ls ~/.cargo/bin/probe-rs
-          # ls ~/.cargo/bin/probe-rs/probe-rs
-          # chmod +x ~/.cargo/bin/probe-rs
           cd hil-test/
           cargo test --release --features=${{ env.PROBE_RS_CHIP }} --test=gpio
