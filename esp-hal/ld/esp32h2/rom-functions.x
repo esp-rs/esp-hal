@@ -23,3 +23,8 @@ PROVIDE(esp_rom_crc8_le = 0x4000072c);
 PROVIDE(esp_rom_md5_init = 0x40000718);
 PROVIDE(esp_rom_md5_update = 0x4000071c);
 PROVIDE(esp_rom_md5_final = 0x40000720);
+
+memset = 0x400004a0;
+memcpy = 0x400004a4;
+memmove = 0x400004a8;
+memcmp = 0x400004ac;
