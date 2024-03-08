@@ -1,13 +1,13 @@
 use std::{
     collections::VecDeque,
     fs::{self, File},
-    io::{BufRead as _, BufReader, Write as _},
+    io::Write as _,
     path::{Path, PathBuf},
 };
 
 use anyhow::{bail, Result};
 use clap::ValueEnum;
-use strum::{Display, EnumIter, IntoEnumIterator};
+use strum::{Display, EnumIter, IntoEnumIterator as _};
 
 use self::cargo::CargoArgsBuilder;
 
@@ -414,6 +414,15 @@ use super::EfuseBlock;
 use crate::soc::efuse_field::EfuseField;
 "#;
 
+#[derive(Debug, Clone, PartialEq, serde::Deserialize)]
+struct EfuseField {
+    field_name: String,
+    efuse_block: String,
+    bit_start: u32,
+    bit_count: u32,
+    description: String,
+}
+
 /// Generate Rust constants for each eFuse field defined in the given CSV file.
 pub fn generate_efuse_table(
     chip: &Chip,
@@ -424,7 +433,11 @@ pub fn generate_efuse_table(
     let out_path = out_path.as_ref();
 
     // Create the reader and writer from our source and destination file paths:
-    let mut reader = BufReader::new(File::open(csv_path)?);
+    let mut reader = csv::ReaderBuilder::new()
+        .comment(Some(b'#'))
+        .has_headers(false)
+        .trim(csv::Trim::All)
+        .from_path(csv_path)?;
     let mut writer = File::create(out_path)?;
 
     // Write the header to the destination file:
@@ -436,60 +449,81 @@ pub fn generate_efuse_table(
             .replace("$CHIP", chip.pretty_name())
     )?;
 
-    // Generate constants from the CSV eFuse table, and write them out to
-    // the destination file:
-    let mut line = String::with_capacity(128);
-    while reader.read_line(&mut line)? > 0 {
-        line = line
-            .trim_end_matches('\n')
-            .trim_end_matches('\r')
-            .to_string();
+    // Build a vector of parsed eFuse fields; we build this vector up first rather
+    // than writing directly to the destination file, as we need to do some
+    // pre-processing first:
+    let mut fields = VecDeque::new();
+    for result in reader.deserialize() {
+        // We will print a warning and just ignore any fields which cannot be
+        // successfull parsed:
+        let mut efuse_field: EfuseField = match result {
+            Ok(field) => field,
+            Err(e) => {
+                log::warn!("{e}");
+                continue;
+            }
+        };
 
-        // Drop comment and trim:
-        line.truncate(
-            if let Some((prefix, _comment)) = line.split_once('#') {
+        // Remove any comments from the eFuse field descriptions:
+        efuse_field.description.truncate(
+            if let Some((prefix, _comment)) = efuse_field.description.split_once('#') {
                 prefix
             } else {
-                &line
+                &efuse_field.description
             }
-            .trim()
+            .trim_end()
             .len(),
         );
 
-        // Skip empty lines (and in turn, comments):
-        if line.is_empty() {
-            continue;
+        // Link to other eFuse fields in documentation, using code blocks:
+        efuse_field.description = efuse_field
+            .description
+            .replace('[', "`[")
+            .replace(']', "]`");
+
+        // Convert the eFuse field name into a valid Rust iddentifier:
+        efuse_field.field_name = efuse_field.field_name.replace('.', "_");
+
+        // Replace any non-digit characters in the eFuse block:
+        efuse_field.efuse_block = efuse_field
+            .efuse_block
+            .replace(|c: char| !c.is_ascii_digit(), "");
+
+        fields.push_back(efuse_field);
+    }
+
+    // Now that we've parsed all eFuse field definitions, we can perform our
+    // pre-processing; right now, this just means handling any multi-world
+    // fields:
+    let mut i = 0;
+    while i < fields.len() {
+        let field = fields[i].clone();
+
+        if field.field_name.is_empty() {
+            let mut prev = fields[i - 1].clone();
+            prev.bit_start = field.bit_start;
+            prev.bit_count += field.bit_count;
+            fields[i - 1] = prev;
+
+            fields.retain(|x| *x != field);
+        } else {
+            i += 1;
         }
+    }
 
-        let mut fields = line.split(',');
-
-        match (
-            fields.next().map(|s| s.trim().replace('.', "_")),
-            fields
-                .next()
-                .map(|s| s.trim().replace(|c: char| !c.is_ascii_digit(), "")),
-            fields
-                .next()
-                .map(|s| s.trim())
-                .and_then(|s| s.parse::<u32>().ok()),
-            fields
-                .next()
-                .map(|s| s.trim())
-                .and_then(|s| s.parse::<u32>().ok()),
-            fields.next().map(|s| s.trim()),
-        ) {
-            (Some(name), Some(block), Some(bit_off), Some(bit_len), Some(desc)) => {
-                let desc = desc.replace('[', "`[").replace(']', "]`");
-                writeln!(writer, "/// {desc}")?;
-                writeln!(
-                    writer,
-                    "pub const {name}: EfuseField = EfuseField::new(EfuseBlock::Block{block}, {bit_off}, {bit_len});"
-                )?;
-            }
-            other => eprintln!("Invalid data: {other:?}"),
-        }
-
-        line.clear();
+    // Finally, write out each eFuse field definition to the destination file:
+    while let Some(EfuseField {
+        field_name,
+        efuse_block,
+        bit_start,
+        bit_count,
+        description,
+    }) = fields.pop_front()
+    {
+        writeln!(writer, "/// {description}")?;
+        writeln!(writer,
+            "pub const {field_name}: EfuseField = EfuseField::new(EfuseBlock::Block{efuse_block}, {bit_start}, {bit_count});"
+        )?;
     }
 
     Ok(())
