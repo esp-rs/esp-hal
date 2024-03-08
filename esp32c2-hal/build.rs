@@ -1,5 +1,18 @@
 use std::{env, error::Error, path::PathBuf};
 
+build_alert::yellow! {"
+
+WARNING: package deprecated!
+
+  The 'esp32c2-hal' package has been deprecated in favour of 'esp-hal'.
+
+  Please refer to the migration guide for help with updating your projects
+  to use the new 'esp-hal' package:
+
+  https://github.com/esp-rs/esp-hal/releases/tag/v0.16.0
+
+"}
+
 fn main() -> Result<(), Box<dyn Error>> {
     check_features();
 

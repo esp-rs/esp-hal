@@ -1,5 +1,13 @@
 //! `no_std` HAL for the ESP32 from Espressif.
 //!
+//! <div class="warning">
+//! This package has been deprecated in favour of <a href="https://github.com/esp-rs/esp-hal/tree/main/esp-hal">esp-hal</a>.
+//! Please refer to the migration guide for help with updating your projects
+//! to use the new <em>esp-hal</em> package:
+//! <br /><br />
+//! <a href="https://github.com/esp-rs/esp-hal/releases/tag/v0.16.0">https://github.com/esp-rs/esp-hal/releases/tag/v0.16.0</a>
+//! </div>
+//!
 //! Implements a number of the traits defined by the various packages in the
 //! [embedded-hal] repository.
 //!

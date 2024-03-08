@@ -1,6 +1,6 @@
 [package]
 name         = "esp32h2-hal"
-version      = "0.6.0"
+version      = "0.6.1"
 edition      = "2021"
 rust-version = "1.67.0"
 description  = "HAL for ESP32-H2 microcontrollers"
@@ -50,6 +50,9 @@ sha2               = { version = "0.10.8", default-features = false}
 smart-leds         = "0.4.0"
 ssd1306            = "0.8.4"
 static_cell        = { version = "2.0.0", features = ["nightly"] }
+
+[build-dependencies]
+build-alert = "0.1.6"
 
 [features]
 default              = ["rt", "vectored", "zero-rtc-bss", "embassy-integrated-timers"]

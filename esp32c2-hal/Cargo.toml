@@ -1,6 +1,6 @@
 [package]
 name         = "esp32c2-hal"
-version      = "0.13.0"
+version      = "0.13.1"
 edition      = "2021"
 rust-version = "1.67.0"
 description  = "HAL for ESP32-C2 microcontrollers"
@@ -45,6 +45,9 @@ p256               = { version = "0.13.2", default-features = false, features = 
 sha2               = { version = "0.10.8", default-features = false}
 ssd1306            = "0.8.4"
 static_cell        = { version = "2.0.0", features = ["nightly"] }
+
+[build-dependencies]
+build-alert = "0.1.6"
 
 [features]
 default              = ["rt", "vectored", "xtal-40mhz", "embassy-integrated-timers"]

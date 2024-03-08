@@ -5,6 +5,15 @@
 ![Crates.io](https://img.shields.io/crates/l/esp32c2-hal?labelColor=1C2C2E&style=flat-square)
 [![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&labelColor=1C2C2E&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
 
+> [!WARNING]  
+>
+> This package has been deprecated in favour of [esp-hal](https://github.com/esp-rs/esp-hal/tree/main/esp-hal).
+>
+> Please refer to the migration guide for help with updating your projects
+> to use the new 'esp-hal' package:
+>
+> https://github.com/esp-rs/esp-hal/releases/tag/v0.16.0
+
 `no_std` HAL for the ESP32-C2 from Espressif.
 
 Implements a number of the traits defined in [embedded-hal](https://github.com/rust-embedded/embedded-hal).
