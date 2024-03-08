@@ -3,124 +3,85 @@ name: HIL Test
 on:
   merge_group:
   workflow_dispatch:
+  # FIXME: Remove before merging?
+  push:
+
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build-tests:
-    runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: false
-      matrix:
-        device: [
-            # Xtensa targets:
-            {
-              chip: "esp32",
-              target: "xtensa-esp32-none-elf",
-            },
-            {
-              chip: "esp32s2",
-              target: "xtensa-esp32s2-none-elf",
-            },
-            {
-              chip: "esp32s3",
-              target: "xtensa-esp32s3-none-elf",
-            },
-
-            # RISC-V targets:
-            {
-              chip: "esp32c2",
-              target: "riscv32imc-unknown-none-elf",
-            },
-            {
-              chip: "esp32c3",
-              target: "riscv32imc-unknown-none-elf",
-            },
-            {
-              chip: "esp32c6",
-              target: "riscv32imac-unknown-none-elf",
-            },
-            {
-              chip: "esp32h2",
-              target: "riscv32imac-unknown-none-elf",
-            },
-          ]
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - if: startsWith(matrix.device.target, 'riscv32')
-        uses: dtolnay/rust-toolchain@v1
-        with:
-          target: ${{ matrix.device.target }}
-          toolchain: nightly
-      - if: startsWith(matrix.device.target, 'xtensa')
-        uses: esp-rs/xtensa-toolchain@v1.5.2
-        with:
-          ldproxy: false
-          override: false
-
-      - uses: Swatinem/rust-cache@v2
-
-      - name: Build test binaries
-        env:
-          CARGO_BUILD_TARGET: ${{ matrix.device.target }}
-        run: |
-          cd hil-test/
-          cargo build --release --target=${{ matrix.device.target }} --features=${{ matrix.device.chip }}
-
-  # Test Xtensa targets:
-
-  # TODO: Add jobs for Xtensa once supported by `probe-rs`
-
   # Test RISC-V targets:
 
-  test-esp32c2:
-    needs: build-tests
-    runs-on:
-      labels: [self-hosted, esp32c2]
+  # test-esp32c2:
+  #   name:HIL Test | ESP32-C2
+  #   runs-on:
+  #     labels: [self-hosted, esp32c2]
 
-    steps:
-      - name: Run tests on-device
-        env:
-          PROBE_RS_CHIP: esp32c2
-        run: |
-          # ...
+  #   steps:
+  #     - name: Run tests on-device
+  #       env:
+  #         PROBE_RS_CHIP: esp32c2
+  #       run: |
+  #         # ...
 
   test-esp32c3:
-    needs: build-tests
+    name: HIL Test | ESP32-C3
     runs-on:
-      labels: [self-hosted, esp32c3]
+      labels: [self-hosted, rustboard]
+    env:
+      PROBE_RS_CHIP: esp32c3
+      CARGO_BUILD_TARGET: riscv32imc-unknown-none-elf
 
     steps:
-      - name: Run tests on-device
-        env:
-          PROBE_RS_CHIP: esp32c3
+      - uses: actions/checkout@v4
+        with:
+          ref: 'feat/hil-testing'
+
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          target: ${{ env.CARGO_BUILD_TARGET }}
+          toolchain: nightly
+
+      - name: Run tests
         run: |
-          # ...
+          cd hil-test/
+          cargo test --release --features=${{ env.PROBE_RS_CHIP }} --test=gpio
 
   test-esp32c6:
-    needs: build-tests
+    name: HIL Test | ESP32-C6
     runs-on:
-      labels: [self-hosted, esp32c6]
+      labels: [self-hosted, esp32c6-usb]
+    env:
+      PROBE_RS_CHIP: esp32c6
+      CARGO_BUILD_TARGET: riscv32imac-unknown-none-elf
 
     steps:
-      - name: Run tests on-device
-        env:
-          PROBE_RS_CHIP: esp32c6
-        run: |
-          # ...
+      - uses: actions/checkout@v4
+        with:
+          ref: 'feat/hil-testing'
 
-  test-esp32h2:
-    needs: build-tests
-    runs-on:
-      labels: [self-hosted, esp32h2]
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          target: ${{ env.CARGO_BUILD_TARGET }}
+          toolchain: nightly
 
-    steps:
-      - name: Run tests on-device
-        env:
-          PROBE_RS_CHIP: esp32h2
+      - name: Run tests
         run: |
-          # ...
+          cd hil-test/
+          cargo test --release --features=${{ env.PROBE_RS_CHIP }} --test=gpio
+
+  # test-esp32h2:
+  #   name: HIL Test | ESP32-H2
+  #   runs-on:
+  #     labels: [self-hosted, esp32h2]
+
+  #   steps:
+  #     - name: Run tests on-device
+  #       env:
+  #         PROBE_RS_CHIP: esp32h2
+  #       run: |
+  #         # ...
+
+  # Test Xtensa targets:
+  # TODO: Add jobs for Xtensa once supported by `probe-rs`
