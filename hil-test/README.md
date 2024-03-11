@@ -58,7 +58,8 @@ The `hil.yml` workflow will build the test suite for all our available targets a
 
 Currently, here are the Virtual Machines set up for HIL testing:
 - ESP32-C6:
-  - Has an ESP32-C6 connected via USB-JTAG-SERIAL.
+  - Has an `ESP32-C6-DevKitC-1 V1.2` connected via USB-JTAG-SERIAL.
+    - Pins 5 and 6 are connected for `uart` test.
     - Pins 2 and 4 are connected for `spi_full_duplex` test.
   - VM has the following setup:
     ```
@@ -76,6 +77,11 @@ Currently, here are the Virtual Machines set up for HIL testing:
     $ sudo usermod -a -G plugdev $USER
     # Reboot the VM
     ```
+- ESP32-C3:
+  - Has an `ESP32-C3-DevKit-RUST-1` connected via USB-JTAG-SERIAL.
+
+
+
 
 ## Adding New Tests
 
