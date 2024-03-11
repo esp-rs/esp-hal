@@ -12,7 +12,7 @@ features = ["esp32c3"]
 targets  = ["riscv32imc-unknown-none-elf"]
 
 [dependencies]
-defmt             = { version = "=0.3.6", optional = true }
+defmt             = { version = "0.3.6", optional = true }
 document-features = "0.2.8"
 esp-hal           = { version = "0.16.0", path = "../esp-hal" }
 fugit             = "0.3.7"
