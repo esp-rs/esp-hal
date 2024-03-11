@@ -1,9 +1,9 @@
-//! # Reading of eFuses (ESP32-H2)
+//! # Reading of eFuses (ESP32-S2)
 //!
 //! ## Overview
 //!
 //! The `efuse` module provides functionality for reading eFuse data
-//! from the `ESP32-H2` chip, allowing access to various chip-specific
+//! from the `ESP32-S2` chip, allowing access to various chip-specific
 //! information such as :
 //!   * MAC address
 //!   * core count
@@ -33,15 +33,33 @@
 //! );
 //! ```
 
+pub use self::fields::*;
 use crate::peripherals::EFUSE;
-pub use crate::soc::efuse_field::*;
+
+mod fields;
 
 pub struct Efuse;
 
 impl Efuse {
     /// Reads chip's MAC address from the eFuse storage.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let mac_address = Efuse::get_mac_address();
+    /// writeln!(
+    ///     serial_tx,
+    ///     "MAC: {:#X}:{:#X}:{:#X}:{:#X}:{:#X}:{:#X}",
+    ///     mac_address[0],
+    ///     mac_address[1],
+    ///     mac_address[2],
+    ///     mac_address[3],
+    ///     mac_address[4],
+    ///     mac_address[5]
+    /// );
+    /// ```
     pub fn read_base_mac_address() -> [u8; 6] {
-        Self::read_field_be(MAC_FACTORY)
+        Self::read_field_be(MAC)
     }
 
     /// Get status of SPI boot encryption.
@@ -76,16 +94,16 @@ impl EfuseBlock {
         let efuse = unsafe { &*EFUSE::ptr() };
         match self {
             Block0 => efuse.rd_wr_dis().as_ptr(),
-            Block1 => efuse.rd_mac_sys_0().as_ptr(),
-            Block2 => efuse.rd_sys_part1_data0().as_ptr(),
-            Block3 => efuse.rd_usr_data0().as_ptr(),
-            Block4 => efuse.rd_key0_data0().as_ptr(),
-            Block5 => efuse.rd_key1_data0().as_ptr(),
-            Block6 => efuse.rd_key2_data0().as_ptr(),
-            Block7 => efuse.rd_key3_data0().as_ptr(),
-            Block8 => efuse.rd_key4_data0().as_ptr(),
-            Block9 => efuse.rd_key5_data0().as_ptr(),
-            Block10 => efuse.rd_sys_part2_data0().as_ptr(),
+            Block1 => efuse.rd_mac_spi_sys_0().as_ptr(),
+            Block2 => efuse.rd_sys_data_part1_(0).as_ptr(),
+            Block3 => efuse.rd_usr_data(0).as_ptr(),
+            Block4 => efuse.rd_key0_data(0).as_ptr(),
+            Block5 => efuse.rd_key1_data(0).as_ptr(),
+            Block6 => efuse.rd_key2_data(0).as_ptr(),
+            Block7 => efuse.rd_key3_data(0).as_ptr(),
+            Block8 => efuse.rd_key4_data(0).as_ptr(),
+            Block9 => efuse.rd_key5_data(0).as_ptr(),
+            Block10 => efuse.rd_sys_data_part2_(0).as_ptr(),
         }
     }
 }

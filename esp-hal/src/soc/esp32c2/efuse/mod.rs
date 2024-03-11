@@ -33,15 +33,17 @@
 //! );
 //! ```
 
-pub use crate::soc::efuse_field::*;
+pub use self::fields::*;
 use crate::{adc::Attenuation, peripherals::EFUSE};
+
+mod fields;
 
 pub struct Efuse;
 
 impl Efuse {
     /// Reads chip's MAC address from the eFuse storage.
     pub fn read_base_mac_address() -> [u8; 6] {
-        Self::read_field_be(MAC_FACTORY)
+        Self::read_field_be(MAC)
     }
 
     /// Get status of SPI boot encryption.

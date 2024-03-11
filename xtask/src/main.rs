@@ -19,10 +19,12 @@ enum Cli {
     BuildExamples(BuildExamplesArgs),
     /// Build the specified package with the given options.
     BuildPackage(BuildPackageArgs),
+    /// Bump the version of the specified package(s).
+    BumpVersion(BumpVersionArgs),
+    /// Generate the eFuse fields source file from a CSV.
+    GenerateEfuseFields(GenerateEfuseFieldsArgs),
     /// Run the given example for the specified chip.
     RunExample(RunExampleArgs),
-    /// Bump the version of the specified package(s)
-    BumpVersion(BumpVersionArgs),
 }
 
 #[derive(Debug, Args)]
@@ -68,15 +70,12 @@ struct BuildPackageArgs {
 }
 
 #[derive(Debug, Args)]
-struct RunExampleArgs {
-    /// Package to run example from.
-    #[arg(value_enum)]
-    package: Package,
-    /// Which chip to run the examples for.
+struct GenerateEfuseFieldsArgs {
+    /// Path to the local ESP-IDF repository.
+    idf_path: PathBuf,
+    /// Chip to build eFuse fields table for.
     #[arg(value_enum)]
     chip: Chip,
-    /// Which example to run
-    example: String,
 }
 
 #[derive(Debug, Args)]
@@ -87,6 +86,18 @@ struct BumpVersionArgs {
     /// Package(s) to target.
     #[arg(value_enum, default_values_t = Package::iter())]
     packages: Vec<Package>,
+}
+
+#[derive(Debug, Args)]
+struct RunExampleArgs {
+    /// Package to run example from.
+    #[arg(value_enum)]
+    package: Package,
+    /// Which chip to run the examples for.
+    #[arg(value_enum)]
+    chip: Chip,
+    /// Which example to run
+    example: String,
 }
 
 // ----------------------------------------------------------------------------
@@ -104,8 +115,9 @@ fn main() -> Result<()> {
         Cli::BuildDocumentation(args) => build_documentation(&workspace, args),
         Cli::BuildExamples(args) => build_examples(&workspace, args),
         Cli::BuildPackage(args) => build_package(&workspace, args),
-        Cli::RunExample(args) => run_example(&workspace, args),
         Cli::BumpVersion(args) => bump_version(&workspace, args),
+        Cli::GenerateEfuseFields(args) => generate_efuse_src(&workspace, args),
+        Cli::RunExample(args) => run_example(&workspace, args),
     }
 }
 
@@ -189,6 +201,37 @@ fn build_package(workspace: &Path, args: BuildPackageArgs) -> Result<()> {
     xtask::build_package(&package_path, args.features, args.toolchain, args.target)
 }
 
+fn bump_version(workspace: &Path, args: BumpVersionArgs) -> Result<()> {
+    // Bump the version by the specified amount for each given package:
+    for package in args.packages {
+        xtask::bump_version(workspace, package, args.amount)?;
+    }
+
+    Ok(())
+}
+
+fn generate_efuse_src(workspace: &Path, args: GenerateEfuseFieldsArgs) -> Result<()> {
+    let idf_path = args.idf_path.canonicalize()?;
+
+    // Build the path for the generated source file, for the specified chip:
+    let esp_hal = workspace.join("esp-hal");
+    let out_path = esp_hal
+        .join("src")
+        .join("soc")
+        .join(args.chip.to_string())
+        .join("efuse")
+        .join("fields.rs");
+
+    // Generate the Rust source file from the CSV file, and write it out to
+    // the appropriate path:
+    xtask::generate_efuse_table(&args.chip, &idf_path, out_path)?;
+
+    // Format the generated code:
+    xtask::cargo::run(&["fmt".into()], &esp_hal)?;
+
+    Ok(())
+}
+
 fn run_example(workspace: &Path, mut args: RunExampleArgs) -> Result<()> {
     // Ensure that the package/chip combination provided are valid:
     validate_package_chip(&args.package, &args.chip)?;
@@ -234,15 +277,6 @@ fn run_example(workspace: &Path, mut args: RunExampleArgs) -> Result<()> {
         xtask::run_example(&package_path, args.chip, target, &example)?;
     } else {
         log::error!("Example not found or unsupported for the given chip");
-    }
-
-    Ok(())
-}
-
-fn bump_version(workspace: &Path, args: BumpVersionArgs) -> Result<()> {
-    // Bump the version by the specified amount for each given package:
-    for package in args.packages {
-        xtask::bump_version(workspace, package, args.amount)?;
     }
 
     Ok(())

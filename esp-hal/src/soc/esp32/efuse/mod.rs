@@ -35,8 +35,10 @@
 
 use fugit::{HertzU32, RateExtU32};
 
+pub use self::fields::*;
 use crate::peripherals::EFUSE;
-pub use crate::soc::efuse_field::*;
+
+mod fields;
 
 pub struct Efuse;
 
@@ -52,7 +54,7 @@ pub enum ChipType {
 
 impl Efuse {
     pub fn read_base_mac_address() -> [u8; 6] {
-        Self::read_field_be(MAC_FACTORY)
+        Self::read_field_be(MAC)
     }
 
     /// Returns the number of CPUs available on the chip.

@@ -1,7 +1,5 @@
 use crate::soc::efuse::{Efuse, EfuseBlock};
 
-include!(concat!(env!("OUT_DIR"), "/efuse_fields.rs"));
-
 /// The bit field for get access to efuse data
 #[derive(Clone, Copy)]
 pub struct EfuseField {
