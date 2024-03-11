@@ -69,7 +69,7 @@ jobs:
       - name: Run tests
         run: |
           cd hil-test/
-          cargo test --release --features=${{ env.PROBE_RS_CHIP }} --test=gpio
+          cargo test --release --features=${{ env.PROBE_RS_CHIP }}
 
   # test-esp32h2:
   #   name: HIL Test | ESP32-H2

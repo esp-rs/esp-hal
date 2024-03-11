@@ -6,6 +6,7 @@ publish = false
 
 [lib]
 harness = false
+test = false
 
 [[test]]
 name    = "gpio"
