@@ -1,3 +1,13 @@
+//! SPI Full Duplex Test
+//!
+//! Folowing pins are used:
+//! SCLK    GPIO0
+//! MISO    GPIO2
+//! MOSI    GPIO4
+//! CS      GPIO5
+//!
+//! Connect MISO (GPIO2) and MOSI (GPIO4) pins.
+
 #![no_std]
 #![no_main]
 
