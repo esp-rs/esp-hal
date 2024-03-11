@@ -1,4 +1,4 @@
-name: HIL Test
+name: HIL
 
 on:
   merge_group:
@@ -11,6 +11,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # TODO: Shall we use a matrix?
+
   # Test RISC-V targets:
 
   # test-esp32c2:

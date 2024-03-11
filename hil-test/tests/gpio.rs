@@ -1,3 +1,9 @@
+//! GPIO Test
+//!
+//! Folowing pins are used:
+//! GPIO0
+//! GPIO
+
 #![no_std]
 #![no_main]
 
