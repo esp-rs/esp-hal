@@ -34,3 +34,8 @@ PROVIDE(esp_rom_md5_final = 0x40001c74);
 PROVIDE (esp_rom_opiflash_exec_cmd = 0x400008b8);
 PROVIDE( esp_rom_spi_set_dtr_swap_mode = 0x4000093c );
 PROVIDE( esp_rom_opiflash_pin_config = 0x40000894 );
+
+memset = 0x400011e8;
+memcpy = 0x400011f4;
+memmove = 0x40001200;
+memcmp = 0x4000120c;

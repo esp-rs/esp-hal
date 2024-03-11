@@ -16,3 +16,8 @@ PROVIDE(esp_rom_crc8_le = 0x40000804);
 PROVIDE(esp_rom_mbedtls_md5_starts_ret = 0x40002be4);
 PROVIDE(esp_rom_mbedtls_md5_update_ret = 0x40002be8);
 PROVIDE(esp_rom_mbedtls_md5_finish_ret = 0x40002bec);
+
+memset = 0x40000488;
+memcpy = 0x4000048c;
+memmove = 0x40000490;
+memcmp = 0x40000494;
