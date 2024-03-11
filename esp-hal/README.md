@@ -29,6 +29,11 @@ Much of the functionality available is feature-gated, so be sure to refer to the
 [cargo-generate]: https://github.com/cargo-generate/cargo-generate/
 [esp-template]: https://github.com/esp-rs/esp-template/
 
+### `defmt` Feature
+
+Please note that `defmt` does _not_ provide MSRV guarantees with releases, and as such we are not able to make any MSRV guarantees when this feature is enabled. For more information refer to the MSRV section of `defmt`'s README:
+https://github.com/knurling-rs/defmt?tab=readme-ov-file#msrv
+
 ### Supporting Packages
 
 A number of additional packages are available which add additional functionality beyond the HAL.
