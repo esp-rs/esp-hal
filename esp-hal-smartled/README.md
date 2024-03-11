@@ -11,6 +11,13 @@ This adapter allows for the use of an RMT output channel to easily interact with
 
 [documentation]: https://docs.rs/esp-hal-smartled/
 
+## Usage
+
+### `defmt` Feature
+
+Please note that `defmt` does _not_ provide MSRV guarantees with releases, and as such we are not able to make any MSRV guarantees when this feature is enabled. For more information refer to the MSRV section of `defmt`'s README:
+https://github.com/knurling-rs/defmt?tab=readme-ov-file#msrv
+
 ## License
 
 Licensed under either of:
