@@ -3,6 +3,7 @@ use std::{
     fs::{self, File},
     io::Write as _,
     path::{Path, PathBuf},
+    process::Command,
 };
 
 use anyhow::{bail, Result};
@@ -409,6 +410,9 @@ const EFUSE_FIELDS_RS_HEADER: &str = r#"
 //!
 //! For information on how to regenerate these files, please refer to the
 //! `xtask` package's `README.md` file.
+//! 
+//! Generated on:   $DATE
+//! ESP-IDF Commit: $HASH
 
 use super::EfuseBlock;
 use crate::soc::efuse_field::EfuseField;
@@ -426,11 +430,29 @@ struct EfuseField {
 /// Generate Rust constants for each eFuse field defined in the given CSV file.
 pub fn generate_efuse_table(
     chip: &Chip,
-    csv_path: impl AsRef<Path>,
+    idf_path: impl AsRef<Path>,
     out_path: impl AsRef<Path>,
 ) -> Result<()> {
-    let csv_path = csv_path.as_ref();
+    let idf_path = idf_path.as_ref();
     let out_path = out_path.as_ref();
+
+    // We will put the date of generation in the file header:
+    let date = chrono::Utc::now().date_naive();
+
+    // Determine the commit (short) hash of the HEAD commit in the
+    // provided ESP-IDF repository:
+    let output = Command::new("git")
+        .args(&["rev-parse", "HEAD"])
+        .current_dir(&idf_path)
+        .output()?;
+    let idf_hash = String::from_utf8_lossy(&output.stdout[0..=7]).to_string();
+
+    // Read the CSV file containing the eFuse field definitions:
+    let csv_path = idf_path
+        .join("components")
+        .join("efuse")
+        .join(chip.to_string())
+        .join("esp_efuse_table.csv");
 
     // Create the reader and writer from our source and destination file paths:
     let mut reader = csv::ReaderBuilder::new()
@@ -447,6 +469,8 @@ pub fn generate_efuse_table(
         EFUSE_FIELDS_RS_HEADER
             .trim_start()
             .replace("$CHIP", chip.pretty_name())
+            .replace("$DATE", &date.to_string())
+            .replace("$HASH", &idf_hash)
     )?;
 
     // Build a vector of parsed eFuse fields; we build this vector up first rather

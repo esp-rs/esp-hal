@@ -71,11 +71,11 @@ struct BuildPackageArgs {
 
 #[derive(Debug, Args)]
 struct GenerateEfuseFieldsArgs {
+    /// Path to the local ESP-IDF repository.
+    idf_path: PathBuf,
     /// Chip to build eFuse fields table for.
     #[arg(value_enum)]
     chip: Chip,
-    /// Path to the CSV file containing the eFuse fields.
-    csv: PathBuf,
 }
 
 #[derive(Debug, Args)]
@@ -211,8 +211,7 @@ fn bump_version(workspace: &Path, args: BumpVersionArgs) -> Result<()> {
 }
 
 fn generate_efuse_src(workspace: &Path, args: GenerateEfuseFieldsArgs) -> Result<()> {
-    // Read the CSV file containing the eFuse field definitions:
-    let csv_path = args.csv.canonicalize()?;
+    let idf_path = args.idf_path.canonicalize()?;
 
     // Build the path for the generated source file, for the specified chip:
     let esp_hal = workspace.join("esp-hal");
@@ -225,7 +224,7 @@ fn generate_efuse_src(workspace: &Path, args: GenerateEfuseFieldsArgs) -> Result
 
     // Generate the Rust source file from the CSV file, and write it out to
     // the appropriate path:
-    xtask::generate_efuse_table(&args.chip, &csv_path, out_path)?;
+    xtask::generate_efuse_table(&args.chip, &idf_path, out_path)?;
 
     // Format the generated code:
     xtask::cargo::run(&["fmt".into()], &esp_hal)?;
