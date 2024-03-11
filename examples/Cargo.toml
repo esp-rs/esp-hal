@@ -22,10 +22,10 @@ embedded-hal-async  = "1.0.0"
 embedded-hal-bus    = "0.1.0"
 embedded-io-async   = "0.6.1"
 esp-alloc           = "0.3.0"
-esp-backtrace       = { version = "0.11.0", features = ["exception-handler", "panic-handler", "println"] }
+esp-backtrace       = { version = "0.11.1", features = ["exception-handler", "panic-handler", "println"] }
 esp-hal             = { version = "0.16.0", path = "../esp-hal" }
 esp-hal-smartled    = { version = "0.9.0",  path = "../esp-hal-smartled", optional = true }
-esp-println         = "0.9.0"
+esp-println         = "0.9.1"
 heapless            = "0.8.0"
 hex-literal         = "0.4.1"
 hmac                = { version = "0.12.1", default-features = false }
