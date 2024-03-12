@@ -18,7 +18,6 @@ use hil_test::esp_hal::{
     peripherals::Peripherals,
     prelude::*,
     spi::{master::Spi, FullDuplexMode, SpiMode},
-    Delay,
 };
 
 struct Context {
@@ -37,7 +36,7 @@ impl Context {
         let mosi = io.pins.gpio4;
         let cs = io.pins.gpio5;
 
-        let mut spi = Spi::new(peripherals.SPI2, 1000u32.kHz(), SpiMode::Mode0, &clocks).with_pins(
+        let spi = Spi::new(peripherals.SPI2, 1000u32.kHz(), SpiMode::Mode0, &clocks).with_pins(
             Some(sclk),
             Some(mosi),
             Some(miso),
@@ -50,7 +49,7 @@ impl Context {
 
 #[embedded_test::tests]
 mod tests {
-    use defmt::{assert_eq, unwrap};
+    use defmt::assert_eq;
 
     use super::*;
 

@@ -13,7 +13,6 @@ use hil_test::esp_hal::{
     clock::ClockControl,
     peripherals::{Peripherals, UART0},
     prelude::*,
-    timer::TimerGroup,
     uart::{
         config::{Config, DataBits, Parity, StopBits},
         TxRxPins,
@@ -43,7 +42,7 @@ impl Context {
             stop_bits: StopBits::STOP1,
         };
 
-        let mut uart = Uart::new_with_config(peripherals.UART0, config, Some(pins), &clocks);
+        let uart = Uart::new_with_config(peripherals.UART0, config, Some(pins), &clocks);
 
         Context { uart }
     }
@@ -51,7 +50,7 @@ impl Context {
 
 #[embedded_test::tests]
 mod tests {
-    use defmt::{assert_eq, unwrap};
+    use defmt::assert_eq;
 
     use super::*;
 
