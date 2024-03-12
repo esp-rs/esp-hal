@@ -36,7 +36,7 @@ impl self::efuse::Efuse {
     /// The new value will be returned by `read_mac_address` instead of the one
     /// hard-coded in eFuse. This does not persist across device resets.
     ///
-    /// Can only be called once. Returns `Err(`[`SetMacError::AlreadySet`]`)`
+    /// Can only be called once. Returns `Err(SetMacError::AlreadySet)`
     /// otherwise.
     pub fn set_mac_address(mac: [u8; 6]) -> Result<(), SetMacError> {
         if MAC_OVERRIDE_STATE
