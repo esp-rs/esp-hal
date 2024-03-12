@@ -60,6 +60,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(3)]
     fn test_send_receive(mut ctx: Context) {
         ctx.uart.write(0x42).ok();
         let read = block!(ctx.uart.read());
