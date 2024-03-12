@@ -65,8 +65,6 @@
 
 use core::{convert::Infallible, marker::PhantomData};
 
-use rand_core::{CryptoRng, RngCore};
-
 use crate::{peripheral::Peripheral, peripherals::RNG};
 
 /// Random number generator driver
@@ -110,7 +108,7 @@ impl embedded_hal::blocking::rng::Read for Rng {
     }
 }
 
-impl RngCore for Rng {
+impl rand_core::RngCore for Rng {
     fn next_u32(&mut self) -> u32 {
         // Directly use the existing random method to get a u32 random number
         self.random()
@@ -141,4 +139,4 @@ impl RngCore for Rng {
 }
 
 #[cfg(not(any(esp32p4, esp32s2)))]
-impl CryptoRng for Rng {}
+impl rand_core::CryptoRng for Rng {}
