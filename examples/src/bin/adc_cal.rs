@@ -3,10 +3,12 @@
 //! 3V3 to see the maximum and minimum raw values read.
 
 //% CHIPS: esp32c2 esp32c3 esp32c6 esp32s3
+//% FEATURES: embedded-hal-02
 
 #![no_std]
 #![no_main]
 
+use embedded_hal_02::adc::OneShot;
 use esp_backtrace as _;
 use esp_hal::{
     analog::adc::{AdcConfig, Attenuation, ADC},

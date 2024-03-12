@@ -6,10 +6,12 @@
 //! Make sure to first compile the `esp-lp-hal/examples/uart.rs` example
 
 //% CHIPS: esp32c6
+//% FEATURES: embedded-hal-02
 
 #![no_std]
 #![no_main]
 
+use embedded_hal_02::serial::Read;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,

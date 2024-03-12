@@ -1,12 +1,14 @@
 //! This shows example usage of the CRC functions in ROM
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% FEATURES: embedded-hal-02
 
 #![no_std]
 #![no_main]
 
 use core::fmt::Write;
 
+use embedded_hal_02::timer::CountDown;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,

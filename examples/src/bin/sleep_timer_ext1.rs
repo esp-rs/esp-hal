@@ -44,12 +44,12 @@ fn main() -> ! {
     let wake_reason = get_wakeup_cause();
     println!("wake reason: {:?}", wake_reason);
 
-    let delay = Delay::new(&clocks);
+    let mut delay = Delay::new(&clocks);
 
     let timer = TimerWakeupSource::new(Duration::from_secs(30));
     let mut wakeup_pins: [&mut dyn RTCPin; 2] = [&mut pin_0, &mut pin_2];
     let ext1 = Ext1WakeupSource::new(&mut wakeup_pins, WakeupLevel::High);
     println!("sleeping!");
     delay.delay_millis(100u32);
-    rtc.sleep_deep(&[&timer, &ext1], &delay);
+    rtc.sleep_deep(&[&timer, &ext1], &mut delay);
 }

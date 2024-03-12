@@ -18,10 +18,12 @@
 //! D7        GPIO15
 
 //% CHIPS: esp32s3
+//% FEATURES: embedded-hal-02
 
 #![no_std]
 #![no_main]
 
+use embedded_hal_02::digital::v2::OutputPin;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
