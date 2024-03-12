@@ -7,6 +7,9 @@
 #![doc = include_str!("../README.md")]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![allow(rustdoc::bare_urls)]
+// allow until num-derive doesn't generate this warning anymore (unknown_lints because Xtensa toolchain doesn't know about that lint, yet)
+#![allow(unknown_lints)]
+#![allow(non_local_definitions)]
 
 // MUST be the first module
 mod fmt;
@@ -18,20 +21,7 @@ use core::ptr::addr_of_mut;
 use common_adapter::RADIO_CLOCKS;
 use critical_section::Mutex;
 
-#[cfg(esp32)]
-use esp32_hal as hal;
-#[cfg(esp32c2)]
-use esp32c2_hal as hal;
-#[cfg(esp32c3)]
-use esp32c3_hal as hal;
-#[cfg(esp32c6)]
-use esp32c6_hal as hal;
-#[cfg(esp32h2)]
-use esp32h2_hal as hal;
-#[cfg(esp32s2)]
-use esp32s2_hal as hal;
-#[cfg(esp32s3)]
-use esp32s3_hal as hal;
+use esp_hal as hal;
 
 #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
 use hal::systimer::{Alarm, Target};
@@ -74,7 +64,6 @@ pub mod tasks;
 
 pub(crate) mod memory_fence;
 
-use critical_section;
 use timer::{get_systimer_count, ticks_to_millis};
 
 #[cfg(all(feature = "wifi", any(feature = "tcp", feature = "udp")))]

@@ -144,19 +144,22 @@ async fn main(_spawner: Spawner) -> ! {
         let counter = RefCell::new(0u8);
         let counter = &counter;
 
-        let mut notifier = async || {
+        let mut notifier = || {
             // TODO how to check if notifications are enabled for the characteristic?
-            // maybe pass something into the closure which just can query the characterisic value
+            // maybe pass something into the closure which just can query the characteristic value
             // probably passing in the attribute server won't work?
-            pin_ref.borrow_mut().wait_for_rising_edge().await.unwrap();
-            let mut data = [0u8; 13];
-            data.copy_from_slice(b"Notification0");
-            {
-                let mut counter = counter.borrow_mut();
-                data[data.len() - 1] += *counter;
-                *counter = (*counter + 1) % 10;
+
+            async {
+                pin_ref.borrow_mut().wait_for_rising_edge().await.unwrap();
+                let mut data = [0u8; 13];
+                data.copy_from_slice(b"Notification0");
+                {
+                    let mut counter = counter.borrow_mut();
+                    data[data.len() - 1] += *counter;
+                    *counter = (*counter + 1) % 10;
+                }
+                NotificationData::new(my_characteristic_handle, &data)
             }
-            NotificationData::new(my_characteristic_handle, &data)
         };
 
         srv.run(&mut notifier).await.unwrap();

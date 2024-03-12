@@ -26,7 +26,6 @@ use enumset::EnumSetType;
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 
-use core::convert::TryInto;
 use core::fmt::Debug;
 use core::mem;
 
@@ -297,7 +296,6 @@ impl Configuration {
 }
 
 pub mod ipv4 {
-    use core::convert::TryFrom;
     use core::fmt::Display;
     use core::str::FromStr;
 
@@ -2273,7 +2271,6 @@ mod asynch {
     use core::task::Poll;
 
     use embassy_sync::waitqueue::AtomicWaker;
-    use num_traits::FromPrimitive;
 
     use super::*;
 

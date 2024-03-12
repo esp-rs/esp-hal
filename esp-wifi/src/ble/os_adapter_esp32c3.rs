@@ -1,5 +1,4 @@
 use super::*;
-use crate::binary::include::esp_bt_controller_config_t;
 
 pub(crate) static mut BT_INTERRUPT_FUNCTION5: (
     *mut crate::binary::c_types::c_void,

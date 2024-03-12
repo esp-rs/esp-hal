@@ -23,13 +23,7 @@ categories = [
 
 [dependencies]
 defmt = { workspace = true, optional = true }
-esp32c3-hal = { workspace = true, optional = true }
-esp32c2-hal = { workspace = true, optional = true }
-esp32c6-hal = { workspace = true, optional = true }
-esp32h2-hal = { workspace = true, optional = true }
-esp32-hal = { workspace = true, optional = true }
-esp32s3-hal = { workspace = true, optional = true }
-esp32s2-hal = { workspace = true, optional = true }
+esp-hal = { workspace = true }
 smoltcp = { workspace = true, optional = true }
 critical-section.workspace = true
 log = { workspace = true, optional = true }
@@ -60,11 +54,11 @@ atomic-waker.workspace = true
 toml-cfg.workspace = true
 
 [dev-dependencies]
-esp-println = { workspace = true, features = ["log"] }
+esp-println = { workspace = true, features = ["log", "uart"] }
 esp-backtrace = { workspace = true, features = [
     "panic-handler",
     "exception-handler",
-    "print-uart",
+    "println",
 ] }
 embassy-executor.workspace = true
 embassy-time.workspace = true
@@ -78,33 +72,21 @@ static_cell.workspace = true
 default = [ "log" ]
 
 # chip features
-esp32c2 = [ "esp32c2-hal", "esp-wifi-sys/esp32c2", "esp-println/esp32c2", "esp-backtrace/esp32c2" ]
-esp32c3 = [ "esp32c3-hal", "esp-wifi-sys/esp32c3", "esp-println/esp32c3", "esp-backtrace/esp32c3" ]
-esp32c6 = [ "esp32c6-hal", "esp-wifi-sys/esp32c6", "esp-println/esp32c6", "esp-backtrace/esp32c6" ]
-esp32h2 = [ "esp32h2-hal", "esp-wifi-sys/esp32h2", "esp-println/esp32h2", "esp-backtrace/esp32h2" ]
-esp32   = [ "esp32-hal",   "esp-wifi-sys/esp32",   "esp-println/esp32",   "esp-backtrace/esp32" ]
-esp32s2 = [ "esp32s2-hal", "esp-wifi-sys/esp32s2", "esp-println/esp32s2", "esp-backtrace/esp32s2" ]
-esp32s3 = [ "esp32s3-hal", "esp-wifi-sys/esp32s3", "esp-println/esp32s3", "esp-backtrace/esp32s3" ]
+esp32c2 = [ "esp-hal/esp32c2", "esp-wifi-sys/esp32c2", "esp-println/esp32c2", "esp-backtrace/esp32c2" ]
+esp32c3 = [ "esp-hal/esp32c3", "esp-wifi-sys/esp32c3", "esp-println/esp32c3", "esp-backtrace/esp32c3" ]
+esp32c6 = [ "esp-hal/esp32c6", "esp-wifi-sys/esp32c6", "esp-println/esp32c6", "esp-backtrace/esp32c6" ]
+esp32h2 = [ "esp-hal/esp32h2", "esp-wifi-sys/esp32h2", "esp-println/esp32h2", "esp-backtrace/esp32h2" ]
+esp32   = [ "esp-hal/esp32",   "esp-wifi-sys/esp32",   "esp-println/esp32",   "esp-backtrace/esp32" ]
+esp32s2 = [ "esp-hal/esp32s2", "esp-wifi-sys/esp32s2", "esp-println/esp32s2", "esp-backtrace/esp32s2" ]
+esp32s3 = [ "esp-hal/esp32s3", "esp-wifi-sys/esp32s3", "esp-println/esp32s3", "esp-backtrace/esp32s3" ]
 
 # async features
 async = [
   "dep:embassy-sync",
   "dep:embassy-futures",
   "dep:embedded-io-async",
-  "esp32c3-hal?/embassy",
-  "esp32c2-hal?/embassy",
-  "esp32c6-hal?/embassy",
-  "esp32h2-hal?/embassy",
-  "esp32-hal?/embassy",
-  "esp32s2-hal?/embassy",
-  "esp32s3-hal?/embassy",
-  "esp32c3-hal?/async",
-  "esp32c2-hal?/async",
-  "esp32c6-hal?/async",
-  "esp32h2-hal?/async",
-  "esp32-hal?/async",
-  "esp32s2-hal?/async",
-  "esp32s3-hal?/async",
+  "esp-hal/embassy",
+  "esp-hal/async",
 ]
 
 embassy-net = ["dep:embassy-net-driver", "async"]
@@ -118,7 +100,7 @@ utils = [ "smoltcp" ]
 enumset = []
 wifi = [ "dep:enumset", "dep:no-std-net" ]
 embedded-svc = [ "dep:embedded-svc" ]
-ble = [ "esp32-hal?/bluetooth" ]
+ble = [ "esp-hal/bluetooth" ]
 phy-enable-usb = []
 ps-min-modem = []
 ps-max-modem = []
@@ -135,27 +117,15 @@ wifi-default = ["ipv4", "tcp", "udp", "icmp", "igmp", "dns", "dhcpv4"]
 defmt = [
   "dep:defmt",
   "smoltcp?/defmt",
-  "esp32c3-hal?/defmt",
-  "esp32c2-hal?/defmt",
-  "esp32c6-hal?/defmt",
-  "esp32h2-hal?/defmt",
-  "esp32-hal?/defmt",
-  "esp32s2-hal?/defmt",
-  "esp32s3-hal?/defmt",
+  "esp-hal/defmt",
 ]
 log = [
   "dep:log",
-  "esp32c3-hal?/log",
-  "esp32c2-hal?/log",
-  "esp32c6-hal?/log",
-  "esp32h2-hal?/log",
-  "esp32-hal?/log",
-  "esp32s2-hal?/log",
-  "esp32s3-hal?/log",
+  "esp-hal/log",
 ]
 
 [package.metadata.docs.rs]
-features = ["esp32c3", "wifi", "ble", "coex", "async", "embassy-net", "esp32c3-hal/embassy-time-systick", "esp32c3-hal/default"]
+features = ["esp32c3", "wifi", "ble", "coex", "async", "embassy-net", "esp-hal/embassy-time-systick", "esp-hal/default"]
 default-target = "riscv32imc-unknown-none-elf"
 
 # These examples are used in test automation
