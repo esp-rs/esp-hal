@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Fixed
+- Fixing `esp-wifi` + `TRNG` issue on `ESP32-S2` (#1272)
 
 ### Changed
 
