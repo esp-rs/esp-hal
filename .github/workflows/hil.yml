@@ -68,6 +68,8 @@ jobs:
           target: ${{ env.CARGO_BUILD_TARGET }}
           toolchain: nightly
 
+      - uses: Swatinem/rust-cache@v2
+
       - name: Run tests
         run: |
           cd hil-test/
@@ -90,6 +92,8 @@ jobs:
         with:
           target: ${{ env.CARGO_BUILD_TARGET }}
           toolchain: nightly
+
+      - uses: Swatinem/rust-cache@v2
 
       - name: Run tests
         run: |
