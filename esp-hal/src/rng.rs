@@ -78,7 +78,7 @@ pub struct Rng {
 impl Rng {
     /// Create a new random number generator instance
     pub fn new(_rng: impl Peripheral<P = RNG>) -> Self {
-        #[cfg(not(esp32p4))]
+        #[cfg(not(any(esp32p4, esp32s2)))]
         crate::soc::trng::ensure_randomness();
 
         Self {
@@ -140,4 +140,5 @@ impl RngCore for Rng {
     }
 }
 
+#[cfg(not(any(esp32p4, esp32s2)))]
 impl CryptoRng for Rng {}
