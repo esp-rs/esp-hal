@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Prefer mutable references over moving for DMA transactions (#1238)
 - Support runtime interrupt binding, adapt GPIO driver (#1231)
+- Renamed `eh1` feature to `embedded-hal`, feature-gated `embedded-hal@0.2.x` trait implementations (#1273)
 
 ### Removed
 
