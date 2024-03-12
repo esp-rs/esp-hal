@@ -1,8 +1,7 @@
 use super::{Ext0WakeupSource, Ext1WakeupSource, TimerWakeupSource, WakeSource, WakeTriggers};
 use crate::{
     gpio::{RTCPin, RtcFunction},
-    rtc_cntl::{sleep::WakeupLevel, Clock, RtcClock},
-    Rtc,
+    rtc_cntl::{sleep::WakeupLevel, Clock, Rtc, RtcClock},
 };
 
 // Approximate mapping of voltages to RTC_CNTL_DBIAS_WAK, RTC_CNTL_DBIAS_SLP,

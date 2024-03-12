@@ -1,6 +1,6 @@
 use core::marker::PhantomData;
 
-use crate::adc::{
+use crate::analog::adc::{
     AdcCalEfuse,
     AdcCalLine,
     AdcCalScheme,
