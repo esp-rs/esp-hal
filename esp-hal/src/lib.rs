@@ -1,6 +1,11 @@
-//! `no_std` HAL implementations for the peripherals which are common among
-//! Espressif devices. Implements a number of the traits defined by
-//! [embedded-hal].
+#![cfg_attr(
+    docsrs,
+    doc = "<div style='padding:30px;background:#810;color:#fff;text-align:center;'><p>You might want to <a href='https://docs.esp-rs.org/esp-hal/'>browse the <code>esp-hal</code> documentation on the esp-rs website</a> instead.</p><p>The documentation here on <a href='https://docs.rs'>docs.rs</a> is built for a single chip only (ESP32-C6, in particular), while on the esp-rs website you can select your exact chip from the list of supported devices. Available peripherals and their APIs change depending on the chip.</p></div>\n\n<br/>\n\n"
+)]
+//! Bare-metal (`no_std`) HAL for Espressif devices. Implements most of the
+//! traits defined by various packages in the [embedded-hal] repository.
+//!
+//! [embedded-hal]: https://github.com/rust-embedded/embedded-hal
 //!
 //! ## Feature Flags
 #![doc = document_features::document_features!()]

@@ -9,6 +9,11 @@ repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 links         = "esp-hal"
 
+[package.metadata.docs.rs]
+default-target = "riscv32imac-unknown-none-elf"
+features       = ["esp32c6"]
+rustdoc-args   = ["--cfg", "docsrs"]
+
 [dependencies]
 bitflags             = "2.4.2"
 bitfield             = "0.14.0"
