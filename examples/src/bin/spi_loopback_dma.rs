@@ -64,7 +64,7 @@ fn main() -> ! {
             DmaPriority::Priority0,
         ));
 
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
 
     // DMA buffer require a static life-time
     let mut send = tx_buffer;
@@ -86,7 +86,7 @@ fn main() -> ! {
         // Check is_done until the transfer is almost done (32000 bytes at 100kHz is
         // 2.56 seconds), then move to wait().
         while !transfer.is_done() && n < 10 {
-            delay.delay_ms(250u32);
+            delay.delay_millis(250u32);
             n += 1;
         }
 
@@ -97,6 +97,6 @@ fn main() -> ! {
             &receive[receive.len() - 10..]
         );
 
-        delay.delay_ms(250u32);
+        delay.delay_millis(250u32);
     }
 }

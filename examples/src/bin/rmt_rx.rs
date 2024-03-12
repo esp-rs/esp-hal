@@ -54,7 +54,7 @@ fn main() -> ! {
         }
     }
 
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
 
     let mut data = [PulseCode {
         level1: true,
@@ -74,9 +74,9 @@ fn main() -> ! {
         // simulate input
         for i in 0u32..5u32 {
             out.set_high().unwrap();
-            delay.delay_us(i * 10 + 20);
+            delay.delay_micros(i * 10 + 20);
             out.set_low().unwrap();
-            delay.delay_us(i * 20 + 20);
+            delay.delay_micros(i * 20 + 20);
         }
 
         match transaction.wait() {
@@ -125,6 +125,6 @@ fn main() -> ! {
             }
         }
 
-        delay.delay_ms(1500u32);
+        delay.delay_millis(1500u32);
     }
 }

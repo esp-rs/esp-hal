@@ -24,10 +24,10 @@ fn main() -> ! {
 
     // Initialize the Delay peripheral, and use it to toggle the LED state in a
     // loop.
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
 
     loop {
         led.toggle().unwrap();
-        delay.delay_ms(500u32);
+        delay.delay_millis(500u32);
     }
 }

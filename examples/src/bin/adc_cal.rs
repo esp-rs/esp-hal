@@ -48,11 +48,11 @@ fn main() -> ! {
         adc1_config.enable_pin_with_cal::<_, AdcCal>(analog_pin, Attenuation::Attenuation11dB);
     let mut adc1 = ADC::<ADC1>::new(peripherals.ADC1, adc1_config);
 
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
 
     loop {
         let pin_mv = nb::block!(adc1.read(&mut adc1_pin)).unwrap();
         println!("PIN2 ADC reading = {pin_mv} mV");
-        delay.delay_ms(1500u32);
+        delay.delay_millis(1500u32);
     }
 }

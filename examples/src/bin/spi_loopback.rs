@@ -48,13 +48,13 @@ fn main() -> ! {
         Some(cs),
     );
 
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
 
     loop {
         let mut data = [0xde, 0xca, 0xfb, 0xad];
         spi.transfer(&mut data).unwrap();
         println!("{:x?}", data);
 
-        delay.delay_ms(250u32);
+        delay.delay_millis(250u32);
     }
 }

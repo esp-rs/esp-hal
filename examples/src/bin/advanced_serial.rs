@@ -49,7 +49,7 @@ fn main() -> ! {
 
     let mut serial1 = Uart::new_with_config(peripherals.UART1, config, Some(pins), &clocks);
 
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
 
     println!("Start");
     loop {
@@ -61,6 +61,6 @@ fn main() -> ! {
             Err(err) => println!("Error {:?}", err),
         }
 
-        delay.delay_ms(250u32);
+        delay.delay_millis(250u32);
     }
 }

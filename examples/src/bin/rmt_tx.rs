@@ -42,7 +42,7 @@ fn main() -> ! {
 
     let mut channel = rmt.channel0.configure(io.pins.gpio4, tx_config).unwrap();
 
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
 
     let mut data = [PulseCode {
         level1: true,
@@ -62,6 +62,6 @@ fn main() -> ! {
     loop {
         let transaction = channel.transmit(&data);
         channel = transaction.wait().unwrap();
-        delay.delay_ms(500u32);
+        delay.delay_millis(500u32);
     }
 }

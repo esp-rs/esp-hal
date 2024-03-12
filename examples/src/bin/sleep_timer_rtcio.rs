@@ -43,7 +43,7 @@ fn main() -> ! {
     let wake_reason = get_wakeup_cause();
     println!("wake reason: {:?}", wake_reason);
 
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
     let timer = TimerWakeupSource::new(Duration::from_secs(10));
 
     #[cfg(feature = "esp32c3")]
@@ -58,6 +58,6 @@ fn main() -> ! {
 
     let rtcio = RtcioWakeupSource::new(wakeup_pins);
     println!("sleeping!");
-    delay.delay_ms(100u32);
-    rtc.sleep_deep(&[&timer, &rtcio], &mut delay);
+    delay.delay_millis(100u32);
+    rtc.sleep_deep(&[&timer, &rtcio], &delay);
 }

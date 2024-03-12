@@ -83,7 +83,7 @@ fn main() -> ! {
         DmaPriority::Priority0,
     ));
 
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
 
     // DMA buffer require a static life-time
     let master_send = &mut [0u8; 32000];
@@ -149,7 +149,7 @@ fn main() -> ! {
             &master_receive[master_receive.len() - 10..]
         );
 
-        delay.delay_ms(250u32);
+        delay.delay_millis(250u32);
 
         slave_receive.fill(0xff);
         let transfer = spi.dma_read(&mut slave_receive).unwrap();
@@ -177,7 +177,7 @@ fn main() -> ! {
             &slave_receive[slave_receive.len() - 10..],
         );
 
-        delay.delay_ms(250u32);
+        delay.delay_millis(250u32);
         let transfer = spi.dma_write(&mut slave_send).unwrap();
 
         master_receive.fill(0);
