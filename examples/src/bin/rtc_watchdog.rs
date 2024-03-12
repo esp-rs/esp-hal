@@ -17,8 +17,7 @@ use esp_hal::{
     interrupt::{self, Priority},
     peripherals::{Interrupt, Peripherals},
     prelude::*,
-    Rtc,
-    Rwdt,
+    rtc_cntl::{Rtc, Rwdt},
 };
 
 static RWDT: Mutex<RefCell<Option<Rwdt>>> = Mutex::new(RefCell::new(None));

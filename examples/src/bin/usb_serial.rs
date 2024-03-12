@@ -9,10 +9,10 @@
 
 use esp_backtrace as _;
 use esp_hal::{
+    gpio::IO,
     otg_fs::{UsbBus, USB},
     peripherals::Peripherals,
     prelude::*,
-    IO,
 };
 use usb_device::prelude::{UsbDeviceBuilder, UsbVidPid};
 use usbd_serial::{SerialPort, USB_CLASS_CDC};

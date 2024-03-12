@@ -24,12 +24,12 @@ use esp_hal::{
     clock::ClockControl,
     dma::{Dma, DmaPriority},
     dma_buffers,
-    embassy::{self},
+    embassy,
+    gpio::IO,
     i2s::{asynch::*, DataFormat, I2s, Standard},
     peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
-    IO,
 };
 use esp_println::println;
 

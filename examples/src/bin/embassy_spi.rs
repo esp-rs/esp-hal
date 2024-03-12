@@ -29,6 +29,7 @@ use esp_hal::{
     dma::*,
     dma_descriptors,
     embassy::{self},
+    gpio::IO,
     peripherals::Peripherals,
     prelude::*,
     spi::{
@@ -36,7 +37,6 @@ use esp_hal::{
         SpiMode,
     },
     timer::TimerGroup,
-    IO,
 };
 
 #[main]

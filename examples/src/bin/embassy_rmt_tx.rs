@@ -14,13 +14,12 @@ use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    embassy::{self},
+    embassy,
+    gpio::IO,
     peripherals::Peripherals,
     prelude::*,
-    rmt::{asynch::TxChannelAsync, PulseCode, TxChannelConfig, TxChannelCreator},
+    rmt::{asynch::TxChannelAsync, PulseCode, Rmt, TxChannelConfig, TxChannelCreator},
     timer::TimerGroup,
-    Rmt,
-    IO,
 };
 use esp_println::println;
 

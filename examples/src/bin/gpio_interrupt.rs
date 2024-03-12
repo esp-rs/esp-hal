@@ -14,12 +14,12 @@ use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
+    delay::Delay,
     gpio::{self, Event, Input, PullDown, IO},
     interrupt::{self, Priority},
     macros::ram,
     peripherals::{Interrupt, Peripherals},
     prelude::*,
-    Delay,
 };
 
 #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]

@@ -20,8 +20,8 @@ use esp_hal::{
     ecc::{Ecc, EllipticCurve, Error, WorkMode},
     peripherals::Peripherals,
     prelude::*,
+    rng::Rng,
     systimer::SystemTimer,
-    Rng,
 };
 use esp_println::{print, println};
 use hex_literal::hex;

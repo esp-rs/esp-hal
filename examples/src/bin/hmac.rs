@@ -63,8 +63,8 @@ use esp_hal::{
     hmac::{Hmac, HmacPurpose, KeyId},
     peripherals::Peripherals,
     prelude::*,
+    rng::Rng,
     systimer::SystemTimer,
-    Rng,
 };
 use esp_println::println;
 use hmac::{Hmac as HmacSw, Mac};

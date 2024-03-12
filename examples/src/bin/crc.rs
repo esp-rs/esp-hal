@@ -14,7 +14,7 @@ use esp_hal::{
     prelude::*,
     rom::{crc, md5},
     timer::TimerGroup,
-    Uart,
+    uart::Uart,
 };
 use nb::block;
 

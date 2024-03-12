@@ -11,12 +11,12 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    adc::{AdcConfig, Attenuation, ADC},
+    analog::adc::{AdcConfig, Attenuation, ADC},
     clock::ClockControl,
+    delay::Delay,
     gpio::IO,
     peripherals::{Peripherals, ADC1},
     prelude::*,
-    Delay,
 };
 use esp_println::println;
 

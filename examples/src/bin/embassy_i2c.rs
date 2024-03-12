@@ -23,11 +23,11 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     embassy::{self},
+    gpio::IO,
     i2c::I2C,
     peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
-    IO,
 };
 use lis3dh_async::{Lis3dh, Range, SlaveAddr};
 

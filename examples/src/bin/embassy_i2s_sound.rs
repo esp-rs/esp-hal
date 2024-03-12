@@ -40,11 +40,11 @@ use esp_hal::{
     dma::{Dma, DmaPriority},
     dma_buffers,
     embassy::{self},
+    gpio::IO,
     i2s::{asynch::*, DataFormat, I2s, Standard},
     peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
-    IO,
 };
 use esp_println::println;
 

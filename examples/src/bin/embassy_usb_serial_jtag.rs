@@ -18,8 +18,7 @@ use esp_hal::{
     peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
-    usb_serial_jtag::{UsbSerialJtagRx, UsbSerialJtagTx},
-    UsbSerialJtag,
+    usb_serial_jtag::{UsbSerialJtag, UsbSerialJtagRx, UsbSerialJtagTx},
 };
 use static_cell::make_static;
 

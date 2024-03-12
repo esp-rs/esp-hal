@@ -12,11 +12,10 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    gpio::lp_gpio::IntoLowPowerPin,
+    gpio::{lp_gpio::IntoLowPowerPin, IO},
     lp_core::{LpCore, LpCoreWakeupSource},
     peripherals::Peripherals,
     prelude::*,
-    IO,
 };
 use esp_println::{print, println};
 

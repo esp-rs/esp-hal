@@ -16,10 +16,10 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     embassy::{self},
+    gpio::IO,
     peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
-    IO,
 };
 
 #[main]

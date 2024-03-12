@@ -13,10 +13,10 @@
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
+    delay::Delay,
     gpio::{AnyPin, Input, Output, PullDown, PushPull, IO},
     peripherals::Peripherals,
     prelude::*,
-    Delay,
 };
 
 #[entry]
