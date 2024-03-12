@@ -18,7 +18,7 @@
 //! a particular Event to a particular Task. When an event is activated, the ETM
 //! channel will trigger the corresponding task automatically.
 //!
-//! More information: https://docs.espressif.com/projects/esp-idf/en/latest/esp32c6/api-reference/peripherals/etm.html
+//! More information: <https://docs.espressif.com/projects/esp-idf/en/latest/esp32c6/api-reference/peripherals/etm.html>
 //!
 //! ## Example
 //! ```no_run
