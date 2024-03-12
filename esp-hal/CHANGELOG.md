@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Do not ensure randomness or implement the `CryptoRng` trait for ESP32-P4/S2 (#1267)
+
 ### Removed
 
 ## [0.16.0] - 2024-03-08
