@@ -25,7 +25,7 @@
 use core::{cell::Cell, convert::Infallible, marker::PhantomData};
 
 use critical_section::Mutex;
-use procmacros::interrupt;
+use procmacros::handler;
 
 #[cfg(any(adc, dac))]
 pub(crate) use crate::analog;
@@ -1852,7 +1852,9 @@ pub struct IO {
 }
 
 impl IO {
-    pub fn new(gpio: GPIO, io_mux: IO_MUX) -> Self {
+    pub fn new(mut gpio: GPIO, io_mux: IO_MUX) -> Self {
+        gpio.bind_gpio_interrupt(gpio_interrupt_handler);
+
         let pins = gpio.split();
 
         IO {
@@ -1875,8 +1877,8 @@ impl IO {
     }
 }
 
-#[interrupt]
-unsafe fn GPIO() {
+#[handler]
+unsafe fn gpio_interrupt_handler() {
     if let Some(user_handler) = critical_section::with(|cs| USER_INTERRUPT_HANDLER.borrow(cs).get())
     {
         unsafe {
