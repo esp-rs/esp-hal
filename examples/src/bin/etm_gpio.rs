@@ -23,7 +23,7 @@ fn main() -> ! {
     let mut led = io.pins.gpio1.into_push_pull_output();
     let button = io.pins.gpio9.into_pull_down_input();
 
-    led.set_high().unwrap();
+    led.set_high();
 
     // setup ETM
     let gpio_ext = GpioEtmChannels::new(peripherals.GPIO_SD);

@@ -43,10 +43,10 @@ async fn control_led(
     loop {
         if control.wait().await {
             esp_println::println!("LED on");
-            led.set_low().unwrap();
+            led.set_low();
         } else {
             esp_println::println!("LED off");
-            led.set_high().unwrap();
+            led.set_high();
         }
     }
 }

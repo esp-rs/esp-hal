@@ -542,68 +542,37 @@ pub struct GpioPin<MODE, const GPIONUM: u8> {
     _mode: PhantomData<MODE>,
 }
 
-#[cfg(feature = "embedded-hal-02")]
-impl<MODE, const GPIONUM: u8> embedded_hal_02::digital::v2::InputPin
-    for GpioPin<Input<MODE>, GPIONUM>
+impl<MODE, const GPIONUM: u8> GpioPin<Input<MODE>, GPIONUM>
 where
     Self: GpioProperties,
 {
-    type Error = core::convert::Infallible;
-    fn is_high(&self) -> Result<bool, Self::Error> {
-        Ok(<Self as GpioProperties>::Bank::read_input() & (1 << (GPIONUM % 32)) != 0)
+    /// Is the input pin high?
+    #[inline]
+    pub fn is_high(&self) -> bool {
+        <Self as GpioProperties>::Bank::read_input() & (1 << (GPIONUM % 32)) != 0
     }
-    fn is_low(&self) -> Result<bool, Self::Error> {
-        Ok(!self.is_high()?)
+
+    /// Is the input pin low?
+    #[inline]
+    pub fn is_low(&self) -> bool {
+        !self.is_high()
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
-impl<const GPIONUM: u8> embedded_hal_02::digital::v2::InputPin
-    for GpioPin<Output<OpenDrain>, GPIONUM>
+impl<const GPIONUM: u8> GpioPin<Output<OpenDrain>, GPIONUM>
 where
     Self: GpioProperties,
 {
-    type Error = core::convert::Infallible;
-    fn is_high(&self) -> Result<bool, Self::Error> {
-        Ok(<Self as GpioProperties>::Bank::read_input() & (1 << (GPIONUM % 32)) != 0)
+    /// Is the input pin high?
+    #[inline]
+    pub fn is_high(&self) -> bool {
+        <Self as GpioProperties>::Bank::read_input() & (1 << (GPIONUM % 32)) != 0
     }
-    fn is_low(&self) -> Result<bool, Self::Error> {
-        Ok(!self.is_high()?)
-    }
-}
 
-#[cfg(feature = "embedded-hal")]
-impl<MODE, const GPIONUM: u8> embedded_hal::digital::ErrorType for GpioPin<Input<MODE>, GPIONUM>
-where
-    Self: GpioProperties,
-{
-    type Error = core::convert::Infallible;
-}
-
-#[cfg(feature = "embedded-hal")]
-impl<MODE, const GPIONUM: u8> embedded_hal::digital::InputPin for GpioPin<Input<MODE>, GPIONUM>
-where
-    Self: GpioProperties,
-{
-    fn is_high(&mut self) -> Result<bool, Self::Error> {
-        Ok(<Self as GpioProperties>::Bank::read_input() & (1 << (GPIONUM % 32)) != 0)
-    }
-    fn is_low(&mut self) -> Result<bool, Self::Error> {
-        Ok(!self.is_high()?)
-    }
-}
-
-#[cfg(feature = "embedded-hal")]
-impl<const GPIONUM: u8> embedded_hal::digital::InputPin for GpioPin<Output<OpenDrain>, GPIONUM>
-where
-    Self: GpioProperties,
-    <Self as GpioProperties>::PinType: IsOutputPin,
-{
-    fn is_high(&mut self) -> Result<bool, Self::Error> {
-        Ok(<Self as GpioProperties>::Bank::read_input() & (1 << (GPIONUM % 32)) != 0)
-    }
-    fn is_low(&mut self) -> Result<bool, Self::Error> {
-        Ok(!self.is_high()?)
+    /// Is the input pin low?
+    #[inline]
+    pub fn is_low(&self) -> bool {
+        !self.is_high()
     }
 }
 
@@ -906,94 +875,46 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
-impl<MODE, const GPIONUM: u8> embedded_hal_02::digital::v2::OutputPin
-    for GpioPin<Output<MODE>, GPIONUM>
+impl<MODE, const GPIONUM: u8> GpioPin<Output<MODE>, GPIONUM>
 where
     Self: GpioProperties,
     <Self as GpioProperties>::PinType: IsOutputPin,
 {
-    type Error = core::convert::Infallible;
-    fn set_high(&mut self) -> Result<(), Self::Error> {
+    /// Drives the pin high.
+    #[inline]
+    pub fn set_high(&mut self) {
         <Self as GpioProperties>::Bank::write_output_set(1 << (GPIONUM % 32));
-        Ok(())
     }
-    fn set_low(&mut self) -> Result<(), Self::Error> {
+
+    /// Drives the pin low.
+    #[inline]
+    pub fn set_low(&mut self) {
         <Self as GpioProperties>::Bank::write_output_clear(1 << (GPIONUM % 32));
-        Ok(())
     }
-}
 
-#[cfg(feature = "embedded-hal-02")]
-impl<MODE, const GPIONUM: u8> embedded_hal_02::digital::v2::StatefulOutputPin
-    for GpioPin<Output<MODE>, GPIONUM>
-where
-    Self: GpioProperties,
-    <Self as GpioProperties>::PinType: IsOutputPin,
-{
-    fn is_set_high(&self) -> Result<bool, Self::Error> {
-        Ok(<Self as GpioProperties>::Bank::read_output() & (1 << (GPIONUM % 32)) != 0)
-    }
-    fn is_set_low(&self) -> Result<bool, Self::Error> {
-        Ok(!self.is_set_high()?)
-    }
-}
+    // TODO: add `set_state(PinState)`
+    // Drives the pin high or low depending on the provided value.
 
-#[cfg(feature = "embedded-hal-02")]
-impl<MODE, const GPIONUM: u8> embedded_hal_02::digital::v2::ToggleableOutputPin
-    for GpioPin<Output<MODE>, GPIONUM>
-where
-    Self: GpioProperties,
-    <Self as GpioProperties>::PinType: IsOutputPin,
-{
-    type Error = core::convert::Infallible;
-    fn toggle(&mut self) -> Result<(), Self::Error> {
-        use embedded_hal_02::digital::v2::{OutputPin as _, StatefulOutputPin as _};
-        if self.is_set_high()? {
-            Ok(self.set_low()?)
+    /// Is the pin in drive high mode?
+    #[inline]
+    pub fn is_set_high(&self) -> bool {
+        <Self as GpioProperties>::Bank::read_output() & (1 << (GPIONUM % 32)) != 0
+    }
+
+    /// Is the pin in drive low mode?
+    #[inline]
+    pub fn is_set_low(&self) -> bool {
+        !self.is_set_high()
+    }
+
+    /// Toggle pin output.
+    #[inline]
+    pub fn toggle(&mut self) {
+        if self.is_set_high() {
+            self.set_low();
         } else {
-            Ok(self.set_high()?)
+            self.set_high();
         }
-    }
-}
-
-#[cfg(feature = "embedded-hal")]
-impl<MODE, const GPIONUM: u8> embedded_hal::digital::ErrorType for GpioPin<Output<MODE>, GPIONUM>
-where
-    Self: GpioProperties,
-    <Self as GpioProperties>::PinType: IsOutputPin,
-{
-    type Error = core::convert::Infallible;
-}
-
-#[cfg(feature = "embedded-hal")]
-impl<MODE, const GPIONUM: u8> embedded_hal::digital::OutputPin for GpioPin<Output<MODE>, GPIONUM>
-where
-    Self: GpioProperties,
-    <Self as GpioProperties>::PinType: IsOutputPin,
-{
-    fn set_low(&mut self) -> Result<(), Self::Error> {
-        <Self as GpioProperties>::Bank::write_output_clear(1 << (GPIONUM % 32));
-        Ok(())
-    }
-    fn set_high(&mut self) -> Result<(), Self::Error> {
-        <Self as GpioProperties>::Bank::write_output_set(1 << (GPIONUM % 32));
-        Ok(())
-    }
-}
-
-#[cfg(feature = "embedded-hal")]
-impl<MODE, const GPIONUM: u8> embedded_hal::digital::StatefulOutputPin
-    for GpioPin<Output<MODE>, GPIONUM>
-where
-    Self: GpioProperties,
-    <Self as GpioProperties>::PinType: IsOutputPin,
-{
-    fn is_set_high(&mut self) -> Result<bool, Self::Error> {
-        Ok(<Self as GpioProperties>::Bank::read_output() & (1 << (GPIONUM % 32)) != 0)
-    }
-    fn is_set_low(&mut self) -> Result<bool, Self::Error> {
-        Ok(!self.is_set_high()?)
     }
 }
 
@@ -1772,131 +1693,91 @@ where
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
-impl<MODE, TYPE> embedded_hal_02::digital::v2::InputPin for AnyPin<Input<MODE>, TYPE> {
-    type Error = core::convert::Infallible;
-
-    fn is_high(&self) -> Result<bool, Self::Error> {
+impl<MODE, TYPE> AnyPin<Input<MODE>, TYPE> {
+    /// Is the input pin high?
+    #[inline]
+    pub fn is_high(&self) -> bool {
         let inner = &self.inner;
         handle_gpio_input!(inner, target, { target.is_high() })
     }
 
-    fn is_low(&self) -> Result<bool, Self::Error> {
+    /// Is the input pin low?
+    #[inline]
+    pub fn is_low(&self) -> bool {
         let inner = &self.inner;
         handle_gpio_input!(inner, target, { target.is_low() })
     }
 }
 
-#[cfg(feature = "embedded-hal")]
-impl<MODE, TYPE> embedded_hal::digital::ErrorType for AnyPin<Input<MODE>, TYPE> {
-    type Error = core::convert::Infallible;
-}
-
-#[cfg(feature = "embedded-hal")]
-impl<MODE, TYPE> embedded_hal::digital::InputPin for AnyPin<Input<MODE>, TYPE> {
-    fn is_high(&mut self) -> Result<bool, Self::Error> {
-        let inner = &mut self.inner;
-        handle_gpio_input!(inner, target, { target.is_high() })
-    }
-
-    fn is_low(&mut self) -> Result<bool, Self::Error> {
-        let inner = &mut self.inner;
-        handle_gpio_input!(inner, target, { target.is_low() })
-    }
-}
-
-#[cfg(feature = "embedded-hal-02")]
-impl<MODE, TYPE> embedded_hal_02::digital::v2::OutputPin for AnyPin<Output<MODE>, TYPE> {
-    type Error = core::convert::Infallible;
-
-    fn set_low(&mut self) -> Result<(), Self::Error> {
+impl<MODE, TYPE> AnyPin<Output<MODE>, TYPE> {
+    /// Drives the pin low.
+    #[inline]
+    pub fn set_low(&mut self) {
         let inner = &mut self.inner;
         handle_gpio_output!(inner, target, { target.set_low() })
     }
 
-    fn set_high(&mut self) -> Result<(), Self::Error> {
+    /// Drives the pin high.
+    #[inline]
+    pub fn set_high(&mut self) {
         let inner = &mut self.inner;
         handle_gpio_output!(inner, target, { target.set_high() })
     }
-}
 
-#[cfg(feature = "embedded-hal-02")]
-impl<MODE, TYPE> embedded_hal_02::digital::v2::StatefulOutputPin for AnyPin<Output<MODE>, TYPE> {
-    fn is_set_high(&self) -> Result<bool, Self::Error> {
+    // TODO: add `set_state(PinState)`
+    // Drives the pin high or low depending on the provided value.
+
+    /// Is the pin in drive high mode?
+    #[inline]
+    pub fn is_set_high(&self) -> bool {
         let inner = &self.inner;
         handle_gpio_output!(inner, target, { target.is_set_high() })
     }
 
-    fn is_set_low(&self) -> Result<bool, Self::Error> {
+    /// Is the pin in drive low mode?
+    #[inline]
+    pub fn is_set_low(&self) -> bool {
         let inner = &self.inner;
         handle_gpio_output!(inner, target, { target.is_set_low() })
     }
-}
 
-#[cfg(feature = "embedded-hal-02")]
-impl<MODE, TYPE> embedded_hal_02::digital::v2::ToggleableOutputPin for AnyPin<Output<MODE>, TYPE> {
-    type Error = core::convert::Infallible;
-
-    fn toggle(&mut self) -> Result<(), Self::Error> {
+    /// Toggle pin output.
+    #[inline]
+    pub fn toggle(&mut self) {
         let inner = &mut self.inner;
         handle_gpio_output!(inner, target, { target.toggle() })
     }
 }
 
-#[cfg(feature = "embedded-hal")]
-impl<MODE, TYPE> embedded_hal::digital::ErrorType for AnyPin<Output<MODE>, TYPE> {
-    type Error = core::convert::Infallible;
-}
-
-#[cfg(feature = "embedded-hal")]
-impl<MODE, TYPE> embedded_hal::digital::OutputPin for AnyPin<Output<MODE>, TYPE> {
-    fn set_low(&mut self) -> Result<(), Self::Error> {
-        let inner = &mut self.inner;
-        handle_gpio_output!(inner, target, { target.set_low() })
-    }
-
-    fn set_high(&mut self) -> Result<(), Self::Error> {
-        let inner = &mut self.inner;
-        handle_gpio_output!(inner, target, { target.set_high() })
-    }
-}
-
-#[cfg(feature = "embedded-hal")]
-impl<MODE, TYPE> embedded_hal::digital::StatefulOutputPin for AnyPin<Output<MODE>, TYPE> {
-    fn is_set_high(&mut self) -> Result<bool, Self::Error> {
-        let inner = &mut self.inner;
-        handle_gpio_output!(inner, target, { target.is_set_high() })
-    }
-
-    fn is_set_low(&mut self) -> Result<bool, Self::Error> {
-        let inner = &mut self.inner;
-        handle_gpio_output!(inner, target, { target.is_set_low() })
-    }
-}
-
 #[cfg(feature = "async")]
-impl<MODE, TYPE> embedded_hal_async::digital::Wait for AnyPin<Input<MODE>, TYPE> {
-    async fn wait_for_high(&mut self) -> Result<(), Self::Error> {
+impl<MODE, TYPE> AnyPin<Input<MODE>, TYPE> {
+    /// Wait until the pin is high. If it is already high, return immediately.
+    pub async fn wait_for_high(&mut self) {
         let inner = &mut self.inner;
         handle_gpio_input!(inner, target, { target.wait_for_high().await })
     }
 
-    async fn wait_for_low(&mut self) -> Result<(), Self::Error> {
+    /// Wait until the pin is low. If it is already low, return immediately.
+    pub async fn wait_for_low(&mut self) {
         let inner = &mut self.inner;
         handle_gpio_input!(inner, target, { target.wait_for_low().await })
     }
 
-    async fn wait_for_rising_edge(&mut self) -> Result<(), Self::Error> {
+    /// Wait for the pin to undergo a transition from low to high.
+    pub async fn wait_for_rising_edge(&mut self) {
         let inner = &mut self.inner;
         handle_gpio_input!(inner, target, { target.wait_for_rising_edge().await })
     }
 
-    async fn wait_for_falling_edge(&mut self) -> Result<(), Self::Error> {
+    /// Wait for the pin to undergo a transition from high to low.
+    pub async fn wait_for_falling_edge(&mut self) {
         let inner = &mut self.inner;
         handle_gpio_input!(inner, target, { target.wait_for_falling_edge().await })
     }
 
-    async fn wait_for_any_edge(&mut self) -> Result<(), Self::Error> {
+    /// Wait for the pin to undergo any transition, i.e low to high OR high to
+    /// low.
+    pub async fn wait_for_any_edge(&mut self) {
         let inner = &mut self.inner;
         handle_gpio_input!(inner, target, { target.wait_for_any_edge().await })
     }
@@ -3138,7 +3019,6 @@ mod asynch {
     use core::task::{Context, Poll};
 
     use embassy_sync::waitqueue::AtomicWaker;
-    use embedded_hal_async::digital::Wait;
 
     use super::*;
 
@@ -3146,54 +3026,68 @@ mod asynch {
     const NEW_AW: AtomicWaker = AtomicWaker::new();
     static PIN_WAKERS: [AtomicWaker; NUM_PINS] = [NEW_AW; NUM_PINS];
 
-    impl<MODE, const GPIONUM: u8> Wait for GpioPin<Input<MODE>, GPIONUM>
+    impl<MODE, const GPIONUM: u8> GpioPin<Input<MODE>, GPIONUM>
     where
         Self: GpioProperties,
         <Self as GpioProperties>::PinType: IsInputPin,
     {
-        async fn wait_for_high(&mut self) -> Result<(), Self::Error> {
+        /// Wait until the pin is high. If it is already high, return
+        /// immediately.
+        pub async fn wait_for_high(&mut self) {
             PinFuture::new(self, Event::HighLevel).await
         }
 
-        async fn wait_for_low(&mut self) -> Result<(), Self::Error> {
+        /// Wait until the pin is low. If it is already low, return immediately.
+        pub async fn wait_for_low(&mut self) {
             PinFuture::new(self, Event::LowLevel).await
         }
 
-        async fn wait_for_rising_edge(&mut self) -> Result<(), Self::Error> {
+        /// Wait for the pin to undergo a transition from low to high.
+        pub async fn wait_for_rising_edge(&mut self) {
             PinFuture::new(self, Event::RisingEdge).await
         }
 
-        async fn wait_for_falling_edge(&mut self) -> Result<(), Self::Error> {
+        /// Wait for the pin to undergo a transition from high to low.
+        pub async fn wait_for_falling_edge(&mut self) {
             PinFuture::new(self, Event::FallingEdge).await
         }
 
-        async fn wait_for_any_edge(&mut self) -> Result<(), Self::Error> {
+        /// Wait for the pin to undergo any transition, i.e low to high OR high
+        /// to low.
+        pub async fn wait_for_any_edge(&mut self) {
             PinFuture::new(self, Event::AnyEdge).await
         }
     }
 
-    impl<const GPIONUM: u8> Wait for GpioPin<Output<OpenDrain>, GPIONUM>
+    impl<const GPIONUM: u8> GpioPin<Output<OpenDrain>, GPIONUM>
     where
         Self: GpioProperties,
         <Self as GpioProperties>::PinType: IsInputPin + IsOutputPin,
     {
-        async fn wait_for_high(&mut self) -> Result<(), Self::Error> {
+        /// Wait until the pin is high. If it is already high, return
+        /// immediately.
+        pub async fn wait_for_high(&mut self) {
             PinFuture::new(self, Event::HighLevel).await
         }
 
-        async fn wait_for_low(&mut self) -> Result<(), Self::Error> {
+        /// Wait until the pin is low. If it is already low, return immediately.
+        pub async fn wait_for_low(&mut self) {
             PinFuture::new(self, Event::LowLevel).await
         }
 
-        async fn wait_for_rising_edge(&mut self) -> Result<(), Self::Error> {
+        /// Wait for the pin to undergo a transition from low to high.
+        pub async fn wait_for_rising_edge(&mut self) {
             PinFuture::new(self, Event::RisingEdge).await
         }
 
-        async fn wait_for_falling_edge(&mut self) -> Result<(), Self::Error> {
+        /// Wait for the pin to undergo a transition from high to low.
+        pub async fn wait_for_falling_edge(&mut self) {
             PinFuture::new(self, Event::FallingEdge).await
         }
 
-        async fn wait_for_any_edge(&mut self) -> Result<(), Self::Error> {
+        /// Wait for the pin to undergo any transition, i.e low to high OR high
+        /// to low.
+        pub async fn wait_for_any_edge(&mut self) {
             PinFuture::new(self, Event::AnyEdge).await
         }
     }
@@ -3204,7 +3098,7 @@ mod asynch {
 
     impl<'a, P> PinFuture<'a, P>
     where
-        P: crate::gpio::Pin + embedded_hal::digital::ErrorType,
+        P: crate::gpio::Pin,
     {
         pub fn new(pin: &'a mut P, event: Event) -> Self {
             pin.listen(event);
@@ -3214,9 +3108,9 @@ mod asynch {
 
     impl<'a, P> core::future::Future for PinFuture<'a, P>
     where
-        P: crate::gpio::Pin + embedded_hal::digital::ErrorType,
+        P: crate::gpio::Pin,
     {
-        type Output = Result<(), P::Error>;
+        type Output = ();
 
         fn poll(self: core::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
             PIN_WAKERS[self.pin.number() as usize].register(cx.waker());
@@ -3224,7 +3118,7 @@ mod asynch {
             // if pin is no longer listening its been triggered
             // therefore the future has resolved
             if !self.pin.is_listening() {
-                Poll::Ready(Ok(()))
+                Poll::Ready(())
             } else {
                 Poll::Pending
             }
@@ -3275,6 +3169,337 @@ mod asynch {
                 intr_bits -= 1 << pin_nr;
             }
             Bank1GpioRegisterAccess::write_interrupt_status_clear(intrs_bank1);
+        }
+    }
+}
+
+#[cfg(feature = "embedded-hal-02")]
+mod embedded_hal_02_impls {
+    use embedded_hal_02::digital::v2 as digital;
+
+    use super::*;
+
+    impl<MODE, const GPIONUM: u8> digital::InputPin for GpioPin<Input<MODE>, GPIONUM>
+    where
+        Self: GpioProperties,
+    {
+        type Error = core::convert::Infallible;
+        fn is_high(&self) -> Result<bool, Self::Error> {
+            Ok(self.is_high())
+        }
+        fn is_low(&self) -> Result<bool, Self::Error> {
+            Ok(self.is_low())
+        }
+    }
+
+    impl<const GPIONUM: u8> digital::InputPin for GpioPin<Output<OpenDrain>, GPIONUM>
+    where
+        Self: GpioProperties,
+    {
+        type Error = core::convert::Infallible;
+        fn is_high(&self) -> Result<bool, Self::Error> {
+            Ok(<Self as GpioProperties>::Bank::read_input() & (1 << (GPIONUM % 32)) != 0)
+        }
+        fn is_low(&self) -> Result<bool, Self::Error> {
+            Ok(self.is_low())
+        }
+    }
+
+    impl<MODE, const GPIONUM: u8> digital::OutputPin for GpioPin<Output<MODE>, GPIONUM>
+    where
+        Self: GpioProperties,
+        <Self as GpioProperties>::PinType: IsOutputPin,
+    {
+        type Error = core::convert::Infallible;
+        fn set_high(&mut self) -> Result<(), Self::Error> {
+            self.set_high();
+            Ok(())
+        }
+        fn set_low(&mut self) -> Result<(), Self::Error> {
+            self.set_low();
+            Ok(())
+        }
+    }
+
+    impl<MODE, const GPIONUM: u8> digital::StatefulOutputPin for GpioPin<Output<MODE>, GPIONUM>
+    where
+        Self: GpioProperties,
+        <Self as GpioProperties>::PinType: IsOutputPin,
+    {
+        fn is_set_high(&self) -> Result<bool, Self::Error> {
+            Ok(self.is_set_high())
+        }
+        fn is_set_low(&self) -> Result<bool, Self::Error> {
+            Ok(self.is_set_low())
+        }
+    }
+
+    impl<MODE, const GPIONUM: u8> digital::ToggleableOutputPin for GpioPin<Output<MODE>, GPIONUM>
+    where
+        Self: GpioProperties,
+        <Self as GpioProperties>::PinType: IsOutputPin,
+    {
+        type Error = core::convert::Infallible;
+        fn toggle(&mut self) -> Result<(), Self::Error> {
+            self.toggle();
+            Ok(())
+        }
+    }
+
+    impl<MODE, TYPE> digital::InputPin for AnyPin<Input<MODE>, TYPE> {
+        type Error = core::convert::Infallible;
+
+        fn is_high(&self) -> Result<bool, Self::Error> {
+            Ok(self.is_high())
+        }
+
+        fn is_low(&self) -> Result<bool, Self::Error> {
+            Ok(self.is_low())
+        }
+    }
+
+    impl<MODE, TYPE> digital::OutputPin for AnyPin<Output<MODE>, TYPE> {
+        type Error = core::convert::Infallible;
+
+        fn set_low(&mut self) -> Result<(), Self::Error> {
+            self.set_low();
+            Ok(())
+        }
+
+        fn set_high(&mut self) -> Result<(), Self::Error> {
+            self.set_high();
+            Ok(())
+        }
+    }
+
+    impl<MODE, TYPE> digital::StatefulOutputPin for AnyPin<Output<MODE>, TYPE> {
+        fn is_set_high(&self) -> Result<bool, Self::Error> {
+            Ok(self.is_set_high())
+        }
+
+        fn is_set_low(&self) -> Result<bool, Self::Error> {
+            Ok(self.is_set_low())
+        }
+    }
+
+    impl<MODE, TYPE> digital::ToggleableOutputPin for AnyPin<Output<MODE>, TYPE> {
+        type Error = core::convert::Infallible;
+
+        fn toggle(&mut self) -> Result<(), Self::Error> {
+            self.toggle();
+            Ok(())
+        }
+    }
+}
+
+#[cfg(feature = "embedded-hal")]
+mod embedded_hal_impls {
+    use embedded_hal::digital;
+
+    use super::*;
+
+    impl<MODE, const GPIONUM: u8> digital::ErrorType for GpioPin<Input<MODE>, GPIONUM>
+    where
+        Self: GpioProperties,
+    {
+        type Error = core::convert::Infallible;
+    }
+
+    impl<MODE, const GPIONUM: u8> digital::InputPin for GpioPin<Input<MODE>, GPIONUM>
+    where
+        Self: GpioProperties,
+    {
+        fn is_high(&mut self) -> Result<bool, Self::Error> {
+            Ok(Self::is_high(self))
+        }
+        fn is_low(&mut self) -> Result<bool, Self::Error> {
+            Ok(Self::is_low(self))
+        }
+    }
+
+    impl<const GPIONUM: u8> digital::InputPin for GpioPin<Output<OpenDrain>, GPIONUM>
+    where
+        Self: GpioProperties,
+        <Self as GpioProperties>::PinType: IsOutputPin,
+    {
+        fn is_high(&mut self) -> Result<bool, Self::Error> {
+            Ok(Self::is_high(self))
+        }
+        fn is_low(&mut self) -> Result<bool, Self::Error> {
+            Ok(Self::is_low(self))
+        }
+    }
+
+    impl<MODE, const GPIONUM: u8> digital::ErrorType for GpioPin<Output<MODE>, GPIONUM>
+    where
+        Self: GpioProperties,
+        <Self as GpioProperties>::PinType: IsOutputPin,
+    {
+        type Error = core::convert::Infallible;
+    }
+
+    impl<MODE, const GPIONUM: u8> digital::OutputPin for GpioPin<Output<MODE>, GPIONUM>
+    where
+        Self: GpioProperties,
+        <Self as GpioProperties>::PinType: IsOutputPin,
+    {
+        fn set_low(&mut self) -> Result<(), Self::Error> {
+            self.set_low();
+            Ok(())
+        }
+        fn set_high(&mut self) -> Result<(), Self::Error> {
+            self.set_high();
+            Ok(())
+        }
+    }
+
+    impl<MODE, const GPIONUM: u8> digital::StatefulOutputPin for GpioPin<Output<MODE>, GPIONUM>
+    where
+        Self: GpioProperties,
+        <Self as GpioProperties>::PinType: IsOutputPin,
+    {
+        fn is_set_high(&mut self) -> Result<bool, Self::Error> {
+            Ok(Self::is_set_high(self))
+        }
+        fn is_set_low(&mut self) -> Result<bool, Self::Error> {
+            Ok(Self::is_set_low(self))
+        }
+    }
+
+    impl<MODE, TYPE> digital::ErrorType for AnyPin<Input<MODE>, TYPE> {
+        type Error = core::convert::Infallible;
+    }
+
+    impl<MODE, TYPE> digital::InputPin for AnyPin<Input<MODE>, TYPE> {
+        fn is_high(&mut self) -> Result<bool, Self::Error> {
+            Ok(Self::is_high(self))
+        }
+
+        fn is_low(&mut self) -> Result<bool, Self::Error> {
+            Ok(Self::is_low(self))
+        }
+    }
+
+    impl<MODE, TYPE> digital::ErrorType for AnyPin<Output<MODE>, TYPE> {
+        type Error = core::convert::Infallible;
+    }
+
+    impl<MODE, TYPE> digital::OutputPin for AnyPin<Output<MODE>, TYPE> {
+        fn set_low(&mut self) -> Result<(), Self::Error> {
+            self.set_low();
+            Ok(())
+        }
+
+        fn set_high(&mut self) -> Result<(), Self::Error> {
+            self.set_high();
+            Ok(())
+        }
+    }
+
+    impl<MODE, TYPE> digital::StatefulOutputPin for AnyPin<Output<MODE>, TYPE> {
+        fn is_set_high(&mut self) -> Result<bool, Self::Error> {
+            Ok(Self::is_set_high(self))
+        }
+
+        fn is_set_low(&mut self) -> Result<bool, Self::Error> {
+            Ok(Self::is_set_low(self))
+        }
+    }
+}
+
+#[cfg(feature = "embedded-hal")]
+#[cfg(feature = "async")]
+mod embedded_hal_async_impls {
+    use embedded_hal_async::digital::Wait;
+
+    use super::*;
+
+    impl<MODE, const GPIONUM: u8> Wait for GpioPin<Input<MODE>, GPIONUM>
+    where
+        Self: GpioProperties,
+        <Self as GpioProperties>::PinType: IsInputPin,
+    {
+        async fn wait_for_high(&mut self) -> Result<(), Self::Error> {
+            self.wait_for_high().await;
+            Ok(())
+        }
+
+        async fn wait_for_low(&mut self) -> Result<(), Self::Error> {
+            self.wait_for_low().await;
+            Ok(())
+        }
+
+        async fn wait_for_rising_edge(&mut self) -> Result<(), Self::Error> {
+            self.wait_for_rising_edge().await;
+            Ok(())
+        }
+
+        async fn wait_for_falling_edge(&mut self) -> Result<(), Self::Error> {
+            self.wait_for_falling_edge().await;
+            Ok(())
+        }
+
+        async fn wait_for_any_edge(&mut self) -> Result<(), Self::Error> {
+            self.wait_for_any_edge().await;
+            Ok(())
+        }
+    }
+
+    impl<const GPIONUM: u8> Wait for GpioPin<Output<OpenDrain>, GPIONUM>
+    where
+        Self: GpioProperties,
+        <Self as GpioProperties>::PinType: IsInputPin + IsOutputPin,
+    {
+        async fn wait_for_high(&mut self) -> Result<(), Self::Error> {
+            self.wait_for_high().await;
+            Ok(())
+        }
+
+        async fn wait_for_low(&mut self) -> Result<(), Self::Error> {
+            self.wait_for_low().await;
+            Ok(())
+        }
+
+        async fn wait_for_rising_edge(&mut self) -> Result<(), Self::Error> {
+            self.wait_for_rising_edge().await;
+            Ok(())
+        }
+
+        async fn wait_for_falling_edge(&mut self) -> Result<(), Self::Error> {
+            self.wait_for_falling_edge().await;
+            Ok(())
+        }
+
+        async fn wait_for_any_edge(&mut self) -> Result<(), Self::Error> {
+            self.wait_for_any_edge().await;
+            Ok(())
+        }
+    }
+
+    impl<MODE, TYPE> embedded_hal_async::digital::Wait for AnyPin<Input<MODE>, TYPE> {
+        async fn wait_for_high(&mut self) -> Result<(), Self::Error> {
+            self.wait_for_high().await;
+            Ok(())
+        }
+
+        async fn wait_for_low(&mut self) -> Result<(), Self::Error> {
+            self.wait_for_low().await;
+            Ok(())
+        }
+
+        async fn wait_for_rising_edge(&mut self) -> Result<(), Self::Error> {
+            self.wait_for_rising_edge().await;
+            Ok(())
+        }
+
+        async fn wait_for_falling_edge(&mut self) -> Result<(), Self::Error> {
+            self.wait_for_falling_edge().await;
+            Ok(())
+        }
+
+        async fn wait_for_any_edge(&mut self) -> Result<(), Self::Error> {
+            self.wait_for_any_edge().await;
+            Ok(())
         }
     }
 }
