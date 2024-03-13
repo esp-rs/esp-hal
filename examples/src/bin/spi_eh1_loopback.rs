@@ -23,11 +23,11 @@ use embedded_hal::spi::SpiBus;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
+    delay::Delay,
     gpio::IO,
     peripherals::Peripherals,
     prelude::*,
     spi::{master::Spi, SpiMode},
-    Delay,
 };
 use esp_println::{print, println};
 

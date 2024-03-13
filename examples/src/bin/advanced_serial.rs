@@ -15,15 +15,15 @@
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
+    delay::Delay,
     gpio::IO,
     peripherals::Peripherals,
     prelude::*,
     uart::{
         config::{Config, DataBits, Parity, StopBits},
         TxRxPins,
+        Uart,
     },
-    Delay,
-    Uart,
 };
 use esp_println::println;
 use nb::block;

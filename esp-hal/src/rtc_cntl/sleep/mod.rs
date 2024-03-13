@@ -28,7 +28,7 @@ use core::time::Duration;
 use crate::gpio::RTCPin as RtcIoWakeupPinType;
 #[cfg(any(esp32c3, esp32c6))]
 use crate::gpio::RTCPinWithResistors as RtcIoWakeupPinType;
-use crate::Rtc;
+use crate::rtc_cntl::Rtc;
 
 #[cfg_attr(esp32, path = "esp32.rs")]
 #[cfg_attr(esp32s3, path = "esp32s3.rs")]

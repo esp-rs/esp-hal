@@ -34,7 +34,7 @@
 //! ```
 
 pub use self::fields::*;
-use crate::{adc::Attenuation, peripherals::EFUSE};
+use crate::{analog::adc::Attenuation, peripherals::EFUSE};
 
 mod fields;
 

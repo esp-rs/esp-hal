@@ -17,9 +17,9 @@ use crate::{
             SavedClockConfig,
         },
         sleep::{Ext1WakeupSource, TimerWakeupSource, WakeSource, WakeTriggers, WakeupLevel},
+        Rtc,
         RtcClock,
     },
-    Rtc,
 };
 
 impl WakeSource for TimerWakeupSource {

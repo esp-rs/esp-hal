@@ -11,7 +11,13 @@
 use core::fmt::Write;
 
 use esp_backtrace as _;
-use esp_hal::{clock::ClockControl, peripherals::Peripherals, prelude::*, timer::TimerGroup, Uart};
+use esp_hal::{
+    clock::ClockControl,
+    peripherals::Peripherals,
+    prelude::*,
+    timer::TimerGroup,
+    uart::Uart,
+};
 use nb::block;
 
 #[entry]

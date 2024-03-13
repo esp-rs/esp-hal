@@ -14,12 +14,10 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     embassy::{self},
-    gpio::{Gpio5, Output, PushPull},
+    gpio::{Gpio5, Output, PushPull, IO},
     peripherals::Peripherals,
     prelude::*,
-    rmt::{asynch::RxChannelAsync, PulseCode, RxChannelConfig, RxChannelCreator},
-    Rmt,
-    IO,
+    rmt::{asynch::RxChannelAsync, PulseCode, Rmt, RxChannelConfig, RxChannelCreator},
 };
 use esp_println::{print, println};
 

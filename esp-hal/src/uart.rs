@@ -1434,12 +1434,7 @@ mod asynch {
     use procmacros::interrupt;
 
     use super::{Error, Instance};
-    use crate::{
-        uart::{RegisterBlock, UART_FIFO_SIZE},
-        Uart,
-        UartRx,
-        UartTx,
-    };
+    use crate::uart::{RegisterBlock, Uart, UartRx, UartTx, UART_FIFO_SIZE};
 
     cfg_if! {
         if #[cfg(all(uart0, uart1, uart2))] {

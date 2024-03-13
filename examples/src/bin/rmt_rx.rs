@@ -9,12 +9,11 @@
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
+    delay::Delay,
     gpio::IO,
     peripherals::Peripherals,
     prelude::*,
-    rmt::{PulseCode, RxChannel, RxChannelConfig, RxChannelCreator},
-    Delay,
-    Rmt,
+    rmt::{PulseCode, Rmt, RxChannel, RxChannelConfig, RxChannelCreator},
 };
 use esp_println::{print, println};
 

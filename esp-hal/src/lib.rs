@@ -28,20 +28,6 @@ pub use xtensa_lx;
 #[cfg(all(xtensa, feature = "rt"))]
 pub use xtensa_lx_rt::{self, entry};
 
-#[cfg(adc)]
-pub use self::analog::adc;
-#[cfg(dac)]
-pub use self::analog::dac;
-#[cfg(any(xtensa, all(riscv, systimer)))]
-pub use self::delay::Delay;
-#[cfg(gpio)]
-pub use self::gpio::IO;
-#[cfg(rmt)]
-pub use self::rmt::Rmt;
-#[cfg(rng)]
-pub use self::rng::Rng;
-#[cfg(any(lp_clkrst, rtc_cntl))]
-pub use self::rtc_cntl::{Rtc, Rwdt};
 #[cfg(any(esp32, esp32s3))]
 pub use self::soc::cpu_control;
 #[cfg(efuse)]
@@ -53,12 +39,6 @@ pub use self::soc::peripherals;
 pub use self::soc::psram;
 #[cfg(ulp_riscv_core)]
 pub use self::soc::ulp_core;
-#[cfg(any(timg0, timg1))]
-pub use self::timer::Timer;
-#[cfg(any(uart0, uart1, uart2))]
-pub use self::uart::{Uart, UartRx, UartTx};
-#[cfg(usb_device)]
-pub use self::usb_serial_jtag::UsbSerialJtag;
 
 #[cfg(aes)]
 pub mod aes;

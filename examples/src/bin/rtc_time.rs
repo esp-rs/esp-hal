@@ -6,7 +6,13 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{clock::ClockControl, peripherals::Peripherals, prelude::*, Delay, Rtc};
+use esp_hal::{
+    clock::ClockControl,
+    delay::Delay,
+    peripherals::Peripherals,
+    prelude::*,
+    rtc_cntl::Rtc,
+};
 
 #[entry]
 fn main() -> ! {

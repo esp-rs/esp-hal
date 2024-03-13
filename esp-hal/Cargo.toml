@@ -68,9 +68,10 @@ esp-riscv-rt = { version = "0.7.0", optional = true, path = "../esp-riscv-rt" }
 xtensa-lx-rt = { version = "0.16.0", optional = true }
 
 [build-dependencies]
-basic-toml = "0.1.8"
-cfg-if     = "1.0.0"
-serde      = { version = "1.0.197", features = ["derive"] }
+basic-toml   = "0.1.8"
+cfg-if       = "1.0.0"
+esp-metadata = { version = "0.1.0", path = "../esp-metadata" }
+serde        = { version = "1.0.197", features = ["derive"] }
 
 [features]
 default = ["rt", "vectored"]
@@ -220,3 +221,13 @@ opsram-16m = []
 
 [lints.clippy]
 mixed_attributes_style = "allow"
+
+[patch.crates-io]
+esp32 =   { git = "https://github.com/esp-rs/esp-pacs", rev = "963c280621f0b7ec26546a5eff24a5032305437f" }
+esp32s2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "963c280621f0b7ec26546a5eff24a5032305437f" }
+esp32s3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "963c280621f0b7ec26546a5eff24a5032305437f" }
+esp32c2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "963c280621f0b7ec26546a5eff24a5032305437f" }
+esp32c3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "963c280621f0b7ec26546a5eff24a5032305437f" }
+esp32c6 = { git = "https://github.com/esp-rs/esp-pacs", rev = "963c280621f0b7ec26546a5eff24a5032305437f" }
+esp32h2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "963c280621f0b7ec26546a5eff24a5032305437f" }
+esp32p4 = { git = "https://github.com/esp-rs/esp-pacs", rev = "963c280621f0b7ec26546a5eff24a5032305437f" }

@@ -15,6 +15,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
+    delay::Delay,
     dma::{Dma, DmaPriority},
     dma_buffers,
     gpio::IO,
@@ -28,7 +29,6 @@ use esp_hal::{
     },
     peripherals::Peripherals,
     prelude::*,
-    Delay,
 };
 use esp_println::println;
 

@@ -22,8 +22,8 @@ use esp_hal::{
     macros::ram,
     peripherals::Peripherals,
     prelude::*,
+    rtc_cntl::Rtc,
     timer::TimerGroup,
-    Rtc,
 };
 use esp_println::println;
 use nb::block;

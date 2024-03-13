@@ -2,8 +2,7 @@ use super::{TimerWakeupSource, WakeSource, WakeTriggers, WakeupLevel};
 use crate::{
     gpio::{RTCPinWithResistors, RtcFunction},
     regi2c_write_mask,
-    rtc_cntl::{sleep::RtcioWakeupSource, Clock, RtcClock},
-    Rtc,
+    rtc_cntl::{sleep::RtcioWakeupSource, Clock, Rtc, RtcClock},
 };
 
 const I2C_DIG_REG: u32 = 0x6D;

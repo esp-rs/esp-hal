@@ -1,5 +1,6 @@
 [device]
-arch = "riscv"
+name  = "esp32p4"
+arch  = "riscv"
 cores = "multi_core"
 
 peripherals = [

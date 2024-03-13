@@ -16,7 +16,7 @@ use esp_hal::{
     interrupt::{self, Priority},
     peripherals::{Interrupt, Peripherals},
     prelude::*,
-    Rtc,
+    rtc_cntl::Rtc,
 };
 use esp_println::println;
 

@@ -13,12 +13,12 @@
 
 use esp_backtrace as _;
 use esp_hal::{
+    analog::dac::{DAC1, DAC2},
     clock::ClockControl,
-    dac::{DAC1, DAC2},
+    delay::Delay,
     gpio::IO,
     peripherals::Peripherals,
     prelude::*,
-    Delay,
 };
 
 #[entry]

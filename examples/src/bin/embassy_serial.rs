@@ -19,8 +19,7 @@ use esp_hal::{
     peripherals::{Peripherals, UART0},
     prelude::*,
     timer::TimerGroup,
-    uart::{config::AtCmdConfig, UartRx, UartTx},
-    Uart,
+    uart::{config::AtCmdConfig, Uart, UartRx, UartTx},
 };
 use static_cell::make_static;
 

@@ -18,7 +18,7 @@ use esp_hal::{
     peripherals::{Interrupt, Peripherals},
     prelude::*,
     timer::TimerGroup,
-    UsbSerialJtag,
+    usb_serial_jtag::UsbSerialJtag,
 };
 use nb::block;
 

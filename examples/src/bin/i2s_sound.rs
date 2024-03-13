@@ -36,10 +36,10 @@ use esp_hal::{
     clock::ClockControl,
     dma::{Dma, DmaPriority},
     dma_buffers,
+    gpio::IO,
     i2s::{DataFormat, I2s, I2sWriteDma, Standard},
     peripherals::Peripherals,
     prelude::*,
-    IO,
 };
 
 const SINE: [i16; 64] = [

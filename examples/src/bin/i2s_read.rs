@@ -21,10 +21,10 @@ use esp_hal::{
     clock::ClockControl,
     dma::{Dma, DmaPriority},
     dma_buffers,
+    gpio::IO,
     i2s::{DataFormat, I2s, I2sReadDma, Standard},
     peripherals::Peripherals,
     prelude::*,
-    IO,
 };
 use esp_println::println;
 
