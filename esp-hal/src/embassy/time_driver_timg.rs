@@ -16,7 +16,7 @@ pub const ALARM_COUNT: usize = 1;
 #[cfg(any(esp32, esp32s2, esp32s3))]
 pub const ALARM_COUNT: usize = 2;
 
-pub type TimerType = TimerGroup<'static, TIMG0>;
+pub type TimerType = TimerGroup<'static, TIMG0, 0>;
 
 pub struct EmbassyTimer {
     pub(crate) alarms: Mutex<[AlarmState; ALARM_COUNT]>,
@@ -30,7 +30,7 @@ embassy_time_driver::time_driver_impl!(static DRIVER: EmbassyTimer = EmbassyTime
 
 impl EmbassyTimer {
     pub(crate) fn now() -> u64 {
-        unsafe { Timer0::<TIMG0>::steal() }.now()
+        unsafe { Timer0::<TIMG0, 0>::steal() }.now()
     }
 
     fn trigger_alarm(&self, n: usize, cs: CriticalSection) {
@@ -77,7 +77,7 @@ impl EmbassyTimer {
 
         #[interrupt]
         fn TG0_T0_LEVEL() {
-            let timer = unsafe { Timer0::<TIMG0>::steal() };
+            let timer = unsafe { Timer0::<TIMG0, 0>::steal() };
             DRIVER.on_interrupt(0, timer);
         }
 
@@ -100,12 +100,12 @@ impl EmbassyTimer {
             // critical section.
             #[cfg(any(esp32, esp32s2, esp32s3))]
             if _alarm.id() == 1 {
-                let mut tg = unsafe { Timer1::<TIMG0>::steal() };
+                let mut tg = unsafe { Timer1::<TIMG0, 0>::steal() };
                 Self::arm(&mut tg, timestamp);
                 return;
             }
 
-            let mut tg = unsafe { Timer0::<TIMG0>::steal() };
+            let mut tg = unsafe { Timer0::<TIMG0, 0>::steal() };
             Self::arm(&mut tg, timestamp);
         });
 

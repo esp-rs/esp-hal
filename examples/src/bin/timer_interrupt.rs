@@ -13,13 +13,19 @@ use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
+    etm::Etm,
     interrupt::{self, Priority},
     peripherals::{Interrupt, Peripherals, TIMG0},
     prelude::*,
-    timer::{Timer, Timer0, TimerGroup},
+    timer::{
+        etm::{TimerEtmEvents, TimerEtmTasks},
+        Timer,
+        Timer0,
+        TimerGroup,
+    },
 };
 
-static TIMER0: Mutex<RefCell<Option<Timer<Timer0<TIMG0>>>>> = Mutex::new(RefCell::new(None));
+static TIMER0: Mutex<RefCell<Option<Timer<Timer0<TIMG0, 0>>>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
@@ -29,6 +35,15 @@ fn main() -> ! {
 
     let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let mut timer0 = timg0.timer0;
+
+    let ev = timer0.on_alarm();
+    let tsk = timer0.cnt_start();
+
+    let etm = Etm::new(peripherals.SOC_ETM);
+
+    let chan0 = etm.channel0;
+
+    chan0.setup(&ev, &tsk);
 
     interrupt::enable(Interrupt::TG0_T0_LEVEL, Priority::Priority1).unwrap();
     timer0.start(500u64.millis());

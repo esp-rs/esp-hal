@@ -68,24 +68,24 @@ pub enum Error {
 
 // A timergroup consisting of up to 2 timers (chip dependent) and a watchdog
 // timer
-pub struct TimerGroup<'d, T>
+pub struct TimerGroup<'d, T, const G: u8>
 where
-    T: TimerGroupInstance,
+    T: TimerGroupInstance<G>,
 {
     _timer_group: PeripheralRef<'d, T>,
-    pub timer0: Timer<Timer0<T>>,
+    pub timer0: Timer<Timer0<T, G>>,
     #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
     pub timer1: Timer<Timer1<T>>,
-    pub wdt: Wdt<T>,
+    pub wdt: Wdt<T, G>,
 }
 
-pub trait TimerGroupInstance {
+pub trait TimerGroupInstance<const G: u8> {
     fn register_block() -> *const RegisterBlock;
     fn configure_src_clk();
     fn configure_wdt_src_clk();
 }
 
-impl TimerGroupInstance for TIMG0 {
+impl TimerGroupInstance<0> for TIMG0 {
     #[inline(always)]
     fn register_block() -> *const RegisterBlock {
         crate::peripherals::TIMG0::PTR
@@ -135,7 +135,7 @@ impl TimerGroupInstance for TIMG0 {
 }
 
 #[cfg(timg1)]
-impl TimerGroupInstance for TIMG1 {
+impl TimerGroupInstance<1> for TIMG1 {
     #[inline(always)]
     fn register_block() -> *const RegisterBlock {
         crate::peripherals::TIMG1::PTR
@@ -177,9 +177,9 @@ impl TimerGroupInstance for TIMG1 {
     }
 }
 
-impl<'d, T> TimerGroup<'d, T>
+impl<'d, T, const G: u8> TimerGroup<'d, T, G>
 where
-    T: TimerGroupInstance,
+    T: TimerGroupInstance<G>,
 {
     pub fn new(timer_group: impl Peripheral<P = T> + 'd, clocks: &Clocks) -> Self {
         crate::into_ref!(timer_group);
@@ -296,13 +296,13 @@ pub trait Instance {
     fn enable_peripheral(&self);
 }
 
-pub struct Timer0<TG> {
+pub struct Timer0<TG, const G: u8> {
     phantom: PhantomData<TG>,
 }
 
-impl<TG> Timer0<TG>
+impl<TG, const G: u8> Timer0<TG, G>
 where
-    TG: TimerGroupInstance,
+    TG: TimerGroupInstance<G>,
 {
     #[allow(unused)]
     pub(crate) unsafe fn steal() -> Self {
@@ -313,9 +313,9 @@ where
 }
 
 /// Timer peripheral instance
-impl<TG> Instance for Timer0<TG>
+impl<TG, const G: u8> Instance for Timer0<TG, G>
 where
-    TG: TimerGroupInstance,
+    TG: TimerGroupInstance<G>,
 {
     fn reset_counter(&mut self) {
         let reg_block = unsafe { &*TG::register_block() };
@@ -465,14 +465,14 @@ where
 }
 
 #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
-pub struct Timer1<TG> {
-    phantom: PhantomData<TG>,
+pub struct Timer1<TG, const G: u8> {
+    phantom: PhantomData<TG, G>,
 }
 
 #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
-impl<TG> Timer1<TG>
+impl<TG, const G: u8> Timer1<TG, G>
 where
-    TG: TimerGroupInstance,
+    TG: TimerGroupInstance<G>,
 {
     #[allow(unused)]
     pub(crate) unsafe fn steal() -> Self {
@@ -484,9 +484,9 @@ where
 
 /// Timer peripheral instance
 #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
-impl<TG> Instance for Timer1<TG>
+impl<TG, const G: u8> Instance for Timer1<TG, G>
 where
-    TG: TimerGroupInstance,
+    TG: TimerGroupInstance<G>,
 {
     fn reset_counter(&mut self) {
         let reg_block = unsafe { &*TG::register_block() };
@@ -715,14 +715,14 @@ where
 impl<T> Periodic for Timer<T> where T: Instance {}
 
 /// Watchdog timer
-pub struct Wdt<TG> {
+pub struct Wdt<TG, const G: u8> {
     phantom: PhantomData<TG>,
 }
 
 /// Watchdog driver
-impl<TG> Wdt<TG>
+impl<TG, const G: u8> Wdt<TG, G>
 where
-    TG: TimerGroupInstance,
+    TG: TimerGroupInstance<G>,
 {
     /// Create a new watchdog timer instance
     pub fn new() -> Self {
@@ -835,27 +835,27 @@ where
     }
 }
 
-impl<TG> Default for Wdt<TG>
+impl<TG, const G: u8> Default for Wdt<TG, G>
 where
-    TG: TimerGroupInstance,
+    TG: TimerGroupInstance<G>,
 {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<TG> WatchdogDisable for Wdt<TG>
+impl<TG, const G: u8> WatchdogDisable for Wdt<TG, G>
 where
-    TG: TimerGroupInstance,
+    TG: TimerGroupInstance<G>,
 {
     fn disable(&mut self) {
         self.disable();
     }
 }
 
-impl<TG> WatchdogEnable for Wdt<TG>
+impl<TG, const G: u8> WatchdogEnable for Wdt<TG, G>
 where
-    TG: TimerGroupInstance,
+    TG: TimerGroupInstance<G>,
 {
     type Time = MicrosDurationU64;
 
@@ -868,11 +868,89 @@ where
     }
 }
 
-impl<TG> Watchdog for Wdt<TG>
+impl<TG, const G: u8> Watchdog for Wdt<TG, G>
 where
-    TG: TimerGroupInstance,
+    TG: TimerGroupInstance<G>,
 {
     fn feed(&mut self) {
         self.feed();
+    }
+}
+
+#[cfg(soc_etm)]
+pub mod etm {
+    use super::*;
+    use crate::{
+        etm::{EtmEvent, EtmTask},
+        private::Sealed,
+    };
+
+    pub struct TimerEtmEvent {
+        id: u8,
+    }
+
+    pub struct TimerEtmTask {
+        id: u8,
+    }
+
+    impl EtmEvent for TimerEtmEvent {
+        fn id(&self) -> u8 {
+            self.id
+        }
+    }
+
+    impl Sealed for TimerEtmEvent {}
+
+    impl EtmTask for TimerEtmTask {
+        fn id(&self) -> u8 {
+            self.id
+        }
+    }
+
+    impl Sealed for TimerEtmTask {}
+
+    pub trait TimerEtmEvents<TG, const G: u8> {
+        fn on_alarm(&self) -> TimerEtmEvent;
+    }
+
+    pub trait TimerEtmTasks<TG, const G: u8> {
+        fn cnt_start(&self) -> TimerEtmTask;
+        fn cnt_stop(&self) -> TimerEtmTask;
+        fn cnt_reload(&self) -> TimerEtmTask;
+        fn cnt_cap(&self) -> TimerEtmTask;
+        fn alarm_start(&self) -> TimerEtmTask;
+    }
+
+    impl<TG, const G: u8> TimerEtmEvents<TG, G> for Timer0<TG, G>
+    where
+        TG: TimerGroupInstance<G>,
+    {
+        fn on_alarm(&self) -> TimerEtmEvent {
+            TimerEtmEvent { id: 48 + G }
+        }
+    }
+
+    impl<TG, const G: u8> TimerEtmTasks<TG, G> for Timer0<TG, G>
+    where
+        TG: TimerGroupInstance<G>,
+    {
+        fn cnt_start(&self) -> TimerEtmTask {
+            TimerEtmTask { id: 88 + G }
+        }
+
+        fn alarm_start(&self) -> TimerEtmTask {
+            TimerEtmTask { id: 90 + G }
+        }
+
+        fn cnt_stop(&self) -> TimerEtmTask {
+            TimerEtmTask { id: 92 + G }
+        }
+
+        fn cnt_reload(&self) -> TimerEtmTask {
+            TimerEtmTask { id: 94 + G }
+        }
+        fn cnt_cap(&self) -> TimerEtmTask {
+            TimerEtmTask { id: 96 + G }
+        }
     }
 }
