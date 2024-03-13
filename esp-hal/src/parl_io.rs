@@ -43,11 +43,9 @@
 //!
 //! ### Start TX transfer
 //! ```no_run
-//! let transfer = parl_io_tx.write_dma(buffer).unwrap();
+//! let mut transfer = parl_io_tx.write_dma(buffer).unwrap();
 //!
-//! // the buffer and driver is moved into the transfer and we can get it back via
-//! // `wait`
-//! (buffer, parl_io_tx) = transfer.wait().unwrap();
+//! transfer.wait().unwrap();
 //! ```
 //!
 //! ### Initialization for RX
@@ -75,14 +73,9 @@
 //!
 //! ### Start RX transfer
 //! ```no_run
-//! let transfer = parl_io_rx.read_dma(buffer).unwrap();
-//!
-//! // the buffer and driver is moved into the transfer and we can get it back via
-//! // `wait`
-//! (buffer, parl_io_rx) = transfer.wait().unwrap();
+//! let mut transfer = parl_io_rx.read_dma(buffer).unwrap();
+//! transfer.wait().unwrap();
 //! ```
-
-use core::mem;
 
 use embedded_dma::{ReadBuffer, WriteBuffer};
 use fugit::HertzU32;
@@ -1172,10 +1165,10 @@ where
     /// instance.
     ///
     /// The maximum amount of data to be sent is 32736 bytes.
-    pub fn write_dma<TXBUF>(
-        mut self,
-        words: TXBUF,
-    ) -> Result<DmaTransfer<'d, CH, TXBUF, P, CP>, Error>
+    pub fn write_dma<'t, TXBUF>(
+        &'t mut self,
+        words: &'t TXBUF,
+    ) -> Result<DmaTransfer<'t, 'd, CH, P, CP>, Error>
     where
         TXBUF: ReadBuffer<Word = u8>,
     {
@@ -1187,10 +1180,7 @@ where
 
         self.start_write_bytes_dma(ptr, len)?;
 
-        Ok(DmaTransfer {
-            instance: self,
-            buffer: words,
-        })
+        Ok(DmaTransfer { instance: self })
     }
 
     fn start_write_bytes_dma(&mut self, ptr: *const u8, len: usize) -> Result<(), Error> {
@@ -1221,54 +1211,37 @@ where
 }
 
 /// An in-progress DMA transfer.
-pub struct DmaTransfer<'d, C, BUFFER, P, CP>
+#[must_use]
+pub struct DmaTransfer<'t, 'd, C, P, CP>
 where
     C: ChannelTypes,
     C::P: ParlIoPeripheral,
     P: TxPins + ConfigurePins,
     CP: TxClkPin,
 {
-    instance: ParlIoTx<'d, C, P, CP>,
-    buffer: BUFFER,
+    instance: &'t mut ParlIoTx<'d, C, P, CP>,
 }
 
-impl<'d, C, BUFFER, P, CP> DmaTransfer<'d, C, BUFFER, P, CP>
+impl<'t, 'd, C, P, CP> DmaTransfer<'t, 'd, C, P, CP>
 where
     C: ChannelTypes,
     C::P: ParlIoPeripheral,
     P: TxPins + ConfigurePins,
     CP: TxClkPin,
 {
-    /// Wait for the DMA transfer to complete and return the buffers and the
-    /// SPI instance.
+    /// Wait for the DMA transfer to complete
     #[allow(clippy::type_complexity)]
-    pub fn wait(
-        self,
-    ) -> Result<(BUFFER, ParlIoTx<'d, C, P, CP>), (DmaError, BUFFER, ParlIoTx<'d, C, P, CP>)> {
+    pub fn wait(self) -> Result<(), DmaError> {
         // Waiting for the DMA transfer is not enough. We need to wait for the
         // peripheral to finish flushing its buffers, too.
         while !Instance::is_tx_eof() {}
 
         Instance::set_tx_start(false);
 
-        let err = self.instance.tx_channel.has_error();
-
-        // `DmaTransfer` needs to have a `Drop` implementation, because we accept
-        // managed buffers that can free their memory on drop. Because of that
-        // we can't move out of the `DmaTransfer`'s fields, so we use `ptr::read`
-        // and `mem::forget`.
-        //
-        // NOTE(unsafe) There is no panic branch between getting the resources
-        // and forgetting `self`.
-        unsafe {
-            let buffer = core::ptr::read(&self.buffer);
-            let payload = core::ptr::read(&self.instance);
-            mem::forget(self);
-            if err {
-                Err((DmaError::DescriptorError, buffer, payload))
-            } else {
-                Ok((buffer, payload))
-            }
+        if self.instance.tx_channel.has_error() {
+            Err(DmaError::DescriptorError)
+        } else {
+            Ok(())
         }
     }
 
@@ -1295,10 +1268,10 @@ where
     ///
     /// It's only limited by the size of the DMA buffer when using
     /// [EofMode::EnableSignal].
-    pub fn read_dma<RXBUF>(
-        mut self,
-        mut words: RXBUF,
-    ) -> Result<RxDmaTransfer<'d, CH, RXBUF, P, CP>, Error>
+    pub fn read_dma<'t, RXBUF>(
+        &'t mut self,
+        words: &'t mut RXBUF,
+    ) -> Result<RxDmaTransfer<'t, 'd, CH, P, CP>, Error>
     where
         RXBUF: WriteBuffer<Word = u8>,
     {
@@ -1310,10 +1283,7 @@ where
 
         self.start_receive_bytes_dma(ptr, len)?;
 
-        Ok(RxDmaTransfer {
-            instance: self,
-            buffer: words,
-        })
+        Ok(RxDmaTransfer { instance: self })
     }
 
     fn start_receive_bytes_dma(&mut self, ptr: *mut u8, len: usize) -> Result<(), Error> {
@@ -1338,30 +1308,26 @@ where
 }
 
 /// An in-progress DMA transfer.
-pub struct RxDmaTransfer<'d, C, BUFFER, P, CP>
+pub struct RxDmaTransfer<'t, 'd, C, P, CP>
 where
     C: ChannelTypes,
     C::P: ParlIoPeripheral,
     P: RxPins + ConfigurePins,
     CP: RxClkPin,
 {
-    instance: ParlIoRx<'d, C, P, CP>,
-    buffer: BUFFER,
+    instance: &'t mut ParlIoRx<'d, C, P, CP>,
 }
 
-impl<'d, C, BUFFER, P, CP> RxDmaTransfer<'d, C, BUFFER, P, CP>
+impl<'t, 'd, C, P, CP> RxDmaTransfer<'t, 'd, C, P, CP>
 where
     C: ChannelTypes,
     C::P: ParlIoPeripheral,
     P: RxPins + ConfigurePins,
     CP: RxClkPin,
 {
-    /// Wait for the DMA transfer to complete and return the buffers and the
-    /// SPI instance.
+    /// Wait for the DMA transfer to complete
     #[allow(clippy::type_complexity)]
-    pub fn wait(
-        self,
-    ) -> Result<(BUFFER, ParlIoRx<'d, C, P, CP>), (DmaError, BUFFER, ParlIoRx<'d, C, P, CP>)> {
+    pub fn wait(self) -> Result<(), DmaError> {
         loop {
             if self.is_done() || self.is_eof_error() {
                 break;
@@ -1370,23 +1336,10 @@ where
 
         Instance::set_rx_start(false);
 
-        // `DmaTransfer` needs to have a `Drop` implementation, because we accept
-        // managed buffers that can free their memory on drop. Because of that
-        // we can't move out of the `DmaTransfer`'s fields, so we use `ptr::read`
-        // and `mem::forget`.
-        //
-        // NOTE(unsafe) There is no panic branch between getting the resources
-        // and forgetting `self`.
-        unsafe {
-            let buffer = core::ptr::read(&self.buffer);
-            let payload = core::ptr::read(&self.instance);
-            let err = self.instance.rx_channel.has_error();
-            mem::forget(self);
-            if err {
-                Err((DmaError::DescriptorError, buffer, payload))
-            } else {
-                Ok((buffer, payload))
-            }
+        if self.instance.rx_channel.has_error() {
+            Err(DmaError::DescriptorError)
+        } else {
+            Ok(())
         }
     }
 

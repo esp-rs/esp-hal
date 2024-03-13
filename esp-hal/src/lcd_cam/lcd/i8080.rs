@@ -296,12 +296,12 @@ where
         Ok(())
     }
 
-    pub fn send_dma<TXBUF>(
-        mut self,
+    pub fn send_dma<'t, TXBUF>(
+        &'t mut self,
         cmd: impl Into<Command<P::Word>>,
         dummy: u8,
-        data: TXBUF,
-    ) -> Result<Transfer<'d, TX, TXBUF, P>, DmaError>
+        data: &'t TXBUF,
+    ) -> Result<Transfer<'t, 'd, TX, P>, DmaError>
     where
         TXBUF: ReadBuffer<Word = P::Word>,
     {
@@ -313,7 +313,6 @@ where
 
         Ok(Transfer {
             instance: Some(self),
-            buffer: Some(data),
         })
     }
 }
@@ -432,17 +431,15 @@ impl<'d, TX, P> core::fmt::Debug for I8080<'d, TX, P> {
 }
 
 /// An in-progress transfer
-pub struct Transfer<'d, TX: Tx, BUFFER, P> {
-    instance: Option<I8080<'d, TX, P>>,
-    buffer: Option<BUFFER>,
+#[must_use]
+pub struct Transfer<'t, 'd, TX: Tx, P> {
+    instance: Option<&'t mut I8080<'d, TX, P>>,
 }
 
-impl<'d, TX: Tx, BUFFER, P> Transfer<'d, TX, BUFFER, P> {
+impl<'t, 'd, TX: Tx, P> Transfer<'t, 'd, TX, P> {
     #[allow(clippy::type_complexity)]
-    pub fn wait(
-        mut self,
-    ) -> Result<(BUFFER, I8080<'d, TX, P>), (DmaError, BUFFER, I8080<'d, TX, P>)> {
-        let mut instance = self
+    pub fn wait(mut self) -> Result<(), DmaError> {
+        let instance = self
             .instance
             .take()
             .expect("instance must be available throughout object lifetime");
@@ -454,15 +451,10 @@ impl<'d, TX: Tx, BUFFER, P> Transfer<'d, TX, BUFFER, P> {
             instance.tear_down_send();
         }
 
-        let buffer = self
-            .buffer
-            .take()
-            .expect("buffer must be available throughout object lifetime");
-
         if instance.tx_channel.has_error() {
-            Err((DmaError::DescriptorError, buffer, instance))
+            Err(DmaError::DescriptorError)
         } else {
-            Ok((buffer, instance))
+            Ok(())
         }
     }
 
@@ -477,7 +469,7 @@ impl<'d, TX: Tx, BUFFER, P> Transfer<'d, TX, BUFFER, P> {
     }
 }
 
-impl<'d, TX: Tx, BUFFER, P> Drop for Transfer<'d, TX, BUFFER, P> {
+impl<'t, 'd, TX: Tx, P> Drop for Transfer<'t, 'd, TX, P> {
     fn drop(&mut self) {
         if let Some(instance) = self.instance.as_mut() {
             // This will cancel the transfer.

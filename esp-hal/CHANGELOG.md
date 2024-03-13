@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixing `esp-wifi` + `TRNG` issue on `ESP32-S2` (#1272)
 
 ### Changed
+- Prefer mutable references over moving for DMA transactions (#1238)
 
 ### Removed
 

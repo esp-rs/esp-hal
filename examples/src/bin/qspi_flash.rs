@@ -96,7 +96,7 @@ fn main() -> ! {
     let mut delay = Delay::new(&clocks);
 
     // DMA buffer require a static life-time
-    let mut zero_buf = zero_buffer();
+    let (zero_buf, _, _, _) = dma_buffers!(0);
     let send = tx_buffer;
     let mut receive = rx_buffer;
 
@@ -107,10 +107,10 @@ fn main() -> ! {
             Command::Command8(0x06, SpiDataMode::Single),
             Address::None,
             0,
-            zero_buf,
+            &zero_buf,
         )
         .unwrap();
-    (zero_buf, spi) = transfer.wait().unwrap();
+    transfer.wait().unwrap();
     delay.delay_ms(250u32);
 
     // erase sector
@@ -120,10 +120,10 @@ fn main() -> ! {
             Command::Command8(0x20, SpiDataMode::Single),
             Address::Address24(0x000000, SpiDataMode::Single),
             0,
-            zero_buf,
+            &zero_buf,
         )
         .unwrap();
-    (zero_buf, spi) = transfer.wait().unwrap();
+    transfer.wait().unwrap();
     delay.delay_ms(250u32);
 
     // write enable
@@ -133,10 +133,10 @@ fn main() -> ! {
             Command::Command8(0x06, SpiDataMode::Single),
             Address::None,
             0,
-            zero_buf,
+            &zero_buf,
         )
         .unwrap();
-    (_, spi) = transfer.wait().unwrap();
+    transfer.wait().unwrap();
     delay.delay_ms(250u32);
 
     // write data / program page
@@ -148,10 +148,10 @@ fn main() -> ! {
             Command::Command8(0x32, SpiDataMode::Single),
             Address::Address24(0x000000, SpiDataMode::Single),
             0,
-            send,
+            &send,
         )
         .unwrap();
-    (_, spi) = transfer.wait().unwrap();
+    transfer.wait().unwrap();
     delay.delay_ms(250u32);
 
     loop {
@@ -162,14 +162,14 @@ fn main() -> ! {
                 Command::Command8(0xeb, SpiDataMode::Single),
                 Address::Address32(0x000000 << 8, SpiDataMode::Quad),
                 4,
-                receive,
+                &mut receive,
             )
             .unwrap();
 
         // here we could do something else while DMA transfer is in progress
         // the buffers and spi is moved into the transfer and we can get it back via
         // `wait`
-        (receive, spi) = transfer.wait().unwrap();
+        transfer.wait().unwrap();
 
         println!("{:x?}", &receive);
         for b in &mut receive.iter() {
@@ -183,9 +183,4 @@ fn main() -> ! {
 
         delay.delay_ms(250u32);
     }
-}
-
-fn zero_buffer() -> &'static mut [u8; 0] {
-    static mut BUFFER: [u8; 0] = [0u8; 0];
-    unsafe { &mut BUFFER }
 }

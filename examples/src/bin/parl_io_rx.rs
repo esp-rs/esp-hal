@@ -60,11 +60,8 @@ fn main() -> ! {
     let mut delay = Delay::new(&clocks);
 
     loop {
-        let transfer = parl_io_rx.read_dma(buffer).unwrap();
-
-        // the buffer and driver is moved into the transfer and we can get it back via
-        // `wait`
-        (buffer, parl_io_rx) = transfer.wait().unwrap();
+        let transfer = parl_io_rx.read_dma(&mut buffer).unwrap();
+        transfer.wait().unwrap();
         println!("Received: {:02x?} ...", &buffer[..30]);
 
         delay.delay_ms(500u32);

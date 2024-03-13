@@ -242,8 +242,6 @@ pub enum Endianness {
 
 #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
 pub mod dma {
-    use core::mem;
-
     use embedded_dma::{ReadBuffer, WriteBuffer};
 
     use crate::{
@@ -303,28 +301,22 @@ pub mod dma {
     }
 
     /// An in-progress DMA transfer
-    pub struct AesDmaTransferRxTx<'d, C, RBUFFER, TBUFFER>
+    #[must_use]
+    pub struct AesDmaTransferRxTx<'t, 'd, C>
     where
         C: ChannelTypes,
         C::P: AesPeripheral,
     {
-        aes_dma: AesDma<'d, C>,
-        rbuffer: RBUFFER,
-        tbuffer: TBUFFER,
+        aes_dma: &'t mut AesDma<'d, C>,
     }
 
-    impl<'d, C, RXBUF, TXBUF> DmaTransferRxTx<RXBUF, TXBUF, AesDma<'d, C>>
-        for AesDmaTransferRxTx<'d, C, RXBUF, TXBUF>
+    impl<'t, 'd, C> DmaTransferRxTx for AesDmaTransferRxTx<'t, 'd, C>
     where
         C: ChannelTypes,
         C::P: AesPeripheral,
     {
-        /// Wait for the DMA transfer to complete and return the buffers and the
-        /// AES instance.
-        fn wait(
-            self,
-        ) -> Result<(RXBUF, TXBUF, AesDma<'d, C>), (DmaError, RXBUF, TXBUF, AesDma<'d, C>)>
-        {
+        /// Wait for the DMA transfer to complete
+        fn wait(self) -> Result<(), DmaError> {
             // Waiting for the DMA transfer is not enough. We need to wait for the
             // peripheral to finish flushing its buffers, too.
             while self.aes_dma.aes.aes.state().read().state().bits() != 2 // DMA status DONE == 2
@@ -335,25 +327,10 @@ pub mod dma {
 
             self.aes_dma.finish_transform();
 
-            let err = self.aes_dma.channel.rx.has_error() || self.aes_dma.channel.tx.has_error();
-
-            // `DmaTransferRxTx` needs to have a `Drop` implementation, because we accept
-            // managed buffers that can free their memory on drop. Because of that
-            // we can't move out of the `DmaTransferRxTx`'s fields, so we use `ptr::read`
-            // and `mem::forget`.
-            //
-            // NOTE(unsafe) There is no panic branch between getting the resources
-            // and forgetting `self`.
-            unsafe {
-                let rbuffer = core::ptr::read(&self.rbuffer);
-                let tbuffer = core::ptr::read(&self.tbuffer);
-                let payload = core::ptr::read(&self.aes_dma);
-                mem::forget(self);
-                if err {
-                    Err((DmaError::DescriptorError, rbuffer, tbuffer, payload))
-                } else {
-                    Ok((rbuffer, tbuffer, payload))
-                }
+            if self.aes_dma.channel.rx.has_error() || self.aes_dma.channel.tx.has_error() {
+                Err(DmaError::DescriptorError)
+            } else {
+                Ok(())
             }
         }
 
@@ -364,7 +341,7 @@ pub mod dma {
         }
     }
 
-    impl<'d, C, RXBUF, TXBUF> Drop for AesDmaTransferRxTx<'d, C, RXBUF, TXBUF>
+    impl<'t, 'd, C> Drop for AesDmaTransferRxTx<'t, 'd, C>
     where
         C: ChannelTypes,
         C::P: AesPeripheral,
@@ -409,14 +386,14 @@ pub mod dma {
         /// This will return a [AesDmaTransferRxTx] owning the buffer(s) and the
         /// AES instance. The maximum amount of data to be sent/received
         /// is 32736 bytes.
-        pub fn process<TXBUF, RXBUF>(
-            mut self,
-            words: TXBUF,
-            mut read_buffer: RXBUF,
+        pub fn process<'t, TXBUF, RXBUF>(
+            &'t mut self,
+            words: &'t TXBUF,
+            read_buffer: &'t mut RXBUF,
             mode: Mode,
             cipher_mode: CipherMode,
             key: [u8; 16],
-        ) -> Result<AesDmaTransferRxTx<'d, C, RXBUF, TXBUF>, crate::dma::DmaError>
+        ) -> Result<AesDmaTransferRxTx<'t, 'd, C>, crate::dma::DmaError>
         where
             TXBUF: ReadBuffer<Word = u8>,
             RXBUF: WriteBuffer<Word = u8>,
@@ -434,11 +411,7 @@ pub mod dma {
                 key,
             )?;
 
-            Ok(AesDmaTransferRxTx {
-                aes_dma: self,
-                rbuffer: read_buffer,
-                tbuffer: words,
-            })
+            Ok(AesDmaTransferRxTx { aes_dma: self })
         }
 
         #[allow(clippy::too_many_arguments)]

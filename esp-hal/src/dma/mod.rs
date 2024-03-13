@@ -1298,18 +1298,18 @@ where
 
 /// Trait to be implemented for an in progress dma transfer.
 #[allow(drop_bounds)]
-pub trait DmaTransfer<B, T>: Drop {
+pub trait DmaTransfer: Drop {
     /// Wait for the transfer to finish.
-    fn wait(self) -> Result<(B, T), (DmaError, B, T)>;
+    fn wait(self) -> Result<(), DmaError>;
     /// Check if the transfer is finished.
     fn is_done(&self) -> bool;
 }
 
 /// Trait to be implemented for an in progress dma transfer.
 #[allow(clippy::type_complexity, drop_bounds)]
-pub trait DmaTransferRxTx<BR, BT, T>: Drop {
+pub trait DmaTransferRxTx: Drop {
     /// Wait for the transfer to finish.
-    fn wait(self) -> Result<(BR, BT, T), (DmaError, BR, BT, T)>;
+    fn wait(self) -> Result<(), DmaError>;
     /// Check if the transfer is finished.
     fn is_done(&self) -> bool;
 }
