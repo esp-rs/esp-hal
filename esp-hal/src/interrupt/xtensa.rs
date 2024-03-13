@@ -311,6 +311,13 @@ mod vectored {
         Ok(())
     }
 
+    /// Bind the given interrupt to the given handler
+    pub unsafe fn bind_interrupt(interrupt: Interrupt, handler: unsafe extern "C" fn() -> ()) {
+        let ptr = &peripherals::__INTERRUPTS[interrupt as usize]._handler as *const _
+            as *mut unsafe extern "C" fn() -> ();
+        ptr.write_volatile(handler);
+    }
+
     fn interrupt_level_to_cpu_interrupt(
         level: Priority,
         is_edge: bool,

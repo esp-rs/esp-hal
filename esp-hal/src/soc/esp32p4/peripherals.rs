@@ -32,7 +32,7 @@ crate::peripherals! {
     ECC <= ECC,
     ECDSA <= ECDSA,
     EFUSE <= EFUSE,
-    GPIO <= GPIO,
+    GPIO <= GPIO (GPIO,GPIO_INT1,GPIO_INT2,GPIO_INT3),
     GPIO_SD <= GPIO_SD,
     H264 <= H264,
     H264_DMA <= H264_DMA,

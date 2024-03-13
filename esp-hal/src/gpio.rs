@@ -22,7 +22,10 @@
 //!
 //! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
 
-use core::{convert::Infallible, marker::PhantomData};
+use core::{cell::Cell, convert::Infallible, marker::PhantomData};
+
+use critical_section::Mutex;
+use procmacros::interrupt;
 
 #[cfg(any(adc, dac))]
 pub(crate) use crate::analog;
@@ -37,6 +40,9 @@ pub type NoPinType = Gpio0<Unknown>;
 
 /// Convenience constant for `Option::None` pin
 pub const NO_PIN: Option<NoPinType> = None;
+
+static USER_INTERRUPT_HANDLER: Mutex<Cell<Option<unsafe extern "C" fn()>>> =
+    Mutex::new(Cell::new(None));
 
 #[derive(Copy, Clone)]
 pub enum Event {
@@ -1854,6 +1860,32 @@ impl IO {
             pins,
         }
     }
+
+    /// Install the given interrupt handler replacing any previously set
+    /// handler.
+    ///
+    /// When the async feature is enabled the handler will be called first and
+    /// the internal async handler will run after. In that case it's
+    /// important to not reset the interrupt status when mixing sync and
+    /// async (i.e. using async wait) interrupt handling.
+    pub fn set_interrupt_handler(&mut self, handler: unsafe extern "C" fn() -> ()) {
+        critical_section::with(|cs| {
+            USER_INTERRUPT_HANDLER.borrow(cs).set(Some(handler));
+        });
+    }
+}
+
+#[interrupt]
+unsafe fn GPIO() {
+    if let Some(user_handler) = critical_section::with(|cs| USER_INTERRUPT_HANDLER.borrow(cs).get())
+    {
+        unsafe {
+            user_handler();
+        }
+    }
+
+    #[cfg(feature = "async")]
+    asynch::handle_gpio_interrupt();
 }
 
 pub trait GpioProperties {
@@ -3149,19 +3181,7 @@ mod asynch {
         });
     }
 
-    #[cfg(not(any(esp32p4)))]
-    #[interrupt]
-    unsafe fn GPIO() {
-        handle_gpio_interrupt();
-    }
-
-    #[cfg(esp32p4)]
-    #[interrupt]
-    unsafe fn GPIO_INT0() {
-        handle_gpio_interrupt();
-    }
-
-    fn handle_gpio_interrupt() {
+    pub(super) fn handle_gpio_interrupt() {
         let intrs_bank0 = InterruptStatusRegisterAccessBank0::interrupt_status_read();
 
         #[cfg(any(esp32, esp32s2, esp32s3, esp32p4))]

@@ -32,7 +32,7 @@ crate::peripherals! {
     EFUSE <= EFUSE,
     FLASH_ENCRYPTION <= FLASH_ENCRYPTION,
     FRC_TIMER <= FRC_TIMER,
-    GPIO <= GPIO,
+    GPIO <= GPIO (GPIO,GPIO_NMI),
     GPIO_SD <= GPIO_SD,
     HINF <= HINF,
     I2C0 <= I2C0,

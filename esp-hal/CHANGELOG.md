@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Prefer mutable references over moving for DMA transactions (#1238)
+- Support runtime interrupt binding, adapt GPIO driver (#1231)
 
 ### Removed
 

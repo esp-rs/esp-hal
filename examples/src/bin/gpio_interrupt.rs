@@ -36,7 +36,8 @@ fn main() -> ! {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     // Set GPIO2 as an output, and set its state high initially.
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let mut io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    io.set_interrupt_handler(handler);
     let mut led = io.pins.gpio2.into_push_pull_output();
 
     #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
@@ -61,9 +62,9 @@ fn main() -> ! {
     }
 }
 
+#[handler]
 #[ram]
-#[interrupt]
-fn GPIO() {
+fn handler() {
     #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
     esp_println::println!(
         "GPIO Interrupt with priority {}",
