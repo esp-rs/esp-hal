@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fixing `esp-wifi` + `TRNG` issue on `ESP32-S2` (#1272)
-- Fixed LCD_CAM i8080 potentially sending garbage to display (#1283)
+- Fixed `LCD_CAM I8080` driver potentially sending garbage to display (#1283)
 
 ### Changed
 
