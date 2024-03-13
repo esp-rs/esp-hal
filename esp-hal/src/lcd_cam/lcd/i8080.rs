@@ -65,6 +65,10 @@ use crate::{
     peripherals::LCD_CAM,
 };
 
+extern "C" {
+    fn ets_delay_us(us: u32);
+}
+
 pub struct I8080<'d, TX, P> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
     tx_channel: TX,
@@ -373,6 +377,12 @@ impl<'d, TX: Tx, P> I8080<'d, TX, P> {
         self.lcd_cam
             .lc_dma_int_clr()
             .write(|w| w.lcd_trans_done_int_clr().set_bit());
+
+        // Before issuing lcd_start need to wait shortly for fifo to get data
+        // Otherwise, some garbage data will be sent out
+        unsafe {
+            ets_delay_us(1);
+        }
 
         self.lcd_cam
             .lcd_user()
