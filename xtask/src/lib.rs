@@ -25,7 +25,7 @@ pub enum Package {
     Examples,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Display, EnumIter, ValueEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Display, EnumIter, ValueEnum, serde::Serialize)]
 #[strum(serialize_all = "kebab-case")]
 pub enum Chip {
     Esp32,
@@ -369,7 +369,7 @@ pub fn bump_version(workspace: &Path, package: Package, amount: Version) -> Resu
     let manifest_path = workspace.join(package.to_string()).join("Cargo.toml");
     let manifest = fs::read_to_string(&manifest_path)?;
 
-    let mut manifest = manifest.parse::<toml_edit::Document>()?;
+    let mut manifest = manifest.parse::<toml_edit::DocumentMut>()?;
 
     let version = manifest["package"]["version"]
         .to_string()
@@ -551,6 +551,27 @@ pub fn generate_efuse_table(
     }
 
     Ok(())
+}
+
+// ----------------------------------------------------------------------------
+// Helper Functions
+
+/// Parse the version from the specified package's Cargo manifest.
+pub fn package_version(workspace: &Path, package: Package) -> Result<semver::Version> {
+    #[derive(Debug, serde::Deserialize)]
+    pub struct Manifest {
+        package: Package,
+    }
+
+    #[derive(Debug, serde::Deserialize)]
+    pub struct Package {
+        version: semver::Version,
+    }
+
+    let manifest = fs::read_to_string(workspace.join(package.to_string()).join("Cargo.toml"))?;
+    let manifest: Manifest = basic_toml::from_str(&manifest)?;
+
+    Ok(manifest.package.version)
 }
 
 /// Make the path "Windows"-safe
