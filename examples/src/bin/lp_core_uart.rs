@@ -13,7 +13,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    gpio::lp_gpio::IntoLowPowerPin,
+    gpio::{lp_gpio::IntoLowPowerPin, IO},
     lp_core::{LpCore, LpCoreWakeupSource},
     peripherals::Peripherals,
     prelude::*,
@@ -21,9 +21,8 @@ use esp_hal::{
         config::{Config, DataBits, Parity, StopBits},
         lp_uart::LpUart,
         TxRxPins,
+        Uart,
     },
-    Uart,
-    IO,
 };
 use esp_println::println;
 

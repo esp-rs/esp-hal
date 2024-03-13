@@ -10,13 +10,12 @@ use core::time::Duration;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
+    delay::Delay,
     entry,
     peripherals::Peripherals,
     prelude::*,
-    rtc_cntl::{get_reset_reason, get_wakeup_cause, sleep::TimerWakeupSource, SocResetReason},
+    rtc_cntl::{get_reset_reason, get_wakeup_cause, sleep::TimerWakeupSource, Rtc, SocResetReason},
     Cpu,
-    Delay,
-    Rtc,
 };
 use esp_println::println;
 

@@ -17,8 +17,7 @@ use esp_hal::{
     peripherals::{Interrupt, Peripherals, UART0},
     prelude::*,
     timer::TimerGroup,
-    uart::config::AtCmdConfig,
-    Uart,
+    uart::{config::AtCmdConfig, Uart},
 };
 use nb::block;
 

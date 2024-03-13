@@ -20,11 +20,11 @@ use core::{
 use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
+    gpio::IO,
     interrupt::{self, Priority},
     pcnt::{channel, channel::PcntSource, unit, PCNT},
     peripherals::{Interrupt, Peripherals},
     prelude::*,
-    IO,
 };
 use esp_println::println;
 

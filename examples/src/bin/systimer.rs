@@ -13,11 +13,11 @@ use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
+    delay::Delay,
     interrupt::{self, Priority},
     peripherals::{Interrupt, Peripherals},
     prelude::*,
     systimer::{Alarm, Periodic, SystemTimer, Target},
-    Delay,
 };
 use esp_println::println;
 

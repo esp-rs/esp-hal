@@ -14,7 +14,14 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{clock::ClockControl, peripherals::Peripherals, prelude::*, rmt::Rmt, Delay, IO};
+use esp_hal::{
+    clock::ClockControl,
+    delay::Delay,
+    gpio::IO,
+    peripherals::Peripherals,
+    prelude::*,
+    rmt::Rmt,
+};
 use esp_hal_smartled::{smartLedBuffer, SmartLedsAdapter};
 use smart_leds::{
     brightness,

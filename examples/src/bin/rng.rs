@@ -6,7 +6,7 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{peripherals::Peripherals, prelude::*, Rng};
+use esp_hal::{peripherals::Peripherals, prelude::*, rng::Rng};
 use esp_println::println;
 
 #[entry]

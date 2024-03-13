@@ -15,11 +15,11 @@ use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
+    delay::Delay,
     interrupt::{self, Priority},
     peripherals::{Interrupt, Peripherals},
     prelude::*,
     system::{SoftwareInterrupt, SoftwareInterruptControl},
-    Delay,
 };
 
 static SWINT: Mutex<RefCell<Option<SoftwareInterruptControl>>> = Mutex::new(RefCell::new(None));

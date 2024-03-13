@@ -36,11 +36,11 @@ use embedded_hal_bus::spi::RefCellDevice;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
+    delay::Delay,
     gpio::{self, IO},
     peripherals::Peripherals,
     prelude::*,
     spi::{master::Spi, SpiMode},
-    Delay,
 };
 use esp_println::{print, println};
 
