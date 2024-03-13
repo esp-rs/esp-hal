@@ -2,7 +2,7 @@
 //!
 //! Folowing pins are used:
 //! GPIO0
-//! GPIO
+//! GPIO1
 
 #![no_std]
 #![no_main]

@@ -27,28 +27,30 @@ jobs:
   #       run: |
   #         # ...
 
-  # test-esp32c3:
-  #   name: HIL Test | ESP32-C3
-  #   runs-on:
-  #     labels: [self-hosted, rustboard]
-  #   env:
-  #     PROBE_RS_CHIP: esp32c3
-  #     CARGO_BUILD_TARGET: riscv32imc-unknown-none-elf
+  test-esp32c3:
+    name: HIL Test | ESP32-C3
+    runs-on:
+      labels: [self-hosted, rustboard]
+    env:
+      PROBE_RS_CHIP: esp32c3
+      CARGO_BUILD_TARGET: riscv32imc-unknown-none-elf
 
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #       with:
-  #         ref: 'feat/hil-testing'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 'feat/hil-testing'
 
-  #     - uses: dtolnay/rust-toolchain@v1
-  #       with:
-  #         target: ${{ env.CARGO_BUILD_TARGET }}
-  #         toolchain: nightly
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          target: ${{ env.CARGO_BUILD_TARGET }}
+          toolchain: nightly
 
-  #     - name: Run tests
-  #       run: |
-  #         cd hil-test/
-  #         cargo test --release --features=${{ env.PROBE_RS_CHIP }}
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Run tests
+        run: |
+          cd hil-test/
+          cargo test --release --features=${{ env.PROBE_RS_CHIP }}
 
   test-esp32c6:
     name: HIL Test | ESP32-C6
