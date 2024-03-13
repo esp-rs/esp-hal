@@ -211,10 +211,6 @@ fn reg_get_bit(reg: u32, b: u32) -> u32 {
     unsafe { (reg as *mut u32).read_volatile() & b }
 }
 
-fn reg_get_field(reg: u32, s: u32, v: u32) -> u32 {
-    unsafe { ((reg as *mut u32).read_volatile() >> s) & v }
-}
-
 fn reg_clr_bit(reg: u32, bit: u32) {
     unsafe {
         (reg as *mut u32).write_volatile((reg as *mut u32).read_volatile() & !bit);
@@ -282,10 +278,8 @@ pub(crate) fn regi2c_write_mask(block: u8, _host_id: u8, reg_add: u8, msb: u8, l
         | (reg_add as u32 & I2C_RTC_ADDR_V as u32) << I2C_RTC_ADDR_S as u32;
     reg_write(I2C_RTC_CONFIG2, temp);
     while reg_get_bit(I2C_RTC_CONFIG2, I2C_RTC_BUSY) != 0 {}
-    temp = reg_get_field(I2C_RTC_CONFIG2, I2C_RTC_DATA_S, I2C_RTC_DATA_V);
     // Write the i2c bus register
-    temp &= (!(0xFFFFFFFF << lsb)) | (0xFFFFFFFF << (msb + 1));
-    temp |= (data as u32 & (!(0xFFFFFFFF << (msb as u32 - lsb as u32 + 1)))) << (lsb as u32);
+    temp = (data as u32 & (!(0xFFFFFFFF << (msb as u32 - lsb as u32 + 1)))) << (lsb as u32);
     temp = ((block as u32 & I2C_RTC_SLAVE_ID_V as u32) << I2C_RTC_SLAVE_ID_S as u32)
         | ((reg_add as u32 & I2C_RTC_ADDR_V as u32) << I2C_RTC_ADDR_S as u32)
         | ((0x1 & I2C_RTC_WR_CNTL_V as u32) << I2C_RTC_WR_CNTL_S as u32)
