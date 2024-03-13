@@ -29,18 +29,15 @@ enum Cli {
 
 #[derive(Debug, Args)]
 struct BuildDocumentationArgs {
+    /// Open the documentation in the default browser once built.
+    #[arg(long)]
+    open: bool,
     /// Package to build documentation for.
     #[arg(value_enum)]
     package: Package,
     /// Which chip to build the documentation for.
-    #[arg(value_enum)]
-    chip: Chip,
-    /// Open the documentation in the default browser once built.
-    #[arg(long)]
-    open: bool,
-    /// Directory in which to place the built documentation.
-    #[arg(long)]
-    output_path: Option<PathBuf>,
+    #[arg(value_enum, default_values_t = Chip::iter())]
+    chips: Vec<Chip>,
 }
 
 #[derive(Debug, Args)]
@@ -125,33 +122,71 @@ fn main() -> Result<()> {
 // Subcommands
 
 fn build_documentation(workspace: &Path, args: BuildDocumentationArgs) -> Result<()> {
-    // Ensure that the package/chip combination provided are valid:
-    validate_package_chip(&args.package, &args.chip)?;
+    let output_path = workspace.join("docs");
+    let resources = workspace.join("resources");
 
-    // Determine the appropriate build target for the given package and chip:
-    let target = target_triple(&args.package, &args.chip)?;
+    let package = args.package.to_string();
+    let version = xtask::package_version(&workspace, args.package)?;
 
-    // Simply build the documentation for the specified package, targeting the
-    // specified chip:
-    xtask::build_documentation(workspace, args.package, args.chip, target, args.open)?;
+    let mut crates = Vec::new();
 
-    // If an output path was specified, once the documentation has been built we
-    // will copy it to the provided path, creating any required directories in the
-    // process:
-    if let Some(output_path) = args.output_path {
+    for chip in args.chips {
+        // Ensure that the package/chip combination provided are valid:
+        validate_package_chip(&args.package, &chip)?;
+
+        // Determine the appropriate build target for the given package and chip:
+        let target = target_triple(&args.package, &chip)?;
+
+        // Build the documentation for the specified package, targeting the
+        // specified chip:
+        xtask::build_documentation(workspace, args.package, chip, target, args.open)?;
+
         let docs_path = xtask::windows_safe_path(
             &workspace
-                .join(args.package.to_string())
+                .join(package.clone())
                 .join("target")
                 .join(target)
                 .join("doc"),
         );
 
+        let output_path = output_path
+            .join(package.clone())
+            .join(version.to_string())
+            .join(chip.to_string());
         let output_path = xtask::windows_safe_path(&output_path);
-        fs::create_dir_all(&output_path)?;
 
+        // Create the output directory, and copy the built documentation into it:
+        fs::create_dir_all(&output_path)?;
         copy_dir_all(&docs_path, &output_path)?;
+
+        // Build the context object required for rendering this particular build's
+        // information on the documentation index:
+        crates.push(minijinja::context! {
+            name => package,
+            version => version,
+            chip => chip.to_string(),
+            chip_pretty => chip.pretty_name(),
+            package => package.replace('-', "_"),
+            description => format!("{} (targeting {})", package, chip.pretty_name()),
+        });
     }
+
+    // Copy any additional assets to the documentation's output path:
+    fs::copy(
+        &resources.join("esp-rs.svg"),
+        &output_path.join("esp-rs.svg"),
+    )?;
+
+    // Render the index and write it out to the documentaiton's output path:
+    let source = fs::read_to_string(resources.join("index.html.jinja"))?;
+
+    let mut env = minijinja::Environment::new();
+    env.add_template("index", &source)?;
+
+    let tmpl = env.get_template("index")?;
+    let html = tmpl.render(minijinja::context! { crates => crates })?;
+
+    fs::write(output_path.join("index.html"), html)?;
 
     Ok(())
 }
