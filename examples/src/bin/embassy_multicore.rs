@@ -64,7 +64,7 @@ async fn main(_spawner: Spawner) {
     let led_ctrl_signal = &*make_static!(Signal::new());
 
     let led = io.pins.gpio0.into_push_pull_output();
-    
+
     let _guard = cpu_control
         .start_app_core(unsafe { &mut APP_CORE_STACK }, move || {
             let executor = make_static!(Executor::new());

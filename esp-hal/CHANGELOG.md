@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fixing `esp-wifi` + `TRNG` issue on `ESP32-S2` (#1272)
+- Fixed core1 startup using the wrong stack on the esp32 and esp32s3 (#1286).
 
 ### Changed
 
