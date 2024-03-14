@@ -49,6 +49,6 @@ unsafe fn post_init() {
     rtc.swd.disable();
     rtc.rwdt.disable();
 
-    Wdt::<TIMG0, 0>::set_wdt_enabled(false);
-    Wdt::<TIMG1, 1>::set_wdt_enabled(false);
+    Wdt::<TIMG0>::set_wdt_enabled(false);
+    Wdt::<TIMG1>::set_wdt_enabled(false);
 }

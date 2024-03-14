@@ -24,7 +24,7 @@ use esp_hal::{
     },
 };
 
-static TIMER0: Mutex<RefCell<Option<Timer<Timer0<TIMG0, 0>>>>> = Mutex::new(RefCell::new(None));
+static TIMER0: Mutex<RefCell<Option<Timer<Timer0<TIMG0>>>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {

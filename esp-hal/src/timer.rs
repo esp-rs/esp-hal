@@ -68,24 +68,28 @@ pub enum Error {
 
 // A timergroup consisting of up to 2 timers (chip dependent) and a watchdog
 // timer
-pub struct TimerGroup<'d, T, const G: u8>
+pub struct TimerGroup<'d, T>
 where
-    T: TimerGroupInstance<G>,
+    T: TimerGroupInstance,
 {
     _timer_group: PeripheralRef<'d, T>,
-    pub timer0: Timer<Timer0<T, G>>,
+    pub timer0: Timer<Timer0<T>>,
     #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
     pub timer1: Timer<Timer1<T>>,
-    pub wdt: Wdt<T, G>,
+    pub wdt: Wdt<T>,
 }
 
-pub trait TimerGroupInstance<const G: u8> {
+pub trait TimerGroupInstance {
     fn register_block() -> *const RegisterBlock;
     fn configure_src_clk();
     fn configure_wdt_src_clk();
+    fn id() -> u8;
 }
 
-impl TimerGroupInstance<0> for TIMG0 {
+impl TimerGroupInstance for TIMG0 {
+    fn id() -> u8 {
+        0
+    }
     #[inline(always)]
     fn register_block() -> *const RegisterBlock {
         crate::peripherals::TIMG0::PTR
@@ -135,7 +139,10 @@ impl TimerGroupInstance<0> for TIMG0 {
 }
 
 #[cfg(timg1)]
-impl TimerGroupInstance<1> for TIMG1 {
+impl TimerGroupInstance for TIMG1 {
+    fn id() -> u8 {
+        1
+    }
     #[inline(always)]
     fn register_block() -> *const RegisterBlock {
         crate::peripherals::TIMG1::PTR
@@ -177,9 +184,9 @@ impl TimerGroupInstance<1> for TIMG1 {
     }
 }
 
-impl<'d, T, const G: u8> TimerGroup<'d, T, G>
+impl<'d, T> TimerGroup<'d, T>
 where
-    T: TimerGroupInstance<G>,
+    T: TimerGroupInstance,
 {
     pub fn new(timer_group: impl Peripheral<P = T> + 'd, clocks: &Clocks) -> Self {
         crate::into_ref!(timer_group);
@@ -296,13 +303,13 @@ pub trait Instance {
     fn enable_peripheral(&self);
 }
 
-pub struct Timer0<TG, const G: u8> {
+pub struct Timer0<TG> {
     phantom: PhantomData<TG>,
 }
 
-impl<TG, const G: u8> Timer0<TG, G>
+impl<TG> Timer0<TG>
 where
-    TG: TimerGroupInstance<G>,
+    TG: TimerGroupInstance,
 {
     #[allow(unused)]
     pub(crate) unsafe fn steal() -> Self {
@@ -313,9 +320,9 @@ where
 }
 
 /// Timer peripheral instance
-impl<TG, const G: u8> Instance for Timer0<TG, G>
+impl<TG> Instance for Timer0<TG>
 where
-    TG: TimerGroupInstance<G>,
+    TG: TimerGroupInstance,
 {
     fn reset_counter(&mut self) {
         let reg_block = unsafe { &*TG::register_block() };
@@ -465,14 +472,14 @@ where
 }
 
 #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
-pub struct Timer1<TG, const G: u8> {
-    phantom: PhantomData<TG, G>,
+pub struct Timer1<TG> {
+    phantom: PhantomData<TG>,
 }
 
 #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
-impl<TG, const G: u8> Timer1<TG, G>
+impl<TG> Timer1<TG>
 where
-    TG: TimerGroupInstance<G>,
+    TG: TimerGroupInstance,
 {
     #[allow(unused)]
     pub(crate) unsafe fn steal() -> Self {
@@ -484,9 +491,9 @@ where
 
 /// Timer peripheral instance
 #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
-impl<TG, const G: u8> Instance for Timer1<TG, G>
+impl<TG> Instance for Timer1<TG>
 where
-    TG: TimerGroupInstance<G>,
+    TG: TimerGroupInstance,
 {
     fn reset_counter(&mut self) {
         let reg_block = unsafe { &*TG::register_block() };
@@ -715,14 +722,14 @@ where
 impl<T> Periodic for Timer<T> where T: Instance {}
 
 /// Watchdog timer
-pub struct Wdt<TG, const G: u8> {
+pub struct Wdt<TG> {
     phantom: PhantomData<TG>,
 }
 
 /// Watchdog driver
-impl<TG, const G: u8> Wdt<TG, G>
+impl<TG> Wdt<TG>
 where
-    TG: TimerGroupInstance<G>,
+    TG: TimerGroupInstance,
 {
     /// Create a new watchdog timer instance
     pub fn new() -> Self {
@@ -835,27 +842,27 @@ where
     }
 }
 
-impl<TG, const G: u8> Default for Wdt<TG, G>
+impl<TG> Default for Wdt<TG>
 where
-    TG: TimerGroupInstance<G>,
+    TG: TimerGroupInstance,
 {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<TG, const G: u8> WatchdogDisable for Wdt<TG, G>
+impl<TG> WatchdogDisable for Wdt<TG>
 where
-    TG: TimerGroupInstance<G>,
+    TG: TimerGroupInstance,
 {
     fn disable(&mut self) {
         self.disable();
     }
 }
 
-impl<TG, const G: u8> WatchdogEnable for Wdt<TG, G>
+impl<TG> WatchdogEnable for Wdt<TG>
 where
-    TG: TimerGroupInstance<G>,
+    TG: TimerGroupInstance,
 {
     type Time = MicrosDurationU64;
 
@@ -868,9 +875,9 @@ where
     }
 }
 
-impl<TG, const G: u8> Watchdog for Wdt<TG, G>
+impl<TG> Watchdog for Wdt<TG>
 where
-    TG: TimerGroupInstance<G>,
+    TG: TimerGroupInstance,
 {
     fn feed(&mut self) {
         self.feed();
@@ -909,11 +916,11 @@ pub mod etm {
 
     impl Sealed for TimerEtmTask {}
 
-    pub trait TimerEtmEvents<TG, const G: u8> {
+    pub trait TimerEtmEvents<TG> {
         fn on_alarm(&self) -> TimerEtmEvent;
     }
 
-    pub trait TimerEtmTasks<TG, const G: u8> {
+    pub trait TimerEtmTasks<TG> {
         fn cnt_start(&self) -> TimerEtmTask;
         fn cnt_stop(&self) -> TimerEtmTask;
         fn cnt_reload(&self) -> TimerEtmTask;
@@ -921,36 +928,36 @@ pub mod etm {
         fn alarm_start(&self) -> TimerEtmTask;
     }
 
-    impl<TG, const G: u8> TimerEtmEvents<TG, G> for Timer0<TG, G>
+    impl<TG> TimerEtmEvents<TG> for Timer0<TG>
     where
-        TG: TimerGroupInstance<G>,
+        TG: TimerGroupInstance,
     {
         fn on_alarm(&self) -> TimerEtmEvent {
-            TimerEtmEvent { id: 48 + G }
+            TimerEtmEvent { id: 48 + TG::id() }
         }
     }
 
-    impl<TG, const G: u8> TimerEtmTasks<TG, G> for Timer0<TG, G>
+    impl<TG> TimerEtmTasks<TG> for Timer0<TG>
     where
-        TG: TimerGroupInstance<G>,
+        TG: TimerGroupInstance,
     {
         fn cnt_start(&self) -> TimerEtmTask {
-            TimerEtmTask { id: 88 + G }
+            TimerEtmTask { id: 88 + TG::id() }
         }
 
         fn alarm_start(&self) -> TimerEtmTask {
-            TimerEtmTask { id: 90 + G }
+            TimerEtmTask { id: 90 + TG::id() }
         }
 
         fn cnt_stop(&self) -> TimerEtmTask {
-            TimerEtmTask { id: 92 + G }
+            TimerEtmTask { id: 92 + TG::id() }
         }
 
         fn cnt_reload(&self) -> TimerEtmTask {
-            TimerEtmTask { id: 94 + G }
+            TimerEtmTask { id: 94 + TG::id() }
         }
         fn cnt_cap(&self) -> TimerEtmTask {
-            TimerEtmTask { id: 96 + G }
+            TimerEtmTask { id: 96 + TG::id() }
         }
     }
 }
