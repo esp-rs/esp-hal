@@ -35,12 +35,7 @@ fn main() -> ! {
     let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let mut timer0 = timg0.timer0;
 
-    interrupt::enable(Interrupt::TG0_T0_LEVEL, Priority::Priority1).unwrap();
-
-    // Alarm at 100ms (80 clock cycles in 1 us)
-    timer0.load_alarm_value(100 * 1_000 * 80);
-    timer0.set_alarm_active(true);
-
+    // Configure ETM to stop timer0 when alarm is triggered
     let event = timer0.on_alarm();
     let task = timer0.cnt_stop();
 
@@ -50,7 +45,18 @@ fn main() -> ! {
 
     channel0.setup(&event, &task);
 
+    timer0.set_counter_decrementing(false);
+    timer0.reset_counter();
     timer0.set_counter_active(true);
+
+    // Setup alarm at 100ms
+    // 80 / 2 (default divider) timer clock cycles == 1 us
+    timer0.load_alarm_value(100 * 1_000 * 40);
+
+    // Enable interrupt that will be triggered by the alarm
+    interrupt::enable(Interrupt::TG0_T0_LEVEL, Priority::Priority1).unwrap();
+
+    timer0.set_alarm_active(true);
 
     critical_section::with(|cs| {
         TIMER0.borrow_ref_mut(cs).replace(timer0);
@@ -67,6 +73,7 @@ fn TG0_T0_LEVEL() {
 
         timer0.clear_interrupt();
 
+        // This should display close to 4_000_000
         esp_println::println!("Counter: {}", timer0.now());
     });
 }
