@@ -80,8 +80,8 @@ async fn main(_spawner: Spawner) {
         peripherals.I2S0,
         Standard::Philips,
         DataFormat::Data16Channel16,
-        44100.Hz(),
-        dma_channel.configure(
+        44100u32.Hz(),
+        dma_channel.configure_for_async(
             false,
             &mut tx_descriptors,
             &mut rx_descriptors,

@@ -25,7 +25,6 @@
 use core::{cell::Cell, convert::Infallible, marker::PhantomData};
 
 use critical_section::Mutex;
-use procmacros::handler;
 
 #[cfg(any(adc, dac))]
 pub(crate) use crate::analog;
@@ -1876,7 +1875,8 @@ pub struct IO {
 impl IO {
     /// Initialize the I/O driver.
     pub fn new(mut gpio: GPIO, io_mux: IO_MUX) -> Self {
-        gpio.bind_gpio_interrupt(gpio_interrupt_handler.handler());
+        gpio.bind_gpio_interrupt(gpio_interrupt_handler);
+
         let pins = gpio.split();
 
         IO {
@@ -1910,8 +1910,7 @@ impl IO {
     }
 }
 
-#[handler]
-fn gpio_interrupt_handler() {
+extern "C" fn gpio_interrupt_handler() {
     if let Some(user_handler) = critical_section::with(|cs| USER_INTERRUPT_HANDLER.borrow(cs).get())
     {
         user_handler.call();

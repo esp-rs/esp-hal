@@ -142,41 +142,57 @@ pub mod dma {
     use super::*;
     #[cfg(spi3)]
     use crate::dma::Spi3Peripheral;
-    use crate::dma::{
-        Channel,
-        ChannelTypes,
-        DmaError,
-        DmaTransfer,
-        DmaTransferRxTx,
-        RxPrivate,
-        Spi2Peripheral,
-        SpiPeripheral,
-        TxPrivate,
+    use crate::{
+        dma::{
+            Channel,
+            ChannelTypes,
+            DmaError,
+            DmaTransfer,
+            DmaTransferRxTx,
+            RxPrivate,
+            Spi2Peripheral,
+            SpiPeripheral,
+            TxPrivate,
+        },
+        Mode,
     };
 
-    pub trait WithDmaSpi2<'d, C>
+    pub trait WithDmaSpi2<'d, C, DmaMode>
     where
         C: ChannelTypes,
         C::P: SpiPeripheral,
+        DmaMode: Mode,
     {
-        fn with_dma(self, channel: Channel<'d, C>) -> SpiDma<'d, crate::peripherals::SPI2, C>;
+        fn with_dma(
+            self,
+            channel: Channel<'d, C, DmaMode>,
+        ) -> SpiDma<'d, crate::peripherals::SPI2, C, DmaMode>;
     }
 
     #[cfg(spi3)]
-    pub trait WithDmaSpi3<'d, C>
+    pub trait WithDmaSpi3<'d, C, DmaMode>
     where
         C: ChannelTypes,
         C::P: SpiPeripheral,
+        DmaMode: Mode,
     {
-        fn with_dma(self, channel: Channel<'d, C>) -> SpiDma<'d, crate::peripherals::SPI3, C>;
+        fn with_dma(
+            self,
+            channel: Channel<'d, C, DmaMode>,
+        ) -> SpiDma<'d, crate::peripherals::SPI3, C, DmaMode>;
     }
 
-    impl<'d, C> WithDmaSpi2<'d, C> for Spi<'d, crate::peripherals::SPI2, FullDuplexMode>
+    impl<'d, C, DmaMode> WithDmaSpi2<'d, C, DmaMode>
+        for Spi<'d, crate::peripherals::SPI2, FullDuplexMode>
     where
         C: ChannelTypes,
         C::P: SpiPeripheral + Spi2Peripheral,
+        DmaMode: Mode,
     {
-        fn with_dma(self, mut channel: Channel<'d, C>) -> SpiDma<'d, crate::peripherals::SPI2, C> {
+        fn with_dma(
+            self,
+            mut channel: Channel<'d, C, DmaMode>,
+        ) -> SpiDma<'d, crate::peripherals::SPI2, C, DmaMode> {
             channel.tx.init_channel(); // no need to call this for both, TX and RX
 
             #[cfg(esp32)]
@@ -195,12 +211,17 @@ pub mod dma {
     }
 
     #[cfg(spi3)]
-    impl<'d, C> WithDmaSpi3<'d, C> for Spi<'d, crate::peripherals::SPI3, FullDuplexMode>
+    impl<'d, C, DmaMode> WithDmaSpi3<'d, C, DmaMode>
+        for Spi<'d, crate::peripherals::SPI3, FullDuplexMode>
     where
         C: ChannelTypes,
         C::P: SpiPeripheral + Spi3Peripheral,
+        DmaMode: Mode,
     {
-        fn with_dma(self, mut channel: Channel<'d, C>) -> SpiDma<'d, crate::peripherals::SPI3, C> {
+        fn with_dma(
+            self,
+            mut channel: Channel<'d, C, DmaMode>,
+        ) -> SpiDma<'d, crate::peripherals::SPI3, C, DmaMode> {
             channel.tx.init_channel(); // no need to call this for both, TX and RX
 
             #[cfg(esp32)]
@@ -219,20 +240,22 @@ pub mod dma {
     }
     /// An in-progress DMA transfer
     #[must_use]
-    pub struct SpiDmaTransferRxTx<'t, 'd, T, C>
+    pub struct SpiDmaTransferRxTx<'t, 'd, T, C, DmaMode>
     where
         T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
         C: ChannelTypes,
         C::P: SpiPeripheral,
+        DmaMode: Mode,
     {
-        spi_dma: &'t mut SpiDma<'d, T, C>,
+        spi_dma: &'t mut SpiDma<'d, T, C, DmaMode>,
     }
 
-    impl<'t, 'd, T, C> DmaTransferRxTx for SpiDmaTransferRxTx<'t, 'd, T, C>
+    impl<'t, 'd, T, C, DmaMode> DmaTransferRxTx for SpiDmaTransferRxTx<'t, 'd, T, C, DmaMode>
     where
         T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
         C: ChannelTypes,
         C::P: SpiPeripheral,
+        DmaMode: Mode,
     {
         /// Wait for the DMA transfer to complete
         fn wait(self) -> Result<(), DmaError> {
@@ -255,11 +278,12 @@ pub mod dma {
         }
     }
 
-    impl<'t, 'd, T, C> Drop for SpiDmaTransferRxTx<'t, 'd, T, C>
+    impl<'t, 'd, T, C, DmaMode> Drop for SpiDmaTransferRxTx<'t, 'd, T, C, DmaMode>
     where
         T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
         C: ChannelTypes,
         C::P: SpiPeripheral,
+        DmaMode: Mode,
     {
         fn drop(&mut self) {
             while !self.is_done() {}
@@ -269,20 +293,22 @@ pub mod dma {
 
     /// An in-progress DMA transfer.
     #[must_use]
-    pub struct SpiDmaTransferRx<'t, 'd, T, C>
+    pub struct SpiDmaTransferRx<'t, 'd, T, C, DmaMode>
     where
         T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
         C: ChannelTypes,
         C::P: SpiPeripheral,
+        DmaMode: Mode,
     {
-        spi_dma: &'t mut SpiDma<'d, T, C>,
+        spi_dma: &'t mut SpiDma<'d, T, C, DmaMode>,
     }
 
-    impl<'t, 'd, T, C> DmaTransfer for SpiDmaTransferRx<'t, 'd, T, C>
+    impl<'t, 'd, T, C, DmaMode> DmaTransfer for SpiDmaTransferRx<'t, 'd, T, C, DmaMode>
     where
         T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
         C: ChannelTypes,
         C::P: SpiPeripheral,
+        DmaMode: Mode,
     {
         /// Wait for the DMA transfer to complete
         fn wait(self) -> Result<(), DmaError> {
@@ -303,11 +329,12 @@ pub mod dma {
         }
     }
 
-    impl<'t, 'd, T, C> Drop for SpiDmaTransferRx<'t, 'd, T, C>
+    impl<'t, 'd, T, C, DmaMode> Drop for SpiDmaTransferRx<'t, 'd, T, C, DmaMode>
     where
         T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
         C: ChannelTypes,
         C::P: SpiPeripheral,
+        DmaMode: Mode,
     {
         fn drop(&mut self) {
             while !self.is_done() {}
@@ -318,20 +345,22 @@ pub mod dma {
 
     /// An in-progress DMA transfer.
     #[must_use]
-    pub struct SpiDmaTransferTx<'t, 'd, T, C>
+    pub struct SpiDmaTransferTx<'t, 'd, T, C, DmaMode>
     where
         T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
         C: ChannelTypes,
         C::P: SpiPeripheral,
+        DmaMode: Mode,
     {
-        spi_dma: &'t mut SpiDma<'d, T, C>,
+        spi_dma: &'t mut SpiDma<'d, T, C, DmaMode>,
     }
 
-    impl<'t, 'd, T, C> DmaTransfer for SpiDmaTransferTx<'t, 'd, T, C>
+    impl<'t, 'd, T, C, DmaMode> DmaTransfer for SpiDmaTransferTx<'t, 'd, T, C, DmaMode>
     where
         T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
         C: ChannelTypes,
         C::P: SpiPeripheral,
+        DmaMode: Mode,
     {
         /// Wait for the DMA transfer to complete
         fn wait(self) -> Result<(), DmaError> {
@@ -354,11 +383,12 @@ pub mod dma {
         }
     }
 
-    impl<'t, 'd, T, C> Drop for SpiDmaTransferTx<'t, 'd, T, C>
+    impl<'t, 'd, T, C, DmaMode> Drop for SpiDmaTransferTx<'t, 'd, T, C, DmaMode>
     where
         T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
         C: ChannelTypes,
         C::P: SpiPeripheral,
+        DmaMode: Mode,
     {
         fn drop(&mut self) {
             while !self.is_done() {}
@@ -368,30 +398,33 @@ pub mod dma {
     }
 
     /// A DMA capable SPI instance.
-    pub struct SpiDma<'d, T, C>
+    pub struct SpiDma<'d, T, C, DmaMode>
     where
         C: ChannelTypes,
         C::P: SpiPeripheral,
+        DmaMode: Mode,
     {
         pub(crate) spi: PeripheralRef<'d, T>,
-        pub(crate) channel: Channel<'d, C>,
+        pub(crate) channel: Channel<'d, C, DmaMode>,
     }
 
-    impl<'d, T, C> core::fmt::Debug for SpiDma<'d, T, C>
+    impl<'d, T, C, DmaMode> core::fmt::Debug for SpiDma<'d, T, C, DmaMode>
     where
         C: ChannelTypes,
         C::P: SpiPeripheral,
+        DmaMode: Mode,
     {
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
             f.debug_struct("SpiDma").finish()
         }
     }
 
-    impl<'d, T, C> SpiDma<'d, T, C>
+    impl<'d, T, C, DmaMode> SpiDma<'d, T, C, DmaMode>
     where
         T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
         C: ChannelTypes,
         C::P: SpiPeripheral,
+        DmaMode: Mode,
     {
         /// Register a buffer for a DMA write.
         ///
@@ -403,7 +436,7 @@ pub mod dma {
         pub fn dma_write<'t, TXBUF>(
             &'t mut self,
             words: &'t TXBUF,
-        ) -> Result<SpiDmaTransferTx<'t, 'd, T, C>, Error>
+        ) -> Result<SpiDmaTransferTx<'t, 'd, T, C, DmaMode>, Error>
         where
             TXBUF: ReadBuffer<Word = u8>,
         {
@@ -428,7 +461,7 @@ pub mod dma {
         pub fn dma_read<'t, RXBUF>(
             &'t mut self,
             words: &'t mut RXBUF,
-        ) -> Result<SpiDmaTransferRx<'t, 'd, T, C>, Error>
+        ) -> Result<SpiDmaTransferRx<'t, 'd, T, C, DmaMode>, Error>
         where
             RXBUF: WriteBuffer<Word = u8>,
         {
@@ -455,7 +488,7 @@ pub mod dma {
             &'t mut self,
             words: &'t TXBUF,
             read_buffer: &'t mut RXBUF,
-        ) -> Result<SpiDmaTransferRxTx<'t, 'd, T, C>, Error>
+        ) -> Result<SpiDmaTransferRxTx<'t, 'd, T, C, DmaMode>, Error>
         where
             TXBUF: ReadBuffer<Word = u8>,
             RXBUF: WriteBuffer<Word = u8>,
