@@ -122,3 +122,12 @@ pub(crate) fn software_reset() {
 
     unsafe { software_reset() };
 }
+
+#[cfg(esp32s3)]
+pub(crate) fn ets_set_appcpu_boot_addr(boot_addr: u32) {
+    extern "C" {
+        fn ets_set_appcpu_boot_addr(boot_addr: u32);
+    }
+
+    unsafe { ets_set_appcpu_boot_addr(boot_addr) };
+}
