@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Support `ETM` for ESP32-C6 / ESP32-H2 general purpose timers (#1274)
+
 ### Fixed
 
 - Fixing `esp-wifi` + `TRNG` issue on `ESP32-S2` (#1272)
