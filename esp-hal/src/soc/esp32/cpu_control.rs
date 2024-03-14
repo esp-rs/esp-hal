@@ -53,8 +53,6 @@ use core::{
     mem::{ManuallyDrop, MaybeUninit},
 };
 
-use xtensa_lx::set_stack_pointer;
-
 use crate::Cpu;
 
 /// Data type for a properly aligned stack of N bytes
@@ -260,6 +258,11 @@ impl CpuControl {
         };
     }
 
+    /// When we get here, the core is out of reset, with a stack setup by ROM
+    /// code
+    ///
+    /// We need to initialize the CPU fully, and setup the new stack to use the
+    /// stack provided by the user.
     unsafe fn start_core1_init<F>() -> !
     where
         F: FnOnce(),
@@ -272,9 +275,6 @@ impl CpuControl {
         xtensa_lx::timer::set_ccompare1(0);
         xtensa_lx::timer::set_ccompare2(0);
 
-        // set stack pointer to end of memory: no need to retain stack up to this point
-        set_stack_pointer(unsafe { unwrap!(APP_CORE_STACK_TOP) });
-
         extern "C" {
             static mut _init_start: u32;
         }
@@ -285,6 +285,22 @@ impl CpuControl {
             core::arch::asm!("wsr.vecbase {0}", in(reg) base, options(nostack));
         }
 
+        // switch to new stack
+        xtensa_lx::set_stack_pointer(unwrap!(APP_CORE_STACK_TOP));
+
+        // Trampoline to run from the new stack.
+        // start_core1_run should _NEVER_ be inlined
+        // as we rely on the function call to use
+        // the new stack.
+        Self::start_core1_run::<F>()
+    }
+
+    /// Run the core1 closure.
+    #[inline(never)]
+    unsafe fn start_core1_run<F>() -> !
+    where
+        F: FnOnce(),
+    {
         match START_CORE1_FUNCTION.take() {
             Some(entry) => {
                 let entry = unsafe { ManuallyDrop::take(&mut *entry.cast::<ManuallyDrop<F>>()) };
