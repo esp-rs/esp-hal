@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Reserve `esp32` ROM stacks to prevent the trashing of dram2 section (#1289)
 - Fixing `esp-wifi` + `TRNG` issue on `ESP32-S2` (#1272)
 - Fixed `LCD_CAM I8080` driver potentially sending garbage to display (#1283)
 
