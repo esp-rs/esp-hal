@@ -6,7 +6,6 @@
 use hil_test::esp_hal::{
     aes::{Aes, Mode},
     peripherals::Peripherals,
-    prelude::*,
 };
 
 struct Context<'a> {
@@ -24,7 +23,7 @@ impl Context<'_> {
 
 #[embedded_test::tests]
 mod tests {
-    use defmt::{assert_eq, unwrap};
+    use defmt::assert_eq;
 
     use super::*;
 
