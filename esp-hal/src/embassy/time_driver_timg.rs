@@ -100,7 +100,7 @@ impl EmbassyTimer {
             // critical section.
             #[cfg(any(esp32, esp32s2, esp32s3))]
             if _alarm.id() == 1 {
-                let mut tg = unsafe { Timer1::<TIMG0, 0>::steal() };
+                let mut tg = unsafe { Timer1::<TIMG0>::steal() };
                 Self::arm(&mut tg, timestamp);
                 return;
             }
