@@ -25,10 +25,18 @@ MEMORY
   * The segment dram2_seg after the rom data space is not mentioned in the esp32 linker scripts in esp-idf, instead the space after is used as heap space.
   * It seems not all rom data space is reserved, but only "core"/"important" ROM functions that may be called after booting from ROM.
   */
-  reserved_rom_data_pro  : ORIGIN = 0X3FFE0000, len = 1088
-  reserved_rom_data_app  : ORIGIN = 0X3FFE3F20, len = 1072
+  reserved_rom_data_pro  : ORIGIN = 0x3ffe0000, len = 1088
+  reserved_rom_data_app  : ORIGIN = 0x3ffe3f20, len = 1072
 
-  dram2_seg              : ORIGIN = 0x3FFE4350, len = 111k /* the rest of DRAM after the rom data segments in the middle */
+  /*
+  *   The following values are derived from the __stack and _stack_sentry values from ROM.
+  *   They represent the stacks used for each core setup by ROM code. In theory both of these 
+  *   can be reclaimed once both cores are running, but for now we play it safe and reserve them both.
+  */
+  reserved_rom_stack_pro  : ORIGIN = 0x3ffe1320, len = 11264
+  reserved_rom_stack_app  : ORIGIN = 0x3ffe5230, len = 11264
+
+  dram2_seg              : ORIGIN = 0x3ffe7e30, len = 98767  /* the rest of DRAM after the rom data segments and rom stacks in the middle */
 
   /* external flash 
      The 0x20 offset is a convenience for the app binary image generation.
