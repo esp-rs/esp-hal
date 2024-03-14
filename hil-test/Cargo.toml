@@ -9,16 +9,21 @@ harness = false
 test = false
 
 [[test]]
+name    = "aes"
+harness = false
+
+[[test]]
 name    = "gpio"
+harness = false
+
+[[test]]
+name    = "spi_full_duplex"
 harness = false
 
 [[test]]
 name    = "uart"
 harness = false
 
-[[test]]
-name    = "spi_full_duplex"
-harness = false
 
 [dependencies]
 defmt         = "0.3.5"
