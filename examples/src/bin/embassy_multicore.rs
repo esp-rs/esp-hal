@@ -64,14 +64,14 @@ async fn main(_spawner: Spawner) {
     let led_ctrl_signal = &*make_static!(Signal::new());
 
     let led = io.pins.gpio0.into_push_pull_output();
-    let cpu1_fnctn = move || {
-        let executor = make_static!(Executor::new());
-        executor.run(|spawner| {
-            spawner.spawn(control_led(led, led_ctrl_signal)).ok();
-        });
-    };
+
     let _guard = cpu_control
-        .start_app_core(unsafe { &mut APP_CORE_STACK }, cpu1_fnctn)
+        .start_app_core(unsafe { &mut APP_CORE_STACK }, move || {
+            let executor = make_static!(Executor::new());
+            executor.run(|spawner| {
+                spawner.spawn(control_led(led, led_ctrl_signal)).ok();
+            });
+        })
         .unwrap();
 
     // Sends periodic messages to control_led, enabling or disabling it.
