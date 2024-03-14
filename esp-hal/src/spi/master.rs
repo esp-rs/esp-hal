@@ -29,11 +29,11 @@
 //! If all you want to do is to communicate to a single device, and you initiate
 //! transactions yourself, there are a number of ways to achieve this:
 //!
-//! - Use the [`FullDuplex`](embedded_hal::spi::FullDuplex) trait to read/write
-//!   single bytes at a time,
-//! - Use the [`SpiBus`](embedded_hal_1::spi::SpiBus) trait (requires the "eh1"
-//!   feature) and its associated functions to initiate transactions with
-//!   simultaneous reads and writes, or
+//! - Use the [`FullDuplex`](embedded_hal_02::spi::FullDuplex) trait to
+//!   read/write single bytes at a time,
+//! - Use the [`SpiBus`](embedded_hal::spi::SpiBus) trait (requires the
+//!   "embedded-hal" feature) and its associated functions to initiate
+//!   transactions with simultaneous reads and writes, or
 //! - Use the `ExclusiveDevice` struct from [`embedded-hal-bus`] or `SpiDevice`
 //!   from [`embassy-embedded-hal`].
 //!
@@ -716,7 +716,8 @@ where
     }
 }
 
-impl<T, M> embedded_hal::spi::FullDuplex<u8> for Spi<'_, T, M>
+#[cfg(feature = "embedded-hal-02")]
+impl<T, M> embedded_hal_02::spi::FullDuplex<u8> for Spi<'_, T, M>
 where
     T: Instance,
     M: IsFullDuplex,
@@ -732,7 +733,8 @@ where
     }
 }
 
-impl<T, M> embedded_hal::blocking::spi::Transfer<u8> for Spi<'_, T, M>
+#[cfg(feature = "embedded-hal-02")]
+impl<T, M> embedded_hal_02::blocking::spi::Transfer<u8> for Spi<'_, T, M>
 where
     T: Instance,
     M: IsFullDuplex,
@@ -744,7 +746,8 @@ where
     }
 }
 
-impl<T, M> embedded_hal::blocking::spi::Write<u8> for Spi<'_, T, M>
+#[cfg(feature = "embedded-hal-02")]
+impl<T, M> embedded_hal_02::blocking::spi::Write<u8> for Spi<'_, T, M>
 where
     T: Instance,
     M: IsFullDuplex,
@@ -1214,7 +1217,8 @@ pub mod dma {
         }
     }
 
-    impl<'d, T, C, M> embedded_hal::blocking::spi::Transfer<u8> for SpiDma<'d, T, C, M>
+    #[cfg(feature = "embedded-hal-02")]
+    impl<'d, T, C, M> embedded_hal_02::blocking::spi::Transfer<u8> for SpiDma<'d, T, C, M>
     where
         T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
         C: ChannelTypes,
@@ -1229,7 +1233,8 @@ pub mod dma {
         }
     }
 
-    impl<'d, T, C, M> embedded_hal::blocking::spi::Write<u8> for SpiDma<'d, T, C, M>
+    #[cfg(feature = "embedded-hal-02")]
+    impl<'d, T, C, M> embedded_hal_02::blocking::spi::Write<u8> for SpiDma<'d, T, C, M>
     where
         T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
         C: ChannelTypes,
@@ -1245,8 +1250,9 @@ pub mod dma {
         }
     }
 
-    impl<T: embedded_hal::blocking::spi::Transfer<u8>, const SIZE: usize>
-        embedded_hal::blocking::spi::Transfer<u8> for FlashSafeDma<T, SIZE>
+    #[cfg(feature = "embedded-hal-02")]
+    impl<T: embedded_hal_02::blocking::spi::Transfer<u8>, const SIZE: usize>
+        embedded_hal_02::blocking::spi::Transfer<u8> for FlashSafeDma<T, SIZE>
     {
         type Error = T::Error;
 
@@ -1255,8 +1261,9 @@ pub mod dma {
         }
     }
 
-    impl<T: embedded_hal::blocking::spi::Write<u8>, const SIZE: usize>
-        embedded_hal::blocking::spi::Write<u8> for FlashSafeDma<T, SIZE>
+    #[cfg(feature = "embedded-hal-02")]
+    impl<T: embedded_hal_02::blocking::spi::Write<u8>, const SIZE: usize>
+        embedded_hal_02::blocking::spi::Write<u8> for FlashSafeDma<T, SIZE>
     {
         type Error = T::Error;
 
@@ -1274,23 +1281,24 @@ pub mod dma {
         }
     }
 
-    impl<T: embedded_hal::spi::FullDuplex<u8>, const SIZE: usize> embedded_hal::spi::FullDuplex<u8>
-        for FlashSafeDma<T, SIZE>
+    #[cfg(feature = "embedded-hal-02")]
+    impl<T: embedded_hal_02::spi::FullDuplex<u8>, const SIZE: usize>
+        embedded_hal_02::spi::FullDuplex<u8> for FlashSafeDma<T, SIZE>
     where
-        Self: embedded_hal::blocking::spi::Transfer<u8, Error = T::Error>,
-        Self: embedded_hal::blocking::spi::Write<u8, Error = T::Error>,
+        Self: embedded_hal_02::blocking::spi::Transfer<u8, Error = T::Error>,
+        Self: embedded_hal_02::blocking::spi::Write<u8, Error = T::Error>,
     {
         type Error = T::Error;
 
         fn read(&mut self) -> nb::Result<u8, Self::Error> {
-            use embedded_hal::blocking::spi::Transfer;
+            use embedded_hal_02::blocking::spi::Transfer;
             let mut buf = [0; 1];
             self.transfer(&mut buf)?;
             Ok(buf[0])
         }
 
         fn send(&mut self, word: u8) -> nb::Result<(), Self::Error> {
-            use embedded_hal::blocking::spi::Write;
+            use embedded_hal_02::blocking::spi::Write;
             self.write(&[word])?;
             Ok(())
         }
@@ -1454,9 +1462,9 @@ pub mod dma {
         }
     }
 
-    #[cfg(feature = "eh1")]
+    #[cfg(feature = "embedded-hal")]
     mod ehal1 {
-        use embedded_hal_1::spi::{ErrorType, SpiBus};
+        use embedded_hal::spi::{ErrorType, SpiBus};
 
         use super::*;
 
@@ -1560,14 +1568,14 @@ pub mod dma {
     }
 }
 
-#[cfg(feature = "eh1")]
+#[cfg(feature = "embedded-hal")]
 mod ehal1 {
-    use embedded_hal_1::spi::SpiBus;
+    use embedded_hal::spi::SpiBus;
     use embedded_hal_nb::spi::FullDuplex;
 
     use super::*;
 
-    impl<T, M> embedded_hal_1::spi::ErrorType for Spi<'_, T, M> {
+    impl<T, M> embedded_hal::spi::ErrorType for Spi<'_, T, M> {
         type Error = super::Error;
     }
 

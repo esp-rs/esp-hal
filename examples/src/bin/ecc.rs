@@ -2,6 +2,7 @@
 //! hardware-accelerated and pure software ECC.
 
 //% CHIPS: esp32c2 esp32c6 esp32h2
+//% FEATURES: embedded-hal-02
 
 #![no_std]
 #![no_main]
@@ -15,6 +16,7 @@ use crypto_bigint::{
     U256,
 };
 use elliptic_curve::sec1::ToEncodedPoint;
+use embedded_hal_02::blocking::rng::Read;
 use esp_backtrace as _;
 use esp_hal::{
     ecc::{Ecc, EllipticCurve, Error, WorkMode},

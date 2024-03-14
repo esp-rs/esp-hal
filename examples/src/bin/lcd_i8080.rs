@@ -18,10 +18,12 @@
 //! D7        GPIO15
 
 //% CHIPS: esp32s3
+//% FEATURES: embedded-hal-02
 
 #![no_std]
 #![no_main]
 
+use embedded_hal_02::digital::v2::OutputPin;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
@@ -64,7 +66,7 @@ fn main() -> ! {
         DmaPriority::Priority0,
     );
 
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
 
     let mut backlight = lcd_backlight.into_push_pull_output();
     let mut reset = lcd_reset.into_push_pull_output();
@@ -96,9 +98,9 @@ fn main() -> ! {
         // https://github.com/lovyan03/LovyanGFX/blob/302169a6f23e9a2a6451f03311c366d182193831/src/lgfx/v1/panel/Panel_ST7796.hpp#L28
 
         reset.set_low().unwrap();
-        delay.delay_us(8_000u32);
+        delay.delay_micros(8_000u32);
         reset.set_high().unwrap();
-        delay.delay_us(64_000u32);
+        delay.delay_micros(64_000u32);
 
         // const CMD_FRMCTR1: u8 = 0xB1;
         // const CMD_FRMCTR2: u8 = 0xB2;
@@ -149,7 +151,7 @@ fn main() -> ! {
         i8080.send(CMD_PWCTR3, 0, &[0xA7]).unwrap(); // Power control 3  //Source driving current level=low, Gamma driving current
                                                      // level=High
         i8080.send(CMD_VMCTR, 0, &[0x18]).unwrap(); // VCOM Control    //VCOM=0.9
-        delay.delay_us(120_000u32);
+        delay.delay_micros(120_000u32);
         i8080
             .send(
                 CMD_GMCTRP1,
@@ -170,13 +172,13 @@ fn main() -> ! {
                 ],
             )
             .unwrap();
-        delay.delay_us(120_000u32);
+        delay.delay_micros(120_000u32);
         i8080.send(CMD_CSCON, 0, &[0x3C]).unwrap(); // Command Set control // Disable extension command 2 partI
         i8080.send(CMD_CSCON, 0, &[0x69]).unwrap(); // Command Set control // Disable
                                                     // extension command 2 partII
 
         i8080.send(0x11, 0, &[]).unwrap(); // ExitSleepMode
-        delay.delay_us(130_000u32);
+        delay.delay_micros(130_000u32);
         i8080.send(0x38, 0, &[]).unwrap(); // ExitIdleMode
         i8080.send(0x29, 0, &[]).unwrap(); // SetDisplayOn
 
@@ -239,10 +241,10 @@ fn main() -> ! {
             transfer.wait().unwrap();
         }
 
-        delay.delay_ms(1_000u32);
+        delay.delay_millis(1_000u32);
     }
 
     loop {
-        delay.delay_ms(1_000u32);
+        delay.delay_millis(1_000u32);
     }
 }

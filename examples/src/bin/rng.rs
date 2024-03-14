@@ -1,10 +1,12 @@
 //! Demonstrates the use of the hardware Random Number Generator (RNG)
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% FEATURES: embedded-hal-02
 
 #![no_std]
 #![no_main]
 
+use embedded_hal_02::blocking::rng::Read;
 use esp_backtrace as _;
 use esp_hal::{peripherals::Peripherals, prelude::*, rng::Rng};
 use esp_println::println;

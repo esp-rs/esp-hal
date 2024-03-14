@@ -57,13 +57,13 @@ fn main() -> ! {
     let mut buffer = rx_buffer;
     buffer.fill(0u8);
 
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
 
     loop {
         let transfer = parl_io_rx.read_dma(&mut buffer).unwrap();
         transfer.wait().unwrap();
         println!("Received: {:02x?} ...", &buffer[..30]);
 
-        delay.delay_ms(500u32);
+        delay.delay_millis(500u32);
     }
 }

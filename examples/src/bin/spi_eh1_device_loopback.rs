@@ -24,7 +24,7 @@
 //! data.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: eh1
+//% FEATURES: embedded-hal
 
 #![no_std]
 #![no_main]
@@ -79,7 +79,7 @@ fn main() -> ! {
         }
     }
 
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
     println!("=== SPI example with embedded-hal-1 traits ===");
 
     loop {
@@ -93,7 +93,7 @@ fn main() -> ! {
         spi_device_2.transfer(&mut read[..], &write[..]).unwrap();
         spi_device_3.transfer(&mut read[..], &write[..]).unwrap();
         println!(" SUCCESS");
-        delay.delay_ms(250u32);
+        delay.delay_millis(250u32);
 
         // --- Asymmetric transfer (Read more than we write) ---
         print!("Starting asymetric transfer (read > write)...");
@@ -111,7 +111,7 @@ fn main() -> ! {
             .transfer(&mut read[0..2], &write[..])
             .expect("Asymmetric transfer failed");
         println!(" SUCCESS");
-        delay.delay_ms(250u32);
+        delay.delay_millis(250u32);
 
         // --- Symmetric transfer with huge buffer ---
         // Only your RAM is the limit!
@@ -133,7 +133,7 @@ fn main() -> ! {
             .transfer(&mut read[..], &write[..])
             .expect("Huge transfer failed");
         println!(" SUCCESS");
-        delay.delay_ms(250u32);
+        delay.delay_millis(250u32);
 
         // --- Symmetric transfer with huge buffer in-place (No additional allocation
         // needed) ---
@@ -156,6 +156,6 @@ fn main() -> ! {
             .transfer_in_place(&mut write[..])
             .expect("Huge transfer failed");
         println!(" SUCCESS");
-        delay.delay_ms(250u32);
+        delay.delay_millis(250u32);
     }
 }

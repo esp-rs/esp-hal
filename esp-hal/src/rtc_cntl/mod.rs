@@ -69,7 +69,6 @@
 //! }
 //! ```
 
-use embedded_hal::watchdog::{Watchdog, WatchdogDisable, WatchdogEnable};
 #[cfg(not(any(esp32c6, esp32h2)))]
 use fugit::HertzU32;
 use fugit::MicrosDurationU64;
@@ -307,9 +306,7 @@ impl<'d> Rtc<'d> {
         }
 
         config.apply();
-
-        use embedded_hal::blocking::delay::DelayMs;
-        delay.delay_ms(100u32);
+        delay.delay_millis(100u32);
 
         config.start_sleep(wakeup_triggers);
         config.finish_sleep();
@@ -871,13 +868,15 @@ impl Rwdt {
     }
 }
 
-impl WatchdogDisable for Rwdt {
+#[cfg(feature = "embedded-hal-02")]
+impl embedded_hal_02::watchdog::WatchdogDisable for Rwdt {
     fn disable(&mut self) {
         self.disable();
     }
 }
 
-impl WatchdogEnable for Rwdt {
+#[cfg(feature = "embedded-hal-02")]
+impl embedded_hal_02::watchdog::WatchdogEnable for Rwdt {
     type Time = MicrosDurationU64;
 
     fn start<T>(&mut self, period: T)
@@ -888,7 +887,8 @@ impl WatchdogEnable for Rwdt {
     }
 }
 
-impl Watchdog for Rwdt {
+#[cfg(feature = "embedded-hal-02")]
+impl embedded_hal_02::watchdog::Watchdog for Rwdt {
     fn feed(&mut self) {
         self.feed();
     }
@@ -949,8 +949,11 @@ impl Default for Swd {
     }
 }
 
-#[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
-impl WatchdogDisable for Swd {
+#[cfg(all(
+    any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3),
+    feature = "embedded-hal-02"
+))]
+impl embedded_hal_02::watchdog::WatchdogDisable for Swd {
     fn disable(&mut self) {
         self.disable();
     }

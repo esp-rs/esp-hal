@@ -5,10 +5,12 @@
 //! maximum and minimum raw values read.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% FEATURES: embedded-hal-02
 
 #![no_std]
 #![no_main]
 
+use embedded_hal_02::adc::OneShot;
 use esp_backtrace as _;
 use esp_hal::{
     analog::adc::{AdcConfig, Attenuation, ADC},
@@ -42,11 +44,11 @@ fn main() -> ! {
     let mut adc1_pin = adc1_config.enable_pin(analog_pin, Attenuation::Attenuation11dB);
     let mut adc1 = ADC::<ADC1>::new(peripherals.ADC1, adc1_config);
 
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
 
     loop {
         let pin_value: u16 = nb::block!(adc1.read(&mut adc1_pin)).unwrap();
         println!("ADC reading = {}", pin_value);
-        delay.delay_ms(1500u32);
+        delay.delay_millis(1500u32);
     }
 }

@@ -285,9 +285,9 @@ where
     }
 }
 
-#[cfg(feature = "eh1")]
+#[cfg(feature = "embedded-hal")]
 mod ehal1 {
-    use embedded_hal_1::pwm::{self, ErrorKind, ErrorType, SetDutyCycle};
+    use embedded_hal::pwm::{self, ErrorKind, ErrorType, SetDutyCycle};
 
     use super::{Channel, ChannelHW, ChannelIFace, Error};
     use crate::{gpio::OutputPin, ledc::timer::TimerSpeed};

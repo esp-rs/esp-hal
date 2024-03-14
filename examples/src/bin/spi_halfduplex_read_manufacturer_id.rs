@@ -77,7 +77,7 @@ fn main() -> ! {
             Some(cs),
         );
 
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
 
     loop {
         // READ MANUFACTURER ID FROM FLASH CHIP
@@ -91,7 +91,7 @@ fn main() -> ! {
         )
         .unwrap();
         println!("Single {:x?}", data);
-        delay.delay_ms(250u32);
+        delay.delay_millis(250u32);
 
         // READ MANUFACTURER ID FROM FLASH CHIP
         let mut data = [0u8; 2];
@@ -104,7 +104,7 @@ fn main() -> ! {
         )
         .unwrap();
         println!("Dual {:x?}", data);
-        delay.delay_ms(250u32);
+        delay.delay_millis(250u32);
 
         // READ MANUFACTURER ID FROM FLASH CHIP
         let mut data = [0u8; 2];
@@ -117,6 +117,6 @@ fn main() -> ! {
         )
         .unwrap();
         println!("Quad {:x?}", data);
-        delay.delay_ms(1500u32);
+        delay.delay_millis(1500u32);
     }
 }
