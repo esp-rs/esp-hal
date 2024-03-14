@@ -4,10 +4,6 @@ use crate::{
     regi2c_write_mask,
 };
 
-extern "C" {
-    fn ets_update_cpu_frequency_rom(ticks_per_us: u32);
-}
-
 const I2C_BBPLL: u32 = 0x66;
 const I2C_BBPLL_HOSTID: u32 = 0;
 
@@ -123,10 +119,10 @@ pub(crate) fn esp32c2_rtc_bbpll_enable() {
 }
 
 pub(crate) fn esp32c2_rtc_update_to_xtal(freq: XtalClock, _div: u32) {
-    let system_control = unsafe { &*crate::peripherals::SYSTEM::ptr() };
+    crate::rom::ets_update_cpu_frequency_rom(freq.mhz());
 
+    let system_control = unsafe { &*crate::peripherals::SYSTEM::ptr() };
     unsafe {
-        ets_update_cpu_frequency_rom(freq.mhz());
         // Set divider from XTAL to APB clock. Need to set divider to 1 (reg. value 0)
         // first.
         system_control.sysclk_conf().modify(|_, w| {
@@ -158,8 +154,9 @@ pub(crate) fn esp32c2_rtc_freq_to_pll_mhz(cpu_clock_speed: CpuClock) {
                 CpuClock::Clock120MHz => 1,
             })
         });
-        ets_update_cpu_frequency_rom(cpu_clock_speed.mhz());
     }
+
+    crate::rom::ets_update_cpu_frequency_rom(cpu_clock_speed.mhz());
 }
 
 pub(crate) fn esp32c2_rtc_apb_freq_update(apb_freq: ApbClock) {

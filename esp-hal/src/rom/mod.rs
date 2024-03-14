@@ -23,6 +23,8 @@
 //! [CRC (Cyclic Redundancy Check)]: ./crc/index.html
 //! [MD5 (Message Digest 5)]: ./md5/index.html
 
+#![allow(unused_macros)]
+
 #[cfg(any(rom_crc_be, rom_crc_le))]
 pub mod crc;
 #[cfg(any(rom_md5_bsd, rom_md5_mbedtls))]
@@ -78,4 +80,45 @@ macro_rules! regi2c_write_mask {
             }
         }
     };
+}
+
+pub(crate) fn ets_delay_us(us: u32) {
+    extern "C" {
+        fn ets_delay_us(us: u32);
+    }
+
+    unsafe { ets_delay_us(us) };
+}
+
+#[allow(unused)]
+pub(crate) fn ets_update_cpu_frequency_rom(ticks_per_us: u32) {
+    extern "C" {
+        fn ets_update_cpu_frequency_rom(ticks_per_us: u32);
+    }
+
+    unsafe { ets_update_cpu_frequency_rom(ticks_per_us) };
+}
+
+pub(crate) fn rtc_get_reset_reason(cpu_num: u32) -> u32 {
+    extern "C" {
+        fn rtc_get_reset_reason(cpu_num: u32) -> u32;
+    }
+
+    unsafe { rtc_get_reset_reason(cpu_num) }
+}
+
+pub(crate) fn software_reset_cpu() {
+    extern "C" {
+        fn software_reset_cpu();
+    }
+
+    unsafe { software_reset_cpu() };
+}
+
+pub(crate) fn software_reset() {
+    extern "C" {
+        fn software_reset();
+    }
+
+    unsafe { software_reset() };
 }
