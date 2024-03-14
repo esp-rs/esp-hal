@@ -11,7 +11,7 @@ links         = "esp-hal"
 
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"
-features       = ["eh1", "esp32c6"]
+features       = ["embedded-hal", "esp32c6"]
 rustdoc-args   = ["--cfg", "docsrs"]
 
 [dependencies]
