@@ -18,14 +18,14 @@
 
 const IS_FIRST_SENDER: bool = true;
 
-// Run this example with the eh1 feature enabled to use embedded-can instead of
+// Run this example with the embedded-hal feature enabled to use embedded-can instead of
 // embedded-hal-0.2.7. embedded-can was split off from embedded-hal before it's
-// upgrade to 1.0.0. cargo run --example twai --features eh1 --release
-#[cfg(feature = "eh1")]
+// upgrade to 1.0.0. cargo run --example twai --features embedded-hal --release
+#[cfg(feature = "embedded-hal")]
 use embedded_can::{nb::Can, Frame, StandardId};
-// Run this example without the eh1 flag to use the embedded-hal 0.2.7 CAN traits.
+// Run this example without the embedded-hal flag to use the embedded-hal 0.2.7 CAN traits.
 // cargo run --example twai --release
-#[cfg(not(feature = "eh1"))]
+#[cfg(not(feature = "embedded-hal"))]
 use embedded_hal_02::can::{Can, Frame, StandardId};
 use esp_backtrace as _;
 use esp_hal::{

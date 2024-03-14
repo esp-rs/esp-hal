@@ -75,10 +75,10 @@
 //! }
 //! ```
 
-#[cfg(feature = "eh1")]
+#[cfg(feature = "embedded-hal")]
 use embedded_can::{nb::Can, Error, ErrorKind, ExtendedId, Frame, Id, StandardId};
-#[cfg(not(feature = "eh1"))]
-use embedded_hal::can::{Can, Error, ErrorKind, ExtendedId, Frame, Id, StandardId};
+#[cfg(not(feature = "embedded-hal"))] // FIXME
+use embedded_hal_02::can::{Can, Error, ErrorKind, ExtendedId, Frame, Id, StandardId};
 use fugit::HertzU32;
 
 use self::filter::{Filter, FilterType};
@@ -92,7 +92,7 @@ use crate::{
 
 pub mod filter;
 
-/// Structure backing the embedded_hal::can::Frame/embedded_can::Frame trait.
+/// Structure backing the embedded_hal_02::can::Frame/embedded_can::Frame trait.
 #[derive(Clone, Copy, Debug)]
 pub struct EspTwaiFrame {
     id: Id,

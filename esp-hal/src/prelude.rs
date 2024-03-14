@@ -10,15 +10,6 @@ pub use embedded_dma::{
     WriteBuffer as _embedded_dma_WriteBuffer,
     WriteTarget as _embedded_dma_WriteTarget,
 };
-pub use embedded_hal::{
-    digital::v2::{
-        InputPin as _embedded_hal_digital_v2_InputPin,
-        OutputPin as _embedded_hal_digital_v2_OutputPin,
-        StatefulOutputPin as _embedded_hal_digital_v2_StatefulOutputPin,
-        ToggleableOutputPin as _embedded_hal_digital_v2_ToggleableOutputPin,
-    },
-    prelude::*,
-};
 pub use fugit::{
     ExtU32 as _fugit_ExtU32,
     ExtU64 as _fugit_ExtU64,

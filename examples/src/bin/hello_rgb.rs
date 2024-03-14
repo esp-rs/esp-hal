@@ -67,7 +67,7 @@ fn main() -> ! {
 
     // Initialize the Delay peripheral, and use it to toggle the LED state in a
     // loop.
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
 
     let mut color = Hsv {
         hue: 0,
@@ -88,7 +88,7 @@ fn main() -> ! {
             // that the output it's not too bright.
             led.write(brightness(gamma(data.iter().cloned()), 10))
                 .unwrap();
-            delay.delay_ms(20u8);
+            delay.delay_millis(20);
         }
     }
 }

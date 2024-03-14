@@ -14,10 +14,12 @@
 //! data.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% FEATURES: embedded-hal-02
 
 #![no_std]
 #![no_main]
 
+use embedded_hal_02::blocking::spi::Transfer;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
@@ -48,13 +50,13 @@ fn main() -> ! {
         Some(cs),
     );
 
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
 
     loop {
         let mut data = [0xde, 0xca, 0xfb, 0xad];
         spi.transfer(&mut data).unwrap();
         println!("{:x?}", data);
 
-        delay.delay_ms(250u32);
+        delay.delay_millis(250u32);
     }
 }

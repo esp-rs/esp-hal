@@ -16,7 +16,7 @@
 //! method, which returns a 32-bit unsigned integer.
 //!
 //! Additionally, this driver implements the
-//! [Read](embedded_hal::blocking::rng::Read) trait from the `embedded_hal`
+//! [Read](embedded_hal_02::blocking::rng::Read) trait from the `embedded_hal`
 //! crate, allowing you to generate random bytes by calling the `read` method.
 //
 //! # Important Note
@@ -95,7 +95,8 @@ impl Rng {
     }
 }
 
-impl embedded_hal::blocking::rng::Read for Rng {
+#[cfg(feature = "embedded-hal-02")]
+impl embedded_hal_02::blocking::rng::Read for Rng {
     type Error = Infallible;
 
     fn read(&mut self, buffer: &mut [u8]) -> Result<(), Self::Error> {

@@ -21,9 +21,10 @@ pub struct AdcPin<PIN, ADCI> {
     _phantom: PhantomData<ADCI>,
 }
 
-impl<PIN, ADCI> embedded_hal::adc::Channel<ADCI> for AdcPin<PIN, ADCI>
+#[cfg(feature = "embedded-hal-02")]
+impl<PIN, ADCI> embedded_hal_02::adc::Channel<ADCI> for AdcPin<PIN, ADCI>
 where
-    PIN: embedded_hal::adc::Channel<ADCI, ID = u8>,
+    PIN: embedded_hal_02::adc::Channel<ADCI, ID = u8>,
 {
     type ID = u8;
 
@@ -346,15 +347,16 @@ impl<'d, ADC1> ADC<'d, ADC1> {
     }
 }
 
-impl<'d, ADCI, PIN> embedded_hal::adc::OneShot<ADCI, u16, AdcPin<PIN, ADCI>> for ADC<'d, ADCI>
+#[cfg(feature = "embedded-hal-02")]
+impl<'d, ADCI, PIN> embedded_hal_02::adc::OneShot<ADCI, u16, AdcPin<PIN, ADCI>> for ADC<'d, ADCI>
 where
-    PIN: embedded_hal::adc::Channel<ADCI, ID = u8>,
+    PIN: embedded_hal_02::adc::Channel<ADCI, ID = u8>,
     ADCI: RegisterAccess,
 {
     type Error = ();
 
     fn read(&mut self, _pin: &mut AdcPin<PIN, ADCI>) -> nb::Result<u16, Self::Error> {
-        use embedded_hal::adc::Channel;
+        use embedded_hal_02::adc::Channel;
 
         if self.attenuations[AdcPin::<PIN, ADCI>::channel() as usize].is_none() {
             panic!(
@@ -405,7 +407,8 @@ macro_rules! impl_adc_interface {
                 const CHANNEL: u8 = $channel;
             }
 
-            impl embedded_hal::adc::Channel<$adc> for crate::gpio::$pin<crate::gpio::Analog> {
+            #[cfg(feature = "embedded-hal-02")]
+            impl embedded_hal_02::adc::Channel<$adc> for crate::gpio::$pin<crate::gpio::Analog> {
                 type ID = u8;
 
                 fn channel() -> u8 { $channel }

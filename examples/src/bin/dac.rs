@@ -43,7 +43,7 @@ fn main() -> ! {
     let mut dac1 = DAC1::new(peripherals.DAC1, dac1_pin);
     let mut dac2 = DAC2::new(peripherals.DAC2, dac2_pin);
 
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
 
     let mut voltage_dac1: u8 = 200;
     let mut voltage_dac2: u8 = 255;
@@ -54,6 +54,6 @@ fn main() -> ! {
 
         voltage_dac2 = voltage_dac2.wrapping_sub(1);
         dac2.write(voltage_dac2);
-        delay.delay_ms(50u32);
+        delay.delay_millis(50u32);
     }
 }

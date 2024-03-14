@@ -4,6 +4,7 @@
 //! second core.
 
 //% CHIPS: esp32 esp32s3
+//% FEATURES: embedded-hal-02
 
 #![no_std]
 #![no_main]
@@ -11,6 +12,7 @@
 use core::cell::RefCell;
 
 use critical_section::Mutex;
+use embedded_hal_02::timer::CountDown;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,

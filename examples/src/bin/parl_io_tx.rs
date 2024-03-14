@@ -80,13 +80,13 @@ fn main() -> ! {
         buffer[i] = (i % 255) as u8;
     }
 
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
 
     loop {
         let transfer = parl_io_tx.write_dma(&buffer).unwrap();
         transfer.wait().unwrap();
         println!("Transferred {} bytes", buffer.len());
 
-        delay.delay_ms(500u32);
+        delay.delay_millis(500u32);
     }
 }
