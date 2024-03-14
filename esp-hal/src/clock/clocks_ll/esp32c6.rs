@@ -7,10 +7,6 @@ use crate::{
     rtc_cntl::rtc::CpuClockSource,
 };
 
-extern "C" {
-    fn ets_update_cpu_frequency(ticks_per_us: u32);
-}
-
 const I2C_BBPLL: u8 = 0x66;
 const I2C_BBPLL_HOSTID: u8 = 0;
 
@@ -248,21 +244,21 @@ pub(crate) fn esp32c6_rtc_update_to_xtal(freq: XtalClock, div: u8) {
 }
 
 pub(crate) fn esp32c6_rtc_update_to_xtal_raw(freq_mhz: u32, div: u8) {
-    unsafe {
-        esp32c6_ahb_set_ls_divider(div);
-        esp32c6_cpu_set_ls_divider(div);
-        CpuClockSource::Xtal.select();
-        ets_update_cpu_frequency(freq_mhz);
-    }
+    esp32c6_ahb_set_ls_divider(div);
+    esp32c6_cpu_set_ls_divider(div);
+
+    CpuClockSource::Xtal.select();
+
+    crate::rom::ets_update_cpu_frequency_rom(freq_mhz);
 }
 
 pub(crate) fn esp32c6_rtc_update_to_8m() {
-    unsafe {
-        esp32c6_ahb_set_ls_divider(1);
-        esp32c6_cpu_set_ls_divider(1);
-        CpuClockSource::RcFast.select();
-        ets_update_cpu_frequency(20);
-    }
+    esp32c6_ahb_set_ls_divider(1);
+    esp32c6_cpu_set_ls_divider(1);
+
+    CpuClockSource::RcFast.select();
+
+    crate::rom::ets_update_cpu_frequency_rom(20);
 }
 
 pub(crate) fn esp32c6_rtc_freq_to_pll_mhz(cpu_clock_speed: CpuClock) {
@@ -289,9 +285,9 @@ pub(crate) fn esp32c6_rtc_freq_to_pll_mhz_raw(cpu_clock_speed_mhz: u32) {
             .modify(|_, w| w.cpu_hs_120m_force().clear_bit());
 
         CpuClockSource::Pll.select();
-
-        ets_update_cpu_frequency(cpu_clock_speed_mhz);
     }
+
+    crate::rom::ets_update_cpu_frequency_rom(cpu_clock_speed_mhz);
 }
 
 pub(crate) fn esp32c6_rtc_apb_freq_update(apb_freq: ApbClock) {

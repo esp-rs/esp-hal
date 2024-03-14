@@ -1,9 +1,5 @@
 use crate::clock::{ApbClock, Clock, CpuClock, PllClock, XtalClock};
 
-extern "C" {
-    fn ets_update_cpu_frequency(ticks_per_us: u32);
-}
-
 const I2C_BBPLL: u8 = 0x66;
 const I2C_BBPLL_HOSTID: u8 = 0;
 const I2C_BBPLL_OC_REF_DIV: u8 = 2;
@@ -165,7 +161,7 @@ pub(crate) fn esp32h2_rtc_bbpll_enable() {
 pub(crate) fn esp32h2_rtc_update_to_xtal(freq: XtalClock, _div: u8) {
     unsafe {
         let pcr = &*crate::peripherals::PCR::PTR;
-        ets_update_cpu_frequency(freq.mhz());
+        crate::rom::ets_update_cpu_frequency_rom(freq.mhz());
         // Set divider from XTAL to APB clock. Need to set divider to 1 (reg. value 0)
         // first.
         clk_ll_ahb_set_divider(_div as u32);
@@ -189,15 +185,15 @@ pub(crate) fn esp32h2_rtc_freq_to_pll_mhz(cpu_clock_speed: CpuClock) {
     };
     clk_ll_ahb_set_divider(ahb_divider);
 
-    let pcr = unsafe { &*crate::peripherals::PCR::PTR };
-
     unsafe {
-        pcr.sysclk_conf().modify(|_, w| w.soc_clk_sel().bits(1));
+        (*crate::peripherals::PCR::PTR)
+            .sysclk_conf()
+            .modify(|_, w| w.soc_clk_sel().bits(1));
 
         clk_ll_bus_update();
-
-        ets_update_cpu_frequency(cpu_clock_speed.mhz());
     }
+
+    crate::rom::ets_update_cpu_frequency_rom(cpu_clock_speed.mhz());
 }
 
 pub(crate) fn esp32h2_rtc_apb_freq_update(apb_freq: ApbClock) {

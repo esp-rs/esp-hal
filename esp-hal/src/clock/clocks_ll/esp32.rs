@@ -1,4 +1,7 @@
-use crate::clock::{Clock, PllClock, XtalClock};
+use crate::{
+    clock::{Clock, PllClock, XtalClock},
+    regi2c_write,
+};
 
 const REF_CLK_FREQ: u32 = 1000000;
 
@@ -42,148 +45,108 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock
     let efuse = unsafe { &*crate::peripherals::EFUSE::ptr() };
     let rtc_cntl = unsafe { &*crate::peripherals::RTC_CNTL::ptr() };
 
-    unsafe {
-        let rtc_cntl_dbias_hp_volt: u32 =
-            RTC_CNTL_DBIAS_1V25 - efuse.blk0_rdata5().read().rd_vol_level_hp_inv().bits() as u32;
-        let dig_dbias_240_m: u32 = rtc_cntl_dbias_hp_volt;
+    let rtc_cntl_dbias_hp_volt: u32 =
+        RTC_CNTL_DBIAS_1V25 - efuse.blk0_rdata5().read().rd_vol_level_hp_inv().bits() as u32;
+    let dig_dbias_240_m: u32 = rtc_cntl_dbias_hp_volt;
 
-        let div_ref: u32;
-        let div7_0: u32;
-        let div10_8: u32;
-        let lref: u32;
-        let dcur: u32;
-        let bw: u32;
+    let div_ref: u32;
+    let div7_0: u32;
+    let div10_8: u32;
+    let lref: u32;
+    let dcur: u32;
+    let bw: u32;
 
-        if matches!(pll_freq, PllClock::Pll320MHz) {
-            // Raise the voltage, if needed
-            rtc_cntl
-                .reg()
-                .modify(|_, w| w.dig_dbias_wak().variant(DIG_DBIAS_80M_160M as u8));
+    if matches!(pll_freq, PllClock::Pll320MHz) {
+        // Raise the voltage, if needed
+        rtc_cntl
+            .reg()
+            .modify(|_, w| w.dig_dbias_wak().variant(DIG_DBIAS_80M_160M as u8));
 
-            // Configure 320M PLL
-            match xtal_freq {
-                XtalClock::RtcXtalFreq40M => {
-                    div_ref = 0;
-                    div7_0 = 32;
-                    div10_8 = 0;
-                    lref = 0;
-                    dcur = 6;
-                    bw = 3;
-                }
-
-                XtalClock::RtcXtalFreq26M => {
-                    div_ref = 12;
-                    div7_0 = 224;
-                    div10_8 = 4;
-                    lref = 1;
-                    dcur = 0;
-                    bw = 1;
-                }
-
-                XtalClock::RtcXtalFreqOther(_) => {
-                    div_ref = 12;
-                    div7_0 = 224;
-                    div10_8 = 4;
-                    lref = 0;
-                    dcur = 0;
-                    bw = 0;
-                }
+        // Configure 320M PLL
+        match xtal_freq {
+            XtalClock::RtcXtalFreq40M => {
+                div_ref = 0;
+                div7_0 = 32;
+                div10_8 = 0;
+                lref = 0;
+                dcur = 6;
+                bw = 3;
             }
 
-            i2c_writereg_rtc(
-                I2C_BBPLL,
-                I2C_BBPLL_HOSTID,
-                I2C_BBPLL_ENDIV5,
-                BBPLL_ENDIV5_VAL_320M,
-            );
-            i2c_writereg_rtc(
-                I2C_BBPLL,
-                I2C_BBPLL_HOSTID,
-                I2C_BBPLL_BBADC_DSMP,
-                BBPLL_BBADC_DSMP_VAL_320M,
-            );
-        } else {
-            // Raise the voltage
-            rtc_cntl
-                .reg()
-                .modify(|_, w| w.dig_dbias_wak().variant(dig_dbias_240_m as u8));
-
-            // Configure 480M PLL
-            match xtal_freq {
-                XtalClock::RtcXtalFreq40M => {
-                    div_ref = 0;
-                    div7_0 = 28;
-                    div10_8 = 0;
-                    lref = 0;
-                    dcur = 6;
-                    bw = 3;
-                }
-
-                XtalClock::RtcXtalFreq26M => {
-                    div_ref = 12;
-                    div7_0 = 144;
-                    div10_8 = 4;
-                    lref = 1;
-                    dcur = 0;
-                    bw = 1;
-                }
-
-                XtalClock::RtcXtalFreqOther(_) => {
-                    div_ref = 12;
-                    div7_0 = 224;
-                    div10_8 = 4;
-                    lref = 0;
-                    dcur = 0;
-                    bw = 0;
-                }
+            XtalClock::RtcXtalFreq26M => {
+                div_ref = 12;
+                div7_0 = 224;
+                div10_8 = 4;
+                lref = 1;
+                dcur = 0;
+                bw = 1;
             }
 
-            i2c_writereg_rtc(
-                I2C_BBPLL,
-                I2C_BBPLL_HOSTID,
-                I2C_BBPLL_ENDIV5,
-                BBPLL_ENDIV5_VAL_480M,
-            );
-
-            i2c_writereg_rtc(
-                I2C_BBPLL,
-                I2C_BBPLL_HOSTID,
-                I2C_BBPLL_BBADC_DSMP,
-                BBPLL_BBADC_DSMP_VAL_480M,
-            );
+            XtalClock::RtcXtalFreqOther(_) => {
+                div_ref = 12;
+                div7_0 = 224;
+                div10_8 = 4;
+                lref = 0;
+                dcur = 0;
+                bw = 0;
+            }
         }
 
-        let i2c_bbpll_lref = (lref << 7) | (div10_8 << 4) | (div_ref);
-        let i2c_bbpll_div_7_0 = div7_0;
-        let i2c_bbpll_dcur = (bw << 6) | dcur;
-        i2c_writereg_rtc(
-            I2C_BBPLL,
-            I2C_BBPLL_HOSTID,
-            I2C_BBPLL_OC_LREF,
-            i2c_bbpll_lref,
-        );
+        regi2c_write!(I2C_BBPLL, I2C_BBPLL_ENDIV5, BBPLL_ENDIV5_VAL_320M);
+        regi2c_write!(I2C_BBPLL, I2C_BBPLL_BBADC_DSMP, BBPLL_BBADC_DSMP_VAL_320M);
+    } else {
+        // Raise the voltage
+        rtc_cntl
+            .reg()
+            .modify(|_, w| w.dig_dbias_wak().variant(dig_dbias_240_m as u8));
 
-        i2c_writereg_rtc(
-            I2C_BBPLL,
-            I2C_BBPLL_HOSTID,
-            I2C_BBPLL_OC_DIV_7_0,
-            i2c_bbpll_div_7_0,
-        );
+        // Configure 480M PLL
+        match xtal_freq {
+            XtalClock::RtcXtalFreq40M => {
+                div_ref = 0;
+                div7_0 = 28;
+                div10_8 = 0;
+                lref = 0;
+                dcur = 6;
+                bw = 3;
+            }
 
-        i2c_writereg_rtc(
-            I2C_BBPLL,
-            I2C_BBPLL_HOSTID,
-            I2C_BBPLL_OC_DCUR,
-            i2c_bbpll_dcur,
-        );
+            XtalClock::RtcXtalFreq26M => {
+                div_ref = 12;
+                div7_0 = 144;
+                div10_8 = 4;
+                lref = 1;
+                dcur = 0;
+                bw = 1;
+            }
+
+            XtalClock::RtcXtalFreqOther(_) => {
+                div_ref = 12;
+                div7_0 = 224;
+                div10_8 = 4;
+                lref = 0;
+                dcur = 0;
+                bw = 0;
+            }
+        }
+
+        regi2c_write!(I2C_BBPLL, I2C_BBPLL_ENDIV5, BBPLL_ENDIV5_VAL_480M);
+        regi2c_write!(I2C_BBPLL, I2C_BBPLL_BBADC_DSMP, BBPLL_BBADC_DSMP_VAL_480M);
     }
+
+    let i2c_bbpll_lref = (lref << 7) | (div10_8 << 4) | (div_ref);
+    let i2c_bbpll_div_7_0 = div7_0;
+    let i2c_bbpll_dcur = (bw << 6) | dcur;
+
+    regi2c_write!(I2C_BBPLL, I2C_BBPLL_OC_LREF, i2c_bbpll_lref);
+    regi2c_write!(I2C_BBPLL, I2C_BBPLL_OC_DIV_7_0, i2c_bbpll_div_7_0);
+    regi2c_write!(I2C_BBPLL, I2C_BBPLL_OC_DCUR, i2c_bbpll_dcur);
 }
 
 pub(crate) fn esp32_rtc_bbpll_enable() {
-    let rtc_cntl = unsafe { &*crate::peripherals::RTC_CNTL::ptr() };
-
-    unsafe {
-        rtc_cntl.options0().modify(|_, w| {
+    unsafe { &*crate::peripherals::RTC_CNTL::ptr() }
+        .options0()
+        .modify(|_, w| {
             w.bias_i2c_force_pd()
                 .clear_bit()
                 .bb_i2c_force_pd()
@@ -194,49 +157,16 @@ pub(crate) fn esp32_rtc_bbpll_enable() {
                 .clear_bit()
         });
 
-        // reset BBPLL configuration
-        i2c_writereg_rtc(
-            I2C_BBPLL,
-            I2C_BBPLL_HOSTID,
-            I2C_BBPLL_IR_CAL_DELAY,
-            BBPLL_IR_CAL_DELAY_VAL,
-        );
-        i2c_writereg_rtc(
-            I2C_BBPLL,
-            I2C_BBPLL_HOSTID,
-            I2C_BBPLL_IR_CAL_EXT_CAP,
-            BBPLL_IR_CAL_EXT_CAP_VAL,
-        );
-        i2c_writereg_rtc(
-            I2C_BBPLL,
-            I2C_BBPLL_HOSTID,
-            I2C_BBPLL_OC_ENB_FCAL,
-            BBPLL_OC_ENB_FCAL_VAL,
-        );
-        i2c_writereg_rtc(
-            I2C_BBPLL,
-            I2C_BBPLL_HOSTID,
-            I2C_BBPLL_OC_ENB_VCON,
-            BBPLL_OC_ENB_VCON_VAL,
-        );
-        i2c_writereg_rtc(
-            I2C_BBPLL,
-            I2C_BBPLL_HOSTID,
-            I2C_BBPLL_BBADC_CAL_7_0,
-            BBPLL_BBADC_CAL_7_0_VAL,
-        );
-    }
-}
-
-#[inline(always)]
-unsafe fn i2c_writereg_rtc(block: u32, block_hostid: u32, reg_add: u32, indata: u32) {
-    const ROM_I2C_WRITEREG: u32 = 0x400041a4;
-
-    // cast to usize is just needed because of the way we run clippy in CI
-    let rom_i2c_writereg: fn(block: u32, block_hostid: u32, reg_add: u32, indata: u32) -> i32 =
-        core::mem::transmute(ROM_I2C_WRITEREG as usize);
-
-    rom_i2c_writereg(block, block_hostid, reg_add, indata);
+    // reset BBPLL configuration
+    regi2c_write!(I2C_BBPLL, I2C_BBPLL_IR_CAL_DELAY, BBPLL_IR_CAL_DELAY_VAL);
+    regi2c_write!(
+        I2C_BBPLL,
+        I2C_BBPLL_IR_CAL_EXT_CAP,
+        BBPLL_IR_CAL_EXT_CAP_VAL
+    );
+    regi2c_write!(I2C_BBPLL, I2C_BBPLL_OC_ENB_FCAL, BBPLL_OC_ENB_FCAL_VAL);
+    regi2c_write!(I2C_BBPLL, I2C_BBPLL_OC_ENB_VCON, BBPLL_OC_ENB_VCON_VAL);
+    regi2c_write!(I2C_BBPLL, I2C_BBPLL_BBADC_CAL_7_0, BBPLL_BBADC_CAL_7_0_VAL);
 }
 
 pub(crate) fn esp32_rtc_update_to_xtal(freq: XtalClock, _div: u32) {

@@ -293,14 +293,7 @@ impl CpuControl {
             APP_CORE_STACK_TOP = Some(stack.top());
         }
 
-        // TODO there is no boot_addr register in SVD or TRM - ESP-IDF uses a ROM
-        // function so we also have to for now
-        const ETS_SET_APPCPU_BOOT_ADDR: usize = 0x40000720;
-        unsafe {
-            let ets_set_appcpu_boot_addr: unsafe extern "C" fn(u32) =
-                core::mem::transmute(ETS_SET_APPCPU_BOOT_ADDR);
-            ets_set_appcpu_boot_addr(Self::start_core1_init::<F> as *const u32 as u32);
-        };
+        crate::rom::ets_set_appcpu_boot_addr(Self::start_core1_init::<F> as *const u32 as u32);
 
         system_control
             .core_1_control_0()

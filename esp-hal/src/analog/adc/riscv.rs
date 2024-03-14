@@ -592,12 +592,7 @@ where
             // the delay might be a bit generous but longer delay seem to not cause problems
             #[cfg(esp32c6)]
             {
-                extern "C" {
-                    fn ets_delay_us(us: u32);
-                }
-                unsafe {
-                    ets_delay_us(40);
-                }
+                crate::rom::ets_delay_us(40);
                 ADCI::start_onetime_sample();
             }
         }
