@@ -101,7 +101,7 @@ impl<const SIZE: usize> Stack<SIZE> {
 // Pointer to the closure that will be executed on the second core. The closure
 // is copied to the core's stack.
 static mut START_CORE1_FUNCTION: Option<*mut ()> = None;
-static mut APP_CORE_STACK_TOP: *mut u32 = core::ptr::null_mut();
+static mut APP_CORE_STACK_TOP: Option<*mut u32> = None;
 
 /// Will park the APP (second) core when dropped
 #[must_use]
@@ -221,7 +221,7 @@ impl CpuControl {
         }
 
         // switch to new stack
-        xtensa_lx::set_stack_pointer(APP_CORE_STACK_TOP);
+        xtensa_lx::set_stack_pointer(unwrap!(APP_CORE_STACK_TOP));
 
         // Trampoline to run from the new stack.
         // start_core1_run should _NEVER_ be inlined
@@ -290,7 +290,7 @@ impl CpuControl {
 
             let entry_fn = entry_dst.cast::<()>();
             START_CORE1_FUNCTION = Some(entry_fn);
-            APP_CORE_STACK_TOP = stack.top();
+            APP_CORE_STACK_TOP = Some(stack.top());
         }
 
         // TODO there is no boot_addr register in SVD or TRM - ESP-IDF uses a ROM
