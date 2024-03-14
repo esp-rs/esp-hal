@@ -106,14 +106,6 @@ pub(crate) mod rtc;
 #[cfg(any(esp32c6, esp32h2))]
 pub use rtc::RtcClock;
 
-extern "C" {
-    #[allow(dead_code)]
-    fn ets_delay_us(us: u32);
-    fn rtc_get_reset_reason(cpu_num: u32) -> u32;
-    pub fn software_reset_cpu();
-    pub fn software_reset();
-}
-
 #[cfg(not(any(esp32c6, esp32h2)))]
 #[allow(unused)]
 #[derive(Debug, Clone, Copy)]
@@ -227,10 +219,8 @@ impl<'d> Rtc<'d> {
         let (l, h) = {
             rtc_cntl.time_update().write(|w| w.time_update().set_bit());
             while rtc_cntl.time_update().read().time_valid().bit_is_clear() {
-                unsafe {
-                    // might take 1 RTC slowclk period, don't flood RTC bus
-                    ets_delay_us(1);
-                }
+                // might take 1 RTC slowclk period, don't flood RTC bus
+                crate::rom::ets_delay_us(1);
             }
             let h = rtc_cntl.time1().read().time_hi().bits();
             let l = rtc_cntl.time0().read().time_lo().bits();
@@ -342,8 +332,8 @@ impl RtcClock {
             rtc_cntl.clk_conf().modify(|_, w| w.enb_ck8m().clear_bit());
             unsafe {
                 rtc_cntl.timer1().modify(|_, w| w.ck8m_wait().bits(5));
-                ets_delay_us(50);
             }
+            crate::rom::ets_delay_us(50);
         } else {
             rtc_cntl.clk_conf().modify(|_, w| w.enb_ck8m().set_bit());
             rtc_cntl
@@ -421,9 +411,9 @@ impl RtcClock {
                     .ck8m_force_pu()
                     .bit(matches!(slow_freq, RtcSlowClock::RtcSlowClock8mD256))
             });
-
-            ets_delay_us(300u32);
         };
+
+        crate::rom::ets_delay_us(300u32);
     }
 
     /// Select source for RTC_FAST_CLK
@@ -437,9 +427,9 @@ impl RtcClock {
                     RtcFastClock::RtcFastClockXtalD4 => false,
                 })
             });
-
-            ets_delay_us(3u32);
         };
+
+        crate::rom::ets_delay_us(3u32);
     }
 
     /// Calibration of RTC_SLOW_CLK is performed using a special feature of
@@ -544,9 +534,7 @@ impl RtcClock {
             .modify(|_, w| w.rtc_cali_start().clear_bit().rtc_cali_start().set_bit());
 
         // Wait for calibration to finish up to another us_time_estimate
-        unsafe {
-            ets_delay_us(us_time_estimate);
-        }
+        crate::rom::ets_delay_us(us_time_estimate);
 
         #[cfg(esp32)]
         let mut timeout_us = us_time_estimate;
@@ -565,9 +553,7 @@ impl RtcClock {
             #[cfg(esp32)]
             if timeout_us > 0 {
                 timeout_us -= 1;
-                unsafe {
-                    ets_delay_us(1);
-                }
+                crate::rom::ets_delay_us(1);
             } else {
                 // Timed out waiting for calibration
                 break 0;
@@ -960,7 +946,7 @@ impl embedded_hal_02::watchdog::WatchdogDisable for Swd {
 }
 
 pub fn get_reset_reason(cpu: Cpu) -> Option<SocResetReason> {
-    let reason = unsafe { rtc_get_reset_reason(cpu as u32) };
+    let reason = crate::rom::rtc_get_reset_reason(cpu as u32);
 
     SocResetReason::from_repr(reason as usize)
 }

@@ -19,6 +19,7 @@ PROVIDE(Cache_Resume_DCache = 0x400018c0 );
 PROVIDE(rom_config_data_cache_mode = 0x40001a28 );
 PROVIDE(rom_config_instruction_cache_mode = 0x40001a1c );
 PROVIDE(ets_efuse_get_wp_pad = 0x40001fa4);
+PROVIDE(ets_set_appcpu_boot_addr = 0x40000720);
 
 PROVIDE(esp_rom_crc32_be = 0x40001ca4);
 PROVIDE(esp_rom_crc16_be = 0x40001cbc);
