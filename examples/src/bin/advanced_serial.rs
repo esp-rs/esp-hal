@@ -49,7 +49,7 @@ fn main() -> ! {
         io.pins.gpio5.into_floating_input(),
     );
 
-    let mut serial1 = Uart::new_with_config(peripherals.UART1, config, Some(pins), &clocks);
+    let mut serial1 = Uart::new_with_config(peripherals.UART1, config, Some(pins), &clocks, None);
 
     let delay = Delay::new(&clocks);
 

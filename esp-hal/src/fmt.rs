@@ -201,6 +201,7 @@ pub struct NoneError;
 pub trait Try {
     type Ok;
     type Error;
+    #[allow(unused)]
     fn into_result(self) -> Result<Self::Ok, Self::Error>;
 }
 

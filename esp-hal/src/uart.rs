@@ -47,10 +47,16 @@ use core::marker::PhantomData;
 use self::config::Config;
 use crate::{
     clock::Clocks,
-    gpio::{InputPin, InputSignal, OutputPin, OutputSignal},
+    gpio::{InputPin, InputSignal, NoPinType, OutputPin, OutputSignal},
+    interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
-    peripherals::uart0::{fifo::FIFO_SPEC, RegisterBlock},
+    peripherals::{
+        uart0::{fifo::FIFO_SPEC, RegisterBlock},
+        Interrupt,
+    },
     system::PeripheralClockControl,
+    Blocking,
+    Mode,
 };
 
 const CONSOLE_UART_NUM: usize = 0;
@@ -317,35 +323,30 @@ impl<TX: OutputPin, RX: InputPin> UartPins for TxRxPins<'_, TX, RX> {
 }
 
 /// UART driver
-pub struct Uart<'d, T> {
+pub struct Uart<'d, T, M> {
     #[cfg(not(esp32))]
     symbol_len: u8,
-    tx: UartTx<'d, T>,
-    rx: UartRx<'d, T>,
+    tx: UartTx<'d, T, M>,
+    rx: UartRx<'d, T, M>,
 }
 
 /// UART TX
-pub struct UartTx<'d, T> {
-    phantom: PhantomData<&'d mut T>,
+pub struct UartTx<'d, T, M> {
+    phantom: PhantomData<(&'d mut T, M)>,
 }
 
 /// UART RX
-pub struct UartRx<'d, T> {
-    phantom: PhantomData<&'d mut T>,
+pub struct UartRx<'d, T, M> {
+    phantom: PhantomData<(&'d mut T, M)>,
     at_cmd_config: Option<config::AtCmdConfig>,
     rx_timeout_config: Option<u8>,
 }
 
-impl<'d, T> UartTx<'d, T>
+impl<'d, T, M> UartTx<'d, T, M>
 where
     T: Instance,
+    M: Mode,
 {
-    // if we want to implement a standalone UartTx,
-    // uncomment below and take care of the configuration
-    // pub fn new(_uart: impl Peripheral<P = T> + 'd) -> Self {
-    //     Self::new_inner()
-    // }
-
     fn new_inner() -> Self {
         Self {
             phantom: PhantomData,
@@ -383,16 +384,11 @@ where
     }
 }
 
-impl<'d, T> UartRx<'d, T>
+impl<'d, T, M> UartRx<'d, T, M>
 where
     T: Instance,
+    M: Mode,
 {
-    // if we want to implement a standalone UartRx,
-    // uncomment below and take care of the configuration
-    // pub fn new(_uart: impl Peripheral<P = T> + 'd) -> Self {
-    //     Self::new_inner()
-    // }
-
     fn new_inner() -> Self {
         Self {
             phantom: PhantomData,
@@ -446,16 +442,41 @@ where
     }
 }
 
-impl<'d, T> Uart<'d, T>
+impl<'d, T> Uart<'d, T, Blocking>
 where
     T: Instance + 'd,
 {
-    /// Create a new UART instance with defaults
+    /// Create a new UART instance with configuration options in [`Blocking`] mode.
     pub fn new_with_config<P>(
+        uart: impl Peripheral<P = T> + 'd,
+        config: Config,
+        pins: Option<P>,
+        clocks: &Clocks,
+        interrupt: Option<InterruptHandler>,
+    ) -> Self
+    where
+        P: UartPins,
+    {
+        Self::new_with_config_inner(uart, config, pins, clocks, interrupt)
+    }
+
+    /// Create a new UART instance with defaults in [`Blocking`] mode.
+    pub fn new(uart: impl Peripheral<P = T> + 'd, clocks: &Clocks) -> Self {
+        Self::new_inner(uart, clocks)
+    }
+}
+
+impl<'d, T, M> Uart<'d, T, M>
+where
+    T: Instance + 'd,
+    M: Mode,
+{
+    fn new_with_config_inner<P>(
         _uart: impl Peripheral<P = T> + 'd,
         config: Config,
         mut pins: Option<P>,
         clocks: &Clocks,
+        interrupt: Option<InterruptHandler>,
     ) -> Self
     where
         P: UartPins,
@@ -483,21 +504,30 @@ where
         serial.change_parity(config.parity);
         serial.change_stop_bits(config.stop_bits);
 
+        if let Some(interrupt) = interrupt {
+            unsafe {
+                crate::interrupt::bind_interrupt(T::interrupt(), interrupt.handler());
+                crate::interrupt::enable(T::interrupt(), interrupt.priority()).unwrap();
+            }
+        }
+
         serial
     }
 
-    /// Create a new UART instance with defaults
-    pub fn new(uart: impl Peripheral<P = T> + 'd, clocks: &Clocks) -> Self {
-        use crate::gpio::*;
-        // not real, just to satify the type
-        type Pins<'a> = TxRxPins<'a, GpioPin<Output<PushPull>, 2>, GpioPin<Input<Floating>, 0>>;
-        Self::new_with_config(uart, Default::default(), None::<Pins<'_>>, clocks)
+    fn new_inner(uart: impl Peripheral<P = T> + 'd, clocks: &Clocks) -> Self {
+        Self::new_with_config_inner(
+            uart,
+            Default::default(),
+            None::<TxRxPins<'_, NoPinType, NoPinType>>,
+            clocks,
+            None,
+        )
     }
 
     /// Split the Uart into a transmitter and receiver, which is
     /// particularly useful when having two tasks correlating to
     /// transmitting and receiving.
-    pub fn split(self) -> (UartTx<'d, T>, UartRx<'d, T>) {
+    pub fn split(self) -> (UartTx<'d, T, M>, UartRx<'d, T, M>) {
         (self.tx, self.rx)
     }
 
@@ -996,6 +1026,7 @@ where
 pub trait Instance {
     fn register_block() -> &'static RegisterBlock;
     fn uart_number() -> usize;
+    fn interrupt() -> Interrupt;
 
     fn disable_tx_interrupts() {
         Self::register_block().int_clr().write(|w| {
@@ -1144,6 +1175,11 @@ macro_rules! impl_instance {
                 $num
             }
 
+            #[inline(always)]
+            fn interrupt() -> Interrupt {
+                Interrupt::$inst
+            }
+
             fn tx_signal() -> OutputSignal {
                 OutputSignal::$txd
             }
@@ -1177,9 +1213,10 @@ impl_instance!(UART1, 1, U1TXD, U1RXD, U1CTS, U1RTS, Uart1);
 impl_instance!(UART2, 2, U2TXD, U2RXD, U2CTS, U2RTS, Uart2);
 
 #[cfg(feature = "ufmt")]
-impl<T> ufmt_write::uWrite for Uart<'_, T>
+impl<T, M> ufmt_write::uWrite for Uart<'_, T, M>
 where
     T: Instance,
+    M: Mode,
 {
     type Error = Error;
 
@@ -1195,9 +1232,10 @@ where
 }
 
 #[cfg(feature = "ufmt")]
-impl<T> ufmt_write::uWrite for UartTx<'_, T>
+impl<T, M> ufmt_write::uWrite for UartTx<'_, T, M>
 where
     T: Instance,
+    M: Mode,
 {
     type Error = Error;
 
@@ -1208,9 +1246,10 @@ where
     }
 }
 
-impl<T> core::fmt::Write for Uart<'_, T>
+impl<T, M> core::fmt::Write for Uart<'_, T, M>
 where
     T: Instance,
+    M: Mode,
 {
     #[inline]
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
@@ -1218,9 +1257,10 @@ where
     }
 }
 
-impl<T> core::fmt::Write for UartTx<'_, T>
+impl<T, M> core::fmt::Write for UartTx<'_, T, M>
 where
     T: Instance,
+    M: Mode,
 {
     #[inline]
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
@@ -1231,9 +1271,10 @@ where
 }
 
 #[cfg(feature = "embedded-hal-02")]
-impl<T> embedded_hal_02::serial::Write<u8> for Uart<'_, T>
+impl<T, M> embedded_hal_02::serial::Write<u8> for Uart<'_, T, M>
 where
     T: Instance,
+    M: Mode,
 {
     type Error = Error;
 
@@ -1247,9 +1288,10 @@ where
 }
 
 #[cfg(feature = "embedded-hal-02")]
-impl<T> embedded_hal_02::serial::Write<u8> for UartTx<'_, T>
+impl<T, M> embedded_hal_02::serial::Write<u8> for UartTx<'_, T, M>
 where
     T: Instance,
+    M: Mode,
 {
     type Error = Error;
 
@@ -1263,9 +1305,10 @@ where
 }
 
 #[cfg(feature = "embedded-hal-02")]
-impl<T> embedded_hal_02::serial::Read<u8> for Uart<'_, T>
+impl<T, M> embedded_hal_02::serial::Read<u8> for Uart<'_, T, M>
 where
     T: Instance,
+    M: Mode,
 {
     type Error = Error;
 
@@ -1275,9 +1318,10 @@ where
 }
 
 #[cfg(feature = "embedded-hal-02")]
-impl<T> embedded_hal_02::serial::Read<u8> for UartRx<'_, T>
+impl<T, M> embedded_hal_02::serial::Read<u8> for UartRx<'_, T, M>
 where
     T: Instance,
+    M: Mode,
 {
     type Error = Error;
 
@@ -1287,24 +1331,25 @@ where
 }
 
 #[cfg(feature = "embedded-hal")]
-impl<T> embedded_hal_nb::serial::ErrorType for Uart<'_, T> {
+impl<T, M> embedded_hal_nb::serial::ErrorType for Uart<'_, T, M> {
     type Error = Error;
 }
 
 #[cfg(feature = "embedded-hal")]
-impl<T> embedded_hal_nb::serial::ErrorType for UartTx<'_, T> {
+impl<T, M> embedded_hal_nb::serial::ErrorType for UartTx<'_, T, M> {
     type Error = Error;
 }
 
 #[cfg(feature = "embedded-hal")]
-impl<T> embedded_hal_nb::serial::ErrorType for UartRx<'_, T> {
+impl<T, M> embedded_hal_nb::serial::ErrorType for UartRx<'_, T, M> {
     type Error = Error;
 }
 
 #[cfg(feature = "embedded-hal")]
-impl<T> embedded_hal_nb::serial::Read for Uart<'_, T>
+impl<T, M> embedded_hal_nb::serial::Read for Uart<'_, T, M>
 where
     T: Instance,
+    M: Mode,
 {
     fn read(&mut self) -> nb::Result<u8, Self::Error> {
         self.read_byte()
@@ -1312,9 +1357,10 @@ where
 }
 
 #[cfg(feature = "embedded-hal")]
-impl<T> embedded_hal_nb::serial::Read for UartRx<'_, T>
+impl<T, M> embedded_hal_nb::serial::Read for UartRx<'_, T, M>
 where
     T: Instance,
+    M: Mode,
 {
     fn read(&mut self) -> nb::Result<u8, Self::Error> {
         self.read_byte()
@@ -1322,9 +1368,10 @@ where
 }
 
 #[cfg(feature = "embedded-hal")]
-impl<T> embedded_hal_nb::serial::Write for Uart<'_, T>
+impl<T, M> embedded_hal_nb::serial::Write for Uart<'_, T, M>
 where
     T: Instance,
+    M: Mode,
 {
     fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
         self.write_byte(word)
@@ -1336,9 +1383,10 @@ where
 }
 
 #[cfg(feature = "embedded-hal")]
-impl<T> embedded_hal_nb::serial::Write for UartTx<'_, T>
+impl<T, M> embedded_hal_nb::serial::Write for UartTx<'_, T, M>
 where
     T: Instance,
+    M: Mode,
 {
     fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
         self.write_byte(word)
@@ -1350,24 +1398,25 @@ where
 }
 
 #[cfg(feature = "embedded-io")]
-impl<T> embedded_io::ErrorType for Uart<'_, T> {
+impl<T, M> embedded_io::ErrorType for Uart<'_, T, M> {
     type Error = Error;
 }
 
 #[cfg(feature = "embedded-io")]
-impl<T> embedded_io::ErrorType for UartTx<'_, T> {
+impl<T, M> embedded_io::ErrorType for UartTx<'_, T, M> {
     type Error = Error;
 }
 
 #[cfg(feature = "embedded-io")]
-impl<T> embedded_io::ErrorType for UartRx<'_, T> {
+impl<T, M> embedded_io::ErrorType for UartRx<'_, T, M> {
     type Error = Error;
 }
 
 #[cfg(feature = "embedded-io")]
-impl<T> embedded_io::Read for Uart<'_, T>
+impl<T, M> embedded_io::Read for Uart<'_, T, M>
 where
     T: Instance,
+    M: Mode,
 {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
         self.rx.read(buf)
@@ -1375,9 +1424,10 @@ where
 }
 
 #[cfg(feature = "embedded-io")]
-impl<T> embedded_io::Read for UartRx<'_, T>
+impl<T, M> embedded_io::Read for UartRx<'_, T, M>
 where
     T: Instance,
+    M: Mode,
 {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
         if buf.len() == 0 {
@@ -1393,9 +1443,10 @@ where
 }
 
 #[cfg(feature = "embedded-io")]
-impl<T> embedded_io::Write for Uart<'_, T>
+impl<T, M> embedded_io::Write for Uart<'_, T, M>
 where
     T: Instance,
+    M: Mode,
 {
     fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
         self.tx.write(buf)
@@ -1407,9 +1458,10 @@ where
 }
 
 #[cfg(feature = "embedded-io")]
-impl<T> embedded_io::Write for UartTx<'_, T>
+impl<T, M> embedded_io::Write for UartTx<'_, T, M>
 where
     T: Instance,
+    M: Mode,
 {
     fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
         self.write_bytes(buf)
@@ -1430,15 +1482,15 @@ where
 
 #[cfg(feature = "async")]
 mod asynch {
-    use core::{marker::PhantomData, task::Poll};
+    use core::task::Poll;
 
     use cfg_if::cfg_if;
     use embassy_sync::waitqueue::AtomicWaker;
     use enumset::{EnumSet, EnumSetType};
-    use procmacros::interrupt;
+    use procmacros::handler;
 
-    use super::{Error, Instance};
-    use crate::uart::{RegisterBlock, Uart, UartRx, UartTx, UART_FIFO_SIZE};
+    use super::*;
+    use crate::Async;
 
     cfg_if! {
         if #[cfg(all(uart0, uart1, uart2))] {
@@ -1633,7 +1685,49 @@ mod asynch {
         }
     }
 
-    impl<T> Uart<'_, T>
+    impl<'d, T> Uart<'d, T, Async>
+    where
+        T: Instance + 'd,
+    {
+        /// Create a new UART instance with configuration options in [`Async`] mode.
+        pub fn new_async_with_config<P>(
+            uart: impl Peripheral<P = T> + 'd,
+            config: Config,
+            pins: Option<P>,
+            clocks: &Clocks,
+        ) -> Self
+        where
+            P: UartPins,
+        {
+            Self::new_with_config_inner(
+                uart,
+                config,
+                pins,
+                clocks,
+                Some(match T::uart_number() {
+                    #[cfg(uart0)]
+                    0 => uart0,
+                    #[cfg(uart1)]
+                    1 => uart1,
+                    #[cfg(uart2)]
+                    2 => uart2,
+                    _ => unreachable!(),
+                }),
+            )
+        }
+
+        /// Create a new UART instance with defaults in [`Async`] mode.
+        pub fn new_async(uart: impl Peripheral<P = T> + 'd, clocks: &Clocks) -> Self {
+            Self::new_async_with_config(
+                uart,
+                Default::default(),
+                None::<TxRxPins<'_, NoPinType, NoPinType>>,
+                clocks,
+            )
+        }
+    }
+
+    impl<T> Uart<'_, T, Async>
     where
         T: Instance,
     {
@@ -1651,7 +1745,7 @@ mod asynch {
         }
     }
 
-    impl<T> UartTx<'_, T>
+    impl<T> UartTx<'_, T, Async>
     where
         T: Instance,
     {
@@ -1690,7 +1784,7 @@ mod asynch {
         }
     }
 
-    impl<T> UartRx<'_, T>
+    impl<T> UartRx<'_, T, Async>
     where
         T: Instance,
     {
@@ -1747,7 +1841,7 @@ mod asynch {
         }
     }
 
-    impl<T> embedded_io_async::Read for Uart<'_, T>
+    impl<T> embedded_io_async::Read for Uart<'_, T, Async>
     where
         T: Instance,
     {
@@ -1759,7 +1853,7 @@ mod asynch {
         }
     }
 
-    impl<T> embedded_io_async::Read for UartRx<'_, T>
+    impl<T> embedded_io_async::Read for UartRx<'_, T, Async>
     where
         T: Instance,
     {
@@ -1771,7 +1865,7 @@ mod asynch {
         }
     }
 
-    impl<T> embedded_io_async::Write for Uart<'_, T>
+    impl<T> embedded_io_async::Write for Uart<'_, T, Async>
     where
         T: Instance,
     {
@@ -1784,7 +1878,7 @@ mod asynch {
         }
     }
 
-    impl<T> embedded_io_async::Write for UartTx<'_, T>
+    impl<T> embedded_io_async::Write for UartTx<'_, T, Async>
     where
         T: Instance,
     {
@@ -1821,8 +1915,8 @@ mod asynch {
     }
 
     #[cfg(uart0)]
-    #[interrupt]
-    fn UART0() {
+    #[handler]
+    fn uart0() {
         let uart = unsafe { &*crate::peripherals::UART0::ptr() };
         let (rx, tx) = intr_handler(uart);
         if rx {
@@ -1834,8 +1928,8 @@ mod asynch {
     }
 
     #[cfg(uart1)]
-    #[interrupt]
-    fn UART1() {
+    #[handler]
+    fn uart1() {
         let uart = unsafe { &*crate::peripherals::UART1::ptr() };
         let (rx, tx) = intr_handler(uart);
         if rx {
@@ -1847,8 +1941,8 @@ mod asynch {
     }
 
     #[cfg(uart2)]
-    #[interrupt]
-    fn UART2() {
+    #[handler]
+    fn uart2() {
         let uart = unsafe { &*crate::peripherals::UART2::ptr() };
         let (rx, tx) = intr_handler(uart);
         if rx {

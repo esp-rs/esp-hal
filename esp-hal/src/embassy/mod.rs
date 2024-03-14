@@ -163,11 +163,6 @@ pub fn init(clocks: &Clocks, td: time_driver::TimerType) {
         #[cfg(all(parl_io, esp32h2))]
         crate::interrupt::enable(Interrupt::PARL_IO_TX, Priority::min()).unwrap();
 
-        #[cfg(uart0)]
-        crate::interrupt::enable(Interrupt::UART0, Priority::min()).unwrap();
-        #[cfg(uart1)]
-        crate::interrupt::enable(Interrupt::UART1, Priority::min()).unwrap();
-
         crate::interrupt::enable(Interrupt::I2C_EXT0, Priority::min()).unwrap();
         crate::interrupt::enable(Interrupt::GPIO, Priority::min()).unwrap();
 
