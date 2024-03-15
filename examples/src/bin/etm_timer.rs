@@ -69,7 +69,7 @@ fn main() -> ! {
         critical_section::with(|cs| {
             let mut timer0 = TIMER0.borrow_ref_mut(cs);
             let timer0 = timer0.as_mut().unwrap();
-            // Counter value should be the same than in interrupt because we configured ETM to stop the timer on alarm
+            // Counter value should be the same than in interrupt
             esp_println::println!("counter in main: {}", timer0.now());
         });
     }
@@ -83,7 +83,8 @@ fn TG0_T0_LEVEL() {
 
         timer0.clear_interrupt();
 
-        // Counter value should be a very small number
+        // Counter value should be a very small number as the alarm triggered a counter reload to 0
+        // and ETM stopped the counter quickly after
         esp_println::println!("counter in interrupt: {}", timer0.now());
     });
 }
