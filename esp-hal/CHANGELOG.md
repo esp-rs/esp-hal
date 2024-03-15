@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- ESP32-C6 / ESP32-H2: Implement `ETM` for general purpose timers (#1274)
+
 ### Fixed
 
 - Reserve `esp32` ROM stacks to prevent the trashing of dram2 section (#1289)
