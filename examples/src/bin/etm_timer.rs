@@ -64,7 +64,7 @@ fn main() -> ! {
     let mut delay = Delay::new(&clocks);
 
     loop {
-        delay.delay_ms(500u32);
+        delay.delay_millis(500u32);
 
         critical_section::with(|cs| {
             let mut timer0 = TIMER0.borrow_ref_mut(cs);
