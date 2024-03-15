@@ -30,10 +30,13 @@ use procmacros::handler;
 #[cfg(any(adc, dac))]
 pub(crate) use crate::analog;
 pub(crate) use crate::gpio;
-use crate::peripherals::{GPIO, IO_MUX};
 #[cfg(any(xtensa, esp32c3))]
 pub(crate) use crate::rtc_pins;
 pub use crate::soc::gpio::*;
+use crate::{
+    interrupt::InterruptHandler,
+    peripherals::{GPIO, IO_MUX},
+};
 
 /// Convenience type-alias for a no-pin / don't care - pin
 pub type NoPinType = Gpio0<Unknown>;
@@ -41,8 +44,7 @@ pub type NoPinType = Gpio0<Unknown>;
 /// Convenience constant for `Option::None` pin
 pub const NO_PIN: Option<NoPinType> = None;
 
-static USER_INTERRUPT_HANDLER: Mutex<Cell<Option<unsafe extern "C" fn()>>> =
-    Mutex::new(Cell::new(None));
+static USER_INTERRUPT_HANDLER: Mutex<Cell<Option<InterruptHandler>>> = Mutex::new(Cell::new(None));
 
 #[derive(Copy, Clone)]
 pub enum Event {
@@ -1872,15 +1874,24 @@ pub struct IO {
 }
 
 impl IO {
+    /// Initialize the I/O driver.
     pub fn new(mut gpio: GPIO, io_mux: IO_MUX) -> Self {
-        gpio.bind_gpio_interrupt(gpio_interrupt_handler);
-
+        gpio.bind_gpio_interrupt(gpio_interrupt_handler.handler());
         let pins = gpio.split();
 
         IO {
             _io_mux: io_mux,
             pins,
         }
+    }
+
+    /// Initialize the I/O driver with a interrupt priority.
+    ///
+    /// This decides the priority for the interrupt when only using async.
+    pub fn new_with_priority(gpio: GPIO, io_mux: IO_MUX, prio: crate::interrupt::Priority) -> Self {
+        crate::interrupt::enable(crate::peripherals::Interrupt::GPIO, prio).unwrap();
+
+        Self::new(gpio, io_mux)
     }
 
     /// Install the given interrupt handler replacing any previously set
@@ -1890,20 +1901,20 @@ impl IO {
     /// the internal async handler will run after. In that case it's
     /// important to not reset the interrupt status when mixing sync and
     /// async (i.e. using async wait) interrupt handling.
-    pub fn set_interrupt_handler(&mut self, handler: unsafe extern "C" fn() -> ()) {
+    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         critical_section::with(|cs| {
+            crate::interrupt::enable(crate::peripherals::Interrupt::GPIO, handler.priority())
+                .unwrap();
             USER_INTERRUPT_HANDLER.borrow(cs).set(Some(handler));
         });
     }
 }
 
 #[handler]
-unsafe fn gpio_interrupt_handler() {
+fn gpio_interrupt_handler() {
     if let Some(user_handler) = critical_section::with(|cs| USER_INTERRUPT_HANDLER.borrow(cs).get())
     {
-        unsafe {
-            user_handler();
-        }
+        user_handler.call();
     }
 
     #[cfg(feature = "async")]
@@ -3095,7 +3106,6 @@ mod asynch {
     use embedded_hal_async::digital::Wait;
 
     use super::*;
-    use crate::prelude::*;
 
     #[allow(clippy::declare_interior_mutable_const)]
     const NEW_AW: AtomicWaker = AtomicWaker::new();
