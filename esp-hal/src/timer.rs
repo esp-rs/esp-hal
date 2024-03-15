@@ -918,10 +918,12 @@ pub mod etm {
 
     impl Sealed for TimerEtmTask {}
 
+    /// General purpose timer ETM events
     pub trait TimerEtmEvents<TG> {
         fn on_alarm(&self) -> TimerEtmEvent;
     }
 
+    /// General purpose timer ETM tasks
     pub trait TimerEtmTasks<TG> {
         fn cnt_start(&self) -> TimerEtmTask;
         fn cnt_stop(&self) -> TimerEtmTask;
@@ -934,6 +936,7 @@ pub mod etm {
     where
         TG: TimerGroupInstance,
     {
+        /// ETM event triggered on alarm
         fn on_alarm(&self) -> TimerEtmEvent {
             TimerEtmEvent { id: 48 + TG::id() }
         }
@@ -943,21 +946,28 @@ pub mod etm {
     where
         TG: TimerGroupInstance,
     {
+        /// ETM task to start the counter
         fn cnt_start(&self) -> TimerEtmTask {
             TimerEtmTask { id: 88 + TG::id() }
         }
 
+        /// ETM task to start the alarm
         fn alarm_start(&self) -> TimerEtmTask {
             TimerEtmTask { id: 90 + TG::id() }
         }
 
+        /// ETM task to stop the counter
         fn cnt_stop(&self) -> TimerEtmTask {
             TimerEtmTask { id: 92 + TG::id() }
         }
 
+        /// ETM task to reload the counter
         fn cnt_reload(&self) -> TimerEtmTask {
             TimerEtmTask { id: 94 + TG::id() }
         }
+
+        /// ETM task to load the counter with the value stored when the last
+        /// `now()` was called
         fn cnt_cap(&self) -> TimerEtmTask {
             TimerEtmTask { id: 96 + TG::id() }
         }
