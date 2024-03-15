@@ -117,9 +117,10 @@ pub struct AdcPin<PIN, ADCI, CS = ()> {
     _phantom: PhantomData<ADCI>,
 }
 
-impl<PIN, ADCI, CS> embedded_hal::adc::Channel<ADCI> for AdcPin<PIN, ADCI, CS>
+#[cfg(feature = "embedded-hal-02")]
+impl<PIN, ADCI, CS> embedded_hal_02::adc::Channel<ADCI> for AdcPin<PIN, ADCI, CS>
 where
-    PIN: embedded_hal::adc::Channel<ADCI, ID = u8>,
+    PIN: embedded_hal_02::adc::Channel<ADCI, ID = u8>,
 {
     type ID = u8;
 
@@ -548,17 +549,18 @@ impl AdcCalEfuse for crate::peripherals::ADC2 {
     }
 }
 
-impl<'d, ADCI, PIN, CS> embedded_hal::adc::OneShot<ADCI, u16, AdcPin<PIN, ADCI, CS>>
+#[cfg(feature = "embedded-hal-02")]
+impl<'d, ADCI, PIN, CS> embedded_hal_02::adc::OneShot<ADCI, u16, AdcPin<PIN, ADCI, CS>>
     for ADC<'d, ADCI>
 where
-    PIN: embedded_hal::adc::Channel<ADCI, ID = u8>,
+    PIN: embedded_hal_02::adc::Channel<ADCI, ID = u8>,
     ADCI: RegisterAccess,
     CS: AdcCalScheme<ADCI>,
 {
     type Error = ();
 
     fn read(&mut self, pin: &mut AdcPin<PIN, ADCI, CS>) -> nb::Result<u16, Self::Error> {
-        use embedded_hal::adc::Channel;
+        use embedded_hal_02::adc::Channel;
 
         if self.attenuations[AdcPin::<PIN, ADCI>::channel() as usize].is_none() {
             panic!(
@@ -590,12 +592,7 @@ where
             // the delay might be a bit generous but longer delay seem to not cause problems
             #[cfg(esp32c6)]
             {
-                extern "C" {
-                    fn ets_delay_us(us: u32);
-                }
-                unsafe {
-                    ets_delay_us(40);
-                }
+                crate::rom::ets_delay_us(40);
                 ADCI::start_onetime_sample();
             }
         }
@@ -639,7 +636,8 @@ macro_rules! impl_adc_interface {
                 const CHANNEL: u8 = $channel;
             }
 
-            impl embedded_hal::adc::Channel<$adc> for crate::gpio::$pin<crate::gpio::Analog> {
+            #[cfg(feature = "embedded-hal-02")]
+            impl embedded_hal_02::adc::Channel<$adc> for crate::gpio::$pin<crate::gpio::Analog> {
                 type ID = u8;
 
                 fn channel() -> u8 { $channel }

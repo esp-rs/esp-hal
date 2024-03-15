@@ -62,10 +62,10 @@ pub enum Error {
     CommandNrExceeded,
 }
 
-#[cfg(feature = "eh1")]
-impl embedded_hal_1::i2c::Error for Error {
-    fn kind(&self) -> embedded_hal_1::i2c::ErrorKind {
-        use embedded_hal_1::i2c::ErrorKind;
+#[cfg(feature = "embedded-hal")]
+impl embedded_hal::i2c::Error for Error {
+    fn kind(&self) -> embedded_hal::i2c::ErrorKind {
+        use embedded_hal::i2c::ErrorKind;
 
         match self {
             Self::ExceedingFifo => ErrorKind::Overrun,
@@ -187,7 +187,8 @@ pub struct I2C<'d, T> {
     peripheral: PeripheralRef<'d, T>,
 }
 
-impl<T> embedded_hal::blocking::i2c::Read for I2C<'_, T>
+#[cfg(feature = "embedded-hal-02")]
+impl<T> embedded_hal_02::blocking::i2c::Read for I2C<'_, T>
 where
     T: Instance,
 {
@@ -198,7 +199,8 @@ where
     }
 }
 
-impl<T> embedded_hal::blocking::i2c::Write for I2C<'_, T>
+#[cfg(feature = "embedded-hal-02")]
+impl<T> embedded_hal_02::blocking::i2c::Write for I2C<'_, T>
 where
     T: Instance,
 {
@@ -209,7 +211,8 @@ where
     }
 }
 
-impl<T> embedded_hal::blocking::i2c::WriteRead for I2C<'_, T>
+#[cfg(feature = "embedded-hal-02")]
+impl<T> embedded_hal_02::blocking::i2c::WriteRead for I2C<'_, T>
 where
     T: Instance,
 {
@@ -225,13 +228,13 @@ where
     }
 }
 
-#[cfg(feature = "eh1")]
-impl<T> embedded_hal_1::i2c::ErrorType for I2C<'_, T> {
+#[cfg(feature = "embedded-hal")]
+impl<T> embedded_hal::i2c::ErrorType for I2C<'_, T> {
     type Error = Error;
 }
 
-#[cfg(feature = "eh1")]
-impl<T> embedded_hal_1::i2c::I2c for I2C<'_, T>
+#[cfg(feature = "embedded-hal")]
+impl<T> embedded_hal::i2c::I2c for I2C<'_, T>
 where
     T: Instance,
 {
@@ -255,7 +258,7 @@ where
     fn transaction<'a>(
         &mut self,
         _address: u8,
-        _operations: &mut [embedded_hal_1::i2c::Operation<'a>],
+        _operations: &mut [embedded_hal::i2c::Operation<'a>],
     ) -> Result<(), Self::Error> {
         todo!()
     }
@@ -337,7 +340,7 @@ mod asynch {
     use cfg_if::cfg_if;
     use embassy_futures::select::select;
     use embassy_sync::waitqueue::AtomicWaker;
-    use embedded_hal_1::i2c::Operation;
+    use embedded_hal::i2c::Operation;
     use procmacros::interrupt;
 
     use super::*;

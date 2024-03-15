@@ -11,7 +11,7 @@ links         = "esp-hal"
 
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"
-features       = ["eh1", "esp32c6"]
+features       = ["embedded-hal", "esp32c6"]
 rustdoc-args   = ["--cfg", "docsrs"]
 
 [dependencies]
@@ -27,8 +27,8 @@ embassy-sync         = { version = "0.5.0", optional = true }
 embassy-time-driver  = { version = "0.1.0", optional = true }
 embedded-can         = { version = "0.4.1", optional = true }
 embedded-dma         = "0.2.0"
-embedded-hal         = { version = "0.2.7", features = ["unproven"] }
-embedded-hal-1       = { version = "1.0.0", optional = true, package = "embedded-hal" }
+embedded-hal-02      = { version = "0.2.7", optional = true, features = ["unproven"], package = "embedded-hal" }
+embedded-hal         = { version = "1.0.0", optional = true }
 embedded-hal-async   = { version = "1.0.0", optional = true }
 embedded-hal-nb      = { version = "1.0.0", optional = true }
 embedded-io          = { version = "0.6.1", optional = true }
@@ -74,7 +74,7 @@ esp-metadata = { version = "0.1.0", path = "../esp-metadata" }
 serde        = { version = "1.0.197", features = ["derive"] }
 
 [features]
-default = ["rt", "vectored"]
+default = ["embedded-hal-02", "rt", "vectored"]
 
 riscv  = ["dep:riscv",     "critical-section/restore-state-u8",  "esp-riscv-rt?/zero-bss"]
 xtensa = ["dep:xtensa-lx", "critical-section/restore-state-u32"]
@@ -151,8 +151,8 @@ rv-init-rtc-data = ["esp-riscv-rt?/init-rtc-fast-data", "esp-riscv-rt?/init-rtc-
 ## Enable support for asynchronous operation, with interfaces provided by
 ## `embedded-hal-async` and `embedded-io-async`.
 async = [
+    "embedded-hal",
     "embedded-hal-async",
-    "eh1",
     "embassy-sync",
     "embassy-futures",
     "embedded-io",
@@ -164,13 +164,15 @@ defmt = [
     "embassy-executor?/defmt",
     "embassy-futures?/defmt",
     "embassy-sync?/defmt",
-    "embedded-hal-1?/defmt-03",
+    "embedded-hal?/defmt-03",
     "embedded-io/defmt-03",
     "embedded-io-async?/defmt-03",
 ]
+## Implement the traits defined in the `0.2.x` release of `embedded-hal`.
+embedded-hal-02 = ["dep:embedded-hal-02"]
 ## Implement the traits defined in the `1.0.0` releases of `embedded-hal` and
 ## `embedded-hal-nb` for the relevant peripherals.
-eh1 = ["embedded-hal-1", "embedded-hal-nb", "embedded-can"]
+embedded-hal = ["dep:embedded-hal", "dep:embedded-hal-nb", "dep:embedded-can"]
 ## Implement the traits defined in `embedded-io` for certain peripherals.
 embedded-io = ["dep:embedded-io"]
 ## Implement the `ufmt_write::uWrite` trait for certain peripherals.
@@ -211,11 +213,11 @@ psram-80mhz = []
 
 #! ### Octal RAM Feature Flags
 ## Use externally connected Octal RAM (2MB).
-opsram-2m  = []
+opsram-2m = []
 ## Use externally connected Octal RAM (4MB).
-opsram-4m  = []
+opsram-4m = []
 ## Use externally connected Octal RAM (8MB).
-opsram-8m  = []
+opsram-8m = []
 ## Use externally connected Octal RAM (16MB).
 opsram-16m = []
 

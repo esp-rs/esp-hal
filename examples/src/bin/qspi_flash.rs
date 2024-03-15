@@ -93,7 +93,7 @@ fn main() -> ! {
             DmaPriority::Priority0,
         ));
 
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
 
     // DMA buffer require a static life-time
     let (zero_buf, _, _, _) = dma_buffers!(0);
@@ -111,7 +111,7 @@ fn main() -> ! {
         )
         .unwrap();
     transfer.wait().unwrap();
-    delay.delay_ms(250u32);
+    delay.delay_millis(250u32);
 
     // erase sector
     let transfer = spi
@@ -124,7 +124,7 @@ fn main() -> ! {
         )
         .unwrap();
     transfer.wait().unwrap();
-    delay.delay_ms(250u32);
+    delay.delay_millis(250u32);
 
     // write enable
     let transfer = spi
@@ -137,7 +137,7 @@ fn main() -> ! {
         )
         .unwrap();
     transfer.wait().unwrap();
-    delay.delay_ms(250u32);
+    delay.delay_millis(250u32);
 
     // write data / program page
     send.fill(b'!');
@@ -152,7 +152,7 @@ fn main() -> ! {
         )
         .unwrap();
     transfer.wait().unwrap();
-    delay.delay_ms(250u32);
+    delay.delay_millis(250u32);
 
     loop {
         // quad fast read
@@ -181,6 +181,6 @@ fn main() -> ! {
         }
         println!();
 
-        delay.delay_ms(250u32);
+        delay.delay_millis(250u32);
     }
 }

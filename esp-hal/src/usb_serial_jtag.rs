@@ -364,15 +364,17 @@ impl ufmt_write::uWrite for UsbSerialJtagTx<'_> {
     }
 }
 
-impl embedded_hal::serial::Read<u8> for UsbSerialJtag<'_> {
+#[cfg(feature = "embedded-hal-02")]
+impl embedded_hal_02::serial::Read<u8> for UsbSerialJtag<'_> {
     type Error = Error;
 
     fn read(&mut self) -> nb::Result<u8, Self::Error> {
-        embedded_hal::serial::Read::read(&mut self.rx)
+        embedded_hal_02::serial::Read::read(&mut self.rx)
     }
 }
 
-impl embedded_hal::serial::Read<u8> for UsbSerialJtagRx<'_> {
+#[cfg(feature = "embedded-hal-02")]
+impl embedded_hal_02::serial::Read<u8> for UsbSerialJtagRx<'_> {
     type Error = Error;
 
     fn read(&mut self) -> nb::Result<u8, Self::Error> {
@@ -380,19 +382,21 @@ impl embedded_hal::serial::Read<u8> for UsbSerialJtagRx<'_> {
     }
 }
 
-impl embedded_hal::serial::Write<u8> for UsbSerialJtag<'_> {
+#[cfg(feature = "embedded-hal-02")]
+impl embedded_hal_02::serial::Write<u8> for UsbSerialJtag<'_> {
     type Error = Error;
 
     fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
-        embedded_hal::serial::Write::write(&mut self.tx, word)
+        embedded_hal_02::serial::Write::write(&mut self.tx, word)
     }
 
     fn flush(&mut self) -> nb::Result<(), Self::Error> {
-        embedded_hal::serial::Write::flush(&mut self.tx)
+        embedded_hal_02::serial::Write::flush(&mut self.tx)
     }
 }
 
-impl embedded_hal::serial::Write<u8> for UsbSerialJtagTx<'_> {
+#[cfg(feature = "embedded-hal-02")]
+impl embedded_hal_02::serial::Write<u8> for UsbSerialJtagTx<'_> {
     type Error = Error;
 
     fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
@@ -404,36 +408,36 @@ impl embedded_hal::serial::Write<u8> for UsbSerialJtagTx<'_> {
     }
 }
 
-#[cfg(feature = "eh1")]
+#[cfg(feature = "embedded-hal")]
 impl embedded_hal_nb::serial::ErrorType for UsbSerialJtag<'_> {
     type Error = Error;
 }
 
-#[cfg(feature = "eh1")]
+#[cfg(feature = "embedded-hal")]
 impl embedded_hal_nb::serial::ErrorType for UsbSerialJtagTx<'_> {
     type Error = Error;
 }
 
-#[cfg(feature = "eh1")]
+#[cfg(feature = "embedded-hal")]
 impl embedded_hal_nb::serial::ErrorType for UsbSerialJtagRx<'_> {
     type Error = Error;
 }
 
-#[cfg(feature = "eh1")]
+#[cfg(feature = "embedded-hal")]
 impl embedded_hal_nb::serial::Read for UsbSerialJtag<'_> {
     fn read(&mut self) -> nb::Result<u8, Self::Error> {
         embedded_hal_nb::serial::Read::read(&mut self.rx)
     }
 }
 
-#[cfg(feature = "eh1")]
+#[cfg(feature = "embedded-hal")]
 impl embedded_hal_nb::serial::Read for UsbSerialJtagRx<'_> {
     fn read(&mut self) -> nb::Result<u8, Self::Error> {
         self.read_byte()
     }
 }
 
-#[cfg(feature = "eh1")]
+#[cfg(feature = "embedded-hal")]
 impl embedded_hal_nb::serial::Write for UsbSerialJtag<'_> {
     fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
         embedded_hal_nb::serial::Write::write(&mut self.tx, word)
@@ -444,7 +448,7 @@ impl embedded_hal_nb::serial::Write for UsbSerialJtag<'_> {
     }
 }
 
-#[cfg(feature = "eh1")]
+#[cfg(feature = "embedded-hal")]
 impl embedded_hal_nb::serial::Write for UsbSerialJtagTx<'_> {
     fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
         self.write_byte_nb(word)

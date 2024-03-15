@@ -38,11 +38,11 @@ fn main() -> ! {
     interrupt::enable(Interrupt::FROM_CPU_INTR2, Priority::Priority3).unwrap();
     interrupt::enable(Interrupt::FROM_CPU_INTR3, Priority::Priority3).unwrap();
 
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
     let mut counter = 0;
 
     loop {
-        delay.delay_ms(500u32);
+        delay.delay_millis(500u32);
         match counter {
             0 => critical_section::with(|cs| {
                 SWINT

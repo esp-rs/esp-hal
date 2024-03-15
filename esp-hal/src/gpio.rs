@@ -541,7 +541,9 @@ pub struct GpioPin<MODE, const GPIONUM: u8> {
     _mode: PhantomData<MODE>,
 }
 
-impl<MODE, const GPIONUM: u8> embedded_hal::digital::v2::InputPin for GpioPin<Input<MODE>, GPIONUM>
+#[cfg(feature = "embedded-hal-02")]
+impl<MODE, const GPIONUM: u8> embedded_hal_02::digital::v2::InputPin
+    for GpioPin<Input<MODE>, GPIONUM>
 where
     Self: GpioProperties,
 {
@@ -554,7 +556,9 @@ where
     }
 }
 
-impl<const GPIONUM: u8> embedded_hal::digital::v2::InputPin for GpioPin<Output<OpenDrain>, GPIONUM>
+#[cfg(feature = "embedded-hal-02")]
+impl<const GPIONUM: u8> embedded_hal_02::digital::v2::InputPin
+    for GpioPin<Output<OpenDrain>, GPIONUM>
 where
     Self: GpioProperties,
 {
@@ -567,16 +571,16 @@ where
     }
 }
 
-#[cfg(feature = "eh1")]
-impl<MODE, const GPIONUM: u8> embedded_hal_1::digital::ErrorType for GpioPin<Input<MODE>, GPIONUM>
+#[cfg(feature = "embedded-hal")]
+impl<MODE, const GPIONUM: u8> embedded_hal::digital::ErrorType for GpioPin<Input<MODE>, GPIONUM>
 where
     Self: GpioProperties,
 {
     type Error = Infallible;
 }
 
-#[cfg(feature = "eh1")]
-impl<MODE, const GPIONUM: u8> embedded_hal_1::digital::InputPin for GpioPin<Input<MODE>, GPIONUM>
+#[cfg(feature = "embedded-hal")]
+impl<MODE, const GPIONUM: u8> embedded_hal::digital::InputPin for GpioPin<Input<MODE>, GPIONUM>
 where
     Self: GpioProperties,
 {
@@ -588,8 +592,8 @@ where
     }
 }
 
-#[cfg(feature = "eh1")]
-impl<const GPIONUM: u8> embedded_hal_1::digital::InputPin for GpioPin<Output<OpenDrain>, GPIONUM>
+#[cfg(feature = "embedded-hal")]
+impl<const GPIONUM: u8> embedded_hal::digital::InputPin for GpioPin<Output<OpenDrain>, GPIONUM>
 where
     Self: GpioProperties,
     <Self as GpioProperties>::PinType: IsOutputPin,
@@ -865,7 +869,8 @@ where
     }
 }
 
-impl<MODE, const GPIONUM: u8> embedded_hal::digital::v2::OutputPin
+#[cfg(feature = "embedded-hal-02")]
+impl<MODE, const GPIONUM: u8> embedded_hal_02::digital::v2::OutputPin
     for GpioPin<Output<MODE>, GPIONUM>
 where
     Self: GpioProperties,
@@ -882,7 +887,8 @@ where
     }
 }
 
-impl<MODE, const GPIONUM: u8> embedded_hal::digital::v2::StatefulOutputPin
+#[cfg(feature = "embedded-hal-02")]
+impl<MODE, const GPIONUM: u8> embedded_hal_02::digital::v2::StatefulOutputPin
     for GpioPin<Output<MODE>, GPIONUM>
 where
     Self: GpioProperties,
@@ -896,7 +902,8 @@ where
     }
 }
 
-impl<MODE, const GPIONUM: u8> embedded_hal::digital::v2::ToggleableOutputPin
+#[cfg(feature = "embedded-hal-02")]
+impl<MODE, const GPIONUM: u8> embedded_hal_02::digital::v2::ToggleableOutputPin
     for GpioPin<Output<MODE>, GPIONUM>
 where
     Self: GpioProperties,
@@ -904,7 +911,7 @@ where
 {
     type Error = Infallible;
     fn toggle(&mut self) -> Result<(), Self::Error> {
-        use embedded_hal::digital::v2::{OutputPin as _, StatefulOutputPin as _};
+        use embedded_hal_02::digital::v2::{OutputPin as _, StatefulOutputPin as _};
         if self.is_set_high()? {
             Ok(self.set_low()?)
         } else {
@@ -913,8 +920,8 @@ where
     }
 }
 
-#[cfg(feature = "eh1")]
-impl<MODE, const GPIONUM: u8> embedded_hal_1::digital::ErrorType for GpioPin<Output<MODE>, GPIONUM>
+#[cfg(feature = "embedded-hal")]
+impl<MODE, const GPIONUM: u8> embedded_hal::digital::ErrorType for GpioPin<Output<MODE>, GPIONUM>
 where
     Self: GpioProperties,
     <Self as GpioProperties>::PinType: IsOutputPin,
@@ -922,8 +929,8 @@ where
     type Error = Infallible;
 }
 
-#[cfg(feature = "eh1")]
-impl<MODE, const GPIONUM: u8> embedded_hal_1::digital::OutputPin for GpioPin<Output<MODE>, GPIONUM>
+#[cfg(feature = "embedded-hal")]
+impl<MODE, const GPIONUM: u8> embedded_hal::digital::OutputPin for GpioPin<Output<MODE>, GPIONUM>
 where
     Self: GpioProperties,
     <Self as GpioProperties>::PinType: IsOutputPin,
@@ -938,8 +945,8 @@ where
     }
 }
 
-#[cfg(feature = "eh1")]
-impl<MODE, const GPIONUM: u8> embedded_hal_1::digital::StatefulOutputPin
+#[cfg(feature = "embedded-hal")]
+impl<MODE, const GPIONUM: u8> embedded_hal::digital::StatefulOutputPin
     for GpioPin<Output<MODE>, GPIONUM>
 where
     Self: GpioProperties,
@@ -1719,7 +1726,8 @@ where
     }
 }
 
-impl<MODE, TYPE> embedded_hal::digital::v2::InputPin for AnyPin<Input<MODE>, TYPE> {
+#[cfg(feature = "embedded-hal-02")]
+impl<MODE, TYPE> embedded_hal_02::digital::v2::InputPin for AnyPin<Input<MODE>, TYPE> {
     type Error = core::convert::Infallible;
 
     fn is_high(&self) -> Result<bool, Self::Error> {
@@ -1733,13 +1741,13 @@ impl<MODE, TYPE> embedded_hal::digital::v2::InputPin for AnyPin<Input<MODE>, TYP
     }
 }
 
-#[cfg(feature = "eh1")]
-impl<MODE, TYPE> embedded_hal_1::digital::ErrorType for AnyPin<Input<MODE>, TYPE> {
+#[cfg(feature = "embedded-hal")]
+impl<MODE, TYPE> embedded_hal::digital::ErrorType for AnyPin<Input<MODE>, TYPE> {
     type Error = Infallible;
 }
 
-#[cfg(feature = "eh1")]
-impl<MODE, TYPE> embedded_hal_1::digital::InputPin for AnyPin<Input<MODE>, TYPE> {
+#[cfg(feature = "embedded-hal")]
+impl<MODE, TYPE> embedded_hal::digital::InputPin for AnyPin<Input<MODE>, TYPE> {
     fn is_high(&mut self) -> Result<bool, Self::Error> {
         let inner = &mut self.inner;
         handle_gpio_input!(inner, target, { target.is_high() })
@@ -1751,7 +1759,8 @@ impl<MODE, TYPE> embedded_hal_1::digital::InputPin for AnyPin<Input<MODE>, TYPE>
     }
 }
 
-impl<MODE, TYPE> embedded_hal::digital::v2::OutputPin for AnyPin<Output<MODE>, TYPE> {
+#[cfg(feature = "embedded-hal-02")]
+impl<MODE, TYPE> embedded_hal_02::digital::v2::OutputPin for AnyPin<Output<MODE>, TYPE> {
     type Error = Infallible;
 
     fn set_low(&mut self) -> Result<(), Self::Error> {
@@ -1765,7 +1774,8 @@ impl<MODE, TYPE> embedded_hal::digital::v2::OutputPin for AnyPin<Output<MODE>, T
     }
 }
 
-impl<MODE, TYPE> embedded_hal::digital::v2::StatefulOutputPin for AnyPin<Output<MODE>, TYPE> {
+#[cfg(feature = "embedded-hal-02")]
+impl<MODE, TYPE> embedded_hal_02::digital::v2::StatefulOutputPin for AnyPin<Output<MODE>, TYPE> {
     fn is_set_high(&self) -> Result<bool, Self::Error> {
         let inner = &self.inner;
         handle_gpio_output!(inner, target, { target.is_set_high() })
@@ -1777,7 +1787,8 @@ impl<MODE, TYPE> embedded_hal::digital::v2::StatefulOutputPin for AnyPin<Output<
     }
 }
 
-impl<MODE, TYPE> embedded_hal::digital::v2::ToggleableOutputPin for AnyPin<Output<MODE>, TYPE> {
+#[cfg(feature = "embedded-hal-02")]
+impl<MODE, TYPE> embedded_hal_02::digital::v2::ToggleableOutputPin for AnyPin<Output<MODE>, TYPE> {
     type Error = Infallible;
 
     fn toggle(&mut self) -> Result<(), Self::Error> {
@@ -1786,13 +1797,13 @@ impl<MODE, TYPE> embedded_hal::digital::v2::ToggleableOutputPin for AnyPin<Outpu
     }
 }
 
-#[cfg(feature = "eh1")]
-impl<MODE, TYPE> embedded_hal_1::digital::ErrorType for AnyPin<Output<MODE>, TYPE> {
+#[cfg(feature = "embedded-hal")]
+impl<MODE, TYPE> embedded_hal::digital::ErrorType for AnyPin<Output<MODE>, TYPE> {
     type Error = Infallible;
 }
 
-#[cfg(feature = "eh1")]
-impl<MODE, TYPE> embedded_hal_1::digital::OutputPin for AnyPin<Output<MODE>, TYPE> {
+#[cfg(feature = "embedded-hal")]
+impl<MODE, TYPE> embedded_hal::digital::OutputPin for AnyPin<Output<MODE>, TYPE> {
     fn set_low(&mut self) -> Result<(), Self::Error> {
         let inner = &mut self.inner;
         handle_gpio_output!(inner, target, { target.set_low() })
@@ -1804,8 +1815,8 @@ impl<MODE, TYPE> embedded_hal_1::digital::OutputPin for AnyPin<Output<MODE>, TYP
     }
 }
 
-#[cfg(feature = "eh1")]
-impl<MODE, TYPE> embedded_hal_1::digital::StatefulOutputPin for AnyPin<Output<MODE>, TYPE> {
+#[cfg(feature = "embedded-hal")]
+impl<MODE, TYPE> embedded_hal::digital::StatefulOutputPin for AnyPin<Output<MODE>, TYPE> {
     fn is_set_high(&mut self) -> Result<bool, Self::Error> {
         let inner = &mut self.inner;
         handle_gpio_output!(inner, target, { target.is_set_high() })
@@ -3139,7 +3150,7 @@ mod asynch {
 
     impl<'a, P> PinFuture<'a, P>
     where
-        P: crate::gpio::Pin + embedded_hal_1::digital::ErrorType,
+        P: crate::gpio::Pin + embedded_hal::digital::ErrorType,
     {
         pub fn new(pin: &'a mut P, event: Event) -> Self {
             pin.listen(event);
@@ -3149,7 +3160,7 @@ mod asynch {
 
     impl<'a, P> core::future::Future for PinFuture<'a, P>
     where
-        P: crate::gpio::Pin + embedded_hal_1::digital::ErrorType,
+        P: crate::gpio::Pin + embedded_hal::digital::ErrorType,
     {
         type Output = Result<(), P::Error>;
 

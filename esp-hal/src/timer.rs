@@ -39,10 +39,6 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
-use embedded_hal::{
-    timer::{Cancel, CountDown, Periodic},
-    watchdog::{Watchdog, WatchdogDisable, WatchdogEnable},
-};
 use fugit::{HertzU32, MicrosDurationU64};
 use void::Void;
 
@@ -657,7 +653,8 @@ where
     (1_000_000 * micros / period as u64) as u64
 }
 
-impl<T> CountDown for Timer<T>
+#[cfg(feature = "embedded-hal-02")]
+impl<T> embedded_hal_02::timer::CountDown for Timer<T>
 where
     T: Instance,
 {
@@ -700,7 +697,8 @@ where
     }
 }
 
-impl<T> Cancel for Timer<T>
+#[cfg(feature = "embedded-hal-02")]
+impl<T> embedded_hal_02::timer::Cancel for Timer<T>
 where
     T: Instance,
 {
@@ -719,7 +717,8 @@ where
     }
 }
 
-impl<T> Periodic for Timer<T> where T: Instance {}
+#[cfg(feature = "embedded-hal-02")]
+impl<T> embedded_hal_02::timer::Periodic for Timer<T> where T: Instance {}
 
 /// Watchdog timer
 pub struct Wdt<TG> {
@@ -851,7 +850,8 @@ where
     }
 }
 
-impl<TG> WatchdogDisable for Wdt<TG>
+#[cfg(feature = "embedded-hal-02")]
+impl<TG> embedded_hal_02::watchdog::WatchdogDisable for Wdt<TG>
 where
     TG: TimerGroupInstance,
 {
@@ -860,7 +860,8 @@ where
     }
 }
 
-impl<TG> WatchdogEnable for Wdt<TG>
+#[cfg(feature = "embedded-hal-02")]
+impl<TG> embedded_hal_02::watchdog::WatchdogEnable for Wdt<TG>
 where
     TG: TimerGroupInstance,
 {
@@ -875,7 +876,8 @@ where
     }
 }
 
-impl<TG> Watchdog for Wdt<TG>
+#[cfg(feature = "embedded-hal-02")]
+impl<TG> embedded_hal_02::watchdog::Watchdog for Wdt<TG>
 where
     TG: TimerGroupInstance,
 {

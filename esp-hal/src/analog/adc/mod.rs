@@ -29,17 +29,21 @@ pub use self::implementation::*;
 mod implementation;
 
 /// The attenuation of the ADC pin.
+///
+/// The effective measurement range for a given attuenation is dependent on the
+/// device being targeted. Please refer to "ADC Characteristics" section of your
+/// device's datasheet for more information.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Attenuation {
-    /// 0dB attenuation, measurement range: 0-800mV
+    /// 0dB attenuation
     Attenuation0dB   = 0b00,
-    /// 2.5dB attenuation, measurement range: 0-1100mV
+    /// 2.5dB attenuation
     #[cfg(not(esp32c2))]
     Attenuation2p5dB = 0b01,
-    /// 6dB attenuation, measurement range: 0-1350mV
+    /// 6dB attenuation
     #[cfg(not(esp32c2))]
     Attenuation6dB   = 0b10,
-    /// 11dB attenuation, measurement range: 0-2600mV
+    /// 11dB attenuation
     Attenuation11dB  = 0b11,
 }
 

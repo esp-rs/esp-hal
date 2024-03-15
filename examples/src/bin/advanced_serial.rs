@@ -8,10 +8,12 @@
 //! - RX => GPIO5
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% FEATURES: embedded-hal-02
 
 #![no_std]
 #![no_main]
 
+use embedded_hal_02::serial::{Read, Write};
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
@@ -49,7 +51,7 @@ fn main() -> ! {
 
     let mut serial1 = Uart::new_with_config(peripherals.UART1, config, Some(pins), &clocks);
 
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
 
     println!("Start");
     loop {
@@ -61,6 +63,6 @@ fn main() -> ! {
             Err(err) => println!("Error {:?}", err),
         }
 
-        delay.delay_ms(250u32);
+        delay.delay_millis(250u32);
     }
 }

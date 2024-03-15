@@ -4,7 +4,7 @@
 //! signal set by the task running on the other core.
 
 //% CHIPS: esp32 esp32s3
-//% FEATURES: embassy embassy-executor-thread embassy-time-timg0 embassy-generic-timers
+//% FEATURES: embassy embassy-executor-thread embassy-time-timg0 embassy-generic-timers embedded-hal-02
 
 #![no_std]
 #![no_main]
@@ -13,6 +13,7 @@
 use embassy_executor::Spawner;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
 use embassy_time::{Duration, Ticker};
+use embedded_hal_02::digital::v2::OutputPin;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
@@ -64,14 +65,14 @@ async fn main(_spawner: Spawner) {
     let led_ctrl_signal = &*make_static!(Signal::new());
 
     let led = io.pins.gpio0.into_push_pull_output();
-    let cpu1_fnctn = move || {
-        let executor = make_static!(Executor::new());
-        executor.run(|spawner| {
-            spawner.spawn(control_led(led, led_ctrl_signal)).ok();
-        });
-    };
+
     let _guard = cpu_control
-        .start_app_core(unsafe { &mut APP_CORE_STACK }, cpu1_fnctn)
+        .start_app_core(unsafe { &mut APP_CORE_STACK }, move || {
+            let executor = make_static!(Executor::new());
+            executor.run(|spawner| {
+                spawner.spawn(control_led(led, led_ctrl_signal)).ok();
+            });
+        })
         .unwrap();
 
     // Sends periodic messages to control_led, enabling or disabling it.

@@ -4,6 +4,7 @@
 //! Most dev-kits use a USB-UART-bridge - in that case you won't see any output.
 
 //% CHIPS: esp32c3 esp32c6 esp32h2 esp32s3
+//% FEATURES: embedded-hal-02
 
 #![no_std]
 #![no_main]
@@ -11,6 +12,7 @@
 use core::{cell::RefCell, fmt::Write};
 
 use critical_section::Mutex;
+use embedded_hal_02::timer::CountDown;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,

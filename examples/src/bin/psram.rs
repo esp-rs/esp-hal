@@ -13,12 +13,7 @@ extern crate alloc;
 use alloc::{string::String, vec::Vec};
 
 use esp_backtrace as _;
-use esp_hal::{
-    clock::{ClockControl, CpuClock},
-    peripherals::Peripherals,
-    prelude::*,
-    psram,
-};
+use esp_hal::{clock::ClockControl, peripherals::Peripherals, prelude::*, psram};
 use esp_println::println;
 
 #[global_allocator]

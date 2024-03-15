@@ -54,6 +54,6 @@ fn main() -> ! {
 
     let rtcio = Ext1WakeupSource::new(wakeup_pins);
     println!("sleeping!");
-    delay.delay_ms(100u32);
+    delay.delay_millis(100u32);
     rtc.sleep_deep(&[&timer, &rtcio], &mut delay);
 }

@@ -4,6 +4,7 @@
 //! second core.
 
 //% CHIPS: esp32 esp32s3
+//% FEATURES: embedded-hal-02
 
 #![no_std]
 #![no_main]
@@ -11,13 +12,14 @@
 use core::cell::RefCell;
 
 use critical_section::Mutex;
+use embedded_hal_02::timer::CountDown;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     cpu_control::{CpuControl, Stack},
-    peripherals::{Peripherals, TIMG1},
+    peripherals::Peripherals,
     prelude::*,
-    timer::{Timer, Timer0, TimerGroup},
+    timer::TimerGroup,
 };
 use esp_println::println;
 use nb::block;
@@ -39,14 +41,20 @@ fn main() -> ! {
     timer0.start(1u64.secs());
     timer1.start(500u64.millis());
 
-    let counter = Mutex::new(RefCell::new(0));
+    let counter = Mutex::new(RefCell::new(0u32));
 
     let mut cpu_control = CpuControl::new(system.cpu_control);
-    let cpu1_fnctn = || {
-        cpu1_task(&mut timer1, &counter);
-    };
     let _guard = cpu_control
-        .start_app_core(unsafe { &mut APP_CORE_STACK }, cpu1_fnctn)
+        .start_app_core(unsafe { &mut APP_CORE_STACK }, || {
+            println!("Hello World - Core 1!");
+            loop {
+                block!(timer1.wait()).unwrap();
+                critical_section::with(|cs| {
+                    let mut val = counter.borrow_ref_mut(cs);
+                    *val = val.wrapping_add(1);
+                });
+            }
+        })
         .unwrap();
 
     loop {
@@ -54,17 +62,5 @@ fn main() -> ! {
 
         let count = critical_section::with(|cs| *counter.borrow_ref(cs));
         println!("Hello World - Core 0! Counter is {}", count);
-    }
-}
-
-fn cpu1_task(timer: &mut Timer<Timer0<TIMG1>>, counter: &Mutex<RefCell<i32>>) -> ! {
-    println!("Hello World - Core 1!");
-    loop {
-        block!(timer.wait()).unwrap();
-
-        critical_section::with(|cs| {
-            let new_val = counter.borrow_ref_mut(cs).wrapping_add(1);
-            *counter.borrow_ref_mut(cs) = new_val;
-        });
     }
 }

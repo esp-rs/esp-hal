@@ -5,6 +5,7 @@
 //! to reset both the main system and the RTC.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% FEATURES: embedded-hal-02
 
 #![no_std]
 #![no_main]
@@ -12,6 +13,7 @@
 use core::cell::RefCell;
 
 use critical_section::Mutex;
+use embedded_hal_02::watchdog::WatchdogEnable;
 use esp_backtrace as _;
 use esp_hal::{
     interrupt::{self, Priority},

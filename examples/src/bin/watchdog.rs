@@ -4,10 +4,15 @@
 //! `wdt.feed()` the watchdog will reset the system.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% FEATURES: embedded-hal-02
 
 #![no_std]
 #![no_main]
 
+use embedded_hal_02::{
+    timer::CountDown,
+    watchdog::{Watchdog, WatchdogEnable},
+};
 use esp_backtrace as _;
 use esp_hal::{clock::ClockControl, peripherals::Peripherals, prelude::*, timer::TimerGroup};
 use esp_println::println;

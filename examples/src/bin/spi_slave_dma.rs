@@ -24,10 +24,12 @@
 //! so no immediate neighbor is available.
 
 //% CHIPS: esp32c2 esp32c3 esp32c6 esp32h2 esp32s3
+//% FEATURES: embedded-hal-02
 
 #![no_std]
 #![no_main]
 
+use embedded_hal_02::digital::v2::{InputPin, OutputPin};
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
@@ -83,7 +85,7 @@ fn main() -> ! {
         DmaPriority::Priority0,
     ));
 
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
 
     // DMA buffer require a static life-time
     let master_send = &mut [0u8; 32000];
@@ -149,7 +151,7 @@ fn main() -> ! {
             &master_receive[master_receive.len() - 10..]
         );
 
-        delay.delay_ms(250u32);
+        delay.delay_millis(250u32);
 
         slave_receive.fill(0xff);
         let transfer = spi.dma_read(&mut slave_receive).unwrap();
@@ -177,7 +179,7 @@ fn main() -> ! {
             &slave_receive[slave_receive.len() - 10..],
         );
 
-        delay.delay_ms(250u32);
+        delay.delay_millis(250u32);
         let transfer = spi.dma_write(&mut slave_send).unwrap();
 
         master_receive.fill(0);
