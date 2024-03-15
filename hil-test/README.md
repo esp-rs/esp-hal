@@ -61,7 +61,7 @@ Currently, here are the Virtual Machines set up for HIL testing:
   - Has an `ESP32-C3-DevKit-RUST-1` connected via USB-JTAG-SERIAL.
 - ESP32-C6:
   - Has an `ESP32-C6-DevKitC-1 V1.2` connected via USB-JTAG-SERIAL.
-    - Pins 2 and 4 are connected for `spi_full_duplex` and `uart` tests.
+    - Pins 9 and 10 are connected for `spi_full_duplex` and `uart` tests.
   - VM has the following setup:
     ```
     # Install Rust:
@@ -80,7 +80,7 @@ Currently, here are the Virtual Machines set up for HIL testing:
     ```
 - ESP32-H2
   - Has an `ESP32-H2-DevKitM-1` connected via USB-JTAG-SERIAL.
-    - Pins 2 and 4 are connected for `spi_full_duplex` and `uart` tests.
+    - Pins 9 and 10 are connected for `spi_full_duplex` and `uart` tests.
   - VM has the following setup:
     ```
     # Install Rust:

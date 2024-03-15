@@ -1,10 +1,10 @@
 //! UART Test
 //!
 //! Folowing pins are used:
-//! TX    GPIP2
-//! RX    GPIO4
+//! TX    GPIP9
+//! RX    GPIO10
 //!
-//! Connect TX (GPIO2) and RX (GPIO4) pins.
+//! Connect TX (GPI10) and RX (GPIO9) pins.
 
 #![no_std]
 #![no_main]
@@ -32,8 +32,8 @@ impl Context {
         let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
         let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
         let pins = TxRxPins::new_tx_rx(
-            io.pins.gpio2.into_push_pull_output(),
-            io.pins.gpio4.into_floating_input(),
+            io.pins.gpio10.into_push_pull_output(),
+            io.pins.gpio9.into_floating_input(),
         );
         let config = Config {
             baudrate: 115200,
