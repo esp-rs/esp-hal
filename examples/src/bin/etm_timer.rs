@@ -61,7 +61,7 @@ fn main() -> ! {
         TIMER0.borrow_ref_mut(cs).replace(timer0);
     });
 
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
 
     loop {
         delay.delay_millis(500u32);
