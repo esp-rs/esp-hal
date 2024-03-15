@@ -11,7 +11,6 @@
 #![no_std]
 #![no_main]
 
-use embedded_hal_1::spi::SpiBus;
 use hil_test::esp_hal::{
     clock::ClockControl,
     gpio::IO,
@@ -60,15 +59,19 @@ mod tests {
 
     #[test]
     fn test_symestric_transfer(mut ctx: Context) {
-        let write = [0xde, 0xad, 0xbe, 0xef];
-        let mut read: [u8; 4] = [0x00u8; 4];
-        SpiBus::transfer(&mut ctx.spi, &mut read[..], &write[..])
+        let mut data = [0xde, 0xad, 0xbe, 0xef];
+        let initial_data = data;
+
+        ctx.spi
+            .transfer(&mut data)
             .expect("Symmetric transfer failed");
-        assert_eq!(write, read);
+        assert_eq!(initial_data, data);
     }
 
     #[test]
     fn test_asymestric_transfer(mut ctx: Context) {
+        use embedded_hal_1::spi::SpiBus;
+
         let write = [0xde, 0xad, 0xbe, 0xef];
         let mut read: [u8; 4] = [0x00; 4];
         SpiBus::transfer(&mut ctx.spi, &mut read[0..2], &write[..])
@@ -79,19 +82,21 @@ mod tests {
 
     #[test]
     fn test_symestric_transfer_huge_buffer(mut ctx: Context) {
-        let mut write = [0x55u8; 4096];
-        for byte in 0..write.len() {
-            write[byte] = byte as u8;
+        let mut data = [0x55u8; 4096];
+        for byte in 0..data.len() {
+            data[byte] = byte as u8;
         }
-        let mut read = [0x00u8; 4096];
+        let initial_data = data;
 
-        SpiBus::transfer(&mut ctx.spi, &mut read[..], &write[..]).expect("Huge transfer failed");
-        assert_eq!(write, read);
+        ctx.spi.transfer(&mut data).expect("Huge transfer failed");
+        assert_eq!(initial_data, data);
     }
 
     #[test]
     #[timeout(3)]
     fn test_symestric_transfer_huge_buffer_no_alloc(mut ctx: Context) {
+        use embedded_hal_1::spi::SpiBus;
+
         let mut write = [0x55u8; 4096];
         for byte in 0..write.len() {
             write[byte] = byte as u8;

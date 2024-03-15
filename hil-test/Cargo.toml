@@ -57,7 +57,8 @@ embassy = ["esp-hal?/embassy"]
 embassy-executor-interrupt = ["esp-hal?/embassy-executor-interrupt"]
 embassy-executor-thread    = ["esp-hal?/embassy-executor-thread"]
 
-embassy-time-systick = ["esp-hal?/embassy-time-systick"]
+embassy-time-systick-16mhz = ["esp-hal?/embassy-time-systick-16mhz"]
+embassy-time-systick-80mhz = ["esp-hal?/embassy-time-systick-80mhz"]
 embassy-time-timg0   = ["esp-hal?/embassy-time-timg0"]
 
 # cargo build/run
