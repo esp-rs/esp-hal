@@ -33,8 +33,6 @@ fn main() -> ! {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let mut delay = Delay::new(&clocks);
-
     let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let mut timer0 = timg0.timer0;
 
@@ -62,6 +60,8 @@ fn main() -> ! {
     critical_section::with(|cs| {
         TIMER0.borrow_ref_mut(cs).replace(timer0);
     });
+
+    let mut delay = Delay::new(&clocks);
 
     loop {
         delay.delay_ms(500u32);
