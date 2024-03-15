@@ -2,7 +2,7 @@
 
 Hardware-in-loop testing for `esp-hal`.
 
-For assistance with this package please [open an issue] or [start a discussion], or contact @jessebraham on Matrix.
+For assistance with this package please [open an issue] or [start a discussion].
 
 [open an issue]: https://github.com/esp-rs/esp-hal/issues/new
 [start a discussion]: https://github.com/esp-rs/esp-hal/discussions/new/choose
