@@ -30,6 +30,9 @@ fn main() -> ! {
 
     loop {
         led.toggle().unwrap();
-        delay.delay_millis(500u32);
+        delay.delay_millis(500);
+        led.toggle().unwrap();
+        // or using `fugit` duration
+        delay.delay(2.secs());
     }
 }

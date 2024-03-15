@@ -46,7 +46,7 @@ async fn main(_spawner: Spawner) {
         peripherals.I2C0,
         io.pins.gpio4,
         io.pins.gpio5,
-        400u32.kHz(),
+        400.kHz(),
         &clocks,
     );
 

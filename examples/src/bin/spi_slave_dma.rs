@@ -151,7 +151,7 @@ fn main() -> ! {
             &master_receive[master_receive.len() - 10..]
         );
 
-        delay.delay_millis(250u32);
+        delay.delay_millis(250);
 
         slave_receive.fill(0xff);
         let transfer = spi.dma_read(&mut slave_receive).unwrap();
@@ -179,7 +179,7 @@ fn main() -> ! {
             &slave_receive[slave_receive.len() - 10..],
         );
 
-        delay.delay_millis(250u32);
+        delay.delay_millis(250);
         let transfer = spi.dma_write(&mut slave_send).unwrap();
 
         master_receive.fill(0);

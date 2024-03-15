@@ -54,6 +54,6 @@ fn main() -> ! {
 
         voltage_dac2 = voltage_dac2.wrapping_sub(1);
         dac2.write(voltage_dac2);
-        delay.delay_millis(50u32);
+        delay.delay_millis(50);
     }
 }

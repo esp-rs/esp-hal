@@ -26,7 +26,7 @@
 //!     lcd_cam.lcd,
 //!     channel.tx,
 //!     tx_pins,
-//!     20u32.MHz(),
+//!     20.MHz(),
 //!     Config::default(),
 //!     &clocks,
 //! )

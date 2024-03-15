@@ -42,7 +42,7 @@ fn main() -> ! {
         .configure(timer::config::Config {
             duty: timer::config::Duty::Duty5Bit,
             clock_source: timer::LSClockSource::APBClk,
-            frequency: 24u32.kHz(),
+            frequency: 24.kHz(),
         })
         .unwrap();
 

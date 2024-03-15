@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `Delay::delay(time: fugit::MicrosDurationU64)`
+
 ### Fixed
 
 - Reserve `esp32` ROM stacks to prevent the trashing of dram2 section (#1289)
@@ -17,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Remove `Ext32` and `RateExtU64` from prelude
 - Prefer mutable references over moving for DMA transactions (#1238)
 - Support runtime interrupt binding, adapt GPIO driver (#1231)
 - Renamed `eh1` feature to `embedded-hal`, feature-gated `embedded-hal@0.2.x` trait implementations (#1273)

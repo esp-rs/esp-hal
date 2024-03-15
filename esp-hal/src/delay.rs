@@ -23,6 +23,7 @@
 //! [embedded-hal]: https://docs.rs/embedded-hal/0.2.7/embedded_hal/index.html
 
 use fugit::HertzU64;
+pub use fugit::MicrosDurationU64;
 
 /// Delay driver
 ///
@@ -37,7 +38,7 @@ impl Delay {
     /// Delay for the specified number of milliseconds
     pub fn delay_millis(&self, ms: u32) {
         for _ in 0..ms {
-            self.delay_micros(1000u32);
+            self.delay_micros(1000);
         }
     }
 }
@@ -49,7 +50,7 @@ where
 {
     fn delay_ms(&mut self, ms: T) {
         for _ in 0..ms.into() {
-            self.delay_micros(1000u32);
+            self.delay_micros(1000);
         }
     }
 }
@@ -87,6 +88,15 @@ mod implementation {
             }
         }
 
+        /// Delay for the specified time
+        pub fn delay(&self, time: MicrosDurationU64) {
+            let t0 = SystemTimer::now();
+            let rate: HertzU64 = MicrosDurationU64::from_ticks(1).into_rate();
+            let clocks = time.ticks() * (self.freq / rate);
+
+            while SystemTimer::now().wrapping_sub(t0) & SystemTimer::BIT_MASK <= clocks {}
+        }
+
         /// Delay for the specified number of microseconds
         pub fn delay_micros(&self, us: u32) {
             let t0 = SystemTimer::now();
@@ -116,6 +126,13 @@ mod implementation {
             Self {
                 freq: clocks.cpu_clock.into(),
             }
+        }
+
+        /// Delay for the specified time
+        pub fn delay(&self, time: MicrosDurationU64) {
+            let rate: HertzU64 = MicrosDurationU64::from_ticks(1).into_rate();
+            let clocks = time.ticks() * (self.freq / rate);
+            xtensa_lx::timer::delay(clocks as u32);
         }
 
         /// Delay for the specified number of microseconds

@@ -29,7 +29,7 @@ fn main() -> ! {
     let peripherals = Peripherals::take();
 
     let mut rtc = Rtc::new(peripherals.LPWR);
-    rtc.rwdt.start(2000u64.millis());
+    rtc.rwdt.start(2000.millis());
     rtc.rwdt.listen();
 
     critical_section::with(|cs| RWDT.borrow_ref_mut(cs).replace(rtc.rwdt));
@@ -52,7 +52,7 @@ fn interrupt_handler() {
 
         esp_println::println!("Restarting in 5 seconds...");
 
-        rwdt.start(5000u64.millis());
+        rwdt.start(5000.millis());
         rwdt.unlisten();
     });
 }

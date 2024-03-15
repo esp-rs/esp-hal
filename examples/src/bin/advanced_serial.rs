@@ -63,6 +63,6 @@ fn main() -> ! {
             Err(err) => println!("Error {:?}", err),
         }
 
-        delay.delay_millis(250u32);
+        delay.delay_millis(250);
     }
 }

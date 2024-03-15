@@ -10,12 +10,7 @@ pub use embedded_dma::{
     WriteBuffer as _embedded_dma_WriteBuffer,
     WriteTarget as _embedded_dma_WriteTarget,
 };
-pub use fugit::{
-    ExtU32 as _fugit_ExtU32,
-    ExtU64 as _fugit_ExtU64,
-    RateExtU32 as _fugit_RateExtU32,
-    RateExtU64 as _fugit_RateExtU64,
-};
+pub use fugit::{ExtU64 as _fugit_ExtU64, RateExtU32 as _fugit_RateExtU32};
 pub use nb;
 
 #[cfg(any(dport, pcr, system))]

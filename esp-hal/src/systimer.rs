@@ -418,7 +418,7 @@ pub mod etm {
     //! ```no_run
     //! let syst = SystemTimer::new(peripherals.SYSTIMER);
     //! let mut alarm0 = syst.alarm0.into_periodic();
-    //! alarm0.set_period(1u32.secs());
+    //! alarm0.set_period(1.secs());
     //!
     //! let timer_event = SysTimerEtmEvent::new(&mut alarm0);
     //! ```

@@ -43,7 +43,7 @@ fn main() -> ! {
     let mosi = io.pins.gpio4;
     let cs = io.pins.gpio5;
 
-    let mut spi = Spi::new(peripherals.SPI2, 100u32.kHz(), SpiMode::Mode0, &clocks).with_pins(
+    let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks).with_pins(
         Some(sclk),
         Some(mosi),
         Some(miso),
@@ -57,6 +57,6 @@ fn main() -> ! {
         spi.transfer(&mut data).unwrap();
         println!("{:x?}", data);
 
-        delay.delay_millis(250u32);
+        delay.delay_millis(250);
     }
 }

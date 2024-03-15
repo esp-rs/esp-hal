@@ -66,7 +66,7 @@ async fn main(_spawner: Spawner) {
             &mut rx_descriptors,
             DmaPriority::Priority0,
         ),
-        1u32.MHz(),
+        1.MHz(),
         &clocks,
     )
     .unwrap();

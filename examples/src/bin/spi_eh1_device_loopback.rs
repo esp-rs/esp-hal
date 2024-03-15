@@ -55,7 +55,7 @@ fn main() -> ! {
     let miso = io.pins.gpio2;
     let mosi = io.pins.gpio4;
 
-    let spi_bus = Spi::new(peripherals.SPI2, 1000u32.kHz(), SpiMode::Mode0, &clocks).with_pins(
+    let spi_bus = Spi::new(peripherals.SPI2, 1000.kHz(), SpiMode::Mode0, &clocks).with_pins(
         Some(sclk),
         Some(mosi),
         Some(miso),
@@ -93,7 +93,7 @@ fn main() -> ! {
         spi_device_2.transfer(&mut read[..], &write[..]).unwrap();
         spi_device_3.transfer(&mut read[..], &write[..]).unwrap();
         println!(" SUCCESS");
-        delay.delay_millis(250u32);
+        delay.delay_millis(250);
 
         // --- Asymmetric transfer (Read more than we write) ---
         print!("Starting asymetric transfer (read > write)...");
@@ -111,7 +111,7 @@ fn main() -> ! {
             .transfer(&mut read[0..2], &write[..])
             .expect("Asymmetric transfer failed");
         println!(" SUCCESS");
-        delay.delay_millis(250u32);
+        delay.delay_millis(250);
 
         // --- Symmetric transfer with huge buffer ---
         // Only your RAM is the limit!
@@ -133,7 +133,7 @@ fn main() -> ! {
             .transfer(&mut read[..], &write[..])
             .expect("Huge transfer failed");
         println!(" SUCCESS");
-        delay.delay_millis(250u32);
+        delay.delay_millis(250);
 
         // --- Symmetric transfer with huge buffer in-place (No additional allocation
         // needed) ---
@@ -156,6 +156,6 @@ fn main() -> ! {
             .transfer_in_place(&mut write[..])
             .expect("Huge transfer failed");
         println!(" SUCCESS");
-        delay.delay_millis(250u32);
+        delay.delay_millis(250);
     }
 }

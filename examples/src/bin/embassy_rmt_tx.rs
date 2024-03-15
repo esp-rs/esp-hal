@@ -37,9 +37,9 @@ async fn main(_spawner: Spawner) {
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32h2")] {
-            let freq = 32u32.MHz();
+            let freq = 32.MHz();
         } else {
-            let freq = 80u32.MHz();
+            let freq = 80.MHz();
         }
     };
 

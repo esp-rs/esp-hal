@@ -42,7 +42,7 @@ fn main() -> ! {
     let mut counter = 0;
 
     loop {
-        delay.delay_millis(500u32);
+        delay.delay_millis(500);
         match counter {
             0 => critical_section::with(|cs| {
                 SWINT
