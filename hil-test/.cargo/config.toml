@@ -1,18 +1,22 @@
 [env]
-DEFMT_LOG="debug"
+DEFMT_LOG="info"
+RUST_LOG = "warn"
 
 [target.'cfg(target_arch = "riscv32")']
-runner    = "probe-rs test  --"
+runner    = "probe-rs run"
 rustflags = [
     "-C", "link-arg=-Tlinkall.x",
-    "-C", "link-arg=-Tdefmt.x",
+    "-C", "link-arg=-Tembedded-test.x",
+    "-C", "link-arg=-Tdefmt.x", # Comment this line when using log feature
 ]
 
 [target.'cfg(target_arch = "xtensa")']
 # TODO: Xtensa not yet fully supported by `probe-rs`
-runner    = "probe-rs test --"
+runner    = "probe-rs run"
 rustflags = [
     "-C", "link-arg=-nostartfiles",
     "-C", "link-arg=-Wl,-Tlinkall.x",
     "-C", "link-arg=-Tdefmt.x",
+    "-C", "link-arg=-Tembedded-test.x",
+
 ]

@@ -4,10 +4,6 @@ version = "0.0.0"
 edition = "2021"
 publish = false
 
-[lib]
-harness = false
-test = false
-
 [[test]]
 name    = "aes"
 harness = false
@@ -24,23 +20,22 @@ harness = false
 name    = "uart"
 harness = false
 
-
 [dependencies]
-defmt         = "0.3.5"
-defmt-rtt     = "0.4.0"
-embedded-test = "0.3.0"
-panic-probe   = "0.3.1"
-semihosting   = "0.1.6"
-
-# HAL package:
-esp-hal = { path = "../esp-hal", features = ["defmt", "eh1"], optional = true }
-
-# Traits:
+defmt = { version = "0.3.5", optional = true }
+defmt-rtt = { version = "0.4.0", optional = true }
+log = { version = "0.4.20", optional = true }
+esp-hal = { path = "../esp-hal", features = ["eh1"], optional = true }
 embedded-hal       = { version = "0.2.7", features = ["unproven"] }
 embedded-hal-async = { version = "1.0.0", optional = true }
 embedded-hal-1     = { version = "1.0.0", package = "embedded-hal" }
+embassy-executor = { default-features = false, version = "0.5.0", features = ["executor-thread", "arch-riscv32"], optional = true }
+
+[dev-dependencies]
+embedded-test = {git = "https://github.com/probe-rs/embedded-test/", branch = "next"}
 
 [features]
+default = ["defmt"]
+# Device support (required!):
 esp32   = ["esp-hal/esp32"]
 esp32c2 = ["esp-hal/esp32c2"]
 esp32c3 = ["esp-hal/esp32c3"]
@@ -48,18 +43,21 @@ esp32c6 = ["esp-hal/esp32c6"]
 esp32h2 = ["esp-hal/esp32h2"]
 esp32s2 = ["esp-hal/esp32s2"]
 esp32s3 = ["esp-hal/esp32s3"]
-
 # Async & Embassy:
 async = ["dep:embedded-hal-async", "esp-hal?/async"]
-
-embassy = ["esp-hal?/embassy"]
-
+embassy = ["esp-hal?/embassy", "embedded-test/embassy", "dep:embassy-executor"]
 embassy-executor-interrupt = ["esp-hal?/embassy-executor-interrupt"]
 embassy-executor-thread    = ["esp-hal?/embassy-executor-thread"]
-
 embassy-time-systick-16mhz = ["esp-hal?/embassy-time-systick-16mhz"]
 embassy-time-systick-80mhz = ["esp-hal?/embassy-time-systick-80mhz"]
 embassy-time-timg0   = ["esp-hal?/embassy-time-timg0"]
+# Loggging:
+# Adding log feature of embedded test to defmt or log makes the testing more verbose
+# log = ["dep:log", "embedded-test/log", "embedded-test/init-log"]
+# defmt = ["dep:defmt", "dep:defmt-rtt", "embedded-test/defmt"]
+log = ["dep:log", "embedded-test/init-log", "esp-hal?/log"]
+# Using defmt crate requires editting `.cargo/config.toml`rustflags.
+defmt = ["dep:defmt", "dep:defmt-rtt", "esp-hal?/defmt"]
 
 # cargo build/run
 [profile.dev]
@@ -98,9 +96,3 @@ incremental      = false
 lto              = 'fat'
 opt-level        = 3     # <-
 overflow-checks  = false # <-
-
-# TODO: remove when able
-[patch.crates-io]
-# FIXME: defmt patch can be removed since embedded-test already takes care of that?
-defmt       = { git = "https://github.com/t-moe/defmt", branch = "features/defmt_test_riscv" }
-panic-probe = { git = "https://github.com/t-moe/defmt", branch = "features/defmt_test_riscv" }

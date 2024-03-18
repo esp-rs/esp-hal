@@ -7,8 +7,10 @@
 #![no_std]
 #![no_main]
 
+#[cfg(feature = "defmt")]
+use defmt_rtt as _;
 use embedded_hal_1::digital::{InputPin as _, OutputPin as _, StatefulOutputPin as _};
-use hil_test::esp_hal::{
+use esp_hal::{
     gpio::{GpioPin, Input, Output, PullDown, PushPull, IO},
     peripherals::Peripherals,
 };
@@ -30,9 +32,11 @@ impl Context {
     }
 }
 
+#[cfg(test)]
 #[embedded_test::tests]
 mod tests {
-    use defmt::{assert_eq, unwrap};
+    #[cfg(feature = "defmt")]
+    use defmt::assert_eq;
 
     use super::*;
 
@@ -53,18 +57,18 @@ mod tests {
         // `StatefulOutputPin`:
         assert_eq!(ctx.io1.is_set_low(), Ok(true));
         assert_eq!(ctx.io1.is_set_high(), Ok(false));
-        unwrap!(ctx.io1.set_high());
+        assert!(ctx.io1.set_high().is_ok());
         assert_eq!(ctx.io1.is_set_low(), Ok(false));
         assert_eq!(ctx.io1.is_set_high(), Ok(true));
 
         // `ToggleableOutputPin`:
-        unwrap!(ctx.io1.toggle());
+        assert!(ctx.io1.toggle().is_ok());
         assert_eq!(ctx.io1.is_set_low(), Ok(true));
         assert_eq!(ctx.io1.is_set_high(), Ok(false));
-        unwrap!(ctx.io1.toggle());
+        assert!(ctx.io1.toggle().is_ok());
         assert_eq!(ctx.io1.is_set_low(), Ok(false));
         assert_eq!(ctx.io1.is_set_high(), Ok(true));
         // Leave in initial state for next test
-        unwrap!(ctx.io1.toggle());
+        assert!(ctx.io1.toggle().is_ok());
     }
 }

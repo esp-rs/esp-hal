@@ -11,7 +11,9 @@
 #![no_std]
 #![no_main]
 
-use hil_test::esp_hal::{
+#[cfg(feature = "defmt")]
+use defmt_rtt as _;
+use esp_hal::{
     clock::ClockControl,
     gpio::IO,
     peripherals::Peripherals,
@@ -46,8 +48,10 @@ impl Context {
     }
 }
 
+#[cfg(test)]
 #[embedded_test::tests]
 mod tests {
+    #[cfg(feature = "defmt")]
     use defmt::assert_eq;
 
     use super::*;
