@@ -79,6 +79,15 @@ impl embedded_io::Error for Error {
     }
 }
 
+pub enum UartLine {
+    Rxd,
+    Cts,
+    Dsr,
+    Txd,
+    Rts,
+    Dtr,
+}
+
 /// UART configuration
 pub mod config {
     /// Number of data bits
@@ -105,11 +114,11 @@ pub mod config {
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     pub enum StopBits {
         /// 1 stop bit
-        STOP1   = 1,
+        STOP1 = 1,
         /// 1.5 stop bits
         STOP1P5 = 2,
         /// 2 stop bits
-        STOP2   = 3,
+        STOP2 = 3,
     }
 
     /// UART configuration
@@ -504,6 +513,18 @@ where
     /// Writes bytes
     pub fn write_bytes(&mut self, data: &[u8]) -> Result<usize, Error> {
         self.tx.write_bytes(data)
+    }
+
+    /// Change interpretation of line polarity for inputs/outputs
+    pub fn set_line_invert(&mut self, line: UartLine, invert: bool) {
+        T::register_block().conf0().write(|w| match line {
+            UartLine::Rxd => w.rxd_inv().bit(invert),
+            UartLine::Txd => w.txd_inv().bit(invert),
+            UartLine::Cts => w.cts_inv().bit(invert),
+            UartLine::Dsr => w.dsr_inv().bit(invert),
+            UartLine::Rts => w.rts_inv().bit(invert),
+            UartLine::Dtr => w.dtr_inv().bit(invert),
+        });
     }
 
     /// Configures the AT-CMD detection settings.
