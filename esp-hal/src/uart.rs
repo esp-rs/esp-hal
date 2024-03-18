@@ -82,13 +82,9 @@ impl embedded_io::Error for Error {
 pub enum UartLine {
     Rxd,
     Txd,
-    #[cfg(not(any(esp32c6, esp32h2)))]
     Cts,
-    #[cfg(not(any(esp32c6, esp32h2)))]
     Dsr,
-    #[cfg(not(any(esp32c6, esp32h2)))]
     Rts,
-    #[cfg(not(any(esp32c6, esp32h2)))]
     Dtr,
 }
 
@@ -118,11 +114,11 @@ pub mod config {
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     pub enum StopBits {
         /// 1 stop bit
-        STOP1 = 1,
+        STOP1   = 1,
         /// 1.5 stop bits
         STOP1P5 = 2,
         /// 2 stop bits
-        STOP2 = 3,
+        STOP2   = 3,
     }
 
     /// UART configuration
@@ -532,7 +528,18 @@ where
             UartLine::Rts => w.rts_inv().bit(invert),
             #[cfg(not(any(esp32c6, esp32h2)))]
             UartLine::Dtr => w.dtr_inv().bit(invert),
+            #[cfg(any(esp32c6, esp32h2))]
+            _ => w,
         });
+        #[cfg(any(esp32c6, esp32h2))]
+        T::register_block().conf1().write(|w| match line {
+            UartLine::Cts => w.cts_inv().bit(invert),
+            UartLine::Dsr => w.dsr_inv().bit(invert),
+            UartLine::Rts => w.rts_inv().bit(invert),
+            UartLine::Dtr => w.dtr_inv().bit(invert),
+            _ => w,
+        });
+        self.sync_regs();
     }
 
     /// Configures the AT-CMD detection settings.
