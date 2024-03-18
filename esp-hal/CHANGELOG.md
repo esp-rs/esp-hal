@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - Remove package-level type exports (#1275)
+- Revert changes related to "CryptoRng" trait (#1309)
 
 ## [0.16.1] - 2024-03-12
 
