@@ -22,9 +22,9 @@ jobs:
       fail-fast: false
       matrix:
         target:
-          # - soc: esp32c3
-          #   runner: rustboard
-          #   rust-target: riscv32imc-unknown-none-elf
+          - soc: esp32c3
+            runner: rustboard
+            rust-target: riscv32imc-unknown-none-elf
           - soc: esp32c6
             runner: esp32c6-usb
             rust-target: riscv32imac-unknown-none-elf
