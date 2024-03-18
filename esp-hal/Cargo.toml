@@ -131,8 +131,6 @@ esp32s2 = ["dep:esp32s2", "xtensa", "portable-atomic/critical-section", "procmac
 esp32s3 = ["dep:esp32s3", "xtensa", "procmacros/has-ulp-core", "xtensa-lx/spin", "xtensa-lx-rt?/esp32s3", "usb-otg"]
 
 #! ### RISC-V Exclusive Feature Flags
-## Enable direct interrupt vectoring.
-direct-vectoring = ["esp-riscv-rt/direct-vectoring"]
 ## Move the stack to start of RAM to get zero-cost stack overflow protection
 ## (ESP32-C6 and ESPS32-H2 only!).
 flip-link = ["esp-riscv-rt/fix-sp"]

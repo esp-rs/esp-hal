@@ -185,7 +185,6 @@ mod vectored {
     ///
     /// Note that interrupts still need to be enabled globally for interrupts
     /// to be serviced.
-    #[cfg(not(feature = "direct-vectoring"))]
     pub fn enable(interrupt: Interrupt, level: Priority) -> Result<(), Error> {
         if matches!(level, Priority::None) {
             return Err(Error::InvalidInterruptPriority);
@@ -214,8 +213,8 @@ mod vectored {
     ///
     /// Note that interrupts still need to be enabled globally for interrupts
     /// to be serviced.
-    #[cfg(feature = "direct-vectoring")]
-    pub unsafe fn enable(
+    // TODO document used interrupts
+    pub unsafe fn enable_direct(
         interrupt: Interrupt,
         level: Priority,
         cpu_interrupt: CpuInterrupt,
@@ -275,119 +274,119 @@ mod vectored {
 
     #[no_mangle]
     #[ram]
-    pub unsafe fn interrupt1(context: &mut TrapFrame) {
+    pub unsafe fn cpu_int_1_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt1, context)
     }
 
     #[no_mangle]
     #[ram]
-    pub unsafe fn interrupt2(context: &mut TrapFrame) {
+    pub unsafe fn cpu_int_2_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt2, context)
     }
 
     #[no_mangle]
     #[ram]
-    pub unsafe fn interrupt3(context: &mut TrapFrame) {
+    pub unsafe fn cpu_int_3_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt3, context)
     }
 
     #[no_mangle]
     #[ram]
-    pub unsafe fn interrupt4(context: &mut TrapFrame) {
+    pub unsafe fn cpu_int_4_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt4, context)
     }
 
     #[no_mangle]
     #[ram]
-    pub unsafe fn interrupt5(context: &mut TrapFrame) {
+    pub unsafe fn cpu_int_5_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt5, context)
     }
 
     #[no_mangle]
     #[ram]
-    pub unsafe fn interrupt6(context: &mut TrapFrame) {
+    pub unsafe fn cpu_int_6_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt6, context)
     }
 
     #[no_mangle]
     #[ram]
-    pub unsafe fn interrupt7(context: &mut TrapFrame) {
+    pub unsafe fn cpu_int_7_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt7, context)
     }
 
     #[no_mangle]
     #[ram]
-    pub unsafe fn interrupt8(context: &mut TrapFrame) {
+    pub unsafe fn cpu_int_8_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt8, context)
     }
 
     #[no_mangle]
     #[ram]
-    pub unsafe fn interrupt9(context: &mut TrapFrame) {
+    pub unsafe fn cpu_int_9_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt9, context)
     }
 
     #[no_mangle]
     #[ram]
-    pub unsafe fn interrupt10(context: &mut TrapFrame) {
+    pub unsafe fn cpu_int_10_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt10, context)
     }
 
     #[no_mangle]
     #[ram]
-    pub unsafe fn interrupt11(context: &mut TrapFrame) {
+    pub unsafe fn cpu_int_11_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt11, context)
     }
 
     #[no_mangle]
     #[ram]
-    pub unsafe fn interrupt12(context: &mut TrapFrame) {
+    pub unsafe fn cpu_int_12_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt12, context)
     }
 
     #[no_mangle]
     #[ram]
-    pub unsafe fn interrupt13(context: &mut TrapFrame) {
+    pub unsafe fn cpu_int_13_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt13, context)
     }
 
     #[no_mangle]
     #[ram]
-    pub unsafe fn interrupt14(context: &mut TrapFrame) {
+    pub unsafe fn cpu_int_14_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt14, context)
     }
 
     #[no_mangle]
     #[ram]
-    pub unsafe fn interrupt15(context: &mut TrapFrame) {
+    pub unsafe fn cpu_int_15_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt15, context)
     }
 
     #[cfg(plic)]
     #[no_mangle]
     #[ram]
-    pub unsafe fn interrupt16(context: &mut TrapFrame) {
+    pub unsafe fn cpu_int_16_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt16, context)
     }
 
     #[cfg(plic)]
     #[no_mangle]
     #[ram]
-    pub unsafe fn interrupt17(context: &mut TrapFrame) {
+    pub unsafe fn cpu_int_17_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt17, context)
     }
 
     #[cfg(plic)]
     #[no_mangle]
     #[ram]
-    pub unsafe fn interrupt18(context: &mut TrapFrame) {
+    pub unsafe fn cpu_int_18_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt18, context)
     }
 
     #[cfg(plic)]
     #[no_mangle]
     #[ram]
-    pub unsafe fn interrupt19(context: &mut TrapFrame) {
+    pub unsafe fn cpu_int_19_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt19, context)
     }
 }
@@ -399,125 +398,14 @@ mod vectored {
 #[link_section = ".trap.rust"]
 #[export_name = "_start_trap_rust_hal"]
 pub unsafe extern "C" fn start_trap_rust_hal(trap_frame: *mut TrapFrame) {
-    // User code shouldn't usually take the mutable TrapFrame or the TrapFrame in
-    // general. However this makes things like preemtive multitasking easier in
-    // future
+    assert!(
+        mcause::read().is_exception(),
+        "Arrived into _start_trap_rust_hal but mcause is not an exception!"
+    );
     extern "C" {
-        fn interrupt1(frame: &mut TrapFrame);
-        fn interrupt2(frame: &mut TrapFrame);
-        fn interrupt3(frame: &mut TrapFrame);
-        fn interrupt4(frame: &mut TrapFrame);
-        fn interrupt5(frame: &mut TrapFrame);
-        fn interrupt6(frame: &mut TrapFrame);
-        fn interrupt7(frame: &mut TrapFrame);
-        fn interrupt8(frame: &mut TrapFrame);
-        fn interrupt9(frame: &mut TrapFrame);
-        fn interrupt10(frame: &mut TrapFrame);
-        fn interrupt11(frame: &mut TrapFrame);
-        fn interrupt12(frame: &mut TrapFrame);
-        fn interrupt13(frame: &mut TrapFrame);
-        fn interrupt14(frame: &mut TrapFrame);
-        fn interrupt15(frame: &mut TrapFrame);
-        fn interrupt16(frame: &mut TrapFrame);
-        fn interrupt17(frame: &mut TrapFrame);
-        fn interrupt18(frame: &mut TrapFrame);
-        fn interrupt19(frame: &mut TrapFrame);
-        fn interrupt20(frame: &mut TrapFrame);
-        fn interrupt21(frame: &mut TrapFrame);
-        fn interrupt22(frame: &mut TrapFrame);
-        fn interrupt23(frame: &mut TrapFrame);
-        fn interrupt24(frame: &mut TrapFrame);
-        fn interrupt25(frame: &mut TrapFrame);
-        fn interrupt26(frame: &mut TrapFrame);
-        fn interrupt27(frame: &mut TrapFrame);
-        fn interrupt28(frame: &mut TrapFrame);
-        fn interrupt29(frame: &mut TrapFrame);
-        fn interrupt30(frame: &mut TrapFrame);
-        fn interrupt31(frame: &mut TrapFrame);
-
-        // Defined in `esp-riscv-rt`
-        pub fn DefaultHandler();
+        fn ExceptionHandler(tf: *mut TrapFrame);
     }
-
-    let cause = mcause::read();
-    if cause.is_exception() {
-        extern "C" {
-            fn ExceptionHandler(tf: *mut TrapFrame);
-        }
-        ExceptionHandler(trap_frame);
-    } else {
-        #[cfg(feature = "interrupt-preemption")]
-        let interrupt_priority = _handle_priority();
-
-        let code = mcause::read().code();
-
-        // with CLIC the MCAUSE register changed
-        // 31:      Interrupt flag (same as before)
-        //
-        // 30:      MINHV: Used to indicate whether the processor is fetching the vector
-        // interrupt entry address. This bit will be set high when the processor
-        // responds to the vector interrupt. Cleared to 0 after successfully obtaining
-        // the vector interrupt service routine entry address
-        //
-        // 29-28:   MPP: This bit is the mirror image of MSTATUS.MPP[1:0], that is,
-        // reading and writing MCAUSE.MPP will produce the same result as
-        // reading and writing MSTATUS.MPP.
-        //
-        // 27:      MPIE: This bit mirrors MSTATUS.MPIE
-        //
-        // 23-16:   MPIL: This bit saves the interrupt priority level before the
-        // processor enters the interrupt service routine, that is, the MINTSTATUS.MIL
-        // bit is copied to this bit. When executing the MRET instruction and returning
-        // from an interrupt, the processor copies the MPIL bit to the MIL bit in the
-        // MINTSTATUS register.
-        //
-        // 11-0:    Exception code: When the processor is configured in CLIC mode, this
-        // bit field is expanded to 12 bits, supporting up to 4096 interrupt ID number
-        // records.
-        //
-        // So we need to mask out bits other than > 12. We currently only support
-        // external interrupts so we subtract EXTERNAL_INTERRUPT_OFFSET
-        #[cfg(clic)]
-        let code = (code & 0b1111_1111_1111) - EXTERNAL_INTERRUPT_OFFSET as usize;
-
-        match code {
-            1 => interrupt1(trap_frame.as_mut().unwrap()),
-            2 => interrupt2(trap_frame.as_mut().unwrap()),
-            3 => interrupt3(trap_frame.as_mut().unwrap()),
-            4 => interrupt4(trap_frame.as_mut().unwrap()),
-            5 => interrupt5(trap_frame.as_mut().unwrap()),
-            6 => interrupt6(trap_frame.as_mut().unwrap()),
-            7 => interrupt7(trap_frame.as_mut().unwrap()),
-            8 => interrupt8(trap_frame.as_mut().unwrap()),
-            9 => interrupt9(trap_frame.as_mut().unwrap()),
-            10 => interrupt10(trap_frame.as_mut().unwrap()),
-            11 => interrupt11(trap_frame.as_mut().unwrap()),
-            12 => interrupt12(trap_frame.as_mut().unwrap()),
-            13 => interrupt13(trap_frame.as_mut().unwrap()),
-            14 => interrupt14(trap_frame.as_mut().unwrap()),
-            15 => interrupt15(trap_frame.as_mut().unwrap()),
-            16 => interrupt16(trap_frame.as_mut().unwrap()),
-            17 => interrupt17(trap_frame.as_mut().unwrap()),
-            18 => interrupt18(trap_frame.as_mut().unwrap()),
-            19 => interrupt19(trap_frame.as_mut().unwrap()),
-            20 => interrupt20(trap_frame.as_mut().unwrap()),
-            21 => interrupt21(trap_frame.as_mut().unwrap()),
-            22 => interrupt22(trap_frame.as_mut().unwrap()),
-            23 => interrupt23(trap_frame.as_mut().unwrap()),
-            24 => interrupt24(trap_frame.as_mut().unwrap()),
-            25 => interrupt25(trap_frame.as_mut().unwrap()),
-            26 => interrupt26(trap_frame.as_mut().unwrap()),
-            27 => interrupt27(trap_frame.as_mut().unwrap()),
-            28 => interrupt28(trap_frame.as_mut().unwrap()),
-            29 => interrupt29(trap_frame.as_mut().unwrap()),
-            30 => interrupt30(trap_frame.as_mut().unwrap()),
-            31 => interrupt31(trap_frame.as_mut().unwrap()),
-            _ => DefaultHandler(),
-        };
-
-        #[cfg(feature = "interrupt-preemption")]
-        _restore_priority(interrupt_priority);
-    }
+    ExceptionHandler(trap_frame);
 }
 
 #[doc(hidden)]
@@ -749,7 +637,7 @@ mod classic {
             .read_volatile();
         core::mem::transmute(prio as u8)
     }
-    #[cfg(any(feature = "interrupt-preemption", feature = "direct-vectoring"))]
+    #[cfg(feature = "interrupt-preemption")]
     #[no_mangle]
     #[link_section = ".trap"]
     pub(super) unsafe extern "C" fn _handle_priority() -> u32 {
@@ -773,7 +661,7 @@ mod classic {
         }
         prev_interrupt_priority
     }
-    #[cfg(any(feature = "interrupt-preemption", feature = "direct-vectoring"))]
+    #[cfg(feature = "interrupt-preemption")]
     #[no_mangle]
     #[link_section = ".trap"]
     pub(super) unsafe extern "C" fn _restore_priority(stored_prio: u32) {
@@ -807,7 +695,7 @@ mod plic {
     const PLIC_MXINT_TYPE_REG: u32 = DR_REG_PLIC_MX_BASE + 0x4;
     const PLIC_MXINT_CLEAR_REG: u32 = DR_REG_PLIC_MX_BASE + 0x8;
     const PLIC_MXINT0_PRI_REG: u32 = DR_REG_PLIC_MX_BASE + 0x10;
-    #[cfg(any(feature = "interrupt-preemption", feature = "direct-vectoring"))]
+    #[cfg(feature = "interrupt-preemption")]
     const PLIC_MXINT_THRESH_REG: u32 = DR_REG_PLIC_MX_BASE + 0x90;
     /// Enable a CPU interrupt
     pub unsafe fn enable_cpu_interrupt(which: CpuInterrupt) {
@@ -883,7 +771,7 @@ mod plic {
             .read_volatile();
         core::mem::transmute(prio as u8)
     }
-    #[cfg(any(feature = "interrupt-preemption", feature = "direct-vectoring"))]
+    #[cfg(feature = "interrupt-preemption")]
     #[no_mangle]
     #[link_section = ".trap"]
     pub(super) unsafe extern "C" fn _handle_priority() -> u32 {
@@ -904,7 +792,7 @@ mod plic {
         }
         prev_interrupt_priority
     }
-    #[cfg(any(feature = "interrupt-preemption", feature = "direct-vectoring"))]
+    #[cfg(feature = "interrupt-preemption")]
     #[no_mangle]
     #[link_section = ".trap"]
     pub(super) unsafe extern "C" fn _restore_priority(stored_prio: u32) {

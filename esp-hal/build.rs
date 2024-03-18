@@ -113,12 +113,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         panic!("The target does not support PSRAM");
     }
 
-    // Don't support "interrupt-preemption" and "direct-vectoring" on Xtensa and
+    // Don't support "interrupt-preemption" on Xtensa and
     // RISC-V with CLIC:
     if (config.contains(&String::from("clic")) || config.arch() == Arch::Xtensa)
-        && (cfg!(feature = "direct-vectoring") || cfg!(feature = "interrupt-preemption"))
+        && cfg!(feature = "interrupt-preemption")
     {
-        panic!("The target does not support interrupt-preemption and direct-vectoring");
+        panic!("The target does not support interrupt-preemption");
     }
 
     // Define all necessary configuration symbols for the configured device:

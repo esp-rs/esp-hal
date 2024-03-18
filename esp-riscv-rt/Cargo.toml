@@ -36,14 +36,11 @@ zero-bss = []
 zero-rtc-fast-bss = []
 
 #! ### Interrupt Feature Flags
-## Enable direct interrupt vectoring.
-direct-vectoring = []
 ## Enable interrupt preemption.
 interrupt-preemption = []
 
 # This feature is intended for testing; you probably don't want to enable it:
 ci = [
-    "direct-vectoring",
     "fix-sp",
     "has-mie-mip",
     "init-data",
