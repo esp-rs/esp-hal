@@ -23,7 +23,20 @@ impl Context<'_> {
     }
 }
 
+#[cfg(not(any(esp32c3, esp32c6, esp32h2)))]
+mod not_test {
+    #[esp_hal::entry]
+    fn main() -> ! {
+        semihosting::process::exit(0)
+    }
+    #[panic_handler]
+    fn panic(_info: &core::panic::PanicInfo) -> ! {
+        loop {}
+    }
+}
+
 #[cfg(test)]
+#[cfg(any(esp32c3, esp32c6, esp32h2))]
 #[embedded_test::tests]
 mod tests {
     #[cfg(feature = "defmt")]

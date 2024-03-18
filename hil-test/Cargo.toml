@@ -29,6 +29,7 @@ embedded-hal       = { version = "0.2.7", features = ["unproven"] }
 embedded-hal-async = { version = "1.0.0", optional = true }
 embedded-hal-1     = { version = "1.0.0", package = "embedded-hal" }
 embassy-executor = { default-features = false, version = "0.5.0", features = ["executor-thread", "arch-riscv32"], optional = true }
+semihosting = "0.1.6"
 
 [dev-dependencies]
 embedded-test = {git = "https://github.com/probe-rs/embedded-test/", branch = "next"}
