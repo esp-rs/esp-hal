@@ -7,8 +7,10 @@
 #![no_std]
 #![no_main]
 
+#[cfg(feature = "defmt")]
+use defmt_rtt as _;
 use embedded_hal_1::digital::{InputPin as _, OutputPin as _, StatefulOutputPin as _};
-use hil_test::esp_hal::{
+use esp_hal::{
     gpio::{GpioPin, Input, Output, PullDown, PushPull, IO},
     peripherals::Peripherals,
 };
@@ -30,9 +32,11 @@ impl Context {
     }
 }
 
+#[cfg(test)]
 #[embedded_test::tests]
 mod tests {
-    // use defmt::{assert_eq, unwrap};
+    #[cfg(feature = "defmt")]
+    use defmt::assert_eq;
 
     use super::*;
 

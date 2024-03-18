@@ -1,15 +1,17 @@
 //! UART Test
 //!
 //! Folowing pins are used:
-//! TX    GPIP9
-//! RX    GPIO10
+//! TX    GPIP2
+//! RX    GPIO4
 //!
-//! Connect TX (GPI10) and RX (GPIO9) pins.
+//! Connect TX (GPIO2) and RX (GPIO4) pins.
 
 #![no_std]
 #![no_main]
 
-use hil_test::esp_hal::{
+#[cfg(feature = "defmt")]
+use defmt_rtt as _;
+use esp_hal::{
     clock::ClockControl,
     peripherals::{Peripherals, UART0},
     prelude::*,
@@ -32,8 +34,8 @@ impl Context {
         let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
         let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
         let pins = TxRxPins::new_tx_rx(
-            io.pins.gpio10.into_push_pull_output(),
-            io.pins.gpio9.into_floating_input(),
+            io.pins.gpio2.into_push_pull_output(),
+            io.pins.gpio4.into_floating_input(),
         );
         let config = Config {
             baudrate: 115200,
@@ -48,8 +50,10 @@ impl Context {
     }
 }
 
+#[cfg(test)]
 #[embedded_test::tests]
 mod tests {
+    #[cfg(feature = "defmt")]
     use defmt::assert_eq;
 
     use super::*;

@@ -2,16 +2,18 @@
 //!
 //! Folowing pins are used:
 //! SCLK    GPIO0
-//! MISO    GPIO9
-//! MOSI    GPIO10
+//! MISO    GPIO2
+//! MOSI    GPIO4
 //! CS      GPIO5
 //!
-//! Connect MISO (GPIO9) and MOSI (GPIO10) pins.
+//! Connect MISO (GPIO2) and MOSI (GPIO4) pins.
 
 #![no_std]
 #![no_main]
 
-use hil_test::esp_hal::{
+#[cfg(feature = "defmt")]
+use defmt_rtt as _;
+use esp_hal::{
     clock::ClockControl,
     gpio::IO,
     peripherals::Peripherals,
@@ -31,8 +33,8 @@ impl Context {
 
         let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
         let sclk = io.pins.gpio0;
-        let miso = io.pins.gpio9;
-        let mosi = io.pins.gpio10;
+        let miso = io.pins.gpio2;
+        let mosi = io.pins.gpio4;
         let cs = io.pins.gpio5;
 
         let spi = Spi::new(peripherals.SPI2, 1000u32.kHz(), SpiMode::Mode0, &clocks).with_pins(
@@ -46,8 +48,10 @@ impl Context {
     }
 }
 
+#[cfg(test)]
 #[embedded_test::tests]
 mod tests {
+    #[cfg(feature = "defmt")]
     use defmt::assert_eq;
 
     use super::*;

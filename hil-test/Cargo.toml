@@ -4,10 +4,6 @@ version = "0.0.0"
 edition = "2021"
 publish = false
 
-[lib]
-harness = false
-test = false
-
 [[test]]
 name    = "aes"
 harness = false
@@ -28,8 +24,7 @@ harness = false
 defmt = { version = "0.3.5", optional = true }
 defmt-rtt = { version = "0.4.0", optional = true }
 log = { version = "0.4.20", optional = true }
-# esp-println = { version="0.9.1", features = ["log", "uart", "esp32c2", "colors"], default-features = false, optional = true}
-esp-hal = { path = "../esp-hal", features = ["defmt", "eh1"], optional = true }
+esp-hal = { path = "../esp-hal", features = ["eh1"], optional = true }
 embedded-hal       = { version = "0.2.7", features = ["unproven"] }
 embedded-hal-async = { version = "1.0.0", optional = true }
 embedded-hal-1     = { version = "1.0.0", package = "embedded-hal" }
@@ -60,8 +55,9 @@ embassy-time-timg0   = ["esp-hal?/embassy-time-timg0"]
 # Adding log feature of embedded test to defmt or log makes the testing more verbose
 # log = ["dep:log", "embedded-test/log", "embedded-test/init-log"]
 # defmt = ["dep:defmt", "dep:defmt-rtt", "embedded-test/defmt"]
-log = ["dep:log", "embedded-test/init-log"]
-defmt = ["dep:defmt", "dep:defmt-rtt"]
+log = ["dep:log", "embedded-test/init-log", "esp-hal?/log"]
+# Using defmt crate requires editting `.cargo/config.toml`rustflags.
+defmt = ["dep:defmt", "dep:defmt-rtt", "esp-hal?/defmt"]
 
 # cargo build/run
 [profile.dev]
