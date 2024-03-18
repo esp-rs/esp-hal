@@ -12,7 +12,6 @@ pub mod efuse;
 pub mod gpio;
 pub mod peripherals;
 pub mod radio_clocks;
-pub mod trng;
 
 #[allow(unused)]
 pub(crate) mod registers {

@@ -19,7 +19,6 @@ pub mod peripherals;
 #[cfg(psram)]
 pub mod psram;
 pub mod radio_clocks;
-pub mod trng;
 pub mod ulp_core;
 
 pub(crate) mod constants {
