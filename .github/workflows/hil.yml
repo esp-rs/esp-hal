@@ -11,53 +11,26 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  # TODO: Shall we use a matrix?
-
-  # Test RISC-V targets:
-
-  # test-esp32c2:
-  #   name:HIL Test | ESP32-C2
-  #   runs-on:
-  #     labels: [self-hosted, esp32c2]
-
-  #   steps:
-  #     - name: Run tests on-device
-  #       env:
-  #         PROBE_RS_CHIP: esp32c2
-  #       run: |
-  #         # ...
-
-  # test-esp32c3:
-  #   name: HIL Test | ESP32-C3
-  #   runs-on:
-  #     labels: [self-hosted, rustboard]
-  #   env:
-  #     PROBE_RS_CHIP: esp32c3
-  #     CARGO_BUILD_TARGET: riscv32imc-unknown-none-elf
-
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #       with:
-  #         ref: 'feat/hil-testing'
-
-  #     - uses: dtolnay/rust-toolchain@v1
-  #       with:
-  #         target: ${{ env.CARGO_BUILD_TARGET }}
-  #         toolchain: nightly
-
-  #     - name: Run tests
-  #       run: |
-  #         cd hil-test/
-  #         cargo test --release --features=${{ env.PROBE_RS_CHIP }}
-
-  test-esp32c6:
-    name: HIL Test | ESP32-C6
+  riscv-hil:
+    name: HIL Test | ${{ matrix.target.soc }}
     runs-on:
-      labels: [self-hosted, esp32c6-usb]
+      labels: [self-hosted, "${{ matrix.target.runner }}"]
     env:
-      PROBE_RS_CHIP: esp32c6
-      CARGO_BUILD_TARGET: riscv32imac-unknown-none-elf
-
+      PROBE_RS_CHIP: ${{ matrix.target.soc }}
+      CARGO_BUILD_TARGET: ${{ matrix.target.rust-target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          # - soc: esp32c3
+          #   runner: rustboard
+          #   rust-target: riscv32imc-unknown-none-elf
+          - soc: esp32c6
+            runner: esp32c6-usb
+            rust-target: riscv32imac-unknown-none-elf
+          - soc: esp32h2
+            runner: esp32h2-usb
+            rust-target: riscv32imac-unknown-none-elf
     steps:
       - uses: actions/checkout@v4
         with:
@@ -71,30 +44,7 @@ jobs:
       - name: Run tests
         run: |
           cd hil-test/
-          cargo test --release --features=${{ env.PROBE_RS_CHIP }}
-
-  test-esp32h2:
-    name: HIL Test | ESP32-H2
-    runs-on:
-      labels: [self-hosted, esp32h2-usb]
-    env:
-      PROBE_RS_CHIP: esp32h2
-      CARGO_BUILD_TARGET: riscv32imac-unknown-none-elf
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: 'feat/hil-testing'
-
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          target: ${{ env.CARGO_BUILD_TARGET }}
-          toolchain: nightly
-
-      - name: Run tests
-        run: |
-          cd hil-test/
-          cargo test --release --features=${{ env.PROBE_RS_CHIP }}
+          cargo test --release --features=${{ matrix.target.soc }}
 
   # Test Xtensa targets:
   # TODO: Add jobs for Xtensa once supported by `probe-rs`
