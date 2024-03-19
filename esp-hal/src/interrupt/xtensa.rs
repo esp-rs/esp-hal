@@ -9,6 +9,14 @@ use crate::{
     Cpu,
 };
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum Error {
+    InvalidInterrupt,
+    #[cfg(feature = "vectored")]
+    CpuInterruptReserved,
+}
+
 /// Enumeration of available CPU interrupts
 ///
 /// It's possible to create one handler per priority level. (e.g
@@ -52,16 +60,41 @@ pub enum CpuInterrupt {
     Interrupt31EdgePriority5,
 }
 
+pub const RESERVED_INTERRUPTS: &[usize] = &[
+    CpuInterrupt::Interrupt1LevelPriority1 as _,
+    CpuInterrupt::Interrupt19LevelPriority2 as _,
+    CpuInterrupt::Interrupt23LevelPriority3 as _,
+    CpuInterrupt::Interrupt10EdgePriority1 as _,
+    CpuInterrupt::Interrupt22EdgePriority3 as _,
+];
+
+/// Enable an interrupt by directly binding it to a available CPU interrupt
+///
+/// Unless you are sure, you most likely want to use [`enable`] with the
+/// `vectored` feature enabled instead.
+///
+/// When the `vectored` feature is enabled, trying using a reserved interrupt
+/// from [`RESERVED_INTERRUPTS`] will return an error.
+pub fn enable_direct(interrupt: Interrupt, cpu_interrupt: CpuInterrupt) -> Result<(), Error> {
+    #[cfg(feature = "vectored")]
+    if RESERVED_INTERRUPTS.contains(&(cpu_interrupt as _)) {
+        return Err(Error::CpuInterruptReserved);
+    }
+    unsafe {
+        map(get_core(), interrupt, cpu_interrupt);
+
+        xtensa_lx::interrupt::enable_mask(
+            xtensa_lx::interrupt::get_mask() | 1 << cpu_interrupt as u32,
+        );
+    }
+    Ok(())
+}
+
 /// Assign a peripheral interrupt to an CPU interrupt
 ///
 /// Great care **must** be taken when using this function with interrupt
-/// vectoring (enabled by default). Avoid the following CPU interrupts:
-/// - Interrupt1LevelPriority1
-/// - Interrupt19LevelPriority2
-/// - Interrupt23LevelPriority3
-/// - Interrupt10EdgePriority1
-/// - Interrupt22EdgePriority3
-/// As they are preallocated for interrupt vectoring.
+/// vectoring (enabled by default). Avoid the interrupts listed in
+/// [`RESERVED_INTERRUPTS`] as they are preallocated for interrupt vectoring.
 ///
 /// Note: this only maps the interrupt to the CPU interrupt. The CPU interrupt
 /// still needs to be enabled afterwards
@@ -195,12 +228,6 @@ mod vectored {
 
     use super::*;
     use crate::get_core;
-
-    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-    pub enum Error {
-        InvalidInterrupt,
-    }
 
     /// Interrupt priority levels.
     #[derive(Copy, Clone, Debug, PartialEq, Eq)]

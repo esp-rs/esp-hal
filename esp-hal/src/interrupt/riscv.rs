@@ -192,6 +192,9 @@ pub fn _setup_interrupts() {
 
 /// Enable an interrupt by directly binding it to a available CPU interrupt
 ///
+/// Unless you are sure, you most likely want to use [`enable`] with the
+/// `vectored` feature enabled instead.
+///
 /// When the `vectored` feature is enabled, trying using a reserved interrupt
 /// from [`RESERVED_INTERRUPTS`] will return an error.
 pub fn enable_direct(
