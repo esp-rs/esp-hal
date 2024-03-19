@@ -477,6 +477,34 @@ _abs_start:
 "#,
 r#"
 _start_trap: // Handle exceptions in vectored mode
+"#,
+#[cfg(feature="fix-sp")]
+r#"
+    // move SP to some save place if it's pointing below the RAM
+    // otherwise we won't be able to do anything reasonable
+    // (since we don't have a working stack)
+    //
+    // most probably we will just print something and halt in this case
+    // we actually can't do anything else
+    csrw mscratch, t0
+    la t0, _stack_end
+    bge sp, t0, 1f
+
+    // use the reserved exception cause 14 to signal we detected a stack overflow
+    li t0, 14
+    csrw mcause, t0
+
+    // set SP to the start of the stack
+    la sp, _stack_start
+    li t0, 4 // make sure stack start is in RAM
+    sub sp, sp, t0
+    andi sp, sp, -16 // Force 16-byte alignment
+
+    1:
+    csrr t0, mscratch
+    // now SP is in RAM - continue
+"#,
+r#"
     addi sp, sp, -40*4
     sw ra, 0(sp)
     la ra, _start_trap_rust_hal /* Load the HAL trap handler */
@@ -638,32 +666,6 @@ _start_trap31:
     j _start_trap_direct
 la ra, _start_trap_rust_hal /* this runs on exception, use regular fault handler */
 _start_trap_direct:
-"#,
-#[cfg(feature="fix-sp")]
-r#"
-    // move SP to some save place if it's pointing below the RAM
-    // otherwise we won't be able to do anything reasonable
-    // (since we don't have a working stack)
-    //
-    // most probably we will just print something and halt in this case
-    // we actually can't do anything else
-    csrw mscratch, t0
-    la t0, _stack_end
-    bge sp, t0, 1f
-
-    // use the reserved exception cause 14 to signal we detected a stack overflow
-    li t0, 14
-    csrw mcause, t0
-
-    // set SP to the start of the stack
-    la sp, _stack_start
-    li t0, 4 // make sure stack start is in RAM
-    sub sp, sp, t0
-    andi sp, sp, -16 // Force 16-byte alignment
-
-    1:
-    csrr t0, mscratch
-    // now SP is in RAM - continue
 "#,
 r#"
     sw t0, 1*4(sp)

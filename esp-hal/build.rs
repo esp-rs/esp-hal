@@ -119,7 +119,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     #[allow(unused_mut)]
     let mut config_symbols = config.all();
     #[cfg(feature = "flip-link")]
-    config_symbols.push("flip-link");
+    config_symbols.push("flip-link".to_owned());
 
     // Place all linker scripts in `OUT_DIR`, and instruct Cargo how to find these
     // files:
