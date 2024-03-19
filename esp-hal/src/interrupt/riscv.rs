@@ -29,6 +29,15 @@ use crate::{
     Cpu,
 };
 
+/// Interrupt Error
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum Error {
+    InvalidInterruptPriority,
+    #[cfg(feature = "vectored")]
+    CpuInterruptReserved,
+}
+
 /// Interrupt kind
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum InterruptKind {
@@ -128,6 +137,191 @@ impl Priority {
 pub use vectored::*;
 
 #[cfg(feature = "vectored")]
+pub const RESERVED_INTERRUPTS: &[usize] = INTERRUPT_TO_PRIORITY;
+
+/// # Safety
+///
+/// This function is called from an assembly trap handler.
+#[doc(hidden)]
+#[link_section = ".trap.rust"]
+#[export_name = "_start_trap_rust_hal"]
+pub unsafe extern "C" fn start_trap_rust_hal(trap_frame: *mut TrapFrame) {
+    assert!(
+        mcause::read().is_exception(),
+        "Arrived into _start_trap_rust_hal but mcause is not an exception!"
+    );
+    extern "C" {
+        fn ExceptionHandler(tf: *mut TrapFrame);
+    }
+    ExceptionHandler(trap_frame);
+}
+
+#[doc(hidden)]
+#[no_mangle]
+pub fn _setup_interrupts() {
+    extern "C" {
+        static _vector_table: *const u32;
+    }
+
+    unsafe {
+        // disable all known interrupts
+        // at least after the 2nd stage bootloader there are some interrupts enabled
+        // (e.g. UART)
+        for peripheral_interrupt in 0..255 {
+            crate::soc::peripherals::Interrupt::try_from(peripheral_interrupt)
+                .map(|intr| {
+                    #[cfg(multi_core)]
+                    disable(Cpu::AppCpu, intr);
+                    disable(Cpu::ProCpu, intr);
+                })
+                .ok();
+        }
+
+        let vec_table = &_vector_table as *const _ as usize;
+        mtvec::write(vec_table, mtvec::TrapMode::Vectored);
+
+        #[cfg(feature = "vectored")]
+        crate::interrupt::init_vectoring();
+    };
+
+    #[cfg(plic)]
+    unsafe {
+        core::arch::asm!("csrw mie, {0}", in(reg) u32::MAX);
+    }
+}
+
+/// Enable an interrupt by directly binding it to a available CPU interrupt
+///
+/// When the `vectored` feature is enabled, trying using a reserved interrupt
+/// from [`RESERVED_INTERRUPTS`] will return an error.
+pub fn enable_direct(
+    interrupt: Interrupt,
+    level: Priority,
+    cpu_interrupt: CpuInterrupt,
+) -> Result<(), Error> {
+    #[cfg(feature = "vectored")]
+    if RESERVED_INTERRUPTS.contains(&(cpu_interrupt as _)) {
+        return Err(Error::CpuInterruptReserved);
+    }
+    if matches!(level, Priority::None) {
+        return Err(Error::InvalidInterruptPriority);
+    }
+    unsafe {
+        map(crate::get_core(), interrupt, cpu_interrupt);
+        set_priority(crate::get_core(), cpu_interrupt, level);
+        enable_cpu_interrupt(cpu_interrupt);
+    }
+    Ok(())
+}
+
+/// Disable the given peripheral interrupt.
+pub fn disable(_core: Cpu, interrupt: Interrupt) {
+    unsafe {
+        let interrupt_number = interrupt as isize;
+        let intr_map_base = crate::soc::registers::INTERRUPT_MAP_BASE as *mut u32;
+
+        // set to 0 to disable the peripheral interrupt on chips with an interrupt
+        // controller other than PLIC use the disabled interrupt 31 otherwise
+        intr_map_base
+            .offset(interrupt_number)
+            .write_volatile(DISABLED_CPU_INTERRUPT);
+    }
+}
+
+/// Get status of peripheral interrupts
+#[inline]
+pub fn get_status(_core: Cpu) -> u128 {
+    #[cfg(large_intr_status)]
+    unsafe {
+        ((*crate::peripherals::INTERRUPT_CORE0::PTR)
+            .intr_status_reg_0()
+            .read()
+            .bits() as u128)
+            | ((*crate::peripherals::INTERRUPT_CORE0::PTR)
+                .intr_status_reg_1()
+                .read()
+                .bits() as u128)
+                << 32
+            | ((*crate::peripherals::INTERRUPT_CORE0::PTR)
+                .int_status_reg_2()
+                .read()
+                .bits() as u128)
+                << 64
+    }
+
+    #[cfg(very_large_intr_status)]
+    unsafe {
+        ((*crate::peripherals::INTERRUPT_CORE0::PTR)
+            .intr_status_reg_0()
+            .read()
+            .bits() as u128)
+            | ((*crate::peripherals::INTERRUPT_CORE0::PTR)
+                .intr_status_reg_1()
+                .read()
+                .bits() as u128)
+                << 32
+            | ((*crate::peripherals::INTERRUPT_CORE0::PTR)
+                .intr_status_reg_2()
+                .read()
+                .bits() as u128)
+                << 64
+            | ((*crate::peripherals::INTERRUPT_CORE0::PTR)
+                .intr_status_reg_3()
+                .read()
+                .bits() as u128)
+                << 96
+    }
+
+    #[cfg(not(any(large_intr_status, very_large_intr_status)))]
+    unsafe {
+        ((*crate::peripherals::INTERRUPT_CORE0::PTR)
+            .intr_status_reg_0()
+            .read()
+            .bits() as u128)
+            | ((*crate::peripherals::INTERRUPT_CORE0::PTR)
+                .intr_status_reg_1()
+                .read()
+                .bits() as u128)
+                << 32
+    }
+}
+
+/// Assign a peripheral interrupt to an CPU interrupt.
+///
+/// Great care must be taken when using the `vectored` feature,
+/// do not use CPU interrupts in the [`RESERVED_INTERRUPTS`] when
+/// the `vectored` feature is enabled.
+pub unsafe fn map(_core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
+    let interrupt_number = interrupt as isize;
+    let cpu_interrupt_number = which as isize;
+    #[cfg(not(multi_core))]
+    let intr_map_base = crate::soc::registers::INTERRUPT_MAP_BASE as *mut u32;
+    #[cfg(multi_core)]
+    let intr_map_base = match _core {
+        Cpu::ProCpu => crate::soc::registers::INTERRUPT_MAP_BASE as *mut u32,
+        Cpu::AppCpu => crate::soc::registers::INTERRUPT_MAP_BASE_APP_CPU as *mut u32,
+    };
+
+    intr_map_base
+        .offset(interrupt_number)
+        .write_volatile(cpu_interrupt_number as u32 + EXTERNAL_INTERRUPT_OFFSET);
+}
+
+/// Get cpu interrupt assigned to peripheral interrupt
+#[inline]
+unsafe fn get_assigned_cpu_interrupt(interrupt: Interrupt) -> Option<CpuInterrupt> {
+    let interrupt_number = interrupt as isize;
+    let intr_map_base = crate::soc::registers::INTERRUPT_MAP_BASE as *mut u32;
+
+    let cpu_intr = intr_map_base.offset(interrupt_number).read_volatile();
+    if cpu_intr > 0 {
+        Some(core::mem::transmute(cpu_intr - EXTERNAL_INTERRUPT_OFFSET))
+    } else {
+        None
+    }
+}
+
+#[cfg(feature = "vectored")]
 mod vectored {
     use procmacros::ram;
 
@@ -174,13 +368,6 @@ mod vectored {
         }
     }
 
-    /// Interrupt Error
-    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-    pub enum Error {
-        InvalidInterruptPriority,
-    }
-
     /// Enables a interrupt at a given priority
     ///
     /// Note that interrupts still need to be enabled globally for interrupts
@@ -203,31 +390,6 @@ mod vectored {
         let ptr = &peripherals::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler as *const _
             as *mut unsafe extern "C" fn() -> ();
         ptr.write_volatile(handler);
-    }
-
-    /// Enables an interrupt at a given priority, maps it to the given CPU
-    /// interrupt and assigns the given priority.
-    ///
-    /// This can be side-effectful since no guarantees can be made about the
-    /// CPU interrupt not already being in use.
-    ///
-    /// Note that interrupts still need to be enabled globally for interrupts
-    /// to be serviced.
-    // TODO document used interrupts
-    pub unsafe fn enable_direct(
-        interrupt: Interrupt,
-        level: Priority,
-        cpu_interrupt: CpuInterrupt,
-    ) -> Result<(), Error> {
-        if matches!(level, Priority::None) {
-            return Err(Error::InvalidInterruptPriority);
-        }
-        unsafe {
-            map(crate::get_core(), interrupt, cpu_interrupt);
-            set_priority(crate::get_core(), cpu_interrupt, level);
-            enable_cpu_interrupt(cpu_interrupt);
-        }
-        Ok(())
     }
 
     #[ram]
@@ -391,163 +553,6 @@ mod vectored {
     }
 }
 
-/// # Safety
-///
-/// This function is called from an assembly trap handler.
-#[doc(hidden)]
-#[link_section = ".trap.rust"]
-#[export_name = "_start_trap_rust_hal"]
-pub unsafe extern "C" fn start_trap_rust_hal(trap_frame: *mut TrapFrame) {
-    assert!(
-        mcause::read().is_exception(),
-        "Arrived into _start_trap_rust_hal but mcause is not an exception!"
-    );
-    extern "C" {
-        fn ExceptionHandler(tf: *mut TrapFrame);
-    }
-    ExceptionHandler(trap_frame);
-}
-
-#[doc(hidden)]
-#[no_mangle]
-pub fn _setup_interrupts() {
-    extern "C" {
-        static _vector_table: *const u32;
-    }
-
-    unsafe {
-        // disable all known interrupts
-        // at least after the 2nd stage bootloader there are some interrupts enabled
-        // (e.g. UART)
-        for peripheral_interrupt in 0..255 {
-            crate::soc::peripherals::Interrupt::try_from(peripheral_interrupt)
-                .map(|intr| {
-                    #[cfg(multi_core)]
-                    disable(Cpu::AppCpu, intr);
-                    disable(Cpu::ProCpu, intr);
-                })
-                .ok();
-        }
-
-        let vec_table = &_vector_table as *const _ as usize;
-        mtvec::write(vec_table, mtvec::TrapMode::Vectored);
-
-        #[cfg(feature = "vectored")]
-        crate::interrupt::init_vectoring();
-    };
-
-    #[cfg(plic)]
-    unsafe {
-        core::arch::asm!("csrw mie, {0}", in(reg) u32::MAX);
-    }
-}
-
-/// Disable the given peripheral interrupt.
-pub fn disable(_core: Cpu, interrupt: Interrupt) {
-    unsafe {
-        let interrupt_number = interrupt as isize;
-        let intr_map_base = crate::soc::registers::INTERRUPT_MAP_BASE as *mut u32;
-
-        // set to 0 to disable the peripheral interrupt on chips with an interrupt
-        // controller other than PLIC use the disabled interrupt 31 otherwise
-        intr_map_base
-            .offset(interrupt_number)
-            .write_volatile(DISABLED_CPU_INTERRUPT);
-    }
-}
-
-/// Get status of peripheral interrupts
-#[inline]
-pub fn get_status(_core: Cpu) -> u128 {
-    #[cfg(large_intr_status)]
-    unsafe {
-        ((*crate::peripherals::INTERRUPT_CORE0::PTR)
-            .intr_status_reg_0()
-            .read()
-            .bits() as u128)
-            | ((*crate::peripherals::INTERRUPT_CORE0::PTR)
-                .intr_status_reg_1()
-                .read()
-                .bits() as u128)
-                << 32
-            | ((*crate::peripherals::INTERRUPT_CORE0::PTR)
-                .int_status_reg_2()
-                .read()
-                .bits() as u128)
-                << 64
-    }
-
-    #[cfg(very_large_intr_status)]
-    unsafe {
-        ((*crate::peripherals::INTERRUPT_CORE0::PTR)
-            .intr_status_reg_0()
-            .read()
-            .bits() as u128)
-            | ((*crate::peripherals::INTERRUPT_CORE0::PTR)
-                .intr_status_reg_1()
-                .read()
-                .bits() as u128)
-                << 32
-            | ((*crate::peripherals::INTERRUPT_CORE0::PTR)
-                .intr_status_reg_2()
-                .read()
-                .bits() as u128)
-                << 64
-            | ((*crate::peripherals::INTERRUPT_CORE0::PTR)
-                .intr_status_reg_3()
-                .read()
-                .bits() as u128)
-                << 96
-    }
-
-    #[cfg(not(any(large_intr_status, very_large_intr_status)))]
-    unsafe {
-        ((*crate::peripherals::INTERRUPT_CORE0::PTR)
-            .intr_status_reg_0()
-            .read()
-            .bits() as u128)
-            | ((*crate::peripherals::INTERRUPT_CORE0::PTR)
-                .intr_status_reg_1()
-                .read()
-                .bits() as u128)
-                << 32
-    }
-}
-
-/// Assign a peripheral interrupt to an CPU interrupt.
-///
-/// Great care must be taken when using the `vectored` feature (enabled by
-/// default). Avoid interrupts 1 - 15 when interrupt vectoring is enabled.
-pub unsafe fn map(_core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
-    let interrupt_number = interrupt as isize;
-    let cpu_interrupt_number = which as isize;
-    #[cfg(not(multi_core))]
-    let intr_map_base = crate::soc::registers::INTERRUPT_MAP_BASE as *mut u32;
-    #[cfg(multi_core)]
-    let intr_map_base = match _core {
-        Cpu::ProCpu => crate::soc::registers::INTERRUPT_MAP_BASE as *mut u32,
-        Cpu::AppCpu => crate::soc::registers::INTERRUPT_MAP_BASE_APP_CPU as *mut u32,
-    };
-
-    intr_map_base
-        .offset(interrupt_number)
-        .write_volatile(cpu_interrupt_number as u32 + EXTERNAL_INTERRUPT_OFFSET);
-}
-
-/// Get cpu interrupt assigned to peripheral interrupt
-#[inline]
-unsafe fn get_assigned_cpu_interrupt(interrupt: Interrupt) -> Option<CpuInterrupt> {
-    let interrupt_number = interrupt as isize;
-    let intr_map_base = crate::soc::registers::INTERRUPT_MAP_BASE as *mut u32;
-
-    let cpu_intr = intr_map_base.offset(interrupt_number).read_volatile();
-    if cpu_intr > 0 {
-        Some(core::mem::transmute(cpu_intr - EXTERNAL_INTERRUPT_OFFSET))
-    } else {
-        None
-    }
-}
-
 #[cfg(not(any(plic, clic)))]
 mod classic {
     use super::{CpuInterrupt, InterruptKind, Priority};
@@ -557,11 +562,11 @@ mod classic {
 
     pub(super) const EXTERNAL_INTERRUPT_OFFSET: u32 = 0;
 
-    pub(super) const PRIORITY_TO_INTERRUPT: [usize; 15] =
-        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+    pub(super) const PRIORITY_TO_INTERRUPT: &[usize] =
+        &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
-    pub(super) const INTERRUPT_TO_PRIORITY: [usize; 15] =
-        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+    pub(super) const INTERRUPT_TO_PRIORITY: &[usize] =
+        &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
     /// Enable a CPU interrupt
     pub unsafe fn enable_cpu_interrupt(which: CpuInterrupt) {
@@ -683,10 +688,10 @@ mod plic {
     // don't use interrupts reserved for CLIC (0,3,4,7)
     // for some reason also CPU interrupt 8 doesn't work by default since it's
     // disabled after reset - so don't use that, too
-    pub(super) const PRIORITY_TO_INTERRUPT: [usize; 15] =
-        [1, 2, 5, 6, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
+    pub(super) const PRIORITY_TO_INTERRUPT: &[usize] =
+        &[1, 2, 5, 6, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
 
-    pub(super) const INTERRUPT_TO_PRIORITY: [usize; 19] = [
+    pub(super) const INTERRUPT_TO_PRIORITY: &[usize] = &[
         1, 2, 0, 0, 3, 4, 0, 0, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
     ];
 
@@ -811,11 +816,11 @@ mod clic {
 
     pub(super) const EXTERNAL_INTERRUPT_OFFSET: u32 = 16;
 
-    pub(super) const PRIORITY_TO_INTERRUPT: [usize; 15] =
-        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+    pub(super) const PRIORITY_TO_INTERRUPT: &[usize] =
+        &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
-    pub(super) const INTERRUPT_TO_PRIORITY: [usize; 15] =
-        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+    pub(super) const INTERRUPT_TO_PRIORITY: &[usize] =
+        &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
     // The memory map for interrupt registers is on a per-core basis,
     // base points to the current core interrupt register,

@@ -32,14 +32,13 @@ fn main() -> ! {
     let sw_int = system.software_interrupt_control;
 
     critical_section::with(|cs| SWINT.borrow_ref_mut(cs).replace(sw_int));
+    interrupt::enable_direct(
+        Interrupt::FROM_CPU_INTR0,
+        Priority::Priority3,
+        CpuInterrupt::Interrupt20,
+    )
+    .unwrap();
     unsafe {
-        interrupt::enable_direct(
-            Interrupt::FROM_CPU_INTR0,
-            Priority::Priority3,
-            CpuInterrupt::Interrupt20,
-        )
-        .unwrap();
-
         asm!(
             "
         csrrwi x0, 0x7e0, 1 #what to count, for cycles write 1 for instructions write 2
