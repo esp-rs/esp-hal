@@ -436,119 +436,119 @@ mod vectored {
 
     #[no_mangle]
     #[ram]
-    pub unsafe fn cpu_int_1_handler(context: &mut TrapFrame) {
+    unsafe fn cpu_int_1_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt1, context)
     }
 
     #[no_mangle]
     #[ram]
-    pub unsafe fn cpu_int_2_handler(context: &mut TrapFrame) {
+    unsafe fn cpu_int_2_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt2, context)
     }
 
     #[no_mangle]
     #[ram]
-    pub unsafe fn cpu_int_3_handler(context: &mut TrapFrame) {
+    unsafe fn cpu_int_3_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt3, context)
     }
 
     #[no_mangle]
     #[ram]
-    pub unsafe fn cpu_int_4_handler(context: &mut TrapFrame) {
+    unsafe fn cpu_int_4_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt4, context)
     }
 
     #[no_mangle]
     #[ram]
-    pub unsafe fn cpu_int_5_handler(context: &mut TrapFrame) {
+    unsafe fn cpu_int_5_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt5, context)
     }
 
     #[no_mangle]
     #[ram]
-    pub unsafe fn cpu_int_6_handler(context: &mut TrapFrame) {
+    unsafe fn cpu_int_6_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt6, context)
     }
 
     #[no_mangle]
     #[ram]
-    pub unsafe fn cpu_int_7_handler(context: &mut TrapFrame) {
+    unsafe fn cpu_int_7_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt7, context)
     }
 
     #[no_mangle]
     #[ram]
-    pub unsafe fn cpu_int_8_handler(context: &mut TrapFrame) {
+    unsafe fn cpu_int_8_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt8, context)
     }
 
     #[no_mangle]
     #[ram]
-    pub unsafe fn cpu_int_9_handler(context: &mut TrapFrame) {
+    unsafe fn cpu_int_9_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt9, context)
     }
 
     #[no_mangle]
     #[ram]
-    pub unsafe fn cpu_int_10_handler(context: &mut TrapFrame) {
+    unsafe fn cpu_int_10_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt10, context)
     }
 
     #[no_mangle]
     #[ram]
-    pub unsafe fn cpu_int_11_handler(context: &mut TrapFrame) {
+    unsafe fn cpu_int_11_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt11, context)
     }
 
     #[no_mangle]
     #[ram]
-    pub unsafe fn cpu_int_12_handler(context: &mut TrapFrame) {
+    unsafe fn cpu_int_12_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt12, context)
     }
 
     #[no_mangle]
     #[ram]
-    pub unsafe fn cpu_int_13_handler(context: &mut TrapFrame) {
+    unsafe fn cpu_int_13_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt13, context)
     }
 
     #[no_mangle]
     #[ram]
-    pub unsafe fn cpu_int_14_handler(context: &mut TrapFrame) {
+    unsafe fn cpu_int_14_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt14, context)
     }
 
     #[no_mangle]
     #[ram]
-    pub unsafe fn cpu_int_15_handler(context: &mut TrapFrame) {
+    unsafe fn cpu_int_15_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt15, context)
     }
 
     #[cfg(plic)]
     #[no_mangle]
     #[ram]
-    pub unsafe fn cpu_int_16_handler(context: &mut TrapFrame) {
+    unsafe fn cpu_int_16_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt16, context)
     }
 
     #[cfg(plic)]
     #[no_mangle]
     #[ram]
-    pub unsafe fn cpu_int_17_handler(context: &mut TrapFrame) {
+    unsafe fn cpu_int_17_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt17, context)
     }
 
     #[cfg(plic)]
     #[no_mangle]
     #[ram]
-    pub unsafe fn cpu_int_18_handler(context: &mut TrapFrame) {
+    unsafe fn cpu_int_18_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt18, context)
     }
 
     #[cfg(plic)]
     #[no_mangle]
     #[ram]
-    pub unsafe fn cpu_int_19_handler(context: &mut TrapFrame) {
+    unsafe fn cpu_int_19_handler(context: &mut TrapFrame) {
         handle_interrupts(CpuInterrupt::Interrupt19, context)
     }
 }
