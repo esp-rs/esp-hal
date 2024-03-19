@@ -781,7 +781,7 @@ mod plic {
     pub(super) unsafe extern "C" fn _handle_priority() -> u32 {
         use super::mcause;
         let plic_mxint_pri_ptr = PLIC_MXINT0_PRI_REG as *mut u32;
-        let interrupt_id: isize = mcause::read().code().try_into().unwrap(); // MSB is whether its exception or interrupt.
+        let interrupt_id: isize = unwrap!(mcause::read().code().try_into()); // MSB is whether its exception or interrupt.
         let interrupt_priority = plic_mxint_pri_ptr.offset(interrupt_id).read_volatile();
 
         let thresh_reg = PLIC_MXINT_THRESH_REG as *mut u32;
