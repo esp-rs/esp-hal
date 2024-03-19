@@ -46,6 +46,8 @@ jobs:
 
   esp-hal:
     runs-on: ubuntu-latest
+    env:
+      RUSTC_BOOTSTRAP: 1
 
     strategy:
       fail-fast: false
@@ -68,14 +70,10 @@ jobs:
 
       # Install the Rust toolchain for RISC-V devices:
       - if: ${{ !contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.soc) }}
-        uses: dtolnay/rust-toolchain@v1
-        with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
-          toolchain: nightly
-          components: rust-src
-      # Install the Rust toolchain for Xtensa devices:
-      - if: contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.soc)
-        uses: esp-rs/xtensa-toolchain@v1.5
+        name: Install rust-src
+        run: rustup component add rust-src --toolchain stable-x86_64-unknown-linux-gnu
+      # Install the Rust esp-toolchain:
+      - uses: esp-rs/xtensa-toolchain@v1.5
         with:
           buildtargets: ${{ matrix.soc }}
           default: true
