@@ -1,13 +1,11 @@
 
-Welcome to the `esp-hal` Contributing Guide
-===========================================
+# Welcome to the `esp-hal` Contributing Guide
 
 Thank you for considering contributing to our project! Your efforts help make `esp-hal` a better ecosystem for everyone.
 
 This guide outlines the contribution workflow, from reporting issues and submitting pull requests, to the review process and eventual merger of contributions.
 
-Quick Navigation
-----------------
+# Quick Navigation
 
 *   [New Contributor Guide]
 *   [Getting Started]
@@ -27,8 +25,7 @@ Quick Navigation
 [Pull Request: From Submission to Merge]: #pull-request-from-submission-to-merge
 [Your PR is merged!]: #your-pr-is-merged
 
-New Contributor Guide
----------------------
+# New Contributor Guide
 
 Welcome aboard! If you're new to `esp-hal` or open-source contribution, here are some resources to get you started:
 
@@ -45,6 +42,8 @@ Welcome aboard! If you're new to `esp-hal` or open-source contribution, here are
 [Pull Requests]: https://docs.github.com/en/github/collaborating-with-pull-requests
 
 Before adding or changing code you might want to review the [esp-rs API guidelines](./API-GUIDELINES.md)
+
+# Getting Started
 
 ### Issues
 
@@ -102,7 +101,7 @@ cargo xtask fmt-workspace
 
 This will use `rustfmt` to ensure that all source code is formatted correctly prior to committing.
 
-### Pull Request: From Submission to Merge
+## Pull Request: From Submission to Merge
 
 *   Fill the pull request template so that we can review your PR. This template helps reviewers understand your changes as well as the purpose of your pull request.
 *   [Link your PR] to any relevant issues it addresses.
@@ -120,8 +119,7 @@ This will use `rustfmt` to ensure that all source code is formatted correctly pr
 [this git tutorial]: https://github.com/skills/resolve-merge-conflicts
 
 
-### Your PR is Merged!
-------------
+## Your PR is Merged!
 
 Congratulations! The `esp-rs` team thanks you for your contributions!
 
