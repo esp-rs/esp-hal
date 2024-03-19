@@ -9,42 +9,67 @@ This guide outlines the contribution workflow, from reporting issues and submitt
 Quick Navigation
 ----------------
 
-*   [New Contributor Guide](#new-contributor-guide)
-*   [Getting Started](#getting-started)
-    *   [Issues: Reporting and Resolving](#issues-reporting-and-resolving)
-    *   [Making Changes: Fork, Edit, and Pull Request](#making-changes-fork-edit-and-pull-request)
-*   [Your Pull Request: From Submission to Merge](#your-pull-request-from-submission-to-merge)
-*   [Community and Communication](#community-and-communication)
+*   [New Contributor Guide]
+*   [Getting Started]
+    *   [Issues: Reporting and Resolving]
+    *   [Making Changes: Fork, Edit, and Pull Request]
+    *   [Testing Your Contributions]
+    *   [Commit Your Updates]
+*   [Pull Request: From Submission to Merge]
+*   [Your PR is merged!]
+
+[New Contributor Guide]: #new-contributor-guide
+[Getting Started]: #getting-started
+[Issues: Reporting and Resolving]: #issues-reporting-and-resolving
+[Making Changes: Fork, Edit, and Pull Request]: #making-changes-fork-edit-and-pull-request
+[Testing Your Contributions]: #testing-your-contributions
+[Commit your updates]: #commit-your-updates
+[Pull Request: From Submission to Merge]: #pull-request-from-submission-to-merge
+[Your PR is merged!]: #your-pr-is-merged
 
 New Contributor Guide
 ---------------------
 
 Welcome aboard! If you're new to `esp-hal` or open-source contribution, here are some resources to get you started:
 
-*   [Understanding the Project](README.md): A high-level overview of `esp-hal`.
-*   Intro to Open Source Contribution: [GitHub's Guide](https://docs.github.com/en/get-started/exploring-projects-on-github/finding-ways-to-contribute-to-open-source-on-github)
-*   [Setting Up Git](https://docs.github.com/en/get-started/quickstart/set-up-git)
-*   Workflow Insights: [GitHub Flow](https://docs.github.com/en/get-started/quickstart/github-flow)
-*   Collaborating via [Pull Requests](https://docs.github.com/en/github/collaborating-with-pull-requests)
+*   [Understanding the Project]: A high-level overview of `esp-hal`.
+*   Intro to Open Source Contribution: [GitHub's Guide]
+*   [Setting Up Git]
+*   Workflow Insights: [GitHub Flow]
+*   Collaborating via [Pull Requests]
+
+[Understanding the Project]: README.md
+[GitHub's Guide]: https://docs.github.com/en/get-started/exploring-projects-on-github/finding-ways-to-contribute-to-open-source-on-github
+[Setting Up Git]: https://docs.github.com/en/get-started/quickstart/set-up-git
+[GitHub Flow]: https://docs.github.com/en/get-started/quickstart/github-flow
+[Pull Requests]: https://docs.github.com/en/github/collaborating-with-pull-requests
 
 Getting Started
 ---------------
 
 ### Issues: Reporting and Resolving
 
-#### Report a New Issue
+#### Reporting a New Issue
 
-Encountered a problem or have an idea? First, [check existing issues](https://github.com/esp-rs/esp-hal/issues) to avoid duplicates. If your concern is new, use our [issue form](https://github.com/esp-rs/esp-hal/issues/new/) to submit it.
+Encountered a problem or have an idea? First, [check existing issues] to avoid duplicates. If your concern is new, use our [issue form] to submit it.
 
-#### Work on an Issue
+[check existing issues]: https://github.com/esp-rs/esp-hal/issues
+[issue form]: https://github.com/esp-rs/esp-hal/issues/new/
 
-Browse [existing issues](https://github.com/esp-rs/esp-hal/issues) to find one that resonates with you. Use labels for easier filtering. If you decide to tackle an issue, it's courteous (but not mandatory) to let others know by commenting.
+#### Working on an Issue
+
+Browse [existing issues] to find one that resonates with you. Use labels for easier filtering. If you decide to tackle an issue, it's courteous (but not mandatory) to let others know by commenting.
+
+[existing issues]: https://github.com/esp-rs/esp-hal/issues
 
 ### Making Changes: Fork, Edit, and Pull Request
 
-1.  **Fork**: Start by [forking the repository](https://docs.github.com/en/github/getting-started-with-github/fork-a-repo). This keeps the main project safe while you make your changes.
-2.  **Setup**: Ensure you have the latest Rust toolchain via [rustup.rs](https://rustup.rs/).
+1.  **Fork**: Start by [forking the repository]. This keeps the main project safe while you make your changes.
+2.  **Setup**: Ensure you have the latest Rust toolchain via [rustup.rs].
 3.  **Branch**: Create a branch in your fork for your changes. Keep your changes focused and limited to a single issue or feature.
+
+[forking the repository]: https://docs.github.com/en/github/getting-started-with-github/fork-a-repo
+[rustup.rs]: https://rustup.rs/
 
 ### Testing Your Contributions
 
@@ -77,11 +102,19 @@ cp pre-commit .git/hooks/pre-commit
 ### Pull Request: From Submission to Merge
 
 *   Fill the pull request template so that we can review your PR. This template helps reviewers understand your changes as well as the purpose of your pull request.
-*   [Link your PR](https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue) to any relevant issues it addresses.
-*   [Allow edits from maintainers](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/allowing-changes-to-a-pull-request-branch-created-from-a-fork) so the branch can be updated for a merge. Once you submit your PR, a Docs team member will review your proposal. We may ask questions or request additional information.
-*   We may ask for changes to be made before a PR can be merged, either using [suggested changes](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/incorporating-feedback-in-your-pull-request) or pull request comments. You can apply suggested changes directly through the UI. You can make any other changes in your fork, then commit them to your branch.
-* As you update your PR and apply changes, mark each conversation as [resolved](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/commenting-on-a-pull-request#resolving-conversations).
-*   Resolve merge conflicts if they arise, using resources like [this git tutorial](https://github.com/skills/resolve-merge-conflicts) for help.
+*   [Link your PR] to any relevant issues it addresses.
+*   [Allow edits from maintainers] so the branch can be updated for a merge. Once you submit your PR, a Docs team member will review your proposal. We may ask questions or request additional information.
+*   Make sure you add an entry with your changes to the [Changelog]. Also make sure that it is in the appropriate section of the document.
+*   We may ask for changes to be made before a PR can be merged, either using [suggested changes] or pull request comments. You can apply suggested changes directly through the UI. You can make any other changes in your fork, then commit them to your branch.
+*   As you update your PR and apply changes, mark each conversation as [resolved].
+*   Resolve merge conflicts if they arise, using resources like [this git tutorial] for help.
+
+[Link your PR]: https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue
+[Allow edits from maintainers]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/allowing-changes-to-a-pull-request-branch-created-from-a-forkmember
+[change log]: esp-hal/CHANGELOG.md
+[suggested changes]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/incorporating-feedback-in-your-pull-request
+[resolved]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/commenting-on-a-pull-request#resolving-conversations
+[this git tutorial]: https://github.com/skills/resolve-merge-conflicts
 
 
 ### Your PR is Merged!
