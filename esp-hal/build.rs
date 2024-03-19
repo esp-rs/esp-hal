@@ -7,7 +7,7 @@ use std::{
     str::FromStr,
 };
 
-use esp_metadata::{Arch, Chip, Config};
+use esp_metadata::{Chip, Config};
 
 // Macros taken from:
 // https://github.com/TheDan64/inkwell/blob/36c3b10/src/lib.rs#L81-L110
@@ -111,14 +111,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         && (cfg!(feature = "psram-2m") || cfg!(feature = "psram-4m") || cfg!(feature = "psram-8m"))
     {
         panic!("The target does not support PSRAM");
-    }
-
-    // Don't support "interrupt-preemption" on Xtensa and
-    // RISC-V with CLIC:
-    if (config.contains(&String::from("clic")) || config.arch() == Arch::Xtensa)
-        && cfg!(feature = "interrupt-preemption")
-    {
-        panic!("The target does not support interrupt-preemption");
     }
 
     // Define all necessary configuration symbols for the configured device:

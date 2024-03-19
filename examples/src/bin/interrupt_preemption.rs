@@ -4,9 +4,6 @@
 //! priority. Should show higher-numbered software interrupts happening during
 //! the handling of lower-numbered ones.
 
-//% CHIPS: esp32c2 esp32c3 esp32c6 esp32h2
-//% FEATURES: interrupt-preemption
-
 #![no_std]
 #![no_main]
 
@@ -34,7 +31,7 @@ fn main() -> ! {
     interrupt::enable(Interrupt::FROM_CPU_INTR0, Priority::Priority1).unwrap();
     interrupt::enable(Interrupt::FROM_CPU_INTR1, Priority::Priority2).unwrap();
     interrupt::enable(Interrupt::FROM_CPU_INTR2, Priority::Priority2).unwrap();
-    interrupt::enable(Interrupt::FROM_CPU_INTR3, Priority::Priority15).unwrap();
+    interrupt::enable(Interrupt::FROM_CPU_INTR3, Priority::Priority3).unwrap();
 
     // Raise mid priority interrupt.
     //

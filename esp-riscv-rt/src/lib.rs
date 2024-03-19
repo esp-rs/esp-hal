@@ -709,7 +709,7 @@ r#"
 
     add a0, sp, zero
     "#,
-    #[cfg(all(feature="interrupt-preemption"))] //store current priority, set threshold, enable interrupts
+    // store current priority, set threshold, enable interrupts
     r#"
     addi sp, sp, -4 #build stack
     sw ra, 0(sp)
@@ -722,7 +722,7 @@ r#"
     r#"
     jalr ra, ra #jump to label loaded in _start_trapx
     "#,
-    #[cfg(all(feature="interrupt-preemption"))] //restore threshold
+    // restore threshold
     r#"
     lw a0, 0(sp) #load stored priority
     jal ra, _restore_priority

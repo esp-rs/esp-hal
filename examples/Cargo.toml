@@ -64,8 +64,6 @@ embassy-executor-interrupt = ["esp-hal/embassy-executor-interrupt"]
 embassy-time-timg0 = ["esp-hal/embassy-time-timg0"]
 embassy-generic-timers = ["embassy-time/generic-queue-8"]
 
-interrupt-preemption = ["esp-hal/interrupt-preemption"]
-
 opsram-2m = ["esp-hal/opsram-2m"]
 psram-2m  = ["esp-hal/psram-2m"]
 

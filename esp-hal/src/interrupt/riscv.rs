@@ -642,7 +642,6 @@ mod classic {
             .read_volatile();
         core::mem::transmute(prio as u8)
     }
-    #[cfg(feature = "interrupt-preemption")]
     #[no_mangle]
     #[link_section = ".trap"]
     pub(super) unsafe extern "C" fn _handle_priority() -> u32 {
@@ -666,7 +665,6 @@ mod classic {
         }
         prev_interrupt_priority
     }
-    #[cfg(feature = "interrupt-preemption")]
     #[no_mangle]
     #[link_section = ".trap"]
     pub(super) unsafe extern "C" fn _restore_priority(stored_prio: u32) {
@@ -700,7 +698,6 @@ mod plic {
     const PLIC_MXINT_TYPE_REG: u32 = DR_REG_PLIC_MX_BASE + 0x4;
     const PLIC_MXINT_CLEAR_REG: u32 = DR_REG_PLIC_MX_BASE + 0x8;
     const PLIC_MXINT0_PRI_REG: u32 = DR_REG_PLIC_MX_BASE + 0x10;
-    #[cfg(feature = "interrupt-preemption")]
     const PLIC_MXINT_THRESH_REG: u32 = DR_REG_PLIC_MX_BASE + 0x90;
     /// Enable a CPU interrupt
     pub unsafe fn enable_cpu_interrupt(which: CpuInterrupt) {
@@ -776,7 +773,6 @@ mod plic {
             .read_volatile();
         core::mem::transmute(prio as u8)
     }
-    #[cfg(feature = "interrupt-preemption")]
     #[no_mangle]
     #[link_section = ".trap"]
     pub(super) unsafe extern "C" fn _handle_priority() -> u32 {
@@ -797,7 +793,6 @@ mod plic {
         }
         prev_interrupt_priority
     }
-    #[cfg(feature = "interrupt-preemption")]
     #[no_mangle]
     #[link_section = ".trap"]
     pub(super) unsafe extern "C" fn _restore_priority(stored_prio: u32) {

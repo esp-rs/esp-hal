@@ -134,8 +134,6 @@ esp32s3 = ["dep:esp32s3", "xtensa", "procmacros/has-ulp-core", "xtensa-lx/spin",
 ## Move the stack to start of RAM to get zero-cost stack overflow protection
 ## (ESP32-C6 and ESPS32-H2 only!).
 flip-link = ["esp-riscv-rt/fix-sp"]
-## Enable interrupt preemption.
-interrupt-preemption = ["esp-riscv-rt/interrupt-preemption"]
 ## Configuration for placing device drivers in the IRAM for faster access.
 place-spi-driver-in-ram = []
 ## Initialize the `.data` section of memory.
