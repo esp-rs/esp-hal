@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - ESP32-C6 / ESP32-H2: Implement `ETM` for general purpose timers (#1274)
+- Add Uart Line invert option (#1151)
 
 ### Fixed
 

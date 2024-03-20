@@ -79,6 +79,15 @@ impl embedded_io::Error for Error {
     }
 }
 
+pub enum UartLine {
+    Rxd,
+    Txd,
+    Cts,
+    Dsr,
+    Rts,
+    Dtr,
+}
+
 /// UART configuration
 pub mod config {
     /// Number of data bits
@@ -504,6 +513,33 @@ where
     /// Writes bytes
     pub fn write_bytes(&mut self, data: &[u8]) -> Result<usize, Error> {
         self.tx.write_bytes(data)
+    }
+
+    /// Change interpretation of line polarity for inputs/outputs
+    pub fn set_line_invert(&mut self, line: UartLine, invert: bool) {
+        T::register_block().conf0().write(|w| match line {
+            UartLine::Rxd => w.rxd_inv().bit(invert),
+            UartLine::Txd => w.txd_inv().bit(invert),
+            #[cfg(not(any(esp32c6, esp32h2)))]
+            UartLine::Cts => w.cts_inv().bit(invert),
+            #[cfg(not(any(esp32c6, esp32h2)))]
+            UartLine::Dsr => w.dsr_inv().bit(invert),
+            #[cfg(not(any(esp32c6, esp32h2)))]
+            UartLine::Rts => w.rts_inv().bit(invert),
+            #[cfg(not(any(esp32c6, esp32h2)))]
+            UartLine::Dtr => w.dtr_inv().bit(invert),
+            #[cfg(any(esp32c6, esp32h2))]
+            _ => w,
+        });
+        #[cfg(any(esp32c6, esp32h2))]
+        T::register_block().conf1().write(|w| match line {
+            UartLine::Cts => w.cts_inv().bit(invert),
+            UartLine::Dsr => w.dsr_inv().bit(invert),
+            UartLine::Rts => w.rts_inv().bit(invert),
+            UartLine::Dtr => w.dtr_inv().bit(invert),
+            _ => w,
+        });
+        self.sync_regs();
     }
 
     /// Configures the AT-CMD detection settings.
