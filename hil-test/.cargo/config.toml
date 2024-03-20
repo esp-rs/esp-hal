@@ -7,14 +7,12 @@ rustflags = [
 ]
 
 [target.'cfg(target_arch = "xtensa")']
-# TODO: Xtensa not yet fully supported by `probe-rs`
 runner    = "probe-rs run"
 rustflags = [
     "-C", "link-arg=-nostartfiles",
     "-C", "link-arg=-Wl,-Tlinkall.x",
     "-C", "link-arg=-Tdefmt.x",
     "-C", "link-arg=-Tembedded-test.x",
-
 ]
 
 [unstable]
