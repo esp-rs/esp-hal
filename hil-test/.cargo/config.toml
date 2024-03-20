@@ -1,7 +1,3 @@
-[env]
-DEFMT_LOG="info"
-RUST_LOG = "warn"
-
 [target.'cfg(target_arch = "riscv32")']
 runner    = "probe-rs run"
 rustflags = [
