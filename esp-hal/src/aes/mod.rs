@@ -154,7 +154,14 @@ impl<'d> Aes<'d> {
     }
 
     /// Encrypts/Decrypts the given buffer based on `mode` parameter
-    pub fn process(&mut self, block: &mut [u8; 16], mode: Mode, key: &[u8; 16]) {
+    pub fn process(&mut self, block: &mut [u8; 16], mode: Mode, key: &[u8]) {
+        if key.len() != 16
+            || (cfg!(any(feature = "esp32", feature = "esp32s2")) && key.len() != 24)
+            || key.len() != 32
+        {
+            panic!("Invalid key size");
+        }
+
         self.write_key(key);
         self.set_mode(mode as u8);
         self.set_block(block);
@@ -396,7 +403,7 @@ pub mod dma {
             read_buffer: &'t mut RXBUF,
             mode: Mode,
             cipher_mode: CipherMode,
-            key: [u8; 16],
+            key: &[u8],
         ) -> Result<AesDmaTransferRxTx<'t, 'd, C>, crate::dma::DmaError>
         where
             TXBUF: ReadBuffer<Word = u8>,
@@ -427,7 +434,7 @@ pub mod dma {
             read_buffer_len: usize,
             mode: Mode,
             cipher_mode: CipherMode,
-            key: [u8; 16],
+            key: &[u8],
         ) -> Result<(), crate::dma::DmaError> {
             // AES has to be restarted after each calculation
             self.reset_aes();
