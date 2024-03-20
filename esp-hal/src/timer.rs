@@ -40,6 +40,7 @@ use core::{
 };
 
 use fugit::{HertzU32, MicrosDurationU64};
+#[cfg(feature = "embedded-hal-02")]
 use void::Void;
 
 #[cfg(timg1)]
@@ -221,6 +222,7 @@ where
 /// General-purpose Timer driver
 pub struct Timer<T> {
     timg: T,
+    #[allow(dead_code)] // FIXME
     apb_clk_freq: HertzU32,
 }
 
@@ -638,6 +640,7 @@ where
     }
 }
 
+#[allow(dead_code)] // FIXME
 fn timeout_to_ticks<T, F>(timeout: T, clock: F, divider: u32) -> u64
 where
     T: Into<MicrosDurationU64>,
@@ -781,7 +784,7 @@ where
             .write(|w| unsafe { w.wdt_wkey().bits(0u32) });
     }
 
-    fn feed(&mut self) {
+    pub fn feed(&mut self) {
         let reg_block = unsafe { &*TG::register_block() };
 
         reg_block
@@ -795,7 +798,7 @@ where
             .write(|w| unsafe { w.wdt_wkey().bits(0u32) });
     }
 
-    fn set_timeout(&mut self, timeout: MicrosDurationU64) {
+    pub fn set_timeout(&mut self, timeout: MicrosDurationU64) {
         let timeout_raw = (timeout.to_nanos() * 10 / 125) as u32;
 
         let reg_block = unsafe { &*TG::register_block() };
