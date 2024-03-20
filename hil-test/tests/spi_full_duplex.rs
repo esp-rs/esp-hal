@@ -11,7 +11,6 @@
 #![no_std]
 #![no_main]
 
-#[cfg(feature = "defmt")]
 use defmt_rtt as _;
 use esp_hal::{
     clock::ClockControl,
@@ -51,7 +50,6 @@ impl Context {
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
-    #[cfg(feature = "defmt")]
     use defmt::assert_eq;
 
     use super::*;

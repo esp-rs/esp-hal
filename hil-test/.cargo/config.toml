@@ -7,7 +7,7 @@ runner    = "probe-rs run"
 rustflags = [
     "-C", "link-arg=-Tlinkall.x",
     "-C", "link-arg=-Tembedded-test.x",
-    "-C", "link-arg=-Tdefmt.x", # Comment this line when using log feature
+    "-C", "link-arg=-Tdefmt.x",
 ]
 
 [target.'cfg(target_arch = "xtensa")']

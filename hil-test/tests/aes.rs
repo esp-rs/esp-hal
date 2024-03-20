@@ -3,7 +3,6 @@
 #![no_std]
 #![no_main]
 
-#[cfg(feature = "defmt")]
 use defmt_rtt as _;
 use esp_hal::{
     aes::{Aes, Mode},
@@ -39,7 +38,6 @@ mod not_test {
 #[cfg(any(esp32c3, esp32c6, esp32h2))]
 #[embedded_test::tests]
 mod tests {
-    #[cfg(feature = "defmt")]
     use defmt::assert_eq;
 
     use super::*;

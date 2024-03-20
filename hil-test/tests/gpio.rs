@@ -7,7 +7,6 @@
 #![no_std]
 #![no_main]
 
-#[cfg(feature = "defmt")]
 use defmt_rtt as _;
 use embedded_hal_1::digital::{InputPin as _, OutputPin as _, StatefulOutputPin as _};
 use esp_hal::{
@@ -35,7 +34,6 @@ impl Context {
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
-    #[cfg(feature = "defmt")]
     use defmt::assert_eq;
 
     use super::*;
