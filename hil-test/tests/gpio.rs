@@ -1,8 +1,8 @@
 //! GPIO Test
 //!
 //! Folowing pins are used:
-//! GPIO0
-//! GPIO1
+//! GPIO2
+//! GPIO4
 
 #![no_std]
 #![no_main]
@@ -16,8 +16,8 @@ use esp_hal::{
 };
 
 struct Context {
-    io0: GpioPin<Input<PullDown>, 0>,
-    io1: GpioPin<Output<PushPull>, 1>,
+    io2: GpioPin<Input<PullDown>, 2>,
+    io4: GpioPin<Output<PushPull>, 4>,
 }
 
 impl Context {
@@ -26,8 +26,8 @@ impl Context {
         let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
         Context {
-            io0: io.pins.gpio0.into_pull_down_input(),
-            io1: io.pins.gpio1.into_push_pull_output(),
+            io2: io.pins.gpio2.into_pull_down_input(),
+            io4: io.pins.gpio4.into_push_pull_output(),
         }
     }
 }
@@ -48,27 +48,27 @@ mod tests {
     #[test]
     fn test_gpio_input(mut ctx: Context) {
         // `InputPin`:
-        assert_eq!(ctx.io0.is_low(), Ok(true));
-        assert_eq!(ctx.io0.is_high(), Ok(false));
+        assert_eq!(ctx.io2.is_low(), Ok(true));
+        assert_eq!(ctx.io2.is_high(), Ok(false));
     }
 
     #[test]
     fn test_gpio_output(mut ctx: Context) {
         // `StatefulOutputPin`:
-        assert_eq!(ctx.io1.is_set_low(), Ok(true));
-        assert_eq!(ctx.io1.is_set_high(), Ok(false));
-        assert!(ctx.io1.set_high().is_ok());
-        assert_eq!(ctx.io1.is_set_low(), Ok(false));
-        assert_eq!(ctx.io1.is_set_high(), Ok(true));
+        assert_eq!(ctx.io4.is_set_low(), Ok(true));
+        assert_eq!(ctx.io4.is_set_high(), Ok(false));
+        assert!(ctx.io4.set_high().is_ok());
+        assert_eq!(ctx.io4.is_set_low(), Ok(false));
+        assert_eq!(ctx.io4.is_set_high(), Ok(true));
 
         // `ToggleableOutputPin`:
-        assert!(ctx.io1.toggle().is_ok());
-        assert_eq!(ctx.io1.is_set_low(), Ok(true));
-        assert_eq!(ctx.io1.is_set_high(), Ok(false));
-        assert!(ctx.io1.toggle().is_ok());
-        assert_eq!(ctx.io1.is_set_low(), Ok(false));
-        assert_eq!(ctx.io1.is_set_high(), Ok(true));
+        assert!(ctx.io4.toggle().is_ok());
+        assert_eq!(ctx.io4.is_set_low(), Ok(true));
+        assert_eq!(ctx.io4.is_set_high(), Ok(false));
+        assert!(ctx.io4.toggle().is_ok());
+        assert_eq!(ctx.io4.is_set_low(), Ok(false));
+        assert_eq!(ctx.io4.is_set_high(), Ok(true));
         // Leave in initial state for next test
-        assert!(ctx.io1.toggle().is_ok());
+        assert!(ctx.io4.toggle().is_ok());
     }
 }
