@@ -40,6 +40,7 @@ use core::{
 };
 
 use fugit::{HertzU32, MicrosDurationU64};
+#[cfg(feature = "embedded-hal-02")]
 use void::Void;
 
 #[cfg(timg1)]
@@ -79,9 +80,13 @@ pub trait TimerGroupInstance {
     fn register_block() -> *const RegisterBlock;
     fn configure_src_clk();
     fn configure_wdt_src_clk();
+    fn id() -> u8;
 }
 
 impl TimerGroupInstance for TIMG0 {
+    fn id() -> u8 {
+        0
+    }
     #[inline(always)]
     fn register_block() -> *const RegisterBlock {
         crate::peripherals::TIMG0::PTR
@@ -132,6 +137,9 @@ impl TimerGroupInstance for TIMG0 {
 
 #[cfg(timg1)]
 impl TimerGroupInstance for TIMG1 {
+    fn id() -> u8 {
+        1
+    }
     #[inline(always)]
     fn register_block() -> *const RegisterBlock {
         crate::peripherals::TIMG1::PTR
@@ -214,6 +222,7 @@ where
 /// General-purpose Timer driver
 pub struct Timer<T> {
     timg: T,
+    #[allow(dead_code)] // FIXME
     apb_clk_freq: HertzU32,
 }
 
@@ -631,6 +640,7 @@ where
     }
 }
 
+#[allow(dead_code)] // FIXME
 fn timeout_to_ticks<T, F>(timeout: T, clock: F, divider: u32) -> u64
 where
     T: Into<MicrosDurationU64>,
@@ -774,7 +784,7 @@ where
             .write(|w| unsafe { w.wdt_wkey().bits(0u32) });
     }
 
-    fn feed(&mut self) {
+    pub fn feed(&mut self) {
         let reg_block = unsafe { &*TG::register_block() };
 
         reg_block
@@ -788,7 +798,7 @@ where
             .write(|w| unsafe { w.wdt_wkey().bits(0u32) });
     }
 
-    fn set_timeout(&mut self, timeout: MicrosDurationU64) {
+    pub fn set_timeout(&mut self, timeout: MicrosDurationU64) {
         let timeout_raw = (timeout.to_nanos() * 10 / 125) as u32;
 
         let reg_block = unsafe { &*TG::register_block() };
@@ -876,5 +886,93 @@ where
 {
     fn feed(&mut self) {
         self.feed();
+    }
+}
+
+#[cfg(soc_etm)]
+pub mod etm {
+    use super::*;
+    use crate::{
+        etm::{EtmEvent, EtmTask},
+        private::Sealed,
+    };
+
+    pub struct TimerEtmEvent {
+        id: u8,
+    }
+
+    pub struct TimerEtmTask {
+        id: u8,
+    }
+
+    impl EtmEvent for TimerEtmEvent {
+        fn id(&self) -> u8 {
+            self.id
+        }
+    }
+
+    impl Sealed for TimerEtmEvent {}
+
+    impl EtmTask for TimerEtmTask {
+        fn id(&self) -> u8 {
+            self.id
+        }
+    }
+
+    impl Sealed for TimerEtmTask {}
+
+    /// General purpose timer ETM events
+    pub trait TimerEtmEvents<TG> {
+        fn on_alarm(&self) -> TimerEtmEvent;
+    }
+
+    /// General purpose timer ETM tasks
+    pub trait TimerEtmTasks<TG> {
+        fn cnt_start(&self) -> TimerEtmTask;
+        fn cnt_stop(&self) -> TimerEtmTask;
+        fn cnt_reload(&self) -> TimerEtmTask;
+        fn cnt_cap(&self) -> TimerEtmTask;
+        fn alarm_start(&self) -> TimerEtmTask;
+    }
+
+    impl<TG> TimerEtmEvents<TG> for Timer0<TG>
+    where
+        TG: TimerGroupInstance,
+    {
+        /// ETM event triggered on alarm
+        fn on_alarm(&self) -> TimerEtmEvent {
+            TimerEtmEvent { id: 48 + TG::id() }
+        }
+    }
+
+    impl<TG> TimerEtmTasks<TG> for Timer0<TG>
+    where
+        TG: TimerGroupInstance,
+    {
+        /// ETM task to start the counter
+        fn cnt_start(&self) -> TimerEtmTask {
+            TimerEtmTask { id: 88 + TG::id() }
+        }
+
+        /// ETM task to start the alarm
+        fn alarm_start(&self) -> TimerEtmTask {
+            TimerEtmTask { id: 90 + TG::id() }
+        }
+
+        /// ETM task to stop the counter
+        fn cnt_stop(&self) -> TimerEtmTask {
+            TimerEtmTask { id: 92 + TG::id() }
+        }
+
+        /// ETM task to reload the counter
+        fn cnt_reload(&self) -> TimerEtmTask {
+            TimerEtmTask { id: 94 + TG::id() }
+        }
+
+        /// ETM task to load the counter with the value stored when the last
+        /// `now()` was called
+        fn cnt_cap(&self) -> TimerEtmTask {
+            TimerEtmTask { id: 96 + TG::id() }
+        }
     }
 }

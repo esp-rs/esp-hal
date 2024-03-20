@@ -1532,29 +1532,27 @@ pub mod dma {
             }
 
             fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-                Ok(
-                    if !crate::soc::is_valid_ram_address(&words[0] as *const _ as u32) {
-                        for chunk in words.chunks(SIZE) {
-                            self.buffer[..chunk.len()].copy_from_slice(chunk);
-                            self.inner.write(&self.buffer[..chunk.len()])?;
-                        }
-                    } else {
-                        self.inner.write(words)?;
-                    },
-                )
+                if !crate::soc::is_valid_ram_address(&words[0] as *const _ as u32) {
+                    for chunk in words.chunks(SIZE) {
+                        self.buffer[..chunk.len()].copy_from_slice(chunk);
+                        self.inner.write(&self.buffer[..chunk.len()])?;
+                    }
+                } else {
+                    self.inner.write(words)?;
+                }
+                Ok(())
             }
 
             fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
-                Ok(
-                    if !crate::soc::is_valid_ram_address(&write[0] as *const _ as u32) {
-                        for (read, write) in read.chunks_mut(SIZE).zip(write.chunks(SIZE)) {
-                            self.buffer[..write.len()].copy_from_slice(write);
-                            self.inner.transfer(read, &self.buffer[..write.len()])?;
-                        }
-                    } else {
-                        self.inner.transfer(read, write)?;
-                    },
-                )
+                if !crate::soc::is_valid_ram_address(&write[0] as *const _ as u32) {
+                    for (read, write) in read.chunks_mut(SIZE).zip(write.chunks(SIZE)) {
+                        self.buffer[..write.len()].copy_from_slice(write);
+                        self.inner.transfer(read, &self.buffer[..write.len()])?;
+                    }
+                } else {
+                    self.inner.transfer(read, write)?;
+                }
+                Ok(())
             }
 
             fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
@@ -1608,9 +1606,9 @@ mod ehal1 {
 
         fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
             // Optimizations
-            if read.len() == 0 {
+            if read.is_empty() {
                 SpiBus::write(self, write)?;
-            } else if write.len() == 0 {
+            } else if write.is_empty() {
                 SpiBus::read(self, read)?;
             }
 

@@ -486,7 +486,9 @@ impl CalibrationAccess for crate::peripherals::ADC2 {
 /// Analog-to-Digital Converter peripheral driver.
 pub struct ADC<'d, ADCI> {
     _adc: PeripheralRef<'d, ADCI>,
+    #[allow(dead_code)] // FIXME
     attenuations: [Option<Attenuation>; NUM_ATTENS],
+    #[allow(dead_code)] // FIXME
     active_channel: Option<u8>,
 }
 
@@ -648,6 +650,7 @@ macro_rules! impl_adc_interface {
 
 #[cfg(esp32c2)]
 mod adc_implementation {
+    #[cfg(feature = "embedded-hal-02")]
     use crate::peripherals::ADC1;
 
     impl_adc_interface! {
@@ -663,6 +666,7 @@ mod adc_implementation {
 
 #[cfg(esp32c3)]
 mod adc_implementation {
+    #[cfg(feature = "embedded-hal-02")]
     use crate::peripherals::{ADC1, ADC2};
 
     impl_adc_interface! {
@@ -684,6 +688,7 @@ mod adc_implementation {
 
 #[cfg(esp32c6)]
 mod adc_implementation {
+    #[cfg(feature = "embedded-hal-02")]
     use crate::peripherals::ADC1;
 
     impl_adc_interface! {
@@ -701,6 +706,7 @@ mod adc_implementation {
 
 #[cfg(esp32h2)]
 mod adc_implementation {
+    #[cfg(feature = "embedded-hal-02")]
     use crate::peripherals::ADC1;
 
     impl_adc_interface! {

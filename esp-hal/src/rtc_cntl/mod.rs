@@ -805,7 +805,7 @@ impl Rwdt {
         self.set_write_protection(true);
     }
 
-    fn set_timeout(&mut self, timeout: MicrosDurationU64) {
+    pub fn set_timeout(&mut self, timeout: MicrosDurationU64) {
         #[cfg(not(any(esp32c6, esp32h2)))]
         let rtc_cntl = unsafe { &*LPWR::PTR };
         #[cfg(any(esp32c6, esp32h2))]

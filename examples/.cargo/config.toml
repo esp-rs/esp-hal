@@ -27,5 +27,8 @@ rustflags = [
   # "-C", "linker=rust-lld",
 ]
 
+[env]
+ESP_LOGLEVEL = "info"
+
 [unstable]
 build-std = ["alloc", "core"]

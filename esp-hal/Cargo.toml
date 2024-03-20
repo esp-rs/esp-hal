@@ -74,7 +74,7 @@ esp-metadata = { version = "0.1.0", path = "../esp-metadata" }
 serde        = { version = "1.0.197", features = ["derive"] }
 
 [features]
-default = ["embedded-hal-02", "rt", "vectored"]
+default = ["embedded-hal", "rt", "vectored"]
 
 riscv  = ["dep:riscv",     "critical-section/restore-state-u8",  "esp-riscv-rt?/zero-bss"]
 xtensa = ["dep:xtensa-lx", "critical-section/restore-state-u32"]
@@ -111,35 +111,31 @@ rt = [
 ]
 ## Enable interrupt vectoring.
 vectored = ["procmacros/interrupt"]
+## Configuration for placing device drivers in the IRAM for faster access.
+place-spi-driver-in-ram = []
 
-#! ### Chip Support Feature Flags
-## Target the ESP32.
+# Chip Support Feature Flags
+# Target the ESP32.
 esp32   = ["dep:esp32",   "xtensa", "xtensa-lx/spin", "xtensa-lx-rt?/esp32"]
-## Target the ESP32-C2.
+# Target the ESP32-C2.
 esp32c2 = ["dep:esp32c2", "riscv",  "portable-atomic/unsafe-assume-single-core"]
-## Target the ESP32-C3.
+# Target the ESP32-C3.
 esp32c3 = ["dep:esp32c3", "riscv",  "portable-atomic/unsafe-assume-single-core", "rv-zero-rtc-bss"]
-## Target the ESP32-C6.
+# Target the ESP32-C6.
 esp32c6 = ["dep:esp32c6", "riscv",  "procmacros/has-lp-core", "rv-zero-rtc-bss"]
-## Target the ESP32-H2.
+# Target the ESP32-H2.
 esp32h2 = ["dep:esp32h2", "riscv", "rv-zero-rtc-bss"]
-## Target the ESP32-P4.
+# Target the ESP32-P4.
 esp32p4 = ["dep:esp32p4", "riscv",  "procmacros/has-lp-core", "rv-zero-rtc-bss"]
-## Target the ESP32-S2.
+# Target the ESP32-S2.
 esp32s2 = ["dep:esp32s2", "xtensa", "portable-atomic/critical-section", "procmacros/has-ulp-core", "xtensa-lx-rt?/esp32s2", "usb-otg"]
-## Target the ESP32-S3.
+# Target the ESP32-S3.
 esp32s3 = ["dep:esp32s3", "xtensa", "procmacros/has-ulp-core", "xtensa-lx/spin", "xtensa-lx-rt?/esp32s3", "usb-otg"]
 
 #! ### RISC-V Exclusive Feature Flags
-## Enable direct interrupt vectoring.
-direct-vectoring = ["esp-riscv-rt/direct-vectoring"]
 ## Move the stack to start of RAM to get zero-cost stack overflow protection
 ## (ESP32-C6 and ESPS32-H2 only!).
 flip-link = ["esp-riscv-rt/fix-sp"]
-## Enable interrupt preemption.
-interrupt-preemption = ["esp-riscv-rt/interrupt-preemption"]
-## Configuration for placing device drivers in the IRAM for faster access.
-place-spi-driver-in-ram = []
 ## Initialize the `.data` section of memory.
 rv-init-data = ["esp-riscv-rt?/init-data", "esp-riscv-rt?/init-rw-text"]
 ## Zero the `.bss` section of low-power memory.
@@ -168,11 +164,11 @@ defmt = [
     "embedded-io/defmt-03",
     "embedded-io-async?/defmt-03",
 ]
-## Implement the traits defined in the `0.2.x` release of `embedded-hal`.
-embedded-hal-02 = ["dep:embedded-hal-02"]
 ## Implement the traits defined in the `1.0.0` releases of `embedded-hal` and
 ## `embedded-hal-nb` for the relevant peripherals.
 embedded-hal = ["dep:embedded-hal", "dep:embedded-hal-nb", "dep:embedded-can"]
+## Implement the traits defined in the `0.2.x` release of `embedded-hal`.
+embedded-hal-02 = ["dep:embedded-hal-02"]
 ## Implement the traits defined in `embedded-io` for certain peripherals.
 embedded-io = ["dep:embedded-io"]
 ## Implement the `ufmt_write::uWrite` trait for certain peripherals.
@@ -220,6 +216,14 @@ opsram-4m = []
 opsram-8m = []
 ## Use externally connected Octal RAM (16MB).
 opsram-16m = []
+
+# This feature is intended for testing; you probably don't want to enable it:
+ci = [
+    "default",
+    "embedded-hal-02",
+    "ufmt",
+    "async",
+]
 
 [lints.clippy]
 mixed_attributes_style = "allow"
