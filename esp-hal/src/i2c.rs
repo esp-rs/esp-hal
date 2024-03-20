@@ -255,10 +255,10 @@ where
         self.peripheral.master_write_read(address, bytes, buffer)
     }
 
-    fn transaction<'a>(
+    fn transaction(
         &mut self,
         _address: u8,
-        _operations: &mut [embedded_hal::i2c::Operation<'a>],
+        _operations: &mut [embedded_hal::i2c::Operation<'_>],
     ) -> Result<(), Self::Error> {
         todo!()
     }

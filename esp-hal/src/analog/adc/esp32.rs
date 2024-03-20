@@ -249,7 +249,9 @@ impl RegisterAccess for ADC2 {
 /// Analog-to-Digital Converter peripheral driver.
 pub struct ADC<'d, ADC> {
     _adc: PeripheralRef<'d, ADC>,
+    #[allow(dead_code)] // FIXME
     attenuations: [Option<Attenuation>; 10],
+    #[allow(dead_code)] // FIXME
     active_channel: Option<u8>,
 }
 
@@ -418,6 +420,7 @@ macro_rules! impl_adc_interface {
 }
 
 mod adc_implementation {
+    #[cfg(feature = "embedded-hal-02")]
     use crate::peripherals::{ADC1, ADC2};
 
     impl_adc_interface! {

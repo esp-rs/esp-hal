@@ -63,7 +63,9 @@
 //! rng.read(&mut buffer).unwrap();
 //! ```
 
-use core::{convert::Infallible, marker::PhantomData};
+#[cfg(feature = "embedded-hal-02")]
+use core::convert::Infallible;
+use core::marker::PhantomData;
 
 use crate::{peripheral::Peripheral, peripherals::RNG};
 
