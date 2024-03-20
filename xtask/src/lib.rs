@@ -155,7 +155,7 @@ pub fn build_documentation(
         .subcommand("doc")
         .arg("-Zbuild-std=core") // Required for Xtensa, for some reason
         .target(target)
-        .features(&[chip.to_string()]);
+        .features(&[chip.to_string(), "ci".to_owned()]);
 
     if open {
         builder = builder.arg("--open");
