@@ -73,14 +73,14 @@ fn main() -> ! {
     );
     let sw_decrypted = block;
 
-    assert!(eq(&sw_encrypted.into(), &hw_encrypted));
-    assert!(eq(&sw_decrypted.into(), &hw_decrypted));
+    assert!(eq(&sw_encrypted, &hw_encrypted));
+    assert!(eq(&sw_decrypted, &hw_decrypted));
 
     println!("done");
 
     loop {}
 }
 
-fn eq(slice1: &[u8; 16], slice2: &[u8; 16]) -> bool {
+fn eq(slice1: &[u8], slice2: &[u8]) -> bool {
     slice1.iter().zip(slice2.iter()).all(|(a, b)| a == b)
 }
