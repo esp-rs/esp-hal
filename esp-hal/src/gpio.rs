@@ -622,7 +622,7 @@ where
             .modify(|_, w| unsafe { w.out_sel().bits(OutputSignal::GPIO as OutputSignalType) });
 
         #[cfg(esp32)]
-        crate::soc::gpio::errata36(GPIONUM, pull_up, pull_down);
+        crate::soc::gpio::errata36(GPIONUM, Some(pull_up), Some(pull_down));
 
         // NOTE: Workaround to make GPIO18 and GPIO19 work on the ESP32-C3, which by
         //       default are assigned to the `USB_SERIAL_JTAG` peripheral.
@@ -1139,6 +1139,9 @@ where
     fn init_output(&self, alternate: AlternateFunction, open_drain: bool) {
         let gpio = unsafe { &*GPIO::PTR };
 
+        #[cfg(esp32)]
+        crate::soc::gpio::errata36(GPIONUM, Some(false), Some(false));
+
         <Self as GpioProperties>::Bank::write_out_en_set(1 << (GPIONUM % 32));
         gpio.pin(GPIONUM as usize)
             .modify(|_, w| w.pad_driver().bit(open_drain));
@@ -1277,10 +1280,16 @@ where
     }
 
     fn internal_pull_up(&mut self, on: bool) -> &mut Self {
+        #[cfg(esp32)]
+        crate::soc::gpio::errata36(GPIONUM, Some(on), None);
+
         get_io_mux_reg(GPIONUM).modify(|_, w| w.fun_wpu().bit(on));
         self
     }
     fn internal_pull_down(&mut self, on: bool) -> &mut Self {
+        #[cfg(esp32)]
+        crate::soc::gpio::errata36(GPIONUM, None, Some(on));
+
         get_io_mux_reg(GPIONUM).modify(|_, w| w.fun_wpd().bit(on));
         self
     }
