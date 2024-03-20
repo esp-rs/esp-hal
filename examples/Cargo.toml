@@ -21,6 +21,7 @@ embedded-hal-02     = { version = "0.2.7", package = "embedded-hal", features = 
 embedded-hal-async  = "1.0.0"
 embedded-hal-bus    = "0.1.0"
 embedded-io-async   = "0.6.1"
+embedded-can        = "0.4.1"
 esp-alloc           = "0.3.0"
 esp-backtrace       = { version = "0.11.1", features = ["exception-handler", "panic-handler", "println"] }
 esp-hal             = { version = "0.16.0", path = "../esp-hal", features = ["log"] }

@@ -150,12 +150,18 @@ pub fn build_documentation(
 
     log::info!("Building '{package_name}' documentation targeting '{chip}'");
 
+    let mut features = vec![chip.to_string()];
+
+    if matches!(package, Package::EspHal) {
+        features.push("ci".to_owned())
+    }
+
     // Build up an array of command-line arguments to pass to `cargo`:
     let mut builder = CargoArgsBuilder::default()
         .subcommand("doc")
         .arg("-Zbuild-std=core") // Required for Xtensa, for some reason
         .target(target)
-        .features(&[chip.to_string(), "ci".to_owned()]);
+        .features(&features);
 
     if open {
         builder = builder.arg("--open");
