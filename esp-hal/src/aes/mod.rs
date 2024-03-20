@@ -462,7 +462,7 @@ pub mod dma {
             self.enable_interrupt();
             self.set_mode(mode);
             self.set_cipher_mode(cipher_mode);
-            self.write_key(&key);
+            self.write_key(key);
 
             // TODO: verify 16?
             self.set_num_block(16);
