@@ -20,3 +20,6 @@ rustflags = [
     "-C", "link-arg=-Tembedded-test.x",
 
 ]
+
+[unstable]
+build-std = ["core"]

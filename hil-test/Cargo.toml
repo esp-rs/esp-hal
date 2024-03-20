@@ -97,3 +97,6 @@ incremental      = false
 lto              = 'fat'
 opt-level        = 3     # <-
 overflow-checks  = false # <-
+
+[patch.crates-io]
+semihosting = { git = "https://github.com/taiki-e/semihosting", branch = "xtensa2" }
