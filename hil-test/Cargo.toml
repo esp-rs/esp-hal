@@ -23,10 +23,11 @@ harness = false
 [dependencies]
 defmt = { version = "0.3.5" }
 defmt-rtt = { version = "0.4.0" }
-esp-hal = { path = "../esp-hal", features = ["eh1", "defmt"], optional = true }
-embedded-hal       = { version = "0.2.7", features = ["unproven"] }
+esp-hal = { path = "../esp-hal", features = ["embedded-hal", "defmt"], optional = true }
+embedded-hal-02       = { version = "0.2.7", package = "embedded-hal", features = ["unproven"] }
 embedded-hal-async = { version = "1.0.0", optional = true }
-embedded-hal-1     = { version = "1.0.0", package = "embedded-hal" }
+embedded-hal     = { version = "1.0.0" }
+embedded-hal-nb      = { version = "1.0.0", optional = true }
 embassy-executor = { default-features = false, version = "0.5.0", features = ["executor-thread", "arch-riscv32"], optional = true }
 semihosting = "0.1.6"
 

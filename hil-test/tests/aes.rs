@@ -22,7 +22,7 @@ impl Context<'_> {
     }
 }
 
-#[cfg(not(any(esp32c3, esp32c6, esp32h2)))]
+#[cfg(not(any(feature = "esp32c3", feature = "esp32c6", feature = "esp32h2")))]
 mod not_test {
     #[esp_hal::entry]
     fn main() -> ! {
@@ -35,7 +35,7 @@ mod not_test {
 }
 
 #[cfg(test)]
-#[cfg(any(esp32c3, esp32c6, esp32h2))]
+#[cfg(any(feature = "esp32c3", feature = "esp32c6", feature = "esp32h2"))]
 #[embedded_test::tests]
 mod tests {
     use defmt::assert_eq;

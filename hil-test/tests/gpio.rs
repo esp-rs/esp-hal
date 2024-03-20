@@ -8,7 +8,7 @@
 #![no_main]
 
 use defmt_rtt as _;
-use embedded_hal_1::digital::{InputPin as _, OutputPin as _, StatefulOutputPin as _};
+use embedded_hal::digital::{InputPin as _, OutputPin as _, StatefulOutputPin as _};
 use esp_hal::{
     gpio::{GpioPin, Input, Output, PullDown, PushPull, IO},
     peripherals::Peripherals,

@@ -10,15 +10,16 @@
 #![no_main]
 
 use defmt_rtt as _;
+use embedded_hal_02::serial::{Read, Write};
 use esp_hal::{
     clock::ClockControl,
+    gpio::IO,
     peripherals::{Peripherals, UART0},
     prelude::*,
     uart::{
         config::{Config, DataBits, Parity, StopBits},
-        TxRxPins,
+        TxRxPins, Uart,
     },
-    Uart, IO,
 };
 use nb::block;
 

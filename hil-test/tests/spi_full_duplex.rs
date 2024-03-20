@@ -61,6 +61,8 @@ mod tests {
 
     #[test]
     fn test_symestric_transfer(mut ctx: Context) {
+        use embedded_hal_02::blocking::spi::Transfer;
+
         let mut data = [0xde, 0xad, 0xbe, 0xef];
         let initial_data = data;
 
@@ -72,7 +74,7 @@ mod tests {
 
     #[test]
     fn test_asymestric_transfer(mut ctx: Context) {
-        use embedded_hal_1::spi::SpiBus;
+        use embedded_hal::spi::SpiBus;
 
         let write = [0xde, 0xad, 0xbe, 0xef];
         let mut read: [u8; 4] = [0x00; 4];
@@ -84,6 +86,8 @@ mod tests {
 
     #[test]
     fn test_symestric_transfer_huge_buffer(mut ctx: Context) {
+        use embedded_hal_02::blocking::spi::Transfer;
+
         let mut data = [0x55u8; 4096];
         for byte in 0..data.len() {
             data[byte] = byte as u8;
@@ -97,7 +101,7 @@ mod tests {
     #[test]
     #[timeout(3)]
     fn test_symestric_transfer_huge_buffer_no_alloc(mut ctx: Context) {
-        use embedded_hal_1::spi::SpiBus;
+        use embedded_hal::spi::SpiBus;
 
         let mut write = [0x55u8; 4096];
         for byte in 0..write.len() {
