@@ -33,7 +33,10 @@ async fn main(_spawner: Spawner) {
     embassy::init(&clocks, timg0);
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
     let mut input = io.pins.gpio0.into_pull_down_input();
+    #[cfg(not(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3")))]
+    let mut input = io.pins.gpio9.into_pull_down_input();
 
     loop {
         esp_println::println!("Waiting...");

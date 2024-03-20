@@ -442,7 +442,7 @@ _abs_start:
     _start_trap_rust, then restores all saved registers before `mret`
 */
 .section .trap, "ax"
-.weak _start_trap
+.weak _start_trap  /* Exceptions call into _start_trap in vectored mode */
 .weak _start_trap1
 .weak _start_trap2
 .weak _start_trap3
@@ -475,8 +475,40 @@ _abs_start:
 .weak _start_trap30
 .weak _start_trap31
 "#,
-#[cfg(feature="direct-vectoring")]
 r#"
+_start_trap: // Handle exceptions in vectored mode
+"#,
+#[cfg(feature="fix-sp")]
+r#"
+    // move SP to some save place if it's pointing below the RAM
+    // otherwise we won't be able to do anything reasonable
+    // (since we don't have a working stack)
+    //
+    // most probably we will just print something and halt in this case
+    // we actually can't do anything else
+    csrw mscratch, t0
+    la t0, _stack_end
+    bge sp, t0, 1f
+
+    // use the reserved exception cause 14 to signal we detected a stack overflow
+    li t0, 14
+    csrw mcause, t0
+
+    // set SP to the start of the stack
+    la sp, _stack_start
+    li t0, 4 // make sure stack start is in RAM
+    sub sp, sp, t0
+    andi sp, sp, -16 // Force 16-byte alignment
+
+    1:
+    csrr t0, mscratch
+    // now SP is in RAM - continue
+"#,
+r#"
+    addi sp, sp, -40*4
+    sw ra, 0(sp)
+    la ra, _start_trap_rust_hal /* Load the HAL trap handler */
+    j _start_trap_direct
 _start_trap1:
     addi sp, sp, -40*4
     sw ra, 0(sp)
@@ -632,77 +664,7 @@ _start_trap31:
     sw ra, 0(sp)
     la ra, cpu_int_31_handler
     j _start_trap_direct
-"#,
-#[cfg(not(feature="direct-vectoring"))]
-r#"
-_start_trap1:
-_start_trap2:
-_start_trap3:
-_start_trap4:
-_start_trap5:
-_start_trap6:
-_start_trap7:
-_start_trap8:
-_start_trap9:
-_start_trap10:
-_start_trap11:
-_start_trap12:
-_start_trap13:
-_start_trap14:
-_start_trap15:
-_start_trap16:
-_start_trap17:
-_start_trap18:
-_start_trap19:
-_start_trap20:
-_start_trap21:
-_start_trap22:
-_start_trap23:
-_start_trap24:
-_start_trap25:
-_start_trap26:
-_start_trap27:
-_start_trap28:
-_start_trap29:
-_start_trap30:
-_start_trap31:
-
-"#,
-r#"
-_start_trap:
-"#,
-#[cfg(feature="fix-sp")]
-r#"
-    // move SP to some save place if it's pointing below the RAM
-    // otherwise we won't be able to do anything reasonable
-    // (since we don't have a working stack)
-    //
-    // most probably we will just print something and halt in this case
-    // we actually can't do anything else
-    csrw mscratch, t0
-    la t0, _stack_end
-    bge sp, t0, 1f
-
-    // use the reserved exception cause 14 to signal we detected a stack overflow
-    li t0, 14
-    csrw mcause, t0
-
-    // set SP to the start of the stack
-    la sp, _stack_start
-    li t0, 4 // make sure stack start is in RAM
-    sub sp, sp, t0
-    andi sp, sp, -16 // Force 16-byte alignment
-
-    1:
-    csrr t0, mscratch
-    // now SP is in RAM - continue
-"#,
-r#"
-    addi sp, sp, -40*4
-    sw ra, 0*4(sp)"#,
-#[cfg(feature="direct-vectoring")] //for the directly vectored handlers the above is stacked beforehand
-r#"
-    la ra, _start_trap_rust_hal #this runs on exception, use regular fault handler
+la ra, _start_trap_rust_hal /* this runs on exception, use regular fault handler */
 _start_trap_direct:
 "#,
 r#"
@@ -749,7 +711,7 @@ r#"
 
     add a0, sp, zero
     "#,
-    #[cfg(all(feature="interrupt-preemption", feature="direct-vectoring"))] //store current priority, set threshold, enable interrupts
+    // store current priority, set threshold, enable interrupts
     r#"
     addi sp, sp, -4 #build stack
     sw ra, 0(sp)
@@ -758,15 +720,11 @@ r#"
     sw a0, 0(sp) #reuse old stack, a0 is return of _handle_priority
     addi a0, sp, 4 #the proper stack pointer is an argument to the HAL handler
     "#,
-    #[cfg(not(feature="direct-vectoring"))] //jump to HAL handler
-    r#"
-    jal ra, _start_trap_rust_hal
-    "#,
-    #[cfg(feature="direct-vectoring")] //jump to handler loaded in direct handler
+    // jump to handler loaded in direct handler
     r#"
     jalr ra, ra #jump to label loaded in _start_trapx
     "#,
-    #[cfg(all(feature="interrupt-preemption", feature="direct-vectoring"))] //restore threshold
+    // restore threshold
     r#"
     lw a0, 0(sp) #load stored priority
     jal ra, _restore_priority
@@ -866,10 +824,8 @@ _vector_table:
     j _start_trap29
     j _start_trap30
     j _start_trap31
-
 .option pop
 "#,
-#[cfg(feature="direct-vectoring")]
 r#"
 #this is required for the linking step, these symbols for in-use interrupts should always be overwritten by the user.
 .section .trap, "ax"

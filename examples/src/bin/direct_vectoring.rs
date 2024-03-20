@@ -2,7 +2,6 @@
 #![no_std]
 
 //% CHIPS: esp32c2 esp32c3 esp32c6 esp32h2
-//% FEATURES: direct-vectoring
 
 use core::{arch::asm, cell::RefCell};
 
@@ -33,14 +32,13 @@ fn main() -> ! {
     let sw_int = system.software_interrupt_control;
 
     critical_section::with(|cs| SWINT.borrow_ref_mut(cs).replace(sw_int));
+    interrupt::enable_direct(
+        Interrupt::FROM_CPU_INTR0,
+        Priority::Priority3,
+        CpuInterrupt::Interrupt20,
+    )
+    .unwrap();
     unsafe {
-        interrupt::enable(
-            Interrupt::FROM_CPU_INTR0,
-            Priority::Priority3,
-            CpuInterrupt::Interrupt1,
-        )
-        .unwrap();
-
         asm!(
             "
         csrrwi x0, 0x7e0, 1 #what to count, for cycles write 1 for instructions write 2
@@ -69,7 +67,7 @@ fn main() -> ! {
 }
 
 #[no_mangle]
-fn cpu_int_1_handler() {
+fn cpu_int_20_handler() {
     unsafe { asm!("csrrwi x0, 0x7e1, 0 #disable timer") }
     critical_section::with(|cs| {
         SWINT

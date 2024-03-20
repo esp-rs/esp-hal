@@ -23,9 +23,9 @@ embedded-hal-bus    = "0.1.0"
 embedded-io-async   = "0.6.1"
 esp-alloc           = "0.3.0"
 esp-backtrace       = { version = "0.11.1", features = ["exception-handler", "panic-handler", "println"] }
-esp-hal             = { version = "0.16.0", path = "../esp-hal" }
+esp-hal             = { version = "0.16.0", path = "../esp-hal", features = ["log"] }
 esp-hal-smartled    = { version = "0.9.0",  path = "../esp-hal-smartled", optional = true }
-esp-println         = "0.9.1"
+esp-println         = { version = "0.9.1", features = ["log"] }
 heapless            = "0.8.0"
 hex-literal         = "0.4.1"
 hmac                = { version = "0.12.1", default-features = false }
@@ -39,6 +39,7 @@ ssd1306             = "0.8.4"
 static_cell         = { version = "2.0.0", features = ["nightly"] }
 usb-device          = "0.3.2"
 usbd-serial         = "0.2.1"
+log                 = "0.4"
 
 [features]
 esp32   = ["esp-hal/esp32",   "esp-backtrace/esp32",   "esp-println/esp32",   "esp-hal-smartled/esp32"]
@@ -62,9 +63,6 @@ embassy-executor-interrupt = ["esp-hal/embassy-executor-interrupt"]
 
 embassy-time-timg0 = ["esp-hal/embassy-time-timg0"]
 embassy-generic-timers = ["embassy-time/generic-queue-8"]
-
-direct-vectoring     = ["esp-hal/direct-vectoring"]
-interrupt-preemption = ["esp-hal/interrupt-preemption"]
 
 opsram-2m = ["esp-hal/opsram-2m"]
 psram-2m  = ["esp-hal/psram-2m"]

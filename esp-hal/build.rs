@@ -7,7 +7,7 @@ use std::{
     str::FromStr,
 };
 
-use esp_metadata::{Arch, Chip, Config};
+use esp_metadata::{Chip, Config};
 
 // Macros taken from:
 // https://github.com/TheDan64/inkwell/blob/36c3b10/src/lib.rs#L81-L110
@@ -113,21 +113,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         panic!("The target does not support PSRAM");
     }
 
-    // Don't support "interrupt-preemption" and "direct-vectoring" on Xtensa and
-    // RISC-V with CLIC:
-    if (config.contains(&String::from("clic")) || config.arch() == Arch::Xtensa)
-        && (cfg!(feature = "direct-vectoring") || cfg!(feature = "interrupt-preemption"))
-    {
-        panic!("The target does not support interrupt-preemption and direct-vectoring");
-    }
-
     // Define all necessary configuration symbols for the configured device:
     config.define_symbols();
 
     #[allow(unused_mut)]
     let mut config_symbols = config.all();
     #[cfg(feature = "flip-link")]
-    config_symbols.push("flip-link");
+    config_symbols.push("flip-link".to_owned());
 
     // Place all linker scripts in `OUT_DIR`, and instruct Cargo how to find these
     // files:

@@ -42,11 +42,7 @@ macro_rules! from_cpu {
                         panic!("FROM_CPU_{} is already used by a different executor.", $irq);
                     }
 
-                    // unsafe block because of direct-vectoring on riscv
-                    #[allow(unused_unsafe)]
-                    unsafe {
-                        unwrap!(interrupt::enable(peripherals::Interrupt::[<FROM_CPU_INTR $irq>], priority));
-                    }
+                    unwrap!(interrupt::enable(peripherals::Interrupt::[<FROM_CPU_INTR $irq>], priority));
                 }
 
                 fn number() -> usize {

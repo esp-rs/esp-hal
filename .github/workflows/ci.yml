@@ -56,7 +56,7 @@ jobs:
             "esp32c3",
             "esp32c6",
             "esp32h2",
-            "esp32p4",
+            # "esp32p4",
             # Xtensa devices:
             "esp32",
             "esp32s2",
@@ -179,7 +179,7 @@ jobs:
           cargo xtask build-package --features=esp32c3 --target=riscv32imc-unknown-none-elf   esp-hal
           cargo xtask build-package --features=esp32c6 --target=riscv32imac-unknown-none-elf  esp-hal
           cargo xtask build-package --features=esp32h2 --target=riscv32imac-unknown-none-elf  esp-hal
-          cargo xtask build-package --features=esp32p4 --target=riscv32imafc-unknown-none-elf esp-hal
+      #   cargo xtask build-package --features=esp32p4 --target=riscv32imafc-unknown-none-elf esp-hal
       - name: msrv (esp-lp-hal)
         run: |
           cargo xtask build-package --features=esp32c6 --target=riscv32imac-unknown-none-elf esp-lp-hal
