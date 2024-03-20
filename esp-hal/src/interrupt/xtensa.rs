@@ -81,7 +81,7 @@ pub fn enable_direct(interrupt: Interrupt, cpu_interrupt: CpuInterrupt) -> Resul
         return Err(Error::CpuInterruptReserved);
     }
     unsafe {
-        map(get_core(), interrupt, cpu_interrupt);
+        map(crate::get_core(), interrupt, cpu_interrupt);
 
         xtensa_lx::interrupt::enable_mask(
             xtensa_lx::interrupt::get_mask() | 1 << cpu_interrupt as u32,

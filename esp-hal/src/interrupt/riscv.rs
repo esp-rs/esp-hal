@@ -654,7 +654,7 @@ mod classic {
         let interrupt_priority = intr
             .cpu_int_pri_0()
             .as_ptr()
-            .offset(interrupt_id as isize)
+            .add(interrupt_id)
             .read_volatile();
 
         let prev_interrupt_priority = intr.cpu_int_thresh().read().bits();
