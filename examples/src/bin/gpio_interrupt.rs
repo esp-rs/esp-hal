@@ -60,7 +60,7 @@ fn main() -> ! {
 
     loop {
         led.toggle().unwrap();
-        delay.delay_millis(500u32);
+        delay.delay_millis(500);
     }
 }
 

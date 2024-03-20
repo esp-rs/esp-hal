@@ -50,6 +50,6 @@ fn main() -> ! {
     let mut wakeup_pins: [&mut dyn RTCPin; 2] = [&mut pin_0, &mut pin_2];
     let ext1 = Ext1WakeupSource::new(&mut wakeup_pins, WakeupLevel::High);
     println!("sleeping!");
-    delay.delay_millis(100u32);
+    delay.delay_millis(100);
     rtc.sleep_deep(&[&timer, &ext1], &mut delay);
 }

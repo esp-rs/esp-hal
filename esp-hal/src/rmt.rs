@@ -41,7 +41,7 @@
 //! ### Initialization
 //!
 //! ```no_run
-//! let rmt = Rmt::new(peripherals.RMT, 80u32.MHz(), &mut clock_control, &clocks).unwrap();
+//! let rmt = Rmt::new(peripherals.RMT, 80.MHz(), &mut clock_control, &clocks).unwrap();
 //! let mut channel = rmt
 //!     .channel0
 //!     .configure(

@@ -32,7 +32,7 @@
 //! use mcpwm::{operator::PwmPinConfig, timer::PwmWorkingMode, PeripheralClockConfig, MCPWM};
 //!
 //! // initialize peripheral
-//! let clock_cfg = PeripheralClockConfig::with_frequency(&clocks, 40u32.MHz()).unwrap();
+//! let clock_cfg = PeripheralClockConfig::with_frequency(&clocks, 40.MHz()).unwrap();
 //! let mut mcpwm = MCPWM::new(peripherals.PWM0, clock_cfg);
 //!
 //! // connect operator0 to timer0
@@ -44,7 +44,7 @@
 //!
 //! // start timer with timestamp values in the range of 0..=99 and a frequency of 20 kHz
 //! let timer_clock_cfg = clock_cfg
-//!     .timer_clock_with_frequency(99, PwmWorkingMode::Increase, 20u32.kHz())
+//!     .timer_clock_with_frequency(99, PwmWorkingMode::Increase, 20.kHz())
 //!     .unwrap();
 //! mcpwm.timer0.start(timer_clock_cfg);
 //!

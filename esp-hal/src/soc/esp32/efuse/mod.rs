@@ -79,9 +79,9 @@ impl Efuse {
         let has_low_rating = Self::read_field_le::<bool>(CHIP_CPU_FREQ_LOW);
 
         if has_rating && has_low_rating {
-            160u32.MHz()
+            160.MHz()
         } else {
-            240u32.MHz()
+            240.MHz()
         }
     }
 

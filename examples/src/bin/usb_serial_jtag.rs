@@ -35,7 +35,7 @@ fn main() -> ! {
     let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let mut timer0 = timg0.timer0;
 
-    timer0.start(1u64.secs());
+    timer0.start(1.secs());
 
     let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE);
     usb_serial.listen_rx_packet_recv_interrupt();

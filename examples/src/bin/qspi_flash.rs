@@ -77,7 +77,7 @@ fn main() -> ! {
 
     let (tx_buffer, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(256, 320);
 
-    let mut spi = Spi::new_half_duplex(peripherals.SPI2, 100u32.kHz(), SpiMode::Mode0, &clocks)
+    let mut spi = Spi::new_half_duplex(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
         .with_pins(
             Some(sclk),
             Some(mosi),
@@ -111,7 +111,7 @@ fn main() -> ! {
         )
         .unwrap();
     transfer.wait().unwrap();
-    delay.delay_millis(250u32);
+    delay.delay_millis(250);
 
     // erase sector
     let transfer = spi
@@ -124,7 +124,7 @@ fn main() -> ! {
         )
         .unwrap();
     transfer.wait().unwrap();
-    delay.delay_millis(250u32);
+    delay.delay_millis(250);
 
     // write enable
     let transfer = spi
@@ -137,7 +137,7 @@ fn main() -> ! {
         )
         .unwrap();
     transfer.wait().unwrap();
-    delay.delay_millis(250u32);
+    delay.delay_millis(250);
 
     // write data / program page
     send.fill(b'!');
@@ -152,7 +152,7 @@ fn main() -> ! {
         )
         .unwrap();
     transfer.wait().unwrap();
-    delay.delay_millis(250u32);
+    delay.delay_millis(250);
 
     loop {
         // quad fast read
@@ -181,6 +181,6 @@ fn main() -> ! {
         }
         println!();
 
-        delay.delay_millis(250u32);
+        delay.delay_millis(250);
     }
 }

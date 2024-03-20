@@ -21,7 +21,7 @@
 //!     peripherals.I2C0,
 //!     io.pins.gpio1,
 //!     io.pins.gpio2,
-//!     100u32.kHz(),
+//!     100.kHz(),
 //!     &clocks,
 //! );
 //! loop {

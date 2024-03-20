@@ -31,7 +31,7 @@ fn main() -> ! {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let mut rtc = Rtc::new(peripherals.LPWR);
-    rtc.rwdt.start(2000u64.millis());
+    rtc.rwdt.start(2000.millis());
     rtc.rwdt.listen();
 
     println!(

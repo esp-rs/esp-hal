@@ -20,6 +20,7 @@ use esp_hal::{
     systimer::{Alarm, Periodic, SystemTimer, Target},
 };
 use esp_println::println;
+use fugit::ExtU32;
 
 static ALARM0: Mutex<RefCell<Option<Alarm<Periodic, 0>>>> = Mutex::new(RefCell::new(None));
 static ALARM1: Mutex<RefCell<Option<Alarm<Target, 1>>>> = Mutex::new(RefCell::new(None));
@@ -62,7 +63,7 @@ fn main() -> ! {
     let delay = Delay::new(&clocks);
 
     loop {
-        delay.delay_millis(500u32);
+        delay.delay_millis(500);
     }
 }
 

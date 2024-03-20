@@ -32,9 +32,9 @@ fn main() -> ! {
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32h2")] {
-            let freq = 32u32.MHz();
+            let freq = 32.MHz();
         } else {
-            let freq = 80u32.MHz();
+            let freq = 80.MHz();
         }
     };
 
@@ -127,6 +127,6 @@ fn main() -> ! {
             }
         }
 
-        delay.delay_millis(1500u32);
+        delay.delay_millis(1500);
     }
 }

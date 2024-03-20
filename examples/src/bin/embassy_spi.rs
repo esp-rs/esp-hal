@@ -64,7 +64,7 @@ async fn main(_spawner: Spawner) {
 
     let (mut descriptors, mut rx_descriptors) = dma_descriptors!(32000);
 
-    let mut spi = Spi::new(peripherals.SPI2, 100u32.kHz(), SpiMode::Mode0, &clocks)
+    let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
         .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
         .with_dma(dma_channel.configure(
             false,

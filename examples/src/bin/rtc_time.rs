@@ -25,6 +25,6 @@ fn main() -> ! {
 
     loop {
         esp_println::println!("rtc time in milliseconds is {}", rtc.get_time_ms());
-        delay.delay_millis(1000u32);
+        delay.delay_millis(1000);
     }
 }

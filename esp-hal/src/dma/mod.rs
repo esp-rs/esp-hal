@@ -51,7 +51,7 @@
 //!     mosi,
 //!     miso,
 //!     cs,
-//!     100u32.kHz(),
+//!     100.kHz(),
 //!     SpiMode::Mode0,
 //!     &clocks,
 //! )

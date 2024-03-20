@@ -44,7 +44,7 @@ fn main() -> ! {
             &mut rx_descriptors,
             DmaPriority::Priority0,
         ),
-        1u32.MHz(),
+        1.MHz(),
         &clocks,
     )
     .unwrap();
@@ -64,6 +64,6 @@ fn main() -> ! {
         transfer.wait().unwrap();
         println!("Received: {:02x?} ...", &buffer[..30]);
 
-        delay.delay_millis(500u32);
+        delay.delay_millis(500);
     }
 }

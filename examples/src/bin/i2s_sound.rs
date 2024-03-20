@@ -70,7 +70,7 @@ fn main() -> ! {
         peripherals.I2S0,
         Standard::Philips,
         DataFormat::Data16Channel16,
-        44100u32.Hz(),
+        44100.Hz(),
         dma_channel.configure(
             false,
             &mut tx_descriptors,

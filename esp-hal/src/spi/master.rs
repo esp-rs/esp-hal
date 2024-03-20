@@ -16,7 +16,7 @@
 //!
 //! let mut spi = hal::spi::Spi::new(
 //!     peripherals.SPI2,
-//!     100u32.kHz(),
+//!     100.kHz(),
 //!     SpiMode::Mode0,
 //!     &mut peripheral_clock_control,
 //!     &mut clocks,

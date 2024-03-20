@@ -46,7 +46,7 @@ fn main() -> ! {
 
     loop {
         toggle_pins(&mut pins, &button);
-        delay.delay_millis(500u32);
+        delay.delay_millis(500);
     }
 }
 

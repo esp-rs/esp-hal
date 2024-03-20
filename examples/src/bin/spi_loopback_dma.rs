@@ -55,7 +55,7 @@ fn main() -> ! {
 
     let (tx_buffer, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(32000);
 
-    let mut spi = Spi::new(peripherals.SPI2, 100u32.kHz(), SpiMode::Mode0, &clocks)
+    let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
         .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
         .with_dma(dma_channel.configure(
             false,
@@ -86,7 +86,7 @@ fn main() -> ! {
         // Check is_done until the transfer is almost done (32000 bytes at 100kHz is
         // 2.56 seconds), then move to wait().
         while !transfer.is_done() && n < 10 {
-            delay.delay_millis(250u32);
+            delay.delay_millis(250);
             n += 1;
         }
 
@@ -97,6 +97,6 @@ fn main() -> ! {
             &receive[receive.len() - 10..]
         );
 
-        delay.delay_millis(250u32);
+        delay.delay_millis(250);
     }
 }

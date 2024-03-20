@@ -27,6 +27,7 @@ esp-backtrace       = { version = "0.11.1", features = ["exception-handler", "pa
 esp-hal             = { version = "0.16.0", path = "../esp-hal", features = ["log"] }
 esp-hal-smartled    = { version = "0.9.0",  path = "../esp-hal-smartled", optional = true }
 esp-println         = { version = "0.9.1", features = ["log"] }
+fugit               = "0.3.7"
 heapless            = "0.8.0"
 hex-literal         = "0.4.1"
 hmac                = { version = "0.12.1", default-features = false }
