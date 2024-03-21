@@ -155,13 +155,12 @@ impl<'d> Aes<'d> {
 
     /// Encrypts/Decrypts the given buffer based on `mode` parameter
     pub fn process(&mut self, block: &mut [u8; 16], mode: Mode, key: &[u8]) {
-        if key.len() != 16
-            || (cfg!(any(feature = "esp32", feature = "esp32s2")) && key.len() != 24)
-            || key.len() != 32
-        {
-            panic!("Invalid key size");
-        }
-
+        assert!(
+            key.len() == 16
+                || (cfg!(any(feature = "esp32", feature = "esp32s2")) && key.len() == 24)
+                || key.len() == 32,
+            "Invalid key size"
+        );
         self.write_key(key);
         self.set_mode(mode as u8);
         self.set_block(block);
@@ -464,7 +463,7 @@ pub mod dma {
             self.enable_interrupt();
             self.set_mode(mode);
             self.set_cipher_mode(cipher_mode);
-            self.write_key(&key);
+            self.write_key(key);
 
             // TODO: verify 16?
             self.set_num_block(16);

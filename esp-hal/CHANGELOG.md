@@ -35,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed writes to SPI not flushing before attempting to write, causing corrupted writes (#1381)
 - fix AdcConfig::adc_calibrate for xtensa targets (#1379)
 - Fixed a divide by zero panic when setting the LEDC duty cycle to 0 with `SetDutyCycle::set_duty_cycle` (#1403)
+- Support 192 and 256-bit keys for AES (#1316)
 
 ### Changed
 
