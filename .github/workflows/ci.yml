@@ -298,3 +298,23 @@ jobs:
         run: cargo fmt --all --manifest-path=esp-riscv-rt/Cargo.toml -- --check
       - name: rustfmt (examples)
         run: cargo fmt --all --manifest-path=examples/Cargo.toml -- --check
+
+  # --------------------------------------------------------------------------
+  # NOTE:
+  #
+  # This is (hopefully) a temporary workaround to allow us to run HIL tests
+  # in merge queue, but not in pull requests. For more information see:
+  #
+  # https://github.com/esp-rs/esp-hal/issues/1328
+
+  riscv-hil:
+    name: HIL Test | ${{ matrix.soc }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        soc: [esp32c3, esp32c6, esp32h2]
+
+    steps:
+      - run: echo "HIL tests are not run in pull requests!"
