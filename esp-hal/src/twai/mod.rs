@@ -81,6 +81,7 @@ use core::marker::PhantomData;
 use embedded_can::{nb::Can, Error, ErrorKind, ExtendedId, Frame, Id, StandardId};
 #[cfg(not(feature = "embedded-hal"))] // FIXME
 use embedded_hal_02::can::{Can, Error, ErrorKind, ExtendedId, Frame, Id, StandardId};
+#[cfg(not(esp32c6))]
 use fugit::HertzU32;
 
 use self::filter::{Filter, FilterType};
