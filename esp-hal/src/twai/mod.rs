@@ -642,6 +642,23 @@ pub trait Instance {
 
 pub trait OperationInstance: Instance {
     #[cfg(feature = "async")]
+    fn enable_interrupts() {
+        let register_block = Self::register_block();
+        register_block.int_ena().modify(|_, w| {
+            w.rx_int_ena()
+                .set_bit()
+                .tx_int_ena()
+                .set_bit()
+                .bus_err_int_ena()
+                .set_bit()
+                .arb_lost_int_ena()
+                .set_bit()
+                .err_passive_int_ena()
+                .set_bit()
+        });
+    }
+
+    #[cfg(feature = "async")]
     fn async_state() -> &'static asynch::TwaiAsyncState {
         &asynch::TWAI_STATE[Self::NUMBER]
     }
@@ -902,6 +919,7 @@ mod asynch {
         T: OperationInstance,
     {
         pub async fn transmit_async(&mut self, frame: &EspTwaiFrame) -> Result<(), EspTwaiError> {
+            T::enable_interrupts();
             poll_fn(|cx| {
                 T::async_state().tx_waker.register(cx.waker());
 
@@ -930,6 +948,7 @@ mod asynch {
         T: OperationInstance,
     {
         pub async fn receive_async(&mut self) -> Result<EspTwaiFrame, EspTwaiError> {
+            T::enable_interrupts();
             poll_fn(|cx| {
                 T::async_state().err_waker.register(cx.waker());
 
