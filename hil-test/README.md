@@ -60,60 +60,33 @@ Currently, here are the Virtual Machines set up for HIL testing:
 - ESP32-C3:
   - Has an `ESP32-C3-DevKit-RUST-1` connected via USB-JTAG-SERIAL.
     - Pins 2 and 4 are connected for `spi_full_duplex` and `uart` tests.
-  - VM has the following setup:
-    ```
-    # Install Rust:
-    $ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain stable -y --profile minimal
-    # Source the current shell:
-    $ source "$HOME/.cargo/env"
-    # Install dependencies
-    $ sudo apt install -y pkg-config libudev-dev
-    # Install probe-rs
-    $ cargo install probe-rs --git=https://github.com/probe-rs/probe-rs --branch=feature/testing-rebased --features=cli --bin=probe-rs --locked --force
-    # Add the udev rules
-    $ wget -O - https://probe.rs/files/69-probe-rs.rules | sudo tee /etc/udev/rules.d/69-probe-rs.rules > /dev/null
-    # Add the user to plugdev group
-    $ sudo usermod -a -G plugdev $USER
-    # Reboot the VM
-    ```
+  - VM has the following [setup](#vm-setup)
 - ESP32-C6:
   - Has an `ESP32-C6-DevKitC-1 V1.2` connected via USB-JTAG-SERIAL.
     - Pins 2 and 4 are connected for `spi_full_duplex` and `uart` tests.
-  - VM has the following setup:
-    ```
-    # Install Rust:
-    $ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain stable -y --profile minimal
-    # Source the current shell:
-    $ source "$HOME/.cargo/env"
-    # Install dependencies
-    $ sudo apt install -y pkg-config libudev-dev
-    # Install probe-rs
-    $ cargo install probe-rs --git=https://github.com/probe-rs/probe-rs --branch=feature/testing-rebased --features=cli --bin=probe-rs --locked --force
-    # Add the udev rules
-    $ wget -O - https://probe.rs/files/69-probe-rs.rules | sudo tee /etc/udev/rules.d/69-probe-rs.rules > /dev/null
-    # Add the user to plugdev group
-    $ sudo usermod -a -G plugdev $USER
-    # Reboot the VM
-    ```
+  - VM has the following [setup](#vm-setup)
 - ESP32-H2
   - Has an `ESP32-H2-DevKitM-1` connected via USB-JTAG-SERIAL.
     - Pins 2 and 4 are connected for `spi_full_duplex` and `uart` tests.
-  - VM has the following setup:
-    ```
-    # Install Rust:
-    $ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain stable -y --profile minimal
-    # Source the current shell:
-    $ source "$HOME/.cargo/env"
-    # Install dependencies
-    $ sudo apt install -y pkg-config libudev-dev
-    # Install probe-rs
-    $ cargo install probe-rs --git=https://github.com/probe-rs/probe-rs --branch=feature/testing-rebased --features=cli --bin=probe-rs --locked --force
-    # Add the udev rules
-    $ wget -O - https://probe.rs/files/69-probe-rs.rules | sudo tee /etc/udev/rules.d/69-probe-rs.rules > /dev/null
-    # Add the user to plugdev group
-    $ sudo usermod -a -G plugdev $USER
-    # Reboot the VM
-    ```
+  - VM has the following [setup](#vm-setup)
+
+#### VM Setup
+```bash
+# Install Rust:
+$ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain stable -y --profile minimal
+# Source the current shell:
+$ source "$HOME/.cargo/env"
+# Install dependencies
+$ sudo apt install -y pkg-config libudev-dev
+# Install probe-rs
+$ cargo install probe-rs --git=https://github.com/probe-rs/probe-rs --rev=b431b24 --features=cli --bin=probe-rs --locked --force
+# Add the udev rules
+$ wget -O - https://probe.rs/files/69-probe-rs.rules | sudo tee /etc/udev/rules.d/69-probe-rs.rules > /dev/null
+# Add the user to plugdev group
+$ sudo usermod -a -G plugdev $USER
+# Reboot the VM
+```
+
 ## Adding New Tests
 
 - Create a new integration test file (`tests/$PERIPHERAL.rs`)

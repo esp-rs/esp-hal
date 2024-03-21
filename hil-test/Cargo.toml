@@ -33,7 +33,7 @@ semihosting = "0.1.6"
 
 [dev-dependencies]
 # Add the `embedded-test/defmt` feature for more verbose testing
-embedded-test = {git = "https://github.com/probe-rs/embedded-test/", branch = "next"}
+embedded-test = {git = "https://github.com/probe-rs/embedded-test", rev = "8e3f925"}
 
 [features]
 # Device support (required!):
@@ -92,4 +92,4 @@ opt-level        = 3     # <-
 overflow-checks  = false # <-
 
 [patch.crates-io]
-semihosting = { git = "https://github.com/taiki-e/semihosting", branch = "xtensa2" }
+semihosting = { git = "https://github.com/taiki-e/semihosting", rev = "c829c19" }
