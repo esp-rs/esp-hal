@@ -79,11 +79,13 @@ pub(crate) mod main {
         let out = &f.sig.output;
 
         let result = quote! {
+            #[doc(hidden)]
             #[::embassy_executor::task()]
             async fn __embassy_main(#fargs) #out {
                 #f_body
             }
 
+            #[doc(hidden)]
             unsafe fn __make_static<T>(t: &mut T) -> &'static mut T {
                 ::core::mem::transmute(t)
             }
