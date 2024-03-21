@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `interrupt::enable` now has a direct CPU enable counter part, `interrupt::enable_direct` (#1310)
 - `Delay::delay(time: fugit::MicrosDurationU64)`
 - Added async support for TWAI (#1320)
+- Add TWAI support for ESP32-C6 (#1323)
 
 ### Fixed
 
