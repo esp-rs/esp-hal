@@ -10,7 +10,7 @@
 //! This example should work with another ESP board running the `twai` example
 //! with `IS_SENDER` set to `true`.
 
-//% CHIPS: esp32c3 esp32s3
+//% CHIPS: esp32c3 esp32s2 esp32s3
 //% FEATURES: async embassy embassy-executor-thread embassy-time-timg0 embassy-generic-timers
 
 #![no_std]
