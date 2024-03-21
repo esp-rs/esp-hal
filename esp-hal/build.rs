@@ -7,44 +7,8 @@ use std::{
     str::FromStr,
 };
 
+use esp_build::assert_unique_used_features;
 use esp_metadata::{Chip, Config};
-
-// Macros taken from:
-// https://github.com/TheDan64/inkwell/blob/36c3b10/src/lib.rs#L81-L110
-
-// Given some features, assert that AT MOST one of the features is enabled.
-macro_rules! assert_unique_features {
-    () => {};
-
-    ( $first:tt $(,$rest:tt)* ) => {
-        $(
-            #[cfg(all(feature = $first, feature = $rest))]
-            compile_error!(concat!("Features \"", $first, "\" and \"", $rest, "\" cannot be used together"));
-        )*
-        assert_unique_features!($($rest),*);
-    };
-}
-
-// Given some features, assert that AT LEAST one of the features is enabled.
-macro_rules! assert_used_features {
-    ( $all:tt ) => {
-        #[cfg(not(feature = $all))]
-        compile_error!(concat!("The feature flag must be provided: ", $all));
-    };
-
-    ( $($all:tt),+ ) => {
-        #[cfg(not(any($(feature = $all),*)))]
-        compile_error!(concat!("One of the feature flags must be provided: ", $($all, ", "),*));
-    };
-}
-
-// Given some features, assert that EXACTLY one of the features is enabled.
-macro_rules! assert_unique_used_features {
-    ( $($all:tt),* ) => {
-        assert_unique_features!($($all),*);
-        assert_used_features!($($all),*);
-    }
-}
 
 fn main() -> Result<(), Box<dyn Error>> {
     // NOTE: update when adding new device support!
@@ -56,23 +20,21 @@ fn main() -> Result<(), Box<dyn Error>> {
     // If the `embassy` feature is enabled, ensure that a time driver implementation
     // is available:
     #[cfg(feature = "embassy")]
-    {
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "esp32")] {
-                assert_unique_used_features!("embassy-time-timg0");
-            } else if #[cfg(feature = "esp32s2")] {
-                assert_unique_used_features!("embassy-time-systick-80mhz", "embassy-time-timg0");
-            } else {
-                assert_unique_used_features!("embassy-time-systick-16mhz", "embassy-time-timg0");
-            }
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "esp32")] {
+            assert_unique_used_features!("embassy-time-timg0");
+        } else if #[cfg(feature = "esp32s2")] {
+            assert_unique_used_features!("embassy-time-systick-80mhz", "embassy-time-timg0");
+        } else {
+            assert_unique_used_features!("embassy-time-systick-16mhz", "embassy-time-timg0");
         }
     }
 
-    #[cfg(feature = "flip-link")]
-    {
-        #[cfg(not(any(feature = "esp32c6", feature = "esp32h2")))]
-        panic!("flip-link is only available on ESP32-C6/ESP32-H2");
-    }
+    #[cfg(all(
+        feature = "flip-link",
+        not(any(feature = "esp32c6", feature = "esp32h2"))
+    ))]
+    esp_build::error!("flip-link is only available on ESP32-C6/ESP32-H2");
 
     // NOTE: update when adding new device support!
     // Determine the name of the configured device:
@@ -95,12 +57,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     } else {
         unreachable!() // We've confirmed exactly one known device was selected
     };
-
-    if detect_atomic_extension("a") || detect_atomic_extension("s32c1i") {
-        panic!(
-            "Atomic emulation flags detected in `.cargo/config.toml`, this is no longer supported!"
-        );
-    }
 
     // Load the configuration file for the configured device:
     let chip = Chip::from_str(device_name)?;
@@ -126,8 +82,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
     println!("cargo:rustc-link-search={}", out.display());
 
+    // RISC-V and Xtensa devices each require some special handling and processing
+    // of linker scripts:
+
     if cfg!(feature = "esp32") || cfg!(feature = "esp32s2") || cfg!(feature = "esp32s3") {
-        fs::copy("ld/xtensa/hal-defaults.x", out.join("hal-defaults.x"))?;
+        // Xtensa devices:
+
+        #[cfg(any(feature = "esp32", feature = "esp32s2"))]
+        File::create(out.join("memory_extras.x"))?.write_all(&generate_memory_extras())?;
 
         let (irtc, drtc) = if cfg!(feature = "esp32s3") {
             ("rtc_fast_seg", "rtc_fast_seg")
@@ -148,24 +110,29 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
 
         fs::write(out.join("alias.x"), alias)?;
+        fs::copy("ld/xtensa/hal-defaults.x", out.join("hal-defaults.x"))?;
     } else {
+        // RISC-V devices:
+
+        preprocess_file(&config_symbols, "ld/riscv/asserts.x", out.join("asserts.x"))?;
+        preprocess_file(&config_symbols, "ld/riscv/debug.x", out.join("debug.x"))?;
         preprocess_file(
             &config_symbols,
             "ld/riscv/hal-defaults.x",
             out.join("hal-defaults.x"),
         )?;
-        preprocess_file(&config_symbols, "ld/riscv/asserts.x", out.join("asserts.x"))?;
-        preprocess_file(&config_symbols, "ld/riscv/debug.x", out.join("debug.x"))?;
     }
 
+    // With the architecture-specific linker scripts taken care of, we can copy all
+    // remaining linker scripts which are common to all devices:
     copy_dir_all(&config_symbols, "ld/sections", &out)?;
     copy_dir_all(&config_symbols, format!("ld/{device_name}"), &out)?;
 
-    #[cfg(any(feature = "esp32", feature = "esp32s2"))]
-    File::create(out.join("memory_extras.x"))?.write_all(&generate_memory_extras())?;
-
     Ok(())
 }
+
+// ----------------------------------------------------------------------------
+// Helper Functions
 
 fn copy_dir_all(
     config_symbols: &Vec<String>,
@@ -232,32 +199,6 @@ fn preprocess_file(
         }
     }
     Ok(())
-}
-
-fn detect_atomic_extension(ext: &str) -> bool {
-    let rustflags = env::var_os("CARGO_ENCODED_RUSTFLAGS")
-        .unwrap()
-        .into_string()
-        .unwrap();
-
-    // Users can pass -Ctarget-feature to the compiler multiple times, so we have to
-    // handle that
-    let target_flags = rustflags
-        .split(0x1f as char)
-        .filter_map(|s| s.strip_prefix("target-feature="));
-    for tf in target_flags {
-        let tf = tf
-            .split(',')
-            .map(|s| s.trim())
-            .filter_map(|s| s.strip_prefix('+'));
-        for tf in tf {
-            if tf == ext {
-                return true;
-            }
-        }
-    }
-
-    false
 }
 
 #[cfg(feature = "esp32")]

@@ -2,6 +2,7 @@
 resolver = "2"
 members  = ["xtask"]
 exclude  = [
+    "esp-build",
     "esp-hal",
     "esp-hal-procmacros",
     "esp-hal-smartled",
