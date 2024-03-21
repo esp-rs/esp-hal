@@ -310,11 +310,11 @@ where
     /// Set the bitrate of the bus.
     ///
     /// Note: The timings currently assume a APB_CLK of 80MHz.
-    fn set_baud_rate(&mut self, baud_rate: BaudRate, clocks: &Clocks) {
+    fn set_baud_rate(&mut self, baud_rate: BaudRate, _clocks: &Clocks) {
         // TWAI is clocked from the APB_CLK according to Table 6-4 [ESP32C3 Reference Manual](https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf)
         // Included timings are all for 80MHz so assert that we are running at 80MHz.
         #[cfg(not(esp32c6))]
-        assert!(clocks.apb_clock == HertzU32::MHz(80));
+        assert!(_clocks.apb_clock == HertzU32::MHz(80));
 
         // Unpack the baud rate timings and convert them to the values needed for the
         // register. Many of the registers have a minimum value of 1 which is
