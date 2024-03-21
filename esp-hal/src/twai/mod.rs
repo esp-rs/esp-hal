@@ -638,26 +638,11 @@ pub trait Instance {
     fn register_block() -> &'static RegisterBlock;
 
     fn enable_peripheral();
+
+    fn enable_interrupts();
 }
 
 pub trait OperationInstance: Instance {
-    #[cfg(feature = "async")]
-    fn enable_interrupts() {
-        let register_block = Self::register_block();
-        register_block.int_ena().modify(|_, w| {
-            w.rx_int_ena()
-                .set_bit()
-                .tx_int_ena()
-                .set_bit()
-                .bus_err_int_ena()
-                .set_bit()
-                .arb_lost_int_ena()
-                .set_bit()
-                .err_passive_int_ena()
-                .set_bit()
-        });
-    }
-
     #[cfg(feature = "async")]
     fn async_state() -> &'static asynch::TwaiAsyncState {
         &asynch::TWAI_STATE[Self::NUMBER]
@@ -802,7 +787,7 @@ pub trait OperationInstance: Instance {
     }
 }
 
-#[cfg(any(esp32c3, esp32s3))]
+#[cfg(any(esp32c3, esp32, esp32s2, esp32s3))]
 impl Instance for crate::peripherals::TWAI0 {
     const SYSTEM_PERIPHERAL: system::Peripheral = system::Peripheral::Twai0;
     const NUMBER: usize = 0;
@@ -818,9 +803,25 @@ impl Instance for crate::peripherals::TWAI0 {
     fn enable_peripheral() {
         PeripheralClockControl::enable(crate::system::Peripheral::Twai0);
     }
+
+    fn enable_interrupts() {
+        let register_block = Self::register_block();
+        register_block.int_ena().modify(|_, w| {
+            w.rx_int_ena()
+                .set_bit()
+                .tx_int_ena()
+                .set_bit()
+                .bus_err_int_ena()
+                .set_bit()
+                .arb_lost_int_ena()
+                .set_bit()
+                .err_passive_int_ena()
+                .set_bit()
+        });
+    }
 }
 
-#[cfg(any(esp32c3, esp32s3))]
+#[cfg(any(esp32c3, esp32, esp32s2, esp32s3))]
 impl OperationInstance for crate::peripherals::TWAI0 {}
 
 #[cfg(esp32c6)]
@@ -838,6 +839,38 @@ impl Instance for crate::peripherals::TWAI0 {
 
     fn enable_peripheral() {
         PeripheralClockControl::enable(crate::system::Peripheral::Twai0);
+    }
+
+    fn enable_interrupts() {
+        let register_block = Self::register_block();
+        register_block.int_ena().modify(|_, w| {
+            w.rx_int_ena()
+                .set_bit()
+                .tx_int_ena()
+                .set_bit()
+                .bus_err_int_ena()
+                .set_bit()
+                .arb_lost_int_ena()
+                .set_bit()
+                .err_passive_int_ena()
+                .set_bit()
+        });
+    }
+
+    fn enable_interrupts() {
+        let register_block = Self::register_block();
+        register_block.interrupt_enable().modify(|_, w| {
+            w.ext_receive_int_ena()
+                .set_bit()
+                .ext_transmit_int_ena()
+                .set_bit()
+                .bus_err_int_ena()
+                .set_bit()
+                .arbitration_lost_int_ena()
+                .set_bit()
+                .err_passive_int_ena()
+                .set_bit()
+        });
     }
 }
 
@@ -859,6 +892,22 @@ impl Instance for crate::peripherals::TWAI1 {
 
     fn enable_peripheral() {
         PeripheralClockControl::enable(crate::system::Peripheral::Twai1);
+    }
+
+    fn enable_interrupts() {
+        let register_block = Self::register_block();
+        register_block.interrupt_enable().modify(|_, w| {
+            w.ext_receive_int_ena()
+                .set_bit()
+                .ext_transmit_int_ena()
+                .set_bit()
+                .bus_err_int_ena()
+                .set_bit()
+                .arbitration_lost_int_ena()
+                .set_bit()
+                .err_passive_int_ena()
+                .set_bit()
+        });
     }
 }
 
@@ -975,7 +1024,7 @@ mod asynch {
         }
     }
 
-    #[cfg(any(esp32c3, esp32s3))]
+    #[cfg(any(esp32c3, esp32, esp32s2, esp32s3))]
     #[interrupt]
     fn TWAI0() {
         let register_block = TWAI0::register_block();
