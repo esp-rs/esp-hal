@@ -7,11 +7,11 @@
 //! * adding a pull-up to the signal pins
 //!
 //! ESP1/GND --- ESP2/GND
-//! ESP1/IO0 --- ESP1/IO1 --- ESP2/IO0 --- ESP2/IO1 --- 4.8kOhm --- ESP1/5V
+//! ESP1/IO0 --- ESP1/IO2 --- ESP2/IO0 --- ESP2/IO2 --- 4.8kOhm --- ESP1/5V
 //!
 //! `IS_FIRST_SENDER` below must be set to false on one of the ESP's
 
-//% CHIPS: esp32c3 esp32s3
+//% CHIPS: esp32c3 esp32s2 esp32s3
 //% FEATURES: embedded-hal
 
 #![no_std]
@@ -50,7 +50,7 @@ fn main() -> ! {
 
     // Set the tx pin as open drain. Skip this if using transceivers.
     let can_tx_pin = io.pins.gpio0.into_open_drain_output();
-    let can_rx_pin = io.pins.gpio1;
+    let can_rx_pin = io.pins.gpio2;
 
     // The speed of the CAN bus.
     const CAN_BAUDRATE: twai::BaudRate = twai::BaudRate::B1000K;
