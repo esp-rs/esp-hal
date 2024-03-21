@@ -843,22 +843,6 @@ impl Instance for crate::peripherals::TWAI0 {
 
     fn enable_interrupts() {
         let register_block = Self::register_block();
-        register_block.int_ena().modify(|_, w| {
-            w.rx_int_ena()
-                .set_bit()
-                .tx_int_ena()
-                .set_bit()
-                .bus_err_int_ena()
-                .set_bit()
-                .arb_lost_int_ena()
-                .set_bit()
-                .err_passive_int_ena()
-                .set_bit()
-        });
-    }
-
-    fn enable_interrupts() {
-        let register_block = Self::register_block();
         register_block.interrupt_enable().modify(|_, w| {
             w.ext_receive_int_ena()
                 .set_bit()
