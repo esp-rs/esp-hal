@@ -70,7 +70,13 @@ opsram-2m = ["esp-hal/opsram-2m"]
 psram-2m  = ["esp-hal/psram-2m"]
 
 [profile.release]
-debug = true
+codegen-units    = 1
+debug            = 2
+debug-assertions = false
+incremental      = false
+opt-level        = 3
+lto = 'fat'
+overflow-checks  = false
 
 [patch.crates-io]
 esp32 =   { git = "https://github.com/esp-rs/esp-pacs", rev = "963c280621f0b7ec26546a5eff24a5032305437f" }
