@@ -18,7 +18,8 @@ use esp_hal::{
     prelude::*,
     uart::{
         config::{Config, DataBits, Parity, StopBits},
-        TxRxPins, Uart,
+        TxRxPins,
+        Uart,
     },
 };
 use nb::block;
