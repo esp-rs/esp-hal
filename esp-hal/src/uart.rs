@@ -446,7 +446,8 @@ impl<'d, T> Uart<'d, T, Blocking>
 where
     T: Instance + 'd,
 {
-    /// Create a new UART instance with configuration options in [`Blocking`] mode.
+    /// Create a new UART instance with configuration options in [`Blocking`]
+    /// mode.
     pub fn new_with_config<P>(
         uart: impl Peripheral<P = T> + 'd,
         config: Config,
@@ -1689,7 +1690,8 @@ mod asynch {
     where
         T: Instance + 'd,
     {
-        /// Create a new UART instance with configuration options in [`Async`] mode.
+        /// Create a new UART instance with configuration options in [`Async`]
+        /// mode.
         pub fn new_async_with_config<P>(
             uart: impl Peripheral<P = T> + 'd,
             config: Config,
