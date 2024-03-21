@@ -241,11 +241,11 @@ mod vectored {
     }
 
     impl Priority {
-        pub fn max() -> Priority {
+        pub const fn max() -> Priority {
             Priority::Priority3
         }
 
-        pub fn min() -> Priority {
+        pub const fn min() -> Priority {
             Priority::Priority1
         }
     }

@@ -88,6 +88,7 @@ pub enum CpuInterrupt {
 }
 
 /// Interrupt priority levels.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(u8)]
 pub enum Priority {
@@ -118,7 +119,7 @@ pub enum Priority {
 }
 
 impl Priority {
-    pub fn max() -> Priority {
+    pub const fn max() -> Priority {
         cfg_if::cfg_if! {
             if #[cfg(not(clic))] {
                 Priority::Priority15
@@ -128,7 +129,7 @@ impl Priority {
         }
     }
 
-    pub fn min() -> Priority {
+    pub const fn min() -> Priority {
         Priority::Priority1
     }
 }

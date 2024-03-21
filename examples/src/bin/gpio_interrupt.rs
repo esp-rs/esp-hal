@@ -18,9 +18,8 @@ use esp_hal::{
     clock::ClockControl,
     delay::Delay,
     gpio::{self, Event, Input, PullDown, IO},
-    interrupt::{self, Priority},
     macros::ram,
-    peripherals::{Interrupt, Peripherals},
+    peripherals::Peripherals,
     prelude::*,
 };
 
@@ -46,12 +45,11 @@ fn main() -> ! {
     let mut button = io.pins.gpio0.into_pull_down_input();
     #[cfg(not(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3")))]
     let mut button = io.pins.gpio9.into_pull_down_input();
-    button.listen(Event::FallingEdge);
 
-    critical_section::with(|cs| BUTTON.borrow_ref_mut(cs).replace(button));
-
-    interrupt::enable(Interrupt::GPIO, Priority::Priority2).unwrap();
-
+    critical_section::with(|cs| {
+        button.listen(Event::FallingEdge);
+        BUTTON.borrow_ref_mut(cs).replace(button)
+    });
     led.set_high().unwrap();
 
     // Initialize the Delay peripheral, and use it to toggle the LED state in a

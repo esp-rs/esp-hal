@@ -60,3 +60,31 @@ pub use self::xtensa::*;
 mod riscv;
 #[cfg(xtensa)]
 mod xtensa;
+
+/// An interrupt handler
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct InterruptHandler {
+    f: extern "C" fn(),
+    prio: Priority,
+}
+
+impl InterruptHandler {
+    pub const fn new(f: extern "C" fn(), prio: Priority) -> Self {
+        Self { f, prio }
+    }
+
+    #[inline]
+    pub fn handler(&self) -> extern "C" fn() {
+        self.f
+    }
+
+    #[inline]
+    pub fn priority(&self) -> Priority {
+        self.prio
+    }
+
+    #[inline]
+    pub(crate) extern "C" fn call(&self) {
+        (self.f)()
+    }
+}

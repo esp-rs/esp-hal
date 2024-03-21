@@ -368,6 +368,8 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
 pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
     use darling::ast::NestedMeta;
     use proc_macro::Span;
+    use proc_macro2::Ident;
+    use proc_macro_crate::{crate_name, FoundCrate};
     use proc_macro_error::abort;
     use syn::{parse::Error as ParseError, spanned::Spanned, ItemFn, ReturnType, Type};
 
@@ -417,10 +419,28 @@ pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
         .into();
     }
 
-    f.sig.abi = syn::parse_quote_spanned!(original_span => extern "C");
+    let root = Ident::new(
+        if let Ok(FoundCrate::Name(ref name)) = crate_name("esp-hal") {
+            &name
+        } else {
+            "crate"
+        },
+        Span::call_site().into(),
+    );
 
-    quote::quote_spanned!( original_span =>
+    f.sig.abi = syn::parse_quote_spanned!(original_span => extern "C");
+    let orig = f.sig.ident;
+    f.sig.ident = Ident::new(
+        &format!("__esp_hal_internal_{}", orig),
+        proc_macro2::Span::call_site(),
+    );
+    let new = f.sig.ident.clone();
+
+    quote::quote_spanned!(original_span =>
         #f
+
+        #[allow(non_upper_case_globals)]
+        static #orig: #root::interrupt::InterruptHandler = #root::interrupt::InterruptHandler::new(#new, #root::interrupt::Priority::min());
     )
     .into()
 }
