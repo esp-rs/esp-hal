@@ -860,38 +860,5 @@ r#"
 .weak cpu_int_29_handler
 .weak cpu_int_30_handler
 .weak cpu_int_31_handler
-cpu_int_1_handler:
-cpu_int_2_handler:
-cpu_int_3_handler:
-cpu_int_4_handler:
-cpu_int_5_handler:
-cpu_int_6_handler:
-cpu_int_7_handler:
-cpu_int_8_handler:
-cpu_int_9_handler:
-cpu_int_10_handler:
-cpu_int_11_handler:
-cpu_int_12_handler:
-cpu_int_13_handler:
-cpu_int_14_handler:
-cpu_int_15_handler:
-cpu_int_16_handler:
-cpu_int_17_handler:
-cpu_int_18_handler:
-cpu_int_19_handler:
-cpu_int_20_handler:
-cpu_int_21_handler:
-cpu_int_22_handler:
-cpu_int_23_handler:
-cpu_int_24_handler:
-cpu_int_25_handler:
-cpu_int_26_handler:
-cpu_int_27_handler:
-cpu_int_28_handler:
-cpu_int_29_handler:
-cpu_int_30_handler:
-cpu_int_31_handler:
-    la ra, abort #abort since proper handler is not defined, this could also just load the default _start_trap_rust_hal address and let the hal handle it.
-    jr ra
 "#,
 }
