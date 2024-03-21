@@ -684,6 +684,14 @@ impl PeripheralClockControl {
                 system
                     .twai0_conf()
                     .modify(|_, w| w.twai0_rst_en().clear_bit());
+
+                // use Xtal clk-src
+                system.twai0_func_clk_conf().modify(|_, w| {
+                    w.twai0_func_clk_en()
+                        .set_bit()
+                        .twai0_func_clk_sel()
+                        .variant(false)
+                });
             }
             #[cfg(twai1)]
             Peripheral::Twai1 => {

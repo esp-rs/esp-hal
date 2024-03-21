@@ -81,6 +81,7 @@ use core::marker::PhantomData;
 use embedded_can::{nb::Can, Error, ErrorKind, ExtendedId, Frame, Id, StandardId};
 #[cfg(not(feature = "embedded-hal"))] // FIXME
 use embedded_hal_02::can::{Can, Error, ErrorKind, ExtendedId, Frame, Id, StandardId};
+#[cfg(not(esp32c6))]
 use fugit::HertzU32;
 
 use self::filter::{Filter, FilterType};
@@ -227,8 +228,11 @@ impl BaudRate {
     // {.brp = 4, .tseg_1 = 16, .tseg_2 = 8, .sjw = 3, .triple_sampling = false}
     // #define TWAI_TIMING_CONFIG_1MBITS()     {.brp = 4, .tseg_1 = 15, .tseg_2 = 4,
     // .sjw = 3, .triple_sampling = false}
+    //
+    // see https://github.com/espressif/esp-idf/tree/master/components/hal/include/hal/twai_types.h
     const fn timing(self) -> TimingConfig {
-        match self {
+        #[allow(unused_mut)]
+        let mut timing = match self {
             Self::B125K => TimingConfig {
                 baud_rate_prescaler: 32,
                 sync_jump_width: 3,
@@ -258,7 +262,15 @@ impl BaudRate {
                 triple_sample: false,
             },
             Self::Custom(timing_config) => timing_config,
+        };
+
+        #[cfg(esp32c6)]
+        {
+            // clock source on ESP32-C6 is xtal (40MHz)
+            timing.baud_rate_prescaler /= 2;
         }
+
+        timing
     }
 }
 
@@ -298,10 +310,11 @@ where
     /// Set the bitrate of the bus.
     ///
     /// Note: The timings currently assume a APB_CLK of 80MHz.
-    fn set_baud_rate(&mut self, baud_rate: BaudRate, clocks: &Clocks) {
+    fn set_baud_rate(&mut self, baud_rate: BaudRate, _clocks: &Clocks) {
         // TWAI is clocked from the APB_CLK according to Table 6-4 [ESP32C3 Reference Manual](https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf)
         // Included timings are all for 80MHz so assert that we are running at 80MHz.
-        assert!(clocks.apb_clock == HertzU32::MHz(80));
+        #[cfg(not(esp32c6))]
+        assert!(_clocks.apb_clock == HertzU32::MHz(80));
 
         // Unpack the baud rate timings and convert them to the values needed for the
         // register. Many of the registers have a minimum value of 1 which is

@@ -11,7 +11,7 @@
 //!
 //! `IS_FIRST_SENDER` below must be set to false on one of the ESP's
 
-//% CHIPS: esp32c3 esp32s2 esp32s3
+//% CHIPS: esp32c3 esp32c6 esp32s2 esp32s3
 //% FEATURES: embedded-hal
 
 #![no_std]
