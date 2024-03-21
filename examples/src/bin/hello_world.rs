@@ -1,7 +1,10 @@
 //! This shows how to write text to UART0.
 //!
 //! You can see the output with `espflash` if you provide the `--monitor`
-//! option.
+//! option. Depending on the chip, you will need to ensure that you are
+//! connected to the UART USB port, and not the USB-SERIAL-JTAG port.
+//! If you want to test printing over USB-SERIAL-JTAG, try the usb_serial_jtag
+//! example instead.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 //% FEATURES: embedded-hal-02
