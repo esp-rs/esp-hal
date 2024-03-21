@@ -70,6 +70,7 @@ xtensa-lx-rt = { version = "0.16.0", optional = true }
 [build-dependencies]
 basic-toml   = "0.1.8"
 cfg-if       = "1.0.0"
+esp-build    = { version = "0.1.0", path = "../esp-build" }
 esp-metadata = { version = "0.1.0", path = "../esp-metadata" }
 serde        = { version = "1.0.197", features = ["derive"] }
 

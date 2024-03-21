@@ -35,6 +35,9 @@ riscv           = { version = "0.11.0", features = ["critical-section-single-har
 [dev-dependencies]
 panic-halt = "0.2.0"
 
+[build-dependencies]
+esp-build = { version = "0.1.0", path = "../esp-build" }
+
 [features]
 default = ["embedded-hal-02"]
 
