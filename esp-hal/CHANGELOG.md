@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reserve `esp32` ROM stacks to prevent the trashing of dram2 section (#1289)
 - Fixing `esp-wifi` + `TRNG` issue on `ESP32-S2` (#1272)
 - Fixed core1 startup using the wrong stack on the esp32 and esp32s3 (#1286).
+- Support 192 and 256-bit keys for AES (#1316)
 
 ### Changed
 
