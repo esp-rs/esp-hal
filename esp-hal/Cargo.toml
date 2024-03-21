@@ -52,14 +52,14 @@ xtensa-lx            = { version = "0.9.0", optional = true }
 # IMPORTANT:
 # Each supported device MUST have its PAC included below along with a
 # corresponding feature.
-esp32   = { git = "https://github.com/esp-rs/esp-pacs", rev = "f5d274d", features = ["critical-section"], optional = true }
-esp32c2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "f5d274d", features = ["critical-section"], optional = true }
-esp32c3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "f5d274d", features = ["critical-section"], optional = true }
-esp32c6 = { git = "https://github.com/esp-rs/esp-pacs", rev = "f5d274d", features = ["critical-section"], optional = true }
-esp32h2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "f5d274d", features = ["critical-section"], optional = true }
-esp32p4 = { git = "https://github.com/esp-rs/esp-pacs", rev = "f5d274d", features = ["critical-section"], optional = true }
-esp32s2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "f5d274d", features = ["critical-section"], optional = true }
-esp32s3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "f5d274d", features = ["critical-section"], optional = true }
+esp32   = { git = "https://github.com/esp-rs/esp-pacs", rev = "ed6d18f", features = ["critical-section"], optional = true }
+esp32c2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "ed6d18f", features = ["critical-section"], optional = true }
+esp32c3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "ed6d18f", features = ["critical-section"], optional = true }
+esp32c6 = { git = "https://github.com/esp-rs/esp-pacs", rev = "ed6d18f", features = ["critical-section"], optional = true }
+esp32h2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "ed6d18f", features = ["critical-section"], optional = true }
+esp32p4 = { git = "https://github.com/esp-rs/esp-pacs", rev = "ed6d18f", features = ["critical-section"], optional = true }
+esp32s2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "ed6d18f", features = ["critical-section"], optional = true }
+esp32s3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "ed6d18f", features = ["critical-section"], optional = true }
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
 esp-riscv-rt = { version = "0.7.0", optional = true, path = "../esp-riscv-rt" }
@@ -164,6 +164,14 @@ defmt = [
     "embedded-hal?/defmt-03",
     "embedded-io/defmt-03",
     "embedded-io-async?/defmt-03",
+    "esp32?/defmt",
+    "esp32c2?/defmt",
+    "esp32c3?/defmt",
+    "esp32c6?/defmt",
+    "esp32h2?/defmt",
+    "esp32p4?/defmt",
+    "esp32s2?/defmt",
+    "esp32s3?/defmt",
 ]
 ## Implement the traits defined in the `1.0.0` releases of `embedded-hal` and
 ## `embedded-hal-nb` for the relevant peripherals.
