@@ -7,7 +7,7 @@ on:
       repository:
         description: "Owner and repository to test"
         required: true
-        default: 'esp-rs/esp-hal'
+        default: "esp-rs/esp-hal"
       branch:
         description: "Branch, tag or SHA to checkout."
         required: true
@@ -17,8 +17,10 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  # Test RISC-V targets:
-  riscv-hil:
+  # job_id **must** match a job that runs in the CI workflow,
+  # this is that we can add a required check that runs this 
+  # workflow in the merge queue
+  esp-hal:
     name: HIL Test | ${{ matrix.target.soc }}
     runs-on:
       labels: [self-hosted, "${{ matrix.target.runner }}"]
