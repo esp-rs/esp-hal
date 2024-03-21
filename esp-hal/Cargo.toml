@@ -52,14 +52,14 @@ xtensa-lx            = { version = "0.9.0", optional = true }
 # IMPORTANT:
 # Each supported device MUST have its PAC included below along with a
 # corresponding feature.
-esp32   = { version = "0.29.0", features = ["critical-section"], optional = true }
-esp32c2 = { version = "0.18.0", features = ["critical-section"], optional = true }
-esp32c3 = { version = "0.21.0", features = ["critical-section"], optional = true }
-esp32c6 = { version = "0.12.0", features = ["critical-section"], optional = true }
-esp32h2 = { version = "0.8.0",  features = ["critical-section"], optional = true }
-esp32p4 = { version = "0.1.0",  features = ["critical-section"], optional = true }
-esp32s2 = { version = "0.20.0", features = ["critical-section"], optional = true }
-esp32s3 = { version = "0.24.0", features = ["critical-section"], optional = true }
+esp32   = { git = "https://github.com/esp-rs/esp-pacs", rev = "963c280", features = ["critical-section"], optional = true }
+esp32c2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "963c280", features = ["critical-section"], optional = true }
+esp32c3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "963c280", features = ["critical-section"], optional = true }
+esp32c6 = { git = "https://github.com/esp-rs/esp-pacs", rev = "963c280", features = ["critical-section"], optional = true }
+esp32h2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "963c280", features = ["critical-section"], optional = true }
+esp32p4 = { git = "https://github.com/esp-rs/esp-pacs", rev = "963c280", features = ["critical-section"], optional = true }
+esp32s2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "963c280", features = ["critical-section"], optional = true }
+esp32s3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "963c280", features = ["critical-section"], optional = true }
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
 esp-riscv-rt = { version = "0.7.0", optional = true, path = "../esp-riscv-rt" }
@@ -228,13 +228,3 @@ ci = [
 
 [lints.clippy]
 mixed_attributes_style = "allow"
-
-[patch.crates-io]
-esp32 =   { git = "https://github.com/esp-rs/esp-pacs", rev = "963c280621f0b7ec26546a5eff24a5032305437f" }
-esp32s2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "963c280621f0b7ec26546a5eff24a5032305437f" }
-esp32s3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "963c280621f0b7ec26546a5eff24a5032305437f" }
-esp32c2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "963c280621f0b7ec26546a5eff24a5032305437f" }
-esp32c3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "963c280621f0b7ec26546a5eff24a5032305437f" }
-esp32c6 = { git = "https://github.com/esp-rs/esp-pacs", rev = "963c280621f0b7ec26546a5eff24a5032305437f" }
-esp32h2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "963c280621f0b7ec26546a5eff24a5032305437f" }
-esp32p4 = { git = "https://github.com/esp-rs/esp-pacs", rev = "963c280621f0b7ec26546a5eff24a5032305437f" }
