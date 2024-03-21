@@ -85,18 +85,6 @@ fn main() -> ! {
         let frame = Frame::new(StandardId::ZERO, &[1, 2, 3]).unwrap();
         block!(can.transmit(&frame)).unwrap();
         println!("Sent a frame");
-
-        // unsafe {
-        //     let mut old = 0;
-        //     loop {
-        //         let new = esp_hal::peripherals::TWAI0::steal().interrupt().read().bits();
-        //         if new != old {
-        //             old = new;
-        //             println!("{:032b}", new);
-        //         }
-
-        //     }
-        // }
     }
 
     // Wait for a frame to be received.
