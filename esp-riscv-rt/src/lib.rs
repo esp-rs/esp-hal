@@ -512,157 +512,157 @@ r#"
 _start_trap1:
     addi sp, sp, -40*4
     sw ra, 0(sp)
-    la ra, cpu_int_1_handler
+    la ra, interrupt1
     j _start_trap_direct
 _start_trap2:
     addi sp, sp, -40*4
     sw ra, 0(sp)
-    la ra, cpu_int_2_handler
+    la ra, interrupt2
     j _start_trap_direct
 _start_trap3:
     addi sp, sp, -40*4
     sw ra, 0(sp)
-    la ra, cpu_int_3_handler
+    la ra, interrupt3
     j _start_trap_direct
 _start_trap4:
     addi sp, sp, -40*4
     sw ra, 0(sp)
-    la ra, cpu_int_4_handler
+    la ra, interrupt4
     j _start_trap_direct
 _start_trap5:
     addi sp, sp, -40*4
     sw ra, 0(sp)
-    la ra, cpu_int_5_handler
+    la ra, interrupt5
     j _start_trap_direct
 _start_trap6:
     addi sp, sp, -40*4
     sw ra, 0(sp)
-    la ra, cpu_int_6_handler
+    la ra, interrupt6
     j _start_trap_direct
 _start_trap7:
     addi sp, sp, -40*4
     sw ra, 0(sp)
-    la ra, cpu_int_7_handler
+    la ra, interrupt7
     j _start_trap_direct
 _start_trap8:
     addi sp, sp, -40*4
     sw ra, 0(sp)
-    la ra, cpu_int_8_handler
+    la ra, interrupt8
     j _start_trap_direct
 _start_trap9:
     addi sp, sp, -40*4
     sw ra, 0(sp)
-    la ra, cpu_int_9_handler
+    la ra, interrupt9
     j _start_trap_direct
 _start_trap10:
     addi sp, sp, -40*4
     sw ra, 0(sp)
-    la ra, cpu_int_10_handler
+    la ra, interrupt10
     j _start_trap_direct
 _start_trap11:
     addi sp, sp, -40*4
     sw ra, 0(sp)
-    la ra, cpu_int_11_handler
+    la ra, interrupt11
     j _start_trap_direct
 _start_trap12:
     addi sp, sp, -40*4
     sw ra, 0(sp)
-    la ra, cpu_int_12_handler
+    la ra, interrupt12
     j _start_trap_direct
 _start_trap13:
     addi sp, sp, -40*4
     sw ra, 0(sp)
-    la ra, cpu_int_13_handler
+    la ra, interrupt13
     j _start_trap_direct
 _start_trap14:
     addi sp, sp, -40*4
     sw ra, 0(sp)
-    la ra, cpu_int_14_handler
+    la ra, interrupt14
     j _start_trap_direct
 _start_trap15:
     addi sp, sp, -40*4
     sw ra, 0(sp)
-    la ra, cpu_int_15_handler
+    la ra, interrupt15
     j _start_trap_direct
 _start_trap16:
     addi sp, sp, -40*4
     sw ra, 0(sp)
-    la ra, cpu_int_16_handler
+    la ra, interrupt16
     j _start_trap_direct
 _start_trap17:
     addi sp, sp, -40*4
     sw ra, 0(sp)
-    la ra, cpu_int_17_handler
+    la ra, interrupt17
     j _start_trap_direct
 _start_trap18:
     addi sp, sp, -40*4
     sw ra, 0(sp)
-    la ra, cpu_int_18_handler
+    la ra, interrupt18
     j _start_trap_direct
 _start_trap19:
     addi sp, sp, -40*4
     sw ra, 0(sp)
-    la ra, cpu_int_19_handler
+    la ra, interrupt19
     j _start_trap_direct
 _start_trap20:
     addi sp, sp, -40*4
     sw ra, 0(sp)
-    la ra, cpu_int_20_handler
+    la ra, interrupt20
     j _start_trap_direct
 _start_trap21:
     addi sp, sp, -40*4
     sw ra, 0(sp)
-    la ra, cpu_int_21_handler
+    la ra, interrupt21
     j _start_trap_direct
 _start_trap22:
     addi sp, sp, -40*4
     sw ra, 0(sp)
-    la ra, cpu_int_22_handler
+    la ra, interrupt22
     j _start_trap_direct
 _start_trap23:
     addi sp, sp, -40*4
     sw ra, 0(sp)
-    la ra, cpu_int_23_handler
+    la ra, interrupt23
     j _start_trap_direct
 _start_trap24:
     addi sp, sp, -40*4
     sw ra, 0(sp)
-    la ra, cpu_int_24_handler
+    la ra, interrupt24
     j _start_trap_direct
 _start_trap25:
     addi sp, sp, -40*4
     sw ra, 0(sp)
-    la ra, cpu_int_25_handler
+    la ra, interrupt25
     j _start_trap_direct
 _start_trap26:
     addi sp, sp, -40*4
     sw ra, 0(sp)
-    la ra, cpu_int_26_handler
+    la ra, interrupt26
     j _start_trap_direct
 _start_trap27:
     addi sp, sp, -40*4
     sw ra, 0(sp)
-    la ra, cpu_int_27_handler
+    la ra, interrupt27
     j _start_trap_direct
 _start_trap28:
     addi sp, sp, -40*4
     sw ra, 0(sp)
-    la ra, cpu_int_28_handler
+    la ra, interrupt28
     j _start_trap_direct
 _start_trap29:
     addi sp, sp, -40*4
     sw ra, 0(sp)
-    la ra, cpu_int_29_handler
+    la ra, interrupt29
     j _start_trap_direct
 _start_trap30:
     addi sp, sp, -40*4
     sw ra, 0(sp)
-    la ra, cpu_int_30_handler
+    la ra, interrupt30
     j _start_trap_direct
 _start_trap31:
     addi sp, sp, -40*4
     sw ra, 0(sp)
-    la ra, cpu_int_31_handler
+    la ra, interrupt31
     j _start_trap_direct
 la ra, _start_trap_rust_hal /* this runs on exception, use regular fault handler */
 _start_trap_direct:
@@ -829,36 +829,39 @@ _vector_table:
 r#"
 #this is required for the linking step, these symbols for in-use interrupts should always be overwritten by the user.
 .section .trap, "ax"
-.weak cpu_int_1_handler
-.weak cpu_int_2_handler
-.weak cpu_int_3_handler
-.weak cpu_int_4_handler
-.weak cpu_int_5_handler
-.weak cpu_int_6_handler
-.weak cpu_int_7_handler
-.weak cpu_int_8_handler
-.weak cpu_int_9_handler
-.weak cpu_int_10_handler
-.weak cpu_int_11_handler
-.weak cpu_int_12_handler
-.weak cpu_int_13_handler
-.weak cpu_int_14_handler
-.weak cpu_int_15_handler
-.weak cpu_int_16_handler
-.weak cpu_int_17_handler
-.weak cpu_int_18_handler
-.weak cpu_int_19_handler
-.weak cpu_int_20_handler
-.weak cpu_int_21_handler
-.weak cpu_int_22_handler
-.weak cpu_int_23_handler
-.weak cpu_int_24_handler
-.weak cpu_int_25_handler
-.weak cpu_int_26_handler
-.weak cpu_int_27_handler
-.weak cpu_int_28_handler
-.weak cpu_int_29_handler
-.weak cpu_int_30_handler
-.weak cpu_int_31_handler
+// See https://github.com/esp-rs/esp-hal/issues/1326 and https://reviews.llvm.org/D98762
+// and yes, this all has to go on one line... *sigh*.
+.lto_discard interrupt1, interrupt2, interrupt3, interrupt4, interrupt5, interrupt6, interrupt7, interrupt8, interrupt9, interrupt10, interrupt11, interrupt12, interrupt13, interrupt14, interrupt15, interrupt16, interrupt17, interrupt18, interrupt19, interrupt20, interrupt21, interrupt22, interrupt23, interrupt24, interrupt25, interrupt26, interrupt27, interrupt28, interrupt29, interrupt30, interrupt31
+.weak interrupt1
+.weak interrupt2
+.weak interrupt3
+.weak interrupt4
+.weak interrupt5
+.weak interrupt6
+.weak interrupt7
+.weak interrupt8
+.weak interrupt9
+.weak interrupt10
+.weak interrupt11
+.weak interrupt12
+.weak interrupt13
+.weak interrupt14
+.weak interrupt15
+.weak interrupt16
+.weak interrupt17
+.weak interrupt18
+.weak interrupt19
+.weak interrupt20
+.weak interrupt21
+.weak interrupt22
+.weak interrupt23
+.weak interrupt24
+.weak interrupt25
+.weak interrupt26
+.weak interrupt27
+.weak interrupt28
+.weak interrupt29
+.weak interrupt30
+.weak interrupt31
 "#,
 }
