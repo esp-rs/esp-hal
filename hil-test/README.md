@@ -38,7 +38,7 @@ Generalized, tests can be run locally via:
 ```shell
 CARGO_BUILD_TARGET=$TARGET_TRIPLE \
 PROBE_RS_CHIP=$CHIP \
-  cargo test --features=$CHIP
+  cargo +$TOOLCHAIN test --features=$CHIP
 ```
 
 For example, testing GPIO on the ESP32-C6:
@@ -46,10 +46,22 @@ For example, testing GPIO on the ESP32-C6:
 ```shell
 CARGO_BUILD_TARGET=riscv32imac-unknown-none-elf \
 PROBE_RS_CHIP=esp32c6 \
-  cargo test --features=esp32c6 --test=gpio
+  cargo +nightly test --features=esp32c6 --test=gpio
 ```
 
 The `--test` argument is optional, and if omitted then all tests will be run.
+
+Also, there is an alias to run all tests for a target with:
+
+```shell
+cargo +$TOOLCHAIN $CHIP
+```
+
+For example, to run all tests on the ESP32-S3:
+
+```shell
+cargo +esp esp32s3
+```
 
 [probe-rs]: https://github.com/probe-rs/probe-rs/
 
@@ -73,17 +85,17 @@ Currently, here are the Virtual Machines set up for HIL testing:
 #### VM Setup
 ```bash
 # Install Rust:
-$ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain stable -y --profile minimal
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain stable -y --profile minimal
 # Source the current shell:
-$ source "$HOME/.cargo/env"
+source "$HOME/.cargo/env"
 # Install dependencies
-$ sudo apt install -y pkg-config libudev-dev
+sudo apt install -y pkg-config libudev-dev
 # Install probe-rs
-$ cargo install probe-rs --git=https://github.com/probe-rs/probe-rs --rev=b431b24 --features=cli --bin=probe-rs --locked --force
+cargo install probe-rs --git=https://github.com/probe-rs/probe-rs --rev=b431b24 --features=cli --bin=probe-rs --locked --force
 # Add the udev rules
-$ wget -O - https://probe.rs/files/69-probe-rs.rules | sudo tee /etc/udev/rules.d/69-probe-rs.rules > /dev/null
+wget -O - https://probe.rs/files/69-probe-rs.rules | sudo tee /etc/udev/rules.d/69-probe-rs.rules > /dev/null
 # Add the user to plugdev group
-$ sudo usermod -a -G plugdev $USER
+sudo usermod -a -G plugdev $USER
 # Reboot the VM
 ```
 
