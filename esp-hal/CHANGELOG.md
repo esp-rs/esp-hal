@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support runtime interrupt binding, adapt GPIO driver (#1231)
 - Renamed `eh1` feature to `embedded-hal`, feature-gated `embedded-hal@0.2.x` trait implementations (#1273)
 - Enable `embedded-hal` feature by default, instead of the `embedded-hal-02` feature (#1313)
+- `Uart` structs now take a `Mode` parameter which defines how the driver is initialized (#1294)
 
 ### Removed
 

@@ -21,11 +21,12 @@ use esp_hal::{
         TxRxPins,
         Uart,
     },
+    Blocking,
 };
 use nb::block;
 
 struct Context {
-    uart: Uart<'static, UART0>,
+    uart: Uart<'static, UART0, Blocking>,
 }
 
 impl Context {
@@ -45,7 +46,7 @@ impl Context {
             stop_bits: StopBits::STOP1,
         };
 
-        let uart = Uart::new_with_config(peripherals.UART0, config, Some(pins), &clocks);
+        let uart = Uart::new_with_config(peripherals.UART0, config, Some(pins), &clocks, None);
 
         Context { uart }
     }

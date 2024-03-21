@@ -50,7 +50,7 @@ fn main() -> ! {
         io.pins.gpio7.into_floating_input(),
     );
 
-    let mut uart1 = Uart::new_with_config(peripherals.UART1, config, Some(pins), &clocks);
+    let mut uart1 = Uart::new_with_config(peripherals.UART1, config, Some(pins), &clocks, None);
 
     // Set up (LP) UART:
     let lp_tx = io.pins.gpio5.into_low_power().into_push_pull_output();

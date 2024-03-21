@@ -154,6 +154,20 @@ extern "C" fn EspDefaultHandler(_interrupt: peripherals::Interrupt) {
     );
 }
 
+/// A marker trait for intializing drivers in a specific mode.
+pub trait Mode: crate::private::Sealed {}
+
+/// Driver initialized in blocking mode.
+pub struct Blocking;
+
+/// Driver initialized in async mode.
+pub struct Async;
+
+impl crate::Mode for Blocking {}
+impl crate::Mode for Async {}
+impl crate::private::Sealed for Blocking {}
+impl crate::private::Sealed for Async {}
+
 pub(crate) mod private {
     pub trait Sealed {}
 }

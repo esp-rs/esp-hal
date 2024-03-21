@@ -20,10 +20,11 @@ use esp_hal::{
     prelude::*,
     timer::TimerGroup,
     uart::{config::AtCmdConfig, Uart},
+    Blocking,
 };
 use nb::block;
 
-static SERIAL: Mutex<RefCell<Option<Uart<UART0>>>> = Mutex::new(RefCell::new(None));
+static SERIAL: Mutex<RefCell<Option<Uart<UART0, Blocking>>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
