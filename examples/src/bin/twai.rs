@@ -11,7 +11,7 @@
 //!
 //! `IS_FIRST_SENDER` below must be set to false on one of the ESP's
 
-//% CHIPS: esp32c3 esp32s2 esp32s3
+//% CHIPS: esp32c3 esp32c6 esp32s2 esp32s3
 //% FEATURES: embedded-hal
 
 #![no_std]
@@ -85,6 +85,18 @@ fn main() -> ! {
         let frame = Frame::new(StandardId::ZERO, &[1, 2, 3]).unwrap();
         block!(can.transmit(&frame)).unwrap();
         println!("Sent a frame");
+
+        // unsafe {
+        //     let mut old = 0;
+        //     loop {
+        //         let new = esp_hal::peripherals::TWAI0::steal().interrupt().read().bits();
+        //         if new != old {
+        //             old = new;
+        //             println!("{:032b}", new);
+        //         }
+
+        //     }
+        // }
     }
 
     // Wait for a frame to be received.
