@@ -9,78 +9,65 @@ For assistance with this package please [open an issue] or [start a discussion].
 
 ## Quickstart
 
-We use [embedded-test] as our testing framework, which relies on [defmt] internally. This allows us to write unit and integration tests much in the same way you would for a normal Rust project when the standard library is available, and to execute them using Cargo's built-in test runner.
+We use [embedded-test] as our testing framework, which relies on [defmt] internally. This allows us to write unit and integration tests much in the same way you would for a normal Rust project, when the standard library is available, and to execute them using Cargo's built-in test runner.
 
 [embedded-test]: https://github.com/probe-rs/embedded-test
 [defmt]: https://github.com/knurling-rs/defmt
 
 ### Running Tests Locally
 
-We use [probe-rs] for flashing and running the tests on a target device, however this **MUST** be installed from the correct branch, and with the correct features enabled:
+We use [probe-rs] for flashing and running the tests on a target device, however, this **MUST** be installed from the correct revision, and with the correct features enabled:
 
 ```text
 cargo install probe-rs \
   --git=https://github.com/probe-rs/probe-rs \
-  --branch=feature/testing-rebased \
+  --rev=b431b24 \
   --features=cli \
   --bin=probe-rs
 ```
 
-You **MUST** have the target device connected via its USB-Serial-JTAG port, or if unavailable (eg. ESP32, ESP32-C2, ESP32-S2) then you must connect a compatible debug probe such as an ESP-Prog.
+Target device **MUST** connected via its USB-Serial-JTAG port, or if unavailable (eg. ESP32, ESP32-C2, ESP32-S2) then you must connect a compatible debug probe such as an [ESP-Prog].
 
-Additionally:
-
-- The build target **MUST** be specified via the `CARGO_BUILD_TARGET` environment variable.
-- The chip **MUST** be specified via the `PROBE_RS_CHIP` environment variable.
-
-Generalized, tests can be run locally via:
+You can run all test for a given device using:
 
 ```shell
-CARGO_BUILD_TARGET=$TARGET_TRIPLE \
-PROBE_RS_CHIP=$CHIP \
-  cargo +$TOOLCHAIN test --features=$CHIP
+cargo +nightly esp32c6
+# or
+cargo +esp esp32s3
 ```
 
-For example, testing GPIO on the ESP32-C6:
+For running a single test on a target:
 
 ```shell
+# Run GPIO tests for ESP32-C6
 CARGO_BUILD_TARGET=riscv32imac-unknown-none-elf \
 PROBE_RS_CHIP=esp32c6 \
   cargo +nightly test --features=esp32c6 --test=gpio
 ```
+- If the `--test` argument is omitted, then all tests will be run.
+- The build target **MUST** be specified via the `CARGO_BUILD_TARGET` environment variable or as an argument (`--target`).
+- The chip **MUST** be specified via the `PROBE_RS_CHIP` environment variable or as an argument of `probe-rs` (`--chip`).
 
-The `--test` argument is optional, and if omitted then all tests will be run.
-
-Also, there is an alias to run all tests for a target with:
-
-```shell
-cargo +$TOOLCHAIN $CHIP
-```
-
-For example, to run all tests on the ESP32-S3:
-
-```shell
-cargo +esp esp32s3
-```
-
-[probe-rs]: https://github.com/probe-rs/probe-rs/
+Some tests will require physical connections, please see the current [configuration in our runners](#running-tests-remotes-ie-on-self-hosted-runners).
 
 ### Running Tests Remotes (ie. On Self-Hosted Runners)
-The `hil.yml` workflow will build the test suite for all our available targets and run the tests on them.
+The [`hil.yml`] workflow builds the test suite for all our available targets and executes them.
 
-Currently, here are the Virtual Machines set up for HIL testing:
-- ESP32-C3:
-  - Has an `ESP32-C3-DevKit-RUST-1` connected via USB-JTAG-SERIAL.
-    - Pins 2 and 4 are connected for `spi_full_duplex` and `uart` tests.
-  - VM has the following [setup](#vm-setup)
-- ESP32-C6:
-  - Has an `ESP32-C6-DevKitC-1 V1.2` connected via USB-JTAG-SERIAL.
-    - Pins 2 and 4 are connected for `spi_full_duplex` and `uart` tests.
-  - VM has the following [setup](#vm-setup)
-- ESP32-H2
-  - Has an `ESP32-H2-DevKitM-1` connected via USB-JTAG-SERIAL.
-    - Pins 2 and 4 are connected for `spi_full_duplex` and `uart` tests.
-  - VM has the following [setup](#vm-setup)
+Our Virtual Machines have the following setup:
+- ESP32-C3 (`rustboard`):
+  - Devkit: `ESP32-C3-DevKit-RUST-1` connected via USB-Serial-JTAG.
+    - `GPIO2` and `GPIO4` are connected.
+  - VM: Configured with the following [setup](#vm-setup)
+- ESP32-C6 (`esp32c6-usb`):
+  - Devkit: `ESP32-C6-DevKitC-1 V1.2` connected via USB-Serial-JTAG (`USB` port).
+    - `GPIO2` and `GPIO4` are connected.
+  - VM: Configured with the following [setup](#vm-setup)
+- ESP32-H2 (`esp32h2-usb`):
+  - Devkit: `ESP32-H2-DevKitM-1` connected via USB-Serial-JTAG (`USB` port).
+    - `GPIO2` and `GPIO4` are connected.
+  - VM: Configured with the following [setup](#vm-setup)
+
+[`hil.yml`]: https://github.com/esp-rs/esp-hal/blob/main/.github/workflows/hil.yml
 
 #### VM Setup
 ```bash
@@ -101,10 +88,8 @@ sudo usermod -a -G plugdev $USER
 
 ## Adding New Tests
 
-- Create a new integration test file (`tests/$PERIPHERAL.rs`)
-- Add a corresponding `[[test]]` entry to `Cargol.toml` (**MUST** set `harness = false`)
-- Write the tests
-- Document any necessary physical connections on boards connected to self-hosted runners
-  - Write some documentation at the top of the `tests/$PERIPHERAL.rs` file with the pins being used and the required connections, if applicable.
-
-
+1. Create a new integration test file (`tests/$PERIPHERAL.rs`)
+2. Add a corresponding `[[test]]` entry to `Cargol.toml` (**MUST** set `harness = false`)
+3. Write the tests
+4. Document any necessary physical connections on boards connected to self-hosted runners
+5. Write some documentation at the top of the `tests/$PERIPHERAL.rs` file with the pins being used and the required connections, if applicable.
