@@ -374,7 +374,8 @@ impl<'a, MODE: WifiDeviceMode> WifiStack<'a, MODE> {
         &self,
         name: &str,
         query_type: DnsQueryType,
-    ) -> Result<heapless::Vec<IpAddress, 1>, WifiStackError> {
+    ) -> Result<heapless::Vec<IpAddress, { smoltcp::config::DNS_MAX_RESULT_COUNT }>, WifiStackError>
+    {
         use smoltcp::socket::dns;
 
         match query_type {
