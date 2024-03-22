@@ -69,20 +69,18 @@ pub const RESERVED_INTERRUPTS: &[usize] = &[
 ];
 
 pub(crate) fn setup_interrupts() {
-    unsafe {
-        // disable all known interrupts
-        // at least after the 2nd stage bootloader there are some interrupts enabled
-        // (e.g. UART)
-        for peripheral_interrupt in 0..255 {
-            crate::soc::peripherals::Interrupt::try_from(peripheral_interrupt)
-                .map(|intr| {
-                    #[cfg(multi_core)]
-                    disable(Cpu::AppCpu, intr);
-                    disable(Cpu::ProCpu, intr);
-                })
-                .ok();
-        }
-    };
+    // disable all known interrupts
+    // at least after the 2nd stage bootloader there are some interrupts enabled
+    // (e.g. UART)
+    for peripheral_interrupt in 0..255 {
+        crate::soc::peripherals::Interrupt::try_from(peripheral_interrupt)
+            .map(|intr| {
+                #[cfg(multi_core)]
+                disable(Cpu::AppCpu, intr);
+                disable(Cpu::ProCpu, intr);
+            })
+            .ok();
+    }
 }
 
 /// Enable an interrupt by directly binding it to a available CPU interrupt

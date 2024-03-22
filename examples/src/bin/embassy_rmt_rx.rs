@@ -18,13 +18,7 @@ use esp_hal::{
     gpio::{Gpio5, Output, PushPull, IO},
     peripherals::Peripherals,
     prelude::*,
-    rmt::{
-        asynch::RxChannelAsync,
-        PulseCode,
-        Rmt,
-        RxChannelConfig,
-        RxChannelCreatorAsync,
-    },
+    rmt::{asynch::RxChannelAsync, PulseCode, Rmt, RxChannelConfig, RxChannelCreatorAsync},
 };
 use esp_println::{print, println};
 

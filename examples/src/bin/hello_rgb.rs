@@ -56,9 +56,9 @@ fn main() -> ! {
 
     // Configure RMT peripheral globally
     #[cfg(not(feature = "esp32h2"))]
-    let rmt = Rmt::new(peripherals.RMT, 80.MHz(), &clocks).unwrap();
+    let rmt = Rmt::new(peripherals.RMT, 80.MHz(), &clocks, None).unwrap();
     #[cfg(feature = "esp32h2")]
-    let rmt = Rmt::new(peripherals.RMT, 32.MHz(), &clocks).unwrap();
+    let rmt = Rmt::new(peripherals.RMT, 32.MHz(), &clocks, None).unwrap();
 
     // We use one of the RMT channels to instantiate a `SmartLedsAdapter` which can
     // be used directly with all `smart_led` implementations

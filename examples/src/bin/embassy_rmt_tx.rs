@@ -18,13 +18,7 @@ use esp_hal::{
     gpio::IO,
     peripherals::Peripherals,
     prelude::*,
-    rmt::{
-        asynch::TxChannelAsync,
-        PulseCode,
-        Rmt,
-        TxChannelConfig,
-        TxChannelCreatorAsync,
-    },
+    rmt::{asynch::TxChannelAsync, PulseCode, Rmt, TxChannelConfig, TxChannelCreatorAsync},
     timer::TimerGroup,
 };
 use esp_println::println;
