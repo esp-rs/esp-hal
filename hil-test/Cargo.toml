@@ -29,21 +29,20 @@ embedded-hal-async = { version = "1.0.0", optional = true }
 embedded-hal     = { version = "1.0.0" }
 embedded-hal-nb      = { version = "1.0.0", optional = true }
 embassy-executor = { default-features = false, version = "0.5.0", features = ["executor-thread", "arch-riscv32"], optional = true }
-semihosting = "0.1.6"
 
 [dev-dependencies]
 # Add the `embedded-test/defmt` feature for more verbose testing
-embedded-test = {git = "https://github.com/probe-rs/embedded-test", rev = "8e3f925"}
+embedded-test = { git = "https://github.com/probe-rs/embedded-test", rev = "b67dec3" }
 
 [features]
 # Device support (required!):
-esp32   = ["esp-hal/esp32"]
+esp32   = ["esp-hal/esp32", "embedded-test/xtensa-semihosting"]
 esp32c2 = ["esp-hal/esp32c2"]
 esp32c3 = ["esp-hal/esp32c3"]
 esp32c6 = ["esp-hal/esp32c6"]
 esp32h2 = ["esp-hal/esp32h2"]
-esp32s2 = ["esp-hal/esp32s2"]
-esp32s3 = ["esp-hal/esp32s3"]
+esp32s2 = ["esp-hal/esp32s2", "embedded-test/xtensa-semihosting"]
+esp32s3 = ["esp-hal/esp32s3", "embedded-test/xtensa-semihosting"]
 # Async & Embassy:
 async = ["dep:embedded-hal-async", "esp-hal?/async"]
 embassy = ["esp-hal?/embassy", "embedded-test/embassy", "dep:embassy-executor"]
@@ -72,6 +71,3 @@ incremental      = false
 opt-level        = 3
 lto = 'fat'
 overflow-checks  = false
-
-[patch.crates-io]
-semihosting = { git = "https://github.com/taiki-e/semihosting", rev = "c829c19" }
