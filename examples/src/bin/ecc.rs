@@ -2,7 +2,6 @@
 //! hardware-accelerated and pure software ECC.
 
 //% CHIPS: esp32c2 esp32c6 esp32h2
-//% FEATURES: embedded-hal-02
 
 #![no_std]
 #![no_main]
@@ -16,10 +15,11 @@ use crypto_bigint::{
     U256,
 };
 use elliptic_curve::sec1::ToEncodedPoint;
-use embedded_hal_02::blocking::rng::Read;
 use esp_backtrace as _;
+#[cfg(feature = "esp32h2")]
+use esp_hal::ecc::WorkMode;
 use esp_hal::{
-    ecc::{Ecc, EllipticCurve, Error, WorkMode},
+    ecc::{Ecc, EllipticCurve, Error},
     peripherals::Peripherals,
     prelude::*,
     rng::Rng,
@@ -89,7 +89,7 @@ fn test_affine_point_multiplication(ecc: &mut Ecc, rng: &mut Rng) {
         let mut delta_time = 0;
         for _ in 0..TEST_PARAMS_VECTOR.nb_loop_mul {
             loop {
-                rng.read(k).unwrap();
+                rng.read(k);
                 let is_zero = k.iter().all(|&elt| elt == 0);
                 let is_modulus = k.iter().zip(prime_field).all(|(&a, &b)| a == b);
                 if is_zero == false && is_modulus == false {
@@ -202,7 +202,7 @@ fn test_affine_point_verification(ecc: &mut Ecc, rng: &mut Rng) {
         let mut delta_time = 0;
         for _ in 0..TEST_PARAMS_VECTOR.nb_loop_mul {
             loop {
-                rng.read(k).unwrap();
+                rng.read(k);
                 let is_zero = k.iter().all(|&elt| elt == 0);
                 let is_modulus = k.iter().zip(prime_field).all(|(&a, &b)| a == b);
                 if is_zero == false && is_modulus == false {
@@ -278,7 +278,7 @@ fn test_afine_point_verification_multiplication(ecc: &mut Ecc, rng: &mut Rng) {
         let qz = &mut [0u8; 8];
         for _ in 0..TEST_PARAMS_VECTOR.nb_loop_mul {
             loop {
-                rng.read(k).unwrap();
+                rng.read(k);
                 let is_zero = k.iter().all(|&elt| elt == 0);
                 let is_modulus = k.iter().zip(prime_field).all(|(&a, &b)| a == b);
                 if is_zero == false && is_modulus == false {
@@ -407,7 +407,7 @@ fn test_jacobian_point_multiplication(ecc: &mut Ecc, rng: &mut Rng) {
             let (sw_k, _) = sw_k.split_at_mut(prime_field.len());
 
             loop {
-                rng.read(k).unwrap();
+                rng.read(k);
                 let is_zero = k.iter().all(|&elt| elt == 0);
                 let is_modulus = k.iter().zip(prime_field).all(|(&a, &b)| a == b);
                 if is_zero == false && is_modulus == false {
@@ -535,8 +535,8 @@ fn test_jacobian_point_verification(ecc: &mut Ecc, rng: &mut Rng) {
         let mut delta_time = 0;
         for _ in 0..TEST_PARAMS_VECTOR.nb_loop_mul {
             loop {
-                rng.read(k).unwrap();
-                rng.read(z).unwrap();
+                rng.read(k);
+                rng.read(z);
                 let is_zero = k.iter().all(|&elt| elt == 0) || z.iter().all(|&elt| elt == 0);
                 let is_modulus = k.iter().zip(prime_field).all(|(&a, &b)| a == b)
                     || z.iter().zip(prime_field).all(|(&a, &b)| a == b);
@@ -629,7 +629,7 @@ fn test_afine_point_verification_jacobian_multiplication(ecc: &mut Ecc, rng: &mu
             let (sw_k, _) = sw_k.split_at_mut(prime_field.len());
 
             loop {
-                rng.read(k).unwrap();
+                rng.read(k);
                 let is_zero = k.iter().all(|&elt| elt == 0);
                 let is_modulus = k.iter().zip(prime_field).all(|(&a, &b)| a == b);
                 if is_zero == false && is_modulus == false {
@@ -763,8 +763,8 @@ fn test_finite_field_division(ecc: &mut Ecc, rng: &mut Rng) {
         let mut delta_time = 0;
         for _ in 0..TEST_PARAMS_VECTOR.nb_loop_inv {
             loop {
-                rng.read(k).unwrap();
-                rng.read(y).unwrap();
+                rng.read(k);
+                rng.read(y);
                 let is_zero = k.iter().all(|&elt| elt == 0) || y.iter().all(|&elt| elt == 0);
                 let is_modulus = k.iter().zip(prime_field).all(|(&a, &b)| a == b)
                     || y.iter().zip(prime_field).all(|(&a, &b)| a == b);
