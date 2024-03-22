@@ -4,8 +4,8 @@
 //! display (via I2C)
 //!
 //! The following wiring is assumed:
-//! - SDA => GPIO1
-//! - SCL => GPIO2
+//! - SDA => GPIO4
+//! - SCL => GPIO5
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 //% FEATURES: embedded-hal-02
