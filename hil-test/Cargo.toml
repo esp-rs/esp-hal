@@ -38,6 +38,7 @@ embassy-executor = { default-features = false, version = "0.5.0", features = [
     "arch-riscv32",
     "executor-thread",
 ], optional = true }
+semihosting = "0.1.7"
 
 [dev-dependencies]
 # Add the `embedded-test/defmt` feature for more verbose testing
