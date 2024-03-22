@@ -64,6 +64,9 @@ struct BuildPackageArgs {
     /// Toolchain to build with.
     #[arg(long)]
     toolchain: Option<String>,
+    /// Don't enabled the default features.
+    #[arg(long)]
+    no_default_features: bool,
 }
 
 #[derive(Debug, Args)]
@@ -233,7 +236,13 @@ fn build_package(workspace: &Path, args: BuildPackageArgs) -> Result<()> {
     let package_path = xtask::windows_safe_path(&workspace.join(args.package.to_string()));
 
     // Build the package using the provided features and/or target, if any:
-    xtask::build_package(&package_path, args.features, args.toolchain, args.target)
+    xtask::build_package(
+        &package_path,
+        args.features,
+        args.no_default_features,
+        args.toolchain,
+        args.target,
+    )
 }
 
 fn bump_version(workspace: &Path, args: BumpVersionArgs) -> Result<()> {
