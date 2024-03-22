@@ -23,12 +23,21 @@ harness = false
 [dependencies]
 defmt = { version = "0.3.5" }
 defmt-rtt = { version = "0.4.0" }
-esp-hal = { path = "../esp-hal", features = ["embedded-hal", "embedded-hal-02",  "defmt"], optional = true }
-embedded-hal-02       = { version = "0.2.7", package = "embedded-hal", features = ["unproven"] }
+esp-hal = { path = "../esp-hal", features = [
+    "defmt",
+    "embedded-hal",
+    "embedded-hal-02",
+], optional = true }
+embedded-hal-02 = { version = "0.2.7", package = "embedded-hal", features = [
+    "unproven",
+] }
 embedded-hal-async = { version = "1.0.0", optional = true }
-embedded-hal     = { version = "1.0.0" }
-embedded-hal-nb      = { version = "1.0.0", optional = true }
-embassy-executor = { default-features = false, version = "0.5.0", features = ["executor-thread", "arch-riscv32"], optional = true }
+embedded-hal = { version = "1.0.0" }
+embedded-hal-nb = { version = "1.0.0", optional = true }
+embassy-executor = { default-features = false, version = "0.5.0", features = [
+    "arch-riscv32",
+    "executor-thread",
+], optional = true }
 
 [dev-dependencies]
 # Add the `embedded-test/defmt` feature for more verbose testing
@@ -36,21 +45,21 @@ embedded-test = { git = "https://github.com/probe-rs/embedded-test", rev = "b67d
 
 [features]
 # Device support (required!):
-esp32   = ["esp-hal/esp32", "embedded-test/xtensa-semihosting"]
+esp32   = ["embedded-test/xtensa-semihosting", "esp-hal/esp32"]
 esp32c2 = ["esp-hal/esp32c2"]
 esp32c3 = ["esp-hal/esp32c3"]
 esp32c6 = ["esp-hal/esp32c6"]
 esp32h2 = ["esp-hal/esp32h2"]
-esp32s2 = ["esp-hal/esp32s2", "embedded-test/xtensa-semihosting"]
-esp32s3 = ["esp-hal/esp32s3", "embedded-test/xtensa-semihosting"]
+esp32s2 = ["embedded-test/xtensa-semihosting", "esp-hal/esp32s2"]
+esp32s3 = ["embedded-test/xtensa-semihosting", "esp-hal/esp32s3"]
 # Async & Embassy:
-async = ["dep:embedded-hal-async", "esp-hal?/async"]
-embassy = ["esp-hal?/embassy", "embedded-test/embassy", "dep:embassy-executor"]
+async                      = ["dep:embedded-hal-async", "esp-hal?/async"]
+embassy                    = ["dep:embassy-executor", "embedded-test/embassy", "esp-hal?/embassy"]
 embassy-executor-interrupt = ["esp-hal?/embassy-executor-interrupt"]
 embassy-executor-thread    = ["esp-hal?/embassy-executor-thread"]
 embassy-time-systick-16mhz = ["esp-hal?/embassy-time-systick-16mhz"]
 embassy-time-systick-80mhz = ["esp-hal?/embassy-time-systick-80mhz"]
-embassy-time-timg0   = ["esp-hal?/embassy-time-timg0"]
+embassy-time-timg0         = ["esp-hal?/embassy-time-timg0"]
 
 # https://doc.rust-lang.org/cargo/reference/profiles.html#test
 # Test and bench profiles inherit from dev and release respectively.
@@ -69,5 +78,5 @@ debug            = 2
 debug-assertions = false
 incremental      = false
 opt-level        = 3
-lto = 'fat'
+lto              = 'fat'
 overflow-checks  = false
