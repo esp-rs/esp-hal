@@ -689,7 +689,9 @@ pub trait Instance {
         // Configure frequency
         #[cfg(esp32)]
         self.set_frequency(clocks.i2c_clock.convert(), frequency, timeout);
-        #[cfg(not(esp32))]
+        #[cfg(esp32s2)]
+        self.set_frequency(clocks.apb_clock.convert(), frequency, timeout);
+        #[cfg(not(any(esp32, esp32s2)))]
         self.set_frequency(clocks.xtal_clock.convert(), frequency, timeout);
 
         self.update_config();

@@ -398,7 +398,7 @@ impl<'d> ClockControl<'d> {
                 cpu_clock: cpu_clock_speed.frequency(),
                 apb_clock: HertzU32::MHz(80),
                 xtal_clock: HertzU32::MHz(40),
-                i2c_clock: HertzU32::MHz(40),
+                i2c_clock: HertzU32::MHz(80),
                 // The docs are unclear here. pwm_clock seems to be tied to clocks.apb_clock
                 // while simultaneously being fixed at 160 MHz.
                 // Testing showed 160 MHz to be correct for current clock configurations.
