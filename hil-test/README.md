@@ -57,19 +57,19 @@ Our Virtual Machines have the following setup:
 - ESP32-C3 (`rustboard`):
   - Devkit: `ESP32-C3-DevKit-RUST-1` connected via USB-Serial-JTAG.
     - `GPIO2` and `GPIO4` are connected.
-  - VM: Configured with the following [setup](#vm-setup)
+  - VM: Ubuntu 20.04.5 configured with the following [setup](#vm-setup)
 - ESP32-C6 (`esp32c6-usb`):
   - Devkit: `ESP32-C6-DevKitC-1 V1.2` connected via USB-Serial-JTAG (`USB` port).
     - `GPIO2` and `GPIO4` are connected.
-  - VM: Configured with the following [setup](#vm-setup)
+  - VM: Ubuntu 20.04.5 configured with the following [setup](#vm-setup)
 - ESP32-H2 (`esp32h2-usb`):
   - Devkit: `ESP32-H2-DevKitM-1` connected via USB-Serial-JTAG (`USB` port).
     - `GPIO2` and `GPIO4` are connected.
-  - VM: Configured with the following [setup](#vm-setup)
+  - VM: Ubuntu 20.04.5 configured with the following [setup](#vm-setup)
 - ESP32-S3 (`esp32s3-usb`):
   - Devkit: `ESP32-S3-DevKitC-1` connected via USB-Serial-JTAG.
     - `GPIO2` and `GPIO4` are connected.
-  - VM: Configured with the following [setup](#vm-setup)
+  - VM: Ubuntu 22.04.4 configured with the following [setup](#vm-setup)
 
 [`hil.yml`]: https://github.com/esp-rs/esp-hal/blob/main/.github/workflows/hil.yml
 
