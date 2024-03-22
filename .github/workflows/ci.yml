@@ -307,7 +307,7 @@ jobs:
   #
   # https://github.com/esp-rs/esp-hal/issues/1328
 
-  riscv-hil:
+  hil:
     name: HIL Test | ${{ matrix.soc }}
     runs-on: ubuntu-latest
 
