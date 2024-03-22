@@ -158,9 +158,11 @@ extern "C" fn EspDefaultHandler(_interrupt: peripherals::Interrupt) {
 pub trait Mode: crate::private::Sealed {}
 
 /// Driver initialized in blocking mode.
+#[derive(Debug)]
 pub struct Blocking;
 
 /// Driver initialized in async mode.
+#[derive(Debug)]
 pub struct Async;
 
 impl crate::Mode for Blocking {}

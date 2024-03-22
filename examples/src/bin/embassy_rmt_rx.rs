@@ -18,7 +18,13 @@ use esp_hal::{
     gpio::{Gpio5, Output, PushPull, IO},
     peripherals::Peripherals,
     prelude::*,
-    rmt::{asynch::RxChannelAsync, PulseCode, Rmt, RxChannelConfig, RxChannelCreator},
+    rmt::{
+        asynch::RxChannelAsync,
+        PulseCode,
+        Rmt,
+        RxChannelConfig,
+        RxChannelCreatorAsync,
+    },
 };
 use esp_println::{print, println};
 
@@ -58,7 +64,7 @@ async fn main(spawner: Spawner) {
         }
     };
 
-    let rmt = Rmt::new(peripherals.RMT, freq, &clocks).unwrap();
+    let rmt = Rmt::new_async(peripherals.RMT, freq, &clocks).unwrap();
     let rx_config = RxChannelConfig {
         clk_divider: 255,
         idle_threshold: 10000,

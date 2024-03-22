@@ -150,9 +150,6 @@ pub fn init(clocks: &Clocks, td: time_driver::TimerType) {
         #[cfg(i2s1)]
         crate::interrupt::enable(Interrupt::I2S1, Priority::min()).unwrap();
 
-        #[cfg(rmt)]
-        crate::interrupt::enable(Interrupt::RMT, Priority::min()).unwrap();
-
         #[cfg(usb_device)]
         crate::interrupt::enable(Interrupt::USB_DEVICE, Priority::min()).unwrap();
 

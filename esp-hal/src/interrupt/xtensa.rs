@@ -68,6 +68,23 @@ pub const RESERVED_INTERRUPTS: &[usize] = &[
     CpuInterrupt::Interrupt22EdgePriority3 as _,
 ];
 
+pub(crate) fn setup_interrupts() {
+    unsafe {
+        // disable all known interrupts
+        // at least after the 2nd stage bootloader there are some interrupts enabled
+        // (e.g. UART)
+        for peripheral_interrupt in 0..255 {
+            crate::soc::peripherals::Interrupt::try_from(peripheral_interrupt)
+                .map(|intr| {
+                    #[cfg(multi_core)]
+                    disable(Cpu::AppCpu, intr);
+                    disable(Cpu::ProCpu, intr);
+                })
+                .ok();
+        }
+    };
+}
+
 /// Enable an interrupt by directly binding it to a available CPU interrupt
 ///
 /// Unless you are sure, you most likely want to use [`enable`] with the
