@@ -4,7 +4,6 @@
 //! Most dev-kits use a USB-UART-bridge - in that case you won't see any output.
 
 //% CHIPS: esp32c3 esp32c6 esp32h2 esp32s3
-//% FEATURES: embedded-hal-02
 
 #![no_std]
 #![no_main]
@@ -12,17 +11,15 @@
 use core::{cell::RefCell, fmt::Write};
 
 use critical_section::Mutex;
-use embedded_hal_02::timer::CountDown;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
+    delay::Delay,
     interrupt::{self, Priority},
     peripherals::{Interrupt, Peripherals},
     prelude::*,
-    timer::TimerGroup,
     usb_serial_jtag::UsbSerialJtag,
 };
-use nb::block;
 
 static USB_SERIAL: Mutex<RefCell<Option<UsbSerialJtag>>> = Mutex::new(RefCell::new(None));
 
@@ -32,10 +29,7 @@ fn main() -> ! {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    let mut timer0 = timg0.timer0;
-
-    timer0.start(1.secs());
+    let delay = Delay::new(&clocks);
 
     let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE);
     usb_serial.listen_rx_packet_recv_interrupt();
@@ -52,7 +46,7 @@ fn main() -> ! {
             .ok();
         });
 
-        block!(timer0.wait()).unwrap();
+        delay.delay(1.secs());
     }
 }
 
