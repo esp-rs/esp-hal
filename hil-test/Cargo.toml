@@ -23,24 +23,27 @@ harness = false
 [[test]]
 name    = "uart_async"
 harness = false
-required-features = ["embassy", "async"]
+required-features = ["async", "embassy"]
 
 [dependencies]
-defmt = { version = "0.3.5" }
-defmt-rtt = { version = "0.4.0" }
-esp-hal = { path = "../esp-hal", features = ["embedded-hal", "embedded-hal-02",  "defmt"], optional = true }
-embedded-hal-02       = { version = "0.2.7", package = "embedded-hal", features = ["unproven"] }
+defmt              = { version = "0.3.6" }
+defmt-rtt          = { version = "0.4.0" }
+embassy-time       = { version = "0.3.0", features = ["generic-queue-8"] }
+embedded-hal       = { version = "1.0.0" }
+embedded-hal-02    = { version = "0.2.7", package = "embedded-hal", features = ["unproven"] }
 embedded-hal-async = { version = "1.0.0", optional = true }
-embedded-hal     = { version = "1.0.0" }
-embedded-hal-nb      = { version = "1.0.0", optional = true }
-semihosting = "0.1.6"
+embedded-hal-nb    = { version = "1.0.0", optional = true }
+esp-hal            = { path = "../esp-hal", features = ["defmt", "embedded-hal", "embedded-hal-02"], optional = true }
+semihosting        = { git = "https://github.com/taiki-e/semihosting", rev = "c829c19" }
 
 [dev-dependencies]
+embassy-executor   = { version = "0.5.0", default-features = false, features = ["executor-thread", "arch-riscv32"] }
 # Add the `embedded-test/defmt` feature for more verbose testing
-embassy-executor = { default-features = false, version = "0.5.0", features = ["executor-thread", "arch-riscv32"] }
 embedded-test = {git = "https://github.com/probe-rs/embedded-test", rev = "8e3f925" }
 
 [features]
+default = ["async", "embassy", "embassy-time-timg0"]
+
 # Device support (required!):
 esp32   = ["esp-hal/esp32"]
 esp32c2 = ["esp-hal/esp32c2"]
@@ -50,13 +53,13 @@ esp32h2 = ["esp-hal/esp32h2"]
 esp32s2 = ["esp-hal/esp32s2"]
 esp32s3 = ["esp-hal/esp32s3"]
 # Async & Embassy:
-async = ["dep:embedded-hal-async", "esp-hal?/async"]
-embassy = ["esp-hal?/embassy", "embedded-test/embassy"]
+async                      = ["dep:embedded-hal-async", "esp-hal?/async"]
+embassy                    = ["esp-hal?/embassy", "embedded-test/embassy"]
 embassy-executor-interrupt = ["esp-hal?/embassy-executor-interrupt"]
 embassy-executor-thread    = ["esp-hal?/embassy-executor-thread"]
 embassy-time-systick-16mhz = ["esp-hal?/embassy-time-systick-16mhz"]
 embassy-time-systick-80mhz = ["esp-hal?/embassy-time-systick-80mhz"]
-embassy-time-timg0   = ["esp-hal?/embassy-time-timg0"]
+embassy-time-timg0         = ["esp-hal?/embassy-time-timg0"]
 
 # https://doc.rust-lang.org/cargo/reference/profiles.html#test
 # Test and bench profiles inherit from dev and release respectively.
@@ -66,7 +69,7 @@ codegen-units    = 1
 debug            = 2
 debug-assertions = true
 incremental      = false
-opt-level        = 'z'
+opt-level        = "z"
 overflow-checks  = true
 
 [profile.release]
@@ -75,8 +78,5 @@ debug            = 2
 debug-assertions = false
 incremental      = false
 opt-level        = 3
-lto = 'fat'
+lto              = "fat"
 overflow-checks  = false
-
-[patch.crates-io]
-semihosting = { git = "https://github.com/taiki-e/semihosting", rev = "c829c19" }
