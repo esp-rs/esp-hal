@@ -512,6 +512,11 @@ where
             }
         }
 
+        // Reset Tx/Rx FIFOs
+        serial.txfifo_reset();
+        serial.rxfifo_reset();
+        crate::rom::ets_delay_us(15);
+
         serial
     }
 
@@ -1021,6 +1026,30 @@ where
     #[cfg(not(any(esp32c3, esp32c6, esp32h2, esp32s3)))]
     #[inline(always)]
     fn sync_regs(&mut self) {}
+
+    fn rxfifo_reset(&mut self) {
+        T::register_block()
+            .conf0()
+            .modify(|_, w| w.rxfifo_rst().set_bit());
+        self.sync_regs();
+
+        T::register_block()
+            .conf0()
+            .modify(|_, w| w.rxfifo_rst().clear_bit());
+        self.sync_regs();
+    }
+
+    fn txfifo_reset(&mut self) {
+        T::register_block()
+            .conf0()
+            .modify(|_, w| w.txfifo_rst().set_bit());
+        self.sync_regs();
+
+        T::register_block()
+            .conf0()
+            .modify(|_, w| w.txfifo_rst().clear_bit());
+        self.sync_regs();
+    }
 }
 
 /// UART peripheral instance
