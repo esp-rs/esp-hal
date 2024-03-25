@@ -334,6 +334,7 @@ pub fn run_example(
 pub fn build_package(
     package_path: &Path,
     features: Vec<String>,
+    no_default_features: bool,
     toolchain: Option<String>,
     target: Option<String>,
 ) -> Result<()> {
@@ -360,6 +361,10 @@ pub fn build_package(
 
     if !features.is_empty() {
         builder = builder.features(&features);
+    }
+
+    if no_default_features {
+        builder = builder.arg("--no-default-features");
     }
 
     let args = builder.build();

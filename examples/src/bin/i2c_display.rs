@@ -22,17 +22,15 @@ use embedded_graphics::{
     prelude::*,
     text::{Alignment, Text},
 };
-use embedded_hal_02::timer::CountDown;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
+    delay::Delay,
     gpio::IO,
     i2c::I2C,
     peripherals::Peripherals,
     prelude::*,
-    timer::TimerGroup,
 };
-use nb::block;
 use ssd1306::{prelude::*, I2CDisplayInterface, Ssd1306};
 
 #[entry]
@@ -41,9 +39,7 @@ fn main() -> ! {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timer_group0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    let mut timer0 = timer_group0.timer0;
-
+    let delay = Delay::new(&clocks);
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
     // Create a new peripheral object with the described wiring
@@ -55,9 +51,6 @@ fn main() -> ! {
         100.kHz(),
         &clocks,
     );
-
-    // Start timer (5 second interval)
-    timer0.start(5u64.secs());
 
     // Initialize display
     let interface = I2CDisplayInterface::new(i2c);
@@ -102,7 +95,7 @@ fn main() -> ! {
         display.clear(BinaryColor::Off).unwrap();
 
         // Wait 5 seconds
-        block!(timer0.wait()).unwrap();
+        delay.delay(5.secs());
 
         // Write single-line centered text "Hello World" to buffer
         Text::with_alignment(
@@ -120,6 +113,6 @@ fn main() -> ! {
         display.clear(BinaryColor::Off).unwrap();
 
         // Wait 5 seconds
-        block!(timer0.wait()).unwrap();
+        delay.delay(5.secs());
     }
 }

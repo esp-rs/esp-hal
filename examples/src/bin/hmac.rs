@@ -53,12 +53,10 @@
 //! ```
 
 //% CHIPS: esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: embedded-hal-02
 
 #![no_std]
 #![no_main]
 
-use embedded_hal_02::blocking::rng::Read;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
@@ -89,7 +87,7 @@ fn main() -> ! {
     let mut hw_hmac = Hmac::new(peripherals.HMAC);
 
     let mut src = [0_u8; 1024];
-    rng.read(src.as_mut_slice()).unwrap();
+    rng.read(src.as_mut_slice());
     // println!("HMAC input {:02X?}", src);
 
     let mut output = [0u8; 32];
