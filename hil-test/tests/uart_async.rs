@@ -72,8 +72,7 @@ mod tests {
         const SEND: &[u8] = &*b"Hello ESP32";
         let mut buf = [0u8; SEND.len()];
 
-        // drain the FiFo to clear previous message
-        // TODO not working?
+        // Drain the FIFO to clear previous message:
         ctx.tx.flush_async().await.unwrap();
         while ctx.rx.drain_fifo(&mut buf[..]) > 0 {}
 
