@@ -701,7 +701,7 @@ where
 {
 }
 
-pub trait Instance {
+pub trait Instance: crate::private::Sealed {
     fn register_block(&self) -> &RegisterBlock;
 
     fn sclk_signal(&self) -> InputSignal;

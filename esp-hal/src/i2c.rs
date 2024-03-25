@@ -645,7 +645,7 @@ mod asynch {
 }
 
 /// I2C Peripheral Instance
-pub trait Instance {
+pub trait Instance: crate::private::Sealed {
     fn scl_output_signal(&self) -> OutputSignal;
     fn scl_input_signal(&self) -> InputSignal;
     fn sda_output_signal(&self) -> OutputSignal;

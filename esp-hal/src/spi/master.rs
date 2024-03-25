@@ -1988,7 +1988,7 @@ pub trait ExtendedInstance: Instance {
     fn sio3_input_signal(&self) -> InputSignal;
 }
 
-pub trait Instance {
+pub trait Instance: crate::private::Sealed {
     fn register_block(&self) -> &RegisterBlock;
 
     fn sclk_signal(&self) -> OutputSignal;

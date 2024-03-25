@@ -267,7 +267,7 @@ where
 }
 
 /// Timer peripheral instance
-pub trait Instance {
+pub trait Instance: crate::private::Sealed {
     fn reset_counter(&mut self);
 
     fn set_counter_active(&mut self, state: bool);
@@ -304,6 +304,8 @@ pub trait Instance {
 pub struct Timer0<TG> {
     phantom: PhantomData<TG>,
 }
+
+impl<TG> crate::private::Sealed for Timer0<TG> {}
 
 impl<TG> Timer0<TG>
 where
@@ -473,6 +475,9 @@ where
 pub struct Timer1<TG> {
     phantom: PhantomData<TG>,
 }
+
+#[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
+impl<TG> crate::private::Sealed for Timer1<TG> {}
 
 #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
 impl<TG> Timer1<TG>

@@ -1053,7 +1053,7 @@ where
 }
 
 /// UART peripheral instance
-pub trait Instance {
+pub trait Instance: crate::private::Sealed {
     fn register_block() -> &'static RegisterBlock;
     fn uart_number() -> usize;
     fn interrupt() -> Interrupt;
