@@ -361,9 +361,12 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
 
 /// Mark a function as an interrupt handler.
 ///
-/// This is really just a nicer looking way to make a function `unsafe extern
-/// "C"`
+/// Optionally a priority can be specified, e.g. `#[handler("Priority3")]`,
+/// "min" and "max" are special values.
+///
+/// If no priority is given, "Priority::min()" is assumed
 #[cfg(feature = "interrupt")]
+#[proc_macro_error::proc_macro_error]
 #[proc_macro_attribute]
 pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
     use darling::ast::NestedMeta;
@@ -385,9 +388,40 @@ pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
         }
     };
 
-    if attr_args.len() > 0 {
-        abort!(Span::call_site(), "This attribute accepts no arguments")
-    }
+    let root = Ident::new(
+        if let Ok(FoundCrate::Name(ref name)) = crate_name("esp-hal") {
+            &name
+        } else {
+            "crate"
+        },
+        Span::call_site().into(),
+    );
+
+    let priority = if attr_args.len() > 1 {
+        abort!(
+            Span::call_site(),
+            "This attribute accepts one optional argument"
+        )
+    } else if attr_args.len() == 1 {
+        match &attr_args[0] {
+            NestedMeta::Lit(syn::Lit::Str(priority)) => priority.value(),
+            _ => abort!(
+                Span::call_site(),
+                "The priority must be provided as a string"
+            ),
+        }
+    } else {
+        String::from("min")
+    };
+
+    let priority = match priority.as_str() {
+        "min" => quote::quote_spanned!(original_span => #root::interrupt::Priority::min()),
+        "max" => quote::quote_spanned!(original_span => #root::interrupt::Priority::max()),
+        _ => {
+            let priority = Ident::new(&priority, proc_macro2::Span::call_site());
+            quote::quote_spanned!(original_span => #root::interrupt::Priority::#priority)
+        }
+    };
 
     // XXX should we blacklist other attributes?
 
@@ -419,17 +453,9 @@ pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
         .into();
     }
 
-    let root = Ident::new(
-        if let Ok(FoundCrate::Name(ref name)) = crate_name("esp-hal") {
-            &name
-        } else {
-            "crate"
-        },
-        Span::call_site().into(),
-    );
-
     f.sig.abi = syn::parse_quote_spanned!(original_span => extern "C");
     let orig = f.sig.ident;
+    let vis = f.vis.clone();
     f.sig.ident = Ident::new(
         &format!("__esp_hal_internal_{}", orig),
         proc_macro2::Span::call_site(),
@@ -440,7 +466,7 @@ pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
         #f
 
         #[allow(non_upper_case_globals)]
-        static #orig: #root::interrupt::InterruptHandler = #root::interrupt::InterruptHandler::new(#new, #root::interrupt::Priority::min());
+        #vis static #orig: #root::interrupt::InterruptHandler = #root::interrupt::InterruptHandler::new(#new, #priority);
     )
     .into()
 }

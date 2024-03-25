@@ -18,7 +18,7 @@ use esp_hal::{
     gpio::IO,
     peripherals::Peripherals,
     prelude::*,
-    rmt::{asynch::TxChannelAsync, PulseCode, Rmt, TxChannelConfig, TxChannelCreator},
+    rmt::{asynch::TxChannelAsync, PulseCode, Rmt, TxChannelConfig, TxChannelCreatorAsync},
     timer::TimerGroup,
 };
 use esp_println::println;
@@ -43,7 +43,7 @@ async fn main(_spawner: Spawner) {
         }
     };
 
-    let rmt = Rmt::new(peripherals.RMT, freq, &clocks).unwrap();
+    let rmt = Rmt::new_async(peripherals.RMT, freq, &clocks).unwrap();
 
     let mut channel = rmt
         .channel0
