@@ -68,6 +68,7 @@
 use core::marker::PhantomData;
 
 use embedded_dma::{ReadBuffer, WriteBuffer};
+use enumset::{EnumSet, EnumSetType};
 use private::*;
 
 #[cfg(any(esp32, esp32s3))]
@@ -85,10 +86,22 @@ use crate::{
         TxPrivate,
     },
     gpio::OutputPin,
+    interrupt::InterruptHandler,
     into_ref,
     peripheral::Peripheral,
     system::PeripheralClockControl,
+    Mode,
 };
+
+#[derive(EnumSetType)]
+pub enum I2sInterrupt {
+    TxHung,
+    RxHung,
+    #[cfg(not(any(esp32, esp32s2)))]
+    TxDone,
+    #[cfg(not(any(esp32, esp32s2)))]
+    RxDone,
+}
 
 #[cfg(any(esp32, esp32s2, esp32s3))]
 const I2S_LL_MCLK_DIVIDER_BIT_WIDTH: usize = 6;
@@ -199,18 +212,20 @@ impl DataFormat {
 
 /// An in-progress DMA write transfer.
 #[must_use]
-pub struct I2sWriteDmaTransfer<'t, 'd, T, CH>
+pub struct I2sWriteDmaTransfer<'t, 'd, T, CH, DmaMode>
 where
     T: RegisterAccess,
     CH: ChannelTypes,
+    DmaMode: Mode,
 {
-    i2s_tx: &'t mut I2sTx<'d, T, CH>,
+    i2s_tx: &'t mut I2sTx<'d, T, CH, DmaMode>,
 }
 
-impl<'t, 'd, T, CH> I2sWriteDmaTransfer<'t, 'd, T, CH>
+impl<'t, 'd, T, CH, DmaMode> I2sWriteDmaTransfer<'t, 'd, T, CH, DmaMode>
 where
     T: RegisterAccess,
     CH: ChannelTypes,
+    DmaMode: Mode,
 {
     /// Amount of bytes which can be pushed.
     /// Only useful for circular DMA transfers
@@ -246,10 +261,11 @@ where
     }
 }
 
-impl<'t, 'd, T, CH> DmaTransfer for I2sWriteDmaTransfer<'t, 'd, T, CH>
+impl<'t, 'd, T, CH, DmaMode> DmaTransfer for I2sWriteDmaTransfer<'t, 'd, T, CH, DmaMode>
 where
     T: RegisterAccess,
     CH: ChannelTypes,
+    DmaMode: Mode,
 {
     /// Wait for the DMA transfer to complete
     fn wait(self) -> Result<(), DmaError> {
@@ -270,10 +286,11 @@ where
     }
 }
 
-impl<'t, 'd, T, CH> Drop for I2sWriteDmaTransfer<'t, 'd, T, CH>
+impl<'t, 'd, T, CH, DmaMode> Drop for I2sWriteDmaTransfer<'t, 'd, T, CH, DmaMode>
 where
     T: RegisterAccess,
     CH: ChannelTypes,
+    DmaMode: Mode,
 {
     fn drop(&mut self) {
         self.i2s_tx.wait_tx_dma_done().ok();
@@ -286,10 +303,11 @@ pub trait I2sWrite<W> {
 }
 
 /// Initiate a DMA tx transfer
-pub trait I2sWriteDma<'d, T, CH, TXBUF>
+pub trait I2sWriteDma<'d, T, CH, TXBUF, DmaMode>
 where
     T: RegisterAccess,
     CH: ChannelTypes,
+    DmaMode: Mode,
 {
     /// Write I2S.
     /// Returns [I2sWriteDmaTransfer] which represents the in-progress DMA
@@ -297,7 +315,7 @@ where
     fn write_dma<'t>(
         &'t mut self,
         words: &'t TXBUF,
-    ) -> Result<I2sWriteDmaTransfer<'t, 'd, T, CH>, Error>
+    ) -> Result<I2sWriteDmaTransfer<'t, 'd, T, CH, DmaMode>, Error>
     where
         TXBUF: ReadBuffer<Word = u8>;
 
@@ -306,25 +324,27 @@ where
     fn write_dma_circular<'t>(
         &'t mut self,
         words: &'t TXBUF,
-    ) -> Result<I2sWriteDmaTransfer<'t, 'd, T, CH>, Error>
+    ) -> Result<I2sWriteDmaTransfer<'t, 'd, T, CH, DmaMode>, Error>
     where
         TXBUF: ReadBuffer<Word = u8>;
 }
 
 /// An in-progress DMA read transfer.
 #[must_use]
-pub struct I2sReadDmaTransfer<'t, 'd, T, CH>
+pub struct I2sReadDmaTransfer<'t, 'd, T, CH, DmaMode>
 where
     T: RegisterAccess,
     CH: ChannelTypes,
+    DmaMode: Mode,
 {
-    i2s_rx: &'t mut I2sRx<'d, T, CH>,
+    i2s_rx: &'t mut I2sRx<'d, T, CH, DmaMode>,
 }
 
-impl<'t, 'd, T, CH> I2sReadDmaTransfer<'t, 'd, T, CH>
+impl<'t, 'd, T, CH, DmaMode> I2sReadDmaTransfer<'t, 'd, T, CH, DmaMode>
 where
     T: RegisterAccess,
     CH: ChannelTypes,
+    DmaMode: Mode,
 {
     /// Amount of bytes which can be popped
     pub fn available(&mut self) -> usize {
@@ -352,10 +372,11 @@ where
     }
 }
 
-impl<'t, 'd, T, CH> DmaTransfer for I2sReadDmaTransfer<'t, 'd, T, CH>
+impl<'t, 'd, T, CH, DmaMode> DmaTransfer for I2sReadDmaTransfer<'t, 'd, T, CH, DmaMode>
 where
     T: RegisterAccess,
     CH: ChannelTypes,
+    DmaMode: Mode,
 {
     /// Wait for the DMA transfer to complete
     fn wait(self) -> Result<(), DmaError> {
@@ -376,10 +397,11 @@ where
     }
 }
 
-impl<'t, T, CH> Drop for I2sReadDmaTransfer<'t, '_, T, CH>
+impl<'t, T, CH, DmaMode> Drop for I2sReadDmaTransfer<'t, '_, T, CH, DmaMode>
 where
     T: RegisterAccess,
     CH: ChannelTypes,
+    DmaMode: Mode,
 {
     fn drop(&mut self) {
         self.i2s_rx.wait_rx_dma_done().ok();
@@ -392,10 +414,11 @@ pub trait I2sRead<W> {
 }
 
 /// Initiate a DMA rx transfer
-pub trait I2sReadDma<'d, T, CH, RXBUF>
+pub trait I2sReadDma<'d, T, CH, RXBUF, DmaMode>
 where
     T: RegisterAccess,
     CH: ChannelTypes,
+    DmaMode: Mode,
 {
     /// Read I2S.
     /// Returns [I2sReadDmaTransfer] which represents the in-progress DMA
@@ -403,7 +426,7 @@ where
     fn read_dma<'t>(
         &'t mut self,
         words: &'t mut RXBUF,
-    ) -> Result<I2sReadDmaTransfer<'t, 'd, T, CH>, Error>
+    ) -> Result<I2sReadDmaTransfer<'t, 'd, T, CH, DmaMode>, Error>
     where
         RXBUF: WriteBuffer<Word = u8>;
 
@@ -413,32 +436,35 @@ where
     fn read_dma_circular<'t>(
         &'t mut self,
         words: &'t mut RXBUF,
-    ) -> Result<I2sReadDmaTransfer<'t, 'd, T, CH>, Error>
+    ) -> Result<I2sReadDmaTransfer<'t, 'd, T, CH, DmaMode>, Error>
     where
         RXBUF: WriteBuffer<Word = u8>;
 }
 
 /// Instance of the I2S peripheral driver
-pub struct I2s<'d, I, CH>
+pub struct I2s<'d, I, CH, DmaMode>
 where
     I: RegisterAccess,
     CH: ChannelTypes,
+    DmaMode: Mode,
 {
-    pub i2s_tx: TxCreator<'d, I, CH>,
-    pub i2s_rx: RxCreator<'d, I, CH>,
+    pub i2s_tx: TxCreator<'d, I, CH, DmaMode>,
+    pub i2s_rx: RxCreator<'d, I, CH, DmaMode>,
+    phantom: PhantomData<DmaMode>,
 }
 
-impl<'d, I, CH> I2s<'d, I, CH>
+impl<'d, I, CH, DmaMode> I2s<'d, I, CH, DmaMode>
 where
     I: RegisterAccess,
     CH: ChannelTypes,
+    DmaMode: Mode,
 {
     fn new_internal(
         _i2s: impl Peripheral<P = I> + 'd,
         standard: Standard,
         data_format: DataFormat,
         sample_rate: impl Into<fugit::HertzU32>,
-        mut channel: Channel<'d, CH>,
+        mut channel: Channel<'d, CH, DmaMode>,
         clocks: &Clocks,
     ) -> Self {
         // on ESP32-C3 / ESP32-S3 and later RX and TX are independent and
@@ -461,19 +487,58 @@ where
             i2s_tx: TxCreator {
                 register_access: PhantomData,
                 tx_channel: channel.tx,
+                phantom: PhantomData,
             },
             i2s_rx: RxCreator {
                 register_access: PhantomData,
                 rx_channel: channel.rx,
+                phantom: PhantomData,
             },
+            phantom: PhantomData,
         }
     }
 }
 
-impl<'d, I, CH> I2s<'d, I, CH>
+impl<'d, I, CH, DmaMode> I2s<'d, I, CH, DmaMode>
 where
     I: RegisterAccess,
     CH: ChannelTypes,
+    DmaMode: Mode,
+{
+    /// Sets the interrupt handler, enables it with
+    /// [crate::interrupt::Priority::min()]
+    ///
+    /// Interrupts are not enabled at the peripheral level here.
+    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        I::set_interrupt_handler(handler);
+    }
+
+    /// Listen for the given interrupts
+    pub fn listen(&mut self, interrupts: EnumSet<I2sInterrupt>) {
+        I::listen(interrupts);
+    }
+
+    /// Unlisten the given interrupts
+    pub fn unlisten(&mut self, interrupts: EnumSet<I2sInterrupt>) {
+        I::unlisten(interrupts);
+    }
+
+    /// Gets asserted interrupts
+    pub fn interrupts(&mut self) -> EnumSet<I2sInterrupt> {
+        I::interrupts()
+    }
+
+    /// Resets asserted interrupts
+    pub fn clear_interrupts(&mut self, interrupts: EnumSet<I2sInterrupt>) {
+        I::clear_interrupts(interrupts);
+    }
+}
+
+impl<'d, I, CH, DmaMode> I2s<'d, I, CH, DmaMode>
+where
+    I: RegisterAccess,
+    CH: ChannelTypes,
+    DmaMode: Mode,
 {
     /// Construct a new I2S peripheral driver instance for the first I2S
     /// peripheral
@@ -482,12 +547,13 @@ where
         standard: Standard,
         data_format: DataFormat,
         sample_rate: impl Into<fugit::HertzU32>,
-        channel: Channel<'d, CH>,
+        channel: Channel<'d, CH, DmaMode>,
         clocks: &Clocks,
     ) -> Self
     where
         I: I2s0Instance,
         CH::P: I2sPeripheral + I2s0Peripheral,
+        DmaMode: Mode,
     {
         Self::new_internal(i2s, standard, data_format, sample_rate, channel, clocks)
     }
@@ -500,7 +566,7 @@ where
         standard: Standard,
         data_format: DataFormat,
         sample_rate: impl Into<fugit::HertzU32>,
-        channel: Channel<'d, CH>,
+        channel: Channel<'d, CH, DmaMode>,
         clocks: &Clocks,
     ) -> Self
     where
@@ -519,34 +585,38 @@ where
 }
 
 /// I2S TX channel
-pub struct I2sTx<'d, T, CH>
+pub struct I2sTx<'d, T, CH, DmaMode>
 where
     T: RegisterAccess,
     CH: ChannelTypes,
 {
     register_access: PhantomData<T>,
     tx_channel: CH::Tx<'d>,
+    phantom: PhantomData<DmaMode>,
 }
 
-impl<'d, T, CH> core::fmt::Debug for I2sTx<'d, T, CH>
+impl<'d, T, CH, DmaMode> core::fmt::Debug for I2sTx<'d, T, CH, DmaMode>
 where
     T: RegisterAccess,
     CH: ChannelTypes,
+    DmaMode: Mode,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("I2sTx").finish()
     }
 }
 
-impl<'d, T, CH> I2sTx<'d, T, CH>
+impl<'d, T, CH, DmaMode> I2sTx<'d, T, CH, DmaMode>
 where
     T: RegisterAccess,
     CH: ChannelTypes,
+    DmaMode: Mode,
 {
     fn new(tx_channel: CH::Tx<'d>) -> Self {
         Self {
             register_access: PhantomData,
             tx_channel,
+            phantom: PhantomData,
         }
     }
 
@@ -578,9 +648,10 @@ where
         &'t mut self,
         words: &'t TXBUF,
         circular: bool,
-    ) -> Result<I2sWriteDmaTransfer<'t, 'd, T, CH>, Error>
+    ) -> Result<I2sWriteDmaTransfer<'t, 'd, T, CH, DmaMode>, Error>
     where
         TXBUF: ReadBuffer<Word = u8>,
+        DmaMode: Mode,
     {
         let (ptr, len) = unsafe { words.read_buffer() };
 
@@ -635,11 +706,12 @@ where
     }
 }
 
-impl<'d, T, W, CH> I2sWrite<W> for I2sTx<'d, T, CH>
+impl<'d, T, W, CH, DmaMode> I2sWrite<W> for I2sTx<'d, T, CH, DmaMode>
 where
     T: RegisterAccess,
     CH: ChannelTypes,
     W: AcceptedWord,
+    DmaMode: Mode,
 {
     fn write(&mut self, words: &[W]) -> Result<(), Error> {
         self.write_bytes(unsafe {
@@ -651,15 +723,16 @@ where
     }
 }
 
-impl<'d, T, CH, TXBUF> I2sWriteDma<'d, T, CH, TXBUF> for I2sTx<'d, T, CH>
+impl<'d, T, CH, TXBUF, DmaMode> I2sWriteDma<'d, T, CH, TXBUF, DmaMode> for I2sTx<'d, T, CH, DmaMode>
 where
     T: RegisterAccess,
     CH: ChannelTypes,
+    DmaMode: Mode,
 {
     fn write_dma<'t>(
         &'t mut self,
         words: &'t TXBUF,
-    ) -> Result<I2sWriteDmaTransfer<'t, 'd, T, CH>, Error>
+    ) -> Result<I2sWriteDmaTransfer<'t, 'd, T, CH, DmaMode>, Error>
     where
         TXBUF: ReadBuffer<Word = u8>,
     {
@@ -669,7 +742,7 @@ where
     fn write_dma_circular<'t>(
         &'t mut self,
         words: &'t TXBUF,
-    ) -> Result<I2sWriteDmaTransfer<'t, 'd, T, CH>, Error>
+    ) -> Result<I2sWriteDmaTransfer<'t, 'd, T, CH, DmaMode>, Error>
     where
         TXBUF: ReadBuffer<Word = u8>,
     {
@@ -678,34 +751,39 @@ where
 }
 
 /// I2S RX channel
-pub struct I2sRx<'d, T, CH>
+pub struct I2sRx<'d, T, CH, DmaMode>
 where
     T: RegisterAccess,
     CH: ChannelTypes,
+    DmaMode: Mode,
 {
     register_access: PhantomData<T>,
     rx_channel: CH::Rx<'d>,
+    phantom: PhantomData<DmaMode>,
 }
 
-impl<'d, T, CH> core::fmt::Debug for I2sRx<'d, T, CH>
+impl<'d, T, CH, DmaMode> core::fmt::Debug for I2sRx<'d, T, CH, DmaMode>
 where
     T: RegisterAccess,
     CH: ChannelTypes,
+    DmaMode: Mode,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("I2sRx").finish()
     }
 }
 
-impl<'d, T, CH> I2sRx<'d, T, CH>
+impl<'d, T, CH, DmaMode> I2sRx<'d, T, CH, DmaMode>
 where
     T: RegisterAccess,
     CH: ChannelTypes,
+    DmaMode: Mode,
 {
     fn new(rx_channel: CH::Rx<'d>) -> Self {
         Self {
             register_access: PhantomData,
             rx_channel,
+            phantom: PhantomData,
         }
     }
 
@@ -737,7 +815,7 @@ where
         &'t mut self,
         words: &'t mut RXBUF,
         circular: bool,
-    ) -> Result<I2sReadDmaTransfer<'t, 'd, T, CH>, Error>
+    ) -> Result<I2sReadDmaTransfer<'t, 'd, T, CH, DmaMode>, Error>
     where
         RXBUF: WriteBuffer<Word = u8>,
     {
@@ -809,11 +887,12 @@ where
     }
 }
 
-impl<'d, W, T, CH> I2sRead<W> for I2sRx<'d, T, CH>
+impl<'d, W, T, CH, DmaMode> I2sRead<W> for I2sRx<'d, T, CH, DmaMode>
 where
     T: RegisterAccess,
     CH: ChannelTypes,
     W: AcceptedWord,
+    DmaMode: Mode,
 {
     fn read(&mut self, words: &mut [W]) -> Result<(), Error> {
         if core::mem::size_of_val(words) > 4096 || words.is_empty() {
@@ -829,15 +908,16 @@ where
     }
 }
 
-impl<'d, T, CH, RXBUF> I2sReadDma<'d, T, CH, RXBUF> for I2sRx<'d, T, CH>
+impl<'d, T, CH, RXBUF, DmaMode> I2sReadDma<'d, T, CH, RXBUF, DmaMode> for I2sRx<'d, T, CH, DmaMode>
 where
     T: RegisterAccess,
     CH: ChannelTypes,
+    DmaMode: Mode,
 {
     fn read_dma<'t>(
         &'t mut self,
         words: &'t mut RXBUF,
-    ) -> Result<I2sReadDmaTransfer<'t, 'd, T, CH>, Error>
+    ) -> Result<I2sReadDmaTransfer<'t, 'd, T, CH, DmaMode>, Error>
     where
         RXBUF: WriteBuffer<Word = u8>,
     {
@@ -847,7 +927,7 @@ where
     fn read_dma_circular<'t>(
         &'t mut self,
         words: &'t mut RXBUF,
-    ) -> Result<I2sReadDmaTransfer<'t, 'd, T, CH>, Error>
+    ) -> Result<I2sReadDmaTransfer<'t, 'd, T, CH, DmaMode>, Error>
     where
         RXBUF: WriteBuffer<Word = u8>,
     {
@@ -860,9 +940,18 @@ pub trait RegisterAccess: RegisterAccessPrivate {}
 mod private {
     use core::marker::PhantomData;
 
+    use enumset::EnumSet;
     use fugit::HertzU32;
 
-    use super::{DataFormat, I2sRx, I2sTx, RegisterAccess, Standard, I2S_LL_MCLK_DIVIDER_MAX};
+    use super::{
+        DataFormat,
+        I2sInterrupt,
+        I2sRx,
+        I2sTx,
+        RegisterAccess,
+        Standard,
+        I2S_LL_MCLK_DIVIDER_MAX,
+    };
     #[cfg(not(any(esp32, esp32s3)))]
     use crate::peripherals::i2s0::RegisterBlock;
     // on ESP32-S3 I2S1 doesn't support all features - use that to avoid using those features
@@ -873,26 +962,31 @@ mod private {
         clock::Clocks,
         dma::{ChannelTypes, DmaPeripheral},
         gpio::{InputPin, InputSignal, OutputPin, OutputSignal},
+        interrupt::InterruptHandler,
         into_ref,
         peripherals::I2S0,
         system::Peripheral,
+        Mode,
     };
 
-    pub struct TxCreator<'d, T, CH>
+    pub struct TxCreator<'d, T, CH, DmaMode>
     where
         T: RegisterAccess,
         CH: ChannelTypes,
+        DmaMode: Mode,
     {
         pub register_access: PhantomData<T>,
         pub tx_channel: CH::Tx<'d>,
+        pub(crate) phantom: PhantomData<DmaMode>,
     }
 
-    impl<'d, T, CH> TxCreator<'d, T, CH>
+    impl<'d, T, CH, DmaMode> TxCreator<'d, T, CH, DmaMode>
     where
         T: RegisterAccess,
         CH: ChannelTypes,
+        DmaMode: Mode,
     {
-        pub fn build(self) -> I2sTx<'d, T, CH> {
+        pub fn build(self) -> I2sTx<'d, T, CH, DmaMode> {
             I2sTx::new(self.tx_channel)
         }
 
@@ -927,21 +1021,24 @@ mod private {
         }
     }
 
-    pub struct RxCreator<'d, T, CH>
+    pub struct RxCreator<'d, T, CH, DmaMode>
     where
         T: RegisterAccess,
         CH: ChannelTypes,
+        DmaMode: Mode,
     {
         pub register_access: PhantomData<T>,
         pub rx_channel: CH::Rx<'d>,
+        pub(crate) phantom: PhantomData<DmaMode>,
     }
 
-    impl<'d, T, CH> RxCreator<'d, T, CH>
+    impl<'d, T, CH, DmaMode> RxCreator<'d, T, CH, DmaMode>
     where
         T: RegisterAccess,
         CH: ChannelTypes,
+        DmaMode: Mode,
     {
-        pub fn build(self) -> I2sRx<'d, T, CH> {
+        pub fn build(self) -> I2sRx<'d, T, CH, DmaMode> {
             I2sRx::new(self.rx_channel)
         }
 
@@ -1002,6 +1099,68 @@ mod private {
 
     #[cfg(any(esp32, esp32s2))]
     pub trait RegisterAccessPrivate: Signals + RegBlock {
+        fn set_interrupt_handler(handler: InterruptHandler);
+
+        fn listen(interrupts: EnumSet<I2sInterrupt>) {
+            let reg_block = Self::register_block();
+
+            for interrupt in interrupts {
+                match interrupt {
+                    I2sInterrupt::TxHung => reg_block
+                        .int_ena()
+                        .modify(|_, w| w.tx_hung_int_ena().set_bit()),
+                    I2sInterrupt::RxHung => reg_block
+                        .int_ena()
+                        .modify(|_, w| w.rx_hung_int_ena().set_bit()),
+                }
+            }
+        }
+
+        fn unlisten(interrupts: EnumSet<I2sInterrupt>) {
+            let reg_block = Self::register_block();
+
+            for interrupt in interrupts {
+                match interrupt {
+                    I2sInterrupt::TxHung => reg_block
+                        .int_ena()
+                        .modify(|_, w| w.tx_hung_int_ena().clear_bit()),
+                    I2sInterrupt::RxHung => reg_block
+                        .int_ena()
+                        .modify(|_, w| w.rx_hung_int_ena().clear_bit()),
+                }
+            }
+        }
+
+        fn interrupts() -> EnumSet<I2sInterrupt> {
+            let mut res = EnumSet::new();
+            let reg_block = Self::register_block();
+            let ints = reg_block.int_st().read();
+
+            if ints.tx_hung_int_st().bit() {
+                res.insert(I2sInterrupt::TxHung);
+            }
+            if ints.rx_hung_int_st().bit() {
+                res.insert(I2sInterrupt::RxHung);
+            }
+
+            res
+        }
+
+        fn clear_interrupts(interrupts: EnumSet<I2sInterrupt>) {
+            let reg_block = Self::register_block();
+
+            for interrupt in interrupts {
+                match interrupt {
+                    I2sInterrupt::TxHung => {
+                        reg_block.int_clr().write(|w| w.tx_hung_int_clr().set_bit())
+                    }
+                    I2sInterrupt::RxHung => {
+                        reg_block.int_clr().write(|w| w.rx_hung_int_clr().set_bit())
+                    }
+                }
+            }
+        }
+
         fn set_clock(clock_settings: I2sClockDividers) {
             let i2s = Self::register_block();
 
@@ -1193,6 +1352,92 @@ mod private {
 
     #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
     pub trait RegisterAccessPrivate: Signals + RegBlock {
+        fn set_interrupt_handler(handler: InterruptHandler);
+
+        fn listen(interrupts: EnumSet<I2sInterrupt>) {
+            let reg_block = Self::register_block();
+
+            for interrupt in interrupts {
+                match interrupt {
+                    I2sInterrupt::TxHung => reg_block
+                        .int_ena()
+                        .modify(|_, w| w.tx_hung_int_ena().set_bit()),
+                    I2sInterrupt::RxHung => reg_block
+                        .int_ena()
+                        .modify(|_, w| w.rx_hung_int_ena().set_bit()),
+                    I2sInterrupt::TxDone => reg_block
+                        .int_ena()
+                        .modify(|_, w| w.tx_done_int_ena().set_bit()),
+                    I2sInterrupt::RxDone => reg_block
+                        .int_ena()
+                        .modify(|_, w| w.rx_done_int_ena().set_bit()),
+                }
+            }
+        }
+
+        fn unlisten(interrupts: EnumSet<I2sInterrupt>) {
+            let reg_block = Self::register_block();
+
+            for interrupt in interrupts {
+                match interrupt {
+                    I2sInterrupt::TxHung => reg_block
+                        .int_ena()
+                        .modify(|_, w| w.tx_hung_int_ena().clear_bit()),
+                    I2sInterrupt::RxHung => reg_block
+                        .int_ena()
+                        .modify(|_, w| w.rx_hung_int_ena().clear_bit()),
+                    I2sInterrupt::TxDone => reg_block
+                        .int_ena()
+                        .modify(|_, w| w.tx_done_int_ena().clear_bit()),
+                    I2sInterrupt::RxDone => reg_block
+                        .int_ena()
+                        .modify(|_, w| w.rx_done_int_ena().clear_bit()),
+                }
+            }
+        }
+
+        fn interrupts() -> EnumSet<I2sInterrupt> {
+            let mut res = EnumSet::new();
+            let reg_block = Self::register_block();
+            let ints = reg_block.int_st().read();
+
+            if ints.tx_hung_int_st().bit() {
+                res.insert(I2sInterrupt::TxHung);
+            }
+            if ints.rx_hung_int_st().bit() {
+                res.insert(I2sInterrupt::RxHung);
+            }
+            if ints.tx_done_int_st().bit() {
+                res.insert(I2sInterrupt::TxDone);
+            }
+            if ints.rx_done_int_st().bit() {
+                res.insert(I2sInterrupt::RxDone);
+            }
+
+            res
+        }
+
+        fn clear_interrupts(interrupts: EnumSet<I2sInterrupt>) {
+            let reg_block = Self::register_block();
+
+            for interrupt in interrupts {
+                match interrupt {
+                    I2sInterrupt::TxHung => {
+                        reg_block.int_clr().write(|w| w.tx_hung_int_clr().set_bit())
+                    }
+                    I2sInterrupt::RxHung => {
+                        reg_block.int_clr().write(|w| w.rx_hung_int_clr().set_bit())
+                    }
+                    I2sInterrupt::TxDone => {
+                        reg_block.int_clr().write(|w| w.tx_done_int_clr().set_bit())
+                    }
+                    I2sInterrupt::RxDone => {
+                        reg_block.int_clr().write(|w| w.rx_done_int_clr().set_bit())
+                    }
+                }
+            }
+        }
+
         #[cfg(any(esp32c3, esp32s3))]
         fn set_clock(clock_settings: I2sClockDividers) {
             let i2s = Self::register_block();
@@ -1870,11 +2115,23 @@ mod private {
         }
     }
 
-    impl RegisterAccessPrivate for I2S0 {}
+    impl RegisterAccessPrivate for I2S0 {
+        fn set_interrupt_handler(handler: InterruptHandler) {
+            unsafe { crate::peripherals::I2S0::steal() }.bind_i2s0_interrupt(handler.handler());
+            crate::interrupt::enable(crate::peripherals::Interrupt::I2S0, handler.priority())
+                .unwrap();
+        }
+    }
     impl super::RegisterAccess for I2S0 {}
 
     #[cfg(any(esp32s3, esp32))]
-    impl RegisterAccessPrivate for I2S1 {}
+    impl RegisterAccessPrivate for I2S1 {
+        fn set_interrupt_handler(handler: InterruptHandler) {
+            unsafe { crate::peripherals::I2S1::steal() }.bind_i2s1_interrupt(handler.handler());
+            crate::interrupt::enable(crate::peripherals::Interrupt::I2S1, handler.priority())
+                .unwrap();
+        }
+    }
     #[cfg(any(esp32s3, esp32))]
     impl super::RegisterAccess for I2S1 {}
 
@@ -1970,11 +2227,14 @@ pub mod asynch {
     use embedded_dma::{ReadBuffer, WriteBuffer};
 
     use super::{Error, I2sRx, I2sTx, RegisterAccess};
-    use crate::dma::{
-        asynch::{DmaRxDoneChFuture, DmaRxFuture, DmaTxDoneChFuture, DmaTxFuture},
-        ChannelTypes,
-        RxPrivate,
-        TxPrivate,
+    use crate::{
+        dma::{
+            asynch::{DmaRxDoneChFuture, DmaRxFuture, DmaTxDoneChFuture, DmaTxFuture},
+            ChannelTypes,
+            RxPrivate,
+            TxPrivate,
+        },
+        Async,
     };
 
     /// Initiate an async DMA tx transfer
@@ -1995,7 +2255,7 @@ pub mod asynch {
             TXBUF: ReadBuffer<Word = u8>;
     }
 
-    impl<'d, T, CH> I2sWriteDmaAsync<'d, T, CH> for super::I2sTx<'d, T, CH>
+    impl<'d, T, CH> I2sWriteDmaAsync<'d, T, CH> for super::I2sTx<'d, T, CH, Async>
     where
         T: RegisterAccess,
         CH: ChannelTypes,
@@ -2039,7 +2299,7 @@ pub mod asynch {
         T: RegisterAccess,
         CH: ChannelTypes,
     {
-        i2s_tx: I2sTx<'d, T, CH>,
+        i2s_tx: I2sTx<'d, T, CH, Async>,
         _buffer: BUFFER,
     }
 
@@ -2102,7 +2362,7 @@ pub mod asynch {
             RXBUF: WriteBuffer<Word = u8>;
     }
 
-    impl<'d, T, CH> I2sReadDmaAsync<'d, T, CH> for super::I2sRx<'d, T, CH>
+    impl<'d, T, CH> I2sReadDmaAsync<'d, T, CH> for super::I2sRx<'d, T, CH, Async>
     where
         T: RegisterAccess,
         CH: ChannelTypes,
@@ -2146,7 +2406,7 @@ pub mod asynch {
         T: RegisterAccess,
         CH: ChannelTypes,
     {
-        i2s_rx: I2sRx<'d, T, CH>,
+        i2s_rx: I2sRx<'d, T, CH, Async>,
         _buffer: BUFFER,
     }
 

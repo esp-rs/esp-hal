@@ -31,8 +31,22 @@ use crate::{
 };
 
 macro_rules! impl_channel {
-    ($num: literal) => {
+    ($num: literal, $async_handler: path, $($interrupt: ident),* ) => {
         paste::paste! {
+            #[non_exhaustive]
+            pub struct [<Channel $num InterruptBinder>] {}
+
+            impl InterruptBinder for [<Channel $num InterruptBinder>] {
+                #[cfg(feature = "vectored")]
+                fn set_isr(handler: $crate::interrupt::InterruptHandler) {
+                    let mut dma = unsafe { crate::peripherals::DMA::steal() };
+                    $(
+                        dma.[< bind_ $interrupt:lower _interrupt >](handler.handler());
+                        $crate::interrupt::enable($crate::peripherals::Interrupt::$interrupt, handler.priority()).unwrap();
+                    )*
+                }
+            }
+
             #[non_exhaustive]
             pub struct [<Channel $num>] {}
 
@@ -40,6 +54,7 @@ macro_rules! impl_channel {
                 type P = [<SuitablePeripheral $num>];
                 type Tx<'a> = ChannelTx<'a, [<Channel $num TxImpl>], [<Channel $num>]>;
                 type Rx<'a> = ChannelRx<'a, [<Channel $num RxImpl>], [<Channel $num>]>;
+                type Binder = [<Channel $num InterruptBinder>];
             }
 
             impl RegisterAccess for [<Channel $num>] {
@@ -550,7 +565,7 @@ macro_rules! impl_channel {
             pub struct [<ChannelCreator $num>] {}
 
             impl [<ChannelCreator $num>] {
-                /// Configure the channel for use
+                /// Configure the channel for use with blocking APIs
                 ///
                 /// Descriptors should be sized as `(CHUNK_SIZE + 4091) / 4092`. I.e., to
                 /// transfer buffers of size `1..=4092`, you need 1 descriptor.
@@ -560,7 +575,7 @@ macro_rules! impl_channel {
                     tx_descriptors: &'a mut [DmaDescriptor],
                     rx_descriptors: &'a mut [DmaDescriptor],
                     priority: DmaPriority,
-                ) -> Channel<'a, [<Channel $num>]> {
+                ) -> Channel<'a, [<Channel $num>], $crate::Blocking> {
                     let mut tx_impl = [<Channel $num TxImpl>] {};
                     tx_impl.init(burst_mode, priority);
 
@@ -570,6 +585,34 @@ macro_rules! impl_channel {
                     Channel {
                         tx: ChannelTx::new(tx_descriptors, tx_impl, burst_mode),
                         rx: ChannelRx::new(rx_descriptors, rx_impl, burst_mode),
+                        phantom: PhantomData,
+                    }
+                }
+
+                /// Configure the channel for use with async APIs
+                ///
+                /// Descriptors should be sized as `(CHUNK_SIZE + 4091) / 4092`. I.e., to
+                /// transfer buffers of size `1..=4092`, you need 1 descriptor.
+                #[cfg(feature = "async")]
+                pub fn configure_for_async<'a>(
+                    self,
+                    burst_mode: bool,
+                    tx_descriptors: &'a mut [DmaDescriptor],
+                    rx_descriptors: &'a mut [DmaDescriptor],
+                    priority: DmaPriority,
+                ) -> Channel<'a, [<Channel $num>], $crate::Async> {
+                    let mut tx_impl = [<Channel $num TxImpl>] {};
+                    tx_impl.init(burst_mode, priority);
+
+                    let mut rx_impl = [<Channel $num RxImpl>] {};
+                    rx_impl.init(burst_mode, priority);
+
+                    <[<Channel $num>] as ChannelTypes>::Binder::set_isr($async_handler);
+
+                    Channel {
+                        tx: ChannelTx::new(tx_descriptors, tx_impl, burst_mode),
+                        rx: ChannelRx::new(rx_descriptors, rx_impl, burst_mode),
+                        phantom: PhantomData,
                     }
                 }
             }
@@ -596,15 +639,25 @@ macro_rules! impl_channel {
     };
 }
 
-impl_channel!(0);
-#[cfg(not(esp32c2))]
-impl_channel!(1);
-#[cfg(not(esp32c2))]
-impl_channel!(2);
-#[cfg(esp32s3)]
-impl_channel!(3);
-#[cfg(esp32s3)]
-impl_channel!(4);
+cfg_if::cfg_if! {
+    if #[cfg(esp32c2)] {
+        impl_channel!(0, super::asynch::interrupt::interrupt_handler_ch0, DMA_CH0);
+    } else if #[cfg(esp32c3)] {
+        impl_channel!(0, super::asynch::interrupt::interrupt_handler_ch0, DMA_CH0);
+        impl_channel!(1, super::asynch::interrupt::interrupt_handler_ch1, DMA_CH1);
+        impl_channel!(2, super::asynch::interrupt::interrupt_handler_ch2, DMA_CH2);
+    } else if #[cfg(any(esp32c6, esp32h2))] {
+        impl_channel!(0, super::asynch::interrupt::interrupt_handler_ch0, DMA_IN_CH0, DMA_OUT_CH0);
+        impl_channel!(1, super::asynch::interrupt::interrupt_handler_ch1, DMA_IN_CH1, DMA_OUT_CH1);
+        impl_channel!(2, super::asynch::interrupt::interrupt_handler_ch2, DMA_IN_CH2, DMA_OUT_CH2);
+   } else if #[cfg(esp32s3)] {
+        impl_channel!(0, super::asynch::interrupt::interrupt_handler_ch0, DMA_IN_CH0, DMA_OUT_CH0);
+        impl_channel!(1, super::asynch::interrupt::interrupt_handler_ch1, DMA_IN_CH1, DMA_OUT_CH1);
+        impl_channel!(2, super::asynch::interrupt::interrupt_handler_ch2, DMA_IN_CH2, DMA_OUT_CH2);
+        impl_channel!(3, super::asynch::interrupt::interrupt_handler_ch3, DMA_IN_CH3, DMA_OUT_CH3);
+        impl_channel!(4, super::asynch::interrupt::interrupt_handler_ch4, DMA_IN_CH4, DMA_OUT_CH4);
+  }
+}
 
 /// GDMA Peripheral
 ///

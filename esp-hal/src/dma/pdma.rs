@@ -23,12 +23,25 @@ macro_rules! ImplSpiChannel {
     ($num: literal) => {
         paste::paste! {
             #[non_exhaustive]
+            pub struct [<Channel $num InterruptBinder>] {}
+
+            impl InterruptBinder for [<Channel $num InterruptBinder>] {
+                #[cfg(feature = "vectored")]
+                fn set_isr(handler: $crate::interrupt::InterruptHandler) {
+                    let mut spi = unsafe { $crate::peripherals::[< SPI $num >]::steal() };
+                    spi.[< bind_spi $num _dma_interrupt>](handler.handler());
+                    $crate::interrupt::enable($crate::peripherals::Interrupt::[< SPI $num _DMA >], handler.priority()).unwrap();
+                }
+            }
+
+            #[non_exhaustive]
             pub struct [<Spi $num DmaChannel>] {}
 
             impl ChannelTypes for [<Spi $num DmaChannel>] {
                 type P = [<Spi $num DmaSuitablePeripheral>];
                 type Tx<'a> = ChannelTx<'a,[<Spi $num DmaChannelTxImpl>], [<Spi $num DmaChannel>]>;
                 type Rx<'a> = ChannelRx<'a,[<Spi $num DmaChannelRxImpl>], [<Spi $num DmaChannel>]>;
+                type Binder = [<Channel $num InterruptBinder>];
             }
 
             impl RegisterAccess for [<Spi $num DmaChannel>] {
@@ -301,7 +314,7 @@ macro_rules! ImplSpiChannel {
             pub struct [<Spi $num DmaChannelCreator>] {}
 
             impl [<Spi $num DmaChannelCreator>] {
-                /// Configure the channel for use
+                /// Configure the channel for use with blocking APIs
                 ///
                 /// Descriptors should be sized as `(CHUNK_SIZE + 4091) / 4092`. I.e., to
                 /// transfer buffers of size `1..=4092`, you need 1 descriptor.
@@ -311,7 +324,7 @@ macro_rules! ImplSpiChannel {
                     tx_descriptors: &'a mut [DmaDescriptor],
                     rx_descriptors: &'a mut [DmaDescriptor],
                     priority: DmaPriority,
-                ) -> Channel<'a, [<Spi $num DmaChannel>]> {
+                ) -> Channel<'a, [<Spi $num DmaChannel>], $crate::Blocking> {
                     let mut tx_impl = [<Spi $num DmaChannelTxImpl>] {};
                     tx_impl.init(burst_mode, priority);
 
@@ -321,6 +334,34 @@ macro_rules! ImplSpiChannel {
                     Channel {
                         tx: ChannelTx::new(tx_descriptors, tx_impl, burst_mode),
                         rx: ChannelRx::new(rx_descriptors, rx_impl, burst_mode),
+                        phantom: PhantomData,
+                    }
+                }
+
+                /// Configure the channel for use with async APIs
+                ///
+                /// Descriptors should be sized as `(CHUNK_SIZE + 4091) / 4092`. I.e., to
+                /// transfer buffers of size `1..=4092`, you need 1 descriptor.
+                #[cfg(feature = "async")]
+                pub fn configure_for_async<'a>(
+                    self,
+                    burst_mode: bool,
+                    tx_descriptors: &'a mut [DmaDescriptor],
+                    rx_descriptors: &'a mut [DmaDescriptor],
+                    priority: DmaPriority,
+                ) -> Channel<'a, [<Spi $num DmaChannel>], $crate::Async> {
+                    let mut tx_impl = [<Spi $num DmaChannelTxImpl>] {};
+                    tx_impl.init(burst_mode, priority);
+
+                    let mut rx_impl = [<Spi $num DmaChannelRxImpl>] {};
+                    rx_impl.init(burst_mode, priority);
+
+                    <[<Spi $num DmaChannel>] as ChannelTypes>::Binder::set_isr(super::asynch::interrupt::[< interrupt_handler_spi $num _dma >]);
+
+                    Channel {
+                        tx: ChannelTx::new(tx_descriptors, tx_impl, burst_mode),
+                        rx: ChannelRx::new(rx_descriptors, rx_impl, burst_mode),
+                        phantom: PhantomData,
                     }
                 }
             }
@@ -331,12 +372,25 @@ macro_rules! ImplSpiChannel {
 macro_rules! ImplI2sChannel {
     ($num: literal, $peripheral: literal) => {
         paste::paste! {
+            #[non_exhaustive]
+            pub struct [<Channel $num InterruptBinder>] {}
+
+            impl InterruptBinder for [<Channel $num InterruptBinder>] {
+                #[cfg(feature = "vectored")]
+                fn set_isr(handler:  $crate::interrupt::InterruptHandler) {
+                    let mut i2s = unsafe { $crate::peripherals::[< I2S $num >]::steal() };
+                    i2s.[< bind_i2s $num _interrupt>](handler.handler());
+                    $crate::interrupt::enable($crate::peripherals::Interrupt::[< I2S $num  >], handler.priority()).unwrap();
+                }
+            }
+
             pub struct [<I2s $num DmaChannel>] {}
 
             impl ChannelTypes for [<I2s $num DmaChannel>] {
                 type P = [<I2s $num DmaSuitablePeripheral>];
                 type Tx<'a> = ChannelTx<'a,[<I2s $num DmaChannelTxImpl>], [<I2s $num DmaChannel>]>;
                 type Rx<'a> = ChannelRx<'a,[<I2s $num DmaChannelRxImpl>], [<I2s $num DmaChannel>]>;
+                type Binder = [<Channel $num InterruptBinder>];
             }
 
             impl RegisterAccess for [<I2s $num DmaChannel>] {
@@ -587,7 +641,7 @@ macro_rules! ImplI2sChannel {
             pub struct [<I2s $num DmaChannelCreator>] {}
 
             impl [<I2s $num DmaChannelCreator>] {
-                /// Configure the channel for use
+                /// Configure the channel for use with blocking APIs
                 ///
                 /// Descriptors should be sized as `(CHUNK_SIZE + 4091) / 4092`. I.e., to
                 /// transfer buffers of size `1..=4092`, you need 1 descriptor.
@@ -597,7 +651,7 @@ macro_rules! ImplI2sChannel {
                     tx_descriptors: &'a mut [DmaDescriptor],
                     rx_descriptors: &'a mut [DmaDescriptor],
                     priority: DmaPriority,
-                ) -> Channel<'a, [<I2s $num DmaChannel>]> {
+                ) -> Channel<'a, [<I2s $num DmaChannel>], $crate::Blocking> {
                     let mut tx_impl = [<I2s $num DmaChannelTxImpl>] {};
                     tx_impl.init(burst_mode, priority);
 
@@ -607,6 +661,34 @@ macro_rules! ImplI2sChannel {
                     Channel {
                         tx: ChannelTx::new(tx_descriptors, tx_impl, burst_mode),
                         rx: ChannelRx::new(rx_descriptors, rx_impl, burst_mode),
+                        phantom: PhantomData,
+                    }
+                }
+
+                /// Configure the channel for use with async APIs
+                ///
+                /// Descriptors should be sized as `(CHUNK_SIZE + 4091) / 4092`. I.e., to
+                /// transfer buffers of size `1..=4092`, you need 1 descriptor.
+                #[cfg(feature = "async")]
+                pub fn configure_for_async<'a>(
+                    self,
+                    burst_mode: bool,
+                    tx_descriptors: &'a mut [DmaDescriptor],
+                    rx_descriptors: &'a mut [DmaDescriptor],
+                    priority: DmaPriority,
+                ) -> Channel<'a, [<I2s $num DmaChannel>], $crate::Async> {
+                    let mut tx_impl = [<I2s $num DmaChannelTxImpl>] {};
+                    tx_impl.init(burst_mode, priority);
+
+                    let mut rx_impl = [<I2s $num DmaChannelRxImpl>] {};
+                    rx_impl.init(burst_mode, priority);
+
+                    <[<I2s $num DmaChannel>] as ChannelTypes>::Binder::set_isr(super::asynch::interrupt::[< interrupt_handler_i2s $num >]);
+
+                    Channel {
+                        tx: ChannelTx::new(tx_descriptors, tx_impl, burst_mode),
+                        rx: ChannelRx::new(rx_descriptors, rx_impl, burst_mode),
+                        phantom: PhantomData,
                     }
                 }
             }

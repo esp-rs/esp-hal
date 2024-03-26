@@ -369,14 +369,18 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
 #[proc_macro_error::proc_macro_error]
 #[proc_macro_attribute]
 pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
-    use darling::ast::NestedMeta;
+    use darling::{ast::NestedMeta, FromMeta};
     use proc_macro::Span;
     use proc_macro2::Ident;
     use proc_macro_crate::{crate_name, FoundCrate};
-    use proc_macro_error::abort;
     use syn::{parse::Error as ParseError, spanned::Spanned, ItemFn, ReturnType, Type};
 
     use self::interrupt::{check_attr_whitelist, WhiteListCaller};
+
+    #[derive(Debug, FromMeta)]
+    struct MacroArgs {
+        priority: Option<syn::Expr>,
+    }
 
     let mut f: ItemFn = syn::parse(input).expect("`#[handler]` must be applied to a function");
     let original_span = f.span();
@@ -385,6 +389,13 @@ pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
         Ok(v) => v,
         Err(e) => {
             return TokenStream::from(darling::Error::from(e).write_errors());
+        }
+    };
+
+    let args = match MacroArgs::from_list(&attr_args) {
+        Ok(v) => v,
+        Err(e) => {
+            return TokenStream::from(e.write_errors());
         }
     };
 
@@ -397,30 +408,10 @@ pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
         Span::call_site().into(),
     );
 
-    let priority = if attr_args.len() > 1 {
-        abort!(
-            Span::call_site(),
-            "This attribute accepts one optional argument"
-        )
-    } else if attr_args.len() == 1 {
-        match &attr_args[0] {
-            NestedMeta::Lit(syn::Lit::Str(priority)) => priority.value(),
-            _ => abort!(
-                Span::call_site(),
-                "The priority must be provided as a string"
-            ),
-        }
+    let priority = if let Some(priority) = args.priority {
+        quote::quote!( #priority )
     } else {
-        String::from("min")
-    };
-
-    let priority = match priority.as_str() {
-        "min" => quote::quote_spanned!(original_span => #root::interrupt::Priority::min()),
-        "max" => quote::quote_spanned!(original_span => #root::interrupt::Priority::max()),
-        _ => {
-            let priority = Ident::new(&priority, proc_macro2::Span::call_site());
-            quote::quote_spanned!(original_span => #root::interrupt::Priority::#priority)
-        }
+        quote::quote! { #root::interrupt::Priority::min() }
     };
 
     // XXX should we blacklist other attributes?

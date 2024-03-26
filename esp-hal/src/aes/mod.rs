@@ -277,7 +277,7 @@ pub mod dma {
     {
         pub aes: super::Aes<'d>,
 
-        pub(crate) channel: Channel<'d, C>,
+        pub(crate) channel: Channel<'d, C, crate::Blocking>,
     }
 
     pub trait WithDmaAes<'d, C>
@@ -285,7 +285,7 @@ pub mod dma {
         C: ChannelTypes,
         C::P: AesPeripheral,
     {
-        fn with_dma(self, channel: Channel<'d, C>) -> AesDma<'d, C>;
+        fn with_dma(self, channel: Channel<'d, C, crate::Blocking>) -> AesDma<'d, C>;
     }
 
     impl<'d, C> WithDmaAes<'d, C> for crate::aes::Aes<'d>
@@ -293,7 +293,7 @@ pub mod dma {
         C: ChannelTypes,
         C::P: AesPeripheral,
     {
-        fn with_dma(self, mut channel: Channel<'d, C>) -> AesDma<'d, C> {
+        fn with_dma(self, mut channel: Channel<'d, C, crate::Blocking>) -> AesDma<'d, C> {
             channel.tx.init_channel(); // no need to call this for both, TX and RX
 
             AesDma { aes: self, channel }
