@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32: Apply fix for Errata 3.6 in all the places necessary. (#1315)
 - ESP32 & ESP32-S2: Fix I²C frequency (#1306)
 - UART's TX/RX FIFOs are now cleared during initialization (#1344)
+- Fixed `LCD_CAM I8080` driver potentially sending garbage to display (#1301)
+
 
 ### Changed
 
