@@ -31,58 +31,58 @@ use crate::{
 };
 
 #[non_exhaustive]
-pub struct Channel<const N: usize> {}
+pub struct Channel<const N: u8> {}
 
 #[non_exhaustive]
-pub struct ChannelInterruptBinder<const N: usize> {}
+pub struct ChannelInterruptBinder<const N: u8> {}
 
-impl<const N: usize> Channel<N> {
+impl<const N: u8> Channel<N> {
     #[inline(always)]
     fn ch() -> &'static crate::peripherals::dma::ch::CH {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
-        dma.ch(N)
+        dma.ch(N as usize)
     }
 
     #[cfg(any(esp32c2, esp32c3))]
     #[inline(always)]
     fn in_int() -> &'static crate::peripherals::dma::int_ch::INT_CH {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
-        dma.int_ch(N)
+        dma.int_ch(N as usize)
     }
     #[inline(always)]
     #[cfg(any(esp32c6, esp32h2))] // also esp32p4 AHB_DMA
     fn in_int() -> &'static crate::peripherals::dma::in_int_ch::IN_INT_CH {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
-        dma.in_int_ch(N)
+        dma.in_int_ch(N as usize)
     }
     #[cfg(esp32s3)]
     #[inline(always)]
     fn in_int() -> &'static crate::peripherals::dma::ch::in_int::IN_INT {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
-        dma.ch(N).in_int()
+        dma.ch(N as usize).in_int()
     }
 
     #[cfg(any(esp32c2, esp32c3))]
     #[inline(always)]
     fn out_int() -> &'static crate::peripherals::dma::int_ch::INT_CH {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
-        dma.int_ch(N)
+        dma.int_ch(N as usize)
     }
     #[inline(always)]
     #[cfg(any(esp32c6, esp32h2))] // also esp32p4 AHB_DMA
     fn out_int() -> &'static crate::peripherals::dma::out_int_ch::OUT_INT_CH {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
-        dma.out_int_ch(N)
+        dma.out_int_ch(N as usize)
     }
     #[cfg(esp32s3)]
     #[inline(always)]
     fn out_int() -> &'static crate::peripherals::dma::ch::out_int::OUT_INT {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
-        dma.ch(N).out_int()
+        dma.ch(N as usize).out_int()
     }
 }
 
-impl<const N: usize> RegisterAccess for Channel<N> {
+impl<const N: u8> RegisterAccess for Channel<N> {
     fn init_channel() {
         // nothing special to be done here
     }
@@ -333,9 +333,9 @@ impl<const N: usize> RegisterAccess for Channel<N> {
 }
 
 #[non_exhaustive]
-pub struct ChannelTxImpl<const N: usize> {}
+pub struct ChannelTxImpl<const N: u8> {}
 
-impl<const N: usize> TxChannel<Channel<N>> for ChannelTxImpl<N> {
+impl<const N: u8> TxChannel<Channel<N>> for ChannelTxImpl<N> {
     #[cfg(feature = "async")]
     fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
         static WAKER: embassy_sync::waitqueue::AtomicWaker =
@@ -345,9 +345,9 @@ impl<const N: usize> TxChannel<Channel<N>> for ChannelTxImpl<N> {
 }
 
 #[non_exhaustive]
-pub struct ChannelRxImpl<const N: usize> {}
+pub struct ChannelRxImpl<const N: u8> {}
 
-impl<const N: usize> RxChannel<Channel<N>> for ChannelRxImpl<N> {
+impl<const N: u8> RxChannel<Channel<N>> for ChannelRxImpl<N> {
     #[cfg(feature = "async")]
     fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
         static WAKER: embassy_sync::waitqueue::AtomicWaker =
@@ -357,26 +357,26 @@ impl<const N: usize> RxChannel<Channel<N>> for ChannelRxImpl<N> {
 }
 
 #[non_exhaustive]
-pub struct ChannelCreator<const N: usize> {}
+pub struct ChannelCreator<const N: u8> {}
 
 #[non_exhaustive]
-pub struct SuitablePeripheral<const N: usize> {}
-impl<const N: usize> PeripheralMarker for SuitablePeripheral<N> {}
+pub struct SuitablePeripheral<const N: u8> {}
+impl<const N: u8> PeripheralMarker for SuitablePeripheral<N> {}
 
 // with GDMA every channel can be used for any peripheral
-impl<const N: usize> SpiPeripheral for SuitablePeripheral<N> {}
-impl<const N: usize> Spi2Peripheral for SuitablePeripheral<N> {}
+impl<const N: u8> SpiPeripheral for SuitablePeripheral<N> {}
+impl<const N: u8> Spi2Peripheral for SuitablePeripheral<N> {}
 #[cfg(esp32s3)]
-impl<const N: usize> Spi3Peripheral for SuitablePeripheral<N> {}
-impl<const N: usize> I2sPeripheral for SuitablePeripheral<N> {}
-impl<const N: usize> I2s0Peripheral for SuitablePeripheral<N> {}
-impl<const N: usize> I2s1Peripheral for SuitablePeripheral<N> {}
+impl<const N: u8> Spi3Peripheral for SuitablePeripheral<N> {}
+impl<const N: u8> I2sPeripheral for SuitablePeripheral<N> {}
+impl<const N: u8> I2s0Peripheral for SuitablePeripheral<N> {}
+impl<const N: u8> I2s1Peripheral for SuitablePeripheral<N> {}
 #[cfg(parl_io)]
-impl<const N: usize> ParlIoPeripheral for SuitablePeripheral<N> {}
+impl<const N: u8> ParlIoPeripheral for SuitablePeripheral<N> {}
 #[cfg(aes)]
-impl<const N: usize> AesPeripheral for SuitablePeripheral<N> {}
+impl<const N: u8> AesPeripheral for SuitablePeripheral<N> {}
 #[cfg(lcd_cam)]
-impl<const N: usize> LcdCamPeripheral for SuitablePeripheral<N> {}
+impl<const N: u8> LcdCamPeripheral for SuitablePeripheral<N> {}
 
 macro_rules! impl_channel {
     ($num: literal, $async_handler: path, $($interrupt: ident),* ) => {
