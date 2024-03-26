@@ -374,6 +374,10 @@ impl<'d, TX: Tx, P> I8080<'d, TX, P> {
             .lc_dma_int_clr()
             .write(|w| w.lcd_trans_done_int_clr().set_bit());
 
+        // Before issuing lcd_start need to wait shortly for fifo to get data
+        // Otherwise, some garbage data will be sent out
+        crate::rom::ets_delay_us(1);
+
         self.lcd_cam
             .lcd_user()
             .modify(|_, w| w.lcd_update().set_bit().lcd_start().set_bit());
