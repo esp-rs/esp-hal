@@ -285,7 +285,7 @@ impl<'d> UsbSerialJtag<'d> {
 }
 
 /// USB Serial JTAG peripheral instance
-pub trait Instance {
+pub trait Instance: crate::private::Sealed {
     fn register_block() -> &'static RegisterBlock;
 
     fn disable_tx_interrupts() {

@@ -641,7 +641,7 @@ where
     }
 }
 
-pub trait Instance {
+pub trait Instance: crate::private::Sealed {
     const SYSTEM_PERIPHERAL: system::Peripheral;
     const NUMBER: usize;
 
