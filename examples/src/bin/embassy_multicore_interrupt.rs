@@ -92,7 +92,7 @@ fn main() -> ! {
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
     embassy::init(&clocks, timg0);
 
     let mut cpu_control = CpuControl::new(system.cpu_control);
