@@ -1,10 +1,12 @@
-//! embassy hello world
+//! embassy hello world systimer
 //!
 //! This is an example of running the embassy executor with multiple tasks
-//! concurrently.
+//! concurrently using the systimer time driver.
+//!
+//! It's not supported on ESP32, on ESP32-S2 the frequency of the systimer is different (so it's left out here)
 
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: embassy embassy-time-timg0 embassy-executor-thread embassy-generic-timers
+//% CHIPS: esp32c2 esp32c3 esp32c6 esp32h2 esp32s3
+//% FEATURES: embassy embassy-time-systick-16mhz embassy-executor-thread embassy-generic-timers
 
 #![no_std]
 #![no_main]
@@ -15,10 +17,10 @@ use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    embassy::{self},
+    embassy,
     peripherals::Peripherals,
     prelude::*,
-    timer::TimerGroup,
+    systimer::SystemTimer,
 };
 
 #[embassy_executor::task]
@@ -36,8 +38,8 @@ async fn main(spawner: Spawner) {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
-    embassy::init(&clocks, timg0);
+    let systimer = SystemTimer::new_async(peripherals.SYSTIMER);
+    embassy::init(&clocks, systimer);
 
     spawner.spawn(run()).ok();
 

@@ -63,6 +63,7 @@ embassy = ["esp-hal/embassy"]
 embassy-executor-thread    = ["esp-hal/embassy-executor-thread"]
 embassy-executor-interrupt = ["esp-hal/embassy-executor-interrupt"]
 
+embassy-time-systick-16mhz = ["esp-hal/embassy-time-systick-16mhz"]
 embassy-time-timg0 = ["esp-hal/embassy-time-timg0"]
 embassy-generic-timers = ["embassy-time/generic-queue-8"]
 
