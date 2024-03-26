@@ -38,7 +38,7 @@ async fn main(spawner: Spawner) {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let systimer = SystemTimer::new_async(peripherals.SYSTIMER);
+    let systimer = SystemTimer::create_async(peripherals.SYSTIMER);
     embassy::init(&clocks, systimer);
 
     spawner.spawn(run()).ok();

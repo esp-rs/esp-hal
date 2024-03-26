@@ -31,7 +31,7 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
     embassy::init(&clocks, timg0);
 
-    let mut alarm0 = SystemTimer::new_async(peripherals.SYSTIMER)
+    let mut alarm0 = SystemTimer::create_async(peripherals.SYSTIMER)
         .alarm0
         .into_periodic();
 

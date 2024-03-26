@@ -19,7 +19,7 @@ use fugit::ExtU32;
 fn main() -> ! {
     let peripherals = Peripherals::take();
 
-    let syst = SystemTimer::new(peripherals.SYSTIMER, None, None, None);
+    let syst = SystemTimer::create(peripherals.SYSTIMER, None, None, None);
     let mut alarm0 = syst.alarm0.into_periodic();
     alarm0.set_period(1u32.secs());
 

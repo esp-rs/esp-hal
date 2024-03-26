@@ -34,7 +34,7 @@ fn main() -> ! {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let systimer = SystemTimer::new(
+    let systimer = SystemTimer::create(
         peripherals.SYSTIMER,
         Some(systimer_target0),
         Some(systimer_target1),

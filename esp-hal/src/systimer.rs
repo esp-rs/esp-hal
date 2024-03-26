@@ -65,7 +65,7 @@ impl SystemTimer {
     /// Create a new instance in [crate::Blocking] mode.
     ///
     /// You can optionally pass interrupt handlers to be registered
-    pub fn new<'d>(
+    pub fn create<'d>(
         p: impl Peripheral<P = SYSTIMER> + 'd,
         target0_isr: Option<InterruptHandler>,
         target1_isr: Option<InterruptHandler>,
@@ -124,7 +124,9 @@ impl SystemTimer {
     }
 
     /// Create a new instance in [crate::Async] mode.
-    pub fn new_async<'d>(p: impl Peripheral<P = SYSTIMER> + 'd) -> SystemTimers<'d, crate::Async> {
+    pub fn create_async<'d>(
+        p: impl Peripheral<P = SYSTIMER> + 'd,
+    ) -> SystemTimers<'d, crate::Async> {
         crate::into_ref!(p);
 
         #[cfg(soc_etm)]
