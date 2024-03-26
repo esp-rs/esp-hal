@@ -1,18 +1,26 @@
-//! # UART driver
+//! Universal Asynchronous Receiver/Transmitter (UART)
 //!
-//! ## Overview
-//! In embedded system applications, data is required to be transferred in a
-//! simple way with minimal system resources. This can be achieved by a
-//! Universal Asynchronous Receiver/Transmitter (UART), which flexibly exchanges
-//! data with other peripheral devices in full-duplex mode.
-//! The UART driver provides an interface to communicate with UART peripherals
-//! on ESP chips. It enables serial communication between the microcontroller
-//! and external devices using the UART protocol.
+//! The UART is a hardware peripheral which handles communication using serial
+//! communication interfaces, such as RS232 and RS485. This peripheral provides
+//! a cheap and ubiquitous method for full- and half-duplex communication
+//! between devices.
 //!
-//! ## Example
+//! Depending on your device, two or more UART controllers are available for
+//! use, all of which can be configured and used in the same way. All UART
+//! controllers are compatible with UART-enabled devices from various
+//! manufacturers, and can also support Infrared Data Association (IrDA)
+//! protocols.
+//!
+//! ## Configuration
+//!
+//! Each UART controller is individually configurable, and the usual setting
+//! such as baud rate, data bits, parity, and stop bits can easily be
+//! configured. Additionally, the transmit (TX) and receive (RX) pins can be
+//! specified.
+//!
 //! ```no_run
 //! let config = Config {
-//!     baudrate: 115200,
+//!     baudrate: 115_200,
 //!     data_bits: DataBits::DataBits8,
 //!     parity: Parity::ParityNone,
 //!     stop_bits: StopBits::STOP1,
@@ -24,23 +32,45 @@
 //!     io.pins.gpio2.into_floating_input(),
 //! );
 //!
-//! let mut serial1 = Uart::new_with_config(peripherals.UART1, config, Some(pins), &clocks);
-//!
-//! timer0.start(250u64.millis());
-//!
-//! println!("Start");
-//! loop {
-//!     serial1.write(0x42).ok();
-//!     let read = block!(serial1.read());
-//!
-//!     match read {
-//!         Ok(read) => println!("Read 0x{:02x}", read),
-//!         Err(err) => println!("Error {:?}", err),
-//!     }
-//!
-//!     block!(timer0.wait()).unwrap();
-//! }
+//! let mut uart1 = Uart::new_with_config(peripherals.UART1, config, Some(pins), &clocks);
 //! ```
+//!
+//! ## Usage
+//!
+//! The UART driver implements a number of third-party traits, with the
+//! intention of making the HAL inter-compatible with various device drivers
+//! from the community. This includes, but is not limited to, the [embedded-hal]
+//! and [embedded-io] blocking traits, and the [embedded-hal-async] and
+//! [embedded-io-async] asynchronous traits.
+//!
+//! In addition to the interfaces provided by these traits, native APIs are also
+//! available. See the examples below for more information on how to interact
+//! with this driver.
+//!
+//! ### Examples
+//!
+//! #### Sending and Receiving Data
+//!
+//! ```no_run
+//! // Write bytes out over the UART:
+//! uart1.write_bytes("Hello, world!".as_bytes())?;
+//! ```
+//!
+//! #### Splitting the UART into TX and RX Components
+//!
+//! ```no_run
+//! // The UART can be split into separate Transmit and Receive components:
+//! let (mut tx, rx) = uart1.split();
+//!
+//! // Each component can be used individually to interact with the UART:
+//! tx.write_bytes(&[42u8])?;
+//! let byte = rx.read_byte()?;
+//! ```
+//!
+//! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
+//! [embedded-io]: https://docs.rs/embedded-io/latest/embedded_io/
+//! [embedded-hal-async]: https://docs.rs/embedded-hal-async/latest/embedded_hal_async/
+//! [embedded-io-async]: https://docs.rs/embedded-io-async/latest/embedded_io_async/
 
 use core::marker::PhantomData;
 
@@ -62,11 +92,13 @@ use crate::{
 const CONSOLE_UART_NUM: usize = 0;
 const UART_FIFO_SIZE: u16 = 128;
 
-/// Custom serial error type
+/// UART Error
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
+    /// An invalid configuration argument was provided
     InvalidArgument,
+    /// The RX FIFO overflowed
     #[cfg(feature = "async")]
     RxFifoOvf,
 }
@@ -85,7 +117,7 @@ impl embedded_io::Error for Error {
     }
 }
 
-/// UART configuration
+/// UART Configuration
 pub mod config {
     /// Number of data bits
     #[derive(PartialEq, Eq, Copy, Clone, Debug)]
@@ -118,7 +150,7 @@ pub mod config {
         STOP2   = 3,
     }
 
-    /// UART configuration
+    /// UART Configuration
     #[derive(Debug, Copy, Clone)]
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     pub struct Config {
@@ -229,7 +261,7 @@ pub trait UartPins {
     );
 }
 
-/// All pins offered by UART
+/// All UART pins (TX, RX, CTS, RTS)
 pub struct AllPins<'d, TX: OutputPin, RX: InputPin, CTS: InputPin, RTS: OutputPin> {
     pub(crate) tx: Option<PeripheralRef<'d, TX>>,
     pub(crate) rx: Option<PeripheralRef<'d, RX>>,
@@ -237,7 +269,6 @@ pub struct AllPins<'d, TX: OutputPin, RX: InputPin, CTS: InputPin, RTS: OutputPi
     pub(crate) rts: Option<PeripheralRef<'d, RTS>>,
 }
 
-/// Tx and Rx pins
 impl<'d, TX: OutputPin, RX: InputPin, CTS: InputPin, RTS: OutputPin> AllPins<'d, TX, RX, CTS, RTS> {
     pub fn new(
         tx: impl Peripheral<P = TX> + 'd,
@@ -285,6 +316,7 @@ impl<TX: OutputPin, RX: InputPin, CTS: InputPin, RTS: OutputPin> UartPins
     }
 }
 
+/// TX and RX pins
 pub struct TxRxPins<'d, TX: OutputPin, RX: InputPin> {
     pub tx: Option<PeripheralRef<'d, TX>>,
     pub rx: Option<PeripheralRef<'d, RX>>,
@@ -322,7 +354,7 @@ impl<TX: OutputPin, RX: InputPin> UartPins for TxRxPins<'_, TX, RX> {
     }
 }
 
-/// UART driver
+/// UART (Full-duplex)
 pub struct Uart<'d, T, M> {
     #[cfg(not(esp32))]
     symbol_len: u8,
@@ -330,12 +362,12 @@ pub struct Uart<'d, T, M> {
     rx: UartRx<'d, T, M>,
 }
 
-/// UART TX
+/// UART (Transmit)
 pub struct UartTx<'d, T, M> {
     phantom: PhantomData<(&'d mut T, M)>,
 }
 
-/// UART RX
+/// UART (Receive)
 pub struct UartRx<'d, T, M> {
     phantom: PhantomData<(&'d mut T, M)>,
     at_cmd_config: Option<config::AtCmdConfig>,
@@ -530,19 +562,20 @@ where
         )
     }
 
-    /// Split the Uart into a transmitter and receiver, which is
-    /// particularly useful when having two tasks correlating to
+    /// Split the UART into a transmitter and receiver
+    ///
+    /// This is particularly useful when having two tasks correlating to
     /// transmitting and receiving.
     pub fn split(self) -> (UartTx<'d, T, M>, UartRx<'d, T, M>) {
         (self.tx, self.rx)
     }
 
-    /// Writes bytes
+    /// Write bytes out over the UART
     pub fn write_bytes(&mut self, data: &[u8]) -> Result<usize, Error> {
         self.tx.write_bytes(data)
     }
 
-    /// Configures the AT-CMD detection settings.
+    /// Configures the AT-CMD detection settings
     #[allow(clippy::useless_conversion)]
     pub fn set_at_cmd(&mut self, config: config::AtCmdConfig) {
         #[cfg(not(any(esp32, esp32s2)))]
@@ -590,14 +623,12 @@ where
     /// `timeout` - the number of symbols ("bytes") to wait for before
     /// triggering a timeout. Pass None to disable the timeout.
     ///
-    ///
     ///  # Errors
     /// `Err(Error::InvalidArgument)` if the provided value exceeds the maximum
     /// value for SOC :
     /// - `esp32`: Symbol size is fixed to 8, do not pass a value > **0x7F**.
     /// - `esp32c2`, `esp32c3`, `esp32c6`, `esp32h2`, esp32s2`, esp32s3`: The
     ///   value you pass times the symbol size must be <= **0x3FF**
-
     pub fn set_rx_timeout(&mut self, timeout: Option<u8>) -> Result<(), Error> {
         #[cfg(esp32)]
         const MAX_THRHD: u8 = 0x7F; // 7 bits
@@ -766,18 +797,18 @@ where
             .write(|w| w.rxfifo_full_int_clr().set_bit());
     }
 
-    #[cfg(feature = "embedded-hal")]
-    fn write_byte(&mut self, word: u8) -> nb::Result<(), Error> {
+    /// Write a byte out over the UART
+    pub fn write_byte(&mut self, word: u8) -> nb::Result<(), Error> {
         self.tx.write_byte(word)
     }
 
-    #[cfg(feature = "embedded-hal")]
-    fn flush_tx(&self) -> nb::Result<(), Error> {
+    /// Flush the transmit buffer of the UART
+    pub fn flush_tx(&self) -> nb::Result<(), Error> {
         self.tx.flush_tx()
     }
 
-    #[cfg(feature = "embedded-hal")]
-    fn read_byte(&mut self) -> nb::Result<u8, Error> {
+    /// Read a byte from the UART
+    pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
         self.rx.read_byte()
     }
 
@@ -811,7 +842,6 @@ where
         self
     }
 
-    /// Change the number of data bits
     fn change_data_bits(&mut self, data_bits: config::DataBits) -> &mut Self {
         T::register_block()
             .conf0()
@@ -820,7 +850,6 @@ where
         self
     }
 
-    /// Change the type of parity checking
     fn change_parity(&mut self, parity: config::Parity) -> &mut Self {
         T::register_block().conf0().modify(|_, w| match parity {
             config::Parity::ParityNone => w.parity_en().clear_bit(),
@@ -1052,7 +1081,7 @@ where
     }
 }
 
-/// UART peripheral instance
+/// UART Peripheral Instance
 pub trait Instance: crate::private::Sealed {
     fn register_block() -> &'static RegisterBlock;
     fn uart_number() -> usize;
@@ -1985,6 +2014,7 @@ mod asynch {
     }
 }
 
+/// Low-power UART
 #[cfg(lp_uart)]
 pub mod lp_uart {
     use crate::{
