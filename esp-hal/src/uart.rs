@@ -1763,15 +1763,15 @@ mod asynch {
         T: Instance,
     {
         /// See [`UartRx::read_async`]
-        async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
+        pub async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
             self.rx.read_async(buf).await
         }
 
-        async fn write_async(&mut self, words: &[u8]) -> Result<usize, Error> {
+        pub async fn write_async(&mut self, words: &[u8]) -> Result<usize, Error> {
             self.tx.write_async(words).await
         }
 
-        async fn flush_async(&mut self) -> Result<(), Error> {
+        pub async fn flush_async(&mut self) -> Result<(), Error> {
             self.tx.flush_async().await
         }
     }
@@ -1780,7 +1780,7 @@ mod asynch {
     where
         T: Instance,
     {
-        async fn write_async(&mut self, words: &[u8]) -> Result<usize, Error> {
+        pub async fn write_async(&mut self, words: &[u8]) -> Result<usize, Error> {
             let mut count = 0;
             let mut offset: usize = 0;
             loop {
@@ -1805,7 +1805,7 @@ mod asynch {
             Ok(count)
         }
 
-        async fn flush_async(&mut self) -> Result<(), Error> {
+        pub async fn flush_async(&mut self) -> Result<(), Error> {
             let count = T::get_tx_fifo_count();
             if count > 0 {
                 UartTxFuture::<T>::new(TxEvent::TxDone.into()).await;
@@ -1839,7 +1839,7 @@ mod asynch {
         /// # Ok
         /// When successful, returns the number of bytes written to buf.
         /// This method will never return Ok(0), unless buf.len() == 0.
-        async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
+        pub async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
             if buf.len() == 0 {
                 return Ok(0);
             }
