@@ -109,21 +109,32 @@ mod tests {
 
     #[test]
     fn test_gpio_interrupt(mut ctx: Context) {
-        assert!(ctx.io4.set_high().is_ok());
         critical_section::with(|cs| {
             *COUNTER.borrow_ref_mut(cs) = 0;
             ctx.io2.listen(Event::AnyEdge);
             INPUT_PIN.borrow_ref_mut(cs).replace(ctx.io2);
         });
-        assert!(ctx.io4.set_low().is_ok());
         assert!(ctx.io4.set_high().is_ok());
+        ctx.delay.delay_millis(1);
         assert!(ctx.io4.set_low().is_ok());
-
-        // make sure the interrupt is serviced before reading the counter
-        ctx.delay.delay_millis(5);
+        ctx.delay.delay_millis(1);
+        assert!(ctx.io4.set_high().is_ok());
+        ctx.delay.delay_millis(1);
+        assert!(ctx.io4.set_low().is_ok());
+        ctx.delay.delay_millis(1);
+        assert!(ctx.io4.set_high().is_ok());
+        ctx.delay.delay_millis(1);
+        assert!(ctx.io4.set_low().is_ok());
+        ctx.delay.delay_millis(1);
+        assert!(ctx.io4.set_high().is_ok());
+        ctx.delay.delay_millis(1);
+        assert!(ctx.io4.set_low().is_ok());
+        ctx.delay.delay_millis(1);
+        assert!(ctx.io4.set_high().is_ok());
+        ctx.delay.delay_millis(1);
 
         let count = critical_section::with(|cs| *COUNTER.borrow_ref(cs));
-        assert_eq!(count, 3);
+        assert_eq!(count, 9);
 
         ctx.io2 = critical_section::with(|cs| INPUT_PIN.borrow_ref_mut(cs).take().unwrap());
         ctx.io2.unlisten();
