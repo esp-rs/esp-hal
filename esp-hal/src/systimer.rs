@@ -298,7 +298,7 @@ impl<T, DM: crate::Mode, const CHANNEL: u8> Alarm<T, DM, CHANNEL> {
 }
 
 impl<DM: crate::Mode, const CHANNEL: u8> Alarm<Target, DM, CHANNEL> {
-    /// Set the target valuer of this [Alarm]
+    /// Set the target value of this [Alarm]
     pub fn set_target(&self, timestamp: u64) {
         self.configure(|tconf, hi, lo| unsafe {
             tconf.write(|w| w.target0_period_mode().clear_bit()); // target mode
