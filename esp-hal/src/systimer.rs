@@ -20,10 +20,19 @@
 //!
 //! ## Example
 //! ```no_run
-//! let peripherals = Peripherals::take();
+#![doc = include_str!("../doc_helper/before")]
+//! # use esp_hal::systimer::SystemTimer;
+//! # use fugit::ExtU32;
+//! let systimer = SystemTimer::new(peripherals.SYSTIMER);
 //!
-//! let syst = SystemTimer::new(peripherals.SYSTIMER);
-//! println!("SYSTIMER Current value = {}", SystemTimer::now());
+//! // a periodic alarm triggering every second
+//! let alarm0 = systimer.alarm0.into_periodic();
+//! alarm0.set_period(1u32.secs());
+//! alarm0.enable_interrupt(true);
+//!
+//! // you can get the current time since boot in systimer ticks anytime without
+//! creating an instance let now = SystemTimer::now();
+#![doc = include_str!("../doc_helper/after")]
 //! ```
 
 use core::{marker::PhantomData, mem::transmute};
@@ -416,11 +425,16 @@ pub mod etm {
     //!
     //! ## Example
     //! ```no_run
+    #![doc = include_str!("../doc_helper/before")]
+    //! # use esp_hal::systimer::SystemTimer;
+    //! # use esp_hal::systimer::etm::SysTimerEtmEvent;
+    //! # use fugit::ExtU32;
     //! let syst = SystemTimer::new(peripherals.SYSTIMER);
     //! let mut alarm0 = syst.alarm0.into_periodic();
     //! alarm0.set_period(1.secs());
     //!
     //! let timer_event = SysTimerEtmEvent::new(&mut alarm0);
+    #![doc = include_str!("../doc_helper/after")]
     //! ```
 
     use super::*;
