@@ -31,7 +31,7 @@
 //! alarm0.enable_interrupt(true);
 //!
 //! // you can get the current time since boot in systimer ticks anytime without
-//! creating an instance let now = SystemTimer::now();
+//! // creating an instance let now = SystemTimer::now();
 #![doc = include_str!("../doc_helper/after")]
 //! ```
 
