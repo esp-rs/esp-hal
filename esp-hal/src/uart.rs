@@ -985,6 +985,7 @@ where
         T::disable_tx_interrupts();
     }
 
+    /// Modify UART baud rate and reset TX/RX fifo.
     pub fn change_baud(&mut self, baudrate: u32, clocks: &Clocks) {
         self.change_baud_internal(baudrate, clocks);
         self.txfifo_reset();
@@ -2169,6 +2170,7 @@ pub mod lp_uart {
             self.update();
         }
 
+        /// Modify UART baud rate and reset TX/RX fifo.
         pub fn change_baud(&mut self, baudrate: u32) {
             self.change_baud_internal(baudrate);
             self.txfifo_reset();
