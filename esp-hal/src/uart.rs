@@ -532,7 +532,7 @@ where
             symbol_len: config.symbol_length(),
         };
 
-        serial.change_baud(config.baudrate, clocks);
+        serial.change_baud_internal(config.baudrate, clocks);
         serial.change_data_bits(config.data_bits);
         serial.change_parity(config.parity);
         serial.change_stop_bits(config.stop_bits);
@@ -861,7 +861,7 @@ where
     }
 
     #[cfg(any(esp32c2, esp32c3, esp32s3))]
-    fn change_baud(&self, baudrate: u32, clocks: &Clocks) {
+    fn change_baud_internal(&self, baudrate: u32, clocks: &Clocks) {
         // we force the clock source to be APB and don't use the decimal part of the
         // divider
         let clk = clocks.apb_clock.to_Hz();
@@ -893,7 +893,7 @@ where
     }
 
     #[cfg(any(esp32c6, esp32h2))]
-    fn change_baud(&self, baudrate: u32, clocks: &Clocks) {
+    fn change_baud_internal(&self, baudrate: u32, clocks: &Clocks) {
         // we force the clock source to be XTAL and don't use the decimal part of
         // the divider
         let clk = clocks.xtal_clock.to_Hz();
@@ -953,7 +953,7 @@ where
     }
 
     #[cfg(any(esp32, esp32s2))]
-    fn change_baud(&self, baudrate: u32, clocks: &Clocks) {
+    fn change_baud_internal(&self, baudrate: u32, clocks: &Clocks) {
         // we force the clock source to be APB and don't use the decimal part of the
         // divider
         let clk = clocks.apb_clock.to_Hz();
@@ -983,6 +983,13 @@ where
         Self::uart_peripheral_reset();
         T::disable_rx_interrupts();
         T::disable_tx_interrupts();
+    }
+
+    /// Modify UART baud rate and reset TX/RX fifo.
+    pub fn change_baud(&mut self, baudrate: u32, clocks: &Clocks) {
+        self.change_baud_internal(baudrate, clocks);
+        self.txfifo_reset();
+        self.rxfifo_reset();
     }
 
     #[cfg(any(esp32c6, esp32h2))]
@@ -2089,7 +2096,7 @@ pub mod lp_uart {
 
             // Override protocol parameters from the configuration
             // uart_hal_set_baudrate(&hal, cfg->uart_proto_cfg.baud_rate, sclk_freq);
-            me.change_baud(config.baudrate);
+            me.change_baud_internal(config.baudrate);
             // uart_hal_set_parity(&hal, cfg->uart_proto_cfg.parity);
             me.change_parity(config.parity);
             // uart_hal_set_data_bit_num(&hal, cfg->uart_proto_cfg.data_bits);
@@ -2131,7 +2138,7 @@ pub mod lp_uart {
             }
         }
 
-        fn change_baud(&mut self, baudrate: u32) {
+        fn change_baud_internal(&mut self, baudrate: u32) {
             // we force the clock source to be XTAL and don't use the decimal part of
             // the divider
             // TODO: Currently it's not possible to use XtalD2Clk
@@ -2161,6 +2168,13 @@ pub mod lp_uart {
                 .write(|w| unsafe { w.clkdiv().bits(divider).frag().bits(0) });
 
             self.update();
+        }
+
+        /// Modify UART baud rate and reset TX/RX fifo.
+        pub fn change_baud(&mut self, baudrate: u32) {
+            self.change_baud_internal(baudrate);
+            self.txfifo_reset();
+            self.rxfifo_reset();
         }
 
         fn change_parity(&mut self, parity: config::Parity) -> &mut Self {
