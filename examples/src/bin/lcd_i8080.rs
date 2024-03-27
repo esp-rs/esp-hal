@@ -18,12 +18,10 @@
 //! D7        GPIO15
 
 //% CHIPS: esp32s3
-//% FEATURES: embedded-hal-02
 
 #![no_std]
 #![no_main]
 
-use embedded_hal_02::digital::v2::OutputPin;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
@@ -97,9 +95,9 @@ fn main() -> ! {
         // https://gist.github.com/sukesh-ak/610508bc84779a26efdcf969bf51a2d1
         // https://github.com/lovyan03/LovyanGFX/blob/302169a6f23e9a2a6451f03311c366d182193831/src/lgfx/v1/panel/Panel_ST7796.hpp#L28
 
-        reset.set_low().unwrap();
+        reset.set_low();
         delay.delay_micros(8_000);
-        reset.set_high().unwrap();
+        reset.set_high();
         delay.delay_micros(64_000);
 
         // const CMD_FRMCTR1: u8 = 0xB1;
@@ -210,7 +208,7 @@ fn main() -> ! {
     const RED: u16 = 0b00000_000000_11111;
     const BLUE: u16 = 0b11111_000000_00000;
 
-    backlight.set_high().unwrap();
+    backlight.set_high();
 
     let total_pixels = width as usize * height as usize;
     let total_bytes = total_pixels * 2;
