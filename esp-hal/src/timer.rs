@@ -49,6 +49,7 @@ use crate::peripherals::TIMG1;
 use crate::soc::constants::TIMG_DEFAULT_CLK_SRC;
 use crate::{
     clock::Clocks,
+    interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{timg0::RegisterBlock, TIMG0},
     system::PeripheralClockControl,
@@ -63,17 +64,32 @@ pub enum Error {
     AlarmInactive,
 }
 
+/// Interrupts which can be registered in [crate::Blocking] mode
+#[derive(Debug, Default)]
+pub struct TimerInterrupts {
+    pub timer0_t0: Option<InterruptHandler>,
+    pub timer0_t1: Option<InterruptHandler>,
+    pub timer0_wdt: Option<InterruptHandler>,
+    #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
+    pub timer1_t0: Option<InterruptHandler>,
+    #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
+    pub timer1_t1: Option<InterruptHandler>,
+    #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
+    pub timer1_wdt: Option<InterruptHandler>,
+}
+
 // A timergroup consisting of up to 2 timers (chip dependent) and a watchdog
 // timer
-pub struct TimerGroup<'d, T>
+pub struct TimerGroup<'d, T, DM>
 where
     T: TimerGroupInstance,
+    DM: crate::Mode,
 {
     _timer_group: PeripheralRef<'d, T>,
-    pub timer0: Timer<Timer0<T>>,
+    pub timer0: Timer<Timer0<T>, DM>,
     #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
-    pub timer1: Timer<Timer1<T>>,
-    pub wdt: Wdt<T>,
+    pub timer1: Timer<Timer1<T>, DM>,
+    pub wdt: Wdt<T, DM>,
 }
 
 pub trait TimerGroupInstance {
@@ -181,11 +197,144 @@ impl TimerGroupInstance for TIMG1 {
     }
 }
 
-impl<'d, T> TimerGroup<'d, T>
+impl<'d, T> TimerGroup<'d, T, crate::Blocking>
 where
     T: TimerGroupInstance,
 {
-    pub fn new(timer_group: impl Peripheral<P = T> + 'd, clocks: &Clocks) -> Self {
+    pub fn new(
+        timer_group: impl Peripheral<P = T> + 'd,
+        clocks: &Clocks,
+        isr: Option<TimerInterrupts>,
+    ) -> Self {
+        crate::into_ref!(timer_group);
+
+        T::configure_src_clk();
+
+        // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
+        let timer0 = Timer::new(
+            Timer0 {
+                phantom: PhantomData,
+            },
+            #[cfg(not(esp32h2))]
+            clocks.apb_clock,
+            #[cfg(esp32h2)]
+            clocks.pll_48m_clock,
+        );
+
+        #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
+        let timer1 = Timer::new(
+            Timer1 {
+                phantom: PhantomData,
+            },
+            clocks.apb_clock,
+        );
+
+        if let Some(isr) = isr {
+            if let Some(handler) = isr.timer0_t0 {
+                unsafe {
+                    crate::interrupt::bind_interrupt(
+                        crate::peripherals::Interrupt::TG0_T0_LEVEL,
+                        handler.handler(),
+                    );
+                    crate::interrupt::enable(
+                        crate::peripherals::Interrupt::TG0_T0_LEVEL,
+                        handler.priority(),
+                    )
+                    .unwrap();
+                }
+            }
+
+            #[cfg(any(esp32, esp32s2, esp32s3))]
+            if let Some(handler) = isr.timer0_t1 {
+                unsafe {
+                    crate::interrupt::bind_interrupt(
+                        crate::peripherals::Interrupt::TG0_T1_LEVEL,
+                        handler.handler(),
+                    );
+                    crate::interrupt::enable(
+                        crate::peripherals::Interrupt::TG0_T1_LEVEL,
+                        handler.priority(),
+                    )
+                    .unwrap();
+                }
+            }
+
+            if let Some(handler) = isr.timer0_wdt {
+                unsafe {
+                    crate::interrupt::bind_interrupt(
+                        crate::peripherals::Interrupt::TG0_WDT_LEVEL,
+                        handler.handler(),
+                    );
+                    crate::interrupt::enable(
+                        crate::peripherals::Interrupt::TG0_WDT_LEVEL,
+                        handler.priority(),
+                    )
+                    .unwrap();
+                }
+            }
+
+            #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
+            {
+                if let Some(handler) = isr.timer1_t0 {
+                    unsafe {
+                        crate::interrupt::bind_interrupt(
+                            crate::peripherals::Interrupt::TG1_T0_LEVEL,
+                            handler.handler(),
+                        );
+                        crate::interrupt::enable(
+                            crate::peripherals::Interrupt::TG1_T0_LEVEL,
+                            handler.priority(),
+                        )
+                        .unwrap();
+                    }
+                }
+
+                #[cfg(any(esp32, esp32s2, esp32s3))]
+                if let Some(handler) = isr.timer1_t1 {
+                    unsafe {
+                        crate::interrupt::bind_interrupt(
+                            crate::peripherals::Interrupt::TG1_T1_LEVEL,
+                            handler.handler(),
+                        );
+                        crate::interrupt::enable(
+                            crate::peripherals::Interrupt::TG1_T1_LEVEL,
+                            handler.priority(),
+                        )
+                        .unwrap();
+                    }
+                }
+
+                if let Some(handler) = isr.timer1_wdt {
+                    unsafe {
+                        crate::interrupt::bind_interrupt(
+                            crate::peripherals::Interrupt::TG1_WDT_LEVEL,
+                            handler.handler(),
+                        );
+                        crate::interrupt::enable(
+                            crate::peripherals::Interrupt::TG1_WDT_LEVEL,
+                            handler.priority(),
+                        )
+                        .unwrap();
+                    }
+                }
+            }
+        }
+
+        Self {
+            _timer_group: timer_group,
+            timer0,
+            #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
+            timer1,
+            wdt: Wdt::new(),
+        }
+    }
+}
+
+impl<'d, T> TimerGroup<'d, T, crate::Async>
+where
+    T: TimerGroupInstance,
+{
+    pub fn new_async(timer_group: impl Peripheral<P = T> + 'd, clocks: &Clocks) -> Self {
         crate::into_ref!(timer_group);
 
         T::configure_src_clk();
@@ -220,13 +369,14 @@ where
 }
 
 /// General-purpose Timer driver
-pub struct Timer<T> {
+pub struct Timer<T, DM: crate::Mode> {
     timg: T,
     #[allow(dead_code)] // FIXME
     apb_clk_freq: HertzU32,
+    phantom: PhantomData<DM>,
 }
 
-impl<T> Timer<T>
+impl<T, DM: crate::Mode> Timer<T, DM>
 where
     T: Instance,
 {
@@ -237,16 +387,15 @@ where
 
         timg.enable_peripheral();
 
-        Self { timg, apb_clk_freq }
-    }
-
-    /// Return the raw interface to the underlying timer instance
-    pub fn free(self) -> T {
-        self.timg
+        Self {
+            timg,
+            apb_clk_freq,
+            phantom: PhantomData,
+        }
     }
 }
 
-impl<T> Deref for Timer<T>
+impl<T, DM: crate::Mode> Deref for Timer<T, DM>
 where
     T: Instance,
 {
@@ -257,7 +406,7 @@ where
     }
 }
 
-impl<T> DerefMut for Timer<T>
+impl<T, DM: crate::Mode> DerefMut for Timer<T, DM>
 where
     T: Instance,
 {
@@ -662,9 +811,10 @@ where
 }
 
 #[cfg(feature = "embedded-hal-02")]
-impl<T> embedded_hal_02::timer::CountDown for Timer<T>
+impl<T, DM> embedded_hal_02::timer::CountDown for Timer<T, DM>
 where
     T: Instance,
+    DM: crate::Mode,
 {
     type Time = MicrosDurationU64;
 
@@ -706,9 +856,10 @@ where
 }
 
 #[cfg(feature = "embedded-hal-02")]
-impl<T> embedded_hal_02::timer::Cancel for Timer<T>
+impl<T, DM> embedded_hal_02::timer::Cancel for Timer<T, DM>
 where
     T: Instance,
+    DM: crate::Mode,
 {
     type Error = Error;
 
@@ -726,17 +877,23 @@ where
 }
 
 #[cfg(feature = "embedded-hal-02")]
-impl<T> embedded_hal_02::timer::Periodic for Timer<T> where T: Instance {}
+impl<T, DM> embedded_hal_02::timer::Periodic for Timer<T, DM>
+where
+    T: Instance,
+    DM: crate::Mode,
+{
+}
 
 /// Watchdog timer
-pub struct Wdt<TG> {
-    phantom: PhantomData<TG>,
+pub struct Wdt<TG, DM> {
+    phantom: PhantomData<(TG, DM)>,
 }
 
 /// Watchdog driver
-impl<TG> Wdt<TG>
+impl<TG, DM> Wdt<TG, DM>
 where
     TG: TimerGroupInstance,
+    DM: crate::Mode,
 {
     /// Create a new watchdog timer instance
     pub fn new() -> Self {
@@ -849,9 +1006,10 @@ where
     }
 }
 
-impl<TG> Default for Wdt<TG>
+impl<TG, DM> Default for Wdt<TG, DM>
 where
     TG: TimerGroupInstance,
+    DM: crate::Mode,
 {
     fn default() -> Self {
         Self::new()
@@ -859,9 +1017,10 @@ where
 }
 
 #[cfg(feature = "embedded-hal-02")]
-impl<TG> embedded_hal_02::watchdog::WatchdogDisable for Wdt<TG>
+impl<TG, DM> embedded_hal_02::watchdog::WatchdogDisable for Wdt<TG, DM>
 where
     TG: TimerGroupInstance,
+    DM: crate::Mode,
 {
     fn disable(&mut self) {
         self.disable();
@@ -869,9 +1028,10 @@ where
 }
 
 #[cfg(feature = "embedded-hal-02")]
-impl<TG> embedded_hal_02::watchdog::WatchdogEnable for Wdt<TG>
+impl<TG, DM> embedded_hal_02::watchdog::WatchdogEnable for Wdt<TG, DM>
 where
     TG: TimerGroupInstance,
+    DM: crate::Mode,
 {
     type Time = MicrosDurationU64;
 
@@ -885,9 +1045,10 @@ where
 }
 
 #[cfg(feature = "embedded-hal-02")]
-impl<TG> embedded_hal_02::watchdog::Watchdog for Wdt<TG>
+impl<TG, DM> embedded_hal_02::watchdog::Watchdog for Wdt<TG, DM>
 where
     TG: TimerGroupInstance,
+    DM: crate::Mode,
 {
     fn feed(&mut self) {
         self.feed();

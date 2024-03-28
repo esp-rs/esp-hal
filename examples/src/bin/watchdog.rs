@@ -9,7 +9,7 @@
 #![no_std]
 #![no_main]
 
-use embedded_hal_02::watchdog::{Watchdog, WatchdogEnable};
+use embedded_hal_02::watchdog::WatchdogEnable;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
@@ -28,7 +28,7 @@ fn main() -> ! {
 
     let delay = Delay::new(&clocks);
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
     let mut wdt0 = timg0.wdt;
     wdt0.start(2u64.secs());
 

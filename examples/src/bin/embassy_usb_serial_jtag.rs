@@ -70,7 +70,7 @@ async fn main(spawner: Spawner) -> () {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    embassy::init(&clocks, TimerGroup::new(peripherals.TIMG0, &clocks));
+    embassy::init(&clocks, TimerGroup::new_async(peripherals.TIMG0, &clocks));
 
     let (tx, rx) = UsbSerialJtag::new(peripherals.USB_DEVICE).split();
 
