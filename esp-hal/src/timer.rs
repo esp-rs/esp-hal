@@ -393,11 +393,6 @@ where
             phantom: PhantomData,
         }
     }
-
-    /// Return the raw interface to the underlying timer instance
-    pub fn free(self) -> T {
-        self.timg
-    }
 }
 
 impl<T, DM: crate::Mode> Deref for Timer<T, DM>
