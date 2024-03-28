@@ -8,8 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Add `ADC::read_blocking` to xtensa chips (#1293)
 
+- Add `ADC::read_blocking` to xtensa chips (#1293)
 - ESP32-C6 / ESP32-H2: Implement `ETM` for general purpose timers (#1274)
 - `interrupt::enable` now has a direct CPU enable counter part, `interrupt::enable_direct` (#1310)
 - `Delay::delay(time: fugit::MicrosDurationU64)`
@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32 & ESP32-S2: Fix I²C frequency (#1306)
 - UART's TX/RX FIFOs are now cleared during initialization (#1344)
 - Fixed `LCD_CAM I8080` driver potentially sending garbage to display (#1301)
-
+- The TWAI driver can now be used without requiring the `embedded-hal` traits (#1355)
 
 ### Changed
 
