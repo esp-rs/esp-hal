@@ -49,7 +49,7 @@ const TEST_PARAMS_VECTOR: TestParams = TestParams {
 fn main() -> ! {
     let peripherals = Peripherals::take();
 
-    let mut hw_ecc = Ecc::new(peripherals.ECC);
+    let mut hw_ecc = Ecc::new(peripherals.ECC, None);
     let mut rng = Rng::new(peripherals.RNG);
 
     println!("Beginning stress tests...");
@@ -75,7 +75,7 @@ fn main() -> ! {
     loop {}
 }
 
-fn test_affine_point_multiplication(ecc: &mut Ecc, rng: &mut Rng) {
+fn test_affine_point_multiplication(ecc: &mut Ecc<esp_hal::Blocking>, rng: &mut Rng) {
     for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
         print!("Beginning affine point multiplication tests over ");
         match prime_field.len() {
@@ -188,7 +188,7 @@ fn test_affine_point_multiplication(ecc: &mut Ecc, rng: &mut Rng) {
     }
 }
 
-fn test_affine_point_verification(ecc: &mut Ecc, rng: &mut Rng) {
+fn test_affine_point_verification(ecc: &mut Ecc<esp_hal::Blocking>, rng: &mut Rng) {
     for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
         print!("Beginning affine point verification tests over ");
         match prime_field.len() {
@@ -258,7 +258,7 @@ fn test_affine_point_verification(ecc: &mut Ecc, rng: &mut Rng) {
     }
 }
 
-fn test_afine_point_verification_multiplication(ecc: &mut Ecc, rng: &mut Rng) {
+fn test_afine_point_verification_multiplication(ecc: &mut Ecc<esp_hal::Blocking>, rng: &mut Rng) {
     for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
         print!("Beginning affine point verification + multiplication tests over ");
         match prime_field.len() {
@@ -387,7 +387,7 @@ fn test_afine_point_verification_multiplication(ecc: &mut Ecc, rng: &mut Rng) {
     }
 }
 
-fn test_jacobian_point_multiplication(ecc: &mut Ecc, rng: &mut Rng) {
+fn test_jacobian_point_multiplication(ecc: &mut Ecc<esp_hal::Blocking>, rng: &mut Rng) {
     for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
         print!("Beginning jacobian point multiplication tests over ");
         match prime_field.len() {
@@ -520,7 +520,7 @@ fn test_jacobian_point_multiplication(ecc: &mut Ecc, rng: &mut Rng) {
     }
 }
 
-fn test_jacobian_point_verification(ecc: &mut Ecc, rng: &mut Rng) {
+fn test_jacobian_point_verification(ecc: &mut Ecc<esp_hal::Blocking>, rng: &mut Rng) {
     for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
         print!("Beginning jacobian point verification tests over ");
         match prime_field.len() {
@@ -609,7 +609,10 @@ fn test_jacobian_point_verification(ecc: &mut Ecc, rng: &mut Rng) {
     }
 }
 
-fn test_afine_point_verification_jacobian_multiplication(ecc: &mut Ecc, rng: &mut Rng) {
+fn test_afine_point_verification_jacobian_multiplication(
+    ecc: &mut Ecc<esp_hal::Blocking>,
+    rng: &mut Rng,
+) {
     for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
         print!("Beginning affine point verification + jacobian point multiplication tests over ");
         match prime_field.len() {
@@ -749,7 +752,7 @@ fn test_afine_point_verification_jacobian_multiplication(ecc: &mut Ecc, rng: &mu
 }
 
 #[cfg(feature = "esp32c2")]
-fn test_finite_field_division(ecc: &mut Ecc, rng: &mut Rng) {
+fn test_finite_field_division(ecc: &mut Ecc<esp_hal::Blocking>, rng: &mut Rng) {
     for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
         print!("Beginning finite field division tests over ");
         match prime_field.len() {

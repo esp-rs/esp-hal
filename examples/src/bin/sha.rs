@@ -23,7 +23,7 @@ fn main() -> ! {
 
     let source_data = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".as_bytes();
     let mut remaining = source_data;
-    let mut hasher = Sha::new(peripherals.SHA, ShaMode::SHA256);
+    let mut hasher = Sha::new(peripherals.SHA, ShaMode::SHA256, None);
 
     // Short hashes can be created by decreasing the output buffer to the desired
     // length

@@ -27,16 +27,21 @@
 //! Inputs of the ECC hardware accelerator must be provided in big-endian
 //! representation. The driver handles the inner representation of the blocks.
 
+use core::marker::PhantomData;
+
 use crate::{
+    interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::ECC,
     reg_access::AlignmentHelper,
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
 };
 
-pub struct Ecc<'d> {
+/// The ECC Accelerator driver instance
+pub struct Ecc<'d, DM: crate::Mode> {
     ecc: PeripheralRef<'d, ECC>,
     alignment_helper: AlignmentHelper,
+    phantom: PhantomData<DM>,
 }
 
 /// ECC interface error
@@ -76,18 +81,35 @@ pub enum WorkMode {
     ModDiv                  = 11,
 }
 
-impl<'d> Ecc<'d> {
-    pub fn new(ecc: impl Peripheral<P = ECC> + 'd) -> Self {
+impl<'d> Ecc<'d, crate::Blocking> {
+    /// Create a new instance in [crate::Blocking] mode.
+    ///
+    /// Optionally an interrupt handler can be bound.    
+    pub fn new(ecc: impl Peripheral<P = ECC> + 'd, interrupt: Option<InterruptHandler>) -> Self {
         crate::into_ref!(ecc);
 
         PeripheralClockControl::enable(PeripheralEnable::Ecc);
 
+        if let Some(interrupt) = interrupt {
+            unsafe {
+                crate::interrupt::bind_interrupt(
+                    crate::peripherals::Interrupt::ECC,
+                    interrupt.handler(),
+                );
+                crate::interrupt::enable(crate::peripherals::Interrupt::ECC, interrupt.priority())
+                    .unwrap();
+            }
+        }
+
         Self {
             ecc,
             alignment_helper: AlignmentHelper::default(),
+            phantom: PhantomData,
         }
     }
+}
 
+impl<'d, DM: crate::Mode> Ecc<'d, DM> {
     pub fn free(self) -> PeripheralRef<'d, ECC> {
         self.ecc
     }

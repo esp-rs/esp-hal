@@ -56,7 +56,7 @@
 //! println!("SHA256 Hash output {:02x?}", soft_result);
 //! ```
 
-use core::convert::Infallible;
+use core::{convert::Infallible, marker::PhantomData};
 
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
@@ -78,15 +78,18 @@ use crate::{
 // – Typical SHA
 // – DMA-SHA (not implemented yet)
 
-pub struct Sha<'d> {
+/// The SHA Accelerator driver instance
+pub struct Sha<'d, DM: crate::Mode> {
     sha: PeripheralRef<'d, SHA>,
     mode: ShaMode,
     alignment_helper: AlignmentHelper,
     cursor: usize,
     first_run: bool,
     finished: bool,
+    phantom: PhantomData<DM>,
 }
 
+/// Hash Algorithm Mode
 #[derive(Debug, Clone, Copy)]
 pub enum ShaMode {
     SHA1,
@@ -126,6 +129,47 @@ fn mode_as_bits(mode: ShaMode) -> u8 {
     }
 }
 
+impl<'d> Sha<'d, crate::Blocking> {
+    /// Create a new instance in [crate::Blocking] mode.
+    #[cfg_attr(not(esp32), doc = "Optionally an interrupt handler can be bound.")]
+    pub fn new(
+        sha: impl Peripheral<P = SHA> + 'd,
+        mode: ShaMode,
+        #[cfg(not(esp32))] interrupt: Option<crate::interrupt::InterruptHandler>,
+    ) -> Self {
+        crate::into_ref!(sha);
+
+        PeripheralClockControl::enable(crate::system::Peripheral::Sha);
+
+        // Setup SHA Mode
+        #[cfg(not(esp32))]
+        sha.mode()
+            .write(|w| unsafe { w.mode().bits(mode_as_bits(mode)) });
+
+        #[cfg(not(esp32))]
+        if let Some(interrupt) = interrupt {
+            unsafe {
+                crate::interrupt::bind_interrupt(
+                    crate::peripherals::Interrupt::SHA,
+                    interrupt.handler(),
+                );
+                crate::interrupt::enable(crate::peripherals::Interrupt::SHA, interrupt.priority())
+                    .unwrap();
+            }
+        }
+
+        Self {
+            sha,
+            mode,
+            cursor: 0,
+            first_run: true,
+            finished: false,
+            alignment_helper: AlignmentHelper::default(),
+            phantom: PhantomData,
+        }
+    }
+}
+
 // TODO: Allow/Implemenet SHA512_(u16)
 
 // A few notes on this implementation with regards to 'memcpy',
@@ -144,27 +188,7 @@ fn mode_as_bits(mode: ShaMode) -> u8 {
 
 // This implementation might fail after u32::MAX/8 bytes, to increase please see
 // ::finish() length/self.cursor usage
-impl<'d> Sha<'d> {
-    pub fn new(sha: impl Peripheral<P = SHA> + 'd, mode: ShaMode) -> Self {
-        crate::into_ref!(sha);
-
-        PeripheralClockControl::enable(crate::system::Peripheral::Sha);
-
-        // Setup SHA Mode
-        #[cfg(not(esp32))]
-        sha.mode()
-            .write(|w| unsafe { w.mode().bits(mode_as_bits(mode)) });
-
-        Self {
-            sha,
-            mode,
-            cursor: 0,
-            first_run: true,
-            finished: false,
-            alignment_helper: AlignmentHelper::default(),
-        }
-    }
-
+impl<'d, DM: crate::Mode> Sha<'d, DM> {
     pub fn first_run(&self) -> bool {
         self.first_run
     }
