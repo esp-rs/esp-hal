@@ -110,10 +110,6 @@ impl<'d> Ecc<'d, crate::Blocking> {
 }
 
 impl<'d, DM: crate::Mode> Ecc<'d, DM> {
-    pub fn free(self) -> PeripheralRef<'d, ECC> {
-        self.ecc
-    }
-
     pub fn reset(&mut self) {
         self.ecc.mult_conf().reset()
     }
