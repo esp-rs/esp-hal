@@ -23,7 +23,10 @@ fn main() -> ! {
 
     let source_data = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".as_bytes();
     let mut remaining = source_data;
+    #[cfg(not(feature = "esp32"))]
     let mut hasher = Sha::new(peripherals.SHA, ShaMode::SHA256, None);
+    #[cfg(feature = "esp32")]
+    let mut hasher = Sha::new(peripherals.SHA, ShaMode::SHA256);
 
     // Short hashes can be created by decreasing the output buffer to the desired
     // length
