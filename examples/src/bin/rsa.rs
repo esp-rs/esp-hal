@@ -56,7 +56,7 @@ const fn compute_mprime(modulus: &U512) -> u32 {
 fn main() -> ! {
     let peripherals = Peripherals::take();
 
-    let mut rsa = Rsa::new(peripherals.RSA);
+    let mut rsa = Rsa::new(peripherals.RSA, None);
     nb::block!(rsa.ready()).unwrap();
 
     mod_exp_example(&mut rsa);
@@ -66,9 +66,9 @@ fn main() -> ! {
     loop {}
 }
 
-fn mod_multi_example(rsa: &mut Rsa) {
+fn mod_multi_example(rsa: &mut Rsa<esp_hal::Blocking>) {
     let mut outbuf = [0_u32; U512::LIMBS];
-    let mut mod_multi = RsaModularMultiplication::<operand_sizes::Op512>::new(
+    let mut mod_multi = RsaModularMultiplication::<operand_sizes::Op512, esp_hal::Blocking>::new(
         rsa,
         #[cfg(not(feature = "esp32"))]
         BIGNUM_1.as_words(),
@@ -109,7 +109,7 @@ fn mod_multi_example(rsa: &mut Rsa) {
     println!("modular multiplication done");
 }
 
-fn mod_exp_example(rsa: &mut Rsa) {
+fn mod_exp_example(rsa: &mut Rsa<esp_hal::Blocking>) {
     #[cfg(not(feature = "esp32"))]
     {
         rsa.enable_disable_constant_time_acceleration(true);
@@ -117,7 +117,7 @@ fn mod_exp_example(rsa: &mut Rsa) {
     }
 
     let mut outbuf = [0_u32; U512::LIMBS];
-    let mut mod_exp = RsaModularExponentiation::<operand_sizes::Op512>::new(
+    let mut mod_exp = RsaModularExponentiation::<operand_sizes::Op512, esp_hal::Blocking>::new(
         rsa,
         BIGNUM_2.as_words(),
         BIGNUM_3.as_words(),
@@ -146,7 +146,7 @@ fn mod_exp_example(rsa: &mut Rsa) {
     println!("modular exponentiation done");
 }
 
-fn multiplication_example(rsa: &mut Rsa) {
+fn multiplication_example(rsa: &mut Rsa<esp_hal::Blocking>) {
     let mut out = [0_u32; U1024::LIMBS];
 
     let operand_a = BIGNUM_1.as_words();
@@ -156,13 +156,14 @@ fn multiplication_example(rsa: &mut Rsa) {
 
     #[cfg(feature = "esp32")]
     {
-        let mut rsamulti = RsaMultiplication::<operand_sizes::Op512>::new(rsa);
+        let mut rsamulti = RsaMultiplication::<operand_sizes::Op512, esp_hal::Blocking>::new(rsa);
         rsamulti.start_multiplication(operand_a, operand_b);
         rsamulti.read_results(&mut out);
     }
     #[cfg(not(feature = "esp32"))]
     {
-        let mut rsamulti = RsaMultiplication::<operand_sizes::Op512>::new(rsa, operand_a);
+        let mut rsamulti =
+            RsaMultiplication::<operand_sizes::Op512, esp_hal::Blocking>::new(rsa, operand_a);
         rsamulti.start_multiplication(operand_b);
         rsamulti.read_results(&mut out);
     }
