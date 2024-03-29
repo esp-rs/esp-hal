@@ -49,7 +49,7 @@ const TEST_PARAMS_VECTOR: TestParams = TestParams {
 fn main() -> ! {
     let peripherals = Peripherals::take();
 
-    let mut hw_ecc = Ecc::new(peripherals.ECC);
+    let mut hw_ecc = Ecc::new(peripherals.ECC, None);
     let mut rng = Rng::new(peripherals.RNG);
 
     println!("Beginning stress tests...");
@@ -75,7 +75,7 @@ fn main() -> ! {
     loop {}
 }
 
-fn test_affine_point_multiplication(ecc: &mut Ecc, rng: &mut Rng) {
+fn test_affine_point_multiplication(ecc: &mut Ecc<esp_hal::Blocking>, rng: &mut Rng) {
     for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
         print!("Beginning affine point multiplication tests over ");
         match prime_field.len() {
@@ -188,7 +188,7 @@ fn test_affine_point_multiplication(ecc: &mut Ecc, rng: &mut Rng) {
     }
 }
 
-fn test_affine_point_verification(ecc: &mut Ecc, rng: &mut Rng) {
+fn test_affine_point_verification(ecc: &mut Ecc<esp_hal::Blocking>, rng: &mut Rng) {
     for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
         print!("Beginning affine point verification tests over ");
         match prime_field.len() {
@@ -258,7 +258,7 @@ fn test_affine_point_verification(ecc: &mut Ecc, rng: &mut Rng) {
     }
 }
 
-fn test_afine_point_verification_multiplication(ecc: &mut Ecc, rng: &mut Rng) {
+fn test_afine_point_verification_multiplication(ecc: &mut Ecc<esp_hal::Blocking>, rng: &mut Rng) {
     for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
         print!("Beginning affine point verification + multiplication tests over ");
         match prime_field.len() {
@@ -387,7 +387,7 @@ fn test_afine_point_verification_multiplication(ecc: &mut Ecc, rng: &mut Rng) {
     }
 }
 
-fn test_jacobian_point_multiplication(ecc: &mut Ecc, rng: &mut Rng) {
+fn test_jacobian_point_multiplication(ecc: &mut Ecc<esp_hal::Blocking>, rng: &mut Rng) {
     for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
         print!("Beginning jacobian point multiplication tests over ");
         match prime_field.len() {
@@ -520,7 +520,7 @@ fn test_jacobian_point_multiplication(ecc: &mut Ecc, rng: &mut Rng) {
     }
 }
 
-fn test_jacobian_point_verification(ecc: &mut Ecc, rng: &mut Rng) {
+fn test_jacobian_point_verification(ecc: &mut Ecc<esp_hal::Blocking>, rng: &mut Rng) {
     for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
         print!("Beginning jacobian point verification tests over ");
         match prime_field.len() {
@@ -609,7 +609,10 @@ fn test_jacobian_point_verification(ecc: &mut Ecc, rng: &mut Rng) {
     }
 }
 
-fn test_afine_point_verification_jacobian_multiplication(ecc: &mut Ecc, rng: &mut Rng) {
+fn test_afine_point_verification_jacobian_multiplication(
+    ecc: &mut Ecc<esp_hal::Blocking>,
+    rng: &mut Rng,
+) {
     for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
         print!("Beginning affine point verification + jacobian point multiplication tests over ");
         match prime_field.len() {
@@ -749,7 +752,7 @@ fn test_afine_point_verification_jacobian_multiplication(ecc: &mut Ecc, rng: &mu
 }
 
 #[cfg(feature = "esp32c2")]
-fn test_finite_field_division(ecc: &mut Ecc, rng: &mut Rng) {
+fn test_finite_field_division(ecc: &mut Ecc<esp_hal::Blocking>, rng: &mut Rng) {
     for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
         print!("Beginning finite field division tests over ");
         match prime_field.len() {
@@ -825,7 +828,7 @@ fn test_finite_field_division(ecc: &mut Ecc, rng: &mut Rng) {
 
 // All values are Little-Endian
 #[cfg(feature = "esp32h2")]
-fn test_point_addition_256(ecc: &mut Ecc) {
+fn test_point_addition_256(ecc: &mut Ecc<esp_hal::Blocking>) {
     const ECC_256_X: [u8; 32] = [
         0x96, 0xC2, 0x98, 0xD8, 0x45, 0x39, 0xA1, 0xF4, 0xA0, 0x33, 0xEB, 0x2D, 0x81, 0x7D, 0x03,
         0x77, 0xF2, 0x40, 0xA4, 0x63, 0xE5, 0xE6, 0xBC, 0xF8, 0x47, 0x42, 0x2C, 0xE1, 0xF2, 0xD1,
@@ -894,7 +897,7 @@ fn test_point_addition_256(ecc: &mut Ecc) {
 
 // All values are Little-Endian
 #[cfg(feature = "esp32h2")]
-fn test_point_addition_192(ecc: &mut Ecc) {
+fn test_point_addition_192(ecc: &mut Ecc<esp_hal::Blocking>) {
     const ECC_192_X: [u8; 24] = [
         0x12, 0x10, 0xFF, 0x82, 0xFD, 0x0A, 0xFF, 0xF4, 0x00, 0x88, 0xA1, 0x43, 0xEB, 0x20, 0xBF,
         0x7C, 0xF6, 0x90, 0x30, 0xB0, 0x0E, 0xA8, 0x8D, 0x18,
@@ -957,7 +960,7 @@ fn test_point_addition_192(ecc: &mut Ecc) {
 
 // All values are Little-Endian
 #[cfg(feature = "esp32h2")]
-fn test_mod_operations_256(ecc: &mut Ecc) {
+fn test_mod_operations_256(ecc: &mut Ecc<esp_hal::Blocking>) {
     const ECC_256_X: [u8; 32] = [
         0x96, 0xC2, 0x98, 0xD8, 0x45, 0x39, 0xA1, 0xF4, 0xA0, 0x33, 0xEB, 0x2D, 0x81, 0x7D, 0x03,
         0x77, 0xF2, 0x40, 0xA4, 0x63, 0xE5, 0xE6, 0xBC, 0xF8, 0x47, 0x42, 0x2C, 0xE1, 0xF2, 0xD1,
@@ -1072,7 +1075,7 @@ fn test_mod_operations_256(ecc: &mut Ecc) {
 
 // All values are Little-Endian
 #[cfg(feature = "esp32h2")]
-fn test_mod_operations_192(ecc: &mut Ecc) {
+fn test_mod_operations_192(ecc: &mut Ecc<esp_hal::Blocking>) {
     const ECC_192_X: [u8; 24] = [
         0x1A, 0x80, 0xA1, 0x5F, 0x1F, 0xB7, 0x59, 0x1B, 0x9F, 0xD7, 0xFB, 0xAE, 0xA9, 0xF9, 0x1E,
         0xBA, 0x67, 0xAE, 0x57, 0xB7, 0x27, 0x80, 0x9E, 0x1A,
