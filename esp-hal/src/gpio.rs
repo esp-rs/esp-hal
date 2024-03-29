@@ -47,11 +47,11 @@ static USER_INTERRUPT_HANDLER: Mutex<Cell<Option<InterruptHandler>>> = Mutex::ne
 
 #[derive(Copy, Clone)]
 pub enum Event {
-    RisingEdge = 1,
+    RisingEdge  = 1,
     FallingEdge = 2,
-    AnyEdge = 3,
-    LowLevel = 4,
-    HighLevel = 5,
+    AnyEdge     = 3,
+    LowLevel    = 4,
+    HighLevel   = 5,
 }
 
 pub struct Unknown {}
@@ -142,7 +142,7 @@ pub struct AF1;
 pub struct AF2;
 
 pub enum DriveStrength {
-    I5mA = 0,
+    I5mA  = 0,
     I10mA = 1,
     I20mA = 2,
     I40mA = 3,
@@ -160,7 +160,7 @@ pub enum AlternateFunction {
 
 #[derive(PartialEq)]
 pub enum RtcFunction {
-    Rtc = 0,
+    Rtc     = 0,
     Digital = 1,
 }
 
