@@ -380,10 +380,10 @@ mod asynch {
                 .register_block()
                 .int_ena()
                 .modify(|_, w| match event {
-                    Event::EndDetect => w.end_detect_int_ena().set_bit(),
-                    Event::TxComplete => w.trans_complete_int_ena().set_bit(),
+                    Event::EndDetect => w.end_detect().set_bit(),
+                    Event::TxComplete => w.trans_complete().set_bit(),
                     #[cfg(not(any(esp32, esp32s2)))]
-                    Event::TxFifoWatermark => w.txfifo_wm_int_ena().set_bit(),
+                    Event::TxFifoWatermark => w.txfifo_wm().set_bit(),
                 });
 
             Self { event, instance }
@@ -393,10 +393,10 @@ mod asynch {
             let r = self.instance.register_block().int_ena().read();
 
             match self.event {
-                Event::EndDetect => r.end_detect_int_ena().bit_is_clear(),
-                Event::TxComplete => r.trans_complete_int_ena().bit_is_clear(),
+                Event::EndDetect => r.end_detect().bit_is_clear(),
+                Event::TxComplete => r.trans_complete().bit_is_clear(),
                 #[cfg(not(any(esp32, esp32s2)))]
-                Event::TxFifoWatermark => r.txfifo_wm_int_ena().bit_is_clear(),
+                Event::TxFifoWatermark => r.txfifo_wm().bit_is_clear(),
             }
         }
     }
@@ -539,7 +539,7 @@ mod asynch {
                 self.peripheral
                     .register_block()
                     .int_clr()
-                    .write(|w| w.txfifo_wm_int_clr().set_bit());
+                    .write(|w| w.txfifo_wm().clear_bit_by_one());
 
                 I2cFuture::new(Event::TxFifoWatermark, self.inner()).await;
 
@@ -608,17 +608,12 @@ mod asynch {
     fn I2C_EXT0() {
         unsafe { &*crate::peripherals::I2C0::PTR }
             .int_ena()
-            .modify(|_, w| {
-                w.end_detect_int_ena()
-                    .clear_bit()
-                    .trans_complete_int_ena()
-                    .clear_bit()
-            });
+            .modify(|_, w| w.end_detect().clear_bit().trans_complete().clear_bit());
 
         #[cfg(not(any(esp32, esp32s2)))]
         unsafe { &*crate::peripherals::I2C0::PTR }
             .int_ena()
-            .modify(|_, w| w.txfifo_wm_int_ena().clear_bit());
+            .modify(|_, w| w.txfifo_wm().clear_bit());
 
         WAKERS[0].wake();
     }
@@ -628,17 +623,12 @@ mod asynch {
     fn I2C_EXT1() {
         unsafe { &*crate::peripherals::I2C1::PTR }
             .int_ena()
-            .modify(|_, w| {
-                w.end_detect_int_ena()
-                    .clear_bit()
-                    .trans_complete_int_ena()
-                    .clear_bit()
-            });
+            .modify(|_, w| w.end_detect().clear_bit().trans_complete().clear_bit());
 
         #[cfg(not(any(esp32, esp32s2)))]
         unsafe { &*crate::peripherals::I2C0::PTR }
             .int_ena()
-            .modify(|_, w| w.txfifo_wm_int_ena().clear_bit());
+            .modify(|_, w| w.txfifo_wm().clear_bit());
 
         WAKERS[1].wake();
     }
@@ -1272,9 +1262,7 @@ pub trait Instance: crate::private::Sealed {
 
             // Handle completion cases
             // A full transmission was completed
-            if interrupts.trans_complete_int_raw().bit_is_set()
-                || interrupts.end_detect_int_raw().bit_is_set()
-            {
+            if interrupts.trans_complete().bit_is_set() || interrupts.end_detect().bit_is_set() {
                 break;
             }
         }
@@ -1295,29 +1283,29 @@ pub trait Instance: crate::private::Sealed {
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
                 // Handle error cases
-                if interrupts.time_out_int_raw().bit_is_set() {
+                if interrupts.time_out().bit_is_set() {
                     self.reset();
                     return Err(Error::TimeOut);
-                } else if interrupts.ack_err_int_raw().bit_is_set() {
+                } else if interrupts.ack_err().bit_is_set() {
                     self.reset();
                     return Err(Error::AckCheckFailed);
-                } else if interrupts.arbitration_lost_int_raw().bit_is_set() {
+                } else if interrupts.arbitration_lost().bit_is_set() {
                     self.reset();
                     return Err(Error::ArbitrationLost);
                 }
             }
             else {
                 // Handle error cases
-                if interrupts.time_out_int_raw().bit_is_set() {
+                if interrupts.time_out().bit_is_set() {
                     self.reset();
                     return Err(Error::TimeOut);
-                } else if interrupts.nack_int_raw().bit_is_set() {
+                } else if interrupts.nack().bit_is_set() {
                     self.reset();
                     return Err(Error::AckCheckFailed);
-                } else if interrupts.arbitration_lost_int_raw().bit_is_set() {
+                } else if interrupts.arbitration_lost().bit_is_set() {
                     self.reset();
                     return Err(Error::ArbitrationLost);
-                } else if  interrupts.trans_complete_int_raw().bit_is_set() && self.register_block().sr().read().resp_rec().bit_is_clear() {
+                } else if  interrupts.trans_complete().bit_is_set() && self.register_block().sr().read().resp_rec().bit_is_clear() {
                     self.reset();
                     return Err(Error::AckCheckFailed);
                 }
@@ -1351,7 +1339,7 @@ pub trait Instance: crate::private::Sealed {
                 .register_block()
                 .int_raw()
                 .read()
-                .txfifo_ovf_int_raw()
+                .txfifo_ovf()
                 .bit_is_set()
         {
             write_fifo(self.register_block(), bytes[index]);
@@ -1361,13 +1349,13 @@ pub trait Instance: crate::private::Sealed {
             .register_block()
             .int_raw()
             .read()
-            .txfifo_ovf_int_raw()
+            .txfifo_ovf()
             .bit_is_set()
         {
             index -= 1;
             self.register_block()
                 .int_clr()
-                .write(|w| w.txfifo_ovf_int_clr().set_bit());
+                .write(|w| w.txfifo_ovf().clear_bit_by_one());
         }
         index
     }
@@ -1382,19 +1370,19 @@ pub trait Instance: crate::private::Sealed {
                 .register_block()
                 .int_raw()
                 .read()
-                .txfifo_wm_int_raw()
+                .txfifo_wm()
                 .bit_is_set()
             {}
 
             self.register_block()
                 .int_clr()
-                .write(|w| w.txfifo_wm_int_clr().set_bit());
+                .write(|w| w.txfifo_wm().clear_bit_by_one());
 
             while !self
                 .register_block()
                 .int_raw()
                 .read()
-                .txfifo_wm_int_raw()
+                .txfifo_wm()
                 .bit_is_set()
             {}
 
@@ -1468,10 +1456,10 @@ pub trait Instance: crate::private::Sealed {
             .modify(|_, w| w.tx_fifo_rst().clear_bit().rx_fifo_rst().clear_bit());
 
         self.register_block().int_clr().write(|w| {
-            w.rxfifo_wm_int_clr()
-                .set_bit()
-                .txfifo_wm_int_clr()
-                .set_bit()
+            w.rxfifo_wm()
+                .clear_bit_by_one()
+                .txfifo_wm()
+                .clear_bit_by_one()
         });
 
         self.update_config();
@@ -1500,7 +1488,7 @@ pub trait Instance: crate::private::Sealed {
 
         self.register_block()
             .int_clr()
-            .write(|w| w.rxfifo_full_int_clr().set_bit());
+            .write(|w| w.rxfifo_full().clear_bit_by_one());
     }
 
     /// Send data bytes from the `bytes` array to a target slave with the

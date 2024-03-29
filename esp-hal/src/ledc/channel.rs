@@ -549,7 +549,7 @@ macro_rules! set_duty_fade {
                 .write(|w| unsafe { w.duty().bits($start_duty << 4) });
             $self.ledc
                 .int_clr()
-                .write(|w| { w.[<duty_chng_end_ $speed sch $num _int_clr>]().set_bit() });
+                .write(|w| { w.[<duty_chng_end_ $speed sch $num>]().clear_bit_by_one() });
         }
         start_duty_fade!(
             $self,
@@ -574,7 +574,7 @@ macro_rules! set_duty_fade {
                 .write(|w| unsafe { w.duty().bits($start_duty << 4) });
             $self.ledc
                 .int_clr()
-                .write(|w| { w.[<duty_chng_end_ $speed sch $num _int_clr>]().set_bit() });
+                .write(|w| { w.[<duty_chng_end_ $speed sch $num>]().clear_bit_by_one() });
         }
         start_duty_fade!(
             $self,
@@ -598,7 +598,7 @@ macro_rules! set_duty_fade {
                 .write(|w| unsafe { w.duty().bits($start_duty << 4) });
             $self.ledc
                 .int_clr()
-                .write(|w| { w.[<duty_chng_end_ch $num _int_clr>]().set_bit() });
+                .write(|w| { w.[<duty_chng_end_ch $num>]().clear_bit_by_one() });
         }
         start_duty_fade!(
             $self,
@@ -620,7 +620,7 @@ macro_rules! is_duty_fade_running {
             $self.ledc
                 .int_raw()
                 .read()
-                .[<duty_chng_end_ $speed sch $num _int_raw>]()
+                .[<duty_chng_end_ $speed sch $num>]()
                 .bit_is_clear()
         }
     }};
@@ -633,7 +633,7 @@ macro_rules! is_duty_fade_running {
             $self.ledc
                 .int_raw()
                 .read()
-                .[<duty_chng_end_ch $num _int_raw>]()
+                .[<duty_chng_end_ch $num>]()
                 .bit_is_clear()
         }
     }};

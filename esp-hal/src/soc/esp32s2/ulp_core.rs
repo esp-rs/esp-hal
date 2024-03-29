@@ -122,13 +122,13 @@ fn ulp_run(wakeup_src: UlpCoreWakeupSource) {
     // Clear any spurious wakeup trigger interrupts upon ULP startup
     crate::rom::ets_delay_us(20);
 
-    rtc_cntl.int_clr_rtc().write(|w| {
-        w.cocpu_int_clr()
-            .set_bit()
-            .cocpu_trap_int_clr()
-            .set_bit()
-            .ulp_cp_int_clr()
-            .set_bit()
+    rtc_cntl.int_clr().write(|w| {
+        w.cocpu()
+            .clear_bit_by_one()
+            .cocpu_trap()
+            .clear_bit_by_one()
+            .ulp_cp()
+            .clear_bit_by_one()
     });
 }
 

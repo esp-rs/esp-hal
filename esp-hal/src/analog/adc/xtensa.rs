@@ -347,10 +347,10 @@ impl RegisterAccess for crate::peripherals::ADC1 {
         cfg_if::cfg_if! {
             if #[cfg(esp32s2)] {
                 adc.int_clr()
-                    .write(|w| w.adc1_done_int_clr().set_bit());
+                    .write(|w| w.adc1_done().clear_bit_by_one());
             } else {
                 adc.int_clr()
-                    .write(|w| w.apb_saradc1_done_int_clr().set_bit());
+                    .write(|w| w.apb_saradc1_done().clear_bit_by_one());
             }
         }
 
@@ -486,10 +486,10 @@ impl RegisterAccess for crate::peripherals::ADC2 {
         cfg_if::cfg_if! {
             if #[cfg(esp32s2)] {
                 adc.int_clr()
-                    .write(|w| w.adc2_done_int_clr().set_bit());
+                    .write(|w| w.adc2_done().clear_bit_by_one());
             } else {
                 adc.int_clr()
-                    .write(|w| w.apb_saradc2_done_int_clr().set_bit());
+                    .write(|w| w.apb_saradc2_done().clear_bit_by_one());
             }
         }
 

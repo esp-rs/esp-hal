@@ -105,24 +105,24 @@ impl<const N: u8> RegisterAccess for Channel<N> {
     fn clear_out_interrupts() {
         #[cfg(not(esp32s3))]
         Self::out_int().clr().write(|w| {
-            w.out_eof().set_bit();
-            w.out_dscr_err().set_bit();
-            w.out_done().set_bit();
-            w.out_total_eof().set_bit();
-            w.outfifo_ovf().set_bit();
-            w.outfifo_udf().set_bit()
+            w.out_eof().clear_bit_by_one();
+            w.out_dscr_err().clear_bit_by_one();
+            w.out_done().clear_bit_by_one();
+            w.out_total_eof().clear_bit_by_one();
+            w.outfifo_ovf().clear_bit_by_one();
+            w.outfifo_udf().clear_bit_by_one()
         });
 
         #[cfg(esp32s3)]
         Self::out_int().clr().write(|w| {
-            w.out_eof().set_bit();
-            w.out_dscr_err().set_bit();
-            w.out_done().set_bit();
-            w.out_total_eof().set_bit();
-            w.outfifo_ovf_l1().set_bit();
-            w.outfifo_ovf_l3().set_bit();
-            w.outfifo_udf_l1().set_bit();
-            w.outfifo_udf_l3().set_bit()
+            w.out_eof().clear_bit_by_one();
+            w.out_dscr_err().clear_bit_by_one();
+            w.out_done().clear_bit_by_one();
+            w.out_total_eof().clear_bit_by_one();
+            w.outfifo_ovf_l1().clear_bit_by_one();
+            w.outfifo_ovf_l3().clear_bit_by_one();
+            w.outfifo_udf_l1().clear_bit_by_one();
+            w.outfifo_udf_l3().clear_bit_by_one()
         });
     }
 
@@ -155,7 +155,9 @@ impl<const N: u8> RegisterAccess for Channel<N> {
     }
 
     fn clear_ch_out_done() {
-        Self::out_int().clr().write(|w| w.out_done().set_bit());
+        Self::out_int()
+            .clr()
+            .write(|w| w.out_done().clear_bit_by_one());
     }
 
     fn is_ch_out_done_set() -> bool {
@@ -193,7 +195,9 @@ impl<const N: u8> RegisterAccess for Channel<N> {
     }
 
     fn reset_out_eof_interrupt() {
-        Self::out_int().clr().write(|w| w.out_eof().set_bit());
+        Self::out_int()
+            .clr()
+            .write(|w| w.out_eof().clear_bit_by_one());
     }
 
     fn set_in_burstmode(burst_mode: bool) {
@@ -214,26 +218,26 @@ impl<const N: u8> RegisterAccess for Channel<N> {
     fn clear_in_interrupts() {
         #[cfg(not(esp32s3))]
         Self::in_int().clr().write(|w| {
-            w.in_suc_eof().set_bit();
-            w.in_err_eof().set_bit();
-            w.in_dscr_err().set_bit();
-            w.in_dscr_empty().set_bit();
-            w.in_done().set_bit();
-            w.infifo_ovf().set_bit();
-            w.infifo_udf().set_bit()
+            w.in_suc_eof().clear_bit_by_one();
+            w.in_err_eof().clear_bit_by_one();
+            w.in_dscr_err().clear_bit_by_one();
+            w.in_dscr_empty().clear_bit_by_one();
+            w.in_done().clear_bit_by_one();
+            w.infifo_ovf().clear_bit_by_one();
+            w.infifo_udf().clear_bit_by_one()
         });
 
         #[cfg(esp32s3)]
         Self::in_int().clr().write(|w| {
-            w.in_suc_eof().set_bit();
-            w.in_err_eof().set_bit();
-            w.in_dscr_err().set_bit();
-            w.in_dscr_empty().set_bit();
-            w.in_done().set_bit();
-            w.infifo_ovf_l1().set_bit();
-            w.infifo_ovf_l3().set_bit();
-            w.infifo_udf_l1().set_bit();
-            w.infifo_udf_l3().set_bit()
+            w.in_suc_eof().clear_bit_by_one();
+            w.in_err_eof().clear_bit_by_one();
+            w.in_dscr_err().clear_bit_by_one();
+            w.in_dscr_empty().clear_bit_by_one();
+            w.in_done().clear_bit_by_one();
+            w.infifo_ovf_l1().clear_bit_by_one();
+            w.infifo_ovf_l3().clear_bit_by_one();
+            w.infifo_udf_l1().clear_bit_by_one();
+            w.infifo_udf_l3().clear_bit_by_one()
         });
     }
 
@@ -316,7 +320,9 @@ impl<const N: u8> RegisterAccess for Channel<N> {
     }
 
     fn clear_ch_in_done() {
-        Self::in_int().clr().write(|w| w.in_done().set_bit());
+        Self::in_int()
+            .clr()
+            .write(|w| w.in_done().clear_bit_by_one());
     }
 
     fn is_ch_in_done_set() -> bool {

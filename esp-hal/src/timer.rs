@@ -403,17 +403,13 @@ where
             .t0config()
             .modify(|_, w| w.level_int_en().set_bit());
 
-        reg_block
-            .int_ena_timers()
-            .modify(|_, w| w.t0_int_ena().set_bit());
+        reg_block.int_ena_timers().modify(|_, w| w.t0().set_bit());
     }
 
     fn unlisten(&mut self) {
         let reg_block = unsafe { &*TG::register_block() };
 
-        reg_block
-            .int_ena_timers()
-            .modify(|_, w| w.t0_int_ena().clear_bit());
+        reg_block.int_ena_timers().modify(|_, w| w.t0().clear_bit());
     }
 
     fn clear_interrupt(&mut self) {
@@ -421,7 +417,7 @@ where
 
         reg_block
             .int_clr_timers()
-            .write(|w| w.t0_int_clr().set_bit());
+            .write(|w| w.t0().clear_bit_by_one());
     }
 
     fn now(&self) -> u64 {
@@ -455,7 +451,7 @@ where
     fn is_interrupt_set(&self) -> bool {
         let reg_block = unsafe { &*TG::register_block() };
 
-        reg_block.int_raw_timers().read().t0_int_raw().bit_is_set()
+        reg_block.int_raw_timers().read().t0().bit_is_set()
     }
 
     fn set_divider(&mut self, divider: u16) {
@@ -577,17 +573,13 @@ where
             .t1config()
             .modify(|_, w| w.level_int_en().set_bit());
 
-        reg_block
-            .int_ena_timers()
-            .modify(|_, w| w.t1_int_ena().set_bit());
+        reg_block.int_ena_timers().modify(|_, w| w.t1().set_bit());
     }
 
     fn unlisten(&mut self) {
         let reg_block = unsafe { &*TG::register_block() };
 
-        reg_block
-            .int_ena_timers()
-            .modify(|_, w| w.t1_int_ena().clear_bit());
+        reg_block.int_ena_timers().modify(|_, w| w.t1().clear_bit());
     }
 
     fn clear_interrupt(&mut self) {
@@ -595,7 +587,7 @@ where
 
         reg_block
             .int_clr_timers()
-            .write(|w| w.t1_int_clr().set_bit());
+            .write(|w| w.t1().clear_bit_by_one());
     }
 
     fn now(&self) -> u64 {
@@ -629,7 +621,7 @@ where
     fn is_interrupt_set(&self) -> bool {
         let reg_block = unsafe { &*TG::register_block() };
 
-        reg_block.int_raw_timers().read().t1_int_raw().bit_is_set()
+        reg_block.int_raw_timers().read().t1().bit_is_set()
     }
 
     fn set_divider(&mut self, divider: u16) {

@@ -1106,12 +1106,12 @@ mod private {
 
             for interrupt in interrupts {
                 match interrupt {
-                    I2sInterrupt::TxHung => reg_block
-                        .int_ena()
-                        .modify(|_, w| w.tx_hung_int_ena().set_bit()),
-                    I2sInterrupt::RxHung => reg_block
-                        .int_ena()
-                        .modify(|_, w| w.rx_hung_int_ena().set_bit()),
+                    I2sInterrupt::TxHung => {
+                        reg_block.int_ena().modify(|_, w| w.tx_hung().set_bit())
+                    }
+                    I2sInterrupt::RxHung => {
+                        reg_block.int_ena().modify(|_, w| w.rx_hung().set_bit())
+                    }
                 }
             }
         }
@@ -1121,12 +1121,12 @@ mod private {
 
             for interrupt in interrupts {
                 match interrupt {
-                    I2sInterrupt::TxHung => reg_block
-                        .int_ena()
-                        .modify(|_, w| w.tx_hung_int_ena().clear_bit()),
-                    I2sInterrupt::RxHung => reg_block
-                        .int_ena()
-                        .modify(|_, w| w.rx_hung_int_ena().clear_bit()),
+                    I2sInterrupt::TxHung => {
+                        reg_block.int_ena().modify(|_, w| w.tx_hung().clear_bit())
+                    }
+                    I2sInterrupt::RxHung => {
+                        reg_block.int_ena().modify(|_, w| w.rx_hung().clear_bit())
+                    }
                 }
             }
         }
@@ -1136,10 +1136,10 @@ mod private {
             let reg_block = Self::register_block();
             let ints = reg_block.int_st().read();
 
-            if ints.tx_hung_int_st().bit() {
+            if ints.tx_hung().bit() {
                 res.insert(I2sInterrupt::TxHung);
             }
-            if ints.rx_hung_int_st().bit() {
+            if ints.rx_hung().bit() {
                 res.insert(I2sInterrupt::RxHung);
             }
 
@@ -1151,12 +1151,12 @@ mod private {
 
             for interrupt in interrupts {
                 match interrupt {
-                    I2sInterrupt::TxHung => {
-                        reg_block.int_clr().write(|w| w.tx_hung_int_clr().set_bit())
-                    }
-                    I2sInterrupt::RxHung => {
-                        reg_block.int_clr().write(|w| w.rx_hung_int_clr().set_bit())
-                    }
+                    I2sInterrupt::TxHung => reg_block
+                        .int_clr()
+                        .write(|w| w.tx_hung().clear_bit_by_one()),
+                    I2sInterrupt::RxHung => reg_block
+                        .int_clr()
+                        .write(|w| w.rx_hung().clear_bit_by_one()),
                 }
             }
         }
@@ -1283,10 +1283,10 @@ mod private {
             i2s.lc_conf().modify(|_, w| w.out_rst().clear_bit());
 
             i2s.int_clr().write(|w| {
-                w.out_done_int_clr()
-                    .set_bit()
-                    .out_total_eof_int_clr()
-                    .set_bit()
+                w.out_done()
+                    .clear_bit_by_one()
+                    .out_total_eof()
+                    .clear_bit_by_one()
             });
         }
 
@@ -1319,14 +1319,18 @@ mod private {
             i2s.lc_conf().modify(|_, w| w.in_rst().set_bit());
             i2s.lc_conf().modify(|_, w| w.in_rst().clear_bit());
 
-            i2s.int_clr()
-                .write(|w| w.in_done_int_clr().set_bit().in_suc_eof_int_clr().set_bit());
+            i2s.int_clr().write(|w| {
+                w.in_done()
+                    .clear_bit_by_one()
+                    .in_suc_eof()
+                    .clear_bit_by_one()
+            });
         }
 
         fn rx_start(len: usize) {
             let i2s = Self::register_block();
 
-            i2s.int_clr().write(|w| w.in_suc_eof_int_clr().set_bit());
+            i2s.int_clr().write(|w| w.in_suc_eof().clear_bit_by_one());
 
             #[cfg(not(esp32))]
             i2s.rxeof_num()
@@ -1342,11 +1346,11 @@ mod private {
 
         fn wait_for_rx_done() {
             let i2s = Self::register_block();
-            while i2s.int_raw().read().in_suc_eof_int_raw().bit_is_clear() {
+            while i2s.int_raw().read().in_suc_eof().bit_is_clear() {
                 // wait
             }
 
-            i2s.int_clr().write(|w| w.in_suc_eof_int_clr().set_bit());
+            i2s.int_clr().write(|w| w.in_suc_eof().clear_bit_by_one());
         }
     }
 
@@ -1359,18 +1363,18 @@ mod private {
 
             for interrupt in interrupts {
                 match interrupt {
-                    I2sInterrupt::TxHung => reg_block
-                        .int_ena()
-                        .modify(|_, w| w.tx_hung_int_ena().set_bit()),
-                    I2sInterrupt::RxHung => reg_block
-                        .int_ena()
-                        .modify(|_, w| w.rx_hung_int_ena().set_bit()),
-                    I2sInterrupt::TxDone => reg_block
-                        .int_ena()
-                        .modify(|_, w| w.tx_done_int_ena().set_bit()),
-                    I2sInterrupt::RxDone => reg_block
-                        .int_ena()
-                        .modify(|_, w| w.rx_done_int_ena().set_bit()),
+                    I2sInterrupt::TxHung => {
+                        reg_block.int_ena().modify(|_, w| w.tx_hung().set_bit())
+                    }
+                    I2sInterrupt::RxHung => {
+                        reg_block.int_ena().modify(|_, w| w.rx_hung().set_bit())
+                    }
+                    I2sInterrupt::TxDone => {
+                        reg_block.int_ena().modify(|_, w| w.tx_done().set_bit())
+                    }
+                    I2sInterrupt::RxDone => {
+                        reg_block.int_ena().modify(|_, w| w.rx_done().set_bit())
+                    }
                 }
             }
         }
@@ -1380,18 +1384,18 @@ mod private {
 
             for interrupt in interrupts {
                 match interrupt {
-                    I2sInterrupt::TxHung => reg_block
-                        .int_ena()
-                        .modify(|_, w| w.tx_hung_int_ena().clear_bit()),
-                    I2sInterrupt::RxHung => reg_block
-                        .int_ena()
-                        .modify(|_, w| w.rx_hung_int_ena().clear_bit()),
-                    I2sInterrupt::TxDone => reg_block
-                        .int_ena()
-                        .modify(|_, w| w.tx_done_int_ena().clear_bit()),
-                    I2sInterrupt::RxDone => reg_block
-                        .int_ena()
-                        .modify(|_, w| w.rx_done_int_ena().clear_bit()),
+                    I2sInterrupt::TxHung => {
+                        reg_block.int_ena().modify(|_, w| w.tx_hung().clear_bit())
+                    }
+                    I2sInterrupt::RxHung => {
+                        reg_block.int_ena().modify(|_, w| w.rx_hung().clear_bit())
+                    }
+                    I2sInterrupt::TxDone => {
+                        reg_block.int_ena().modify(|_, w| w.tx_done().clear_bit())
+                    }
+                    I2sInterrupt::RxDone => {
+                        reg_block.int_ena().modify(|_, w| w.rx_done().clear_bit())
+                    }
                 }
             }
         }
@@ -1401,16 +1405,16 @@ mod private {
             let reg_block = Self::register_block();
             let ints = reg_block.int_st().read();
 
-            if ints.tx_hung_int_st().bit() {
+            if ints.tx_hung().bit() {
                 res.insert(I2sInterrupt::TxHung);
             }
-            if ints.rx_hung_int_st().bit() {
+            if ints.rx_hung().bit() {
                 res.insert(I2sInterrupt::RxHung);
             }
-            if ints.tx_done_int_st().bit() {
+            if ints.tx_done().bit() {
                 res.insert(I2sInterrupt::TxDone);
             }
-            if ints.rx_done_int_st().bit() {
+            if ints.rx_done().bit() {
                 res.insert(I2sInterrupt::RxDone);
             }
 
@@ -1422,18 +1426,18 @@ mod private {
 
             for interrupt in interrupts {
                 match interrupt {
-                    I2sInterrupt::TxHung => {
-                        reg_block.int_clr().write(|w| w.tx_hung_int_clr().set_bit())
-                    }
-                    I2sInterrupt::RxHung => {
-                        reg_block.int_clr().write(|w| w.rx_hung_int_clr().set_bit())
-                    }
-                    I2sInterrupt::TxDone => {
-                        reg_block.int_clr().write(|w| w.tx_done_int_clr().set_bit())
-                    }
-                    I2sInterrupt::RxDone => {
-                        reg_block.int_clr().write(|w| w.rx_done_int_clr().set_bit())
-                    }
+                    I2sInterrupt::TxHung => reg_block
+                        .int_clr()
+                        .write(|w| w.tx_hung().clear_bit_by_one()),
+                    I2sInterrupt::RxHung => reg_block
+                        .int_clr()
+                        .write(|w| w.rx_hung().clear_bit_by_one()),
+                    I2sInterrupt::TxDone => reg_block
+                        .int_clr()
+                        .write(|w| w.tx_done().clear_bit_by_one()),
+                    I2sInterrupt::RxDone => reg_block
+                        .int_clr()
+                        .write(|w| w.rx_done().clear_bit_by_one()),
                 }
             }
         }
@@ -1818,7 +1822,7 @@ mod private {
                 .modify(|_, w| w.tx_reset().clear_bit().tx_fifo_reset().clear_bit());
 
             i2s.int_clr()
-                .write(|w| w.tx_done_int_clr().set_bit().tx_hung_int_clr().set_bit());
+                .write(|w| w.tx_done().clear_bit_by_one().tx_hung().clear_bit_by_one());
         }
 
         fn tx_start() {
@@ -1848,7 +1852,7 @@ mod private {
                 .modify(|_, w| w.rx_reset().clear_bit().rx_fifo_reset().clear_bit());
 
             i2s.int_clr()
-                .write(|w| w.rx_done_int_clr().set_bit().rx_hung_int_clr().set_bit());
+                .write(|w| w.rx_done().clear_bit_by_one().rx_hung().clear_bit_by_one());
         }
 
         fn rx_start(len: usize) {
@@ -1860,11 +1864,11 @@ mod private {
 
         fn wait_for_rx_done() {
             let i2s = Self::register_block();
-            while i2s.int_raw().read().rx_done_int_raw().bit_is_clear() {
+            while i2s.int_raw().read().rx_done().bit_is_clear() {
                 // wait
             }
 
-            i2s.int_clr().write(|w| w.rx_done_int_clr().set_bit());
+            i2s.int_clr().write(|w| w.rx_done().clear_bit_by_one());
         }
     }
 

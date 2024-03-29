@@ -1955,16 +1955,16 @@ where
     fn clear_dma_interrupts(&self) {
         let reg_block = self.register_block();
         reg_block.dma_int_clr().write(|w| {
-            w.dma_infifo_full_err_int_clr()
-                .set_bit()
-                .dma_outfifo_empty_err_int_clr()
-                .set_bit()
-                .trans_done_int_clr()
-                .set_bit()
-                .mst_rx_afifo_wfull_err_int_clr()
-                .set_bit()
-                .mst_tx_afifo_rempty_err_int_clr()
-                .set_bit()
+            w.dma_infifo_full_err()
+                .clear_bit_by_one()
+                .dma_outfifo_empty_err()
+                .clear_bit_by_one()
+                .trans_done()
+                .clear_bit_by_one()
+                .mst_rx_afifo_wfull_err()
+                .clear_bit_by_one()
+                .mst_tx_afifo_rempty_err()
+                .clear_bit_by_one()
         });
     }
 
@@ -1972,24 +1972,24 @@ where
     fn clear_dma_interrupts(&self) {
         let reg_block = self.register_block();
         reg_block.dma_int_clr().write(|w| {
-            w.inlink_dscr_empty_int_clr()
-                .set_bit()
-                .outlink_dscr_error_int_clr()
-                .set_bit()
-                .inlink_dscr_error_int_clr()
-                .set_bit()
-                .in_done_int_clr()
-                .set_bit()
-                .in_err_eof_int_clr()
-                .set_bit()
-                .in_suc_eof_int_clr()
-                .set_bit()
-                .out_done_int_clr()
-                .set_bit()
-                .out_eof_int_clr()
-                .set_bit()
-                .out_total_eof_int_clr()
-                .set_bit()
+            w.inlink_dscr_empty()
+                .clear_bit_by_one()
+                .outlink_dscr_error()
+                .clear_bit_by_one()
+                .inlink_dscr_error()
+                .clear_bit_by_one()
+                .in_done()
+                .clear_bit_by_one()
+                .in_err_eof()
+                .clear_bit_by_one()
+                .in_suc_eof()
+                .clear_bit_by_one()
+                .out_done()
+                .clear_bit_by_one()
+                .out_eof()
+                .clear_bit_by_one()
+                .out_total_eof()
+                .clear_bit_by_one()
         });
     }
 }
@@ -2405,9 +2405,7 @@ pub trait Instance: crate::private::Sealed {
                     pre = 16;
                 }
 
-                errval = (apb_clk_freq.raw() as i32 / (pre * n)
-                    - frequency.raw() as i32)
-                    .abs();
+                errval = (apb_clk_freq.raw() as i32 / (pre * n) - frequency.raw() as i32).abs();
                 if bestn == -1 || errval <= besterr {
                     besterr = errval;
                     bestn = n;
@@ -2452,7 +2450,7 @@ pub trait Instance: crate::private::Sealed {
                 SpiInterrupt::TransDone => {
                     reg_block
                         .dma_int_ena()
-                        .modify(|_, w| w.trans_done_int_ena().set_bit());
+                        .modify(|_, w| w.trans_done().set_bit());
                 }
             }
         }
@@ -2468,7 +2466,7 @@ pub trait Instance: crate::private::Sealed {
                 SpiInterrupt::TransDone => {
                     reg_block
                         .dma_int_ena()
-                        .modify(|_, w| w.trans_done_int_ena().clear_bit());
+                        .modify(|_, w| w.trans_done().clear_bit());
                 }
             }
         }
@@ -2482,7 +2480,7 @@ pub trait Instance: crate::private::Sealed {
 
         let ints = reg_block.dma_int_st().read();
 
-        if ints.trans_done_int_st().bit() {
+        if ints.trans_done().bit() {
             res.insert(SpiInterrupt::TransDone);
         }
 
@@ -2499,7 +2497,7 @@ pub trait Instance: crate::private::Sealed {
                 SpiInterrupt::TransDone => {
                     reg_block
                         .dma_int_clr()
-                        .write(|w| w.trans_done_int_clr().set_bit());
+                        .write(|w| w.trans_done().clear_bit_by_one());
                 }
             }
         }

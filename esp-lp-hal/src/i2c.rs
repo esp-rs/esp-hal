@@ -457,23 +457,23 @@ impl LpI2c {
 
     fn wait_for_completion(&self) -> Result<(), Error> {
         loop {
-            let interrupts = self.i2c.int_status().read();
+            let interrupts = self.i2c.int_st().read();
 
             // Handle completion cases
             // A full transmission was completed
-            if interrupts.nack_int_st().bit_is_set() {
+            if interrupts.nack().bit_is_set() {
                 self.i2c
                     .int_clr()
                     .write(|w| unsafe { w.bits(I2C_LL_INTR_MASK) });
                 return Err(Error::InvalidResponse);
-            } else if interrupts.trans_complete_int_st().bit_is_set() {
+            } else if interrupts.trans_complete().bit_is_set() {
                 self.disable_interrupts();
 
                 self.i2c
                     .int_clr()
                     .write(|w| unsafe { w.bits(I2C_LL_INTR_MASK) });
                 break;
-            } else if interrupts.end_detect_int_st().bit_is_set() {
+            } else if interrupts.end_detect().bit_is_set() {
                 self.i2c
                     .int_clr()
                     .write(|w| unsafe { w.bits(I2C_LL_INTR_MASK) });
