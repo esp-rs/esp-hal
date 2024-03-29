@@ -172,14 +172,14 @@ impl<'d> UsbSerialJtagRx<'d> {
     pub fn listen_rx_packet_recv_interrupt(&mut self) {
         USB_DEVICE::register_block()
             .int_ena()
-            .modify(|_, w| w.serial_out_recv_pkt_int_ena().set_bit());
+            .modify(|_, w| w.serial_out_recv_pkt().set_bit());
     }
 
     /// Stop listening for RX-PACKET-RECV interrupts
     pub fn unlisten_rx_packet_recv_interrupt(&mut self) {
         USB_DEVICE::register_block()
             .int_ena()
-            .modify(|_, w| w.serial_out_recv_pkt_int_ena().clear_bit());
+            .modify(|_, w| w.serial_out_recv_pkt().clear_bit());
     }
 
     /// Checks if RX-PACKET-RECV interrupt is set
@@ -187,7 +187,7 @@ impl<'d> UsbSerialJtagRx<'d> {
         USB_DEVICE::register_block()
             .int_st()
             .read()
-            .serial_out_recv_pkt_int_st()
+            .serial_out_recv_pkt()
             .bit_is_set()
     }
 
@@ -195,7 +195,7 @@ impl<'d> UsbSerialJtagRx<'d> {
     pub fn reset_rx_packet_recv_interrupt(&mut self) {
         USB_DEVICE::register_block()
             .int_clr()
-            .write(|w| w.serial_out_recv_pkt_int_clr().set_bit())
+            .write(|w| w.serial_out_recv_pkt().clear_bit_by_one())
     }
 }
 
@@ -291,21 +291,21 @@ pub trait Instance: crate::private::Sealed {
     fn disable_tx_interrupts() {
         Self::register_block()
             .int_ena()
-            .write(|w| w.serial_in_empty_int_ena().clear_bit());
+            .write(|w| w.serial_in_empty().clear_bit());
 
         Self::register_block()
             .int_clr()
-            .write(|w| w.serial_in_empty_int_clr().set_bit())
+            .write(|w| w.serial_in_empty().clear_bit_by_one())
     }
 
     fn disable_rx_interrupts() {
         Self::register_block()
             .int_ena()
-            .write(|w| w.serial_out_recv_pkt_int_ena().clear_bit());
+            .write(|w| w.serial_out_recv_pkt().clear_bit());
 
         Self::register_block()
             .int_clr()
-            .write(|w| w.serial_out_recv_pkt_int_clr().set_bit())
+            .write(|w| w.serial_out_recv_pkt().clear_bit_by_one())
     }
 }
 
@@ -541,7 +541,7 @@ mod asynch {
             // interrupt
             USB_DEVICE::register_block()
                 .int_ena()
-                .modify(|_, w| w.serial_in_empty_int_ena().set_bit());
+                .modify(|_, w| w.serial_in_empty().set_bit());
 
             Self {
                 phantom: PhantomData,
@@ -552,7 +552,7 @@ mod asynch {
             USB_DEVICE::register_block()
                 .int_ena()
                 .read()
-                .serial_in_empty_int_ena()
+                .serial_in_empty()
                 .bit_is_clear()
         }
     }
@@ -583,7 +583,7 @@ mod asynch {
             // interrupt
             USB_DEVICE::register_block()
                 .int_ena()
-                .modify(|_, w| w.serial_out_recv_pkt_int_ena().set_bit());
+                .modify(|_, w| w.serial_out_recv_pkt().set_bit());
 
             Self {
                 phantom: PhantomData,
@@ -594,7 +594,7 @@ mod asynch {
             USB_DEVICE::register_block()
                 .int_ena()
                 .read()
-                .serial_out_recv_pkt_int_ena()
+                .serial_out_recv_pkt()
                 .bit_is_clear()
         }
     }
@@ -702,23 +702,21 @@ mod asynch {
         let usb = USB_DEVICE::register_block();
         let interrupts = usb.int_st().read();
 
-        let tx = interrupts.serial_in_empty_int_st().bit_is_set();
-        let rx = interrupts.serial_out_recv_pkt_int_st().bit_is_set();
+        let tx = interrupts.serial_in_empty().bit_is_set();
+        let rx = interrupts.serial_out_recv_pkt().bit_is_set();
 
         if tx {
-            usb.int_ena()
-                .write(|w| w.serial_in_empty_int_ena().clear_bit());
+            usb.int_ena().write(|w| w.serial_in_empty().clear_bit());
         }
         if rx {
-            usb.int_ena()
-                .write(|w| w.serial_out_recv_pkt_int_ena().clear_bit());
+            usb.int_ena().write(|w| w.serial_out_recv_pkt().clear_bit());
         }
 
         usb.int_clr().write(|w| {
-            w.serial_in_empty_int_clr()
-                .set_bit()
-                .serial_out_recv_pkt_int_clr()
-                .set_bit()
+            w.serial_in_empty()
+                .clear_bit_by_one()
+                .serial_out_recv_pkt()
+                .clear_bit_by_one()
         });
 
         if rx {

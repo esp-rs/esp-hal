@@ -700,12 +700,7 @@ impl Rwdt {
             .wdtconfig0()
             .modify(|_, w| unsafe { w.wdt_stg0().bits(self.stg0_action as u8) });
 
-        #[cfg(esp32)]
-        rtc_cntl.int_ena().modify(|_, w| w.wdt_int_ena().set_bit());
-        #[cfg(not(esp32))]
-        rtc_cntl
-            .int_ena_rtc()
-            .modify(|_, w| w.wdt_int_ena().set_bit());
+        rtc_cntl.int_ena().modify(|_, w| w.wdt().set_bit());
 
         self.set_write_protection(true);
     }
@@ -725,14 +720,7 @@ impl Rwdt {
             .wdtconfig0()
             .modify(|_, w| unsafe { w.wdt_stg0().bits(self.stg0_action as u8) });
 
-        #[cfg(esp32)]
-        rtc_cntl
-            .int_ena()
-            .modify(|_, w| w.wdt_int_ena().clear_bit());
-        #[cfg(not(esp32))]
-        rtc_cntl
-            .int_ena_rtc()
-            .modify(|_, w| w.wdt_int_ena().clear_bit());
+        rtc_cntl.int_ena().modify(|_, w| w.wdt().clear_bit());
 
         self.set_write_protection(true);
     }
@@ -745,10 +733,7 @@ impl Rwdt {
 
         self.set_write_protection(false);
 
-        #[cfg(esp32)]
-        rtc_cntl.int_clr().write(|w| w.wdt_int_clr().set_bit());
-        #[cfg(not(esp32))]
-        rtc_cntl.int_clr_rtc().write(|w| w.wdt_int_clr().set_bit());
+        rtc_cntl.int_clr().write(|w| w.wdt().clear_bit_by_one());
 
         self.set_write_protection(true);
     }
@@ -759,13 +744,7 @@ impl Rwdt {
         #[cfg(any(esp32c6, esp32h2))]
         let rtc_cntl = unsafe { &*LP_WDT::PTR };
 
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                rtc_cntl.int_st().read().wdt_int_st().bit_is_set()
-            } else {
-                rtc_cntl.int_st_rtc().read().wdt_int_st().bit_is_set()
-            }
-        }
+        rtc_cntl.int_st().read().wdt().bit_is_set()
     }
 
     pub fn feed(&mut self) {

@@ -288,7 +288,7 @@ impl RegisterAccess for crate::peripherals::ADC1 {
     fn is_done() -> bool {
         let sar_adc = unsafe { &*APB_SARADC::PTR };
 
-        sar_adc.int_raw().read().apb_saradc1_done_int_raw().bit()
+        sar_adc.int_raw().read().apb_saradc1_done().bit()
     }
 
     fn read_data() -> u16 {
@@ -303,7 +303,7 @@ impl RegisterAccess for crate::peripherals::ADC1 {
         // Clear ADC1 sampling done interrupt bit
         sar_adc
             .int_clr()
-            .write(|w| w.apb_saradc1_done_int_clr().set_bit());
+            .write(|w| w.apb_saradc1_done().clear_bit_by_one());
 
         // Disable ADC sampling
         sar_adc
@@ -399,7 +399,7 @@ impl RegisterAccess for crate::peripherals::ADC2 {
     fn is_done() -> bool {
         let sar_adc = unsafe { &*APB_SARADC::PTR };
 
-        sar_adc.int_raw().read().apb_saradc2_done_int_raw().bit()
+        sar_adc.int_raw().read().apb_saradc2_done().bit()
     }
 
     fn read_data() -> u16 {
@@ -413,7 +413,7 @@ impl RegisterAccess for crate::peripherals::ADC2 {
 
         sar_adc
             .int_clr()
-            .write(|w| w.apb_saradc2_done_int_clr().set_bit());
+            .write(|w| w.apb_saradc2_done().clear_bit_by_one());
 
         sar_adc
             .onetime_sample()

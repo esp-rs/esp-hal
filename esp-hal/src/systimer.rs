@@ -121,15 +121,9 @@ impl<T, const CHANNEL: u8> Alarm<T, CHANNEL> {
     pub fn enable_interrupt(&self, val: bool) {
         let systimer = unsafe { &*SYSTIMER::ptr() };
         match CHANNEL {
-            0 => systimer
-                .int_ena()
-                .modify(|_, w| w.target0_int_ena().bit(val)),
-            1 => systimer
-                .int_ena()
-                .modify(|_, w| w.target1_int_ena().bit(val)),
-            2 => systimer
-                .int_ena()
-                .modify(|_, w| w.target2_int_ena().bit(val)),
+            0 => systimer.int_ena().modify(|_, w| w.target0().bit(val)),
+            1 => systimer.int_ena().modify(|_, w| w.target1().bit(val)),
+            2 => systimer.int_ena().modify(|_, w| w.target2().bit(val)),
             _ => unreachable!(),
         }
     }
@@ -137,9 +131,9 @@ impl<T, const CHANNEL: u8> Alarm<T, CHANNEL> {
     pub fn clear_interrupt(&self) {
         let systimer = unsafe { &*SYSTIMER::ptr() };
         match CHANNEL {
-            0 => systimer.int_clr().write(|w| w.target0_int_clr().set_bit()),
-            1 => systimer.int_clr().write(|w| w.target1_int_clr().set_bit()),
-            2 => systimer.int_clr().write(|w| w.target2_int_clr().set_bit()),
+            0 => systimer.int_clr().write(|w| w.target0().clear_bit_by_one()),
+            1 => systimer.int_clr().write(|w| w.target1().clear_bit_by_one()),
+            2 => systimer.int_clr().write(|w| w.target2().clear_bit_by_one()),
             _ => unreachable!(),
         }
     }
@@ -335,9 +329,9 @@ mod asynch {
                 .read();
 
             match N {
-                0 => r.target0_int_ena().bit_is_clear(),
-                1 => r.target1_int_ena().bit_is_clear(),
-                2 => r.target2_int_ena().bit_is_clear(),
+                0 => r.target0().bit_is_clear(),
+                1 => r.target1().bit_is_clear(),
+                2 => r.target2().bit_is_clear(),
                 _ => unreachable!(),
             }
         }
@@ -376,7 +370,7 @@ mod asynch {
     fn SYSTIMER_TARGET0() {
         unsafe { &*crate::peripherals::SYSTIMER::PTR }
             .int_ena
-            .modify(|_, w| w.target0_int_ena().clear_bit());
+            .modify(|_, w| w.target0().clear_bit());
 
         WAKERS[0].wake();
     }
@@ -385,7 +379,7 @@ mod asynch {
     fn SYSTIMER_TARGET1() {
         unsafe { &*crate::peripherals::SYSTIMER::PTR }
             .int_ena
-            .modify(|_, w| w.target1_int_ena().clear_bit());
+            .modify(|_, w| w.target1().clear_bit());
 
         WAKERS[1].wake();
     }
@@ -394,7 +388,7 @@ mod asynch {
     fn SYSTIMER_TARGET2() {
         unsafe { &*crate::peripherals::SYSTIMER::PTR }
             .int_ena
-            .modify(|_, w| w.target2_int_ena().clear_bit());
+            .modify(|_, w| w.target2().clear_bit());
 
         WAKERS[2].wake();
     }
