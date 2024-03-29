@@ -77,13 +77,6 @@
 
 use core::marker::PhantomData;
 
-#[cfg(feature = "embedded-hal")]
-use embedded_can::{nb::Can, Error, ErrorKind, ExtendedId, Frame, Id, StandardId};
-#[cfg(not(feature = "embedded-hal"))] // FIXME
-use embedded_hal_02::can::{Can, Error, ErrorKind, ExtendedId, Frame, Id, StandardId};
-#[cfg(not(esp32c6))]
-use fugit::HertzU32;
-
 use self::filter::{Filter, FilterType};
 use crate::{
     clock::Clocks,
@@ -95,6 +88,312 @@ use crate::{
 
 pub mod filter;
 
+/// CAN error kind
+///
+/// This represents a common set of CAN operation errors. HAL implementations
+/// are free to define more specific or additional error types. However, by
+/// providing a mapping to these common CAN errors, generic code can still react
+/// to them.
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[non_exhaustive]
+pub enum ErrorKind {
+    /// The peripheral receive buffer was overrun.
+    Overrun,
+    // MAC sublayer errors
+    /// A bit error is detected at that bit time when the bit value that is
+    /// monitored differs from the bit value sent.
+    Bit,
+    /// A stuff error is detected at the bit time of the sixth consecutive
+    /// equal bit level in a frame field that shall be coded by the method
+    /// of bit stuffing.
+    Stuff,
+    /// Calculated CRC sequence does not equal the received one.
+    Crc,
+    /// A form error shall be detected when a fixed-form bit field contains
+    /// one or more illegal bits.
+    Form,
+    /// An ACK  error shall be detected by a transmitter whenever it does not
+    /// monitor a dominant bit during the ACK slot.
+    Acknowledge,
+    /// A different error occurred. The original error may contain more
+    /// information.
+    Other,
+}
+
+impl core::fmt::Display for ErrorKind {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Overrun => write!(f, "The peripheral receive buffer was overrun"),
+            Self::Bit => write!(
+                f,
+                "Bit value that is monitored differs from the bit value sent"
+            ),
+            Self::Stuff => write!(f, "Sixth consecutive equal bits detected"),
+            Self::Crc => write!(f, "Calculated CRC sequence does not equal the received one"),
+            Self::Form => write!(
+                f,
+                "A fixed-form bit field contains one or more illegal bits"
+            ),
+            Self::Acknowledge => write!(f, "Transmitted frame was not acknowledged"),
+            Self::Other => write!(
+                f,
+                "A different error occurred. The original error may contain more information"
+            ),
+        }
+    }
+}
+
+#[cfg(feature = "embedded-hal-02")]
+impl From<ErrorKind> for embedded_hal_02::can::ErrorKind {
+    fn from(value: ErrorKind) -> Self {
+        match value {
+            ErrorKind::Overrun => embedded_hal_02::can::ErrorKind::Overrun,
+            ErrorKind::Bit => embedded_hal_02::can::ErrorKind::Bit,
+            ErrorKind::Stuff => embedded_hal_02::can::ErrorKind::Stuff,
+            ErrorKind::Crc => embedded_hal_02::can::ErrorKind::Crc,
+            ErrorKind::Form => embedded_hal_02::can::ErrorKind::Form,
+            ErrorKind::Acknowledge => embedded_hal_02::can::ErrorKind::Acknowledge,
+            ErrorKind::Other => embedded_hal_02::can::ErrorKind::Other,
+        }
+    }
+}
+
+#[cfg(feature = "embedded-hal-02")]
+impl embedded_hal_02::can::Error for ErrorKind {
+    fn kind(&self) -> embedded_hal_02::can::ErrorKind {
+        (*self).into()
+    }
+}
+
+#[cfg(feature = "embedded-hal")]
+impl From<ErrorKind> for embedded_can::ErrorKind {
+    fn from(value: ErrorKind) -> Self {
+        match value {
+            ErrorKind::Overrun => embedded_can::ErrorKind::Overrun,
+            ErrorKind::Bit => embedded_can::ErrorKind::Bit,
+            ErrorKind::Stuff => embedded_can::ErrorKind::Stuff,
+            ErrorKind::Crc => embedded_can::ErrorKind::Crc,
+            ErrorKind::Form => embedded_can::ErrorKind::Form,
+            ErrorKind::Acknowledge => embedded_can::ErrorKind::Acknowledge,
+            ErrorKind::Other => embedded_can::ErrorKind::Other,
+        }
+    }
+}
+
+#[cfg(feature = "embedded-hal")]
+impl embedded_can::Error for ErrorKind {
+    fn kind(&self) -> embedded_can::ErrorKind {
+        (*self).into()
+    }
+}
+
+/// Standard 11-bit CAN Identifier (`0..=0x7FF`).
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct StandardId(u16);
+
+impl StandardId {
+    /// CAN ID `0`, the highest priority.
+    pub const ZERO: Self = StandardId(0);
+
+    /// CAN ID `0x7FF`, the lowest priority.
+    pub const MAX: Self = StandardId(0x7FF);
+
+    /// Tries to create a `StandardId` from a raw 16-bit integer.
+    ///
+    /// This will return `None` if `raw` is out of range of an 11-bit integer
+    /// (`> 0x7FF`).
+    #[inline]
+    pub fn new(raw: u16) -> Option<Self> {
+        if raw <= 0x7FF {
+            Some(StandardId(raw))
+        } else {
+            None
+        }
+    }
+
+    /// Creates a new `StandardId` without checking if it is inside the valid
+    /// range.
+    ///
+    /// # Safety
+    /// Using this method can create an invalid ID and is thus marked as unsafe.
+    #[inline]
+    pub const unsafe fn new_unchecked(raw: u16) -> Self {
+        StandardId(raw)
+    }
+
+    /// Returns this CAN Identifier as a raw 16-bit integer.
+    #[inline]
+    pub fn as_raw(&self) -> u16 {
+        self.0
+    }
+}
+
+#[cfg(feature = "embedded-hal-02")]
+impl From<StandardId> for embedded_hal_02::can::StandardId {
+    fn from(value: StandardId) -> Self {
+        embedded_hal_02::can::StandardId::new(value.as_raw()).unwrap()
+    }
+}
+
+#[cfg(feature = "embedded-hal-02")]
+impl From<embedded_hal_02::can::StandardId> for StandardId {
+    fn from(value: embedded_hal_02::can::StandardId) -> Self {
+        StandardId::new(value.as_raw()).unwrap()
+    }
+}
+
+#[cfg(feature = "embedded-hal")]
+impl From<StandardId> for embedded_can::StandardId {
+    fn from(value: StandardId) -> Self {
+        embedded_can::StandardId::new(value.as_raw()).unwrap()
+    }
+}
+
+#[cfg(feature = "embedded-hal")]
+impl From<embedded_can::StandardId> for StandardId {
+    fn from(value: embedded_can::StandardId) -> Self {
+        StandardId::new(value.as_raw()).unwrap()
+    }
+}
+
+/// Extended 29-bit CAN Identifier (`0..=1FFF_FFFF`).
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct ExtendedId(u32);
+
+impl ExtendedId {
+    /// CAN ID `0`, the highest priority.
+    pub const ZERO: Self = ExtendedId(0);
+
+    /// CAN ID `0x1FFFFFFF`, the lowest priority.
+    pub const MAX: Self = ExtendedId(0x1FFF_FFFF);
+
+    /// Tries to create a `ExtendedId` from a raw 32-bit integer.
+    ///
+    /// This will return `None` if `raw` is out of range of an 29-bit integer
+    /// (`> 0x1FFF_FFFF`).
+    #[inline]
+    pub fn new(raw: u32) -> Option<Self> {
+        if raw <= 0x1FFF_FFFF {
+            Some(ExtendedId(raw))
+        } else {
+            None
+        }
+    }
+
+    /// Creates a new `ExtendedId` without checking if it is inside the valid
+    /// range.
+    ///
+    /// # Safety
+    /// Using this method can create an invalid ID and is thus marked as unsafe.
+    #[inline]
+    pub const unsafe fn new_unchecked(raw: u32) -> Self {
+        ExtendedId(raw)
+    }
+
+    /// Returns this CAN Identifier as a raw 32-bit integer.
+    #[inline]
+    pub fn as_raw(&self) -> u32 {
+        self.0
+    }
+
+    /// Returns the Base ID part of this extended identifier.
+    pub fn standard_id(&self) -> StandardId {
+        // ID-28 to ID-18
+        StandardId((self.0 >> 18) as u16)
+    }
+}
+
+#[cfg(feature = "embedded-hal-02")]
+impl From<ExtendedId> for embedded_hal_02::can::ExtendedId {
+    fn from(value: ExtendedId) -> Self {
+        embedded_hal_02::can::ExtendedId::new(value.0).unwrap()
+    }
+}
+
+#[cfg(feature = "embedded-hal-02")]
+impl From<embedded_hal_02::can::ExtendedId> for ExtendedId {
+    fn from(value: embedded_hal_02::can::ExtendedId) -> Self {
+        ExtendedId::new(value.as_raw()).unwrap()
+    }
+}
+
+#[cfg(feature = "embedded-hal")]
+impl From<ExtendedId> for embedded_can::ExtendedId {
+    fn from(value: ExtendedId) -> Self {
+        embedded_can::ExtendedId::new(value.0).unwrap()
+    }
+}
+
+#[cfg(feature = "embedded-hal")]
+impl From<embedded_can::ExtendedId> for ExtendedId {
+    fn from(value: embedded_can::ExtendedId) -> Self {
+        ExtendedId::new(value.as_raw()).unwrap()
+    }
+}
+
+/// A CAN Identifier (standard or extended).
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum Id {
+    /// Standard 11-bit Identifier (`0..=0x7FF`).
+    Standard(StandardId),
+    /// Extended 29-bit Identifier (`0..=0x1FFF_FFFF`).
+    Extended(ExtendedId),
+}
+
+impl From<StandardId> for Id {
+    #[inline]
+    fn from(id: StandardId) -> Self {
+        Id::Standard(id)
+    }
+}
+
+impl From<ExtendedId> for Id {
+    #[inline]
+    fn from(id: ExtendedId) -> Self {
+        Id::Extended(id)
+    }
+}
+
+#[cfg(feature = "embedded-hal-02")]
+impl From<Id> for embedded_hal_02::can::Id {
+    fn from(value: Id) -> Self {
+        match value {
+            Id::Standard(id) => embedded_hal_02::can::Id::Standard(id.into()),
+            Id::Extended(id) => embedded_hal_02::can::Id::Extended(id.into()),
+        }
+    }
+}
+
+#[cfg(feature = "embedded-hal-02")]
+impl From<embedded_hal_02::can::Id> for Id {
+    fn from(value: embedded_hal_02::can::Id) -> Self {
+        match value {
+            embedded_hal_02::can::Id::Standard(id) => Id::Standard(id.into()),
+            embedded_hal_02::can::Id::Extended(id) => Id::Extended(id.into()),
+        }
+    }
+}
+
+#[cfg(feature = "embedded-hal")]
+impl From<Id> for embedded_can::Id {
+    fn from(value: Id) -> Self {
+        match value {
+            Id::Standard(id) => embedded_can::Id::Standard(id.into()),
+            Id::Extended(id) => embedded_can::Id::Extended(id.into()),
+        }
+    }
+}
+
+#[cfg(feature = "embedded-hal")]
+impl From<embedded_can::Id> for Id {
+    fn from(value: embedded_can::Id) -> Self {
+        match value {
+            embedded_can::Id::Standard(id) => Id::Standard(id.into()),
+            embedded_can::Id::Extended(id) => Id::Extended(id.into()),
+        }
+    }
+}
+
 /// Structure backing the embedded_hal_02::can::Frame/embedded_can::Frame trait.
 #[derive(Clone, Copy, Debug)]
 pub struct EspTwaiFrame {
@@ -105,6 +404,38 @@ pub struct EspTwaiFrame {
 }
 
 impl EspTwaiFrame {
+    pub fn new(id: Id, data: &[u8]) -> Option<Self> {
+        // CAN2.0 frames cannot contain more than 8 bytes of data.
+        if data.len() > 8 {
+            return None;
+        }
+
+        let mut d: [u8; 8] = [0; 8];
+        let (left, _unused) = d.split_at_mut(data.len());
+        left.clone_from_slice(data);
+
+        Some(EspTwaiFrame {
+            id,
+            data: d,
+            dlc: data.len(),
+            is_remote: false,
+        })
+    }
+
+    pub fn new_remote(id: Id, dlc: usize) -> Option<Self> {
+        // CAN2.0 frames cannot have more than 8 bytes.
+        if dlc > 8 {
+            return None;
+        }
+
+        Some(EspTwaiFrame {
+            id,
+            data: [0; 8],
+            dlc,
+            is_remote: true,
+        })
+    }
+
     /// Make a new frame from an id, pointer to the TWAI_DATA_x_REG registers,
     /// and the length of the data payload (dlc).
     ///
@@ -129,36 +460,16 @@ impl EspTwaiFrame {
     }
 }
 
-impl Frame for EspTwaiFrame {
-    fn new(id: impl Into<Id>, data: &[u8]) -> Option<Self> {
-        // CAN2.0 frames cannot contain more than 8 bytes of data.
-        if data.len() > 8 {
-            return None;
-        }
-
-        let mut d: [u8; 8] = [0; 8];
-        let (left, _unused) = d.split_at_mut(data.len());
-        left.clone_from_slice(data);
-
-        Some(EspTwaiFrame {
-            id: id.into(),
-            data: d,
-            dlc: data.len(),
-            is_remote: false,
-        })
+#[cfg(feature = "embedded-hal-02")]
+impl embedded_hal_02::can::Frame for EspTwaiFrame {
+    fn new(id: impl Into<embedded_hal_02::can::Id>, data: &[u8]) -> Option<Self> {
+        let id: embedded_hal_02::can::Id = id.into();
+        Self::new(id.into(), data)
     }
 
-    fn new_remote(id: impl Into<Id>, dlc: usize) -> Option<Self> {
-        // CAN2.0 frames cannot have more than 8 bytes.
-        if dlc > 8 {
-            return None;
-        }
-        Some(EspTwaiFrame {
-            id: id.into(),
-            data: [0; 8],
-            dlc,
-            is_remote: true,
-        })
+    fn new_remote(id: impl Into<embedded_hal_02::can::Id>, dlc: usize) -> Option<Self> {
+        let id: embedded_hal_02::can::Id = id.into();
+        Self::new_remote(id.into(), dlc)
     }
 
     fn is_extended(&self) -> bool {
@@ -172,8 +483,8 @@ impl Frame for EspTwaiFrame {
         self.is_remote
     }
 
-    fn id(&self) -> Id {
-        self.id
+    fn id(&self) -> embedded_hal_02::can::Id {
+        self.id.into()
     }
 
     fn dlc(&self) -> usize {
@@ -183,7 +494,48 @@ impl Frame for EspTwaiFrame {
     fn data(&self) -> &[u8] {
         // Remote frames do not contain data, yet have a value for the dlc so return
         // an empty slice for remote frames.
-        match self.is_remote_frame() {
+        match self.is_remote {
+            true => &[],
+            false => &self.data[0..self.dlc],
+        }
+    }
+}
+
+#[cfg(feature = "embedded-hal")]
+impl embedded_can::Frame for EspTwaiFrame {
+    fn new(id: impl Into<embedded_can::Id>, data: &[u8]) -> Option<Self> {
+        let id: embedded_can::Id = id.into();
+        Self::new(id.into(), data)
+    }
+
+    fn new_remote(id: impl Into<embedded_can::Id>, dlc: usize) -> Option<Self> {
+        let id: embedded_can::Id = id.into();
+        Self::new_remote(id.into(), dlc)
+    }
+
+    fn is_extended(&self) -> bool {
+        match self.id {
+            Id::Standard(_) => false,
+            Id::Extended(_) => true,
+        }
+    }
+
+    fn is_remote_frame(&self) -> bool {
+        self.is_remote
+    }
+
+    fn id(&self) -> embedded_can::Id {
+        self.id.into()
+    }
+
+    fn dlc(&self) -> usize {
+        self.dlc
+    }
+
+    fn data(&self) -> &[u8] {
+        // Remote frames do not contain data, yet have a value for the dlc so return
+        // an empty slice for remote frames.
+        match self.is_remote {
             true => &[],
             false => &self.data[0..self.dlc],
         }
@@ -314,7 +666,7 @@ where
         // TWAI is clocked from the APB_CLK according to Table 6-4 [ESP32C3 Reference Manual](https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf)
         // Included timings are all for 80MHz so assert that we are running at 80MHz.
         #[cfg(not(esp32c6))]
-        assert!(_clocks.apb_clock == HertzU32::MHz(80));
+        assert!(_clocks.apb_clock == fugit::HertzU32::MHz(80));
 
         // Unpack the baud rate timings and convert them to the values needed for the
         // register. Many of the registers have a minimum value of 1 which is
@@ -577,11 +929,22 @@ pub enum EspTwaiError {
     EmbeddedHAL(ErrorKind),
 }
 
-impl Error for EspTwaiError {
-    fn kind(&self) -> ErrorKind {
+#[cfg(feature = "embedded-hal-02")]
+impl embedded_hal_02::can::Error for EspTwaiError {
+    fn kind(&self) -> embedded_hal_02::can::ErrorKind {
         match self {
-            Self::BusOff => ErrorKind::Other,
-            Self::EmbeddedHAL(kind) => *kind,
+            Self::BusOff => embedded_hal_02::can::ErrorKind::Other,
+            Self::EmbeddedHAL(kind) => (*kind).into(),
+        }
+    }
+}
+
+#[cfg(feature = "embedded-hal")]
+impl embedded_can::Error for EspTwaiError {
+    fn kind(&self) -> embedded_can::ErrorKind {
+        match self {
+            Self::BusOff => embedded_can::ErrorKind::Other,
+            Self::EmbeddedHAL(kind) => (*kind).into(),
         }
     }
 }
@@ -618,7 +981,32 @@ unsafe fn copy_to_data_register(dest: *mut u32, src: &[u8]) {
     }
 }
 
-impl<'d, T> Can for Twai<'d, T>
+#[cfg(feature = "embedded-hal-02")]
+impl<'d, T> embedded_hal_02::can::Can for Twai<'d, T>
+where
+    T: OperationInstance,
+{
+    type Frame = EspTwaiFrame;
+    type Error = EspTwaiError;
+
+    /// Transmit a frame.
+    fn transmit(&mut self, frame: &Self::Frame) -> nb::Result<Option<Self::Frame>, Self::Error> {
+        self.tx.transmit(frame)?;
+
+        // Success in readying packet for transmit. No packets can be replaced in the
+        // transmit buffer so return None in accordance with the
+        // embedded-can/embedded-hal trait.
+        nb::Result::Ok(None)
+    }
+
+    /// Return a received frame if there are any available.
+    fn receive(&mut self) -> nb::Result<Self::Frame, Self::Error> {
+        self.rx.receive()
+    }
+}
+
+#[cfg(feature = "embedded-hal")]
+impl<'d, T> embedded_can::nb::Can for Twai<'d, T>
 where
     T: OperationInstance,
 {
@@ -673,9 +1061,9 @@ pub trait OperationInstance: Instance {
     /// Write a frame to the peripheral.
     fn write_frame(frame: &EspTwaiFrame) {
         // Assemble the frame information into the data_0 byte.
-        let frame_format: u8 = frame.is_extended() as u8;
-        let rtr_bit: u8 = frame.is_remote_frame() as u8;
-        let dlc_bits: u8 = frame.dlc() as u8 & 0b1111;
+        let frame_format: u8 = matches!(frame.id, Id::Extended(_)) as u8;
+        let rtr_bit: u8 = frame.is_remote as u8;
+        let dlc_bits: u8 = frame.dlc as u8 & 0b1111;
 
         let data_0: u8 = frame_format << 7 | rtr_bit << 6 | dlc_bits;
 
@@ -686,7 +1074,7 @@ pub trait OperationInstance: Instance {
             .write(|w| w.tx_byte_0().variant(data_0));
 
         // Assemble the identifier information of the packet.
-        match frame.id() {
+        match frame.id {
             Id::Standard(id) => {
                 let id = id.as_raw();
 
@@ -717,13 +1105,25 @@ pub trait OperationInstance: Instance {
         }
 
         // Store the data portion of the packet into the transmit buffer.
-        if frame.is_data_frame() {
-            match frame.id() {
+        if !frame.is_remote {
+            match frame.id {
                 Id::Standard(_) => unsafe {
-                    copy_to_data_register(register_block.data_3().as_ptr(), frame.data())
+                    copy_to_data_register(
+                        register_block.data_3().as_ptr(),
+                        match frame.is_remote {
+                            true => &[],
+                            false => &frame.data[0..frame.dlc],
+                        },
+                    )
                 },
                 Id::Extended(_) => unsafe {
-                    copy_to_data_register(register_block.data_5().as_ptr(), frame.data())
+                    copy_to_data_register(
+                        register_block.data_5().as_ptr(),
+                        match frame.is_remote {
+                            true => &[],
+                            false => &frame.data[0..frame.dlc],
+                        },
+                    )
                 },
             }
         } else {
@@ -764,7 +1164,7 @@ pub trait OperationInstance: Instance {
                     EspTwaiFrame::new_from_data_registers(id, register_block.data_3().as_ptr(), dlc)
                 }
             } else {
-                EspTwaiFrame::new_remote(id, dlc).unwrap()
+                EspTwaiFrame::new_remote(id.into(), dlc).unwrap()
             }
         } else {
             // Frame uses extended 29 bit id.
@@ -788,7 +1188,7 @@ pub trait OperationInstance: Instance {
                     EspTwaiFrame::new_from_data_registers(id, register_block.data_5().as_ptr(), dlc)
                 }
             } else {
-                EspTwaiFrame::new_remote(id, dlc).unwrap()
+                EspTwaiFrame::new_remote(id.into(), dlc).unwrap()
             }
         };
 
@@ -800,7 +1200,7 @@ pub trait OperationInstance: Instance {
     }
 }
 
-#[cfg(any(esp32c3, esp32, esp32s2, esp32s3))]
+#[cfg(any(esp32, esp32c3, esp32s2, esp32s3))]
 impl Instance for crate::peripherals::TWAI0 {
     const SYSTEM_PERIPHERAL: system::Peripheral = system::Peripheral::Twai0;
     const NUMBER: usize = 0;
@@ -834,7 +1234,7 @@ impl Instance for crate::peripherals::TWAI0 {
     }
 }
 
-#[cfg(any(esp32c3, esp32, esp32s2, esp32s3))]
+#[cfg(any(esp32, esp32c3, esp32s2, esp32s3))]
 impl OperationInstance for crate::peripherals::TWAI0 {}
 
 #[cfg(esp32c6)]

@@ -631,7 +631,18 @@ where
         if GPIONUM == 18 || GPIONUM == 19 {
             unsafe { &*crate::peripherals::USB_DEVICE::PTR }
                 .conf0()
-                .modify(|_, w| w.usb_pad_enable().clear_bit());
+                .modify(|_, w| {
+                    w.usb_pad_enable()
+                        .clear_bit()
+                        .dm_pullup()
+                        .clear_bit()
+                        .dm_pulldown()
+                        .clear_bit()
+                        .dp_pullup()
+                        .clear_bit()
+                        .dp_pulldown()
+                        .clear_bit()
+                });
         }
 
         // Same workaround as above for ESP32-S3
@@ -639,7 +650,18 @@ where
         if GPIONUM == 19 || GPIONUM == 20 {
             unsafe { &*crate::peripherals::USB_DEVICE::PTR }
                 .conf0()
-                .modify(|_, w| w.usb_pad_enable().clear_bit());
+                .modify(|_, w| {
+                    w.usb_pad_enable()
+                        .clear_bit()
+                        .dm_pullup()
+                        .clear_bit()
+                        .dm_pulldown()
+                        .clear_bit()
+                        .dp_pullup()
+                        .clear_bit()
+                        .dp_pulldown()
+                        .clear_bit()
+                });
         }
 
         get_io_mux_reg(GPIONUM).modify(|_, w| unsafe {

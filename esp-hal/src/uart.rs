@@ -711,42 +711,42 @@ where
     pub fn listen_at_cmd(&mut self) {
         T::register_block()
             .int_ena()
-            .modify(|_, w| w.at_cmd_char_det_int_ena().set_bit());
+            .modify(|_, w| w.at_cmd_char_det().set_bit());
     }
 
     /// Stop listening for AT-CMD interrupts
     pub fn unlisten_at_cmd(&mut self) {
         T::register_block()
             .int_ena()
-            .modify(|_, w| w.at_cmd_char_det_int_ena().clear_bit());
+            .modify(|_, w| w.at_cmd_char_det().clear_bit());
     }
 
     /// Listen for TX-DONE interrupts
     pub fn listen_tx_done(&mut self) {
         T::register_block()
             .int_ena()
-            .modify(|_, w| w.tx_done_int_ena().set_bit());
+            .modify(|_, w| w.tx_done().set_bit());
     }
 
     /// Stop listening for TX-DONE interrupts
     pub fn unlisten_tx_done(&mut self) {
         T::register_block()
             .int_ena()
-            .modify(|_, w| w.tx_done_int_ena().clear_bit());
+            .modify(|_, w| w.tx_done().clear_bit());
     }
 
     /// Listen for RX-FIFO-FULL interrupts
     pub fn listen_rx_fifo_full(&mut self) {
         T::register_block()
             .int_ena()
-            .modify(|_, w| w.rxfifo_full_int_ena().set_bit());
+            .modify(|_, w| w.rxfifo_full().set_bit());
     }
 
     /// Stop listening for RX-FIFO-FULL interrupts
     pub fn unlisten_rx_fifo_full(&mut self) {
         T::register_block()
             .int_ena()
-            .modify(|_, w| w.rxfifo_full_int_ena().clear_bit());
+            .modify(|_, w| w.rxfifo_full().clear_bit());
     }
 
     /// Checks if AT-CMD interrupt is set
@@ -754,17 +754,13 @@ where
         T::register_block()
             .int_raw()
             .read()
-            .at_cmd_char_det_int_raw()
+            .at_cmd_char_det()
             .bit_is_set()
     }
 
     /// Checks if TX-DONE interrupt is set
     pub fn tx_done_interrupt_set(&self) -> bool {
-        T::register_block()
-            .int_raw()
-            .read()
-            .tx_done_int_raw()
-            .bit_is_set()
+        T::register_block().int_raw().read().tx_done().bit_is_set()
     }
 
     /// Checks if RX-FIFO-FULL interrupt is set
@@ -772,7 +768,7 @@ where
         T::register_block()
             .int_raw()
             .read()
-            .rxfifo_full_int_raw()
+            .rxfifo_full()
             .bit_is_set()
     }
 
@@ -780,21 +776,21 @@ where
     pub fn reset_at_cmd_interrupt(&self) {
         T::register_block()
             .int_clr()
-            .write(|w| w.at_cmd_char_det_int_clr().set_bit());
+            .write(|w| w.at_cmd_char_det().clear_bit_by_one());
     }
 
     /// Reset TX-DONE interrupt
     pub fn reset_tx_done_interrupt(&self) {
         T::register_block()
             .int_clr()
-            .write(|w| w.tx_done_int_clr().set_bit());
+            .write(|w| w.tx_done().clear_bit_by_one());
     }
 
     /// Reset RX-FIFO-FULL interrupt
     pub fn reset_rx_fifo_full_interrupt(&self) {
         T::register_block()
             .int_clr()
-            .write(|w| w.rxfifo_full_int_clr().set_bit());
+            .write(|w| w.rxfifo_full().clear_bit_by_one());
     }
 
     /// Write a byte out over the UART
@@ -1096,48 +1092,48 @@ pub trait Instance: crate::private::Sealed {
 
     fn disable_tx_interrupts() {
         Self::register_block().int_clr().write(|w| {
-            w.txfifo_empty_int_clr()
-                .set_bit()
-                .tx_brk_done_int_clr()
-                .set_bit()
-                .tx_brk_idle_done_int_clr()
-                .set_bit()
-                .tx_done_int_clr()
-                .set_bit()
+            w.txfifo_empty()
+                .clear_bit_by_one()
+                .tx_brk_done()
+                .clear_bit_by_one()
+                .tx_brk_idle_done()
+                .clear_bit_by_one()
+                .tx_done()
+                .clear_bit_by_one()
         });
 
         Self::register_block().int_ena().write(|w| {
-            w.txfifo_empty_int_ena()
+            w.txfifo_empty()
                 .clear_bit()
-                .tx_brk_done_int_ena()
+                .tx_brk_done()
                 .clear_bit()
-                .tx_brk_idle_done_int_ena()
+                .tx_brk_idle_done()
                 .clear_bit()
-                .tx_done_int_ena()
+                .tx_done()
                 .clear_bit()
         });
     }
 
     fn disable_rx_interrupts() {
         Self::register_block().int_clr().write(|w| {
-            w.rxfifo_full_int_clr()
-                .set_bit()
-                .rxfifo_ovf_int_clr()
-                .set_bit()
-                .rxfifo_tout_int_clr()
-                .set_bit()
-                .at_cmd_char_det_int_clr()
-                .set_bit()
+            w.rxfifo_full()
+                .clear_bit_by_one()
+                .rxfifo_ovf()
+                .clear_bit_by_one()
+                .rxfifo_tout()
+                .clear_bit_by_one()
+                .at_cmd_char_det()
+                .clear_bit_by_one()
         });
 
         Self::register_block().int_ena().write(|w| {
-            w.rxfifo_full_int_ena()
+            w.rxfifo_full()
                 .clear_bit()
-                .rxfifo_ovf_int_ena()
+                .rxfifo_ovf()
                 .clear_bit()
-                .rxfifo_tout_int_ena()
+                .rxfifo_tout()
                 .clear_bit()
-                .at_cmd_char_det_int_ena()
+                .at_cmd_char_det()
                 .clear_bit()
         });
     }
@@ -1615,13 +1611,13 @@ mod asynch {
             let mut event_triggered = false;
             for event in self.events {
                 event_triggered |= match event {
-                    RxEvent::RxFifoFull => interrupts_enabled.rxfifo_full_int_ena().bit_is_clear(),
+                    RxEvent::RxFifoFull => interrupts_enabled.rxfifo_full().bit_is_clear(),
                     RxEvent::RxCmdCharDetected => {
-                        interrupts_enabled.at_cmd_char_det_int_ena().bit_is_clear()
+                        interrupts_enabled.at_cmd_char_det().bit_is_clear()
                     }
 
-                    RxEvent::RxFifoOvf => interrupts_enabled.rxfifo_ovf_int_ena().bit_is_clear(),
-                    RxEvent::RxFifoTout => interrupts_enabled.rxfifo_tout_int_ena().bit_is_clear(),
+                    RxEvent::RxFifoOvf => interrupts_enabled.rxfifo_ovf().bit_is_clear(),
+                    RxEvent::RxFifoTout => interrupts_enabled.rxfifo_tout().bit_is_clear(),
                 }
             }
             event_triggered
@@ -1640,10 +1636,10 @@ mod asynch {
                 T::register_block().int_ena().modify(|_, w| {
                     for event in self.events {
                         match event {
-                            RxEvent::RxFifoFull => w.rxfifo_full_int_ena().set_bit(),
-                            RxEvent::RxCmdCharDetected => w.at_cmd_char_det_int_ena().set_bit(),
-                            RxEvent::RxFifoOvf => w.rxfifo_ovf_int_ena().set_bit(),
-                            RxEvent::RxFifoTout => w.rxfifo_tout_int_ena().set_bit(),
+                            RxEvent::RxFifoFull => w.rxfifo_full().set_bit(),
+                            RxEvent::RxCmdCharDetected => w.at_cmd_char_det().set_bit(),
+                            RxEvent::RxFifoOvf => w.rxfifo_ovf().set_bit(),
+                            RxEvent::RxFifoTout => w.rxfifo_tout().set_bit(),
                         };
                     }
                     w
@@ -1666,16 +1662,12 @@ mod asynch {
             let int_ena = &T::register_block().int_ena();
             for event in self.events {
                 match event {
-                    RxEvent::RxFifoFull => {
-                        int_ena.modify(|_, w| w.rxfifo_full_int_ena().clear_bit())
-                    }
+                    RxEvent::RxFifoFull => int_ena.modify(|_, w| w.rxfifo_full().clear_bit()),
                     RxEvent::RxCmdCharDetected => {
-                        int_ena.modify(|_, w| w.at_cmd_char_det_int_ena().clear_bit())
+                        int_ena.modify(|_, w| w.at_cmd_char_det().clear_bit())
                     }
-                    RxEvent::RxFifoOvf => int_ena.modify(|_, w| w.rxfifo_ovf_int_ena().clear_bit()),
-                    RxEvent::RxFifoTout => {
-                        int_ena.modify(|_, w| w.rxfifo_tout_int_ena().clear_bit())
-                    }
+                    RxEvent::RxFifoOvf => int_ena.modify(|_, w| w.rxfifo_ovf().clear_bit()),
+                    RxEvent::RxFifoTout => int_ena.modify(|_, w| w.rxfifo_tout().clear_bit()),
                 }
             }
         }
@@ -1695,10 +1687,8 @@ mod asynch {
             let mut event_triggered = false;
             for event in self.events {
                 event_triggered |= match event {
-                    TxEvent::TxDone => interrupts_enabled.tx_done_int_ena().bit_is_clear(),
-                    TxEvent::TxFiFoEmpty => {
-                        interrupts_enabled.txfifo_empty_int_ena().bit_is_clear()
-                    }
+                    TxEvent::TxDone => interrupts_enabled.tx_done().bit_is_clear(),
+                    TxEvent::TxFiFoEmpty => interrupts_enabled.txfifo_empty().bit_is_clear(),
                 }
             }
             event_triggered
@@ -1717,8 +1707,8 @@ mod asynch {
                 T::register_block().int_ena().modify(|_, w| {
                     for event in self.events {
                         match event {
-                            TxEvent::TxDone => w.tx_done_int_ena().set_bit(),
-                            TxEvent::TxFiFoEmpty => w.txfifo_empty_int_ena().set_bit(),
+                            TxEvent::TxDone => w.tx_done().set_bit(),
+                            TxEvent::TxFiFoEmpty => w.txfifo_empty().set_bit(),
                         };
                     }
                     w
@@ -1742,10 +1732,8 @@ mod asynch {
             let int_ena = &T::register_block().int_ena();
             for event in self.events {
                 match event {
-                    TxEvent::TxDone => int_ena.modify(|_, w| w.tx_done_int_ena().clear_bit()),
-                    TxEvent::TxFiFoEmpty => {
-                        int_ena.modify(|_, w| w.txfifo_empty_int_ena().clear_bit())
-                    }
+                    TxEvent::TxDone => int_ena.modify(|_, w| w.tx_done().clear_bit()),
+                    TxEvent::TxFiFoEmpty => int_ena.modify(|_, w| w.txfifo_empty().clear_bit()),
                 }
             }
         }
@@ -1900,7 +1888,7 @@ mod asynch {
                     // reset the counter here, after draining the fifo.
                     T::register_block()
                         .int_clr()
-                        .write(|w| w.rxfifo_tout_int_clr().set_bit());
+                        .write(|w| w.rxfifo_tout().clear_bit_by_one());
 
                     return Ok(read_bytes);
                 }
@@ -1968,12 +1956,11 @@ mod asynch {
         if interrupt_bits == 0 {
             return (false, false);
         }
-        let rx_wake = interrupts.rxfifo_full_int_st().bit_is_set()
-            || interrupts.rxfifo_ovf_int_st().bit_is_set()
-            || interrupts.rxfifo_tout_int_st().bit_is_set()
-            || interrupts.at_cmd_char_det_int_st().bit_is_set();
-        let tx_wake = interrupts.tx_done_int_st().bit_is_set()
-            || interrupts.txfifo_empty_int_st().bit_is_set();
+        let rx_wake = interrupts.rxfifo_full().bit_is_set()
+            || interrupts.rxfifo_ovf().bit_is_set()
+            || interrupts.rxfifo_tout().bit_is_set()
+            || interrupts.at_cmd_char_det().bit_is_set();
+        let tx_wake = interrupts.tx_done().bit_is_set() || interrupts.txfifo_empty().bit_is_set();
         uart.int_clr().write(|w| unsafe { w.bits(interrupt_bits) });
         uart.int_ena()
             .modify(|r, w| unsafe { w.bits(r.bits() & !interrupt_bits) });

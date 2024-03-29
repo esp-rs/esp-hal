@@ -8,8 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Add `ADC::read_blocking` to xtensa chips (#1293)
 
+- Add `ADC::read_blocking` to xtensa chips (#1293)
 - ESP32-C6 / ESP32-H2: Implement `ETM` for general purpose timers (#1274)
 - `interrupt::enable` now has a direct CPU enable counter part, `interrupt::enable_direct` (#1310)
 - `Delay::delay(time: fugit::MicrosDurationU64)`
@@ -25,7 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32 & ESP32-S2: Fix I²C frequency (#1306)
 - UART's TX/RX FIFOs are now cleared during initialization (#1344)
 - Fixed `LCD_CAM I8080` driver potentially sending garbage to display (#1301)
-
+- The TWAI driver can now be used without requiring the `embedded-hal` traits (#1355)
+- USB pullup/pulldown now gets properly cleared and does not interfere anymore on esp32c3 and esp32s3 (#1244)
 
 ### Changed
 
@@ -41,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - DMA channels can/have to be explicitly created for async or blocking drivers, added `set_interrupt_handler` to DMA channels, SPI, I2S, PARL_IO, don't enable interrupts on startup for DMA, I2S, PARL_IO, GPIO (#1300)
 - UART: Rework `change_baud` so it is possible to set baud rate even after instantiation (#1350)
 - Runtime ISR binding for SHA,ECC and RSA (#1354)
+- Update `pac`s with removed suffixes in `int` field names. Use `W1TC` for `int_clr`
 
 ### Removed
 

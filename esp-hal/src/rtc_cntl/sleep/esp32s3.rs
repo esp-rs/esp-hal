@@ -97,8 +97,8 @@ impl WakeSource for TimerWakeupSource {
                 .write(|w| w.slp_val_lo().bits((time_in_ticks & 0xffffffff) as u32));
 
             rtc_cntl
-                .int_clr_rtc()
-                .write(|w| w.main_timer_int_clr().set_bit());
+                .int_clr()
+                .write(|w| w.main_timer().clear_bit_by_one());
 
             rtc_cntl.slp_timer1().write(|w| {
                 w.slp_val_hi()
@@ -690,8 +690,8 @@ impl RtcSleepConfig {
                 .dig_pwc()
                 .modify(|_, w| w.wifi_force_pd().set_bit());
 
-            rtc_cntl.int_ena_rtc().write(|w| w.bits(0));
-            rtc_cntl.int_clr_rtc().write(|w| w.bits(u32::MAX));
+            rtc_cntl.int_ena().write(|w| w.bits(0));
+            rtc_cntl.int_clr().write(|w| w.bits(u32::MAX));
         }
     }
 
@@ -896,11 +896,11 @@ impl RtcSleepConfig {
         unsafe {
             let rtc_cntl = &*esp32s3::RTC_CNTL::ptr();
 
-            rtc_cntl.int_clr_rtc().write(|w| {
-                w.slp_reject_int_clr()
-                    .set_bit()
-                    .slp_wakeup_int_clr()
-                    .set_bit()
+            rtc_cntl.int_clr().write(|w| {
+                w.slp_reject()
+                    .clear_bit_by_one()
+                    .slp_wakeup()
+                    .clear_bit_by_one()
             });
 
             // restore config if it is a light sleep

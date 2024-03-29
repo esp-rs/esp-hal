@@ -12,30 +12,19 @@
 //! `IS_FIRST_SENDER` below must be set to false on one of the ESP's
 
 //% CHIPS: esp32c3 esp32c6 esp32s2 esp32s3
-//% FEATURES: embedded-hal
 
 #![no_std]
 #![no_main]
 
 const IS_FIRST_SENDER: bool = true;
 
-// Run this example with the embedded-hal feature enabled to use embedded-can instead of
-// embedded-hal-0.2.7. embedded-can was split off from embedded-hal before it's
-// upgrade to 1.0.0. cargo run --example twai --release
-#[cfg(feature = "embedded-hal")]
-use embedded_can::{nb::Can, Frame, StandardId};
-// Run this example without the embedded-hal flag to use the embedded-hal 0.2.7 CAN traits.
-// cargo run --example twai --features embedded-hal-02 --release
-#[cfg(feature = "embedded-hal-02")]
-use embedded_hal_02::can::{Can, Frame, StandardId};
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     gpio::IO,
     peripherals::Peripherals,
     prelude::*,
-    twai,
-    twai::filter::SingleStandardFilter,
+    twai::{self, filter::SingleStandardFilter, EspTwaiFrame, StandardId},
 };
 use esp_println::println;
 use nb::block;
@@ -82,7 +71,7 @@ fn main() -> ! {
 
     if IS_FIRST_SENDER {
         // Send a frame to the other ESP
-        let frame = Frame::new(StandardId::ZERO, &[1, 2, 3]).unwrap();
+        let frame = EspTwaiFrame::new(StandardId::ZERO.into(), &[1, 2, 3]).unwrap();
         block!(can.transmit(&frame)).unwrap();
         println!("Sent a frame");
     }
