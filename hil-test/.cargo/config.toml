@@ -25,5 +25,8 @@ rustflags = [
     "-C", "link-arg=-Tembedded-test.x",
 ]
 
+[env]
+DEFMT_LOG = "info"
+
 [unstable]
 build-std = ["core"]
