@@ -116,11 +116,13 @@ mod tests {
 
     #[test]
     async fn test_pins_can_wait(_ctx: Context) {
+        let mut first = unsafe { GpioPin::<Unknown, 0>::steal() }.into_pull_down_input();
         // convenient way to get the last pin without cfgs for all chips
-        let last = unsafe { GpioPin::<Unknown, { (NUM_PINS - 1) as u8 }>::steal() };
-        let mut last = last.into_pull_down_input();
+        let mut last =
+            unsafe { GpioPin::<Unknown, { (NUM_PINS - 1) as u8 }>::steal() }.into_pull_down_input();
 
-        embassy_futures::select::select(
+        embassy_futures::select::select3(
+            first.wait_for_rising_edge(),
             last.wait_for_rising_edge(),
             // Other futures won't return, this one will, make sure its last so all other futures
             // are polled first
