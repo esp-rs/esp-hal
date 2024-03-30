@@ -58,7 +58,7 @@ use crate::{
     Cpu,
 };
 
-pub const NUM_PINS: usize = 39;
+pub const NUM_PINS: usize = 40;
 
 pub(crate) const FUNC_IN_SEL_OFFSET: usize = 0;
 

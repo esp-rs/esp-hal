@@ -64,7 +64,7 @@ use crate::{
     peripherals::GPIO,
 };
 
-pub const NUM_PINS: usize = 46;
+pub const NUM_PINS: usize = 47;
 
 pub(crate) const FUNC_IN_SEL_OFFSET: usize = 0;
 

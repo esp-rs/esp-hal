@@ -27,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed `LCD_CAM I8080` driver potentially sending garbage to display (#1301)
 - The TWAI driver can now be used without requiring the `embedded-hal` traits (#1355)
 - USB pullup/pulldown now gets properly cleared and does not interfere anymore on esp32c3 and esp32s3 (#1244)
-- Fixed number of GPIO pins in C3 (#1361)
+- Fixed GPIO counts so that using async code with the higher GPIO number should no longer panic (#1361, #1362)
 
 ### Changed
 
