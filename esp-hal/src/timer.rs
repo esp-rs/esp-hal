@@ -103,7 +103,8 @@ impl TimerGroupInstance for TIMG0 {
     fn configure_src_clk() {
         unsafe {
             (*Self::register_block())
-                .t0config()
+                .t(0)
+                .config()
                 .modify(|_, w| w.use_xtal().clear_bit())
         };
     }
@@ -156,7 +157,8 @@ impl TimerGroupInstance for TIMG1 {
     fn configure_src_clk() {
         unsafe {
             (*Self::register_block())
-                .t1config()
+                .t(1)
+                .config()
                 .modify(|_, w| w.use_xtal().clear_bit())
         };
     }
@@ -267,7 +269,7 @@ where
 }
 
 /// Timer peripheral instance
-pub trait Instance: crate::private::Sealed {
+pub trait Instance: crate::private::Sealed + Enable {
     fn reset_counter(&mut self);
 
     fn set_counter_active(&mut self, state: bool);
@@ -297,17 +299,24 @@ pub trait Instance: crate::private::Sealed {
     fn set_divider(&mut self, divider: u16);
 
     fn is_interrupt_set(&self) -> bool;
+}
 
+pub trait Enable: crate::private::Sealed {
     fn enable_peripheral(&self);
 }
 
-pub struct Timer0<TG> {
+pub struct TimerX<TG, const T: u8 = 0> {
     phantom: PhantomData<TG>,
 }
 
-impl<TG> crate::private::Sealed for Timer0<TG> {}
+pub type Timer0<TG> = TimerX<TG, 0>;
 
-impl<TG> Timer0<TG>
+#[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
+pub type Timer1<TG> = TimerX<TG, 1>;
+
+impl<TG, const T: u8> crate::private::Sealed for TimerX<TG, T> {}
+
+impl<TG, const T: u8> TimerX<TG, T>
 where
     TG: TimerGroupInstance,
 {
@@ -317,65 +326,58 @@ where
             phantom: PhantomData,
         }
     }
+
+    unsafe fn t() -> &'static crate::peripherals::timg0::T {
+        (*TG::register_block()).t(T as usize)
+    }
 }
 
 /// Timer peripheral instance
-impl<TG> Instance for Timer0<TG>
+impl<TG, const T: u8> Instance for TimerX<TG, T>
 where
     TG: TimerGroupInstance,
+    Self: Enable,
 {
     fn reset_counter(&mut self) {
-        let reg_block = unsafe { &*TG::register_block() };
+        let t = unsafe { Self::t() };
 
-        reg_block
-            .t0loadlo()
-            .write(|w| unsafe { w.load_lo().bits(0) });
+        t.loadlo().write(|w| unsafe { w.load_lo().bits(0) });
 
-        reg_block
-            .t0loadhi()
-            .write(|w| unsafe { w.load_hi().bits(0) });
+        t.loadhi().write(|w| unsafe { w.load_hi().bits(0) });
 
-        reg_block.t0load().write(|w| unsafe { w.load().bits(1) });
+        t.load().write(|w| unsafe { w.load().bits(1) });
     }
 
     fn set_counter_active(&mut self, state: bool) {
-        let reg_block = unsafe { &*TG::register_block() };
-
-        reg_block.t0config().modify(|_, w| w.en().bit(state));
+        unsafe { Self::t() }
+            .config()
+            .modify(|_, w| w.en().bit(state));
     }
 
     fn is_counter_active(&self) -> bool {
-        let reg_block = unsafe { &*TG::register_block() };
-
-        reg_block.t0config().read().en().bit_is_set()
+        unsafe { Self::t() }.config().read().en().bit_is_set()
     }
 
     fn set_counter_decrementing(&mut self, decrementing: bool) {
-        let reg_block = unsafe { &*TG::register_block() };
-
-        reg_block
-            .t0config()
+        unsafe { Self::t() }
+            .config()
             .modify(|_, w| w.increase().bit(!decrementing));
     }
 
     fn set_auto_reload(&mut self, auto_reload: bool) {
-        let reg_block = unsafe { &*TG::register_block() };
-
-        reg_block
-            .t0config()
+        unsafe { Self::t() }
+            .config()
             .modify(|_, w| w.autoreload().bit(auto_reload));
     }
 
     fn set_alarm_active(&mut self, state: bool) {
-        let reg_block = unsafe { &*TG::register_block() };
-
-        reg_block.t0config().modify(|_, w| w.alarm_en().bit(state));
+        unsafe { Self::t() }
+            .config()
+            .modify(|_, w| w.alarm_en().bit(state));
     }
 
     fn is_alarm_active(&self) -> bool {
-        let reg_block = unsafe { &*TG::register_block() };
-
-        reg_block.t0config().read().alarm_en().bit_is_set()
+        unsafe { Self::t() }.config().read().alarm_en().bit_is_set()
     }
 
     fn load_alarm_value(&mut self, value: u64) {
@@ -383,15 +385,11 @@ where
         let high = (value >> 32) as u32;
         let low = (value & 0xFFFF_FFFF) as u32;
 
-        let reg_block = unsafe { &*TG::register_block() };
+        let t = unsafe { Self::t() };
 
-        reg_block
-            .t0alarmlo()
-            .write(|w| unsafe { w.alarm_lo().bits(low) });
+        t.alarmlo().write(|w| unsafe { w.alarm_lo().bits(low) });
 
-        reg_block
-            .t0alarmhi()
-            .write(|w| unsafe { w.alarm_hi().bits(high) });
+        t.alarmhi().write(|w| unsafe { w.alarm_hi().bits(high) });
     }
 
     fn listen(&mut self) {
@@ -399,17 +397,17 @@ where
 
         // always use level interrupt
         #[cfg(any(esp32, esp32s2))]
-        reg_block
-            .t0config()
+        unsafe { Self::t() }
+            .config()
             .modify(|_, w| w.level_int_en().set_bit());
 
-        reg_block.int_ena_timers().modify(|_, w| w.t0().set_bit());
+        reg_block.int_ena_timers().modify(|_, w| w.t(T).set_bit());
     }
 
     fn unlisten(&mut self) {
         let reg_block = unsafe { &*TG::register_block() };
 
-        reg_block.int_ena_timers().modify(|_, w| w.t0().clear_bit());
+        reg_block.int_ena_timers().modify(|_, w| w.t(T).clear_bit());
     }
 
     fn clear_interrupt(&mut self) {
@@ -417,23 +415,23 @@ where
 
         reg_block
             .int_clr_timers()
-            .write(|w| w.t0().clear_bit_by_one());
+            .write(|w| w.t(T).clear_bit_by_one());
     }
 
     fn now(&self) -> u64 {
-        let reg_block = unsafe { &*TG::register_block() };
+        let t = unsafe { Self::t() };
 
-        reg_block.t0update().write(|w| w.update().set_bit());
-        while reg_block.t0update().read().update().bit_is_set() {}
+        t.update().write(|w| w.update().set_bit());
+        while t.update().read().update().bit_is_set() {}
 
-        let value_lo = reg_block.t0lo().read().bits() as u64;
-        let value_hi = (reg_block.t0hi().read().bits() as u64) << 32;
+        let value_lo = t.lo().read().bits() as u64;
+        let value_hi = (t.hi().read().bits() as u64) << 32;
 
         value_lo | value_hi
     }
 
     fn divider(&self) -> u32 {
-        let reg_block = unsafe { &*TG::register_block() };
+        let t = unsafe { Self::t() };
 
         // From the ESP32 TRM, "11.2.1 16­-bit Prescaler and Clock Selection":
         //
@@ -441,7 +439,7 @@ where
         // Specifically, when TIMGn_Tx_DIVIDER is either 1 or 2, the clock divisor is 2;
         // when TIMGn_Tx_DIVIDER is 0, the clock divisor is 65536. Any other value will
         // cause the clock to be divided by exactly that value."
-        match reg_block.t0config().read().divider().bits() {
+        match t.config().read().divider().bits() {
             0 => 65536,
             1 | 2 => 2,
             n => n as u32,
@@ -451,187 +449,30 @@ where
     fn is_interrupt_set(&self) -> bool {
         let reg_block = unsafe { &*TG::register_block() };
 
-        reg_block.int_raw_timers().read().t0().bit_is_set()
+        reg_block.int_raw_timers().read().t(T).bit_is_set()
     }
 
     fn set_divider(&mut self, divider: u16) {
-        let reg_block = unsafe { &*TG::register_block() };
-
-        reg_block
-            .t0config()
+        unsafe { Self::t() }
+            .config()
             .modify(|_, w| unsafe { w.divider().bits(divider) })
     }
+}
 
+impl<TG> Enable for Timer0<TG>
+where
+    TG: TimerGroupInstance,
+{
     fn enable_peripheral(&self) {
         PeripheralClockControl::enable(crate::system::Peripheral::Timg0);
     }
 }
 
 #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
-pub struct Timer1<TG> {
-    phantom: PhantomData<TG>,
-}
-
-#[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
-impl<TG> crate::private::Sealed for Timer1<TG> {}
-
-#[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
-impl<TG> Timer1<TG>
+impl<TG> Enable for Timer1<TG>
 where
     TG: TimerGroupInstance,
 {
-    #[allow(unused)]
-    pub(crate) unsafe fn steal() -> Self {
-        Self {
-            phantom: PhantomData,
-        }
-    }
-}
-
-/// Timer peripheral instance
-#[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
-impl<TG> Instance for Timer1<TG>
-where
-    TG: TimerGroupInstance,
-{
-    fn reset_counter(&mut self) {
-        let reg_block = unsafe { &*TG::register_block() };
-
-        reg_block
-            .t1loadlo()
-            .write(|w| unsafe { w.load_lo().bits(0) });
-
-        reg_block
-            .t1loadhi()
-            .write(|w| unsafe { w.load_hi().bits(0) });
-
-        reg_block.t1load().write(|w| unsafe { w.load().bits(1) });
-    }
-
-    fn set_counter_active(&mut self, state: bool) {
-        let reg_block = unsafe { &*TG::register_block() };
-
-        reg_block.t1config().modify(|_, w| w.en().bit(state));
-    }
-
-    fn is_counter_active(&self) -> bool {
-        let reg_block = unsafe { &*TG::register_block() };
-
-        reg_block.t1config().read().en().bit_is_set()
-    }
-
-    fn set_counter_decrementing(&mut self, decrementing: bool) {
-        let reg_block = unsafe { &*TG::register_block() };
-
-        reg_block
-            .t1config()
-            .modify(|_, w| w.increase().bit(!decrementing));
-    }
-
-    fn set_auto_reload(&mut self, auto_reload: bool) {
-        let reg_block = unsafe { &*TG::register_block() };
-
-        reg_block
-            .t1config()
-            .modify(|_, w| w.autoreload().bit(auto_reload));
-    }
-
-    fn set_alarm_active(&mut self, state: bool) {
-        let reg_block = unsafe { &*TG::register_block() };
-
-        reg_block.t1config().modify(|_, w| w.alarm_en().bit(state));
-    }
-
-    fn is_alarm_active(&self) -> bool {
-        let reg_block = unsafe { &*TG::register_block() };
-
-        reg_block.t1config().read().alarm_en().bit_is_set()
-    }
-
-    fn load_alarm_value(&mut self, value: u64) {
-        let value = value & 0x3F_FFFF_FFFF_FFFF;
-        let high = (value >> 32) as u32;
-        let low = (value & 0xFFFF_FFFF) as u32;
-
-        let reg_block = unsafe { &*TG::register_block() };
-
-        reg_block
-            .t1alarmlo()
-            .write(|w| unsafe { w.alarm_lo().bits(low) });
-
-        reg_block
-            .t1alarmhi()
-            .write(|w| unsafe { w.alarm_hi().bits(high) });
-    }
-
-    fn listen(&mut self) {
-        let reg_block = unsafe { &*TG::register_block() };
-
-        // always use level interrupt
-        #[cfg(any(esp32, esp32s2))]
-        reg_block
-            .t1config()
-            .modify(|_, w| w.level_int_en().set_bit());
-
-        reg_block.int_ena_timers().modify(|_, w| w.t1().set_bit());
-    }
-
-    fn unlisten(&mut self) {
-        let reg_block = unsafe { &*TG::register_block() };
-
-        reg_block.int_ena_timers().modify(|_, w| w.t1().clear_bit());
-    }
-
-    fn clear_interrupt(&mut self) {
-        let reg_block = unsafe { &*TG::register_block() };
-
-        reg_block
-            .int_clr_timers()
-            .write(|w| w.t1().clear_bit_by_one());
-    }
-
-    fn now(&self) -> u64 {
-        let reg_block = unsafe { &*TG::register_block() };
-
-        reg_block.t1update().write(|w| w.update().set_bit());
-        while reg_block.t1update().read().update().bit_is_set() {}
-
-        let value_lo = reg_block.t1lo().read().bits() as u64;
-        let value_hi = (reg_block.t1hi().read().bits() as u64) << 32;
-
-        value_lo | value_hi
-    }
-
-    fn divider(&self) -> u32 {
-        let reg_block = unsafe { &*TG::register_block() };
-
-        // From the ESP32 TRM, "11.2.1 16­-bit Prescaler and Clock Selection":
-        //
-        // "The prescaler can divide the APB clock by a factor from 2 to 65536.
-        // Specifically, when TIMGn_Tx_DIVIDER is either 1 or 2, the clock divisor is 2;
-        // when TIMGn_Tx_DIVIDER is 0, the clock divisor is 65536. Any other value will
-        // cause the clock to be divided by exactly that value."
-        match reg_block.t1config().read().divider().bits() {
-            0 => 65536,
-            1 | 2 => 2,
-            n => n as u32,
-        }
-    }
-
-    fn is_interrupt_set(&self) -> bool {
-        let reg_block = unsafe { &*TG::register_block() };
-
-        reg_block.int_raw_timers().read().t1().bit_is_set()
-    }
-
-    fn set_divider(&mut self, divider: u16) {
-        let reg_block = unsafe { &*TG::register_block() };
-
-        reg_block
-            .t1config()
-            .modify(|_, w| unsafe { w.divider().bits(divider) })
-    }
-
     fn enable_peripheral(&self) {
         PeripheralClockControl::enable(crate::system::Peripheral::Timg1);
     }
