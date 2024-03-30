@@ -811,7 +811,11 @@ impl<const GPIONUM: u8> GpioPin<Unknown, GPIONUM>
 where
     Self: GpioProperties,
 {
-    /// Create a pin out of thin air
+    /// Create a pin out of thin air.
+    ///
+    /// # Safety
+    ///
+    /// Ensure that only one instance of a pin exists at one time.
     pub unsafe fn steal() -> Self {
         Self { _mode: PhantomData }
     }
