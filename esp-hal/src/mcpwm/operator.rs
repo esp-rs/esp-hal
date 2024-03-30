@@ -142,71 +142,6 @@ impl DeadTimeCfg {
     }
 }
 
-#[cfg(feature = "esp32s3")]
-fn dt_cfg<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mcpwm0::DB0_CFG {
-    let block = unsafe { &*PWM::block() };
-    match OP {
-        0 => block.db0_cfg(),
-        1 => unsafe { &*(&block.db1_cfg() as *const _ as *const _) },
-        2 => unsafe { &*(&block.db2_cfg() as *const _ as *const _) },
-        _ => unreachable!(),
-    }
-}
-#[cfg(feature = "esp32s3")]
-fn dt_fed<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mcpwm0::DB0_FED_CFG {
-    let block = unsafe { &*PWM::block() };
-    match OP {
-        0 => block.db0_fed_cfg(),
-        1 => unsafe { &*(&block.db1_fed_cfg() as *const _ as *const _) },
-        2 => unsafe { &*(&block.db2_fed_cfg() as *const _ as *const _) },
-        _ => unreachable!(),
-    }
-}
-#[cfg(feature = "esp32s3")]
-fn dt_red<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mcpwm0::DB0_RED_CFG {
-    let block = unsafe { &*PWM::block() };
-    match OP {
-        0 => block.db0_red_cfg(),
-        1 => unsafe { &*(&block.db1_red_cfg() as *const _ as *const _) },
-        2 => unsafe { &*(&block.db2_red_cfg() as *const _ as *const _) },
-        _ => unreachable!(),
-    }
-}
-
-// TODO: dt_cfg, dt_fed, dt_red (and similar functions in mcpwm can be made safe
-// by patching PACS)
-#[cfg(not(feature = "esp32s3"))]
-fn dt_cfg<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mcpwm0::DT0_CFG {
-    let block = unsafe { &*PWM::block() };
-    match OP {
-        0 => block.dt0_cfg(),
-        1 => unsafe { &*(&block.dt1_cfg() as *const _ as *const _) },
-        2 => unsafe { &*(&block.dt2_cfg() as *const _ as *const _) },
-        _ => unreachable!(),
-    }
-}
-
-#[cfg(not(feature = "esp32s3"))]
-fn dt_fed<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mcpwm0::DT0_FED_CFG {
-    let block = unsafe { &*PWM::block() };
-    match OP {
-        0 => block.dt0_fed_cfg(),
-        1 => unsafe { &*(&block.dt1_fed_cfg() as *const _ as *const _) },
-        2 => unsafe { &*(&block.dt2_fed_cfg() as *const _ as *const _) },
-        _ => unreachable!(),
-    }
-}
-#[cfg(not(feature = "esp32s3"))]
-fn dt_red<const OP: u8, PWM: PwmPeripheral>() -> &'static crate::peripherals::mcpwm0::DT0_RED_CFG {
-    let block = unsafe { &*PWM::block() };
-    match OP {
-        0 => block.dt0_red_cfg(),
-        1 => unsafe { &*(&block.dt1_red_cfg() as *const _ as *const _) },
-        2 => unsafe { &*(&block.dt2_red_cfg() as *const _ as *const _) },
-        _ => unreachable!(),
-    }
-}
-
 /// A MCPWM operator
 ///
 /// The PWM Operator submodule has the following functions:
@@ -255,9 +190,23 @@ impl<const OP: u8, PWM: PwmPeripheral> Operator<OP, PWM> {
 
     /// Configures deadtime for this operator
     pub fn set_deadtime(&mut self, cfg: &DeadTimeCfg) {
-        dt_fed::<OP, PWM>().write(|w| unsafe { w.bits(cfg.falling_edge_delay as u32) });
-        dt_red::<OP, PWM>().write(|w| unsafe { w.bits(cfg.rising_edge_delay as u32) });
-        dt_cfg::<OP, PWM>().write(|w| unsafe { w.bits(cfg.cfg_reg) });
+        let ch = unsafe { &*PWM::block() }.ch(OP as usize);
+        #[cfg(esp32s3)]
+        {
+            ch.db_fed_cfg()
+                .write(|w| unsafe { w.bits(cfg.falling_edge_delay as u32) });
+            ch.db_red_cfg()
+                .write(|w| unsafe { w.bits(cfg.rising_edge_delay as u32) });
+            ch.db_cfg().write(|w| unsafe { w.bits(cfg.cfg_reg) });
+        }
+        #[cfg(not(esp32s3))]
+        {
+            ch.dt_fed_cfg()
+                .write(|w| unsafe { w.bits(cfg.falling_edge_delay as u32) });
+            ch.dt_red_cfg()
+                .write(|w| unsafe { w.bits(cfg.rising_edge_delay as u32) });
+            ch.dt_cfg().write(|w| unsafe { w.bits(cfg.cfg_reg) });
+        }
     }
 
     /// Use the A output with the given pin and configuration
@@ -350,7 +299,11 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
     /// another pin
     #[inline]
     pub fn update_fed(&self, cycles: u16) {
-        dt_fed::<OP, PWM>().write(|w| unsafe { w.bits(cycles as u32) });
+        #[cfg(esp32s3)]
+        let dt_fed = unsafe { Self::ch() }.db_fed_cfg();
+        #[cfg(not(esp32s3))]
+        let dt_fed = unsafe { Self::ch() }.dt_fed_cfg();
+        dt_fed.write(|w| unsafe { w.bits(cycles as u32) });
     }
 
     /// Updates dead-time RED register
@@ -359,251 +312,89 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
     /// another pin
     #[inline]
     pub fn update_red(&self, cycles: u16) {
-        dt_red::<OP, PWM>().write(|w| unsafe { w.bits(cycles as u32) });
+        #[cfg(esp32s3)]
+        let dt_red = unsafe { Self::ch() }.db_red_cfg();
+        #[cfg(not(esp32s3))]
+        let dt_red = unsafe { Self::ch() }.dt_red_cfg();
+        dt_red.write(|w| unsafe { w.bits(cycles as u32) });
     }
 
     /// Configure what actions should be taken on timing events
     pub fn set_actions(&mut self, value: PwmActions<IS_A>) {
         // SAFETY:
         // We only write to our GENx_x register
-        let block = unsafe { &*PWM::block() };
-
+        let ch = unsafe { Self::ch() };
         let bits = value.0;
 
         // SAFETY:
         // `bits` is a valid bit pattern
-        unsafe {
-            match (OP, IS_A) {
-                (0, true) => block.gen0_a().write(|w| w.bits(bits)),
-                (1, true) => block.gen1_a().write(|w| w.bits(bits)),
-                (2, true) => block.gen2_a().write(|w| w.bits(bits)),
-                (0, false) => block.gen0_b().write(|w| w.bits(bits)),
-                (1, false) => block.gen1_b().write(|w| w.bits(bits)),
-                (2, false) => block.gen2_b().write(|w| w.bits(bits)),
-                _ => unreachable!(),
-            }
-        }
+        ch.gen((!IS_A) as usize).write(|w| unsafe { w.bits(bits) })
     }
 
     /// Set how a new timestamp syncs with the timer
-    #[cfg(esp32)]
     pub fn set_update_method(&mut self, update_method: PwmUpdateMethod) {
         // SAFETY:
         // We only write to our GENx_x_UPMETHOD register
-        let block = unsafe { &*PWM::block() };
+        let ch = unsafe { Self::ch() };
         let bits = update_method.0;
-        match (OP, IS_A) {
-            (0, true) => block
-                .gen0_stmp_cfg()
-                .modify(|_, w| w.gen0_a_upmethod().variant(bits)),
-            (1, true) => block
-                .gen1_stmp_cfg()
-                .modify(|_, w| w.gen1_a_upmethod().variant(bits)),
-            (2, true) => block
-                .gen2_stmp_cfg()
-                .modify(|_, w| w.gen2_a_upmethod().variant(bits)),
-            (0, false) => block
-                .gen0_stmp_cfg()
-                .modify(|_, w| w.gen0_b_upmethod().variant(bits)),
-            (1, false) => block
-                .gen1_stmp_cfg()
-                .modify(|_, w| w.gen1_b_upmethod().variant(bits)),
-            (2, false) => block
-                .gen2_stmp_cfg()
-                .modify(|_, w| w.gen2_b_upmethod().variant(bits)),
-            _ => {
-                unreachable!()
-            }
-        }
-    }
 
-    /// Set how a new timestamp syncs with the timer
-    #[cfg(esp32s3)]
-    pub fn set_update_method(&mut self, update_method: PwmUpdateMethod) {
-        // SAFETY:
-        // We only write to our GENx_x_UPMETHOD register
-        let block = unsafe { &*PWM::block() };
-        let bits = update_method.0;
-        match (OP, IS_A) {
-            (0, true) => block
-                .cmpr0_cfg()
-                .modify(|_, w| w.cmpr0_a_upmethod().variant(bits)),
-            (1, true) => block
-                .cmpr1_cfg()
-                .modify(|_, w| w.cmpr1_a_upmethod().variant(bits)),
-            (2, true) => block
-                .cmpr2_cfg()
-                .modify(|_, w| w.cmpr2_a_upmethod().variant(bits)),
-            (0, false) => block
-                .cmpr0_cfg()
-                .modify(|_, w| w.cmpr0_b_upmethod().variant(bits)),
-            (1, false) => block
-                .cmpr1_cfg()
-                .modify(|_, w| w.cmpr1_b_upmethod().variant(bits)),
-            (2, false) => block
-                .cmpr2_cfg()
-                .modify(|_, w| w.cmpr2_b_upmethod().variant(bits)),
-            _ => {
-                unreachable!()
-            }
-        }
-    }
+        #[cfg(esp32s3)]
+        let cfg = ch.cmpr_cfg();
+        #[cfg(any(esp32, esp32c6, esp32h2))]
+        let cfg = ch.gen_stmp_cfg();
 
-    /// Set how a new timestamp syncs with the timer
-    #[cfg(any(esp32c6, esp32h2))]
-    pub fn set_update_method(&mut self, update_method: PwmUpdateMethod) {
-        // SAFETY:
-        // We only write to our GENx_x_UPMETHOD register
-        let block = unsafe { &*PWM::block() };
-        let bits = update_method.0;
-        match (OP, IS_A) {
-            (0, true) => block
-                .gen0_stmp_cfg()
-                .modify(|_, w| w.cmpr0_a_upmethod().variant(bits)),
-            (1, true) => block
-                .gen1_stmp_cfg()
-                .modify(|_, w| w.cmpr1_a_upmethod().variant(bits)),
-            (2, true) => block
-                .gen2_stmp_cfg()
-                .modify(|_, w| w.cmpr2_a_upmethod().variant(bits)),
-            (0, false) => block
-                .gen0_stmp_cfg()
-                .modify(|_, w| w.cmpr0_b_upmethod().variant(bits)),
-            (1, false) => block
-                .gen1_stmp_cfg()
-                .modify(|_, w| w.cmpr1_b_upmethod().variant(bits)),
-            (2, false) => block
-                .gen2_stmp_cfg()
-                .modify(|_, w| w.cmpr2_b_upmethod().variant(bits)),
-            _ => {
-                unreachable!()
+        cfg.modify(|_, w| unsafe {
+            if IS_A {
+                w.a_upmethod().bits(bits)
+            } else {
+                w.b_upmethod().bits(bits)
             }
-        }
+        })
     }
 
     /// Write a new timestamp.
     /// The written value will take effect according to the set
     /// [`PwmUpdateMethod`].
-    #[cfg(esp32)]
     pub fn set_timestamp(&mut self, value: u16) {
         // SAFETY:
         // We only write to our GENx_TSTMP_x register
-        let block = unsafe { &*PWM::block() };
-        match (OP, IS_A) {
-            (0, true) => block.gen0_tstmp_a().write(|w| w.gen0_a().variant(value)),
-            (1, true) => block.gen1_tstmp_a().write(|w| w.gen1_a().variant(value)),
-            (2, true) => block.gen2_tstmp_a().write(|w| w.gen2_a().variant(value)),
-            (0, false) => block.gen0_tstmp_b().write(|w| w.gen0_b().variant(value)),
-            (1, false) => block.gen1_tstmp_b().write(|w| w.gen1_b().variant(value)),
-            (2, false) => block.gen2_tstmp_b().write(|w| w.gen2_b().variant(value)),
-            _ => {
-                unreachable!()
-            }
+        let ch = unsafe { Self::ch() };
+
+        #[cfg(esp32s3)]
+        if IS_A {
+            ch.cmpr_value0().write(|w| unsafe { w.a().bits(value) })
+        } else {
+            ch.cmpr_value1().write(|w| unsafe { w.b().bits(value) })
+        }
+
+        #[cfg(any(esp32, esp32c6, esp32h2))]
+        if IS_A {
+            ch.gen_tstmp_a().write(|w| unsafe { w.a().bits(value) })
+        } else {
+            ch.gen_tstmp_b().write(|w| unsafe { w.b().bits(value) })
         }
     }
 
     /// Get the old timestamp.
     /// The value of the timestamp will take effect according to the set
     /// [`PwmUpdateMethod`].
-    #[cfg(esp32)]
     pub fn get_timestamp(&self) -> u16 {
         // SAFETY:
         // We only read to our GENx_TSTMP_x register
-        let block = unsafe { &*PWM::block() };
-        match (OP, IS_A) {
-            (0, true) => block.gen0_tstmp_a().read().gen0_a().bits(),
-            (1, true) => block.gen1_tstmp_a().read().gen1_a().bits(),
-            (2, true) => block.gen2_tstmp_a().read().gen2_a().bits(),
-            (0, false) => block.gen0_tstmp_b().read().gen0_b().bits(),
-            (1, false) => block.gen1_tstmp_b().read().gen1_b().bits(),
-            (2, false) => block.gen2_tstmp_b().read().gen2_b().bits(),
-            _ => {
-                unreachable!()
-            }
-        }
-    }
+        let ch = unsafe { Self::ch() };
 
-    /// Write a new timestamp.
-    /// The written value will take effect according to the set
-    /// [`PwmUpdateMethod`].
-    #[cfg(esp32s3)]
-    pub fn set_timestamp(&mut self, value: u16) {
-        // SAFETY:
-        // We only write to our CMPRx_VALUEx register
-        let block = unsafe { &*PWM::block() };
-        match (OP, IS_A) {
-            (0, true) => block.cmpr0_value0().write(|w| w.cmpr0_a().variant(value)),
-            (1, true) => block.cmpr1_value0().write(|w| w.cmpr1_a().variant(value)),
-            (2, true) => block.cmpr2_value0().write(|w| w.cmpr2_a().variant(value)),
-            (0, false) => block.cmpr0_value1().write(|w| w.cmpr0_b().variant(value)),
-            (1, false) => block.cmpr1_value1().write(|w| w.cmpr1_b().variant(value)),
-            (2, false) => block.cmpr2_value1().write(|w| w.cmpr2_b().variant(value)),
-            _ => {
-                unreachable!()
-            }
+        #[cfg(esp32s3)]
+        if IS_A {
+            ch.cmpr_value0().read().a().bits()
+        } else {
+            ch.cmpr_value1().read().b().bits()
         }
-    }
 
-    /// Get the old timestamp.
-    /// The value of the timestamp will take effect according to the set
-    /// [`PwmUpdateMethod`].
-    #[cfg(esp32s3)]
-    pub fn get_timestamp(&self) -> u16 {
-        // SAFETY:
-        // We only read to our GENx_TSTMP_x register
-        let block = unsafe { &*PWM::block() };
-        match (OP, IS_A) {
-            (0, true) => block.cmpr0_value0().read().cmpr0_a().bits(),
-            (1, true) => block.cmpr1_value0().read().cmpr1_a().bits(),
-            (2, true) => block.cmpr2_value0().read().cmpr2_a().bits(),
-            (0, false) => block.cmpr0_value1().read().cmpr0_b().bits(),
-            (1, false) => block.cmpr1_value1().read().cmpr1_b().bits(),
-            (2, false) => block.cmpr2_value1().read().cmpr2_b().bits(),
-            _ => {
-                unreachable!()
-            }
-        }
-    }
-
-    /// Write a new timestamp.
-    /// The written value will take effect according to the set
-    /// [`PwmUpdateMethod`].
-    #[cfg(any(esp32c6, esp32h2))]
-    pub fn set_timestamp(&mut self, value: u16) {
-        // SAFETY:
-        // We only write to our GENx_TSTMP_x register
-        let block = unsafe { &*PWM::block() };
-        match (OP, IS_A) {
-            (0, true) => block.gen0_tstmp_a().write(|w| w.cmpr0_a().variant(value)),
-            (1, true) => block.gen1_tstmp_a().write(|w| w.cmpr1_a().variant(value)),
-            (2, true) => block.gen2_tstmp_a().write(|w| w.cmpr2_a().variant(value)),
-            (0, false) => block.gen0_tstmp_b().write(|w| w.cmpr0_b().variant(value)),
-            (1, false) => block.gen1_tstmp_b().write(|w| w.cmpr1_b().variant(value)),
-            (2, false) => block.gen2_tstmp_b().write(|w| w.cmpr2_b().variant(value)),
-            _ => {
-                unreachable!()
-            }
-        }
-    }
-
-    /// Get the old timestamp.
-    /// The value of the timestamp will take effect according to the set
-    /// [`PwmUpdateMethod`].
-    #[cfg(any(esp32c6, esp32h2))]
-    pub fn get_timestamp(&self) -> u16 {
-        // SAFETY:
-        // We only read to our GENx_TSTMP_x register
-        let block = unsafe { &*PWM::block() };
-        match (OP, IS_A) {
-            (0, true) => block.gen0_tstmp_a().read().cmpr0_a().bits(),
-            (1, true) => block.gen1_tstmp_a().read().cmpr1_a().bits(),
-            (2, true) => block.gen2_tstmp_a().read().cmpr2_a().bits(),
-            (0, false) => block.gen0_tstmp_b().read().cmpr0_b().bits(),
-            (1, false) => block.gen1_tstmp_b().read().cmpr1_b().bits(),
-            (2, false) => block.gen2_tstmp_b().read().cmpr2_b().bits(),
-            _ => {
-                unreachable!()
-            }
+        #[cfg(any(esp32, esp32c6, esp32h2))]
+        if IS_A {
+            ch.gen_tstmp_a().read().a().bits()
+        } else {
+            ch.gen_tstmp_b().read().b().bits()
         }
     }
 
@@ -626,15 +417,12 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
         // SAFETY:
         // The CFG0 registers are identical for all timers so we can pretend they're
         // TIMER0_CFG0
-        let timer0_cfg = &block.timer0_cfg0();
-        let timer0_cfg = match tim {
-            0 => timer0_cfg,
-            1 => unsafe { &*(&block.timer1_cfg0() as *const _ as *const _) },
-            2 => unsafe { &*(&block.timer2_cfg0() as *const _ as *const _) },
-            _ => unreachable!(),
-        };
+        block.timer(tim as usize).cfg0().read().period().bits()
+    }
 
-        timer0_cfg.read().timer0_period().bits()
+    unsafe fn ch() -> &'static crate::peripherals::mcpwm0::CH {
+        let block = unsafe { &*PWM::block() };
+        block.ch(OP as usize)
     }
 }
 
