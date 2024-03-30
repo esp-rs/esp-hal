@@ -807,6 +807,16 @@ where
     }
 }
 
+impl<const GPIONUM: u8> GpioPin<Unknown, GPIONUM>
+where
+    Self: GpioProperties,
+{
+    /// Create a pin out of thin air
+    pub unsafe fn steal() -> Self {
+        Self { _mode: PhantomData }
+    }
+}
+
 impl<MODE, const GPIONUM: u8> Pin for GpioPin<MODE, GPIONUM>
 where
     Self: GpioProperties,

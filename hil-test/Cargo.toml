@@ -37,6 +37,7 @@ embedded-hal-nb    = { version = "1.0.0", optional = true }
 esp-hal            = { path = "../esp-hal", features = ["defmt", "embedded-hal", "embedded-hal-02", "defmt"], optional = true }
 esp-backtrace       = { version = "0.11.1", default-features = false, features = ["exception-handler", "panic-handler", "defmt", "semihosting"] }
 critical-section   = { version = "1.1.2" }
+portable-atomic = "1"
 
 [dev-dependencies]
 embassy-executor   = { version = "0.5.0", default-features = false, features = ["executor-thread", "arch-riscv32"] }

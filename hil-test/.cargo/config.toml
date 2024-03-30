@@ -14,6 +14,7 @@ rustflags = [
     "-C", "link-arg=-Tlinkall.x",
     "-C", "link-arg=-Tembedded-test.x",
     "-C", "link-arg=-Tdefmt.x",
+    "-C", "force-frame-pointers"
 ]
 
 [target.'cfg(target_arch = "xtensa")']

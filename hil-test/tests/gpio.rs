@@ -17,7 +17,7 @@ use esp_hal::{
     clock::ClockControl,
     delay::Delay,
     embassy,
-    gpio::{GpioPin, Input, Output, OutputPin, PullDown, PushPull, IO},
+    gpio::{GpioPin, Input, Output, OutputPin, PullDown, PushPull, Unknown, IO, NUM_PINS},
     macros::handler,
     peripherals::Peripherals,
     system::SystemExt,
@@ -72,12 +72,11 @@ pub fn interrupt_handler() {
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
-    use core::sync::atomic::{AtomicUsize, Ordering};
-
     use defmt::assert_eq;
     use embassy_time::{Duration, Timer};
     use embedded_hal_async::digital::Wait;
     use esp_hal::gpio::{Event, Pin};
+    use portable_atomic::{AtomicUsize, Ordering};
 
     use super::*;
 
@@ -113,6 +112,21 @@ mod tests {
         )
         .await;
         assert_eq!(counter.load(Ordering::SeqCst), 5);
+    }
+
+    #[test]
+    async fn test_pins_can_wait(_ctx: Context) {
+        // convenient way to get the last pin without cfgs for all chips
+        let last = unsafe { GpioPin::<Unknown, { (NUM_PINS - 1) as u8 }>::steal() };
+        let mut last = last.into_pull_down_input();
+
+        embassy_futures::select::select(
+            last.wait_for_rising_edge(),
+            // Other futures won't return, this one will, make sure its last so all other futures
+            // are polled first
+            embassy_futures::yield_now(),
+        )
+        .await;
     }
 
     #[test]
