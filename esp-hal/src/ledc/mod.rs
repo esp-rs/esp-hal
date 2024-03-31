@@ -96,12 +96,18 @@ pub struct HighSpeed {}
 /// Used to specify LowSpeed Timer/Channel
 pub struct LowSpeed {}
 
-pub trait Speed {}
+pub trait Speed {
+    const IS_HS: bool;
+}
 
 #[cfg(esp32)]
-impl Speed for HighSpeed {}
+impl Speed for HighSpeed {
+    const IS_HS: bool = true;
+}
 
-impl Speed for LowSpeed {}
+impl Speed for LowSpeed {
+    const IS_HS: bool = false;
+}
 
 impl<'d> LEDC<'d> {
     /// Return a new LEDC

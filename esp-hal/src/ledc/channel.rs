@@ -9,15 +9,7 @@
 //! `Pulse-Width Modulation (PWM)` applications by offering configurable duty
 //! cycles and frequencies.
 
-#[cfg(esp32)]
-use paste::paste;
-
-#[cfg(esp32)]
-use super::HighSpeed;
-use super::{
-    timer::{TimerIFace, TimerSpeed},
-    LowSpeed,
-};
+use super::timer::{TimerIFace, TimerSpeed};
 use crate::{
     gpio::{OutputPin, OutputSignal},
     peripheral::{Peripheral, PeripheralRef},
@@ -56,16 +48,16 @@ pub enum Error {
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Number {
-    Channel0,
-    Channel1,
-    Channel2,
-    Channel3,
-    Channel4,
-    Channel5,
+    Channel0 = 0,
+    Channel1 = 1,
+    Channel2 = 2,
+    Channel3 = 3,
+    Channel4 = 4,
+    Channel5 = 5,
     #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
-    Channel6,
+    Channel6 = 6,
     #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
-    Channel7,
+    Channel7 = 7,
 }
 
 /// Channel configuration
@@ -338,88 +330,80 @@ mod ehal1 {
     }
 }
 
-#[cfg(esp32)]
-/// Macro to configure channel parameters in hw
-macro_rules! set_channel {
-    ($self: ident, $speed: ident, $num: literal, $timer_number: ident) => {{
-        paste! {
-            $self.ledc.[<$speed sch>]($num as usize).hpoint()
-                .write(|w| unsafe { w.hpoint().bits(0x0) });
-            $self.ledc.[<$speed sch>]($num as usize).conf0().modify(|_, w| unsafe {
-                w.sig_out_en()
-                    .set_bit()
-                    .timer_sel()
-                    .bits($timer_number)
-            });
+impl<'a, O: OutputPin, S: crate::ledc::timer::TimerSpeed> Channel<'a, S, O> {
+    #[cfg(esp32)]
+    fn set_channel(&mut self, timer_number: u8) {
+        if S::IS_HS {
+            let ch = self.ledc.hsch(self.number as usize);
+            ch.hpoint().write(|w| unsafe { w.hpoint().bits(0x0) });
+            ch.conf0()
+                .modify(|_, w| unsafe { w.sig_out_en().set_bit().timer_sel().bits(timer_number) });
+        } else {
+            let ch = self.ledc.lsch(self.number as usize);
+            ch.hpoint().write(|w| unsafe { w.hpoint().bits(0x0) });
+            ch.conf0()
+                .modify(|_, w| unsafe { w.sig_out_en().set_bit().timer_sel().bits(timer_number) });
         }
-        start_duty_without_fading!($self, $speed, $num);
-    }};
-}
-
-#[cfg(not(esp32))]
-/// Macro to configure channel parameters in hw
-macro_rules! set_channel {
-    ($self: ident, $speed: ident, $num: literal, $timer_number: ident) => {{
+        self.start_duty_without_fading();
+    }
+    #[cfg(not(esp32))]
+    fn set_channel(&mut self, timer_number: u8) {
         {
-            let ch = $self.ledc.ch($num as usize);
+            let ch = self.ledc.ch(self.number as usize);
             ch.hpoint().write(|w| unsafe { w.hpoint().bits(0x0) });
             ch.conf0().modify(|_, w| {
                 w.sig_out_en().set_bit();
-                unsafe { w.timer_sel().bits($timer_number) }
+                unsafe { w.timer_sel().bits(timer_number) }
             });
         }
-        start_duty_without_fading!($self, $num);
-    }};
-}
+        self.start_duty_without_fading();
+    }
 
-#[cfg(esp32)]
-/// Macro to start duty cycle, without fading
-macro_rules! start_duty_without_fading {
-    ($self: ident, $speed: ident, $num: literal) => {
-        paste! {
-            $self.ledc.[<$speed sch>]($num as usize).conf1().write(|w| unsafe {
-                w.duty_start()
-                    .set_bit()
-                    .duty_inc()
-                    .set_bit()
-                    .duty_num()
-                    .bits(0x1)
-                    .duty_cycle()
-                    .bits(0x1)
-                    .duty_scale()
-                    .bits(0x0)
+    #[cfg(esp32)]
+    fn start_duty_without_fading(&self) {
+        if S::IS_HS {
+            self.ledc
+                .hsch(self.number as usize)
+                .conf1()
+                .write(|w| unsafe {
+                    w.duty_start().set_bit();
+                    w.duty_inc().set_bit();
+                    w.duty_num().bits(0x1);
+                    w.duty_cycle().bits(0x1);
+                    w.duty_scale().bits(0x0)
+                });
+        } else {
+            self.ledc
+                .lsch(self.number as usize)
+                .conf1()
+                .write(|w| unsafe {
+                    w.duty_start().set_bit();
+                    w.duty_inc().set_bit();
+                    w.duty_num().bits(0x1);
+                    w.duty_cycle().bits(0x1);
+                    w.duty_scale().bits(0x0)
                 });
         }
-    };
-}
-
-#[cfg(any(esp32c6, esp32h2))]
-/// Macro to start duty cycle, without fading
-macro_rules! start_duty_without_fading {
-    ($self: ident, $num: literal) => {
-        $self
-            .ledc
-            .ch($num as usize)
+    }
+    #[cfg(any(esp32c6, esp32h2))]
+    fn start_duty_without_fading(&self) {
+        let cnum = self.number as usize;
+        self.ledc
+            .ch(cnum)
             .conf1()
             .write(|w| w.duty_start().set_bit());
-        $self.ledc.ch_gamma_wr($num as usize).write(|w| unsafe {
-            w.ch_gamma_duty_inc()
-                .set_bit()
-                .ch_gamma_duty_num()
-                .bits(0x1)
-                .ch_gamma_duty_cycle()
-                .bits(0x1)
-                .ch_gamma_scale()
-                .bits(0x0)
+        self.ledc.ch_gamma_wr(cnum).write(|w| {
+            w.ch_gamma_duty_inc().set_bit();
+            unsafe {
+                w.ch_gamma_duty_num().bits(0x1);
+                w.ch_gamma_duty_cycle().bits(0x1);
+                w.ch_gamma_scale().bits(0x0)
+            }
         });
-    };
-}
-
-#[cfg(not(any(esp32, esp32c6, esp32h2)))]
-/// Macro to start duty cycle, without fading
-macro_rules! start_duty_without_fading {
-    ($self: ident, $num: literal) => {
-        $self.ledc.ch($num as usize).conf1().write(|w| {
+    }
+    #[cfg(not(any(esp32, esp32c6, esp32h2)))]
+    fn start_duty_without_fading(&self) {
+        self.ledc.ch(self.number as usize).conf1().write(|w| {
             w.duty_start().set_bit();
             w.duty_inc().set_bit();
             unsafe {
@@ -428,215 +412,128 @@ macro_rules! start_duty_without_fading {
                 w.duty_scale().bits(0x0)
             }
         });
-    };
-}
+    }
 
-#[cfg(esp32)]
-/// Macro to start duty cycle fade
-macro_rules! start_duty_fade {
-    ($self: ident, $speed: ident, $num: literal, $duty_inc: ident, $duty_steps: ident, $cycles_per_step: ident, $duty_per_cycle: ident) => {
-        paste! {
-            $self.ledc.[<$speed sch>]($num as usize).conf1().write(|w| unsafe {
-                w.duty_start()
-                    .set_bit()
-                    .duty_inc()
-                    .variant($duty_inc)
-                    .duty_num()  /* count of incs before stopping */
-                    .bits($duty_steps)
-                    .duty_cycle()  /* overflows between incs */
-                    .bits($cycles_per_step)
-                    .duty_scale()
-                    .bits($duty_per_cycle)
+    #[cfg(esp32)]
+    fn start_duty_fade_inner(
+        &self,
+        duty_inc: bool,
+        duty_steps: u16,
+        cycles_per_step: u16,
+        duty_per_cycle: u16,
+    ) {
+        if S::IS_HS {
+            self.ledc
+                .hsch(self.number as usize)
+                .conf1()
+                .write(|w| unsafe {
+                    w.duty_start()
+                        .set_bit()
+                        .duty_inc()
+                        .variant(duty_inc)
+                        .duty_num() // count of incs before stopping
+                        .bits(duty_steps)
+                        .duty_cycle() // overflows between incs
+                        .bits(cycles_per_step)
+                        .duty_scale()
+                        .bits(duty_per_cycle)
+                });
+        } else {
+            self.ledc
+                .lsch(self.number as usize)
+                .conf1()
+                .write(|w| unsafe {
+                    w.duty_start()
+                        .set_bit()
+                        .duty_inc()
+                        .variant(duty_inc)
+                        .duty_num() // count of incs before stopping
+                        .bits(duty_steps)
+                        .duty_cycle() // overflows between incs
+                        .bits(cycles_per_step)
+                        .duty_scale()
+                        .bits(duty_per_cycle)
                 });
         }
-    };
-}
+    }
 
-#[cfg(any(esp32c6, esp32h2))]
-/// Macro to start a duty cycle fade
-macro_rules! start_duty_fade {
-    ($self: ident, $num: literal, $duty_inc: ident, $duty_steps: ident, $cycles_per_step: ident, $duty_per_cycle: ident) => {{
-        $self
-            .ledc
-            .ch($num as usize)
+    #[cfg(any(esp32c6, esp32h2))]
+    fn start_duty_fade_inner(
+        &self,
+        duty_inc: bool,
+        duty_steps: u16,
+        cycles_per_step: u16,
+        duty_per_cycle: u16,
+    ) {
+        let cnum = self.number as usize;
+        self.ledc
+            .ch(cnum)
             .conf1()
             .write(|w| w.duty_start().set_bit());
-        $self.ledc.ch_gamma_wr($num as usize).write(|w| unsafe {
+        self.ledc.ch_gamma_wr(cnum).write(|w| unsafe {
             w.ch_gamma_duty_inc()
-                .variant($duty_inc)
+                .variant(duty_inc)
                 .ch_gamma_duty_num() // count of incs before stopping
-                .bits($duty_steps)
+                .bits(duty_steps)
                 .ch_gamma_duty_cycle() // overflows between incs
-                .bits($cycles_per_step)
+                .bits(cycles_per_step)
                 .ch_gamma_scale()
-                .bits($duty_per_cycle)
+                .bits(duty_per_cycle)
         });
-        $self
-            .ledc
-            .ch_gamma_wr_addr($num as usize)
+        self.ledc
+            .ch_gamma_wr_addr(cnum)
             .write(|w| unsafe { w.ch_gamma_wr_addr().bits(0) });
-        $self
-            .ledc
-            .ch_gamma_conf($num)
+        self.ledc
+            .ch_gamma_conf(cnum)
             .write(|w| unsafe { w.ch_gamma_entry_num().bits(0x1) });
-    }};
-}
+    }
 
-#[cfg(not(any(esp32, esp32c6, esp32h2)))]
-/// Macro to start a duty cycle fade
-macro_rules! start_duty_fade {
-    ($self: ident, $num: literal, $duty_inc: ident, $duty_steps: ident, $cycles_per_step: ident, $duty_per_cycle: ident) => {{
-        $self.ledc.ch($num as usize).conf1().write(|w| unsafe {
-            w.duty_start().set_bit();
-            w.duty_inc().variant($duty_inc);
-            // count of incs before stopping
-            w.duty_num().bits($duty_steps);
-            // overflows between incs
-            w.duty_cycle().bits($cycles_per_step);
-            w.duty_scale().bits($duty_per_cycle)
-        });
-    }};
-}
+    #[cfg(not(any(esp32, esp32c6, esp32h2)))]
+    fn start_duty_fade_inner(
+        &self,
+        duty_inc: bool,
+        duty_steps: u16,
+        cycles_per_step: u16,
+        duty_per_cycle: u16,
+    ) {
+        self.ledc
+            .ch(self.number as usize)
+            .conf1()
+            .write(|w| unsafe {
+                w.duty_start().set_bit();
+                w.duty_inc().variant(duty_inc);
+                // count of incs before stopping
+                w.duty_num().bits(duty_steps);
+                // overflows between incs
+                w.duty_cycle().bits(cycles_per_step);
+                w.duty_scale().bits(duty_per_cycle)
+            });
+    }
 
-#[cfg(esp32)]
-/// Macro to set duty parameters in hw
-macro_rules! set_duty {
-    ($self: ident, $speed: ident, $num: literal, $duty: ident) => {{
-        paste! {
-            $self.ledc
-                .[<$speed sch>]($num as usize).duty()
-                .write(|w| unsafe { w.duty().bits($duty << 4) });
+    #[cfg(esp32)]
+    fn update_channel(&self) {
+        if !S::IS_HS {
+            self.ledc
+                .lsch(self.number as usize)
+                .conf0()
+                .modify(|_, w| w.para_up().set_bit());
         }
-        start_duty_without_fading!($self, $speed, $num);
-        update_channel!($self, $speed, $num);
-    }};
-}
-
-#[cfg(not(esp32))]
-/// Macro to set duty parameters in hw
-macro_rules! set_duty {
-    ($self: ident, $speed: ident, $num: literal, $duty: ident) => {{
-        {
-            $self
-                .ledc
-                .ch($num as usize)
-                .duty()
-                .write(|w| unsafe { w.duty().bits($duty << 4) });
-        }
-        start_duty_without_fading!($self, $num);
-        update_channel!($self, $speed, $num);
-    }};
-}
-
-#[cfg(esp32)]
-/// Macro to set duty parameters in hw for a fade
-macro_rules! set_duty_fade {
-    ($self: ident, $speed: ident, $num: literal, $start_duty: ident, $duty_inc: ident, $duty_steps: ident, $cycles_per_step: ident, $duty_per_cycle: ident) => {{
-        paste! {
-            $self.ledc
-                .[<$speed sch>]($num as usize).duty()
-                .write(|w| unsafe { w.duty().bits($start_duty << 4) });
-            $self.ledc
-                .int_clr()
-                .write(|w| { w.[<duty_chng_end_ $speed sch>]($num).clear_bit_by_one() });
-        }
-        start_duty_fade!(
-            $self,
-            $speed,
-            $num,
-            $duty_inc,
-            $duty_steps,
-            $cycles_per_step,
-            $duty_per_cycle
-        );
-        update_channel!($self, $speed, $num);
-    }};
-}
-
-#[cfg(not(esp32))]
-/// Macro to set duty parameters in hw for a fade
-macro_rules! set_duty_fade {
-    ($self: ident, $speed: ident, $num: literal, $start_duty: ident, $duty_inc: ident, $duty_steps: ident, $cycles_per_step: ident, $duty_per_cycle: ident) => {{
-        $self
-            .ledc
-            .ch($num as usize)
-            .duty()
-            .write(|w| unsafe { w.duty().bits($start_duty << 4) });
-        $self
-            .ledc
-            .int_clr()
-            .write(|w| w.duty_chng_end_ch($num).clear_bit_by_one());
-        start_duty_fade!(
-            $self,
-            $num,
-            $duty_inc,
-            $duty_steps,
-            $cycles_per_step,
-            $duty_per_cycle
-        );
-        update_channel!($self, $speed, $num);
-    }};
-}
-
-/// Macro to check if a duty-cycle fade is running
-#[cfg(esp32)]
-macro_rules! is_duty_fade_running {
-    ($self: ident, $speed: ident, $num: literal) => {{
-        paste! {
-            $self.ledc
-                .int_raw()
-                .read()
-                .[<duty_chng_end_ $speed sch>]($num)
-                .bit_is_clear()
-        }
-    }};
-}
-
-#[cfg(not(esp32))]
-macro_rules! is_duty_fade_running {
-    ($self: ident, $speed: ident, $num: literal) => {{
-        $self
-            .ledc
-            .int_raw()
-            .read()
-            .duty_chng_end_ch($num)
-            .bit_is_clear()
-    }};
-}
-
-#[cfg(esp32)]
-/// Macro to update channel configuration (only for LowSpeed channels)
-macro_rules! update_channel {
-    ($self: ident, l, $num: literal) => {
-        $self
-            .ledc
-            .lsch($num as usize)
+    }
+    #[cfg(not(esp32))]
+    fn update_channel(&self) {
+        self.ledc
+            .ch(self.number as usize)
             .conf0()
             .modify(|_, w| w.para_up().set_bit());
-    };
-    ($self: ident, h, $num: literal) => {};
+    }
 }
 
-#[cfg(not(esp32))]
-/// Macro to update channel configuration (only for LowSpeed channels)
-macro_rules! update_channel {
-    ($self: ident, l, $num: literal) => {
-        $self
-            .ledc
-            .ch($num as usize)
-            .conf0()
-            .modify(|_, w| w.para_up().set_bit());
-    };
-}
-
-#[cfg(esp32)]
-/// Channel HW interface for HighSpeed channels
-impl<'a, O> ChannelHW<O> for Channel<'a, HighSpeed, O>
+impl<'a, O, S> ChannelHW<O> for Channel<'a, S, O>
 where
     O: OutputPin,
+    S: crate::ledc::timer::TimerSpeed,
 {
-    /// Configure Channel HW except for the duty which is set via
-    /// [`Self::set_duty_hw`].
+    /// Configure Channel HW
     fn configure_hw(&mut self) -> Result<(), Error> {
         self.configure_hw_with_pin_config(config::PinConfig::PushPull)
     }
@@ -652,48 +549,51 @@ where
             };
 
             let timer_number = timer.get_number() as u8;
-            match self.number {
-                Number::Channel0 => {
-                    set_channel!(self, h, 0, timer_number);
-                    self.output_pin
-                        .connect_peripheral_to_output(OutputSignal::LEDC_HS_SIG0);
+
+            self.set_channel(timer_number);
+            self.update_channel();
+
+            #[cfg(esp32)]
+            let signal = if S::IS_HS {
+                #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
+                match self.number {
+                    Number::Channel0 => OutputSignal::LEDC_HS_SIG0,
+                    Number::Channel1 => OutputSignal::LEDC_HS_SIG1,
+                    Number::Channel2 => OutputSignal::LEDC_HS_SIG2,
+                    Number::Channel3 => OutputSignal::LEDC_HS_SIG3,
+                    Number::Channel4 => OutputSignal::LEDC_HS_SIG4,
+                    Number::Channel5 => OutputSignal::LEDC_HS_SIG5,
+                    Number::Channel6 => OutputSignal::LEDC_HS_SIG6,
+                    Number::Channel7 => OutputSignal::LEDC_HS_SIG7,
                 }
-                Number::Channel1 => {
-                    set_channel!(self, h, 1, timer_number);
-                    self.output_pin
-                        .connect_peripheral_to_output(OutputSignal::LEDC_HS_SIG1);
+            } else {
+                match self.number {
+                    Number::Channel0 => OutputSignal::LEDC_LS_SIG0,
+                    Number::Channel1 => OutputSignal::LEDC_LS_SIG1,
+                    Number::Channel2 => OutputSignal::LEDC_LS_SIG2,
+                    Number::Channel3 => OutputSignal::LEDC_LS_SIG3,
+                    Number::Channel4 => OutputSignal::LEDC_LS_SIG4,
+                    Number::Channel5 => OutputSignal::LEDC_LS_SIG5,
+                    #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
+                    Number::Channel6 => OutputSignal::LEDC_LS_SIG6,
+                    #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
+                    Number::Channel7 => OutputSignal::LEDC_LS_SIG7,
                 }
-                Number::Channel2 => {
-                    set_channel!(self, h, 2, timer_number);
-                    self.output_pin
-                        .connect_peripheral_to_output(OutputSignal::LEDC_HS_SIG2);
-                }
-                Number::Channel3 => {
-                    set_channel!(self, h, 3, timer_number);
-                    self.output_pin
-                        .connect_peripheral_to_output(OutputSignal::LEDC_HS_SIG3);
-                }
-                Number::Channel4 => {
-                    set_channel!(self, h, 4, timer_number);
-                    self.output_pin
-                        .connect_peripheral_to_output(OutputSignal::LEDC_HS_SIG4);
-                }
-                Number::Channel5 => {
-                    set_channel!(self, h, 5, timer_number);
-                    self.output_pin
-                        .connect_peripheral_to_output(OutputSignal::LEDC_HS_SIG5);
-                }
-                Number::Channel6 => {
-                    set_channel!(self, h, 6, timer_number);
-                    self.output_pin
-                        .connect_peripheral_to_output(OutputSignal::LEDC_HS_SIG6);
-                }
-                Number::Channel7 => {
-                    set_channel!(self, h, 7, timer_number);
-                    self.output_pin
-                        .connect_peripheral_to_output(OutputSignal::LEDC_HS_SIG7);
-                }
-            }
+            };
+            #[cfg(not(esp32))]
+            let signal = match self.number {
+                Number::Channel0 => OutputSignal::LEDC_LS_SIG0,
+                Number::Channel1 => OutputSignal::LEDC_LS_SIG1,
+                Number::Channel2 => OutputSignal::LEDC_LS_SIG2,
+                Number::Channel3 => OutputSignal::LEDC_LS_SIG3,
+                Number::Channel4 => OutputSignal::LEDC_LS_SIG4,
+                Number::Channel5 => OutputSignal::LEDC_LS_SIG5,
+                #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
+                Number::Channel6 => OutputSignal::LEDC_LS_SIG6,
+                #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
+                Number::Channel7 => OutputSignal::LEDC_LS_SIG7,
+            };
+            self.output_pin.connect_peripheral_to_output(signal);
         } else {
             return Err(Error::Timer);
         }
@@ -702,227 +602,36 @@ where
     }
 
     /// Set duty in channel HW
+    #[cfg(esp32)]
     fn set_duty_hw(&self, duty: u32) {
-        match self.number {
-            Number::Channel0 => set_duty!(self, h, 0, duty),
-            Number::Channel1 => set_duty!(self, h, 1, duty),
-            Number::Channel2 => set_duty!(self, h, 2, duty),
-            Number::Channel3 => set_duty!(self, h, 3, duty),
-            Number::Channel4 => set_duty!(self, h, 4, duty),
-            Number::Channel5 => set_duty!(self, h, 5, duty),
-            Number::Channel6 => set_duty!(self, h, 6, duty),
-            Number::Channel7 => set_duty!(self, h, 7, duty),
-        };
-    }
-
-    /// Start a duty-cycle fade HW
-    fn start_duty_fade_hw(
-        &self,
-        start_duty: u32,
-        duty_inc: bool,
-        duty_steps: u16,
-        cycles_per_step: u16,
-        duty_per_cycle: u16,
-    ) {
-        match self.number {
-            Number::Channel0 => set_duty_fade!(
-                self,
-                h,
-                0,
-                start_duty,
-                duty_inc,
-                duty_steps,
-                cycles_per_step,
-                duty_per_cycle
-            ),
-            Number::Channel1 => set_duty_fade!(
-                self,
-                h,
-                1,
-                start_duty,
-                duty_inc,
-                duty_steps,
-                cycles_per_step,
-                duty_per_cycle
-            ),
-            Number::Channel2 => set_duty_fade!(
-                self,
-                h,
-                2,
-                start_duty,
-                duty_inc,
-                duty_steps,
-                cycles_per_step,
-                duty_per_cycle
-            ),
-            Number::Channel3 => set_duty_fade!(
-                self,
-                h,
-                3,
-                start_duty,
-                duty_inc,
-                duty_steps,
-                cycles_per_step,
-                duty_per_cycle
-            ),
-            Number::Channel4 => set_duty_fade!(
-                self,
-                h,
-                4,
-                start_duty,
-                duty_inc,
-                duty_steps,
-                cycles_per_step,
-                duty_per_cycle
-            ),
-            Number::Channel5 => set_duty_fade!(
-                self,
-                h,
-                5,
-                start_duty,
-                duty_inc,
-                duty_steps,
-                cycles_per_step,
-                duty_per_cycle
-            ),
-            Number::Channel6 => set_duty_fade!(
-                self,
-                h,
-                6,
-                start_duty,
-                duty_inc,
-                duty_steps,
-                cycles_per_step,
-                duty_per_cycle
-            ),
-            Number::Channel7 => set_duty_fade!(
-                self,
-                h,
-                7,
-                start_duty,
-                duty_inc,
-                duty_steps,
-                cycles_per_step,
-                duty_per_cycle
-            ),
-        }
-    }
-
-    fn is_duty_fade_running_hw(&self) -> bool {
-        match self.number {
-            Number::Channel0 => is_duty_fade_running!(self, h, 0),
-            Number::Channel1 => is_duty_fade_running!(self, h, 1),
-            Number::Channel2 => is_duty_fade_running!(self, h, 2),
-            Number::Channel3 => is_duty_fade_running!(self, h, 3),
-            Number::Channel4 => is_duty_fade_running!(self, h, 4),
-            Number::Channel5 => is_duty_fade_running!(self, h, 5),
-            Number::Channel6 => is_duty_fade_running!(self, h, 6),
-            Number::Channel7 => is_duty_fade_running!(self, h, 7),
-        }
-    }
-}
-
-/// Channel HW interface for LowSpeed channels
-impl<'a, O: OutputPin> ChannelHW<O> for Channel<'a, LowSpeed, O>
-where
-    O: OutputPin,
-{
-    /// Configure Channel HW
-    fn configure_hw(&mut self) -> Result<(), Error> {
-        self.configure_hw_with_pin_config(config::PinConfig::PushPull)
-    }
-    fn configure_hw_with_pin_config(&mut self, cfg: config::PinConfig) -> Result<(), Error> {
-        if let Some(timer) = self.timer {
-            if !timer.is_configured() {
-                return Err(Error::Timer);
-            }
-
-            match cfg {
-                config::PinConfig::PushPull => {
-                    self.output_pin.set_to_push_pull_output();
-                }
-                config::PinConfig::OpenDrain => {
-                    self.output_pin.set_to_open_drain_output();
-                }
-            }
-
-            let timer_number = timer.get_number() as u8;
-            match self.number {
-                Number::Channel0 => {
-                    set_channel!(self, l, 0, timer_number);
-                    update_channel!(self, l, 0);
-                    self.output_pin
-                        .connect_peripheral_to_output(OutputSignal::LEDC_LS_SIG0);
-                }
-                Number::Channel1 => {
-                    set_channel!(self, l, 1, timer_number);
-                    update_channel!(self, l, 1);
-                    self.output_pin
-                        .connect_peripheral_to_output(OutputSignal::LEDC_LS_SIG1);
-                }
-                Number::Channel2 => {
-                    set_channel!(self, l, 2, timer_number);
-                    update_channel!(self, l, 2);
-                    self.output_pin
-                        .connect_peripheral_to_output(OutputSignal::LEDC_LS_SIG2);
-                }
-                Number::Channel3 => {
-                    set_channel!(self, l, 3, timer_number);
-                    update_channel!(self, l, 3);
-                    self.output_pin
-                        .connect_peripheral_to_output(OutputSignal::LEDC_LS_SIG3);
-                }
-                Number::Channel4 => {
-                    set_channel!(self, l, 4, timer_number);
-                    update_channel!(self, l, 4);
-                    self.output_pin
-                        .connect_peripheral_to_output(OutputSignal::LEDC_LS_SIG4);
-                }
-                Number::Channel5 => {
-                    set_channel!(self, l, 5, timer_number);
-                    update_channel!(self, l, 5);
-                    self.output_pin
-                        .connect_peripheral_to_output(OutputSignal::LEDC_LS_SIG5);
-                }
-                #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
-                Number::Channel6 => {
-                    set_channel!(self, l, 6, timer_number);
-                    update_channel!(self, l, 6);
-                    self.output_pin
-                        .connect_peripheral_to_output(OutputSignal::LEDC_LS_SIG6);
-                }
-                #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
-                Number::Channel7 => {
-                    set_channel!(self, l, 7, timer_number);
-                    update_channel!(self, l, 7);
-                    self.output_pin
-                        .connect_peripheral_to_output(OutputSignal::LEDC_LS_SIG7);
-                }
-            }
+        if S::IS_HS {
+            self.ledc
+                .hsch(self.number as usize)
+                .duty()
+                .write(|w| unsafe { w.duty().bits(duty << 4) });
         } else {
-            return Err(Error::Timer);
+            self.ledc
+                .hsch(self.number as usize)
+                .duty()
+                .write(|w| unsafe { w.duty().bits(duty << 4) });
         }
-
-        Ok(())
+        self.start_duty_without_fading();
+        self.update_channel();
     }
 
     /// Set duty in channel HW
+    #[cfg(not(esp32))]
     fn set_duty_hw(&self, duty: u32) {
-        match self.number {
-            Number::Channel0 => set_duty!(self, l, 0, duty),
-            Number::Channel1 => set_duty!(self, l, 1, duty),
-            Number::Channel2 => set_duty!(self, l, 2, duty),
-            Number::Channel3 => set_duty!(self, l, 3, duty),
-            Number::Channel4 => set_duty!(self, l, 4, duty),
-            Number::Channel5 => set_duty!(self, l, 5, duty),
-            #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
-            Number::Channel6 => set_duty!(self, l, 6, duty),
-            #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
-            Number::Channel7 => set_duty!(self, l, 7, duty),
-        };
+        self.ledc
+            .ch(self.number as usize)
+            .duty()
+            .write(|w| unsafe { w.duty().bits(duty << 4) });
+        self.start_duty_without_fading();
+        self.update_channel();
     }
 
     /// Start a duty-cycle fade HW
+    #[cfg(esp32)]
     fn start_duty_fade_hw(
         &self,
         start_duty: u32,
@@ -931,104 +640,64 @@ where
         cycles_per_step: u16,
         duty_per_cycle: u16,
     ) {
-        match self.number {
-            Number::Channel0 => set_duty_fade!(
-                self,
-                l,
-                0,
-                start_duty,
-                duty_inc,
-                duty_steps,
-                cycles_per_step,
-                duty_per_cycle
-            ),
-            Number::Channel1 => set_duty_fade!(
-                self,
-                l,
-                1,
-                start_duty,
-                duty_inc,
-                duty_steps,
-                cycles_per_step,
-                duty_per_cycle
-            ),
-            Number::Channel2 => set_duty_fade!(
-                self,
-                l,
-                2,
-                start_duty,
-                duty_inc,
-                duty_steps,
-                cycles_per_step,
-                duty_per_cycle
-            ),
-            Number::Channel3 => set_duty_fade!(
-                self,
-                l,
-                3,
-                start_duty,
-                duty_inc,
-                duty_steps,
-                cycles_per_step,
-                duty_per_cycle
-            ),
-            Number::Channel4 => set_duty_fade!(
-                self,
-                l,
-                4,
-                start_duty,
-                duty_inc,
-                duty_steps,
-                cycles_per_step,
-                duty_per_cycle
-            ),
-            Number::Channel5 => set_duty_fade!(
-                self,
-                l,
-                5,
-                start_duty,
-                duty_inc,
-                duty_steps,
-                cycles_per_step,
-                duty_per_cycle
-            ),
-            #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
-            Number::Channel6 => set_duty_fade!(
-                self,
-                l,
-                6,
-                start_duty,
-                duty_inc,
-                duty_steps,
-                cycles_per_step,
-                duty_per_cycle
-            ),
-            #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
-            Number::Channel7 => set_duty_fade!(
-                self,
-                l,
-                7,
-                start_duty,
-                duty_inc,
-                duty_steps,
-                cycles_per_step,
-                duty_per_cycle
-            ),
+        if S::IS_HS {
+            self.ledc
+                .hsch(self.number as usize)
+                .duty()
+                .write(|w| unsafe { w.duty().bits(start_duty << 4) });
+            self.ledc
+                .int_clr()
+                .write(|w| w.duty_chng_end_hsch(self.number as u8).clear_bit_by_one());
+        } else {
+            self.ledc
+                .lsch(self.number as usize)
+                .duty()
+                .write(|w| unsafe { w.duty().bits(start_duty << 4) });
+            self.ledc
+                .int_clr()
+                .write(|w| w.duty_chng_end_lsch(self.number as u8).clear_bit_by_one());
+        }
+        self.start_duty_fade_inner(duty_inc, duty_steps, cycles_per_step, duty_per_cycle);
+        self.update_channel();
+    }
+
+    /// Start a duty-cycle fade HW
+    #[cfg(not(esp32))]
+    fn start_duty_fade_hw(
+        &self,
+        start_duty: u32,
+        duty_inc: bool,
+        duty_steps: u16,
+        cycles_per_step: u16,
+        duty_per_cycle: u16,
+    ) {
+        self.ledc
+            .ch(self.number as usize)
+            .duty()
+            .write(|w| unsafe { w.duty().bits(start_duty << 4) });
+        self.ledc
+            .int_clr()
+            .write(|w| w.duty_chng_end_ch(self.number as u8).clear_bit_by_one());
+        self.start_duty_fade_inner(duty_inc, duty_steps, cycles_per_step, duty_per_cycle);
+        self.update_channel();
+    }
+
+    #[cfg(esp32)]
+    fn is_duty_fade_running_hw(&self) -> bool {
+        let reg = self.ledc.int_raw().read();
+        if S::IS_HS {
+            reg.duty_chng_end_hsch(self.number as u8).bit_is_clear()
+        } else {
+            reg.duty_chng_end_lsch(self.number as u8).bit_is_clear()
         }
     }
 
+    #[cfg(not(esp32))]
     fn is_duty_fade_running_hw(&self) -> bool {
-        match self.number {
-            Number::Channel0 => is_duty_fade_running!(self, l, 0),
-            Number::Channel1 => is_duty_fade_running!(self, l, 1),
-            Number::Channel2 => is_duty_fade_running!(self, l, 2),
-            Number::Channel3 => is_duty_fade_running!(self, l, 3),
-            Number::Channel4 => is_duty_fade_running!(self, l, 4),
-            Number::Channel5 => is_duty_fade_running!(self, l, 5),
-            #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
-            Number::Channel6 => is_duty_fade_running!(self, l, 6),
-            #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
-            Number::Channel7 => is_duty_fade_running!(self, l, 7),
-        }
+        self.ledc
+            .int_raw()
+            .read()
+            .duty_chng_end_ch(self.number as u8)
+            .bit_is_clear()
     }
 }

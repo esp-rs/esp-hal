@@ -48,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   MCPWM clusters (#1360)
   TIMG clusters (#1364)
   SOC_ETM clusters (#1365)
+  LEDC clusters (#1368)
 
 ### Removed
 
