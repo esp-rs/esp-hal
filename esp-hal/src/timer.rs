@@ -224,7 +224,6 @@ where
 /// General-purpose Timer driver
 pub struct Timer<T> {
     timg: T,
-    #[allow(dead_code)] // FIXME
     apb_clk_freq: HertzU32,
 }
 
@@ -232,7 +231,7 @@ impl<T> Timer<T>
 where
     T: Instance,
 {
-    /// Create a new timer instance
+    /// Create a new timer instance.
     pub fn new(timg: T, apb_clk_freq: HertzU32) -> Self {
         // TODO: this currently assumes APB_CLK is being used, as we don't yet have a
         //       way to select the XTAL_CLK.
@@ -240,6 +239,46 @@ where
         timg.enable_peripheral();
 
         Self { timg, apb_clk_freq }
+    }
+
+    /// Start the timer with the given time period.
+    pub fn start(&mut self, timeout: MicrosDurationU64) {
+        self.timg.set_counter_active(false);
+        self.timg.set_alarm_active(false);
+
+        self.timg.reset_counter();
+
+        // TODO: this currently assumes APB_CLK is being used, as we don't yet have a
+        //       way to select the XTAL_CLK.
+        // TODO: can we cache the divider (only get it on initialization)?
+        let ticks = timeout_to_ticks(timeout, self.apb_clk_freq, self.timg.divider());
+        self.timg.load_alarm_value(ticks);
+
+        self.timg.set_counter_decrementing(false);
+        self.timg.set_auto_reload(true);
+        self.timg.set_counter_active(true);
+        self.timg.set_alarm_active(true);
+    }
+
+    /// Check if the timer has elapsed
+    pub fn has_elapsed(&mut self) -> bool {
+        if !self.timg.is_counter_active() {
+            panic!("Called wait on an inactive timer!")
+        }
+
+        if self.timg.is_interrupt_set() {
+            self.timg.clear_interrupt();
+            self.timg.set_alarm_active(true);
+
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Block until the timer has elasped.
+    pub fn wait(&mut self) {
+        while !self.has_elapsed() {}
     }
 
     /// Return the raw interface to the underlying timer instance
@@ -478,7 +517,6 @@ where
     }
 }
 
-#[allow(dead_code)] // FIXME
 fn timeout_to_ticks<T, F>(timeout: T, clock: F, divider: u32) -> u64
 where
     T: Into<MicrosDurationU64>,
@@ -505,32 +543,11 @@ where
     where
         Time: Into<Self::Time>,
     {
-        self.timg.set_counter_active(false);
-        self.timg.set_alarm_active(false);
-
-        self.timg.reset_counter();
-
-        // TODO: this currently assumes APB_CLK is being used, as we don't yet have a
-        //       way to select the XTAL_CLK.
-        // TODO: can we cache the divider (only get it on initialization)?
-        let ticks = timeout_to_ticks(timeout, self.apb_clk_freq, self.timg.divider());
-        self.timg.load_alarm_value(ticks);
-
-        self.timg.set_counter_decrementing(false);
-        self.timg.set_auto_reload(true);
-        self.timg.set_counter_active(true);
-        self.timg.set_alarm_active(true);
+        (*self).start(timeout.into())
     }
 
     fn wait(&mut self) -> nb::Result<(), Void> {
-        if !self.timg.is_counter_active() {
-            panic!("Called wait on an inactive timer!")
-        }
-
-        if self.timg.is_interrupt_set() {
-            self.timg.clear_interrupt();
-            self.timg.set_alarm_active(true);
-
+        if self.has_elapsed() {
             Ok(())
         } else {
             Err(nb::Error::WouldBlock)

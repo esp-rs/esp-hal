@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- TIMG: Allow use without the embedded-hal-02 traits in scope (#1367)
 - DMA: use channel clusters
 - Remove `Ext32` and `RateExtU64` from prelude
 - Prefer mutable references over moving for DMA transactions (#1238)
