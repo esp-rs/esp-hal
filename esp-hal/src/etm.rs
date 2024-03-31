@@ -67,7 +67,7 @@ impl<const C: u8> EtmChannel<C> {
             .modify(|_, w| unsafe { w.evt_id().bits(event.id()) });
         etm.ch(C as usize)
             .task_id()
-            .modify(|_, w| unsafe { w.task_id().bits(event.id()) });
+            .modify(|_, w| unsafe { w.task_id().bits(task.id()) });
         if C < 32 {
             etm.ch_ena_ad0_set().write(|w| w.ch_set(C).set_bit());
         } else {
