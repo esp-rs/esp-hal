@@ -125,7 +125,8 @@ impl<'d> LEDC<'d> {
     pub fn set_global_slow_clock(&mut self, _clock_source: LSGlobalClkSource) {
         self.ledc.conf().write(|w| w.apb_clk_sel().set_bit());
         self.ledc
-            .lstimer0_conf()
+            .lstimer(0)
+            .conf()
             .modify(|_, w| w.para_up().set_bit());
     }
 
@@ -152,7 +153,10 @@ impl<'d> LEDC<'d> {
                     .write(|w| unsafe { w.ledc_sclk_sel().bits(0) });
             }
         }
-        self.ledc.timer0_conf().modify(|_, w| w.para_up().set_bit());
+        self.ledc
+            .timer(0)
+            .conf()
+            .modify(|_, w| w.para_up().set_bit());
     }
 
     /// Return a new timer
