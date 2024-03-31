@@ -115,11 +115,34 @@ mod tests {
     }
 
     #[test]
-    async fn test_pins_can_wait(_ctx: Context) {
+    async fn test_first_last_pins_can_wait(_ctx: Context) {
         let mut first = unsafe { GpioPin::<Unknown, 0>::steal() }.into_pull_down_input();
-        // convenient way to get the last pin without cfgs for all chips
-        let mut last =
-            unsafe { GpioPin::<Unknown, { (NUM_PINS - 1) as u8 }>::steal() }.into_pull_down_input();
+
+        // Pulled from https://github.com/espressif/esp-idf/blob/master/components/soc/$CHIP/gpio_periph.c
+        // The idea is behind this test is that _if_ NUM_PINS changes, this test will
+        // fail, meaning we can access if the change is actually correct or not
+        //
+        // This should essentially always be NUM_PINS - 1 for any given chip
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "esp32")] {
+                const LAST: u8 = 39;
+            } else if #[cfg(feature = "esp32s2")] {
+                const LAST: u8 = 45;
+            } else if #[cfg(feature = "esp32s3")] {
+                const LAST: u8 = 47;
+            } else if #[cfg(feature = "esp32c2")] {
+                const LAST: u8 = 20;
+            } else if #[cfg(feature = "esp32c3")] {
+                const LAST: u8 = 21;
+            } else if #[cfg(feature = "esp32c6")] {
+                const LAST: u8 = 30;
+            } else if #[cfg(feature = "esp32h2")] {
+                const LAST: u8 = 27;
+            } else {
+                panic!("Unhandled chip")
+            }
+        }
+        let mut last = unsafe { GpioPin::<Unknown, { LAST }>::steal() }.into_pull_down_input();
 
         embassy_futures::select::select3(
             first.wait_for_rising_edge(),
