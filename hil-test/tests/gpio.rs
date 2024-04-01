@@ -17,7 +17,7 @@ use esp_hal::{
     clock::ClockControl,
     delay::Delay,
     embassy,
-    gpio::{GpioPin, Input, Output, OutputPin, PullDown, PushPull, Unknown, IO, NUM_PINS},
+    gpio::{GpioPin, Input, Output, OutputPin, PullDown, PushPull, Unknown, IO},
     macros::handler,
     peripherals::Peripherals,
     system::SystemExt,
