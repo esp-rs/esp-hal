@@ -56,7 +56,7 @@ jobs:
             "esp32c3",
             "esp32c6",
             "esp32h2",
-            # "esp32p4",
+            "esp32p4",
             # Xtensa devices:
             "esp32",
             "esp32s2",
