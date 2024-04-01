@@ -44,10 +44,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - DMA channels can/have to be explicitly created for async or blocking drivers, added `set_interrupt_handler` to DMA channels, SPI, I2S, PARL_IO, don't enable interrupts on startup for DMA, I2S, PARL_IO, GPIO (#1300)
 - UART: Rework `change_baud` so it is possible to set baud rate even after instantiation (#1350)
 - Runtime ISR binding for SHA,ECC and RSA (#1354)
-- Update `pac`s with removed suffixes in `int` field names. Use `W1TC` for `int_clr` (#1357)
-  MCPWM clusters (#1360)
-  TIMG clusters (#1364)
-  SOC_ETM clusters (#1365)
 
 ### Removed
 
