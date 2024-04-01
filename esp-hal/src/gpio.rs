@@ -22,7 +22,7 @@
 //!
 //! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
 
-use core::{cell::Cell, convert::Infallible, marker::PhantomData};
+use core::{cell::Cell, marker::PhantomData};
 
 use critical_section::Mutex;
 
@@ -548,7 +548,7 @@ impl<MODE, const GPIONUM: u8> embedded_hal_02::digital::v2::InputPin
 where
     Self: GpioProperties,
 {
-    type Error = Infallible;
+    type Error = core::convert::Infallible;
     fn is_high(&self) -> Result<bool, Self::Error> {
         Ok(<Self as GpioProperties>::Bank::read_input() & (1 << (GPIONUM % 32)) != 0)
     }
@@ -563,7 +563,7 @@ impl<const GPIONUM: u8> embedded_hal_02::digital::v2::InputPin
 where
     Self: GpioProperties,
 {
-    type Error = Infallible;
+    type Error = core::convert::Infallible;
     fn is_high(&self) -> Result<bool, Self::Error> {
         Ok(<Self as GpioProperties>::Bank::read_input() & (1 << (GPIONUM % 32)) != 0)
     }
@@ -577,7 +577,7 @@ impl<MODE, const GPIONUM: u8> embedded_hal::digital::ErrorType for GpioPin<Input
 where
     Self: GpioProperties,
 {
-    type Error = Infallible;
+    type Error = core::convert::Infallible;
 }
 
 #[cfg(feature = "embedded-hal")]
@@ -899,7 +899,7 @@ where
     Self: GpioProperties,
     <Self as GpioProperties>::PinType: IsOutputPin,
 {
-    type Error = Infallible;
+    type Error = core::convert::Infallible;
     fn set_high(&mut self) -> Result<(), Self::Error> {
         <Self as GpioProperties>::Bank::write_output_set(1 << (GPIONUM % 32));
         Ok(())
@@ -932,7 +932,7 @@ where
     Self: GpioProperties,
     <Self as GpioProperties>::PinType: IsOutputPin,
 {
-    type Error = Infallible;
+    type Error = core::convert::Infallible;
     fn toggle(&mut self) -> Result<(), Self::Error> {
         use embedded_hal_02::digital::v2::{OutputPin as _, StatefulOutputPin as _};
         if self.is_set_high()? {
@@ -949,7 +949,7 @@ where
     Self: GpioProperties,
     <Self as GpioProperties>::PinType: IsOutputPin,
 {
-    type Error = Infallible;
+    type Error = core::convert::Infallible;
 }
 
 #[cfg(feature = "embedded-hal")]
@@ -1775,7 +1775,7 @@ impl<MODE, TYPE> embedded_hal_02::digital::v2::InputPin for AnyPin<Input<MODE>, 
 
 #[cfg(feature = "embedded-hal")]
 impl<MODE, TYPE> embedded_hal::digital::ErrorType for AnyPin<Input<MODE>, TYPE> {
-    type Error = Infallible;
+    type Error = core::convert::Infallible;
 }
 
 #[cfg(feature = "embedded-hal")]
@@ -1793,7 +1793,7 @@ impl<MODE, TYPE> embedded_hal::digital::InputPin for AnyPin<Input<MODE>, TYPE> {
 
 #[cfg(feature = "embedded-hal-02")]
 impl<MODE, TYPE> embedded_hal_02::digital::v2::OutputPin for AnyPin<Output<MODE>, TYPE> {
-    type Error = Infallible;
+    type Error = core::convert::Infallible;
 
     fn set_low(&mut self) -> Result<(), Self::Error> {
         let inner = &mut self.inner;
@@ -1821,7 +1821,7 @@ impl<MODE, TYPE> embedded_hal_02::digital::v2::StatefulOutputPin for AnyPin<Outp
 
 #[cfg(feature = "embedded-hal-02")]
 impl<MODE, TYPE> embedded_hal_02::digital::v2::ToggleableOutputPin for AnyPin<Output<MODE>, TYPE> {
-    type Error = Infallible;
+    type Error = core::convert::Infallible;
 
     fn toggle(&mut self) -> Result<(), Self::Error> {
         let inner = &mut self.inner;
@@ -1831,7 +1831,7 @@ impl<MODE, TYPE> embedded_hal_02::digital::v2::ToggleableOutputPin for AnyPin<Ou
 
 #[cfg(feature = "embedded-hal")]
 impl<MODE, TYPE> embedded_hal::digital::ErrorType for AnyPin<Output<MODE>, TYPE> {
-    type Error = Infallible;
+    type Error = core::convert::Infallible;
 }
 
 #[cfg(feature = "embedded-hal")]

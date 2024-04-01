@@ -399,7 +399,7 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
     }
 
     /// Get the period of the timer.
-    fn get_period(&self) -> u16 {
+    pub fn get_period(&self) -> u16 {
         // SAFETY:
         // We only grant access to our CFG0 register with the lifetime of &mut self
         let block = unsafe { &*PWM::block() };

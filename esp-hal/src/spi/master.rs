@@ -790,7 +790,6 @@ pub mod dma {
             SpiPeripheral,
             TxPrivate,
         },
-        FlashSafeDma,
         Mode,
     };
 
@@ -1330,7 +1329,7 @@ pub mod dma {
 
     #[cfg(feature = "embedded-hal-02")]
     impl<T: embedded_hal_02::blocking::spi::Transfer<u8>, const SIZE: usize>
-        embedded_hal_02::blocking::spi::Transfer<u8> for FlashSafeDma<T, SIZE>
+        embedded_hal_02::blocking::spi::Transfer<u8> for crate::FlashSafeDma<T, SIZE>
     {
         type Error = T::Error;
 
@@ -1341,7 +1340,7 @@ pub mod dma {
 
     #[cfg(feature = "embedded-hal-02")]
     impl<T: embedded_hal_02::blocking::spi::Write<u8>, const SIZE: usize>
-        embedded_hal_02::blocking::spi::Write<u8> for FlashSafeDma<T, SIZE>
+        embedded_hal_02::blocking::spi::Write<u8> for crate::FlashSafeDma<T, SIZE>
     {
         type Error = T::Error;
 
@@ -1361,7 +1360,7 @@ pub mod dma {
 
     #[cfg(feature = "embedded-hal-02")]
     impl<T: embedded_hal_02::spi::FullDuplex<u8>, const SIZE: usize>
-        embedded_hal_02::spi::FullDuplex<u8> for FlashSafeDma<T, SIZE>
+        embedded_hal_02::spi::FullDuplex<u8> for crate::FlashSafeDma<T, SIZE>
     where
         Self: embedded_hal_02::blocking::spi::Transfer<u8, Error = T::Error>,
         Self: embedded_hal_02::blocking::spi::Write<u8, Error = T::Error>,
@@ -1496,7 +1495,7 @@ pub mod dma {
         }
 
         impl<T: embedded_hal_async::spi::SpiBus, const SIZE: usize> embedded_hal_async::spi::SpiBus
-            for FlashSafeDma<T, SIZE>
+            for crate::FlashSafeDma<T, SIZE>
         {
             async fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
                 self.inner.read(words).await
@@ -1600,11 +1599,11 @@ pub mod dma {
             }
         }
 
-        impl<T: ErrorType, const SIZE: usize> ErrorType for FlashSafeDma<T, SIZE> {
+        impl<T: ErrorType, const SIZE: usize> ErrorType for crate::FlashSafeDma<T, SIZE> {
             type Error = T::Error;
         }
 
-        impl<T: SpiBus, const SIZE: usize> SpiBus for FlashSafeDma<T, SIZE> {
+        impl<T: SpiBus, const SIZE: usize> SpiBus for crate::FlashSafeDma<T, SIZE> {
             fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
                 self.inner.read(words)
             }

@@ -40,8 +40,6 @@ use core::{
 };
 
 use fugit::{HertzU32, MicrosDurationU64};
-#[cfg(feature = "embedded-hal-02")]
-use void::Void;
 
 #[cfg(timg1)]
 use crate::peripherals::TIMG1;
@@ -546,7 +544,7 @@ where
         (*self).start(timeout.into())
     }
 
-    fn wait(&mut self) -> nb::Result<(), Void> {
+    fn wait(&mut self) -> nb::Result<(), void::Void> {
         if self.has_elapsed() {
             Ok(())
         } else {
