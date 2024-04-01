@@ -3,7 +3,6 @@
 //! clock cycles within a given number of RTC_SLOW_CLK cycles.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: embedded-hal-02
 
 #![no_std]
 #![no_main]
@@ -11,7 +10,6 @@
 use core::cell::RefCell;
 
 use critical_section::Mutex;
-use embedded_hal_02::watchdog::WatchdogEnable;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
@@ -31,7 +29,7 @@ fn main() -> ! {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let mut rtc = Rtc::new(peripherals.LPWR);
-    rtc.rwdt.start(2000.millis());
+    rtc.rwdt.set_timeout(2000.millis());
     rtc.rwdt.listen();
 
     println!(

@@ -8,12 +8,10 @@
 //! - RX => GPIO5
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: embedded-hal-02
 
 #![no_std]
 #![no_main]
 
-use embedded_hal_02::serial::{Read, Write};
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
@@ -55,8 +53,8 @@ fn main() -> ! {
 
     println!("Start");
     loop {
-        serial1.write(0x42).ok();
-        let read = block!(serial1.read());
+        serial1.write_byte(0x42).ok();
+        let read = block!(serial1.read_byte());
 
         match read {
             Ok(read) => println!("Read 0x{:02x}", read),

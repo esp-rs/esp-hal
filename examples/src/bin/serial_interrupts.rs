@@ -3,7 +3,6 @@
 //! espflash won't work)
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: embedded-hal-02
 
 #![no_std]
 #![no_main]
@@ -11,7 +10,6 @@
 use core::{cell::RefCell, fmt::Write};
 
 use critical_section::Mutex;
-use embedded_hal_02::serial::Read;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
@@ -61,7 +59,7 @@ fn UART0() {
         let serial = serial.as_mut().unwrap();
 
         let mut cnt = 0;
-        while let nb::Result::Ok(_c) = serial.read() {
+        while let nb::Result::Ok(_c) = serial.read_byte() {
             cnt += 1;
         }
         writeln!(serial, "Read {} bytes", cnt,).ok();
