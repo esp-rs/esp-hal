@@ -54,7 +54,7 @@ crate::peripherals! {
     LCD_CAM <= LCD_CAM,
     LEDC <= LEDC,
     LP_ADC <= LP_ADC,
-    LP_ANA_PERI <= LP_ANA_PERI,
+    LP_ANA <= LP_ANA,
     LP_AON_CLKRST <= LP_AON_CLKRST,
     LP_GPIO <= LP_GPIO,
     LP_HUK <= LP_HUK,
