@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed writes to SPI not flushing before attempting to write, causing corrupted writes (#1381)
 - fix AdcConfig::adc_calibrate for xtensa targets (#1379)
 - Fixed a divide by zero panic when setting the LEDC duty cycle to 0 with `SetDutyCycle::set_duty_cycle` (#1403)
+- Fixed MCPWM DeadTimeCfg bit values (#1378)
 
 ### Changed
 
@@ -59,6 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Runtime ISR binding for software interrupts, software interrupts are split now, interrupt-executor takes the software interrupt to use, interrupt-executor is easier to use (#1398)
 - PCNT: Runtime ISR binding (#1396)
 - Runtime ISR binding for RTC (#1405)
+- Improve MCPWM DeadTimeCfg API (#1378)
 
 ### Removed
 
