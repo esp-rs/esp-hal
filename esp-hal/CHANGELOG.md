@@ -47,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - UART: Rework `change_baud` so it is possible to set baud rate even after instantiation (#1350)
 - Runtime ISR binding for SHA,ECC and RSA (#1354)
 - Runtime ISR binding for I2C (#1376)
+- `UsbSerialJtag` can be created in async or blocking mode. The blocking constructor takes an optional interrupt handler argument (#1377)
 
 ### Removed
 
