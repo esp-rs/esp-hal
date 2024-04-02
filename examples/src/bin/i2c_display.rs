@@ -50,6 +50,7 @@ fn main() -> ! {
         io.pins.gpio5,
         100.kHz(),
         &clocks,
+        None,
     );
 
     // Initialize display
