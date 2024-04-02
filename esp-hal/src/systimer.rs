@@ -140,65 +140,6 @@ impl<T, DM: crate::Mode, const CHANNEL: u8> Alarm<T, DM, CHANNEL> {
         Self { _pd: PhantomData }
     }
 
-    /// Set the interrupt handler for this alarm.
-    pub fn set_interrupt_handler(&self, handler: InterruptHandler) {
-        match CHANNEL {
-            0 => unsafe {
-                crate::interrupt::bind_interrupt(
-                    crate::peripherals::Interrupt::SYSTIMER_TARGET0,
-                    handler.handler(),
-                );
-                unwrap!(crate::interrupt::enable(
-                    crate::peripherals::Interrupt::SYSTIMER_TARGET0,
-                    handler.priority(),
-                ));
-            },
-            1 => unsafe {
-                crate::interrupt::bind_interrupt(
-                    crate::peripherals::Interrupt::SYSTIMER_TARGET1,
-                    handler.handler(),
-                );
-                unwrap!(crate::interrupt::enable(
-                    crate::peripherals::Interrupt::SYSTIMER_TARGET1,
-                    handler.priority(),
-                ));
-            },
-            2 => unsafe {
-                crate::interrupt::bind_interrupt(
-                    crate::peripherals::Interrupt::SYSTIMER_TARGET2,
-                    handler.handler(),
-                );
-                unwrap!(crate::interrupt::enable(
-                    crate::peripherals::Interrupt::SYSTIMER_TARGET2,
-                    handler.priority(),
-                ));
-            },
-            _ => unreachable!(),
-        }
-    }
-
-    /// Enable the interrupt for this alarm.
-    pub fn enable_interrupt(&self, val: bool) {
-        let systimer = unsafe { &*SYSTIMER::ptr() };
-        match CHANNEL {
-            0 => systimer.int_ena().modify(|_, w| w.target0().bit(val)),
-            1 => systimer.int_ena().modify(|_, w| w.target1().bit(val)),
-            2 => systimer.int_ena().modify(|_, w| w.target2().bit(val)),
-            _ => unreachable!(),
-        }
-    }
-
-    /// Enable the interrupt pending status for this alarm.
-    pub fn clear_interrupt(&self) {
-        let systimer = unsafe { &*SYSTIMER::ptr() };
-        match CHANNEL {
-            0 => systimer.int_clr().write(|w| w.target0().clear_bit_by_one()),
-            1 => systimer.int_clr().write(|w| w.target1().clear_bit_by_one()),
-            2 => systimer.int_clr().write(|w| w.target2().clear_bit_by_one()),
-            _ => unreachable!(),
-        }
-    }
-
     fn configure(
         &self,
         conf: impl FnOnce(&Reg<TARGET0_CONF_SPEC>, &Reg<TARGET0_HI_SPEC>, &Reg<TARGET0_LO_SPEC>),
@@ -273,8 +214,76 @@ impl<T, DM: crate::Mode, const CHANNEL: u8> Alarm<T, DM, CHANNEL> {
             });
         }
     }
+
+    pub(crate) fn enable_interrupt_internal(&self, val: bool) {
+        let systimer = unsafe { &*SYSTIMER::ptr() };
+        match CHANNEL {
+            0 => systimer.int_ena().modify(|_, w| w.target0().bit(val)),
+            1 => systimer.int_ena().modify(|_, w| w.target1().bit(val)),
+            2 => systimer.int_ena().modify(|_, w| w.target2().bit(val)),
+            _ => unreachable!(),
+        }
+    }
+
+    pub(crate) fn clear_interrupt_internal(&self) {
+        let systimer = unsafe { &*SYSTIMER::ptr() };
+        match CHANNEL {
+            0 => systimer.int_clr().write(|w| w.target0().clear_bit_by_one()),
+            1 => systimer.int_clr().write(|w| w.target1().clear_bit_by_one()),
+            2 => systimer.int_clr().write(|w| w.target2().clear_bit_by_one()),
+            _ => unreachable!(),
+        }
+    }
 }
 
+impl<T, const CHANNEL: u8> Alarm<T, crate::Blocking, CHANNEL> {
+    /// Set the interrupt handler for this alarm.
+    pub fn set_interrupt_handler(&self, handler: InterruptHandler) {
+        match CHANNEL {
+            0 => unsafe {
+                crate::interrupt::bind_interrupt(
+                    crate::peripherals::Interrupt::SYSTIMER_TARGET0,
+                    handler.handler(),
+                );
+                unwrap!(crate::interrupt::enable(
+                    crate::peripherals::Interrupt::SYSTIMER_TARGET0,
+                    handler.priority(),
+                ));
+            },
+            1 => unsafe {
+                crate::interrupt::bind_interrupt(
+                    crate::peripherals::Interrupt::SYSTIMER_TARGET1,
+                    handler.handler(),
+                );
+                unwrap!(crate::interrupt::enable(
+                    crate::peripherals::Interrupt::SYSTIMER_TARGET1,
+                    handler.priority(),
+                ));
+            },
+            2 => unsafe {
+                crate::interrupt::bind_interrupt(
+                    crate::peripherals::Interrupt::SYSTIMER_TARGET2,
+                    handler.handler(),
+                );
+                unwrap!(crate::interrupt::enable(
+                    crate::peripherals::Interrupt::SYSTIMER_TARGET2,
+                    handler.priority(),
+                ));
+            },
+            _ => unreachable!(),
+        }
+    }
+
+    /// Enable the interrupt for this alarm.
+    pub fn enable_interrupt(&self, val: bool) {
+        self.enable_interrupt_internal(val);
+    }
+
+    /// Enable the interrupt pending status for this alarm.
+    pub fn clear_interrupt(&self) {
+        self.clear_interrupt_internal();
+    }
+}
 impl<DM: crate::Mode, const CHANNEL: u8> Alarm<Target, DM, CHANNEL> {
     /// Set the target value of this [Alarm]
     pub fn set_target(&self, timestamp: u64) {
@@ -375,7 +384,7 @@ mod asynch {
 
     impl<'a, const N: u8> AlarmFuture<'a, N> {
         pub(crate) fn new(alarm: &'a Alarm<Periodic, crate::Async, N>) -> Self {
-            alarm.clear_interrupt();
+            alarm.clear_interrupt_internal();
 
             let (interrupt, handler) = match N {
                 0 => (
@@ -397,7 +406,7 @@ mod asynch {
                 crate::interrupt::enable(interrupt, handler.priority()).unwrap();
             }
 
-            alarm.enable_interrupt(true);
+            alarm.enable_interrupt_internal(true);
 
             Self {
                 phantom: PhantomData,

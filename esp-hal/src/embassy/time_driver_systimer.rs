@@ -43,9 +43,9 @@ impl EmbassyTimer {
 
     pub(super) fn on_alarm_allocated(&self, n: usize) {
         match n {
-            0 => self.alarm0.enable_interrupt(true),
-            1 => self.alarm1.enable_interrupt(true),
-            2 => self.alarm2.enable_interrupt(true),
+            0 => self.alarm0.enable_interrupt_internal(true),
+            1 => self.alarm1.enable_interrupt_internal(true),
+            2 => self.alarm2.enable_interrupt_internal(true),
             _ => {}
         }
     }
@@ -126,9 +126,9 @@ impl EmbassyTimer {
 
     fn clear_interrupt(&self, id: usize) {
         match id {
-            0 => self.alarm0.clear_interrupt(),
-            1 => self.alarm1.clear_interrupt(),
-            2 => self.alarm2.clear_interrupt(),
+            0 => self.alarm0.clear_interrupt_internal(),
+            1 => self.alarm1.clear_interrupt_internal(),
+            2 => self.alarm2.clear_interrupt_internal(),
             _ => {}
         }
     }
