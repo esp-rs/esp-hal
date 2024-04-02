@@ -1,19 +1,68 @@
-//! # USB Serial JTAG peripheral driver
+//! USB Serial/JTAG Controller
 //!
-//! ## Overview
-//! The USB Serial JTAG peripheral driver provides an interface to communicate
-//! with the USB Serial/JTAG peripheral on ESP chips. It enables serial
-//! communication and JTAG debugging capabilities, allowing developers to
-//! interact with the ESP chip for programming, debugging, and data transfer
-//! purposes, can be also used to program the SoC's flash, read program output,
-//! as well as attach a debugger to a running program.
+//! The USB Serial/JTAG controller can be used to program the SoC's flash, read
+//! program output, or attach a debugger to the running program. This is
+//! possible for any computer with a USB host (hereafter referred to as 'host'),
+//! without any active external components.
 //!
-//! ## Example
+//! This peripheral integrates the functionality of both a USB-to-serial
+//! converter as well as a USB-to-JTAG adapter. As this device directly
+//! interfaces with an external USB host using only the two data lines required
+//! by USB 2.0, only two pins are required to be dedicated to this functionality
+//! for debugging.
+//!
+//! The USB Serial/JTAG controller boasts the following features:
+//!
+//! - Hardwired for CDC-ACM (Communication Device Class - Abstract Control
+//!   Model) and JTAG adapter functionality
+//! - Integrates CDC-ACM adherent serial port emulation (plug-and-play on most
+//!   modern OSes); supports host controllable chip reset and entry into
+//!   download mode
+//! - Allows fast communication with CPU debugging core using a compact
+//!   representation of JTAG instructions
+//! - Two OUT Endpoints and three IN Endpoints in addition to Control Endpoint
+//!   0; Up to 64-byte data payload size
+//! - Internal PHY means that very few or no external components needed to
+//!   connect to a host computer
+//!
+//! ## Usage
+//!
+//! The USB Serial/JTAG driver implements a number of third-party traits, with
+//! the intention of making the HAL inter-compatible with various device drivers
+//! from the community. This includes, but is not limited to, the [embedded-hal]
+//! and [embedded-io] blocking traits, and the [embedded-hal-async] and
+//! [embedded-io-async] asynchronous traits.
+//!
+//! In addition to the interfaces provided by these traits, native APIs are also
+//! available. See the examples below for more information on how to interact
+//! with this driver.
+//!
+//! ## Examples
+//!
+//! ### Sending and Receiving Data
+//!
 //! ```no_run
-//! let peripherals = Peripherals::take();
-//! ...
-//! // Initialize USB Serial/JTAG peripheral
-//! let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE);
+//! let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE, None);
+//!
+//! // Write bytes out over the USB Serial/JTAG:
+//! usb_serial.write_bytes("Hello, world!".as_bytes())?;
+//! ```
+//!
+//! ### Splitting the USB Serial/JTAG into TX and RX Components
+//!
+//! ```no_run
+//! // The USB Serial/JTAG can be split into separate Transmit and Receive components:
+//! let (mut tx, rx) = usb_serial.split();
+//!
+//! // Each component can be used individually to interact with the USB Serial/JTAG:
+//! tx.write_bytes(&[42u8])?;
+//! let byte = rx.read_byte()?;
+//! ```
+//!
+//! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
+//! [embedded-io]: https://docs.rs/embedded-io/latest/embedded_io/
+//! [embedded-hal-async]: https://docs.rs/embedded-hal-async/latest/embedded_hal_async/
+//! [embedded-io-async]: https://docs.rs/embedded-io-async/latest/embedded_io_async/
 
 use core::{convert::Infallible, marker::PhantomData};
 
@@ -29,18 +78,18 @@ use crate::{
 /// Custom USB serial error type
 type Error = Infallible;
 
-/// USB Serial JTAG driver
+/// USB Serial/JTAG (Full-duplex)
 pub struct UsbSerialJtag<'d, M> {
     tx: UsbSerialJtagTx<'d, M>,
     rx: UsbSerialJtagRx<'d, M>,
 }
 
-/// USB Serial JTAG TX driver
+/// USB Serial/JTAG (Transmit)
 pub struct UsbSerialJtagTx<'d, M> {
     phantom: PhantomData<(&'d mut USB_DEVICE, M)>,
 }
 
-/// USB Serial JTAG RX driver
+/// USB Serial/JTAG (Receive)
 pub struct UsbSerialJtagRx<'d, M> {
     phantom: PhantomData<(&'d mut USB_DEVICE, M)>,
 }
@@ -304,10 +353,12 @@ where
     }
 }
 
-/// USB Serial JTAG peripheral instance
+/// USB Serial/JTAG peripheral instance
 pub trait Instance: crate::private::Sealed {
+    /// Get a reference to the peripheral's underlying register block
     fn register_block() -> &'static RegisterBlock;
 
+    /// Disable all transmit interrupts for the peripheral
     fn disable_tx_interrupts() {
         Self::register_block()
             .int_ena()
@@ -318,6 +369,7 @@ pub trait Instance: crate::private::Sealed {
             .write(|w| w.serial_in_empty().clear_bit_by_one())
     }
 
+    /// Disable all receive interrupts for the peripheral
     fn disable_rx_interrupts() {
         Self::register_block()
             .int_ena()
