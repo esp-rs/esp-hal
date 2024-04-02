@@ -2620,7 +2620,7 @@ pub trait Instance: crate::private::Sealed {
 
         // Flush in case previous writes have not completed yet, required as per
         // embedded-hal documentation (#1369).
-        self.flush();
+        self.flush()?;
 
         // The fifo has a limited fixed size, so the data must be chunked and then
         // transmitted
