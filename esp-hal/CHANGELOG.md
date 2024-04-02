@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Delay::delay(time: fugit::MicrosDurationU64)`
 - Added async support for TWAI (#1320)
 - Add TWAI support for ESP32-C6 (#1323)
+- `GpioPin::steal` unsafe API (#1363)
 
 ### Fixed
 

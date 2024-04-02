@@ -13,6 +13,7 @@
 
 use defmt_rtt as _;
 use embedded_hal::spi::SpiBus;
+use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     gpio::IO,

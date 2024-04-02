@@ -28,31 +28,34 @@ required-features = ["async", "embassy"]
 [dependencies]
 defmt              = { version = "0.3.6" }
 defmt-rtt          = { version = "0.4.0" }
-embassy-time       = { version = "0.3.0", features = ["generic-queue-8"] }
+embassy-time       = { version = "0.3.0", features = ["generic-queue-64"] }
+embassy-futures    = { version = "0.1" }
 embedded-hal       = { version = "1.0.0" }
 embedded-hal-02    = { version = "0.2.7", package = "embedded-hal", features = ["unproven"] }
 embedded-hal-async = { version = "1.0.0", optional = true }
 embedded-hal-nb    = { version = "1.0.0", optional = true }
 esp-hal            = { path = "../esp-hal", features = ["defmt", "embedded-hal", "embedded-hal-02"], optional = true }
-semihosting        = { git = "https://github.com/taiki-e/semihosting", rev = "c829c19" }
+esp-backtrace       = { version = "0.11.1", git = "https://github.com/esp-rs/esp-backtrace", rev = "edff83c3945e8aa11081d8467af65803a82434ba", default-features = false, features = ["exception-handler", "panic-handler", "defmt", "semihosting"] }
 critical-section   = { version = "1.1.2" }
+portable-atomic = "1"
+cfg-if = "1"
 
 [dev-dependencies]
 embassy-executor   = { version = "0.5.0", default-features = false, features = ["executor-thread", "arch-riscv32"] }
 # Add the `embedded-test/defmt` feature for more verbose testing
-embedded-test = {git = "https://github.com/probe-rs/embedded-test", rev = "8e3f925" }
+embedded-test = { git = "https://github.com/probe-rs/embedded-test", rev = "b67dec33992f5bd79d414a0e70220dc4142278cf", default-features = false }
 
 [features]
 default = ["async", "embassy", "embassy-time-timg0"]
 
 # Device support (required!):
-esp32   = ["esp-hal/esp32"]
-esp32c2 = ["esp-hal/esp32c2"]
-esp32c3 = ["esp-hal/esp32c3"]
-esp32c6 = ["esp-hal/esp32c6"]
-esp32h2 = ["esp-hal/esp32h2"]
-esp32s2 = ["esp-hal/esp32s2"]
-esp32s3 = ["esp-hal/esp32s3"]
+esp32   = ["esp-hal/esp32", "esp-backtrace/esp32"]
+esp32c2 = ["esp-hal/esp32c2", "esp-backtrace/esp32c2"]
+esp32c3 = ["esp-hal/esp32c3", "esp-backtrace/esp32c3"]
+esp32c6 = ["esp-hal/esp32c6", "esp-backtrace/esp32c6"]
+esp32h2 = ["esp-hal/esp32h2", "esp-backtrace/esp32h2"]
+esp32s2 = ["esp-hal/esp32s2", "esp-backtrace/esp32s2"]
+esp32s3 = ["esp-hal/esp32s3", "esp-backtrace/esp32s3"]
 # Async & Embassy:
 async                      = ["dep:embedded-hal-async", "esp-hal?/async"]
 embassy                    = ["esp-hal?/embassy", "embedded-test/embassy"]

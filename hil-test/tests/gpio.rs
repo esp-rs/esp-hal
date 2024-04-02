@@ -12,13 +12,16 @@ use core::cell::RefCell;
 use critical_section::Mutex;
 use defmt_rtt as _;
 use embedded_hal::digital::{InputPin as _, OutputPin as _, StatefulOutputPin as _};
+use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     delay::Delay,
-    gpio::{GpioPin, Input, Output, OutputPin, PullDown, PushPull, IO},
+    embassy,
+    gpio::{GpioPin, Input, Output, OutputPin, PullDown, PushPull, Unknown, IO},
     macros::handler,
     peripherals::Peripherals,
     system::SystemExt,
+    timer::TimerGroup,
 };
 
 static COUNTER: Mutex<RefCell<u32>> = Mutex::new(RefCell::new(0));
@@ -42,6 +45,9 @@ impl Context {
 
         let delay = Delay::new(&clocks);
 
+        let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+        embassy::init(&clocks, timg0);
+
         Context {
             io2: io.pins.gpio2.into_pull_down_input(),
             io4: io.pins.gpio4.into_push_pull_output(),
@@ -58,9 +64,8 @@ pub fn interrupt_handler() {
         *COUNTER.borrow_ref_mut(cs) += 1;
         INPUT_PIN
             .borrow_ref_mut(cs)
-            .as_mut()
-            .unwrap()
-            .clear_interrupt();
+            .as_mut() // we can't unwrap as the handler may get called for async operations
+            .map(|pin| pin.clear_interrupt());
     });
 }
 
@@ -68,7 +73,10 @@ pub fn interrupt_handler() {
 #[embedded_test::tests]
 mod tests {
     use defmt::assert_eq;
+    use embassy_time::{Duration, Timer};
+    use embedded_hal_async::digital::Wait;
     use esp_hal::gpio::{Event, Pin};
+    use portable_atomic::{AtomicUsize, Ordering};
 
     use super::*;
 
@@ -78,6 +86,45 @@ mod tests {
         // make sure tests don't interfere with each other
         ctx.io4.set_low().ok();
         ctx
+    }
+
+    #[test]
+    async fn test_async_edge(ctx: Context) {
+        let counter = AtomicUsize::new(0);
+        let Context {
+            mut io2, mut io4, ..
+        } = ctx;
+        embassy_futures::select::select(
+            async {
+                loop {
+                    io2.wait_for_rising_edge().await.unwrap();
+                    counter.fetch_add(1, Ordering::SeqCst);
+                }
+            },
+            async {
+                for _ in 0..5 {
+                    io4.set_high().unwrap();
+                    Timer::after(Duration::from_millis(25)).await;
+                    io4.set_low().unwrap();
+                    Timer::after(Duration::from_millis(25)).await;
+                }
+            },
+        )
+        .await;
+        assert_eq!(counter.load(Ordering::SeqCst), 5);
+    }
+
+    #[test]
+    async fn test_a_pin_can_wait(_ctx: Context) {
+        let mut first = unsafe { GpioPin::<Unknown, 0>::steal() }.into_pull_down_input();
+
+        embassy_futures::select::select(
+            first.wait_for_rising_edge(),
+            // Other futures won't return, this one will, make sure its last so all other futures
+            // are polled first
+            embassy_futures::yield_now(),
+        )
+        .await;
     }
 
     #[test]
