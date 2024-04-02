@@ -111,17 +111,12 @@ pub fn init(clocks: &Clocks, td: time_driver::TimerType) {
     // only enable interrupts if the async feature is present
     #[cfg(feature = "async")]
     {
-        #[cfg(rmt)]
-        crate::interrupt::enable(Interrupt::RMT, Priority::min()).unwrap();
-
         #[cfg(usb_device)]
         crate::interrupt::enable(Interrupt::USB_DEVICE, Priority::min()).unwrap();
 
-        crate::interrupt::enable(Interrupt::I2C_EXT0, Priority::min()).unwrap();
-        crate::interrupt::enable(Interrupt::GPIO, Priority::min()).unwrap();
-
         #[cfg(twai0)]
         crate::interrupt::enable(Interrupt::TWAI0, Priority::min()).unwrap();
+
         #[cfg(twai1)]
         crate::interrupt::enable(Interrupt::TWAI1, Priority::min()).unwrap();
     }
