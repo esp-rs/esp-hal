@@ -52,20 +52,20 @@ xtensa-lx            = { version = "0.9.0", optional = true }
 # IMPORTANT:
 # Each supported device MUST have its PAC included below along with a
 # corresponding feature.
-esp32   = { git = "https://github.com/esp-rs/esp-pacs", rev = "a8a8340", features = ["critical-section"], optional = true }
-esp32c2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "a8a8340", features = ["critical-section"], optional = true }
-esp32c3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "a8a8340", features = ["critical-section"], optional = true }
-esp32c6 = { git = "https://github.com/esp-rs/esp-pacs", rev = "a8a8340", features = ["critical-section"], optional = true }
-esp32h2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "a8a8340", features = ["critical-section"], optional = true }
-esp32p4 = { git = "https://github.com/esp-rs/esp-pacs", rev = "a8a8340", features = ["critical-section"], optional = true }
-esp32s2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "a8a8340", features = ["critical-section"], optional = true }
-esp32s3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "a8a8340", features = ["critical-section"], optional = true }
+esp32   = { git = "https://github.com/esp-rs/esp-pacs", rev = "a8a8340", features = ["critical-section", "rt"], optional = true }
+esp32c2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "a8a8340", features = ["critical-section", "rt"], optional = true }
+esp32c3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "a8a8340", features = ["critical-section", "rt"], optional = true }
+esp32c6 = { git = "https://github.com/esp-rs/esp-pacs", rev = "a8a8340", features = ["critical-section", "rt"], optional = true }
+esp32h2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "a8a8340", features = ["critical-section", "rt"], optional = true }
+esp32p4 = { git = "https://github.com/esp-rs/esp-pacs", rev = "a8a8340", features = ["critical-section", "rt"], optional = true }
+esp32s2 = { git = "https://github.com/esp-rs/esp-pacs", rev = "a8a8340", features = ["critical-section", "rt"], optional = true }
+esp32s3 = { git = "https://github.com/esp-rs/esp-pacs", rev = "a8a8340", features = ["critical-section", "rt"], optional = true }
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
-esp-riscv-rt = { version = "0.7.0", optional = true, path = "../esp-riscv-rt" }
+esp-riscv-rt = { version = "0.7.0", path = "../esp-riscv-rt" }
 
 [target.'cfg(target_arch = "xtensa")'.dependencies]
-xtensa-lx-rt = { version = "0.16.0", optional = true }
+xtensa-lx-rt = "0.16.0"
 
 [build-dependencies]
 basic-toml   = "0.1.8"
@@ -75,9 +75,9 @@ esp-metadata = { version = "0.1.0", path = "../esp-metadata" }
 serde        = { version = "1.0.197", features = ["derive"] }
 
 [features]
-default = ["embedded-hal", "rt"]
+default = ["embedded-hal"]
 
-riscv  = ["dep:riscv",     "critical-section/restore-state-u8",  "esp-riscv-rt?/zero-bss"]
+riscv  = ["dep:riscv",     "critical-section/restore-state-u8",  "esp-riscv-rt/zero-bss"]
 xtensa = ["dep:xtensa-lx", "critical-section/restore-state-u32"]
 
 bluetooth = []
@@ -97,25 +97,12 @@ debug = [
 ]
 ## Enable logging output using the `log` crate.
 log = ["dep:log"]
-## Enable runtime support.
-rt = [
-    "dep:esp-riscv-rt",
-    "dep:xtensa-lx-rt",
-    "esp32?/rt",
-    "esp32c2?/rt",
-    "esp32c3?/rt",
-    "esp32c6?/rt",
-    "esp32h2?/rt",
-    "esp32p4?/rt",
-    "esp32s2?/rt",
-    "esp32s3?/rt",
-]
 ## Configuration for placing device drivers in the IRAM for faster access.
 place-spi-driver-in-ram = []
 
 # Chip Support Feature Flags
 # Target the ESP32.
-esp32   = ["dep:esp32",   "xtensa", "xtensa-lx/spin", "xtensa-lx-rt?/esp32"]
+esp32   = ["dep:esp32",   "xtensa", "xtensa-lx/spin", "xtensa-lx-rt/esp32"]
 # Target the ESP32-C2.
 esp32c2 = ["dep:esp32c2", "riscv",  "portable-atomic/unsafe-assume-single-core"]
 # Target the ESP32-C3.
@@ -127,20 +114,20 @@ esp32h2 = ["dep:esp32h2", "riscv", "rv-zero-rtc-bss"]
 # Target the ESP32-P4.
 esp32p4 = ["dep:esp32p4", "riscv",  "procmacros/has-lp-core", "rv-zero-rtc-bss"]
 # Target the ESP32-S2.
-esp32s2 = ["dep:esp32s2", "xtensa", "portable-atomic/critical-section", "procmacros/has-ulp-core", "xtensa-lx-rt?/esp32s2", "usb-otg"]
+esp32s2 = ["dep:esp32s2", "xtensa", "portable-atomic/critical-section", "procmacros/has-ulp-core", "xtensa-lx-rt/esp32s2", "usb-otg"]
 # Target the ESP32-S3.
-esp32s3 = ["dep:esp32s3", "xtensa", "procmacros/has-ulp-core", "xtensa-lx/spin", "xtensa-lx-rt?/esp32s3", "usb-otg"]
+esp32s3 = ["dep:esp32s3", "xtensa", "procmacros/has-ulp-core", "xtensa-lx/spin", "xtensa-lx-rt/esp32s3", "usb-otg"]
 
 #! ### RISC-V Exclusive Feature Flags
 ## Move the stack to start of RAM to get zero-cost stack overflow protection
 ## (ESP32-C6 and ESPS32-H2 only!).
 flip-link = ["esp-riscv-rt/fix-sp"]
 ## Initialize the `.data` section of memory.
-rv-init-data = ["esp-riscv-rt?/init-data", "esp-riscv-rt?/init-rw-text"]
+rv-init-data = ["esp-riscv-rt/init-data", "esp-riscv-rt/init-rw-text"]
 ## Zero the `.bss` section of low-power memory.
-rv-zero-rtc-bss = ["esp-riscv-rt?/zero-rtc-fast-bss"]
+rv-zero-rtc-bss = ["esp-riscv-rt/zero-rtc-fast-bss"]
 ## Initialize the `.data` section of low-power memory.
-rv-init-rtc-data = ["esp-riscv-rt?/init-rtc-fast-data", "esp-riscv-rt?/init-rtc-fast-text"]
+rv-init-rtc-data = ["esp-riscv-rt/init-rtc-fast-data", "esp-riscv-rt/init-rtc-fast-text"]
 
 #! ### Trait Implementation Feature Flags
 ## Enable support for asynchronous operation, with interfaces provided by

@@ -18,14 +18,12 @@
 // MUST be the first module
 mod fmt;
 
-#[cfg(all(riscv, feature = "rt"))]
-pub use esp_riscv_rt::{self, entry};
-pub use procmacros as macros;
 #[cfg(riscv)]
-pub use riscv;
+pub use esp_riscv_rt::{self, entry, riscv};
+pub use procmacros as macros;
 #[cfg(xtensa)]
 pub use xtensa_lx;
-#[cfg(all(xtensa, feature = "rt"))]
+#[cfg(xtensa)]
 pub use xtensa_lx_rt::{self, entry};
 
 #[cfg(any(esp32, esp32s3))]
@@ -66,7 +64,7 @@ pub mod hmac;
 pub mod i2c;
 #[cfg(any(i2s0, i2s1))]
 pub mod i2s;
-#[cfg(all(any(dport, interrupt_core0, interrupt_core1), feature = "rt"))]
+#[cfg(any(dport, interrupt_core0, interrupt_core1))]
 pub mod interrupt;
 #[cfg(lcd_cam)]
 pub mod lcd_cam;
@@ -115,7 +113,6 @@ pub mod uart;
 pub mod usb_serial_jtag;
 
 /// State of the CPU saved when entering exception or interrupt
-#[cfg(feature = "rt")]
 pub mod trapframe {
     #[cfg(riscv)]
     pub use esp_riscv_rt::TrapFrame;

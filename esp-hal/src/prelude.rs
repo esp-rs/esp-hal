@@ -20,8 +20,6 @@ pub use crate::dma::{
     DmaTransfer as _esp_hal_dma_DmaTransfer,
     DmaTransferRxTx as _esp_hal_dma_DmaTransferRxTx,
 };
-#[cfg(feature = "rt")]
-pub use crate::entry;
 #[cfg(gpio)]
 pub use crate::gpio::{
     InputPin as _esp_hal_gpio_InputPin,
@@ -38,7 +36,6 @@ pub use crate::ledc::{
     },
     timer::{TimerHW as _esp_hal_ledc_timer_TimerHW, TimerIFace as _esp_hal_ledc_timer_TimerIFace},
 };
-pub use crate::macros::*;
 #[cfg(any(dport, pcr, system))]
 pub use crate::system::SystemExt as _esp_hal_system_SystemExt;
 #[cfg(any(timg0, timg1))]
@@ -48,3 +45,4 @@ pub use crate::timer::{
 };
 #[cfg(any(uart0, uart1, uart2))]
 pub use crate::uart::{Instance as _esp_hal_uart_Instance, UartPins as _esp_hal_uart_UartPins};
+pub use crate::{entry, macros::*};
