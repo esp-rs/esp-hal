@@ -873,7 +873,7 @@ mod clic {
 
     /// Set the priority level of an CPU interrupt
     ///
-    /// Great care must be taken when using this funciton; avoid changing the
+    /// Great care must be taken when using this function; avoid changing the
     /// priority of interrupts 1 - 15.
     pub unsafe fn set_priority(core: Cpu, which: CpuInterrupt, priority: Priority) {
         let cpu_interrupt_number = which as usize;
