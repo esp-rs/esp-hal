@@ -394,7 +394,6 @@ macro_rules! impl_channel {
             pub type [<Channel $num InterruptBinder>] = ChannelInterruptBinder<$num>;
 
             impl InterruptBinder for ChannelInterruptBinder<$num> {
-                #[cfg(feature = "vectored")]
                 fn set_isr(handler: $crate::interrupt::InterruptHandler) {
                     let mut dma = unsafe { crate::peripherals::DMA::steal() };
                     $(

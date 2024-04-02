@@ -52,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Remove package-level type exports (#1275)
 - Removed `direct-vectoring` & `interrupt-preemption` features, as they are now enabled by default (#1310)
+- Removed the `rt` and `vectored` features (#1380)
 
 ## [0.16.1] - 2024-03-12
 

@@ -1298,7 +1298,6 @@ pub trait ChannelTypes {
 }
 
 pub trait InterruptBinder {
-    #[cfg(feature = "vectored")]
     fn set_isr(handler: InterruptHandler);
 }
 
@@ -1321,7 +1320,6 @@ where
     /// with [crate::interrupt::Priority::max()]
     ///
     /// Interrupts are not enabled at the peripheral level here.
-    #[cfg(feature = "vectored")]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         C::Binder::set_isr(handler);
     }
