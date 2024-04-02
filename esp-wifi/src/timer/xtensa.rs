@@ -1,5 +1,7 @@
 use core::cell::RefCell;
 
+use embedded_hal::timer::CountDown;
+
 use portable_atomic::{AtomicU32, Ordering};
 
 use critical_section::Mutex;

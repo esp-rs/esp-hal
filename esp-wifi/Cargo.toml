@@ -27,6 +27,7 @@ esp-hal = { workspace = true }
 smoltcp = { workspace = true, optional = true }
 critical-section.workspace = true
 log = { workspace = true, optional = true }
+embedded-hal = { workspace = true }
 embedded-svc = { workspace = true, optional = true }
 enumset = { workspace = true, optional = true }
 linked_list_allocator = { workspace = true }

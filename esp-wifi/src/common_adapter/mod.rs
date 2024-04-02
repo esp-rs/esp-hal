@@ -12,8 +12,8 @@ use crate::compat::timer_compat::*;
 use crate::hal;
 
 use esp_wifi_sys::include::timespec;
+use hal::rng::Rng;
 use hal::system::RadioClockControl;
-use hal::Rng;
 
 use hal::macros::ram;
 

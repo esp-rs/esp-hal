@@ -235,7 +235,7 @@ impl EspWifiInitFor {
 pub fn initialize(
     init_for: EspWifiInitFor,
     timer: EspWifiTimer,
-    rng: hal::Rng,
+    rng: hal::rng::Rng,
     radio_clocks: hal::system::RadioClockControl,
     clocks: &Clocks,
 ) -> Result<EspWifiInitialization, InitializationError> {
