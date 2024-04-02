@@ -4,6 +4,7 @@
 use xtensa_lx::interrupt::{self, InterruptNumber};
 use xtensa_lx_rt::exception::Context;
 
+pub use self::vectored::*;
 use crate::{
     peripherals::{self, Interrupt},
     Cpu,
@@ -13,7 +14,6 @@ use crate::{
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
     InvalidInterrupt,
-    #[cfg(feature = "vectored")]
     CpuInterruptReserved,
 }
 
@@ -85,13 +85,11 @@ pub(crate) fn setup_interrupts() {
 
 /// Enable an interrupt by directly binding it to a available CPU interrupt
 ///
-/// Unless you are sure, you most likely want to use [`enable`] with the
-/// `vectored` feature enabled instead.
+/// Unless you are sure, you most likely want to use [`enable`] instead.
 ///
-/// When the `vectored` feature is enabled, trying using a reserved interrupt
-/// from [`RESERVED_INTERRUPTS`] will return an error.
+/// Trying using a reserved interrupt from [`RESERVED_INTERRUPTS`] will return
+/// an error.
 pub fn enable_direct(interrupt: Interrupt, cpu_interrupt: CpuInterrupt) -> Result<(), Error> {
-    #[cfg(feature = "vectored")]
     if RESERVED_INTERRUPTS.contains(&(cpu_interrupt as _)) {
         return Err(Error::CpuInterruptReserved);
     }
@@ -234,10 +232,6 @@ unsafe fn core1_interrupt_peripheral() -> *const crate::peripherals::interrupt_c
     crate::peripherals::INTERRUPT_CORE1::PTR
 }
 
-#[cfg(feature = "vectored")]
-pub use vectored::*;
-
-#[cfg(feature = "vectored")]
 mod vectored {
     use procmacros::ram;
 
@@ -566,37 +560,10 @@ mod raw {
     use super::*;
 
     extern "C" {
-        #[cfg(not(feature = "vectored"))]
-        fn level1_interrupt(save_frame: &mut Context);
-        #[cfg(not(feature = "vectored"))]
-        fn level2_interrupt(save_frame: &mut Context);
-        #[cfg(not(feature = "vectored"))]
-        fn level3_interrupt(save_frame: &mut Context);
         fn level4_interrupt(save_frame: &mut Context);
         fn level5_interrupt(save_frame: &mut Context);
         fn level6_interrupt(save_frame: &mut Context);
         fn level7_interrupt(save_frame: &mut Context);
-    }
-
-    #[no_mangle]
-    #[link_section = ".rwtext"]
-    #[cfg(not(feature = "vectored"))]
-    unsafe fn __level_1_interrupt(_level: u32, save_frame: &mut Context) {
-        level1_interrupt(save_frame)
-    }
-
-    #[no_mangle]
-    #[link_section = ".rwtext"]
-    #[cfg(not(feature = "vectored"))]
-    unsafe fn __level_2_interrupt(_level: u32, save_frame: &mut Context) {
-        level2_interrupt(save_frame)
-    }
-
-    #[no_mangle]
-    #[link_section = ".rwtext"]
-    #[cfg(not(feature = "vectored"))]
-    unsafe fn __level_3_interrupt(_level: u32, save_frame: &mut Context) {
-        level3_interrupt(save_frame)
     }
 
     #[no_mangle]

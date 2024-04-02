@@ -1,7 +1,7 @@
 //! Interrupt handling - RISC-V
 //!
-//! When the `vectored` feature is enabled, CPU interrupts 1 through 15 are
-//! reserved for each of the possible interrupt priorities.
+//! CPU interrupts 1 through 15 are reserved for each of the possible interrupt
+//! priorities.
 //!
 //! On chips with a PLIC CPU interrupts 1,2,5,6,9 .. 19 are used.
 //!
@@ -24,6 +24,7 @@ pub use self::classic::*;
 pub use self::clic::*;
 #[cfg(plic)]
 pub use self::plic::*;
+pub use self::vectored::*;
 use crate::{
     peripherals::{self, Interrupt},
     Cpu,
@@ -34,7 +35,6 @@ use crate::{
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
     InvalidInterruptPriority,
-    #[cfg(feature = "vectored")]
     CpuInterruptReserved,
 }
 
@@ -134,10 +134,6 @@ impl Priority {
     }
 }
 
-#[cfg(feature = "vectored")]
-pub use vectored::*;
-
-#[cfg(feature = "vectored")]
 pub const RESERVED_INTERRUPTS: &[usize] = INTERRUPT_TO_PRIORITY;
 
 /// # Safety
@@ -181,7 +177,6 @@ pub fn _setup_interrupts() {
         let vec_table = &_vector_table as *const _ as usize;
         mtvec::write(vec_table, mtvec::TrapMode::Vectored);
 
-        #[cfg(feature = "vectored")]
         crate::interrupt::init_vectoring();
     };
 
@@ -193,17 +188,15 @@ pub fn _setup_interrupts() {
 
 /// Enable an interrupt by directly binding it to a available CPU interrupt
 ///
-/// Unless you are sure, you most likely want to use [`enable`] with the
-/// `vectored` feature enabled instead.
+/// Unless you are sure, you most likely want to use [`enable`] instead.
 ///
-/// When the `vectored` feature is enabled, trying using a reserved interrupt
-/// from [`RESERVED_INTERRUPTS`] will return an error.
+/// Trying using a reserved interrupt from [`RESERVED_INTERRUPTS`] will return
+/// an error.
 pub fn enable_direct(
     interrupt: Interrupt,
     level: Priority,
     cpu_interrupt: CpuInterrupt,
 ) -> Result<(), Error> {
-    #[cfg(feature = "vectored")]
     if RESERVED_INTERRUPTS.contains(&(cpu_interrupt as _)) {
         return Err(Error::CpuInterruptReserved);
     }
@@ -292,9 +285,7 @@ pub fn get_status(_core: Cpu) -> u128 {
 
 /// Assign a peripheral interrupt to an CPU interrupt.
 ///
-/// Great care must be taken when using the `vectored` feature,
-/// do not use CPU interrupts in the [`RESERVED_INTERRUPTS`] when
-/// the `vectored` feature is enabled.
+/// Do not use CPU interrupts in the [`RESERVED_INTERRUPTS`].
 pub unsafe fn map(_core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
     let interrupt_number = interrupt as isize;
     let cpu_interrupt_number = which as isize;
@@ -325,7 +316,6 @@ unsafe fn get_assigned_cpu_interrupt(interrupt: Interrupt) -> Option<CpuInterrup
     }
 }
 
-#[cfg(feature = "vectored")]
 mod vectored {
     use procmacros::ram;
 
@@ -582,8 +572,7 @@ mod classic {
 
     /// Set the interrupt kind (i.e. level or edge) of an CPU interrupt
     ///
-    /// This is safe to call when the `vectored` feature is enabled. The
-    /// vectored interrupt handler will take care of clearing edge interrupt
+    /// The vectored interrupt handler will take care of clearing edge interrupt
     /// bits.
     pub fn set_kind(_core: Cpu, which: CpuInterrupt, kind: InterruptKind) {
         unsafe {
@@ -605,9 +594,8 @@ mod classic {
 
     /// Set the priority level of an CPU interrupt
     ///
-    /// Great care must be taken when using the `vectored` feature (enabled by
-    /// default). Avoid changing the priority of interrupts 1 - 15 when
-    /// interrupt vectoring is enabled.
+    /// Great care must be taken when using this function; avoid changing the
+    /// priority of interrupts 1 - 15.
     pub unsafe fn set_priority(_core: Cpu, which: CpuInterrupt, priority: Priority) {
         let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
         let cpu_interrupt_number = which as isize;
@@ -714,8 +702,7 @@ mod plic {
 
     /// Set the interrupt kind (i.e. level or edge) of an CPU interrupt
     ///
-    /// This is safe to call when the `vectored` feature is enabled. The
-    /// vectored interrupt handler will take care of clearing edge interrupt
+    /// The vectored interrupt handler will take care of clearing edge interrupt
     /// bits.
     pub fn set_kind(_core: Cpu, which: CpuInterrupt, kind: InterruptKind) {
         unsafe {
@@ -735,9 +722,8 @@ mod plic {
 
     /// Set the priority level of an CPU interrupt
     ///
-    /// Great care must be taken when using the `vectored` feature (enabled by
-    /// default). Avoid changing the priority of interrupts 1 - 15 when
-    /// interrupt vectoring is enabled.
+    /// Great care must be taken when using this function; avoid changing the
+    /// priority of interrupts 1 - 15.
     pub unsafe fn set_priority(_core: Cpu, which: CpuInterrupt, priority: Priority) {
         let plic_mxint_pri_ptr = PLIC_MXINT0_PRI_REG as *mut u32;
 
@@ -870,8 +856,7 @@ mod clic {
 
     /// Set the interrupt kind (i.e. level or edge) of an CPU interrupt
     ///
-    /// This is safe to call when the `vectored` feature is enabled. The
-    /// vectored interrupt handler will take care of clearing edge interrupt
+    /// The vectored interrupt handler will take care of clearing edge interrupt
     /// bits.
     pub fn set_kind(core: Cpu, which: CpuInterrupt, kind: InterruptKind) {
         let cpu_interrupt_number = which as usize;
@@ -888,9 +873,8 @@ mod clic {
 
     /// Set the priority level of an CPU interrupt
     ///
-    /// Great care must be taken when using the `vectored` feature (enabled by
-    /// default). Avoid changing the priority of interrupts 1 - 15 when
-    /// interrupt vectoring is enabled.
+    /// Great care must be taken when using this funciton; avoid changing the
+    /// priority of interrupts 1 - 15.
     pub unsafe fn set_priority(core: Cpu, which: CpuInterrupt, priority: Priority) {
         let cpu_interrupt_number = which as usize;
         let intr_cntrl = intr_cntrl(core, cpu_interrupt_number);

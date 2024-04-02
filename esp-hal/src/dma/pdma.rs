@@ -26,7 +26,6 @@ macro_rules! ImplSpiChannel {
             pub struct [<Channel $num InterruptBinder>] {}
 
             impl InterruptBinder for [<Channel $num InterruptBinder>] {
-                #[cfg(feature = "vectored")]
                 fn set_isr(handler: $crate::interrupt::InterruptHandler) {
                     let mut spi = unsafe { $crate::peripherals::[< SPI $num >]::steal() };
                     spi.[< bind_spi $num _dma_interrupt>](handler.handler());
@@ -376,7 +375,6 @@ macro_rules! ImplI2sChannel {
             pub struct [<Channel $num InterruptBinder>] {}
 
             impl InterruptBinder for [<Channel $num InterruptBinder>] {
-                #[cfg(feature = "vectored")]
                 fn set_isr(handler:  $crate::interrupt::InterruptHandler) {
                     let mut i2s = unsafe { $crate::peripherals::[< I2S $num >]::steal() };
                     i2s.[< bind_i2s $num _interrupt>](handler.handler());

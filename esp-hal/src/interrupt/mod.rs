@@ -2,19 +2,18 @@
 //!
 //! Interrupt support functionality depends heavily on the features enabled.
 //!
-//! When the `vectored` feature is enabled, the
-//! [`enable`] method will map interrupt to a CPU
-//! interrupt, and handle the `vector`ing to the peripheral interrupt, for
-//! example `UART0`.
+//! The [`enable`] method will map interrupt to a CPU interrupt, and handle the
+//! vectoring to the peripheral interrupt, for example `UART0`.
 //!
 //! It is also possible, but not recommended, to bind an interrupt directly to a
 //! CPU interrupt. This can offer lower latency, at the cost of more complexity
 //! in the interrupt handler.
 //!
-//! The `vectored` reserves a number of CPU interrupts, which cannot be used see
+//! We reserve a number of CPU interrupts, which cannot be used; see
 //! [`RESERVED_INTERRUPTS`].
 //!
 //! ## Example
+//!
 //! ```no_run
 //! #[entry]
 //! fn main() -> ! {
