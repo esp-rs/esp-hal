@@ -19,6 +19,7 @@ use esp_hal::{
     prelude::*,
     timer::TimerGroup,
     usb_serial_jtag::{UsbSerialJtag, UsbSerialJtagRx, UsbSerialJtagTx},
+    Async,
 };
 use static_cell::make_static;
 
@@ -26,7 +27,7 @@ const MAX_BUFFER_SIZE: usize = 512;
 
 #[embassy_executor::task]
 async fn writer(
-    mut tx: UsbSerialJtagTx<'static>,
+    mut tx: UsbSerialJtagTx<'static, Async>,
     signal: &'static Signal<NoopRawMutex, heapless::String<MAX_BUFFER_SIZE>>,
 ) {
     use core::fmt::Write;
@@ -46,7 +47,7 @@ async fn writer(
 
 #[embassy_executor::task]
 async fn reader(
-    mut rx: UsbSerialJtagRx<'static>,
+    mut rx: UsbSerialJtagRx<'static, Async>,
     signal: &'static Signal<NoopRawMutex, heapless::String<MAX_BUFFER_SIZE>>,
 ) {
     let mut rbuf = [0u8; MAX_BUFFER_SIZE];
@@ -72,7 +73,7 @@ async fn main(spawner: Spawner) -> () {
 
     embassy::init(&clocks, TimerGroup::new(peripherals.TIMG0, &clocks));
 
-    let (tx, rx) = UsbSerialJtag::new(peripherals.USB_DEVICE).split();
+    let (tx, rx) = UsbSerialJtag::new_async(peripherals.USB_DEVICE).split();
 
     let signal = &*make_static!(Signal::new());
 
