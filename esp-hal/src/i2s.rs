@@ -1293,6 +1293,10 @@ mod private {
         fn tx_start() {
             let i2s = Self::register_block();
             i2s.conf().modify(|_, w| w.tx_start().set_bit());
+
+            while i2s.state().read().tx_idle().bit_is_set() {
+                // wait
+            }
         }
 
         fn tx_stop() {
