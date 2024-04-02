@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - USB pullup/pulldown now gets properly cleared and does not interfere anymore on esp32c3 and esp32s3 (#1244)
 - Fixed GPIO counts so that using async code with the higher GPIO number should no longer panic (#1361, #1362)
 - ESP32/ESP32-S2: Wait for I2S getting out of TX_IDLE when starting a transfer (#1375)
+- Fixed writes to SPI not flushing before attemting to write, causing corrupted writes (#1381)
 
 ### Changed
 
