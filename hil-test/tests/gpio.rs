@@ -45,7 +45,7 @@ impl Context {
 
         let delay = Delay::new(&clocks);
 
-        let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+        let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
         embassy::init(&clocks, timg0);
 
         Context {
