@@ -14,10 +14,15 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     delay::Delay,
+    gpio,
     interrupt::{self, Priority},
     peripherals::{Interrupt, Peripherals, UART0},
     prelude::*,
-    uart::{config::AtCmdConfig, Uart},
+    uart::{
+        config::{AtCmdConfig, Config},
+        TxRxPins,
+        Uart,
+    },
     Blocking,
 };
 
@@ -31,15 +36,22 @@ fn main() -> ! {
 
     let delay = Delay::new(&clocks);
 
-    let mut uart0 = Uart::new(peripherals.UART0, &clocks);
-    uart0.set_at_cmd(AtCmdConfig::new(None, None, None, b'#', None));
-    uart0.set_rx_fifo_full_threshold(30).unwrap();
-    uart0.listen_at_cmd();
-    uart0.listen_rx_fifo_full();
+    let mut uart0 = Uart::new_with_config(
+        peripherals.UART0,
+        Config::default(),
+        None::<TxRxPins<gpio::NoPinType, gpio::NoPinType>>,
+        &clocks,
+        Some(interrupt_handler),
+    );
 
-    interrupt::enable(Interrupt::UART0, Priority::Priority2).unwrap();
+    critical_section::with(|cs| {
+        uart0.set_at_cmd(AtCmdConfig::new(None, None, None, b'#', None));
+        uart0.set_rx_fifo_full_threshold(30).unwrap();
+        uart0.listen_at_cmd();
+        uart0.listen_rx_fifo_full();
 
-    critical_section::with(|cs| SERIAL.borrow_ref_mut(cs).replace(uart0));
+        SERIAL.borrow_ref_mut(cs).replace(uart0);
+    });
 
     loop {
         critical_section::with(|cs| {
@@ -52,8 +64,8 @@ fn main() -> ! {
     }
 }
 
-#[interrupt]
-fn UART0() {
+#[handler]
+fn interrupt_handler() {
     critical_section::with(|cs| {
         let mut serial = SERIAL.borrow_ref_mut(cs);
         let serial = serial.as_mut().unwrap();
