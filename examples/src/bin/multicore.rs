@@ -8,7 +8,7 @@
 #![no_std]
 #![no_main]
 
-use core::cell::RefCell;
+use core::{cell::RefCell, ptr::addr_of_mut};
 
 use critical_section::Mutex;
 use esp_backtrace as _;
@@ -35,7 +35,7 @@ fn main() -> ! {
 
     let mut cpu_control = CpuControl::new(system.cpu_control);
     let _guard = cpu_control
-        .start_app_core(unsafe { &mut APP_CORE_STACK }, || {
+        .start_app_core(unsafe { &mut *addr_of_mut!(APP_CORE_STACK) }, || {
             println!("Hello World - Core 1!");
             loop {
                 delay.delay(500.millis());

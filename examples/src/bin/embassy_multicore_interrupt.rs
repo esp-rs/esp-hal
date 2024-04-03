@@ -10,6 +10,8 @@
 #![no_main]
 #![feature(type_alias_impl_trait)]
 
+use core::ptr::addr_of_mut;
+
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
 use embassy_time::{Duration, Ticker};
 use embedded_hal_02::digital::v2::OutputPin;
@@ -109,7 +111,7 @@ fn main() -> ! {
         loop {}
     };
     let _guard = cpu_control
-        .start_app_core(unsafe { &mut APP_CORE_STACK }, cpu1_fnctn)
+        .start_app_core(unsafe { &mut *addr_of_mut!(APP_CORE_STACK) }, cpu1_fnctn)
         .unwrap();
 
     let spawner = INT_EXECUTOR_CORE_0.start(Priority::Priority1);

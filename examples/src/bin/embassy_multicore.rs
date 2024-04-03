@@ -10,6 +10,8 @@
 #![no_main]
 #![feature(type_alias_impl_trait)]
 
+use core::ptr::addr_of_mut;
+
 use embassy_executor::Spawner;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
 use embassy_time::{Duration, Ticker};
@@ -67,7 +69,7 @@ async fn main(_spawner: Spawner) {
     let led = io.pins.gpio0.into_push_pull_output();
 
     let _guard = cpu_control
-        .start_app_core(unsafe { &mut APP_CORE_STACK }, move || {
+        .start_app_core(unsafe { &mut *addr_of_mut!(APP_CORE_STACK) }, move || {
             let executor = make_static!(Executor::new());
             executor.run(|spawner| {
                 spawner.spawn(control_led(led, led_ctrl_signal)).ok();
