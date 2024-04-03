@@ -534,16 +534,16 @@ impl super::AdcCalEfuse for crate::peripherals::ADC2 {
 }
 
 #[cfg(feature = "embedded-hal-02")]
-impl<'d, ADCI, PIN, CS> embedded_hal_02::adc::OneShot<ADCI, u16, AdcPin<PIN, ADCI, CS>>
+impl<'d, ADCI, PIN, CS> embedded_hal_02::adc::OneShot<ADCI, u16, super::AdcPin<PIN, ADCI, CS>>
     for ADC<'d, ADCI>
 where
-    PIN: embedded_hal_02::adc::Channel<ADCI, ID = u8>,
+    PIN: embedded_hal_02::adc::Channel<ADCI, ID = u8> + super::AdcChannel,
     ADCI: RegisterAccess,
-    CS: AdcCalScheme<ADCI>,
+    CS: super::AdcCalScheme<ADCI>,
 {
     type Error = ();
 
-    fn read(&mut self, pin: &mut AdcPin<PIN, ADCI, CS>) -> nb::Result<u16, Self::Error> {
+    fn read(&mut self, pin: &mut super::AdcPin<PIN, ADCI, CS>) -> nb::Result<u16, Self::Error> {
         self.read_oneshot(pin)
     }
 }

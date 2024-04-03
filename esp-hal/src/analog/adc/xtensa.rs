@@ -439,7 +439,6 @@ impl super::CalibrationAccess for crate::peripherals::ADC2 {
 /// Analog-to-Digital Converter peripheral driver.
 pub struct ADC<'d, ADC> {
     _adc: PeripheralRef<'d, ADC>,
-    #[cfg(feature = "embedded-hal-02")]
     active_channel: Option<u8>,
     last_init_code: u16,
 }
@@ -518,7 +517,6 @@ where
 
         ADC {
             _adc: adc_instance.into_ref(),
-            #[cfg(feature = "embedded-hal-02")]
             active_channel: None,
             last_init_code: 0,
         }
