@@ -23,6 +23,7 @@ pub enum Package {
     EspLpHal,
     EspRiscvRt,
     Examples,
+    HilTest,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Display, EnumIter, ValueEnum, serde::Serialize)]
@@ -246,12 +247,11 @@ pub fn build_example(
         log::info!("  Features: {}", example.features().join(","));
     }
 
-    let bin = if example
-        .example_path()
-        .strip_prefix(package_path)?
-        .starts_with("src/bin")
-    {
+    let package = example.example_path().strip_prefix(package_path)?;
+    let bin = if package.starts_with("src/bin") {
         format!("--bin={}", example.name())
+    } else if package.starts_with("tests") {
+        format!("--test={}", example.name())
     } else {
         format!("--example={}", example.name())
     };
