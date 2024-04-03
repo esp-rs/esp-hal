@@ -52,6 +52,7 @@ fn main() -> ! {
         can_rx_pin,
         &clocks,
         CAN_BAUDRATE,
+        None,
     );
 
     // Partially filter the incoming messages to reduce overhead of receiving
