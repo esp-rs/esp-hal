@@ -215,7 +215,7 @@ fn build_examples(workspace: &Path, mut args: BuildExamplesArgs) -> Result<()> {
     let example_path = match args.package {
         Package::Examples => package_path.join("src").join("bin"),
         Package::HilTest => package_path.join("tests"),
-        _ => package_path.join("examples")
+        _ => package_path.join("examples"),
     };
 
     // Determine the appropriate build target for the given package and chip:
