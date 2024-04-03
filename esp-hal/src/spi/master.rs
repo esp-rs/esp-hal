@@ -2618,6 +2618,10 @@ pub trait Instance: crate::private::Sealed {
     fn write_bytes(&mut self, words: &[u8]) -> Result<(), Error> {
         let num_chunks = words.len() / FIFO_SIZE;
 
+        // Flush in case previous writes have not completed yet, required as per
+        // embedded-hal documentation (#1369).
+        self.flush()?;
+
         // The fifo has a limited fixed size, so the data must be chunked and then
         // transmitted
         for (i, chunk) in words.chunks(FIFO_SIZE).enumerate() {
