@@ -30,7 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - USB pullup/pulldown now gets properly cleared and does not interfere anymore on esp32c3 and esp32s3 (#1244)
 - Fixed GPIO counts so that using async code with the higher GPIO number should no longer panic (#1361, #1362)
 - ESP32/ESP32-S2: Wait for I2S getting out of TX_IDLE when starting a transfer (#1375)
-- Fixed writes to SPI not flushing before attemting to write, causing corrupted writes (#1381)
+- Fixed writes to SPI not flushing before attempting to write, causing corrupted writes (#1381)
 
 ### Changed
 
@@ -49,8 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Runtime ISR binding for SHA,ECC and RSA (#1354)
 - Runtime ISR binding for I2C (#1376)
 - `UsbSerialJtag` can be created in async or blocking mode. The blocking constructor takes an optional interrupt handler argument (#1377)
-- SYSTIMER and TIMG instances can now be created in async or blocking mode. The blocking constructor takes an optional argument to set interrupt handlers. The constructors are named `create`/`create_async` (#1348)
 - SYSTIMER and TIMG instances can now be created in async or blocking mode (#1348)
+- Runtime ISR binding for TWAI (#1384)
 
 ### Removed
 
