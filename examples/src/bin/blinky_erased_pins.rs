@@ -52,10 +52,10 @@ fn main() -> ! {
 
 fn toggle_pins(leds: &mut [AnyPin<Output<PushPull>>], button: &AnyPin<Input<PullDown>>) {
     for pin in leds.iter_mut() {
-        pin.toggle().unwrap();
+        pin.toggle();
     }
 
-    if button.is_low().unwrap() {
+    if button.is_low() {
         esp_println::println!("Button pressed");
     }
 }

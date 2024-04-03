@@ -4,7 +4,6 @@
 //! It also blinks an LED like the blinky example.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: embedded-hal-02
 
 #![no_std]
 #![no_main]
@@ -12,7 +11,6 @@
 use core::cell::RefCell;
 
 use critical_section::Mutex;
-use embedded_hal_02::digital::v2::{OutputPin, ToggleableOutputPin};
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
@@ -50,14 +48,14 @@ fn main() -> ! {
         button.listen(Event::FallingEdge);
         BUTTON.borrow_ref_mut(cs).replace(button)
     });
-    led.set_high().unwrap();
+    led.set_high();
 
     // Initialize the Delay peripheral, and use it to toggle the LED state in a
     // loop.
     let delay = Delay::new(&clocks);
 
     loop {
-        led.toggle().unwrap();
+        led.toggle();
         delay.delay_millis(500);
     }
 }

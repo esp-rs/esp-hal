@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added async support for TWAI (#1320)
 - Add TWAI support for ESP32-C6 (#1323)
 - `GpioPin::steal` unsafe API (#1363)
+- Inherent implementions of GPIO pin `set_low`, `is_low`, etc.
 
 ### Fixed
 

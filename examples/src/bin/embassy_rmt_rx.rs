@@ -31,7 +31,7 @@ compile_error!("Run this example in release mode");
 async fn signal_task(mut pin: Gpio5<Output<PushPull>>) {
     loop {
         for _ in 0..10 {
-            pin.toggle().unwrap();
+            pin.toggle();
             Timer::after(Duration::from_micros(10)).await;
         }
         Timer::after(Duration::from_millis(1000)).await;

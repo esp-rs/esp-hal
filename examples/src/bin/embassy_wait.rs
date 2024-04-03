@@ -40,7 +40,7 @@ async fn main(_spawner: Spawner) {
 
     loop {
         esp_println::println!("Waiting...");
-        input.wait_for_rising_edge().await.unwrap();
+        input.wait_for_rising_edge().await;
         esp_println::println!("Ping!");
         Timer::after(Duration::from_millis(100)).await;
     }
