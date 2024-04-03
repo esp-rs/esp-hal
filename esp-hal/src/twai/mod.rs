@@ -1045,9 +1045,10 @@ unsafe fn copy_to_data_register(dest: *mut u32, src: &[u8]) {
 }
 
 #[cfg(feature = "embedded-hal-02")]
-impl<'d, T> embedded_hal_02::can::Can for Twai<'d, T>
+impl<'d, T, DM> embedded_hal_02::can::Can for Twai<'d, T, DM>
 where
     T: OperationInstance,
+    DM: crate::Mode,
 {
     type Frame = EspTwaiFrame;
     type Error = EspTwaiError;
