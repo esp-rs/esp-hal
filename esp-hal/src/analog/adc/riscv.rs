@@ -432,68 +432,29 @@ where
             active_channel: None,
         }
     }
-}
 
-#[cfg(any(esp32c2, esp32c3, esp32c6))]
-impl super::AdcCalEfuse for crate::peripherals::ADC1 {
-    fn get_init_code(atten: Attenuation) -> Option<u16> {
-        Efuse::get_rtc_calib_init_code(1, atten)
-    }
-
-    fn get_cal_mv(atten: Attenuation) -> u16 {
-        Efuse::get_rtc_calib_cal_mv(1, atten)
-    }
-
-    fn get_cal_code(atten: Attenuation) -> Option<u16> {
-        Efuse::get_rtc_calib_cal_code(1, atten)
-    }
-}
-
-#[cfg(esp32c3)]
-impl super::AdcCalEfuse for crate::peripherals::ADC2 {
-    fn get_init_code(atten: Attenuation) -> Option<u16> {
-        Efuse::get_rtc_calib_init_code(2, atten)
-    }
-
-    fn get_cal_mv(atten: Attenuation) -> u16 {
-        Efuse::get_rtc_calib_cal_mv(2, atten)
-    }
-
-    fn get_cal_code(atten: Attenuation) -> Option<u16> {
-        Efuse::get_rtc_calib_cal_code(2, atten)
-    }
-}
-
-#[cfg(feature = "embedded-hal-02")]
-impl<'d, ADCI, PIN, CS> embedded_hal_02::adc::OneShot<ADCI, u16, AdcPin<PIN, ADCI, CS>>
-    for ADC<'d, ADCI>
-where
-    PIN: embedded_hal_02::adc::Channel<ADCI, ID = u8>,
-    ADCI: RegisterAccess,
-    CS: AdcCalScheme<ADCI>,
-{
-    type Error = ();
-
-    fn read(&mut self, pin: &mut AdcPin<PIN, ADCI, CS>) -> nb::Result<u16, Self::Error> {
-        use embedded_hal_02::adc::Channel;
-
-        if self.attenuations[AdcPin::<PIN, ADCI>::channel() as usize].is_none() {
-            panic!(
-                "Channel {} is not configured reading!",
-                super::AdcPin::<PIN, ADCI>::channel()
-            );
+    pub fn read_oneshot<PIN, CS>(
+        &mut self,
+        pin: &mut super::AdcPin<PIN, ADCI, CS>,
+    ) -> nb::Result<u16, ()>
+    where
+        PIN: super::AdcChannel,
+        CS: super::AdcCalScheme<ADCI>,
+    {
+        if self.attenuations[PIN::CHANNEL as usize].is_none() {
+            panic!("Channel {} is not configured reading!", PIN::CHANNEL);
         }
 
         if let Some(active_channel) = self.active_channel {
             // There is conversion in progress:
             // - if it's for a different channel try again later
             // - if it's for the given channel, go ahead and check progress
-            if active_channel != AdcPin::<PIN, ADCI>::channel() {
+            if active_channel != PIN::CHANNEL {
                 return Err(nb::Error::WouldBlock);
             }
         } else {
             // If no conversions are in progress, start a new one for given channel
-            self.active_channel = Some(AdcPin::<PIN, ADCI>::channel());
+            self.active_channel = Some(PIN::CHANNEL);
 
             // Set ADC unit calibration according used scheme for pin
             ADCI::set_init_code(pin.cal_scheme.adc_cal());
@@ -539,6 +500,51 @@ where
         self.active_channel = None;
 
         Ok(converted_value)
+    }
+}
+
+#[cfg(any(esp32c2, esp32c3, esp32c6))]
+impl super::AdcCalEfuse for crate::peripherals::ADC1 {
+    fn get_init_code(atten: Attenuation) -> Option<u16> {
+        Efuse::get_rtc_calib_init_code(1, atten)
+    }
+
+    fn get_cal_mv(atten: Attenuation) -> u16 {
+        Efuse::get_rtc_calib_cal_mv(1, atten)
+    }
+
+    fn get_cal_code(atten: Attenuation) -> Option<u16> {
+        Efuse::get_rtc_calib_cal_code(1, atten)
+    }
+}
+
+#[cfg(esp32c3)]
+impl super::AdcCalEfuse for crate::peripherals::ADC2 {
+    fn get_init_code(atten: Attenuation) -> Option<u16> {
+        Efuse::get_rtc_calib_init_code(2, atten)
+    }
+
+    fn get_cal_mv(atten: Attenuation) -> u16 {
+        Efuse::get_rtc_calib_cal_mv(2, atten)
+    }
+
+    fn get_cal_code(atten: Attenuation) -> Option<u16> {
+        Efuse::get_rtc_calib_cal_code(2, atten)
+    }
+}
+
+#[cfg(feature = "embedded-hal-02")]
+impl<'d, ADCI, PIN, CS> embedded_hal_02::adc::OneShot<ADCI, u16, AdcPin<PIN, ADCI, CS>>
+    for ADC<'d, ADCI>
+where
+    PIN: embedded_hal_02::adc::Channel<ADCI, ID = u8>,
+    ADCI: RegisterAccess,
+    CS: AdcCalScheme<ADCI>,
+{
+    type Error = ();
+
+    fn read(&mut self, pin: &mut AdcPin<PIN, ADCI, CS>) -> nb::Result<u16, Self::Error> {
+        self.read_oneshot(pin)
     }
 }
 

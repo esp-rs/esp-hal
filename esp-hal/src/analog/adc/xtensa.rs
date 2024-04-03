@@ -544,6 +544,47 @@ where
         pin.cal_scheme.adc_val(converted_value)
     }
 
+    pub fn read_oneshot<PIN, CS>(
+        &mut self,
+        pin: &mut super::AdcPin<PIN, ADCI, CS>,
+    ) -> nb::Result<u16, ()>
+    where
+        PIN: super::AdcChannel,
+        CS: super::AdcCalScheme<ADCI>,
+    {
+        if let Some(active_channel) = self.active_channel {
+            // There is conversion in progress:
+            // - if it's for a different channel try again later
+            // - if it's for the given channel, go ahead and check progress
+            if active_channel != PIN::CHANNEL {
+                return Err(nb::Error::WouldBlock);
+            }
+        } else {
+            // If no conversions are in progress, start a new one for given channel
+            self.active_channel = Some(PIN::CHANNEL);
+
+            self.start_sample(pin);
+        }
+
+        // Wait for ADC to finish conversion
+        let conversion_finished = ADCI::is_done();
+        if !conversion_finished {
+            return Err(nb::Error::WouldBlock);
+        }
+
+        // Get converted value
+        let converted_value = ADCI::read_data();
+        ADCI::reset();
+
+        // Postprocess converted value according to calibration scheme used for pin
+        let converted_value = pin.cal_scheme.adc_val(converted_value);
+
+        // Mark that no conversions are currently in progress
+        self.active_channel = None;
+
+        Ok(converted_value)
+    }
+
     fn start_sample<PIN, CS>(&mut self, pin: &mut AdcPin<PIN, ADCI, CS>)
     where
         PIN: AdcChannel,
@@ -604,39 +645,7 @@ where
     type Error = ();
 
     fn read(&mut self, pin: &mut AdcPin<PIN, ADCI, CS>) -> nb::Result<u16, Self::Error> {
-        use embedded_hal_02::adc::Channel;
-
-        if let Some(active_channel) = self.active_channel {
-            // There is conversion in progress:
-            // - if it's for a different channel try again later
-            // - if it's for the given channel, go ahead and check progress
-            if active_channel != AdcPin::<PIN, ADCI>::channel() {
-                return Err(nb::Error::WouldBlock);
-            }
-        } else {
-            // If no conversions are in progress, start a new one for given channel
-            self.active_channel = Some(AdcPin::<PIN, ADCI>::channel());
-
-            self.start_sample(pin);
-        }
-
-        // Wait for ADC to finish conversion
-        let conversion_finished = ADCI::is_done();
-        if !conversion_finished {
-            return Err(nb::Error::WouldBlock);
-        }
-
-        // Get converted value
-        let converted_value = ADCI::read_data();
-        ADCI::reset();
-
-        // Postprocess converted value according to calibration scheme used for pin
-        let converted_value = pin.cal_scheme.adc_val(converted_value);
-
-        // Mark that no conversions are currently in progress
-        self.active_channel = None;
-
-        Ok(converted_value)
+        self.read_oneshot(pin)
     }
 }
 
