@@ -85,10 +85,12 @@ pub struct AdcConfig<ADCI> {
 }
 
 impl<ADCI> AdcConfig<ADCI> {
+    /// Create a new configuration struct with its default values
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Enable the specified pin with the given attenuation
     pub fn enable_pin<PIN>(&mut self, pin: PIN, attenuation: Attenuation) -> AdcPin<PIN, ADCI>
     where
         PIN: AdcChannel,
@@ -102,6 +104,8 @@ impl<ADCI> AdcConfig<ADCI> {
         }
     }
 
+    /// Enable the specified pin with the given attentuation and calibration
+    /// scheme
     #[cfg(not(esp32))]
     pub fn enable_pin_with_cal<PIN, CS>(
         &mut self,

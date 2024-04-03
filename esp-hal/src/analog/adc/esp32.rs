@@ -204,6 +204,8 @@ impl<'d, ADCI> ADC<'d, ADCI>
 where
     ADCI: RegisterAccess,
 {
+    /// Configure a given ADC instance using the provided configuration, and
+    /// initialize the ADC for use
     pub fn new(
         adc_instance: impl crate::peripheral::Peripheral<P = ADCI> + 'd,
         config: AdcConfig<ADCI>,
@@ -277,6 +279,11 @@ where
         }
     }
 
+    /// Request that the ADC begin a conversion on the specified pin
+    ///
+    /// This method takes an [AdcPin](super::AdcPin) reference, as it is
+    /// expected that the ADC will be able to sample whatever channel
+    /// underlies the pin.
     pub fn read_oneshot<PIN>(&mut self, _pin: &mut super::AdcPin<PIN, ADCI>) -> nb::Result<u16, ()>
     where
         PIN: super::AdcChannel,
