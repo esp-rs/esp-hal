@@ -11,7 +11,6 @@
 
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
-use embedded_hal_async::digital::Wait;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,

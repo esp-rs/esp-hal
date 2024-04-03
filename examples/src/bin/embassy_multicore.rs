@@ -4,7 +4,7 @@
 //! signal set by the task running on the other core.
 
 //% CHIPS: esp32 esp32s3
-//% FEATURES: embassy embassy-executor-thread embassy-time-timg0 embassy-generic-timers embedded-hal-02
+//% FEATURES: embassy embassy-executor-thread embassy-time-timg0 embassy-generic-timers
 
 #![no_std]
 #![no_main]
@@ -15,7 +15,6 @@ use core::ptr::addr_of_mut;
 use embassy_executor::Spawner;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
 use embassy_time::{Duration, Ticker};
-use embedded_hal_02::digital::v2::OutputPin;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,

@@ -1,12 +1,10 @@
 //! Control LED on GPIO1 by the BOOT-BUTTON via ETM
 
 //% CHIPS: esp32c6 esp32h2
-//% FEATURES: embedded-hal-02
 
 #![no_std]
 #![no_main]
 
-use embedded_hal_02::digital::v2::OutputPin;
 use esp_backtrace as _;
 use esp_hal::{
     etm::Etm,
