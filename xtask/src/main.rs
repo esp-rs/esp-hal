@@ -212,11 +212,10 @@ fn build_examples(workspace: &Path, mut args: BuildExamplesArgs) -> Result<()> {
     // Absolute path of the package's root:
     let package_path = xtask::windows_safe_path(&workspace.join(args.package.to_string()));
 
-    // Absolute path to the directory containing the examples:
-    let example_path = if args.package == Package::Examples {
-        package_path.join("src").join("bin")
-    } else {
-        package_path.join("examples")
+    let example_path = match args.package {
+        Package::Examples => package_path.join("src").join("bin"),
+        Package::HilTest => package_path.join("tests"),
+        _ => package_path.join("examples"),
     };
 
     // Determine the appropriate build target for the given package and chip:
