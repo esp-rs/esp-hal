@@ -37,7 +37,10 @@ use static_cell::make_static;
 type TwaiOutbox = Channel<NoopRawMutex, EspTwaiFrame, 16>;
 
 #[embassy_executor::task]
-async fn receiver(mut rx: TwaiRx<'static, TWAI0>, channel: &'static TwaiOutbox) -> ! {
+async fn receiver(
+    mut rx: TwaiRx<'static, TWAI0, esp_hal::Async>,
+    channel: &'static TwaiOutbox,
+) -> ! {
     loop {
         let frame = rx.receive_async().await;
 
@@ -57,7 +60,10 @@ async fn receiver(mut rx: TwaiRx<'static, TWAI0>, channel: &'static TwaiOutbox) 
 }
 
 #[embassy_executor::task]
-async fn transmitter(mut tx: TwaiTx<'static, TWAI0>, channel: &'static TwaiOutbox) -> ! {
+async fn transmitter(
+    mut tx: TwaiTx<'static, TWAI0, esp_hal::Async>,
+    channel: &'static TwaiOutbox,
+) -> ! {
     loop {
         let frame = channel.receive().await;
         let result = tx.transmit_async(&frame).await;
@@ -94,7 +100,7 @@ async fn main(spawner: Spawner) {
 
     // Begin configuring the TWAI peripheral. The peripheral is in a reset like
     // state that prevents transmission but allows configuration.
-    let mut can_config = twai::TwaiConfiguration::new(
+    let mut can_config = twai::TwaiConfiguration::new_async(
         peripherals.TWAI0,
         can_tx_pin,
         can_rx_pin,

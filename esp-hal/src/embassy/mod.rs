@@ -82,9 +82,6 @@ use core::cell::Cell;
 
 use embassy_time_driver::{AlarmHandle, Driver};
 
-#[cfg(feature = "async")]
-use crate::{interrupt::Priority, peripherals::Interrupt};
-
 #[cfg_attr(
     all(
         systimer,
@@ -105,18 +102,8 @@ use time_driver::EmbassyTimer;
 
 use crate::clock::Clocks;
 
-/// Initialise embassy, including setting up interrupts for the DMA and async
-/// enabled peripherals.
+/// Initialise embassy
 pub fn init(clocks: &Clocks, td: time_driver::TimerType) {
-    // only enable interrupts if the async feature is present
-    #[cfg(feature = "async")]
-    {
-        #[cfg(twai0)]
-        crate::interrupt::enable(Interrupt::TWAI0, Priority::min()).unwrap();
-        #[cfg(twai1)]
-        crate::interrupt::enable(Interrupt::TWAI1, Priority::min()).unwrap();
-    }
-
     EmbassyTimer::init(clocks, td)
 }
 

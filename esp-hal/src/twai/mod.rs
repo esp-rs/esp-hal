@@ -34,6 +34,7 @@
 //!     can_rx_pin,
 //!     &clocks,
 //!     CAN_BAUDRATE,
+//!     None,
 //! );
 //!
 //! // Partially filter the incoming messages to reduce overhead of receiving undesired messages
@@ -81,6 +82,7 @@ use self::filter::{Filter, FilterType};
 use crate::{
     clock::Clocks,
     gpio::{InputPin, InputSignal, OutputPin, OutputSignal},
+    interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::twai0::RegisterBlock,
     system::{self, PeripheralClockControl},
@@ -627,20 +629,23 @@ impl BaudRate {
 }
 
 /// An inactive TWAI peripheral in the "Reset"/configuration state.
-pub struct TwaiConfiguration<'d, T> {
+pub struct TwaiConfiguration<'d, T, DM: crate::Mode> {
     peripheral: PhantomData<&'d PeripheralRef<'d, T>>,
+    phantom: PhantomData<DM>,
 }
 
-impl<'d, T> TwaiConfiguration<'d, T>
+impl<'d, T, DM> TwaiConfiguration<'d, T, DM>
 where
     T: Instance,
+    DM: crate::Mode,
 {
-    pub fn new<TX: OutputPin, RX: InputPin>(
+    fn new_internal<TX: OutputPin, RX: InputPin>(
         _peripheral: impl Peripheral<P = T> + 'd,
         tx_pin: impl Peripheral<P = TX> + 'd,
         rx_pin: impl Peripheral<P = RX> + 'd,
         clocks: &Clocks,
         baud_rate: BaudRate,
+        interrupt: Option<InterruptHandler>,
     ) -> Self {
         // Enable the peripheral clock for the TWAI peripheral.
         T::enable_peripheral();
@@ -652,9 +657,17 @@ where
 
         let mut cfg = TwaiConfiguration {
             peripheral: PhantomData,
+            phantom: PhantomData,
         };
 
         cfg.set_baud_rate(baud_rate, clocks);
+
+        if let Some(interrupt) = interrupt {
+            unsafe {
+                crate::interrupt::bind_interrupt(T::INTERRUPT, interrupt.handler());
+                crate::interrupt::enable(T::INTERRUPT, interrupt.priority()).unwrap();
+            }
+        }
 
         cfg
     }
@@ -741,7 +754,7 @@ where
 
     /// Put the peripheral into Operation Mode, allowing the transmission and
     /// reception of packets using the new object.
-    pub fn start(self) -> Twai<'d, T> {
+    pub fn start(self) -> Twai<'d, T, DM> {
         // Put the peripheral into operation mode by clearing the reset mode bit.
         T::register_block()
             .mode()
@@ -750,11 +763,54 @@ where
         Twai {
             tx: TwaiTx {
                 _peripheral: PhantomData,
+                phantom: PhantomData,
             },
             rx: TwaiRx {
                 _peripheral: PhantomData,
+                phantom: PhantomData,
             },
+            phantom: PhantomData,
         }
+    }
+}
+
+impl<'d, T> TwaiConfiguration<'d, T, crate::Blocking>
+where
+    T: Instance,
+{
+    pub fn new<TX: OutputPin, RX: InputPin>(
+        peripheral: impl Peripheral<P = T> + 'd,
+        tx_pin: impl Peripheral<P = TX> + 'd,
+        rx_pin: impl Peripheral<P = RX> + 'd,
+        clocks: &Clocks,
+        baud_rate: BaudRate,
+        interrupt: Option<InterruptHandler>,
+    ) -> Self {
+        Self::new_internal(peripheral, tx_pin, rx_pin, clocks, baud_rate, interrupt)
+    }
+}
+
+#[cfg(feature = "async")]
+impl<'d, T> TwaiConfiguration<'d, T, crate::Async>
+where
+    T: Instance,
+{
+    pub fn new_async<TX: OutputPin, RX: InputPin>(
+        peripheral: impl Peripheral<P = T> + 'd,
+        tx_pin: impl Peripheral<P = TX> + 'd,
+        rx_pin: impl Peripheral<P = RX> + 'd,
+        clocks: &Clocks,
+        baud_rate: BaudRate,
+    ) -> Self {
+        let interrupt = T::async_handler();
+        Self::new_internal(
+            peripheral,
+            tx_pin,
+            rx_pin,
+            clocks,
+            baud_rate,
+            Some(interrupt),
+        )
     }
 }
 
@@ -762,18 +818,20 @@ where
 ///
 /// In this mode, the TWAI controller can transmit and receive messages
 /// including error signals (such as error and overload frames).
-pub struct Twai<'d, T> {
-    tx: TwaiTx<'d, T>,
-    rx: TwaiRx<'d, T>,
+pub struct Twai<'d, T, DM: crate::Mode> {
+    tx: TwaiTx<'d, T, DM>,
+    rx: TwaiRx<'d, T, DM>,
+    phantom: PhantomData<DM>,
 }
 
-impl<'d, T> Twai<'d, T>
+impl<'d, T, DM> Twai<'d, T, DM>
 where
     T: OperationInstance,
+    DM: crate::Mode,
 {
     /// Stop the peripheral, putting it into reset mode and enabling
     /// reconfiguration.
-    pub fn stop(self) -> TwaiConfiguration<'d, T> {
+    pub fn stop(self) -> TwaiConfiguration<'d, T, DM> {
         // Put the peripheral into reset/configuration mode by setting the reset mode
         // bit.
         T::register_block()
@@ -782,6 +840,7 @@ where
 
         TwaiConfiguration {
             peripheral: PhantomData,
+            phantom: PhantomData,
         }
     }
 
@@ -838,19 +897,21 @@ where
 
     /// Consumes this `Twai` instance and splits it into transmitting and
     /// receiving halves.
-    pub fn split(self) -> (TwaiTx<'d, T>, TwaiRx<'d, T>) {
+    pub fn split(self) -> (TwaiTx<'d, T, DM>, TwaiRx<'d, T, DM>) {
         (self.tx, self.rx)
     }
 }
 
 /// Interface to the CAN transmitter part.
-pub struct TwaiTx<'d, T> {
+pub struct TwaiTx<'d, T, DM: crate::Mode> {
     _peripheral: PhantomData<&'d T>,
+    phantom: PhantomData<DM>,
 }
 
-impl<'d, T> TwaiTx<'d, T>
+impl<'d, T, DM> TwaiTx<'d, T, DM>
 where
     T: OperationInstance,
+    DM: crate::Mode,
 {
     /// Transmit a frame.
     ///
@@ -884,13 +945,15 @@ where
 }
 
 /// Interface to the CAN receiver part.
-pub struct TwaiRx<'d, T> {
+pub struct TwaiRx<'d, T, DM: crate::Mode> {
     _peripheral: PhantomData<&'d T>,
+    phantom: PhantomData<DM>,
 }
 
-impl<'d, T> TwaiRx<'d, T>
+impl<'d, T, DM> TwaiRx<'d, T, DM>
 where
     T: OperationInstance,
+    DM: crate::Mode,
 {
     // Receive a frame
     pub fn receive(&mut self) -> nb::Result<EspTwaiFrame, EspTwaiError> {
@@ -1006,9 +1069,10 @@ where
 }
 
 #[cfg(feature = "embedded-hal")]
-impl<'d, T> embedded_can::nb::Can for Twai<'d, T>
+impl<'d, T, DM> embedded_can::nb::Can for Twai<'d, T, DM>
 where
     T: OperationInstance,
+    DM: crate::Mode,
 {
     type Frame = EspTwaiFrame;
     type Error = EspTwaiError;
@@ -1035,6 +1099,10 @@ pub trait Instance: crate::private::Sealed {
 
     const INPUT_SIGNAL: InputSignal;
     const OUTPUT_SIGNAL: OutputSignal;
+
+    const INTERRUPT: crate::peripherals::Interrupt;
+    #[cfg(feature = "async")]
+    fn async_handler() -> InterruptHandler;
 
     fn register_block() -> &'static RegisterBlock;
 
@@ -1208,6 +1276,13 @@ impl Instance for crate::peripherals::TWAI0 {
     const INPUT_SIGNAL: InputSignal = InputSignal::TWAI_RX;
     const OUTPUT_SIGNAL: OutputSignal = OutputSignal::TWAI_TX;
 
+    const INTERRUPT: crate::peripherals::Interrupt = crate::peripherals::Interrupt::TWAI0;
+
+    #[cfg(feature = "async")]
+    fn async_handler() -> InterruptHandler {
+        asynch::twai0
+    }
+
     #[inline(always)]
     fn register_block() -> &'static RegisterBlock {
         unsafe { &*crate::peripherals::TWAI0::PTR }
@@ -1245,6 +1320,13 @@ impl Instance for crate::peripherals::TWAI0 {
     const INPUT_SIGNAL: InputSignal = InputSignal::TWAI0_RX;
     const OUTPUT_SIGNAL: OutputSignal = OutputSignal::TWAI0_TX;
 
+    const INTERRUPT: crate::peripherals::Interrupt = crate::peripherals::Interrupt::TWAI0;
+
+    #[cfg(feature = "async")]
+    fn async_handler() -> InterruptHandler {
+        asynch::twai0
+    }
+
     #[inline(always)]
     fn register_block() -> &'static RegisterBlock {
         unsafe { &*crate::peripherals::TWAI0::PTR }
@@ -1281,6 +1363,13 @@ impl Instance for crate::peripherals::TWAI1 {
 
     const INPUT_SIGNAL: InputSignal = InputSignal::TWAI1_RX;
     const OUTPUT_SIGNAL: OutputSignal = OutputSignal::TWAI1_TX;
+
+    const INTERRUPT: crate::peripherals::Interrupt = crate::peripherals::Interrupt::TWAI1;
+
+    #[cfg(feature = "async")]
+    fn async_handler() -> InterruptHandler {
+        asynch::twai1
+    }
 
     #[inline(always)]
     fn register_block() -> &'static RegisterBlock {
@@ -1320,7 +1409,7 @@ mod asynch {
         channel::Channel,
         waitqueue::AtomicWaker,
     };
-    use procmacros::interrupt;
+    use procmacros::handler;
 
     use super::*;
     use crate::peripherals::TWAI0;
@@ -1347,7 +1436,7 @@ mod asynch {
     const NEW_STATE: TwaiAsyncState = TwaiAsyncState::new();
     pub(crate) static TWAI_STATE: [TwaiAsyncState; NUM_TWAI] = [NEW_STATE; NUM_TWAI];
 
-    impl<T> Twai<'_, T>
+    impl<T> Twai<'_, T, crate::Async>
     where
         T: OperationInstance,
     {
@@ -1360,7 +1449,7 @@ mod asynch {
         }
     }
 
-    impl<'d, T> TwaiTx<'d, T>
+    impl<'d, T> TwaiTx<'d, T, crate::Async>
     where
         T: OperationInstance,
     {
@@ -1389,7 +1478,7 @@ mod asynch {
         }
     }
 
-    impl<'d, T> TwaiRx<'d, T>
+    impl<'d, T> TwaiRx<'d, T, crate::Async>
     where
         T: OperationInstance,
     {
@@ -1422,8 +1511,8 @@ mod asynch {
     }
 
     #[cfg(any(esp32c3, esp32, esp32s2, esp32s3))]
-    #[interrupt]
-    fn TWAI0() {
+    #[handler]
+    pub(super) fn twai0() {
         let register_block = TWAI0::register_block();
 
         let intr_enable = register_block.int_ena().read();
@@ -1467,8 +1556,8 @@ mod asynch {
     }
 
     #[cfg(esp32c6)]
-    #[interrupt]
-    fn TWAI0() {
+    #[handler]
+    pub(super) fn twai0() {
         let register_block = TWAI0::register_block();
 
         let intr_enable = register_block.interrupt_enable().read();
@@ -1512,8 +1601,8 @@ mod asynch {
     }
 
     #[cfg(esp32c6)]
-    #[interrupt]
-    fn TWAI1() {
+    #[handler]
+    pub(super) fn twai1() {
         let register_block = TWAI1::register_block();
 
         let intr_enable = register_block.interrupt_enable().read();
