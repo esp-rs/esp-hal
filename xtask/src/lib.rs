@@ -296,26 +296,31 @@ pub fn run_example(
         log::info!("  Features: {}", example.features().join(","));
     }
 
-    let bin = if example
-        .example_path()
-        .strip_prefix(package_path)?
-        .starts_with("src/bin")
-    {
-        format!("--bin={}", example.name())
+    let package = example.example_path().strip_prefix(package_path)?;
+    let (bin, subcommand) = if package.starts_with("src/bin") {
+        (format!("--bin={}", example.name()), "run")
+    } else if package.starts_with("tests") {
+        (format!("--test={}", example.name()), "test")
     } else {
-        format!("--example={}", example.name())
+        (format!("--example={}", example.name()), "run")
     };
 
     let mut features = example.features().to_vec();
     features.push(chip.to_string());
 
     let mut builder = CargoArgsBuilder::default()
-        .subcommand("run")
+        .subcommand(subcommand)
         .arg("-Zbuild-std=alloc,core")
         .arg("--release")
         .target(target)
         .features(&features)
         .arg(bin);
+
+    // probe-rs cannot currently do auto detection, so we need to tell probe-rs run
+    // which chip we are testing
+    if subcommand == "test" {
+        builder = builder.arg("--").arg("--chip").arg(format!("{}", chip));
+    }
 
     // If targeting an Xtensa device, we must use the '+esp' toolchain modifier:
     if target.starts_with("xtensa") {
