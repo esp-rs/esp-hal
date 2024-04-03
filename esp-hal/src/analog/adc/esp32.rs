@@ -1,74 +1,19 @@
-use core::marker::PhantomData;
-
-use super::{AdcChannel, Attenuation};
+use super::{AdcConfig, Attenuation};
 use crate::{
     peripheral::PeripheralRef,
     peripherals::{ADC1, ADC2, RTC_IO, SENS},
 };
 
+pub(super) const NUM_ATTENS: usize = 10;
+
 /// The sampling/readout resolution of the ADC.
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum Resolution {
     Resolution9Bit  = 0b00,
     Resolution10Bit = 0b01,
     Resolution11Bit = 0b10,
+    #[default]
     Resolution12Bit = 0b11,
-}
-
-/// An I/O pin which can be read using the ADC.
-pub struct AdcPin<PIN, ADCI> {
-    pub pin: PIN,
-    _phantom: PhantomData<ADCI>,
-}
-
-#[cfg(feature = "embedded-hal-02")]
-impl<PIN, ADCI> embedded_hal_02::adc::Channel<ADCI> for AdcPin<PIN, ADCI>
-where
-    PIN: embedded_hal_02::adc::Channel<ADCI, ID = u8>,
-{
-    type ID = u8;
-
-    fn channel() -> Self::ID {
-        PIN::channel()
-    }
-}
-
-/// Configuration for the ADC.
-pub struct AdcConfig<ADCI> {
-    pub resolution: Resolution,
-    pub attenuations: [Option<Attenuation>; 10],
-    _phantom: PhantomData<ADCI>,
-}
-
-impl<ADCI> AdcConfig<ADCI>
-where
-    ADCI: RegisterAccess,
-{
-    pub fn new() -> AdcConfig<ADCI> {
-        Self::default()
-    }
-
-    pub fn enable_pin<PIN>(&mut self, pin: PIN, attenuation: Attenuation) -> AdcPin<PIN, ADCI>
-    where
-        PIN: AdcChannel,
-    {
-        self.attenuations[PIN::CHANNEL as usize] = Some(attenuation);
-
-        AdcPin {
-            pin,
-            _phantom: PhantomData,
-        }
-    }
-}
-
-impl<ADCI> Default for AdcConfig<ADCI> {
-    fn default() -> Self {
-        AdcConfig {
-            resolution: Resolution::Resolution12Bit,
-            attenuations: [None; 10],
-            _phantom: PhantomData,
-        }
-    }
 }
 
 #[doc(hidden)]
@@ -250,7 +195,7 @@ impl RegisterAccess for ADC2 {
 pub struct ADC<'d, ADC> {
     _adc: PeripheralRef<'d, ADC>,
     #[allow(dead_code)] // FIXME
-    attenuations: [Option<Attenuation>; 10],
+    attenuations: [Option<Attenuation>; NUM_ATTENS],
     #[allow(dead_code)] // FIXME
     active_channel: Option<u8>,
 }
@@ -400,30 +345,8 @@ where
     }
 }
 
-macro_rules! impl_adc_interface {
-    ($adc:ident [
-        $( ($pin:ident, $channel:expr) ,)+
-    ]) => {
-        $(
-            impl $crate::analog::adc::AdcChannel for crate::gpio::$pin<crate::gpio::Analog> {
-                const CHANNEL: u8 = $channel;
-            }
-
-            #[cfg(feature = "embedded-hal-02")]
-            impl embedded_hal_02::adc::Channel<$adc> for crate::gpio::$pin<crate::gpio::Analog> {
-                type ID = u8;
-
-                fn channel() -> u8 { $channel }
-            }
-        )+
-    }
-}
-
 mod adc_implementation {
-    #[cfg(feature = "embedded-hal-02")]
-    use crate::peripherals::{ADC1, ADC2};
-
-    impl_adc_interface! {
+    crate::analog::adc::impl_adc_interface! {
         ADC1 [
             (Gpio36, 0), // Alt. name: SENSOR_VP
             (Gpio37, 1), // Alt. name: SENSOR_CAPP
@@ -436,7 +359,7 @@ mod adc_implementation {
         ]
     }
 
-    impl_adc_interface! {
+    crate::analog::adc::impl_adc_interface! {
         ADC2 [
             (Gpio4,  0),
             (Gpio0,  1),
