@@ -12,7 +12,7 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    gpio::{lp_gpio::IntoLowPowerPin, IO},
+    gpio::{lp_io::IntoLowPowerPin, IO},
     i2c::lp_i2c::LpI2c,
     lp_core::{LpCore, LpCoreWakeupSource},
     peripherals::Peripherals,

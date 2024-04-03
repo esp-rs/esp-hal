@@ -458,7 +458,7 @@ crate::gpio::gpio! {
 // crate::gpio::analog! {
 // }
 
-// crate::gpio::lp_gpio::lp_gpio! {
+// crate::gpio::lp_io::lp_gpio! {
 //     0
 //     1
 //     2
