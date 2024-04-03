@@ -49,6 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Runtime ISR binding for SHA,ECC and RSA (#1354)
 - Runtime ISR binding for I2C (#1376)
 - `UsbSerialJtag` can be created in async or blocking mode. The blocking constructor takes an optional interrupt handler argument (#1377)
+- SYSTIMER and TIMG instances can now be created in async or blocking mode. The blocking constructor takes an optional argument to set interrupt handlers. The constructors are named `create`/`create_async` (#1348)
+- SYSTIMER and TIMG instances can now be created in async or blocking mode (#1348)
 
 ### Removed
 

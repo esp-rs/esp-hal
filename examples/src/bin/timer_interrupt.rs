@@ -16,10 +16,11 @@ use esp_hal::{
     interrupt::{self, Priority},
     peripherals::{Interrupt, Peripherals, TIMG0},
     prelude::*,
-    timer::{Timer, Timer0, TimerGroup},
+    timer::{Timer, Timer0, TimerGroup, TimerInterrupts},
 };
 
-static TIMER0: Mutex<RefCell<Option<Timer<Timer0<TIMG0>>>>> = Mutex::new(RefCell::new(None));
+static TIMER0: Mutex<RefCell<Option<Timer<Timer0<TIMG0>, esp_hal::Blocking>>>> =
+    Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
@@ -27,7 +28,14 @@ fn main() -> ! {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let timg0 = TimerGroup::new(
+        peripherals.TIMG0,
+        &clocks,
+        Some(TimerInterrupts {
+            timer0_t0: Some(tg0_t0_level),
+            ..Default::default()
+        }),
+    );
     let mut timer0 = timg0.timer0;
 
     interrupt::enable(Interrupt::TG0_T0_LEVEL, Priority::Priority1).unwrap();
@@ -41,8 +49,8 @@ fn main() -> ! {
     loop {}
 }
 
-#[interrupt]
-fn TG0_T0_LEVEL() {
+#[handler]
+fn tg0_t0_level() {
     critical_section::with(|cs| {
         esp_println::println!("Interrupt 1");
 

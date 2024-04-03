@@ -80,7 +80,7 @@ async fn main(spawner: Spawner) {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
     embassy::init(&clocks, timg0);
 
     let mut uart0 = Uart::new_async(peripherals.UART0, &clocks);
