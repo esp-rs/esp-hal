@@ -27,23 +27,14 @@ use embassy_time::{Duration, Instant, Ticker, Timer};
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    embassy::{
-        self,
-        executor::{FromCpu1, InterruptExecutor},
-    },
+    embassy::{self, executor::InterruptExecutor},
     interrupt::Priority,
     peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
 };
 use esp_println::println;
-
-static INT_EXECUTOR_0: InterruptExecutor<FromCpu1> = InterruptExecutor::new();
-
-#[interrupt]
-fn FROM_CPU_INTR1() {
-    unsafe { INT_EXECUTOR_0.on_interrupt() }
-}
+use static_cell::make_static;
 
 /// Periodically print something.
 #[embassy_executor::task]
@@ -82,6 +73,7 @@ async fn low_prio_async() {
 
 #[main]
 async fn main(low_prio_spawner: Spawner) {
+    esp_println::logger::init_logger_from_env();
     println!("Init!");
     let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();
@@ -90,7 +82,10 @@ async fn main(low_prio_spawner: Spawner) {
     let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
     embassy::init(&clocks, timg0);
 
-    let spawner = INT_EXECUTOR_0.start(Priority::Priority2);
+    let executor = InterruptExecutor::new(system.software_interrupt_control.software_interrupt2);
+    let executor = make_static!(executor);
+
+    let spawner = executor.start(Priority::Priority3);
     spawner.must_spawn(high_prio());
 
     println!("Spawning low-priority tasks");

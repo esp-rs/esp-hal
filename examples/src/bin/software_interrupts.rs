@@ -16,8 +16,7 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     delay::Delay,
-    interrupt::{self, Priority},
-    peripherals::{Interrupt, Peripherals},
+    peripherals::Peripherals,
     prelude::*,
     system::SoftwareInterrupt,
 };
@@ -63,11 +62,6 @@ fn main() -> ! {
             .borrow_ref_mut(cs)
             .replace(sw_int.software_interrupt3);
     });
-
-    interrupt::enable(Interrupt::FROM_CPU_INTR0, Priority::Priority3).unwrap();
-    interrupt::enable(Interrupt::FROM_CPU_INTR1, Priority::Priority3).unwrap();
-    interrupt::enable(Interrupt::FROM_CPU_INTR2, Priority::Priority3).unwrap();
-    interrupt::enable(Interrupt::FROM_CPU_INTR3, Priority::Priority3).unwrap();
 
     let delay = Delay::new(&clocks);
     let mut counter = 0;
