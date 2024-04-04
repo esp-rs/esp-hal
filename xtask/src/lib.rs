@@ -297,6 +297,7 @@ pub fn run_example(
     }
 
     let package = example.example_path().strip_prefix(package_path)?;
+    log::info!("Package: {:?}", package);
     let (bin, subcommand) = if package.starts_with("src/bin") {
         (format!("--bin={}", example.name()), "run")
     } else if package.starts_with("tests") {

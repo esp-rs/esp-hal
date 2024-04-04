@@ -25,6 +25,8 @@ enum Cli {
     GenerateEfuseFields(GenerateEfuseFieldsArgs),
     /// Run the given example for the specified chip.
     RunExample(RunExampleArgs),
+    /// Run all applicable tests for a specified chip.
+    RunTests(RunTestsArgs),
 }
 
 #[derive(Debug, Args)]
@@ -100,6 +102,13 @@ struct RunExampleArgs {
     example: String,
 }
 
+#[derive(Debug, Args)]
+struct RunTestsArgs {
+    /// Which chip to run the examples for.
+    #[arg(value_enum)]
+    chip: Chip,
+}
+
 // ----------------------------------------------------------------------------
 // Application
 
@@ -118,6 +127,7 @@ fn main() -> Result<()> {
         Cli::BumpVersion(args) => bump_version(&workspace, args),
         Cli::GenerateEfuseFields(args) => generate_efuse_src(&workspace, args),
         Cli::RunExample(args) => run_example(&workspace, args),
+        Cli::RunTests(args) => run_tests(&workspace, args),
     }
 }
 
@@ -319,6 +329,26 @@ fn run_example(workspace: &Path, mut args: RunExampleArgs) -> Result<()> {
         xtask::run_example(&package_path, args.chip, target, &example)?;
     } else {
         log::error!("Example not found or unsupported for the given chip");
+    }
+
+    Ok(())
+}
+
+fn run_tests(workspace: &PathBuf, args: RunTestsArgs) -> Result<(), anyhow::Error> {
+    // Absolute path of the package's root:
+    let package_path = xtask::windows_safe_path(&workspace.join("hil-test"));
+
+    // Determine the appropriate build target for the given package and chip:
+    let target = target_triple(&Package::HilTest, &args.chip)?;
+
+    // Load all examples and parse their metadata:
+    let tests = xtask::load_examples(&package_path.join("tests"))?;
+    let tests = tests.iter()
+        // Filter down the examples to only those for which the specified chip is supported:
+        .filter(|example| example.supports_chip(args.chip));
+
+    for test in tests {
+        xtask::run_example(&package_path, args.chip, target, &test)?;
     }
 
     Ok(())
