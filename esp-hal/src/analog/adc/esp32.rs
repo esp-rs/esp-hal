@@ -1,74 +1,19 @@
-use core::marker::PhantomData;
-
-use super::{AdcChannel, Attenuation};
+use super::{AdcConfig, Attenuation};
 use crate::{
     peripheral::PeripheralRef,
     peripherals::{ADC1, ADC2, RTC_IO, SENS},
 };
 
+pub(super) const NUM_ATTENS: usize = 10;
+
 /// The sampling/readout resolution of the ADC.
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum Resolution {
     Resolution9Bit  = 0b00,
     Resolution10Bit = 0b01,
     Resolution11Bit = 0b10,
+    #[default]
     Resolution12Bit = 0b11,
-}
-
-/// An I/O pin which can be read using the ADC.
-pub struct AdcPin<PIN, ADCI> {
-    pub pin: PIN,
-    _phantom: PhantomData<ADCI>,
-}
-
-#[cfg(feature = "embedded-hal-02")]
-impl<PIN, ADCI> embedded_hal_02::adc::Channel<ADCI> for AdcPin<PIN, ADCI>
-where
-    PIN: embedded_hal_02::adc::Channel<ADCI, ID = u8>,
-{
-    type ID = u8;
-
-    fn channel() -> Self::ID {
-        PIN::channel()
-    }
-}
-
-/// Configuration for the ADC.
-pub struct AdcConfig<ADCI> {
-    pub resolution: Resolution,
-    pub attenuations: [Option<Attenuation>; 10],
-    _phantom: PhantomData<ADCI>,
-}
-
-impl<ADCI> AdcConfig<ADCI>
-where
-    ADCI: RegisterAccess,
-{
-    pub fn new() -> AdcConfig<ADCI> {
-        Self::default()
-    }
-
-    pub fn enable_pin<PIN>(&mut self, pin: PIN, attenuation: Attenuation) -> AdcPin<PIN, ADCI>
-    where
-        PIN: AdcChannel,
-    {
-        self.attenuations[PIN::CHANNEL as usize] = Some(attenuation);
-
-        AdcPin {
-            pin,
-            _phantom: PhantomData,
-        }
-    }
-}
-
-impl<ADCI> Default for AdcConfig<ADCI> {
-    fn default() -> Self {
-        AdcConfig {
-            resolution: Resolution::Resolution12Bit,
-            attenuations: [None; 10],
-            _phantom: PhantomData,
-        }
-    }
 }
 
 #[doc(hidden)]
@@ -250,7 +195,7 @@ impl RegisterAccess for ADC2 {
 pub struct ADC<'d, ADC> {
     _adc: PeripheralRef<'d, ADC>,
     #[allow(dead_code)] // FIXME
-    attenuations: [Option<Attenuation>; 10],
+    attenuations: [Option<Attenuation>; NUM_ATTENS],
     #[allow(dead_code)] // FIXME
     active_channel: Option<u8>,
 }
@@ -259,6 +204,8 @@ impl<'d, ADCI> ADC<'d, ADCI>
 where
     ADCI: RegisterAccess,
 {
+    /// Configure a given ADC instance using the provided configuration, and
+    /// initialize the ADC for use
     pub fn new(
         adc_instance: impl crate::peripheral::Peripheral<P = ADCI> + 'd,
         config: AdcConfig<ADCI>,
@@ -331,54 +278,32 @@ where
             active_channel: None,
         }
     }
-}
 
-impl<'d, ADC1> ADC<'d, ADC1> {
-    pub fn enable_hall_sensor() {
-        // Connect hall sensor
-        unsafe { &*RTC_IO::ptr() }
-            .hall_sens()
-            .modify(|_, w| w.xpd_hall().set_bit());
-    }
-
-    pub fn disable_hall_sensor() {
-        // Disconnect hall sensor
-        unsafe { &*RTC_IO::ptr() }
-            .hall_sens()
-            .modify(|_, w| w.xpd_hall().clear_bit());
-    }
-}
-
-#[cfg(feature = "embedded-hal-02")]
-impl<'d, ADCI, PIN> embedded_hal_02::adc::OneShot<ADCI, u16, AdcPin<PIN, ADCI>> for ADC<'d, ADCI>
-where
-    PIN: embedded_hal_02::adc::Channel<ADCI, ID = u8>,
-    ADCI: RegisterAccess,
-{
-    type Error = ();
-
-    fn read(&mut self, _pin: &mut AdcPin<PIN, ADCI>) -> nb::Result<u16, Self::Error> {
-        use embedded_hal_02::adc::Channel;
-
-        if self.attenuations[AdcPin::<PIN, ADCI>::channel() as usize].is_none() {
-            panic!(
-                "Channel {} is not configured reading!",
-                AdcPin::<PIN, ADCI>::channel()
-            );
+    /// Request that the ADC begin a conversion on the specified pin
+    ///
+    /// This method takes an [AdcPin](super::AdcPin) reference, as it is
+    /// expected that the ADC will be able to sample whatever channel
+    /// underlies the pin.
+    pub fn read_oneshot<PIN>(&mut self, _pin: &mut super::AdcPin<PIN, ADCI>) -> nb::Result<u16, ()>
+    where
+        PIN: super::AdcChannel,
+    {
+        if self.attenuations[PIN::CHANNEL as usize].is_none() {
+            panic!("Channel {} is not configured reading!", PIN::CHANNEL);
         }
 
         if let Some(active_channel) = self.active_channel {
             // There is conversion in progress:
             // - if it's for a different channel try again later
             // - if it's for the given channel, go ahead and check progress
-            if active_channel != AdcPin::<PIN, ADCI>::channel() {
+            if active_channel != PIN::CHANNEL {
                 return Err(nb::Error::WouldBlock);
             }
         } else {
             // If no conversions are in progress, start a new one for given channel
-            self.active_channel = Some(AdcPin::<PIN, ADCI>::channel());
+            self.active_channel = Some(PIN::CHANNEL);
 
-            ADCI::set_en_pad(AdcPin::<PIN, ADCI>::channel());
+            ADCI::set_en_pad(PIN::CHANNEL);
 
             ADCI::clear_start_sar();
             ADCI::set_start_sar();
@@ -400,30 +325,38 @@ where
     }
 }
 
-macro_rules! impl_adc_interface {
-    ($adc:ident [
-        $( ($pin:ident, $channel:expr) ,)+
-    ]) => {
-        $(
-            impl $crate::analog::adc::AdcChannel for crate::gpio::$pin<crate::gpio::Analog> {
-                const CHANNEL: u8 = $channel;
-            }
+impl<'d, ADC1> ADC<'d, ADC1> {
+    pub fn enable_hall_sensor() {
+        // Connect hall sensor
+        unsafe { &*RTC_IO::ptr() }
+            .hall_sens()
+            .modify(|_, w| w.xpd_hall().set_bit());
+    }
 
-            #[cfg(feature = "embedded-hal-02")]
-            impl embedded_hal_02::adc::Channel<$adc> for crate::gpio::$pin<crate::gpio::Analog> {
-                type ID = u8;
+    pub fn disable_hall_sensor() {
+        // Disconnect hall sensor
+        unsafe { &*RTC_IO::ptr() }
+            .hall_sens()
+            .modify(|_, w| w.xpd_hall().clear_bit());
+    }
+}
 
-                fn channel() -> u8 { $channel }
-            }
-        )+
+#[cfg(feature = "embedded-hal-02")]
+impl<'d, ADCI, PIN> embedded_hal_02::adc::OneShot<ADCI, u16, super::AdcPin<PIN, ADCI>>
+    for ADC<'d, ADCI>
+where
+    PIN: embedded_hal_02::adc::Channel<ADCI, ID = u8> + super::AdcChannel,
+    ADCI: RegisterAccess,
+{
+    type Error = ();
+
+    fn read(&mut self, pin: &mut super::AdcPin<PIN, ADCI>) -> nb::Result<u16, Self::Error> {
+        self.read_oneshot(pin)
     }
 }
 
 mod adc_implementation {
-    #[cfg(feature = "embedded-hal-02")]
-    use crate::peripherals::{ADC1, ADC2};
-
-    impl_adc_interface! {
+    crate::analog::adc::impl_adc_interface! {
         ADC1 [
             (Gpio36, 0), // Alt. name: SENSOR_VP
             (Gpio37, 1), // Alt. name: SENSOR_CAPP
@@ -436,7 +369,7 @@ mod adc_implementation {
         ]
     }
 
-    impl_adc_interface! {
+    crate::analog::adc::impl_adc_interface! {
         ADC2 [
             (Gpio4,  0),
             (Gpio0,  1),

@@ -1,10 +1,6 @@
-use core::marker::PhantomData;
-
 #[cfg(esp32s3)]
 pub use self::calibration::*;
-#[cfg(esp32s3)]
-use super::AdcCalEfuse;
-use super::{AdcCalScheme, AdcCalSource, AdcChannel, Attenuation};
+use super::{AdcCalScheme, AdcCalSource, AdcChannel, AdcConfig, AdcPin, Attenuation};
 #[cfg(esp32s3)]
 use crate::efuse::Efuse;
 use crate::{
@@ -13,6 +9,8 @@ use crate::{
 };
 
 mod calibration;
+
+pub(super) const NUM_ATTENS: usize = 10;
 
 // Constants taken from:
 // https://github.com/espressif/esp-idf/blob/903af13e8/components/soc/esp32s2/include/soc/regi2c_saradc.h
@@ -74,81 +72,20 @@ cfg_if::cfg_if! {
 }
 
 /// The sampling/readout resolution of the ADC.
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum Resolution {
+    #[default]
     Resolution13Bit,
-}
-
-/// An I/O pin which can be read using the ADC.
-pub struct AdcPin<PIN, ADCI, CS = ()> {
-    pub pin: PIN,
-    pub cal_scheme: CS,
-    _phantom: PhantomData<ADCI>,
-}
-
-#[cfg(feature = "embedded-hal-02")]
-impl<PIN, ADCI, CS> embedded_hal_02::adc::Channel<ADCI> for AdcPin<PIN, ADCI, CS>
-where
-    PIN: embedded_hal_02::adc::Channel<ADCI, ID = u8>,
-{
-    type ID = u8;
-
-    fn channel() -> Self::ID {
-        PIN::channel()
-    }
-}
-
-/// Configuration for the ADC.
-pub struct AdcConfig<ADCI> {
-    pub resolution: Resolution,
-    pub attenuations: [Option<Attenuation>; 10],
-    _phantom: PhantomData<ADCI>,
 }
 
 impl<ADCI> AdcConfig<ADCI>
 where
     ADCI: RegisterAccess,
 {
-    pub fn new() -> AdcConfig<ADCI> {
-        Self::default()
-    }
-
-    pub fn enable_pin<PIN>(&mut self, pin: PIN, attenuation: Attenuation) -> AdcPin<PIN, ADCI>
-    where
-        PIN: AdcChannel,
-    {
-        self.attenuations[PIN::CHANNEL as usize] = Some(attenuation);
-
-        AdcPin {
-            pin,
-            cal_scheme: AdcCalScheme::<()>::new_cal(attenuation),
-            _phantom: PhantomData,
-        }
-    }
-
-    pub fn enable_pin_with_cal<PIN, CS>(
-        &mut self,
-        pin: PIN,
-        attenuation: Attenuation,
-    ) -> AdcPin<PIN, ADCI, CS>
-    where
-        ADCI: CalibrationAccess,
-        PIN: AdcChannel,
-        CS: AdcCalScheme<ADCI>,
-    {
-        self.attenuations[PIN::CHANNEL as usize] = Some(attenuation);
-
-        AdcPin {
-            pin,
-            cal_scheme: CS::new_cal(attenuation),
-            _phantom: PhantomData,
-        }
-    }
-
     /// Calibrate ADC with specified attenuation and voltage source
     pub fn adc_calibrate(atten: Attenuation, source: AdcCalSource) -> u16
     where
-        ADCI: CalibrationAccess,
+        ADCI: super::CalibrationAccess,
     {
         let mut adc_max: u16 = 0;
         let mut adc_min: u16 = u16::MAX;
@@ -191,16 +128,6 @@ where
     }
 }
 
-impl<ADCI> Default for AdcConfig<ADCI> {
-    fn default() -> Self {
-        AdcConfig {
-            resolution: Resolution::Resolution13Bit,
-            attenuations: [None; 10],
-            _phantom: PhantomData,
-        }
-    }
-}
-
 #[doc(hidden)]
 pub trait RegisterAccess {
     fn adc_samplecfg(channel: u16);
@@ -230,18 +157,6 @@ pub trait RegisterAccess {
 
     /// Reset flags
     fn reset();
-}
-
-#[doc(hidden)]
-pub trait CalibrationAccess: RegisterAccess {
-    const ADC_CAL_CNT_MAX: u16;
-    const ADC_CAL_CHANNEL: u16;
-    const ADC_VAL_MASK: u16;
-
-    fn enable_vdef(enable: bool);
-
-    /// Enable internal calibration voltage source
-    fn connect_cal(source: AdcCalSource, enable: bool);
 }
 
 impl RegisterAccess for crate::peripherals::ADC1 {
@@ -361,7 +276,7 @@ impl RegisterAccess for crate::peripherals::ADC1 {
 }
 
 #[cfg(esp32s3)]
-impl CalibrationAccess for crate::peripherals::ADC1 {
+impl super::CalibrationAccess for crate::peripherals::ADC1 {
     const ADC_CAL_CNT_MAX: u16 = ADC_CAL_CNT_MAX;
     const ADC_CAL_CHANNEL: u16 = ADC_CAL_CHANNEL;
     const ADC_VAL_MASK: u16 = ADC_VAL_MASK;
@@ -500,7 +415,7 @@ impl RegisterAccess for crate::peripherals::ADC2 {
 }
 
 #[cfg(esp32s3)]
-impl CalibrationAccess for crate::peripherals::ADC2 {
+impl super::CalibrationAccess for crate::peripherals::ADC2 {
     const ADC_CAL_CNT_MAX: u16 = ADC_CAL_CNT_MAX;
     const ADC_CAL_CHANNEL: u16 = ADC_CAL_CHANNEL;
     const ADC_VAL_MASK: u16 = ADC_VAL_MASK;
@@ -524,7 +439,6 @@ impl CalibrationAccess for crate::peripherals::ADC2 {
 /// Analog-to-Digital Converter peripheral driver.
 pub struct ADC<'d, ADC> {
     _adc: PeripheralRef<'d, ADC>,
-    #[cfg(feature = "embedded-hal-02")]
     active_channel: Option<u8>,
     last_init_code: u16,
 }
@@ -533,6 +447,8 @@ impl<'d, ADCI> ADC<'d, ADCI>
 where
     ADCI: RegisterAccess,
 {
+    /// Configure a given ADC instance using the provided configuration, and
+    /// initialize the ADC for use
     pub fn new(
         adc_instance: impl crate::peripheral::Peripheral<P = ADCI> + 'd,
         config: AdcConfig<ADCI>,
@@ -603,7 +519,6 @@ where
 
         ADC {
             _adc: adc_instance.into_ref(),
-            #[cfg(feature = "embedded-hal-02")]
             active_channel: None,
             last_init_code: 0,
         }
@@ -629,6 +544,52 @@ where
         pin.cal_scheme.adc_val(converted_value)
     }
 
+    /// Request that the ADC begin a conversion on the specified pin
+    ///
+    /// This method takes an [AdcPin](super::AdcPin) reference, as it is
+    /// expected that the ADC will be able to sample whatever channel
+    /// underlies the pin.
+    pub fn read_oneshot<PIN, CS>(
+        &mut self,
+        pin: &mut super::AdcPin<PIN, ADCI, CS>,
+    ) -> nb::Result<u16, ()>
+    where
+        PIN: super::AdcChannel,
+        CS: super::AdcCalScheme<ADCI>,
+    {
+        if let Some(active_channel) = self.active_channel {
+            // There is conversion in progress:
+            // - if it's for a different channel try again later
+            // - if it's for the given channel, go ahead and check progress
+            if active_channel != PIN::CHANNEL {
+                return Err(nb::Error::WouldBlock);
+            }
+        } else {
+            // If no conversions are in progress, start a new one for given channel
+            self.active_channel = Some(PIN::CHANNEL);
+
+            self.start_sample(pin);
+        }
+
+        // Wait for ADC to finish conversion
+        let conversion_finished = ADCI::is_done();
+        if !conversion_finished {
+            return Err(nb::Error::WouldBlock);
+        }
+
+        // Get converted value
+        let converted_value = ADCI::read_data();
+        ADCI::reset();
+
+        // Postprocess converted value according to calibration scheme used for pin
+        let converted_value = pin.cal_scheme.adc_val(converted_value);
+
+        // Mark that no conversions are currently in progress
+        self.active_channel = None;
+
+        Ok(converted_value)
+    }
+
     fn start_sample<PIN, CS>(&mut self, pin: &mut AdcPin<PIN, ADCI, CS>)
     where
         PIN: AdcChannel,
@@ -649,7 +610,7 @@ where
 }
 
 #[cfg(esp32s3)]
-impl AdcCalEfuse for crate::peripherals::ADC1 {
+impl super::AdcCalEfuse for crate::peripherals::ADC1 {
     fn get_init_code(atten: Attenuation) -> Option<u16> {
         Efuse::get_rtc_calib_init_code(1, atten)
     }
@@ -664,7 +625,7 @@ impl AdcCalEfuse for crate::peripherals::ADC1 {
 }
 
 #[cfg(esp32s3)]
-impl AdcCalEfuse for crate::peripherals::ADC2 {
+impl super::AdcCalEfuse for crate::peripherals::ADC2 {
     fn get_init_code(atten: Attenuation) -> Option<u16> {
         Efuse::get_rtc_calib_init_code(2, atten)
     }
@@ -689,67 +650,12 @@ where
     type Error = ();
 
     fn read(&mut self, pin: &mut AdcPin<PIN, ADCI, CS>) -> nb::Result<u16, Self::Error> {
-        use embedded_hal_02::adc::Channel;
-
-        if let Some(active_channel) = self.active_channel {
-            // There is conversion in progress:
-            // - if it's for a different channel try again later
-            // - if it's for the given channel, go ahead and check progress
-            if active_channel != AdcPin::<PIN, ADCI>::channel() {
-                return Err(nb::Error::WouldBlock);
-            }
-        } else {
-            // If no conversions are in progress, start a new one for given channel
-            self.active_channel = Some(AdcPin::<PIN, ADCI>::channel());
-
-            self.start_sample(pin);
-        }
-
-        // Wait for ADC to finish conversion
-        let conversion_finished = ADCI::is_done();
-        if !conversion_finished {
-            return Err(nb::Error::WouldBlock);
-        }
-
-        // Get converted value
-        let converted_value = ADCI::read_data();
-        ADCI::reset();
-
-        // Postprocess converted value according to calibration scheme used for pin
-        let converted_value = pin.cal_scheme.adc_val(converted_value);
-
-        // Mark that no conversions are currently in progress
-        self.active_channel = None;
-
-        Ok(converted_value)
-    }
-}
-
-macro_rules! impl_adc_interface {
-    ($adc:ident [
-        $( ($pin:ident, $channel:expr) ,)+
-    ]) => {
-
-        $(
-            impl $crate::analog::adc::AdcChannel for crate::gpio::$pin<crate::gpio::Analog> {
-                const CHANNEL: u8 = $channel;
-            }
-
-            #[cfg(feature = "embedded-hal-02")]
-            impl embedded_hal_02::adc::Channel<$adc> for crate::gpio::$pin<crate::gpio::Analog> {
-                type ID = u8;
-
-                fn channel() -> u8 { $channel }
-            }
-        )+
+        self.read_oneshot(pin)
     }
 }
 
 mod adc_implementation {
-    #[cfg(feature = "embedded-hal-02")]
-    use crate::peripherals::{ADC1, ADC2};
-
-    impl_adc_interface! {
+    crate::analog::adc::impl_adc_interface! {
         ADC1 [
             (Gpio1,  0),
             (Gpio2,  1),
@@ -764,7 +670,7 @@ mod adc_implementation {
         ]
     }
 
-    impl_adc_interface! {
+    crate::analog::adc::impl_adc_interface! {
         ADC2 [
             (Gpio11, 0),
             (Gpio12, 1),
