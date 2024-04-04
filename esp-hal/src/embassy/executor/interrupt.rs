@@ -53,44 +53,30 @@ impl CallbackContext {
     }
 }
 
-extern "C" fn swi_handler0() {
-    let mut swi = unsafe { SoftwareInterrupt::<0>::steal() };
+fn handle_interrupt<const NUM: u8>() {
+    let mut swi = unsafe { SoftwareInterrupt::<NUM>::steal() };
     swi.reset();
 
     unsafe {
-        let executor = EXECUTORS[0].get().as_mut().unwrap();
+        let executor = EXECUTORS[NUM as usize].get().as_mut().unwrap();
         executor.poll();
     }
+}
+
+extern "C" fn swi_handler0() {
+    handle_interrupt::<0>();
 }
 
 extern "C" fn swi_handler1() {
-    let mut swi = unsafe { SoftwareInterrupt::<1>::steal() };
-    swi.reset();
-
-    unsafe {
-        let executor = EXECUTORS[1].get().as_mut().unwrap();
-        executor.poll();
-    }
+    handle_interrupt::<1>();
 }
 
 extern "C" fn swi_handler2() {
-    let mut swi = unsafe { SoftwareInterrupt::<2>::steal() };
-    swi.reset();
-
-    unsafe {
-        let executor = EXECUTORS[2].get().as_mut().unwrap();
-        executor.poll();
-    }
+    handle_interrupt::<2>();
 }
 
 extern "C" fn swi_handler3() {
-    let mut swi = unsafe { SoftwareInterrupt::<3>::steal() };
-    swi.reset();
-
-    unsafe {
-        let executor = EXECUTORS[3].get().as_mut().unwrap();
-        executor.poll();
-    }
+    handle_interrupt::<3>();
 }
 
 impl<const SWI: u8> InterruptExecutor<SWI> {

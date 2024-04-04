@@ -100,11 +100,12 @@ pub enum Peripheral {
     LcdCam,
 }
 
-pub struct SoftwareInterrupt<const NUM: u8> {
-    _private: (),
-}
+#[non_exhaustive]
+pub struct SoftwareInterrupt<const NUM: u8> {}
 
 impl<const NUM: u8> SoftwareInterrupt<NUM> {
+    // TODO interrupts missing in PAC or named wrong for P4
+    #[cfg(not(esp32p4))]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         let interrupt = match NUM {
             0 => crate::peripherals::Interrupt::FROM_CPU_INTR0,
@@ -190,7 +191,7 @@ impl<const NUM: u8> SoftwareInterrupt<NUM> {
     /// time.
     #[inline]
     pub unsafe fn steal() -> Self {
-        Self { _private: () }
+        Self {}
     }
 }
 
@@ -205,8 +206,8 @@ impl<const NUM: u8> crate::peripheral::Peripheral for SoftwareInterrupt<NUM> {
 
 impl<const NUM: u8> crate::private::Sealed for SoftwareInterrupt<NUM> {}
 
+#[non_exhaustive]
 pub struct SoftwareInterruptControl {
-    _private: (),
     #[cfg(not(all(feature = "embassy-executor-thread", multi_core)))]
     pub software_interrupt0: SoftwareInterrupt<0>,
     pub software_interrupt1: SoftwareInterrupt<1>,
@@ -221,12 +222,11 @@ impl SoftwareInterruptControl {
         // before `main` via proc-macro
 
         SoftwareInterruptControl {
-            _private: (),
             #[cfg(not(all(feature = "embassy-executor-thread", multi_core)))]
-            software_interrupt0: SoftwareInterrupt { _private: () },
-            software_interrupt1: SoftwareInterrupt { _private: () },
-            software_interrupt2: SoftwareInterrupt { _private: () },
-            software_interrupt3: SoftwareInterrupt { _private: () },
+            software_interrupt0: SoftwareInterrupt {},
+            software_interrupt1: SoftwareInterrupt {},
+            software_interrupt2: SoftwareInterrupt {},
+            software_interrupt3: SoftwareInterrupt {},
         }
     }
 }
