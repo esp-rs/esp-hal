@@ -119,3 +119,23 @@ impl rand_core::RngCore for Rng {
         Ok(())
     }
 }
+
+#[derive(Clone, Copy)]
+pub struct Trng<'d, ADC> {
+    pub rng: Rng,
+    _adc1: PeripheralRef<'d, ADCI>,
+    #[cfg(esp32c3, )]>,
+}
+
+impl Trng<ADC> {
+    /// Create a new True Random Number Generator instance
+    pub fn new(rng: impl Peripheral<P = RNG>) -> Self {
+        let gen = Rng::new(rng);  
+        #[cfg(not(esp32p4))]
+        crate::soc::trng::ensure_randomness();
+        Self{rng: gen}
+    }
+}
+
+#[cfg(not(esp32p4))]
+impl rand_core::CryptoRng for Rng {}
