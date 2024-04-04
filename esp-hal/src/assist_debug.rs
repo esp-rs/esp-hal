@@ -9,35 +9,66 @@
 //! Debug Assistant is an auxiliary module that features a set of functions to
 //! help locate bugs and issues during software debugging.
 //!
-//! While all the targets support PC logging it's API is not exposed here.
-//! Instead the ROM bootloader will always enable it and print the last seen PC
-//! (e.g. _Saved PC:0x42002ff2_). Make sure the reset was triggered by a TIMG
-//! watchdog. Not an RTC or SWD watchdog.
+//! While all the targets support program counter (PC) logging it's API is not
+//! exposed here. Instead the ROM bootloader will always enable it and print the
+//! last seen PC (e.g. _Saved PC:0x42002ff2_). Make sure the reset was triggered
+//! by a TIMG watchdog. Not an RTC or SWD watchdog.
 //!
 //! ⚠️ Bus write access logging is not available via this API. ⚠️
 
+use core::marker::PhantomData;
+
 use crate::{
+    interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::ASSIST_DEBUG,
 };
 
-pub struct DebugAssist<'d> {
+/// The debug assist driver instance.
+pub struct DebugAssist<'d, DM: crate::Mode> {
     debug_assist: PeripheralRef<'d, ASSIST_DEBUG>,
+    phantom: PhantomData<DM>,
 }
 
-impl<'d> DebugAssist<'d> {
-    pub fn new(debug_assist: impl Peripheral<P = ASSIST_DEBUG> + 'd) -> Self {
+impl<'d> DebugAssist<'d, crate::Blocking> {
+    /// Create a new instance in [crate::Blocking] mode.
+    ///
+    /// Optionally an interrupt handler can be bound.
+    pub fn new(
+        debug_assist: impl Peripheral<P = ASSIST_DEBUG> + 'd,
+        interrupt: Option<InterruptHandler>,
+    ) -> Self {
         crate::into_ref!(debug_assist);
 
         // NOTE: We should enable the debug assist, however, it's always enabled in ROM
         //       code already.
 
-        DebugAssist { debug_assist }
+        if let Some(interrupt) = interrupt {
+            unsafe {
+                crate::interrupt::bind_interrupt(
+                    crate::peripherals::Interrupt::ASSIST_DEBUG,
+                    interrupt.handler(),
+                );
+                crate::interrupt::enable(
+                    crate::peripherals::Interrupt::ASSIST_DEBUG,
+                    interrupt.priority(),
+                )
+                .unwrap();
+            }
+        }
+
+        DebugAssist {
+            debug_assist,
+            phantom: PhantomData,
+        }
     }
 }
 
 #[cfg(assist_debug_sp_monitor)]
-impl<'d> DebugAssist<'d> {
+impl<'d> DebugAssist<'d, crate::Blocking> {
+    /// Enable SP monitoring on main core. When the SP exceeds the
+    /// `lower_bound` or `upper_bound` treshold, the module will record the PC
+    /// pointer and generate an interrupt.
     pub fn enable_sp_monitor(&mut self, lower_bound: u32, upper_bound: u32) {
         self.debug_assist
             .core_0_sp_min()
@@ -64,6 +95,7 @@ impl<'d> DebugAssist<'d> {
         });
     }
 
+    /// Disable SP monitoring on main core.
     pub fn disable_sp_monitor(&mut self) {
         self.debug_assist.core_0_intr_ena().modify(|_, w| {
             w.core_0_sp_spill_max_intr_ena()
@@ -80,6 +112,7 @@ impl<'d> DebugAssist<'d> {
         });
     }
 
+    /// Clear SP monitoring interrupt on main core.
     pub fn clear_sp_monitor_interrupt(&mut self) {
         self.debug_assist.core_0_intr_clr().write(|w| {
             w.core_0_sp_spill_max_clr()
@@ -89,6 +122,7 @@ impl<'d> DebugAssist<'d> {
         });
     }
 
+    /// Check, if SP monitoring interrupt is set on main core.
     pub fn is_sp_monitor_interrupt_set(&self) -> bool {
         self.debug_assist
             .core_0_intr_raw()
@@ -103,6 +137,7 @@ impl<'d> DebugAssist<'d> {
                 .bit_is_set()
     }
 
+    /// Get SP monitoring PC value on main core.
     pub fn get_sp_monitor_pc(&self) -> u32 {
         self.debug_assist
             .core_0_sp_pc()
@@ -113,7 +148,10 @@ impl<'d> DebugAssist<'d> {
 }
 
 #[cfg(all(assist_debug_sp_monitor, multi_core))]
-impl<'d> DebugAssist<'d> {
+impl<'d> DebugAssist<'d, crate::Blocking> {
+    /// Enable SP monitoring on secondondary core. When the SP exceeds the
+    /// `lower_bound` or `upper_bound` treshold, the module will record the PC
+    /// pointer and generate an interrupt.
     pub fn enable_core1_sp_monitor(&mut self, lower_bound: u32, upper_bound: u32) {
         self.debug_assist
             .core_1_sp_min
@@ -140,6 +178,7 @@ impl<'d> DebugAssist<'d> {
         });
     }
 
+    /// Disable SP monitoring on secondary core.
     pub fn disable_core1_sp_monitor(&mut self) {
         self.debug_assist.core_1_intr_ena.modify(|_, w| {
             w.core_1_sp_spill_max_intr_ena()
@@ -156,6 +195,7 @@ impl<'d> DebugAssist<'d> {
         });
     }
 
+    /// Clear SP monitoring interrupt on secondary core.
     pub fn clear_core1_sp_monitor_interrupt(&mut self) {
         self.debug_assist.core_1_intr_clr.write(|w| {
             w.core_1_sp_spill_max_clr()
@@ -165,6 +205,7 @@ impl<'d> DebugAssist<'d> {
         });
     }
 
+    /// Check, if SP monitoring interrupt is set on secondary core.
     pub fn is_core1_sp_monitor_interrupt_set(&self) -> bool {
         self.debug_assist
             .core_1_intr_raw
@@ -179,13 +220,18 @@ impl<'d> DebugAssist<'d> {
                 .bit_is_set()
     }
 
+    /// Get SP monitoring PC value on secondary core.
     pub fn get_core1_sp_monitor_pc(&self) -> u32 {
         self.debug_assist.core_1_sp_pc.read().core_1_sp_pc().bits()
     }
 }
 
 #[cfg(assist_debug_region_monitor)]
-impl<'d> DebugAssist<'d> {
+impl<'d> DebugAssist<'d, crate::Blocking> {
+    /// Enable region monitoring of read/write performed by the main CPU in a
+    /// certain memory region0. Whenever the bus reads or writes in the
+    /// specified memory region, an interrupt will be triggered. Two memory
+    /// regions (region0, region1) can be monitored at the same time.
     pub fn enable_region0_monitor(
         &mut self,
         lower_bound: u32,
@@ -218,6 +264,7 @@ impl<'d> DebugAssist<'d> {
         });
     }
 
+    /// Disable region0 monitoring on main core.
     pub fn disable_region0_monitor(&mut self) {
         self.debug_assist.core_0_intr_ena().modify(|_, w| {
             w.core_0_area_dram0_0_rd_intr_ena()
@@ -234,6 +281,7 @@ impl<'d> DebugAssist<'d> {
         });
     }
 
+    /// Clear region0 monitoring interrupt on main core.
     pub fn clear_region0_monitor_interrupt(&mut self) {
         self.debug_assist.core_0_intr_clr().write(|w| {
             w.core_0_area_dram0_0_rd_clr()
@@ -243,6 +291,7 @@ impl<'d> DebugAssist<'d> {
         });
     }
 
+    /// Check, if region0 monitoring interrupt is set on main core.
     pub fn is_region0_monitor_interrupt_set(&self) -> bool {
         self.debug_assist
             .core_0_intr_raw()
@@ -257,6 +306,9 @@ impl<'d> DebugAssist<'d> {
                 .bit_is_set()
     }
 
+    /// Enable region monitoring of read/write performed by the main CPU in a
+    /// certain memory region1. Whenever the bus reads or writes in the
+    /// specified memory region, an interrupt will be triggered.
     pub fn enable_region1_monitor(
         &mut self,
         lower_bound: u32,
@@ -289,6 +341,7 @@ impl<'d> DebugAssist<'d> {
         });
     }
 
+    /// Disable region1 monitoring on main core.
     pub fn disable_region1_monitor(&mut self) {
         self.debug_assist.core_0_intr_ena().modify(|_, w| {
             w.core_0_area_dram0_1_rd_intr_ena()
@@ -305,6 +358,7 @@ impl<'d> DebugAssist<'d> {
         });
     }
 
+    /// Clear region1 monitoring interrupt on main core.
     pub fn clear_region1_monitor_interrupt(&mut self) {
         self.debug_assist.core_0_intr_clr().write(|w| {
             w.core_0_area_dram0_1_rd_clr()
@@ -314,6 +368,7 @@ impl<'d> DebugAssist<'d> {
         });
     }
 
+    /// Check, if region1 monitoring interrupt is set on main core.
     pub fn is_region1_monitor_interrupt_set(&self) -> bool {
         self.debug_assist
             .core_0_intr_raw()
@@ -328,6 +383,7 @@ impl<'d> DebugAssist<'d> {
                 .bit_is_set()
     }
 
+    /// Get region monotoring PC value on main core.
     pub fn get_region_monitor_pc(&self) -> u32 {
         self.debug_assist
             .core_0_area_pc()
@@ -338,7 +394,10 @@ impl<'d> DebugAssist<'d> {
 }
 
 #[cfg(all(assist_debug_region_monitor, multi_core))]
-impl<'d> DebugAssist<'d> {
+impl<'d> DebugAssist<'d, crate::Blocking> {
+    /// Enable region monitoring of read/write performed by the secondary CPU in
+    /// a certain memory region0. Whenever the bus reads or writes in the
+    /// specified memory region, an interrupt will be triggered.
     pub fn enable_core1_region0_monitor(
         &mut self,
         lower_bound: u32,
@@ -371,6 +430,7 @@ impl<'d> DebugAssist<'d> {
         });
     }
 
+    /// Disable region0 monitoring on secondary core.
     pub fn disable_core1_region0_monitor(&mut self) {
         self.debug_assist.core_1_intr_ena().modify(|_, w| {
             w.core_1_area_dram0_0_rd_intr_ena()
@@ -387,6 +447,7 @@ impl<'d> DebugAssist<'d> {
         });
     }
 
+    /// Clear region0 monitoring interrupt on secondary core.
     pub fn clear_core1_region0_monitor_interrupt(&mut self) {
         self.debug_assist.core_1_intr_clr().write(|w| {
             w.core_1_area_dram0_0_rd_clr()
@@ -396,6 +457,7 @@ impl<'d> DebugAssist<'d> {
         });
     }
 
+    /// Check, if region0 monitoring interrupt is set on secondary core.
     pub fn is_core1_region0_monitor_interrupt_set(&self) -> bool {
         self.debug_assist
             .core_1_intr_raw()
@@ -410,6 +472,9 @@ impl<'d> DebugAssist<'d> {
                 .bit_is_set()
     }
 
+    /// Enable region monitoring of read/write performed by the secondary CPU in
+    /// a certain memory region1. Whenever the bus reads or writes in the
+    /// specified memory region, an interrupt will be triggered.
     pub fn enable_core1_region1_monitor(
         &mut self,
         lower_bound: u32,
@@ -442,6 +507,7 @@ impl<'d> DebugAssist<'d> {
         });
     }
 
+    /// Disable region1 monitoring on secondary core.
     pub fn disable_core1_region1_monitor(&mut self) {
         self.debug_assist.core_1_intr_ena().modify(|_, w| {
             w.core_1_area_dram0_1_rd_intr_ena()
@@ -458,6 +524,7 @@ impl<'d> DebugAssist<'d> {
         });
     }
 
+    /// Clear region1 monitoring interrupt on secondary core.
     pub fn clear_core1_region1_monitor_interrupt(&mut self) {
         self.debug_assist.core_1_intr_clr().write(|w| {
             w.core_1_area_dram0_1_rd_clr()
@@ -467,6 +534,7 @@ impl<'d> DebugAssist<'d> {
         });
     }
 
+    /// Check, if region1 monitoring interrupt is set on secondary core.
     pub fn is_core1_region1_monitor_interrupt_set(&self) -> bool {
         self.debug_assist
             .core_1_intr_raw()
@@ -481,6 +549,7 @@ impl<'d> DebugAssist<'d> {
                 .bit_is_set()
     }
 
+    /// Get region monotoring PC value on secondary core.
     pub fn get_core1_region_monitor_pc(&self) -> u32 {
         self.debug_assist
             .core_1_area_pc()

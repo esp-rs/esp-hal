@@ -20,7 +20,7 @@ use esp_hal::{
 };
 use esp_println::println;
 
-static DA: Mutex<RefCell<Option<DebugAssist>>> = Mutex::new(RefCell::new(None));
+static DA: Mutex<RefCell<Option<DebugAssist<esp_hal::Blocking>>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
@@ -28,7 +28,7 @@ fn main() -> ! {
     let system = peripherals.SYSTEM.split();
     let _clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let mut da = DebugAssist::new(peripherals.ASSIST_DEBUG);
+    let mut da = DebugAssist::new(peripherals.ASSIST_DEBUG, None);
 
     cfg_if::cfg_if! {
         if #[cfg(not(feature = "esp32s3"))] {
