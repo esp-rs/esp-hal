@@ -28,14 +28,7 @@
 //! let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 //! ```
 
-use crate::{peripheral::PeripheralRef, peripherals::SYSTEM};
-
-pub enum SoftwareInterrupt {
-    SoftwareInterrupt0,
-    SoftwareInterrupt1,
-    SoftwareInterrupt2,
-    SoftwareInterrupt3,
-}
+use crate::{interrupt::InterruptHandler, peripheral::PeripheralRef, peripherals::SYSTEM};
 
 /// Peripherals which can be enabled via `PeripheralClockControl`
 pub enum Peripheral {
@@ -107,70 +100,117 @@ pub enum Peripheral {
     LcdCam,
 }
 
-pub struct SoftwareInterruptControl {
+pub struct SoftwareInterrupt<const NUM: u8> {
     _private: (),
 }
 
-impl SoftwareInterruptControl {
-    pub fn raise(&mut self, interrupt: SoftwareInterrupt) {
+impl<const NUM: u8> SoftwareInterrupt<NUM> {
+    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        let interrupt = match NUM {
+            0 => crate::peripherals::Interrupt::FROM_CPU_INTR0,
+            1 => crate::peripherals::Interrupt::FROM_CPU_INTR1,
+            2 => crate::peripherals::Interrupt::FROM_CPU_INTR2,
+            3 => crate::peripherals::Interrupt::FROM_CPU_INTR3,
+            _ => unreachable!(),
+        };
+
+        unsafe {
+            crate::interrupt::bind_interrupt(interrupt, handler.handler());
+            crate::interrupt::enable(interrupt, handler.priority()).unwrap();
+        }
+    }
+
+    pub fn raise(&mut self) {
         #[cfg(not(any(esp32c6, esp32h2)))]
         let system = unsafe { &*SYSTEM::PTR };
         #[cfg(any(esp32c6, esp32h2))]
         let system = unsafe { &*crate::peripherals::INTPRI::PTR };
 
-        match interrupt {
-            SoftwareInterrupt::SoftwareInterrupt0 => {
+        match NUM {
+            0 => {
                 system
                     .cpu_intr_from_cpu_0()
                     .write(|w| w.cpu_intr_from_cpu_0().set_bit());
             }
-            SoftwareInterrupt::SoftwareInterrupt1 => {
+            1 => {
                 system
                     .cpu_intr_from_cpu_1()
                     .write(|w| w.cpu_intr_from_cpu_1().set_bit());
             }
-            SoftwareInterrupt::SoftwareInterrupt2 => {
+            2 => {
                 system
                     .cpu_intr_from_cpu_2()
                     .write(|w| w.cpu_intr_from_cpu_2().set_bit());
             }
-            SoftwareInterrupt::SoftwareInterrupt3 => {
+            3 => {
                 system
                     .cpu_intr_from_cpu_3()
                     .write(|w| w.cpu_intr_from_cpu_3().set_bit());
             }
+            _ => unreachable!(),
         }
     }
 
-    pub fn reset(&mut self, interrupt: SoftwareInterrupt) {
+    pub fn reset(&mut self) {
         #[cfg(not(any(esp32c6, esp32h2)))]
         let system = unsafe { &*SYSTEM::PTR };
         #[cfg(any(esp32c6, esp32h2))]
         let system = unsafe { &*crate::peripherals::INTPRI::PTR };
 
-        match interrupt {
-            SoftwareInterrupt::SoftwareInterrupt0 => {
+        match NUM {
+            0 => {
                 system
                     .cpu_intr_from_cpu_0()
                     .write(|w| w.cpu_intr_from_cpu_0().clear_bit());
             }
-            SoftwareInterrupt::SoftwareInterrupt1 => {
+            1 => {
                 system
                     .cpu_intr_from_cpu_1()
                     .write(|w| w.cpu_intr_from_cpu_1().clear_bit());
             }
-            SoftwareInterrupt::SoftwareInterrupt2 => {
+            2 => {
                 system
                     .cpu_intr_from_cpu_2()
                     .write(|w| w.cpu_intr_from_cpu_2().clear_bit());
             }
-            SoftwareInterrupt::SoftwareInterrupt3 => {
+            3 => {
                 system
                     .cpu_intr_from_cpu_3()
                     .write(|w| w.cpu_intr_from_cpu_3().clear_bit());
             }
+            _ => unreachable!(),
         }
     }
+
+    /// Unsafely create an instance of this peripheral out of thin air.
+    ///
+    /// # Safety
+    ///
+    /// You must ensure that you're only using one instance of this type at a
+    /// time.
+    #[inline]
+    pub unsafe fn steal() -> Self {
+        Self { _private: () }
+    }
+}
+
+impl<const NUM: u8> crate::peripheral::Peripheral for SoftwareInterrupt<NUM> {
+    type P = SoftwareInterrupt<NUM>;
+
+    #[inline]
+    unsafe fn clone_unchecked(&mut self) -> Self::P {
+        Self::steal()
+    }
+}
+
+impl<const NUM: u8> crate::private::Sealed for SoftwareInterrupt<NUM> {}
+
+pub struct SoftwareInterruptControl {
+    _private: (),
+    pub software_interrupt0: SoftwareInterrupt<0>,
+    pub software_interrupt1: SoftwareInterrupt<1>,
+    pub software_interrupt2: SoftwareInterrupt<2>,
+    pub software_interrupt3: SoftwareInterrupt<3>,
 }
 
 /// Controls the enablement of peripheral clocks.
@@ -1087,7 +1127,13 @@ impl<'d, T: crate::peripheral::Peripheral<P = SYSTEM> + 'd> SystemExt<'d> for T 
             clock_control: SystemClockControl { _private: () },
             cpu_control: CpuControl { _private: () },
             radio_clock_control: RadioClockControl { _private: () },
-            software_interrupt_control: SoftwareInterruptControl { _private: () },
+            software_interrupt_control: SoftwareInterruptControl {
+                _private: (),
+                software_interrupt0: SoftwareInterrupt { _private: () },
+                software_interrupt1: SoftwareInterrupt { _private: () },
+                software_interrupt2: SoftwareInterrupt { _private: () },
+                software_interrupt3: SoftwareInterrupt { _private: () },
+            },
         }
     }
 }
