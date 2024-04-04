@@ -15,8 +15,8 @@
 //! by a TIMG watchdog. Not an RTC or SWD watchdog.
 //!
 //! ⚠️ Bus write access logging is not available via this API. ⚠️
-
-use core::marker::PhantomData;
+//!
+//! ⚠️ This driver has only blocking API. ⚠️
 
 use crate::{
     interrupt::InterruptHandler,
@@ -25,12 +25,11 @@ use crate::{
 };
 
 /// The debug assist driver instance.
-pub struct DebugAssist<'d, DM: crate::Mode> {
+pub struct DebugAssist<'d> {
     debug_assist: PeripheralRef<'d, ASSIST_DEBUG>,
-    phantom: PhantomData<DM>,
 }
 
-impl<'d> DebugAssist<'d, crate::Blocking> {
+impl<'d> DebugAssist<'d> {
     /// Create a new instance in [crate::Blocking] mode.
     ///
     /// Optionally an interrupt handler can be bound.
@@ -57,15 +56,12 @@ impl<'d> DebugAssist<'d, crate::Blocking> {
             }
         }
 
-        DebugAssist {
-            debug_assist,
-            phantom: PhantomData,
-        }
+        DebugAssist { debug_assist }
     }
 }
 
 #[cfg(assist_debug_sp_monitor)]
-impl<'d> DebugAssist<'d, crate::Blocking> {
+impl<'d> DebugAssist<'d> {
     /// Enable SP monitoring on main core. When the SP exceeds the
     /// `lower_bound` or `upper_bound` treshold, the module will record the PC
     /// pointer and generate an interrupt.
@@ -148,7 +144,7 @@ impl<'d> DebugAssist<'d, crate::Blocking> {
 }
 
 #[cfg(all(assist_debug_sp_monitor, multi_core))]
-impl<'d> DebugAssist<'d, crate::Blocking> {
+impl<'d> DebugAssist<'d> {
     /// Enable SP monitoring on secondondary core. When the SP exceeds the
     /// `lower_bound` or `upper_bound` treshold, the module will record the PC
     /// pointer and generate an interrupt.
@@ -227,7 +223,7 @@ impl<'d> DebugAssist<'d, crate::Blocking> {
 }
 
 #[cfg(assist_debug_region_monitor)]
-impl<'d> DebugAssist<'d, crate::Blocking> {
+impl<'d> DebugAssist<'d> {
     /// Enable region monitoring of read/write performed by the main CPU in a
     /// certain memory region0. Whenever the bus reads or writes in the
     /// specified memory region, an interrupt will be triggered. Two memory
@@ -394,7 +390,7 @@ impl<'d> DebugAssist<'d, crate::Blocking> {
 }
 
 #[cfg(all(assist_debug_region_monitor, multi_core))]
-impl<'d> DebugAssist<'d, crate::Blocking> {
+impl<'d> DebugAssist<'d> {
     /// Enable region monitoring of read/write performed by the secondary CPU in
     /// a certain memory region0. Whenever the bus reads or writes in the
     /// specified memory region, an interrupt will be triggered.

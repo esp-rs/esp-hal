@@ -19,7 +19,7 @@ use esp_hal::{
 };
 use esp_println::println;
 
-static DA: Mutex<RefCell<Option<DebugAssist<esp_hal::Blocking>>>> = Mutex::new(RefCell::new(None));
+static DA: Mutex<RefCell<Option<DebugAssist>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
