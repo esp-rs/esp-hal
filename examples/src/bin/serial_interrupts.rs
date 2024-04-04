@@ -15,8 +15,7 @@ use esp_hal::{
     clock::ClockControl,
     delay::Delay,
     gpio,
-    interrupt::{self, Priority},
-    peripherals::{Interrupt, Peripherals, UART0},
+    peripherals::{Peripherals, UART0},
     prelude::*,
     uart::{
         config::{AtCmdConfig, Config},

@@ -24,12 +24,10 @@
 //! so no immediate neighbor is available.
 
 //% CHIPS: esp32c2 esp32c3 esp32c6 esp32h2 esp32s3
-//% FEATURES: embedded-hal-02
 
 #![no_std]
 #![no_main]
 
-use embedded_hal_02::digital::v2::{InputPin, OutputPin};
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,

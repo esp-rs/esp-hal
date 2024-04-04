@@ -1166,11 +1166,13 @@ where
         GpioPin { _mode: PhantomData }
     }
 
+    /// Configures the pin into alternate mode one.
     pub fn into_alternate_1(self) -> GpioPin<Alternate<AF1>, GPIONUM> {
         self.init_output(AlternateFunction::Function1, false);
         GpioPin { _mode: PhantomData }
     }
 
+    /// Configures the pin into alternate mode two.
     pub fn into_alternate_2(self) -> GpioPin<Alternate<AF2>, GPIONUM> {
         self.init_output(AlternateFunction::Function2, false);
         GpioPin { _mode: PhantomData }
@@ -1334,6 +1336,7 @@ where
     Self: GpioProperties,
     <Self as GpioProperties>::PinType: IsAnalogPin,
 {
+    /// Configures the pin into a an [Analog] pin.
     pub fn into_analog(self) -> GpioPin<Analog, GPIONUM> {
         crate::soc::gpio::internal_into_analog(GPIONUM);
 
@@ -1377,6 +1380,7 @@ impl<MODE, TYPE> AnyPin<MODE, TYPE>
 where
     TYPE: PinType,
 {
+    /// Degrade the pin to remove the pin number generics.
     pub fn degrade(self) -> AnyPin<MODE> {
         AnyPin {
             inner: self.inner,
