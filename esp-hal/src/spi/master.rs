@@ -391,6 +391,46 @@ pub struct Spi<'d, T, M> {
     _mode: PhantomData<M>,
 }
 
+impl<'d, T, M> Spi<'d, T, M>
+where
+    T: Instance,
+    M: IsFullDuplex,
+{
+    /// Read bytes from SPI.
+    ///
+    /// Sends out a stuffing byte for every byte to read. This function doesn't
+    /// perform flushing. If you want to read the response to something you
+    /// have written before, consider using [`Self::transfer`] instead.
+    pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
+        self.spi.read_byte()
+    }
+
+    /// Write a byte to SPI.
+    pub fn write_byte(&mut self, word: u8) -> nb::Result<(), Error> {
+        self.spi.write_byte(word)
+    }
+
+    /// Write bytes to SPI.
+    ///
+    /// Copies the content of `words` in chunks of 64 bytes into the SPI
+    /// transmission FIFO. If `words` is longer than 64 bytes, multiple
+    /// sequential transfers are performed. This function will return before
+    /// all bytes of the last chunk to transmit have been sent to the wire. If
+    /// you must ensure that the whole messages was written correctly, use
+    /// [`Self::flush`].
+    pub fn write_bytes(&mut self, words: &[u8]) -> Result<(), Error> {
+        self.spi.write_bytes(words)?;
+        self.spi.flush()?;
+
+        Ok(())
+    }
+
+    /// Sends `words` to the slave. Returns the `words` received from the slave
+    pub fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Error> {
+        self.spi.transfer(words)
+    }
+}
+
 impl<'d, T> Spi<'d, T, FullDuplexMode>
 where
     T: Instance,
@@ -736,11 +776,11 @@ where
     type Error = Error;
 
     fn read(&mut self) -> nb::Result<u8, Self::Error> {
-        self.spi.read_byte()
+        self.read_byte()
     }
 
     fn send(&mut self, word: u8) -> nb::Result<(), Self::Error> {
-        self.spi.write_byte(word)
+        self.write_byte(word)
     }
 }
 
@@ -753,7 +793,7 @@ where
     type Error = Error;
 
     fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Self::Error> {
-        self.spi.transfer(words)
+        self.transfer(words)
     }
 }
 
@@ -766,9 +806,7 @@ where
     type Error = Error;
 
     fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-        self.spi.write_bytes(words)?;
-        self.spi.flush()?;
-        Ok(())
+        self.write_bytes(words)
     }
 }
 

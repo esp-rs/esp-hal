@@ -66,8 +66,7 @@ mod tests {
         let write = [0xde, 0xad, 0xbe, 0xef];
         let mut read: [u8; 4] = [0x00u8; 4];
 
-        ctx.spi
-            .transfer(&mut read[..], &write[..])
+        SpiBus::transfer(&mut ctx.spi, &mut read[..], &write[..])
             .expect("Symmetric transfer failed");
         assert_eq!(write, read);
     }
@@ -77,8 +76,7 @@ mod tests {
         let write = [0xde, 0xad, 0xbe, 0xef];
         let mut read: [u8; 4] = [0x00; 4];
 
-        ctx.spi
-            .transfer(&mut read[0..2], &write[..])
+        SpiBus::transfer(&mut ctx.spi, &mut read[0..2], &write[..])
             .expect("Asymmetric transfer failed");
         assert_eq!(write[0], read[0]);
         assert_eq!(read[2], 0x00u8);
@@ -92,9 +90,7 @@ mod tests {
         }
         let mut read = [0x00u8; 4096];
 
-        ctx.spi
-            .transfer(&mut read[..], &write[..])
-            .expect("Huge transfer failed");
+        SpiBus::transfer(&mut ctx.spi, &mut read[..], &write[..]).expect("Huge transfer failed");
         assert_eq!(write, read);
     }
 

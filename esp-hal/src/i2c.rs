@@ -191,6 +191,33 @@ pub struct I2C<'d, T, DM: crate::Mode> {
     phantom: PhantomData<DM>,
 }
 
+impl<T, DM> I2C<'_, T, DM>
+where
+    T: Instance,
+    DM: crate::Mode,
+{
+    /// Reads enough bytes from slave with `address` to fill `buffer`
+    pub fn read(&mut self, address: u8, buffer: &mut [u8]) -> Result<(), Error> {
+        self.peripheral.master_read(address, buffer)
+    }
+
+    /// Writes bytes to slave with address `address`
+    pub fn write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Error> {
+        self.peripheral.master_write(addr, bytes)
+    }
+
+    /// Writes bytes to slave with address `address` and then reads enough bytes
+    /// to fill `buffer` *in a single transaction*
+    pub fn write_read(
+        &mut self,
+        address: u8,
+        bytes: &[u8],
+        buffer: &mut [u8],
+    ) -> Result<(), Error> {
+        self.peripheral.master_write_read(address, bytes, buffer)
+    }
+}
+
 #[cfg(feature = "embedded-hal-02")]
 impl<T, DM: crate::Mode> embedded_hal_02::blocking::i2c::Read for I2C<'_, T, DM>
 where
@@ -199,7 +226,7 @@ where
     type Error = Error;
 
     fn read(&mut self, address: u8, buffer: &mut [u8]) -> Result<(), Self::Error> {
-        self.peripheral.master_read(address, buffer)
+        self.read(address, buffer)
     }
 }
 
@@ -211,7 +238,7 @@ where
     type Error = Error;
 
     fn write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Self::Error> {
-        self.peripheral.master_write(addr, bytes)
+        self.write(addr, bytes)
     }
 }
 
@@ -228,7 +255,7 @@ where
         bytes: &[u8],
         buffer: &mut [u8],
     ) -> Result<(), Self::Error> {
-        self.peripheral.master_write_read(address, bytes, buffer)
+        self.write_read(address, bytes, buffer)
     }
 }
 
