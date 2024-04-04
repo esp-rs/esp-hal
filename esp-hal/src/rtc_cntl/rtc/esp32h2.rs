@@ -37,15 +37,6 @@ const I2C_PMU_OR_XPD_TRX: u8 = 15;
 const I2C_PMU_OR_XPD_TRX_MSB: u8 = 2;
 const I2C_PMU_OR_XPD_TRX_LSB: u8 = 2;
 
-const DR_REG_PMU_BASE: u32 = 0x600B0000;
-
-const PMU_POWER_PD_TOP_CNTL_REG: u32 = DR_REG_PMU_BASE + 0xf4;
-const PMU_POWER_PD_HPAON_CNTL_REG: u32 = DR_REG_PMU_BASE + 0xf8;
-const PMU_POWER_PD_HPCPU_CNTL_REG: u32 = DR_REG_PMU_BASE + 0xfc;
-const PMU_POWER_PD_HPPERI_RESERVE_REG: u32 = DR_REG_PMU_BASE + 0x100;
-const PMU_POWER_PD_HPWIFI_CNTL_REG: u32 = DR_REG_PMU_BASE + 0x104;
-const PMU_POWER_PD_LPPERI_CNTL_REG: u32 = DR_REG_PMU_BASE + 0x108;
-
 pub(crate) fn init() {
     // * No peripheral reg i2c power up required on the target */
     unsafe {
@@ -106,14 +97,14 @@ pub(crate) fn init() {
             0,
         );
 
-        (PMU_POWER_PD_TOP_CNTL_REG as *mut u32).write_volatile(0);
-        (PMU_POWER_PD_HPAON_CNTL_REG as *mut u32).write_volatile(0);
-        (PMU_POWER_PD_HPCPU_CNTL_REG as *mut u32).write_volatile(0);
-        (PMU_POWER_PD_HPPERI_RESERVE_REG as *mut u32).write_volatile(0);
-        (PMU_POWER_PD_HPWIFI_CNTL_REG as *mut u32).write_volatile(0);
-        (PMU_POWER_PD_LPPERI_CNTL_REG as *mut u32).write_volatile(0);
+        let pmu = &*crate::peripherals::PMU::PTR;
 
-        let pmu = &*PMU::ptr();
+        pmu.power_pd_top_cntl().write(|w| w.bits(0));
+        pmu.power_pd_hpaon_cntl().write(|w| w.bits(0));
+        pmu.power_pd_hpcpu_cntl().write(|w| w.bits(0));
+        pmu.power_pd_hpperi_reserve().write(|w| w.bits(0));
+        pmu.power_pd_hpwifi_cntl().write(|w| w.bits(0));
+        pmu.power_pd_lpperi_cntl().write(|w| w.bits(0));
 
         pmu.hp_active_hp_regulator0()
             .modify(|_, w| w.hp_active_hp_regulator_dbias().bits(25));
