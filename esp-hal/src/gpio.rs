@@ -1797,6 +1797,11 @@ impl IO {
     /// Initialize the I/O driver.
     pub fn new(mut gpio: GPIO, io_mux: IO_MUX) -> Self {
         gpio.bind_gpio_interrupt(gpio_interrupt_handler);
+        crate::interrupt::enable(
+            crate::peripherals::Interrupt::GPIO,
+            crate::interrupt::Priority::min(),
+        )
+        .unwrap();
 
         let pins = gpio.split();
 
@@ -1810,9 +1815,9 @@ impl IO {
     ///
     /// This decides the priority for the interrupt when only using async.
     pub fn new_with_priority(gpio: GPIO, io_mux: IO_MUX, prio: crate::interrupt::Priority) -> Self {
+        let io = Self::new(gpio, io_mux);
         crate::interrupt::enable(crate::peripherals::Interrupt::GPIO, prio).unwrap();
-
-        Self::new(gpio, io_mux)
+        io
     }
 
     /// Install the given interrupt handler replacing any previously set
