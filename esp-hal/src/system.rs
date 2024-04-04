@@ -207,10 +207,28 @@ impl<const NUM: u8> crate::private::Sealed for SoftwareInterrupt<NUM> {}
 
 pub struct SoftwareInterruptControl {
     _private: (),
+    #[cfg(not(all(feature = "embassy-executor-thread", multi_core)))]
     pub software_interrupt0: SoftwareInterrupt<0>,
     pub software_interrupt1: SoftwareInterrupt<1>,
     pub software_interrupt2: SoftwareInterrupt<2>,
     pub software_interrupt3: SoftwareInterrupt<3>,
+}
+
+impl SoftwareInterruptControl {
+    fn new_internal() -> Self {
+        // the thread-executor uses SW-INT0 when used on a multi-core system
+        // we cannot easily require `software_interrupt0` there since it's created
+        // before `main` via proc-macro
+
+        SoftwareInterruptControl {
+            _private: (),
+            #[cfg(not(all(feature = "embassy-executor-thread", multi_core)))]
+            software_interrupt0: SoftwareInterrupt { _private: () },
+            software_interrupt1: SoftwareInterrupt { _private: () },
+            software_interrupt2: SoftwareInterrupt { _private: () },
+            software_interrupt3: SoftwareInterrupt { _private: () },
+        }
+    }
 }
 
 /// Controls the enablement of peripheral clocks.
@@ -1127,13 +1145,7 @@ impl<'d, T: crate::peripheral::Peripheral<P = SYSTEM> + 'd> SystemExt<'d> for T 
             clock_control: SystemClockControl { _private: () },
             cpu_control: CpuControl { _private: () },
             radio_clock_control: RadioClockControl { _private: () },
-            software_interrupt_control: SoftwareInterruptControl {
-                _private: (),
-                software_interrupt0: SoftwareInterrupt { _private: () },
-                software_interrupt1: SoftwareInterrupt { _private: () },
-                software_interrupt2: SoftwareInterrupt { _private: () },
-                software_interrupt3: SoftwareInterrupt { _private: () },
-            },
+            software_interrupt_control: SoftwareInterruptControl::new_internal(),
         }
     }
 }
