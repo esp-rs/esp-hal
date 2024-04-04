@@ -110,7 +110,7 @@ impl<MODE, const PIN: u8> LowPowerPin<MODE, PIN> {
         }
     }
 
-    /// Configures the pin as an output pin.
+    /// Configures the pin as a push-pull output pin.
     pub fn into_push_pull_output(self) -> LowPowerPin<Output<PushPull>, PIN> {
         self.output_enable(true);
         LowPowerPin {
@@ -118,6 +118,7 @@ impl<MODE, const PIN: u8> LowPowerPin<MODE, PIN> {
         }
     }
 
+    /// Configures the pin as an open-drain output pin.
     pub fn into_open_drain_output(self) -> LowPowerPin<OpenDrain, PIN> {
         use crate::peripherals::GPIO;
 
