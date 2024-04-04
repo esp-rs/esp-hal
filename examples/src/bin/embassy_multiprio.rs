@@ -11,8 +11,11 @@
 //!    demonstrates that this task will continue to run even while the low
 //!    priority blocking task is running.
 
+// HINT: At first it looks a bit suspicious that we need *two* executor features enabled here but that's because we are really using
+// both together. the thread-executor is created by the `#[main]` macro and is used to spawn `low_prio_async` and `low_prio_blocking`.
+// The interrupt-executor is created in `main` and is used to spawn `high_prio`.
+
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-// FIXME: We should not need *two* executor features enabled here...
 //% FEATURES: embassy embassy-executor-interrupt embassy-executor-thread embassy-time-timg0 embassy-generic-timers
 
 #![no_std]
