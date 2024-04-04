@@ -1,23 +1,25 @@
 # esp-lp-hal
 
-[![Crates.io](https://img.shields.io/crates/v/esp-lp-hal?labelColor=1C2C2E&color=C96329&logo=Rust&style=flat-square)](https://crates.io/crates/esp-lp-hal)
-[![docs.rs](https://img.shields.io/docsrs/esp-lp-hal?labelColor=1C2C2E&color=C96329&logo=rust&style=flat-square)](https://docs.rs/esp-lp-hal)
+[![Crates.io](https://img.shields.io/crates/v/esp32s3-ulp?labelColor=1C2C2E&color=C96329&logo=Rust&style=flat-square)](https://crates.io/crates/esp32s3-ulp)
+[![docs.rs](https://img.shields.io/docsrs/esp32s3-ulp?labelColor=1C2C2E&color=C96329&logo=rust&style=flat-square)](https://docs.rs/esp32s3-ulp)
 ![MSRV](https://img.shields.io/badge/MSRV-1.76-blue?labelColor=1C2C2E&style=flat-square)
-![Crates.io](https://img.shields.io/crates/l/esp-lp-hal?labelColor=1C2C2E&style=flat-square)
+![Crates.io](https://img.shields.io/crates/l/esp32s3-ulp?labelColor=1C2C2E&style=flat-square)
 [![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&labelColor=1C2C2E&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
 
 Bare-metal (`no_std`) hardware abstraction layer for the low-power RISC-V coprocessors found in the ESP32-C6, ESP32-S2, and ESP32-S3 from Espressif.
 
 Implements a number of blocking and, where applicable, async traits from the various packages in the [embedded-hal] repository.
 
-For help getting started with this HAL, please refer to [The Rust on ESP Book] and the [documentation].
+For help getting started with this HAL, please refer to [The Rust on ESP Book] and the documentation.
 
 [embedded-hal]: https://github.com/rust-embedded/embedded-hal
 [the rust on esp book]: https://docs.esp-rs.org/book/
 
-## [Documentation]
+## Documentation
+[esp32s2](https://docs.rs/esp32s2-ulp) - [esp32s3](https://docs.rs/esp32s3-ulp/) - esp32c6(not published)  
 
-[documentation]: https://docs.rs/esp-lp-hal/
+The crate rename on crates.io/docs.rs has not yet occurred. Use git overrides in your Cargo.toml for the updated name, code, and C6 support.  
+
 
 ## Supported Devices
 
