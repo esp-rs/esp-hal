@@ -34,7 +34,7 @@
 //!
 //! // setup a pulse couter
 //! println!("setup pulse counter unit 0");
-//! let pcnt = PCNT::new(peripherals.PCNT);
+//! let pcnt = PCNT::new(peripherals.PCNT, Some(PCNT));
 //! let mut u0 = pcnt.get_unit(unit_number);
 //! u0.configure(unit::Config {
 //!     low_limit: -100,
@@ -93,8 +93,6 @@
 //!
 //! critical_section::with(|cs| UNIT0.borrow_ref_mut(cs).replace(u0));
 //!
-//! interrupt::enable(peripherals::Interrupt::PCNT, interrupt::Priority::Priority2).unwrap();
-//!
 //! let mut last_value: i32 = 0;
 //! loop {
 //!     critical_section::with(|cs| {
@@ -111,7 +109,7 @@
 //!
 //! Where the `PCNT` interrupt handler is defined as:
 //! ```no_run
-//! #[interrupt]
+//! #[handler(priority = esp_hal::interrupt::Priority::Priority2)]
 //! fn PCNT() {
 //!     critical_section::with(|cs| {
 //!         let mut u0 = UNIT0.borrow_ref_mut(cs);
@@ -147,10 +145,24 @@ pub struct PCNT<'d> {
 
 impl<'d> PCNT<'d> {
     /// Return a new PCNT
-    pub fn new(_instance: impl Peripheral<P = crate::peripherals::PCNT> + 'd) -> Self {
+    pub fn new(
+        _instance: impl Peripheral<P = crate::peripherals::PCNT> + 'd,
+        interrupt: Option<crate::interrupt::InterruptHandler>,
+    ) -> Self {
         crate::into_ref!(_instance);
         // Enable the PCNT peripherals clock in the system peripheral
         PeripheralClockControl::enable(crate::system::Peripheral::Pcnt);
+
+        if let Some(interrupt) = interrupt {
+            unsafe {
+                crate::interrupt::bind_interrupt(
+                    crate::peripherals::Interrupt::PCNT,
+                    interrupt.handler(),
+                );
+                crate::interrupt::enable(crate::peripherals::Interrupt::PCNT, interrupt.priority())
+                    .unwrap();
+            }
+        }
 
         PCNT { _instance }
     }

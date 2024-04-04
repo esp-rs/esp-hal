@@ -39,7 +39,7 @@ fn main() -> ! {
 
     // Set up a pulse counter:
     println!("setup pulse counter unit 0");
-    let pcnt = PCNT::new(peripherals.PCNT);
+    let pcnt = PCNT::new(peripherals.PCNT, Some(interrupt_handler));
     let mut u0 = pcnt.get_unit(unit::Number::Unit1);
     u0.configure(unit::Config {
         low_limit: -100,
@@ -97,8 +97,6 @@ fn main() -> ! {
 
     critical_section::with(|cs| UNIT0.borrow_ref_mut(cs).replace(u0));
 
-    interrupt::enable(Interrupt::PCNT, Priority::Priority2).unwrap();
-
     let mut last_value: i32 = 0;
     loop {
         critical_section::with(|cs| {
@@ -114,6 +112,7 @@ fn main() -> ! {
 }
 
 #[cfg(not(feature = "esp32s2"))]
+#[handler(priority = esp_hal::interrupt::Priority::Priority2)]
 fn interrupt_handler() {
     critical_section::with(|cs| {
         let mut u0 = UNIT0.borrow_ref_mut(cs);
@@ -131,6 +130,7 @@ fn interrupt_handler() {
 }
 
 #[cfg(feature = "esp32s2")]
+#[handler(priority = esp_hal::interrupt::Priority::Priority2)]
 fn interrupt_handler() {
     critical_section::with(|cs| {
         let mut u0 = UNIT0.borrow_ref_mut(cs);
@@ -145,9 +145,4 @@ fn interrupt_handler() {
             u0.reset_interrupt();
         }
     });
-}
-
-#[interrupt]
-fn PCNT() {
-    interrupt_handler();
 }
