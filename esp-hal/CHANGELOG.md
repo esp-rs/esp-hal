@@ -52,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `UsbSerialJtag` can be created in async or blocking mode. The blocking constructor takes an optional interrupt handler argument (#1377)
 - SYSTIMER and TIMG instances can now be created in async or blocking mode (#1348)
 - Runtime ISR binding for TWAI (#1384)
+- Runtime ISR binding for assist_debug (#1395)
 
 ### Removed
 
