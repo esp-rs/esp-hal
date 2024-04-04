@@ -21,9 +21,9 @@ use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
     gpio::IO,
-    interrupt::{self, Priority},
+    interrupt::Priority,
     pcnt::{channel, channel::PcntSource, unit, PCNT},
-    peripherals::{Interrupt, Peripherals},
+    peripherals::Peripherals,
     prelude::*,
 };
 use esp_println::println;
@@ -112,7 +112,7 @@ fn main() -> ! {
 }
 
 #[cfg(not(feature = "esp32s2"))]
-#[handler(priority = esp_hal::interrupt::Priority::Priority2)]
+#[handler(priority = Priority::Priority2)]
 fn interrupt_handler() {
     critical_section::with(|cs| {
         let mut u0 = UNIT0.borrow_ref_mut(cs);
@@ -130,7 +130,7 @@ fn interrupt_handler() {
 }
 
 #[cfg(feature = "esp32s2")]
-#[handler(priority = esp_hal::interrupt::Priority::Priority2)]
+#[handler(priority = Priority::Priority2)]
 fn interrupt_handler() {
     critical_section::with(|cs| {
         let mut u0 = UNIT0.borrow_ref_mut(cs);

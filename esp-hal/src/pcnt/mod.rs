@@ -34,7 +34,7 @@
 //!
 //! // setup a pulse couter
 //! println!("setup pulse counter unit 0");
-//! let pcnt = PCNT::new(peripherals.PCNT, Some(PCNT));
+//! let pcnt = PCNT::new(peripherals.PCNT, Some(interrupt_handler));
 //! let mut u0 = pcnt.get_unit(unit_number);
 //! u0.configure(unit::Config {
 //!     low_limit: -100,
@@ -110,7 +110,7 @@
 //! Where the `PCNT` interrupt handler is defined as:
 //! ```no_run
 //! #[handler(priority = esp_hal::interrupt::Priority::Priority2)]
-//! fn PCNT() {
+//! fn interrupt_handler() {
 //!     critical_section::with(|cs| {
 //!         let mut u0 = UNIT0.borrow_ref_mut(cs);
 //!         let u0 = u0.as_mut().unwrap();
@@ -132,7 +132,9 @@
 
 use self::unit::Unit;
 use crate::{
+    interrupt::{self, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
+    peripherals::{self, Interrupt},
     system::PeripheralClockControl,
 };
 
@@ -140,14 +142,14 @@ pub mod channel;
 pub mod unit;
 
 pub struct PCNT<'d> {
-    _instance: PeripheralRef<'d, crate::peripherals::PCNT>,
+    _instance: PeripheralRef<'d, peripherals::PCNT>,
 }
 
 impl<'d> PCNT<'d> {
     /// Return a new PCNT
     pub fn new(
-        _instance: impl Peripheral<P = crate::peripherals::PCNT> + 'd,
-        interrupt: Option<crate::interrupt::InterruptHandler>,
+        _instance: impl Peripheral<P = peripherals::PCNT> + 'd,
+        interrupt: Option<InterruptHandler>,
     ) -> Self {
         crate::into_ref!(_instance);
         // Enable the PCNT peripherals clock in the system peripheral
@@ -155,12 +157,8 @@ impl<'d> PCNT<'d> {
 
         if let Some(interrupt) = interrupt {
             unsafe {
-                crate::interrupt::bind_interrupt(
-                    crate::peripherals::Interrupt::PCNT,
-                    interrupt.handler(),
-                );
-                crate::interrupt::enable(crate::peripherals::Interrupt::PCNT, interrupt.priority())
-                    .unwrap();
+                interrupt::bind_interrupt(Interrupt::PCNT, interrupt.handler());
+                interrupt::enable(Interrupt::PCNT, interrupt.priority()).unwrap();
             }
         }
 
