@@ -1,5 +1,7 @@
 //! AES Test
 
+//% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+
 #![no_std]
 #![no_main]
 
@@ -23,30 +25,6 @@ impl Context<'_> {
     }
 }
 
-#[cfg(not(any(
-    feature = "esp32c3",
-    feature = "esp32c6",
-    feature = "esp32h2",
-    feature = "esp32s3"
-)))]
-mod not_test {
-    #[esp_hal::entry]
-    fn main() -> ! {
-        semihosting::process::exit(0)
-    }
-    #[panic_handler]
-    fn panic(_info: &core::panic::PanicInfo) -> ! {
-        loop {}
-    }
-}
-
-#[cfg(test)]
-#[cfg(any(
-    feature = "esp32c3",
-    feature = "esp32c6",
-    feature = "esp32h2",
-    feature = "esp32s3"
-))]
 #[embedded_test::tests]
 mod tests {
     use defmt::assert_eq;
