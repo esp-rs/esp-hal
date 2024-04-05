@@ -86,8 +86,9 @@ use crate::peripherals::{LP_TIMER, LP_WDT};
 use crate::rtc_cntl::sleep::{RtcSleepConfig, WakeSource, WakeTriggers};
 use crate::{
     clock::Clock,
-    interrupt::InterruptHandler,
+    interrupt::{self, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
+    peripherals::Interrupt,
     reset::{SleepSource, WakeupReason},
     Cpu,
 };
@@ -210,18 +211,18 @@ impl<'d> Rtc<'d> {
 
         if let Some(interrupt) = interrupt {
             unsafe {
-                crate::interrupt::bind_interrupt(
+                interrupt::bind_interrupt(
                     #[cfg(any(esp32c6, esp32h2))]
-                    crate::peripherals::Interrupt::LP_WDT,
+                    Interrupt::LP_WDT,
                     #[cfg(not(any(esp32c6, esp32h2)))]
-                    crate::peripherals::Interrupt::RTC_CORE,
+                    Interrupt::RTC_CORE,
                     interrupt.handler(),
                 );
-                crate::interrupt::enable(
+                interrupt::enable(
                     #[cfg(any(esp32c6, esp32h2))]
-                    crate::peripherals::Interrupt::LP_WDT,
+                    Interrupt::LP_WDT,
                     #[cfg(not(any(esp32c6, esp32h2)))]
-                    crate::peripherals::Interrupt::RTC_CORE,
+                    Interrupt::RTC_CORE,
                     interrupt.priority(),
                 )
                 .unwrap();
