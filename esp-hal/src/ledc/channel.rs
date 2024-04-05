@@ -323,8 +323,12 @@ mod ehal1 {
         }
 
         fn set_duty_cycle(&mut self, duty: u16) -> Result<(), Self::Error> {
-            let duty_pct = 100 / (self.max_duty_cycle() / duty);
-            self.set_duty(duty_pct as u8)?;
+            if duty == 0 {
+                self.set_duty(0)?;
+            } else {
+                let duty_pct = 100 / (self.max_duty_cycle() / duty);
+                self.set_duty(duty_pct as u8)?;
+            }
             Ok(())
         }
     }
