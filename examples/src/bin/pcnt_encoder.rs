@@ -11,22 +11,19 @@
 #![no_std]
 #![no_main]
 
-use core::{
-    cell::RefCell,
-    cmp::min,
-    sync::atomic::{AtomicI32, Ordering},
-};
+use core::{cell::RefCell, cmp::min, sync::atomic::Ordering};
 
 use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
     gpio::IO,
-    interrupt::{self, Priority},
+    interrupt::Priority,
     pcnt::{channel, channel::PcntSource, unit, PCNT},
-    peripherals::{Interrupt, Peripherals},
+    peripherals::Peripherals,
     prelude::*,
 };
 use esp_println::println;
+use portable_atomic::AtomicI32;
 
 static UNIT0: Mutex<RefCell<Option<unit::Unit>>> = Mutex::new(RefCell::new(None));
 static VALUE: AtomicI32 = AtomicI32::new(0);
@@ -39,7 +36,7 @@ fn main() -> ! {
 
     // Set up a pulse counter:
     println!("setup pulse counter unit 0");
-    let pcnt = PCNT::new(peripherals.PCNT);
+    let pcnt = PCNT::new(peripherals.PCNT, Some(interrupt_handler));
     let mut u0 = pcnt.get_unit(unit::Number::Unit1);
     u0.configure(unit::Config {
         low_limit: -100,
@@ -97,8 +94,6 @@ fn main() -> ! {
 
     critical_section::with(|cs| UNIT0.borrow_ref_mut(cs).replace(u0));
 
-    interrupt::enable(Interrupt::PCNT, Priority::Priority2).unwrap();
-
     let mut last_value: i32 = 0;
     loop {
         critical_section::with(|cs| {
@@ -113,7 +108,7 @@ fn main() -> ! {
     }
 }
 
-#[cfg(not(feature = "esp32s2"))]
+#[handler(priority = Priority::Priority2)]
 fn interrupt_handler() {
     critical_section::with(|cs| {
         let mut u0 = UNIT0.borrow_ref_mut(cs);
@@ -128,26 +123,4 @@ fn interrupt_handler() {
             u0.reset_interrupt();
         }
     });
-}
-
-#[cfg(feature = "esp32s2")]
-fn interrupt_handler() {
-    critical_section::with(|cs| {
-        let mut u0 = UNIT0.borrow_ref_mut(cs);
-        let u0 = u0.as_mut().unwrap();
-        if u0.interrupt_set() {
-            let events = u0.get_events();
-            if events.high_limit {
-                VALUE.store(VALUE.load(Ordering::SeqCst) + 100, Ordering::SeqCst);
-            } else if events.low_limit {
-                VALUE.store(VALUE.load(Ordering::SeqCst) - 100, Ordering::SeqCst);
-            }
-            u0.reset_interrupt();
-        }
-    });
-}
-
-#[interrupt]
-fn PCNT() {
-    interrupt_handler();
 }
