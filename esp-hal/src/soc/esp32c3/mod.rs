@@ -39,7 +39,7 @@ pub(crate) mod constants {
 #[export_name = "__post_init"]
 unsafe fn post_init() {
     // RTC domain must be enabled before we try to disable
-    let mut rtc = Rtc::new(LPWR::steal());
+    let mut rtc = Rtc::new(LPWR::steal(), None);
     rtc.swd.disable();
     rtc.rwdt.disable();
 

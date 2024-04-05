@@ -29,7 +29,7 @@
 //! ```
 //! ### Accessing peripherals
 //! ```no_run
-//! let mut rtc = Rtc::new(peripherals.LPWR);
+//! let mut rtc = Rtc::new(peripherals.LPWR, None);
 //! ```
 //! ```no_run
 //! let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
