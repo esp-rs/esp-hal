@@ -52,8 +52,7 @@ jobs:
           components: rust-src
 
       - name: Run tests
-        working-directory: hil-test
-        run: cargo ${{ matrix.target.soc }}
+        run: cargo xtask run-tests ${{ matrix.target.soc }}
 
   # Test Xtensa targets:
   # TODO: Add jobs for Xtensa once supported by `probe-rs`
