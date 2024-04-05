@@ -81,6 +81,7 @@ extern "C" fn swi_handler3() {
 
 impl<const SWI: u8> InterruptExecutor<SWI> {
     /// Create a new `InterruptExecutor`.
+    /// This takes the software interrupt to be used internally.
     #[inline]
     pub const fn new(interrupt: SoftwareInterrupt<SWI>) -> Self {
         Self {
@@ -102,14 +103,6 @@ impl<const SWI: u8> InterruptExecutor<SWI> {
     ///
     /// To obtain a [`Spawner`] for this executor, use
     /// [`Spawner::for_current_executor()`] from a task running in it.
-    ///
-    /// # Interrupt requirements
-    ///
-    /// You must write the interrupt handler yourself, and make it call
-    /// [`Self::on_interrupt()`]
-    ///
-    /// [`Spawner`]: embassy_executor::Spawner
-    /// [`Spawner::for_current_executor()`]: embassy_executor::Spawner::for_current_executor()
     pub fn start(&'static mut self, priority: interrupt::Priority) -> SendSpawner {
         if self
             .core

@@ -7,12 +7,11 @@
 //! configure chip clocks, and control radio peripherals.
 //!
 //! ### Software Interrupts
-//! The `SoftwareInterrupt` enum represents the available software interrupt
-//! sources.
+//! The `SoftwareInterruptControl` struct gives access to the available software
+//! interrupts.
 //!
-//! The SoftwareInterruptControl struct allows raising or resetting software
-//! interrupts using the `raise()` and `reset()` methods. The behavior of these
-//! methods depends on the specific chip variant.
+//! The `SoftwareInterrupt` struct allows raising or resetting software
+//! interrupts using the `raise()` and `reset()` methods.
 //!
 //! ### Peripheral Clock Control
 //! The `PeripheralClockControl` struct controls the enablement of peripheral
@@ -100,10 +99,12 @@ pub enum Peripheral {
     LcdCam,
 }
 
+/// A software interrupt can be triggered by software.
 #[non_exhaustive]
 pub struct SoftwareInterrupt<const NUM: u8> {}
 
 impl<const NUM: u8> SoftwareInterrupt<NUM> {
+    /// Sets the interrupt handler for this software-interrupt
     // TODO interrupts missing in PAC or named wrong for P4
     #[cfg(not(esp32p4))]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
@@ -121,6 +122,7 @@ impl<const NUM: u8> SoftwareInterrupt<NUM> {
         }
     }
 
+    /// Trigger this software-interrupt
     pub fn raise(&mut self) {
         #[cfg(not(any(esp32c6, esp32h2)))]
         let system = unsafe { &*SYSTEM::PTR };
@@ -152,6 +154,7 @@ impl<const NUM: u8> SoftwareInterrupt<NUM> {
         }
     }
 
+    /// Resets this software-interrupt
     pub fn reset(&mut self) {
         #[cfg(not(any(esp32c6, esp32h2)))]
         let system = unsafe { &*SYSTEM::PTR };
@@ -206,6 +209,10 @@ impl<const NUM: u8> crate::peripheral::Peripheral for SoftwareInterrupt<NUM> {
 
 impl<const NUM: u8> crate::private::Sealed for SoftwareInterrupt<NUM> {}
 
+/// This gives access to the available software interrupts.
+///
+/// Please note: Software interrupt 0 is not available when using the
+/// `embassy-executor-thread` feature
 #[non_exhaustive]
 pub struct SoftwareInterruptControl {
     #[cfg(not(all(feature = "embassy-executor-thread", multi_core)))]
@@ -1083,6 +1090,7 @@ pub struct CpuControl {
     _private: (),
 }
 
+/// Enumeration of the available radio peripherals for this chip.
 pub enum RadioPeripherals {
     #[cfg(phy)]
     Phy,
@@ -1094,6 +1102,7 @@ pub enum RadioPeripherals {
     Ieee802154,
 }
 
+/// Functionality of clocks controlling the radio peripherals.
 pub struct RadioClockControl {
     _private: (),
 }

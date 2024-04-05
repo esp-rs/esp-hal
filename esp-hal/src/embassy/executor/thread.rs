@@ -57,6 +57,9 @@ pub struct Executor {
 
 impl Executor {
     /// Create a new Executor.
+    ///
+    /// On multi_core systems this will use software-interrupt 0 which isn't
+    /// available for anything else.
     pub fn new() -> Self {
         #[cfg(multi_core)]
         unsafe {
@@ -104,6 +107,7 @@ impl Executor {
         }
     }
 
+    #[doc(hidden)]
     #[cfg(xtensa)]
     pub fn wait_impl(cpu: usize) {
         // Manual critical section implementation that only masks interrupts handlers.
@@ -135,6 +139,7 @@ impl Executor {
         }
     }
 
+    #[doc(hidden)]
     #[cfg(riscv)]
     pub fn wait_impl(cpu: usize) {
         // we do not care about race conditions between the load and store operations,
