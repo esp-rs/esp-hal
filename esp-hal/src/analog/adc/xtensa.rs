@@ -94,7 +94,7 @@ where
         ADCI::enable_vdef(true);
 
         // Start sampling
-        ADCI::adc_samplecfg(ADCI::ADC_CAL_CHANNEL);
+        ADCI::set_en_pad(ADCI::ADC_CAL_CHANNEL as u8);
         ADCI::set_attenuation(ADCI::ADC_CAL_CHANNEL as usize, atten as u8);
 
         // Connect calibration source
@@ -130,8 +130,6 @@ where
 
 #[doc(hidden)]
 pub trait RegisterAccess {
-    fn adc_samplecfg(channel: u16);
-
     fn set_attenuation(channel: usize, attenuation: u8);
 
     fn clear_dig_force();
@@ -160,25 +158,6 @@ pub trait RegisterAccess {
 }
 
 impl RegisterAccess for crate::peripherals::ADC1 {
-    fn adc_samplecfg(channel: u16) {
-        let sensors = unsafe { &*SENS::ptr() };
-
-        // Configure for RTC control
-        sensors.sar_meas1_mux().modify(|_r, w| {
-            w.sar1_dig_force().clear_bit() // 1: Select digital control;
-                                           // 0: Select RTC control.
-        });
-        sensors.sar_meas1_ctrl2().modify(|_r, w| {
-            w.meas1_start_force()
-                .set_bit() // 1: SW control RTC ADC start;     0: ULP control RTC ADC start.
-                .sar1_en_pad_force()
-                .set_bit() // 1: SW control RTC ADC bit map;   0: ULP control RTC ADC bit map;
-                // Enable internal connect GND (for calibration).
-                .sar1_en_pad()
-                .variant(channel) // only one channel is selected.
-        });
-    }
-
     fn set_attenuation(channel: usize, attenuation: u8) {
         let sensors = unsafe { &*SENS::ptr() };
         sensors.sar_atten1().modify(|r, w| {
@@ -298,21 +277,6 @@ impl super::CalibrationAccess for crate::peripherals::ADC1 {
 }
 
 impl RegisterAccess for crate::peripherals::ADC2 {
-    fn adc_samplecfg(channel: u16) {
-        let sensors = unsafe { &*SENS::ptr() };
-
-        // Configure for RTC control
-        sensors.sar_meas2_ctrl2().modify(|_r, w| {
-            w.meas2_start_force()
-                .set_bit() // 1: SW control RTC ADC start;     0: ULP control RTC ADC start.
-                .sar2_en_pad_force()
-                .set_bit() // 1: SW control RTC ADC bit map;   0: ULP control RTC ADC bit map;
-                // Enable internal connect GND (for calibration).
-                .sar2_en_pad()
-                .variant(channel) // only one channel is selected.
-        });
-    }
-
     fn set_attenuation(channel: usize, attenuation: u8) {
         let sensors = unsafe { &*SENS::ptr() };
         sensors.sar_atten2().modify(|r, w| {
