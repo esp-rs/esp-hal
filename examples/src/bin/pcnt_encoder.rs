@@ -11,11 +11,7 @@
 #![no_std]
 #![no_main]
 
-use core::{
-    cell::RefCell,
-    cmp::min,
-    sync::atomic::{AtomicI32, Ordering},
-};
+use core::{cell::RefCell, cmp::min, sync::atomic::Ordering};
 
 use critical_section::Mutex;
 use esp_backtrace as _;
@@ -27,6 +23,7 @@ use esp_hal::{
     prelude::*,
 };
 use esp_println::println;
+use portable_atomic::AtomicI32;
 
 static UNIT0: Mutex<RefCell<Option<unit::Unit>>> = Mutex::new(RefCell::new(None));
 static VALUE: AtomicI32 = AtomicI32::new(0);
@@ -111,7 +108,6 @@ fn main() -> ! {
     }
 }
 
-#[cfg(not(feature = "esp32s2"))]
 #[handler(priority = Priority::Priority2)]
 fn interrupt_handler() {
     critical_section::with(|cs| {
@@ -123,24 +119,6 @@ fn interrupt_handler() {
                 VALUE.fetch_add(100, Ordering::SeqCst);
             } else if events.low_limit {
                 VALUE.fetch_add(-100, Ordering::SeqCst);
-            }
-            u0.reset_interrupt();
-        }
-    });
-}
-
-#[cfg(feature = "esp32s2")]
-#[handler(priority = Priority::Priority2)]
-fn interrupt_handler() {
-    critical_section::with(|cs| {
-        let mut u0 = UNIT0.borrow_ref_mut(cs);
-        let u0 = u0.as_mut().unwrap();
-        if u0.interrupt_set() {
-            let events = u0.get_events();
-            if events.high_limit {
-                VALUE.store(VALUE.load(Ordering::SeqCst) + 100, Ordering::SeqCst);
-            } else if events.low_limit {
-                VALUE.store(VALUE.load(Ordering::SeqCst) - 100, Ordering::SeqCst);
             }
             u0.reset_interrupt();
         }
