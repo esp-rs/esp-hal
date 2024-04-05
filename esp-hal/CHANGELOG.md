@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed GPIO counts so that using async code with the higher GPIO number should no longer panic (#1361, #1362)
 - ESP32/ESP32-S2: Wait for I2S getting out of TX_IDLE when starting a transfer (#1375)
 - Fixed writes to SPI not flushing before attempting to write, causing corrupted writes (#1381)
+- Fixed a divide by zero panic when setting the LEDC duty cycle to 0 with `SetDutyCycle::set_duty_cycle` (#1403)
 
 ### Changed
 
@@ -53,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SYSTIMER and TIMG instances can now be created in async or blocking mode (#1348)
 - Runtime ISR binding for TWAI (#1384)
 - ESP32-C6: The `gpio::lp_gpio` module has been renamed to `gpio::lp_io` to match the peripheral name (#1397)
+- Runtime ISR binding for assist_debug (#1395)
 
 ### Removed
 
