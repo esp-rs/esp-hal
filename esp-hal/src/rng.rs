@@ -44,47 +44,52 @@
 
 use core::marker::PhantomData;
 
-use crate::{peripheral::Peripheral, peripherals::RNG};
-
-pub trait BasicRng {}
-pub trait SecureRng {}
-
-pub struct Basic;
-pub struct Secure;
-
-impl BasicRng for Basic {}
-impl SecureRng for Secure {}
+use crate::{peripheral::{Peripheral, PeripheralRef} , peripherals::RNG};
 
 /// Random number generator driver
 #[derive(Clone, Copy)]
-pub struct Rng<T> {
-    _phantom: PhantomData<(RNG, T)>,
+pub struct Rng {
+    _phantom: PhantomData<RNG>,
 }
 
-impl Rng<Basic> {
+impl Rng {
     /// Create a new random number generator instance
     pub fn new(_rng: impl Peripheral<P = RNG>) -> Self {
         Self {
             _phantom: PhantomData,
         }
     }
-}
 
-impl Rng<Secure> {
-    /// Create a new secure random number generator (or TRNG) instance
-    pub fn new<'d>(
-        rng: impl Peripheral<P = RNG>,
-        _adc: impl Peripheral<P = crate::peripherals::ADC1> + 'd,
-    ) -> Self {
-        crate::soc::trng::ensure_randomness();
-        Self {
-            _phantom: PhantomData,
+    #[inline]
+    /// Reads currently available `u32` integer from `RNG`
+    pub fn random(&mut self) -> u32 {
+        // SAFETY: read-only register access
+        unsafe { &*crate::peripherals::RNG::PTR }
+            .data()
+            .read()
+            .bits()
+    }
+
+    #[inline]
+    /// Reads enough bytes from hardware random number generator to fill
+    /// `buffer`.
+    ///
+    /// If any error is encountered then this function immediately returns. The
+    /// contents of buf are unspecified in this case.
+    ///
+    /// If this function returns an error, it is unspecified how many bytes it
+    /// has read, but it will never read more than would be necessary to
+    /// completely fill the buffer.
+    pub fn read(&mut self, buffer: &mut [u8]) {
+        for chunk in buffer.chunks_mut(4) {
+            let bytes = self.random().to_le_bytes();
+            chunk.copy_from_slice(&bytes[..chunk.len()]);
         }
     }
 }
 
 #[cfg(feature = "embedded-hal-02")]
-impl<T> embedded_hal_02::blocking::rng::Read for Rng<T> {
+impl embedded_hal_02::blocking::rng::Read for Rng {
     type Error = core::convert::Infallible;
 
     fn read(&mut self, buffer: &mut [u8]) -> Result<(), Self::Error> {
@@ -93,7 +98,7 @@ impl<T> embedded_hal_02::blocking::rng::Read for Rng<T> {
     }
 }
 
-impl<T> rand_core::RngCore for Rng<T> {
+impl rand_core::RngCore for Rng {
     fn next_u32(&mut self) -> u32 {
         self.random()
     }
@@ -115,24 +120,49 @@ impl<T> rand_core::RngCore for Rng<T> {
     }
 }
 
-// Common RNG functionality that applies to both basic and true RNG
-impl<T> Rng<T> {
-    pub fn read(&mut self, buffer: &mut [u8]) {
-        for chunk in buffer.chunks_mut(4) {
-            let bytes = self.random().to_le_bytes();
-            chunk.copy_from_slice(&bytes[..chunk.len()]);
+#[cfg(not(esp32p4))]
+pub struct Trng<'d>{
+    pub rng: Rng,
+    adc: PeripheralRef<'d, crate::peripherals::ADC1>,
+}
+
+#[cfg(not(esp32p4))]
+impl<'d> Trng<'d> {
+    /// Create a new True Random Number Generator instance
+    pub fn new(rng: impl Peripheral<P = RNG>, adc: impl Peripheral<P = crate::peripherals::ADC1> + 'd) -> Self {
+        crate::into_ref!(adc);
+        let gen = Rng::new(rng);  
+        crate::soc::trng::ensure_randomness();
+        Self{
+            rng: gen,
+            adc,
         }
     }
 
-    /// Reads currently available `u32` integer from `RNG`
     pub fn random(&mut self) -> u32 {
-        // SAFETY: read-only register access
-        unsafe { &*crate::peripherals::RNG::PTR }
-            .data()
-            .read()
-            .bits()
+        self.rng.random()
+    }
+
+    pub fn read(&mut self, buffer: &mut [u8]) {
+        self.rng.read(buffer)
+    }
+
+    /// Downgrade Trng to Rng and release ADC1
+    pub fn downgrade(self) -> (Rng, PeripheralRef<'d, crate::peripherals::ADC1>) {
+        crate::soc::trng::revert_trng();
+        (self.rng, self.adc)
+    }
+}
+
+#[cfg(feature = "embedded-hal-02")]
+impl embedded_hal_02::blocking::rng::Read for Trng {
+    type Error = core::convert::Infallible;
+
+    fn read(&mut self, buffer: &mut [u8]) -> Result<(), Self::Error> {
+        self.rng.read(buffer);
+        Ok(())
     }
 }
 
 #[cfg(not(esp32p4))]
-impl rand_core::CryptoRng for Rng<Secure> {}
+impl rand_core::CryptoRng for Trng<'_> {}
