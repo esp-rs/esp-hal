@@ -1764,7 +1764,7 @@ pub mod lp_i2c {
     use fugit::HertzU32;
 
     use crate::{
-        gpio::{lp_gpio::LowPowerPin, OpenDrain},
+        gpio::{lp_io::LowPowerPin, OpenDrain},
         peripherals::{LP_CLKRST, LP_I2C0},
     };
 

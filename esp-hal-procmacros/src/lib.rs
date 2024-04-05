@@ -620,7 +620,7 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
     let imports = quote! {
         use #hal_crate::lp_core::LpCore;
         use #hal_crate::lp_core::LpCoreWakeupSource;
-        use #hal_crate::gpio::lp_gpio::LowPowerPin;
+        use #hal_crate::gpio::lp_io::LowPowerPin;
         use #hal_crate::gpio::*;
         use #hal_crate::uart::lp_uart::LpUart;
         use #hal_crate::i2c::lp_i2c::LpI2c;

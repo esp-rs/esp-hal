@@ -321,7 +321,7 @@ crate::gpio::analog! {
     7
 }
 
-crate::gpio::lp_gpio::lp_gpio! {
+crate::gpio::lp_io::lp_gpio! {
     0
     1
     2

@@ -2012,7 +2012,7 @@ mod asynch {
 #[cfg(lp_uart)]
 pub mod lp_uart {
     use crate::{
-        gpio::{lp_gpio::LowPowerPin, Floating, Input, Output, PushPull},
+        gpio::{lp_io::LowPowerPin, Floating, Input, Output, PushPull},
         peripherals::{LP_CLKRST, LP_UART},
         uart::{config, config::Config},
     };
