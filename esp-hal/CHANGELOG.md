@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32/ESP32-S2: Wait for I2S getting out of TX_IDLE when starting a transfer (#1375)
 - Fixed writes to SPI not flushing before attempting to write, causing corrupted writes (#1381)
 - fix AdcConfig::adc_calibrate for xtensa targets (#1379)
+- Fixed a divide by zero panic when setting the LEDC duty cycle to 0 with `SetDutyCycle::set_duty_cycle` (#1403)
 
 ### Changed
 
@@ -53,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `UsbSerialJtag` can be created in async or blocking mode. The blocking constructor takes an optional interrupt handler argument (#1377)
 - SYSTIMER and TIMG instances can now be created in async or blocking mode (#1348)
 - Runtime ISR binding for TWAI (#1384)
+- Runtime ISR binding for assist_debug (#1395)
 
 ### Removed
 

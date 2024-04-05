@@ -39,9 +39,9 @@ fn main() -> ! {
     // return raw readings in some unspecified scale.
     //
     type AdcCal = ();
-    // type AdcCal = esp_hal::adc::AdcCalBasic<ADC1>;
-    // type AdcCal = esp_hal::adc::AdcCalLine<ADC1>;
-    // type AdcCal = esp_hal::adc::AdcCalCurve<ADC1>;
+    // type AdcCal = esp_hal::analog::adc::AdcCalBasic<ADC1>;
+    // type AdcCal = esp_hal::analog::adc::AdcCalLine<ADC1>;
+    // type AdcCal = esp_hal::analog::adc::AdcCalCurve<ADC1>;
 
     let mut adc1_config = AdcConfig::new();
     let mut adc1_pin =
