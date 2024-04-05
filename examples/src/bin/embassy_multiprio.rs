@@ -11,8 +11,11 @@
 //!    demonstrates that this task will continue to run even while the low
 //!    priority blocking task is running.
 
+// HINT: At first it looks a bit suspicious that we need *two* executor features enabled here but that's because we are really using
+// both together. The thread-executor is created by the `#[main]` macro and is used to spawn `low_prio_async` and `low_prio_blocking`.
+// The interrupt-executor is created in `main` and is used to spawn `high_prio`.
+
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-// FIXME: We should not need *two* executor features enabled here...
 //% FEATURES: embassy embassy-executor-interrupt embassy-executor-thread embassy-time-timg0 embassy-generic-timers
 
 #![no_std]
@@ -24,23 +27,14 @@ use embassy_time::{Duration, Instant, Ticker, Timer};
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    embassy::{
-        self,
-        executor::{FromCpu1, InterruptExecutor},
-    },
+    embassy::{self, executor::InterruptExecutor},
     interrupt::Priority,
     peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
 };
 use esp_println::println;
-
-static INT_EXECUTOR_0: InterruptExecutor<FromCpu1> = InterruptExecutor::new();
-
-#[interrupt]
-fn FROM_CPU_INTR1() {
-    unsafe { INT_EXECUTOR_0.on_interrupt() }
-}
+use static_cell::make_static;
 
 /// Periodically print something.
 #[embassy_executor::task]
@@ -79,6 +73,7 @@ async fn low_prio_async() {
 
 #[main]
 async fn main(low_prio_spawner: Spawner) {
+    esp_println::logger::init_logger_from_env();
     println!("Init!");
     let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();
@@ -87,7 +82,10 @@ async fn main(low_prio_spawner: Spawner) {
     let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
     embassy::init(&clocks, timg0);
 
-    let spawner = INT_EXECUTOR_0.start(Priority::Priority2);
+    let executor = InterruptExecutor::new(system.software_interrupt_control.software_interrupt2);
+    let executor = make_static!(executor);
+
+    let spawner = executor.start(Priority::Priority3);
     spawner.must_spawn(high_prio());
 
     println!("Spawning low-priority tasks");

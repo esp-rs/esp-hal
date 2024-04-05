@@ -3,13 +3,12 @@ use core::marker::PhantomData;
 
 use embassy_executor::{raw, Spawner};
 use portable_atomic::{AtomicBool, Ordering};
-
-use crate::{get_core, prelude::interrupt};
 #[cfg(multi_core)]
-use crate::{
-    interrupt,
-    peripherals::{self, SYSTEM},
-};
+use procmacros::handler;
+
+use crate::get_core;
+#[cfg(multi_core)]
+use crate::peripherals::SYSTEM;
 
 /// global atomic used to keep track of whether there is work to do since sev()
 /// is not available on either Xtensa or RISC-V
@@ -18,19 +17,17 @@ static SIGNAL_WORK_THREAD_MODE: [AtomicBool; 1] = [AtomicBool::new(false)];
 #[cfg(multi_core)]
 static SIGNAL_WORK_THREAD_MODE: [AtomicBool; 2] = [AtomicBool::new(false), AtomicBool::new(false)];
 
-#[interrupt]
-fn FROM_CPU_INTR0() {
-    #[cfg(multi_core)]
-    {
-        // This interrupt is fired when the thread-mode executor's core needs to be
-        // woken. It doesn't matter which core handles this interrupt first, the
-        // point is just to wake up the core that is currently executing
-        // `waiti`.
-        let system = unsafe { &*SYSTEM::PTR };
-        system
-            .cpu_intr_from_cpu_0()
-            .write(|w| w.cpu_intr_from_cpu_0().bit(false));
-    }
+#[cfg(multi_core)]
+#[handler]
+fn software0_interrupt() {
+    // This interrupt is fired when the thread-mode executor's core needs to be
+    // woken. It doesn't matter which core handles this interrupt first, the
+    // point is just to wake up the core that is currently executing
+    // `waiti`.
+    let system = unsafe { &*SYSTEM::PTR };
+    system
+        .cpu_intr_from_cpu_0()
+        .write(|w| w.cpu_intr_from_cpu_0().bit(false));
 }
 
 pub(crate) fn pend_thread_mode(core: usize) {
@@ -60,12 +57,15 @@ pub struct Executor {
 
 impl Executor {
     /// Create a new Executor.
+    ///
+    /// On multi_core systems this will use software-interrupt 0 which isn't
+    /// available for anything else.
     pub fn new() -> Self {
         #[cfg(multi_core)]
-        unwrap!(interrupt::enable(
-            peripherals::Interrupt::FROM_CPU_INTR0,
-            interrupt::Priority::Priority1,
-        ));
+        unsafe {
+            crate::system::SoftwareInterrupt::<0>::steal()
+                .set_interrupt_handler(software0_interrupt)
+        }
 
         Self {
             inner: raw::Executor::new(usize::from_le_bytes([0, get_core() as u8, 0, 0]) as *mut ()),
@@ -107,6 +107,7 @@ impl Executor {
         }
     }
 
+    #[doc(hidden)]
     #[cfg(xtensa)]
     pub fn wait_impl(cpu: usize) {
         // Manual critical section implementation that only masks interrupts handlers.
@@ -138,6 +139,7 @@ impl Executor {
         }
     }
 
+    #[doc(hidden)]
     #[cfg(riscv)]
     pub fn wait_impl(cpu: usize) {
         // we do not care about race conditions between the load and store operations,

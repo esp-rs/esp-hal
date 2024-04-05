@@ -18,10 +18,7 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     cpu_control::{CpuControl, Stack},
-    embassy::{
-        self,
-        executor::{FromCpu1, FromCpu2, InterruptExecutor},
-    },
+    embassy::{self, executor::InterruptExecutor},
     get_core,
     gpio::{GpioPin, Output, PushPull, IO},
     interrupt::Priority,
@@ -33,19 +30,6 @@ use esp_println::println;
 use static_cell::make_static;
 
 static mut APP_CORE_STACK: Stack<8192> = Stack::new();
-
-static INT_EXECUTOR_CORE_0: InterruptExecutor<FromCpu1> = InterruptExecutor::new();
-static INT_EXECUTOR_CORE_1: InterruptExecutor<FromCpu2> = InterruptExecutor::new();
-
-#[interrupt]
-fn FROM_CPU_INTR1() {
-    unsafe { INT_EXECUTOR_CORE_0.on_interrupt() }
-}
-
-#[interrupt]
-fn FROM_CPU_INTR2() {
-    unsafe { INT_EXECUTOR_CORE_1.on_interrupt() }
-}
 
 /// Waits for a message that contains a duration, then flashes a led for that
 /// duration of time.
@@ -101,8 +85,13 @@ fn main() -> ! {
     let led_ctrl_signal = &*make_static!(Signal::new());
 
     let led = io.pins.gpio0.into_push_pull_output();
+
+    let executor_core1 =
+        InterruptExecutor::new(system.software_interrupt_control.software_interrupt1);
+    let executor_core1 = make_static!(executor_core1);
+
     let cpu1_fnctn = move || {
-        let spawner = INT_EXECUTOR_CORE_1.start(Priority::Priority1);
+        let spawner = executor_core1.start(Priority::Priority1);
 
         spawner.spawn(control_led(led, led_ctrl_signal)).ok();
 
@@ -113,7 +102,11 @@ fn main() -> ! {
         .start_app_core(unsafe { &mut *addr_of_mut!(APP_CORE_STACK) }, cpu1_fnctn)
         .unwrap();
 
-    let spawner = INT_EXECUTOR_CORE_0.start(Priority::Priority1);
+    let executor_core0 =
+        InterruptExecutor::new(system.software_interrupt_control.software_interrupt0);
+    let executor_core0 = make_static!(executor_core0);
+
+    let spawner = executor_core0.start(Priority::Priority1);
     spawner.spawn(enable_disable_led(led_ctrl_signal)).ok();
 
     // Just loop to show that the main thread does not need to poll the executor.

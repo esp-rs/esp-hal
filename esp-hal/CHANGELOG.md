@@ -55,6 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SYSTIMER and TIMG instances can now be created in async or blocking mode (#1348)
 - Runtime ISR binding for TWAI (#1384)
 - Runtime ISR binding for assist_debug (#1395)
+- Runtime ISR binding for software interrupts, software interrupts are split now, interrupt-executor takes the software interrupt to use, interrupt-executor is easier to use (#1398)
 
 ### Removed
 
