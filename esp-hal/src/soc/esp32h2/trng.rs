@@ -3,9 +3,39 @@ const PCR_SARADC_RST_EN: u32 = 1 << 1;
 const PCR_SARADC_REG_CLK_EN: u32 = 1 << 2;
 const PCR_SARADC_CLKM_CONF_REG: u32 = 0x60096000 + 0x84;
 const PCR_SARADC_CLKM_EN: u32 = 1 << 22;
+const PCR_SARADC_CLKM_SEL_V: u32 = 0x00000003;
+const PCR_SARADC_CLKM_SEL_S: u32 = 20;
+const PCR_SARADC_CLKM_DIV_NUM_V: u32 = 0x000000FF;
+const PCR_SARADC_CLKM_DIV_NUM_S: u32 = 12;
 const PMU_RF_PWC_REG: u32 = 0x600B0000 + 0x154;
+const PMU_XPD_PERIF_I2C: u32 = 1 << 27;
 const I2C_SAR_ADC: u8 = 0x69;
 const I2C_SAR_ADC_HOSTID: u8 = 0;
+
+const I2C_SARADC_DTEST: u8 = 7;
+const I2C_SARADC_DTEST_MSB: u8 = 1;
+const I2C_SARADC_DTEST_LSB: u8 = 0;
+const I2C_SARADC_ENT_SAR: u8 = 7;
+const I2C_SARADC_ENT_SAR_MSB: u8 = 3;
+const I2C_SARADC_ENT_SAR_LSB: u8 = 1;
+const I2C_SARADC_EN_TOUT_SAR1_BUS: u8 = 7;
+const I2C_SARADC_EN_TOUT_SAR1_BUS_MSB: u8 = 5;
+const I2C_SARADC_EN_TOUT_SAR1_BUS_LSB: u8 = 5;
+
+const I2C_SARADC_SAR2_INIT_CODE_MSB: u8 = 4;
+const I2C_SARADC_SAR2_INIT_CODE_MSB_MSB: u8 = 3;
+const I2C_SARADC_SAR2_INIT_CODE_MSB_LSB: u8 = 0;
+const I2C_SARADC_SAR2_INIT_CODE_LSB: u8 = 3;
+const I2C_SARADC_SAR2_INIT_CODE_LSB_MSB: u8 = 7;
+const I2C_SARADC_SAR2_INIT_CODE_LSB_LSB: u8 = 0;
+
+const I2C_SARADC_SAR1_INIT_CODE_MSB: u8 = 1;
+const I2C_SARADC_SAR1_INIT_CODE_MSB_MSB: u8 = 3;
+const I2C_SARADC_SAR1_INIT_CODE_MSB_LSB: u8 = 0;
+const I2C_SARADC_SAR1_INIT_CODE_LSB: u8 = 3;
+const I2C_SARADC_SAR1_INIT_CODE_LSB_MSB: u8 = 7;
+const I2C_SARADC_SAR1_INIT_CODE_LSB_LSB: u8 = 0;
+
 const SAR2_CHANNEL: u32 = 9;
 const SAR2_ATTEN: u32 = 1;
 const SAR1_ATTEN: u32 = 1;
@@ -13,6 +43,14 @@ const PATTERN_BIT_WIDTH: u32 = 6;
 const APB_SARADC_SAR_PATT_TAB1_REG: u32 = 0x60040000 + 0x18;
 const APB_SARADC_CTRL_REG: u32 = 0x60040000;
 const APB_SARADC_CTRL2_REG: u32 = 0x60040000 + 0x4;
+
+const APB_SARADC_SARADC_SAR_PATT_LEN_V: u32 = 0x00000007;
+const APB_SARADC_SARADC_SAR_PATT_LEN_S: u32 = 15;
+const APB_SARADC_SARADC_SAR_CLK_DIV_V: u32 = 0x000000FF;
+const APB_SARADC_SARADC_SAR_CLK_DIV_S: u32 = 7;
+const APB_SARADC_SARADC_TIMER_TARGET_V: u32 = 0x00000FFF;
+const APB_SARADC_SARADC_TIMER_TARGET_S: u32 = 12;
+const APB_SARADC_SARADC_TIMER_EN: u32 = 1 << 24;
 
 const DR_REG_MODEM_LPCON_BASE: u32 = 0x600AF000;
 const MODEM_LPCON_CLK_CONF_REG: u32 = DR_REG_MODEM_LPCON_BASE + 0x18;
@@ -49,55 +87,6 @@ const LP_I2C_ANA_MST_I2C0_DATA_REG: u32 = DR_REG_LP_I2C_ANA_MST_BASE + 0x8;
 const LP_I2C_ANA_MST_I2C0_RDATA_V: u32 = 0x000000FF;
 const LP_I2C_ANA_MST_I2C0_RDATA_S: u32 = 0;
 
-const PCR_SARADC_CLKM_SEL_V: u32 = 0x00000003;
-const PCR_SARADC_CLKM_SEL_S: u32 = 20;
-
-const PCR_SARADC_CLKM_DIV_NUM_V: u32 = 0x000000FF;
-const PCR_SARADC_CLKM_DIV_NUM_S: u32 = 12;
-
-const PMU_PERIF_I2C_RSTB: u32 = 1 << 26;
-const PMU_XPD_PERIF_I2C: u32 = 1 << 27;
-
-const ADC_SAR2_INITIAL_CODE_HIGH_ADDR: u8 = 0x4;
-const ADC_SAR2_INITIAL_CODE_HIGH_ADDR_MSB: u8 = 0x3;
-const ADC_SAR2_INITIAL_CODE_HIGH_ADDR_LSB: u8 = 0x0;
-
-const ADC_SAR2_INITIAL_CODE_LOW_ADDR: u8 = 0x3;
-const ADC_SAR2_INITIAL_CODE_LOW_ADDR_MSB: u8 = 0x7;
-const ADC_SAR2_INITIAL_CODE_LOW_ADDR_LSB: u8 = 0x0;
-
-const  ADC_SAR1_INITIAL_CODE_HIGH_ADDR: u8 = 0x1;
-const  ADC_SAR1_INITIAL_CODE_HIGH_ADDR_MSB: u8 = 0x3;
-const  ADC_SAR1_INITIAL_CODE_HIGH_ADDR_LSB: u8 = 0x0;
-
-const ADC_SAR1_INITIAL_CODE_LOW_ADDR: u8 = 0x0;
-const ADC_SAR1_INITIAL_CODE_LOW_ADDR_MSB: u8 = 0x7;
-const ADC_SAR1_INITIAL_CODE_LOW_ADDR_LSB: u8 = 0x0;
-
-const ADC_SARADC2_ENCAL_REF_ADDR: u8 = 0x7;
-const ADC_SARADC2_ENCAL_REF_ADDR_MSB: u8 = 1;
-const ADC_SARADC2_ENCAL_REF_ADDR_LSB: u8 = 0;
-
-const ADC_SARADC_ENT_RTC_ADDR: u8 = 0x7
-const ADC_SARADC_ENT_RTC_ADDR_MSB: u8 = 3;
-const  ADC_SARADC_ENT_RTC_ADDR_LSB: u8 = 3;
-
-const ADC_SARADC1_ENCAL_REF_ADDR: u8 = 0x7;
-const ADC_SARADC1_ENCAL_REF_ADDR_MSB: u8 = 4;
-const ADC_SARADC1_ENCAL_REF_ADDR_LSB: u8 = 4;
-
-const ADC_SARADC2_ENCAL_REF_ADDR: u8 = 0x7;
-const ADC_SARADC2_ENCAL_REF_ADDR_MSB: u8 = 6;
-const ADC_SARADC2_ENCAL_REF_ADDR_LSB: u8 = 6;
-
-const APB_SARADC_SARADC_SAR_PATT_LEN_V: u32 = 0x00000007;
-const APB_SARADC_SARADC_SAR_PATT_LEN_S: u32 = 15;
-const APB_SARADC_SARADC_SAR_CLK_DIV_V: u32 = 0x000000FF;
-const APB_SARADC_SARADC_SAR_CLK_DIV_S: u32 = 7;
-const APB_SARADC_SARADC_TIMER_TARGET_V: u32 = 0x00000FFF;
-const APB_SARADC_SARADC_TIMER_TARGET_S: u32 = 12;
-const APB_SARADC_SARADC_TIMER_EN: u32 = 1 << 24;
-
 pub(crate) fn ensure_randomness() {
     // Pull SAR ADC out of reset
     reg_set_bit(PCR_SARADC_CONF_REG, PCR_SARADC_RST_EN);
@@ -128,7 +117,6 @@ pub(crate) fn ensure_randomness() {
 
     // some ADC sensor registers are in power group PERIF_I2C and need to be enabled
     // via PMU
-    set_peri_reg_mask(PMU_RF_PWC_REG, PMU_PERIF_I2C_RSTB);
     set_peri_reg_mask(PMU_RF_PWC_REG, PMU_XPD_PERIF_I2C);
 
     // Config ADC circuit (Analog part) with I2C(HOST ID 0x69) and chose internal
@@ -136,69 +124,62 @@ pub(crate) fn ensure_randomness() {
     regi2c_write_mask(
         I2C_SAR_ADC,
         I2C_SAR_ADC_HOSTID,
-        ADC_SARADC_DTEST_RTC_ADDR,
-        ADC_SARADC_DTEST_RTC_ADDR_MSB,
-        ADC_SARADC_DTEST_RTC_ADDR_LSB,
+        I2C_SARADC_DTEST,
+        I2C_SARADC_DTEST_MSB,
+        I2C_SARADC_DTEST_LSB,
         2,
     );
     regi2c_write_mask(
         I2C_SAR_ADC,
         I2C_SAR_ADC_HOSTID,
-        ADC_SARADC_ENT_RTC_ADDR,
-        ADC_SARADC_ENT_RTC_ADDR_MSB,
-        ADC_SARADC_ENT_RTC_ADDR_LSB,
+        I2C_SARADC_ENT_SAR,
+        I2C_SARADC_ENT_SAR_MSB,
+        I2C_SARADC_ENT_SAR_LSB,
         1,
     );
     regi2c_write_mask(
         I2C_SAR_ADC,
         I2C_SAR_ADC_HOSTID,
-        ADC_SARADC1_ENCAL_REF_ADDR,
-        ADC_SARADC1_ENCAL_REF_ADDR_MSB,
-        ADC_SARADC1_ENCAL_REF_ADDR_LSB,
-        1,
-    );
-    regi2c_write_mask(
-        I2C_SAR_ADC,
-        I2C_SAR_ADC_HOSTID,
-        ADC_SARADC1_ENCAL_REF_ADDR,
-        ADC_SARADC1_ENCAL_REF_ADDR_MSB,
-        ADC_SARADC1_ENCAL_REF_ADDR_LSB,
+        I2C_SARADC_EN_TOUT_SAR1_BUS,
+        I2C_SARADC_EN_TOUT_SAR1_BUS_MSB,
+        I2C_SARADC_EN_TOUT_SAR1_BUS_LSB,
         1,
     );
 
+    // SAR2 High ADDR
     regi2c_write_mask(
         I2C_SAR_ADC,
         I2C_SAR_ADC_HOSTID,
-        ADC_SAR2_INITIAL_CODE_HIGH_ADDR
-        ADC_SAR2_INITIAL_CODE_HIGH_ADDR_MSB,
-        ADC_SAR2_INITIAL_CODE_HIGH_ADDR_LSB,
-        0x60,
-    );
-
-    regi2c_write_mask(
-        I2C_SAR_ADC,
-        I2C_SAR_ADC_HOSTID,
-        ADC_SAR2_INITIAL_CODE_LOW_ADDR
-        ADC_SAR2_INITIAL_CODE_LOW_ADDR_MSB,
-        ADC_SAR2_INITIAL_CODE_LOW_ADDR_LSB,
-        0x66,
-    );
-    
-    regi2c_write_mask(
-        I2C_SAR_ADC,
-        I2C_SAR_ADC_HOSTID,
-        ADC_SAR1_INITIAL_CODE_HIGH_ADDR
-        ADC_SAR1_INITIAL_CODE_HIGH_ADDR_MSB,
-        ADC_SAR1_INITIAL_CODE_HIGH_ADDR_LSB,
+        I2C_SARADC_SAR2_INIT_CODE_MSB,
+        I2C_SARADC_SAR2_INIT_CODE_MSB_MSB,
+        I2C_SARADC_SAR2_INIT_CODE_MSB_LSB,
         0x08,
     );
-
+    // SAR2 Low ADDR
     regi2c_write_mask(
         I2C_SAR_ADC,
         I2C_SAR_ADC_HOSTID,
-        ADC_SAR1_INITIAL_CODE_LOW_ADDR
-        ADC_SAR1_INITIAL_CODE_LOW_ADDR_MSB,
-        ADC_SAR1_INITIAL_CODE_LOW_ADDR_LSB,
+        I2C_SARADC_SAR2_INIT_CODE_LSB,
+        I2C_SARADC_SAR2_INIT_CODE_LSB_MSB,
+        I2C_SARADC_SAR2_INIT_CODE_LSB_LSB,
+        0x66,
+    );
+    // SAR1 High ADDR
+    regi2c_write_mask(
+        I2C_SAR_ADC,
+        I2C_SAR_ADC_HOSTID,
+        I2C_SARADC_SAR1_INIT_CODE_MSB,
+        I2C_SARADC_SAR1_INIT_CODE_MSB_MSB,
+        I2C_SARADC_SAR1_INIT_CODE_MSB_LSB,
+        0x08,
+    );
+    // SAR1 Low ADDR
+    regi2c_write_mask(
+        I2C_SAR_ADC,
+        I2C_SAR_ADC_HOSTID,
+        I2C_SARADC_SAR1_INIT_CODE_LSB,
+        I2C_SARADC_SAR1_INIT_CODE_LSB_MSB,
+        I2C_SARADC_SAR1_INIT_CODE_LSB_LSB,
         0x66,
     );
 
@@ -207,7 +188,6 @@ pub(crate) fn ensure_randomness() {
     let pattern_two: u32 = SAR1_ATTEN; // we want channel 0 with max attenuation, channel doesn't really matter here
     let pattern_table: u32 =
         (pattern_two << (3 * PATTERN_BIT_WIDTH)) | (pattern_one << (2 * PATTERN_BIT_WIDTH));
-
     reg_write(APB_SARADC_SAR_PATT_TAB1_REG, pattern_table);
 
     // set pattern length to 2 (APB_SARADC_SAR_PATT_LEN counts from 0)
@@ -215,7 +195,7 @@ pub(crate) fn ensure_randomness() {
         APB_SARADC_CTRL_REG,
         APB_SARADC_SARADC_SAR_PATT_LEN_V,
         APB_SARADC_SARADC_SAR_PATT_LEN_S,
-        1,
+        0,
     );
 
     // Same as in C3
@@ -239,83 +219,80 @@ pub(crate) fn ensure_randomness() {
 }
 
 pub(crate) fn revert_trng() {
-    reg_clr_bit(APB_SARADC_CTRL2_REG, APB_SARADC_TIMER_EN);
+    // Disable timer
+    reg_clr_bit(APB_SARADC_CTRL2_REG, APB_SARADC_SARADC_TIMER_EN);
+
+    // Write reset value
     reg_write(APB_SARADC_SAR_PATT_TAB1_REG, 0xFFFFFF);
 
+    // Revert ADC I2C configuration and initial voltage source setting
     regi2c_write_mask(
         I2C_SAR_ADC,
         I2C_SAR_ADC_HOSTID,
-        ADC_SAR2_INITIAL_CODE_HIGH_ADDR,
-        ADC_SAR2_INITIAL_CODE_HIGH_ADDR_MSB,
-        ADC_SAR2_INITIAL_CODE_HIGH_ADDR_LSB,
+        I2C_SARADC_SAR2_INIT_CODE_MSB,
+        I2C_SARADC_SAR2_INIT_CODE_MSB_MSB,
+        I2C_SARADC_SAR2_INIT_CODE_MSB_LSB,
         0x60,
     );
 
     regi2c_write_mask(
         I2C_SAR_ADC,
         I2C_SAR_ADC_HOSTID,
-        ADC_SAR2_INITIAL_CODE_LOW_ADDR,
-        ADC_SAR2_INITIAL_CODE_LOW_ADDR_MSB,
-        ADC_SAR2_INITIAL_CODE_LOW_ADDR_LSB,
+        I2C_SARADC_SAR2_INIT_CODE_LSB,
+        I2C_SARADC_SAR2_INIT_CODE_LSB_MSB,
+        I2C_SARADC_SAR2_INIT_CODE_LSB_LSB,
         0,
     );
     
     regi2c_write_mask(
         I2C_SAR_ADC,
         I2C_SAR_ADC_HOSTID,
-        ADC_SAR1_INITIAL_CODE_HIGH_ADDR,
-        ADC_SAR1_INITIAL_CODE_HIGH_ADDR_MSB,
-        ADC_SAR1_INITIAL_CODE_HIGH_ADDR_LSB,
+        I2C_SARADC_SAR1_INIT_CODE_MSB,
+        I2C_SARADC_SAR1_INIT_CODE_MSB_MSB,
+        I2C_SARADC_SAR1_INIT_CODE_MSB_LSB,
         0x60,
     );
 
     regi2c_write_mask(
         I2C_SAR_ADC,
         I2C_SAR_ADC_HOSTID,
-        ADC_SAR1_INITIAL_CODE_LOW_ADDR,
-        ADC_SAR1_INITIAL_CODE_LOW_ADDR_MSB,
-        ADC_SAR1_INITIAL_CODE_LOW_ADDR_LSB,
+        I2C_SARADC_SAR1_INIT_CODE_LSB,
+        I2C_SARADC_SAR1_INIT_CODE_LSB_MSB,
+        I2C_SARADC_SAR1_INIT_CODE_LSB_LSB,
         0,
     );
 
     regi2c_write_mask(
         I2C_SAR_ADC,
         I2C_SAR_ADC_HOSTID,
-        ADC_SARADC_DTEST_RTC_ADDR,
-        ADC_SARADC_DTEST_RTC_ADDR_MSB,
-        ADC_SARADC_DTEST_RTC_ADDR_LSB,
+        I2C_SARADC_DTEST,
+        I2C_SARADC_DTEST_MSB,
+        I2C_SARADC_DTEST_LSB,
         0,
     );
 
     regi2c_write_mask(
         I2C_SAR_ADC,
         I2C_SAR_ADC_HOSTID,
-        ADC_SARADC_ENT_RTC_ADDR,
-        ADC_SARADC_ENT_RTC_ADDR_MSB,
-        ADC_SARADC_ENT_RTC_ADDR_LSB,
+        I2C_SARADC_ENT_SAR,
+        I2C_SARADC_ENT_SAR_MSB,
+        I2C_SARADC_ENT_SAR_LSB,
         0,
     );
 
     regi2c_write_mask(
         I2C_SAR_ADC,
         I2C_SAR_ADC_HOSTID,
-        ADC_SARADC1_ENCAL_REF_ADDR,
-        ADC_SARADC1_ENCAL_REF_ADDR_MSB,
-        ADC_SARADC1_ENCAL_REF_ADDR_LSB,
+        I2C_SARADC_EN_TOUT_SAR1_BUS
+        I2C_SARADC_EN_TOUT_SAR1_BUS_MSB,
+        I2C_SARADC_EN_TOUT_SAR1_BUS_LSB,
         0,
     );
 
-    regi2c_write_mask(
-        I2C_SAR_ADC,
-        I2C_SAR_ADC_HOSTID,
-        ADC_SARADC2_ENCAL_REF_ADDR,
-        ADC_SARADC2_ENCAL_REF_ADDR_MSB,
-        ADC_SARADC2_ENCAL_REF_ADDR_LSB,
-        0,
-    );
-
-    clear_peri_reg_mask(PMU_RF_PWC_REG, PMU_PERIF_I2C_RSTB);
+    // disable ADC_CTRL_CLK (SAR ADC function clock)
     reg_write(PCR_SARADC_CLKM_CONF_REG, 0x00404000);
+    
+    // Set PCR_SARADC_CONF_REG to initial state
     reg_write(PCR_SARADC_CONF_REG, 0x5);
 }
 

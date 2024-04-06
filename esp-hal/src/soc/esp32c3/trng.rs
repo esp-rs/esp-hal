@@ -169,7 +169,7 @@ pub(crate) fn ensure_randomness() {
     set_peri_reg_mask(APB_SARADC_CTRL2_REG, APB_SARADC_TIMER_EN);
 }
 
-pub(crate) fn ensure_randomness() {
+pub(crate) fn revert_trng() {
     /* Restore internal I2C bus state */
     regi2c_write_mask!(I2C_SAR_ADC, ADC_SARADC2_ENCAL_REF_ADDR, 0);
 
