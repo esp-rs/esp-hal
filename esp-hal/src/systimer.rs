@@ -39,6 +39,12 @@ use crate::{
             target0_conf::TARGET0_CONF_SPEC,
             target0_hi::TARGET0_HI_SPEC,
             target0_lo::TARGET0_LO_SPEC,
+            target1_conf::TARGET1_CONF_SPEC,
+            target1_hi::TARGET1_HI_SPEC,
+            target1_lo::TARGET1_LO_SPEC,
+            target2_conf::TARGET2_CONF_SPEC,
+            target2_hi::TARGET2_HI_SPEC,
+            target2_lo::TARGET2_LO_SPEC,
         },
         SYSTIMER,
     },
@@ -157,14 +163,26 @@ impl<T, DM: crate::Mode, const CHANNEL: u8> Alarm<T, DM, CHANNEL> {
                     systimer.target0_lo(),
                 ),
                 1 => (
-                    transmute(systimer.target1_conf()),
-                    transmute(systimer.target1_hi()),
-                    transmute(systimer.target1_lo()),
+                    transmute::<&Reg<TARGET1_CONF_SPEC>, &Reg<TARGET0_CONF_SPEC>>(
+                        systimer.target1_conf(),
+                    ),
+                    transmute::<&Reg<TARGET1_HI_SPEC>, &Reg<TARGET0_HI_SPEC>>(
+                        systimer.target1_hi(),
+                    ),
+                    transmute::<&Reg<TARGET1_LO_SPEC>, &Reg<TARGET0_LO_SPEC>>(
+                        systimer.target1_lo(),
+                    ),
                 ),
                 2 => (
-                    transmute(systimer.target2_conf()),
-                    transmute(systimer.target2_hi()),
-                    transmute(systimer.target2_lo()),
+                    transmute::<&Reg<TARGET2_CONF_SPEC>, &Reg<TARGET0_CONF_SPEC>>(
+                        systimer.target2_conf(),
+                    ),
+                    transmute::<&Reg<TARGET2_HI_SPEC>, &Reg<TARGET0_HI_SPEC>>(
+                        systimer.target2_hi(),
+                    ),
+                    transmute::<&Reg<TARGET2_LO_SPEC>, &Reg<TARGET0_LO_SPEC>>(
+                        systimer.target2_lo(),
+                    ),
                 ),
                 _ => unreachable!(),
             };

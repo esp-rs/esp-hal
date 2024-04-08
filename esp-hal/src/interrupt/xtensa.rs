@@ -321,7 +321,8 @@ mod vectored {
                 let i = interrupt_nr as isize;
                 let cpu_interrupt = intr_map_base.offset(i).read_volatile();
                 // safety: cast is safe because of repr(u32)
-                let cpu_interrupt: CpuInterrupt = core::mem::transmute(cpu_interrupt);
+                let cpu_interrupt: CpuInterrupt =
+                    core::mem::transmute::<u32, CpuInterrupt>(cpu_interrupt);
                 let level = cpu_interrupt.level() as u8 as usize;
 
                 levels[level] |= 1 << i;
@@ -491,7 +492,8 @@ mod vectored {
         ) {
             EspDefaultHandler(level, interrupt);
         } else {
-            let handler: fn(&mut Context) = core::mem::transmute(handler);
+            let handler: fn(&mut Context) =
+                core::mem::transmute::<unsafe extern "C" fn(), fn(&mut Context)>(handler);
             handler(save_frame);
         }
     }
