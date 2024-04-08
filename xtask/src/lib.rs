@@ -462,8 +462,8 @@ pub fn generate_efuse_table(
     // Determine the commit (short) hash of the HEAD commit in the
     // provided ESP-IDF repository:
     let output = Command::new("git")
-        .args(&["rev-parse", "HEAD"])
-        .current_dir(&idf_path)
+        .args(["rev-parse", "HEAD"])
+        .current_dir(idf_path)
         .output()?;
     let idf_hash = String::from_utf8_lossy(&output.stdout[0..=7]).to_string();
 

@@ -142,7 +142,7 @@ fn build_documentation(workspace: &Path, args: BuildDocumentationArgs) -> Result
     let resources = workspace.join("resources");
 
     let package = args.package.to_string();
-    let version = xtask::package_version(&workspace, args.package)?;
+    let version = xtask::package_version(workspace, args.package)?;
 
     let mut crates = Vec::new();
 
@@ -188,10 +188,7 @@ fn build_documentation(workspace: &Path, args: BuildDocumentationArgs) -> Result
     }
 
     // Copy any additional assets to the documentation's output path:
-    fs::copy(
-        &resources.join("esp-rs.svg"),
-        &output_path.join("esp-rs.svg"),
-    )?;
+    fs::copy(resources.join("esp-rs.svg"), output_path.join("esp-rs.svg"))?;
 
     // Render the index and write it out to the documentaiton's output path:
     let source = fs::read_to_string(resources.join("index.html.jinja"))?;
@@ -280,7 +277,7 @@ fn generate_efuse_src(workspace: &Path, args: GenerateEfuseFieldsArgs) -> Result
 
     // Generate the Rust source file from the CSV file, and write it out to
     // the appropriate path:
-    xtask::generate_efuse_table(&args.chip, &idf_path, out_path)?;
+    xtask::generate_efuse_table(&args.chip, idf_path, out_path)?;
 
     // Format the generated code:
     xtask::cargo::run(&["fmt".into()], &esp_hal)?;
@@ -337,7 +334,7 @@ fn run_example(workspace: &Path, mut args: RunExampleArgs) -> Result<()> {
     Ok(())
 }
 
-fn run_tests(workspace: &PathBuf, args: RunTestsArgs) -> Result<(), anyhow::Error> {
+fn run_tests(workspace: &Path, args: RunTestsArgs) -> Result<(), anyhow::Error> {
     // Absolute path of the package's root:
     let package_path = xtask::windows_safe_path(&workspace.join("hil-test"));
 
