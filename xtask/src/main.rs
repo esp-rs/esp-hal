@@ -25,7 +25,7 @@ enum Cli {
     GenerateEfuseFields(GenerateEfuseFieldsArgs),
     /// Run the given example for the specified chip.
     RunExample(RunExampleArgs),
-    /// Run all applicable tests for a specified chip.
+    /// Run all applicable tests or the specified test for a specified chip.
     RunTests(RunTestsArgs),
 }
 
@@ -98,15 +98,18 @@ struct RunExampleArgs {
     /// Which chip to run the examples for.
     #[arg(value_enum)]
     chip: Chip,
-    /// Which example to run
+    /// Which example to run.
     example: String,
 }
 
 #[derive(Debug, Args)]
 struct RunTestsArgs {
-    /// Which chip to run the examples for.
+    /// Which chip to run the tests for.
     #[arg(value_enum)]
     chip: Chip,
+    /// Which example to run.
+    #[arg(short = 't', long)]
+    test: Option<String>,
 }
 
 // ----------------------------------------------------------------------------
@@ -343,12 +346,27 @@ fn run_tests(workspace: &PathBuf, args: RunTestsArgs) -> Result<(), anyhow::Erro
 
     // Load all examples and parse their metadata:
     let tests = xtask::load_examples(&package_path.join("tests"))?;
-    let tests = tests.iter()
+    let mut supported_tests = tests
+        .iter()
         // Filter down the examples to only those for which the specified chip is supported:
         .filter(|example| example.supports_chip(args.chip));
-
-    for test in tests {
-        xtask::run_example(&package_path, args.chip, target, &test)?;
+    if let Some(test_name) = &args.test {
+        let test = supported_tests.find_map(|example| {
+            if &example.name() == test_name {
+                Some(example.clone())
+            } else {
+                None
+            }
+        });
+        if let Some(test) = test {
+            xtask::run_example(&package_path, args.chip, target, &test)?;
+        } else {
+            log::error!("Test not found or unsupported for the given chip");
+        }
+    } else {
+        for test in supported_tests {
+            xtask::run_example(&package_path, args.chip, target, test)?;
+        }
     }
 
     Ok(())

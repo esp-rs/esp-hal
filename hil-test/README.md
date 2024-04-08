@@ -34,15 +34,21 @@ You can run all test for a given device running the following command from the `
 cargo xtask run-tests $CHIP
 ```
 
-For running a single test on a target, from the `hil-test` folder run:
+For running a single test on a target, from the `xtask` folder run:
 
+```shell
+# Run GPIO tests for ESP32-C6
+cargo xtask run-tests esp32h2 --test gpio
+```
+
+Another alternative way of running a single test is, from the `hil-tests` folder:
 ```shell
 # Run GPIO tests for ESP32-C6
 CARGO_BUILD_TARGET=riscv32imac-unknown-none-elf \
 PROBE_RS_CHIP=esp32c6 \
   cargo +nightly test --features=esp32c6 --test=gpio
 ```
-- If the `--test` argument is omitted, then all tests will be run, independently if the tests are supported for that target, for this reason we encourage using the `xtask` approach.
+- If the `--test` argument is omitted, then all tests will be run, independently if the tests are supported for that target, for this reason, we encourage using the `xtask` approach.
 - The build target **MUST** be specified via the `CARGO_BUILD_TARGET` environment variable or as an argument (`--target`).
 - The chip **MUST** be specified via the `PROBE_RS_CHIP` environment variable or as an argument of `probe-rs` (`--chip`).
 
