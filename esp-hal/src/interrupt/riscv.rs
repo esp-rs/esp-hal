@@ -310,7 +310,9 @@ unsafe fn get_assigned_cpu_interrupt(interrupt: Interrupt) -> Option<CpuInterrup
 
     let cpu_intr = intr_map_base.offset(interrupt_number).read_volatile();
     if cpu_intr > 0 {
-        Some(core::mem::transmute(cpu_intr - EXTERNAL_INTERRUPT_OFFSET))
+        Some(core::mem::transmute::<u32, CpuInterrupt>(
+            cpu_intr - EXTERNAL_INTERRUPT_OFFSET,
+        ))
     } else {
         None
     }
@@ -327,15 +329,15 @@ mod vectored {
         for (prio, num) in PRIORITY_TO_INTERRUPT.iter().enumerate() {
             set_kind(
                 crate::get_core(),
-                core::mem::transmute(*num as u32),
+                core::mem::transmute::<u32, CpuInterrupt>(*num as u32),
                 InterruptKind::Level,
             );
             set_priority(
                 crate::get_core(),
-                core::mem::transmute(*num as u32),
-                core::mem::transmute((prio as u8) + 1),
+                core::mem::transmute::<u32, CpuInterrupt>(*num as u32),
+                core::mem::transmute::<u8, Priority>((prio as u8) + 1),
             );
-            enable_cpu_interrupt(core::mem::transmute(*num as u32));
+            enable_cpu_interrupt(core::mem::transmute::<u32, CpuInterrupt>(*num as u32));
         }
     }
 
@@ -349,7 +351,7 @@ mod vectored {
                 let interrupt_nr = status.trailing_zeros() as u16;
                 // safety: cast is safe because of repr(u16)
                 if let Some(cpu_interrupt) =
-                    get_assigned_cpu_interrupt(core::mem::transmute(interrupt_nr))
+                    get_assigned_cpu_interrupt(core::mem::transmute::<u16, Interrupt>(interrupt_nr))
                 {
                     let prio = get_priority_by_core(core, cpu_interrupt);
                     prios[prio as usize] |= 1 << (interrupt_nr as usize);
@@ -371,8 +373,9 @@ mod vectored {
             return Err(Error::InvalidInterruptPriority);
         }
         unsafe {
-            let cpu_interrupt =
-                core::mem::transmute(PRIORITY_TO_INTERRUPT[(level as usize) - 1] as u32);
+            let cpu_interrupt = core::mem::transmute::<u32, CpuInterrupt>(
+                PRIORITY_TO_INTERRUPT[(level as usize) - 1] as u32,
+            );
             map(crate::get_core(), interrupt, cpu_interrupt);
             enable_cpu_interrupt(cpu_interrupt);
         }
@@ -423,7 +426,8 @@ mod vectored {
         ) {
             EspDefaultHandler(interrupt);
         } else {
-            let handler: fn(&mut TrapFrame) = core::mem::transmute(handler);
+            let handler: fn(&mut TrapFrame) =
+                core::mem::transmute::<unsafe extern "C" fn(), fn(&mut TrapFrame)>(handler);
             handler(save_frame);
         }
     }
@@ -632,7 +636,7 @@ mod classic {
         let prio = intr_prio_base
             .offset(cpu_interrupt as isize)
             .read_volatile();
-        core::mem::transmute(prio as u8)
+        core::mem::transmute::<u8, Priority>(prio as u8)
     }
     #[no_mangle]
     #[link_section = ".trap"]
@@ -761,7 +765,7 @@ mod plic {
         let prio = plic_mxint_pri_ptr
             .offset(cpu_interrupt_number)
             .read_volatile();
-        core::mem::transmute(prio as u8)
+        core::mem::transmute::<u8, Priority>(prio as u8)
     }
     #[no_mangle]
     #[link_section = ".trap"]
@@ -904,7 +908,7 @@ mod clic {
         unsafe {
             let intr_cntrl = intr_cntrl(core, cpu_interrupt_number);
             let val = InterruptControl(intr_cntrl.read_volatile());
-            core::mem::transmute(val.priority())
+            core::mem::transmute::<u8, Priority>(val.priority())
         }
     }
 }
