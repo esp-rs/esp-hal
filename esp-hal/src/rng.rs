@@ -43,8 +43,10 @@
 #![doc = concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", crate::soc::chip!(), "/api-reference/system/random.html)")]
 
 use core::marker::PhantomData;
+use core::ops::Deref;
+use crate::analog::adc::ADC;
 
-use crate::{peripheral::{Peripheral, PeripheralRef} , peripherals::RNG};
+use crate::{peripheral::Peripheral , peripherals::RNG};
 
 /// Random number generator driver
 #[derive(Clone, Copy)]
@@ -123,19 +125,18 @@ impl rand_core::RngCore for Rng {
 #[cfg(not(esp32p4))]
 pub struct Trng<'d>{
     pub rng: Rng,
-    adc: PeripheralRef<'d, crate::peripherals::ADC1>,
+    adc: &'d mut ADC<'d, crate::peripherals::ADC1>
 }
 
 #[cfg(not(esp32p4))]
 impl<'d> Trng<'d> {
     /// Create a new True Random Number Generator instance
-    pub fn new(rng: impl Peripheral<P = RNG>, adc: impl Peripheral<P = crate::peripherals::ADC1> + 'd) -> Self {
-        crate::into_ref!(adc);
+    pub fn new(rng: impl Peripheral<P = RNG>, adc: &'d mut ADC<'d, crate::peripherals::ADC1>) -> Self {
         let gen = Rng::new(rng);  
         crate::soc::trng::ensure_randomness();
         Self{
             rng: gen,
-            adc,
+            adc: adc,
         }
     }
 
@@ -148,7 +149,7 @@ impl<'d> Trng<'d> {
     }
 
     /// Downgrade Trng to Rng and release ADC1
-    pub fn downgrade(self) -> (Rng, PeripheralRef<'d, crate::peripherals::ADC1>) {
+    pub fn downgrade(&mut self) -> (Rng, &'d mut ADC<'_, crate::peripherals::ADC1>) {
         crate::soc::trng::revert_trng();
         (self.rng, self.adc)
     }
