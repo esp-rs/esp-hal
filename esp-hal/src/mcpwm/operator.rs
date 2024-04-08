@@ -203,32 +203,6 @@ impl<const OP: u8, PWM: PwmPeripheral> Operator<OP, PWM> {
         });
     }
 
-    /// Configures deadtime for this operator
-    pub fn set_deadtime(
-        &mut self,
-        cfg: DeadTimeCfg,
-        falling_edge_deadtime: u16,
-        rising_edge_deadtime: u16,
-    ) {
-        let ch = unsafe { &*PWM::block() }.ch(OP as usize);
-        #[cfg(esp32s3)]
-        {
-            ch.db_fed_cfg()
-                .write(|w| w.fed().variant(falling_edge_deadtime));
-            ch.db_red_cfg()
-                .write(|w| w.red().variant(rising_edge_deadtime));
-            ch.db_cfg().write(|w| unsafe { w.bits(cfg.cfg_reg) });
-        }
-        #[cfg(not(esp32s3))]
-        {
-            ch.dt_fed_cfg()
-                .write(|w| w.fed().variant(falling_edge_deadtime));
-            ch.dt_red_cfg()
-                .write(|w| w.red().variant(rising_edge_deadtime));
-            ch.dt_cfg().write(|w| unsafe { w.bits(cfg.cfg_reg) });
-        }
-    }
-
     /// Use the A output with the given pin and configuration
     pub fn with_pin_a<'d, Pin: OutputPin>(
         self,
@@ -260,6 +234,21 @@ impl<const OP: u8, PWM: PwmPeripheral> Operator<OP, PWM> {
     ) {
         (PwmPin::new(pin_a, config_a), PwmPin::new(pin_b, config_b))
     }
+
+    /// Link two pins using the deadtime generator
+    ///
+    /// This is useful for complementary or mirrored signals with or without
+    /// configured deadtime
+    pub fn with_linked_pins<'d, PinA: OutputPin, PinB: OutputPin>(
+        self,
+        pin_a: impl Peripheral<P = PinA> + 'd,
+        config_a: PwmPinConfig<true>,
+        pin_b: impl Peripheral<P = PinB> + 'd,
+        config_b: PwmPinConfig<false>,
+        config_dt: DeadTimeCfg,
+    ) -> LinkedPins<'d, PinA, PinB, PWM, OP> {
+        LinkedPins::new(pin_a, config_a, pin_b, config_b, config_dt)
+    }
 }
 
 /// Configuration describing how the operator generates a signal on a connected
@@ -280,6 +269,9 @@ impl<const IS_A: bool> PwmPinConfig<IS_A> {
         PwmActions::UP_DOWN_ACTIVE_HIGH,
         PwmUpdateMethod::SYNC_ON_ZERO,
     );
+    /// A configuration using [`PwmActions::empty`] and
+    /// [`PwmUpdateMethod::empty`]
+    pub const EMPTY: Self = Self::new(PwmActions::empty(), PwmUpdateMethod::empty());
 
     /// Get a configuration using the given `PwmActions` and `PwmUpdateMethod`
     pub const fn new(actions: PwmActions<IS_A>, update_method: PwmUpdateMethod) -> Self {
@@ -292,7 +284,7 @@ impl<const IS_A: bool> PwmPinConfig<IS_A> {
 
 /// A pin driven by an MCPWM operator
 pub struct PwmPin<'d, Pin, PWM, const OP: u8, const IS_A: bool> {
-    _pin: PeripheralRef<'d, Pin>,
+    pin: PeripheralRef<'d, Pin>,
     phantom: PhantomData<PWM>,
 }
 
@@ -313,45 +305,6 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
             .connect_peripheral_to_output(output_signal)
             .enable_output(true);
         pin
-    }
-
-    /// Updates dead-time FED register
-    ///
-    /// WARNING: FED is connected to the operator, and could be connected to
-    /// another pin
-    #[inline]
-    pub fn update_fed(&self, cycles: u16) {
-        #[cfg(esp32s3)]
-        let dt_fed = unsafe { Self::ch() }.db_fed_cfg();
-        #[cfg(not(esp32s3))]
-        let dt_fed = unsafe { Self::ch() }.dt_fed_cfg();
-        dt_fed.write(|w| w.fed().variant(cycles));
-    }
-
-    /// Updates dead-time RED register
-    ///
-    /// WARNING: RED is connected to the operator, and could be connected to
-    /// another pin
-    #[inline]
-    pub fn update_red(&self, cycles: u16) {
-        #[cfg(esp32s3)]
-        let dt_red = unsafe { Self::ch() }.db_red_cfg();
-        #[cfg(not(esp32s3))]
-        let dt_red = unsafe { Self::ch() }.dt_red_cfg();
-        dt_red.write(|w| w.red().variant(cycles));
-    }
-
-    /// Updates dead-time CFG register
-    ///
-    /// WARNING: CFG is connected to the operator, and could be connected to
-    /// another pin
-    #[inline]
-    pub fn update_deadtime_cfg(&mut self, cfg: DeadTimeCfg) {
-        #[cfg(esp32s3)]
-        let dt_cfg = unsafe { Self::ch() }.db_cfg();
-        #[cfg(not(esp32s3))]
-        let dt_cfg = unsafe { Self::ch() }.dt_cfg();
-        dt_cfg.write(|w| unsafe { w.bits(cfg.cfg_reg) });
     }
 
     /// Configure what actions should be taken on timing events
@@ -517,6 +470,125 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
     fn set_duty_cycle(&mut self, duty: u16) -> Result<(), core::convert::Infallible> {
         self.set_timestamp(duty);
         Ok(())
+    }
+}
+
+/// Two pins driven by the same timer and operator
+///
+/// Useful for complementary or mirrored signals with or without
+/// configured deadtime.
+///
+/// # H-Bridge example
+/// ```no_run
+/// // active high complementary using PWMA input
+/// let bridge_active = DeadTimeCfg::new_ahc();
+/// // use PWMB as input for both outputs
+/// let bride_off = DeadTimeCfg::new_bypass().set_output_swap(PWMStream::PWMA, true);
+/// let mut pins = mcpwm.operator0.with_linked_pins(
+///     pin_a,
+///     PwmPinConfig::UP_DOWN_ACTIVE_HIGH, // use PWMA as our main input
+///     pin_b,
+///     PwmPinConfig::EMPTY, // keep PWMB "low"
+///     bride_off,
+/// );
+///
+/// pins.set_falling_edge_deadtime(5);
+/// pins.set_rising_edge_deadtime(5);
+/// // pin_a: ________________________________________
+/// // pin_b: ________________________________________
+/// pins.set_timestamp_a(40); // 40% duty cycle if period configured to 100
+/// pins.set_deadtime_cfg(bridge_active);
+/// // pin_a: _______-------_____________-------______
+/// // pin_b: ------_________-----------_________-----
+/// ```
+pub struct LinkedPins<'d, PinA, PinB, PWM, const OP: u8> {
+    pin_a: PwmPin<'d, PinA, PWM, OP, true>,
+    pin_b: PwmPin<'d, PinB, PWM, OP, false>,
+}
+
+impl<'d, PinA: OutputPin, PinB: OutputPin, PWM: PwmPeripheral, const OP: u8>
+    LinkedPins<'d, PinA, PinB, PWM, OP>
+{
+    fn new(
+        pin_a: impl Peripheral<P = PinA> + 'd,
+        config_a: PwmPinConfig<true>,
+        pin_b: impl Peripheral<P = PinB> + 'd,
+        config_b: PwmPinConfig<false>,
+        config_dt: DeadTimeCfg,
+    ) -> Self {
+        // setup deadtime config before enabling the pins
+        #[cfg(esp32s3)]
+        let dt_cfg = unsafe { Self::ch() }.db_cfg();
+        #[cfg(not(esp32s3))]
+        let dt_cfg = unsafe { Self::ch() }.dt_cfg();
+        dt_cfg.write(|w| unsafe { w.bits(config_dt.cfg_reg) });
+
+        let pin_a = PwmPin::new(pin_a, config_a);
+        let pin_b = PwmPin::new(pin_b, config_b);
+
+        LinkedPins { pin_a, pin_b }
+    }
+
+    /// Configure what actions should be taken on timing events
+    pub fn set_actions_a(&mut self, value: PwmActions<true>) {
+        self.pin_a.set_actions(value)
+    }
+    /// Configure what actions should be taken on timing events
+    pub fn set_actions_b(&mut self, value: PwmActions<false>) {
+        self.pin_b.set_actions(value)
+    }
+
+    /// Set how a new timestamp syncs with the timer
+    pub fn set_update_method_a(&mut self, update_method: PwmUpdateMethod) {
+        self.pin_a.set_update_method(update_method)
+    }
+    /// Set how a new timestamp syncs with the timer
+    pub fn set_update_method_b(&mut self, update_method: PwmUpdateMethod) {
+        self.pin_b.set_update_method(update_method)
+    }
+
+    /// Write a new timestamp.
+    /// The written value will take effect according to the set
+    /// [`PwmUpdateMethod`].
+    pub fn set_timestamp_a(&mut self, value: u16) {
+        self.pin_a.set_timestamp(value)
+    }
+    /// Write a new timestamp.
+    /// The written value will take effect according to the set
+    /// [`PwmUpdateMethod`].
+    pub fn set_timestamp_b(&mut self, value: u16) {
+        self.pin_a.set_timestamp(value)
+    }
+
+    /// Configure the deadtime generator
+    pub fn set_deadtime_cfg(&mut self, config: DeadTimeCfg) {
+        #[cfg(esp32s3)]
+        let dt_cfg = unsafe { Self::ch() }.db_cfg();
+        #[cfg(not(esp32s3))]
+        let dt_cfg = unsafe { Self::ch() }.dt_cfg();
+        dt_cfg.write(|w| unsafe { w.bits(config.cfg_reg) });
+    }
+
+    /// Set the deadtime generator rising edge delay
+    pub fn set_rising_edge_deadtime(&mut self, dead_time: u16) {
+        #[cfg(esp32s3)]
+        let dt_red = unsafe { Self::ch() }.db_red_cfg();
+        #[cfg(not(esp32s3))]
+        let dt_red = unsafe { Self::ch() }.dt_red_cfg();
+        dt_red.write(|w| w.red().variant(dead_time));
+    }
+    /// Set the deadtime generator falling edge delay
+    pub fn set_falling_edge_deadtime(&mut self, dead_time: u16) {
+        #[cfg(esp32s3)]
+        let dt_fed = unsafe { Self::ch() }.db_fed_cfg();
+        #[cfg(not(esp32s3))]
+        let dt_fed = unsafe { Self::ch() }.dt_fed_cfg();
+        dt_fed.write(|w| w.fed().variant(dead_time));
+    }
+
+    unsafe fn ch() -> &'static crate::peripherals::mcpwm0::CH {
+        let block = unsafe { &*PWM::block() };
+        block.ch(OP as usize)
     }
 }
 
