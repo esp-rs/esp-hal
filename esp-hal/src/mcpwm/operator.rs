@@ -301,15 +301,17 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
 {
     fn new(pin: impl Peripheral<P = Pin> + 'd, config: PwmPinConfig<IS_A>) -> Self {
         crate::into_ref!(pin);
-        let output_signal = PWM::output_signal::<OP, IS_A>();
-        pin.enable_output(true)
-            .connect_peripheral_to_output(output_signal);
         let mut pin = PwmPin {
-            _pin: pin,
+            pin,
             phantom: PhantomData,
         };
         pin.set_actions(config.actions);
         pin.set_update_method(config.update_method);
+
+        let output_signal = PWM::output_signal::<OP, IS_A>();
+        pin.pin
+            .connect_peripheral_to_output(output_signal)
+            .enable_output(true);
         pin
     }
 
