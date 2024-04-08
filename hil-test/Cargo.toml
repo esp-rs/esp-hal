@@ -29,8 +29,8 @@ name    = "uart"
 harness = false
 
 [[test]]
-name    = "uart_async"
-harness = false
+name              = "uart_async"
+harness           = false
 required-features = ["async", "embassy"]
 
 [[test]]
@@ -64,24 +64,28 @@ p192                = { version = "0.13.0", default-features = false, features =
 p256                = { version = "0.13.2", default-features = false, features = ["arithmetic"] }
 
 [features]
-default = ["async", "embassy", "embassy-time-timg0", "embassy-executor-thread"]
+default = ["async", "embassy", "embassy-executor-thread", "embassy-time-timg0"]
 
 # Device support (required!):
-esp32   = ["esp-hal/esp32", "esp-backtrace/esp32"]
-esp32c2 = ["esp-hal/esp32c2", "esp-backtrace/esp32c2"]
-esp32c3 = ["esp-hal/esp32c3", "esp-backtrace/esp32c3"]
-esp32c6 = ["esp-hal/esp32c6", "esp-backtrace/esp32c6"]
-esp32h2 = ["esp-hal/esp32h2", "esp-backtrace/esp32h2"]
-esp32s2 = ["esp-hal/esp32s2", "esp-backtrace/esp32s2"]
-esp32s3 = ["esp-hal/esp32s3", "esp-backtrace/esp32s3"]
+esp32   = ["esp-backtrace/esp32", "esp-hal/esp32"]
+esp32c2 = ["esp-backtrace/esp32c2", "esp-hal/esp32c2"]
+esp32c3 = ["esp-backtrace/esp32c3", "esp-hal/esp32c3"]
+esp32c6 = ["esp-backtrace/esp32c6", "esp-hal/esp32c6"]
+esp32h2 = ["esp-backtrace/esp32h2", "esp-hal/esp32h2"]
+esp32s2 = ["esp-backtrace/esp32s2", "esp-hal/esp32s2"]
+esp32s3 = ["esp-backtrace/esp32s3", "esp-hal/esp32s3"]
 # Async & Embassy:
-async                      = ["dep:embedded-hal-async", "esp-hal?/async"]
-embassy                    = ["esp-hal?/embassy", "embedded-test/embassy", "embedded-test/external-executor"]
+async = ["dep:embedded-hal-async", "esp-hal?/async"]
+embassy = [
+    "embedded-test/embassy",
+    "embedded-test/external-executor",
+    "esp-hal?/embassy",
+]
 embassy-executor-interrupt = ["esp-hal?/embassy-executor-interrupt"]
-embassy-executor-thread    = ["esp-hal?/embassy-executor-thread"]
+embassy-executor-thread = ["esp-hal?/embassy-executor-thread"]
 embassy-time-systick-16mhz = ["esp-hal?/embassy-time-systick-16mhz"]
 embassy-time-systick-80mhz = ["esp-hal?/embassy-time-systick-80mhz"]
-embassy-time-timg0         = ["esp-hal?/embassy-time-timg0"]
+embassy-time-timg0 = ["esp-hal?/embassy-time-timg0"]
 
 # https://doc.rust-lang.org/cargo/reference/profiles.html#test
 # Test and bench profiles inherit from dev and release respectively.

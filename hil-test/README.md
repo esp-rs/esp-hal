@@ -28,7 +28,7 @@ cargo install probe-rs \
 
 Target device **MUST** connected via its USB-Serial-JTAG port, or if unavailable (eg. ESP32, ESP32-C2, ESP32-S2) then you must connect a compatible debug probe such as an [ESP-Prog].
 
-You can run all test for a given device running the following command from the `xtask` folder:
+You can run all tests for a given device by running the following command from the `xtask` folder:
 
 ```shell
 cargo xtask run-tests $CHIP
@@ -38,7 +38,7 @@ For running a single test on a target, from the `xtask` folder run:
 
 ```shell
 # Run GPIO tests for ESP32-C6
-cargo xtask run-tests esp32h2 --test gpio
+cargo xtask run-tests esp32c6 --test gpio
 ```
 
 Another alternative way of running a single test is, from the `hil-tests` folder:
@@ -103,4 +103,5 @@ sudo reboot
 
 //% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 ```
+If the test is supported by all the targets, you can omit the header.
 6. Write some documentation at the top of the `tests/$PERIPHERAL.rs` file with the pins being used and the required connections, if applicable.
