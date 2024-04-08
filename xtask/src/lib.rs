@@ -320,7 +320,11 @@ pub fn run_example(
     // probe-rs cannot currently do auto detection, so we need to tell probe-rs run
     // which chip we are testing
     if subcommand == "test" {
-        builder = builder.arg("--").arg("--chip").arg(format!("{}", chip));
+        if chip == Chip::Esp32 {
+            builder = builder.arg("--").arg("--chip").arg("esp32-3.3v");
+        } else {
+            builder = builder.arg("--").arg("--chip").arg(format!("{}", chip));
+        }
     }
 
     // If targeting an Xtensa device, we must use the '+esp' toolchain modifier:
