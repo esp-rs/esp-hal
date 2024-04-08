@@ -67,13 +67,25 @@ p256                = { version = "0.13.2", default-features = false, features =
 default = ["async", "embassy", "embassy-executor-thread", "embassy-time-timg0"]
 
 # Device support (required!):
-esp32   = ["esp-backtrace/esp32", "esp-hal/esp32"]
+esp32 = [
+    "embedded-test/xtensa-semihosting",
+    "esp-backtrace/esp32",
+    "esp-hal/esp32",
+]
 esp32c2 = ["esp-backtrace/esp32c2", "esp-hal/esp32c2"]
 esp32c3 = ["esp-backtrace/esp32c3", "esp-hal/esp32c3"]
 esp32c6 = ["esp-backtrace/esp32c6", "esp-hal/esp32c6"]
 esp32h2 = ["esp-backtrace/esp32h2", "esp-hal/esp32h2"]
-esp32s2 = ["esp-backtrace/esp32s2", "esp-hal/esp32s2"]
-esp32s3 = ["esp-backtrace/esp32s3", "esp-hal/esp32s3"]
+esp32s2 = [
+    "embedded-test/xtensa-semihosting",
+    "esp-backtrace/esp32s2",
+    "esp-hal/esp32s2",
+]
+esp32s3 = [
+    "embedded-test/xtensa-semihosting",
+    "esp-backtrace/esp32s3",
+    "esp-hal/esp32s3",
+]
 # Async & Embassy:
 async = ["dep:embedded-hal-async", "esp-hal?/async"]
 embassy = [
