@@ -78,7 +78,7 @@ impl DeadTimeCfg {
     /// Active High Complementary (AHC) from Technical Reference manual
     ///
     /// Will generate a PWM from input PWMA, such that output PWMA & PWMB are
-    /// each others complement Except during a transition in which they will
+    /// each others complement except during a transition in which they will
     /// be both off (as deadtime) such that they should never overlap, useful
     /// for H-Bridge type scenarios
     pub const fn new_ahc() -> DeadTimeCfg {
@@ -524,7 +524,7 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
 pub enum UpdateAction {
     /// Clear the output by setting it to a low level.
     SetLow  = 1,
-    /// Set the to a high level.
+    /// Set the output to a high level.
     SetHigh = 2,
     /// Change the current output level to the opposite value.
     /// If it is currently pulled high, pull it low, or vice versa.

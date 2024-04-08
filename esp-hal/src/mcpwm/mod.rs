@@ -240,7 +240,7 @@ impl<'a> PeripheralClockConfig<'a> {
 
     /// Get a timer clock configuration with the given prescaler.
     ///
-    /// The resulting timer frequency depends of the chosen
+    /// The resulting timer frequency depends on the chosen
     /// [`timer::PwmWorkingMode`].
     ///
     /// #### `PwmWorkingMode::Increase` or `PwmWorkingMode::Decrease`
