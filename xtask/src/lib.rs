@@ -331,8 +331,7 @@ pub fn run_example(
     let args = builder.build();
     log::debug!("{args:#?}");
 
-    cargo::run_with_input(&args, package_path)?;
-    Ok(())
+    cargo::run_with_input(&args, package_path)
 }
 
 /// Build the specified package, using the given toolchain/target/features if
@@ -427,7 +426,7 @@ const EFUSE_FIELDS_RS_HEADER: &str = r#"
 //!
 //! For information on how to regenerate these files, please refer to the
 //! `xtask` package's `README.md` file.
-//! 
+//!
 //! Generated on:   $DATE
 //! ESP-IDF Commit: $HASH
 
