@@ -148,8 +148,6 @@ mod tests {
         ctx.io4.toggle();
         assert_eq!(ctx.io4.is_set_low(), false);
         assert_eq!(ctx.io4.is_set_high(), true);
-        // Leave in initial state for next test
-        ctx.io4.toggle();
     }
 
     #[test]
