@@ -20,7 +20,7 @@ use esp_hal::{
     peripherals::Peripherals,
     prelude::*,
     uart::{
-        config::{Config, DataBits, Parity, StopBits},
+        config::Config,
         TxRxPins,
         Uart,
     },
@@ -34,12 +34,7 @@ fn main() -> ! {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let config = Config {
-        baudrate: 115200,
-        data_bits: DataBits::DataBits8,
-        parity: Parity::ParityNone,
-        stop_bits: StopBits::STOP1,
-    };
+    let config = Config::default();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let pins = TxRxPins::new_tx_rx(

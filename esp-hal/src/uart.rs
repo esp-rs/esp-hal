@@ -123,6 +123,20 @@ impl embedded_io::Error for Error {
     }
 }
 
+// Define an enum for the clock source
+// (outside of `config` module in order not to "use" it an extra time)
+#[derive(PartialEq, Eq, Copy, Clone, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum ClockSource {
+    Apb,
+    #[cfg(not(any(esp32, esp32s2)))]
+    RcFast,
+    #[cfg(not(any(esp32, esp32s2)))]
+    Xtal,
+    #[cfg(any(esp32, esp32s2))]
+    RefTick,
+}
+
 /// UART Configuration
 pub mod config {
     /// Number of data bits
@@ -164,6 +178,7 @@ pub mod config {
         pub data_bits: DataBits,
         pub parity: Parity,
         pub stop_bits: StopBits,
+        pub clock_source: super::ClockSource,
     }
 
     impl Config {
@@ -197,6 +212,11 @@ pub mod config {
             self
         }
 
+        pub fn clock_source(mut self, source: super::ClockSource) -> Self {
+            self.clock_source = source;
+            self
+        }
+
         pub fn symbol_length(&self) -> u8 {
             let mut length: u8 = 1; // start bit
             length += match self.data_bits {
@@ -224,6 +244,10 @@ pub mod config {
                 data_bits: DataBits::DataBits8,
                 parity: Parity::ParityNone,
                 stop_bits: StopBits::STOP1,
+                #[cfg(any(esp32c6, esp32h2, lp_uart))]
+                clock_source: super::ClockSource::Xtal,
+                #[cfg(not(any(esp32c6, esp32h2, lp_uart)))]
+                clock_source: super::ClockSource::Apb,
             }
         }
     }
@@ -538,7 +562,7 @@ where
             symbol_len: config.symbol_length(),
         };
 
-        serial.change_baud_internal(config.baudrate, clocks);
+        serial.change_baud_internal(config.baudrate, config.clock_source, clocks);
         serial.change_data_bits(config.data_bits);
         serial.change_parity(config.parity);
         serial.change_stop_bits(config.stop_bits);
@@ -869,15 +893,22 @@ where
     }
 
     #[cfg(any(esp32c2, esp32c3, esp32s3))]
-    fn change_baud_internal(&self, baudrate: u32, clocks: &Clocks) {
-        // we force the clock source to be APB and don't use the decimal part of the
-        // divider
-        let clk = clocks.apb_clock.to_Hz();
-        let max_div = 0b1111_1111_1111; // 12 bit clkdiv
+    fn change_baud_internal(&self, baudrate: u32, clock_source: ClockSource, clocks: &Clocks) {
+        let clk = match clock_source {
+            ClockSource::Apb => clocks.apb_clock.to_Hz(),
+            ClockSource::Xtal => clocks.xtal_clock.to_Hz(),
+            ClockSource::RcFast => 17_500_000,
+        };
+
+        let max_div = 0b1111_1111_1111 - 1;
         let clk_div = ((clk) + (max_div * baudrate) - 1) / (max_div * baudrate);
         T::register_block().clk_conf().write(|w| unsafe {
             w.sclk_sel()
-                .bits(1) // APB
+                .bits(match clock_source {
+                    ClockSource::Apb => 1,
+                    ClockSource::RcFast => 2,
+                    ClockSource::Xtal => 3,
+                })
                 .sclk_div_a()
                 .bits(0)
                 .sclk_div_b()
@@ -899,10 +930,13 @@ where
     }
 
     #[cfg(any(esp32c6, esp32h2))]
-    fn change_baud_internal(&self, baudrate: u32, clocks: &Clocks) {
-        // we force the clock source to be XTAL and don't use the decimal part of
-        // the divider
-        let clk = clocks.xtal_clock.to_Hz();
+    fn change_baud_internal(&self, baudrate: u32, clock_source: ClockSource, clocks: &Clocks) {
+        let clk = match clock_source {
+            ClockSource::Apb => clocks.apb_clock.to_Hz(),
+            ClockSource::Xtal => clocks.xtal_clock.to_Hz(),
+            ClockSource::RcFast => 17_500_000,
+        };
+
         let max_div = 0b1111_1111_1111 - 1;
         let clk_div = ((clk) + (max_div * baudrate) - 1) / (max_div * baudrate);
 
@@ -922,7 +956,11 @@ where
                         .uart0_sclk_div_num()
                         .bits(clk_div as u8 - 1)
                         .uart0_sclk_sel()
-                        .bits(0x3) // TODO: this probably shouldn't be hard-coded
+                        .bits(match clock_source {
+                            ClockSource::Apb => 1,
+                            ClockSource::RcFast => 2,
+                            ClockSource::Xtal => 3,
+                        })
                         .uart0_sclk_en()
                         .set_bit()
                 });
@@ -959,14 +997,19 @@ where
     }
 
     #[cfg(any(esp32, esp32s2))]
-    fn change_baud_internal(&self, baudrate: u32, clocks: &Clocks) {
-        // we force the clock source to be APB and don't use the decimal part of the
-        // divider
-        let clk = clocks.apb_clock.to_Hz();
+    fn change_baud_internal(&self, baudrate: u32, clock_source: ClockSource, clocks: &Clocks) {
+        let clk = match clock_source {
+            ClockSource::Apb => clocks.apb_clock.to_Hz(),
+            ClockSource::RefTick => 1, // ESP32 TRM, section 3.2.4.2 (RefTick)
+        };
 
-        T::register_block()
-            .conf0()
-            .modify(|_, w| w.tick_ref_always_on().bit(true));
+        T::register_block().conf0().modify(|_, w| {
+            w.tick_ref_always_on().bit(match clock_source {
+                ClockSource::Apb => true,
+                ClockSource::RefTick => false,
+            })
+        });
+
         let divider = clk / baudrate;
 
         T::register_block()
@@ -992,8 +1035,8 @@ where
     }
 
     /// Modify UART baud rate and reset TX/RX fifo.
-    pub fn change_baud(&mut self, baudrate: u32, clocks: &Clocks) {
-        self.change_baud_internal(baudrate, clocks);
+    pub fn change_baud(&mut self, baudrate: u32, clock_source: ClockSource, clocks: &Clocks) {
+        self.change_baud_internal(baudrate, clock_source, clocks);
         self.txfifo_reset();
         self.rxfifo_reset();
     }
@@ -2130,7 +2173,7 @@ pub mod lp_uart {
 
             // Override protocol parameters from the configuration
             // uart_hal_set_baudrate(&hal, cfg->uart_proto_cfg.baud_rate, sclk_freq);
-            me.change_baud_internal(config.baudrate);
+            me.change_baud_internal(config.baudrate, config.clock_source);
             // uart_hal_set_parity(&hal, cfg->uart_proto_cfg.parity);
             me.change_parity(config.parity);
             // uart_hal_set_data_bit_num(&hal, cfg->uart_proto_cfg.data_bits);
@@ -2172,7 +2215,7 @@ pub mod lp_uart {
             }
         }
 
-        fn change_baud_internal(&mut self, baudrate: u32) {
+        fn change_baud_internal(&mut self, baudrate: u32, clock_source: super::ClockSource) {
             // we force the clock source to be XTAL and don't use the decimal part of
             // the divider
             let clk = 16_000_000;
@@ -2187,7 +2230,11 @@ pub mod lp_uart {
                     .sclk_div_num()
                     .bits(clk_div as u8 - 1)
                     .sclk_sel()
-                    .bits(0x3) // TODO: this probably shouldn't be hard-coded
+                    .bits(match clock_source {
+                        super::ClockSource::Xtal => 3,
+                        super::ClockSource::RcFast => 2,
+                        super::ClockSource::Apb => panic!("Wrong clock source for LP_UART"),
+                    })
                     .sclk_en()
                     .set_bit()
             });
@@ -2204,8 +2251,8 @@ pub mod lp_uart {
         }
 
         /// Modify UART baud rate and reset TX/RX fifo.
-        pub fn change_baud(&mut self, baudrate: u32) {
-            self.change_baud_internal(baudrate);
+        pub fn change_baud(&mut self, baudrate: u32, clock_source: super::ClockSource) {
+            self.change_baud_internal(baudrate, clock_source);
             self.txfifo_reset();
             self.rxfifo_reset();
         }
