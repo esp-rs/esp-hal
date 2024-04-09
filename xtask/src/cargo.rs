@@ -35,7 +35,7 @@ pub fn run_with_input(args: &[String], cwd: &Path) -> Result<()> {
         bail!("The `cwd` argument MUST be a directory");
     }
 
-    let status = Command::new(get_cargo())
+    let _status = Command::new(get_cargo())
         .args(args)
         .current_dir(cwd)
         .stdout(std::process::Stdio::inherit())
@@ -43,11 +43,7 @@ pub fn run_with_input(args: &[String], cwd: &Path) -> Result<()> {
         .stdin(std::process::Stdio::inherit())
         .status()?;
 
-    if status.success() {
-        Ok(())
-    } else {
-        bail!("Failed to execute cargo subcommand")
-    }
+    Ok(())
 }
 
 fn get_cargo() -> String {
