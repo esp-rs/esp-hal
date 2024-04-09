@@ -361,8 +361,14 @@ fn run_tests(workspace: &Path, args: RunTestsArgs) -> Result<(), anyhow::Error> 
             log::error!("Test not found or unsupported for the given chip");
         }
     } else {
+        let mut failed_tests: Vec<String> = Vec::new();
         for test in supported_tests {
-            xtask::run_example(&package_path, args.chip, target, test)?;
+            if xtask::run_example(&package_path, args.chip, target, test).is_err() {
+                failed_tests.push(test.name());
+            }
+        }
+        if !failed_tests.is_empty() {
+            bail!("Failed tests: {:?}", failed_tests);
         }
     }
 
