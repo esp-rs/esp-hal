@@ -1,13 +1,3 @@
-[alias]
-esp32   = "test --release --features=esp32   --target=xtensa-esp32-none-elf -- --chip esp32-3.3v"
-esp32c2 = "test --release --features=esp32c2 --target=riscv32imc-unknown-none-elf -- --chip esp32c2"
-esp32c3 = "test --release --features=esp32c3 --target=riscv32imc-unknown-none-elf -- --chip esp32c3"
-esp32c6 = "test --release --features=esp32c6 --target=riscv32imac-unknown-none-elf -- --chip esp32c6"
-esp32h2 = "test --release --features=esp32h2 --target=riscv32imac-unknown-none-elf -- --chip esp32h2"
-# esp32p4 = "test --release --features=esp32p4 --target=riscv32imafc-unknown-none-elf -- --chip esp32p4"
-esp32s2 = "test --release --features=esp32s2 --target=xtensa-esp32s2-none-elf -- --chip esp32s2"
-esp32s3 = "test --release --features=esp32s3 --target=xtensa-esp32s3-none-elf -- --chip esp32s3"
-
 [target.'cfg(target_arch = "riscv32")']
 runner    = "probe-rs run"
 rustflags = [
