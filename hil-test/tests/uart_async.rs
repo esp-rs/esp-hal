@@ -17,7 +17,7 @@ use esp_hal::{
     peripherals::{Peripherals, UART0},
     prelude::*,
     uart::{
-        config::{Config, DataBits, Parity, StopBits},
+        config::Config,
         TxRxPins,
         Uart,
         UartRx,
@@ -41,14 +41,8 @@ impl Context {
             io.pins.gpio2.into_push_pull_output(),
             io.pins.gpio4.into_floating_input(),
         );
-        let config = Config {
-            baudrate: 115200,
-            data_bits: DataBits::DataBits8,
-            parity: Parity::ParityNone,
-            stop_bits: StopBits::STOP1,
-        };
 
-        let uart = Uart::new_async_with_config(peripherals.UART0, config, Some(pins), &clocks);
+        let uart = Uart::new_async_with_config(peripherals.UART0, Config::default(), Some(pins), &clocks);
         let (tx, rx) = uart.split();
 
         Context { rx, tx }
