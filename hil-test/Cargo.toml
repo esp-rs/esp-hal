@@ -17,6 +17,10 @@ name    = "spi_full_duplex"
 harness = false
 
 [[test]]
+name    = "rsa"
+harness = false
+
+[[test]]
 name    = "uart"
 harness = false
 
@@ -44,6 +48,8 @@ cfg-if = "1"
 embassy-executor   = { version = "0.5.0", default-features = false, features = ["executor-thread", "arch-riscv32"] }
 # Add the `embedded-test/defmt` feature for more verbose testing
 embedded-test = { git = "https://github.com/probe-rs/embedded-test", rev = "b67dec33992f5bd79d414a0e70220dc4142278cf", default-features = false }
+crypto-bigint = { version = "0.5.5", default-features = false }
+nb            = "1.1.0"
 
 [features]
 default = ["async", "embassy", "embassy-time-timg0"]
