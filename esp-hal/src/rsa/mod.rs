@@ -23,11 +23,10 @@
 //! ### Initialization
 //! ```no_run
 //! let peripherals = Peripherals::take();
-//! let mut system = peripherals.SYSTEM.split();
 //!
-//! let mut rsa = Rsa::new(peripherals.RSA);
+//! let mut rsa = Rsa::new(peripherals.RSA, None);
 //! ```
-//!  
+//!
 //! ### Async (modular exponentiation)
 //! ```no_run
 //! #[embassy_executor::task]

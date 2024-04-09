@@ -147,7 +147,7 @@ fn mod_exp_example(rsa: &mut Rsa<esp_hal::Blocking>) {
 }
 
 fn multiplication_example(rsa: &mut Rsa<esp_hal::Blocking>) {
-    let mut out = [0_u32; U1024::LIMBS];
+    let mut outbuf = [0_u32; U1024::LIMBS];
 
     let operand_a = BIGNUM_1.as_words();
     let operand_b = BIGNUM_2.as_words();
@@ -158,14 +158,14 @@ fn multiplication_example(rsa: &mut Rsa<esp_hal::Blocking>) {
     {
         let mut rsamulti = RsaMultiplication::<operand_sizes::Op512, esp_hal::Blocking>::new(rsa);
         rsamulti.start_multiplication(operand_a, operand_b);
-        rsamulti.read_results(&mut out);
+        rsamulti.read_results(&mut outbuf);
     }
     #[cfg(not(feature = "esp32"))]
     {
         let mut rsamulti =
             RsaMultiplication::<operand_sizes::Op512, esp_hal::Blocking>::new(rsa, operand_a);
         rsamulti.start_multiplication(operand_b);
-        rsamulti.read_results(&mut out);
+        rsamulti.read_results(&mut outbuf);
     }
 
     let post_hw_mul = cycles();
@@ -180,6 +180,6 @@ fn multiplication_example(rsa: &mut Rsa<esp_hal::Blocking>) {
         "it took {} cycles for sw multiplication",
         post_sw_mul - pre_sw_mul
     );
-    assert_eq!(U1024::from_words(out), sw_out.1.concat(&sw_out.0));
+    assert_eq!(U1024::from_words(outbuf), sw_out.1.concat(&sw_out.0));
     println!("multiplication done");
 }
