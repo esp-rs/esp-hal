@@ -87,7 +87,7 @@ const CONSOLE_UART_NUM: usize = 0;
 const UART_FIFO_SIZE: u16 = 128;
 
 #[cfg(not(any(esp32, esp32s2)))]
-const RC_FAST_CLK_HZ: u32 = 17_500_000;
+use crate::soc::constants::RC_FAST_CLK;
 
 /// UART Error
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -894,7 +894,7 @@ where
         let clk = match clock_source {
             ClockSource::Apb => clocks.apb_clock.to_Hz(),
             ClockSource::Xtal => clocks.xtal_clock.to_Hz(),
-            ClockSource::RcFast => RC_FAST_CLK_HZ,
+            ClockSource::RcFast => RC_FAST_CLK.to_Hz(),
         };
 
         let max_div = 0b1111_1111_1111 - 1;
@@ -931,7 +931,7 @@ where
         let clk = match clock_source {
             ClockSource::Apb => clocks.apb_clock.to_Hz(),
             ClockSource::Xtal => clocks.xtal_clock.to_Hz(),
-            ClockSource::RcFast => RC_FAST_CLK_HZ,
+            ClockSource::RcFast => RC_FAST_CLK.to_Hz(),
         };
 
         let max_div = 0b1111_1111_1111 - 1;
