@@ -33,6 +33,10 @@ name    = "uart_async"
 harness = false
 required-features = ["async", "embassy"]
 
+[[test]]
+name    = "ecc"
+harness = false
+
 [dependencies]
 defmt              = { version = "0.3.6" }
 defmt-rtt          = { version = "0.4.0" }
@@ -51,9 +55,13 @@ cfg-if = "1"
 [dev-dependencies]
 embassy-executor   = { version = "0.5.0", default-features = false, features = ["executor-thread", "arch-riscv32"] }
 # Add the `embedded-test/defmt` feature for more verbose testing
-embedded-test = { git = "https://github.com/probe-rs/embedded-test", rev = "b67dec33992f5bd79d414a0e70220dc4142278cf", default-features = false }
-crypto-bigint = { version = "0.5.5", default-features = false }
-nb            = "1.1.0"
+embedded-test  = { git = "https://github.com/probe-rs/embedded-test", rev = "b67dec33992f5bd79d414a0e70220dc4142278cf", default-features = false }
+crypto-bigint  = { version = "0.5.5", default-features = false }
+nb             = "1.1.0"
+hex-literal    = "0.4.1"
+p192           = { version = "0.13.0", default-features = false, features = ["arithmetic"] }
+p256           = { version = "0.13.2", default-features = false, features = ["arithmetic"] }
+elliptic-curve = { version = "0.13.8", default-features = false, features = ["sec1"] }
 
 [features]
 default = ["async", "embassy", "embassy-time-timg0"]
