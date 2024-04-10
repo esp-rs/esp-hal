@@ -58,6 +58,7 @@ impl Context<'_> {
     }
 }
 
+#[cfg(test)]
 #[embedded_test::tests]
 mod tests {
     use defmt::assert_eq;
@@ -708,10 +709,9 @@ mod tests {
                     _ => unimplemented!(),
                 };
 
-                ctx.ecc.finite_field_division(curve, k, y)
+                ctx.ecc
+                    .finite_field_division(curve, k, y)
                     .expect("Inputs data doesn't match the key length selected.");
-                let end_time = SystemTimer::now();
-                delta_time += end_time - begin_time;
 
                 match prime_field.len() {
                     24 => {
@@ -719,22 +719,24 @@ mod tests {
                         let sw_y = DynResidue::new(&U192::from_be_slice(sw_y), modulus);
                         let sw_k = DynResidue::new(&U192::from_be_slice(sw_k), modulus);
                         let sw_inv_k = sw_k.invert().0;
-                        sw_res.copy_from_slice(sw_y.mul(&sw_inv_k).retrieve().to_be_bytes().as_slice());
+                        sw_res.copy_from_slice(
+                            sw_y.mul(&sw_inv_k).retrieve().to_be_bytes().as_slice(),
+                        );
                     }
                     32 => {
                         let modulus = DynResidueParams::new(&U256::from_be_slice(prime_field));
                         let sw_y = DynResidue::new(&U256::from_be_slice(sw_y), modulus);
                         let sw_k = DynResidue::new(&U256::from_be_slice(sw_k), modulus);
                         let sw_inv_k = sw_k.invert().0;
-                        sw_res.copy_from_slice(sw_y.mul(&sw_inv_k).retrieve().to_be_bytes().as_slice());
+                        sw_res.copy_from_slice(
+                            sw_y.mul(&sw_inv_k).retrieve().to_be_bytes().as_slice(),
+                        );
                     }
                     _ => unimplemented!(),
                 };
-    
+
                 for (a, b) in y.iter().zip(sw_res) {
-                    assert_eq!(
-                        a, b
-                    );
+                    assert_eq!(a, b);
                 }
             }
         }
