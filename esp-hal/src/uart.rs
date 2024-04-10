@@ -86,6 +86,9 @@ use crate::{
 const CONSOLE_UART_NUM: usize = 0;
 const UART_FIFO_SIZE: u16 = 128;
 
+#[cfg(not(any(esp32, esp32s2)))]
+const RC_FAST_CLK_HZ: u32 = 17_500_000;
+
 /// UART Error
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -891,7 +894,7 @@ where
         let clk = match clock_source {
             ClockSource::Apb => clocks.apb_clock.to_Hz(),
             ClockSource::Xtal => clocks.xtal_clock.to_Hz(),
-            ClockSource::RcFast => 17_500_000,
+            ClockSource::RcFast => RC_FAST_CLK_HZ,
         };
 
         let max_div = 0b1111_1111_1111 - 1;
@@ -928,7 +931,7 @@ where
         let clk = match clock_source {
             ClockSource::Apb => clocks.apb_clock.to_Hz(),
             ClockSource::Xtal => clocks.xtal_clock.to_Hz(),
-            ClockSource::RcFast => 17_500_000,
+            ClockSource::RcFast => RC_FAST_CLK_HZ,
         };
 
         let max_div = 0b1111_1111_1111 - 1;
@@ -994,7 +997,8 @@ where
     fn change_baud_internal(&self, baudrate: u32, clock_source: ClockSource, clocks: &Clocks) {
         let clk = match clock_source {
             ClockSource::Apb => clocks.apb_clock.to_Hz(),
-            ClockSource::RefTick => 1, // ESP32 TRM, section 3.2.4.2 (RefTick)
+            ClockSource::RefTick => 1, /* ESP32(/-S2) TRM, section 3.2.4.2 (6.2.4.2 for S2)
+                                        * (RefTick) */
         };
 
         T::register_block().conf0().modify(|_, w| {
@@ -2210,8 +2214,7 @@ pub mod lp_uart {
         }
 
         fn change_baud_internal(&mut self, baudrate: u32, clock_source: super::ClockSource) {
-            // we force the clock source to be XTAL and don't use the decimal part of
-            // the divider
+            // TODO: Currently it's not possible to use XtalD2Clk
             let clk = 16_000_000;
             let max_div = 0b1111_1111_1111 - 1;
             let clk_div = ((clk) + (max_div * baudrate) - 1) / (max_div * baudrate);
