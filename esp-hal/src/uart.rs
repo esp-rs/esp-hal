@@ -88,6 +88,8 @@ const UART_FIFO_SIZE: u16 = 128;
 
 #[cfg(not(any(esp32, esp32s2)))]
 use crate::soc::constants::RC_FAST_CLK;
+#[cfg(any(esp32, esp32s2))]
+use crate::soc::constants::REF_TICK;
 
 /// UART Error
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -997,8 +999,8 @@ where
     fn change_baud_internal(&self, baudrate: u32, clock_source: ClockSource, clocks: &Clocks) {
         let clk = match clock_source {
             ClockSource::Apb => clocks.apb_clock.to_Hz(),
-            ClockSource::RefTick => 1, /* ESP32(/-S2) TRM, section 3.2.4.2 (6.2.4.2 for S2)
-                                        * (RefTick) */
+            ClockSource::RefTick => REF_TICK.to_Hz(), /* ESP32(/-S2) TRM, section 3.2.4.2
+                                                       * (6.2.4.2 for S2) */
         };
 
         T::register_block().conf0().modify(|_, w| {
