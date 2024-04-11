@@ -25,6 +25,10 @@ name    = "rsa"
 harness = false
 
 [[test]]
+name    = "sha"
+harness = false
+
+[[test]]
 name    = "uart"
 harness = false
 
