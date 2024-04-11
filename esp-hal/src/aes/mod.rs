@@ -100,7 +100,7 @@
 //!         keybuf,
 //!     )
 //!     .unwrap();
-//! let (hw_encrypted, plaintext, aes) = transfer.wait().unwrap();
+//! transfer.wait().unwrap();
 //! ```
 
 #[cfg(esp32)]
