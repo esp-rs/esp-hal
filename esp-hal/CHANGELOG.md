@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `GpioPin::steal` unsafe API (#1363)
 - Inherent implementions of GPIO pin `set_low`, `is_low`, etc.
 - Warn users when attempting to build using the `dev` profile (#1420)
+- ESP32-PICO-V3-02: Initial support (#1155)
 
 ### Fixed
 
