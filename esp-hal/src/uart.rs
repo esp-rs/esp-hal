@@ -122,17 +122,21 @@ impl embedded_io::Error for Error {
     }
 }
 
-// Define an enum for the clock source
 // (outside of `config` module in order not to "use" it an extra time)
+/// UART clock source
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ClockSource {
+    /// APB_CLK clock source (default for UART on all the chips except of esp32c6 and esp32h2)
     Apb,
     #[cfg(not(any(esp32, esp32s2)))]
+    /// RC_FAST_CLK clock source (17.5 MHz)
     RcFast,
     #[cfg(not(any(esp32, esp32s2)))]
+    /// XTAL_CLK clock source (default for UART on esp32c6 and esp32h2 and LP_UART)
     Xtal,
     #[cfg(any(esp32, esp32s2))]
+    /// REF_TICK clock source (derived from XTAL or RC_FAST, 1MHz) 
     RefTick,
 }
 
