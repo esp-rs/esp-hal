@@ -1077,11 +1077,6 @@ pub struct SystemClockControl {
     _private: (),
 }
 
-/// Controls the configuration of the chip's clocks.
-pub struct CpuControl {
-    _private: (),
-}
-
 /// Enumeration of the available radio peripherals for this chip.
 pub enum RadioPeripherals {
     #[cfg(phy)]
@@ -1123,7 +1118,6 @@ pub trait RadioClockController {
 pub struct SystemParts<'d> {
     _private: PeripheralRef<'d, SYSTEM>,
     pub clock_control: SystemClockControl,
-    pub cpu_control: CpuControl,
     pub radio_clock_control: RadioClockControl,
     pub software_interrupt_control: SoftwareInterruptControl,
 }
@@ -1144,7 +1138,6 @@ impl<'d, T: crate::peripheral::Peripheral<P = SYSTEM> + 'd> SystemExt<'d> for T 
         Self::Parts {
             _private: self.into_ref(),
             clock_control: SystemClockControl { _private: () },
-            cpu_control: CpuControl { _private: () },
             radio_clock_control: RadioClockControl { _private: () },
             software_interrupt_control: SoftwareInterruptControl::new_internal(),
         }

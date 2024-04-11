@@ -13,7 +13,7 @@
 //!
 //! let counter = Mutex::new(RefCell::new(0));
 //!
-//! let mut cpu_control = CpuControl::new(system.cpu_control);
+//! let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
 //! let cpu1_fnctn = || {
 //!     cpu1_task(&mut timer1, &counter);
 //! };
@@ -125,7 +125,7 @@ pub enum Error {
 
 /// Control CPU Cores
 pub struct CpuControl {
-    _cpu_control: crate::system::CpuControl,
+    _cpu_control: crate::peripherals::CPU_CTRL,
 }
 
 unsafe fn internal_park_core(core: Cpu) {
@@ -153,7 +153,7 @@ unsafe fn internal_park_core(core: Cpu) {
 }
 
 impl CpuControl {
-    pub fn new(cpu_control: crate::system::CpuControl) -> CpuControl {
+    pub fn new(cpu_control: crate::peripherals::CPU_CTRL) -> CpuControl {
         CpuControl {
             _cpu_control: cpu_control,
         }

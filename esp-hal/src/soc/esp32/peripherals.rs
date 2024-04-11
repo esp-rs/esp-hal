@@ -26,6 +26,7 @@ crate::peripherals! {
     APB_CTRL <= APB_CTRL,
     BB <= BB,
     BT <= virtual,
+    CPU_CTRL <= virtual,
     DAC1 <= virtual,
     DAC2 <= virtual,
     DMA <= virtual,
