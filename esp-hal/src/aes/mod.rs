@@ -124,8 +124,12 @@ const ALIGN_SIZE: usize = core::mem::size_of::<u32>();
 
 pub enum Mode {
     Encryption128 = 0,
+    #[cfg(any(esp32, esp32s2))]
+    Encryption192 = 1,
     Encryption256 = 2,
     Decryption128 = 4,
+    #[cfg(any(esp32, esp32s2))]
+    Decryption192 = 5,
     Decryption256 = 6,
 }
 
