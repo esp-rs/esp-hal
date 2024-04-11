@@ -1078,6 +1078,7 @@ pub struct SystemClockControl {
 }
 
 /// Enumeration of the available radio peripherals for this chip.
+#[cfg(any(bt, ieee802154, wifi))]
 pub enum RadioPeripherals {
     #[cfg(phy)]
     Phy,
@@ -1089,12 +1090,8 @@ pub enum RadioPeripherals {
     Ieee802154,
 }
 
-/// Functionality of clocks controlling the radio peripherals.
-pub struct RadioClockControl {
-    _private: (),
-}
-
 /// Control the radio peripheral clocks
+#[cfg(any(bt, ieee802154, wifi))]
 pub trait RadioClockController {
     /// Enable the peripheral
     fn enable(&mut self, peripheral: RadioPeripherals);
@@ -1118,7 +1115,6 @@ pub trait RadioClockController {
 pub struct SystemParts<'d> {
     _private: PeripheralRef<'d, SYSTEM>,
     pub clock_control: SystemClockControl,
-    pub radio_clock_control: RadioClockControl,
     pub software_interrupt_control: SoftwareInterruptControl,
 }
 
@@ -1138,7 +1134,6 @@ impl<'d, T: crate::peripheral::Peripheral<P = SYSTEM> + 'd> SystemExt<'d> for T 
         Self::Parts {
             _private: self.into_ref(),
             clock_control: SystemClockControl { _private: () },
-            radio_clock_control: RadioClockControl { _private: () },
             software_interrupt_control: SoftwareInterruptControl::new_internal(),
         }
     }

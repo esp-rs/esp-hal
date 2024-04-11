@@ -49,6 +49,7 @@ crate::peripherals! {
     PSRAM <= virtual,
     MCPWM0 <= MCPWM0,
     MCPWM1 <= MCPWM1,
+    RADIO_CLK <= virtual,
     RMT <= RMT,
     RNG <= RNG,
     RSA <= RSA,

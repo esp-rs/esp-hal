@@ -51,6 +51,7 @@ crate::peripherals! {
     RNG <= RNG,
     RSA <= RSA,
     LPWR <= RTC_CNTL,
+    RADIO_CLK <= virtual,
     RTC_IO <= RTC_IO,
     RTC_I2C <= RTC_I2C,
     SDHOST <= SDHOST,

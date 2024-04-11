@@ -10,7 +10,8 @@
 //! The module defines a `RadioClockController` trait implemented by the
 //! `RadioClockControl` struct. This trait provides methods to enable, disable,
 //! reset the MAC, initialize clocks and perform other related operations.
-use crate::system::{RadioClockControl, RadioClockController, RadioPeripherals};
+
+use crate::system::{RadioClockController, RadioPeripherals};
 
 // Note: this comment has been copied from esp-idf, including the mistake.
 // Mask for clock bits used by both WIFI and Bluetooth, 0, 1, 2, 3, 7,
@@ -20,7 +21,7 @@ const SYSTEM_WIFI_CLK_WIFI_BT_COMMON_M: u32 = 0x78078F;
 // SYSTEM_WIFI_CLK_EN : R/W ;bitpos:[31:0] ;default: 32'hfffce030
 const SYSTEM_WIFI_CLK_EN: u32 = 0x00FB9FCF;
 
-impl RadioClockController for RadioClockControl {
+impl RadioClockController for crate::peripherals::RADIO_CLK {
     fn enable(&mut self, peripheral: RadioPeripherals) {
         match peripheral {
             RadioPeripherals::Phy => enable_phy(),
