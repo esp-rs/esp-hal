@@ -25,7 +25,7 @@ enum Cli {
     GenerateEfuseFields(GenerateEfuseFieldsArgs),
     /// Run the given example for the specified chip.
     RunExample(RunExampleArgs),
-    /// Run all applicable tests for a specified chip.
+    /// Run all applicable tests or the specified test for a specified chip.
     RunTests(RunTestsArgs),
 }
 
@@ -98,15 +98,18 @@ struct RunExampleArgs {
     /// Which chip to run the examples for.
     #[arg(value_enum)]
     chip: Chip,
-    /// Which example to run
+    /// Which example to run.
     example: String,
 }
 
 #[derive(Debug, Args)]
 struct RunTestsArgs {
-    /// Which chip to run the examples for.
+    /// Which chip to run the tests for.
     #[arg(value_enum)]
     chip: Chip,
+    /// Which example to run.
+    #[arg(short = 't', long)]
+    test: Option<String>,
 }
 
 // ----------------------------------------------------------------------------
@@ -139,7 +142,7 @@ fn build_documentation(workspace: &Path, args: BuildDocumentationArgs) -> Result
     let resources = workspace.join("resources");
 
     let package = args.package.to_string();
-    let version = xtask::package_version(&workspace, args.package)?;
+    let version = xtask::package_version(workspace, args.package)?;
 
     let mut crates = Vec::new();
 
@@ -185,10 +188,7 @@ fn build_documentation(workspace: &Path, args: BuildDocumentationArgs) -> Result
     }
 
     // Copy any additional assets to the documentation's output path:
-    fs::copy(
-        &resources.join("esp-rs.svg"),
-        &output_path.join("esp-rs.svg"),
-    )?;
+    fs::copy(resources.join("esp-rs.svg"), output_path.join("esp-rs.svg"))?;
 
     // Render the index and write it out to the documentaiton's output path:
     let source = fs::read_to_string(resources.join("index.html.jinja"))?;
@@ -277,7 +277,7 @@ fn generate_efuse_src(workspace: &Path, args: GenerateEfuseFieldsArgs) -> Result
 
     // Generate the Rust source file from the CSV file, and write it out to
     // the appropriate path:
-    xtask::generate_efuse_table(&args.chip, &idf_path, out_path)?;
+    xtask::generate_efuse_table(&args.chip, idf_path, out_path)?;
 
     // Format the generated code:
     xtask::cargo::run(&["fmt".into()], &esp_hal)?;
@@ -334,7 +334,7 @@ fn run_example(workspace: &Path, mut args: RunExampleArgs) -> Result<()> {
     Ok(())
 }
 
-fn run_tests(workspace: &PathBuf, args: RunTestsArgs) -> Result<(), anyhow::Error> {
+fn run_tests(workspace: &Path, args: RunTestsArgs) -> Result<(), anyhow::Error> {
     // Absolute path of the package's root:
     let package_path = xtask::windows_safe_path(&workspace.join("hil-test"));
 
@@ -343,12 +343,33 @@ fn run_tests(workspace: &PathBuf, args: RunTestsArgs) -> Result<(), anyhow::Erro
 
     // Load all examples and parse their metadata:
     let tests = xtask::load_examples(&package_path.join("tests"))?;
-    let tests = tests.iter()
+    let mut supported_tests = tests
+        .iter()
         // Filter down the examples to only those for which the specified chip is supported:
         .filter(|example| example.supports_chip(args.chip));
-
-    for test in tests {
-        xtask::run_example(&package_path, args.chip, target, &test)?;
+    if let Some(test_name) = &args.test {
+        let test = supported_tests.find_map(|example| {
+            if &example.name() == test_name {
+                Some(example.clone())
+            } else {
+                None
+            }
+        });
+        if let Some(test) = test {
+            xtask::run_example(&package_path, args.chip, target, &test)?;
+        } else {
+            log::error!("Test not found or unsupported for the given chip");
+        }
+    } else {
+        let mut failed_tests: Vec<String> = Vec::new();
+        for test in supported_tests {
+            if xtask::run_example(&package_path, args.chip, target, test).is_err() {
+                failed_tests.push(test.name());
+            }
+        }
+        if !failed_tests.is_empty() {
+            bail!("Failed tests: {:?}", failed_tests);
+        }
     }
 
     Ok(())

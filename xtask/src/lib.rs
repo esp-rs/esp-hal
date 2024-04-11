@@ -320,7 +320,11 @@ pub fn run_example(
     // probe-rs cannot currently do auto detection, so we need to tell probe-rs run
     // which chip we are testing
     if subcommand == "test" {
-        builder = builder.arg("--").arg("--chip").arg(format!("{}", chip));
+        if chip == Chip::Esp32 {
+            builder = builder.arg("--").arg("--chip").arg("esp32-3.3v");
+        } else {
+            builder = builder.arg("--").arg("--chip").arg(format!("{}", chip));
+        }
     }
 
     // If targeting an Xtensa device, we must use the '+esp' toolchain modifier:
@@ -331,8 +335,7 @@ pub fn run_example(
     let args = builder.build();
     log::debug!("{args:#?}");
 
-    cargo::run_with_input(&args, package_path)?;
-    Ok(())
+    cargo::run_with_input(&args, package_path)
 }
 
 /// Build the specified package, using the given toolchain/target/features if
@@ -427,7 +430,7 @@ const EFUSE_FIELDS_RS_HEADER: &str = r#"
 //!
 //! For information on how to regenerate these files, please refer to the
 //! `xtask` package's `README.md` file.
-//! 
+//!
 //! Generated on:   $DATE
 //! ESP-IDF Commit: $HASH
 
@@ -459,8 +462,8 @@ pub fn generate_efuse_table(
     // Determine the commit (short) hash of the HEAD commit in the
     // provided ESP-IDF repository:
     let output = Command::new("git")
-        .args(&["rev-parse", "HEAD"])
-        .current_dir(&idf_path)
+        .args(["rev-parse", "HEAD"])
+        .current_dir(idf_path)
         .output()?;
     let idf_hash = String::from_utf8_lossy(&output.stdout[0..=7]).to_string();
 

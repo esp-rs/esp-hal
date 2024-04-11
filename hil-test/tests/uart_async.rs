@@ -56,7 +56,7 @@ impl Context {
 }
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(executor = esp_hal::embassy::executor::thread::Executor::new())]
 mod tests {
     use defmt::assert_eq;
 
