@@ -11,6 +11,7 @@ use defmt_rtt as _;
 use esp_backtrace as _;
 use esp_hal::rom::{crc, md5};
 
+#[cfg(test)]
 #[embedded_test::tests]
 mod tests {
     use defmt::assert_eq;

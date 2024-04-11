@@ -59,6 +59,7 @@ const fn compute_mprime(modulus: &U512) -> u32 {
     (-1 * m_inv as i64 % 4294967296) as u32
 }
 
+#[cfg(test)]
 #[embedded_test::tests]
 mod tests {
     use defmt::assert_eq;
