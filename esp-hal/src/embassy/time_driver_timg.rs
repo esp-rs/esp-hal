@@ -16,7 +16,7 @@ pub const ALARM_COUNT: usize = 1;
 #[cfg(any(esp32, esp32s2, esp32s3))]
 pub const ALARM_COUNT: usize = 2;
 
-pub type TimerType = TimerGroup<'static, TIMG0>;
+pub type TimerType = TimerGroup<'static, TIMG0, crate::Async>;
 
 pub struct EmbassyTimer {
     pub(crate) alarms: Mutex<[AlarmState; ALARM_COUNT]>,
@@ -51,8 +51,6 @@ impl EmbassyTimer {
     }
 
     pub fn init(clocks: &Clocks, mut timer: TimerType) {
-        use crate::{interrupt, interrupt::Priority};
-
         // set divider to get a 1mhz clock. APB (80mhz) / 80 = 1mhz...
         // TODO: assert APB clock is the source and its at the correct speed for the
         // divider
@@ -65,25 +63,39 @@ impl EmbassyTimer {
             timer.timer1.set_counter_active(true);
         }
 
-        unwrap!(interrupt::enable(
-            peripherals::Interrupt::TG0_T0_LEVEL,
-            Priority::max()
-        ));
+        unsafe {
+            crate::interrupt::bind_interrupt(
+                crate::peripherals::Interrupt::TG0_T0_LEVEL,
+                tg0_t0_level.handler(),
+            );
+            crate::interrupt::enable(
+                crate::peripherals::Interrupt::TG0_T0_LEVEL,
+                tg0_t0_level.priority(),
+            )
+            .unwrap();
+        }
         #[cfg(any(esp32, esp32s2, esp32s3))]
-        unwrap!(interrupt::enable(
-            peripherals::Interrupt::TG0_T1_LEVEL,
-            Priority::max()
-        ));
+        unsafe {
+            crate::interrupt::bind_interrupt(
+                crate::peripherals::Interrupt::TG0_T1_LEVEL,
+                tg0_t1_level.handler(),
+            );
+            crate::interrupt::enable(
+                crate::peripherals::Interrupt::TG0_T1_LEVEL,
+                tg0_t1_level.priority(),
+            )
+            .unwrap();
+        }
 
-        #[interrupt]
-        fn TG0_T0_LEVEL() {
+        #[handler(priority = crate::interrupt::Priority::max())]
+        fn tg0_t0_level() {
             let timer = unsafe { Timer0::<TIMG0>::steal() };
             DRIVER.on_interrupt(0, timer);
         }
 
         #[cfg(any(esp32, esp32s2, esp32s3))]
-        #[interrupt]
-        fn TG0_T1_LEVEL() {
+        #[handler(priority = crate::interrupt::Priority::max())]
+        fn tg0_t1_level() {
             let timer = unsafe { Timer1::<TIMG0>::steal() };
             DRIVER.on_interrupt(1, timer);
         }

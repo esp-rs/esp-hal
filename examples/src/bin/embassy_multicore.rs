@@ -10,6 +10,8 @@
 #![no_main]
 #![feature(type_alias_impl_trait)]
 
+use core::ptr::addr_of_mut;
+
 use embassy_executor::Spawner;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
 use embassy_time::{Duration, Ticker};
@@ -40,10 +42,10 @@ async fn control_led(
     loop {
         if control.wait().await {
             esp_println::println!("LED on");
-            led.set_low().unwrap();
+            led.set_low();
         } else {
             esp_println::println!("LED off");
-            led.set_high().unwrap();
+            led.set_high();
         }
     }
 }
@@ -56,7 +58,7 @@ async fn main(_spawner: Spawner) {
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
     embassy::init(&clocks, timg0);
 
     let mut cpu_control = CpuControl::new(system.cpu_control);
@@ -64,14 +66,14 @@ async fn main(_spawner: Spawner) {
     let led_ctrl_signal = &*make_static!(Signal::new());
 
     let led = io.pins.gpio0.into_push_pull_output();
-    let cpu1_fnctn = move || {
-        let executor = make_static!(Executor::new());
-        executor.run(|spawner| {
-            spawner.spawn(control_led(led, led_ctrl_signal)).ok();
-        });
-    };
+
     let _guard = cpu_control
-        .start_app_core(unsafe { &mut APP_CORE_STACK }, cpu1_fnctn)
+        .start_app_core(unsafe { &mut *addr_of_mut!(APP_CORE_STACK) }, move || {
+            let executor = make_static!(Executor::new());
+            executor.run(|spawner| {
+                spawner.spawn(control_led(led, led_ctrl_signal)).ok();
+            });
+        })
         .unwrap();
 
     // Sends periodic messages to control_led, enabling or disabling it.

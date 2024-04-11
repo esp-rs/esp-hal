@@ -52,7 +52,7 @@ use crate::{
 };
 
 // https://github.com/espressif/esp-idf/blob/df9310a/components/soc/esp32h2/gpio_periph.c#L42
-pub const NUM_PINS: usize = 27;
+pub const NUM_PINS: usize = 28;
 
 pub(crate) const FUNC_IN_SEL_OFFSET: usize = 0;
 
@@ -305,9 +305,3 @@ impl InterruptStatusRegisterAccess for InterruptStatusRegisterAccessBank0 {
         unsafe { &*GPIO::PTR }.pcpu_nmi_int().read().bits()
     }
 }
-
-// TODO USB pins
-// implement marker traits on USB pins
-// impl<T> crate::otg_fs::UsbSel for Gpio??<T> {}
-// impl<T> crate::otg_fs::UsbDp for Gpio27<T> {}
-// impl<T> crate::otg_fs::UsbDm for Gpio26<T> {}

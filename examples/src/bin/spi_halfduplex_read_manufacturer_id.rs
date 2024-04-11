@@ -30,6 +30,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
+    delay::Delay,
     gpio::IO,
     peripherals::Peripherals,
     prelude::*,
@@ -38,7 +39,6 @@ use esp_hal::{
         SpiDataMode,
         SpiMode,
     },
-    Delay,
 };
 use esp_println::println;
 
@@ -67,7 +67,7 @@ fn main() -> ! {
         }
     }
 
-    let mut spi = Spi::new_half_duplex(peripherals.SPI2, 100u32.kHz(), SpiMode::Mode0, &clocks)
+    let mut spi = Spi::new_half_duplex(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
         .with_pins(
             Some(sclk),
             Some(mosi),
@@ -77,7 +77,7 @@ fn main() -> ! {
             Some(cs),
         );
 
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
 
     loop {
         // READ MANUFACTURER ID FROM FLASH CHIP
@@ -91,7 +91,7 @@ fn main() -> ! {
         )
         .unwrap();
         println!("Single {:x?}", data);
-        delay.delay_ms(250u32);
+        delay.delay_millis(250);
 
         // READ MANUFACTURER ID FROM FLASH CHIP
         let mut data = [0u8; 2];
@@ -104,7 +104,7 @@ fn main() -> ! {
         )
         .unwrap();
         println!("Dual {:x?}", data);
-        delay.delay_ms(250u32);
+        delay.delay_millis(250);
 
         // READ MANUFACTURER ID FROM FLASH CHIP
         let mut data = [0u8; 2];
@@ -117,6 +117,6 @@ fn main() -> ! {
         )
         .unwrap();
         println!("Quad {:x?}", data);
-        delay.delay_ms(1500u32);
+        delay.delay_millis(1500);
     }
 }

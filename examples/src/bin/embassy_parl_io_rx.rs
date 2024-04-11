@@ -33,7 +33,7 @@ async fn main(_spawner: Spawner) {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
     embassy::init(&clocks, timg0);
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
@@ -47,13 +47,13 @@ async fn main(_spawner: Spawner) {
 
     let parl_io = ParlIoRxOnly::new(
         peripherals.PARL_IO,
-        dma_channel.configure(
+        dma_channel.configure_for_async(
             false,
             &mut tx_descriptors,
             &mut rx_descriptors,
             DmaPriority::Priority0,
         ),
-        1u32.MHz(),
+        1.MHz(),
         &clocks,
     )
     .unwrap();

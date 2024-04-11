@@ -10,13 +10,12 @@ use core::fmt::Write;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
+    delay::Delay,
     peripherals::Peripherals,
     prelude::*,
     rom::{crc, md5},
-    timer::TimerGroup,
-    Uart,
+    uart::Uart,
 };
-use nb::block;
 
 #[entry]
 fn main() -> ! {
@@ -24,9 +23,7 @@ fn main() -> ! {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    let mut timer0 = timg0.timer0;
-    timer0.start(1u64.secs());
+    let delay = Delay::new(&clocks);
 
     let mut uart0 = Uart::new(peripherals.UART0, &clocks);
 
@@ -93,6 +90,6 @@ fn main() -> ! {
         )
         .unwrap();
 
-        block!(timer0.wait()).unwrap();
+        delay.delay(1.secs());
     }
 }

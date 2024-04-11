@@ -19,14 +19,13 @@
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
+    delay::Delay,
     macros::ram,
     peripherals::Peripherals,
     prelude::*,
-    timer::TimerGroup,
-    Rtc,
+    rtc_cntl::Rtc,
 };
 use esp_println::println;
-use nb::block;
 
 #[ram(rtc_fast)]
 static mut SOME_INITED_DATA: [u8; 2] = [0xaa, 0xbb];
@@ -43,15 +42,12 @@ fn main() -> ! {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    let mut timer0 = timg0.timer0;
+    let delay = Delay::new(&clocks);
 
     // The RWDT flash boot protection must be enabled, as it is triggered as part of
     // the example.
-    let mut rtc = Rtc::new(peripherals.LPWR);
+    let mut rtc = Rtc::new(peripherals.LPWR, None);
     rtc.rwdt.enable();
-
-    timer0.start(1u64.secs());
 
     println!(
         "IRAM function located at {:p}",
@@ -90,7 +86,7 @@ fn main() -> ! {
 
     loop {
         function_in_ram();
-        block!(timer0.wait()).unwrap();
+        delay.delay(1.secs());
     }
 }
 

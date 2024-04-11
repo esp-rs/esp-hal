@@ -2,7 +2,6 @@
 #![no_std]
 
 //% CHIPS: esp32c2 esp32c3 esp32c6 esp32h2
-//% FEATURES: direct-vectoring
 
 use core::{arch::asm, cell::RefCell};
 
@@ -12,10 +11,10 @@ use esp_hal::{
     interrupt::{self, CpuInterrupt, Priority},
     peripherals::{Interrupt, Peripherals},
     prelude::*,
-    system::{SoftwareInterrupt, SoftwareInterruptControl},
+    system::SoftwareInterrupt,
 };
 
-static SWINT: Mutex<RefCell<Option<SoftwareInterruptControl>>> = Mutex::new(RefCell::new(None));
+static SWINT0: Mutex<RefCell<Option<SoftwareInterrupt<0>>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
@@ -32,15 +31,18 @@ fn main() -> ! {
     let system = peripherals.SYSTEM.split();
     let sw_int = system.software_interrupt_control;
 
-    critical_section::with(|cs| SWINT.borrow_ref_mut(cs).replace(sw_int));
+    critical_section::with(|cs| {
+        SWINT0
+            .borrow_ref_mut(cs)
+            .replace(sw_int.software_interrupt0)
+    });
+    interrupt::enable_direct(
+        Interrupt::FROM_CPU_INTR0,
+        Priority::Priority3,
+        CpuInterrupt::Interrupt20,
+    )
+    .unwrap();
     unsafe {
-        interrupt::enable(
-            Interrupt::FROM_CPU_INTR0,
-            Priority::Priority3,
-            CpuInterrupt::Interrupt1,
-        )
-        .unwrap();
-
         asm!(
             "
         csrrwi x0, 0x7e0, 1 #what to count, for cycles write 1 for instructions write 2
@@ -69,14 +71,10 @@ fn main() -> ! {
 }
 
 #[no_mangle]
-fn cpu_int_1_handler() {
+fn interrupt20() {
     unsafe { asm!("csrrwi x0, 0x7e1, 0 #disable timer") }
     critical_section::with(|cs| {
-        SWINT
-            .borrow_ref_mut(cs)
-            .as_mut()
-            .unwrap()
-            .reset(SoftwareInterrupt::SoftwareInterrupt0);
+        SWINT0.borrow_ref_mut(cs).as_mut().unwrap().reset();
     });
 
     let mut perf_counter: u32 = 0;

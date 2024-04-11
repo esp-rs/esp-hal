@@ -13,7 +13,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    gpio::lp_gpio::IntoLowPowerPin,
+    gpio::{lp_io::IntoLowPowerPin, IO},
     lp_core::{LpCore, LpCoreWakeupSource},
     peripherals::Peripherals,
     prelude::*,
@@ -21,9 +21,8 @@ use esp_hal::{
         config::{Config, DataBits, Parity, StopBits},
         lp_uart::LpUart,
         TxRxPins,
+        Uart,
     },
-    Uart,
-    IO,
 };
 use esp_println::println;
 
@@ -49,7 +48,7 @@ fn main() -> ! {
         io.pins.gpio7.into_floating_input(),
     );
 
-    let mut uart1 = Uart::new_with_config(peripherals.UART1, config, Some(pins), &clocks);
+    let mut uart1 = Uart::new_with_config(peripherals.UART1, config, Some(pins), &clocks, None);
 
     // Set up (LP) UART:
     let lp_tx = io.pins.gpio5.into_low_power().into_push_pull_output();
@@ -69,7 +68,7 @@ fn main() -> ! {
     println!("lpcore run");
 
     loop {
-        let read = nb::block!(uart1.read());
+        let read = nb::block!(uart1.read_byte());
 
         match read {
             Ok(read) => println!("Read 0x{:02x}", read),

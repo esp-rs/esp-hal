@@ -11,12 +11,12 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    adc::{AdcConfig, Attenuation, ADC},
+    analog::adc::{AdcConfig, Attenuation, ADC},
     clock::ClockControl,
+    delay::Delay,
     gpio::IO,
     peripherals::{Peripherals, ADC1},
     prelude::*,
-    Delay,
 };
 use esp_println::println;
 
@@ -42,11 +42,11 @@ fn main() -> ! {
     let mut adc1_pin = adc1_config.enable_pin(analog_pin, Attenuation::Attenuation11dB);
     let mut adc1 = ADC::<ADC1>::new(peripherals.ADC1, adc1_config);
 
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
 
     loop {
-        let pin_value: u16 = nb::block!(adc1.read(&mut adc1_pin)).unwrap();
+        let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();
         println!("ADC reading = {}", pin_value);
-        delay.delay_ms(1500u32);
+        delay.delay_millis(1500);
     }
 }

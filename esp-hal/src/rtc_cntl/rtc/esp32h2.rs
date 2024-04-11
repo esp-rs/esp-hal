@@ -37,15 +37,6 @@ const I2C_PMU_OR_XPD_TRX: u8 = 15;
 const I2C_PMU_OR_XPD_TRX_MSB: u8 = 2;
 const I2C_PMU_OR_XPD_TRX_LSB: u8 = 2;
 
-const DR_REG_PMU_BASE: u32 = 0x600B0000;
-
-const PMU_POWER_PD_TOP_CNTL_REG: u32 = DR_REG_PMU_BASE + 0xf4;
-const PMU_POWER_PD_HPAON_CNTL_REG: u32 = DR_REG_PMU_BASE + 0xf8;
-const PMU_POWER_PD_HPCPU_CNTL_REG: u32 = DR_REG_PMU_BASE + 0xfc;
-const PMU_POWER_PD_HPPERI_RESERVE_REG: u32 = DR_REG_PMU_BASE + 0x100;
-const PMU_POWER_PD_HPWIFI_CNTL_REG: u32 = DR_REG_PMU_BASE + 0x104;
-const PMU_POWER_PD_LPPERI_CNTL_REG: u32 = DR_REG_PMU_BASE + 0x108;
-
 pub(crate) fn init() {
     // * No peripheral reg i2c power up required on the target */
     unsafe {
@@ -106,14 +97,14 @@ pub(crate) fn init() {
             0,
         );
 
-        (PMU_POWER_PD_TOP_CNTL_REG as *mut u32).write_volatile(0);
-        (PMU_POWER_PD_HPAON_CNTL_REG as *mut u32).write_volatile(0);
-        (PMU_POWER_PD_HPCPU_CNTL_REG as *mut u32).write_volatile(0);
-        (PMU_POWER_PD_HPPERI_RESERVE_REG as *mut u32).write_volatile(0);
-        (PMU_POWER_PD_HPWIFI_CNTL_REG as *mut u32).write_volatile(0);
-        (PMU_POWER_PD_LPPERI_CNTL_REG as *mut u32).write_volatile(0);
+        let pmu = &*crate::peripherals::PMU::PTR;
 
-        let pmu = &*PMU::ptr();
+        pmu.power_pd_top_cntl().write(|w| w.bits(0));
+        pmu.power_pd_hpaon_cntl().write(|w| w.bits(0));
+        pmu.power_pd_hpcpu_cntl().write(|w| w.bits(0));
+        pmu.power_pd_hpperi_reserve().write(|w| w.bits(0));
+        pmu.power_pd_hpwifi_cntl().write(|w| w.bits(0));
+        pmu.power_pd_lpperi_cntl().write(|w| w.bits(0));
 
         pmu.hp_active_hp_regulator0()
             .modify(|_, w| w.hp_active_hp_regulator_dbias().bits(25));
@@ -221,10 +212,6 @@ impl Clock for RtcFastClock {
     }
 }
 
-extern "C" {
-    fn ets_delay_us(us: u32);
-}
-
 /// RTC SLOW_CLK frequency values
 #[allow(clippy::enum_variant_names)]
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -314,8 +301,9 @@ impl RtcClock {
                     RtcFastClock::RtcFastClockXtalD2 => 0b01,
                 })
             });
-            ets_delay_us(3);
         }
+
+        crate::rom::ets_delay_us(3);
     }
 
     fn set_slow_freq(slow_freq: RtcSlowClock) {
@@ -457,18 +445,14 @@ impl RtcClock {
             if !rc_fast_enabled {
                 pmu.hp_sleep_lp_ck_power()
                     .modify(|_, w| w.hp_sleep_xpd_fosc_clk().set_bit());
-                unsafe {
-                    ets_delay_us(50);
-                }
+                crate::rom::ets_delay_us(50);
             }
 
             if !dig_rc_fast_enabled {
                 lp_clkrst
                     .clk_to_hp()
                     .modify(|_, w| w.icg_hp_fosc().set_bit());
-                unsafe {
-                    ets_delay_us(5);
-                }
+                crate::rom::ets_delay_us(5);
             }
         }
 
@@ -483,9 +467,7 @@ impl RtcClock {
             if !rc32k_enabled {
                 pmu.hp_sleep_lp_ck_power()
                     .modify(|_, w| w.hp_sleep_xpd_rc32k().set_bit());
-                unsafe {
-                    ets_delay_us(300);
-                }
+                crate::rom::ets_delay_us(300);
             }
 
             if !dig_rc32k_enabled {
@@ -560,9 +542,7 @@ impl RtcClock {
             .modify(|_, w| w.rtc_cali_start().set_bit());
 
         // Wait for calibration to finish up to another us_time_estimate
-        unsafe {
-            ets_delay_us(us_time_estimate);
-        }
+        crate::rom::ets_delay_us(us_time_estimate);
 
         let cal_val = loop {
             if timg0.rtccalicfg().read().rtc_cali_rdy().bit_is_set() {
@@ -589,18 +569,14 @@ impl RtcClock {
             if rc_fast_enabled {
                 pmu.hp_sleep_lp_ck_power()
                     .modify(|_, w| w.hp_sleep_xpd_fosc_clk().set_bit());
-                unsafe {
-                    ets_delay_us(50);
-                }
+                crate::rom::ets_delay_us(50);
             }
 
             if dig_rc_fast_enabled {
                 lp_clkrst
                     .clk_to_hp()
                     .modify(|_, w| w.icg_hp_fosc().set_bit());
-                unsafe {
-                    ets_delay_us(5);
-                }
+                crate::rom::ets_delay_us(5);
             }
         }
 
@@ -608,9 +584,7 @@ impl RtcClock {
             if rc32k_enabled {
                 pmu.hp_sleep_lp_ck_power()
                     .modify(|_, w| w.hp_sleep_xpd_rc32k().set_bit());
-                unsafe {
-                    ets_delay_us(300);
-                }
+                crate::rom::ets_delay_us(300);
             }
             if dig_rc32k_enabled {
                 lp_clkrst

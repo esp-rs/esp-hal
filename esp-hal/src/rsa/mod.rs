@@ -23,11 +23,10 @@
 //! ### Initialization
 //! ```no_run
 //! let peripherals = Peripherals::take();
-//! let mut system = peripherals.SYSTEM.split();
 //!
-//! let mut rsa = Rsa::new(peripherals.RSA);
+//! let mut rsa = Rsa::new(peripherals.RSA, None);
 //! ```
-//!  
+//!
 //! ### Async (modular exponentiation)
 //! ```no_run
 //! #[embassy_executor::task]
@@ -65,6 +64,7 @@
 use core::{marker::PhantomData, ptr::copy_nonoverlapping};
 
 use crate::{
+    interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::RSA,
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
@@ -81,17 +81,52 @@ mod rsa_spec_impl;
 pub use rsa_spec_impl::operand_sizes;
 
 /// RSA peripheral container
-pub struct Rsa<'d> {
+pub struct Rsa<'d, DM: crate::Mode> {
     rsa: PeripheralRef<'d, RSA>,
+    phantom: PhantomData<DM>,
 }
 
-impl<'d> Rsa<'d> {
-    pub fn new(rsa: impl Peripheral<P = RSA> + 'd) -> Self {
+impl<'d> Rsa<'d, crate::Blocking> {
+    /// Create a new instance in [crate::Blocking] mode.
+    ///
+    /// Optionally an interrupt handler can be bound.
+    pub fn new(rsa: impl Peripheral<P = RSA> + 'd, interrupt: Option<InterruptHandler>) -> Self {
+        Self::new_internal(rsa, interrupt)
+    }
+}
+
+#[cfg(feature = "async")]
+impl<'d> Rsa<'d, crate::Async> {
+    /// Create a new instance in [crate::Blocking] mode.
+    pub fn new_async(rsa: impl Peripheral<P = RSA> + 'd) -> Self {
+        Self::new_internal(rsa, Some(asynch::rsa_interrupt_handler))
+    }
+}
+
+impl<'d, DM: crate::Mode> Rsa<'d, DM> {
+    fn new_internal(
+        rsa: impl Peripheral<P = RSA> + 'd,
+        interrupt: Option<InterruptHandler>,
+    ) -> Self {
         crate::into_ref!(rsa);
 
         PeripheralClockControl::enable(PeripheralEnable::Rsa);
 
-        Self { rsa }
+        if let Some(interrupt) = interrupt {
+            unsafe {
+                crate::interrupt::bind_interrupt(
+                    crate::peripherals::Interrupt::RSA,
+                    interrupt.handler(),
+                );
+                crate::interrupt::enable(crate::peripherals::Interrupt::RSA, interrupt.priority())
+                    .unwrap();
+            }
+        }
+
+        Self {
+            rsa,
+            phantom: PhantomData,
+        }
     }
 
     unsafe fn write_operand_b<const N: usize>(&mut self, operand_b: &[u32; N]) {
@@ -169,12 +204,12 @@ use implement_op;
 /// used to find the `(base ^ exponent) mod modulus`.
 ///
 /// Each operand is a little endian byte array of the same size
-pub struct RsaModularExponentiation<'a, 'd, T: RsaMode> {
-    rsa: &'a mut Rsa<'d>,
+pub struct RsaModularExponentiation<'a, 'd, T: RsaMode, DM: crate::Mode> {
+    rsa: &'a mut Rsa<'d, DM>,
     phantom: PhantomData<T>,
 }
 
-impl<'a, 'd, T: RsaMode, const N: usize> RsaModularExponentiation<'a, 'd, T>
+impl<'a, 'd, T: RsaMode, DM: crate::Mode, const N: usize> RsaModularExponentiation<'a, 'd, T, DM>
 where
     T: RsaMode<InputType = [u32; N]>,
 {
@@ -210,12 +245,12 @@ where
 /// used to find the `(operand a * operand b) mod modulus`.
 ///
 /// Each operand is a little endian byte array of the same size
-pub struct RsaModularMultiplication<'a, 'd, T: RsaMode> {
-    rsa: &'a mut Rsa<'d>,
+pub struct RsaModularMultiplication<'a, 'd, T: RsaMode, DM: crate::Mode> {
+    rsa: &'a mut Rsa<'d, DM>,
     phantom: PhantomData<T>,
 }
 
-impl<'a, 'd, T: RsaMode, const N: usize> RsaModularMultiplication<'a, 'd, T>
+impl<'a, 'd, T: RsaMode, DM: crate::Mode, const N: usize> RsaModularMultiplication<'a, 'd, T, DM>
 where
     T: RsaMode<InputType = [u32; N]>,
 {
@@ -239,12 +274,12 @@ where
 /// be used to find the `operand a * operand b`.
 ///
 /// Each operand is a little endian byte array of the same size
-pub struct RsaMultiplication<'a, 'd, T: RsaMode + Multi> {
-    rsa: &'a mut Rsa<'d>,
+pub struct RsaMultiplication<'a, 'd, T: RsaMode + Multi, DM: crate::Mode> {
+    rsa: &'a mut Rsa<'d, DM>,
     phantom: PhantomData<T>,
 }
 
-impl<'a, 'd, T: RsaMode + Multi, const N: usize> RsaMultiplication<'a, 'd, T>
+impl<'a, 'd, T: RsaMode + Multi, DM: crate::Mode, const N: usize> RsaMultiplication<'a, 'd, T, DM>
 where
     T: RsaMode<InputType = [u32; N]>,
 {
@@ -273,7 +308,7 @@ pub(crate) mod asynch {
     use core::task::Poll;
 
     use embassy_sync::waitqueue::AtomicWaker;
-    use procmacros::interrupt;
+    use procmacros::handler;
 
     use crate::rsa::{
         Multi,
@@ -338,7 +373,7 @@ pub(crate) mod asynch {
         }
     }
 
-    impl<'a, 'd, T: RsaMode, const N: usize> RsaModularExponentiation<'a, 'd, T>
+    impl<'a, 'd, T: RsaMode, const N: usize> RsaModularExponentiation<'a, 'd, T, crate::Async>
     where
         T: RsaMode<InputType = [u32; N]>,
     {
@@ -354,7 +389,7 @@ pub(crate) mod asynch {
         }
     }
 
-    impl<'a, 'd, T: RsaMode, const N: usize> RsaModularMultiplication<'a, 'd, T>
+    impl<'a, 'd, T: RsaMode, const N: usize> RsaModularMultiplication<'a, 'd, T, crate::Async>
     where
         T: RsaMode<InputType = [u32; N]>,
     {
@@ -384,7 +419,7 @@ pub(crate) mod asynch {
         }
     }
 
-    impl<'a, 'd, T: RsaMode + Multi, const N: usize> RsaMultiplication<'a, 'd, T>
+    impl<'a, 'd, T: RsaMode + Multi, const N: usize> RsaMultiplication<'a, 'd, T, crate::Async>
     where
         T: RsaMode<InputType = [u32; N]>,
     {
@@ -416,8 +451,8 @@ pub(crate) mod asynch {
         }
     }
 
-    #[interrupt]
-    fn RSA() {
+    #[handler]
+    pub(super) fn rsa_interrupt_handler() {
         #[cfg(not(any(esp32, esp32s2, esp32s3)))]
         unsafe { &*crate::peripherals::RSA::ptr() }
             .int_ena()

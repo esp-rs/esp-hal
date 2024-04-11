@@ -22,21 +22,35 @@
 //!
 //! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
 
-use core::{convert::Infallible, marker::PhantomData};
+use core::{cell::Cell, marker::PhantomData};
+
+use critical_section::Mutex;
 
 #[cfg(any(adc, dac))]
 pub(crate) use crate::analog;
 pub(crate) use crate::gpio;
-use crate::peripherals::{GPIO, IO_MUX};
 #[cfg(any(xtensa, esp32c3))]
 pub(crate) use crate::rtc_pins;
 pub use crate::soc::gpio::*;
+use crate::{
+    interrupt::InterruptHandler,
+    peripherals::{GPIO, IO_MUX},
+};
+
+#[cfg(soc_etm)]
+pub mod etm;
+#[cfg(lp_io)]
+pub mod lp_io;
+#[cfg(all(rtc_io, not(esp32)))]
+pub mod rtc_io;
 
 /// Convenience type-alias for a no-pin / don't care - pin
 pub type NoPinType = Gpio0<Unknown>;
 
 /// Convenience constant for `Option::None` pin
 pub const NO_PIN: Option<NoPinType> = None;
+
+static USER_INTERRUPT_HANDLER: Mutex<Cell<Option<InterruptHandler>>> = Mutex::new(Cell::new(None));
 
 #[derive(Copy, Clone)]
 pub enum Event {
@@ -535,64 +549,37 @@ pub struct GpioPin<MODE, const GPIONUM: u8> {
     _mode: PhantomData<MODE>,
 }
 
-impl<MODE, const GPIONUM: u8> embedded_hal::digital::v2::InputPin for GpioPin<Input<MODE>, GPIONUM>
+impl<MODE, const GPIONUM: u8> GpioPin<Input<MODE>, GPIONUM>
 where
     Self: GpioProperties,
 {
-    type Error = Infallible;
-    fn is_high(&self) -> Result<bool, Self::Error> {
-        Ok(<Self as GpioProperties>::Bank::read_input() & (1 << (GPIONUM % 32)) != 0)
+    /// Is the input pin high?
+    #[inline]
+    pub fn is_high(&self) -> bool {
+        <Self as GpioProperties>::Bank::read_input() & (1 << (GPIONUM % 32)) != 0
     }
-    fn is_low(&self) -> Result<bool, Self::Error> {
-        Ok(!self.is_high()?)
+
+    /// Is the input pin low?
+    #[inline]
+    pub fn is_low(&self) -> bool {
+        !self.is_high()
     }
 }
 
-impl<const GPIONUM: u8> embedded_hal::digital::v2::InputPin for GpioPin<Output<OpenDrain>, GPIONUM>
+impl<const GPIONUM: u8> GpioPin<Output<OpenDrain>, GPIONUM>
 where
     Self: GpioProperties,
 {
-    type Error = Infallible;
-    fn is_high(&self) -> Result<bool, Self::Error> {
-        Ok(<Self as GpioProperties>::Bank::read_input() & (1 << (GPIONUM % 32)) != 0)
+    /// Is the input pin high?
+    #[inline]
+    pub fn is_high(&self) -> bool {
+        <Self as GpioProperties>::Bank::read_input() & (1 << (GPIONUM % 32)) != 0
     }
-    fn is_low(&self) -> Result<bool, Self::Error> {
-        Ok(!self.is_high()?)
-    }
-}
 
-#[cfg(feature = "eh1")]
-impl<MODE, const GPIONUM: u8> embedded_hal_1::digital::ErrorType for GpioPin<Input<MODE>, GPIONUM>
-where
-    Self: GpioProperties,
-{
-    type Error = Infallible;
-}
-
-#[cfg(feature = "eh1")]
-impl<MODE, const GPIONUM: u8> embedded_hal_1::digital::InputPin for GpioPin<Input<MODE>, GPIONUM>
-where
-    Self: GpioProperties,
-{
-    fn is_high(&mut self) -> Result<bool, Self::Error> {
-        Ok(<Self as GpioProperties>::Bank::read_input() & (1 << (GPIONUM % 32)) != 0)
-    }
-    fn is_low(&mut self) -> Result<bool, Self::Error> {
-        Ok(!self.is_high()?)
-    }
-}
-
-#[cfg(feature = "eh1")]
-impl<const GPIONUM: u8> embedded_hal_1::digital::InputPin for GpioPin<Output<OpenDrain>, GPIONUM>
-where
-    Self: GpioProperties,
-    <Self as GpioProperties>::PinType: IsOutputPin,
-{
-    fn is_high(&mut self) -> Result<bool, Self::Error> {
-        Ok(<Self as GpioProperties>::Bank::read_input() & (1 << (GPIONUM % 32)) != 0)
-    }
-    fn is_low(&mut self) -> Result<bool, Self::Error> {
-        Ok(!self.is_high()?)
+    /// Is the input pin low?
+    #[inline]
+    pub fn is_low(&self) -> bool {
+        !self.is_high()
     }
 }
 
@@ -612,7 +599,7 @@ where
             .modify(|_, w| unsafe { w.out_sel().bits(OutputSignal::GPIO as OutputSignalType) });
 
         #[cfg(esp32)]
-        crate::soc::gpio::errata36(GPIONUM, pull_up, pull_down);
+        crate::soc::gpio::errata36(GPIONUM, Some(pull_up), Some(pull_down));
 
         // NOTE: Workaround to make GPIO18 and GPIO19 work on the ESP32-C3, which by
         //       default are assigned to the `USB_SERIAL_JTAG` peripheral.
@@ -620,7 +607,18 @@ where
         if GPIONUM == 18 || GPIONUM == 19 {
             unsafe { &*crate::peripherals::USB_DEVICE::PTR }
                 .conf0()
-                .modify(|_, w| w.usb_pad_enable().clear_bit());
+                .modify(|_, w| {
+                    w.usb_pad_enable()
+                        .clear_bit()
+                        .dm_pullup()
+                        .clear_bit()
+                        .dm_pulldown()
+                        .clear_bit()
+                        .dp_pullup()
+                        .clear_bit()
+                        .dp_pulldown()
+                        .clear_bit()
+                });
         }
 
         // Same workaround as above for ESP32-S3
@@ -628,7 +626,18 @@ where
         if GPIONUM == 19 || GPIONUM == 20 {
             unsafe { &*crate::peripherals::USB_DEVICE::PTR }
                 .conf0()
-                .modify(|_, w| w.usb_pad_enable().clear_bit());
+                .modify(|_, w| {
+                    w.usb_pad_enable()
+                        .clear_bit()
+                        .dm_pullup()
+                        .clear_bit()
+                        .dm_pulldown()
+                        .clear_bit()
+                        .dp_pullup()
+                        .clear_bit()
+                        .dp_pulldown()
+                        .clear_bit()
+                });
         }
 
         get_io_mux_reg(GPIONUM).modify(|_, w| unsafe {
@@ -774,6 +783,20 @@ where
     }
 }
 
+impl<const GPIONUM: u8> GpioPin<Unknown, GPIONUM>
+where
+    Self: GpioProperties,
+{
+    /// Create a pin out of thin air.
+    ///
+    /// # Safety
+    ///
+    /// Ensure that only one instance of a pin exists at one time.
+    pub unsafe fn steal() -> Self {
+        Self { _mode: PhantomData }
+    }
+}
+
 impl<MODE, const GPIONUM: u8> Pin for GpioPin<MODE, GPIONUM>
 where
     Self: GpioProperties,
@@ -859,91 +882,46 @@ where
     }
 }
 
-impl<MODE, const GPIONUM: u8> embedded_hal::digital::v2::OutputPin
-    for GpioPin<Output<MODE>, GPIONUM>
+impl<MODE, const GPIONUM: u8> GpioPin<Output<MODE>, GPIONUM>
 where
     Self: GpioProperties,
     <Self as GpioProperties>::PinType: IsOutputPin,
 {
-    type Error = Infallible;
-    fn set_high(&mut self) -> Result<(), Self::Error> {
+    /// Drives the pin high.
+    #[inline]
+    pub fn set_high(&mut self) {
         <Self as GpioProperties>::Bank::write_output_set(1 << (GPIONUM % 32));
-        Ok(())
     }
-    fn set_low(&mut self) -> Result<(), Self::Error> {
+
+    /// Drives the pin low.
+    #[inline]
+    pub fn set_low(&mut self) {
         <Self as GpioProperties>::Bank::write_output_clear(1 << (GPIONUM % 32));
-        Ok(())
     }
-}
 
-impl<MODE, const GPIONUM: u8> embedded_hal::digital::v2::StatefulOutputPin
-    for GpioPin<Output<MODE>, GPIONUM>
-where
-    Self: GpioProperties,
-    <Self as GpioProperties>::PinType: IsOutputPin,
-{
-    fn is_set_high(&self) -> Result<bool, Self::Error> {
-        Ok(<Self as GpioProperties>::Bank::read_output() & (1 << (GPIONUM % 32)) != 0)
-    }
-    fn is_set_low(&self) -> Result<bool, Self::Error> {
-        Ok(!self.is_set_high()?)
-    }
-}
+    // TODO: add `set_state(PinState)`
+    // Drives the pin high or low depending on the provided value.
 
-impl<MODE, const GPIONUM: u8> embedded_hal::digital::v2::ToggleableOutputPin
-    for GpioPin<Output<MODE>, GPIONUM>
-where
-    Self: GpioProperties,
-    <Self as GpioProperties>::PinType: IsOutputPin,
-{
-    type Error = Infallible;
-    fn toggle(&mut self) -> Result<(), Self::Error> {
-        use embedded_hal::digital::v2::{OutputPin as _, StatefulOutputPin as _};
-        if self.is_set_high()? {
-            Ok(self.set_low()?)
+    /// Is the pin in drive high mode?
+    #[inline]
+    pub fn is_set_high(&self) -> bool {
+        <Self as GpioProperties>::Bank::read_output() & (1 << (GPIONUM % 32)) != 0
+    }
+
+    /// Is the pin in drive low mode?
+    #[inline]
+    pub fn is_set_low(&self) -> bool {
+        !self.is_set_high()
+    }
+
+    /// Toggle pin output.
+    #[inline]
+    pub fn toggle(&mut self) {
+        if self.is_set_high() {
+            self.set_low();
         } else {
-            Ok(self.set_high()?)
+            self.set_high();
         }
-    }
-}
-
-#[cfg(feature = "eh1")]
-impl<MODE, const GPIONUM: u8> embedded_hal_1::digital::ErrorType for GpioPin<Output<MODE>, GPIONUM>
-where
-    Self: GpioProperties,
-    <Self as GpioProperties>::PinType: IsOutputPin,
-{
-    type Error = Infallible;
-}
-
-#[cfg(feature = "eh1")]
-impl<MODE, const GPIONUM: u8> embedded_hal_1::digital::OutputPin for GpioPin<Output<MODE>, GPIONUM>
-where
-    Self: GpioProperties,
-    <Self as GpioProperties>::PinType: IsOutputPin,
-{
-    fn set_low(&mut self) -> Result<(), Self::Error> {
-        <Self as GpioProperties>::Bank::write_output_clear(1 << (GPIONUM % 32));
-        Ok(())
-    }
-    fn set_high(&mut self) -> Result<(), Self::Error> {
-        <Self as GpioProperties>::Bank::write_output_set(1 << (GPIONUM % 32));
-        Ok(())
-    }
-}
-
-#[cfg(feature = "eh1")]
-impl<MODE, const GPIONUM: u8> embedded_hal_1::digital::StatefulOutputPin
-    for GpioPin<Output<MODE>, GPIONUM>
-where
-    Self: GpioProperties,
-    <Self as GpioProperties>::PinType: IsOutputPin,
-{
-    fn is_set_high(&mut self) -> Result<bool, Self::Error> {
-        Ok(<Self as GpioProperties>::Bank::read_output() & (1 << (GPIONUM % 32)) != 0)
-    }
-    fn is_set_low(&mut self) -> Result<bool, Self::Error> {
-        Ok(!self.is_set_high()?)
     }
 }
 
@@ -1126,6 +1104,9 @@ where
     fn init_output(&self, alternate: AlternateFunction, open_drain: bool) {
         let gpio = unsafe { &*GPIO::PTR };
 
+        #[cfg(esp32)]
+        crate::soc::gpio::errata36(GPIONUM, Some(false), Some(false));
+
         <Self as GpioProperties>::Bank::write_out_en_set(1 << (GPIONUM % 32));
         gpio.pin(GPIONUM as usize)
             .modify(|_, w| w.pad_driver().bit(open_drain));
@@ -1192,11 +1173,13 @@ where
         GpioPin { _mode: PhantomData }
     }
 
+    /// Configures the pin into alternate mode one.
     pub fn into_alternate_1(self) -> GpioPin<Alternate<AF1>, GPIONUM> {
         self.init_output(AlternateFunction::Function1, false);
         GpioPin { _mode: PhantomData }
     }
 
+    /// Configures the pin into alternate mode two.
     pub fn into_alternate_2(self) -> GpioPin<Alternate<AF2>, GPIONUM> {
         self.init_output(AlternateFunction::Function2, false);
         GpioPin { _mode: PhantomData }
@@ -1264,10 +1247,16 @@ where
     }
 
     fn internal_pull_up(&mut self, on: bool) -> &mut Self {
+        #[cfg(esp32)]
+        crate::soc::gpio::errata36(GPIONUM, Some(on), None);
+
         get_io_mux_reg(GPIONUM).modify(|_, w| w.fun_wpu().bit(on));
         self
     }
     fn internal_pull_down(&mut self, on: bool) -> &mut Self {
+        #[cfg(esp32)]
+        crate::soc::gpio::errata36(GPIONUM, None, Some(on));
+
         get_io_mux_reg(GPIONUM).modify(|_, w| w.fun_wpd().bit(on));
         self
     }
@@ -1354,6 +1343,7 @@ where
     Self: GpioProperties,
     <Self as GpioProperties>::PinType: IsAnalogPin,
 {
+    /// Configures the pin into a an [Analog] pin.
     pub fn into_analog(self) -> GpioPin<Analog, GPIONUM> {
         crate::soc::gpio::internal_into_analog(GPIONUM);
 
@@ -1397,6 +1387,7 @@ impl<MODE, TYPE> AnyPin<MODE, TYPE>
 where
     TYPE: PinType,
 {
+    /// Degrade the pin to remove the pin number generics.
     pub fn degrade(self) -> AnyPin<MODE> {
         AnyPin {
             inner: self.inner,
@@ -1713,127 +1704,91 @@ where
     }
 }
 
-impl<MODE, TYPE> embedded_hal::digital::v2::InputPin for AnyPin<Input<MODE>, TYPE> {
-    type Error = core::convert::Infallible;
-
-    fn is_high(&self) -> Result<bool, Self::Error> {
+impl<MODE, TYPE> AnyPin<Input<MODE>, TYPE> {
+    /// Is the input pin high?
+    #[inline]
+    pub fn is_high(&self) -> bool {
         let inner = &self.inner;
         handle_gpio_input!(inner, target, { target.is_high() })
     }
 
-    fn is_low(&self) -> Result<bool, Self::Error> {
+    /// Is the input pin low?
+    #[inline]
+    pub fn is_low(&self) -> bool {
         let inner = &self.inner;
         handle_gpio_input!(inner, target, { target.is_low() })
     }
 }
 
-#[cfg(feature = "eh1")]
-impl<MODE, TYPE> embedded_hal_1::digital::ErrorType for AnyPin<Input<MODE>, TYPE> {
-    type Error = Infallible;
-}
-
-#[cfg(feature = "eh1")]
-impl<MODE, TYPE> embedded_hal_1::digital::InputPin for AnyPin<Input<MODE>, TYPE> {
-    fn is_high(&mut self) -> Result<bool, Self::Error> {
-        let inner = &mut self.inner;
-        handle_gpio_input!(inner, target, { target.is_high() })
-    }
-
-    fn is_low(&mut self) -> Result<bool, Self::Error> {
-        let inner = &mut self.inner;
-        handle_gpio_input!(inner, target, { target.is_low() })
-    }
-}
-
-impl<MODE, TYPE> embedded_hal::digital::v2::OutputPin for AnyPin<Output<MODE>, TYPE> {
-    type Error = Infallible;
-
-    fn set_low(&mut self) -> Result<(), Self::Error> {
+impl<MODE, TYPE> AnyPin<Output<MODE>, TYPE> {
+    /// Drives the pin low.
+    #[inline]
+    pub fn set_low(&mut self) {
         let inner = &mut self.inner;
         handle_gpio_output!(inner, target, { target.set_low() })
     }
 
-    fn set_high(&mut self) -> Result<(), Self::Error> {
+    /// Drives the pin high.
+    #[inline]
+    pub fn set_high(&mut self) {
         let inner = &mut self.inner;
         handle_gpio_output!(inner, target, { target.set_high() })
     }
-}
 
-impl<MODE, TYPE> embedded_hal::digital::v2::StatefulOutputPin for AnyPin<Output<MODE>, TYPE> {
-    fn is_set_high(&self) -> Result<bool, Self::Error> {
+    // TODO: add `set_state(PinState)`
+    // Drives the pin high or low depending on the provided value.
+
+    /// Is the pin in drive high mode?
+    #[inline]
+    pub fn is_set_high(&self) -> bool {
         let inner = &self.inner;
         handle_gpio_output!(inner, target, { target.is_set_high() })
     }
 
-    fn is_set_low(&self) -> Result<bool, Self::Error> {
+    /// Is the pin in drive low mode?
+    #[inline]
+    pub fn is_set_low(&self) -> bool {
         let inner = &self.inner;
         handle_gpio_output!(inner, target, { target.is_set_low() })
     }
-}
 
-impl<MODE, TYPE> embedded_hal::digital::v2::ToggleableOutputPin for AnyPin<Output<MODE>, TYPE> {
-    type Error = Infallible;
-
-    fn toggle(&mut self) -> Result<(), Self::Error> {
+    /// Toggle pin output.
+    #[inline]
+    pub fn toggle(&mut self) {
         let inner = &mut self.inner;
         handle_gpio_output!(inner, target, { target.toggle() })
     }
 }
 
-#[cfg(feature = "eh1")]
-impl<MODE, TYPE> embedded_hal_1::digital::ErrorType for AnyPin<Output<MODE>, TYPE> {
-    type Error = Infallible;
-}
-
-#[cfg(feature = "eh1")]
-impl<MODE, TYPE> embedded_hal_1::digital::OutputPin for AnyPin<Output<MODE>, TYPE> {
-    fn set_low(&mut self) -> Result<(), Self::Error> {
-        let inner = &mut self.inner;
-        handle_gpio_output!(inner, target, { target.set_low() })
-    }
-
-    fn set_high(&mut self) -> Result<(), Self::Error> {
-        let inner = &mut self.inner;
-        handle_gpio_output!(inner, target, { target.set_high() })
-    }
-}
-
-#[cfg(feature = "eh1")]
-impl<MODE, TYPE> embedded_hal_1::digital::StatefulOutputPin for AnyPin<Output<MODE>, TYPE> {
-    fn is_set_high(&mut self) -> Result<bool, Self::Error> {
-        let inner = &mut self.inner;
-        handle_gpio_output!(inner, target, { target.is_set_high() })
-    }
-
-    fn is_set_low(&mut self) -> Result<bool, Self::Error> {
-        let inner = &mut self.inner;
-        handle_gpio_output!(inner, target, { target.is_set_low() })
-    }
-}
-
 #[cfg(feature = "async")]
-impl<MODE, TYPE> embedded_hal_async::digital::Wait for AnyPin<Input<MODE>, TYPE> {
-    async fn wait_for_high(&mut self) -> Result<(), Self::Error> {
+impl<MODE, TYPE> AnyPin<Input<MODE>, TYPE> {
+    /// Wait until the pin is high. If it is already high, return immediately.
+    pub async fn wait_for_high(&mut self) {
         let inner = &mut self.inner;
         handle_gpio_input!(inner, target, { target.wait_for_high().await })
     }
 
-    async fn wait_for_low(&mut self) -> Result<(), Self::Error> {
+    /// Wait until the pin is low. If it is already low, return immediately.
+    pub async fn wait_for_low(&mut self) {
         let inner = &mut self.inner;
         handle_gpio_input!(inner, target, { target.wait_for_low().await })
     }
 
-    async fn wait_for_rising_edge(&mut self) -> Result<(), Self::Error> {
+    /// Wait for the pin to undergo a transition from low to high.
+    pub async fn wait_for_rising_edge(&mut self) {
         let inner = &mut self.inner;
         handle_gpio_input!(inner, target, { target.wait_for_rising_edge().await })
     }
 
-    async fn wait_for_falling_edge(&mut self) -> Result<(), Self::Error> {
+    /// Wait for the pin to undergo a transition from high to low.
+    pub async fn wait_for_falling_edge(&mut self) {
         let inner = &mut self.inner;
         handle_gpio_input!(inner, target, { target.wait_for_falling_edge().await })
     }
 
-    async fn wait_for_any_edge(&mut self) -> Result<(), Self::Error> {
+    /// Wait for the pin to undergo any transition, i.e low to high OR high to
+    /// low.
+    pub async fn wait_for_any_edge(&mut self) {
         let inner = &mut self.inner;
         handle_gpio_input!(inner, target, { target.wait_for_any_edge().await })
     }
@@ -1846,7 +1801,22 @@ pub struct IO {
 }
 
 impl IO {
+    /// Initialize the I/O driver.
     pub fn new(gpio: GPIO, io_mux: IO_MUX) -> Self {
+        Self::new_with_priority(gpio, io_mux, crate::interrupt::Priority::min())
+    }
+
+    /// Initialize the I/O driver with a interrupt priority.
+    ///
+    /// This decides the priority for the interrupt when using async.
+    pub fn new_with_priority(
+        mut gpio: GPIO,
+        io_mux: IO_MUX,
+        prio: crate::interrupt::Priority,
+    ) -> Self {
+        gpio.bind_gpio_interrupt(gpio_interrupt_handler);
+        crate::interrupt::enable(crate::peripherals::Interrupt::GPIO, prio).unwrap();
+
         let pins = gpio.split();
 
         IO {
@@ -1854,6 +1824,31 @@ impl IO {
             pins,
         }
     }
+
+    /// Install the given interrupt handler replacing any previously set
+    /// handler.
+    ///
+    /// When the async feature is enabled the handler will be called first and
+    /// the internal async handler will run after. In that case it's
+    /// important to not reset the interrupt status when mixing sync and
+    /// async (i.e. using async wait) interrupt handling.
+    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        critical_section::with(|cs| {
+            crate::interrupt::enable(crate::peripherals::Interrupt::GPIO, handler.priority())
+                .unwrap();
+            USER_INTERRUPT_HANDLER.borrow(cs).set(Some(handler));
+        });
+    }
+}
+
+extern "C" fn gpio_interrupt_handler() {
+    if let Some(user_handler) = critical_section::with(|cs| USER_INTERRUPT_HANDLER.borrow(cs).get())
+    {
+        user_handler.call();
+    }
+
+    #[cfg(feature = "async")]
+    asynch::handle_gpio_interrupt();
 }
 
 pub trait GpioProperties {
@@ -2259,842 +2254,80 @@ macro_rules! analog {
     }
 }
 
-#[cfg(soc_etm)]
-pub mod etm {
-    //! # Event Task Matrix Function
-    //!
-    //! ## Overview
-    //!
-    //! GPIO supports ETM function, that is, the ETM task of GPIO can be
-    //! triggered by the ETM event of any peripheral, or the ETM task of any
-    //! peripheral can be triggered by the ETM event of GPIO.
-    //!
-    //! The GPIO ETM provides eight task channels. The ETM tasks that each task
-    //! channel can receive are:
-    //! - SET: GPIO goes high when triggered
-    //! - CLEAR: GPIO goes low when triggered
-    //! - TOGGLE: GPIO toggle level when triggered.
-    //!
-    //! GPIO has eight event channels, and the ETM events that each event
-    //! channel can generate are:
-    //! - RISE_EDGE: Indicates that the output signal of the corresponding GPIO
-    //!   has a rising edge
-    //! - FALL_EDGE: Indicates that the output signal of the corresponding GPIO
-    //!   has a falling edge
-    //! - ANY_EDGE: Indicates that the output signal of the corresponding GPIO
-    //!   is reversed
-    //!
-    //! ## Example
-    //! ```no_run
-    //! let led_task = gpio_ext.channel0_task.toggle(&mut led);
-    //! let button_event = gpio_ext.channel0_event.falling_edge(button);
-    //! ```
-
-    use crate::peripheral::{Peripheral, PeripheralRef};
-
-    /// All the GPIO ETM channels
-    #[non_exhaustive]
-    pub struct GpioEtmChannels<'d> {
-        _gpio_sd: PeripheralRef<'d, crate::peripherals::GPIO_SD>,
-        pub channel0_task: GpioEtmTaskChannel<0>,
-        pub channel0_event: GpioEtmEventChannel<0>,
-        pub channel1_task: GpioEtmTaskChannel<1>,
-        pub channel1_event: GpioEtmEventChannel<1>,
-        pub channel2_task: GpioEtmTaskChannel<2>,
-        pub channel2_event: GpioEtmEventChannel<2>,
-        pub channel3_task: GpioEtmTaskChannel<3>,
-        pub channel3_event: GpioEtmEventChannel<3>,
-        pub channel4_task: GpioEtmTaskChannel<4>,
-        pub channel4_event: GpioEtmEventChannel<4>,
-        pub channel5_task: GpioEtmTaskChannel<5>,
-        pub channel5_event: GpioEtmEventChannel<5>,
-        pub channel6_task: GpioEtmTaskChannel<6>,
-        pub channel6_event: GpioEtmEventChannel<6>,
-        pub channel7_task: GpioEtmTaskChannel<7>,
-        pub channel7_event: GpioEtmEventChannel<7>,
-    }
-
-    impl<'d> GpioEtmChannels<'d> {
-        pub fn new(peripheral: impl Peripheral<P = crate::peripherals::GPIO_SD> + 'd) -> Self {
-            crate::into_ref!(peripheral);
-
-            Self {
-                _gpio_sd: peripheral,
-                channel0_task: GpioEtmTaskChannel {},
-                channel0_event: GpioEtmEventChannel {},
-                channel1_task: GpioEtmTaskChannel {},
-                channel1_event: GpioEtmEventChannel {},
-                channel2_task: GpioEtmTaskChannel {},
-                channel2_event: GpioEtmEventChannel {},
-                channel3_task: GpioEtmTaskChannel {},
-                channel3_event: GpioEtmEventChannel {},
-                channel4_task: GpioEtmTaskChannel {},
-                channel4_event: GpioEtmEventChannel {},
-                channel5_task: GpioEtmTaskChannel {},
-                channel5_event: GpioEtmEventChannel {},
-                channel6_task: GpioEtmTaskChannel {},
-                channel6_event: GpioEtmEventChannel {},
-                channel7_task: GpioEtmTaskChannel {},
-                channel7_event: GpioEtmEventChannel {},
-            }
-        }
-    }
-
-    /// An ETM controlled GPIO event
-    pub struct GpioEtmEventChannel<const C: u8> {}
-
-    impl<const C: u8> GpioEtmEventChannel<C> {
-        /// Trigger at rising edge
-        pub fn rising_edge<'d, PIN>(
-            self,
-            pin: impl Peripheral<P = PIN> + 'd,
-        ) -> GpioEtmEventChannelRising<'d, PIN, C>
-        where
-            PIN: super::Pin,
-        {
-            crate::into_ref!(pin);
-            enable_event_channel(C, pin.number());
-            GpioEtmEventChannelRising { _pin: pin }
-        }
-
-        /// Trigger at falling edge
-        pub fn falling_edge<'d, PIN>(
-            self,
-            pin: impl Peripheral<P = PIN> + 'd,
-        ) -> GpioEtmEventChannelFalling<'d, PIN, C>
-        where
-            PIN: super::Pin,
-        {
-            crate::into_ref!(pin);
-            enable_event_channel(C, pin.number());
-            GpioEtmEventChannelFalling { _pin: pin }
-        }
-
-        /// Trigger at any edge
-        pub fn any_edge<'d, PIN>(
-            self,
-            pin: impl Peripheral<P = PIN> + 'd,
-        ) -> GpioEtmEventChannelAny<'d, PIN, C>
-        where
-            PIN: super::Pin,
-        {
-            crate::into_ref!(pin);
-            enable_event_channel(C, pin.number());
-            GpioEtmEventChannelAny { _pin: pin }
-        }
-    }
-
-    /// Event for rising edge
-    #[non_exhaustive]
-    pub struct GpioEtmEventChannelRising<'d, PIN, const C: u8>
-    where
-        PIN: super::Pin,
-    {
-        _pin: PeripheralRef<'d, PIN>,
-    }
-
-    impl<'d, PIN, const C: u8> crate::private::Sealed for GpioEtmEventChannelRising<'d, PIN, C> where
-        PIN: super::Pin
-    {
-    }
-
-    impl<'d, PIN, const C: u8> crate::etm::EtmEvent for GpioEtmEventChannelRising<'d, PIN, C>
-    where
-        PIN: super::Pin,
-    {
-        fn id(&self) -> u8 {
-            1 + C
-        }
-    }
-
-    /// Event for falling edge
-    #[non_exhaustive]
-    pub struct GpioEtmEventChannelFalling<'d, PIN, const C: u8>
-    where
-        PIN: super::Pin,
-    {
-        _pin: PeripheralRef<'d, PIN>,
-    }
-
-    impl<'d, PIN, const C: u8> crate::private::Sealed for GpioEtmEventChannelFalling<'d, PIN, C> where
-        PIN: super::Pin
-    {
-    }
-
-    impl<'d, PIN, const C: u8> crate::etm::EtmEvent for GpioEtmEventChannelFalling<'d, PIN, C>
-    where
-        PIN: super::Pin,
-    {
-        fn id(&self) -> u8 {
-            9 + C
-        }
-    }
-
-    /// Event for any edge
-    #[non_exhaustive]
-    pub struct GpioEtmEventChannelAny<'d, PIN, const C: u8>
-    where
-        PIN: super::Pin,
-    {
-        _pin: PeripheralRef<'d, PIN>,
-    }
-
-    impl<'d, PIN, const C: u8> crate::private::Sealed for GpioEtmEventChannelAny<'d, PIN, C> where
-        PIN: super::Pin
-    {
-    }
-
-    impl<'d, PIN, const C: u8> crate::etm::EtmEvent for GpioEtmEventChannelAny<'d, PIN, C>
-    where
-        PIN: super::Pin,
-    {
-        fn id(&self) -> u8 {
-            17 + C
-        }
-    }
-
-    /// An ETM controlled GPIO task
-    pub struct GpioEtmTaskChannel<const C: u8> {}
-
-    impl<const C: u8> GpioEtmTaskChannel<C> {
-        // In theory we could have multiple pins assigned to the same task. Not sure how
-        // useful that would be. If we want to support it, the easiest would be
-        // to offer additional functions like `set2`, `set3` etc. where the
-        // number is the pin-count
-
-        /// Task to set a high level
-        pub fn set<'d, PIN>(self, pin: impl Peripheral<P = PIN> + 'd) -> GpioEtmTaskSet<'d, PIN, C>
-        where
-            PIN: super::Pin,
-        {
-            crate::into_ref!(pin);
-            enable_task_channel(C, pin.number());
-            GpioEtmTaskSet { _pin: pin }
-        }
-
-        /// Task to set a low level
-        pub fn clear<'d, PIN>(
-            self,
-            pin: impl Peripheral<P = PIN> + 'd,
-        ) -> GpioEtmTaskClear<'d, PIN, C>
-        where
-            PIN: super::Pin,
-        {
-            crate::into_ref!(pin);
-            enable_task_channel(C, pin.number());
-            GpioEtmTaskClear { _pin: pin }
-        }
-
-        /// Task to toggle the level
-        pub fn toggle<'d, PIN>(
-            self,
-            pin: impl Peripheral<P = PIN> + 'd,
-        ) -> GpioEtmTaskToggle<'d, PIN, C>
-        where
-            PIN: super::Pin,
-        {
-            crate::into_ref!(pin);
-            enable_task_channel(C, pin.number());
-            GpioEtmTaskToggle { _pin: pin }
-        }
-    }
-
-    /// Task for set operation
-    #[non_exhaustive]
-    pub struct GpioEtmTaskSet<'d, PIN, const C: u8>
-    where
-        PIN: super::Pin,
-    {
-        _pin: PeripheralRef<'d, PIN>,
-    }
-
-    impl<'d, PIN, const C: u8> crate::private::Sealed for GpioEtmTaskSet<'d, PIN, C> where
-        PIN: super::Pin
-    {
-    }
-
-    impl<'d, PIN, const C: u8> crate::etm::EtmTask for GpioEtmTaskSet<'d, PIN, C>
-    where
-        PIN: super::Pin,
-    {
-        fn id(&self) -> u8 {
-            1 + C
-        }
-    }
-
-    /// Task for clear operation
-    #[non_exhaustive]
-    pub struct GpioEtmTaskClear<'d, PIN, const C: u8> {
-        _pin: PeripheralRef<'d, PIN>,
-    }
-
-    impl<'d, PIN, const C: u8> crate::private::Sealed for GpioEtmTaskClear<'d, PIN, C> where
-        PIN: super::Pin
-    {
-    }
-
-    impl<'d, PIN, const C: u8> crate::etm::EtmTask for GpioEtmTaskClear<'d, PIN, C>
-    where
-        PIN: super::Pin,
-    {
-        fn id(&self) -> u8 {
-            9 + C
-        }
-    }
-
-    /// Task for toggle operation
-    #[non_exhaustive]
-    pub struct GpioEtmTaskToggle<'d, PIN, const C: u8> {
-        _pin: PeripheralRef<'d, PIN>,
-    }
-
-    impl<'d, PIN, const C: u8> crate::private::Sealed for GpioEtmTaskToggle<'d, PIN, C> where
-        PIN: super::Pin
-    {
-    }
-
-    impl<'d, PIN, const C: u8> crate::etm::EtmTask for GpioEtmTaskToggle<'d, PIN, C>
-    where
-        PIN: super::Pin,
-    {
-        fn id(&self) -> u8 {
-            17 + C
-        }
-    }
-
-    fn enable_task_channel(channel: u8, pin: u8) {
-        let gpio_sd = unsafe { crate::peripherals::GPIO_SD::steal() };
-        let ptr = unsafe { gpio_sd.etm_task_p0_cfg().as_ptr().add(pin as usize / 4) };
-        let shift = 8 * (pin as usize % 4);
-        // bit 0 = en, bit 1-3 = channel
-        unsafe {
-            ptr.write_volatile(
-                ptr.read_volatile() & !(0xf << shift)
-                    | 1 << shift
-                    | (channel as u32) << (shift + 1),
-            );
-        }
-    }
-
-    fn enable_event_channel(channel: u8, pin: u8) {
-        let gpio_sd = unsafe { crate::peripherals::GPIO_SD::steal() };
-        gpio_sd
-            .etm_event_ch_cfg(channel as usize)
-            .modify(|_, w| w.etm_ch0_event_en().clear_bit());
-        gpio_sd
-            .etm_event_ch_cfg(channel as usize)
-            .modify(|_, w| w.etm_ch0_event_sel().variant(pin));
-        gpio_sd
-            .etm_event_ch_cfg(channel as usize)
-            .modify(|_, w| w.etm_ch0_event_en().set_bit());
-    }
-}
-
-#[cfg(all(rtc_io, not(esp32)))]
-pub mod rtc_io {
-    //! RTC IO
-    //!
-    //! # Overview
-    //!
-    //! The hardware provides a couple of GPIO pins with low power (LP)
-    //! capabilities and analog functions. These pins can be controlled by
-    //! either IO MUX or RTC IO.
-    //!
-    //! If controlled by RTC IO, these pins will bypass IO MUX and GPIO
-    //! matrix for the use by ULP and peripherals in RTC system.
-    //!
-    //! When configured as RTC GPIOs, the pins can still be controlled by ULP or
-    //! the peripherals in RTC system during chip Deep-sleep, and wake up the
-    //! chip from Deep-sleep.
-    //!
-    //! # Example
-    //! ```no_run
-    //! let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-    //! // configure GPIO 1 as ULP output pin
-    //! let lp_pin = io.pins.gpio1.into_low_power().into_push_pull_output();
-    //! ```
-
-    use core::marker::PhantomData;
-
-    #[cfg(esp32c6)]
-    use super::OpenDrain;
-    use super::{Floating, Input, Output, PullDown, PullUp, PushPull, Unknown};
-
-    /// A GPIO pin configured for low power operation
-    pub struct LowPowerPin<MODE, const PIN: u8> {
-        pub(crate) private: PhantomData<MODE>,
-    }
-
-    /// Configures a pin for use as a low power pin
-    pub trait IntoLowPowerPin<const PIN: u8> {
-        fn into_low_power(self) -> LowPowerPin<Unknown, { PIN }>;
-    }
-
-    impl<MODE, const PIN: u8> LowPowerPin<MODE, PIN> {
-        #[doc(hidden)]
-        pub fn output_enable(&self, enable: bool) {
-            let rtc_io = unsafe { crate::peripherals::RTC_IO::steal() };
-            if enable {
-                // TODO align PAC
-                #[cfg(esp32s2)]
-                rtc_io
-                    .rtc_gpio_enable_w1ts()
-                    .write(|w| w.reg_rtcio_reg_gpio_enable_w1ts().variant(1 << PIN));
-
-                #[cfg(esp32s3)]
-                rtc_io
-                    .rtc_gpio_enable_w1ts()
-                    .write(|w| w.rtc_gpio_enable_w1ts().variant(1 << PIN));
-            } else {
-                rtc_io
-                    .enable_w1tc()
-                    .write(|w| w.enable_w1tc().variant(1 << PIN));
-            }
-        }
-
-        fn input_enable(&self, enable: bool) {
-            get_pin_reg(PIN).modify(|_, w| w.fun_ie().bit(enable));
-        }
-
-        fn pullup_enable(&self, enable: bool) {
-            get_pin_reg(PIN).modify(|_, w| w.rue().bit(enable));
-        }
-
-        fn pulldown_enable(&self, enable: bool) {
-            get_pin_reg(PIN).modify(|_, w| w.rde().bit(enable));
-        }
-
-        #[doc(hidden)]
-        pub fn set_level(&mut self, level: bool) {
-            let rtc_io = unsafe { &*crate::peripherals::RTC_IO::PTR };
-
-            // TODO align PACs
-            #[cfg(esp32s2)]
-            if level {
-                rtc_io
-                    .rtc_gpio_out_w1ts()
-                    .write(|w| w.gpio_out_data_w1ts().variant(1 << PIN));
-            } else {
-                rtc_io
-                    .rtc_gpio_out_w1tc()
-                    .write(|w| w.gpio_out_data_w1tc().variant(1 << PIN));
-            }
-
-            #[cfg(esp32s3)]
-            if level {
-                rtc_io
-                    .rtc_gpio_out_w1ts()
-                    .write(|w| w.rtc_gpio_out_data_w1ts().variant(1 << PIN));
-            } else {
-                rtc_io
-                    .rtc_gpio_out_w1tc()
-                    .write(|w| w.rtc_gpio_out_data_w1tc().variant(1 << PIN));
-            }
-        }
-
-        #[doc(hidden)]
-        pub fn get_level(&self) -> bool {
-            let rtc_io = unsafe { &*crate::peripherals::RTC_IO::PTR };
-            (rtc_io.rtc_gpio_in().read().bits() & 1 << PIN) != 0
-        }
-
-        /// Configures the pin as an input with the internal pull-up resistor
-        /// enabled.
-        pub fn into_pull_up_input(self) -> LowPowerPin<Input<PullUp>, PIN> {
-            self.input_enable(true);
-            self.pullup_enable(true);
-            self.pulldown_enable(false);
-            LowPowerPin {
-                private: PhantomData,
-            }
-        }
-
-        /// Configures the pin as an input with the internal pull-down resistor
-        /// enabled.
-        pub fn into_pull_down_input(self) -> LowPowerPin<Input<PullDown>, PIN> {
-            self.input_enable(true);
-            self.pullup_enable(false);
-            self.pulldown_enable(true);
-            LowPowerPin {
-                private: PhantomData,
-            }
-        }
-
-        /// Configures the pin as a floating input pin.
-        pub fn into_floating_input(self) -> LowPowerPin<Input<Floating>, PIN> {
-            self.input_enable(true);
-            self.pullup_enable(false);
-            self.pulldown_enable(false);
-            LowPowerPin {
-                private: PhantomData,
-            }
-        }
-
-        /// Configures the pin as an output pin.
-        pub fn into_push_pull_output(self) -> LowPowerPin<Output<PushPull>, PIN> {
-            self.output_enable(true);
-            LowPowerPin {
-                private: PhantomData,
-            }
-        }
-
-        #[cfg(esp32c6)]
-        /// Configures the pin as an pullup input and a push pull output pin.
-        pub fn into_open_drain_output(self) -> LowPowerPin<OpenDrain, PIN> {
-            self.into_pull_up_input();
-            self.into_push_pull_output();
-            use crate::peripherals::GPIO;
-
-            let gpio = unsafe { &*GPIO::PTR };
-
-            gpio.pin(PIN).modify(|_, w| w.pad_driver().bit(true));
-            self.pulldown_enable(false);
-
-            LowPowerPin {
-                private: PhantomData,
-            }
-        }
-    }
-
-    #[cfg(esp32s3)]
-    #[inline(always)]
-    fn get_pin_reg(pin: u8) -> &'static crate::peripherals::rtc_io::TOUCH_PAD0 {
-        unsafe {
-            let rtc_io = &*crate::peripherals::RTC_IO::PTR;
-            let pin_ptr = (rtc_io.touch_pad0().as_ptr()).add(pin as usize);
-
-            &*(pin_ptr
-                as *const esp32s3::generic::Reg<esp32s3::rtc_io::touch_pad0::TOUCH_PAD0_SPEC>)
-        }
-    }
-
-    #[cfg(esp32s2)]
-    #[inline(always)]
-    fn get_pin_reg(pin: u8) -> &'static crate::peripherals::rtc_io::TOUCH_PAD {
-        unsafe {
-            let rtc_io = &*crate::peripherals::RTC_IO::PTR;
-            let pin_ptr = (rtc_io.touch_pad(0).as_ptr()).add(pin as usize);
-
-            &*(pin_ptr as *const esp32s2::generic::Reg<esp32s2::rtc_io::touch_pad::TOUCH_PAD_SPEC>)
-        }
-    }
-}
-
-#[cfg(lp_io)]
-pub mod lp_gpio {
-    //! Low Power IO (LP_IO)
-    //!
-    //! # Overview
-    //!
-    //! The hardware provides a couple of GPIO pins with low power (LP)
-    //! capabilities and analog functions. These pins can be controlled by
-    //! either IO MUX or LP IO MUX.
-    //!
-    //! If controlled by LP IO MUX, these pins will bypass IO MUX and GPIO
-    //! matrix for the use by ULP and peripherals in LP system.
-    //!
-    //! When configured as LP GPIOs, the pins can still be controlled by ULP or
-    //! the peripherals in LP system during chip Deep-sleep, and wake up the
-    //! chip from Deep-sleep.
-    //!
-    //! # Example
-    //! ```no_run
-    //! let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-    //! // configure GPIO 1 as LP output pin
-    //! let lp_pin = io.pins.gpio1.into_low_power().into_push_pull_output();
-    //! ```
-
-    use core::marker::PhantomData;
-
-    #[cfg(esp32c6)]
-    use super::OpenDrain;
-    use super::{Floating, Input, Output, PullDown, PullUp, PushPull, Unknown};
-
-    /// A GPIO pin configured for low power operation
-    pub struct LowPowerPin<MODE, const PIN: u8> {
-        pub(crate) private: PhantomData<MODE>,
-    }
-
-    impl<MODE, const PIN: u8> LowPowerPin<MODE, PIN> {
-        #[doc(hidden)]
-        pub fn output_enable(&self, enable: bool) {
-            let lp_io = unsafe { &*crate::peripherals::LP_IO::PTR };
-            if enable {
-                lp_io
-                    .out_enable_w1ts()
-                    .write(|w| w.enable_w1ts().variant(1 << PIN));
-            } else {
-                lp_io
-                    .out_enable_w1tc()
-                    .write(|w| w.enable_w1tc().variant(1 << PIN));
-            }
-        }
-
-        fn input_enable(&self, enable: bool) {
-            get_pin_reg(PIN).modify(|_, w| w.fun_ie().bit(enable));
-        }
-
-        fn pullup_enable(&self, enable: bool) {
-            get_pin_reg(PIN).modify(|_, w| w.fun_wpu().bit(enable));
-        }
-
-        fn pulldown_enable(&self, enable: bool) {
-            get_pin_reg(PIN).modify(|_, w| w.fun_wpd().bit(enable));
-        }
-
-        #[doc(hidden)]
-        pub fn set_level(&mut self, level: bool) {
-            let lp_io = unsafe { &*crate::peripherals::LP_IO::PTR };
-            if level {
-                lp_io
-                    .out_data_w1ts()
-                    .write(|w| w.out_data_w1ts().variant(1 << PIN));
-            } else {
-                lp_io
-                    .out_data_w1tc()
-                    .write(|w| w.out_data_w1tc().variant(1 << PIN));
-            }
-        }
-
-        #[doc(hidden)]
-        pub fn get_level(&self) -> bool {
-            let lp_io = unsafe { &*crate::peripherals::LP_IO::PTR };
-            (lp_io.in_().read().data_next().bits() & 1 << PIN) != 0
-        }
-
-        /// Configures the pin as an input with the internal pull-up resistor
-        /// enabled.
-        pub fn into_pull_up_input(self) -> LowPowerPin<Input<PullUp>, PIN> {
-            self.input_enable(true);
-            self.pullup_enable(true);
-            self.pulldown_enable(false);
-            LowPowerPin {
-                private: PhantomData,
-            }
-        }
-
-        /// Configures the pin as an input with the internal pull-down resistor
-        /// enabled.
-        pub fn into_pull_down_input(self) -> LowPowerPin<Input<PullDown>, PIN> {
-            self.input_enable(true);
-            self.pullup_enable(false);
-            self.pulldown_enable(true);
-            LowPowerPin {
-                private: PhantomData,
-            }
-        }
-
-        /// Configures the pin as a floating input pin.
-        pub fn into_floating_input(self) -> LowPowerPin<Input<Floating>, PIN> {
-            self.input_enable(true);
-            self.pullup_enable(false);
-            self.pulldown_enable(false);
-            LowPowerPin {
-                private: PhantomData,
-            }
-        }
-
-        /// Configures the pin as an output pin.
-        pub fn into_push_pull_output(self) -> LowPowerPin<Output<PushPull>, PIN> {
-            self.output_enable(true);
-            LowPowerPin {
-                private: PhantomData,
-            }
-        }
-
-        pub fn into_open_drain_output(self) -> LowPowerPin<OpenDrain, PIN> {
-            use crate::peripherals::GPIO;
-
-            let gpio = unsafe { &*GPIO::PTR };
-
-            gpio.pin(PIN as usize)
-                .modify(|_, w| w.pad_driver().bit(true));
-            self.pulldown_enable(false);
-            self.into_pull_up_input().into_push_pull_output();
-
-            LowPowerPin {
-                private: PhantomData,
-            }
-        }
-    }
-
-    pub(crate) fn init_low_power_pin(pin: u8) {
-        let lp_aon = unsafe { &*crate::peripherals::LP_AON::PTR };
-
-        lp_aon
-            .gpio_mux()
-            .modify(|r, w| w.sel().variant(r.sel().bits() | 1 << pin));
-
-        get_pin_reg(pin).modify(|_, w| w.mcu_sel().variant(0));
-    }
-
-    #[inline(always)]
-    fn get_pin_reg(pin: u8) -> &'static crate::peripherals::lp_io::GPIO0 {
-        // ideally we should change the SVD and make the GPIOx registers into an
-        // array
-        unsafe {
-            let lp_io = &*crate::peripherals::LP_IO::PTR;
-            let pin_ptr = (lp_io.gpio0().as_ptr()).add(pin as usize);
-
-            &*(pin_ptr as *const esp32c6::generic::Reg<esp32c6::lp_io::gpio0::GPIO0_SPEC>)
-        }
-    }
-
-    /// Configures a pin for use as a low power pin
-    pub trait IntoLowPowerPin<const PIN: u8> {
-        fn into_low_power(self) -> LowPowerPin<Unknown, { PIN }>;
-    }
-
-    #[doc(hidden)]
-    #[macro_export]
-    macro_rules! lp_gpio {
-        (
-            $($gpionum:literal)+
-        ) => {
-            paste::paste!{
-                $(
-                    impl<MODE> $crate::gpio::lp_gpio::IntoLowPowerPin<$gpionum> for GpioPin<MODE, $gpionum> {
-                        fn into_low_power(self) -> $crate::gpio::lp_gpio::LowPowerPin<Unknown, $gpionum> {
-                            $crate::gpio::lp_gpio::init_low_power_pin($gpionum);
-                            $crate::gpio::lp_gpio::LowPowerPin {
-                                private: core::marker::PhantomData,
-                            }
-                        }
-                    }
-
-                    impl<MODE> $crate::gpio::RTCPin for GpioPin<MODE, $gpionum> {
-                        unsafe fn apply_wakeup(&mut self, wakeup: bool, level: u8) {
-                            let lp_io = &*$crate::peripherals::LP_IO::ptr();
-                            lp_io.[< pin $gpionum >]().modify(|_, w| {
-                                w.wakeup_enable().bit(wakeup).int_type().bits(level)
-                            });
-                        }
-
-                        fn rtcio_pad_hold(&mut self, enable: bool) {
-                            let mask = 1 << $gpionum;
-                            unsafe {
-                                let lp_aon =  &*$crate::peripherals::LP_AON::ptr();
-
-                                lp_aon.gpio_hold0().modify(|r, w| {
-                                    if enable {
-                                        w.gpio_hold0().bits(r.gpio_hold0().bits() | mask)
-                                    } else {
-                                        w.gpio_hold0().bits(r.gpio_hold0().bits() & !mask)
-                                    }
-                                });
-                            }
-                        }
-
-                        /// Set the LP properties of the pin. If `mux` is true then then pin is
-                        /// routed to LP_IO, when false it is routed to IO_MUX.
-                        fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: $crate::gpio::RtcFunction) {
-                            let mask = 1 << $gpionum;
-                            unsafe {
-                                // Select LP_IO
-                                let lp_aon = &*$crate::peripherals::LP_AON::ptr();
-                                lp_aon
-                                    .gpio_mux()
-                                    .modify(|r, w| {
-                                        if mux {
-                                            w.sel().bits(r.sel().bits() | mask)
-                                        } else {
-                                            w.sel().bits(r.sel().bits() & !mask)
-                                        }
-                                    });
-
-                                // Configure input, function and select normal operation registers
-                                let lp_io = &*$crate::peripherals::LP_IO::ptr();
-                                lp_io.[< gpio $gpionum >]().modify(|_, w| {
-                                    w
-                                        .slp_sel().bit(false)
-                                        .fun_ie().bit(input_enable)
-                                        .mcu_sel().bits(func as u8)
-                                });
-                            }
-                        }
-                    }
-
-                    impl<MODE> $crate::gpio::RTCPinWithResistors for GpioPin<MODE, $gpionum> {
-                        fn rtcio_pullup(&mut self, enable: bool) {
-                            let lp_io = unsafe { &*$crate::peripherals::LP_IO::ptr() };
-                            lp_io.[< gpio $gpionum >]().modify(|_, w| w.fun_wpu().bit(enable));
-                        }
-
-                        fn rtcio_pulldown(&mut self, enable: bool) {
-                            let lp_io = unsafe { &*$crate::peripherals::LP_IO::ptr() };
-                            lp_io.[< gpio $gpionum >]().modify(|_, w| w.fun_wpd().bit(enable));
-                        }
-                    }
-                )+
-            }
-        }
-    }
-
-    pub(crate) use lp_gpio;
-}
-
 #[cfg(feature = "async")]
 mod asynch {
     use core::task::{Context, Poll};
 
     use embassy_sync::waitqueue::AtomicWaker;
-    use embedded_hal_async::digital::Wait;
 
     use super::*;
-    use crate::prelude::*;
 
     #[allow(clippy::declare_interior_mutable_const)]
     const NEW_AW: AtomicWaker = AtomicWaker::new();
     static PIN_WAKERS: [AtomicWaker; NUM_PINS] = [NEW_AW; NUM_PINS];
 
-    impl<MODE, const GPIONUM: u8> Wait for GpioPin<Input<MODE>, GPIONUM>
+    impl<MODE, const GPIONUM: u8> GpioPin<Input<MODE>, GPIONUM>
     where
         Self: GpioProperties,
         <Self as GpioProperties>::PinType: IsInputPin,
     {
-        async fn wait_for_high(&mut self) -> Result<(), Self::Error> {
+        /// Wait until the pin is high. If it is already high, return
+        /// immediately.
+        pub async fn wait_for_high(&mut self) {
             PinFuture::new(self, Event::HighLevel).await
         }
 
-        async fn wait_for_low(&mut self) -> Result<(), Self::Error> {
+        /// Wait until the pin is low. If it is already low, return immediately.
+        pub async fn wait_for_low(&mut self) {
             PinFuture::new(self, Event::LowLevel).await
         }
 
-        async fn wait_for_rising_edge(&mut self) -> Result<(), Self::Error> {
+        /// Wait for the pin to undergo a transition from low to high.
+        pub async fn wait_for_rising_edge(&mut self) {
             PinFuture::new(self, Event::RisingEdge).await
         }
 
-        async fn wait_for_falling_edge(&mut self) -> Result<(), Self::Error> {
+        /// Wait for the pin to undergo a transition from high to low.
+        pub async fn wait_for_falling_edge(&mut self) {
             PinFuture::new(self, Event::FallingEdge).await
         }
 
-        async fn wait_for_any_edge(&mut self) -> Result<(), Self::Error> {
+        /// Wait for the pin to undergo any transition, i.e low to high OR high
+        /// to low.
+        pub async fn wait_for_any_edge(&mut self) {
             PinFuture::new(self, Event::AnyEdge).await
         }
     }
 
-    impl<const GPIONUM: u8> Wait for GpioPin<Output<OpenDrain>, GPIONUM>
+    impl<const GPIONUM: u8> GpioPin<Output<OpenDrain>, GPIONUM>
     where
         Self: GpioProperties,
         <Self as GpioProperties>::PinType: IsInputPin + IsOutputPin,
     {
-        async fn wait_for_high(&mut self) -> Result<(), Self::Error> {
+        /// Wait until the pin is high. If it is already high, return
+        /// immediately.
+        pub async fn wait_for_high(&mut self) {
             PinFuture::new(self, Event::HighLevel).await
         }
 
-        async fn wait_for_low(&mut self) -> Result<(), Self::Error> {
+        /// Wait until the pin is low. If it is already low, return immediately.
+        pub async fn wait_for_low(&mut self) {
             PinFuture::new(self, Event::LowLevel).await
         }
 
-        async fn wait_for_rising_edge(&mut self) -> Result<(), Self::Error> {
+        /// Wait for the pin to undergo a transition from low to high.
+        pub async fn wait_for_rising_edge(&mut self) {
             PinFuture::new(self, Event::RisingEdge).await
         }
 
-        async fn wait_for_falling_edge(&mut self) -> Result<(), Self::Error> {
+        /// Wait for the pin to undergo a transition from high to low.
+        pub async fn wait_for_falling_edge(&mut self) {
             PinFuture::new(self, Event::FallingEdge).await
         }
 
-        async fn wait_for_any_edge(&mut self) -> Result<(), Self::Error> {
+        /// Wait for the pin to undergo any transition, i.e low to high OR high
+        /// to low.
+        pub async fn wait_for_any_edge(&mut self) {
             PinFuture::new(self, Event::AnyEdge).await
         }
     }
@@ -3105,7 +2338,7 @@ mod asynch {
 
     impl<'a, P> PinFuture<'a, P>
     where
-        P: crate::gpio::Pin + embedded_hal_1::digital::ErrorType,
+        P: crate::gpio::Pin,
     {
         pub fn new(pin: &'a mut P, event: Event) -> Self {
             pin.listen(event);
@@ -3115,9 +2348,9 @@ mod asynch {
 
     impl<'a, P> core::future::Future for PinFuture<'a, P>
     where
-        P: crate::gpio::Pin + embedded_hal_1::digital::ErrorType,
+        P: crate::gpio::Pin,
     {
-        type Output = Result<(), P::Error>;
+        type Output = ();
 
         fn poll(self: core::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
             PIN_WAKERS[self.pin.number() as usize].register(cx.waker());
@@ -3125,7 +2358,7 @@ mod asynch {
             // if pin is no longer listening its been triggered
             // therefore the future has resolved
             if !self.pin.is_listening() {
-                Poll::Ready(Ok(()))
+                Poll::Ready(())
             } else {
                 Poll::Pending
             }
@@ -3149,19 +2382,7 @@ mod asynch {
         });
     }
 
-    #[cfg(not(any(esp32p4)))]
-    #[interrupt]
-    unsafe fn GPIO() {
-        handle_gpio_interrupt();
-    }
-
-    #[cfg(esp32p4)]
-    #[interrupt]
-    unsafe fn GPIO_INT0() {
-        handle_gpio_interrupt();
-    }
-
-    fn handle_gpio_interrupt() {
+    pub(super) fn handle_gpio_interrupt() {
         let intrs_bank0 = InterruptStatusRegisterAccessBank0::interrupt_status_read();
 
         #[cfg(any(esp32, esp32s2, esp32s3, esp32p4))]
@@ -3188,6 +2409,337 @@ mod asynch {
                 intr_bits -= 1 << pin_nr;
             }
             Bank1GpioRegisterAccess::write_interrupt_status_clear(intrs_bank1);
+        }
+    }
+}
+
+#[cfg(feature = "embedded-hal-02")]
+mod embedded_hal_02_impls {
+    use embedded_hal_02::digital::v2 as digital;
+
+    use super::*;
+
+    impl<MODE, const GPIONUM: u8> digital::InputPin for GpioPin<Input<MODE>, GPIONUM>
+    where
+        Self: GpioProperties,
+    {
+        type Error = core::convert::Infallible;
+        fn is_high(&self) -> Result<bool, Self::Error> {
+            Ok(self.is_high())
+        }
+        fn is_low(&self) -> Result<bool, Self::Error> {
+            Ok(self.is_low())
+        }
+    }
+
+    impl<const GPIONUM: u8> digital::InputPin for GpioPin<Output<OpenDrain>, GPIONUM>
+    where
+        Self: GpioProperties,
+    {
+        type Error = core::convert::Infallible;
+        fn is_high(&self) -> Result<bool, Self::Error> {
+            Ok(<Self as GpioProperties>::Bank::read_input() & (1 << (GPIONUM % 32)) != 0)
+        }
+        fn is_low(&self) -> Result<bool, Self::Error> {
+            Ok(self.is_low())
+        }
+    }
+
+    impl<MODE, const GPIONUM: u8> digital::OutputPin for GpioPin<Output<MODE>, GPIONUM>
+    where
+        Self: GpioProperties,
+        <Self as GpioProperties>::PinType: IsOutputPin,
+    {
+        type Error = core::convert::Infallible;
+        fn set_high(&mut self) -> Result<(), Self::Error> {
+            self.set_high();
+            Ok(())
+        }
+        fn set_low(&mut self) -> Result<(), Self::Error> {
+            self.set_low();
+            Ok(())
+        }
+    }
+
+    impl<MODE, const GPIONUM: u8> digital::StatefulOutputPin for GpioPin<Output<MODE>, GPIONUM>
+    where
+        Self: GpioProperties,
+        <Self as GpioProperties>::PinType: IsOutputPin,
+    {
+        fn is_set_high(&self) -> Result<bool, Self::Error> {
+            Ok(self.is_set_high())
+        }
+        fn is_set_low(&self) -> Result<bool, Self::Error> {
+            Ok(self.is_set_low())
+        }
+    }
+
+    impl<MODE, const GPIONUM: u8> digital::ToggleableOutputPin for GpioPin<Output<MODE>, GPIONUM>
+    where
+        Self: GpioProperties,
+        <Self as GpioProperties>::PinType: IsOutputPin,
+    {
+        type Error = core::convert::Infallible;
+        fn toggle(&mut self) -> Result<(), Self::Error> {
+            self.toggle();
+            Ok(())
+        }
+    }
+
+    impl<MODE, TYPE> digital::InputPin for AnyPin<Input<MODE>, TYPE> {
+        type Error = core::convert::Infallible;
+
+        fn is_high(&self) -> Result<bool, Self::Error> {
+            Ok(self.is_high())
+        }
+
+        fn is_low(&self) -> Result<bool, Self::Error> {
+            Ok(self.is_low())
+        }
+    }
+
+    impl<MODE, TYPE> digital::OutputPin for AnyPin<Output<MODE>, TYPE> {
+        type Error = core::convert::Infallible;
+
+        fn set_low(&mut self) -> Result<(), Self::Error> {
+            self.set_low();
+            Ok(())
+        }
+
+        fn set_high(&mut self) -> Result<(), Self::Error> {
+            self.set_high();
+            Ok(())
+        }
+    }
+
+    impl<MODE, TYPE> digital::StatefulOutputPin for AnyPin<Output<MODE>, TYPE> {
+        fn is_set_high(&self) -> Result<bool, Self::Error> {
+            Ok(self.is_set_high())
+        }
+
+        fn is_set_low(&self) -> Result<bool, Self::Error> {
+            Ok(self.is_set_low())
+        }
+    }
+
+    impl<MODE, TYPE> digital::ToggleableOutputPin for AnyPin<Output<MODE>, TYPE> {
+        type Error = core::convert::Infallible;
+
+        fn toggle(&mut self) -> Result<(), Self::Error> {
+            self.toggle();
+            Ok(())
+        }
+    }
+}
+
+#[cfg(feature = "embedded-hal")]
+mod embedded_hal_impls {
+    use embedded_hal::digital;
+
+    use super::*;
+
+    impl<MODE, const GPIONUM: u8> digital::ErrorType for GpioPin<Input<MODE>, GPIONUM>
+    where
+        Self: GpioProperties,
+    {
+        type Error = core::convert::Infallible;
+    }
+
+    impl<MODE, const GPIONUM: u8> digital::InputPin for GpioPin<Input<MODE>, GPIONUM>
+    where
+        Self: GpioProperties,
+    {
+        fn is_high(&mut self) -> Result<bool, Self::Error> {
+            Ok(Self::is_high(self))
+        }
+        fn is_low(&mut self) -> Result<bool, Self::Error> {
+            Ok(Self::is_low(self))
+        }
+    }
+
+    impl<const GPIONUM: u8> digital::InputPin for GpioPin<Output<OpenDrain>, GPIONUM>
+    where
+        Self: GpioProperties,
+        <Self as GpioProperties>::PinType: IsOutputPin,
+    {
+        fn is_high(&mut self) -> Result<bool, Self::Error> {
+            Ok(Self::is_high(self))
+        }
+        fn is_low(&mut self) -> Result<bool, Self::Error> {
+            Ok(Self::is_low(self))
+        }
+    }
+
+    impl<MODE, const GPIONUM: u8> digital::ErrorType for GpioPin<Output<MODE>, GPIONUM>
+    where
+        Self: GpioProperties,
+        <Self as GpioProperties>::PinType: IsOutputPin,
+    {
+        type Error = core::convert::Infallible;
+    }
+
+    impl<MODE, const GPIONUM: u8> digital::OutputPin for GpioPin<Output<MODE>, GPIONUM>
+    where
+        Self: GpioProperties,
+        <Self as GpioProperties>::PinType: IsOutputPin,
+    {
+        fn set_low(&mut self) -> Result<(), Self::Error> {
+            self.set_low();
+            Ok(())
+        }
+        fn set_high(&mut self) -> Result<(), Self::Error> {
+            self.set_high();
+            Ok(())
+        }
+    }
+
+    impl<MODE, const GPIONUM: u8> digital::StatefulOutputPin for GpioPin<Output<MODE>, GPIONUM>
+    where
+        Self: GpioProperties,
+        <Self as GpioProperties>::PinType: IsOutputPin,
+    {
+        fn is_set_high(&mut self) -> Result<bool, Self::Error> {
+            Ok(Self::is_set_high(self))
+        }
+        fn is_set_low(&mut self) -> Result<bool, Self::Error> {
+            Ok(Self::is_set_low(self))
+        }
+    }
+
+    impl<MODE, TYPE> digital::ErrorType for AnyPin<Input<MODE>, TYPE> {
+        type Error = core::convert::Infallible;
+    }
+
+    impl<MODE, TYPE> digital::InputPin for AnyPin<Input<MODE>, TYPE> {
+        fn is_high(&mut self) -> Result<bool, Self::Error> {
+            Ok(Self::is_high(self))
+        }
+
+        fn is_low(&mut self) -> Result<bool, Self::Error> {
+            Ok(Self::is_low(self))
+        }
+    }
+
+    impl<MODE, TYPE> digital::ErrorType for AnyPin<Output<MODE>, TYPE> {
+        type Error = core::convert::Infallible;
+    }
+
+    impl<MODE, TYPE> digital::OutputPin for AnyPin<Output<MODE>, TYPE> {
+        fn set_low(&mut self) -> Result<(), Self::Error> {
+            self.set_low();
+            Ok(())
+        }
+
+        fn set_high(&mut self) -> Result<(), Self::Error> {
+            self.set_high();
+            Ok(())
+        }
+    }
+
+    impl<MODE, TYPE> digital::StatefulOutputPin for AnyPin<Output<MODE>, TYPE> {
+        fn is_set_high(&mut self) -> Result<bool, Self::Error> {
+            Ok(Self::is_set_high(self))
+        }
+
+        fn is_set_low(&mut self) -> Result<bool, Self::Error> {
+            Ok(Self::is_set_low(self))
+        }
+    }
+}
+
+#[cfg(feature = "embedded-hal")]
+#[cfg(feature = "async")]
+mod embedded_hal_async_impls {
+    use embedded_hal_async::digital::Wait;
+
+    use super::*;
+
+    impl<MODE, const GPIONUM: u8> Wait for GpioPin<Input<MODE>, GPIONUM>
+    where
+        Self: GpioProperties,
+        <Self as GpioProperties>::PinType: IsInputPin,
+    {
+        async fn wait_for_high(&mut self) -> Result<(), Self::Error> {
+            self.wait_for_high().await;
+            Ok(())
+        }
+
+        async fn wait_for_low(&mut self) -> Result<(), Self::Error> {
+            self.wait_for_low().await;
+            Ok(())
+        }
+
+        async fn wait_for_rising_edge(&mut self) -> Result<(), Self::Error> {
+            self.wait_for_rising_edge().await;
+            Ok(())
+        }
+
+        async fn wait_for_falling_edge(&mut self) -> Result<(), Self::Error> {
+            self.wait_for_falling_edge().await;
+            Ok(())
+        }
+
+        async fn wait_for_any_edge(&mut self) -> Result<(), Self::Error> {
+            self.wait_for_any_edge().await;
+            Ok(())
+        }
+    }
+
+    impl<const GPIONUM: u8> Wait for GpioPin<Output<OpenDrain>, GPIONUM>
+    where
+        Self: GpioProperties,
+        <Self as GpioProperties>::PinType: IsInputPin + IsOutputPin,
+    {
+        async fn wait_for_high(&mut self) -> Result<(), Self::Error> {
+            self.wait_for_high().await;
+            Ok(())
+        }
+
+        async fn wait_for_low(&mut self) -> Result<(), Self::Error> {
+            self.wait_for_low().await;
+            Ok(())
+        }
+
+        async fn wait_for_rising_edge(&mut self) -> Result<(), Self::Error> {
+            self.wait_for_rising_edge().await;
+            Ok(())
+        }
+
+        async fn wait_for_falling_edge(&mut self) -> Result<(), Self::Error> {
+            self.wait_for_falling_edge().await;
+            Ok(())
+        }
+
+        async fn wait_for_any_edge(&mut self) -> Result<(), Self::Error> {
+            self.wait_for_any_edge().await;
+            Ok(())
+        }
+    }
+
+    impl<MODE, TYPE> embedded_hal_async::digital::Wait for AnyPin<Input<MODE>, TYPE> {
+        async fn wait_for_high(&mut self) -> Result<(), Self::Error> {
+            self.wait_for_high().await;
+            Ok(())
+        }
+
+        async fn wait_for_low(&mut self) -> Result<(), Self::Error> {
+            self.wait_for_low().await;
+            Ok(())
+        }
+
+        async fn wait_for_rising_edge(&mut self) -> Result<(), Self::Error> {
+            self.wait_for_rising_edge().await;
+            Ok(())
+        }
+
+        async fn wait_for_falling_edge(&mut self) -> Result<(), Self::Error> {
+            self.wait_for_falling_edge().await;
+            Ok(())
+        }
+
+        async fn wait_for_any_edge(&mut self) -> Result<(), Self::Error> {
+            self.wait_for_any_edge().await;
+            Ok(())
         }
     }
 }

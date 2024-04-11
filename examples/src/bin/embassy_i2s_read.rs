@@ -24,12 +24,12 @@ use esp_hal::{
     clock::ClockControl,
     dma::{Dma, DmaPriority},
     dma_buffers,
-    embassy::{self},
+    embassy,
+    gpio::IO,
     i2s::{asynch::*, DataFormat, I2s, Standard},
     peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
-    IO,
 };
 use esp_println::println;
 
@@ -40,7 +40,7 @@ async fn main(_spawner: Spawner) {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
     embassy::init(&clocks, timg0);
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
@@ -58,7 +58,7 @@ async fn main(_spawner: Spawner) {
         Standard::Philips,
         DataFormat::Data16Channel16,
         44100u32.Hz(),
-        dma_channel.configure(
+        dma_channel.configure_for_async(
             false,
             &mut tx_descriptors,
             &mut rx_descriptors,

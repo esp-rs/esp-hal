@@ -34,16 +34,6 @@
 //!
 //! ## Examples
 //!
-//! #### `interrupt` macro
-//!
-//! Requires the `interrupt` feature to be enabled.
-//!
-//! ```no_run
-//! #[interrupt]
-//! fn INTR_NAME() {
-//!     // Interrupt handling code here
-//! }
-//! ```
 //!
 //! #### `main` macro
 //!
@@ -184,86 +174,60 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
     output.into()
 }
 
-/// Marks a function as an interrupt handler
+/// Mark a function as an interrupt handler.
 ///
-/// Used to handle on of the [interrupts](enum.Interrupt.html).
+/// Optionally a priority can be specified, e.g. `#[handler(priority =
+/// esp_hal::interrupt::Priority::Priority2)]`.
 ///
-/// When specified between braces (`#[interrupt(example)]`) that interrupt will
-/// be used and the function can have an arbitrary name. Otherwise the name of
-/// the function must be the name of the interrupt.
-///
-/// Example usage:
-///
-/// ```rust
-/// #[interrupt]
-/// fn GPIO() {
-///     // code
-/// }
-/// ```
-///
-/// The interrupt context can also be supplied by adding a argument to the
-/// interrupt function for example, on Xtensa based chips:
-///
-/// ```rust
-/// fn GPIO(context: &mut xtensa_lx_rt::exception::Context) {
-///     // code
-/// }
-/// ```
+/// If no priority is given, `Priority::min()` is assumed
 #[cfg(feature = "interrupt")]
+#[proc_macro_error::proc_macro_error]
 #[proc_macro_attribute]
-pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
-    use std::iter;
-
-    use darling::{ast::NestedMeta, Error};
+pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
+    use darling::{ast::NestedMeta, FromMeta};
     use proc_macro::Span;
     use proc_macro2::Ident;
     use proc_macro_crate::{crate_name, FoundCrate};
-    use proc_macro_error::abort;
-    use quote::quote;
-    use syn::{
-        parse::Error as ParseError,
-        spanned::Spanned,
-        ItemFn,
-        Meta,
-        ReturnType,
-        Type,
-        Visibility,
-    };
+    use syn::{parse::Error as ParseError, spanned::Spanned, ItemFn, ReturnType, Type};
 
-    use self::interrupt::{check_attr_whitelist, extract_cfgs, WhiteListCaller};
+    use self::interrupt::{check_attr_whitelist, WhiteListCaller};
 
-    let mut f: ItemFn = syn::parse(input).expect("`#[interrupt]` must be applied to a function");
+    #[derive(Debug, FromMeta)]
+    struct MacroArgs {
+        priority: Option<syn::Expr>,
+    }
+
+    let mut f: ItemFn = syn::parse(input).expect("`#[handler]` must be applied to a function");
+    let original_span = f.span();
 
     let attr_args = match NestedMeta::parse_meta_list(args.into()) {
         Ok(v) => v,
         Err(e) => {
-            return TokenStream::from(Error::from(e).write_errors());
+            return TokenStream::from(darling::Error::from(e).write_errors());
         }
     };
 
-    if attr_args.len() > 1 {
-        abort!(
-            Span::call_site(),
-            "This attribute accepts zero or 1 arguments"
-        )
-    }
-
-    let ident = f.sig.ident.clone();
-    let mut ident_s = &ident.clone();
-
-    if attr_args.len() == 1 {
-        if let NestedMeta::Meta(Meta::Path(x)) = &attr_args[0] {
-            ident_s = x.get_ident().unwrap();
-        } else {
-            abort!(
-                Span::call_site(),
-                format!(
-                    "This attribute accepts a string attribute {:?}",
-                    attr_args[0]
-                )
-            )
+    let args = match MacroArgs::from_list(&attr_args) {
+        Ok(v) => v,
+        Err(e) => {
+            return TokenStream::from(e.write_errors());
         }
-    }
+    };
+
+    let root = Ident::new(
+        if let Ok(FoundCrate::Name(ref name)) = crate_name("esp-hal") {
+            &name
+        } else {
+            "crate"
+        },
+        Span::call_site().into(),
+    );
+
+    let priority = if let Some(priority) = args.priority {
+        quote::quote!( #priority )
+    } else {
+        quote::quote! { #root::interrupt::Priority::min() }
+    };
 
     // XXX should we blacklist other attributes?
 
@@ -272,7 +236,6 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
     }
 
     let valid_signature = f.sig.constness.is_none()
-        && f.vis == Visibility::Inherited
         && f.sig.abi.is_none()
         && f.sig.generics.params.is_empty()
         && f.sig.generics.where_clause.is_none()
@@ -290,71 +253,26 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
     if !valid_signature {
         return ParseError::new(
             f.span(),
-            "`#[interrupt]` handlers must have signature `[unsafe] fn([&mut Context]) [-> !]`",
+            "`#[handler]` handlers must have signature `[unsafe] fn([&mut Context]) [-> !]`",
         )
         .to_compile_error()
         .into();
     }
 
+    f.sig.abi = syn::parse_quote_spanned!(original_span => extern "C");
+    let orig = f.sig.ident;
+    let vis = f.vis.clone();
     f.sig.ident = Ident::new(
-        &format!("__esp_hal_internal_{}", f.sig.ident),
+        &format!("__esp_hal_internal_{}", orig),
         proc_macro2::Span::call_site(),
     );
+    let new = f.sig.ident.clone();
 
-    let hal_crate = if cfg!(any(feature = "is-lp-core", feature = "is-ulp-core")) {
-        crate_name("esp-lp-hal")
-    } else {
-        crate_name("esp-hal")
-    };
-
-    let interrupt_in_hal_crate = if let Ok(FoundCrate::Name(ref name)) = hal_crate {
-        let ident = Ident::new(&name, Span::call_site().into());
-        quote!( #ident::peripherals::Interrupt::#ident_s )
-    } else {
-        quote!( crate::peripherals::Interrupt::#ident_s )
-    };
-
-    f.block.stmts.extend(iter::once(
-        syn::parse2(quote! {{
-            // Check that this interrupt actually exists
-            #interrupt_in_hal_crate;
-        }})
-        .unwrap(),
-    ));
-
-    let tramp_ident = Ident::new(
-        &format!("{}_trampoline", f.sig.ident),
-        proc_macro2::Span::call_site(),
-    );
-    let ident = &f.sig.ident;
-
-    let (ref cfgs, ref attrs) = extract_cfgs(f.attrs.clone());
-
-    let export_name = ident_s.to_string();
-
-    let trap_frame_in_hal_crate = if let Ok(FoundCrate::Name(ref name)) = hal_crate {
-        let ident = Ident::new(&name, Span::call_site().into());
-        quote!( #ident::trapframe::TrapFrame )
-    } else {
-        quote!(crate::trapframe::TrapFrame)
-    };
-
-    let context_call =
-        (f.sig.inputs.len() == 1).then(|| Ident::new("context", proc_macro2::Span::call_site()));
-
-    quote!(
-        #(#cfgs)*
-        #(#attrs)*
-        #[doc(hidden)]
-        #[export_name = #export_name]
-        pub unsafe extern "C" fn #tramp_ident(context: &mut #trap_frame_in_hal_crate) {
-            #ident(
-                #context_call
-            )
-        }
-
-        #[inline(always)]
+    quote::quote_spanned!(original_span =>
         #f
+
+        #[allow(non_upper_case_globals)]
+        #vis static #orig: #root::interrupt::InterruptHandler = #root::interrupt::InterruptHandler::new(#new, #priority);
     )
     .into()
 }
@@ -517,7 +435,7 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
     let imports = quote! {
         use #hal_crate::lp_core::LpCore;
         use #hal_crate::lp_core::LpCoreWakeupSource;
-        use #hal_crate::gpio::lp_gpio::LowPowerPin;
+        use #hal_crate::gpio::lp_io::LowPowerPin;
         use #hal_crate::gpio::*;
         use #hal_crate::uart::lp_uart::LpUart;
         use #hal_crate::i2c::lp_i2c::LpI2c;

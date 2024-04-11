@@ -14,15 +14,15 @@ use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    interrupt::{self, Priority},
-    peripherals::{Interrupt, Peripherals},
+    delay::Delay,
+    peripherals::Peripherals,
     prelude::*,
-    timer::TimerGroup,
-    UsbSerialJtag,
+    usb_serial_jtag::UsbSerialJtag,
+    Blocking,
 };
-use nb::block;
 
-static USB_SERIAL: Mutex<RefCell<Option<UsbSerialJtag>>> = Mutex::new(RefCell::new(None));
+static USB_SERIAL: Mutex<RefCell<Option<UsbSerialJtag<'static, Blocking>>>> =
+    Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
@@ -30,16 +30,12 @@ fn main() -> ! {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    let mut timer0 = timg0.timer0;
+    let delay = Delay::new(&clocks);
 
-    timer0.start(1u64.secs());
-
-    let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE);
+    let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE, Some(usb_device));
     usb_serial.listen_rx_packet_recv_interrupt();
 
     critical_section::with(|cs| USB_SERIAL.borrow_ref_mut(cs).replace(usb_serial));
-    interrupt::enable(Interrupt::USB_DEVICE, Priority::Priority1).unwrap();
 
     loop {
         critical_section::with(|cs| {
@@ -50,12 +46,12 @@ fn main() -> ! {
             .ok();
         });
 
-        block!(timer0.wait()).unwrap();
+        delay.delay(1.secs());
     }
 }
 
-#[interrupt]
-fn USB_DEVICE() {
+#[handler]
+fn usb_device() {
     critical_section::with(|cs| {
         let mut usb_serial = USB_SERIAL.borrow_ref_mut(cs);
         let usb_serial = usb_serial.as_mut().unwrap();

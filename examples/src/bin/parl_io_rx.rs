@@ -11,13 +11,13 @@
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
+    delay::Delay,
     dma::{Dma, DmaPriority},
     dma_buffers,
     gpio::IO,
     parl_io::{BitPackOrder, NoClkPin, ParlIoRxOnly, RxFourBits},
     peripherals::Peripherals,
     prelude::*,
-    Delay,
 };
 use esp_println::println;
 
@@ -44,7 +44,7 @@ fn main() -> ! {
             &mut rx_descriptors,
             DmaPriority::Priority0,
         ),
-        1u32.MHz(),
+        1.MHz(),
         &clocks,
     )
     .unwrap();
@@ -57,16 +57,13 @@ fn main() -> ! {
     let mut buffer = rx_buffer;
     buffer.fill(0u8);
 
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
 
     loop {
-        let transfer = parl_io_rx.read_dma(buffer).unwrap();
-
-        // the buffer and driver is moved into the transfer and we can get it back via
-        // `wait`
-        (buffer, parl_io_rx) = transfer.wait().unwrap();
+        let transfer = parl_io_rx.read_dma(&mut buffer).unwrap();
+        transfer.wait().unwrap();
         println!("Received: {:02x?} ...", &buffer[..30]);
 
-        delay.delay_ms(500u32);
+        delay.delay_millis(500);
     }
 }

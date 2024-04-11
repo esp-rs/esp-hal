@@ -6,7 +6,7 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{peripherals::Peripherals, prelude::*, Rng};
+use esp_hal::{peripherals::Peripherals, prelude::*, rng::Rng};
 use esp_println::println;
 
 #[entry]
@@ -19,7 +19,7 @@ fn main() -> ! {
 
     // Fill a buffer with random bytes:
     let mut buf = [0u8; 16];
-    rng.read(&mut buf).unwrap();
+    rng.read(&mut buf);
     println!("Random bytes: {:?}", buf);
 
     loop {}

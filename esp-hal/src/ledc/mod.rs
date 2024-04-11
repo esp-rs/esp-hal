@@ -18,7 +18,7 @@
 //!     .configure(timer::config::Config {
 //!         duty: timer::config::Duty::Duty5Bit,
 //!         clock_source: timer::LSClockSource::APBClk,
-//!         frequency: 24u32.kHz(),
+//!         frequency: 24.kHz(),
 //!     })
 //!     .unwrap();
 //!
@@ -44,7 +44,7 @@
 //!     .configure(timer::config::Config {
 //!         duty: timer::config::Duty::Duty5Bit,
 //!         clock_source: timer::HSClockSource::APBClk,
-//!         frequency: 24u32.kHz(),
+//!         frequency: 24.kHz(),
 //!     })
 //!     .unwrap();
 //!
@@ -96,12 +96,18 @@ pub struct HighSpeed {}
 /// Used to specify LowSpeed Timer/Channel
 pub struct LowSpeed {}
 
-pub trait Speed {}
+pub trait Speed {
+    const IS_HS: bool;
+}
 
 #[cfg(esp32)]
-impl Speed for HighSpeed {}
+impl Speed for HighSpeed {
+    const IS_HS: bool = true;
+}
 
-impl Speed for LowSpeed {}
+impl Speed for LowSpeed {
+    const IS_HS: bool = false;
+}
 
 impl<'d> LEDC<'d> {
     /// Return a new LEDC
@@ -125,7 +131,8 @@ impl<'d> LEDC<'d> {
     pub fn set_global_slow_clock(&mut self, _clock_source: LSGlobalClkSource) {
         self.ledc.conf().write(|w| w.apb_clk_sel().set_bit());
         self.ledc
-            .lstimer0_conf()
+            .lstimer(0)
+            .conf()
             .modify(|_, w| w.para_up().set_bit());
     }
 
@@ -152,7 +159,10 @@ impl<'d> LEDC<'d> {
                     .write(|w| unsafe { w.ledc_sclk_sel().bits(0) });
             }
         }
-        self.ledc.timer0_conf().modify(|_, w| w.para_up().set_bit());
+        self.ledc
+            .timer(0)
+            .conf()
+            .modify(|_, w| w.para_up().set_bit());
     }
 
     /// Return a new timer

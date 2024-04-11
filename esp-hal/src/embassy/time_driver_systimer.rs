@@ -1,4 +1,5 @@
 use critical_section::{CriticalSection, Mutex};
+use procmacros::handler;
 
 use super::AlarmState;
 use crate::{
@@ -9,22 +10,22 @@ use crate::{
 
 pub const ALARM_COUNT: usize = 3;
 
-pub type TimerType = SystemTimer<'static>;
+pub type TimerType = SystemTimer<'static, crate::Async>;
 
 pub struct EmbassyTimer {
     pub(crate) alarms: Mutex<[AlarmState; ALARM_COUNT]>,
-    pub(crate) alarm0: Alarm<Target, 0>,
-    pub(crate) alarm1: Alarm<Target, 1>,
-    pub(crate) alarm2: Alarm<Target, 2>,
+    pub(crate) alarm0: Alarm<Target, crate::Async, 0>,
+    pub(crate) alarm1: Alarm<Target, crate::Async, 1>,
+    pub(crate) alarm2: Alarm<Target, crate::Async, 2>,
 }
 
 const ALARM_STATE_NONE: AlarmState = AlarmState::new();
 
 embassy_time_driver::time_driver_impl!(static DRIVER: EmbassyTimer = EmbassyTimer {
     alarms: Mutex::new([ALARM_STATE_NONE; ALARM_COUNT]),
-    alarm0: unsafe { Alarm::<_, 0>::conjure() },
-    alarm1: unsafe { Alarm::<_, 1>::conjure() },
-    alarm2: unsafe { Alarm::<_, 2>::conjure() },
+    alarm0: unsafe { Alarm::<_, crate::Async, 0>::conjure() },
+    alarm1: unsafe { Alarm::<_, crate::Async, 1>::conjure() },
+    alarm2: unsafe { Alarm::<_, crate::Async, 2>::conjure() },
 });
 
 impl EmbassyTimer {
@@ -42,9 +43,9 @@ impl EmbassyTimer {
 
     pub(super) fn on_alarm_allocated(&self, n: usize) {
         match n {
-            0 => self.alarm0.enable_interrupt(true),
-            1 => self.alarm1.enable_interrupt(true),
-            2 => self.alarm2.enable_interrupt(true),
+            0 => self.alarm0.enable_interrupt_internal(true),
+            1 => self.alarm1.enable_interrupt_internal(true),
+            2 => self.alarm2.enable_interrupt_internal(true),
             _ => {}
         }
     }
@@ -57,31 +58,47 @@ impl EmbassyTimer {
     }
 
     pub fn init(_clocks: &Clocks, _systimer: TimerType) {
-        use crate::{interrupt, interrupt::Priority, macros::interrupt};
+        unsafe {
+            crate::interrupt::bind_interrupt(
+                peripherals::Interrupt::SYSTIMER_TARGET0,
+                target0_handler.handler(),
+            );
+            unwrap!(crate::interrupt::enable(
+                peripherals::Interrupt::SYSTIMER_TARGET0,
+                target0_handler.priority()
+            ));
 
-        unwrap!(interrupt::enable(
-            peripherals::Interrupt::SYSTIMER_TARGET0,
-            Priority::max()
-        ));
-        unwrap!(interrupt::enable(
-            peripherals::Interrupt::SYSTIMER_TARGET1,
-            Priority::max()
-        ));
-        unwrap!(interrupt::enable(
-            peripherals::Interrupt::SYSTIMER_TARGET2,
-            Priority::max()
-        ));
+            crate::interrupt::bind_interrupt(
+                peripherals::Interrupt::SYSTIMER_TARGET1,
+                target1_handler.handler(),
+            );
+            unwrap!(crate::interrupt::enable(
+                peripherals::Interrupt::SYSTIMER_TARGET1,
+                target1_handler.priority()
+            ));
 
-        #[interrupt]
-        fn SYSTIMER_TARGET0() {
+            crate::interrupt::bind_interrupt(
+                peripherals::Interrupt::SYSTIMER_TARGET2,
+                target2_handler.handler(),
+            );
+            unwrap!(crate::interrupt::enable(
+                peripherals::Interrupt::SYSTIMER_TARGET2,
+                target2_handler.priority()
+            ));
+        }
+
+        #[handler]
+        fn target0_handler() {
             DRIVER.on_interrupt(0);
         }
-        #[interrupt]
-        fn SYSTIMER_TARGET1() {
+
+        #[handler]
+        fn target1_handler() {
             DRIVER.on_interrupt(1);
         }
-        #[interrupt]
-        fn SYSTIMER_TARGET2() {
+
+        #[handler]
+        fn target2_handler() {
             DRIVER.on_interrupt(2);
         }
     }
@@ -109,9 +126,9 @@ impl EmbassyTimer {
 
     fn clear_interrupt(&self, id: usize) {
         match id {
-            0 => self.alarm0.clear_interrupt(),
-            1 => self.alarm1.clear_interrupt(),
-            2 => self.alarm2.clear_interrupt(),
+            0 => self.alarm0.clear_interrupt_internal(),
+            1 => self.alarm1.clear_interrupt_internal(),
+            2 => self.alarm2.clear_interrupt_internal(),
             _ => {}
         }
     }

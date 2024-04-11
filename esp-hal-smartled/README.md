@@ -2,21 +2,22 @@
 
 [![Crates.io](https://img.shields.io/crates/v/esp-hal-smartled?labelColor=1C2C2E&color=C96329&logo=Rust&style=flat-square)](https://crates.io/crates/esp-hal-smartled)
 [![docs.rs](https://img.shields.io/docsrs/esp-hal-smartled?labelColor=1C2C2E&color=C96329&logo=rust&style=flat-square)](https://docs.rs/esp-hal-smartled)
+![MSRV](https://img.shields.io/badge/MSRV-1.76-blue?labelColor=1C2C2E&style=flat-square)
 ![Crates.io](https://img.shields.io/crates/l/esp-hal-smartled?labelColor=1C2C2E&style=flat-square)
 [![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&labelColor=1C2C2E&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
 
-This adapter allows for the use of an RMT output channel to easily interact with RGB LEDs and use the convenience functions of the [`smart-leds`](https://crates.io/crates/smart-leds) crate.
+Allows for the use of an RMT output channel to easily interact with RGB LEDs and use the convenience functions of the [smart-leds] crate.
+
+[smart-leds]: https://crates.io/crates/smart-leds
 
 ## [Documentation]
 
 [documentation]: https://docs.rs/esp-hal-smartled/
 
-## Usage
+## Minimum Supported Rust Version (MSRV)
 
-### `defmt` Feature
-
-Please note that `defmt` does _not_ provide MSRV guarantees with releases, and as such we are not able to make any MSRV guarantees when this feature is enabled. For more information refer to the MSRV section of `defmt`'s README:
-https://github.com/knurling-rs/defmt?tab=readme-ov-file#msrv
+This crate is guaranteed to compile on stable Rust 1.76 and up. It _might_
+compile with older versions but that may change in any new patch release.
 
 ## License
 

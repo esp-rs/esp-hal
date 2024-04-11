@@ -15,15 +15,15 @@
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
+    delay::Delay,
     gpio::IO,
     peripherals::Peripherals,
     prelude::*,
     uart::{
         config::{Config, DataBits, Parity, StopBits},
         TxRxPins,
+        Uart,
     },
-    Delay,
-    Uart,
 };
 use esp_println::println;
 use nb::block;
@@ -47,20 +47,20 @@ fn main() -> ! {
         io.pins.gpio5.into_floating_input(),
     );
 
-    let mut serial1 = Uart::new_with_config(peripherals.UART1, config, Some(pins), &clocks);
+    let mut serial1 = Uart::new_with_config(peripherals.UART1, config, Some(pins), &clocks, None);
 
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
 
     println!("Start");
     loop {
-        serial1.write(0x42).ok();
-        let read = block!(serial1.read());
+        serial1.write_byte(0x42).ok();
+        let read = block!(serial1.read_byte());
 
         match read {
             Ok(read) => println!("Read 0x{:02x}", read),
             Err(err) => println!("Error {:?}", err),
         }
 
-        delay.delay_ms(250u32);
+        delay.delay_millis(250);
     }
 }

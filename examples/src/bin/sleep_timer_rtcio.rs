@@ -11,20 +11,20 @@ use core::time::Duration;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
+    delay::Delay,
     entry,
     gpio,
+    gpio::IO,
     peripherals::Peripherals,
     prelude::*,
     rtc_cntl::{
         get_reset_reason,
         get_wakeup_cause,
         sleep::{RtcioWakeupSource, TimerWakeupSource, WakeupLevel},
+        Rtc,
         SocResetReason,
     },
     Cpu,
-    Delay,
-    Rtc,
-    IO,
 };
 use esp_println::println;
 
@@ -35,7 +35,7 @@ fn main() -> ! {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let mut io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-    let mut rtc = Rtc::new(peripherals.LPWR);
+    let mut rtc = Rtc::new(peripherals.LPWR, None);
 
     println!("up and runnning!");
     let reason = get_reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
@@ -58,6 +58,6 @@ fn main() -> ! {
 
     let rtcio = RtcioWakeupSource::new(wakeup_pins);
     println!("sleeping!");
-    delay.delay_ms(100u32);
+    delay.delay_millis(100);
     rtc.sleep_deep(&[&timer, &rtcio], &mut delay);
 }

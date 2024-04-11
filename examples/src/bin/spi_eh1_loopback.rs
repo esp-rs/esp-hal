@@ -14,7 +14,7 @@
 //! data.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: eh1
+//% FEATURES: embedded-hal
 
 #![no_std]
 #![no_main]
@@ -23,11 +23,11 @@ use embedded_hal::spi::SpiBus;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
+    delay::Delay,
     gpio::IO,
     peripherals::Peripherals,
     prelude::*,
     spi::{master::Spi, SpiMode},
-    Delay,
 };
 use esp_println::{print, println};
 
@@ -43,14 +43,14 @@ fn main() -> ! {
     let mosi = io.pins.gpio4;
     let cs = io.pins.gpio5;
 
-    let mut spi = Spi::new(peripherals.SPI2, 1000u32.kHz(), SpiMode::Mode0, &clocks).with_pins(
+    let mut spi = Spi::new(peripherals.SPI2, 1000.kHz(), SpiMode::Mode0, &clocks).with_pins(
         Some(sclk),
         Some(mosi),
         Some(miso),
         Some(cs),
     );
 
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
     println!("=== SPI example with embedded-hal-1 traits ===");
 
     loop {
@@ -62,7 +62,7 @@ fn main() -> ! {
         SpiBus::transfer(&mut spi, &mut read[..], &write[..]).expect("Symmetric transfer failed");
         assert_eq!(write, read);
         println!(" SUCCESS");
-        delay.delay_ms(250u32);
+        delay.delay_millis(250);
 
         // --- Asymmetric transfer (Read more than we write) ---
         print!("Starting asymetric transfer (read > write)...");
@@ -73,7 +73,7 @@ fn main() -> ! {
         assert_eq!(write[0], read[0]);
         assert_eq!(read[2], 0x00u8);
         println!(" SUCCESS");
-        delay.delay_ms(250u32);
+        delay.delay_millis(250);
 
         // --- Symmetric transfer with huge buffer ---
         // Only your RAM is the limit!
@@ -87,7 +87,7 @@ fn main() -> ! {
         SpiBus::transfer(&mut spi, &mut read[..], &write[..]).expect("Huge transfer failed");
         assert_eq!(write, read);
         println!(" SUCCESS");
-        delay.delay_ms(250u32);
+        delay.delay_millis(250);
 
         // --- Symmetric transfer with huge buffer in-place (No additional allocation
         // needed) ---
@@ -102,6 +102,6 @@ fn main() -> ! {
             assert_eq!(write[byte], byte as u8);
         }
         println!(" SUCCESS");
-        delay.delay_ms(250u32);
+        delay.delay_millis(250);
     }
 }

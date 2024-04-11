@@ -29,7 +29,7 @@
 //! ```
 //! ### Accessing peripherals
 //! ```no_run
-//! let mut rtc = Rtc::new(peripherals.LPWR);
+//! let mut rtc = Rtc::new(peripherals.LPWR, None);
 //! ```
 //! ```no_run
 //! let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
@@ -46,7 +46,7 @@ use core::{
 /// dedicated struct is memory efficiency:
 ///
 /// Peripheral singletons are typically either zero-sized (for concrete
-/// peripehrals like `PA9` or `Spi4`) or very small (for example `AnyPin` which
+/// peripherals like `PA9` or `Spi4`) or very small (for example `AnyPin` which
 /// is 1 byte). However `&mut T` is always 4 bytes for 32-bit targets, even if T
 /// is zero-sized. PeripheralRef stores a copy of `T` instead, so it's the same
 /// size.
@@ -221,7 +221,7 @@ mod peripheral_macros {
     #[doc(hidden)]
     #[macro_export]
     macro_rules! peripherals {
-        ($($(#[$cfg:meta])? $name:ident <= $from_pac:tt),*$(,)?) => {
+        ($($(#[$cfg:meta])? $name:ident <= $from_pac:tt $(($($interrupt:ident),*))? ),*$(,)?) => {
 
             /// Contains the generated peripherals which implement [`Peripheral`]
             mod peripherals {
@@ -278,6 +278,21 @@ mod peripheral_macros {
             $(
                 pub use peripherals::$name;
             )*
+
+            $(
+                $(
+                    impl peripherals::$name {
+                        $(
+                            paste::paste!{
+                                pub fn [<bind_ $interrupt:lower _interrupt >](&mut self, handler: unsafe extern "C" fn() -> ()) {
+                                    unsafe { $crate::interrupt::bind_interrupt($crate::peripherals::Interrupt::$interrupt, handler); }
+                                }
+                            }
+                        )*
+                    }
+                )*
+            )*
+
         }
     }
 

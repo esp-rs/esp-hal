@@ -47,8 +47,8 @@ pub(crate) fn init() {
     power_control_init();
 
     unsafe {
-        rtc_cntl.int_ena_rtc().write(|w| w.bits(0));
-        rtc_cntl.int_clr_rtc().write(|w| w.bits(u32::MAX));
+        rtc_cntl.int_ena().write(|w| w.bits(0));
+        rtc_cntl.int_clr().write(|w| w.bits(u32::MAX));
     }
 
     regi2c_write_mask!(I2C_ULP, I2C_ULP_IR_FORCE_XPD_CK, 0);

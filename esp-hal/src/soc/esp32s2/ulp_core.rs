@@ -40,10 +40,6 @@ use esp32s2 as pac;
 
 use crate::peripheral::{Peripheral, PeripheralRef};
 
-extern "C" {
-    fn ets_delay_us(delay: u32);
-}
-
 #[derive(Debug, Clone, Copy)]
 pub enum UlpCoreWakeupSource {
     HpCpu,
@@ -109,9 +105,7 @@ fn ulp_run(wakeup_src: UlpCoreWakeupSource) {
         .modify(|_, w| w.ulp_cp_slp_timer_en().clear_bit());
 
     // wait for at least 1 RTC_SLOW_CLK cycle
-    unsafe {
-        ets_delay_us(20);
-    }
+    crate::rom::ets_delay_us(20);
 
     // Select ULP-RISC-V to send the DONE signal
     rtc_cntl
@@ -126,17 +120,15 @@ fn ulp_run(wakeup_src: UlpCoreWakeupSource) {
         .modify(|_, w| w.cocpu_sel().clear_bit());
 
     // Clear any spurious wakeup trigger interrupts upon ULP startup
-    unsafe {
-        ets_delay_us(20);
-    }
+    crate::rom::ets_delay_us(20);
 
-    rtc_cntl.int_clr_rtc().write(|w| {
-        w.cocpu_int_clr()
-            .set_bit()
-            .cocpu_trap_int_clr()
-            .set_bit()
-            .ulp_cp_int_clr()
-            .set_bit()
+    rtc_cntl.int_clr().write(|w| {
+        w.cocpu()
+            .clear_bit_by_one()
+            .cocpu_trap()
+            .clear_bit_by_one()
+            .ulp_cp()
+            .clear_bit_by_one()
     });
 }
 

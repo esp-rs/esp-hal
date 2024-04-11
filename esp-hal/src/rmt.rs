@@ -41,7 +41,7 @@
 //! ### Initialization
 //!
 //! ```no_run
-//! let rmt = Rmt::new(peripherals.RMT, 80u32.MHz(), &mut clock_control, &clocks).unwrap();
+//! let rmt = Rmt::new(peripherals.RMT, 80.MHz(), &mut clock_control, &clocks).unwrap();
 //! let mut channel = rmt
 //!     .channel0
 //!     .configure(
@@ -83,11 +83,14 @@
 //! channel = transaction.wait().unwrap();
 //! ```
 
+use core::marker::PhantomData;
+
 use fugit::HertzU32;
 
 use crate::{
     clock::Clocks,
     gpio::{InputPin, OutputPin},
+    interrupt::InterruptHandler,
     peripheral::Peripheral,
     rmt::private::CreateInstance,
     soc::constants,
@@ -201,12 +204,18 @@ pub struct RxChannelConfig {
 
 pub use impl_for_chip::Rmt;
 
-impl<'d> Rmt<'d> {
-    /// Create a new RMT instance
-    pub fn new(
+#[cfg(feature = "async")]
+use self::asynch::{RxChannelAsync, TxChannelAsync};
+
+impl<'d, M> Rmt<'d, M>
+where
+    M: crate::Mode,
+{
+    pub fn new_internal(
         peripheral: impl Peripheral<P = crate::peripherals::RMT> + 'd,
         frequency: HertzU32,
         _clocks: &Clocks,
+        interrupt: Option<InterruptHandler>,
     ) -> Result<Self, Error> {
         let me = Rmt::create(peripheral);
 
@@ -222,6 +231,17 @@ impl<'d> Rmt<'d> {
 
         #[cfg(any(esp32, esp32s2))]
         self::chip_specific::configure_clock();
+
+        if let Some(interrupt) = interrupt {
+            unsafe {
+                crate::interrupt::bind_interrupt(
+                    crate::peripherals::Interrupt::RMT,
+                    interrupt.handler(),
+                );
+                crate::interrupt::enable(crate::peripherals::Interrupt::RMT, interrupt.priority())
+                    .unwrap();
+            }
+        }
 
         Ok(me)
     }
@@ -246,10 +266,70 @@ impl<'d> Rmt<'d> {
     }
 }
 
+impl<'d> Rmt<'d, crate::Blocking> {
+    /// Create a new RMT instance
+    pub fn new(
+        peripheral: impl Peripheral<P = crate::peripherals::RMT> + 'd,
+        frequency: HertzU32,
+        _clocks: &Clocks,
+        interrupt: Option<InterruptHandler>,
+    ) -> Result<Self, Error> {
+        Self::new_internal(peripheral, frequency, _clocks, interrupt)
+    }
+}
+
+#[cfg(feature = "async")]
+impl<'d> Rmt<'d, crate::Async> {
+    /// Create a new RMT instance
+    pub fn new_async(
+        peripheral: impl Peripheral<P = crate::peripherals::RMT> + 'd,
+        frequency: HertzU32,
+        _clocks: &Clocks,
+    ) -> Result<Self, Error> {
+        Self::new_internal(
+            peripheral,
+            frequency,
+            _clocks,
+            Some(asynch::async_interrupt_handler),
+        )
+    }
+}
+
 pub trait TxChannelCreator<'d, T, P>
 where
     P: OutputPin,
     T: TxChannel,
+{
+    /// Configure the TX channel
+    fn configure(
+        self,
+        pin: impl Peripheral<P = P> + 'd,
+        config: TxChannelConfig,
+    ) -> Result<T, Error>
+    where
+        Self: Sized,
+    {
+        crate::into_ref!(pin);
+        pin.set_to_push_pull_output()
+            .connect_peripheral_to_output(T::output_signal());
+        T::set_divider(config.clk_divider);
+        T::set_carrier(
+            config.carrier_modulation,
+            config.carrier_high,
+            config.carrier_low,
+            config.carrier_level,
+        );
+        T::set_idle_output(config.idle_output, config.idle_output_level);
+
+        Ok(T::new())
+    }
+}
+
+#[cfg(feature = "async")]
+pub trait TxChannelCreatorAsync<'d, T, P>
+where
+    P: OutputPin,
+    T: TxChannelAsync,
 {
     /// Configure the TX channel
     fn configure(
@@ -321,6 +401,52 @@ where
     }
 }
 
+#[cfg(feature = "async")]
+pub trait RxChannelCreatorAsync<'d, T, P>
+where
+    P: InputPin,
+    T: RxChannelAsync,
+{
+    /// Configure the RX channel
+    fn configure(
+        self,
+        pin: impl Peripheral<P = P> + 'd,
+        config: RxChannelConfig,
+    ) -> Result<T, Error>
+    where
+        Self: Sized,
+    {
+        if config.filter_threshold > 0b111_1111 {
+            return Err(Error::InvalidArgument);
+        }
+
+        #[cfg(any(esp32, esp32s2))]
+        if config.idle_threshold > 0b111_1111_1111_1111 {
+            return Err(Error::InvalidArgument);
+        }
+
+        #[cfg(not(any(esp32, esp32s2)))]
+        if config.idle_threshold > 0b11_1111_1111_1111 {
+            return Err(Error::InvalidArgument);
+        }
+
+        crate::into_ref!(pin);
+        pin.set_to_input()
+            .connect_input_to_peripheral(T::input_signal());
+        T::set_divider(config.clk_divider);
+        T::set_carrier(
+            config.carrier_modulation,
+            config.carrier_high,
+            config.carrier_low,
+            config.carrier_level,
+        );
+        T::set_filter_threshold(config.filter_threshold);
+        T::set_idle_threshold(config.idle_threshold);
+
+        Ok(T::new())
+    }
+}
+
 /// An in-progress transaction for a single shot TX transaction.
 pub struct SingleShotTxTransaction<'a, C, T: Into<u32> + Copy>
 where
@@ -338,18 +464,18 @@ where
     /// Wait for the transaction to complete
     pub fn wait(mut self) -> Result<C, (Error, C)> {
         loop {
-            if <C as private::TxChannelInternal>::is_error() {
+            if <C as private::TxChannelInternal<crate::Blocking>>::is_error() {
                 return Err((Error::TransmissionError, self.channel));
             }
 
             if self.index < self.data.len() {
                 // wait for TX-THR
                 loop {
-                    if <C as private::TxChannelInternal>::is_threshold_set() {
+                    if <C as private::TxChannelInternal<crate::Blocking>>::is_threshold_set() {
                         break;
                     }
                 }
-                <C as private::TxChannelInternal>::reset_threshold_set();
+                <C as private::TxChannelInternal<crate::Blocking>>::reset_threshold_set();
 
                 // re-fill TX RAM
                 let ram_index = (((self.index - constants::RMT_CHANNEL_RAM_SIZE)
@@ -377,11 +503,11 @@ where
         }
 
         loop {
-            if <C as private::TxChannelInternal>::is_error() {
+            if <C as private::TxChannelInternal<crate::Blocking>>::is_error() {
                 return Err((Error::TransmissionError, self.channel));
             }
 
-            if <C as private::TxChannelInternal>::is_done() {
+            if <C as private::TxChannelInternal<crate::Blocking>>::is_done() {
                 break;
             }
         }
@@ -404,15 +530,15 @@ where
 {
     /// Stop transaction when the current iteration ends.
     pub fn stop_next(self) -> Result<C, (Error, C)> {
-        <C as private::TxChannelInternal>::set_continuous(false);
-        <C as private::TxChannelInternal>::update();
+        <C as private::TxChannelInternal<crate::Blocking>>::set_continuous(false);
+        <C as private::TxChannelInternal<crate::Blocking>>::update();
 
         loop {
-            if <C as private::TxChannelInternal>::is_error() {
+            if <C as private::TxChannelInternal<crate::Blocking>>::is_error() {
                 return Err((Error::TransmissionError, self.channel));
             }
 
-            if <C as private::TxChannelInternal>::is_done() {
+            if <C as private::TxChannelInternal<crate::Blocking>>::is_done() {
                 break;
             }
         }
@@ -422,8 +548,8 @@ where
 
     /// Stop transaction as soon as possible.
     pub fn stop(self) -> Result<C, (Error, C)> {
-        <C as private::TxChannelInternal>::set_continuous(false);
-        <C as private::TxChannelInternal>::update();
+        <C as private::TxChannelInternal<crate::Blocking>>::set_continuous(false);
+        <C as private::TxChannelInternal<crate::Blocking>>::update();
 
         let ptr = (constants::RMT_RAM_START
             + C::CHANNEL as usize * constants::RMT_CHANNEL_RAM_SIZE * 4)
@@ -435,11 +561,11 @@ where
         }
 
         loop {
-            if <C as private::TxChannelInternal>::is_error() {
+            if <C as private::TxChannelInternal<crate::Blocking>>::is_error() {
                 return Err((Error::TransmissionError, self.channel));
             }
 
-            if <C as private::TxChannelInternal>::is_done() {
+            if <C as private::TxChannelInternal<crate::Blocking>>::is_done() {
                 break;
             }
         }
@@ -448,71 +574,110 @@ where
     }
 
     pub fn is_loopcount_interrupt_set(&self) -> bool {
-        <C as private::TxChannelInternal>::is_loopcount_interrupt_set()
+        <C as private::TxChannelInternal<crate::Blocking>>::is_loopcount_interrupt_set()
     }
 }
 
 macro_rules! impl_tx_channel_creator {
     ($channel:literal) => {
-        impl<'d, P> $crate::rmt::TxChannelCreator<'d, $crate::rmt::Channel<$channel>, P>
-            for ChannelCreator<$channel>
+        impl<'d, P> $crate::rmt::TxChannelCreator<'d, $crate::rmt::Channel<$crate::Blocking, $channel>, P>
+            for ChannelCreator<$crate::Blocking, $channel>
         where
             P: $crate::gpio::OutputPin,
         {
         }
 
-        impl $crate::rmt::TxChannel for $crate::rmt::Channel<$channel> {}
+        impl $crate::rmt::TxChannel for $crate::rmt::Channel<$crate::Blocking, $channel> {}
 
         #[cfg(feature = "async")]
-        impl $crate::rmt::asynch::TxChannelAsync for $crate::rmt::Channel<$channel> {}
+        impl<'d, P> $crate::rmt::TxChannelCreatorAsync<'d, $crate::rmt::Channel<$crate::Async, $channel>, P>
+            for ChannelCreator<$crate::Async, $channel>
+        where
+            P: $crate::gpio::OutputPin,
+        {
+        }
+
+        #[cfg(feature = "async")]
+        impl $crate::rmt::asynch::TxChannelAsync for $crate::rmt::Channel<$crate::Async, $channel> {}
     };
 }
 
 macro_rules! impl_rx_channel_creator {
     ($channel:literal) => {
-        impl<'d, P> $crate::rmt::RxChannelCreator<'d, $crate::rmt::Channel<$channel>, P>
-            for ChannelCreator<$channel>
+        impl<'d, P> $crate::rmt::RxChannelCreator<'d, $crate::rmt::Channel<$crate::Blocking, $channel>, P>
+            for ChannelCreator<$crate::Blocking, $channel>
         where
             P: $crate::gpio::InputPin,
         {
         }
 
-        impl $crate::rmt::RxChannel for $crate::rmt::Channel<$channel> {}
+        impl $crate::rmt::RxChannel for $crate::rmt::Channel<$crate::Blocking, $channel> {}
 
         #[cfg(feature = "async")]
-        impl $crate::rmt::asynch::RxChannelAsync for $crate::rmt::Channel<$channel> {}
+        impl<'d, P> $crate::rmt::RxChannelCreatorAsync<'d, $crate::rmt::Channel<$crate::Async, $channel>, P>
+        for ChannelCreator<$crate::Async, $channel>
+        where
+            P: $crate::gpio::InputPin,
+        {
+        }
+
+        #[cfg(feature = "async")]
+        impl $crate::rmt::asynch::RxChannelAsync for $crate::rmt::Channel<$crate::Async, $channel> {}
     };
 }
 
 #[cfg(not(any(esp32, esp32s2, esp32s3)))]
 mod impl_for_chip {
+    use core::marker::PhantomData;
+
     use super::private::CreateInstance;
     use crate::peripheral::{Peripheral, PeripheralRef};
 
     /// RMT Instance
-    pub struct Rmt<'d> {
+    pub struct Rmt<'d, M>
+    where
+        M: crate::Mode,
+    {
         _peripheral: PeripheralRef<'d, crate::peripherals::RMT>,
-        pub channel0: ChannelCreator<0>,
-        pub channel1: ChannelCreator<1>,
-        pub channel2: ChannelCreator<2>,
-        pub channel3: ChannelCreator<3>,
+        pub channel0: ChannelCreator<M, 0>,
+        pub channel1: ChannelCreator<M, 1>,
+        pub channel2: ChannelCreator<M, 2>,
+        pub channel3: ChannelCreator<M, 3>,
+        phantom: PhantomData<M>,
     }
 
-    impl<'d> CreateInstance<'d> for Rmt<'d> {
+    impl<'d, M> CreateInstance<'d> for Rmt<'d, M>
+    where
+        M: crate::Mode,
+    {
         fn create(peripheral: impl Peripheral<P = crate::peripherals::RMT> + 'd) -> Self {
             crate::into_ref!(peripheral);
 
             Self {
                 _peripheral: peripheral,
-                channel0: ChannelCreator {},
-                channel1: ChannelCreator {},
-                channel2: ChannelCreator {},
-                channel3: ChannelCreator {},
+                channel0: ChannelCreator {
+                    phantom: PhantomData,
+                },
+                channel1: ChannelCreator {
+                    phantom: PhantomData,
+                },
+                channel2: ChannelCreator {
+                    phantom: PhantomData,
+                },
+                channel3: ChannelCreator {
+                    phantom: PhantomData,
+                },
+                phantom: PhantomData,
             }
         }
     }
 
-    pub struct ChannelCreator<const CHANNEL: u8> {}
+    pub struct ChannelCreator<M, const CHANNEL: u8>
+    where
+        M: crate::Mode,
+    {
+        phantom: PhantomData<M>,
+    }
 
     impl_tx_channel_creator!(0);
     impl_tx_channel_creator!(1);
@@ -529,41 +694,72 @@ mod impl_for_chip {
 
 #[cfg(esp32)]
 mod impl_for_chip {
+    use core::marker::PhantomData;
+
     use super::private::CreateInstance;
     use crate::peripheral::{Peripheral, PeripheralRef};
 
     /// RMT Instance
-    pub struct Rmt<'d> {
+    pub struct Rmt<'d, M>
+    where
+        M: crate::Mode,
+    {
         _peripheral: PeripheralRef<'d, crate::peripherals::RMT>,
-        pub channel0: ChannelCreator<0>,
-        pub channel1: ChannelCreator<1>,
-        pub channel2: ChannelCreator<2>,
-        pub channel3: ChannelCreator<3>,
-        pub channel4: ChannelCreator<4>,
-        pub channel5: ChannelCreator<5>,
-        pub channel6: ChannelCreator<6>,
-        pub channel7: ChannelCreator<7>,
+        pub channel0: ChannelCreator<M, 0>,
+        pub channel1: ChannelCreator<M, 1>,
+        pub channel2: ChannelCreator<M, 2>,
+        pub channel3: ChannelCreator<M, 3>,
+        pub channel4: ChannelCreator<M, 4>,
+        pub channel5: ChannelCreator<M, 5>,
+        pub channel6: ChannelCreator<M, 6>,
+        pub channel7: ChannelCreator<M, 7>,
+        phantom: PhantomData<M>,
     }
 
-    impl<'d> CreateInstance<'d> for Rmt<'d> {
+    impl<'d, M> CreateInstance<'d> for Rmt<'d, M>
+    where
+        M: crate::Mode,
+    {
         fn create(peripheral: impl Peripheral<P = crate::peripherals::RMT> + 'd) -> Self {
             crate::into_ref!(peripheral);
 
             Self {
                 _peripheral: peripheral,
-                channel0: ChannelCreator {},
-                channel1: ChannelCreator {},
-                channel2: ChannelCreator {},
-                channel3: ChannelCreator {},
-                channel4: ChannelCreator {},
-                channel5: ChannelCreator {},
-                channel6: ChannelCreator {},
-                channel7: ChannelCreator {},
+                channel0: ChannelCreator {
+                    phantom: PhantomData,
+                },
+                channel1: ChannelCreator {
+                    phantom: PhantomData,
+                },
+                channel2: ChannelCreator {
+                    phantom: PhantomData,
+                },
+                channel3: ChannelCreator {
+                    phantom: PhantomData,
+                },
+                channel4: ChannelCreator {
+                    phantom: PhantomData,
+                },
+                channel5: ChannelCreator {
+                    phantom: PhantomData,
+                },
+                channel6: ChannelCreator {
+                    phantom: PhantomData,
+                },
+                channel7: ChannelCreator {
+                    phantom: PhantomData,
+                },
+                phantom: PhantomData,
             }
         }
     }
 
-    pub struct ChannelCreator<const CHANNEL: u8> {}
+    pub struct ChannelCreator<M, const CHANNEL: u8>
+    where
+        M: crate::Mode,
+    {
+        phantom: PhantomData<M>,
+    }
 
     impl_tx_channel_creator!(0);
     impl_tx_channel_creator!(1);
@@ -604,33 +800,56 @@ mod impl_for_chip {
 
 #[cfg(esp32s2)]
 mod impl_for_chip {
+    use core::marker::PhantomData;
+
     use super::private::CreateInstance;
     use crate::peripheral::{Peripheral, PeripheralRef};
 
     /// RMT Instance
-    pub struct Rmt<'d> {
+    pub struct Rmt<'d, M>
+    where
+        M: crate::Mode,
+    {
         _peripheral: PeripheralRef<'d, crate::peripherals::RMT>,
-        pub channel0: ChannelCreator<0>,
-        pub channel1: ChannelCreator<1>,
-        pub channel2: ChannelCreator<2>,
-        pub channel3: ChannelCreator<3>,
+        pub channel0: ChannelCreator<M, 0>,
+        pub channel1: ChannelCreator<M, 1>,
+        pub channel2: ChannelCreator<M, 2>,
+        pub channel3: ChannelCreator<M, 3>,
+        phantom: PhantomData<M>,
     }
 
-    impl<'d> CreateInstance<'d> for Rmt<'d> {
+    impl<'d, M> CreateInstance<'d> for Rmt<'d, M>
+    where
+        M: crate::Mode,
+    {
         fn create(peripheral: impl Peripheral<P = crate::peripherals::RMT> + 'd) -> Self {
             crate::into_ref!(peripheral);
 
             Self {
                 _peripheral: peripheral,
-                channel0: ChannelCreator {},
-                channel1: ChannelCreator {},
-                channel2: ChannelCreator {},
-                channel3: ChannelCreator {},
+                channel0: ChannelCreator {
+                    phantom: PhantomData,
+                },
+                channel1: ChannelCreator {
+                    phantom: PhantomData,
+                },
+                channel2: ChannelCreator {
+                    phantom: PhantomData,
+                },
+                channel3: ChannelCreator {
+                    phantom: PhantomData,
+                },
+                phantom: PhantomData,
             }
         }
     }
 
-    pub struct ChannelCreator<const CHANNEL: u8> {}
+    pub struct ChannelCreator<M, const CHANNEL: u8>
+    where
+        M: crate::Mode,
+    {
+        phantom: PhantomData<M>,
+    }
 
     impl_tx_channel_creator!(0);
     impl_tx_channel_creator!(1);
@@ -655,41 +874,72 @@ mod impl_for_chip {
 
 #[cfg(esp32s3)]
 mod impl_for_chip {
+    use core::marker::PhantomData;
+
     use super::private::CreateInstance;
     use crate::peripheral::{Peripheral, PeripheralRef};
 
     /// RMT Instance
-    pub struct Rmt<'d> {
+    pub struct Rmt<'d, M>
+    where
+        M: crate::Mode,
+    {
         _peripheral: PeripheralRef<'d, crate::peripherals::RMT>,
-        pub channel0: ChannelCreator<0>,
-        pub channel1: ChannelCreator<1>,
-        pub channel2: ChannelCreator<2>,
-        pub channel3: ChannelCreator<3>,
-        pub channel4: ChannelCreator<4>,
-        pub channel5: ChannelCreator<5>,
-        pub channel6: ChannelCreator<6>,
-        pub channel7: ChannelCreator<7>,
+        pub channel0: ChannelCreator<M, 0>,
+        pub channel1: ChannelCreator<M, 1>,
+        pub channel2: ChannelCreator<M, 2>,
+        pub channel3: ChannelCreator<M, 3>,
+        pub channel4: ChannelCreator<M, 4>,
+        pub channel5: ChannelCreator<M, 5>,
+        pub channel6: ChannelCreator<M, 6>,
+        pub channel7: ChannelCreator<M, 7>,
+        phantom: PhantomData<M>,
     }
 
-    impl<'d> CreateInstance<'d> for Rmt<'d> {
+    impl<'d, M> CreateInstance<'d> for Rmt<'d, M>
+    where
+        M: crate::Mode,
+    {
         fn create(peripheral: impl Peripheral<P = crate::peripherals::RMT> + 'd) -> Self {
             crate::into_ref!(peripheral);
 
             Self {
                 _peripheral: peripheral,
-                channel0: ChannelCreator {},
-                channel1: ChannelCreator {},
-                channel2: ChannelCreator {},
-                channel3: ChannelCreator {},
-                channel4: ChannelCreator {},
-                channel5: ChannelCreator {},
-                channel6: ChannelCreator {},
-                channel7: ChannelCreator {},
+                channel0: ChannelCreator {
+                    phantom: PhantomData,
+                },
+                channel1: ChannelCreator {
+                    phantom: PhantomData,
+                },
+                channel2: ChannelCreator {
+                    phantom: PhantomData,
+                },
+                channel3: ChannelCreator {
+                    phantom: PhantomData,
+                },
+                channel4: ChannelCreator {
+                    phantom: PhantomData,
+                },
+                channel5: ChannelCreator {
+                    phantom: PhantomData,
+                },
+                channel6: ChannelCreator {
+                    phantom: PhantomData,
+                },
+                channel7: ChannelCreator {
+                    phantom: PhantomData,
+                },
+                phantom: PhantomData,
             }
         }
     }
 
-    pub struct ChannelCreator<const CHANNEL: u8> {}
+    pub struct ChannelCreator<M, const CHANNEL: u8>
+    where
+        M: crate::Mode,
+    {
+        phantom: PhantomData<M>,
+    }
 
     impl_tx_channel_creator!(0);
     impl_tx_channel_creator!(1);
@@ -715,9 +965,14 @@ mod impl_for_chip {
 /// RMT Channel
 #[non_exhaustive]
 #[derive(Debug)]
-pub struct Channel<const CHANNEL: u8> {}
+pub struct Channel<M, const CHANNEL: u8>
+where
+    M: crate::Mode,
+{
+    phantom: PhantomData<M>,
+}
 
-pub trait TxChannel: private::TxChannelInternal {
+pub trait TxChannel: private::TxChannelInternal<crate::Blocking> {
     /// Start transmitting the given pulse code sequence.
     /// This returns a [`SingleShotTxTransaction`] which can be used to wait for
     /// the transaction to complete and get back the channel for further
@@ -784,18 +1039,18 @@ where
     /// Wait for the transaction to complete
     pub fn wait(self) -> Result<C, (Error, C)> {
         loop {
-            if <C as private::RxChannelInternal>::is_error() {
+            if <C as private::RxChannelInternal<crate::Blocking>>::is_error() {
                 return Err((Error::TransmissionError, self.channel));
             }
 
-            if <C as private::RxChannelInternal>::is_done() {
+            if <C as private::RxChannelInternal<crate::Blocking>>::is_done() {
                 break;
             }
         }
 
-        <C as private::RxChannelInternal>::stop();
-        <C as private::RxChannelInternal>::clear_interrupts();
-        <C as private::RxChannelInternal>::update();
+        <C as private::RxChannelInternal<crate::Blocking>>::stop();
+        <C as private::RxChannelInternal<crate::Blocking>>::clear_interrupts();
+        <C as private::RxChannelInternal<crate::Blocking>>::update();
 
         let ptr = (constants::RMT_RAM_START
             + C::CHANNEL as usize * constants::RMT_CHANNEL_RAM_SIZE * 4)
@@ -809,7 +1064,7 @@ where
     }
 }
 
-pub trait RxChannel: private::RxChannelInternal {
+pub trait RxChannel: private::RxChannelInternal<crate::Blocking> {
     /// Start receiving pulse codes into the given buffer.
     /// This returns a [RxTransaction] which can be used to wait for receive to
     /// complete and get back the channel for further use.
@@ -834,13 +1089,12 @@ pub trait RxChannel: private::RxChannelInternal {
 #[cfg(feature = "async")]
 pub mod asynch {
     use core::{
-        marker::PhantomData,
         pin::Pin,
         task::{Context, Poll},
     };
 
     use embassy_sync::waitqueue::AtomicWaker;
-    use procmacros::interrupt;
+    use procmacros::handler;
 
     use super::{private::Event, *};
 
@@ -887,7 +1141,7 @@ pub mod asynch {
         }
     }
 
-    pub trait TxChannelAsync: private::TxChannelInternal {
+    pub trait TxChannelAsync: private::TxChannelInternal<crate::Async> {
         /// Start transmitting the given pulse code sequence.
         /// The length of sequence cannot exceed the size of the allocated RMT
         /// RAM.
@@ -948,7 +1202,7 @@ pub mod asynch {
         }
     }
 
-    pub trait RxChannelAsync: private::RxChannelInternal {
+    pub trait RxChannelAsync: private::RxChannelInternal<crate::Async> {
         /// Start receiving a pulse code sequence.
         /// The length of sequence cannot exceed the size of the allocated RMT
         /// RAM.
@@ -988,49 +1242,48 @@ pub mod asynch {
     }
 
     #[cfg(not(any(esp32, esp32s2)))]
-    #[interrupt]
-    fn RMT() {
+    #[handler]
+    pub(super) fn async_interrupt_handler() {
         if let Some(channel) = super::chip_specific::pending_interrupt_for_channel() {
             use crate::rmt::private::{RxChannelInternal, TxChannelInternal};
 
             match channel {
                 0 => {
-                    super::Channel::<0>::unlisten_interrupt(Event::End);
-                    super::Channel::<0>::unlisten_interrupt(Event::Error);
+                    super::Channel::<crate::Async, 0>::unlisten_interrupt(Event::End);
+                    super::Channel::<crate::Async, 0>::unlisten_interrupt(Event::Error);
                 }
                 1 => {
-                    super::Channel::<1>::unlisten_interrupt(Event::End);
-                    super::Channel::<1>::unlisten_interrupt(Event::Error);
+                    super::Channel::<crate::Async, 1>::unlisten_interrupt(Event::End);
+                    super::Channel::<crate::Async, 1>::unlisten_interrupt(Event::Error);
                 }
                 2 => {
-                    super::Channel::<2>::unlisten_interrupt(Event::End);
-                    super::Channel::<2>::unlisten_interrupt(Event::Error);
+                    super::Channel::<crate::Async, 2>::unlisten_interrupt(Event::End);
+                    super::Channel::<crate::Async, 2>::unlisten_interrupt(Event::Error);
                 }
                 3 => {
-                    super::Channel::<3>::unlisten_interrupt(Event::End);
-                    super::Channel::<3>::unlisten_interrupt(Event::Error);
+                    super::Channel::<crate::Async, 3>::unlisten_interrupt(Event::End);
+                    super::Channel::<crate::Async, 3>::unlisten_interrupt(Event::Error);
                 }
 
-                // TODO ... how to handle chips which can use a channel for tx AND rx?
                 #[cfg(any(esp32, esp32s3))]
                 4 => {
-                    super::Channel::<4>::unlisten_interrupt(Event::End);
-                    super::Channel::<4>::unlisten_interrupt(Event::Error);
+                    super::Channel::<crate::Async, 4>::unlisten_interrupt(Event::End);
+                    super::Channel::<crate::Async, 4>::unlisten_interrupt(Event::Error);
                 }
                 #[cfg(any(esp32, esp32s3))]
                 5 => {
-                    super::Channel::<5>::unlisten_interrupt(Event::End);
-                    super::Channel::<5>::unlisten_interrupt(Event::Error);
+                    super::Channel::<crate::Async, 5>::unlisten_interrupt(Event::End);
+                    super::Channel::<crate::Async, 5>::unlisten_interrupt(Event::Error);
                 }
                 #[cfg(any(esp32, esp32s3))]
                 6 => {
-                    super::Channel::<6>::unlisten_interrupt(Event::End);
-                    super::Channel::<6>::unlisten_interrupt(Event::Error);
+                    super::Channel::<crate::Async, 6>::unlisten_interrupt(Event::End);
+                    super::Channel::<crate::Async, 6>::unlisten_interrupt(Event::Error);
                 }
                 #[cfg(any(esp32, esp32s3))]
                 7 => {
-                    super::Channel::<7>::unlisten_interrupt(Event::End);
-                    super::Channel::<7>::unlisten_interrupt(Event::Error);
+                    super::Channel::<crate::Async, 7>::unlisten_interrupt(Event::End);
+                    super::Channel::<crate::Async, 7>::unlisten_interrupt(Event::Error);
                 }
 
                 _ => unreachable!(),
@@ -1041,123 +1294,123 @@ pub mod asynch {
     }
 
     #[cfg(any(esp32, esp32s2))]
-    #[interrupt]
-    fn RMT() {
+    #[handler]
+    pub(super) fn async_interrupt_handler() {
         if let Some(channel) = super::chip_specific::pending_interrupt_for_channel() {
             match channel {
                 0 => {
-                    <Channel<0> as super::private::TxChannelInternal>::unlisten_interrupt(
+                    <Channel<crate::Async,0> as super::private::TxChannelInternal<crate::Async>>::unlisten_interrupt(
                         Event::End,
                     );
-                    <Channel<0> as super::private::TxChannelInternal>::unlisten_interrupt(
+                    <Channel<crate::Async,0> as super::private::TxChannelInternal<crate::Async>>::unlisten_interrupt(
                         Event::Error,
                     );
-                    <Channel<0> as super::private::RxChannelInternal>::unlisten_interrupt(
+                    <Channel<crate::Async,0> as super::private::RxChannelInternal<crate::Async>>::unlisten_interrupt(
                         Event::End,
                     );
-                    <Channel<0> as super::private::RxChannelInternal>::unlisten_interrupt(
+                    <Channel<crate::Async,0> as super::private::RxChannelInternal<crate::Async>>::unlisten_interrupt(
                         Event::Error,
                     );
                 }
                 1 => {
-                    <Channel<1> as super::private::TxChannelInternal>::unlisten_interrupt(
+                    <Channel<crate::Async,1> as super::private::TxChannelInternal<crate::Async>>::unlisten_interrupt(
                         Event::End,
                     );
-                    <Channel<1> as super::private::TxChannelInternal>::unlisten_interrupt(
+                    <Channel<crate::Async,1> as super::private::TxChannelInternal<crate::Async>>::unlisten_interrupt(
                         Event::Error,
                     );
-                    <Channel<1> as super::private::RxChannelInternal>::unlisten_interrupt(
+                    <Channel<crate::Async,1> as super::private::RxChannelInternal<crate::Async>>::unlisten_interrupt(
                         Event::End,
                     );
-                    <Channel<1> as super::private::RxChannelInternal>::unlisten_interrupt(
+                    <Channel<crate::Async,1> as super::private::RxChannelInternal<crate::Async>>::unlisten_interrupt(
                         Event::Error,
                     );
                 }
                 2 => {
-                    <Channel<2> as super::private::TxChannelInternal>::unlisten_interrupt(
+                    <Channel<crate::Async,2> as super::private::TxChannelInternal<crate::Async>>::unlisten_interrupt(
                         Event::End,
                     );
-                    <Channel<2> as super::private::TxChannelInternal>::unlisten_interrupt(
+                    <Channel<crate::Async,2> as super::private::TxChannelInternal<crate::Async>>::unlisten_interrupt(
                         Event::Error,
                     );
-                    <Channel<2> as super::private::RxChannelInternal>::unlisten_interrupt(
+                    <Channel<crate::Async,2> as super::private::RxChannelInternal<crate::Async>>::unlisten_interrupt(
                         Event::End,
                     );
-                    <Channel<2> as super::private::RxChannelInternal>::unlisten_interrupt(
+                    <Channel<crate::Async,2> as super::private::RxChannelInternal<crate::Async>>::unlisten_interrupt(
                         Event::Error,
                     );
                 }
                 3 => {
-                    <Channel<3> as super::private::TxChannelInternal>::unlisten_interrupt(
+                    <Channel<crate::Async,3> as super::private::TxChannelInternal<crate::Async>>::unlisten_interrupt(
                         Event::End,
                     );
-                    <Channel<3> as super::private::TxChannelInternal>::unlisten_interrupt(
+                    <Channel<crate::Async,3> as super::private::TxChannelInternal<crate::Async>>::unlisten_interrupt(
                         Event::Error,
                     );
-                    <Channel<3> as super::private::RxChannelInternal>::unlisten_interrupt(
+                    <Channel<crate::Async,3> as super::private::RxChannelInternal<crate::Async>>::unlisten_interrupt(
                         Event::End,
                     );
-                    <Channel<3> as super::private::RxChannelInternal>::unlisten_interrupt(
+                    <Channel<crate::Async,3> as super::private::RxChannelInternal<crate::Async>>::unlisten_interrupt(
                         Event::Error,
                     );
                 }
                 #[cfg(esp32)]
                 4 => {
-                    <Channel<4> as super::private::TxChannelInternal>::unlisten_interrupt(
+                    <Channel<crate::Async,4> as super::private::TxChannelInternal<crate::Async>>::unlisten_interrupt(
                         Event::End,
                     );
-                    <Channel<4> as super::private::TxChannelInternal>::unlisten_interrupt(
+                    <Channel<crate::Async,4> as super::private::TxChannelInternal<crate::Async>>::unlisten_interrupt(
                         Event::Error,
                     );
-                    <Channel<4> as super::private::RxChannelInternal>::unlisten_interrupt(
+                    <Channel<crate::Async,4> as super::private::RxChannelInternal<crate::Async>>::unlisten_interrupt(
                         Event::End,
                     );
-                    <Channel<4> as super::private::RxChannelInternal>::unlisten_interrupt(
+                    <Channel<crate::Async,4> as super::private::RxChannelInternal<crate::Async>>::unlisten_interrupt(
                         Event::Error,
                     );
                 }
                 #[cfg(any(esp32, esp32s3))]
                 5 => {
-                    <Channel<5> as super::private::TxChannelInternal>::unlisten_interrupt(
+                    <Channel<crate::Async,5> as super::private::TxChannelInternal<crate::Async>>::unlisten_interrupt(
                         Event::End,
                     );
-                    <Channel<5> as super::private::TxChannelInternal>::unlisten_interrupt(
+                    <Channel<crate::Async,5> as super::private::TxChannelInternal<crate::Async>>::unlisten_interrupt(
                         Event::Error,
                     );
-                    <Channel<5> as super::private::RxChannelInternal>::unlisten_interrupt(
+                    <Channel<crate::Async,5> as super::private::RxChannelInternal<crate::Async>>::unlisten_interrupt(
                         Event::End,
                     );
-                    <Channel<5> as super::private::RxChannelInternal>::unlisten_interrupt(
+                    <Channel<crate::Async,5> as super::private::RxChannelInternal<crate::Async>>::unlisten_interrupt(
                         Event::Error,
                     );
                 }
                 #[cfg(any(esp32, esp32s3))]
                 6 => {
-                    <Channel<6> as super::private::TxChannelInternal>::unlisten_interrupt(
+                    <Channel<crate::Async,6> as super::private::TxChannelInternal<crate::Async>>::unlisten_interrupt(
                         Event::End,
                     );
-                    <Channel<6> as super::private::TxChannelInternal>::unlisten_interrupt(
+                    <Channel<crate::Async,6> as super::private::TxChannelInternal<crate::Async>>::unlisten_interrupt(
                         Event::Error,
                     );
-                    <Channel<6> as super::private::RxChannelInternal>::unlisten_interrupt(
+                    <Channel<crate::Async,6> as super::private::RxChannelInternal<crate::Async>>::unlisten_interrupt(
                         Event::End,
                     );
-                    <Channel<6> as super::private::RxChannelInternal>::unlisten_interrupt(
+                    <Channel<crate::Async,6> as super::private::RxChannelInternal<crate::Async>>::unlisten_interrupt(
                         Event::Error,
                     );
                 }
                 #[cfg(any(esp32, esp32s3))]
                 7 => {
-                    <Channel<7> as super::private::TxChannelInternal>::unlisten_interrupt(
+                    <Channel<crate::Async,7> as super::private::TxChannelInternal<crate::Async>>::unlisten_interrupt(
                         Event::End,
                     );
-                    <Channel<7> as super::private::TxChannelInternal>::unlisten_interrupt(
+                    <Channel<crate::Async,7> as super::private::TxChannelInternal<crate::Async>>::unlisten_interrupt(
                         Event::Error,
                     );
-                    <Channel<7> as super::private::RxChannelInternal>::unlisten_interrupt(
+                    <Channel<crate::Async,7> as super::private::RxChannelInternal<crate::Async>>::unlisten_interrupt(
                         Event::End,
                     );
-                    <Channel<7> as super::private::RxChannelInternal>::unlisten_interrupt(
+                    <Channel<crate::Async,7> as super::private::RxChannelInternal<crate::Async>>::unlisten_interrupt(
                         Event::Error,
                     );
                 }
@@ -1183,7 +1436,10 @@ mod private {
         fn create(peripheral: impl Peripheral<P = crate::peripherals::RMT> + 'd) -> Self;
     }
 
-    pub trait TxChannelInternal {
+    pub trait TxChannelInternal<M>
+    where
+        M: crate::Mode,
+    {
         const CHANNEL: u8;
 
         fn new() -> Self;
@@ -1261,7 +1517,10 @@ mod private {
         fn unlisten_interrupt(event: Event);
     }
 
-    pub trait RxChannelInternal {
+    pub trait RxChannelInternal<M>
+    where
+        M: crate::Mode,
+    {
         const CHANNEL: u8;
 
         fn new() -> Self;
@@ -1396,11 +1655,13 @@ mod chip_specific {
     macro_rules! impl_tx_channel {
         ($channel:ident, $signal:ident, $ch_num:literal) => {
             paste::paste! {
-                impl $crate::rmt::private::TxChannelInternal for $crate::rmt::$channel<$ch_num> {
+                impl<M> $crate::rmt::private::TxChannelInternal<M> for $crate::rmt::$channel<M, $ch_num> where M: $crate::Mode {
                     const CHANNEL: u8 = $ch_num;
 
                     fn new() -> Self {
-                        Self {}
+                        Self {
+                            phantom: core::marker::PhantomData,
+                        }
                     }
 
                     fn output_signal() -> crate::gpio::OutputSignal {
@@ -1587,11 +1848,13 @@ mod chip_specific {
     macro_rules! impl_rx_channel {
         ($channel:ident, $signal:ident, $ch_num:literal, $ch_index:literal) => {
             paste::paste! {
-                impl $crate::rmt::private::RxChannelInternal for $crate::rmt::$channel<$ch_num> {
+                impl<M> $crate::rmt::private::RxChannelInternal<M> for $crate::rmt::$channel<M, $ch_num> where M: $crate::Mode {
                     const CHANNEL: u8 = $ch_num;
 
                     fn new() -> Self {
-                        Self {}
+                        Self {
+                            phantom: core::marker::PhantomData,
+                        }
                     }
 
                     fn input_signal() -> crate::gpio::InputSignal {
@@ -1801,11 +2064,13 @@ mod chip_specific {
     macro_rules! impl_tx_channel {
         ($channel:ident, $signal:ident, $ch_num:literal) => {
             paste::paste! {
-                impl super::private::TxChannelInternal for super::$channel<$ch_num> {
+                impl<M> super::private::TxChannelInternal<M> for super::$channel<M, $ch_num> where M: $crate::Mode {
                     const CHANNEL: u8 = $ch_num;
 
                     fn new() -> Self {
-                        Self {}
+                        Self {
+                            phantom: core::marker::PhantomData,
+                        }
                     }
 
                     fn output_signal() -> crate::gpio::OutputSignal {
@@ -1972,11 +2237,13 @@ mod chip_specific {
     macro_rules! impl_rx_channel {
         ($channel:ident, $signal:ident, $ch_num:literal) => {
             paste::paste! {
-                impl super::private::RxChannelInternal for super::$channel<$ch_num> {
+                impl<M> super::private::RxChannelInternal<M> for super::$channel<M, $ch_num> where M: $crate::Mode {
                     const CHANNEL: u8 = $ch_num;
 
                     fn new() -> Self {
-                        Self {}
+                        Self {
+                            phantom: core::marker::PhantomData,
+                        }
                     }
 
                     fn input_signal() -> crate::gpio::InputSignal {

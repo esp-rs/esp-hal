@@ -29,8 +29,9 @@ fn main() -> ! {
         peripherals.I2C0,
         io.pins.gpio4,
         io.pins.gpio5,
-        100u32.kHz(),
+        100.kHz(),
         &clocks,
+        None,
     );
 
     loop {

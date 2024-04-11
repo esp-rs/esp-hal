@@ -17,9 +17,9 @@ use crate::{
             SavedClockConfig,
         },
         sleep::{Ext1WakeupSource, TimerWakeupSource, WakeSource, WakeTriggers, WakeupLevel},
+        Rtc,
         RtcClock,
     },
-    Rtc,
 };
 
 impl WakeSource for TimerWakeupSource {
@@ -46,7 +46,7 @@ impl WakeSource for TimerWakeupSource {
             });
             lp_timer
                 .int_clr()
-                .write(|w| w.soc_wakeup_int_clr().set_bit());
+                .write(|w| w.soc_wakeup().clear_bit_by_one());
             lp_timer
                 .tar0_high()
                 .modify(|_, w| w.main_timer_tar_en0().set_bit());
@@ -951,13 +951,13 @@ impl RtcSleepConfig {
                 .slp_wakeup_cntl4()
                 .write(|w| w.slp_reject_cause_clr().bit(true));
 
-            pmu().hp_int_clr().write(|w| {
-                w.sw_int_clr() // pmu_ll_hp_clear_sw_intr_status
-                    .bit(true)
-                    .soc_sleep_reject_int_clr() // pmu_ll_hp_clear_reject_intr_status
-                    .bit(true)
-                    .soc_wakeup_int_clr() // pmu_ll_hp_clear_wakeup_intr_status
-                    .bit(true)
+            pmu().int_clr().write(|w| {
+                w.sw() // pmu_ll_hp_clear_sw_intr_status
+                    .clear_bit_by_one()
+                    .soc_sleep_reject() // pmu_ll_hp_clear_reject_intr_status
+                    .clear_bit_by_one()
+                    .soc_wakeup() // pmu_ll_hp_clear_wakeup_intr_status
+                    .clear_bit_by_one()
             });
 
             // misc_modules_sleep_prepare
@@ -979,9 +979,7 @@ impl RtcSleepConfig {
             // In pd_cpu lightsleep and deepsleep mode, we never get here
             loop {
                 let int_raw = pmu().int_raw().read();
-                if int_raw.soc_wakeup_int_raw().bit_is_set()
-                    || int_raw.soc_sleep_reject_int_raw().bit_is_set()
-                {
+                if int_raw.soc_wakeup().bit_is_set() || int_raw.soc_sleep_reject().bit_is_set() {
                     break;
                 }
             }

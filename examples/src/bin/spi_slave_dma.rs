@@ -31,6 +31,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
+    delay::Delay,
     dma::{Dma, DmaPriority},
     dma_buffers,
     gpio::IO,
@@ -40,7 +41,6 @@ use esp_hal::{
         slave::{prelude::*, Spi},
         SpiMode,
     },
-    Delay,
 };
 use esp_println::println;
 
@@ -59,9 +59,9 @@ fn main() -> ! {
     let mut master_mosi = io.pins.gpio8.into_push_pull_output();
     let slave_cs = io.pins.gpio3;
     let mut master_cs = io.pins.gpio9.into_push_pull_output();
-    master_cs.set_high().unwrap();
-    master_sclk.set_low().unwrap();
-    master_mosi.set_low().unwrap();
+    master_cs.set_high();
+    master_sclk.set_low();
+    master_mosi.set_low();
 
     let dma = Dma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
@@ -83,7 +83,7 @@ fn main() -> ! {
         DmaPriority::Priority0,
     ));
 
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
 
     // DMA buffer require a static life-time
     let master_send = &mut [0u8; 32000];
@@ -107,38 +107,40 @@ fn main() -> ! {
         slave_receive.fill(0xff);
         i = i.wrapping_add(1);
 
-        let transfer = spi.dma_transfer(slave_send, slave_receive).unwrap();
+        let transfer = spi
+            .dma_transfer(&mut slave_send, &mut slave_receive)
+            .unwrap();
         // Bit-bang out the contents of master_send and read into master_receive
         // as quickly as manageable. MSB first. Mode 0, so sampled on the rising
         // edge and set on the falling edge.
-        master_cs.set_low().unwrap();
+        master_cs.set_low();
         for (j, v) in master_send.iter().enumerate() {
             let mut b = *v;
             let mut rb = 0u8;
             for _ in 0..8 {
                 if b & 128 != 0 {
-                    master_mosi.set_high().unwrap();
+                    master_mosi.set_high();
                 } else {
-                    master_mosi.set_low().unwrap();
+                    master_mosi.set_low();
                 }
-                master_sclk.set_low().unwrap();
+                master_sclk.set_low();
                 b <<= 1;
                 rb <<= 1;
                 // NB: adding about 24 NOPs here makes the clock's duty cycle
                 // run at about 50% ... but we don't strictly need the delay,
                 // either.
-                master_sclk.set_high().unwrap();
-                if master_miso.is_high().unwrap() {
+                master_sclk.set_high();
+                if master_miso.is_high() {
                     rb |= 1;
                 }
             }
             master_receive[j] = rb;
         }
-        master_cs.set_high().unwrap();
-        master_sclk.set_low().unwrap();
+        master_cs.set_high();
+        master_sclk.set_low();
         // the buffers and spi is moved into the transfer and we can get it back via
         // `wait`
-        (slave_receive, slave_send, spi) = transfer.wait().unwrap();
+        transfer.wait().unwrap();
         println!(
             "slave got {:x?} .. {:x?}, master got {:x?} .. {:x?}",
             &slave_receive[..10],
@@ -147,54 +149,54 @@ fn main() -> ! {
             &master_receive[master_receive.len() - 10..]
         );
 
-        delay.delay_ms(250u32);
+        delay.delay_millis(250);
 
         slave_receive.fill(0xff);
-        let transfer = spi.dma_read(slave_receive).unwrap();
-        master_cs.set_high().unwrap();
+        let transfer = spi.dma_read(&mut slave_receive).unwrap();
+        master_cs.set_high();
 
-        master_cs.set_low().unwrap();
+        master_cs.set_low();
         for v in master_send.iter() {
             let mut b = *v;
             for _ in 0..8 {
                 if b & 128 != 0 {
-                    master_mosi.set_high().unwrap();
+                    master_mosi.set_high();
                 } else {
-                    master_mosi.set_low().unwrap();
+                    master_mosi.set_low();
                 }
                 b <<= 1;
-                master_sclk.set_low().unwrap();
-                master_sclk.set_high().unwrap();
+                master_sclk.set_low();
+                master_sclk.set_high();
             }
         }
-        master_cs.set_high().unwrap();
-        (slave_receive, spi) = transfer.wait().unwrap();
+        master_cs.set_high();
+        transfer.wait().unwrap();
         println!(
             "slave got {:x?} .. {:x?}",
             &slave_receive[..10],
             &slave_receive[slave_receive.len() - 10..],
         );
 
-        delay.delay_ms(250u32);
-        let transfer = spi.dma_write(slave_send).unwrap();
+        delay.delay_millis(250);
+        let transfer = spi.dma_write(&mut slave_send).unwrap();
 
         master_receive.fill(0);
 
-        master_cs.set_low().unwrap();
+        master_cs.set_low();
         for (j, _) in master_send.iter().enumerate() {
             let mut rb = 0u8;
             for _ in 0..8 {
-                master_sclk.set_low().unwrap();
+                master_sclk.set_low();
                 rb <<= 1;
-                master_sclk.set_high().unwrap();
-                if master_miso.is_high().unwrap() {
+                master_sclk.set_high();
+                if master_miso.is_high() {
                     rb |= 1;
                 }
             }
             master_receive[j] = rb;
         }
-        master_cs.set_high().unwrap();
-        (slave_send, spi) = transfer.wait().unwrap();
+        master_cs.set_high();
+        transfer.wait().unwrap();
 
         println!(
             "master got {:x?} .. {:x?}",

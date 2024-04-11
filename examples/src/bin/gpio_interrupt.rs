@@ -14,12 +14,11 @@ use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
+    delay::Delay,
     gpio::{self, Event, Input, PullDown, IO},
-    interrupt::{self, Priority},
     macros::ram,
-    peripherals::{Interrupt, Peripherals},
+    peripherals::Peripherals,
     prelude::*,
-    Delay,
 };
 
 #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
@@ -36,34 +35,34 @@ fn main() -> ! {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     // Set GPIO2 as an output, and set its state high initially.
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let mut io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    io.set_interrupt_handler(handler);
     let mut led = io.pins.gpio2.into_push_pull_output();
 
     #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
     let mut button = io.pins.gpio0.into_pull_down_input();
     #[cfg(not(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3")))]
     let mut button = io.pins.gpio9.into_pull_down_input();
-    button.listen(Event::FallingEdge);
 
-    critical_section::with(|cs| BUTTON.borrow_ref_mut(cs).replace(button));
-
-    interrupt::enable(Interrupt::GPIO, Priority::Priority2).unwrap();
-
-    led.set_high().unwrap();
+    critical_section::with(|cs| {
+        button.listen(Event::FallingEdge);
+        BUTTON.borrow_ref_mut(cs).replace(button)
+    });
+    led.set_high();
 
     // Initialize the Delay peripheral, and use it to toggle the LED state in a
     // loop.
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
 
     loop {
-        led.toggle().unwrap();
-        delay.delay_ms(500u32);
+        led.toggle();
+        delay.delay_millis(500);
     }
 }
 
+#[handler]
 #[ram]
-#[interrupt]
-fn GPIO() {
+fn handler() {
     #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
     esp_println::println!(
         "GPIO Interrupt with priority {}",

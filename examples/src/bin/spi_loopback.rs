@@ -21,11 +21,11 @@
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
+    delay::Delay,
     gpio::IO,
     peripherals::Peripherals,
     prelude::*,
     spi::{master::Spi, SpiMode},
-    Delay,
 };
 use esp_println::println;
 
@@ -41,20 +41,20 @@ fn main() -> ! {
     let mosi = io.pins.gpio4;
     let cs = io.pins.gpio5;
 
-    let mut spi = Spi::new(peripherals.SPI2, 100u32.kHz(), SpiMode::Mode0, &clocks).with_pins(
+    let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks).with_pins(
         Some(sclk),
         Some(mosi),
         Some(miso),
         Some(cs),
     );
 
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
 
     loop {
         let mut data = [0xde, 0xca, 0xfb, 0xad];
         spi.transfer(&mut data).unwrap();
         println!("{:x?}", data);
 
-        delay.delay_ms(250u32);
+        delay.delay_millis(250);
     }
 }

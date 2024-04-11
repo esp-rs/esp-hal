@@ -1,12 +1,9 @@
-//! # Two-wire Automotive Interface (TWAI) Filters
+//! Two-wire Automotive Interface (TWAI) Filters
 //!
 //! These are acceptance filters that limit which packets are received by the
 //! TWAI peripheral.
 
-#[cfg(feature = "eh1")]
-use embedded_can::{ExtendedId, StandardId};
-#[cfg(not(feature = "eh1"))]
-use embedded_hal::can::{ExtendedId, StandardId};
+use super::{ExtendedId, StandardId};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum FilterType {
@@ -14,6 +11,16 @@ pub enum FilterType {
     Dual,
 }
 
+/// Interface for interacting with Acceptance Filters.
+///
+/// The Acceptance Filter is a programmable message filtering unit that allows
+/// the TWAI controller to accept or reject a received message based on the
+/// message’s ID field.
+///
+/// Only accepted messages will be stored in the Receive FIFO.
+///
+/// The Acceptance Filter’s registers can be programmed to specify a single
+/// filter, or two separate filters (dual filter mode).
 pub trait Filter {
     /// The type of the filter.
     const FILTER_TYPE: FilterType;
@@ -27,8 +34,7 @@ pub trait Filter {
 
 pub type BitFilter<const N: usize> = [u8; N];
 
-/// Internal macro used to convert a byte from a bytestring into a bit inside a
-/// given code and mask.
+// Convert a byte from a bytestring into a bit inside a given code and mask.
 macro_rules! set_bit_from_byte {
     ($code:expr, $mask:expr, $byte:expr, $shift:expr) => {
         match $byte {
@@ -46,11 +52,11 @@ macro_rules! set_bit_from_byte {
     };
 }
 
-/// Convert a code and mask to the byte array needed at a register level.
-///
-/// On the input mask, set bits (1) mean we care about the exact value of the
-/// corresponding bit in the code, reset bits (0) mean the bit could be any
-/// value.
+// Convert a code and mask to the byte array needed at a register level.
+//
+// On the input mask, set bits (1) mean we care about the exact value of the
+// corresponding bit in the code, reset bits (0) mean the bit could be any
+// value.
 const fn code_mask_to_register_array(code: u32, mask: u32) -> [u8; 8] {
     // Convert the filter code and mask into the full byte array needed for the
     // registers.
@@ -66,10 +72,10 @@ const fn code_mask_to_register_array(code: u32, mask: u32) -> [u8; 8] {
     ]
 }
 
-/// A filter that matches against a single 11 bit id, the rtr bit, and the first
+/// A filter that matches against a single 11 bit id, the RTR bit, and the first
 /// two bytes of the payload.
 ///
-/// Warning: This is not a perfect filter. Extended ids that match the bit
+/// Warning: This is not a perfect filter. Extended IDs that match the bit
 /// layout of this filter will also be accepted.
 pub struct SingleStandardFilter {
     /// The register representation of the filter.
@@ -78,10 +84,10 @@ pub struct SingleStandardFilter {
 
 impl SingleStandardFilter {
     /// Create a new filter that matches against a single 11-bit standard id.
-    /// The filter can match against the packet's id, rtr bit, and first two
+    /// The filter can match against the packet's id, RTR bit, and first two
     /// bytes of the payload.
     ///
-    /// Example matching only even ids, allowing any rtr value and any payload
+    /// Example matching only even IDs, allowing any rtr value and any payload
     /// data:
     /// ```
     /// const FILTER: SingleStandardFilter =
@@ -105,7 +111,7 @@ impl SingleStandardFilter {
                 idx += 1;
             }
         }
-        // Convert the rtr bit filter into the code and mask bits.
+        // Convert the RTR bit filter into the code and mask bits.
         {
             let shift = 20;
             set_bit_from_byte!(acceptance_code, acceptance_mask, rtr[0], shift);
@@ -173,7 +179,7 @@ impl SingleStandardFilter {
         acceptance_code |= (id_code.as_raw() as u32) << 21;
         acceptance_mask |= (id_mask.as_raw() as u32) << 21;
 
-        // Pack the rtr bit into the full layout.
+        // Pack the RTR bit into the full layout.
         acceptance_code |= (rtr_code as u32) << 20;
         acceptance_mask |= (rtr_mask as u32) << 20;
 
@@ -193,18 +199,20 @@ impl Filter for SingleStandardFilter {
         self.raw
     }
 }
-/// Warning: This is not a perfect filter. Standard ids that match the bit
+
+/// Warning: This is not a perfect filter. Standard IDs that match the bit
 /// layout of this filter will also be accepted.
 pub struct SingleExtendedFilter {
     raw: [u8; 8],
 }
+
 impl SingleExtendedFilter {
     /// Create a filter that matches against a single 29-bit extended id.
     ///
-    /// The filter can match against the packet's id and the rtr bit.
+    /// The filter can match against the packet's id and the RTR bit.
     ///
     /// # Examples
-    /// A filter matching any odd extended ids, with any rtr value.
+    /// A filter matching any odd extended IDs, with any rtr value.
     /// ```
     /// const FILTER: twai::filter::SingleExtendedFilter =
     ///     twai::filter::SingleExtendedFilter::new(b"xxxxxxxxxxxxxxxxxxxxxxxxxxxx1", b"x");
@@ -227,7 +235,7 @@ impl SingleExtendedFilter {
                 idx += 1;
             }
         }
-        // Convert the rtr bit filter into the code and mask bits.
+        // Convert the RTR bit filter into the code and mask bits.
         {
             let shift = 2;
             set_bit_from_byte!(acceptance_code, acceptance_mask, rtr[0], shift);
@@ -258,7 +266,7 @@ impl SingleExtendedFilter {
         acceptance_code |= id_code.as_raw() << 3;
         acceptance_mask |= id_mask.as_raw() << 3;
 
-        // Pack the rtr bit into the full layout.
+        // Pack the RTR bit into the full layout.
         acceptance_code |= (rtr_code as u32) << 2;
         acceptance_mask |= (rtr_mask as u32) << 2;
 
@@ -275,26 +283,27 @@ impl Filter for SingleExtendedFilter {
     }
 }
 
-/// A filter that matches against two standard 11-bit standard ids.
+/// A filter that matches against two standard 11-bit standard IDs.
 ///
-/// The first filter part can match a packet's id, rtr bit, and the first byte
-/// of the payload. The second filter part can match a packet's id and rtr bit.
+/// The first filter part can match a packet's id, RTR bit, and the first byte
+/// of the payload. The second filter part can match a packet's id and RTR bit.
 ///
-/// Warning: This is not a perfect filter. Extended ids that match the bit
+/// Warning: This is not a perfect filter. Extended IDs that match the bit
 /// layout of this filter will also be accepted.
 pub struct DualStandardFilter {
     raw: [u8; 8],
 }
+
 impl DualStandardFilter {
-    /// Create a filter that matches against two standard 11-bit standard ids.
+    /// Create a filter that matches against two standard 11-bit standard IDs.
     ///
-    /// The first filter part can match a packet's id, rtr bit, and the first
+    /// The first filter part can match a packet's id, RTR bit, and the first
     /// byte of the payload. The second filter part can match a packet's id
-    /// and rtr bit.
+    /// and RTR bit.
     ///
     /// # Examples
     /// A filter that matches any standard id that ends with a 00 or a 11, with
-    /// any rtr, and with any payload on the first filter.
+    /// any RTR, and with any payload on the first filter.
     /// ```
     /// const FILTER: twai::filter::DualStandardFilter = twai::filter::DualStandardFilter::new(
     ///     b"xxxxxxxxx00",
@@ -328,7 +337,7 @@ impl DualStandardFilter {
                 idx += 1;
             }
         }
-        // Convert the first rtr bit filter into the code and mask bits.
+        // Convert the first RTR bit filter into the code and mask bits.
         {
             let shift = 20;
             set_bit_from_byte!(acceptance_code, acceptance_mask, first_rtr[0], shift);
@@ -356,7 +365,7 @@ impl DualStandardFilter {
                 idx += 1;
             }
         }
-        // Convert the second rtr bit filter into the code and mask bits.
+        // Convert the second RTR bit filter into the code and mask bits.
         {
             let shift = 4;
             set_bit_from_byte!(acceptance_code, acceptance_mask, second_rtr[0], shift);
@@ -394,7 +403,7 @@ impl DualStandardFilter {
         acceptance_code |= (first_id_code.as_raw() as u32) << 21;
         acceptance_mask |= (first_id_mask.as_raw() as u32) << 21;
 
-        // Pack the rtr bit into the full layout.
+        // Pack the RTR bit into the full layout.
         acceptance_code |= (first_rtr_code as u32) << 20;
         acceptance_mask |= (first_rtr_mask as u32) << 20;
 
@@ -408,7 +417,7 @@ impl DualStandardFilter {
         acceptance_code |= (second_id_code.as_raw() as u32) << 5;
         acceptance_mask |= (second_id_mask.as_raw() as u32) << 5;
 
-        // Pack the second rtr bit into the full layout.
+        // Pack the second RTR bit into the full layout.
         acceptance_code |= (second_rtr_code as u32) << 4;
         acceptance_mask |= (second_rtr_mask as u32) << 4;
 
@@ -424,21 +433,22 @@ impl Filter for DualStandardFilter {
         self.raw
     }
 }
+
+/// Warning: This is not a perfect filter. Standard IDs that match the bit
+/// layout of this filter will also be accepted.
+///
 /// NOTE: The dual extended id acceptance filters can only match "the first 16
 /// bits of the 29-bit ID".
-///
-///
-/// Warning: This is not a perfect filter. Standard ids that match the bit
-/// layout of this filter will also be accepted.
 pub struct DualExtendedFilter {
     raw: [u8; 8],
 }
+
 impl DualExtendedFilter {
     /// Create a filter that matches the first 16 bits of two 29-bit extended
-    /// ids.
+    /// IDs.
     ///
     /// # Examples
-    /// A filter that matches ids with 4 bits either set or reset in the higher
+    /// A filter that matches IDs with 4 bits either set or reset in the higher
     /// part of the id. For example this id matches: 0x000f000f, 0x000f000a,
     /// 0x0000000a, 0x0000000b.
     /// But it does not match: 0x000a000a
@@ -478,7 +488,7 @@ impl DualExtendedFilter {
             raw: code_mask_to_register_array(acceptance_code, acceptance_mask),
         }
     }
-    /// Create a new filter matching the first 16 bits of two 29-bit ids.
+    /// Create a new filter matching the first 16 bits of two 29-bit IDs.
     ///
     /// The masks indicate which bits of the code the filter should match
     /// against. Set bits in the mask indicate that the corresponding bit in
@@ -505,6 +515,7 @@ impl DualExtendedFilter {
         }
     }
 }
+
 impl Filter for DualExtendedFilter {
     const FILTER_TYPE: FilterType = FilterType::Dual;
     fn to_registers(&self) -> [u8; 8] {

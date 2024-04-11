@@ -8,19 +8,18 @@
 #![no_std]
 #![no_main]
 
-use core::cell::RefCell;
+use core::{cell::RefCell, ptr::addr_of_mut};
 
 use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     cpu_control::{CpuControl, Stack},
-    peripherals::{Peripherals, TIMG1},
+    delay::Delay,
+    peripherals::Peripherals,
     prelude::*,
-    timer::{Timer, Timer0, TimerGroup},
 };
 use esp_println::println;
-use nb::block;
 
 static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 
@@ -30,41 +29,28 @@ fn main() -> ! {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    let mut timer0 = timg0.timer0;
+    let delay = Delay::new(&clocks);
 
-    let timg1 = TimerGroup::new(peripherals.TIMG1, &clocks);
-    let mut timer1 = timg1.timer0;
-
-    timer0.start(1u64.secs());
-    timer1.start(500u64.millis());
-
-    let counter = Mutex::new(RefCell::new(0));
+    let counter = Mutex::new(RefCell::new(0u32));
 
     let mut cpu_control = CpuControl::new(system.cpu_control);
-    let cpu1_fnctn = || {
-        cpu1_task(&mut timer1, &counter);
-    };
     let _guard = cpu_control
-        .start_app_core(unsafe { &mut APP_CORE_STACK }, cpu1_fnctn)
+        .start_app_core(unsafe { &mut *addr_of_mut!(APP_CORE_STACK) }, || {
+            println!("Hello World - Core 1!");
+            loop {
+                delay.delay(500.millis());
+                critical_section::with(|cs| {
+                    let mut val = counter.borrow_ref_mut(cs);
+                    *val = val.wrapping_add(1);
+                });
+            }
+        })
         .unwrap();
 
     loop {
-        block!(timer0.wait()).unwrap();
+        delay.delay(1.secs());
 
         let count = critical_section::with(|cs| *counter.borrow_ref(cs));
         println!("Hello World - Core 0! Counter is {}", count);
-    }
-}
-
-fn cpu1_task(timer: &mut Timer<Timer0<TIMG1>>, counter: &Mutex<RefCell<i32>>) -> ! {
-    println!("Hello World - Core 1!");
-    loop {
-        block!(timer.wait()).unwrap();
-
-        critical_section::with(|cs| {
-            let new_val = counter.borrow_ref_mut(cs).wrapping_add(1);
-            *counter.borrow_ref_mut(cs) = new_val;
-        });
     }
 }

@@ -9,12 +9,11 @@
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
+    delay::Delay,
     gpio::IO,
     peripherals::Peripherals,
     prelude::*,
-    rmt::{PulseCode, RxChannel, RxChannelConfig, RxChannelCreator},
-    Delay,
-    Rmt,
+    rmt::{PulseCode, Rmt, RxChannel, RxChannelConfig, RxChannelCreator},
 };
 use esp_println::{print, println};
 
@@ -31,13 +30,13 @@ fn main() -> ! {
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32h2")] {
-            let freq = 32u32.MHz();
+            let freq = 32.MHz();
         } else {
-            let freq = 80u32.MHz();
+            let freq = 80.MHz();
         }
     };
 
-    let rmt = Rmt::new(peripherals.RMT, freq, &clocks).unwrap();
+    let rmt = Rmt::new(peripherals.RMT, freq, &clocks, None).unwrap();
 
     let rx_config = RxChannelConfig {
         clk_divider: 1,
@@ -55,7 +54,7 @@ fn main() -> ! {
         }
     }
 
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
 
     let mut data = [PulseCode {
         level1: true,
@@ -74,10 +73,10 @@ fn main() -> ! {
 
         // simulate input
         for i in 0u32..5u32 {
-            out.set_high().unwrap();
-            delay.delay_us(i * 10 + 20);
-            out.set_low().unwrap();
-            delay.delay_us(i * 20 + 20);
+            out.set_high();
+            delay.delay_micros(i * 10 + 20);
+            out.set_low();
+            delay.delay_micros(i * 20 + 20);
         }
 
         match transaction.wait() {
@@ -126,6 +125,6 @@ fn main() -> ! {
             }
         }
 
-        delay.delay_ms(1500u32);
+        delay.delay_millis(1500);
     }
 }

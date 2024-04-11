@@ -4,101 +4,20 @@ use std::{
     fs::{self, File},
     io::{BufRead, Write},
     path::{Path, PathBuf},
+    str::FromStr,
 };
 
-use serde::Deserialize;
+use esp_build::assert_unique_used_features;
+use esp_metadata::{Chip, Config};
 
-// Macros taken from:
-// https://github.com/TheDan64/inkwell/blob/36c3b10/src/lib.rs#L81-L110
-
-// Given some features, assert that AT MOST one of the features is enabled.
-macro_rules! assert_unique_features {
-    () => {};
-
-    ( $first:tt $(,$rest:tt)* ) => {
-        $(
-            #[cfg(all(feature = $first, feature = $rest))]
-            compile_error!(concat!("Features \"", $first, "\" and \"", $rest, "\" cannot be used together"));
-        )*
-        assert_unique_features!($($rest),*);
-    };
-}
-
-// Given some features, assert that AT LEAST one of the features is enabled.
-macro_rules! assert_used_features {
-    ( $all:tt ) => {
-        #[cfg(not(feature = $all))]
-        compile_error!(concat!("The feature flag must be provided: ", $all));
-    };
-
-    ( $($all:tt),+ ) => {
-        #[cfg(not(any($(feature = $all),*)))]
-        compile_error!(concat!("One of the feature flags must be provided: ", $($all, ", "),*));
-    };
-}
-
-// Given some features, assert that EXACTLY one of the features is enabled.
-macro_rules! assert_unique_used_features {
-    ( $($all:tt),* ) => {
-        assert_unique_features!($($all),*);
-        assert_used_features!($($all),*);
-    }
-}
-
-#[derive(Debug, Deserialize, PartialEq)]
-enum Arch {
-    #[serde(rename = "riscv")]
-    RiscV,
-    #[serde(rename = "xtensa")]
-    Xtensa,
-}
-
-impl std::fmt::Display for Arch {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                Arch::RiscV => "riscv",
-                Arch::Xtensa => "xtensa",
-            }
-        )
-    }
-}
-
-#[derive(Debug, Deserialize)]
-enum CoreCount {
-    #[serde(rename = "single_core")]
-    Single,
-    #[serde(rename = "multi_core")]
-    Multi,
-}
-
-impl std::fmt::Display for CoreCount {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                CoreCount::Single => "single_core",
-                CoreCount::Multi => "multi_core",
-            }
-        )
-    }
-}
-
-#[derive(Debug, Deserialize)]
-struct Device {
-    pub arch: Arch,
-    pub cores: CoreCount,
-    pub peripherals: Vec<String>,
-    pub symbols: Vec<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct Config {
-    pub device: Device,
-}
+#[cfg(debug_assertions)]
+esp_build::warning! {"
+WARNING: use --release
+  We *strongly* recommend using release profile when building esp-hal.
+  The dev profile can potentially be one or more orders of magnitude
+  slower than release, and may cause issues with timing-senstive
+  peripherals and/or devices.
+"}
 
 fn main() -> Result<(), Box<dyn Error>> {
     // NOTE: update when adding new device support!
@@ -110,23 +29,21 @@ fn main() -> Result<(), Box<dyn Error>> {
     // If the `embassy` feature is enabled, ensure that a time driver implementation
     // is available:
     #[cfg(feature = "embassy")]
-    {
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "esp32")] {
-                assert_unique_used_features!("embassy-time-timg0");
-            } else if #[cfg(feature = "esp32s2")] {
-                assert_unique_used_features!("embassy-time-systick-80mhz", "embassy-time-timg0");
-            } else {
-                assert_unique_used_features!("embassy-time-systick-16mhz", "embassy-time-timg0");
-            }
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "esp32")] {
+            assert_unique_used_features!("embassy-time-timg0");
+        } else if #[cfg(feature = "esp32s2")] {
+            assert_unique_used_features!("embassy-time-systick-80mhz", "embassy-time-timg0");
+        } else {
+            assert_unique_used_features!("embassy-time-systick-16mhz", "embassy-time-timg0");
         }
     }
 
-    #[cfg(feature = "flip-link")]
-    {
-        #[cfg(not(any(feature = "esp32c6", feature = "esp32h2")))]
-        panic!("flip-link is only available on ESP32-C6/ESP32-H2");
-    }
+    #[cfg(all(
+        feature = "flip-link",
+        not(any(feature = "esp32c6", feature = "esp32h2"))
+    ))]
+    esp_build::error!("flip-link is only available on ESP32-C6/ESP32-H2");
 
     // NOTE: update when adding new device support!
     // Determine the name of the configured device:
@@ -150,76 +67,38 @@ fn main() -> Result<(), Box<dyn Error>> {
         unreachable!() // We've confirmed exactly one known device was selected
     };
 
-    if detect_atomic_extension("a") || detect_atomic_extension("s32c1i") {
-        panic!(
-            "Atomic emulation flags detected in `.cargo/config.toml`, this is no longer supported!"
-        );
-    }
-
     // Load the configuration file for the configured device:
-    let chip_toml_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("devices")
-        .join(device_name)
-        .join("device.toml")
-        .canonicalize()?;
-
-    let config = fs::read_to_string(chip_toml_path)?;
-    let config: Config = basic_toml::from_str(&config)?;
-    let device = &config.device;
+    let chip = Chip::from_str(device_name)?;
+    let config = Config::for_chip(&chip);
 
     // Check PSRAM features are only given if the target supports PSRAM:
-    if !&device.symbols.contains(&String::from("psram"))
+    if !config.contains(&String::from("psram"))
         && (cfg!(feature = "psram-2m") || cfg!(feature = "psram-4m") || cfg!(feature = "psram-8m"))
     {
         panic!("The target does not support PSRAM");
     }
 
-    // Don't support "interrupt-preemption" and "direct-vectoring" on Xtensa and
-    // RISC-V with CLIC:
-    if (device.symbols.contains(&String::from("clic")) || device.arch == Arch::Xtensa)
-        && (cfg!(feature = "direct-vectoring") || cfg!(feature = "interrupt-preemption"))
-    {
-        panic!("The target does not support interrupt-preemption and direct-vectoring");
-    }
-
     // Define all necessary configuration symbols for the configured device:
-    println!("cargo:rustc-cfg={}", device_name);
-    println!("cargo:rustc-cfg={}", device.arch);
-    println!("cargo:rustc-cfg={}", device.cores);
+    config.define_symbols();
 
-    for peripheral in &device.peripherals {
-        println!("cargo:rustc-cfg={peripheral}");
-    }
-
-    for symbol in &device.symbols {
-        println!("cargo:rustc-cfg={symbol}");
-    }
-
-    let mut config_symbols = Vec::new();
-    let arch = device.arch.to_string();
-    let cores = device.cores.to_string();
-    config_symbols.push(device_name);
-    config_symbols.push(&arch);
-    config_symbols.push(&cores);
-
-    for peripheral in &device.peripherals {
-        config_symbols.push(peripheral);
-    }
-
-    for symbol in &device.symbols {
-        config_symbols.push(symbol);
-    }
-
+    #[allow(unused_mut)]
+    let mut config_symbols = config.all();
     #[cfg(feature = "flip-link")]
-    config_symbols.push("flip-link");
+    config_symbols.push("flip-link".to_owned());
 
     // Place all linker scripts in `OUT_DIR`, and instruct Cargo how to find these
     // files:
     let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
     println!("cargo:rustc-link-search={}", out.display());
 
+    // RISC-V and Xtensa devices each require some special handling and processing
+    // of linker scripts:
+
     if cfg!(feature = "esp32") || cfg!(feature = "esp32s2") || cfg!(feature = "esp32s3") {
-        fs::copy("ld/xtensa/hal-defaults.x", out.join("hal-defaults.x"))?;
+        // Xtensa devices:
+
+        #[cfg(any(feature = "esp32", feature = "esp32s2"))]
+        File::create(out.join("memory_extras.x"))?.write_all(&generate_memory_extras())?;
 
         let (irtc, drtc) = if cfg!(feature = "esp32s3") {
             ("rtc_fast_seg", "rtc_fast_seg")
@@ -240,27 +119,32 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
 
         fs::write(out.join("alias.x"), alias)?;
+        fs::copy("ld/xtensa/hal-defaults.x", out.join("hal-defaults.x"))?;
     } else {
+        // RISC-V devices:
+
+        preprocess_file(&config_symbols, "ld/riscv/asserts.x", out.join("asserts.x"))?;
+        preprocess_file(&config_symbols, "ld/riscv/debug.x", out.join("debug.x"))?;
         preprocess_file(
             &config_symbols,
             "ld/riscv/hal-defaults.x",
             out.join("hal-defaults.x"),
         )?;
-        preprocess_file(&config_symbols, "ld/riscv/asserts.x", out.join("asserts.x"))?;
-        preprocess_file(&config_symbols, "ld/riscv/debug.x", out.join("debug.x"))?;
     }
 
+    // With the architecture-specific linker scripts taken care of, we can copy all
+    // remaining linker scripts which are common to all devices:
     copy_dir_all(&config_symbols, "ld/sections", &out)?;
     copy_dir_all(&config_symbols, format!("ld/{device_name}"), &out)?;
-
-    #[cfg(any(feature = "esp32", feature = "esp32s2"))]
-    File::create(out.join("memory_extras.x"))?.write_all(&generate_memory_extras())?;
 
     Ok(())
 }
 
+// ----------------------------------------------------------------------------
+// Helper Functions
+
 fn copy_dir_all(
-    config_symbols: &Vec<&str>,
+    config_symbols: &Vec<String>,
     src: impl AsRef<Path>,
     dst: impl AsRef<Path>,
 ) -> std::io::Result<()> {
@@ -287,7 +171,7 @@ fn copy_dir_all(
 
 /// A naive pre-processor for linker scripts
 fn preprocess_file(
-    config: &[&str],
+    config: &[String],
     src: impl AsRef<Path>,
     dst: impl AsRef<Path>,
 ) -> std::io::Result<()> {
@@ -302,7 +186,7 @@ fn preprocess_file(
         let trimmed = line.trim();
 
         if let Some(stripped) = trimmed.strip_prefix("#IF ") {
-            let condition = stripped;
+            let condition = stripped.to_string();
             let should_take = take.iter().all(|v| *v);
             let should_take = should_take && config.contains(&condition);
             take.push(should_take);
@@ -324,32 +208,6 @@ fn preprocess_file(
         }
     }
     Ok(())
-}
-
-fn detect_atomic_extension(ext: &str) -> bool {
-    let rustflags = env::var_os("CARGO_ENCODED_RUSTFLAGS")
-        .unwrap()
-        .into_string()
-        .unwrap();
-
-    // Users can pass -Ctarget-feature to the compiler multiple times, so we have to
-    // handle that
-    let target_flags = rustflags
-        .split(0x1f as char)
-        .filter_map(|s| s.strip_prefix("target-feature="));
-    for tf in target_flags {
-        let tf = tf
-            .split(',')
-            .map(|s| s.trim())
-            .filter_map(|s| s.strip_prefix('+'));
-        for tf in tf {
-            if tf == ext {
-                return true;
-            }
-        }
-    }
-
-    false
 }
 
 #[cfg(feature = "esp32")]

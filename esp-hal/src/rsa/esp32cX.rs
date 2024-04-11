@@ -10,7 +10,7 @@ use crate::rsa::{
     RsaMultiplication,
 };
 
-impl<'d> Rsa<'d> {
+impl<'d, DM: crate::Mode> Rsa<'d, DM> {
     /// After the RSA Accelerator is released from reset, the memory blocks
     /// needs to be initialized, only after that peripheral should be used.
     /// This function would return without an error if the memory is initialized
@@ -216,7 +216,7 @@ pub mod operand_sizes {
     );
 }
 
-impl<'a, 'd, T: RsaMode, const N: usize> RsaModularExponentiation<'a, 'd, T>
+impl<'a, 'd, T: RsaMode, DM: crate::Mode, const N: usize> RsaModularExponentiation<'a, 'd, T, DM>
 where
     T: RsaMode<InputType = [u32; N]>,
 {
@@ -225,7 +225,7 @@ where
     /// modulus) mod 2^32`, for more information check 19.3.1 in the
     /// <https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf>
     pub fn new(
-        rsa: &'a mut Rsa<'d>,
+        rsa: &'a mut Rsa<'d, DM>,
         exponent: &T::InputType,
         modulus: &T::InputType,
         m_prime: u32,
@@ -255,7 +255,7 @@ where
         0
     }
 
-    pub(super) fn set_mode(rsa: &mut Rsa) {
+    pub(super) fn set_mode(rsa: &mut Rsa<DM>) {
         rsa.write_mode((N - 1) as u32)
     }
 
@@ -264,11 +264,11 @@ where
     }
 }
 
-impl<'a, 'd, T: RsaMode, const N: usize> RsaModularMultiplication<'a, 'd, T>
+impl<'a, 'd, T: RsaMode, DM: crate::Mode, const N: usize> RsaModularMultiplication<'a, 'd, T, DM>
 where
     T: RsaMode<InputType = [u32; N]>,
 {
-    fn write_mode(rsa: &mut Rsa) {
+    fn write_mode(rsa: &mut Rsa<DM>) {
         rsa.write_mode((N - 1) as u32)
     }
 
@@ -277,7 +277,7 @@ where
     /// modulus) mod 2^32`, for more information check 19.3.1 in the
     /// <https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf>
     pub fn new(
-        rsa: &'a mut Rsa<'d>,
+        rsa: &'a mut Rsa<'d, DM>,
         operand_a: &T::InputType,
         operand_b: &T::InputType,
         modulus: &T::InputType,
@@ -311,12 +311,12 @@ where
     }
 }
 
-impl<'a, 'd, T: RsaMode + Multi, const N: usize> RsaMultiplication<'a, 'd, T>
+impl<'a, 'd, T: RsaMode + Multi, DM: crate::Mode, const N: usize> RsaMultiplication<'a, 'd, T, DM>
 where
     T: RsaMode<InputType = [u32; N]>,
 {
     /// Creates an Instance of `RsaMultiplication`.
-    pub fn new(rsa: &'a mut Rsa<'d>, operand_a: &T::InputType) -> Self {
+    pub fn new(rsa: &'a mut Rsa<'d, DM>, operand_a: &T::InputType) -> Self {
         Self::set_mode(rsa);
         unsafe {
             rsa.write_operand_a(operand_a);
@@ -335,7 +335,7 @@ where
         self.set_start();
     }
 
-    pub(super) fn set_mode(rsa: &mut Rsa) {
+    pub(super) fn set_mode(rsa: &mut Rsa<DM>) {
         rsa.write_mode((N * 2 - 1) as u32)
     }
 

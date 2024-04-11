@@ -13,10 +13,10 @@
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
+    delay::Delay,
     gpio::{AnyPin, Input, Output, PullDown, PushPull, IO},
     peripherals::Peripherals,
     prelude::*,
-    Delay,
 };
 
 #[entry]
@@ -40,20 +40,20 @@ fn main() -> ! {
 
     // Initialize the `Delay` peripheral, and use it to toggle the LED state
     // in a loop:
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
 
     loop {
         toggle_pins(&mut pins, &button);
-        delay.delay_ms(500u32);
+        delay.delay_millis(500);
     }
 }
 
 fn toggle_pins(leds: &mut [AnyPin<Output<PushPull>>], button: &AnyPin<Input<PullDown>>) {
     for pin in leds.iter_mut() {
-        pin.toggle().unwrap();
+        pin.toggle();
     }
 
-    if button.is_low().unwrap() {
+    if button.is_low() {
         esp_println::println!("Button pressed");
     }
 }

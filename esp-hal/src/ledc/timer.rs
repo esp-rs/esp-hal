@@ -47,10 +47,10 @@ pub enum LSClockSource {
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Number {
-    Timer0,
-    Timer1,
-    Timer2,
-    Timer3,
+    Timer0 = 0,
+    Timer1 = 1,
+    Timer2 = 2,
+    Timer3 = 3,
 }
 
 /// Timer configuration
@@ -256,56 +256,16 @@ impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
         let duty = unwrap!(self.duty) as u8;
         let use_apb = !self.use_ref_tick;
 
-        match self.number {
-            Number::Timer0 => self.ledc.lstimer0_conf().modify(|_, w| unsafe {
-                w.tick_sel()
-                    .bit(use_apb)
-                    .rst()
-                    .clear_bit()
-                    .pause()
-                    .clear_bit()
-                    .div_num()
-                    .bits(divisor)
-                    .duty_res()
-                    .bits(duty)
-            }),
-            Number::Timer1 => self.ledc.lstimer1_conf().modify(|_, w| unsafe {
-                w.tick_sel()
-                    .bit(use_apb)
-                    .rst()
-                    .clear_bit()
-                    .pause()
-                    .clear_bit()
-                    .div_num()
-                    .bits(divisor)
-                    .duty_res()
-                    .bits(duty)
-            }),
-            Number::Timer2 => self.ledc.lstimer2_conf().modify(|_, w| unsafe {
-                w.tick_sel()
-                    .bit(use_apb)
-                    .rst()
-                    .clear_bit()
-                    .pause()
-                    .clear_bit()
-                    .div_num()
-                    .bits(divisor)
-                    .duty_res()
-                    .bits(duty)
-            }),
-            Number::Timer3 => self.ledc.lstimer3_conf().modify(|_, w| unsafe {
-                w.tick_sel()
-                    .bit(use_apb)
-                    .rst()
-                    .clear_bit()
-                    .pause()
-                    .clear_bit()
-                    .div_num()
-                    .bits(divisor)
-                    .duty_res()
-                    .bits(duty)
-            }),
-        };
+        self.ledc
+            .lstimer(self.number as usize)
+            .conf()
+            .modify(|_, w| unsafe {
+                w.tick_sel().bit(use_apb);
+                w.rst().clear_bit();
+                w.pause().clear_bit();
+                w.div_num().bits(divisor);
+                w.duty_res().bits(duty)
+            });
     }
 
     #[cfg(not(esp32))]
@@ -314,90 +274,26 @@ impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
         let duty = unwrap!(self.duty) as u8;
         let use_ref_tick = self.use_ref_tick;
 
-        match self.number {
-            Number::Timer0 => self.ledc.timer0_conf().modify(|_, w| unsafe {
-                w.tick_sel()
-                    .bit(use_ref_tick)
-                    .rst()
-                    .clear_bit()
-                    .pause()
-                    .clear_bit()
-                    .clk_div()
-                    .bits(divisor)
-                    .duty_res()
-                    .bits(duty)
-            }),
-            Number::Timer1 => self.ledc.timer1_conf().modify(|_, w| unsafe {
-                w.tick_sel()
-                    .bit(use_ref_tick)
-                    .rst()
-                    .clear_bit()
-                    .pause()
-                    .clear_bit()
-                    .clk_div()
-                    .bits(divisor)
-                    .duty_res()
-                    .bits(duty)
-            }),
-            Number::Timer2 => self.ledc.timer2_conf().modify(|_, w| unsafe {
-                w.tick_sel()
-                    .bit(use_ref_tick)
-                    .rst()
-                    .clear_bit()
-                    .pause()
-                    .clear_bit()
-                    .clk_div()
-                    .bits(divisor)
-                    .duty_res()
-                    .bits(duty)
-            }),
-            Number::Timer3 => self.ledc.timer3_conf().modify(|_, w| unsafe {
-                w.tick_sel()
-                    .bit(use_ref_tick)
-                    .rst()
-                    .clear_bit()
-                    .pause()
-                    .clear_bit()
-                    .clk_div()
-                    .bits(divisor)
-                    .duty_res()
-                    .bits(duty)
-            }),
-        };
+        self.ledc
+            .timer(self.number as usize)
+            .conf()
+            .modify(|_, w| unsafe {
+                w.tick_sel().bit(use_ref_tick);
+                w.rst().clear_bit();
+                w.pause().clear_bit();
+                w.clk_div().bits(divisor);
+                w.duty_res().bits(duty)
+            });
     }
 
-    #[cfg(esp32)]
     /// Update the timer in HW
     fn update_hw(&self) {
-        match self.number {
-            Number::Timer0 => self
-                .ledc
-                .lstimer0_conf()
-                .modify(|_, w| w.para_up().set_bit()),
-            Number::Timer1 => self
-                .ledc
-                .lstimer1_conf()
-                .modify(|_, w| w.para_up().set_bit()),
-            Number::Timer2 => self
-                .ledc
-                .lstimer2_conf()
-                .modify(|_, w| w.para_up().set_bit()),
-            Number::Timer3 => self
-                .ledc
-                .lstimer3_conf()
-                .modify(|_, w| w.para_up().set_bit()),
-        };
-    }
+        #[cfg(esp32)]
+        let tmr = self.ledc.lstimer(self.number as usize);
+        #[cfg(not(esp32))]
+        let tmr = self.ledc.timer(self.number as usize);
 
-    #[cfg(not(esp32))]
-    /// Update the timer in HW
-    fn update_hw(&self) {
-        match self.number {
-            Number::Timer0 => self.ledc.timer0_conf().modify(|_, w| w.para_up().set_bit()),
-            Number::Timer1 => self.ledc.timer1_conf().modify(|_, w| w.para_up().set_bit()),
-            Number::Timer2 => self.ledc.timer2_conf().modify(|_, w| w.para_up().set_bit()),
-            Number::Timer3 => self.ledc.timer3_conf().modify(|_, w| w.para_up().set_bit()),
-        };
+        tmr.conf().modify(|_, w| w.para_up().set_bit());
     }
 }
 
@@ -417,56 +313,16 @@ impl<'a> TimerHW<HighSpeed> for Timer<'a, HighSpeed> {
         let duty = unwrap!(self.duty) as u8;
         let sel_hstimer = self.clock_source == Some(HSClockSource::APBClk);
 
-        match self.number {
-            Number::Timer0 => self.ledc.hstimer0_conf().modify(|_, w| unsafe {
-                w.tick_sel()
-                    .bit(sel_hstimer)
-                    .rst()
-                    .clear_bit()
-                    .pause()
-                    .clear_bit()
-                    .div_num()
-                    .bits(divisor)
-                    .duty_res()
-                    .bits(duty)
-            }),
-            Number::Timer1 => self.ledc.hstimer1_conf().modify(|_, w| unsafe {
-                w.tick_sel()
-                    .bit(sel_hstimer)
-                    .rst()
-                    .clear_bit()
-                    .pause()
-                    .clear_bit()
-                    .div_num()
-                    .bits(divisor)
-                    .duty_res()
-                    .bits(duty)
-            }),
-            Number::Timer2 => self.ledc.hstimer2_conf().modify(|_, w| unsafe {
-                w.tick_sel()
-                    .bit(sel_hstimer)
-                    .rst()
-                    .clear_bit()
-                    .pause()
-                    .clear_bit()
-                    .div_num()
-                    .bits(divisor)
-                    .duty_res()
-                    .bits(duty)
-            }),
-            Number::Timer3 => self.ledc.hstimer3_conf().modify(|_, w| unsafe {
-                w.tick_sel()
-                    .bit(sel_hstimer)
-                    .rst()
-                    .clear_bit()
-                    .pause()
-                    .clear_bit()
-                    .div_num()
-                    .bits(divisor)
-                    .duty_res()
-                    .bits(duty)
-            }),
-        };
+        self.ledc
+            .hstimer(self.number as usize)
+            .conf()
+            .modify(|_, w| unsafe {
+                w.tick_sel().bit(sel_hstimer);
+                w.rst().clear_bit();
+                w.pause().clear_bit();
+                w.div_num().bits(divisor);
+                w.duty_res().bits(duty)
+            });
     }
 
     /// Update the timer in HW

@@ -14,7 +14,14 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{clock::ClockControl, peripherals::Peripherals, prelude::*, rmt::Rmt, Delay, IO};
+use esp_hal::{
+    clock::ClockControl,
+    delay::Delay,
+    gpio::IO,
+    peripherals::Peripherals,
+    prelude::*,
+    rmt::Rmt,
+};
 use esp_hal_smartled::{smartLedBuffer, SmartLedsAdapter};
 use smart_leds::{
     brightness,
@@ -49,9 +56,9 @@ fn main() -> ! {
 
     // Configure RMT peripheral globally
     #[cfg(not(feature = "esp32h2"))]
-    let rmt = Rmt::new(peripherals.RMT, 80u32.MHz(), &clocks).unwrap();
+    let rmt = Rmt::new(peripherals.RMT, 80.MHz(), &clocks, None).unwrap();
     #[cfg(feature = "esp32h2")]
-    let rmt = Rmt::new(peripherals.RMT, 32u32.MHz(), &clocks).unwrap();
+    let rmt = Rmt::new(peripherals.RMT, 32.MHz(), &clocks, None).unwrap();
 
     // We use one of the RMT channels to instantiate a `SmartLedsAdapter` which can
     // be used directly with all `smart_led` implementations
@@ -60,7 +67,7 @@ fn main() -> ! {
 
     // Initialize the Delay peripheral, and use it to toggle the LED state in a
     // loop.
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
 
     let mut color = Hsv {
         hue: 0,
@@ -81,7 +88,7 @@ fn main() -> ! {
             // that the output it's not too bright.
             led.write(brightness(gamma(data.iter().cloned()), 10))
                 .unwrap();
-            delay.delay_ms(20u8);
+            delay.delay_millis(20);
         }
     }
 }

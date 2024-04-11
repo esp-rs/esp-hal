@@ -23,9 +23,10 @@ pub enum Package {
     EspLpHal,
     EspRiscvRt,
     Examples,
+    HilTest,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Display, EnumIter, ValueEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Display, EnumIter, ValueEnum, serde::Serialize)]
 #[strum(serialize_all = "kebab-case")]
 pub enum Chip {
     Esp32,
@@ -150,12 +151,18 @@ pub fn build_documentation(
 
     log::info!("Building '{package_name}' documentation targeting '{chip}'");
 
+    let mut features = vec![chip.to_string()];
+
+    if matches!(package, Package::EspHal) {
+        features.push("ci".to_owned())
+    }
+
     // Build up an array of command-line arguments to pass to `cargo`:
     let mut builder = CargoArgsBuilder::default()
         .subcommand("doc")
         .arg("-Zbuild-std=core") // Required for Xtensa, for some reason
         .target(target)
-        .features(&[chip.to_string()]);
+        .features(&features);
 
     if open {
         builder = builder.arg("--open");
@@ -240,12 +247,11 @@ pub fn build_example(
         log::info!("  Features: {}", example.features().join(","));
     }
 
-    let bin = if example
-        .example_path()
-        .strip_prefix(package_path)?
-        .starts_with("src/bin")
-    {
+    let package = example.example_path().strip_prefix(package_path)?;
+    let bin = if package.starts_with("src/bin") {
         format!("--bin={}", example.name())
+    } else if package.starts_with("tests") {
+        format!("--test={}", example.name())
     } else {
         format!("--example={}", example.name())
     };
@@ -290,26 +296,36 @@ pub fn run_example(
         log::info!("  Features: {}", example.features().join(","));
     }
 
-    let bin = if example
-        .example_path()
-        .strip_prefix(package_path)?
-        .starts_with("src/bin")
-    {
-        format!("--bin={}", example.name())
+    let package = example.example_path().strip_prefix(package_path)?;
+    log::info!("Package: {:?}", package);
+    let (bin, subcommand) = if package.starts_with("src/bin") {
+        (format!("--bin={}", example.name()), "run")
+    } else if package.starts_with("tests") {
+        (format!("--test={}", example.name()), "test")
     } else {
-        format!("--example={}", example.name())
+        (format!("--example={}", example.name()), "run")
     };
 
     let mut features = example.features().to_vec();
     features.push(chip.to_string());
 
     let mut builder = CargoArgsBuilder::default()
-        .subcommand("run")
+        .subcommand(subcommand)
         .arg("-Zbuild-std=alloc,core")
         .arg("--release")
         .target(target)
         .features(&features)
         .arg(bin);
+
+    // probe-rs cannot currently do auto detection, so we need to tell probe-rs run
+    // which chip we are testing
+    if subcommand == "test" {
+        if chip == Chip::Esp32 {
+            builder = builder.arg("--").arg("--chip").arg("esp32-3.3v");
+        } else {
+            builder = builder.arg("--").arg("--chip").arg(format!("{}", chip));
+        }
+    }
 
     // If targeting an Xtensa device, we must use the '+esp' toolchain modifier:
     if target.starts_with("xtensa") {
@@ -319,8 +335,7 @@ pub fn run_example(
     let args = builder.build();
     log::debug!("{args:#?}");
 
-    cargo::run_with_input(&args, package_path)?;
-    Ok(())
+    cargo::run_with_input(&args, package_path)
 }
 
 /// Build the specified package, using the given toolchain/target/features if
@@ -328,6 +343,7 @@ pub fn run_example(
 pub fn build_package(
     package_path: &Path,
     features: Vec<String>,
+    no_default_features: bool,
     toolchain: Option<String>,
     target: Option<String>,
 ) -> Result<()> {
@@ -356,6 +372,10 @@ pub fn build_package(
         builder = builder.features(&features);
     }
 
+    if no_default_features {
+        builder = builder.arg("--no-default-features");
+    }
+
     let args = builder.build();
     log::debug!("{args:#?}");
 
@@ -369,7 +389,7 @@ pub fn bump_version(workspace: &Path, package: Package, amount: Version) -> Resu
     let manifest_path = workspace.join(package.to_string()).join("Cargo.toml");
     let manifest = fs::read_to_string(&manifest_path)?;
 
-    let mut manifest = manifest.parse::<toml_edit::Document>()?;
+    let mut manifest = manifest.parse::<toml_edit::DocumentMut>()?;
 
     let version = manifest["package"]["version"]
         .to_string()
@@ -410,7 +430,7 @@ const EFUSE_FIELDS_RS_HEADER: &str = r#"
 //!
 //! For information on how to regenerate these files, please refer to the
 //! `xtask` package's `README.md` file.
-//! 
+//!
 //! Generated on:   $DATE
 //! ESP-IDF Commit: $HASH
 
@@ -442,8 +462,8 @@ pub fn generate_efuse_table(
     // Determine the commit (short) hash of the HEAD commit in the
     // provided ESP-IDF repository:
     let output = Command::new("git")
-        .args(&["rev-parse", "HEAD"])
-        .current_dir(&idf_path)
+        .args(["rev-parse", "HEAD"])
+        .current_dir(idf_path)
         .output()?;
     let idf_hash = String::from_utf8_lossy(&output.stdout[0..=7]).to_string();
 
@@ -551,6 +571,27 @@ pub fn generate_efuse_table(
     }
 
     Ok(())
+}
+
+// ----------------------------------------------------------------------------
+// Helper Functions
+
+/// Parse the version from the specified package's Cargo manifest.
+pub fn package_version(workspace: &Path, package: Package) -> Result<semver::Version> {
+    #[derive(Debug, serde::Deserialize)]
+    pub struct Manifest {
+        package: Package,
+    }
+
+    #[derive(Debug, serde::Deserialize)]
+    pub struct Package {
+        version: semver::Version,
+    }
+
+    let manifest = fs::read_to_string(workspace.join(package.to_string()).join("Cargo.toml"))?;
+    let manifest: Manifest = basic_toml::from_str(&manifest)?;
+
+    Ok(manifest.package.version)
 }
 
 /// Make the path "Windows"-safe

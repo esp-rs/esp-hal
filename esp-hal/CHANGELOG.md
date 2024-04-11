@@ -5,6 +5,68 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Add `ADC::read_blocking` to xtensa chips (#1293)
+- ESP32-C6 / ESP32-H2: Implement `ETM` for general purpose timers (#1274)
+- `interrupt::enable` now has a direct CPU enable counter part, `interrupt::enable_direct` (#1310)
+- `Delay::delay(time: fugit::MicrosDurationU64)`
+- Added async support for TWAI (#1320)
+- Add TWAI support for ESP32-C6 (#1323)
+- `GpioPin::steal` unsafe API (#1363)
+- Inherent implementions of GPIO pin `set_low`, `is_low`, etc.
+- Warn users when attempting to build using the `dev` profile (#1420)
+
+### Fixed
+
+- Reserve `esp32` ROM stacks to prevent the trashing of dram2 section (#1289)
+- Fixing `esp-wifi` + `TRNG` issue on `ESP32-S2` (#1272)
+- Fixed core1 startup using the wrong stack on the esp32 and esp32s3 (#1286).
+- ESP32: Apply fix for Errata 3.6 in all the places necessary. (#1315)
+- ESP32 & ESP32-S2: Fix I²C frequency (#1306)
+- UART's TX/RX FIFOs are now cleared during initialization (#1344)
+- Fixed `LCD_CAM I8080` driver potentially sending garbage to display (#1301)
+- The TWAI driver can now be used without requiring the `embedded-hal` traits (#1355)
+- USB pullup/pulldown now gets properly cleared and does not interfere anymore on esp32c3 and esp32s3 (#1244)
+- Fixed GPIO counts so that using async code with the higher GPIO number should no longer panic (#1361, #1362)
+- ESP32/ESP32-S2: Wait for I2S getting out of TX_IDLE when starting a transfer (#1375)
+- Fixed writes to SPI not flushing before attempting to write, causing corrupted writes (#1381)
+- fix AdcConfig::adc_calibrate for xtensa targets (#1379)
+- Fixed a divide by zero panic when setting the LEDC duty cycle to 0 with `SetDutyCycle::set_duty_cycle` (#1403)
+
+### Changed
+
+- TIMG: Allow use without the embedded-hal-02 traits in scope (#1367)
+- DMA: use channel clusters
+- Remove `Ext32` and `RateExtU64` from prelude
+- Prefer mutable references over moving for DMA transactions (#1238)
+- Support runtime interrupt binding, adapt GPIO driver (#1231)
+- Renamed `eh1` feature to `embedded-hal`, feature-gated `embedded-hal@0.2.x` trait implementations (#1273)
+- Enable `embedded-hal` feature by default, instead of the `embedded-hal-02` feature (#1313)
+- `Uart` structs now take a `Mode` parameter which defines how the driver is initialized (#1294)
+- `Rmt` can be created in async or blocking mode. The blocking constructor takes an optional interrupt handler argument. (#1341)
+- All `Instance` traits are now sealed, and can no longer be implemented for arbitrary types (#1346)
+- DMA channels can/have to be explicitly created for async or blocking drivers, added `set_interrupt_handler` to DMA channels, SPI, I2S, PARL_IO, don't enable interrupts on startup for DMA, I2S, PARL_IO, GPIO (#1300)
+- UART: Rework `change_baud` so it is possible to set baud rate even after instantiation (#1350)
+- Runtime ISR binding for SHA,ECC and RSA (#1354)
+- Runtime ISR binding for I2C (#1376)
+- `UsbSerialJtag` can be created in async or blocking mode. The blocking constructor takes an optional interrupt handler argument (#1377)
+- SYSTIMER and TIMG instances can now be created in async or blocking mode (#1348)
+- Runtime ISR binding for TWAI (#1384)
+- ESP32-C6: The `gpio::lp_gpio` module has been renamed to `gpio::lp_io` to match the peripheral name (#1397)
+- Runtime ISR binding for assist_debug (#1395)
+- Runtime ISR binding for software interrupts, software interrupts are split now, interrupt-executor takes the software interrupt to use, interrupt-executor is easier to use (#1398)
+- PCNT: Runtime ISR binding (#1396)
+- Runtime ISR binding for RTC (#1405)
+
+### Removed
+
+- Remove package-level type exports (#1275)
+- Removed `direct-vectoring` & `interrupt-preemption` features, as they are now enabled by default (#1310)
+- Removed the `rt` and `vectored` features (#1380)
+
 ## [0.16.1] - 2024-03-12
 
 - Resolved an issue with the `defmt` dependency/feature (#1264)
@@ -35,6 +97,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ensuring that the random number generator is TRNG. (#1200)
 - ESP32-C6: Add timer wakeup source for deepsleep (#1201)
 - Introduce `InterruptExecutor::spawner()` (#1211)
+- Add `InterruptHandler` struct, which couples interrupt handlers and their priority together (#1299)
 
 ### Fixed
 
@@ -456,6 +519,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2022-08-05
 
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.16.1...HEAD
 [0.16.1]: https://github.com/esp-rs/esp-hal/compare/v0.16.0...v0.16.1
 [0.16.0]: https://github.com/esp-rs/esp-hal/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/esp-rs/esp-hal/compare/v0.14.1...v0.15.0

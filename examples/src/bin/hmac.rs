@@ -63,8 +63,8 @@ use esp_hal::{
     hmac::{Hmac, HmacPurpose, KeyId},
     peripherals::Peripherals,
     prelude::*,
+    rng::Rng,
     systimer::SystemTimer,
-    Rng,
 };
 use esp_println::println;
 use hmac::{Hmac as HmacSw, Mac};
@@ -87,7 +87,7 @@ fn main() -> ! {
     let mut hw_hmac = Hmac::new(peripherals.HMAC);
 
     let mut src = [0_u8; 1024];
-    rng.read(src.as_mut_slice()).unwrap();
+    rng.read(src.as_mut_slice());
     // println!("HMAC input {:02X?}", src);
 
     let mut output = [0u8; 32];

@@ -14,13 +14,12 @@ use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    embassy::{self},
+    embassy,
+    gpio::IO,
     peripherals::Peripherals,
     prelude::*,
-    rmt::{asynch::TxChannelAsync, PulseCode, TxChannelConfig, TxChannelCreator},
+    rmt::{asynch::TxChannelAsync, PulseCode, Rmt, TxChannelConfig, TxChannelCreatorAsync},
     timer::TimerGroup,
-    Rmt,
-    IO,
 };
 use esp_println::println;
 
@@ -31,20 +30,20 @@ async fn main(_spawner: Spawner) {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
     embassy::init(&clocks, timg0);
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32h2")] {
-            let freq = 32u32.MHz();
+            let freq = 32.MHz();
         } else {
-            let freq = 80u32.MHz();
+            let freq = 80.MHz();
         }
     };
 
-    let rmt = Rmt::new(peripherals.RMT, freq, &clocks).unwrap();
+    let rmt = Rmt::new_async(peripherals.RMT, freq, &clocks).unwrap();
 
     let mut channel = rmt
         .channel0

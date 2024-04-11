@@ -4,10 +4,18 @@
 use xtensa_lx::interrupt::{self, InterruptNumber};
 use xtensa_lx_rt::exception::Context;
 
+pub use self::vectored::*;
 use crate::{
     peripherals::{self, Interrupt},
     Cpu,
 };
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum Error {
+    InvalidInterrupt,
+    CpuInterruptReserved,
+}
 
 /// Enumeration of available CPU interrupts
 ///
@@ -52,16 +60,54 @@ pub enum CpuInterrupt {
     Interrupt31EdgePriority5,
 }
 
+pub const RESERVED_INTERRUPTS: &[usize] = &[
+    CpuInterrupt::Interrupt1LevelPriority1 as _,
+    CpuInterrupt::Interrupt19LevelPriority2 as _,
+    CpuInterrupt::Interrupt23LevelPriority3 as _,
+    CpuInterrupt::Interrupt10EdgePriority1 as _,
+    CpuInterrupt::Interrupt22EdgePriority3 as _,
+];
+
+pub(crate) fn setup_interrupts() {
+    // disable all known interrupts
+    // at least after the 2nd stage bootloader there are some interrupts enabled
+    // (e.g. UART)
+    for peripheral_interrupt in 0..255 {
+        crate::soc::peripherals::Interrupt::try_from(peripheral_interrupt)
+            .map(|intr| {
+                #[cfg(multi_core)]
+                disable(Cpu::AppCpu, intr);
+                disable(Cpu::ProCpu, intr);
+            })
+            .ok();
+    }
+}
+
+/// Enable an interrupt by directly binding it to a available CPU interrupt
+///
+/// Unless you are sure, you most likely want to use [`enable`] instead.
+///
+/// Trying using a reserved interrupt from [`RESERVED_INTERRUPTS`] will return
+/// an error.
+pub fn enable_direct(interrupt: Interrupt, cpu_interrupt: CpuInterrupt) -> Result<(), Error> {
+    if RESERVED_INTERRUPTS.contains(&(cpu_interrupt as _)) {
+        return Err(Error::CpuInterruptReserved);
+    }
+    unsafe {
+        map(crate::get_core(), interrupt, cpu_interrupt);
+
+        xtensa_lx::interrupt::enable_mask(
+            xtensa_lx::interrupt::get_mask() | 1 << cpu_interrupt as u32,
+        );
+    }
+    Ok(())
+}
+
 /// Assign a peripheral interrupt to an CPU interrupt
 ///
 /// Great care **must** be taken when using this function with interrupt
-/// vectoring (enabled by default). Avoid the following CPU interrupts:
-/// - Interrupt1LevelPriority1
-/// - Interrupt19LevelPriority2
-/// - Interrupt23LevelPriority3
-/// - Interrupt10EdgePriority1
-/// - Interrupt22EdgePriority3
-/// As they are preallocated for interrupt vectoring.
+/// vectoring (enabled by default). Avoid the interrupts listed in
+/// [`RESERVED_INTERRUPTS`] as they are preallocated for interrupt vectoring.
 ///
 /// Note: this only maps the interrupt to the CPU interrupt. The CPU interrupt
 /// still needs to be enabled afterwards
@@ -186,21 +232,11 @@ unsafe fn core1_interrupt_peripheral() -> *const crate::peripherals::interrupt_c
     crate::peripherals::INTERRUPT_CORE1::PTR
 }
 
-#[cfg(feature = "vectored")]
-pub use vectored::*;
-
-#[cfg(feature = "vectored")]
 mod vectored {
     use procmacros::ram;
 
     use super::*;
     use crate::get_core;
-
-    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-    pub enum Error {
-        InvalidInterrupt,
-    }
 
     /// Interrupt priority levels.
     #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -214,11 +250,11 @@ mod vectored {
     }
 
     impl Priority {
-        pub fn max() -> Priority {
+        pub const fn max() -> Priority {
             Priority::Priority3
         }
 
-        pub fn min() -> Priority {
+        pub const fn min() -> Priority {
             Priority::Priority1
         }
     }
@@ -285,7 +321,8 @@ mod vectored {
                 let i = interrupt_nr as isize;
                 let cpu_interrupt = intr_map_base.offset(i).read_volatile();
                 // safety: cast is safe because of repr(u32)
-                let cpu_interrupt: CpuInterrupt = core::mem::transmute(cpu_interrupt);
+                let cpu_interrupt: CpuInterrupt =
+                    core::mem::transmute::<u32, CpuInterrupt>(cpu_interrupt);
                 let level = cpu_interrupt.level() as u8 as usize;
 
                 levels[level] |= 1 << i;
@@ -309,6 +346,13 @@ mod vectored {
             );
         }
         Ok(())
+    }
+
+    /// Bind the given interrupt to the given handler
+    pub unsafe fn bind_interrupt(interrupt: Interrupt, handler: unsafe extern "C" fn() -> ()) {
+        let ptr = &peripherals::__INTERRUPTS[interrupt as usize]._handler as *const _
+            as *mut unsafe extern "C" fn() -> ();
+        ptr.write_volatile(handler);
     }
 
     fn interrupt_level_to_cpu_interrupt(
@@ -448,7 +492,8 @@ mod vectored {
         ) {
             EspDefaultHandler(level, interrupt);
         } else {
-            let handler: fn(&mut Context) = core::mem::transmute(handler);
+            let handler: fn(&mut Context) =
+                core::mem::transmute::<unsafe extern "C" fn(), fn(&mut Context)>(handler);
             handler(save_frame);
         }
     }
@@ -517,37 +562,10 @@ mod raw {
     use super::*;
 
     extern "C" {
-        #[cfg(not(feature = "vectored"))]
-        fn level1_interrupt(save_frame: &mut Context);
-        #[cfg(not(feature = "vectored"))]
-        fn level2_interrupt(save_frame: &mut Context);
-        #[cfg(not(feature = "vectored"))]
-        fn level3_interrupt(save_frame: &mut Context);
         fn level4_interrupt(save_frame: &mut Context);
         fn level5_interrupt(save_frame: &mut Context);
         fn level6_interrupt(save_frame: &mut Context);
         fn level7_interrupt(save_frame: &mut Context);
-    }
-
-    #[no_mangle]
-    #[link_section = ".rwtext"]
-    #[cfg(not(feature = "vectored"))]
-    unsafe fn __level_1_interrupt(_level: u32, save_frame: &mut Context) {
-        level1_interrupt(save_frame)
-    }
-
-    #[no_mangle]
-    #[link_section = ".rwtext"]
-    #[cfg(not(feature = "vectored"))]
-    unsafe fn __level_2_interrupt(_level: u32, save_frame: &mut Context) {
-        level2_interrupt(save_frame)
-    }
-
-    #[no_mangle]
-    #[link_section = ".rwtext"]
-    #[cfg(not(feature = "vectored"))]
-    unsafe fn __level_3_interrupt(_level: u32, save_frame: &mut Context) {
-        level3_interrupt(save_frame)
     }
 
     #[no_mangle]

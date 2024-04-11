@@ -21,10 +21,10 @@ use esp_hal::{
     clock::ClockControl,
     dma::{Dma, DmaPriority},
     dma_buffers,
+    gpio::IO,
     i2s::{DataFormat, I2s, I2sReadDma, Standard},
     peripherals::Peripherals,
     prelude::*,
-    IO,
 };
 use esp_println::println;
 
@@ -42,7 +42,7 @@ fn main() -> ! {
     #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
     let dma_channel = dma.channel0;
 
-    let (_, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(0, 4 * 4092);
+    let (_, mut tx_descriptors, mut rx_buffer, mut rx_descriptors) = dma_buffers!(0, 4 * 4092);
 
     // Here we test that the type is
     // 1) reasonably simple (or at least this will flag changes that may make it
@@ -52,7 +52,7 @@ fn main() -> ! {
         peripherals.I2S0,
         Standard::Philips,
         DataFormat::Data16Channel16,
-        44100u32.Hz(),
+        44100.Hz(),
         dma_channel.configure(
             false,
             &mut tx_descriptors,
@@ -67,16 +67,14 @@ fn main() -> ! {
         i2s.with_mclk(io.pins.gpio0);
     }
 
-    let i2s_rx = i2s
+    let mut i2s_rx = i2s
         .i2s_rx
         .with_bclk(io.pins.gpio2)
         .with_ws(io.pins.gpio4)
         .with_din(io.pins.gpio5)
         .build();
 
-    let buffer = rx_buffer;
-
-    let mut transfer = i2s_rx.read_dma_circular(buffer).unwrap();
+    let mut transfer = i2s_rx.read_dma_circular(&mut rx_buffer).unwrap();
     println!("Started transfer");
 
     loop {

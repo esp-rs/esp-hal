@@ -137,48 +137,62 @@ where
 }
 
 pub mod dma {
-    use core::mem;
-
     use embedded_dma::{ReadBuffer, WriteBuffer};
 
     use super::*;
     #[cfg(spi3)]
     use crate::dma::Spi3Peripheral;
-    use crate::dma::{
-        Channel,
-        ChannelTypes,
-        DmaError,
-        DmaTransfer,
-        DmaTransferRxTx,
-        RxPrivate,
-        Spi2Peripheral,
-        SpiPeripheral,
-        TxPrivate,
+    use crate::{
+        dma::{
+            Channel,
+            ChannelTypes,
+            DmaError,
+            DmaTransfer,
+            DmaTransferRxTx,
+            RxPrivate,
+            Spi2Peripheral,
+            SpiPeripheral,
+            TxPrivate,
+        },
+        Mode,
     };
 
-    pub trait WithDmaSpi2<'d, C>
+    pub trait WithDmaSpi2<'d, C, DmaMode>
     where
         C: ChannelTypes,
         C::P: SpiPeripheral,
+        DmaMode: Mode,
     {
-        fn with_dma(self, channel: Channel<'d, C>) -> SpiDma<'d, crate::peripherals::SPI2, C>;
+        fn with_dma(
+            self,
+            channel: Channel<'d, C, DmaMode>,
+        ) -> SpiDma<'d, crate::peripherals::SPI2, C, DmaMode>;
     }
 
     #[cfg(spi3)]
-    pub trait WithDmaSpi3<'d, C>
+    pub trait WithDmaSpi3<'d, C, DmaMode>
     where
         C: ChannelTypes,
         C::P: SpiPeripheral,
+        DmaMode: Mode,
     {
-        fn with_dma(self, channel: Channel<'d, C>) -> SpiDma<'d, crate::peripherals::SPI3, C>;
+        fn with_dma(
+            self,
+            channel: Channel<'d, C, DmaMode>,
+        ) -> SpiDma<'d, crate::peripherals::SPI3, C, DmaMode>;
     }
 
-    impl<'d, C> WithDmaSpi2<'d, C> for Spi<'d, crate::peripherals::SPI2, FullDuplexMode>
+    impl<'d, C, DmaMode> WithDmaSpi2<'d, C, DmaMode>
+        for Spi<'d, crate::peripherals::SPI2, FullDuplexMode>
     where
         C: ChannelTypes,
         C::P: SpiPeripheral + Spi2Peripheral,
+        DmaMode: Mode,
     {
-        fn with_dma(self, mut channel: Channel<'d, C>) -> SpiDma<'d, crate::peripherals::SPI2, C> {
+        fn with_dma(
+            self,
+            mut channel: Channel<'d, C, DmaMode>,
+        ) -> SpiDma<'d, crate::peripherals::SPI2, C, DmaMode> {
             channel.tx.init_channel(); // no need to call this for both, TX and RX
 
             #[cfg(esp32)]
@@ -197,12 +211,17 @@ pub mod dma {
     }
 
     #[cfg(spi3)]
-    impl<'d, C> WithDmaSpi3<'d, C> for Spi<'d, crate::peripherals::SPI3, FullDuplexMode>
+    impl<'d, C, DmaMode> WithDmaSpi3<'d, C, DmaMode>
+        for Spi<'d, crate::peripherals::SPI3, FullDuplexMode>
     where
         C: ChannelTypes,
         C::P: SpiPeripheral + Spi3Peripheral,
+        DmaMode: Mode,
     {
-        fn with_dma(self, mut channel: Channel<'d, C>) -> SpiDma<'d, crate::peripherals::SPI3, C> {
+        fn with_dma(
+            self,
+            mut channel: Channel<'d, C, DmaMode>,
+        ) -> SpiDma<'d, crate::peripherals::SPI3, C, DmaMode> {
             channel.tx.init_channel(); // no need to call this for both, TX and RX
 
             #[cfg(esp32)]
@@ -220,54 +239,35 @@ pub mod dma {
         }
     }
     /// An in-progress DMA transfer
-    pub struct SpiDmaTransferRxTx<'d, T, C, RBUFFER, TBUFFER>
+    #[must_use]
+    pub struct SpiDmaTransferRxTx<'t, 'd, T, C, DmaMode>
     where
         T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
         C: ChannelTypes,
         C::P: SpiPeripheral,
+        DmaMode: Mode,
     {
-        spi_dma: SpiDma<'d, T, C>,
-        rbuffer: RBUFFER,
-        tbuffer: TBUFFER,
+        spi_dma: &'t mut SpiDma<'d, T, C, DmaMode>,
     }
 
-    impl<'d, T, C, RXBUF, TXBUF> DmaTransferRxTx<RXBUF, TXBUF, SpiDma<'d, T, C>>
-        for SpiDmaTransferRxTx<'d, T, C, RXBUF, TXBUF>
+    impl<'t, 'd, T, C, DmaMode> DmaTransferRxTx for SpiDmaTransferRxTx<'t, 'd, T, C, DmaMode>
     where
         T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
         C: ChannelTypes,
         C::P: SpiPeripheral,
+        DmaMode: Mode,
     {
-        /// Wait for the DMA transfer to complete and return the buffers and the
-        /// SPI instance.
-        fn wait(
-            mut self,
-        ) -> Result<(RXBUF, TXBUF, SpiDma<'d, T, C>), (DmaError, RXBUF, TXBUF, SpiDma<'d, T, C>)>
-        {
+        /// Wait for the DMA transfer to complete
+        fn wait(self) -> Result<(), DmaError> {
             // Waiting for the DMA transfer is not enough. We need to wait for the
             // peripheral to finish flushing its buffers, too.
             while !self.is_done() {}
             self.spi_dma.spi.flush().ok();
 
-            let err = self.spi_dma.channel.rx.has_error() || self.spi_dma.channel.tx.has_error();
-
-            // `DmaTransfer` needs to have a `Drop` implementation, because we accept
-            // managed buffers that can free their memory on drop. Because of that
-            // we can't move out of the `DmaTransfer`'s fields, so we use `ptr::read`
-            // and `mem::forget`.
-            //
-            // NOTE(unsafe) There is no panic branch between getting the resources
-            // and forgetting `self`.
-            unsafe {
-                let rbuffer = core::ptr::read(&self.rbuffer);
-                let tbuffer = core::ptr::read(&self.tbuffer);
-                let payload = core::ptr::read(&self.spi_dma);
-                mem::forget(self);
-                if err {
-                    Err((DmaError::DescriptorError, rbuffer, tbuffer, payload))
-                } else {
-                    Ok((rbuffer, tbuffer, payload))
-                }
+            if self.spi_dma.channel.rx.has_error() || self.spi_dma.channel.tx.has_error() {
+                Err(DmaError::DescriptorError)
+            } else {
+                Ok(())
             }
         }
 
@@ -278,11 +278,12 @@ pub mod dma {
         }
     }
 
-    impl<'d, T, C, RXBUF, TXBUF> Drop for SpiDmaTransferRxTx<'d, T, C, RXBUF, TXBUF>
+    impl<'t, 'd, T, C, DmaMode> Drop for SpiDmaTransferRxTx<'t, 'd, T, C, DmaMode>
     where
         T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
         C: ChannelTypes,
         C::P: SpiPeripheral,
+        DmaMode: Mode,
     {
         fn drop(&mut self) {
             while !self.is_done() {}
@@ -290,48 +291,34 @@ pub mod dma {
         }
     }
 
-    pub struct SpiDmaTransferRx<'d, T, C, BUFFER>
+    /// An in-progress DMA transfer.
+    #[must_use]
+    pub struct SpiDmaTransferRx<'t, 'd, T, C, DmaMode>
     where
         T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
         C: ChannelTypes,
         C::P: SpiPeripheral,
+        DmaMode: Mode,
     {
-        spi_dma: SpiDma<'d, T, C>,
-        buffer: BUFFER,
+        spi_dma: &'t mut SpiDma<'d, T, C, DmaMode>,
     }
 
-    impl<'d, T, C, BUFFER> DmaTransfer<BUFFER, SpiDma<'d, T, C>> for SpiDmaTransferRx<'d, T, C, BUFFER>
+    impl<'t, 'd, T, C, DmaMode> DmaTransfer for SpiDmaTransferRx<'t, 'd, T, C, DmaMode>
     where
         T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
         C: ChannelTypes,
         C::P: SpiPeripheral,
+        DmaMode: Mode,
     {
-        /// Wait for the DMA transfer to complete and return the buffers and the
-        /// SPI instance.
-        fn wait(
-            mut self,
-        ) -> Result<(BUFFER, SpiDma<'d, T, C>), (DmaError, BUFFER, SpiDma<'d, T, C>)> {
+        /// Wait for the DMA transfer to complete
+        fn wait(self) -> Result<(), DmaError> {
             while !self.is_done() {}
             self.spi_dma.spi.flush().ok(); // waiting for the DMA transfer is not enough
 
-            // `DmaTransfer` needs to have a `Drop` implementation, because we accept
-            // managed buffers that can free their memory on drop. Because of that
-            // we can't move out of the `DmaTransfer`'s fields, so we use `ptr::read`
-            // and `mem::forget`.
-            //
-            // NOTE(unsafe) There is no panic branch between getting the resources
-            // and forgetting `self`.
-            unsafe {
-                let buffer = core::ptr::read(&self.buffer);
-                let payload = core::ptr::read(&self.spi_dma);
-                let err =
-                    self.spi_dma.channel.rx.has_error() || self.spi_dma.channel.tx.has_error();
-                mem::forget(self);
-                if err {
-                    Err((DmaError::DescriptorError, buffer, payload))
-                } else {
-                    Ok((buffer, payload))
-                }
+            if self.spi_dma.channel.rx.has_error() || self.spi_dma.channel.tx.has_error() {
+                Err(DmaError::DescriptorError)
+            } else {
+                Ok(())
             }
         }
 
@@ -342,11 +329,12 @@ pub mod dma {
         }
     }
 
-    impl<'d, T, C, BUFFER> Drop for SpiDmaTransferRx<'d, T, C, BUFFER>
+    impl<'t, 'd, T, C, DmaMode> Drop for SpiDmaTransferRx<'t, 'd, T, C, DmaMode>
     where
         T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
         C: ChannelTypes,
         C::P: SpiPeripheral,
+        DmaMode: Mode,
     {
         fn drop(&mut self) {
             while !self.is_done() {}
@@ -356,50 +344,35 @@ pub mod dma {
     }
 
     /// An in-progress DMA transfer.
-    pub struct SpiDmaTransferTx<'d, T, C, BUFFER>
+    #[must_use]
+    pub struct SpiDmaTransferTx<'t, 'd, T, C, DmaMode>
     where
         T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
         C: ChannelTypes,
         C::P: SpiPeripheral,
+        DmaMode: Mode,
     {
-        spi_dma: SpiDma<'d, T, C>,
-        buffer: BUFFER,
+        spi_dma: &'t mut SpiDma<'d, T, C, DmaMode>,
     }
 
-    impl<'d, T, C, BUFFER> DmaTransfer<BUFFER, SpiDma<'d, T, C>> for SpiDmaTransferTx<'d, T, C, BUFFER>
+    impl<'t, 'd, T, C, DmaMode> DmaTransfer for SpiDmaTransferTx<'t, 'd, T, C, DmaMode>
     where
         T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
         C: ChannelTypes,
         C::P: SpiPeripheral,
+        DmaMode: Mode,
     {
-        /// Wait for the DMA transfer to complete and return the buffers and the
-        /// SPI instance.
-        fn wait(
-            mut self,
-        ) -> Result<(BUFFER, SpiDma<'d, T, C>), (DmaError, BUFFER, SpiDma<'d, T, C>)> {
+        /// Wait for the DMA transfer to complete
+        fn wait(self) -> Result<(), DmaError> {
             // Waiting for the DMA transfer is not enough. We need to wait for the
             // peripheral to finish flushing its buffers, too.
             while !self.is_done() {}
             self.spi_dma.spi.flush().ok();
 
-            let err = self.spi_dma.channel.rx.has_error() || self.spi_dma.channel.tx.has_error();
-
-            // `DmaTransfer` needs to have a `Drop` implementation, because we accept
-            // managed buffers that can free their memory on drop. Because of that
-            // we can't move out of the `DmaTransfer`'s fields, so we use `ptr::read`
-            // and `mem::forget`.
-            //
-            // NOTE(unsafe) There is no panic branch between getting the resources
-            // and forgetting `self`.
-            unsafe {
-                let buffer = core::ptr::read(&self.buffer);
-                let payload = core::ptr::read(&self.spi_dma);
-                mem::forget(self);
-                if err {
-                    Err((DmaError::DescriptorError, buffer, payload))
-                } else {
-                    Ok((buffer, payload))
-                }
+            if self.spi_dma.channel.rx.has_error() || self.spi_dma.channel.tx.has_error() {
+                Err(DmaError::DescriptorError)
+            } else {
+                Ok(())
             }
         }
 
@@ -410,11 +383,12 @@ pub mod dma {
         }
     }
 
-    impl<'d, T, C, BUFFER> Drop for SpiDmaTransferTx<'d, T, C, BUFFER>
+    impl<'t, 'd, T, C, DmaMode> Drop for SpiDmaTransferTx<'t, 'd, T, C, DmaMode>
     where
         T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
         C: ChannelTypes,
         C::P: SpiPeripheral,
+        DmaMode: Mode,
     {
         fn drop(&mut self) {
             while !self.is_done() {}
@@ -424,30 +398,33 @@ pub mod dma {
     }
 
     /// A DMA capable SPI instance.
-    pub struct SpiDma<'d, T, C>
+    pub struct SpiDma<'d, T, C, DmaMode>
     where
         C: ChannelTypes,
         C::P: SpiPeripheral,
+        DmaMode: Mode,
     {
         pub(crate) spi: PeripheralRef<'d, T>,
-        pub(crate) channel: Channel<'d, C>,
+        pub(crate) channel: Channel<'d, C, DmaMode>,
     }
 
-    impl<'d, T, C> core::fmt::Debug for SpiDma<'d, T, C>
+    impl<'d, T, C, DmaMode> core::fmt::Debug for SpiDma<'d, T, C, DmaMode>
     where
         C: ChannelTypes,
         C::P: SpiPeripheral,
+        DmaMode: Mode,
     {
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
             f.debug_struct("SpiDma").finish()
         }
     }
 
-    impl<'d, T, C> SpiDma<'d, T, C>
+    impl<'d, T, C, DmaMode> SpiDma<'d, T, C, DmaMode>
     where
         T: InstanceDma<C::Tx<'d>, C::Rx<'d>>,
         C: ChannelTypes,
         C::P: SpiPeripheral,
+        DmaMode: Mode,
     {
         /// Register a buffer for a DMA write.
         ///
@@ -456,10 +433,10 @@ pub mod dma {
         /// bytes.
         ///
         /// The write is driven by the SPI master's sclk signal and cs line.
-        pub fn dma_write<TXBUF>(
-            mut self,
-            words: TXBUF,
-        ) -> Result<SpiDmaTransferTx<'d, T, C, TXBUF>, Error>
+        pub fn dma_write<'t, TXBUF>(
+            &'t mut self,
+            words: &'t TXBUF,
+        ) -> Result<SpiDmaTransferTx<'t, 'd, T, C, DmaMode>, Error>
         where
             TXBUF: ReadBuffer<Word = u8>,
         {
@@ -471,10 +448,7 @@ pub mod dma {
 
             self.spi
                 .start_write_bytes_dma(ptr, len, &mut self.channel.tx)
-                .map(move |_| SpiDmaTransferTx {
-                    spi_dma: self,
-                    buffer: words,
-                })
+                .map(move |_| SpiDmaTransferTx { spi_dma: self })
         }
 
         /// Register a buffer for a DMA read.
@@ -484,10 +458,10 @@ pub mod dma {
         /// 32736 bytes.
         ///
         /// The read is driven by the SPI master's sclk signal and cs line.
-        pub fn dma_read<RXBUF>(
-            mut self,
-            mut words: RXBUF,
-        ) -> Result<SpiDmaTransferRx<'d, T, C, RXBUF>, Error>
+        pub fn dma_read<'t, RXBUF>(
+            &'t mut self,
+            words: &'t mut RXBUF,
+        ) -> Result<SpiDmaTransferRx<'t, 'd, T, C, DmaMode>, Error>
         where
             RXBUF: WriteBuffer<Word = u8>,
         {
@@ -499,10 +473,7 @@ pub mod dma {
 
             self.spi
                 .start_read_bytes_dma(ptr, len, &mut self.channel.rx)
-                .map(move |_| SpiDmaTransferRx {
-                    spi_dma: self,
-                    buffer: words,
-                })
+                .map(move |_| SpiDmaTransferRx { spi_dma: self })
         }
 
         /// Register buffers for a DMA transfer.
@@ -513,11 +484,11 @@ pub mod dma {
         ///
         /// The data transfer is driven by the SPI master's sclk signal and cs
         /// line.
-        pub fn dma_transfer<TXBUF, RXBUF>(
-            mut self,
-            words: TXBUF,
-            mut read_buffer: RXBUF,
-        ) -> Result<SpiDmaTransferRxTx<'d, T, C, RXBUF, TXBUF>, Error>
+        pub fn dma_transfer<'t, TXBUF, RXBUF>(
+            &'t mut self,
+            words: &'t TXBUF,
+            read_buffer: &'t mut RXBUF,
+        ) -> Result<SpiDmaTransferRxTx<'t, 'd, T, C, DmaMode>, Error>
         where
             TXBUF: ReadBuffer<Word = u8>,
             RXBUF: WriteBuffer<Word = u8>,
@@ -538,11 +509,7 @@ pub mod dma {
                     &mut self.channel.tx,
                     &mut self.channel.rx,
                 )
-                .map(move |_| SpiDmaTransferRxTx {
-                    spi_dma: self,
-                    rbuffer: read_buffer,
-                    tbuffer: words,
-                })
+                .map(move |_| SpiDmaTransferRxTx { spi_dma: self })
         }
     }
 }
@@ -681,16 +648,16 @@ where
     fn clear_dma_interrupts(&self) {
         let reg_block = self.register_block();
         reg_block.dma_int_clr().write(|w| {
-            w.dma_infifo_full_err_int_clr()
-                .set_bit()
-                .dma_outfifo_empty_err_int_clr()
-                .set_bit()
-                .trans_done_int_clr()
-                .set_bit()
-                .mst_rx_afifo_wfull_err_int_clr()
-                .set_bit()
-                .mst_tx_afifo_rempty_err_int_clr()
-                .set_bit()
+            w.dma_infifo_full_err()
+                .clear_bit_by_one()
+                .dma_outfifo_empty_err()
+                .clear_bit_by_one()
+                .trans_done()
+                .clear_bit_by_one()
+                .mst_rx_afifo_wfull_err()
+                .clear_bit_by_one()
+                .mst_tx_afifo_rempty_err()
+                .clear_bit_by_one()
         });
     }
 
@@ -698,24 +665,24 @@ where
     fn clear_dma_interrupts(&self) {
         let reg_block = self.register_block();
         reg_block.dma_int_clr.write(|w| {
-            w.inlink_dscr_empty_int_clr()
-                .set_bit()
-                .outlink_dscr_error_int_clr()
-                .set_bit()
-                .inlink_dscr_error_int_clr()
-                .set_bit()
-                .in_done_int_clr()
-                .set_bit()
-                .in_err_eof_int_clr()
-                .set_bit()
-                .in_suc_eof_int_clr()
-                .set_bit()
-                .out_done_int_clr()
-                .set_bit()
-                .out_eof_int_clr()
-                .set_bit()
-                .out_total_eof_int_clr()
-                .set_bit()
+            w.inlink_dscr_empty()
+                .clear_bit_by_one()
+                .outlink_dscr_error()
+                .clear_bit_by_one()
+                .inlink_dscr_error()
+                .clear_bit_by_one()
+                .in_done()
+                .clear_bit_by_one()
+                .in_err_eof()
+                .clear_bit_by_one()
+                .in_suc_eof()
+                .clear_bit_by_one()
+                .out_done()
+                .clear_bit_by_one()
+                .out_eof()
+                .clear_bit_by_one()
+                .out_total_eof()
+                .clear_bit_by_one()
         });
     }
 }
@@ -767,7 +734,7 @@ where
 {
 }
 
-pub trait Instance {
+pub trait Instance: crate::private::Sealed {
     fn register_block(&self) -> &RegisterBlock;
 
     fn sclk_signal(&self) -> InputSignal;
@@ -929,11 +896,7 @@ pub trait Instance {
         }
         #[cfg(not(any(esp32, esp32s2)))]
         {
-            reg_block
-                .dma_int_raw()
-                .read()
-                .trans_done_int_raw()
-                .bit_is_clear()
+            reg_block.dma_int_raw().read().trans_done().bit_is_clear()
         }
     }
 
@@ -955,7 +918,7 @@ pub trait Instance {
         #[cfg(not(any(esp32, esp32s2)))]
         self.register_block()
             .dma_int_clr()
-            .write(|w| w.trans_done_int_clr().set_bit());
+            .write(|w| w.trans_done().clear_bit_by_one());
     }
 }
 

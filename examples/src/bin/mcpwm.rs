@@ -28,9 +28,9 @@ fn main() -> ! {
 
     // initialize peripheral
     #[cfg(feature = "esp32h2")]
-    let clock_cfg = PeripheralClockConfig::with_frequency(&clocks, 40u32.MHz()).unwrap();
+    let clock_cfg = PeripheralClockConfig::with_frequency(&clocks, 40.MHz()).unwrap();
     #[cfg(not(feature = "esp32h2"))]
-    let clock_cfg = PeripheralClockConfig::with_frequency(&clocks, 32u32.MHz()).unwrap();
+    let clock_cfg = PeripheralClockConfig::with_frequency(&clocks, 32.MHz()).unwrap();
 
     let mut mcpwm = MCPWM::new(peripherals.MCPWM0, clock_cfg);
 
@@ -44,7 +44,7 @@ fn main() -> ! {
     // start timer with timestamp values in the range of 0..=99 and a frequency of
     // 20 kHz
     let timer_clock_cfg = clock_cfg
-        .timer_clock_with_frequency(99, PwmWorkingMode::Increase, 20u32.kHz())
+        .timer_clock_with_frequency(99, PwmWorkingMode::Increase, 20.kHz())
         .unwrap();
     mcpwm.timer0.start(timer_clock_cfg);
 

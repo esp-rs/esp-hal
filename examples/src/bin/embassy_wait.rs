@@ -11,15 +11,14 @@
 
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
-use embedded_hal_async::digital::Wait;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     embassy::{self},
+    gpio::IO,
     peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
-    IO,
 };
 
 #[main]
@@ -29,15 +28,18 @@ async fn main(_spawner: Spawner) {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
     embassy::init(&clocks, timg0);
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
     let mut input = io.pins.gpio0.into_pull_down_input();
+    #[cfg(not(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3")))]
+    let mut input = io.pins.gpio9.into_pull_down_input();
 
     loop {
         esp_println::println!("Waiting...");
-        input.wait_for_rising_edge().await.unwrap();
+        input.wait_for_rising_edge().await;
         esp_println::println!("Ping!");
         Timer::after(Duration::from_millis(100)).await;
     }

@@ -13,6 +13,7 @@ use esp_hal::{
     prelude::*,
     systimer::{etm::SysTimerEtmEvent, SystemTimer},
 };
+use fugit::ExtU32;
 
 #[entry]
 fn main() -> ! {

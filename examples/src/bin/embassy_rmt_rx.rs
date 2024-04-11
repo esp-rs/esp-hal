@@ -14,12 +14,10 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     embassy::{self},
-    gpio::{Gpio5, Output, PushPull},
+    gpio::{Gpio5, Output, PushPull, IO},
     peripherals::Peripherals,
     prelude::*,
-    rmt::{asynch::RxChannelAsync, PulseCode, RxChannelConfig, RxChannelCreator},
-    Rmt,
-    IO,
+    rmt::{asynch::RxChannelAsync, PulseCode, Rmt, RxChannelConfig, RxChannelCreatorAsync},
 };
 use esp_println::{print, println};
 
@@ -32,7 +30,7 @@ compile_error!("Run this example in release mode");
 async fn signal_task(mut pin: Gpio5<Output<PushPull>>) {
     loop {
         for _ in 0..10 {
-            pin.toggle().unwrap();
+            pin.toggle();
             Timer::after(Duration::from_micros(10)).await;
         }
         Timer::after(Duration::from_millis(1000)).await;
@@ -46,20 +44,20 @@ async fn main(spawner: Spawner) {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timer_group0 = esp_hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks);
+    let timer_group0 = esp_hal::timer::TimerGroup::new_async(peripherals.TIMG0, &clocks);
     embassy::init(&clocks, timer_group0);
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32h2")] {
-            let freq = 32u32.MHz();
+            let freq = 32.MHz();
         } else {
-            let freq = 80u32.MHz();
+            let freq = 80.MHz();
         }
     };
 
-    let rmt = Rmt::new(peripherals.RMT, freq, &clocks).unwrap();
+    let rmt = Rmt::new_async(peripherals.RMT, freq, &clocks).unwrap();
     let rx_config = RxChannelConfig {
         clk_divider: 255,
         idle_threshold: 10000,

@@ -7,34 +7,24 @@
 //! * adding a pull-up to the signal pins
 //!
 //! ESP1/GND --- ESP2/GND
-//! ESP1/IO0 --- ESP1/IO1 --- ESP2/IO0 --- ESP2/IO1 --- 4.8kOhm --- ESP1/5V
+//! ESP1/IO0 --- ESP1/IO2 --- ESP2/IO0 --- ESP2/IO2 --- 4.8kOhm --- ESP1/5V
 //!
 //! `IS_FIRST_SENDER` below must be set to false on one of the ESP's
 
-//% CHIPS: esp32c3 esp32s3
+//% CHIPS: esp32c3 esp32c6 esp32s2 esp32s3
 
 #![no_std]
 #![no_main]
 
 const IS_FIRST_SENDER: bool = true;
 
-// Run this example with the eh1 feature enabled to use embedded-can instead of
-// embedded-hal-0.2.7. embedded-can was split off from embedded-hal before it's
-// upgrade to 1.0.0. cargo run --example twai --features eh1 --release
-#[cfg(feature = "eh1")]
-use embedded_can::{nb::Can, Frame, StandardId};
-// Run this example without the eh1 flag to use the embedded-hal 0.2.7 CAN traits.
-// cargo run --example twai --release
-#[cfg(not(feature = "eh1"))]
-use embedded_hal_02::can::{Can, Frame, StandardId};
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     gpio::IO,
     peripherals::Peripherals,
     prelude::*,
-    twai,
-    twai::filter::SingleStandardFilter,
+    twai::{self, filter::SingleStandardFilter, EspTwaiFrame, StandardId},
 };
 use esp_println::println;
 use nb::block;
@@ -49,7 +39,7 @@ fn main() -> ! {
 
     // Set the tx pin as open drain. Skip this if using transceivers.
     let can_tx_pin = io.pins.gpio0.into_open_drain_output();
-    let can_rx_pin = io.pins.gpio1;
+    let can_rx_pin = io.pins.gpio2;
 
     // The speed of the CAN bus.
     const CAN_BAUDRATE: twai::BaudRate = twai::BaudRate::B1000K;
@@ -62,6 +52,7 @@ fn main() -> ! {
         can_rx_pin,
         &clocks,
         CAN_BAUDRATE,
+        None,
     );
 
     // Partially filter the incoming messages to reduce overhead of receiving
@@ -81,7 +72,7 @@ fn main() -> ! {
 
     if IS_FIRST_SENDER {
         // Send a frame to the other ESP
-        let frame = Frame::new(StandardId::ZERO, &[1, 2, 3]).unwrap();
+        let frame = EspTwaiFrame::new(StandardId::ZERO.into(), &[1, 2, 3]).unwrap();
         block!(can.transmit(&frame)).unwrap();
         println!("Sent a frame");
     }

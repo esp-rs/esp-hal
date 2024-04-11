@@ -31,13 +31,20 @@ use core::{marker::PhantomData, mem::transmute};
 use fugit::MicrosDurationU32;
 
 use crate::{
-    peripheral::{Peripheral, PeripheralRef},
+    interrupt::InterruptHandler,
+    peripheral::Peripheral,
     peripherals::{
         generic::Reg,
         systimer::{
             target0_conf::TARGET0_CONF_SPEC,
             target0_hi::TARGET0_HI_SPEC,
             target0_lo::TARGET0_LO_SPEC,
+            target1_conf::TARGET1_CONF_SPEC,
+            target1_hi::TARGET1_HI_SPEC,
+            target1_lo::TARGET1_LO_SPEC,
+            target2_conf::TARGET2_CONF_SPEC,
+            target2_hi::TARGET2_HI_SPEC,
+            target2_lo::TARGET2_LO_SPEC,
         },
         SYSTIMER,
     },
@@ -45,42 +52,45 @@ use crate::{
 
 // TODO this only handles unit0 of the systimer
 
-pub struct SystemTimer<'d> {
-    _inner: PeripheralRef<'d, SYSTIMER>,
-    pub alarm0: Alarm<Target, 0>,
-    pub alarm1: Alarm<Target, 1>,
-    pub alarm2: Alarm<Target, 2>,
+/// The SystemTimer
+pub struct SystemTimer<'d, DM: crate::Mode> {
+    pub alarm0: Alarm<Target, DM, 0>,
+    pub alarm1: Alarm<Target, DM, 1>,
+    pub alarm2: Alarm<Target, DM, 2>,
+    _phantom: &'d PhantomData<()>,
 }
 
-impl<'d> SystemTimer<'d> {
+impl<'d> SystemTimer<'d, crate::Blocking> {
+    /// Bitmask to be applied to the raw register value
     #[cfg(esp32s2)]
     pub const BIT_MASK: u64 = u64::MAX;
     #[cfg(not(esp32s2))]
     pub const BIT_MASK: u64 = 0xF_FFFF_FFFF_FFFF;
 
+    /// The ticks per second the underlying peripheral uses
     #[cfg(esp32s2)]
     pub const TICKS_PER_SECOND: u64 = 80_000_000; // TODO this can change when we have support for changing APB frequency
     #[cfg(not(esp32s2))]
     pub const TICKS_PER_SECOND: u64 = 16_000_000;
 
-    pub fn new(p: impl Peripheral<P = SYSTIMER> + 'd) -> Self {
-        crate::into_ref!(p);
-
+    /// Create a new instance in [crate::Blocking] mode.
+    pub fn new(_p: impl Peripheral<P = SYSTIMER> + 'd) -> Self {
         #[cfg(soc_etm)]
         etm::enable_etm();
 
         Self {
-            _inner: p,
             alarm0: Alarm::new(),
             alarm1: Alarm::new(),
             alarm2: Alarm::new(),
+            _phantom: &PhantomData,
         }
     }
 
     // TODO use fugit types
+    /// Get the current count of the system-timer.
     pub fn now() -> u64 {
         // This should be safe to access from multiple contexts
-        // worst case scenario the second accesor ends up reading
+        // worst case scenario the second accessor ends up reading
         // an older time stamp
         let systimer = unsafe { &*SYSTIMER::ptr() };
         systimer
@@ -101,47 +111,39 @@ impl<'d> SystemTimer<'d> {
     }
 }
 
+impl<'d> SystemTimer<'d, crate::Async> {
+    /// Create a new instance in [crate::Async] mode.
+    pub fn new_async(_p: impl Peripheral<P = SYSTIMER> + 'd) -> Self {
+        #[cfg(soc_etm)]
+        etm::enable_etm();
+
+        Self {
+            alarm0: Alarm::new(),
+            alarm1: Alarm::new(),
+            alarm2: Alarm::new(),
+            _phantom: &PhantomData,
+        }
+    }
+}
+
+/// A marker for a [Alarm] in target mode.
 #[derive(Debug)]
 pub struct Target;
 
+/// A marker for a [Alarm] in periodic mode.
 #[derive(Debug)]
 pub struct Periodic; // TODO, also impl e-h timer traits
 
+/// A single alarm.
 #[derive(Debug)]
-pub struct Alarm<MODE, const CHANNEL: u8> {
-    _pd: PhantomData<MODE>,
+pub struct Alarm<MODE, DM: crate::Mode, const CHANNEL: u8> {
+    _pd: PhantomData<(MODE, DM)>,
 }
 
-impl<T, const CHANNEL: u8> Alarm<T, CHANNEL> {
+impl<T, DM: crate::Mode, const CHANNEL: u8> Alarm<T, DM, CHANNEL> {
     // private constructor
     fn new() -> Self {
         Self { _pd: PhantomData }
-    }
-
-    pub fn enable_interrupt(&self, val: bool) {
-        let systimer = unsafe { &*SYSTIMER::ptr() };
-        match CHANNEL {
-            0 => systimer
-                .int_ena()
-                .modify(|_, w| w.target0_int_ena().bit(val)),
-            1 => systimer
-                .int_ena()
-                .modify(|_, w| w.target1_int_ena().bit(val)),
-            2 => systimer
-                .int_ena()
-                .modify(|_, w| w.target2_int_ena().bit(val)),
-            _ => unreachable!(),
-        }
-    }
-
-    pub fn clear_interrupt(&self) {
-        let systimer = unsafe { &*SYSTIMER::ptr() };
-        match CHANNEL {
-            0 => systimer.int_clr().write(|w| w.target0_int_clr().set_bit()),
-            1 => systimer.int_clr().write(|w| w.target1_int_clr().set_bit()),
-            2 => systimer.int_clr().write(|w| w.target2_int_clr().set_bit()),
-            _ => unreachable!(),
-        }
     }
 
     fn configure(
@@ -161,14 +163,26 @@ impl<T, const CHANNEL: u8> Alarm<T, CHANNEL> {
                     systimer.target0_lo(),
                 ),
                 1 => (
-                    transmute(systimer.target1_conf()),
-                    transmute(systimer.target1_hi()),
-                    transmute(systimer.target1_lo()),
+                    transmute::<&Reg<TARGET1_CONF_SPEC>, &Reg<TARGET0_CONF_SPEC>>(
+                        systimer.target1_conf(),
+                    ),
+                    transmute::<&Reg<TARGET1_HI_SPEC>, &Reg<TARGET0_HI_SPEC>>(
+                        systimer.target1_hi(),
+                    ),
+                    transmute::<&Reg<TARGET1_LO_SPEC>, &Reg<TARGET0_LO_SPEC>>(
+                        systimer.target1_lo(),
+                    ),
                 ),
                 2 => (
-                    transmute(systimer.target2_conf()),
-                    transmute(systimer.target2_hi()),
-                    transmute(systimer.target2_lo()),
+                    transmute::<&Reg<TARGET2_CONF_SPEC>, &Reg<TARGET0_CONF_SPEC>>(
+                        systimer.target2_conf(),
+                    ),
+                    transmute::<&Reg<TARGET2_HI_SPEC>, &Reg<TARGET0_HI_SPEC>>(
+                        systimer.target2_hi(),
+                    ),
+                    transmute::<&Reg<TARGET2_LO_SPEC>, &Reg<TARGET0_LO_SPEC>>(
+                        systimer.target2_lo(),
+                    ),
                 ),
                 _ => unreachable!(),
             };
@@ -218,9 +232,78 @@ impl<T, const CHANNEL: u8> Alarm<T, CHANNEL> {
             });
         }
     }
+
+    pub(crate) fn enable_interrupt_internal(&self, val: bool) {
+        let systimer = unsafe { &*SYSTIMER::ptr() };
+        match CHANNEL {
+            0 => systimer.int_ena().modify(|_, w| w.target0().bit(val)),
+            1 => systimer.int_ena().modify(|_, w| w.target1().bit(val)),
+            2 => systimer.int_ena().modify(|_, w| w.target2().bit(val)),
+            _ => unreachable!(),
+        }
+    }
+
+    pub(crate) fn clear_interrupt_internal(&self) {
+        let systimer = unsafe { &*SYSTIMER::ptr() };
+        match CHANNEL {
+            0 => systimer.int_clr().write(|w| w.target0().clear_bit_by_one()),
+            1 => systimer.int_clr().write(|w| w.target1().clear_bit_by_one()),
+            2 => systimer.int_clr().write(|w| w.target2().clear_bit_by_one()),
+            _ => unreachable!(),
+        }
+    }
 }
 
-impl<const CHANNEL: u8> Alarm<Target, CHANNEL> {
+impl<T, const CHANNEL: u8> Alarm<T, crate::Blocking, CHANNEL> {
+    /// Set the interrupt handler for this alarm.
+    pub fn set_interrupt_handler(&self, handler: InterruptHandler) {
+        match CHANNEL {
+            0 => unsafe {
+                crate::interrupt::bind_interrupt(
+                    crate::peripherals::Interrupt::SYSTIMER_TARGET0,
+                    handler.handler(),
+                );
+                unwrap!(crate::interrupt::enable(
+                    crate::peripherals::Interrupt::SYSTIMER_TARGET0,
+                    handler.priority(),
+                ));
+            },
+            1 => unsafe {
+                crate::interrupt::bind_interrupt(
+                    crate::peripherals::Interrupt::SYSTIMER_TARGET1,
+                    handler.handler(),
+                );
+                unwrap!(crate::interrupt::enable(
+                    crate::peripherals::Interrupt::SYSTIMER_TARGET1,
+                    handler.priority(),
+                ));
+            },
+            2 => unsafe {
+                crate::interrupt::bind_interrupt(
+                    crate::peripherals::Interrupt::SYSTIMER_TARGET2,
+                    handler.handler(),
+                );
+                unwrap!(crate::interrupt::enable(
+                    crate::peripherals::Interrupt::SYSTIMER_TARGET2,
+                    handler.priority(),
+                ));
+            },
+            _ => unreachable!(),
+        }
+    }
+
+    /// Enable the interrupt for this alarm.
+    pub fn enable_interrupt(&self, val: bool) {
+        self.enable_interrupt_internal(val);
+    }
+
+    /// Enable the interrupt pending status for this alarm.
+    pub fn clear_interrupt(&self) {
+        self.clear_interrupt_internal();
+    }
+}
+impl<DM: crate::Mode, const CHANNEL: u8> Alarm<Target, DM, CHANNEL> {
+    /// Set the target value of this [Alarm]
     pub fn set_target(&self, timestamp: u64) {
         self.configure(|tconf, hi, lo| unsafe {
             tconf.write(|w| w.target0_period_mode().clear_bit()); // target mode
@@ -229,12 +312,14 @@ impl<const CHANNEL: u8> Alarm<Target, CHANNEL> {
         })
     }
 
-    pub fn into_periodic(self) -> Alarm<Periodic, CHANNEL> {
+    /// Converts this [Alarm] into [Periodic] mode
+    pub fn into_periodic(self) -> Alarm<Periodic, DM, CHANNEL> {
         Alarm { _pd: PhantomData }
     }
 }
 
-impl<const CHANNEL: u8> Alarm<Periodic, CHANNEL> {
+impl<DM: crate::Mode, const CHANNEL: u8> Alarm<Periodic, DM, CHANNEL> {
+    /// Set the period of this [Alarm]
     pub fn set_period(&self, period: MicrosDurationU32) {
         let us = period.ticks();
         let ticks = us * (SystemTimer::TICKS_PER_SECOND / 1_000_000) as u32;
@@ -251,12 +336,13 @@ impl<const CHANNEL: u8> Alarm<Periodic, CHANNEL> {
         });
     }
 
-    pub fn into_target(self) -> Alarm<Target, CHANNEL> {
+    /// Converts this [Alarm] into [Target] mode
+    pub fn into_target(self) -> Alarm<Target, DM, CHANNEL> {
         Alarm { _pd: PhantomData }
     }
 }
 
-impl<T> Alarm<T, 0> {
+impl<T, DM: crate::Mode> Alarm<T, DM, 0> {
     /// Conjure an alarm out of thin air.
     ///
     /// # Safety
@@ -268,7 +354,7 @@ impl<T> Alarm<T, 0> {
     }
 }
 
-impl<T> Alarm<T, 1> {
+impl<T, DM: crate::Mode> Alarm<T, DM, 1> {
     /// Conjure an alarm out of thin air.
     ///
     /// # Safety
@@ -280,7 +366,7 @@ impl<T> Alarm<T, 1> {
     }
 }
 
-impl<T> Alarm<T, 2> {
+impl<T, DM: crate::Mode> Alarm<T, DM, 2> {
     /// Conjure an alarm out of thin air.
     ///
     /// # Safety
@@ -292,13 +378,8 @@ impl<T> Alarm<T, 2> {
     }
 }
 
-// FIXME: The `embedded_hal_async::delay::DelayUs` trait implementation
-//        interferes with the embassy time driver, which also uses the
-//        `SYSTIMER` peripheral. Until we come up with a solution, do not
-//        implement this trait if the `embassy-time-systick` feature is enabled.
-// #[cfg(all(feature = "async", not(feature = "embassy-time-systick")))]
-// HACK: disable `asynch` module *always* until we come up with a solution
-#[cfg(not(systimer))]
+// Async functionality of the system timer.
+#[cfg(feature = "async")]
 mod asynch {
     use core::{
         pin::Pin,
@@ -306,7 +387,7 @@ mod asynch {
     };
 
     use embassy_sync::waitqueue::AtomicWaker;
-    use procmacros::interrupt;
+    use procmacros::handler;
 
     use super::*;
 
@@ -316,13 +397,34 @@ mod asynch {
     static WAKERS: [AtomicWaker; NUM_ALARMS] = [INIT; NUM_ALARMS];
 
     pub(crate) struct AlarmFuture<'a, const N: u8> {
-        phantom: PhantomData<&'a Alarm<Periodic, N>>,
+        phantom: PhantomData<&'a Alarm<Periodic, crate::Async, N>>,
     }
 
     impl<'a, const N: u8> AlarmFuture<'a, N> {
-        pub(crate) fn new(alarm: &'a Alarm<Periodic, N>) -> Self {
-            alarm.clear_interrupt();
-            alarm.enable_interrupt(true);
+        pub(crate) fn new(alarm: &'a Alarm<Periodic, crate::Async, N>) -> Self {
+            alarm.clear_interrupt_internal();
+
+            let (interrupt, handler) = match N {
+                0 => (
+                    crate::peripherals::Interrupt::SYSTIMER_TARGET0,
+                    target0_handler,
+                ),
+                1 => (
+                    crate::peripherals::Interrupt::SYSTIMER_TARGET1,
+                    target1_handler,
+                ),
+                _ => (
+                    crate::peripherals::Interrupt::SYSTIMER_TARGET2,
+                    target2_handler,
+                ),
+            };
+
+            unsafe {
+                crate::interrupt::bind_interrupt(interrupt, handler.handler());
+                crate::interrupt::enable(interrupt, handler.priority()).unwrap();
+            }
+
+            alarm.enable_interrupt_internal(true);
 
             Self {
                 phantom: PhantomData,
@@ -331,13 +433,13 @@ mod asynch {
 
         fn event_bit_is_clear(&self) -> bool {
             let r = unsafe { &*crate::peripherals::SYSTIMER::PTR }
-                .int_ena
+                .int_ena()
                 .read();
 
             match N {
-                0 => r.target0_int_ena().bit_is_clear(),
-                1 => r.target1_int_ena().bit_is_clear(),
-                2 => r.target2_int_ena().bit_is_clear(),
+                0 => r.target0().bit_is_clear(),
+                1 => r.target1().bit_is_clear(),
+                2 => r.target2().bit_is_clear(),
                 _ => unreachable!(),
             }
         }
@@ -357,9 +459,11 @@ mod asynch {
         }
     }
 
-    impl<const CHANNEL: u8> embedded_hal_async::delay::DelayUs for Alarm<Periodic, CHANNEL> {
-        async fn delay_us(&mut self, us: u32) {
-            let period = MicrosDurationU32::from_ticks(us);
+    impl<const CHANNEL: u8> embedded_hal_async::delay::DelayNs
+        for Alarm<Periodic, crate::Async, CHANNEL>
+    {
+        async fn delay_ns(&mut self, ns: u32) {
+            let period = MicrosDurationU32::from_ticks(ns / 1000);
             self.set_period(period);
 
             AlarmFuture::new(self).await;
@@ -372,29 +476,29 @@ mod asynch {
         }
     }
 
-    #[interrupt]
-    fn SYSTIMER_TARGET0() {
+    #[handler]
+    fn target0_handler() {
         unsafe { &*crate::peripherals::SYSTIMER::PTR }
-            .int_ena
-            .modify(|_, w| w.target0_int_ena().clear_bit());
+            .int_ena()
+            .modify(|_, w| w.target0().clear_bit());
 
         WAKERS[0].wake();
     }
 
-    #[interrupt]
-    fn SYSTIMER_TARGET1() {
+    #[handler]
+    fn target1_handler() {
         unsafe { &*crate::peripherals::SYSTIMER::PTR }
-            .int_ena
-            .modify(|_, w| w.target1_int_ena().clear_bit());
+            .int_ena()
+            .modify(|_, w| w.target1().clear_bit());
 
         WAKERS[1].wake();
     }
 
-    #[interrupt]
-    fn SYSTIMER_TARGET2() {
+    #[handler]
+    fn target2_handler() {
         unsafe { &*crate::peripherals::SYSTIMER::PTR }
-            .int_ena
-            .modify(|_, w| w.target2_int_ena().clear_bit());
+            .int_ena()
+            .modify(|_, w| w.target2().clear_bit());
 
         WAKERS[2].wake();
     }
@@ -418,7 +522,7 @@ pub mod etm {
     //! ```no_run
     //! let syst = SystemTimer::new(peripherals.SYSTIMER);
     //! let mut alarm0 = syst.alarm0.into_periodic();
-    //! alarm0.set_period(1u32.secs());
+    //! alarm0.set_period(1.secs());
     //!
     //! let timer_event = SysTimerEtmEvent::new(&mut alarm0);
     //! ```
@@ -426,26 +530,29 @@ pub mod etm {
     use super::*;
 
     /// An ETM controlled SYSTIMER event
-    pub struct SysTimerEtmEvent<'a, M, const N: u8> {
-        alarm: &'a mut Alarm<M, N>,
+    pub struct SysTimerEtmEvent<'a, M, DM: crate::Mode, const N: u8> {
+        alarm: &'a mut Alarm<M, DM, N>,
     }
 
-    impl<'a, M, const N: u8> SysTimerEtmEvent<'a, M, N> {
+    impl<'a, M, DM: crate::Mode, const N: u8> SysTimerEtmEvent<'a, M, DM, N> {
         /// Creates an ETM event from the given [Alarm]
-        pub fn new(alarm: &'a mut Alarm<M, N>) -> Self {
+        pub fn new(alarm: &'a mut Alarm<M, DM, N>) -> Self {
             Self { alarm }
         }
 
         /// Execute closure f with mutable access to the wrapped [Alarm].
-        pub fn with<R>(&self, f: impl FnOnce(&&'a mut Alarm<M, N>) -> R) -> R {
+        pub fn with<R>(&self, f: impl FnOnce(&&'a mut Alarm<M, DM, N>) -> R) -> R {
             let alarm = &self.alarm;
             f(alarm)
         }
     }
 
-    impl<'a, M, const N: u8> crate::private::Sealed for SysTimerEtmEvent<'a, M, N> {}
+    impl<'a, M, DM: crate::Mode, const N: u8> crate::private::Sealed
+        for SysTimerEtmEvent<'a, M, DM, N>
+    {
+    }
 
-    impl<'a, M, const N: u8> crate::etm::EtmEvent for SysTimerEtmEvent<'a, M, N> {
+    impl<'a, M, DM: crate::Mode, const N: u8> crate::etm::EtmEvent for SysTimerEtmEvent<'a, M, DM, N> {
         fn id(&self) -> u8 {
             50 + N
         }

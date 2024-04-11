@@ -10,21 +10,7 @@ pub use embedded_dma::{
     WriteBuffer as _embedded_dma_WriteBuffer,
     WriteTarget as _embedded_dma_WriteTarget,
 };
-pub use embedded_hal::{
-    digital::v2::{
-        InputPin as _embedded_hal_digital_v2_InputPin,
-        OutputPin as _embedded_hal_digital_v2_OutputPin,
-        StatefulOutputPin as _embedded_hal_digital_v2_StatefulOutputPin,
-        ToggleableOutputPin as _embedded_hal_digital_v2_ToggleableOutputPin,
-    },
-    prelude::*,
-};
-pub use fugit::{
-    ExtU32 as _fugit_ExtU32,
-    ExtU64 as _fugit_ExtU64,
-    RateExtU32 as _fugit_RateExtU32,
-    RateExtU64 as _fugit_RateExtU64,
-};
+pub use fugit::{ExtU64 as _fugit_ExtU64, RateExtU32 as _fugit_RateExtU32};
 pub use nb;
 
 #[cfg(any(dport, pcr, system))]
@@ -34,8 +20,6 @@ pub use crate::dma::{
     DmaTransfer as _esp_hal_dma_DmaTransfer,
     DmaTransferRxTx as _esp_hal_dma_DmaTransferRxTx,
 };
-#[cfg(feature = "rt")]
-pub use crate::entry;
 #[cfg(gpio)]
 pub use crate::gpio::{
     InputPin as _esp_hal_gpio_InputPin,
@@ -52,7 +36,6 @@ pub use crate::ledc::{
     },
     timer::{TimerHW as _esp_hal_ledc_timer_TimerHW, TimerIFace as _esp_hal_ledc_timer_TimerIFace},
 };
-pub use crate::macros::*;
 #[cfg(any(dport, pcr, system))]
 pub use crate::system::SystemExt as _esp_hal_system_SystemExt;
 #[cfg(any(timg0, timg1))]
@@ -62,3 +45,4 @@ pub use crate::timer::{
 };
 #[cfg(any(uart0, uart1, uart2))]
 pub use crate::uart::{Instance as _esp_hal_uart_Instance, UartPins as _esp_hal_uart_UartPins};
+pub use crate::{entry, macros::*};

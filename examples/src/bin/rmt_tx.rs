@@ -10,12 +10,11 @@
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
+    delay::Delay,
     gpio::IO,
     peripherals::Peripherals,
     prelude::*,
-    rmt::{PulseCode, TxChannel, TxChannelConfig, TxChannelCreator},
-    Delay,
-    Rmt,
+    rmt::{PulseCode, Rmt, TxChannel, TxChannelConfig, TxChannelCreator},
 };
 
 #[entry]
@@ -28,13 +27,13 @@ fn main() -> ! {
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32h2")] {
-            let freq = 32u32.MHz();
+            let freq = 32.MHz();
         } else {
-            let freq = 80u32.MHz();
+            let freq = 80.MHz();
         }
     };
 
-    let rmt = Rmt::new(peripherals.RMT, freq, &clocks).unwrap();
+    let rmt = Rmt::new(peripherals.RMT, freq, &clocks, None).unwrap();
 
     let tx_config = TxChannelConfig {
         clk_divider: 255,
@@ -43,7 +42,7 @@ fn main() -> ! {
 
     let mut channel = rmt.channel0.configure(io.pins.gpio4, tx_config).unwrap();
 
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
 
     let mut data = [PulseCode {
         level1: true,
@@ -63,6 +62,6 @@ fn main() -> ! {
     loop {
         let transaction = channel.transmit(&data);
         channel = transaction.wait().unwrap();
-        delay.delay_ms(500u32);
+        delay.delay_millis(500);
     }
 }

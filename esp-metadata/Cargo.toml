@@ -1,0 +1,14 @@
+[package]
+name         = "esp-metadata"
+version      = "0.1.0"
+edition      = "2021"
+rust-version = "1.60.0"
+description  = "Metadata for Espressif devices"
+repository   = "https://github.com/esp-rs/esp-hal"
+license      = "MIT OR Apache-2.0"
+
+[dependencies]
+basic-toml  = "0.1.8"
+lazy_static = "1.4.0"
+serde       = { version = "1.0.197", features = ["derive"] }
+strum       = { version = "0.26.1",  features = ["derive"] }

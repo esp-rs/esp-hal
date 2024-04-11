@@ -58,7 +58,7 @@ use crate::{
     Cpu,
 };
 
-pub const NUM_PINS: usize = 39;
+pub const NUM_PINS: usize = 40;
 
 pub(crate) const FUNC_IN_SEL_OFFSET: usize = 0;
 
@@ -76,42 +76,150 @@ pub(crate) fn get_io_mux_reg(gpio_num: u8) -> &'static crate::peripherals::io_mu
         let iomux = &*crate::peripherals::IO_MUX::PTR;
 
         match gpio_num {
-            0 => core::mem::transmute(iomux.gpio0()),
-            1 => core::mem::transmute(iomux.gpio1()),
-            2 => core::mem::transmute(iomux.gpio2()),
-            3 => core::mem::transmute(iomux.gpio3()),
-            4 => core::mem::transmute(iomux.gpio4()),
-            5 => core::mem::transmute(iomux.gpio5()),
-            6 => core::mem::transmute(iomux.gpio6()),
-            7 => core::mem::transmute(iomux.gpio7()),
-            8 => core::mem::transmute(iomux.gpio8()),
-            9 => core::mem::transmute(iomux.gpio9()),
-            10 => core::mem::transmute(iomux.gpio10()),
-            11 => core::mem::transmute(iomux.gpio11()),
-            12 => core::mem::transmute(iomux.gpio12()),
-            13 => core::mem::transmute(iomux.gpio13()),
-            14 => core::mem::transmute(iomux.gpio14()),
-            15 => core::mem::transmute(iomux.gpio15()),
-            16 => core::mem::transmute(iomux.gpio16()),
-            17 => core::mem::transmute(iomux.gpio17()),
-            18 => core::mem::transmute(iomux.gpio18()),
-            19 => core::mem::transmute(iomux.gpio19()),
-            20 => core::mem::transmute(iomux.gpio20()),
-            21 => core::mem::transmute(iomux.gpio21()),
-            22 => core::mem::transmute(iomux.gpio22()),
-            23 => core::mem::transmute(iomux.gpio23()),
-            24 => core::mem::transmute(iomux.gpio24()),
-            25 => core::mem::transmute(iomux.gpio25()),
-            26 => core::mem::transmute(iomux.gpio26()),
-            27 => core::mem::transmute(iomux.gpio27()),
-            32 => core::mem::transmute(iomux.gpio32()),
-            33 => core::mem::transmute(iomux.gpio33()),
-            34 => core::mem::transmute(iomux.gpio34()),
-            35 => core::mem::transmute(iomux.gpio35()),
-            36 => core::mem::transmute(iomux.gpio36()),
-            37 => core::mem::transmute(iomux.gpio37()),
-            38 => core::mem::transmute(iomux.gpio38()),
-            39 => core::mem::transmute(iomux.gpio39()),
+            0 => core::mem::transmute::<
+                &'static crate::peripherals::io_mux::GPIO0,
+                &'static crate::peripherals::io_mux::GPIO0,
+            >(iomux.gpio0()),
+            1 => core::mem::transmute::<
+                &'static crate::peripherals::io_mux::GPIO1,
+                &'static crate::peripherals::io_mux::GPIO0,
+            >(iomux.gpio1()),
+            2 => core::mem::transmute::<
+                &'static crate::peripherals::io_mux::GPIO2,
+                &'static crate::peripherals::io_mux::GPIO0,
+            >(iomux.gpio2()),
+            3 => core::mem::transmute::<
+                &'static crate::peripherals::io_mux::GPIO3,
+                &'static crate::peripherals::io_mux::GPIO0,
+            >(iomux.gpio3()),
+            4 => core::mem::transmute::<
+                &'static crate::peripherals::io_mux::GPIO4,
+                &'static crate::peripherals::io_mux::GPIO0,
+            >(iomux.gpio4()),
+            5 => core::mem::transmute::<
+                &'static crate::peripherals::io_mux::GPIO5,
+                &'static crate::peripherals::io_mux::GPIO0,
+            >(iomux.gpio5()),
+            6 => core::mem::transmute::<
+                &'static crate::peripherals::io_mux::GPIO6,
+                &'static crate::peripherals::io_mux::GPIO0,
+            >(iomux.gpio6()),
+            7 => core::mem::transmute::<
+                &'static crate::peripherals::io_mux::GPIO7,
+                &'static crate::peripherals::io_mux::GPIO0,
+            >(iomux.gpio7()),
+            8 => core::mem::transmute::<
+                &'static crate::peripherals::io_mux::GPIO8,
+                &'static crate::peripherals::io_mux::GPIO0,
+            >(iomux.gpio8()),
+            9 => core::mem::transmute::<
+                &'static crate::peripherals::io_mux::GPIO9,
+                &'static crate::peripherals::io_mux::GPIO0,
+            >(iomux.gpio9()),
+            10 => core::mem::transmute::<
+                &'static crate::peripherals::io_mux::GPIO10,
+                &'static crate::peripherals::io_mux::GPIO0,
+            >(iomux.gpio10()),
+            11 => core::mem::transmute::<
+                &'static crate::peripherals::io_mux::GPIO11,
+                &'static crate::peripherals::io_mux::GPIO0,
+            >(iomux.gpio11()),
+            12 => core::mem::transmute::<
+                &'static crate::peripherals::io_mux::GPIO12,
+                &'static crate::peripherals::io_mux::GPIO0,
+            >(iomux.gpio12()),
+            13 => core::mem::transmute::<
+                &'static crate::peripherals::io_mux::GPIO13,
+                &'static crate::peripherals::io_mux::GPIO0,
+            >(iomux.gpio13()),
+            14 => core::mem::transmute::<
+                &'static crate::peripherals::io_mux::GPIO14,
+                &'static crate::peripherals::io_mux::GPIO0,
+            >(iomux.gpio14()),
+            15 => core::mem::transmute::<
+                &'static crate::peripherals::io_mux::GPIO15,
+                &'static crate::peripherals::io_mux::GPIO0,
+            >(iomux.gpio15()),
+            16 => core::mem::transmute::<
+                &'static crate::peripherals::io_mux::GPIO16,
+                &'static crate::peripherals::io_mux::GPIO0,
+            >(iomux.gpio16()),
+            17 => core::mem::transmute::<
+                &'static crate::peripherals::io_mux::GPIO17,
+                &'static crate::peripherals::io_mux::GPIO0,
+            >(iomux.gpio17()),
+            18 => core::mem::transmute::<
+                &'static crate::peripherals::io_mux::GPIO18,
+                &'static crate::peripherals::io_mux::GPIO0,
+            >(iomux.gpio18()),
+            19 => core::mem::transmute::<
+                &'static crate::peripherals::io_mux::GPIO19,
+                &'static crate::peripherals::io_mux::GPIO0,
+            >(iomux.gpio19()),
+            20 => core::mem::transmute::<
+                &'static crate::peripherals::io_mux::GPIO20,
+                &'static crate::peripherals::io_mux::GPIO0,
+            >(iomux.gpio20()),
+            21 => core::mem::transmute::<
+                &'static crate::peripherals::io_mux::GPIO21,
+                &'static crate::peripherals::io_mux::GPIO0,
+            >(iomux.gpio21()),
+            22 => core::mem::transmute::<
+                &'static crate::peripherals::io_mux::GPIO22,
+                &'static crate::peripherals::io_mux::GPIO0,
+            >(iomux.gpio22()),
+            23 => core::mem::transmute::<
+                &'static crate::peripherals::io_mux::GPIO23,
+                &'static crate::peripherals::io_mux::GPIO0,
+            >(iomux.gpio23()),
+            24 => core::mem::transmute::<
+                &'static crate::peripherals::io_mux::GPIO24,
+                &'static crate::peripherals::io_mux::GPIO0,
+            >(iomux.gpio24()),
+            25 => core::mem::transmute::<
+                &'static crate::peripherals::io_mux::GPIO25,
+                &'static crate::peripherals::io_mux::GPIO0,
+            >(iomux.gpio25()),
+            26 => core::mem::transmute::<
+                &'static crate::peripherals::io_mux::GPIO26,
+                &'static crate::peripherals::io_mux::GPIO0,
+            >(iomux.gpio26()),
+            27 => core::mem::transmute::<
+                &'static crate::peripherals::io_mux::GPIO27,
+                &'static crate::peripherals::io_mux::GPIO0,
+            >(iomux.gpio27()),
+            32 => core::mem::transmute::<
+                &'static crate::peripherals::io_mux::GPIO32,
+                &'static crate::peripherals::io_mux::GPIO0,
+            >(iomux.gpio32()),
+            33 => core::mem::transmute::<
+                &'static crate::peripherals::io_mux::GPIO33,
+                &'static crate::peripherals::io_mux::GPIO0,
+            >(iomux.gpio33()),
+            34 => core::mem::transmute::<
+                &'static crate::peripherals::io_mux::GPIO34,
+                &'static crate::peripherals::io_mux::GPIO0,
+            >(iomux.gpio34()),
+            35 => core::mem::transmute::<
+                &'static crate::peripherals::io_mux::GPIO35,
+                &'static crate::peripherals::io_mux::GPIO0,
+            >(iomux.gpio35()),
+            36 => core::mem::transmute::<
+                &'static crate::peripherals::io_mux::GPIO36,
+                &'static crate::peripherals::io_mux::GPIO0,
+            >(iomux.gpio36()),
+            37 => core::mem::transmute::<
+                &'static crate::peripherals::io_mux::GPIO37,
+                &'static crate::peripherals::io_mux::GPIO0,
+            >(iomux.gpio37()),
+            38 => core::mem::transmute::<
+                &'static crate::peripherals::io_mux::GPIO38,
+                &'static crate::peripherals::io_mux::GPIO0,
+            >(iomux.gpio38()),
+            39 => core::mem::transmute::<
+                &'static crate::peripherals::io_mux::GPIO39,
+                &'static crate::peripherals::io_mux::GPIO0,
+            >(iomux.gpio39()),
             _ => panic!(),
         }
     }
@@ -218,7 +326,7 @@ pub enum InputSignal {
     RMT_SIG_6             = 89,
     RMT_SIG_7             = 90,
     EXT_ADC_START         = 93,
-    CAN_RX                = 94,
+    TWAI_RX               = 94,
     I2CEXT1_SCL           = 95,
     I2CEXT1_SDA           = 96,
     HOST_CARD_DETECT_N_1  = 97,
@@ -473,7 +581,7 @@ pub enum OutputSignal {
     PWM2_3L                  = 119,
     PWM2_4H                  = 120,
     PWM2_4L                  = 121,
-    CAN_TX                   = 123,
+    TWAI_TX                  = 123,
     CAN_BUS_OFF_ON           = 124,
     SPID4                    = 128,
     SPID5                    = 129,
@@ -619,85 +727,141 @@ pub enum OutputSignal {
     MTDO,
 }
 
-pub(crate) fn errata36(pin_num: u8, pull_up: bool, pull_down: bool) {
+pub(crate) fn errata36(pin_num: u8, pull_up: Option<bool>, pull_down: Option<bool>) {
     use crate::peripherals::RTC_IO;
     let rtcio = unsafe { &*RTC_IO::PTR };
 
     match pin_num {
         0 => {
-            rtcio
-                .touch_pad1()
-                .modify(|r, w| unsafe { w.bits(r.bits()).rue().bit(pull_up).rde().bit(pull_down) });
+            rtcio.touch_pad1().modify(|_, w| {
+                if let Some(pull_up) = pull_up {
+                    w.rue().bit(pull_up);
+                }
+                if let Some(pull_down) = pull_down {
+                    w.rde().bit(pull_down);
+                }
+                w
+            });
         }
         2 => {
-            rtcio
-                .touch_pad2()
-                .modify(|r, w| unsafe { w.bits(r.bits()).rue().bit(pull_up).rde().bit(pull_down) });
+            rtcio.touch_pad2().modify(|_, w| {
+                if let Some(pull_up) = pull_up {
+                    w.rue().bit(pull_up);
+                }
+                if let Some(pull_down) = pull_down {
+                    w.rde().bit(pull_down);
+                }
+                w
+            });
         }
         4 => {
-            rtcio
-                .touch_pad0()
-                .modify(|r, w| unsafe { w.bits(r.bits()).rue().bit(pull_up).rde().bit(pull_down) });
+            rtcio.touch_pad0().modify(|_, w| {
+                if let Some(pull_up) = pull_up {
+                    w.rue().bit(pull_up);
+                }
+                if let Some(pull_down) = pull_down {
+                    w.rde().bit(pull_down);
+                }
+                w
+            });
         }
         12 => {
-            rtcio
-                .touch_pad5()
-                .modify(|r, w| unsafe { w.bits(r.bits()).rue().bit(pull_up).rde().bit(pull_down) });
+            rtcio.touch_pad5().modify(|_, w| {
+                if let Some(pull_up) = pull_up {
+                    w.rue().bit(pull_up);
+                }
+                if let Some(pull_down) = pull_down {
+                    w.rde().bit(pull_down);
+                }
+                w
+            });
         }
         13 => {
-            rtcio
-                .touch_pad4()
-                .modify(|r, w| unsafe { w.bits(r.bits()).rue().bit(pull_up).rde().bit(pull_down) });
+            rtcio.touch_pad4().modify(|_, w| {
+                if let Some(pull_up) = pull_up {
+                    w.rue().bit(pull_up);
+                }
+                if let Some(pull_down) = pull_down {
+                    w.rde().bit(pull_down);
+                }
+                w
+            });
         }
         14 => {
-            rtcio
-                .touch_pad6()
-                .modify(|r, w| unsafe { w.bits(r.bits()).rue().bit(pull_up).rde().bit(pull_down) });
+            rtcio.touch_pad6().modify(|_, w| {
+                if let Some(pull_up) = pull_up {
+                    w.rue().bit(pull_up);
+                }
+                if let Some(pull_down) = pull_down {
+                    w.rde().bit(pull_down);
+                }
+                w
+            });
         }
         15 => {
-            rtcio
-                .touch_pad3()
-                .modify(|r, w| unsafe { w.bits(r.bits()).rue().bit(pull_up).rde().bit(pull_down) });
+            rtcio.touch_pad3().modify(|_, w| {
+                if let Some(pull_up) = pull_up {
+                    w.rue().bit(pull_up);
+                }
+                if let Some(pull_down) = pull_down {
+                    w.rde().bit(pull_down);
+                }
+                w
+            });
         }
         25 => {
-            rtcio.pad_dac1().modify(|r, w| unsafe {
-                w.bits(r.bits())
-                    .pdac1_rue()
-                    .bit(pull_up)
-                    .pdac1_rde()
-                    .bit(pull_down)
+            rtcio.pad_dac1().modify(|_, w| {
+                if let Some(pull_up) = pull_up {
+                    w.pdac1_rue().bit(pull_up);
+                }
+                if let Some(pull_down) = pull_down {
+                    w.pdac1_rde().bit(pull_down);
+                }
+                w
             });
         }
         26 => {
-            rtcio.pad_dac2().modify(|r, w| unsafe {
-                w.bits(r.bits())
-                    .pdac2_rue()
-                    .bit(pull_up)
-                    .pdac2_rde()
-                    .bit(pull_down)
+            rtcio.pad_dac2().modify(|_, w| {
+                if let Some(pull_up) = pull_up {
+                    w.pdac2_rue().bit(pull_up);
+                }
+                if let Some(pull_down) = pull_down {
+                    w.pdac2_rde().bit(pull_down);
+                }
+                w
             });
         }
         27 => {
-            rtcio
-                .touch_pad7()
-                .modify(|r, w| unsafe { w.bits(r.bits()).rue().bit(pull_up).rde().bit(pull_down) });
+            rtcio.touch_pad7().modify(|_, w| {
+                if let Some(pull_up) = pull_up {
+                    w.rue().bit(pull_up);
+                }
+                if let Some(pull_down) = pull_down {
+                    w.rde().bit(pull_down);
+                }
+                w
+            });
         }
         32 => {
-            rtcio.xtal_32k_pad().modify(|r, w| unsafe {
-                w.bits(r.bits())
-                    .x32p_rue()
-                    .bit(pull_up)
-                    .x32p_rde()
-                    .bit(pull_down)
+            rtcio.xtal_32k_pad().modify(|_, w| {
+                if let Some(pull_up) = pull_up {
+                    w.x32p_rue().bit(pull_up);
+                }
+                if let Some(pull_down) = pull_down {
+                    w.x32p_rde().bit(pull_down);
+                }
+                w
             });
         }
         33 => {
-            rtcio.xtal_32k_pad().modify(|r, w| unsafe {
-                w.bits(r.bits())
-                    .x32n_rue()
-                    .bit(pull_up)
-                    .x32n_rde()
-                    .bit(pull_down)
+            rtcio.xtal_32k_pad().modify(|_, w| {
+                if let Some(pull_up) = pull_up {
+                    w.x32n_rue().bit(pull_up);
+                }
+                if let Some(pull_down) = pull_down {
+                    w.x32n_rde().bit(pull_down);
+                }
+                w
             });
         }
         _ => (),

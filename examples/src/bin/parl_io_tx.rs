@@ -15,6 +15,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
+    delay::Delay,
     dma::{Dma, DmaPriority},
     dma_buffers,
     gpio::IO,
@@ -28,7 +29,6 @@ use esp_hal::{
     },
     peripherals::Peripherals,
     prelude::*,
-    Delay,
 };
 use esp_println::println;
 
@@ -57,7 +57,7 @@ fn main() -> ! {
             &mut rx_descriptors,
             DmaPriority::Priority0,
         ),
-        1u32.MHz(),
+        1.MHz(),
         &clocks,
     )
     .unwrap();
@@ -75,21 +75,18 @@ fn main() -> ! {
         )
         .unwrap();
 
-    let mut buffer = tx_buffer;
+    let buffer = tx_buffer;
     for i in 0..buffer.len() {
         buffer[i] = (i % 255) as u8;
     }
 
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
 
     loop {
-        let transfer = parl_io_tx.write_dma(buffer).unwrap();
-
-        // the buffer and driver is moved into the transfer and we can get it back via
-        // `wait`
-        (buffer, parl_io_tx) = transfer.wait().unwrap();
+        let transfer = parl_io_tx.write_dma(&buffer).unwrap();
+        transfer.wait().unwrap();
         println!("Transferred {} bytes", buffer.len());
 
-        delay.delay_ms(500u32);
+        delay.delay_millis(500);
     }
 }

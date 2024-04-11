@@ -1,56 +1,55 @@
 //! # Interrupt support
 //!
-//! ## Overview
-//! The `interrupt` driver is a crucial module for ESP chips. Its primary
-//! purpose is to manage and handle interrupts, which are asynchronous events
-//! requiring immediate attention from the CPU. Interrupts are essential in
-//! various applications, such as real-time tasks, I/O communications, and
-//! handling external events like hardware signals.
+//! Usually peripheral drivers offer a mechanism to register your interrupt
+//! handler. e.g. the systimer offers `set_interrupt_handler` to register a
+//! handler for a specific alarm. Other drivers might take an interrupt handler
+//! as an optional parameter to their constructor.
 //!
-//! The core functionality of the `interrupt` driver revolves around the
-//! management of interrupts. When an interrupt occurs, it temporarily stops the
-//! ongoing CPU operations, saves its current state, and starts executing the
-//! corresponding interrupt service routine (ISR). The interrupt service routine
-//! is a user-defined function that performs the necessary actions to handle the
-//! specific interrupt. Once the ISR is executed, the driver restores the saved
-//! CPU state and resumes normal program execution.
+//! This is the preferred way to register handlers.
 //!
-//! In scenarios where multiple interrupts may occur simultaneously, the
-//! interrupt driver determines the `priority` of each interrupt. This
-//! prioritization ensures that critical or high-priority tasks are handled
-//! first. It helps prevent delays in time-sensitive applications and allows the
-//! system to allocate resources efficiently. This functionality is provided and
-//! implemented by the `priority` enum.
+//! ## Example using the peripheral driver to register an interrupt handler
 //!
-//!
-//! ## Example
 //! ```no_run
 //! #[entry]
 //! fn main() -> ! {
-//!     ...
-//!     critical_section::with(|cs| SWINT.borrow_ref_mut(cs).replace(sw_int));
+//! ...
+//!     let mut sw_int = system.software_interrupt_control;
+//!     critical_section::with(|cs| {
+//!         sw_int
+//!            .software_interrupt0
+//!            .set_interrupt_handler(swint0_handler);
+//!         SWINT0
+//!            .borrow_ref_mut(cs)
+//!            .replace(sw_int.software_interrupt0);
+//!     });
 //!
-//!     interrupt::enable(
-//!         peripherals::Interrupt::FROM_CPU_INTR0,
-//!         interrupt::Priority::Priority1,
-//!     )
-//!     .unwrap();
-//!
-//!     loop {}
+//!     // trigger the interrupt
+//!     critical_section::with(|cs| {
+//!         SWINT0.borrow_ref_mut(cs).as_mut().unwrap().raise();
+//!     });
+//! ...
 //! }
 //!
-//! #[interrupt]
-//! fn FROM_CPU_INTR0() {
+//! // use the `handler` macro to define a handler, optionally you can set a priority
+//! #[handler(priority = esp_hal::interrupt::Priority::Priority2)]
+//! fn swint0_handler() {
 //!     esp_println::println!("SW interrupt0");
 //!     critical_section::with(|cs| {
-//!         SWINT
-//!             .borrow_ref_mut(cs)
-//!             .as_mut()
-//!             .unwrap()
-//!             .reset(SoftwareInterrupt::SoftwareInterrupt0);
+//!         SWINT0.borrow_ref_mut(cs).as_mut().unwrap().reset();
 //!     });
-//! }
 //! ```
+//!
+//! There are additional ways to register interrupt handlers which are generally
+//! only meant to be used in very special situations (mostly internal to the HAL
+//! or the supporting libraries). Those are outside the scope of this
+//! documentation.
+//!
+//! It is even possible, but not recommended, to bind an interrupt directly to a
+//! CPU interrupt. This can offer lower latency, at the cost of more complexity
+//! in the interrupt handler. See the `direct_vectoring.rs` example
+//!
+//! We reserve a number of CPU interrupts, which cannot be used; see
+//! [`RESERVED_INTERRUPTS`].
 
 #[cfg(riscv)]
 pub use self::riscv::*;
@@ -61,3 +60,31 @@ pub use self::xtensa::*;
 mod riscv;
 #[cfg(xtensa)]
 mod xtensa;
+
+/// An interrupt handler
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct InterruptHandler {
+    f: extern "C" fn(),
+    prio: Priority,
+}
+
+impl InterruptHandler {
+    pub const fn new(f: extern "C" fn(), prio: Priority) -> Self {
+        Self { f, prio }
+    }
+
+    #[inline]
+    pub fn handler(&self) -> extern "C" fn() {
+        self.f
+    }
+
+    #[inline]
+    pub fn priority(&self) -> Priority {
+        self.prio
+    }
+
+    #[inline]
+    pub(crate) extern "C" fn call(&self) {
+        (self.f)()
+    }
+}

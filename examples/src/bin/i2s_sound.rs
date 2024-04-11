@@ -36,10 +36,10 @@ use esp_hal::{
     clock::ClockControl,
     dma::{Dma, DmaPriority},
     dma_buffers,
+    gpio::IO,
     i2s::{DataFormat, I2s, I2sWriteDma, Standard},
     peripherals::Peripherals,
     prelude::*,
-    IO,
 };
 
 const SINE: [i16; 64] = [
@@ -70,7 +70,7 @@ fn main() -> ! {
         peripherals.I2S0,
         Standard::Philips,
         DataFormat::Data16Channel16,
-        44100u32.Hz(),
+        44100.Hz(),
         dma_channel.configure(
             false,
             &mut tx_descriptors,
@@ -80,7 +80,7 @@ fn main() -> ! {
         &clocks,
     );
 
-    let i2s_tx = i2s
+    let mut i2s_tx = i2s
         .i2s_tx
         .with_bclk(io.pins.gpio2)
         .with_ws(io.pins.gpio4)
@@ -90,10 +90,9 @@ fn main() -> ! {
     let data =
         unsafe { core::slice::from_raw_parts(&SINE as *const _ as *const u8, SINE.len() * 2) };
 
-    let buffer = tx_buffer;
     let mut idx = 0;
-    for i in 0..usize::min(data.len(), buffer.len()) {
-        buffer[i] = data[idx];
+    for i in 0..usize::min(data.len(), tx_buffer.len()) {
+        tx_buffer[i] = data[idx];
 
         idx += 1;
 
@@ -103,7 +102,7 @@ fn main() -> ! {
     }
 
     let mut filler = [0u8; 10000];
-    let mut transfer = i2s_tx.write_dma_circular(buffer).unwrap();
+    let mut transfer = i2s_tx.write_dma_circular(&tx_buffer).unwrap();
 
     loop {
         let avail = transfer.available();

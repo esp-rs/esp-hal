@@ -13,16 +13,19 @@ use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    interrupt::{self, Priority},
-    peripherals::{Interrupt, Peripherals, UART0},
+    delay::Delay,
+    gpio,
+    peripherals::{Peripherals, UART0},
     prelude::*,
-    timer::TimerGroup,
-    uart::config::AtCmdConfig,
-    Uart,
+    uart::{
+        config::{AtCmdConfig, Config},
+        TxRxPins,
+        Uart,
+    },
+    Blocking,
 };
-use nb::block;
 
-static SERIAL: Mutex<RefCell<Option<Uart<UART0>>>> = Mutex::new(RefCell::new(None));
+static SERIAL: Mutex<RefCell<Option<Uart<UART0, Blocking>>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
@@ -30,20 +33,24 @@ fn main() -> ! {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    let mut timer0 = timg0.timer0;
+    let delay = Delay::new(&clocks);
 
-    let mut uart0 = Uart::new(peripherals.UART0, &clocks);
-    uart0.set_at_cmd(AtCmdConfig::new(None, None, None, b'#', None));
-    uart0.set_rx_fifo_full_threshold(30).unwrap();
-    uart0.listen_at_cmd();
-    uart0.listen_rx_fifo_full();
+    let mut uart0 = Uart::new_with_config(
+        peripherals.UART0,
+        Config::default(),
+        None::<TxRxPins<gpio::NoPinType, gpio::NoPinType>>,
+        &clocks,
+        Some(interrupt_handler),
+    );
 
-    interrupt::enable(Interrupt::UART0, Priority::Priority2).unwrap();
+    critical_section::with(|cs| {
+        uart0.set_at_cmd(AtCmdConfig::new(None, None, None, b'#', None));
+        uart0.set_rx_fifo_full_threshold(30).unwrap();
+        uart0.listen_at_cmd();
+        uart0.listen_rx_fifo_full();
 
-    timer0.start(1u64.secs());
-
-    critical_section::with(|cs| SERIAL.borrow_ref_mut(cs).replace(uart0));
+        SERIAL.borrow_ref_mut(cs).replace(uart0);
+    });
 
     loop {
         critical_section::with(|cs| {
@@ -52,18 +59,18 @@ fn main() -> ! {
             writeln!(serial, "Hello World! Send a single `#` character or send at least 30 characters and see the interrupts trigger.").ok();
         });
 
-        block!(timer0.wait()).unwrap();
+        delay.delay(1.secs());
     }
 }
 
-#[interrupt]
-fn UART0() {
+#[handler]
+fn interrupt_handler() {
     critical_section::with(|cs| {
         let mut serial = SERIAL.borrow_ref_mut(cs);
         let serial = serial.as_mut().unwrap();
 
         let mut cnt = 0;
-        while let nb::Result::Ok(_c) = serial.read() {
+        while let nb::Result::Ok(_c) = serial.read_byte() {
             cnt += 1;
         }
         writeln!(serial, "Read {} bytes", cnt,).ok();

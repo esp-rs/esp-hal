@@ -25,6 +25,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
+    delay::Delay,
     dma::{Dma, DmaPriority},
     dma_buffers,
     gpio::IO,
@@ -34,7 +35,6 @@ use esp_hal::{
     },
     peripherals::Peripherals,
     prelude::*,
-    Delay,
 };
 use esp_println::println;
 
@@ -64,7 +64,7 @@ fn main() -> ! {
         DmaPriority::Priority0,
     );
 
-    let mut delay = Delay::new(&clocks);
+    let delay = Delay::new(&clocks);
 
     let mut backlight = lcd_backlight.into_push_pull_output();
     let mut reset = lcd_reset.into_push_pull_output();
@@ -85,7 +85,7 @@ fn main() -> ! {
         lcd_cam.lcd,
         channel.tx,
         tx_pins,
-        20u32.MHz(),
+        20.MHz(),
         Config::default(),
         &clocks,
     )
@@ -95,10 +95,10 @@ fn main() -> ! {
         // https://gist.github.com/sukesh-ak/610508bc84779a26efdcf969bf51a2d1
         // https://github.com/lovyan03/LovyanGFX/blob/302169a6f23e9a2a6451f03311c366d182193831/src/lgfx/v1/panel/Panel_ST7796.hpp#L28
 
-        reset.set_low().unwrap();
-        delay.delay_us(8_000u32);
-        reset.set_high().unwrap();
-        delay.delay_us(64_000u32);
+        reset.set_low();
+        delay.delay_micros(8_000);
+        reset.set_high();
+        delay.delay_micros(64_000);
 
         // const CMD_FRMCTR1: u8 = 0xB1;
         // const CMD_FRMCTR2: u8 = 0xB2;
@@ -149,7 +149,7 @@ fn main() -> ! {
         i8080.send(CMD_PWCTR3, 0, &[0xA7]).unwrap(); // Power control 3  //Source driving current level=low, Gamma driving current
                                                      // level=High
         i8080.send(CMD_VMCTR, 0, &[0x18]).unwrap(); // VCOM Control    //VCOM=0.9
-        delay.delay_us(120_000u32);
+        delay.delay_micros(120_000);
         i8080
             .send(
                 CMD_GMCTRP1,
@@ -170,13 +170,13 @@ fn main() -> ! {
                 ],
             )
             .unwrap();
-        delay.delay_us(120_000u32);
+        delay.delay_micros(120_000);
         i8080.send(CMD_CSCON, 0, &[0x3C]).unwrap(); // Command Set control // Disable extension command 2 partI
         i8080.send(CMD_CSCON, 0, &[0x69]).unwrap(); // Command Set control // Disable
                                                     // extension command 2 partII
 
         i8080.send(0x11, 0, &[]).unwrap(); // ExitSleepMode
-        delay.delay_us(130_000u32);
+        delay.delay_micros(130_000);
         i8080.send(0x38, 0, &[]).unwrap(); // ExitIdleMode
         i8080.send(0x29, 0, &[]).unwrap(); // SetDisplayOn
 
@@ -208,12 +208,12 @@ fn main() -> ! {
     const RED: u16 = 0b00000_000000_11111;
     const BLUE: u16 = 0b11111_000000_00000;
 
-    backlight.set_high().unwrap();
+    backlight.set_high();
 
     let total_pixels = width as usize * height as usize;
     let total_bytes = total_pixels * 2;
 
-    let mut buffer = tx_buffer;
+    let buffer = tx_buffer;
 
     for color in [RED, BLUE].iter().cycle() {
         let color = color.to_be_bytes();
@@ -223,26 +223,26 @@ fn main() -> ! {
 
         let mut bytes_left_to_write = total_bytes;
 
-        let transfer = i8080.send_dma(0x2C, 0, buffer).unwrap();
-        (buffer, i8080) = transfer.wait().unwrap();
+        let transfer = i8080.send_dma(0x2C, 0, &buffer).unwrap();
+        transfer.wait().unwrap();
 
         bytes_left_to_write -= buffer.len();
 
         while bytes_left_to_write >= buffer.len() {
-            let transfer = i8080.send_dma(0x3C, 0, buffer).unwrap();
-            (buffer, i8080) = transfer.wait().unwrap();
+            let transfer = i8080.send_dma(0x3C, 0, &buffer).unwrap();
+            transfer.wait().unwrap();
 
             bytes_left_to_write -= buffer.len();
         }
         if bytes_left_to_write > 0 {
-            let transfer = i8080.send_dma(0x3C, 0, buffer).unwrap();
-            (buffer, i8080) = transfer.wait().unwrap();
+            let transfer = i8080.send_dma(0x3C, 0, &buffer).unwrap();
+            transfer.wait().unwrap();
         }
 
-        delay.delay_ms(1_000u32);
+        delay.delay_millis(1_000);
     }
 
     loop {
-        delay.delay_ms(1_000u32);
+        delay.delay_millis(1_000);
     }
 }

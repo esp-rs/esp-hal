@@ -16,7 +16,7 @@
 //! method, which returns a 32-bit unsigned integer.
 //!
 //! Additionally, this driver implements the
-//! [Read](embedded_hal::blocking::rng::Read) trait from the `embedded_hal`
+//! [Read](embedded_hal_02::blocking::rng::Read) trait from the `embedded_hal`
 //! crate, allowing you to generate random bytes by calling the `read` method.
 //
 //! # Important Note
@@ -63,7 +63,7 @@
 //! rng.read(&mut buffer).unwrap();
 //! ```
 
-use core::{convert::Infallible, marker::PhantomData};
+use core::marker::PhantomData;
 
 use crate::{peripheral::Peripheral, peripherals::RNG};
 
@@ -76,7 +76,7 @@ pub struct Rng {
 impl Rng {
     /// Create a new random number generator instance
     pub fn new(_rng: impl Peripheral<P = RNG>) -> Self {
-        #[cfg(not(any(esp32p4, esp32s2)))]
+        #[cfg(not(esp32p4))]
         crate::soc::trng::ensure_randomness();
 
         Self {
@@ -93,50 +93,56 @@ impl Rng {
             .read()
             .bits()
     }
-}
 
-impl embedded_hal::blocking::rng::Read for Rng {
-    type Error = Infallible;
-
-    fn read(&mut self, buffer: &mut [u8]) -> Result<(), Self::Error> {
+    #[inline]
+    /// Reads enough bytes from hardware random number generator to fill
+    /// `buffer`.
+    ///
+    /// If any error is encountered then this function immediately returns. The
+    /// contents of buf are unspecified in this case.
+    ///
+    /// If this function returns an error, it is unspecified how many bytes it
+    /// has read, but it will never read more than would be necessary to
+    /// completely fill the buffer.
+    pub fn read(&mut self, buffer: &mut [u8]) {
         for chunk in buffer.chunks_mut(4) {
             let bytes = self.random().to_le_bytes();
             chunk.copy_from_slice(&bytes[..chunk.len()]);
         }
+    }
+}
 
+#[cfg(feature = "embedded-hal-02")]
+impl embedded_hal_02::blocking::rng::Read for Rng {
+    type Error = core::convert::Infallible;
+
+    fn read(&mut self, buffer: &mut [u8]) -> Result<(), Self::Error> {
+        self.read(buffer);
         Ok(())
     }
 }
 
 impl rand_core::RngCore for Rng {
     fn next_u32(&mut self) -> u32 {
-        // Directly use the existing random method to get a u32 random number
         self.random()
     }
 
     fn next_u64(&mut self) -> u64 {
-        // Call random() twice to generate a u64 random number (сombine two u32)
         let upper = self.random() as u64;
         let lower = self.random() as u64;
+
         (upper << 32) | lower
     }
 
     fn fill_bytes(&mut self, dest: &mut [u8]) {
-        // Fill the destination buffer with random bytes
-        for chunk in dest.chunks_mut(4) {
-            let rand_bytes = self.random().to_le_bytes();
-            for (dest_byte, rand_byte) in chunk.iter_mut().zip(&rand_bytes) {
-                *dest_byte = *rand_byte;
-            }
-        }
+        self.read(dest);
     }
 
     fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core::Error> {
-        // Similar implementation as fill_bytes, but encapsulated in a Result
-        self.fill_bytes(dest);
+        self.read(dest);
         Ok(())
     }
 }
 
-#[cfg(not(any(esp32p4, esp32s2)))]
+#[cfg(not(esp32p4))]
 impl rand_core::CryptoRng for Rng {}

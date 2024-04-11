@@ -12,12 +12,11 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    gpio::lp_gpio::IntoLowPowerPin,
+    gpio::{lp_io::IntoLowPowerPin, IO},
     i2c::lp_i2c::LpI2c,
     lp_core::{LpCore, LpCoreWakeupSource},
     peripherals::Peripherals,
     prelude::*,
-    IO,
 };
 use esp_println::println;
 
@@ -30,7 +29,7 @@ fn main() -> ! {
     let lp_sda = io.pins.gpio6.into_low_power().into_open_drain_output();
     let lp_scl = io.pins.gpio7.into_low_power().into_open_drain_output();
 
-    let lp_i2c = LpI2c::new(peripherals.LP_I2C0, lp_sda, lp_scl, 100u32.kHz());
+    let lp_i2c = LpI2c::new(peripherals.LP_I2C0, lp_sda, lp_scl, 100.kHz());
 
     let mut lp_core = LpCore::new(peripherals.LP_CORE);
     lp_core.stop();

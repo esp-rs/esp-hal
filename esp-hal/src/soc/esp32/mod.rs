@@ -5,8 +5,10 @@
 //! The `SOC` module provides access, functions and structures that are useful
 //! for interacting with various system-related peripherals on `ESP32` chip.
 
+use core::ptr::addr_of_mut;
+
 use self::peripherals::{LPWR, TIMG0, TIMG1};
-use crate::{timer::Wdt, Rtc};
+use crate::{rtc_cntl::Rtc, timer::Wdt};
 
 pub mod cpu_control;
 pub mod efuse;
@@ -34,7 +36,6 @@ pub(crate) mod constants {
 /// ENTRY point is defined in memory.x
 /// *Note: the pre_init function is called in the original reset handler
 /// after the initializations done in this function*
-#[cfg(feature = "rt")]
 #[doc(hidden)]
 #[no_mangle]
 pub unsafe extern "C" fn ESP32Reset() -> ! {
@@ -52,14 +53,20 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
     }
 
     // set stack pointer to end of memory: no need to retain stack up to this point
-    xtensa_lx::set_stack_pointer(&mut _stack_start_cpu0);
+    xtensa_lx::set_stack_pointer(addr_of_mut!(_stack_start_cpu0));
 
     // copying data from flash to various data segments is done by the bootloader
     // initialization to zero needs to be done by the application
 
     // Initialize RTC RAM
-    xtensa_lx_rt::zero_bss(&mut _rtc_fast_bss_start, &mut _rtc_fast_bss_end);
-    xtensa_lx_rt::zero_bss(&mut _rtc_slow_bss_start, &mut _rtc_slow_bss_end);
+    xtensa_lx_rt::zero_bss(
+        addr_of_mut!(_rtc_fast_bss_start),
+        addr_of_mut!(_rtc_fast_bss_end),
+    );
+    xtensa_lx_rt::zero_bss(
+        addr_of_mut!(_rtc_slow_bss_start),
+        addr_of_mut!(_rtc_slow_bss_end),
+    );
 
     unsafe {
         let stack_chk_guard = core::ptr::addr_of_mut!(__stack_chk_guard);
@@ -67,6 +74,8 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
         // numbers here
         stack_chk_guard.write_volatile(0xdeadbabe);
     }
+
+    crate::interrupt::setup_interrupts();
 
     // continue with default reset handler
     xtensa_lx_rt::Reset();
@@ -84,9 +93,9 @@ pub extern "Rust" fn __init_data() -> bool {
 #[export_name = "__post_init"]
 unsafe fn post_init() {
     // RTC domain must be enabled before we try to disable
-    let mut rtc = Rtc::new(LPWR::steal());
+    let mut rtc = Rtc::new(LPWR::steal(), None);
     rtc.rwdt.disable();
 
-    Wdt::<TIMG0>::set_wdt_enabled(false);
-    Wdt::<TIMG1>::set_wdt_enabled(false);
+    Wdt::<TIMG0, crate::Blocking>::set_wdt_enabled(false);
+    Wdt::<TIMG1, crate::Blocking>::set_wdt_enabled(false);
 }

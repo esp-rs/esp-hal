@@ -2,9 +2,9 @@
 //!
 //! Folowing pins are used:
 //! SCLK    GPIO0
-//! MISO    GPIO1
-//! MOSI    GPIO2
-//! CS      GPIO3
+//! MISO    GPIO2
+//! MOSI    GPIO4
+//! CS      GPIO5
 //!
 //! Depending on your target and the board you are using you have to change the
 //! pins.
@@ -26,9 +26,10 @@ use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    dma::{DmaPriority, *},
+    dma::*,
     dma_descriptors,
     embassy::{self},
+    gpio::IO,
     peripherals::Peripherals,
     prelude::*,
     spi::{
@@ -36,7 +37,6 @@ use esp_hal::{
         SpiMode,
     },
     timer::TimerGroup,
-    IO,
 };
 
 #[main]
@@ -46,14 +46,14 @@ async fn main(_spawner: Spawner) {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
     embassy::init(&clocks, timg0);
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let sclk = io.pins.gpio0;
-    let miso = io.pins.gpio1;
-    let mosi = io.pins.gpio2;
-    let cs = io.pins.gpio3;
+    let miso = io.pins.gpio2;
+    let mosi = io.pins.gpio4;
+    let cs = io.pins.gpio5;
 
     let dma = Dma::new(peripherals.DMA);
 
@@ -64,9 +64,9 @@ async fn main(_spawner: Spawner) {
 
     let (mut descriptors, mut rx_descriptors) = dma_descriptors!(32000);
 
-    let mut spi = Spi::new(peripherals.SPI2, 100u32.kHz(), SpiMode::Mode0, &clocks)
+    let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
         .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
-        .with_dma(dma_channel.configure(
+        .with_dma(dma_channel.configure_for_async(
             false,
             &mut descriptors,
             &mut rx_descriptors,
@@ -80,7 +80,7 @@ async fn main(_spawner: Spawner) {
         embedded_hal_async::spi::SpiBus::transfer(&mut spi, &mut buffer, &send_buffer)
             .await
             .unwrap();
-        esp_println::println!("Bytes recieved: {:?}", buffer);
+        esp_println::println!("Bytes received: {:?}", buffer);
         Timer::after(Duration::from_millis(5_000)).await;
     }
 }

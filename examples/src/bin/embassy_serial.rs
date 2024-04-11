@@ -19,8 +19,8 @@ use esp_hal::{
     peripherals::{Peripherals, UART0},
     prelude::*,
     timer::TimerGroup,
-    uart::{config::AtCmdConfig, UartRx, UartTx},
-    Uart,
+    uart::{config::AtCmdConfig, Uart, UartRx, UartTx},
+    Async,
 };
 use static_cell::make_static;
 
@@ -30,7 +30,10 @@ const READ_BUF_SIZE: usize = 64;
 const AT_CMD: u8 = 0x04;
 
 #[embassy_executor::task]
-async fn writer(mut tx: UartTx<'static, UART0>, signal: &'static Signal<NoopRawMutex, usize>) {
+async fn writer(
+    mut tx: UartTx<'static, UART0, Async>,
+    signal: &'static Signal<NoopRawMutex, usize>,
+) {
     use core::fmt::Write;
     embedded_io_async::Write::write(
         &mut tx,
@@ -48,7 +51,10 @@ async fn writer(mut tx: UartTx<'static, UART0>, signal: &'static Signal<NoopRawM
 }
 
 #[embassy_executor::task]
-async fn reader(mut rx: UartRx<'static, UART0>, signal: &'static Signal<NoopRawMutex, usize>) {
+async fn reader(
+    mut rx: UartRx<'static, UART0, Async>,
+    signal: &'static Signal<NoopRawMutex, usize>,
+) {
     const MAX_BUFFER_SIZE: usize = 10 * READ_BUF_SIZE + 16;
 
     let mut rbuf: [u8; MAX_BUFFER_SIZE] = [0u8; MAX_BUFFER_SIZE];
@@ -74,10 +80,10 @@ async fn main(spawner: Spawner) {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
     embassy::init(&clocks, timg0);
 
-    let mut uart0 = Uart::new(peripherals.UART0, &clocks);
+    let mut uart0 = Uart::new_async(peripherals.UART0, &clocks);
     uart0.set_at_cmd(AtCmdConfig::new(None, None, None, AT_CMD, None));
     uart0
         .set_rx_fifo_full_threshold(READ_BUF_SIZE as u16)

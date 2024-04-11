@@ -1,8 +1,7 @@
 use super::{Ext0WakeupSource, Ext1WakeupSource, TimerWakeupSource, WakeSource, WakeTriggers};
 use crate::{
     gpio::{RTCPin, RtcFunction},
-    rtc_cntl::{sleep::WakeupLevel, Clock, RtcClock},
-    Rtc,
+    rtc_cntl::{sleep::WakeupLevel, Clock, Rtc, RtcClock},
 };
 
 // Approximate mapping of voltages to RTC_CNTL_DBIAS_WAK, RTC_CNTL_DBIAS_SLP,
@@ -315,9 +314,7 @@ impl RtcSleepConfig {
                     .clear_bit()
             });
 
-            rtc_cntl
-                .int_ena()
-                .modify(|_, w| w.brown_out_int_ena().set_bit());
+            rtc_cntl.int_ena().modify(|_, w| w.brown_out().set_bit());
         }
     }
 
@@ -551,10 +548,10 @@ impl RtcSleepConfig {
             let rtc_cntl = &*esp32::RTC_CNTL::ptr();
 
             rtc_cntl.int_clr().write(|w| {
-                w.slp_reject_int_clr()
-                    .set_bit()
-                    .slp_wakeup_int_clr()
-                    .set_bit()
+                w.slp_reject()
+                    .clear_bit_by_one()
+                    .slp_wakeup()
+                    .clear_bit_by_one()
             });
 
             // restore DBG_ATTEN to the default value

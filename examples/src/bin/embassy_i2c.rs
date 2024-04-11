@@ -23,11 +23,11 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     embassy::{self},
+    gpio::IO,
     i2c::I2C,
     peripherals::Peripherals,
     prelude::*,
     timer::TimerGroup,
-    IO,
 };
 use lis3dh_async::{Lis3dh, Range, SlaveAddr};
 
@@ -37,16 +37,16 @@ async fn main(_spawner: Spawner) {
     let system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
     embassy::init(&clocks, timg0);
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let i2c0 = I2C::new(
+    let i2c0 = I2C::new_async(
         peripherals.I2C0,
         io.pins.gpio4,
         io.pins.gpio5,
-        400u32.kHz(),
+        400.kHz(),
         &clocks,
     );
 

@@ -41,10 +41,6 @@ use esp32s3 as pac;
 
 use crate::peripheral::{Peripheral, PeripheralRef};
 
-extern "C" {
-    fn ets_delay_us(delay: u32);
-}
-
 #[derive(Debug, Clone, Copy)]
 pub enum UlpCoreWakeupSource {
     HpCpu,
@@ -94,9 +90,7 @@ fn ulp_stop() {
         .cocpu_ctrl()
         .modify(|_, w| w.cocpu_shut_reset_en().set_bit());
 
-    unsafe {
-        ets_delay_us(20);
-    }
+    crate::rom::ets_delay_us(20);
 
     // above doesn't seem to halt the ULP core - this will
     rtc_cntl
@@ -124,9 +118,7 @@ fn ulp_run(wakeup_src: UlpCoreWakeupSource) {
         .modify(|_, w| w.ulp_cp_slp_timer_en().clear_bit());
 
     // wait for at least 1 RTC_SLOW_CLK cycle
-    unsafe {
-        ets_delay_us(20);
-    }
+    crate::rom::ets_delay_us(20);
 
     // We do not select RISC-V as the Coprocessor here as this could lead to a hang
     // in the main CPU. Instead, we reset RTC_CNTL_COCPU_SEL after we have enabled
@@ -154,17 +146,15 @@ fn ulp_run(wakeup_src: UlpCoreWakeupSource) {
         .modify(|_, w| w.cocpu_sel().clear_bit());
 
     // Clear any spurious wakeup trigger interrupts upon ULP startup
-    unsafe {
-        ets_delay_us(20);
-    }
+    crate::rom::ets_delay_us(20);
 
-    rtc_cntl.int_clr_rtc().write(|w| {
-        w.cocpu_int_clr()
-            .set_bit()
-            .cocpu_trap_int_clr()
-            .set_bit()
-            .ulp_cp_int_clr()
-            .set_bit()
+    rtc_cntl.int_clr().write(|w| {
+        w.cocpu()
+            .clear_bit_by_one()
+            .cocpu_trap()
+            .clear_bit_by_one()
+            .ulp_cp()
+            .clear_bit_by_one()
     });
 
     rtc_cntl
