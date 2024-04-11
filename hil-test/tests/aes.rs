@@ -25,6 +25,7 @@ impl Context<'_> {
     }
 }
 
+#[cfg(test)]
 #[embedded_test::tests]
 mod tests {
     use defmt::assert_eq;
