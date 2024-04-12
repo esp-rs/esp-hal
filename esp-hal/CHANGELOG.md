@@ -60,7 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Runtime ISR binding for software interrupts, software interrupts are split now, interrupt-executor takes the software interrupt to use, interrupt-executor is easier to use (#1398)
 - PCNT: Runtime ISR binding (#1396)
 - Runtime ISR binding for RTC (#1405)
-- Update `esp-synopsys-usb-otg`, includes https://github.com/esp-rs-compat/synopsys-usb-otg/pull/1
+- Update `esp-synopsys-usb-otg`, includes https://github.com/esp-rs-compat/synopsys-usb-otg/pull/1 (#1427)
 
 ### Removed
 
