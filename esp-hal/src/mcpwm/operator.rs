@@ -483,7 +483,7 @@ impl<'d, Pin: OutputPin, PWM: PwmPeripheral, const OP: u8, const IS_A: bool>
 /// // active high complementary using PWMA input
 /// let bridge_active = DeadTimeCfg::new_ahc();
 /// // use PWMB as input for both outputs
-/// let bride_off = DeadTimeCfg::new_bypass().set_output_swap(PWMStream::PWMA, true);
+/// let bridge_off = DeadTimeCfg::new_bypass().set_output_swap(PWMStream::PWMA, true);
 /// let mut pins = mcpwm.operator0.with_linked_pins(
 ///     pin_a,
 ///     PwmPinConfig::UP_DOWN_ACTIVE_HIGH, // use PWMA as our main input
