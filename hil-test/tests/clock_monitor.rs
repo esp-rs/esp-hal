@@ -43,10 +43,10 @@ mod tests {
         let estimated_xtal_freq = ctx.rtc.estimate_xtal_frequency();
 
         #[cfg(feature = "esp32c2")] // 26 MHz
-        assert!(estimated_xtal_freq > 22 && estimated_xtal_freq < 30);
+        assert!(estimated_xtal_freq > 23 && estimated_xtal_freq < 29);
         #[cfg(feature = "esp32h2")] // 32 MHz
-        assert!(estimated_xtal_freq > 26 && estimated_xtal_freq < 36);
+        assert!(estimated_xtal_freq > 29 && estimated_xtal_freq < 35);
         #[cfg(not(any(feature = "esp32h2", feature = "esp32c2")))] // 40 MHz
-        assert!(estimated_xtal_freq > 34 && estimated_xtal_freq < 44);
+        assert!(estimated_xtal_freq > 37 && estimated_xtal_freq < 43);
     }
 }
