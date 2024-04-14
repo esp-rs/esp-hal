@@ -435,9 +435,9 @@ mod asynch {
         task::{Context, Poll},
     };
 
+    use atomic_waker::AtomicWaker;
     use cfg_if::cfg_if;
     use embassy_futures::select::select;
-    use embassy_sync::waitqueue::AtomicWaker;
     use embedded_hal::i2c::Operation;
     use procmacros::handler;
 

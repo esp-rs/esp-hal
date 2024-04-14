@@ -307,7 +307,7 @@ where
 pub(crate) mod asynch {
     use core::task::Poll;
 
-    use embassy_sync::waitqueue::AtomicWaker;
+    use atomic_waker::AtomicWaker;
     use procmacros::handler;
 
     use crate::rsa::{

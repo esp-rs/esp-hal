@@ -343,9 +343,8 @@ pub struct ChannelTxImpl<const N: u8> {}
 
 impl<const N: u8> TxChannel<Channel<N>> for ChannelTxImpl<N> {
     #[cfg(feature = "async")]
-    fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
-        static WAKER: embassy_sync::waitqueue::AtomicWaker =
-            embassy_sync::waitqueue::AtomicWaker::new();
+    fn waker() -> &'static atomic_waker::AtomicWaker {
+        static WAKER: atomic_waker::AtomicWaker = atomic_waker::AtomicWaker::new();
         &WAKER
     }
 }
@@ -355,9 +354,8 @@ pub struct ChannelRxImpl<const N: u8> {}
 
 impl<const N: u8> RxChannel<Channel<N>> for ChannelRxImpl<N> {
     #[cfg(feature = "async")]
-    fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
-        static WAKER: embassy_sync::waitqueue::AtomicWaker =
-            embassy_sync::waitqueue::AtomicWaker::new();
+    fn waker() -> &'static atomic_waker::AtomicWaker {
+        static WAKER: atomic_waker::AtomicWaker = atomic_waker::AtomicWaker::new();
         &WAKER
     }
 }

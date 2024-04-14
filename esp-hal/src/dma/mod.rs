@@ -488,7 +488,7 @@ pub trait RxPrivate {
     fn has_eof_error(&self) -> bool;
 
     #[cfg(feature = "async")]
-    fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker;
+    fn waker() -> &'static atomic_waker::AtomicWaker;
 }
 
 pub trait RxChannel<R>
@@ -585,7 +585,7 @@ where
     }
 
     #[cfg(feature = "async")]
-    fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker;
+    fn waker() -> &'static atomic_waker::AtomicWaker;
 }
 
 // DMA receive channel
@@ -811,7 +811,7 @@ where
     }
 
     #[cfg(feature = "async")]
-    fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
+    fn waker() -> &'static atomic_waker::AtomicWaker {
         T::waker()
     }
 }
@@ -859,7 +859,7 @@ pub trait TxPrivate {
     fn push_with(&mut self, f: impl FnOnce(&mut [u8]) -> usize) -> Result<usize, DmaError>;
 
     #[cfg(feature = "async")]
-    fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker;
+    fn waker() -> &'static atomic_waker::AtomicWaker;
 }
 
 pub trait TxChannel<R>
@@ -986,7 +986,7 @@ where
     }
 
     #[cfg(feature = "async")]
-    fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker;
+    fn waker() -> &'static atomic_waker::AtomicWaker;
 }
 
 /// DMA transmit channel
@@ -1237,7 +1237,7 @@ where
     }
 
     #[cfg(feature = "async")]
-    fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
+    fn waker() -> &'static atomic_waker::AtomicWaker {
         T::waker()
     }
 }

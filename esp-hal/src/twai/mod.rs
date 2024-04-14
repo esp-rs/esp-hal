@@ -1405,11 +1405,8 @@ impl OperationInstance for crate::peripherals::TWAI1 {}
 mod asynch {
     use core::{future::poll_fn, task::Poll};
 
-    use embassy_sync::{
-        blocking_mutex::raw::CriticalSectionRawMutex,
-        channel::Channel,
-        waitqueue::AtomicWaker,
-    };
+    use atomic_waker::AtomicWaker;
+    use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel::Channel};
     use procmacros::handler;
 
     use super::*;

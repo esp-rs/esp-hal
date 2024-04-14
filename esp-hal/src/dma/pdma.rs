@@ -292,8 +292,8 @@ macro_rules! ImplSpiChannel {
 
             impl<'a> TxChannel<[<Spi $num DmaChannel>]> for [<Spi $num DmaChannelTxImpl>] {
                 #[cfg(feature = "async")]
-                fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
-                    static WAKER: embassy_sync::waitqueue::AtomicWaker = embassy_sync::waitqueue::AtomicWaker::new();
+                fn waker() -> &'static atomic_waker::AtomicWaker {
+                    static WAKER: atomic_waker::AtomicWaker = atomic_waker::AtomicWaker::new();
                     &WAKER
                 }
             }
@@ -303,8 +303,8 @@ macro_rules! ImplSpiChannel {
 
             impl<'a> RxChannel<[<Spi $num DmaChannel>]> for [<Spi $num DmaChannelRxImpl>] {
                 #[cfg(feature = "async")]
-                fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
-                    static WAKER: embassy_sync::waitqueue::AtomicWaker = embassy_sync::waitqueue::AtomicWaker::new();
+                fn waker() -> &'static atomic_waker::AtomicWaker {
+                    static WAKER: atomic_waker::AtomicWaker = atomic_waker::AtomicWaker::new();
                     &WAKER
                 }
             }
@@ -620,8 +620,8 @@ macro_rules! ImplI2sChannel {
 
             impl<'a> TxChannel<[<I2s $num DmaChannel>]> for [<I2s $num DmaChannelTxImpl>] {
                 #[cfg(feature = "async")]
-                fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
-                    static WAKER: embassy_sync::waitqueue::AtomicWaker = embassy_sync::waitqueue::AtomicWaker::new();
+                fn waker() -> &'static atomic_waker::AtomicWaker {
+                    static WAKER: atomic_waker::AtomicWaker = atomic_waker::AtomicWaker::new();
                     &WAKER
                 }
             }
@@ -630,8 +630,8 @@ macro_rules! ImplI2sChannel {
 
             impl<'a> RxChannel<[<I2s $num DmaChannel>]> for [<I2s $num DmaChannelRxImpl>] {
                 #[cfg(feature = "async")]
-                fn waker() -> &'static embassy_sync::waitqueue::AtomicWaker {
-                    static WAKER: embassy_sync::waitqueue::AtomicWaker = embassy_sync::waitqueue::AtomicWaker::new();
+                fn waker() -> &'static atomic_waker::AtomicWaker {
+                    static WAKER: atomic_waker::AtomicWaker = atomic_waker::AtomicWaker::new();
                     &WAKER
                 }
             }

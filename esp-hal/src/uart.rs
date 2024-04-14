@@ -1546,8 +1546,8 @@ where
 mod asynch {
     use core::task::Poll;
 
+    use atomic_waker::AtomicWaker;
     use cfg_if::cfg_if;
-    use embassy_sync::waitqueue::AtomicWaker;
     use enumset::{EnumSet, EnumSetType};
     use procmacros::handler;
 

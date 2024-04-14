@@ -2258,7 +2258,7 @@ macro_rules! analog {
 mod asynch {
     use core::task::{Context, Poll};
 
-    use embassy_sync::waitqueue::AtomicWaker;
+    use atomic_waker::AtomicWaker;
 
     use super::*;
 

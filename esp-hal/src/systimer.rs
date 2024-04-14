@@ -386,7 +386,7 @@ mod asynch {
         task::{Context, Poll},
     };
 
-    use embassy_sync::waitqueue::AtomicWaker;
+    use atomic_waker::AtomicWaker;
     use procmacros::handler;
 
     use super::*;
