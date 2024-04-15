@@ -75,7 +75,6 @@ mod tests {
         (&mut encrypted_output[..]).copy_from_slice(output);
 
         assert_eq!(encrypted_output, encrypted_message);
-        aes.reset_aes();
     }
 
     #[test]
@@ -121,7 +120,6 @@ mod tests {
         (&mut decrypted_output[..]).copy_from_slice(output);
 
         assert_eq!(&decrypted_output[..plaintext.len()], plaintext);
-        aes.reset_aes();
     }
 
     #[test]
@@ -168,7 +166,6 @@ mod tests {
         (&mut encrypted_output[..]).copy_from_slice(output);
 
         assert_eq!(encrypted_output, encrypted_message);
-        aes.reset_aes();
     }
 
     #[test]
@@ -214,6 +211,5 @@ mod tests {
         (&mut decrypted_output[..]).copy_from_slice(output);
 
         assert_eq!(&decrypted_output[..plaintext.len()], plaintext);
-        aes.reset_aes();
     }
 }

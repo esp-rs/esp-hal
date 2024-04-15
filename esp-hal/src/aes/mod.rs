@@ -530,6 +530,7 @@ pub mod dma {
         pub fn finish_transform(&self) {
             self.aes.aes.dma_exit().write(|w| w.dma_exit().set_bit());
             self.enable_dma(false);
+            self.reset_aes();
         }
 
         fn set_num_block(&self, block: u32) {
