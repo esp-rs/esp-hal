@@ -628,6 +628,11 @@ impl RtcClock {
                 .rtc_cali_start()
                 .set_bit()
         });
+
+        timg0
+            .rtccalicfg()
+            .modify(|_, w| w.rtc_cali_start().set_bit());
+
         while timg0.rtccalicfg().read().rtc_cali_rdy().bit_is_clear() {}
 
         (timg0.rtccalicfg1().read().rtc_cali_value().bits()

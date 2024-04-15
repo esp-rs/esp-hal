@@ -9,6 +9,14 @@ name    = "aes"
 harness = false
 
 [[test]]
+name    = "aes_dma"
+harness = false
+
+[[test]]
+name    = "clock_monitor"
+harness = false
+
+[[test]]
 name    = "crc"
 harness = false
 
