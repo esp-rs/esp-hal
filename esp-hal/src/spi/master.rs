@@ -806,7 +806,8 @@ where
     type Error = Error;
 
     fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-        self.write_bytes(words)
+        self.write_bytes(words)?;
+        self.spi.flush()
     }
 }
 
@@ -1454,8 +1455,6 @@ pub mod dma {
 
                     crate::dma::asynch::DmaTxFuture::new(&mut self.channel.tx).await;
 
-                    // FIXME: in the future we should use the peripheral DMA status registers to
-                    // await on both the dma transfer _and_ the peripherals status
                     self.spi.flush()?;
                 }
 
@@ -1487,8 +1486,6 @@ pub mod dma {
                     )
                     .await;
 
-                    // FIXME: in the future we should use the peripheral DMA status registers to
-                    // await on both the dma transfer _and_ the peripherals status
                     self.spi.flush()?;
 
                     idx += MAX_DMA_SIZE as isize;
@@ -1518,8 +1515,6 @@ pub mod dma {
                     )
                     .await;
 
-                    // FIXME: in the future we should use the peripheral DMA status registers to
-                    // await on both the dma transfer _and_ the peripherals status
                     self.spi.flush()?;
                 }
 
@@ -1527,7 +1522,6 @@ pub mod dma {
             }
 
             async fn flush(&mut self) -> Result<(), Self::Error> {
-                // TODO use async flush in the future
                 self.spi.flush()
             }
         }
@@ -2391,7 +2385,6 @@ pub trait Instance: crate::private::Sealed {
 
     // taken from https://github.com/apache/incubator-nuttx/blob/8267a7618629838231256edfa666e44b5313348e/arch/risc-v/src/esp32c3/esp32c3_spi.c#L496
     fn setup(&mut self, frequency: HertzU32, clocks: &Clocks) {
-        // FIXME: this might not be always true
         #[cfg(not(esp32h2))]
         let apb_clk_freq: HertzU32 = HertzU32::Hz(clocks.apb_clock.to_Hz());
         // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
@@ -2651,7 +2644,6 @@ pub trait Instance: crate::private::Sealed {
     /// all bytes of the last chunk to transmit have been sent to the wire. If
     /// you must ensure that the whole messages was written correctly, use
     /// [`Self::flush`].
-    // FIXME: See below.
     #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
     fn write_bytes(&mut self, words: &[u8]) -> Result<(), Error> {
         let num_chunks = words.len() / FIFO_SIZE;
@@ -2702,9 +2694,6 @@ pub trait Instance: crate::private::Sealed {
             // Wait for all chunks to complete except the last one.
             // The function is allowed to return before the bus is idle.
             // see [embedded-hal flushing](https://docs.rs/embedded-hal/1.0.0-alpha.8/embedded_hal/spi/blocking/index.html#flushing)
-            //
-            // THIS IS NOT TRUE FOR EH 0.2.X! MAKE SURE TO FLUSH IN EH 0.2.X TRAIT
-            // IMPLEMENTATIONS!
             if i < num_chunks {
                 self.flush()?;
             }
@@ -2735,9 +2724,6 @@ pub trait Instance: crate::private::Sealed {
     /// doesn't perform flushing. If you want to read the response to
     /// something you have written before, consider using [`Self::transfer`]
     /// instead.
-    // FIXME: Using something like `core::slice::from_raw_parts` and
-    // `copy_from_slice` on the receive registers works only for the esp32 and
-    // esp32c3 varaints. The reason for this is unknown.
     #[cfg_attr(feature = "place-spi-driver-in-ram", ram)]
     fn read_bytes_from_fifo(&mut self, words: &mut [u8]) -> Result<(), Error> {
         let reg_block = self.register_block();
@@ -2747,7 +2733,7 @@ pub trait Instance: crate::private::Sealed {
 
             let mut fifo_ptr = reg_block.w0().as_ptr();
             for index in (0..chunk.len()).step_by(4) {
-                let reg_val = unsafe { *fifo_ptr };
+                let reg_val = unsafe { core::ptr::read_volatile(fifo_ptr) };
                 let bytes = reg_val.to_le_bytes();
 
                 let len = usize::min(chunk.len(), index + 4) - index;
