@@ -21,7 +21,6 @@ pub enum Error {
 ///
 /// It's possible to create one handler per priority level. (e.g
 /// `level1_interrupt`)
-#[allow(unused)]
 #[derive(Debug, Copy, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(u32)]
@@ -150,8 +149,7 @@ pub fn clear(_core: Cpu, which: CpuInterrupt) {
 /// Get status of peripheral interrupts
 pub fn get_status(core: Cpu) -> u128 {
     unsafe {
-        #[allow(unused_mut)]
-        let mut status = match core {
+        let status = match core {
             Cpu::ProCpu => {
                 ((*core0_interrupt_peripheral())
                     .pro_intr_status_0()
@@ -188,23 +186,25 @@ pub fn get_status(core: Cpu) -> u128 {
         };
 
         #[cfg(feature = "esp32s3")]
-        match core {
+        let status = match core {
             Cpu::ProCpu => {
-                status |= ((*core0_interrupt_peripheral())
-                    .pro_intr_status_3()
-                    .read()
-                    .bits() as u128)
-                    << 96;
+                status
+                    | ((*core0_interrupt_peripheral())
+                        .pro_intr_status_3()
+                        .read()
+                        .bits() as u128)
+                        << 96
             }
             #[cfg(multi_core)]
             Cpu::AppCpu => {
-                status |= ((*core1_interrupt_peripheral())
-                    .app_intr_status_3()
-                    .read()
-                    .bits() as u128)
-                    << 96;
+                status
+                    | ((*core1_interrupt_peripheral())
+                        .app_intr_status_3()
+                        .read()
+                        .bits() as u128)
+                        << 96
             }
-        }
+        };
 
         status
     }
