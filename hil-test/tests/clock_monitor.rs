@@ -37,9 +37,6 @@ mod tests {
 
     #[test]
     fn test_estimated_clock(mut ctx: Context<'static>) {
-        // We call the function twice since sometimes the first call gives a
-        // wrong result
-        ctx.rtc.estimate_xtal_frequency();
         let estimated_xtal_freq = ctx.rtc.estimate_xtal_frequency();
 
         #[cfg(feature = "esp32c2")] // 26 MHz
