@@ -37,13 +37,11 @@ mod tests {
 
     #[test]
     fn test_estimated_clock(mut ctx: Context<'static>) {
-        let estimated_xtal_freq = ctx.rtc.estimate_xtal_frequency();
-
         #[cfg(feature = "esp32c2")] // 26 MHz
-        assert!(estimated_xtal_freq > 23 && estimated_xtal_freq < 29);
+        defmt::assert!((23..=29).contains(&ctx.rtc.estimate_xtal_frequency()));
         #[cfg(feature = "esp32h2")] // 32 MHz
-        assert!(estimated_xtal_freq > 29 && estimated_xtal_freq < 35);
+        defmt::assert!((29..=35).contains(&ctx.rtc.estimate_xtal_frequency()));
         #[cfg(not(any(feature = "esp32h2", feature = "esp32c2")))] // 40 MHz
-        assert!(estimated_xtal_freq > 37 && estimated_xtal_freq < 43);
+        defmt::assert!((35..=45).contains(&ctx.rtc.estimate_xtal_frequency()));
     }
 }
