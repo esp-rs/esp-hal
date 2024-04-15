@@ -103,23 +103,23 @@ where
             ],
         );
 
-        lcd_cam.lcd_clock().write(|w| {
+        lcd_cam.lcd_clock().write(|w| unsafe {
             // Force enable the clock for all configuration registers.
             w.clk_en()
                 .set_bit()
                 .lcd_clk_sel()
-                .variant((i + 1) as _)
+                .bits((i + 1) as _)
                 .lcd_clkm_div_num()
-                .variant(divider.div_num as _)
+                .bits(divider.div_num as _)
                 .lcd_clkm_div_b()
-                .variant(divider.div_b as _)
+                .bits(divider.div_b as _)
                 .lcd_clkm_div_a()
-                .variant(divider.div_a as _)
+                .bits(divider.div_a as _)
                 // LCD_PCLK = LCD_CLK / 2
                 .lcd_clk_equ_sysclk()
                 .clear_bit()
                 .lcd_clkcnt_n()
-                .variant(2 - 1) // Must not be 0.
+                .bits(2 - 1) // Must not be 0.
                 .lcd_ck_idle_edge()
                 .bit(config.clock_mode.polarity == Polarity::IdleHigh)
                 .lcd_ck_out_edge()
@@ -143,18 +143,18 @@ where
                 .lcd_2byte_en()
                 .bit(is_2byte_mode)
         });
-        lcd_cam.lcd_misc().write(|w| {
+        lcd_cam.lcd_misc().write(|w| unsafe {
             // Set the threshold for Async Tx FIFO full event. (5 bits)
             w.lcd_afifo_threshold_num()
-                .variant(0)
+                .bits(0)
                 // Configure the setup cycles in LCD non-RGB mode. Setup cycles
                 // expected = this value + 1. (6 bit)
                 .lcd_vfk_cyclelen()
-                .variant(config.setup_cycles.saturating_sub(1) as _)
+                .bits(config.setup_cycles.saturating_sub(1) as _)
                 // Configure the hold time cycles in LCD non-RGB mode. Hold
                 // cycles expected = this value + 1.
                 .lcd_vbk_cyclelen()
-                .variant(config.hold_cycles.saturating_sub(1) as _)
+                .bits(config.hold_cycles.saturating_sub(1) as _)
                 // 1: Send the next frame data when the current frame is sent out.
                 // 0: LCD stops when the current frame is sent out.
                 .lcd_next_frame_en()
@@ -180,40 +180,40 @@ where
         });
         lcd_cam
             .lcd_dly_mode()
-            .write(|w| w.lcd_cd_mode().variant(config.cd_mode as u8));
-        lcd_cam.lcd_data_dout_mode().write(|w| {
+            .write(|w| unsafe { w.lcd_cd_mode().bits(config.cd_mode as u8) });
+        lcd_cam.lcd_data_dout_mode().write(|w| unsafe {
             w.dout0_mode()
-                .variant(config.output_bit_mode as u8)
+                .bits(config.output_bit_mode as u8)
                 .dout1_mode()
-                .variant(config.output_bit_mode as u8)
+                .bits(config.output_bit_mode as u8)
                 .dout2_mode()
-                .variant(config.output_bit_mode as u8)
+                .bits(config.output_bit_mode as u8)
                 .dout3_mode()
-                .variant(config.output_bit_mode as u8)
+                .bits(config.output_bit_mode as u8)
                 .dout4_mode()
-                .variant(config.output_bit_mode as u8)
+                .bits(config.output_bit_mode as u8)
                 .dout5_mode()
-                .variant(config.output_bit_mode as u8)
+                .bits(config.output_bit_mode as u8)
                 .dout6_mode()
-                .variant(config.output_bit_mode as u8)
+                .bits(config.output_bit_mode as u8)
                 .dout7_mode()
-                .variant(config.output_bit_mode as u8)
+                .bits(config.output_bit_mode as u8)
                 .dout8_mode()
-                .variant(config.output_bit_mode as u8)
+                .bits(config.output_bit_mode as u8)
                 .dout9_mode()
-                .variant(config.output_bit_mode as u8)
+                .bits(config.output_bit_mode as u8)
                 .dout10_mode()
-                .variant(config.output_bit_mode as u8)
+                .bits(config.output_bit_mode as u8)
                 .dout11_mode()
-                .variant(config.output_bit_mode as u8)
+                .bits(config.output_bit_mode as u8)
                 .dout12_mode()
-                .variant(config.output_bit_mode as u8)
+                .bits(config.output_bit_mode as u8)
                 .dout13_mode()
-                .variant(config.output_bit_mode as u8)
+                .bits(config.output_bit_mode as u8)
                 .dout14_mode()
-                .variant(config.output_bit_mode as u8)
+                .bits(config.output_bit_mode as u8)
                 .dout15_mode()
-                .variant(config.output_bit_mode as u8)
+                .bits(config.output_bit_mode as u8)
         });
 
         lcd_cam.lcd_user().modify(|_, w| w.lcd_update().set_bit());
@@ -340,7 +340,7 @@ impl<'d, TX: Tx, P> I8080<'d, TX, P> {
                     .modify(|_, w| w.lcd_cmd().set_bit().lcd_cmd_2_cycle_en().clear_bit());
                 self.lcd_cam
                     .lcd_cmd_val()
-                    .write(|w| w.lcd_cmd_value().variant(value.into() as _));
+                    .write(|w| unsafe { w.lcd_cmd_value().bits(value.into() as _) });
             }
             Command::Two(first, second) => {
                 self.lcd_cam
@@ -349,19 +349,19 @@ impl<'d, TX: Tx, P> I8080<'d, TX, P> {
                 let cmd = first.into() as u32 | (second.into() as u32) << 16;
                 self.lcd_cam
                     .lcd_cmd_val()
-                    .write(|w| w.lcd_cmd_value().variant(cmd));
+                    .write(|w| unsafe { w.lcd_cmd_value().bits(cmd) });
             }
         }
 
         // Set dummy length
-        self.lcd_cam.lcd_user().modify(|_, w| {
+        self.lcd_cam.lcd_user().modify(|_, w| unsafe {
             if dummy > 0 {
                 // Enable DUMMY phase in LCD sequence when LCD starts.
                 w.lcd_dummy()
                     .set_bit()
                     // Configure DUMMY cycles. DUMMY cycles = this value + 1. (2 bits)
                     .lcd_dummy_cyclelen()
-                    .variant((dummy - 1) as _)
+                    .bits((dummy - 1) as _)
             } else {
                 w.lcd_dummy().clear_bit()
             }
@@ -401,13 +401,13 @@ impl<'d, TX: Tx, P> I8080<'d, TX, P> {
                 .modify(|_, w| w.lcd_dout().clear_bit());
         } else {
             // Set transfer length.
-            self.lcd_cam.lcd_user().modify(|_, w| {
+            self.lcd_cam.lcd_user().modify(|_, w| unsafe {
                 if len <= 8192 {
                     // Data length in fixed mode. (13 bits)
                     w.lcd_always_out_en()
                         .clear_bit()
                         .lcd_dout_cyclelen()
-                        .variant((len - 1) as _)
+                        .bits((len - 1) as _)
                 } else {
                     // Enable continuous output.
                     w.lcd_always_out_en().set_bit()

@@ -197,8 +197,8 @@ impl<'a, 'b> RtcioWakeupSource<'a, 'b> {
 
         pin.rtc_set_config(true, true, RtcFunction::Rtc);
 
-        rtcio.pin(pin.number() as usize).modify(|_, w| {
-            w.wakeup_enable().set_bit().int_type().variant(match level {
+        rtcio.pin(pin.number() as usize).modify(|_, w| unsafe {
+            w.wakeup_enable().set_bit().int_type().bits(match level {
                 WakeupLevel::Low => 4,
                 WakeupLevel::High => 5,
             })

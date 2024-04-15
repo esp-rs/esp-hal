@@ -108,7 +108,7 @@ impl<'d, PWM: PwmPeripheral> MCPWM<'d, PWM> {
             // set prescaler
             peripheral
                 .clk_cfg()
-                .write(|w| w.clk_prescale().variant(peripheral_clock.prescaler));
+                .write(|w| unsafe { w.clk_prescale().bits(peripheral_clock.prescaler) });
 
             // enable clock
             peripheral.clk().write(|w| w.en().set_bit());
@@ -120,7 +120,7 @@ impl<'d, PWM: PwmPeripheral> MCPWM<'d, PWM> {
                 .pwm_clk_conf()
                 .modify(|_, w| unsafe {
                     w.pwm_div_num()
-                        .variant(peripheral_clock.prescaler)
+                        .bits(peripheral_clock.prescaler)
                         .pwm_clkm_en()
                         .set_bit()
                         .pwm_clkm_sel()
@@ -136,7 +136,7 @@ impl<'d, PWM: PwmPeripheral> MCPWM<'d, PWM> {
                 .pwm_clk_conf()
                 .modify(|_, w| unsafe {
                     w.pwm_div_num()
-                        .variant(peripheral_clock.prescaler)
+                        .bits(peripheral_clock.prescaler)
                         .pwm_clkm_en()
                         .set_bit()
                         .pwm_clkm_sel()

@@ -2034,13 +2034,13 @@ pub mod lp_uart {
 
             lp_aon
                 .gpio_mux()
-                .modify(|r, w| w.sel().variant(r.sel().bits() | 1 << 4));
+                .modify(|r, w| unsafe { w.sel().bits(r.sel().bits() | 1 << 4) });
             lp_aon
                 .gpio_mux()
-                .modify(|r, w| w.sel().variant(r.sel().bits() | 1 << 5));
+                .modify(|r, w| unsafe { w.sel().bits(r.sel().bits() | 1 << 5) });
 
-            lp_io.gpio4().modify(|_, w| w.mcu_sel().variant(1));
-            lp_io.gpio5().modify(|_, w| w.mcu_sel().variant(1));
+            lp_io.gpio4().modify(|_, w| unsafe { w.mcu_sel().bits(1) });
+            lp_io.gpio5().modify(|_, w| unsafe { w.mcu_sel().bits(1) });
 
             Self::new_with_config(uart, Config::default())
         }

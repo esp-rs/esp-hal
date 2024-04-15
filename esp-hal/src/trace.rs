@@ -76,13 +76,12 @@ where
     pub fn start_trace(&mut self, buffer: &'d mut [u8]) {
         let reg_block = self.peripheral.register_block();
 
-        reg_block.mem_start_addr().modify(|_, w| {
-            w.mem_start_addr()
-                .variant(buffer.as_ptr() as *const _ as u32)
-        });
-        reg_block.mem_end_addr().modify(|_, w| {
+        reg_block
+            .mem_start_addr()
+            .modify(|_, w| unsafe { w.mem_start_addr().bits(buffer.as_ptr() as *const _ as u32) });
+        reg_block.mem_end_addr().modify(|_, w| unsafe {
             w.mem_end_addr()
-                .variant((buffer.as_ptr() as *const _ as u32) + (buffer.len() as u32))
+                .bits((buffer.as_ptr() as *const _ as u32) + (buffer.len() as u32))
         });
         reg_block
             .mem_addr_update()

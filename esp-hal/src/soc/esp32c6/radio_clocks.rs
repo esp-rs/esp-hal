@@ -336,11 +336,11 @@ fn init_clocks() {
         let pmu = &*esp32c6::PMU::PTR;
 
         pmu.hp_sleep_icg_modem()
-            .modify(|_, w| w.hp_sleep_dig_icg_modem_code().variant(0));
+            .modify(|_, w| w.hp_sleep_dig_icg_modem_code().bits(0));
         pmu.hp_modem_icg_modem()
-            .modify(|_, w| w.hp_modem_dig_icg_modem_code().variant(1));
+            .modify(|_, w| w.hp_modem_dig_icg_modem_code().bits(1));
         pmu.hp_active_icg_modem()
-            .modify(|_, w| w.hp_active_dig_icg_modem_code().variant(2));
+            .modify(|_, w| w.hp_active_dig_icg_modem_code().bits(2));
         pmu.imm_modem_icg()
             .as_ptr()
             .write_volatile(pmu.imm_modem_icg().as_ptr().read_volatile() | 1 << 31);
@@ -351,29 +351,29 @@ fn init_clocks() {
         let modem_syscon = &*esp32c6::MODEM_SYSCON::PTR;
         modem_syscon.clk_conf_power_st().modify(|_, w| {
             w.clk_modem_apb_st_map()
-                .variant(6)
+                .bits(6)
                 .clk_modem_peri_st_map()
-                .variant(4)
+                .bits(4)
                 .clk_wifi_st_map()
-                .variant(6)
+                .bits(6)
                 .clk_bt_st_map()
-                .variant(6)
+                .bits(6)
                 .clk_fe_st_map()
-                .variant(6)
+                .bits(6)
                 .clk_zb_st_map()
-                .variant(6)
+                .bits(6)
         });
 
         let modem_lpcon = &*esp32c6::MODEM_LPCON::PTR;
         modem_lpcon.clk_conf_power_st().modify(|_, w| {
             w.clk_lp_apb_st_map()
-                .variant(6)
+                .bits(6)
                 .clk_i2c_mst_st_map()
-                .variant(6)
+                .bits(6)
                 .clk_coex_st_map()
-                .variant(6)
+                .bits(6)
                 .clk_wifipwr_st_map()
-                .variant(6)
+                .bits(6)
         });
 
         modem_lpcon.wifi_lp_clk_conf().modify(|_, w| {
@@ -389,7 +389,7 @@ fn init_clocks() {
 
         modem_lpcon
             .wifi_lp_clk_conf()
-            .modify(|_, w| w.clk_wifipwr_lp_div_num().variant(0));
+            .modify(|_, w| w.clk_wifipwr_lp_div_num().bits(0));
 
         modem_lpcon
             .clk_conf()
