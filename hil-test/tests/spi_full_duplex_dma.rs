@@ -14,11 +14,9 @@
 #![no_main]
 
 use defmt_rtt as _;
-use embedded_hal::spi::SpiBus;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    delay::Delay,
     dma::{Dma, DmaPriority},
     dma_buffers,
     gpio::IO,
@@ -38,7 +36,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_symestric_transfer() {
+    #[timeout(3)]
+    fn test_symestric_dma_transfer() {
         const DMA_BUFFER_SIZE: usize = 4;
 
         let peripherals = Peripherals::take();
@@ -75,6 +74,96 @@ mod tests {
         let mut receive = rx_buffer;
 
         send.copy_from_slice(&[0xde, 0xad, 0xbe, 0xef]);
+
+        let transfer = spi.dma_transfer(&mut send, &mut receive).unwrap();
+        transfer.wait().unwrap();
+        assert_eq!(send, receive);
+    }
+
+    #[test]
+    #[timeout(3)]
+    fn test_asymestric_dma_transfer() {
+        let peripherals = Peripherals::take();
+        let system = peripherals.SYSTEM.split();
+        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+
+        let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+        let sclk = io.pins.gpio0;
+        let miso = io.pins.gpio2;
+        let mosi = io.pins.gpio4;
+        let cs = io.pins.gpio5;
+
+        let dma = Dma::new(peripherals.DMA);
+
+        #[cfg(any(feature = "esp32", feature = "esp32s2"))]
+        let dma_channel = dma.spi2channel;
+        #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
+        let dma_channel = dma.channel0;
+
+        let (tx_buffer, mut tx_descriptors, rx_buffer, mut rx_descriptors) = dma_buffers!(4, 2);
+
+        let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
+            .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
+            .with_dma(dma_channel.configure(
+                false,
+                &mut tx_descriptors,
+                &mut rx_descriptors,
+                DmaPriority::Priority0,
+            ));
+
+        // DMA buffer require a static life-time
+        let mut send = tx_buffer;
+        let mut receive = rx_buffer;
+
+        send.copy_from_slice(&[0xde, 0xad, 0xbe, 0xef]);
+
+        let transfer = spi.dma_transfer(&mut send, &mut receive).unwrap();
+        transfer.wait().unwrap();
+        assert_eq!(send[0], receive[0]);
+    }
+
+    #[test]
+    #[timeout(3)]
+    fn test_symestric_dma_transfer_huge_buffer() {
+        const DMA_BUFFER_SIZE: usize = 4096;
+
+        let peripherals = Peripherals::take();
+        let system = peripherals.SYSTEM.split();
+        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+
+        let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+        let sclk = io.pins.gpio0;
+        let miso = io.pins.gpio2;
+        let mosi = io.pins.gpio4;
+        let cs = io.pins.gpio5;
+
+        let dma = Dma::new(peripherals.DMA);
+
+        #[cfg(any(feature = "esp32", feature = "esp32s2"))]
+        let dma_channel = dma.spi2channel;
+        #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
+        let dma_channel = dma.channel0;
+
+        let (tx_buffer, mut tx_descriptors, rx_buffer, mut rx_descriptors) =
+            dma_buffers!(DMA_BUFFER_SIZE);
+
+        let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &clocks)
+            .with_pins(Some(sclk), Some(mosi), Some(miso), Some(cs))
+            .with_dma(dma_channel.configure(
+                false,
+                &mut tx_descriptors,
+                &mut rx_descriptors,
+                DmaPriority::Priority0,
+            ));
+
+        // DMA buffer require a static life-time
+        let mut send = tx_buffer;
+        let mut receive = rx_buffer;
+
+        send.copy_from_slice(&[0x55u8; 4096]);
+        for byte in 0..send.len() {
+            send[byte] = byte as u8;
+        }
 
         let transfer = spi.dma_transfer(&mut send, &mut receive).unwrap();
         transfer.wait().unwrap();
