@@ -62,7 +62,8 @@ mod tests {
     }
 
     #[test]
-    fn test_symestric_transfer(mut ctx: Context) {
+    #[timeout(3)]
+    fn test_symmetric_transfer(mut ctx: Context) {
         let write = [0xde, 0xad, 0xbe, 0xef];
         let mut read: [u8; 4] = [0x00u8; 4];
 
@@ -72,7 +73,8 @@ mod tests {
     }
 
     #[test]
-    fn test_asymestric_transfer(mut ctx: Context) {
+    #[timeout(3)]
+    fn test_asymmetric_transfer(mut ctx: Context) {
         let write = [0xde, 0xad, 0xbe, 0xef];
         let mut read: [u8; 4] = [0x00; 4];
 
@@ -83,7 +85,8 @@ mod tests {
     }
 
     #[test]
-    fn test_symestric_transfer_huge_buffer(mut ctx: Context) {
+    #[timeout(3)]
+    fn test_symmetric_transfer_huge_buffer(mut ctx: Context) {
         let mut write = [0x55u8; 4096];
         for byte in 0..write.len() {
             write[byte] = byte as u8;
@@ -96,7 +99,7 @@ mod tests {
 
     #[test]
     #[timeout(3)]
-    fn test_symestric_transfer_huge_buffer_no_alloc(mut ctx: Context) {
+    fn test_symmetric_transfer_huge_buffer_no_alloc(mut ctx: Context) {
         let mut write = [0x55u8; 4096];
         for byte in 0..write.len() {
             write[byte] = byte as u8;
