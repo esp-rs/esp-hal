@@ -314,8 +314,8 @@ mod ehal1 {
         }
 
         fn set_duty_cycle(&mut self, mut duty: u16) -> Result<(), Self::Error> {
-			let max = self.max_duty_cycle();
-			duty = if duty > max { max } else { duty };
+            let max = self.max_duty_cycle();
+            duty = if duty > max { max } else { duty };
             self.set_duty_hw(duty.into());
             Ok(())
         }
