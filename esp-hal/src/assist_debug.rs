@@ -68,11 +68,11 @@ impl<'d> DebugAssist<'d> {
     pub fn enable_sp_monitor(&mut self, lower_bound: u32, upper_bound: u32) {
         self.debug_assist
             .core_0_sp_min()
-            .write(|w| w.core_0_sp_min().variant(lower_bound));
+            .write(|w| unsafe { w.core_0_sp_min().bits(lower_bound) });
 
         self.debug_assist
             .core_0_sp_max()
-            .write(|w| w.core_0_sp_max().variant(upper_bound));
+            .write(|w| unsafe { w.core_0_sp_max().bits(upper_bound) });
 
         self.debug_assist.core_0_montr_ena().modify(|_, w| {
             w.core_0_sp_spill_min_ena()
@@ -151,11 +151,11 @@ impl<'d> DebugAssist<'d> {
     pub fn enable_core1_sp_monitor(&mut self, lower_bound: u32, upper_bound: u32) {
         self.debug_assist
             .core_1_sp_min
-            .write(|w| w.core_1_sp_min().variant(lower_bound));
+            .write(|w| w.core_1_sp_min().bits(lower_bound));
 
         self.debug_assist
             .core_1_sp_max
-            .write(|w| w.core_1_sp_max().variant(upper_bound));
+            .write(|w| w.core_1_sp_max().bits(upper_bound));
 
         self.debug_assist.core_1_montr_ena.modify(|_, w| {
             w.core_1_sp_spill_min_ena()
@@ -237,11 +237,11 @@ impl<'d> DebugAssist<'d> {
     ) {
         self.debug_assist
             .core_0_area_dram0_0_min()
-            .write(|w| w.core_0_area_dram0_0_min().variant(lower_bound));
+            .write(|w| unsafe { w.core_0_area_dram0_0_min().bits(lower_bound) });
 
         self.debug_assist
             .core_0_area_dram0_0_max()
-            .write(|w| w.core_0_area_dram0_0_max().variant(upper_bound));
+            .write(|w| unsafe { w.core_0_area_dram0_0_max().bits(upper_bound) });
 
         self.debug_assist.core_0_montr_ena().modify(|_, w| {
             w.core_0_area_dram0_0_rd_ena()
@@ -314,11 +314,11 @@ impl<'d> DebugAssist<'d> {
     ) {
         self.debug_assist
             .core_0_area_dram0_1_min()
-            .write(|w| w.core_0_area_dram0_1_min().variant(lower_bound));
+            .write(|w| unsafe { w.core_0_area_dram0_1_min().bits(lower_bound) });
 
         self.debug_assist
             .core_0_area_dram0_1_max()
-            .write(|w| w.core_0_area_dram0_1_max().variant(upper_bound));
+            .write(|w| unsafe { w.core_0_area_dram0_1_max().bits(upper_bound) });
 
         self.debug_assist.core_0_montr_ena().modify(|_, w| {
             w.core_0_area_dram0_1_rd_ena()
@@ -403,11 +403,11 @@ impl<'d> DebugAssist<'d> {
     ) {
         self.debug_assist
             .core_1_area_dram0_0_min()
-            .write(|w| w.core_1_area_dram0_0_min().variant(lower_bound));
+            .write(|w| unsafe { w.core_1_area_dram0_0_min().bits(lower_bound) });
 
         self.debug_assist
             .core_1_area_dram0_0_max()
-            .write(|w| w.core_1_area_dram0_0_max().variant(upper_bound));
+            .write(|w| unsafe { w.core_1_area_dram0_0_max().bits(upper_bound) });
 
         self.debug_assist.core_1_montr_ena().modify(|_, w| {
             w.core_1_area_dram0_0_rd_ena()
@@ -480,11 +480,11 @@ impl<'d> DebugAssist<'d> {
     ) {
         self.debug_assist
             .core_1_area_dram0_1_min()
-            .write(|w| w.core_1_area_dram0_1_min().variant(lower_bound));
+            .write(|w| unsafe { w.core_1_area_dram0_1_min().bits(lower_bound) });
 
         self.debug_assist
             .core_1_area_dram0_1_max()
-            .write(|w| w.core_1_area_dram0_1_max().variant(upper_bound));
+            .write(|w| unsafe { w.core_1_area_dram0_1_max().bits(upper_bound) });
 
         self.debug_assist.core_1_montr_ena().modify(|_, w| {
             w.core_1_area_dram0_1_rd_ena()

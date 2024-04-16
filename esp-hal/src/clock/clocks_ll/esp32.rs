@@ -60,7 +60,7 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock
         // Raise the voltage, if needed
         rtc_cntl
             .reg()
-            .modify(|_, w| w.dig_dbias_wak().variant(DIG_DBIAS_80M_160M as u8));
+            .modify(|_, w| unsafe { w.dig_dbias_wak().bits(DIG_DBIAS_80M_160M as u8) });
 
         // Configure 320M PLL
         match xtal_freq {
@@ -98,7 +98,7 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock
         // Raise the voltage
         rtc_cntl
             .reg()
-            .modify(|_, w| w.dig_dbias_wak().variant(dig_dbias_240_m as u8));
+            .modify(|_, w| unsafe { w.dig_dbias_wak().bits(dig_dbias_240_m as u8) });
 
         // Configure 480M PLL
         match xtal_freq {
@@ -176,6 +176,7 @@ pub(crate) fn esp32_rtc_update_to_xtal(freq: XtalClock, _div: u32) {
     unsafe {
         let value = (((freq.hz()) >> 12) & UINT16_MAX) | ((((freq.hz()) >> 12) & UINT16_MAX) << 16);
         esp32_update_cpu_freq(freq.hz());
+
         // set divider from XTAL to APB clock
         apb_cntl.sysclk_conf().modify(|_, w| {
             w.pre_div_cnt()
@@ -183,9 +184,10 @@ pub(crate) fn esp32_rtc_update_to_xtal(freq: XtalClock, _div: u32) {
         });
 
         // adjust ref_tick
-        apb_cntl.xtal_tick_conf().as_ptr().write_volatile(
-            ((freq.hz()) / REF_CLK_FREQ - 1) | apb_cntl.xtal_tick_conf().as_ptr().read_volatile(),
-        ); // TODO make it RW in SVD
+        apb_cntl.xtal_tick_conf().modify(|_, w| {
+            w.xtal_tick_num()
+                .bits(((freq.hz()) / REF_CLK_FREQ - 1) as u8)
+        });
 
         // switch clock source
         rtc_cntl.clk_conf().modify(|_, w| w.soc_clk_sel().xtal());
@@ -194,7 +196,7 @@ pub(crate) fn esp32_rtc_update_to_xtal(freq: XtalClock, _div: u32) {
         // lower the voltage
         rtc_cntl
             .reg()
-            .modify(|_, w| w.dig_dbias_wak().variant(DIG_DBIAS_XTAL as u8));
+            .modify(|_, w| w.dig_dbias_wak().bits(DIG_DBIAS_XTAL as u8));
     }
 }
 
@@ -236,7 +238,7 @@ pub(crate) fn set_cpu_freq(cpu_freq_mhz: crate::clock::CpuClock) {
             .write(|w| w.cpuperiod_sel().bits(per_conf as u8));
         rtc_cntl
             .reg()
-            .modify(|_, w| w.dig_dbias_wak().variant(dbias as u8));
+            .modify(|_, w| w.dig_dbias_wak().bits(dbias as u8));
         rtc_cntl.clk_conf().modify(|_, w| w.soc_clk_sel().pll());
         rtc_cntl.store5().modify(|_, w| w.scratch5().bits(value));
 

@@ -274,7 +274,6 @@ pub struct Clocks<'d> {
     pub pll_48m_clock: HertzU32,
     #[cfg(esp32h2)]
     pub pll_96m_clock: HertzU32,
-    // TODO chip specific additional ones as needed
 }
 
 #[doc(hidden)]
@@ -325,7 +324,6 @@ pub struct RawClocks {
     pub pll_48m_clock: HertzU32,
     #[cfg(esp32h2)]
     pub pll_96m_clock: HertzU32,
-    // TODO chip specific additional ones as needed
 }
 
 /// Used to configure the frequencies of the clocks present in the chip.

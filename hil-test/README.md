@@ -28,23 +28,27 @@ cargo install probe-rs \
 
 Target device **MUST** connected via its USB-Serial-JTAG port, or if unavailable (eg. ESP32, ESP32-C2, ESP32-S2) then you must connect a compatible debug probe such as an [ESP-Prog].
 
-You can run all test for a given device using:
+You can run all tests for a given device by running the following command from the `xtask` folder:
 
 ```shell
-cargo +nightly esp32c6
-# or
-cargo +esp esp32s3
+cargo xtask run-tests $CHIP
 ```
 
-For running a single test on a target:
+For running a single test on a target, from the `xtask` folder run:
 
+```shell
+# Run GPIO tests for ESP32-C6
+cargo xtask run-tests esp32c6 --test gpio
+```
+
+Another alternative way of running a single test is, from the `hil-tests` folder:
 ```shell
 # Run GPIO tests for ESP32-C6
 CARGO_BUILD_TARGET=riscv32imac-unknown-none-elf \
 PROBE_RS_CHIP=esp32c6 \
   cargo +nightly test --features=esp32c6 --test=gpio
 ```
-- If the `--test` argument is omitted, then all tests will be run.
+- If the `--test` argument is omitted, then all tests will be run, independently if the tests are supported for that target, for this reason, we encourage using the `xtask` approach.
 - The build target **MUST** be specified via the `CARGO_BUILD_TARGET` environment variable or as an argument (`--target`).
 - The chip **MUST** be specified via the `PROBE_RS_CHIP` environment variable or as an argument of `probe-rs` (`--chip`).
 
@@ -57,15 +61,19 @@ Our Virtual Machines have the following setup:
 - ESP32-C3 (`rustboard`):
   - Devkit: `ESP32-C3-DevKit-RUST-1` connected via USB-Serial-JTAG.
     - `GPIO2` and `GPIO4` are connected.
-  - VM: Configured with the following [setup](#vm-setup)
+  - VM: Ubuntu 20.04.5 configured with the following [setup](#vm-setup)
 - ESP32-C6 (`esp32c6-usb`):
   - Devkit: `ESP32-C6-DevKitC-1 V1.2` connected via USB-Serial-JTAG (`USB` port).
     - `GPIO2` and `GPIO4` are connected.
-  - VM: Configured with the following [setup](#vm-setup)
+  - VM: Ubuntu 20.04.5 configured with the following [setup](#vm-setup)
 - ESP32-H2 (`esp32h2-usb`):
   - Devkit: `ESP32-H2-DevKitM-1` connected via USB-Serial-JTAG (`USB` port).
     - `GPIO2` and `GPIO4` are connected.
-  - VM: Configured with the following [setup](#vm-setup)
+  - VM: Ubuntu 20.04.5 configured with the following [setup](#vm-setup)
+- ESP32-S3 (`esp32s3-usb`):
+  - Devkit: `ESP32-S3-DevKitC-1` connected via USB-Serial-JTAG.
+    - `GPIO2` and `GPIO4` are connected.
+  - VM: Ubuntu 22.04.4 configured with the following [setup](#vm-setup)
 
 [`hil.yml`]: https://github.com/esp-rs/esp-hal/blob/main/.github/workflows/hil.yml
 
@@ -84,6 +92,7 @@ wget -O - https://probe.rs/files/69-probe-rs.rules | sudo tee /etc/udev/rules.d/
 # Add the user to plugdev group
 sudo usermod -a -G plugdev $USER
 # Reboot the VM
+sudo reboot
 ```
 
 ## Adding New Tests
@@ -92,4 +101,11 @@ sudo usermod -a -G plugdev $USER
 2. Add a corresponding `[[test]]` entry to `Cargol.toml` (**MUST** set `harness = false`)
 3. Write the tests
 4. Document any necessary physical connections on boards connected to self-hosted runners
-5. Write some documentation at the top of the `tests/$PERIPHERAL.rs` file with the pins being used and the required connections, if applicable.
+5. Add a header in the test stating which targets support the given tests. Eg:
+```rust
+//! AES Test
+
+//% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+```
+If the test is supported by all the targets, you can omit the header.
+6. Write some documentation at the top of the `tests/$PERIPHERAL.rs` file with the pins being used and the required connections, if applicable.

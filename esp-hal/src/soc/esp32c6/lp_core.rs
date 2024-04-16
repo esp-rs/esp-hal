@@ -168,7 +168,7 @@ fn ulp_lp_core_run(wakeup_src: LpCoreWakeupSource) {
         LpCoreWakeupSource::HpCpu => 0x01,
     };
     pmu.lp_cpu_pwr1()
-        .modify(|_, w| w.lp_cpu_wakeup_en().variant(src));
+        .modify(|_, w| unsafe { w.lp_cpu_wakeup_en().bits(src) });
 
     // Enable JTAG debugging
     lp_peri

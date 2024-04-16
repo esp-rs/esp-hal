@@ -256,7 +256,6 @@ pub enum OutputSignal {
     GPIO             = 128,
 }
 
-// FIXME: add alternate function numbers/signals where necessary
 crate::gpio::gpio! {
     (0, 0, InputOutputAnalog (2 => FSPIQ) (2 => FSPIQ))
     (1, 0, InputOutputAnalog (2 => FSPICS0) (2 => FSPICS0))

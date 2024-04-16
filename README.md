@@ -56,7 +56,6 @@ There are a number of other crates within the [esp-rs organization] which can be
 
 |      Crate       |                                  Description                                   |
 | :--------------: | :----------------------------------------------------------------------------: |
-|   [esp-alloc]    |                        A simple `no_std` heap allocator                        |
 | [esp-backtrace]  |                 Backtrace support for bare-metal applications                  |
 | [esp-ieee802154] |          Low-level IEEE802.15.4 driver for the ESP32-C6 and ESP32-H2           |
 | [esp-openthread] |           A bare-metal Thread implementation using `esp-ieee802154`            |

@@ -41,21 +41,6 @@ pub(crate) fn check_attr_whitelist(
     Ok(())
 }
 
-pub(crate) fn extract_cfgs(attrs: Vec<Attribute>) -> (Vec<Attribute>, Vec<Attribute>) {
-    let mut cfgs = vec![];
-    let mut not_cfgs = vec![];
-
-    for attr in attrs {
-        if eq(&attr, "cfg") {
-            cfgs.push(attr);
-        } else {
-            not_cfgs.push(attr);
-        }
-    }
-
-    (cfgs, not_cfgs)
-}
-
 /// Returns `true` if `attr.path` matches `name`
 fn eq(attr: &Attribute, name: &str) -> bool {
     attr.style == AttrStyle::Outer && attr.path().is_ident(name)

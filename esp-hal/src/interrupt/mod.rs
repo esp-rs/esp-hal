@@ -1,54 +1,55 @@
 //! # Interrupt support
 //!
-//! Interrupt support functionality depends heavily on the features enabled.
+//! Usually peripheral drivers offer a mechanism to register your interrupt
+//! handler. e.g. the systimer offers `set_interrupt_handler` to register a
+//! handler for a specific alarm. Other drivers might take an interrupt handler
+//! as an optional parameter to their constructor.
 //!
-//! The [`enable`] method will map interrupt to a CPU interrupt, and handle the
-//! vectoring to the peripheral interrupt, for example `UART0`.
+//! This is the preferred way to register handlers.
 //!
-//! It is also possible, but not recommended, to bind an interrupt directly to a
-//! CPU interrupt. This can offer lower latency, at the cost of more complexity
-//! in the interrupt handler.
-//!
-//! We reserve a number of CPU interrupts, which cannot be used; see
-//! [`RESERVED_INTERRUPTS`].
-//!
-//! ## Example
+//! ## Example using the peripheral driver to register an interrupt handler
 //!
 //! ```no_run
 //! #[entry]
 //! fn main() -> ! {
-//!     ...
-//!     critical_section::with(|cs| SWINT.borrow_ref_mut(cs).replace(sw_int));
-//!
-//!     // enable the interrupt
-//!     interrupt::enable(
-//!         peripherals::Interrupt::FROM_CPU_INTR0,
-//!         interrupt::Priority::Priority1,
-//!     )
-//!     .unwrap();
+//! ...
+//!     let mut sw_int = system.software_interrupt_control;
+//!     critical_section::with(|cs| {
+//!         sw_int
+//!            .software_interrupt0
+//!            .set_interrupt_handler(swint0_handler);
+//!         SWINT0
+//!            .borrow_ref_mut(cs)
+//!            .replace(sw_int.software_interrupt0);
+//!     });
 //!
 //!     // trigger the interrupt
-//!     SWINT
-//!        .borrow_ref_mut(cs)
-//!        .as_mut()
-//!        .unwrap()
-//!        .raise(SoftwareInterrupt::SoftwareInterrupt0);
-//!
-//!     loop {}
+//!     critical_section::with(|cs| {
+//!         SWINT0.borrow_ref_mut(cs).as_mut().unwrap().raise();
+//!     });
+//! ...
 //! }
 //!
-//! #[interrupt]
-//! fn FROM_CPU_INTR0() {
+//! // use the `handler` macro to define a handler, optionally you can set a priority
+//! #[handler(priority = esp_hal::interrupt::Priority::Priority2)]
+//! fn swint0_handler() {
 //!     esp_println::println!("SW interrupt0");
 //!     critical_section::with(|cs| {
-//!         SWINT
-//!             .borrow_ref_mut(cs)
-//!             .as_mut()
-//!             .unwrap()
-//!             .reset(SoftwareInterrupt::SoftwareInterrupt0);
+//!         SWINT0.borrow_ref_mut(cs).as_mut().unwrap().reset();
 //!     });
-//! }
 //! ```
+//!
+//! There are additional ways to register interrupt handlers which are generally
+//! only meant to be used in very special situations (mostly internal to the HAL
+//! or the supporting libraries). Those are outside the scope of this
+//! documentation.
+//!
+//! It is even possible, but not recommended, to bind an interrupt directly to a
+//! CPU interrupt. This can offer lower latency, at the cost of more complexity
+//! in the interrupt handler. See the `direct_vectoring.rs` example
+//!
+//! We reserve a number of CPU interrupts, which cannot be used; see
+//! [`RESERVED_INTERRUPTS`].
 
 #[cfg(riscv)]
 pub use self::riscv::*;

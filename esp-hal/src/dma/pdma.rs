@@ -54,12 +54,12 @@ macro_rules! ImplSpiChannel {
                             2 => {
                                 dport
                                 .spi_dma_chan_sel()
-                                .modify(|_, w| w.spi2_dma_chan_sel().variant(1));
+                                .modify(|_, w| unsafe { w.spi2_dma_chan_sel().bits(1) });
                             },
                             3 => {
                                 dport
                                 .spi_dma_chan_sel()
-                                .modify(|_, w| w.spi3_dma_chan_sel().variant(2));
+                                .modify(|_, w| unsafe { w.spi3_dma_chan_sel().bits(2) });
                             },
                             _ => panic!("Only SPI2 and SPI3 supported"),
                         }

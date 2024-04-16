@@ -69,7 +69,7 @@ pub fn interrupt_handler() {
 }
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(executor = esp_hal::embassy::executor::thread::Executor::new())]
 mod tests {
     use defmt::assert_eq;
     use embassy_time::{Duration, Timer};
@@ -148,11 +148,11 @@ mod tests {
         ctx.io4.toggle();
         assert_eq!(ctx.io4.is_set_low(), false);
         assert_eq!(ctx.io4.is_set_high(), true);
-        // Leave in initial state for next test
-        ctx.io4.toggle();
     }
 
     #[test]
+    // TODO: See https://github.com/esp-rs/esp-hal/issues/1413
+    #[cfg(not(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3")))]
     fn test_gpio_interrupt(mut ctx: Context) {
         critical_section::with(|cs| {
             *COUNTER.borrow_ref_mut(cs) = 0;

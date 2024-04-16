@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add TWAI support for ESP32-C6 (#1323)
 - `GpioPin::steal` unsafe API (#1363)
 - Inherent implementions of GPIO pin `set_low`, `is_low`, etc.
+- Warn users when attempting to build using the `dev` profile (#1420)
+- Async uart now reports interrupt errors(overflow, glitch, frame error, parity) back to user of read/write. uart clock decimal part configured for c2,c3,s3 (#1168, #1445)
 
 ### Fixed
 
@@ -34,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed writes to SPI not flushing before attempting to write, causing corrupted writes (#1381)
 - fix AdcConfig::adc_calibrate for xtensa targets (#1379)
 - Fixed a divide by zero panic when setting the LEDC duty cycle to 0 with `SetDutyCycle::set_duty_cycle` (#1403)
+- Support 192 and 256-bit keys for AES (#1316)
 - Fixed MCPWM DeadTimeCfg bit values (#1378)
 
 ### Changed

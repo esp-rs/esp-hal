@@ -287,9 +287,9 @@ fn modem_clock_hal_select_wifi_lpclk_source(src: ModemClockLpclkSource) {
             | ModemClockLpclkSource::RcFast
             | ModemClockLpclkSource::MainXtal => w,
 
-            ModemClockLpclkSource::RC32K => w.clk_modem_32k_sel().variant(1),
-            ModemClockLpclkSource::XTAL32K => w.clk_modem_32k_sel().variant(0),
-            ModemClockLpclkSource::EXT32K => w.clk_modem_32k_sel().variant(2),
+            ModemClockLpclkSource::RC32K => w.clk_modem_32k_sel().bits(1),
+            ModemClockLpclkSource::XTAL32K => w.clk_modem_32k_sel().bits(0),
+            ModemClockLpclkSource::EXT32K => w.clk_modem_32k_sel().bits(2),
         });
     }
 }
@@ -303,7 +303,6 @@ fn modem_lpcon_ll_set_wifi_lpclk_divisor_value(divider: u16) {
 }
 
 fn modem_clock_hal_enable_wifipwr_clock(enable: bool) {
-    // FIXME: esp-idf uses refcounting here for later revisions.
     unsafe {
         modem_lpcon()
             .clk_conf()
@@ -1811,16 +1810,20 @@ impl RtcClock {
         let timg0 = unsafe { crate::peripherals::TIMG0::steal() };
         while timg0.rtccalicfg().read().rtc_cali_rdy().bit_is_clear() {}
 
-        timg0.rtccalicfg().modify(|_, w| {
+        timg0.rtccalicfg().modify(|_, w| unsafe {
             w.rtc_cali_clk_sel()
-                .variant(0) // RTC_SLOW_CLK
+                .bits(0) // RTC_SLOW_CLK
                 .rtc_cali_max()
-                .variant(100)
+                .bits(100)
                 .rtc_cali_start_cycling()
                 .clear_bit()
                 .rtc_cali_start()
                 .set_bit()
         });
+        timg0
+            .rtccalicfg()
+            .modify(|_, w| w.rtc_cali_start().set_bit());
+
         while timg0.rtccalicfg().read().rtc_cali_rdy().bit_is_clear() {}
 
         (timg0.rtccalicfg1().read().rtc_cali_value().bits()

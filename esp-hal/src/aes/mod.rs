@@ -37,10 +37,10 @@
 //!
 //! ```no_run
 //! let mut block = block_buf.clone();
-//! aes.process(&mut block, Mode::Encryption128, &keybuf);
+//! aes.process(&mut block, Mode::Encryption128, keybuf);
 //! let hw_encrypted = block.clone();
 //!
-//! aes.process(&mut block, Mode::Decryption128, &keybuf);
+//! aes.process(&mut block, Mode::Decryption128, keybuf);
 //! let hw_decrypted = block;
 //! ```
 //!
@@ -100,7 +100,7 @@
 //!         keybuf,
 //!     )
 //!     .unwrap();
-//! let (hw_encrypted, plaintext, aes) = transfer.wait().unwrap();
+//! transfer.wait().unwrap();
 //! ```
 
 #[cfg(esp32)]
@@ -122,10 +122,64 @@ mod aes_spec_impl;
 
 const ALIGN_SIZE: usize = core::mem::size_of::<u32>();
 
+/// Represents the various key sizes allowed for AES encryption and decryption.
+pub enum Key {
+    /// 128-bit AES key
+    Key16([u8; 16]),
+    /// 192-bit AES key
+    #[cfg(any(feature = "esp32", feature = "esp32s2"))]
+    Key24([u8; 24]),
+    /// 256-bit AES key
+    Key32([u8; 32]),
+}
+
+// Implementing From for easy conversion from array to Key enum.
+impl From<[u8; 16]> for Key {
+    fn from(key: [u8; 16]) -> Self {
+        Key::Key16(key)
+    }
+}
+
+#[cfg(any(feature = "esp32", feature = "esp32s2"))]
+impl From<[u8; 24]> for Key {
+    fn from(key: [u8; 24]) -> Self {
+        Key::Key24(key)
+    }
+}
+
+impl From<[u8; 32]> for Key {
+    fn from(key: [u8; 32]) -> Self {
+        Key::Key32(key)
+    }
+}
+
+impl Key {
+    /// Returns a slice representation of the AES key.
+    fn as_slice(&self) -> &[u8] {
+        match self {
+            Key::Key16(ref key) => key,
+            #[cfg(any(feature = "esp32", feature = "esp32s2"))]
+            Key::Key24(ref key) => key,
+            Key::Key32(ref key) => key,
+        }
+    }
+}
+
+/// Defines the operating modes for AES encryption and decryption.
 pub enum Mode {
+    /// Encryption mode with 128-bit key
     Encryption128 = 0,
+    /// Encryption mode with 192-bit key
+    #[cfg(any(esp32, esp32s2))]
+    Encryption192 = 1,
+    /// Encryption mode with 256-bit key
     Encryption256 = 2,
+    /// Decryption mode with 128-bit key
     Decryption128 = 4,
+    /// Decryption mode with 192-bit key
+    #[cfg(any(esp32, esp32s2))]
+    Decryption192 = 5,
+    /// Decryption mode with 256-bit key
     Decryption256 = 6,
 }
 
@@ -137,6 +191,7 @@ pub struct Aes<'d> {
 }
 
 impl<'d> Aes<'d> {
+    /// Constructs a new `Aes` instance.
     pub fn new(aes: impl Peripheral<P = AES> + 'd) -> Self {
         crate::into_ref!(aes);
         let mut ret = Self {
@@ -150,8 +205,12 @@ impl<'d> Aes<'d> {
     }
 
     /// Encrypts/Decrypts the given buffer based on `mode` parameter
-    pub fn process(&mut self, block: &mut [u8; 16], mode: Mode, key: &[u8; 16]) {
-        self.write_key(key);
+    pub fn process<K>(&mut self, block: &mut [u8; 16], mode: Mode, key: K)
+    where
+        K: Into<Key>,
+    {
+        // Convert from into Key enum
+        self.write_key(key.into().as_slice());
         self.set_mode(mode as u8);
         self.set_block(block);
         self.start();
@@ -240,12 +299,18 @@ pub enum Endianness {
     LittleEndian = 0,
 }
 
+/// Provides DMA (Direct Memory Access) support for AES operations.
+///
+/// This module enhances the AES capabilities by utilizing DMA to handle data
+/// transfer, which can significantly speed up operations when dealing with
+/// large data volumes. It supports various cipher modes such as ECB, CBC, OFB,
+/// CTR, CFB8, and CFB128.
 #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
 pub mod dma {
     use embedded_dma::{ReadBuffer, WriteBuffer};
 
     use crate::{
-        aes::Mode,
+        aes::{Key, Mode},
         dma::{
             AesPeripheral,
             Channel,
@@ -260,12 +325,19 @@ pub mod dma {
 
     const ALIGN_SIZE: usize = core::mem::size_of::<u32>();
 
+    /// Specifies the block cipher modes available for AES operations.
     pub enum CipherMode {
+        /// Electronic Codebook Mode
         Ecb = 0,
+        /// Cipher Block Chaining Mode
         Cbc,
+        /// Output Feedback Mode
         Ofb,
+        /// Counter Mode.
         Ctr,
+        /// Cipher Feedback Mode with 8-bit shifting.
         Cfb8,
+        /// Cipher Feedback Mode with 128-bit shifting.
         Cfb128,
     }
 
@@ -370,12 +442,20 @@ pub mod dma {
         C: ChannelTypes,
         C::P: AesPeripheral,
     {
-        pub fn write_key(&mut self, key: &[u8]) {
-            debug_assert!(key.len() <= 8 * ALIGN_SIZE);
-            debug_assert_eq!(key.len() % ALIGN_SIZE, 0);
-            self.aes.write_key(key);
+        /// Writes the encryption key to the AES hardware, checking that its
+        /// length matches expected constraints.
+        pub fn write_key<K>(&mut self, key: K)
+        where
+            K: Into<Key>,
+        {
+            let key = key.into(); // Convert into Key enum
+            debug_assert!(key.as_slice().len() <= 8 * ALIGN_SIZE);
+            debug_assert_eq!(key.as_slice().len() % ALIGN_SIZE, 0);
+            self.aes.write_key(key.as_slice());
         }
 
+        /// Writes a block of data to the AES hardware, ensuring the block's
+        /// length is properly aligned.
         pub fn write_block(&mut self, block: &[u8]) {
             debug_assert_eq!(block.len(), 4 * ALIGN_SIZE);
             self.aes.write_key(block);
@@ -386,15 +466,16 @@ pub mod dma {
         /// This will return a [AesDmaTransferRxTx] owning the buffer(s) and the
         /// AES instance. The maximum amount of data to be sent/received
         /// is 32736 bytes.
-        pub fn process<'t, TXBUF, RXBUF>(
+        pub fn process<'t, K, TXBUF, RXBUF>(
             &'t mut self,
             words: &'t TXBUF,
             read_buffer: &'t mut RXBUF,
             mode: Mode,
             cipher_mode: CipherMode,
-            key: [u8; 16],
+            key: K,
         ) -> Result<AesDmaTransferRxTx<'t, 'd, C>, crate::dma::DmaError>
         where
+            K: Into<Key>,
             TXBUF: ReadBuffer<Word = u8>,
             RXBUF: WriteBuffer<Word = u8>,
         {
@@ -408,14 +489,14 @@ pub mod dma {
                 read_len,
                 mode,
                 cipher_mode,
-                key,
+                key.into(),
             )?;
 
             Ok(AesDmaTransferRxTx { aes_dma: self })
         }
 
         #[allow(clippy::too_many_arguments)]
-        fn start_transfer_dma(
+        fn start_transfer_dma<K>(
             &mut self,
             write_buffer_ptr: *const u8,
             write_buffer_len: usize,
@@ -423,8 +504,11 @@ pub mod dma {
             read_buffer_len: usize,
             mode: Mode,
             cipher_mode: CipherMode,
-            key: [u8; 16],
-        ) -> Result<(), crate::dma::DmaError> {
+            key: K,
+        ) -> Result<(), crate::dma::DmaError>
+        where
+            K: Into<Key>,
+        {
             // AES has to be restarted after each calculation
             self.reset_aes();
 
@@ -453,7 +537,7 @@ pub mod dma {
             self.enable_interrupt();
             self.set_mode(mode);
             self.set_cipher_mode(cipher_mode);
-            self.write_key(&key);
+            self.write_key(key.into());
 
             // TODO: verify 16?
             self.set_num_block(16);
@@ -464,7 +548,7 @@ pub mod dma {
         }
 
         #[cfg(any(esp32c3, esp32s3))]
-        pub fn reset_aes(&self) {
+        fn reset_aes(&self) {
             unsafe {
                 let s = crate::peripherals::SYSTEM::steal();
                 s.perip_rst_en1()
@@ -475,7 +559,7 @@ pub mod dma {
         }
 
         #[cfg(any(esp32c6, esp32h2))]
-        pub fn reset_aes(&self) {
+        fn reset_aes(&self) {
             unsafe {
                 let s = crate::peripherals::PCR::steal();
                 s.aes_conf().modify(|_, w| w.aes_rst_en().set_bit());
@@ -498,7 +582,7 @@ pub mod dma {
             self.aes.aes.int_ena().write(|w| w.int_ena().set_bit());
         }
 
-        pub fn set_cipher_mode(&self, mode: CipherMode) {
+        fn set_cipher_mode(&self, mode: CipherMode) {
             self.aes
                 .aes
                 .block_mode()
@@ -512,20 +596,21 @@ pub mod dma {
             }
         }
 
-        pub fn set_mode(&self, mode: Mode) {
+        fn set_mode(&self, mode: Mode) {
             self.aes
                 .aes
                 .mode()
-                .modify(|_, w| w.mode().variant(mode as u8));
+                .modify(|_, w| unsafe { w.mode().bits(mode as u8) });
         }
 
         fn start_transform(&self) {
             self.aes.aes.trigger().write(|w| w.trigger().set_bit());
         }
 
-        pub fn finish_transform(&self) {
+        fn finish_transform(&self) {
             self.aes.aes.dma_exit().write(|w| w.dma_exit().set_bit());
             self.enable_dma(false);
+            self.reset_aes();
         }
 
         fn set_num_block(&self, block: u32) {

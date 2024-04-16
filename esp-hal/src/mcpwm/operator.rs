@@ -194,9 +194,9 @@ impl<const OP: u8, PWM: PwmPeripheral> Operator<OP, PWM> {
         // We only write to our OPERATORx_TIMERSEL register
         let block = unsafe { &*PWM::block() };
         block.operator_timersel().modify(|_, w| match OP {
-            0 => w.operator0_timersel().variant(TIM),
-            1 => w.operator1_timersel().variant(TIM),
-            2 => w.operator2_timersel().variant(TIM),
+            0 => unsafe { w.operator0_timersel().bits(TIM) },
+            1 => unsafe { w.operator1_timersel().bits(TIM) },
+            2 => unsafe { w.operator2_timersel().bits(TIM) },
             _ => {
                 unreachable!()
             }

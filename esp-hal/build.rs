@@ -10,6 +10,15 @@ use std::{
 use esp_build::assert_unique_used_features;
 use esp_metadata::{Chip, Config};
 
+#[cfg(debug_assertions)]
+esp_build::warning! {"
+WARNING: use --release
+  We *strongly* recommend using release profile when building esp-hal.
+  The dev profile can potentially be one or more orders of magnitude
+  slower than release, and may cause issues with timing-senstive
+  peripherals and/or devices.
+"}
+
 fn main() -> Result<(), Box<dyn Error>> {
     // NOTE: update when adding new device support!
     // Ensure that exactly one chip has been specified:
