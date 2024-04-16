@@ -183,9 +183,9 @@ pub(crate) fn esp32_rtc_update_to_xtal(freq: XtalClock, _div: u32) {
         });
 
         // adjust ref_tick
-        apb_cntl.xtal_tick_conf().as_ptr().write_volatile(
-            ((freq.hz()) / REF_CLK_FREQ - 1) | apb_cntl.xtal_tick_conf().as_ptr().read_volatile(),
-        ); // TODO make it RW in SVD
+        apb_cntl
+            .xtal_tick_conf()
+            .modify(|_, w| w.xtal_tick_num().bits((freq.hz() / REF_CLK_FREQ - 1) as u8));
 
         // switch clock source
         rtc_cntl.clk_conf().modify(|_, w| w.soc_clk_sel().xtal());
