@@ -2061,7 +2061,9 @@ pub mod lp_uart {
         peripherals::{LP_CLKRST, LP_UART},
         uart::{config, config::Config},
     };
-    /// UART driver
+    /// LP-UART driver
+    ///
+    /// The driver uses XTAL as clock source.
     pub struct LpUart {
         uart: LP_UART,
     }
@@ -2173,7 +2175,6 @@ pub mod lp_uart {
         fn change_baud_internal(&mut self, baudrate: u32) {
             // we force the clock source to be XTAL and don't use the decimal part of
             // the divider
-            // TODO: Currently it's not possible to use XtalD2Clk
             let clk = 16_000_000;
             let max_div = 0b1111_1111_1111 - 1;
             let clk_div = ((clk) + (max_div * baudrate) - 1) / (max_div * baudrate);

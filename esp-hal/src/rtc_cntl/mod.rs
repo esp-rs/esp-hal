@@ -647,7 +647,6 @@ impl RtcClock {
         (100_000_000 * 1000 / period) as u16
     }
 
-    // TODO: implement for ESP32-C6, and H2
     /// Return estimated XTAL frequency in MHz.
     #[cfg(not(any(esp32c6, esp32h2)))]
     pub(crate) fn estimate_xtal_frequency() -> u32 {
