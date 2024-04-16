@@ -109,13 +109,9 @@ fn main() -> ! {
     );
     let sw_decrypted = block.clone();
 
-    assert!(eq(&sw_encrypted.into(), &hw_encrypted));
-    assert!(eq(&sw_decrypted.into(), &hw_decrypted));
+    assert!(&sw_encrypted as &[u8] == &hw_encrypted);
+    assert!(&sw_decrypted as &[u8] == &hw_decrypted);
 
     println!("done");
     loop {}
-}
-
-fn eq(slice1: &[u8; 16], slice2: &[u8; 16]) -> bool {
-    slice1.iter().zip(slice2.iter()).all(|(a, b)| a == b)
 }
