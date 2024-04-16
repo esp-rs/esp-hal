@@ -37,7 +37,7 @@ mod tests {
 
     #[test]
     #[timeout(3)]
-    fn test_symestric_dma_transfer() {
+    fn test_symmetric_dma_transfer() {
         const DMA_BUFFER_SIZE: usize = 4;
 
         let peripherals = Peripherals::take();
@@ -82,7 +82,7 @@ mod tests {
 
     #[test]
     #[timeout(3)]
-    fn test_asymestric_dma_transfer() {
+    fn test_asymmetric_dma_transfer() {
         let peripherals = Peripherals::take();
         let system = peripherals.SYSTEM.split();
         let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
@@ -124,7 +124,7 @@ mod tests {
 
     #[test]
     #[timeout(3)]
-    fn test_symestric_dma_transfer_huge_buffer() {
+    fn test_symmetric_dma_transfer_huge_buffer() {
         const DMA_BUFFER_SIZE: usize = 4096;
 
         let peripherals = Peripherals::take();
