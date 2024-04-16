@@ -7,6 +7,8 @@
 #![no_std]
 #![no_main]
 
+use core::ptr::addr_of_mut;
+
 use esp_backtrace as _;
 use esp_hal::{
     gpio::IO,
@@ -26,7 +28,7 @@ fn main() -> ! {
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
     let usb = USB::new(peripherals.USB0, io.pins.gpio19, io.pins.gpio20);
-    let usb_bus = UsbBus::new(usb, unsafe { &mut EP_MEMORY });
+    let usb_bus = UsbBus::new(usb, unsafe { &mut *addr_of_mut!(EP_MEMORY) });
 
     let mut serial = SerialPort::new(&usb_bus);
 
