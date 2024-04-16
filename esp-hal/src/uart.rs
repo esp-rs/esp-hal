@@ -555,7 +555,6 @@ where
         T::register_block()
             .conf0()
             .modify(|_, w| w.err_wr_mask().set_bit());
-        // TODO reset? https://github.com/espressif/esp-idf/blob/4d90eedb6ef32ff949c6f298a3d845f9f07bac92/components/hal/esp32s3/include/hal/uart_ll.h#L112
 
         // Reset Tx/Rx FIFOs
         serial.txfifo_reset();
@@ -1632,13 +1631,9 @@ mod asynch {
 
                     RxEvent::RxFifoOvf => interrupts_enabled.rxfifo_ovf().bit_is_clear(),
                     RxEvent::RxFifoTout => interrupts_enabled.rxfifo_tout().bit_is_clear(),
-                    RxEvent::RxGlitchDetected => {
-                        interrupts_enabled.glitch_det().bit_is_clear()
-                    }
+                    RxEvent::RxGlitchDetected => interrupts_enabled.glitch_det().bit_is_clear(),
                     RxEvent::RxFrameError => interrupts_enabled.frm_err().bit_is_clear(),
-                    RxEvent::RxParityError => {
-                        interrupts_enabled.parity_err().bit_is_clear()
-                    }
+                    RxEvent::RxParityError => interrupts_enabled.parity_err().bit_is_clear(),
                 };
                 if event_triggered {
                     events_triggered |= event;
@@ -1694,13 +1689,11 @@ mod asynch {
                     RxEvent::RxCmdCharDetected => {
                         int_ena.modify(|_, w| w.at_cmd_char_det().clear_bit())
                     }
-                    RxEvent::RxGlitchDetected => {
-                        int_ena.modify(|_, w| w.glitch_det().clear_bit())
-                    }
+                    RxEvent::RxGlitchDetected => int_ena.modify(|_, w| w.glitch_det().clear_bit()),
                     RxEvent::RxFrameError => int_ena.modify(|_, w| w.frm_err().clear_bit()),
-                    RxEvent::RxParityError => {
-                        int_ena.modify(|_, w| w.parity_err().clear_bit())
-                    }
+                    RxEvent::RxParityError => int_ena.modify(|_, w| w.parity_err().clear_bit()),
+                    RxEvent::RxFifoOvf => int_ena.modify(|_, w| w.rxfifo_ovf().clear_bit()),
+                    RxEvent::RxFifoTout => int_ena.modify(|_, w| w.rxfifo_tout().clear_bit()),
                 }
             }
         }
@@ -1916,16 +1909,9 @@ mod asynch {
                     events |= RxEvent::RxFifoTout;
                 }
                 let events_happened = UartRxFuture::<T>::new(events).await;
+                // always drain the fifo, if an error has occurred the data is lost
                 let read_bytes = self.drain_fifo(buf);
-                if read_bytes > 0 {
-                    // Unfortunately, the uart's rx-timeout counter counts up whenever there is
-                    // data in the fifo, even if the interrupt is disabled and the status bit
-                    // cleared. Since we do not drain the fifo in the interrupt handler, we need to
-                    // reset the counter here, after draining the fifo.
-                    T::register_block()
-                        .int_clr()
-                        .write(|w| w.rxfifo_tout().clear_bit_by_one());
-                }
+                // check error events
                 for event_happened in events_happened {
                     match event_happened {
                         RxEvent::RxFifoOvf => return Err(Error::RxFifoOvf),
@@ -1937,8 +1923,17 @@ mod asynch {
                         }
                     }
                 }
+                // Unfortunately, the uart's rx-timeout counter counts up whenever there is
+                // data in the fifo, even if the interrupt is disabled and the status bit
+                // cleared. Since we do not drain the fifo in the interrupt handler, we need to
+                // reset the counter here, after draining the fifo.
+                T::register_block()
+                    .int_clr()
+                    .write(|w| w.rxfifo_tout().clear_bit_by_one());
 
-                return Ok(read_bytes);
+                if read_bytes > 0 {
+                    return Ok(read_bytes);
+                }
             }
         }
     }
@@ -2010,8 +2005,7 @@ mod asynch {
             || interrupts.glitch_det().bit_is_set()
             || interrupts.frm_err().bit_is_set()
             || interrupts.parity_err().bit_is_set();
-        let tx_wake = interrupts.tx_done().bit_is_set()
-            || interrupts.txfifo_empty().bit_is_set();
+        let tx_wake = interrupts.tx_done().bit_is_set() || interrupts.txfifo_empty().bit_is_set();
         uart.int_clr().write(|w| unsafe { w.bits(interrupt_bits) });
         uart.int_ena()
             .modify(|r, w| unsafe { w.bits(r.bits() & !interrupt_bits) });
