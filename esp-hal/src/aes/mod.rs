@@ -97,7 +97,7 @@
 //!         hw_encrypted,
 //!         Mode::Encryption128,
 //!         CipherMode::Ecb,
-//!         keybuf,
+//!         &keybuf,
 //!     )
 //!     .unwrap();
 //! transfer.wait().unwrap();
@@ -197,7 +197,7 @@ impl<'d> Aes<'d> {
     }
 
     /// Encrypts/Decrypts the given buffer based on `mode` parameter
-    pub fn process(&mut self, block: &mut [u8; 16], mode: Mode, key: Key){
+    pub fn process(&mut self, block: &mut [u8; 16], mode: Mode, key: Key) {
         // Convert from Key enum to required byte slice
         self.write_key(key.as_slice());
         self.set_mode(mode as u8);
