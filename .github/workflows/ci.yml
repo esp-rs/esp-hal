@@ -307,21 +307,41 @@ jobs:
       - name: rustfmt (examples)
         run: cargo fmt --all --manifest-path=examples/Cargo.toml -- --check
 
-  riscv-hil:
-    name: HIL Test | ${{ matrix.soc }}
+  hil:
+    name: HIL Test | ${{ matrix.target.soc }}
     runs-on: ubuntu-latest
 
     strategy:
       fail-fast: false
       matrix:
-        soc: [esp32c3, esp32c6, esp32h2]
+        target:
+          # RISC-V devices:
+          - soc: esp32c3
+            rust-target: riscv32imc-unknown-none-elf
+          - soc: esp32c6
+            rust-target: riscv32imac-unknown-none-elf
+          - soc: esp32h2
+            rust-target: riscv32imac-unknown-none-elf
+          # Xtensa devices:
+          - soc: esp32s3
 
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@v1
+        # Install the Rust toolchain for RISC-V devices:
+
+      - if: ${{ !contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.target.soc) }}
+        uses: dtolnay/rust-toolchain@v1
         with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
+          target: ${{ matrix.target.rust-target }}
           toolchain: nightly
           components: rust-src
+      # Install the Rust toolchain for Xtensa devices:
+      - if: contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.target.soc)
+        uses: esp-rs/xtensa-toolchain@v1.5
+        with:
+          buildtargets: ${{ matrix.target.soc }}
+          default: true
+          ldproxy: false
+
       - uses: Swatinem/rust-cache@v2
-      - run: cargo xtask build-examples hil-test ${{ matrix.soc }}
+      - run: cargo xtask build-examples hil-test ${{ matrix.target.soc }}

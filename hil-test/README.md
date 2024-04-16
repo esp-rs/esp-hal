@@ -70,6 +70,10 @@ Our Virtual Machines have the following setup:
   - Devkit: `ESP32-H2-DevKitM-1` connected via USB-Serial-JTAG (`USB` port).
     - `GPIO2` and `GPIO4` are connected.
   - VM: Ubuntu 20.04.5 configured with the following [setup](#vm-setup)
+- ESP32-S3 (`esp32s3-usb`):
+  - Devkit: `ESP32-S3-DevKitC-1` connected via USB-Serial-JTAG.
+    - `GPIO2` and `GPIO4` are connected.
+  - VM: Ubuntu 22.04.4 configured with the following [setup](#vm-setup)
 
 [`hil.yml`]: https://github.com/esp-rs/esp-hal/blob/main/.github/workflows/hil.yml
 
@@ -87,7 +91,7 @@ cargo install probe-rs --git=https://github.com/probe-rs/probe-rs --rev=ddd59fa 
 wget -O - https://probe.rs/files/69-probe-rs.rules | sudo tee /etc/udev/rules.d/69-probe-rs.rules > /dev/null
 # Add the user to plugdev group
 sudo usermod -a -G plugdev $USER
-# Reboot the
+# Reboot the VM
 sudo reboot
 ```
 
